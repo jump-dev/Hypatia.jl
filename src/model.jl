@@ -113,10 +113,11 @@ function MOI.optimize!(mod::AlfonsoModel)
     # main loop
     iter = 0
     while iter < mod.maxiter
-        # check convergence criteria
+        #=
+        calculate convergence metrics, check criteria, print
+        =#
         cx = dot(c, x)
         by = dot(b, y)
-
         metr_P = norm(A*x - tau*b, Inf)/term_pres
         metr_D = norm(A'*y + s - tau*c, Inf)/term_dres  # TODO blas for A'*y?
         metr_G = abs(cx - by + kappa)/term_comp
@@ -136,15 +137,89 @@ function MOI.optimize!(mod::AlfonsoModel)
             break
         end
 
-        # print progress metrics
         if mod.verbose
             @printf("%d: pobj=%d pIn=%d dIn=%d gap=%d tau=%d kap=%d mu=%d\n", iter, metr_O, metr_P, metr_D, metr_A, tau, kappa, mu)
         end
 
+        #=
+        prediction phase: calculate prediction direction, perform line search
+        =#
         iter += 1
 
-        # predictor phase
-        (alphapred, betapred, predfail) = predstep(mod)
+        rhs = -vcat(A*x - b*tau, -A'*y + c*tau - s, dot(b, y) - dot(c, x) - kappa, s, kappa)
+        (dy, dx, dtau, ds, dkappa) = computenewtondirection(mod, rhs)
+
+        alpha = mod.alphapred
+        betaalpha = Inf
+        sa_innhd = false
+        alphaprevok = false
+        predfail = false
+
+        while true
+            sa_y = mod.y + alpha*dy
+            sa_x = mod.x + alpha*dx
+            sa_tau = mod.tau + alpha*dtau
+            sa_s = mod.s + alpha*ds
+            sa_kappa = mod.kappa + alpha*dkappa
+
+            (sa_in, sa_g, sa_H, sa_L) = gH(sa_x)
+
+            if sa_in
+                # primal iterate is inside the cone
+                sa_mu = (dot(sa_x, sa_s) + sa_tau*sa_kappa)/mod.gH_bnu
+                sa_psi = [sa_s; sa_kappa] + sa_mu*[sa_g; -1.0/sa_tau]
+                betaalpha = sqrt(sum(abs2, sa_L\sa_psi(1:end-1)) + (sa_tau*sa_psi[end])^2)/sa_mu
+                sa_innhd = (betaalpha < mod.beta)
+            end
+
+            if sa_in && sa_innhd
+                # iterate is inside the beta-neighborhood
+                if !alphaprevok || (alpha > mod.predlsmulti)
+                    # either the previous iterate was outside the beta-neighborhood or increasing alpha again will make it > 1
+                    if mod.predlinesearch
+                        mod.alphapred = alpha
+                    end
+                    break
+                end
+                alphaprevok = true
+                alphaprev = alpha
+                betaalphaprev = betaalpha
+                solnalphaprev = solnalpha
+                alpha = alpha/mod.predlsmulti
+            else
+                # iterate is outside the beta-neighborhood
+                if alphaprevok
+                    # previous iterate was in the beta-neighborhood
+                    alpha = alphaprev
+                    betaalpha = betaalphaprev
+                    solnalpha = solnalphaprev
+                    if mod.predlinesearch
+                        mod.alphapred = alpha
+                    end
+                    break
+                end
+
+                if alpha < mod.alphapredthreshold
+                    # last two iterates were outside the beta-neighborhood and alpha is very small, so predictor has failed
+                    predfail = true # predictor has failed
+                    alpha = 0.0
+                    betaalpha = Inf
+                    solnalpha = soln
+                    if mod.predlinesearch
+                        mod.alphapred = alpha
+                    end
+                    break
+                end
+
+                # alphaprev, betaalphaprev, solnalphaprev will not be used
+                alphaprevok = false
+                alphaprev = alpha
+                betaalphaprev = betaalpha
+                solnalphaprev = solnalpha
+                alpha = mod.predlsmulti*alpha
+            end
+        end
+
         alphapred[iter] = alphapred
         betapred[iter] = betapred
         if predfail
@@ -153,35 +228,78 @@ function MOI.optimize!(mod::AlfonsoModel)
             break
         end
 
-        # corrector phase
+        # skip correction phase if allowed and current iterate is in the eta-neighborhood
         etacorr[iter] = betapred[iter]
+        if mod.corrcheck && (etacorr[iter] <= mod.eta)
+            mu[iter] = mu
+            continue
+        end
+
+        #=
+        correction phase: perform correction steps
+        =#
         corrfail = false
-        # skip if allowed and current iterate is in the eta-neighborhood
-        if !mod.corrcheck || (etacorr[iter] > mod.eta)
-            for corriter in 1:mod.maxcorrsteps
-                # perform a correction step
-                corrfail = corrstep(mod)
-                if corrfail
-                    println("Corrector could not improve the solution; terminating")
+        for corriter in 1:mod.maxcorrsteps
+            # calculate correction direction
+            rhs = vcat(zeros(m+n+1), -soln_psi)
+            (dy, dx, dtau, ds, dkappa) = computenewtondirection(mod, rhs)
+
+            # perform line search to ensure next primal iterate remains inside the cone
+            alpha = mod.alphacorr
+            for lsiter in 1:mod.maxcorrlsiters
+                sa_y = y + alpha*dy
+                sa_x = x + alpha*dx
+                sa_tau = tau + alpha*dtau
+                sa_s = s + alpha*ds
+                sa_kappa = kappa + alpha*dkappa
+
+                (sa_in, sa_g, sa_H, sa_L) = gH(sa_x)
+
+
+
+
+
+
+
+                corrfail = !sa_in
+
+                # terminate line search if primal iterate is inside the cone
+                if sa_in
+                    sa_mu = (dot(sa_x, sa_s) + sa_tau*sa_kappa)/mod.gH_bnu
+                    sa_psi = vcat(sa_s, sa_kappa) + sa_mu*vcat(sa_g, -1.0/sa_tau)
                     break
                 end
 
-                # finish if allowed and current iterate is in the eta-neighborhood, or if
-                if (mod.corrcheck && (corriter < mod.maxcorrsteps)) || (mod == mod.maxcorrsteps)
-                    etacorr[iter] = sqrt(sum(abs2, soln_L\soln_psi[1:end-1]) + (tau*soln_psi[end])^2)/mu
-                    if etacorr[iter] <= mod.eta
-                        break
-                    end
-                end
+                alpha = mod.corrlsmulti*alpha
             end
-            if etacorr[iter] > mod.eta
-                println("Corrector phase finished outside the eta-neighborhood; terminating")
+
+            if corrfail
+                solnalpha = soln
+                println("Corrector could not improve the solution; terminating")
                 break
             end
+
+            # finish if allowed and current iterate is in the eta-neighborhood, or if
+            if (mod.corrcheck && (corriter < mod.maxcorrsteps)) || (mod == mod.maxcorrsteps)
+                etacorr[iter] = sqrt(sum(abs2, soln_L\soln_psi[1:end-1]) + (tau*soln_psi[end])^2)/mu
+                if etacorr[iter] <= mod.eta
+                    break
+                end
+            end
         end
+
+        if etacorr[iter] > mod.eta
+            println("Corrector phase finished outside the eta-neighborhood; terminating")
+            break
+        end
+
         if corrfail
             break
         end
+
+
+
+
 
         mu[iter] = mu
     end
@@ -223,130 +341,121 @@ function MOI.optimize!(mod::AlfonsoModel)
     return nothing
 end
 
+# 
+# # perform predictor step
+# function predstep(mod, delta)
+#     (dy, dx, dtau, ds, dkappa) = (delta[1:m], delta[m+1:m+n], delta[m+n+1], delta[m+n+2:m+2n+1], delta[end])
+#
+#     alpha = mod.alphapred
+#     betaalpha = Inf
+#     sa_innhd = false
+#     alphaprevok = false
+#     predfail = false
+#
+#     while true
+#         sa_y = mod.y + alpha*dy
+#         sa_x = mod.x + alpha*dx
+#         sa_tau = mod.tau + alpha*dtau
+#         sa_s = mod.s + alpha*ds
+#         sa_kappa = mod.kappa + alpha*dkappa
+#
+#         (sa_in, sa_g, sa_H, sa_L) = gH(sa_x)
+#
+#         if sa_in
+#             # primal iterate is inside the cone
+#             sa_mu = (dot(sa_x, sa_s) + sa_tau*sa_kappa)/mod.gH_bnu
+#             sa_psi = [sa_s; sa_kappa] + sa_mu*[sa_g; -1.0/sa_tau]
+#             betaalpha = sqrt(sum(abs2, sa_L\sa_psi(1:end-1)) + (sa_tau*sa_psi[end])^2)/sa_mu
+#             sa_innhd = (betaalpha < mod.beta)
+#         end
+#
+#         if sa_in && sa_innhd
+#             # iterate is inside the beta-neighborhood
+#             if !alphaprevok || (alpha > mod.predlsmulti)
+#                 # either the previous iterate was outside the beta-neighborhood or increasing alpha again will make it > 1
+#                 if mod.predlinesearch
+#                     mod.alphapred = alpha
+#                 end
+#                 break
+#             end
+#             alphaprevok = true
+#             alphaprev = alpha
+#             betaalphaprev = betaalpha
+#             solnalphaprev = solnalpha
+#             alpha = alpha/mod.predlsmulti
+#         else
+#             # iterate is outside the beta-neighborhood
+#             if alphaprevok
+#                 # previous iterate was in the beta-neighborhood
+#                 alpha = alphaprev
+#                 betaalpha = betaalphaprev
+#                 solnalpha = solnalphaprev
+#                 if mod.predlinesearch
+#                     mod.alphapred = alpha
+#                 end
+#                 break
+#             end
+#
+#             if alpha < mod.alphapredthreshold
+#                 # last two iterates were outside the beta-neighborhood and alpha is very small, so predictor has failed
+#                 predfail = true # predictor has failed
+#                 alpha = 0.0
+#                 betaalpha = Inf
+#                 solnalpha = soln
+#                 if mod.predlinesearch
+#                     mod.alphapred = alpha
+#                 end
+#                 break
+#             end
+#
+#             # alphaprev, betaalphaprev, solnalphaprev will not be used
+#             alphaprevok = false
+#             alphaprev = alpha
+#             betaalphaprev = betaalpha
+#             solnalphaprev = solnalpha
+#             alpha = mod.predlsmulti*alpha
+#         end
+#     end
+#
+#     return (alphapred, betapred, predfail)
+# end
 
-# perform predictor step
-function predstep(mod)
-    (m, n) = size(mod.A)
-
-    rhs = -vcat(mod.A*mod.x - mod.b*mod.tau, -mod.A'*mod.y + mod.c*mod.tau - mod.s, dot(mod.b, mod.y) - dot(mod.c, mod.x) - mod.kappa, mod.s, mod.kappa)
-    (dy, dx, dtau, ds, dkappa) = computenewtondirection(mod, rhs)
-
-    alpha = mod.alphapred
-    betaalpha = Inf
-    sa_innhd = 0
-    alphaprevok = false
-    predfail = false
-    nsteps = 0
-    
-    while true
-        nsteps += 1
-
-        sa_y = mod.y + alpha*dy
-        sa_x = mod.s + alpha*dx
-        sa_tau = mod.tau + alpha*dtau
-        sa_s = mod.s + alpha*ds
-        sa_kappa = mod.kappa + alpha*dkappa
-
-        (sa_in, sa_g, sa_H, sa_L) = gH(sa_x)
-
-        if sa_in
-            # primal iterate is inside the cone
-            sa_mu = (dot(sa_x, sa_s) + sa_tau*sa_kappa)/mod.gH_bnu
-            sa_psi = [sa_s; sa_kappa] + sa_mu*[sa_g; -1.0/sa_tau]
-            betaalpha = sqrt(sum(abs2, sa_L\sa_psi(1:end-1)) + (sa_tau*sa_psi[end])^2)/sa_mu
-            sa_innhd = (betaalpha < mod.beta)
-        end
-
-        if sa_in && sa_innhd
-            # iterate is inside the beta-neighborhood
-            if !alphaprevok || (alpha > mod.predlsmulti)
-                # either the previous iterate was outside the beta-neighborhood or increasing alpha again will make it > 1
-                if mod.predlinesearch
-                    mod.alphapred = alpha
-                end
-                break
-            end
-            alphaprevok = true
-            alphaprev = alpha
-            betaalphaprev = betaalpha
-            solnalphaprev = solnalpha
-            alpha = alpha/mod.predlsmulti
-        else
-            # iterate is outside the beta-neighborhood
-            if alphaprevok
-                # previous iterate was in the beta-neighborhood
-                alpha = alphaprev
-                betaalpha = betaalphaprev
-                solnalpha = solnalphaprev
-                if mod.predlinesearch
-                    mod.alphapred = alpha
-                end
-                break
-            end
-
-            if alpha < mod.alphapredthreshold
-                # last two iterates were outside the beta-neighborhood and alpha is very small, so predictor has failed
-                predfail = true # predictor has failed
-                alpha = 0.0
-                betaalpha = Inf
-                solnalpha = soln
-                if mod.predlinesearch
-                    mod.alphapred = alpha
-                end
-                break
-            end
-
-            # alphaprev, betaalphaprev, solnalphaprev will not be used
-            alphaprevok = false
-            alphaprev = alpha
-            betaalphaprev = betaalpha
-            solnalphaprev = solnalpha
-            alpha = mod.predlsmulti*alpha
-        end
-    end
-
-    return (alphapred, betapred, predfail)
-end
-
-
-# perform corrector step
-function corrstep(mod)
-    (m, n) = size(mod.A)
-
-    rhs = vcat(zeros(m+n+1), -soln_psi)
-    (dy, dx, dtau, ds, dkappa) = computenewtondirection(mod, rhs)
-
-    alpha = mod.alphacorr
-    corrfail = false
-
-    # perform line search to make sure next primal iterate remains inside the cone
-    for nsteps in 1:mod.maxcorrlsiters
-        sa_y = mod.y + alpha*dy
-        sa_x = mod.s + alpha*dx
-        sa_tau = mod.tau + alpha*dtau
-        sa_s = mod.s + alpha*ds
-        sa_kappa = mod.kappa + alpha*dkappa
-
-        (sa_in, sa_g, sa_H, sa_L) = gH(sa_x)
-
-        # terminate line search if primal iterate is inside the cone
-        if sa_in
-            sa_mu = (dot(sa_x, sa_s) + sa_tau*sa_kappa)/mod.gH_bnu
-            sa_psi = [sa_s; sa_kappa] + sa_mu*[sa_g; -1.0/sa_tau]
-            break
-        end
-
-        alpha = mod.corrlsmulti*alpha
-    end
-
-    if !sa_in
-        corrfail = true # corrector has failed
-        solnalpha = soln
-    end
-
-    return corrfail
-end
-
+#
+# # perform corrector step
+# function corrstep(mod, delta)
+#     (dy, dx, dtau, ds, dkappa) = (delta[1:m], delta[m+1:m+n], delta[m+n+1], delta[m+n+2:m+2n+1], delta[end])
+#
+#     alpha = mod.alphacorr
+#     corrfail = false
+#
+#     # perform line search to make sure next primal iterate remains inside the cone
+#     for nsteps in 1:mod.maxcorrlsiters
+#         sa_y = mod.y + alpha*dy
+#         sa_x = mod.x + alpha*dx
+#         sa_tau = mod.tau + alpha*dtau
+#         sa_s = mod.s + alpha*ds
+#         sa_kappa = mod.kappa + alpha*dkappa
+#
+#         (sa_in, sa_g, sa_H, sa_L) = gH(sa_x)
+#
+#         # terminate line search if primal iterate is inside the cone
+#         if sa_in
+#             sa_mu = (dot(sa_x, sa_s) + sa_tau*sa_kappa)/mod.gH_bnu
+#             sa_psi = [sa_s; sa_kappa] + sa_mu*[sa_g; -1.0/sa_tau]
+#             break
+#         end
+#
+#         alpha = mod.corrlsmulti*alpha
+#     end
+#
+#     if !sa_in
+#         corrfail = true # corrector has failed
+#         solnalpha = soln
+#     end
+#
+#     return corrfail
+# end
+#
 
 # set up the Newton system and compute Newton direction
 # TODO optimize operations
@@ -360,8 +469,8 @@ function computenewtondirection(mod, L, rhs)
         # TODO rcond and eps?
         if rcond(full(soln_H)) < mod.eps
             lhsnew = mod.lhs
-            lhsnew(m+n+2:m+2n+1,m+1:m+n) = mu*soln_H
-            lhsnew(end,m+n+1) = mod.mu/mod.tau^2
+            lhsnew[m+n+2:m+2n+1,m+1:m+n] = mu*soln_H
+            lhsnew[end,m+n+1] = mod.mu/mod.tau^2
 
             res = residual3p(lhsnew, delta, rhs)
             resnorm = norm(res)
@@ -387,7 +496,8 @@ function computenewtondirection(mod, L, rhs)
         end
     end
 
-    return (delta[1:m], delta[m+1:m+n], delta[m+n+1], delta[m+n+2:m+2n+1], delta[end])
+    # return (delta[1:m], delta[m+1:m+n], delta[m+n+1], delta[m+n+2:m+2n+1], delta[end])
+    return delta
 end
 
 
