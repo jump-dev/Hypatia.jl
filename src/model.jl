@@ -1,12 +1,9 @@
 #=
 Copyright 2018, David Papp, Sercan Yildiz, and contributors
 
-This code is an implementation of the algorithm for non-symmetric conic
-optimization Alfonso, available at https://github.com/dpapp-github/alfonso
-and analyzed in the paper:
-D. Papp and S. Yildiz. On "A homogeneous interior-point algorithm for
-nonsymmetric convex conic optimization". Available at
-https://arxiv.org/abs/1712.00492.
+an implementation of the algorithm for non-symmetric conic optimization Alfonso (https://github.com/dpapp-github/alfonso) and analyzed in the paper:
+D. Papp and S. Yildiz. On "A homogeneous interior-point algorithm for nonsymmetric convex conic optimization"
+available at https://arxiv.org/abs/1712.00492
 =#
 
 mutable struct AlfonsoModel <: MOI.ModelLike
@@ -17,7 +14,7 @@ mutable struct AlfonsoModel <: MOI.ModelLike
     predlinesearch::Bool        # if false, predictor step uses a fixed step size, else step size is determined via line search
     maxpredsmallsteps::Int      # maximum number of predictor step size reductions allowed with respect to the safe fixed step size
     maxcorrsteps::Int           # maximum number of corrector steps (possible values: 1, 2, or 4)
-    corrcheck::Bool             # if false, maxcorrsteps corrector steps are performed at each corrector phase, elsethe corrector phase can be terminated before maxcorrsteps corrector steps if the iterate is in the eta-neighborhood
+    corrcheck::Bool             # if false, maxcorrsteps corrector steps are performed at each corrector phase, else the corrector phase can be terminated before maxcorrsteps corrector steps if the iterate is in the eta-neighborhood
     maxcorrlsiters::Int         # maximum number of line search iterations in each corrector step
     maxitrefinesteps::Int       # maximum number of iterative refinement steps in linear system solves
     alphacorr::Float64          # corrector step size
@@ -25,7 +22,15 @@ mutable struct AlfonsoModel <: MOI.ModelLike
     corrlsmulti::Float64        # corrector line search step size multiplier
     itrefinethreshold::Float64  # iterative refinement success threshold
 
-    # other algorithmic parameters
+    # problem data
+    A               # constraint matrix
+    b               # right-hand side vector
+    c               # cost vector
+    cones           # TODO
+
+    # other algorithmic parameters and utilities
+    eval_gh::Function            # function for computing the gradient and Hessian of the barrier function
+    gh_bnu::Float64             # complexity parameter of the augmented barrier (nu-bar)
     beta::Float64               # large neighborhood parameter
     eta::Float64                # small neighborhood parameter
     alphapredls::Float64        # initial predictor step size with line search
@@ -33,15 +38,7 @@ mutable struct AlfonsoModel <: MOI.ModelLike
     alphapred::Float64          # initial predictor step size
     alphapredthreshold::Float64 # minimum predictor step size
 
-    # data
-    A               # constraint matrix
-    b               # right-hand side vector
-    c               # cost vector
-    x0              # initial primal iterate
-    gH::Function    # method for computing the gradient and Hessian of the barrier function
-    gH_bnu          # complexity parameter of the augmented barrier (nu-bar)
-
-    # output
+    # results
     status          # solver status
     niterations     # total number of iterations
     all_alphapred   # predictor step size at each iteration
@@ -93,67 +90,7 @@ end
 
 function MOI.optimize!(mod::AlfonsoModel)
     #=
-    set remaining algorithmic parameters based on precomputed safe values (from original authors):
-    parameters are chosen to make sure that each predictor step takes the current iterate from the eta-neighborhood to the beta-neighborhood and each corrector phase takes the current iterate from the beta-neighborhood to the eta-neighborhood. extra corrector steps are allowed to mitigate the effects of finite precision
-    =#
-    if mod.maxcorrsteps <= 2
-        if mod.gH_bnu < 10.0
-            mod.beta = 0.1810
-            mod.eta = 0.0733
-            cpredfix = 0.0225
-        elseif mod.gH_bnu < 100.0
-            mod.beta = 0.2054
-            mod.eta = 0.0806
-            cpredfix = 0.0263
-        else
-            mod.beta = 0.2190
-            mod.eta = 0.0836
-            cpredfix = 0.0288
-        end
-    elseif mod.maxcorrsteps <= 4
-        if mod.gH_bnu < 10.0
-            mod.beta = 0.2084
-            mod.eta = 0.0502
-            cpredfix = 0.0328
-        elseif mod.gH_bnu < 100.0
-            mod.beta = 0.2356
-            mod.eta = 0.0544
-            cpredfix = 0.0380
-        else
-            mod.beta = 0.2506
-            mod.eta = 0.0558
-            cpredfix = 0.0411
-        end
-    else
-        if mod.gH_bnu < 10.0
-            mod.beta = 0.2387
-            mod.eta = 0.0305
-            cpredfix = 0.0429
-        elseif mod.gH_bnu < 100.0
-            mod.beta = 0.2683
-            mod.eta = 0.0327
-            cpredfix = 0.0489
-        else
-            mod.beta = 0.2844
-            mod.eta = 0.0332
-            cpredfix = 0.0525
-        end
-    end
-
-    mod.alphapredfix = cpredfix/(mod.eta + sqrt(2*mod.eta^2 + mod.gH_bnu))
-    mod.alphapredls = min(100.0*mod.alphapredfix, 0.9999)
-    mod.alphapredthreshold = (mod.predlsmulti^opts.maxpredsmallsteps)*mod.alphapredfix
-
-    if !mod.predlinesearch
-        # fixed predictor step size
-        mod.alphapred = mod.alphapredfix
-    else
-        # initial predictor step size with line search
-        mod.alphapred = mod.alphapredls
-    end
-
-    #=
-    verify problem input and set up algorithmic data
+    verify problem data, setup other algorithmic parameters and utilities
     =#
     (A, b, c) = (mod.A, mod.b, mod.c)
     (m, n) = size(A)
@@ -168,8 +105,84 @@ function MOI.optimize!(mod::AlfonsoModel)
         error("dimension of vector c is $(length(c)), but number of columns in matrix A is $n")
     end
 
+    # TODO check cones
+    cones = mod.cones
+
+    # create function for computing the gradient and Hessian of the barrier function
+    function eval_gh(x)
+        # TODO
+
+
+        return (incone, g, H, L)
+    end
+    mod.eval_gh = eval_gh
+
+    # calculate complexity parameter of the augmented barrier (nu-bar)
+    mod.gh_bnu = NaN # TODO
+
+    # set remaining algorithmic parameters based on precomputed safe values (from original authors):
+    # parameters are chosen to make sure that each predictor step takes the current iterate from the eta-neighborhood to the beta-neighborhood and each corrector phase takes the current iterate from the beta-neighborhood to the eta-neighborhood. extra corrector steps are allowed to mitigate the effects of finite precision
+    if mod.maxcorrsteps <= 2
+        if mod.gh_bnu < 10.0
+            mod.beta = 0.1810
+            mod.eta = 0.0733
+            cpredfix = 0.0225
+        elseif mod.gh_bnu < 100.0
+            mod.beta = 0.2054
+            mod.eta = 0.0806
+            cpredfix = 0.0263
+        else
+            mod.beta = 0.2190
+            mod.eta = 0.0836
+            cpredfix = 0.0288
+        end
+    elseif mod.maxcorrsteps <= 4
+        if mod.gh_bnu < 10.0
+            mod.beta = 0.2084
+            mod.eta = 0.0502
+            cpredfix = 0.0328
+        elseif mod.gh_bnu < 100.0
+            mod.beta = 0.2356
+            mod.eta = 0.0544
+            cpredfix = 0.0380
+        else
+            mod.beta = 0.2506
+            mod.eta = 0.0558
+            cpredfix = 0.0411
+        end
+    else
+        if mod.gh_bnu < 10.0
+            mod.beta = 0.2387
+            mod.eta = 0.0305
+            cpredfix = 0.0429
+        elseif mod.gh_bnu < 100.0
+            mod.beta = 0.2683
+            mod.eta = 0.0327
+            cpredfix = 0.0489
+        else
+            mod.beta = 0.2844
+            mod.eta = 0.0332
+            cpredfix = 0.0525
+        end
+    end
+
+    mod.alphapredfix = cpredfix/(mod.eta + sqrt(2*mod.eta^2 + mod.gh_bnu))
+    mod.alphapredls = min(100.0*mod.alphapredfix, 0.9999)
+    mod.alphapredthreshold = (mod.predlsmulti^opts.maxpredsmallsteps)*mod.alphapredfix
+
+    if !mod.predlinesearch
+        # fixed predictor step size
+        mod.alphapred = mod.alphapredfix
+    else
+        # initial predictor step size with line search
+        mod.alphapred = mod.alphapredls
+    end
+
     mod.status = :Loaded
 
+    #=
+    setup data and functions needed in main loop
+    =#
     # build sparse LHS matrix
     lhs = [
         spzeros(m,m)  A             -b            spzeros(m,n)   spzeros(m,1)
@@ -243,14 +256,23 @@ function MOI.optimize!(mod::AlfonsoModel)
     term_dres = max(1.0, norm([A', speye(n), -c], Inf))
     term_comp = max(1.0, norm([-c', b', 1.0], Inf))
 
-    # calculate the central primal-dual iterate corresponding to x0
-    (incone, g, H, L) = gH(x0)
+    # calculate initial primal iterate
+    # scaling factor for the primal problem
+    rp = maximum((1.0 + abs(b[i]))/(1.0 + abs(sum(A[i,:]))) for i in 1:m)
+    # scaling factor for the dual problem
+    g0 = mod.eval_gh(ones(n))[2]
+    rd = maximum((1.0 + abs(g0[j]))/(1.0 + abs(c[j])) for j in 1:n)
+    # initial primal iterate
+    x0 = fill(sqrt(rp*rd), n)
+
+    # calculate the central primal-dual iterate corresponding to the initial primal iterate
+    (incone, g, H, L) = mod.eval_gh(x0)
     x = x0
     y = zeros(m)
     tau = 1.0
     s = -g
     kappa = 1.0
-    mu = (dot(x, s) + tau*kappa)/gH_bnu
+    mu = (dot(x, s) + tau*kappa)/gh_bnu
 
     #=
     main loop
@@ -314,11 +336,11 @@ function MOI.optimize!(mod::AlfonsoModel)
             sa_s = mod.s + alpha*ds
             sa_kappa = mod.kappa + alpha*dkappa
 
-            (sa_incone, sa_g, sa_H, sa_L) = gH(sa_x)
+            (sa_incone, sa_g, sa_H, sa_L) = mod.eval_gh(sa_x)
 
             if sa_incone
                 # primal iterate is inside the cone
-                sa_mu = (dot(sa_x, sa_s) + sa_tau*sa_kappa)/mod.gH_bnu
+                sa_mu = (dot(sa_x, sa_s) + sa_tau*sa_kappa)/mod.gh_bnu
                 sa_psi = vcat(sa_s + sa_mu*sa_g, sa_kappa - sa_mu/sa_tau)
                 betaalpha = sqrt(sum(abs2, sa_L\sa_psi[1:end-1]) + (sa_tau*sa_psi[end])^2)/sa_mu
                 sa_inconenhd = (betaalpha < mod.beta)
@@ -407,11 +429,11 @@ function MOI.optimize!(mod::AlfonsoModel)
                 sa_s = s + alpha*ds
                 sa_kappa = kappa + alpha*dkappa
 
-                (sa_incone, sa_g, sa_H, sa_L) = gH(sa_x)
+                (sa_incone, sa_g, sa_H, sa_L) = mod.eval_gh(sa_x)
 
                 # terminate line search if primal iterate is inside the cone
                 if sa_incone
-                    sa_mu = (dot(sa_x, sa_s) + sa_tau*sa_kappa)/mod.gH_bnu
+                    sa_mu = (dot(sa_x, sa_s) + sa_tau*sa_kappa)/mod.gh_bnu
                     sa_psi = vcat(sa_s + sa_mu*sa_g, sa_kappa - sa_mu/sa_tau)
                     break
                 elseif lsiter == mod.maxcorrlsiters

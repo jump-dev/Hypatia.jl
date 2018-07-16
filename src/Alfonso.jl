@@ -7,4 +7,5 @@ module Alfonso
 
     include("optimizer.jl")
     include("model.jl")
+    include("cones.jl")
 end

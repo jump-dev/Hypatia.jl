@@ -9,7 +9,7 @@ mutable struct AlfonsoOptimizer <: MOI.AbstractOptimizer
     predlinesearch::Bool        # if false, predictor step uses a fixed step size, else step size is determined via line search
     maxpredsmallsteps::Int      # maximum number of predictor step size reductions allowed with respect to the safe fixed step size
     maxcorrsteps::Int           # maximum number of corrector steps (possible values: 1, 2, or 4)
-    corrcheck::Bool             # if false, maxcorrsteps corrector steps are performed at each corrector phase, elsethe corrector phase can be terminated before maxcorrsteps corrector steps if the iterate is in the eta-neighborhood
+    corrcheck::Bool             # if false, maxcorrsteps corrector steps are performed at each corrector phase, else the corrector phase can be terminated before maxcorrsteps corrector steps if the iterate is in the eta-neighborhood
     maxcorrlsiters::Int         # maximum number of line search iterations in each corrector step
     maxitrefinesteps::Int       # maximum number of iterative refinement steps in linear system solves
     alphacorr::Float64          # corrector step size
