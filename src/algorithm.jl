@@ -10,12 +10,11 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
     #=
     verify problem data, setup other algorithmic parameters and utilities
     =#
-    @show issparse(opt.A)
     dropzeros!(opt.A)
     (A, b, c) = (opt.A, opt.b, opt.c)
     (m, n) = size(A)
 
-    if m == 0 || n == 0
+    if (m == 0) || (n == 0)
         error("input matrix A has trivial dimension $m x $n")
     end
     if m != length(b)
@@ -105,14 +104,12 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
     =#
     # build sparse LHS matrix
     lhs = [
-        spzeros(m,m)  A             -b            spzeros(m,n)   spzeros(m,1)
-        -A'           spzeros(n,n)  c             -speye(n)      spzeros(n,1)
-        b'            -c'           0.0           spzeros(1,n)   -1.0
-        spzeros(n,m)  speye(n)      spzeros(n,1)  speye(n)       spzeros(n,1)
-        spzeros(1,m)  spzeros(1,n)  1.0           spzeros(1,n)   1.0
+        spzeros(m,m)  A                 -b            spzeros(m,n)       spzeros(m,1)
+        -A'           spzeros(n,n)      c             sparse(-1.0I,n,n)  spzeros(n,1)
+        b'            -c'               0.0           spzeros(1,n)       -1.0
+        spzeros(n,m)  sparse(1.0I,n,n)  spzeros(n,1)  sparse(1.0I,n,n)   spzeros(n,1)
+        spzeros(1,m)  spzeros(1,n)      1.0           spzeros(1,n)       1.0
         ]
-
-    @show issparse(lhs)
     dropzeros!(lhs)
 
     # create block solver function
@@ -120,14 +117,14 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
     function solvesystem(rhs, L, mu, tau)
         Hic = L'\(L\c)
         HiAt = -L'\(L\A')
-        Hirxrs = L'\(L\(rhs[1:m] + rhs[m+n+2:m+2n+1]))
+        Hirxrs = L'\(L\(rhs[m+1:m+n] + rhs[m+n+2:m+2n+1]))
 
-        lhsdydtau = [zeros(m) -b; b' mu/tau^2] - [A; -c']*[HiAt, Hic]/mu
-        rhsdydtau = [rhs[1:m]; (rhs[m+n+1] + rhs[end])] - [A; -c']*Hirxrs/mu
+        lhsdydtau = [zeros(m,m) -b; b' mu/tau^2] - ([A; -c']*[HiAt Hic])/mu
+        rhsdydtau = [rhs[1:m]; (rhs[m+n+1] + rhs[end])] - ([A; -c']*Hirxrs)/mu
         dydtau = lhsdydtau\rhsdydtau
-        dx = (Hirxrs - [HiAt, Hic]*dydtau)/mu
+        dx = (Hirxrs - [HiAt Hic]*dydtau)/mu
 
-        return vcat(dydtau[1:m], dx, dydtau[m+1], (-rhs[1:m] - [A', -c]*dydtau), (-rhs[m+n+1] + dot(b, dydtau[1:m]) - dot(c, dx)))
+        return vcat(dydtau[1:m], dx, dydtau[m+1], (-rhs[m+1:m+n] - [A' -c]*dydtau), (-rhs[m+n+1] + dot(b, dydtau[1:m]) - dot(c, dx)))
     end
 
     # create Newton system solver function to compute Newton directions
@@ -147,7 +144,7 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
                 res = lhsnew*delta - rhs # TODO needs to be in at least triple precision
                 resnorm = norm(res)
 
-                for iter in 1:opt.maxitrefinesteps
+                for refiter in 1:opt.maxitrefinesteps
                     d = solvesystem(rhs, L, mu, tau)
                     deltanew = delta - d
 
@@ -176,7 +173,7 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
     # calculate contants for termination criteria
     # TODO what norms are these
     tol_pres = max(1.0, norm([A, b], Inf))
-    tol_dres = max(1.0, norm([A', speye(n), -c], Inf))
+    tol_dres = max(1.0, norm([A', sparse(1.0I,n,n), -c], Inf))
     tol_compl = max(1.0, norm([-c', b', 1.0], Inf))
 
     # calculate initial primal iterate
@@ -190,6 +187,7 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
 
     # calculate the central primal-dual iterate corresponding to the initial primal iterate
     (incone, g, H, L) = opt.eval_gh(tx0)
+    # TODO maybe can do these as views of a concatenated array - faster to update with delta direction
     tx = tx0
     ty = zeros(m)
     tau = 1.0
@@ -206,7 +204,7 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
     all_mu = fill(NaN, opt.maxiter)
 
     if opt.verbose
-        @printf("\n%5s %10s %10s %7s %7s %7s %7s %7s %7s\n", "iter", "p_obj", "d_obj", "gap", "p_inf", "d_inf", "tau", "kap", "mu")
+        @printf("\n%5s %11s %11s %9s %9s %9s %9s %9s %9s\n", "iter", "p_obj", "d_obj", "gap", "p_inf", "d_inf", "tau", "kap", "mu")
     end
 
     iter = 0
@@ -225,7 +223,7 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
         compl = abs(ctx - bty + kap)/tol_compl
 
         if opt.verbose
-            @printf("%5d %10.6e %10.6e %7.3e %7.3e %7.3e %7.3e %7.3e %7.3e\n", iter, p_obj, d_obj, gap, p_inf, d_inf, tau, kap, mu)
+            @printf("%5d %11.4e %11.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n", iter, p_obj, d_obj, gap, p_inf, d_inf, tau, kap, mu)
         end
 
         if (p_inf <= opt.optimtol) && (d_inf <= opt.optimtol)
@@ -249,6 +247,8 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
         #=
         prediction phase: calculate prediction direction, perform line search
         =#
+        println("prediction")
+
         rhs = -vcat(A*tx - b*tau, -A'*ty + c*tau - ts, dot(b, ty) - dot(c, tx) - kap, ts, kap)
         (dty, dtx, dtau, dts, dkap) = computenewtondirection(rhs, H, L, mu, tau)
 
@@ -258,14 +258,15 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
         alphaprevok = false
         predfail = false
         while true
-            sa_ty = opt.ty + alpha*dty
-            sa_tx = opt.tx + alpha*dtx
-            sa_tau = opt.tau + alpha*dtau
-            sa_ts = opt.ts + alpha*dts
-            sa_kap = opt.kap + alpha*dkap
+            sa_ty = ty + alpha*dty
+            sa_tx = tx + alpha*dtx
+            sa_tau = tau + alpha*dtau
+            sa_ts = ts + alpha*dts
+            sa_kap = kap + alpha*dkap
 
             (sa_incone, sa_g, sa_H, sa_L) = opt.eval_gh(sa_tx)
 
+            @show sa_incone
             if sa_incone
                 # primal iterate is inside the cone
                 sa_mu = (dot(sa_tx, sa_ts) + sa_tau*sa_kap)/opt.gh_bnu
@@ -286,7 +287,6 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
                 alphaprevok = true
                 alphaprev = alpha
                 betaalphaprev = betaalpha
-                solnalphaprev = solnalpha
                 alpha = alpha/opt.predlsmulti
             else
                 # iterate is outside the beta-neighborhood
@@ -294,7 +294,6 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
                     # previous iterate was in the beta-neighborhood
                     alpha = alphaprev
                     betaalpha = betaalphaprev
-                    solnalpha = solnalphaprev
                     if opt.predlinesearch
                         opt.alphapred = alpha
                     end
@@ -306,27 +305,24 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
                     predfail = true # predictor has failed
                     alpha = 0.0
                     betaalpha = Inf
-                    solnalpha = soln
                     if opt.predlinesearch
                         opt.alphapred = alpha
                     end
                     break
                 end
 
-                # alphaprev, betaalphaprev, solnalphaprev will not be used
                 alphaprevok = false
                 alphaprev = alpha
                 betaalphaprev = betaalpha
-                solnalphaprev = solnalpha
                 alpha = opt.predlsmulti*alpha
             end
         end
 
-        all_alphapred[iter] = alphapred
-        all_betapred[iter] = betapred
+        all_alphapred[iter] = opt.alphapred
+        all_betapred[iter] = betaalpha
 
         if predfail
-            all_betapred[iter] = all_etacorr[iter-1]
+            all_betapred[iter] = (iter == 1) ? Inf : all_etacorr[iter-1]
             println("Predictor could not improve the solution; terminating")
             opt.status = :PredictorFail
             break
@@ -342,6 +338,8 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
         #=
         correction phase: perform correction steps
         =#
+        println("correction")
+
         corrfail = false
         for corriter in 1:opt.maxcorrsteps
             # calculate correction direction
@@ -400,7 +398,7 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
         all_mu[iter] = mu
     end
 
-    println("Finished in $iter iterations\nInternal status is $status\n")
+    println("\nFinished in $iter iterations\nInternal status is $(opt.status)\n")
 
     #=
     calculate final solution and iteration statistics

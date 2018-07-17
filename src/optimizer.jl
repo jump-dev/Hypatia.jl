@@ -45,7 +45,7 @@ mutable struct AlfonsoOptimizer <: MOI.AbstractOptimizer
     s               # final value of the dual slack variables
     y               # final value of the dual free variables
     tau             # final value of the tau-variable
-    kappa           # final value of the kappa-variable
+    kap             # final value of the kappa-variable
     pobj            # final primal objective value
     dobj            # final dual objective value
     dgap            # final duality gap
@@ -84,9 +84,9 @@ end
 
 
 function AlfonsoOptimizer(;
-    verbose = false,
+    verbose = true,
     optimtol = 1e-06,
-    maxiter = 1e4,
+    maxiter = 5,
     predlinesearch = true,
     maxpredsmallsteps = 8,
     maxcorrsteps = 8, # NOTE doubled in .m code
