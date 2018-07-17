@@ -60,25 +60,25 @@ mutable struct AlfonsoOptimizer <: MOI.AbstractOptimizer
     rel_din         # final relative dual infeasibility
 
     function AlfonsoOptimizer(verbose, optimtol, maxiter, predlinesearch, maxpredsmallsteps, maxcorrsteps, corrcheck, maxcorrlsiters, maxitrefinesteps, alphacorr, predlsmulti, corrlsmulti, itrefinethreshold)
-        mod = new()
+        opt = new()
 
-        mod.verbose = verbose
-        mod.optimtol = optimtol
-        mod.maxiter = maxiter
-        mod.predlinesearch = predlinesearch
-        mod.maxpredsmallsteps = maxpredsmallsteps
-        mod.maxcorrsteps = maxcorrsteps
-        mod.corrcheck = corrcheck
-        mod.maxcorrlsiters = maxcorrlsiters
-        mod.maxitrefinesteps = maxitrefinesteps
-        mod.alphacorr = alphacorr
-        mod.predlsmulti = predlsmulti
-        mod.corrlsmulti = corrlsmulti
-        mod.itrefinethreshold = itrefinethreshold
+        opt.verbose = verbose
+        opt.optimtol = optimtol
+        opt.maxiter = maxiter
+        opt.predlinesearch = predlinesearch
+        opt.maxpredsmallsteps = maxpredsmallsteps
+        opt.maxcorrsteps = maxcorrsteps
+        opt.corrcheck = corrcheck
+        opt.maxcorrlsiters = maxcorrlsiters
+        opt.maxitrefinesteps = maxitrefinesteps
+        opt.alphacorr = alphacorr
+        opt.predlsmulti = predlsmulti
+        opt.corrlsmulti = corrlsmulti
+        opt.itrefinethreshold = itrefinethreshold
 
-        mod.status = :NotLoaded
+        opt.status = :NotLoaded
 
-        return mod
+        return opt
     end
 end
 
@@ -113,4 +113,15 @@ function AlfonsoOptimizer(;
     end
 
     return AlfonsoOptimizer(verbose, optimtol, maxiter, predlinesearch, maxpredsmallsteps, maxcorrsteps, corrcheck, maxcorrlsiters, maxitrefinesteps, alphacorr, predlsmulti, corrlsmulti, itrefinethreshold)
+end
+
+
+function loaddata!(opt::AlfonsoOptimizer, A, b, c, eval_gh, gh_bnu)
+    opt.c = c
+    opt.A = A
+    opt.b = b
+    opt.eval_gh = eval_gh
+    opt.gh_bnu = gh_bnu
+
+    return opt
 end
