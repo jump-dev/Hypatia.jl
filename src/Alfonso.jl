@@ -6,6 +6,6 @@ module Alfonso
     const MOI = MathOptInterface
 
     include("optimizer.jl")
-    include("model.jl")
     include("cones.jl")
+    include("algorithm.jl")
 end

@@ -3,6 +3,7 @@
 export AlfonsoOptimizer
 
 mutable struct AlfonsoOptimizer <: MOI.AbstractOptimizer
+    # options
     verbose::Bool               # if true, prints progress at each iteration
     optimtol::Float64           # optimization tolerance parameter
     maxiter::Int                # maximum number of iterations
@@ -16,6 +17,69 @@ mutable struct AlfonsoOptimizer <: MOI.AbstractOptimizer
     predlsmulti::Float64        # predictor line search step size multiplier
     corrlsmulti::Float64        # corrector line search step size multiplier
     itrefinethreshold::Float64  # iterative refinement success threshold
+
+    # problem data
+    A               # constraint matrix
+    b               # right-hand side vector
+    c               # cost vector
+    cones           # TODO
+
+    # other algorithmic parameters and utilities
+    eval_gh::Function           # function for computing the gradient and Hessian of the barrier function
+    gh_bnu::Float64             # complexity parameter of the augmented barrier (nu-bar)
+    beta::Float64               # large neighborhood parameter
+    eta::Float64                # small neighborhood parameter
+    alphapredls::Float64        # initial predictor step size with line search
+    alphapredfix::Float64       # fixed predictor step size
+    alphapred::Float64          # initial predictor step size
+    alphapredthreshold::Float64 # minimum predictor step size
+
+    # results
+    status          # solver status
+    niterations     # total number of iterations
+    all_alphapred   # predictor step size at each iteration
+    all_betapred    # neighborhood parameter at the end of the predictor phase at each iteration
+    all_etacorr     # neighborhood parameter at the end of the corrector phase at each iteration
+    all_mu          # complementarity gap at each iteration
+    x               # final value of the primal variables
+    s               # final value of the dual slack variables
+    y               # final value of the dual free variables
+    tau             # final value of the tau-variable
+    kappa           # final value of the kappa-variable
+    pobj            # final primal objective value
+    dobj            # final dual objective value
+    dgap            # final duality gap
+    cgap            # final complementarity gap
+    rel_dgap        # final relative duality gap
+    rel_cgap        # final relative complementarity gap
+    pres            # final primal residuals
+    dres            # final dual residuals
+    pin             # final primal infeasibility
+    din             # final dual infeasibility
+    rel_pin         # final relative primal infeasibility
+    rel_din         # final relative dual infeasibility
+
+    function AlfonsoOptimizer(verbose, optimtol, maxiter, predlinesearch, maxpredsmallsteps, maxcorrsteps, corrcheck, maxcorrlsiters, maxitrefinesteps, alphacorr, predlsmulti, corrlsmulti, itrefinethreshold)
+        mod = new()
+
+        mod.verbose = verbose
+        mod.optimtol = optimtol
+        mod.maxiter = maxiter
+        mod.predlinesearch = predlinesearch
+        mod.maxpredsmallsteps = maxpredsmallsteps
+        mod.maxcorrsteps = maxcorrsteps
+        mod.corrcheck = corrcheck
+        mod.maxcorrlsiters = maxcorrlsiters
+        mod.maxitrefinesteps = maxitrefinesteps
+        mod.alphacorr = alphacorr
+        mod.predlsmulti = predlsmulti
+        mod.corrlsmulti = corrlsmulti
+        mod.itrefinethreshold = itrefinethreshold
+
+        mod.status = :NotLoaded
+
+        return mod
+    end
 end
 
 
@@ -35,6 +99,15 @@ function AlfonsoOptimizer(;
     itrefinethreshold = 0.1,
     )
 
+    if !(1e-10 <= optimtol <= 1e-2)
+        error("optimtol must be from 1e-10 to 1e-2")
+    end
+    if maxiter < 1
+        error("maxiter must be at least 1")
+    end
+    if maxpredsmallsteps < 1
+        error("maxcorrsteps must be at least 1")
+    end
     if !(1 <= maxcorrsteps <= 8)
         error("maxcorrsteps must be from 1 to 8")
     end

@@ -6,89 +6,7 @@ D. Papp and S. Yildiz. On "A homogeneous interior-point algorithm for nonsymmetr
 available at https://arxiv.org/abs/1712.00492
 =#
 
-mutable struct AlfonsoModel <: MOI.ModelLike
-    # options
-    verbose::Bool               # if true, prints progress at each iteration
-    optimtol::Float64           # optimization tolerance parameter
-    maxiter::Int                # maximum number of iterations
-    predlinesearch::Bool        # if false, predictor step uses a fixed step size, else step size is determined via line search
-    maxpredsmallsteps::Int      # maximum number of predictor step size reductions allowed with respect to the safe fixed step size
-    maxcorrsteps::Int           # maximum number of corrector steps (possible values: 1, 2, or 4)
-    corrcheck::Bool             # if false, maxcorrsteps corrector steps are performed at each corrector phase, else the corrector phase can be terminated before maxcorrsteps corrector steps if the iterate is in the eta-neighborhood
-    maxcorrlsiters::Int         # maximum number of line search iterations in each corrector step
-    maxitrefinesteps::Int       # maximum number of iterative refinement steps in linear system solves
-    alphacorr::Float64          # corrector step size
-    predlsmulti::Float64        # predictor line search step size multiplier
-    corrlsmulti::Float64        # corrector line search step size multiplier
-    itrefinethreshold::Float64  # iterative refinement success threshold
-
-    # problem data
-    A               # constraint matrix
-    b               # right-hand side vector
-    c               # cost vector
-    cones           # TODO
-
-    # other algorithmic parameters and utilities
-    eval_gh::Function            # function for computing the gradient and Hessian of the barrier function
-    gh_bnu::Float64             # complexity parameter of the augmented barrier (nu-bar)
-    beta::Float64               # large neighborhood parameter
-    eta::Float64                # small neighborhood parameter
-    alphapredls::Float64        # initial predictor step size with line search
-    alphapredfix::Float64       # fixed predictor step size
-    alphapred::Float64          # initial predictor step size
-    alphapredthreshold::Float64 # minimum predictor step size
-
-    # results
-    status          # solver status
-    niterations     # total number of iterations
-    all_alphapred   # predictor step size at each iteration
-    all_betapred    # neighborhood parameter at the end of the predictor phase at each iteration
-    all_etacorr     # neighborhood parameter at the end of the corrector phase at each iteration
-    all_mu          # complementarity gap at each iteration
-    x               # final value of the primal variables
-    s               # final value of the dual slack variables
-    y               # final value of the dual free variables
-    tau             # final value of the tau-variable
-    kappa           # final value of the kappa-variable
-    pobj            # final primal objective value
-    dobj            # final dual objective value
-    dgap            # final duality gap
-    cgap            # final complementarity gap
-    rel_dgap        # final relative duality gap
-    rel_cgap        # final relative complementarity gap
-    pres            # final primal residuals
-    dres            # final dual residuals
-    pin             # final primal infeasibility
-    din             # final dual infeasibility
-    rel_pin         # final relative primal infeasibility
-    rel_din         # final relative dual infeasibility
-
-    # Model constructor
-    function AlfonsoModel(verbose, optimtol, maxiter, predlinesearch, maxpredsmallsteps, maxcorrsteps, corrcheck, maxcorrlsiters, maxitrefinesteps, alphacorr, predlsmulti, corrlsmulti, itrefinethreshold)
-        mod = new()
-
-        mod.verbose = verbose
-        mod.optimtol = optimtol
-        mod.maxiter = maxiter
-        mod.predlinesearch = predlinesearch
-        mod.maxpredsmallsteps = maxpredsmallsteps
-        mod.maxcorrsteps = maxcorrsteps
-        mod.corrcheck = corrcheck
-        mod.maxcorrlsiters = maxcorrlsiters
-        mod.maxitrefinesteps = maxitrefinesteps
-        mod.alphacorr = alphacorr
-        mod.predlsmulti = predlsmulti
-        mod.corrlsmulti = corrlsmulti
-        mod.itrefinethreshold = itrefinethreshold
-
-        mod.status = :NotLoaded
-
-        return mod
-    end
-end
-
-
-function MOI.optimize!(mod::AlfonsoModel)
+function MOI.optimize!(mod::AlfonsoOptimizer)
     #=
     verify problem data, setup other algorithmic parameters and utilities
     =#
@@ -109,7 +27,7 @@ function MOI.optimize!(mod::AlfonsoModel)
     cones = mod.cones
 
     # create function for computing the gradient and Hessian of the barrier function
-    function eval_gh(x)
+    function eval_gh(tx)
         # TODO
 
 
@@ -168,7 +86,7 @@ function MOI.optimize!(mod::AlfonsoModel)
 
     mod.alphapredfix = cpredfix/(mod.eta + sqrt(2*mod.eta^2 + mod.gh_bnu))
     mod.alphapredls = min(100.0*mod.alphapredfix, 0.9999)
-    mod.alphapredthreshold = (mod.predlsmulti^opts.maxpredsmallsteps)*mod.alphapredfix
+    mod.alphapredthreshold = (mod.predlsmulti^mod.maxpredsmallsteps)*mod.alphapredfix
 
     if !mod.predlinesearch
         # fixed predictor step size
@@ -199,9 +117,9 @@ function MOI.optimize!(mod::AlfonsoModel)
         HiAt = -L'\(L\A')
         Hirxrs = L'\(L\(rhs[1:m] + rhs[m+n+2:m+2n+1]))
 
-        LHSdydtau = [zeros(m) -b; b' mu/tau^2] - [A; -c']*[HiAt, Hic]/mu
+        lhsdydtau = [zeros(m) -b; b' mu/tau^2] - [A; -c']*[HiAt, Hic]/mu
         rhsdydtau = [rhs[1:m]; (rhs[m+n+1] + rhs[end])] - [A; -c']*Hirxrs/mu
-        dydtau = LHSdydtau\rhsdydtau
+        dydtau = lhsdydtau\rhsdydtau
         dx = (Hirxrs - [HiAt, Hic]*dydtau)/mu
 
         return vcat(dydtau[1:m], dx, dydtau[m+1], (-rhs[1:m] - [A', -c]*dydtau), (-rhs[m+n+1] + dot(b, dydtau[1:m]) - dot(c, dx)))
@@ -252,9 +170,9 @@ function MOI.optimize!(mod::AlfonsoModel)
 
     # calculate contants for termination criteria
     # TODO what norms are these
-    term_pres = max(1.0, norm([A, b], Inf))
-    term_dres = max(1.0, norm([A', speye(n), -c], Inf))
-    term_comp = max(1.0, norm([-c', b', 1.0], Inf))
+    tol_pres = max(1.0, norm([A, b], Inf))
+    tol_dres = max(1.0, norm([A', speye(n), -c], Inf))
+    tol_compl = max(1.0, norm([-c', b', 1.0], Inf))
 
     # calculate initial primal iterate
     # scaling factor for the primal problem
@@ -263,16 +181,16 @@ function MOI.optimize!(mod::AlfonsoModel)
     g0 = mod.eval_gh(ones(n))[2]
     rd = maximum((1.0 + abs(g0[j]))/(1.0 + abs(c[j])) for j in 1:n)
     # initial primal iterate
-    x0 = fill(sqrt(rp*rd), n)
+    tx0 = fill(sqrt(rp*rd), n)
 
     # calculate the central primal-dual iterate corresponding to the initial primal iterate
-    (incone, g, H, L) = mod.eval_gh(x0)
-    x = x0
-    y = zeros(m)
+    (incone, g, H, L) = mod.eval_gh(tx0)
+    tx = tx0
+    ty = zeros(m)
     tau = 1.0
-    s = -g
-    kappa = 1.0
-    mu = (dot(x, s) + tau*kappa)/gh_bnu
+    ts = -g
+    kap = 1.0
+    mu = (dot(tx, ts) + tau*kap)/mod.gh_bnu
 
     #=
     main loop
@@ -282,38 +200,43 @@ function MOI.optimize!(mod::AlfonsoModel)
     all_etacorr = fill(NaN, mod.maxiter)
     all_mu = fill(NaN, mod.maxiter)
 
+    if mod.verbose
+        @printf("\n%5s %10s %10s %7s %7s %7s %7s %7s %7s\n", "iter", "p_obj", "d_obj", "gap", "p_inf", "d_inf", "tau", "kap", "mu")
+    end
+
     iter = 0
     mod.status = :StartedIterating
     while iter < mod.maxiter
         #=
         calculate convergence metrics, check criteria, print
         =#
-        cx = dot(c, x)
-        by = dot(b, y)
-        metr_P = norm(A*x - tau*b, Inf)/term_pres
-        metr_D = norm(A'*y + s - tau*c, Inf)/term_dres
-        metr_G = abs(cx - by + kappa)/term_comp
-        metr_A = abs(cx - by)/(tau + abs(by))
-        metr_O = cx/tau
+        ctx = dot(c, tx)
+        bty = dot(b, ty)
+        p_obj = ctx/tau
+        d_obj = bty/tau
+        gap = abs(ctx - bty)/(tau + abs(bty))
+        p_inf = norm(A*tx - tau*b, Inf)/tol_pres
+        d_inf = norm(A'*ty + ts - tau*c, Inf)/tol_dres
+        compl = abs(ctx - bty + kap)/tol_compl
 
-        if (metr_P <= mod.optimtol) && (metr_D <= mod.optimtol)
-            if metr_A <= mod.optimtol
+        if mod.verbose
+            @printf("%5d %10.6e %10.6e %7.3e %7.3e %7.3e %7.3e %7.3e %7.3e\n", iter, p_obj, d_obj, gap, p_inf, d_inf, tau, kap, mu)
+        end
+
+        if (p_inf <= mod.optimtol) && (d_inf <= mod.optimtol)
+            if gap <= mod.optimtol
                 println("Problem is feasible and approximate optimal solution found; terminating")
                 mod.status = :Optimal
                 break
-            elseif (metr_G <= mod.optimtol) && (tau <= mod.optimtol * 1e-02 * max(1.0, kappa))
+            elseif (compl <= mod.optimtol) && (tau <= mod.optimtol*1e-02*max(1.0, kap))
                 println("Problem is nearly primal or dual infeasible; terminating")
                 mod.status = :NearlyInfeasible
                 break
             end
-        elseif (tau <= mod.optimtol * 1e-02 * min(1.0, kappa)) && (mu <= mod.optimtol * 1e-02)
+        elseif (tau <= mod.optimtol*1e-02*min(1.0, kap)) && (mu <= mod.optimtol*1e-02)
             println("Problem is ill-posed; terminating")
             mod.status = :IllPosed
             break
-        end
-
-        if mod.verbose
-            @printf("%d: pobj=%d pIn=%d dIn=%d gap=%d tau=%d kap=%d mu=%d\n", iter, metr_O, metr_P, metr_D, metr_A, tau, kappa, mu)
         end
 
         iter += 1
@@ -321,8 +244,8 @@ function MOI.optimize!(mod::AlfonsoModel)
         #=
         prediction phase: calculate prediction direction, perform line search
         =#
-        rhs = -vcat(A*x - b*tau, -A'*y + c*tau - s, dot(b, y) - dot(c, x) - kappa, s, kappa)
-        (dy, dx, dtau, ds, dkappa) = computenewtondirection(mod, rhs)
+        rhs = -vcat(A*tx - b*tau, -A'*ty + c*tau - ts, dot(b, ty) - dot(c, tx) - kap, ts, kap)
+        (dty, dtx, dtau, dts, dkap) = computenewtondirection(mod, rhs)
 
         alpha = mod.alphapred
         betaalpha = Inf
@@ -330,18 +253,18 @@ function MOI.optimize!(mod::AlfonsoModel)
         alphaprevok = false
         predfail = false
         while true
-            sa_y = mod.y + alpha*dy
-            sa_x = mod.x + alpha*dx
+            sa_ty = mod.ty + alpha*dty
+            sa_tx = mod.tx + alpha*dtx
             sa_tau = mod.tau + alpha*dtau
-            sa_s = mod.s + alpha*ds
-            sa_kappa = mod.kappa + alpha*dkappa
+            sa_ts = mod.ts + alpha*dts
+            sa_kap = mod.kap + alpha*dkap
 
-            (sa_incone, sa_g, sa_H, sa_L) = mod.eval_gh(sa_x)
+            (sa_incone, sa_g, sa_H, sa_L) = mod.eval_gh(sa_tx)
 
             if sa_incone
                 # primal iterate is inside the cone
-                sa_mu = (dot(sa_x, sa_s) + sa_tau*sa_kappa)/mod.gh_bnu
-                sa_psi = vcat(sa_s + sa_mu*sa_g, sa_kappa - sa_mu/sa_tau)
+                sa_mu = (dot(sa_tx, sa_ts) + sa_tau*sa_kap)/mod.gh_bnu
+                sa_psi = vcat(sa_ts + sa_mu*sa_g, sa_kap - sa_mu/sa_tau)
                 betaalpha = sqrt(sum(abs2, sa_L\sa_psi[1:end-1]) + (sa_tau*sa_psi[end])^2)/sa_mu
                 sa_inconenhd = (betaalpha < mod.beta)
             end
@@ -418,23 +341,23 @@ function MOI.optimize!(mod::AlfonsoModel)
         for corriter in 1:mod.maxcorrsteps
             # calculate correction direction
             rhs = vcat(zeros(m+n+1), -psi)
-            (dy, dx, dtau, ds, dkappa) = computenewtondirection(mod, rhs)
+            (dty, dtx, dtau, dts, dkap) = computenewtondirection(mod, rhs)
 
             # perform line search to ensure next primal iterate remains inside the cone
             alpha = mod.alphacorr
             for lsiter in 1:mod.maxcorrlsiters
-                sa_y = y + alpha*dy
-                sa_x = x + alpha*dx
+                sa_ty = ty + alpha*dty
+                sa_tx = tx + alpha*dtx
                 sa_tau = tau + alpha*dtau
-                sa_s = s + alpha*ds
-                sa_kappa = kappa + alpha*dkappa
+                sa_ts = ts + alpha*dts
+                sa_kap = kap + alpha*dkap
 
-                (sa_incone, sa_g, sa_H, sa_L) = mod.eval_gh(sa_x)
+                (sa_incone, sa_g, sa_H, sa_L) = mod.eval_gh(sa_tx)
 
                 # terminate line search if primal iterate is inside the cone
                 if sa_incone
-                    sa_mu = (dot(sa_x, sa_s) + sa_tau*sa_kappa)/mod.gh_bnu
-                    sa_psi = vcat(sa_s + sa_mu*sa_g, sa_kappa - sa_mu/sa_tau)
+                    sa_mu = (dot(sa_tx, sa_ts) + sa_tau*sa_kap)/mod.gh_bnu
+                    sa_psi = vcat(sa_ts + sa_mu*sa_g, sa_kap - sa_mu/sa_tau)
                     break
                 elseif lsiter == mod.maxcorrlsiters
                     println("Corrector could not improve the solution; terminating")
@@ -472,8 +395,7 @@ function MOI.optimize!(mod::AlfonsoModel)
         all_mu[iter] = mu
     end
 
-    println("Finished in $iter iterations")
-    println("Internal status is $status")
+    println("Finished in $iter iterations\nInternal status is $status\n")
 
     #=
     calculate final solution and iteration statistics
@@ -484,27 +406,23 @@ function MOI.optimize!(mod::AlfonsoModel)
     mod.all_etacorr = all_etacorr[1:iter]
     mod.all_mu = all_mu[1:iter]
 
-    mod.x = x./tau
-    mod.s = s./tau
-    mod.y = y./tau
+    mod.x = tx./tau
+    mod.y = ty./tau
     mod.tau = tau
-    mod.kappa = kappa
+    mod.s = ts./tau
+    mod.kap = kap
 
     mod.pobj = dot(c, mod.x)
     mod.dobj = dot(b, mod.y)
-
     mod.dgap = mod.pobj - mod.dobj
     mod.cgap = dot(mod.s, mod.x)
-
     mod.rel_dgap = mod.dgap/(1.0 + abs(mod.pobj) + abs(mod.dobj))
     mod.rel_cgap = mod.cgap/(1.0 + abs(mod.pobj) + abs(mod.dobj))
 
     mod.pres = b - A*mod.x
     mod.dres = c - A'*mod.y - mod.s
-
     mod.pin = norm(mod.pres)
     mod.din = norm(mod.dres)
-
     mod.rel_pin = mod.pin/(1.0 + norm(b, Inf))
     mod.rel_din = mod.din/(1.0 + norm(c, Inf))
 
