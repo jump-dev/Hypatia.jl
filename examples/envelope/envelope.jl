@@ -15,7 +15,6 @@ using SparseArrays
 using LinearAlgebra
 using DelimitedFiles
 
-
 loc = joinpath(pwd(), "data")
 
 n = 1
@@ -36,11 +35,10 @@ numPolys = 2
 degPolys = 5
 
 LWts = [5,]
-nu = numPolys*(l + sum(LWts))
-gh_bnu = nu + 1.0
+gh_bnu = numPolys*(l + sum(LWts)) + 1.0
 wtVals = 1.0 .- pts.^2
 
-PWts = [(qr(Diagonal(sqrt.(wtVals[:,j]))*P[:,1:LWts[j]])).Q for j in 1:n]
+PWts = [Array((qr(Diagonal(sqrt.(wtVals[:,j]))*P[:,1:LWts[j]])).Q) for j in 1:n]
 
 A = repeat(sparse(1.0I, u, u), outer=(1, numPolys))
 b = w
@@ -79,8 +77,7 @@ function eval_gh(tx)
 
         for j in 1:n
             (inpWt, gpWt, HpWt) = eval_gh_SOSWt(txp, PWts[j])
-            inp &= inpWt
-            if !inp
+            if !inpWt
                 return (false, zeros(0), zeros(0,0), zeros(0,0))
             end
             gp = gp + gpWt
@@ -98,25 +95,12 @@ function eval_gh(tx)
     end
 
     @assert issymmetric(H)
-
     return (true, g, H, L)
 end
 
 
-# test
-# tx0 = ones(numPolys*u)
-# (incone0, g0, H0, L0) = eval_gh(tx0)
-# @show incone0
-# @show g0
-# @show H0
-# @show L0
-
-
 # load into optimizer and solve
-
-
-
-opt = AlfonsoOptimizer(maxiter=5)
-Alfonso.loaddata!(opt::AlfonsoOptimizer, A::AbstractMatrix, b::Vector{Float64}, c::Vector{Float64}, eval_gh::Function, gh_bnu::Float64)
+opt = AlfonsoOptimizer(maxiter=100)
+Alfonso.loaddata!(opt::AlfonsoOptimizer, A::AbstractMatrix{Float64}, b::Vector{Float64}, c::Vector{Float64}, eval_gh::Function, gh_bnu::Float64)
 # @show opt
-MOI.optimize!(opt)
+@time MOI.optimize!(opt)

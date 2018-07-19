@@ -29,75 +29,22 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
     #
     # # create function for computing the gradient and Hessian of the barrier function
     # function eval_gh(tx)
-    #     # TODO
-    #
-    #
     #     return (incone, g, H, L)
     # end
-    # opt.eval_gh = eval_gh
     #
     # # calculate complexity parameter of the augmented barrier (nu-bar)
-    # opt.gh_bnu = NaN # TODO
+    # gh_bnu = NaN # TODO
 
-    # set remaining algorithmic parameters based on precomputed safe values (from original authors):
+    eval_gh = opt.eval_gh
+    gh_bnu = opt.gh_bnu
+
+    # set remaining algorithmic parameters based on precomputed safe values (from original authors)
     # parameters are chosen to make sure that each predictor step takes the current iterate from the eta-neighborhood to the beta-neighborhood and each corrector phase takes the current iterate from the beta-neighborhood to the eta-neighborhood. extra corrector steps are allowed to mitigate the effects of finite precision
-    if opt.maxcorrsteps <= 2
-        if opt.gh_bnu < 10.0
-            opt.beta = 0.1810
-            opt.eta = 0.0733
-            cpredfix = 0.0225
-        elseif opt.gh_bnu < 100.0
-            opt.beta = 0.2054
-            opt.eta = 0.0806
-            cpredfix = 0.0263
-        else
-            opt.beta = 0.2190
-            opt.eta = 0.0836
-            cpredfix = 0.0288
-        end
-    elseif opt.maxcorrsteps <= 4
-        if opt.gh_bnu < 10.0
-            opt.beta = 0.2084
-            opt.eta = 0.0502
-            cpredfix = 0.0328
-        elseif opt.gh_bnu < 100.0
-            opt.beta = 0.2356
-            opt.eta = 0.0544
-            cpredfix = 0.0380
-        else
-            opt.beta = 0.2506
-            opt.eta = 0.0558
-            cpredfix = 0.0411
-        end
-    else
-        if opt.gh_bnu < 10.0
-            opt.beta = 0.2387
-            opt.eta = 0.0305
-            cpredfix = 0.0429
-        elseif opt.gh_bnu < 100.0
-            opt.beta = 0.2683
-            opt.eta = 0.0327
-            cpredfix = 0.0489
-        else
-            opt.beta = 0.2844
-            opt.eta = 0.0332
-            cpredfix = 0.0525
-        end
-    end
-
-    opt.alphapredfix = cpredfix/(opt.eta + sqrt(2*opt.eta^2 + opt.gh_bnu))
-    opt.alphapredls = min(100.0*opt.alphapredfix, 0.9999)
-    opt.alphapredthreshold = (opt.predlsmulti^opt.maxpredsmallsteps)*opt.alphapredfix
-
-    if !opt.predlinesearch
-        # fixed predictor step size
-        opt.alphapred = opt.alphapredfix
-    else
-        # initial predictor step size with line search
-        opt.alphapred = opt.alphapredls
-    end
-
-    opt.status = :Loaded
+    (beta, eta, cpredfix) = setbetaeta(opt.maxcorrsteps, gh_bnu) # beta: large neighborhood parameter, eta: small neighborhood parameter
+    alphapredfix = cpredfix/(eta + sqrt(2*eta^2 + gh_bnu)) # fixed predictor step size
+    alphapredls = min(100.0*alphapredfix, 0.9999) # initial predictor step size with line search
+    alphapredthres = (opt.predlsmulti^opt.maxpredsmallsteps)*alphapredfix # minimum predictor step size
+    alphapred = (opt.predlinesearch ? alphapredls : alphapredfix) # predictor step size
 
     #=
     setup data and functions needed in main loop
@@ -133,9 +80,10 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
         delta = solvesystem(rhs, L, mu, tau)
 
         if opt.maxitrefinesteps > 0
+            error("NOT IMPLEMENTED")
             # checks to see if we need to refine the solution
-            # TODO rcond and eps?
-            if rcond(Array(H)) < opt.eps # TODO Base.LinAlg.LAPACK.gecon!
+            # TODO rcond is not a function. and eps?
+            if rcond(Array(H)) < eps() # TODO Base.LinAlg.LAPACK.gecon! # TODO really epsilon?\
                 lhsnew = copy(lhs)
                 lhsnew[m+n+2:m+2n+1,m+1:m+n] = mu*H
                 lhsnew[end,m+n+1] = mu/tau^2
@@ -153,7 +101,7 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
                     resnewnorm = norm(resnew)
 
                     # stop iterative refinement if there is not enough progress
-                    if resnewnorm > opt.itrefinethreshold*resnorm
+                    if resnewnorm > opt.itrefinethres*resnorm
                         break
                     end
 
@@ -170,45 +118,52 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
         return (delta[1:m], delta[m+1:m+n], delta[m+n+1], delta[m+n+2:m+2n+1], delta[end])
     end
 
-    # calculate contants for termination criteria
-    # TODO what norms are these
-    tol_pres = max(1.0, norm([A, b], Inf))
-    tol_dres = max(1.0, norm([A', sparse(1.0I,n,n), -c], Inf))
-    tol_compl = max(1.0, norm([-c', b', 1.0], Inf))
+    # termination tolerances are infinity operator norms of submatrices of lhs
+    tol_pres = max(1.0, maximum(sum(abs, A[i,:]) + abs(b[i]) for i in 1:m)) # first m rows
+    tol_dres = max(1.0, maximum(sum(abs, A[:,j]) + abs(c[j]) + 1.0 for j in 1:n)) # next n rows
+    tol_compl = max(1.0, maximum(abs, b), maximum(abs, c)) # row m+n+1
 
     # calculate initial primal iterate
     # scaling factor for the primal problem
     rp = maximum((1.0 + abs(b[i]))/(1.0 + abs(sum(A[i,:]))) for i in 1:m)
     # scaling factor for the dual problem
-    g0 = opt.eval_gh(ones(n))[2]
+    g0 = eval_gh(ones(n))[2]
     rd = maximum((1.0 + abs(g0[j]))/(1.0 + abs(c[j])) for j in 1:n)
     # initial primal iterate
     tx0 = fill(sqrt(rp*rd), n)
 
     # calculate the central primal-dual iterate corresponding to the initial primal iterate
-    (incone, g, H, L) = opt.eval_gh(tx0)
+    (incone, g, H, L) = eval_gh(tx0)
     # TODO maybe can do these as views of a concatenated array - faster to update with delta direction
-    tx = tx0
     ty = zeros(m)
+    tx = tx0
     tau = 1.0
     ts = -g
     kap = 1.0
-    mu = (dot(tx, ts) + tau*kap)/opt.gh_bnu
+    mu = (dot(tx, ts) + tau*kap)/gh_bnu
+
+    # set up placeholders
+    # TODO can be better with allocation
+    sa_ty = similar(ty)
+    sa_tx = similar(tx)
+    sa_tau = 0.0
+    sa_ts = similar(ts)
+    sa_kap = 0.0
+    sa_mu = 0.0
+    sa_incone = false
+    sa_g = similar(g)
+    sa_H = similar(H)
+    sa_L = similar(L)
 
     #=
     main loop
     =#
-    all_alphapred = fill(NaN, opt.maxiter)
-    all_betapred = fill(NaN, opt.maxiter)
-    all_etacorr = fill(NaN, opt.maxiter)
-    all_mu = fill(NaN, opt.maxiter)
-
     if opt.verbose
         @printf("\n%5s %11s %11s %9s %9s %9s %9s %9s %9s\n", "iter", "p_obj", "d_obj", "gap", "p_inf", "d_inf", "tau", "kap", "mu")
     end
 
-    iter = 0
     opt.status = :StartedIterating
+    iter = 0
     while iter < opt.maxiter
         #=
         calculate convergence metrics, check criteria, print
@@ -218,8 +173,8 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
         p_obj = ctx/tau
         d_obj = bty/tau
         gap = abs(ctx - bty)/(tau + abs(bty))
-        p_inf = norm(A*tx - tau*b, Inf)/tol_pres
-        d_inf = norm(A'*ty + ts - tau*c, Inf)/tol_dres
+        p_inf = maximum(abs, A*tx - tau*b)/tol_pres
+        d_inf = maximum(abs, A'*ty + ts - tau*c)/tol_dres
         compl = abs(ctx - bty + kap)/tol_compl
 
         if opt.verbose
@@ -245,157 +200,174 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
         iter += 1
 
         #=
-        prediction phase: calculate prediction direction, perform line search
+        prediction phase
         =#
-        println("prediction")
-
-        rhs = -vcat(A*tx - b*tau, -A'*ty + c*tau - ts, dot(b, ty) - dot(c, tx) - kap, ts, kap)
+        # determine prediction direction
+        rhs = vcat(-A*tx + b*tau, A'*ty - c*tau + ts, -dot(b, ty) + dot(c, tx) + kap, -ts, -kap)
         (dty, dtx, dtau, dts, dkap) = computenewtondirection(rhs, H, L, mu, tau)
 
-        alpha = opt.alphapred
+        # determine step length alpha by line search
+        alpha = alphapred
         betaalpha = Inf
-        sa_inconenhd = false
-        alphaprevok = false
+        alphaprevok = true
+        alphaprev = Inf
+        betaalphaprev = Inf
         predfail = false
+        nprediters = 0
         while true
-            sa_ty = ty + alpha*dty
-            sa_tx = tx + alpha*dtx
+            nprediters += 1
+
+            sa_ty .= ty + alpha*dty
+            sa_tx .= tx + alpha*dtx
             sa_tau = tau + alpha*dtau
-            sa_ts = ts + alpha*dts
+            sa_ts .= ts + alpha*dts
             sa_kap = kap + alpha*dkap
+            sa_mu = (dot(sa_tx, sa_ts) + sa_tau*sa_kap)/gh_bnu
+            (sa_incone, sa_g, sa_H, sa_L) = eval_gh(sa_tx)
 
-            (sa_incone, sa_g, sa_H, sa_L) = opt.eval_gh(sa_tx)
-
-            @show sa_incone
             if sa_incone
                 # primal iterate is inside the cone
-                sa_mu = (dot(sa_tx, sa_ts) + sa_tau*sa_kap)/opt.gh_bnu
-                sa_psi = vcat(sa_ts + sa_mu*sa_g, sa_kap - sa_mu/sa_tau)
-                betaalpha = sqrt(sum(abs2, sa_L\sa_psi[1:end-1]) + (sa_tau*sa_psi[end])^2)/sa_mu
-                sa_inconenhd = (betaalpha < opt.beta)
+                betaalpha = sqrt(sum(abs2, sa_L\(sa_ts + sa_mu*sa_g)) + (sa_tau*sa_kap - sa_mu)^2)/sa_mu
+
+                if betaalpha < beta
+                    # iterate is inside the beta-neighborhood
+                    if !alphaprevok || (alpha > opt.predlsmulti)
+                        # either the previous iterate was outside the beta-neighborhood or increasing alpha again will make it > 1
+                        if opt.predlinesearch
+                            alphapred = alpha
+                        end
+                        break
+                    end
+
+                    alphaprevok = true
+                    alphaprev = alpha
+                    betaalphaprev = betaalpha
+                    alpha = alpha/opt.predlsmulti
+                    continue
+                end
             end
 
-            if sa_incone && sa_inconenhd
-                # iterate is inside the beta-neighborhood
-                if !alphaprevok || (alpha > opt.predlsmulti)
-                    # either the previous iterate was outside the beta-neighborhood or increasing alpha again will make it > 1
-                    if opt.predlinesearch
-                        opt.alphapred = alpha
-                    end
-                    break
+            # iterate is outside the cone and beta-neighborhood
+            if alphaprevok && (nprediters > 1)
+                # previous iterate was in the beta-neighborhood
+                alpha = alphaprev
+                betaalpha = betaalphaprev
+                if opt.predlinesearch
+                    alphapred = alpha
                 end
-                alphaprevok = true
-                alphaprev = alpha
-                betaalphaprev = betaalpha
-                alpha = alpha/opt.predlsmulti
-            else
-                # iterate is outside the beta-neighborhood
-                if alphaprevok
-                    # previous iterate was in the beta-neighborhood
-                    alpha = alphaprev
-                    betaalpha = betaalphaprev
-                    if opt.predlinesearch
-                        opt.alphapred = alpha
-                    end
-                    break
-                end
-
-                if alpha < opt.alphapredthreshold
-                    # last two iterates were outside the beta-neighborhood and alpha is very small, so predictor has failed
-                    predfail = true # predictor has failed
-                    alpha = 0.0
-                    betaalpha = Inf
-                    if opt.predlinesearch
-                        opt.alphapred = alpha
-                    end
-                    break
-                end
-
-                alphaprevok = false
-                alphaprev = alpha
-                betaalphaprev = betaalpha
-                alpha = opt.predlsmulti*alpha
+                break
             end
+
+            # the last two iterates were outside the beta-neighborhood
+            if alpha < alphapredthres
+                # alpha is very small, so predictor has failed
+                predfail = true
+                println("Predictor could not improve the solution; terminating")
+                opt.status = :PredictorFail
+                break
+            end
+
+            alphaprevok = false
+            alphaprev = alpha
+            betaalphaprev = betaalpha
+            alpha = opt.predlsmulti*alpha
         end
-
-        all_alphapred[iter] = opt.alphapred
-        all_betapred[iter] = betaalpha
-
+        # @show nprediters
         if predfail
-            all_betapred[iter] = (iter == 1) ? Inf : all_etacorr[iter-1]
-            println("Predictor could not improve the solution; terminating")
-            opt.status = :PredictorFail
             break
         end
 
+        # step distance alpha in the direction
+        # TODO can take sa_ values already above in most cases
+        ty .+= alpha*dty
+        tx .+= alpha*dtx
+        tau += alpha*dtau
+        ts .+= alpha*dts
+        kap += alpha*dkap
+        mu = (dot(tx, ts) + tau*kap)/gh_bnu
+        (incone, g, H, L) = eval_gh(tx)
+
         # skip correction phase if allowed and current iterate is in the eta-neighborhood
-        all_etacorr[iter] = all_betapred[iter]
-        if opt.corrcheck && (all_etacorr[iter] <= opt.eta)
-            all_mu[iter] = mu
+        if opt.corrcheck && (betaalpha <= eta)
             continue
         end
 
         #=
         correction phase: perform correction steps
         =#
-        println("correction")
-
+        etacorr = betaalpha
         corrfail = false
-        for corriter in 1:opt.maxcorrsteps
+        ncorrsteps = 0
+        while true
+            ncorrsteps += 1
+
             # calculate correction direction
-            rhs = vcat(zeros(m+n+1), -psi)
+            rhs = vcat(zeros(m+n+1), -ts - mu*g, -kap + mu/tau)
             (dty, dtx, dtau, dts, dkap) = computenewtondirection(rhs, H, L, mu, tau)
 
-            # perform line search to ensure next primal iterate remains inside the cone
+            # determine step length alpha by line search
             alpha = opt.alphacorr
-            for lsiter in 1:opt.maxcorrlsiters
-                sa_ty = ty + alpha*dty
-                sa_tx = tx + alpha*dtx
+            ncorrlsiters = 0
+            while ncorrlsiters <= opt.maxcorrlsiters
+                ncorrlsiters += 1
+
+                sa_ty .= ty + alpha*dty
+                sa_tx .= tx + alpha*dtx
                 sa_tau = tau + alpha*dtau
-                sa_ts = ts + alpha*dts
+                sa_ts .= ts + alpha*dts
                 sa_kap = kap + alpha*dkap
+                sa_mu = (dot(sa_tx, sa_ts) + sa_tau*sa_kap)/gh_bnu
+                (sa_incone, sa_g, sa_H, sa_L) = eval_gh(sa_tx) # TODO only need incone until last iter
 
-                (sa_incone, sa_g, sa_H, sa_L) = opt.eval_gh(sa_tx)
-
-                # terminate line search if primal iterate is inside the cone
                 if sa_incone
-                    sa_mu = (dot(sa_tx, sa_ts) + sa_tau*sa_kap)/opt.gh_bnu
-                    sa_psi = vcat(sa_ts + sa_mu*sa_g, sa_kap - sa_mu/sa_tau)
+                    # primal iterate is inside the cone, so terminate line search
                     break
-                elseif lsiter == opt.maxcorrlsiters
+                end
+
+                # primal iterate is outside the cone
+                if lsiter == opt.maxcorrlsiters
+                    # corrector failed
+                    corrfail = true
                     println("Corrector could not improve the solution; terminating")
                     opt.status = :CorrectorFail
-                    corrfail = true
                     break
-                else
-                    alpha = opt.corrlsmulti*alpha
                 end
-            end
 
+                alpha = opt.corrlsmulti*alpha
+            end
+            # @show ncorrlsiters
             if corrfail
                 break
             end
 
-            # finish if allowed and current iterate is in the eta-neighborhood, or if
-            if (opt.corrcheck && (corriter < opt.maxcorrsteps)) || (corriter == opt.maxcorrsteps)
-                all_etacorr[iter] = sqrt(sum(abs2, L\psi[1:end-1]) + (tau*psi[end])^2)/mu
-                if all_etacorr[iter] <= opt.eta
+            # step distance alpha in the direction
+            # TODO can take sa_ values already above in most cases
+            ty .+= alpha*dty
+            tx .+= alpha*dtx
+            tau += alpha*dtau
+            ts .+= alpha*dts
+            kap += alpha*dkap
+            mu = (dot(tx, ts) + tau*kap)/gh_bnu
+            (incone, g, H, L) = eval_gh(tx)
+
+            # finish if allowed and current iterate is in the eta-neighborhood, or if taken max steps
+            if (ncorrsteps == opt.maxcorrsteps) || opt.corrcheck
+                etacorr = sqrt(sum(abs2, L\(ts + mu*g)) + (tau*kap - mu)^2)/mu
+                if etacorr <= eta
+                    break
+                elseif ncorrsteps == opt.maxcorrsteps
+                    # etacorr > eta, so corrector failed
+                    corrfail = true
+                    println("Corrector phase finished outside the eta-neighborhood; terminating")
+                    opt.status = :CorrectorFail
                     break
                 end
             end
         end
-
+        # @show ncorrsteps
         if corrfail
             break
         end
-
-        if all_etacorr[iter] > opt.eta
-            println("Corrector phase finished outside the eta-neighborhood; terminating")
-            opt.status = :CorrectorFail
-            break
-        end
-
-        all_mu[iter] = mu
     end
 
     println("\nFinished in $iter iterations\nInternal status is $(opt.status)\n")
@@ -404,10 +376,6 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
     calculate final solution and iteration statistics
     =#
     opt.niterations = iter
-    opt.all_alphapred = all_alphapred[1:iter]
-    opt.all_betapred = all_betapred[1:iter]
-    opt.all_etacorr = all_etacorr[1:iter]
-    opt.all_mu = all_mu[1:iter]
 
     opt.x = tx./tau
     opt.y = ty./tau
@@ -430,4 +398,33 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
     opt.rel_din = opt.din/(1.0 + norm(c, Inf))
 
     return nothing
+end
+
+
+function setbetaeta(maxcorrsteps, gh_bnu)
+    if maxcorrsteps <= 2
+        if gh_bnu < 10.0
+            return (0.1810, 0.0733, 0.0225)
+        elseif gh_bnu < 100.0
+            return (0.2054, 0.0806, 0.0263)
+        else
+            return (0.2190, 0.0836, 0.0288)
+        end
+    elseif maxcorrsteps <= 4
+        if gh_bnu < 10.0
+            return (0.2084, 0.0502, 0.0328)
+        elseif gh_bnu < 100.0
+            return (0.2356, 0.0544, 0.0380)
+        else
+            return (0.2506, 0.0558, 0.0411)
+        end
+    else
+        if gh_bnu < 10.0
+            return (0.2387, 0.0305, 0.0429)
+        elseif gh_bnu < 100.0
+            return (0.2683, 0.0327, 0.0489)
+        else
+            return (0.2844, 0.0332, 0.0525)
+        end
+    end
 end

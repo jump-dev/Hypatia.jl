@@ -4,47 +4,42 @@ export AlfonsoOptimizer
 
 mutable struct AlfonsoOptimizer <: MOI.AbstractOptimizer
     # options
-    verbose::Bool               # if true, prints progress at each iteration
-    optimtol::Float64           # optimization tolerance parameter
-    maxiter::Int                # maximum number of iterations
-    predlinesearch::Bool        # if false, predictor step uses a fixed step size, else step size is determined via line search
-    maxpredsmallsteps::Int      # maximum number of predictor step size reductions allowed with respect to the safe fixed step size
-    maxcorrsteps::Int           # maximum number of corrector steps (possible values: 1, 2, or 4)
-    corrcheck::Bool             # if false, maxcorrsteps corrector steps are performed at each corrector phase, else the corrector phase can be terminated before maxcorrsteps corrector steps if the iterate is in the eta-neighborhood
-    maxcorrlsiters::Int         # maximum number of line search iterations in each corrector step
-    maxitrefinesteps::Int       # maximum number of iterative refinement steps in linear system solves
-    alphacorr::Float64          # corrector step size
-    predlsmulti::Float64        # predictor line search step size multiplier
-    corrlsmulti::Float64        # corrector line search step size multiplier
-    itrefinethreshold::Float64  # iterative refinement success threshold
+    verbose::Bool           # if true, prints progress at each iteration
+    optimtol::Float64       # optimization tolerance parameter
+    maxiter::Int            # maximum number of iterations
+    predlinesearch::Bool    # if false, predictor step uses a fixed step size, else step size is determined via line search
+    maxpredsmallsteps::Int  # maximum number of predictor step size reductions allowed with respect to the safe fixed step size
+    maxcorrsteps::Int       # maximum number of corrector steps (possible values: 1, 2, or 4)
+    corrcheck::Bool         # if false, maxcorrsteps corrector steps are performed at each corrector phase, else the corrector phase can be terminated before maxcorrsteps corrector steps if the iterate is in the eta-neighborhood
+    maxcorrlsiters::Int     # maximum number of line search iterations in each corrector step
+    maxitrefinesteps::Int   # maximum number of iterative refinement steps in linear system solves
+    alphacorr::Float64      # corrector step size
+    predlsmulti::Float64    # predictor line search step size multiplier
+    corrlsmulti::Float64    # corrector line search step size multiplier
+    itrefinethres::Float64  # iterative refinement success threshold
 
     # problem data
     A               # constraint matrix
     b               # right-hand side vector
     c               # cost vector
-    cones           # TODO
+    # cones           # TODO
 
     # other algorithmic parameters and utilities
+    # TODO these will be removed when "cones" is working
     eval_gh::Function           # function for computing the gradient and Hessian of the barrier function
     gh_bnu::Float64             # complexity parameter of the augmented barrier (nu-bar)
-    beta::Float64               # large neighborhood parameter
-    eta::Float64                # small neighborhood parameter
-    alphapredls::Float64        # initial predictor step size with line search
-    alphapredfix::Float64       # fixed predictor step size
-    alphapred::Float64          # initial predictor step size
-    alphapredthreshold::Float64 # minimum predictor step size
 
     # results
     status          # solver status
     niterations     # total number of iterations
-    all_alphapred   # predictor step size at each iteration
-    all_betapred    # neighborhood parameter at the end of the predictor phase at each iteration
-    all_etacorr     # neighborhood parameter at the end of the corrector phase at each iteration
-    all_mu          # complementarity gap at each iteration
-    x               # final value of the primal variables
-    s               # final value of the dual slack variables
+    # all_alphapred   # predictor step size at each iteration
+    # all_betapred    # neighborhood parameter at the end of the predictor phase at each iteration
+    # all_etacorr     # neighborhood parameter at the end of the corrector phase at each iteration
+    # all_mu          # complementarity gap at each iteration
     y               # final value of the dual free variables
+    x               # final value of the primal variables
     tau             # final value of the tau-variable
+    s               # final value of the dual slack variables
     kap             # final value of the kappa-variable
     pobj            # final primal objective value
     dobj            # final dual objective value
@@ -59,7 +54,7 @@ mutable struct AlfonsoOptimizer <: MOI.AbstractOptimizer
     rel_pin         # final relative primal infeasibility
     rel_din         # final relative dual infeasibility
 
-    function AlfonsoOptimizer(verbose, optimtol, maxiter, predlinesearch, maxpredsmallsteps, maxcorrsteps, corrcheck, maxcorrlsiters, maxitrefinesteps, alphacorr, predlsmulti, corrlsmulti, itrefinethreshold)
+    function AlfonsoOptimizer(verbose, optimtol, maxiter, predlinesearch, maxpredsmallsteps, maxcorrsteps, corrcheck, maxcorrlsiters, maxitrefinesteps, alphacorr, predlsmulti, corrlsmulti, itrefinethres)
         opt = new()
 
         opt.verbose = verbose
@@ -74,7 +69,7 @@ mutable struct AlfonsoOptimizer <: MOI.AbstractOptimizer
         opt.alphacorr = alphacorr
         opt.predlsmulti = predlsmulti
         opt.corrlsmulti = corrlsmulti
-        opt.itrefinethreshold = itrefinethreshold
+        opt.itrefinethres = itrefinethres
 
         opt.status = :NotLoaded
 
@@ -86,7 +81,7 @@ end
 function AlfonsoOptimizer(;
     verbose = true,
     optimtol = 1e-06,
-    maxiter = 5,
+    maxiter = 1e3,
     predlinesearch = true,
     maxpredsmallsteps = 8,
     maxcorrsteps = 8, # NOTE doubled in .m code
@@ -96,7 +91,7 @@ function AlfonsoOptimizer(;
     alphacorr = 1.0,
     predlsmulti = 0.7,
     corrlsmulti = 0.5,
-    itrefinethreshold = 0.1,
+    itrefinethres = 0.1,
     )
 
     if !(1e-10 <= optimtol <= 1e-2)
@@ -112,7 +107,7 @@ function AlfonsoOptimizer(;
         error("maxcorrsteps must be from 1 to 8")
     end
 
-    return AlfonsoOptimizer(verbose, optimtol, maxiter, predlinesearch, maxpredsmallsteps, maxcorrsteps, corrcheck, maxcorrlsiters, maxitrefinesteps, alphacorr, predlsmulti, corrlsmulti, itrefinethreshold)
+    return AlfonsoOptimizer(verbose, optimtol, maxiter, predlinesearch, maxpredsmallsteps, maxcorrsteps, corrcheck, maxcorrlsiters, maxitrefinesteps, alphacorr, predlsmulti, corrlsmulti, itrefinethres)
 end
 
 
