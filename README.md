@@ -6,3 +6,4 @@
 - hook up to MathOptInterface
 - reduce memory footprint (maybe use array views for iterates)
 - improve use of sparse linear algebra
+- move to JuliaOpt
