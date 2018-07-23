@@ -28,8 +28,7 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
     # cones = opt.cones
     #
     # # create function for computing the gradient and Hessian of the barrier function
-    # function eval_gh(tx)
-    #     return (incone, g, H, L)
+    # function eval_gh(...)
     # end
     #
     # # calculate complexity parameter of the augmented barrier (nu-bar)
@@ -49,92 +48,25 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
     #=
     setup data and functions needed in main loop
     =#
-    # build sparse LHS matrix
-    lhs = [
-        spzeros(m,m)  A                 -b            spzeros(m,n)       spzeros(m,1)
-        -A'           spzeros(n,n)      c             sparse(-1.0I,n,n)  spzeros(n,1)
-        b'            -c'               0.0           spzeros(1,n)       -1.0
-        spzeros(n,m)  sparse(1.0I,n,n)  spzeros(n,1)  sparse(1.0I,n,n)   spzeros(n,1)
-        spzeros(1,m)  spzeros(1,n)      1.0           spzeros(1,n)       1.0
-        ]
-    dropzeros!(lhs)
-
-    # create block solver function
-    # TODO optimize operations
-    function solvesystem(rhs, L, mu, tau)
-        Hic = L'\(L\c)
-        HiAt = -L'\(L\A')
-        Hirxrs = L'\(L\(rhs[m+1:m+n] + rhs[m+n+2:m+2n+1]))
-
-        lhsdydtau = [zeros(m,m) -b; b' mu/tau^2] - ([A; -c']*[HiAt Hic])/mu
-        rhsdydtau = [rhs[1:m]; (rhs[m+n+1] + rhs[end])] - ([A; -c']*Hirxrs)/mu
-        dydtau = lhsdydtau\rhsdydtau
-        dx = (Hirxrs - [HiAt Hic]*dydtau)/mu
-
-        return vcat(dydtau[1:m], dx, dydtau[m+1], (-rhs[m+1:m+n] - [A' -c]*dydtau), (-rhs[m+n+1] + dot(b, dydtau[1:m]) - dot(c, dx)))
-    end
-
-    # create Newton system solver function to compute Newton directions
-    # TODO optimize operations
-    function computenewtondirection(rhs, H, L, mu, tau)
-        delta = solvesystem(rhs, L, mu, tau)
-
-        if opt.maxitrefinesteps > 0
-            error("NOT IMPLEMENTED")
-            # checks to see if we need to refine the solution
-            # TODO rcond is not a function. and eps?
-            if rcond(Array(H)) < eps() # TODO Base.LinAlg.LAPACK.gecon! # TODO really epsilon?\
-                lhsnew = copy(lhs)
-                lhsnew[m+n+2:m+2n+1,m+1:m+n] = mu*H
-                lhsnew[end,m+n+1] = mu/tau^2
-
-                # res = residual3p(lhsnew, delta, rhs)
-                res = lhsnew*delta - rhs # TODO needs to be in at least triple precision
-                resnorm = norm(res)
-
-                for refiter in 1:opt.maxitrefinesteps
-                    d = solvesystem(rhs, L, mu, tau)
-                    deltanew = delta - d
-
-                    # res = residual3p(lhsnew, deltanew, rhs)
-                    resnew = lhsnew*deltanew - rhs # TODO needs to be in at least triple precision
-                    resnewnorm = norm(resnew)
-
-                    # stop iterative refinement if there is not enough progress
-                    if resnewnorm > opt.itrefinethres*resnorm
-                        break
-                    end
-
-                    # update solution if residual norm is smaller
-                    if resnewnorm < resnorm
-                        delta = deltanew
-                        res = resnew
-                        resnorm = resnewnorm
-                    end
-                end
-            end
-        end
-
-        return (delta[1:m], delta[m+1:m+n], delta[m+n+1], delta[m+n+2:m+2n+1], delta[end])
-    end
-
     # termination tolerances are infinity operator norms of submatrices of lhs
     tol_pres = max(1.0, maximum(sum(abs, A[i,:]) + abs(b[i]) for i in 1:m)) # first m rows
     tol_dres = max(1.0, maximum(sum(abs, A[:,j]) + abs(c[j]) + 1.0 for j in 1:n)) # next n rows
     tol_compl = max(1.0, maximum(abs, b), maximum(abs, c)) # row m+n+1
 
     # calculate initial primal iterate
+    g = zeros(n)
+    Hi = zeros(n,n)
+    L = zeros(n,n)
+    eval_gh(g, Hi, L, ones(n))
     # scaling factor for the primal problem
     rp = maximum((1.0 + abs(b[i]))/(1.0 + abs(sum(A[i,:]))) for i in 1:m)
     # scaling factor for the dual problem
-    g0 = eval_gh(ones(n))[2]
-    rd = maximum((1.0 + abs(g0[j]))/(1.0 + abs(c[j])) for j in 1:n)
+    rd = maximum((1.0 + abs(g[j]))/(1.0 + abs(c[j])) for j in 1:n)
     # initial primal iterate
     tx0 = fill(sqrt(rp*rd), n)
 
     # calculate the central primal-dual iterate corresponding to the initial primal iterate
-    (incone, g, H, L) = eval_gh(tx0)
-    # TODO maybe can do these as views of a concatenated array - faster to update with delta direction
+    incone = eval_gh(g, Hi, L, tx0)
     ty = zeros(m)
     tx = tx0
     tau = 1.0
@@ -142,18 +74,12 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
     kap = 1.0
     mu = (dot(tx, ts) + tau*kap)/gh_bnu
 
-    # set up placeholders
-    # TODO can be better with allocation
-    sa_ty = similar(ty)
+    # preallocate for test iterate and direction vectors
     sa_tx = similar(tx)
-    sa_tau = 0.0
     sa_ts = similar(ts)
-    sa_kap = 0.0
-    sa_mu = 0.0
-    sa_incone = false
-    sa_g = similar(g)
-    sa_H = similar(H)
-    sa_L = similar(L)
+    dir_ty = similar(ty)
+    dir_tx = similar(tx)
+    dir_ts = similar(ts)
 
     #=
     main loop
@@ -173,12 +99,16 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
         p_obj = ctx/tau
         d_obj = bty/tau
         gap = abs(ctx - bty)/(tau + abs(bty))
-        p_inf = maximum(abs, A*tx - tau*b)/tol_pres
-        d_inf = maximum(abs, A'*ty + ts - tau*c)/tol_dres
-        compl = abs(ctx - bty + kap)/tol_compl
+        rhs_ty = -A*tx + b*tau
+        p_inf = maximum(abs, rhs_ty)/tol_pres
+        rhs_tx = A'*ty - c*tau + ts
+        d_inf = maximum(abs, rhs_tx)/tol_dres
+        rhs_tau = -bty + ctx + kap
+        compl = abs(rhs_tau)/tol_compl
 
         if opt.verbose
             @printf("%5d %11.4e %11.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n", iter, p_obj, d_obj, gap, p_inf, d_inf, tau, kap, mu)
+            flush(stdout)
         end
 
         if (p_inf <= opt.optimtol) && (d_inf <= opt.optimtol)
@@ -203,31 +133,51 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
         prediction phase
         =#
         # determine prediction direction
-        rhs = vcat(-A*tx + b*tau, A'*ty - c*tau + ts, -dot(b, ty) + dot(c, tx) + kap, -ts, -kap)
-        (dty, dtx, dtau, dts, dkap) = computenewtondirection(rhs, H, L, mu, tau)
+        print("preddir  ")
+        @time begin
+            # TODO improve operations
+            Hic = Hi*c
+            HiAt = -Hi*A'
+            Hirxrs = Hi*(rhs_tx - ts)
+
+            lhsdydtau = [spzeros(m,m) -b; b' mu/tau^2] - ([A; -c']*[HiAt Hic])/mu
+            rhsdydtau = [rhs_ty; (rhs_tau - kap)] - ([A; -c']*Hirxrs)/mu
+            dydtau = lhsdydtau\rhsdydtau
+
+            # @show typeof(Hic)
+            # @show typeof(HiAt)
+            # @show typeof(Hirxrs)
+            # @show typeof(lhsdydtau)
+            # @show typeof(rhsdydtau)
+            # @show typeof(dydtau)
+
+            dir_ty .= dydtau[1:m]
+            dir_tx .= (Hirxrs - [HiAt Hic]*dydtau)/mu
+            dir_tau = dydtau[m+1]
+            dir_ts .= -rhs_tx - [A' -c]*dydtau
+            dir_kap = -rhs_tau + dot(b, dydtau[1:m]) - dot(c, dir_tx)
+        end
 
         # determine step length alpha by line search
         alpha = alphapred
         betaalpha = Inf
         alphaprevok = true
-        alphaprev = Inf
+        alphaprev = 0.0
         betaalphaprev = Inf
         predfail = false
         nprediters = 0
         while true
             nprediters += 1
 
-            sa_ty .= ty + alpha*dty
-            sa_tx .= tx + alpha*dtx
-            sa_tau = tau + alpha*dtau
-            sa_ts .= ts + alpha*dts
-            sa_kap = kap + alpha*dkap
-            sa_mu = (dot(sa_tx, sa_ts) + sa_tau*sa_kap)/gh_bnu
-            (sa_incone, sa_g, sa_H, sa_L) = eval_gh(sa_tx)
-
-            if sa_incone
-                # primal iterate is inside the cone
-                betaalpha = sqrt(sum(abs2, sa_L\(sa_ts + sa_mu*sa_g)) + (sa_tau*sa_kap - sa_mu)^2)/sa_mu
+            sa_tx .= tx + alpha*dir_tx
+            print(" eval_gh ")
+            @time incone = eval_gh(g, Hi, L, sa_tx)
+            if incone
+                # primal iterate tx is inside the cone
+                sa_ts .= ts + alpha*dir_ts
+                sa_tk = (tau + alpha*dir_tau)*(kap + alpha*dir_kap)
+                sa_mu = (dot(sa_tx, sa_ts) + sa_tk)/gh_bnu
+                betaalpha = sqrt(sum(abs2, L\(sa_ts + sa_mu*g)) + (sa_tk - sa_mu)^2)/sa_mu
 
                 if betaalpha < beta
                     # iterate is inside the beta-neighborhood
@@ -247,7 +197,7 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
                 end
             end
 
-            # iterate is outside the cone and beta-neighborhood
+            # primal iterate tx is outside the cone and beta-neighborhood
             if alphaprevok && (nprediters > 1)
                 # previous iterate was in the beta-neighborhood
                 alpha = alphaprev
@@ -258,7 +208,7 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
                 break
             end
 
-            # the last two iterates were outside the beta-neighborhood
+            # the last two primal iterates were outside the beta-neighborhood
             if alpha < alphapredthres
                 # alpha is very small, so predictor has failed
                 predfail = true
@@ -278,14 +228,14 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
         end
 
         # step distance alpha in the direction
-        # TODO can take sa_ values already above in most cases
-        ty .+= alpha*dty
-        tx .+= alpha*dtx
-        tau += alpha*dtau
-        ts .+= alpha*dts
-        kap += alpha*dkap
+        ty .+= alpha*dir_ty
+        tx .+= alpha*dir_tx
+        tau += alpha*dir_tau
+        ts .+= alpha*dir_ts
+        kap += alpha*dir_kap
         mu = (dot(tx, ts) + tau*kap)/gh_bnu
-        (incone, g, H, L) = eval_gh(tx)
+        print(" eval_gh ")
+        @time eval_gh(g, Hi, L, tx)
 
         # skip correction phase if allowed and current iterate is in the eta-neighborhood
         if opt.corrcheck && (betaalpha <= eta)
@@ -302,8 +252,23 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
             ncorrsteps += 1
 
             # calculate correction direction
-            rhs = vcat(zeros(m+n+1), -ts - mu*g, -kap + mu/tau)
-            (dty, dtx, dtau, dts, dkap) = computenewtondirection(rhs, H, L, mu, tau)
+            print("corrdir  ")
+            @time begin
+                # TODO improve operations
+                Hic = Hi*c
+                HiAt = -Hi*A'
+                Hirxrs = Hi*(-ts - mu*g)
+
+                lhsdydtau = [spzeros(m,m) -b; b' mu/tau^2] - ([A; -c']*[HiAt Hic])/mu
+                rhsdydtau = [zeros(m); -kap + mu/tau] - ([A; -c']*Hirxrs)/mu
+                dydtau = lhsdydtau\rhsdydtau
+
+                dir_ty .= dydtau[1:m]
+                dir_tx .= (Hirxrs - [HiAt Hic]*dydtau)/mu
+                dir_tau = dydtau[m+1]
+                dir_ts .= [-A' c]*dydtau
+                dir_kap = dot(b, dydtau[1:m]) - dot(c, dir_tx)
+            end
 
             # determine step length alpha by line search
             alpha = opt.alphacorr
@@ -311,21 +276,16 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
             while ncorrlsiters <= opt.maxcorrlsiters
                 ncorrlsiters += 1
 
-                sa_ty .= ty + alpha*dty
-                sa_tx .= tx + alpha*dtx
-                sa_tau = tau + alpha*dtau
-                sa_ts .= ts + alpha*dts
-                sa_kap = kap + alpha*dkap
-                sa_mu = (dot(sa_tx, sa_ts) + sa_tau*sa_kap)/gh_bnu
-                (sa_incone, sa_g, sa_H, sa_L) = eval_gh(sa_tx) # TODO only need incone until last iter
-
-                if sa_incone
-                    # primal iterate is inside the cone, so terminate line search
+                sa_tx .= tx + alpha*dir_tx
+                print(" eval_gh ")
+                @time incone = eval_gh(g, Hi, L, sa_tx) # TODO only need incone until last iter
+                if incone
+                    # primal iterate tx is inside the cone, so terminate line search
                     break
                 end
 
-                # primal iterate is outside the cone
-                if lsiter == opt.maxcorrlsiters
+                # primal iterate tx is outside the cone
+                if ncorrlsiters == opt.maxcorrlsiters
                     # corrector failed
                     corrfail = true
                     println("Corrector could not improve the solution; terminating")
@@ -341,14 +301,14 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
             end
 
             # step distance alpha in the direction
-            # TODO can take sa_ values already above in most cases
-            ty .+= alpha*dty
-            tx .+= alpha*dtx
-            tau += alpha*dtau
-            ts .+= alpha*dts
-            kap += alpha*dkap
+            ty .+= alpha*dir_ty
+            tx .+= alpha*dir_tx
+            tau += alpha*dir_tau
+            ts .+= alpha*dir_ts
+            kap += alpha*dir_kap
             mu = (dot(tx, ts) + tau*kap)/gh_bnu
-            (incone, g, H, L) = eval_gh(tx)
+            print(" eval_gh ")
+            @time eval_gh(g, Hi, L, tx)
 
             # finish if allowed and current iterate is in the eta-neighborhood, or if taken max steps
             if (ncorrsteps == opt.maxcorrsteps) || opt.corrcheck
@@ -428,3 +388,76 @@ function setbetaeta(maxcorrsteps, gh_bnu)
         end
     end
 end
+
+
+#
+# build sparse LHS matrix
+# TODO this is not used by default, so ignore for now; only used if opt.maxitrefinesteps > 0
+# lhs = [
+#     spzeros(m,m)  A                 -b            spzeros(m,n)       spzeros(m,1)
+#     -A'           spzeros(n,n)      c             sparse(-1.0I,n,n)  spzeros(n,1)
+#     b'            -c'               0.0           spzeros(1,n)       -1.0
+#     spzeros(n,m)  sparse(1.0I,n,n)  spzeros(n,1)  sparse(1.0I,n,n)   spzeros(n,1)
+#     spzeros(1,m)  spzeros(1,n)      1.0           spzeros(1,n)       1.0
+#     ]
+# dropzeros!(lhs)
+#
+# create block solver function
+# TODO optimize operations
+# function solvesystem(rhs, L, mu, tau)
+#     Hic = L'\(L\c)
+#     HiAt = -L'\(L\A')
+#     Hirxrs = L'\(L\(rhs[m+1:m+n] + rhs[m+n+2:m+2n+1]))
+#
+#     lhsdydtau = [zeros(m,m) -b; b' mu/tau^2] - ([A; -c']*[HiAt Hic])/mu
+#     rhsdydtau = [rhs[1:m]; (rhs[m+n+1] + rhs[end])] - ([A; -c']*Hirxrs)/mu
+#     dydtau = lhsdydtau\rhsdydtau
+#     dx = (Hirxrs - [HiAt Hic]*dydtau)/mu
+#
+#     return (dydtau[1:m], dx, dydtau[m+1], (-rhs[m+1:m+n] - [A' -c]*dydtau), (-rhs[m+n+1] + dot(b, dydtau[1:m]) - dot(c, dx)))
+# end
+#
+# # create Newton system solver function to compute Newton directions
+# # TODO optimize operations
+# function computenewtondirection(rhs, H, L, mu, tau)
+#     delta = solvesystem(rhs, L, mu, tau)
+#
+#     if opt.maxitrefinesteps > 0
+#         # TODO this is not used by default, so ignore for now
+#         error("NOT IMPLEMENTED")
+#         # checks to see if we need to refine the solution
+#         # TODO rcond is not a function. and eps?
+#         # if rcond(Array(H)) < eps() # TODO Base.LinAlg.LAPACK.gecon! # TODO really epsilon?\
+#         #     lhsnew = copy(lhs)
+#         #     lhsnew[m+n+2:m+2n+1,m+1:m+n] = mu*H
+#         #     lhsnew[end,m+n+1] = mu/tau^2
+#         #
+#         #     # res = residual3p(lhsnew, delta, rhs)
+#         #     res = lhsnew*delta - rhs # TODO needs to be in at least triple precision
+#         #     resnorm = norm(res)
+#         #
+#         #     for refiter in 1:opt.maxitrefinesteps
+#         #         d = solvesystem(rhs, L, mu, tau)
+#         #         deltanew = delta - d
+#         #
+#         #         # res = residual3p(lhsnew, deltanew, rhs)
+#         #         resnew = lhsnew*deltanew - rhs # TODO needs to be in at least triple precision
+#         #         resnewnorm = norm(resnew)
+#         #
+#         #         # stop iterative refinement if there is not enough progress
+#         #         if resnewnorm > opt.itrefinethres*resnorm
+#         #             break
+#         #         end
+#         #
+#         #         # update solution if residual norm is smaller
+#         #         if resnewnorm < resnorm
+#         #             delta = deltanew
+#         #             res = resnew
+#         #             resnorm = resnewnorm
+#         #         end
+#         #     end
+#         # end
+#     end
+#
+#     return (delta[1:m], delta[m+1:m+n], delta[m+n+1], delta[m+n+2:m+2n+1], delta[end])
+# end
