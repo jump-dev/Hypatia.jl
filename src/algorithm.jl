@@ -75,11 +75,19 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
     mu = (dot(tx, ts) + tau*kap)/gh_bnu
 
     # preallocate for test iterate and direction vectors
-    sa_tx = similar(tx)
-    sa_ts = similar(ts)
+    rhs_ty = similar(ty)
+    rhs_tx = similar(tx)
     dir_ty = similar(ty)
     dir_tx = similar(tx)
     dir_ts = similar(ts)
+    Hic = similar(tx)
+    HiAt = spzeros(n,m)
+    Hirxrs = similar(tx)
+    lhsdydtau = spzeros(m+1,m+1)
+    rhsdydtau = Vector{Float64}(undef,m+1)
+    dydtau = similar(rhsdydtau)
+    sa_tx = similar(tx)
+    sa_ts = similar(ts)
 
     #=
     main loop
@@ -99,9 +107,9 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
         p_obj = ctx/tau
         d_obj = bty/tau
         gap = abs(ctx - bty)/(tau + abs(bty))
-        rhs_ty = -A*tx + b*tau
+        rhs_ty .= -A*tx + b*tau
         p_inf = maximum(abs, rhs_ty)/tol_pres
-        rhs_tx = A'*ty - c*tau + ts
+        rhs_tx .= A'*ty - c*tau + ts
         d_inf = maximum(abs, rhs_tx)/tol_dres
         rhs_tau = -bty + ctx + kap
         compl = abs(rhs_tau)/tol_compl
@@ -135,27 +143,20 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
         # determine prediction direction
         print("preddir  ")
         @time begin
-            # TODO improve operations
-            Hic = Hi*c
-            HiAt = -Hi*A'
-            Hirxrs = Hi*(rhs_tx - ts)
+            # TODO use in-place BLAS?
+            Hic .= Hi*c/mu
+            HiAt .= Hi*A'/mu
+            Hirxrs .= Hi*(rhs_tx - ts)/mu
 
-            lhsdydtau = [spzeros(m,m) -b; b' mu/tau^2] - ([A; -c']*[HiAt Hic])/mu
-            rhsdydtau = [rhs_ty; (rhs_tau - kap)] - ([A; -c']*Hirxrs)/mu
-            dydtau = lhsdydtau\rhsdydtau
-
-            # @show typeof(Hic)
-            # @show typeof(HiAt)
-            # @show typeof(Hirxrs)
-            # @show typeof(lhsdydtau)
-            # @show typeof(rhsdydtau)
-            # @show typeof(dydtau)
+            lhsdydtau .= [A*HiAt (-b - A*Hic); (b' - c'*HiAt) (mu/tau^2 + c'*Hic)]
+            rhsdydtau .= [(rhs_ty - A*Hirxrs); (rhs_tau - kap + c'*Hirxrs)]
+            dydtau .= lhsdydtau\rhsdydtau
 
             dir_ty .= dydtau[1:m]
-            dir_tx .= (Hirxrs - [HiAt Hic]*dydtau)/mu
             dir_tau = dydtau[m+1]
-            dir_ts .= -rhs_tx - [A' -c]*dydtau
-            dir_kap = -rhs_tau + dot(b, dydtau[1:m]) - dot(c, dir_tx)
+            dir_tx .= Hirxrs + HiAt*dir_ty - Hic*dir_tau
+            dir_ts .= -rhs_tx - A'*dir_ty + c*dir_tau
+            dir_kap = -rhs_tau + dot(b, dir_ty) - dot(c, dir_tx)
         end
 
         # determine step length alpha by line search
@@ -171,7 +172,7 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
 
             sa_tx .= tx + alpha*dir_tx
             print(" eval_gh ")
-            @time incone = eval_gh(g, Hi, L, sa_tx)
+            @time incone = eval_gh(g, Hi, L, sa_tx) # don't need Hi
             if incone
                 # primal iterate tx is inside the cone
                 sa_ts .= ts + alpha*dir_ts
@@ -254,20 +255,20 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
             # calculate correction direction
             print("corrdir  ")
             @time begin
-                # TODO improve operations
-                Hic = Hi*c
-                HiAt = -Hi*A'
-                Hirxrs = Hi*(-ts - mu*g)
+                # TODO use in-place BLAS?
+                Hic .= Hi*c/mu
+                HiAt .= Hi*A'/mu
+                Hirxrs .= Hi*(-ts/mu - g)
 
-                lhsdydtau = [spzeros(m,m) -b; b' mu/tau^2] - ([A; -c']*[HiAt Hic])/mu
-                rhsdydtau = [zeros(m); -kap + mu/tau] - ([A; -c']*Hirxrs)/mu
-                dydtau = lhsdydtau\rhsdydtau
+                lhsdydtau .= [A*HiAt (-b - A*Hic); (b' - c'*HiAt) (mu/tau^2 + c'*Hic)]
+                rhsdydtau .= [-A*Hirxrs; (-kap + mu/tau + c'*Hirxrs)]
+                dydtau .= lhsdydtau\rhsdydtau
 
                 dir_ty .= dydtau[1:m]
-                dir_tx .= (Hirxrs - [HiAt Hic]*dydtau)/mu
                 dir_tau = dydtau[m+1]
-                dir_ts .= [-A' c]*dydtau
-                dir_kap = dot(b, dydtau[1:m]) - dot(c, dir_tx)
+                dir_tx .= Hirxrs + HiAt*dir_ty - Hic*dir_tau
+                dir_ts .= -A'*dir_ty + c*dir_tau
+                dir_kap = dot(b, dir_ty) - dot(c, dir_tx)
             end
 
             # determine step length alpha by line search
@@ -278,7 +279,7 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
 
                 sa_tx .= tx + alpha*dir_tx
                 print(" eval_gh ")
-                @time incone = eval_gh(g, Hi, L, sa_tx) # TODO only need incone until last iter
+                @time incone = eval_gh(g, Hi, L, sa_tx) # don't need g, Hi, L
                 if incone
                     # primal iterate tx is inside the cone, so terminate line search
                     break
