@@ -9,11 +9,10 @@ available at https://arxiv.org/abs/1712.00492
 function MOI.optimize!(opt::AlfonsoOptimizer)
     #=
     verify problem data, setup other algorithmic parameters and utilities
+    TODO simple presolve (see ConicIP solver)
     =#
-    dropzeros!(opt.A)
     (A, b, c) = (opt.A, opt.b, opt.c)
     (m, n) = size(A)
-
     if (m == 0) || (n == 0)
         error("input matrix A has trivial dimension $m x $n")
     end
@@ -23,19 +22,48 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
     if n != length(c)
         error("dimension of vector c is $(length(c)), but number of columns in matrix A is $n")
     end
+    @assert issparse(A)
+    dropzeros!(opt.A)
+    @assert !issparse(b)
+    @assert !issparse(c)
 
-    # # TODO check cones
-    # cones = opt.cones
-    #
-    # # create function for computing the gradient and Hessian of the barrier function
-    # function eval_gh(...)
-    # end
-    #
-    # # calculate complexity parameter of the augmented barrier (nu-bar)
-    # gh_bnu = NaN # TODO
+
+
+    # TODO check consistency
+    cones = opt.cones
+    coneidxs = opt.coneidxs
+
+    # create cone objects and functions related to primal cone barrier
+    coneobjs = ...
+
+    function load_tx
+
+    end
+    function check_incone
+
+    end
+    function calc_g
+
+    end
+    function calc_Hinv
+
+    end
+    function calc_nbhd
+
+    end
+
+
+
+    # calculate complexity parameter of the augmented barrier (nu-bar)
+    gh_bnu = NaN # TODO
+
+
 
     eval_gh = opt.eval_gh
     gh_bnu = opt.gh_bnu
+
+
+
 
     # set remaining algorithmic parameters based on precomputed safe values (from original authors)
     # parameters are chosen to make sure that each predictor step takes the current iterate from the eta-neighborhood to the beta-neighborhood and each corrector phase takes the current iterate from the beta-neighborhood to the eta-neighborhood. extra corrector steps are allowed to mitigate the effects of finite precision
@@ -53,24 +81,20 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
     tol_dres = max(1.0, maximum(sum(abs, A[:,j]) + abs(c[j]) + 1.0 for j in 1:n)) # next n rows
     tol_compl = max(1.0, maximum(abs, b), maximum(abs, c)) # row m+n+1
 
-    # calculate initial primal iterate
-    g = zeros(n)
-    Hi = zeros(n,n)
-    L = zeros(n,n)
-    eval_gh(g, Hi, L, ones(n))
+    # calculate initial primal iterate tx and central primal-dual iterate
     # scaling factor for the primal problem
     rp = maximum((1.0 + abs(b[i]))/(1.0 + abs(sum(A[i,:]))) for i in 1:m)
     # scaling factor for the dual problem
-    rd = maximum((1.0 + abs(g[j]))/(1.0 + abs(c[j])) for j in 1:n)
+    load_tx(ones(n))
+    g0 = calc_g()
+    rd = maximum((1.0 + abs(g0[j]))/(1.0 + abs(c[j])) for j in 1:n)
     # initial primal iterate
-    tx0 = fill(sqrt(rp*rd), n)
-
-    # calculate the central primal-dual iterate corresponding to the initial primal iterate
-    incone = eval_gh(g, Hi, L, tx0)
+    tx = fill(sqrt(rp*rd), n)
+    # initial primal-dual iterate
+    load_tx(tx)
     ty = zeros(m)
-    tx = tx0
     tau = 1.0
-    ts = -g
+    ts = -calc_g()
     kap = 1.0
     mu = (dot(tx, ts) + tau*kap)/gh_bnu
 
@@ -144,6 +168,12 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
         print("preddir  ")
         @time begin
             # TODO use in-place BLAS?
+            print(" calc_Hi  ")
+            if iter > 1
+                load_tx(tx)
+            end
+            @time Hi = calc_Hinv()
+
             Hic .= Hi*c/mu
             HiAt .= Hi*A'/mu
             Hirxrs .= Hi*(rhs_tx - ts)/mu
@@ -171,14 +201,18 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
             nprediters += 1
 
             sa_tx .= tx + alpha*dir_tx
-            print(" eval_gh ")
-            @time incone = eval_gh(g, Hi, L, sa_tx) # don't need Hi
+            print(" is_incone")
+            load_tx(sa_tx)
+            @time incone = check_incone()
+
             if incone
                 # primal iterate tx is inside the cone
                 sa_ts .= ts + alpha*dir_ts
-                sa_tk = (tau + alpha*dir_tau)*(kap + alpha*dir_kap)
-                sa_mu = (dot(sa_tx, sa_ts) + sa_tk)/gh_bnu
-                betaalpha = sqrt(sum(abs2, L\(sa_ts + sa_mu*g)) + (sa_tk - sa_mu)^2)/sa_mu
+                # sa_mu = (dot(sa_tx, sa_ts) + sa_tk)/gh_bnu
+                # sa_tk = (tau + alpha*dir_tau)*(kap + alpha*dir_kap)
+                print(" calc_nbhd")
+                @time betaalpha = calc_nbhd(sa_ts, (dot(sa_tx, sa_ts) + sa_tk)/gh_bnu, (tau + alpha*dir_tau)*(kap + alpha*dir_kap))
+                # betaalpha = sqrt(sum(abs2, L\(sa_ts + sa_mu*g)) + (sa_tk - sa_mu)^2)/sa_mu
 
                 if betaalpha < beta
                     # iterate is inside the beta-neighborhood
@@ -235,8 +269,6 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
         ts .+= alpha*dir_ts
         kap += alpha*dir_kap
         mu = (dot(tx, ts) + tau*kap)/gh_bnu
-        print(" eval_gh ")
-        @time eval_gh(g, Hi, L, tx)
 
         # skip correction phase if allowed and current iterate is in the eta-neighborhood
         if opt.corrcheck && (betaalpha <= eta)
@@ -256,6 +288,11 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
             print("corrdir  ")
             @time begin
                 # TODO use in-place BLAS?
+                print(" calc_gHi ")
+                load_tx(tx)
+                @time Hi = calc_Hinv()
+                @time g = calc_g()
+
                 Hic .= Hi*c/mu
                 HiAt .= Hi*A'/mu
                 Hirxrs .= Hi*(-ts/mu - g)
@@ -278,8 +315,10 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
                 ncorrlsiters += 1
 
                 sa_tx .= tx + alpha*dir_tx
-                print(" eval_gh ")
-                @time incone = eval_gh(g, Hi, L, sa_tx) # don't need g, Hi, L
+                print(" is_incone")
+                load_tx(sa_tx)
+                @time incone = check_incone(sa_tx)
+
                 if incone
                     # primal iterate tx is inside the cone, so terminate line search
                     break
@@ -303,17 +342,18 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
 
             # step distance alpha in the direction
             ty .+= alpha*dir_ty
-            tx .+= alpha*dir_tx
+            tx .+= sa_tx
             tau += alpha*dir_tau
             ts .+= alpha*dir_ts
             kap += alpha*dir_kap
             mu = (dot(tx, ts) + tau*kap)/gh_bnu
-            print(" eval_gh ")
-            @time eval_gh(g, Hi, L, tx)
 
             # finish if allowed and current iterate is in the eta-neighborhood, or if taken max steps
             if (ncorrsteps == opt.maxcorrsteps) || opt.corrcheck
-                etacorr = sqrt(sum(abs2, L\(ts + mu*g)) + (tau*kap - mu)^2)/mu
+                print(" calc_nbhd")
+                @time etacorr = calc_nbhd(ts, mu, tau*kap)
+                # etacorr = sqrt(sum(abs2, L\(ts + mu*g)) + (tau*kap - mu)^2)/mu
+
                 if etacorr <= eta
                     break
                 elseif ncorrsteps == opt.maxcorrsteps
