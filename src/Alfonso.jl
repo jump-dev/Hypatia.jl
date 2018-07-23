@@ -7,8 +7,8 @@ module Alfonso
     using Printf
     using SparseArrays
     using LinearAlgebra
-    
+
+    include("barriers.jl")
     include("optimizer.jl")
-    # include("cones.jl")
     include("algorithm.jl")
 end
