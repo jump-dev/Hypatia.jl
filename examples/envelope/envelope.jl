@@ -47,56 +47,48 @@ c = vec(readdlm(joinpath(loc, "c.txt"), ',', Float64))
 c[abs.(c) .< 1e-10] .= 0.0
 
 
-function eval_gh_SOSWt(txp, Pp)
-    Y = Symmetric(Pp'*Diagonal(txp)*Pp)
-    if isposdef(Y)
-        Lp = (cholesky(Y)).U'
-        Vp = Lp\Pp'
-        VtVp = Vp'*Vp
-        return (true, -diag(VtVp), VtVp.^2) # (inpolyp, gp, Hp)
-    else
-        return (false, zeros(0), zeros(0,0))
-    end
-end
-
-
-# TODO non-allocating
-function eval_gh(tx)
-    g = zeros(numPolys*u)
-    H = zeros(numPolys*u, numPolys*u)
-    L = zeros(numPolys*u, numPolys*u)
-
+function eval_gh(g, Hi, L, tx)
     off = 0
     for polyId in 1:numPolys
-        txp = tx[off+1:off+u]
-        (inp, gp, Hp) = eval_gh_SOSWt(txp, P)
+        txp = view(tx, off+1:off+u)
+        gp = view(g, off+1:off+u)
+        Hip = view(Hi, off+1:off+u, off+1:off+u)
+        Lp = view(L, off+1:off+u, off+1:off+u)
 
-        if !inp
-            return (false, zeros(0), zeros(0,0), zeros(0,0))
+        F = cholesky!(Symmetric(P'*Diagonal(txp)*P), check=false) # TODO could this cholesky of P'DP be faster?
+        if !issuccess(F)
+            return false
         end
+        Vp = F.L\P'
+        VtVp = Vp'*Vp
+        gp .= -diag(VtVp)
+        Lp .= VtVp.^2
 
         for j in 1:n
-            (inpWt, gpWt, HpWt) = eval_gh_SOSWt(txp, PWts[j])
-            if !inpWt
-                return (false, zeros(0), zeros(0,0), zeros(0,0))
+            F = cholesky!(Symmetric(PWts[j]'*Diagonal(txp)*PWts[j]), check=false)
+            if !issuccess(F)
+                return false
             end
-            gp = gp + gpWt
-            Hp = Symmetric(Hp + HpWt)
+            Vp = F.L\PWts[j]'
+            VtVp = Vp'*Vp
+            gp .-= diag(VtVp)
+            Lp .+= VtVp.^2
         end
 
-        if !isposdef(Hp)
-            return (false, zeros(0), zeros(0,0), zeros(0,0))
+        F = cholesky!(Lp, check=false)
+        if !issuccess(F)
+            return false
         end
+        Hip .= inv(F)
+        Lp .= F.L
 
-        g[off+1:off+u] .= gp
-        H[off+1:off+u,off+1:off+u] .= Hp
-        L[off+1:off+u,off+1:off+u] .= (cholesky(Hp)).U'
         off += u
     end
-
-    @assert issymmetric(H)
-    return (true, g, H, L)
+    return true
 end
+
+
+
 
 
 # load into optimizer and solve
