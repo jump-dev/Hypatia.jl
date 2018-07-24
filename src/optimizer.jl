@@ -19,40 +19,32 @@ mutable struct AlfonsoOptimizer <: MOI.AbstractOptimizer
     itrefinethres::Float64  # iterative refinement success threshold
 
     # problem data
-    A               # constraint matrix
-    b               # right-hand side vector
-    c               # cost vector
-    # cones           # TODO
-
-    # other algorithmic parameters and utilities
-    # TODO these will be removed when "cones" is working
-    eval_gh::Function           # function for computing the gradient and Hessian of the barrier function
-    gh_bnu::Float64             # complexity parameter of the augmented barrier (nu-bar)
+    A::AbstractMatrix{Float64}          # constraint matrix
+    b::Vector{Float64}                  # right-hand side vector
+    c::Vector{Float64}                  # cost vector
+    cones::Vector{ConeData}             # primal cones list
+    coneidxs::Vector{AbstractUnitRange} # primal cones variable indices list
 
     # results
-    status          # solver status
-    niterations     # total number of iterations
-    # all_alphapred   # predictor step size at each iteration
-    # all_betapred    # neighborhood parameter at the end of the predictor phase at each iteration
-    # all_etacorr     # neighborhood parameter at the end of the corrector phase at each iteration
-    # all_mu          # complementarity gap at each iteration
-    y               # final value of the dual free variables
-    x               # final value of the primal variables
-    tau             # final value of the tau-variable
-    s               # final value of the dual slack variables
-    kap             # final value of the kappa-variable
-    pobj            # final primal objective value
-    dobj            # final dual objective value
-    dgap            # final duality gap
-    cgap            # final complementarity gap
-    rel_dgap        # final relative duality gap
-    rel_cgap        # final relative complementarity gap
-    pres            # final primal residuals
-    dres            # final dual residuals
-    pin             # final primal infeasibility
-    din             # final dual infeasibility
-    rel_pin         # final relative primal infeasibility
-    rel_din         # final relative dual infeasibility
+    status::Symbol          # solver status
+    niters::Int             # total number of iterations
+    y::Vector{Float64}      # final value of the dual free variables
+    x::Vector{Float64}      # final value of the primal variables
+    tau::Float64            # final value of the tau-variable
+    s::Vector{Float64}      # final value of the dual slack variables
+    kap::Float64            # final value of the kappa-variable
+    pobj::Float64           # final primal objective value
+    dobj::Float64           # final dual objective value
+    dgap::Float64           # final duality gap
+    cgap::Float64           # final complementarity gap
+    rel_dgap::Float64       # final relative duality gap
+    rel_cgap::Float64       # final relative complementarity gap
+    pres::Vector{Float64}   # final primal residuals
+    dres::Vector{Float64}   # final dual residuals
+    pin::Float64            # final primal infeasibility
+    din::Float64            # final dual infeasibility
+    rel_pin::Float64        # final relative primal infeasibility
+    rel_din::Float64        # final relative dual infeasibility
 
     function AlfonsoOptimizer(verbose, optimtol, maxiter, predlinesearch, maxpredsmallsteps, maxcorrsteps, corrcheck, maxcorrlsiters, maxitrefinesteps, alphacorr, predlsmulti, corrlsmulti, itrefinethres)
         opt = new()
@@ -111,12 +103,44 @@ function AlfonsoOptimizer(;
 end
 
 
-function loaddata!(opt::AlfonsoOptimizer, A, b, c, eval_gh, gh_bnu)
-    opt.c = c
+function loaddata!(opt::AlfonsoOptimizer, A::AbstractMatrix{Float64}, b::Vector{Float64}, c::Vector{Float64}, cones::Vector{ConeData}, coneidxs::Vector{AbstractUnitRange})
+    #=
+    verify problem data, setup other algorithmic parameters and utilities
+    TODO simple presolve (see ConicIP solver)
+    =#
+    (m, n) = size(A)
+    if (m == 0) || (n == 0)
+        error("input matrix A has trivial dimension $m x $n")
+    end
+    if m != length(b)
+        error("dimension of vector b is $(length(b)), but number of rows in matrix A is $m")
+    end
+    if n != length(c)
+        error("dimension of vector c is $(length(c)), but number of columns in matrix A is $n")
+    end
+    @assert issparse(A)
+    dropzeros!(A)
+
+    idxend = 0
+    for k in eachindex(cones)
+        if dimension(cones[k]) != length(coneidxs[k])
+            error("dimension of cone type $(cones[k]) does not match length of variable indices")
+        end
+        @assert coneidxs[k][1] == idxend + 1
+        idxend += length(coneidxs[k])
+    end
+    @assert idxend == n
+
+    # coneobjs = [coneobj(ck) for ck in cones] # TODO convert from MOI cones
+
+    # save data in optimizer object
     opt.A = A
     opt.b = b
-    opt.eval_gh = eval_gh
-    opt.gh_bnu = gh_bnu
+    opt.c = c
+    opt.cones = cones
+    opt.coneidxs = coneidxs
+
+    opt.status = :Loaded
 
     return opt
 end
