@@ -16,13 +16,6 @@ using LinearAlgebra
 using DelimitedFiles
 
 
-
-
-
-
-
-
-
 loc = joinpath(pwd(), "data")
 
 pts = vec(readdlm(joinpath(loc, "pts.txt"), ',', Float64))
@@ -41,7 +34,7 @@ u = binomial(n+2*d, n)
 numPolys = 2
 degPolys = 5
 
-LWts = fill(n, binomial(n+2*d, n))
+LWts = fill(binomial(n+d-1, n), n)
 bnu = numPolys*(l + sum(LWts)) + 1.0
 wtVals = 1.0 .- pts.^2
 PWts = [Array((qr(Diagonal(sqrt.(wtVals[:,j]))*P[:,1:LWts[j]])).Q) for j in 1:n]
@@ -58,7 +51,6 @@ for k in 1:numPolys
     push!(coneidxs, 1+(k-1)*u:k*u)
 end
 
-@show coneidxs
 
 # load into optimizer and solve
 opt = AlfonsoOptimizer(maxiter=100)

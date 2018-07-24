@@ -16,12 +16,20 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
     bnu = 1.0 + sum(barpar(ck) for ck in coneobjs) # TODO sum of the primitive cone barrier parameters (plus 1?)
 
     # create cone object functions related to primal cone barrier
-    function load_tx(_tx::Vector{Float64})
+    function load_tx(_tx::Vector{Float64}; save_prev=false)
         for k in eachindex(coneobjs)
-            load_txk(coneobjs[k], _tx[coneidxs[k]])
+            load_txk(coneobjs[k], _tx[coneidxs[k]], save_prev)
         end
         return nothing
     end
+
+    function use_prev()
+        for k in eachindex(coneobjs)
+            use_prevk(coneobjs[k])
+        end
+        return nothing
+    end
+
     function check_incone()
         for k in eachindex(coneobjs)
             if !inconek(coneobjs[k])
@@ -30,18 +38,21 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
         end
         return true
     end
+
     function calc_g!(_g)
         for k in eachindex(coneobjs)
             _g[coneidxs[k]] .= calc_gk(coneobjs[k])
         end
         return _g
     end
+
     function calc_Hi_vec!(_Hi_vec, _v)
         for k in eachindex(coneobjs)
             _Hi_vec[coneidxs[k]] .= calc_Hik(coneobjs[k])*_v[coneidxs[k]]
         end
         return _Hi_vec
     end
+
     function calc_Hi_At()
         _Hi_At = spzeros(n,m)
         for k in eachindex(coneobjs)
@@ -49,7 +60,9 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
         end
         return _Hi_At
     end
+
     function calc_nbhd(_ts, _mu, _tk)
+        # sqrt(sum(abs2, L\(ts + mu*g)) + (tau*kap - mu)^2)/mu
         sumsqr = (_tk - _mu)^2
         for k in eachindex(coneobjs)
             sumsqr += sum(abs2, calc_Lk(coneobjs[k])\(_ts[coneidxs[k]] + _mu*calc_gk(coneobjs[k])))
@@ -80,7 +93,8 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
     g = ones(n)
     load_tx(g)
     @assert check_incone() # TODO will fail in general
-    calc_g!(g)
+    g = calc_g!(g)
+
     rd = maximum((1.0 + abs(g[j]))/(1.0 + abs(c[j])) for j in 1:n)
     # initial primal iterate
     tx = fill(sqrt(rp*rd), n)
@@ -161,30 +175,23 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
         prediction phase
         =#
         # determine prediction direction
-        println("preddir  ")
-        @time begin
-            if iter > 1
-                load_tx(tx)
-            end
-            invmu = 1.0/mu
-            calc_Hi_vec!(Hic, c)
-            Hic .*= invmu
-            HiAt = calc_Hi_At()
-            HiAt .*= invmu
-            dir_ts .= invmu*(rhs_tx - ts)
-            calc_Hi_vec!(Hirxrs, dir_ts)
-        end
-        @time begin
-            lhsdydtau = [A*HiAt (-b - A*Hic); (b' - c'*HiAt) (mu/tau^2 + c'*Hic)]
-            rhsdydtau .= [(rhs_ty - A*Hirxrs); (rhs_tau - kap + c'*Hirxrs)]
-            dydtau .= lhsdydtau\rhsdydtau
+        invmu = 1.0/mu
+        calc_Hi_vec!(Hic, c)
+        Hic .*= invmu
+        HiAt = calc_Hi_At()
+        HiAt .*= invmu
+        dir_ts .= invmu*(rhs_tx - ts)
+        calc_Hi_vec!(Hirxrs, dir_ts)
 
-            dir_ty .= dydtau[1:m]
-            dir_tau = dydtau[m+1]
-            dir_tx .= Hirxrs + HiAt*dir_ty - Hic*dir_tau
-            dir_ts .= -rhs_tx - A'*dir_ty + c*dir_tau
-            dir_kap = -rhs_tau + dot(b, dir_ty) - dot(c, dir_tx)
-        end
+        lhsdydtau = [A*HiAt (-b - A*Hic); (b' - c'*HiAt) (mu/tau^2 + c'*Hic)]
+        rhsdydtau .= [(rhs_ty - A*Hirxrs); (rhs_tau - kap + c'*Hirxrs)]
+        dydtau .= lhsdydtau\rhsdydtau
+
+        dir_ty .= dydtau[1:m]
+        dir_tau = dydtau[m+1]
+        dir_tx .= Hirxrs + HiAt*dir_ty - Hic*dir_tau
+        dir_ts .= -rhs_tx - A'*dir_ty + c*dir_tau
+        dir_kap = -rhs_tau + dot(b, dir_ty) - dot(c, dir_tx)
 
         # determine step length alpha by line search
         alpha = alphapred
@@ -198,18 +205,14 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
             nprediters += 1
 
             sa_tx .= tx + alpha*dir_tx
-            print(" is_incone")
-            load_tx(sa_tx)
-            @time incone = check_incone()
+            load_tx(sa_tx, save_prev=(alphaprevok && (nprediters > 1)))
 
-            if incone
+            if check_incone()
                 # primal iterate tx is inside the cone
                 sa_ts .= ts + alpha*dir_ts
                 sa_tk = (tau + alpha*dir_tau)*(kap + alpha*dir_kap)
                 sa_mu = (dot(sa_tx, sa_ts) + sa_tk)/bnu
-                print(" calc_nbhd")
-                @time nbhd_beta = calc_nbhd(sa_ts, sa_mu, sa_tk)
-                # nbhd_beta = sqrt(sum(abs2, L\(sa_ts + sa_mu*g)) + (sa_tk - sa_mu)^2)/sa_mu
+                nbhd_beta = calc_nbhd(sa_ts, sa_mu, sa_tk)
 
                 if nbhd_beta < beta
                     # iterate is inside the beta-neighborhood
@@ -237,6 +240,7 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
                 if opt.predlinesearch
                     alphapred = alpha
                 end
+                use_prev()
                 break
             end
 
@@ -275,35 +279,29 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
         #=
         correction phase: perform correction steps
         =#
-        nbhd_eta = nbhd_beta
         corrfail = false
         ncorrsteps = 0
         while true
             ncorrsteps += 1
 
             # calculate correction direction
-            println("corrdir  ")
-            @time begin
-                # TODO use in-place BLAS?
-                print(" calc_gHi ")
-                load_tx(tx)
-                @time Hi = calc_Hinv()
-                @time g = calc_g!(g)
+            invmu = 1.0/mu
+            calc_Hi_vec!(Hic, c)
+            Hic .*= invmu
+            HiAt = calc_Hi_At()
+            HiAt .*= invmu
+            dir_ts .= -invmu*ts - calc_g!(g)
+            calc_Hi_vec!(Hirxrs, dir_ts)
 
-                Hic .= Hi*c/mu
-                HiAt .= Hi*A'/mu
-                Hirxrs .= Hi*(-ts/mu - g)
+            lhsdydtau = [A*HiAt (-b - A*Hic); (b' - c'*HiAt) (mu/tau^2 + c'*Hic)]
+            rhsdydtau .= [-A*Hirxrs; (-kap + mu/tau + c'*Hirxrs)]
+            dydtau .= lhsdydtau\rhsdydtau
 
-                lhsdydtau .= [A*HiAt (-b - A*Hic); (b' - c'*HiAt) (mu/tau^2 + c'*Hic)]
-                rhsdydtau .= [-A*Hirxrs; (-kap + mu/tau + c'*Hirxrs)]
-                dydtau .= lhsdydtau\rhsdydtau
-
-                dir_ty .= dydtau[1:m]
-                dir_tau = dydtau[m+1]
-                dir_tx .= Hirxrs + HiAt*dir_ty - Hic*dir_tau
-                dir_ts .= -A'*dir_ty + c*dir_tau
-                dir_kap = dot(b, dir_ty) - dot(c, dir_tx)
-            end
+            dir_ty .= dydtau[1:m]
+            dir_tau = dydtau[m+1]
+            dir_tx .= Hirxrs + HiAt*dir_ty - Hic*dir_tau
+            dir_ts .= -A'*dir_ty + c*dir_tau
+            dir_kap = dot(b, dir_ty) - dot(c, dir_tx)
 
             # determine step length alpha by line search
             alpha = opt.alphacorr
@@ -312,11 +310,9 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
                 ncorrlsiters += 1
 
                 sa_tx .= tx + alpha*dir_tx
-                print(" is_incone")
                 load_tx(sa_tx)
-                @time incone = check_incone(sa_tx)
 
-                if incone
+                if check_incone() # TODO only calculates everything for the nonnegpoly cone - for others need to make sure g,H are calculated after correction step
                     # primal iterate tx is inside the cone, so terminate line search
                     break
                 end
@@ -339,7 +335,7 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
 
             # step distance alpha in the direction
             ty .+= alpha*dir_ty
-            tx .+= sa_tx
+            tx .= sa_tx
             tau += alpha*dir_tau
             ts .+= alpha*dir_ts
             kap += alpha*dir_kap
@@ -347,11 +343,7 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
 
             # finish if allowed and current iterate is in the eta-neighborhood, or if taken max steps
             if (ncorrsteps == opt.maxcorrsteps) || opt.corrcheck
-                print(" calc_nbhd")
-                @time nbhd_eta = calc_nbhd(ts, mu, tau*kap)
-                # nbhd_eta = sqrt(sum(abs2, L\(ts + mu*g)) + (tau*kap - mu)^2)/mu
-
-                if nbhd_eta <= eta
+                if calc_nbhd(ts, mu, tau*kap) <= eta
                     break
                 elseif ncorrsteps == opt.maxcorrsteps
                     # nbhd_eta > eta, so corrector failed
