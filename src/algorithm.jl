@@ -12,8 +12,8 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
     coneobjs = opt.cones
     coneidxs = opt.coneidxs
 
-    # calculate complexity parameter of the augmented barrier (nu-bar)
-    bnu = 1.0 + sum(barpar(ck) for ck in coneobjs) # TODO sum of the primitive cone barrier parameters (plus 1?)
+    # calculate complexity parameter of the augmented barrier (nu-bar): sum of the primitive cone barrier parameters (# TODO plus 1?)
+    bnu = 1.0 + sum(barpar(ck) for ck in coneobjs)
 
     # create cone object functions related to primal cone barrier
     function load_tx(_tx::Vector{Float64}; save_prev=false)
@@ -92,9 +92,8 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
     # scaling factor for the dual problem
     g = ones(n)
     load_tx(g)
-    @assert check_incone() # TODO will fail in general
-    g = calc_g!(g)
-
+    @assert check_incone() # TODO will fail in general? TODO for some cones will not automatically calculate g,H
+    calc_g!(g)
     rd = maximum((1.0 + abs(g[j]))/(1.0 + abs(c[j])) for j in 1:n)
     # initial primal iterate
     tx = fill(sqrt(rp*rd), n)
@@ -115,9 +114,7 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
     dir_tx = similar(tx)
     dir_ts = similar(ts)
     Hic = similar(tx)
-    # HiAt = spzeros(n,m)
     Hirxrs = similar(tx)
-    # lhsdydtau = spzeros(m+1,m+1)
     rhsdydtau = Vector{Float64}(undef,m+1)
     dydtau = similar(rhsdydtau)
     sa_tx = similar(tx)
@@ -127,7 +124,8 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
     main loop
     =#
     if opt.verbose
-        @printf("\n%5s %11s %11s %9s %9s %9s %9s %9s %9s\n", "iter", "p_obj", "d_obj", "gap", "p_inf", "d_inf", "tau", "kap", "mu")
+        @printf("\n%5s %12s %12s %9s %9s %9s %9s %9s %9s\n", "iter", "p_obj", "d_obj", "gap", "p_inf", "d_inf", "tau", "kap", "mu")
+        flush(stdout)
     end
 
     opt.status = :StartedIterating
@@ -149,7 +147,7 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
         compl = abs(rhs_tau)/tol_compl
 
         if opt.verbose
-            @printf("%5d %11.4e %11.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n", iter, p_obj, d_obj, gap, p_inf, d_inf, tau, kap, mu)
+            @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n", iter, p_obj, d_obj, gap, p_inf, d_inf, tau, kap, mu)
             flush(stdout)
         end
 
@@ -365,7 +363,7 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
     #=
     calculate final solution and iteration statistics
     =#
-    opt.niterations = iter
+    opt.niters = iter
 
     opt.x = tx./tau
     opt.y = ty./tau
@@ -418,76 +416,3 @@ function setbetaeta(maxcorrsteps, bnu)
         end
     end
 end
-
-
-#
-# build sparse LHS matrix
-# TODO this is not used by default, so ignore for now; only used if opt.maxitrefinesteps > 0
-# lhs = [
-#     spzeros(m,m)  A                 -b            spzeros(m,n)       spzeros(m,1)
-#     -A'           spzeros(n,n)      c             sparse(-1.0I,n,n)  spzeros(n,1)
-#     b'            -c'               0.0           spzeros(1,n)       -1.0
-#     spzeros(n,m)  sparse(1.0I,n,n)  spzeros(n,1)  sparse(1.0I,n,n)   spzeros(n,1)
-#     spzeros(1,m)  spzeros(1,n)      1.0           spzeros(1,n)       1.0
-#     ]
-# dropzeros!(lhs)
-#
-# create block solver function
-# TODO optimize operations
-# function solvesystem(rhs, L, mu, tau)
-#     Hic = L'\(L\c)
-#     HiAt = -L'\(L\A')
-#     Hirxrs = L'\(L\(rhs[m+1:m+n] + rhs[m+n+2:m+2n+1]))
-#
-#     lhsdydtau = [zeros(m,m) -b; b' mu/tau^2] - ([A; -c']*[HiAt Hic])/mu
-#     rhsdydtau = [rhs[1:m]; (rhs[m+n+1] + rhs[end])] - ([A; -c']*Hirxrs)/mu
-#     dydtau = lhsdydtau\rhsdydtau
-#     dx = (Hirxrs - [HiAt Hic]*dydtau)/mu
-#
-#     return (dydtau[1:m], dx, dydtau[m+1], (-rhs[m+1:m+n] - [A' -c]*dydtau), (-rhs[m+n+1] + dot(b, dydtau[1:m]) - dot(c, dx)))
-# end
-#
-# # create Newton system solver function to compute Newton directions
-# # TODO optimize operations
-# function computenewtondirection(rhs, H, L, mu, tau)
-#     delta = solvesystem(rhs, L, mu, tau)
-#
-#     if opt.maxitrefinesteps > 0
-#         # TODO this is not used by default, so ignore for now
-#         error("NOT IMPLEMENTED")
-#         # checks to see if we need to refine the solution
-#         # TODO rcond is not a function. and eps?
-#         # if rcond(Array(H)) < eps() # TODO Base.LinAlg.LAPACK.gecon! # TODO really epsilon?\
-#         #     lhsnew = copy(lhs)
-#         #     lhsnew[m+n+2:m+2n+1,m+1:m+n] = mu*H
-#         #     lhsnew[end,m+n+1] = mu/tau^2
-#         #
-#         #     # res = residual3p(lhsnew, delta, rhs)
-#         #     res = lhsnew*delta - rhs # TODO needs to be in at least triple precision
-#         #     resnorm = norm(res)
-#         #
-#         #     for refiter in 1:opt.maxitrefinesteps
-#         #         d = solvesystem(rhs, L, mu, tau)
-#         #         deltanew = delta - d
-#         #
-#         #         # res = residual3p(lhsnew, deltanew, rhs)
-#         #         resnew = lhsnew*deltanew - rhs # TODO needs to be in at least triple precision
-#         #         resnewnorm = norm(resnew)
-#         #
-#         #         # stop iterative refinement if there is not enough progress
-#         #         if resnewnorm > opt.itrefinethres*resnorm
-#         #             break
-#         #         end
-#         #
-#         #         # update solution if residual norm is smaller
-#         #         if resnewnorm < resnorm
-#         #             delta = deltanew
-#         #             res = resnew
-#         #             resnorm = resnewnorm
-#         #         end
-#         #     end
-#         # end
-#     end
-#
-#     return (delta[1:m], delta[m+1:m+n], delta[m+n+1], delta[m+n+2:m+2n+1], delta[end])
-# end
