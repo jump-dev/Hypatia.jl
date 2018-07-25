@@ -181,8 +181,9 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
         dir_ts .= invmu*(rhs_tx - ts)
         calc_Hi_vec!(Hirxrs, dir_ts)
 
-        lhsdydtau = [A*HiAt (-b - A*Hic); (b' - c'*HiAt) (mu/tau^2 + c'*Hic)]
-        rhsdydtau .= [(rhs_ty - A*Hirxrs); (rhs_tau - kap + c'*Hirxrs)]
+        # TODO maybe can use special structure of lhsdydtau: top left mxm is symmetric (L*A)^2, then last row and col are skew-symmetric
+        lhsdydtau = [A*HiAt (-b - A*Hic); (b' - c'*HiAt) (mu/tau^2 + dot(c, Hic))]
+        rhsdydtau .= [(rhs_ty - A*Hirxrs); (rhs_tau - kap + dot(c, Hirxrs))]
         dydtau .= lhsdydtau\rhsdydtau
 
         dir_ty .= dydtau[1:m]
@@ -291,8 +292,8 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
             dir_ts .= -invmu*ts - calc_g!(g)
             calc_Hi_vec!(Hirxrs, dir_ts)
 
-            lhsdydtau = [A*HiAt (-b - A*Hic); (b' - c'*HiAt) (mu/tau^2 + c'*Hic)]
-            rhsdydtau .= [-A*Hirxrs; (-kap + mu/tau + c'*Hirxrs)]
+            lhsdydtau = [A*HiAt (-b - A*Hic); (b' - c'*HiAt) (mu/tau^2 + dot(c, Hic))]
+            rhsdydtau .= [-A*Hirxrs; (-kap + mu/tau + dot(c, Hirxrs))]
             dydtau .= lhsdydtau\rhsdydtau
 
             dir_ty .= dydtau[1:m]
