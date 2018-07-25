@@ -16,7 +16,7 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
     bnu = 1.0 + sum(barpar(ck) for ck in coneobjs)
 
     # create cone object functions related to primal cone barrier
-    function load_tx(_tx::Vector{Float64}; save_prev=false)
+    function load_tx(_tx; save_prev=false)
         for k in eachindex(coneobjs)
             load_txk(coneobjs[k], _tx[coneidxs[k]], save_prev)
         end
@@ -46,17 +46,16 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
         return _g
     end
 
-    function calc_Hi_vec!(_Hi_vec, _v)
+    function calc_Hinv_vec!(_Hi_vec, _v)
         for k in eachindex(coneobjs)
-            _Hi_vec[coneidxs[k]] .= calc_Hik(coneobjs[k])*_v[coneidxs[k]]
+            _Hi_vec[coneidxs[k]] .= calc_Hinvk(coneobjs[k])*_v[coneidxs[k]]
         end
         return _Hi_vec
     end
 
-    function calc_Hi_At()
-        _Hi_At = spzeros(n,m)
+    function calc_Hinv_At!(_Hi_At)
         for k in eachindex(coneobjs)
-            _Hi_At[coneidxs[k],:] .= calc_Hik(coneobjs[k])*A[:,coneidxs[k]] # TODO maybe faster with CSC to do IJV
+            _Hi_At[coneidxs[k],:] .= calc_Hinvk(coneobjs[k])*A[:,coneidxs[k]]' # TODO maybe faster with CSC to do IJV
         end
         return _Hi_At
     end
@@ -65,7 +64,7 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
         # sqrt(sum(abs2, L\(ts + mu*g)) + (tau*kap - mu)^2)/mu
         sumsqr = (_tk - _mu)^2
         for k in eachindex(coneobjs)
-            sumsqr += sum(abs2, calc_Lk(coneobjs[k])\(_ts[coneidxs[k]] + _mu*calc_gk(coneobjs[k])))
+            sumsqr += sum(abs2, calc_HCholLk(coneobjs[k])\(_ts[coneidxs[k]] + _mu*calc_gk(coneobjs[k])))
         end
         return sqrt(sumsqr)/_mu
      end
@@ -114,8 +113,10 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
     dir_tx = similar(tx)
     dir_ts = similar(ts)
     Hic = similar(tx)
+    HiAt = similar(A, n, m)
     Hirxrs = similar(tx)
-    rhsdydtau = Vector{Float64}(undef,m+1)
+    lhsdydtau = similar(A, m+1, m+1)
+    rhsdydtau = similar(tx, m+1)
     dydtau = similar(rhsdydtau)
     sa_tx = similar(tx)
     sa_ts = similar(ts)
@@ -174,15 +175,15 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
         =#
         # determine prediction direction
         invmu = 1.0/mu
-        calc_Hi_vec!(Hic, c)
+        calc_Hinv_vec!(Hic, c)
         Hic .*= invmu
-        HiAt = calc_Hi_At()
+        calc_Hinv_At!(HiAt)
         HiAt .*= invmu
         dir_ts .= invmu*(rhs_tx - ts)
-        calc_Hi_vec!(Hirxrs, dir_ts)
+        calc_Hinv_vec!(Hirxrs, dir_ts)
 
         # TODO maybe can use special structure of lhsdydtau: top left mxm is symmetric (L*A)^2, then last row and col are skew-symmetric
-        lhsdydtau = [A*HiAt (-b - A*Hic); (b' - c'*HiAt) (mu/tau^2 + dot(c, Hic))]
+        lhsdydtau .= [A*HiAt (-b - A*Hic); (b' - c'*HiAt) (mu/tau^2 + dot(c, Hic))]
         rhsdydtau .= [(rhs_ty - A*Hirxrs); (rhs_tau - kap + dot(c, Hirxrs))]
         dydtau .= lhsdydtau\rhsdydtau
 
@@ -285,14 +286,14 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
 
             # calculate correction direction
             invmu = 1.0/mu
-            calc_Hi_vec!(Hic, c)
+            calc_Hinv_vec!(Hic, c)
             Hic .*= invmu
-            HiAt = calc_Hi_At()
+            calc_Hinv_At!(HiAt)
             HiAt .*= invmu
             dir_ts .= -invmu*ts - calc_g!(g)
-            calc_Hi_vec!(Hirxrs, dir_ts)
+            calc_Hinv_vec!(Hirxrs, dir_ts)
 
-            lhsdydtau = [A*HiAt (-b - A*Hic); (b' - c'*HiAt) (mu/tau^2 + dot(c, Hic))]
+            lhsdydtau .= [A*HiAt (-b - A*Hic); (b' - c'*HiAt) (mu/tau^2 + dot(c, Hic))]
             rhsdydtau .= [-A*Hirxrs; (-kap + mu/tau + dot(c, Hirxrs))]
             dydtau .= lhsdydtau\rhsdydtau
 
