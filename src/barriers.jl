@@ -1,9 +1,55 @@
 
-export ConeData, PolyNonnegData
+export ConeData, NonnegData, SumOfSqrData
 
 abstract type ConeData end
 
-mutable struct PolyNonnegData <: ConeData
+
+#=
+ Nonnegative cone
+=#
+mutable struct NonnegData <: ConeData
+    dim::Int
+
+    pnt
+    pnt_prev
+    # invpnt # TODO store this and the square
+
+    function NonnegData(dim)
+        k = new()
+        k.dim = dim
+        return k
+    end
+end
+
+dimension(k::NonnegData) = k.dim
+
+barpar(k::NonnegData) = k.dim
+
+function load_txk(k::NonnegData, pnt, save_prev)
+    @assert length(pnt) == k.dim
+
+    if save_prev
+        k.pnt_prev = copy(k.pnt)
+    end
+
+    k.pnt = pnt
+end
+
+use_prevk(k::NonnegData) = (k.pnt = copy(k.pnt_prev))
+
+inconek(k::NonnegData) = all(x -> (x > 0.0), k.pnt)
+
+calc_gk(k::NonnegData) = -inv.(k.pnt)
+
+calc_Hinvk(k::NonnegData) = Diagonal(k.pnt.^2)
+
+calc_HCholLk(k::NonnegData) = Diagonal(inv.(k.pnt)) # TODO just -g
+
+
+#=
+ Sum of squares cone
+=#
+mutable struct SumOfSqrData <: ConeData
     dim::Int
     ip
     ipwt
@@ -25,7 +71,7 @@ mutable struct PolyNonnegData <: ConeData
 
     # TODO prealloc etc
 
-    function PolyNonnegData(dim, ip, ipwt)
+    function SumOfSqrData(dim, ip, ipwt)
         k = new()
         k.dim = dim
         k.ip = ip
@@ -35,18 +81,19 @@ mutable struct PolyNonnegData <: ConeData
     end
 end
 
-dimension(k::PolyNonnegData) = k.dim
-barpar(k::PolyNonnegData) = k.dim
+dimension(k::SumOfSqrData) = k.dim
 
-function load_txk(k::PolyNonnegData, pnt, save_prev)
+barpar(k::SumOfSqrData) = k.dim
+
+function load_txk(k::SumOfSqrData, pnt, save_prev)
     @assert length(pnt) == k.dim
 
     if save_prev
         # may want to use previously calculated values, so store
         @assert k.hasgH
         k.grad_prev = calc_gk(k)
-        k.Hi_prev = calc_Hik(k)
-        k.L_prev = calc_Lk(k)
+        k.Hi_prev = calc_Hinvk(k)
+        k.L_prev = calc_HCholLk(k)
     end
 
     k.pnt = pnt
@@ -56,7 +103,7 @@ function load_txk(k::PolyNonnegData, pnt, save_prev)
     k.hasL = false
 end
 
-function use_prevk(k::PolyNonnegData)
+function use_prevk(k::SumOfSqrData)
     k.grad = copy(k.grad_prev) # TODO prealloc not copy
     k.Hi = copy(k.Hi_prev)
     k.L = copy(k.L_prev)
@@ -66,7 +113,7 @@ function use_prevk(k::PolyNonnegData)
     k.hasL = true
 end
 
-function inconek(k::PolyNonnegData)
+function inconek(k::SumOfSqrData)
     @assert k.isnewpnt
     k.isnewpnt = false
 
@@ -101,12 +148,12 @@ function inconek(k::PolyNonnegData)
     return true
 end
 
-function calc_gk(k::PolyNonnegData)
+function calc_gk(k::SumOfSqrData)
     @assert k.hasgH
     return k.grad
 end
 
-function calc_Hik(k::PolyNonnegData)
+function calc_Hinvk(k::SumOfSqrData)
     @assert k.hasgH
     if !k.hasHi
         k.Hi = inv(k.Hfact)
@@ -115,7 +162,7 @@ function calc_Hik(k::PolyNonnegData)
     return k.Hi
 end
 
-function calc_Lk(k::PolyNonnegData)
+function calc_HCholLk(k::SumOfSqrData)
     @assert k.hasgH
     if !k.hasL
         k.L = k.Hfact.L
@@ -123,11 +170,3 @@ function calc_Lk(k::PolyNonnegData)
     end
     return k.L
 end
-
-
-
-
-
-# get barrier function parameter
-# barpar(k::NonnegativesData) = k.dimension
-# barpar(k::SecondOrderConeData) = 2

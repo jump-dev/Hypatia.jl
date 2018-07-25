@@ -47,7 +47,7 @@ c[abs.(c) .< 1e-10] .= 0.0
 cones = ConeData[]
 coneidxs = AbstractUnitRange[]
 for k in 1:numPolys
-    push!(cones, PolyNonnegData(u, P, PWts))
+    push!(cones, SumOfSqrData(u, P, PWts))
     push!(coneidxs, 1+(k-1)*u:k*u)
 end
 

@@ -118,8 +118,9 @@ function loaddata!(opt::AlfonsoOptimizer, A::AbstractMatrix{Float64}, b::Vector{
     if n != length(c)
         error("dimension of vector c is $(length(c)), but number of columns in matrix A is $n")
     end
-    @assert issparse(A)
-    dropzeros!(A)
+    if issparse(A)
+        dropzeros!(A)
+    end
 
     idxend = 0
     for k in eachindex(cones)
