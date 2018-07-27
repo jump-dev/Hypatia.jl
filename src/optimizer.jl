@@ -69,7 +69,7 @@ end
 
 
 function AlfonsoOptimizer(;
-    verbose = true,
+    verbose = false,
     optimtol = 1e-06,
     maxiter = 1e3,
     predlinesearch = true,
