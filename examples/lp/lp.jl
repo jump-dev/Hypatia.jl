@@ -8,21 +8,32 @@ solves a simple LP min c'x s.t. Ax >= b
 using Alfonso
 import MathOptInterface
 const MOI = MathOptInterface
-using Printf
 using SparseArrays
 using LinearAlgebra
 using DelimitedFiles
+using Random
 
 
-loc = joinpath(pwd(), "data")
+m = 500
+n = 1000
+use_data = false
+dense = false
+nzfrac = 1/sqrt(n)
 
-A = readdlm(joinpath(loc, "A.txt"), ',', Float64)
-b = vec(readdlm(joinpath(loc, "b.txt"), ',', Float64))
-c = vec(readdlm(joinpath(loc, "c.txt"), ',', Float64))
-A[abs.(A) .< 1e-10] .= 0.0
-b[abs.(b) .< 1e-10] .= 0.0
-c[abs.(c) .< 1e-10] .= 0.0
-(m, n) = size(A)
+if use_data
+    A = readdlm(joinpath(pwd(), "data/A$(m)x$(n).txt"), ',', Float64)
+    b = vec(readdlm(joinpath(pwd(), "data/b$m.txt"), ',', Float64))
+    c = vec(readdlm(joinpath(pwd(), "data/c$n.txt"), ',', Float64))
+else
+    srand(100)
+    if dense
+        A = rand(-9.0:9.0, m, n)
+    else
+        A = 10.0.*sprandn(m, n, nzfrac)
+    end
+    b = A*ones(n)
+    c = rand(0.0:9.0, n)
+end
 
 cones = ConeData[NonnegData(n),]
 coneidxs = AbstractUnitRange[1:n,]

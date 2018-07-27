@@ -1,7 +1,5 @@
 
 
-export AlfonsoOptimizer
-
 mutable struct AlfonsoOptimizer <: MOI.AbstractOptimizer
     # options
     verbose::Bool           # if true, prints progress at each iteration

@@ -14,7 +14,7 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
 
     # calculate complexity parameter of the augmented barrier (nu-bar): sum of the primitive cone barrier parameters (# TODO plus 1?)
     bnu = 1.0 + sum(barpar(ck) for ck in coneobjs)
-
+    
     # create cone object functions related to primal cone barrier
     function load_tx(_tx; save_prev=false)
         for k in eachindex(coneobjs)
