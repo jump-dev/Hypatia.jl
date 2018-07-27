@@ -1,8 +1,8 @@
 #=
 Copyright 2018, David Papp, Sercan Yildiz, and contributors
 
-modified from https://github.com/dpapp-github/alfonso/blob/master/polyEnv.m
-formulates and solves the polynomial envelope problem described in the paper:
+modified from https://github.com/dpapp-github/alfonso/blob/master/polyOpt.m
+formulates and solves the polynomial optimization problem for a given polynomial, described in the paper:
 D. Papp and S. Yildiz. Sum-of-squares optimization without semidefinite programming
 available at https://arxiv.org/abs/1712.01792
 =#
