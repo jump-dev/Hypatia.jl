@@ -83,7 +83,7 @@ end
 
 dimension(k::SumOfSqrData) = k.dim
 
-barpar(k::SumOfSqrData) = k.dim
+barpar(k::SumOfSqrData) = (size(k.ip, 2) + sum(size(k.ipwt[j], 2) for j in 1:length(k.ipwt)))
 
 function load_txk(k::SumOfSqrData, pnt, save_prev)
     @assert length(pnt) == k.dim

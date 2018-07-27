@@ -10,45 +10,40 @@ available at https://arxiv.org/abs/1712.01792
 using Alfonso
 import MathOptInterface
 const MOI = MathOptInterface
-using Printf
 using SparseArrays
 using LinearAlgebra
 using DelimitedFiles
+using Random
 
 
-loc = joinpath(pwd(), "data")
-
-pts = vec(readdlm(joinpath(loc, "pts.txt"), ',', Float64))
-w = vec(readdlm(joinpath(loc, "w.txt"), ',', Float64))
-P = readdlm(joinpath(loc, "P.txt"), ',', Float64)
-P0 = readdlm(joinpath(loc, "P0.txt"), ',', Float64)
-pts[abs.(pts) .< 1e-10] .= 0.0
-w[abs.(w) .< 1e-10] .= 0.0
-P[abs.(P) .< 1e-10] .= 0.0
-P0[abs.(P0) .< 1e-10] .= 0.0
-
-n = 1
-d = 5
-l = binomial(n+d, n)
-u = binomial(n+2*d, n)
 numPolys = 2
 degPolys = 5
+n = 1
+d = 5
+use_data = true
+
+(L, U, pts, w, P0, P) = cheb2_data(d)
 
 LWts = fill(binomial(n+d-1, n), n)
-bnu = numPolys*(l + sum(LWts)) + 1.0
 wtVals = 1.0 .- pts.^2
 PWts = [Array((qr(Diagonal(sqrt.(wtVals[:,j]))*P[:,1:LWts[j]])).Q) for j in 1:n]
 
-A = repeat(sparse(1.0I, u, u), outer=(1, numPolys))
+A = repeat(sparse(1.0I, U, U), outer=(1, numPolys))
 b = w
-c = vec(readdlm(joinpath(loc, "c.txt"), ',', Float64))
-c[abs.(c) .< 1e-10] .= 0.0
+
+if use_data
+    c = vec(readdlm(joinpath(pwd(), "data/c$(size(A,2)).txt"), ',', Float64))
+else
+    srand(100)
+    LDegs = binomial(n+degPolys, n)
+    c = vec(P[:,1:LDegs]*rand(-9:9, LDegs, numPolys))
+end
 
 cones = ConeData[]
 coneidxs = AbstractUnitRange[]
 for k in 1:numPolys
-    push!(cones, SumOfSqrData(u, P, PWts))
-    push!(coneidxs, 1+(k-1)*u:k*u)
+    push!(cones, SumOfSqrData(U, P, PWts))
+    push!(coneidxs, 1+(k-1)*U:k*U)
 end
 
 
