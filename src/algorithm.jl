@@ -232,7 +232,7 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
                 end
             end
 
-            # primal iterate tx is outside the cone and beta-neighborhood
+            # primal iterate tx is outside the beta-neighborhood
             if alphaprevok && (nprediters > 1)
                 # previous iterate was in the beta-neighborhood
                 alpha = alphaprev
@@ -244,7 +244,7 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
                 break
             end
 
-            # the last two primal iterates were outside the beta-neighborhood
+            # current and previous primal iterates are outside the beta-neighborhood
             if alpha < alphapredthres
                 # alpha is very small, so predictor has failed
                 predfail = true
