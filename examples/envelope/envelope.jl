@@ -22,15 +22,16 @@ n = 1
 d = 5
 use_data = true
 
-(L, U, pts, w, P0, P) = cheb2_data(d)
 
+# generate interpolation
+(L, U, pts, P0, P, w) = cheb2_data(d)
 LWts = fill(binomial(n+d-1, n), n)
 wtVals = 1.0 .- pts.^2
 PWts = [Array((qr(Diagonal(sqrt.(wtVals[:,j]))*P[:,1:LWts[j]])).Q) for j in 1:n]
 
+# set up MOI problem data
 A = repeat(sparse(1.0I, U, U), outer=(1, numPolys))
 b = w
-
 if use_data
     c = vec(readdlm(joinpath(pwd(), "data/c$(size(A,2)).txt"), ',', Float64))
 else
@@ -48,7 +49,7 @@ end
 
 
 # load into optimizer and solve
-opt = AlfonsoOptimizer(maxiter=100)
+opt = AlfonsoOptimizer(maxiter=100, verbose=true)
 Alfonso.loaddata!(opt, A, b, c, cones, coneidxs)
 # @show opt
 @time MOI.optimize!(opt)
