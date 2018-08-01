@@ -14,7 +14,7 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
 
     # calculate complexity parameter of the augmented barrier (nu-bar): sum of the primitive cone barrier parameters (# TODO plus 1?)
     bnu = 1.0 + sum(barpar(ck) for ck in coneobjs)
-    
+
     # create cone object functions related to primal cone barrier
     function load_tx(_tx; save_prev=false)
         for k in eachindex(coneobjs)
@@ -154,7 +154,7 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
 
         if (p_inf <= opt.optimtol) && (d_inf <= opt.optimtol)
             if gap <= opt.optimtol
-                println("Problem is feasible and approximate optimal solution found; terminating")
+                println("Problem is feasible and an approximate optimal solution was found; terminating")
                 opt.status = :Optimal
                 break
             elseif (compl <= opt.optimtol) && (tau <= opt.optimtol*1e-02*max(1.0, kap))
