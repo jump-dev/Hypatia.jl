@@ -73,14 +73,14 @@ function padua_data(d::Int)
     end
 
     # evaluations
-    # TODO could this be same as in fekete?
     u = calc_u(2, d, pts)
-    P0 = ones(U, L)
-    col = 0
-    for xp in Combinatorics.multiexponents(3, d)
-        col += 1
-        for j in 1:2
-            P0[:,col] .*= u[j][:,xp[j]+1]
+    P0 = Matrix{Float64}(undef, U, L)
+    P0[:,1] .= 1
+    col = 1
+    for t in 1:d
+        for xp in Combinatorics.multiexponents(2, t)
+            col += 1
+            P0[:,col] .= u[1][:,xp[1]+1] .* u[2][:,xp[2]+1]
         end
     end
     P = Array(qr(P0).Q)
@@ -170,15 +170,16 @@ function approxfekete_data(n::Int, d::Int)
     m = ones(U)
     u = calc_u(n, 2d, _pts)
     M = ones(npts, U)
-    keep_deg = trues(U)
-    col = 0
-    for xp in Combinatorics.multiexponents(n+1, 2d)
-        col += 1
-        for j in 1:n
-            M[:,col] .*= u[j][:,xp[j]+1]
-            m[col] *= iseven(xp[j]) ? 2/(1 - xp[j]^2) : 0
+    M[:,1] .= 1
+    col = 1
+    for t in 1:2d
+        for xp in Combinatorics.multiexponents(n, t)
+            col += 1
+            for j in 1:n
+                m[col] *= iseven(xp[j]) ? 2/(1 - xp[j]^2) : 0
+                M[:,col] .*= u[j][:,xp[j]+1]
+            end
         end
-        keep_deg[col] = (xp[end] >= d)
     end
 
     F = qr(M', Val(true))
@@ -186,8 +187,7 @@ function approxfekete_data(n::Int, d::Int)
 
     w = F.R[:,1:U]\(F.Q'*m)
     pts = _pts[keep_pnt,:] # subset of points indexed with the support of w
-    P0 = M[keep_pnt,keep_deg] # subset of polynomial evaluations up to total degree d
-
+    P0 = M[keep_pnt,1:L] # subset of polynomial evaluations up to total degree d
     P = Array(qr(P0).Q)
 
     return (L=L, U=U, pts=pts, P0=P0, P=P, w=w)
