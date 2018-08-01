@@ -20,6 +20,8 @@ use_data = false
 dense = false
 nzfrac = 1/sqrt(n)
 
+
+# set up MOI problem data
 if use_data
     A = readdlm(joinpath(pwd(), "data/A$(m)x$(n).txt"), ',', Float64)
     b = vec(readdlm(joinpath(pwd(), "data/b$m.txt"), ',', Float64))
@@ -38,8 +40,9 @@ end
 cones = ConeData[NonnegData(n),]
 coneidxs = AbstractUnitRange[1:n,]
 
+
 # load into optimizer and solve
-opt = AlfonsoOptimizer(maxiter=100)
+opt = AlfonsoOptimizer(maxiter=100, verbose=true)
 Alfonso.loaddata!(opt, A, b, c, cones, coneidxs)
 # @show opt
 @time MOI.optimize!(opt)
