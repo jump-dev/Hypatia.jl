@@ -10,11 +10,11 @@ module Alfonso
     import FFTW
     import Combinatorics
 
+    include("interpfuns.jl")
     include("barriers.jl")
     include("optimizer.jl")
     include("algorithm.jl")
-    include("interpfuns.jl")
 
-    export cheb2_data, padua_data
+    export cheb2_data, padua_data, approxfekete_data
     export AlfonsoOptimizer
 end
