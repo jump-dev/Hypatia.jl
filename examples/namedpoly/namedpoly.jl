@@ -13,15 +13,8 @@ const MOI = MathOptInterface
 using SparseArrays
 using LinearAlgebra
 
-
-# select the SOS degree and named polynomial to minimize
-# let d > deg/2 where deg is the degree of the named polynomial
-d = 3
-polyname = :lotkavolterra
-
-
 # list of currently available named polynomials
-polys = Dict{Symbol,NamedTuple}(
+const polys = Dict{Symbol,NamedTuple}(
     :robinson => (n=2, lbs=fill(-1.0, 2), ubs=fill(1.0, 2), deg=6,
         feval=((x,y) -> 1+x^6+y^6-x^4*y^2+x^4-x^2*y^4+y^4-x^2+y^2+3x^2*y^2)
         ),
@@ -33,38 +26,44 @@ polys = Dict{Symbol,NamedTuple}(
         ),
 )
 
-(n, lbs, ubs, deg, feval) = polys[polyname]
-if d < ceil(Int, deg/2)
-    error("requires d >= $(ceil(Int, deg/2))")
+function solve_namedpoly(polyname, d)
+    (n, lbs, ubs, deg, feval) = polys[polyname]
+    if d < ceil(Int, deg/2)
+        error("requires d >= $(ceil(Int, deg/2))")
+    end
+
+    # generate interpolation
+    if n == 1
+        (L, U, pts, w, P0, P) = cheb2_data(d)
+    elseif n == 2
+        (L, U, pts, w, P0, P) = padua_data(d)
+        # (L, U, pts, w, P0, P) = approxfekete_data(n, d)
+    elseif n > 2
+        (L, U, pts, w, P0, P) = approxfekete_data(n, d)
+    end
+
+    # transform points to fit the box domain
+    pts .*= (ubs - lbs)'/2
+    pts .+= (ubs + lbs)'/2
+    wtVals = (pts .- lbs') .* (ubs' .- pts)
+    LWts = fill(binomial(n+d-1, n), n)
+    PWts = [Diagonal(sqrt.(wtVals[:,j]))*P0[:,1:LWts[j]] for j in 1:n]
+
+    # set up MOI problem data
+    A = ones(1, U)
+    b = [1.0,]
+    c = [feval(pts[j,:]...) for j in 1:U]
+    cones = ConeData[SumOfSqrData(U, P0, PWts),]
+    coneidxs = AbstractUnitRange[1:U]
+
+    # load into optimizer and solve
+    opt = AlfonsoOptimizer(maxiter=100, verbose=true)
+    Alfonso.loaddata!(opt, A, b, c, cones, coneidxs)
+    # @show opt
+    @time MOI.optimize!(opt)
 end
 
-# generate interpolation
-if n == 1
-    (L, U, pts, w, P0, P) = cheb2_data(d)
-elseif n == 2
-    (L, U, pts, w, P0, P) = padua_data(d)
-    # (L, U, pts, w, P0, P) = approxfekete_data(n, d)
-elseif n > 2
-    (L, U, pts, w, P0, P) = approxfekete_data(n, d)
-end
-
-# transform points to fit the box domain
-pts .*= (ubs - lbs)'/2
-pts .+= (ubs + lbs)'/2
-wtVals = (pts .- lbs') .* (ubs' .- pts)
-LWts = fill(binomial(n+d-1, n), n)
-PWts = [Diagonal(sqrt.(wtVals[:,j]))*P0[:,1:LWts[j]] for j in 1:n]
-
-# set up MOI problem data
-A = ones(1, U)
-b = [1.0,]
-c = [feval(pts[j,:]...) for j in 1:U]
-cones = ConeData[SumOfSqrData(U, P0, PWts),]
-coneidxs = AbstractUnitRange[1:U]
-
-
-# load into optimizer and solve
-opt = AlfonsoOptimizer(maxiter=100, verbose=true)
-Alfonso.loaddata!(opt, A, b, c, cones, coneidxs)
-# @show opt
-@time MOI.optimize!(opt)
+# select the named polynomial to minimize and the SOS degree (to be squared)
+# solve_namedpoly(:robinson, 10)
+# solve_namedpoly(:goldsteinprice, 10)
+# solve_namedpoly(:lotkavolterra, 3)
