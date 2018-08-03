@@ -1,6 +1,4 @@
 
-__precompile__()
-
 module Alfonso
     import MathOptInterface
     const MOI = MathOptInterface
