@@ -85,30 +85,27 @@ function padua_data(d::Int)
     end
     P = Array(qr(P0).Q)
 
-    # weights TODO
+    # cubature weights at Padua points
+    # even-degree Chebyshev polynomials on the subgrids
+    te1 = [cospi(i*j/(2d)) for i in 0:2:2d, j in 0:2:2d]
+    to1 = [cospi(i*j/(2d)) for i in 0:2:2d, j in 1:2:2d]
+    te2 = [cospi(i*j/(2d+1)) for i in 0:2:2d, j in 0:2:2d+1]
+    to2 = [cospi(i*j/(2d+1)) for i in 0:2:2d, j in 1:2:2d+1]
+    te1[2:d+1,:] .*= sqrt(2)
+    to1[2:d+1,:] .*= sqrt(2)
+    te2[2:d+1,:] .*= sqrt(2)
+    to2[2:d+1,:] .*= sqrt(2)
+    # even, even moments matrix
+    mom = 2*sqrt(2)./[1 - i^2 for i in 0:2:2d]
+    mom[1] = 2
+    Mmom = zeros(d+1, d+1)
+    for j in 1:d+1, i in 1:d+2-j
+        Mmom[i,j] = mom[i]*mom[j]
+    end
+    # interpolation weights matrices
 
-    # weights for cubature at pts in Padua
-    # TODO adapt matlab code
-    #   argn = linspace(0,pi,n+1);
-    #   argn1 = linspace(0,pi,n+2);
-    #   k = [0:2:n]';
-    #   l = (n-mod(n,2))/2+1;
-    # % even-degree Chebyshev polynomials on the subgrids
-    #   TE1 = cos(k*argn(1:2:n+1));
-    #   TE1(2:l,:) = TE1(2:l,:)*sqrt(2);
-    #   TO1 = cos(k*argn(2:2:n+1));
-    #   TO1(2:l,:) = TO1(2:l,:)*sqrt(2);
-    #   TE2 = cos(k*argn1(1:2:n+2));
-    #   TE2(2:l,:) = TE2(2:l,:)*sqrt(2);
-    #   TO2 = cos(k*argn1(2:2:n+2));
-    #   TO2(2:l,:) = TO2(2:l,:)*sqrt(2);
-    # % even,even moments matrix
-    #   mom = 2*sqrt(2)./(1-k.^2);
-    #   mom(1) = 2;
-    #   [M1,M2] = meshgrid(mom);
-    #   M = M1.*M2;
-    #   Mmom = fliplr(triu(fliplr(M)));
-    # % interpolation weights matrices
+
+    # TODO n = 2d, l = d + 1
     #   W1 = 2*ones(l)/(n*(n+1));
     #   W2 = 2*ones((n+mod(n,2))/2+1,(n+mod(n,2))/2)/(n*(n+1));
     #   W1(:,1) = W1(:,1)/2;
@@ -135,7 +132,7 @@ function padua_data(d::Int)
     #     L = L(:);
     #   end
 
-    return (L=L, U=U, pts=pts, P0=P0, P=P, w=NaN)
+    return (L=L, U=U, pts=pts, P0=P0, P=P, w=w)
 end
 
 
