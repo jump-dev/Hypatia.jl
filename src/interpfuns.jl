@@ -99,38 +99,19 @@ function padua_data(d::Int)
     mom = 2*sqrt(2)./[1 - i^2 for i in 0:2:2d]
     mom[1] = 2
     Mmom = zeros(d+1, d+1)
+    f = 1/(d*(2d+1))
     for j in 1:d+1, i in 1:d+2-j
-        Mmom[i,j] = mom[i]*mom[j]
+        Mmom[i,j] = mom[i]*mom[j]*f
     end
-    # interpolation weights matrices
-
-
-    # TODO n = 2d, l = d + 1
-    #   W1 = 2*ones(l)/(n*(n+1));
-    #   W2 = 2*ones((n+mod(n,2))/2+1,(n+mod(n,2))/2)/(n*(n+1));
-    #   W1(:,1) = W1(:,1)/2;
-    #   W2(1,:) = W2(1,:)/2;
-    #   if (mod(n,2) == 0)
-    #     Mmom(n/2+1,1) = Mmom(n/2+1,1)/2;
-    #     W1(:,n/2+1) = W1(:,n/2+1)/2;
-    #     W1(n/2+1,:) = W1(n/2+1,:)/2;
-    #   else
-    #     W2((n+1)/2+1,:) = W2((n+1)/2+1,:)/2;
-    #     W2(:,(n+1)/2) = W2(:,(n+1)/2)/2;
-    #   end
-    # % cubature weights as matrices on the subgrids.
-    #   L1 = W1.*(TE1'*Mmom*TO2)';
-    #   L2 = W2.*(TO1'*Mmom*TE2)';
-    #   if (mod(n,2) == 0)
-    #     L = zeros(n/2+1,n+1);
-    #     L(:,1:2:n+1) = L1;
-    #     L(:,2:2:n+1) = L2;
-    #     L = L(:);
-    #   else
-    #     L = zeros((n+1)/2,(n+2));
-    #     L = [L1',L2']';
-    #     L = L(:);
-    #   end
+    Mmom[1,d+1] ./= 2
+    # cubature weights as matrices on the subgrids
+    W = Matrix{Float64}(undef, d+1, 2d+1)
+    W[:,1:2:2d+1] .= to2'*Mmom*te1
+    W[:,2:2:2d+1] .= te2'*Mmom*to1
+    W[:,[1,2d+1]] ./= 2
+    W[1,2:2:2d+1] ./= 2
+    W[d+1,1:2:2d+1] ./= 2
+    w = vec(W)
 
     return (L=L, U=U, pts=pts, P0=P0, P=P, w=w)
 end
@@ -181,7 +162,6 @@ function approxfekete_data(n::Int, d::Int)
 
     F = qr(M', Val(true))
     keep_pnt = F.p[1:U]
-
     w = F.R[:,1:U]\(F.Q'*m)
     pts = _pts[keep_pnt,:] # subset of points indexed with the support of w
     P0 = M[keep_pnt,1:L] # subset of polynomial evaluations up to total degree d
