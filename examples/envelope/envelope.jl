@@ -15,41 +15,45 @@ using LinearAlgebra
 using DelimitedFiles
 using Random
 
+function solve_envelope(npoly, deg, n, d; use_data=false, rseed=1)
+    # TODO allow n > 1
+    @assert n == 1
 
-numPolys = 2
-degPolys = 5
-n = 1
-d = 5
-use_data = true
+    # generate interpolation
+    (L, U, pts, P0, P, w) = cheb2_data(d)
+    LWts = fill(binomial(n+d-1, n), n)
+    wtVals = 1.0 .- pts.^2
+    PWts = [Array((qr(Diagonal(sqrt.(wtVals[:,j]))*P[:,1:LWts[j]])).Q) for j in 1:n]
 
+    # set up MOI problem data
+    A = repeat(sparse(1.0I, U, U), outer=(1, npoly))
+    b = w
+    if use_data
+        # use provided data in data folder
+        c = vec(readdlm(joinpath(pwd(), "data/c$(size(A,2)).txt"), ',', Float64))
+    else
+        # generate random data
+        Random.seed!(rseed)
+        LDegs = binomial(n+deg, n)
+        c = vec(P[:,1:LDegs]*rand(-9:9, LDegs, npoly))
+    end
 
-# generate interpolation
-(L, U, pts, P0, P, w) = cheb2_data(d)
-LWts = fill(binomial(n+d-1, n), n)
-wtVals = 1.0 .- pts.^2
-PWts = [Array((qr(Diagonal(sqrt.(wtVals[:,j]))*P[:,1:LWts[j]])).Q) for j in 1:n]
+    cones = ConeData[]
+    coneidxs = AbstractUnitRange[]
+    for k in 1:npoly
+        push!(cones, SumOfSqrData(U, P, PWts))
+        push!(coneidxs, 1+(k-1)*U:k*U)
+    end
 
-# set up MOI problem data
-A = repeat(sparse(1.0I, U, U), outer=(1, numPolys))
-b = w
-if use_data
-    c = vec(readdlm(joinpath(pwd(), "data/c$(size(A,2)).txt"), ',', Float64))
-else
-    srand(100)
-    LDegs = binomial(n+degPolys, n)
-    c = vec(P[:,1:LDegs]*rand(-9:9, LDegs, numPolys))
+    # load into optimizer and solve
+    opt = AlfonsoOptimizer(maxiter=100, verbose=true)
+    Alfonso.loaddata!(opt, A, b, c, cones, coneidxs)
+    # @show opt
+    @time MOI.optimize!(opt)
 end
 
-cones = ConeData[]
-coneidxs = AbstractUnitRange[]
-for k in 1:numPolys
-    push!(cones, SumOfSqrData(U, P, PWts))
-    push!(coneidxs, 1+(k-1)*U:k*U)
-end
-
-
-# load into optimizer and solve
-opt = AlfonsoOptimizer(maxiter=100, verbose=true)
-Alfonso.loaddata!(opt, A, b, c, cones, coneidxs)
-# @show opt
-@time MOI.optimize!(opt)
+# optionally use fixed data in folder
+# select number of polynomials and degrees for the envelope
+# select dimension and SOS degree (to be squared)
+# solve_envelope(2, 5, 1, 5, use_data=true)
+# solve_envelope(2, 5, 1, 5)

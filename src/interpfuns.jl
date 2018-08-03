@@ -73,69 +73,47 @@ function padua_data(d::Int)
     end
 
     # evaluations
-    # TODO could this be same as in fekete?
     u = calc_u(2, d, pts)
-    P0 = ones(U, L)
-    col = 0
-    for xp in Combinatorics.multiexponents(3, d)
-        col += 1
-        for j in 1:2
-            P0[:,col] .*= u[j][:,xp[j]+1]
+    P0 = Matrix{Float64}(undef, U, L)
+    P0[:,1] .= 1
+    col = 1
+    for t in 1:d
+        for xp in Combinatorics.multiexponents(2, t)
+            col += 1
+            P0[:,col] .= u[1][:,xp[1]+1] .* u[2][:,xp[2]+1]
         end
     end
     P = Array(qr(P0).Q)
 
-    # weights TODO
+    # cubature weights at Padua points
+    # even-degree Chebyshev polynomials on the subgrids
+    te1 = [cospi(i*j/(2d)) for i in 0:2:2d, j in 0:2:2d]
+    to1 = [cospi(i*j/(2d)) for i in 0:2:2d, j in 1:2:2d]
+    te2 = [cospi(i*j/(2d+1)) for i in 0:2:2d, j in 0:2:2d+1]
+    to2 = [cospi(i*j/(2d+1)) for i in 0:2:2d, j in 1:2:2d+1]
+    te1[2:d+1,:] .*= sqrt(2)
+    to1[2:d+1,:] .*= sqrt(2)
+    te2[2:d+1,:] .*= sqrt(2)
+    to2[2:d+1,:] .*= sqrt(2)
+    # even, even moments matrix
+    mom = 2*sqrt(2)./[1 - i^2 for i in 0:2:2d]
+    mom[1] = 2
+    Mmom = zeros(d+1, d+1)
+    f = 1/(d*(2d+1))
+    for j in 1:d+1, i in 1:d+2-j
+        Mmom[i,j] = mom[i]*mom[j]*f
+    end
+    Mmom[1,d+1] ./= 2
+    # cubature weights as matrices on the subgrids
+    W = Matrix{Float64}(undef, d+1, 2d+1)
+    W[:,1:2:2d+1] .= to2'*Mmom*te1
+    W[:,2:2:2d+1] .= te2'*Mmom*to1
+    W[:,[1,2d+1]] ./= 2
+    W[1,2:2:2d+1] ./= 2
+    W[d+1,1:2:2d+1] ./= 2
+    w = vec(W)
 
-    # weights for cubature at pts in Padua
-    # TODO adapt matlab code
-    #   argn = linspace(0,pi,n+1);
-    #   argn1 = linspace(0,pi,n+2);
-    #   k = [0:2:n]';
-    #   l = (n-mod(n,2))/2+1;
-    # % even-degree Chebyshev polynomials on the subgrids
-    #   TE1 = cos(k*argn(1:2:n+1));
-    #   TE1(2:l,:) = TE1(2:l,:)*sqrt(2);
-    #   TO1 = cos(k*argn(2:2:n+1));
-    #   TO1(2:l,:) = TO1(2:l,:)*sqrt(2);
-    #   TE2 = cos(k*argn1(1:2:n+2));
-    #   TE2(2:l,:) = TE2(2:l,:)*sqrt(2);
-    #   TO2 = cos(k*argn1(2:2:n+2));
-    #   TO2(2:l,:) = TO2(2:l,:)*sqrt(2);
-    # % even,even moments matrix
-    #   mom = 2*sqrt(2)./(1-k.^2);
-    #   mom(1) = 2;
-    #   [M1,M2] = meshgrid(mom);
-    #   M = M1.*M2;
-    #   Mmom = fliplr(triu(fliplr(M)));
-    # % interpolation weights matrices
-    #   W1 = 2*ones(l)/(n*(n+1));
-    #   W2 = 2*ones((n+mod(n,2))/2+1,(n+mod(n,2))/2)/(n*(n+1));
-    #   W1(:,1) = W1(:,1)/2;
-    #   W2(1,:) = W2(1,:)/2;
-    #   if (mod(n,2) == 0)
-    #     Mmom(n/2+1,1) = Mmom(n/2+1,1)/2;
-    #     W1(:,n/2+1) = W1(:,n/2+1)/2;
-    #     W1(n/2+1,:) = W1(n/2+1,:)/2;
-    #   else
-    #     W2((n+1)/2+1,:) = W2((n+1)/2+1,:)/2;
-    #     W2(:,(n+1)/2) = W2(:,(n+1)/2)/2;
-    #   end
-    # % cubature weights as matrices on the subgrids.
-    #   L1 = W1.*(TE1'*Mmom*TO2)';
-    #   L2 = W2.*(TO1'*Mmom*TE2)';
-    #   if (mod(n,2) == 0)
-    #     L = zeros(n/2+1,n+1);
-    #     L(:,1:2:n+1) = L1;
-    #     L(:,2:2:n+1) = L2;
-    #     L = L(:);
-    #   else
-    #     L = zeros((n+1)/2,(n+2));
-    #     L = [L1',L2']';
-    #     L = L(:);
-    #   end
-
-    return (L=L, U=U, pts=pts, P0=P0, P=P, w=NaN)
+    return (L=L, U=U, pts=pts, P0=P0, P=P, w=w)
 end
 
 
@@ -170,24 +148,23 @@ function approxfekete_data(n::Int, d::Int)
     m = ones(U)
     u = calc_u(n, 2d, _pts)
     M = ones(npts, U)
-    keep_deg = trues(U)
-    col = 0
-    for xp in Combinatorics.multiexponents(n+1, 2d)
-        col += 1
-        for j in 1:n
-            M[:,col] .*= u[j][:,xp[j]+1]
-            m[col] *= iseven(xp[j]) ? 2/(1 - xp[j]^2) : 0
+    M[:,1] .= 1
+    col = 1
+    for t in 1:2d
+        for xp in Combinatorics.multiexponents(n, t)
+            col += 1
+            for j in 1:n
+                m[col] *= iseven(xp[j]) ? 2/(1 - xp[j]^2) : 0
+                M[:,col] .*= u[j][:,xp[j]+1]
+            end
         end
-        keep_deg[col] = (xp[end] >= d)
     end
 
     F = qr(M', Val(true))
     keep_pnt = F.p[1:U]
-
     w = F.R[:,1:U]\(F.Q'*m)
     pts = _pts[keep_pnt,:] # subset of points indexed with the support of w
-    P0 = M[keep_pnt,keep_deg] # subset of polynomial evaluations up to total degree d
-
+    P0 = M[keep_pnt,1:L] # subset of polynomial evaluations up to total degree d
     P = Array(qr(P0).Q)
 
     return (L=L, U=U, pts=pts, P0=P0, P=P, w=w)
