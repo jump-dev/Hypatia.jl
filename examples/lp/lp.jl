@@ -17,9 +17,10 @@ function solve_lp(m, n; use_data=false, dense=false, nzfrac=1/sqrt(n), rseed=1)
     # set up MOI problem data
     if use_data
         # use provided data in data folder
-        A = readdlm(joinpath(pwd(), "data/A$(m)x$(n).txt"), ',', Float64)
-        b = vec(readdlm(joinpath(pwd(), "data/b$m.txt"), ',', Float64))
-        c = vec(readdlm(joinpath(pwd(), "data/c$n.txt"), ',', Float64))
+        datapath = joinpath(@__DIR__, "data")
+        A = readdlm(joinpath(datapath, "A$(m)x$(n).txt"), ',', Float64)
+        b = vec(readdlm(joinpath(datapath, "b$m.txt"), ',', Float64))
+        c = vec(readdlm(joinpath(datapath, "c$n.txt"), ',', Float64))
     else
         # generate random data
         Random.seed!(rseed)
@@ -36,12 +37,18 @@ function solve_lp(m, n; use_data=false, dense=false, nzfrac=1/sqrt(n), rseed=1)
     coneidxs = AbstractUnitRange[1:n,]
 
     # load into optimizer and solve
-    opt = AlfonsoOptimizer(maxiter=100, verbose=true)
+    opt = Alfonso.Optimizer(maxiter=100, verbose=true)
     Alfonso.loaddata!(opt, A, b, c, cones, coneidxs)
     # @show opt
     @time MOI.optimize!(opt)
+
+    status = MOI.get(opt, MOI.TerminationStatus())
+    objval = MOI.get(opt, MOI.ObjectiveValue())
+    objbnd = MOI.get(opt, MOI.ObjectiveBound())
+
+    return (status=status, objval=objval, objbnd=objbnd)
 end
 
 # optionally use fixed data in folder
 # select the random matrix size, dense/sparse, sparsity fraction
-solve_lp(500, 1000)
+# solve_lp(500, 1000)
