@@ -36,8 +36,8 @@ function solve_namedpoly(polyname, d)
     if n == 1
         (L, U, pts, w, P0, P) = cheb2_data(d)
     elseif n == 2
-        # (L, U, pts, w, P0, P) = padua_data(d)
-        (L, U, pts, w, P0, P) = approxfekete_data(n, d)
+        (L, U, pts, w, P0, P) = padua_data(d)
+        # (L, U, pts, w, P0, P) = approxfekete_data(n, d)
     elseif n > 2
         (L, U, pts, w, P0, P) = approxfekete_data(n, d)
     end

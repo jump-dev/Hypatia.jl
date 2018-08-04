@@ -101,6 +101,49 @@ function Optimizer(;
 end
 
 
+const CI = MOI.ConstraintIndex
+const VI = MOI.VariableIndex
+# TODO maybe don't enforce Float64 type
+const SF = Union{MOI.SingleVariable, MOI.ScalarAffineFunction{Float64}, MOI.VectorOfVariables, MOI.VectorAffineFunction{Float64}}
+const SS = Union{MOI.EqualTo{Float64}, MOI.GreaterThan{Float64}, MOI.LessThan{Float64}, MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives, MOI.SecondOrderCone, MOI.ExponentialCone, MOI.PositiveSemidefiniteConeTriangle}
+
+
+MOI.isempty(opt::Optimizer) = (opt.status = :NotLoaded)
+
+# function MOI.empty!(opt::Optimizer)
+#     # TODO empty the data and results
+# end
+
+
+
+MOI.canaddvariable(::Optimizer) = false
+MOI.supports(::Optimizer, ::MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}) = true
+MOI.supportsconstraint(::Optimizer, ::Type{<:SF}, ::Type{<:SS}) = true
+
+function MOI.copy!(dest::Optimizer, src::MOI.ModelLike; copynames=false, warnattributes=true)
+    @assert !copynames
+
+    @assert MOI.get(src, MOI.ObjectiveSense()) == MOI.MinSense()
+
+    mattr_src = MOI.get(src, MOI.ListOfModelAttributesSet())
+
+    vn_src = MOI.get(src, MOI.NumberOfVariables())
+    vidx_src = MOI.get(src, MOI.ListOfVariableIndices())
+    vattr_src = MOI.get(src, MOI.ListOfVariableAttributesSet())
+
+    c_src = MOI.get(src, MOI.ListOfConstraints())
+    for fs in c_src
+        fsc_src = MOI.get(src, MOI.ListOfConstraintIndices(fs))
+        fsattr_src = MOI.get(src, MOI.ListOfConstraintAttributesSet(fs))
+    end
+
+
+end
+
+
+
+
+
 function loaddata!(opt::Optimizer, A::AbstractMatrix{Float64}, b::Vector{Float64}, c::Vector{Float64}, cones::Vector{ConeData}, coneidxs::Vector{AbstractUnitRange})
     #=
     verify problem data, setup other algorithmic parameters and utilities
