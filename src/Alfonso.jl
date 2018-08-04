@@ -1,14 +1,13 @@
 
 module Alfonso
     import MathOptInterface
-    const MOI = MathOptInterface
-    const MOIU = MOI.Utilities
-
     using Printf
     using SparseArrays
     using LinearAlgebra
     import FFTW
     import Combinatorics
+
+    const MOI = MathOptInterface
 
     include("interpolation.jl")
     include("barriers.jl")
