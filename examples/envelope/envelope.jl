@@ -30,7 +30,7 @@ function solve_envelope(npoly, deg, n, d; use_data=false, rseed=1)
     b = w
     if use_data
         # use provided data in data folder
-        c = vec(readdlm(joinpath(pwd(), "data/c$(size(A,2)).txt"), ',', Float64))
+        c = vec(readdlm(joinpath(@__DIR__, "data/c$(size(A,2)).txt"), ',', Float64))
     else
         # generate random data
         Random.seed!(rseed)
@@ -46,10 +46,16 @@ function solve_envelope(npoly, deg, n, d; use_data=false, rseed=1)
     end
 
     # load into optimizer and solve
-    opt = AlfonsoOptimizer(maxiter=100, verbose=true)
+    opt = Alfonso.Optimizer(maxiter=100, verbose=true)
     Alfonso.loaddata!(opt, A, b, c, cones, coneidxs)
     # @show opt
     @time MOI.optimize!(opt)
+
+    status = MOI.get(opt, MOI.TerminationStatus())
+    objval = MOI.get(opt, MOI.ObjectiveValue())
+    objbnd = MOI.get(opt, MOI.ObjectiveBound())
+
+    return (status=status, objval=objval, objbnd=objbnd)
 end
 
 # optionally use fixed data in folder

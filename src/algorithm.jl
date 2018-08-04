@@ -6,7 +6,7 @@ D. Papp and S. Yildiz. On "A homogeneous interior-point algorithm for nonsymmetr
 available at https://arxiv.org/abs/1712.00492
 =#
 
-function MOI.optimize!(opt::AlfonsoOptimizer)
+function runalgorithm!(opt::Optimizer)
     (A, b, c) = (opt.A, opt.b, opt.c)
     (m, n) = size(A)
     coneobjs = opt.cones
@@ -131,7 +131,7 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
 
     opt.status = :StartedIterating
     iter = 0
-    while iter < opt.maxiter
+    while true
         #=
         calculate convergence metrics, check criteria, print
         =#
@@ -169,6 +169,9 @@ function MOI.optimize!(opt::AlfonsoOptimizer)
         end
 
         iter += 1
+        if iter >= opt.maxiter
+            opt.status = :IterationLimit
+        end
 
         #=
         prediction phase
