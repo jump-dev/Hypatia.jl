@@ -46,3 +46,29 @@ include(joinpath(@__DIR__, "../examples/namedpoly/namedpoly.jl"))
         @test r.objbnd ≈ r.objval rtol=1e-4
     end
 end
+
+
+
+
+using Alfonso
+using MathOptInterface
+using Test
+
+const MOI = MathOptInterface
+const MOIT = MOI.Test
+const MOIB = MOI.Bridges
+const MOIU = MOI.Utilities
+
+
+MOIU.@model AlfonsoModelData () (EqualTo, GreaterThan, LessThan) (Zeros, Nonnegatives, Nonpositives) () (SingleVariable,) (ScalarAffineFunction,) (VectorOfVariables,) (VectorAffineFunction,)
+const opt = MOIU.CachingOptimizer(AlfonsoModelData{Float64}(), Alfonso.Optimizer())
+
+const config = MOIT.TestConfig(atol=1e-4, rtol=1e-4)
+
+@testset "Continuous linear problems" begin
+    MOIT.contlineartest(MOIB.SplitInterval{Float64}(opt), config)
+end
+
+# @testset "Continuous conic problems" begin
+#     MOIT.contconictest(MOIB.GeoMean{Float64}(MOIB.RSOC{Float64}(optimizer)), config, ["sdp", "rootdet", "logdet"])
+# end
