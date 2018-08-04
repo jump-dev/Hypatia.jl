@@ -105,41 +105,56 @@ const CI = MOI.ConstraintIndex
 const VI = MOI.VariableIndex
 # TODO maybe don't enforce Float64 type
 const SF = Union{MOI.SingleVariable, MOI.ScalarAffineFunction{Float64}, MOI.VectorOfVariables, MOI.VectorAffineFunction{Float64}}
-const SS = Union{MOI.EqualTo{Float64}, MOI.GreaterThan{Float64}, MOI.LessThan{Float64}, MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives, MOI.SecondOrderCone, MOI.ExponentialCone, MOI.PositiveSemidefiniteConeTriangle}
+const SS = Union{MOI.EqualTo{Float64}, MOI.GreaterThan{Float64}, MOI.LessThan{Float64}, MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives}
 
 
-MOI.isempty(opt::Optimizer) = (opt.status = :NotLoaded)
+MOI.isempty(opt::Optimizer) = (opt.status == :NotLoaded)
 
-# function MOI.empty!(opt::Optimizer)
-#     # TODO empty the data and results
-# end
-
-
-
-MOI.canaddvariable(::Optimizer) = false
-MOI.supports(::Optimizer, ::MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}) = true
-MOI.supportsconstraint(::Optimizer, ::Type{<:SF}, ::Type{<:SS}) = true
-
-function MOI.copy!(dest::Optimizer, src::MOI.ModelLike; copynames=false, warnattributes=true)
-    @assert !copynames
-
-    @assert MOI.get(src, MOI.ObjectiveSense()) == MOI.MinSense()
-
-    mattr_src = MOI.get(src, MOI.ListOfModelAttributesSet())
-
-    vn_src = MOI.get(src, MOI.NumberOfVariables())
-    vidx_src = MOI.get(src, MOI.ListOfVariableIndices())
-    vattr_src = MOI.get(src, MOI.ListOfVariableAttributesSet())
-
-    c_src = MOI.get(src, MOI.ListOfConstraints())
-    for fs in c_src
-        fsc_src = MOI.get(src, MOI.ListOfConstraintIndices(fs))
-        fsattr_src = MOI.get(src, MOI.ListOfConstraintAttributesSet(fs))
-    end
-
-
+function MOI.empty!(opt::Optimizer)
+    # TODO empty the data and results
+    opt.status == :NotLoaded
 end
 
+MOI.supports(::Optimizer, ::MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}) = true
+MOI.supports(::Optimizer, ::MOI.ObjectiveSense) = true
+MOI.supportsconstraint(::Optimizer, ::Type{<:SF}, ::Type{<:SS}) = true
+
+function MOI.copy!(opt::Optimizer, src::MOI.ModelLike; copynames=false, warnattributes=true)
+    @assert !copynames
+
+    idxmap = MOIU.IndexMap()
+
+    # model
+    # sense_src = MOI.get(src, MOI.ObjectiveSense())
+    # mattr_src = MOI.get(src, MOI.ListOfModelAttributesSet())
+
+    # variables
+    vn_src = MOI.get(src, MOI.NumberOfVariables())
+    vidx_src = MOI.get(src, MOI.ListOfVariableIndices())
+    # vattr_src = MOI.get(src, MOI.ListOfVariableAttributesSet())
+    j = 0
+    for vj in vis_src
+        j += 1
+        idxmap[vj] = j
+    end
+
+    # constraints
+    c_src = MOI.get(src, MOI.ListOfConstraints())
+    i = 0
+    for (F, S) in c_src
+        fsc_src = MOI.get(src, MOI.ListOfConstraintIndices{F,S}())
+        # fsattr_src = MOI.get(src, MOI.ListOfConstraintAttributesSet(fs..))
+        for ci in fsc_src
+            i += 1
+            idxmap[ci] = i
+            fi = MOI.get(src, MOI.ConstraintFunction(), ci)
+            si = MOI.get(src, MOI.ConstraintSet(), ci)
+            # loadconstraint!(dest, fi, si) # TODO build A and cones list
+        end
+    end
+
+    return idxmap
+end
 
 
 
@@ -233,3 +248,24 @@ function MOI.get(opt::Optimizer, ::MOI.DualStatus)
         return MOI.UnknownResultStatus
     end
 end
+
+
+
+# TODO from ecos test
+# const MOIT = MOI.Test
+# const MOIB = MOI.Bridges
+#
+# const MOIU = MOI.Utilities
+# MOIU.@model ECOSModelData () (EqualTo, GreaterThan, LessThan) (Zeros, Nonnegatives, Nonpositives, SecondOrderCone, ExponentialCone) () (SingleVariable,) (ScalarAffineFunction,) (VectorOfVariables,) (VectorAffineFunction,)
+# const optimizer = MOIU.CachingOptimizer(ECOSModelData{Float64}(), ECOSOptimizer())
+#
+# # SOC2 requires 1e-4
+# const config = MOIT.TestConfig(atol=1e-4, rtol=1e-4)
+#
+# @testset "Continuous linear problems" begin
+#     MOIT.contlineartest(MOIB.SplitInterval{Float64}(optimizer), config)
+# end
+#
+# @testset "Continuous conic problems" begin
+#     MOIT.contconictest(MOIB.GeoMean{Float64}(MOIB.RSOC{Float64}(optimizer)), config, ["sdp", "rootdet", "logdet"])
+# end

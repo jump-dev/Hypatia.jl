@@ -8,6 +8,7 @@ module Alfonso
     import Combinatorics
 
     const MOI = MathOptInterface
+    const MOIU = MOI.Utilities  
 
     include("interpolation.jl")
     include("barriers.jl")
