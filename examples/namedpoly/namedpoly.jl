@@ -36,8 +36,8 @@ function solve_namedpoly(polyname, d)
     if n == 1
         (L, U, pts, w, P0, P) = cheb2_data(d)
     elseif n == 2
-        (L, U, pts, w, P0, P) = padua_data(d)
-        # (L, U, pts, w, P0, P) = approxfekete_data(n, d)
+        # (L, U, pts, w, P0, P) = padua_data(d)
+        (L, U, pts, w, P0, P) = approxfekete_data(n, d)
     elseif n > 2
         (L, U, pts, w, P0, P) = approxfekete_data(n, d)
     end
@@ -57,13 +57,19 @@ function solve_namedpoly(polyname, d)
     coneidxs = AbstractUnitRange[1:U]
 
     # load into optimizer and solve
-    opt = AlfonsoOptimizer(maxiter=100, verbose=true)
+    opt = Alfonso.Optimizer(maxiter=100, verbose=true)
     Alfonso.loaddata!(opt, A, b, c, cones, coneidxs)
     # @show opt
     @time MOI.optimize!(opt)
+
+    status = MOI.get(opt, MOI.TerminationStatus())
+    objval = MOI.get(opt, MOI.ObjectiveValue())
+    objbnd = MOI.get(opt, MOI.ObjectiveBound())
+
+    return (status=status, objval=objval, objbnd=objbnd)
 end
 
 # select the named polynomial to minimize and the SOS degree (to be squared)
-# solve_namedpoly(:robinson, 10)
-# solve_namedpoly(:goldsteinprice, 10)
+# solve_namedpoly(:robinson, 8)
+# solve_namedpoly(:goldsteinprice, 7)
 # solve_namedpoly(:lotkavolterra, 3)
