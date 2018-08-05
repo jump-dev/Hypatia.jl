@@ -18,7 +18,7 @@ include(joinpath(egs_dir, "namedpoly/namedpoly.jl"))
 
 # run native and MOI interfaces on examples
 include(joinpath(@__DIR__, "nativeexamples.jl"))
-include(joinpath(@__DIR__, "moiexamples.jl"))
+# include(joinpath(@__DIR__, "moiexamples.jl"))
 
 # run MOI continuous linear and conic tests
 # MOIU.@model AlfonsoModelData () () (Zeros, Nonnegatives) () () () (VectorOfVariables,) (VectorAffineFunction,)

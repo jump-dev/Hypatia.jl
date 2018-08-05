@@ -6,7 +6,7 @@ D. Papp and S. Yildiz. On "A homogeneous interior-point algorithm for nonsymmetr
 available at https://arxiv.org/abs/1712.00492
 =#
 
-# TODO add time limit option and use it in loop 
+# TODO add time limit option and use it in loop
 mutable struct AlfonsoOpt
     # options
     verbose::Bool           # if true, prints progress at each iteration
@@ -17,11 +17,11 @@ mutable struct AlfonsoOpt
     maxcorrsteps::Int       # maximum number of corrector steps (possible values: 1, 2, or 4)
     corrcheck::Bool         # if false, maxcorrsteps corrector steps are performed at each corrector phase, else the corrector phase can be terminated before maxcorrsteps corrector steps if the iterate is in the eta-neighborhood
     maxcorrlsiters::Int     # maximum number of line search iterations in each corrector step
-    maxitrefinesteps::Int   # maximum number of iterative refinement steps in linear system solves
+    # maxitrefinesteps::Int   # maximum number of iterative refinement steps in linear system solves
     alphacorr::Float64      # corrector step size
     predlsmulti::Float64    # predictor line search step size multiplier
     corrlsmulti::Float64    # corrector line search step size multiplier
-    itrefinethres::Float64  # iterative refinement success threshold
+    # itrefinethres::Float64  # iterative refinement success threshold
 
     # problem data
     A::AbstractMatrix{Float64}          # constraint matrix
@@ -52,7 +52,7 @@ mutable struct AlfonsoOpt
     rel_pin::Float64        # final relative primal infeasibility
     rel_din::Float64        # final relative dual infeasibility
 
-    function AlfonsoOpt(verbose, optimtol, maxiter, predlinesearch, maxpredsmallsteps, maxcorrsteps, corrcheck, maxcorrlsiters, maxitrefinesteps, alphacorr, predlsmulti, corrlsmulti, itrefinethres)
+    function AlfonsoOpt(verbose, optimtol, maxiter, predlinesearch, maxpredsmallsteps, maxcorrsteps, corrcheck, maxcorrlsiters, alphacorr, predlsmulti, corrlsmulti)
         alf = new()
 
         alf.verbose = verbose
@@ -63,11 +63,9 @@ mutable struct AlfonsoOpt
         alf.maxcorrsteps = maxcorrsteps
         alf.corrcheck = corrcheck
         alf.maxcorrlsiters = maxcorrlsiters
-        alf.maxitrefinesteps = maxitrefinesteps
         alf.alphacorr = alphacorr
         alf.predlsmulti = predlsmulti
         alf.corrlsmulti = corrlsmulti
-        alf.itrefinethres = itrefinethres
 
         alf.status = :NotLoaded
 
@@ -84,11 +82,9 @@ function AlfonsoOpt(;
     maxcorrsteps = 8, # NOTE doubled in .m code
     corrcheck = true,
     maxcorrlsiters = 8,
-    maxitrefinesteps = 0,
     alphacorr = 1.0,
     predlsmulti = 0.7,
     corrlsmulti = 0.5,
-    itrefinethres = 0.1,
     )
 
     if !(1e-10 <= optimtol <= 1e-2)
@@ -104,7 +100,7 @@ function AlfonsoOpt(;
         error("maxcorrsteps must be from 1 to 8")
     end
 
-    return AlfonsoOpt(verbose, optimtol, maxiter, predlinesearch, maxpredsmallsteps, maxcorrsteps, corrcheck, maxcorrlsiters, maxitrefinesteps, alphacorr, predlsmulti, corrlsmulti, itrefinethres)
+    return AlfonsoOpt(verbose, optimtol, maxiter, predlinesearch, maxpredsmallsteps, maxcorrsteps, corrcheck, maxcorrlsiters, alphacorr, predlsmulti, corrlsmulti)
 end
 
 get_status(alf::AlfonsoOpt) = alf.status
