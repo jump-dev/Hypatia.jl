@@ -10,6 +10,7 @@ const optimizer = MOIU.CachingOptimizer(AlfonsoModelData{Float64}(), Alfonso.Opt
 
 const config = MOIT.TestConfig(atol=1e-4, rtol=1e-4)
 
+# TODO is there a bridge to turn GreaterThan constraints into Nonnegatives constraints? etc
 # @testset "Continuous linear problems" begin
 #     MOIT.contlineartest(MOIB.SplitInterval{Float64}(optimizer), config)
 # end

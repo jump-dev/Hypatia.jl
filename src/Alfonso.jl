@@ -7,6 +7,5 @@ module Alfonso
     include("interpolation.jl")
     include("conedata.jl")
     include("nativeinterface.jl")
-    include("algorithm.jl")
-    # include("mathoptinterface.jl")
+    include("mathoptinterface.jl")
 end
