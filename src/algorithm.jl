@@ -6,11 +6,11 @@ D. Papp and S. Yildiz. On "A homogeneous interior-point algorithm for nonsymmetr
 available at https://arxiv.org/abs/1712.00492
 =#
 
-function runalgorithm!(opt::Optimizer)
-    (A, b, c) = (opt.A, opt.b, opt.c)
+function runalgorithm!(alf::AlfonsoOpt)
+    (A, b, c) = (alf.A, alf.b, alf.c)
     (m, n) = size(A)
-    coneobjs = opt.cones
-    coneidxs = opt.coneidxs
+    coneobjs = alf.cones
+    coneidxs = alf.coneidxs
 
     # calculate complexity parameter of the augmented barrier (nu-bar): sum of the primitive cone barrier parameters (# TODO plus 1?)
     bnu = 1.0 + sum(barpar(ck) for ck in coneobjs)
@@ -71,11 +71,11 @@ function runalgorithm!(opt::Optimizer)
 
     # set remaining algorithmic parameters based on precomputed safe values (from original authors)
     # parameters are chosen to make sure that each predictor step takes the current iterate from the eta-neighborhood to the beta-neighborhood and each corrector phase takes the current iterate from the beta-neighborhood to the eta-neighborhood. extra corrector steps are allowed to mitigate the effects of finite precision
-    (beta, eta, cpredfix) = setbetaeta(opt.maxcorrsteps, bnu) # beta: large neighborhood parameter, eta: small neighborhood parameter
+    (beta, eta, cpredfix) = setbetaeta(alf.maxcorrsteps, bnu) # beta: large neighborhood parameter, eta: small neighborhood parameter
     alphapredfix = cpredfix/(eta + sqrt(2.0*eta^2 + bnu)) # fixed predictor step size
     alphapredls = min(100.0*alphapredfix, 0.9999) # initial predictor step size with line search
-    alphapredthres = (opt.predlsmulti^opt.maxpredsmallsteps)*alphapredfix # minimum predictor step size
-    alphapred = (opt.predlinesearch ? alphapredls : alphapredfix) # predictor step size
+    alphapredthres = (alf.predlsmulti^alf.maxpredsmallsteps)*alphapredfix # minimum predictor step size
+    alphapred = (alf.predlinesearch ? alphapredls : alphapredfix) # predictor step size
 
     #=
     setup data and functions needed in main loop
@@ -124,12 +124,12 @@ function runalgorithm!(opt::Optimizer)
     #=
     main loop
     =#
-    if opt.verbose
+    if alf.verbose
         @printf("\n%5s %12s %12s %9s %9s %9s %9s %9s %9s\n", "iter", "p_obj", "d_obj", "gap", "p_inf", "d_inf", "tau", "kap", "mu")
         flush(stdout)
     end
 
-    opt.status = :StartedIterating
+    alf.status = :StartedIterating
     iter = 0
     while true
         #=
@@ -147,30 +147,30 @@ function runalgorithm!(opt::Optimizer)
         rhs_tau = -bty + ctx + kap
         compl = abs(rhs_tau)/tol_compl
 
-        if opt.verbose
+        if alf.verbose
             @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n", iter, p_obj, d_obj, gap, p_inf, d_inf, tau, kap, mu)
             flush(stdout)
         end
 
-        if (p_inf <= opt.optimtol) && (d_inf <= opt.optimtol)
-            if gap <= opt.optimtol
+        if (p_inf <= alf.optimtol) && (d_inf <= alf.optimtol)
+            if gap <= alf.optimtol
                 println("Problem is feasible and an approximate optimal solution was found; terminating")
-                opt.status = :Optimal
+                alf.status = :Optimal
                 break
-            elseif (compl <= opt.optimtol) && (tau <= opt.optimtol*1e-02*max(1.0, kap))
+            elseif (compl <= alf.optimtol) && (tau <= alf.optimtol*1e-02*max(1.0, kap))
                 println("Problem is nearly primal or dual infeasible; terminating")
-                opt.status = :NearlyInfeasible
+                alf.status = :NearlyInfeasible
                 break
             end
-        elseif (tau <= opt.optimtol*1e-02*min(1.0, kap)) && (mu <= opt.optimtol*1e-02)
+        elseif (tau <= alf.optimtol*1e-02*min(1.0, kap)) && (mu <= alf.optimtol*1e-02)
             println("Problem is ill-posed; terminating")
-            opt.status = :IllPosed
+            alf.status = :IllPosed
             break
         end
 
         iter += 1
-        if iter >= opt.maxiter
-            opt.status = :IterationLimit
+        if iter >= alf.maxiter
+            alf.status = :IterationLimit
         end
 
         #=
@@ -219,9 +219,9 @@ function runalgorithm!(opt::Optimizer)
 
                 if nbhd_beta < beta
                     # iterate is inside the beta-neighborhood
-                    if !alphaprevok || (alpha > opt.predlsmulti)
+                    if !alphaprevok || (alpha > alf.predlsmulti)
                         # either the previous iterate was outside the beta-neighborhood or increasing alpha again will make it > 1
-                        if opt.predlinesearch
+                        if alf.predlinesearch
                             alphapred = alpha
                         end
                         break
@@ -230,7 +230,7 @@ function runalgorithm!(opt::Optimizer)
                     alphaprevok = true
                     alphaprev = alpha
                     nbhd_betaprev = nbhd_beta
-                    alpha = alpha/opt.predlsmulti
+                    alpha = alpha/alf.predlsmulti
                     continue
                 end
             end
@@ -240,7 +240,7 @@ function runalgorithm!(opt::Optimizer)
                 # previous iterate was in the beta-neighborhood
                 alpha = alphaprev
                 nbhd_beta = nbhd_betaprev
-                if opt.predlinesearch
+                if alf.predlinesearch
                     alphapred = alpha
                 end
                 use_prev()
@@ -252,14 +252,14 @@ function runalgorithm!(opt::Optimizer)
                 # alpha is very small, so predictor has failed
                 predfail = true
                 println("Predictor could not improve the solution; terminating")
-                opt.status = :PredictorFail
+                alf.status = :PredictorFail
                 break
             end
 
             alphaprevok = false
             alphaprev = alpha
             nbhd_betaprev = nbhd_beta
-            alpha = opt.predlsmulti*alpha
+            alpha = alf.predlsmulti*alpha
         end
         # @show nprediters
         if predfail
@@ -275,7 +275,7 @@ function runalgorithm!(opt::Optimizer)
         mu = (dot(tx, ts) + tau*kap)/bnu
 
         # skip correction phase if allowed and current iterate is in the eta-neighborhood
-        if opt.corrcheck && (nbhd_beta <= eta)
+        if alf.corrcheck && (nbhd_beta <= eta)
             continue
         end
 
@@ -307,9 +307,9 @@ function runalgorithm!(opt::Optimizer)
             dir_kap = dot(b, dir_ty) - dot(c, dir_tx)
 
             # determine step length alpha by line search
-            alpha = opt.alphacorr
+            alpha = alf.alphacorr
             ncorrlsiters = 0
-            while ncorrlsiters <= opt.maxcorrlsiters
+            while ncorrlsiters <= alf.maxcorrlsiters
                 ncorrlsiters += 1
 
                 sa_tx .= tx + alpha*dir_tx
@@ -321,15 +321,15 @@ function runalgorithm!(opt::Optimizer)
                 end
 
                 # primal iterate tx is outside the cone
-                if ncorrlsiters == opt.maxcorrlsiters
+                if ncorrlsiters == alf.maxcorrlsiters
                     # corrector failed
                     corrfail = true
                     println("Corrector could not improve the solution; terminating")
-                    opt.status = :CorrectorFail
+                    alf.status = :CorrectorFail
                     break
                 end
 
-                alpha = opt.corrlsmulti*alpha
+                alpha = alf.corrlsmulti*alpha
             end
             # @show ncorrlsiters
             if corrfail
@@ -345,14 +345,14 @@ function runalgorithm!(opt::Optimizer)
             mu = (dot(tx, ts) + tau*kap)/bnu
 
             # finish if allowed and current iterate is in the eta-neighborhood, or if taken max steps
-            if (ncorrsteps == opt.maxcorrsteps) || opt.corrcheck
+            if (ncorrsteps == alf.maxcorrsteps) || alf.corrcheck
                 if calc_nbhd(ts, mu, tau*kap) <= eta
                     break
-                elseif ncorrsteps == opt.maxcorrsteps
+                elseif ncorrsteps == alf.maxcorrsteps
                     # nbhd_eta > eta, so corrector failed
                     corrfail = true
                     println("Corrector phase finished outside the eta-neighborhood; terminating")
-                    opt.status = :CorrectorFail
+                    alf.status = :CorrectorFail
                     break
                 end
             end
@@ -363,32 +363,32 @@ function runalgorithm!(opt::Optimizer)
         end
     end
 
-    println("\nFinished in $iter iterations\nInternal status is $(opt.status)\n")
+    println("\nFinished in $iter iterations\nInternal status is $(alf.status)\n")
 
     #=
     calculate final solution and iteration statistics
     =#
-    opt.niters = iter
+    alf.niters = iter
 
-    opt.x = tx./tau
-    opt.y = ty./tau
-    opt.tau = tau
-    opt.s = ts./tau
-    opt.kap = kap
+    alf.x = tx./tau
+    alf.y = ty./tau
+    alf.tau = tau
+    alf.s = ts./tau
+    alf.kap = kap
 
-    opt.pobj = dot(c, opt.x)
-    opt.dobj = dot(b, opt.y)
-    opt.dgap = opt.pobj - opt.dobj
-    opt.cgap = dot(opt.s, opt.x)
-    opt.rel_dgap = opt.dgap/(1.0 + abs(opt.pobj) + abs(opt.dobj))
-    opt.rel_cgap = opt.cgap/(1.0 + abs(opt.pobj) + abs(opt.dobj))
+    alf.pobj = dot(c, alf.x)
+    alf.dobj = dot(b, alf.y)
+    alf.dgap = alf.pobj - alf.dobj
+    alf.cgap = dot(alf.s, alf.x)
+    alf.rel_dgap = alf.dgap/(1.0 + abs(alf.pobj) + abs(alf.dobj))
+    alf.rel_cgap = alf.cgap/(1.0 + abs(alf.pobj) + abs(alf.dobj))
 
-    opt.pres = b - A*opt.x
-    opt.dres = c - A'*opt.y - opt.s
-    opt.pin = norm(opt.pres)
-    opt.din = norm(opt.dres)
-    opt.rel_pin = opt.pin/(1.0 + norm(b, Inf))
-    opt.rel_din = opt.din/(1.0 + norm(c, Inf))
+    alf.pres = b - A*alf.x
+    alf.dres = c - A'*alf.y - alf.s
+    alf.pin = norm(alf.pres)
+    alf.din = norm(alf.dres)
+    alf.rel_pin = alf.pin/(1.0 + norm(b, Inf))
+    alf.rel_din = alf.din/(1.0 + norm(c, Inf))
 
     return nothing
 end
