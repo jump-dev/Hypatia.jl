@@ -1,4 +1,6 @@
 
+export ConeData, NonnegData, SumOfSqrData
+
 
 abstract type ConeData end
 
