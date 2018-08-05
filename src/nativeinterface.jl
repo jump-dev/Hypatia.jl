@@ -6,6 +6,7 @@ D. Papp and S. Yildiz. On "A homogeneous interior-point algorithm for nonsymmetr
 available at https://arxiv.org/abs/1712.00492
 =#
 
+# TODO add time limit option and use it in loop 
 mutable struct AlfonsoOpt
     # options
     verbose::Bool           # if true, prints progress at each iteration
@@ -31,6 +32,7 @@ mutable struct AlfonsoOpt
 
     # results
     status::Symbol          # solver status
+    solvetime::Float64      # total solve time
     niters::Int             # total number of iterations
     y::Vector{Float64}      # final value of the dual free variables
     x::Vector{Float64}      # final value of the primal variables
@@ -106,6 +108,7 @@ function AlfonsoOpt(;
 end
 
 get_status(alf::AlfonsoOpt) = alf.status
+get_solvetime(alf::AlfonsoOpt) = alf.solvetime
 get_niters(alf::AlfonsoOpt) = alf.niters
 get_y(alf::AlfonsoOpt) = copy(alf.y)
 get_x(alf::AlfonsoOpt) = copy(alf.x)
@@ -167,6 +170,7 @@ function load_data!(alf::AlfonsoOpt, A::AbstractMatrix{Float64}, b::Vector{Float
 end
 
 function solve!(alf::AlfonsoOpt)
+    starttime = time()
     (A, b, c) = (alf.A, alf.b, alf.c)
     (m, n) = size(A)
     cones = alf.cones
@@ -549,6 +553,8 @@ function solve!(alf::AlfonsoOpt)
     alf.din = norm(alf.dres)
     alf.rel_pin = alf.pin/(1.0 + norm(b, Inf))
     alf.rel_din = alf.din/(1.0 + norm(c, Inf))
+
+    alf.solvetime = time() - starttime
 
     return nothing
 end
