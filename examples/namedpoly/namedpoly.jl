@@ -26,7 +26,7 @@ const polys = Dict{Symbol,NamedTuple}(
         ),
 )
 
-function solve_namedpoly(polyname, d)
+function solve_namedpoly(polyname, d; native=true)
     (n, lbs, ubs, deg, feval) = polys[polyname]
     if d < ceil(Int, deg/2)
         error("requires d >= $(ceil(Int, deg/2))")
@@ -56,17 +56,21 @@ function solve_namedpoly(polyname, d)
     cones = ConeData[SumOfSqrData(U, P0, PWts),]
     coneidxs = AbstractUnitRange[1:U]
 
-    # load into optimizer and solve
-    opt = Alfonso.Optimizer(maxiter=100, verbose=true)
-    Alfonso.loaddata!(opt, A, b, c, cones, coneidxs)
-    # @show opt
-    @time MOI.optimize!(opt)
+    if native
+        # use native interface
+        alf = Alfonso.AlfonsoOpt(maxiter=100, verbose=true)
+        Alfonso.loaddata!(alf, A, b, c, cones, coneidxs)
 
-    status = MOI.get(opt, MOI.TerminationStatus())
-    objval = MOI.get(opt, MOI.ObjectiveValue())
-    objbnd = MOI.get(opt, MOI.ObjectiveBound())
+        @time Alfonso.runalgorithm!(alf)
 
-    return (status=status, objval=objval, objbnd=objbnd)
+        return (status=alf.status, objval=alf.pobj, objbnd=alf.dobj)
+    else
+        error("MOI tests not implemented")
+        # status = MOI.get(opt, MOI.TerminationStatus())
+        # objval = MOI.get(opt, MOI.ObjectiveValue())
+        # objbnd = MOI.get(opt, MOI.ObjectiveBound())
+        # return (status=status, objval=objval, objbnd=objbnd)
+    end
 end
 
 # select the named polynomial to minimize and the SOS degree (to be squared)
