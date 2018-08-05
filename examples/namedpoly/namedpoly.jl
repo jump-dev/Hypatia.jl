@@ -13,13 +13,13 @@ const MOI = MathOptInterface
 using SparseArrays
 using LinearAlgebra
 
-# list of currently available named polynomials
+# list of currently available named polynomials, see https://people.sc.fsu.edu/~jburkardt/py_src/polynomials/polynomials.html
 const polys = Dict{Symbol,NamedTuple}(
     :butcher => (n=6, lbs=[-1,-0.1,-0.1,-1,-0.1,-0.1], ubs=[0,0.9,0.5,-0.1,-0.05,-0.03], deg=3,
         fn=((u,v,w,x,y,z) -> z*v^2+y*w^2-u*x^2+x^3+x^2-(1/3)*u+(4/3)*x)
         ),
     :caprasse => (n=4, lbs=fill(-1/2,4), ubs=fill(1/2,4), deg=8,
-        fn=((w,x,y,z) -> -w*y^3+4x*y^2*z+4w*y*z^2+2x*y^3+4w*y+4y^2-10x*z-10z^2+2)
+        fn=((w,x,y,z) -> -w*y^3+4x*y^2*z+4w*y*z^2+2x*z^3+4w*y+4y^2-10x*z-10z^2+2)
         ),
     :goldsteinprice => (n=2, lbs=fill(-2,2), ubs=fill(2,2), deg=8,
         fn=((x,y) -> (1+(x+y+1)^2*(19-14x+3x^2-14y+6x*y+3y^2))*(30+(2x-3y)^2*(18-32x+12x^2+48y-36x*y+27y^2)))
@@ -42,8 +42,8 @@ const polys = Dict{Symbol,NamedTuple}(
     :robinson => (n=2, lbs=fill(-1,2), ubs=fill(1,2), deg=6,
         fn=((x,y) -> 1+x^6+y^6-x^4*y^2+x^4-x^2*y^4+y^4-x^2+y^2+3x^2*y^2)
         ),
-    :rosenbrock => (n=2, lbs=fill(-10,2), ubs=fill(1,2), deg=4,
-        fn=((x,y) -> 1-2x+x^2+100x^4-200x^2*y+100y^2)
+    :rosenbrock => (n=2, lbs=fill(-5,2), ubs=fill(10,2), deg=4,
+        fn=((x,y) -> (1-x)^2+100*(x^2-y)^2)
         ),
     :schwefel => (n=3, lbs=fill(-10,3), ubs=fill(10,3), deg=4,
         fn=((x,y,z) -> (x-y^2)^2+(y-1)^2+(x-z^2)^2+(z-1)^2)
