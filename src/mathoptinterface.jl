@@ -10,17 +10,13 @@ end
 
 Optimizer() = Optimizer(AlfonsoOpt())
 
-MOI.isempty(opt::Alfonso.Optimizer) = (opt.alf.status == :NotLoaded)
+MOI.get(::Optimizer, ::MOI.SolverName) = "Alfonso"
 
-function MOI.empty!(opt::Alfonso.Optimizer)
-    # TODO empty the data and results, or just create a new one?
-    opt.alf.status == :NotLoaded
-end
+MOI.isempty(opt::Optimizer) = (get_status(opt.alf) == :NotLoaded)
+MOI.empty!(opt::Optimizer) = Optimizer() # TODO empty the data and results, or just create a new one? keep options?
 
-MOI.get(::Alfonso.Optimizer, ::MOI.SolverName) = "Alfonso"
-
-MOI.supports(::Alfonso.Optimizer, ::MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}) = true
-MOI.supports(::Alfonso.Optimizer, ::MOI.ObjectiveSense) = true
+MOI.supports(::Optimizer, ::MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}) = true
+MOI.supports(::Optimizer, ::MOI.ObjectiveSense) = true
 
 # TODO don't restrict to Float64 type
 const SupportedFuns = Union{
@@ -38,11 +34,11 @@ const SupportedSets = Union{
     # MOI.Nonpositives,
     }
 
-MOI.supportsconstraint(::Alfonso.Optimizer, ::Type{<:SupportedFuns}, ::Type{<:SupportedSets}) = true
+MOI.supportsconstraint(::Optimizer, ::Type{<:SupportedFuns}, ::Type{<:SupportedSets}) = true
 
 # build representation as min c'x s.t. Ax = b, x in K
 # TODO what if some variables x are in multiple cone constraints?
-function MOI.copy!(opt::Alfonso.Optimizer, src::MOI.ModelLike; copynames=false, warnattributes=true)
+function MOI.copy!(opt::Optimizer, src::MOI.ModelLike; copynames=false, warnattributes=true)
     @assert !copynames
     idxmap = Dict{MOI.Index,Int}()
 
@@ -74,7 +70,7 @@ function MOI.copy!(opt::Alfonso.Optimizer, src::MOI.ModelLike; copynames=false, 
     # TODO don't enforce Float64 type
     (IA, JA, VA) = (Int[], Int[], Float64[])
     (Ib, Vb) = (Int[], Float64[])
-    cones = Alfonso.ConeData[]
+    cones = ConeData[]
     coneidxs = AbstractUnitRange[]
 
     i = 0 # MOI constraint objects
@@ -141,51 +137,53 @@ function MOI.copy!(opt::Alfonso.Optimizer, src::MOI.ModelLike; copynames=false, 
     b = Vector(dropzeros!(sparsevec(Ib, Vb, m)))
     c = Vector(dropzeros!(sparsevec(Jc, Vc, n)))
 
-    loaddata!(opt.alf, A, b, c, cones, coneidxs)
+    # load problem data through native interface
+    load_data!(opt.alf, A, b, c, cones, coneidxs)
 
     return idxmap
 end
 
-function MOI.optimize!(opt::Alfonso.Optimizer)
-    runalgorithm!(opt.alf)
-    # TODO do things to set MOI-related fields in opt
-end
+MOI.optimize!(opt::Optimizer) = solve!(opt.alf)
 
-# function MOI.free!(opt::Alfonso.Optimizer) # TODO call gc on opt.alf?
+# function MOI.free!(opt::Optimizer) # TODO call gc on opt.alf?
 
-function MOI.get(opt::Alfonso.Optimizer, ::MOI.TerminationStatus)
+function MOI.get(opt::Optimizer, ::MOI.TerminationStatus)
     # TODO time limit etc
-    if opt.status in (:Optimal, :NearlyInfeasible, :IllPosed)
+    status = get_status(opt.alf)
+    if status in (:Optimal, :NearlyInfeasible, :IllPosed)
         return MOI.Success
-    elseif opt.status in (:PredictorFail, :CorrectorFail)
+    elseif status in (:PredictorFail, :CorrectorFail)
         return MOI.NumericalError
-    elseif opt.status == :IterationLimit
+    elseif status == :IterationLimit
         return MOI.IterationLimit
     else
         return MOI.OtherError
     end
 end
 
-MOI.get(opt::Alfonso.Optimizer, ::MOI.ObjectiveValue) = opt.pobj
-MOI.get(opt::Alfonso.Optimizer, ::MOI.ObjectiveBound) = opt.dobj
+MOI.get(opt::Optimizer, ::MOI.ObjectiveValue) = opt.alf.pobj
+MOI.get(opt::Optimizer, ::MOI.ObjectiveBound) = opt.alf.dobj
 
-function MOI.get(opt::Alfonso.Optimizer, ::MOI.ResultCount)
-    # TODO if opt.status in (:Optimal, :NearlyInfeasible, :IllPosed)
-    if opt.status == :Optimal
+function MOI.get(opt::Optimizer, ::MOI.ResultCount)
+    # TODO if status in (:Optimal, :NearlyInfeasible, :IllPosed)
+    status = get_status(opt.alf)
+    if status == :Optimal
         return 1
     end
 end
 
-function MOI.get(opt::Alfonso.Optimizer, ::MOI.PrimalStatus)
-    if opt.status == :Optimal
+function MOI.get(opt::Optimizer, ::MOI.PrimalStatus)
+    status = get_status(opt.alf)
+    if status == :Optimal
         return MOI.FeasiblePoint
     else
         return MOI.UnknownResultStatus
     end
 end
 
-function MOI.get(opt::Alfonso.Optimizer, ::MOI.DualStatus)
-    if opt.status == :Optimal
+function MOI.get(opt::Optimizer, ::MOI.DualStatus)
+    status = get_status(opt.alf)
+    if status == :Optimal
         return MOI.FeasiblePoint
     else
         return MOI.UnknownResultStatus
