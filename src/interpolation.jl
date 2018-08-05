@@ -13,7 +13,7 @@ Padua2DM by M. Caliari, S. De Marchi, A. Sommariva, and M. Vianello http://profs
 import FFTW
 import Combinatorics
 
-export cheb2_data, padua_data, approxfekete_data
+# export cheb2_data, padua_data, approxfekete_data
 
 
 # return k Chebyshev points of the second kind
