@@ -6,4 +6,5 @@ using Test
 
 include("testnative.jl")
 
-# include("testmoi.jl")
+# TODO MOI tests
+include("testmoi.jl")

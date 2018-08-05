@@ -26,7 +26,7 @@ const polys = Dict{Symbol,NamedTuple}(
         ),
 )
 
-function solve_namedpoly(polyname, d; native=true)
+function build_namedpoly(polyname, d; native=true)
     (n, lbs, ubs, deg, feval) = polys[polyname]
     if d < ceil(Int, deg/2)
         error("requires d >= $(ceil(Int, deg/2))")
@@ -34,12 +34,12 @@ function solve_namedpoly(polyname, d; native=true)
 
     # generate interpolation
     if n == 1
-        (L, U, pts, w, P0, P) = cheb2_data(d)
+        (L, U, pts, w, P0, P) = Alfonso.cheb2_data(d)
     elseif n == 2
-        (L, U, pts, w, P0, P) = padua_data(d)
-        # (L, U, pts, w, P0, P) = approxfekete_data(n, d)
+        (L, U, pts, w, P0, P) = Alfonso.padua_data(d)
+        # (L, U, pts, w, P0, P) = Alfonso.approxfekete_data(n, d)
     elseif n > 2
-        (L, U, pts, w, P0, P) = approxfekete_data(n, d)
+        (L, U, pts, w, P0, P) = Alfonso.approxfekete_data(n, d)
     end
 
     # transform points to fit the box domain
@@ -53,27 +53,26 @@ function solve_namedpoly(polyname, d; native=true)
     A = ones(1, U)
     b = [1.0,]
     c = [feval(pts[j,:]...) for j in 1:U]
-    cones = ConeData[SumOfSqrData(U, P0, PWts),]
+    cones = Alfonso.ConeData[Alfonso.SumOfSqrData(U, P0, PWts),]
     coneidxs = AbstractUnitRange[1:U]
 
     if native
         # use native interface
         alf = Alfonso.AlfonsoOpt(maxiter=100, verbose=true)
-        Alfonso.loaddata!(alf, A, b, c, cones, coneidxs)
-
-        @time Alfonso.runalgorithm!(alf)
-
-        return (status=alf.status, objval=alf.pobj, objbnd=alf.dobj)
+        Alfonso.load_data!(alf, A, b, c, cones, coneidxs)
+        return alf
     else
         error("MOI tests not implemented")
-        # status = MOI.get(opt, MOI.TerminationStatus())
-        # objval = MOI.get(opt, MOI.ObjectiveValue())
-        # objbnd = MOI.get(opt, MOI.ObjectiveBound())
-        # return (status=status, objval=objval, objbnd=objbnd)
+        # opt = Alfonso.Optimizer()
+        # return opt
     end
 end
 
 # select the named polynomial to minimize and the SOS degree (to be squared)
-# solve_namedpoly(:robinson, 8)
-# solve_namedpoly(:goldsteinprice, 7)
-# solve_namedpoly(:lotkavolterra, 3)
+# alf =
+#     build_namedpoly(:robinson, 8)
+    # build_namedpoly(:goldsteinprice, 7)
+    # build_namedpoly(:lotkavolterra, 3)
+
+# solve it
+# @time Alfonso.solve!(alf)
