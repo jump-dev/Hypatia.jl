@@ -15,14 +15,23 @@ using LinearAlgebra
 
 # list of currently available named polynomials
 const polys = Dict{Symbol,NamedTuple}(
+    :butcher => (n=6, lbs=[-1, -0.1, -0.1, -1, -0.1, -0.1], ubs=[0, 0.9, 0.5, -0.1, -0.05, -0.03], deg=3,
+        feval=((u,v,w,x,y,z) -> z*v^2+y*w^2-u*x^2+x^3+x^2-(1/3)*u+(4/3)*x)
+        ),
     :caprasse => (n=4, lbs=fill(-1/2, 4), ubs=fill(1/2, 4), deg=8,
         feval=((w,x,y,z) -> -w*y^3+4x*y^2*z+4w*y*z^2+2x*y^3+4w*y+4y^2-10x*z-10z^2+2)
         ),
     :goldsteinprice => (n=2, lbs=fill(-2, 2), ubs=fill(2, 2), deg=8,
         feval=((x,y) -> (1+(x+y+1)^2*(19-14x+3x^2-14y+6x*y+3y^2))*(30+(2x-3y)^2*(18-32x+12x^2+48y-36x*y+27y^2)))
         ),
+    :heart => (n=8, lbs=[-0.1, 0.4, -0.7, -0.7, 0.1, -0.1, -0.3, -1.1], ubs=[0.4, 1, -0.4, 0.4, 0.2, 0.2, 1.1, -0.3], deg=4,
+        feval=((s,t,u,v,w,x,y,z) -> z*v^2+y*w^2-u*x^2+x^3+x^2-(1/3)*u+(4/3)*x)
+        ),
     :lotkavolterra => (n=4, lbs=fill(-2, 4), ubs=fill(2, 4), deg=3,
         feval=((w,x,y,z) -> w*(x^2+y^2+z^2-1.1)+1)
+        ),
+    :magnetism7 => (n=7, lbs=fill(-1, 7), ubs=fill(1, 7), deg=2,
+        feval=((t,u,v,w,x,y,z) -> t^2+2u^2+2v^2+2w^2+2x^2+2y^2+2z^2-t)
         ),
     :motzkin => (n=2, lbs=fill(-1, 2), ubs=fill(1, 2), deg=6,
         feval=((x,y) -> 1-48x^2*y^2+64x^2*y^4+64x^4*y^2)
@@ -40,29 +49,6 @@ const polys = Dict{Symbol,NamedTuple}(
         feval=((x,y,z) -> (x-y^2)^2+(y-1)^2+(x-z^2)^2+(z-1)^2)
         ),
 )
-
-
-# case 'butcher'
-#     if n ~= 6; error('butcher requires 6 arguments.'); end;
-#     polyDeg = 3;
-#     lb = [-1; -0.1; -0.1; -1; -0.1; -0.1];
-#     ub = [0; 0.9; 0.5; -0.1; -0.05; -0.03];
-#
-#     vals = pts(:,6).*(pts(:,2).^2) + pts(:,5).*(pts(:,3).^2) - pts(:,1).*(pts(:,4).^2) +...
-# pts(:,4).^3 + pts(:,4).^2 - (1/3)*pts(:,1) + (4/3)*pts(:,4);
-# case 'magnetism7'
-#     if n ~= 7; error('magnetism7 requires 7 arguments.'); end;
-#     polyDeg = 2;
-#     lb = repmat(-1, n, 1);
-#     ub = repmat(1, n, 1);
-# case 'heart'
-#     if n ~= 8; error('heart requires 8 arguments.'); end;
-#     polyDeg = 4;
-#     lb = [-0.1; 0.4; -0.7; -0.7; 0.1; -0.1; -0.3; -1.1];
-#     ub = [0.4; 1; -0.4; 0.4; 0.2; 0.2; 1.1; -0.3];
-
-
-
 
 function build_namedpoly(polyname, d; native=true)
     (n, lbs, ubs, deg, feval) = polys[polyname]
