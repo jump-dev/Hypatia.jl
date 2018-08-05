@@ -10,6 +10,11 @@ Chebfun http://www.chebfun.org/
 Padua2DM by M. Caliari, S. De Marchi, A. Sommariva, and M. Vianello http://profs.sci.univr.it/~caliari/software.htm
 =#
 
+import FFTW
+import Combinatorics
+
+export cheb2_data, padua_data, approxfekete_data
+
 
 # return k Chebyshev points of the second kind
 cheb2_pts(k::Int) = [-cospi(j/(k-1)) for j in 0:k-1]

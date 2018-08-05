@@ -1,6 +1,5 @@
 
-
-mutable struct Optimizer <: MOI.AbstractOptimizer
+mutable struct AlfonsoOpt
     # options
     verbose::Bool           # if true, prints progress at each iteration
     optimtol::Float64       # optimization tolerance parameter
@@ -44,7 +43,7 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     rel_pin::Float64        # final relative primal infeasibility
     rel_din::Float64        # final relative dual infeasibility
 
-    function Optimizer(verbose, optimtol, maxiter, predlinesearch, maxpredsmallsteps, maxcorrsteps, corrcheck, maxcorrlsiters, maxitrefinesteps, alphacorr, predlsmulti, corrlsmulti, itrefinethres)
+    function AlfonsoOpt(verbose, optimtol, maxiter, predlinesearch, maxpredsmallsteps, maxcorrsteps, corrcheck, maxcorrlsiters, maxitrefinesteps, alphacorr, predlsmulti, corrlsmulti, itrefinethres)
         opt = new()
 
         opt.verbose = verbose
@@ -67,8 +66,7 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     end
 end
 
-
-function Optimizer(;
+function AlfonsoOpt(;
     verbose = false,
     optimtol = 1e-06,
     maxiter = 1e3,
@@ -97,11 +95,11 @@ function Optimizer(;
         error("maxcorrsteps must be from 1 to 8")
     end
 
-    return Optimizer(verbose, optimtol, maxiter, predlinesearch, maxpredsmallsteps, maxcorrsteps, corrcheck, maxcorrlsiters, maxitrefinesteps, alphacorr, predlsmulti, corrlsmulti, itrefinethres)
+    return AlfonsoOpt(verbose, optimtol, maxiter, predlinesearch, maxpredsmallsteps, maxcorrsteps, corrcheck, maxcorrlsiters, maxitrefinesteps, alphacorr, predlsmulti, corrlsmulti, itrefinethres)
 end
 
 
-function loaddata!(opt::Optimizer, A::AbstractMatrix{Float64}, b::Vector{Float64}, c::Vector{Float64}, cones::Vector{ConeData}, coneidxs::Vector{AbstractUnitRange})
+function loaddata!(opt::AlfonsoOpt, A::AbstractMatrix{Float64}, b::Vector{Float64}, c::Vector{Float64}, cones::Vector{ConeData}, coneidxs::Vector{AbstractUnitRange})
     #=
     verify problem data, setup other algorithmic parameters and utilities
     TODO simple presolve (see ConicIP solver)
@@ -142,51 +140,4 @@ function loaddata!(opt::Optimizer, A::AbstractMatrix{Float64}, b::Vector{Float64
     opt.status = :Loaded
 
     return opt
-end
-
-
-
-
-MOI.optimize!(opt::Optimizer) = runalgorithm!(opt)
-
-# function MOI.free!(opt::Optimizer)
-
-# TODO time limit etc
-function MOI.get(opt::Optimizer, ::MOI.TerminationStatus)
-    if opt.status in (:Optimal, :NearlyInfeasible, :IllPosed)
-        return MOI.Success
-    elseif opt.status in (:PredictorFail, :CorrectorFail)
-        return MOI.NumericalError
-    elseif opt.status == :IterationLimit
-        return MOI.IterationLimit
-    else
-        return MOI.OtherError
-    end
-end
-
-MOI.get(opt::Optimizer, ::MOI.ObjectiveValue) = opt.pobj
-
-MOI.get(opt::Optimizer, ::MOI.ObjectiveBound) = opt.dobj
-
-function MOI.get(opt::Optimizer, ::MOI.ResultCount)
-    # TODO if opt.status in (:Optimal, :NearlyInfeasible, :IllPosed)
-    if opt.status == :Optimal
-        return 1
-    end
-end
-
-function MOI.get(opt::Optimizer, ::MOI.PrimalStatus)
-    if opt.status == :Optimal
-        return MOI.FeasiblePoint
-    else
-        return MOI.UnknownResultStatus
-    end
-end
-
-function MOI.get(opt::Optimizer, ::MOI.DualStatus)
-    if opt.status == :Optimal
-        return MOI.FeasiblePoint
-    else
-        return MOI.UnknownResultStatus
-    end
 end

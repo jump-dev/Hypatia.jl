@@ -1,5 +1,6 @@
 #=
-Copyright 2018, David Papp, Sercan Yildiz, and contributors
+Copyright 2018, Chris Coey and contributors
+Copyright 2018, David Papp, Sercan Yildiz
 
 modified from https://github.com/dpapp-github/alfonso/blob/master/polyEnv.m
 formulates and solves the polynomial envelope problem described in the paper:
@@ -15,7 +16,7 @@ using LinearAlgebra
 using DelimitedFiles
 using Random
 
-function solve_envelope(npoly, deg, n, d; use_data=false, rseed=1)
+function solve_envelope(npoly, deg, n, d; native=true, use_data=false, rseed=1)
     # TODO allow n > 1
     @assert n == 1
 
@@ -45,17 +46,21 @@ function solve_envelope(npoly, deg, n, d; use_data=false, rseed=1)
         push!(coneidxs, 1+(k-1)*U:k*U)
     end
 
-    # load into optimizer and solve
-    opt = Alfonso.Optimizer(maxiter=100, verbose=true)
-    Alfonso.loaddata!(opt, A, b, c, cones, coneidxs)
-    # @show opt
-    @time MOI.optimize!(opt)
+    if native
+        # use native interface
+        alf = Alfonso.AlfonsoOpt(maxiter=100, verbose=true)
+        Alfonso.loaddata!(alf, A, b, c, cones, coneidxs)
 
-    status = MOI.get(opt, MOI.TerminationStatus())
-    objval = MOI.get(opt, MOI.ObjectiveValue())
-    objbnd = MOI.get(opt, MOI.ObjectiveBound())
+        @time Alfonso.runalgorithm!(alf)
 
-    return (status=status, objval=objval, objbnd=objbnd)
+        return (status=alf.status, objval=alf.pobj, objbnd=alf.dobj)
+    else
+        error("MOI tests not implemented")
+        # status = MOI.get(opt, MOI.TerminationStatus())
+        # objval = MOI.get(opt, MOI.ObjectiveValue())
+        # objbnd = MOI.get(opt, MOI.ObjectiveBound())
+        # return (status=status, objval=objval, objbnd=objbnd)
+    end
 end
 
 # optionally use fixed data in folder
