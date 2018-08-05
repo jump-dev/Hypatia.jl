@@ -50,25 +50,25 @@ end
 
 
 
+# TODO use MOI
 using Alfonso
-using MathOptInterface
 using Test
 
+using MathOptInterface
 const MOI = MathOptInterface
 const MOIT = MOI.Test
 const MOIB = MOI.Bridges
 const MOIU = MOI.Utilities
 
-
-MOIU.@model AlfonsoModelData () (EqualTo, GreaterThan, LessThan) (Zeros, Nonnegatives, Nonpositives) () (SingleVariable,) (ScalarAffineFunction,) (VectorOfVariables,) (VectorAffineFunction,)
-const opt = MOIU.CachingOptimizer(AlfonsoModelData{Float64}(), Alfonso.Optimizer())
+MOIU.@model AlfonsoModelData () () (Zeros, Nonnegatives) () () () (VectorOfVariables,) (VectorAffineFunction,)
+const optimizer = MOIU.CachingOptimizer(AlfonsoModelData{Float64}(), Alfonso.Optimizer())
 
 const config = MOIT.TestConfig(atol=1e-4, rtol=1e-4)
 
-@testset "Continuous linear problems" begin
-    MOIT.contlineartest(MOIB.SplitInterval{Float64}(opt), config)
-end
-
-# @testset "Continuous conic problems" begin
-#     MOIT.contconictest(MOIB.GeoMean{Float64}(MOIB.RSOC{Float64}(optimizer)), config, ["sdp", "rootdet", "logdet"])
+# @testset "Continuous linear problems" begin
+#     MOIT.contlineartest(MOIB.SplitInterval{Float64}(optimizer), config)
 # end
+
+
+MOI.empty!(model)
+@test MOI.isempty(model)

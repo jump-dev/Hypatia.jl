@@ -1,5 +1,6 @@
 #=
-Copyright 2018, David Papp, Sercan Yildiz, and contributors
+Copyright 2018, Chris Coey and contributors
+Copyright 2018, David Papp, Sercan Yildiz
 
 modified from https://github.com/dpapp-github/alfonso/blob/master/polyEnv.m
 formulates and solves the polynomial envelope problem described in the paper:
