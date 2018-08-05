@@ -32,8 +32,8 @@ function build_lp(m, n; native=true, use_data=false, dense=false, nzfrac=1/sqrt(
         c = rand(0.0:9.0, n)
     end
 
-    cones = Alfonso.ConeData[Alfonso.NonnegData(n),]
-    coneidxs = AbstractUnitRange[1:n,]
+    cones = [Alfonso.NonnegData(n),]
+    coneidxs = [1:n,]
 
     if native
         # use native interface
