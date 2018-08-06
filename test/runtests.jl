@@ -1,12 +1,8 @@
 
 using Alfonso
 using Test
-using MathOptInterface
-const MOI = MathOptInterface
-const MOIT = MOI.Test
-const MOIB = MOI.Bridges
-const MOIU = MOI.Utilities
 
+verbflag = true # Alfonso verbose option
 
 # TODO interpolation tests
 
@@ -18,6 +14,13 @@ include(joinpath(egs_dir, "namedpoly/namedpoly.jl"))
 
 # run native and MOI interfaces on examples
 include(joinpath(@__DIR__, "nativeexamples.jl"))
+
+# using MathOptInterface
+# const MOI = MathOptInterface
+# const MOIT = MOI.Test
+# const MOIB = MOI.Bridges
+# const MOIU = MOI.Utilities
+
 # include(joinpath(@__DIR__, "moiexamples.jl"))
 
 # run MOI continuous linear and conic tests
