@@ -8,9 +8,6 @@ available at https://arxiv.org/abs/1712.01792
 =#
 
 using Alfonso
-import MathOptInterface
-const MOI = MathOptInterface
-using SparseArrays
 using LinearAlgebra
 
 # list of currently available named polynomials, see https://people.sc.fsu.edu/~jburkardt/py_src/polynomials/polynomials.html
@@ -50,7 +47,8 @@ const polys = Dict{Symbol,NamedTuple}(
         ),
 )
 
-function build_namedpoly(polyname, d; native=true)
+function build_namedpoly!(alf::Alfonso.AlfonsoOpt, polyname::Symbol, d::Int)
+    # get data for named polynomial
     (n, lbs, ubs, deg, fn) = polys[polyname]
     if d < ceil(Int, deg/2)
         error("requires d >= $(ceil(Int, deg/2))")
@@ -73,38 +71,30 @@ function build_namedpoly(polyname, d; native=true)
     LWts = fill(binomial(n+d-1, n), n)
     PWts = [Diagonal(sqrt.(wtVals[:,j]))*P0[:,1:LWts[j]] for j in 1:n]
 
-    # set up MOI problem data
+    # set up problem data
     A = ones(1, U)
     b = [1.0,]
     c = [fn(pts[j,:]...) for j in 1:U]
     cones = Alfonso.ConeData[Alfonso.SumOfSqrData(U, P0, PWts),]
     coneidxs = AbstractUnitRange[1:U,]
 
-    if native
-        # use native interface
-        alf = Alfonso.AlfonsoOpt(maxiter=100, verbose=true)
-        Alfonso.load_data!(alf, A, b, c, cones, coneidxs)
-        return alf
-    else
-        error("MOI tests not implemented")
-        # opt = Alfonso.Optimizer()
-        # return opt
-    end
+    return Alfonso.load_data!(alf, A, b, c, cones, coneidxs)
 end
 
+# alf = Alfonso.AlfonsoOpt(maxiter=100, verbose=true)
+
 # select the named polynomial to minimize and the SOS degree (to be squared)
-# alf =
-    # build_namedpoly(:butcher, 2)
-    # build_namedpoly(:caprasse, 4)
-    # build_namedpoly(:goldsteinprice, 7)
-    # build_namedpoly(:heart, 3)
-    # build_namedpoly(:lotkavolterra, 3)
-    # build_namedpoly(:magnetism7, 2)
-    # build_namedpoly(:motzkin, 7)
-    # build_namedpoly(:reactiondiffusion, 4)
-    # build_namedpoly(:robinson, 6)
-    # build_namedpoly(:rosenbrock, 6)
-    # build_namedpoly(:schwefel, 5)
+# build_namedpoly!(alf, :butcher, 2)
+# build_namedpoly!(alf, :caprasse, 4)
+# build_namedpoly!(alf, :goldsteinprice, 7)
+# build_namedpoly!(alf, :heart, 2)
+# build_namedpoly!(alf, :lotkavolterra, 3)
+# build_namedpoly!(alf, :magnetism7, 2)
+# build_namedpoly!(alf, :motzkin, 7)
+# build_namedpoly!(alf, :reactiondiffusion, 4)
+# build_namedpoly!(alf, :robinson, 8)
+# build_namedpoly!(alf, :rosenbrock, 4)
+# build_namedpoly!(alf, :schwefel, 3)
 
 # solve it
 # @time Alfonso.solve!(alf)
