@@ -523,7 +523,9 @@ function solve!(alf::AlfonsoOpt)
         end
     end
 
-    println("\nFinished in $iter iterations\nInternal status is $(alf.status)\n")
+    if alf.verbose
+        println("\nFinished in $iter iterations\nInternal status is $(alf.status)\n")
+    end
 
     #=
     calculate final solution and iteration statistics
