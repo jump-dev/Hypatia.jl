@@ -2,7 +2,7 @@
 using Alfonso
 using Test
 
-verbflag = true # Alfonso verbose option
+verbflag = false # Alfonso verbose option
 
 # TODO interpolation tests
 

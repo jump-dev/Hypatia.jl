@@ -15,10 +15,8 @@ import Combinatorics
 
 # export cheb2_data, padua_data, approxfekete_data
 
-
 # return k Chebyshev points of the second kind
 cheb2_pts(k::Int) = [-cospi(j/(k-1)) for j in 0:k-1]
-
 
 function calc_u(n, d, pts)
     u = Vector{Matrix{Float64}}(undef, n)
@@ -32,7 +30,6 @@ function calc_u(n, d, pts)
     end
     return u
 end
-
 
 function cheb2_data(d::Int)
     @assert d > 1
@@ -55,7 +52,6 @@ function cheb2_data(d::Int)
 
     return (L=L, U=U, pts=pts, P0=P0, P=P, w=w)
 end
-
 
 function padua_data(d::Int)
     @assert d > 1
@@ -108,7 +104,7 @@ function padua_data(d::Int)
     for j in 1:d+1, i in 1:d+2-j
         Mmom[i,j] = mom[i]*mom[j]*f
     end
-    Mmom[1,d+1] ./= 2
+    Mmom[1,d+1] /= 2
     # cubature weights as matrices on the subgrids
     W = Matrix{Float64}(undef, d+1, 2d+1)
     W[:,1:2:2d+1] .= to2'*Mmom*te1
@@ -120,7 +116,6 @@ function padua_data(d::Int)
 
     return (L=L, U=U, pts=pts, P0=P0, P=P, w=w)
 end
-
 
 function approxfekete_data(n::Int, d::Int)
     @assert d > 1
