@@ -1,23 +1,24 @@
 
 # export ConeData, NonnegData, SumOfSqrData
 
-
 abstract type ConeData end
-
 
 #=
  Nonnegative cone
 =#
 mutable struct NonnegData <: ConeData
     dim::Int
-
-    pnt
-    pnt_prev
-    # invpnt # TODO store this and the square
+    pnt::Vector{Float64}
+    hasg::Bool
+    g::Vector{Float64}
+    g_prev::Vector{Float64}
 
     function NonnegData(dim)
         k = new()
         k.dim = dim
+        k.hasg = false
+        k.g = Vector{Float64}(undef, dim)
+        k.g_prev = Vector{Float64}(undef, dim)
         return k
     end
 end
@@ -26,26 +27,34 @@ dimension(k::NonnegData) = k.dim
 
 barpar(k::NonnegData) = k.dim
 
-function load_txk(k::NonnegData, pnt, save_prev)
+function load_txk(k::NonnegData, pnt::Vector{Float64}, save_prev::Bool)
     @assert length(pnt) == k.dim
-
-    if save_prev
-        k.pnt_prev = copy(k.pnt)
+    if save_prev # may want to use previously calculated values, so store
+        @assert k.hasg
+        k.g_prev .= k.g
     end
-
     k.pnt = pnt
+    k.hasg = false
+    return nothing
 end
 
-use_prevk(k::NonnegData) = (k.pnt = copy(k.pnt_prev))
+function use_prevk(k::NonnegData)
+    k.g .= k.g_prev
+    k.hasg = true
+    return nothing
+end
 
 inconek(k::NonnegData) = all(x -> (x > 0.0), k.pnt)
 
-calc_gk(k::NonnegData) = -inv.(k.pnt)
+function calc_gk(k::NonnegData)
+    if !k.hasg
+        k.g .= -inv.(k.pnt)
+        k.hasg = true
+    end
+    return k.g
+end
 
-calc_Hinvk(k::NonnegData) = Diagonal(k.pnt.^2)
-
-calc_HCholLk(k::NonnegData) = Diagonal(inv.(k.pnt)) # TODO just -g
-
+calc_Wik(k::NonnegData) = Diagonal(k.pnt)
 
 #=
  Sum of squares cone
