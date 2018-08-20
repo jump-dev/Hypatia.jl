@@ -218,33 +218,14 @@ function solve!(alf::AlfonsoOpt)
     dir_ty = similar(ty)
     dir_tx = similar(tx)
     dir_ts = similar(ts)
-    # Hic = similar(tx)
-    # HiAt = similar(A, n, m)
-    # # AHi = similar(A, m, n)
-    # Hirxrs = similar(tx)
-    # lhsdydtau = similar(A, m+1, m+1)
-    # rhsdydtau = similar(tx, m+1)
-    # dydtau = similar(rhsdydtau)
     sa_tx = similar(tx)
     sa_ts = similar(ts)
 
-    # G = [zeros(m,m) A -b; -A' zeros(n,n) c; b' -c' 0]
-    # Gp = [zeros(m,m) A; -A' zeros(n,n)]
-    # Gps = [zeros(m,m) -A; -A' zeros(n,n)]
-    # lhs = Symmetric([zeros(m,m) -A; -A' zeros(n,n)])
-    # W = zeros(n, n)
-    Wi = similar(A, n, n)
-    # rhs1 = [-b; -c]
-    # rhs2 = similar(rhs1)
-    # yx1 = similar(rhs1)
-    # yx2 = similar(rhs1)
+    HiAt = similar(A, n, m) # TODO for very sparse LPs, this is good, but for sparse problems with dense hessians, unclear
     y1 = similar(b)
     x1 = similar(c)
     y2 = similar(b)
     x2 = similar(c)
-    AWi = similar(A, m, n)
-    Witc = similar(c)
-    Witxs = similar(c)
 
     #=
     main loop
@@ -302,65 +283,15 @@ function solve!(alf::AlfonsoOpt)
         prediction phase
         =#
         # determine prediction direction
-
-        # @time begin
-        # invmu = 1.0/mu
-        # calc_Hinv_vec!(cones, coneidxs, Hic, c)
-        # Hic .*= invmu
-        # calc_Hinv_At!(cones, coneidxs, HiAt, A)
-        # HiAt .*= invmu
-        # dir_ts .= invmu*(rhs_tx - ts)
-        # calc_Hinv_vec!(cones, coneidxs, Hirxrs, dir_ts)
-        #
-        # # TODO maybe can use special structure of lhsdydtau: top left mxm is symmetric (L*A)^2, then last row and col are skew-symmetric
-        # lhsdydtau .= [A*HiAt (-b - A*Hic); (b' - c'*HiAt) (mu/tau^2 + dot(c, Hic))]
-        # rhsdydtau .= [(rhs_ty - A*Hirxrs); (rhs_tau - kap + dot(c, Hirxrs))]
-        # dydtau .= lhsdydtau\rhsdydtau
-        #
-        # dir_ty .= dydtau[1:m]
-        # dir_tau = dydtau[m+1]
-        # dir_tx .= Hirxrs + HiAt*dir_ty - Hic*dir_tau
-        # dir_ts .= -rhs_tx - A'*dir_ty + c*dir_tau
-        # dir_kap = -rhs_tau + dot(b, dir_ty) - dot(c, dir_tx)
-        # end
-
-        # calc_W!(cones, coneidxs, W)
-        # H = W'*W
-        #
-        # lhs = G + [zeros(m,m) zeros(m,n) zeros(m,1); zeros(n,m) mu*H zeros(n,1); zeros(1,m) zeros(1,n) mu/tau^2]
-        # rhs = -G*[ty; tx; tau]
-        # @time yxt = lhs\rhs
-        #
-        # dir_ty = yxt[1:m]
-        # dir_tx = yxt[m+1:m+n]
-        # dir_tau = yxt[end]
-        # dir_ts .= -rhs_tx - A'*dir_ty + c*dir_tau
-        # dir_kap = -rhs_tau + dot(b, dir_ty) - dot(c, dir_tx)
-        #
-        # @show dir_tau, dir_kap
-
-        # lhs.data[m+1:m+n,m+1:m+n] .= W'*W
-        # rhs2[1:m] .= -rhs_ty
-        # rhs2[m+1:m+n] .= rhs_tx - ts
-        #
-        # @time begin
-        # F = factorize(lhs)
-        # yx1 .= F\rhs1
-        # yx2 .= F\rhs2
-        # end
-
-        #10.1
-        calc_Wi!(cones, coneidxs, Wi) # TODO maybe can be faster using factorizations in cones
-        Wi .*= inv(sqrt(mu))
-        AWi .= A*Wi
-        FAW = cholesky(Symmetric(AWi*AWi')) # TODO use structure of W (upper triangular), and precomputed factorize(A)
-        Witc .= Wi'*c
-        Witxs .= Wi'*(ts - rhs_tx)
-        # TODO can parallelize 1 and 2
-        y1 .= FAW\(b + AWi*Witc)
-        x1 .= Wi*(AWi'*y1 - Witc)
-        y2 .= FAW\(rhs_ty + AWi*Witxs)
-        x2 .= Wi*(AWi'*y2 - Witxs)
+        invmu = 1.0/mu
+        calc_Hinv_At!(cones, coneidxs, HiAt, A)
+        HiAt .*= invmu
+        FAW = cholesky(Symmetric(A*HiAt))
+        # # TODO can parallelize 1 and 2
+        y1 .= FAW\(b + HiAt'*c)
+        calc_Hinv_vec!(cones, coneidxs, x1, invmu*(A'*y1 - c))
+        y2 .= FAW\(rhs_ty + HiAt'*(ts - rhs_tx))
+        calc_Hinv_vec!(cones, coneidxs, x2, invmu*(A'*y2 - ts + rhs_tx))
 
         dir_tau = (rhs_tau - kap - dot(b, y2) + dot(c, x2))/(mu/tau^2 + dot(b, y1) - dot(c, x1))
         dir_ty .= y2 + dir_tau*y1
@@ -387,10 +318,7 @@ function solve!(alf::AlfonsoOpt)
                 sa_ts .= ts + alpha*dir_ts
                 sa_tk = (tau + alpha*dir_tau)*(kap + alpha*dir_kap)
                 sa_mu = (dot(sa_tx, sa_ts) + sa_tk)/bnu
-                calc_g!(cones, coneidxs, g)
-                calc_Wi!(cones, coneidxs, Wi)
-                Witxs .= Wi'*(sa_ts + sa_mu*g)
-                nbhd_beta = sqrt(dot(Witxs, Witxs) + (sa_tk - sa_mu)^2)/sa_mu
+                nbhd_beta = calc_nbhd(cones, coneidxs, sa_ts, sa_mu, sa_tk)
 
                 if nbhd_beta < beta
                     # iterate is inside the beta-neighborhood
@@ -462,37 +390,16 @@ function solve!(alf::AlfonsoOpt)
         while true
             ncorrsteps += 1
             # calculate correction direction
-            # invmu = 1.0/mu
-            # calc_Hinv_vec!(cones, coneidxs, Hic, c)
-            # Hic .*= invmu
-            # calc_Hinv_At!(cones, coneidxs, HiAt, A)
-            # HiAt .*= invmu
-            # dir_ts .= -invmu*ts - calc_g!(cones, coneidxs, g)
-            # calc_Hinv_vec!(cones, coneidxs, Hirxrs, dir_ts)
-            #
-            # lhsdydtau .= [A*HiAt (-b - A*Hic); (b' - c'*HiAt) (mu/tau^2 + dot(c, Hic))]
-            # rhsdydtau .= [-A*Hirxrs; (-kap + mu/tau + dot(c, Hirxrs))]
-            # dydtau .= lhsdydtau\rhsdydtau
-            #
-            # dir_ty .= dydtau[1:m]
-            # dir_tau = dydtau[m+1]
-            # dir_tx .= Hirxrs + HiAt*dir_ty - Hic*dir_tau
-            # dir_ts .= -A'*dir_ty + c*dir_tau
-            # dir_kap = dot(b, dir_ty) - dot(c, dir_tx)
-
-            #10.1
-            calc_Wi!(cones, coneidxs, Wi) # TODO maybe can be faster using factorizations in cones
-            Wi .*= inv(sqrt(mu))
-            AWi .= A*Wi
-            FAW = cholesky(Symmetric(AWi*AWi')) # TODO use structure of W (upper triangular), and precomputed factorize(A)
-            Witc .= Wi'*c
             calc_g!(cones, coneidxs, g)
-            Witxs .= Wi'*(ts + mu*g)
+            invmu = 1.0/mu
+            calc_Hinv_At!(cones, coneidxs, HiAt, A)
+            HiAt .*= invmu
+            FAW = cholesky(Symmetric(A*HiAt), check=false)
             # TODO can parallelize 1 and 2
-            y1 .= FAW\(b + AWi*Witc)
-            x1 .= Wi*(AWi'*y1 - Witc)
-            y2 .= FAW\(AWi*Witxs)
-            x2 .= Wi*(AWi'*y2 - Witxs)
+            y1 .= FAW\(b + HiAt'*c)
+            calc_Hinv_vec!(cones, coneidxs, x1, invmu*(A'*y1 - c))
+            y2 .= FAW\(HiAt'*(ts + mu*g))
+            calc_Hinv_vec!(cones, coneidxs, x2, invmu*(A'*y2 - ts) - g)
 
             dir_tau = (mu/tau - kap - dot(b, y2) + dot(c, x2))/(mu/tau^2 + dot(b, y1) - dot(c, x1))
             dir_ty .= y2 + dir_tau*y1
@@ -540,10 +447,7 @@ function solve!(alf::AlfonsoOpt)
 
             # finish if allowed and current iterate is in the eta-neighborhood, or if taken max steps
             if (ncorrsteps == alf.maxcorrsteps) || alf.corrcheck
-                calc_g!(cones, coneidxs, g)
-                calc_Wi!(cones, coneidxs, Wi)
-                Witxs .= Wi'*(ts + mu*g)
-                if sqrt(dot(Witxs, Witxs) + (tau*kap - mu)^2) <= mu*eta
+                if calc_nbhd(cones, coneidxs, ts, mu, tau*kap) <= eta
                     break
                 elseif ncorrsteps == alf.maxcorrsteps
                     # nbhd_eta > eta, so corrector failed
@@ -623,58 +527,29 @@ function calc_g!(cones, coneidxs, g)
     return g
 end
 
-# TODO store inv(W) inside the cones
-function calc_Wi!(cones, coneidxs, Wi)
+function calc_Hinv_vec!(cones, coneidxs, Hi_vec, v)
     for k in eachindex(cones)
-        Wi[coneidxs[k],coneidxs[k]] .= inv(calc_HCholLk(cones[k]))'
+        Hi_vec[coneidxs[k]] .= calc_Hik(cones[k])*v[coneidxs[k]]
     end
-    return Wi
+    return Hi_vec
 end
 
-# function calc_Hinv_vec!(cones, coneidxs, Hi_vec, v)
-#     for k in eachindex(cones)
-#         Hi_vec[coneidxs[k]] .= calc_Hinvk(cones[k])*v[coneidxs[k]]
-#     end
-#     return Hi_vec
-# end
+# TODO could save At submatrix inside cone objects
+function calc_Hinv_At!(cones, coneidxs, Hi_At, A)
+    for k in eachindex(cones)
+        Hi_At[coneidxs[k],:] .= calc_Hik(cones[k])*A[:,coneidxs[k]]'
+    end
+    return Hi_At
+end
 
-# # TODO could save At submatrix inside cone objects
-# function calc_Hinv_At!(cones, coneidxs, Hi_At, A)
-#     for k in eachindex(cones)
-#         Hi_At[coneidxs[k],:] .= calc_Hinvk(cones[k])*A[:,coneidxs[k]]'
-#     end
-#     return Hi_At
-# end
-#
-# function calc_A_Hinv!(cones, coneidxs, A_Hi, A)
-#     for k in eachindex(cones)
-#         A_Hi[:,coneidxs[k]] .= A[:,coneidxs[k]]*calc_Hinvk(cones[k])
-#     end
-#     return A_Hi
-# end
-
-# function calc_nbhd(cones, coneidxs, ts, mu, tk)
-#     # sqrt(sum(abs2, L\(ts + mu*g)) + (tau*kap - mu)^2)/mu
-#     sumsqr = (tk - mu)^2
-#     for k in eachindex(cones)
-#         sumsqr += sum(abs2, calc_HCholLk(cones[k])\(ts[coneidxs[k]] + mu*calc_gk(cones[k])))
-#     end
-#     return sqrt(sumsqr)/mu
-# end
-
-# function calc_L!(cones, coneidxs, L)
-#     for k in eachindex(cones)
-#         L[coneidxs[k],coneidxs[k]] .= calc_HCholLk(cones[k])
-#     end
-#     return L
-# end
-#
-# function calc_W!(cones, coneidxs, W)
-#     for k in eachindex(cones)
-#         W[coneidxs[k],coneidxs[k]] .= calc_HCholLk(cones[k])'
-#     end
-#     return W
-# end
+function calc_nbhd(cones, coneidxs, ts, mu, tk)
+    # sqrt(sum(abs2, L\(ts + mu*g)) + (tau*kap - mu)^2)/mu
+    sumsqr = (tk - mu)^2
+    for k in eachindex(cones)
+        sumsqr += sum(abs2, calc_Lk(cones[k])\(ts[coneidxs[k]] + mu*calc_gk(cones[k])))
+    end
+    return sqrt(sumsqr)/mu
+end
 
 function getbetaeta(maxcorrsteps, bnu)
     if maxcorrsteps <= 2
