@@ -172,60 +172,6 @@ function solve!(alf::AlfonsoOpt)
     cones = alf.cones
     coneidxs = alf.coneidxs
 
-    # create cone object functions related to primal cone barrier
-    function load_tx(_tx; save_prev=false)
-        for k in eachindex(cones)
-            load_txk(cones[k], _tx[coneidxs[k]], save_prev)
-        end
-        return nothing
-    end
-
-    function use_prev()
-        for k in eachindex(cones)
-            use_prevk(cones[k])
-        end
-        return nothing
-    end
-
-    function check_incone()
-        for k in eachindex(cones)
-            if !inconek(cones[k])
-                return false
-            end
-        end
-        return true
-    end
-
-    function calc_g!(_g)
-        for k in eachindex(cones)
-            _g[coneidxs[k]] .= calc_gk(cones[k])
-        end
-        return _g
-    end
-
-    function calc_Hinv_vec!(_Hi_vec, _v)
-        for k in eachindex(cones)
-            _Hi_vec[coneidxs[k]] .= calc_Hinvk(cones[k])*_v[coneidxs[k]]
-        end
-        return _Hi_vec
-    end
-
-    function calc_Hinv_At!(_Hi_At)
-        for k in eachindex(cones)
-            _Hi_At[coneidxs[k],:] .= calc_Hinvk(cones[k])*A[:,coneidxs[k]]' # TODO maybe faster with CSC to do IJV
-        end
-        return _Hi_At
-    end
-
-    function calc_nbhd(_ts, _mu, _tk)
-        # sqrt(sum(abs2, L\(ts + mu*g)) + (tau*kap - mu)^2)/mu
-        sumsqr = (_tk - _mu)^2
-        for k in eachindex(cones)
-            sumsqr += sum(abs2, calc_HCholLk(cones[k])\(_ts[coneidxs[k]] + _mu*calc_gk(cones[k])))
-        end
-        return sqrt(sumsqr)/_mu
-    end
-
     # calculate complexity parameter of the augmented barrier (nu-bar): sum of the primitive cone barrier parameters (# TODO plus 1?)
     bnu = 1.0 + sum(barpar(ck) for ck in cones)
 
@@ -250,19 +196,19 @@ function solve!(alf::AlfonsoOpt)
     rp = maximum((1.0 + abs(b[i]))/(1.0 + abs(sum(A[i,:]))) for i in 1:m)
     # scaling factor for the dual problem
     g = ones(n)
-    load_tx(g)
-    @assert check_incone() # TODO will fail in general? TODO for some cones will not automatically calculate g,H
-    calc_g!(g)
+    load_tx!(cones, coneidxs, g)
+    @assert check_incone(cones) # TODO will fail in general? TODO for some cones will not automatically calculate g,H
+    calc_g!(cones, coneidxs, g)
     rd = maximum((1.0 + abs(g[j]))/(1.0 + abs(c[j])) for j in 1:n)
     # initial primal iterate
     tx = fill(sqrt(rp*rd), n)
 
     # calculate central primal-dual iterate
-    load_tx(tx)
-    @assert check_incone()
+    load_tx!(cones, coneidxs, tx)
+    @assert check_incone(cones)
     ty = zeros(m)
     tau = 1.0
-    ts = -calc_g!(g)
+    ts = -calc_g!(cones, coneidxs, g)
     kap = 1.0
     mu = (dot(tx, ts) + tau*kap)/bnu
 
@@ -272,14 +218,14 @@ function solve!(alf::AlfonsoOpt)
     dir_ty = similar(ty)
     dir_tx = similar(tx)
     dir_ts = similar(ts)
-    Hic = similar(tx)
-    HiAt = similar(A, n, m)
-    Hirxrs = similar(tx)
-    lhsdydtau = similar(A, m+1, m+1)
-    rhsdydtau = similar(tx, m+1)
-    dydtau = similar(rhsdydtau)
     sa_tx = similar(tx)
     sa_ts = similar(ts)
+
+    HiAt = similar(A, n, m) # TODO for very sparse LPs, this is good, but for sparse problems with dense hessians, unclear
+    y1 = similar(b)
+    x1 = similar(c)
+    y2 = similar(b)
+    x2 = similar(c)
 
     #=
     main loop
@@ -314,16 +260,16 @@ function solve!(alf::AlfonsoOpt)
 
         if (p_inf <= alf.optimtol) && (d_inf <= alf.optimtol)
             if gap <= alf.optimtol
-                println("Problem is feasible and an approximate optimal solution was found; terminating")
+                alf.verbose && println("Problem is feasible and an approximate optimal solution was found; terminating")
                 alf.status = :Optimal
                 break
             elseif (compl <= alf.optimtol) && (tau <= alf.optimtol*1e-02*max(1.0, kap))
-                println("Problem is nearly primal or dual infeasible; terminating")
+                alf.verbose && println("Problem is nearly primal or dual infeasible; terminating")
                 alf.status = :NearlyInfeasible
                 break
             end
         elseif (tau <= alf.optimtol*1e-02*min(1.0, kap)) && (mu <= alf.optimtol*1e-02)
-            println("Problem is ill-posed; terminating")
+            alf.verbose && println("Problem is ill-posed; terminating")
             alf.status = :IllPosed
             break
         end
@@ -338,21 +284,18 @@ function solve!(alf::AlfonsoOpt)
         =#
         # determine prediction direction
         invmu = 1.0/mu
-        calc_Hinv_vec!(Hic, c)
-        Hic .*= invmu
-        calc_Hinv_At!(HiAt)
+        calc_Hinv_At!(cones, coneidxs, HiAt, A)
         HiAt .*= invmu
-        dir_ts .= invmu*(rhs_tx - ts)
-        calc_Hinv_vec!(Hirxrs, dir_ts)
+        FAW = cholesky(Symmetric(A*HiAt))
+        # # TODO can parallelize 1 and 2
+        y1 .= FAW\(b + HiAt'*c)
+        calc_Hinv_vec!(cones, coneidxs, x1, invmu*(A'*y1 - c))
+        y2 .= FAW\(rhs_ty + HiAt'*(ts - rhs_tx))
+        calc_Hinv_vec!(cones, coneidxs, x2, invmu*(A'*y2 - ts + rhs_tx))
 
-        # TODO maybe can use special structure of lhsdydtau: top left mxm is symmetric (L*A)^2, then last row and col are skew-symmetric
-        lhsdydtau .= [A*HiAt (-b - A*Hic); (b' - c'*HiAt) (mu/tau^2 + dot(c, Hic))]
-        rhsdydtau .= [(rhs_ty - A*Hirxrs); (rhs_tau - kap + dot(c, Hirxrs))]
-        dydtau .= lhsdydtau\rhsdydtau
-
-        dir_ty .= dydtau[1:m]
-        dir_tau = dydtau[m+1]
-        dir_tx .= Hirxrs + HiAt*dir_ty - Hic*dir_tau
+        dir_tau = (rhs_tau - kap - dot(b, y2) + dot(c, x2))/(mu/tau^2 + dot(b, y1) - dot(c, x1))
+        dir_ty .= y2 + dir_tau*y1
+        dir_tx .= x2 + dir_tau*x1
         dir_ts .= -rhs_tx - A'*dir_ty + c*dir_tau
         dir_kap = -rhs_tau + dot(b, dir_ty) - dot(c, dir_tx)
 
@@ -368,14 +311,14 @@ function solve!(alf::AlfonsoOpt)
             nprediters += 1
 
             sa_tx .= tx + alpha*dir_tx
-            load_tx(sa_tx, save_prev=(alphaprevok && (nprediters > 1)))
+            load_tx!(cones, coneidxs, sa_tx, save_prev=(alphaprevok && (nprediters > 1)))
 
-            if check_incone()
+            if check_incone(cones)
                 # primal iterate tx is inside the cone
                 sa_ts .= ts + alpha*dir_ts
                 sa_tk = (tau + alpha*dir_tau)*(kap + alpha*dir_kap)
                 sa_mu = (dot(sa_tx, sa_ts) + sa_tk)/bnu
-                nbhd_beta = calc_nbhd(sa_ts, sa_mu, sa_tk)
+                nbhd_beta = calc_nbhd(cones, coneidxs, sa_ts, sa_mu, sa_tk)
 
                 if nbhd_beta < beta
                     # iterate is inside the beta-neighborhood
@@ -403,7 +346,7 @@ function solve!(alf::AlfonsoOpt)
                 if alf.predlinesearch
                     alphapred = alpha
                 end
-                use_prev()
+                use_prev!(cones)
                 break
             end
 
@@ -411,7 +354,7 @@ function solve!(alf::AlfonsoOpt)
             if alpha < alphapredthres
                 # alpha is very small, so predictor has failed
                 predfail = true
-                println("Predictor could not improve the solution; terminating")
+                alf.verbose && println("Predictor could not improve the solution; terminating")
                 alf.status = :PredictorFail
                 break
             end
@@ -446,23 +389,21 @@ function solve!(alf::AlfonsoOpt)
         ncorrsteps = 0
         while true
             ncorrsteps += 1
-
             # calculate correction direction
+            calc_g!(cones, coneidxs, g)
             invmu = 1.0/mu
-            calc_Hinv_vec!(Hic, c)
-            Hic .*= invmu
-            calc_Hinv_At!(HiAt)
+            calc_Hinv_At!(cones, coneidxs, HiAt, A)
             HiAt .*= invmu
-            dir_ts .= -invmu*ts - calc_g!(g)
-            calc_Hinv_vec!(Hirxrs, dir_ts)
+            FAW = cholesky(Symmetric(A*HiAt), check=false)
+            # TODO can parallelize 1 and 2
+            y1 .= FAW\(b + HiAt'*c)
+            calc_Hinv_vec!(cones, coneidxs, x1, invmu*(A'*y1 - c))
+            y2 .= FAW\(HiAt'*(ts + mu*g))
+            calc_Hinv_vec!(cones, coneidxs, x2, invmu*(A'*y2 - ts) - g)
 
-            lhsdydtau .= [A*HiAt (-b - A*Hic); (b' - c'*HiAt) (mu/tau^2 + dot(c, Hic))]
-            rhsdydtau .= [-A*Hirxrs; (-kap + mu/tau + dot(c, Hirxrs))]
-            dydtau .= lhsdydtau\rhsdydtau
-
-            dir_ty .= dydtau[1:m]
-            dir_tau = dydtau[m+1]
-            dir_tx .= Hirxrs + HiAt*dir_ty - Hic*dir_tau
+            dir_tau = (mu/tau - kap - dot(b, y2) + dot(c, x2))/(mu/tau^2 + dot(b, y1) - dot(c, x1))
+            dir_ty .= y2 + dir_tau*y1
+            dir_tx .= x2 + dir_tau*x1
             dir_ts .= -A'*dir_ty + c*dir_tau
             dir_kap = dot(b, dir_ty) - dot(c, dir_tx)
 
@@ -473,9 +414,9 @@ function solve!(alf::AlfonsoOpt)
                 ncorrlsiters += 1
 
                 sa_tx .= tx + alpha*dir_tx
-                load_tx(sa_tx)
+                load_tx!(cones, coneidxs, sa_tx)
 
-                if check_incone() # TODO only calculates everything for the nonnegpoly cone - for others need to make sure g,H are calculated after correction step
+                if check_incone(cones) # TODO only calculates everything for the nonnegpoly cone - for others need to make sure g,H are calculated after correction step
                     # primal iterate tx is inside the cone, so terminate line search
                     break
                 end
@@ -484,7 +425,7 @@ function solve!(alf::AlfonsoOpt)
                 if ncorrlsiters == alf.maxcorrlsiters
                     # corrector failed
                     corrfail = true
-                    println("Corrector could not improve the solution; terminating")
+                    alf.verbose && println("Corrector could not improve the solution; terminating")
                     alf.status = :CorrectorFail
                     break
                 end
@@ -506,12 +447,12 @@ function solve!(alf::AlfonsoOpt)
 
             # finish if allowed and current iterate is in the eta-neighborhood, or if taken max steps
             if (ncorrsteps == alf.maxcorrsteps) || alf.corrcheck
-                if calc_nbhd(ts, mu, tau*kap) <= eta
+                if calc_nbhd(cones, coneidxs, ts, mu, tau*kap) <= eta
                     break
                 elseif ncorrsteps == alf.maxcorrsteps
                     # nbhd_eta > eta, so corrector failed
                     corrfail = true
-                    println("Corrector phase finished outside the eta-neighborhood; terminating")
+                    alf.verbose && println("Corrector phase finished outside the eta-neighborhood; terminating")
                     alf.status = :CorrectorFail
                     break
                 end
@@ -523,9 +464,7 @@ function solve!(alf::AlfonsoOpt)
         end
     end
 
-    if alf.verbose
-        println("\nFinished in $iter iterations\nInternal status is $(alf.status)\n")
-    end
+    alf.verbose && println("\nFinished in $iter iterations\nInternal status is $(alf.status)\n")
 
     #=
     calculate final solution and iteration statistics
@@ -555,6 +494,61 @@ function solve!(alf::AlfonsoOpt)
     alf.solvetime = time() - starttime
 
     return nothing
+end
+
+# create cone object functions related to primal cone barrier
+function load_tx!(cones, coneidxs, tx; save_prev=false)
+    for k in eachindex(cones)
+        load_txk(cones[k], tx[coneidxs[k]], save_prev)
+    end
+    return nothing
+end
+
+function use_prev!(cones)
+    for k in eachindex(cones)
+        use_prevk(cones[k])
+    end
+    return nothing
+end
+
+function check_incone(cones)
+    for k in eachindex(cones)
+        if !inconek(cones[k])
+            return false
+        end
+    end
+    return true
+end
+
+function calc_g!(cones, coneidxs, g)
+    for k in eachindex(cones)
+        g[coneidxs[k]] .= calc_gk(cones[k])
+    end
+    return g
+end
+
+function calc_Hinv_vec!(cones, coneidxs, Hi_vec, v)
+    for k in eachindex(cones)
+        Hi_vec[coneidxs[k]] .= calc_Hik(cones[k])*v[coneidxs[k]]
+    end
+    return Hi_vec
+end
+
+# TODO could save At submatrix inside cone objects
+function calc_Hinv_At!(cones, coneidxs, Hi_At, A)
+    for k in eachindex(cones)
+        Hi_At[coneidxs[k],:] .= calc_Hik(cones[k])*A[:,coneidxs[k]]'
+    end
+    return Hi_At
+end
+
+function calc_nbhd(cones, coneidxs, ts, mu, tk)
+    # sqrt(sum(abs2, L\(ts + mu*g)) + (tau*kap - mu)^2)/mu
+    sumsqr = (tk - mu)^2
+    for k in eachindex(cones)
+        sumsqr += sum(abs2, calc_Lk(cones[k])\(ts[coneidxs[k]] + mu*calc_gk(cones[k])))
+    end
+    return sqrt(sumsqr)/mu
 end
 
 function getbetaeta(maxcorrsteps, bnu)
