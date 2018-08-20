@@ -7,6 +7,7 @@ mutable struct Cone
     idxs::Vector{AbstractUnitRange}
 end
 
+# TODO can parallelize the functions acting on Cone
 function load_tx(cone::Cone, tx::Vector{Float64})
     for k in eachindex(cone.prms)
         cone.prms[k].point .= tx[cone.idxs[k]]
@@ -38,7 +39,11 @@ function get_Hi_vec!(Hi_vec::Vector{Float64}, vec::Vector{Float64}, cone::Cone)
 end
 
 
+#=
+predefined standard primitive cone types
+=#
 
+# nonnegative orthant cone
 mutable struct NonnegData <: ConeData
     dim::Int
     pnt::Vector{Float64}
@@ -67,11 +72,8 @@ calc_gk(k::NonnegData) = -inv.(k.pnt)
 
 calc_Hik(k::NonnegData) = Diagonal(abs2.(k.pnt))
 
-calc_Lk(k::NonnegData) = Diagonal(inv.(k.pnt)) # TODO just -g
 
-#=
- Sum of squares cone
-=#
+# polynomial (weighted) sum of squares cone (parametrized by ip and ipwt)
 mutable struct SumOfSqrData <: ConeData
     dim::Int
     ip::Matrix{Float64}
@@ -80,10 +82,8 @@ mutable struct SumOfSqrData <: ConeData
     Hfact
     hasgH::Bool
     hasHi::Bool
-    hasL::Bool
     grad::Vector{Float64}
     Hi::Matrix{Float64}
-    L::Matrix{Float64}
 
     function SumOfSqrData(dim, ip, ipwt)
         k = new()
@@ -148,80 +148,8 @@ end
 function calc_Hik(k::SumOfSqrData)
     @assert k.hasgH
     if !k.hasHi
-        k.Hi = inv(k.Hfact) # TODO maybe should do L\L'\A
+        k.Hi = inv(k.Hfact) # TODO maybe should do L\L'\A (see math in original code)
         k.hasHi = true
     end
     return k.Hi
 end
-
-function calc_Lk(k::SumOfSqrData)
-    @assert k.hasgH
-    if !k.hasL
-        k.L = k.Hfact.L
-        k.hasL = true
-    end
-    return k.L
-end
-
-
-
-
-
-
-
-
-#=
- Nonnegative cone
-=#
-#
-# mutable struct NonnegData <: ConeData
-#     dim::Int
-#     pnt::Vector{Float64}
-#     has_g::Bool
-#     g::Vector{Float64}
-#     has_Hi::Bool
-#     Hi::Diagonal{Float64}
-#
-#     function NonnegData(dim)
-#         k = new()
-#         k.dim = dim
-#         k.has_g = false
-#         k.g = Vector{Float64}(undef, dim)
-#         k.has_Hi = false
-#         k.Hi = Diagonal{Float64}(copy(k.g))
-#         return k
-#     end
-# end
-#
-# dimension(k::NonnegData) = k.dim
-#
-# barpar(k::NonnegData) = k.dim
-#
-# function load_txk(k::NonnegData, pnt::Vector{Float64})
-#     @assert length(pnt) == k.dim
-#     k.pnt = pnt
-#     k.has_g = false
-#     k.has_Hi = false
-#     return nothing
-# end
-#
-# inconek(k::NonnegData) = all(x -> (x > 0.0), k.pnt)
-#
-# function calc_gk(k::NonnegData)
-#     if !k.has_g
-#         k.g .= -inv.(k.pnt)
-#         k.has_g = true
-#     end
-#     return k.g
-# end
-#
-# function calc_Hik(k::NonnegData)
-#     if !k.has_Hi
-#         k.Hi.diag .= abs2.(k.pnt)
-#         k.has_Hi = true
-#     end
-#     return k.Hi
-# end
-#
-# calc_Lk(k::NonnegData) = Diagonal(-k.g)
-#
