@@ -12,20 +12,16 @@ abstract type ConeData end
 #     pnt::Vector{Float64}
 #     has_g::Bool
 #     g::Vector{Float64}
-#     g_prev::Vector{Float64}
 #     has_Hi::Bool
 #     Hi::Diagonal{Float64}
-#     Hi_prev::Diagonal{Float64}
 #
 #     function NonnegData(dim)
 #         k = new()
 #         k.dim = dim
 #         k.has_g = false
 #         k.g = Vector{Float64}(undef, dim)
-#         k.g_prev = copy(k.g)
 #         k.has_Hi = false
 #         k.Hi = Diagonal{Float64}(copy(k.g))
-#         k.Hi_prev = copy(k.Hi)
 #         return k
 #     end
 # end
@@ -34,21 +30,11 @@ abstract type ConeData end
 #
 # barpar(k::NonnegData) = k.dim
 #
-# function load_txk(k::NonnegData, pnt::Vector{Float64}, save_prev::Bool)
+# function load_txk(k::NonnegData, pnt::Vector{Float64})
 #     @assert length(pnt) == k.dim
-#     if save_prev # may want to use previously calculated values, so store
-#         k.g_prev .= k.g
-#         k.Hi_prev.diag .= k.Hi.diag
-#     end
 #     k.pnt = pnt
 #     k.has_g = false
 #     k.has_Hi = false
-#     return nothing
-# end
-#
-# function use_prevk(k::NonnegData)
-#     k.g .= k.g_prev
-#     k.Hi.diag .= k.Hi_prev.diag
 #     return nothing
 # end
 #
@@ -76,13 +62,11 @@ abstract type ConeData end
 mutable struct NonnegData <: ConeData
     dim::Int
     pnt::Vector{Float64}
-    pnt_prev::Vector{Float64}
 
     function NonnegData(dim)
         k = new()
         k.dim = dim
         k.pnt = Vector{Float64}(undef, dim)
-        k.pnt_prev = copy(k.pnt)
         # TODO prealloc etc
         return k
     end
@@ -92,15 +76,10 @@ dimension(k::NonnegData) = k.dim
 
 barpar(k::NonnegData) = k.dim
 
-function load_txk(k::NonnegData, pnt, save_prev)
+function load_txk(k::NonnegData, pnt)
     @assert length(pnt) == k.dim
-    if save_prev
-        k.pnt_prev .= k.pnt
-    end
     k.pnt .= pnt
 end
-
-use_prevk(k::NonnegData) = (k.pnt .= k.pnt_prev)
 
 inconek(k::NonnegData) = all(x -> (x > 0.0), k.pnt)
 
@@ -123,11 +102,8 @@ mutable struct SumOfSqrData <: ConeData
     hasHi::Bool
     hasL::Bool
     grad::Vector{Float64}
-    grad_prev::Vector{Float64}
     Hi::Matrix{Float64}
-    Hi_prev::Matrix{Float64}
     L::Matrix{Float64}
-    L_prev::Matrix{Float64}
 
     function SumOfSqrData(dim, ip, ipwt)
         k = new()
@@ -144,29 +120,12 @@ dimension(k::SumOfSqrData) = k.dim
 
 barpar(k::SumOfSqrData) = (size(k.ip, 2) + sum(size(k.ipwt[j], 2) for j in 1:length(k.ipwt)))
 
-function load_txk(k::SumOfSqrData, pnt::Vector{Float64}, save_prev::Bool)
+function load_txk(k::SumOfSqrData, pnt::Vector{Float64})
     @assert length(pnt) == k.dim
-    if save_prev
-        # may want to use previously calculated values, so store
-        @assert k.hasgH
-        k.grad_prev = calc_gk(k)
-        k.Hi_prev = calc_Hik(k)
-        k.L_prev = calc_Lk(k)
-    end
     k.pnt .= pnt
     k.hasgH = false
     k.hasHi = false
     k.hasL = false
-end
-
-function use_prevk(k::SumOfSqrData)
-    k.grad = copy(k.grad_prev) # TODO prealloc not copy
-    k.Hi = copy(k.Hi_prev)
-    k.L = copy(k.L_prev)
-
-    k.hasgH = true
-    k.hasHi = true
-    k.hasL = true
 end
 
 function inconek(k::SumOfSqrData)
