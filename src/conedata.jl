@@ -1,73 +1,58 @@
 
 abstract type PrimitiveCone end
 
-
+# TODO reorder primitive cones so easiest ones to check incone are first
 mutable struct Cone
-    primitives::Vector{PrimitiveCone}
+    prms::Vector{PrimitiveCone}
+    idxs::Vector{AbstractUnitRange}
+end
 
+function load_tx(cone::Cone, tx::Vector{Float64})
+    for k in eachindex(cone.prms)
+        cone.prms[k].point .= tx[cone.idxs[k]]
+    end
+    return nothing
+end
+
+incone(cone::Cone) = all(incone_prm, cone.prms)
+
+function get_g!(g::Vector{Float64}, cone::Cone)
+    for k in eachindex(cone.prms)
+        g[cone.idxs[k]] .= calcg_prm(cone.prms[k])
+    end
+    return g
+end
+
+function get_Hi_mat_t!(Hi_mat::AbstractMatrix{Float64}, mat::AbstractMatrix{Float64}, cone::Cone)
+    for k in eachindex(cone.prms)
+        Hi_mat[cone.idxs[k],:] .= calcHiprod_prm(cone.prms[k], mat[:,cone.idxs[k]]') # TODO maybe faster with views or by saving submatrix of A in cone object
+    end
+    return Hi_mat
+end
+
+function get_Hi_vec!(Hi_vec::Vector{Float64}, vec::Vector{Float64}, cone::Cone)
+    for k in eachindex(cone.prms)
+        Hi_vec[cone.idxs[k]] .= calcHiprod_prm(cone.prms[k], vec)
+    end
+    return Hi_vec
+end
+
+# TODO probably can use Hi_vec for this instead of L\vec, move back to nativeinterface file
+# maybe:
+# tmp = similar(ts)
+# tmp2 = ts + mu*get_g!(g, cone)
+# sumsqr += dot(tmp2, get_Hi_vec!(tmp, tmp2, cone))
+function get_nbhd(cone, ts, mu, tk)
+    # sqrt(sum(abs2, L\(ts + mu*g)) + (tau*kap - mu)^2)/mu
+    sumsqr = (tk - mu)^2
+    for k in eachindex(cone.prms)
+        sumsqr += sum(abs2, calcL_prm(cone.prms[k])\(ts[cone.idxs[k]] + mu*calcg_prm(cone.prms[k])))
+    end
+    return sqrt(sumsqr)/mu
 end
 
 
 
-
-
-
-
-#=
- Nonnegative cone
-=#
-#
-# mutable struct NonnegData <: ConeData
-#     dim::Int
-#     pnt::Vector{Float64}
-#     has_g::Bool
-#     g::Vector{Float64}
-#     has_Hi::Bool
-#     Hi::Diagonal{Float64}
-#
-#     function NonnegData(dim)
-#         k = new()
-#         k.dim = dim
-#         k.has_g = false
-#         k.g = Vector{Float64}(undef, dim)
-#         k.has_Hi = false
-#         k.Hi = Diagonal{Float64}(copy(k.g))
-#         return k
-#     end
-# end
-#
-# dimension(k::NonnegData) = k.dim
-#
-# barpar(k::NonnegData) = k.dim
-#
-# function load_txk(k::NonnegData, pnt::Vector{Float64})
-#     @assert length(pnt) == k.dim
-#     k.pnt = pnt
-#     k.has_g = false
-#     k.has_Hi = false
-#     return nothing
-# end
-#
-# inconek(k::NonnegData) = all(x -> (x > 0.0), k.pnt)
-#
-# function calc_gk(k::NonnegData)
-#     if !k.has_g
-#         k.g .= -inv.(k.pnt)
-#         k.has_g = true
-#     end
-#     return k.g
-# end
-#
-# function calc_Hik(k::NonnegData)
-#     if !k.has_Hi
-#         k.Hi.diag .= abs2.(k.pnt)
-#         k.has_Hi = true
-#     end
-#     return k.Hi
-# end
-#
-# calc_Lk(k::NonnegData) = Diagonal(-k.g)
-#
 
 mutable struct NonnegData <: ConeData
     dim::Int
@@ -196,50 +181,62 @@ end
 
 
 
-# # create cone object functions related to primal cone barrier
-# function load_tx!(cone, tx)
-#     for k in eachindex(cone)
-#         load_txk(cone[k], tx[coneidxs[k]])
+
+
+
+
+#=
+ Nonnegative cone
+=#
+#
+# mutable struct NonnegData <: ConeData
+#     dim::Int
+#     pnt::Vector{Float64}
+#     has_g::Bool
+#     g::Vector{Float64}
+#     has_Hi::Bool
+#     Hi::Diagonal{Float64}
+#
+#     function NonnegData(dim)
+#         k = new()
+#         k.dim = dim
+#         k.has_g = false
+#         k.g = Vector{Float64}(undef, dim)
+#         k.has_Hi = false
+#         k.Hi = Diagonal{Float64}(copy(k.g))
+#         return k
 #     end
+# end
+#
+# dimension(k::NonnegData) = k.dim
+#
+# barpar(k::NonnegData) = k.dim
+#
+# function load_txk(k::NonnegData, pnt::Vector{Float64})
+#     @assert length(pnt) == k.dim
+#     k.pnt = pnt
+#     k.has_g = false
+#     k.has_Hi = false
 #     return nothing
 # end
 #
-# function check_incone(cone)
-#     for k in eachindex(cone)
-#         if !inconek(cone[k])
-#             return false
-#         end
+# inconek(k::NonnegData) = all(x -> (x > 0.0), k.pnt)
+#
+# function calc_gk(k::NonnegData)
+#     if !k.has_g
+#         k.g .= -inv.(k.pnt)
+#         k.has_g = true
 #     end
-#     return true
+#     return k.g
 # end
 #
-# function calc_g!(cone, g)
-#     for k in eachindex(cone)
-#         g[coneidxs[k]] .= calc_gk(cone[k])
+# function calc_Hik(k::NonnegData)
+#     if !k.has_Hi
+#         k.Hi.diag .= abs2.(k.pnt)
+#         k.has_Hi = true
 #     end
-#     return g
+#     return k.Hi
 # end
 #
-# function calc_Hinv_vec!(cone, Hi_vec, v)
-#     for k in eachindex(cone)
-#         Hi_vec[coneidxs[k]] .= calc_Hik(cone[k])*v[coneidxs[k]]
-#     end
-#     return Hi_vec
-# end
+# calc_Lk(k::NonnegData) = Diagonal(-k.g)
 #
-# # TODO could save At submatrix inside cone objects
-# function calc_Hinv_At!(cone, Hi_At, A)
-#     for k in eachindex(cone)
-#         Hi_At[coneidxs[k],:] .= calc_Hik(cone[k])*A[:,coneidxs[k]]'
-#     end
-#     return Hi_At
-# end
-#
-# function calc_nbhd(cone, ts, mu, tk)
-#     # sqrt(sum(abs2, L\(ts + mu*g)) + (tau*kap - mu)^2)/mu
-#     sumsqr = (tk - mu)^2
-#     for k in eachindex(cone)
-#         sumsqr += sum(abs2, calc_Lk(cone[k])\(ts[coneidxs[k]] + mu*calc_gk(cone[k])))
-#     end
-#     return sqrt(sumsqr)/mu
-# end
