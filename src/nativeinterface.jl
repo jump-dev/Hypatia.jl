@@ -75,7 +75,7 @@ end
 
 function AlfonsoOpt(;
     verbose = false,
-    optimtol = 1e-06,
+    optimtol = 1e-6,
     maxiter = 1e3,
     predlinesearch = true,
     maxpredsmallsteps = 8,
