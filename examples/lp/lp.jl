@@ -40,7 +40,7 @@ function build_lp!(alf::Alfonso.AlfonsoOpt, m::Int, n::Int; use_data=false, dens
     return Alfonso.load_data!(alf, A, b, c, cones, coneidxs)
 end
 
-# alf = Alfonso.AlfonsoOpt(maxiter=100, verbose=false)
+# alf = Alfonso.AlfonsoOpt(maxiter=100, verbose=true)
 
 # optionally use fixed data in folder
 # select the random matrix size, dense/sparse, sparsity fraction
