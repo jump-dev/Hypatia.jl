@@ -348,7 +348,16 @@ function solve!(alf::AlfonsoOpt)
                 sa_ts .= ts + alpha*dir_ts
                 sa_tk = (tau + alpha*dir_tau)*(kap + alpha*dir_kap)
                 sa_mu = (dot(sa_tx, sa_ts) + sa_tk)/alf.bnu
-                nbhd = calc_nbhd(cone, sa_ts, sa_mu, sa_tk)
+
+                calc_g!(cone, g)
+                sa_ts .+= sa_mu*g
+                calc_Hinv_vec!(cone, g, sa_ts)
+                nbhd = sqrt((sa_tk - sa_mu)^2 + dot(g, sa_ts))/sa_mu
+                # tmp = similar(ts)
+                # tmp2 = ts + mu*calc_g!(cone, tmp)
+                # calc_Hinv_vec!(cone, tmp, tmp2)
+                # sqrt((tk - mu)^2 + dot(tmp2, tmp))/mu
+
 
                 if nbhd < alf.beta
                     # iterate is inside the beta-neighborhood
@@ -471,7 +480,13 @@ function solve!(alf::AlfonsoOpt)
 
             # finish if allowed and current iterate is in the eta-neighborhood, or if taken max steps
             if (ncorrsteps == alf.maxcorrsteps) || alf.corrcheck
-                if calc_nbhd(cone, ts, mu, tau*kap) <= alf.eta
+                calc_g!(cone, g)
+                sa_ts .= ts + mu*g
+                calc_Hinv_vec!(cone, g, sa_ts)
+                nbhd = sqrt((tau*kap - mu)^2 + dot(g, sa_ts))/mu
+
+                # if calc_nbhd(cone, ts, mu, tau*kap) <= alf.eta
+                if nbhd <= alf.eta
                     break
                 elseif ncorrsteps == alf.maxcorrsteps
                     # nbhd_eta > eta, so corrector failed
