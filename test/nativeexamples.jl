@@ -118,7 +118,7 @@ end
 end
 
 @testset "Robinson" begin
-    alf = Alfonso.AlfonsoOpt(verbose=verbflag)
+    alf = Alfonso.AlfonsoOpt(verbose=verbflag, optimtol=1e-5)
     build_namedpoly!(alf, :robinson, 8)
     @time Alfonso.solve!(alf)
     @test Alfonso.get_status(alf) == :Optimal
