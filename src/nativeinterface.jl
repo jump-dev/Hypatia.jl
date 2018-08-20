@@ -301,26 +301,27 @@ function solve!(alf::AlfonsoOpt)
 
         # determine step length alpha by line search
         alpha = alphapred
-        nbhd_beta = Inf
+        nbhd = Inf
         alphaprevok = true
-        alphaprev = 0.0
-        nbhd_betaprev = Inf
         predfail = false
         nprediters = 0
         while true
             nprediters += 1
 
             sa_tx .= tx + alpha*dir_tx
-            load_tx!(cones, coneidxs, sa_tx, save_prev=(alphaprevok && (nprediters > 1)))
+            load_tx!(cones, coneidxs, sa_tx)
 
+            # accept primal iterate if
+            # - decreased alpha and it is the first inside the cone and beta-neighborhood or
+            # - increased alpha and it is inside the cone and the first to leave beta-neighborhood
             if check_incone(cones)
-                # primal iterate tx is inside the cone
+                # primal iterate is inside the cone
                 sa_ts .= ts + alpha*dir_ts
                 sa_tk = (tau + alpha*dir_tau)*(kap + alpha*dir_kap)
                 sa_mu = (dot(sa_tx, sa_ts) + sa_tk)/bnu
-                nbhd_beta = calc_nbhd(cones, coneidxs, sa_ts, sa_mu, sa_tk)
+                nbhd = calc_nbhd(cones, coneidxs, sa_ts, sa_mu, sa_tk)
 
-                if nbhd_beta < beta
+                if nbhd < beta
                     # iterate is inside the beta-neighborhood
                     if !alphaprevok || (alpha > alf.predlsmulti)
                         # either the previous iterate was outside the beta-neighborhood or increasing alpha again will make it > 1
@@ -331,26 +332,23 @@ function solve!(alf::AlfonsoOpt)
                     end
 
                     alphaprevok = true
-                    alphaprev = alpha
-                    nbhd_betaprev = nbhd_beta
-                    alpha = alpha/alf.predlsmulti
+                    alpha = alpha/alf.predlsmulti # increase alpha
                     continue
                 end
-            end
 
-            # primal iterate tx is outside the beta-neighborhood
-            if alphaprevok && (nprediters > 1)
-                # previous iterate was in the beta-neighborhood
-                alpha = alphaprev
-                nbhd_beta = nbhd_betaprev
-                if alf.predlinesearch
-                    alphapred = alpha
+                # iterate is outside the beta-neighborhood
+                if alphaprevok
+                    # previous iterate was inside the beta-neighborhood
+                    if alf.predlinesearch
+                        alphapred = alpha*alf.predlsmulti
+                    end
+                    break
                 end
-                use_prev!(cones)
-                break
             end
 
-            # current and previous primal iterates are outside the beta-neighborhood
+            # primal iterate is either
+            # - outside the cone or
+            # - inside the cone and outside the beta-neighborhood and previous iterate was outside the beta-neighborhood
             if alpha < alphapredthres
                 # alpha is very small, so predictor has failed
                 predfail = true
@@ -360,9 +358,7 @@ function solve!(alf::AlfonsoOpt)
             end
 
             alphaprevok = false
-            alphaprev = alpha
-            nbhd_betaprev = nbhd_beta
-            alpha = alf.predlsmulti*alpha
+            alpha = alf.predlsmulti*alpha # decrease alpha
         end
         # @show nprediters
         if predfail
@@ -378,7 +374,7 @@ function solve!(alf::AlfonsoOpt)
         mu = (dot(tx, ts) + tau*kap)/bnu
 
         # skip correction phase if allowed and current iterate is in the eta-neighborhood
-        if alf.corrcheck && (nbhd_beta <= eta)
+        if alf.corrcheck && (nbhd <= eta)
             continue
         end
 
@@ -416,7 +412,7 @@ function solve!(alf::AlfonsoOpt)
                 sa_tx .= tx + alpha*dir_tx
                 load_tx!(cones, coneidxs, sa_tx)
 
-                if check_incone(cones) # TODO only calculates everything for the nonnegpoly cone - for others need to make sure g,H are calculated after correction step
+                if check_incone(cones)
                     # primal iterate tx is inside the cone, so terminate line search
                     break
                 end
@@ -497,16 +493,9 @@ function solve!(alf::AlfonsoOpt)
 end
 
 # create cone object functions related to primal cone barrier
-function load_tx!(cones, coneidxs, tx; save_prev=false)
+function load_tx!(cones, coneidxs, tx)
     for k in eachindex(cones)
-        load_txk(cones[k], tx[coneidxs[k]], save_prev)
-    end
-    return nothing
-end
-
-function use_prev!(cones)
-    for k in eachindex(cones)
-        use_prevk(cones[k])
+        load_txk(cones[k], tx[coneidxs[k]])
     end
     return nothing
 end
