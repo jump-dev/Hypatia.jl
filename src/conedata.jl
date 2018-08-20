@@ -37,21 +37,6 @@ function get_Hi_vec!(Hi_vec::Vector{Float64}, vec::Vector{Float64}, cone::Cone)
     return Hi_vec
 end
 
-# TODO probably can use Hi_vec for this instead of L\vec, move back to nativeinterface file
-# maybe:
-# tmp = similar(ts)
-# tmp2 = ts + mu*get_g!(g, cone)
-# sumsqr += dot(tmp2, get_Hi_vec!(tmp, tmp2, cone))
-function get_nbhd(cone, ts, mu, tk)
-    # sqrt(sum(abs2, L\(ts + mu*g)) + (tau*kap - mu)^2)/mu
-    sumsqr = (tk - mu)^2
-    for k in eachindex(cone.prms)
-        sumsqr += sum(abs2, calcL_prm(cone.prms[k])\(ts[cone.idxs[k]] + mu*calcg_prm(cone.prms[k])))
-    end
-    return sqrt(sumsqr)/mu
-end
-
-
 
 
 mutable struct NonnegData <: ConeData
