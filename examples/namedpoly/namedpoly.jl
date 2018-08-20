@@ -55,14 +55,7 @@ function build_namedpoly!(alf::Alfonso.AlfonsoOpt, polyname::Symbol, d::Int)
     end
 
     # generate interpolation
-    if n == 1
-        (L, U, pts, w, P0, P) = Alfonso.cheb2_data(d)
-    elseif n == 2
-        (L, U, pts, w, P0, P) = Alfonso.padua_data(d)
-        # (L, U, pts, w, P0, P) = Alfonso.approxfekete_data(n, d)
-    elseif n > 2
-        (L, U, pts, w, P0, P) = Alfonso.approxfekete_data(n, d)
-    end
+    (L, U, pts, P0, P, w) = Alfonso.interpolate(n, d, calc_w=false)
 
     # transform points to fit the box domain
     pts .*= (ubs - lbs)'/2

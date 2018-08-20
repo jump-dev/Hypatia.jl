@@ -15,6 +15,16 @@ import Combinatorics
 
 # export cheb2_data, padua_data, approxfekete_data
 
+function interpolate(n, d; calc_w::Bool=false)
+    if n == 1
+        return cheb2_data(d, calc_w)
+    elseif n == 2
+        return padua_data(d, calc_w) # or approxfekete_data(n, d)
+    elseif n > 2
+        return approxfekete_data(n, d, calc_w)
+    end
+end
+
 # return k Chebyshev points of the second kind
 cheb2_pts(k::Int) = [-cospi(j/(k-1)) for j in 0:k-1]
 
@@ -31,7 +41,7 @@ function calc_u(n, d, pts)
     return u
 end
 
-function cheb2_data(d::Int)
+function cheb2_data(d::Int, calc_w::Bool)
     @assert d > 1
     L = 1 + d
     U = 1 + 2d
@@ -44,16 +54,20 @@ function cheb2_data(d::Int)
     P = Array(qr(P0).Q)
 
     # weights for Clenshaw-Curtis quadrature at pts
-    wa = Float64[2/(1 - j^2) for j in 0:2:U-1]
-    append!(wa, wa[floor(Int, U/2):-1:2])
-    w = real.(FFTW.ifft(wa))
-    w[1] = w[1]/2
-    push!(w, w[1])
+    if calc_w
+        wa = Float64[2/(1 - j^2) for j in 0:2:U-1]
+        append!(wa, wa[floor(Int, U/2):-1:2])
+        w = real.(FFTW.ifft(wa))
+        w[1] = w[1]/2
+        push!(w, w[1])
+    else
+        w = Float64[]
+    end
 
     return (L=L, U=U, pts=pts, P0=P0, P=P, w=w)
 end
 
-function padua_data(d::Int)
+function padua_data(d::Int, calc_w::Bool)
     @assert d > 1
     L = binomial(2+d, 2)
     U = binomial(2+2d, 2)
@@ -88,36 +102,40 @@ function padua_data(d::Int)
 
     # cubature weights at Padua points
     # even-degree Chebyshev polynomials on the subgrids
-    te1 = [cospi(i*j/(2d)) for i in 0:2:2d, j in 0:2:2d]
-    to1 = [cospi(i*j/(2d)) for i in 0:2:2d, j in 1:2:2d]
-    te2 = [cospi(i*j/(2d+1)) for i in 0:2:2d, j in 0:2:2d+1]
-    to2 = [cospi(i*j/(2d+1)) for i in 0:2:2d, j in 1:2:2d+1]
-    te1[2:d+1,:] .*= sqrt(2)
-    to1[2:d+1,:] .*= sqrt(2)
-    te2[2:d+1,:] .*= sqrt(2)
-    to2[2:d+1,:] .*= sqrt(2)
-    # even, even moments matrix
-    mom = 2*sqrt(2)./[1 - i^2 for i in 0:2:2d]
-    mom[1] = 2
-    Mmom = zeros(d+1, d+1)
-    f = 1/(d*(2d+1))
-    for j in 1:d+1, i in 1:d+2-j
-        Mmom[i,j] = mom[i]*mom[j]*f
+    if calc_w
+        te1 = [cospi(i*j/(2d)) for i in 0:2:2d, j in 0:2:2d]
+        to1 = [cospi(i*j/(2d)) for i in 0:2:2d, j in 1:2:2d]
+        te2 = [cospi(i*j/(2d+1)) for i in 0:2:2d, j in 0:2:2d+1]
+        to2 = [cospi(i*j/(2d+1)) for i in 0:2:2d, j in 1:2:2d+1]
+        te1[2:d+1,:] .*= sqrt(2)
+        to1[2:d+1,:] .*= sqrt(2)
+        te2[2:d+1,:] .*= sqrt(2)
+        to2[2:d+1,:] .*= sqrt(2)
+        # even, even moments matrix
+        mom = 2*sqrt(2)./[1 - i^2 for i in 0:2:2d]
+        mom[1] = 2
+        Mmom = zeros(d+1, d+1)
+        f = 1/(d*(2d+1))
+        for j in 1:d+1, i in 1:d+2-j
+            Mmom[i,j] = mom[i]*mom[j]*f
+        end
+        Mmom[1,d+1] /= 2
+        # cubature weights as matrices on the subgrids
+        W = Matrix{Float64}(undef, d+1, 2d+1)
+        W[:,1:2:2d+1] .= to2'*Mmom*te1
+        W[:,2:2:2d+1] .= te2'*Mmom*to1
+        W[:,[1,2d+1]] ./= 2
+        W[1,2:2:2d+1] ./= 2
+        W[d+1,1:2:2d+1] ./= 2
+        w = vec(W)
+    else
+        w = Float64[]
     end
-    Mmom[1,d+1] /= 2
-    # cubature weights as matrices on the subgrids
-    W = Matrix{Float64}(undef, d+1, 2d+1)
-    W[:,1:2:2d+1] .= to2'*Mmom*te1
-    W[:,2:2:2d+1] .= te2'*Mmom*to1
-    W[:,[1,2d+1]] ./= 2
-    W[1,2:2:2d+1] ./= 2
-    W[d+1,1:2:2d+1] ./= 2
-    w = vec(W)
 
     return (L=L, U=U, pts=pts, P0=P0, P=P, w=w)
 end
 
-function approxfekete_data(n::Int, d::Int)
+function approxfekete_data(n::Int, d::Int, calc_w::Bool)
     @assert d > 1
     @assert n > 1
     L = binomial(n+d, n)
@@ -162,10 +180,16 @@ function approxfekete_data(n::Int, d::Int)
 
     F = qr(M', Val(true))
     keep_pnt = F.p[1:U]
-    w = F.R[:,1:U]\(F.Q'*m)
+
     pts = _pts[keep_pnt,:] # subset of points indexed with the support of w
     P0 = M[keep_pnt,1:L] # subset of polynomial evaluations up to total degree d
     P = Array(qr(P0).Q)
+
+    if calc_w
+        w = F.R[:,1:U]\(F.Q'*m)
+    else
+        w = Float64[]
+    end
 
     return (L=L, U=U, pts=pts, P0=P0, P=P, w=w)
 end

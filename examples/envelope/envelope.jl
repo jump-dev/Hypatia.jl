@@ -15,11 +15,8 @@ using DelimitedFiles
 using Random
 
 function build_envelope!(alf::Alfonso.AlfonsoOpt, npoly::Int, deg::Int, n::Int, d::Int; use_data::Bool=false, rseed::Int=1)
-    # TODO allow n > 1
-    @assert n == 1
-
     # generate interpolation
-    (L, U, pts, P0, P, w) = Alfonso.cheb2_data(d)
+    (L, U, pts, P0, P, w) = Alfonso.interpolate(n, d, calc_w=true)
     LWts = fill(binomial(n+d-1, n), n)
     wtVals = 1.0 .- pts.^2
     PWts = [Array((qr(Diagonal(sqrt.(wtVals[:,j]))*P[:,1:LWts[j]])).Q) for j in 1:n]
@@ -54,5 +51,6 @@ end
 # select dimension and SOS degree (to be squared)
 # build_envelope!(alf, 2, 5, 1, 5, use_data=true)
 # build_envelope!(alf, 2, 5, 1, 5)
+# build_envelope!(alf, 3, 5, 3, 5)
 
 # @time Alfonso.solve!(alf)
