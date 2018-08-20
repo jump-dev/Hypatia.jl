@@ -1,7 +1,17 @@
 
-# export ConeData, NonnegData, SumOfSqrData
+abstract type PrimitiveCone end
 
-abstract type ConeData end
+
+mutable struct Cone
+    primitives::Vector{PrimitiveCone}
+
+end
+
+
+
+
+
+
 
 #=
  Nonnegative cone
@@ -182,3 +192,54 @@ function calc_Lk(k::SumOfSqrData)
     end
     return k.L
 end
+
+
+
+
+# # create cone object functions related to primal cone barrier
+# function load_tx!(cone, tx)
+#     for k in eachindex(cone)
+#         load_txk(cone[k], tx[coneidxs[k]])
+#     end
+#     return nothing
+# end
+#
+# function check_incone(cone)
+#     for k in eachindex(cone)
+#         if !inconek(cone[k])
+#             return false
+#         end
+#     end
+#     return true
+# end
+#
+# function calc_g!(cone, g)
+#     for k in eachindex(cone)
+#         g[coneidxs[k]] .= calc_gk(cone[k])
+#     end
+#     return g
+# end
+#
+# function calc_Hinv_vec!(cone, Hi_vec, v)
+#     for k in eachindex(cone)
+#         Hi_vec[coneidxs[k]] .= calc_Hik(cone[k])*v[coneidxs[k]]
+#     end
+#     return Hi_vec
+# end
+#
+# # TODO could save At submatrix inside cone objects
+# function calc_Hinv_At!(cone, Hi_At, A)
+#     for k in eachindex(cone)
+#         Hi_At[coneidxs[k],:] .= calc_Hik(cone[k])*A[:,coneidxs[k]]'
+#     end
+#     return Hi_At
+# end
+#
+# function calc_nbhd(cone, ts, mu, tk)
+#     # sqrt(sum(abs2, L\(ts + mu*g)) + (tau*kap - mu)^2)/mu
+#     sumsqr = (tk - mu)^2
+#     for k in eachindex(cone)
+#         sumsqr += sum(abs2, calc_Lk(cone[k])\(ts[coneidxs[k]] + mu*calc_gk(cone[k])))
+#     end
+#     return sqrt(sumsqr)/mu
+# end
