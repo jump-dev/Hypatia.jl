@@ -99,14 +99,14 @@ end
 #     @test Alfonso.get_dobj(alf) ≈ -0.25 atol=1e-4 rtol=1e-4
 # end
 
-@testset "Motzkin" begin
-    alf = Alfonso.AlfonsoOpt(verbose=verbflag)
-    build_namedpoly!(alf, :motzkin, 7)
-    @time Alfonso.solve!(alf)
-    @test Alfonso.get_status(alf) == :Optimal
-    @test Alfonso.get_pobj(alf) ≈ 0 atol=1e-4 rtol=1e-4
-    @test Alfonso.get_dobj(alf) ≈ 0 atol=1e-4 rtol=1e-4
-end
+# @testset "Motzkin" begin
+#     alf = Alfonso.AlfonsoOpt(verbose=verbflag)
+#     build_namedpoly!(alf, :motzkin, 7)
+#     @time Alfonso.solve!(alf)
+#     @test Alfonso.get_status(alf) == :Optimal
+#     @test Alfonso.get_pobj(alf) ≈ 0 atol=1e-4 rtol=1e-4
+#     @test Alfonso.get_dobj(alf) ≈ 0 atol=1e-4 rtol=1e-4
+# end
 
 @testset "Reaction-diffusion" begin
     alf = Alfonso.AlfonsoOpt(verbose=verbflag)
