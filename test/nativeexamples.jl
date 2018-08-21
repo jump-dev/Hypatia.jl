@@ -33,14 +33,14 @@ end
     @test Alfonso.get_dobj(d_alf) ≈ Alfonso.get_dobj(s_alf) atol=1e-4 rtol=1e-4
 end
 
-@testset "poly envelope example" begin
-    alf = Alfonso.AlfonsoOpt(verbose=verbflag)
-    build_envelope!(alf, 2, 5, 1, 5, use_data=true)
-    @time Alfonso.solve!(alf)
-    @test Alfonso.get_status(alf) == :Optimal
-    @test Alfonso.get_pobj(alf) ≈ -25.502777 atol=1e-4 rtol=1e-4
-    @test Alfonso.get_dobj(alf) ≈ -25.502777 atol=1e-4 rtol=1e-4
-end
+# @testset "poly envelope example" begin
+#     alf = Alfonso.AlfonsoOpt(verbose=verbflag)
+#     build_envelope!(alf, 2, 5, 1, 5, use_data=true)
+#     @time Alfonso.solve!(alf)
+#     @test Alfonso.get_status(alf) == :Optimal
+#     @test Alfonso.get_pobj(alf) ≈ -25.502777 atol=1e-4 rtol=1e-4
+#     @test Alfonso.get_dobj(alf) ≈ -25.502777 atol=1e-4 rtol=1e-4
+# end
 
 # most values taken from https://people.sc.fsu.edu/~jburkardt/py_src/polynomials/polynomials.html
 @testset "Butcher" begin
@@ -127,21 +127,21 @@ end
 end
 
 # tolerances not satisfied
-# @testset "Rosenbrock" begin
-#     alf = Alfonso.AlfonsoOpt(verbose=verbflag, optimtol=1e-5)
-#     build_namedpoly!(alf, :rosenbrock, 4)
-#     @time Alfonso.solve!(alf)
-#     @test Alfonso.get_status(alf) == :Optimal
-#     @test Alfonso.get_pobj(alf) ≈ 0 atol=1e-4 rtol=1e-4
-#     @test Alfonso.get_dobj(alf) ≈ 0 atol=1e-4 rtol=1e-4
-# end
+@testset "Rosenbrock" begin
+    alf = Alfonso.AlfonsoOpt(verbose=verbflag, optimtol=1e-4, maxpredsmallsteps=20)
+    build_namedpoly!(alf, :rosenbrock, 4)
+    @time Alfonso.solve!(alf)
+    @test Alfonso.get_status(alf) == :Optimal
+    @test Alfonso.get_pobj(alf) ≈ 0 atol=1e-3 rtol=1e-3
+    @test Alfonso.get_dobj(alf) ≈ 0 atol=1e-3 rtol=1e-3
+end
 
 # tolerances not satisfied
-# @testset "Schwefel" begin
-#     alf = Alfonso.AlfonsoOpt(verbose=verbflag, optimtol=1e-5)
-#     build_namedpoly!(alf, :schwefel, 3)
-#     @time Alfonso.solve!(alf)
-#     @test Alfonso.get_status(alf) == :Optimal
-#     @test Alfonso.get_pobj(alf) ≈ 0 atol=1e-4 rtol=1e-4
-#     @test Alfonso.get_dobj(alf) ≈ 0 atol=1e-4 rtol=1e-4
-# end
+@testset "Schwefel" begin
+    alf = Alfonso.AlfonsoOpt(verbose=verbflag, optimtol=1e-4, maxpredsmallsteps=25)
+    build_namedpoly!(alf, :schwefel, 4)
+    @time Alfonso.solve!(alf)
+    @test Alfonso.get_status(alf) == :Optimal
+    @test Alfonso.get_pobj(alf) ≈ 0 atol=1e-3 rtol=1e-3
+    @test Alfonso.get_dobj(alf) ≈ 0 atol=1e-3 rtol=1e-3
+end
