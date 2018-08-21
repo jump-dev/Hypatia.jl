@@ -5,7 +5,8 @@ module Alfonso
     using LinearAlgebra
 
     include("interpolation.jl")
-    include("conedata.jl")
+    include("primitivecones.jl")
+    include("cone.jl")
     include("nativeinterface.jl")
     include("mathoptinterface.jl")
 end
