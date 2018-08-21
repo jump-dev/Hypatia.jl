@@ -168,8 +168,8 @@ function load_data!(
     # end
     # @assert idxend == n
 
-    # calculate complexity parameter of the augmented barrier (nu-bar): sum of the primitive cone barrier parameters plus 1
-    bnu = 1 + getbarrierparameter(cone)
+    # calculate complexity parameter nu-bar of the augmented barrier (sum of the primitive cone barrier parameters plus 1)
+    bnu = 1 + barrierpar(cone)
 
     # calculate prediction and correction step parameters
     (beta, eta, cpredfix) = getbetaeta(alf.maxcorrsteps, bnu) # beta: large neighborhood parameter, eta: small neighborhood parameter
@@ -211,18 +211,18 @@ function getinitialiterate(alf::AlfonsoOpt)
     rp = maximum((1.0 + abs(b[i]))/(1.0 + abs(sum(A[i,:]))) for i in 1:m)
     # scaling factor for the dual problem
     g = ones(n)
-    load_tx!(cone, g)
-    @assert check_incone(cone)
-    calc_g!(cone, g)
+    loadpnt!(cone, g)
+    @assert incone(cone)
+    calcg!(g, cone)
     rd = maximum((1.0 + abs(g[j]))/(1.0 + abs(c[j])) for j in 1:n)
 
     # central primal-dual iterate
     tx = fill(sqrt(rp*rd), n)
-    load_tx!(cone, tx)
-    @assert check_incone(cone)
+    loadpnt!(cone, tx)
+    @assert incone(cone)
     ty = zeros(m)
     tau = 1.0
-    ts = calc_g!(cone, g)
+    ts = calcg!(g, cone)
     ts .*= -1
     kap = 1.0
     mu = (dot(tx, ts) + tau*kap)/alf.bnu
@@ -247,10 +247,11 @@ function solve!(alf::AlfonsoOpt)
     dir_ty = similar(ty)
     dir_tx = similar(tx)
     dir_ts = similar(ts)
-    sa_tx = similar(tx)
+    sa_tx = copy(tx)
+    loadpnt!(cone, sa_tx)
     sa_ts = similar(ts)
     g = similar(tx)
-    HiAt = similar(A, n, m) # TODO for very sparse LPs, this is good (diagonal hessian), but for sparse problems with dense hessians, probably not
+    HiAt = similar(b, n, m) # TODO for very sparse LPs, using sparse here is good (diagonal hessian), but for sparse problems with dense hessians, want dense
     y1 = similar(b)
     x1 = similar(c)
     y2 = similar(b)
@@ -313,14 +314,14 @@ function solve!(alf::AlfonsoOpt)
         # prediction phase
         # determine prediction direction
         invmu = 1.0/mu
-        calc_Hinv_At!(cone, HiAt, A)
+        calcHiprod!(HiAt, A', cone) # TODO may be faster as calcLiprod
         HiAt .*= invmu
         FAW = cholesky(Symmetric(A*HiAt))
         # TODO can parallelize 1 and 2
         y1 .= FAW\(b + HiAt'*c)
-        calc_Hinv_vec!(cone, x1, invmu*(A'*y1 - c))
+        calcHiprod!(x1, invmu*(A'*y1 - c), cone)
         y2 .= FAW\(rhs_ty + HiAt'*(ts - rhs_tx))
-        calc_Hinv_vec!(cone, x2, invmu*(A'*y2 - ts + rhs_tx))
+        calcHiprod!(x2, invmu*(A'*y2 - ts + rhs_tx), cone)
 
         dir_tau = (rhs_tau - kap - dot(b, y2) + dot(c, x2))/(mu/tau^2 + dot(b, y1) - dot(c, x1))
         dir_ty .= y2 + dir_tau*y1
@@ -338,26 +339,20 @@ function solve!(alf::AlfonsoOpt)
             nprediters += 1
 
             sa_tx .= tx + alpha*dir_tx
-            load_tx!(cone, sa_tx)
 
             # accept primal iterate if
             # - decreased alpha and it is the first inside the cone and beta-neighborhood or
             # - increased alpha and it is inside the cone and the first to leave beta-neighborhood
-            if check_incone(cone)
+            if incone(cone)
                 # primal iterate is inside the cone
                 sa_ts .= ts + alpha*dir_ts
                 sa_tk = (tau + alpha*dir_tau)*(kap + alpha*dir_kap)
                 sa_mu = (dot(sa_tx, sa_ts) + sa_tk)/alf.bnu
 
-                calc_g!(cone, g)
+                calcg!(g, cone)
                 sa_ts .+= sa_mu*g
-                calc_Hinv_vec!(cone, g, sa_ts)
-                nbhd = sqrt((sa_tk - sa_mu)^2 + dot(g, sa_ts))/sa_mu
-                # tmp = similar(ts)
-                # tmp2 = ts + mu*calc_g!(cone, tmp)
-                # calc_Hinv_vec!(cone, tmp, tmp2)
-                # sqrt((tk - mu)^2 + dot(tmp2, tmp))/mu
-
+                calcLiprod!(g, sa_ts, cone)
+                nbhd = sqrt((sa_tk - sa_mu)^2 + sum(abs2, g))/sa_mu
 
                 if nbhd < alf.beta
                     # iterate is inside the beta-neighborhood
@@ -390,7 +385,7 @@ function solve!(alf::AlfonsoOpt)
             if alpha < alf.alphapredthres
                 # alpha is very small, so predictor has failed
                 predfail = true
-                alf.verbose && println("Predictor could not improve the solution; terminating")
+                alf.verbose && println("Predictor could not improve the solution ($nprediters line search steps); terminating")
                 alf.status = :PredictorFail
                 break
             end
@@ -423,16 +418,16 @@ function solve!(alf::AlfonsoOpt)
             ncorrsteps += 1
 
             # calculate correction direction
-            calc_g!(cone, g)
+            calcg!(g, cone)
             invmu = 1.0/mu
-            calc_Hinv_At!(cone, HiAt, A)
+            calcHiprod!(HiAt, A', cone) # TODO may be faster as calcLiprod
             HiAt .*= invmu
             FAW = cholesky(Symmetric(A*HiAt), check=false)
             # TODO can parallelize 1 and 2
             y1 .= FAW\(b + HiAt'*c)
-            calc_Hinv_vec!(cone, x1, invmu*(A'*y1 - c))
+            calcHiprod!(x1, invmu*(A'*y1 - c), cone)
             y2 .= FAW\(HiAt'*(ts + mu*g))
-            calc_Hinv_vec!(cone, x2, invmu*(A'*y2 - ts) - g)
+            calcHiprod!(x2, invmu*(A'*y2 - ts) - g, cone)
 
             dir_tau = (mu/tau - kap - dot(b, y2) + dot(c, x2))/(mu/tau^2 + dot(b, y1) - dot(c, x1))
             dir_ty .= y2 + dir_tau*y1
@@ -447,9 +442,8 @@ function solve!(alf::AlfonsoOpt)
                 ncorrlsiters += 1
 
                 sa_tx .= tx + alpha*dir_tx
-                load_tx!(cone, sa_tx)
 
-                if check_incone(cone)
+                if incone(cone)
                     # primal iterate tx is inside the cone, so terminate line search
                     break
                 end
@@ -458,7 +452,7 @@ function solve!(alf::AlfonsoOpt)
                 if ncorrlsiters == alf.maxcorrlsiters
                     # corrector failed
                     corrfail = true
-                    alf.verbose && println("Corrector could not improve the solution; terminating")
+                    alf.verbose && println("Corrector could not improve the solution ($ncorrlsiters line search steps); terminating")
                     alf.status = :CorrectorFail
                     break
                 end
@@ -480,18 +474,17 @@ function solve!(alf::AlfonsoOpt)
 
             # finish if allowed and current iterate is in the eta-neighborhood, or if taken max steps
             if (ncorrsteps == alf.maxcorrsteps) || alf.corrcheck
-                calc_g!(cone, g)
+                calcg!(g, cone)
                 sa_ts .= ts + mu*g
-                calc_Hinv_vec!(cone, g, sa_ts)
-                nbhd = sqrt((tau*kap - mu)^2 + dot(g, sa_ts))/mu
+                calcLiprod!(g, sa_ts, cone)
+                nbhd = sqrt((tau*kap - mu)^2 + sum(abs2, g))/mu
 
-                # if calc_nbhd(cone, ts, mu, tau*kap) <= alf.eta
                 if nbhd <= alf.eta
                     break
                 elseif ncorrsteps == alf.maxcorrsteps
                     # nbhd_eta > eta, so corrector failed
                     corrfail = true
-                    alf.verbose && println("Corrector phase finished outside the eta-neighborhood; terminating")
+                    alf.verbose && println("Corrector phase finished outside the eta-neighborhood ($ncorrsteps correction steps); terminating")
                     alf.status = :CorrectorFail
                     break
                 end

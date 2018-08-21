@@ -29,15 +29,12 @@ function build_lp!(alf::Alfonso.AlfonsoOpt, m::Int, n::Int; use_data=false, dens
         b = A*ones(n)
         c = rand(0.0:9.0, n)
     end
-
     if tosparse && !issparse(A)
         A = sparse(A)
     end
+    cone = Alfonso.Cone([Alfonso.NonnegCone(n),], AbstractUnitRange[1:n,])
 
-    cones = Alfonso.ConeData[Alfonso.NonnegData(n),]
-    coneidxs = AbstractUnitRange[1:n,]
-
-    return Alfonso.load_data!(alf, A, b, c, cones, coneidxs)
+    return Alfonso.load_data!(alf, A, b, c, cone)
 end
 
 # alf = Alfonso.AlfonsoOpt(maxiter=100, verbose=true)
