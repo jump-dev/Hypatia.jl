@@ -12,23 +12,32 @@ mutable struct AlfonsoOpt
     verbose::Bool           # if true, prints progress at each iteration
     optimtol::Float64       # optimization tolerance parameter
     maxiter::Int            # maximum number of iterations
+    # itrefinethres::Float64  # iterative refinement success threshold
+    # maxitrefinesteps::Int   # maximum number of iterative refinement steps in linear system solves
     predlinesearch::Bool    # if false, predictor step uses a fixed step size, else step size is determined via line search
     maxpredsmallsteps::Int  # maximum number of predictor step size reductions allowed with respect to the safe fixed step size
-    maxcorrsteps::Int       # maximum number of corrector steps (possible values: 1, 2, or 4)
-    corrcheck::Bool         # if false, maxcorrsteps corrector steps are performed at each corrector phase, else the corrector phase can be terminated before maxcorrsteps corrector steps if the iterate is in the eta-neighborhood
-    maxcorrlsiters::Int     # maximum number of line search iterations in each corrector step
-    # maxitrefinesteps::Int   # maximum number of iterative refinement steps in linear system solves
-    alphacorr::Float64      # corrector step size
     predlsmulti::Float64    # predictor line search step size multiplier
+    corrcheck::Bool         # if false, maxcorrsteps corrector steps are performed at each corrector phase, else the corrector phase can be terminated before maxcorrsteps corrector steps if the iterate is in the eta-neighborhood
+    maxcorrsteps::Int       # maximum number of corrector steps (possible values: 1, 2, or 4)
+    alphacorr::Float64      # corrector step size
+    maxcorrlsiters::Int     # maximum number of line search iterations in each corrector step
     corrlsmulti::Float64    # corrector line search step size multiplier
-    # itrefinethres::Float64  # iterative refinement success threshold
 
     # problem data
-    A::AbstractMatrix{Float64}          # constraint matrix
-    b::Vector{Float64}                  # right-hand side vector
-    c::Vector{Float64}                  # cost vector
-    cones::Vector{ConeData}             # primal cones list
-    coneidxs::Vector{AbstractUnitRange} # primal cones variable indices list
+    A::AbstractMatrix{Float64}  # constraint matrix
+    b::Vector{Float64}          # right-hand side vector
+    c::Vector{Float64}          # cost vector
+    cone::Cone                  # primal cone object
+
+    # algorithmic parameters
+    bnu::Float64
+    beta::Float64
+    eta::Float64
+    alphapredthres::Float64
+    alphapredinit::Float64
+    tol_pres::Float64
+    tol_dres::Float64
+    tol_compl::Float64
 
     # results
     status::Symbol          # solver status
@@ -52,6 +61,7 @@ mutable struct AlfonsoOpt
     rel_pin::Float64        # final relative primal infeasibility
     rel_din::Float64        # final relative dual infeasibility
 
+    # TODO match natural order of options listed above
     function AlfonsoOpt(verbose, optimtol, maxiter, predlinesearch, maxpredsmallsteps, maxcorrsteps, corrcheck, maxcorrlsiters, alphacorr, predlsmulti, corrlsmulti)
         alf = new()
 
@@ -124,11 +134,15 @@ get_din(alf::AlfonsoOpt) = alf.din
 get_rel_pin(alf::AlfonsoOpt) = alf.rel_pin
 get_rel_din(alf::AlfonsoOpt) = alf.rel_din
 
-function load_data!(alf::AlfonsoOpt, A::AbstractMatrix{Float64}, b::Vector{Float64}, c::Vector{Float64}, cones::Vector{ConeData}, coneidxs::Vector{AbstractUnitRange})
-    #=
-    verify problem data, setup other algorithmic parameters and utilities
-    TODO simple presolve (see ConicIP solver)
-    =#
+# load and verify problem data, calculate algorithmic parameters
+function load_data!(
+    alf::AlfonsoOpt,
+    A::AbstractMatrix{Float64},
+    b::Vector{Float64},
+    c::Vector{Float64},
+    cone::Cone,
+    )
+    # check data consistency
     (m, n) = size(A)
     if (m == 0) || (n == 0)
         error("input matrix A has trivial dimension $m x $n")
@@ -143,121 +157,136 @@ function load_data!(alf::AlfonsoOpt, A::AbstractMatrix{Float64}, b::Vector{Float
         dropzeros!(A)
     end
 
-    idxend = 0
-    for k in eachindex(cones)
-        if dimension(cones[k]) != length(coneidxs[k])
-            error("dimension of cone type $(cones[k]) does not match length of variable indices")
-        end
-        @assert coneidxs[k][1] == idxend + 1
-        idxend += length(coneidxs[k])
-    end
-    @assert idxend == n
+    # TODO check cone consistency in cone functions file
+    # idxend = 0
+    # for k in eachindex(cone)
+    #     if dimension(cone[k]) != length(coneidxs[k])
+    #         error("dimension of cone type $(cone[k]) does not match length of variable indices")
+    #     end
+    #     @assert coneidxs[k][1] == idxend + 1
+    #     idxend += length(coneidxs[k])
+    # end
+    # @assert idxend == n
 
-    # save data in
+    # calculate complexity parameter nu-bar of the augmented barrier (sum of the primitive cone barrier parameters plus 1)
+    bnu = 1 + barrierpar(cone)
+
+    # calculate prediction and correction step parameters
+    (beta, eta, cpredfix) = getbetaeta(alf.maxcorrsteps, bnu) # beta: large neighborhood parameter, eta: small neighborhood parameter
+    alphapredfix = cpredfix/(eta + sqrt(2*eta^2 + bnu)) # fixed predictor step size
+    alphapredthres = (alf.predlsmulti^alf.maxpredsmallsteps)*alphapredfix # minimum predictor step size
+    alphapredinit = (alf.predlinesearch ? min(100*alphapredfix, 0.9999) : alphapredfix) # predictor step size
+
+    # calculate termination tolerances: infinity operator norms of submatrices of LHS matrix
+    tol_pres = max(1.0, maximum(sum(abs, A[i,:]) + abs(b[i]) for i in 1:m)) # first m rows
+    tol_dres = max(1.0, maximum(sum(abs, A[:,j]) + abs(c[j]) + 1.0 for j in 1:n)) # next n rows
+    tol_compl = max(1.0, maximum(abs, b), maximum(abs, c)) # row m+n+1
+
+    # save data in solver object
     alf.A = A
     alf.b = b
     alf.c = c
-    alf.cones = cones
-    alf.coneidxs = coneidxs
+    alf.cone = cone
+    alf.bnu = bnu
+    alf.beta = beta
+    alf.eta = eta
+    alf.alphapredthres = alphapredthres
+    alf.alphapredinit = alphapredinit
+    alf.tol_pres = tol_pres
+    alf.tol_dres = tol_dres
+    alf.tol_compl = tol_compl
 
     alf.status = :Loaded
 
     return alf
 end
 
-function solve!(alf::AlfonsoOpt)
-    starttime = time()
+# calculate initial central primal-dual iterate
+function getinitialiterate(alf::AlfonsoOpt)
     (A, b, c) = (alf.A, alf.b, alf.c)
     (m, n) = size(A)
-    cones = alf.cones
-    coneidxs = alf.coneidxs
+    cone = alf.cone
 
-    # calculate complexity parameter of the augmented barrier (nu-bar): sum of the primitive cone barrier parameters (# TODO plus 1?)
-    bnu = 1.0 + sum(barpar(ck) for ck in cones)
-
-    # set remaining algorithmic parameters based on precomputed safe values (from original authors)
-    # parameters are chosen to make sure that each predictor step takes the current iterate from the eta-neighborhood to the beta-neighborhood and each corrector phase takes the current iterate from the beta-neighborhood to the eta-neighborhood. extra corrector steps are allowed to mitigate the effects of finite precision
-    (beta, eta, cpredfix) = getbetaeta(alf.maxcorrsteps, bnu) # beta: large neighborhood parameter, eta: small neighborhood parameter
-    alphapredfix = cpredfix/(eta + sqrt(2.0*eta^2 + bnu)) # fixed predictor step size
-    alphapredls = min(100.0*alphapredfix, 0.9999) # initial predictor step size with line search
-    alphapredthres = (alf.predlsmulti^alf.maxpredsmallsteps)*alphapredfix # minimum predictor step size
-    alphapred = (alf.predlinesearch ? alphapredls : alphapredfix) # predictor step size
-
-    #=
-    setup data and functions needed in main loop
-    =#
-    # termination tolerances are infinity operator norms of submatrices of lhs
-    tol_pres = max(1.0, maximum(sum(abs, A[i,:]) + abs(b[i]) for i in 1:m)) # first m rows
-    tol_dres = max(1.0, maximum(sum(abs, A[:,j]) + abs(c[j]) + 1.0 for j in 1:n)) # next n rows
-    tol_compl = max(1.0, maximum(abs, b), maximum(abs, c)) # row m+n+1
-
-    # calculate initial primal iterate tx
     # scaling factor for the primal problem
     rp = maximum((1.0 + abs(b[i]))/(1.0 + abs(sum(A[i,:]))) for i in 1:m)
     # scaling factor for the dual problem
     g = ones(n)
-    load_tx!(cones, coneidxs, g)
-    @assert check_incone(cones) # TODO will fail in general? TODO for some cones will not automatically calculate g,H
-    calc_g!(cones, coneidxs, g)
+    loadpnt!(cone, g)
+    @assert incone(cone)
+    calcg!(g, cone)
     rd = maximum((1.0 + abs(g[j]))/(1.0 + abs(c[j])) for j in 1:n)
-    # initial primal iterate
-    tx = fill(sqrt(rp*rd), n)
 
-    # calculate central primal-dual iterate
-    load_tx!(cones, coneidxs, tx)
-    @assert check_incone(cones)
+    # central primal-dual iterate
+    tx = fill(sqrt(rp*rd), n)
+    loadpnt!(cone, tx)
+    @assert incone(cone)
     ty = zeros(m)
     tau = 1.0
-    ts = -calc_g!(cones, coneidxs, g)
+    ts = calcg!(g, cone)
+    ts .*= -1
     kap = 1.0
-    mu = (dot(tx, ts) + tau*kap)/bnu
+    mu = (dot(tx, ts) + tau*kap)/alf.bnu
 
-    # preallocate for test iterate and direction vectors
+    return (tx, ty, tau, ts, kap, mu)
+end
+
+# perform prediction and correction steps in a loop until converged
+function solve!(alf::AlfonsoOpt)
+    starttime = time()
+
+    (A, b, c) = (alf.A, alf.b, alf.c)
+    (m, n) = size(A)
+    cone = alf.cone
+
+    # calculate initial central primal-dual iterate
+    (tx, ty, tau, ts, kap, mu) = getinitialiterate(alf)
+
+    # preallocate arrays
     rhs_ty = similar(ty)
     rhs_tx = similar(tx)
     dir_ty = similar(ty)
     dir_tx = similar(tx)
     dir_ts = similar(ts)
-    sa_tx = similar(tx)
+    sa_tx = copy(tx)
+    loadpnt!(cone, sa_tx)
     sa_ts = similar(ts)
-
-    HiAt = similar(A, n, m) # TODO for very sparse LPs, this is good, but for sparse problems with dense hessians, unclear
+    g = similar(tx)
+    HiAt = similar(b, n, m) # TODO for very sparse LPs, using sparse here is good (diagonal hessian), but for sparse problems with dense hessians, want dense
     y1 = similar(b)
     x1 = similar(c)
     y2 = similar(b)
     x2 = similar(c)
 
-    #=
-    main loop
-    =#
+    # main loop
     if alf.verbose
         @printf("\n%5s %12s %12s %9s %9s %9s %9s %9s %9s\n", "iter", "p_obj", "d_obj", "gap", "p_inf", "d_inf", "tau", "kap", "mu")
         flush(stdout)
     end
 
     alf.status = :StartedIterating
+    alphapred = alf.alphapredinit
     iter = 0
     while true
-        #=
-        calculate convergence metrics, check criteria, print
-        =#
+        # calculate convergence metrics
         ctx = dot(c, tx)
         bty = dot(b, ty)
         p_obj = ctx/tau
         d_obj = bty/tau
         gap = abs(ctx - bty)/(tau + abs(bty))
         rhs_ty .= -A*tx + b*tau
-        p_inf = maximum(abs, rhs_ty)/tol_pres
+        p_inf = maximum(abs, rhs_ty)/alf.tol_pres
         rhs_tx .= A'*ty - c*tau + ts
-        d_inf = maximum(abs, rhs_tx)/tol_dres
+        d_inf = maximum(abs, rhs_tx)/alf.tol_dres
         rhs_tau = -bty + ctx + kap
-        compl = abs(rhs_tau)/tol_compl
+        compl = abs(rhs_tau)/alf.tol_compl
 
         if alf.verbose
+            # print iteration statistics
             @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n", iter, p_obj, d_obj, gap, p_inf, d_inf, tau, kap, mu)
             flush(stdout)
         end
 
+        # check convergence criteria
         if (p_inf <= alf.optimtol) && (d_inf <= alf.optimtol)
             if gap <= alf.optimtol
                 alf.verbose && println("Problem is feasible and an approximate optimal solution was found; terminating")
@@ -274,24 +303,25 @@ function solve!(alf::AlfonsoOpt)
             break
         end
 
+        # check iteration limit
         iter += 1
         if iter >= alf.maxiter
+            alf.verbose && println("Reached iteration limit; terminating")
             alf.status = :IterationLimit
+            break
         end
 
-        #=
-        prediction phase
-        =#
+        # prediction phase
         # determine prediction direction
         invmu = 1.0/mu
-        calc_Hinv_At!(cones, coneidxs, HiAt, A)
+        calcHiprod!(HiAt, A', cone) # TODO may be faster as calcLiprod
         HiAt .*= invmu
         FAW = cholesky(Symmetric(A*HiAt))
-        # # TODO can parallelize 1 and 2
+        # TODO can parallelize 1 and 2
         y1 .= FAW\(b + HiAt'*c)
-        calc_Hinv_vec!(cones, coneidxs, x1, invmu*(A'*y1 - c))
+        calcHiprod!(x1, invmu*(A'*y1 - c), cone)
         y2 .= FAW\(rhs_ty + HiAt'*(ts - rhs_tx))
-        calc_Hinv_vec!(cones, coneidxs, x2, invmu*(A'*y2 - ts + rhs_tx))
+        calcHiprod!(x2, invmu*(A'*y2 - ts + rhs_tx), cone)
 
         dir_tau = (rhs_tau - kap - dot(b, y2) + dot(c, x2))/(mu/tau^2 + dot(b, y1) - dot(c, x1))
         dir_ty .= y2 + dir_tau*y1
@@ -309,19 +339,22 @@ function solve!(alf::AlfonsoOpt)
             nprediters += 1
 
             sa_tx .= tx + alpha*dir_tx
-            load_tx!(cones, coneidxs, sa_tx)
 
             # accept primal iterate if
             # - decreased alpha and it is the first inside the cone and beta-neighborhood or
             # - increased alpha and it is inside the cone and the first to leave beta-neighborhood
-            if check_incone(cones)
+            if incone(cone)
                 # primal iterate is inside the cone
                 sa_ts .= ts + alpha*dir_ts
                 sa_tk = (tau + alpha*dir_tau)*(kap + alpha*dir_kap)
-                sa_mu = (dot(sa_tx, sa_ts) + sa_tk)/bnu
-                nbhd = calc_nbhd(cones, coneidxs, sa_ts, sa_mu, sa_tk)
+                sa_mu = (dot(sa_tx, sa_ts) + sa_tk)/alf.bnu
 
-                if nbhd < beta
+                calcg!(g, cone)
+                sa_ts .+= sa_mu*g
+                calcLiprod!(g, sa_ts, cone)
+                nbhd = sqrt((sa_tk - sa_mu)^2 + sum(abs2, g))/sa_mu
+
+                if nbhd < alf.beta
                     # iterate is inside the beta-neighborhood
                     if !alphaprevok || (alpha > alf.predlsmulti)
                         # either the previous iterate was outside the beta-neighborhood or increasing alpha again will make it > 1
@@ -349,10 +382,10 @@ function solve!(alf::AlfonsoOpt)
             # primal iterate is either
             # - outside the cone or
             # - inside the cone and outside the beta-neighborhood and previous iterate was outside the beta-neighborhood
-            if alpha < alphapredthres
+            if alpha < alf.alphapredthres
                 # alpha is very small, so predictor has failed
                 predfail = true
-                alf.verbose && println("Predictor could not improve the solution; terminating")
+                alf.verbose && println("Predictor could not improve the solution ($nprediters line search steps); terminating")
                 alf.status = :PredictorFail
                 break
             end
@@ -371,31 +404,30 @@ function solve!(alf::AlfonsoOpt)
         tau += alpha*dir_tau
         ts .+= alpha*dir_ts
         kap += alpha*dir_kap
-        mu = (dot(tx, ts) + tau*kap)/bnu
+        mu = (dot(tx, ts) + tau*kap)/alf.bnu
 
         # skip correction phase if allowed and current iterate is in the eta-neighborhood
-        if alf.corrcheck && (nbhd <= eta)
+        if alf.corrcheck && (nbhd <= alf.eta)
             continue
         end
 
-        #=
-        correction phase: perform correction steps
-        =#
+        # correction phase
         corrfail = false
         ncorrsteps = 0
         while true
             ncorrsteps += 1
+
             # calculate correction direction
-            calc_g!(cones, coneidxs, g)
+            calcg!(g, cone)
             invmu = 1.0/mu
-            calc_Hinv_At!(cones, coneidxs, HiAt, A)
+            calcHiprod!(HiAt, A', cone) # TODO may be faster as calcLiprod
             HiAt .*= invmu
             FAW = cholesky(Symmetric(A*HiAt), check=false)
             # TODO can parallelize 1 and 2
             y1 .= FAW\(b + HiAt'*c)
-            calc_Hinv_vec!(cones, coneidxs, x1, invmu*(A'*y1 - c))
+            calcHiprod!(x1, invmu*(A'*y1 - c), cone)
             y2 .= FAW\(HiAt'*(ts + mu*g))
-            calc_Hinv_vec!(cones, coneidxs, x2, invmu*(A'*y2 - ts) - g)
+            calcHiprod!(x2, invmu*(A'*y2 - ts) - g, cone)
 
             dir_tau = (mu/tau - kap - dot(b, y2) + dot(c, x2))/(mu/tau^2 + dot(b, y1) - dot(c, x1))
             dir_ty .= y2 + dir_tau*y1
@@ -410,9 +442,8 @@ function solve!(alf::AlfonsoOpt)
                 ncorrlsiters += 1
 
                 sa_tx .= tx + alpha*dir_tx
-                load_tx!(cones, coneidxs, sa_tx)
 
-                if check_incone(cones)
+                if incone(cone)
                     # primal iterate tx is inside the cone, so terminate line search
                     break
                 end
@@ -421,12 +452,12 @@ function solve!(alf::AlfonsoOpt)
                 if ncorrlsiters == alf.maxcorrlsiters
                     # corrector failed
                     corrfail = true
-                    alf.verbose && println("Corrector could not improve the solution; terminating")
+                    alf.verbose && println("Corrector could not improve the solution ($ncorrlsiters line search steps); terminating")
                     alf.status = :CorrectorFail
                     break
                 end
 
-                alpha = alf.corrlsmulti*alpha
+                alpha = alf.corrlsmulti*alpha # decrease alpha
             end
             # @show ncorrlsiters
             if corrfail
@@ -439,16 +470,21 @@ function solve!(alf::AlfonsoOpt)
             tau += alpha*dir_tau
             ts .+= alpha*dir_ts
             kap += alpha*dir_kap
-            mu = (dot(tx, ts) + tau*kap)/bnu
+            mu = (dot(tx, ts) + tau*kap)/alf.bnu
 
             # finish if allowed and current iterate is in the eta-neighborhood, or if taken max steps
             if (ncorrsteps == alf.maxcorrsteps) || alf.corrcheck
-                if calc_nbhd(cones, coneidxs, ts, mu, tau*kap) <= eta
+                calcg!(g, cone)
+                sa_ts .= ts + mu*g
+                calcLiprod!(g, sa_ts, cone)
+                nbhd = sqrt((tau*kap - mu)^2 + sum(abs2, g))/mu
+
+                if nbhd <= alf.eta
                     break
                 elseif ncorrsteps == alf.maxcorrsteps
                     # nbhd_eta > eta, so corrector failed
                     corrfail = true
-                    alf.verbose && println("Corrector phase finished outside the eta-neighborhood; terminating")
+                    alf.verbose && println("Corrector phase finished outside the eta-neighborhood ($ncorrsteps correction steps); terminating")
                     alf.status = :CorrectorFail
                     break
                 end
@@ -462,9 +498,7 @@ function solve!(alf::AlfonsoOpt)
 
     alf.verbose && println("\nFinished in $iter iterations\nInternal status is $(alf.status)\n")
 
-    #=
-    calculate final solution and iteration statistics
-    =#
+    # calculate final solution and iteration statistics
     alf.niters = iter
 
     alf.x = tx./tau
@@ -490,54 +524,6 @@ function solve!(alf::AlfonsoOpt)
     alf.solvetime = time() - starttime
 
     return nothing
-end
-
-# create cone object functions related to primal cone barrier
-function load_tx!(cones, coneidxs, tx)
-    for k in eachindex(cones)
-        load_txk(cones[k], tx[coneidxs[k]])
-    end
-    return nothing
-end
-
-function check_incone(cones)
-    for k in eachindex(cones)
-        if !inconek(cones[k])
-            return false
-        end
-    end
-    return true
-end
-
-function calc_g!(cones, coneidxs, g)
-    for k in eachindex(cones)
-        g[coneidxs[k]] .= calc_gk(cones[k])
-    end
-    return g
-end
-
-function calc_Hinv_vec!(cones, coneidxs, Hi_vec, v)
-    for k in eachindex(cones)
-        Hi_vec[coneidxs[k]] .= calc_Hik(cones[k])*v[coneidxs[k]]
-    end
-    return Hi_vec
-end
-
-# TODO could save At submatrix inside cone objects
-function calc_Hinv_At!(cones, coneidxs, Hi_At, A)
-    for k in eachindex(cones)
-        Hi_At[coneidxs[k],:] .= calc_Hik(cones[k])*A[:,coneidxs[k]]'
-    end
-    return Hi_At
-end
-
-function calc_nbhd(cones, coneidxs, ts, mu, tk)
-    # sqrt(sum(abs2, L\(ts + mu*g)) + (tau*kap - mu)^2)/mu
-    sumsqr = (tk - mu)^2
-    for k in eachindex(cones)
-        sumsqr += sum(abs2, calc_Lk(cones[k])\(ts[coneidxs[k]] + mu*calc_gk(cones[k])))
-    end
-    return sqrt(sumsqr)/mu
 end
 
 function getbetaeta(maxcorrsteps, bnu)
