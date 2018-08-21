@@ -35,7 +35,8 @@ mutable struct SumOfSquaresCone <: PrimitiveCone
     F
     ippnt::Matrix{Float64}
     ipwtpnt::Vector{Matrix{Float64}}
-    Vp::Vector{Float64}
+    Vp::Matrix{Float64}
+    Vpwt::Vector{Matrix{Float64}}
     VtVp::Matrix{Float64}
     gtmp::Vector{Float64}
     Htmp::Matrix{Float64}
@@ -48,7 +49,8 @@ mutable struct SumOfSquaresCone <: PrimitiveCone
         prm.g = similar(ip, dim)
         prm.ippnt = similar(ip, size(ip, 2), size(ip, 2))
         prm.ipwtpnt = [similar(ip, size(ipwtj, 2), size(ipwtj, 2)) for ipwtj in ipwt]
-        prm.Vp = similar(ip, dim, size(ip, 2))
+        prm.Vp = similar(ip, size(ip, 2), dim)
+        prm.Vpwt = [similar(ip, size(ipwtj, 2), dim) for ipwtj in ipwt]
         prm.VtVp = similar(ip, dim, dim)
         prm.gtmp = similar(ip, dim)
         prm.Htmp = similar(prm.VtVp)
@@ -77,8 +79,8 @@ function incone_prm(prm::SumOfSquaresCone)
         if !issuccess(F)
             return false
         end
-        prm.Vp .= F.L\prm.ipwt[j]'
-        prm.VtVp .= prm.Vp'*prm.Vp
+        prm.Vpwt[j] .= F.L\prm.ipwt[j]'
+        prm.VtVp .= prm.Vpwt[j]'*prm.Vpwt[j]
         prm.gtmp .-= diag(prm.VtVp)
         prm.Htmp .+= prm.VtVp.^2
     end
