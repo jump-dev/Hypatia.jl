@@ -50,6 +50,7 @@ barrierpar_prm(prm::SumOfSquaresCone) = size(prm.ip, 2) + sum(size(ipwtj, 2) for
 loadpnt_prm!(prm::SumOfSquaresCone, pnt) = (prm.pnt = pnt)
 
 function incone_prm(prm::SumOfSquaresCone)
+    # TODO each of the following choleskys can be done in parallel
     F = cholesky!(Symmetric(prm.ip'*Diagonal(prm.pnt)*prm.ip), check=false) # TODO do inplace. TODO could this cholesky of P'DP be faster?
     if !issuccess(F)
         return false
