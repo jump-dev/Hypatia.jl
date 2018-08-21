@@ -33,14 +33,27 @@ mutable struct SumOfSquaresCone <: PrimitiveCone
     pnt
     g::Vector{Float64}
     F
+    ippnt::Matrix{Float64}
+    ipwtpnt::Vector{Matrix{Float64}}
+    Vp::Matrix{Float64}
+    Vpwt::Vector{Matrix{Float64}}
+    VtVp::Matrix{Float64}
+    gtmp::Vector{Float64}
+    Htmp::Matrix{Float64}
 
     function SumOfSquaresCone(dim::Int, ip::Matrix{Float64}, ipwt::Vector{Matrix{Float64}})
         prm = new()
         prm.dim = dim
         prm.ip = ip
         prm.ipwt = ipwt
-        # prm.g = similar(prm.pnt)
-        # TODO prealloc etc
+        prm.g = similar(ip, dim)
+        prm.ippnt = similar(ip, size(ip, 2), size(ip, 2))
+        prm.ipwtpnt = [similar(ip, size(ipwtj, 2), size(ipwtj, 2)) for ipwtj in ipwt]
+        prm.Vp = similar(ip, size(ip, 2), dim)
+        prm.Vpwt = [similar(ip, size(ipwtj, 2), dim) for ipwtj in ipwt]
+        prm.VtVp = similar(ip, dim, dim)
+        prm.gtmp = similar(ip, dim)
+        prm.Htmp = similar(prm.VtVp)
         return prm
     end
 end
@@ -51,32 +64,33 @@ loadpnt_prm!(prm::SumOfSquaresCone, pnt) = (prm.pnt = pnt)
 
 function incone_prm(prm::SumOfSquaresCone)
     # TODO each of the following choleskys can be done in parallel
-    F = cholesky!(Symmetric(prm.ip'*Diagonal(prm.pnt)*prm.ip), check=false) # TODO do inplace. TODO could this cholesky of P'DP be faster?
+    prm.ippnt .= prm.ip'*Diagonal(prm.pnt)*prm.ip
+    F = cholesky!(Symmetric(prm.ippnt), check=false) # TODO use structure cholesky of P'DP to speed up chol?
     if !issuccess(F)
         return false
     end
-    Vp = F.L\prm.ip' # TODO prealloc
-    VtVp = Vp'*Vp
-    g = -diag(VtVp)
-    H = VtVp.^2
+    prm.Vp .= F.L\prm.ip' # TODO do in-place
+    prm.VtVp .= prm.Vp'*prm.Vp
+    prm.gtmp .= -diag(prm.VtVp)
+    prm.Htmp .= prm.VtVp.^2
 
     for j in 1:length(prm.ipwt)
-        F = cholesky!(Symmetric(prm.ipwt[j]'*Diagonal(prm.pnt)*prm.ipwt[j]), check=false)
+        prm.ipwtpnt[j] .= prm.ipwt[j]'*Diagonal(prm.pnt)*prm.ipwt[j]
+        F = cholesky!(Symmetric(prm.ipwtpnt[j]), check=false)
         if !issuccess(F)
             return false
         end
-        Vp = F.L\prm.ipwt[j]'
-        VtVp = Vp'*Vp
-        g .-= diag(VtVp)
-        H .+= VtVp.^2
+        prm.Vpwt[j] .= F.L\prm.ipwt[j]'
+        prm.VtVp .= prm.Vpwt[j]'*prm.Vpwt[j]
+        prm.gtmp .-= diag(prm.VtVp)
+        prm.Htmp .+= prm.VtVp.^2
     end
 
-    F = cholesky!(H, check=false)
+    F = cholesky!(prm.Htmp, check=false)
     if !issuccess(F)
         return false
     end
-
-    prm.g = g
+    prm.g .= prm.gtmp
     prm.F = F
     return true
 end
