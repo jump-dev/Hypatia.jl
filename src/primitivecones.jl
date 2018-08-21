@@ -63,6 +63,7 @@ barrierpar_prm(prm::SumOfSquaresCone) = size(prm.ip, 2) + sum(size(ipwtj, 2) for
 loadpnt_prm!(prm::SumOfSquaresCone, pnt) = (prm.pnt = pnt)
 
 function incone_prm(prm::SumOfSquaresCone)
+    # TODO each of the following choleskys can be done in parallel
     prm.ippnt .= prm.ip'*Diagonal(prm.pnt)*prm.ip
     F = cholesky!(Symmetric(prm.ippnt), check=false) # TODO use structure cholesky of P'DP to speed up chol?
     if !issuccess(F)
