@@ -64,15 +64,15 @@ loadpnt_prm!(prm::SumOfSquaresCone, pnt) = (prm.pnt = pnt)
 
 function incone_prm(prm::SumOfSquaresCone)
     # TODO each of the following choleskys can be done in parallel
-    prm.ippnt .= prm.ip'*Diagonal(prm.pnt)*prm.ip
-    F = cholesky!(Symmetric(prm.ippnt), check=false) # TODO use structure cholesky of P'DP to speed up chol?
+    @time prm.ippnt .= prm.ip'*Diagonal(prm.pnt)*prm.ip
+    @time F = cholesky!(Symmetric(prm.ippnt), check=false) # TODO use structure cholesky of P'DP to speed up chol? maybe LDLT type decomp precomputed, change diag
     if !issuccess(F)
         return false
     end
-    prm.Vp .= F.L\prm.ip' # TODO do in-place
-    prm.VtVp .= prm.Vp'*prm.Vp
-    prm.gtmp .= -diag(prm.VtVp)
-    prm.Htmp .= prm.VtVp.^2
+    @time ldiv!(prm.Vp, F.L, prm.ip')
+    @time mul!(prm.VtVp, prm.Vp', prm.Vp)
+    @time prm.gtmp .= diag(prm.VtVp) .* -1.0
+    @time prm.Htmp .= prm.VtVp.^2
 
     for j in 1:length(prm.ipwt)
         prm.ipwtpnt[j] .= prm.ipwt[j]'*Diagonal(prm.pnt)*prm.ipwt[j]

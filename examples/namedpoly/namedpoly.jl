@@ -73,14 +73,14 @@ function build_namedpoly!(alf::Alfonso.AlfonsoOpt, polyname::Symbol, d::Int)
     return Alfonso.load_data!(alf, A, b, c, cone)
 end
 
-# alf = Alfonso.AlfonsoOpt(maxiter=100, verbose=false)
+alf = Alfonso.AlfonsoOpt(maxiter=100, verbose=true)
 
 # select the named polynomial to minimize and the SOS degree (to be squared)
 # build_namedpoly!(alf, :butcher, 2)
 # build_namedpoly!(alf, :caprasse, 4)
 # build_namedpoly!(alf, :goldsteinprice, 7)
 # build_namedpoly!(alf, :heart, 2)
-# build_namedpoly!(alf, :lotkavolterra, 3)
+build_namedpoly!(alf, :lotkavolterra, 3)
 # build_namedpoly!(alf, :magnetism7, 2)
 # build_namedpoly!(alf, :motzkin, 7)
 # build_namedpoly!(alf, :reactiondiffusion, 4)
@@ -89,4 +89,4 @@ end
 # build_namedpoly!(alf, :schwefel, 3)
 
 # solve it
-# @time Alfonso.solve!(alf)
+@time Alfonso.solve!(alf)
