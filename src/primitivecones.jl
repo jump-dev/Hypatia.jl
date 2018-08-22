@@ -8,7 +8,7 @@ abstract type PrimitiveCone end
 # nonnegative orthant cone
 mutable struct NonnegCone <: PrimitiveCone
     dim::Int
-    pnt # maybe don't need to ever update this - it always points to the same view of same array
+    pnt
 
     function NonnegCone(dim::Int)
         prm = new()
@@ -21,7 +21,7 @@ dimension(prm::NonnegCone) = prm.dim
 barrierpar_prm(prm::NonnegCone) = prm.dim
 loadpnt_prm!(prm::NonnegCone, pnt) = (prm.pnt = pnt)
 incone_prm(prm::NonnegCone) = all(x -> (x > 0.0), prm.pnt)
-calcg_prm!(g, prm::NonnegCone) = (g .= -inv.(prm.pnt)) # TODO use view
+calcg_prm!(g, prm::NonnegCone) = (g .= inv.(prm.pnt) .* -1.0)
 calcHiprod_prm!(prod, arr, prm::NonnegCone) = (prod .= abs2.(prm.pnt) .* arr)
 calcLiprod_prm!(prod, arr, prm::NonnegCone) = (prod .= prm.pnt .* arr)
 
