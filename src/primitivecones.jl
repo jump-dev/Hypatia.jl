@@ -8,7 +8,7 @@ abstract type PrimitiveCone end
 # nonnegative orthant cone
 mutable struct NonnegCone <: PrimitiveCone
     dim::Int
-    pnt # maybe don't need to ever update this - it always points to the same view of same array
+    pnt
 
     function NonnegCone(dim::Int)
         prm = new()
@@ -21,80 +21,70 @@ dimension(prm::NonnegCone) = prm.dim
 barrierpar_prm(prm::NonnegCone) = prm.dim
 loadpnt_prm!(prm::NonnegCone, pnt) = (prm.pnt = pnt)
 incone_prm(prm::NonnegCone) = all(x -> (x > 0.0), prm.pnt)
-calcg_prm!(g, prm::NonnegCone) = (g .= -inv.(prm.pnt)) # TODO use view
+calcg_prm!(g, prm::NonnegCone) = (g .= inv.(prm.pnt) .* -1.0)
 calcHiprod_prm!(prod, arr, prm::NonnegCone) = (prod .= abs2.(prm.pnt) .* arr)
 calcLiprod_prm!(prod, arr, prm::NonnegCone) = (prod .= prm.pnt .* arr)
 
 # polynomial (weighted) sum of squares cone (parametrized by ip and ipwt)
 mutable struct SumOfSquaresCone <: PrimitiveCone
     dim::Int
-    ip::Matrix{Float64}
     ipwt::Vector{Matrix{Float64}}
     pnt
     g::Vector{Float64}
+    H::Matrix{Float64}
     F
-    ippnt::Matrix{Float64}
     ipwtpnt::Vector{Matrix{Float64}}
-    Vp::Matrix{Float64}
-    Vpwt::Vector{Matrix{Float64}}
-    VtVp::Matrix{Float64}
-    gtmp::Vector{Float64}
-    Htmp::Matrix{Float64}
+    Vp::Vector{Matrix{Float64}}
+    Vp2::Matrix{Float64}
 
-    function SumOfSquaresCone(dim::Int, ip::Matrix{Float64}, ipwt::Vector{Matrix{Float64}})
+    function SumOfSquaresCone(dim::Int, ipwt::Vector{Matrix{Float64}})
+        for ipwtj in ipwt
+            @assert size(ipwtj, 1) == dim
+        end
         prm = new()
         prm.dim = dim
-        prm.ip = ip
         prm.ipwt = ipwt
-        prm.g = similar(ip, dim)
-        prm.ippnt = similar(ip, size(ip, 2), size(ip, 2))
-        prm.ipwtpnt = [similar(ip, size(ipwtj, 2), size(ipwtj, 2)) for ipwtj in ipwt]
-        prm.Vp = similar(ip, size(ip, 2), dim)
-        prm.Vpwt = [similar(ip, size(ipwtj, 2), dim) for ipwtj in ipwt]
-        prm.VtVp = similar(ip, dim, dim)
-        prm.gtmp = similar(ip, dim)
-        prm.Htmp = similar(prm.VtVp)
+        prm.g = similar(ipwt[1], dim)
+        prm.H = similar(ipwt[1], dim, dim)
+        prm.ipwtpnt = [similar(ipwt[1], size(ipwtj, 2), size(ipwtj, 2)) for ipwtj in ipwt]
+        prm.Vp = [similar(ipwt[1], dim, size(ipwtj, 2)) for ipwtj in ipwt]
+        prm.Vp2 = similar(ipwt[1], dim, dim)
         return prm
     end
 end
 
 dimension(prm::SumOfSquaresCone) = prm.dim
-barrierpar_prm(prm::SumOfSquaresCone) = size(prm.ip, 2) + sum(size(ipwtj, 2) for ipwtj in prm.ipwt)
+barrierpar_prm(prm::SumOfSquaresCone) = sum(size(ipwtj, 2) for ipwtj in prm.ipwt)
 loadpnt_prm!(prm::SumOfSquaresCone, pnt) = (prm.pnt = pnt)
 
 function incone_prm(prm::SumOfSquaresCone)
-    # TODO each of the following choleskys can be done in parallel
-    prm.ippnt .= prm.ip'*Diagonal(prm.pnt)*prm.ip
-    F = cholesky!(Symmetric(prm.ippnt), check=false) # TODO use structure cholesky of P'DP to speed up chol?
-    if !issuccess(F)
-        return false
-    end
-    prm.Vp .= F.L\prm.ip' # TODO do in-place
-    prm.VtVp .= prm.Vp'*prm.Vp
-    prm.gtmp .= -diag(prm.VtVp)
-    prm.Htmp .= prm.VtVp.^2
+    prm.g .= 0.0
+    prm.H .= 0.0
 
-    for j in 1:length(prm.ipwt)
-        prm.ipwtpnt[j] .= prm.ipwt[j]'*Diagonal(prm.pnt)*prm.ipwt[j]
+    for j in eachindex(prm.ipwt) # TODO can do this loop in parallel (use separate Vp2[j])
+        # prm.ipwtpnt[j] .= prm.ipwt[j]'*Diagonal(prm.pnt)*prm.ipwt[j]
+        mul!(prm.Vp[j], Diagonal(prm.pnt), prm.ipwt[j])
+        mul!(prm.ipwtpnt[j], prm.ipwt[j]', prm.Vp[j])
+
         F = cholesky!(Symmetric(prm.ipwtpnt[j]), check=false)
         if !issuccess(F)
             return false
         end
-        prm.Vpwt[j] .= F.L\prm.ipwt[j]'
-        prm.VtVp .= prm.Vpwt[j]'*prm.Vpwt[j]
-        prm.gtmp .-= diag(prm.VtVp)
-        prm.Htmp .+= prm.VtVp.^2
+
+        prm.Vp[j] .= prm.ipwt[j]/F.U # TODO in-place syntax should work but ldiv! is very broken for triangular matrices in 0.7
+        mul!(prm.Vp2, prm.Vp[j], prm.Vp[j]') # TODO if parallel, need to use separate Vp2[j] # TODO this is much slower than it should be on 0.7
+
+        prm.g .-= diag(prm.Vp2)
+        prm.H .+= abs2.(prm.Vp2)
     end
 
-    F = cholesky!(prm.Htmp, check=false)
-    if !issuccess(F)
+    prm.F = cholesky!(prm.H, check=false)
+    if !issuccess(prm.F)
         return false
     end
-    prm.g .= prm.gtmp
-    prm.F = F
     return true
 end
 
 calcg_prm!(g, prm::SumOfSquaresCone) = (g .= prm.g)
-calcHiprod_prm!(prod, arr, prm::SumOfSquaresCone) = (prod .= prm.F.U\(prm.F.L\arr)) # TODO do in-place
-calcLiprod_prm!(prod, arr, prm::SumOfSquaresCone) = (prod .= prm.F.L\arr)
+calcHiprod_prm!(prod, arr, prm::SumOfSquaresCone) = ldiv!(prod, prm.F, arr)
+calcLiprod_prm!(prod, arr, prm::SumOfSquaresCone) = ldiv!(prm.F.U', arr, prod) # TODO this in-place syntax should not work (arguments order wrong, should accept F.L) but ldiv! is very broken for triangular matrices in 0.7
