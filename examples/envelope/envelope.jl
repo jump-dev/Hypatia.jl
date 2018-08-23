@@ -22,7 +22,8 @@ function build_envelope!(alf::Alfonso.AlfonsoOpt, npoly::Int, deg::Int, n::Int, 
     PWts = [Array((qr(Diagonal(sqrt.(wtVals[:,j]))*P[:,1:LWts[j]])).Q) for j in 1:n]
 
     # set up problem data
-    A = repeat(sparse(1.0I, U, U), outer=(1, npoly))
+    # A = repeat(sparse(1.0I, U, U), outer=(1, npoly)) # TODO ldiv! with sparse A is broken on julia 0.7
+    A = repeat(Array(1.0I, U, U), outer=(1, npoly))
     b = w
     if use_data
         # use provided data in data folder
@@ -33,7 +34,8 @@ function build_envelope!(alf::Alfonso.AlfonsoOpt, npoly::Int, deg::Int, n::Int, 
         LDegs = binomial(n+deg, n)
         c = vec(P[:,1:LDegs]*rand(-9:9, LDegs, npoly))
     end
-    cone = Alfonso.Cone(fill(Alfonso.SumOfSquaresCone(U, P, PWts), npoly), AbstractUnitRange[1+(k-1)*U:k*U for k in 1:npoly])
+
+    cone = Alfonso.Cone(fill(Alfonso.SumOfSquaresCone(U, [P, PWts...]), npoly), AbstractUnitRange[1+(k-1)*U:k*U for k in 1:npoly])
 
     return Alfonso.load_data!(alf, A, b, c, cone)
 end

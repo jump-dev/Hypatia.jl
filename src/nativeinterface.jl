@@ -223,7 +223,7 @@ function getinitialiterate(alf::AlfonsoOpt)
     ty = zeros(m)
     tau = 1.0
     ts = calcg!(g, cone)
-    ts .*= -1
+    ts .*= -1.0
     kap = 1.0
     mu = (dot(tx, ts) + tau*kap)/alf.bnu
 
@@ -239,19 +239,20 @@ function solve!(alf::AlfonsoOpt)
     cone = alf.cone
 
     # calculate initial central primal-dual iterate
+    alf.verbose && println("Finding initial iterate")
     (tx, ty, tau, ts, kap, mu) = getinitialiterate(alf)
 
-    # preallocate arrays
-    rhs_ty = similar(ty)
-    rhs_tx = similar(tx)
+    # preallocate arrays # TODO probably could get away with fewer. rename to temp_
+    p_res = similar(ty)
+    d_res = similar(tx)
     dir_ty = similar(ty)
     dir_tx = similar(tx)
     dir_ts = similar(ts)
     sa_tx = copy(tx)
-    loadpnt!(cone, sa_tx)
     sa_ts = similar(ts)
     g = similar(tx)
     HiAt = similar(b, n, m) # TODO for very sparse LPs, using sparse here is good (diagonal hessian), but for sparse problems with dense hessians, want dense
+    AHiAt = similar(b, m, m)
     y1 = similar(b)
     x1 = similar(c)
     y2 = similar(b)
@@ -259,36 +260,43 @@ function solve!(alf::AlfonsoOpt)
 
     # main loop
     if alf.verbose
+        println("Starting iteration")
         @printf("\n%5s %12s %12s %9s %9s %9s %9s %9s %9s\n", "iter", "p_obj", "d_obj", "gap", "p_inf", "d_inf", "tau", "kap", "mu")
         flush(stdout)
     end
 
+    loadpnt!(cone, sa_tx)
     alf.status = :StartedIterating
     alphapred = alf.alphapredinit
     iter = 0
+
     while true
         # calculate convergence metrics
         ctx = dot(c, tx)
         bty = dot(b, ty)
         p_obj = ctx/tau
         d_obj = bty/tau
-        gap = abs(ctx - bty)/(tau + abs(bty))
-        rhs_ty .= -A*tx + b*tau
-        p_inf = maximum(abs, rhs_ty)/alf.tol_pres
-        rhs_tx .= A'*ty - c*tau + ts
-        d_inf = maximum(abs, rhs_tx)/alf.tol_dres
-        rhs_tau = -bty + ctx + kap
-        compl = abs(rhs_tau)/alf.tol_compl
+        rel_gap = abs(ctx - bty)/(tau + abs(bty))
+        # p_res = -A*tx + b*tau
+        mul!(p_res, A, tx)
+        p_res .= tau .* b .- p_res
+        p_inf = maximum(abs, p_res)/alf.tol_pres
+        # d_res = A'*ty - c*tau + ts
+        mul!(d_res, A', ty)
+        d_res .+= ts .- tau .* c
+        d_inf = maximum(abs, d_res)/alf.tol_dres
+        abs_gap = -bty + ctx + kap
+        compl = abs(abs_gap)/alf.tol_compl
 
         if alf.verbose
             # print iteration statistics
-            @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n", iter, p_obj, d_obj, gap, p_inf, d_inf, tau, kap, mu)
+            @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n", iter, p_obj, d_obj, rel_gap, p_inf, d_inf, tau, kap, mu)
             flush(stdout)
         end
 
         # check convergence criteria
         if (p_inf <= alf.optimtol) && (d_inf <= alf.optimtol)
-            if gap <= alf.optimtol
+            if rel_gap <= alf.optimtol
                 alf.verbose && println("Problem is feasible and an approximate optimal solution was found; terminating")
                 alf.status = :Optimal
                 break
@@ -312,22 +320,17 @@ function solve!(alf::AlfonsoOpt)
         end
 
         # prediction phase
-        # determine prediction direction
-        invmu = 1.0/mu
-        calcHiprod!(HiAt, A', cone) # TODO may be faster as calcLiprod
-        HiAt .*= invmu
-        FAW = cholesky(Symmetric(A*HiAt))
-        # TODO can parallelize 1 and 2
-        y1 .= FAW\(b + HiAt'*c)
-        calcHiprod!(x1, invmu*(A'*y1 - c), cone)
-        y2 .= FAW\(rhs_ty + HiAt'*(ts - rhs_tx))
-        calcHiprod!(x2, invmu*(A'*y2 - ts + rhs_tx), cone)
+        # calculate prediction direction
+        # x rhs is (ts - d_res), y rhs is p_res
+        dir_tx .= ts .- d_res # temp for x rhs
+        solvelinsys!(y1, x1, y2, x2, mu, dir_tx, p_res, A, b, c, cone, HiAt, AHiAt)
 
-        dir_tau = (rhs_tau - kap - dot(b, y2) + dot(c, x2))/(mu/tau^2 + dot(b, y1) - dot(c, x1))
-        dir_ty .= y2 + dir_tau*y1
-        dir_tx .= x2 + dir_tau*x1
-        dir_ts .= -rhs_tx - A'*dir_ty + c*dir_tau
-        dir_kap = -rhs_tau + dot(b, dir_ty) - dot(c, dir_tx)
+        dir_tau = (abs_gap - kap - dot(b, y2) + dot(c, x2))/(mu/tau^2 + dot(b, y1) - dot(c, x1))
+        dir_ty .= y2 .+ dir_tau .* y1
+        dir_tx .= x2 .+ dir_tau .* x1
+        mul!(dir_ts, A', dir_ty)
+        dir_ts .= dir_tau .* c .- dir_ts .- d_res
+        dir_kap = -abs_gap + dot(b, dir_ty) - dot(c, dir_tx)
 
         # determine step length alpha by line search
         alpha = alphapred
@@ -338,19 +341,19 @@ function solve!(alf::AlfonsoOpt)
         while true
             nprediters += 1
 
-            sa_tx .= tx + alpha*dir_tx
+            sa_tx .= tx .+ alpha .* dir_tx
 
             # accept primal iterate if
             # - decreased alpha and it is the first inside the cone and beta-neighborhood or
             # - increased alpha and it is inside the cone and the first to leave beta-neighborhood
             if incone(cone)
                 # primal iterate is inside the cone
-                sa_ts .= ts + alpha*dir_ts
+                sa_ts .= ts .+ alpha .* dir_ts
                 sa_tk = (tau + alpha*dir_tau)*(kap + alpha*dir_kap)
                 sa_mu = (dot(sa_tx, sa_ts) + sa_tk)/alf.bnu
 
                 calcg!(g, cone)
-                sa_ts .+= sa_mu*g
+                sa_ts .+= sa_mu .* g # temp
                 calcLiprod!(g, sa_ts, cone)
                 nbhd = sqrt((sa_tk - sa_mu)^2 + sum(abs2, g))/sa_mu
 
@@ -399,10 +402,10 @@ function solve!(alf::AlfonsoOpt)
         end
 
         # step distance alpha in the direction
-        ty .+= alpha*dir_ty
-        tx .+= alpha*dir_tx
+        ty .+= alpha .* dir_ty
+        tx .= sa_tx
         tau += alpha*dir_tau
-        ts .+= alpha*dir_ts
+        ts .+= alpha .* dir_ts
         kap += alpha*dir_kap
         mu = (dot(tx, ts) + tau*kap)/alf.bnu
 
@@ -418,21 +421,18 @@ function solve!(alf::AlfonsoOpt)
             ncorrsteps += 1
 
             # calculate correction direction
+            # x rhs is (ts + mu*g), y rhs is 0
             calcg!(g, cone)
-            invmu = 1.0/mu
-            calcHiprod!(HiAt, A', cone) # TODO may be faster as calcLiprod
-            HiAt .*= invmu
-            FAW = cholesky(Symmetric(A*HiAt), check=false)
-            # TODO can parallelize 1 and 2
-            y1 .= FAW\(b + HiAt'*c)
-            calcHiprod!(x1, invmu*(A'*y1 - c), cone)
-            y2 .= FAW\(HiAt'*(ts + mu*g))
-            calcHiprod!(x2, invmu*(A'*y2 - ts) - g, cone)
+            dir_tx .= ts .+ mu .* g # temp for x rhs
+            dir_ty .= 0.0 # temp for y rhs
+            solvelinsys!(y1, x1, y2, x2, mu, dir_tx, dir_ty, A, b, c, cone, HiAt, AHiAt)
 
             dir_tau = (mu/tau - kap - dot(b, y2) + dot(c, x2))/(mu/tau^2 + dot(b, y1) - dot(c, x1))
-            dir_ty .= y2 + dir_tau*y1
-            dir_tx .= x2 + dir_tau*x1
-            dir_ts .= -A'*dir_ty + c*dir_tau
+            dir_ty .= y2 .+ dir_tau .* y1
+            dir_tx .= x2 .+ dir_tau .* x1
+            # dir_ts = -A'*dir_ty + c*dir_tau
+            mul!(dir_ts, A', dir_ty)
+            dir_ts .= dir_tau .* c .- dir_ts
             dir_kap = dot(b, dir_ty) - dot(c, dir_tx)
 
             # determine step length alpha by line search
@@ -441,7 +441,7 @@ function solve!(alf::AlfonsoOpt)
             while ncorrlsiters <= alf.maxcorrlsiters
                 ncorrlsiters += 1
 
-                sa_tx .= tx + alpha*dir_tx
+                sa_tx .= tx .+ alpha .* dir_tx
 
                 if incone(cone)
                     # primal iterate tx is inside the cone, so terminate line search
@@ -465,17 +465,17 @@ function solve!(alf::AlfonsoOpt)
             end
 
             # step distance alpha in the direction
-            ty .+= alpha*dir_ty
+            ty .+= alpha .* dir_ty
             tx .= sa_tx
             tau += alpha*dir_tau
-            ts .+= alpha*dir_ts
+            ts .+= alpha .* dir_ts
             kap += alpha*dir_kap
             mu = (dot(tx, ts) + tau*kap)/alf.bnu
 
             # finish if allowed and current iterate is in the eta-neighborhood, or if taken max steps
             if (ncorrsteps == alf.maxcorrsteps) || alf.corrcheck
                 calcg!(g, cone)
-                sa_ts .= ts + mu*g
+                sa_ts .= ts .+ mu .* g
                 calcLiprod!(g, sa_ts, cone)
                 nbhd = sqrt((tau*kap - mu)^2 + sum(abs2, g))/mu
 
@@ -501,10 +501,13 @@ function solve!(alf::AlfonsoOpt)
     # calculate final solution and iteration statistics
     alf.niters = iter
 
-    alf.x = tx./tau
-    alf.y = ty./tau
+    tx ./= tau
+    alf.x = tx
+    ty ./= tau
+    alf.y = ty
     alf.tau = tau
-    alf.s = ts./tau
+    ts ./= tau
+    alf.s = ts
     alf.kap = kap
 
     alf.pobj = dot(c, alf.x)
@@ -514,8 +517,15 @@ function solve!(alf::AlfonsoOpt)
     alf.rel_dgap = alf.dgap/(1.0 + abs(alf.pobj) + abs(alf.dobj))
     alf.rel_cgap = alf.cgap/(1.0 + abs(alf.pobj) + abs(alf.dobj))
 
-    alf.pres = b - A*alf.x
-    alf.dres = c - A'*alf.y - alf.s
+    # alf.pres = b - A*alf.x
+    mul!(p_res, A, alf.x)
+    p_res .= b .- p_res
+    alf.pres = p_res
+    # alf.dres = c - A'*alf.y - alf.s
+    mul!(d_res, A', alf.y)
+    d_res .= c .- d_res .- alf.s
+    alf.dres = d_res
+
     alf.pin = norm(alf.pres)
     alf.din = norm(alf.dres)
     alf.rel_pin = alf.pin/(1.0 + norm(b, Inf))
@@ -525,6 +535,42 @@ function solve!(alf::AlfonsoOpt)
 
     return nothing
 end
+
+function solvelinsys!(y1, x1, y2, x2, mu, rhs_tx, rhs_ty, A, b, c, cone, HiAt, AHiAt)
+    invmu = inv(mu)
+
+    calcHiprod!(HiAt, A', cone) # TODO may be faster as calcLiprod
+    HiAt .*= invmu
+
+    mul!(AHiAt, A, HiAt)
+    FAH = cholesky!(Symmetric(AHiAt))
+
+    # TODO can parallelize 1 and 2
+    # y1 = FAH\(b + HiAt'*c)
+    mul!(y1, HiAt', c)
+    y1 .+= b
+    ldiv!(FAH, y1)
+
+    # x1 = Hi*invmu*(A'*y1 - c)
+    mul!(x1, A', y1)
+    x1 .-= c
+    x1 .*= invmu
+    calcHiprod!(x1, x1, cone)
+
+    # y2 = FAH\(rhs_ty + HiAt'*rhs_tx)
+    mul!(y2, HiAt', rhs_tx)
+    y2 .+= rhs_ty
+    ldiv!(FAH, y2)
+
+    # x2 = Hi*invmu*(A'*y2 - rhs_tx)
+    mul!(x2, A', y2)
+    x2 .-= rhs_tx
+    x2 .*= invmu
+    calcHiprod!(x2, x2, cone)
+
+    return (y1, x1, y2, x2)
+end
+
 
 function getbetaeta(maxcorrsteps, bnu)
     if maxcorrsteps <= 2
