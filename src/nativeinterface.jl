@@ -239,6 +239,7 @@ function solve!(alf::AlfonsoOpt)
     cone = alf.cone
 
     # calculate initial central primal-dual iterate
+    alf.verbose && println("Finding initial iterate")
     (tx, ty, tau, ts, kap, mu) = getinitialiterate(alf)
 
     # preallocate arrays # TODO probably could get away with fewer. rename to temp_
@@ -259,6 +260,7 @@ function solve!(alf::AlfonsoOpt)
 
     # main loop
     if alf.verbose
+        println("Starting iteration")
         @printf("\n%5s %12s %12s %9s %9s %9s %9s %9s %9s\n", "iter", "p_obj", "d_obj", "gap", "p_inf", "d_inf", "tau", "kap", "mu")
         flush(stdout)
     end
