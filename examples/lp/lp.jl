@@ -10,7 +10,7 @@ using SparseArrays
 using DelimitedFiles
 using Random
 
-function build_lp!(alf::Alfonso.AlfonsoOpt, m::Int, n::Int; use_data=false, dense=false, nzfrac::Float64=1/sqrt(n), tosparse=false, rseed::Int=1)
+function build_lp!(alf::Alfonso.AlfonsoOpt, m::Int, n::Int; use_data::Bool=false, dense::Bool=false, nzfrac::Float64=1/sqrt(n), tosparse::Bool=false, rseed::Int=1)
     # set up problem data
     if use_data
         # use provided data in data folder
