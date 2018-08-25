@@ -14,7 +14,7 @@ using LinearAlgebra
 using DelimitedFiles
 using Random
 
-function build_envelope!(alf::Alfonso.AlfonsoOpt, npoly::Int, deg::Int, n::Int, d::Int; use_data::Bool=false, rseed::Int=1)
+function build_envelope!(alf::Alfonso.AlfonsoOpt, npoly::Int, deg::Int, n::Int, d::Int; use_data::Bool=false, dense::Bool=false, rseed::Int=1)
     @assert deg <= d
 
     # generate interpolation
@@ -24,8 +24,11 @@ function build_envelope!(alf::Alfonso.AlfonsoOpt, npoly::Int, deg::Int, n::Int, 
     PWts = [Array((qr(Diagonal(sqrt.(wtVals[:,j]))*P[:,1:LWts[j]])).Q) for j in 1:n]
 
     # set up problem data
-    A = repeat(sparse(1.0I, U, U), outer=(1, npoly)) # sparse
-    # A = repeat(Array(1.0I, U, U), outer=(1, npoly)) # dense
+    if dense
+        A = repeat(Array(1.0I, U, U), outer=(1, npoly)) # dense A
+    else
+        A = repeat(sparse(1.0I, U, U), outer=(1, npoly)) # sparse A
+    end
     b = w
     if use_data
         # use provided data in data folder
@@ -42,13 +45,13 @@ function build_envelope!(alf::Alfonso.AlfonsoOpt, npoly::Int, deg::Int, n::Int, 
     return Alfonso.load_data!(alf, A, b, c, cone)
 end
 
-alf = Alfonso.AlfonsoOpt(maxiter=100, verbose=true)
+# alf = Alfonso.AlfonsoOpt(maxiter=100, verbose=true)
 
 # optionally use fixed data in folder
 # select number of polynomials and degrees for the envelope
 # select dimension and SOS degree (to be squared)
-build_envelope!(alf, 2, 5, 1, 5, use_data=true)
+# build_envelope!(alf, 2, 5, 1, 5, use_data=true)
 # build_envelope!(alf, 2, 5, 2, 8)
 # build_envelope!(alf, 3, 5, 3, 5)
 
-@time Alfonso.solve!(alf)
+# @time Alfonso.solve!(alf)
