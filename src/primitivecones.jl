@@ -62,7 +62,7 @@ function incone_prm(prm::SumOfSquaresCone)
     prm.H .= 0.0
 
     for j in eachindex(prm.ipwt) # TODO can do this loop in parallel (use separate Vp2[j])
-        # prm.ipwtpnt[j] .= prm.ipwt[j]'*Diagonal(prm.pnt)*prm.ipwt[j]
+        # prm.ipwtpnt[j] = prm.ipwt[j]'*Diagonal(prm.pnt)*prm.ipwt[j]
         mul!(prm.Vp[j], Diagonal(prm.pnt), prm.ipwt[j])
         mul!(prm.ipwtpnt[j], prm.ipwt[j]', prm.Vp[j])
 
@@ -71,10 +71,12 @@ function incone_prm(prm::SumOfSquaresCone)
             return false
         end
 
-        prm.Vp[j] .= prm.ipwt[j]/F.U # TODO in-place syntax should work but ldiv! is very broken for triangular matrices in 0.7
-        mul!(prm.Vp2, prm.Vp[j], prm.Vp[j]') # TODO if parallel, need to use separate Vp2[j] # TODO this is much slower than it should be on 0.7
+        rdiv!(prm.ipwt[j], F.U)
+        mul!(prm.Vp2, prm.ipwt[j], prm.ipwt[j]') # TODO if parallel, need to use separate Vp2[j]
 
-        prm.g .-= diag(prm.Vp2)
+        for i in eachindex(prm.g)
+            @inbounds prm.g[i] -= prm.Vp2[i,i]
+        end
         prm.H .+= abs2.(prm.Vp2)
     end
 
@@ -87,4 +89,3 @@ end
 
 calcg_prm!(g, prm::SumOfSquaresCone) = (g .= prm.g)
 calcHiprod_prm!(prod, arr, prm::SumOfSquaresCone) = ldiv!(prod, prm.F, arr)
-calcLiprod_prm!(prod, arr, prm::SumOfSquaresCone) = ldiv!(prm.F.U', arr, prod) # TODO this in-place syntax should not work (arguments order wrong, should accept F.L) but ldiv! is very broken for triangular matrices in 0.7
