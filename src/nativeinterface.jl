@@ -407,6 +407,13 @@ function solve!(alf::AlfonsoOpt)
         kap += alpha*dir_kap
         mu = (dot(tx, ts) + tau*kap)/alf.bnu
 
+        @show ty
+        @show tx
+        @show tau
+        @show ts
+        @show kap
+        @show mu
+        exit()
         # skip correction phase if allowed and current iterate is in the eta-neighborhood
         if alf.corrcheck && (nbhd <= alf.eta)
             continue
