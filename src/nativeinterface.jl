@@ -233,7 +233,6 @@ end
 # perform prediction and correction steps in a loop until converged
 function solve!(alf::AlfonsoOpt)
     starttime = time()
-
     (A, b, c) = (alf.A, alf.b, alf.c)
     (m, n) = size(A)
     cone = alf.cone
@@ -269,9 +268,8 @@ function solve!(alf::AlfonsoOpt)
     alf.status = :StartedIterating
     alphapred = alf.alphapredinit
     iter = 0
-
     while true
-        # calculate convergence metrics
+    # calculate convergence metrics
         ctx = dot(c, tx)
         bty = dot(b, ty)
         p_obj = ctx/tau
@@ -354,8 +352,9 @@ function solve!(alf::AlfonsoOpt)
 
                 calcg!(g, cone)
                 sa_ts .+= sa_mu .* g # temp
-                calcLiprod!(g, sa_ts, cone)
-                nbhd = sqrt((sa_tk - sa_mu)^2 + sum(abs2, g))/sa_mu
+                # calcLiprod!(g, sa_ts, cone)
+                calcHiprod!(g, sa_ts, cone)
+                nbhd = sqrt((sa_tk - sa_mu)^2 + dot(sa_ts, g))/sa_mu
 
                 if nbhd < alf.beta
                     # iterate is inside the beta-neighborhood
@@ -476,8 +475,9 @@ function solve!(alf::AlfonsoOpt)
             if (ncorrsteps == alf.maxcorrsteps) || alf.corrcheck
                 calcg!(g, cone)
                 sa_ts .= ts .+ mu .* g
-                calcLiprod!(g, sa_ts, cone)
-                nbhd = sqrt((tau*kap - mu)^2 + sum(abs2, g))/mu
+                # calcLiprod!(g, sa_ts, cone)
+                calcHiprod!(g, sa_ts, cone)
+                nbhd = sqrt((tau*kap - mu)^2 + dot(sa_ts, g))/mu
 
                 if nbhd <= alf.eta
                     break
