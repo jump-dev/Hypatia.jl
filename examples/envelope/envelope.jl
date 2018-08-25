@@ -47,8 +47,8 @@ alf = Alfonso.AlfonsoOpt(maxiter=100, verbose=true)
 # optionally use fixed data in folder
 # select number of polynomials and degrees for the envelope
 # select dimension and SOS degree (to be squared)
-# build_envelope!(alf, 2, 5, 1, 5, use_data=true)
-build_envelope!(alf, 2, 5, 2, 8)
+build_envelope!(alf, 2, 5, 1, 5, use_data=true)
+# build_envelope!(alf, 2, 5, 2, 8)
 # build_envelope!(alf, 3, 5, 3, 5)
 
 @time Alfonso.solve!(alf)
