@@ -8,7 +8,7 @@ abstract type PrimitiveCone end
 # nonnegative orthant cone
 mutable struct NonnegCone <: PrimitiveCone
     dim::Int
-    pnt
+    pnt::AbstractVector{Float64}
 
     function NonnegCone(dim::Int)
         prm = new()
@@ -19,20 +19,19 @@ end
 
 dimension(prm::NonnegCone) = prm.dim
 barrierpar_prm(prm::NonnegCone) = prm.dim
-loadpnt_prm!(prm::NonnegCone, pnt) = (prm.pnt = pnt)
+loadpnt_prm!(prm::NonnegCone, pnt::AbstractVector{Float64}) = (prm.pnt = pnt)
 incone_prm(prm::NonnegCone) = all(x -> (x > 0.0), prm.pnt)
-calcg_prm!(g, prm::NonnegCone) = (g .= inv.(prm.pnt) .* -1.0)
-calcHiprod_prm!(prod, arr, prm::NonnegCone) = (prod .= abs2.(prm.pnt) .* arr)
-calcLiprod_prm!(prod, arr, prm::NonnegCone) = (prod .= prm.pnt .* arr)
+calcg_prm!(g::AbstractVector{Float64}, prm::NonnegCone) = (g .= inv.(prm.pnt) .* -1.0)
+calcHiarr_prm!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prm::NonnegCone) = (prod .= abs2.(prm.pnt) .* arr)
 
 # polynomial (weighted) sum of squares cone (parametrized by ip and ipwt)
 mutable struct SumOfSquaresCone <: PrimitiveCone
     dim::Int
     ipwt::Vector{Matrix{Float64}}
-    pnt
+    pnt::AbstractVector{Float64}
     g::Vector{Float64}
     H::Matrix{Float64}
-    F
+    F::Cholesky{Float64,Array{Float64,2}}
     ipwtpnt::Vector{Matrix{Float64}}
     Vp::Vector{Matrix{Float64}}
     Vp2::Matrix{Float64}
@@ -55,7 +54,7 @@ end
 
 dimension(prm::SumOfSquaresCone) = prm.dim
 barrierpar_prm(prm::SumOfSquaresCone) = sum(size(ipwtj, 2) for ipwtj in prm.ipwt)
-loadpnt_prm!(prm::SumOfSquaresCone, pnt) = (prm.pnt = pnt)
+loadpnt_prm!(prm::SumOfSquaresCone, pnt::AbstractVector{Float64}) = (prm.pnt = pnt)
 
 function incone_prm(prm::SumOfSquaresCone)
     prm.g .= 0.0
@@ -87,5 +86,5 @@ function incone_prm(prm::SumOfSquaresCone)
     return true
 end
 
-calcg_prm!(g, prm::SumOfSquaresCone) = (g .= prm.g)
-calcHiprod_prm!(prod, arr, prm::SumOfSquaresCone) = ldiv!(prod, prm.F, arr)
+calcg_prm!(g::AbstractVector{Float64}, prm::SumOfSquaresCone) = (g .= prm.g)
+calcHiarr_prm!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prm::SumOfSquaresCone) = ldiv!(prod, prm.F, arr)

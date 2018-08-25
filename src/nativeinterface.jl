@@ -352,8 +352,7 @@ function solve!(alf::AlfonsoOpt)
 
                 calcg!(g, cone)
                 sa_ts .+= sa_mu .* g # temp
-                # calcLiprod!(g, sa_ts, cone)
-                calcHiprod!(g, sa_ts, cone)
+                calcHiarr!(g, sa_ts, cone)
                 nbhd = sqrt((sa_tk - sa_mu)^2 + dot(sa_ts, g))/sa_mu
 
                 if nbhd < alf.beta
@@ -475,8 +474,7 @@ function solve!(alf::AlfonsoOpt)
             if (ncorrsteps == alf.maxcorrsteps) || alf.corrcheck
                 calcg!(g, cone)
                 sa_ts .= ts .+ mu .* g
-                # calcLiprod!(g, sa_ts, cone)
-                calcHiprod!(g, sa_ts, cone)
+                calcHiarr!(g, sa_ts, cone)
                 nbhd = sqrt((tau*kap - mu)^2 + dot(sa_ts, g))/mu
 
                 if nbhd <= alf.eta
@@ -539,38 +537,38 @@ end
 function solvelinsys!(y1, x1, y2, x2, mu, rhs_tx, rhs_ty, A, b, c, cone, HiAt, AHiAt)
     invmu = inv(mu)
 
-    calcHiprod!(HiAt, A', cone) # TODO may be faster as calcLiprod
+    # TODO could ultimately be faster or more stable to do cholesky.L ldiv everywhere than to do full hessian ldiv
+    calcHiarr!(HiAt, A', cone)
     HiAt .*= invmu
 
     mul!(AHiAt, A, HiAt)
-    FAH = cholesky!(Symmetric(AHiAt))
+    F = cholesky!(Symmetric(AHiAt))
 
     # TODO can parallelize 1 and 2
-    # y1 = FAH\(b + HiAt'*c)
+    # y1 = F\(b + HiAt'*c)
     mul!(y1, HiAt', c)
     y1 .+= b
-    ldiv!(FAH, y1)
+    ldiv!(F, y1)
 
     # x1 = Hi*invmu*(A'*y1 - c)
     mul!(x1, A', y1)
     x1 .-= c
     x1 .*= invmu
-    calcHiprod!(x1, x1, cone)
+    calcHiarr!(x1, x1, cone)
 
-    # y2 = FAH\(rhs_ty + HiAt'*rhs_tx)
+    # y2 = F\(rhs_ty + HiAt'*rhs_tx)
     mul!(y2, HiAt', rhs_tx)
     y2 .+= rhs_ty
-    ldiv!(FAH, y2)
+    ldiv!(F, y2)
 
     # x2 = Hi*invmu*(A'*y2 - rhs_tx)
     mul!(x2, A', y2)
     x2 .-= rhs_tx
     x2 .*= invmu
-    calcHiprod!(x2, x2, cone)
+    calcHiarr!(x2, x2, cone)
 
     return (y1, x1, y2, x2)
 end
-
 
 function getbetaeta(maxcorrsteps, bnu)
     if maxcorrsteps <= 2
