@@ -42,17 +42,3 @@ function calcHiprod!(Hi_vec::Vector{Float64}, vec::Vector{Float64}, cone::Cone)
     end
     return Hi_vec
 end
-
-function calcLiprod!(Li_mat::AbstractMatrix{Float64}, mat::AbstractMatrix{Float64}, cone::Cone)
-    for k in eachindex(cone.prms)
-        calcLiprod_prm!(view(Li_mat, cone.idxs[k], :), view(mat, cone.idxs[k], :), cone.prms[k])
-    end
-    return Li_mat
-end
-
-function calcLiprod!(Li_vec::Vector{Float64}, vec::Vector{Float64}, cone::Cone)
-    for k in eachindex(cone.prms)
-        calcLiprod_prm!(view(Li_vec, cone.idxs[k]), view(vec, cone.idxs[k]), cone.prms[k])
-    end
-    return Li_vec
-end
