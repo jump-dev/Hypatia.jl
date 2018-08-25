@@ -29,16 +29,16 @@ function calcg!(g::Vector{Float64}, cone::Cone)
     return g
 end
 
-function calcHiprod!(Hi_mat::AbstractMatrix{Float64}, mat::AbstractMatrix{Float64}, cone::Cone)
+function calcHiarr!(Hi_mat::AbstractMatrix{Float64}, mat::AbstractMatrix{Float64}, cone::Cone)
     for k in eachindex(cone.prms)
-        calcHiprod_prm!(view(Hi_mat, cone.idxs[k], :), view(mat, cone.idxs[k], :), cone.prms[k])
+        calcHiarr_prm!(view(Hi_mat, cone.idxs[k], :), view(mat, cone.idxs[k], :), cone.prms[k])
     end
     return Hi_mat
 end
 
-function calcHiprod!(Hi_vec::Vector{Float64}, vec::Vector{Float64}, cone::Cone)
+function calcHiarr!(Hi_vec::Vector{Float64}, vec::Vector{Float64}, cone::Cone)
     for k in eachindex(cone.prms)
-        calcHiprod_prm!(view(Hi_vec, cone.idxs[k]), view(vec, cone.idxs[k]), cone.prms[k])
+        calcHiarr_prm!(view(Hi_vec, cone.idxs[k]), view(vec, cone.idxs[k]), cone.prms[k])
     end
     return Hi_vec
 end
