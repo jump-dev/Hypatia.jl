@@ -14,7 +14,9 @@ using LinearAlgebra
 using DelimitedFiles
 using Random
 
-function build_envelope!(alf::Alfonso.AlfonsoOpt, npoly::Int, deg::Int, n::Int, d::Int; use_data::Bool=false, rseed::Int=1)
+function build_envelope!(alf::Alfonso.AlfonsoOpt, npoly::Int, deg::Int, n::Int, d::Int; use_data::Bool=false, dense::Bool=false, rseed::Int=1)
+    @assert deg <= d
+
     # generate interpolation
     (L, U, pts, P0, P, w) = Alfonso.interpolate(n, d, calc_w=true)
     LWts = fill(binomial(n+d-1, n), n)
@@ -22,8 +24,11 @@ function build_envelope!(alf::Alfonso.AlfonsoOpt, npoly::Int, deg::Int, n::Int, 
     PWts = [Array((qr(Diagonal(sqrt.(wtVals[:,j]))*P[:,1:LWts[j]])).Q) for j in 1:n]
 
     # set up problem data
-    # A = repeat(sparse(1.0I, U, U), outer=(1, npoly)) # TODO ldiv! with sparse A is broken on julia 0.7
-    A = repeat(Array(1.0I, U, U), outer=(1, npoly))
+    if dense
+        A = repeat(Array(1.0I, U, U), outer=(1, npoly)) # dense A
+    else
+        A = repeat(sparse(1.0I, U, U), outer=(1, npoly)) # sparse A
+    end
     b = w
     if use_data
         # use provided data in data folder
@@ -32,10 +37,10 @@ function build_envelope!(alf::Alfonso.AlfonsoOpt, npoly::Int, deg::Int, n::Int, 
         # generate random data
         Random.seed!(rseed)
         LDegs = binomial(n+deg, n)
-        c = vec(P[:,1:LDegs]*rand(-9:9, LDegs, npoly))
+        c = vec(P0[:,1:LDegs]*rand(-9:9, LDegs, npoly))
     end
 
-    cone = Alfonso.Cone(fill(Alfonso.SumOfSquaresCone(U, [P, PWts...]), npoly), AbstractUnitRange[1+(k-1)*U:k*U for k in 1:npoly])
+    cone = Alfonso.Cone([Alfonso.SumOfSquaresCone(U, [P, PWts...]) for k in 1:npoly], AbstractUnitRange[1+(k-1)*U:k*U for k in 1:npoly])
 
     return Alfonso.load_data!(alf, A, b, c, cone)
 end
@@ -46,7 +51,8 @@ end
 # select number of polynomials and degrees for the envelope
 # select dimension and SOS degree (to be squared)
 # build_envelope!(alf, 2, 5, 1, 5, use_data=true)
-# build_envelope!(alf, 2, 5, 1, 5)
+# build_envelope!(alf, 2, 5, 2, 8)
 # build_envelope!(alf, 3, 5, 3, 5)
+# build_envelope!(alf, 2, 3, 3, 5, dense=false)
 
 # @time Alfonso.solve!(alf)
