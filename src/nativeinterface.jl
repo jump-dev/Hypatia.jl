@@ -321,7 +321,7 @@ function solve!(alf::AlfonsoOpt)
         # calculate prediction direction
         # x rhs is (ts - d_res), y rhs is p_res
         dir_tx .= ts .- d_res # temp for x rhs
-        solvelinsys!(y1, x1, y2, x2, mu, dir_tx, p_res, A, b, c, cone, HiAt, AHiAt)
+        (y1, x1, y2, x2) = solvelinsys(y1, x1, y2, x2, mu, dir_tx, p_res, A, b, c, cone, HiAt, AHiAt)
 
         dir_tau = (abs_gap - kap - dot(b, y2) + dot(c, x2))/(mu/tau^2 + dot(b, y1) - dot(c, x1))
         dir_ty .= y2 .+ dir_tau .* y1
@@ -349,11 +349,7 @@ function solve!(alf::AlfonsoOpt)
                 sa_ts .= ts .+ alpha .* dir_ts
                 sa_tk = (tau + alpha*dir_tau)*(kap + alpha*dir_kap)
                 sa_mu = (dot(sa_tx, sa_ts) + sa_tk)/alf.bnu
-
-                calcg!(g, cone)
-                sa_ts .+= sa_mu .* g # temp
-                calcHiarr!(g, sa_ts, cone)
-                nbhd = sqrt((sa_tk - sa_mu)^2 + dot(sa_ts, g))/sa_mu
+                nbhd = calcnbhd(sa_tk, sa_mu, sa_ts, g, cone)
 
                 if nbhd < alf.beta
                     # iterate is inside the beta-neighborhood
@@ -408,7 +404,7 @@ function solve!(alf::AlfonsoOpt)
         mu = (dot(tx, ts) + tau*kap)/alf.bnu
 
         # skip correction phase if allowed and current iterate is in the eta-neighborhood
-        if alf.corrcheck && (nbhd <= alf.eta)
+        if alf.corrcheck && (nbhd < alf.eta)
             continue
         end
 
@@ -423,7 +419,7 @@ function solve!(alf::AlfonsoOpt)
             calcg!(g, cone)
             dir_tx .= ts .+ mu .* g # temp for x rhs
             dir_ty .= 0.0 # temp for y rhs
-            solvelinsys!(y1, x1, y2, x2, mu, dir_tx, dir_ty, A, b, c, cone, HiAt, AHiAt)
+            (y1, x1, y2, x2) = solvelinsys(y1, x1, y2, x2, mu, dir_tx, dir_ty, A, b, c, cone, HiAt, AHiAt)
 
             dir_tau = (mu/tau - kap - dot(b, y2) + dot(c, x2))/(mu/tau^2 + dot(b, y1) - dot(c, x1))
             dir_ty .= y2 .+ dir_tau .* y1
@@ -472,12 +468,8 @@ function solve!(alf::AlfonsoOpt)
 
             # finish if allowed and current iterate is in the eta-neighborhood, or if taken max steps
             if (ncorrsteps == alf.maxcorrsteps) || alf.corrcheck
-                calcg!(g, cone)
-                sa_ts .= ts .+ mu .* g
-                calcHiarr!(g, sa_ts, cone)
-                nbhd = sqrt((tau*kap - mu)^2 + dot(sa_ts, g))/mu
-
-                if nbhd <= alf.eta
+                sa_ts .= ts
+                if calcnbhd(tau*kap, mu, sa_ts, g, cone) <= alf.eta
                     break
                 elseif ncorrsteps == alf.maxcorrsteps
                     # nbhd_eta > eta, so corrector failed
@@ -534,7 +526,14 @@ function solve!(alf::AlfonsoOpt)
     return nothing
 end
 
-function solvelinsys!(y1, x1, y2, x2, mu, rhs_tx, rhs_ty, A, b, c, cone, HiAt, AHiAt)
+function calcnbhd(tk, mu, sa_ts, g, cone)
+    calcg!(g, cone)
+    sa_ts .+= mu .* g
+    calcHiarr!(g, sa_ts, cone)
+    return sqrt((tk - mu)^2 + dot(sa_ts, g))/mu
+end
+
+function solvelinsys(y1, x1, y2, x2, mu, rhs_tx, rhs_ty, A, b, c, cone, HiAt, AHiAt)
     invmu = inv(mu)
 
     # TODO could ultimately be faster or more stable to do cholesky.L ldiv everywhere than to do full hessian ldiv
