@@ -37,7 +37,7 @@ function build_envelope!(alf::Alfonso.AlfonsoOpt, npoly::Int, deg::Int, n::Int, 
         # generate random data
         Random.seed!(rseed)
         LDegs = binomial(n+deg, n)
-        c = vec(P[:,1:LDegs]*rand(-9:9, LDegs, npoly))
+        c = vec(P0[:,1:LDegs]*rand(-9:9, LDegs, npoly))
     end
 
     cone = Alfonso.Cone([Alfonso.SumOfSquaresCone(U, [P, PWts...]) for k in 1:npoly], AbstractUnitRange[1+(k-1)*U:k*U for k in 1:npoly])
@@ -53,5 +53,6 @@ end
 # build_envelope!(alf, 2, 5, 1, 5, use_data=true)
 # build_envelope!(alf, 2, 5, 2, 8)
 # build_envelope!(alf, 3, 5, 3, 5)
+# build_envelope!(alf, 2, 3, 3, 5, dense=false)
 
 # @time Alfonso.solve!(alf)

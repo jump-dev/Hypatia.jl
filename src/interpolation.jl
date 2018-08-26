@@ -143,14 +143,14 @@ function approxfekete_data(n::Int, d::Int, calc_w::Bool)
 
     # points in the initial interpolation grid
     npts = prod(2d+1:2d+n)
-    _pts = Matrix{Float64}(undef, npts, n)
+    ipts = Matrix{Float64}(undef, npts, n)
     for j in 1:n
         ig = prod(2d+1+j:2d+n)
         cs = cheb2_pts(2d+j)
         i = 1
         l = 1
         while true
-            _pts[i:i+ig-1,j] .= cs[l]
+            ipts[i:i+ig-1,j] .= cs[l]
             i += ig
             l += 1
             if l >= 2d+1+j
@@ -164,11 +164,10 @@ function approxfekete_data(n::Int, d::Int, calc_w::Bool)
 
     # evaluations on the initial interpolation grid
     m = ones(U)
-    u = calc_u(n, 2d, _pts)
+    u = calc_u(n, 2d, ipts)
     M = ones(npts, U)
-    M[:,1] .= 1
-    col = 1
-    for t in 1:2d
+    col = 0
+    for t in 0:2d
         for xp in Combinatorics.multiexponents(n, t)
             col += 1
             for j in 1:n
@@ -181,12 +180,12 @@ function approxfekete_data(n::Int, d::Int, calc_w::Bool)
     F = qr(M', Val(true))
     keep_pnt = F.p[1:U]
 
-    pts = _pts[keep_pnt,:] # subset of points indexed with the support of w
+    pts = ipts[keep_pnt,:] # subset of points indexed with the support of w
     P0 = M[keep_pnt,1:L] # subset of polynomial evaluations up to total degree d
-    P = Array(qr(P0).Q)
+    P = Array(qr(P0).Q) 
 
     if calc_w
-        w = F.R[:,1:U]\(F.Q'*m)
+        w = UpperTriangular(F.R[:,1:U])\(F.Q'*m)
     else
         w = Float64[]
     end

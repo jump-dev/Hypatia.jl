@@ -54,13 +54,13 @@ end
 @testset "2D poly envelope example (dense vs sparse A)" begin
     # dense methods
     d_alf = Alfonso.AlfonsoOpt(verbose=verbflag)
-    build_envelope!(d_alf, 2, 5, 1, 5, dense=true)
+    build_envelope!(d_alf, 2, 4, 2, 7, dense=true)
     @time Alfonso.solve!(d_alf)
     @test Alfonso.get_status(d_alf) == :Optimal
 
     # sparse methods
     s_alf = Alfonso.AlfonsoOpt(verbose=verbflag)
-    build_envelope!(s_alf, 2, 5, 1, 5, dense=false)
+    build_envelope!(s_alf, 2, 4, 2, 7, dense=false)
     @time Alfonso.solve!(s_alf)
     @test Alfonso.get_status(s_alf) == :Optimal
 
@@ -70,7 +70,15 @@ end
 
 @testset "3D poly envelope example (sparse A)" begin
     alf = Alfonso.AlfonsoOpt(verbose=verbflag)
-    build_envelope!(alf, 2, 4, 3, 8, dense=false)
+    build_envelope!(alf, 2, 3, 3, 5, dense=false)
+    @time Alfonso.solve!(alf)
+    @test Alfonso.get_status(alf) == :Optimal
+    @test Alfonso.get_pobj(alf) ≈ Alfonso.get_dobj(alf) atol=1e-4 rtol=1e-4
+end
+
+@testset "4D poly envelope example (sparse A)" begin
+    alf = Alfonso.AlfonsoOpt(verbose=verbflag)
+    build_envelope!(alf, 2, 3, 4, 4, dense=false)
     @time Alfonso.solve!(alf)
     @test Alfonso.get_status(alf) == :Optimal
     @test Alfonso.get_pobj(alf) ≈ Alfonso.get_dobj(alf) atol=1e-4 rtol=1e-4
