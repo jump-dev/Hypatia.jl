@@ -546,32 +546,31 @@ function solvelinsys(y1, x1, y2, x2, mu, rhs_tx, rhs_ty, A, b, c, cone, HiAt, AH
     # TODO could ultimately be faster or more stable to do cholesky.L ldiv everywhere than to do full hessian ldiv
     calcHiarr!(HiAt, A', cone)
     HiAt .*= invmu
-
     mul!(AHiAt, A, HiAt)
     F = cholesky!(Symmetric(AHiAt))
 
     # TODO can parallelize 1 and 2
-    # y1 = F\(b + HiAt'*c)
-    mul!(y1, HiAt', c)
-    y1 .+= b
-    ldiv!(F, y1)
-
-    # x1 = Hi*invmu*(A'*y1 - c)
-    mul!(x1, A', y1)
-    x1 .-= c
-    x1 .*= invmu
-    calcHiarr!(x1, x1, cone)
-
     # y2 = F\(rhs_ty + HiAt'*rhs_tx)
     mul!(y2, HiAt', rhs_tx)
     y2 .+= rhs_ty
-    ldiv!(F, y2)
+    ldiv!(F, y2) # y2 done
 
     # x2 = Hi*invmu*(A'*y2 - rhs_tx)
     mul!(x2, A', y2)
-    x2 .-= rhs_tx
-    x2 .*= invmu
-    calcHiarr!(x2, x2, cone)
+    rhs_tx .= x2 .- rhs_tx # destroys rhs_tx
+    rhs_tx .*= invmu
+    calcHiarr!(x2, rhs_tx, cone) # x2 done
+
+    # y1 = F\(b + HiAt'*c)
+    mul!(y1, HiAt', c)
+    y1 .+= b
+    ldiv!(F, y1) # y1 done
+
+    # x1 = Hi*invmu*(A'*y1 - c)
+    mul!(rhs_tx, A', y1)
+    rhs_tx .-= c
+    rhs_tx .*= invmu
+    calcHiarr!(x1, rhs_tx, cone) # x1 done
 
     return (y1, x1, y2, x2)
 end
