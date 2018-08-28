@@ -3,6 +3,8 @@
 cone object
 =#
 
+abstract type PrimitiveCone end
+
 # TODO reorder primitive cones so easiest ones to check incone are first
 mutable struct Cone
     prms::Vector{PrimitiveCone}
