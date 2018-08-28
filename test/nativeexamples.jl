@@ -170,7 +170,7 @@ end
 
 # tolerances not satisfied
 @testset "Rosenbrock" begin
-    alf = Alfonso.AlfonsoOpt(verbose=verbflag, optimtol=1e-4, maxpredsmallsteps=20)
+    alf = Alfonso.AlfonsoOpt(verbose=verbflag, optimtol=1e-5, maxpredsmallsteps=20)
     build_namedpoly!(alf, :rosenbrock, 3)
     @time Alfonso.solve!(alf)
     # @test Alfonso.get_status(alf) == :Optimal
@@ -180,10 +180,25 @@ end
 
 # tolerances not satisfied
 @testset "Schwefel" begin
-    alf = Alfonso.AlfonsoOpt(verbose=verbflag, optimtol=1e-4, maxpredsmallsteps=25)
+    alf = Alfonso.AlfonsoOpt(verbose=verbflag, optimtol=1e-5, maxpredsmallsteps=25)
     build_namedpoly!(alf, :schwefel, 4)
     @time Alfonso.solve!(alf)
     @test Alfonso.get_status(alf) == :Optimal
     @test Alfonso.get_pobj(alf) ≈ 0 atol=1e-3 rtol=1e-3
     @test Alfonso.get_dobj(alf) ≈ 0 atol=1e-3 rtol=1e-3
+end
+
+@testset "small second-order cone problem" begin
+    alf = Alfonso.AlfonsoOpt(verbose=verbflag)
+    c = Float64[0, -1, -1]
+    A = Float64[1 0 0; 0 1 0]
+    b = Float64[1, 1/sqrt(2)]
+    cone = Alfonso.Cone([Alfonso.SecondOrderCone(3)], AbstractUnitRange[1:3])
+    Alfonso.load_data!(alf, A, b, c, cone)
+    @time Alfonso.solve!(alf)
+    @test Alfonso.get_status(alf) == :Optimal
+    @test Alfonso.get_pobj(alf) ≈ -sqrt(2) atol=1e-4 rtol=1e-4
+    @test Alfonso.get_dobj(alf) ≈ Alfonso.get_pobj(alf) atol=1e-4 rtol=1e-4
+    @test Alfonso.get_y(alf) ≈ [-sqrt(2), 0.0] atol=1e-4 rtol=1e-4
+    @test Alfonso.get_x(alf) ≈ [1.0, 1/sqrt(2), 1/sqrt(2)] atol=1e-4 rtol=1e-4
 end
