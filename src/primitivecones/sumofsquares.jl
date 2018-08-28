@@ -29,7 +29,7 @@ end
 
 dimension(prm::SumOfSquaresCone) = prm.dim
 barrierpar_prm(prm::SumOfSquaresCone) = sum(size(ipwtj, 2) for ipwtj in prm.ipwt)
-getintdir_prm!(arr::AbstractVector{Float64}, prm::SumOfSquaresCone) = (arr .= 1.0)
+getintdir_prm!(arr::AbstractVector{Float64}, prm::SumOfSquaresCone) = (arr .= 1.0; arr)
 loadpnt_prm!(prm::SumOfSquaresCone, pnt::AbstractVector{Float64}) = (prm.pnt = pnt)
 
 function incone_prm(prm::SumOfSquaresCone)
@@ -63,5 +63,5 @@ function incone_prm(prm::SumOfSquaresCone)
     return true
 end
 
-calcg_prm!(g::AbstractVector{Float64}, prm::SumOfSquaresCone) = (g .= prm.g)
+calcg_prm!(g::AbstractVector{Float64}, prm::SumOfSquaresCone) = (g .= prm.g; g)
 calcHiarr_prm!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prm::SumOfSquaresCone) = ldiv!(prod, prm.F, arr)
