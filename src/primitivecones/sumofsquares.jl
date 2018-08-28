@@ -1,30 +1,4 @@
 
-#=
-predefined standard primitive cone types
-=#
-
-abstract type PrimitiveCone end
-
-# nonnegative orthant cone
-mutable struct NonnegCone <: PrimitiveCone
-    dim::Int
-    pnt::AbstractVector{Float64}
-
-    function NonnegCone(dim::Int)
-        prm = new()
-        prm.dim = dim
-        return prm
-    end
-end
-
-dimension(prm::NonnegCone) = prm.dim
-barrierpar_prm(prm::NonnegCone) = prm.dim
-getintdir_prm!(arr::AbstractVector{Float64}, prm::NonnegCone) = (arr .= 1.0)
-loadpnt_prm!(prm::NonnegCone, pnt::AbstractVector{Float64}) = (prm.pnt = pnt)
-incone_prm(prm::NonnegCone) = all(x -> (x > 0.0), prm.pnt)
-calcg_prm!(g::AbstractVector{Float64}, prm::NonnegCone) = (g .= inv.(prm.pnt) .* -1.0)
-calcHiarr_prm!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prm::NonnegCone) = (prod .= abs2.(prm.pnt) .* arr)
-
 # polynomial (weighted) sum of squares cone (parametrized by ip and ipwt)
 mutable struct SumOfSquaresCone <: PrimitiveCone
     dim::Int
