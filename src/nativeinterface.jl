@@ -373,14 +373,14 @@ function solve!(alf::AlfonsoOpt)
                     continue
                 end
 
-                # iterate is outside the beta-neighborhood
-                if alphaprevok # TODO technically this should be only if nprediters > 1, but it seems to work
-                    # previous iterate was inside the beta-neighborhood
-                    if alf.predlinesearch
-                        alphapred = alpha*alf.predlsmulti
-                    end
-                    break
-                end
+                # # iterate is outside the beta-neighborhood
+                # if alphaprevok # TODO technically this should be only if nprediters > 1, but it seems to work
+                #     # previous iterate was inside the beta-neighborhood
+                #     if alf.predlinesearch
+                #         alphapred = alpha*alf.predlsmulti
+                #     end
+                #     break
+                # end
             end
 
             # primal iterate is either
