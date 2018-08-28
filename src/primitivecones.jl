@@ -19,6 +19,7 @@ end
 
 dimension(prm::NonnegCone) = prm.dim
 barrierpar_prm(prm::NonnegCone) = prm.dim
+getintdir_prm!(arr::AbstractVector{Float64}, prm::NonnegCone) = (arr .= 1.0)
 loadpnt_prm!(prm::NonnegCone, pnt::AbstractVector{Float64}) = (prm.pnt = pnt)
 incone_prm(prm::NonnegCone) = all(x -> (x > 0.0), prm.pnt)
 calcg_prm!(g::AbstractVector{Float64}, prm::NonnegCone) = (g .= inv.(prm.pnt) .* -1.0)
@@ -54,6 +55,7 @@ end
 
 dimension(prm::SumOfSquaresCone) = prm.dim
 barrierpar_prm(prm::SumOfSquaresCone) = sum(size(ipwtj, 2) for ipwtj in prm.ipwt)
+getintdir_prm!(arr::AbstractVector{Float64}, prm::SumOfSquaresCone) = (arr .= 1.0)
 loadpnt_prm!(prm::SumOfSquaresCone, pnt::AbstractVector{Float64}) = (prm.pnt = pnt)
 
 function incone_prm(prm::SumOfSquaresCone)

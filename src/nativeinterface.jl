@@ -207,25 +207,32 @@ function getinitialiterate(alf::AlfonsoOpt)
     (m, n) = size(A)
     cone = alf.cone
 
+    # initial primal iterate
+    tx = similar(c)
+    getintdir!(tx, cone)
+    loadpnt!(cone, tx)
+    @assert incone(cone)
+
     # scaling factor for the primal problem
     rp = maximum((1.0 + abs(b[i]))/(1.0 + abs(sum(A[i,:]))) for i in 1:m)
     # scaling factor for the dual problem
-    g = ones(n)
-    loadpnt!(cone, g)
-    @assert incone(cone)
+    g = similar(c)
     calcg!(g, cone)
     rd = maximum((1.0 + abs(g[j]))/(1.0 + abs(c[j])) for j in 1:n)
 
     # central primal-dual iterate
-    tx = fill(sqrt(rp*rd), n)
-    loadpnt!(cone, tx)
-    @assert incone(cone)
+    tx .*= sqrt(rp*rd)
+    @assert incone(cone) # TODO a little expensive to call this twice
     ty = zeros(m)
     tau = 1.0
     ts = calcg!(g, cone)
     ts .*= -1.0
     kap = 1.0
     mu = (dot(tx, ts) + tau*kap)/alf.bnu
+
+    # TODO can delete later
+    @assert abs(1.0 - mu) < 1e-8
+    @assert abs(calcnbhd(tau*kap, mu, copy(ts), copy(ts), cone)) < 1e-6
 
     return (tx, ty, tau, ts, kap, mu)
 end
@@ -367,7 +374,7 @@ function solve!(alf::AlfonsoOpt)
                 end
 
                 # iterate is outside the beta-neighborhood
-                if alphaprevok
+                if alphaprevok # TODO technically this should be only if nprediters > 1, but it seems to work
                     # previous iterate was inside the beta-neighborhood
                     if alf.predlinesearch
                         alphapred = alpha*alf.predlsmulti
