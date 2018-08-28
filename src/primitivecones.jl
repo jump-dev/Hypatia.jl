@@ -70,8 +70,9 @@ function incone_prm(prm::SumOfSquaresCone)
             return false
         end
 
-        rdiv!(prm.ipwt[j], F.U)
-        mul!(prm.Vp2, prm.ipwt[j], prm.ipwt[j]') # TODO if parallel, need to use separate Vp2[j]
+        prm.Vp[j] .= prm.ipwt[j] # TODO this shouldn't be necessary if don't have to use rdiv
+        rdiv!(prm.Vp[j], F.U)
+        mul!(prm.Vp2, prm.Vp[j], prm.Vp[j]') # TODO if parallel, need to use separate Vp2[j]
 
         for i in eachindex(prm.g)
             @inbounds prm.g[i] -= prm.Vp2[i,i]
