@@ -199,6 +199,23 @@ end
     @test Alfonso.get_status(alf) == :Optimal
     @test Alfonso.get_pobj(alf) ≈ -sqrt(2) atol=1e-4 rtol=1e-4
     @test Alfonso.get_dobj(alf) ≈ Alfonso.get_pobj(alf) atol=1e-4 rtol=1e-4
-    @test Alfonso.get_y(alf) ≈ [-sqrt(2), 0.0] atol=1e-4 rtol=1e-4
-    @test Alfonso.get_x(alf) ≈ [1.0, 1/sqrt(2), 1/sqrt(2)] atol=1e-4 rtol=1e-4
+    @test Alfonso.get_y(alf) ≈ [-sqrt(2), 0] atol=1e-4 rtol=1e-4
+    @test Alfonso.get_x(alf) ≈ [1, 1/sqrt(2), 1/sqrt(2)] atol=1e-4 rtol=1e-4
+end
+
+@testset "small exponential cone problem" begin
+    alf = Alfonso.AlfonsoOpt(verbose=verbflag)
+    c = Float64[1, 1, 1]
+    A = Float64[0 1 0; 1 0 0]
+    b = Float64[2, 1]
+    cone = Alfonso.Cone([Alfonso.ExponentialCone()], AbstractUnitRange[1:3])
+    Alfonso.load_data!(alf, A, b, c, cone)
+    @time Alfonso.solve!(alf)
+    @test Alfonso.get_status(alf) == :Optimal
+    @test Alfonso.get_pobj(alf) ≈ (2*exp(1/2)+3) atol=1e-4 rtol=1e-4
+    @test Alfonso.get_dobj(alf) ≈ Alfonso.get_pobj(alf) atol=1e-4 rtol=1e-4
+    @test dot(Alfonso.get_y(alf), b) ≈ Alfonso.get_pobj(alf) atol=1e-4 rtol=1e-4
+    @test Alfonso.get_x(alf) ≈ [1, 2, 2*exp(1/2)] atol=1e-4 rtol=1e-4
+    @test Alfonso.get_y(alf) ≈ [1+exp(1/2)/2, 1+exp(1/2)] atol=1e-4 rtol=1e-4
+    @test Alfonso.get_s(alf) ≈ (c - A'*Alfonso.get_y(alf)) atol=1e-4 rtol=1e-4
 end
