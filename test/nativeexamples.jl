@@ -193,7 +193,7 @@ end
     c = Float64[0, -1, -1]
     A = Float64[1 0 0; 0 1 0]
     b = Float64[1, 1/sqrt(2)]
-    cone = Alfonso.Cone([Alfonso.SecondOrderCone(3)], AbstractUnitRange[1:3])
+    cone = Alfonso.Cone([Alfonso.SecondOrderCone(3)], [1:3])
     Alfonso.load_data!(alf, A, b, c, cone)
     @time Alfonso.solve!(alf)
     @test Alfonso.get_status(alf) == :Optimal
@@ -208,7 +208,7 @@ end
     c = Float64[1, 1, 1]
     A = Float64[0 1 0; 1 0 0]
     b = Float64[2, 1]
-    cone = Alfonso.Cone([Alfonso.ExponentialCone()], AbstractUnitRange[1:3])
+    cone = Alfonso.Cone([Alfonso.ExponentialCone()], [1:3])
     Alfonso.load_data!(alf, A, b, c, cone)
     @time Alfonso.solve!(alf)
     @test Alfonso.get_status(alf) == :Optimal
@@ -218,4 +218,18 @@ end
     @test Alfonso.get_x(alf) ≈ [1, 2, 2*exp(1/2)] atol=1e-4 rtol=1e-4
     @test Alfonso.get_y(alf) ≈ [1+exp(1/2)/2, 1+exp(1/2)] atol=1e-4 rtol=1e-4
     @test Alfonso.get_s(alf) ≈ (c - A'*Alfonso.get_y(alf)) atol=1e-4 rtol=1e-4
+end
+
+@testset "small power cone problem" begin
+    alf = Alfonso.AlfonsoOpt(verbose=verbflag)
+    c = Float64[1, 0, 0, -1, -1, 0]
+    A = Float64[1 1 1/2 0 0 0; 0 0 0 0 0 1]
+    b = Float64[2, 1]
+    cone = Alfonso.Cone([Alfonso.PowerCone(0.2), Alfonso.PowerCone(0.4)], [[1, 2, 4], [3, 6, 5]])
+    Alfonso.load_data!(alf, A, b, c, cone)
+    @time Alfonso.solve!(alf)
+    @test Alfonso.get_status(alf) == :Optimal
+    @test Alfonso.get_pobj(alf) ≈ -1.80734 atol=1e-4 rtol=1e-4
+    @test Alfonso.get_dobj(alf) ≈ Alfonso.get_pobj(alf) atol=1e-4 rtol=1e-4
+    @test Alfonso.get_x(alf)[1:3] ≈ [0.0639314, 0.783361, 2.30542] atol=1e-4 rtol=1e-4
 end
