@@ -32,7 +32,7 @@ function build_lp!(alf::Alfonso.AlfonsoOpt, m::Int, n::Int; use_data::Bool=false
     if tosparse && !issparse(A)
         A = sparse(A)
     end
-    cone = Alfonso.Cone([Alfonso.NonnegativeCone(n),], AbstractUnitRange[1:n,])
+    cone = Alfonso.Cone([Alfonso.NonnegativeCone(n)], [1:n])
 
     return Alfonso.load_data!(alf, A, b, c, cone)
 end
