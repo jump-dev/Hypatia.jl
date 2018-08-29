@@ -40,7 +40,7 @@ function build_envelope!(alf::Alfonso.AlfonsoOpt, npoly::Int, deg::Int, n::Int, 
         c = vec(P0[:,1:LDegs]*rand(-9:9, LDegs, npoly))
     end
 
-    cone = Alfonso.Cone([Alfonso.SumOfSquaresCone(U, [P, PWts...]) for k in 1:npoly], AbstractUnitRange[1+(k-1)*U:k*U for k in 1:npoly])
+    cone = Alfonso.Cone([Alfonso.SumOfSquaresCone(U, [P, PWts...]) for k in 1:npoly], [1+(k-1)*U:k*U for k in 1:npoly])
 
     return Alfonso.load_data!(alf, A, b, c, cone)
 end

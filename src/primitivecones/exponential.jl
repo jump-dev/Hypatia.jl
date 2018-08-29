@@ -44,7 +44,7 @@ function incone_prm(prm::ExponentialCone)
     HiU = prm.Hi.data # upper triangle
     den = 2*y + dist
     invden = inv(den)
-    # TODO combine more repeated subexpressions
+    # TODO refactor more repeated subexpressions
     HiU[1,1] = -(-2*ylzy^3 + (4*x - y)*abs2(ylzy) + (-3*abs2(x) + 2*y*x - 2*abs2(y))*ylzy + x*(abs2(x) - 2*y*x + 2*abs2(y))) * invden # (-2 y^3 log^3(z/y) + (4 x - y) y^2 log^2(z/y) + y (-3 x^2 + 2 y x - 2 y^2) log(z/y) + x (x^2 - 2 y x + 2 y^2))/(x - 2 y - y log(z/y))
     HiU[1,2] = y * (abs2(ylzy) - x*ylzy + x*y) * invden  # (y^2 (y log^2(z/y) - x log(z/y) + x))/(-x + 2 y + y log(z/y))
     HiU[1,3] = y * z * (2*ylzy - x) * invden # (y z (2 y log(z/y) - x))/(-x + 2 y + y log(z/y))
