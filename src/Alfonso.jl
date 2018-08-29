@@ -6,7 +6,7 @@ module Alfonso
 
     include("interpolation.jl")
     include("cone.jl")
-    for primcone in ["nonnegative", "secondorder", "sumofsquares"]
+    for primcone in ["nonnegative", "sumofsquares", "secondorder", "exponential"]
         include(joinpath(@__DIR__, "primitivecones", primcone * ".jl"))
     end
     include("nativeinterface.jl")
