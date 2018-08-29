@@ -8,7 +8,7 @@ abstract type PrimitiveCone end
 # TODO reorder primitive cones so easiest ones to check incone are first
 mutable struct Cone
     prms::Vector{PrimitiveCone}
-    idxs::Vector{AbstractUnitRange}
+    idxs::Vector{AbstractVector{Int}}
 end
 
 # calculate complexity parameter of the barrier (sum of the primitive cone barrier parameters)
