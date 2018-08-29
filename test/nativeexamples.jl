@@ -219,3 +219,6 @@ end
     @test Alfonso.get_y(alf) ≈ [1+exp(1/2)/2, 1+exp(1/2)] atol=1e-4 rtol=1e-4
     @test Alfonso.get_s(alf) ≈ (c - A'*Alfonso.get_y(alf)) atol=1e-4 rtol=1e-4
 end
+
+
+power cone test: https://github.com/JuliaOpt/Mosek.jl/blob/master/examples/pow1.jl
