@@ -9,7 +9,7 @@ mutable struct SecondOrderCone <: PrimitiveCone
     function SecondOrderCone(dim::Int)
         prm = new()
         prm.dim = dim
-        prm.Hi = Matrix{Float64}(undef, dim , dim)
+        prm.Hi = Matrix{Float64}(undef, dim, dim)
         return prm
     end
 end
@@ -20,8 +20,11 @@ getintdir_prm!(arr::AbstractVector{Float64}, prm::SecondOrderCone) = (arr[1] = 1
 loadpnt_prm!(prm::SecondOrderCone, pnt::AbstractVector{Float64}) = (prm.pnt = pnt)
 
 function incone_prm(prm::SecondOrderCone)
-    prm.dist = abs2(prm.pnt[1]) - sum(abs2, prm.pnt[j] for j in 2:prm.dim)
+    if prm.pnt[1] <= 0
+        return false
+    end
 
+    prm.dist = abs2(prm.pnt[1]) - sum(abs2, prm.pnt[j] for j in 2:prm.dim)
     if prm.dist > 0.0
         mul!(prm.Hi, prm.pnt, prm.pnt')
         prm.Hi .+= prm.Hi
