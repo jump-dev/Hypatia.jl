@@ -269,10 +269,23 @@ end
     b = Float64[1/2, 1]
     cone = Alfonso.Cone([Alfonso.PositiveSemidefiniteCone(3)], [1:3])
     Alfonso.load_data!(alf, A, b, c, cone)
-    alf.maxcorrsteps = 25
     @time Alfonso.solve!(alf)
     @test Alfonso.get_status(alf) == :Optimal
     @test Alfonso.get_pobj(alf) ≈ -1 atol=1e-4 rtol=1e-4
     @test Alfonso.get_dobj(alf) ≈ Alfonso.get_pobj(alf) atol=1e-4 rtol=1e-4
     @test Alfonso.get_x(alf)[2] ≈ 1 atol=1e-4 rtol=1e-4
+end
+
+@testset "small positive semidefinite cone problem 2" begin
+    alf = Alfonso.AlfonsoOpt(verbose=verbflag)
+    c = Float64[1, 0, 0, 1, 0, 1]
+    A = Float64[1 2 3 4 5 6; 1 1 1 1 1 1]
+    b = Float64[10, 3]
+    cone = Alfonso.Cone([Alfonso.PositiveSemidefiniteCone(6)], [1:6])
+    Alfonso.load_data!(alf, A, b, c, cone)
+    @time Alfonso.solve!(alf)
+    @test Alfonso.get_status(alf) == :Optimal
+    @test Alfonso.get_pobj(alf) ≈ 1.2461836 atol=1e-4 rtol=1e-4
+    @test Alfonso.get_dobj(alf) ≈ Alfonso.get_pobj(alf) atol=1e-4 rtol=1e-4
+    @test Alfonso.get_x(alf) ≈ [0.478289, 0.622167, 0.589457, 0.404663, 0.542193, 0.363232] atol=1e-4 rtol=1e-4
 end
