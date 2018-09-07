@@ -358,7 +358,7 @@ function solve!(alf::AlfonsoOpt)
                 sa_mu = (dot(sa_tx, sa_ts) + sa_tk)/alf.bnu
                 nbhd = calcnbhd(sa_tk, sa_mu, sa_ts, g, cone)
 
-                if nbhd < alf.beta
+                if nbhd < abs2(alf.beta*sa_mu)
                     # iterate is inside the beta-neighborhood
                     if !alphaprevok || (alpha > alf.predlsmulti)
                         # either the previous iterate was outside the beta-neighborhood or increasing alpha again will make it > 1
@@ -411,7 +411,7 @@ function solve!(alf::AlfonsoOpt)
         mu = (dot(tx, ts) + tau*kap)/alf.bnu
 
         # skip correction phase if allowed and current iterate is in the eta-neighborhood
-        if alf.corrcheck && (nbhd < alf.eta)
+        if alf.corrcheck && (nbhd < abs2(alf.eta*mu))
             continue
         end
 
@@ -476,7 +476,7 @@ function solve!(alf::AlfonsoOpt)
             # finish if allowed and current iterate is in the eta-neighborhood, or if taken max steps
             if (ncorrsteps == alf.maxcorrsteps) || alf.corrcheck
                 sa_ts .= ts
-                if calcnbhd(tau*kap, mu, sa_ts, g, cone) <= alf.eta
+                if calcnbhd(tau*kap, mu, sa_ts, g, cone) <= abs2(alf.eta*mu)
                     break
                 elseif ncorrsteps == alf.maxcorrsteps
                     # nbhd_eta > eta, so corrector failed
@@ -537,7 +537,7 @@ function calcnbhd(tk, mu, sa_ts, g, cone)
     calcg!(g, cone)
     sa_ts .+= mu .* g
     calcHiarr!(g, sa_ts, cone)
-    return sqrt((tk - mu)^2 + dot(sa_ts, g))/mu
+    return (tk - mu)^2 + dot(sa_ts, g)
 end
 
 function solvelinsys(y1, x1, y2, x2, mu, rhs_tx, rhs_ty, A, b, c, cone, HiAt, AHiAt)
