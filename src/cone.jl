@@ -9,6 +9,25 @@ abstract type PrimitiveCone end
 mutable struct Cone
     prms::Vector{PrimitiveCone}
     idxs::Vector{AbstractVector{Int}}
+
+    function Cone(prms::Vector{PrimitiveCone}, idxs::Vector{AbstractVector{Int}})
+        @assert length(prms) == length(idxs)
+        for k in eachindex(prms)
+            @assert dimension(prms[k]) == length(idxs[k])
+        end
+        cone = new()
+        cone.prms = prms
+        cone.idxs = idxs
+        return cone
+    end
+end
+Cone() = Cone(PrimitiveCone[], AbstractVector{Int}[])
+
+function addprimitivecone!(cone, prm, idx)
+    @assert dimension(prm) == length(idx)
+    push!(cone.prms, prm)
+    push!(cone.idxs, idx)
+    return cone
 end
 
 # calculate complexity parameter of the barrier (sum of the primitive cone barrier parameters)
