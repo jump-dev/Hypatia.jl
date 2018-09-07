@@ -247,3 +247,32 @@ end
     @test Alfonso.get_dobj(alf) ≈ Alfonso.get_pobj(alf) atol=1e-4 rtol=1e-4
     @test Alfonso.get_x(alf)[3:4] ≈ [1, 1]/sqrt(2) atol=1e-4 rtol=1e-4
 end
+
+@testset "small rotated second-order cone problem 2" begin
+    alf = Alfonso.AlfonsoOpt(verbose=verbflag)
+    c = Float64[0, 0, -1]
+    A = Float64[1 0 0; 0 1 0]
+    b = Float64[1/2, 1]/sqrt(2)
+    cone = Alfonso.Cone([Alfonso.RotatedSecondOrderCone(3)], [1:3])
+    Alfonso.load_data!(alf, A, b, c, cone)
+    @time Alfonso.solve!(alf)
+    @test Alfonso.get_status(alf) == :Optimal
+    @test Alfonso.get_pobj(alf) ≈ -1/sqrt(2) atol=1e-4 rtol=1e-4
+    @test Alfonso.get_dobj(alf) ≈ Alfonso.get_pobj(alf) atol=1e-4 rtol=1e-4
+    @test Alfonso.get_x(alf)[2] ≈ 1/sqrt(2) atol=1e-4 rtol=1e-4
+end
+
+@testset "small positive semidefinite cone problem" begin
+    alf = Alfonso.AlfonsoOpt(verbose=verbflag)
+    c = Float64[0, -1, 0]
+    A = Float64[1 0 0; 0 0 1]
+    b = Float64[1/2, 1]
+    cone = Alfonso.Cone([Alfonso.PositiveSemidefiniteCone(3)], [1:3])
+    Alfonso.load_data!(alf, A, b, c, cone)
+    alf.maxcorrsteps = 25
+    @time Alfonso.solve!(alf)
+    @test Alfonso.get_status(alf) == :Optimal
+    @test Alfonso.get_pobj(alf) ≈ -1 atol=1e-4 rtol=1e-4
+    @test Alfonso.get_dobj(alf) ≈ Alfonso.get_pobj(alf) atol=1e-4 rtol=1e-4
+    @test Alfonso.get_x(alf)[2] ≈ 1 atol=1e-4 rtol=1e-4
+end
