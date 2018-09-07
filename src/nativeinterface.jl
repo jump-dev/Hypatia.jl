@@ -84,7 +84,7 @@ mutable struct AlfonsoOpt
 end
 
 function AlfonsoOpt(;
-    verbose = false,
+    verbose = true,
     optimtol = 1e-6,
     maxiter = 1e3,
     predlinesearch = true,
