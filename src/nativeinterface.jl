@@ -84,7 +84,7 @@ mutable struct AlfonsoOpt
 end
 
 function AlfonsoOpt(;
-    verbose = true,
+    verbose = false,
     optimtol = 1e-6,
     maxiter = 1e3,
     predlinesearch = true,
@@ -116,10 +116,10 @@ end
 get_status(alf::AlfonsoOpt) = alf.status
 get_solvetime(alf::AlfonsoOpt) = alf.solvetime
 get_niters(alf::AlfonsoOpt) = alf.niters
-get_y(alf::AlfonsoOpt) = copy(alf.y)
-get_x(alf::AlfonsoOpt) = copy(alf.x)
+get_y(alf::AlfonsoOpt) = alf.y # TODO? copy(alf.y)
+get_x(alf::AlfonsoOpt) = alf.x # copy(alf.x)
 get_tau(alf::AlfonsoOpt) = alf.tau
-get_s(alf::AlfonsoOpt) = copy(alf.s)
+get_s(alf::AlfonsoOpt) = alf.s # copy(alf.s)
 get_kappa(alf::AlfonsoOpt) = alf.kappa
 get_pobj(alf::AlfonsoOpt) = alf.pobj
 get_dobj(alf::AlfonsoOpt) = alf.dobj
@@ -127,8 +127,8 @@ get_dgap(alf::AlfonsoOpt) = alf.dgap
 get_cgap(alf::AlfonsoOpt) = alf.cgap
 get_rel_dgap(alf::AlfonsoOpt) = alf.rel_dgap
 get_rel_cgap(alf::AlfonsoOpt) = alf.rel_cgap
-get_pres(alf::AlfonsoOpt) = copy(alf.pres)
-get_dres(alf::AlfonsoOpt) = copy(alf.dres)
+get_pres(alf::AlfonsoOpt) = alf.pres # copy(alf.pres)
+get_dres(alf::AlfonsoOpt) = alf.dres # copy(alf.dres)
 get_pin(alf::AlfonsoOpt) = alf.pin
 get_din(alf::AlfonsoOpt) = alf.din
 get_rel_pin(alf::AlfonsoOpt) = alf.rel_pin
@@ -208,7 +208,7 @@ function getinitialiterate(alf::AlfonsoOpt)
     cone = alf.cone
 
     # initial primal iterate
-    tx = similar(c)
+    tx = zeros(n)
     getintdir!(tx, cone)
     loadpnt!(cone, tx)
     @assert incone(cone)
@@ -222,6 +222,7 @@ function getinitialiterate(alf::AlfonsoOpt)
 
     # central primal-dual iterate
     tx .*= sqrt(rp*rd)
+
     @assert incone(cone) # TODO a little expensive to call this twice
     ty = zeros(m)
     tau = 1.0
