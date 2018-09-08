@@ -23,7 +23,7 @@ mutable struct Cone
 end
 Cone() = Cone(PrimitiveCone[], AbstractVector{Int}[])
 
-function addprimitivecone!(cone, prm, idx)
+function addprimitivecone!(cone::Cone, prm::PrimitiveCone, idx::AbstractVector{Int})
     @assert dimension(prm) == length(idx)
     push!(cone.prms, prm)
     push!(cone.idxs, idx)
