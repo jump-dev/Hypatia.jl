@@ -181,16 +181,17 @@ function MOI.copy_to(opt::Optimizer, src::MOI.ModelLike; copy_names=false, warn_
         idxmap[ci] = MOI.ConstraintIndex{MOI.SingleVariable, S}(i)
 
         bval = ((S == MOI.GreaterThan{Float64}) ? getconset(ci).lower : getconset(ci).upper)
+        vn = getconfun(ci).variable
         if iszero(bval)
             # no need to change A,b
-            push!(nonnegvars, idxmap[getconfun(ci).variable].value)
+            push!(nonnegvars, idxmap[vn].value)
         else
             # add auxiliary variable and equality constraint
             m += 1
             push!(Ib, m)
             push!(Vb, bval)
             push!(IA, m)
-            push!(JA, idxmap[getconfun(ci).variable].value)
+            push!(JA, idxmap[vn].value)
             push!(VA, 1.0)
             n += 1
             push!(IA, m)
@@ -221,11 +222,39 @@ function MOI.copy_to(opt::Optimizer, src::MOI.ModelLike; copy_names=false, warn_
         push!(nonnegvars, n)
     end
 
-    # MOI.VectorOfVariables,
-    # MOI.VectorAffineFunction{Float64},
-    # MOI.Nonnegatives,
-    # MOI.Nonpositives,
+    for S in (MOI.Nonnegatives, MOI.Nonpositives), ci in getsrccons(MOI.VectorOfVariables, S)
+        i += 1
+        idxmap[ci] = MOI.ConstraintIndex{MOI.VectorOfVariables, S}(i)
 
+        for vj in getconfun(ci).variables
+            col = idxmap[vj].value
+            m += 1
+            push!(IA, m)
+            push!(JA, col)
+            push!(VA, ((S == MOI.Nonnegatives) ? 1.0 : -1.0))
+            push!(nonnegvars, col)
+        end
+    end
+
+    for S in (MOI.Nonnegatives, MOI.Nonpositives), ci in getsrccons(MOI.VectorAffineFunction{Float64}, S)
+        i += 1
+        idxmap[ci] = MOI.ConstraintIndex{MOI.VectorAffineFunction{Float64}, S}(i)
+
+        fi = getconfun(ci)
+        dim = MOI.output_dimension(fi)
+        for vt in fi.terms
+            push!(IA, m + vt.output_index)
+            push!(JA, idxmap[vt.scalar_term.variable_index].value)
+            push!(VA, vt.scalar_term.coefficient)
+        end
+        append!(Ib, collect(m+1:m+dim))
+        append!(Vb, -fi.constants)
+        append!(IA, collect(m+1:m+dim))
+        append!(JA, collect(n+1:n+dim))
+        append!(VA, fill(((S == MOI.Nonnegatives) ? 1.0 : -1.0), dim))
+        m += dim
+        n += dim
+    end
 
     # add single nonnegative cone
     addprimitivecone!(cone, NonnegativeCone(length(nonnegvars)), nonnegvars)
