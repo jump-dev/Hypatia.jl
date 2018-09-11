@@ -52,15 +52,15 @@ function calcHiarr!(Hi_vec::AbstractVector{Float64}, vec::AbstractVector{Float64
     return Hi_vec
 end
 
-# utilities for converting between smat and svec forms (no rescaling) for symmetric matrices
-# TODO only need to do upper triangle if use symmetric matrix types
+# utilities for converting between smat and svec forms (lower triangle) for symmetric matrices
+# TODO only need to do lower triangle if use symmetric matrix types
 const rt2 = sqrt(2)
 const rt2i = inv(rt2)
 
 function mattovec!(vec::AbstractVector{Float64}, mat::AbstractMatrix{Float64})
     k = 1
-    (m, n) = size(mat)
-    for i in 1:m, j in i:n
+    m = size(mat, 1)
+    for i in 1:m, j in 1:i
         if i == j
             vec[k] = mat[i,j]
         else
@@ -73,8 +73,8 @@ end
 
 function vectomat!(mat::AbstractMatrix{Float64}, vec::AbstractVector{Float64})
     k = 1
-    (m, n) = size(mat)
-    for i in 1:m, j in i:n
+    m = size(mat, 1)
+    for i in 1:m, j in 1:i
         if i == j
             mat[i,j] = vec[k]
         else
