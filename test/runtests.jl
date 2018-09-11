@@ -38,28 +38,28 @@ const optimizer = MOIU.CachingOptimizer(AlfonsoModelData{Float64}(), Alfonso.Opt
 const config = MOIT.TestConfig(
     atol=1e-4,
     rtol=1e-4,
-    solve=false,
+    solve=true,
     query=true,
     modify_lhs=true,
     duals=false,
     infeas_certificates=false,
     )
 
-@testset "Continuous linear problems" begin
-    MOIT.contlineartest(MOIB.SplitInterval{Float64}(optimizer), config)
-end
-
-# @testset "Continuous conic problems" begin
-#     exclude = ["rootdet", "logdet"]
-#     MOIT.contconictest(
-#         MOIB.SquarePSD{Float64}(
-#         MOIB.GeoMean{Float64}(
-#         MOIB.LogDet{Float64}(
-#         MOIB.RootDet{Float64}(
-#             optimizer
-#         )))),
-#         config, exclude)
+# @testset "Continuous linear problems" begin
+#     MOIT.contlineartest(MOIB.SplitInterval{Float64}(optimizer), config)
 # end
+
+@testset "Continuous conic problems" begin
+    exclude = ["rootdet", "logdet"]
+    MOIT.contconictest(
+        MOIB.SquarePSD{Float64}(
+        MOIB.GeoMean{Float64}(
+        # MOIB.LogDet{Float64}(
+        # MOIB.RootDet{Float64}(
+            optimizer
+        )),
+        config, exclude)
+end
 
 
 #
