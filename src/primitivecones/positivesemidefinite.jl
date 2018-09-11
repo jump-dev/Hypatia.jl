@@ -1,5 +1,5 @@
 
-# positive semidefinite cone
+# positive semidefinite cone (lower triangle, off-diagonals scaled)
 mutable struct PositiveSemidefiniteCone <: PrimitiveCone
     dim::Int
     side::Int
