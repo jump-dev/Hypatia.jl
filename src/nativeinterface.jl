@@ -1,13 +1,23 @@
 #=
-primal (over x):
+linear objective
+ primal (over x):
   min  c'x :
     b - Ax == 0   (y)
     h - Gx in K   (z)
-
-dual (over z,y):
+ dual (over z,y):
   max  -b'y - h'z :
     c + A'y + G'z == 0   (x)
                 z in K*  (s)
+
+TODO quadratic objective (P is PSD) with scalar offset o (see http://www.seas.ucla.edu/~vandenbe/publications/coneprog.pdf)
+ primal (over x):
+  min  1/2 x'Px + c'x + o :
+               b - Ax == 0   (y)
+               h - Gx in K   (z)
+ dual (over z,y,w):
+  max  -1/2 w'Pw - b'y - h'z + o :
+               c + A'y + G'z == Pw  (x)
+                           z in K*  (s)
 =#
 
 mutable struct AlfonsoOpt
@@ -25,7 +35,7 @@ mutable struct AlfonsoOpt
     corrlsmulti::Float64    # corrector line search step size multiplier
 
     # problem data
-    # Q::AbstractMatrix{Float64}  # quadratic cost matrix, size n*n
+    # P::AbstractMatrix{Float64}  # quadratic cost matrix, size n*n
     c::Vector{Float64}          # linear cost vector, size n
     # o::Vector{Float64}          # objective offset scalar
     A::AbstractMatrix{Float64}  # equality constraint matrix, size p*n
@@ -112,7 +122,7 @@ end
 # load and verify problem data, calculate algorithmic parameters
 function load_data!(
     alf::AlfonsoOpt,
-    # Q::AbstractMatrix{Float64},
+    # P::AbstractMatrix{Float64},
     c::Vector{Float64},
     # o::Vector{Float64},
     A::AbstractMatrix{Float64},
@@ -130,7 +140,7 @@ function load_data!(
         p = length(h)
         @assert n > 0
         @assert m + p > 0
-        if n != size(A, 2) || n != size(G, 2) # n != size(Q, 2) || n != size(Q, 1) ||
+        if n != size(A, 2) || n != size(G, 2) # n != size(P, 2) || n != size(P, 1) ||
             error("number of variables is not consistent in A, G, and c")
         end
         if m != size(A, 1)
@@ -139,11 +149,11 @@ function load_data!(
         if p != size(G, 1)
             error("number of constraint rows is not consistent in G and h")
         end
-        # if !isposdef(Q) # TODO performs cholesky - slow
-        #     error("Q matrix is not positive ")
+        # if !isposdef(P) # TODO performs cholesky - slow
+        #     error("P matrix is not positive ")
         # end
-        # if issparse(Q)
-        #     dropzeros!(Q)
+        # if issparse(P)
+        #     dropzeros!(P)
         # end
         if issparse(A)
             dropzeros!(A)
@@ -158,7 +168,7 @@ function load_data!(
     # TODO rank checks and preprocessing
 
     # save data in solver object
-    # alf.Q = Q
+    # alf.P = P
     alf.c = c
     # alf.o = o
     alf.A = A
