@@ -1,19 +1,20 @@
 #=
-Copyright 2018, David Papp, Sercan Yildiz, and contributors
+primal (over x):
+  min  c'x :
+    b - Ax == 0   (y)
+    h - Gx in K   (z)
 
-an implementation of the algorithm for non-symmetric conic optimization Alfonso (https://github.com/dpapp-github/alfonso) and analyzed in the paper:
-D. Papp and S. Yildiz. On "A homogeneous interior-point algorithm for nonsymmetric convex conic optimization"
-available at https://arxiv.org/abs/1712.00492
+dual (over z,y):
+  max  -b'y - h'z :
+    c + A'y + G'z == 0   (x)
+                z in K*  (s)
 =#
 
-# TODO add time limit option and use it in loop
 mutable struct AlfonsoOpt
     # options
     verbose::Bool           # if true, prints progress at each iteration
     optimtol::Float64       # optimization tolerance parameter
     maxiter::Int            # maximum number of iterations
-    # itrefinethres::Float64  # iterative refinement success threshold
-    # maxitrefinesteps::Int   # maximum number of iterative refinement steps in linear system solves
     predlinesearch::Bool    # if false, predictor step uses a fixed step size, else step size is determined via line search
     maxpredsmallsteps::Int  # maximum number of predictor step size reductions allowed with respect to the safe fixed step size
     predlsmulti::Float64    # predictor line search step size multiplier
@@ -24,10 +25,12 @@ mutable struct AlfonsoOpt
     corrlsmulti::Float64    # corrector line search step size multiplier
 
     # problem data
-    A::AbstractMatrix{Float64}  # constraint matrix
-    b::Vector{Float64}          # right-hand side vector
-    c::Vector{Float64}          # cost vector
-    cone::Cone                  # primal cone object
+    c::Vector{Float64}          # cost vector, size n
+    A::AbstractMatrix{Float64}  # equality constraint matrix, size p*n
+    b::Vector{Float64}          # equality constraint vector, size p
+    G::AbstractMatrix{Float64}  # cone constraint matrix, size q*n
+    h::Vector{Float64}          # cone constraint vector, size q
+    cone::Cone                  # primal cone object, size q
 
     # algorithmic parameters
     bnu::Float64
@@ -113,60 +116,42 @@ function AlfonsoOpt(;
     return AlfonsoOpt(verbose, optimtol, maxiter, predlinesearch, maxpredsmallsteps, maxcorrsteps, corrcheck, maxcorrlsiters, alphacorr, predlsmulti, corrlsmulti)
 end
 
-get_status(alf::AlfonsoOpt) = alf.status
-get_solvetime(alf::AlfonsoOpt) = alf.solvetime
-get_niters(alf::AlfonsoOpt) = alf.niters
-get_y(alf::AlfonsoOpt) = copy(alf.y)
-get_x(alf::AlfonsoOpt) = copy(alf.x)
-get_tau(alf::AlfonsoOpt) = alf.tau
-get_s(alf::AlfonsoOpt) = copy(alf.s)
-get_kappa(alf::AlfonsoOpt) = alf.kappa
-get_pobj(alf::AlfonsoOpt) = alf.pobj
-get_dobj(alf::AlfonsoOpt) = alf.dobj
-get_dgap(alf::AlfonsoOpt) = alf.dgap
-get_cgap(alf::AlfonsoOpt) = alf.cgap
-get_rel_dgap(alf::AlfonsoOpt) = alf.rel_dgap
-get_rel_cgap(alf::AlfonsoOpt) = alf.rel_cgap
-get_pres(alf::AlfonsoOpt) = copy(alf.pres)
-get_dres(alf::AlfonsoOpt) = copy(alf.dres)
-get_pin(alf::AlfonsoOpt) = alf.pin
-get_din(alf::AlfonsoOpt) = alf.din
-get_rel_pin(alf::AlfonsoOpt) = alf.rel_pin
-get_rel_din(alf::AlfonsoOpt) = alf.rel_din
-
 # load and verify problem data, calculate algorithmic parameters
 function load_data!(
     alf::AlfonsoOpt,
     A::AbstractMatrix{Float64},
     b::Vector{Float64},
     c::Vector{Float64},
+    G::AbstractMatrix{Float64},
+    h::Vector{Float64},
     cone::Cone,
     )
     # check data consistency
-    (m, n) = size(A)
-    if (m == 0) || (n == 0)
-        error("input matrix A has trivial dimension $m x $n")
-    end
-    if m != length(b)
-        error("dimension of vector b is $(length(b)), but number of rows in matrix A is $m")
-    end
+    (p, n) = size(A)
+    @assert n == size(G, 2)
+    @assert n > 0
+    q = size(G, 1)
+    @assert p + q >= 1
     if n != length(c)
-        error("dimension of vector c is $(length(c)), but number of columns in matrix A is $n")
+        error("dimension of vector c is $(length(c)), but number of variables is $n")
+    end
+    if p != length(b)
+        error("dimension of vector b is $(length(b)), but number of rows in matrix A is $p")
+    end
+    if q != length(h)
+        error("dimension of vector h is $(length(h)), but number of rows in matrix G is $q")
     end
     if issparse(A)
         dropzeros!(A)
     end
-
+    if issparse(G)
+        dropzeros!(G)
+    end
     # TODO check cone consistency in cone functions file
-    # idxend = 0
-    # for k in eachindex(cone)
-    #     if dimension(cone[k]) != length(coneidxs[k])
-    #         error("dimension of cone type $(cone[k]) does not match length of variable indices")
-    #     end
-    #     @assert coneidxs[k][1] == idxend + 1
-    #     idxend += length(coneidxs[k])
-    # end
-    # @assert idxend == n
+
+
+
+
 
     # calculate complexity parameter nu-bar of the augmented barrier (sum of the primitive cone barrier parameters plus 1)
     bnu = 1 + barrierpar(cone)
@@ -602,3 +587,24 @@ function getbetaeta(maxcorrsteps, bnu)
         end
     end
 end
+
+get_status(alf::AlfonsoOpt) = alf.status
+get_solvetime(alf::AlfonsoOpt) = alf.solvetime
+get_niters(alf::AlfonsoOpt) = alf.niters
+get_y(alf::AlfonsoOpt) = copy(alf.y)
+get_x(alf::AlfonsoOpt) = copy(alf.x)
+get_tau(alf::AlfonsoOpt) = alf.tau
+get_s(alf::AlfonsoOpt) = copy(alf.s)
+get_kappa(alf::AlfonsoOpt) = alf.kappa
+get_pobj(alf::AlfonsoOpt) = alf.pobj
+get_dobj(alf::AlfonsoOpt) = alf.dobj
+get_dgap(alf::AlfonsoOpt) = alf.dgap
+get_cgap(alf::AlfonsoOpt) = alf.cgap
+get_rel_dgap(alf::AlfonsoOpt) = alf.rel_dgap
+get_rel_cgap(alf::AlfonsoOpt) = alf.rel_cgap
+get_pres(alf::AlfonsoOpt) = copy(alf.pres)
+get_dres(alf::AlfonsoOpt) = copy(alf.dres)
+get_pin(alf::AlfonsoOpt) = alf.pin
+get_din(alf::AlfonsoOpt) = alf.din
+get_rel_pin(alf::AlfonsoOpt) = alf.rel_pin
+get_rel_din(alf::AlfonsoOpt) = alf.rel_din
