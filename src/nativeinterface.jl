@@ -10,6 +10,15 @@ quadratic objective (P is PSD) with scalar offset o (S1 of V.)
   max  -1/2 w'Pw - b'y - h'z + o :
                c + A'y + G'z == Pw   (x)
                            z in K*   (s)
+
+optimality conditions are:
+  c + Px + A'y + G'z == 0
+  b - Ax             == 0
+  h - Gx             == s
+ and:
+  z's == 0
+    s in K
+    z in K*
 =#
 
 mutable struct AlfonsoOpt
@@ -213,7 +222,7 @@ function solve!(alf::AlfonsoOpt)
     if !incone(cone)
         println("not in the cone")
         getintdir!(dir_ts, cone)
-        alpha = 1.0
+        alpha = 1.0 # TODO starting alpha maybe should depend on sa_ts (eg norm like in Alfonso) in case 1.0 is too large/small
         steps = 1
         while !incone(cone)
             sa_ts .= ts .+ alpha .* dir_ts
@@ -237,26 +246,19 @@ function solve!(alf::AlfonsoOpt)
     mu = (dot(tz, ts) + tau*kap)/alf.bnu
 
     # TODO delete later
-    # @show mu
-    # @show calcnbhd(tau*kap, mu, copy(tz), copy(tz), cone)
     @assert abs(1.0 - mu) < 1e-8
     @assert calcnbhd(tau*kap, mu, copy(tz), copy(tz), cone) < 1e-6
 
     alf.verbose && println("found initial iterate")
 
 
+    # calculate prediction and correction step parameters
+    # TODO put in prediction and correction step cache functions
+    (beta, eta, cpredfix) = getbetaeta(alf.maxcorrsteps, alf.bnu) # beta: large neighborhood parameter, eta: small neighborhood parameter
+    alphapredfix = cpredfix/(eta + sqrt(2*eta^2 + alf.bnu)) # fixed predictor step size
+    alphapredthres = (alf.predlsmulti^alf.maxpredsmallsteps)*alphapredfix # minimum predictor step size
+    alphapredinit = (alf.predlinesearch ? min(100*alphapredfix, 0.9999) : alphapredfix) # predictor step size
 
-    #= TODO delete here
-    quadratic objective (P is PSD) with scalar offset o (see http://www.seas.ucla.edu/~vandenbe/publications/coneprog.pdf)
-     primal (over x):
-      min  1/2 x'Px + c'x + o :
-                   b - Ax == 0        (y)
-                   h - Gx == s in K   (z)
-     dual (over z,y,w):
-      max  -1/2 w'Pw - b'y - h'z + o :
-                   c + A'y + G'z == Pw   (x)
-                               z in K*   (s)
-    =#
 
 
     # TODO old
@@ -276,54 +278,65 @@ function solve!(alf::AlfonsoOpt)
     # x2 = similar(c)
 
 
-    # # calculate prediction and correction step parameters
-    # # TODO put in prediction and correction step cache functions
-    # (beta, eta, cpredfix) = getbetaeta(alf.maxcorrsteps, alf.bnu) # beta: large neighborhood parameter, eta: small neighborhood parameter
-    # alphapredfix = cpredfix/(eta + sqrt(2*eta^2 + alf.bnu)) # fixed predictor step size
-    # alphapredthres = (alf.predlsmulti^alf.maxpredsmallsteps)*alphapredfix # minimum predictor step size
-    # alphapredinit = (alf.predlinesearch ? min(100*alphapredfix, 0.9999) : alphapredfix) # predictor step size
-    #
-    #
-    # # calculate termination tolerances: infinity operator norms of submatrices of LHS matrix
-    # # TODO put in a convergence check cache function
-    # tol_pres = max(1.0, maximum(sum(abs, A[i,:]) + abs(b[i]) for i in 1:m)) # first m rows
-    # tol_dres = max(1.0, maximum(sum(abs, A[:,j]) + abs(c[j]) + 1.0 for j in 1:n)) # next n rows
-    # tol_compl = max(1.0, maximum(abs, b), maximum(abs, c)) # row m+n+1
-    #
-    # # main loop
-    # if alf.verbose
-    #     println("Starting iteration")
-    #     @printf("\n%5s %12s %12s %9s %9s %9s %9s %9s %9s\n", "iter", "p_obj", "d_obj", "gap", "p_inf", "d_inf", "tau", "kap", "mu")
-    #     flush(stdout)
-    # end
-    #
-    # loadpnt!(cone, sa_tx)
-    # alf.status = :StartedIterating
-    # alphapred = alphapredinit
-    # iter = 0
-    # while true
-    # # calculate convergence metrics
-    #     ctx = dot(c, tx)
-    #     bty = dot(b, ty)
-    #     p_obj = ctx/tau
-    #     d_obj = bty/tau
-    #     rel_gap = abs(ctx - bty)/(tau + abs(bty))
-    #     # p_res = -A*tx + b*tau
-    #     mul!(p_res, A, tx)
-    #     p_res .= tau .* b .- p_res
-    #     p_inf = maximum(abs, p_res)/tol_pres
-    #     # d_res = A'*ty - c*tau + ts
-    #     mul!(d_res, A', ty)
-    #     d_res .+= ts .- tau .* c
-    #     d_inf = maximum(abs, d_res)/tol_dres
-    #     abs_gap = -bty + ctx + kap
-    #     compl = abs(abs_gap)/tol_compl
-    #
-    #     if alf.verbose
-    #         # print iteration statistics
-    #         @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n", iter, p_obj, d_obj, rel_gap, p_inf, d_inf, tau, kap, mu)
-    #         flush(stdout)
-    #     end
+
+    # (norm_c, norm_b, norm_h) = (norm(c), norm(b), norm(h))
+    tol_pres = inv(1.0 + norm(b))
+    tol_dres = inv(1.0 + norm(c))
+
+    # main loop
+    if alf.verbose
+        println("Starting iteration")
+        @printf("\n%5s %12s %12s %9s %9s %9s %9s %9s %9s\n", "iter", "p_obj", "d_obj", "gap", "p_inf", "d_inf", "tau", "kap", "mu")
+        flush(stdout)
+    end
+
+    alf.status = :StartedIterating
+    alphapred = alphapredinit
+    iter = 0
+    while true
+
+        #=
+        primal (over x):
+         min  1/2 x'Px + c'x + o :
+                      b - Ax == 0        (y)
+                      h - Gx == s in K   (z)
+        dual (over z,y,w):
+         max  -1/2 w'Pw - b'y - h'z + o :
+                      c + A'y + G'z == Pw   (x)
+                                  z in K*   (s)
+
+       optimality conditions are:
+         c + Px + A'y + G'z == 0
+         b - Ax             == 0
+         h - Gx             == s
+        and:
+         z's == 0
+           s in K
+           z in K*
+        =#
+
+        # calculate convergence metrics
+        ctx = dot(c, tx)
+        bty = dot(b, ty)
+        p_obj = ctx/tau
+        d_obj = bty/tau
+        rel_gap = abs(ctx - bty)/(tau + abs(bty))
+        # p_res = -A*tx + b*tau
+        mul!(p_res, A, tx)
+        p_res .= tau .* b .- p_res
+        p_inf = maximum(abs, p_res)/tol_pres
+        # d_res = A'*ty - c*tau + ts
+        mul!(d_res, A', ty)
+        d_res .+= ts .- tau .* c
+        d_inf = maximum(abs, d_res)/tol_dres
+        abs_gap = -bty + ctx + kap
+        compl = abs(abs_gap)/tol_compl
+
+        if alf.verbose
+            # print iteration statistics
+            @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n", iter, p_obj, d_obj, rel_gap, p_inf, d_inf, tau, kap, mu)
+            flush(stdout)
+        end
     #
     #     # check convergence criteria
     #     if (p_inf <= alf.optimtol) && (d_inf <= alf.optimtol)
