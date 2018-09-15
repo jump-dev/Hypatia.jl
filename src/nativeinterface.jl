@@ -12,8 +12,6 @@ mutable struct AlfonsoOpt
     verbose::Bool           # if true, prints progress at each iteration
     optimtol::Float64       # optimization tolerance parameter
     maxiter::Int            # maximum number of iterations
-    # itrefinethres::Float64  # iterative refinement success threshold
-    # maxitrefinesteps::Int   # maximum number of iterative refinement steps in linear system solves
     predlinesearch::Bool    # if false, predictor step uses a fixed step size, else step size is determined via line search
     maxpredsmallsteps::Int  # maximum number of predictor step size reductions allowed with respect to the safe fixed step size
     predlsmulti::Float64    # predictor line search step size multiplier
@@ -24,20 +22,14 @@ mutable struct AlfonsoOpt
     corrlsmulti::Float64    # corrector line search step size multiplier
 
     # problem data
-    A::AbstractMatrix{Float64}  # constraint matrix
-    b::Vector{Float64}          # right-hand side vector
-    c::Vector{Float64}          # cost vector
-    cone::Cone                  # primal cone object
-
-    # algorithmic parameters
-    bnu::Float64
-    beta::Float64
-    eta::Float64
-    alphapredthres::Float64
-    alphapredinit::Float64
-    tol_pres::Float64
-    tol_dres::Float64
-    tol_compl::Float64
+    c::Vector{Float64}          # linear cost vector, size n
+    o::Float64                  # objective offset scalar
+    A::AbstractMatrix{Float64}  # equality constraint matrix, size p*n
+    b::Vector{Float64}          # equality constraint vector, size p
+    G::AbstractMatrix{Float64}  # cone constraint matrix, size q*n
+    h::Vector{Float64}          # cone constraint vector, size q
+    cone::Cone                  # primal cone object, size q
+    bnu::Float64                # complexity parameter nu-bar of the augmented barrier (sum of the primitive cone barrier parameters plus 1)
 
     # results
     status::Symbol          # solver status
@@ -137,132 +129,125 @@ get_rel_din(alf::AlfonsoOpt) = alf.rel_din
 # load and verify problem data, calculate algorithmic parameters
 function load_data!(
     alf::AlfonsoOpt,
+    c::Vector{Float64},
     A::AbstractMatrix{Float64},
     b::Vector{Float64},
-    c::Vector{Float64},
-    cone::Cone,
+    G::AbstractMatrix{Float64},
+    h::Vector{Float64},
+    cone::Cone;
+    check=true, # TODO later make false
     )
+
     # check data consistency
-    (m, n) = size(A)
-    if (m == 0) || (n == 0)
-        error("input matrix A has trivial dimension $m x $n")
+    if check
+        n = length(c)
+        p = length(b)
+        q = length(h)
+        @assert n > 0
+        @assert p + q > 0
+        if n != size(A, 2) || n != size(G, 2)
+            error("number of variables is not consistent in A, G, and c")
+        end
+        if p != size(A, 1)
+            error("number of constraint rows is not consistent in A and b")
+        end
+        if q != size(G, 1)
+            error("number of constraint rows is not consistent in G and h")
+        end
+         # TODO do appropriate decomps at the same time, do preprocessing
+        if rank(A) < p
+            error("A matrix is not full-row-rank; some primal equalities may be redundant or inconsistent")
+        end
+        if rank(vcat(A, G)) < n
+            error("[A' G'] is not full-row-rank; some dual equalities may be redundant (i.e. primal variables can be removed) or inconsistent")
+        end
     end
-    if m != length(b)
-        error("dimension of vector b is $(length(b)), but number of rows in matrix A is $m")
-    end
-    if n != length(c)
-        error("dimension of vector c is $(length(c)), but number of columns in matrix A is $n")
-    end
-    if issparse(A)
-        dropzeros!(A)
-    end
-
-    # TODO check cone consistency in cone functions file
-    # idxend = 0
-    # for k in eachindex(cone)
-    #     if dimension(cone[k]) != length(coneidxs[k])
-    #         error("dimension of cone type $(cone[k]) does not match length of variable indices")
-    #     end
-    #     @assert coneidxs[k][1] == idxend + 1
-    #     idxend += length(coneidxs[k])
-    # end
-    # @assert idxend == n
-
-    # calculate complexity parameter nu-bar of the augmented barrier (sum of the primitive cone barrier parameters plus 1)
-    bnu = 1 + barrierpar(cone)
-
-    # calculate prediction and correction step parameters
-    (beta, eta, cpredfix) = getbetaeta(alf.maxcorrsteps, bnu) # beta: large neighborhood parameter, eta: small neighborhood parameter
-    alphapredfix = cpredfix/(eta + sqrt(2*eta^2 + bnu)) # fixed predictor step size
-    alphapredthres = (alf.predlsmulti^alf.maxpredsmallsteps)*alphapredfix # minimum predictor step size
-    alphapredinit = (alf.predlinesearch ? min(100*alphapredfix, 0.9999) : alphapredfix) # predictor step size
-
-    # calculate termination tolerances: infinity operator norms of submatrices of LHS matrix
-    tol_pres = max(1.0, maximum(sum(abs, A[i,:]) + abs(b[i]) for i in 1:m)) # first m rows
-    tol_dres = max(1.0, maximum(sum(abs, A[:,j]) + abs(c[j]) + 1.0 for j in 1:n)) # next n rows
-    tol_compl = max(1.0, maximum(abs, b), maximum(abs, c)) # row m+n+1
 
     # save data in solver object
+    alf.c = c
     alf.A = A
     alf.b = b
-    alf.c = c
+    alf.G = G
+    alf.h = h
     alf.cone = cone
-    alf.bnu = bnu
-    alf.beta = beta
-    alf.eta = eta
-    alf.alphapredthres = alphapredthres
-    alf.alphapredinit = alphapredinit
-    alf.tol_pres = tol_pres
-    alf.tol_dres = tol_dres
-    alf.tol_compl = tol_compl
-
+    alf.bnu = 1.0 + barrierpar(cone)
     alf.status = :Loaded
 
     return alf
 end
 
-# calculate initial central primal-dual iterate
-function getinitialiterate(alf::AlfonsoOpt)
-    (A, b, c) = (alf.A, alf.b, alf.c)
-    (m, n) = size(A)
-    cone = alf.cone
-
-    # initial primal iterate
-    tx = similar(c)
-    getintdir!(tx, cone)
-    loadpnt!(cone, tx)
-    @assert incone(cone)
-
-    # scaling factor for the primal problem
-    rp = maximum((1.0 + abs(b[i]))/(1.0 + abs(sum(A[i,:]))) for i in 1:m)
-    # scaling factor for the dual problem
-    g = similar(c)
-    calcg!(g, cone)
-    rd = maximum((1.0 + abs(g[j]))/(1.0 + abs(c[j])) for j in 1:n)
-
-    # central primal-dual iterate
-    tx .*= sqrt(rp*rd)
-    @assert incone(cone) # TODO a little expensive to call this twice
-    ty = zeros(m)
-    tau = 1.0
-    ts = calcg!(g, cone)
-    ts .*= -1.0
-    kap = 1.0
-    mu = (dot(tx, ts) + tau*kap)/alf.bnu
-
-    # TODO can delete later
-    @assert abs(1.0 - mu) < 1e-8
-    @assert abs(calcnbhd(tau*kap, mu, copy(ts), copy(ts), cone)) < 1e-6
-
-    return (tx, ty, tau, ts, kap, mu)
-end
-
 # perform prediction and correction steps in a loop until converged
 function solve!(alf::AlfonsoOpt)
     starttime = time()
-    (A, b, c) = (alf.A, alf.b, alf.c)
-    (m, n) = size(A)
+
+    (c, A, b, G, h) = (alf.c, alf.A, alf.b, alf.G, alf.h)
+    (n, p, q) = (length(c), length(b), length(h))
     cone = alf.cone
 
-    # calculate initial central primal-dual iterate
-    alf.verbose && println("Finding initial iterate")
-    (tx, ty, tau, ts, kap, mu) = getinitialiterate(alf)
-
-    # preallocate arrays # TODO probably could get away with fewer. rename to temp_
-    p_res = similar(ty)
-    d_res = similar(tx)
-    dir_ty = similar(ty)
-    dir_tx = similar(tx)
-    dir_ts = similar(ts)
-    sa_tx = copy(tx)
+    # preallocate arrays
+    ts = similar(h)
+    ty = similar(b)
+    tz = similar(h)
     sa_ts = similar(ts)
-    g = similar(tx)
-    HiAt = similar(b, n, m) # TODO for very sparse LPs, using sparse here is good (diagonal hessian), but for sparse problems with dense hessians, want dense
-    AHiAt = similar(b, m, m)
-    y1 = similar(b)
-    x1 = similar(c)
-    y2 = similar(b)
-    x2 = similar(c)
+    dir_ts = similar(ts)
+
+    loadpnt!(cone, sa_ts)
+
+    # calculate initial central primal-dual iterate (S5.3 of V.)
+    # solve linear equation then step in interior direction of cone until inside cone
+    alf.verbose && println("finding initial iterate")
+
+    # TODO use linsys solve function
+    xyz = Symmetric([zeros(n, n) A' G'; A zeros(p, p) zeros(p, q); G zeros(q, p) I]) \ [-c; b; h]
+    tx .= xyz[1:n]
+    ty .= xyz[n+1:n+p]
+    sa_ts .= -xyz[n+p+1:n+p+q]
+    ts .= sa_ts
+
+    if !incone(cone)
+        println("not in the cone")
+        getintdir!(dir_ts, cone)
+        alpha = 1.0 # TODO starting alpha maybe should depend on sa_ts (eg norm like in Alfonso) in case 1.0 is too large/small
+        steps = 1
+        while !incone(cone)
+            sa_ts .= ts .+ alpha .* dir_ts
+            alpha *= 1.2
+            steps += 1
+            if steps > 100
+                error("cannot find initial iterate")
+            end
+        end
+        @show alpha
+        @show steps
+        ts .= sa_ts
+    end
+
+    @assert incone(cone) # TODO delete
+    calcg!(tz, cone)
+    tz .*= -1.0
+
+    tau = 1.0
+    kap = 1.0
+    mu = (dot(tz, ts) + tau*kap)/alf.bnu
+
+    # TODO delete later
+    @assert abs(1.0 - mu) < 1e-8
+    @assert calcnbhd(tau*kap, mu, copy(tz), copy(tz), cone) < 1e-6
+
+    alf.verbose && println("found initial iterate")
+
+
+    # calculate prediction and correction step parameters
+    # TODO put in prediction and correction step cache functions
+    (beta, eta, cpredfix) = getbetaeta(alf.maxcorrsteps, alf.bnu) # beta: large neighborhood parameter, eta: small neighborhood parameter
+    alphapredfix = cpredfix/(eta + sqrt(2*eta^2 + alf.bnu)) # fixed predictor step size
+    alphapredthres = (alf.predlsmulti^alf.maxpredsmallsteps)*alphapredfix # minimum predictor step size
+    alphapredinit = (alf.predlinesearch ? min(100*alphapredfix, 0.9999) : alphapredfix) # predictor step size
+
+
+    # (norm_c, norm_b, norm_h) = (norm(c), norm(b), norm(h))
+    tol_pres = inv(1.0 + norm(b))
+    tol_dres = inv(1.0 + norm(c))
 
     # main loop
     if alf.verbose
@@ -271,12 +256,14 @@ function solve!(alf::AlfonsoOpt)
         flush(stdout)
     end
 
-    loadpnt!(cone, sa_tx)
     alf.status = :StartedIterating
-    alphapred = alf.alphapredinit
+    alphapred = alphapredinit
     iter = 0
     while true
-    # calculate convergence metrics
+        # calculate convergence metrics
+
+
+        
         ctx = dot(c, tx)
         bty = dot(b, ty)
         p_obj = ctx/tau
