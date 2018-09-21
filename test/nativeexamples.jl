@@ -291,13 +291,13 @@
 # end
 
 
-@testset "small LP easy" begin
-    (n, p, q) = (10, 8, 9)
+@testset "small LP 1" begin
+    (n, p, q) = (30, 12, 30)
     c = rand(0.0:9.0, n)
     A = rand(-9.0:9.0, p, n)
     b = A*ones(n)
-    G = Matrix{Float64}(I, q, n) # TODO try I
-    h = G*ones(n)
+    G = Matrix{Float64}(-1.0I, q, n) # TODO try I
+    h = zeros(q)
     cone = Alfonso.Cone([Alfonso.NonnegativeCone(q)], [1:q])
     alf = Alfonso.AlfonsoOpt(verbose=true)
     Alfonso.load_data!(alf, c, A, b, G, h, cone)
@@ -308,7 +308,24 @@
 end
 
 
-@testset "small LP" begin
+@testset "small LP 2" begin
+    (n, p, q) = (10, 8, 9)
+    c = rand(0.0:9.0, n)
+    A = rand(-9.0:9.0, p, n)
+    b = A*ones(n)
+    G = Matrix{Float64}(-1.0I, q, n) # TODO try I
+    h = zeros(q)
+    cone = Alfonso.Cone([Alfonso.NonnegativeCone(q)], [1:q])
+    alf = Alfonso.AlfonsoOpt(verbose=true)
+    Alfonso.load_data!(alf, c, A, b, G, h, cone)
+    @time Alfonso.solve!(alf)
+    # @test Alfonso.get_status(alf) == :Optimal
+    # @test Alfonso.get_pobj(alf) ≈ 2055.807 atol=1e-4 rtol=1e-4
+    # @test Alfonso.get_dobj(alf) ≈ 2055.807 atol=1e-4 rtol=1e-4
+end
+
+
+@testset "small LP 3" begin
     (n, p, q) = (5, 2, 5)
     c = rand(0.0:9.0, n)
     A = rand(-9.0:9.0, p, n)
