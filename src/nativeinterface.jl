@@ -1,12 +1,4 @@
-#=
-Copyright 2018, David Papp, Sercan Yildiz, and contributors
 
-an implementation of the algorithm for non-symmetric conic optimization Alfonso (https://github.com/dpapp-github/alfonso) and analyzed in the paper:
-D. Papp and S. Yildiz. On "A homogeneous interior-point algorithm for nonsymmetric convex conic optimization"
-available at https://arxiv.org/abs/1712.00492
-=#
-
-# TODO add time limit option and use it in loop
 mutable struct AlfonsoOpt
     # options
     verbose::Bool           # if true, prints progress at each iteration
@@ -26,7 +18,7 @@ mutable struct AlfonsoOpt
     o::Float64                  # objective offset scalar
     A::AbstractMatrix{Float64}  # equality constraint matrix, size p*n
     b::Vector{Float64}          # equality constraint vector, size p
-    varK::Cone                  # primal variable cone object
+    # varK::Cone                  # primal variable cone object
     G::AbstractMatrix{Float64}  # cone constraint matrix, size q*n
     h::Vector{Float64}          # cone constraint vector, size q
     conK::Cone                  # primal constraint cone object
@@ -132,7 +124,7 @@ function load_data!(
     c::Vector{Float64},
     A::AbstractMatrix{Float64},
     b::Vector{Float64},
-    varK::Cone,
+    # varK::Cone,
     G::AbstractMatrix{Float64},
     h::Vector{Float64},
     conK::Cone;
@@ -168,7 +160,7 @@ function load_data!(
     alf.c = c
     alf.A = A
     alf.b = b
-    alf.varK = varK
+    # alf.varK = varK
     alf.G = G
     alf.h = h
     alf.conK = conK
@@ -177,369 +169,15 @@ function load_data!(
     return alf
 end
 
-# solve using basic method (no HSDE)
-function solve_basic!(alf::AlfonsoOpt)
-    starttime = time()
-
-    (c, A, b, G, h) = (alf.c, alf.A, alf.b, alf.G, alf.h)
-    (varK, conK) = (alf.varK, alf.conK)
-    (n, p, q) = (length(c), length(b), length(h))
-    bnu = barrierpar(varK) + barrierpar(conK) # complexity parameter of the barrier (sum of the primitive cone barrier parameters)
-
-    # preallocate arrays
-    tx = similar(c)
-    ts = similar(h)
-    ty = similar(b)
-    tz = similar(ts)
-    sa_ts = similar(ts)
-    dir_ts = similar(ts)
-
-    loadpnt!(cone, sa_ts)
-
-    # calculate initial central primal-dual iterate (S5.3 of V.)
-    # solve linear equation then step in interior direction of cone until inside cone
-    alf.verbose && println("finding initial iterate")
-
-    # TODO use linsys solve function
-    xyz = Symmetric([diagm(getincidence!(tx, varK)) A' G'; A zeros(p, p) zeros(p, q); G zeros(q, p) I]) \ [-c; b; h]
-    tx .= xyz[1:n]
-    ty .= xyz[n+1:n+p]
-    sa_ts .= -xyz[n+p+1:n+p+q]
-    ts .= sa_ts
-
-    if !incone(cone)
-        println("not in the cone")
-        getintdir!(dir_ts, cone)
-        alpha = 1.0 # TODO starting alpha maybe should depend on sa_ts (eg norm like in Alfonso) in case 1.0 is too large/small
-        steps = 1
-        while !incone(cone)
-            sa_ts .= ts .+ alpha .* dir_ts
-            alpha *= 1.2
-            steps += 1
-            if steps > 100
-                error("cannot find initial iterate")
-            end
-        end
-        @show alpha
-        @show steps
-        ts .= sa_ts
-    end
-
-    @assert incone(cone) # TODO delete
-    calcg!(tz, cone)
-    tz .*= -1.0
-
-    mu = dot(tz, ts)/bnu
-
-    # TODO delete later
-    @assert abs(1.0 - mu) < 1e-8
-    @assert calcnbhd(tau*kap, mu, copy(tz), copy(tz), cone) < 1e-6
-
-    alf.verbose && println("found initial iterate")
-
-
-    # calculate prediction and correction step parameters
-    # TODO put in prediction and correction step cache functions
-    (beta, eta, cpredfix) = getbetaeta(alf.maxcorrsteps, bnu) # beta: large neighborhood parameter, eta: small neighborhood parameter
-    alphapredfix = cpredfix/(eta + sqrt(2*eta^2 + bnu)) # fixed predictor step size
-    alphapredthres = (alf.predlsmulti^alf.maxpredsmallsteps)*alphapredfix # minimum predictor step size
-    alphapredinit = (alf.predlinesearch ? min(100*alphapredfix, 0.9999) : alphapredfix) # predictor step size
-
-
-    # (norm_c, norm_b, norm_h) = (norm(c), norm(b), norm(h))
-    # tol_pres = inv(1.0 + norm(b))
-    # tol_dres = inv(1.0 + norm(c))
-
-    # main loop
-    if alf.verbose
-        println("Starting iteration")
-        @printf("\n%5s %12s %12s %9s %9s %9s %9s %9s %9s\n", "iter", "p_obj", "d_obj", "gap", "p_inf", "d_inf", "tau", "kap", "mu")
-        flush(stdout)
-    end
-
-    alf.status = :StartedIterating
-    alphapred = alphapredinit
-    iter = 0
-    while true
-        # calculate residuals
-        # TODO in-place
-        res_tx = -A'*ty - G'*tz - c*tau
-        res_ty = A*tx - b*tau
-        res_tz = ts + G*x - h*tau
-        res_tau = kap + dot(c, x) + dot(b, y) + dot(h, z)
-
-        # TODO calculate convergence metrics
-        # ctx = dot(c, tx)
-        # bty = dot(b, ty)
-        # p_obj = ctx/tau
-        # d_obj = bty/tau
-        # rel_gap = abs(ctx - bty)/(tau + abs(bty))
-        # p_inf = maximum(abs, p_res)/alf.tol_pres
-        # # d_res = A'*ty - c*tau + ts
-        # mul!(d_res, A', ty)
-        # d_res .+= ts .- tau .* c
-        # d_inf = maximum(abs, d_res)/alf.tol_dres
-        # abs_gap = -bty + ctx + kap
-        # compl = abs(abs_gap)/alf.tol_compl
-        #
-        # if alf.verbose
-        #     # print iteration statistics
-        #     @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n", iter, p_obj, d_obj, rel_gap, p_inf, d_inf, tau, kap, mu)
-        #     flush(stdout)
-        # end
-        #
-        # # check convergence criteria
-        # if (p_inf <= alf.optimtol) && (d_inf <= alf.optimtol)
-        #     if rel_gap <= alf.optimtol
-        #         alf.verbose && println("Problem is feasible and an approximate optimal solution was found; terminating")
-        #         alf.status = :Optimal
-        #         break
-        #     elseif (compl <= alf.optimtol) && (tau <= alf.optimtol*1e-02*max(1.0, kap))
-        #         alf.verbose && println("Problem is nearly primal or dual infeasible; terminating")
-        #         alf.status = :NearlyInfeasible
-        #         break
-        #     end
-        # elseif (tau <= alf.optimtol*1e-02*min(1.0, kap)) && (mu <= alf.optimtol*1e-02)
-        #     alf.verbose && println("Problem is ill-posed; terminating")
-        #     alf.status = :IllPosed
-        #     break
-        # end
-
-        # check iteration limit
-        iter += 1
-        if iter >= alf.maxiter
-            alf.verbose && println("Reached iteration limit; terminating")
-            alf.status = :IterationLimit
-            break
-        end
-
-        # prediction phase
-        # calculate prediction direction
-
-
-
-
-
-
-        # x rhs is (ts - d_res), y rhs is p_res
-        dir_tx .= ts .- d_res # temp for x rhs
-        (y1, x1, y2, x2) = solvelinsys(y1, x1, y2, x2, mu, dir_tx, p_res, A, b, c, cone, HiAt, AHiAt)
-
-        dir_tau = (abs_gap - kap - dot(b, y2) + dot(c, x2))/(mu/tau^2 + dot(b, y1) - dot(c, x1))
-        dir_ty .= y2 .+ dir_tau .* y1
-        dir_tx .= x2 .+ dir_tau .* x1
-        mul!(dir_ts, A', dir_ty)
-        dir_ts .= dir_tau .* c .- dir_ts .- d_res
-        dir_kap = -abs_gap + dot(b, dir_ty) - dot(c, dir_tx)
-
-        # determine step length alpha by line search
-        alpha = alphapred
-        nbhd = Inf
-        alphaprevok = true
-        predfail = false
-        nprediters = 0
-        while true
-            nprediters += 1
-
-            sa_tx .= tx .+ alpha .* dir_tx
-
-            # accept primal iterate if
-            # - decreased alpha and it is the first inside the cone and beta-neighborhood or
-            # - increased alpha and it is inside the cone and the first to leave beta-neighborhood
-            if incone(cone)
-                # primal iterate is inside the cone
-                sa_ts .= ts .+ alpha .* dir_ts
-                sa_tk = (tau + alpha*dir_tau)*(kap + alpha*dir_kap)
-                sa_mu = (dot(sa_tx, sa_ts) + sa_tk)/bnu
-                nbhd = calcnbhd(sa_tk, sa_mu, sa_ts, g, cone)
-
-                if nbhd < abs2(alf.beta*sa_mu)
-                    # iterate is inside the beta-neighborhood
-                    if !alphaprevok || (alpha > alf.predlsmulti)
-                        # either the previous iterate was outside the beta-neighborhood or increasing alpha again will make it > 1
-                        if alf.predlinesearch
-                            alphapred = alpha
-                        end
-                        break
-                    end
-
-                    alphaprevok = true
-                    alpha = alpha/alf.predlsmulti # increase alpha
-                    continue
-                end
-
-                # # iterate is outside the beta-neighborhood
-                # if alphaprevok # TODO technically this should be only if nprediters > 1, but it seems to work
-                #     # previous iterate was inside the beta-neighborhood
-                #     if alf.predlinesearch
-                #         alphapred = alpha*alf.predlsmulti
-                #     end
-                #     break
-                # end
-            end
-
-            # primal iterate is either
-            # - outside the cone or
-            # - inside the cone and outside the beta-neighborhood and previous iterate was outside the beta-neighborhood
-            if alpha < alf.alphapredthres
-                # alpha is very small, so predictor has failed
-                predfail = true
-                alf.verbose && println("Predictor could not improve the solution ($nprediters line search steps); terminating")
-                alf.status = :PredictorFail
-                break
-            end
-
-            alphaprevok = false
-            alpha = alf.predlsmulti*alpha # decrease alpha
-        end
-        # @show nprediters
-        if predfail
-            break
-        end
-
-        # step distance alpha in the direction
-        ty .+= alpha .* dir_ty
-        tx .= sa_tx
-        tau += alpha*dir_tau
-        ts .+= alpha .* dir_ts
-        kap += alpha*dir_kap
-        mu = (dot(tx, ts) + tau*kap)/bnu
-
-        # skip correction phase if allowed and current iterate is in the eta-neighborhood
-        if alf.corrcheck && (nbhd < abs2(alf.eta*mu))
-            continue
-        end
-
-        # correction phase
-        corrfail = false
-        ncorrsteps = 0
-        while true
-            ncorrsteps += 1
-
-            # calculate correction direction
-            # x rhs is (ts + mu*g), y rhs is 0
-            calcg!(g, cone)
-            dir_tx .= ts .+ mu .* g # temp for x rhs
-            dir_ty .= 0.0 # temp for y rhs
-            (y1, x1, y2, x2) = solvelinsys(y1, x1, y2, x2, mu, dir_tx, dir_ty, A, b, c, cone, HiAt, AHiAt)
-
-            dir_tau = (mu/tau - kap - dot(b, y2) + dot(c, x2))/(mu/tau^2 + dot(b, y1) - dot(c, x1))
-            dir_ty .= y2 .+ dir_tau .* y1
-            dir_tx .= x2 .+ dir_tau .* x1
-            # dir_ts = -A'*dir_ty + c*dir_tau
-            mul!(dir_ts, A', dir_ty)
-            dir_ts .= dir_tau .* c .- dir_ts
-            dir_kap = dot(b, dir_ty) - dot(c, dir_tx)
-
-            # determine step length alpha by line search
-            alpha = alf.alphacorr
-            ncorrlsiters = 0
-            while ncorrlsiters <= alf.maxcorrlsiters
-                ncorrlsiters += 1
-
-                sa_tx .= tx .+ alpha .* dir_tx
-
-                if incone(cone)
-                    # primal iterate tx is inside the cone, so terminate line search
-                    break
-                end
-
-                # primal iterate tx is outside the cone
-                if ncorrlsiters == alf.maxcorrlsiters
-                    # corrector failed
-                    corrfail = true
-                    alf.verbose && println("Corrector could not improve the solution ($ncorrlsiters line search steps); terminating")
-                    alf.status = :CorrectorFail
-                    break
-                end
-
-                alpha = alf.corrlsmulti*alpha # decrease alpha
-            end
-            # @show ncorrlsiters
-            if corrfail
-                break
-            end
-
-            # step distance alpha in the direction
-            ty .+= alpha .* dir_ty
-            tx .= sa_tx
-            tau += alpha*dir_tau
-            ts .+= alpha .* dir_ts
-            kap += alpha*dir_kap
-            mu = (dot(tx, ts) + tau*kap)/bnu
-
-            # finish if allowed and current iterate is in the eta-neighborhood, or if taken max steps
-            if (ncorrsteps == alf.maxcorrsteps) || alf.corrcheck
-                sa_ts .= ts
-                if calcnbhd(tau*kap, mu, sa_ts, g, cone) <= abs2(alf.eta*mu)
-                    break
-                elseif ncorrsteps == alf.maxcorrsteps
-                    # nbhd_eta > eta, so corrector failed
-                    corrfail = true
-                    alf.verbose && println("Corrector phase finished outside the eta-neighborhood ($ncorrsteps correction steps); terminating")
-                    alf.status = :CorrectorFail
-                    break
-                end
-            end
-        end
-        # @show ncorrsteps
-        if corrfail
-            break
-        end
-    end
-
-    alf.verbose && println("\nFinished in $iter iterations\nInternal status is $(alf.status)\n")
-
-    # calculate final solution and iteration statistics
-    alf.niters = iter
-
-    tx ./= tau
-    alf.x = tx
-    ty ./= tau
-    alf.y = ty
-    alf.tau = tau
-    ts ./= tau
-    alf.s = ts
-    alf.kap = kap
-
-    alf.pobj = dot(c, alf.x)
-    alf.dobj = dot(b, alf.y)
-    alf.dgap = alf.pobj - alf.dobj
-    alf.cgap = dot(alf.s, alf.x)
-    alf.rel_dgap = alf.dgap/(1.0 + abs(alf.pobj) + abs(alf.dobj))
-    alf.rel_cgap = alf.cgap/(1.0 + abs(alf.pobj) + abs(alf.dobj))
-
-    # alf.pres = b - A*alf.x
-    mul!(p_res, A, alf.x)
-    p_res .= b .- p_res
-    alf.pres = p_res
-    # alf.dres = c - A'*alf.y - alf.s
-    mul!(d_res, A', alf.y)
-    d_res .= c .- d_res .- alf.s
-    alf.dres = d_res
-
-    alf.pin = norm(alf.pres)
-    alf.din = norm(alf.dres)
-    alf.rel_pin = alf.pin/(1.0 + norm(b, Inf))
-    alf.rel_din = alf.din/(1.0 + norm(c, Inf))
-
-    alf.solvetime = time() - starttime
-
-    return nothing
-end
-
-
-
-
-
-# # solve using HSDE
-# function solve_hsde!(alf::AlfonsoOpt)
+# solve without HSDE
+# function solve_basic!(alf::AlfonsoOpt)
 #     starttime = time()
 #
 #     (c, A, b, G, h) = (alf.c, alf.A, alf.b, alf.G, alf.h)
-#     (varK, conK) = (alf.varK, alf.conK)
+#     cone = alf.conK
+#     # (varK, conK) = (alf.varK, alf.conK)
 #     (n, p, q) = (length(c), length(b), length(h))
-#     bnu = 1.0 + barrierpar(varK) + barrierpar(conK) # complexity parameter nu-bar of the augmented barrier (sum of the primitive cone barrier parameters plus 1)
+#     bnu = barrierpar(cone) # + barrierpar(varK) # complexity parameter of the barrier (sum of the primitive cone barrier parameters)
 #
 #     # preallocate arrays
 #     tx = similar(c)
@@ -547,7 +185,9 @@ end
 #     ty = similar(b)
 #     tz = similar(ts)
 #     sa_ts = similar(ts)
+#     sa_tz = similar(tz)
 #     dir_ts = similar(ts)
+#     g = similar(ts)
 #
 #     loadpnt!(cone, sa_ts)
 #
@@ -556,7 +196,9 @@ end
 #     alf.verbose && println("finding initial iterate")
 #
 #     # TODO use linsys solve function
-#     xyz = Symmetric([diagm(getincidence!(tx, varK)) A' G'; A zeros(p, p) zeros(p, q); G zeros(q, p) I]) \ [-c; b; h]
+#     # lhs = Symmetric([diagm(getincidence!(tx, varK)) A' G'; A zeros(p, p) zeros(p, q); G zeros(q, p) I]) \ [-c; b; h]
+#     lhs = Symmetric([zeros(n, n) A' G'; A zeros(p, p) zeros(p, q); G zeros(q, p) I])
+#     xyz = lhs\[-c; b; h]
 #     tx .= xyz[1:n]
 #     ty .= xyz[n+1:n+p]
 #     sa_ts .= -xyz[n+p+1:n+p+q]
@@ -583,14 +225,11 @@ end
 #     @assert incone(cone) # TODO delete
 #     calcg!(tz, cone)
 #     tz .*= -1.0
-#
-#     tau = 1.0
-#     kap = 1.0
-#     mu = (dot(tz, ts) + tau*kap)/bnu
+#     mu = dot(tz, ts)/bnu
 #
 #     # TODO delete later
 #     @assert abs(1.0 - mu) < 1e-8
-#     @assert calcnbhd(tau*kap, mu, copy(tz), copy(tz), cone) < 1e-6
+#     @assert calcnbhd(mu, copy(tz), copy(tz), cone) < 1e-6
 #
 #     alf.verbose && println("found initial iterate")
 #
@@ -602,17 +241,12 @@ end
 #     alphapredthres = (alf.predlsmulti^alf.maxpredsmallsteps)*alphapredfix # minimum predictor step size
 #     alphapredinit = (alf.predlinesearch ? min(100*alphapredfix, 0.9999) : alphapredfix) # predictor step size
 #
-#
-#     # (norm_c, norm_b, norm_h) = (norm(c), norm(b), norm(h))
-#     # tol_pres = inv(1.0 + norm(b))
-#     # tol_dres = inv(1.0 + norm(c))
-#
-#     # main loop
-#     if alf.verbose
-#         println("Starting iteration")
-#         @printf("\n%5s %12s %12s %9s %9s %9s %9s %9s %9s\n", "iter", "p_obj", "d_obj", "gap", "p_inf", "d_inf", "tau", "kap", "mu")
-#         flush(stdout)
-#     end
+#     # # main loop
+#     # if alf.verbose
+#     #     println("Starting iteration")
+#     #     @printf("\n%5s %12s %12s %9s %9s %9s %9s %9s %9s\n", "iter", "p_obj", "d_obj", "gap", "p_inf", "d_inf", "tau", "kap", "mu")
+#     #     flush(stdout)
+#     # end
 #
 #     alf.status = :StartedIterating
 #     alphapred = alphapredinit
@@ -620,10 +254,9 @@ end
 #     while true
 #         # calculate residuals
 #         # TODO in-place
-#         res_tx = -A'*ty - G'*tz - c*tau
-#         res_ty = A*tx - b*tau
-#         res_tz = ts + G*x - h*tau
-#         res_tau = kap + dot(c, x) + dot(b, y) + dot(h, z)
+#         res_tx = A'*ty + G'*tz + c
+#         res_ty = A*tx - b
+#         res_tz = ts + G*tx - h
 #
 #         # TODO calculate convergence metrics
 #         # ctx = dot(c, tx)
@@ -672,22 +305,18 @@ end
 #
 #         # prediction phase
 #         # calculate prediction direction
+#         Hi = zeros(q, q)
+#         calcHiarr!(Hi, Matrix(1.0I, q, q), cone)
+#         lhs.data[n+p+1:n+p+q,n+p+1:n+p+q] .= -Hi
+#         dir = lhs\[-res_tx; -res_ty; ts - res_tz]
 #
-#
-#
-#
-#
-#
-#         # x rhs is (ts - d_res), y rhs is p_res
-#         dir_tx .= ts .- d_res # temp for x rhs
-#         (y1, x1, y2, x2) = solvelinsys(y1, x1, y2, x2, mu, dir_tx, p_res, A, b, c, cone, HiAt, AHiAt)
-#
-#         dir_tau = (abs_gap - kap - dot(b, y2) + dot(c, x2))/(mu/tau^2 + dot(b, y1) - dot(c, x1))
-#         dir_ty .= y2 .+ dir_tau .* y1
-#         dir_tx .= x2 .+ dir_tau .* x1
-#         mul!(dir_ts, A', dir_ty)
-#         dir_ts .= dir_tau .* c .- dir_ts .- d_res
-#         dir_kap = -abs_gap + dot(b, dir_ty) - dot(c, dir_tx)
+#         dir_tx = dir[1:n]
+#         dir_ty = dir[n+1:n+p]
+#         dir_tz = dir[n+p+1:n+p+q]
+#         # (dir_tx, dir_ty, dir_tz) = finddirection(alf, lhs, -res_tx, -res_ty, ts - res_tz)
+#         # dir_ts = -res_tz - G*dir_tx
+#         dir_ts = -ts - Hi*dir_tz
+#         # @show norm(dir_ts - (-ts - Hi*dir_tz))
 #
 #         # determine step length alpha by line search
 #         alpha = alphapred
@@ -698,19 +327,18 @@ end
 #         while true
 #             nprediters += 1
 #
-#             sa_tx .= tx .+ alpha .* dir_tx
-#
+#             sa_ts .= ts .+ alpha .* dir_ts
+#             @show alpha
 #             # accept primal iterate if
 #             # - decreased alpha and it is the first inside the cone and beta-neighborhood or
 #             # - increased alpha and it is inside the cone and the first to leave beta-neighborhood
 #             if incone(cone)
 #                 # primal iterate is inside the cone
-#                 sa_ts .= ts .+ alpha .* dir_ts
-#                 sa_tk = (tau + alpha*dir_tau)*(kap + alpha*dir_kap)
-#                 sa_mu = (dot(sa_tx, sa_ts) + sa_tk)/bnu
-#                 nbhd = calcnbhd(sa_tk, sa_mu, sa_ts, g, cone)
-#
-#                 if nbhd < abs2(alf.beta*sa_mu)
+#                 sa_tz .= tz .+ alpha .* dir_tz
+#                 sa_mu = dot(sa_ts, sa_tz)/bnu
+#                 nbhd = calcnbhd(sa_mu, sa_tz, g, cone)
+#                 @show sqrt(nbhd)/sa_mu, beta
+#                 if nbhd < abs2(beta*sa_mu)
 #                     # iterate is inside the beta-neighborhood
 #                     if !alphaprevok || (alpha > alf.predlsmulti)
 #                         # either the previous iterate was outside the beta-neighborhood or increasing alpha again will make it > 1
@@ -724,21 +352,12 @@ end
 #                     alpha = alpha/alf.predlsmulti # increase alpha
 #                     continue
 #                 end
-#
-#                 # # iterate is outside the beta-neighborhood
-#                 # if alphaprevok # TODO technically this should be only if nprediters > 1, but it seems to work
-#                 #     # previous iterate was inside the beta-neighborhood
-#                 #     if alf.predlinesearch
-#                 #         alphapred = alpha*alf.predlsmulti
-#                 #     end
-#                 #     break
-#                 # end
 #             end
 #
 #             # primal iterate is either
 #             # - outside the cone or
 #             # - inside the cone and outside the beta-neighborhood and previous iterate was outside the beta-neighborhood
-#             if alpha < alf.alphapredthres
+#             if alpha < alphapredthres
 #                 # alpha is very small, so predictor has failed
 #                 predfail = true
 #                 alf.verbose && println("Predictor could not improve the solution ($nprediters line search steps); terminating")
@@ -755,15 +374,15 @@ end
 #         end
 #
 #         # step distance alpha in the direction
+#         tx .+= alpha .* dir_tx
 #         ty .+= alpha .* dir_ty
-#         tx .= sa_tx
-#         tau += alpha*dir_tau
-#         ts .+= alpha .* dir_ts
-#         kap += alpha*dir_kap
-#         mu = (dot(tx, ts) + tau*kap)/bnu
+#         tz .+= alpha .* dir_tz
+#         ts .= sa_ts
+#         mu = dot(ts, tz)/bnu
+#         @show mu
 #
 #         # skip correction phase if allowed and current iterate is in the eta-neighborhood
-#         if alf.corrcheck && (nbhd < abs2(alf.eta*mu))
+#         if alf.corrcheck && (nbhd < abs2(eta*mu))
 #             continue
 #         end
 #
@@ -774,19 +393,22 @@ end
 #             ncorrsteps += 1
 #
 #             # calculate correction direction
-#             # x rhs is (ts + mu*g), y rhs is 0
-#             calcg!(g, cone)
-#             dir_tx .= ts .+ mu .* g # temp for x rhs
-#             dir_ty .= 0.0 # temp for y rhs
-#             (y1, x1, y2, x2) = solvelinsys(y1, x1, y2, x2, mu, dir_tx, dir_ty, A, b, c, cone, HiAt, AHiAt)
+#             Hi = zeros(q, q)
+#             calcHiarr!(Hi, Matrix(1.0I, q, q), cone)
 #
-#             dir_tau = (mu/tau - kap - dot(b, y2) + dot(c, x2))/(mu/tau^2 + dot(b, y1) - dot(c, x1))
-#             dir_ty .= y2 .+ dir_tau .* y1
-#             dir_tx .= x2 .+ dir_tau .* x1
-#             # dir_ts = -A'*dir_ty + c*dir_tau
-#             mul!(dir_ts, A', dir_ty)
-#             dir_ts .= dir_tau .* c .- dir_ts
-#             dir_kap = dot(b, dir_ty) - dot(c, dir_tx)
+#             lhsnew = [zeros(n, n) A' G'; -A zeros(p, p) zeros(p, q); -G zeros(q, p) -Hi/mu]
+#
+#             Hipsi = Hi/mu*(tz + mu*calcg!(g, cone)) # TODO simplifies
+#             dir = lhsnew\[zeros(n); zeros(p); Hipsi]
+#
+#             dir_tx = dir[1:n]
+#             dir_ty = dir[n+1:n+p]
+#             dir_tz = dir[n+p+1:n+p+q]
+#             # (dir_tx, dir_ty, dir_tz) = finddirection(alf, lhs, zeros(n), zeros(p), tz + mu*calcg!(g, cone))
+#             dir_ts = Hipsi + Hi/mu*dir_tz
+#             # dir_ts = -ts - Hi*dir_tz
+#             # dir_ts = -ts - mu*calcg!(g, cone) - Hi*dir_tz
+#             # @show norm(dir_ts - (-tz - mu*calcg!(g, cone) - Hi*dir_tz))
 #
 #             # determine step length alpha by line search
 #             alpha = alf.alphacorr
@@ -794,8 +416,8 @@ end
 #             while ncorrlsiters <= alf.maxcorrlsiters
 #                 ncorrlsiters += 1
 #
-#                 sa_tx .= tx .+ alpha .* dir_tx
-#
+#                 sa_ts .= ts .+ alpha .* dir_ts
+#                 @show alpha
 #                 if incone(cone)
 #                     # primal iterate tx is inside the cone, so terminate line search
 #                     break
@@ -818,17 +440,19 @@ end
 #             end
 #
 #             # step distance alpha in the direction
+#             tx .+= alpha .* dir_tx
 #             ty .+= alpha .* dir_ty
-#             tx .= sa_tx
-#             tau += alpha*dir_tau
-#             ts .+= alpha .* dir_ts
-#             kap += alpha*dir_kap
-#             mu = (dot(tx, ts) + tau*kap)/bnu
+#             tz .+= alpha .* dir_tz
+#             ts .= sa_ts
+#             mu = dot(ts, tz)/bnu
+#             @show mu
 #
 #             # finish if allowed and current iterate is in the eta-neighborhood, or if taken max steps
 #             if (ncorrsteps == alf.maxcorrsteps) || alf.corrcheck
-#                 sa_ts .= ts
-#                 if calcnbhd(tau*kap, mu, sa_ts, g, cone) <= abs2(alf.eta*mu)
+#                 sa_tz .= tz
+#                 nbhd = calcnbhd(mu, sa_tz, g, cone)
+#                 @show sqrt(nbhd)/mu, eta
+#                 if nbhd <= abs2(eta*mu)
 #                     break
 #                 elseif ncorrsteps == alf.maxcorrsteps
 #                     # nbhd_eta > eta, so corrector failed
@@ -843,6 +467,8 @@ end
 #         if corrfail
 #             break
 #         end
+#
+#         return
 #     end
 #
 #     alf.verbose && println("\nFinished in $iter iterations\nInternal status is $(alf.status)\n")
@@ -850,82 +476,578 @@ end
 #     # calculate final solution and iteration statistics
 #     alf.niters = iter
 #
-#     tx ./= tau
-#     alf.x = tx
-#     ty ./= tau
-#     alf.y = ty
-#     alf.tau = tau
-#     ts ./= tau
-#     alf.s = ts
-#     alf.kap = kap
-#
-#     alf.pobj = dot(c, alf.x)
-#     alf.dobj = dot(b, alf.y)
-#     alf.dgap = alf.pobj - alf.dobj
-#     alf.cgap = dot(alf.s, alf.x)
-#     alf.rel_dgap = alf.dgap/(1.0 + abs(alf.pobj) + abs(alf.dobj))
-#     alf.rel_cgap = alf.cgap/(1.0 + abs(alf.pobj) + abs(alf.dobj))
-#
-#     # alf.pres = b - A*alf.x
-#     mul!(p_res, A, alf.x)
-#     p_res .= b .- p_res
-#     alf.pres = p_res
-#     # alf.dres = c - A'*alf.y - alf.s
-#     mul!(d_res, A', alf.y)
-#     d_res .= c .- d_res .- alf.s
-#     alf.dres = d_res
-#
-#     alf.pin = norm(alf.pres)
-#     alf.din = norm(alf.dres)
-#     alf.rel_pin = alf.pin/(1.0 + norm(b, Inf))
-#     alf.rel_din = alf.din/(1.0 + norm(c, Inf))
+#     # tx ./= tau
+#     # alf.x = tx
+#     # ty ./= tau
+#     # alf.y = ty
+#     # alf.tau = tau
+#     # ts ./= tau
+#     # alf.s = ts
+#     # alf.kap = kap
+#     #
+#     # alf.pobj = dot(c, alf.x)
+#     # alf.dobj = dot(b, alf.y)
+#     # alf.dgap = alf.pobj - alf.dobj
+#     # alf.cgap = dot(alf.s, alf.x)
+#     # alf.rel_dgap = alf.dgap/(1.0 + abs(alf.pobj) + abs(alf.dobj))
+#     # alf.rel_cgap = alf.cgap/(1.0 + abs(alf.pobj) + abs(alf.dobj))
+#     #
+#     # # alf.pres = b - A*alf.x
+#     # mul!(p_res, A, alf.x)
+#     # p_res .= b .- p_res
+#     # alf.pres = p_res
+#     # # alf.dres = c - A'*alf.y - alf.s
+#     # mul!(d_res, A', alf.y)
+#     # d_res .= c .- d_res .- alf.s
+#     # alf.dres = d_res
+#     #
+#     # alf.pin = norm(alf.pres)
+#     # alf.din = norm(alf.dres)
+#     # alf.rel_pin = alf.pin/(1.0 + norm(b, Inf))
+#     # alf.rel_din = alf.din/(1.0 + norm(c, Inf))
 #
 #     alf.solvetime = time() - starttime
 #
 #     return nothing
 # end
+#
+#
+# # function finddirection(alf, lhs, rhs_tx, rhs_ty, rhs_tz)
+# #     (c, A, b, G, h) = (alf.c, alf.A, alf.b, alf.G, alf.h)
+# #     cone = alf.conK
+# #     (n, p, q) = (length(c), length(b), length(h))
+# #
+# #     Hi = zeros(q, q)
+# #     calcHiarr!(Hi, Matrix(1.0I, q, q), cone)
+# #     lhs.data[n+p+1:n+p+q,n+p+1:n+p+q] .= -Hi
+# #     dir = lhs\[rhs_tx; rhs_ty; rhs_tz]
+# #
+# #     dir_tx = dir[1:n]
+# #     dir_ty = dir[n+1:n+p]
+# #     dir_tz = dir[n+p+1:n+p+q]
+# #
+# #     return (dir_tx, dir_ty, dir_tz)
+# # end
+#
+# function calcnbhd(mu, sa_tz, g, cone)
+#     sa_tz .+= mu .* calcg!(g, cone)
+#     calcHiarr!(g, sa_tz, cone)
+#     return dot(sa_tz, g)
+# end
 
-function calcnbhd(tk, mu, sa_ts, g, cone)
+
+
+
+
+
+# solve using HSDE
+function solve!(alf::AlfonsoOpt)
+    starttime = time()
+
+    (c, A, b, G, h) = (alf.c, alf.A, alf.b, alf.G, alf.h)
+    cone = alf.conK
+    # (varK, conK) = (alf.varK, alf.conK)
+    (n, p, q) = (length(c), length(b), length(h))
+    bnu = 1.0 + barrierpar(cone) # + barrierpar(varK) # complexity parameter nu-bar of the augmented barrier (sum of the primitive cone barrier parameters plus 1)
+
+    # preallocate arrays
+    tx = similar(c)
+    ts = similar(h)
+    ty = similar(b)
+    tz = similar(ts)
+    sa_ts = similar(ts)
+    sa_tz = similar(tz)
+    dir_ts = similar(ts)
+    g = similar(ts)
+
+    loadpnt!(cone, sa_ts)
+
+    # calculate initial central primal-dual iterate (S5.3 of V.)
+    # solve linear equation then step in interior direction of cone until inside cone
+    alf.verbose && println("finding initial iterate")
+
+    # TODO use linsys solve function
+    # lhs = Symmetric([diagm(getincidence!(tx, varK)) A' G'; A zeros(p, p) zeros(p, q); G zeros(q, p) I]) \ [-c; b; h]
+    xyz = Symmetric([zeros(n, n) A' G'; A zeros(p, p) zeros(p, q); G zeros(q, p) I]) \ [-c; b; h]
+    tx .= xyz[1:n]
+    ty .= xyz[n+1:n+p]
+    sa_ts .= -xyz[n+p+1:n+p+q]
+    ts .= sa_ts
+
+    if !incone(cone)
+        println("not in the cone")
+        getintdir!(dir_ts, cone)
+        alpha = 1.0 # TODO starting alpha maybe should depend on sa_ts (eg norm like in Alfonso) in case 1.0 is too large/small
+        steps = 1
+        while !incone(cone)
+            sa_ts .= ts .+ alpha .* dir_ts
+            alpha *= 1.2
+            steps += 1
+            if steps > 100
+                error("cannot find initial iterate")
+            end
+        end
+        @show alpha
+        @show steps
+        ts .= sa_ts
+    end
+
+    @assert incone(cone) # TODO delete
+    calcg!(tz, cone)
+    tz .*= -1.0
+
+    tau = 1.0
+    kap = 1.0
+    mu = (dot(tz, ts) + tau*kap)/bnu
+
+    # TODO delete later
+    @assert abs(1.0 - mu) < 1e-8
+    @assert calcnbhd(tau*kap, mu, copy(tz), copy(tz), cone) < 1e-6
+
+    alf.verbose && println("found initial iterate")
+
+
+    # calculate prediction and correction step parameters
+    # TODO put in prediction and correction step cache functions
+    (beta, eta, cpredfix) = getbetaeta(alf.maxcorrsteps, bnu) # beta: large neighborhood parameter, eta: small neighborhood parameter
+    alphapredfix = cpredfix/(eta + sqrt(2*eta^2 + bnu)) # fixed predictor step size
+    alphapredthres = (alf.predlsmulti^alf.maxpredsmallsteps)*alphapredfix # minimum predictor step size
+    alphapredinit = (alf.predlinesearch ? min(100*alphapredfix, 0.9999) : alphapredfix) # predictor step size
+
+
+    # (norm_c, norm_b, norm_h) = (norm(c), norm(b), norm(h))
+    # tol_pres = inv(1.0 + norm(b))
+    # tol_dres = inv(1.0 + norm(c))
+
+    # main loop
+    if alf.verbose
+        println("Starting iteration")
+        @printf("\n%5s %12s %12s %9s %9s %9s %9s %9s %9s\n", "iter", "p_obj", "d_obj", "gap", "p_inf", "d_inf", "tau", "kap", "mu")
+        flush(stdout)
+    end
+
+    alf.status = :StartedIterating
+    alphapred = alphapredinit
+    iter = 0
+    while true
+        # calculate residuals
+        # TODO in-place
+        res_tx = -A'*ty - G'*tz - c*tau
+        res_ty = A*tx - b*tau
+        res_ts = ts + G*tx - h*tau
+        res_tau = kap + dot(c, tx) + dot(b, ty) + dot(h, tz)
+
+        println(iter)
+        @show res_tx
+        @show res_ty
+        @show res_ts
+        @show res_tau
+        @show tau
+        @show kap
+        @show mu
+        @show dot(c, tx)/tau
+        @show -(dot(b, ty) + dot(h, tz))/tau
+        
+        # TODO calculate convergence metrics
+        # ctx = dot(c, tx)
+        # bty = dot(b, ty)
+        # p_obj = ctx/tau
+        # d_obj = bty/tau
+        # rel_gap = abs(ctx - bty)/(tau + abs(bty))
+        # p_inf = maximum(abs, p_res)/alf.tol_pres
+        # # d_res = A'*ty - c*tau + ts
+        # mul!(d_res, A', ty)
+        # d_res .+= ts .- tau .* c
+        # d_inf = maximum(abs, d_res)/alf.tol_dres
+        # abs_gap = -bty + ctx + kap
+        # compl = abs(abs_gap)/alf.tol_compl
+        #
+        # if alf.verbose
+        #     # print iteration statistics
+        #     @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n", iter, p_obj, d_obj, rel_gap, p_inf, d_inf, tau, kap, mu)
+        #     flush(stdout)
+        # end
+        #
+        # # check convergence criteria
+        # if (p_inf <= alf.optimtol) && (d_inf <= alf.optimtol)
+        #     if rel_gap <= alf.optimtol
+        #         alf.verbose && println("Problem is feasible and an approximate optimal solution was found; terminating")
+        #         alf.status = :Optimal
+        #         break
+        #     elseif (compl <= alf.optimtol) && (tau <= alf.optimtol*1e-02*max(1.0, kap))
+        #         alf.verbose && println("Problem is nearly primal or dual infeasible; terminating")
+        #         alf.status = :NearlyInfeasible
+        #         break
+        #     end
+        # elseif (tau <= alf.optimtol*1e-02*min(1.0, kap)) && (mu <= alf.optimtol*1e-02)
+        #     alf.verbose && println("Problem is ill-posed; terminating")
+        #     alf.status = :IllPosed
+        #     break
+        # end
+
+        # check iteration limit
+        iter += 1
+        if iter >= alf.maxiter
+            alf.verbose && println("Reached iteration limit; terminating")
+            alf.status = :IterationLimit
+            break
+        end
+
+        # prediction phase
+        # calculate prediction direction
+        # (dir_tx, dir_ty, dir_tz, dir_ts, dir_kap, dir_tau) = finddirection(alf, res_tx, res_ty, res_tz, res_tau, ts, kap*tau, kap, tau)
+
+        # Hi = zeros(q, q)
+        # calcHiarr!(Hi, Matrix(1.0I, q, q), cone)
+        #
+        # lhsnew = [zeros(n, n) A' G' c; -A zeros(p, p) zeros(p, q) b; -G zeros(q, p) Hi/mu h; -c' -b' -h' tau^2/mu]
+        # rhsnew = -lhsnew*[tx; ty; tz; tau] + [zeros(n); zeros(p); ts; kap]
+        # dir = lhsnew\rhsnew
+        #
+        # dir_tx = dir[1:n]
+        # dir_ty = dir[n+1:n+p]
+        # dir_tz = dir[n+p+1:n+p+q]
+        # dir_tau = dir[n+p+q+1]
+        # dir_ts = Hi/mu*(-tz - dir_tz)
+        # dir_kap = tau^2/mu*(-tau - dir_tau)
+
+        sa_ts .= ts
+        H = Diagonal(inv.(abs2.(sa_ts)))
+
+        # tx ty tz kap ts tau
+        lhsbig = [
+            zeros(n, n) A' G' zeros(n) zeros(n, q) c;
+            -A zeros(p, p) zeros(p, q) zeros(p) zeros(p, q) b;
+            zeros(q, n) zeros(q, p) Matrix(1.0I, q, q) zeros(q) mu*H zeros(q);
+            zeros(1, n) zeros(1, p) zeros(1, q) 1.0 zeros(1, q) mu/tau^2
+            -G zeros(q, p) zeros(q, q) zeros(q) Matrix(-1.0I, q, q) h;
+            -c' -b' -h' -1.0 zeros(1, q) 0.0;
+            ]
+
+        rhsbig = [res_tx; res_ty; -tz; -kap; res_ts; res_tau]
+        dir = lhsbig\rhsbig
+        dir_tx = dir[1:n]
+        dir_ty = dir[n+1:n+p]
+        dir_tz = dir[n+p+1:n+p+q]
+        dir_kap = dir[n+p+q+1]
+        dir_ts = dir[n+p+q+2:n+p+2*q+1]
+        dir_tau = dir[n+p+2*q+2]
+
+
+        # determine step length alpha by line search
+        alpha = alphapred
+        nbhd = Inf
+        alphaprevok = true
+        predfail = false
+        nprediters = 0
+        while true
+            nprediters += 1
+
+            sa_ts .= ts .+ alpha .* dir_ts
+            @show alpha
+            # accept primal iterate if
+            # - decreased alpha and it is the first inside the cone and beta-neighborhood or
+            # - increased alpha and it is inside the cone and the first to leave beta-neighborhood
+            if incone(cone)
+                # primal iterate is inside the cone
+                sa_tz .= tz .+ alpha .* dir_tz
+                sa_tk = (tau + alpha*dir_tau)*(kap + alpha*dir_kap)
+                sa_mu = (dot(sa_ts, sa_tz) + sa_tk)/bnu
+                nbhd = calcnbhd(sa_tk, sa_mu, sa_tz, g, cone)
+                @show sqrt(nbhd)/sa_mu
+
+                if nbhd < abs2(beta*sa_mu)
+                    # iterate is inside the beta-neighborhood
+                    if !alphaprevok || (alpha > alf.predlsmulti)
+                        # either the previous iterate was outside the beta-neighborhood or increasing alpha again will make it > 1
+                        if alf.predlinesearch
+                            alphapred = alpha
+                        end
+                        break
+                    end
+
+                    alphaprevok = true
+                    alpha = alpha/alf.predlsmulti # increase alpha
+                    continue
+                end
+            end
+
+            # primal iterate is either
+            # - outside the cone or
+            # - inside the cone and outside the beta-neighborhood and previous iterate was outside the beta-neighborhood
+            if alpha < alphapredthres
+                # alpha is very small, so predictor has failed
+                predfail = true
+                alf.verbose && println("Predictor could not improve the solution ($nprediters line search steps); terminating")
+                alf.status = :PredictorFail
+                break
+            end
+
+            alphaprevok = false
+            alpha = alf.predlsmulti*alpha # decrease alpha
+        end
+        # @show nprediters
+        if predfail
+            break
+        end
+
+        # step distance alpha in the direction
+        tx .+= alpha .* dir_tx
+        ty .+= alpha .* dir_ty
+        tz .+= alpha .* dir_tz
+        ts .= sa_ts
+        tau += alpha*dir_tau
+        kap += alpha*dir_kap
+        mu = (dot(ts, tz) + tau*kap)/bnu
+        # @show mu
+        # @show tau, kap
+        # @show tx
+        # @show sqrt(nbhd)/mu
+
+        # skip correction phase if allowed and current iterate is in the eta-neighborhood
+        if alf.corrcheck && (nbhd < abs2(eta*mu))
+            continue
+        end
+
+        # correction phase
+        corrfail = false
+        ncorrsteps = 0
+        while true
+            ncorrsteps += 1
+
+            # calculate correction direction
+            # (dir_tx, dir_ty, dir_tz, dir_ts, dir_kap, dir_tau) = finddirection(alf, zeros(n), zeros(p), -mu*calcg!(g, cone), mu/tau, tz, kap*tau, kap, tau)
+
+            # Hi = zeros(q, q)
+            # calcHiarr!(Hi, Matrix(1.0I, q, q), cone)
+            #
+            # lhsnew = [zeros(n, n) A' G' c; -A zeros(p, p) zeros(p, q) b; -G zeros(q, p) -Hi/mu h; -c' -b' -h' -tau^2/mu]
+            # Hipsis = Hi/mu*(tz + mu*calcg!(g, cone)) # TODO simplifies
+            # Hipsik = tau^2/mu*(kap - mu/tau)
+            # dir = lhsnew\[zeros(n); zeros(p); Hipsis; Hipsik]
+            #
+            # dir_tx = dir[1:n]
+            # dir_ty = dir[n+1:n+p]
+            # dir_tz = dir[n+p+1:n+p+q]
+            # dir_tau = dir[n+p+q+1]
+            #
+            # dir_ts = Hipsis + Hi/mu*dir_tz
+            # # dir_ts = -G*dir_tx + h*dir_tau
+            # dir_kap = Hipsik + tau^2/mu*dir_tau
+            # # dir_kap = -dot(c, dir_tx) - dot(b, dir_ty) - dot(h, dir_tz)
+
+            # Hi = zeros(q, q)
+            # calcHiarr!(Hi, Matrix(1.0I, q, q), cone)
+            H = Diagonal(inv.(abs2.(sa_ts)))
+
+            # tx ty tz kap ts tau
+            lhsbig = [
+                zeros(n, n) A' G' zeros(n) zeros(n, q) c;
+                -A zeros(p, p) zeros(p, q) zeros(p) zeros(p, q) b;
+                zeros(q, n) zeros(q, p) Matrix(1.0I, q, q) zeros(q) mu*H zeros(q);
+                zeros(1, n) zeros(1, p) zeros(1, q) 1.0 zeros(1, q) mu/tau^2
+                -G zeros(q, p) zeros(q, q) zeros(q) Matrix(-1.0I, q, q) h;
+                -c' -b' -h' -1.0 zeros(1, q) 0.0;
+                ]
+
+            rhsbig = [zeros(n); zeros(p); -(tz + mu*calcg!(g, cone)); -(kap - mu/tau); zeros(q); 0.0]
+            dir = lhsbig\rhsbig
+            dir_tx = dir[1:n]
+            dir_ty = dir[n+1:n+p]
+            dir_tz = dir[n+p+1:n+p+q]
+            dir_kap = dir[n+p+q+1]
+            dir_ts = dir[n+p+q+2:n+p+2*q+1]
+            dir_tau = dir[n+p+2*q+2]
+
+            # determine step length alpha by line search
+            alpha = alf.alphacorr
+            ncorrlsiters = 0
+            while ncorrlsiters <= alf.maxcorrlsiters
+                ncorrlsiters += 1
+
+                sa_ts .= ts .+ alpha .* dir_ts
+                if incone(cone)
+                    # primal iterate tx is inside the cone, so terminate line search
+                    break
+                end
+
+                # primal iterate tx is outside the cone
+                if ncorrlsiters == alf.maxcorrlsiters
+                    # corrector failed
+                    corrfail = true
+                    alf.verbose && println("Corrector could not improve the solution ($ncorrlsiters line search steps); terminating")
+                    alf.status = :CorrectorFail
+                    break
+                end
+
+                alpha = alf.corrlsmulti*alpha # decrease alpha
+            end
+            # @show ncorrlsiters
+            if corrfail
+                break
+            end
+
+            # step distance alpha in the direction
+            tx .+= alpha .* dir_tx
+            ty .+= alpha .* dir_ty
+            tz .+= alpha .* dir_tz
+            ts .= sa_ts
+            tau += alpha*dir_tau
+            kap += alpha*dir_kap
+            mu = (dot(ts, tz) + tau*kap)/bnu
+
+            # finish if allowed and current iterate is in the eta-neighborhood, or if taken max steps
+            if (ncorrsteps == alf.maxcorrsteps) || alf.corrcheck
+                sa_tz .= tz
+                nbhd = calcnbhd(tau*kap, mu, sa_tz, g, cone)
+                if nbhd <= abs2(eta*mu)
+                    break
+                elseif ncorrsteps == alf.maxcorrsteps
+                    # nbhd_eta > eta, so corrector failed
+                    corrfail = true
+                    alf.verbose && println("Corrector phase finished outside the eta-neighborhood ($ncorrsteps correction steps); terminating")
+                    alf.status = :CorrectorFail
+                    break
+                end
+            end
+        end
+        # @show ncorrsteps
+        if corrfail
+            break
+        end
+    end
+
+    alf.verbose && println("\nFinished in $iter iterations\nInternal status is $(alf.status)\n")
+
+    # calculate final solution and iteration statistics
+    alf.niters = iter
+
+    # tx ./= tau
+    # alf.x = tx
+    # ty ./= tau
+    # alf.y = ty
+    # alf.tau = tau
+    # ts ./= tau
+    # alf.s = ts
+    # alf.kap = kap
+    #
+    # alf.pobj = dot(c, alf.x)
+    # alf.dobj = dot(b, alf.y)
+    # alf.dgap = alf.pobj - alf.dobj
+    # alf.cgap = dot(alf.s, alf.x)
+    # alf.rel_dgap = alf.dgap/(1.0 + abs(alf.pobj) + abs(alf.dobj))
+    # alf.rel_cgap = alf.cgap/(1.0 + abs(alf.pobj) + abs(alf.dobj))
+    #
+    # # alf.pres = b - A*alf.x
+    # mul!(p_res, A, alf.x)
+    # p_res .= b .- p_res
+    # alf.pres = p_res
+    # # alf.dres = c - A'*alf.y - alf.s
+    # mul!(d_res, A', alf.y)
+    # d_res .= c .- d_res .- alf.s
+    # alf.dres = d_res
+    #
+    # alf.pin = norm(alf.pres)
+    # alf.din = norm(alf.dres)
+    # alf.rel_pin = alf.pin/(1.0 + norm(b, Inf))
+    # alf.rel_din = alf.din/(1.0 + norm(c, Inf))
+
+    alf.solvetime = time() - starttime
+
+    return nothing
+end
+
+function calcnbhd(tk, mu, sa_tz, g, cone)
     calcg!(g, cone)
-    sa_ts .+= mu .* g
-    calcHiarr!(g, sa_ts, cone)
-    return (tk - mu)^2 + dot(sa_ts, g)
+    sa_tz .+= mu .* g
+    calcHiarr!(g, sa_tz, cone)
+    return (tk - mu)^2 + dot(sa_tz, g)
 end
 
-function solvelinsys(y1, x1, y2, x2, mu, rhs_tx, rhs_ty, A, b, c, cone, HiAt, AHiAt)
-    invmu = inv(mu)
 
-    # TODO could ultimately be faster or more stable to do cholesky.L ldiv everywhere than to do full hessian ldiv
-    calcHiarr!(HiAt, A', cone)
-    HiAt .*= invmu
-    mul!(AHiAt, A, HiAt)
-    F = cholesky!(Symmetric(AHiAt))
+function finddirection(alf, rhs_tx, rhs_ty, rhs_tz, rhs_tau, rhs_ts, rhs_kap, kap, tau)
+    (c, A, b, G, h) = (alf.c, alf.A, alf.b, alf.G, alf.h)
+    cone = alf.conK
+    (n, p, q) = (length(c), length(b), length(h))
 
-    # TODO can parallelize 1 and 2
-    # y2 = F\(rhs_ty + HiAt'*rhs_tx)
-    mul!(y2, HiAt', rhs_tx)
-    y2 .+= rhs_ty
-    ldiv!(F, y2) # y2 done
+    Hi = zeros(q, q)
+    calcHiarr!(Hi, Matrix(1.0I, q, q), cone)
+    lhs = [zeros(n, n) A' G' c; -A zeros(p, p) zeros(p, q) b; -G zeros(q, p) Hi h; -c' -b' -h' kap/tau]
 
-    # x2 = Hi*invmu*(A'*y2 - rhs_tx)
-    mul!(x2, A', y2)
-    rhs_tx .= x2 .- rhs_tx # destroys rhs_tx
-    rhs_tx .*= invmu
-    calcHiarr!(x2, rhs_tx, cone) # x2 done
+    xyzt = lhs\[rhs_tx; rhs_ty; rhs_tz - rhs_ts; rhs_tau - rhs_kap/tau]
 
-    # y1 = F\(b + HiAt'*c)
-    mul!(y1, HiAt', c)
-    y1 .+= b
-    ldiv!(F, y1) # y1 done
+    dir_tx = xyzt[1:n]
+    dir_ty = xyzt[n+1:n+p]
+    dir_tz = xyzt[n+p+1:n+p+q]
+    dir_tau = xyzt[n+p+q+1]
+    dir_ts = -G*dir_tx + h*dir_tau - rhs_tz
+    dir_kap = -dot(c, dir_tx) - dot(b, dir_ty) - dot(h, dir_tz) - rhs_tau
 
-    # x1 = Hi*invmu*(A'*y1 - c)
-    mul!(rhs_tx, A', y1)
-    rhs_tx .-= c
-    rhs_tx .*= invmu
-    calcHiarr!(x1, rhs_tx, cone) # x1 done
-
-    return (y1, x1, y2, x2)
+    return (dir_tx, dir_ty, dir_tz, dir_ts, dir_kap, dir_tau)
 end
+
+
+# function solvesystem(alf, b_tx, b_ty, b_tz)
+#     # TODO s10.3 of V.
+#
+#
+#     sol_ty = AGW2 \ AHi*(b_tx + )
+#     return
+# end
+#
+# function finddirection(alf, rhs_tx, rhs_ty, rhs_tz, rhs_tau, rhs_ts, rhs_kap, kap, tau)
+#
+#
+#     invmu = inv(mu)
+#
+#     # TODO could ultimately be faster or more stable to do cholesky.L ldiv everywhere than to do full hessian ldiv
+#     calcHiarr!(HiAt, A', cone)
+#     HiAt .*= invmu
+#     mul!(AHiAt, A, HiAt)
+#     F = cholesky!(Symmetric(AHiAt))
+#
+#     # TODO can parallelize 1 and 2
+#     # y2 = F\(rhs_ty + HiAt'*rhs_tx)
+#     mul!(y2, HiAt', rhs_tx)
+#     y2 .+= rhs_ty
+#     ldiv!(F, y2) # y2 done
+#
+#     # x2 = Hi*invmu*(A'*y2 - rhs_tx)
+#     mul!(x2, A', y2)
+#     rhs_tx .= x2 .- rhs_tx # destroys rhs_tx
+#     rhs_tx .*= invmu
+#     calcHiarr!(x2, rhs_tx, cone) # x2 done
+#
+#     # y1 = F\(b + HiAt'*c)
+#     mul!(y1, HiAt', c)
+#     y1 .+= b
+#     ldiv!(F, y1) # y1 done
+#
+#     # x1 = Hi*invmu*(A'*y1 - c)
+#     mul!(rhs_tx, A', y1)
+#     rhs_tx .-= c
+#     rhs_tx .*= invmu
+#     calcHiarr!(x1, rhs_tx, cone) # x1 done
+#
+#
+#     x1
+#     y1
+#     z1
+#
+#     x2
+#     y2
+#     z2
+#
+#     dir_tau = (rhs_tau - rhs_kap/tau + dot(c, x2) + dot(b, y2) + dot(h, z2))/(kap/tau - dot(c, x1) - dot(b, y1) - dot(h, z1))
+#     dir_tx = x2 + dir_tau * x1
+#     dir_ty = y2 + dir_tau * y1
+#     dir_tz = z2 + dir_tau * z1
+#     dir_ts = -G*dir_tx + h*dir_tau - rhs_tz
+#     dir_kap = -dot(c, dir_tx) - dot(b, dir_ty) - dot(h, dir_tz) - rhs_tau
+#
+#     return (dir_tx, dir_ty, dir_tz, dir_ts, dir_kap, dir_tau)
+# end
+
 
 function getbetaeta(maxcorrsteps, bnu)
     if maxcorrsteps <= 2
