@@ -213,6 +213,7 @@ function solve!(alf::AlfonsoOpt)
     sa_tz = similar(tz)
     dir_ts = similar(ts)
     g = similar(ts)
+    Hi = zeros(q, q)
 
     loadpnt!(cone, sa_ts)
 
@@ -269,6 +270,19 @@ function solve!(alf::AlfonsoOpt)
     alphapredfix = cpredfix/(eta + sqrt(2*eta^2 + bnu)) # fixed predictor step size
     alphapredthres = (alf.predlsmulti^alf.maxpredsmallsteps)*alphapredfix # minimum predictor step size
     alphapredinit = (alf.predlinesearch ? min(100*alphapredfix, 0.9999) : alphapredfix) # predictor step size
+
+
+    H = Matrix(1.0I, q, q)
+    # tx ty tz kap ts tau
+    lhsbig = [
+        zeros(n,n)  A'          G'                zeros(n)  zeros(n,q)         c;
+        -A          zeros(p,p)  zeros(p,q)        zeros(p)  zeros(p,q)         b;
+        zeros(q,n)  zeros(q,p)  Matrix(1.0I,q,q)  zeros(q)  mu*H               zeros(q);
+        zeros(1,n)  zeros(1,p)  zeros(1,q)        1.0       zeros(1,q)         mu/tau^2;
+        -G          zeros(q,p)  zeros(q,q)        zeros(q)  Matrix(-1.0I,q,q)  h;
+        -c'         -b'         -h'               -1.0      zeros(1,q)         0.0;
+        ]
+
 
     # main loop
     if alf.verbose
@@ -366,45 +380,8 @@ function solve!(alf::AlfonsoOpt)
 
         # prediction phase
         # calculate prediction direction
-        # (dir_tx, dir_ty, dir_tz, dir_ts, dir_kap, dir_tau) = finddirection(alf, res_tx, res_ty, res_tz, res_tau, ts, kap*tau, kap, tau)
-
-        # Hi = zeros(q, q)
-        # calcHiarr!(Hi, Matrix(1.0I, q, q), cone)
-        #
-        # lhsnew = [zeros(n, n) A' G' c; -A zeros(p, p) zeros(p, q) b; -G zeros(q, p) Hi/mu h; -c' -b' -h' tau^2/mu]
-        # rhsnew = -lhsnew*[tx; ty; tz; tau] + [zeros(n); zeros(p); ts; kap]
-        # dir = lhsnew\rhsnew
-        #
-        # dir_tx = dir[1:n]
-        # dir_ty = dir[n+1:n+p]
-        # dir_tz = dir[n+p+1:n+p+q]
-        # dir_tau = dir[n+p+q+1]
-        # dir_ts = Hi/mu*(-tz - dir_tz)
-        # dir_kap = tau^2/mu*(-tau - dir_tau)
-
         sa_ts .= ts
-        Hi = zeros(q, q)
-        calcHiarr!(Hi, Matrix(1.0I, q, q), cone)
-        H = inv(Hi)
-
-        # tx ty tz kap ts tau
-        lhsbig = [
-            zeros(n, n) A' G' zeros(n) zeros(n, q) c;
-            -A zeros(p, p) zeros(p, q) zeros(p) zeros(p, q) b;
-            zeros(q, n) zeros(q, p) Matrix(1.0I, q, q) zeros(q) mu*H zeros(q);
-            zeros(1, n) zeros(1, p) zeros(1, q) 1.0 zeros(1, q) mu/tau^2
-            -G zeros(q, p) zeros(q, q) zeros(q) Matrix(-1.0I, q, q) h;
-            -c' -b' -h' -1.0 zeros(1, q) 0.0;
-            ]
-
-        rhsbig = [res_tx; res_ty; -tz; -kap; res_tz; res_tau]
-        dir = lhsbig\rhsbig
-        dir_tx = dir[1:n]
-        dir_ty = dir[n+1:n+p]
-        dir_tz = dir[n+p+1:n+p+q]
-        dir_kap = dir[n+p+q+1]
-        dir_ts = dir[n+p+q+2:n+p+2*q+1]
-        dir_tau = dir[n+p+2*q+2]
+        (dir_tx, dir_ty, dir_tz, dir_kap, dir_ts, dir_tau) = finddirection(alf, lhsbig, Hi, res_tx, res_ty, -tz, -kap, res_tz, res_tau, mu, tau)
 
         # determine step length alpha by line search
         alpha = alphapred
@@ -482,48 +459,7 @@ function solve!(alf::AlfonsoOpt)
             ncorrsteps += 1
 
             # calculate correction direction
-            # (dir_tx, dir_ty, dir_tz, dir_ts, dir_kap, dir_tau) = finddirection(alf, zeros(n), zeros(p), -mu*calcg!(g, cone), mu/tau, tz, kap*tau, kap, tau)
-
-            # Hi = zeros(q, q)
-            # calcHiarr!(Hi, Matrix(1.0I, q, q), cone)
-            #
-            # lhsnew = [zeros(n, n) A' G' c; -A zeros(p, p) zeros(p, q) b; -G zeros(q, p) -Hi/mu h; -c' -b' -h' -tau^2/mu]
-            # Hipsis = Hi/mu*(tz + mu*calcg!(g, cone)) # TODO simplifies
-            # Hipsik = tau^2/mu*(kap - mu/tau)
-            # dir = lhsnew\[zeros(n); zeros(p); Hipsis; Hipsik]
-            #
-            # dir_tx = dir[1:n]
-            # dir_ty = dir[n+1:n+p]
-            # dir_tz = dir[n+p+1:n+p+q]
-            # dir_tau = dir[n+p+q+1]
-            #
-            # dir_ts = Hipsis + Hi/mu*dir_tz
-            # # dir_ts = -G*dir_tx + h*dir_tau
-            # dir_kap = Hipsik + tau^2/mu*dir_tau
-            # # dir_kap = -dot(c, dir_tx) - dot(b, dir_ty) - dot(h, dir_tz)
-
-            Hi = zeros(q, q)
-            calcHiarr!(Hi, Matrix(1.0I, q, q), cone)
-            H = inv(Hi)
-
-            # tx ty tz kap ts tau
-            lhsbig = [
-                zeros(n, n) A' G' zeros(n) zeros(n, q) c;
-                -A zeros(p, p) zeros(p, q) zeros(p) zeros(p, q) b;
-                zeros(q, n) zeros(q, p) Matrix(1.0I, q, q) zeros(q) mu*H zeros(q);
-                zeros(1, n) zeros(1, p) zeros(1, q) 1.0 zeros(1, q) mu/tau^2
-                -G zeros(q, p) zeros(q, q) zeros(q) Matrix(-1.0I, q, q) h;
-                -c' -b' -h' -1.0 zeros(1, q) 0.0;
-                ]
-
-            rhsbig = [zeros(n); zeros(p); -(tz + mu*calcg!(g, cone)); -(kap - mu/tau); zeros(q); 0.0]
-            dir = lhsbig\rhsbig
-            dir_tx = dir[1:n]
-            dir_ty = dir[n+1:n+p]
-            dir_tz = dir[n+p+1:n+p+q]
-            dir_kap = dir[n+p+q+1]
-            dir_ts = dir[n+p+q+2:n+p+2*q+1]
-            dir_tau = dir[n+p+2*q+2]
+            (dir_tx, dir_ty, dir_tz, dir_kap, dir_ts, dir_tau) = finddirection(alf, lhsbig, Hi, zeros(n), zeros(p), -(tz + mu*calcg!(g, cone)), -(kap - mu/tau), zeros(q), 0.0, mu, tau)
 
             # determine step length alpha by line search
             alpha = alf.alphacorr
@@ -565,6 +501,7 @@ function solve!(alf::AlfonsoOpt)
             if (ncorrsteps == alf.maxcorrsteps) || alf.corrcheck
                 sa_tz .= tz
                 nbhd = calcnbhd(tau*kap, mu, sa_tz, g, cone)
+                @show sqrt(nbhd)/mu
                 if nbhd <= abs2(eta*mu)
                     break
                 elseif ncorrsteps == alf.maxcorrsteps
@@ -604,26 +541,61 @@ function calcnbhd(tk, mu, sa_tz, g, cone)
     return (tk - mu)^2 + dot(sa_tz, g)
 end
 
-
-function finddirection(alf, rhs_tx, rhs_ty, rhs_tz, rhs_tau, rhs_ts, rhs_kap, kap, tau)
+function finddirection(alf, lhsbig, Hi, rhs_tx, rhs_ty, rhs_tz, rhs_kap, rhs_ts, rhs_tau, mu, tau)
     (c, A, b, G, h) = (alf.c, alf.A, alf.b, alf.G, alf.h)
     cone = alf.conK
     (n, p, q) = (length(c), length(b), length(h))
 
-    Hi = zeros(q, q)
     calcHiarr!(Hi, Matrix(1.0I, q, q), cone)
-    lhs = [zeros(n, n) A' G' c; -A zeros(p, p) zeros(p, q) b; -G zeros(q, p) Hi h; -c' -b' -h' kap/tau]
+    H = inv(Hi)
 
-    xyzt = lhs\[rhs_tx; rhs_ty; rhs_tz - rhs_ts; rhs_tau - rhs_kap/tau]
+    # tx ty tz kap ts tau
+    lhsbig[n+p+1:n+p+q, n+p+q+2:n+p+q+1+q] .= mu*H
+    lhsbig[n+p+q+1, end] = mu/tau^2
+    rhsbig = [rhs_tx; rhs_ty; rhs_tz; rhs_kap; rhs_ts; rhs_tau]
 
-    dir_tx = xyzt[1:n]
-    dir_ty = xyzt[n+1:n+p]
-    dir_tz = xyzt[n+p+1:n+p+q]
-    dir_tau = xyzt[n+p+q+1]
-    dir_ts = -G*dir_tx + h*dir_tau - rhs_tz
-    dir_kap = -dot(c, dir_tx) - dot(b, dir_ty) - dot(h, dir_tz) - rhs_tau
+    dir = lhsbig\rhsbig
+    dir_tx = dir[1:n]
+    dir_ty = dir[n+1:n+p]
+    dir_tz = dir[n+p+1:n+p+q]
+    dir_kap = dir[n+p+q+1]
+    dir_ts = dir[n+p+q+2:n+p+2*q+1]
+    dir_tau = dir[n+p+2*q+2]
 
-    return (dir_tx, dir_ty, dir_tz, dir_ts, dir_kap, dir_tau)
+
+
+
+    # Hi = zeros(q, q)
+    # calcHiarr!(Hi, Matrix(1.0I, q, q), cone)
+    # lhs = [zeros(n, n) A' G' c; -A zeros(p, p) zeros(p, q) b; -G zeros(q, p) Hi h; -c' -b' -h' kap/tau]
+    #
+    # xyzt = lhs\[rhs_tx; rhs_ty; rhs_tz - rhs_ts; rhs_tau - rhs_kap/tau]
+    #
+    # dir_tx = xyzt[1:n]
+    # dir_ty = xyzt[n+1:n+p]
+    # dir_tz = xyzt[n+p+1:n+p+q]
+    # dir_tau = xyzt[n+p+q+1]
+    # dir_ts = -G*dir_tx + h*dir_tau - rhs_tz
+    # dir_kap = -dot(c, dir_tx) - dot(b, dir_ty) - dot(h, dir_tz) - rhs_tau
+
+
+    # lhsnew = [zeros(n, n) A' G' c; -A zeros(p, p) zeros(p, q) b; -G zeros(q, p) -Hi/mu h; -c' -b' -h' -tau^2/mu]
+    # Hipsis = Hi/mu*(tz + mu*calcg!(g, cone)) # TODO simplifies
+    # Hipsik = tau^2/mu*(kap - mu/tau)
+    # dir = lhsnew\[zeros(n); zeros(p); Hipsis; Hipsik]
+    #
+    # dir_tx = dir[1:n]
+    # dir_ty = dir[n+1:n+p]
+    # dir_tz = dir[n+p+1:n+p+q]
+    # dir_tau = dir[n+p+q+1]
+    #
+    # dir_ts = Hipsis + Hi/mu*dir_tz
+    # # dir_ts = -G*dir_tx + h*dir_tau
+    # dir_kap = Hipsik + tau^2/mu*dir_tau
+    # # dir_kap = -dot(c, dir_tx) - dot(b, dir_ty) - dot(h, dir_tz)
+
+
+    return (dir_tx, dir_ty, dir_tz, dir_kap, dir_ts, dir_tau)
 end
 
 function getbetaeta(maxcorrsteps, bnu)
