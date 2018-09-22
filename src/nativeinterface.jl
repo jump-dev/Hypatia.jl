@@ -45,13 +45,15 @@ mutable struct AlfonsoOpt
     status::Symbol          # solver status
     solvetime::Float64      # total solve time
     niters::Int             # total number of iterations
-    y::Vector{Float64}      # final value of the dual free variables
     x::Vector{Float64}      # final value of the primal variables
+    y::Vector{Float64}      # final value of the dual free variables
+    z::Vector{Float64}      # final value of the dual cone variables
     tau::Float64            # final value of the tau-variable
-    s::Vector{Float64}      # final value of the dual slack variables
+    s::Vector{Float64}      # final value of the primal cone variables
     kap::Float64            # final value of the kappa-variable
     pobj::Float64           # final primal objective value
     dobj::Float64           # final dual objective value
+
     dgap::Float64           # final duality gap
     cgap::Float64           # final complementarity gap
     rel_dgap::Float64       # final relative duality gap
@@ -89,10 +91,10 @@ end
 
 function AlfonsoOpt(;
     verbose = false,
-    tolrelopt = 1e-6,
-    tolabsopt = 1e-7,
-    tolfeas = 1e-7,
-    maxiter = 2e2,
+    tolrelopt = 1e-5,
+    tolabsopt = 1e-6,
+    tolfeas = 1e-6,
+    maxiter = 5e2,
     predlinesearch = true,
     maxpredsmallsteps = 8,
     maxcorrsteps = 8,
@@ -169,11 +171,12 @@ function load_data!(
         if q != size(G, 1)
             error("number of constraint rows is not consistent in G and h")
         end
-         # TODO do appropriate decomps at the same time, do preprocessing
-        if rank(A) < p
+        # TODO do appropriate decomps at the same time, do preprocessing
+        # TODO rank currently missing method for sparse A, G
+        if !issparse(A) && rank(A) < p
             error("A matrix is not full-row-rank; some primal equalities may be redundant or inconsistent")
         end
-        if rank(vcat(A, G)) < n
+        if !issparse(A) && !issparse(G) && rank(vcat(A, G)) < n
             error("[A' G'] is not full-row-rank; some dual equalities may be redundant (i.e. primal variables can be removed) or inconsistent")
         end
     end
@@ -215,7 +218,7 @@ function solve!(alf::AlfonsoOpt)
 
     # calculate initial central primal-dual iterate (S5.3 of V.)
     # solve linear equation then step in interior direction of cone until inside cone
-    alf.verbose && println("finding initial iterate")
+    alf.verbose && println("\nfinding initial iterate")
 
     # TODO use linsys solve function
     # lhs = Symmetric([diagm(getincidence!(tx, varK)) A' G'; A zeros(p, p) zeros(p, q); G zeros(q, p) I]) \ [-c; b; h]
@@ -231,9 +234,9 @@ function solve!(alf::AlfonsoOpt)
         steps = 1
         while !incone(cone)
             sa_ts .= ts .+ alpha .* dir_ts
-            alpha *= 1.2
+            alpha *= 1.5
             steps += 1
-            if steps > 100
+            if steps > 25
                 error("cannot find initial iterate")
             end
         end
@@ -387,7 +390,9 @@ function solve!(alf::AlfonsoOpt)
         # dir_kap = tau^2/mu*(-tau - dir_tau)
 
         sa_ts .= ts
-        H = Diagonal(inv.(abs2.(sa_ts)))
+        Hi = zeros(q, q)
+        calcHiarr!(Hi, Matrix(1.0I, q, q), cone)
+        H = inv(Hi)
 
         # tx ty tz kap ts tau
         lhsbig = [
@@ -511,9 +516,9 @@ function solve!(alf::AlfonsoOpt)
             # dir_kap = Hipsik + tau^2/mu*dir_tau
             # # dir_kap = -dot(c, dir_tx) - dot(b, dir_ty) - dot(h, dir_tz)
 
-            # Hi = zeros(q, q)
-            # calcHiarr!(Hi, Matrix(1.0I, q, q), cone)
-            H = Diagonal(inv.(abs2.(sa_ts)))
+            Hi = zeros(q, q)
+            calcHiarr!(Hi, Matrix(1.0I, q, q), cone)
+            H = inv(Hi)
 
             # tx ty tz kap ts tau
             lhsbig = [
@@ -597,17 +602,24 @@ function solve!(alf::AlfonsoOpt)
     # calculate final solution and iteration statistics
     alf.niters = iter
 
-    # tx ./= tau
-    # alf.x = tx
-    # ty ./= tau
-    # alf.y = ty
-    # alf.tau = tau
-    # ts ./= tau
-    # alf.s = ts
-    # alf.kap = kap
-    #
-    # alf.pobj = dot(c, alf.x)
-    # alf.dobj = dot(b, alf.y)
+
+
+    tx ./= tau
+    alf.x = tx
+    ty ./= tau
+    alf.y = ty
+    tz ./= tau
+    alf.z = tz
+    alf.tau = tau
+    ts ./= tau
+    alf.s = ts
+    alf.kap = kap
+
+    alf.pobj = dot(c, alf.x)
+    alf.dobj = -dot(b, alf.y) - dot(h, alf.z) # TODO already calculated; maybe should just calculate in getter functions though
+
+
+
     # alf.dgap = alf.pobj - alf.dobj
     # alf.cgap = dot(alf.s, alf.x)
     # alf.rel_dgap = alf.dgap/(1.0 + abs(alf.pobj) + abs(alf.dobj))
