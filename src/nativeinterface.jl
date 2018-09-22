@@ -535,18 +535,6 @@ function finddirection(alf, Hi, rhs_tx, rhs_ty, rhs_tz, rhs_kap, rhs_ts, rhs_tau
 
     calcHiarr!(Hi, Matrix(1.0I, q, q), cone)
 
-    # H = inv(Hi)
-    # lhsbig[n+p+1:n+p+q, n+p+q+2:n+p+q+1+q] .= mu*H
-    # lhsbig[n+p+q+1, end] = mu/tau^2
-    # rhsbig = [rhs_tx; rhs_ty; rhs_tz; rhs_kap; rhs_ts; rhs_tau]
-    # dir = lhsbig\rhsbig
-    # dir_tx = dir[1:n]
-    # dir_ty = dir[n+1:n+p]
-    # dir_tz = dir[n+p+1:n+p+q]
-    # dir_kap = dir[n+p+q+1]
-    # dir_ts = dir[n+p+q+2:n+p+2*q+1]
-    # dir_tau = dir[n+p+2*q+2]
-
     # tx ty tz kap ts tau
     # lhsbig = [
     #     zeros(n,n)  A'          G'                zeros(n)  zeros(n,q)         c;
@@ -561,19 +549,50 @@ function finddirection(alf, Hi, rhs_tx, rhs_ty, rhs_tz, rhs_kap, rhs_ts, rhs_tau
     # dir_kap + mu/tau^2*dir_tau = rhs_kap
     # dir_kap = rhs_kap - mu/tau^2*dir_tau
 
-    lhs = [
-        zeros(n,n)  A'          G'          c;
-        -A          zeros(p,p)  zeros(p,q)  b;
-        -G          zeros(q,p)  Hi/mu       h;
-        -c'         -b'         -h'         mu/tau/tau;
-        ]
-    rhs = [rhs_tx; rhs_ty; rhs_ts + Hi/mu*rhs_tz; rhs_tau + rhs_kap]
-    dir = lhs\rhs
 
-    dir_tx = dir[1:n]
-    dir_ty = dir[n+1:n+p]
-    dir_tz = dir[n+p+1:n+p+q]
-    dir_tau = dir[n+p+q+1]
+    # lhs = [
+    #     zeros(n,n)  A'          G'          c;
+    #     -A          zeros(p,p)  zeros(p,q)  b;
+    #     -G          zeros(q,p)  Hi/mu       h;
+    #     -c'         -b'         -h'         mu/tau/tau;
+    #     ]
+    # rhs = [rhs_tx; rhs_ty; rhs_ts + Hi/mu*rhs_tz; rhs_tau + rhs_kap]
+    # dir = lhs\rhs
+    #
+    # dir_tx = dir[1:n]
+    # dir_ty = dir[n+1:n+p]
+    # dir_tz = dir[n+p+1:n+p+q]
+    # dir_tau = dir[n+p+q+1]
+    # dir_ts = -G*dir_tx + h*dir_tau - rhs_ts
+    # dir_kap = -dot(c, dir_tx) - dot(b, dir_ty) - dot(h, dir_tz) - rhs_tau
+
+
+    # solve two symmetric systems and combine the solutions
+    lhs = [
+        zeros(n,n)  A'          G';
+        -A          zeros(p,p)  zeros(p,q);
+        -G          zeros(q,p)  Hi/mu;
+        ]
+
+    # system 1
+    rhs1 = [-c; -b; -h]
+    sol1 = lhs\rhs1
+    x1 = sol1[1:n]
+    y1 = sol1[n+1:n+p]
+    z1 = sol1[n+p+1:end]
+
+    # system 2
+    rhs2 = [rhs_tx; rhs_ty; rhs_ts + Hi/mu*rhs_tz]
+    sol2 = lhs\rhs2
+    x2 = sol2[1:n]
+    y2 = sol2[n+1:n+p]
+    z2 = sol2[n+p+1:end]
+
+    # combine
+    dir_tau = ((rhs_tau + rhs_kap) + dot(c, x2) + dot(b, y2) + dot(h, z2))/(mu/tau/tau - dot(c, x1) - dot(b, y1) - dot(h, z1))
+    dir_tx = x2 + dir_tau * x1
+    dir_ty = y2 + dir_tau * y1
+    dir_tz = z2 + dir_tau * z1
     dir_ts = -G*dir_tx + h*dir_tau - rhs_ts
     dir_kap = -dot(c, dir_tx) - dot(b, dir_ty) - dot(h, dir_tz) - rhs_tau
 
