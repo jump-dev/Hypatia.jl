@@ -271,19 +271,6 @@ function solve!(alf::AlfonsoOpt)
     alphapredthres = (alf.predlsmulti^alf.maxpredsmallsteps)*alphapredfix # minimum predictor step size
     alphapredinit = (alf.predlinesearch ? min(100*alphapredfix, 0.9999) : alphapredfix) # predictor step size
 
-
-    H = Matrix(1.0I, q, q)
-    # tx ty tz kap ts tau
-    lhsbig = [
-        zeros(n,n)  A'          G'                zeros(n)  zeros(n,q)         c;
-        -A          zeros(p,p)  zeros(p,q)        zeros(p)  zeros(p,q)         b;
-        zeros(q,n)  zeros(q,p)  Matrix(1.0I,q,q)  zeros(q)  mu*H               zeros(q);
-        zeros(1,n)  zeros(1,p)  zeros(1,q)        1.0       zeros(1,q)         mu/tau^2;
-        -G          zeros(q,p)  zeros(q,q)        zeros(q)  Matrix(-1.0I,q,q)  h;
-        -c'         -b'         -h'               -1.0      zeros(1,q)         0.0;
-        ]
-
-
     # main loop
     if alf.verbose
         println("starting iteration")
@@ -381,7 +368,7 @@ function solve!(alf::AlfonsoOpt)
         # prediction phase
         # calculate prediction direction
         sa_ts .= ts
-        (dir_tx, dir_ty, dir_tz, dir_kap, dir_ts, dir_tau) = finddirection(alf, lhsbig, Hi, res_tx, res_ty, -tz, -kap, res_tz, res_tau, mu, tau)
+        (dir_tx, dir_ty, dir_tz, dir_kap, dir_ts, dir_tau) = finddirection(alf, Hi, res_tx, res_ty, -tz, -kap, res_tz, res_tau, mu, tau)
 
         # determine step length alpha by line search
         alpha = alphapred
@@ -459,7 +446,7 @@ function solve!(alf::AlfonsoOpt)
             ncorrsteps += 1
 
             # calculate correction direction
-            (dir_tx, dir_ty, dir_tz, dir_kap, dir_ts, dir_tau) = finddirection(alf, lhsbig, Hi, zeros(n), zeros(p), -(tz + mu*calcg!(g, cone)), -(kap - mu/tau), zeros(q), 0.0, mu, tau)
+            (dir_tx, dir_ty, dir_tz, dir_kap, dir_ts, dir_tau) = finddirection(alf, Hi, zeros(n), zeros(p), -(tz + mu*calcg!(g, cone)), -(kap - mu/tau), zeros(q), 0.0, mu, tau)
 
             # determine step length alpha by line search
             alpha = alf.alphacorr
@@ -501,7 +488,7 @@ function solve!(alf::AlfonsoOpt)
             if (ncorrsteps == alf.maxcorrsteps) || alf.corrcheck
                 sa_tz .= tz
                 nbhd = calcnbhd(tau*kap, mu, sa_tz, g, cone)
-                @show sqrt(nbhd)/mu
+                # @show sqrt(nbhd)/mu
                 if nbhd <= abs2(eta*mu)
                     break
                 elseif ncorrsteps == alf.maxcorrsteps
@@ -541,59 +528,54 @@ function calcnbhd(tk, mu, sa_tz, g, cone)
     return (tk - mu)^2 + dot(sa_tz, g)
 end
 
-function finddirection(alf, lhsbig, Hi, rhs_tx, rhs_ty, rhs_tz, rhs_kap, rhs_ts, rhs_tau, mu, tau)
+function finddirection(alf, Hi, rhs_tx, rhs_ty, rhs_tz, rhs_kap, rhs_ts, rhs_tau, mu, tau)
     (c, A, b, G, h) = (alf.c, alf.A, alf.b, alf.G, alf.h)
     cone = alf.conK
     (n, p, q) = (length(c), length(b), length(h))
 
     calcHiarr!(Hi, Matrix(1.0I, q, q), cone)
-    H = inv(Hi)
 
-    # tx ty tz kap ts tau
-    lhsbig[n+p+1:n+p+q, n+p+q+2:n+p+q+1+q] .= mu*H
-    lhsbig[n+p+q+1, end] = mu/tau^2
-    rhsbig = [rhs_tx; rhs_ty; rhs_tz; rhs_kap; rhs_ts; rhs_tau]
-
-    dir = lhsbig\rhsbig
-    dir_tx = dir[1:n]
-    dir_ty = dir[n+1:n+p]
-    dir_tz = dir[n+p+1:n+p+q]
-    dir_kap = dir[n+p+q+1]
-    dir_ts = dir[n+p+q+2:n+p+2*q+1]
-    dir_tau = dir[n+p+2*q+2]
-
-
-
-
-    # Hi = zeros(q, q)
-    # calcHiarr!(Hi, Matrix(1.0I, q, q), cone)
-    # lhs = [zeros(n, n) A' G' c; -A zeros(p, p) zeros(p, q) b; -G zeros(q, p) Hi h; -c' -b' -h' kap/tau]
-    #
-    # xyzt = lhs\[rhs_tx; rhs_ty; rhs_tz - rhs_ts; rhs_tau - rhs_kap/tau]
-    #
-    # dir_tx = xyzt[1:n]
-    # dir_ty = xyzt[n+1:n+p]
-    # dir_tz = xyzt[n+p+1:n+p+q]
-    # dir_tau = xyzt[n+p+q+1]
-    # dir_ts = -G*dir_tx + h*dir_tau - rhs_tz
-    # dir_kap = -dot(c, dir_tx) - dot(b, dir_ty) - dot(h, dir_tz) - rhs_tau
-
-
-    # lhsnew = [zeros(n, n) A' G' c; -A zeros(p, p) zeros(p, q) b; -G zeros(q, p) -Hi/mu h; -c' -b' -h' -tau^2/mu]
-    # Hipsis = Hi/mu*(tz + mu*calcg!(g, cone)) # TODO simplifies
-    # Hipsik = tau^2/mu*(kap - mu/tau)
-    # dir = lhsnew\[zeros(n); zeros(p); Hipsis; Hipsik]
-    #
+    # H = inv(Hi)
+    # lhsbig[n+p+1:n+p+q, n+p+q+2:n+p+q+1+q] .= mu*H
+    # lhsbig[n+p+q+1, end] = mu/tau^2
+    # rhsbig = [rhs_tx; rhs_ty; rhs_tz; rhs_kap; rhs_ts; rhs_tau]
+    # dir = lhsbig\rhsbig
     # dir_tx = dir[1:n]
     # dir_ty = dir[n+1:n+p]
     # dir_tz = dir[n+p+1:n+p+q]
-    # dir_tau = dir[n+p+q+1]
-    #
-    # dir_ts = Hipsis + Hi/mu*dir_tz
-    # # dir_ts = -G*dir_tx + h*dir_tau
-    # dir_kap = Hipsik + tau^2/mu*dir_tau
-    # # dir_kap = -dot(c, dir_tx) - dot(b, dir_ty) - dot(h, dir_tz)
+    # dir_kap = dir[n+p+q+1]
+    # dir_ts = dir[n+p+q+2:n+p+2*q+1]
+    # dir_tau = dir[n+p+2*q+2]
 
+    # tx ty tz kap ts tau
+    # lhsbig = [
+    #     zeros(n,n)  A'          G'                zeros(n)  zeros(n,q)         c;
+    #     -A          zeros(p,p)  zeros(p,q)        zeros(p)  zeros(p,q)         b;
+    #     zeros(q,n)  zeros(q,p)  Matrix(1.0I,q,q)  zeros(q)  mu*H               zeros(q);
+    #     zeros(1,n)  zeros(1,p)  zeros(1,q)        1.0       zeros(1,q)         mu/tau^2;
+    #     -G          zeros(q,p)  zeros(q,q)        zeros(q)  Matrix(-1.0I,q,q)  h;
+    #     -c'         -b'         -h'               -1.0      zeros(1,q)         0.0;
+    #     ]
+    # dir_tz + mu*H*dir_ts = rhs_tz
+    # dir_ts = Hi/mu*(rhs_tz - dir_tz)
+    # dir_kap + mu/tau^2*dir_tau = rhs_kap
+    # dir_kap = rhs_kap - mu/tau^2*dir_tau
+
+    lhs = [
+        zeros(n,n)  A'          G'          c;
+        -A          zeros(p,p)  zeros(p,q)  b;
+        -G          zeros(q,p)  Hi/mu       h;
+        -c'         -b'         -h'         mu/tau/tau;
+        ]
+    rhs = [rhs_tx; rhs_ty; rhs_ts + Hi/mu*rhs_tz; rhs_tau + rhs_kap]
+    dir = lhs\rhs
+
+    dir_tx = dir[1:n]
+    dir_ty = dir[n+1:n+p]
+    dir_tz = dir[n+p+1:n+p+q]
+    dir_tau = dir[n+p+q+1]
+    dir_ts = -G*dir_tx + h*dir_tau - rhs_ts
+    dir_kap = -dot(c, dir_tx) - dot(b, dir_ty) - dot(h, dir_tz) - rhs_tau
 
     return (dir_tx, dir_ty, dir_tz, dir_kap, dir_ts, dir_tau)
 end
