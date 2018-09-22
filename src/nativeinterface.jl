@@ -40,6 +40,8 @@ mutable struct AlfonsoOpt
     h::Vector{Float64}          # cone constraint vector, size q
     conK::Cone                  # primal constraint cone object
 
+    At_qr                       # QR factorization of A'
+
     # results
     status::Symbol          # solver status
     solvetime::Float64      # total solve time
@@ -169,14 +171,16 @@ function load_data!(
         error("number of constraint rows is not consistent in G and h")
     end
 
-    # check rank conditions
-    # TODO do appropriate decomps at the same time, do preprocessing
+    # perform QR decomposition of A' for use in linear system solves
+    # TODO only use for factorization-based linear system solves
+    At_qr = issparse(A) ? qr(sparse(A')) : qr(A') # TODO this should be automatic in Julia for transpose
+    # TODO rank for qr decomp should be implemented in Julia - see https://github.com/JuliaLang/julia/blob/f8b52dab77415a22d28497f48407aca92fbbd4c3/stdlib/LinearAlgebra/src/qr.jl#L895
     if check
-        # TODO rank currently missing method for sparse A, G
+        # check rank conditions
         if issparse(A) || issparse(G)
             error("rank cannot currently be determined for sparse A or G")
         end
-        if rank(A) < p
+        if rank(A) < p # TODO change to rank(At_qr)
             error("A matrix is not full-row-rank; some primal equalities may be redundant or inconsistent")
         end
         if rank(vcat(A, G)) < n
@@ -190,6 +194,7 @@ function load_data!(
     alf.G = G
     alf.h = h
     alf.conK = conK
+    alf.At_qr = At_qr
     alf.status = :Loaded
 
     return alf
@@ -532,8 +537,9 @@ function finddirection(alf, Hi, rhs_tx, rhs_ty, rhs_tz, rhs_kap, rhs_ts, rhs_tau
     (c, A, b, G, h) = (alf.c, alf.A, alf.b, alf.G, alf.h)
     cone = alf.conK
     (n, p, q) = (length(c), length(b), length(h))
+    At_qr = alf.At_qr
 
-    calcHiarr!(Hi, Matrix(1.0I, q, q), cone)
+    # calcHiarr!(Hi, Matrix(1.0I, q, q), cone)
 
     # tx ty tz kap ts tau
     # lhsbig = [
@@ -566,13 +572,72 @@ function finddirection(alf, Hi, rhs_tx, rhs_ty, rhs_tz, rhs_kap, rhs_ts, rhs_tau
     # dir_ts = -G*dir_tx + h*dir_tau - rhs_ts
     # dir_kap = -dot(c, dir_tx) - dot(b, dir_ty) - dot(h, dir_tz) - rhs_tau
 
+    # lhs = [
+    #     zeros(n,n)  A'          G';
+    #     -A          zeros(p,p)  zeros(p,q);
+    #     -G          zeros(q,p)  Hi/mu;
+    #     ]
+
 
     # solve two symmetric systems and combine the solutions
-    lhs = [
-        zeros(n,n)  A'          G';
-        -A          zeros(p,p)  zeros(p,q);
-        -G          zeros(q,p)  Hi/mu;
-        ]
+    # use QR + cholesky method from CVXOPT
+    # (1) eliminate equality constraints via QR of A'
+    # (2) solve reduced system by cholesky
+
+    # |0  A'  G    | * |ux| = |bx|
+    # |A  0   0    |   |uy|   |by|
+    # |G  0  -Hi/mu|   |uz|   |bz|
+
+
+    # A' = [Q1 Q2] * [R1; 0]
+    Q1 = At_qr.Q[:,1:p]
+    Q2 = At_qr.Q[:,p+1:end]
+    R1 = At_qr.R
+
+    ch = cholesky!(Symmetric(Q2'*G'*Hi/mu*G*Q2)) # TODO maybe bunch-kaufman
+
+
+
+    
+    # invmu = inv(mu)
+    # calcHiarr!(HiG, G, cone)
+    # mul!(GtHiG, G', HiG)
+    # GtHiG .*= invmu
+    # chG = cholesky!(Symmetric(GtHiG)) # TODO maybe bunch-kaufman
+
+
+
+    # invmu = inv(mu)
+
+    # calcHiarr!(HiAt, A', cone)
+    # HiAt .*= invmu
+    # mul!(AHiAt, A, HiAt)
+    # F = cholesky!(Symmetric(AHiAt))
+    #
+    # # TODO can parallelize 1 and 2
+    # # y2 = F\(rhs_ty + HiAt'*rhs_tx)
+    # mul!(y2, HiAt', rhs_tx)
+    # y2 .+= rhs_ty
+    # ldiv!(F, y2) # y2 done
+    #
+    # # x2 = Hi*invmu*(A'*y2 - rhs_tx)
+    # mul!(x2, A', y2)
+    # rhs_tx .= x2 .- rhs_tx # destroys rhs_tx
+    # rhs_tx .*= invmu
+    # calcHiarr!(x2, rhs_tx, cone) # x2 done
+    #
+    # # y1 = F\(b + HiAt'*c)
+    # mul!(y1, HiAt', c)
+    # y1 .+= b
+    # ldiv!(F, y1) # y1 done
+    #
+    # # x1 = Hi*invmu*(A'*y1 - c)
+    # mul!(rhs_tx, A', y1)
+    # rhs_tx .-= c
+    # rhs_tx .*= invmu
+    # calcHiarr!(x1, rhs_tx, cone) # x1 done
+
+
 
     # system 1
     rhs1 = [-c; -b; -h]
