@@ -40,7 +40,9 @@ mutable struct AlfonsoOpt
     h::Vector{Float64}          # cone constraint vector, size q
     conK::Cone                  # primal constraint cone object
 
-    At_qr                       # QR factorization of A'
+    Q1                       # QR factorization of A'
+    Q2
+    Ri
 
     # results
     status::Symbol          # solver status
@@ -173,7 +175,21 @@ function load_data!(
 
     # perform QR decomposition of A' for use in linear system solves
     # TODO only use for factorization-based linear system solves
+    # TODO reduce allocs, time
+    # A' = [Q1 Q2] * [R1; 0]
     At_qr = issparse(A) ? qr(sparse(A')) : qr(A') # TODO this should be automatic in Julia for transpose
+
+    Q1 = At_qr.Q[:,1:p]
+    Q2 = At_qr.Q[:,p+1:n]
+    # TODO problematic for sparse or large? versus:
+    # Q = Array(At_qr.Q)
+    # Q1 = Q[:,1:p]
+    # Q2 = Q[:,p+1:n]
+
+    R = At_qr.R # TODO check upper tri
+    @assert istriu(R)
+    Ri = inv(UpperTriangular(R))
+
     # TODO rank for qr decomp should be implemented in Julia - see https://github.com/JuliaLang/julia/blob/f8b52dab77415a22d28497f48407aca92fbbd4c3/stdlib/LinearAlgebra/src/qr.jl#L895
     if check
         # check rank conditions
@@ -194,7 +210,9 @@ function load_data!(
     alf.G = G
     alf.h = h
     alf.conK = conK
-    alf.At_qr = At_qr
+    alf.Q1 = Q1
+    alf.Q2 = Q2
+    alf.Ri = Ri
     alf.status = :Loaded
 
     return alf
@@ -537,121 +555,58 @@ function finddirection(alf, Hi, rhs_tx, rhs_ty, rhs_tz, rhs_kap, rhs_ts, rhs_tau
     (c, A, b, G, h) = (alf.c, alf.A, alf.b, alf.G, alf.h)
     cone = alf.conK
     (n, p, q) = (length(c), length(b), length(h))
-    At_qr = alf.At_qr
+    (Q1, Q2, Ri) = (alf.Q1, alf.Q2, alf.Ri)
 
     # calcHiarr!(Hi, Matrix(1.0I, q, q), cone)
 
-    # tx ty tz kap ts tau
-    # lhsbig = [
-    #     zeros(n,n)  A'          G'                zeros(n)  zeros(n,q)         c;
-    #     -A          zeros(p,p)  zeros(p,q)        zeros(p)  zeros(p,q)         b;
-    #     zeros(q,n)  zeros(q,p)  Matrix(1.0I,q,q)  zeros(q)  mu*H               zeros(q);
-    #     zeros(1,n)  zeros(1,p)  zeros(1,q)        1.0       zeros(1,q)         mu/tau^2;
-    #     -G          zeros(q,p)  zeros(q,q)        zeros(q)  Matrix(-1.0I,q,q)  h;
-    #     -c'         -b'         -h'               -1.0      zeros(1,q)         0.0;
-    #     ]
-    # dir_tz + mu*H*dir_ts = rhs_tz
-    # dir_ts = Hi/mu*(rhs_tz - dir_tz)
-    # dir_kap + mu/tau^2*dir_tau = rhs_kap
-    # dir_kap = rhs_kap - mu/tau^2*dir_tau
-
-
-    # lhs = [
-    #     zeros(n,n)  A'          G'          c;
-    #     -A          zeros(p,p)  zeros(p,q)  b;
-    #     -G          zeros(q,p)  Hi/mu       h;
-    #     -c'         -b'         -h'         mu/tau/tau;
-    #     ]
-    # rhs = [rhs_tx; rhs_ty; rhs_ts + Hi/mu*rhs_tz; rhs_tau + rhs_kap]
-    # dir = lhs\rhs
-    #
-    # dir_tx = dir[1:n]
-    # dir_ty = dir[n+1:n+p]
-    # dir_tz = dir[n+p+1:n+p+q]
-    # dir_tau = dir[n+p+q+1]
-    # dir_ts = -G*dir_tx + h*dir_tau - rhs_ts
-    # dir_kap = -dot(c, dir_tx) - dot(b, dir_ty) - dot(h, dir_tz) - rhs_tau
-
-    # lhs = [
-    #     zeros(n,n)  A'          G';
-    #     -A          zeros(p,p)  zeros(p,q);
-    #     -G          zeros(q,p)  Hi/mu;
-    #     ]
-
+    g = zeros(q)
+    calcg!(g, cone)
+    H = Diagonal(g .* g) # TODO LP only
 
     # solve two symmetric systems and combine the solutions
     # use QR + cholesky method from CVXOPT
     # (1) eliminate equality constraints via QR of A'
     # (2) solve reduced system by cholesky
 
-    # |0  A'  G    | * |ux| = |bx|
+    # |0  A'  G'   | * |ux| = |bx|
     # |A  0   0    |   |uy|   |by|
     # |G  0  -Hi/mu|   |uz|   |bz|
 
 
     # A' = [Q1 Q2] * [R1; 0]
-    Q1 = At_qr.Q[:,1:p]
-    Q2 = At_qr.Q[:,p+1:end]
-    R1 = At_qr.R
+    # [Q1 Q2]' * G' * mu*H * G * [Q1 Q2]
+    muH = Symmetric(mu*H)
 
-    ch = cholesky!(Symmetric(Q2'*G'*Hi/mu*G*Q2)) # TODO maybe bunch-kaufman
+    QH = G'*muH*G
+    K22 = Q2'*QH*Q2 # TODO use syrk
+    K11 = Q1'*QH*Q1
+    K12 = Q1'*QH*Q2
 
+    # factorize K22 = Q2' * G' * mu*H * G * Q2
+    K22_ch = cholesky!(Symmetric(K22)) # TODO in-place; maybe bunch-kaufman
 
-
-    
-    # invmu = inv(mu)
-    # calcHiarr!(HiG, G, cone)
-    # mul!(GtHiG, G', HiG)
-    # GtHiG .*= invmu
-    # chG = cholesky!(Symmetric(GtHiG)) # TODO maybe bunch-kaufman
-
-
-
-    # invmu = inv(mu)
-
-    # calcHiarr!(HiAt, A', cone)
-    # HiAt .*= invmu
-    # mul!(AHiAt, A, HiAt)
-    # F = cholesky!(Symmetric(AHiAt))
-    #
-    # # TODO can parallelize 1 and 2
-    # # y2 = F\(rhs_ty + HiAt'*rhs_tx)
-    # mul!(y2, HiAt', rhs_tx)
-    # y2 .+= rhs_ty
-    # ldiv!(F, y2) # y2 done
-    #
-    # # x2 = Hi*invmu*(A'*y2 - rhs_tx)
-    # mul!(x2, A', y2)
-    # rhs_tx .= x2 .- rhs_tx # destroys rhs_tx
-    # rhs_tx .*= invmu
-    # calcHiarr!(x2, rhs_tx, cone) # x2 done
-    #
-    # # y1 = F\(b + HiAt'*c)
-    # mul!(y1, HiAt', c)
-    # y1 .+= b
-    # ldiv!(F, y1) # y1 done
-    #
-    # # x1 = Hi*invmu*(A'*y1 - c)
-    # mul!(rhs_tx, A', y1)
-    # rhs_tx .-= c
-    # rhs_tx .*= invmu
-    # calcHiarr!(x1, rhs_tx, cone) # x1 done
-
-
-
+    # TODO refac systems 1 and 2
     # system 1
-    rhs1 = [-c; -b; -h]
-    sol1 = lhs\rhs1
-    x1 = sol1[1:n]
-    y1 = sol1[n+1:n+p]
-    z1 = sol1[n+p+1:end]
+    (bx, by, muHbz) = (-c, b, muH*h)
+
+    bxGHbz = bx + G'*muHbz
+    Q1tx = Ri'*by
+    Q2tx = K22_ch\(Q2'*bxGHbz - K12'*Q1tx)
+
+    y1 = Ri*(Q1'*bxGHbz - K11*Q1tx - K12*Q2tx)
+    x1 = Q1*Q1tx + Q2*Q2tx
+    z1 = muH*G*x1 - muHbz
 
     # system 2
-    rhs2 = [rhs_tx; rhs_ty; rhs_ts + Hi/mu*rhs_tz]
-    sol2 = lhs\rhs2
-    x2 = sol2[1:n]
-    y2 = sol2[n+1:n+p]
-    z2 = sol2[n+p+1:end]
+    (bx, by, muHbz) = (rhs_tx, -rhs_ty, -muH*rhs_ts - rhs_tz)
+
+    bxGHbz = bx + G'*muHbz
+    Q1tx = Ri'*by
+    Q2tx = K22_ch\(Q2'*bxGHbz - K12'*Q1tx)
+
+    y2 = Ri*(Q1'*bxGHbz - K11*Q1tx - K12*Q2tx)
+    x2 = Q1*Q1tx + Q2*Q2tx
+    z2 = muH*G*x2 - muHbz
 
     # combine
     dir_tau = ((rhs_tau + rhs_kap) + dot(c, x2) + dot(b, y2) + dot(h, z2))/(mu/tau/tau - dot(c, x1) - dot(b, y1) - dot(h, z1))
