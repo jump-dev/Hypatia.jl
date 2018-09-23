@@ -557,11 +557,8 @@ function finddirection(alf, Hi, rhs_tx, rhs_ty, rhs_tz, rhs_kap, rhs_ts, rhs_tau
     (n, p, q) = (length(c), length(b), length(h))
     (Q1, Q2, Ri) = (alf.Q1, alf.Q2, alf.Ri)
 
-    # calcHiarr!(Hi, Matrix(1.0I, q, q), cone)
-
-    g = zeros(q)
-    calcg!(g, cone)
-    H = Diagonal(g .* g) # TODO LP only
+    calcHiarr!(Hi, Matrix(1.0I, q, q), cone)
+    H = inv(Hi)
 
     # solve two symmetric systems and combine the solutions
     # use QR + cholesky method from CVXOPT
@@ -575,38 +572,37 @@ function finddirection(alf, Hi, rhs_tx, rhs_ty, rhs_tz, rhs_kap, rhs_ts, rhs_tau
 
     # A' = [Q1 Q2] * [R1; 0]
     # [Q1 Q2]' * G' * mu*H * G * [Q1 Q2]
-    muH = Symmetric(mu*H)
-
-    QH = G'*muH*G
-    K22 = Q2'*QH*Q2 # TODO use syrk
-    K11 = Q1'*QH*Q1
-    K12 = Q1'*QH*Q2
+    HG = mu*H*G
+    GHG = G'*HG
+    K22 = Q2'*GHG*Q2 # TODO use syrk
+    K11 = Q1'*GHG*Q1
+    K12 = Q1'*GHG*Q2
 
     # factorize K22 = Q2' * G' * mu*H * G * Q2
-    K22_ch = cholesky!(Symmetric(K22)) # TODO in-place; maybe bunch-kaufman
+    K22_F = bunchkaufman!(Symmetric(K22)) # TODO cholesky vs bunch-kaufman?
 
     # TODO refac systems 1 and 2
     # system 1
-    (bx, by, muHbz) = (-c, b, muH*h)
+    (bx, by, Hbz) = (-c, b, mu*H*h)
 
-    bxGHbz = bx + G'*muHbz
+    bxGHbz = bx + G'*Hbz
     Q1tx = Ri'*by
-    Q2tx = K22_ch\(Q2'*bxGHbz - K12'*Q1tx)
+    Q2tx = K22_F\(Q2'*bxGHbz - K12'*Q1tx)
 
     y1 = Ri*(Q1'*bxGHbz - K11*Q1tx - K12*Q2tx)
     x1 = Q1*Q1tx + Q2*Q2tx
-    z1 = muH*G*x1 - muHbz
+    z1 = HG*x1 - Hbz
 
     # system 2
-    (bx, by, muHbz) = (rhs_tx, -rhs_ty, -muH*rhs_ts - rhs_tz)
+    (bx, by, Hbz) = (rhs_tx, -rhs_ty, -mu*H*rhs_ts - rhs_tz)
 
-    bxGHbz = bx + G'*muHbz
+    bxGHbz = bx + G'*Hbz
     Q1tx = Ri'*by
-    Q2tx = K22_ch\(Q2'*bxGHbz - K12'*Q1tx)
+    Q2tx = K22_F\(Q2'*bxGHbz - K12'*Q1tx)
 
     y2 = Ri*(Q1'*bxGHbz - K11*Q1tx - K12*Q2tx)
     x2 = Q1*Q1tx + Q2*Q2tx
-    z2 = muH*G*x2 - muHbz
+    z2 = HG*x2 - Hbz
 
     # combine
     dir_tau = ((rhs_tau + rhs_kap) + dot(c, x2) + dot(b, y2) + dot(h, z2))/(mu/tau/tau - dot(c, x1) - dot(b, y1) - dot(h, z1))
