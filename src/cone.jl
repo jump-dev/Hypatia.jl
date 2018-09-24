@@ -52,18 +52,18 @@ function calcHarr!(prod::AbstractVector{Float64}, arr::AbstractVector{Float64}, 
     return prod
 end
 
-function calcHiarr!(Hi_mat::AbstractMatrix{Float64}, mat::AbstractMatrix{Float64}, cone::Cone)
+function calcHiarr!(prod::AbstractMatrix{Float64}, arr::AbstractMatrix{Float64}, cone::Cone)
     for k in eachindex(cone.prms)
-        calcHiarr_prm!(view(Hi_mat, cone.idxs[k], :), view(mat, cone.idxs[k], :), cone.prms[k])
+        calcHiarr_prm!(view(prod, cone.idxs[k], :), view(arr, cone.idxs[k], :), cone.prms[k])
     end
-    return Hi_mat
+    return prod
 end
 
-function calcHiarr!(Hi_vec::AbstractVector{Float64}, vec::AbstractVector{Float64}, cone::Cone)
+function calcHiarr!(prod::AbstractVector{Float64}, arr::AbstractVector{Float64}, cone::Cone)
     for k in eachindex(cone.prms)
-        calcHiarr_prm!(view(Hi_vec, cone.idxs[k]), view(vec, cone.idxs[k]), cone.prms[k])
+        calcHiarr_prm!(view(prod, cone.idxs[k]), view(arr, cone.idxs[k]), cone.prms[k])
     end
-    return Hi_vec
+    return prod
 end
 
 # utilities for converting between smat and svec forms (lower triangle) for symmetric matrices

@@ -56,7 +56,8 @@ function incone_prm(prm::SumOfSquaresCone)
         prm.H .+= abs2.(prm.Vp2)
     end
 
-    prm.F = cholesky!(prm.H, check=false)
+    # TODO copy over H and do cholesky in-place
+    prm.F = cholesky(prm.H, check=false)
     if !issuccess(prm.F)
         return false
     end
@@ -65,3 +66,4 @@ end
 
 calcg_prm!(g::AbstractVector{Float64}, prm::SumOfSquaresCone) = (g .= prm.g; g)
 calcHiarr_prm!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prm::SumOfSquaresCone) = ldiv!(prod, prm.F, arr)
+calcHarr_prm!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prm::SumOfSquaresCone) = mul!(prod, prm.H, arr)
