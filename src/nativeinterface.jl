@@ -280,8 +280,7 @@ function solve!(alf::AlfonsoOpt)
                 error("cannot find initial iterate")
             end
         end
-        @show alpha
-        @show steps
+        alf.verbose && println("$steps steps taken for initial iterate")
         ts .= sa_ts
     end
 
@@ -371,11 +370,11 @@ function solve!(alf::AlfonsoOpt)
             infres_du = NaN
         end
 
-        # if alf.verbose
-        #     # print iteration statistics
-        #     @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n", iter, obj_pr, obj_du, relgap, nres_pr, nres_du, tau, kap, mu)
-        #     flush(stdout)
-        # end
+        if alf.verbose
+            # print iteration statistics
+            @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n", iter, obj_pr, obj_du, relgap, nres_pr, nres_du, tau, kap, mu)
+            flush(stdout)
+        end
 
         # check convergence criteria
         # TODO nearly primal or dual infeasible or nearly optimal cases?
@@ -549,10 +548,11 @@ function solve!(alf::AlfonsoOpt)
 
     # calculate solution and iteration statistics
     alf.niters = iter
-    alf.x = tx ./= tau
-    alf.s = ts ./= tau
-    alf.y = ty ./= tau
-    alf.z = tz ./= tau
+    invtau = inv(tau)
+    alf.x = tx .*= invtau
+    alf.s = ts .*= invtau
+    alf.y = ty .*= invtau
+    alf.z = tz .*= invtau
     alf.tau = tau
     alf.kap = kap
     alf.mu = mu
