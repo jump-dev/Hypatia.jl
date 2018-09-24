@@ -252,21 +252,26 @@ function solve!(alf::AlfonsoOpt)
 
     loadpnt!(cone, sa_ts)
 
-    # calculate initial central primal-dual iterate (S5.3 of V.)
+    # calculate initial central primal-dual iterate
     # solve linear equation then step in interior direction of cone until inside cone
     alf.verbose && println("\nfinding initial iterate")
 
-    # TODO use linsys solve function
-    xyz = Symmetric([zeros(n, n) A' G'; A zeros(p, p) zeros(p, q); G zeros(q, p) I]) \ [-c; b; h] # TODO this is currently different from what CVXOPT does
-    tx .= xyz[1:n]
-    ty .= xyz[n+1:n+p]
-    sa_ts .= -xyz[n+p+1:n+p+q]
+    (Q1, Q2, Ri) = (alf.Q1, alf.Q2, alf.Ri)
+    GHG = Matrix(G'*G) # TODO slow if diagonal (varcones)
+    K22 = Q2'*GHG*Q2 # TODO use syrk
+    K11 = Q1'*GHG*Q1
+    K12 = Q1'*GHG*Q2
+    Q1tx = Ri'*b
+    Q2tx = Symmetric(K22)\(Q2'*G'*h - K12'*Q1tx)
+    ty .= Ri*(Q1'*G'*h - K11*Q1tx - K12*Q2tx)
+    tx .= Q1*Q1tx + Q2*Q2tx
+    sa_ts .= -G*tx + h
     ts .= sa_ts
 
     if !incone(cone)
         getintdir!(dir_ts, cone)
         alpha = 1.0 # TODO starting alpha maybe should depend on sa_ts (eg norm like in Alfonso) in case 1.0 is too large/small
-        steps = 1
+        steps = 0
         while !incone(cone)
             sa_ts .= ts .+ alpha .* dir_ts
             alpha *= 1.5
@@ -366,11 +371,11 @@ function solve!(alf::AlfonsoOpt)
             infres_du = NaN
         end
 
-        if alf.verbose
-            # print iteration statistics
-            @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n", iter, obj_pr, obj_du, relgap, nres_pr, nres_du, tau, kap, mu)
-            flush(stdout)
-        end
+        # if alf.verbose
+        #     # print iteration statistics
+        #     @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n", iter, obj_pr, obj_du, relgap, nres_pr, nres_du, tau, kap, mu)
+        #     flush(stdout)
+        # end
 
         # check convergence criteria
         # TODO nearly primal or dual infeasible or nearly optimal cases?

@@ -1,37 +1,37 @@
 
-# @testset "large dense lp example (dense A)" begin
-#     alf = Alfonso.AlfonsoOpt(verbose=verbflag)
-#     build_lp!(alf, 500, 1000, use_data=true, dense=true)
-#     @time Alfonso.solve!(alf)
-#     @test Alfonso.get_status(alf) == :Optimal
-#     @test Alfonso.get_pobj(alf) ≈ 2055.807 atol=1e-4 rtol=1e-4
-#     @test Alfonso.get_dobj(alf) ≈ 2055.807 atol=1e-4 rtol=1e-4
-# end
-#
-# @testset "large sparse lp example (sparse A)" begin
-#     alf = Alfonso.AlfonsoOpt(verbose=verbflag)
-#     build_lp!(alf, 500, 1000, dense=false, nzfrac=10/1000)
-#     @time Alfonso.solve!(alf)
-#     @test Alfonso.get_status(alf) == :Optimal
-#     @test Alfonso.get_pobj(alf) ≈ Alfonso.get_dobj(alf) atol=1e-4 rtol=1e-4
-# end
+@testset "large dense lp example (dense A)" begin
+    alf = Alfonso.AlfonsoOpt(verbose=verbflag)
+    build_lp!(alf, 500, 1000, use_data=true, dense=true)
+    @time Alfonso.solve!(alf)
+    @test Alfonso.get_status(alf) == :Optimal
+    @test Alfonso.get_pobj(alf) ≈ 2055.807 atol=1e-4 rtol=1e-4
+    @test Alfonso.get_dobj(alf) ≈ 2055.807 atol=1e-4 rtol=1e-4
+end
 
-# @testset "small dense lp example (dense vs sparse A)" begin
-#     # dense methods
-#     d_alf = Alfonso.AlfonsoOpt(verbose=verbflag)
-#     build_lp!(d_alf, 50, 100, dense=true, tosparse=false)
-#     @time Alfonso.solve!(d_alf)
-#     @test Alfonso.get_status(d_alf) == :Optimal
-#
-#     # sparse methods
-#     s_alf = Alfonso.AlfonsoOpt(verbose=verbflag)
-#     build_lp!(s_alf, 50, 100, dense=true, tosparse=true)
-#     @time Alfonso.solve!(s_alf)
-#     @test Alfonso.get_status(s_alf) == :Optimal
-#
-#     @test Alfonso.get_pobj(d_alf) ≈ Alfonso.get_pobj(s_alf) atol=1e-4 rtol=1e-4
-#     @test Alfonso.get_dobj(d_alf) ≈ Alfonso.get_dobj(s_alf) atol=1e-4 rtol=1e-4
-# end
+@testset "large sparse lp example (sparse A)" begin
+    alf = Alfonso.AlfonsoOpt(verbose=verbflag)
+    build_lp!(alf, 500, 1000, dense=false, nzfrac=10/1000)
+    @time Alfonso.solve!(alf)
+    @test Alfonso.get_status(alf) == :Optimal
+    @test Alfonso.get_pobj(alf) ≈ Alfonso.get_dobj(alf) atol=1e-4 rtol=1e-4
+end
+
+@testset "small dense lp example (dense vs sparse A)" begin
+    # dense methods
+    d_alf = Alfonso.AlfonsoOpt(verbose=verbflag)
+    build_lp!(d_alf, 50, 100, dense=true, tosparse=false)
+    @time Alfonso.solve!(d_alf)
+    @test Alfonso.get_status(d_alf) == :Optimal
+
+    # sparse methods
+    s_alf = Alfonso.AlfonsoOpt(verbose=verbflag)
+    build_lp!(s_alf, 50, 100, dense=true, tosparse=true)
+    @time Alfonso.solve!(s_alf)
+    @test Alfonso.get_status(s_alf) == :Optimal
+
+    @test Alfonso.get_pobj(d_alf) ≈ Alfonso.get_pobj(s_alf) atol=1e-4 rtol=1e-4
+    @test Alfonso.get_dobj(d_alf) ≈ Alfonso.get_dobj(s_alf) atol=1e-4 rtol=1e-4
+end
 
 @testset "1D poly envelope example (dense vs sparse A)" begin
     # dense methods
@@ -68,21 +68,21 @@ end
     @test Alfonso.get_dobj(d_alf) ≈ Alfonso.get_dobj(s_alf) atol=1e-4 rtol=1e-4
 end
 
-@testset "3D poly envelope example (sparse A)" begin
-    alf = Alfonso.AlfonsoOpt(verbose=verbflag)
-    build_envelope!(alf, 2, 3, 3, 5, dense=false)
-    @time Alfonso.solve!(alf)
-    @test Alfonso.get_status(alf) == :Optimal
-    @test Alfonso.get_pobj(alf) ≈ Alfonso.get_dobj(alf) atol=1e-4 rtol=1e-4
-end
-
-@testset "4D poly envelope example (sparse A)" begin
-    alf = Alfonso.AlfonsoOpt(verbose=verbflag, tolrelopt=1e-5, tolabsopt=1e-6, tolfeas=1e-6)
-    build_envelope!(alf, 2, 3, 4, 4, dense=false)
-    @time Alfonso.solve!(alf)
-    @test Alfonso.get_status(alf) == :Optimal
-    @test Alfonso.get_pobj(alf) ≈ Alfonso.get_dobj(alf) atol=1e-4 rtol=1e-4
-end
+# @testset "3D poly envelope example (sparse A)" begin
+#     alf = Alfonso.AlfonsoOpt(verbose=verbflag)
+#     build_envelope!(alf, 2, 3, 3, 5, dense=false)
+#     @time Alfonso.solve!(alf)
+#     @test Alfonso.get_status(alf) == :Optimal
+#     @test Alfonso.get_pobj(alf) ≈ Alfonso.get_dobj(alf) atol=1e-4 rtol=1e-4
+# end
+#
+# @testset "4D poly envelope example (sparse A)" begin
+#     alf = Alfonso.AlfonsoOpt(verbose=verbflag, tolrelopt=1e-5, tolabsopt=1e-6, tolfeas=1e-6)
+#     build_envelope!(alf, 2, 3, 4, 4, dense=false)
+#     @time Alfonso.solve!(alf)
+#     @test Alfonso.get_status(alf) == :Optimal
+#     @test Alfonso.get_pobj(alf) ≈ Alfonso.get_dobj(alf) atol=1e-4 rtol=1e-4
+# end
 
 # most values taken from https://people.sc.fsu.edu/~jburkardt/py_src/polynomials/polynomials.html
 @testset "Butcher" begin
@@ -290,8 +290,9 @@ end
 #     @test Alfonso.get_x(alf) ≈ [0.491545, 0.647333, 0.426249, 0.571161, 0.531874, 0.331838] atol=1e-4 rtol=1e-4
 # end
 
-
+#
 @testset "small LP 1" begin
+    Random.seed!(1)
     (n, p, q) = (30, 12, 30)
     c = rand(0.0:9.0, n)
     A = rand(-9.0:9.0, p, n)
@@ -308,6 +309,7 @@ end
 
 
 @testset "small LP 2" begin
+    Random.seed!(1)
     (n, p, q) = (10, 8, 9)
     c = rand(0.0:9.0, n)
     A = rand(-9.0:9.0, p, n)
@@ -323,6 +325,7 @@ end
 
 
 @testset "small LP 3" begin
+    Random.seed!(1)
     (n, p, q) = (5, 2, 5)
     c = rand(0.0:9.0, n)
     A = rand(-9.0:9.0, p, n)
