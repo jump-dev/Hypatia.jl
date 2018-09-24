@@ -26,11 +26,10 @@ function build_envelope!(alf::Alfonso.AlfonsoOpt, npoly::Int, deg::Int, n::Int, 
     # set up problem data
     if dense
         A = repeat(Array(1.0I, U, U), outer=(1, npoly))
-        G = Matrix(-1.0I, npoly*U, npoly*U) # TODO uniformscaling?
     else
         A = repeat(sparse(1.0I, U, U), outer=(1, npoly))
-        G = SparseMatrixCSC(-1.0I, npoly*U, npoly*U)
     end
+    G = SparseMatrixCSC(-1.0I, npoly*U, npoly*U)
     b = w
     h = zeros(npoly*U)
     if use_data
