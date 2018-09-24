@@ -177,18 +177,30 @@ function load_data!(
     # TODO only use for factorization-based linear system solves
     # TODO reduce allocs, time
     # A' = [Q1 Q2] * [R1; 0]
-    At_qr = issparse(A) ? qr(sparse(A')) : qr(A') # TODO this should be automatic in Julia for transpose
+    if issparse(A)
+        F = qr(sparse(A'))
 
-    Q1 = At_qr.Q[:,1:p]
-    Q2 = At_qr.Q[:,p+1:n]
-    # TODO problematic for sparse or large? versus:
-    # Q = Array(At_qr.Q)
-    # Q1 = Q[:,1:p]
-    # Q2 = Q[:,p+1:n]
+        Q1 = zeros(n, p)
+        Q2 = zeros(n, n-p)
+        Ri = zeros(p, p)
 
-    R = At_qr.R # TODO check upper tri
-    @assert istriu(R)
-    Ri = inv(UpperTriangular(R))
+        Q = F.Q*Matrix(1.0I, n, n) # TODO should this be sparse?
+        Q1[F.prow, F.pcol] = Q[:, 1:p]
+        Q2[F.prow, :] = Q[:, p+1:n]
+
+        @assert istriu(F.R)
+        Ri[F.pcol, F.pcol] = inv(UpperTriangular(F.R))
+    else
+        F = qr(A')
+
+        Q = F.Q*Matrix(1.0I, n, n)
+        Q1 = Q[:,1:p]
+        Q2 = Q[:,p+1:n]
+
+        @assert norm(A' - Q1*F.R) < 1e-10 # TODO delete later
+        @assert istriu(F.R)
+        Ri = inv(UpperTriangular(F.R))
+    end
 
     # TODO rank for qr decomp should be implemented in Julia - see https://github.com/JuliaLang/julia/blob/f8b52dab77415a22d28497f48407aca92fbbd4c3/stdlib/LinearAlgebra/src/qr.jl#L895
     if check
@@ -544,6 +556,7 @@ function solve!(alf::AlfonsoOpt)
     return nothing
 end
 
+# TODO put this inside the cone functions and ideally don't use Hi
 function calcnbhd(tk, mu, sa_tz, g, cone)
     calcg!(g, cone)
     sa_tz .+= mu .* g
@@ -557,8 +570,8 @@ function finddirection(alf, Hi, rhs_tx, rhs_ty, rhs_tz, rhs_kap, rhs_ts, rhs_tau
     (n, p, q) = (length(c), length(b), length(h))
     (Q1, Q2, Ri) = (alf.Q1, alf.Q2, alf.Ri)
 
-    calcHiarr!(Hi, Matrix(1.0I, q, q), cone)
-    H = inv(Hi)
+    # calcHiarr!(Hi, Matrix(1.0I, q, q), cone)
+    # H = inv(Hi)
 
     # solve two symmetric systems and combine the solutions
     # use QR + cholesky method from CVXOPT
@@ -572,7 +585,10 @@ function finddirection(alf, Hi, rhs_tx, rhs_ty, rhs_tz, rhs_kap, rhs_ts, rhs_tau
 
     # A' = [Q1 Q2] * [R1; 0]
     # [Q1 Q2]' * G' * mu*H * G * [Q1 Q2]
-    HG = mu*H*G
+    HG = zeros(q, n) # TODO prealloc instead of Hi
+    Hvec = zeros(q)
+
+    calcHarr!(HG, mu*G, cone)
     GHG = G'*HG
     K22 = Q2'*GHG*Q2 # TODO use syrk
     K11 = Q1'*GHG*Q1
@@ -583,7 +599,7 @@ function finddirection(alf, Hi, rhs_tx, rhs_ty, rhs_tz, rhs_kap, rhs_ts, rhs_tau
 
     # TODO refac systems 1 and 2
     # system 1
-    (bx, by, Hbz) = (-c, b, mu*H*h)
+    (bx, by, Hbz) = (-c, b, calcHarr!(Hvec, mu*h, cone))
 
     bxGHbz = bx + G'*Hbz
     Q1tx = Ri'*by
@@ -594,7 +610,7 @@ function finddirection(alf, Hi, rhs_tx, rhs_ty, rhs_tz, rhs_kap, rhs_ts, rhs_tau
     z1 = HG*x1 - Hbz
 
     # system 2
-    (bx, by, Hbz) = (rhs_tx, -rhs_ty, -mu*H*rhs_ts - rhs_tz)
+    (bx, by, Hbz) = (rhs_tx, -rhs_ty, -calcHarr!(Hvec, mu*rhs_ts, cone) - rhs_tz)
 
     bxGHbz = bx + G'*Hbz
     Q1tx = Ri'*by
