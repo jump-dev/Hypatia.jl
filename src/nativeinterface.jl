@@ -103,10 +103,10 @@ function AlfonsoOpt(;
     tolfeas = 1e-7,
     maxiter = 5e2,
     predlinesearch = true,
-    maxpredsmallsteps = 8,
-    maxcorrsteps = 8,
+    maxpredsmallsteps = 15,
+    maxcorrsteps = 15,
     corrcheck = true,
-    maxcorrlsiters = 8,
+    maxcorrlsiters = 15,
     alphacorr = 1.0,
     predlsmulti = 0.7,
     corrlsmulti = 0.5,
@@ -119,10 +119,10 @@ function AlfonsoOpt(;
         error("maxiter must be at least 1")
     end
     if maxpredsmallsteps < 1
-        error("maxcorrsteps must be at least 1")
+        error("maxpredsmallsteps must be at least 1")
     end
-    if !(1 <= maxcorrsteps <= 8)
-        error("maxcorrsteps must be from 1 to 8")
+    if maxcorrsteps < 1
+        error("maxcorrsteps must be at least 1")
     end
 
     return AlfonsoOpt(verbose, tolrelopt, tolabsopt, tolfeas, maxiter, predlinesearch, maxpredsmallsteps, maxcorrsteps, corrcheck, maxcorrlsiters, alphacorr, predlsmulti, corrlsmulti)

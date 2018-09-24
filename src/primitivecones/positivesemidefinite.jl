@@ -1,5 +1,7 @@
 
 # positive semidefinite cone (lower triangle, off-diagonals scaled)
+# barrier for matrix cone is -ln det(X)
+# from Nesterov & Todd "Self-Scaled Barriers and Interior-Point Methods for Convex Programming"
 mutable struct PositiveSemidefiniteCone <: PrimitiveCone
     dim::Int
     side::Int

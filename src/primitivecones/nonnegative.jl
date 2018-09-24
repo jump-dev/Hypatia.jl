@@ -1,5 +1,7 @@
 
 # nonnegative orthant cone
+# barrier is -sum_j ln x_j
+# from Nesterov & Todd "Self-Scaled Barriers and Interior-Point Methods for Convex Programming"
 mutable struct NonnegativeCone <: PrimitiveCone
     dim::Int
     pnt::AbstractVector{Float64}
@@ -25,5 +27,5 @@ function calcg_prm!(g::AbstractVector{Float64}, prm::NonnegativeCone)
     return g
 end
 
-calcHarr_prm!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prm::NonnegativeCone) = (prod .= abs2.(prm.invpnt) .* arr; prod)
 calcHiarr_prm!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prm::NonnegativeCone) = (prod .= abs2.(prm.pnt) .* arr; prod)
+calcHarr_prm!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prm::NonnegativeCone) = (prod .= abs2.(prm.invpnt) .* arr; prod)

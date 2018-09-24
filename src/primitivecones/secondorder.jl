@@ -1,5 +1,7 @@
 
 # second order cone
+# barrier is -ln(x^2 - norm(y)^2)
+# from Nesterov & Todd "Self-Scaled Barriers and Interior-Point Methods for Convex Programming"
 mutable struct SecondOrderCone <: PrimitiveCone
     dim::Int
     pnt::AbstractVector{Float64}
@@ -44,6 +46,6 @@ function incone_prm(prm::SecondOrderCone)
     return true
 end
 
-calcg_prm!(g::AbstractVector{Float64}, prm::SecondOrderCone) = (g .= inv(prm.dist) .* prm.pnt; g[1] = -g[1]; g)
+calcg_prm!(g::AbstractVector{Float64}, prm::SecondOrderCone) = (g .= prm.pnt ./ prm.dist; g[1] = -g[1]; g)
 calcHiarr_prm!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prm::SecondOrderCone) = mul!(prod, prm.Hi, arr)
 calcHarr_prm!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prm::SecondOrderCone) = mul!(prod, prm.H, arr)
