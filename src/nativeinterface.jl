@@ -381,18 +381,41 @@ function solve!(alf::AlfonsoOpt)
         if nres_pr <= alf.tolfeas && nres_du <= alf.tolfeas && (gap <= alf.tolabsopt || (!isnan(relgap) && relgap <= alf.tolrelopt))
             alf.verbose && println("optimal solution found; terminating")
             alf.status = :Optimal
+
+            invtau = inv(tau)
+            alf.x = tx .*= invtau
+            alf.s = ts .*= invtau
+            alf.y = ty .*= invtau
+            alf.z = tz .*= invtau
             break
         elseif !isnan(infres_pr) && infres_pr <= alf.tolfeas
             alf.verbose && println("primal infeasibility detected; terminating")
             alf.status = :PrimalInfeasible
+
+            invobj = inv(-by - hz)
+            alf.x = tx .= NaN
+            alf.s = ts .= NaN
+            alf.y = ty .*= invobj
+            alf.z = tz .*= invobj
             break
         elseif !isnan(infres_du) && infres_du <= alf.tolfeas
             alf.verbose && println("dual infeasibility detected; terminating")
             alf.status = :DualInfeasible
+
+            invobj = inv(-cx)
+            alf.x = tx .*= invobj
+            alf.s = ts .*= invobj
+            alf.y = ty .= NaN
+            alf.z = tz .= NaN
             break
         elseif mu <= alf.tolfeas*1e-2 && tau <= alf.tolfeas*1e-2*min(1.0, kap)
             alf.verbose && println("ill-posedness detected; terminating")
             alf.status = :IllPosed
+
+            alf.x = tx .= NaN
+            alf.s = ts .= NaN
+            alf.y = ty .= NaN
+            alf.z = tz .= NaN
             break
         end
 
@@ -548,11 +571,6 @@ function solve!(alf::AlfonsoOpt)
 
     # calculate solution and iteration statistics
     alf.niters = iter
-    invtau = inv(tau)
-    alf.x = tx .*= invtau
-    alf.s = ts .*= invtau
-    alf.y = ty .*= invtau
-    alf.z = tz .*= invtau
     alf.tau = tau
     alf.kap = kap
     alf.mu = mu
