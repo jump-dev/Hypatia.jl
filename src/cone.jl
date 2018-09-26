@@ -14,11 +14,11 @@ end
 # calculate complexity parameter of the barrier (sum of the primitive cone barrier parameters)
 barrierpar(cone::Cone) = sum(barrierpar_prm(prm) for prm in cone.prms)
 
-function getintdir!(a::Vector{Float64}, cone::Cone)
+function getintdir!(dir::Vector{Float64}, cone::Cone)
     for k in eachindex(cone.prms)
-        getintdir_prm!(view(a, cone.idxs[k]), cone.prms[k])
+        getintdir_prm!(view(dir, cone.idxs[k]), cone.prms[k])
     end
-    return a
+    return dir
 end
 
 # TODO can parallelize the functions acting on Cone
