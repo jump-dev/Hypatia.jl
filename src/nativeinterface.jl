@@ -1,20 +1,73 @@
+
+mutable struct LinSysCache
+    Q1
+    Q2
+    Ri
+    HG
+    GHG
+    GHGQ2
+    Q2GHGQ2
+    bxGHbz
+    Riby
+    Q1x
+    rhs
+    Q2div
+    Q2x
+    GHGxi
+    Q1yirhs
+    HGxi
+    x1
+    y1
+    z1
+
+    function LinSysCache(Q1::Matrix{Float64}, Q2::Matrix{Float64}, Ri::AbstractMatrix{Float64}, n::Int, p::Int, q::Int)
+        L = new()
+        nmp = n - p
+        @assert size(Q1) == (n, p)
+        @assert size(Q2) == (n, nmp)
+        @assert size(Ri) == (p, p)
+        L.Q1 = Q1
+        L.Q2 = Q2
+        L.Ri = Ri
+        L.HG = Matrix{Float64}(undef, q, n)
+        L.GHG = Matrix{Float64}(undef, n, n)
+        L.GHGQ2 = Matrix{Float64}(undef, n, nmp)
+        L.Q2GHGQ2 = Matrix{Float64}(undef, nmp, nmp)
+        L.bxGHbz = Vector{Float64}(undef, n)
+        L.Riby = Vector{Float64}(undef, p)
+        L.Q1x = Vector{Float64}(undef, n)
+        L.rhs = Vector{Float64}(undef, n)
+        L.Q2div = Vector{Float64}(undef, nmp)
+        L.Q2x = Vector{Float64}(undef, n)
+        L.GHGxi = Vector{Float64}(undef, n)
+        L.Q1yirhs = Vector{Float64}(undef, p)
+        L.HGxi = Vector{Float64}(undef, q)
+        L.x1 = Vector{Float64}(undef, n)
+        L.y1 = Vector{Float64}(undef, p)
+        L.z1 = Vector{Float64}(undef, q)
+        return L
+    end
+end
+
 """
 solves a pair of primal and dual cone programs
-    minimize    c'*x
-    subject to  G*x + s = h
-                A*x = b
-                s in K
-    maximize    -h'*z - b'*y
-    subject to  G'*z + A'*y + c = 0
-                z in K*
-K is a convex cone defined as a Cartesian product of recognized primitive cones, and K* is its dual cone
+ primal (over x,s):
+  min  c'x :          duals
+    b - Ax == 0       (y)
+    h - Gx == s in K  (z)
+ dual (over z,y):
+  max  -b'y - h'z :      duals
+    c + A'y + G'z == 0   (x)
+                z in K*  (s)
+where K is a convex cone defined as a Cartesian product of recognized primitive cones, and K* is its dual cone
 
 the primal-dual optimality conditions are
-    G*x + s = h,  A*x = b
-    G'*z + A'*y + c = 0
-    s in K, z in K*
-    s'*z = 0
-
+           b - Ax == 0
+           h - Gx == s
+    c + A'y + G'z == 0
+              s'z == 0
+                s in K
+                z in K*
 """
 mutable struct AlfonsoOpt
     # options
@@ -38,12 +91,10 @@ mutable struct AlfonsoOpt
     b::Vector{Float64}          # equality constraint vector, size p
     G::AbstractMatrix{Float64}  # cone constraint matrix, size q*n
     h::Vector{Float64}          # cone constraint vector, size q
-    conK::Cone                  # primal constraint cone object
+    cone::Cone                  # primal constraint cone object
 
-    # QR factorization of A' matrix
-    Q1::Matrix{Float64}
-    Q2::Matrix{Float64}
-    Ri::AbstractMatrix{Float64}
+    L::LinSysCache  # cache for direction finding functions
+
 
     # results
     status::Symbol          # solver status
@@ -54,24 +105,11 @@ mutable struct AlfonsoOpt
     s::Vector{Float64}      # final value of the primal cone variables
     y::Vector{Float64}      # final value of the dual free variables
     z::Vector{Float64}      # final value of the dual cone variables
-
     tau::Float64            # final value of the tau variable
     kap::Float64            # final value of the kappa variable
     mu::Float64             # final value of mu
-
     pobj::Float64           # final primal objective value
     dobj::Float64           # final dual objective value
-
-    dgap::Float64           # final duality gap
-    cgap::Float64           # final complementarity gap
-    rel_dgap::Float64       # final relative duality gap
-    rel_cgap::Float64       # final relative complementarity gap
-    pres::Vector{Float64}   # final primal residuals
-    dres::Vector{Float64}   # final dual residuals
-    pin::Float64            # final primal infeasibility
-    din::Float64            # final dual infeasibility
-    rel_pin::Float64        # final relative primal infeasibility
-    rel_din::Float64        # final relative dual infeasibility
 
     # TODO match natural order of options listed above
     function AlfonsoOpt(verbose, tolrelopt, tolabsopt, tolfeas, maxiter, predlinesearch, maxpredsmallsteps, maxcorrsteps, corrcheck, maxcorrlsiters, alphacorr, predlsmulti, corrlsmulti)
@@ -153,7 +191,7 @@ function load_data!(
     b::Vector{Float64},
     G::AbstractMatrix{Float64},
     h::Vector{Float64},
-    conK::Cone;
+    cone::Cone;
     check::Bool=false, # check rank conditions
     )
 
@@ -219,10 +257,8 @@ function load_data!(
     alf.b = b
     alf.G = G
     alf.h = h
-    alf.conK = conK
-    alf.Q1 = Q1
-    alf.Q2 = Q2
-    alf.Ri = Ri
+    alf.cone = cone
+    alf.L = LinSysCache(Q1, Q2, Ri, n, p, q)
     alf.status = :Loaded
 
     return alf
@@ -232,8 +268,7 @@ end
 function solve!(alf::AlfonsoOpt)
     starttime = time()
 
-    (c, A, b, G, h) = (alf.c, alf.A, alf.b, alf.G, alf.h)
-    cone = alf.conK
+    (c, A, b, G, h, cone) = (alf.c, alf.A, alf.b, alf.G, alf.h, alf.cone)
     (n, p, q) = (length(c), length(b), length(h))
     bnu = 1.0 + barrierpar(cone) # complexity parameter nu-bar of the augmented barrier (sum of the primitive cone barrier parameters plus 1)
 
@@ -246,6 +281,9 @@ function solve!(alf::AlfonsoOpt)
     # gradient evaluations at ls_ts of the barrier function for K
     g = similar(ts)
     # search directions
+    dir_tx = similar(tx)
+    dir_ty = similar(ty)
+    dir_tz = similar(tz)
     dir_ts = similar(ts)
     # values during line searches
     ls_ts = similar(ts)
@@ -261,7 +299,9 @@ function solve!(alf::AlfonsoOpt)
     # |A  0  0 |   |ty|   |b|
     # |G  0  -I|   |ts|   |h|
 
-    (Q1, Q2, Ri) = (alf.Q1, alf.Q2, alf.Ri)
+    L = alf.L
+    (Q1, Q2, Ri) = (L.Q1, L.Q2, L.Ri)
+
     GQ2 = G*Q2
     Q1x = Q1*Ri'*b
     Q2x = Q2*(Symmetric(GQ2'*GQ2)\(GQ2'*(h - G*Q1x)))
@@ -431,8 +471,11 @@ function solve!(alf::AlfonsoOpt)
 
         # prediction phase
         # calculate prediction direction
-        ls_ts .= ts
-        (dir_tx, dir_ty, dir_tz, dir_kap, dir_ts, dir_tau) = finddirection(alf, res_tx, res_ty, -tz, -kap, res_tz, res_tau, mu, tau)
+        @. dir_tx = res_tx
+        @. dir_ty = res_ty
+        @. dir_tz = -tz
+        @. dir_ts = res_tz
+        (dir_kap, dir_tau) = finddirection!(dir_tx, dir_ty, dir_tz, dir_ts, -kap, res_tau, mu, tau, alf)
 
         # determine step length alpha by line search
         alpha = alphapred
@@ -443,14 +486,14 @@ function solve!(alf::AlfonsoOpt)
         while true
             nprediters += 1
 
-            ls_ts .= ts .+ alpha .* dir_ts
+            @. ls_ts = ts + alpha*dir_ts
 
             # accept primal iterate if
             # - decreased alpha and it is the first inside the cone and beta-neighborhood or
             # - increased alpha and it is inside the cone and the first to leave beta-neighborhood
             if incone(cone)
                 # primal iterate is inside the cone
-                ls_tz .= tz .+ alpha .* dir_tz
+                @. ls_tz = tz + alpha*dir_tz
                 ls_tk = (tau + alpha*dir_tau)*(kap + alpha*dir_kap)
                 ls_mu = (dot(ls_ts, ls_tz) + ls_tk)/bnu
                 nbhd = calcnbhd(ls_tk, ls_mu, ls_tz, g, cone)
@@ -490,10 +533,10 @@ function solve!(alf::AlfonsoOpt)
         end
 
         # step distance alpha in the direction
-        tx .+= alpha .* dir_tx
-        ty .+= alpha .* dir_ty
-        tz .+= alpha .* dir_tz
-        ts .= ls_ts
+        @. tx += alpha*dir_tx
+        @. ty += alpha*dir_ty
+        @. tz += alpha*dir_tz
+        @. ts = ls_ts
         tau += alpha*dir_tau
         kap += alpha*dir_kap
         mu = (dot(ts, tz) + tau*kap)/bnu
@@ -510,7 +553,12 @@ function solve!(alf::AlfonsoOpt)
             ncorrsteps += 1
 
             # calculate correction direction
-            (dir_tx, dir_ty, dir_tz, dir_kap, dir_ts, dir_tau) = finddirection(alf, zeros(n), zeros(p), -(tz + mu*calcg!(g, cone)), -(kap - mu/tau), zeros(q), 0.0, mu, tau)
+            @. dir_tx = 0.0
+            @. dir_ty = 0.0
+            calcg!(g, cone)
+            @. dir_tz = -tz - mu*g
+            @. dir_ts = 0.0
+            (dir_kap, dir_tau) = finddirection!(dir_tx, dir_ty, dir_tz, dir_ts, -kap + mu/tau, 0.0, mu, tau, alf)
 
             # determine step length alpha by line search
             alpha = alf.alphacorr
@@ -518,7 +566,7 @@ function solve!(alf::AlfonsoOpt)
             while ncorrlsiters <= alf.maxcorrlsiters
                 ncorrlsiters += 1
 
-                ls_ts .= ts .+ alpha .* dir_ts
+                @. ls_ts = ts + alpha*dir_ts
                 if incone(cone)
                     # primal iterate tx is inside the cone, so terminate line search
                     break
@@ -540,17 +588,17 @@ function solve!(alf::AlfonsoOpt)
             end
 
             # step distance alpha in the direction
-            tx .+= alpha .* dir_tx
-            ty .+= alpha .* dir_ty
-            tz .+= alpha .* dir_tz
-            ts .= ls_ts
+            @. tx += alpha*dir_tx
+            @. ty += alpha*dir_ty
+            @. tz += alpha*dir_tz
+            @. ts = ls_ts
             tau += alpha*dir_tau
             kap += alpha*dir_kap
             mu = (dot(ts, tz) + tau*kap)/bnu
 
             # finish if allowed and current iterate is in the eta-neighborhood, or if taken max steps
             if (ncorrsteps == alf.maxcorrsteps) || alf.corrcheck
-                ls_tz .= tz
+                @. ls_tz = tz
                 nbhd = calcnbhd(tau*kap, mu, ls_tz, g, cone)
                 # @show sqrt(nbhd)/mu
                 if nbhd <= abs2(eta*mu)
@@ -584,16 +632,16 @@ end
 # TODO put this inside the cone functions
 function calcnbhd(tk, mu, ls_tz, g, cone)
     calcg!(g, cone)
-    ls_tz .+= mu .* g
+    @. ls_tz += mu*g
     calcHiarr!(g, ls_tz, cone)
     return (tk - mu)^2 + dot(ls_tz, g)
 end
 
-function finddirection(alf, rhs_tx, rhs_ty, rhs_tz, rhs_kap, rhs_ts, rhs_tau, mu, tau)
-    (c, A, b, G, h) = (alf.c, alf.A, alf.b, alf.G, alf.h)
-    cone = alf.conK
+function finddirection!(rhs_tx, rhs_ty, rhs_tz, rhs_ts, rhs_kap, rhs_tau, mu, tau, alf)
+    (c, A, b, G, h, cone) = (alf.c, alf.A, alf.b, alf.G, alf.h, alf.cone)
     (n, p, q) = (length(c), length(b), length(h))
-    (Q1, Q2, Ri) = (alf.Q1, alf.Q2, alf.Ri)
+    L = alf.L
+    (Q1, Q2, Ri, HG, GHG, GHGQ2, Q2GHGQ2, x1, y1, z1) = (L.Q1, L.Q2, L.Ri, L.HG, L.GHG, L.GHGQ2, L.Q2GHGQ2, L.x1, L.y1, L.z1)
 
     # solve two symmetric systems and combine the solutions
     # use QR + cholesky method from CVXOPT
@@ -604,37 +652,73 @@ function finddirection(alf, rhs_tx, rhs_ty, rhs_tz, rhs_kap, rhs_ts, rhs_tau, mu
     # |G  0  -Hi/mu|   |uz|   |bz|
 
     # A' = [Q1 Q2] * [R1; 0]
-    HG = zeros(q, n) # TODO prealloc
-    Hvec = zeros(q)
+    # factorize Q2' * G' * mu*H * G * Q2
     calcHarr!(HG, G, cone)
-    HG .*= mu
-    GHG = G'*HG
+    @. HG *= mu
+    mul!(GHG, G', HG)
+    mul!(GHGQ2, GHG, Q2)
+    mul!(Q2GHGQ2, Q2', GHGQ2)
 
-    # factorize K22 = Q2' * G' * mu*H * G * Q2
-    K22_F = bunchkaufman!(Symmetric(Q2'*GHG*Q2)) # TODO cholesky vs bunch-kaufman?
+    # TODO cholesky vs bunch-kaufman?
+    F = bunchkaufman!(Symmetric(Q2GHGQ2))
+    # F = cholesky!(Symmetric(Q2GHGQ2))
 
-    function calcxyz(bx, by, Hbz)
-        bxGHbz = bx + G'*Hbz
-        Q1x = Q1*Ri'*by
-        Q2x = Q2*(K22_F\(Q2'*(bxGHbz - GHG*Q1x)))
-        xi = Q1x + Q2x
-        yi = Ri*Q1'*(bxGHbz - GHG*xi)
-        zi = HG*xi - Hbz
-        return (xi, yi, zi)
+    # (x2, y2, z2) = (rhs_tx, -rhs_ty, -mu*H*rhs_ts - rhs_tz)
+    @. rhs_ty *= -1.0
+    @. rhs_tz *= -1.0
+    if !iszero(rhs_ts)
+        calcHarr!(z1, rhs_ts, cone)
+        @. rhs_tz -= mu*z1
     end
+    calcxyz!(rhs_tx, rhs_ty, rhs_tz, F, alf)
 
-    (x1, y1, z1) = calcxyz(-c, b, calcHarr!(Hvec, mu*h, cone))
-    (x2, y2, z2) = calcxyz(rhs_tx, -rhs_ty, -calcHarr!(Hvec, mu*rhs_ts, cone) - rhs_tz) # TODO in correction, rhs_ts is zeros
+    # (x1, y1, z1) = (-c, b, mu*H*h)
+    @. x1 = -c
+    @. y1 = b
+    calcHarr!(z1, h, cone)
+    @. z1 *= mu
+    calcxyz!(x1, y1, z1, F, alf)
 
     # combine
-    dir_tau = ((rhs_tau + rhs_kap) + dot(c, x2) + dot(b, y2) + dot(h, z2))/(mu/tau/tau - dot(c, x1) - dot(b, y1) - dot(h, z1))
-    dir_tx = x2 + dir_tau * x1
-    dir_ty = y2 + dir_tau * y1
-    dir_tz = z2 + dir_tau * z1
-    dir_ts = -G*dir_tx + h*dir_tau - rhs_ts
-    dir_kap = -dot(c, dir_tx) - dot(b, dir_ty) - dot(h, dir_tz) - rhs_tau
+    dir_tau = (rhs_tau + rhs_kap + dot(c, rhs_tx) + dot(b, rhs_ty) + dot(h, rhs_tz))/(mu/tau/tau - dot(c, x1) - dot(b, y1) - dot(h, z1))
+    @. rhs_tx += dir_tau*x1
+    @. rhs_ty += dir_tau*y1
+    @. rhs_tz += dir_tau*z1
+    mul!(z1, G, rhs_tx)
+    @. rhs_ts = -z1 + h*dir_tau - rhs_ts
+    dir_kap = -dot(c, rhs_tx) - dot(b, rhs_ty) - dot(h, rhs_tz) - rhs_tau
 
-    return (dir_tx, dir_ty, dir_tz, dir_kap, dir_ts, dir_tau)
+    return (dir_kap, dir_tau)
+end
+
+function calcxyz!(xi, yi, zi, F, alf)
+    L = alf.L
+    (Q1, Q2, Ri, HG, GHG, bxGHbz, Riby, Q1x, rhs, Q2div, Q2x, GHGxi, Q1yirhs, HGxi) = (L.Q1, L.Q2, L.Ri, L.HG, L.GHG, L.bxGHbz, L.Riby, L.Q1x, L.rhs, L.Q2div, L.Q2x, L.GHGxi, L.Q1yirhs, L.HGxi)
+
+    # bxGHbz = bx + G'*Hbz
+    mul!(bxGHbz, alf.G', zi)
+    @. bxGHbz += xi
+    # Q1x = Q1*Ri'*by
+    mul!(Riby, Ri', yi)
+    mul!(Q1x, Q1, Riby)
+    # Q2x = Q2*(K22_F\(Q2'*(bxGHbz - GHG*Q1x)))
+    mul!(rhs, GHG, Q1x)
+    @. rhs = bxGHbz - rhs
+    mul!(Q2div, Q2', rhs)
+    ldiv!(F, Q2div)
+    mul!(Q2x, Q2, Q2div)
+    # xi = Q1x + Q2x
+    @. xi = Q1x + Q2x
+    # yi = Ri*Q1'*(bxGHbz - GHG*xi)
+    mul!(GHGxi, GHG, xi)
+    @. bxGHbz -= GHGxi
+    mul!(Q1yirhs, Q1', bxGHbz)
+    mul!(yi, Ri, Q1yirhs)
+    # zi = HG*xi - Hbz
+    mul!(HGxi, HG, xi)
+    @. zi = HGxi - zi
+
+    return (xi, yi, zi)
 end
 
 function getbetaeta(maxcorrsteps, bnu)
