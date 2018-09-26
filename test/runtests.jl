@@ -32,3 +32,5 @@ include(joinpath(@__DIR__, "nativeexamples.jl"))
 # @testset "Continuous linear problems" begin
 #     MOIT.contlineartest(MOIB.SplitInterval{Float64}(optimizer), config)
 # end
+
+return nothing
