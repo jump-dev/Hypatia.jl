@@ -135,6 +135,7 @@ mutable struct AlfonsoOpt
     end
 end
 
+# initialize a model object
 function AlfonsoOpt(;
     verbose = false,
     tolrelopt = 1e-6,
@@ -183,7 +184,7 @@ get_mu(alf::AlfonsoOpt) = alf.mu
 get_pobj(alf::AlfonsoOpt) = dot(alf.c, alf.x)
 get_dobj(alf::AlfonsoOpt) = -dot(alf.b, alf.y) - dot(alf.h, alf.z)
 
-# load and verify problem data, calculate algorithmic parameters
+# verify problem data and load into model object
 function load_data!(
     alf::AlfonsoOpt,
     c::Vector{Float64},
@@ -264,7 +265,7 @@ function load_data!(
     return alf
 end
 
-# solve using homogeneous self-dual embedding
+# solve using predictor-corrector algorithm based on homogeneous self-dual embedding
 function solve!(alf::AlfonsoOpt)
     starttime = time()
 
@@ -278,19 +279,19 @@ function solve!(alf::AlfonsoOpt)
     ty = similar(b)
     tz = similar(h)
     ts = similar(h)
-    # gradient evaluations at ls_ts of the barrier function for K
-    g = similar(ts)
-    # search directions
-    dir_tx = similar(tx)
-    dir_ty = similar(ty)
-    dir_tz = similar(tz)
-    dir_ts = similar(ts)
     # values during line searches
     ls_tz = similar(tz)
     ls_ts = similar(ts)
-
     # cone functions evaluate barrier derivatives at ls_ts
     loadpnt!(cone, ls_ts)
+    # gradient evaluations at ls_ts of the barrier function for K
+    g = similar(ts)
+    # helper arrays for residuals, right-hand-sides, and search directions
+    tmp_tx = similar(tx)
+    tmp_tx2 = similar(tx)
+    tmp_ty = similar(ty)
+    tmp_tz = similar(tz)
+    tmp_ts = similar(ts)
 
     # find initial primal-dual iterate
     (tau, kap, mu) = findinitialiterate!(tx, ty, tz, ts, ls_ts, bnu, alf)
@@ -301,7 +302,6 @@ function solve!(alf::AlfonsoOpt)
     tol_res_tz = inv(max(1.0, norm(h)))
 
     # calculate prediction and correction step parameters
-    # TODO put in prediction and correction step cache functions
     (beta, eta, cpredfix) = getbetaeta(alf.maxcorrsteps, bnu) # beta: large neighborhood parameter, eta: small neighborhood parameter
     alphapredfix = cpredfix/(eta + sqrt(2*eta^2 + bnu)) # fixed predictor step size
     alphapredthres = (alf.predlsmulti^alf.maxpredsmallsteps)*alphapredfix # minimum predictor step size
@@ -318,30 +318,33 @@ function solve!(alf::AlfonsoOpt)
     alphapred = alphapredinit
     iter = 0
     while true
-        # calculate residuals
-        # TODO in-place
-        res_x = -A'*ty - G'*tz
-        nres_x = norm(res_x)
-        res_tx = res_x - c*tau
-        nres_tx = norm(res_tx)/tau
+        # calculate residuals and convergence parameters
+        invtau = inv(tau)
 
-        res_y = A*tx
-        nres_y = norm(res_y)
-        res_ty = res_y - b*tau
-        nres_ty = norm(res_ty)/tau
+        # tmp_tx = -A'*ty - G'*tz - c*tau
+        mul!(tmp_tx2, A', ty)
+        mul!(tmp_tx, G', tz)
+        @. tmp_tx = -tmp_tx2 - tmp_tx
+        nres_x = norm(tmp_tx)
+        @. tmp_tx -= c*tau
+        nres_tx = norm(tmp_tx)*invtau
 
-        res_z = ts + G*tx
-        nres_z = norm(res_z)
-        res_tz = res_z - h*tau
-        nres_tz = norm(res_tz)/tau
+        # tmp_ty = A*tx - b*tau
+        mul!(tmp_ty, A, tx)
+        nres_y = norm(tmp_ty)
+        @. tmp_ty -= b*tau
+        nres_ty = norm(tmp_ty)*invtau
+
+        # tmp_tz = ts + G*tx - h*tau
+        mul!(tmp_tz, G, tx)
+        @. tmp_tz += ts
+        nres_z = norm(tmp_tz)
+        @. tmp_tz -= h*tau
+        nres_tz = norm(tmp_tz)*invtau
 
         (cx, by, hz) = (dot(c, tx), dot(b, ty), dot(h, tz))
-
-        res_tau = kap + cx + by + hz
-
-        obj_pr = cx/tau
-        obj_du = -(by + hz)/tau
-
+        obj_pr = cx*invtau
+        obj_du = -(by + hz)*invtau
         gap = dot(tz, ts) # TODO is this right? maybe should adapt original alfonso conditions
 
         # TODO maybe add small epsilon to denominators that are zero to avoid NaNs, and get rid of isnans further down
@@ -379,7 +382,6 @@ function solve!(alf::AlfonsoOpt)
             alf.verbose && println("optimal solution found; terminating")
             alf.status = :Optimal
 
-            invtau = inv(tau)
             alf.x = tx .*= invtau
             alf.s = ts .*= invtau
             alf.y = ty .*= invtau
@@ -426,11 +428,9 @@ function solve!(alf::AlfonsoOpt)
 
         # prediction phase
         # calculate prediction direction
-        @. dir_tx = res_tx
-        @. dir_ty = res_ty
-        @. dir_tz = -tz
-        @. dir_ts = res_tz
-        (dir_kap, dir_tau) = finddirection!(dir_tx, dir_ty, dir_tz, dir_ts, -kap, res_tau, mu, tau, alf)
+        @. tmp_ts = tmp_tz
+        @. tmp_tz = -tz
+        (tmp_kap, tmp_tau) = finddirection!(tmp_tx, tmp_ty, tmp_tz, tmp_ts, -kap, kap + cx + by + hz, mu, tau, alf)
 
         # determine step length alpha by line search
         alpha = alphapred
@@ -441,15 +441,15 @@ function solve!(alf::AlfonsoOpt)
         while true
             nprediters += 1
 
-            @. ls_ts = ts + alpha*dir_ts
+            @. ls_ts = ts + alpha*tmp_ts
 
             # accept primal iterate if
             # - decreased alpha and it is the first inside the cone and beta-neighborhood or
             # - increased alpha and it is inside the cone and the first to leave beta-neighborhood
             if incone(cone)
                 # primal iterate is inside the cone
-                @. ls_tz = tz + alpha*dir_tz
-                ls_tk = (tau + alpha*dir_tau)*(kap + alpha*dir_kap)
+                @. ls_tz = tz + alpha*tmp_tz
+                ls_tk = (tau + alpha*tmp_tau)*(kap + alpha*tmp_kap)
                 ls_mu = (dot(ls_ts, ls_tz) + ls_tk)/bnu
                 nbhd = calcnbhd(ls_tk, ls_mu, ls_tz, g, cone)
 
@@ -488,12 +488,12 @@ function solve!(alf::AlfonsoOpt)
         end
 
         # step distance alpha in the direction
-        @. tx += alpha*dir_tx
-        @. ty += alpha*dir_ty
-        @. tz += alpha*dir_tz
+        @. tx += alpha*tmp_tx
+        @. ty += alpha*tmp_ty
+        @. tz += alpha*tmp_tz
         @. ts = ls_ts
-        tau += alpha*dir_tau
-        kap += alpha*dir_kap
+        tau += alpha*tmp_tau
+        kap += alpha*tmp_kap
         mu = (dot(ts, tz) + tau*kap)/bnu
 
         # skip correction phase if allowed and current iterate is in the eta-neighborhood
@@ -508,12 +508,12 @@ function solve!(alf::AlfonsoOpt)
             ncorrsteps += 1
 
             # calculate correction direction
-            @. dir_tx = 0.0
-            @. dir_ty = 0.0
+            @. tmp_tx = 0.0
+            @. tmp_ty = 0.0
             calcg!(g, cone)
-            @. dir_tz = -tz - mu*g
-            @. dir_ts = 0.0
-            (dir_kap, dir_tau) = finddirection!(dir_tx, dir_ty, dir_tz, dir_ts, -kap + mu/tau, 0.0, mu, tau, alf)
+            @. tmp_tz = -tz - mu*g
+            @. tmp_ts = 0.0
+            (tmp_kap, tmp_tau) = finddirection!(tmp_tx, tmp_ty, tmp_tz, tmp_ts, -kap + mu/tau, 0.0, mu, tau, alf)
 
             # determine step length alpha by line search
             alpha = alf.alphacorr
@@ -521,7 +521,7 @@ function solve!(alf::AlfonsoOpt)
             while ncorrlsiters <= alf.maxcorrlsiters
                 ncorrlsiters += 1
 
-                @. ls_ts = ts + alpha*dir_ts
+                @. ls_ts = ts + alpha*tmp_ts
                 if incone(cone)
                     # primal iterate tx is inside the cone, so terminate line search
                     break
@@ -543,12 +543,12 @@ function solve!(alf::AlfonsoOpt)
             end
 
             # step distance alpha in the direction
-            @. tx += alpha*dir_tx
-            @. ty += alpha*dir_ty
-            @. tz += alpha*dir_tz
+            @. tx += alpha*tmp_tx
+            @. ty += alpha*tmp_ty
+            @. tz += alpha*tmp_tz
             @. ts = ls_ts
-            tau += alpha*dir_tau
-            kap += alpha*dir_kap
+            tau += alpha*tmp_tau
+            kap += alpha*tmp_kap
             mu = (dot(ts, tz) + tau*kap)/bnu
 
             # finish if allowed and current iterate is in the eta-neighborhood, or if taken max steps
@@ -607,7 +607,7 @@ function findinitialiterate!(tx, ty, tz, ts, ls_ts, bnu, alf)
     # GQ2 = G*Q2
     # Q1x = Q1*Ri'*b
     # Q2x = Q2*(Symmetric(GQ2'*GQ2)\(GQ2'*(h - G*Q1x)))
-    # tx = Q1x .+ Q2x
+    # tx = Q1x + Q2x
     # ts = h - G*tx
     # ty = Ri*Q1'*G'*ts
 
@@ -637,11 +637,11 @@ function findinitialiterate!(tx, ty, tz, ts, ls_ts, bnu, alf)
     # from ts, step along interior direction of cone until ts is inside cone
     @. ls_ts = ts
     if !incone(cone)
-        dir_ts = getintdir!(rhs, cone)
+        tmp_ts = getintdir!(rhs, cone)
         alpha = 1.0 # TODO starting alpha maybe should depend on ls_ts (eg norm like in Alfonso) in case 1.0 is too large/small
         steps = 0
         while !incone(cone)
-            @. ls_ts = ts + alpha*dir_ts
+            @. ls_ts = ts + alpha*tmp_ts
             alpha *= 1.5
             steps += 1
             if steps > 25
@@ -669,13 +669,11 @@ function findinitialiterate!(tx, ty, tz, ts, ls_ts, bnu, alf)
     return (tau, kap, mu)
 end
 
-
-
+# calculate new prediction or correction direction given rhs of KKT linear system
 function finddirection!(rhs_tx, rhs_ty, rhs_tz, rhs_ts, rhs_kap, rhs_tau, mu, tau, alf)
-    (c, A, b, G, h, cone) = (alf.c, alf.A, alf.b, alf.G, alf.h, alf.cone)
-    (n, p, q) = (length(c), length(b), length(h))
+    (c, b, G, h, cone) = (alf.c, alf.b, alf.G, alf.h, alf.cone)
     L = alf.L
-    (Q1, Q2, Ri, HG, GHG, GHGQ2, Q2GHGQ2, x1, y1, z1) = (L.Q1, L.Q2, L.Ri, L.HG, L.GHG, L.GHGQ2, L.Q2GHGQ2, L.x1, L.y1, L.z1)
+    (Q2, HG, GHG, GHGQ2, Q2GHGQ2, x1, y1, z1) = (L.Q2, L.HG, L.GHG, L.GHGQ2, L.Q2GHGQ2, L.x1, L.y1, L.z1)
 
     # solve two symmetric systems and combine the solutions
     # use QR + cholesky method from CVXOPT
@@ -725,6 +723,7 @@ function finddirection!(rhs_tx, rhs_ty, rhs_tz, rhs_ts, rhs_kap, rhs_tau, mu, ta
     return (dir_kap, dir_tau)
 end
 
+# calculate solution to reduced symmetric linear systems
 function calcxyz!(xi, yi, zi, F, alf)
     L = alf.L
     (Q1, Q2, Ri, HG, GHG, bxGHbz, Riby, Q1x, rhs, Q2div, Q2x, GHGxi, Q1yirhs, HGxi) = (L.Q1, L.Q2, L.Ri, L.HG, L.GHG, L.bxGHbz, L.Riby, L.Q1x, L.rhs, L.Q2div, L.Q2x, L.GHGxi, L.Q1yirhs, L.HGxi)
@@ -755,6 +754,7 @@ function calcxyz!(xi, yi, zi, F, alf)
     return (xi, yi, zi)
 end
 
+# get neighborhood parameters depending on magnitude of barrier parameter and maximum number of correction steps
 function getbetaeta(maxcorrsteps, bnu)
     if maxcorrsteps <= 2
         if bnu < 10.0

@@ -6,7 +6,8 @@
     A = rand(-9.0:9.0, p, n)
     b = A*ones(n)
     # G = -1.0I
-    G = SparseMatrixCSC(-1.0I, q, n)
+    @assert n == q
+    G = Diagonal(-1.0I, n)
     h = zeros(q)
     cone = Alfonso.Cone([Alfonso.NonnegativeCone(q)], [1:q])
     alf = Alfonso.AlfonsoOpt(verbose=verbflag)
