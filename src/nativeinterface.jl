@@ -275,9 +275,9 @@ function solve!(alf::AlfonsoOpt)
     # preallocate arrays
     # primal and dual variables multiplied by tau
     tx = similar(c)
-    ts = similar(h)
     ty = similar(b)
-    tz = similar(ts)
+    tz = similar(h)
+    ts = similar(h)
     # gradient evaluations at ls_ts of the barrier function for K
     g = similar(ts)
     # search directions
@@ -286,59 +286,14 @@ function solve!(alf::AlfonsoOpt)
     dir_tz = similar(tz)
     dir_ts = similar(ts)
     # values during line searches
-    ls_ts = similar(ts)
     ls_tz = similar(tz)
+    ls_ts = similar(ts)
 
     # cone functions evaluate barrier derivatives at ls_ts
     loadpnt!(cone, ls_ts)
 
-    # calculate initial central primal-dual iterate
-    alf.verbose && println("\nfinding initial iterate")
-    # solve linear equation then step in interior direction of cone until inside cone
-    # |0  A' G'| * |tx| = |0|
-    # |A  0  0 |   |ty|   |b|
-    # |G  0  -I|   |ts|   |h|
-
-    L = alf.L
-    (Q1, Q2, Ri) = (L.Q1, L.Q2, L.Ri)
-
-    GQ2 = G*Q2
-    Q1x = Q1*Ri'*b
-    Q2x = Q2*(Symmetric(GQ2'*GQ2)\(GQ2'*(h - G*Q1x)))
-    tx .= Q1x .+ Q2x
-    ts .= h - G*tx
-    ty .= Ri*Q1'*G'*ts
-    ls_ts .= ts
-
-    if !incone(cone)
-        getintdir!(dir_ts, cone)
-        alpha = 1.0 # TODO starting alpha maybe should depend on ls_ts (eg norm like in Alfonso) in case 1.0 is too large/small
-        steps = 0
-        while !incone(cone)
-            ls_ts .= ts .+ alpha .* dir_ts
-            alpha *= 1.5
-            steps += 1
-            if steps > 25
-                error("cannot find initial iterate")
-            end
-        end
-        alf.verbose && println("$steps steps taken for initial iterate")
-        ts .= ls_ts
-    end
-
-    @assert incone(cone) # TODO delete
-    calcg!(tz, cone)
-    tz .*= -1.0
-
-    tau = 1.0
-    kap = 1.0
-    mu = (dot(tz, ts) + tau*kap)/bnu
-
-    # TODO delete later
-    @assert abs(1.0 - mu) < 1e-8
-    @assert calcnbhd(tau*kap, mu, copy(tz), copy(tz), cone) < 1e-6
-
-    alf.verbose && println("initial iterate found")
+    # find initial primal-dual iterate
+    (tau, kap, mu) = findinitialiterate!(tx, ty, tz, ts, ls_ts, bnu, alf)
 
     # calculate tolerances for convergence
     tol_res_tx = inv(max(1.0, norm(c)))
@@ -600,7 +555,6 @@ function solve!(alf::AlfonsoOpt)
             if (ncorrsteps == alf.maxcorrsteps) || alf.corrcheck
                 @. ls_tz = tz
                 nbhd = calcnbhd(tau*kap, mu, ls_tz, g, cone)
-                # @show sqrt(nbhd)/mu
                 if nbhd <= abs2(eta*mu)
                     break
                 elseif ncorrsteps == alf.maxcorrsteps
@@ -636,6 +590,86 @@ function calcnbhd(tk, mu, ls_tz, g, cone)
     calcHiarr!(g, ls_tz, cone)
     return (tk - mu)^2 + dot(ls_tz, g)
 end
+
+# calculate initial central primal-dual iterate
+function findinitialiterate!(tx, ty, tz, ts, ls_ts, bnu, alf)
+    (b, G, h, cone) = (alf.b, alf.G, alf.h, alf.cone)
+    L = alf.L
+    (Q1, Q2, Ri, Q2GHGQ2, bxGHbz, Riby, Q1x, rhs, Q2div, Q2x, Q1yirhs) = (L.Q1, L.Q2, L.Ri, L.Q2GHGQ2, L.bxGHbz, L.Riby, L.Q1x, L.rhs, L.Q2div, L.Q2x, L.Q1yirhs)
+
+    alf.verbose && println("\nfinding initial iterate")
+
+    # solve linear equation
+    # |0  A' G'| * |tx| = |0|
+    # |A  0  0 |   |ty|   |b|
+    # |G  0  -I|   |ts|   |h|
+
+    # GQ2 = G*Q2
+    # Q1x = Q1*Ri'*b
+    # Q2x = Q2*(Symmetric(GQ2'*GQ2)\(GQ2'*(h - G*Q1x)))
+    # tx = Q1x .+ Q2x
+    # ts = h - G*tx
+    # ty = Ri*Q1'*G'*ts
+
+    GQ2 = G*Q2 # TODO not prealloced
+    mul!(Q2GHGQ2, GQ2', GQ2)
+    F = bunchkaufman!(Symmetric(Q2GHGQ2))
+
+    # Q1x = Q1*Ri'*b
+    mul!(Riby, Ri', b)
+    mul!(Q1x, Q1, Riby)
+    # Q2x = Q2*(F\(GQ2'*(h - G*Q1x)))
+    mul!(rhs, G, Q1x)
+    @. rhs = h - rhs
+    mul!(Q2div, GQ2', rhs)
+    ldiv!(F, Q2div)
+    mul!(Q2x, Q2, Q2div)
+    # tx = Q1x + Q2x
+    @. tx = Q1x + Q2x
+    # ts = h - G*tx
+    mul!(ts, G, tx)
+    @. ts = h - ts
+    # ty = Ri*Q1'*G'*ts
+    mul!(bxGHbz, G', ts)
+    mul!(Q1yirhs, Q1', bxGHbz)
+    mul!(ty, Ri, Q1yirhs)
+
+    # from ts, step along interior direction of cone until ts is inside cone
+    @. ls_ts = ts
+    if !incone(cone)
+        dir_ts = getintdir!(rhs, cone)
+        alpha = 1.0 # TODO starting alpha maybe should depend on ls_ts (eg norm like in Alfonso) in case 1.0 is too large/small
+        steps = 0
+        while !incone(cone)
+            @. ls_ts = ts + alpha*dir_ts
+            alpha *= 1.5
+            steps += 1
+            if steps > 25
+                error("cannot find initial iterate")
+            end
+        end
+        alf.verbose && println("$steps steps taken for initial iterate")
+        @. ts = ls_ts
+    end
+
+    @assert incone(cone) # TODO delete
+    calcg!(tz, cone)
+    @. tz *= -1.0
+
+    tau = 1.0
+    kap = 1.0
+    mu = (dot(tz, ts) + tau*kap)/bnu
+
+    # TODO delete later
+    @assert abs(1.0 - mu) < 1e-8
+    @assert calcnbhd(tau*kap, mu, copy(tz), copy(tz), cone) < 1e-6
+
+    alf.verbose && println("initial iterate found")
+
+    return (tau, kap, mu)
+end
+
+
 
 function finddirection!(rhs_tx, rhs_ty, rhs_tz, rhs_ts, rhs_kap, rhs_tau, mu, tau, alf)
     (c, A, b, G, h, cone) = (alf.c, alf.A, alf.b, alf.G, alf.h, alf.cone)
