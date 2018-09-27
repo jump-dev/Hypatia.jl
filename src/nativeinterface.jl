@@ -448,6 +448,7 @@ function solve!(alf::AlfonsoOpt)
             # - increased alpha and it is inside the cone and the first to leave beta-neighborhood
             if incone(cone)
                 # primal iterate is inside the cone
+
                 @. ls_tz = tz + alpha*tmp_tz
                 ls_tk = (tau + alpha*tmp_tau)*(kap + alpha*tmp_kap)
                 ls_mu = (dot(ls_ts, ls_tz) + ls_tk)/bnu
@@ -611,9 +612,10 @@ function findinitialiterate!(tx, ty, tz, ts, ls_ts, bnu, alf)
     # ts = h - G*tx
     # ty = Ri*Q1'*G'*ts
 
-    GQ2 = G*Q2 # TODO not prealloced
+    GQ2 = G*Q2     # TODO not prealloced; all allocs in this function are from here
     mul!(Q2GHGQ2, GQ2', GQ2)
-    F = bunchkaufman!(Symmetric(Q2GHGQ2))
+    # F = bunchkaufman!(Symmetric(Q2GHGQ2))
+    F = cholesky!(Symmetric(Q2GHGQ2))
 
     # Q1x = Q1*Ri'*b
     mul!(Riby, Ri', b)
@@ -662,8 +664,7 @@ function findinitialiterate!(tx, ty, tz, ts, ls_ts, bnu, alf)
 
     # TODO delete later
     @assert abs(1.0 - mu) < 1e-8
-    @assert calcnbhd(tau*kap, mu, copy(tz), copy(tz), cone) < 1e-6
-
+    # @assert calcnbhd(tau*kap, mu, copy(tz), copy(tz), cone) < 1e-6
     alf.verbose && println("initial iterate found")
 
     return (tau, kap, mu)
@@ -691,9 +692,14 @@ function finddirection!(rhs_tx, rhs_ty, rhs_tz, rhs_ts, rhs_kap, rhs_tau, mu, ta
     mul!(GHGQ2, GHG, Q2)
     mul!(Q2GHGQ2, Q2', GHGQ2)
 
-    # TODO cholesky vs bunch-kaufman?
-    F = bunchkaufman!(Symmetric(Q2GHGQ2))
-    # F = cholesky!(Symmetric(Q2GHGQ2))
+    # bunchkaufman allocates more than cholesky, but doesn't fail when approximately quasidefinite
+    # TODO does it matter that F could be either type?
+    F = cholesky!(Symmetric(Q2GHGQ2), check=false)
+    if !issuccess(F)
+        alf.verbose && println("linear system matrix was nearly not positive definite")
+        mul!(Q2GHGQ2, Q2', GHGQ2)
+        F = bunchkaufman!(Symmetric(Q2GHGQ2))
+    end
 
     # (x2, y2, z2) = (rhs_tx, -rhs_ty, -mu*H*rhs_ts - rhs_tz)
     @. rhs_ty *= -1.0
