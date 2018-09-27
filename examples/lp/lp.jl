@@ -32,7 +32,7 @@ function build_lp!(alf::Alfonso.AlfonsoOpt, m::Int, n::Int; use_data::Bool=false
     if tosparse && !issparse(A)
         A = sparse(A)
     end
-    G = SparseMatrixCSC(-1.0I, n, n)
+    G = Diagonal(-1.0I, n) # TODO uniformscaling
     h = zeros(n)
     cone = Alfonso.Cone([Alfonso.NonnegativeCone(n)], [1:n])
 
