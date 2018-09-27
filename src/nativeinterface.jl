@@ -3,6 +3,7 @@ mutable struct LinSysCache
     Q1
     Q2
     Ri
+    GQ2
     HG
     GHG
     GHGQ2
@@ -29,6 +30,7 @@ mutable struct LinSysCache
         L.Q1 = Q1
         L.Q2 = Q2
         L.Ri = Ri
+        L.GQ2 = Matrix{Float64}(undef, q, nmp)
         L.HG = Matrix{Float64}(undef, q, n)
         L.GHG = Matrix{Float64}(undef, n, n)
         L.GHGQ2 = Matrix{Float64}(undef, n, nmp)
@@ -596,7 +598,7 @@ end
 function findinitialiterate!(tx, ty, tz, ts, ls_ts, bnu, alf)
     (b, G, h, cone) = (alf.b, alf.G, alf.h, alf.cone)
     L = alf.L
-    (Q1, Q2, Ri, Q2GHGQ2, bxGHbz, Riby, Q1x, rhs, Q2div, Q2x, Q1yirhs) = (L.Q1, L.Q2, L.Ri, L.Q2GHGQ2, L.bxGHbz, L.Riby, L.Q1x, L.rhs, L.Q2div, L.Q2x, L.Q1yirhs)
+    (Q1, Q2, Ri, GQ2, Q2GHGQ2, bxGHbz, Riby, Q1x, rhs, Q2div, Q2x, Q1yirhs) = (L.Q1, L.Q2, L.Ri, L.GQ2, L.Q2GHGQ2, L.bxGHbz, L.Riby, L.Q1x, L.rhs, L.Q2div, L.Q2x, L.Q1yirhs)
 
     alf.verbose && println("\nfinding initial iterate")
 
@@ -612,7 +614,7 @@ function findinitialiterate!(tx, ty, tz, ts, ls_ts, bnu, alf)
     # ts = h - G*tx
     # ty = Ri*Q1'*G'*ts
 
-    GQ2 = G*Q2     # TODO not prealloced; all allocs in this function are from here
+    mul!(GQ2, G, Q2)
     mul!(Q2GHGQ2, GQ2', GQ2)
     # F = bunchkaufman!(Symmetric(Q2GHGQ2))
     F = cholesky!(Symmetric(Q2GHGQ2))
