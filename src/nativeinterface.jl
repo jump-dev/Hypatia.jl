@@ -696,6 +696,7 @@ function finddirection!(rhs_tx, rhs_ty, rhs_tz, rhs_ts, rhs_kap, rhs_tau, mu, ta
 
     # bunchkaufman allocates more than cholesky, but doesn't fail when approximately quasidefinite
     # TODO does it matter that F could be either type?
+    # TODO what about LDL decomp?
     F = cholesky!(Symmetric(Q2GHGQ2), check=false)
     if !issuccess(F)
         alf.verbose && println("linear system matrix was nearly not positive definite")
