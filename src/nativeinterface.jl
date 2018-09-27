@@ -1,48 +1,39 @@
 
 mutable struct LinSysCache
-    Q1
     Q2
-    Ri
+    RiQ1
     GQ2
     HG
     GHG
     GHGQ2
     Q2GHGQ2
     bxGHbz
-    Riby
     Q1x
     rhs
     Q2div
     Q2x
     GHGxi
-    Q1yirhs
     HGxi
     x1
     y1
     z1
 
-    function LinSysCache(Q1::Matrix{Float64}, Q2::Matrix{Float64}, Ri::AbstractMatrix{Float64}, n::Int, p::Int, q::Int)
+    function LinSysCache(Q1::AbstractMatrix{Float64}, Q2::AbstractMatrix{Float64}, Ri::AbstractMatrix{Float64}, G::AbstractMatrix{Float64}, n::Int, p::Int, q::Int)
         L = new()
         nmp = n - p
-        @assert size(Q1) == (n, p)
-        @assert size(Q2) == (n, nmp)
-        @assert size(Ri) == (p, p)
-        L.Q1 = Q1
         L.Q2 = Q2
-        L.Ri = Ri
-        L.GQ2 = Matrix{Float64}(undef, q, nmp)
-        L.HG = Matrix{Float64}(undef, q, n)
+        L.RiQ1 = Ri*Q1'
+        L.GQ2 = G*Q2
+        L.HG = Matrix{Float64}(undef, q, n) # TODO don't enforce dense on some
         L.GHG = Matrix{Float64}(undef, n, n)
         L.GHGQ2 = Matrix{Float64}(undef, n, nmp)
         L.Q2GHGQ2 = Matrix{Float64}(undef, nmp, nmp)
         L.bxGHbz = Vector{Float64}(undef, n)
-        L.Riby = Vector{Float64}(undef, p)
         L.Q1x = Vector{Float64}(undef, n)
         L.rhs = Vector{Float64}(undef, n)
         L.Q2div = Vector{Float64}(undef, nmp)
         L.Q2x = Vector{Float64}(undef, n)
         L.GHGxi = Vector{Float64}(undef, n)
-        L.Q1yirhs = Vector{Float64}(undef, p)
         L.HGxi = Vector{Float64}(undef, q)
         L.x1 = Vector{Float64}(undef, n)
         L.y1 = Vector{Float64}(undef, p)
@@ -95,8 +86,7 @@ mutable struct AlfonsoOpt
     h::Vector{Float64}          # cone constraint vector, size q
     cone::Cone                  # primal constraint cone object
 
-    L::LinSysCache  # cache for direction finding functions
-
+    L::LinSysCache  # cache for linear system solves
 
     # results
     status::Symbol          # solver status
@@ -261,7 +251,7 @@ function load_data!(
     alf.G = G
     alf.h = h
     alf.cone = cone
-    alf.L = LinSysCache(Q1, Q2, Ri, n, p, q)
+    alf.L = LinSysCache(Q1, Q2, Ri, G, n, p, q)
     alf.status = :Loaded
 
     return alf
@@ -598,7 +588,7 @@ end
 function findinitialiterate!(tx, ty, tz, ts, ls_ts, bnu, alf)
     (b, G, h, cone) = (alf.b, alf.G, alf.h, alf.cone)
     L = alf.L
-    (Q1, Q2, Ri, GQ2, Q2GHGQ2, bxGHbz, Riby, Q1x, rhs, Q2div, Q2x, Q1yirhs) = (L.Q1, L.Q2, L.Ri, L.GQ2, L.Q2GHGQ2, L.bxGHbz, L.Riby, L.Q1x, L.rhs, L.Q2div, L.Q2x, L.Q1yirhs)
+    (Q2, RiQ1, GQ2, Q2GHGQ2, bxGHbz, Q1x, rhs, Q2div, Q2x) = (L.Q2, L.RiQ1, L.GQ2, L.Q2GHGQ2, L.bxGHbz, L.Q1x, L.rhs, L.Q2div, L.Q2x)
 
     alf.verbose && println("\nfinding initial iterate")
 
@@ -607,21 +597,25 @@ function findinitialiterate!(tx, ty, tz, ts, ls_ts, bnu, alf)
     # |A  0  0 |   |ty|   |b|
     # |G  0  -I|   |ts|   |h|
 
-    # GQ2 = G*Q2
     # Q1x = Q1*Ri'*b
     # Q2x = Q2*(Symmetric(GQ2'*GQ2)\(GQ2'*(h - G*Q1x)))
     # tx = Q1x + Q2x
     # ts = h - G*tx
     # ty = Ri*Q1'*G'*ts
 
-    mul!(GQ2, G, Q2)
+    # bunchkaufman allocates more than cholesky, but doesn't fail when approximately quasidefinite
+    # TODO does it matter that F could be either type?
+    # TODO what about LDL decomp?
     mul!(Q2GHGQ2, GQ2', GQ2)
-    # F = bunchkaufman!(Symmetric(Q2GHGQ2))
-    F = cholesky!(Symmetric(Q2GHGQ2))
+    F = cholesky!(Symmetric(Q2GHGQ2), check=false)
+    if !issuccess(F)
+        alf.verbose && println("linear system matrix was nearly not positive definite")
+        mul!(Q2GHGQ2, Q2', GHGQ2)
+        F = bunchkaufman!(Symmetric(Q2GHGQ2))
+    end
 
     # Q1x = Q1*Ri'*b
-    mul!(Riby, Ri', b)
-    mul!(Q1x, Q1, Riby)
+    mul!(Q1x, RiQ1', b)
     # Q2x = Q2*(F\(GQ2'*(h - G*Q1x)))
     mul!(rhs, G, Q1x)
     @. rhs = h - rhs
@@ -635,8 +629,7 @@ function findinitialiterate!(tx, ty, tz, ts, ls_ts, bnu, alf)
     @. ts = h - ts
     # ty = Ri*Q1'*G'*ts
     mul!(bxGHbz, G', ts)
-    mul!(Q1yirhs, Q1', bxGHbz)
-    mul!(ty, Ri, Q1yirhs)
+    mul!(ty, RiQ1, bxGHbz)
 
     # from ts, step along interior direction of cone until ts is inside cone
     @. ls_ts = ts
@@ -735,14 +728,13 @@ end
 # calculate solution to reduced symmetric linear systems
 function calcxyz!(xi, yi, zi, F, alf)
     L = alf.L
-    (Q1, Q2, Ri, HG, GHG, bxGHbz, Riby, Q1x, rhs, Q2div, Q2x, GHGxi, Q1yirhs, HGxi) = (L.Q1, L.Q2, L.Ri, L.HG, L.GHG, L.bxGHbz, L.Riby, L.Q1x, L.rhs, L.Q2div, L.Q2x, L.GHGxi, L.Q1yirhs, L.HGxi)
+    (Q2, RiQ1, HG, GHG, bxGHbz, Q1x, rhs, Q2div, Q2x, GHGxi, HGxi) = (L.Q2, L.RiQ1, L.HG, L.GHG, L.bxGHbz, L.Q1x, L.rhs, L.Q2div, L.Q2x, L.GHGxi, L.HGxi)
 
     # bxGHbz = bx + G'*Hbz
     mul!(bxGHbz, alf.G', zi)
     @. bxGHbz += xi
     # Q1x = Q1*Ri'*by
-    mul!(Riby, Ri', yi)
-    mul!(Q1x, Q1, Riby)
+    mul!(Q1x, RiQ1', yi)
     # Q2x = Q2*(K22_F\(Q2'*(bxGHbz - GHG*Q1x)))
     mul!(rhs, GHG, Q1x)
     @. rhs = bxGHbz - rhs
@@ -754,8 +746,7 @@ function calcxyz!(xi, yi, zi, F, alf)
     # yi = Ri*Q1'*(bxGHbz - GHG*xi)
     mul!(GHGxi, GHG, xi)
     @. bxGHbz -= GHGxi
-    mul!(Q1yirhs, Q1', bxGHbz)
-    mul!(yi, Ri, Q1yirhs)
+    mul!(yi, RiQ1, bxGHbz)
     # zi = HG*xi - Hbz
     mul!(HGxi, HG, xi)
     @. zi = HGxi - zi
