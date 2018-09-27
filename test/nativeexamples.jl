@@ -1,91 +1,91 @@
 
-@testset "small LP 1" begin
-    Random.seed!(1)
-    (n, p, q) = (30, 12, 30)
-    c = rand(0.0:9.0, n)
-    A = rand(-9.0:9.0, p, n)
-    b = A*ones(n)
-    # G = -1.0I
-    @assert n == q
-    G = Diagonal(-1.0I, n)
-    h = zeros(q)
-    cone = Alfonso.Cone([Alfonso.NonnegativeCone(q)], [1:q])
-    alf = Alfonso.AlfonsoOpt(verbose=verbflag)
-    Alfonso.load_data!(alf, c, A, b, G, h, cone)
-    @time Alfonso.solve!(alf)
-    @test Alfonso.get_niters(alf) <= 25
-    @test Alfonso.get_status(alf) == :Optimal
-end
-
-@testset "small LP 2" begin
-    Random.seed!(1)
-    (n, p, q) = (10, 8, 10)
-    c = rand(0.0:9.0, n)
-    A = rand(-9.0:9.0, p, n)
-    b = A*ones(n)
-    G = SparseMatrixCSC(-1.0I, q, n)
-    h = zeros(q)
-    cone = Alfonso.Cone([Alfonso.NonnegativeCone(q)], [1:q])
-    alf = Alfonso.AlfonsoOpt(verbose=verbflag)
-    Alfonso.load_data!(alf, c, A, b, G, h, cone)
-    @time Alfonso.solve!(alf)
-    @test Alfonso.get_niters(alf) <= 20
-    @test Alfonso.get_status(alf) == :Optimal
-end
-
-@testset "small LP 3" begin
-    Random.seed!(1)
-    (n, p, q) = (5, 2, 5)
-    c = rand(0.0:9.0, n)
-    A = rand(-9.0:9.0, p, n)
-    b = A*ones(n)
-    G = SparseMatrixCSC(-1.0I, q, n)
-    h = G*ones(n)
-    cone = Alfonso.Cone([Alfonso.NonnegativeCone(q)], [1:q])
-    alf = Alfonso.AlfonsoOpt(verbose=verbflag)
-    Alfonso.load_data!(alf, c, A, b, G, h, cone)
-    @time Alfonso.solve!(alf)
-    @test Alfonso.get_niters(alf) <= 20
-    @test Alfonso.get_status(alf) == :Optimal
-end
-
-@testset "large dense lp example (dense A)" begin
-    alf = Alfonso.AlfonsoOpt(verbose=verbflag)
-    build_lp!(alf, 500, 1000, use_data=true, dense=true)
-    @time Alfonso.solve!(alf)
-    @test Alfonso.get_niters(alf) <= 75
-    @test Alfonso.get_status(alf) == :Optimal
-    @test Alfonso.get_pobj(alf) ≈ 2055.807 atol=1e-4 rtol=1e-4
-    @test Alfonso.get_dobj(alf) ≈ 2055.807 atol=1e-4 rtol=1e-4
-end
-
-@testset "large sparse lp example (sparse A)" begin
-    alf = Alfonso.AlfonsoOpt(verbose=verbflag)
-    build_lp!(alf, 500, 1000, dense=false, nzfrac=10/1000)
-    @time Alfonso.solve!(alf)
-    @test Alfonso.get_niters(alf) <= 70
-    @test Alfonso.get_status(alf) == :Optimal
-    @test Alfonso.get_pobj(alf) ≈ Alfonso.get_dobj(alf) atol=1e-4 rtol=1e-4
-end
-
-@testset "small dense lp example (dense vs sparse A)" begin
-    # dense methods
-    d_alf = Alfonso.AlfonsoOpt(verbose=verbflag)
-    build_lp!(d_alf, 50, 100, dense=true, tosparse=false)
-    @time Alfonso.solve!(d_alf)
-    @test Alfonso.get_niters(d_alf) <= 40
-    @test Alfonso.get_status(d_alf) == :Optimal
-
-    # sparse methods
-    s_alf = Alfonso.AlfonsoOpt(verbose=verbflag)
-    build_lp!(s_alf, 50, 100, dense=true, tosparse=true)
-    @time Alfonso.solve!(s_alf)
-    @test Alfonso.get_niters(s_alf) <= 40
-    @test Alfonso.get_status(s_alf) == :Optimal
-
-    @test Alfonso.get_pobj(d_alf) ≈ Alfonso.get_pobj(s_alf) atol=1e-4 rtol=1e-4
-    @test Alfonso.get_dobj(d_alf) ≈ Alfonso.get_dobj(s_alf) atol=1e-4 rtol=1e-4
-end
+# @testset "small LP 1" begin
+#     Random.seed!(1)
+#     (n, p, q) = (30, 12, 30)
+#     c = rand(0.0:9.0, n)
+#     A = rand(-9.0:9.0, p, n)
+#     b = A*ones(n)
+#     # G = -1.0I
+#     @assert n == q
+#     G = Diagonal(-1.0I, n)
+#     h = zeros(q)
+#     cone = Alfonso.Cone([Alfonso.NonnegativeCone(q)], [1:q])
+#     alf = Alfonso.AlfonsoOpt(verbose=verbflag)
+#     Alfonso.load_data!(alf, c, A, b, G, h, cone)
+#     @time Alfonso.solve!(alf)
+#     @test Alfonso.get_niters(alf) <= 25
+#     @test Alfonso.get_status(alf) == :Optimal
+# end
+#
+# @testset "small LP 2" begin
+#     Random.seed!(1)
+#     (n, p, q) = (10, 8, 10)
+#     c = rand(0.0:9.0, n)
+#     A = rand(-9.0:9.0, p, n)
+#     b = A*ones(n)
+#     G = SparseMatrixCSC(-1.0I, q, n)
+#     h = zeros(q)
+#     cone = Alfonso.Cone([Alfonso.NonnegativeCone(q)], [1:q])
+#     alf = Alfonso.AlfonsoOpt(verbose=verbflag)
+#     Alfonso.load_data!(alf, c, A, b, G, h, cone)
+#     @time Alfonso.solve!(alf)
+#     @test Alfonso.get_niters(alf) <= 20
+#     @test Alfonso.get_status(alf) == :Optimal
+# end
+#
+# @testset "small LP 3" begin
+#     Random.seed!(1)
+#     (n, p, q) = (5, 2, 5)
+#     c = rand(0.0:9.0, n)
+#     A = rand(-9.0:9.0, p, n)
+#     b = A*ones(n)
+#     G = SparseMatrixCSC(-1.0I, q, n)
+#     h = G*ones(n)
+#     cone = Alfonso.Cone([Alfonso.NonnegativeCone(q)], [1:q])
+#     alf = Alfonso.AlfonsoOpt(verbose=verbflag)
+#     Alfonso.load_data!(alf, c, A, b, G, h, cone)
+#     @time Alfonso.solve!(alf)
+#     @test Alfonso.get_niters(alf) <= 20
+#     @test Alfonso.get_status(alf) == :Optimal
+# end
+#
+# @testset "large dense lp example (dense A)" begin
+#     alf = Alfonso.AlfonsoOpt(verbose=verbflag)
+#     build_lp!(alf, 500, 1000, use_data=true, dense=true)
+#     @time Alfonso.solve!(alf)
+#     @test Alfonso.get_niters(alf) <= 75
+#     @test Alfonso.get_status(alf) == :Optimal
+#     @test Alfonso.get_pobj(alf) ≈ 2055.807 atol=1e-4 rtol=1e-4
+#     @test Alfonso.get_dobj(alf) ≈ 2055.807 atol=1e-4 rtol=1e-4
+# end
+#
+# @testset "large sparse lp example (sparse A)" begin
+#     alf = Alfonso.AlfonsoOpt(verbose=verbflag)
+#     build_lp!(alf, 500, 1000, dense=false, nzfrac=10/1000)
+#     @time Alfonso.solve!(alf)
+#     @test Alfonso.get_niters(alf) <= 70
+#     @test Alfonso.get_status(alf) == :Optimal
+#     @test Alfonso.get_pobj(alf) ≈ Alfonso.get_dobj(alf) atol=1e-4 rtol=1e-4
+# end
+#
+# @testset "small dense lp example (dense vs sparse A)" begin
+#     # dense methods
+#     d_alf = Alfonso.AlfonsoOpt(verbose=verbflag)
+#     build_lp!(d_alf, 50, 100, dense=true, tosparse=false)
+#     @time Alfonso.solve!(d_alf)
+#     @test Alfonso.get_niters(d_alf) <= 40
+#     @test Alfonso.get_status(d_alf) == :Optimal
+#
+#     # sparse methods
+#     s_alf = Alfonso.AlfonsoOpt(verbose=verbflag)
+#     build_lp!(s_alf, 50, 100, dense=true, tosparse=true)
+#     @time Alfonso.solve!(s_alf)
+#     @test Alfonso.get_niters(s_alf) <= 40
+#     @test Alfonso.get_status(s_alf) == :Optimal
+#
+#     @test Alfonso.get_pobj(d_alf) ≈ Alfonso.get_pobj(s_alf) atol=1e-4 rtol=1e-4
+#     @test Alfonso.get_dobj(d_alf) ≈ Alfonso.get_dobj(s_alf) atol=1e-4 rtol=1e-4
+# end
 
 @testset "1D poly envelope example (dense vs sparse A)" begin
     # dense methods
@@ -248,123 +248,123 @@ end
 #     @test Alfonso.get_pobj(alf) ≈ 0 atol=1e-3 rtol=1e-3
 #     @test Alfonso.get_dobj(alf) ≈ 0 atol=1e-3 rtol=1e-3
 # end
-
-@testset "small second-order cone problem" begin
-    alf = Alfonso.AlfonsoOpt(verbose=verbflag)
-    c = Float64[0, -1, -1]
-    A = Float64[1 0 0; 0 1 0]
-    b = Float64[1, 1/sqrt(2)]
-    G = SparseMatrixCSC(-1.0I, 3, 3)
-    h = zeros(3)
-    cone = Alfonso.Cone([Alfonso.SecondOrderCone(3)], [1:3])
-    Alfonso.load_data!(alf, c, A, b, G, h, cone)
-    @time Alfonso.solve!(alf)
-    @test Alfonso.get_niters(alf) <= 15
-    @test Alfonso.get_status(alf) == :Optimal
-    @test Alfonso.get_pobj(alf) ≈ -sqrt(2) atol=1e-4 rtol=1e-4
-    @test Alfonso.get_dobj(alf) ≈ Alfonso.get_pobj(alf) atol=1e-4 rtol=1e-4
-    @test Alfonso.get_y(alf) ≈ [sqrt(2), 0] atol=1e-4 rtol=1e-4
-    @test Alfonso.get_x(alf) ≈ [1, 1/sqrt(2), 1/sqrt(2)] atol=1e-4 rtol=1e-4
-end
-
-@testset "small rotated second-order cone problem" begin
-    alf = Alfonso.AlfonsoOpt(verbose=verbflag)
-    c = Float64[0, 0, -1, -1]
-    A = Float64[1 0 0 0; 0 1 0 0]
-    b = Float64[1/2, 1]
-    G = SparseMatrixCSC(-1.0I, 4, 4)
-    h = zeros(4)
-    cone = Alfonso.Cone([Alfonso.RotatedSecondOrderCone(4)], [1:4])
-    Alfonso.load_data!(alf, c, A, b, G, h, cone)
-    @time Alfonso.solve!(alf)
-    @test Alfonso.get_niters(alf) <= 15
-    @test Alfonso.get_status(alf) == :Optimal
-    @test Alfonso.get_pobj(alf) ≈ -sqrt(2) atol=1e-4 rtol=1e-4
-    @test Alfonso.get_dobj(alf) ≈ Alfonso.get_pobj(alf) atol=1e-4 rtol=1e-4
-    @test Alfonso.get_x(alf)[3:4] ≈ [1, 1]/sqrt(2) atol=1e-4 rtol=1e-4
-end
-
-@testset "small rotated second-order cone problem 2" begin
-    alf = Alfonso.AlfonsoOpt(verbose=verbflag)
-    c = Float64[0, 0, -1]
-    A = Float64[1 0 0; 0 1 0]
-    b = Float64[1/2, 1]/sqrt(2)
-    G = SparseMatrixCSC(-1.0I, 3, 3)
-    h = zeros(3)
-    cone = Alfonso.Cone([Alfonso.RotatedSecondOrderCone(3)], [1:3])
-    Alfonso.load_data!(alf, c, A, b, G, h, cone)
-    @time Alfonso.solve!(alf)
-    @test Alfonso.get_niters(alf) <= 20
-    @test Alfonso.get_status(alf) == :Optimal
-    @test Alfonso.get_pobj(alf) ≈ -1/sqrt(2) atol=1e-4 rtol=1e-4
-    @test Alfonso.get_dobj(alf) ≈ Alfonso.get_pobj(alf) atol=1e-4 rtol=1e-4
-    @test Alfonso.get_x(alf)[2] ≈ 1/sqrt(2) atol=1e-4 rtol=1e-4
-end
-
-@testset "small positive semidefinite cone problem" begin
-    alf = Alfonso.AlfonsoOpt(verbose=verbflag)
-    c = Float64[0, -1, 0]
-    A = Float64[1 0 0; 0 0 1]
-    b = Float64[1/2, 1]
-    G = SparseMatrixCSC(-1.0I, 3, 3)
-    h = zeros(3)
-    cone = Alfonso.Cone([Alfonso.PositiveSemidefiniteCone(3)], [1:3])
-    Alfonso.load_data!(alf, c, A, b, G, h, cone)
-    @time Alfonso.solve!(alf)
-    @test Alfonso.get_niters(alf) <= 15
-    @test Alfonso.get_status(alf) == :Optimal
-    @test Alfonso.get_pobj(alf) ≈ -1 atol=1e-4 rtol=1e-4
-    @test Alfonso.get_dobj(alf) ≈ Alfonso.get_pobj(alf) atol=1e-4 rtol=1e-4
-    @test Alfonso.get_x(alf)[2] ≈ 1 atol=1e-4 rtol=1e-4
-end
-
-@testset "small positive semidefinite cone problem 2" begin
-    alf = Alfonso.AlfonsoOpt(verbose=verbflag)
-    c = Float64[1, 0, 1, 0, 0, 1]
-    A = Float64[1 2 3 4 5 6; 1 1 1 1 1 1]
-    b = Float64[10, 3]
-    G = SparseMatrixCSC(-1.0I, 6, 6)
-    h = zeros(6)
-    cone = Alfonso.Cone([Alfonso.PositiveSemidefiniteCone(6)], [1:6])
-    Alfonso.load_data!(alf, c, A, b, G, h, cone)
-    @time Alfonso.solve!(alf)
-    @test Alfonso.get_niters(alf) <= 20
-    @test Alfonso.get_status(alf) == :Optimal
-    @test Alfonso.get_pobj(alf) ≈ 1.249632 atol=1e-4 rtol=1e-4
-    @test Alfonso.get_dobj(alf) ≈ Alfonso.get_pobj(alf) atol=1e-4 rtol=1e-4
-    @test Alfonso.get_x(alf) ≈ [0.491545, 0.647333, 0.426249, 0.571161, 0.531874, 0.331838] atol=1e-4 rtol=1e-4
-end
-
-@testset "small exponential cone problem" begin
-    alf = Alfonso.AlfonsoOpt(verbose=verbflag)
-    c = Float64[1, 1, 1]
-    A = Float64[0 1 0; 1 0 0]
-    b = Float64[2, 1]
-    G = SparseMatrixCSC(-1.0I, 3, 3)
-    h = zeros(3)
-    cone = Alfonso.Cone([Alfonso.ExponentialCone()], [1:3])
-    Alfonso.load_data!(alf, c, A, b, G, h, cone)
-    @time Alfonso.solve!(alf)
-    @test Alfonso.get_niters(alf) <= 20
-    @test Alfonso.get_status(alf) == :Optimal
-    @test Alfonso.get_pobj(alf) ≈ (2*exp(1/2)+3) atol=1e-4 rtol=1e-4
-    @test Alfonso.get_dobj(alf) ≈ Alfonso.get_pobj(alf) atol=1e-4 rtol=1e-4
-    @test dot(Alfonso.get_y(alf), b) ≈ -Alfonso.get_pobj(alf) atol=1e-4 rtol=1e-4
-    @test Alfonso.get_x(alf) ≈ [1, 2, 2*exp(1/2)] atol=1e-4 rtol=1e-4
-    @test Alfonso.get_y(alf) ≈ -[1+exp(1/2)/2, 1+exp(1/2)] atol=1e-4 rtol=1e-4
-    @test Alfonso.get_z(alf) ≈ (c + A'*Alfonso.get_y(alf)) atol=1e-4 rtol=1e-4
-end
-
-# @testset "small power cone problem" begin
+#
+# @testset "small second-order cone problem" begin
 #     alf = Alfonso.AlfonsoOpt(verbose=verbflag)
-#     c = Float64[1, 0, 0, -1, -1, 0]
-#     A = Float64[1 1 1/2 0 0 0; 0 0 0 0 0 1]
-#     b = Float64[2, 1]
-#     cone = Alfonso.Cone([Alfonso.PowerCone(0.2), Alfonso.PowerCone(0.4)], [[1, 2, 4], [3, 6, 5]])
-#     Alfonso.load_data!(alf, A, b, c, cone)
+#     c = Float64[0, -1, -1]
+#     A = Float64[1 0 0; 0 1 0]
+#     b = Float64[1, 1/sqrt(2)]
+#     G = SparseMatrixCSC(-1.0I, 3, 3)
+#     h = zeros(3)
+#     cone = Alfonso.Cone([Alfonso.SecondOrderCone(3)], [1:3])
+#     Alfonso.load_data!(alf, c, A, b, G, h, cone)
 #     @time Alfonso.solve!(alf)
+#     @test Alfonso.get_niters(alf) <= 15
 #     @test Alfonso.get_status(alf) == :Optimal
-#     @test Alfonso.get_pobj(alf) ≈ -1.80734 atol=1e-4 rtol=1e-4
+#     @test Alfonso.get_pobj(alf) ≈ -sqrt(2) atol=1e-4 rtol=1e-4
 #     @test Alfonso.get_dobj(alf) ≈ Alfonso.get_pobj(alf) atol=1e-4 rtol=1e-4
-#     @test Alfonso.get_x(alf)[1:3] ≈ [0.0639314, 0.783361, 2.30542] atol=1e-4 rtol=1e-4
+#     @test Alfonso.get_y(alf) ≈ [sqrt(2), 0] atol=1e-4 rtol=1e-4
+#     @test Alfonso.get_x(alf) ≈ [1, 1/sqrt(2), 1/sqrt(2)] atol=1e-4 rtol=1e-4
 # end
+#
+# @testset "small rotated second-order cone problem" begin
+#     alf = Alfonso.AlfonsoOpt(verbose=verbflag)
+#     c = Float64[0, 0, -1, -1]
+#     A = Float64[1 0 0 0; 0 1 0 0]
+#     b = Float64[1/2, 1]
+#     G = SparseMatrixCSC(-1.0I, 4, 4)
+#     h = zeros(4)
+#     cone = Alfonso.Cone([Alfonso.RotatedSecondOrderCone(4)], [1:4])
+#     Alfonso.load_data!(alf, c, A, b, G, h, cone)
+#     @time Alfonso.solve!(alf)
+#     @test Alfonso.get_niters(alf) <= 15
+#     @test Alfonso.get_status(alf) == :Optimal
+#     @test Alfonso.get_pobj(alf) ≈ -sqrt(2) atol=1e-4 rtol=1e-4
+#     @test Alfonso.get_dobj(alf) ≈ Alfonso.get_pobj(alf) atol=1e-4 rtol=1e-4
+#     @test Alfonso.get_x(alf)[3:4] ≈ [1, 1]/sqrt(2) atol=1e-4 rtol=1e-4
+# end
+#
+# @testset "small rotated second-order cone problem 2" begin
+#     alf = Alfonso.AlfonsoOpt(verbose=verbflag)
+#     c = Float64[0, 0, -1]
+#     A = Float64[1 0 0; 0 1 0]
+#     b = Float64[1/2, 1]/sqrt(2)
+#     G = SparseMatrixCSC(-1.0I, 3, 3)
+#     h = zeros(3)
+#     cone = Alfonso.Cone([Alfonso.RotatedSecondOrderCone(3)], [1:3])
+#     Alfonso.load_data!(alf, c, A, b, G, h, cone)
+#     @time Alfonso.solve!(alf)
+#     @test Alfonso.get_niters(alf) <= 20
+#     @test Alfonso.get_status(alf) == :Optimal
+#     @test Alfonso.get_pobj(alf) ≈ -1/sqrt(2) atol=1e-4 rtol=1e-4
+#     @test Alfonso.get_dobj(alf) ≈ Alfonso.get_pobj(alf) atol=1e-4 rtol=1e-4
+#     @test Alfonso.get_x(alf)[2] ≈ 1/sqrt(2) atol=1e-4 rtol=1e-4
+# end
+#
+# @testset "small positive semidefinite cone problem" begin
+#     alf = Alfonso.AlfonsoOpt(verbose=verbflag)
+#     c = Float64[0, -1, 0]
+#     A = Float64[1 0 0; 0 0 1]
+#     b = Float64[1/2, 1]
+#     G = SparseMatrixCSC(-1.0I, 3, 3)
+#     h = zeros(3)
+#     cone = Alfonso.Cone([Alfonso.PositiveSemidefiniteCone(3)], [1:3])
+#     Alfonso.load_data!(alf, c, A, b, G, h, cone)
+#     @time Alfonso.solve!(alf)
+#     @test Alfonso.get_niters(alf) <= 15
+#     @test Alfonso.get_status(alf) == :Optimal
+#     @test Alfonso.get_pobj(alf) ≈ -1 atol=1e-4 rtol=1e-4
+#     @test Alfonso.get_dobj(alf) ≈ Alfonso.get_pobj(alf) atol=1e-4 rtol=1e-4
+#     @test Alfonso.get_x(alf)[2] ≈ 1 atol=1e-4 rtol=1e-4
+# end
+#
+# @testset "small positive semidefinite cone problem 2" begin
+#     alf = Alfonso.AlfonsoOpt(verbose=verbflag)
+#     c = Float64[1, 0, 1, 0, 0, 1]
+#     A = Float64[1 2 3 4 5 6; 1 1 1 1 1 1]
+#     b = Float64[10, 3]
+#     G = SparseMatrixCSC(-1.0I, 6, 6)
+#     h = zeros(6)
+#     cone = Alfonso.Cone([Alfonso.PositiveSemidefiniteCone(6)], [1:6])
+#     Alfonso.load_data!(alf, c, A, b, G, h, cone)
+#     @time Alfonso.solve!(alf)
+#     @test Alfonso.get_niters(alf) <= 20
+#     @test Alfonso.get_status(alf) == :Optimal
+#     @test Alfonso.get_pobj(alf) ≈ 1.249632 atol=1e-4 rtol=1e-4
+#     @test Alfonso.get_dobj(alf) ≈ Alfonso.get_pobj(alf) atol=1e-4 rtol=1e-4
+#     @test Alfonso.get_x(alf) ≈ [0.491545, 0.647333, 0.426249, 0.571161, 0.531874, 0.331838] atol=1e-4 rtol=1e-4
+# end
+#
+# @testset "small exponential cone problem" begin
+#     alf = Alfonso.AlfonsoOpt(verbose=verbflag)
+#     c = Float64[1, 1, 1]
+#     A = Float64[0 1 0; 1 0 0]
+#     b = Float64[2, 1]
+#     G = SparseMatrixCSC(-1.0I, 3, 3)
+#     h = zeros(3)
+#     cone = Alfonso.Cone([Alfonso.ExponentialCone()], [1:3])
+#     Alfonso.load_data!(alf, c, A, b, G, h, cone)
+#     @time Alfonso.solve!(alf)
+#     @test Alfonso.get_niters(alf) <= 20
+#     @test Alfonso.get_status(alf) == :Optimal
+#     @test Alfonso.get_pobj(alf) ≈ (2*exp(1/2)+3) atol=1e-4 rtol=1e-4
+#     @test Alfonso.get_dobj(alf) ≈ Alfonso.get_pobj(alf) atol=1e-4 rtol=1e-4
+#     @test dot(Alfonso.get_y(alf), b) ≈ -Alfonso.get_pobj(alf) atol=1e-4 rtol=1e-4
+#     @test Alfonso.get_x(alf) ≈ [1, 2, 2*exp(1/2)] atol=1e-4 rtol=1e-4
+#     @test Alfonso.get_y(alf) ≈ -[1+exp(1/2)/2, 1+exp(1/2)] atol=1e-4 rtol=1e-4
+#     @test Alfonso.get_z(alf) ≈ (c + A'*Alfonso.get_y(alf)) atol=1e-4 rtol=1e-4
+# end
+#
+# # @testset "small power cone problem" begin
+# #     alf = Alfonso.AlfonsoOpt(verbose=verbflag)
+# #     c = Float64[1, 0, 0, -1, -1, 0]
+# #     A = Float64[1 1 1/2 0 0 0; 0 0 0 0 0 1]
+# #     b = Float64[2, 1]
+# #     cone = Alfonso.Cone([Alfonso.PowerCone(0.2), Alfonso.PowerCone(0.4)], [[1, 2, 4], [3, 6, 5]])
+# #     Alfonso.load_data!(alf, A, b, c, cone)
+# #     @time Alfonso.solve!(alf)
+# #     @test Alfonso.get_status(alf) == :Optimal
+# #     @test Alfonso.get_pobj(alf) ≈ -1.80734 atol=1e-4 rtol=1e-4
+# #     @test Alfonso.get_dobj(alf) ≈ Alfonso.get_pobj(alf) atol=1e-4 rtol=1e-4
+# #     @test Alfonso.get_x(alf)[1:3] ≈ [0.0639314, 0.783361, 2.30542] atol=1e-4 rtol=1e-4
+# # end
