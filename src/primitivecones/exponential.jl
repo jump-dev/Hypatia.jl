@@ -20,7 +20,7 @@ mutable struct ExponentialCone <: PrimitiveCone
 end
 
 dimension(prm::ExponentialCone) = 3
-barrierpar_prm(prm::ExponentialCone) = 3.0
+barrierpar_prm(prm::ExponentialCone) = 3
 getintdir_prm!(arr::AbstractVector{Float64}, prm::ExponentialCone) = (arr[1] = 0.0; arr[2] = 0.5; arr[3] = 1.0; arr)
 loadpnt_prm!(prm::ExponentialCone, pnt::AbstractVector{Float64}) = (prm.pnt = pnt)
 
@@ -55,7 +55,11 @@ function incone_prm(prm::ExponentialCone)
     H[3,3] = abs2(yz)*H[1,1] + yz/z*iylzyx + inv(abs2(z))
 
     @. prm.H2 = H
-    prm.F = bunchkaufman!(Symmetric(prm.H2))
+    prm.F = cholesky!(Symmetric(prm.H2), check=false) # bunchkaufman if it fails
+    if !issuccess(prm.F)
+        @. prm.H2 = H
+        prm.F = bunchkaufman!(Symmetric(prm.H2))
+    end
 
     # old code for inverse hessian
     # den = 2*y + dist
