@@ -622,28 +622,27 @@ function findinitialiterate!(tx::Vector{Float64}, ty::Vector{Float64}, tz::Vecto
         tmp_ts = getintdir!(tz, cone)
         alpha = 1.0 # TODO starting alpha maybe should depend on ls_ts (eg norm like in Alfonso) in case 1.0 is too large/small
         steps = 0
+        @. ls_ts = ts + alpha*tmp_ts
         while !incone(cone)
-            @. ls_ts = ts + alpha*tmp_ts
-            alpha *= 1.5
             steps += 1
             if steps > 25
                 error("cannot find initial iterate")
             end
+            alpha *= 1.5
+            @. ls_ts = ts + alpha*tmp_ts
         end
         alf.verbose && println("$steps steps taken for initial iterate")
         @. ts = ls_ts
     end
 
-    @assert incone(cone) # TODO delete
     calcg!(tz, cone)
     @. tz *= -1.0
-
     tau = 1.0
     kap = 1.0
     mu = (dot(tz, ts) + tau*kap)/bnu
-
     @assert abs(1.0 - mu) < 1e-10
     # @assert calcnbhd(tau*kap, mu, copy(tz), copy(tz), cone) < 1e-6
+    
     alf.verbose && println("initial iterate found")
 
     return (tau, kap, mu)

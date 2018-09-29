@@ -14,6 +14,7 @@ module Alfonso
         # "power",
         "rotatedsecondorder",
         "positivesemidefinite",
+        "ellinfinity",
         ]
         include(joinpath(@__DIR__, "primitivecones", primcone * ".jl"))
     end
