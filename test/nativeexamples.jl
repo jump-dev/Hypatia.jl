@@ -215,23 +215,25 @@ end
     @test Alfonso.get_dobj(alf) ≈ -1.4393333333 atol=1e-4 rtol=1e-4
 end
 
-# @testset "Caprasse" begin
-#     alf = Alfonso.AlfonsoOpt(verbose=verbflag)
-#     build_namedpoly!(alf, :caprasse, 4)
-#     @time Alfonso.solve!(alf)
-#     @test Alfonso.get_status(alf) == :Optimal
-#     @test Alfonso.get_pobj(alf) ≈ -3.1800966258 atol=1e-4 rtol=1e-4
-#     @test Alfonso.get_dobj(alf) ≈ -3.1800966258 atol=1e-4 rtol=1e-4
-# end
+@testset "Caprasse" begin
+    alf = Alfonso.AlfonsoOpt(verbose=verbflag, tolfeas=5e-7)
+    build_namedpoly!(alf, :caprasse, 4)
+    @time Alfonso.solve!(alf)
+    @test Alfonso.get_niters(alf) <= 45
+    @test Alfonso.get_status(alf) == :Optimal
+    @test Alfonso.get_pobj(alf) ≈ -3.1800966258 atol=1e-4 rtol=1e-4
+    @test Alfonso.get_dobj(alf) ≈ -3.1800966258 atol=1e-4 rtol=1e-4
+end
 
-# @testset "Goldstein-Price" begin
-#     alf = Alfonso.AlfonsoOpt(verbose=verbflag)
-#     build_namedpoly!(alf, :goldsteinprice, 7)
-#     @time Alfonso.solve!(alf)
-#     @test Alfonso.get_status(alf) == :Optimal
-#     @test Alfonso.get_pobj(alf) ≈ 3 atol=1e-4 rtol=1e-4
-#     @test Alfonso.get_dobj(alf) ≈ 3 atol=1e-4 rtol=1e-4
-# end
+@testset "Goldstein-Price" begin
+    alf = Alfonso.AlfonsoOpt(verbose=verbflag, tolfeas=1e-10)
+    build_namedpoly!(alf, :goldsteinprice, 7)
+    @time Alfonso.solve!(alf)
+    @test Alfonso.get_niters(alf) <= 60
+    @test Alfonso.get_status(alf) == :Optimal
+    @test Alfonso.get_pobj(alf) ≈ 3 atol=1e-4 rtol=1e-4
+    @test Alfonso.get_dobj(alf) ≈ 3 atol=1e-4 rtol=1e-4
+end
 
 # out of memory during interpolation calculations
 # @testset "Heart" begin
@@ -283,33 +285,35 @@ end
     @test Alfonso.get_dobj(alf) ≈ -36.71269068 atol=1e-4 rtol=1e-4
 end
 
-# @testset "Robinson" begin
-#     alf = Alfonso.AlfonsoOpt(verbose=verbflag, tolrelopt=1e-5, tolabsopt=1e-6, tolfeas=1e-6)
-#     build_namedpoly!(alf, :robinson, 8)
-#     @time Alfonso.solve!(alf)
-#     @test Alfonso.get_niters(alf) <= 35
-#     @test Alfonso.get_status(alf) == :Optimal
-#     @test Alfonso.get_pobj(alf) ≈ 0.814814 atol=1e-4 rtol=1e-4
-#     @test Alfonso.get_dobj(alf) ≈ 0.814814 atol=1e-4 rtol=1e-4
-# end
+@testset "Robinson" begin
+    alf = Alfonso.AlfonsoOpt(verbose=verbflag)
+    build_namedpoly!(alf, :robinson, 8)
+    @time Alfonso.solve!(alf)
+    @test Alfonso.get_niters(alf) <= 40
+    @test Alfonso.get_status(alf) == :Optimal
+    @test Alfonso.get_pobj(alf) ≈ 0.814814 atol=1e-4 rtol=1e-4
+    @test Alfonso.get_dobj(alf) ≈ 0.814814 atol=1e-4 rtol=1e-4
+end
 
-# @testset "Rosenbrock" begin
-#     alf = Alfonso.AlfonsoOpt(verbose=verbflag, tolrelopt=1e-5, tolabsopt=1e-6, tolfeas=1e-6, maxpredsmallsteps=20)
-#     build_namedpoly!(alf, :rosenbrock, 3)
-#     @time Alfonso.solve!(alf)
-#     @test Alfonso.get_status(alf) == :Optimal
-#     @test Alfonso.get_pobj(alf) ≈ 0 atol=1e-3 rtol=1e-3
-#     @test Alfonso.get_dobj(alf) ≈ 0 atol=1e-3 rtol=1e-3
-# end
+@testset "Rosenbrock" begin
+    alf = Alfonso.AlfonsoOpt(verbose=verbflag, tolfeas=1.1e-8)
+    build_namedpoly!(alf, :rosenbrock, 3)
+    @time Alfonso.solve!(alf)
+    @test Alfonso.get_niters(alf) <= 65
+    @test Alfonso.get_status(alf) == :Optimal
+    @test Alfonso.get_pobj(alf) ≈ 0 atol=1e-2 rtol=1e-2
+    @test Alfonso.get_dobj(alf) ≈ 0 atol=1e-3 rtol=1e-3
+end
 
-# @testset "Schwefel" begin
-#     alf = Alfonso.AlfonsoOpt(verbose=verbflag, tolrelopt=1e-5, tolabsopt=1e-6, tolfeas=1e-6, maxpredsmallsteps=25)
-#     build_namedpoly!(alf, :schwefel, 4)
-#     @time Alfonso.solve!(alf)
-#     @test Alfonso.get_status(alf) == :Optimal
-#     @test Alfonso.get_pobj(alf) ≈ 0 atol=1e-3 rtol=1e-3
-#     @test Alfonso.get_dobj(alf) ≈ 0 atol=1e-3 rtol=1e-3
-# end
+@testset "Schwefel" begin
+    alf = Alfonso.AlfonsoOpt(verbose=verbflag)
+    build_namedpoly!(alf, :schwefel, 4)
+    @time Alfonso.solve!(alf)
+    @test Alfonso.get_niters(alf) <= 50
+    @test Alfonso.get_status(alf) == :Optimal
+    @test Alfonso.get_pobj(alf) ≈ 0 atol=1e-3 rtol=1e-3
+    @test Alfonso.get_dobj(alf) ≈ 0 atol=1e-3 rtol=1e-3
+end
 
 @testset "large dense lp example (dense A)" begin
     alf = Alfonso.AlfonsoOpt(verbose=verbflag)
