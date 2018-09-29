@@ -18,14 +18,14 @@ mutable struct PositiveSemidefiniteCone <: PrimitiveCone
         prm.mat = Matrix{Float64}(undef, prm.side, prm.side)
         prm.mat2 = copy(prm.mat)
         prm.matpnt = copy(prm.mat)
-        prm.matinv = copy(prm.mat)
+        # prm.matinv = copy(prm.mat)
         return prm
     end
 end
 
 dimension(prm::PositiveSemidefiniteCone) = prm.dim
 barrierpar_prm(prm::PositiveSemidefiniteCone) = prm.side
-getintdir_prm!(arr::AbstractVector{Float64}, prm::PositiveSemidefiniteCone) = mattovec!(arr, Matrix(1.0I, prm.side, prm.side))
+getintdir_prm!(arr::AbstractVector{Float64}, prm::PositiveSemidefiniteCone) = mattovec!(arr, Matrix(1.0I, prm.side, prm.side)) # TODO eliminate allocs
 loadpnt_prm!(prm::PositiveSemidefiniteCone, pnt::AbstractVector{Float64}) = (prm.pnt = pnt)
 
 function incone_prm(prm::PositiveSemidefiniteCone)
@@ -35,7 +35,7 @@ function incone_prm(prm::PositiveSemidefiniteCone)
         return false
     end
 
-    prm.matinv = -inv(F) # TODO reduce allocs
+    prm.matinv = -inv(F) # TODO eliminate allocs
     vectomat!(prm.matpnt, prm.pnt)
     return true
 end

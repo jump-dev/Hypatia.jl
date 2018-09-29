@@ -1,4 +1,11 @@
 
+# cache for linear system solves (to avoid allocations)
+# use QR + cholesky method from CVXOPT
+# (1) eliminate equality constraints via QR of A'
+# (2) solve reduced system by cholesky
+# |0  A'  G'   | * |ux| = |bx|
+# |A  0   0    |   |uy|   |by|
+# |G  0  -Hi/mu|   |uz|   |bz|
 mutable struct LinSysCache
     Q2
     RiQ1
@@ -42,26 +49,7 @@ mutable struct LinSysCache
     end
 end
 
-"""
-solves a pair of primal and dual cone programs
- primal (over x,s):
-  min  c'x :          duals
-    b - Ax == 0       (y)
-    h - Gx == s in K  (z)
- dual (over z,y):
-  max  -b'y - h'z :      duals
-    c + A'y + G'z == 0   (x)
-                z in K*  (s)
-where K is a convex cone defined as a Cartesian product of recognized primitive cones, and K* is its dual cone
-
-the primal-dual optimality conditions are
-           b - Ax == 0
-           h - Gx == s
-    c + A'y + G'z == 0
-              s'z == 0
-                s in K
-                z in K*
-"""
+# model object containing options, problem data, linear system cache, and solution
 mutable struct AlfonsoOpt
     # options
     verbose::Bool           # if true, prints progress at each iteration
@@ -103,8 +91,7 @@ mutable struct AlfonsoOpt
     pobj::Float64           # final primal objective value
     dobj::Float64           # final dual objective value
 
-    # TODO match natural order of options listed above
-    function AlfonsoOpt(verbose, tolrelopt, tolabsopt, tolfeas, maxiter, predlinesearch, maxpredsmallsteps, maxcorrsteps, corrcheck, maxcorrlsiters, alphacorr, predlsmulti, corrlsmulti)
+    function AlfonsoOpt(verbose, tolrelopt, tolabsopt, tolfeas, maxiter, predlinesearch, maxpredsmallsteps, predlsmulti, corrcheck, maxcorrsteps, alphacorr, maxcorrlsiters, corrlsmulti)
         alf = new()
 
         alf.verbose = verbose
@@ -114,11 +101,11 @@ mutable struct AlfonsoOpt
         alf.maxiter = maxiter
         alf.predlinesearch = predlinesearch
         alf.maxpredsmallsteps = maxpredsmallsteps
-        alf.maxcorrsteps = maxcorrsteps
-        alf.corrcheck = corrcheck
-        alf.maxcorrlsiters = maxcorrlsiters
-        alf.alphacorr = alphacorr
         alf.predlsmulti = predlsmulti
+        alf.corrcheck = corrcheck
+        alf.maxcorrsteps = maxcorrsteps
+        alf.alphacorr = alphacorr
+        alf.maxcorrlsiters = maxcorrlsiters
         alf.corrlsmulti = corrlsmulti
 
         alf.status = :NotLoaded
@@ -136,11 +123,11 @@ function AlfonsoOpt(;
     maxiter = 5e2,
     predlinesearch = true,
     maxpredsmallsteps = 15,
-    maxcorrsteps = 15,
-    corrcheck = true,
-    maxcorrlsiters = 15,
-    alphacorr = 1.0,
     predlsmulti = 0.7,
+    corrcheck = true,
+    maxcorrsteps = 15,
+    alphacorr = 1.0,
+    maxcorrlsiters = 15,
     corrlsmulti = 0.5,
     )
 
@@ -157,7 +144,7 @@ function AlfonsoOpt(;
         error("maxcorrsteps must be at least 1")
     end
 
-    return AlfonsoOpt(verbose, tolrelopt, tolabsopt, tolfeas, maxiter, predlinesearch, maxpredsmallsteps, maxcorrsteps, corrcheck, maxcorrlsiters, alphacorr, predlsmulti, corrlsmulti)
+    return AlfonsoOpt(verbose, tolrelopt, tolabsopt, tolfeas, maxiter, predlinesearch, maxpredsmallsteps, predlsmulti, corrcheck, maxcorrsteps, alphacorr, maxcorrlsiters, corrlsmulti)
 end
 
 get_status(alf::AlfonsoOpt) = alf.status
@@ -205,7 +192,6 @@ function load_data!(
     end
 
     # perform QR decomposition of A' for use in linear system solves
-    # TODO only use for factorization-based linear system solves
     # TODO reduce allocs, improve efficiency
     # A' = [Q1 Q2] * [R1; 0]
     if issparse(A)
@@ -585,10 +571,10 @@ function calcnbhd(tk, mu, ls_tz, g, cone)
 end
 
 # calculate initial central primal-dual iterate
-function findinitialiterate!(tx, ty, tz, ts, ls_ts, bnu, alf)
+function findinitialiterate!(tx::Vector{Float64}, ty::Vector{Float64}, tz::Vector{Float64}, ts::Vector{Float64}, ls_ts::Vector{Float64}, bnu::Float64, alf::AlfonsoOpt)
     (b, G, h, cone) = (alf.b, alf.G, alf.h, alf.cone)
     L = alf.L
-    (Q2, RiQ1, GQ2, Q2GHGQ2, bxGHbz, Q1x, rhs, Q2div, Q2x) = (L.Q2, L.RiQ1, L.GQ2, L.Q2GHGQ2, L.bxGHbz, L.Q1x, L.rhs, L.Q2div, L.Q2x)
+    (Q2, RiQ1, GQ2, Q2GHGQ2, bxGHbz, Q1x, rhs, Q2div, Q2x, HGxi) = (L.Q2, L.RiQ1, L.GQ2, L.Q2GHGQ2, L.bxGHbz, L.Q1x, L.rhs, L.Q2div, L.Q2x, L.HGxi)
 
     alf.verbose && println("\nfinding initial iterate")
 
@@ -603,9 +589,8 @@ function findinitialiterate!(tx, ty, tz, ts, ls_ts, bnu, alf)
     # ts = h - G*tx
     # ty = Ri*Q1'*G'*ts
 
-    # bunchkaufman allocates more than cholesky, but doesn't fail when approximately quasidefinite
+    # bunchkaufman allocates more than cholesky, but doesn't fail when approximately quasidefinite (TODO could try LDL instead)
     # TODO does it matter that F could be either type?
-    # TODO what about LDL decomp?
     mul!(Q2GHGQ2, GQ2', GQ2)
     F = cholesky!(Symmetric(Q2GHGQ2), check=false)
     if !issuccess(F)
@@ -617,9 +602,9 @@ function findinitialiterate!(tx, ty, tz, ts, ls_ts, bnu, alf)
     # Q1x = Q1*Ri'*b
     mul!(Q1x, RiQ1', b)
     # Q2x = Q2*(F\(GQ2'*(h - G*Q1x)))
-    mul!(rhs, G, Q1x)
-    @. rhs = h - rhs
-    mul!(Q2div, GQ2', rhs)
+    mul!(HGxi, G, Q1x)
+    @. HGxi = h - HGxi
+    mul!(Q2div, GQ2', HGxi)
     ldiv!(F, Q2div)
     mul!(Q2x, Q2, Q2div)
     # tx = Q1x + Q2x
@@ -634,7 +619,7 @@ function findinitialiterate!(tx, ty, tz, ts, ls_ts, bnu, alf)
     # from ts, step along interior direction of cone until ts is inside cone
     @. ls_ts = ts
     if !incone(cone)
-        tmp_ts = getintdir!(rhs, cone)
+        tmp_ts = getintdir!(tz, cone)
         alpha = 1.0 # TODO starting alpha maybe should depend on ls_ts (eg norm like in Alfonso) in case 1.0 is too large/small
         steps = 0
         while !incone(cone)
@@ -657,8 +642,7 @@ function findinitialiterate!(tx, ty, tz, ts, ls_ts, bnu, alf)
     kap = 1.0
     mu = (dot(tz, ts) + tau*kap)/bnu
 
-    # TODO delete later
-    @assert abs(1.0 - mu) < 1e-8
+    @assert abs(1.0 - mu) < 1e-10
     # @assert calcnbhd(tau*kap, mu, copy(tz), copy(tz), cone) < 1e-6
     alf.verbose && println("initial iterate found")
 
@@ -666,7 +650,7 @@ function findinitialiterate!(tx, ty, tz, ts, ls_ts, bnu, alf)
 end
 
 # calculate new prediction or correction direction given rhs of KKT linear system
-function finddirection!(rhs_tx, rhs_ty, rhs_tz, rhs_ts, rhs_kap, rhs_tau, mu, tau, alf)
+function finddirection!(rhs_tx::Vector{Float64}, rhs_ty::Vector{Float64}, rhs_tz::Vector{Float64}, rhs_ts::Vector{Float64}, rhs_kap::Float64, rhs_tau::Float64, mu::Float64, tau::Float64, alf::AlfonsoOpt)
     (c, b, G, h, cone) = (alf.c, alf.b, alf.G, alf.h, alf.cone)
     L = alf.L
     (Q2, HG, GHG, GHGQ2, Q2GHGQ2, x1, y1, z1) = (L.Q2, L.HG, L.GHG, L.GHGQ2, L.Q2GHGQ2, L.x1, L.y1, L.z1)
@@ -687,9 +671,8 @@ function finddirection!(rhs_tx, rhs_ty, rhs_tz, rhs_ts, rhs_kap, rhs_tau, mu, ta
     mul!(GHGQ2, GHG, Q2)
     mul!(Q2GHGQ2, Q2', GHGQ2)
 
-    # bunchkaufman allocates more than cholesky, but doesn't fail when approximately quasidefinite
+    # bunchkaufman allocates more than cholesky, but doesn't fail when approximately quasidefinite (TODO could try LDL instead)
     # TODO does it matter that F could be either type?
-    # TODO what about LDL decomp?
     F = cholesky!(Symmetric(Q2GHGQ2), check=false)
     if !issuccess(F)
         alf.verbose && println("linear system matrix was nearly not positive definite")
@@ -704,14 +687,14 @@ function finddirection!(rhs_tx, rhs_ty, rhs_tz, rhs_ts, rhs_kap, rhs_tau, mu, ta
         calcHarr!(z1, rhs_ts, cone)
         @. rhs_tz -= mu*z1
     end
-    calcxyz!(rhs_tx, rhs_ty, rhs_tz, F, alf)
+    calcxyz!(rhs_tx, rhs_ty, rhs_tz, F, G, L)
 
     # (x1, y1, z1) = (-c, b, mu*H*h)
     @. x1 = -c
     @. y1 = b
     calcHarr!(z1, h, cone)
     @. z1 *= mu
-    calcxyz!(x1, y1, z1, F, alf)
+    calcxyz!(x1, y1, z1, F, G, L)
 
     # combine
     dir_tau = (rhs_tau + rhs_kap + dot(c, rhs_tx) + dot(b, rhs_ty) + dot(h, rhs_tz))/(mu/tau/tau - dot(c, x1) - dot(b, y1) - dot(h, z1))
@@ -726,12 +709,11 @@ function finddirection!(rhs_tx, rhs_ty, rhs_tz, rhs_ts, rhs_kap, rhs_tau, mu, ta
 end
 
 # calculate solution to reduced symmetric linear systems
-function calcxyz!(xi, yi, zi, F, alf)
-    L = alf.L
+function calcxyz!(xi::Vector{Float64}, yi::Vector{Float64}, zi::Vector{Float64}, F, G::AbstractMatrix{Float64}, L::LinSysCache)
     (Q2, RiQ1, HG, GHG, bxGHbz, Q1x, rhs, Q2div, Q2x, GHGxi, HGxi) = (L.Q2, L.RiQ1, L.HG, L.GHG, L.bxGHbz, L.Q1x, L.rhs, L.Q2div, L.Q2x, L.GHGxi, L.HGxi)
 
     # bxGHbz = bx + G'*Hbz
-    mul!(bxGHbz, alf.G', zi)
+    mul!(bxGHbz, G', zi)
     @. bxGHbz += xi
     # Q1x = Q1*Ri'*by
     mul!(Q1x, RiQ1', yi)
@@ -755,7 +737,7 @@ function calcxyz!(xi, yi, zi, F, alf)
 end
 
 # get neighborhood parameters depending on magnitude of barrier parameter and maximum number of correction steps
-function getbetaeta(maxcorrsteps, bnu)
+function getbetaeta(maxcorrsteps::Int, bnu::Float64)
     if maxcorrsteps <= 2
         if bnu < 10.0
             return (0.1810, 0.0733, 0.0225)

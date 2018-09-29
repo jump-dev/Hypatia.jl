@@ -65,6 +65,6 @@ function incone_prm(prm::PowerCone)
     return true
 end
 
-calcg_prm!(g::AbstractVector{Float64}, prm::PowerCone) = (g .= prm.g; g)
+calcg_prm!(g::AbstractVector{Float64}, prm::PowerCone) = (@. g = prm.g; g)
 calcHiarr_prm!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prm::PowerCone) = mul!(prod, prm.Hi, arr)
 calcHarr_prm!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prm::PowerCone) = mul!(prod, prm.H, arr)
