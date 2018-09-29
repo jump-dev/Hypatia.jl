@@ -39,7 +39,7 @@ const SupportedSets = Union{
     MOI.RotatedSecondOrderCone,
     MOI.PositiveSemidefiniteConeTriangle,
     MOI.ExponentialCone,
-    MOI.PowerCone,
+    # MOI.PowerCone,
     }
 
 MOI.supports_constraint(::Optimizer, ::Type{<:SupportedFuns}, ::Type{<:SupportedSets}) = true
@@ -79,36 +79,34 @@ function MOI.copy_to(opt::Optimizer, src::MOI.ModelLike; copy_names=false, warn_
     getconset(conidx) =  MOI.get(src, MOI.ConstraintSet(), conidx)
 
     # pass over vector constraints to construct conic model data
-    # TODO don't enforce Float64 type
     (IA, JA, VA) = (Int[], Int[], Float64[])
     (Ib, Vb) = (Int[], Float64[])
     cone = Cone()
 
     i = 0 # MOI constraint objects
-    m = 0 # rows of A
+    p = 0 # rows of A (equality constraint matrix)
+    q = 0 # rows of G (cone constraint matrix)
 
     # equality constraints
 
     for ci in getsrccons(MOI.SingleVariable, MOI.EqualTo{Float64})
-        # TODO can preprocess out maybe
         i += 1
         idxmap[ci] = MOI.ConstraintIndex{MOI.SingleVariable, MOI.EqualTo{Float64}}(i)
 
-        m += 1
-        push!(Ib, m)
+        p += 1
+        push!(Ib, p)
         push!(Vb, getconset(ci).value)
-        push!(IA, m)
+        push!(IA, p)
         push!(JA, idxmap[getconfun(ci).variable].value)
         push!(VA, 1.0)
     end
 
     for ci in getsrccons(MOI.SingleVariable, MOI.Zeros)
-        # TODO can preprocess out maybe
         i += 1
         idxmap[ci] = MOI.ConstraintIndex{MOI.SingleVariable, MOI.Zeros}(i)
 
-        m += 1
-        push!(IA, m)
+        p += 1
+        push!(IA, p)
         push!(JA, idxmap[getconfun(ci).variable].value)
         push!(VA, 1.0)
     end
@@ -118,11 +116,11 @@ function MOI.copy_to(opt::Optimizer, src::MOI.ModelLike; copy_names=false, warn_
         idxmap[ci] = MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, MOI.EqualTo{Float64}}(i)
 
         fi = getconfun(ci)
-        m += 1
-        push!(Ib, m)
+        p += 1
+        push!(Ib, p)
         push!(Vb, getconset(ci).value - fi.constant)
         for vt in fi.terms
-            push!(IA, m)
+            push!(IA, p)
             push!(JA, idxmap[vt.variable_index].value)
             push!(VA, vt.coefficient)
         end
@@ -133,11 +131,11 @@ function MOI.copy_to(opt::Optimizer, src::MOI.ModelLike; copy_names=false, warn_
         idxmap[ci] = MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, MOI.Zeros}(i)
 
         fi = getconfun(ci)
-        m += 1
-        push!(Ib, m)
+        p += 1
+        push!(Ib, p)
         push!(Vb, -fi.constant)
         for vt in fi.terms
-            push!(IA, m)
+            push!(IA, p)
             push!(JA, idxmap[vt.variable_index].value)
             push!(VA, vt.coefficient)
         end
@@ -148,8 +146,8 @@ function MOI.copy_to(opt::Optimizer, src::MOI.ModelLike; copy_names=false, warn_
         idxmap[ci] = MOI.ConstraintIndex{MOI.VectorOfVariables, MOI.Zeros}(i)
 
         for vi in getconfun(ci).variables
-            m += 1
-            push!(IA, m)
+            p += 1
+            push!(IA, p)
             push!(JA, idxmap[vi].value)
             push!(VA, 1.0)
         end
@@ -161,19 +159,27 @@ function MOI.copy_to(opt::Optimizer, src::MOI.ModelLike; copy_names=false, warn_
 
         fi = getconfun(ci)
         dim = MOI.output_dimension(fi)
-        append!(Ib, collect(m+1:m+dim))
+        append!(Ib, collect(p+1:p+dim))
         append!(Vb, -fi.constants)
         for vt in fi.terms
-            push!(IA, m + vt.output_index)
+            push!(IA, p + vt.output_index)
             push!(JA, idxmap[vt.scalar_term.variable_index].value)
             push!(VA, vt.scalar_term.coefficient)
         end
-        m += dim
+        p += dim
     end
+
+
+
+
+
+
+
 
     # linear inequality constraints
 
     nonnegvars = Int[] # for building up a single nonnegative cone
+    # TODO do the same for variable bounds to make a L_inf cone
 
     for S in (MOI.GreaterThan{Float64}, MOI.LessThan{Float64})
         for ci in getsrccons(MOI.SingleVariable, S)
@@ -187,14 +193,14 @@ function MOI.copy_to(opt::Optimizer, src::MOI.ModelLike; copy_names=false, warn_
                 push!(nonnegvars, idxmap[vn].value)
             else
                 # add auxiliary variable and equality constraint
-                m += 1
-                push!(Ib, m)
+                p += 1
+                push!(Ib, p)
                 push!(Vb, bval)
-                push!(IA, m)
+                push!(IA, p)
                 push!(JA, idxmap[vn].value)
                 push!(VA, 1.0)
                 n += 1
-                push!(IA, m)
+                push!(IA, p)
                 push!(JA, n)
                 push!(VA, ((S == MOI.GreaterThan{Float64}) ? -1.0 : 1.0))
                 push!(nonnegvars, n)
@@ -207,16 +213,16 @@ function MOI.copy_to(opt::Optimizer, src::MOI.ModelLike; copy_names=false, warn_
 
             # add auxiliary variable and equality constraint
             fi = getconfun(ci)
-            m += 1
-            push!(Ib, m)
+            p += 1
+            push!(Ib, p)
             push!(Vb, ((S == MOI.GreaterThan{Float64}) ? getconset(ci).lower : getconset(ci).upper) - fi.constant)
             for vt in fi.terms
-                push!(IA, m)
+                push!(IA, p)
                 push!(JA, idxmap[vt.variable_index].value)
                 push!(VA, vt.coefficient)
             end
             n += 1
-            push!(IA, m)
+            push!(IA, p)
             push!(JA, n)
             push!(VA, ((S == MOI.GreaterThan{Float64}) ? -1.0 : 1.0))
             push!(nonnegvars, n)
@@ -230,8 +236,8 @@ function MOI.copy_to(opt::Optimizer, src::MOI.ModelLike; copy_names=false, warn_
 
             for vj in getconfun(ci).variables
                 col = idxmap[vj].value
-                m += 1
-                push!(IA, m)
+                p += 1
+                push!(IA, p)
                 push!(JA, col)
                 push!(VA, ((S == MOI.Nonnegatives) ? 1.0 : -1.0))
                 push!(nonnegvars, col)
@@ -245,16 +251,16 @@ function MOI.copy_to(opt::Optimizer, src::MOI.ModelLike; copy_names=false, warn_
             fi = getconfun(ci)
             dim = MOI.output_dimension(fi)
             for vt in fi.terms
-                push!(IA, m + vt.output_index)
+                push!(IA, p + vt.output_index)
                 push!(JA, idxmap[vt.scalar_term.variable_index].value)
                 push!(VA, vt.scalar_term.coefficient)
             end
-            append!(Ib, collect(m+1:m+dim))
+            append!(Ib, collect(p+1:p+dim))
             append!(Vb, -fi.constants)
-            append!(IA, collect(m+1:m+dim))
+            append!(IA, collect(p+1:p+dim))
             append!(JA, collect(n+1:n+dim))
             append!(VA, fill(((S == MOI.Nonnegatives) ? 1.0 : -1.0), dim))
-            m += dim
+            p += dim
             append!(nonnegvars, collect(n+1:n+dim))
             n += dim
         end
@@ -269,7 +275,7 @@ function MOI.copy_to(opt::Optimizer, src::MOI.ModelLike; copy_names=false, warn_
     conefrommoi(s::MOI.RotatedSecondOrderCone) = RotatedSecondOrderCone(MOI.dimension(s))
     conefrommoi(s::MOI.PositiveSemidefiniteConeTriangle) = PositiveSemidefiniteCone(MOI.dimension(s))
     conefrommoi(s::MOI.ExponentialCone) = ExponentialCone()
-    conefrommoi(s::MOI.PowerCone) = PowerCone(s.exponent)
+    # conefrommoi(s::MOI.PowerCone) = PowerCone(s.exponent)
 
     for S in (MOI.SecondOrderCone, MOI.RotatedSecondOrderCone, MOI.ExponentialCone, MOI.PowerCone, MOI.PositiveSemidefiniteConeTriangle)
         for ci in getsrccons(MOI.VectorOfVariables, S)
@@ -278,8 +284,8 @@ function MOI.copy_to(opt::Optimizer, src::MOI.ModelLike; copy_names=false, warn_
 
             fi = getconfun(ci)
             for vj in fi.variables
-                m += 1
-                push!(IA, m)
+                p += 1
+                push!(IA, p)
                 push!(JA, idxmap[vj].value)
                 push!(VA, 1.0)
             end
@@ -293,24 +299,24 @@ function MOI.copy_to(opt::Optimizer, src::MOI.ModelLike; copy_names=false, warn_
             fi = getconfun(ci)
             dim = MOI.output_dimension(fi)
             for vt in fi.terms
-                push!(IA, m + vt.output_index)
+                push!(IA, p + vt.output_index)
                 push!(JA, idxmap[vt.scalar_term.variable_index].value)
                 push!(VA, vt.scalar_term.coefficient)
             end
-            append!(Ib, collect(m+1:m+dim))
+            append!(Ib, collect(p+1:p+dim))
             append!(Vb, -fi.constants)
-            append!(IA, collect(m+1:m+dim))
+            append!(IA, collect(p+1:p+dim))
             append!(JA, collect(n+1:n+dim))
             append!(VA, fill(1.0, dim))
-            m += dim
+            p += dim
             addprimitivecone!(cone, conefrommoi(getconset(ci)), n+1:n+dim)
             n += dim
         end
     end
 
     # finalize data and load into Alfonso model
-    A = dropzeros!(sparse(IA, JA, VA, m, n))
-    b = Vector(dropzeros!(sparsevec(Ib, Vb, m)))
+    A = dropzeros!(sparse(IA, JA, VA, p, n))
+    b = Vector(dropzeros!(sparsevec(Ib, Vb, p)))
     c = Vector(dropzeros!(sparsevec(Jc, Vc, n)))
     load_data!(opt.alf, A, b, c, cone)
 
