@@ -24,7 +24,7 @@ mutable struct PowerCone <: PrimitiveCone
 end
 
 dimension(prm::PowerCone) = 3
-barrierpar_prm(prm::PowerCone) = 3.0
+barrierpar_prm(prm::PowerCone) = 3
 getintdir_prm!(arr::AbstractVector{Float64}, prm::PowerCone) = (arr[1] = 1.0; arr[2] = 1.0; arr[3] = 0.0; arr)
 loadpnt_prm!(prm::PowerCone, pnt::AbstractVector{Float64}) = (prm.pnt = pnt)
 

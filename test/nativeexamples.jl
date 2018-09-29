@@ -1,5 +1,6 @@
 
 @testset "small lp 1" begin
+    alf = Alfonso.AlfonsoOpt(verbose=verbflag)
     Random.seed!(1)
     (n, p, q) = (10, 8, 10)
     c = rand(0.0:9.0, n)
@@ -8,13 +9,13 @@
     G = SparseMatrixCSC(-1.0I, q, n)
     h = zeros(q)
     cone = Alfonso.Cone([Alfonso.NonnegativeCone(q)], [1:q])
-    alf = Alfonso.AlfonsoOpt(verbose=verbflag)
     Alfonso.load_data!(alf, c, A, b, G, h, cone)
     @time Alfonso.solve!(alf)
     @test Alfonso.get_status(alf) == :Optimal
 end
 
 @testset "small lp 2" begin
+    alf = Alfonso.AlfonsoOpt(verbose=verbflag)
     Random.seed!(1)
     (n, p, q) = (5, 2, 10)
     c = rand(0.0:9.0, n)
@@ -23,13 +24,13 @@ end
     G = rand(q, n) - Matrix(2.0I, q, n)
     h = G*ones(n)
     cone = Alfonso.Cone([Alfonso.NonnegativeCone(q)], [1:q])
-    alf = Alfonso.AlfonsoOpt(verbose=verbflag)
     Alfonso.load_data!(alf, c, A, b, G, h, cone)
     @time Alfonso.solve!(alf)
     @test Alfonso.get_status(alf) == :Optimal
 end
 
 @testset "small lp 3" begin
+    alf = Alfonso.AlfonsoOpt(verbose=verbflag)
     Random.seed!(1)
     (n, p, q) = (30, 12, 30)
     c = rand(0.0:9.0, n)
@@ -39,10 +40,44 @@ end
     G = Diagonal(-1.0I, n)
     h = zeros(q)
     cone = Alfonso.Cone([Alfonso.NonnegativeCone(q)], [1:q])
-    alf = Alfonso.AlfonsoOpt(verbose=verbflag)
     Alfonso.load_data!(alf, c, A, b, G, h, cone)
     @time Alfonso.solve!(alf)
     @test Alfonso.get_status(alf) == :Optimal
+end
+
+@testset "small L_infinity cone problem" begin
+    alf = Alfonso.AlfonsoOpt(verbose=verbflag)
+    c = Float64[0, -1, -1]
+    A = Float64[1 0 0; 0 1 0]
+    b = Float64[1, 1/sqrt(2)]
+    G = SparseMatrixCSC(-1.0I, 3, 3)
+    h = zeros(3)
+    cone = Alfonso.Cone([Alfonso.EllInfinityCone(3)], [1:3])
+    Alfonso.load_data!(alf, c, A, b, G, h, cone)
+    @time Alfonso.solve!(alf)
+    @test Alfonso.get_niters(alf) <= 20
+    @test Alfonso.get_status(alf) == :Optimal
+    @test Alfonso.get_pobj(alf) ≈ -1 - 1/sqrt(2) atol=1e-4 rtol=1e-4
+    @test Alfonso.get_dobj(alf) ≈ Alfonso.get_pobj(alf) atol=1e-4 rtol=1e-4
+    @test Alfonso.get_y(alf) ≈ [1, 1] atol=1e-4 rtol=1e-4
+    @test Alfonso.get_x(alf) ≈ [1, 1/sqrt(2), 1] atol=1e-4 rtol=1e-4
+end
+
+@testset "small L_infinity cone problem 2" begin
+    alf = Alfonso.AlfonsoOpt(verbose=verbflag)
+    Random.seed!(1)
+    c = Float64[1, 0, 0, 0, 0, 0]
+    A = rand(-9.0:9.0, 3, 6)
+    b = A*ones(6)
+    G = rand(6, 6)
+    h = G*ones(6)
+    cone = Alfonso.Cone([Alfonso.EllInfinityCone(6)], [1:6])
+    Alfonso.load_data!(alf, c, A, b, G, h, cone)
+    @time Alfonso.solve!(alf)
+    @test Alfonso.get_niters(alf) <= 20
+    @test Alfonso.get_status(alf) == :Optimal
+    @test Alfonso.get_pobj(alf) ≈ 1 atol=1e-4 rtol=1e-4
+    @test Alfonso.get_dobj(alf) ≈ Alfonso.get_pobj(alf) atol=1e-4 rtol=1e-4
 end
 
 @testset "small second-order cone problem" begin
