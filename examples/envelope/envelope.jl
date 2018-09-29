@@ -21,15 +21,17 @@ function build_envelope!(alf::Alfonso.AlfonsoOpt, npoly::Int, deg::Int, n::Int, 
     (L, U, pts, P0, P, w) = Alfonso.interpolate(n, d, calc_w=true)
     LWts = fill(binomial(n+d-1, n), n)
     wtVals = 1.0 .- pts.^2
-    PWts = [Array((qr(Diagonal(sqrt.(wtVals[:,j]))*P[:,1:LWts[j]])).Q) for j in 1:n]
+    PWts = [Array((qr(Diagonal(sqrt.(wtVals[:, j])) * P[:, 1:LWts[j]])).Q) for j in 1:n]
 
     # set up problem data
     if dense
-        A = repeat(Array(1.0I, U, U), outer=(1, npoly)) # dense A
+        A = repeat(Array(1.0I, U, U), outer=(1, npoly))
     else
-        A = repeat(sparse(1.0I, U, U), outer=(1, npoly)) # sparse A
+        A = repeat(sparse(1.0I, U, U), outer=(1, npoly)) # TODO maybe construct without repeat
     end
+    G = Diagonal(-1.0I, npoly*U) # TODO uniformscaling
     b = w
+    h = zeros(npoly*U)
     if use_data
         # use provided data in data folder
         c = vec(readdlm(joinpath(@__DIR__, "data/c$(size(A,2)).txt"), ',', Float64))
@@ -37,12 +39,12 @@ function build_envelope!(alf::Alfonso.AlfonsoOpt, npoly::Int, deg::Int, n::Int, 
         # generate random data
         Random.seed!(rseed)
         LDegs = binomial(n+deg, n)
-        c = vec(P0[:,1:LDegs]*rand(-9:9, LDegs, npoly))
+        c = vec(P0[:, 1:LDegs]*rand(-9:9, LDegs, npoly))
     end
 
     cone = Alfonso.Cone([Alfonso.SumOfSquaresCone(U, [P, PWts...]) for k in 1:npoly], [1+(k-1)*U:k*U for k in 1:npoly])
 
-    return Alfonso.load_data!(alf, A, b, c, cone)
+    return Alfonso.load_data!(alf, c, A, b, G, h, cone)
 end
 
 # alf = Alfonso.AlfonsoOpt(maxiter=100, verbose=true)
