@@ -19,7 +19,7 @@ mutable struct SecondOrderCone <: PrimitiveCone
 end
 
 dimension(prm::SecondOrderCone) = prm.dim
-barrierpar_prm(prm::SecondOrderCone) = 1.0
+barrierpar_prm(prm::SecondOrderCone) = 1
 getintdir_prm!(arr::AbstractVector{Float64}, prm::SecondOrderCone) = (arr[1] = 1.0; @. arr[2:end] = 0.0; arr)
 loadpnt_prm!(prm::SecondOrderCone, pnt::AbstractVector{Float64}) = (prm.pnt = pnt)
 
