@@ -20,7 +20,7 @@ end
 
 dimension(prm::SecondOrderCone) = prm.dim
 barrierpar_prm(prm::SecondOrderCone) = 1.0
-getintdir_prm!(arr::AbstractVector{Float64}, prm::SecondOrderCone) = (arr[1] = 1.0; arr[2:end] .= 0.0; arr)
+getintdir_prm!(arr::AbstractVector{Float64}, prm::SecondOrderCone) = (arr[1] = 1.0; @. arr[2:end] = 0.0; arr)
 loadpnt_prm!(prm::SecondOrderCone, pnt::AbstractVector{Float64}) = (prm.pnt = pnt)
 
 function incone_prm(prm::SecondOrderCone)
@@ -33,19 +33,19 @@ function incone_prm(prm::SecondOrderCone)
     end
 
     mul!(prm.Hi, prm.pnt, prm.pnt')
-    prm.Hi .+= prm.Hi
+    @. prm.Hi += prm.Hi
     prm.Hi[1,1] -= prm.dist
     for j in 2:prm.dim
         prm.Hi[j,j] += prm.dist
     end
-    prm.H .= prm.Hi
+    @. prm.H = prm.Hi
     for j in 2:prm.dim
         prm.H[1,j] = prm.H[j,1] = -prm.H[j,1]
     end
-    prm.H .*= inv(prm.dist)^2
+    @. prm.H *= inv(prm.dist)^2
     return true
 end
 
-calcg_prm!(g::AbstractVector{Float64}, prm::SecondOrderCone) = (g .= prm.pnt ./ prm.dist; g[1] = -g[1]; g)
+calcg_prm!(g::AbstractVector{Float64}, prm::SecondOrderCone) = (@. g = prm.pnt/prm.dist; g[1] = -g[1]; g)
 calcHiarr_prm!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prm::SecondOrderCone) = mul!(prod, prm.Hi, arr)
 calcHarr_prm!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prm::SecondOrderCone) = mul!(prod, prm.H, arr)

@@ -11,7 +11,7 @@ module Alfonso
         "sumofsquares",
         "secondorder",
         "exponential",
-        # "power", 
+        # "power",
         "rotatedsecondorder",
         "positivesemidefinite",
         ]

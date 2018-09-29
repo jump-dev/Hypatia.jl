@@ -7,14 +7,14 @@ mutable struct ExponentialCone <: PrimitiveCone
     pnt::AbstractVector{Float64}
     g::AbstractVector{Float64}
     H::Matrix{Float64} # TODO could be faster as StaticArray
-    Hi::Matrix{Float64}
+    H2::Matrix{Float64}
     F
 
     function ExponentialCone()
         prm = new()
         prm.g = Vector{Float64}(undef, 3)
         prm.H = similar(prm.g, 3, 3)
-        prm.Hi = copy(prm.H)
+        prm.H2 = copy(prm.H)
         return prm
     end
 end
@@ -54,8 +54,8 @@ function incone_prm(prm::ExponentialCone)
     H[2,3] = H[3,2] = yz*(lzy - 1.0)*H[1,1] - iylzyx/z
     H[3,3] = abs2(yz)*H[1,1] + yz/z*iylzyx + inv(abs2(z))
 
-    prm.Hi .= H
-    prm.F = bunchkaufman!(Symmetric(prm.Hi))
+    @. prm.H2 = H
+    prm.F = bunchkaufman!(Symmetric(prm.H2))
 
     # old code for inverse hessian
     # den = 2*y + dist
@@ -70,6 +70,6 @@ function incone_prm(prm::ExponentialCone)
     return true
 end
 
-calcg_prm!(g::AbstractVector{Float64}, prm::ExponentialCone) = (g .= prm.g; g)
+calcg_prm!(g::AbstractVector{Float64}, prm::ExponentialCone) = (@. g = prm.g; g)
 calcHiarr_prm!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prm::ExponentialCone) = ldiv!(prod, prm.F, arr)
 calcHarr_prm!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prm::ExponentialCone) = mul!(prod, prm.H, arr)
