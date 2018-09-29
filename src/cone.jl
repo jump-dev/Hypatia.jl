@@ -14,11 +14,11 @@ end
 # calculate complexity parameter of the barrier (sum of the primitive cone barrier parameters)
 barrierpar(cone::Cone) = sum(barrierpar_prm(prm) for prm in cone.prms)
 
-function getintdir!(arr::Vector{Float64}, cone::Cone)
+function getintdir!(dir::Vector{Float64}, cone::Cone)
     for k in eachindex(cone.prms)
-        getintdir_prm!(view(arr, cone.idxs[k]), cone.prms[k])
+        getintdir_prm!(view(dir, cone.idxs[k]), cone.prms[k])
     end
-    return arr
+    return dir
 end
 
 # TODO can parallelize the functions acting on Cone
@@ -38,18 +38,32 @@ function calcg!(g::Vector{Float64}, cone::Cone)
     return g
 end
 
-function calcHiarr!(Hi_mat::AbstractMatrix{Float64}, mat::AbstractMatrix{Float64}, cone::Cone)
+function calcHarr!(prod::AbstractMatrix{Float64}, arr::AbstractMatrix{Float64}, cone::Cone)
     for k in eachindex(cone.prms)
-        calcHiarr_prm!(view(Hi_mat, cone.idxs[k], :), view(mat, cone.idxs[k], :), cone.prms[k])
+        calcHarr_prm!(view(prod, cone.idxs[k], :), view(arr, cone.idxs[k], :), cone.prms[k])
     end
-    return Hi_mat
+    return prod
 end
 
-function calcHiarr!(Hi_vec::AbstractVector{Float64}, vec::AbstractVector{Float64}, cone::Cone)
+function calcHarr!(prod::AbstractVector{Float64}, arr::AbstractVector{Float64}, cone::Cone)
     for k in eachindex(cone.prms)
-        calcHiarr_prm!(view(Hi_vec, cone.idxs[k]), view(vec, cone.idxs[k]), cone.prms[k])
+        calcHarr_prm!(view(prod, cone.idxs[k]), view(arr, cone.idxs[k]), cone.prms[k])
     end
-    return Hi_vec
+    return prod
+end
+
+function calcHiarr!(prod::AbstractMatrix{Float64}, arr::AbstractMatrix{Float64}, cone::Cone)
+    for k in eachindex(cone.prms)
+        calcHiarr_prm!(view(prod, cone.idxs[k], :), view(arr, cone.idxs[k], :), cone.prms[k])
+    end
+    return prod
+end
+
+function calcHiarr!(prod::AbstractVector{Float64}, arr::AbstractVector{Float64}, cone::Cone)
+    for k in eachindex(cone.prms)
+        calcHiarr_prm!(view(prod, cone.idxs[k]), view(arr, cone.idxs[k]), cone.prms[k])
+    end
+    return prod
 end
 
 # utilities for converting between smat and svec forms (lower triangle) for symmetric matrices

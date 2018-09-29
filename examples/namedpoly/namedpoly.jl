@@ -68,9 +68,12 @@ function build_namedpoly!(alf::Alfonso.AlfonsoOpt, polyname::Symbol, d::Int)
     A = ones(1, U)
     b = [1.0,]
     c = [fn(pts[j,:]...) for j in 1:U]
+    G = Diagonal(-1.0I, U) # TODO uniformscaling?
+    h = zeros(U)
+
     cone = Alfonso.Cone([Alfonso.SumOfSquaresCone(U, [P0, PWts...])], [1:U])
 
-    return Alfonso.load_data!(alf, A, b, c, cone)
+    return Alfonso.load_data!(alf, c, A, b, G, h, cone)
 end
 
 # alf = Alfonso.AlfonsoOpt(maxiter=100, verbose=false)
