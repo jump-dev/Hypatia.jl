@@ -48,115 +48,114 @@ config = MOIT.TestConfig(
     atol=1e-4,
     rtol=1e-4,
     solve=true,
-    query=false,
+    query=true,
     modify_lhs=true,
-    duals=false,
-    infeas_certificates=false,
+    duals=true,
+    infeas_certificates=true,
     )
 
 # @testset "Continuous linear problems" begin
-#     MOIT.contlineartest(MOIB.SplitInterval{Float64}(optimizer), config)
+#     MOIT.contlineartest(
+#         MOIB.SplitInterval{Float64}(
+#             optimizer
+#         ),
+#         config)
 # end
 
-@testset "Continuous conic problems" begin
-    exclude = ["rootdet", "logdet"] # TODO bridges not working? should not need to exclude in future
-    MOIT.contconictest(
-        MOIB.SquarePSD{Float64}(
-        MOIB.GeoMean{Float64}(
-        MOIB.LogDet{Float64}(
-        MOIB.RootDet{Float64}(
-            optimizer
-        )))),
-        config, exclude)
+# @testset "Continuous conic problems" begin
+#     exclude = ["rootdet", "logdet"] # TODO bridges not working? should not need to exclude in future
+#     MOIT.contconictest(
+#         MOIB.SquarePSD{Float64}(
+#         MOIB.GeoMean{Float64}(
+#         # MOIB.LogDet{Float64}(
+#         # MOIB.RootDet{Float64}(
+#             optimizer
+#         )),#)),
+#         config, exclude)
+# end
+
+
+
+model = optimizer
+
+atol = config.atol
+rtol = config.rtol
+
+# simple 2 variable, 1 constraint problem
+# min -x
+# st   x + y <= 1   (x + y - 1 ∈ Nonpositives)
+#       x, y >= 0   (x, y ∈ Nonnegatives)
+
+@test MOI.supports(model, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}())
+@test MOI.supports(model, MOI.ObjectiveSense())
+@test MOI.supports_constraint(model, MOI.ScalarAffineFunction{Float64}, MOI.EqualTo{Float64})
+@test MOI.supports_constraint(model, MOI.ScalarAffineFunction{Float64}, MOI.GreaterThan{Float64})
+@test MOI.supports_constraint(model, MOI.ScalarAffineFunction{Float64}, MOI.LessThan{Float64})
+@test MOI.supports_constraint(model, MOI.SingleVariable, MOI.EqualTo{Float64})
+@test MOI.supports_constraint(model, MOI.SingleVariable, MOI.GreaterThan{Float64})
+
+MOI.empty!(model)
+@test MOI.is_empty(model)
+
+v = MOI.add_variables(model, 2)
+@test MOI.get(model, MOI.NumberOfVariables()) == 2
+
+cf = MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([1.0,1.0], v), 0.0)
+c = MOI.add_constraint(model, cf, MOI.LessThan(1.0))
+@test MOI.get(model, MOI.NumberOfConstraints{MOI.ScalarAffineFunction{Float64},MOI.LessThan{Float64}}()) == 1
+
+vc1 = MOI.add_constraint(model, MOI.SingleVariable(v[1]), MOI.GreaterThan(0.0))
+# test fallback
+vc2 = MOI.add_constraint(model, v[2], MOI.GreaterThan(0.0))
+@test MOI.get(model, MOI.NumberOfConstraints{MOI.SingleVariable,MOI.GreaterThan{Float64}}()) == 2
+
+# note: adding some redundant zero coefficients to catch solvers that don't handle duplicate coefficients correctly:
+objf = MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([0.0,0.0,-1.0,0.0,0.0,0.0], [v; v; v]), 0.0)
+MOI.set(model, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), objf)
+MOI.set(model, MOI.ObjectiveSense(), MOI.MinSense)
+
+@test MOI.get(model, MOI.ObjectiveSense()) == MOI.MinSense
+
+if config.query
+    vrs = MOI.get(model, MOI.ListOfVariableIndices())
+    @test vrs == v || vrs == reverse(v)
+
+    @test objf ≈ MOI.get(model, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}())
+
+    @test cf ≈ MOI.get(model, MOI.ConstraintFunction(), c)
+
+    s = MOI.get(model, MOI.ConstraintSet(), c)
+    @test s == MOI.LessThan(1.0)
+
+    s = MOI.get(model, MOI.ConstraintSet(), vc1)
+    @test s == MOI.GreaterThan(0.0)
+
+    s = MOI.get(model, MOI.ConstraintSet(), vc2)
+    @test s == MOI.GreaterThan(0.0)
 end
 
+if config.solve
+    MOI.optimize!(model)
 
-#
-#
-#
-# model = optimizer
-#
-# atol = config.atol
-# rtol = config.rtol
-# # simple 2 variable, 1 constraint problem
-# # min -x
-# # st   x + y <= 1   (x + y - 1 ∈ Nonpositives)
-# #       x, y >= 0   (x, y ∈ Nonnegatives)
-#
-# @test MOI.supports(model, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}())
-# @test MOI.supports(model, MOI.ObjectiveSense())
-# @test MOI.supports_constraint(model, MOI.ScalarAffineFunction{Float64}, MOI.EqualTo{Float64})
-# @test MOI.supports_constraint(model, MOI.ScalarAffineFunction{Float64}, MOI.GreaterThan{Float64})
-# @test MOI.supports_constraint(model, MOI.ScalarAffineFunction{Float64}, MOI.LessThan{Float64})
-# @test MOI.supports_constraint(model, MOI.SingleVariable, MOI.EqualTo{Float64})
-# @test MOI.supports_constraint(model, MOI.SingleVariable, MOI.GreaterThan{Float64})
-#
-# #@test MOI.get(model, MOI.SupportsAddConstraintAfterSolve())
-# #@test MOI.get(model, MOI.SupportsAddVariableAfterSolve())
-# #@test MOI.get(model, MOI.SupportsDeleteConstraint())
-#
-# MOI.empty!(model)
-# @test MOI.is_empty(model)
-#
-# v = MOI.add_variables(model, 2)
-# @test MOI.get(model, MOI.NumberOfVariables()) == 2
-#
-# cf = MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([1.0,1.0], v), 0.0)
-# c = MOI.add_constraint(model, cf, MOI.LessThan(1.0))
-# @test MOI.get(model, MOI.NumberOfConstraints{MOI.ScalarAffineFunction{Float64},MOI.LessThan{Float64}}()) == 1
-#
-# vc1 = MOI.add_constraint(model, MOI.SingleVariable(v[1]), MOI.GreaterThan(0.0))
-# # test fallback
-# vc2 = MOI.add_constraint(model, v[2], MOI.GreaterThan(0.0))
-# @test MOI.get(model, MOI.NumberOfConstraints{MOI.SingleVariable,MOI.GreaterThan{Float64}}()) == 2
-#
-# # note: adding some redundant zero coefficients to catch solvers that don't handle duplicate coefficients correctly:
-# objf = MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([0.0,0.0,-1.0,0.0,0.0,0.0], [v; v; v]), 0.0)
-# MOI.set(model, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), objf)
-# MOI.set(model, MOI.ObjectiveSense(), MOI.MinSense)
-#
-# @test MOI.get(model, MOI.ObjectiveSense()) == MOI.MinSense
-#
-# if config.query
-#     vrs = MOI.get(model, MOI.ListOfVariableIndices())
-#     @test vrs == v || vrs == reverse(v)
-#
-#     @test objf ≈ MOI.get(model, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}())
-#
-#     @test cf ≈ MOI.get(model, MOI.ConstraintFunction(), c)
-#
-#     s = MOI.get(model, MOI.ConstraintSet(), c)
-#     @test s == MOI.LessThan(1.0)
-#
-#     s = MOI.get(model, MOI.ConstraintSet(), vc1)
-#     @test s == MOI.GreaterThan(0.0)
-#
-#     s = MOI.get(model, MOI.ConstraintSet(), vc2)
-#     @test s == MOI.GreaterThan(0.0)
-# end
-#
-# if config.solve
-#     MOI.optimize!(model)
-#
-#     @test MOI.get(model, MOI.TerminationStatus()) == MOI.Success
-#
-#     @test MOI.get(model, MOI.PrimalStatus()) == MOI.FeasiblePoint
-#
-#     @test MOI.get(model, MOI.ObjectiveValue()) ≈ -1 atol=atol rtol=rtol
-#
-#     @test MOI.get(model, MOI.VariablePrimal(), v) ≈ [1, 0] atol=atol rtol=rtol
-#
-#     # @test MOI.get(model, MOI.ConstraintPrimal(), c) ≈ 1 atol=atol rtol=rtol
-#
-#     if config.duals
-#         @test MOI.get(model, MOI.DualStatus()) == MOI.FeasiblePoint
-#         @test MOI.get(model, MOI.ConstraintDual(), c) ≈ -1 atol=atol rtol=rtol
-#
-#         # reduced costs
-#         @test MOI.get(model, MOI.ConstraintDual(), vc1) ≈ 0 atol=atol rtol=rtol
-#         @test MOI.get(model, MOI.ConstraintDual(), vc2) ≈ 1 atol=atol rtol=rtol
-#     end
-# end
+    @test MOI.get(model, MOI.TerminationStatus()) == MOI.Success
+
+    @test MOI.get(model, MOI.PrimalStatus()) == MOI.FeasiblePoint
+
+    @test MOI.get(model, MOI.ObjectiveValue()) ≈ -1 atol=atol rtol=rtol
+
+    @test MOI.get(model, MOI.VariablePrimal(), v) ≈ [1, 0] atol=atol rtol=rtol
+
+    # @test MOI.get(model, MOI.ConstraintPrimal(), c) ≈ 1 atol=atol rtol=rtol
+
+    if config.duals
+        @test MOI.get(model, MOI.DualStatus()) == MOI.FeasiblePoint
+        @test MOI.get(model, MOI.ConstraintDual(), c) ≈ -1 atol=atol rtol=rtol
+
+        # reduced costs
+        @test MOI.get(model, MOI.ConstraintDual(), vc1) ≈ 0 atol=atol rtol=rtol
+        @test MOI.get(model, MOI.ConstraintDual(), vc2) ≈ 1 atol=atol rtol=rtol
+    end
+end
 #
 # # change objective to Max +x
 #
