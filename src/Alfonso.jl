@@ -21,6 +21,6 @@ module Alfonso
     include("nativeinterface.jl")
 
     import MathOptInterface
-    const MOI = MathOptInterface
+    MOI = MathOptInterface
     include("mathoptinterface.jl")
 end
