@@ -44,6 +44,13 @@ const SupportedSets = Union{
 
 MOI.supports_constraint(::Optimizer, ::Type{<:SupportedFuns}, ::Type{<:SupportedSets}) = true
 
+conefrommoi(s::MOI.SecondOrderCone) = SecondOrderCone(MOI.dimension(s))
+conefrommoi(s::MOI.RotatedSecondOrderCone) = RotatedSecondOrderCone(MOI.dimension(s))
+conefrommoi(s::MOI.PositiveSemidefiniteConeTriangle) = PositiveSemidefiniteCone(MOI.dimension(s))
+conefrommoi(s::MOI.ExponentialCone) = ExponentialCone()
+# conefrommoi(s::MOI.PowerCone) = PowerCone(s.exponent)
+
+
 # build representation as min c'x s.t. Ax = b, x in K
 # TODO what if some variables x are in multiple cone constraints?
 function MOI.copy_to(opt::Optimizer, src::MOI.ModelLike; copy_names=false, warn_attributes=true)
@@ -79,15 +86,12 @@ function MOI.copy_to(opt::Optimizer, src::MOI.ModelLike; copy_names=false, warn_
     getconset(conidx) =  MOI.get(src, MOI.ConstraintSet(), conidx)
 
     # pass over vector constraints to construct conic model data
-    (IA, JA, VA) = (Int[], Int[], Float64[])
-    (Ib, Vb) = (Int[], Float64[])
-    cone = Cone()
-
     i = 0 # MOI constraint objects
-    p = 0 # rows of A (equality constraint matrix)
-    q = 0 # rows of G (cone constraint matrix)
 
     # equality constraints
+    p = 0 # rows of A (equality constraint matrix)
+    (IA, JA, VA) = (Int[], Int[], Float64[])
+    (Ib, Vb) = (Int[], Float64[])
 
     for ci in getsrccons(MOI.SingleVariable, MOI.EqualTo{Float64})
         i += 1
@@ -169,17 +173,19 @@ function MOI.copy_to(opt::Optimizer, src::MOI.ModelLike; copy_names=false, warn_
         p += dim
     end
 
+    # conic constraints
+    q = 0 # rows of G (cone constraint matrix)
+    (IG, JG, VG) = (Int[], Int[], Float64[])
+    (Ih, Vh) = (Int[], Float64[])
+    cone = Cone()
+
+    # LP constraints: build up one nonnegative cone and/or one nonpositive cone
+    nonnegvars = Int[]
+    nonposvars = Int[]
+    # TODO also use variable bounds to build one L_inf cone
 
 
-
-
-
-
-
-    # linear inequality constraints
-
-    nonnegvars = Int[] # for building up a single nonnegative cone
-    # TODO do the same for variable bounds to make a L_inf cone
+# TODO use nonpositive cone
 
     for S in (MOI.GreaterThan{Float64}, MOI.LessThan{Float64})
         for ci in getsrccons(MOI.SingleVariable, S)
@@ -266,16 +272,19 @@ function MOI.copy_to(opt::Optimizer, src::MOI.ModelLike; copy_names=false, warn_
         end
     end
 
+
+
+
     # add single nonnegative cone
     addprimitivecone!(cone, NonnegativeCone(length(nonnegvars)), nonnegvars)
 
-    # add other primitive cone constraints (in increasing order of difficulty of evaluating in-cone checks)
 
-    conefrommoi(s::MOI.SecondOrderCone) = SecondOrderCone(MOI.dimension(s))
-    conefrommoi(s::MOI.RotatedSecondOrderCone) = RotatedSecondOrderCone(MOI.dimension(s))
-    conefrommoi(s::MOI.PositiveSemidefiniteConeTriangle) = PositiveSemidefiniteCone(MOI.dimension(s))
-    conefrommoi(s::MOI.ExponentialCone) = ExponentialCone()
-    # conefrommoi(s::MOI.PowerCone) = PowerCone(s.exponent)
+
+
+
+
+
+    # add other primitive cone constraints (in increasing order of difficulty of evaluating in-cone checks)
 
     for S in (MOI.SecondOrderCone, MOI.RotatedSecondOrderCone, MOI.ExponentialCone, MOI.PowerCone, MOI.PositiveSemidefiniteConeTriangle)
         for ci in getsrccons(MOI.VectorOfVariables, S)
@@ -314,11 +323,17 @@ function MOI.copy_to(opt::Optimizer, src::MOI.ModelLike; copy_names=false, warn_
         end
     end
 
+
+
+
+
     # finalize data and load into Alfonso model
+    c = Vector(dropzeros!(sparsevec(Jc, Vc, n)))
     A = dropzeros!(sparse(IA, JA, VA, p, n))
     b = Vector(dropzeros!(sparsevec(Ib, Vb, p)))
-    c = Vector(dropzeros!(sparsevec(Jc, Vc, n)))
-    load_data!(opt.alf, A, b, c, cone)
+    G = dropzeros!(sparse(IG, JG, VG, q, n))
+    h = Vector(dropzeros!(sparsevec(Ih, Vh, q)))
+    Alfonso.load_data!(alf, c, A, b, G, h, cone)
 
     # set objective sense
     opt.objsense = MOI.get(src, MOI.ObjectiveSense())

@@ -20,7 +20,7 @@ module Alfonso
     end
     include("nativeinterface.jl")
 
-    # import MathOptInterface
-    # const MOI = MathOptInterface
-    # include("mathoptinterface.jl")
+    import MathOptInterface
+    const MOI = MathOptInterface
+    include("mathoptinterface.jl")
 end
