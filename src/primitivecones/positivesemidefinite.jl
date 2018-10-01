@@ -25,7 +25,17 @@ end
 
 dimension(prm::PositiveSemidefiniteCone) = prm.dim
 barrierpar_prm(prm::PositiveSemidefiniteCone) = prm.side
-getintdir_prm!(arr::AbstractVector{Float64}, prm::PositiveSemidefiniteCone) = mattovec!(arr, Matrix(1.0I, prm.side, prm.side)) # TODO eliminate allocs
+function getintdir_prm!(arr::AbstractVector{Float64}, prm::PositiveSemidefiniteCone)
+    for i in 1:prm.side, j in i:prm.side
+        if i == j
+            prm.mat[i,j] = 1.0
+        else
+            prm.mat[i,j] = prm.mat[j,i] = 0.0
+        end
+    end
+    mattovec!(arr, prm.mat)
+    return arr
+end
 loadpnt_prm!(prm::PositiveSemidefiniteCone, pnt::AbstractVector{Float64}) = (prm.pnt = pnt)
 
 function incone_prm(prm::PositiveSemidefiniteCone)
