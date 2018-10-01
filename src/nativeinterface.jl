@@ -191,6 +191,11 @@ function load_data!(
         error("number of constraint rows is not consistent in G and h")
     end
 
+    @assert length(cone.prms) == length(cone.idxs)
+    for k in eachindex(cone.prms)
+        @assert dimension(cone.prms[k]) == length(cone.idxs[k])
+    end
+
     # perform QR decomposition of A' for use in linear system solves
     # TODO reduce allocs, improve efficiency
     # A' = [Q1 Q2] * [R1; 0]
@@ -574,7 +579,7 @@ end
 function findinitialiterate!(tx::Vector{Float64}, ty::Vector{Float64}, tz::Vector{Float64}, ts::Vector{Float64}, ls_ts::Vector{Float64}, bnu::Float64, alf::AlfonsoOpt)
     (b, G, h, cone) = (alf.b, alf.G, alf.h, alf.cone)
     L = alf.L
-    (Q2, RiQ1, GQ2, Q2GHGQ2, bxGHbz, Q1x, rhs, Q2div, Q2x, HGxi) = (L.Q2, L.RiQ1, L.GQ2, L.Q2GHGQ2, L.bxGHbz, L.Q1x, L.rhs, L.Q2div, L.Q2x, L.HGxi)
+    (Q2, RiQ1, GQ2, GHGQ2, Q2GHGQ2, bxGHbz, Q1x, rhs, Q2div, Q2x, HGxi) = (L.Q2, L.RiQ1, L.GQ2, L.GHGQ2, L.Q2GHGQ2, L.bxGHbz, L.Q1x, L.rhs, L.Q2div, L.Q2x, L.HGxi)
 
     alf.verbose && println("\nfinding initial iterate")
 
@@ -594,7 +599,7 @@ function findinitialiterate!(tx::Vector{Float64}, ty::Vector{Float64}, tz::Vecto
     mul!(Q2GHGQ2, GQ2', GQ2)
     F = cholesky!(Symmetric(Q2GHGQ2), check=false)
     if !issuccess(F)
-        alf.verbose && println("linear system matrix was nearly not positive definite")
+        alf.verbose && println("linear system matrix was not positive definite")
         mul!(Q2GHGQ2, Q2', GHGQ2)
         F = bunchkaufman!(Symmetric(Q2GHGQ2))
     end
@@ -642,7 +647,7 @@ function findinitialiterate!(tx::Vector{Float64}, ty::Vector{Float64}, tz::Vecto
     mu = (dot(tz, ts) + tau*kap)/bnu
     @assert abs(1.0 - mu) < 1e-10
     # @assert calcnbhd(tau*kap, mu, copy(tz), copy(tz), cone) < 1e-6
-    
+
     alf.verbose && println("initial iterate found")
 
     return (tau, kap, mu)
@@ -674,7 +679,7 @@ function finddirection!(rhs_tx::Vector{Float64}, rhs_ty::Vector{Float64}, rhs_tz
     # TODO does it matter that F could be either type?
     F = cholesky!(Symmetric(Q2GHGQ2), check=false)
     if !issuccess(F)
-        alf.verbose && println("linear system matrix was nearly not positive definite")
+        alf.verbose && println("linear system matrix was not positive definite")
         mul!(Q2GHGQ2, Q2', GHGQ2)
         F = bunchkaufman!(Symmetric(Q2GHGQ2))
     end

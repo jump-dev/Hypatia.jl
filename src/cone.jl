@@ -1,14 +1,19 @@
 
-#=
-cone object
-=#
-
+# cone object
 abstract type PrimitiveCone end
 
 # TODO reorder primitive cones so easiest ones to check incone are first
 mutable struct Cone
     prms::Vector{PrimitiveCone}
     idxs::Vector{AbstractVector{Int}}
+end
+Cone() = Cone(PrimitiveCone[], AbstractVector{Int}[])
+
+function addprimitivecone!(cone::Cone, prm::PrimitiveCone, idx::AbstractVector{Int})
+    @assert dimension(prm) == length(idx)
+    push!(cone.prms, prm)
+    push!(cone.idxs, idx)
+    return cone
 end
 
 # calculate complexity parameter of the barrier (sum of the primitive cone barrier parameters)

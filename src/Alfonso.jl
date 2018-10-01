@@ -7,7 +7,7 @@ module Alfonso
     include("interpolation.jl")
     include("cone.jl")
     for primcone in [
-        "nonnegative",
+        "orthant",
         "sumofsquares",
         "secondorder",
         "exponential",
@@ -19,5 +19,8 @@ module Alfonso
         include(joinpath(@__DIR__, "primitivecones", primcone * ".jl"))
     end
     include("nativeinterface.jl")
-    # include("mathoptinterface.jl")
+
+    import MathOptInterface
+    MOI = MathOptInterface
+    include("mathoptinterface.jl")
 end

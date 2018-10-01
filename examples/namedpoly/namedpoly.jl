@@ -1,5 +1,6 @@
 #=
-Copyright 2018, David Papp, Sercan Yildiz, and contributors
+Copyright 2018, Chris Coey and contributors
+Copyright 2018, David Papp, Sercan Yildiz
 
 modified from https://github.com/dpapp-github/alfonso/blob/master/polyOpt.m
 formulates and solves the polynomial optimization problem for a given polynomial, described in the paper:
