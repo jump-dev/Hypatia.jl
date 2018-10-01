@@ -2,6 +2,9 @@
 using Alfonso
 using Test
 
+
+# native interface tests
+
 verbflag = false # Alfonso verbose option
 
 # TODO interpolation tests
@@ -15,22 +18,66 @@ include(joinpath(egs_dir, "namedpoly/namedpoly.jl"))
 # run native and MOI interfaces on examples
 include(joinpath(@__DIR__, "nativeexamples.jl"))
 
-# using MathOptInterface
-# const MOI = MathOptInterface
-# const MOIT = MOI.Test
-# const MOIB = MOI.Bridges
-# const MOIU = MOI.Utilities
 
-# include(joinpath(@__DIR__, "moiexamples.jl"))
+# MathOptInterface tests
 
-# run MOI continuous linear and conic tests
-# MOIU.@model AlfonsoModelData () () (Zeros, Nonnegatives) () () () (VectorOfVariables,) (VectorAffineFunction,)
-# const optimizer = MOIU.CachingOptimizer(AlfonsoModelData{Float64}(), Alfonso.Optimizer())
-# const config = MOIT.TestConfig(atol=1e-4, rtol=1e-4)
+import MathOptInterface
+MOI = MathOptInterface
+MOIT = MOI.Test
+MOIB = MOI.Bridges
+MOIU = MOI.Utilities
 
-# TODO use bridges e.g. GreaterThan constraints into Nonnegatives constraints
-# @testset "Continuous linear problems" begin
-#     MOIT.contlineartest(MOIB.SplitInterval{Float64}(optimizer), config)
-# end
+MOIU.@model(AlfonsoModelData,
+    (),
+    (
+        MOI.EqualTo, MOI.GreaterThan, MOI.LessThan,
+        # MOI.Interval,
+    ),
+    (
+        MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives,
+        MOI.SecondOrderCone, MOI.RotatedSecondOrderCone,
+        MOI.PositiveSemidefiniteConeTriangle,
+        MOI.ExponentialCone,
+        # MOI.PowerCone,
+    ),
+    (),
+    (MOI.SingleVariable,),
+    (MOI.ScalarAffineFunction,),
+    (MOI.VectorOfVariables,),
+    (MOI.VectorAffineFunction,),
+    )
+
+optimizer = MOIU.CachingOptimizer(AlfonsoModelData{Float64}(), Alfonso.Optimizer())
+
+config = MOIT.TestConfig(
+    atol=1e-4,
+    rtol=1e-4,
+    solve=true,
+    query=true,
+    modify_lhs=true,
+    duals=true,
+    infeas_certificates=true,
+    )
+
+@testset "Continuous linear problems" begin
+    MOIT.contlineartest(
+        MOIB.SplitInterval{Float64}(
+            optimizer
+        ),
+        config)
+end
+
+@testset "Continuous conic problems" begin
+    exclude = ["rootdet", "logdet", "sdp"] # TODO bridges not working? should not need to exclude in future
+    MOIT.contconictest(
+        # MOIB.SquarePSD{Float64}(
+        MOIB.GeoMean{Float64}(
+        # MOIB.LogDet{Float64}(
+        # MOIB.RootDet{Float64}(
+            optimizer
+        ),#))),
+        config, exclude)
+end
+
 
 return nothing

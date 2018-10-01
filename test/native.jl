@@ -1,17 +1,28 @@
 
-@testset "small lp 1" begin
-    alf = Alfonso.AlfonsoOpt(verbose=verbflag)
+@testset "small lp 1: nonnegative vs nonpositive orthant" begin
     Random.seed!(1)
     (n, p, q) = (10, 8, 10)
     c = rand(0.0:9.0, n)
     A = rand(-9.0:9.0, p, n)
     b = A*ones(n)
-    G = SparseMatrixCSC(-1.0I, q, n)
     h = zeros(q)
+
+    alf1 = Alfonso.AlfonsoOpt(verbose=verbflag)
+    G = SparseMatrixCSC(-1.0I, q, n)
     cone = Alfonso.Cone([Alfonso.NonnegativeCone(q)], [1:q])
-    Alfonso.load_data!(alf, c, A, b, G, h, cone)
-    @time Alfonso.solve!(alf)
-    @test Alfonso.get_status(alf) == :Optimal
+    Alfonso.load_data!(alf1, c, A, b, G, h, cone)
+    @time Alfonso.solve!(alf1)
+    @test Alfonso.get_status(alf1) == :Optimal
+
+    alf2 = Alfonso.AlfonsoOpt(verbose=verbflag)
+    G = SparseMatrixCSC(1.0I, q, n)
+    cone = Alfonso.Cone([Alfonso.NonpositiveCone(q)], [1:q])
+    Alfonso.load_data!(alf2, c, A, b, G, h, cone)
+    @time Alfonso.solve!(alf2)
+    @test Alfonso.get_status(alf2) == :Optimal
+
+    @test Alfonso.get_pobj(alf1) ≈ Alfonso.get_pobj(alf2) atol=1e-4 rtol=1e-4
+    @test Alfonso.get_dobj(alf1) ≈ Alfonso.get_dobj(alf2) atol=1e-4 rtol=1e-4
 end
 
 @testset "small lp 2" begin
@@ -37,9 +48,9 @@ end
     A = rand(-9.0:9.0, p, n)
     b = A*ones(n)
     @assert n == q
-    G = Diagonal(-1.0I, n)
+    G = Diagonal(1.0I, n)
     h = zeros(q)
-    cone = Alfonso.Cone([Alfonso.NonnegativeCone(q)], [1:q])
+    cone = Alfonso.Cone([Alfonso.NonpositiveCone(q)], [1:q])
     Alfonso.load_data!(alf, c, A, b, G, h, cone)
     @time Alfonso.solve!(alf)
     @test Alfonso.get_status(alf) == :Optimal
@@ -202,41 +213,41 @@ end
 
 @testset "small dense lp example (dense vs sparse A)" begin
     # dense methods
-    d_alf = Alfonso.AlfonsoOpt(verbose=verbflag)
-    build_lp!(d_alf, 50, 100, dense=true, tosparse=false)
-    @time Alfonso.solve!(d_alf)
-    @test Alfonso.get_niters(d_alf) <= 40
-    @test Alfonso.get_status(d_alf) == :Optimal
+    alf2 = Alfonso.AlfonsoOpt(verbose=verbflag)
+    build_lp!(alf2, 50, 100, dense=true, tosparse=false)
+    @time Alfonso.solve!(alf2)
+    @test Alfonso.get_niters(alf2) <= 40
+    @test Alfonso.get_status(alf2) == :Optimal
 
     # sparse methods
-    s_alf = Alfonso.AlfonsoOpt(verbose=verbflag)
-    build_lp!(s_alf, 50, 100, dense=true, tosparse=true)
-    @time Alfonso.solve!(s_alf)
-    @test Alfonso.get_niters(s_alf) <= 40
-    @test Alfonso.get_status(s_alf) == :Optimal
+    alf1 = Alfonso.AlfonsoOpt(verbose=verbflag)
+    build_lp!(alf1, 50, 100, dense=true, tosparse=true)
+    @time Alfonso.solve!(alf1)
+    @test Alfonso.get_niters(alf1) <= 40
+    @test Alfonso.get_status(alf1) == :Optimal
 
-    @test Alfonso.get_pobj(d_alf) ≈ Alfonso.get_pobj(s_alf) atol=1e-4 rtol=1e-4
-    @test Alfonso.get_dobj(d_alf) ≈ Alfonso.get_dobj(s_alf) atol=1e-4 rtol=1e-4
+    @test Alfonso.get_pobj(alf2) ≈ Alfonso.get_pobj(alf1) atol=1e-4 rtol=1e-4
+    @test Alfonso.get_dobj(alf2) ≈ Alfonso.get_dobj(alf1) atol=1e-4 rtol=1e-4
 end
 
 @testset "1D poly envelope example (dense vs sparse A)" begin
     # dense methods
-    d_alf = Alfonso.AlfonsoOpt(verbose=verbflag)
-    build_envelope!(d_alf, 2, 5, 1, 5, use_data=true, dense=true)
-    @time Alfonso.solve!(d_alf)
-    @test Alfonso.get_niters(d_alf) <= 30
-    @test Alfonso.get_status(d_alf) == :Optimal
-    @test Alfonso.get_pobj(d_alf) ≈ -25.502777 atol=1e-4 rtol=1e-4
-    @test Alfonso.get_dobj(d_alf) ≈ -25.502777 atol=1e-4 rtol=1e-4
+    alf2 = Alfonso.AlfonsoOpt(verbose=verbflag)
+    build_envelope!(alf2, 2, 5, 1, 5, use_data=true, dense=true)
+    @time Alfonso.solve!(alf2)
+    @test Alfonso.get_niters(alf2) <= 30
+    @test Alfonso.get_status(alf2) == :Optimal
+    @test Alfonso.get_pobj(alf2) ≈ -25.502777 atol=1e-4 rtol=1e-4
+    @test Alfonso.get_dobj(alf2) ≈ -25.502777 atol=1e-4 rtol=1e-4
 
     # sparse methods
-    s_alf = Alfonso.AlfonsoOpt(verbose=verbflag)
-    build_envelope!(s_alf, 2, 5, 1, 5, use_data=true, dense=false)
-    @time Alfonso.solve!(s_alf)
-    @test Alfonso.get_niters(s_alf) <= 30
-    @test Alfonso.get_status(s_alf) == :Optimal
-    @test Alfonso.get_pobj(s_alf) ≈ -25.502777 atol=1e-4 rtol=1e-4
-    @test Alfonso.get_dobj(s_alf) ≈ -25.502777 atol=1e-4 rtol=1e-4
+    alf1 = Alfonso.AlfonsoOpt(verbose=verbflag)
+    build_envelope!(alf1, 2, 5, 1, 5, use_data=true, dense=false)
+    @time Alfonso.solve!(alf1)
+    @test Alfonso.get_niters(alf1) <= 30
+    @test Alfonso.get_status(alf1) == :Optimal
+    @test Alfonso.get_pobj(alf1) ≈ -25.502777 atol=1e-4 rtol=1e-4
+    @test Alfonso.get_dobj(alf1) ≈ -25.502777 atol=1e-4 rtol=1e-4
 end
 
 # most values taken from https://people.sc.fsu.edu/~jburkardt/py_src/polynomials/polynomials.html
@@ -371,21 +382,21 @@ end
 
 @testset "2D poly envelope example (dense vs sparse A)" begin
     # dense methods
-    d_alf = Alfonso.AlfonsoOpt(verbose=verbflag)
-    build_envelope!(d_alf, 2, 4, 2, 7, dense=true)
-    @time Alfonso.solve!(d_alf)
-    @test Alfonso.get_niters(d_alf) <= 55
-    @test Alfonso.get_status(d_alf) == :Optimal
+    alf2 = Alfonso.AlfonsoOpt(verbose=verbflag)
+    build_envelope!(alf2, 2, 4, 2, 7, dense=true)
+    @time Alfonso.solve!(alf2)
+    @test Alfonso.get_niters(alf2) <= 55
+    @test Alfonso.get_status(alf2) == :Optimal
 
     # sparse methods
-    s_alf = Alfonso.AlfonsoOpt(verbose=verbflag)
-    build_envelope!(s_alf, 2, 4, 2, 7, dense=false)
-    @time Alfonso.solve!(s_alf)
-    @test Alfonso.get_niters(s_alf) <= 55
-    @test Alfonso.get_status(s_alf) == :Optimal
+    alf1 = Alfonso.AlfonsoOpt(verbose=verbflag)
+    build_envelope!(alf1, 2, 4, 2, 7, dense=false)
+    @time Alfonso.solve!(alf1)
+    @test Alfonso.get_niters(alf1) <= 55
+    @test Alfonso.get_status(alf1) == :Optimal
 
-    @test Alfonso.get_pobj(d_alf) ≈ Alfonso.get_pobj(s_alf) atol=1e-4 rtol=1e-4
-    @test Alfonso.get_dobj(d_alf) ≈ Alfonso.get_dobj(s_alf) atol=1e-4 rtol=1e-4
+    @test Alfonso.get_pobj(alf2) ≈ Alfonso.get_pobj(alf1) atol=1e-4 rtol=1e-4
+    @test Alfonso.get_dobj(alf2) ≈ Alfonso.get_dobj(alf1) atol=1e-4 rtol=1e-4
 end
 
 @testset "3D poly envelope example (sparse A)" begin
