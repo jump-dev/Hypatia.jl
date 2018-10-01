@@ -1,6 +1,6 @@
 
-# polynomial (weighted) sum of squares cone (parametrized by ip and ipwt)
-mutable struct SumOfSquaresCone <: PrimitiveCone
+# dual cone of the polynomial (weighted) sum of squares cone (parametrized by ip and ipwt)
+mutable struct DualSumOfSquaresCone <: PrimitiveCone
     dim::Int
     ipwt::Vector{Matrix{Float64}}
     pnt::AbstractVector{Float64}
@@ -12,7 +12,7 @@ mutable struct SumOfSquaresCone <: PrimitiveCone
     Vp::Vector{Matrix{Float64}}
     Vp2::Matrix{Float64}
 
-    function SumOfSquaresCone(dim::Int, ipwt::Vector{Matrix{Float64}})
+    function DualSumOfSquaresCone(dim::Int, ipwt::Vector{Matrix{Float64}})
         for ipwtj in ipwt
             @assert size(ipwtj, 1) == dim
         end
@@ -29,12 +29,12 @@ mutable struct SumOfSquaresCone <: PrimitiveCone
     end
 end
 
-dimension(prm::SumOfSquaresCone) = prm.dim
-barrierpar_prm(prm::SumOfSquaresCone) = sum(size(ipwtj, 2) for ipwtj in prm.ipwt)
-getintdir_prm!(arr::AbstractVector{Float64}, prm::SumOfSquaresCone) = (@. arr = 1.0; arr)
-loadpnt_prm!(prm::SumOfSquaresCone, pnt::AbstractVector{Float64}) = (prm.pnt = pnt)
+dimension(prm::DualSumOfSquaresCone) = prm.dim
+barrierpar_prm(prm::DualSumOfSquaresCone) = sum(size(ipwtj, 2) for ipwtj in prm.ipwt)
+getintdir_prm!(arr::AbstractVector{Float64}, prm::DualSumOfSquaresCone) = (@. arr = 1.0; arr)
+loadpnt_prm!(prm::DualSumOfSquaresCone, pnt::AbstractVector{Float64}) = (prm.pnt = pnt)
 
-function incone_prm(prm::SumOfSquaresCone)
+function incone_prm(prm::DualSumOfSquaresCone)
     @. prm.g = 0.0
     @. prm.H = 0.0
 
@@ -66,6 +66,6 @@ function incone_prm(prm::SumOfSquaresCone)
     return true
 end
 
-calcg_prm!(g::AbstractVector{Float64}, prm::SumOfSquaresCone) = (@. g = prm.g; g)
-calcHiarr_prm!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prm::SumOfSquaresCone) = ldiv!(prod, prm.F, arr)
-calcHarr_prm!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prm::SumOfSquaresCone) = mul!(prod, prm.H, arr)
+calcg_prm!(g::AbstractVector{Float64}, prm::DualSumOfSquaresCone) = (@. g = prm.g; g)
+calcHiarr_prm!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prm::DualSumOfSquaresCone) = ldiv!(prod, prm.F, arr)
+calcHarr_prm!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prm::DualSumOfSquaresCone) = mul!(prod, prm.H, arr)

@@ -3,7 +3,7 @@ Copyright 2018, Chris Coey and contributors
 Copyright 2018, David Papp, Sercan Yildiz
 
 modified from https://github.com/dpapp-github/alfonso/blob/master/polyOpt.m
-formulates and solves the polynomial optimization problem for a given polynomial, described in the paper:
+formulates and solves the (dual of the) polynomial optimization problem for a given polynomial, described in the paper:
 D. Papp and S. Yildiz. Sum-of-squares optimization without semidefinite programming
 available at https://arxiv.org/abs/1712.01792
 =#
@@ -72,7 +72,7 @@ function build_namedpoly!(alf::Alfonso.AlfonsoOpt, polyname::Symbol, d::Int)
     G = Diagonal(-1.0I, U) # TODO uniformscaling?
     h = zeros(U)
 
-    cone = Alfonso.Cone([Alfonso.SumOfSquaresCone(U, [P0, PWts...])], [1:U])
+    cone = Alfonso.Cone([Alfonso.DualSumOfSquaresCone(U, [P0, PWts...])], [1:U])
 
     return Alfonso.load_data!(alf, c, A, b, G, h, cone)
 end

@@ -8,7 +8,7 @@ module Alfonso
     include("cone.jl")
     for primcone in [
         "orthant",
-        "sumofsquares",
+        "dualsumofsquares",
         "secondorder",
         "exponential",
         # "power",

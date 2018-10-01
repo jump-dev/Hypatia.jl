@@ -16,7 +16,7 @@ include(joinpath(egs_dir, "lp/lp.jl"))
 include(joinpath(egs_dir, "namedpoly/namedpoly.jl"))
 
 # run native and MOI interfaces on examples
-include(joinpath(@__DIR__, "nativeexamples.jl"))
+include(joinpath(@__DIR__, "native.jl"))
 
 
 # MathOptInterface tests

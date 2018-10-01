@@ -3,7 +3,7 @@ Copyright 2018, Chris Coey and contributors
 Copyright 2018, David Papp, Sercan Yildiz
 
 modified from https://github.com/dpapp-github/alfonso/blob/master/polyEnv.m
-formulates and solves the polynomial envelope problem described in the paper:
+formulates and solves the (dual of the) polynomial envelope problem described in the paper:
 D. Papp and S. Yildiz. Sum-of-squares optimization without semidefinite programming
 available at https://arxiv.org/abs/1712.01792
 =#
@@ -42,7 +42,7 @@ function build_envelope!(alf::Alfonso.AlfonsoOpt, npoly::Int, deg::Int, n::Int, 
         c = vec(P0[:, 1:LDegs]*rand(-9:9, LDegs, npoly))
     end
 
-    cone = Alfonso.Cone([Alfonso.SumOfSquaresCone(U, [P, PWts...]) for k in 1:npoly], [1+(k-1)*U:k*U for k in 1:npoly])
+    cone = Alfonso.Cone([Alfonso.DualSumOfSquaresCone(U, [P, PWts...]) for k in 1:npoly], [1+(k-1)*U:k*U for k in 1:npoly])
 
     return Alfonso.load_data!(alf, c, A, b, G, h, cone)
 end
