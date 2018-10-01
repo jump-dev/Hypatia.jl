@@ -599,7 +599,7 @@ function findinitialiterate!(tx::Vector{Float64}, ty::Vector{Float64}, tz::Vecto
     mul!(Q2GHGQ2, GQ2', GQ2)
     F = cholesky!(Symmetric(Q2GHGQ2), check=false)
     if !issuccess(F)
-        alf.verbose && println("linear system matrix was nearly not positive definite")
+        alf.verbose && println("linear system matrix was not positive definite")
         mul!(Q2GHGQ2, Q2', GHGQ2)
         F = bunchkaufman!(Symmetric(Q2GHGQ2))
     end
@@ -679,7 +679,7 @@ function finddirection!(rhs_tx::Vector{Float64}, rhs_ty::Vector{Float64}, rhs_tz
     # TODO does it matter that F could be either type?
     F = cholesky!(Symmetric(Q2GHGQ2), check=false)
     if !issuccess(F)
-        alf.verbose && println("linear system matrix was nearly not positive definite")
+        alf.verbose && println("linear system matrix was not positive definite")
         mul!(Q2GHGQ2, Q2', GHGQ2)
         F = bunchkaufman!(Symmetric(Q2GHGQ2))
     end

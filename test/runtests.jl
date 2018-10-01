@@ -49,10 +49,9 @@ MOIU.@model(AlfonsoModelData,
 
 optimizer = MOIU.CachingOptimizer(AlfonsoModelData{Float64}(), Alfonso.Optimizer())
 
-# TODO tols relaxed temporarily from 1e-4
 config = MOIT.TestConfig(
-    atol=1e-3,
-    rtol=1e-3,
+    atol=1e-4,
+    rtol=1e-4,
     solve=true,
     query=true,
     modify_lhs=true,
@@ -69,14 +68,14 @@ config = MOIT.TestConfig(
 end
 
 @testset "Continuous conic problems" begin
-    exclude = ["rootdet", "logdet"] # TODO bridges not working? should not need to exclude in future
+    exclude = ["rootdet", "logdet", "sdp"] # TODO bridges not working? should not need to exclude in future
     MOIT.contconictest(
-        MOIB.SquarePSD{Float64}(
+        # MOIB.SquarePSD{Float64}(
         MOIB.GeoMean{Float64}(
         # MOIB.LogDet{Float64}(
         # MOIB.RootDet{Float64}(
             optimizer
-        )),#)),
+        ),#))),
         config, exclude)
 end
 
