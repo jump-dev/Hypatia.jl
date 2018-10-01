@@ -1,25 +1,11 @@
 
-#=
-cone object
-=#
-
+# cone object
 abstract type PrimitiveCone end
 
 # TODO reorder primitive cones so easiest ones to check incone are first
 mutable struct Cone
     prms::Vector{PrimitiveCone}
     idxs::Vector{AbstractVector{Int}}
-
-    function Cone(prms::Vector{PrimitiveCone}, idxs::Vector{AbstractVector{Int}})
-        @assert length(prms) == length(idxs)
-        for k in eachindex(prms)
-            @assert dimension(prms[k]) == length(idxs[k])
-        end
-        cone = new()
-        cone.prms = prms
-        cone.idxs = idxs
-        return cone
-    end
 end
 Cone() = Cone(PrimitiveCone[], AbstractVector{Int}[])
 

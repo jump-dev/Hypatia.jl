@@ -1,19 +1,27 @@
 
 mutable struct Optimizer <: MOI.AbstractOptimizer
     alf::AlfonsoOpt
-
+    c::Vector{Float64}          # linear cost vector, size n
+    A::AbstractMatrix{Float64}  # equality constraint matrix, size p*n
+    b::Vector{Float64}          # equality constraint vector, size p
+    G::AbstractMatrix{Float64}  # cone constraint matrix, size q*n
+    h::Vector{Float64}          # cone constraint vector, size q
+    cone::Cone                  # primal constraint cone object
     objsense::MOI.OptimizationSense
-    constroffsets::Vector{Int}
+    objconst::Float64
     numeqconstrs::Int
-
-    x
-    s
-    y
-    z
-    status
-    solvetime
-    pobj
-    dobj
+    constroffseteq::Vector{Int}
+    constrprimeq::Vector{Float64}
+    constroffsetcone::Vector{Int}
+    constrprimcone::Vector{Float64}
+    x::Vector{Float64}
+    s::Vector{Float64}
+    y::Vector{Float64}
+    z::Vector{Float64}
+    status::Symbol
+    solvetime::Float64
+    pobj::Float64
+    dobj::Float64
 
     function Optimizer(alf::AlfonsoOpt)
         opt = new()
@@ -62,15 +70,11 @@ conefrommoi(s::MOI.PositiveSemidefiniteConeTriangle) = PositiveSemidefiniteCone(
 conefrommoi(s::MOI.ExponentialCone) = ExponentialCone()
 # conefrommoi(s::MOI.PowerCone) = PowerCone(s.exponent)
 
-
 # build representation as min c'x s.t. Ax = b, x in K
 # TODO what if some variables x are in multiple cone constraints?
 function MOI.copy_to(opt::Optimizer, src::MOI.ModelLike; copy_names=false, warn_attributes=true)
     @assert !copy_names
     idxmap = Dict{MOI.Index, MOI.Index}()
-
-    # model
-    # mattr_src = MOI.get(src, MOI.ListOfModelAttributesSet())
 
     # variables
     n = MOI.get(src, MOI.NumberOfVariables()) # columns of A
@@ -83,63 +87,68 @@ function MOI.copy_to(opt::Optimizer, src::MOI.ModelLike; copy_names=false, warn_
     @assert j == n
 
     # objective function
+    obj = MOI.get(src, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}())
     (Jc, Vc) = (Int[], Float64[])
-    for t in (MOI.get(src, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}())).terms
+    for t in obj.terms
         push!(Jc, idxmap[t.variable_index].value)
         push!(Vc, t.coefficient)
     end
-    ismax = (MOI.get(src, MOI.ObjectiveSense()) == MOI.MaxSense) ? true : false
-    if ismax
-        Vc .*= -1
+    if MOI.get(src, MOI.ObjectiveSense()) == MOI.MaxSense
+        Vc .*= -1.0
     end
+    opt.objconst = obj.constant
+    opt.objsense = MOI.get(src, MOI.ObjectiveSense())
+    opt.c = Vector(sparsevec(Jc, Vc, n))
 
+    # constraints
     getsrccons(F, S) = MOI.get(src, MOI.ListOfConstraintIndices{F,S}())
     getconfun(conidx) = MOI.get(src, MOI.ConstraintFunction(), conidx)
     getconset(conidx) = MOI.get(src, MOI.ConstraintSet(), conidx)
-
-    # pass over vector constraints to construct conic model data
-    constroffsets = Vector{Int}()
-    i = 0 # MOI constraint objects
+    i = 0 # MOI constraint index
 
     # equality constraints
     p = 0 # rows of A (equality constraint matrix)
     (IA, JA, VA) = (Int[], Int[], Float64[])
     (Ib, Vb) = (Int[], Float64[])
+    (Icpe, Vcpe) = (Int[], Float64[]) # constraint set constants for opt.constrprimeq
+    constroffseteq = Vector{Int}()
 
     for S in (MOI.EqualTo{Float64}, MOI.Zeros)
         # TODO can preprocess variables equal to constant
         for ci in getsrccons(MOI.SingleVariable, S)
             i += 1
             idxmap[ci] = MOI.ConstraintIndex{MOI.SingleVariable, S}(i)
-            push!(constroffsets, p)
-
+            push!(constroffseteq, p)
             p += 1
             push!(IA, p)
             push!(JA, idxmap[getconfun(ci).variable].value)
-            push!(VA, 1.0)
+            push!(VA, -1.0)
             if S == MOI.EqualTo{Float64}
                 push!(Ib, p)
-                push!(Vb, getconset(ci).value)
+                push!(Vb, -getconset(ci).value)
+                push!(Icpe, p)
+                push!(Vcpe, getconset(ci).value)
             end
         end
 
         for ci in getsrccons(MOI.ScalarAffineFunction{Float64}, S)
             i += 1
             idxmap[ci] = MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, S}(i)
-            push!(constroffsets, p)
-
+            push!(constroffseteq, p)
             p += 1
             fi = getconfun(ci)
             for vt in fi.terms
                 push!(IA, p)
                 push!(JA, idxmap[vt.variable_index].value)
-                push!(VA, vt.coefficient)
+                push!(VA, -vt.coefficient)
             end
             push!(Ib, p)
             if S == MOI.EqualTo{Float64}
-                push!(Vb, getconset(ci).value - fi.constant)
+                push!(Vb, fi.constant - getconset(ci).value)
+                push!(Icpe, p)
+                push!(Vcpe, getconset(ci).value)
             else
-                push!(Vb, -fi.constant)
+                push!(Vb, fi.constant)
             end
         end
     end
@@ -148,38 +157,44 @@ function MOI.copy_to(opt::Optimizer, src::MOI.ModelLike; copy_names=false, warn_
     for ci in getsrccons(MOI.VectorOfVariables, MOI.Zeros)
         i += 1
         idxmap[ci] = MOI.ConstraintIndex{MOI.VectorOfVariables, MOI.Zeros}(i)
-        push!(constroffsets, p)
-
+        push!(constroffseteq, p)
         fi = getconfun(ci)
         dim = MOI.output_dimension(fi)
         append!(IA, p+1:p+dim)
         append!(JA, idxmap[vi].value for vi in fi.variables)
-        append!(VA, ones(dim))
+        append!(VA, -ones(dim))
     end
 
     for ci in getsrccons(MOI.VectorAffineFunction{Float64}, MOI.Zeros)
         i += 1
         idxmap[ci] = MOI.ConstraintIndex{MOI.VectorAffineFunction{Float64}, MOI.Zeros}(i)
-        push!(constroffsets, p)
-
+        push!(constroffseteq, p)
         fi = getconfun(ci)
         dim = MOI.output_dimension(fi)
         for vt in fi.terms
             push!(IA, p + vt.output_index)
             push!(JA, idxmap[vt.scalar_term.variable_index].value)
-            push!(VA, vt.scalar_term.coefficient)
+            push!(VA, -vt.scalar_term.coefficient)
         end
         append!(Ib, p+1:p+dim)
-        append!(Vb, -fi.constants)
+        append!(Vb, fi.constants)
         p += dim
     end
 
-    numeqconstrs = i
+    push!(constroffseteq, p)
+    opt.A = Matrix(sparse(IA, JA, VA, p, n))
+    # opt.A = dropzeros!(sparse(IA, JA, VA, p, n))
+    opt.b = Vector(sparsevec(Ib, Vb, p))
+    opt.numeqconstrs = i
+    opt.constrprimeq = Vector(sparsevec(Icpe, Vcpe, p))
+    opt.constroffseteq = constroffseteq
 
     # conic constraints
     q = 0 # rows of G (cone constraint matrix)
     (IG, JG, VG) = (Int[], Int[], Float64[])
     (Ih, Vh) = (Int[], Float64[])
+    (Icpc, Vcpc) = (Int[], Float64[]) # constraint set constants for opt.constrprimeq
+    constroffsetcone = Vector{Int}()
     cone = Cone()
 
     # LP constraints: build up one nonnegative cone and/or one nonpositive cone
@@ -192,8 +207,7 @@ function MOI.copy_to(opt::Optimizer, src::MOI.ModelLike; copy_names=false, warn_
         for ci in getsrccons(MOI.SingleVariable, S)
             i += 1
             idxmap[ci] = MOI.ConstraintIndex{MOI.SingleVariable, S}(i)
-            push!(constroffsets, q)
-
+            push!(constroffsetcone, q)
             q += 1
             push!(IG, q)
             push!(JG, idxmap[getconfun(ci).variable].value)
@@ -202,17 +216,19 @@ function MOI.copy_to(opt::Optimizer, src::MOI.ModelLike; copy_names=false, warn_
             if S == MOI.GreaterThan{Float64}
                 push!(Vh, -getconset(ci).lower)
                 push!(nonnegrows, q)
+                push!(Vcpc, getconset(ci).lower)
             else
                 push!(Vh, -getconset(ci).upper)
                 push!(nonposrows, q)
+                push!(Vcpc, getconset(ci).upper)
             end
+            push!(Icpc, q)
         end
 
         for ci in getsrccons(MOI.ScalarAffineFunction{Float64}, S)
             i += 1
             idxmap[ci] = MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, S}(i)
-            push!(constroffsets, q)
-
+            push!(constroffsetcone, q)
             q += 1
             fi = getconfun(ci)
             for vt in fi.terms
@@ -222,12 +238,15 @@ function MOI.copy_to(opt::Optimizer, src::MOI.ModelLike; copy_names=false, warn_
             end
             push!(Ih, q)
             if S == MOI.GreaterThan{Float64}
-                push!(Vh, -getconset(ci).lower + fi.constant)
+                push!(Vh, fi.constant - getconset(ci).lower)
                 push!(nonnegrows, q)
+                push!(Vcpc, getconset(ci).lower)
             else
-                push!(Vh, -getconset(ci).upper + fi.constant)
+                push!(Vh, fi.constant - getconset(ci).upper)
                 push!(nonposrows, q)
+                push!(Vcpc, getconset(ci).upper)
             end
+            push!(Icpc, q)
         end
     end
 
@@ -235,8 +254,7 @@ function MOI.copy_to(opt::Optimizer, src::MOI.ModelLike; copy_names=false, warn_
         for ci in getsrccons(MOI.VectorOfVariables, S)
             i += 1
             idxmap[ci] = MOI.ConstraintIndex{MOI.VectorOfVariables, S}(i)
-            push!(constroffsets, q)
-
+            push!(constroffsetcone, q)
             for vj in getconfun(ci).variables
                 q += 1
                 push!(IG, q)
@@ -253,8 +271,7 @@ function MOI.copy_to(opt::Optimizer, src::MOI.ModelLike; copy_names=false, warn_
         for ci in getsrccons(MOI.VectorAffineFunction{Float64}, S)
             i += 1
             idxmap[ci] = MOI.ConstraintIndex{MOI.VectorAffineFunction{Float64}, S}(i)
-            push!(constroffsets, q)
-
+            push!(constroffsetcone, q)
             fi = getconfun(ci)
             dim = MOI.output_dimension(fi)
             for vt in fi.terms
@@ -282,8 +299,7 @@ function MOI.copy_to(opt::Optimizer, src::MOI.ModelLike; copy_names=false, warn_
         for ci in getsrccons(MOI.VectorOfVariables, S)
             i += 1
             idxmap[ci] = MOI.ConstraintIndex{MOI.VectorOfVariables, S}(i)
-            push!(constroffsets, q)
-
+            push!(constroffsetcone, q)
             fi = getconfun(ci)
             dim = MOI.output_dimension(fi)
             append!(IG, q+1:q+dim)
@@ -296,8 +312,7 @@ function MOI.copy_to(opt::Optimizer, src::MOI.ModelLike; copy_names=false, warn_
         for ci in getsrccons(MOI.VectorAffineFunction{Float64}, S)
             i += 1
             idxmap[ci] = MOI.ConstraintIndex{MOI.VectorAffineFunction{Float64}, S}(i)
-            push!(constroffsets, q)
-
+            push!(constroffsetcone, q)
             fi = getconfun(ci)
             dim = MOI.output_dimension(fi)
             for vt in fi.terms
@@ -312,35 +327,32 @@ function MOI.copy_to(opt::Optimizer, src::MOI.ModelLike; copy_names=false, warn_
         end
     end
 
-    # finalize data and load into Alfonso model
-    c = Vector(dropzeros!(sparsevec(Jc, Vc, n)))
-    A = dropzeros!(sparse(IA, JA, VA, p, n))
-    b = Vector(dropzeros!(sparsevec(Ib, Vb, p)))
-    G = dropzeros!(sparse(IG, JG, VG, q, n))
-    h = Vector(dropzeros!(sparsevec(Ih, Vh, q)))
-    # TODO make converting to dense optional
-    # Alfonso.load_data!(opt.alf, c, A, b, G, h, cone) # sparse
-    Alfonso.load_data!(opt.alf, c, Matrix(A), b, Matrix(G), h, cone) # dense
-
-    # store information needed by MOI getter functions
-    opt.objsense = MOI.get(src, MOI.ObjectiveSense())
-    opt.constroffsets = constroffsets
-    opt.numeqconstrs = numeqconstrs
+    push!(constroffsetcone, q)
+    opt.G = Matrix(sparse(IG, JG, VG, q, n))
+    # opt.G = dropzeros!(sparse(IG, JG, VG, q, n))
+    opt.h = Vector(sparsevec(Ih, Vh, q))
+    opt.cone = cone
+    opt.constroffsetcone = constroffsetcone
+    opt.constrprimcone = Vector(sparsevec(Icpc, Vcpc, q))
 
     return idxmap
 end
 
 function MOI.optimize!(opt::Optimizer)
-    solve!(opt.alf)
+    Alfonso.load_data!(opt.alf, opt.c, opt.A, opt.b, opt.G, opt.h, opt.cone) # dense
+    Alfonso.solve!(opt.alf)
 
-    opt.x = get_x(opt.alf)
-    opt.s = get_s(opt.alf)
-    opt.y = get_y(opt.alf)
-    opt.z = get_z(opt.alf)
-    opt.status = get_status(opt.alf)
-    opt.solvetime = get_solvetime(opt.alf)
-    opt.pobj = get_pobj(opt.alf)
-    opt.dobj = get_dobj(opt.alf)
+    opt.x = Alfonso.get_x(opt.alf)
+    opt.constrprimeq += opt.b - opt.A*opt.x
+    opt.s = Alfonso.get_s(opt.alf)
+    opt.constrprimcone += opt.s
+    opt.y = Alfonso.get_y(opt.alf)
+    opt.z = Alfonso.get_z(opt.alf)
+
+    opt.status = Alfonso.get_status(opt.alf)
+    opt.solvetime = Alfonso.get_solvetime(opt.alf)
+    opt.pobj = Alfonso.get_pobj(opt.alf)
+    opt.dobj = Alfonso.get_dobj(opt.alf)
 
     return nothing
 end
@@ -362,9 +374,9 @@ end
 
 function MOI.get(opt::Optimizer, ::MOI.ObjectiveValue)
     if opt.objsense == MOI.MinSense
-        return opt.pobj
+        return opt.pobj + opt.objconst
     elseif opt.objsense == MOI.MaxSense
-        return -opt.pobj
+        return -opt.pobj + opt.objconst
     else
         error("no objective sense is set")
     end
@@ -372,9 +384,9 @@ end
 
 function MOI.get(opt::Optimizer, ::MOI.ObjectiveBound)
     if opt.objsense == MOI.MinSense
-        return opt.dobj
+        return opt.dobj + opt.objconst
     elseif opt.objsense == MOI.MaxSense
-        return -opt.dobj
+        return -opt.dobj + opt.objconst
     else
         error("no objective sense is set")
     end
@@ -418,47 +430,58 @@ end
 MOI.get(opt::Optimizer, ::MOI.VariablePrimal, vi::MOI.VariableIndex) = opt.x[vi.value]
 MOI.get(opt::Optimizer, a::MOI.VariablePrimal, vi::Vector{MOI.VariableIndex}) = MOI.get.(opt, a, vi)
 
-function MOI.get(opt::Optimizer, ::MOI.ConstraintDual, ci::MOI.ConstraintIndex{F, S}) where {F, S}
-    os = opt.constroffsets
+function MOI.get(opt::Optimizer, ::MOI.ConstraintDual, ci::MOI.ConstraintIndex{F, S}) where {F <: MOI.AbstractFunction, S <: MOI.AbstractScalarSet}
+    # scalar set
     i = ci.value
     if i <= opt.numeqconstrs
         # constraint is an equality
+        return opt.y[opt.constroffseteq[i]+1]
+    else
+        # constraint is conic
+        i -= opt.numeqconstrs
+        return opt.z[opt.constroffsetcone[i]+1]
+    end
+end
+function MOI.get(opt::Optimizer, ::MOI.ConstraintDual, ci::MOI.ConstraintIndex{F, S}) where {F <: MOI.AbstractFunction, S <: MOI.AbstractVectorSet}
+    # vector set
+    i = ci.value
+    if i <= opt.numeqconstrs
+        # constraint is an equality
+        os = opt.constroffseteq
         return opt.y[os[i]+1:os[i+1]]
     else
         # constraint is conic
+        i -= opt.numeqconstrs
+        os = opt.constroffsetcone
         return opt.z[os[i]+1:os[i+1]]
     end
 end
 MOI.get(opt::Optimizer, a::MOI.ConstraintDual, ci::Vector{MOI.ConstraintIndex}) = MOI.get.(opt, a, ci)
 
-# TODO use x and s. if conic then just return s. otherwise have to use x - rhs after saving rhs in opt maybe
-MOI.get(opt::Optimizer, ::MOI.ConstraintPrimal, ci::MOI.ConstraintIndex) = NaN
+function MOI.get(opt::Optimizer, ::MOI.ConstraintPrimal, ci::MOI.ConstraintIndex{F, S}) where {F <: MOI.AbstractFunction, S <: MOI.AbstractScalarSet}
+    # scalar set
+    i = ci.value
+    if i <= opt.numeqconstrs
+        # constraint is an equality
+        return opt.constrprimeq[opt.constroffseteq[i]+1]
+    else
+        # constraint is conic
+        i -= opt.numeqconstrs
+        return opt.constrprimcone[opt.constroffsetcone[i]+1]
+    end
+end
+function MOI.get(opt::Optimizer, ::MOI.ConstraintPrimal, ci::MOI.ConstraintIndex{F, S}) where {F <: MOI.AbstractFunction, S <: MOI.AbstractVectorSet}
+    # vector set
+    i = ci.value
+    if i <= opt.numeqconstrs
+        # constraint is an equality
+        os = opt.constroffseteq
+        return opt.constrprimeq[os[i]+1:os[i+1]]
+    else
+        # constraint is conic
+        i -= opt.numeqconstrs
+        os = opt.constroffsetcone
+        return opt.constrprimcone[os[i]+1:os[i+1]]
+    end
+end
 MOI.get(opt::Optimizer, a::MOI.ConstraintPrimal, ci::Vector{MOI.ConstraintIndex}) = MOI.get.(opt, a, ci)
-
-
-
-
-
-# function MOI.get(instance::Optimizer, ::MOI.ConstraintPrimal, ci::CI{<:MOI.AbstractFunction, MOI.Zeros})
-#     rows = constrrows(instance, ci)
-#     zeros(length(rows))
-# end
-# function MOI.get(instance::Optimizer, ::MOI.ConstraintPrimal, ci::CI{<:MOI.AbstractFunction, <:MOI.EqualTo})
-#     offset = constroffset(instance, ci)
-#     setconstant(instance, offset, ci)
-# end
-# function MOI.get(instance::Optimizer, ::MOI.ConstraintPrimal, ci::CI{<:MOI.AbstractFunction, S}) where S <: MOI.AbstractSet
-#     offset = constroffset(instance, ci)
-#     rows = constrrows(instance, ci)
-#     _unshift(instance, offset, scalecoef(rows, reorderval(instance.sol.slack[offset .+ rows], S), false, S), ci)
-# end
-#
-# _dual(instance, ci::CI{<:MOI.AbstractFunction, <:ZeroCones}) = instance.sol.dual_eq
-# _dual(instance, ci::CI) = instance.sol.dual_ineq
-# function MOI.get(instance::Optimizer, ::MOI.ConstraintDual, ci::CI{<:MOI.AbstractFunction, S}) where S <: MOI.AbstractSet
-#     offset = constroffset(instance, ci)
-#     rows = constrrows(instance, ci)
-#     scalecoef(rows, reorderval(_dual(instance, ci)[offset .+ rows], S), false, S)
-# end
-#
-# MOI.get(instance::Optimizer, ::MOI.ResultCount) = 1

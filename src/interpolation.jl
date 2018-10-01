@@ -1,5 +1,6 @@
 #=
-Copyright 2018, David Papp, Sercan Yildiz, and contributors
+Copyright 2018, Chris Coey and contributors
+Copyright 2018, David Papp, Sercan Yildiz
 
 modified from files in https://github.com/dpapp-github/alfonso/
 https://github.com/dpapp-github/alfonso/blob/master/ChebInterval.m
@@ -182,7 +183,7 @@ function approxfekete_data(n::Int, d::Int, calc_w::Bool)
 
     pts = ipts[keep_pnt,:] # subset of points indexed with the support of w
     P0 = M[keep_pnt,1:L] # subset of polynomial evaluations up to total degree d
-    P = Array(qr(P0).Q) 
+    P = Array(qr(P0).Q)
 
     if calc_w
         w = UpperTriangular(F.R[:,1:U])\(F.Q'*m)
