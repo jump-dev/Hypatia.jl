@@ -1,5 +1,10 @@
+#=
+Copyright 2018, Chris Coey and contributors
+Copyright 2018, David Papp, Sercan Yildiz
 
-# dual cone of the polynomial (weighted) sum of squares cone (parametrized by ip and ipwt)
+dual cone of the polynomial (weighted) sum of squares cone (parametrized by ipwt)
+=#
+
 mutable struct DualSumOfSquaresCone <: PrimitiveCone
     dim::Int
     ipwt::Vector{Matrix{Float64}}

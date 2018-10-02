@@ -1,7 +1,12 @@
+#=
+Copyright 2018, Chris Coey and contributors
 
-# rotated second order cone
-# barrier is -ln(2*x*y - norm(z)^2)
-# from Nesterov & Todd "Self-Scaled Barriers and Interior-Point Methods for Convex Programming"
+rotated second order cone
+(x, y, z) : 2*x*y >= norm(x)^2, x,y >= 0
+barrier is -ln(2*x*y - norm(z)^2)
+from Nesterov & Todd "Self-Scaled Barriers and Interior-Point Methods for Convex Programming"
+=#
+
 mutable struct RotatedSecondOrderCone <: PrimitiveCone
     dim::Int
     pnt::AbstractVector{Float64}
