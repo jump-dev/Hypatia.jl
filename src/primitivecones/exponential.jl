@@ -1,11 +1,11 @@
 
 # exponential cone (MathOptInterface definition)
-# z >= y*exp(x/y), y > 0
+# z >= y*exp(x/y), y >= 0
 # barrier from Skajaa & Ye 2014 is
 # -log (y log (z/y) - x) - log z - log y
 mutable struct ExponentialCone <: PrimitiveCone
     pnt::AbstractVector{Float64}
-    g::AbstractVector{Float64}
+    g::Vector{Float64}
     H::Matrix{Float64} # TODO could be faster as StaticArray
     H2::Matrix{Float64}
     F

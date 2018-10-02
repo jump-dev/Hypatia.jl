@@ -1,70 +1,66 @@
 
-# TODO use AD for the barrier function
-# TODO should we just do the n-dim power cone? any benefit from 3-d restriction?
-
-
-# power cone (MathOptInterface definition) parametrized by power α
-# x^α * y^(1-α) >= abs(z), x,y >= 0
-# barrier from Skajaa & Ye 2014 is
-# -log((x^α * y^(1-α))^2 - z^2) - (1-α)*log(x) - α*log(y)
+# power cone parametrized by powers vector α belonging to the unit simplex
+# (z, x) : prod_i x_i^alpha_i >= abs(z), x >= 0
+# barrier from Roy & Xiao 2018 (theorem 1) is
+# -log(prod_i x_i^(2*alpha_i) - z^2) - sum_i (1 - alpha_i) log(x_i)
 mutable struct PowerCone <: PrimitiveCone
-    exponent::Float64
+    dim::Int
+    alpha::Vector{Float64}
+    barfun::Function
     pnt::AbstractVector{Float64}
-    g::AbstractVector{Float64}
-    Hi::Symmetric{Float64,Array{Float64,2}} # TODO could be faster as StaticArray
+    g::Vector{Float64}
+    diffres
+    H::Matrix{Float64} # TODO could be faster as StaticArray
+    H2::Matrix{Float64}
+    F
 
-    function PowerCone(exponent::Float64)
+    function PowerCone(alpha::Vector{Float64})
         prm = new()
-        @assert 0.0 < exponent < 1.0
-        prm.exponent = exponent
-        prm.g = Vector{Float64}(undef, 3)
-        prm.Hi = Symmetric(similar(prm.g, 3, 3))
+        dim = length(alpha) + 1
+        @assert dim >= 3
+        @assert all(ai >= 0.0 for ai in alpha)
+        @assert sum(alpha) == 1.0
+        prm.dim = dim
+        prm.alpha = alpha
+        prm.g = Vector{Float64}(undef, dim)
+        prm.diffres = DiffResults.HessianResult(prm.g)
+        prm.barfun = (pnt -> -log(prod(pnt[i+1]^(alpha[i] + alpha[i]) for i in 1:dim-1) - abs2(pnt[1])) - sum((1.0 - alpha[i])*log(pnt[i+1]) for i in 1:dim-1))
+        prm.H = similar(prm.g, dim, dim)
+        prm.H2 = copy(prm.H)
         return prm
     end
 end
 
-dimension(prm::PowerCone) = 3
-barrierpar_prm(prm::PowerCone) = 3
-getintdir_prm!(arr::AbstractVector{Float64}, prm::PowerCone) = (arr[1] = 1.0; arr[2] = 1.0; arr[3] = 0.0; arr)
+dimension(prm::PowerCone) = prm.dim
+barrierpar_prm(prm::PowerCone) = prm.dim
+getintdir_prm!(arr::AbstractVector{Float64}, prm::PowerCone) = (@. arr = 1.0; arr[1] = 0.0; arr)
 loadpnt_prm!(prm::PowerCone, pnt::AbstractVector{Float64}) = (prm.pnt = pnt)
 
 function incone_prm(prm::PowerCone)
-    x = prm.pnt[1]; y = prm.pnt[2]; z = prm.pnt[3]
-    if (x <= 0.0) || (y <= 0.0)
+    if any(prm.pnt[i+1] <= 0.0 for i in 1:prm.dim-1)
         return false
     end
-    α = prm.exponent
-
-    if x^α * y^(1-α) - abs(z) <= 0.0
+    if prod(prm.pnt[i+1]^prm.alpha[i] for i in 1:prm.dim-1) <= abs(prm.pnt[1])
         return false
     end
 
-    # gradient
+    # TODO check allocations, check with Jarrett if this is most efficient way to use DiffResults
 
-    # Hessian
+    prm.diffres = ForwardDiff.hessian!(prm.diffres, prm.barfun, prm.pnt)
 
+    prm.g .= DiffResults.gradient(prm.diffres)
+    prm.H .= DiffResults.hessian(prm.diffres)
 
-    # old code for gradient and inverse hessian
-    # g[1] = (α - (2*α*y^2*x^(2*α))/(y^2*x^(2*α) - z^2*y^(2*α)) - 1)/x # (α - (2 α y^2 x^(2 α))/(y^2 x^(2 α) - z^2 y^(2 α)) - 1)/x
-    # g[2] = ((α - 2)*y^2*x^(2*α) + α*z^2*y^(2*α))/(y*(y^2*x^(2*α) - z^2*y^(2*α))) # ((α - 2) y^2 x^(2 α) + α z^2 y^(2 α))/(y (y^2 x^(2 α) - z^2 y^(2 α)))
-    # g[3] = (2*z)/(x^(2*α)*y^(2 - 2*α) - z^2) # (2 z)/(x^(2 α) y^(2 - 2 α) - z^2)
-
-    # Hi[1,1] = (x^2*(2*y^(2*α + 2)*z^2*(2*α^2 - 3*α + 1)*x^(2*α) + y^4*(α - 2)*x^(4*α) + y^(4*α)*z^4*α))/(2*y^(2*α + 2)*z^2*(1 - 2*α)^2*x^(2*α) + y^4*(α^2 - α - 2)*x^(4*α) - y^(4*α)*z^4*(α - 1)*α)
-    # # (x^2 (2 y^(2 α + 2) z^2 (2 α^2 - 3 α + 1) x^(2 α) + y^4 (α - 2) x^(4 α) + y^(4 α) z^4 α))/(2 y^(2 α + 2) z^2 (1 - 2 α)^2 x^(2 α) + y^4 (α^2 - α - 2) x^(4 α) - y^(4 α) z^4 (α - 1) α)
-    # Hi[1,2] = (4*x^(2*α + 1)*y^(2*α + 3)*z^2*(α - 1)*α)/(2*y^(2*α + 2)*z^2*(1 - 2*α)^2*x^(2*α) + y^4*(α^2 - α - 2)*x^(4*α) - y^(4*α)*z^4*(α - 1)*α)
-    # # (4 x^(2 α + 1) y^(2 α + 3) z^2 (α - 1) α)/(2 y^(2 α + 2) z^2 (1 - 2 α)^2 x^(2 α) + y^4 (α^2 - α - 2) x^(4 α) - y^(4 α) z^4 (α - 1) α)
-    # Hi[1,3] = (2*x^(2*α + 1)*y^2*z*α*(y^2*(α - 2)*x^(2*α) + y^(2*α)*z^2*α))/(2*y^(2*α + 2)*z^2*(1 - 2*α)^2*x^(2*α) + y^4*(α^2 - α - 2)*x^(4*α) - y^(4*α)*z^4*(α - 1)*α)
-    # # (2 x^(2 α + 1) y^2 z α (y^2 (α - 2) x^(2 α) + y^(2 α) z^2 α))/(2 y^(2 α + 2) z^2 (1 - 2 α)^2 x^(2 α) + y^4 (α^2 - α - 2) x^(4 α) - y^(4 α) z^4 (α - 1) α)
-    # Hi[2,2] = -(-2*y^(2*α + 4)*z^2*α*(2*α - 1)*x^(2*α) + y^6*(α + 1)*x^(4*α) + y^(4*α + 2)*z^4*(α - 1))/(2*y^(2*α + 2)*z^2*(1 - 2*α)^2*x^(2*α) + y^4*(α^2 - α - 2)*x^(4*α) - y^(4*α)*z^4*(α - 1)*α)
-    # # -(-2 y^(2 α + 4) z^2 α (2 α - 1) x^(2 α) + y^6 (α + 1) x^(4 α) + y^(4 α + 2) z^4 (α - 1))/(2 y^(2 α + 2) z^2 (1 - 2 α)^2 x^(2 α) + y^4 (α^2 - α - 2) x^(4 α) - y^(4 α) z^4 (α - 1) α)
-    # Hi[2,3] = (2*x^(2*α)*y^3*z*(α - 1)*(y^2*(α + 1)*x^(2*α) + y^(2*α)*z^2*(α - 1)))/(2*y^(2*α + 2)*z^2*(1 - 2*α)^2*x^(2*α) + y^4*(α^2 - α - 2)*x^(4*α) - y^(4*α)*z^4*(α - 1)*α)
-    # # (2 x^(2 α) y^3 z (α - 1) (y^2 (α + 1) x^(2 α) + y^(2 α) z^2 (α - 1)))/(2 y^(2 α + 2) z^2 (1 - 2 α)^2 x^(2 α) + y^4 (α^2 - α - 2) x^(4 α) - y^(4 α) z^4 (α - 1) α)
-    # Hi[3,3] = (y^(4*α + 2)*z^4*(11*α^2 - 11*α + 2)*x^(2*α) - 3*y^(2*α + 4)*z^2*(α - 1)*α*x^(4*α) + y^6*(α^2 - α - 2)*x^(6*α) - y^(6*α)*z^6*(α - 1)*α)/(4*y^(4*α + 2)*z^2*(1 - 2*α)^2*x^(2*α) + 2*y^(2*α + 4)*(α^2 - α - 2)*x^(4*α) - 2*y^(6*α)*z^4*(α - 1)*α)
-    # # (y^(4 α + 2) z^4 (11 α^2 - 11 α + 2) x^(2 α) - 3 y^(2 α + 4) z^2 (α - 1) α x^(4 α) + y^6 (α^2 - α - 2) x^(6 α) - y^(6 α) z^6 (α - 1) α)/(4 y^(4 α + 2) z^2 (1 - 2 α)^2 x^(2 α) + 2 y^(2 α + 4) (α^2 - α - 2) x^(4 α) - 2 y^(6 α) z^4 (α - 1) α)
+    @. prm.H2 = prm.H
+    prm.F = cholesky!(Symmetric(prm.H2), check=false) # bunchkaufman if it fails
+    if !issuccess(prm.F)
+        @. prm.H2 = prm.H
+        prm.F = bunchkaufman!(Symmetric(prm.H2))
+    end
 
     return true
 end
 
 calcg_prm!(g::AbstractVector{Float64}, prm::PowerCone) = (@. g = prm.g; g)
-calcHiarr_prm!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prm::PowerCone) = mul!(prod, prm.Hi, arr)
+calcHiarr_prm!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prm::PowerCone) = ldiv!(prod, prm.F, arr)
 calcHarr_prm!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prm::PowerCone) = mul!(prod, prm.H, arr)
