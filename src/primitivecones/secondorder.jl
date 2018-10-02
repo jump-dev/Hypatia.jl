@@ -1,7 +1,12 @@
+#=
+Copyright 2018, Chris Coey and contributors
 
-# second order cone
-# barrier is -ln(x^2 - norm(y)^2)
-# from Nesterov & Todd "Self-Scaled Barriers and Interior-Point Methods for Convex Programming"
+second order cone
+(x, y) : x >= norm(y)
+barrier is -ln(x^2 - norm(y)^2)
+from Nesterov & Todd "Self-Scaled Barriers and Interior-Point Methods for Convex Programming"
+=#
+
 mutable struct SecondOrderCone <: PrimitiveCone
     dim::Int
     pnt::AbstractVector{Float64}

@@ -1,8 +1,12 @@
+#=
+Copyright 2018, Chris Coey and contributors
 
-# epigraph of L-infinity norm
-# x >= ||y||_inf for x in R, y in R^n
-# barrier is -sum_j ln (x^2 - y_j^2) + (n-1) ln x
-# from "Barrier Functions in Interior Point Methods" by Osman Guler
+epigraph of L-infinity norm
+(x, y) : x >= ||y||_inf for x in R, y in R^n
+barrier is -sum_j ln (x^2 - y_j^2) + (n-1) ln x
+from "Barrier Functions in Interior Point Methods" by Osman Guler
+=#
+
 mutable struct EllInfinityCone <: PrimitiveCone
     dim::Int
     pnt::AbstractVector{Float64}

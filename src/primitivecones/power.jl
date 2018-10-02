@@ -1,8 +1,12 @@
+#=
+Copyright 2018, Chris Coey and contributors
 
-# power cone parametrized by powers vector α belonging to the unit simplex
-# (z, x) : prod_i x_i^alpha_i >= abs(z), x >= 0
-# barrier from Roy & Xiao 2018 (theorem 1) is
-# -log(prod_i x_i^(2*alpha_i) - z^2) - sum_i (1 - alpha_i) log(x_i)
+power cone parametrized by powers vector α belonging to the unit simplex
+(z, x) : prod_i x_i^alpha_i >= abs(z), x >= 0
+barrier from Roy & Xiao 2018 (theorem 1) is
+-log(prod_i x_i^(2*alpha_i) - z^2) - sum_i (1 - alpha_i) log(x_i)
+=#
+
 mutable struct PowerCone <: PrimitiveCone
     dim::Int
     alpha::Vector{Float64}

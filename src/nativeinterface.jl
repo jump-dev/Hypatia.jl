@@ -1,3 +1,8 @@
+#=
+Copyright 2018, Chris Coey and contributors
+Copyright 2018, David Papp, Sercan Yildiz
+=#
+
 
 # cache for linear system solves (to avoid allocations)
 # use QR + cholesky method from CVXOPT
@@ -50,7 +55,7 @@ mutable struct LinSysCache
 end
 
 # model object containing options, problem data, linear system cache, and solution
-mutable struct AlfonsoOpt
+mutable struct HypatiaOpt
     # options
     verbose::Bool           # if true, prints progress at each iteration
     tolrelopt::Float64      # relative optimality gap tolerance
@@ -91,7 +96,7 @@ mutable struct AlfonsoOpt
     pobj::Float64           # final primal objective value
     dobj::Float64           # final dual objective value
 
-    function AlfonsoOpt(verbose, tolrelopt, tolabsopt, tolfeas, maxiter, predlinesearch, maxpredsmallsteps, predlsmulti, corrcheck, maxcorrsteps, alphacorr, maxcorrlsiters, corrlsmulti)
+    function HypatiaOpt(verbose, tolrelopt, tolabsopt, tolfeas, maxiter, predlinesearch, maxpredsmallsteps, predlsmulti, corrcheck, maxcorrsteps, alphacorr, maxcorrlsiters, corrlsmulti)
         alf = new()
 
         alf.verbose = verbose
@@ -115,7 +120,7 @@ mutable struct AlfonsoOpt
 end
 
 # initialize a model object
-function AlfonsoOpt(;
+function HypatiaOpt(;
     verbose = false,
     tolrelopt = 1e-6,
     tolabsopt = 1e-7,
@@ -144,28 +149,28 @@ function AlfonsoOpt(;
         error("maxcorrsteps must be at least 1")
     end
 
-    return AlfonsoOpt(verbose, tolrelopt, tolabsopt, tolfeas, maxiter, predlinesearch, maxpredsmallsteps, predlsmulti, corrcheck, maxcorrsteps, alphacorr, maxcorrlsiters, corrlsmulti)
+    return HypatiaOpt(verbose, tolrelopt, tolabsopt, tolfeas, maxiter, predlinesearch, maxpredsmallsteps, predlsmulti, corrcheck, maxcorrsteps, alphacorr, maxcorrlsiters, corrlsmulti)
 end
 
-get_status(alf::AlfonsoOpt) = alf.status
-get_solvetime(alf::AlfonsoOpt) = alf.solvetime
-get_niters(alf::AlfonsoOpt) = alf.niters
+get_status(alf::HypatiaOpt) = alf.status
+get_solvetime(alf::HypatiaOpt) = alf.solvetime
+get_niters(alf::HypatiaOpt) = alf.niters
 
-get_x(alf::AlfonsoOpt) = copy(alf.x)
-get_s(alf::AlfonsoOpt) = copy(alf.s)
-get_y(alf::AlfonsoOpt) = copy(alf.y)
-get_z(alf::AlfonsoOpt) = copy(alf.z)
+get_x(alf::HypatiaOpt) = copy(alf.x)
+get_s(alf::HypatiaOpt) = copy(alf.s)
+get_y(alf::HypatiaOpt) = copy(alf.y)
+get_z(alf::HypatiaOpt) = copy(alf.z)
 
-get_tau(alf::AlfonsoOpt) = alf.tau
-get_kappa(alf::AlfonsoOpt) = alf.kappa
-get_mu(alf::AlfonsoOpt) = alf.mu
+get_tau(alf::HypatiaOpt) = alf.tau
+get_kappa(alf::HypatiaOpt) = alf.kappa
+get_mu(alf::HypatiaOpt) = alf.mu
 
-get_pobj(alf::AlfonsoOpt) = dot(alf.c, alf.x)
-get_dobj(alf::AlfonsoOpt) = -dot(alf.b, alf.y) - dot(alf.h, alf.z)
+get_pobj(alf::HypatiaOpt) = dot(alf.c, alf.x)
+get_dobj(alf::HypatiaOpt) = -dot(alf.b, alf.y) - dot(alf.h, alf.z)
 
 # verify problem data and load into model object
 function load_data!(
-    alf::AlfonsoOpt,
+    alf::HypatiaOpt,
     c::Vector{Float64},
     A::AbstractMatrix{Float64},
     b::Vector{Float64},
@@ -200,7 +205,7 @@ function load_data!(
     # TODO reduce allocs, improve efficiency
     # A' = [Q1 Q2] * [R1; 0]
     if issparse(A)
-        alf.verbose && println("\nJulia is currently missing some sparse matrix methods that could improve performance; Alfonso may perform better if A is loaded as a dense matrix")
+        alf.verbose && println("\nJulia is currently missing some sparse matrix methods that could improve performance; Hypatia may perform better if A is loaded as a dense matrix")
         # TODO currently using dense Q1, Q2, R - probably some should be sparse
         F = qr(sparse(A'))
         @assert length(F.prow) == n
@@ -249,7 +254,7 @@ function load_data!(
 end
 
 # solve using predictor-corrector algorithm based on homogeneous self-dual embedding
-function solve!(alf::AlfonsoOpt)
+function solve!(alf::HypatiaOpt)
     starttime = time()
 
     (c, A, b, G, h, cone) = (alf.c, alf.A, alf.b, alf.G, alf.h, alf.cone)
@@ -328,7 +333,7 @@ function solve!(alf::AlfonsoOpt)
         (cx, by, hz) = (dot(c, tx), dot(b, ty), dot(h, tz))
         obj_pr = cx*invtau
         obj_du = -(by + hz)*invtau
-        gap = dot(tz, ts) # TODO is this right? maybe should adapt original alfonso conditions
+        gap = dot(tz, ts) # TODO maybe should adapt original alfonso condition instead of using this CVXOPT condition
 
         # TODO maybe add small epsilon to denominators that are zero to avoid NaNs, and get rid of isnans further down
         if obj_pr < 0.0
@@ -576,7 +581,7 @@ function calcnbhd(tk, mu, ls_tz, g, cone)
 end
 
 # calculate initial central primal-dual iterate
-function findinitialiterate!(tx::Vector{Float64}, ty::Vector{Float64}, tz::Vector{Float64}, ts::Vector{Float64}, ls_ts::Vector{Float64}, bnu::Float64, alf::AlfonsoOpt)
+function findinitialiterate!(tx::Vector{Float64}, ty::Vector{Float64}, tz::Vector{Float64}, ts::Vector{Float64}, ls_ts::Vector{Float64}, bnu::Float64, alf::HypatiaOpt)
     (b, G, h, cone) = (alf.b, alf.G, alf.h, alf.cone)
     L = alf.L
     (Q2, RiQ1, GQ2, GHGQ2, Q2GHGQ2, bxGHbz, Q1x, rhs, Q2div, Q2x, HGxi) = (L.Q2, L.RiQ1, L.GQ2, L.GHGQ2, L.Q2GHGQ2, L.bxGHbz, L.Q1x, L.rhs, L.Q2div, L.Q2x, L.HGxi)
@@ -625,7 +630,7 @@ function findinitialiterate!(tx::Vector{Float64}, ty::Vector{Float64}, tz::Vecto
     @. ls_ts = ts
     if !incone(cone)
         tmp_ts = getintdir!(tz, cone)
-        alpha = 1.0 # TODO starting alpha maybe should depend on ls_ts (eg norm like in Alfonso) in case 1.0 is too large/small
+        alpha = 1.0 # TODO starting alpha maybe should depend on ls_ts (eg norm like in Hypatia) in case 1.0 is too large/small
         steps = 0
         @. ls_ts = ts + alpha*tmp_ts
         while !incone(cone)
@@ -654,7 +659,7 @@ function findinitialiterate!(tx::Vector{Float64}, ty::Vector{Float64}, tz::Vecto
 end
 
 # calculate new prediction or correction direction given rhs of KKT linear system
-function finddirection!(rhs_tx::Vector{Float64}, rhs_ty::Vector{Float64}, rhs_tz::Vector{Float64}, rhs_ts::Vector{Float64}, rhs_kap::Float64, rhs_tau::Float64, mu::Float64, tau::Float64, alf::AlfonsoOpt)
+function finddirection!(rhs_tx::Vector{Float64}, rhs_ty::Vector{Float64}, rhs_tz::Vector{Float64}, rhs_ts::Vector{Float64}, rhs_kap::Float64, rhs_tau::Float64, mu::Float64, tau::Float64, alf::HypatiaOpt)
     (c, b, G, h, cone) = (alf.c, alf.b, alf.G, alf.h, alf.cone)
     L = alf.L
     (Q2, HG, GHG, GHGQ2, Q2GHGQ2, x1, y1, z1) = (L.Q2, L.HG, L.GHG, L.GHGQ2, L.Q2GHGQ2, L.x1, L.y1, L.z1)
