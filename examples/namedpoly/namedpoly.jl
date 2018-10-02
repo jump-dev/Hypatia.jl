@@ -8,7 +8,7 @@ D. Papp and S. Yildiz. Sum-of-squares optimization without semidefinite programm
 available at https://arxiv.org/abs/1712.01792
 =#
 
-using Alfonso
+using Hypatia
 using LinearAlgebra
 
 # list of currently available named polynomials, see https://people.sc.fsu.edu/~jburkardt/py_src/polynomials/polynomials.html
@@ -48,7 +48,7 @@ const polys = Dict{Symbol,NamedTuple}(
         ),
 )
 
-function build_namedpoly!(alf::Alfonso.AlfonsoOpt, polyname::Symbol, d::Int)
+function build_namedpoly!(alf::Hypatia.HypatiaOpt, polyname::Symbol, d::Int)
     # get data for named polynomial
     (n, lbs, ubs, deg, fn) = polys[polyname]
     if d < ceil(Int, deg/2)
@@ -56,7 +56,7 @@ function build_namedpoly!(alf::Alfonso.AlfonsoOpt, polyname::Symbol, d::Int)
     end
 
     # generate interpolation
-    (L, U, pts, P0, P, w) = Alfonso.interpolate(n, d, calc_w=false)
+    (L, U, pts, P0, P, w) = Hypatia.interpolate(n, d, calc_w=false)
 
     # transform points to fit the box domain
     pts .*= (ubs - lbs)'/2
@@ -72,12 +72,12 @@ function build_namedpoly!(alf::Alfonso.AlfonsoOpt, polyname::Symbol, d::Int)
     G = Diagonal(-1.0I, U) # TODO uniformscaling?
     h = zeros(U)
 
-    cone = Alfonso.Cone([Alfonso.DualSumOfSquaresCone(U, [P0, PWts...])], [1:U])
+    cone = Hypatia.Cone([Hypatia.DualSumOfSquaresCone(U, [P0, PWts...])], [1:U])
 
-    return Alfonso.load_data!(alf, c, A, b, G, h, cone)
+    return Hypatia.load_data!(alf, c, A, b, G, h, cone)
 end
 
-# alf = Alfonso.AlfonsoOpt(maxiter=100, verbose=false)
+# alf = Hypatia.HypatiaOpt(maxiter=100, verbose=false)
 
 # select the named polynomial to minimize and the SOS degree (to be squared)
 # build_namedpoly!(alf, :butcher, 2)
@@ -93,4 +93,4 @@ end
 # build_namedpoly!(alf, :schwefel, 3)
 
 # solve it
-# @time Alfonso.solve!(alf)
+# @time Hypatia.solve!(alf)

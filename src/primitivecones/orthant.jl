@@ -1,6 +1,9 @@
+#=
+Copyright 2018, Chris Coey and contributors
 
-# nonnegative/nonpositive orthant cones
-# from Nesterov & Todd "Self-Scaled Barriers and Interior-Point Methods for Convex Programming"
+nonnegative/nonpositive orthant cones
+from Nesterov & Todd "Self-Scaled Barriers and Interior-Point Methods for Convex Programming"
+=#
 
 # nonnegative cone barrier is -sum_j ln x_j
 mutable struct NonnegativeCone <: PrimitiveCone

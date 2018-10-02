@@ -1,5 +1,8 @@
+#=
+Copyright 2018, Chris Coey and contributors
+=#
 
-module Alfonso
+module Hypatia
     using Printf
     using SparseArrays
     using LinearAlgebra

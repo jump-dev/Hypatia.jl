@@ -2,19 +2,17 @@
 Copyright 2018, Chris Coey and contributors
 Copyright 2018, David Papp, Sercan Yildiz
 
-modified from files in https://github.com/dpapp-github/alfonso/
-https://github.com/dpapp-github/alfonso/blob/master/ChebInterval.m
-https://github.com/dpapp-github/alfonso/blob/master/PaduaSquare.m
-https://github.com/dpapp-github/alfonso/blob/master/FeketeCube.m
-and from Matlab files obtained from the packages
-Chebfun http://www.chebfun.org/
-Padua2DM by M. Caliari, S. De Marchi, A. Sommariva, and M. Vianello http://profs.sci.univr.it/~caliari/software.htm
+modified/inspired from files in https://github.com/dpapp-github/alfonso/
+- https://github.com/dpapp-github/alfonso/blob/master/ChebInterval.m
+- https://github.com/dpapp-github/alfonso/blob/master/PaduaSquare.m
+- https://github.com/dpapp-github/alfonso/blob/master/FeketeCube.m
+and Matlab files in the packages
+- Chebfun http://www.chebfun.org/
+- Padua2DM by M. Caliari, S. De Marchi, A. Sommariva, and M. Vianello http://profs.sci.univr.it/~caliari/software.htm
 =#
 
 import FFTW
 import Combinatorics
-
-# export cheb2_data, padua_data, approxfekete_data
 
 function interpolate(n, d; calc_w::Bool=false)
     if n == 1
