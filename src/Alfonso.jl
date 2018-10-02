@@ -3,6 +3,8 @@ module Alfonso
     using Printf
     using SparseArrays
     using LinearAlgebra
+    using ForwardDiff
+    using DiffResults
 
     include("interpolation.jl")
     include("cone.jl")
@@ -11,7 +13,7 @@ module Alfonso
         "dualsumofsquares",
         "secondorder",
         "exponential",
-        # "power",
+        "power",
         "rotatedsecondorder",
         "positivesemidefinite",
         "ellinfinity",
