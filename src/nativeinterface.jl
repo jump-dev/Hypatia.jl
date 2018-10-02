@@ -177,7 +177,7 @@ function load_data!(
     G::AbstractMatrix{Float64},
     h::Vector{Float64},
     cone::Cone;
-    check::Bool=false, # check rank conditions
+    check::Bool=true, # check rank conditions
     )
 
     # check data consistency
@@ -201,10 +201,73 @@ function load_data!(
         @assert dimension(cone.prms[k]) == length(cone.idxs[k])
     end
 
+
+    if issparse(A)
+        error("not implemented for sparse A")
+    end
+
+    prseps = 1e-10 # presolve epsilon
+
+
+    # preprocess primal equality constraints
+    # F = qr(A')
+    M = A
+    v = b
+
+    samp = rand(size(M, 2), 3)
+    sol = M'\samp
+    keeprows = [sum(abs(sol[i,j]) for j in 1:3) > prseps for i in 1:size(M, 1)]
+
+    if norm(M*(M[keeprows,:]\v[keeprows,:]) - v, Inf) > prseps
+        error("some primal equality constraints are inconsistent")
+    end
+
+    A = A[keeprows,:]
+    b = b[keeprows]
+    p = length(b)
+
+    # preprocess dual equality constraints
+    M = hcat(A', G')
+    v = c
+
+    samp = rand(size(M, 2), 3)
+    F = qr(M')
+    @show M'
+    @show F
+    sol = F\samp
+    keeprows = [sum(abs(sol[i,j]) for j in 1:3) > prseps for i in 1:size(M, 1)]
+
+    if norm(M*(M[keeprows,:]\v[keeprows,:]) - v, Inf) > prseps
+        error("some dual equality constraints are inconsistent")
+    end
+
+    A = A[:,keeprows]
+    G = G[:,keeprows]
+    c = c[keeprows]
+
+
+    if check
+        # check rank conditions
+        # TODO rank for qr decomp should be implemented in Julia - see https://github.com/JuliaLang/julia/blob/f8b52dab77415a22d28497f48407aca92fbbd4c3/stdlib/LinearAlgebra/src/qr.jl#L895
+        # if n < p
+        #     error("number of equality constraints ($p) exceeds number of variables ($n)")
+        # end
+        # if rank(A) < p # TODO change to rank(F)
+        #     error("A matrix is not full-row-rank; some primal equalities may be redundant or inconsistent")
+        # end
+        if rank(vcat(A, G)) < n
+            error("[A' G'] is not full-row-rank; some dual equalities may be redundant (i.e. primal variables can be removed) or inconsistent")
+        end
+    end
+
+
+
+
     # perform QR decomposition of A' for use in linear system solves
     # TODO reduce allocs, improve efficiency
     # A' = [Q1 Q2] * [R1; 0]
     if issparse(A)
+        # TODO don't reorder to match original: store indices and permute optimal solution
         alf.verbose && println("\nJulia is currently missing some sparse matrix methods that could improve performance; Hypatia may perform better if A is loaded as a dense matrix")
         # TODO currently using dense Q1, Q2, R - probably some should be sparse
         F = qr(sparse(A'))
@@ -228,17 +291,6 @@ function load_data!(
         Q2 = Q[:, p+1:n]
         Ri = inv(UpperTriangular(F.R))
         @assert norm(A'*Ri - Q1) < 1e-8 # TODO delete later
-    end
-
-    if check
-        # check rank conditions
-        # TODO rank for qr decomp should be implemented in Julia - see https://github.com/JuliaLang/julia/blob/f8b52dab77415a22d28497f48407aca92fbbd4c3/stdlib/LinearAlgebra/src/qr.jl#L895
-        if rank(A) < p # TODO change to rank(F)
-            error("A matrix is not full-row-rank; some primal equalities may be redundant or inconsistent")
-        end
-        if rank(vcat(A, G)) < n
-            error("[A' G'] is not full-row-rank; some dual equalities may be redundant (i.e. primal variables can be removed) or inconsistent")
-        end
     end
 
     alf.c = c
