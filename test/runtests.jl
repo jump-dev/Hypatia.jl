@@ -1,11 +1,14 @@
+#=
+Copyright 2018, Chris Coey and contributors
+=#
 
-using Alfonso
+using Hypatia
 using Test
 
 
 # native interface tests
 
-verbflag = false # Alfonso verbose option
+verbflag = false # Hypatia verbose option
 
 # TODO interpolation tests
 
@@ -27,7 +30,7 @@ MOIT = MOI.Test
 MOIB = MOI.Bridges
 MOIU = MOI.Utilities
 
-MOIU.@model(AlfonsoModelData,
+MOIU.@model(HypatiaModelData,
     (),
     (
         MOI.EqualTo, MOI.GreaterThan, MOI.LessThan,
@@ -47,7 +50,7 @@ MOIU.@model(AlfonsoModelData,
     (MOI.VectorAffineFunction,),
     )
 
-optimizer = MOIU.CachingOptimizer(AlfonsoModelData{Float64}(), Alfonso.Optimizer())
+optimizer = MOIU.CachingOptimizer(HypatiaModelData{Float64}(), Hypatia.Optimizer())
 
 config = MOIT.TestConfig(
     atol=1e-4,

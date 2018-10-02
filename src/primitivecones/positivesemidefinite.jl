@@ -1,7 +1,11 @@
+#=
+Copyright 2018, Chris Coey and contributors
 
-# positive semidefinite cone (lower triangle, off-diagonals scaled)
-# barrier for matrix cone is -ln det(X)
-# from Nesterov & Todd "Self-Scaled Barriers and Interior-Point Methods for Convex Programming"
+positive semidefinite cone lower triangle, svec (scaled) definition
+barrier for matrix cone is -ln det(X)
+from Nesterov & Todd "Self-Scaled Barriers and Interior-Point Methods for Convex Programming"
+=#
+
 mutable struct PositiveSemidefiniteCone <: PrimitiveCone
     dim::Int
     side::Int
@@ -18,7 +22,6 @@ mutable struct PositiveSemidefiniteCone <: PrimitiveCone
         prm.mat = Matrix{Float64}(undef, prm.side, prm.side)
         prm.mat2 = copy(prm.mat)
         prm.matpnt = copy(prm.mat)
-        # prm.matinv = copy(prm.mat)
         return prm
     end
 end

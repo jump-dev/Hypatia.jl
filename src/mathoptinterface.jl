@@ -1,6 +1,9 @@
+#=
+Copyright 2018, Chris Coey and contributors
+=#
 
 mutable struct Optimizer <: MOI.AbstractOptimizer
-    alf::AlfonsoOpt
+    alf::HypatiaOpt
     c::Vector{Float64}          # linear cost vector, size n
     A::AbstractMatrix{Float64}  # equality constraint matrix, size p*n
     b::Vector{Float64}          # equality constraint vector, size p
@@ -23,16 +26,16 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     pobj::Float64
     dobj::Float64
 
-    function Optimizer(alf::AlfonsoOpt)
+    function Optimizer(alf::HypatiaOpt)
         opt = new()
         opt.alf = alf
         return opt
     end
 end
 
-Optimizer() = Optimizer(AlfonsoOpt())
+Optimizer() = Optimizer(HypatiaOpt())
 
-MOI.get(::Optimizer, ::MOI.SolverName) = "Alfonso"
+MOI.get(::Optimizer, ::MOI.SolverName) = "Hypatia"
 
 MOI.is_empty(opt::Optimizer) = (get_status(opt.alf) == :NotLoaded)
 MOI.empty!(opt::Optimizer) = Optimizer() # TODO empty the data and results, or just create a new one? keep options?
@@ -339,20 +342,20 @@ function MOI.copy_to(opt::Optimizer, src::MOI.ModelLike; copy_names=false, warn_
 end
 
 function MOI.optimize!(opt::Optimizer)
-    Alfonso.load_data!(opt.alf, opt.c, opt.A, opt.b, opt.G, opt.h, opt.cone) # dense
-    Alfonso.solve!(opt.alf)
+    Hypatia.load_data!(opt.alf, opt.c, opt.A, opt.b, opt.G, opt.h, opt.cone) # dense
+    Hypatia.solve!(opt.alf)
 
-    opt.x = Alfonso.get_x(opt.alf)
+    opt.x = Hypatia.get_x(opt.alf)
     opt.constrprimeq += opt.b - opt.A*opt.x
-    opt.s = Alfonso.get_s(opt.alf)
+    opt.s = Hypatia.get_s(opt.alf)
     opt.constrprimcone += opt.s
-    opt.y = Alfonso.get_y(opt.alf)
-    opt.z = Alfonso.get_z(opt.alf)
+    opt.y = Hypatia.get_y(opt.alf)
+    opt.z = Hypatia.get_z(opt.alf)
 
-    opt.status = Alfonso.get_status(opt.alf)
-    opt.solvetime = Alfonso.get_solvetime(opt.alf)
-    opt.pobj = Alfonso.get_pobj(opt.alf)
-    opt.dobj = Alfonso.get_dobj(opt.alf)
+    opt.status = Hypatia.get_status(opt.alf)
+    opt.solvetime = Hypatia.get_solvetime(opt.alf)
+    opt.pobj = Hypatia.get_pobj(opt.alf)
+    opt.dobj = Hypatia.get_dobj(opt.alf)
 
     return nothing
 end
