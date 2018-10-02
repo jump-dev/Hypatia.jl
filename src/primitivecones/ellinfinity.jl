@@ -6,7 +6,7 @@
 mutable struct EllInfinityCone <: PrimitiveCone
     dim::Int
     pnt::AbstractVector{Float64}
-    g::AbstractVector{Float64}
+    g::Vector{Float64}
     H::Matrix{Float64}
     H2::Matrix{Float64}
     F
