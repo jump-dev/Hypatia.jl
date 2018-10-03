@@ -181,6 +181,8 @@ function solve!(opt::Optimizer)
     loadpnt!(cone, ls_ts)
     # gradient evaluations at ls_ts of the barrier function for K
     g = similar(ts)
+    H = similar(ts, q, q)
+    @. H = 0.0
     # helper arrays for residuals, right-hand-sides, and search directions
     tmp_tx = similar(tx)
     tmp_tx2 = similar(tx)
@@ -196,53 +198,20 @@ function solve!(opt::Optimizer)
     # |0  A' G'| * |tx| = |0|
     # |A  0  0 |   |ty|   |b|
     # |G  0 -I |   |ts|   |h|
-
-
-
-
-    # Q1x = Q1*Ri'*b
-    # Q2x = Q2*(Symmetric(GQ2'*GQ2)\(GQ2'*(h - G*Q1x)))
-    # tx = Q1x + Q2x
-    # ts = h - G*tx
-    # ty = Ri*Q1'*G'*ts
-
-    # bunchkaufman allocates more than cholesky, but doesn't fail when approximately quasidefinite (TODO could try LDL instead)
-    # TODO does it matter that F could be either type?
-    mul!(Q2GHGQ2, GQ2', GQ2)
-    F = cholesky!(Symmetric(Q2GHGQ2), check=false)
-    if !issuccess(F)
-        opt.verbose && println("linear system matrix was not positive definite")
-        mul!(Q2GHGQ2, Q2', GHGQ2)
-        F = bunchkaufman!(Symmetric(Q2GHGQ2))
-    end
-
-    # Q1x = Q1*Ri'*b
-    mul!(Q1x, RiQ1', b)
-    # Q2x = Q2*(F\(GQ2'*(h - G*Q1x)))
-    mul!(HGxi, G, Q1x)
-    @. HGxi = h - HGxi
-    mul!(Q2div, GQ2', HGxi)
-    ldiv!(F, Q2div)
-    mul!(Q2x, Q2, Q2div)
-    # tx = Q1x + Q2x
-    @. tx = Q1x + Q2x
-    # ts = h - G*tx
-    mul!(ts, G, tx)
-    @. ts = h - ts
-    # ty = Ri*Q1'*G'*ts
-    mul!(bxGHbz, G', ts)
-    mul!(ty, RiQ1, bxGHbz)
-
-
-
+    @. tx = 0.0
+    @. ty = -b
+    @. tz = -h
+    H = Matrix(1.0I, q, q) # TODO use 1.0I
+    solvesinglelinsys!(tx, ty, tz, H, G, opt.L)
+    @. ts = -tz
+    @. ls_ts = ts
 
     # from ts, step along interior direction of cone until ts is inside cone
-    @. ls_ts = ts
     if !incone(cone)
-        tmp_ts = getintdir!(tz, cone)
+        getintdir!(tmp_ts, cone)
         alpha = 1.0 # TODO starting alpha maybe should depend on ls_ts (eg norm like in Hypatia) in case 1.0 is too large/small
-        steps = 0
-        @. ls_ts = ts + alpha*tmp_ts
+        steps = 1
+        @. ls_ts += alpha*tmp_ts
         while !incone(cone)
             steps += 1
             if steps > 25
@@ -400,7 +369,8 @@ function solve!(opt::Optimizer)
         # calculate prediction direction
         @. tmp_ts = tmp_tz
         @. tmp_tz = -tz
-        (tmp_kap, tmp_tau) = solvedoublelinsys!(tmp_tx, tmp_ty, tmp_tz, tmp_ts, -kap, kap + cx + by + hz, mu, tau, opt.L, c, b, G, h, cone)
+        calcHarr!(H, Matrix(mu*I, q, q), cone) # TODO rewrite function to just return the H (or vector of H_k)
+        (tmp_kap, tmp_tau) = solvedoublelinsys!(tmp_tx, tmp_ty, tmp_tz, tmp_ts, -kap, kap + cx + by + hz, mu, tau, H, c, b, G, h, opt.L)
 
         # determine step length alpha by line search
         alpha = alphapred
@@ -484,7 +454,8 @@ function solve!(opt::Optimizer)
             calcg!(g, cone)
             @. tmp_tz = -tz - mu*g
             @. tmp_ts = 0.0
-            (tmp_kap, tmp_tau) = solvedoublelinsys!(tmp_tx, tmp_ty, tmp_tz, tmp_ts, -kap + mu/tau, 0.0, mu, tau, opt.L, c, b, G, h, cone)
+            calcHarr!(H, Matrix(mu*I, q, q), cone) # TODO rewrite function to just return the H (or vector of H_k)
+            (tmp_kap, tmp_tau) = solvedoublelinsys!(tmp_tx, tmp_ty, tmp_tz, tmp_ts, -kap + mu/tau, 0.0, mu, tau, H, c, b, G, h, opt.L)
 
             # determine step length alpha by line search
             alpha = opt.alphacorr
