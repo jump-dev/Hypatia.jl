@@ -124,9 +124,9 @@ function solvesinglelinsys!(
     rhs_tx::Vector{Float64},
     rhs_ty::Vector{Float64},
     rhs_tz::Vector{Float64},
-    L::QRCholCache,
-    G::AbstractMatrix{Float64},
     H::AbstractMatrix{Float64},
+    G::AbstractMatrix{Float64},
+    L::QRCholCache,
     )
 
     (Q2, HG, GHG, GHGQ2, Q2GHGQ2) = (L.Q2, L.HG, L.GHG, L.GHGQ2, L.Q2GHGQ2)
@@ -172,12 +172,12 @@ function solvedoublelinsys!(
     rhs_tau::Float64,
     mu::Float64,
     tau::Float64,
+    H::AbstractMatrix{Float64},
+    c::Vector{Float64},
+    b::Vector{Float64},
+    G::AbstractMatrix{Float64},
+    h::Vector{Float64},
     L::QRCholCache,
-    c,
-    b,
-    G,
-    h,
-    cone,
     )
 
     (Q2, HG, GHG, GHGQ2, Q2GHGQ2, x1, y1, z1) = (L.Q2, L.HG, L.GHG, L.GHGQ2, L.Q2GHGQ2, L.x1, L.y1, L.z1)
@@ -186,14 +186,13 @@ function solvedoublelinsys!(
     # use QR + cholesky method from CVXOPT
     # (1) eliminate equality constraints via QR of A'
     # (2) solve reduced system by cholesky
-    # |0  A'  G'   | * |ux| = |bx|
-    # |A  0   0    |   |uy|   |by|
-    # |G  0  -Hi/mu|   |uz|   |bz|
+    # |0  A' G'  | * |ux| = |bx|
+    # |A  0  0   |   |uy|   |by|
+    # |G  0 -H^-1|   |uz|   |bz|
 
     # A' = [Q1 Q2] * [R1; 0]
-    # factorize Q2' * G' * mu*H * G * Q2
-    calcHarr!(HG, G, cone)
-    @. HG *= mu
+    # factorize Q2' * G' * H * G * Q2
+    mul!(HG, H, G)
     mul!(GHG, G', HG)
     mul!(GHGQ2, GHG, Q2)
     mul!(Q2GHGQ2, Q2', GHGQ2)
@@ -208,20 +207,19 @@ function solvedoublelinsys!(
         F = bunchkaufman!(Symmetric(Q2GHGQ2))
     end
 
-    # (x2, y2, z2) = (rhs_tx, -rhs_ty, -mu*H*rhs_ts - rhs_tz)
+    # (x2, y2, z2) = (rhs_tx, -rhs_ty, -H*rhs_ts - rhs_tz)
     @. rhs_ty *= -1.0
     @. rhs_tz *= -1.0
     if !iszero(rhs_ts)
-        calcHarr!(z1, rhs_ts, cone)
-        @. rhs_tz -= mu*z1
+        mul!(z1, H, rhs_ts)
+        @. rhs_tz -= z1
     end
     solvereducedlinsys!(rhs_tx, rhs_ty, rhs_tz, F, G, L)
 
-    # (x1, y1, z1) = (-c, b, mu*H*h)
+    # (x1, y1, z1) = (-c, b, H*h)
     @. x1 = -c
     @. y1 = b
-    calcHarr!(z1, h, cone)
-    @. z1 *= mu
+    mul!(z1, H, h)
     solvereducedlinsys!(x1, y1, z1, F, G, L)
 
     # combine
@@ -269,5 +267,5 @@ function solvereducedlinsys!(
     mul!(HGxi, HG, xi)
     @. zi = HGxi - zi
 
-    return (xi, yi, zi)
+    return nothing
 end
