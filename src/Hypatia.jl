@@ -4,14 +4,17 @@ Copyright 2018, Chris Coey and contributors
 
 module Hypatia
     using Printf
-    using SparseArrays
     using LinearAlgebra
-    using ForwardDiff
-    using DiffResults
+    using SparseArrays
 
+    import FFTW
+    import Combinatorics
     include("interpolation.jl")
+
+    import ForwardDiff
+    import DiffResults
     include("cone.jl")
-    for primcone in [
+    for primitivecone in [
         "orthant",
         "dualsumofsquares",
         "secondorder",
@@ -21,9 +24,16 @@ module Hypatia
         "positivesemidefinite",
         "ellinfinity",
         ]
-        include(joinpath(@__DIR__, "primitivecones", primcone * ".jl"))
+        include(joinpath(@__DIR__, "primitivecones", primitivecone * ".jl"))
     end
+
     include("linearsystem.jl")
+    for linsyssolver in [
+        "qrcholesky",
+        ]
+        include(joinpath(@__DIR__, "linsyssolvers", linsyssolver * ".jl"))
+    end
+
     include("nativeinterface.jl")
 
     import MathOptInterface

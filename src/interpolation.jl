@@ -11,9 +11,6 @@ and Matlab files in the packages
 - Padua2DM by M. Caliari, S. De Marchi, A. Sommariva, and M. Vianello http://profs.sci.univr.it/~caliari/software.htm
 =#
 
-import FFTW
-import Combinatorics
-
 function interpolate(n, d; calc_w::Bool=false)
     if n == 1
         return cheb2_data(d, calc_w)
