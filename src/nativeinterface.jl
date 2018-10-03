@@ -202,7 +202,7 @@ function solve!(opt::Optimizer)
     @. ty = -b
     @. tz = -h
     H = Matrix(1.0I, q, q) # TODO use 1.0I
-    solvesinglelinsys!(tx, ty, tz, H, G, opt.L)
+    solvelinsys3!(tx, ty, tz, H, opt.L)
     @. ts = -tz
     @. ls_ts = ts
 
@@ -370,7 +370,7 @@ function solve!(opt::Optimizer)
         @. tmp_ts = tmp_tz
         @. tmp_tz = -tz
         calcHarr!(H, Matrix(mu*I, q, q), cone) # TODO rewrite function to just return the H (or vector of H_k)
-        (tmp_kap, tmp_tau) = solvedoublelinsys!(tmp_tx, tmp_ty, tmp_tz, tmp_ts, -kap, kap + cx + by + hz, mu, tau, H, c, b, G, h, opt.L)
+        (tmp_kap, tmp_tau) = solvelinsys6!(tmp_tx, tmp_ty, tmp_tz, tmp_ts, -kap, kap + cx + by + hz, mu, tau, H, opt.L)
 
         # determine step length alpha by line search
         alpha = alphapred
@@ -455,7 +455,7 @@ function solve!(opt::Optimizer)
             @. tmp_tz = -tz - mu*g
             @. tmp_ts = 0.0
             calcHarr!(H, Matrix(mu*I, q, q), cone) # TODO rewrite function to just return the H (or vector of H_k)
-            (tmp_kap, tmp_tau) = solvedoublelinsys!(tmp_tx, tmp_ty, tmp_tz, tmp_ts, -kap + mu/tau, 0.0, mu, tau, H, c, b, G, h, opt.L)
+            (tmp_kap, tmp_tau) = solvelinsys6!(tmp_tx, tmp_ty, tmp_tz, tmp_ts, -kap + mu/tau, 0.0, mu, tau, H, opt.L)
 
             # determine step length alpha by line search
             alpha = opt.alphacorr
