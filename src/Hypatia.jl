@@ -23,6 +23,7 @@ module Hypatia
         ]
         include(joinpath(@__DIR__, "primitivecones", primcone * ".jl"))
     end
+    include("linearsystem.jl")
     include("nativeinterface.jl")
 
     import MathOptInterface

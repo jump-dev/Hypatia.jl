@@ -48,7 +48,7 @@ const polys = Dict{Symbol,NamedTuple}(
         ),
 )
 
-function build_namedpoly!(alf::Hypatia.HypatiaOpt, polyname::Symbol, d::Int)
+function build_namedpoly!(opt::Hypatia.Optimizer, polyname::Symbol, d::Int)
     # get data for named polynomial
     (n, lbs, ubs, deg, fn) = polys[polyname]
     if d < ceil(Int, deg/2)
@@ -74,23 +74,23 @@ function build_namedpoly!(alf::Hypatia.HypatiaOpt, polyname::Symbol, d::Int)
 
     cone = Hypatia.Cone([Hypatia.DualSumOfSquaresCone(U, [P0, PWts...])], [1:U])
 
-    return Hypatia.load_data!(alf, c, A, b, G, h, cone)
+    return Hypatia.load_data!(opt, c, A, b, G, h, cone)
 end
 
-# alf = Hypatia.HypatiaOpt(maxiter=100, verbose=false)
+# opt = Hypatia.Optimizer(maxiter=100, verbose=false)
 
 # select the named polynomial to minimize and the SOS degree (to be squared)
-# build_namedpoly!(alf, :butcher, 2)
-# build_namedpoly!(alf, :caprasse, 4)
-# build_namedpoly!(alf, :goldsteinprice, 7)
-# build_namedpoly!(alf, :heart, 2)
-# build_namedpoly!(alf, :lotkavolterra, 3)
-# build_namedpoly!(alf, :magnetism7, 2)
-# build_namedpoly!(alf, :motzkin, 7)
-# build_namedpoly!(alf, :reactiondiffusion, 4)
-# build_namedpoly!(alf, :robinson, 8)
-# build_namedpoly!(alf, :rosenbrock, 4)
-# build_namedpoly!(alf, :schwefel, 3)
+# build_namedpoly!(opt, :butcher, 2)
+# build_namedpoly!(opt, :caprasse, 4)
+# build_namedpoly!(opt, :goldsteinprice, 7)
+# build_namedpoly!(opt, :heart, 2)
+# build_namedpoly!(opt, :lotkavolterra, 3)
+# build_namedpoly!(opt, :magnetism7, 2)
+# build_namedpoly!(opt, :motzkin, 7)
+# build_namedpoly!(opt, :reactiondiffusion, 4)
+# build_namedpoly!(opt, :robinson, 8)
+# build_namedpoly!(opt, :rosenbrock, 4)
+# build_namedpoly!(opt, :schwefel, 3)
 
 # solve it
-# @time Hypatia.solve!(alf)
+# @time Hypatia.solve!(opt)

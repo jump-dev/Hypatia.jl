@@ -1,3 +1,6 @@
+#=
+Copyright 2018, Chris Coey and contributors
+=#
 
 # cone object
 abstract type PrimitiveCone end
