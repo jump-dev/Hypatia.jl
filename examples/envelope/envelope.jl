@@ -14,7 +14,7 @@ using LinearAlgebra
 using DelimitedFiles
 using Random
 
-function build_envelope!(alf::Hypatia.HypatiaOpt, npoly::Int, deg::Int, n::Int, d::Int; use_data::Bool=false, dense::Bool=false, rseed::Int=1)
+function build_envelope!(opt::Hypatia.Optimizer, npoly::Int, deg::Int, n::Int, d::Int; use_data::Bool=false, dense::Bool=false, rseed::Int=1)
     @assert deg <= d
 
     # generate interpolation
@@ -44,17 +44,17 @@ function build_envelope!(alf::Hypatia.HypatiaOpt, npoly::Int, deg::Int, n::Int, 
 
     cone = Hypatia.Cone([Hypatia.DualSumOfSquaresCone(U, [P, PWts...]) for k in 1:npoly], [1+(k-1)*U:k*U for k in 1:npoly])
 
-    return Hypatia.load_data!(alf, c, A, b, G, h, cone)
+    return Hypatia.load_data!(opt, c, A, b, G, h, cone)
 end
 
-# alf = Hypatia.HypatiaOpt(maxiter=100, verbose=true)
+# opt = Hypatia.Optimizer(maxiter=100, verbose=true)
 
 # optionally use fixed data in folder
 # select number of polynomials and degrees for the envelope
 # select dimension and SOS degree (to be squared)
-# build_envelope!(alf, 2, 5, 1, 5, use_data=true)
-# build_envelope!(alf, 2, 5, 2, 8)
-# build_envelope!(alf, 3, 5, 3, 5)
-# build_envelope!(alf, 2, 3, 3, 5, dense=false)
+# build_envelope!(opt, 2, 5, 1, 5, use_data=true)
+# build_envelope!(opt, 2, 5, 2, 8)
+# build_envelope!(opt, 3, 5, 3, 5)
+# build_envelope!(opt, 2, 3, 3, 5, dense=false)
 
-# @time Hypatia.solve!(alf)
+# @time Hypatia.solve!(opt)

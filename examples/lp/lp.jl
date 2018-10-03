@@ -11,7 +11,7 @@ using SparseArrays
 using DelimitedFiles
 using Random
 
-function build_lp!(alf::Hypatia.HypatiaOpt, m::Int, n::Int; use_data::Bool=false, dense::Bool=false, nzfrac::Float64=1/sqrt(n), tosparse::Bool=false, rseed::Int=1)
+function build_lp!(opt::Hypatia.Optimizer, m::Int, n::Int; use_data::Bool=false, dense::Bool=false, nzfrac::Float64=1/sqrt(n), tosparse::Bool=false, rseed::Int=1)
     # set up problem data
     if use_data
         # use provided data in data folder
@@ -37,15 +37,15 @@ function build_lp!(alf::Hypatia.HypatiaOpt, m::Int, n::Int; use_data::Bool=false
     h = zeros(n)
     cone = Hypatia.Cone([Hypatia.NonnegativeCone(n)], [1:n])
 
-    return Hypatia.load_data!(alf, c, A, b, G, h, cone)
+    return Hypatia.load_data!(opt, c, A, b, G, h, cone)
 end
 
-# alf = Hypatia.HypatiaOpt(maxiter=100, verbose=true)
+# opt = Hypatia.Optimizer(maxiter=100, verbose=true)
 
 # optionally use fixed data in folder
 # select the random matrix size, dense/sparse, sparsity fraction
-# build_lp!(alf, 500, 1000)
-# build_lp!(alf, 500, 1000, use_data=true)
+# build_lp!(opt, 500, 1000)
+# build_lp!(opt, 500, 1000, use_data=true)
 
 # solve it
-# @time Hypatia.solve!(alf)
+# @time Hypatia.solve!(opt)
