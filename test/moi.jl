@@ -40,26 +40,24 @@ config = MOIT.TestConfig(
 
 function testmoi(verbflag::Bool)
     @testset "MathOptInterface tests" begin
-        @testset "Continuous linear problems" begin
-            MOIT.contlineartest(
-                MOIB.SplitInterval{Float64}(
-                    optimizer
-                ),
-                config)
-        end
-
-        @testset "Continuous conic problems" begin
-            exclude = ["rootdet", "logdet", "sdp"] # TODO bridges not working? should not need to exclude in future
-            MOIT.contconictest(
-                # MOIB.SquarePSD{Float64}(
-                MOIB.GeoMean{Float64}(
-                # MOIB.LogDet{Float64}(
-                # MOIB.RootDet{Float64}(
-                    optimizer
-                ),#))),
-                config, exclude)
-        end
+    @testset "Continuous linear problems" begin
+        MOIT.contlineartest(
+            MOIB.SplitInterval{Float64}(
+                optimizer
+            ),
+            config)
     end
-
+    @testset "Continuous conic problems" begin
+        exclude = ["rootdet", "logdet", "sdp"] # TODO bridges not working? should not need to exclude in future
+        MOIT.contconictest(
+            # MOIB.SquarePSD{Float64}(
+            MOIB.GeoMean{Float64}(
+            # MOIB.LogDet{Float64}(
+            # MOIB.RootDet{Float64}(
+                optimizer
+            ),#))),
+            config, exclude)
+    end
+    end
     return nothing
 end

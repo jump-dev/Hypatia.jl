@@ -2,6 +2,9 @@
 solve two symmetric linear systems and combine solutions
 use a method from IterativeSolvers.jl to solve each symmetric system
 =#
+
+# TODO incomplete
+
 mutable struct SymmIterCache <: LinSysCache
 
     function SymmIterCache(

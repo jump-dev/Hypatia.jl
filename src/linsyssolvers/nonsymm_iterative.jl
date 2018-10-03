@@ -2,6 +2,9 @@
 solve a nonsymmetric linear system
 use a method from IterativeSolvers.jl
 =#
+
+# TODO incomplete
+
 mutable struct NonSymmIterCache <: LinSysCache
 
     function NonSymmIterCache(
