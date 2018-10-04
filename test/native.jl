@@ -355,79 +355,82 @@ function testnative(verbflag::Bool; linsyscache=Hypatia.QRCholCache)
         @test Hypatia.get_dobj(opt) ≈ 0.814814 atol=1e-4 rtol=1e-4
     end
 
-    # @testset "Rosenbrock" begin
-    #     opt = Hypatia.Optimizer(verbose=verbflag, tolfeas=1.1e-8)
-    #     build_namedpoly!(opt, :rosenbrock, 3, linsyscache=linsyscache)
-    #     @time Hypatia.solve!(opt)
-    #     @test Hypatia.get_niters(opt) <= 65
-    #     @test Hypatia.get_status(opt) == :Optimal
-    #     @test Hypatia.get_pobj(opt) ≈ 0 atol=1e-2 rtol=1e-2
-    #     @test Hypatia.get_dobj(opt) ≈ 0 atol=1e-3 rtol=1e-3
-    # end
-    #
-    # @testset "Schwefel" begin
-    #     opt = Hypatia.Optimizer(verbose=verbflag)
-    #     build_namedpoly!(opt, :schwefel, 4, linsyscache=linsyscache)
-    #     @time Hypatia.solve!(opt)
-    #     @test Hypatia.get_niters(opt) <= 50
-    #     @test Hypatia.get_status(opt) == :Optimal
-    #     @test Hypatia.get_pobj(opt) ≈ 0 atol=1e-3 rtol=1e-3
-    #     @test Hypatia.get_dobj(opt) ≈ 0 atol=1e-3 rtol=1e-3
-    # end
+    return
 
-    # @testset "large dense lp example (dense A)" begin
-    #     opt = Hypatia.Optimizer(verbose=verbflag)
-    #     build_lp!(opt, 500, 1000, use_data=true, dense=true, linsyscache=linsyscache)
-    #     @time Hypatia.solve!(opt)
-    #     @test Hypatia.get_niters(opt) <= 75
-    #     @test Hypatia.get_status(opt) == :Optimal
-    #     @test Hypatia.get_pobj(opt) ≈ 2055.807 atol=1e-4 rtol=1e-4
-    #     @test Hypatia.get_dobj(opt) ≈ 2055.807 atol=1e-4 rtol=1e-4
-    # end
-    #
-    # @testset "large sparse lp example (sparse A)" begin
-    #     opt = Hypatia.Optimizer(verbose=verbflag)
-    #     build_lp!(opt, 500, 1000, dense=false, nzfrac=10/1000, linsyscache=linsyscache)
-    #     @time Hypatia.solve!(opt)
-    #     @test Hypatia.get_niters(opt) <= 70
-    #     @test Hypatia.get_status(opt) == :Optimal
-    #     @test Hypatia.get_pobj(opt) ≈ Hypatia.get_dobj(opt) atol=1e-4 rtol=1e-4
-    # end
 
-    # @testset "2D poly envelope example (dense vs sparse A)" begin
-    #     # dense methods
-    #     opt2 = Hypatia.Optimizer(verbose=verbflag)
-    #     build_envelope!(opt2, 2, 4, 2, 7, dense=true, linsyscache=linsyscache)
-    #     @time Hypatia.solve!(opt2)
-    #     @test Hypatia.get_niters(opt2) <= 55
-    #     @test Hypatia.get_status(opt2) == :Optimal
-    #
-    #     # sparse methods
-    #     opt1 = Hypatia.Optimizer(verbose=verbflag)
-    #     build_envelope!(opt1, 2, 4, 2, 7, dense=false, linsyscache=linsyscache)
-    #     @time Hypatia.solve!(opt1)
-    #     @test Hypatia.get_niters(opt1) <= 55
-    #     @test Hypatia.get_status(opt1) == :Optimal
-    #
-    #     @test Hypatia.get_pobj(opt2) ≈ Hypatia.get_pobj(opt1) atol=1e-4 rtol=1e-4
-    #     @test Hypatia.get_dobj(opt2) ≈ Hypatia.get_dobj(opt1) atol=1e-4 rtol=1e-4
-    # end
-    #
-    # @testset "3D poly envelope example (sparse A)" begin
-    #     opt = Hypatia.Optimizer(verbose=verbflag)
-    #     build_envelope!(opt, 2, 3, 3, 5, dense=false, linsyscache=linsyscache)
-    #     @time Hypatia.solve!(opt)
-    #     @test Hypatia.get_status(opt) == :Optimal
-    #     @test Hypatia.get_pobj(opt) ≈ Hypatia.get_dobj(opt) atol=1e-4 rtol=1e-4
-    # end
-    #
-    # @testset "4D poly envelope example (sparse A)" begin
-    #     opt = Hypatia.Optimizer(verbose=verbflag, tolrelopt=1e-5, tolabsopt=1e-6, tolfeas=1e-6)
-    #     build_envelope!(opt, 2, 3, 4, 4, dense=false, linsyscache=linsyscache)
-    #     @time Hypatia.solve!(opt)
-    #     @test Hypatia.get_status(opt) == :Optimal
-    #     @test Hypatia.get_pobj(opt) ≈ Hypatia.get_dobj(opt) atol=1e-4 rtol=1e-4
-    # end
+    @testset "Rosenbrock" begin
+        opt = Hypatia.Optimizer(verbose=verbflag, tolfeas=1.1e-8)
+        build_namedpoly!(opt, :rosenbrock, 3, linsyscache=linsyscache)
+        @time Hypatia.solve!(opt)
+        @test Hypatia.get_niters(opt) <= 65
+        @test Hypatia.get_status(opt) == :Optimal
+        @test Hypatia.get_pobj(opt) ≈ 0 atol=1e-2 rtol=1e-2
+        @test Hypatia.get_dobj(opt) ≈ 0 atol=1e-3 rtol=1e-3
+    end
+
+    @testset "Schwefel" begin
+        opt = Hypatia.Optimizer(verbose=verbflag)
+        build_namedpoly!(opt, :schwefel, 4, linsyscache=linsyscache)
+        @time Hypatia.solve!(opt)
+        @test Hypatia.get_niters(opt) <= 50
+        @test Hypatia.get_status(opt) == :Optimal
+        @test Hypatia.get_pobj(opt) ≈ 0 atol=1e-3 rtol=1e-3
+        @test Hypatia.get_dobj(opt) ≈ 0 atol=1e-3 rtol=1e-3
+    end
+
+    @testset "large dense lp example (dense A)" begin
+        opt = Hypatia.Optimizer(verbose=verbflag)
+        build_lp!(opt, 500, 1000, use_data=true, dense=true, linsyscache=linsyscache)
+        @time Hypatia.solve!(opt)
+        @test Hypatia.get_niters(opt) <= 75
+        @test Hypatia.get_status(opt) == :Optimal
+        @test Hypatia.get_pobj(opt) ≈ 2055.807 atol=1e-4 rtol=1e-4
+        @test Hypatia.get_dobj(opt) ≈ 2055.807 atol=1e-4 rtol=1e-4
+    end
+
+    @testset "large sparse lp example (sparse A)" begin
+        opt = Hypatia.Optimizer(verbose=verbflag)
+        build_lp!(opt, 500, 1000, dense=false, nzfrac=10/1000, linsyscache=linsyscache)
+        @time Hypatia.solve!(opt)
+        @test Hypatia.get_niters(opt) <= 70
+        @test Hypatia.get_status(opt) == :Optimal
+        @test Hypatia.get_pobj(opt) ≈ Hypatia.get_dobj(opt) atol=1e-4 rtol=1e-4
+    end
+
+    @testset "2D poly envelope example (dense vs sparse A)" begin
+        # dense methods
+        opt2 = Hypatia.Optimizer(verbose=verbflag)
+        build_envelope!(opt2, 2, 4, 2, 7, dense=true, linsyscache=linsyscache)
+        @time Hypatia.solve!(opt2)
+        @test Hypatia.get_niters(opt2) <= 55
+        @test Hypatia.get_status(opt2) == :Optimal
+
+        # sparse methods
+        opt1 = Hypatia.Optimizer(verbose=verbflag)
+        build_envelope!(opt1, 2, 4, 2, 7, dense=false, linsyscache=linsyscache)
+        @time Hypatia.solve!(opt1)
+        @test Hypatia.get_niters(opt1) <= 55
+        @test Hypatia.get_status(opt1) == :Optimal
+
+        @test Hypatia.get_pobj(opt2) ≈ Hypatia.get_pobj(opt1) atol=1e-4 rtol=1e-4
+        @test Hypatia.get_dobj(opt2) ≈ Hypatia.get_dobj(opt1) atol=1e-4 rtol=1e-4
+    end
+
+    @testset "3D poly envelope example (sparse A)" begin
+        opt = Hypatia.Optimizer(verbose=verbflag)
+        build_envelope!(opt, 2, 3, 3, 5, dense=false, linsyscache=linsyscache)
+        @time Hypatia.solve!(opt)
+        @test Hypatia.get_status(opt) == :Optimal
+        @test Hypatia.get_pobj(opt) ≈ Hypatia.get_dobj(opt) atol=1e-4 rtol=1e-4
+    end
+
+    @testset "4D poly envelope example (sparse A)" begin
+        opt = Hypatia.Optimizer(verbose=verbflag, tolrelopt=1e-5, tolabsopt=1e-6, tolfeas=1e-6)
+        build_envelope!(opt, 2, 3, 4, 4, dense=false, linsyscache=linsyscache)
+        @time Hypatia.solve!(opt)
+        @test Hypatia.get_status(opt) == :Optimal
+        @test Hypatia.get_pobj(opt) ≈ Hypatia.get_dobj(opt) atol=1e-4 rtol=1e-4
+    end
 
     end
     return nothing

@@ -183,8 +183,7 @@ function solve!(opt::Optimizer)
     loadpnt!(cone, ls_ts)
     # gradient evaluations at ls_ts of the barrier function for K
     g = similar(ts)
-    H = similar(ts, q, q)
-    @. H = 0.0
+    H = Matrix(1.0I, q, q)
     # helper arrays for residuals, right-hand-sides, and search directions
     tmp_tx = similar(tx)
     tmp_tx2 = similar(tx)
@@ -203,7 +202,6 @@ function solve!(opt::Optimizer)
     @. tx = 0.0
     @. ty = -b
     @. tz = -h
-    H = Matrix(1.0I, q, q) # TODO use 1.0I
     solvelinsys3!(tx, ty, tz, H, opt.L)
     @. ts = -tz
     @. ls_ts = ts
