@@ -9,6 +9,7 @@ QR + Cholesky factorization (direct) solver
 where M = -I (for initial iterate only) or M = -Hi/mu (Hi is Hessian inverse)
 =#
 mutable struct QRCholCache <: LinSysCache
+    # TODO can probably remove some of the intermediary prealloced arrays after github.com/JuliaLang/julia/issues/23919 is resolved
     c
     b
     G
