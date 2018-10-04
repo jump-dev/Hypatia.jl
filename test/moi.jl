@@ -2,6 +2,8 @@
 Copyright 2018, Chris Coey and contributors
 =#
 
+using MathOptInterface
+MOI = MathOptInterface
 MOIT = MOI.Test
 MOIB = MOI.Bridges
 MOIU = MOI.Utilities

@@ -12,7 +12,8 @@ verbflag = false # test verbosity
 # native interface tests
 # TODO test all interface functions (codecov will help)
 include(joinpath(@__DIR__, "native.jl"))
-testnative(verbflag)
+testnative(verbflag, linsyscache=Hypatia.QRCholCache)
+testnative(verbflag, linsyscache=Hypatia.NaiveCache)
 
 # MathOptInterface tests
 # TODO test with a variety of methods/options (eg various linsys solvers)

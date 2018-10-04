@@ -30,6 +30,7 @@ module Hypatia
     include("linearsystem.jl")
     for linsyssolver in [
         "qrcholesky",
+        "naive",
         ]
         include(joinpath(@__DIR__, "linsyssolvers", linsyssolver * ".jl"))
     end
@@ -37,6 +38,6 @@ module Hypatia
     include("nativeinterface.jl")
 
     import MathOptInterface
-    MOI = MathOptInterface
+    const MOI = MathOptInterface
     include("mathoptinterface.jl")
 end

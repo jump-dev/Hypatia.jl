@@ -127,6 +127,7 @@ function load_data!(
     h::Vector{Float64},
     cone::Cone;
     check::Bool=false, # check rank conditions
+    linsyscache=QRCholCache, # linear system solver cache (see linsyssolvers folder)
     )
 
     # check data consistency
@@ -148,7 +149,8 @@ function load_data!(
         @assert dimension(cone.prms[k]) == length(cone.idxs[k])
     end
 
-    opt.L = QRCholCache(c, A, b, G, h)
+    opt.L = linsyscache(c, A, b, G, h)
+
     opt.c = c
     opt.A = A
     opt.b = b
@@ -220,8 +222,7 @@ function solve!(opt::Optimizer)
             alpha *= 1.5
             @. ls_ts = ts + alpha*tmp_ts
         end
-        # opt.verbose &&
-        println("$steps steps taken for initial iterate")
+        opt.verbose && println("$steps steps taken for initial iterate")
         @. ts = ls_ts
     end
 
