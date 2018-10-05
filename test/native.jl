@@ -355,9 +355,6 @@ function testnative(verbflag::Bool, linsyscache)
         @test Hypatia.get_dobj(opt) ≈ 0.814814 atol=1e-4 rtol=1e-4
     end
 
-    return
-
-
     @testset "Rosenbrock" begin
         opt = Hypatia.Optimizer(verbose=verbflag, tolfeas=1.1e-8)
         build_namedpoly!(opt, :rosenbrock, 3, linsyscache=linsyscache)

@@ -229,6 +229,7 @@ function solve!(opt::Optimizer)
     tau = 1.0
     kap = 1.0
     mu = (dot(tz, ts) + tau*kap)/bnu
+    @assert !isnan(mu)
     @assert abs(1.0 - mu) < 1e-10
     # @assert calcnbhd(tau*kap, mu, copy(tz), copy(tz), cone) < 1e-6
 
