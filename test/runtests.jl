@@ -5,7 +5,7 @@ Copyright 2018, Chris Coey and contributors
 using Hypatia
 using Test
 
-verbflag = false # test verbosity
+verbflag = true # test verbosity
 
 # TODO interpolation tests
 
@@ -13,6 +13,7 @@ verbflag = false # test verbosity
 # TODO test all interface functions (codecov will help)
 include(joinpath(@__DIR__, "native.jl"))
 testnative(verbflag, Hypatia.QRCholCache)
+# testnative(verbflag, Hypatia.QRConjGradCache)
 testnative(verbflag, Hypatia.NaiveCache)
 
 # MathOptInterface tests

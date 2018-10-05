@@ -27,9 +27,11 @@ module Hypatia
         include(joinpath(@__DIR__, "primitivecones", primitivecone * ".jl"))
     end
 
+    import IterativeSolvers
     include("linearsystem.jl")
     for linsyssolver in [
         "qrcholesky",
+        "qrconjgrad",
         "naive",
         ]
         include(joinpath(@__DIR__, "linsyssolvers", linsyssolver * ".jl"))

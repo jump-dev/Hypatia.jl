@@ -12,7 +12,7 @@ using Hypatia
 using LinearAlgebra
 
 # list of currently available named polynomials, see https://people.sc.fsu.edu/~jburkardt/py_src/polynomials/polynomials.html
-const polys = Dict{Symbol,NamedTuple}(
+polys = Dict{Symbol,NamedTuple}(
     :butcher => (n=6, lbs=[-1,-0.1,-0.1,-1,-0.1,-0.1], ubs=[0,0.9,0.5,-0.1,-0.05,-0.03], deg=3,
         fn=((u,v,w,x,y,z) -> z*v^2+y*w^2-u*x^2+x^3+x^2-(1/3)*u+(4/3)*x)
         ),
