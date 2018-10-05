@@ -8,11 +8,11 @@ abstract type PrimitiveCone end
 # TODO reorder primitive cones so easiest ones to check incone are first
 mutable struct Cone
     prms::Vector{PrimitiveCone}
-    idxs::Vector{AbstractVector{Int}}
+    idxs::Vector{UnitRange{Int}}
 end
-Cone() = Cone(PrimitiveCone[], AbstractVector{Int}[])
+Cone() = Cone(PrimitiveCone[], UnitRange{Int}[])
 
-function addprimitivecone!(cone::Cone, prm::PrimitiveCone, idx::AbstractVector{Int})
+function addprimitivecone!(cone::Cone, prm::PrimitiveCone, idx::UnitRange{Int})
     @assert dimension(prm) == length(idx)
     push!(cone.prms, prm)
     push!(cone.idxs, idx)

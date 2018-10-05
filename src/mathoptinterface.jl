@@ -200,101 +200,135 @@ function MOI.copy_to(moiopt::HypatiaOptimizer, src::MOI.ModelLike; copy_names=fa
     constroffsetcone = Vector{Int}()
     cone = Cone()
 
-    # LP constraints: build up one nonnegative cone and/or one nonpositive cone
-    nonnegrows = Int[]
-    nonposrows = Int[]
+    # build up one nonnegative cone
+    nonnegstart = q
 
-    # TODO also use variable bounds to build one L_inf cone
+    for ci in getsrccons(MOI.SingleVariable, MOI.GreaterThan{Float64})
+        i += 1
+        idxmap[ci] = MOI.ConstraintIndex{MOI.SingleVariable, MOI.GreaterThan{Float64}}(i)
+        push!(constroffsetcone, q)
+        q += 1
+        push!(IG, q)
+        push!(JG, idxmap[getconfun(ci).variable].value)
+        push!(VG, -1.0)
+        push!(Ih, q)
+        push!(Vh, -getconset(ci).lower)
+        push!(Vcpc, getconset(ci).lower)
+        push!(Icpc, q)
+    end
 
-    for S in (MOI.GreaterThan{Float64}, MOI.LessThan{Float64})
-        for ci in getsrccons(MOI.SingleVariable, S)
-            i += 1
-            idxmap[ci] = MOI.ConstraintIndex{MOI.SingleVariable, S}(i)
-            push!(constroffsetcone, q)
+    for ci in getsrccons(MOI.ScalarAffineFunction{Float64}, MOI.GreaterThan{Float64})
+        i += 1
+        idxmap[ci] = MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, MOI.GreaterThan{Float64}}(i)
+        push!(constroffsetcone, q)
+        q += 1
+        fi = getconfun(ci)
+        for vt in fi.terms
+            push!(IG, q)
+            push!(JG, idxmap[vt.variable_index].value)
+            push!(VG, -vt.coefficient)
+        end
+        push!(Ih, q)
+        push!(Vh, fi.constant - getconset(ci).lower)
+        push!(Vcpc, getconset(ci).lower)
+        push!(Icpc, q)
+    end
+
+    for ci in getsrccons(MOI.VectorOfVariables, MOI.Nonnegatives)
+        i += 1
+        idxmap[ci] = MOI.ConstraintIndex{MOI.VectorOfVariables, MOI.Nonnegatives}(i)
+        push!(constroffsetcone, q)
+        for vj in getconfun(ci).variables
             q += 1
             push!(IG, q)
-            push!(JG, idxmap[getconfun(ci).variable].value)
+            push!(JG, idxmap[vj].value)
             push!(VG, -1.0)
-            push!(Ih, q)
-            if S == MOI.GreaterThan{Float64}
-                push!(Vh, -getconset(ci).lower)
-                push!(nonnegrows, q)
-                push!(Vcpc, getconset(ci).lower)
-            else
-                push!(Vh, -getconset(ci).upper)
-                push!(nonposrows, q)
-                push!(Vcpc, getconset(ci).upper)
-            end
-            push!(Icpc, q)
         end
+    end
 
-        for ci in getsrccons(MOI.ScalarAffineFunction{Float64}, S)
-            i += 1
-            idxmap[ci] = MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, S}(i)
-            push!(constroffsetcone, q)
+    for ci in getsrccons(MOI.VectorAffineFunction{Float64}, MOI.Nonnegatives)
+        i += 1
+        idxmap[ci] = MOI.ConstraintIndex{MOI.VectorAffineFunction{Float64}, MOI.Nonnegatives}(i)
+        push!(constroffsetcone, q)
+        fi = getconfun(ci)
+        dim = MOI.output_dimension(fi)
+        for vt in fi.terms
+            push!(IG, q + vt.output_index)
+            push!(JG, idxmap[vt.scalar_term.variable_index].value)
+            push!(VG, -vt.scalar_term.coefficient)
+        end
+        append!(Ih, q+1:q+dim)
+        append!(Vh, fi.constants)
+        q += dim
+    end
+
+    addprimitivecone!(cone, NonnegativeCone(q - nonnegstart), nonnegstart+1:q)
+
+    # build up one nonpositive cone
+    nonposstart = q
+
+    for ci in getsrccons(MOI.SingleVariable, MOI.LessThan{Float64})
+        i += 1
+        idxmap[ci] = MOI.ConstraintIndex{MOI.SingleVariable, MOI.LessThan{Float64}}(i)
+        push!(constroffsetcone, q)
+        q += 1
+        push!(IG, q)
+        push!(JG, idxmap[getconfun(ci).variable].value)
+        push!(VG, -1.0)
+        push!(Ih, q)
+        push!(Vh, -getconset(ci).upper)
+        push!(Vcpc, getconset(ci).upper)
+        push!(Icpc, q)
+    end
+
+    for ci in getsrccons(MOI.ScalarAffineFunction{Float64}, MOI.LessThan{Float64})
+        i += 1
+        idxmap[ci] = MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, MOI.LessThan{Float64}}(i)
+        push!(constroffsetcone, q)
+        q += 1
+        fi = getconfun(ci)
+        for vt in fi.terms
+            push!(IG, q)
+            push!(JG, idxmap[vt.variable_index].value)
+            push!(VG, -vt.coefficient)
+        end
+        push!(Ih, q)
+        push!(Vh, fi.constant - getconset(ci).upper)
+        push!(Vcpc, getconset(ci).upper)
+        push!(Icpc, q)
+    end
+
+    for ci in getsrccons(MOI.VectorOfVariables, MOI.Nonpositives)
+        i += 1
+        idxmap[ci] = MOI.ConstraintIndex{MOI.VectorOfVariables, MOI.Nonpositives}(i)
+        push!(constroffsetcone, q)
+        for vj in getconfun(ci).variables
             q += 1
-            fi = getconfun(ci)
-            for vt in fi.terms
-                push!(IG, q)
-                push!(JG, idxmap[vt.variable_index].value)
-                push!(VG, -vt.coefficient)
-            end
-            push!(Ih, q)
-            if S == MOI.GreaterThan{Float64}
-                push!(Vh, fi.constant - getconset(ci).lower)
-                push!(nonnegrows, q)
-                push!(Vcpc, getconset(ci).lower)
-            else
-                push!(Vh, fi.constant - getconset(ci).upper)
-                push!(nonposrows, q)
-                push!(Vcpc, getconset(ci).upper)
-            end
-            push!(Icpc, q)
+            push!(IG, q)
+            push!(JG, idxmap[vj].value)
+            push!(VG, -1.0)
         end
     end
 
-    for S in (MOI.Nonnegatives, MOI.Nonpositives)
-        for ci in getsrccons(MOI.VectorOfVariables, S)
-            i += 1
-            idxmap[ci] = MOI.ConstraintIndex{MOI.VectorOfVariables, S}(i)
-            push!(constroffsetcone, q)
-            for vj in getconfun(ci).variables
-                q += 1
-                push!(IG, q)
-                push!(JG, idxmap[vj].value)
-                push!(VG, -1.0)
-                if S == MOI.Nonnegatives
-                    push!(nonnegrows, q)
-                else
-                    push!(nonposrows, q)
-                end
-            end
+    for ci in getsrccons(MOI.VectorAffineFunction{Float64}, MOI.Nonpositives)
+        i += 1
+        idxmap[ci] = MOI.ConstraintIndex{MOI.VectorAffineFunction{Float64}, MOI.Nonpositives}(i)
+        push!(constroffsetcone, q)
+        fi = getconfun(ci)
+        dim = MOI.output_dimension(fi)
+        for vt in fi.terms
+            push!(IG, q + vt.output_index)
+            push!(JG, idxmap[vt.scalar_term.variable_index].value)
+            push!(VG, -vt.scalar_term.coefficient)
         end
-
-        for ci in getsrccons(MOI.VectorAffineFunction{Float64}, S)
-            i += 1
-            idxmap[ci] = MOI.ConstraintIndex{MOI.VectorAffineFunction{Float64}, S}(i)
-            push!(constroffsetcone, q)
-            fi = getconfun(ci)
-            dim = MOI.output_dimension(fi)
-            for vt in fi.terms
-                push!(IG, q + vt.output_index)
-                push!(JG, idxmap[vt.scalar_term.variable_index].value)
-                push!(VG, -vt.scalar_term.coefficient)
-            end
-            append!(Ih, q+1:q+dim)
-            append!(Vh, fi.constants)
-            if S == MOI.Nonnegatives
-                append!(nonnegrows, q+1:q+dim)
-            else
-                append!(nonposrows, q+1:q+dim)
-            end
-            q += dim
-        end
+        append!(Ih, q+1:q+dim)
+        append!(Vh, fi.constants)
+        q += dim
     end
 
-    addprimitivecone!(cone, NonnegativeCone(length(nonnegrows)), nonnegrows)
-    addprimitivecone!(cone, NonpositiveCone(length(nonposrows)), nonposrows)
+    addprimitivecone!(cone, NonpositiveCone(q - nonposstart), nonposstart+1:q)
+
+    # TODO also use variable bounds to build one L_inf cone
 
     # non-LP conic constraints
 
