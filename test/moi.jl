@@ -28,19 +28,19 @@ MOIU.@model(HypatiaModelData,
     (MOI.VectorAffineFunction,),
     )
 
-optimizer = MOIU.CachingOptimizer(HypatiaModelData{Float64}(), Hypatia.HypatiaOptimizer())
+function testmoi(verbflag::Bool, usedense::Bool)
+    optimizer = MOIU.CachingOptimizer(HypatiaModelData{Float64}(), Hypatia.HypatiaOptimizer(usedense=usedense))
 
-config = MOIT.TestConfig(
-    atol=1e-3,
-    rtol=1e-3,
-    solve=true,
-    query=true,
-    modify_lhs=true,
-    duals=true,
-    infeas_certificates=true,
-    )
+    config = MOIT.TestConfig(
+        atol=1e-3,
+        rtol=1e-3,
+        solve=true,
+        query=true,
+        modify_lhs=true,
+        duals=true,
+        infeas_certificates=true,
+        )
 
-function testmoi(verbflag::Bool)
     @testset "MathOptInterface tests" begin
     @testset "Continuous linear problems" begin
         MOIT.contlineartest(

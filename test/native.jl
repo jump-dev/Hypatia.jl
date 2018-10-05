@@ -7,7 +7,7 @@ include(joinpath(egs_dir, "envelope/envelope.jl"))
 include(joinpath(egs_dir, "lp/lp.jl"))
 include(joinpath(egs_dir, "namedpoly/namedpoly.jl"))
 
-function testnative(verbflag::Bool; linsyscache=Hypatia.QRCholCache)
+function testnative(verbflag::Bool, linsyscache)
     @testset "native interface tests" begin
 
     @testset "small lp 1: nonnegative vs nonpositive orthant" begin

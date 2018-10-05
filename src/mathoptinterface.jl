@@ -4,6 +4,7 @@ Copyright 2018, Chris Coey and contributors
 
 mutable struct HypatiaOptimizer <: MOI.AbstractOptimizer
     opt::Optimizer
+    usedense::Bool
     c::Vector{Float64}          # linear cost vector, size n
     A::AbstractMatrix{Float64}  # equality constraint matrix, size p*n
     b::Vector{Float64}          # equality constraint vector, size p
@@ -26,14 +27,15 @@ mutable struct HypatiaOptimizer <: MOI.AbstractOptimizer
     pobj::Float64
     dobj::Float64
 
-    function HypatiaOptimizer(opt::Optimizer)
+    function HypatiaOptimizer(opt::Optimizer, usedense::Bool)
         moiopt = new()
         moiopt.opt = opt
+        moiopt.usedense = usedense
         return moiopt
     end
 end
 
-HypatiaOptimizer() = HypatiaOptimizer(Optimizer())
+HypatiaOptimizer(; usedense::Bool=true) = HypatiaOptimizer(Optimizer(), usedense)
 
 MOI.get(::HypatiaOptimizer, ::MOI.SolverName) = "Hypatia"
 
@@ -185,9 +187,12 @@ function MOI.copy_to(moiopt::HypatiaOptimizer, src::MOI.ModelLike; copy_names=fa
     end
 
     push!(constroffseteq, p)
-    moiopt.A = Matrix(sparse(IA, JA, VA, p, n))
-    # moiopt.A = dropzeros!(sparse(IA, JA, VA, p, n))
-    moiopt.b = Vector(sparsevec(Ib, Vb, p))
+    if moiopt.usedense
+        moiopt.A = Matrix(sparse(IA, JA, VA, p, n))
+    else
+        moiopt.A = dropzeros!(sparse(IA, JA, VA, p, n))
+    end
+    moiopt.b = Vector(sparsevec(Ib, Vb, p)) # TODO if type less strongly, this can be sparse too
     moiopt.numeqconstrs = i
     moiopt.constrprimeq = Vector(sparsevec(Icpe, Vcpe, p))
     moiopt.constroffseteq = constroffseteq
@@ -365,9 +370,12 @@ function MOI.copy_to(moiopt::HypatiaOptimizer, src::MOI.ModelLike; copy_names=fa
     end
 
     push!(constroffsetcone, q)
-    moiopt.G = Matrix(sparse(IG, JG, VG, q, n))
-    # moiopt.G = dropzeros!(sparse(IG, JG, VG, q, n))
-    moiopt.h = Vector(sparsevec(Ih, Vh, q))
+    if moiopt.usedense
+        moiopt.G = Matrix(sparse(IG, JG, VG, q, n))
+    else
+        moiopt.G = dropzeros!(sparse(IG, JG, VG, q, n))
+    end
+    moiopt.h = Vector(sparsevec(Ih, Vh, q)) # TODO if type less strongly, this can be sparse too
     moiopt.cone = cone
     moiopt.constroffsetcone = constroffsetcone
     moiopt.constrprimcone = Vector(sparsevec(Icpc, Vcpc, q))
