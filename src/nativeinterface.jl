@@ -117,20 +117,19 @@ get_mu(opt::Optimizer) = opt.mu
 get_pobj(opt::Optimizer) = dot(opt.c, opt.x)
 get_dobj(opt::Optimizer) = -dot(opt.b, opt.y) - dot(opt.h, opt.z)
 
-# verify problem data and load into model object
-function load_data!(
-    opt::Optimizer,
+
+
+
+# check data for consistency
+function check_data(
     c::Vector{Float64},
     A::AbstractMatrix{Float64},
     b::Vector{Float64},
     G::AbstractMatrix{Float64},
     h::Vector{Float64},
-    cone::Cone;
-    check::Bool=false, # check rank conditions
-    linsyscache=QRCholCache, # linear system solver cache (see linsyssolvers folder)
+    cone::Cone,
     )
 
-    # check data consistency
     (n, p, q) = (length(c), length(b), length(h))
     @assert n > 0
     @assert p + q > 0
@@ -148,6 +147,133 @@ function load_data!(
     for k in eachindex(cone.prms)
         @assert dimension(cone.prms[k]) == length(cone.idxs[k])
     end
+
+    return nothing
+end
+
+
+# preprocess data (optional)
+function preprocess_data(
+    c::Vector{Float64},
+    A::AbstractMatrix{Float64},
+    b::Vector{Float64},
+    G::AbstractMatrix{Float64},
+    h::Vector{Float64};
+    tol::Float64=1e-10, # presolve tolerance
+    nsamp::Int=3, # number of samples in consistency check
+    )
+
+    (n, p, q) = (length(c), length(b), length(h))
+
+    issparse(A) && error("not implemented for sparse A") # TODO fix
+
+
+    # TODO delete
+    if n < p
+        println("number of equality constraints ($p) exceeds number of variables ($n)")
+    end
+    if rank(A) < p # TODO change to rank(F)
+        println("A matrix is not full-row-rank; some primal equalities may be redundant or inconsistent")
+    end
+    if rank(vcat(A, G)) < n
+        println("[A' G'] is not full-row-rank; some dual equalities may be redundant (i.e. primal variables can be removed) or inconsistent")
+    end
+
+
+    function helppreprocess(M, v)
+        # NOTE different behavior of sparse and dense qr
+        # TODO use a similar approach to the qr procedure in interpolation.jl
+        # F = qr(M', Val(true))
+        # keep_pnt = F.p[1:U]
+        # pts = ipts[keep_pnt,:] # subset of points indexed with the support of w
+        # P0 = M[keep_pnt,1:L] # subset of polynomial evaluations up to total degree d
+        
+        samp = rand(size(M, 2), nsamp)
+        sol = M'\samp
+        keepidxs = [sum(abs(sol[i,j]) for j in 1:nsamp) > tol for i in 1:size(M, 1)]
+        isconsistent = norm(M*(M[keepidxs,:]\v[keepidxs,:]) - v, Inf) < tol
+
+        return (isconsistent, keepidxs)
+    end
+
+    # preprocess primal equality constraints
+    if p > 0
+        (prconsistent, prkeepidxs) = helppreprocess(A, b)
+        if !prconsistent
+            error("some primal equality constraints are inconsistent")
+        end
+        A = A[prkeepidxs,:]
+        b = b[prkeepidxs]
+        # p = length(b)
+    end
+
+    # preprocess dual equality constraints
+    (duconsistent, dukeepidxs) = helppreprocess(hcat(A', G'), c)
+    if !duconsistent
+        error("some dual equality constraints are inconsistent")
+    end
+    A = A[:,dukeepidxs]
+    G = G[:,dukeepidxs]
+    c = c[dukeepidxs]
+    # n = length(c)
+
+    # TODO note h doesn't change
+
+    return (c, A, b, G, h)
+
+
+    #
+    #
+    # # perform QR decomposition of A' for use in some linear system solvers
+    # # TODO reduce allocs, improve efficiency
+    # # A' = [Q1 Q2] * [R1; 0]
+    # if issparse(A)
+    #     # TODO don't reorder to match original: store indices and permute optimal solution
+    #     alf.verbose && println("\nJulia is currently missing some sparse matrix methods that could improve performance; Hypatia may perform better if A is loaded as a dense matrix")
+    #     # TODO currently using dense Q1, Q2, R - probably some should be sparse
+    #     F = qr(sparse(A'))
+    #     @assert length(F.prow) == n
+    #     @assert length(F.pcol) == p
+    #     @assert istriu(F.R)
+    #
+    #     Q = F.Q*Matrix(1.0I, n, n)
+    #     Q1 = zeros(n, p)
+    #     Q1[F.prow, F.pcol] = Q[:, 1:p]
+    #     Q2 = zeros(n, n-p)
+    #     Q2[F.prow, :] = Q[:, p+1:n]
+    #     Ri = zeros(p, p)
+    #     Ri[F.pcol, F.pcol] = inv(UpperTriangular(F.R))
+    # else
+    #     F = qr(A')
+    #     @assert istriu(F.R)
+    #
+    #     Q = F.Q*Matrix(1.0I, n, n)
+    #     Q1 = Q[:, 1:p]
+    #     Q2 = Q[:, p+1:n]
+    #     Ri = inv(UpperTriangular(F.R))
+    #     @assert norm(A'*Ri - Q1) < 1e-8 # TODO delete later
+    # end
+
+
+    # return maps and new data
+end
+
+
+
+
+
+# verify problem data and load into model object
+function load_data!(
+    opt::Optimizer,
+    c::Vector{Float64},
+    A::AbstractMatrix{Float64},
+    b::Vector{Float64},
+    G::AbstractMatrix{Float64},
+    h::Vector{Float64},
+    cone::Cone;
+    check::Bool=false, # check rank conditions
+    linsyscache=QRCholCache, # linear system solver cache (see linsyssolvers folder)
+    )
 
     opt.L = linsyscache(c, A, b, G, h)
 

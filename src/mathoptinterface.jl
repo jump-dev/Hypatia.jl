@@ -385,7 +385,17 @@ end
 
 function MOI.optimize!(moiopt::HypatiaOptimizer)
     opt = moiopt.opt
-    load_data!(opt, moiopt.c, moiopt.A, moiopt.b, moiopt.G, moiopt.h, moiopt.cone) # dense
+    (c, A, b, G, h, cone) = (moiopt.c, moiopt.A, moiopt.b, moiopt.G, moiopt.h, moiopt.cone)
+
+    check_data(c, A, b, G, h, cone)
+
+    # TODO make it optional
+    # TODO handle transformation back
+    (c, A, b, G, h) = preprocess_data(c, A, b, G, h)
+
+    load_data!(opt, c, A, b, G, h, moiopt.cone)
+
+
     solve!(opt)
 
     moiopt.x = get_x(opt)
