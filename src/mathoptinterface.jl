@@ -27,15 +27,16 @@ mutable struct HypatiaOptimizer <: MOI.AbstractOptimizer
     pobj::Float64
     dobj::Float64
 
-    function HypatiaOptimizer(opt::Optimizer, usedense::Bool)
+    function HypatiaOptimizer(opt::Optimizer, verbose::Bool, usedense::Bool)
         moiopt = new()
+        opt.verbose = verbose
         moiopt.opt = opt
         moiopt.usedense = usedense
         return moiopt
     end
 end
 
-HypatiaOptimizer(; usedense::Bool=true) = HypatiaOptimizer(Optimizer(), usedense)
+HypatiaOptimizer(; verbose::Bool=false, usedense::Bool=true) = HypatiaOptimizer(Optimizer(), verbose, usedense)
 
 MOI.get(::HypatiaOptimizer, ::MOI.SolverName) = "Hypatia"
 
@@ -168,6 +169,7 @@ function MOI.copy_to(moiopt::HypatiaOptimizer, src::MOI.ModelLike; copy_names=fa
         append!(IA, p+1:p+dim)
         append!(JA, idxmap[vi].value for vi in fi.variables)
         append!(VA, -ones(dim))
+        p += dim
     end
 
     for ci in getsrccons(MOI.VectorAffineFunction{Float64}, MOI.Zeros)
@@ -390,19 +392,19 @@ function MOI.optimize!(moiopt::HypatiaOptimizer)
     check_data(c, A, b, G, h, cone)
 
     # TODO make it optional
-    # TODO handle transformation back
-    (c, A, b, G, h) = preprocess_data(c, A, b, G, h)
+    (c1, A1, b1, G1, prkeep, dukeep) = preprocess_data(c, A, b, G)
 
-    load_data!(opt, c, A, b, G, h, moiopt.cone)
-
-
+    load_data!(opt, c1, A1, b1, G1, h, moiopt.cone)
     solve!(opt)
 
-    moiopt.x = get_x(opt)
+    moiopt.x = zeros(length(c))
+    moiopt.x[dukeep] = get_x(opt)
     moiopt.constrprimeq += moiopt.b - moiopt.A*moiopt.x
+    moiopt.y = zeros(length(b))
+    moiopt.y[prkeep] = get_y(opt)
+
     moiopt.s = get_s(opt)
     moiopt.constrprimcone += moiopt.s
-    moiopt.y = get_y(opt)
     moiopt.z = get_z(opt)
 
     moiopt.status = get_status(opt)

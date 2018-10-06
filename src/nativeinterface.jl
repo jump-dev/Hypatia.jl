@@ -117,9 +117,6 @@ get_mu(opt::Optimizer) = opt.mu
 get_pobj(opt::Optimizer) = dot(opt.c, opt.x)
 get_dobj(opt::Optimizer) = -dot(opt.b, opt.y) - dot(opt.h, opt.z)
 
-
-
-
 # check data for consistency
 function check_data(
     c::Vector{Float64},
@@ -133,6 +130,9 @@ function check_data(
     (n, p, q) = (length(c), length(b), length(h))
     @assert n > 0
     @assert p + q > 0
+    if n < p
+        println("number of equality constraints ($p) exceeds number of variables ($n)")
+    end
     if n != size(A, 2) || n != size(G, 2)
         error("number of variables is not consistent in A, G, and c")
     end
@@ -151,116 +151,86 @@ function check_data(
     return nothing
 end
 
-
 # preprocess data (optional)
 function preprocess_data(
     c::Vector{Float64},
     A::AbstractMatrix{Float64},
     b::Vector{Float64},
     G::AbstractMatrix{Float64},
-    h::Vector{Float64};
-    tol::Float64=1e-10, # presolve tolerance
-    nsamp::Int=3, # number of samples in consistency check
+    tol::Float64=1e-13, # presolve tolerance
     )
 
-    (n, p, q) = (length(c), length(b), length(h))
-
-    issparse(A) && error("not implemented for sparse A") # TODO fix
-
+    (n, p) = (length(c), length(b))
 
     # TODO delete
-    if n < p
-        println("number of equality constraints ($p) exceeds number of variables ($n)")
-    end
-    if rank(A) < p # TODO change to rank(F)
-        println("A matrix is not full-row-rank; some primal equalities may be redundant or inconsistent")
-    end
-    if rank(vcat(A, G)) < n
-        println("[A' G'] is not full-row-rank; some dual equalities may be redundant (i.e. primal variables can be removed) or inconsistent")
-    end
+    issparse(A) && error("not implemented for sparse A") # TODO fix
 
-
-    function helppreprocess(M, v)
-        # NOTE different behavior of sparse and dense qr
-        # TODO use a similar approach to the qr procedure in interpolation.jl
-        # F = qr(M', Val(true))
-        # keep_pnt = F.p[1:U]
-        # pts = ipts[keep_pnt,:] # subset of points indexed with the support of w
-        # P0 = M[keep_pnt,1:L] # subset of polynomial evaluations up to total degree d
-        
-        samp = rand(size(M, 2), nsamp)
-        sol = M'\samp
-        keepidxs = [sum(abs(sol[i,j]) for j in 1:nsamp) > tol for i in 1:size(M, 1)]
-        isconsistent = norm(M*(M[keepidxs,:]\v[keepidxs,:]) - v, Inf) < tol
-
-        return (isconsistent, keepidxs)
-    end
+    # NOTE rank-revealing QR factorizations may be unreliable, see http://www.math.sjsu.edu/~foster/rankrevealingcode.html
+    # rank of a matrix is number of nonzero diagonal elements of R in QR factorization
+    # TODO handle different behavior of sparse and dense qr
+    # TODO re-use one qr decomp for A' to do the A1\b1 solve (similarly for [A; G]) and return
 
     # preprocess primal equality constraints
+    prkeep = 1:p
     if p > 0
-        (prconsistent, prkeepidxs) = helppreprocess(A, b)
-        if !prconsistent
-            error("some primal equality constraints are inconsistent")
+        AF = qr(A', Val(true)) # pivoted QR
+        AR = AF.R
+        Arank = 0
+        for i in 1:size(AR, 1)
+            if abs(AR[i,i]) > tol
+                Arank += 1
+            end
         end
-        A = A[prkeepidxs,:]
-        b = b[prkeepidxs]
-        # p = length(b)
+
+        if Arank < p
+            prkeep = AF.p[1:Arank]
+            A1 = A[prkeep,:]
+            b1 = b[prkeep]
+
+            # TODO should be able to re-use AF to do the div by getting modified QR fact
+            if norm(A*(A1\b1) - b, Inf) > tol
+                error("some primal equality constraints are inconsistent")
+            end
+
+            A = A1
+            b = b1
+            println("removed $(p - Arank) out of $p primal equality constraints")
+        end
+        p = Arank
     end
 
     # preprocess dual equality constraints
-    (duconsistent, dukeepidxs) = helppreprocess(hcat(A', G'), c)
-    if !duconsistent
-        error("some dual equality constraints are inconsistent")
+    dukeep = 1:n
+    AG = vcat(A, G)
+    AGF = qr(AG, Val(true)) # pivoted QR
+    AGR = AGF.R
+    AGrank = 0
+    for j in 1:size(AGR, 1)
+        if abs(AGR[j,j]) > tol
+            AGrank += 1
+        end
     end
-    A = A[:,dukeepidxs]
-    G = G[:,dukeepidxs]
-    c = c[dukeepidxs]
-    # n = length(c)
 
-    # TODO note h doesn't change
+    if AGrank < n
+        dukeep = AGF.p[1:AGrank]
+        A2 = A[:,dukeep]
+        G2 = G[:,dukeep]
+        c2 = c[dukeep]
 
-    return (c, A, b, G, h)
+        # TODO should be able to re-use AGF to do the div by getting modified QR fact
+        if norm(AG'*(hcat(A2', G2')\-c2) + c, Inf) > tol
+            error("some dual equality constraints are inconsistent")
+        end
 
+        A = A2
+        G = G2
+        c = c2
+        println("removed $(n - AGrank) out of $n dual equality constraints")
+    end
+    n = AGrank
 
-    #
-    #
-    # # perform QR decomposition of A' for use in some linear system solvers
-    # # TODO reduce allocs, improve efficiency
-    # # A' = [Q1 Q2] * [R1; 0]
-    # if issparse(A)
-    #     # TODO don't reorder to match original: store indices and permute optimal solution
-    #     alf.verbose && println("\nJulia is currently missing some sparse matrix methods that could improve performance; Hypatia may perform better if A is loaded as a dense matrix")
-    #     # TODO currently using dense Q1, Q2, R - probably some should be sparse
-    #     F = qr(sparse(A'))
-    #     @assert length(F.prow) == n
-    #     @assert length(F.pcol) == p
-    #     @assert istriu(F.R)
-    #
-    #     Q = F.Q*Matrix(1.0I, n, n)
-    #     Q1 = zeros(n, p)
-    #     Q1[F.prow, F.pcol] = Q[:, 1:p]
-    #     Q2 = zeros(n, n-p)
-    #     Q2[F.prow, :] = Q[:, p+1:n]
-    #     Ri = zeros(p, p)
-    #     Ri[F.pcol, F.pcol] = inv(UpperTriangular(F.R))
-    # else
-    #     F = qr(A')
-    #     @assert istriu(F.R)
-    #
-    #     Q = F.Q*Matrix(1.0I, n, n)
-    #     Q1 = Q[:, 1:p]
-    #     Q2 = Q[:, p+1:n]
-    #     Ri = inv(UpperTriangular(F.R))
-    #     @assert norm(A'*Ri - Q1) < 1e-8 # TODO delete later
-    # end
-
-
-    # return maps and new data
+    return (c, A, b, G, prkeep, dukeep)
 end
-
-
-
-
 
 # verify problem data and load into model object
 function load_data!(
@@ -271,7 +241,6 @@ function load_data!(
     G::AbstractMatrix{Float64},
     h::Vector{Float64},
     cone::Cone;
-    check::Bool=false, # check rank conditions
     linsyscache=QRCholCache, # linear system solver cache (see linsyssolvers folder)
     )
 
