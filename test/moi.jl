@@ -28,8 +28,8 @@ MOIU.@model(HypatiaModelData,
     (MOI.VectorAffineFunction,),
     )
 
-function testmoi(verbflag::Bool, usedense::Bool)
-    optimizer = MOIU.CachingOptimizer(HypatiaModelData{Float64}(), Hypatia.HypatiaOptimizer(usedense=usedense))
+function testmoi(verbose::Bool, usedense::Bool)
+    optimizer = MOIU.CachingOptimizer(HypatiaModelData{Float64}(), Hypatia.HypatiaOptimizer(verbose=verbose, usedense=usedense))
 
     config = MOIT.TestConfig(
         atol=1e-3,
@@ -61,5 +61,6 @@ function testmoi(verbflag::Bool, usedense::Bool)
             config, exclude)
     end
     end
+
     return nothing
 end
