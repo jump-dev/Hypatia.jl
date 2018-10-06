@@ -187,8 +187,12 @@ function preprocess_data(
             A1 = A[prkeep,:]
             b1 = b[prkeep]
 
-            # TODO should be able to re-use AF to do the div by getting modified QR fact
-            if norm(A*(A1\b1) - b, Inf) > tol
+            AR1 = UpperTriangular(AR[1:Arank,1:Arank])
+            AR1i = inv(AR1)
+
+            sol = AF.Q[:,1:Arank]*AR1i'*b1
+
+            if norm(A*sol - b, Inf) > tol
                 error("some primal equality constraints are inconsistent")
             end
 
@@ -216,6 +220,10 @@ function preprocess_data(
         A2 = A[:,dukeep]
         G2 = G[:,dukeep]
         c2 = c[dukeep]
+
+
+
+
 
         # TODO should be able to re-use AGF to do the div by getting modified QR fact
         if norm(AG'*(hcat(A2', G2')\-c2) + c, Inf) > tol
