@@ -163,36 +163,43 @@ function preprocess_data(
 
     (n, p) = (length(c), length(b))
 
-    # TODO delete
-    issparse(A) && error("not implemented for sparse A") # TODO fix
-
     # NOTE (pivoted) QR factorizations are usually rank-revealing but may be unreliable, see http://www.math.sjsu.edu/~foster/rankrevealingcode.html
     # rank of a matrix is number of nonzero diagonal elements of R
-    # TODO handle different behavior of sparse and dense qr
 
     # preprocess dual equality constraints
     dukeep = 1:n
     AG = vcat(A, G)
-    AGF = qr(AG, Val(true)) # pivoted QR
-    AGR = AGF.R
-    AGrank = 0
-    for j in 1:size(AGR, 1)
-        if abs(AGR[j,j]) > tol
-            AGrank += 1
+
+    # get pivoted QR # TODO when Julia has a unified QR interface, replace this
+    if issparse(AG)
+        AGF = qr(AG, tol=tol)
+        AGR = AGF.R
+        AGrank = rank(AGF) # cheap
+    else
+        AGF = qr(AG, Val(true))
+        AGR = AGF.R
+        AGrank = 0
+        for i in 1:size(AGR, 1) # TODO could replace this with rank(AF) when available for both dense and sparse
+            if abs(AGR[i,i]) > tol
+                AGrank += 1
+            end
         end
     end
 
-    AGQ = AGF.Q*Matrix{Float64}(I, n, AGrank)
-    @assert norm(AGQ - AGF.Q[:,1:AGrank]) < 1e-14
-
     if AGrank < n
-        dukeep = AGF.p[1:AGrank]
+        if issparse(AG)
+            dukeep = AGF.pcol[1:AGrank]
+            AGQ1 = Matrix{Float64}(undef, n, AGrank)
+            AGQ1[AGF.prow,:] = AGF.Q*Matrix{Float64}(I, n, AGrank) # TODO could eliminate this allocation
+        else
+            dukeep = AGF.p[1:AGrank]
+            AGQ1 = AGF.Q*Matrix{Float64}(I, n, AGrank) # TODO could eliminate this allocation
+        end
+        AGRiQ1 = UpperTriangular(AGR[1:AGrank,1:AGrank])\AGQ1'
+
         A1 = A[:,dukeep]
         G1 = G[:,dukeep]
         c1 = c[dukeep]
-
-        AGQ1 = AGF.Q*Matrix{Float64}(I, n, AGrank)
-        AGRiQ1 = UpperTriangular(AGR[1:AGrank,1:AGrank])\AGQ1'
 
         if norm(AG'*AGRiQ1'*c1 - c, Inf) > tol
             error("some dual equality constraints are inconsistent")
@@ -202,9 +209,8 @@ function preprocess_data(
         G = G1
         c = c1
         println("removed $(n - AGrank) out of $n dual equality constraints")
+        n = AGrank
     end
-
-    n = AGrank
 
     if p == 0
         # no primal equality constraints to preprocess
@@ -213,12 +219,20 @@ function preprocess_data(
     end
 
     # preprocess primal equality constraints
-    AF = qr(A', Val(true)) # pivoted QR
-    AR = AF.R
-    Arank = 0
-    for i in 1:size(AR, 1)
-        if abs(AR[i,i]) > tol
-            Arank += 1
+    # get pivoted QR # TODO when Julia has a unified QR interface, replace this
+    # TODO LQ decomposition is the QR decomposition of A'
+    if issparse(A)
+        AF = qr(sparse(A'), tol=tol)
+        AR = AF.R
+        Arank = rank(AF) # cheap
+    else
+        AF = qr(A', Val(true))
+        AR = AF.R
+        Arank = 0
+        for i in 1:size(AR, 1) # TODO could replace this with rank(AF) when available for both dense and sparse
+            if abs(AR[i,i]) > tol
+                Arank += 1
+            end
         end
     end
 
@@ -228,13 +242,19 @@ function preprocess_data(
     end
 
     # using QR of A' (requires reordering rows) and/or some primal equalities are dependent
-    prkeep = AF.p[1:Arank]
-    A1 = A[prkeep,:]
-    b1 = b[prkeep]
-
-    AQ = AF.Q*I
+    if issparse(A)
+        prkeep = AF.pcol[1:Arank]
+        AQ = Matrix{Float64}(undef, n, n)
+        AQ[AF.prow,:] = AF.Q*Matrix{Float64}(I, n, n) # TODO could eliminate this allocation
+    else
+        prkeep = AF.p[1:Arank]
+        AQ = AF.Q*Matrix{Float64}(I, n, n) # TODO could eliminate this allocation
+    end
     AQ2 = AQ[:,Arank+1:n]
     ARiQ1 = UpperTriangular(AR[1:Arank,1:Arank])\AQ[:,1:Arank]'
+
+    A1 = A[prkeep,:]
+    b1 = b[prkeep]
 
     if Arank < p
         # some dependent primal equalities, so check if they are consistent
