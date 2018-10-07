@@ -156,8 +156,9 @@ function preprocess_data(
     c::Vector{Float64},
     A::AbstractMatrix{Float64},
     b::Vector{Float64},
-    G::AbstractMatrix{Float64},
-    tol::Float64=1e-13, # presolve tolerance
+    G::AbstractMatrix{Float64};
+    tol::Float64 = 1e-13, # presolve tolerance
+    useQR::Bool = false, # returns QR fact of A' for use in a QR-based linear system solver
     )
 
     (n, p) = (length(c), length(b))
@@ -165,42 +166,9 @@ function preprocess_data(
     # TODO delete
     issparse(A) && error("not implemented for sparse A") # TODO fix
 
-    # NOTE rank-revealing QR factorizations may be unreliable, see http://www.math.sjsu.edu/~foster/rankrevealingcode.html
-    # rank of a matrix is number of nonzero diagonal elements of R in QR factorization
+    # NOTE (pivoted) QR factorizations are usually rank-revealing but may be unreliable, see http://www.math.sjsu.edu/~foster/rankrevealingcode.html
+    # rank of a matrix is number of nonzero diagonal elements of R
     # TODO handle different behavior of sparse and dense qr
-    # TODO re-use one qr decomp for A' to do the A1\b1 solve (similarly for [A; G]) and return
-
-    # preprocess primal equality constraints
-    prkeep = 1:p
-    if p > 0
-        AF = qr(A', Val(true)) # pivoted QR
-        AR = AF.R
-        Arank = 0
-        for i in 1:size(AR, 1)
-            if abs(AR[i,i]) > tol
-                Arank += 1
-            end
-        end
-
-        if Arank < p
-            prkeep = AF.p[1:Arank]
-            A1 = A[prkeep,:]
-            b1 = b[prkeep]
-
-            AR1 = UpperTriangular(AR[1:Arank,1:Arank])
-            AR1i = inv(AR1)
-
-            x1 = AF.Q[:,1:Arank]*AR1i'*b1
-            if norm(A*x1 - b, Inf) > tol
-                error("some primal equality constraints are inconsistent")
-            end
-
-            A = A1
-            b = b1
-            println("removed $(p - Arank) out of $p primal equality constraints")
-        end
-        p = Arank
-    end
 
     # preprocess dual equality constraints
     dukeep = 1:n
@@ -214,17 +182,19 @@ function preprocess_data(
         end
     end
 
+    AGQ = AGF.Q*Matrix{Float64}(I, n, AGrank)
+    @assert norm(AGQ - AGF.Q[:,1:AGrank]) < 1e-14
+
     if AGrank < n
         dukeep = AGF.p[1:AGrank]
         A1 = A[:,dukeep]
         G1 = G[:,dukeep]
         c1 = c[dukeep]
 
-        AGR1 = UpperTriangular(AGR[1:AGrank,1:AGrank])
-        AGR1i = inv(AGR1)
+        AGQ1 = AGF.Q*Matrix{Float64}(I, n, AGrank)
+        AGRiQ1 = UpperTriangular(AGR[1:AGrank,1:AGrank])\AGQ1'
 
-        yz1 = AGF.Q[:,1:AGrank]*AGR1i'*c1
-        if norm(AG'*yz1 - c, Inf) > tol
+        if norm(AG'*AGRiQ1'*c1 - c, Inf) > tol
             error("some dual equality constraints are inconsistent")
         end
 
@@ -233,9 +203,52 @@ function preprocess_data(
         c = c1
         println("removed $(n - AGrank) out of $n dual equality constraints")
     end
+
     n = AGrank
 
-    return (c, A, b, G, prkeep, dukeep)
+    if p == 0
+        # no primal equality constraints to preprocess
+        # TODO use I instead of dense for Q2
+        return (c, A, b, G, 1:0, dukeep, Matrix{Float64}(I, n, n), Matrix{Float64}(I, 0, n))
+    end
+
+    # preprocess primal equality constraints
+    AF = qr(A', Val(true)) # pivoted QR
+    AR = AF.R
+    Arank = 0
+    for i in 1:size(AR, 1)
+        if abs(AR[i,i]) > tol
+            Arank += 1
+        end
+    end
+
+    if !useQR && Arank == p
+        # no primal equalities to remove and QR of A' not needed
+        return (c, A, b, G, 1:p, dukeep, Matrix{Float64}(undef, 0, 0), Matrix{Float64}(undef, 0, 0))
+    end
+
+    # using QR of A' (requires reordering rows) and/or some primal equalities are dependent
+    prkeep = AF.p[1:Arank]
+    A1 = A[prkeep,:]
+    b1 = b[prkeep]
+
+    AQ = AF.Q*I
+    AQ2 = AQ[:,Arank+1:n]
+    ARiQ1 = UpperTriangular(AR[1:Arank,1:Arank])\AQ[:,1:Arank]'
+
+    if Arank < p
+        # some dependent primal equalities, so check if they are consistent
+        x1 = ARiQ1'*b1
+        if norm(A*x1 - b, Inf) > tol
+            error("some primal equality constraints are inconsistent")
+        end
+        println("removed $(p - Arank) out of $p primal equality constraints")
+    end
+
+    A = A1
+    b = b1
+
+    return (c, A, b, G, prkeep, dukeep, AQ2, ARiQ1)
 end
 
 # verify problem data and load into model object
@@ -246,11 +259,9 @@ function load_data!(
     b::Vector{Float64},
     G::AbstractMatrix{Float64},
     h::Vector{Float64},
-    cone::Cone;
-    linsyscache=QRCholCache, # linear system solver cache (see linsyssolvers folder)
+    cone::Cone,
+    L::LinSysCache, # linear system solver cache (see linsyssolvers folder)
     )
-
-    opt.L = linsyscache(c, A, b, G, h)
 
     opt.c = c
     opt.A = A
@@ -258,10 +269,22 @@ function load_data!(
     opt.G = G
     opt.h = h
     opt.cone = cone
+    opt.L = L
     opt.status = :Loaded
 
     return opt
 end
+
+load_data!(
+    opt::Optimizer,
+    c::Vector{Float64},
+    A::AbstractMatrix{Float64},
+    b::Vector{Float64},
+    G::AbstractMatrix{Float64},
+    h::Vector{Float64},
+    cone::Cone;
+    lscachetype = QRCholCache, # linear system solver cache type (see linsyssolvers folder)
+    ) = load_data!(opt, c, A, b, G, h, cone, lscachetype(c, A, b, G, h))
 
 # solve using predictor-corrector algorithm based on homogeneous self-dual embedding
 function solve!(opt::Optimizer)
@@ -421,7 +444,6 @@ function solve!(opt::Optimizer)
         if nres_pr <= opt.tolfeas && nres_du <= opt.tolfeas && (gap <= opt.tolabsopt || (!isnan(relgap) && relgap <= opt.tolrelopt))
             opt.verbose && println("optimal solution found; terminating")
             opt.status = :Optimal
-
             opt.x = tx .*= invtau
             opt.s = ts .*= invtau
             opt.y = ty .*= invtau
@@ -430,7 +452,6 @@ function solve!(opt::Optimizer)
         elseif !isnan(infres_pr) && infres_pr <= opt.tolfeas
             opt.verbose && println("primal infeasibility detected; terminating")
             opt.status = :PrimalInfeasible
-
             invobj = inv(-by - hz)
             opt.x = tx .= NaN
             opt.s = ts .= NaN
@@ -440,7 +461,6 @@ function solve!(opt::Optimizer)
         elseif !isnan(infres_du) && infres_du <= opt.tolfeas
             opt.verbose && println("dual infeasibility detected; terminating")
             opt.status = :DualInfeasible
-
             invobj = inv(-cx)
             opt.x = tx .*= invobj
             opt.s = ts .*= invobj
@@ -450,7 +470,6 @@ function solve!(opt::Optimizer)
         elseif mu <= opt.tolfeas*1e-2 && tau <= opt.tolfeas*1e-2*min(1.0, kap)
             opt.verbose && println("ill-posedness detected; terminating")
             opt.status = :IllPosed
-
             opt.x = tx .= NaN
             opt.s = ts .= NaN
             opt.y = ty .= NaN
@@ -463,6 +482,10 @@ function solve!(opt::Optimizer)
         if iter >= opt.maxiter
             opt.verbose && println("iteration limit reached; terminating")
             opt.status = :IterationLimit
+            opt.x = tx .*= invtau
+            opt.s = ts .*= invtau
+            opt.y = ty .*= invtau
+            opt.z = tz .*= invtau
             break
         end
 
@@ -518,7 +541,6 @@ function solve!(opt::Optimizer)
                 # alpha is very small, so predictor has failed
                 predfail = true
                 opt.verbose && println("predictor could not improve the solution ($nprediters line search steps); terminating")
-                opt.status = :PredictorFail
                 break
             end
 
@@ -526,6 +548,11 @@ function solve!(opt::Optimizer)
             alpha = opt.predlsmulti*alpha # decrease alpha
         end
         if predfail
+            opt.status = :PredictorFail
+            opt.x = tx .*= invtau
+            opt.s = ts .*= invtau
+            opt.y = ty .*= invtau
+            opt.z = tz .*= invtau
             break
         end
 
@@ -575,7 +602,6 @@ function solve!(opt::Optimizer)
                     # corrector failed
                     corrfail = true
                     opt.verbose && println("corrector could not improve the solution ($ncorrlsiters line search steps); terminating")
-                    opt.status = :CorrectorFail
                     break
                 end
 
@@ -604,12 +630,17 @@ function solve!(opt::Optimizer)
                     # outside eta neighborhood, so corrector failed
                     corrfail = true
                     opt.verbose && println("corrector phase finished outside the eta-neighborhood ($ncorrsteps correction steps); terminating")
-                    opt.status = :CorrectorFail
                     break
                 end
             end
         end
         if corrfail
+            opt.status = :CorrectorFail
+            invtau = inv(tau)
+            opt.x = tx .*= invtau
+            opt.s = ts .*= invtau
+            opt.y = ty .*= invtau
+            opt.z = tz .*= invtau
             break
         end
     end
