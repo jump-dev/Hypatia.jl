@@ -14,7 +14,7 @@ using LinearAlgebra
 using DelimitedFiles
 using Random
 
-function build_envelope!(opt::Hypatia.Optimizer, npoly::Int, deg::Int, n::Int, d::Int; use_data::Bool=false, dense::Bool=false, rseed::Int=1, linsyscache=QRCholCache)
+function build_envelope!(opt::Hypatia.Optimizer, npoly::Int, deg::Int, n::Int, d::Int; use_data::Bool=false, dense::Bool=false, rseed::Int=1, lscachetype=QRSymmCache)
     @assert deg <= d
 
     # generate interpolation
@@ -44,7 +44,7 @@ function build_envelope!(opt::Hypatia.Optimizer, npoly::Int, deg::Int, n::Int, d
 
     cone = Hypatia.Cone([Hypatia.DualSumOfSquaresCone(U, [P, PWts...]) for k in 1:npoly], [1+(k-1)*U:k*U for k in 1:npoly])
 
-    return Hypatia.load_data!(opt, c, A, b, G, h, cone, linsyscache=linsyscache)
+    return Hypatia.load_data!(opt, c, A, b, G, h, cone, lscachetype=lscachetype)
 end
 
 # opt = Hypatia.Optimizer(maxiter=100, verbose=true)

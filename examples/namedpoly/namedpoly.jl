@@ -48,7 +48,7 @@ polys = Dict{Symbol,NamedTuple}(
         ),
 )
 
-function build_namedpoly!(opt::Hypatia.Optimizer, polyname::Symbol, d::Int; linsyscache=QRCholCache)
+function build_namedpoly!(opt::Hypatia.Optimizer, polyname::Symbol, d::Int; lscachetype=QRSymmCache)
     # get data for named polynomial
     (n, lbs, ubs, deg, fn) = polys[polyname]
     if d < ceil(Int, deg/2)
@@ -74,7 +74,7 @@ function build_namedpoly!(opt::Hypatia.Optimizer, polyname::Symbol, d::Int; lins
 
     cone = Hypatia.Cone([Hypatia.DualSumOfSquaresCone(U, [P0, PWts...])], [1:U])
 
-    return Hypatia.load_data!(opt, c, A, b, G, h, cone, linsyscache=linsyscache)
+    return Hypatia.load_data!(opt, c, A, b, G, h, cone, lscachetype=lscachetype)
 end
 
 # opt = Hypatia.Optimizer(maxiter=100, verbose=false)

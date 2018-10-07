@@ -295,16 +295,26 @@ function load_data!(
     return opt
 end
 
-load_data!(
-    opt::Optimizer,
-    c::Vector{Float64},
-    A::AbstractMatrix{Float64},
-    b::Vector{Float64},
-    G::AbstractMatrix{Float64},
-    h::Vector{Float64},
-    cone::Cone;
-    lscachetype = QRCholCache, # linear system solver cache type (see linsyssolvers folder)
-    ) = load_data!(opt, c, A, b, G, h, cone, lscachetype(c, A, b, G, h))
+# function load_data!(
+#     opt::Optimizer,
+#     c::Vector{Float64},
+#     A::AbstractMatrix{Float64},
+#     b::Vector{Float64},
+#     G::AbstractMatrix{Float64},
+#     h::Vector{Float64},
+#     cone::Cone;
+#     preprocess::Bool = true,
+#     lscachetype = QRSymmCache, # linear system solver cache type (see linsyssolvers folder)
+#     )
+#
+#     if preprocess || lscachetype == QRSymmCache
+#         # must preprocess
+#
+#     load_data!(opt, c, A, b, G, h, cone, lscachetype(c, A, b, G, h))
+#
+#
+#     return ???
+# end
 
 # solve using predictor-corrector algorithm based on homogeneous self-dual embedding
 function solve!(opt::Optimizer)

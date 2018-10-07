@@ -1,15 +1,16 @@
 #=
 CVXOPT method: solve two symmetric linear systems and combine solutions
-QR + conjugate gradients iterative (indirect) solver
+QR plus either Cholesky factorization or iterative conjugate gradients method
 (1) eliminate equality constraints via QR of A'
-(2) solve reduced system by CG
+(2) solve reduced system by Cholesky or iterative method
 |0  A' G'| * |ux| = |bx|
 |A  0  0 |   |uy|   |by|
 |G  0  M |   |uz|   |bz|
-where M = -I (for initial iterate only) or M = -Hi/mu (Hi is Hessian inverse)
+where M = -I (for initial iterate only) or M = -Hi (Hi is Hessian inverse, pre-scaled by 1/mu)
 =#
-mutable struct QRConjGradCache <: LinSysCache
-    # TODO can probably remove some of the intermediary prealloced arrays after github.com/JuliaLang/julia/issues/23919 is resolved
+mutable struct QRSymmCache <: LinSysCache
+    # TODO can remove some of the intermediary prealloced arrays after github.com/JuliaLang/julia/issues/23919 is resolved
+    useiterative
     c
     b
     G
@@ -24,36 +25,38 @@ mutable struct QRConjGradCache <: LinSysCache
     Q1x
     rhs
     Q2div
-    cgstate
-    lprecond
-    Q2sol
     Q2x
     GHGxi
     HGxi
     x1
     y1
     z1
+    # for iterative only
+    cgstate
+    lprecond
+    Q2sol
 
-    function QRConjGradCache(
+    function QRSymmCache(
         c::Vector{Float64},
         A::AbstractMatrix{Float64},
         b::Vector{Float64},
         G::AbstractMatrix{Float64},
         h::Vector{Float64},
-        Q1::AbstractMatrix{Float64},
         Q2::AbstractMatrix{Float64},
-        Ri::AbstractMatrix{Float64},
+        RiQ1::AbstractMatrix{Float64};
+        useiterative::Bool = false,
         )
 
         L = new()
         (n, p, q) = (length(c), length(b), length(h))
         nmp = n - p
+        L.useiterative = useiterative
         L.c = c
         L.b = b
         L.G = G
         L.h = h
         L.Q2 = Q2
-        L.RiQ1 = Ri*Q1'
+        L.RiQ1 = RiQ1
         L.HG = Matrix{Float64}(undef, q, n) # TODO don't enforce dense on some
         L.GHG = Matrix{Float64}(undef, n, n)
         L.GHGQ2 = Matrix{Float64}(undef, n, nmp)
@@ -62,69 +65,31 @@ mutable struct QRConjGradCache <: LinSysCache
         L.Q1x = Vector{Float64}(undef, n)
         L.rhs = Vector{Float64}(undef, n)
         L.Q2div = Vector{Float64}(undef, nmp)
-        cgu = zeros(nmp)
-        L.cgstate = IterativeSolvers.CGStateVariables{Float64, Vector{Float64}}(cgu, similar(cgu), similar(cgu))
-        L.lprecond = IterativeSolvers.Identity()
-        L.Q2sol = zeros(nmp)
         L.Q2x = Vector{Float64}(undef, n)
         L.GHGxi = Vector{Float64}(undef, n)
         L.HGxi = Vector{Float64}(undef, q)
         L.x1 = Vector{Float64}(undef, n)
         L.y1 = Vector{Float64}(undef, p)
         L.z1 = Vector{Float64}(undef, q)
+        if useiterative
+            cgu = zeros(nmp)
+            L.cgstate = IterativeSolvers.CGStateVariables{Float64, Vector{Float64}}(cgu, similar(cgu), similar(cgu))
+            L.lprecond = IterativeSolvers.Identity()
+            L.Q2sol = zeros(nmp)
+        end
 
         return L
     end
 end
 
-function QRConjGradCache(
+QRSymmCache(
     c::Vector{Float64},
     A::AbstractMatrix{Float64},
     b::Vector{Float64},
     G::AbstractMatrix{Float64},
-    h::Vector{Float64},
-    )
-
-    (n, p, q) = (length(c), length(b), length(h))
-
-    # TODO use dispatch, not manually checking issparse. implement the necessary functions in Julia
-    if issparse(A)
-        println("Julia is currently missing some sparse matrix methods that could improve performance; Hypatia may perform better if A is loaded as a dense matrix")
-        # TODO currently using dense Q1, Q2, R - probably some should be sparse
-        F = qr(sparse(A'))
-        @assert length(F.prow) == n
-        @assert length(F.pcol) == p
-        @assert istriu(F.R)
-
-        Q = F.Q*Matrix(1.0I, n, n)
-        Q1 = zeros(n, p)
-        Q1[F.prow, F.pcol] = Q[:, 1:p]
-        Q2 = zeros(n, n-p)
-        Q2[F.prow, :] = Q[:, p+1:n]
-        Ri = zeros(p, p)
-        Ri[F.pcol, F.pcol] = inv(UpperTriangular(F.R))
-    else
-        F = qr(A')
-        @assert istriu(F.R)
-
-        Q = F.Q*Matrix(1.0I, n, n)
-        Q1 = Q[:, 1:p]
-        Q2 = Q[:, p+1:n]
-        Ri = inv(UpperTriangular(F.R))
-        @assert norm(A'*Ri - Q1) < 1e-8 # TODO delete later
-    end
-
-    # # check rank conditions
-    # # TODO rank for qr decomp should be implemented in Julia - see https://github.com/JuliaLang/julia/blob/f8b52dab77415a22d28497f48407aca92fbbd4c3/stdlib/LinearAlgebra/src/qr.jl#L895
-    # if rank(A) < p # TODO change to rank(F)
-    #     error("A matrix is not full-row-rank; some primal equalities may be redundant or inconsistent")
-    # end
-    # if rank(vcat(A, G)) < n
-    #     error("[A' G'] is not full-row-rank; some dual equalities may be redundant (i.e. primal variables can be removed) or inconsistent")
-    # end
-
-    return QRConjGradCache(c, A, b, G, h, Q1, Q2, Ri)
-end
+    h::Vector{Float64};
+    useiterative::Bool = false,
+    ) = error("to use a QRSymmCache for linear system solves, the data must be preprocessed and Q2 and RiQ1 must be passed into the QRSymmCache constructor")
 
 # solve system for x, y, z
 function solvelinsys3!(
@@ -132,11 +97,10 @@ function solvelinsys3!(
     rhs_ty::Vector{Float64},
     rhs_tz::Vector{Float64},
     H::AbstractMatrix{Float64},
-    L::QRConjGradCache,
+    L::QRSymmCache,
     )
 
     F = helplhs!(H, L)
-
     @. rhs_ty *= -1.0
     @. rhs_tz *= -1.0
     helplinsys!(rhs_tx, rhs_ty, rhs_tz, F, L)
@@ -155,7 +119,7 @@ function solvelinsys6!(
     mu::Float64,
     tau::Float64,
     H::AbstractMatrix{Float64},
-    L::QRConjGradCache,
+    L::QRSymmCache,
     )
 
     # solve two symmetric systems and combine the solutions
@@ -194,7 +158,7 @@ function helplinsys!(
     yi::Vector{Float64},
     zi::Vector{Float64},
     F,
-    L::QRConjGradCache,
+    L::QRSymmCache,
     )
 
     # bxGHbz = bx + G'*Hbz
@@ -207,11 +171,16 @@ function helplinsys!(
     @. L.rhs = L.bxGHbz - L.rhs
     mul!(L.Q2div, L.Q2', L.rhs)
 
-    # TODO use previous solution from same pred/corr (requires knowing if in pred or corr step, and having two Q2sol objects)
-    # TODO allow tol to be loose in early iterations and tighter later (maybe depend on mu)
-    IterativeSolvers.cg!(L.Q2sol, F, L.Q2div, maxiter=10000, tol=1e-13, statevars=L.cgstate, Pl=L.lprecond, verbose=false)
+    if L.useiterative
+        # TODO use previous solution from same pred/corr (requires knowing if in pred or corr step, and having two Q2sol objects)
+        # TODO allow tol to be loose in early iterations and tighter later (maybe depend on mu)
+        IterativeSolvers.cg!(L.Q2sol, F, L.Q2div, maxiter=10000, tol=1e-13, statevars=L.cgstate, Pl=L.lprecond, verbose=false)
+        @. L.Q2div = L.Q2sol
+    else
+        ldiv!(F, L.Q2div)
+    end
 
-    mul!(L.Q2x, L.Q2, L.Q2sol)
+    mul!(L.Q2x, L.Q2, L.Q2div)
     # xi = Q1x + Q2x
     @. xi = L.Q1x + L.Q2x
     # yi = Ri*Q1'*(bxGHbz - GHG*xi)
@@ -225,10 +194,10 @@ function helplinsys!(
     return nothing
 end
 
-# calculate LHS of symmetric positive definite linear system
+# calculate or factorize LHS of symmetric positive definite linear system
 function helplhs!(
     H::AbstractMatrix{Float64},
-    L::QRConjGradCache,
+    L::QRSymmCache,
     )
 
     # Q2' * G' * H * G * Q2
@@ -237,7 +206,18 @@ function helplhs!(
     mul!(L.GHGQ2, L.GHG, L.Q2)
     mul!(L.Q2GHGQ2, L.Q2', L.GHGQ2)
 
-    F = Symmetric(L.Q2GHGQ2)
-
-    return F
+    if L.useiterative
+        return Symmetric(L.Q2GHGQ2)
+    else
+        # bunchkaufman allocates more than cholesky, but doesn't fail when approximately quasidefinite (TODO could try LDL instead)
+        # TODO does it matter that F could be either type?
+        F = cholesky!(Symmetric(L.Q2GHGQ2), check=false)
+        if !issuccess(F)
+            # verbose && # TODO pass this in
+            println("linear system matrix was not positive definite")
+            mul!(L.Q2GHGQ2, L.Q2', L.GHGQ2)
+            F = bunchkaufman!(Symmetric(L.Q2GHGQ2))
+        end
+        return F
+    end
 end
