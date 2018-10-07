@@ -7,7 +7,7 @@ include(joinpath(egs_dir, "envelope/envelope.jl"))
 include(joinpath(egs_dir, "lp/lp.jl"))
 include(joinpath(egs_dir, "namedpoly/namedpoly.jl"))
 
-function testnative(verbose::Bool, linsyscache)
+function testnative(verbose::Bool, lscachetype)
     @testset "native interface tests" begin
 
     @testset "small lp 1: nonnegative vs nonpositive orthant" begin
@@ -21,14 +21,14 @@ function testnative(verbose::Bool, linsyscache)
         opt1 = Hypatia.Optimizer(verbose=verbose)
         G = SparseMatrixCSC(-1.0I, q, n)
         cone = Hypatia.Cone([Hypatia.NonnegativeCone(q)], [1:q])
-        Hypatia.load_data!(opt1, c, A, b, G, h, cone, linsyscache=linsyscache)
+        Hypatia.load_data!(opt1, c, A, b, G, h, cone, lscachetype=lscachetype)
         @time Hypatia.solve!(opt1)
         @test Hypatia.get_status(opt1) == :Optimal
 
         opt2 = Hypatia.Optimizer(verbose=verbose)
         G = SparseMatrixCSC(1.0I, q, n)
         cone = Hypatia.Cone([Hypatia.NonpositiveCone(q)], [1:q])
-        Hypatia.load_data!(opt2, c, A, b, G, h, cone, linsyscache=linsyscache)
+        Hypatia.load_data!(opt2, c, A, b, G, h, cone, lscachetype=lscachetype)
         @time Hypatia.solve!(opt2)
         @test Hypatia.get_status(opt2) == :Optimal
 
@@ -46,7 +46,7 @@ function testnative(verbose::Bool, linsyscache)
         G = rand(q, n) - Matrix(2.0I, q, n)
         h = G*ones(n)
         cone = Hypatia.Cone([Hypatia.NonnegativeCone(q)], [1:q])
-        Hypatia.load_data!(opt, c, A, b, G, h, cone, linsyscache=linsyscache)
+        Hypatia.load_data!(opt, c, A, b, G, h, cone, lscachetype=lscachetype)
         @time Hypatia.solve!(opt)
         @test Hypatia.get_status(opt) == :Optimal
     end
@@ -62,7 +62,7 @@ function testnative(verbose::Bool, linsyscache)
         G = Diagonal(1.0I, n)
         h = zeros(q)
         cone = Hypatia.Cone([Hypatia.NonpositiveCone(q)], [1:q])
-        Hypatia.load_data!(opt, c, A, b, G, h, cone, linsyscache=linsyscache)
+        Hypatia.load_data!(opt, c, A, b, G, h, cone, lscachetype=lscachetype)
         @time Hypatia.solve!(opt)
         @test Hypatia.get_status(opt) == :Optimal
     end
@@ -75,7 +75,7 @@ function testnative(verbose::Bool, linsyscache)
         G = SparseMatrixCSC(-1.0I, 3, 3)
         h = zeros(3)
         cone = Hypatia.Cone([Hypatia.EllInfinityCone(3)], [1:3])
-        Hypatia.load_data!(opt, c, A, b, G, h, cone, linsyscache=linsyscache)
+        Hypatia.load_data!(opt, c, A, b, G, h, cone, lscachetype=lscachetype)
         @time Hypatia.solve!(opt)
         @test Hypatia.get_niters(opt) <= 20
         @test Hypatia.get_status(opt) == :Optimal
@@ -94,7 +94,7 @@ function testnative(verbose::Bool, linsyscache)
         G = rand(6, 6)
         h = G*ones(6)
         cone = Hypatia.Cone([Hypatia.EllInfinityCone(6)], [1:6])
-        Hypatia.load_data!(opt, c, A, b, G, h, cone, linsyscache=linsyscache)
+        Hypatia.load_data!(opt, c, A, b, G, h, cone, lscachetype=lscachetype)
         @time Hypatia.solve!(opt)
         @test Hypatia.get_niters(opt) <= 20
         @test Hypatia.get_status(opt) == :Optimal
@@ -110,7 +110,7 @@ function testnative(verbose::Bool, linsyscache)
         G = SparseMatrixCSC(-1.0I, 3, 3)
         h = zeros(3)
         cone = Hypatia.Cone([Hypatia.SecondOrderCone(3)], [1:3])
-        Hypatia.load_data!(opt, c, A, b, G, h, cone, linsyscache=linsyscache)
+        Hypatia.load_data!(opt, c, A, b, G, h, cone, lscachetype=lscachetype)
         @time Hypatia.solve!(opt)
         @test Hypatia.get_niters(opt) <= 15
         @test Hypatia.get_status(opt) == :Optimal
@@ -128,7 +128,7 @@ function testnative(verbose::Bool, linsyscache)
         G = SparseMatrixCSC(-1.0I, 4, 4)
         h = zeros(4)
         cone = Hypatia.Cone([Hypatia.RotatedSecondOrderCone(4)], [1:4])
-        Hypatia.load_data!(opt, c, A, b, G, h, cone, linsyscache=linsyscache)
+        Hypatia.load_data!(opt, c, A, b, G, h, cone, lscachetype=lscachetype)
         @time Hypatia.solve!(opt)
         @test Hypatia.get_niters(opt) <= 15
         @test Hypatia.get_status(opt) == :Optimal
@@ -145,7 +145,7 @@ function testnative(verbose::Bool, linsyscache)
         G = SparseMatrixCSC(-1.0I, 3, 3)
         h = zeros(3)
         cone = Hypatia.Cone([Hypatia.RotatedSecondOrderCone(3)], [1:3])
-        Hypatia.load_data!(opt, c, A, b, G, h, cone, linsyscache=linsyscache)
+        Hypatia.load_data!(opt, c, A, b, G, h, cone, lscachetype=lscachetype)
         @time Hypatia.solve!(opt)
         @test Hypatia.get_niters(opt) <= 20
         @test Hypatia.get_status(opt) == :Optimal
@@ -162,7 +162,7 @@ function testnative(verbose::Bool, linsyscache)
         G = SparseMatrixCSC(-1.0I, 3, 3)
         h = zeros(3)
         cone = Hypatia.Cone([Hypatia.PositiveSemidefiniteCone(3)], [1:3])
-        Hypatia.load_data!(opt, c, A, b, G, h, cone, linsyscache=linsyscache)
+        Hypatia.load_data!(opt, c, A, b, G, h, cone, lscachetype=lscachetype)
         @time Hypatia.solve!(opt)
         @test Hypatia.get_niters(opt) <= 15
         @test Hypatia.get_status(opt) == :Optimal
@@ -179,7 +179,7 @@ function testnative(verbose::Bool, linsyscache)
         G = SparseMatrixCSC(-1.0I, 6, 6)
         h = zeros(6)
         cone = Hypatia.Cone([Hypatia.PositiveSemidefiniteCone(6)], [1:6])
-        Hypatia.load_data!(opt, c, A, b, G, h, cone, linsyscache=linsyscache)
+        Hypatia.load_data!(opt, c, A, b, G, h, cone, lscachetype=lscachetype)
         @time Hypatia.solve!(opt)
         @test Hypatia.get_niters(opt) <= 20
         @test Hypatia.get_status(opt) == :Optimal
@@ -196,7 +196,7 @@ function testnative(verbose::Bool, linsyscache)
         G = SparseMatrixCSC(-1.0I, 3, 3)
         h = zeros(3)
         cone = Hypatia.Cone([Hypatia.ExponentialCone()], [1:3])
-        Hypatia.load_data!(opt, c, A, b, G, h, cone, linsyscache=linsyscache)
+        Hypatia.load_data!(opt, c, A, b, G, h, cone, lscachetype=lscachetype)
         @time Hypatia.solve!(opt)
         @test Hypatia.get_niters(opt) <= 20
         @test Hypatia.get_status(opt) == :Optimal
@@ -216,7 +216,7 @@ function testnative(verbose::Bool, linsyscache)
         G = SparseMatrixCSC(-1.0I, 6, 6)[[4, 1, 2, 5, 3, 6], :]
         h = zeros(6)
         cone = Hypatia.Cone([Hypatia.PowerCone([0.2, 0.8]), Hypatia.PowerCone([0.4, 0.6])], [1:3, 4:6])
-        Hypatia.load_data!(opt, c, A, b, G, h, cone, linsyscache=linsyscache)
+        Hypatia.load_data!(opt, c, A, b, G, h, cone, lscachetype=lscachetype)
         @time Hypatia.solve!(opt)
         @test Hypatia.get_niters(opt) <= 25
         @test Hypatia.get_status(opt) == :Optimal
@@ -228,14 +228,14 @@ function testnative(verbose::Bool, linsyscache)
     @testset "small dense lp example (dense vs sparse A)" begin
         # dense methods
         opt2 = Hypatia.Optimizer(verbose=verbose)
-        build_lp!(opt2, 50, 100, dense=true, tosparse=false, linsyscache=linsyscache)
+        build_lp!(opt2, 50, 100, dense=true, tosparse=false, lscachetype=lscachetype)
         @time Hypatia.solve!(opt2)
         @test Hypatia.get_niters(opt2) <= 40
         @test Hypatia.get_status(opt2) == :Optimal
 
         # sparse methods
         opt1 = Hypatia.Optimizer(verbose=verbose)
-        build_lp!(opt1, 50, 100, dense=true, tosparse=true, linsyscache=linsyscache)
+        build_lp!(opt1, 50, 100, dense=true, tosparse=true, lscachetype=lscachetype)
         @time Hypatia.solve!(opt1)
         @test Hypatia.get_niters(opt1) <= 40
         @test Hypatia.get_status(opt1) == :Optimal
@@ -247,7 +247,7 @@ function testnative(verbose::Bool, linsyscache)
     @testset "1D poly envelope example (dense vs sparse A)" begin
         # dense methods
         opt2 = Hypatia.Optimizer(verbose=verbose)
-        build_envelope!(opt2, 2, 5, 1, 5, use_data=true, dense=true, linsyscache=linsyscache)
+        build_envelope!(opt2, 2, 5, 1, 5, use_data=true, dense=true, lscachetype=lscachetype)
         @time Hypatia.solve!(opt2)
         @test Hypatia.get_niters(opt2) <= 30
         @test Hypatia.get_status(opt2) == :Optimal
@@ -256,7 +256,7 @@ function testnative(verbose::Bool, linsyscache)
 
         # sparse methods
         opt1 = Hypatia.Optimizer(verbose=verbose)
-        build_envelope!(opt1, 2, 5, 1, 5, use_data=true, dense=false, linsyscache=linsyscache)
+        build_envelope!(opt1, 2, 5, 1, 5, use_data=true, dense=false, lscachetype=lscachetype)
         @time Hypatia.solve!(opt1)
         @test Hypatia.get_niters(opt1) <= 30
         @test Hypatia.get_status(opt1) == :Optimal
@@ -267,7 +267,7 @@ function testnative(verbose::Bool, linsyscache)
     # most values taken from https://people.sc.fsu.edu/~jburkardt/py_src/polynomials/polynomials.html
     @testset "Butcher" begin
         opt = Hypatia.Optimizer(verbose=verbose)
-        build_namedpoly!(opt, :butcher, 2, linsyscache=linsyscache)
+        build_namedpoly!(opt, :butcher, 2, lscachetype=lscachetype)
         @time Hypatia.solve!(opt)
         @test Hypatia.get_niters(opt) <= 40
         @test Hypatia.get_status(opt) == :Optimal
@@ -277,7 +277,7 @@ function testnative(verbose::Bool, linsyscache)
 
     @testset "Caprasse" begin
         opt = Hypatia.Optimizer(verbose=verbose, tolfeas=5e-7)
-        build_namedpoly!(opt, :caprasse, 4, linsyscache=linsyscache)
+        build_namedpoly!(opt, :caprasse, 4, lscachetype=lscachetype)
         @time Hypatia.solve!(opt)
         @test Hypatia.get_niters(opt) <= 45
         @test Hypatia.get_status(opt) == :Optimal
@@ -287,7 +287,7 @@ function testnative(verbose::Bool, linsyscache)
 
     # @testset "Goldstein-Price" begin
     #     opt = Hypatia.Optimizer(verbose=verbose, tolfeas=1e-10)
-    #     build_namedpoly!(opt, :goldsteinprice, 7, linsyscache=linsyscache)
+    #     build_namedpoly!(opt, :goldsteinprice, 7, lscachetype=lscachetype)
     #     @time Hypatia.solve!(opt)
     #     @test Hypatia.get_niters(opt) <= 60
     #     @test Hypatia.get_status(opt) == :Optimal
@@ -298,7 +298,7 @@ function testnative(verbose::Bool, linsyscache)
     # out of memory during interpolation calculations
     # @testset "Heart" begin
     #     opt = Hypatia.Optimizer(verbose=verbose)
-    #     build_namedpoly!(opt, :heart, 2, linsyscache=linsyscache)
+    #     build_namedpoly!(opt, :heart, 2, lscachetype=lscachetype)
     #     @time Hypatia.solve!(opt)
     #     @test Hypatia.get_status(opt) == :Optimal
     #     @test Hypatia.get_pobj(opt) ≈ -1.36775 atol=1e-4 rtol=1e-4
@@ -307,7 +307,7 @@ function testnative(verbose::Bool, linsyscache)
 
     @testset "Lotka-Volterra" begin
         opt = Hypatia.Optimizer(verbose=verbose)
-        build_namedpoly!(opt, :lotkavolterra, 3, linsyscache=linsyscache)
+        build_namedpoly!(opt, :lotkavolterra, 3, lscachetype=lscachetype)
         @time Hypatia.solve!(opt)
         @test Hypatia.get_niters(opt) <= 35
         @test Hypatia.get_status(opt) == :Optimal
@@ -318,7 +318,7 @@ function testnative(verbose::Bool, linsyscache)
     # out of memory during interpolation calculations
     # @testset "Magnetism-7" begin
     #     opt = Hypatia.Optimizer(verbose=verbose)
-    #     build_namedpoly!(opt, :magnetism7, 2, linsyscache=linsyscache)
+    #     build_namedpoly!(opt, :magnetism7, 2, lscachetype=lscachetype)
     #     @time Hypatia.solve!(opt)
     #     @test Hypatia.get_status(opt) == :Optimal
     #     @test Hypatia.get_pobj(opt) ≈ -0.25 atol=1e-4 rtol=1e-4
@@ -327,7 +327,7 @@ function testnative(verbose::Bool, linsyscache)
 
     @testset "Motzkin" begin
         opt = Hypatia.Optimizer(verbose=verbose, tolrelopt=1e-5, tolabsopt=1e-6, tolfeas=1e-6)
-        build_namedpoly!(opt, :motzkin, 7, linsyscache=linsyscache)
+        build_namedpoly!(opt, :motzkin, 7, lscachetype=lscachetype)
         @time Hypatia.solve!(opt)
         @test Hypatia.get_niters(opt) <= 35
         @test Hypatia.get_status(opt) == :Optimal
@@ -337,7 +337,7 @@ function testnative(verbose::Bool, linsyscache)
 
     @testset "Reaction-diffusion" begin
         opt = Hypatia.Optimizer(verbose=verbose)
-        build_namedpoly!(opt, :reactiondiffusion, 4, linsyscache=linsyscache)
+        build_namedpoly!(opt, :reactiondiffusion, 4, lscachetype=lscachetype)
         @time Hypatia.solve!(opt)
         @test Hypatia.get_niters(opt) <= 35
         @test Hypatia.get_status(opt) == :Optimal
@@ -347,7 +347,7 @@ function testnative(verbose::Bool, linsyscache)
 
     @testset "Robinson" begin
         opt = Hypatia.Optimizer(verbose=verbose)
-        build_namedpoly!(opt, :robinson, 8, linsyscache=linsyscache)
+        build_namedpoly!(opt, :robinson, 8, lscachetype=lscachetype)
         @time Hypatia.solve!(opt)
         @test Hypatia.get_niters(opt) <= 40
         @test Hypatia.get_status(opt) == :Optimal
@@ -357,7 +357,7 @@ function testnative(verbose::Bool, linsyscache)
 
     @testset "Rosenbrock" begin
         opt = Hypatia.Optimizer(verbose=verbose, tolfeas=1.1e-8)
-        build_namedpoly!(opt, :rosenbrock, 3, linsyscache=linsyscache)
+        build_namedpoly!(opt, :rosenbrock, 3, lscachetype=lscachetype)
         @time Hypatia.solve!(opt)
         @test Hypatia.get_niters(opt) <= 65
         @test Hypatia.get_status(opt) == :Optimal
@@ -367,7 +367,7 @@ function testnative(verbose::Bool, linsyscache)
 
     @testset "Schwefel" begin
         opt = Hypatia.Optimizer(verbose=verbose)
-        build_namedpoly!(opt, :schwefel, 4, linsyscache=linsyscache)
+        build_namedpoly!(opt, :schwefel, 4, lscachetype=lscachetype)
         @time Hypatia.solve!(opt)
         @test Hypatia.get_niters(opt) <= 50
         @test Hypatia.get_status(opt) == :Optimal
@@ -377,7 +377,7 @@ function testnative(verbose::Bool, linsyscache)
 
     @testset "large dense lp example (dense A)" begin
         opt = Hypatia.Optimizer(verbose=verbose)
-        build_lp!(opt, 500, 1000, use_data=true, dense=true, linsyscache=linsyscache)
+        build_lp!(opt, 500, 1000, use_data=true, dense=true, lscachetype=lscachetype)
         @time Hypatia.solve!(opt)
         @test Hypatia.get_niters(opt) <= 75
         @test Hypatia.get_status(opt) == :Optimal
@@ -387,7 +387,7 @@ function testnative(verbose::Bool, linsyscache)
 
     @testset "large sparse lp example (sparse A)" begin
         opt = Hypatia.Optimizer(verbose=verbose)
-        build_lp!(opt, 500, 1000, dense=false, nzfrac=10/1000, linsyscache=linsyscache)
+        build_lp!(opt, 500, 1000, dense=false, nzfrac=10/1000, lscachetype=lscachetype)
         @time Hypatia.solve!(opt)
         @test Hypatia.get_niters(opt) <= 70
         @test Hypatia.get_status(opt) == :Optimal
@@ -397,14 +397,14 @@ function testnative(verbose::Bool, linsyscache)
     @testset "2D poly envelope example (dense vs sparse A)" begin
         # dense methods
         opt2 = Hypatia.Optimizer(verbose=verbose)
-        build_envelope!(opt2, 2, 4, 2, 7, dense=true, linsyscache=linsyscache)
+        build_envelope!(opt2, 2, 4, 2, 7, dense=true, lscachetype=lscachetype)
         @time Hypatia.solve!(opt2)
         @test Hypatia.get_niters(opt2) <= 55
         @test Hypatia.get_status(opt2) == :Optimal
 
         # sparse methods
         opt1 = Hypatia.Optimizer(verbose=verbose)
-        build_envelope!(opt1, 2, 4, 2, 7, dense=false, linsyscache=linsyscache)
+        build_envelope!(opt1, 2, 4, 2, 7, dense=false, lscachetype=lscachetype)
         @time Hypatia.solve!(opt1)
         @test Hypatia.get_niters(opt1) <= 55
         @test Hypatia.get_status(opt1) == :Optimal
@@ -415,7 +415,7 @@ function testnative(verbose::Bool, linsyscache)
 
     @testset "3D poly envelope example (sparse A)" begin
         opt = Hypatia.Optimizer(verbose=verbose)
-        build_envelope!(opt, 2, 3, 3, 5, dense=false, linsyscache=linsyscache)
+        build_envelope!(opt, 2, 3, 3, 5, dense=false, lscachetype=lscachetype)
         @time Hypatia.solve!(opt)
         @test Hypatia.get_status(opt) == :Optimal
         @test Hypatia.get_pobj(opt) ≈ Hypatia.get_dobj(opt) atol=1e-4 rtol=1e-4
@@ -423,7 +423,7 @@ function testnative(verbose::Bool, linsyscache)
 
     @testset "4D poly envelope example (sparse A)" begin
         opt = Hypatia.Optimizer(verbose=verbose, tolrelopt=1e-5, tolabsopt=1e-6, tolfeas=1e-6)
-        build_envelope!(opt, 2, 3, 4, 4, dense=false, linsyscache=linsyscache)
+        build_envelope!(opt, 2, 3, 4, 4, dense=false, lscachetype=lscachetype)
         @time Hypatia.solve!(opt)
         @test Hypatia.get_status(opt) == :Optimal
         @test Hypatia.get_pobj(opt) ≈ Hypatia.get_dobj(opt) atol=1e-4 rtol=1e-4
