@@ -190,9 +190,8 @@ function preprocess_data(
             AR1 = UpperTriangular(AR[1:Arank,1:Arank])
             AR1i = inv(AR1)
 
-            sol = AF.Q[:,1:Arank]*AR1i'*b1
-
-            if norm(A*sol - b, Inf) > tol
+            x1 = AF.Q[:,1:Arank]*AR1i'*b1
+            if norm(A*x1 - b, Inf) > tol
                 error("some primal equality constraints are inconsistent")
             end
 
@@ -217,22 +216,21 @@ function preprocess_data(
 
     if AGrank < n
         dukeep = AGF.p[1:AGrank]
-        A2 = A[:,dukeep]
-        G2 = G[:,dukeep]
-        c2 = c[dukeep]
+        A1 = A[:,dukeep]
+        G1 = G[:,dukeep]
+        c1 = c[dukeep]
 
+        AGR1 = UpperTriangular(AGR[1:AGrank,1:AGrank])
+        AGR1i = inv(AGR1)
 
-
-
-
-        # TODO should be able to re-use AGF to do the div by getting modified QR fact
-        if norm(AG'*(hcat(A2', G2')\-c2) + c, Inf) > tol
+        yz1 = AGF.Q[:,1:AGrank]*AGR1i'*c1
+        if norm(AG'*yz1 - c, Inf) > tol
             error("some dual equality constraints are inconsistent")
         end
 
-        A = A2
-        G = G2
-        c = c2
+        A = A1
+        G = G1
+        c = c1
         println("removed $(n - AGrank) out of $n dual equality constraints")
     end
     n = AGrank
