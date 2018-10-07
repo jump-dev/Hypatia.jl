@@ -78,7 +78,13 @@ conefrommoi(s::MOI.ExponentialCone) = ExponentialCone()
 
 # build representation as min c'x s.t. Ax = b, x in K
 # TODO what if some variables x are in multiple cone constraints?
-function MOI.copy_to(moiopt::HypatiaOptimizer, src::MOI.ModelLike; copy_names=false, warn_attributes=true)
+function MOI.copy_to(
+    moiopt::HypatiaOptimizer,
+    src::MOI.ModelLike;
+    copy_names::Bool = false,
+    warn_attributes::Bool = true,
+    )
+
     @assert !copy_names
     idxmap = Dict{MOI.Index, MOI.Index}()
 
@@ -392,9 +398,11 @@ function MOI.optimize!(moiopt::HypatiaOptimizer)
     check_data(c, A, b, G, h, cone)
 
     # TODO make it optional
-    (c1, A1, b1, G1, prkeep, dukeep) = preprocess_data(c, A, b, G)
+    (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = preprocess_data(c, A, b, G, useQR=true)
 
-    load_data!(opt, c1, A1, b1, G1, h, moiopt.cone)
+    L = QRCholCache(c1, A1, b1, G1, h, Q2, RiQ1)
+    load_data!(opt, c1, A1, b1, G1, h, cone, L)
+
     solve!(opt)
 
     moiopt.x = zeros(length(c))

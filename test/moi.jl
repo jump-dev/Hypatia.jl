@@ -32,13 +32,13 @@ function testmoi(verbose::Bool, usedense::Bool)
     optimizer = MOIU.CachingOptimizer(HypatiaModelData{Float64}(), Hypatia.HypatiaOptimizer(verbose=verbose, usedense=usedense))
 
     config = MOIT.TestConfig(
-        atol=1e-3,
-        rtol=1e-3,
-        solve=true,
-        query=true,
-        modify_lhs=true,
-        duals=true,
-        infeas_certificates=true,
+        atol = 1e-3,
+        rtol = 1e-3,
+        solve = true,
+        query = true,
+        modify_lhs = true,
+        duals = true,
+        infeas_certificates = true,
         )
 
     @testset "MathOptInterface tests" begin

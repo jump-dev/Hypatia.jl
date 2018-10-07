@@ -37,9 +37,8 @@ mutable struct QRCholCache <: LinSysCache
         b::Vector{Float64},
         G::AbstractMatrix{Float64},
         h::Vector{Float64},
-        Q1::AbstractMatrix{Float64},
         Q2::AbstractMatrix{Float64},
-        Ri::AbstractMatrix{Float64},
+        RiQ1::AbstractMatrix{Float64},
         )
 
         L = new()
@@ -50,7 +49,7 @@ mutable struct QRCholCache <: LinSysCache
         L.G = G
         L.h = h
         L.Q2 = Q2
-        L.RiQ1 = Ri*Q1'
+        L.RiQ1 = RiQ1
         L.HG = Matrix{Float64}(undef, q, n) # TODO don't enforce dense on some
         L.GHG = Matrix{Float64}(undef, n, n)
         L.GHGQ2 = Matrix{Float64}(undef, n, nmp)
@@ -95,7 +94,7 @@ function QRCholCache(
         Q2 = zeros(n, n-p)
         Q2[F.prow, :] = Q[:, p+1:n]
         Ri = zeros(p, p)
-        Ri[F.pcol, F.pcol] = inv(UpperTriangular(F.R))
+        Ri[F.pcol, F.pcol] = inv(UpperTriangular(F.R))  # TODO make RiQ1 by ldiv! instead
     else
         F = qr(A')
         @assert istriu(F.R)
@@ -103,7 +102,7 @@ function QRCholCache(
         Q = F.Q*Matrix(1.0I, n, n)
         Q1 = Q[:, 1:p]
         Q2 = Q[:, p+1:n]
-        Ri = inv(UpperTriangular(F.R))
+        Ri = inv(UpperTriangular(F.R)) # TODO make RiQ1 by ldiv! instead
         @assert norm(A'*Ri - Q1) < 1e-8 # TODO delete later
     end
 
@@ -116,7 +115,7 @@ function QRCholCache(
     #     error("[A' G'] is not full-row-rank; some dual equalities may be redundant (i.e. primal variables can be removed) or inconsistent")
     # end
 
-    return QRCholCache(c, A, b, G, h, Q1, Q2, Ri)
+    return QRCholCache(c, A, b, G, h, Q2, Ri*Q1')
 end
 
 # solve system for x, y, z
