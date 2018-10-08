@@ -9,15 +9,23 @@ available at https://arxiv.org/abs/1712.01792
 =#
 
 using Hypatia
-using SparseArrays
 using LinearAlgebra
+using SparseArrays
 using DelimitedFiles
 using Random
 
-function build_envelope!(opt::Hypatia.Optimizer, npoly::Int, deg::Int, n::Int, d::Int; use_data::Bool=false, dense::Bool=false, rseed::Int=1, lscachetype=QRSymmCache)
-    @assert deg <= d
+function build_envelope!(
+    npoly::Int,
+    deg::Int,
+    n::Int,
+    d::Int;
+    use_data::Bool = false,
+    dense::Bool = false,
+    rseed::Int = 1,
+    )
 
     # generate interpolation
+    @assert deg <= d
     (L, U, pts, P0, P, w) = Hypatia.interpolate(n, d, calc_w=true)
     LWts = fill(binomial(n+d-1, n), n)
     wtVals = 1.0 .- pts.^2
@@ -27,7 +35,7 @@ function build_envelope!(opt::Hypatia.Optimizer, npoly::Int, deg::Int, n::Int, d
     if dense
         A = repeat(Array(1.0I, U, U), outer=(1, npoly))
     else
-        A = repeat(sparse(1.0I, U, U), outer=(1, npoly)) # TODO maybe construct without repeat
+        A = repeat(sparse(1.0I, U, U), outer=(1, npoly))
     end
     G = Diagonal(-1.0I, npoly*U) # TODO uniformscaling
     b = w
@@ -44,17 +52,42 @@ function build_envelope!(opt::Hypatia.Optimizer, npoly::Int, deg::Int, n::Int, d
 
     cone = Hypatia.Cone([Hypatia.DualSumOfSquaresCone(U, [P, PWts...]) for k in 1:npoly], [1+(k-1)*U:k*U for k in 1:npoly])
 
-    return Hypatia.load_data!(opt, c, A, b, G, h, cone, lscachetype=lscachetype)
+    return (c, A, b, G, h, cone)
 end
 
-# opt = Hypatia.Optimizer(maxiter=100, verbose=true)
+function run_envelope()
+    # optionally use fixed data in folder
+    # select number of polynomials and degrees for the envelope
+    # select dimension and SOS degree (to be squared)
+    (c, A, b, G, h, cone) =
+        # build_envelope!(2, 5, 1, 5, use_data=true)
+        # build_envelope!(2, 5, 2, 8)
+        # build_envelope!(3, 5, 3, 5)
+        build_envelope!(2, 3, 1, 4, dense=false)
 
-# optionally use fixed data in folder
-# select number of polynomials and degrees for the envelope
-# select dimension and SOS degree (to be squared)
-# build_envelope!(opt, 2, 5, 1, 5, use_data=true)
-# build_envelope!(opt, 2, 5, 2, 8)
-# build_envelope!(opt, 3, 5, 3, 5)
-# build_envelope!(opt, 2, 3, 3, 5, dense=false)
+    Hypatia.check_data(c, A, b, G, h, cone)
+    (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = Hypatia.preprocess_data(c, A, b, G, useQR=true)
+    L = Hypatia.QRSymmCache(c1, A1, b1, G1, h, Q2, RiQ1)
 
-# @time Hypatia.solve!(opt)
+    opt = Hypatia.Optimizer(maxiter=100, verbose=false)
+    Hypatia.load_data!(opt, c1, A1, b1, G1, h, cone, L)
+    Hypatia.solve!(opt)
+
+    x = zeros(length(c))
+    x[dukeep] = Hypatia.get_x(opt)
+    y = zeros(length(b))
+    y[prkeep] = Hypatia.get_y(opt)
+    s = Hypatia.get_s(opt)
+    z = Hypatia.get_z(opt)
+
+    status = Hypatia.get_status(opt)
+    solvetime = Hypatia.get_solvetime(opt)
+    pobj = Hypatia.get_pobj(opt)
+    dobj = Hypatia.get_dobj(opt)
+
+    # @show status
+    # @show x
+    # @show pobj
+    # @show dobj
+    return nothing
+end

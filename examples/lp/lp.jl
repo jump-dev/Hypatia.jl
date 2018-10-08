@@ -11,7 +11,16 @@ using SparseArrays
 using DelimitedFiles
 using Random
 
-function build_lp!(opt::Hypatia.Optimizer, m::Int, n::Int; use_data::Bool=false, dense::Bool=false, nzfrac::Float64=1/sqrt(n), tosparse::Bool=false, rseed::Int=1, lscachetype=QRSymmCache)
+function build_lp!(
+    m::Int,
+    n::Int;
+    use_data::Bool = false,
+    dense::Bool = false,
+    nzfrac::Float64 = 1/sqrt(n),
+    tosparse::Bool = false,
+    rseed::Int = 1,
+    )
+
     # set up problem data
     if use_data
         # use provided data in data folder
@@ -35,17 +44,43 @@ function build_lp!(opt::Hypatia.Optimizer, m::Int, n::Int; use_data::Bool=false,
     end
     G = Diagonal(-1.0I, n) # TODO uniformscaling
     h = zeros(n)
+
     cone = Hypatia.Cone([Hypatia.NonnegativeCone(n)], [1:n])
 
-    return Hypatia.load_data!(opt, c, A, b, G, h, cone, lscachetype=lscachetype)
+    return (c, A, b, G, h, cone)
 end
 
-# opt = Hypatia.Optimizer(maxiter=100, verbose=true)
+function run_lp()
+    # optionally use fixed data in folder
+    # select the random matrix size, dense/sparse, sparsity fraction
+    (c, A, b, G, h, cone) =
+        # build_lp!(500, 1000, use_data=true)
+        # build_lp!(500, 1000)
+        build_lp!(15, 20)
 
-# optionally use fixed data in folder
-# select the random matrix size, dense/sparse, sparsity fraction
-# build_lp!(opt, 500, 1000)
-# build_lp!(opt, 500, 1000, use_data=true)
+    Hypatia.check_data(c, A, b, G, h, cone)
+    (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = Hypatia.preprocess_data(c, A, b, G, useQR=true)
+    L = Hypatia.QRSymmCache(c1, A1, b1, G1, h, Q2, RiQ1)
 
-# solve it
-# @time Hypatia.solve!(opt)
+    opt = Hypatia.Optimizer(maxiter=100, verbose=false)
+    Hypatia.load_data!(opt, c1, A1, b1, G1, h, cone, L)
+    Hypatia.solve!(opt)
+
+    x = zeros(length(c))
+    x[dukeep] = Hypatia.get_x(opt)
+    y = zeros(length(b))
+    y[prkeep] = Hypatia.get_y(opt)
+    s = Hypatia.get_s(opt)
+    z = Hypatia.get_z(opt)
+
+    status = Hypatia.get_status(opt)
+    solvetime = Hypatia.get_solvetime(opt)
+    pobj = Hypatia.get_pobj(opt)
+    dobj = Hypatia.get_dobj(opt)
+
+    # @show status
+    # @show x
+    # @show pobj
+    # @show dobj
+    return nothing
+end

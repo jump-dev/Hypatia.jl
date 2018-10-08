@@ -50,10 +50,10 @@ function testmoi(verbose::Bool, usedense::Bool)
             config)
     end
     @testset "Continuous conic problems" begin
-        exclude = ["rootdet", "logdet", "sdp"] # TODO bridges not working? should not need to exclude in future
+        exclude = ["rootdet", "logdet", "sdp"] # TODO MOI does not yet support scaled PSD triangle
         MOIT.contconictest(
-            # MOIB.SquarePSD{Float64}(
             MOIB.GeoMean{Float64}(
+            # MOIB.SquarePSD{Float64}(
             # MOIB.LogDet{Float64}(
             # MOIB.RootDet{Float64}(
                 optimizer

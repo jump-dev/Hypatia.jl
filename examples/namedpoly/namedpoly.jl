@@ -48,7 +48,11 @@ polys = Dict{Symbol,NamedTuple}(
         ),
 )
 
-function build_namedpoly!(opt::Hypatia.Optimizer, polyname::Symbol, d::Int; lscachetype=QRSymmCache)
+function build_namedpoly!(
+    polyname::Symbol,
+    d::Int,
+    )
+
     # get data for named polynomial
     (n, lbs, ubs, deg, fn) = polys[polyname]
     if d < ceil(Int, deg/2)
@@ -63,34 +67,58 @@ function build_namedpoly!(opt::Hypatia.Optimizer, polyname::Symbol, d::Int; lsca
     pts .+= (ubs + lbs)'/2
     wtVals = (pts .- lbs') .* (ubs' .- pts)
     LWts = fill(binomial(n+d-1, n), n)
-    PWts = [Diagonal(sqrt.(wtVals[:,j]))*P0[:,1:LWts[j]] for j in 1:n]
+    PWts = [Diagonal(sqrt.(wtVals[:, j])) * P0[:, 1:LWts[j]] for j in 1:n]
 
     # set up problem data
     A = ones(1, U)
     b = [1.0,]
-    c = [fn(pts[j,:]...) for j in 1:U]
+    c = [fn(pts[j, :]...) for j in 1:U]
     G = Diagonal(-1.0I, U) # TODO uniformscaling?
     h = zeros(U)
 
     cone = Hypatia.Cone([Hypatia.DualSumOfSquaresCone(U, [P0, PWts...])], [1:U])
 
-    return Hypatia.load_data!(opt, c, A, b, G, h, cone, lscachetype=lscachetype)
+    return (c, A, b, G, h, cone)
 end
 
-# opt = Hypatia.Optimizer(maxiter=100, verbose=false)
+function run_namedpoly()
+    # select the named polynomial to minimize and the SOS degree (to be squared)
+    (c, A, b, G, h, cone) =
+        # build_namedpoly!(:butcher, 2)
+        # build_namedpoly!(:caprasse, 4)
+        # build_namedpoly!(:goldsteinprice, 7)
+        # build_namedpoly!(:heart, 2)
+        # build_namedpoly!(:lotkavolterra, 3)
+        # build_namedpoly!(:magnetism7, 2)
+        # build_namedpoly!(:motzkin, 7)
+        build_namedpoly!(:reactiondiffusion, 3)
+        # build_namedpoly!(:robinson, 8)
+        # build_namedpoly!(:rosenbrock, 4)
+        # build_namedpoly!(:schwefel, 3)
 
-# select the named polynomial to minimize and the SOS degree (to be squared)
-# build_namedpoly!(opt, :butcher, 2)
-# build_namedpoly!(opt, :caprasse, 4)
-# build_namedpoly!(opt, :goldsteinprice, 7)
-# build_namedpoly!(opt, :heart, 2)
-# build_namedpoly!(opt, :lotkavolterra, 3)
-# build_namedpoly!(opt, :magnetism7, 2)
-# build_namedpoly!(opt, :motzkin, 7)
-# build_namedpoly!(opt, :reactiondiffusion, 4)
-# build_namedpoly!(opt, :robinson, 8)
-# build_namedpoly!(opt, :rosenbrock, 4)
-# build_namedpoly!(opt, :schwefel, 3)
+    Hypatia.check_data(c, A, b, G, h, cone)
+    (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = Hypatia.preprocess_data(c, A, b, G, useQR=true)
+    L = Hypatia.QRSymmCache(c1, A1, b1, G1, h, Q2, RiQ1)
 
-# solve it
-# @time Hypatia.solve!(opt)
+    opt = Hypatia.Optimizer(maxiter=100, verbose=false)
+    Hypatia.load_data!(opt, c1, A1, b1, G1, h, cone, L)
+    Hypatia.solve!(opt)
+
+    x = zeros(length(c))
+    x[dukeep] = Hypatia.get_x(opt)
+    y = zeros(length(b))
+    y[prkeep] = Hypatia.get_y(opt)
+    s = Hypatia.get_s(opt)
+    z = Hypatia.get_z(opt)
+
+    status = Hypatia.get_status(opt)
+    solvetime = Hypatia.get_solvetime(opt)
+    pobj = Hypatia.get_pobj(opt)
+    dobj = Hypatia.get_dobj(opt)
+
+    # @show status
+    # @show x
+    # @show pobj
+    # @show dobj
+    return nothing
+end
