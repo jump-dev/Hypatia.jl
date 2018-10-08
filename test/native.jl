@@ -2,6 +2,64 @@
 Copyright 2018, Chris Coey and contributors
 =#
 
+function _consistent1(verbose::Bool, lscachetype)
+    opt = Hypatia.Optimizer(verbose=verbose)
+    Random.seed!(1)
+    (n, p, q) = (30, 15, 30)
+    A = rand(-9.0:9.0, p, n)
+    G = Matrix(1.0I, q, n)
+    c = rand(0.0:9.0, n)
+    rnd1 = rand()
+    rnd2 = rand()
+    A[11:15,:] = rnd1*A[1:5,:] - rnd2*A[6:10,:]
+    b = A*ones(n)
+    rnd1 = rand()
+    rnd2 = rand()
+    A[:,11:15] = rnd1*A[:,1:5] - rnd2*A[:,6:10]
+    G[:,11:15] = rnd1*G[:,1:5] - rnd2*G[:,6:10]
+    c[11:15] = rnd1*c[1:5] - rnd2*c[6:10]
+    h = zeros(q)
+    cone = Hypatia.Cone([Hypatia.NonpositiveCone(q)], [1:q])
+    r = fullsolve(opt, c, A, b, G, h, cone)
+    @test r.status == :Optimal
+    @test r.pobj ≈ r.dobj atol=1e-4 rtol=1e-4
+end
+
+function _inconsistent1(verbose::Bool, lscachetype)
+    opt = Hypatia.Optimizer(verbose=verbose)
+    Random.seed!(1)
+    (n, p, q) = (30, 15, 30)
+    A = rand(-9.0:9.0, p, n)
+    G = Matrix(-1.0I, q, n)
+    c = rand(0.0:9.0, n)
+    b = rand(p)
+    rnd1 = rand()
+    rnd2 = rand()
+    A[11:15,:] = rnd1*A[1:5,:] - rnd2*A[6:10,:]
+    b[11:15] = 2*(rnd1*b[1:5] - rnd2*b[6:10])
+    h = zeros(q)
+    cone = Hypatia.Cone([Hypatia.NonnegativeCone(q)], [1:q])
+    @test_throws ErrorException("some primal equality constraints are inconsistent") fullsolve(opt, c, A, b, G, h, cone)
+end
+
+function _inconsistent2(verbose::Bool, lscachetype)
+    opt = Hypatia.Optimizer(verbose=verbose)
+    Random.seed!(1)
+    (n, p, q) = (30, 15, 30)
+    A = rand(-9.0:9.0, p, n)
+    G = Matrix(-1.0I, q, n)
+    c = rand(0.0:9.0, n)
+    b = rand(p)
+    rnd1 = rand()
+    rnd2 = rand()
+    A[:,11:15] = rnd1*A[:,1:5] - rnd2*A[:,6:10]
+    G[:,11:15] = rnd1*G[:,1:5] - rnd2*G[:,6:10]
+    c[11:15] = 2*(rnd1*c[1:5] - rnd2*c[6:10])
+    h = zeros(q)
+    cone = Hypatia.Cone([Hypatia.NonnegativeCone(q)], [1:q])
+    @test_throws ErrorException("some dual equality constraints are inconsistent") fullsolve(opt, c, A, b, G, h, cone)
+end
+
 function _orthant1(verbose::Bool, lscachetype)
     Random.seed!(1)
     (n, p, q) = (40, 20, 40)
