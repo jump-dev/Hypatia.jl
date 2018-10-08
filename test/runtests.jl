@@ -14,7 +14,10 @@ using SparseArrays
 function fullsolve(opt::Hypatia.Optimizer, c, A, b, G, h, cone) # TODO handle lscachetype
     Hypatia.check_data(c, A, b, G, h, cone)
     (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = Hypatia.preprocess_data(c, A, b, G, useQR=true)
-    L = Hypatia.QRSymmCache(c1, A1, b1, G1, h, Q2, RiQ1)
+
+    L = Hypatia.QRSymmCache(c1, A1, b1, G1, h, cone, Q2, RiQ1)
+    # L = Hypatia.NaiveCache(c1, A1, b1, G1, h, cone)
+    
     Hypatia.load_data!(opt, c1, A1, b1, G1, h, cone, L)
 
     Hypatia.solve!(opt)

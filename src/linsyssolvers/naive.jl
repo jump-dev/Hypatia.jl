@@ -3,6 +3,7 @@ naive method that simply performs one high-dimensional linear system solve
 TODO currently only does dense operations, needs to work for sparse
 =#
 mutable struct NaiveCache <: LinSysCache
+    cone
     c
     A
     b
@@ -26,10 +27,12 @@ mutable struct NaiveCache <: LinSysCache
         b::Vector{Float64},
         G::AbstractMatrix{Float64},
         h::Vector{Float64},
+        cone::Cone,
         )
 
         (n, p, q) = (length(c), length(b), length(h))
         L = new()
+        L.cone = cone
         L.c = c
         L.A = A
         L.b = b
@@ -69,8 +72,9 @@ function solvelinsys3!(
     rhs_tx::Vector{Float64},
     rhs_ty::Vector{Float64},
     rhs_tz::Vector{Float64},
-    H::AbstractMatrix{Float64},
-    L::NaiveCache,
+    mu::Float64,
+    L::NaiveCache;
+    identityH::Bool = false,
     )
 
     rhs = L.rhs3
@@ -79,7 +83,13 @@ function solvelinsys3!(
     @. rhs[L.tzk:L.tkk-1] = -rhs_tz
 
     @. L.LHS3copy = L.LHS3
-    @. L.LHS3copy[L.tzk:L.tkk-1, L.tzk:L.tkk-1] = -H
+    if !identityH
+        for k in eachindex(L.cone.prms)
+            idxs = L.tzk - 1 .+ L.cone.idxs[k]
+            dim = dimension(L.cone.prms[k])
+            calcHarr_prm!(view(L.LHS3copy, idxs, idxs), Matrix(-mu*I, dim, dim), L.cone.prms[k])
+        end
+    end
 
     F = bunchkaufman!(Symmetric(L.LHS3copy))
     ldiv!(F, rhs)
@@ -103,7 +113,6 @@ function solvelinsys6!(
     rhs_tau::Float64,
     mu::Float64,
     tau::Float64,
-    H::AbstractMatrix{Float64},
     L::NaiveCache,
     )
 
@@ -116,7 +125,11 @@ function solvelinsys6!(
     rhs[end] = rhs_tau
 
     @. L.LHS6copy = L.LHS6
-    L.LHS6copy[L.tzk:L.tkk-1, L.tsk:L.ttk-1] = H
+    for k in eachindex(L.cone.prms)
+        dim = dimension(L.cone.prms[k])
+        calcHarr_prm!(view(L.LHS6copy, L.tzk - 1 .+ L.cone.idxs[k], L.tsk - 1 .+ L.cone.idxs[k]), Matrix(mu*I, dim, dim), L.cone.prms[k])
+    end
+
     L.LHS6copy[L.tkk, end] = mu/tau/tau
 
     F = qr!(L.LHS6copy)

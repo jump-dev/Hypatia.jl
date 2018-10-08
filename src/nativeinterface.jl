@@ -316,7 +316,6 @@ function solve!(opt::Optimizer)
     loadpnt!(cone, ls_ts)
     # gradient evaluations at ls_ts of the barrier function for K
     g = similar(ts)
-    H = Matrix(1.0I, q, q)
     # helper arrays for residuals, right-hand-sides, and search directions
     tmp_tx = similar(tx)
     tmp_tx2 = similar(tx)
@@ -335,7 +334,7 @@ function solve!(opt::Optimizer)
     @. tx = 0.0
     @. ty = -b
     @. tz = -h
-    solvelinsys3!(tx, ty, tz, H, opt.L)
+    solvelinsys3!(tx, ty, tz, 1.0, opt.L, identityH=true)
     @. ts = -tz
 
     # from ts, step along interior direction of cone
@@ -501,8 +500,7 @@ function solve!(opt::Optimizer)
         # calculate prediction direction
         @. tmp_ts = tmp_tz
         @. tmp_tz = -tz
-        calcHarr!(H, Matrix(mu*I, q, q), cone) # TODO rewrite function to just return the H (or vector of H_k)
-        (tmp_kap, tmp_tau) = solvelinsys6!(tmp_tx, tmp_ty, tmp_tz, tmp_ts, -kap, kap + cx + by + hz, mu, tau, H, opt.L)
+        (tmp_kap, tmp_tau) = solvelinsys6!(tmp_tx, tmp_ty, tmp_tz, tmp_ts, -kap, kap + cx + by + hz, mu, tau, opt.L)
 
         # determine step length alpha by line search
         alpha = alphapred
@@ -590,8 +588,7 @@ function solve!(opt::Optimizer)
             calcg!(g, cone)
             @. tmp_tz = -tz - mu*g
             @. tmp_ts = 0.0
-            calcHarr!(H, Matrix(mu*I, q, q), cone) # TODO rewrite function to just return the H (or vector of H_k)
-            (tmp_kap, tmp_tau) = solvelinsys6!(tmp_tx, tmp_ty, tmp_tz, tmp_ts, -kap + mu/tau, 0.0, mu, tau, H, opt.L)
+            (tmp_kap, tmp_tau) = solvelinsys6!(tmp_tx, tmp_ty, tmp_tz, tmp_ts, -kap + mu/tau, 0.0, mu, tau, opt.L)
 
             # determine step length alpha by line search
             alpha = opt.alphacorr
