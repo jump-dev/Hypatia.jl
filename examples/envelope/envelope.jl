@@ -67,7 +67,7 @@ function run_envelope()
 
     Hypatia.check_data(c, A, b, G, h, cone)
     (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = Hypatia.preprocess_data(c, A, b, G, useQR=true)
-    L = Hypatia.QRSymmCache(c1, A1, b1, G1, h, Q2, RiQ1)
+    L = Hypatia.QRSymmCache(c1, A1, b1, G1, h, cone, Q2, RiQ1)
 
     opt = Hypatia.Optimizer(maxiter=100, verbose=false)
     Hypatia.load_data!(opt, c1, A1, b1, G1, h, cone, L)

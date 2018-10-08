@@ -11,6 +11,7 @@ where M = -I (for initial iterate only) or M = -Hi (Hi is Hessian inverse, pre-s
 mutable struct QRSymmCache <: LinSysCache
     # TODO can remove some of the intermediary prealloced arrays after github.com/JuliaLang/julia/issues/23919 is resolved
     useiterative
+    cone
     c
     b
     G
@@ -42,6 +43,7 @@ mutable struct QRSymmCache <: LinSysCache
         b::Vector{Float64},
         G::AbstractMatrix{Float64},
         h::Vector{Float64},
+        cone::Cone,
         Q2::AbstractMatrix{Float64},
         RiQ1::AbstractMatrix{Float64};
         useiterative::Bool = false,
@@ -51,6 +53,7 @@ mutable struct QRSymmCache <: LinSysCache
         (n, p, q) = (length(c), length(b), length(h))
         nmp = n - p
         L.useiterative = useiterative
+        L.cone = cone
         L.c = c
         L.b = b
         L.G = G
@@ -87,7 +90,8 @@ QRSymmCache(
     A::AbstractMatrix{Float64},
     b::Vector{Float64},
     G::AbstractMatrix{Float64},
-    h::Vector{Float64};
+    h::Vector{Float64},
+    cone::Cone;
     useiterative::Bool = false,
     ) = error("to use a QRSymmCache for linear system solves, the data must be preprocessed and Q2 and RiQ1 must be passed into the QRSymmCache constructor")
 
@@ -96,11 +100,12 @@ function solvelinsys3!(
     rhs_tx::Vector{Float64},
     rhs_ty::Vector{Float64},
     rhs_tz::Vector{Float64},
-    H::AbstractMatrix{Float64},
-    L::QRSymmCache,
+    mu::Float64,
+    L::QRSymmCache;
+    identityH::Bool = false,
     )
 
-    F = helplhs!(H, L)
+    F = helplhs!(mu, L, identityH=identityH)
     @. rhs_ty *= -1.0
     @. rhs_tz *= -1.0
     helplinsys!(rhs_tx, rhs_ty, rhs_tz, F, L)
@@ -118,26 +123,26 @@ function solvelinsys6!(
     rhs_tau::Float64,
     mu::Float64,
     tau::Float64,
-    H::AbstractMatrix{Float64},
     L::QRSymmCache,
     )
 
     # solve two symmetric systems and combine the solutions
-    F = helplhs!(H, L)
+    F = helplhs!(mu, L)
 
     # (x2, y2, z2) = (rhs_tx, -rhs_ty, -H*rhs_ts - rhs_tz)
     @. rhs_ty *= -1.0
     @. rhs_tz *= -1.0
     if !iszero(rhs_ts)
-        mul!(L.z1, H, rhs_ts)
-        @. rhs_tz -= L.z1
+        calcHarr!(L.z1, rhs_ts, L.cone)
+        @. rhs_tz -= mu*L.z1
     end
     helplinsys!(rhs_tx, rhs_ty, rhs_tz, F, L)
 
     # (x1, y1, z1) = (-c, b, H*h)
     @. L.x1 = -L.c
     @. L.y1 = L.b
-    mul!(L.z1, H, L.h)
+    calcHarr!(L.z1, L.h, L.cone)
+    @. L.z1 *= mu
     helplinsys!(L.x1, L.y1, L.z1, F, L)
 
     # combine
@@ -196,12 +201,18 @@ end
 
 # calculate or factorize LHS of symmetric positive definite linear system
 function helplhs!(
-    H::AbstractMatrix{Float64},
-    L::QRSymmCache,
+    mu::Float64,
+    L::QRSymmCache;
+    identityH::Bool = false,
     )
 
     # Q2' * G' * H * G * Q2
-    mul!(L.HG, H, L.G)
+    if identityH
+        @. L.HG = L.G
+    else
+        calcHarr!(L.HG, L.G, L.cone)
+        @. L.HG *= mu
+    end
     mul!(L.GHG, L.G', L.HG)
     mul!(L.GHGQ2, L.GHG, L.Q2)
     mul!(L.Q2GHGQ2, L.Q2', L.GHGQ2)

@@ -46,11 +46,6 @@ function calcg!(g::Vector{Float64}, cone::Cone)
     return g
 end
 
-
-
-# TODO rewrite to return block-diagonal matrix type. maybe use
-# https://github.com/JuliaMatrices/BlockBandedMatrices.jl
-
 function calcHarr!(prod::AbstractMatrix{Float64}, arr::AbstractMatrix{Float64}, cone::Cone)
     for k in eachindex(cone.prms)
         calcHarr_prm!(view(prod, cone.idxs[k], :), view(arr, cone.idxs[k], :), cone.prms[k])
@@ -78,11 +73,6 @@ function calcHiarr!(prod::AbstractVector{Float64}, arr::AbstractVector{Float64},
     end
     return prod
 end
-
-
-
-
-
 
 # utilities for converting between smat and svec forms (lower triangle) for symmetric matrices
 # TODO only need to do lower triangle if use symmetric matrix types

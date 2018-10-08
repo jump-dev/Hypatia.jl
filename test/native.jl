@@ -177,7 +177,7 @@ function _rsoc1(verbose::Bool, lscachetype)
     cone = Hypatia.Cone([Hypatia.RotatedSecondOrderCone(4)], [1:4])
     r = fullsolve(opt, c, A, b, G, h, cone)
     @test r.status == :Optimal
-    @test r.niters <= 15
+    @test r.niters <= 20
     @test r.pobj ≈ r.dobj atol=1e-4 rtol=1e-4
     @test r.pobj ≈ -sqrt(2) atol=1e-4 rtol=1e-4
     @test r.x[3:4] ≈ [1, 1]/sqrt(2) atol=1e-4 rtol=1e-4
