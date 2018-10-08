@@ -11,9 +11,6 @@ and Matlab files in the packages
 - Padua2DM by M. Caliari, S. De Marchi, A. Sommariva, and M. Vianello http://profs.sci.univr.it/~caliari/software.htm
 =#
 
-import FFTW
-import Combinatorics
-
 function interpolate(n, d; calc_w::Bool=false)
     if n == 1
         return cheb2_data(d, calc_w)
@@ -170,7 +167,11 @@ function approxfekete_data(n::Int, d::Int, calc_w::Bool)
         for xp in Combinatorics.multiexponents(n, t)
             col += 1
             for j in 1:n
-                m[col] *= iseven(xp[j]) ? 2/(1 - xp[j]^2) : 0
+                if iseven(xp[j])
+                    m[col] *= 2/(1 - xp[j]^2)
+                else
+                    m[col] = 0.0
+                end
                 M[:,col] .*= u[j][:,xp[j]+1]
             end
         end
