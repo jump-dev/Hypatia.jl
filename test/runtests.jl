@@ -43,6 +43,9 @@ lscachetype = Hypatia.QRSymmCache # linear system cache type
 
 @testset "native interface tests" begin
     for testfun in (
+        _consistent1,
+        _inconsistent1,
+        _inconsistent2,
         _orthant1,
         _orthant2,
         _orthant3,
