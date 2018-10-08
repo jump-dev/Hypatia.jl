@@ -10,6 +10,7 @@ using SparseArrays
 
 
 # TODO make it a native interface function eventually
+# TODO maybe build a new high-level optimizer struct. the current optimizer struct is low-level
 function fullsolve(opt::Hypatia.Optimizer, c, A, b, G, h, cone) # TODO handle lscachetype
     Hypatia.check_data(c, A, b, G, h, cone)
     (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = Hypatia.preprocess_data(c, A, b, G, useQR=true)
@@ -106,9 +107,10 @@ end
 
 
 # MathOptInterface tests
+verbose = false # test verbosity
 include(joinpath(@__DIR__, "moi.jl"))
 testmoi(verbose, false)
-# testmoi(verbose, true) # TODO fix failure on linear1
+testmoi(verbose, true)
 
 
 return nothing
