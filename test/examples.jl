@@ -10,7 +10,7 @@ function _envelope1(verbose::Bool, lscachetype)
     @test r.status == :Optimal
     @test r.pobj ≈ r.dobj atol=1e-4 rtol=1e-4
     @test r.pobj ≈ -25.502777 atol=1e-4 rtol=1e-4
-    @test r.niters <= 30
+    @test r.niters <= 35
 
     # sparse methods
     opt = Hypatia.Optimizer(verbose=verbose)
@@ -19,7 +19,7 @@ function _envelope1(verbose::Bool, lscachetype)
     @test r.status == :Optimal
     @test r.pobj ≈ r.dobj atol=1e-4 rtol=1e-4
     @test r.pobj ≈ -25.502777 atol=1e-4 rtol=1e-4
-    @test r.niters <= 30
+    @test r.niters <= 35
 end
 
 function _envelope2(verbose::Bool, lscachetype)
@@ -28,7 +28,7 @@ function _envelope2(verbose::Bool, lscachetype)
     (c, A, b, G, h, cone) = build_envelope!(2, 4, 2, 7, dense=true)
     rd = fullsolve(opt, c, A, b, G, h, cone)
     @test rd.status == :Optimal
-    @test rd.niters <= 55
+    @test rd.niters <= 60
     @test rd.pobj ≈ rd.dobj atol=1e-4 rtol=1e-4
 
     # sparse methods
@@ -36,7 +36,7 @@ function _envelope2(verbose::Bool, lscachetype)
     (c, A, b, G, h, cone) = build_envelope!(2, 4, 2, 7, dense=false)
     rs = fullsolve(opt, c, A, b, G, h, cone)
     @test rs.status == :Optimal
-    @test rs.niters <= 55
+    @test rs.niters <= 60
     @test rs.pobj ≈ rs.dobj atol=1e-4 rtol=1e-4
 
     @test rs.pobj ≈ rd.pobj atol=1e-4 rtol=1e-4
@@ -64,7 +64,7 @@ function _lp1(verbose::Bool, lscachetype)
     (c, A, b, G, h, cone) = build_lp!(50, 100, dense=true, tosparse=false)
     rd = fullsolve(opt, c, A, b, G, h, cone)
     @test rd.status == :Optimal
-    @test rd.niters <= 40
+    @test rd.niters <= 45
     @test rd.pobj ≈ rd.dobj atol=1e-4 rtol=1e-4
 
     # sparse methods
@@ -72,7 +72,7 @@ function _lp1(verbose::Bool, lscachetype)
     (c, A, b, G, h, cone) = build_lp!(50, 100, dense=true, tosparse=true)
     rs = fullsolve(opt, c, A, b, G, h, cone)
     @test rs.status == :Optimal
-    @test rs.niters <= 40
+    @test rs.niters <= 45
     @test rs.pobj ≈ rs.dobj atol=1e-4 rtol=1e-4
 
     @test rs.pobj ≈ rd.pobj atol=1e-4 rtol=1e-4
@@ -164,7 +164,7 @@ function _namedpoly7(verbose::Bool, lscachetype)
     (c, A, b, G, h, cone) = build_namedpoly!(:motzkin, 7)
     r = fullsolve(opt, c, A, b, G, h, cone)
     @test r.status == :Optimal
-    @test r.niters <= 35
+    @test r.niters <= 40
     @test r.pobj ≈ r.dobj atol=1e-4 rtol=1e-4
     @test r.pobj ≈ 0 atol=1e-4 rtol=1e-4
 end

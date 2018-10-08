@@ -145,7 +145,7 @@ function _ellinf2(verbose::Bool, lscachetype)
     cone = Hypatia.Cone([Hypatia.EllInfinityCone(6)], [1:6])
     r = fullsolve(opt, c, A, b, G, h, cone)
     @test r.status == :Optimal
-    @test r.niters <= 20
+    @test r.niters <= 25
     @test r.pobj ≈ r.dobj atol=1e-4 rtol=1e-4
     @test r.pobj ≈ 1 atol=1e-4 rtol=1e-4
 end
@@ -160,7 +160,7 @@ function _soc1(verbose::Bool, lscachetype)
     cone = Hypatia.Cone([Hypatia.SecondOrderCone(3)], [1:3])
     r = fullsolve(opt, c, A, b, G, h, cone)
     @test r.status == :Optimal
-    @test r.niters <= 15
+    @test r.niters <= 20
     @test r.pobj ≈ r.dobj atol=1e-4 rtol=1e-4
     @test r.pobj ≈ -sqrt(2) atol=1e-4 rtol=1e-4
     @test r.x ≈ [1, 1/sqrt(2), 1/sqrt(2)] atol=1e-4 rtol=1e-4
@@ -209,7 +209,7 @@ function _psd1(verbose::Bool, lscachetype)
     cone = Hypatia.Cone([Hypatia.PositiveSemidefiniteCone(3)], [1:3])
     r = fullsolve(opt, c, A, b, G, h, cone)
     @test r.status == :Optimal
-    @test r.niters <= 15
+    @test r.niters <= 20
     @test r.pobj ≈ r.dobj atol=1e-4 rtol=1e-4
     @test r.pobj ≈ -1 atol=1e-4 rtol=1e-4
     @test r.x[2] ≈ 1 atol=1e-4 rtol=1e-4

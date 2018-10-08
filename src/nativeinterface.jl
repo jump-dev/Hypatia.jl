@@ -295,27 +295,6 @@ function load_data!(
     return opt
 end
 
-# function load_data!(
-#     opt::Optimizer,
-#     c::Vector{Float64},
-#     A::AbstractMatrix{Float64},
-#     b::Vector{Float64},
-#     G::AbstractMatrix{Float64},
-#     h::Vector{Float64},
-#     cone::Cone;
-#     preprocess::Bool = true,
-#     lscachetype = QRSymmCache, # linear system solver cache type (see linsyssolvers folder)
-#     )
-#
-#     if preprocess || lscachetype == QRSymmCache
-#         # must preprocess
-#
-#     load_data!(opt, c, A, b, G, h, cone, lscachetype(c, A, b, G, h))
-#
-#
-#     return ???
-# end
-
 # solve using predictor-corrector algorithm based on homogeneous self-dual embedding
 function solve!(opt::Optimizer)
     starttime = time()
@@ -358,25 +337,24 @@ function solve!(opt::Optimizer)
     @. tz = -h
     solvelinsys3!(tx, ty, tz, H, opt.L)
     @. ts = -tz
-    @. ls_ts = ts
 
-    # from ts, step along interior direction of cone until ts is inside cone
-    if !incone(cone)
-        getintdir!(tmp_ts, cone)
-        alpha = 1.0 # TODO starting alpha maybe should depend on ls_ts (eg norm like in Hypatia) in case 1.0 is too large/small
-        steps = 1
-        @. ls_ts += alpha*tmp_ts
-        while !incone(cone)
-            steps += 1
-            if steps > 25
-                error("cannot find initial iterate")
-            end
-            alpha *= 1.5
-            @. ls_ts = ts + alpha*tmp_ts
+    # from ts, step along interior direction of cone
+    getintdir!(tmp_ts, cone)
+    alpha = (norm(ts) + 1e-3)#/norm(tmp_ts) # TODO tune this
+    @. ls_ts = ts + alpha*tmp_ts
+
+    # continue stepping until ts is inside cone
+    steps = 1
+    while !incone(cone)
+        steps += 1
+        if steps > 25
+            error("cannot find initial iterate")
         end
-        opt.verbose && println("$steps steps taken for initial iterate")
-        @. ts = ls_ts
+        alpha *= 1.5
+        @. ls_ts = ts + alpha*tmp_ts
     end
+    opt.verbose && println("$steps steps taken for initial iterate")
+    @. ts = ls_ts
 
     calcg!(tz, cone)
     @. tz *= -1.0
