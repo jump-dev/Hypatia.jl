@@ -27,12 +27,24 @@ MOIU.@model(HypatiaModelData,
     (MOI.VectorAffineFunction,),
     )
 
-function testmoi(verbose::Bool, usedense::Bool)
-    optimizer = MOIU.CachingOptimizer(HypatiaModelData{Float64}(), Hypatia.HypatiaOptimizer(verbose=verbose, usedense=usedense))
+function testmoi(
+    verbose::Bool,
+    usedense::Bool,
+    atol::Float64 = 1e-4,
+    rtol::Float64 = 1e-4,
+    )
+
+    optimizer = MOIU.CachingOptimizer(HypatiaModelData{Float64}(), Hypatia.HypatiaOptimizer(
+        verbose = verbose,
+        usedense = usedense,
+        tolrelopt = 1e-8,
+        tolabsopt = 1e-8,
+        tolfeas = 1e-7,
+        ))
 
     config = MOIT.TestConfig(
-        atol = 1e-3,
-        rtol = 1e-3,
+        atol = atol,
+        rtol = rtol,
         solve = true,
         query = true,
         modify_lhs = true,
@@ -40,12 +52,11 @@ function testmoi(verbose::Bool, usedense::Bool)
         infeas_certificates = true,
         )
 
-    @testset "MathOptInterface tests" begin
-    @testset "Continuous linear problems" begin
+    @testset "dense is $usedense" begin
         MOIT.contlineartest(MOIB.SplitInterval{Float64}(optimizer), config)
+
         MOIT.linear10test(optimizer, config)
-    end
-    @testset "Continuous conic problems" begin
+
         exclude = ["rootdet", "logdet", "sdp"] # TODO MOI does not yet support scaled PSD triangle
         MOIT.contconictest(
             MOIB.GeoMean{Float64}(
@@ -55,7 +66,6 @@ function testmoi(verbose::Bool, usedense::Bool)
                 optimizer
             ),#))),
             config, exclude)
-    end
     end
 
     return nothing
