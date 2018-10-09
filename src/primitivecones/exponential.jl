@@ -58,13 +58,14 @@ function incone_prm(prm::ExponentialCone)
     H[2,3] = H[3,2] = yz*(lzy - 1.0)*H[1,1] - iylzyx/z
     H[3,3] = abs2(yz)*H[1,1] + yz/z*iylzyx + inv(abs2(z))
 
-    @. prm.H2 = H
-    prm.F = cholesky!(Symmetric(prm.H2), check=false) # bunchkaufman if it fails
-    if !issuccess(prm.F)
-        @. prm.H2 = H
-        prm.F = bunchkaufman!(Symmetric(prm.H2), check=false)
+    @. prm.H2 = prm.H
+    prm.F = cholesky!(Symmetric(prm.H2), Val(true), check=false) # bunchkaufman if it fails
+    if !isposdef(prm.F)
+        @. prm.H2 = prm.H
+        prm.F = bunchkaufman!(Symmetric(prm.H2), true, check=false)
+        return issuccess(prm.F)
     end
-    return issuccess(prm.F)
+    return true
 end
 
 calcg_prm!(g::AbstractVector{Float64}, prm::ExponentialCone) = (@. g = prm.g; g)
