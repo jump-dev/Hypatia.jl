@@ -56,13 +56,14 @@ function incone_prm(prm::PowerCone)
     prm.H .= DiffResults.hessian(prm.diffres)
 
     @. prm.H2 = prm.H
-    prm.F = cholesky!(Symmetric(prm.H2), check=false) # bunchkaufman if it fails
-    if !issuccess(prm.F)
-        @. prm.H2 = prm.H
-        prm.F = bunchkaufman!(Symmetric(prm.H2))
-    end
+    prm.F = cholesky!(Symmetric(prm.H2), check=false)
+    return issuccess(prm.F)
 
-    return true
+    # # bunchkaufman if it fails
+    # if !issuccess(prm.F)
+    #     @. prm.H2 = prm.H
+    #     prm.F = bunchkaufman!(Symmetric(prm.H2))
+    # end
 end
 
 calcg_prm!(g::AbstractVector{Float64}, prm::PowerCone) = (@. g = prm.g; g)

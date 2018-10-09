@@ -20,7 +20,7 @@ function addprimitivecone!(cone::Cone, prm::PrimitiveCone, idx::UnitRange{Int})
 end
 
 # calculate complexity parameter of the barrier (sum of the primitive cone barrier parameters)
-barrierpar(cone::Cone) = sum(barrierpar_prm(prm) for prm in cone.prms)
+barrierpar(cone::Cone)::Float64 = isempty(cone.prms) ? 0.0 : sum(barrierpar_prm(prm) for prm in cone.prms)
 
 function getintdir!(dir::Vector{Float64}, cone::Cone)
     for k in eachindex(cone.prms)
