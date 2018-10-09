@@ -62,20 +62,9 @@ function incone_prm(prm::ExponentialCone)
     prm.F = cholesky!(Symmetric(prm.H2), check=false) # bunchkaufman if it fails
     if !issuccess(prm.F)
         @. prm.H2 = H
-        prm.F = bunchkaufman!(Symmetric(prm.H2))
+        prm.F = bunchkaufman!(Symmetric(prm.H2), check=false)
     end
-
-    # old code for inverse hessian
-    # den = 2*y + dist
-    # invden = inv(den)
-    # Hi[1,1] = -(-2*ylzy^3 + (4*x - y)*abs2(ylzy) + (-3*abs2(x) + 2*y*x - 2*abs2(y))*ylzy + x*(abs2(x) - 2*y*x + 2*abs2(y))) * invden # (-2 y^3 log^3(z/y) + (4 x - y) y^2 log^2(z/y) + y (-3 x^2 + 2 y x - 2 y^2) log(z/y) + x (x^2 - 2 y x + 2 y^2))/(x - 2 y - y log(z/y))
-    # Hi[1,2] = y * (abs2(ylzy) - x*ylzy + x*y) * invden  # (y^2 (y log^2(z/y) - x log(z/y) + x))/(-x + 2 y + y log(z/y))
-    # Hi[1,3] = y * z * (2*ylzy - x) * invden # (y z (2 y log(z/y) - x))/(-x + 2 y + y log(z/y))
-    # Hi[2,2] = abs2(y) * (1 - y*invden) # (y^2 (-x + y + y log(z/y)))/(-x + 2 y + y log(z/y))
-    # Hi[2,3] = abs2(y) * z * invden # (y^2 z)/(-x + 2 y + y log(z/y))
-    # Hi[3,3] = abs2(z) * (1 - y*invden) # (z^2 (-x + y + y log(z/y)))/(-x + 2 y + y log(z/y)))
-
-    return true
+    return issuccess(prm.F)
 end
 
 calcg_prm!(g::AbstractVector{Float64}, prm::ExponentialCone) = (@. g = prm.g; g)
