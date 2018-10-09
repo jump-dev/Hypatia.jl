@@ -4,6 +4,7 @@ Copyright 2018, Chris Coey and contributors
 
 mutable struct HypatiaOptimizer <: MOI.AbstractOptimizer
     opt::Optimizer
+    verbose::Bool
     usedense::Bool
     c::Vector{Float64}          # linear cost vector, size n
     A::AbstractMatrix{Float64}  # equality constraint matrix, size p*n
@@ -31,14 +32,20 @@ mutable struct HypatiaOptimizer <: MOI.AbstractOptimizer
 
     function HypatiaOptimizer(opt::Optimizer, verbose::Bool, usedense::Bool)
         moiopt = new()
-        opt.verbose = verbose
         moiopt.opt = opt
+        moiopt.verbose = verbose
         moiopt.usedense = usedense
         return moiopt
     end
 end
 
-HypatiaOptimizer(; verbose::Bool=false, usedense::Bool=true) = HypatiaOptimizer(Optimizer(), verbose, usedense)
+HypatiaOptimizer(;
+    verbose::Bool = false,
+    usedense::Bool = true,
+    tolrelopt::Float64 = 1e-6,
+    tolabsopt::Float64 = 1e-7,
+    tolfeas::Float64 = 1e-7,
+    ) = HypatiaOptimizer(Optimizer(verbose=verbose, tolrelopt=tolrelopt, tolabsopt=tolabsopt, tolfeas=tolfeas), verbose, usedense)
 
 MOI.get(::HypatiaOptimizer, ::MOI.SolverName) = "Hypatia"
 
@@ -361,7 +368,6 @@ function MOI.copy_to(
         q += 1
         push!(Ih, q)
         push!(Vh, 1.0)
-        println("\n interval set!!\n")
     end
 
     intervalcount = 0
