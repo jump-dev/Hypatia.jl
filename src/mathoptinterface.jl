@@ -18,6 +18,8 @@ mutable struct HypatiaOptimizer <: MOI.AbstractOptimizer
     constrprimeq::Vector{Float64}
     constroffsetcone::Vector{Int}
     constrprimcone::Vector{Float64}
+    intervalidxs
+    intervalscales
     x::Vector{Float64}
     s::Vector{Float64}
     y::Vector{Float64}
@@ -350,10 +352,10 @@ function MOI.copy_to(
 
     # build up one L_infinity norm cone from two-sided interval constraints
     intervalstart = q
+    nintervals = MOI.get(src, MOI.NumberOfConstraints{MOI.SingleVariable, MOI.Interval{Float64}}()) + MOI.get(src, MOI.NumberOfConstraints{MOI.ScalarAffineFunction{Float64}, MOI.Interval{Float64}}())
+    intervalscales = Vector{Float64}(undef, nintervals)
 
-    hasintervals = (MOI.get(src, MOI.NumberOfConstraints{MOI.SingleVariable, MOI.Interval{Float64}}()) > 0) || (MOI.get(src, MOI.NumberOfConstraints{MOI.ScalarAffineFunction{Float64}, MOI.Interval{Float64}}()) > 0)
-    if hasintervals
-        # TODO extra row may cause dimension issues with constroffsetcone
+    if nintervals > 0
         i += 1
         push!(constroffsetcone, q)
         q += 1
@@ -361,6 +363,8 @@ function MOI.copy_to(
         push!(Vh, 1.0)
         println("\n interval set!!\n")
     end
+
+    intervalcount = 0
 
     for ci in getsrccons(MOI.SingleVariable, MOI.Interval{Float64})
         i += 1
@@ -380,8 +384,10 @@ function MOI.copy_to(
         push!(VG, -scal)
         push!(Ih, q)
         push!(Vh, -mid*scal)
-        # push!(Vcpc, mid/2.0) # TODO more complicated: need to multiply by upper-lower
-        # push!(Icpc, q)
+        push!(Vcpc, mid) # TODO more complicated: need to multiply by upper-lower
+        push!(Icpc, q)
+        intervalcount += 1
+        intervalscales[intervalcount] = scal
     end
 
     for ci in getsrccons(MOI.ScalarAffineFunction{Float64}, MOI.Interval{Float64})
@@ -405,13 +411,16 @@ function MOI.copy_to(
         end
         push!(Ih, q)
         push!(Vh, (fi.constant - mid)*scal)
-        # push!(Vcpc, mid/2.0) # TODO more complicated: need to multiply by upper-lower
-        # push!(Icpc, q)
+        push!(Vcpc, mid) # TODO more complicated: need to multiply by upper-lower
+        push!(Icpc, q)
+        intervalcount += 1
+        intervalscales[intervalcount] = scal
     end
 
+    moiopt.intervalidxs = intervalstart+2:q
+    moiopt.intervalscales = intervalscales
     if q > intervalstart
         # exists at least one interval-type constraint
-        @assert hasintervals
         addprimitivecone!(cone, EllInfinityCone(q - intervalstart), intervalstart+1:q)
     end
 
@@ -491,8 +500,10 @@ function MOI.optimize!(moiopt::HypatiaOptimizer)
     moiopt.y[prkeep] = get_y(opt)
 
     moiopt.s = get_s(opt)
+    moiopt.s[moiopt.intervalidxs] ./= moiopt.intervalscales
     moiopt.constrprimcone += moiopt.s
     moiopt.z = get_z(opt)
+    moiopt.z[moiopt.intervalidxs] .*= moiopt.intervalscales
 
     moiopt.status = get_status(opt)
     moiopt.solvetime = get_solvetime(opt)

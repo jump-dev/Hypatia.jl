@@ -41,23 +41,21 @@ function testmoi(verbose::Bool, usedense::Bool)
         )
 
     @testset "MathOptInterface tests" begin
-    # @testset "Continuous linear problems without interval sets" begin
-    #     MOIT.contlineartest(MOIB.SplitInterval{Float64}(optimizer), config)
-    # end
-    @testset "Continuous linear problems with interval sets" begin
+    @testset "Continuous linear problems" begin
+        MOIT.contlineartest(MOIB.SplitInterval{Float64}(optimizer), config)
         MOIT.linear10test(optimizer, config)
     end
-    # @testset "Continuous conic problems" begin
-    #     exclude = ["rootdet", "logdet", "sdp"] # TODO MOI does not yet support scaled PSD triangle
-    #     MOIT.contconictest(
-    #         MOIB.GeoMean{Float64}(
-    #         # MOIB.SquarePSD{Float64}(
-    #         # MOIB.LogDet{Float64}(
-    #         # MOIB.RootDet{Float64}(
-    #             optimizer
-    #         ),#))),
-    #         config, exclude)
-    # end
+    @testset "Continuous conic problems" begin
+        exclude = ["rootdet", "logdet", "sdp"] # TODO MOI does not yet support scaled PSD triangle
+        MOIT.contconictest(
+            MOIB.GeoMean{Float64}(
+            # MOIB.SquarePSD{Float64}(
+            # MOIB.LogDet{Float64}(
+            # MOIB.RootDet{Float64}(
+                optimizer
+            ),#))),
+            config, exclude)
+    end
     end
 
     return nothing
