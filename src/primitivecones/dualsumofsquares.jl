@@ -11,8 +11,8 @@ mutable struct DualSumOfSquaresCone <: PrimitiveCone
     pnt::AbstractVector{Float64}
     g::Vector{Float64}
     H::Matrix{Float64}
-    Hchol::Matrix{Float64}
-    F::Cholesky{Float64,Array{Float64,2}}
+    H2::Matrix{Float64}
+    F
     ipwtpnt::Vector{Matrix{Float64}}
     Vp::Vector{Matrix{Float64}}
     Vp2::Matrix{Float64}
@@ -26,7 +26,7 @@ mutable struct DualSumOfSquaresCone <: PrimitiveCone
         prm.ipwt = ipwt
         prm.g = similar(ipwt[1], dim)
         prm.H = similar(ipwt[1], dim, dim)
-        prm.Hchol = copy(prm.H)
+        prm.H2 = copy(prm.H)
         prm.ipwtpnt = [similar(ipwt[1], size(ipwtj, 2), size(ipwtj, 2)) for ipwtj in ipwt]
         prm.Vp = [similar(ipwt[1], dim, size(ipwtj, 2)) for ipwtj in ipwt]
         prm.Vp2 = similar(ipwt[1], dim, dim)
@@ -54,7 +54,7 @@ function incone_prm(prm::DualSumOfSquaresCone)
         end
 
         @. prm.Vp[j] = prm.ipwt[j] # TODO this shouldn't be necessary if don't have to use rdiv
-        rdiv!(prm.Vp[j], F.U)
+        rdiv!(prm.Vp[j], F.U) # TODO make sure this dispatches to a fast method
         mul!(prm.Vp2, prm.Vp[j], prm.Vp[j]') # TODO if parallel, need to use separate Vp2[j]
 
         for i in eachindex(prm.g)
@@ -63,12 +63,13 @@ function incone_prm(prm::DualSumOfSquaresCone)
         @. prm.H += abs2(prm.Vp2)
     end
 
-    @. prm.Hchol = prm.H
-    prm.F = cholesky!(prm.Hchol, check=false)
+    @. prm.H2 = prm.H
+    prm.F = cholesky!(Symmetric(prm.H2), check=false) # bunchkaufman if it fails
     if !issuccess(prm.F)
-        return false
+        @. prm.H2 = prm.H
+        prm.F = bunchkaufman!(Symmetric(prm.H2), check=false)
     end
-    return true
+    return issuccess(prm.F)
 end
 
 calcg_prm!(g::AbstractVector{Float64}, prm::DualSumOfSquaresCone) = (@. g = prm.g; g)

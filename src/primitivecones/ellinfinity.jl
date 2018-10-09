@@ -51,18 +51,18 @@ function incone_prm(prm::EllInfinityCone)
         H[j,j] = vj + abs2(wj)
         H[1,j] = H[j,1] = -vj*wj*x
     end
-    t1 = (prm.dim - 2)/x
+    invx = inv(x)
+    t1 = (prm.dim - 2)*invx
     g[1] = t1 - x*g1
-    H[1,1] = -t1/x + xsqr*h1 - g1
+    H[1,1] = -t1*invx + xsqr*h1 - g1
 
     @. prm.H2 = H
     prm.F = cholesky!(Symmetric(prm.H2), check=false) # bunchkaufman if it fails
     if !issuccess(prm.F)
         @. prm.H2 = H
-        prm.F = bunchkaufman!(Symmetric(prm.H2))
+        prm.F = bunchkaufman!(Symmetric(prm.H2), check=false)
     end
-
-    return true
+    return issuccess(prm.F)
 end
 
 calcg_prm!(g::AbstractVector{Float64}, prm::EllInfinityCone) = (@. g = prm.g; g)

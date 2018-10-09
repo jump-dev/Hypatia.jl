@@ -11,13 +11,12 @@ MOIU = MOI.Utilities
 MOIU.@model(HypatiaModelData,
     (),
     (
-        MOI.EqualTo, MOI.GreaterThan, MOI.LessThan,
-        # MOI.Interval,
+        MOI.EqualTo, MOI.GreaterThan, MOI.LessThan, MOI.Interval,
     ),
     (
         MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives,
         MOI.SecondOrderCone, MOI.RotatedSecondOrderCone,
-        MOI.PositiveSemidefiniteConeTriangle,
+        # MOI.PositiveSemidefiniteConeTriangle,
         MOI.ExponentialCone,
         # MOI.PowerCone,
     ),
@@ -42,24 +41,23 @@ function testmoi(verbose::Bool, usedense::Bool)
         )
 
     @testset "MathOptInterface tests" begin
-    @testset "Continuous linear problems" begin
-        MOIT.contlineartest(
-            MOIB.SplitInterval{Float64}(
-                optimizer
-            ),
-            config)
+    # @testset "Continuous linear problems without interval sets" begin
+    #     MOIT.contlineartest(MOIB.SplitInterval{Float64}(optimizer), config)
+    # end
+    @testset "Continuous linear problems with interval sets" begin
+        MOIT.linear10test(optimizer, config)
     end
-    @testset "Continuous conic problems" begin
-        exclude = ["rootdet", "logdet", "sdp"] # TODO MOI does not yet support scaled PSD triangle
-        MOIT.contconictest(
-            MOIB.GeoMean{Float64}(
-            # MOIB.SquarePSD{Float64}(
-            # MOIB.LogDet{Float64}(
-            # MOIB.RootDet{Float64}(
-                optimizer
-            ),#))),
-            config, exclude)
-    end
+    # @testset "Continuous conic problems" begin
+    #     exclude = ["rootdet", "logdet", "sdp"] # TODO MOI does not yet support scaled PSD triangle
+    #     MOIT.contconictest(
+    #         MOIB.GeoMean{Float64}(
+    #         # MOIB.SquarePSD{Float64}(
+    #         # MOIB.LogDet{Float64}(
+    #         # MOIB.RootDet{Float64}(
+    #             optimizer
+    #         ),#))),
+    #         config, exclude)
+    # end
     end
 
     return nothing

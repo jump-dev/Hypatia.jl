@@ -56,11 +56,12 @@ const SupportedFuns = Union{
 
 const SupportedSets = Union{
     MOI.EqualTo{Float64},
-    MOI.GreaterThan{Float64},
-    MOI.LessThan{Float64},
     MOI.Zeros,
+    MOI.GreaterThan{Float64},
     MOI.Nonnegatives,
+    MOI.LessThan{Float64},
     MOI.Nonpositives,
+    MOI.Interval{Float64},
     MOI.SecondOrderCone,
     MOI.RotatedSecondOrderCone,
     MOI.PositiveSemidefiniteConeTriangle,
@@ -113,7 +114,7 @@ function MOI.copy_to(
     moiopt.c = Vector(sparsevec(Jc, Vc, n))
 
     # constraints
-    getsrccons(F, S) = MOI.get(src, MOI.ListOfConstraintIndices{F,S}())
+    getsrccons(F, S) = MOI.get(src, MOI.ListOfConstraintIndices{F, S}())
     getconfun(conidx) = MOI.get(src, MOI.ConstraintFunction(), conidx)
     getconset(conidx) = MOI.get(src, MOI.ConstraintSet(), conidx)
     i = 0 # MOI constraint index
@@ -275,7 +276,10 @@ function MOI.copy_to(
         q += dim
     end
 
-    addprimitivecone!(cone, NonnegativeCone(q - nonnegstart), nonnegstart+1:q)
+    if q > nonnegstart
+        # exists at least one nonnegative constraint
+        addprimitivecone!(cone, NonnegativeCone(q - nonnegstart), nonnegstart+1:q)
+    end
 
     # build up one nonpositive cone
     nonposstart = q
@@ -339,13 +343,88 @@ function MOI.copy_to(
         q += dim
     end
 
-    addprimitivecone!(cone, NonpositiveCone(q - nonposstart), nonposstart+1:q)
+    if q > nonposstart
+        # exists at least one nonpositive constraint
+        addprimitivecone!(cone, NonpositiveCone(q - nonposstart), nonposstart+1:q)
+    end
 
-    # TODO also use variable bounds to build one L_inf cone
+    # build up one L_infinity norm cone from two-sided interval constraints
+    intervalstart = q
 
-    # non-LP conic constraints
+    hasintervals = (MOI.get(src, MOI.NumberOfConstraints{MOI.SingleVariable, MOI.Interval{Float64}}()) > 0) || (MOI.get(src, MOI.NumberOfConstraints{MOI.ScalarAffineFunction{Float64}, MOI.Interval{Float64}}()) > 0)
+    if hasintervals
+        # TODO extra row may cause dimension issues with constroffsetcone
+        i += 1
+        push!(constroffsetcone, q)
+        q += 1
+        push!(Ih, q)
+        push!(Vh, 1.0)
+        println("\n interval set!!\n")
+    end
 
-    for S in (MOI.SecondOrderCone, MOI.RotatedSecondOrderCone, MOI.ExponentialCone, MOI.PowerCone, MOI.PositiveSemidefiniteConeTriangle)
+    for ci in getsrccons(MOI.SingleVariable, MOI.Interval{Float64})
+        i += 1
+        idxmap[ci] = MOI.ConstraintIndex{MOI.SingleVariable, MOI.Interval{Float64}}(i)
+        push!(constroffsetcone, q)
+        q += 1
+
+        upper = getconset(ci).upper
+        lower = getconset(ci).lower
+        @assert isfinite(upper) && isfinite(lower)
+        @assert upper > lower
+        mid = 0.5*(upper + lower)
+        scal = 2.0*inv(upper - lower)
+
+        push!(IG, q)
+        push!(JG, idxmap[getconfun(ci).variable].value)
+        push!(VG, -scal)
+        push!(Ih, q)
+        push!(Vh, -mid*scal)
+        # push!(Vcpc, mid/2.0) # TODO more complicated: need to multiply by upper-lower
+        # push!(Icpc, q)
+    end
+
+    for ci in getsrccons(MOI.ScalarAffineFunction{Float64}, MOI.Interval{Float64})
+        i += 1
+        idxmap[ci] = MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, MOI.Interval{Float64}}(i)
+        push!(constroffsetcone, q)
+        q += 1
+
+        upper = getconset(ci).upper
+        lower = getconset(ci).lower
+        @assert isfinite(upper) && isfinite(lower)
+        @assert upper > lower
+        mid = 0.5*(upper + lower)
+        scal = 2.0/(upper - lower)
+
+        fi = getconfun(ci)
+        for vt in fi.terms
+            push!(IG, q)
+            push!(JG, idxmap[vt.variable_index].value)
+            push!(VG, -vt.coefficient*scal)
+        end
+        push!(Ih, q)
+        push!(Vh, (fi.constant - mid)*scal)
+        # push!(Vcpc, mid/2.0) # TODO more complicated: need to multiply by upper-lower
+        # push!(Icpc, q)
+    end
+
+    if q > intervalstart
+        # exists at least one interval-type constraint
+        @assert hasintervals
+        addprimitivecone!(cone, EllInfinityCone(q - intervalstart), intervalstart+1:q)
+    end
+
+    # add non-LP conic constraints
+
+    for S in (
+        MOI.SecondOrderCone,
+        MOI.RotatedSecondOrderCone,
+        MOI.ExponentialCone,
+        MOI.PowerCone,
+        MOI.PositiveSemidefiniteConeTriangle,
+        )
+
         for ci in getsrccons(MOI.VectorOfVariables, S)
             i += 1
             idxmap[ci] = MOI.ConstraintIndex{MOI.VectorOfVariables, S}(i)
