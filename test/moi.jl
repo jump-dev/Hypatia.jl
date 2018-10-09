@@ -11,13 +11,12 @@ MOIU = MOI.Utilities
 MOIU.@model(HypatiaModelData,
     (),
     (
-        MOI.EqualTo, MOI.GreaterThan, MOI.LessThan,
-        # MOI.Interval,
+        MOI.EqualTo, MOI.GreaterThan, MOI.LessThan, MOI.Interval,
     ),
     (
         MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives,
         MOI.SecondOrderCone, MOI.RotatedSecondOrderCone,
-        MOI.PositiveSemidefiniteConeTriangle,
+        # MOI.PositiveSemidefiniteConeTriangle,
         MOI.ExponentialCone,
         # MOI.PowerCone,
     ),
@@ -43,11 +42,8 @@ function testmoi(verbose::Bool, usedense::Bool)
 
     @testset "MathOptInterface tests" begin
     @testset "Continuous linear problems" begin
-        MOIT.contlineartest(
-            MOIB.SplitInterval{Float64}(
-                optimizer
-            ),
-            config)
+        MOIT.contlineartest(MOIB.SplitInterval{Float64}(optimizer), config)
+        MOIT.linear10test(optimizer, config)
     end
     @testset "Continuous conic problems" begin
         exclude = ["rootdet", "logdet", "sdp"] # TODO MOI does not yet support scaled PSD triangle
