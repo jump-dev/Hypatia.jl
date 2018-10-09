@@ -90,8 +90,8 @@ lscachetype = Hypatia.QRSymmCache # linear system cache type
         _envelope3,
         # _envelope4,
         _lp1,
-        # _lp2,
-        # _lp3,
+        _lp2,
+        _lp3,
         _namedpoly1,
         _namedpoly2,
         _namedpoly3,
@@ -101,19 +101,20 @@ lscachetype = Hypatia.QRSymmCache # linear system cache type
         _namedpoly7,
         _namedpoly8,
         _namedpoly9,
-        # _namedpoly10,
-        # _namedpoly11,
+        _namedpoly10,
+        _namedpoly11,
         )
         testfun(verbose, lscachetype)
     end
 end
 
-
 # MathOptInterface tests
 verbose = false # test verbosity
 include(joinpath(@__DIR__, "moi.jl"))
-testmoi(verbose, false)
-testmoi(verbose, true)
+@testset "MathOptInterface tests" begin
+    testmoi(verbose, false)
+    testmoi(verbose, true)
+end
 
 
 return nothing

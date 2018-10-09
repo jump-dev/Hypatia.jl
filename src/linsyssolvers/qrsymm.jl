@@ -220,15 +220,18 @@ function helplhs!(
     if L.useiterative
         return Symmetric(L.Q2GHGQ2)
     else
-        # bunchkaufman allocates more than cholesky, but doesn't fail when approximately quasidefinite (TODO could try LDL instead)
+        # bunchkaufman allocates more than cholesky, but doesn't fail when approximately quasidefinite
         # TODO does it matter that F could be either type?
-        F = cholesky!(Symmetric(L.Q2GHGQ2), check=false)
-        if !issuccess(F)
+        F = cholesky!(Symmetric(L.Q2GHGQ2), Val(true), check=false)
+        if !isposdef(F)
             # verbose && # TODO pass this in
-            println("linear system matrix was not positive definite")
             mul!(L.Q2GHGQ2, L.Q2', L.GHGQ2)
-            F = bunchkaufman!(Symmetric(L.Q2GHGQ2))
+            F = bunchkaufman!(Symmetric(L.Q2GHGQ2), true, check=false) # TODO remove allocs, need to use low-level functions
+            if !issuccess(F)
+                error("linear system matrix was not positive definite")
+            end
         end
+        # F = bunchkaufman!(Symmetric(L.Q2GHGQ2)) # TODO remove allocs, need to use low-level functions
         return F
     end
 end
