@@ -20,7 +20,7 @@ function _consistent1(verbose::Bool, lscachetype)
     c[11:15] = rnd1*c[1:5] - rnd2*c[6:10]
     h = zeros(q)
     cone = Hypatia.Cone([Hypatia.NonpositiveCone(q)], [1:q])
-    r = fullsolve(opt, c, A, b, G, h, cone)
+    r = fullsolve(opt, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
     @test r.pobj ≈ r.dobj atol=1e-4 rtol=1e-4
 end
@@ -39,7 +39,7 @@ function _inconsistent1(verbose::Bool, lscachetype)
     b[11:15] = 2*(rnd1*b[1:5] - rnd2*b[6:10])
     h = zeros(q)
     cone = Hypatia.Cone([Hypatia.NonnegativeCone(q)], [1:q])
-    @test_throws ErrorException("some primal equality constraints are inconsistent") fullsolve(opt, c, A, b, G, h, cone)
+    @test_throws ErrorException("some primal equality constraints are inconsistent") fullsolve(opt, c, A, b, G, h, cone, lscachetype)
 end
 
 function _inconsistent2(verbose::Bool, lscachetype)
@@ -57,7 +57,7 @@ function _inconsistent2(verbose::Bool, lscachetype)
     c[11:15] = 2*(rnd1*c[1:5] - rnd2*c[6:10])
     h = zeros(q)
     cone = Hypatia.Cone([Hypatia.NonnegativeCone(q)], [1:q])
-    @test_throws ErrorException("some dual equality constraints are inconsistent") fullsolve(opt, c, A, b, G, h, cone)
+    @test_throws ErrorException("some dual equality constraints are inconsistent") fullsolve(opt, c, A, b, G, h, cone, lscachetype)
 end
 
 function _orthant1(verbose::Bool, lscachetype)
@@ -72,7 +72,7 @@ function _orthant1(verbose::Bool, lscachetype)
     opt = Hypatia.Optimizer(verbose=verbose)
     G = SparseMatrixCSC(-1.0I, q, n)
     cone = Hypatia.Cone([Hypatia.NonnegativeCone(q)], [1:q])
-    rnn = fullsolve(opt, c, A, b, G, h, cone)
+    rnn = fullsolve(opt, c, A, b, G, h, cone, lscachetype)
     @test rnn.status == :Optimal
     @test rnn.pobj ≈ rnn.dobj atol=1e-4 rtol=1e-4
 
@@ -80,7 +80,7 @@ function _orthant1(verbose::Bool, lscachetype)
     opt = Hypatia.Optimizer(verbose=verbose)
     G = SparseMatrixCSC(1.0I, q, n)
     cone = Hypatia.Cone([Hypatia.NonpositiveCone(q)], [1:q])
-    rnp = fullsolve(opt, c, A, b, G, h, cone)
+    rnp = fullsolve(opt, c, A, b, G, h, cone, lscachetype)
     @test rnp.status == :Optimal
     @test rnp.pobj ≈ rnp.dobj atol=1e-4 rtol=1e-4
 
@@ -97,7 +97,7 @@ function _orthant2(verbose::Bool, lscachetype)
     G = rand(q, n) - Matrix(2.0I, q, n)
     h = G*ones(n)
     cone = Hypatia.Cone([Hypatia.NonnegativeCone(q)], [1:q])
-    r = fullsolve(opt, c, A, b, G, h, cone)
+    r = fullsolve(opt, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
     @test r.pobj ≈ r.dobj atol=1e-4 rtol=1e-4
 end
@@ -112,7 +112,7 @@ function _orthant3(verbose::Bool, lscachetype)
     G = Diagonal(1.0I, n)
     h = zeros(q)
     cone = Hypatia.Cone([Hypatia.NonpositiveCone(q)], [1:q])
-    r = fullsolve(opt, c, A, b, G, h, cone)
+    r = fullsolve(opt, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
     @test r.pobj ≈ r.dobj atol=1e-4 rtol=1e-4
 end
@@ -125,7 +125,7 @@ function _ellinf1(verbose::Bool, lscachetype)
     G = SparseMatrixCSC(-1.0I, 3, 3)
     h = zeros(3)
     cone = Hypatia.Cone([Hypatia.EllInfinityCone(3)], [1:3])
-    r = fullsolve(opt, c, A, b, G, h, cone)
+    r = fullsolve(opt, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
     @test r.niters <= 20
     @test r.pobj ≈ r.dobj atol=1e-4 rtol=1e-4
@@ -143,7 +143,7 @@ function _ellinf2(verbose::Bool, lscachetype)
     G = rand(6, 6)
     h = G*ones(6)
     cone = Hypatia.Cone([Hypatia.EllInfinityCone(6)], [1:6])
-    r = fullsolve(opt, c, A, b, G, h, cone)
+    r = fullsolve(opt, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
     @test r.niters <= 25
     @test r.pobj ≈ r.dobj atol=1e-4 rtol=1e-4
@@ -158,7 +158,7 @@ function _soc1(verbose::Bool, lscachetype)
     G = SparseMatrixCSC(-1.0I, 3, 3)
     h = zeros(3)
     cone = Hypatia.Cone([Hypatia.SecondOrderCone(3)], [1:3])
-    r = fullsolve(opt, c, A, b, G, h, cone)
+    r = fullsolve(opt, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
     @test r.niters <= 20
     @test r.pobj ≈ r.dobj atol=1e-4 rtol=1e-4
@@ -175,7 +175,7 @@ function _rsoc1(verbose::Bool, lscachetype)
     G = SparseMatrixCSC(-1.0I, 4, 4)
     h = zeros(4)
     cone = Hypatia.Cone([Hypatia.RotatedSecondOrderCone(4)], [1:4])
-    r = fullsolve(opt, c, A, b, G, h, cone)
+    r = fullsolve(opt, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
     @test r.niters <= 20
     @test r.pobj ≈ r.dobj atol=1e-4 rtol=1e-4
@@ -191,7 +191,7 @@ function _rsoc2(verbose::Bool, lscachetype)
     G = SparseMatrixCSC(-1.0I, 3, 3)
     h = zeros(3)
     cone = Hypatia.Cone([Hypatia.RotatedSecondOrderCone(3)], [1:3])
-    r = fullsolve(opt, c, A, b, G, h, cone)
+    r = fullsolve(opt, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
     @test r.niters <= 20
     @test r.pobj ≈ r.dobj atol=1e-4 rtol=1e-4
@@ -207,7 +207,7 @@ function _psd1(verbose::Bool, lscachetype)
     G = SparseMatrixCSC(-1.0I, 3, 3)
     h = zeros(3)
     cone = Hypatia.Cone([Hypatia.PositiveSemidefiniteCone(3)], [1:3])
-    r = fullsolve(opt, c, A, b, G, h, cone)
+    r = fullsolve(opt, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
     @test r.niters <= 20
     @test r.pobj ≈ r.dobj atol=1e-4 rtol=1e-4
@@ -223,7 +223,7 @@ function _psd2(verbose::Bool, lscachetype)
     G = SparseMatrixCSC(-1.0I, 6, 6)
     h = zeros(6)
     cone = Hypatia.Cone([Hypatia.PositiveSemidefiniteCone(6)], [1:6])
-    r = fullsolve(opt, c, A, b, G, h, cone)
+    r = fullsolve(opt, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
     @test r.niters <= 20
     @test r.pobj ≈ r.dobj atol=1e-4 rtol=1e-4
@@ -239,7 +239,7 @@ function _exp1(verbose::Bool, lscachetype)
     G = SparseMatrixCSC(-1.0I, 3, 3)
     h = zeros(3)
     cone = Hypatia.Cone([Hypatia.ExponentialCone()], [1:3])
-    r = fullsolve(opt, c, A, b, G, h, cone)
+    r = fullsolve(opt, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
     @test r.niters <= 20
     @test r.pobj ≈ r.dobj atol=1e-4 rtol=1e-4
@@ -257,7 +257,7 @@ function _power1(verbose::Bool, lscachetype)
     G = SparseMatrixCSC(-1.0I, 6, 6)[[4, 1, 2, 5, 3, 6], :]
     h = zeros(6)
     cone = Hypatia.Cone([Hypatia.PowerCone([0.2, 0.8]), Hypatia.PowerCone([0.4, 0.6])], [1:3, 4:6])
-    r = fullsolve(opt, c, A, b, G, h, cone)
+    r = fullsolve(opt, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
     @test r.niters <= 25
     @test r.pobj ≈ r.dobj atol=1e-4 rtol=1e-4

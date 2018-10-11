@@ -380,7 +380,7 @@ function solve!(opt::Optimizer)
     # main loop
     if opt.verbose
         println("starting iteration")
-        @printf("\n%5s %12s %12s %9s %9s %9s %9s %9s %9s\n", "iter", "p_obj", "d_obj", "rel_gap", "p_inf", "d_inf", "tau", "kap", "mu")
+        @printf("\n%5s %12s %12s %9s %9s %9s %9s %9s %9s %9s\n", "iter", "p_obj", "d_obj", "abs_gap", "rel_gap", "p_inf", "d_inf", "tau", "kap", "mu")
         flush(stdout)
     end
 
@@ -420,7 +420,7 @@ function solve!(opt::Optimizer)
         # TODO maybe add small epsilon to denominators that are zero to avoid NaNs, and get rid of isnans further down
         if obj_pr < 0.0
             relgap = gap/-obj_pr
-        elseif obj_pr > 0.0
+        elseif obj_du > 0.0
             relgap = gap/obj_du
         else
             relgap = NaN
@@ -442,7 +442,7 @@ function solve!(opt::Optimizer)
 
         if opt.verbose
             # print iteration statistics
-            @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n", iter, obj_pr, obj_du, relgap, nres_pr, nres_du, tau, kap, mu)
+            @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n", iter, obj_pr, obj_du, gap, relgap, nres_pr, nres_du, tau, kap, mu)
             flush(stdout)
         end
 
