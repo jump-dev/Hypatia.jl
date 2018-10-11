@@ -9,12 +9,16 @@ using LinearAlgebra
 using SparseArrays
 
 
-# TODO make it a native interface function eventually
+# TODO make first part a native interface function eventually
 # TODO maybe build a new high-level optimizer struct. the current optimizer struct is low-level
-function fullsolve(opt::Hypatia.Optimizer, c, A, b, G, h, cone) # TODO handle lscachetype
+function fullsolve(opt::Hypatia.Optimizer, c, A, b, G, h, cone, lscachetype)
     Hypatia.check_data(c, A, b, G, h, cone)
     (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = Hypatia.preprocess_data(c, A, b, G, useQR=true)
 
+    # TODO handle lscachetype
+    if lscachetype != Hypatia.QRSymmCache
+        error("tests only support QRSymmCache now")
+    end
     L = Hypatia.QRSymmCache(c1, A1, b1, G1, h, cone, Q2, RiQ1)
     # L = Hypatia.NaiveCache(c1, A1, b1, G1, h, cone)
 
@@ -107,6 +111,7 @@ lscachetype = Hypatia.QRSymmCache # linear system cache type
         testfun(verbose, lscachetype)
     end
 end
+
 
 # MathOptInterface tests
 verbose = false # test verbosity
