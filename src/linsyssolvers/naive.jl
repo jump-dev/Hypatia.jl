@@ -38,7 +38,7 @@ mutable struct NaiveCache <: LinSysCache
         L.b = b
         L.G = G
         L.h = h
-        L.tyk = n+1
+        L.tyk = n + 1
         L.tzk = L.tyk + p
         L.tkk = L.tzk + q
         L.tsk = L.tkk + 1
@@ -51,7 +51,7 @@ mutable struct NaiveCache <: LinSysCache
             ]
         L.LHS3copy = similar(L.LHS3)
         L.rhs3 = zeros(L.tkk-1)
-        # tx ty tz kap ts tau
+        # tx ty tzp tzd kap tsp tsd tau
         L.LHS6 = [
             zeros(n,n)  A'          G'                zeros(n)  zeros(n,q)         c;
             -A          zeros(p,p)  zeros(p,q)        zeros(p)  zeros(p,q)         b;
@@ -83,13 +83,15 @@ function solvelinsys3!(
     @. rhs[L.tzk:L.tkk-1] = -rhs_tz
 
     @. L.LHS3copy = L.LHS3
-    if !identityH
-        for k in eachindex(L.cone.prms)
-            idxs = L.tzk - 1 .+ L.cone.idxs[k]
-            dim = dimension(L.cone.prms[k])
-            calcHarr_prm!(view(L.LHS3copy, idxs, idxs), Matrix(-mu*I, dim, dim), L.cone.prms[k])
-        end
-    end
+    @assert identityH
+    # TODO update for prim or dual cones
+    # if !identityH
+    #     for k in eachindex(L.cone.prms)
+    #         idxs = L.tzk - 1 .+ L.cone.idxs[k]
+    #         dim = dimension(L.cone.prms[k])
+    #         calcHiarr_prm!(view(L.LHS3copy, idxs, idxs), Matrix(-inv(mu)*I, dim, dim), L.cone.prms[k])
+    #     end
+    # end
 
     F = bunchkaufman!(Symmetric(L.LHS3copy))
     ldiv!(F, rhs)
@@ -109,7 +111,7 @@ function solvelinsys6!(
     rhs_ty::Vector{Float64},
     rhs_tz::Vector{Float64},
     rhs_ts::Vector{Float64},
-    rhs_kap::Float64,
+    rhs_kap::Float64, # TODO reorder kap and tau to match 6x6 system order
     rhs_tau::Float64,
     mu::Float64,
     tau::Float64,
@@ -124,13 +126,17 @@ function solvelinsys6!(
     rhs[L.tsk:L.ttk-1] = rhs_ts
     rhs[end] = rhs_tau
 
+    # TODO don't use Matrix(mu*I, dim, dim) because it allocates and is slow
     @. L.LHS6copy = L.LHS6
+    L.LHS6copy[L.tkk, end] = mu/tau/tau
     for k in eachindex(L.cone.prms)
         dim = dimension(L.cone.prms[k])
-        calcHarr_prm!(view(L.LHS6copy, L.tzk - 1 .+ L.cone.idxs[k], L.tsk - 1 .+ L.cone.idxs[k]), Matrix(mu*I, dim, dim), L.cone.prms[k])
+        if L.cone.useduals[k]
+            calcHarr_prm!(view(L.LHS6copy, L.tzk - 1 .+ L.cone.idxs[k], L.tzk - 1 .+ L.cone.idxs[k]), Matrix(mu*I, dim, dim), L.cone.prms[k])
+        else
+            calcHarr_prm!(view(L.LHS6copy, L.tzk - 1 .+ L.cone.idxs[k], L.tsk - 1 .+ L.cone.idxs[k]), Matrix(mu*I, dim, dim), L.cone.prms[k])
+        end
     end
-
-    L.LHS6copy[L.tkk, end] = mu/tau/tau
 
     F = qr!(L.LHS6copy)
     ldiv!(F, rhs)

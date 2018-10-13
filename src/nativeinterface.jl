@@ -312,10 +312,9 @@ function solve!(opt::Optimizer)
     # values during line searches
     ls_tz = similar(tz)
     ls_ts = similar(ts)
-    # cone functions evaluate barrier derivatives at ls_ts
-    loadpnt!(cone, ls_ts)
-    # gradient evaluations at ls_ts of the barrier function for K
-    g = similar(ts)
+    # cone functions evaluate barrier derivatives
+    loadpnt!(cone, ls_ts, ls_tz)
+    g = similar(ts) # TODO maybe use tmp_tz or tmp_ts
     # helper arrays for residuals, right-hand-sides, and search directions
     tmp_tx = similar(tx)
     tmp_tx2 = similar(tx)
@@ -326,43 +325,68 @@ function solve!(opt::Optimizer)
     # find initial primal-dual iterate
     opt.verbose && println("\nfinding initial iterate")
 
-    # solve linear equation
-    # TODO check equations
-    # |0  A' G'| * |tx| = |0|
-    # |A  0  0 |   |ty|   |b|
-    # |G  0 -I |   |ts|   |h|
-    @. tx = 0.0
-    @. ty = -b
-    @. tz = -h
-    solvelinsys3!(tx, ty, tz, 1.0, opt.L, identityH=true)
-    @. ts = -tz
 
-    # from ts, step along interior direction of cone
-    getintdir!(tmp_ts, cone)
-    alpha = (norm(ts) + 1e-3)#/norm(tmp_ts) # TODO tune this
-    @. ls_ts = ts + alpha*tmp_ts
+    # # solve linear equation
+    # # TODO check equations
+    # # |0  A' G'| * |tx| = |0|
+    # # |A  0  0 |   |ty|   |b|
+    # # |G  0 -I |   |ts|   |h|
+    # @. tx = 0.0
+    # @. ty = -b
+    # @. tz = -h
+    # solvelinsys3!(tx, ty, tz, 1.0, opt.L, identityH=true)
+    # @. ts = -tz
+    #
+    # # from ts, step along interior direction of cone
+    # getintdir!(tmp_ts, cone)
+    # alpha = (norm(ts) + 1e-3)#/norm(tmp_ts) # TODO tune this
+    # @. ls_ts = ts + alpha*tmp_ts
+    #
+    # # continue stepping until ts is inside cone
+    # steps = 1
+    # while !incone(cone)
+    #     steps += 1
+    #     if steps > 25
+    #         error("cannot find initial iterate")
+    #     end
+    #     alpha *= 1.5
+    #     @. ls_ts = ts + alpha*tmp_ts
+    # end
+    # opt.verbose && println("$steps steps taken for initial iterate")
+    # @. ts = ls_ts
+    #
+    # calcg!(tz, cone) # TODO fixes parts of ts and tz
+    # @. tz *= -1.0
 
-    # continue stepping until ts is inside cone
-    steps = 1
-    while !incone(cone)
-        steps += 1
-        if steps > 25
-            error("cannot find initial iterate")
-        end
-        alpha *= 1.5
-        @. ls_ts = ts + alpha*tmp_ts
-    end
-    opt.verbose && println("$steps steps taken for initial iterate")
+
+    # TODO choose scaled interior direction vector and use gradients
+    getinitsz!(ls_ts, ls_tz, cone)
+    @show ls_ts
+    @show ls_tz
     @. ts = ls_ts
+    @. tz = ls_tz
 
-    calcg!(tz, cone)
-    @. tz *= -1.0
     tau = 1.0
     kap = 1.0
     mu = (dot(tz, ts) + tau*kap)/bnu
+
     @assert !isnan(mu)
+    @show mu
     @assert abs(1.0 - mu) < 1e-10
     # @assert calcnbhd(tau*kap, mu, copy(tz), copy(tz), cone) < 1e-6
+
+    return
+
+    nbhd = calcnbhd(mu, cone) # + (tau*kap - mu)^2
+    if nbhd < 0.0 || nbhd > 1e-8
+        error("neighborhood value (distance to central path) was not zero")
+    end
+
+
+
+
+
+
 
     opt.verbose && println("initial iterate found")
 
@@ -499,7 +523,14 @@ function solve!(opt::Optimizer)
         # prediction phase
         # calculate prediction direction
         @. tmp_ts = tmp_tz
-        @. tmp_tz = -tz
+        for k in eachindex(cone.prms)
+            if cone.useduals[k]
+                tmp_tz[cone.idxs[k]] = -ts[cone.idxs[k]]
+            else
+                tmp_tz[cone.idxs[k]] = -tz[cone.idxs[k]]
+            end
+        end
+        # @. tmp_tz = -tz
         (tmp_kap, tmp_tau) = solvelinsys6!(tmp_tx, tmp_ty, tmp_tz, tmp_ts, -kap, kap + cx + by + hz, mu, tau, opt.L)
 
         # determine step length alpha by line search
@@ -512,17 +543,17 @@ function solve!(opt::Optimizer)
             nprediters += 1
 
             @. ls_ts = ts + alpha*tmp_ts
+            @. ls_tz = tz + alpha*tmp_tz
 
             # accept primal iterate if
             # - decreased alpha and it is the first inside the cone and beta-neighborhood or
             # - increased alpha and it is inside the cone and the first to leave beta-neighborhood
             if incone(cone)
                 # primal iterate is inside the cone
-
-                @. ls_tz = tz + alpha*tmp_tz
                 ls_tk = (tau + alpha*tmp_tau)*(kap + alpha*tmp_kap)
                 ls_mu = (dot(ls_ts, ls_tz) + ls_tk)/bnu
-                nbhd = calcnbhd(ls_tk, ls_mu, ls_tz, g, cone)
+                # nbhd = calcnbhd(ls_tk, ls_mu, ls_tz, g, cone)
+                nbhd = calcnbhd(ls_mu, cone) + (ls_tk - ls_mu)^2
 
                 if nbhd < abs2(beta*ls_mu)
                     # iterate is inside the beta-neighborhood
@@ -565,7 +596,7 @@ function solve!(opt::Optimizer)
         # step distance alpha in the direction
         @. tx += alpha*tmp_tx
         @. ty += alpha*tmp_ty
-        @. tz += alpha*tmp_tz
+        @. tz = ls_tz
         @. ts = ls_ts
         tau += alpha*tmp_tau
         kap += alpha*tmp_kap
@@ -585,8 +616,15 @@ function solve!(opt::Optimizer)
             # calculate correction direction
             @. tmp_tx = 0.0
             @. tmp_ty = 0.0
+            for k in eachindex(cone.prms)
+                if cone.useduals[k]
+                    tmp_tz[cone.idxs[k]] = -ts[cone.idxs[k]]
+                else
+                    tmp_tz[cone.idxs[k]] = -tz[cone.idxs[k]]
+                end
+            end
             calcg!(g, cone)
-            @. tmp_tz = -tz - mu*g
+            @. tmp_tz -= mu*g
             @. tmp_ts = 0.0
             (tmp_kap, tmp_tau) = solvelinsys6!(tmp_tx, tmp_ty, tmp_tz, tmp_ts, -kap + mu/tau, 0.0, mu, tau, opt.L)
 
@@ -597,6 +635,8 @@ function solve!(opt::Optimizer)
                 ncorrlsiters += 1
 
                 @. ls_ts = ts + alpha*tmp_ts
+                @. ls_tz = tz + alpha*tmp_tz
+
                 if incone(cone)
                     # primal iterate tx is inside the cone, so terminate line search
                     break
@@ -619,7 +659,7 @@ function solve!(opt::Optimizer)
             # step distance alpha in the direction
             @. tx += alpha*tmp_tx
             @. ty += alpha*tmp_ty
-            @. tz += alpha*tmp_tz
+            @. tz = ls_tz
             @. ts = ls_ts
             tau += alpha*tmp_tau
             kap += alpha*tmp_kap
@@ -627,8 +667,10 @@ function solve!(opt::Optimizer)
 
             # finish if allowed and current iterate is in the eta-neighborhood, or if taken max steps
             if (ncorrsteps == opt.maxcorrsteps) || opt.corrcheck
+                @. ls_ts = ts
                 @. ls_tz = tz
-                nbhd = calcnbhd(tau*kap, mu, ls_tz, g, cone)
+                # nbhd = calcnbhd(tau*kap, mu, ls_tz, g, cone)
+                nbhd = calcnbhd(mu, cone) + (tau*kap - mu)^2
                 if nbhd <= abs2(eta*mu)
                     break
                 elseif ncorrsteps == opt.maxcorrsteps
@@ -662,13 +704,13 @@ function solve!(opt::Optimizer)
     return nothing
 end
 
-# TODO put this inside the cone functions
-function calcnbhd(tk, mu, ls_tz, g, cone)
-    calcg!(g, cone)
-    @. ls_tz += mu*g
-    calcHiarr!(g, ls_tz, cone)
-    return (tk - mu)^2 + dot(ls_tz, g)
-end
+# # TODO put this inside the cone functions
+# function calcnbhd(tk, mu, ls_tz, g, cone)
+#     calcg!(g, cone)
+#     @. ls_tz += mu*g
+#     calcHiarr!(g, ls_tz, cone)
+#     return (tk - mu)^2 + dot(ls_tz, g)
+# end
 
 # get neighborhood parameters depending on magnitude of barrier parameter and maximum number of correction steps
 function getbetaeta(maxcorrsteps::Int, bnu::Float64)

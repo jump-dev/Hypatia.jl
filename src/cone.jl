@@ -9,13 +9,15 @@ abstract type PrimitiveCone end
 mutable struct Cone
     prms::Vector{PrimitiveCone}
     idxs::Vector{UnitRange{Int}}
+    useduals::Vector{Bool}
 end
-Cone() = Cone(PrimitiveCone[], UnitRange{Int}[])
+Cone() = Cone(PrimitiveCone[], UnitRange{Int}[], Bool[])
 
-function addprimitivecone!(cone::Cone, prm::PrimitiveCone, idx::UnitRange{Int})
+function addprimitivecone!(cone::Cone, prm::PrimitiveCone, idx::UnitRange{Int}, usedual::Bool)
     @assert dimension(prm) == length(idx)
     push!(cone.prms, prm)
     push!(cone.idxs, idx)
+    push!(cone.useduals, usedual)
     return cone
 end
 
@@ -30,14 +32,33 @@ function getintdir!(dir::Vector{Float64}, cone::Cone)
 end
 
 # TODO can parallelize the functions acting on Cone
-function loadpnt!(cone::Cone, pnt::Vector{Float64})
+function loadpnt!(cone::Cone, ts::Vector{Float64}, tz::Vector{Float64})
     for k in eachindex(cone.prms)
-        loadpnt_prm!(cone.prms[k], view(pnt, cone.idxs[k]))
+        if cone.useduals[k]
+            loadpnt_prm!(cone.prms[k], view(tz, cone.idxs[k]))
+        else
+            loadpnt_prm!(cone.prms[k], view(ts, cone.idxs[k]))
+        end
     end
     return nothing
 end
 
 incone(cone::Cone) = all(incone_prm, cone.prms)
+
+function getinitsz!(ts, tz, cone)
+    for k in eachindex(cone.prms)
+        if cone.useduals[k]
+            getintdir_prm!(view(tz, cone.idxs[k]), cone.prms[k])
+            calcg_prm!(view(ts, cone.idxs[k]), cone.prms[k])
+            ts[cone.idxs[k]] *= -1.0
+        else
+            getintdir_prm!(view(ts, cone.idxs[k]), cone.prms[k])
+            calcg_prm!(view(tz, cone.idxs[k]), cone.prms[k])
+            tz[cone.idxs[k]] *= -1.0
+        end
+    end
+    return (ts, tz)
+end
 
 function calcg!(g::Vector{Float64}, cone::Cone)
     for k in eachindex(cone.prms)
@@ -46,33 +67,41 @@ function calcg!(g::Vector{Float64}, cone::Cone)
     return g
 end
 
-function calcHarr!(prod::AbstractMatrix{Float64}, arr::AbstractMatrix{Float64}, cone::Cone)
-    for k in eachindex(cone.prms)
-        calcHarr_prm!(view(prod, cone.idxs[k], :), view(arr, cone.idxs[k], :), cone.prms[k])
-    end
-    return prod
-end
+# calculate neighborhood distance to central path
+calcnbhd(mu, cone) = sum(calcnbhd_prm(mu, cone.prms[k]) for k in eachindex(cone.prms))
 
-function calcHarr!(prod::AbstractVector{Float64}, arr::AbstractVector{Float64}, cone::Cone)
-    for k in eachindex(cone.prms)
-        calcHarr_prm!(view(prod, cone.idxs[k]), view(arr, cone.idxs[k]), cone.prms[k])
-    end
-    return prod
-end
 
-function calcHiarr!(prod::AbstractMatrix{Float64}, arr::AbstractMatrix{Float64}, cone::Cone)
-    for k in eachindex(cone.prms)
-        calcHiarr_prm!(view(prod, cone.idxs[k], :), view(arr, cone.idxs[k], :), cone.prms[k])
-    end
-    return prod
-end
 
-function calcHiarr!(prod::AbstractVector{Float64}, arr::AbstractVector{Float64}, cone::Cone)
-    for k in eachindex(cone.prms)
-        calcHiarr_prm!(view(prod, cone.idxs[k]), view(arr, cone.idxs[k]), cone.prms[k])
-    end
-    return prod
-end
+
+# function calcHarr!(prod::AbstractMatrix{Float64}, arr::AbstractMatrix{Float64}, cone::Cone)
+#     for k in eachindex(cone.prms)
+#         calcHarr_prm!(view(prod, cone.idxs[k], :), view(arr, cone.idxs[k], :), cone.prms[k])
+#     end
+#     return prod
+# end
+#
+# function calcHarr!(prod::AbstractVector{Float64}, arr::AbstractVector{Float64}, cone::Cone)
+#     for k in eachindex(cone.prms)
+#         calcHarr_prm!(view(prod, cone.idxs[k]), view(arr, cone.idxs[k]), cone.prms[k])
+#     end
+#     return prod
+# end
+
+# function calcHiarr!(prod::AbstractMatrix{Float64}, arr::AbstractMatrix{Float64}, cone::Cone)
+#     for k in eachindex(cone.prms)
+#         calcHiarr_prm!(view(prod, cone.idxs[k], :), view(arr, cone.idxs[k], :), cone.prms[k])
+#     end
+#     return prod
+# end
+#
+# function calcHiarr!(prod::AbstractVector{Float64}, arr::AbstractVector{Float64}, cone::Cone)
+#     for k in eachindex(cone.prms)
+#         calcHiarr_prm!(view(prod, cone.idxs[k]), view(arr, cone.idxs[k]), cone.prms[k])
+#     end
+#     return prod
+# end
+
+
 
 # utilities for converting between smat and svec forms (lower triangle) for symmetric matrices
 # TODO only need to do lower triangle if use symmetric matrix types
