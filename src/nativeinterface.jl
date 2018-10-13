@@ -373,15 +373,13 @@ function solve!(opt::Optimizer)
     @assert !isnan(mu)
     @show mu
     @assert abs(1.0 - mu) < 1e-10
-    # @assert calcnbhd(tau*kap, mu, copy(tz), copy(tz), cone) < 1e-6
-
-    return
-
-    nbhd = calcnbhd(mu, cone) # + (tau*kap - mu)^2
+    nbhd = calcnbhd!(ls_ts, ls_tz, mu, cone) # + (tau*kap - mu)^2
+    @show nbhd
     if nbhd < 0.0 || nbhd > 1e-8
         error("neighborhood value (distance to central path) was not zero")
     end
 
+    return
 
 
 
@@ -553,7 +551,7 @@ function solve!(opt::Optimizer)
                 ls_tk = (tau + alpha*tmp_tau)*(kap + alpha*tmp_kap)
                 ls_mu = (dot(ls_ts, ls_tz) + ls_tk)/bnu
                 # nbhd = calcnbhd(ls_tk, ls_mu, ls_tz, g, cone)
-                nbhd = calcnbhd(ls_mu, cone) + (ls_tk - ls_mu)^2
+                nbhd = calcnbhd!(ls_ts, ls_tz, ls_mu, cone) + (ls_tk - ls_mu)^2
 
                 if nbhd < abs2(beta*ls_mu)
                     # iterate is inside the beta-neighborhood
@@ -596,8 +594,8 @@ function solve!(opt::Optimizer)
         # step distance alpha in the direction
         @. tx += alpha*tmp_tx
         @. ty += alpha*tmp_ty
-        @. tz = ls_tz
-        @. ts = ls_ts
+        @. tz += alpha*tmp_tz
+        @. ts += alpha*tmp_ts
         tau += alpha*tmp_tau
         kap += alpha*tmp_kap
         mu = (dot(ts, tz) + tau*kap)/bnu
@@ -659,8 +657,8 @@ function solve!(opt::Optimizer)
             # step distance alpha in the direction
             @. tx += alpha*tmp_tx
             @. ty += alpha*tmp_ty
-            @. tz = ls_tz
-            @. ts = ls_ts
+            @. tz += alpha*tmp_tz
+            @. ts += alpha*tmp_ts
             tau += alpha*tmp_tau
             kap += alpha*tmp_kap
             mu = (dot(ts, tz) + tau*kap)/bnu
@@ -670,7 +668,7 @@ function solve!(opt::Optimizer)
                 @. ls_ts = ts
                 @. ls_tz = tz
                 # nbhd = calcnbhd(tau*kap, mu, ls_tz, g, cone)
-                nbhd = calcnbhd(mu, cone) + (tau*kap - mu)^2
+                nbhd = calcnbhd!(ls_ts, ls_tz, mu, cone) + (tau*kap - mu)^2
                 if nbhd <= abs2(eta*mu)
                     break
                 elseif ncorrsteps == opt.maxcorrsteps

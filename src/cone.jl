@@ -68,8 +68,20 @@ function calcg!(g::Vector{Float64}, cone::Cone)
 end
 
 # calculate neighborhood distance to central path
-calcnbhd(mu, cone) = sum(calcnbhd_prm(mu, cone.prms[k]) for k in eachindex(cone.prms))
-
+function calcnbhd!(ts, tz, mu, cone)
+    for k in eachindex(cone.prms)
+        if cone.useduals[k]
+            calcg_prm!(view(tz, cone.idxs[k]), cone.prms[k])
+            ts[cone.idxs[k]] += mu*tz[cone.idxs[k]] # TODO is this allocing
+            calcHiarr_prm!(view(tz, cone.idxs[k]), view(ts, cone.idxs[k]), cone.prms[k])
+        else
+            calcg_prm!(view(ts, cone.idxs[k]), cone.prms[k])
+            tz[cone.idxs[k]] += mu*ts[cone.idxs[k]] # TODO is this allocing
+            calcHiarr_prm!(view(ts, cone.idxs[k]), view(tz, cone.idxs[k]), cone.prms[k])
+        end
+    end
+    return dot(ts, tz)
+end
 
 
 
