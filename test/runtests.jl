@@ -19,28 +19,28 @@ function fullsolve(opt::Hypatia.Optimizer, c, A, b, G, h, cone, lscachetype)
     if lscachetype != Hypatia.QRSymmCache
         error("tests only support QRSymmCache now")
     end
-    L = Hypatia.QRSymmCache(c1, A1, b1, G1, h, cone, Q2, RiQ1)
-    # L = Hypatia.NaiveCache(c1, A1, b1, G1, h, cone)
+    # L = Hypatia.QRSymmCache(c1, A1, b1, G1, h, cone, Q2, RiQ1)
+    L = Hypatia.NaiveCache(c1, A1, b1, G1, h, cone)
 
     Hypatia.load_data!(opt, c1, A1, b1, G1, h, cone, L)
 
     Hypatia.solve!(opt)
 
-    # x = zeros(length(c))
-    # x[dukeep] = Hypatia.get_x(opt)
-    # y = zeros(length(b))
-    # y[prkeep] = Hypatia.get_y(opt)
-    # s = Hypatia.get_s(opt)
-    # z = Hypatia.get_z(opt)
-    #
-    # pobj = Hypatia.get_pobj(opt)
-    # dobj = Hypatia.get_dobj(opt)
-    #
-    # status = Hypatia.get_status(opt)
-    # stime = Hypatia.get_solvetime(opt)
-    # niters = Hypatia.get_niters(opt)
-    #
-    # return (x=x, y=y, s=s, z=z, pobj=pobj, dobj=dobj, status=status, stime=stime, niters=niters)
+    x = zeros(length(c))
+    x[dukeep] = Hypatia.get_x(opt)
+    y = zeros(length(b))
+    y[prkeep] = Hypatia.get_y(opt)
+    s = Hypatia.get_s(opt)
+    z = Hypatia.get_z(opt)
+
+    pobj = Hypatia.get_pobj(opt)
+    dobj = Hypatia.get_dobj(opt)
+
+    status = Hypatia.get_status(opt)
+    stime = Hypatia.get_solvetime(opt)
+    niters = Hypatia.get_niters(opt)
+
+    return (x=x, y=y, s=s, z=z, pobj=pobj, dobj=dobj, status=status, stime=stime, niters=niters)
 end
 
 

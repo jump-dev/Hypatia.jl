@@ -68,15 +68,15 @@ function calcg!(g::Vector{Float64}, cone::Cone)
 end
 
 # calculate neighborhood distance to central path
-function calcnbhd!(ts, tz, mu, cone)
+function calcnbhd!(g, ts, tz, mu, cone)
     for k in eachindex(cone.prms)
+        calcg_prm!(view(g, cone.idxs[k]), cone.prms[k])
         if cone.useduals[k]
-            calcg_prm!(view(tz, cone.idxs[k]), cone.prms[k])
-            ts[cone.idxs[k]] += mu*tz[cone.idxs[k]] # TODO is this allocing
+            ts[cone.idxs[k]] += mu*g[cone.idxs[k]] # TODO is this allocing
             calcHiarr_prm!(view(tz, cone.idxs[k]), view(ts, cone.idxs[k]), cone.prms[k])
         else
-            calcg_prm!(view(ts, cone.idxs[k]), cone.prms[k])
-            tz[cone.idxs[k]] += mu*ts[cone.idxs[k]] # TODO is this allocing
+            calcg_prm!(view(g, cone.idxs[k]), cone.prms[k])
+            tz[cone.idxs[k]] += mu*g[cone.idxs[k]] # TODO is this allocing
             calcHiarr_prm!(view(ts, cone.idxs[k]), view(tz, cone.idxs[k]), cone.prms[k])
         end
     end
@@ -85,33 +85,33 @@ end
 
 
 
-# function calcHarr!(prod::AbstractMatrix{Float64}, arr::AbstractMatrix{Float64}, cone::Cone)
-#     for k in eachindex(cone.prms)
-#         calcHarr_prm!(view(prod, cone.idxs[k], :), view(arr, cone.idxs[k], :), cone.prms[k])
-#     end
-#     return prod
-# end
-#
-# function calcHarr!(prod::AbstractVector{Float64}, arr::AbstractVector{Float64}, cone::Cone)
-#     for k in eachindex(cone.prms)
-#         calcHarr_prm!(view(prod, cone.idxs[k]), view(arr, cone.idxs[k]), cone.prms[k])
-#     end
-#     return prod
-# end
+function calcHarr!(prod::AbstractMatrix{Float64}, arr::AbstractMatrix{Float64}, cone::Cone)
+    for k in eachindex(cone.prms)
+        calcHarr_prm!(view(prod, cone.idxs[k], :), view(arr, cone.idxs[k], :), cone.prms[k])
+    end
+    return prod
+end
 
-# function calcHiarr!(prod::AbstractMatrix{Float64}, arr::AbstractMatrix{Float64}, cone::Cone)
-#     for k in eachindex(cone.prms)
-#         calcHiarr_prm!(view(prod, cone.idxs[k], :), view(arr, cone.idxs[k], :), cone.prms[k])
-#     end
-#     return prod
-# end
-#
-# function calcHiarr!(prod::AbstractVector{Float64}, arr::AbstractVector{Float64}, cone::Cone)
-#     for k in eachindex(cone.prms)
-#         calcHiarr_prm!(view(prod, cone.idxs[k]), view(arr, cone.idxs[k]), cone.prms[k])
-#     end
-#     return prod
-# end
+function calcHarr!(prod::AbstractVector{Float64}, arr::AbstractVector{Float64}, cone::Cone)
+    for k in eachindex(cone.prms)
+        calcHarr_prm!(view(prod, cone.idxs[k]), view(arr, cone.idxs[k]), cone.prms[k])
+    end
+    return prod
+end
+
+function calcHiarr!(prod::AbstractMatrix{Float64}, arr::AbstractMatrix{Float64}, cone::Cone)
+    for k in eachindex(cone.prms)
+        calcHiarr_prm!(view(prod, cone.idxs[k], :), view(arr, cone.idxs[k], :), cone.prms[k])
+    end
+    return prod
+end
+
+function calcHiarr!(prod::AbstractVector{Float64}, arr::AbstractVector{Float64}, cone::Cone)
+    for k in eachindex(cone.prms)
+        calcHiarr_prm!(view(prod, cone.idxs[k]), view(arr, cone.idxs[k]), cone.prms[k])
+    end
+    return prod
+end
 
 
 
