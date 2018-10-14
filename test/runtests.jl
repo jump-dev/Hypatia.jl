@@ -85,44 +85,44 @@ end
 #     run_lp()
 #     run_namedpoly()
 # end
-
-include(joinpath(@__DIR__, "examples.jl"))
-verbose = true # test verbosity
-lscachetype = Hypatia.QRSymmCache # linear system cache type
-
-@testset "varied examples" begin
-    for testfun in (
-        _envelope1,
-        _envelope2,
-        # _envelope3,
-        # # _envelope4,
-        # _lp1,
-        # _lp2,
-        # _lp3,
-        # _namedpoly1,
-        # _namedpoly2,
-        # _namedpoly3,
-        # # _namedpoly4,
-        _namedpoly5,
-        # # _namedpoly6,
-        # _namedpoly7,
-        # _namedpoly8,
-        # _namedpoly9,
-        _namedpoly10,
-        _namedpoly11,
-        )
-        testfun(verbose, lscachetype)
-    end
-end
 #
+# include(joinpath(@__DIR__, "examples.jl"))
+# verbose = true # test verbosity
+# lscachetype = Hypatia.QRSymmCache # linear system cache type
 #
-# # MathOptInterface tests
-# verbose = false # test verbosity
-# include(joinpath(@__DIR__, "moi.jl"))
-# @testset "MathOptInterface tests" begin
-#     testmoi(verbose, false)
-#     testmoi(verbose, true)
+# @testset "varied examples" begin
+#     for testfun in (
+#         _envelope1,
+#         _envelope2,
+#         # _envelope3,
+#         # # _envelope4,
+#         # _lp1,
+#         # _lp2,
+#         # _lp3,
+#         # _namedpoly1,
+#         # _namedpoly2,
+#         # _namedpoly3,
+#         # # _namedpoly4,
+#         _namedpoly5,
+#         # # _namedpoly6,
+#         # _namedpoly7,
+#         # _namedpoly8,
+#         # _namedpoly9,
+#         _namedpoly10,
+#         _namedpoly11,
+#         )
+#         testfun(verbose, lscachetype)
+#     end
 # end
-#
+
+
+# MathOptInterface tests
+verbose = true # test verbosity
+include(joinpath(@__DIR__, "moi.jl"))
+@testset "MathOptInterface tests" begin
+    testmoi(verbose, false)
+    testmoi(verbose, true)
+end
+
 
 return nothing
