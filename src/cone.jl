@@ -12,6 +12,7 @@ mutable struct Cone
     useduals::Vector{Bool}
 end
 Cone() = Cone(PrimitiveCone[], UnitRange{Int}[], Bool[])
+Cone(prms::Vector{<:PrimitiveCone}, idxs::Vector{UnitRange{Int}}) = Cone(prms, idxs, fill(false, length(prms)))
 
 function addprimitivecone!(cone::Cone, prm::PrimitiveCone, idx::UnitRange{Int}, usedual::Bool)
     @assert dimension(prm) == length(idx)
@@ -49,10 +50,12 @@ function getinitsz!(ts, tz, cone)
     for k in eachindex(cone.prms)
         if cone.useduals[k]
             getintdir_prm!(view(tz, cone.idxs[k]), cone.prms[k])
+            @assert incone_prm(cone.prms[k])
             calcg_prm!(view(ts, cone.idxs[k]), cone.prms[k])
             ts[cone.idxs[k]] *= -1.0
         else
             getintdir_prm!(view(ts, cone.idxs[k]), cone.prms[k])
+            @assert incone_prm(cone.prms[k])
             calcg_prm!(view(tz, cone.idxs[k]), cone.prms[k])
             tz[cone.idxs[k]] *= -1.0
         end

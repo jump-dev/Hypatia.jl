@@ -174,6 +174,39 @@ function _ellinf2(verbose::Bool, lscachetype)
     @test r.pobj ≈ 1 atol=1e-4 rtol=1e-4
 end
 
+function _ellinfdual1(verbose::Bool, lscachetype)
+    opt = Hypatia.Optimizer(verbose=verbose)
+    c = Float64[0, 1, -1]
+    A = Float64[1 0 0; 0 1 0]
+    b = Float64[1, -0.4]
+    G = SparseMatrixCSC(-1.0I, 3, 3)
+    h = zeros(3)
+    cone = Hypatia.Cone([Hypatia.EllInfinityCone(3)], [1:3], [true])
+    r = fullsolve(opt, c, A, b, G, h, cone, lscachetype)
+    @test r.status == :Optimal
+    @test r.niters <= 25
+    @test r.pobj ≈ r.dobj atol=1e-4 rtol=1e-4
+    @test r.pobj ≈ -1 atol=1e-4 rtol=1e-4
+    @test r.x ≈ [1, -0.4, 0.6] atol=1e-4 rtol=1e-4
+    @test r.y ≈ [1, 0] atol=1e-4 rtol=1e-4
+end
+
+function _ellinfdual2(verbose::Bool, lscachetype)
+    opt = Hypatia.Optimizer(verbose=verbose)
+    Random.seed!(1)
+    c = Float64[1, 0, 0, 0, 0, 0]
+    A = rand(-9.0:9.0, 3, 6)
+    b = A*ones(6)
+    G = rand(6, 6)
+    h = G*ones(6)
+    cone = Hypatia.Cone([Hypatia.EllInfinityCone(6)], [1:6], [true])
+    r = fullsolve(opt, c, A, b, G, h, cone, lscachetype)
+    @test r.status == :Optimal
+    @test r.niters <= 20
+    @test r.pobj ≈ r.dobj atol=1e-4 rtol=1e-4
+    @test r.pobj ≈ 1 atol=1e-4 rtol=1e-4
+end
+
 function _soc1(verbose::Bool, lscachetype)
     opt = Hypatia.Optimizer(verbose=verbose)
     c = Float64[0, -1, -1]
