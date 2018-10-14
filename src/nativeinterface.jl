@@ -326,6 +326,10 @@ function solve!(opt::Optimizer)
     opt.verbose && println("\nfinding initial iterate")
 
 
+    # TODO another approach to try: like CVXOPT, solve two 3x3 systems, use the s and z subvectors
+    # could even take midpoint of the g and each of the two subvectors, balancing the infeasibility for the linear constraints and distance from central path
+
+    # NOTE old approach (only one 3x3 solve for primal)
     # # solve linear equation
     # # TODO check equations
     # # |0  A' G'| * |tx| = |0|
@@ -359,19 +363,14 @@ function solve!(opt::Optimizer)
     # @. tz *= -1.0
 
 
-
-
     # TODO scale like in alfonso?
     getinitsz!(ls_ts, ls_tz, cone)
-    @show ls_ts
-    @show ls_tz
     @. ts = ls_ts
     @. tz = ls_tz
 
     tau = 1.0
     kap = 1.0
     mu = (dot(tz, ts) + tau*kap)/bnu
-    @show mu
     @assert !isnan(mu)
     @assert abs(1.0 - mu) < 1e-10
 
@@ -384,7 +383,6 @@ function solve!(opt::Optimizer)
     # A'y = -c - G'z
     # Ax = b
     # Gx = h - ts
-
     LHS = [zeros(n, n) A'; A zeros(p, p); G zeros(q, p)]
     rhs = [-c - G'*tz; b; h - ts]
     txty = LHS\rhs
@@ -392,9 +390,6 @@ function solve!(opt::Optimizer)
         tx = txty[1:n]
         ty = txty[n+1:end]
     end
-
-    # @show tx
-    # @show ty
 
 
     opt.verbose && println("initial iterate found")

@@ -48,7 +48,6 @@ mutable struct QRSymmCache <: LinSysCache
         RiQ1::AbstractMatrix{Float64};
         useiterative::Bool = false,
         )
-
         L = new()
         (n, p, q) = (length(c), length(b), length(h))
         nmp = n - p
@@ -95,23 +94,22 @@ QRSymmCache(
     useiterative::Bool = false,
     ) = error("to use a QRSymmCache for linear system solves, the data must be preprocessed and Q2 and RiQ1 must be passed into the QRSymmCache constructor")
 
-# solve system for x, y, z
-function solvelinsys3!(
-    rhs_tx::Vector{Float64},
-    rhs_ty::Vector{Float64},
-    rhs_tz::Vector{Float64},
-    mu::Float64,
-    L::QRSymmCache;
-    identityH::Bool = false,
-    )
-
-    F = helplhs!(mu, L, identityH=identityH)
-    @. rhs_ty *= -1.0
-    @. rhs_tz *= -1.0
-    helplinsys!(rhs_tx, rhs_ty, rhs_tz, F, L)
-
-    return nothing
-end
+# # solve system for x, y, z
+# function solvelinsys3!(
+#     rhs_tx::Vector{Float64},
+#     rhs_ty::Vector{Float64},
+#     rhs_tz::Vector{Float64},
+#     mu::Float64,
+#     L::QRSymmCache;
+#     identityH::Bool = false,
+#     )
+#     F = helplhs!(mu, L, identityH=identityH)
+#     @. rhs_ty *= -1.0
+#     @. rhs_tz *= -1.0
+#     helplinsys!(rhs_tx, rhs_ty, rhs_tz, F, L)
+#
+#     return nothing
+# end
 
 # solve system for x, y, z, s, kap, tau
 function solvelinsys6!(
@@ -125,24 +123,39 @@ function solvelinsys6!(
     tau::Float64,
     L::QRSymmCache,
     )
-
     # solve two symmetric systems and combine the solutions
-    F = helplhs!(mu, L)
+    invmu = inv(mu)
+    F = helplhs!(mu, invmu, L)
 
     # (x2, y2, z2) = (rhs_tx, -rhs_ty, -H*rhs_ts - rhs_tz)
     @. rhs_ty *= -1.0
     @. rhs_tz *= -1.0
-    if !iszero(rhs_ts)
-        calcHarr!(L.z1, rhs_ts, L.cone)
-        @. rhs_tz -= mu*L.z1
+    for k in eachindex(L.cone.prms)
+        if L.cone.useduals[k]
+            @views L.z1[L.cone.idxs[k]] = rhs_tz[L.cone.idxs[k]] - rhs_ts[L.cone.idxs[k]]
+            calcHiarr_prm!(view(rhs_tz, L.cone.idxs[k]), view(L.z1, L.cone.idxs[k]), L.cone.prms[k])
+            rhs_tz[L.cone.idxs[k]] *= invmu
+        else
+            # TODO if rhs_ts[L.cone.idxs[k]] is zero, don't need this
+            calcHarr_prm!(view(L.z1, L.cone.idxs[k]), view(rhs_ts, L.cone.idxs[k]), L.cone.prms[k])
+            @views rhs_tz[L.cone.idxs[k]] -= mu*L.z1[L.cone.idxs[k]]
+        end
     end
     helplinsys!(rhs_tx, rhs_ty, rhs_tz, F, L)
 
     # (x1, y1, z1) = (-c, b, H*h)
     @. L.x1 = -L.c
     @. L.y1 = L.b
-    calcHarr!(L.z1, L.h, L.cone)
-    @. L.z1 *= mu
+    for k in eachindex(L.cone.prms)
+        if L.cone.useduals[k]
+            calcHiarr_prm!(view(L.z1, L.cone.idxs[k]), view(L.h, L.cone.idxs[k]), L.cone.prms[k])
+            L.z1[L.cone.idxs[k]] *= invmu
+        else
+            calcHarr_prm!(view(L.z1, L.cone.idxs[k]), view(L.h, L.cone.idxs[k]), L.cone.prms[k])
+            L.z1[L.cone.idxs[k]] *= mu
+        end
+    end
+
     helplinsys!(L.x1, L.y1, L.z1, F, L)
 
     # combine
@@ -165,7 +178,6 @@ function helplinsys!(
     F,
     L::QRSymmCache,
     )
-
     # bxGHbz = bx + G'*Hbz
     mul!(L.bxGHbz, L.G', zi)
     @. L.bxGHbz += xi
@@ -202,16 +214,23 @@ end
 # calculate or factorize LHS of symmetric positive definite linear system
 function helplhs!(
     mu::Float64,
+    invmu::Float64,
     L::QRSymmCache;
     identityH::Bool = false,
     )
-
     # Q2' * G' * H * G * Q2
     if identityH
         @. L.HG = L.G
     else
-        calcHarr!(L.HG, L.G, L.cone)
-        @. L.HG *= mu
+        for k in eachindex(L.cone.prms)
+            if L.cone.useduals[k]
+                calcHiarr_prm!(view(L.HG, L.cone.idxs[k], :), view(L.G, L.cone.idxs[k], :), L.cone.prms[k])
+                L.HG[L.cone.idxs[k], :] *= invmu
+            else
+                calcHarr_prm!(view(L.HG, L.cone.idxs[k], :), view(L.G, L.cone.idxs[k], :), L.cone.prms[k])
+                L.HG[L.cone.idxs[k], :] *= mu
+            end
+        end
     end
     mul!(L.GHG, L.G', L.HG)
     mul!(L.GHGQ2, L.GHG, L.Q2)

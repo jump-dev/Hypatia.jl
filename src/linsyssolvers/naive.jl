@@ -67,43 +67,43 @@ mutable struct NaiveCache <: LinSysCache
     end
 end
 
-# solve system for x, y, z
-function solvelinsys3!(
-    rhs_tx::Vector{Float64},
-    rhs_ty::Vector{Float64},
-    rhs_tz::Vector{Float64},
-    mu::Float64,
-    L::NaiveCache;
-    identityH::Bool = false,
-    )
-
-    rhs = L.rhs3
-    rhs[1:L.tyk-1] = rhs_tx
-    @. rhs[L.tyk:L.tzk-1] = -rhs_ty
-    @. rhs[L.tzk:L.tkk-1] = -rhs_tz
-
-    @. L.LHS3copy = L.LHS3
-    @assert identityH
-    # TODO update for prim or dual cones
-    # if !identityH
-    #     for k in eachindex(L.cone.prms)
-    #         idxs = L.tzk - 1 .+ L.cone.idxs[k]
-    #         dim = dimension(L.cone.prms[k])
-    #         calcHiarr_prm!(view(L.LHS3copy, idxs, idxs), Matrix(-inv(mu)*I, dim, dim), L.cone.prms[k])
-    #     end
-    # end
-
-    F = bunchkaufman!(Symmetric(L.LHS3copy))
-    ldiv!(F, rhs)
-
-    @. @views begin
-        rhs_tx = rhs[1:L.tyk-1]
-        rhs_ty = rhs[L.tyk:L.tzk-1]
-        rhs_tz = rhs[L.tzk:L.tkk-1]
-    end
-
-    return nothing
-end
+# # solve system for x, y, z
+# function solvelinsys3!(
+#     rhs_tx::Vector{Float64},
+#     rhs_ty::Vector{Float64},
+#     rhs_tz::Vector{Float64},
+#     mu::Float64,
+#     L::NaiveCache;
+#     identityH::Bool = false,
+#     )
+#
+#     rhs = L.rhs3
+#     rhs[1:L.tyk-1] = rhs_tx
+#     @. rhs[L.tyk:L.tzk-1] = -rhs_ty
+#     @. rhs[L.tzk:L.tkk-1] = -rhs_tz
+#
+#     @. L.LHS3copy = L.LHS3
+#     @assert identityH
+#     # TODO update for prim or dual cones
+#     # if !identityH
+#     #     for k in eachindex(L.cone.prms)
+#     #         idxs = L.tzk - 1 .+ L.cone.idxs[k]
+#     #         dim = dimension(L.cone.prms[k])
+#     #         calcHiarr_prm!(view(L.LHS3copy, idxs, idxs), Matrix(-inv(mu)*I, dim, dim), L.cone.prms[k])
+#     #     end
+#     # end
+#
+#     F = bunchkaufman!(Symmetric(L.LHS3copy))
+#     ldiv!(F, rhs)
+#
+#     @. @views begin
+#         rhs_tx = rhs[1:L.tyk-1]
+#         rhs_ty = rhs[L.tyk:L.tzk-1]
+#         rhs_tz = rhs[L.tzk:L.tkk-1]
+#     end
+#
+#     return nothing
+# end
 
 # solve system for x, y, z, s, kap, tau
 function solvelinsys6!(
@@ -128,7 +128,7 @@ function solvelinsys6!(
 
     # TODO don't use Matrix(mu*I, dim, dim) because it allocates and is slow
     @. L.LHS6copy = L.LHS6
-    L.LHS6copy[L.tkk, end] = mu/tau/tau
+    L.LHS6copy[L.tkk, end] = mu/tau/tau # TODO note in CVXOPT coneprog doc, there is no rescaling by tau, they to kap*dtau + tau*dkap = -rhskap
     for k in eachindex(L.cone.prms)
         dim = dimension(L.cone.prms[k])
         if L.cone.useduals[k]
