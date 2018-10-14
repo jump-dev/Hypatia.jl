@@ -52,8 +52,11 @@ MOI.get(::HypatiaOptimizer, ::MOI.SolverName) = "Hypatia"
 MOI.is_empty(moiopt::HypatiaOptimizer) = (get_status(moiopt.opt) == :NotLoaded)
 MOI.empty!(moiopt::HypatiaOptimizer) = HypatiaOptimizer() # TODO empty the data and results, or just create a new one? keep options?
 
-MOI.supports(::HypatiaOptimizer, ::MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}) = true
-MOI.supports(::HypatiaOptimizer, ::MOI.ObjectiveSense) = true
+MOI.supports(::HypatiaOptimizer, ::Union{
+    MOI.ObjectiveSense,
+    MOI.ObjectiveFunction{MOI.SingleVariable},
+    MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}},
+    ) = true
 
 # TODO don't restrict to Float64 type
 const SupportedFuns = Union{
@@ -477,7 +480,7 @@ function MOI.copy_to(
     else
         moiopt.G = dropzeros!(sparse(IG, JG, VG, q, n))
     end
-    moiopt.h = Vector(sparsevec(Ih, Vh, q)) # TODO if type less strongly, this can be sparse too
+    moiopt.h = Vector(sparsevec(Ih, Vh, q))
     moiopt.cone = cone
     moiopt.constroffsetcone = constroffsetcone
     moiopt.constrprimcone = Vector(sparsevec(Icpc, Vcpc, q))
@@ -494,7 +497,10 @@ function MOI.optimize!(moiopt::HypatiaOptimizer)
     # TODO make it optional
     (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = preprocess_data(c, A, b, G, useQR=true)
 
-    L = QRSymmCache(c1, A1, b1, G1, h, cone, Q2, RiQ1)
+    # TODO make cache type optional, and turn off useQR in preprocess if don't need
+    # L = QRSymmCache(c1, A1, b1, G1, h, cone, Q2, RiQ1)
+    L = NaiveCache(c1, A1, b1, G1, h, cone)
+
     load_data!(opt, c1, A1, b1, G1, h, cone, L)
 
     solve!(opt)

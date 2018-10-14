@@ -14,7 +14,12 @@ end
 Cone() = Cone(PrimitiveCone[], UnitRange{Int}[], Bool[])
 Cone(prms::Vector{<:PrimitiveCone}, idxs::Vector{UnitRange{Int}}) = Cone(prms, idxs, fill(false, length(prms)))
 
-function addprimitivecone!(cone::Cone, prm::PrimitiveCone, idx::UnitRange{Int}, usedual::Bool)
+function addprimitivecone!(
+    cone::Cone,
+    prm::PrimitiveCone,
+    idx::UnitRange{Int};
+    usedual::Bool = false,
+    )
     @assert dimension(prm) == length(idx)
     push!(cone.prms, prm)
     push!(cone.idxs, idx)
