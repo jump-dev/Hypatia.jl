@@ -46,7 +46,7 @@ end
 
 # native interface tests
 include(joinpath(@__DIR__, "native.jl"))
-verbose = false # test verbosity
+verbose = true # test verbosity
 lscachetype = Hypatia.QRSymmCache # linear system cache type
 
 @testset "native interface tests" begin
@@ -62,6 +62,7 @@ lscachetype = Hypatia.QRSymmCache # linear system cache type
         _ellinf2,
         _ellinfdual1,
         _ellinfdual2,
+        _ellinfdual3,
         _soc1,
         _rsoc1,
         _rsoc2,
@@ -108,7 +109,7 @@ lscachetype = Hypatia.QRSymmCache # linear system cache type
         _namedpoly7,
         _namedpoly8,
         _namedpoly9,
-        _namedpoly10,
+        # _namedpoly10,
         _namedpoly11,
         )
         testfun(verbose, lscachetype)
