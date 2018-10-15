@@ -314,7 +314,7 @@ function solve!(opt::Optimizer)
     ls_ts = similar(ts)
     # cone functions evaluate barrier derivatives
     loadpnt!(cone, ls_ts, ls_tz)
-    g = similar(ts) # TODO maybe use tmp_tz or tmp_ts
+    g = similar(ts)
     # helper arrays for residuals, right-hand-sides, and search directions
     tmp_tx = similar(tx)
     tmp_tx2 = similar(tx)
@@ -341,12 +341,11 @@ function solve!(opt::Optimizer)
     # Ax = b
     # Gx = h - ts
     LHS = [zeros(n, n) A'; A zeros(p, p); G zeros(q, p)]
+    F = qr!(LHS)
     rhs = [-c - G'*tz; b; h - ts]
-    txty = LHS\rhs
-    @. @views begin
-        tx = txty[1:n]
-        ty = txty[n+1:end]
-    end
+    txty = F\rhs
+    @. @views tx = txty[1:n]
+    @. @views ty = txty[n+1:end]
 
     opt.verbose && println("initial iterate found")
 
@@ -487,7 +486,7 @@ function solve!(opt::Optimizer)
         @. tmp_ts = tmp_tz
         for k in eachindex(cone.prmtvs)
             (v1, v2) = (cone.useduals[k] ? (ts, tz) : (tz, ts))
-            tmp_tz[cone.idxs[k]] = -v1[cone.idxs[k]] # TODO allocs
+            @. @views tmp_tz[cone.idxs[k]] = -v1[cone.idxs[k]]
         end
         (tmp_kap, tmp_tau) = solvelinsys6!(tmp_tx, tmp_ty, tmp_tz, -kap, tmp_ts, kap + cx + by + hz, mu, tau, opt.L)
 
@@ -577,7 +576,7 @@ function solve!(opt::Optimizer)
             @. tmp_ty = 0.0
             for k in eachindex(cone.prmtvs)
                 (v1, v2) = (cone.useduals[k] ? (ts, tz) : (tz, ts))
-                tmp_tz[cone.idxs[k]] = -v1[cone.idxs[k]] # TODO allocs
+                @. @views tmp_tz[cone.idxs[k]] = -v1[cone.idxs[k]]
             end
             calcg!(g, cone)
             @. tmp_tz -= mu*g

@@ -128,12 +128,12 @@ function solvelinsys6!(
     @. rhs_tz *= -1.0
     for k in eachindex(L.cone.prmtvs)
         if L.cone.useduals[k]
-            @views L.z1[L.cone.idxs[k]] = rhs_tz[L.cone.idxs[k]] - rhs_ts[L.cone.idxs[k]]
+            @. @views  L.z1[L.cone.idxs[k]] = rhs_tz[L.cone.idxs[k]] - rhs_ts[L.cone.idxs[k]]
             calcHiarr_prmtv!(view(rhs_tz, L.cone.idxs[k]), view(L.z1, L.cone.idxs[k]), L.cone.prmtvs[k])
-            rhs_tz[L.cone.idxs[k]] *= invmu
+            @. @views rhs_tz[L.cone.idxs[k]] *= invmu
         elseif !iszero(rhs_ts[L.cone.idxs[k]]) # TODO rhs_ts = 0 for correction steps, so can just check if doing correction
             calcHarr_prmtv!(view(L.z1, L.cone.idxs[k]), view(rhs_ts, L.cone.idxs[k]), L.cone.prmtvs[k])
-            @views rhs_tz[L.cone.idxs[k]] -= mu*L.z1[L.cone.idxs[k]]
+            @. @views rhs_tz[L.cone.idxs[k]] -= mu*L.z1[L.cone.idxs[k]]
         end
     end
     helplinsys!(rhs_tx, rhs_ty, rhs_tz, F, L)
@@ -145,10 +145,10 @@ function solvelinsys6!(
     for k in eachindex(L.cone.prmtvs)
         if L.cone.useduals[k]
             calcHiarr_prmtv!(view(L.z1, L.cone.idxs[k]), view(L.h, L.cone.idxs[k]), L.cone.prmtvs[k])
-            L.z1[L.cone.idxs[k]] *= invmu
+            @. @views L.z1[L.cone.idxs[k]] *= invmu
         else
             calcHarr_prmtv!(view(L.z1, L.cone.idxs[k]), view(L.h, L.cone.idxs[k]), L.cone.prmtvs[k])
-            L.z1[L.cone.idxs[k]] *= mu
+            @. @views L.z1[L.cone.idxs[k]] *= mu
         end
     end
     helplinsys!(L.x1, L.y1, L.z1, F, L)
@@ -220,10 +220,10 @@ function helplhs!(
         for k in eachindex(L.cone.prmtvs)
             if L.cone.useduals[k]
                 calcHiarr_prmtv!(view(L.HG, L.cone.idxs[k], :), view(L.G, L.cone.idxs[k], :), L.cone.prmtvs[k])
-                L.HG[L.cone.idxs[k], :] *= invmu
+                @. @views L.HG[L.cone.idxs[k], :] *= invmu
             else
                 calcHarr_prmtv!(view(L.HG, L.cone.idxs[k], :), view(L.G, L.cone.idxs[k], :), L.cone.prmtvs[k])
-                L.HG[L.cone.idxs[k], :] *= mu
+                @. @views L.HG[L.cone.idxs[k], :] *= mu
             end
         end
     end
