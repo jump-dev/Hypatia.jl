@@ -374,6 +374,7 @@ function solve!(opt::Optimizer)
     @assert !isnan(mu)
     @assert abs(1.0 - mu) < 1e-10
 
+    # TODO delete later
     nbhd = calcnbhd!(g, ls_ts, ls_tz, mu, cone) # + (tau*kap - mu)^2
     if nbhd < 0.0 || nbhd > 1e-8
         error("neighborhood value (distance to central path) was not zero")
@@ -390,7 +391,6 @@ function solve!(opt::Optimizer)
         tx = txty[1:n]
         ty = txty[n+1:end]
     end
-
 
     opt.verbose && println("initial iterate found")
 
@@ -526,6 +526,8 @@ function solve!(opt::Optimizer)
 
         # prediction phase
         # calculate prediction direction
+        @. ls_ts = ts
+        @. ls_tz = tz
         @. tmp_ts = tmp_tz
         for k in eachindex(cone.prms)
             if cone.useduals[k]
