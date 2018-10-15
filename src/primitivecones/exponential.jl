@@ -15,21 +15,21 @@ mutable struct ExponentialCone <: PrimitiveCone
     F
 
     function ExponentialCone()
-        prm = new()
-        prm.g = Vector{Float64}(undef, 3)
-        prm.H = similar(prm.g, 3, 3)
-        prm.H2 = copy(prm.H)
-        return prm
+        prmtv = new()
+        prmtv.g = Vector{Float64}(undef, 3)
+        prmtv.H = similar(prmtv.g, 3, 3)
+        prmtv.H2 = copy(prmtv.H)
+        return prmtv
     end
 end
 
-dimension(prm::ExponentialCone) = 3
-barrierpar_prm(prm::ExponentialCone) = 3
-getintdir_prm!(arr::AbstractVector{Float64}, prm::ExponentialCone) = (arr[1] = 0.0; arr[2] = 0.5; arr[3] = 1.0; arr)
-loadpnt_prm!(prm::ExponentialCone, pnt::AbstractVector{Float64}) = (prm.pnt = pnt)
+dimension(prmtv::ExponentialCone) = 3
+barrierpar_prmtv(prmtv::ExponentialCone) = 3
+getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::ExponentialCone) = (arr[1] = 0.0; arr[2] = 0.5; arr[3] = 1.0; arr)
+loadpnt_prmtv!(prmtv::ExponentialCone, pnt::AbstractVector{Float64}) = (prmtv.pnt = pnt)
 
-function incone_prm(prm::ExponentialCone)
-    x = prm.pnt[1]; y = prm.pnt[2]; z = prm.pnt[3]
+function incone_prmtv(prmtv::ExponentialCone)
+    x = prmtv.pnt[1]; y = prmtv.pnt[2]; z = prmtv.pnt[3]
     if (y < 1e-9) || (z < 1e-12)
         return false
     end
@@ -43,14 +43,14 @@ function incone_prm(prm::ExponentialCone)
 
     # gradient
     iylzyx = inv(ylzyx)
-    g = prm.g
+    g = prmtv.g
     g[1] = iylzyx # 1/(-x + y log(z/y))
     g[2] = iylzyx * (y - x - 2*ylzyx) / y # (x + y - 2 y log(z/y))/(y (-x + y log(z/y)))
     g[3] = (-1 - y*iylzyx) / z # (-1 + y/(x - y log(z/y)))/z
 
     # Hessian
     yz = y/z
-    H = prm.H
+    H = prmtv.H
     H[1,1] = abs2(iylzyx)
     H[1,2] = H[2,1] = -(lzy - 1.0)*H[1,1]
     H[1,3] = H[3,1] = -yz*H[1,1]
@@ -58,16 +58,16 @@ function incone_prm(prm::ExponentialCone)
     H[2,3] = H[3,2] = yz*(lzy - 1.0)*H[1,1] - iylzyx/z
     H[3,3] = abs2(yz)*H[1,1] + yz/z*iylzyx + inv(abs2(z))
 
-    @. prm.H2 = prm.H
-    prm.F = cholesky!(Symmetric(prm.H2), Val(true), check=false) # bunchkaufman if it fails
-    if !isposdef(prm.F)
-        @. prm.H2 = prm.H
-        prm.F = bunchkaufman!(Symmetric(prm.H2), true, check=false)
-        return issuccess(prm.F)
+    @. prmtv.H2 = prmtv.H
+    prmtv.F = cholesky!(Symmetric(prmtv.H2), Val(true), check=false) # bunchkaufman if it fails
+    if !isposdef(prmtv.F)
+        @. prmtv.H2 = prmtv.H
+        prmtv.F = bunchkaufman!(Symmetric(prmtv.H2), true, check=false)
+        return issuccess(prmtv.F)
     end
     return true
 end
 
-calcg_prm!(g::AbstractVector{Float64}, prm::ExponentialCone) = (@. g = prm.g; g)
-calcHiarr_prm!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prm::ExponentialCone) = ldiv!(prod, prm.F, arr)
-calcHarr_prm!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prm::ExponentialCone) = mul!(prod, prm.H, arr)
+calcg_prmtv!(g::AbstractVector{Float64}, prmtv::ExponentialCone) = (@. g = prmtv.g; g)
+calcHiarr_prmtv!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prmtv::ExponentialCone) = ldiv!(prod, prmtv.F, arr)
+calcHarr_prmtv!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prmtv::ExponentialCone) = mul!(prod, prmtv.H, arr)

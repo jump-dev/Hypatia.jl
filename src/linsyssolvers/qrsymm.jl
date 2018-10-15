@@ -2,11 +2,7 @@
 CVXOPT method: solve two symmetric linear systems and combine solutions
 QR plus either Cholesky factorization or iterative conjugate gradients method
 (1) eliminate equality constraints via QR of A'
-(2) solve reduced system by Cholesky or iterative method
-|0  A' G'| * |ux| = |bx|
-|A  0  0 |   |uy|   |by|
-|G  0  M |   |uz|   |bz|
-where M = -I (for initial iterate only) or M = -Hi (Hi is Hessian inverse, pre-scaled by 1/mu)
+(2) solve reduced symmetric system by Cholesky or iterative method
 =#
 mutable struct QRSymmCache <: LinSysCache
     # TODO can remove some of the intermediary prealloced arrays after github.com/JuliaLang/julia/issues/23919 is resolved
@@ -48,7 +44,6 @@ mutable struct QRSymmCache <: LinSysCache
         RiQ1::AbstractMatrix{Float64};
         useiterative::Bool = false,
         )
-
         L = new()
         (n, p, q) = (length(c), length(b), length(h))
         nmp = n - p
@@ -95,54 +90,67 @@ QRSymmCache(
     useiterative::Bool = false,
     ) = error("to use a QRSymmCache for linear system solves, the data must be preprocessed and Q2 and RiQ1 must be passed into the QRSymmCache constructor")
 
-# solve system for x, y, z
-function solvelinsys3!(
-    rhs_tx::Vector{Float64},
-    rhs_ty::Vector{Float64},
-    rhs_tz::Vector{Float64},
-    mu::Float64,
-    L::QRSymmCache;
-    identityH::Bool = false,
-    )
-
-    F = helplhs!(mu, L, identityH=identityH)
-    @. rhs_ty *= -1.0
-    @. rhs_tz *= -1.0
-    helplinsys!(rhs_tx, rhs_ty, rhs_tz, F, L)
-
-    return nothing
-end
+# # solve system for x, y, z
+# function solvelinsys3!(
+#     rhs_tx::Vector{Float64},
+#     rhs_ty::Vector{Float64},
+#     rhs_tz::Vector{Float64},
+#     mu::Float64,
+#     L::QRSymmCache;
+#     identityH::Bool = false,
+#     )
+#     F = helplhs!(mu, L, identityH=identityH)
+#     @. rhs_ty *= -1.0
+#     @. rhs_tz *= -1.0
+#     helplinsys!(rhs_tx, rhs_ty, rhs_tz, F, L)
+#
+#     return nothing
+# end
 
 # solve system for x, y, z, s, kap, tau
 function solvelinsys6!(
     rhs_tx::Vector{Float64},
     rhs_ty::Vector{Float64},
     rhs_tz::Vector{Float64},
-    rhs_ts::Vector{Float64},
     rhs_kap::Float64,
+    rhs_ts::Vector{Float64},
     rhs_tau::Float64,
     mu::Float64,
     tau::Float64,
     L::QRSymmCache,
     )
-
     # solve two symmetric systems and combine the solutions
-    F = helplhs!(mu, L)
+    invmu = inv(mu)
+    F = helplhs!(mu, invmu, L)
 
-    # (x2, y2, z2) = (rhs_tx, -rhs_ty, -H*rhs_ts - rhs_tz)
+    # (x2, y2, z2) = (rhs_tx, -rhs_ty, -H*rhs_ts - rhs_tz) # TODO update math description
     @. rhs_ty *= -1.0
     @. rhs_tz *= -1.0
-    if !iszero(rhs_ts)
-        calcHarr!(L.z1, rhs_ts, L.cone)
-        @. rhs_tz -= mu*L.z1
+    for k in eachindex(L.cone.prmtvs)
+        if L.cone.useduals[k]
+            @. @views  L.z1[L.cone.idxs[k]] = rhs_tz[L.cone.idxs[k]] - rhs_ts[L.cone.idxs[k]]
+            calcHiarr_prmtv!(view(rhs_tz, L.cone.idxs[k]), view(L.z1, L.cone.idxs[k]), L.cone.prmtvs[k])
+            @. @views rhs_tz[L.cone.idxs[k]] *= invmu
+        elseif !iszero(rhs_ts[L.cone.idxs[k]]) # TODO rhs_ts = 0 for correction steps, so can just check if doing correction
+            calcHarr_prmtv!(view(L.z1, L.cone.idxs[k]), view(rhs_ts, L.cone.idxs[k]), L.cone.prmtvs[k])
+            @. @views rhs_tz[L.cone.idxs[k]] -= mu*L.z1[L.cone.idxs[k]]
+        end
     end
     helplinsys!(rhs_tx, rhs_ty, rhs_tz, F, L)
 
-    # (x1, y1, z1) = (-c, b, H*h)
+    # (x1, y1, z1) = (-c, b, H*h) # TODO update math description
     @. L.x1 = -L.c
     @. L.y1 = L.b
-    calcHarr!(L.z1, L.h, L.cone)
-    @. L.z1 *= mu
+    # TODO don't need this if h is zero (can check once when creating cache)
+    for k in eachindex(L.cone.prmtvs)
+        if L.cone.useduals[k]
+            calcHiarr_prmtv!(view(L.z1, L.cone.idxs[k]), view(L.h, L.cone.idxs[k]), L.cone.prmtvs[k])
+            @. @views L.z1[L.cone.idxs[k]] *= invmu
+        else
+            calcHarr_prmtv!(view(L.z1, L.cone.idxs[k]), view(L.h, L.cone.idxs[k]), L.cone.prmtvs[k])
+            @. @views L.z1[L.cone.idxs[k]] *= mu
+        end
+    end
     helplinsys!(L.x1, L.y1, L.z1, F, L)
 
     # combine
@@ -165,7 +173,6 @@ function helplinsys!(
     F,
     L::QRSymmCache,
     )
-
     # bxGHbz = bx + G'*Hbz
     mul!(L.bxGHbz, L.G', zi)
     @. L.bxGHbz += xi
@@ -202,16 +209,23 @@ end
 # calculate or factorize LHS of symmetric positive definite linear system
 function helplhs!(
     mu::Float64,
+    invmu::Float64,
     L::QRSymmCache;
     identityH::Bool = false,
     )
-
-    # Q2' * G' * H * G * Q2
+    # Q2' * G' * H * G * Q2 # TODO update math description
     if identityH
         @. L.HG = L.G
     else
-        calcHarr!(L.HG, L.G, L.cone)
-        @. L.HG *= mu
+        for k in eachindex(L.cone.prmtvs)
+            if L.cone.useduals[k]
+                calcHiarr_prmtv!(view(L.HG, L.cone.idxs[k], :), view(L.G, L.cone.idxs[k], :), L.cone.prmtvs[k])
+                @. @views L.HG[L.cone.idxs[k], :] *= invmu
+            else
+                calcHarr_prmtv!(view(L.HG, L.cone.idxs[k], :), view(L.G, L.cone.idxs[k], :), L.cone.prmtvs[k])
+                @. @views L.HG[L.cone.idxs[k], :] *= mu
+            end
+        end
     end
     mul!(L.GHG, L.G', L.HG)
     mul!(L.GHGQ2, L.GHG, L.Q2)
@@ -221,17 +235,16 @@ function helplhs!(
         return Symmetric(L.Q2GHGQ2)
     else
         # bunchkaufman allocates more than cholesky, but doesn't fail when approximately quasidefinite
-        # TODO does it matter that F could be either type?
         F = cholesky!(Symmetric(L.Q2GHGQ2), Val(true), check=false)
         if !isposdef(F)
             # verbose && # TODO pass this in
             mul!(L.Q2GHGQ2, L.Q2', L.GHGQ2)
-            F = bunchkaufman!(Symmetric(L.Q2GHGQ2), true, check=false) # TODO remove allocs, need to use low-level functions
+            F = bunchkaufman!(Symmetric(L.Q2GHGQ2), true, check=false)
             if !issuccess(F)
                 error("linear system matrix was not positive definite")
             end
         end
-        # F = bunchkaufman!(Symmetric(L.Q2GHGQ2)) # TODO remove allocs, need to use low-level functions
+        # F = bunchkaufman!(Symmetric(L.Q2GHGQ2)) # TODO only use this; remove allocs, need to use low-level functions
         return F
     end
 end
