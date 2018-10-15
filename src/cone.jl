@@ -48,7 +48,7 @@ function getinitsz!(ts, tz, cone)
         getintdir_prmtv!(view(v2, cone.idxs[k]), cone.prmtvs[k])
         @assert incone_prmtv(cone.prmtvs[k])
         calcg_prmtv!(view(v1, cone.idxs[k]), cone.prmtvs[k])
-        v1[cone.idxs[k]] *= -1.0
+        @. @views v1[cone.idxs[k]] *= -1.0
     end
     return (ts, tz)
 end
@@ -65,7 +65,7 @@ function calcnbhd!(g, ts, tz, mu, cone)
     for k in eachindex(cone.prmtvs)
         calcg_prmtv!(view(g, cone.idxs[k]), cone.prmtvs[k])
         (v1, v2) = (cone.useduals[k] ? (ts, tz) : (tz, ts))
-        v1[cone.idxs[k]] += mu*g[cone.idxs[k]] # TODO is this allocing
+        @. @views v1[cone.idxs[k]] += mu*g[cone.idxs[k]]
         calcHiarr_prmtv!(view(v2, cone.idxs[k]), view(v1, cone.idxs[k]), cone.prmtvs[k])
     end
     return dot(ts, tz)
