@@ -16,77 +16,77 @@ mutable struct PositiveSemidefiniteCone <: PrimitiveCone
     matinv::Matrix{Float64}
 
     function PositiveSemidefiniteCone(dim::Int)
-        prm = new()
-        prm.dim = dim
-        prm.side = round(Int, sqrt(0.25 + dim + dim) - 0.5)
-        prm.mat = Matrix{Float64}(undef, prm.side, prm.side)
-        prm.mat2 = copy(prm.mat)
-        prm.matpnt = copy(prm.mat)
-        return prm
+        prmtv = new()
+        prmtv.dim = dim
+        prmtv.side = round(Int, sqrt(0.25 + dim + dim) - 0.5)
+        prmtv.mat = Matrix{Float64}(undef, prmtv.side, prmtv.side)
+        prmtv.mat2 = copy(prmtv.mat)
+        prmtv.matpnt = copy(prmtv.mat)
+        return prmtv
     end
 end
 
-dimension(prm::PositiveSemidefiniteCone) = prm.dim
-barrierpar_prm(prm::PositiveSemidefiniteCone) = prm.side
-function getintdir_prm!(arr::AbstractVector{Float64}, prm::PositiveSemidefiniteCone)
-    for i in 1:prm.side, j in i:prm.side
+dimension(prmtv::PositiveSemidefiniteCone) = prmtv.dim
+barrierpar_prmtv(prmtv::PositiveSemidefiniteCone) = prmtv.side
+function getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::PositiveSemidefiniteCone)
+    for i in 1:prmtv.side, j in i:prmtv.side
         if i == j
-            prm.mat[i,j] = 1.0
+            prmtv.mat[i,j] = 1.0
         else
-            prm.mat[i,j] = prm.mat[j,i] = 0.0
+            prmtv.mat[i,j] = prmtv.mat[j,i] = 0.0
         end
     end
-    mattovec!(arr, prm.mat)
+    mattovec!(arr, prmtv.mat)
     return arr
 end
-loadpnt_prm!(prm::PositiveSemidefiniteCone, pnt::AbstractVector{Float64}) = (prm.pnt = pnt)
+loadpnt_prmtv!(prmtv::PositiveSemidefiniteCone, pnt::AbstractVector{Float64}) = (prmtv.pnt = pnt)
 
-function incone_prm(prm::PositiveSemidefiniteCone)
-    vectomat!(prm.mat, prm.pnt)
-    F = cholesky!(Symmetric(prm.mat), check=false)
+function incone_prmtv(prmtv::PositiveSemidefiniteCone)
+    vectomat!(prmtv.mat, prmtv.pnt)
+    F = cholesky!(Symmetric(prmtv.mat), check=false)
     if !issuccess(F)
         return false
     end
 
-    prm.matinv = -inv(F) # TODO eliminate allocs
-    vectomat!(prm.matpnt, prm.pnt)
+    prmtv.matinv = -inv(F) # TODO eliminate allocs
+    vectomat!(prmtv.matpnt, prmtv.pnt)
     return true
 end
 
-calcg_prm!(g::AbstractVector{Float64}, prm::PositiveSemidefiniteCone) = (mattovec!(g, prm.matinv); g)
+calcg_prmtv!(g::AbstractVector{Float64}, prmtv::PositiveSemidefiniteCone) = (mattovec!(g, prmtv.matinv); g)
 
-function calcHiarr_prm!(prod::AbstractVector{Float64}, arr::AbstractVector{Float64}, prm::PositiveSemidefiniteCone)
-    vectomat!(prm.mat, arr)
-    mul!(prm.mat2, prm.mat, prm.matpnt)
-    mul!(prm.mat, prm.matpnt, prm.mat2)
-    mattovec!(prod, prm.mat)
+function calcHiarr_prmtv!(prod::AbstractVector{Float64}, arr::AbstractVector{Float64}, prmtv::PositiveSemidefiniteCone)
+    vectomat!(prmtv.mat, arr)
+    mul!(prmtv.mat2, prmtv.mat, prmtv.matpnt)
+    mul!(prmtv.mat, prmtv.matpnt, prmtv.mat2)
+    mattovec!(prod, prmtv.mat)
     return prod
 end
 
-function calcHiarr_prm!(prod::AbstractMatrix{Float64}, arr::AbstractMatrix{Float64}, prm::PositiveSemidefiniteCone)
+function calcHiarr_prmtv!(prod::AbstractMatrix{Float64}, arr::AbstractMatrix{Float64}, prmtv::PositiveSemidefiniteCone)
     for j in 1:size(arr, 2)
-        vectomat!(prm.mat, view(arr, :, j))
-        mul!(prm.mat2, prm.mat, prm.matpnt)
-        mul!(prm.mat, prm.matpnt, prm.mat2)
-        mattovec!(view(prod, :, j), prm.mat)
+        vectomat!(prmtv.mat, view(arr, :, j))
+        mul!(prmtv.mat2, prmtv.mat, prmtv.matpnt)
+        mul!(prmtv.mat, prmtv.matpnt, prmtv.mat2)
+        mattovec!(view(prod, :, j), prmtv.mat)
     end
     return prod
 end
 
-function calcHarr_prm!(prod::AbstractVector{Float64}, arr::AbstractVector{Float64}, prm::PositiveSemidefiniteCone)
-    vectomat!(prm.mat, arr)
-    mul!(prm.mat2, prm.mat, prm.matinv)
-    mul!(prm.mat, prm.matinv, prm.mat2)
-    mattovec!(prod, prm.mat)
+function calcHarr_prmtv!(prod::AbstractVector{Float64}, arr::AbstractVector{Float64}, prmtv::PositiveSemidefiniteCone)
+    vectomat!(prmtv.mat, arr)
+    mul!(prmtv.mat2, prmtv.mat, prmtv.matinv)
+    mul!(prmtv.mat, prmtv.matinv, prmtv.mat2)
+    mattovec!(prod, prmtv.mat)
     return prod
 end
 
-function calcHarr_prm!(prod::AbstractMatrix{Float64}, arr::AbstractMatrix{Float64}, prm::PositiveSemidefiniteCone)
+function calcHarr_prmtv!(prod::AbstractMatrix{Float64}, arr::AbstractMatrix{Float64}, prmtv::PositiveSemidefiniteCone)
     for j in 1:size(arr, 2)
-        vectomat!(prm.mat, view(arr, :, j))
-        mul!(prm.mat2, prm.mat, prm.matinv)
-        mul!(prm.mat, prm.matinv, prm.mat2)
-        mattovec!(view(prod, :, j), prm.mat)
+        vectomat!(prmtv.mat, view(arr, :, j))
+        mul!(prmtv.mat2, prmtv.mat, prmtv.matinv)
+        mul!(prmtv.mat, prmtv.matinv, prmtv.mat2)
+        mattovec!(view(prod, :, j), prmtv.mat)
     end
     return prod
 end

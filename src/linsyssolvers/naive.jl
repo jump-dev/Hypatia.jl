@@ -1,6 +1,6 @@
 #=
 naive method that simply performs one high-dimensional linear system solve
-TODO currently only does dense operations, needs to work for sparse
+TODO should allow LHS6 to be sparse
 =#
 mutable struct NaiveCache <: LinSysCache
     cone
@@ -86,10 +86,10 @@ end
 #     @assert identityH
 #     # TODO update for prim or dual cones
 #     # if !identityH
-#     #     for k in eachindex(L.cone.prms)
+#     #     for k in eachindex(L.cone.prmtvs)
 #     #         idxs = L.tzk - 1 .+ L.cone.idxs[k]
-#     #         dim = dimension(L.cone.prms[k])
-#     #         calcHiarr_prm!(view(L.LHS3copy, idxs, idxs), Matrix(-inv(mu)*I, dim, dim), L.cone.prms[k])
+#     #         dim = dimension(L.cone.prmtvs[k])
+#     #         calcHiarr_prmtv!(view(L.LHS3copy, idxs, idxs), Matrix(-inv(mu)*I, dim, dim), L.cone.prmtvs[k])
 #     #     end
 #     # end
 #
@@ -105,13 +105,13 @@ end
 #     return nothing
 # end
 
-# solve system for x, y, z, s, kap, tau
+# solve system for x, y, z, kap, s, tau
 function solvelinsys6!(
     rhs_tx::Vector{Float64},
     rhs_ty::Vector{Float64},
     rhs_tz::Vector{Float64},
+    rhs_kap::Float64,
     rhs_ts::Vector{Float64},
-    rhs_kap::Float64, # TODO reorder kap and tau to match 6x6 system order
     rhs_tau::Float64,
     mu::Float64,
     tau::Float64,
@@ -126,16 +126,13 @@ function solvelinsys6!(
     rhs[L.tsk:L.ttk-1] = rhs_ts
     rhs[end] = rhs_tau
 
-    # TODO don't use Matrix(mu*I, dim, dim) because it allocates and is slow
     @. L.LHS6copy = L.LHS6
     L.LHS6copy[L.tkk, end] = mu/tau/tau # TODO note in CVXOPT coneprog doc, there is no rescaling by tau, they to kap*dtau + tau*dkap = -rhskap
-    for k in eachindex(L.cone.prms)
-        dim = dimension(L.cone.prms[k])
-        if L.cone.useduals[k]
-            calcHarr_prm!(view(L.LHS6copy, L.tzk - 1 .+ L.cone.idxs[k], L.tzk - 1 .+ L.cone.idxs[k]), Matrix(mu*I, dim, dim), L.cone.prms[k])
-        else
-            calcHarr_prm!(view(L.LHS6copy, L.tzk - 1 .+ L.cone.idxs[k], L.tsk - 1 .+ L.cone.idxs[k]), Matrix(mu*I, dim, dim), L.cone.prms[k])
-        end
+    for k in eachindex(L.cone.prmtvs)
+        dim = dimension(L.cone.prmtvs[k])
+        coloffset = (L.cone.useduals[k] ? L.tzk : L.tsk)
+        # TODO don't use Matrix(mu*I, dim, dim) because it allocates and is slow
+        calcHarr_prmtv!(view(L.LHS6copy, L.tzk - 1 .+ L.cone.idxs[k], coloffset - 1 .+ L.cone.idxs[k]), Matrix(mu*I, dim, dim), L.cone.prmtvs[k])
     end
 
     F = qr!(L.LHS6copy)

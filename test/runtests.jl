@@ -46,7 +46,7 @@ end
 
 # native interface tests
 include(joinpath(@__DIR__, "native.jl"))
-verbose = true # test verbosity
+verbose = false # test verbosity
 lscachetype = Hypatia.QRSymmCache # linear system cache type
 
 @testset "native interface tests" begin

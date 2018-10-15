@@ -143,9 +143,9 @@ function check_data(
         error("number of constraint rows is not consistent in G and h")
     end
 
-    @assert length(cone.prms) == length(cone.idxs)
-    for k in eachindex(cone.prms)
-        @assert dimension(cone.prms[k]) == length(cone.idxs[k])
+    @assert length(cone.prmtvs) == length(cone.idxs)
+    for k in eachindex(cone.prmtvs)
+        @assert dimension(cone.prmtvs[k]) == length(cone.idxs[k])
     end
 
     return nothing
@@ -325,44 +325,6 @@ function solve!(opt::Optimizer)
     # find initial primal-dual iterate
     opt.verbose && println("\nfinding initial iterate")
 
-
-    # TODO another approach to try: like CVXOPT, solve two 3x3 systems, use the s and z subvectors
-    # could even take midpoint of the g and each of the two subvectors, balancing the infeasibility for the linear constraints and distance from central path
-
-    # NOTE old approach (only one 3x3 solve for primal)
-    # # solve linear equation
-    # # TODO check equations
-    # # |0  A' G'| * |tx| = |0|
-    # # |A  0  0 |   |ty|   |b|
-    # # |G  0 -I |   |ts|   |h|
-    # @. tx = 0.0
-    # @. ty = -b
-    # @. tz = -h
-    # solvelinsys3!(tx, ty, tz, 1.0, opt.L, identityH=true)
-    # @. ts = -tz
-    #
-    # # from ts, step along interior direction of cone
-    # getintdir!(tmp_ts, cone)
-    # alpha = (norm(ts) + 1e-3)#/norm(tmp_ts) # TODO tune this
-    # @. ls_ts = ts + alpha*tmp_ts
-    #
-    # # continue stepping until ts is inside cone
-    # steps = 1
-    # while !incone(cone)
-    #     steps += 1
-    #     if steps > 25
-    #         error("cannot find initial iterate")
-    #     end
-    #     alpha *= 1.5
-    #     @. ls_ts = ts + alpha*tmp_ts
-    # end
-    # opt.verbose && println("$steps steps taken for initial iterate")
-    # @. ts = ls_ts
-    #
-    # calcg!(tz, cone) # TODO fixes parts of ts and tz
-    # @. tz *= -1.0
-
-
     # TODO scale like in alfonso?
     getinitsz!(ls_ts, ls_tz, cone)
     @. ts = ls_ts
@@ -373,12 +335,6 @@ function solve!(opt::Optimizer)
     mu = (dot(tz, ts) + tau*kap)/bnu
     @assert !isnan(mu)
     @assert abs(1.0 - mu) < 1e-10
-
-    # TODO delete later
-    nbhd = calcnbhd!(g, ls_ts, ls_tz, mu, cone) # + (tau*kap - mu)^2
-    if nbhd < 0.0 || nbhd > 1e-8
-        error("neighborhood value (distance to central path) was not zero")
-    end
 
     # solve for tx and ty
     # A'y = -c - G'z
@@ -529,15 +485,11 @@ function solve!(opt::Optimizer)
         @. ls_ts = ts
         @. ls_tz = tz
         @. tmp_ts = tmp_tz
-        for k in eachindex(cone.prms)
-            if cone.useduals[k]
-                tmp_tz[cone.idxs[k]] = -ts[cone.idxs[k]]
-            else
-                tmp_tz[cone.idxs[k]] = -tz[cone.idxs[k]]
-            end
+        for k in eachindex(cone.prmtvs)
+            (v1, v2) = (cone.useduals[k] ? (ts, tz) : (tz, ts))
+            tmp_tz[cone.idxs[k]] = -v1[cone.idxs[k]] # TODO allocs
         end
-        # @. tmp_tz = -tz
-        (tmp_kap, tmp_tau) = solvelinsys6!(tmp_tx, tmp_ty, tmp_tz, tmp_ts, -kap, kap + cx + by + hz, mu, tau, opt.L)
+        (tmp_kap, tmp_tau) = solvelinsys6!(tmp_tx, tmp_ty, tmp_tz, -kap, tmp_ts, kap + cx + by + hz, mu, tau, opt.L)
 
         # determine step length alpha by line search
         alpha = alphapred
@@ -623,17 +575,14 @@ function solve!(opt::Optimizer)
             # calculate correction direction
             @. tmp_tx = 0.0
             @. tmp_ty = 0.0
-            for k in eachindex(cone.prms)
-                if cone.useduals[k]
-                    tmp_tz[cone.idxs[k]] = -ts[cone.idxs[k]]
-                else
-                    tmp_tz[cone.idxs[k]] = -tz[cone.idxs[k]]
-                end
+            for k in eachindex(cone.prmtvs)
+                (v1, v2) = (cone.useduals[k] ? (ts, tz) : (tz, ts))
+                tmp_tz[cone.idxs[k]] = -v1[cone.idxs[k]] # TODO allocs
             end
             calcg!(g, cone)
             @. tmp_tz -= mu*g
             @. tmp_ts = 0.0
-            (tmp_kap, tmp_tau) = solvelinsys6!(tmp_tx, tmp_ty, tmp_tz, tmp_ts, -kap + mu/tau, 0.0, mu, tau, opt.L)
+            (tmp_kap, tmp_tau) = solvelinsys6!(tmp_tx, tmp_ty, tmp_tz, -kap + mu/tau, tmp_ts, 0.0, mu, tau, opt.L)
 
             # determine step length alpha by line search
             alpha = opt.alphacorr
@@ -713,6 +662,7 @@ function solve!(opt::Optimizer)
 end
 
 # get neighborhood parameters depending on magnitude of barrier parameter and maximum number of correction steps
+# TODO calculate values from the formulae given in Papp & Yildiz "On A Homogeneous Interior-Point Algorithm for Non-Symmetric Convex Conic Optimization"
 function getbetaeta(maxcorrsteps::Int, bnu::Float64)
     if maxcorrsteps <= 2
         if bnu < 10.0
