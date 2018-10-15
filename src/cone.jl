@@ -1,77 +1,74 @@
 #=
 Copyright 2018, Chris Coey and contributors
+
+# TODO can parallelize expensive functions mapped over primitive cones
 =#
 
 # cone object
 abstract type PrimitiveCone end
 
-# TODO reorder primitive cones so easiest ones to check incone are first
+# TODO order primitive cones so easiest ones to check incone are first
 mutable struct Cone
-    prms::Vector{PrimitiveCone}
+    prmtvs::Vector{PrimitiveCone}
     idxs::Vector{UnitRange{Int}}
+    useduals::Vector{Bool}
 end
-Cone() = Cone(PrimitiveCone[], UnitRange{Int}[])
+Cone() = Cone(PrimitiveCone[], UnitRange{Int}[], Bool[])
+Cone(prmtvs::Vector{<:PrimitiveCone}, idxs::Vector{UnitRange{Int}}) = Cone(prmtvs, idxs, fill(false, length(prmtvs)))
 
-function addprimitivecone!(cone::Cone, prm::PrimitiveCone, idx::UnitRange{Int})
-    @assert dimension(prm) == length(idx)
-    push!(cone.prms, prm)
+function addprimitivecone!(
+    cone::Cone,
+    prmtv::PrimitiveCone,
+    idx::UnitRange{Int};
+    usedual::Bool = false,
+    )
+    @assert dimension(prmtv) == length(idx)
+    push!(cone.prmtvs, prmtv)
     push!(cone.idxs, idx)
+    push!(cone.useduals, usedual)
     return cone
 end
 
 # calculate complexity parameter of the barrier (sum of the primitive cone barrier parameters)
-barrierpar(cone::Cone)::Float64 = isempty(cone.prms) ? 0.0 : sum(barrierpar_prm(prm) for prm in cone.prms)
+barrierpar(cone::Cone)::Float64 = (isempty(cone.prmtvs) ? 0.0 : sum(barrierpar_prmtv(prmtv) for prmtv in cone.prmtvs))
 
-function getintdir!(dir::Vector{Float64}, cone::Cone)
-    for k in eachindex(cone.prms)
-        getintdir_prm!(view(dir, cone.idxs[k]), cone.prms[k])
-    end
-    return dir
-end
-
-# TODO can parallelize the functions acting on Cone
-function loadpnt!(cone::Cone, pnt::Vector{Float64})
-    for k in eachindex(cone.prms)
-        loadpnt_prm!(cone.prms[k], view(pnt, cone.idxs[k]))
+function loadpnt!(cone::Cone, ts::Vector{Float64}, tz::Vector{Float64})
+    for k in eachindex(cone.prmtvs)
+        (v1, v2) = (cone.useduals[k] ? (ts, tz) : (tz, ts))
+        loadpnt_prmtv!(cone.prmtvs[k], view(v2, cone.idxs[k]))
     end
     return nothing
 end
 
-incone(cone::Cone) = all(incone_prm, cone.prms)
+incone(cone::Cone) = all(incone_prmtv, cone.prmtvs)
+
+function getinitsz!(ts, tz, cone)
+    for k in eachindex(cone.prmtvs)
+        (v1, v2) = (cone.useduals[k] ? (ts, tz) : (tz, ts))
+        getintdir_prmtv!(view(v2, cone.idxs[k]), cone.prmtvs[k])
+        @assert incone_prmtv(cone.prmtvs[k])
+        calcg_prmtv!(view(v1, cone.idxs[k]), cone.prmtvs[k])
+        @. @views v1[cone.idxs[k]] *= -1.0
+    end
+    return (ts, tz)
+end
 
 function calcg!(g::Vector{Float64}, cone::Cone)
-    for k in eachindex(cone.prms)
-        calcg_prm!(view(g, cone.idxs[k]), cone.prms[k])
+    for k in eachindex(cone.prmtvs)
+        calcg_prmtv!(view(g, cone.idxs[k]), cone.prmtvs[k])
     end
     return g
 end
 
-function calcHarr!(prod::AbstractMatrix{Float64}, arr::AbstractMatrix{Float64}, cone::Cone)
-    for k in eachindex(cone.prms)
-        calcHarr_prm!(view(prod, cone.idxs[k], :), view(arr, cone.idxs[k], :), cone.prms[k])
+# calculate neighborhood distance to central path
+function calcnbhd!(g, ts, tz, mu, cone)
+    for k in eachindex(cone.prmtvs)
+        calcg_prmtv!(view(g, cone.idxs[k]), cone.prmtvs[k])
+        (v1, v2) = (cone.useduals[k] ? (ts, tz) : (tz, ts))
+        @. @views v1[cone.idxs[k]] += mu*g[cone.idxs[k]]
+        calcHiarr_prmtv!(view(v2, cone.idxs[k]), view(v1, cone.idxs[k]), cone.prmtvs[k])
     end
-    return prod
-end
-
-function calcHarr!(prod::AbstractVector{Float64}, arr::AbstractVector{Float64}, cone::Cone)
-    for k in eachindex(cone.prms)
-        calcHarr_prm!(view(prod, cone.idxs[k]), view(arr, cone.idxs[k]), cone.prms[k])
-    end
-    return prod
-end
-
-function calcHiarr!(prod::AbstractMatrix{Float64}, arr::AbstractMatrix{Float64}, cone::Cone)
-    for k in eachindex(cone.prms)
-        calcHiarr_prm!(view(prod, cone.idxs[k], :), view(arr, cone.idxs[k], :), cone.prms[k])
-    end
-    return prod
-end
-
-function calcHiarr!(prod::AbstractVector{Float64}, arr::AbstractVector{Float64}, cone::Cone)
-    for k in eachindex(cone.prms)
-        calcHiarr_prm!(view(prod, cone.idxs[k]), view(arr, cone.idxs[k]), cone.prms[k])
-    end
-    return prod
+    return dot(ts, tz)
 end
 
 # utilities for converting between smat and svec forms (lower triangle) for symmetric matrices

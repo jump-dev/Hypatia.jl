@@ -1,6 +1,6 @@
 #=
 naive method that simply performs one high-dimensional linear system solve
-TODO currently only does dense operations, needs to work for sparse
+TODO should allow LHS6 to be sparse
 =#
 mutable struct NaiveCache <: LinSysCache
     cone
@@ -38,7 +38,7 @@ mutable struct NaiveCache <: LinSysCache
         L.b = b
         L.G = G
         L.h = h
-        L.tyk = n+1
+        L.tyk = n + 1
         L.tzk = L.tyk + p
         L.tkk = L.tzk + q
         L.tsk = L.tkk + 1
@@ -51,7 +51,7 @@ mutable struct NaiveCache <: LinSysCache
             ]
         L.LHS3copy = similar(L.LHS3)
         L.rhs3 = zeros(L.tkk-1)
-        # tx ty tz kap ts tau
+        # tx ty tzp tzd kap tsp tsd tau
         L.LHS6 = [
             zeros(n,n)  A'          G'                zeros(n)  zeros(n,q)         c;
             -A          zeros(p,p)  zeros(p,q)        zeros(p)  zeros(p,q)         b;
@@ -67,49 +67,51 @@ mutable struct NaiveCache <: LinSysCache
     end
 end
 
-# solve system for x, y, z
-function solvelinsys3!(
-    rhs_tx::Vector{Float64},
-    rhs_ty::Vector{Float64},
-    rhs_tz::Vector{Float64},
-    mu::Float64,
-    L::NaiveCache;
-    identityH::Bool = false,
-    )
+# # solve system for x, y, z
+# function solvelinsys3!(
+#     rhs_tx::Vector{Float64},
+#     rhs_ty::Vector{Float64},
+#     rhs_tz::Vector{Float64},
+#     mu::Float64,
+#     L::NaiveCache;
+#     identityH::Bool = false,
+#     )
+#
+#     rhs = L.rhs3
+#     rhs[1:L.tyk-1] = rhs_tx
+#     @. rhs[L.tyk:L.tzk-1] = -rhs_ty
+#     @. rhs[L.tzk:L.tkk-1] = -rhs_tz
+#
+#     @. L.LHS3copy = L.LHS3
+#     @assert identityH
+#     # TODO update for prim or dual cones
+#     # if !identityH
+#     #     for k in eachindex(L.cone.prmtvs)
+#     #         idxs = L.tzk - 1 .+ L.cone.idxs[k]
+#     #         dim = dimension(L.cone.prmtvs[k])
+#     #         calcHiarr_prmtv!(view(L.LHS3copy, idxs, idxs), Matrix(-inv(mu)*I, dim, dim), L.cone.prmtvs[k])
+#     #     end
+#     # end
+#
+#     F = bunchkaufman!(Symmetric(L.LHS3copy))
+#     ldiv!(F, rhs)
+#
+#     @. @views begin
+#         rhs_tx = rhs[1:L.tyk-1]
+#         rhs_ty = rhs[L.tyk:L.tzk-1]
+#         rhs_tz = rhs[L.tzk:L.tkk-1]
+#     end
+#
+#     return nothing
+# end
 
-    rhs = L.rhs3
-    rhs[1:L.tyk-1] = rhs_tx
-    @. rhs[L.tyk:L.tzk-1] = -rhs_ty
-    @. rhs[L.tzk:L.tkk-1] = -rhs_tz
-
-    @. L.LHS3copy = L.LHS3
-    if !identityH
-        for k in eachindex(L.cone.prms)
-            idxs = L.tzk - 1 .+ L.cone.idxs[k]
-            dim = dimension(L.cone.prms[k])
-            calcHarr_prm!(view(L.LHS3copy, idxs, idxs), Matrix(-mu*I, dim, dim), L.cone.prms[k])
-        end
-    end
-
-    F = bunchkaufman!(Symmetric(L.LHS3copy))
-    ldiv!(F, rhs)
-
-    @. @views begin
-        rhs_tx = rhs[1:L.tyk-1]
-        rhs_ty = rhs[L.tyk:L.tzk-1]
-        rhs_tz = rhs[L.tzk:L.tkk-1]
-    end
-
-    return nothing
-end
-
-# solve system for x, y, z, s, kap, tau
+# solve system for x, y, z, kap, s, tau
 function solvelinsys6!(
     rhs_tx::Vector{Float64},
     rhs_ty::Vector{Float64},
     rhs_tz::Vector{Float64},
-    rhs_ts::Vector{Float64},
     rhs_kap::Float64,
+    rhs_ts::Vector{Float64},
     rhs_tau::Float64,
     mu::Float64,
     tau::Float64,
@@ -125,12 +127,13 @@ function solvelinsys6!(
     rhs[end] = rhs_tau
 
     @. L.LHS6copy = L.LHS6
-    for k in eachindex(L.cone.prms)
-        dim = dimension(L.cone.prms[k])
-        calcHarr_prm!(view(L.LHS6copy, L.tzk - 1 .+ L.cone.idxs[k], L.tsk - 1 .+ L.cone.idxs[k]), Matrix(mu*I, dim, dim), L.cone.prms[k])
+    L.LHS6copy[L.tkk, end] = mu/tau/tau # TODO note in CVXOPT coneprog doc, there is no rescaling by tau, they to kap*dtau + tau*dkap = -rhskap
+    for k in eachindex(L.cone.prmtvs)
+        dim = dimension(L.cone.prmtvs[k])
+        coloffset = (L.cone.useduals[k] ? L.tzk : L.tsk)
+        # TODO don't use Matrix(mu*I, dim, dim) because it allocates and is slow
+        calcHarr_prmtv!(view(L.LHS6copy, L.tzk - 1 .+ L.cone.idxs[k], coloffset - 1 .+ L.cone.idxs[k]), Matrix(mu*I, dim, dim), L.cone.prmtvs[k])
     end
-
-    L.LHS6copy[L.tkk, end] = mu/tau/tau
 
     F = qr!(L.LHS6copy)
     ldiv!(F, rhs)

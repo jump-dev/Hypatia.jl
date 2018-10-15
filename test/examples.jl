@@ -106,7 +106,7 @@ function _namedpoly1(verbose::Bool, lscachetype)
     (c, A, b, G, h, cone) = build_namedpoly!(:butcher, 2)
     r = fullsolve(opt, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
-    @test r.niters <= 35
+    @test r.niters <= 45
     @test r.pobj ≈ r.dobj atol=1e-4 rtol=1e-4
     @test r.pobj ≈ -1.4393333333 atol=1e-4 rtol=1e-4
 end
@@ -116,7 +116,7 @@ function _namedpoly2(verbose::Bool, lscachetype)
     (c, A, b, G, h, cone) = build_namedpoly!(:caprasse, 4)
     r = fullsolve(opt, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
-    @test r.niters <= 35
+    @test r.niters <= 45
     @test r.pobj ≈ r.dobj atol=1e-4 rtol=1e-4
     @test r.pobj ≈ -3.1800966258 atol=1e-4 rtol=1e-4
 end
@@ -126,7 +126,7 @@ function _namedpoly3(verbose::Bool, lscachetype)
     (c, A, b, G, h, cone) = build_namedpoly!(:goldsteinprice, 7)
     r = fullsolve(opt, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
-    @test r.niters <= 60
+    @test r.niters <= 65
     @test r.pobj ≈ r.dobj atol=1e-4 rtol=1e-4
     @test r.pobj ≈ 3 atol=1e-4 rtol=1e-4
 end
@@ -146,7 +146,7 @@ function _namedpoly5(verbose::Bool, lscachetype)
     (c, A, b, G, h, cone) = build_namedpoly!(:lotkavolterra, 3)
     r = fullsolve(opt, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
-    @test r.niters <= 35
+    @test r.niters <= 45
     @test r.pobj ≈ r.dobj atol=1e-4 rtol=1e-4
     @test r.pobj ≈ -20.8 atol=1e-4 rtol=1e-4
 end
@@ -166,7 +166,7 @@ function _namedpoly7(verbose::Bool, lscachetype)
     (c, A, b, G, h, cone) = build_namedpoly!(:motzkin, 7)
     r = fullsolve(opt, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
-    @test r.niters <= 40
+    @test r.niters <= 45
     @test r.pobj ≈ r.dobj atol=1e-4 rtol=1e-4
     @test r.pobj ≈ 0 atol=1e-4 rtol=1e-4
 end
@@ -176,7 +176,7 @@ function _namedpoly8(verbose::Bool, lscachetype)
     (c, A, b, G, h, cone) = build_namedpoly!(:reactiondiffusion, 4)
     r = fullsolve(opt, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
-    @test r.niters <= 35
+    @test r.niters <= 40
     @test r.pobj ≈ r.dobj atol=1e-4 rtol=1e-4
     @test r.pobj ≈ -36.71269068 atol=1e-4 rtol=1e-4
 end
@@ -186,7 +186,7 @@ function _namedpoly9(verbose::Bool, lscachetype)
     (c, A, b, G, h, cone) = build_namedpoly!(:robinson, 8)
     r = fullsolve(opt, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
-    @test r.niters <= 35
+    @test r.niters <= 40
     @test r.pobj ≈ r.dobj atol=1e-4 rtol=1e-4
     @test r.pobj ≈ 0.814814 atol=1e-4 rtol=1e-4
 end
@@ -206,7 +206,7 @@ function _namedpoly11(verbose::Bool, lscachetype)
     (c, A, b, G, h, cone) = build_namedpoly!(:schwefel, 4)
     r = fullsolve(opt, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
-    @test r.niters <= 55
+    @test r.niters <= 60
     @test r.pobj ≈ r.dobj atol=1e-4 rtol=1e-4
     @test r.pobj ≈ 0 atol=1e-4 rtol=1e-4
 end

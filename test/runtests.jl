@@ -57,8 +57,12 @@ lscachetype = Hypatia.QRSymmCache # linear system cache type
         _orthant1,
         _orthant2,
         _orthant3,
+        _orthant4,
         _ellinf1,
         _ellinf2,
+        _ellinfdual1,
+        _ellinfdual2,
+        _ellinfdual3,
         _soc1,
         _rsoc1,
         _rsoc2,
@@ -105,7 +109,7 @@ lscachetype = Hypatia.QRSymmCache # linear system cache type
         _namedpoly7,
         _namedpoly8,
         _namedpoly9,
-        _namedpoly10,
+        # _namedpoly10,
         _namedpoly11,
         )
         testfun(verbose, lscachetype)
