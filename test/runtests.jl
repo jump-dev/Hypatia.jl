@@ -11,7 +11,7 @@ using SparseArrays
 
 
 # TODO make first part a native interface function eventually
-# TODO maybe build a new high-level optimizer struct. the current optimizer struct is low-level
+# TODO maybe build a new high-level optimizer struct; the current optimizer struct is low-level
 function solveandcheck(
     opt::Hypatia.Optimizer,
     c,
@@ -89,36 +89,36 @@ end
 
 
 # native interface tests
-# verbose = false # test verbosity
-# include(joinpath(@__DIR__, "native.jl"))
-# @info("starting native interface tests")
-# @testset "native interface tests" begin
-#     for testfun in (
-#         _dimension1,
-#         _consistent1,
-#         _inconsistent1,
-#         _inconsistent2,
-#         _orthant1,
-#         _orthant2,
-#         _orthant3,
-#         _orthant4,
-#         _ellinf1,
-#         _ellinf2,
-#         _ellinfdual1,
-#         _ellinfdual2,
-#         _ellinfdual3,
-#         _soc1,
-#         _rsoc1,
-#         _rsoc2,
-#         _psd1,
-#         _psd2,
-#         _exp1,
-#         _power1,
-#         )
-#         testfun(verbose, Hypatia.QRSymmCache)
-#         testfun(verbose, Hypatia.NaiveCache)
-#     end
-# end
+verbose = false # test verbosity
+include(joinpath(@__DIR__, "native.jl"))
+@info("starting native interface tests")
+@testset "native interface tests" begin
+    for testfun in (
+        _dimension1,
+        _consistent1,
+        _inconsistent1,
+        _inconsistent2,
+        _orthant1,
+        _orthant2,
+        _orthant3,
+        _orthant4,
+        _ellinf1,
+        _ellinf2,
+        _ellinfdual1,
+        _ellinfdual2,
+        _ellinfdual3,
+        _soc1,
+        _rsoc1,
+        _rsoc2,
+        _psd1,
+        _psd2,
+        _exp1,
+        _power1,
+        )
+        testfun(verbose, Hypatia.QRSymmCache)
+        testfun(verbose, Hypatia.NaiveCache)
+    end
+end
 
 # examples in src/examples/ folder
 egs_dir = joinpath(@__DIR__, "../examples")
@@ -127,34 +127,34 @@ include(joinpath(egs_dir, "lp/lp.jl"))
 include(joinpath(egs_dir, "namedpoly/namedpoly.jl"))
 
 @info("starting default examples tests")
-# @testset "default examples" begin
-#     run_envelope()
-#     run_lp()
-#     run_namedpoly()
-# end
+@testset "default examples" begin
+    run_envelope()
+    run_lp()
+    run_namedpoly()
+end
 
 verbose = false # test verbosity
 include(joinpath(@__DIR__, "examples.jl"))
 @info("starting varied examples tests")
 @testset "varied examples" begin
     for testfun in (
-        # _envelope1,
-        # _envelope2,
-        # _envelope3,
-        # # _envelope4,
-        # _lp1,
-        # # _lp2,
-        # _namedpoly1,
-        # _namedpoly2,
-        _namedpoly3,
-        # # _namedpoly4,
-        # _namedpoly5,
-        # # _namedpoly6,
-        # _namedpoly7,
-        # _namedpoly8,
-        # _namedpoly9,
-        # # _namedpoly10,
-        # _namedpoly11,
+        _envelope1,
+        _envelope2,
+        _envelope3,
+        # _envelope4,
+        _lp1,
+        # _lp2,
+        _namedpoly1,
+        _namedpoly2,
+        # _namedpoly3,
+        # _namedpoly4,
+        _namedpoly5,
+        # _namedpoly6,
+        _namedpoly7,
+        _namedpoly8,
+        _namedpoly9,
+        # _namedpoly10,
+        _namedpoly11,
         )
         testfun(verbose, Hypatia.QRSymmCache)
         testfun(verbose, Hypatia.NaiveCache)
@@ -163,13 +163,13 @@ end
 
 
 # MathOptInterface tests
-# verbose = false # test verbosity
-# include(joinpath(@__DIR__, "moi.jl"))
-# @info("starting MathOptInterface tests")
-# @testset "MathOptInterface tests" begin
-#     testmoi(verbose, false)
-#     testmoi(verbose, true)
-# end
+verbose = false # test verbosity
+include(joinpath(@__DIR__, "moi.jl"))
+@info("starting MathOptInterface tests")
+@testset "MathOptInterface tests" begin
+    testmoi(verbose, false)
+    testmoi(verbose, true)
+end
 
 
 return nothing

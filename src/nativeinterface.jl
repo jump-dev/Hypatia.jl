@@ -506,6 +506,12 @@ function solve!(opt::Optimizer)
 
         # determine step length alpha by line search
         alpha = alphapred
+        if tmp_kap < 0.0
+            alpha = min(alpha, -kap/tmp_kap*0.999)
+        end
+        if tmp_tau < 0.0
+            alpha = min(alpha, -tau/tmp_tau*0.999)
+        end
         nbhd = Inf
         alphaprevok = true
         predfail = false
@@ -513,15 +519,17 @@ function solve!(opt::Optimizer)
         while true
             nprediters += 1
 
+            ls_tau = tau + alpha*tmp_tau
+            ls_kap = kap + alpha*tmp_kap
             @. ls_ts = ts + alpha*tmp_ts
             @. ls_tz = tz + alpha*tmp_tz
 
             # accept primal iterate if
             # - decreased alpha and it is the first inside the cone and beta-neighborhood or
             # - increased alpha and it is inside the cone and the first to leave beta-neighborhood
-            if incone(cone)
+            if ls_tau > 0.0 && ls_kap > 0.0 && incone(cone)
                 # primal iterate is inside the cone
-                ls_tk = (tau + alpha*tmp_tau)*(kap + alpha*tmp_kap)
+                ls_tk = ls_tau*ls_kap
                 ls_mu = (dot(ls_ts, ls_tz) + ls_tk)/bnu
                 nbhd = calcnbhd!(g, ls_ts, ls_tz, ls_mu, cone) + (ls_tk - ls_mu)^2
 
@@ -573,6 +581,9 @@ function solve!(opt::Optimizer)
         tau += alpha*tmp_tau
         kap += alpha*tmp_kap
         mu = (dot(ts, tz) + tau*kap)/bnu
+        @assert tau >= 0.0
+        @assert kap >= 0.0
+        @assert mu >= 0.0
 
         # skip correction phase if allowed and current iterate is in the eta-neighborhood
         if opt.corrcheck && (nbhd < abs2(eta*mu))
