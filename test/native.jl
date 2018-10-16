@@ -2,7 +2,7 @@
 Copyright 2018, Chris Coey and contributors
 =#
 
-function _dimension1(verbose::Bool, lscachetype)
+function _dimension1(; verbose, lscachetype)
     A = Matrix{Float64}(undef, 0, 2)
     b = Float64[]
     G = [1.0 0.0]
@@ -36,7 +36,7 @@ function _dimension1(verbose::Bool, lscachetype)
     @test_throws ErrorException("some dual equality constraints are inconsistent") Hypatia.preprocess_data(c, A, b, G, useQR=true)
 end
 
-function _consistent1(verbose::Bool, lscachetype)
+function _consistent1(; verbose, lscachetype)
     opt = Hypatia.Optimizer(verbose=verbose)
     Random.seed!(1)
     (n, p, q) = (30, 15, 30)
@@ -58,7 +58,7 @@ function _consistent1(verbose::Bool, lscachetype)
     @test r.status == :Optimal
 end
 
-function _inconsistent1(verbose::Bool, lscachetype)
+function _inconsistent1(; verbose, lscachetype)
     opt = Hypatia.Optimizer(verbose=verbose)
     Random.seed!(1)
     (n, p, q) = (30, 15, 30)
@@ -75,7 +75,7 @@ function _inconsistent1(verbose::Bool, lscachetype)
     @test_throws ErrorException("some primal equality constraints are inconsistent") solveandcheck(opt, c, A, b, G, h, cone, lscachetype)
 end
 
-function _inconsistent2(verbose::Bool, lscachetype)
+function _inconsistent2(; verbose, lscachetype)
     opt = Hypatia.Optimizer(verbose=verbose)
     Random.seed!(1)
     (n, p, q) = (30, 15, 30)
@@ -93,7 +93,7 @@ function _inconsistent2(verbose::Bool, lscachetype)
     @test_throws ErrorException("some dual equality constraints are inconsistent") solveandcheck(opt, c, A, b, G, h, cone, lscachetype)
 end
 
-function _orthant1(verbose::Bool, lscachetype)
+function _orthant1(; verbose, lscachetype)
     Random.seed!(1)
     (n, p, q) = (40, 20, 40)
     c = rand(0.0:9.0, n)
@@ -118,7 +118,7 @@ function _orthant1(verbose::Bool, lscachetype)
     @test rnp.pobj ≈ rnn.pobj atol=1e-4 rtol=1e-4
 end
 
-function _orthant2(verbose::Bool, lscachetype)
+function _orthant2(; verbose, lscachetype)
     Random.seed!(1)
     (n, p, q) = (5, 2, 10)
     c = rand(0.0:9.0, n)
@@ -140,7 +140,7 @@ function _orthant2(verbose::Bool, lscachetype)
     @test r1.pobj ≈ r2.pobj atol=1e-4 rtol=1e-4
 end
 
-function _orthant3(verbose::Bool, lscachetype)
+function _orthant3(; verbose, lscachetype)
     Random.seed!(1)
     (n, p, q) = (30, 12, 30)
     c = rand(0.0:9.0, n)
@@ -162,7 +162,7 @@ function _orthant3(verbose::Bool, lscachetype)
     @test r1.pobj ≈ r2.pobj atol=1e-4 rtol=1e-4
 end
 
-function _orthant4(verbose::Bool, lscachetype)
+function _orthant4(; verbose, lscachetype)
     Random.seed!(1)
     (n, p, q) = (5, 2, 10)
     c = rand(0.0:9.0, n)
@@ -184,7 +184,7 @@ function _orthant4(verbose::Bool, lscachetype)
     @test r1.pobj ≈ r2.pobj atol=1e-4 rtol=1e-4
 end
 
-function _ellinf1(verbose::Bool, lscachetype)
+function _ellinf1(; verbose, lscachetype)
     opt = Hypatia.Optimizer(verbose=verbose)
     c = Float64[0, -1, -1]
     A = Float64[1 0 0; 0 1 0]
@@ -200,7 +200,7 @@ function _ellinf1(verbose::Bool, lscachetype)
     @test r.y ≈ [1, 1] atol=1e-4 rtol=1e-4
 end
 
-function _ellinf2(verbose::Bool, lscachetype)
+function _ellinf2(; verbose, lscachetype)
     opt = Hypatia.Optimizer(verbose=verbose)
     Random.seed!(1)
     c = Float64[1, 0, 0, 0, 0, 0]
@@ -215,7 +215,7 @@ function _ellinf2(verbose::Bool, lscachetype)
     @test r.pobj ≈ 1 atol=1e-4 rtol=1e-4
 end
 
-function _ellinfdual1(verbose::Bool, lscachetype)
+function _ellinfdual1(; verbose, lscachetype)
     opt = Hypatia.Optimizer(verbose=verbose)
     c = Float64[0, 1, -1]
     A = Float64[1 0 0; 0 1 0]
@@ -231,7 +231,7 @@ function _ellinfdual1(verbose::Bool, lscachetype)
     @test r.y ≈ [1, 0] atol=1e-4 rtol=1e-4
 end
 
-function _ellinfdual2(verbose::Bool, lscachetype)
+function _ellinfdual2(; verbose, lscachetype)
     opt = Hypatia.Optimizer(verbose=verbose)
     Random.seed!(1)
     c = Float64[1, 0, 0, 0, 0, 0]
@@ -246,7 +246,7 @@ function _ellinfdual2(verbose::Bool, lscachetype)
     @test r.pobj ≈ 1 atol=1e-4 rtol=1e-4
 end
 
-function _ellinfdual3(verbose::Bool, lscachetype)
+function _ellinfdual3(; verbose, lscachetype)
     Random.seed!(1)
     n = 15
     c = collect(-7.0:7.0)
@@ -265,7 +265,7 @@ function _ellinfdual3(verbose::Bool, lscachetype)
     @test sum(abs, r.x) ≈ 1.0 atol=1e-4 rtol=1e-4
 end
 
-function _soc1(verbose::Bool, lscachetype)
+function _soc1(; verbose, lscachetype)
     c = Float64[0, -1, -1]
     A = Float64[1 0 0; 0 1 0]
     b = Float64[1, 1/sqrt(2)]
@@ -284,7 +284,7 @@ function _soc1(verbose::Bool, lscachetype)
     end
 end
 
-function _rsoc1(verbose::Bool, lscachetype)
+function _rsoc1(; verbose, lscachetype)
     c = Float64[0, 0, -1, -1]
     A = Float64[1 0 0 0; 0 1 0 0]
     b = Float64[1/2, 1]
@@ -302,7 +302,7 @@ function _rsoc1(verbose::Bool, lscachetype)
     end
 end
 
-function _rsoc2(verbose::Bool, lscachetype)
+function _rsoc2(; verbose, lscachetype)
     c = Float64[0, 0, -1]
     A = Float64[1 0 0; 0 1 0]
     b = Float64[1/2, 1]/sqrt(2)
@@ -320,7 +320,7 @@ function _rsoc2(verbose::Bool, lscachetype)
     end
 end
 
-function _psd1(verbose::Bool, lscachetype)
+function _psd1(; verbose, lscachetype)
     c = Float64[0, -1, 0]
     A = Float64[1 0 0; 0 0 1]
     b = Float64[1/2, 1]
@@ -338,7 +338,7 @@ function _psd1(verbose::Bool, lscachetype)
     end
 end
 
-function _psd2(verbose::Bool, lscachetype)
+function _psd2(; verbose, lscachetype)
     c = Float64[1, 0, 1, 0, 0, 1]
     A = Float64[1 2 3 4 5 6; 1 1 1 1 1 1]
     b = Float64[10, 3]
@@ -356,7 +356,7 @@ function _psd2(verbose::Bool, lscachetype)
     end
 end
 
-function _exp1(verbose::Bool, lscachetype)
+function _exp1(; verbose, lscachetype)
     opt = Hypatia.Optimizer(verbose=verbose)
     c = Float64[1, 1, 1]
     A = Float64[0 1 0; 1 0 0]
@@ -373,7 +373,7 @@ function _exp1(verbose::Bool, lscachetype)
     @test r.z ≈ c+A'*r.y atol=1e-4 rtol=1e-4
 end
 
-function _power1(verbose::Bool, lscachetype)
+function _power1(; verbose, lscachetype)
     opt = Hypatia.Optimizer(verbose=verbose)
     c = Float64[1, 0, 0, -1, -1, 0]
     A = Float64[1 1 1/2 0 0 0; 0 0 0 0 0 1]

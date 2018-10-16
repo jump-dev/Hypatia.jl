@@ -241,7 +241,14 @@ function helplhs!(
             mul!(L.Q2GHGQ2, L.Q2', L.GHGQ2)
             F = bunchkaufman!(Symmetric(L.Q2GHGQ2), true, check=false)
             if !issuccess(F)
-                error("linear system matrix was not positive definite")
+                @warn("linear system matrix was not positive definite")
+                # TODO improve recovery method
+                mul!(L.Q2GHGQ2, L.Q2', L.GHGQ2)
+                L.Q2GHGQ2 += 1e-4I
+                F = bunchkaufman!(Symmetric(L.Q2GHGQ2), true, check=false)
+                if !issuccess(F)
+                    error("could not fix failure of positive definiteness; terminating")
+                end
             end
         end
         # F = bunchkaufman!(Symmetric(L.Q2GHGQ2)) # TODO only use this; remove allocs, need to use low-level functions
