@@ -132,7 +132,7 @@ function check_data(
         error("c vector is empty, but number of variables must be positive")
     end
     if q == 0
-        warn("no conic constraints were specified")
+        @warn("no conic constraints were specified")
     end
     if n < p
         println("number of equality constraints ($p) exceeds number of variables ($n)")

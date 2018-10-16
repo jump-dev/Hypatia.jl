@@ -1,5 +1,6 @@
 #=
 Copyright 2018, Chris Coey and contributors
+# TODO add a progress meter to silent tests?
 =#
 
 using Hypatia
@@ -11,32 +12,75 @@ using SparseArrays
 
 # TODO make first part a native interface function eventually
 # TODO maybe build a new high-level optimizer struct. the current optimizer struct is low-level
-function fullsolve(opt::Hypatia.Optimizer, c, A, b, G, h, cone, lscachetype)
+function solveandcheck(
+    opt::Hypatia.Optimizer,
+    c,
+    A,
+    b,
+    G,
+    h,
+    cone,
+    lscachetype;
+    atol=1e-4,
+    rtol=1e-4,
+    )
+    # check, preprocess, load, and solve
     Hypatia.check_data(c, A, b, G, h, cone)
-    (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = Hypatia.preprocess_data(c, A, b, G, useQR=true)
-
-    # TODO handle lscachetype
-    if lscachetype != Hypatia.QRSymmCache
-        error("tests only support QRSymmCache now")
+    if lscachetype == Hypatia.QRSymmCache
+        (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = Hypatia.preprocess_data(c, A, b, G, useQR=true)
+        L = Hypatia.QRSymmCache(c1, A1, b1, G1, h, cone, Q2, RiQ1)
+    elseif lscachetype == Hypatia.NaiveCache
+        (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = Hypatia.preprocess_data(c, A, b, G, useQR=false)
+        L = Hypatia.NaiveCache(c1, A1, b1, G1, h, cone)
+    else
+        error("linear system cache type $lscachetype is not recognized")
     end
-    L = Hypatia.QRSymmCache(c1, A1, b1, G1, h, cone, Q2, RiQ1)
-    # L = Hypatia.NaiveCache(c1, A1, b1, G1, h, cone)
-
     Hypatia.load_data!(opt, c1, A1, b1, G1, h, cone, L)
-
     Hypatia.solve!(opt)
 
+    # construct solution
     x = zeros(length(c))
     x[dukeep] = Hypatia.get_x(opt)
     y = zeros(length(b))
     y[prkeep] = Hypatia.get_y(opt)
     s = Hypatia.get_s(opt)
     z = Hypatia.get_z(opt)
-
     pobj = Hypatia.get_pobj(opt)
     dobj = Hypatia.get_dobj(opt)
 
     status = Hypatia.get_status(opt)
+
+    # check conic certificates are valid; conditions are described by CVXOPT at https://github.com/cvxopt/cvxopt/blob/master/src/python/coneprog.py
+    if status == :Optimal
+        @test pobj ≈ dobj atol=atol rtol=rtol
+        @test A*x ≈ b atol=atol rtol=rtol
+        @test G*x + s ≈ h atol=atol rtol=rtol
+        @test G'*z + A'*y ≈ -c atol=atol rtol=rtol
+        @test dot(s, z) ≈ 0.0 atol=atol rtol=rtol
+        @test dot(c, x) ≈ pobj atol=1e-8 rtol=1e-8
+        @test dot(b, y) + dot(h, z) ≈ -dobj atol=1e-8 rtol=1e-8
+    elseif status == :PrimalInfeasible
+        @test isnan(pobj)
+        @test dobj ≈ 1.0 atol=1e-8 rtol=1e-8
+        @test all(isnan, x)
+        @test all(isnan, s)
+        @test dot(b, y) + dot(h, z) ≈ -1.0 atol=1e-8 rtol=1e-8
+        @test G'*z ≈ -A'*y atol=atol rtol=rtol
+    elseif status == :DualInfeasible
+        @test isnan(dobj)
+        @test pobj ≈ -1.0 atol=1e-8 rtol=1e-8
+        @test all(isnan, y)
+        @test all(isnan, z)
+        @test dot(c, x) ≈ -1.0 atol=1e-8 rtol=1e-8
+        @test G*x ≈ -s atol=atol rtol=rtol
+        @test A*x ≈ zeros(length(y)) atol=atol rtol=rtol
+    elseif status == :IllPosed
+        @test all(isnan, x)
+        @test all(isnan, s)
+        @test all(isnan, y)
+        @test all(isnan, z)
+    end
+
     stime = Hypatia.get_solvetime(opt)
     niters = Hypatia.get_niters(opt)
 
@@ -45,36 +89,36 @@ end
 
 
 # native interface tests
-include(joinpath(@__DIR__, "native.jl"))
-verbose = false # test verbosity
-lscachetype = Hypatia.QRSymmCache # linear system cache type
-
-@testset "native interface tests" begin
-    for testfun in (
-        _dimension1,
-        _consistent1,
-        _inconsistent1,
-        _inconsistent2,
-        _orthant1,
-        _orthant2,
-        _orthant3,
-        _orthant4,
-        _ellinf1,
-        _ellinf2,
-        _ellinfdual1,
-        _ellinfdual2,
-        _ellinfdual3,
-        _soc1,
-        _rsoc1,
-        _rsoc2,
-        _psd1,
-        _psd2,
-        _exp1,
-        _power1,
-        )
-        testfun(verbose, lscachetype)
-    end
-end
+# verbose = false # test verbosity
+# include(joinpath(@__DIR__, "native.jl"))
+# @info("starting native interface tests")
+# @testset "native interface tests" begin
+#     for testfun in (
+#         _dimension1,
+#         _consistent1,
+#         _inconsistent1,
+#         _inconsistent2,
+#         _orthant1,
+#         _orthant2,
+#         _orthant3,
+#         _orthant4,
+#         _ellinf1,
+#         _ellinf2,
+#         _ellinfdual1,
+#         _ellinfdual2,
+#         _ellinfdual3,
+#         _soc1,
+#         _rsoc1,
+#         _rsoc2,
+#         _psd1,
+#         _psd2,
+#         _exp1,
+#         _power1,
+#         )
+#         testfun(verbose, Hypatia.QRSymmCache)
+#         testfun(verbose, Hypatia.NaiveCache)
+#     end
+# end
 
 # examples in src/examples/ folder
 egs_dir = joinpath(@__DIR__, "../examples")
@@ -82,49 +126,50 @@ include(joinpath(egs_dir, "envelope/envelope.jl"))
 include(joinpath(egs_dir, "lp/lp.jl"))
 include(joinpath(egs_dir, "namedpoly/namedpoly.jl"))
 
-@testset "default examples" begin
-    run_envelope()
-    run_lp()
-    run_namedpoly()
-end
+@info("starting default examples tests")
+# @testset "default examples" begin
+#     run_envelope()
+#     run_lp()
+#     run_namedpoly()
+# end
 
-include(joinpath(@__DIR__, "examples.jl"))
 verbose = false # test verbosity
-lscachetype = Hypatia.QRSymmCache # linear system cache type
-
+include(joinpath(@__DIR__, "examples.jl"))
+@info("starting varied examples tests")
 @testset "varied examples" begin
     for testfun in (
-        _envelope1,
-        _envelope2,
-        _envelope3,
-        # _envelope4,
-        _lp1,
-        _lp2,
-        _lp3,
-        _namedpoly1,
-        _namedpoly2,
+        # _envelope1,
+        # _envelope2,
+        # _envelope3,
+        # # _envelope4,
+        # _lp1,
+        # # _lp2,
+        # _namedpoly1,
+        # _namedpoly2,
         _namedpoly3,
-        # _namedpoly4,
-        _namedpoly5,
-        # _namedpoly6,
-        _namedpoly7,
-        _namedpoly8,
-        _namedpoly9,
-        # _namedpoly10,
-        _namedpoly11,
+        # # _namedpoly4,
+        # _namedpoly5,
+        # # _namedpoly6,
+        # _namedpoly7,
+        # _namedpoly8,
+        # _namedpoly9,
+        # # _namedpoly10,
+        # _namedpoly11,
         )
-        testfun(verbose, lscachetype)
+        testfun(verbose, Hypatia.QRSymmCache)
+        testfun(verbose, Hypatia.NaiveCache)
     end
 end
 
 
 # MathOptInterface tests
-verbose = false # test verbosity
-include(joinpath(@__DIR__, "moi.jl"))
-@testset "MathOptInterface tests" begin
-    testmoi(verbose, false)
-    testmoi(verbose, true)
-end
+# verbose = false # test verbosity
+# include(joinpath(@__DIR__, "moi.jl"))
+# @info("starting MathOptInterface tests")
+# @testset "MathOptInterface tests" begin
+#     testmoi(verbose, false)
+#     testmoi(verbose, true)
+# end
 
 
 return nothing
