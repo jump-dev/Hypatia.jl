@@ -2,6 +2,42 @@
 Copyright 2018, Chris Coey and contributors
 =#
 
+function _dimension1(verbose::Bool, lscachetype)
+    A = Matrix{Float64}(undef, 0, 2)
+    b = Float64[]
+    G = [1.0 0.0]
+    h = [1.0]
+    c = [-1.0, 0.0]
+    cone = Hypatia.Cone([Hypatia.NonnegativeCone(1)], [1:1], [false])
+
+    opt = Hypatia.Optimizer(verbose=verbose)
+    r = fullsolve(opt, c, A, b, G, h, cone, lscachetype)
+    r.status == :Optimal
+    @test r.pobj ≈ r.dobj atol=1e-4 rtol=1e-4
+    @test r.pobj ≈ -1 atol=1e-4 rtol=1e-4
+    @test r.x ≈ [1, 0] atol=1e-4 rtol=1e-4
+    @test isempty(r.y)
+
+    c = [-1.0, -1.0]
+    Hypatia.check_data(c, A, b, G, h, cone)
+    @test_throws ErrorException("some dual equality constraints are inconsistent") Hypatia.preprocess_data(c, A, b, G, useQR=true)
+
+    A = sparse(A)
+    G = sparse(G)
+    c = [-1.0, 0.0]
+    opt = Hypatia.Optimizer(verbose=verbose)
+    r = fullsolve(opt, c, A, b, G, h, cone, lscachetype)
+    r.status == :Optimal
+    @test r.pobj ≈ r.dobj atol=1e-4 rtol=1e-4
+    @test r.pobj ≈ -1 atol=1e-4 rtol=1e-4
+    @test r.x ≈ [1, 0] atol=1e-4 rtol=1e-4
+    @test isempty(r.y)
+
+    c = [-1.0, -1.0]
+    Hypatia.check_data(c, A, b, G, h, cone)
+    @test_throws ErrorException("some dual equality constraints are inconsistent") Hypatia.preprocess_data(c, A, b, G, useQR=true)
+end
+
 function _consistent1(verbose::Bool, lscachetype)
     opt = Hypatia.Optimizer(verbose=verbose)
     Random.seed!(1)

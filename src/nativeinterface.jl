@@ -132,7 +132,7 @@ function check_data(
         error("c vector is empty, but number of variables must be positive")
     end
     if q == 0
-        error("h vector is empty, but number of conic constraints must be positive (do not use Hypatia for problems with only equality constraints)")
+        warn("no conic constraints were specified")
     end
     if n < p
         println("number of equality constraints ($p) exceeds number of variables ($n)")
@@ -175,6 +175,7 @@ function preprocess_data(
     )
 
     (n, p) = (length(c), length(b))
+    q = size(G, 1)
 
     # NOTE (pivoted) QR factorizations are usually rank-revealing but may be unreliable, see http://www.math.sjsu.edu/~foster/rankrevealingcode.html
     # rank of a matrix is number of nonzero diagonal elements of R
@@ -202,11 +203,11 @@ function preprocess_data(
     if AGrank < n
         if issparse(AG)
             dukeep = AGF.pcol[1:AGrank]
-            AGQ1 = Matrix{Float64}(undef, n, AGrank)
-            AGQ1[AGF.prow,:] = AGF.Q*Matrix{Float64}(I, n, AGrank) # TODO could eliminate this allocation
+            AGQ1 = Matrix{Float64}(undef, p + q, AGrank)
+            AGQ1[AGF.prow,:] = AGF.Q*Matrix{Float64}(I, p + q, AGrank) # TODO could eliminate this allocation
         else
             dukeep = AGF.p[1:AGrank]
-            AGQ1 = AGF.Q*Matrix{Float64}(I, n, AGrank) # TODO could eliminate this allocation
+            AGQ1 = AGF.Q*Matrix{Float64}(I, p + q, AGrank) # TODO could eliminate this allocation
         end
         AGRiQ1 = UpperTriangular(AGR[1:AGrank,1:AGrank])\AGQ1'
 
