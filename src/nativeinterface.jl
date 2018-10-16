@@ -128,8 +128,12 @@ function check_data(
     )
 
     (n, p, q) = (length(c), length(b), length(h))
-    @assert n > 0
-    @assert p + q > 0
+    if n == 0
+        error("c vector is empty, but number of variables must be positive")
+    end
+    if p + q == 0
+        error("b and h vectors are empty, but number of equality or conic constraints must be positive")
+    end
     if n < p
         println("number of equality constraints ($p) exceeds number of variables ($n)")
     end
@@ -143,9 +147,18 @@ function check_data(
         error("number of constraint rows is not consistent in G and h")
     end
 
-    @assert length(cone.prmtvs) == length(cone.idxs)
+    if length(cone.prmtvs) != length(cone.idxs)
+        error("number of primitive cones does not match number of index ranges")
+    end
+    qcone = 0
     for k in eachindex(cone.prmtvs)
-        @assert dimension(cone.prmtvs[k]) == length(cone.idxs[k])
+        if dimension(cone.prmtvs[k]) != length(cone.idxs[k])
+            error("dimension of cone $k does not match number of indices in the corresponding range")
+        end
+        qcone += dimension(cone.prmtvs[k])
+    end
+    if qcone != q
+        error("dimension of cone is not consistent with number of rows in G and h")
     end
 
     return nothing
