@@ -27,15 +27,10 @@ MOIU.@model(HypatiaModelData,
     (MOI.VectorAffineFunction,),
     )
 
-function testmoi(
-    verbose::Bool,
-    usedense::Bool,
-    atol::Float64 = 1e-4,
-    rtol::Float64 = 1e-4,
-    )
-
+function testmoi(; verbose, lscachetype, usedense)
     optimizer = MOIU.CachingOptimizer(HypatiaModelData{Float64}(), Hypatia.HypatiaOptimizer(
         verbose = verbose,
+        lscachetype = lscachetype,
         usedense = usedense,
         tolrelopt = 1e-8,
         tolabsopt = 1e-8,
@@ -43,8 +38,8 @@ function testmoi(
         ))
 
     config = MOIT.TestConfig(
-        atol = atol,
-        rtol = rtol,
+        atol = 1e-4,
+        rtol = 1e-4,
         solve = true,
         query = true,
         modify_lhs = true,
@@ -52,21 +47,19 @@ function testmoi(
         infeas_certificates = true,
         )
 
-    @testset "dense is $usedense" begin
-        MOIT.contlineartest(MOIB.SplitInterval{Float64}(optimizer), config)
+    MOIT.contlineartest(MOIB.SplitInterval{Float64}(optimizer), config)
 
-        MOIT.linear10test(optimizer, config)
+    MOIT.linear10test(optimizer, config)
 
-        exclude = ["rootdet", "logdet", "sdp"] # TODO MOI does not yet support scaled PSD triangle
-        MOIT.contconictest(
-            MOIB.GeoMean{Float64}(
-            # MOIB.SquarePSD{Float64}(
-            # MOIB.LogDet{Float64}(
-            # MOIB.RootDet{Float64}(
-                optimizer
-            ),#))),
-            config, exclude)
-    end
+    exclude = ["rootdet", "logdet", "sdp"] # TODO MOI does not yet support scaled PSD triangle
+    MOIT.contconictest(
+        MOIB.GeoMean{Float64}(
+        # MOIB.SquarePSD{Float64}(
+        # MOIB.LogDet{Float64}(
+        # MOIB.RootDet{Float64}(
+            optimizer
+        ),#))),
+        config, exclude)
 
     return nothing
 end

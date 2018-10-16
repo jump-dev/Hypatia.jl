@@ -115,8 +115,8 @@ include(joinpath(@__DIR__, "native.jl"))
         _exp1,
         _power1,
         )
-        testfun(verbose, Hypatia.QRSymmCache)
-        testfun(verbose, Hypatia.NaiveCache)
+        testfun(verbose=verbose, lscachetype=Hypatia.QRSymmCache)
+        testfun(verbose=verbose, lscachetype=Hypatia.NaiveCache)
     end
 end
 
@@ -154,10 +154,10 @@ include(joinpath(@__DIR__, "examples.jl"))
         _namedpoly8,
         _namedpoly9,
         # _namedpoly10,
-        _namedpoly11,
+        # _namedpoly11,
         )
-        testfun(verbose, Hypatia.QRSymmCache)
-        testfun(verbose, Hypatia.NaiveCache)
+        testfun(verbose=verbose, lscachetype=Hypatia.QRSymmCache)
+        testfun(verbose=verbose, lscachetype=Hypatia.NaiveCache)
     end
 end
 
@@ -167,8 +167,10 @@ verbose = false # test verbosity
 include(joinpath(@__DIR__, "moi.jl"))
 @info("starting MathOptInterface tests")
 @testset "MathOptInterface tests" begin
-    testmoi(verbose, false)
-    testmoi(verbose, true)
+    testmoi(verbose=verbose, lscachetype=Hypatia.QRSymmCache, usedense=false)
+    testmoi(verbose=verbose, lscachetype=Hypatia.QRSymmCache, usedense=true)
+    testmoi(verbose=verbose, lscachetype=Hypatia.NaiveCache, usedense=false)
+    testmoi(verbose=verbose, lscachetype=Hypatia.NaiveCache, usedense=true)
 end
 
 

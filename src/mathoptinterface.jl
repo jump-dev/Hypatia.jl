@@ -5,6 +5,7 @@ Copyright 2018, Chris Coey and contributors
 mutable struct HypatiaOptimizer <: MOI.AbstractOptimizer
     opt::Optimizer
     verbose::Bool
+    lscachetype
     usedense::Bool
     c::Vector{Float64}          # linear cost vector, size n
     A::AbstractMatrix{Float64}  # equality constraint matrix, size p*n
@@ -30,10 +31,11 @@ mutable struct HypatiaOptimizer <: MOI.AbstractOptimizer
     pobj::Float64
     dobj::Float64
 
-    function HypatiaOptimizer(opt::Optimizer, verbose::Bool, usedense::Bool)
+    function HypatiaOptimizer(opt::Optimizer, verbose::Bool, lscachetype, usedense::Bool)
         moiopt = new()
         moiopt.opt = opt
         moiopt.verbose = verbose
+        moiopt.lscachetype = lscachetype
         moiopt.usedense = usedense
         return moiopt
     end
@@ -41,11 +43,12 @@ end
 
 HypatiaOptimizer(;
     verbose::Bool = false,
+    lscachetype = QRSymmCache,
     usedense::Bool = true,
     tolrelopt::Float64 = 1e-6,
     tolabsopt::Float64 = 1e-7,
     tolfeas::Float64 = 1e-7,
-    ) = HypatiaOptimizer(Optimizer(verbose=verbose, tolrelopt=tolrelopt, tolabsopt=tolabsopt, tolfeas=tolfeas), verbose, usedense)
+    ) = HypatiaOptimizer(Optimizer(verbose=verbose, tolrelopt=tolrelopt, tolabsopt=tolabsopt, tolfeas=tolfeas), verbose, lscachetype, usedense)
 
 MOI.get(::HypatiaOptimizer, ::MOI.SolverName) = "Hypatia"
 
@@ -492,17 +495,18 @@ function MOI.optimize!(moiopt::HypatiaOptimizer)
     opt = moiopt.opt
     (c, A, b, G, h, cone) = (moiopt.c, moiopt.A, moiopt.b, moiopt.G, moiopt.h, moiopt.cone)
 
+    # check, preprocess, load, and solve
     check_data(c, A, b, G, h, cone)
-
-    # TODO make it optional
-    (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = preprocess_data(c, A, b, G, useQR=true)
-
-    # TODO make cache type optional, and turn off useQR in preprocess if don't need
-    # L = QRSymmCache(c1, A1, b1, G1, h, cone, Q2, RiQ1)
-    L = NaiveCache(c1, A1, b1, G1, h, cone)
-
+    if moiopt.lscachetype == QRSymmCache
+        (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = preprocess_data(c, A, b, G, useQR=true)
+        L = QRSymmCache(c1, A1, b1, G1, h, cone, Q2, RiQ1)
+    elseif moiopt.lscachetype == NaiveCache
+        (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = preprocess_data(c, A, b, G, useQR=false)
+        L = NaiveCache(c1, A1, b1, G1, h, cone)
+    else
+        error("linear system cache type $(moiopt.lscachetype) is not recognized")
+    end
     load_data!(opt, c1, A1, b1, G1, h, cone, L)
-
     solve!(opt)
 
     moiopt.x = zeros(length(c))
@@ -517,10 +521,11 @@ function MOI.optimize!(moiopt::HypatiaOptimizer)
     moiopt.z = get_z(opt)
     moiopt.z[moiopt.intervalidxs] .*= moiopt.intervalscales
 
-    moiopt.status = get_status(opt)
-    moiopt.solvetime = get_solvetime(opt)
     moiopt.pobj = get_pobj(opt)
     moiopt.dobj = get_dobj(opt)
+
+    moiopt.status = get_status(opt)
+    moiopt.solvetime = get_solvetime(opt)
 
     return nothing
 end
