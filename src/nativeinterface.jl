@@ -131,8 +131,8 @@ function check_data(
     if n == 0
         error("c vector is empty, but number of variables must be positive")
     end
-    if p + q == 0
-        error("b and h vectors are empty, but number of equality or conic constraints must be positive")
+    if q == 0
+        error("h vector is empty, but number of conic constraints must be positive (do not use Hypatia for problems with only equality constraints)")
     end
     if n < p
         println("number of equality constraints ($p) exceeds number of variables ($n)")
