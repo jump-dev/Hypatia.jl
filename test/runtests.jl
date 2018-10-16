@@ -1,6 +1,7 @@
 #=
 Copyright 2018, Chris Coey and contributors
 # TODO add a progress meter to silent tests?
+# TODO don't print "Hypatia." before linsyscache types in testset printing
 =#
 
 using Hypatia
@@ -89,36 +90,35 @@ end
 
 
 # native interface tests
-verbose = false # test verbosity
 include(joinpath(@__DIR__, "native.jl"))
 @info("starting native interface tests")
-@testset "native interface tests" begin
-    for testfun in (
-        _dimension1,
-        _consistent1,
-        _inconsistent1,
-        _inconsistent2,
-        _orthant1,
-        _orthant2,
-        _orthant3,
-        _orthant4,
-        _ellinf1,
-        _ellinf2,
-        _ellinfdual1,
-        _ellinfdual2,
-        _ellinfdual3,
-        _soc1,
-        _rsoc1,
-        _rsoc2,
-        _psd1,
-        _psd2,
-        _exp1,
-        _power1,
-        )
-        testfun(verbose=verbose, lscachetype=Hypatia.QRSymmCache)
-        testfun(verbose=verbose, lscachetype=Hypatia.NaiveCache)
-    end
+verbose = false # test verbosity
+testfuns = [
+    _dimension1,
+    _consistent1,
+    _inconsistent1,
+    _inconsistent2,
+    _orthant1,
+    _orthant2,
+    _orthant3,
+    _orthant4,
+    _ellinf1,
+    _ellinf2,
+    _ellinfdual1,
+    _ellinfdual2,
+    _ellinfdual3,
+    _soc1,
+    _rsoc1,
+    _rsoc2,
+    _psd1,
+    _psd2,
+    _exp1,
+    _power1,
+    ]
+@testset "native tests: $testfun, $lscachetype" for testfun in testfuns, lscachetype in (Hypatia.QRSymmCache, Hypatia.NaiveCache)
+    testfun(verbose=verbose, lscachetype=lscachetype)
 end
+
 
 # examples in src/examples/ folder
 egs_dir = joinpath(@__DIR__, "../examples")
@@ -127,50 +127,48 @@ include(joinpath(egs_dir, "lp/lp.jl"))
 include(joinpath(egs_dir, "namedpoly/namedpoly.jl"))
 
 @info("starting default examples tests")
-@testset "default examples" begin
-    run_envelope()
-    run_lp()
-    run_namedpoly()
+testfuns = [
+    run_envelope,
+    run_lp,
+    run_namedpoly,
+    ]
+@testset "default examples: $testfun" for testfun in testfuns
+    testfun()
 end
 
-verbose = false # test verbosity
 include(joinpath(@__DIR__, "examples.jl"))
 @info("starting varied examples tests")
-@testset "varied examples" begin
-    for testfun in (
-        _envelope1,
-        _envelope2,
-        _envelope3,
-        # _envelope4,
-        _lp1,
-        # _lp2,
-        _namedpoly1,
-        _namedpoly2,
-        # _namedpoly3,
-        # _namedpoly4,
-        _namedpoly5,
-        # _namedpoly6,
-        _namedpoly7,
-        _namedpoly8,
-        _namedpoly9,
-        # _namedpoly10,
-        # _namedpoly11,
-        )
-        testfun(verbose=verbose, lscachetype=Hypatia.QRSymmCache)
-        testfun(verbose=verbose, lscachetype=Hypatia.NaiveCache)
-    end
+verbose = false # test verbosity
+testfuns = [
+    _envelope1,
+    _envelope2,
+    _envelope3,
+    # _envelope4,
+    _lp1,
+    # _lp2,
+    _namedpoly1,
+    _namedpoly2,
+    # _namedpoly3,
+    # _namedpoly4,
+    _namedpoly5,
+    # _namedpoly6,
+    _namedpoly7,
+    _namedpoly8,
+    _namedpoly9,
+    # _namedpoly10,
+    # _namedpoly11,
+    ]
+@testset "varied examples: $testfun, $lscachetype" for testfun in testfuns, lscachetype in (Hypatia.QRSymmCache, Hypatia.NaiveCache)
+    testfun(verbose=verbose, lscachetype=lscachetype)
 end
 
 
 # MathOptInterface tests
-verbose = false # test verbosity
 include(joinpath(@__DIR__, "moi.jl"))
 @info("starting MathOptInterface tests")
-@testset "MathOptInterface tests" begin
-    testmoi(verbose=verbose, lscachetype=Hypatia.QRSymmCache, usedense=false)
-    testmoi(verbose=verbose, lscachetype=Hypatia.QRSymmCache, usedense=true)
-    testmoi(verbose=verbose, lscachetype=Hypatia.NaiveCache, usedense=false)
-    testmoi(verbose=verbose, lscachetype=Hypatia.NaiveCache, usedense=true)
+verbose = false # test verbosity
+@testset "MOI tests: $lscachetype, $(usedense ? "dense" : "sparse")" for lscachetype in (Hypatia.QRSymmCache, Hypatia.NaiveCache), usedense in (false, true)
+    testmoi(verbose=verbose, lscachetype=lscachetype, usedense=usedense)
 end
 
 
