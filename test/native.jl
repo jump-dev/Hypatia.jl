@@ -11,9 +11,8 @@ function _dimension1(verbose::Bool, lscachetype)
     cone = Hypatia.Cone([Hypatia.NonnegativeCone(1)], [1:1], [false])
 
     opt = Hypatia.Optimizer(verbose=verbose)
-    r = fullsolve(opt, c, A, b, G, h, cone, lscachetype)
+    r = solveandcheck(opt, c, A, b, G, h, cone, lscachetype)
     r.status == :Optimal
-    @test r.pobj ≈ r.dobj atol=1e-4 rtol=1e-4
     @test r.pobj ≈ -1 atol=1e-4 rtol=1e-4
     @test r.x ≈ [1, 0] atol=1e-4 rtol=1e-4
     @test isempty(r.y)
@@ -26,9 +25,8 @@ function _dimension1(verbose::Bool, lscachetype)
     G = sparse(G)
     c = [-1.0, 0.0]
     opt = Hypatia.Optimizer(verbose=verbose)
-    r = fullsolve(opt, c, A, b, G, h, cone, lscachetype)
+    r = solveandcheck(opt, c, A, b, G, h, cone, lscachetype)
     r.status == :Optimal
-    @test r.pobj ≈ r.dobj atol=1e-4 rtol=1e-4
     @test r.pobj ≈ -1 atol=1e-4 rtol=1e-4
     @test r.x ≈ [1, 0] atol=1e-4 rtol=1e-4
     @test isempty(r.y)
@@ -56,9 +54,8 @@ function _consistent1(verbose::Bool, lscachetype)
     c[11:15] = rnd1*c[1:5] - rnd2*c[6:10]
     h = zeros(q)
     cone = Hypatia.Cone([Hypatia.NonpositiveCone(q)], [1:q])
-    r = fullsolve(opt, c, A, b, G, h, cone, lscachetype)
+    r = solveandcheck(opt, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
-    @test r.pobj ≈ r.dobj atol=1e-4 rtol=1e-4
 end
 
 function _inconsistent1(verbose::Bool, lscachetype)
@@ -75,7 +72,7 @@ function _inconsistent1(verbose::Bool, lscachetype)
     b[11:15] = 2*(rnd1*b[1:5] - rnd2*b[6:10])
     h = zeros(q)
     cone = Hypatia.Cone([Hypatia.NonnegativeCone(q)], [1:q])
-    @test_throws ErrorException("some primal equality constraints are inconsistent") fullsolve(opt, c, A, b, G, h, cone, lscachetype)
+    @test_throws ErrorException("some primal equality constraints are inconsistent") solveandcheck(opt, c, A, b, G, h, cone, lscachetype)
 end
 
 function _inconsistent2(verbose::Bool, lscachetype)
@@ -93,7 +90,7 @@ function _inconsistent2(verbose::Bool, lscachetype)
     c[11:15] = 2*(rnd1*c[1:5] - rnd2*c[6:10])
     h = zeros(q)
     cone = Hypatia.Cone([Hypatia.NonnegativeCone(q)], [1:q])
-    @test_throws ErrorException("some dual equality constraints are inconsistent") fullsolve(opt, c, A, b, G, h, cone, lscachetype)
+    @test_throws ErrorException("some dual equality constraints are inconsistent") solveandcheck(opt, c, A, b, G, h, cone, lscachetype)
 end
 
 function _orthant1(verbose::Bool, lscachetype)
@@ -108,17 +105,15 @@ function _orthant1(verbose::Bool, lscachetype)
     opt = Hypatia.Optimizer(verbose=verbose)
     G = SparseMatrixCSC(-1.0I, q, n)
     cone = Hypatia.Cone([Hypatia.NonnegativeCone(q)], [1:q])
-    rnn = fullsolve(opt, c, A, b, G, h, cone, lscachetype)
+    rnn = solveandcheck(opt, c, A, b, G, h, cone, lscachetype)
     @test rnn.status == :Optimal
-    @test rnn.pobj ≈ rnn.dobj atol=1e-4 rtol=1e-4
 
     # nonpositive cone
     opt = Hypatia.Optimizer(verbose=verbose)
     G = SparseMatrixCSC(1.0I, q, n)
     cone = Hypatia.Cone([Hypatia.NonpositiveCone(q)], [1:q])
-    rnp = fullsolve(opt, c, A, b, G, h, cone, lscachetype)
+    rnp = solveandcheck(opt, c, A, b, G, h, cone, lscachetype)
     @test rnp.status == :Optimal
-    @test rnp.pobj ≈ rnp.dobj atol=1e-4 rtol=1e-4
 
     @test rnp.pobj ≈ rnn.pobj atol=1e-4 rtol=1e-4
 end
@@ -134,15 +129,13 @@ function _orthant2(verbose::Bool, lscachetype)
 
     opt = Hypatia.Optimizer(verbose=verbose)
     cone = Hypatia.Cone([Hypatia.NonnegativeCone(q)], [1:q], [true])
-    r1 = fullsolve(opt, c, A, b, G, h, cone, lscachetype)
+    r1 = solveandcheck(opt, c, A, b, G, h, cone, lscachetype)
     @test r1.status == :Optimal
-    @test r1.pobj ≈ r1.dobj atol=1e-4 rtol=1e-4
 
     opt = Hypatia.Optimizer(verbose=verbose)
     cone = Hypatia.Cone([Hypatia.NonnegativeCone(q)], [1:q], [false])
-    r2 = fullsolve(opt, c, A, b, G, h, cone, lscachetype)
+    r2 = solveandcheck(opt, c, A, b, G, h, cone, lscachetype)
     @test r2.status == :Optimal
-    @test r2.pobj ≈ r2.dobj atol=1e-4 rtol=1e-4
 
     @test r1.pobj ≈ r2.pobj atol=1e-4 rtol=1e-4
 end
@@ -158,15 +151,13 @@ function _orthant3(verbose::Bool, lscachetype)
 
     opt = Hypatia.Optimizer(verbose=verbose)
     cone = Hypatia.Cone([Hypatia.NonpositiveCone(q)], [1:q], [true])
-    r1 = fullsolve(opt, c, A, b, G, h, cone, lscachetype)
+    r1 = solveandcheck(opt, c, A, b, G, h, cone, lscachetype)
     @test r1.status == :Optimal
-    @test r1.pobj ≈ r1.dobj atol=1e-4 rtol=1e-4
 
     opt = Hypatia.Optimizer(verbose=verbose)
     cone = Hypatia.Cone([Hypatia.NonpositiveCone(q)], [1:q], [false])
-    r2 = fullsolve(opt, c, A, b, G, h, cone, lscachetype)
+    r2 = solveandcheck(opt, c, A, b, G, h, cone, lscachetype)
     @test r2.status == :Optimal
-    @test r2.pobj ≈ r2.dobj atol=1e-4 rtol=1e-4
 
     @test r1.pobj ≈ r2.pobj atol=1e-4 rtol=1e-4
 end
@@ -182,15 +173,13 @@ function _orthant4(verbose::Bool, lscachetype)
 
     opt = Hypatia.Optimizer(verbose=verbose)
     cone = Hypatia.Cone([Hypatia.NonnegativeCone(4), Hypatia.NonnegativeCone(6)], [1:4, 5:10], [false, true])
-    r1 = fullsolve(opt, c, A, b, G, h, cone, lscachetype)
+    r1 = solveandcheck(opt, c, A, b, G, h, cone, lscachetype)
     @test r1.status == :Optimal
-    @test r1.pobj ≈ r1.dobj atol=1e-4 rtol=1e-4
 
     opt = Hypatia.Optimizer(verbose=verbose)
     cone = Hypatia.Cone([Hypatia.NonnegativeCone(10)], [1:10], [false])
-    r2 = fullsolve(opt, c, A, b, G, h, cone, lscachetype)
+    r2 = solveandcheck(opt, c, A, b, G, h, cone, lscachetype)
     @test r2.status == :Optimal
-    @test r2.pobj ≈ r2.dobj atol=1e-4 rtol=1e-4
 
     @test r1.pobj ≈ r2.pobj atol=1e-4 rtol=1e-4
 end
@@ -203,10 +192,9 @@ function _ellinf1(verbose::Bool, lscachetype)
     G = SparseMatrixCSC(-1.0I, 3, 3)
     h = zeros(3)
     cone = Hypatia.Cone([Hypatia.EllInfinityCone(3)], [1:3])
-    r = fullsolve(opt, c, A, b, G, h, cone, lscachetype)
+    r = solveandcheck(opt, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
     @test r.niters <= 20
-    @test r.pobj ≈ r.dobj atol=1e-4 rtol=1e-4
     @test r.pobj ≈ -1 - 1/sqrt(2) atol=1e-4 rtol=1e-4
     @test r.x ≈ [1, 1/sqrt(2), 1] atol=1e-4 rtol=1e-4
     @test r.y ≈ [1, 1] atol=1e-4 rtol=1e-4
@@ -221,10 +209,9 @@ function _ellinf2(verbose::Bool, lscachetype)
     G = rand(6, 6)
     h = G*ones(6)
     cone = Hypatia.Cone([Hypatia.EllInfinityCone(6)], [1:6])
-    r = fullsolve(opt, c, A, b, G, h, cone, lscachetype)
+    r = solveandcheck(opt, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
     @test r.niters <= 25
-    @test r.pobj ≈ r.dobj atol=1e-4 rtol=1e-4
     @test r.pobj ≈ 1 atol=1e-4 rtol=1e-4
 end
 
@@ -236,10 +223,9 @@ function _ellinfdual1(verbose::Bool, lscachetype)
     G = SparseMatrixCSC(-1.0I, 3, 3)
     h = zeros(3)
     cone = Hypatia.Cone([Hypatia.EllInfinityCone(3)], [1:3], [true])
-    r = fullsolve(opt, c, A, b, G, h, cone, lscachetype)
+    r = solveandcheck(opt, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
     @test r.niters <= 25
-    @test r.pobj ≈ r.dobj atol=1e-4 rtol=1e-4
     @test r.pobj ≈ -1 atol=1e-4 rtol=1e-4
     @test r.x ≈ [1, -0.4, 0.6] atol=1e-4 rtol=1e-4
     @test r.y ≈ [1, 0] atol=1e-4 rtol=1e-4
@@ -254,10 +240,9 @@ function _ellinfdual2(verbose::Bool, lscachetype)
     G = rand(6, 6)
     h = G*ones(6)
     cone = Hypatia.Cone([Hypatia.EllInfinityCone(6)], [1:6], [true])
-    r = fullsolve(opt, c, A, b, G, h, cone, lscachetype)
+    r = solveandcheck(opt, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
     @test r.niters <= 20
-    @test r.pobj ≈ r.dobj atol=1e-4 rtol=1e-4
     @test r.pobj ≈ 1 atol=1e-4 rtol=1e-4
 end
 
@@ -272,9 +257,8 @@ function _ellinfdual3(verbose::Bool, lscachetype)
     h = zeros(2n+2); h[1] = 1.0; h[n+2] = 1.0
     opt = Hypatia.Optimizer(verbose=verbose)
     cone = Hypatia.Cone([Hypatia.EllInfinityCone(n+1), Hypatia.EllInfinityCone(n+1)], [1:n+1, n+2:2n+2], [true, false])
-    r = fullsolve(opt, c, A, b, G, h, cone, lscachetype)
+    r = solveandcheck(opt, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
-    @test r.pobj ≈ r.dobj atol=1e-4 rtol=1e-4
     @test r.pobj ≈ -6.0 atol=1e-4 rtol=1e-4
     @test r.x[2] ≈ 0.5 atol=1e-4 rtol=1e-4
     @test r.x[14] ≈ -0.5 atol=1e-4 rtol=1e-4
@@ -291,10 +275,9 @@ function _soc1(verbose::Bool, lscachetype)
     for usedual in [true, false]
         opt = Hypatia.Optimizer(verbose=verbose)
         cone = Hypatia.Cone([Hypatia.SecondOrderCone(3)], [1:3], [usedual])
-        r = fullsolve(opt, c, A, b, G, h, cone, lscachetype)
+        r = solveandcheck(opt, c, A, b, G, h, cone, lscachetype)
         @test r.status == :Optimal
         @test r.niters <= 20
-        @test r.pobj ≈ r.dobj atol=1e-4 rtol=1e-4
         @test r.pobj ≈ -sqrt(2) atol=1e-4 rtol=1e-4
         @test r.x ≈ [1, 1/sqrt(2), 1/sqrt(2)] atol=1e-4 rtol=1e-4
         @test r.y ≈ [sqrt(2), 0] atol=1e-4 rtol=1e-4
@@ -311,10 +294,9 @@ function _rsoc1(verbose::Bool, lscachetype)
     for usedual in [true, false]
         opt = Hypatia.Optimizer(verbose=verbose)
         cone = Hypatia.Cone([Hypatia.RotatedSecondOrderCone(4)], [1:4], [usedual])
-        r = fullsolve(opt, c, A, b, G, h, cone, lscachetype)
+        r = solveandcheck(opt, c, A, b, G, h, cone, lscachetype)
         @test r.status == :Optimal
         @test r.niters <= 20
-        @test r.pobj ≈ r.dobj atol=1e-4 rtol=1e-4
         @test r.pobj ≈ -sqrt(2) atol=1e-4 rtol=1e-4
         @test r.x[3:4] ≈ [1, 1]/sqrt(2) atol=1e-4 rtol=1e-4
     end
@@ -330,10 +312,9 @@ function _rsoc2(verbose::Bool, lscachetype)
     for usedual in [true, false]
         opt = Hypatia.Optimizer(verbose=verbose)
         cone = Hypatia.Cone([Hypatia.RotatedSecondOrderCone(3)], [1:3], [usedual])
-        r = fullsolve(opt, c, A, b, G, h, cone, lscachetype)
+        r = solveandcheck(opt, c, A, b, G, h, cone, lscachetype)
         @test r.status == :Optimal
         @test r.niters <= 20
-        @test r.pobj ≈ r.dobj atol=1e-4 rtol=1e-4
         @test r.pobj ≈ -1/sqrt(2) atol=1e-4 rtol=1e-4
         @test r.x[2] ≈ 1/sqrt(2) atol=1e-4 rtol=1e-4
     end
@@ -349,10 +330,9 @@ function _psd1(verbose::Bool, lscachetype)
     for usedual in [true, false]
         opt = Hypatia.Optimizer(verbose=verbose)
         cone = Hypatia.Cone([Hypatia.PositiveSemidefiniteCone(3)], [1:3], [usedual])
-        r = fullsolve(opt, c, A, b, G, h, cone, lscachetype)
+        r = solveandcheck(opt, c, A, b, G, h, cone, lscachetype)
         @test r.status == :Optimal
         @test r.niters <= 20
-        @test r.pobj ≈ r.dobj atol=1e-4 rtol=1e-4
         @test r.pobj ≈ -1 atol=1e-4 rtol=1e-4
         @test r.x[2] ≈ 1 atol=1e-4 rtol=1e-4
     end
@@ -368,10 +348,9 @@ function _psd2(verbose::Bool, lscachetype)
     for usedual in [true, false]
         opt = Hypatia.Optimizer(verbose=verbose)
         cone = Hypatia.Cone([Hypatia.PositiveSemidefiniteCone(6)], [1:6], [usedual])
-        r = fullsolve(opt, c, A, b, G, h, cone, lscachetype)
+        r = solveandcheck(opt, c, A, b, G, h, cone, lscachetype)
         @test r.status == :Optimal
         @test r.niters <= 20
-        @test r.pobj ≈ r.dobj atol=1e-4 rtol=1e-4
         @test r.pobj ≈ 1.249632 atol=1e-4 rtol=1e-4
         @test r.x ≈ [0.491545, 0.647333, 0.426249, 0.571161, 0.531874, 0.331838] atol=1e-4 rtol=1e-4
     end
@@ -385,10 +364,9 @@ function _exp1(verbose::Bool, lscachetype)
     G = SparseMatrixCSC(-1.0I, 3, 3)
     h = zeros(3)
     cone = Hypatia.Cone([Hypatia.ExponentialCone()], [1:3])
-    r = fullsolve(opt, c, A, b, G, h, cone, lscachetype)
+    r = solveandcheck(opt, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
     @test r.niters <= 20
-    @test r.pobj ≈ r.dobj atol=1e-4 rtol=1e-4
     @test r.pobj ≈ 2*exp(1/2)+3 atol=1e-4 rtol=1e-4
     @test r.x ≈ [1, 2, 2*exp(1/2)] atol=1e-4 rtol=1e-4
     @test r.y ≈ -[1+exp(1/2)/2, 1+exp(1/2)] atol=1e-4 rtol=1e-4
@@ -403,10 +381,9 @@ function _power1(verbose::Bool, lscachetype)
     G = SparseMatrixCSC(-1.0I, 6, 6)[[4, 1, 2, 5, 3, 6], :]
     h = zeros(6)
     cone = Hypatia.Cone([Hypatia.PowerCone([0.2, 0.8]), Hypatia.PowerCone([0.4, 0.6])], [1:3, 4:6])
-    r = fullsolve(opt, c, A, b, G, h, cone, lscachetype)
+    r = solveandcheck(opt, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
     @test r.niters <= 25
-    @test r.pobj ≈ r.dobj atol=1e-4 rtol=1e-4
     @test r.pobj ≈ -1.80734 atol=1e-4 rtol=1e-4
     @test r.x[1:3] ≈ [0.0639314, 0.783361, 2.30542] atol=1e-4 rtol=1e-4
 end
