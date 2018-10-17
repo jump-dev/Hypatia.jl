@@ -62,21 +62,21 @@ function run_lp()
     (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = Hypatia.preprocess_data(c, A, b, G, useQR=true)
     L = Hypatia.QRSymmCache(c1, A1, b1, G1, h, cone, Q2, RiQ1)
 
-    opt = Hypatia.Optimizer(maxiter=100, verbose=false)
-    Hypatia.load_data!(opt, c1, A1, b1, G1, h, cone, L)
-    Hypatia.solve!(opt)
+    mdl = Hypatia.Model(maxiter=100, verbose=false)
+    Hypatia.load_data!(mdl, c1, A1, b1, G1, h, cone, L)
+    Hypatia.solve!(mdl)
 
     x = zeros(length(c))
-    x[dukeep] = Hypatia.get_x(opt)
+    x[dukeep] = Hypatia.get_x(mdl)
     y = zeros(length(b))
-    y[prkeep] = Hypatia.get_y(opt)
-    s = Hypatia.get_s(opt)
-    z = Hypatia.get_z(opt)
+    y[prkeep] = Hypatia.get_y(mdl)
+    s = Hypatia.get_s(mdl)
+    z = Hypatia.get_z(mdl)
 
-    status = Hypatia.get_status(opt)
-    solvetime = Hypatia.get_solvetime(opt)
-    pobj = Hypatia.get_pobj(opt)
-    dobj = Hypatia.get_dobj(opt)
+    status = Hypatia.get_status(mdl)
+    solvetime = Hypatia.get_solvetime(mdl)
+    pobj = Hypatia.get_pobj(mdl)
+    dobj = Hypatia.get_dobj(mdl)
 
     # @show status
     # @show x
