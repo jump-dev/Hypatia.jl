@@ -12,9 +12,9 @@ using SparseArrays
 
 
 # TODO make first part a native interface function eventually
-# TODO maybe build a new high-level optimizer struct; the current optimizer struct is low-level
+# TODO maybe build a new high-level model struct; the current model struct is low-level
 function solveandcheck(
-    opt::Hypatia.Optimizer,
+    mdl::Hypatia.Model,
     c,
     A,
     b,
@@ -36,20 +36,20 @@ function solveandcheck(
     else
         error("linear system cache type $lscachetype is not recognized")
     end
-    Hypatia.load_data!(opt, c1, A1, b1, G1, h, cone, L)
-    Hypatia.solve!(opt)
+    Hypatia.load_data!(mdl, c1, A1, b1, G1, h, cone, L)
+    Hypatia.solve!(mdl)
 
     # construct solution
     x = zeros(length(c))
-    x[dukeep] = Hypatia.get_x(opt)
+    x[dukeep] = Hypatia.get_x(mdl)
     y = zeros(length(b))
-    y[prkeep] = Hypatia.get_y(opt)
-    s = Hypatia.get_s(opt)
-    z = Hypatia.get_z(opt)
-    pobj = Hypatia.get_pobj(opt)
-    dobj = Hypatia.get_dobj(opt)
+    y[prkeep] = Hypatia.get_y(mdl)
+    s = Hypatia.get_s(mdl)
+    z = Hypatia.get_z(mdl)
+    pobj = Hypatia.get_pobj(mdl)
+    dobj = Hypatia.get_dobj(mdl)
 
-    status = Hypatia.get_status(opt)
+    status = Hypatia.get_status(mdl)
 
     # check conic certificates are valid; conditions are described by CVXOPT at https://github.com/cvxopt/cvxopt/blob/master/src/python/coneprog.py
     if status == :Optimal
@@ -82,8 +82,8 @@ function solveandcheck(
         @test all(isnan, z)
     end
 
-    stime = Hypatia.get_solvetime(opt)
-    niters = Hypatia.get_niters(opt)
+    stime = Hypatia.get_solvetime(mdl)
+    niters = Hypatia.get_niters(mdl)
 
     return (x=x, y=y, s=s, z=z, pobj=pobj, dobj=dobj, status=status, stime=stime, niters=niters)
 end

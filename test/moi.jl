@@ -53,7 +53,7 @@ conic_exclude = [
 
 function testmoi(; verbose, lscachetype, usedense)
     optimizer = MOIU.CachingOptimizer(HypatiaModelData{Float64}(),
-        Hypatia.HypatiaOptimizer(
+        Hypatia.Optimizer(
             verbose = verbose,
             lscachetype = lscachetype,
             usedense = usedense,

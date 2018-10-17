@@ -4,7 +4,7 @@ Copyright 2018, David Papp, Sercan Yildiz
 =#
 
 # model object containing options, problem data, linear system cache, and solution
-mutable struct Optimizer
+mutable struct Model
     # options
     verbose::Bool           # if true, prints progress at each iteration
     tolrelopt::Float64      # relative optimality gap tolerance
@@ -45,31 +45,28 @@ mutable struct Optimizer
     pobj::Float64           # final primal objective value
     dobj::Float64           # final dual objective value
 
-    function Optimizer(verbose, tolrelopt, tolabsopt, tolfeas, maxiter, predlinesearch, maxpredsmallsteps, predlsmulti, corrcheck, maxcorrsteps, alphacorr, maxcorrlsiters, corrlsmulti)
-        opt = new()
-
-        opt.verbose = verbose
-        opt.tolrelopt = tolrelopt
-        opt.tolabsopt = tolabsopt
-        opt.tolfeas = tolfeas
-        opt.maxiter = maxiter
-        opt.predlinesearch = predlinesearch
-        opt.maxpredsmallsteps = maxpredsmallsteps
-        opt.predlsmulti = predlsmulti
-        opt.corrcheck = corrcheck
-        opt.maxcorrsteps = maxcorrsteps
-        opt.alphacorr = alphacorr
-        opt.maxcorrlsiters = maxcorrlsiters
-        opt.corrlsmulti = corrlsmulti
-
-        opt.status = :NotLoaded
-
-        return opt
+    function Model(verbose, tolrelopt, tolabsopt, tolfeas, maxiter, predlinesearch, maxpredsmallsteps, predlsmulti, corrcheck, maxcorrsteps, alphacorr, maxcorrlsiters, corrlsmulti)
+        mdl = new()
+        mdl.verbose = verbose
+        mdl.tolrelopt = tolrelopt
+        mdl.tolabsopt = tolabsopt
+        mdl.tolfeas = tolfeas
+        mdl.maxiter = maxiter
+        mdl.predlinesearch = predlinesearch
+        mdl.maxpredsmallsteps = maxpredsmallsteps
+        mdl.predlsmulti = predlsmulti
+        mdl.corrcheck = corrcheck
+        mdl.maxcorrsteps = maxcorrsteps
+        mdl.alphacorr = alphacorr
+        mdl.maxcorrlsiters = maxcorrlsiters
+        mdl.corrlsmulti = corrlsmulti
+        mdl.status = :NotLoaded
+        return mdl
     end
 end
 
 # initialize a model object
-function Optimizer(;
+function Model(;
     verbose = false,
     tolrelopt = 1e-6,
     tolabsopt = 1e-7,
@@ -84,7 +81,6 @@ function Optimizer(;
     maxcorrlsiters = 15,
     corrlsmulti = 0.5,
     )
-
     if min(tolrelopt, tolabsopt, tolfeas) < 1e-10 || max(tolrelopt, tolabsopt, tolfeas) > 1e-2
         error("tolrelopt, tolabsopt, tolfeas must be between 1e-10 and 1e-2")
     end
@@ -98,24 +94,24 @@ function Optimizer(;
         error("maxcorrsteps must be at least 1")
     end
 
-    return Optimizer(verbose, tolrelopt, tolabsopt, tolfeas, maxiter, predlinesearch, maxpredsmallsteps, predlsmulti, corrcheck, maxcorrsteps, alphacorr, maxcorrlsiters, corrlsmulti)
+    return Model(verbose, tolrelopt, tolabsopt, tolfeas, maxiter, predlinesearch, maxpredsmallsteps, predlsmulti, corrcheck, maxcorrsteps, alphacorr, maxcorrlsiters, corrlsmulti)
 end
 
-get_status(opt::Optimizer) = opt.status
-get_solvetime(opt::Optimizer) = opt.solvetime
-get_niters(opt::Optimizer) = opt.niters
+get_status(mdl::Model) = mdl.status
+get_solvetime(mdl::Model) = mdl.solvetime
+get_niters(mdl::Model) = mdl.niters
 
-get_x(opt::Optimizer) = copy(opt.x)
-get_s(opt::Optimizer) = copy(opt.s)
-get_y(opt::Optimizer) = copy(opt.y)
-get_z(opt::Optimizer) = copy(opt.z)
+get_x(mdl::Model) = copy(mdl.x)
+get_s(mdl::Model) = copy(mdl.s)
+get_y(mdl::Model) = copy(mdl.y)
+get_z(mdl::Model) = copy(mdl.z)
 
-get_tau(opt::Optimizer) = opt.tau
-get_kappa(opt::Optimizer) = opt.kappa
-get_mu(opt::Optimizer) = opt.mu
+get_tau(mdl::Model) = mdl.tau
+get_kappa(mdl::Model) = mdl.kappa
+get_mu(mdl::Model) = mdl.mu
 
-get_pobj(opt::Optimizer) = dot(opt.c, opt.x)
-get_dobj(opt::Optimizer) = -dot(opt.b, opt.y) - dot(opt.h, opt.z)
+get_pobj(mdl::Model) = dot(mdl.c, mdl.x)
+get_dobj(mdl::Model) = -dot(mdl.b, mdl.y) - dot(mdl.h, mdl.z)
 
 # check data for consistency
 function check_data(
@@ -126,7 +122,6 @@ function check_data(
     h::Vector{Float64},
     cone::Cone,
     )
-
     (n, p, q) = (length(c), length(b), length(h))
     if n == 0
         error("c vector is empty, but number of variables must be positive")
@@ -173,7 +168,6 @@ function preprocess_data(
     tol::Float64 = 1e-13, # presolve tolerance
     useQR::Bool = false, # returns QR fact of A' for use in a QR-based linear system solver
     )
-
     (n, p) = (length(c), length(b))
     q = size(G, 1)
 
@@ -281,13 +275,12 @@ function preprocess_data(
 
     A = A1
     b = b1
-
     return (c, A, b, G, prkeep, dukeep, AQ2, ARiQ1)
 end
 
 # verify problem data and load into model object
 function load_data!(
-    opt::Optimizer,
+    mdl::Model,
     c::Vector{Float64},
     A::AbstractMatrix{Float64},
     b::Vector{Float64},
@@ -296,24 +289,15 @@ function load_data!(
     cone::Cone,
     L::LinSysCache, # linear system solver cache (see linsyssolvers folder)
     )
-
-    opt.c = c
-    opt.A = A
-    opt.b = b
-    opt.G = G
-    opt.h = h
-    opt.cone = cone
-    opt.L = L
-    opt.status = :Loaded
-
-    return opt
+    (mdl.c, mdl.A, mdl.b, mdl.G, mdl.h, mdl.cone, mdl.L) = (c, A, b, G, h, cone, L)
+    mdl.status = :Loaded
+    return mdl
 end
 
 # solve using predictor-corrector algorithm based on homogeneous self-dual embedding
-function solve!(opt::Optimizer)
+function solve!(mdl::Model)
     starttime = time()
-
-    (c, A, b, G, h, cone) = (opt.c, opt.A, opt.b, opt.G, opt.h, opt.cone)
+    (c, A, b, G, h, cone, L) = (mdl.c, mdl.A, mdl.b, mdl.G, mdl.h, mdl.cone, mdl.L)
     (n, p, q) = (length(c), length(b), length(h))
     bnu = 1.0 + barrierpar(cone) # complexity parameter nu-bar of the augmented barrier (sum of the primitive cone barrier parameters plus 1)
 
@@ -337,7 +321,7 @@ function solve!(opt::Optimizer)
     tmp_ts = similar(ts)
 
     # find initial primal-dual iterate
-    opt.verbose && println("\nfinding initial iterate")
+    mdl.verbose && println("\nfinding initial iterate")
 
     # TODO scale like in alfonso?
     getinitsz!(ls_ts, ls_tz, cone)
@@ -361,7 +345,7 @@ function solve!(opt::Optimizer)
     @. @views tx = txty[1:n]
     @. @views ty = txty[n+1:end]
 
-    opt.verbose && println("initial iterate found")
+    mdl.verbose && println("initial iterate found")
 
     # calculate tolerances for convergence
     tol_res_tx = inv(max(1.0, norm(c)))
@@ -369,19 +353,19 @@ function solve!(opt::Optimizer)
     tol_res_tz = inv(max(1.0, norm(h)))
 
     # calculate prediction and correction step parameters
-    (beta, eta, cpredfix) = getbetaeta(opt.maxcorrsteps, bnu) # beta: large neighborhood parameter, eta: small neighborhood parameter
+    (beta, eta, cpredfix) = getbetaeta(mdl.maxcorrsteps, bnu) # beta: large neighborhood parameter, eta: small neighborhood parameter
     alphapredfix = cpredfix/(eta + sqrt(2*eta^2 + bnu)) # fixed predictor step size
-    alphapredthres = (opt.predlsmulti^opt.maxpredsmallsteps)*alphapredfix # minimum predictor step size
-    alphapredinit = (opt.predlinesearch ? min(100*alphapredfix, 0.9999) : alphapredfix) # predictor step size
+    alphapredthres = (mdl.predlsmulti^mdl.maxpredsmallsteps)*alphapredfix # minimum predictor step size
+    alphapredinit = (mdl.predlinesearch ? min(100*alphapredfix, 0.9999) : alphapredfix) # predictor step size
 
     # main loop
-    if opt.verbose
+    if mdl.verbose
         println("starting iteration")
         @printf("\n%5s %12s %12s %9s %9s %9s %9s %9s %9s %9s\n", "iter", "p_obj", "d_obj", "abs_gap", "rel_gap", "p_inf", "d_inf", "tau", "kap", "mu")
         flush(stdout)
     end
 
-    opt.status = :StartedIterating
+    mdl.status = :StartedIterating
     alphapred = alphapredinit
     iter = 0
     while true
@@ -437,7 +421,7 @@ function solve!(opt::Optimizer)
             infres_du = NaN
         end
 
-        if opt.verbose
+        if mdl.verbose
             # print iteration statistics
             @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n", iter, obj_pr, obj_du, gap, relgap, nres_pr, nres_du, tau, kap, mu)
             flush(stdout)
@@ -445,51 +429,51 @@ function solve!(opt::Optimizer)
 
         # check convergence criteria
         # TODO nearly primal or dual infeasible or nearly optimal cases?
-        if nres_pr <= opt.tolfeas && nres_du <= opt.tolfeas && (gap <= opt.tolabsopt || (!isnan(relgap) && relgap <= opt.tolrelopt))
-            opt.verbose && println("optimal solution found; terminating")
-            opt.status = :Optimal
-            opt.x = tx .*= invtau
-            opt.s = ts .*= invtau
-            opt.y = ty .*= invtau
-            opt.z = tz .*= invtau
+        if nres_pr <= mdl.tolfeas && nres_du <= mdl.tolfeas && (gap <= mdl.tolabsopt || (!isnan(relgap) && relgap <= mdl.tolrelopt))
+            mdl.verbose && println("optimal solution found; terminating")
+            mdl.status = :Optimal
+            mdl.x = tx .*= invtau
+            mdl.s = ts .*= invtau
+            mdl.y = ty .*= invtau
+            mdl.z = tz .*= invtau
             break
-        elseif !isnan(infres_pr) && infres_pr <= opt.tolfeas
-            opt.verbose && println("primal infeasibility detected; terminating")
-            opt.status = :PrimalInfeasible
+        elseif !isnan(infres_pr) && infres_pr <= mdl.tolfeas
+            mdl.verbose && println("primal infeasibility detected; terminating")
+            mdl.status = :PrimalInfeasible
             invobj = inv(-by - hz)
-            opt.x = tx .= NaN
-            opt.s = ts .= NaN
-            opt.y = ty .*= invobj
-            opt.z = tz .*= invobj
+            mdl.x = tx .= NaN
+            mdl.s = ts .= NaN
+            mdl.y = ty .*= invobj
+            mdl.z = tz .*= invobj
             break
-        elseif !isnan(infres_du) && infres_du <= opt.tolfeas
-            opt.verbose && println("dual infeasibility detected; terminating")
-            opt.status = :DualInfeasible
+        elseif !isnan(infres_du) && infres_du <= mdl.tolfeas
+            mdl.verbose && println("dual infeasibility detected; terminating")
+            mdl.status = :DualInfeasible
             invobj = inv(-cx)
-            opt.x = tx .*= invobj
-            opt.s = ts .*= invobj
-            opt.y = ty .= NaN
-            opt.z = tz .= NaN
+            mdl.x = tx .*= invobj
+            mdl.s = ts .*= invobj
+            mdl.y = ty .= NaN
+            mdl.z = tz .= NaN
             break
-        elseif mu <= opt.tolfeas*1e-2 && tau <= opt.tolfeas*1e-2*min(1.0, kap)
-            opt.verbose && println("ill-posedness detected; terminating")
-            opt.status = :IllPosed
-            opt.x = tx .= NaN
-            opt.s = ts .= NaN
-            opt.y = ty .= NaN
-            opt.z = tz .= NaN
+        elseif mu <= mdl.tolfeas*1e-2 && tau <= mdl.tolfeas*1e-2*min(1.0, kap)
+            mdl.verbose && println("ill-posedness detected; terminating")
+            mdl.status = :IllPosed
+            mdl.x = tx .= NaN
+            mdl.s = ts .= NaN
+            mdl.y = ty .= NaN
+            mdl.z = tz .= NaN
             break
         end
 
         # check iteration limit
         iter += 1
-        if iter >= opt.maxiter
-            opt.verbose && println("iteration limit reached; terminating")
-            opt.status = :IterationLimit
-            opt.x = tx .*= invtau
-            opt.s = ts .*= invtau
-            opt.y = ty .*= invtau
-            opt.z = tz .*= invtau
+        if iter >= mdl.maxiter
+            mdl.verbose && println("iteration limit reached; terminating")
+            mdl.status = :IterationLimit
+            mdl.x = tx .*= invtau
+            mdl.s = ts .*= invtau
+            mdl.y = ty .*= invtau
+            mdl.z = tz .*= invtau
             break
         end
 
@@ -502,7 +486,7 @@ function solve!(opt::Optimizer)
             (v1, v2) = (cone.useduals[k] ? (ts, tz) : (tz, ts))
             @. @views tmp_tz[cone.idxs[k]] = -v1[cone.idxs[k]]
         end
-        (tmp_kap, tmp_tau) = solvelinsys6!(tmp_tx, tmp_ty, tmp_tz, -kap, tmp_ts, kap + cx + by + hz, mu, tau, opt.L)
+        (tmp_kap, tmp_tau) = solvelinsys6!(tmp_tx, tmp_ty, tmp_tz, -kap, tmp_ts, kap + cx + by + hz, mu, tau, L)
 
         # determine step length alpha by line search
         alpha = alphapred
@@ -535,16 +519,16 @@ function solve!(opt::Optimizer)
 
                 if nbhd < abs2(beta*ls_mu)
                     # iterate is inside the beta-neighborhood
-                    if !alphaprevok || (alpha > opt.predlsmulti)
+                    if !alphaprevok || (alpha > mdl.predlsmulti)
                         # either the previous iterate was outside the beta-neighborhood or increasing alpha again will make it > 1
-                        if opt.predlinesearch
+                        if mdl.predlinesearch
                             alphapred = alpha
                         end
                         break
                     end
 
                     alphaprevok = true
-                    alpha = alpha/opt.predlsmulti # increase alpha
+                    alpha = alpha/mdl.predlsmulti # increase alpha
                     continue
                 end
             end
@@ -555,19 +539,19 @@ function solve!(opt::Optimizer)
             if alpha < alphapredthres
                 # alpha is very small, so predictor has failed
                 predfail = true
-                opt.verbose && println("predictor could not improve the solution ($nprediters line search steps); terminating")
+                mdl.verbose && println("predictor could not improve the solution ($nprediters line search steps); terminating")
                 break
             end
 
             alphaprevok = false
-            alpha = opt.predlsmulti*alpha # decrease alpha
+            alpha = mdl.predlsmulti*alpha # decrease alpha
         end
         if predfail
-            opt.status = :PredictorFail
-            opt.x = tx .*= invtau
-            opt.s = ts .*= invtau
-            opt.y = ty .*= invtau
-            opt.z = tz .*= invtau
+            mdl.status = :PredictorFail
+            mdl.x = tx .*= invtau
+            mdl.s = ts .*= invtau
+            mdl.y = ty .*= invtau
+            mdl.z = tz .*= invtau
             break
         end
 
@@ -586,7 +570,7 @@ function solve!(opt::Optimizer)
         @assert mu >= 0.0
 
         # skip correction phase if allowed and current iterate is in the eta-neighborhood
-        if opt.corrcheck && (nbhd < abs2(eta*mu))
+        if mdl.corrcheck && (nbhd < abs2(eta*mu))
             continue
         end
 
@@ -606,12 +590,12 @@ function solve!(opt::Optimizer)
             calcg!(g, cone)
             @. tmp_tz -= mu*g
             @. tmp_ts = 0.0
-            (tmp_kap, tmp_tau) = solvelinsys6!(tmp_tx, tmp_ty, tmp_tz, -kap + mu/tau, tmp_ts, 0.0, mu, tau, opt.L)
+            (tmp_kap, tmp_tau) = solvelinsys6!(tmp_tx, tmp_ty, tmp_tz, -kap + mu/tau, tmp_ts, 0.0, mu, tau, L)
 
             # determine step length alpha by line search
-            alpha = opt.alphacorr
+            alpha = mdl.alphacorr
             ncorrlsiters = 0
-            while ncorrlsiters <= opt.maxcorrlsiters
+            while ncorrlsiters <= mdl.maxcorrlsiters
                 ncorrlsiters += 1
 
                 @. ls_ts = ts + alpha*tmp_ts
@@ -623,14 +607,14 @@ function solve!(opt::Optimizer)
                 end
 
                 # primal iterate tx is outside the cone
-                if ncorrlsiters == opt.maxcorrlsiters
+                if ncorrlsiters == mdl.maxcorrlsiters
                     # corrector failed
                     corrfail = true
-                    opt.verbose && println("corrector could not improve the solution ($ncorrlsiters line search steps); terminating")
+                    mdl.verbose && println("corrector could not improve the solution ($ncorrlsiters line search steps); terminating")
                     break
                 end
 
-                alpha = opt.corrlsmulti*alpha # decrease alpha
+                alpha = mdl.corrlsmulti*alpha # decrease alpha
             end
             if corrfail
                 break
@@ -648,39 +632,39 @@ function solve!(opt::Optimizer)
             mu = (dot(ts, tz) + tau*kap)/bnu
 
             # finish if allowed and current iterate is in the eta-neighborhood, or if taken max steps
-            if (ncorrsteps == opt.maxcorrsteps) || opt.corrcheck
+            if (ncorrsteps == mdl.maxcorrsteps) || mdl.corrcheck
                 nbhd = calcnbhd!(g, ls_ts, ls_tz, mu, cone) + (tau*kap - mu)^2
                 @. ls_ts = ts
                 @. ls_tz = tz
                 if nbhd <= abs2(eta*mu)
                     break
-                elseif ncorrsteps == opt.maxcorrsteps
+                elseif ncorrsteps == mdl.maxcorrsteps
                     # outside eta neighborhood, so corrector failed
                     corrfail = true
-                    opt.verbose && println("corrector phase finished outside the eta-neighborhood ($ncorrsteps correction steps); terminating")
+                    mdl.verbose && println("corrector phase finished outside the eta-neighborhood ($ncorrsteps correction steps); terminating")
                     break
                 end
             end
         end
         if corrfail
-            opt.status = :CorrectorFail
+            mdl.status = :CorrectorFail
             invtau = inv(tau)
-            opt.x = tx .*= invtau
-            opt.s = ts .*= invtau
-            opt.y = ty .*= invtau
-            opt.z = tz .*= invtau
+            mdl.x = tx .*= invtau
+            mdl.s = ts .*= invtau
+            mdl.y = ty .*= invtau
+            mdl.z = tz .*= invtau
             break
         end
     end
 
-    opt.verbose && println("\nfinished in $iter iterations; internal status is $(opt.status)\n")
+    mdl.verbose && println("\nfinished in $iter iterations; internal status is $(mdl.status)\n")
 
     # calculate solution and iteration statistics
-    opt.niters = iter
-    opt.tau = tau
-    opt.kap = kap
-    opt.mu = mu
-    opt.solvetime = time() - starttime
+    mdl.niters = iter
+    mdl.tau = tau
+    mdl.kap = kap
+    mdl.mu = mu
+    mdl.solvetime = time() - starttime
 
     return nothing
 end
