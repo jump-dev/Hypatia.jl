@@ -38,7 +38,6 @@ config = MOIT.TestConfig(
     )
 
 unit_exclude = [
-    "solve_blank_obj", # TODO fix this?
     "solve_qcp_edge_cases",
     "solve_qp_edge_cases",
     "solve_integer_edge_cases",
