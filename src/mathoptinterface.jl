@@ -2,8 +2,8 @@
 Copyright 2018, Chris Coey and contributors
 =#
 
-mutable struct HypatiaOptimizer <: MOI.AbstractOptimizer
-    opt::Optimizer
+mutable struct Optimizer <: MOI.AbstractOptimizer
+    mdl::Model
     verbose::Bool
     lscachetype
     usedense::Bool
@@ -31,31 +31,31 @@ mutable struct HypatiaOptimizer <: MOI.AbstractOptimizer
     pobj::Float64
     dobj::Float64
 
-    function HypatiaOptimizer(opt::Optimizer, verbose::Bool, lscachetype, usedense::Bool)
-        moiopt = new()
-        moiopt.opt = opt
-        moiopt.verbose = verbose
-        moiopt.lscachetype = lscachetype
-        moiopt.usedense = usedense
-        return moiopt
+    function Optimizer(mdl::Model, verbose::Bool, lscachetype, usedense::Bool)
+        opt = new()
+        opt.mdl = mdl
+        opt.verbose = verbose
+        opt.lscachetype = lscachetype
+        opt.usedense = usedense
+        return opt
     end
 end
 
-HypatiaOptimizer(;
+Optimizer(;
     verbose::Bool = false,
     lscachetype = QRSymmCache,
     usedense::Bool = true,
     tolrelopt::Float64 = 1e-6,
     tolabsopt::Float64 = 1e-7,
     tolfeas::Float64 = 1e-7,
-    ) = HypatiaOptimizer(Optimizer(verbose=verbose, tolrelopt=tolrelopt, tolabsopt=tolabsopt, tolfeas=tolfeas), verbose, lscachetype, usedense)
+    ) = Optimizer(Model(verbose=verbose, tolrelopt=tolrelopt, tolabsopt=tolabsopt, tolfeas=tolfeas), verbose, lscachetype, usedense)
 
-MOI.get(::HypatiaOptimizer, ::MOI.SolverName) = "Hypatia"
+MOI.get(::Optimizer, ::MOI.SolverName) = "Hypatia"
 
-MOI.is_empty(moiopt::HypatiaOptimizer) = (get_status(moiopt.opt) == :NotLoaded)
-MOI.empty!(moiopt::HypatiaOptimizer) = HypatiaOptimizer() # TODO empty the data and results, or just create a new one? keep options?
+MOI.is_empty(opt::Optimizer) = (get_status(opt.mdl) == :NotLoaded)
+MOI.empty!(opt::Optimizer) = Optimizer() # TODO empty the data and results, or just create a new one? keep options?
 
-MOI.supports(::HypatiaOptimizer, ::Union{
+MOI.supports(::Optimizer, ::Union{
     MOI.ObjectiveSense,
     MOI.ObjectiveFunction{MOI.SingleVariable},
     MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}},
@@ -84,7 +84,7 @@ const SupportedSets = Union{
     # MOI.PowerCone,
     }
 
-MOI.supports_constraint(::HypatiaOptimizer, ::Type{<:SupportedFuns}, ::Type{<:SupportedSets}) = true
+MOI.supports_constraint(::Optimizer, ::Type{<:SupportedFuns}, ::Type{<:SupportedSets}) = true
 
 conefrommoi(s::MOI.SecondOrderCone) = SecondOrderCone(MOI.dimension(s))
 conefrommoi(s::MOI.RotatedSecondOrderCone) = RotatedSecondOrderCone(MOI.dimension(s))
@@ -95,7 +95,7 @@ conefrommoi(s::MOI.ExponentialCone) = ExponentialCone()
 # build representation as min c'x s.t. Ax = b, x in K
 # TODO what if some variables x are in multiple cone constraints?
 function MOI.copy_to(
-    moiopt::HypatiaOptimizer,
+    opt::Optimizer,
     src::MOI.ModelLike;
     copy_names::Bool = false,
     warn_attributes::Bool = true,
@@ -115,7 +115,12 @@ function MOI.copy_to(
     @assert j == n
 
     # objective function
-    obj = MOI.get(src, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}())
+    F = MOI.get(src, MOI.ObjectiveFunctionType())
+    if F == MOI.SingleVariable # TODO make sure this is tested by MOI.Test in future
+        obj = MOI.ScalarAffineFunction{Float64}(MOI.get(src, MOI.ObjectiveFunction{F}()))
+    elseif F == MOI.ScalarAffineFunction{Float64}
+        obj = MOI.get(src, MOI.ObjectiveFunction{F}())
+    end
     (Jc, Vc) = (Int[], Float64[])
     for t in obj.terms
         push!(Jc, idxmap[t.variable_index].value)
@@ -124,9 +129,9 @@ function MOI.copy_to(
     if MOI.get(src, MOI.ObjectiveSense()) == MOI.MaxSense
         Vc .*= -1.0
     end
-    moiopt.objconst = obj.constant
-    moiopt.objsense = MOI.get(src, MOI.ObjectiveSense())
-    moiopt.c = Vector(sparsevec(Jc, Vc, n))
+    opt.objconst = obj.constant
+    opt.objsense = MOI.get(src, MOI.ObjectiveSense())
+    opt.c = Vector(sparsevec(Jc, Vc, n))
 
     # constraints
     getsrccons(F, S) = MOI.get(src, MOI.ListOfConstraintIndices{F, S}())
@@ -138,7 +143,7 @@ function MOI.copy_to(
     p = 0 # rows of A (equality constraint matrix)
     (IA, JA, VA) = (Int[], Int[], Float64[])
     (Ib, Vb) = (Int[], Float64[])
-    (Icpe, Vcpe) = (Int[], Float64[]) # constraint set constants for moiopt.constrprimeq
+    (Icpe, Vcpe) = (Int[], Float64[]) # constraint set constants for opt.constrprimeq
     constroffseteq = Vector{Int}()
 
     for S in (MOI.EqualTo{Float64}, MOI.Zeros)
@@ -211,21 +216,21 @@ function MOI.copy_to(
     end
 
     push!(constroffseteq, p)
-    if moiopt.usedense
-        moiopt.A = Matrix(sparse(IA, JA, VA, p, n))
+    if opt.usedense
+        opt.A = Matrix(sparse(IA, JA, VA, p, n))
     else
-        moiopt.A = dropzeros!(sparse(IA, JA, VA, p, n))
+        opt.A = dropzeros!(sparse(IA, JA, VA, p, n))
     end
-    moiopt.b = Vector(sparsevec(Ib, Vb, p)) # TODO if type less strongly, this can be sparse too
-    moiopt.numeqconstrs = i
-    moiopt.constrprimeq = Vector(sparsevec(Icpe, Vcpe, p))
-    moiopt.constroffseteq = constroffseteq
+    opt.b = Vector(sparsevec(Ib, Vb, p)) # TODO if type less strongly, this can be sparse too
+    opt.numeqconstrs = i
+    opt.constrprimeq = Vector(sparsevec(Icpe, Vcpe, p))
+    opt.constroffseteq = constroffseteq
 
     # conic constraints
     q = 0 # rows of G (cone constraint matrix)
     (IG, JG, VG) = (Int[], Int[], Float64[])
     (Ih, Vh) = (Int[], Float64[])
-    (Icpc, Vcpc) = (Int[], Float64[]) # constraint set constants for moiopt.constrprimeq
+    (Icpc, Vcpc) = (Int[], Float64[]) # constraint set constants for opt.constrprimeq
     constroffsetcone = Vector{Int}()
     cone = Cone()
 
@@ -429,8 +434,8 @@ function MOI.copy_to(
         intervalscales[intervalcount] = scal
     end
 
-    moiopt.intervalidxs = intervalstart+2:q
-    moiopt.intervalscales = intervalscales
+    opt.intervalidxs = intervalstart+2:q
+    opt.intervalscales = intervalscales
     if q > intervalstart
         # exists at least one interval-type constraint
         addprimitivecone!(cone, EllInfinityCone(q - intervalstart), intervalstart+1:q)
@@ -478,183 +483,183 @@ function MOI.copy_to(
     end
 
     push!(constroffsetcone, q)
-    if moiopt.usedense
-        moiopt.G = Matrix(sparse(IG, JG, VG, q, n))
+    if opt.usedense
+        opt.G = Matrix(sparse(IG, JG, VG, q, n))
     else
-        moiopt.G = dropzeros!(sparse(IG, JG, VG, q, n))
+        opt.G = dropzeros!(sparse(IG, JG, VG, q, n))
     end
-    moiopt.h = Vector(sparsevec(Ih, Vh, q))
-    moiopt.cone = cone
-    moiopt.constroffsetcone = constroffsetcone
-    moiopt.constrprimcone = Vector(sparsevec(Icpc, Vcpc, q))
+    opt.h = Vector(sparsevec(Ih, Vh, q))
+    opt.cone = cone
+    opt.constroffsetcone = constroffsetcone
+    opt.constrprimcone = Vector(sparsevec(Icpc, Vcpc, q))
 
     return idxmap
 end
 
-function MOI.optimize!(moiopt::HypatiaOptimizer)
-    opt = moiopt.opt
-    (c, A, b, G, h, cone) = (moiopt.c, moiopt.A, moiopt.b, moiopt.G, moiopt.h, moiopt.cone)
+function MOI.optimize!(opt::Optimizer)
+    mdl = opt.mdl
+    (c, A, b, G, h, cone) = (opt.c, opt.A, opt.b, opt.G, opt.h, opt.cone)
 
     # check, preprocess, load, and solve
     check_data(c, A, b, G, h, cone)
-    if moiopt.lscachetype == QRSymmCache
+    if opt.lscachetype == QRSymmCache
         (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = preprocess_data(c, A, b, G, useQR=true)
         L = QRSymmCache(c1, A1, b1, G1, h, cone, Q2, RiQ1)
-    elseif moiopt.lscachetype == NaiveCache
+    elseif opt.lscachetype == NaiveCache
         (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = preprocess_data(c, A, b, G, useQR=false)
         L = NaiveCache(c1, A1, b1, G1, h, cone)
     else
-        error("linear system cache type $(moiopt.lscachetype) is not recognized")
+        error("linear system cache type $(opt.lscachetype) is not recognized")
     end
-    load_data!(opt, c1, A1, b1, G1, h, cone, L)
-    solve!(opt)
+    load_data!(mdl, c1, A1, b1, G1, h, cone, L)
+    solve!(mdl)
 
-    moiopt.x = zeros(length(c))
-    moiopt.x[dukeep] = get_x(opt)
-    moiopt.constrprimeq += moiopt.b - moiopt.A*moiopt.x
-    moiopt.y = zeros(length(b))
-    moiopt.y[prkeep] = get_y(opt)
+    opt.x = zeros(length(c))
+    opt.x[dukeep] = get_x(mdl)
+    opt.constrprimeq += opt.b - opt.A*opt.x
+    opt.y = zeros(length(b))
+    opt.y[prkeep] = get_y(mdl)
 
-    moiopt.s = get_s(opt)
-    moiopt.s[moiopt.intervalidxs] ./= moiopt.intervalscales
-    moiopt.constrprimcone += moiopt.s
-    moiopt.z = get_z(opt)
-    moiopt.z[moiopt.intervalidxs] .*= moiopt.intervalscales
+    opt.s = get_s(mdl)
+    opt.s[opt.intervalidxs] ./= opt.intervalscales
+    opt.constrprimcone += opt.s
+    opt.z = get_z(mdl)
+    opt.z[opt.intervalidxs] .*= opt.intervalscales
 
-    moiopt.pobj = get_pobj(opt)
-    moiopt.dobj = get_dobj(opt)
+    opt.pobj = get_pobj(mdl)
+    opt.dobj = get_dobj(mdl)
 
-    moiopt.status = get_status(opt)
-    moiopt.solvetime = get_solvetime(opt)
+    opt.status = get_status(mdl)
+    opt.solvetime = get_solvetime(mdl)
 
     return nothing
 end
 
-# function MOI.free!(moiopt::HypatiaOptimizer) # TODO call gc on moiopt.opt?
+# function MOI.free!(opt::Optimizer) # TODO call gc on opt.mdl?
 
-function MOI.get(moiopt::HypatiaOptimizer, ::MOI.TerminationStatus)
+function MOI.get(opt::Optimizer, ::MOI.TerminationStatus)
     # TODO time limit etc
-    if moiopt.status in (:Optimal, :PrimalInfeasible, :DualInfeasible, :IllPosed)
+    if opt.status in (:Optimal, :PrimalInfeasible, :DualInfeasible, :IllPosed)
         return MOI.Success
-    elseif moiopt.status in (:PredictorFail, :CorrectorFail)
+    elseif opt.status in (:PredictorFail, :CorrectorFail)
         return MOI.NumericalError
-    elseif moiopt.status == :IterationLimit
+    elseif opt.status == :IterationLimit
         return MOI.IterationLimit
     else
         return MOI.OtherError
     end
 end
 
-function MOI.get(moiopt::HypatiaOptimizer, ::MOI.ObjectiveValue)
-    if moiopt.objsense == MOI.MinSense
-        return moiopt.pobj + moiopt.objconst
-    elseif moiopt.objsense == MOI.MaxSense
-        return -moiopt.pobj + moiopt.objconst
+function MOI.get(opt::Optimizer, ::MOI.ObjectiveValue)
+    if opt.objsense == MOI.MinSense
+        return opt.pobj + opt.objconst
+    elseif opt.objsense == MOI.MaxSense
+        return -opt.pobj + opt.objconst
     else
         error("no objective sense is set")
     end
 end
 
-function MOI.get(moiopt::HypatiaOptimizer, ::MOI.ObjectiveBound)
-    if moiopt.objsense == MOI.MinSense
-        return moiopt.dobj + moiopt.objconst
-    elseif moiopt.objsense == MOI.MaxSense
-        return -moiopt.dobj + moiopt.objconst
+function MOI.get(opt::Optimizer, ::MOI.ObjectiveBound)
+    if opt.objsense == MOI.MinSense
+        return opt.dobj + opt.objconst
+    elseif opt.objsense == MOI.MaxSense
+        return -opt.dobj + opt.objconst
     else
         error("no objective sense is set")
     end
 end
 
-function MOI.get(moiopt::HypatiaOptimizer, ::MOI.ResultCount)
-    if moiopt.status in (:Optimal, :PrimalInfeasible, :DualInfeasible, :IllPosed)
+function MOI.get(opt::Optimizer, ::MOI.ResultCount)
+    if opt.status in (:Optimal, :PrimalInfeasible, :DualInfeasible, :IllPosed)
         return 1
     end
     return 0
 end
 
-function MOI.get(moiopt::HypatiaOptimizer, ::MOI.PrimalStatus)
-    if moiopt.status == :Optimal
+function MOI.get(opt::Optimizer, ::MOI.PrimalStatus)
+    if opt.status == :Optimal
         return MOI.FeasiblePoint
-    elseif moiopt.status == :PrimalInfeasible
+    elseif opt.status == :PrimalInfeasible
         return MOI.InfeasiblePoint
-    elseif moiopt.status == :DualInfeasible
+    elseif opt.status == :DualInfeasible
         return MOI.InfeasibilityCertificate
-    elseif moiopt.status == :IllPosed
+    elseif opt.status == :IllPosed
         return MOI.UnknownResultStatus # TODO later distinguish primal/dual ill posed certificates
     else
         return MOI.UnknownResultStatus
     end
 end
 
-function MOI.get(moiopt::HypatiaOptimizer, ::MOI.DualStatus)
-    if moiopt.status == :Optimal
+function MOI.get(opt::Optimizer, ::MOI.DualStatus)
+    if opt.status == :Optimal
         return MOI.FeasiblePoint
-    elseif moiopt.status == :PrimalInfeasible
+    elseif opt.status == :PrimalInfeasible
         return MOI.InfeasibilityCertificate
-    elseif moiopt.status == :DualInfeasible
+    elseif opt.status == :DualInfeasible
         return MOI.InfeasiblePoint
-    elseif moiopt.status == :IllPosed
+    elseif opt.status == :IllPosed
         return MOI.UnknownResultStatus # TODO later distinguish primal/dual ill posed certificates
     else
         return MOI.UnknownResultStatus
     end
 end
 
-MOI.get(moiopt::HypatiaOptimizer, ::MOI.VariablePrimal, vi::MOI.VariableIndex) = moiopt.x[vi.value]
-MOI.get(moiopt::HypatiaOptimizer, a::MOI.VariablePrimal, vi::Vector{MOI.VariableIndex}) = MOI.get.(moiopt, a, vi)
+MOI.get(opt::Optimizer, ::MOI.VariablePrimal, vi::MOI.VariableIndex) = opt.x[vi.value]
+MOI.get(opt::Optimizer, a::MOI.VariablePrimal, vi::Vector{MOI.VariableIndex}) = MOI.get.(opt, a, vi)
 
-function MOI.get(moiopt::HypatiaOptimizer, ::MOI.ConstraintDual, ci::MOI.ConstraintIndex{F, S}) where {F <: MOI.AbstractFunction, S <: MOI.AbstractScalarSet}
+function MOI.get(opt::Optimizer, ::MOI.ConstraintDual, ci::MOI.ConstraintIndex{F, S}) where {F <: MOI.AbstractFunction, S <: MOI.AbstractScalarSet}
     # scalar set
     i = ci.value
-    if i <= moiopt.numeqconstrs
+    if i <= opt.numeqconstrs
         # constraint is an equality
-        return moiopt.y[moiopt.constroffseteq[i]+1]
+        return opt.y[opt.constroffseteq[i]+1]
     else
         # constraint is conic
-        i -= moiopt.numeqconstrs
-        return moiopt.z[moiopt.constroffsetcone[i]+1]
+        i -= opt.numeqconstrs
+        return opt.z[opt.constroffsetcone[i]+1]
     end
 end
-function MOI.get(moiopt::HypatiaOptimizer, ::MOI.ConstraintDual, ci::MOI.ConstraintIndex{F, S}) where {F <: MOI.AbstractFunction, S <: MOI.AbstractVectorSet}
+function MOI.get(opt::Optimizer, ::MOI.ConstraintDual, ci::MOI.ConstraintIndex{F, S}) where {F <: MOI.AbstractFunction, S <: MOI.AbstractVectorSet}
     # vector set
     i = ci.value
-    if i <= moiopt.numeqconstrs
+    if i <= opt.numeqconstrs
         # constraint is an equality
-        os = moiopt.constroffseteq
-        return moiopt.y[os[i]+1:os[i+1]]
+        os = opt.constroffseteq
+        return opt.y[os[i]+1:os[i+1]]
     else
         # constraint is conic
-        i -= moiopt.numeqconstrs
-        os = moiopt.constroffsetcone
-        return moiopt.z[os[i]+1:os[i+1]]
+        i -= opt.numeqconstrs
+        os = opt.constroffsetcone
+        return opt.z[os[i]+1:os[i+1]]
     end
 end
-MOI.get(moiopt::HypatiaOptimizer, a::MOI.ConstraintDual, ci::Vector{MOI.ConstraintIndex}) = MOI.get.(moiopt, a, ci)
+MOI.get(opt::Optimizer, a::MOI.ConstraintDual, ci::Vector{MOI.ConstraintIndex}) = MOI.get.(opt, a, ci)
 
-function MOI.get(moiopt::HypatiaOptimizer, ::MOI.ConstraintPrimal, ci::MOI.ConstraintIndex{F, S}) where {F <: MOI.AbstractFunction, S <: MOI.AbstractScalarSet}
+function MOI.get(opt::Optimizer, ::MOI.ConstraintPrimal, ci::MOI.ConstraintIndex{F, S}) where {F <: MOI.AbstractFunction, S <: MOI.AbstractScalarSet}
     # scalar set
     i = ci.value
-    if i <= moiopt.numeqconstrs
+    if i <= opt.numeqconstrs
         # constraint is an equality
-        return moiopt.constrprimeq[moiopt.constroffseteq[i]+1]
+        return opt.constrprimeq[opt.constroffseteq[i]+1]
     else
         # constraint is conic
-        i -= moiopt.numeqconstrs
-        return moiopt.constrprimcone[moiopt.constroffsetcone[i]+1]
+        i -= opt.numeqconstrs
+        return opt.constrprimcone[opt.constroffsetcone[i]+1]
     end
 end
-function MOI.get(moiopt::HypatiaOptimizer, ::MOI.ConstraintPrimal, ci::MOI.ConstraintIndex{F, S}) where {F <: MOI.AbstractFunction, S <: MOI.AbstractVectorSet}
+function MOI.get(opt::Optimizer, ::MOI.ConstraintPrimal, ci::MOI.ConstraintIndex{F, S}) where {F <: MOI.AbstractFunction, S <: MOI.AbstractVectorSet}
     # vector set
     i = ci.value
-    if i <= moiopt.numeqconstrs
+    if i <= opt.numeqconstrs
         # constraint is an equality
-        os = moiopt.constroffseteq
-        return moiopt.constrprimeq[os[i]+1:os[i+1]]
+        os = opt.constroffseteq
+        return opt.constrprimeq[os[i]+1:os[i+1]]
     else
         # constraint is conic
-        i -= moiopt.numeqconstrs
-        os = moiopt.constroffsetcone
-        return moiopt.constrprimcone[os[i]+1:os[i+1]]
+        i -= opt.numeqconstrs
+        os = opt.constroffsetcone
+        return opt.constrprimcone[os[i]+1:os[i+1]]
     end
 end
-MOI.get(moiopt::HypatiaOptimizer, a::MOI.ConstraintPrimal, ci::Vector{MOI.ConstraintIndex}) = MOI.get.(moiopt, a, ci)
+MOI.get(opt::Optimizer, a::MOI.ConstraintPrimal, ci::Vector{MOI.ConstraintIndex}) = MOI.get.(opt, a, ci)
