@@ -116,7 +116,7 @@ function MOI.copy_to(
 
     # objective function
     F = MOI.get(src, MOI.ObjectiveFunctionType())
-    if F == MOI.SingleVariable # TODO make sure this is tested by MOI.Test in future
+    if F == MOI.SingleVariable
         obj = MOI.ScalarAffineFunction{Float64}(MOI.get(src, MOI.ObjectiveFunction{F}()))
     elseif F == MOI.ScalarAffineFunction{Float64}
         obj = MOI.get(src, MOI.ObjectiveFunction{F}())
