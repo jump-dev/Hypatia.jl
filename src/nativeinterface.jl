@@ -567,7 +567,10 @@ function solve!(mdl::Model)
         mu = (dot(ts, tz) + tau*kap)/bnu
         @assert tau >= 0.0
         @assert kap >= 0.0
-        @assert mu >= -1e-10
+        if mu < 0.0
+            @assert mu >= -1e-10
+            @warn("mu = $mu is slightly negative")
+        end
 
         # skip correction phase if allowed and current iterate is in the eta-neighborhood
         if mdl.corrcheck && (nbhd < abs2(eta*mu))
