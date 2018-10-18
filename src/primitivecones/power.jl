@@ -30,7 +30,7 @@ mutable struct PowerCone <: PrimitiveCone
         prmtv.diffres = DiffResults.HessianResult(prmtv.g)
         prmtv.barfun = (pnt -> -log(prod(pnt[i+1]^(alpha[i] + alpha[i]) for i in 1:dim-1) - abs2(pnt[1])) - sum((1.0 - alpha[i])*log(pnt[i+1]) for i in 1:dim-1))
         prmtv.H = similar(prmtv.g, dim, dim)
-        prmtv.H2 = copy(prmtv.H)
+        prmtv.H2 = similar(prmtv.H)
         return prmtv
     end
 end
@@ -44,7 +44,7 @@ function incone_prmtv(prmtv::PowerCone)
     if any(prmtv.pnt[i+1] <= 0.0 for i in 1:prmtv.dim-1)
         return false
     end
-    if prod(prmtv.pnt[i+1]^prmtv.alpha[i] for i in 1:prmtv.dim-1) <= abs(prmtv.pnt[1])
+    if prod(prmtv.pnt[i+1]^prmtv.alpha[i] for i in 1:prmtv.dim-1) <= abs(prmtv.pnt[1]) # TODO may be better to check this in log-space
         return false
     end
 
