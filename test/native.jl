@@ -387,3 +387,21 @@ function _power1(; verbose, lscachetype)
     @test r.pobj ≈ -1.80734 atol=1e-4 rtol=1e-4
     @test r.x[1:3] ≈ [0.0639314, 0.783361, 2.30542] atol=1e-4 rtol=1e-4
 end
+
+function _opernorm1(; verbose, lscachetype)
+    mdl = Hypatia.Model(verbose=verbose)
+    Random.seed!(1)
+    (Xn, Xm) = (5, 10)
+    Xnm = Xn*Xm
+    c = vcat(1.0, zeros(Xnm))
+    p = 0
+    A = [spzeros(Xnm, 1) sparse(1.0I, Xnm, Xnm)]
+    b = rand(Xnm)
+    G = sparse(-1.0I, Xnm+1, Xnm+1)
+    h = vcat(0.0, rand(Xnm))
+    cone = Hypatia.Cone([Hypatia.OperatorNormCone(Xnm+1, Xn, Xm)], [1:Xnm+1])
+    r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
+    @test r.status == :Optimal
+    @test r.niters <= 25
+    @test opnorm(reshape(r.s[2:end], Xn, Xm)) ≈ r.pobj atol=1e-4 rtol=1e-4
+end

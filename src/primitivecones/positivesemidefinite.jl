@@ -20,8 +20,8 @@ mutable struct PositiveSemidefiniteCone <: PrimitiveCone
         prmtv.dim = dim
         prmtv.side = round(Int, sqrt(0.25 + dim + dim) - 0.5)
         prmtv.mat = Matrix{Float64}(undef, prmtv.side, prmtv.side)
-        prmtv.mat2 = copy(prmtv.mat)
-        prmtv.matpnt = copy(prmtv.mat)
+        prmtv.mat2 = similar(prmtv.mat)
+        prmtv.matpnt = similar(prmtv.mat)
         return prmtv
     end
 end
