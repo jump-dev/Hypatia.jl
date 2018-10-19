@@ -18,14 +18,14 @@ mutable struct SecondOrderCone <: PrimitiveCone
         prmtv = new()
         prmtv.dim = dim
         prmtv.Hi = Matrix{Float64}(undef, dim, dim)
-        prmtv.H = copy(prmtv.Hi)
+        prmtv.H = similar(prmtv.Hi)
         return prmtv
     end
 end
 
 dimension(prmtv::SecondOrderCone) = prmtv.dim
 barrierpar_prmtv(prmtv::SecondOrderCone) = 1
-getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::SecondOrderCone) = (arr[1] = 1.0; @. arr[2:end] = 0.0; arr)
+getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::SecondOrderCone) = (@. arr = 0.0; arr[1] = 1.0; arr)
 loadpnt_prmtv!(prmtv::SecondOrderCone, pnt::AbstractVector{Float64}) = (prmtv.pnt = pnt)
 
 function incone_prmtv(prmtv::SecondOrderCone)
