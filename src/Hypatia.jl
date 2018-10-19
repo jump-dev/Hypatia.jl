@@ -23,6 +23,7 @@ module Hypatia
         "rotatedsecondorder",
         "positivesemidefinite",
         "ellinfinity",
+        "spectralnorm",
         ]
         include(joinpath(@__DIR__, "primitivecones", primitivecone * ".jl"))
     end

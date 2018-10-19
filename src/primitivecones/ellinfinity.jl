@@ -28,7 +28,7 @@ end
 
 dimension(prmtv::EllInfinityCone) = prmtv.dim
 barrierpar_prmtv(prmtv::EllInfinityCone) = prmtv.dim
-getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::EllInfinityCone) = (arr[1] = 1.0; @. arr[2:end] = 0.0; arr)
+getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::EllInfinityCone) = (@. arr = 0.0; arr[1] = 1.0; arr)
 loadpnt_prmtv!(prmtv::EllInfinityCone, pnt::AbstractVector{Float64}) = (prmtv.pnt = pnt)
 
 function incone_prmtv(prmtv::EllInfinityCone)

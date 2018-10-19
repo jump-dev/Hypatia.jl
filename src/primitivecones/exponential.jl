@@ -18,7 +18,7 @@ mutable struct ExponentialCone <: PrimitiveCone
         prmtv = new()
         prmtv.g = Vector{Float64}(undef, 3)
         prmtv.H = similar(prmtv.g, 3, 3)
-        prmtv.H2 = copy(prmtv.H)
+        prmtv.H2 = similar(prmtv.H)
         return prmtv
     end
 end

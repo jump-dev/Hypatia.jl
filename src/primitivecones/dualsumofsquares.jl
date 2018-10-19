@@ -26,7 +26,7 @@ mutable struct DualSumOfSquaresCone <: PrimitiveCone
         prmtv.ipwt = ipwt
         prmtv.g = similar(ipwt[1], dim)
         prmtv.H = similar(ipwt[1], dim, dim)
-        prmtv.H2 = copy(prmtv.H)
+        prmtv.H2 = similar(prmtv.H)
         prmtv.ipwtpnt = [similar(ipwt[1], size(ipwtj, 2), size(ipwtj, 2)) for ipwtj in ipwt]
         prmtv.Vpt = [similar(ipwt[1], size(ipwtj, 2), dim) for ipwtj in ipwt]
         prmtv.Vp2 = similar(ipwt[1], dim, dim)
