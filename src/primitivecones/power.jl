@@ -10,13 +10,13 @@ barrier from Roy & Xiao 2018 (theorem 1) is
 mutable struct PowerCone <: PrimitiveCone
     dim::Int
     alpha::Vector{Float64}
-    barfun::Function
     pnt::AbstractVector{Float64}
     g::Vector{Float64}
-    diffres
     H::Matrix{Float64} # TODO could be faster as StaticArray
     H2::Matrix{Float64}
     F
+    barfun::Function
+    diffres
 
     function PowerCone(alpha::Vector{Float64})
         prmtv = new()
@@ -27,10 +27,11 @@ mutable struct PowerCone <: PrimitiveCone
         prmtv.dim = dim
         prmtv.alpha = alpha
         prmtv.g = Vector{Float64}(undef, dim)
-        prmtv.diffres = DiffResults.HessianResult(prmtv.g)
-        prmtv.barfun = (pnt -> -log(prod(pnt[i+1]^(alpha[i] + alpha[i]) for i in 1:dim-1) - abs2(pnt[1])) - sum((1.0 - alpha[i])*log(pnt[i+1]) for i in 1:dim-1))
         prmtv.H = similar(prmtv.g, dim, dim)
         prmtv.H2 = similar(prmtv.H)
+        barfun(x) = -log(prod(x[i+1]^(2.0*alpha[i]) for i in 1:dim-1) - abs2(x[1])) - sum((1.0 - alpha[i])*log(x[i+1]) for i in 1:dim-1)
+        prmtv.barfun = barfun
+        prmtv.diffres = DiffResults.HessianResult(prmtv.g)
         return prmtv
     end
 end
@@ -49,9 +50,7 @@ function incone_prmtv(prmtv::PowerCone)
     end
 
     # TODO check allocations, check with Jarrett if this is most efficient way to use DiffResults
-
     prmtv.diffres = ForwardDiff.hessian!(prmtv.diffres, prmtv.barfun, prmtv.pnt)
-
     prmtv.g .= DiffResults.gradient(prmtv.diffres)
     prmtv.H .= DiffResults.hessian(prmtv.diffres)
 
