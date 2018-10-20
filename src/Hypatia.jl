@@ -24,6 +24,7 @@ module Hypatia
         "positivesemidefinite",
         "ellinfinity",
         "spectralnorm",
+        "logsumexp"
         ]
         include(joinpath(@__DIR__, "primitivecones", primitivecone * ".jl"))
     end

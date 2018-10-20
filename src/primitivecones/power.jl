@@ -19,11 +19,11 @@ mutable struct PowerCone <: PrimitiveCone
     diffres
 
     function PowerCone(alpha::Vector{Float64})
-        prmtv = new()
         dim = length(alpha) + 1
         @assert dim >= 3
         @assert all(ai >= 0.0 for ai in alpha)
         @assert sum(alpha) == 1.0
+        prmtv = new()
         prmtv.dim = dim
         prmtv.alpha = alpha
         prmtv.g = Vector{Float64}(undef, dim)
@@ -42,10 +42,11 @@ getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::PowerCone) = (@. arr = 1.0
 loadpnt_prmtv!(prmtv::PowerCone, pnt::AbstractVector{Float64}) = (prmtv.pnt = pnt)
 
 function incone_prmtv(prmtv::PowerCone)
-    if any(prmtv.pnt[i+1] <= 0.0 for i in 1:prmtv.dim-1)
+    z = prmtv.pnt[1]; x = view(prmtv.pnt, 2:prmtv.dim); alpha = prmtv.alpha
+    if any(xi <= 0.0 for xi in x)
         return false
     end
-    if prod(prmtv.pnt[i+1]^prmtv.alpha[i] for i in 1:prmtv.dim-1) <= abs(prmtv.pnt[1]) # TODO may be better to check this in log-space
+    if sum(alpha[i]*log(x[i]) for i in eachindex(alpha)) <= log(abs(z))
         return false
     end
 

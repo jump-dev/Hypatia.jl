@@ -425,3 +425,20 @@ function _spectraldual1(; verbose, lscachetype)
     @test sum(svdvals!(reshape(r.s[2:end], Xn, Xm))) ≈ r.pobj atol=1e-4 rtol=1e-4
     @test svdvals!(reshape(r.z[2:end], Xn, Xm))[1] ≈ r.z[1] atol=1e-4 rtol=1e-4
 end
+
+function _lse1(; verbose, lscachetype)
+    mdl = Hypatia.Model(verbose=verbose)
+    Random.seed!(1)
+    l = 5
+    c = vcat(1.0, 0.0, zeros(l))
+    A = [spzeros(l, 2) sparse(1.0I, l, l)]
+    b = rand(l)
+    G = sparse(-1.0I, l+2, l+2); G[2,2] = 0.0
+    h = vcat(0.0, 1.0, rand(l))
+    cone = Hypatia.Cone([Hypatia.LogSumExpCone(l+2)], [1:l+2], [false])
+    r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
+    @test r.status == :Optimal
+    # @test r.niters <= 30
+    @test r.s[2] ≈ 1 atol=1e-4 rtol=1e-4
+    @test r.s[1] ≈ log(sum(exp(r.s[i+2]) for i in 1:l)) atol=1e-4 rtol=1e-4
+end

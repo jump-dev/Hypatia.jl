@@ -25,12 +25,12 @@ end
 
 dimension(prmtv::ExponentialCone) = 3
 barrierpar_prmtv(prmtv::ExponentialCone) = 3
-getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::ExponentialCone) = (arr[1] = 0.0; arr[2] = 0.5; arr[3] = 1.0; arr)
+getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::ExponentialCone) = (arr[1] = 0.0; arr[2] = 0.5; arr[3] = 1.0; arr) # TODO change this to balance norm of initial s and z
 loadpnt_prmtv!(prmtv::ExponentialCone, pnt::AbstractVector{Float64}) = (prmtv.pnt = pnt)
 
 function incone_prmtv(prmtv::ExponentialCone)
     x = prmtv.pnt[1]; y = prmtv.pnt[2]; z = prmtv.pnt[3]
-    if (y < 1e-9) || (z < 1e-12)
+    if y <= 0.0 || z <= 0.0
         return false
     end
 
