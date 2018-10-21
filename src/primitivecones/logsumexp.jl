@@ -30,15 +30,20 @@ mutable struct LogSumExpCone <: PrimitiveCone
             # w = [exp((xi - z)*invy) for xi in x]
             # w *= y/sum(w)
             # return -sum(log(z + y*log(w[i]) - x[i] - y*log(y)) + log(w[i]) + log(y) for i in eachindex(w))
-            invy = inv(y)
-            w = [exp((xi - z)*invy) for xi in x]
-            sumw = sum(w)
+            # invy = inv(y)
+            # w = [exp((xi - z)*invy) for xi in x]
+            # sumw = sum(w)
             # lws = [(xi - z)*invy - log(sumw) for xi in x]
             # return -sum(log(z + y*lws[i] - x[i]) for i in eachindex(w)) - sum(lws) - 2.0*n*log(y)
             # return -sum(log(z + y*((x[i] - z)*invy - log(sumw)) - x[i]) for i in eachindex(w)) - sum(lws) - 2.0*n*log(y)
             # return -n*log(-y*log(sumw)) - sum(lws) - 2.0*n*log(y)
             # return -n*log(-log(sumw)) - sum(lws) - 3.0*n*log(y)
-            return -n*log(-log(sumw)) - 3.0*n*log(y) - sum((xi - z)*invy for xi in x) + n*log(sumw)
+            # lse = log(sum(exp(xi*invy) for xi in x))
+            # return -n*log(z/y - lse) - 3.0*n*log(y) - sum(x)/y + n*lse
+            # return -log(z/y - lse) - 3.0*log(y) - sum(x)/(n*y) + lse
+            x ./= y
+            lse = log(sum(exp, x))
+            return -log(z - y*lse) - 2.0*log(y) - sum(x)/n + lse
         end
         prmtv.barfun = barfun
         prmtv.diffres = DiffResults.HessianResult(prmtv.g)
@@ -47,8 +52,8 @@ mutable struct LogSumExpCone <: PrimitiveCone
 end
 
 dimension(prmtv::LogSumExpCone) = prmtv.dim
-barrierpar_prmtv(prmtv::LogSumExpCone) = 3*(prmtv.dim - 2)
-getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::LogSumExpCone) = (@. arr = 0.0; arr[1] = 2*log(prmtv.dim); arr[2] = 1.0; arr) # TODO change this to balance norm of initial s and z
+barrierpar_prmtv(prmtv::LogSumExpCone) = 3#*(prmtv.dim - 2)
+getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::LogSumExpCone) = (@. arr = 0.0; arr[1] = 2*log(prmtv.dim); arr[2] = 0.8; arr) # TODO change this to balance norm of initial s and z
 loadpnt_prmtv!(prmtv::LogSumExpCone, pnt::AbstractVector{Float64}) = (prmtv.pnt = pnt)
 
 function incone_prmtv(prmtv::LogSumExpCone)
@@ -61,13 +66,13 @@ function incone_prmtv(prmtv::LogSumExpCone)
         return false
     end
 
-    @show z
-    @show y
-    @show x
-    invy = inv(y)
-    w = [exp(xi - z) for xi in x]
-    w *= y/sum(w)
-    @show w
+    # @show z
+    # @show y
+    # @show x
+    # invy = inv(y)
+    # w = [exp(xi - z) for xi in x]
+    # w *= y/sum(w)
+    # @show w
 
 
     # TODO check allocations, check with Jarrett if this is most efficient way to use DiffResults

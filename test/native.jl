@@ -440,13 +440,13 @@ function _lse1(; verbose, lscachetype)
     r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
     @test r.niters <= 20
-    @show r.x
-    @show r.y
-    @show r.s
-    @show r.z
+    # @show r.x
+    # @show r.y
+    # @show r.s
+    # @show r.z
     @test r.s[2] ≈ persp atol=1e-4 rtol=1e-4
     @test r.s[1] ≈ r.s[2]*log(sum(exp(r.s[i+2]/r.s[2]) for i in 1:l)) atol=1e-4 rtol=1e-4
-    @test r.z[1] ≈ persp atol=1e-4 rtol=1e-4
+    @test r.z[1] ≈ 1 atol=1e-4 rtol=1e-4
     @test r.z[2] ≈ -sum(r.z[i+2]*log(-r.z[i+2]/r.z[1]) for i in 1:l) atol=1e-4 rtol=1e-4
 end
 

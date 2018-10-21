@@ -330,6 +330,7 @@ function solve!(mdl::Model)
 
     tau = 1.0
     kap = 1.0
+    @show dot(tz, ts)
     mu = (dot(tz, ts) + tau*kap)/bnu
     @assert !isnan(mu)
     @assert abs(1.0 - mu) < 1e-10

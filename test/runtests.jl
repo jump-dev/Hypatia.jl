@@ -117,7 +117,7 @@ testfuns = [
     # _spectral1,
     # _spectraldual1,
     _lse1,
-    _lsedual1,
+    # _lsedual1,
     ]
 @testset "native tests: $testfun, $lscachetype" for testfun in testfuns, lscachetype in (Hypatia.NaiveCache, Hypatia.QRSymmCache)
     testfun(verbose=verbose, lscachetype=lscachetype)
