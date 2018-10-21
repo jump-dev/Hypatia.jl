@@ -43,13 +43,13 @@ loadpnt_prmtv!(prmtv::PositiveSemidefiniteCone, pnt::AbstractVector{Float64}) = 
 
 function incone_prmtv(prmtv::PositiveSemidefiniteCone)
     vectomat!(prmtv.mat, prmtv.pnt)
-    F = cholesky!(Symmetric(prmtv.mat), check=false)
+    @. prmtv.matpnt = prmtv.mat
+
+    F = bunchkaufman!(Symmetric(prmtv.mat), true, check=false)
     if !issuccess(F)
         return false
     end
-
     prmtv.matinv = -inv(F) # TODO eliminate allocs
-    vectomat!(prmtv.matpnt, prmtv.pnt)
     return true
 end
 

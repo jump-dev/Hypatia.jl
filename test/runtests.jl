@@ -104,18 +104,26 @@ testfuns = [
     _orthant4,
     _ellinf1,
     _ellinf2,
+    _ellinf3,
     _ellinfdual1,
     _ellinfdual2,
     _ellinfdual3,
     _soc1,
+    _soc2,
     _rsoc1,
     _rsoc2,
+    _rsoc3,
     _psd1,
     _psd2,
+    _psd3,
     _exp1,
     _exp2,
     _exp3,
+    _expdual1,
     _power1,
+    _power2,
+    _power3,
+    _power4,
     _spectral1,
     _spectraldual1,
     ]
@@ -124,49 +132,49 @@ testfuns = [
 end
 
 
-# # examples in src/examples/ folder
-# egs_dir = joinpath(@__DIR__, "../examples")
-# include(joinpath(egs_dir, "envelope/envelope.jl"))
-# include(joinpath(egs_dir, "lp/lp.jl"))
-# include(joinpath(egs_dir, "namedpoly/namedpoly.jl"))
-#
-# @info("starting default examples tests")
-# testfuns = [
-#     run_envelope,
-#     run_lp,
-#     run_namedpoly,
-#     ]
-# @testset "default examples: $testfun" for testfun in testfuns
-#     testfun()
-# end
-#
-# include(joinpath(@__DIR__, "examples.jl"))
-# @info("starting varied examples tests")
-# verbose = false # test verbosity
-# testfuns = [
-#     _envelope1,
-#     _envelope2,
-#     _envelope3,
-#     # _envelope4,
-#     _lp1,
-#     # _lp2,
-#     _namedpoly1,
-#     _namedpoly2,
-#     # _namedpoly3,
-#     # _namedpoly4,
-#     _namedpoly5,
-#     # _namedpoly6,
-#     _namedpoly7,
-#     _namedpoly8,
-#     _namedpoly9,
-#     # _namedpoly10,
-#     # _namedpoly11,
-#     ]
-# @testset "varied examples: $testfun, $lscachetype" for testfun in testfuns, lscachetype in (Hypatia.QRSymmCache, Hypatia.NaiveCache)
-#     testfun(verbose=verbose, lscachetype=lscachetype)
-# end
-#
-#
+# examples in src/examples/ folder
+egs_dir = joinpath(@__DIR__, "../examples")
+include(joinpath(egs_dir, "envelope/envelope.jl"))
+include(joinpath(egs_dir, "lp/lp.jl"))
+include(joinpath(egs_dir, "namedpoly/namedpoly.jl"))
+
+@info("starting default examples tests")
+testfuns = [
+    run_envelope,
+    run_lp,
+    run_namedpoly,
+    ]
+@testset "default examples: $testfun" for testfun in testfuns
+    testfun()
+end
+
+include(joinpath(@__DIR__, "examples.jl"))
+@info("starting varied examples tests")
+verbose = false # test verbosity
+testfuns = [
+    _envelope1,
+    _envelope2,
+    _envelope3,
+    # _envelope4,
+    _lp1,
+    # _lp2,
+    _namedpoly1,
+    _namedpoly2,
+    # _namedpoly3,
+    # _namedpoly4,
+    _namedpoly5,
+    # _namedpoly6,
+    _namedpoly7,
+    _namedpoly8,
+    _namedpoly9,
+    # _namedpoly10,
+    # _namedpoly11,
+    ]
+@testset "varied examples: $testfun, $lscachetype" for testfun in testfuns, lscachetype in (Hypatia.QRSymmCache, Hypatia.NaiveCache)
+    testfun(verbose=verbose, lscachetype=lscachetype)
+end
+
+
 # # MathOptInterface tests
 # include(joinpath(@__DIR__, "moi.jl"))
 # @info("starting MathOptInterface tests")
