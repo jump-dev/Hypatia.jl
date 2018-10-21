@@ -2,8 +2,8 @@
 Copyright 2018, Chris Coey and contributors
 
 rotated second order cone
-(x, y, z) : 2*x*y >= norm(x)^2, x,y >= 0
-barrier is -ln(2*x*y - norm(z)^2)
+(u, v, w) : 2*u*v >= norm(w)^2, u,v >= 0
+barrier is -ln(2*u*v - norm(w)^2)
 from Nesterov & Todd "Self-Scaled Barriers and Interior-Point Methods for Convex Programming"
 =#
 

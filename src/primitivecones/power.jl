@@ -2,9 +2,9 @@
 Copyright 2018, Chris Coey and contributors
 
 power cone parametrized by powers vector α belonging to the unit simplex
-(z, x) : prod_i x_i^alpha_i >= abs(z), x >= 0
+(u, v) : prod_i v_i^alpha_i >= abs(u), v >= 0
 barrier from Roy & Xiao 2018 (theorem 1) is
--log(prod_i x_i^(2*alpha_i) - z^2) - sum_i (1 - alpha_i) log(x_i)
+-log(prod_i v_i^(2*alpha_i) - u^2) - sum_i (1 - alpha_i) log(v_i)
 =#
 
 mutable struct PowerCone <: PrimitiveCone
@@ -29,7 +29,11 @@ mutable struct PowerCone <: PrimitiveCone
         prmtv.g = Vector{Float64}(undef, dim)
         prmtv.H = similar(prmtv.g, dim, dim)
         prmtv.H2 = similar(prmtv.H)
-        barfun(x) = -log(prod(x[i+1]^(2.0*alpha[i]) for i in 1:dim-1) - abs2(x[1])) - sum((1.0 - alpha[i])*log(x[i+1]) for i in 1:dim-1)
+        function barfun(pnt)
+            u = pnt[1]
+            v = view(pnt, 2:dim)
+            return -log(prod(v[i]^(2.0*alpha[i]) for i in eachindex(alpha)) - abs2(u)) - sum((1.0 - alpha[i])*log(v[i]) for i in eachindex(alpha))
+        end
         prmtv.barfun = barfun
         prmtv.diffres = DiffResults.HessianResult(prmtv.g)
         return prmtv

@@ -5,7 +5,7 @@ nonnegative/nonpositive orthant cones
 from Nesterov & Todd "Self-Scaled Barriers and Interior-Point Methods for Convex Programming"
 =#
 
-# nonnegative cone barrier is -sum_j ln x_j
+# nonnegative cone barrier is -sum_j ln u_j
 mutable struct NonnegativeCone <: PrimitiveCone
     dim::Int
     pnt::AbstractVector{Float64}
@@ -19,7 +19,7 @@ mutable struct NonnegativeCone <: PrimitiveCone
     end
 end
 
-# nonpositive cone barrier is -sum_j ln x_j
+# nonpositive cone barrier is -sum_j ln u_j
 mutable struct NonpositiveCone <: PrimitiveCone
     dim::Int
     pnt::AbstractVector{Float64}
@@ -43,8 +43,8 @@ getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::NonpositiveCone) = (@. arr
 
 loadpnt_prmtv!(prmtv::OrthantCone, pnt::AbstractVector{Float64}) = (prmtv.pnt = pnt)
 
-incone_prmtv(prmtv::NonnegativeCone) = all(x -> (x > 0.0), prmtv.pnt)
-incone_prmtv(prmtv::NonpositiveCone) = all(x -> (x < 0.0), prmtv.pnt)
+incone_prmtv(prmtv::NonnegativeCone) = all(u -> (u > 0.0), prmtv.pnt)
+incone_prmtv(prmtv::NonpositiveCone) = all(u -> (u < 0.0), prmtv.pnt)
 
 function calcg_prmtv!(g::AbstractVector{Float64}, prmtv::OrthantCone)
     @. prmtv.invpnt = inv(prmtv.pnt)
