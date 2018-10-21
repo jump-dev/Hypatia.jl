@@ -359,7 +359,7 @@ end
 function _exp1(; verbose, lscachetype)
     mdl = Hypatia.Model(verbose=verbose)
     c = Float64[1, 1, 1]
-    A = Float64[0 1 0; 1 0 0]
+    A = Float64[0 1 0; 0 0 1]
     b = Float64[2, 1]
     G = SparseMatrixCSC(-1.0I, 3, 3)
     h = zeros(3)
@@ -368,9 +368,39 @@ function _exp1(; verbose, lscachetype)
     @test r.status == :Optimal
     @test r.niters <= 20
     @test r.pobj ≈ 2*exp(1/2)+3 atol=1e-4 rtol=1e-4
-    @test r.x ≈ [1, 2, 2*exp(1/2)] atol=1e-4 rtol=1e-4
+    @test r.x ≈ [2*exp(1/2), 2, 1] atol=1e-4 rtol=1e-4
     @test r.y ≈ -[1+exp(1/2)/2, 1+exp(1/2)] atol=1e-4 rtol=1e-4
     @test r.z ≈ c+A'*r.y atol=1e-4 rtol=1e-4
+end
+
+function _exp2(; verbose, lscachetype)
+    mdl = Hypatia.Model(verbose=verbose)
+    c = Float64[0, 0, -1]
+    A = Float64[0 1 0]
+    b = Float64[0]
+    G = SparseMatrixCSC(-1.0I, 3, 3)
+    h = zeros(3)
+    cone = Hypatia.Cone([Hypatia.ExponentialCone()], [1:3])
+    r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
+    @test r.status == :Optimal
+    @test r.niters <= 20
+    @test r.pobj ≈ 0 atol=1e-4 rtol=1e-4
+end
+
+function _exp3(; verbose, lscachetype)
+    mdl = Hypatia.Model(verbose=verbose)
+    c = Float64[1, 1, 1]
+    A = Matrix{Float64}(undef, 0, 3)
+    b = Vector{Float64}(undef, 0)
+    G = sparse([1, 2, 3, 4], [1, 2, 3, 3], -ones(4))
+    h = zeros(4)
+    cone = Hypatia.Cone([Hypatia.ExponentialCone(), Hypatia.NonnegativeCone(1)], [1:3, 4:4])
+    r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
+    @test r.status == :Optimal
+    @test r.niters <= 20
+    @test r.pobj ≈ 0 atol=1e-4 rtol=1e-4
+    @test r.x ≈ [0, 0, 0] atol=1e-4 rtol=1e-4
+    @test isempty(r.y)
 end
 
 function _power1(; verbose, lscachetype)

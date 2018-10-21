@@ -2,7 +2,7 @@
 Copyright 2018, Chris Coey and contributors
 
 positive semidefinite cone lower triangle, svec (scaled) definition
-barrier for matrix cone is -ln det(X)
+barrier for matrix cone is -ln det(U)
 from Nesterov & Todd "Self-Scaled Barriers and Interior-Point Methods for Convex Programming"
 =#
 
