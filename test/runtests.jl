@@ -117,8 +117,9 @@ testfuns = [
     # _spectral1,
     # _spectraldual1,
     _lse1,
+    _lsedual1,
     ]
-@testset "native tests: $testfun, $lscachetype" for testfun in testfuns, lscachetype in (Hypatia.QRSymmCache, Hypatia.NaiveCache)
+@testset "native tests: $testfun, $lscachetype" for testfun in testfuns, lscachetype in (Hypatia.NaiveCache, Hypatia.QRSymmCache)
     testfun(verbose=verbose, lscachetype=lscachetype)
 end
 
@@ -161,7 +162,7 @@ end
 #     # _namedpoly10,
 #     # _namedpoly11,
 #     ]
-# @testset "varied examples: $testfun, $lscachetype" for testfun in testfuns, lscachetype in (Hypatia.QRSymmCache, Hypatia.NaiveCache)
+# @testset "varied examples: $testfun, $lscachetype" for testfun in testfuns, lscachetype in (Hypatia.NaiveCache, Hypatia.QRSymmCache)
 #     testfun(verbose=verbose, lscachetype=lscachetype)
 # end
 #
@@ -170,7 +171,7 @@ end
 # include(joinpath(@__DIR__, "moi.jl"))
 # @info("starting MathOptInterface tests")
 # verbose = false # test verbosity
-# @testset "MOI tests: $lscachetype, $(usedense ? "dense" : "sparse")" for lscachetype in (Hypatia.QRSymmCache, Hypatia.NaiveCache), usedense in (false, true)
+# @testset "MOI tests: $lscachetype, $(usedense ? "dense" : "sparse")" for lscachetype in (Hypatia.NaiveCache, Hypatia.QRSymmCache), usedense in (false, true)
 #     testmoi(verbose=verbose, lscachetype=lscachetype, usedense=usedense)
 # end
 

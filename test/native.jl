@@ -429,16 +429,48 @@ end
 function _lse1(; verbose, lscachetype)
     mdl = Hypatia.Model(verbose=verbose)
     Random.seed!(1)
-    l = 5
+    l = 10
+    persp = 1.0
     c = vcat(1.0, 0.0, zeros(l))
     A = [spzeros(l, 2) sparse(1.0I, l, l)]
     b = rand(l)
     G = sparse(-1.0I, l+2, l+2); G[2,2] = 0.0
-    h = vcat(0.0, 1.0, rand(l))
+    h = vcat(0.0, persp, rand(l))
     cone = Hypatia.Cone([Hypatia.LogSumExpCone(l+2)], [1:l+2], [false])
     r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
-    # @test r.niters <= 30
-    @test r.s[2] ≈ 1 atol=1e-4 rtol=1e-4
-    @test r.s[1] ≈ log(sum(exp(r.s[i+2]) for i in 1:l)) atol=1e-4 rtol=1e-4
+    @test r.niters <= 20
+    @show r.x
+    @show r.y
+    @show r.s
+    @show r.z
+    @test r.s[2] ≈ persp atol=1e-4 rtol=1e-4
+    @test r.s[1] ≈ r.s[2]*log(sum(exp(r.s[i+2]/r.s[2]) for i in 1:l)) atol=1e-4 rtol=1e-4
+    @test r.z[1] ≈ persp atol=1e-4 rtol=1e-4
+    @test r.z[2] ≈ -sum(r.z[i+2]*log(-r.z[i+2]/r.z[1]) for i in 1:l) atol=1e-4 rtol=1e-4
+end
+
+function _lsedual1(; verbose, lscachetype)
+    mdl = Hypatia.Model(verbose=verbose)
+    Random.seed!(1)
+    l = 5
+    persp = 1.0
+    c = vcat(0.0, 1.0, zeros(l))
+    A = [spzeros(l, 2) sparse(1.0I, l, l)]
+    b = -rand(l)
+    G = sparse(-1.0I, l+2, l+2); G[1,1] = 0.0
+    h = vcat(persp, 0.0, -rand(l))
+    # @show -sum(h[i+2]*log(-h[i+2]/persp) for i in 1:l)
+    cone = Hypatia.Cone([Hypatia.LogSumExpCone(l+2)], [1:l+2], [true])
+    r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
+    @show r.x
+    @show r.y
+    @show r.s
+    @show r.z
+    @test r.status == :Optimal
+    # @test r.niters <= 20
+    # @test r.s[1] ≈ persp atol=1e-4 rtol=1e-4
+    # @test r.s[2] ≈ -sum(r.s[i+2]*log(-r.s[i+2]/r.s[1]) for i in 1:l) atol=1e-4 rtol=1e-4
+    # @test r.z[2] ≈ persp atol=1e-4 rtol=1e-4
+    # @test r.z[1] ≈ r.z[2]*log(sum(exp(r.z[i+2]/r.z[2]) for i in 1:l)) atol=1e-4 rtol=1e-4
 end
