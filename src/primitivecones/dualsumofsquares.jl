@@ -74,13 +74,8 @@ function incone_prmtv(prmtv::DualSumOfSquaresCone)
     end
 
     @. prmtv.H2 = prmtv.H
-    prmtv.F = cholesky!(Symmetric(prmtv.H2), Val(true), check=false) # bunchkaufman if it fails
-    if !isposdef(prmtv.F)
-        @. prmtv.H2 = prmtv.H
-        prmtv.F = bunchkaufman!(Symmetric(prmtv.H2), true, check=false)
-        return issuccess(prmtv.F)
-    end
-    return true
+    prmtv.F = bunchkaufman!(Symmetric(prmtv.H2), true, check=false)
+    return issuccess(prmtv.F)
 end
 
 calcg_prmtv!(g::AbstractVector{Float64}, prmtv::DualSumOfSquaresCone) = (@. g = prmtv.g; g)

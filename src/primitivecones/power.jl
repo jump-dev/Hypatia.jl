@@ -2,7 +2,7 @@
 Copyright 2018, Chris Coey and contributors
 
 power cone parametrized by powers vector α belonging to the unit simplex
-(u, v) : prod_i v_i^alpha_i >= abs(u), v >= 0
+(u, v) : abs(u) <= prod_i v_i^alpha_i, v >= 0
 barrier from Roy & Xiao 2018 (theorem 1) is
 -log(prod_i v_i^(2*alpha_i) - u^2) - sum_i (1 - alpha_i) log(v_i)
 =#
@@ -59,13 +59,8 @@ function incone_prmtv(prmtv::PowerCone)
     prmtv.H .= DiffResults.hessian(prmtv.diffres)
 
     @. prmtv.H2 = prmtv.H
-    prmtv.F = cholesky!(Symmetric(prmtv.H2), Val(true), check=false) # bunchkaufman if it fails
-    if !isposdef(prmtv.F)
-        @. prmtv.H2 = prmtv.H
-        prmtv.F = bunchkaufman!(Symmetric(prmtv.H2), true, check=false)
-        return issuccess(prmtv.F)
-    end
-    return true
+    prmtv.F = bunchkaufman!(Symmetric(prmtv.H2), true, check=false)
+    return issuccess(prmtv.F)
 end
 
 calcg_prmtv!(g::AbstractVector{Float64}, prmtv::PowerCone) = (@. g = prmtv.g; g)

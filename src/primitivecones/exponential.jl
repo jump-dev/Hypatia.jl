@@ -59,13 +59,8 @@ function incone_prmtv(prmtv::ExponentialCone)
     H[1,1] = abs2(vu)*H[3,3] + vu/u*ivluvw + inv(abs2(u))
 
     @. prmtv.H2 = prmtv.H
-    prmtv.F = cholesky!(Symmetric(prmtv.H2), Val(true), check=false) # bunchkaufman if it fails
-    if !isposdef(prmtv.F)
-        @. prmtv.H2 = prmtv.H
-        prmtv.F = bunchkaufman!(Symmetric(prmtv.H2), true, check=false)
-        return issuccess(prmtv.F)
-    end
-    return true
+    prmtv.F = bunchkaufman!(Symmetric(prmtv.H2), true, check=false)
+    return issuccess(prmtv.F)
 end
 
 calcg_prmtv!(g::AbstractVector{Float64}, prmtv::ExponentialCone) = (@. g = prmtv.g; g)

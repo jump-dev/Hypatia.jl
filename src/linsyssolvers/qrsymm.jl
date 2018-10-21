@@ -234,24 +234,18 @@ function helplhs!(
     if L.useiterative
         return Symmetric(L.Q2GHGQ2)
     else
-        # bunchkaufman allocates more than cholesky, but doesn't fail when approximately quasidefinite
-        F = cholesky!(Symmetric(L.Q2GHGQ2), Val(true), check=false)
-        if !isposdef(F)
-            # verbose && # TODO pass this in
+        # TODO remove allocs from bunch-kaufman by using lower-level functions
+        F = bunchkaufman!(Symmetric(L.Q2GHGQ2), true, check=false)
+        if !issuccess(F)
+            @warn("linear system matrix was not positive definite")
+            # TODO improve recovery method for making LHS positive definite
             mul!(L.Q2GHGQ2, L.Q2', L.GHGQ2)
+            L.Q2GHGQ2 += 1e-4I
             F = bunchkaufman!(Symmetric(L.Q2GHGQ2), true, check=false)
             if !issuccess(F)
-                @warn("linear system matrix was not positive definite")
-                # TODO improve recovery method
-                mul!(L.Q2GHGQ2, L.Q2', L.GHGQ2)
-                L.Q2GHGQ2 += 1e-4I
-                F = bunchkaufman!(Symmetric(L.Q2GHGQ2), true, check=false)
-                if !issuccess(F)
-                    error("could not fix failure of positive definiteness; terminating")
-                end
+                error("could not fix failure of positive definiteness; terminating")
             end
         end
-        # F = bunchkaufman!(Symmetric(L.Q2GHGQ2)) # TODO only use this; remove allocs, need to use low-level functions
         return F
     end
 end
