@@ -231,7 +231,7 @@ function _ellinf3(; verbose, lscachetype)
     @test r.x ≈ zeros(6) atol=1e-4 rtol=1e-4
 end
 
-function _ellinfdual1(; verbose, lscachetype)
+function _ellinf4(; verbose, lscachetype)
     mdl = Hypatia.Model(verbose=verbose)
     c = Float64[0, 1, -1]
     A = Float64[1 0 0; 0 1 0]
@@ -247,7 +247,7 @@ function _ellinfdual1(; verbose, lscachetype)
     @test r.y ≈ [1, 0] atol=1e-4 rtol=1e-4
 end
 
-function _ellinfdual2(; verbose, lscachetype)
+function _ellinf5(; verbose, lscachetype)
     mdl = Hypatia.Model(verbose=verbose)
     Random.seed!(1)
     c = Float64[1, 0, 0, 0, 0, 0]
@@ -262,7 +262,7 @@ function _ellinfdual2(; verbose, lscachetype)
     @test r.pobj ≈ 1 atol=1e-4 rtol=1e-4
 end
 
-function _ellinfdual3(; verbose, lscachetype)
+function _ellinf6(; verbose, lscachetype)
     Random.seed!(1)
     l = 3
     L = 2l + 1
@@ -475,7 +475,7 @@ function _exp3(; verbose, lscachetype)
     @test isempty(r.y)
 end
 
-function _expdual1(; verbose, lscachetype)
+function _exp4(; verbose, lscachetype)
     mdl = Hypatia.Model(verbose=verbose)
     c = Float64[1, 0, 0]
     A = Float64[0 1 0; 0 0 1]
@@ -562,7 +562,6 @@ function _power4(; verbose, lscachetype)
 end
 
 function _spectral1(; verbose, lscachetype)
-    mdl = Hypatia.Model(verbose=verbose)
     Random.seed!(1)
     (Xn, Xm) = (3, 4)
     Xnm = Xn*Xm
@@ -572,29 +571,19 @@ function _spectral1(; verbose, lscachetype)
     b = rand(Xnm)
     G = sparse(-1.0I, Xnm+1, Xnm+1)
     h = vcat(0.0, rand(Xnm))
-    cone = Hypatia.Cone([Hypatia.SpectralNormCone(Xnm+1, Xn, Xm)], [1:Xnm+1], [false])
-    r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
-    @test r.status == :Optimal
-    @test r.niters <= 20
-    @test svdvals!(reshape(r.s[2:end], Xn, Xm))[1] ≈ r.pobj atol=1e-4 rtol=1e-4
-    @test sum(svdvals!(reshape(r.z[2:end], Xn, Xm))) ≈ r.z[1] atol=1e-4 rtol=1e-4
-end
 
-function _spectraldual1(; verbose, lscachetype)
-    mdl = Hypatia.Model(verbose=verbose)
-    Random.seed!(1)
-    (Xn, Xm) = (3, 4)
-    Xnm = Xn*Xm
-    c = vcat(1.0, zeros(Xnm))
-    p = 0
-    A = [spzeros(Xnm, 1) sparse(1.0I, Xnm, Xnm)]
-    b = rand(Xnm)
-    G = sparse(-1.0I, Xnm+1, Xnm+1)
-    h = vcat(0.0, rand(Xnm))
-    cone = Hypatia.Cone([Hypatia.SpectralNormCone(Xnm+1, Xn, Xm)], [1:Xnm+1], [true])
-    r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
-    @test r.status == :Optimal
-    @test r.niters <= 20
-    @test sum(svdvals!(reshape(r.s[2:end], Xn, Xm))) ≈ r.pobj atol=1e-4 rtol=1e-4
-    @test svdvals!(reshape(r.z[2:end], Xn, Xm))[1] ≈ r.z[1] atol=1e-4 rtol=1e-4
+    for usedual in [true, false]
+        mdl = Hypatia.Model(verbose=verbose)
+        cone = Hypatia.Cone([Hypatia.SpectralNormCone(Xnm+1, Xn, Xm)], [1:Xnm+1], [usedual])
+        r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
+        @test r.status == :Optimal
+        @test r.niters <= 20
+        if usedual
+            @test sum(svdvals!(reshape(r.s[2:end], Xn, Xm))) ≈ r.pobj atol=1e-4 rtol=1e-4
+            @test svdvals!(reshape(r.z[2:end], Xn, Xm))[1] ≈ r.z[1] atol=1e-4 rtol=1e-4
+        else
+            @test svdvals!(reshape(r.s[2:end], Xn, Xm))[1] ≈ r.pobj atol=1e-4 rtol=1e-4
+            @test sum(svdvals!(reshape(r.z[2:end], Xn, Xm))) ≈ r.z[1] atol=1e-4 rtol=1e-4
+        end
+    end
 end
