@@ -2,8 +2,8 @@
 Copyright 2018, Chris Coey and contributors
 
 second order cone
-(x, y) : x >= norm(y)
-barrier is -ln(x^2 - norm(y)^2)
+(u, v) : u >= norm(v)
+barrier is -ln(u^2 - norm(v)^2)
 from Nesterov & Todd "Self-Scaled Barriers and Interior-Point Methods for Convex Programming"
 =#
 
