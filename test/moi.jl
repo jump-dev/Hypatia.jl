@@ -17,7 +17,7 @@ MOIU.@model(HypatiaModelData,
         MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives,
         MOI.SecondOrderCone, MOI.RotatedSecondOrderCone,
         # MOI.PositiveSemidefiniteConeTriangle,
-        MOI.ExponentialCone,
+        # MOI.ExponentialCone,
         # MOI.PowerCone,
     ),
     (),
@@ -44,9 +44,11 @@ unit_exclude = [
     "solve_objbound_edge_cases",
     ]
 conic_exclude = [
+    "exp",
+    "geomean",
+    "sdp",
     "rootdet",
     "logdet",
-    "sdp",
     ]
 
 
@@ -74,12 +76,12 @@ function testmoi(; verbose, lscachetype, usedense)
     # TODO MOI does not yet support scaled PSD triangle
     @testset "conic tests" begin
         MOIT.contconictest(
-            MOIB.GeoMean{Float64}(
+            # MOIB.GeoMean{Float64}(
             # MOIB.SquarePSD{Float64}(
             # MOIB.LogDet{Float64}(
             # MOIB.RootDet{Float64}(
                 optimizer
-            ),#))),
+            ,#)))),
             config, conic_exclude)
     end
 

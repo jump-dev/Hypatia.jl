@@ -1,13 +1,13 @@
 #=
 Copyright 2018, Chris Coey and contributors
 
-epigraph of spectral norm, or operator norm of matrix X in R^{n x m} associated with standard euclidean norms on R^m and R^n i.e. (y, X) : y >= opnorm(X)
-note n <= m is enforced WLOG since opnorm(X) = opnorm(X')
-X is vectorized column-by-column (i.e. vec(X) in Julia)
-barrier for matrix cone is -ln det(y*I_n - X*X'/y) - ln y
+epigraph of spectral norm, or operator norm of matrix V in R^{n x m} associated with standard euclidean norms on R^m and R^n i.e. (u, V) : u >= opnorm(V)
+note n <= m is enforced WLOG since opnorm(V) = opnorm(V')
+V is vectorized column-by-column (i.e. vec(V) in Julia)
+barrier for matrix cone is -ln det(u*I_n - V*V'/y) - ln u
 from Nesterov & Nemirovskii 1994 "Interior-Point Polynomial Algorithms in Convex Programming"
 
-# TODO don't need ForwardDiff: use identity for inverse of matrix plus I to get inv(y*I - X*X'/y) using properties of SVD unitary matrices U and V'
+# TODO don't need ForwardDiff: use identity for inverse of matrix plus I and properties of SVD unitary matrices
 =#
 
 mutable struct SpectralNormCone <: PrimitiveCone
@@ -34,11 +34,10 @@ mutable struct SpectralNormCone <: PrimitiveCone
         prmtv.g = Vector{Float64}(undef, dim)
         prmtv.H = similar(prmtv.g, dim, dim)
         prmtv.H2 = similar(prmtv.H)
-        function barfun(x)
-            X = reshape(x[2:end], n, m)
-            y = x[1]
-            mat = y*I - X*X'/y
-            return -logdet(mat) - log(y)
+        function barfun(pnt)
+            V = reshape(pnt[2:end], n, m)
+            u = pnt[1]
+            return -logdet(u*I - V*V'/u) - log(u)
         end
         prmtv.barfun = barfun
         prmtv.diffres = DiffResults.HessianResult(prmtv.g)
@@ -64,13 +63,8 @@ function incone_prmtv(prmtv::SpectralNormCone)
     prmtv.H .= DiffResults.hessian(prmtv.diffres)
 
     @. prmtv.H2 = prmtv.H
-    prmtv.F = cholesky!(Symmetric(prmtv.H2), Val(true), check=false) # bunchkaufman if it fails
-    if !isposdef(prmtv.F)
-        @. prmtv.H2 = prmtv.H
-        prmtv.F = bunchkaufman!(Symmetric(prmtv.H2), true, check=false)
-        return issuccess(prmtv.F)
-    end
-    return true
+    prmtv.F = bunchkaufman!(Symmetric(prmtv.H2), true, check=false)
+    return issuccess(prmtv.F)
 end
 
 calcg_prmtv!(g::AbstractVector{Float64}, prmtv::SpectralNormCone) = (@. g = prmtv.g; g)

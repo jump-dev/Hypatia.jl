@@ -89,7 +89,7 @@ MOI.supports_constraint(::Optimizer, ::Type{<:SupportedFuns}, ::Type{<:Supported
 conefrommoi(s::MOI.SecondOrderCone) = SecondOrderCone(MOI.dimension(s))
 conefrommoi(s::MOI.RotatedSecondOrderCone) = RotatedSecondOrderCone(MOI.dimension(s))
 conefrommoi(s::MOI.PositiveSemidefiniteConeTriangle) = PositiveSemidefiniteCone(MOI.dimension(s))
-conefrommoi(s::MOI.ExponentialCone) = ExponentialCone()
+conefrommoi(s::MOI.ExponentialCone) = error("need to swap ordering...") #ExponentialCone()
 # conefrommoi(s::MOI.PowerCone) = PowerCone(s.exponent)
 
 # build representation as min c'x s.t. Ax = b, x in K

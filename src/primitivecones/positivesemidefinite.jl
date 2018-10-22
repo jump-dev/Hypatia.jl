@@ -2,7 +2,7 @@
 Copyright 2018, Chris Coey and contributors
 
 positive semidefinite cone lower triangle, svec (scaled) definition
-barrier for matrix cone is -ln det(X)
+barrier for matrix cone is -ln det(U)
 from Nesterov & Todd "Self-Scaled Barriers and Interior-Point Methods for Convex Programming"
 =#
 
@@ -43,13 +43,13 @@ loadpnt_prmtv!(prmtv::PositiveSemidefiniteCone, pnt::AbstractVector{Float64}) = 
 
 function incone_prmtv(prmtv::PositiveSemidefiniteCone)
     vectomat!(prmtv.mat, prmtv.pnt)
-    F = cholesky!(Symmetric(prmtv.mat), check=false)
+    @. prmtv.matpnt = prmtv.mat
+
+    F = bunchkaufman!(Symmetric(prmtv.mat), true, check=false)
     if !issuccess(F)
         return false
     end
-
     prmtv.matinv = -inv(F) # TODO eliminate allocs
-    vectomat!(prmtv.matpnt, prmtv.pnt)
     return true
 end
 
