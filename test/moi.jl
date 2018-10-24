@@ -27,7 +27,7 @@ MOIU.@model(HypatiaModelData,
     )
 
 config = MOIT.TestConfig(
-    atol = 1e-4,
+    atol = 1.2e-4,
     rtol = 1e-4,
     solve = true,
     query = true,
@@ -42,15 +42,18 @@ unit_exclude = [
     "solve_integer_edge_cases",
     "solve_objbound_edge_cases",
     ]
-conic_exclude = [
-    "lin",
-    "soc",
-    "rsoc",
-    "exp",
-    "geomean",
+conic_exclude = String[
+    # "lin",
+    # "soc",
+    # "rsoc",
+    # "exp",
+    # "geomean",
     # "sdp",
     # "logdet",
     # "rootdet",
+    # TODO MOI bridges don't support square logdet or rootdet
+    "logdets",
+    "rootdets",
     ]
 
 
@@ -61,19 +64,19 @@ function testmoi(; verbose, lscachetype, usedense)
             lscachetype = lscachetype,
             usedense = usedense,
             tolrelopt = 1e-8,
-            tolabsopt = 1e-8,
+            tolabsopt = 5e-8,
             tolfeas = 1e-7,
             )
         )
-    # @testset "unit tests" begin
-    #     MOIT.unittest(MOIB.SplitInterval{Float64}(optimizer), config, unit_exclude)
-    #     MOIT.unittest(optimizer, config, unit_exclude)
-    # end
-    #
-    # @testset "linear tests" begin
-    #     MOIT.contlineartest(MOIB.SplitInterval{Float64}(optimizer), config)
-    #     MOIT.linear10test(optimizer, config)
-    # end
+    @testset "unit tests" begin
+        MOIT.unittest(MOIB.SplitInterval{Float64}(optimizer), config, unit_exclude)
+        MOIT.unittest(optimizer, config, unit_exclude)
+    end
+
+    @testset "linear tests" begin
+        MOIT.contlineartest(MOIB.SplitInterval{Float64}(optimizer), config)
+        MOIT.linear10test(optimizer, config)
+    end
 
     @testset "conic tests" begin
         MOIT.contconictest(
