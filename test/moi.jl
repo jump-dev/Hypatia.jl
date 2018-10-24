@@ -16,9 +16,8 @@ MOIU.@model(HypatiaModelData,
     (
         MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives,
         MOI.SecondOrderCone, MOI.RotatedSecondOrderCone,
-        # MOI.PositiveSemidefiniteConeTriangle,
-        # MOI.ExponentialCone,
-        # MOI.PowerCone,
+        MOI.ExponentialCone, MOI.PowerCone, MOI.GeometricMeanCone,
+        MOI.PositiveSemidefiniteConeTriangle,
     ),
     (),
     (MOI.SingleVariable,),
@@ -28,7 +27,7 @@ MOIU.@model(HypatiaModelData,
     )
 
 config = MOIT.TestConfig(
-    atol = 1e-4,
+    atol = 1.2e-4,
     rtol = 1e-4,
     solve = true,
     query = true,
@@ -43,12 +42,18 @@ unit_exclude = [
     "solve_integer_edge_cases",
     "solve_objbound_edge_cases",
     ]
-conic_exclude = [
-    "exp",
-    "geomean",
-    "sdp",
-    "rootdet",
-    "logdet",
+conic_exclude = String[
+    # "lin",
+    # "soc",
+    # "rsoc",
+    # "exp",
+    # "geomean",
+    # "sdp",
+    # "logdet",
+    # "rootdet",
+    # TODO MOI bridges don't support square logdet or rootdet
+    "logdets",
+    "rootdets",
     ]
 
 
@@ -59,7 +64,7 @@ function testmoi(; verbose, lscachetype, usedense)
             lscachetype = lscachetype,
             usedense = usedense,
             tolrelopt = 1e-8,
-            tolabsopt = 1e-8,
+            tolabsopt = 5e-8,
             tolfeas = 1e-7,
             )
         )
@@ -73,15 +78,13 @@ function testmoi(; verbose, lscachetype, usedense)
         MOIT.linear10test(optimizer, config)
     end
 
-    # TODO MOI does not yet support scaled PSD triangle
     @testset "conic tests" begin
         MOIT.contconictest(
-            # MOIB.GeoMean{Float64}(
-            # MOIB.SquarePSD{Float64}(
-            # MOIB.LogDet{Float64}(
-            # MOIB.RootDet{Float64}(
+            MOIB.SquarePSD{Float64}(
+            MOIB.LogDet{Float64}(
+            MOIB.RootDet{Float64}(
                 optimizer
-            ,#)))),
+            ))),
             config, conic_exclude)
     end
 

@@ -181,16 +181,14 @@ function preprocess_data(
     # get pivoted QR # TODO when Julia has a unified QR interface, replace this
     if issparse(AG)
         AGF = qr(AG, tol=tol)
-        AGR = AGF.R
-        AGrank = rank(AGF) # cheap
     else
         AGF = qr(AG, Val(true))
-        AGR = AGF.R
-        AGrank = 0
-        for i in 1:size(AGR, 1) # TODO could replace this with rank(AF) when available for both dense and sparse
-            if abs(AGR[i,i]) > tol
-                AGrank += 1
-            end
+    end
+    AGR = AGF.R
+    AGrank = 0
+    for i in 1:size(AGR, 1) # TODO could replace this with rank(AF) when available for both dense and sparse
+        if abs(AGR[i,i]) > tol
+            AGrank += 1
         end
     end
 
@@ -228,19 +226,16 @@ function preprocess_data(
 
     # preprocess primal equality constraints
     # get pivoted QR # TODO when Julia has a unified QR interface, replace this
-    # TODO LQ decomposition is the QR decomposition of A'
     if issparse(A)
         AF = qr(sparse(A'), tol=tol)
-        AR = AF.R
-        Arank = rank(AF) # cheap
     else
         AF = qr(A', Val(true))
-        AR = AF.R
-        Arank = 0
-        for i in 1:size(AR, 1) # TODO could replace this with rank(AF) when available for both dense and sparse
-            if abs(AR[i,i]) > tol
-                Arank += 1
-            end
+    end
+    AR = AF.R
+    Arank = 0
+    for i in 1:size(AR, 1) # TODO could replace this with rank(AF) when available for both dense and sparse
+        if abs(AR[i,i]) > tol
+            Arank += 1
         end
     end
 

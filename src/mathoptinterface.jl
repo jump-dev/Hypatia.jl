@@ -62,14 +62,14 @@ MOI.supports(::Optimizer, ::Union{
     ) = true
 
 # TODO don't restrict to Float64 type
-const SupportedFuns = Union{
+SupportedFuns = Union{
     MOI.SingleVariable,
     MOI.ScalarAffineFunction{Float64},
     MOI.VectorOfVariables,
     MOI.VectorAffineFunction{Float64},
     }
 
-const SupportedSets = Union{
+SupportedSets = Union{
     MOI.EqualTo{Float64},
     MOI.Zeros,
     MOI.GreaterThan{Float64},
@@ -79,18 +79,96 @@ const SupportedSets = Union{
     MOI.Interval{Float64},
     MOI.SecondOrderCone,
     MOI.RotatedSecondOrderCone,
-    MOI.PositiveSemidefiniteConeTriangle,
     MOI.ExponentialCone,
-    # MOI.PowerCone,
+    MOI.GeometricMeanCone,
+    MOI.PowerCone,
+    MOI.PositiveSemidefiniteConeTriangle,
     }
 
 MOI.supports_constraint(::Optimizer, ::Type{<:SupportedFuns}, ::Type{<:SupportedSets}) = true
 
+# MOI cones for which no transformation is needed
 conefrommoi(s::MOI.SecondOrderCone) = SecondOrderCone(MOI.dimension(s))
 conefrommoi(s::MOI.RotatedSecondOrderCone) = RotatedSecondOrderCone(MOI.dimension(s))
-conefrommoi(s::MOI.PositiveSemidefiniteConeTriangle) = PositiveSemidefiniteCone(MOI.dimension(s))
-conefrommoi(s::MOI.ExponentialCone) = error("need to swap ordering...") #ExponentialCone()
-# conefrommoi(s::MOI.PowerCone) = PowerCone(s.exponent)
+conefrommoi(s::MOI.GeometricMeanCone) = (l = MOI.dimension(s) - 1; PowerCone(fill(1.0/l, l)))
+conefrommoi(s::MOI.AbstractVectorSet) = error("MOI set $s is not recognized")
+
+function buildvarcone(fi::MOI.VectorOfVariables, si::MOI.AbstractVectorSet, dim::Int, q::Int)
+    IGi = q+1:q+dim
+    VGi = -ones(dim)
+    prmtvi = conefrommoi(si)
+    return (IGi, VGi, prmtvi)
+end
+
+function buildconstrcone(fi::MOI.VectorAffineFunction{Float64}, si::MOI.AbstractVectorSet, dim::Int, q::Int)
+    IGi = [q + vt.output_index for vt in fi.terms]
+    VGi = [-vt.scalar_term.coefficient for vt in fi.terms]
+    Ihi = q+1:q+dim
+    Vhi = fi.constants
+    prmtvi = conefrommoi(si)
+    return (IGi, VGi, Ihi, Vhi, prmtvi)
+end
+
+# MOI cones requiring transformations (eg rescaling, changing order)
+# exponential cone: reverse order of indices
+function buildvarcone(fi::MOI.VectorOfVariables, si::MOI.ExponentialCone, dim::Int, q::Int)
+    @assert dim == 3
+    IGi = [q+3, q+2, q+1]
+    VGi = -ones(3)
+    prmtvi = ExponentialCone()
+    return (IGi, VGi, prmtvi)
+end
+
+function buildconstrcone(fi::MOI.VectorAffineFunction{Float64}, si::MOI.ExponentialCone, dim::Int, q::Int)
+    @assert dim == 3
+    IGi = [q + (4 - vt.output_index) for vt in fi.terms]
+    VGi = [-vt.scalar_term.coefficient for vt in fi.terms]
+    Ihi = [q+3, q+2, q+1]
+    Vhi = fi.constants
+    prmtvi = ExponentialCone()
+    return (IGi, VGi, Ihi, Vhi, prmtvi)
+end
+
+# power cone: convert from 3-dim to n-dim definition (requires reversing order of indices)
+function buildvarcone(fi::MOI.VectorOfVariables, si::MOI.PowerCone, dim::Int, q::Int)
+    @assert dim == 3
+    IGi = [q+3, q+2, q+1]
+    VGi = -ones(3)
+    prmtvi = PowerCone([1.0 - si.exponent, si.exponent])
+    return (IGi, VGi, prmtvi)
+end
+
+function buildconstrcone(fi::MOI.VectorAffineFunction{Float64}, si::MOI.PowerCone, dim::Int, q::Int)
+    @assert dim == 3
+    IGi = [q + (4 - vt.output_index) for vt in fi.terms]
+    VGi = [-vt.scalar_term.coefficient for vt in fi.terms]
+    Ihi = [q+3, q+2, q+1]
+    Vhi = fi.constants
+    prmtvi = PowerCone([1.0 - si.exponent, si.exponent])
+    return (IGi, VGi, Ihi, Vhi, prmtvi)
+end
+
+# PSD cone: convert from smat to svec form (scale off-diagonals)
+# TODO later remove if MOI gets a scaled triangle PSD set
+svecscale(dim) = [(i == j ? 1.0 : rt2) for i in 1:round(Int, sqrt(0.25 + 2*dim) - 0.5) for j in 1:i]
+svecunscale(dim) = [(i == j ? 1.0 : rt2i) for i in 1:round(Int, sqrt(0.25 + 2*dim) - 0.5) for j in 1:i]
+
+function buildvarcone(fi::MOI.VectorOfVariables, si::MOI.PositiveSemidefiniteConeTriangle, dim::Int, q::Int)
+    IGi = q+1:q+dim
+    VGi = -svecscale(dim)
+    prmtvi = PositiveSemidefiniteCone(dim)
+    return (IGi, VGi, prmtvi)
+end
+
+function buildconstrcone(fi::MOI.VectorAffineFunction{Float64}, si::MOI.PositiveSemidefiniteConeTriangle, dim::Int, q::Int)
+    scalevec = svecscale(dim)
+    IGi = [q + vt.output_index for vt in fi.terms]
+    VGi = [-vt.scalar_term.coefficient*scalevec[vt.output_index] for vt in fi.terms]
+    Ihi = q+1:q+dim
+    Vhi = scalevec .* fi.constants
+    prmtvi = PositiveSemidefiniteCone(dim)
+    return (IGi, VGi, Ihi, Vhi, prmtvi)
+end
 
 # build representation as min c'x s.t. Ax = b, x in K
 # TODO what if some variables x are in multiple cone constraints?
@@ -448,36 +526,29 @@ function MOI.copy_to(
         MOI.RotatedSecondOrderCone,
         MOI.ExponentialCone,
         MOI.PowerCone,
+        MOI.GeometricMeanCone,
         MOI.PositiveSemidefiniteConeTriangle,
-        )
-
-        for ci in getsrccons(MOI.VectorOfVariables, S)
+        ),
+        F in (MOI.VectorOfVariables, MOI.VectorAffineFunction{Float64})
+        for ci in getsrccons(F, S)
             i += 1
-            idxmap[ci] = MOI.ConstraintIndex{MOI.VectorOfVariables, S}(i)
+            idxmap[ci] = MOI.ConstraintIndex{F, S}(i)
             push!(constroffsetcone, q)
             fi = getconfun(ci)
+            si = getconset(ci)
             dim = MOI.output_dimension(fi)
-            append!(IG, q+1:q+dim)
-            append!(JG, idxmap[vj].value for vj in fi.variables)
-            append!(VG, -ones(dim))
-            addprimitivecone!(cone, conefrommoi(getconset(ci)), q+1:q+dim)
-            q += dim
-        end
-
-        for ci in getsrccons(MOI.VectorAffineFunction{Float64}, S)
-            i += 1
-            idxmap[ci] = MOI.ConstraintIndex{MOI.VectorAffineFunction{Float64}, S}(i)
-            push!(constroffsetcone, q)
-            fi = getconfun(ci)
-            dim = MOI.output_dimension(fi)
-            for vt in fi.terms
-                push!(IG, q + vt.output_index)
-                push!(JG, idxmap[vt.scalar_term.variable_index].value)
-                push!(VG, -vt.scalar_term.coefficient)
+            if F == MOI.VectorOfVariables
+                append!(JG, idxmap[vj].value for vj in fi.variables)
+                (IGi, VGi, prmtvi) = buildvarcone(fi, si, dim, q)
+            else
+                append!(JG, idxmap[vt.scalar_term.variable_index].value for vt in fi.terms)
+                (IGi, VGi, Ihi, Vhi, prmtvi) = buildconstrcone(fi, si, dim, q)
+                append!(Ih, Ihi)
+                append!(Vh, Vhi)
             end
-            append!(Ih, q+1:q+dim)
-            append!(Vh, fi.constants)
-            addprimitivecone!(cone, conefrommoi(getconset(ci)), q+1:q+dim)
+            append!(IG, IGi)
+            append!(VG, VGi)
+            addprimitivecone!(cone, prmtvi, q+1:q+dim)
             q += dim
         end
     end
@@ -514,6 +585,12 @@ function MOI.optimize!(opt::Optimizer)
     load_data!(mdl, c1, A1, b1, G1, h, cone, L)
     solve!(mdl)
 
+    opt.status = get_status(mdl)
+    opt.solvetime = get_solvetime(mdl)
+    opt.pobj = get_pobj(mdl)
+    opt.dobj = get_dobj(mdl)
+
+    # get solution and transform for MOI
     opt.x = zeros(length(c))
     opt.x[dukeep] = get_x(mdl)
     opt.constrprimeq += opt.b - opt.A*opt.x
@@ -521,16 +598,25 @@ function MOI.optimize!(opt::Optimizer)
     opt.y[prkeep] = get_y(mdl)
 
     opt.s = get_s(mdl)
+    opt.z = get_z(mdl)
+
+    for k in eachindex(cone.prmtvs)
+        if cone.prmtvs[k] isa ExponentialCone || cone.prmtvs[k] isa PowerCone
+            idxs = cone.idxs[k]
+            revidxs = reverse(idxs)
+            opt.s[idxs] = opt.s[revidxs]
+            opt.z[idxs] = opt.z[revidxs]
+        elseif cone.prmtvs[k] isa PositiveSemidefiniteCone
+            idxs = cone.idxs[k]
+            scalevec = svecunscale(length(idxs))
+            opt.s[idxs] .*= scalevec
+            opt.z[idxs] .*= scalevec
+        end
+    end
+
     opt.s[opt.intervalidxs] ./= opt.intervalscales
     opt.constrprimcone += opt.s
-    opt.z = get_z(mdl)
     opt.z[opt.intervalidxs] .*= opt.intervalscales
-
-    opt.pobj = get_pobj(mdl)
-    opt.dobj = get_dobj(mdl)
-
-    opt.status = get_status(mdl)
-    opt.solvetime = get_solvetime(mdl)
 
     return nothing
 end
