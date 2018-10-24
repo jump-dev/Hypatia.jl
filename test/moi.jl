@@ -16,9 +16,8 @@ MOIU.@model(HypatiaModelData,
     (
         MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives,
         MOI.SecondOrderCone, MOI.RotatedSecondOrderCone,
-        # MOI.PositiveSemidefiniteConeTriangle,
-        # MOI.ExponentialCone,
-        # MOI.PowerCone,
+        MOI.ExponentialCone, MOI.PowerCone, MOI.GeometricMeanCone,
+        MOI.PositiveSemidefiniteConeTriangle,
     ),
     (),
     (MOI.SingleVariable,),
@@ -44,11 +43,14 @@ unit_exclude = [
     "solve_objbound_edge_cases",
     ]
 conic_exclude = [
+    "lin",
+    "soc",
+    "rsoc",
     "exp",
     "geomean",
-    "sdp",
-    "rootdet",
-    "logdet",
+    # "sdp",
+    # "logdet",
+    # "rootdet",
     ]
 
 
@@ -63,25 +65,23 @@ function testmoi(; verbose, lscachetype, usedense)
             tolfeas = 1e-7,
             )
         )
-    @testset "unit tests" begin
-        MOIT.unittest(MOIB.SplitInterval{Float64}(optimizer), config, unit_exclude)
-        MOIT.unittest(optimizer, config, unit_exclude)
-    end
+    # @testset "unit tests" begin
+    #     MOIT.unittest(MOIB.SplitInterval{Float64}(optimizer), config, unit_exclude)
+    #     MOIT.unittest(optimizer, config, unit_exclude)
+    # end
+    #
+    # @testset "linear tests" begin
+    #     MOIT.contlineartest(MOIB.SplitInterval{Float64}(optimizer), config)
+    #     MOIT.linear10test(optimizer, config)
+    # end
 
-    @testset "linear tests" begin
-        MOIT.contlineartest(MOIB.SplitInterval{Float64}(optimizer), config)
-        MOIT.linear10test(optimizer, config)
-    end
-
-    # TODO MOI does not yet support scaled PSD triangle
     @testset "conic tests" begin
         MOIT.contconictest(
-            # MOIB.GeoMean{Float64}(
-            # MOIB.SquarePSD{Float64}(
-            # MOIB.LogDet{Float64}(
-            # MOIB.RootDet{Float64}(
+            MOIB.SquarePSD{Float64}(
+            MOIB.LogDet{Float64}(
+            MOIB.RootDet{Float64}(
                 optimizer
-            ,#)))),
+            ))),
             config, conic_exclude)
     end
 
