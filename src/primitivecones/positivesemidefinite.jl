@@ -18,7 +18,7 @@ mutable struct PositiveSemidefiniteCone <: PrimitiveCone
     function PositiveSemidefiniteCone(dim::Int)
         prmtv = new()
         prmtv.dim = dim
-        prmtv.side = round(Int, sqrt(0.25 + dim + dim) - 0.5)
+        prmtv.side = round(Int, sqrt(0.25 + 2*dim) - 0.5)
         prmtv.mat = Matrix{Float64}(undef, prmtv.side, prmtv.side)
         prmtv.mat2 = similar(prmtv.mat)
         prmtv.matpnt = similar(prmtv.mat)
