@@ -498,20 +498,19 @@ function solve!(mdl::Model)
         while true
             nprediters += 1
 
-            ls_tau = tau + alpha*tmp_tau
-            ls_kap = kap + alpha*tmp_kap
             @. ls_ts = ts + alpha*tmp_ts
             @. ls_tz = tz + alpha*tmp_tz
+            ls_tau = tau + alpha*tmp_tau
+            ls_kap = kap + alpha*tmp_kap
+            ls_tk = ls_tau*ls_kap
+            ls_mu = (dot(ls_ts, ls_tz) + ls_tk)/bnu
 
             # accept primal iterate if
             # - decreased alpha and it is the first inside the cone and beta-neighborhood or
             # - increased alpha and it is inside the cone and the first to leave beta-neighborhood
-            if ls_tau > 0.0 && ls_kap > 0.0 && incone(cone)
+            if ls_mu > 0.0 && ls_tau > 0.0 && ls_kap > 0.0 && incone(cone)
                 # primal iterate is inside the cone
-                ls_tk = ls_tau*ls_kap
-                ls_mu = (dot(ls_ts, ls_tz) + ls_tk)/bnu
                 nbhd = calcnbhd!(g, ls_ts, ls_tz, ls_mu, cone) + (ls_tk - ls_mu)^2
-
                 if nbhd < abs2(beta*ls_mu)
                     # iterate is inside the beta-neighborhood
                     if !alphaprevok || (alpha > mdl.predlsmulti)
@@ -598,7 +597,7 @@ function solve!(mdl::Model)
 
                 @. ls_ts = ts + alpha*tmp_ts
                 @. ls_tz = tz + alpha*tmp_tz
-
+                # TODO maybe check mu, tau, kap >= 0 condition here (as in pred)
                 if incone(cone)
                     # primal iterate tx is inside the cone, so terminate line search
                     break
@@ -628,6 +627,9 @@ function solve!(mdl::Model)
             tau += alpha*tmp_tau
             kap += alpha*tmp_kap
             mu = (dot(ts, tz) + tau*kap)/bnu
+            @assert tau >= 0.0
+            @assert kap >= 0.0
+            @assert mu >= 0.0
 
             # finish if allowed and current iterate is in the eta-neighborhood, or if taken max steps
             if (ncorrsteps == mdl.maxcorrsteps) || mdl.corrcheck
