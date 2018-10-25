@@ -474,8 +474,8 @@ function solve!(mdl::Model)
 
         # prediction phase
         # calculate prediction direction
-        @. ls_ts = ts
         @. ls_tz = tz
+        @. ls_ts = ts
         @. tmp_ts = tmp_tz
         for k in eachindex(cone.prmtvs)
             (v1, v2) = (cone.useduals[k] ? (ts, tz) : (tz, ts))
@@ -486,20 +486,22 @@ function solve!(mdl::Model)
         # determine step length alpha by line search
         alpha = alphapred
         if tmp_kap < 0.0
-            alpha = min(alpha, -kap/tmp_kap*0.999)
+            alpha = min(alpha, -kap/tmp_kap*0.9999)
         end
         if tmp_tau < 0.0
-            alpha = min(alpha, -tau/tmp_tau*0.999)
+            alpha = min(alpha, -tau/tmp_tau*0.9999)
         end
+
         nbhd = Inf
+        ls_tau = ls_kap = ls_tk = ls_mu = 0.0
         alphaprevok = true
         predfail = false
         nprediters = 0
         while true
             nprediters += 1
 
-            @. ls_ts = ts + alpha*tmp_ts
             @. ls_tz = tz + alpha*tmp_tz
+            @. ls_ts = ts + alpha*tmp_ts
             ls_tau = tau + alpha*tmp_tau
             ls_kap = kap + alpha*tmp_kap
             ls_tk = ls_tau*ls_kap
@@ -511,9 +513,10 @@ function solve!(mdl::Model)
             if ls_mu > 0.0 && ls_tau > 0.0 && ls_kap > 0.0 && incone(cone)
                 # primal iterate is inside the cone
                 nbhd = calcnbhd!(g, ls_ts, ls_tz, ls_mu, cone) + (ls_tk - ls_mu)^2
+
                 if nbhd < abs2(beta*ls_mu)
                     # iterate is inside the beta-neighborhood
-                    if !alphaprevok || (alpha > mdl.predlsmulti)
+                    if !alphaprevok || alpha > mdl.predlsmulti
                         # either the previous iterate was outside the beta-neighborhood or increasing alpha again will make it > 1
                         if mdl.predlinesearch
                             alphapred = alpha
@@ -552,22 +555,16 @@ function solve!(mdl::Model)
         # step distance alpha in the direction
         @. tx += alpha*tmp_tx
         @. ty += alpha*tmp_ty
-        @. tz += alpha*tmp_tz
-        @. ts += alpha*tmp_ts
-        @. ls_ts = ts
-        @. ls_tz = tz
-        tau += alpha*tmp_tau
-        kap += alpha*tmp_kap
-        mu = (dot(ts, tz) + tau*kap)/bnu
-        @assert tau >= 0.0
-        @assert kap >= 0.0
-        if mu < 0.0
-            @assert mu >= -1e-10
-            @warn("mu = $mu is slightly negative")
-        end
+        @. ls_tz = tz + alpha*tmp_tz
+        @. ls_ts = ts + alpha*tmp_ts
+        @. tz = ls_tz
+        @. ts = ls_ts
+        tau = ls_tau
+        kap = ls_kap
+        mu = ls_mu
 
         # skip correction phase if allowed and current iterate is in the eta-neighborhood
-        if mdl.corrcheck && (nbhd < abs2(eta*mu))
+        if mdl.corrcheck && nbhd <= abs2(eta*mu)
             continue
         end
 
@@ -591,14 +588,26 @@ function solve!(mdl::Model)
 
             # determine step length alpha by line search
             alpha = mdl.alphacorr
+            if tmp_kap < 0.0
+                alpha = min(alpha, -kap/tmp_kap*0.9999)
+            end
+            if tmp_tau < 0.0
+                alpha = min(alpha, -tau/tmp_tau*0.9999)
+            end
+
             ncorrlsiters = 0
             while ncorrlsiters <= mdl.maxcorrlsiters
                 ncorrlsiters += 1
 
-                @. ls_ts = ts + alpha*tmp_ts
                 @. ls_tz = tz + alpha*tmp_tz
-                # TODO maybe check mu, tau, kap >= 0 condition here (as in pred)
-                if incone(cone)
+                @. ls_ts = ts + alpha*tmp_ts
+                ls_tau = tau + alpha*tmp_tau
+                @assert ls_tau > 0.0
+                ls_kap = kap + alpha*tmp_kap
+                @assert ls_kap > 0.0
+                ls_mu = (dot(ls_ts, ls_tz) + ls_tau*ls_kap)/bnu
+
+                if ls_mu > 0.0 && incone(cone)
                     # primal iterate tx is inside the cone, so terminate line search
                     break
                 end
@@ -620,22 +629,18 @@ function solve!(mdl::Model)
             # step distance alpha in the direction
             @. tx += alpha*tmp_tx
             @. ty += alpha*tmp_ty
-            @. tz += alpha*tmp_tz
-            @. ts += alpha*tmp_ts
-            @. ls_ts = ts
-            @. ls_tz = tz
-            tau += alpha*tmp_tau
-            kap += alpha*tmp_kap
-            mu = (dot(ts, tz) + tau*kap)/bnu
-            @assert tau >= 0.0
-            @assert kap >= 0.0
-            @assert mu >= 0.0
+            @. tz = ls_tz
+            @. ts = ls_ts
+            tau = ls_tau
+            kap = ls_kap
+            mu = ls_mu
 
             # finish if allowed and current iterate is in the eta-neighborhood, or if taken max steps
-            if (ncorrsteps == mdl.maxcorrsteps) || mdl.corrcheck
+            if ncorrsteps == mdl.maxcorrsteps || mdl.corrcheck
                 nbhd = calcnbhd!(g, ls_ts, ls_tz, mu, cone) + (tau*kap - mu)^2
-                @. ls_ts = ts
                 @. ls_tz = tz
+                @. ls_ts = ts
+
                 if nbhd <= abs2(eta*mu)
                     break
                 elseif ncorrsteps == mdl.maxcorrsteps
