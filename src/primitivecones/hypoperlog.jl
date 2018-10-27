@@ -2,7 +2,7 @@
 Copyright 2018, Chris Coey and contributors
 
 (closure of) hypograph of perspective of (natural) log
-(u in R, v in R_+, w in R) : u <= v*log(w/v)
+(u in R, v in R_+, w in R_+) : u <= v*log(w/v)
 
 barrier from "A homogeneous interior-point algorithm for nonsymmetric convex conic optimization" by Skajaa & Ye 2014
 -log(v*log(w/v) - u) - log(w) - log(v)
@@ -11,7 +11,7 @@ TODO allow different log bases?
 TODO maybe use StaticArrays
 TODO try to extend to case w in R^n
 TODO could write the inverse hessian analytically rather than factorizing
-TODO choose a better interior direction 
+TODO choose a better interior direction
 =#
 
 mutable struct HypoPerLog <: PrimitiveCone

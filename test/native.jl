@@ -184,7 +184,7 @@ function _orthant4(; verbose, lscachetype)
     @test r1.pobj ≈ r2.pobj atol=1e-4 rtol=1e-4
 end
 
-function _ellinf1(; verbose, lscachetype)
+function _epinorminf1(; verbose, lscachetype)
     mdl = Hypatia.Model(verbose=verbose)
     c = Float64[0, -1, -1]
     A = Float64[1 0 0; 0 1 0]
@@ -200,7 +200,7 @@ function _ellinf1(; verbose, lscachetype)
     @test r.y ≈ [1, 1] atol=1e-4 rtol=1e-4
 end
 
-function _ellinf2(; verbose, lscachetype)
+function _epinorminf2(; verbose, lscachetype)
     mdl = Hypatia.Model(verbose=verbose)
     Random.seed!(1)
     c = Float64[1, 0, 0, 0, 0, 0]
@@ -215,7 +215,7 @@ function _ellinf2(; verbose, lscachetype)
     @test r.pobj ≈ 1 atol=1e-4 rtol=1e-4
 end
 
-function _ellinf3(; verbose, lscachetype)
+function _epinorminf3(; verbose, lscachetype)
     mdl = Hypatia.Model(verbose=verbose)
     Random.seed!(1)
     c = Float64[1, 0, 0, 0, 0, 0]
@@ -231,7 +231,7 @@ function _ellinf3(; verbose, lscachetype)
     @test r.x ≈ zeros(6) atol=1e-4 rtol=1e-4
 end
 
-function _ellinf4(; verbose, lscachetype)
+function _epinorminf4(; verbose, lscachetype)
     mdl = Hypatia.Model(verbose=verbose)
     c = Float64[0, 1, -1]
     A = Float64[1 0 0; 0 1 0]
@@ -247,7 +247,7 @@ function _ellinf4(; verbose, lscachetype)
     @test r.y ≈ [1, 0] atol=1e-4 rtol=1e-4
 end
 
-function _ellinf5(; verbose, lscachetype)
+function _epinorminf5(; verbose, lscachetype)
     mdl = Hypatia.Model(verbose=verbose)
     Random.seed!(1)
     c = Float64[1, 0, 0, 0, 0, 0]
@@ -262,7 +262,7 @@ function _ellinf5(; verbose, lscachetype)
     @test r.pobj ≈ 1 atol=1e-4 rtol=1e-4
 end
 
-function _ellinf6(; verbose, lscachetype)
+function _epinorminf6(; verbose, lscachetype)
     Random.seed!(1)
     l = 3
     L = 2l + 1
@@ -283,7 +283,7 @@ function _ellinf6(; verbose, lscachetype)
     @test sum(abs, r.x) ≈ 1.0 atol=1e-4 rtol=1e-4
 end
 
-function _soc1(; verbose, lscachetype)
+function _epinormeucl1(; verbose, lscachetype)
     c = Float64[0, -1, -1]
     A = Float64[1 0 0; 0 1 0]
     b = Float64[1, 1/sqrt(2)]
@@ -302,7 +302,7 @@ function _soc1(; verbose, lscachetype)
     end
 end
 
-function _soc2(; verbose, lscachetype)
+function _epinormeucl2(; verbose, lscachetype)
     c = Float64[0, -1, -1]
     A = Float64[1 0 0]
     b = Float64[0]
@@ -320,7 +320,7 @@ function _soc2(; verbose, lscachetype)
     end
 end
 
-function _rsoc1(; verbose, lscachetype)
+function _epipersquare1(; verbose, lscachetype)
     c = Float64[0, 0, -1, -1]
     A = Float64[1 0 0 0; 0 1 0 0]
     b = Float64[1/2, 1]
@@ -338,7 +338,7 @@ function _rsoc1(; verbose, lscachetype)
     end
 end
 
-function _rsoc2(; verbose, lscachetype)
+function _epipersquare2(; verbose, lscachetype)
     c = Float64[0, 0, -1]
     A = Float64[1 0 0; 0 1 0]
     b = Float64[1/2, 1]/sqrt(2)
@@ -356,7 +356,7 @@ function _rsoc2(; verbose, lscachetype)
     end
 end
 
-function _rsoc3(; verbose, lscachetype)
+function _epipersquare3(; verbose, lscachetype)
     c = Float64[0, 1, -1, -1]
     A = Float64[1 0 0 0]
     b = Float64[0]
@@ -374,7 +374,7 @@ function _rsoc3(; verbose, lscachetype)
     end
 end
 
-function _psd1(; verbose, lscachetype)
+function _semidefinite1(; verbose, lscachetype)
     c = Float64[0, -1, 0]
     A = Float64[1 0 0; 0 0 1]
     b = Float64[1/2, 1]
@@ -392,7 +392,7 @@ function _psd1(; verbose, lscachetype)
     end
 end
 
-function _psd2(; verbose, lscachetype)
+function _semidefinite2(; verbose, lscachetype)
     c = Float64[0, -1, 0]
     A = Float64[1 0 1]
     b = Float64[0]
@@ -410,7 +410,7 @@ function _psd2(; verbose, lscachetype)
     end
 end
 
-function _psd3(; verbose, lscachetype)
+function _semidefinite3(; verbose, lscachetype)
     c = Float64[1, 0, 1, 0, 0, 1]
     A = Float64[1 2 3 4 5 6; 1 1 1 1 1 1]
     b = Float64[10, 3]
@@ -428,7 +428,7 @@ function _psd3(; verbose, lscachetype)
     end
 end
 
-function _exp1(; verbose, lscachetype)
+function _hypoperlog1(; verbose, lscachetype)
     mdl = Hypatia.Model(verbose=verbose)
     c = Float64[1, 1, 1]
     A = Float64[0 1 0; 1 0 0]
@@ -445,7 +445,7 @@ function _exp1(; verbose, lscachetype)
     @test r.z ≈ c+A'*r.y atol=1e-4 rtol=1e-4
 end
 
-function _exp2(; verbose, lscachetype)
+function _hypoperlog2(; verbose, lscachetype)
     mdl = Hypatia.Model(verbose=verbose)
     c = Float64[-1, 0, 0]
     A = Float64[0 1 0]
@@ -459,7 +459,7 @@ function _exp2(; verbose, lscachetype)
     @test r.pobj ≈ 0 atol=1e-4 rtol=1e-4
 end
 
-function _exp3(; verbose, lscachetype)
+function _hypoperlog3(; verbose, lscachetype)
     mdl = Hypatia.Model(verbose=verbose)
     c = Float64[1, 1, 1]
     A = Matrix{Float64}(undef, 0, 3)
@@ -475,7 +475,7 @@ function _exp3(; verbose, lscachetype)
     @test isempty(r.y)
 end
 
-function _exp4(; verbose, lscachetype)
+function _hypoperlog4(; verbose, lscachetype)
     mdl = Hypatia.Model(verbose=verbose)
     c = Float64[0, 0, 1]
     A = Float64[0 1 0; 1 0 0]
@@ -490,14 +490,14 @@ function _exp4(; verbose, lscachetype)
     @test r.x ≈ [-1, 1, exp(-2)] atol=1e-4 rtol=1e-4
 end
 
-function _power1(; verbose, lscachetype)
+function _hypogeomean1(; verbose, lscachetype)
     mdl = Hypatia.Model(verbose=verbose)
     c = Float64[1, 0, 0, -1, -1, 0]
     A = Float64[1 1 1/2 0 0 0; 0 0 0 0 0 1]
     b = Float64[2, 1]
     G = SparseMatrixCSC(-1.0I, 6, 6)[[4, 1, 2, 5, 3, 6], :]
     h = zeros(6)
-    cone = Hypatia.Cone([Hypatia.PowerCone([0.2, 0.8]), Hypatia.PowerCone([0.4, 0.6])], [1:3, 4:6])
+    cone = Hypatia.Cone([Hypatia.HypoGeomean([0.2, 0.8]), Hypatia.HypoGeomean([0.4, 0.6])], [1:3, 4:6])
     r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
     @test r.niters <= 25
@@ -505,8 +505,8 @@ function _power1(; verbose, lscachetype)
     @test r.x[1:3] ≈ [0.0639314, 0.783361, 2.30542] atol=1e-4 rtol=1e-4
 end
 
-function _power2(; verbose, lscachetype)
-    c = Float64[1, 0, 0]
+function _hypogeomean2(; verbose, lscachetype)
+    c = Float64[-1, 0, 0]
     A = Float64[0 0 1; 0 1 0]
     b = Float64[1/2, 1]
     G = SparseMatrixCSC(-1.0I, 3, 3)
@@ -514,26 +514,26 @@ function _power2(; verbose, lscachetype)
 
     for usedual in [true, false]
         mdl = Hypatia.Model(verbose=verbose)
-        cone = Hypatia.Cone([Hypatia.PowerCone([0.5, 0.5])], [1:3], [usedual])
+        cone = Hypatia.Cone([Hypatia.HypoGeomean([0.5, 0.5])], [1:3], [usedual])
         r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
         @test r.status == :Optimal
         @test r.niters <= 20
-        @test r.pobj ≈ (usedual ? -sqrt(2) : -1/sqrt(2)) atol=1e-4 rtol=1e-4
+        @test r.pobj ≈ (usedual ? 0 : -1/sqrt(2)) atol=1e-4 rtol=1e-4
         @test r.x[2:3] ≈ [1, 0.5] atol=1e-4 rtol=1e-4
     end
 end
 
-function _power3(; verbose, lscachetype)
+function _hypogeomean3(; verbose, lscachetype)
     l = 4
     c = vcat(0.0, ones(l))
     A = [1.0 zeros(1, l)]
-    b = [1.0]
     G = SparseMatrixCSC(-1.0I, l+1, l+1)
     h = zeros(l+1)
 
     for usedual in [true, false]
+        b = (usedual ? [-1.0] : [1.0])
         mdl = Hypatia.Model(verbose=verbose)
-        cone = Hypatia.Cone([Hypatia.PowerCone(fill(1/l, l))], [1:l+1], [usedual])
+        cone = Hypatia.Cone([Hypatia.HypoGeomean(fill(1/l, l))], [1:l+1], [usedual])
         r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
         @test r.status == :Optimal
         @test r.niters <= 20
@@ -542,7 +542,7 @@ function _power3(; verbose, lscachetype)
     end
 end
 
-function _power4(; verbose, lscachetype)
+function _hypogeomean4(; verbose, lscachetype)
     l = 4
     c = ones(l)
     A = zeros(0, l)
@@ -552,7 +552,7 @@ function _power4(; verbose, lscachetype)
 
     for usedual in [true, false]
         mdl = Hypatia.Model(verbose=verbose)
-        cone = Hypatia.Cone([Hypatia.PowerCone(fill(1/l, l))], [1:l+1], [usedual])
+        cone = Hypatia.Cone([Hypatia.HypoGeomean(fill(1/l, l))], [1:l+1], [usedual])
         r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
         @test r.status == :Optimal
         @test r.niters <= 15

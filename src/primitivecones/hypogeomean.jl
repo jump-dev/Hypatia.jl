@@ -1,17 +1,17 @@
 #=
 Copyright 2018, Chris Coey and contributors
 
+hypograph of generalized geomean (product of powers) parametrized by alpha in R_+^n on unit simplex
+(u in R, w in R_+^n) : u <= prod_i(w_i^alpha_i)
+where sum_i(alpha_i) = 1, alpha_i >= 0
 
-# TODO don't use form with abs
-# TODO rename
+barrier *modified* from "On self-concordant barriers for generalized power cones" by Roy & Xiao 2018
+-log(prod_i(w_i^alpha_i) - u) - sum_i((1 - alpha_i)*log(w_i))
 
-power cone parametrized by powers vector α belonging to the unit simplex
-(u, v) : abs(u) <= prod_i v_i^alpha_i, v >= 0
-barrier from Roy & Xiao 2018 (theorem 1) is
--log(prod_i v_i^(2*alpha_i) - u^2) - sum_i (1 - alpha_i) log(v_i)
+TODO check if this modified barrier remains self-concordant log-homogeneous or not (can it be modified if not?)
 =#
 
-mutable struct PowerCone <: PrimitiveCone
+mutable struct HypoGeomean <: PrimitiveCone
     dim::Int
     alpha::Vector{Float64}
     pnt::AbstractVector{Float64}
@@ -22,7 +22,7 @@ mutable struct PowerCone <: PrimitiveCone
     barfun::Function
     diffres
 
-    function PowerCone(alpha::Vector{Float64})
+    function HypoGeomean(alpha::Vector{Float64})
         dim = length(alpha) + 1
         @assert dim >= 3
         @assert all(ai >= 0.0 for ai in alpha)
@@ -35,8 +35,8 @@ mutable struct PowerCone <: PrimitiveCone
         prmtv.H2 = similar(prmtv.H)
         function barfun(pnt)
             u = pnt[1]
-            v = view(pnt, 2:dim)
-            return -log(prod(v[i]^(2.0*alpha[i]) for i in eachindex(alpha)) - abs2(u)) - sum((1.0 - alpha[i])*log(v[i]) for i in eachindex(alpha))
+            w = view(pnt, 2:dim)
+            return -log(prod(w[i]^alpha[i] for i in eachindex(alpha)) - u) - sum((1.0 - alpha[i])*log(w[i]) for i in eachindex(alpha))
         end
         prmtv.barfun = barfun
         prmtv.diffres = DiffResults.HessianResult(prmtv.g)
@@ -44,19 +44,19 @@ mutable struct PowerCone <: PrimitiveCone
     end
 end
 
-dimension(prmtv::PowerCone) = prmtv.dim
-barrierpar_prmtv(prmtv::PowerCone) = prmtv.dim
-getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::PowerCone) = (@. arr = 1.0; arr[1] = 0.0; arr)
-loadpnt_prmtv!(prmtv::PowerCone, pnt::AbstractVector{Float64}) = (prmtv.pnt = pnt)
+dimension(prmtv::HypoGeomean) = prmtv.dim
+barrierpar_prmtv(prmtv::HypoGeomean) = prmtv.dim - 1
+getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::HypoGeomean) = (@. arr = 1.0; arr[1] = 0.0; arr)
+loadpnt_prmtv!(prmtv::HypoGeomean, pnt::AbstractVector{Float64}) = (prmtv.pnt = pnt)
 
-function incone_prmtv(prmtv::PowerCone)
+function incone_prmtv(prmtv::HypoGeomean)
     u = prmtv.pnt[1]
-    v = view(prmtv.pnt, 2:prmtv.dim)
+    w = view(prmtv.pnt, 2:prmtv.dim)
     alpha = prmtv.alpha
-    if any(vi <= 0.0 for vi in v)
+    if any(wi <= 0.0 for wi in w)
         return false
     end
-    if sum(alpha[i]*log(v[i]) for i in eachindex(alpha)) <= log(abs(u))
+    if prod(w[i]^alpha[i] for i in eachindex(alpha)) <= u
         return false
     end
 
@@ -70,6 +70,6 @@ function incone_prmtv(prmtv::PowerCone)
     return issuccess(prmtv.F)
 end
 
-calcg_prmtv!(g::AbstractVector{Float64}, prmtv::PowerCone) = (@. g = prmtv.g; g)
-calcHiarr_prmtv!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prmtv::PowerCone) = ldiv!(prod, prmtv.F, arr)
-calcHarr_prmtv!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prmtv::PowerCone) = mul!(prod, prmtv.H, arr)
+calcg_prmtv!(g::AbstractVector{Float64}, prmtv::HypoGeomean) = (@. g = prmtv.g; g)
+calcHiarr_prmtv!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prmtv::HypoGeomean) = ldiv!(prod, prmtv.F, arr)
+calcHarr_prmtv!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prmtv::HypoGeomean) = mul!(prod, prmtv.H, arr)
