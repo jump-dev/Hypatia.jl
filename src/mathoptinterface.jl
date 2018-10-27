@@ -91,7 +91,7 @@ MOI.supports_constraint(::Optimizer, ::Type{<:SupportedFuns}, ::Type{<:Supported
 conefrommoi(s::MOI.SecondOrderCone) = EpiNormEucl(MOI.dimension(s))
 conefrommoi(s::MOI.RotatedSecondOrderCone) = EpiPerSquare(MOI.dimension(s))
 conefrommoi(s::MOI.ExponentialCone) = HypoPerLog()
-conefrommoi(s::MOI.GeometricMeanCone) = (l = MOI.dimension(s) - 1; PowerCone(fill(1.0/l, l)))
+conefrommoi(s::MOI.GeometricMeanCone) = (l = MOI.dimension(s) - 1; HypoGeomean(fill(1.0/l, l)))
 conefrommoi(s::MOI.AbstractVectorSet) = error("MOI set $s is not recognized")
 
 function buildvarcone(fi::MOI.VectorOfVariables, si::MOI.AbstractVectorSet, dim::Int, q::Int)
@@ -117,7 +117,7 @@ function buildvarcone(fi::MOI.VectorOfVariables, si::MOI.PowerCone, dim::Int, q:
     @assert dim == 3
     IGi = [q+3, q+2, q+1]
     VGi = -ones(3)
-    prmtvi = PowerCone([1.0 - si.exponent, si.exponent])
+    prmtvi = HypoGeomean([1.0 - si.exponent, si.exponent])
     return (IGi, VGi, prmtvi)
 end
 
@@ -127,7 +127,7 @@ function buildconstrcone(fi::MOI.VectorAffineFunction{Float64}, si::MOI.PowerCon
     VGi = [-vt.scalar_term.coefficient for vt in fi.terms]
     Ihi = [q+3, q+2, q+1]
     Vhi = fi.constants
-    prmtvi = PowerCone([1.0 - si.exponent, si.exponent])
+    prmtvi = HypoGeomean([1.0 - si.exponent, si.exponent])
     return (IGi, VGi, Ihi, Vhi, prmtvi)
 end
 
@@ -584,7 +584,7 @@ function MOI.optimize!(opt::Optimizer)
     opt.z = get_z(mdl)
 
     for k in eachindex(cone.prmtvs)
-        if cone.prmtvs[k] isa PowerCone
+        if cone.prmtvs[k] isa HypoGeomean
             idxs = cone.idxs[k]
             revidxs = reverse(idxs)
             opt.s[idxs] = opt.s[revidxs]
