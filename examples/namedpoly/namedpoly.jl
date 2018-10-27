@@ -76,7 +76,7 @@ function build_namedpoly!(
     G = Diagonal(-1.0I, U) # TODO uniformscaling?
     h = zeros(U)
 
-    cone = Hypatia.Cone([Hypatia.DualSumOfSquaresCone(U, [P0, PWts...])], [1:U])
+    cone = Hypatia.Cone([Hypatia.DualWSOSInterp(U, [P0, PWts...])], [1:U])
 
     return (c, A, b, G, h, cone)
 end

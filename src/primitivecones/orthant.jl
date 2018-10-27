@@ -2,10 +2,15 @@
 Copyright 2018, Chris Coey and contributors
 
 nonnegative/nonpositive orthant cones
-from Nesterov & Todd "Self-Scaled Barriers and Interior-Point Methods for Convex Programming"
+nonnegative cone: w in R^n : w_i >= 0
+nonpositive cone: w in R^n : w_i <= 0
+
+barriers from "Self-Scaled Barriers and Interior-Point Methods for Convex Programming" by Nesterov & Todd
+nonnegative cone: -sum_i(log(u_i))
+nonpositive cone: -sum_i(log(-u_i))
 =#
 
-# nonnegative cone barrier is -sum_j ln u_j
+
 mutable struct NonnegativeCone <: PrimitiveCone
     dim::Int
     pnt::AbstractVector{Float64}
@@ -19,7 +24,6 @@ mutable struct NonnegativeCone <: PrimitiveCone
     end
 end
 
-# nonpositive cone barrier is -sum_j ln u_j
 mutable struct NonpositiveCone <: PrimitiveCone
     dim::Int
     pnt::AbstractVector{Float64}

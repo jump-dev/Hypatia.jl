@@ -1,6 +1,10 @@
 #=
 Copyright 2018, Chris Coey and contributors
 
+
+# TODO don't use form with abs
+
+
 power cone parametrized by powers vector α belonging to the unit simplex
 (u, v) : abs(u) <= prod_i v_i^alpha_i, v >= 0
 barrier from Roy & Xiao 2018 (theorem 1) is
@@ -12,7 +16,7 @@ mutable struct PowerCone <: PrimitiveCone
     alpha::Vector{Float64}
     pnt::AbstractVector{Float64}
     g::Vector{Float64}
-    H::Matrix{Float64} # TODO could be faster as StaticArray
+    H::Matrix{Float64}
     H2::Matrix{Float64}
     F
     barfun::Function
@@ -46,7 +50,9 @@ getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::PowerCone) = (@. arr = 1.0
 loadpnt_prmtv!(prmtv::PowerCone, pnt::AbstractVector{Float64}) = (prmtv.pnt = pnt)
 
 function incone_prmtv(prmtv::PowerCone)
-    u = prmtv.pnt[1]; v = view(prmtv.pnt, 2:prmtv.dim); alpha = prmtv.alpha
+    u = prmtv.pnt[1]
+    v = view(prmtv.pnt, 2:prmtv.dim)
+    alpha = prmtv.alpha
     if any(vi <= 0.0 for vi in v)
         return false
     end

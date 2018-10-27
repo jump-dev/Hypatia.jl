@@ -1,12 +1,17 @@
 #=
 Copyright 2018, Chris Coey and contributors
 
-positive semidefinite cone lower triangle, svec (scaled) definition
-barrier for matrix cone is -ln det(U)
-from Nesterov & Todd "Self-Scaled Barriers and Interior-Point Methods for Convex Programming"
+row-wise lower triangle (svec space) of positive semidefinite matrix cone
+(smat space) W \in S^n : 0 >= eigmin(W)
+(see equivalent MathOptInterface PositiveSemidefiniteConeTriangle definition)
+
+barrier from "Self-Scaled Barriers and Interior-Point Methods for Convex Programming" by Nesterov & Todd
+-logdet(W)
+
+TODO eliminate allocations for inverse-finding
 =#
 
-mutable struct PositiveSemidefiniteCone <: PrimitiveCone
+mutable struct PosSemidef <: PrimitiveCone
     dim::Int
     side::Int
     pnt::AbstractVector{Float64}
@@ -15,7 +20,7 @@ mutable struct PositiveSemidefiniteCone <: PrimitiveCone
     matpnt::Matrix{Float64}
     matinv::Matrix{Float64}
 
-    function PositiveSemidefiniteCone(dim::Int)
+    function PosSemidef(dim::Int)
         prmtv = new()
         prmtv.dim = dim
         prmtv.side = round(Int, sqrt(0.25 + 2*dim) - 0.5)
@@ -26,9 +31,9 @@ mutable struct PositiveSemidefiniteCone <: PrimitiveCone
     end
 end
 
-dimension(prmtv::PositiveSemidefiniteCone) = prmtv.dim
-barrierpar_prmtv(prmtv::PositiveSemidefiniteCone) = prmtv.side
-function getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::PositiveSemidefiniteCone)
+dimension(prmtv::PosSemidef) = prmtv.dim
+barrierpar_prmtv(prmtv::PosSemidef) = prmtv.side
+function getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::PosSemidef)
     for i in 1:prmtv.side, j in i:prmtv.side
         if i == j
             prmtv.mat[i,j] = 1.0
@@ -39,9 +44,9 @@ function getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::PositiveSemidefin
     mattovec!(arr, prmtv.mat)
     return arr
 end
-loadpnt_prmtv!(prmtv::PositiveSemidefiniteCone, pnt::AbstractVector{Float64}) = (prmtv.pnt = pnt)
+loadpnt_prmtv!(prmtv::PosSemidef, pnt::AbstractVector{Float64}) = (prmtv.pnt = pnt)
 
-function incone_prmtv(prmtv::PositiveSemidefiniteCone)
+function incone_prmtv(prmtv::PosSemidef)
     vectomat!(prmtv.mat, prmtv.pnt)
     @. prmtv.matpnt = prmtv.mat
 
@@ -53,9 +58,9 @@ function incone_prmtv(prmtv::PositiveSemidefiniteCone)
     return true
 end
 
-calcg_prmtv!(g::AbstractVector{Float64}, prmtv::PositiveSemidefiniteCone) = (mattovec!(g, prmtv.matinv); g)
+calcg_prmtv!(g::AbstractVector{Float64}, prmtv::PosSemidef) = (mattovec!(g, prmtv.matinv); g)
 
-function calcHiarr_prmtv!(prod::AbstractVector{Float64}, arr::AbstractVector{Float64}, prmtv::PositiveSemidefiniteCone)
+function calcHiarr_prmtv!(prod::AbstractVector{Float64}, arr::AbstractVector{Float64}, prmtv::PosSemidef)
     vectomat!(prmtv.mat, arr)
     mul!(prmtv.mat2, prmtv.mat, prmtv.matpnt)
     mul!(prmtv.mat, prmtv.matpnt, prmtv.mat2)
@@ -63,7 +68,7 @@ function calcHiarr_prmtv!(prod::AbstractVector{Float64}, arr::AbstractVector{Flo
     return prod
 end
 
-function calcHiarr_prmtv!(prod::AbstractMatrix{Float64}, arr::AbstractMatrix{Float64}, prmtv::PositiveSemidefiniteCone)
+function calcHiarr_prmtv!(prod::AbstractMatrix{Float64}, arr::AbstractMatrix{Float64}, prmtv::PosSemidef)
     for j in 1:size(arr, 2)
         vectomat!(prmtv.mat, view(arr, :, j))
         mul!(prmtv.mat2, prmtv.mat, prmtv.matpnt)
@@ -73,7 +78,7 @@ function calcHiarr_prmtv!(prod::AbstractMatrix{Float64}, arr::AbstractMatrix{Flo
     return prod
 end
 
-function calcHarr_prmtv!(prod::AbstractVector{Float64}, arr::AbstractVector{Float64}, prmtv::PositiveSemidefiniteCone)
+function calcHarr_prmtv!(prod::AbstractVector{Float64}, arr::AbstractVector{Float64}, prmtv::PosSemidef)
     vectomat!(prmtv.mat, arr)
     mul!(prmtv.mat2, prmtv.mat, prmtv.matinv)
     mul!(prmtv.mat, prmtv.matinv, prmtv.mat2)
@@ -81,7 +86,7 @@ function calcHarr_prmtv!(prod::AbstractVector{Float64}, arr::AbstractVector{Floa
     return prod
 end
 
-function calcHarr_prmtv!(prod::AbstractMatrix{Float64}, arr::AbstractMatrix{Float64}, prmtv::PositiveSemidefiniteCone)
+function calcHarr_prmtv!(prod::AbstractMatrix{Float64}, arr::AbstractMatrix{Float64}, prmtv::PosSemidef)
     for j in 1:size(arr, 2)
         vectomat!(prmtv.mat, view(arr, :, j))
         mul!(prmtv.mat2, prmtv.mat, prmtv.matinv)
