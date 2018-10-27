@@ -191,7 +191,7 @@ function _ellinf1(; verbose, lscachetype)
     b = Float64[1, 1/sqrt(2)]
     G = SparseMatrixCSC(-1.0I, 3, 3)
     h = zeros(3)
-    cone = Hypatia.Cone([Hypatia.EllInfinityCone(3)], [1:3])
+    cone = Hypatia.Cone([Hypatia.EpiNormInf(3)], [1:3])
     r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
     @test r.niters <= 20
@@ -208,7 +208,7 @@ function _ellinf2(; verbose, lscachetype)
     b = A*ones(6)
     G = rand(6, 6)
     h = G*ones(6)
-    cone = Hypatia.Cone([Hypatia.EllInfinityCone(6)], [1:6])
+    cone = Hypatia.Cone([Hypatia.EpiNormInf(6)], [1:6])
     r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
     @test r.niters <= 20
@@ -223,7 +223,7 @@ function _ellinf3(; verbose, lscachetype)
     b = zeros(0)
     G = SparseMatrixCSC(-1.0I, 6, 6)
     h = zeros(6)
-    cone = Hypatia.Cone([Hypatia.EllInfinityCone(6)], [1:6])
+    cone = Hypatia.Cone([Hypatia.EpiNormInf(6)], [1:6])
     r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
     @test r.niters <= 20
@@ -238,7 +238,7 @@ function _ellinf4(; verbose, lscachetype)
     b = Float64[1, -0.4]
     G = SparseMatrixCSC(-1.0I, 3, 3)
     h = zeros(3)
-    cone = Hypatia.Cone([Hypatia.EllInfinityCone(3)], [1:3], [true])
+    cone = Hypatia.Cone([Hypatia.EpiNormInf(3)], [1:3], [true])
     r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
     @test r.niters <= 20
@@ -255,7 +255,7 @@ function _ellinf5(; verbose, lscachetype)
     b = A*ones(6)
     G = rand(6, 6)
     h = G*ones(6)
-    cone = Hypatia.Cone([Hypatia.EllInfinityCone(6)], [1:6], [true])
+    cone = Hypatia.Cone([Hypatia.EpiNormInf(6)], [1:6], [true])
     r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
     @test r.niters <= 15
@@ -273,7 +273,7 @@ function _ellinf6(; verbose, lscachetype)
     G = [spzeros(1, L); sparse(1.0I, L, L); spzeros(1, L); sparse(2.0I, L, L)]
     h = zeros(2L+2); h[1] = 1.0; h[L+2] = 1.0
     mdl = Hypatia.Model(verbose=verbose)
-    cone = Hypatia.Cone([Hypatia.EllInfinityCone(L+1), Hypatia.EllInfinityCone(L+1)], [1:L+1, L+2:2L+2], [true, false])
+    cone = Hypatia.Cone([Hypatia.EpiNormInf(L+1), Hypatia.EpiNormInf(L+1)], [1:L+1, L+2:2L+2], [true, false])
     r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
     @test r.niters <= 25
@@ -292,7 +292,7 @@ function _soc1(; verbose, lscachetype)
 
     for usedual in [true, false]
         mdl = Hypatia.Model(verbose=verbose)
-        cone = Hypatia.Cone([Hypatia.SecondOrderCone(3)], [1:3], [usedual])
+        cone = Hypatia.Cone([Hypatia.EpiNormEucl(3)], [1:3], [usedual])
         r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
         @test r.status == :Optimal
         @test r.niters <= 20
@@ -311,7 +311,7 @@ function _soc2(; verbose, lscachetype)
 
     for usedual in [true, false]
         mdl = Hypatia.Model(verbose=verbose)
-        cone = Hypatia.Cone([Hypatia.SecondOrderCone(3)], [1:3], [usedual])
+        cone = Hypatia.Cone([Hypatia.EpiNormEucl(3)], [1:3], [usedual])
         r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
         @test r.status == :Optimal
         @test r.niters <= 20
@@ -329,7 +329,7 @@ function _rsoc1(; verbose, lscachetype)
 
     for usedual in [true, false]
         mdl = Hypatia.Model(verbose=verbose)
-        cone = Hypatia.Cone([Hypatia.RotatedSecondOrderCone(4)], [1:4], [usedual])
+        cone = Hypatia.Cone([Hypatia.EpiPerSquare(4)], [1:4], [usedual])
         r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
         @test r.status == :Optimal
         @test r.niters <= 20
@@ -347,7 +347,7 @@ function _rsoc2(; verbose, lscachetype)
 
     for usedual in [true, false]
         mdl = Hypatia.Model(verbose=verbose)
-        cone = Hypatia.Cone([Hypatia.RotatedSecondOrderCone(3)], [1:3], [usedual])
+        cone = Hypatia.Cone([Hypatia.EpiPerSquare(3)], [1:3], [usedual])
         r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
         @test r.status == :Optimal
         @test r.niters <= 15
@@ -365,7 +365,7 @@ function _rsoc3(; verbose, lscachetype)
 
     for usedual in [true, false]
         mdl = Hypatia.Model(verbose=verbose)
-        cone = Hypatia.Cone([Hypatia.RotatedSecondOrderCone(4)], [1:4], [usedual])
+        cone = Hypatia.Cone([Hypatia.EpiPerSquare(4)], [1:4], [usedual])
         r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
         @test r.status == :Optimal
         @test r.niters <= 20
@@ -383,7 +383,7 @@ function _psd1(; verbose, lscachetype)
 
     for usedual in [true, false]
         mdl = Hypatia.Model(verbose=verbose)
-        cone = Hypatia.Cone([Hypatia.PositiveSemidefiniteCone(3)], [1:3], [usedual])
+        cone = Hypatia.Cone([Hypatia.PosSemidef(3)], [1:3], [usedual])
         r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
         @test r.status == :Optimal
         @test r.niters <= 20
@@ -401,7 +401,7 @@ function _psd2(; verbose, lscachetype)
 
     for usedual in [true, false]
         mdl = Hypatia.Model(verbose=verbose)
-        cone = Hypatia.Cone([Hypatia.PositiveSemidefiniteCone(3)], [1:3], [usedual])
+        cone = Hypatia.Cone([Hypatia.PosSemidef(3)], [1:3], [usedual])
         r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
         @test r.status == :Optimal
         @test r.niters <= 20
@@ -419,7 +419,7 @@ function _psd3(; verbose, lscachetype)
 
     for usedual in [true, false]
         mdl = Hypatia.Model(verbose=verbose)
-        cone = Hypatia.Cone([Hypatia.PositiveSemidefiniteCone(6)], [1:6], [usedual])
+        cone = Hypatia.Cone([Hypatia.PosSemidef(6)], [1:6], [usedual])
         r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
         @test r.status == :Optimal
         @test r.niters <= 20
@@ -431,28 +431,28 @@ end
 function _exp1(; verbose, lscachetype)
     mdl = Hypatia.Model(verbose=verbose)
     c = Float64[1, 1, 1]
-    A = Float64[0 1 0; 0 0 1]
+    A = Float64[0 1 0; 1 0 0]
     b = Float64[2, 1]
     G = SparseMatrixCSC(-1.0I, 3, 3)
     h = zeros(3)
-    cone = Hypatia.Cone([Hypatia.ExponentialCone()], [1:3])
+    cone = Hypatia.Cone([Hypatia.HypoPerLog()], [1:3])
     r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
     @test r.niters <= 20
     @test r.pobj ≈ 2*exp(1/2)+3 atol=1e-4 rtol=1e-4
-    @test r.x ≈ [2*exp(1/2), 2, 1] atol=1e-4 rtol=1e-4
+    @test r.x ≈ [1, 2, 2*exp(1/2)] atol=1e-4 rtol=1e-4
     @test r.y ≈ -[1+exp(1/2)/2, 1+exp(1/2)] atol=1e-4 rtol=1e-4
     @test r.z ≈ c+A'*r.y atol=1e-4 rtol=1e-4
 end
 
 function _exp2(; verbose, lscachetype)
     mdl = Hypatia.Model(verbose=verbose)
-    c = Float64[0, 0, -1]
+    c = Float64[-1, 0, 0]
     A = Float64[0 1 0]
     b = Float64[0]
     G = SparseMatrixCSC(-1.0I, 3, 3)
     h = zeros(3)
-    cone = Hypatia.Cone([Hypatia.ExponentialCone()], [1:3])
+    cone = Hypatia.Cone([Hypatia.HypoPerLog()], [1:3])
     r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
     @test r.niters <= 20
@@ -464,9 +464,9 @@ function _exp3(; verbose, lscachetype)
     c = Float64[1, 1, 1]
     A = Matrix{Float64}(undef, 0, 3)
     b = Vector{Float64}(undef, 0)
-    G = sparse([1, 2, 3, 4], [1, 2, 3, 3], -ones(4))
+    G = sparse([1, 2, 3, 4], [1, 2, 3, 1], -ones(4))
     h = zeros(4)
-    cone = Hypatia.Cone([Hypatia.ExponentialCone(), Hypatia.NonnegativeCone(1)], [1:3, 4:4])
+    cone = Hypatia.Cone([Hypatia.HypoPerLog(), Hypatia.NonnegativeCone(1)], [1:3, 4:4])
     r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
     @test r.niters <= 15
@@ -477,17 +477,17 @@ end
 
 function _exp4(; verbose, lscachetype)
     mdl = Hypatia.Model(verbose=verbose)
-    c = Float64[1, 0, 0]
-    A = Float64[0 1 0; 0 0 1]
+    c = Float64[0, 0, 1]
+    A = Float64[0 1 0; 1 0 0]
     b = Float64[1, -1]
     G = SparseMatrixCSC(-1.0I, 3, 3)
     h = zeros(3)
-    cone = Hypatia.Cone([Hypatia.ExponentialCone()], [1:3], [true])
+    cone = Hypatia.Cone([Hypatia.HypoPerLog()], [1:3], [true])
     r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
     @test r.niters <= 15
     @test r.pobj ≈ exp(-2) atol=1e-4 rtol=1e-4
-    @test r.x ≈ [exp(-2), 1, -1] atol=1e-4 rtol=1e-4
+    @test r.x ≈ [-1, 1, exp(-2)] atol=1e-4 rtol=1e-4
 end
 
 function _power1(; verbose, lscachetype)
@@ -574,7 +574,7 @@ function _spectral1(; verbose, lscachetype)
 
     for usedual in [true, false]
         mdl = Hypatia.Model(verbose=verbose)
-        cone = Hypatia.Cone([Hypatia.SpectralNormCone(Xnm+1, Xn, Xm)], [1:Xnm+1], [usedual])
+        cone = Hypatia.Cone([Hypatia.EpiNormSpectral(Xnm+1, Xn, Xm)], [1:Xnm+1], [usedual])
         r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
         @test r.status == :Optimal
         @test r.niters <= 20
