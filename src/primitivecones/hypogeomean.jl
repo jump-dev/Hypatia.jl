@@ -3,7 +3,7 @@ Copyright 2018, Chris Coey and contributors
 
 
 # TODO don't use form with abs
-
+# TODO rename
 
 power cone parametrized by powers vector α belonging to the unit simplex
 (u, v) : abs(u) <= prod_i v_i^alpha_i, v >= 0
