@@ -5,15 +5,16 @@ hypograph of generalized geomean (product of powers) parametrized by alpha in R_
 (u in R, w in R_+^n) : u <= prod_i(w_i^alpha_i)
 where sum_i(alpha_i) = 1, alpha_i >= 0
 
-barrier *modified* from "On self-concordant barriers for generalized power cones" by Roy & Xiao 2018
--log(prod_i(w_i^alpha_i) - u) - sum_i((1 - alpha_i)*log(w_i))
+dual barrier (modified by reflecting around u = 0 and using dual cone definition) from "On self-concordant barriers for generalized power cones" by Roy & Xiao 2018
+-log(prod_i((w_i/alpha_i)^alpha_i) + u) - sum_i((1 - alpha_i)*log(w_i/alpha_i)) - log(-u)
 
-TODO check if this modified barrier remains self-concordant log-homogeneous or not (can it be modified if not?)
+TODO try to make barrier evaluation more efficient
 =#
 
 mutable struct HypoGeomean <: PrimitiveCone
     dim::Int
     alpha::Vector{Float64}
+    ialpha::Vector{Float64}
     pnt::AbstractVector{Float64}
     g::Vector{Float64}
     H::Matrix{Float64}
@@ -30,13 +31,15 @@ mutable struct HypoGeomean <: PrimitiveCone
         prmtv = new()
         prmtv.dim = dim
         prmtv.alpha = alpha
+        ialpha = inv.(alpha)
+        prmtv.ialpha = ialpha
         prmtv.g = Vector{Float64}(undef, dim)
         prmtv.H = similar(prmtv.g, dim, dim)
         prmtv.H2 = similar(prmtv.H)
         function barfun(pnt)
             u = pnt[1]
             w = view(pnt, 2:dim)
-            return -log(prod(w[i]^alpha[i] for i in eachindex(alpha)) - u) - sum((1.0 - alpha[i])*log(w[i]) for i in eachindex(alpha))
+            return -log(prod((w[i]*ialpha[i])^alpha[i] for i in eachindex(alpha)) + u) - sum((1.0 - alpha[i])*log(w[i]*ialpha[i]) for i in eachindex(alpha)) - log(-u)
         end
         prmtv.barfun = barfun
         prmtv.diffres = DiffResults.HessianResult(prmtv.g)
@@ -45,18 +48,19 @@ mutable struct HypoGeomean <: PrimitiveCone
 end
 
 dimension(prmtv::HypoGeomean) = prmtv.dim
-barrierpar_prmtv(prmtv::HypoGeomean) = prmtv.dim - 1
-getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::HypoGeomean) = (@. arr = 1.0; arr[1] = 0.0; arr)
+barrierpar_prmtv(prmtv::HypoGeomean) = prmtv.dim
+getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::HypoGeomean) = (@. arr = 1.0; arr[1] = -prod(prmtv.ialpha[i]^prmtv.alpha[i] for i in eachindex(prmtv.alpha))/prmtv.dim; arr)
 loadpnt_prmtv!(prmtv::HypoGeomean, pnt::AbstractVector{Float64}) = (prmtv.pnt = pnt)
 
 function incone_prmtv(prmtv::HypoGeomean)
     u = prmtv.pnt[1]
     w = view(prmtv.pnt, 2:prmtv.dim)
     alpha = prmtv.alpha
-    if any(wi <= 0.0 for wi in w)
+    ialpha = prmtv.ialpha
+    if u >= 0.0 || any(wi <= 0.0 for wi in w)
         return false
     end
-    if prod(w[i]^alpha[i] for i in eachindex(alpha)) <= u
+    if sum(alpha[i]*log(w[i]*ialpha[i]) for i in eachindex(alpha)) <= log(-u)
         return false
     end
 

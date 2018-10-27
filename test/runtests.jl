@@ -92,9 +92,9 @@ end
 # native interface tests
 include(joinpath(@__DIR__, "native.jl"))
 @info("starting native interface tests")
-verbose = false
+verbose = true
 lscachetypes = [
-    Hypatia.QRSymmCache,
+    # Hypatia.QRSymmCache,
     Hypatia.NaiveCache,
     ]
 testfuns = [
@@ -181,18 +181,18 @@ end
 #     testfun(verbose=verbose, lscachetype=lscachetype)
 # end
 
-
-# MathOptInterface tests
-include(joinpath(@__DIR__, "moi.jl"))
-@info("starting MathOptInterface tests")
-verbose = false
-lscachetypes = [
-    Hypatia.QRSymmCache,
-    Hypatia.NaiveCache,
-    ]
-@testset "MOI tests: $lscachetype, $(usedense ? "dense" : "sparse")" for lscachetype in lscachetypes, usedense in [false, true]
-    testmoi(verbose=verbose, lscachetype=lscachetype, usedense=usedense)
-end
+#
+# # MathOptInterface tests
+# include(joinpath(@__DIR__, "moi.jl"))
+# @info("starting MathOptInterface tests")
+# verbose = false
+# lscachetypes = [
+#     Hypatia.QRSymmCache,
+#     Hypatia.NaiveCache,
+#     ]
+# @testset "MOI tests: $lscachetype, $(usedense ? "dense" : "sparse")" for lscachetype in lscachetypes, usedense in [false, true]
+#     testmoi(verbose=verbose, lscachetype=lscachetype, usedense=usedense)
+# end
 
 
 return nothing

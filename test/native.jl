@@ -497,7 +497,7 @@ function _hypogeomean1(; verbose, lscachetype)
     b = Float64[2, 1]
     G = SparseMatrixCSC(-1.0I, 6, 6)[[4, 1, 2, 5, 3, 6], :]
     h = zeros(6)
-    cone = Hypatia.Cone([Hypatia.HypoGeomean([0.2, 0.8]), Hypatia.HypoGeomean([0.4, 0.6])], [1:3, 4:6])
+    cone = Hypatia.Cone([Hypatia.HypoGeomean([0.2, 0.8]), Hypatia.HypoGeomean([0.4, 0.6])], [1:3, 4:6], [true, true])
     r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
     @test r.niters <= 25
@@ -514,7 +514,7 @@ function _hypogeomean2(; verbose, lscachetype)
 
     for usedual in [true, false]
         mdl = Hypatia.Model(verbose=verbose)
-        cone = Hypatia.Cone([Hypatia.HypoGeomean([0.5, 0.5])], [1:3], [usedual])
+        cone = Hypatia.Cone([Hypatia.HypoGeomean([0.5, 0.5])], [1:3], [!usedual])
         r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
         @test r.status == :Optimal
         @test r.niters <= 20
@@ -533,10 +533,10 @@ function _hypogeomean3(; verbose, lscachetype)
     for usedual in [true, false]
         b = (usedual ? [-1.0] : [1.0])
         mdl = Hypatia.Model(verbose=verbose)
-        cone = Hypatia.Cone([Hypatia.HypoGeomean(fill(1/l, l))], [1:l+1], [usedual])
+        cone = Hypatia.Cone([Hypatia.HypoGeomean(fill(1/l, l))], [1:l+1], [!usedual])
         r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
         @test r.status == :Optimal
-        @test r.niters <= 20
+        @test r.niters <= 25
         @test r.pobj ≈ (usedual ? 1 : l) atol=1e-4 rtol=1e-4
         @test r.x[2:end] ≈ (usedual ? fill(1/l, l) : ones(l)) atol=1e-4 rtol=1e-4
     end
@@ -552,7 +552,7 @@ function _hypogeomean4(; verbose, lscachetype)
 
     for usedual in [true, false]
         mdl = Hypatia.Model(verbose=verbose)
-        cone = Hypatia.Cone([Hypatia.HypoGeomean(fill(1/l, l))], [1:l+1], [usedual])
+        cone = Hypatia.Cone([Hypatia.HypoGeomean(fill(1/l, l))], [1:l+1], [!usedual])
         r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
         @test r.status == :Optimal
         @test r.niters <= 15
