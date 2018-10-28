@@ -50,7 +50,7 @@ function build_envelope!(
         c = vec(P0[:, 1:LDegs]*rand(-9:9, LDegs, npoly))
     end
 
-    cone = Hypatia.Cone([Hypatia.DualSumOfSquaresCone(U, [P, PWts...]) for k in 1:npoly], [1+(k-1)*U:k*U for k in 1:npoly])
+    cone = Hypatia.Cone([Hypatia.WSOSPolyInterp(U, [P, PWts...], true) for k in 1:npoly], [1+(k-1)*U:k*U for k in 1:npoly])
 
     return (c, A, b, G, h, cone)
 end

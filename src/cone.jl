@@ -11,21 +11,25 @@ abstract type PrimitiveCone end
 mutable struct Cone
     prmtvs::Vector{PrimitiveCone}
     idxs::Vector{UnitRange{Int}}
-    useduals::Vector{Bool}
+
+    function Cone(prmtvs::Vector{<:PrimitiveCone}, idxs::Vector{UnitRange{Int}})
+        cone = new()
+        @assert length(prmtvs) == length(idxs)
+        cone.prmtvs = prmtvs
+        cone.idxs = idxs
+        return cone
+    end
 end
-Cone() = Cone(PrimitiveCone[], UnitRange{Int}[], Bool[])
-Cone(prmtvs::Vector{<:PrimitiveCone}, idxs::Vector{UnitRange{Int}}) = Cone(prmtvs, idxs, fill(false, length(prmtvs)))
+Cone() = Cone(PrimitiveCone[], UnitRange{Int}[])
 
 function addprimitivecone!(
     cone::Cone,
     prmtv::PrimitiveCone,
-    idx::UnitRange{Int};
-    usedual::Bool = false,
+    idx::UnitRange{Int},
     )
     @assert dimension(prmtv) == length(idx)
     push!(cone.prmtvs, prmtv)
     push!(cone.idxs, idx)
-    push!(cone.useduals, usedual)
     return cone
 end
 
@@ -34,7 +38,7 @@ barrierpar(cone::Cone)::Float64 = (isempty(cone.prmtvs) ? 0.0 : sum(barrierpar_p
 
 function loadpnt!(cone::Cone, ts::Vector{Float64}, tz::Vector{Float64})
     for k in eachindex(cone.prmtvs)
-        (v1, v2) = (cone.useduals[k] ? (ts, tz) : (tz, ts))
+        (v1, v2) = (cone.prmtvs[k].usedual ? (ts, tz) : (tz, ts))
         loadpnt_prmtv!(cone.prmtvs[k], view(v2, cone.idxs[k]))
     end
     return nothing
@@ -44,7 +48,7 @@ incone(cone::Cone) = all(incone_prmtv, cone.prmtvs)
 
 function getinitsz!(ts, tz, cone)
     for k in eachindex(cone.prmtvs)
-        (v1, v2) = (cone.useduals[k] ? (ts, tz) : (tz, ts))
+        (v1, v2) = (cone.prmtvs[k].usedual ? (ts, tz) : (tz, ts))
         getintdir_prmtv!(view(v2, cone.idxs[k]), cone.prmtvs[k])
         @assert incone_prmtv(cone.prmtvs[k])
         calcg_prmtv!(view(v1, cone.idxs[k]), cone.prmtvs[k])
@@ -64,7 +68,7 @@ end
 function calcnbhd!(g, ts, tz, mu, cone)
     for k in eachindex(cone.prmtvs)
         calcg_prmtv!(view(g, cone.idxs[k]), cone.prmtvs[k])
-        (v1, v2) = (cone.useduals[k] ? (ts, tz) : (tz, ts))
+        (v1, v2) = (cone.prmtvs[k].usedual ? (ts, tz) : (tz, ts))
         @. @views v1[cone.idxs[k]] += mu*g[cone.idxs[k]]
         calcHiarr_prmtv!(view(v2, cone.idxs[k]), view(v1, cone.idxs[k]), cone.prmtvs[k])
     end
