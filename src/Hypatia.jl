@@ -20,6 +20,7 @@ module Hypatia
         "epinormeucl",
         "epipersquare",
         "hypoperlog",
+        "epiperpower",
         "hypogeomean",
         "epinormspectral",
         "semidefinite",

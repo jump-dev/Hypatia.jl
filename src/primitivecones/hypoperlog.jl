@@ -1,7 +1,7 @@
 #=
 Copyright 2018, Chris Coey and contributors
 
-(closure of) hypograph of perspective of (natural) log
+(closure of) hypograph of perspective of (natural) log (AKA exponential cone)
 (u in R, v in R_+, w in R_+) : u <= v*log(w/v)
 
 barrier from "A homogeneous interior-point algorithm for nonsymmetric convex conic optimization" by Skajaa & Ye 2014

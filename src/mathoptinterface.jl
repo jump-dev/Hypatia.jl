@@ -92,6 +92,7 @@ conefrommoi(s::MOI.SecondOrderCone) = EpiNormEucl(MOI.dimension(s))
 conefrommoi(s::MOI.RotatedSecondOrderCone) = EpiPerSquare(MOI.dimension(s))
 conefrommoi(s::MOI.ExponentialCone) = HypoPerLog()
 conefrommoi(s::MOI.GeometricMeanCone) = (l = MOI.dimension(s) - 1; HypoGeomean(fill(1.0/l, l)))
+conefrommoi(s::MOI.PowerCone) = EpiPerPower(inv(s.exponent))
 conefrommoi(s::MOI.AbstractVectorSet) = error("MOI set $s is not recognized")
 
 function buildvarcone(fi::MOI.VectorOfVariables, si::MOI.AbstractVectorSet, dim::Int, q::Int)
@@ -111,25 +112,6 @@ function buildconstrcone(fi::MOI.VectorAffineFunction{Float64}, si::MOI.Abstract
 end
 
 # MOI cones requiring transformations (eg rescaling, changing order)
-
-# power cone: convert from 3-dim to n-dim definition (requires reversing order of indices)
-function buildvarcone(fi::MOI.VectorOfVariables, si::MOI.PowerCone, dim::Int, q::Int)
-    @assert dim == 3
-    IGi = [q+3, q+2, q+1]
-    VGi = -ones(3)
-    prmtvi = HypoGeomean([1.0 - si.exponent, si.exponent])
-    return (IGi, VGi, prmtvi)
-end
-
-function buildconstrcone(fi::MOI.VectorAffineFunction{Float64}, si::MOI.PowerCone, dim::Int, q::Int)
-    @assert dim == 3
-    IGi = [q + (4 - vt.output_index) for vt in fi.terms]
-    VGi = [-vt.scalar_term.coefficient for vt in fi.terms]
-    Ihi = [q+3, q+2, q+1]
-    Vhi = fi.constants
-    prmtvi = HypoGeomean([1.0 - si.exponent, si.exponent])
-    return (IGi, VGi, Ihi, Vhi, prmtvi)
-end
 
 # PSD cone: convert from smat to svec form (scale off-diagonals)
 # TODO later remove if MOI gets a scaled triangle PSD set
@@ -584,13 +566,7 @@ function MOI.optimize!(opt::Optimizer)
     opt.z = get_z(mdl)
 
     for k in eachindex(cone.prmtvs)
-        # TODO this should be new power cone type
-        if cone.prmtvs[k] isa HypoGeomean
-            idxs = cone.idxs[k]
-            revidxs = reverse(idxs)
-            opt.s[idxs] = opt.s[revidxs]
-            opt.z[idxs] = opt.z[revidxs]
-        elseif cone.prmtvs[k] isa PosSemidef
+        if cone.prmtvs[k] isa PosSemidef
             idxs = cone.idxs[k]
             scalevec = svecunscale(length(idxs))
             opt.s[idxs] .*= scalevec
