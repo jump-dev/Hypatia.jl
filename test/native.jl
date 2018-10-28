@@ -490,6 +490,57 @@ function _hypoperlog4(; verbose, lscachetype)
     @test r.x ≈ [-1, 1, exp(-2)] atol=1e-4 rtol=1e-4
 end
 
+function _epiperpower1(; verbose, lscachetype)
+    mdl = Hypatia.Model(verbose=verbose)
+    c = Float64[1, 0, -1, 0, 0, -1]
+    A = Float64[1 1 0 1/2 0 0; 0 0 0 0 1 0]
+    b = Float64[2, 1]
+    G = SparseMatrixCSC(-1.0I, 6, 6)
+    h = zeros(6)
+    cone = Hypatia.Cone([Hypatia.EpiPerPower(5.0, false), Hypatia.EpiPerPower(2.5, false)], [1:3, 4:6])
+    r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
+    @test r.status == :Optimal
+    @test r.niters <= 20
+    @test r.pobj ≈ -1.80734 atol=1e-4 rtol=1e-4
+    @test r.x[[1,2,4]] ≈ [0.0639314, 0.783361, 2.30542] atol=1e-4 rtol=1e-4
+end
+
+function _epiperpower2(; verbose, lscachetype)
+    c = Float64[0, 0, -1]
+    A = Float64[1 0 0; 0 1 0]
+    b = Float64[1/2, 1]
+    G = SparseMatrixCSC(-1.0I, 3, 3)
+    h = zeros(3)
+
+    for isdual in [true, false]
+        mdl = Hypatia.Model(verbose=verbose)
+        cone = Hypatia.Cone([Hypatia.EpiPerPower(2.0, isdual)], [1:3])
+        r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
+        @test r.status == :Optimal
+        @test r.niters <= 20
+        @test r.pobj ≈ (isdual ? -sqrt(2) : -1/sqrt(2)) atol=1e-4 rtol=1e-4
+        @test r.x[1:2] ≈ [1/2, 1] atol=1e-4 rtol=1e-4
+    end
+end
+
+function _epiperpower3(; verbose, lscachetype)
+    c = Float64[0, 0, 1]
+    A = Float64[1 0 0; 0 1 0]
+    b = Float64[0, 1]
+    G = SparseMatrixCSC(-1.0I, 3, 3)
+    h = zeros(3)
+
+    for isdual in [true, false]
+        mdl = Hypatia.Model(verbose=verbose, tolfeas=1e-9)
+        cone = Hypatia.Cone([Hypatia.EpiPerPower(2.0, isdual)], [1:3])
+        r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
+        @test r.status == :Optimal
+        @test r.niters <= 50
+        @test r.pobj ≈ 0 atol=1e-4 rtol=1e-4
+        @test r.x[1:2] ≈ [0, 1] atol=1e-4 rtol=1e-4
+    end
+end
+
 function _hypogeomean1(; verbose, lscachetype)
     mdl = Hypatia.Model(verbose=verbose)
     c = Float64[1, 0, 0, -1, -1, 0]
