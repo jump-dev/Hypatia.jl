@@ -16,14 +16,15 @@ module Hypatia
     include("cone.jl")
     for primitivecone in [
         "orthant",
-        "dualsumofsquares",
-        "secondorder",
-        "exponential",
-        "power",
-        "rotatedsecondorder",
-        "positivesemidefinite",
-        "ellinfinity",
-        "spectralnorm",
+        "epinorminf",
+        "epinormeucl",
+        "epipersquare",
+        "hypoperlog",
+        "epiperpower",
+        "hypogeomean",
+        "epinormspectral",
+        "semidefinite",
+        "wsospolyinterp",
         ]
         include(joinpath(@__DIR__, "primitivecones", primitivecone * ".jl"))
     end

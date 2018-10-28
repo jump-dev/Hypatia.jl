@@ -127,7 +127,7 @@ function solvelinsys6!(
     @. rhs_ty *= -1.0
     @. rhs_tz *= -1.0
     for k in eachindex(L.cone.prmtvs)
-        if L.cone.useduals[k]
+        if L.cone.prmtvs[k].usedual
             @. @views  L.z1[L.cone.idxs[k]] = rhs_tz[L.cone.idxs[k]] - rhs_ts[L.cone.idxs[k]]
             calcHiarr_prmtv!(view(rhs_tz, L.cone.idxs[k]), view(L.z1, L.cone.idxs[k]), L.cone.prmtvs[k])
             @. @views rhs_tz[L.cone.idxs[k]] *= invmu
@@ -143,7 +143,7 @@ function solvelinsys6!(
     @. L.y1 = L.b
     # TODO don't need this if h is zero (can check once when creating cache)
     for k in eachindex(L.cone.prmtvs)
-        if L.cone.useduals[k]
+        if L.cone.prmtvs[k].usedual
             calcHiarr_prmtv!(view(L.z1, L.cone.idxs[k]), view(L.h, L.cone.idxs[k]), L.cone.prmtvs[k])
             @. @views L.z1[L.cone.idxs[k]] *= invmu
         else
@@ -218,7 +218,7 @@ function helplhs!(
         @. L.HG = L.G
     else
         for k in eachindex(L.cone.prmtvs)
-            if L.cone.useduals[k]
+            if L.cone.prmtvs[k].usedual
                 calcHiarr_prmtv!(view(L.HG, L.cone.idxs[k], :), view(L.G, L.cone.idxs[k], :), L.cone.prmtvs[k])
                 @. @views L.HG[L.cone.idxs[k], :] *= invmu
             else

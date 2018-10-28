@@ -88,9 +88,11 @@ SupportedSets = Union{
 MOI.supports_constraint(::Optimizer, ::Type{<:SupportedFuns}, ::Type{<:SupportedSets}) = true
 
 # MOI cones for which no transformation is needed
-conefrommoi(s::MOI.SecondOrderCone) = SecondOrderCone(MOI.dimension(s))
-conefrommoi(s::MOI.RotatedSecondOrderCone) = RotatedSecondOrderCone(MOI.dimension(s))
-conefrommoi(s::MOI.GeometricMeanCone) = (l = MOI.dimension(s) - 1; PowerCone(fill(1.0/l, l)))
+conefrommoi(s::MOI.SecondOrderCone) = EpiNormEucl(MOI.dimension(s))
+conefrommoi(s::MOI.RotatedSecondOrderCone) = EpiPerSquare(MOI.dimension(s))
+conefrommoi(s::MOI.ExponentialCone) = HypoPerLog()
+conefrommoi(s::MOI.GeometricMeanCone) = (l = MOI.dimension(s) - 1; HypoGeomean(fill(1.0/l, l)))
+conefrommoi(s::MOI.PowerCone) = EpiPerPower(inv(s.exponent))
 conefrommoi(s::MOI.AbstractVectorSet) = error("MOI set $s is not recognized")
 
 function buildvarcone(fi::MOI.VectorOfVariables, si::MOI.AbstractVectorSet, dim::Int, q::Int)
@@ -110,43 +112,6 @@ function buildconstrcone(fi::MOI.VectorAffineFunction{Float64}, si::MOI.Abstract
 end
 
 # MOI cones requiring transformations (eg rescaling, changing order)
-# exponential cone: reverse order of indices
-function buildvarcone(fi::MOI.VectorOfVariables, si::MOI.ExponentialCone, dim::Int, q::Int)
-    @assert dim == 3
-    IGi = [q+3, q+2, q+1]
-    VGi = -ones(3)
-    prmtvi = ExponentialCone()
-    return (IGi, VGi, prmtvi)
-end
-
-function buildconstrcone(fi::MOI.VectorAffineFunction{Float64}, si::MOI.ExponentialCone, dim::Int, q::Int)
-    @assert dim == 3
-    IGi = [q + (4 - vt.output_index) for vt in fi.terms]
-    VGi = [-vt.scalar_term.coefficient for vt in fi.terms]
-    Ihi = [q+3, q+2, q+1]
-    Vhi = fi.constants
-    prmtvi = ExponentialCone()
-    return (IGi, VGi, Ihi, Vhi, prmtvi)
-end
-
-# power cone: convert from 3-dim to n-dim definition (requires reversing order of indices)
-function buildvarcone(fi::MOI.VectorOfVariables, si::MOI.PowerCone, dim::Int, q::Int)
-    @assert dim == 3
-    IGi = [q+3, q+2, q+1]
-    VGi = -ones(3)
-    prmtvi = PowerCone([1.0 - si.exponent, si.exponent])
-    return (IGi, VGi, prmtvi)
-end
-
-function buildconstrcone(fi::MOI.VectorAffineFunction{Float64}, si::MOI.PowerCone, dim::Int, q::Int)
-    @assert dim == 3
-    IGi = [q + (4 - vt.output_index) for vt in fi.terms]
-    VGi = [-vt.scalar_term.coefficient for vt in fi.terms]
-    Ihi = [q+3, q+2, q+1]
-    Vhi = fi.constants
-    prmtvi = PowerCone([1.0 - si.exponent, si.exponent])
-    return (IGi, VGi, Ihi, Vhi, prmtvi)
-end
 
 # PSD cone: convert from smat to svec form (scale off-diagonals)
 # TODO later remove if MOI gets a scaled triangle PSD set
@@ -156,7 +121,7 @@ svecunscale(dim) = [(i == j ? 1.0 : rt2i) for i in 1:round(Int, sqrt(0.25 + 2*di
 function buildvarcone(fi::MOI.VectorOfVariables, si::MOI.PositiveSemidefiniteConeTriangle, dim::Int, q::Int)
     IGi = q+1:q+dim
     VGi = -svecscale(dim)
-    prmtvi = PositiveSemidefiniteCone(dim)
+    prmtvi = PosSemidef(dim)
     return (IGi, VGi, prmtvi)
 end
 
@@ -166,7 +131,7 @@ function buildconstrcone(fi::MOI.VectorAffineFunction{Float64}, si::MOI.Positive
     VGi = [-vt.scalar_term.coefficient*scalevec[vt.output_index] for vt in fi.terms]
     Ihi = q+1:q+dim
     Vhi = scalevec .* fi.constants
-    prmtvi = PositiveSemidefiniteCone(dim)
+    prmtvi = PosSemidef(dim)
     return (IGi, VGi, Ihi, Vhi, prmtvi)
 end
 
@@ -376,7 +341,7 @@ function MOI.copy_to(
 
     if q > nonnegstart
         # exists at least one nonnegative constraint
-        addprimitivecone!(cone, NonnegativeCone(q - nonnegstart), nonnegstart+1:q)
+        addprimitivecone!(cone, Nonnegative(q - nonnegstart), nonnegstart+1:q)
     end
 
     # build up one nonpositive cone
@@ -443,7 +408,7 @@ function MOI.copy_to(
 
     if q > nonposstart
         # exists at least one nonpositive constraint
-        addprimitivecone!(cone, NonpositiveCone(q - nonposstart), nonposstart+1:q)
+        addprimitivecone!(cone, Nonpositive(q - nonposstart), nonposstart+1:q)
     end
 
     # build up one L_infinity norm cone from two-sided interval constraints
@@ -516,7 +481,7 @@ function MOI.copy_to(
     opt.intervalscales = intervalscales
     if q > intervalstart
         # exists at least one interval-type constraint
-        addprimitivecone!(cone, EllInfinityCone(q - intervalstart), intervalstart+1:q)
+        addprimitivecone!(cone, EpiNormInf(q - intervalstart), intervalstart+1:q)
     end
 
     # add non-LP conic constraints
@@ -601,12 +566,7 @@ function MOI.optimize!(opt::Optimizer)
     opt.z = get_z(mdl)
 
     for k in eachindex(cone.prmtvs)
-        if cone.prmtvs[k] isa ExponentialCone || cone.prmtvs[k] isa PowerCone
-            idxs = cone.idxs[k]
-            revidxs = reverse(idxs)
-            opt.s[idxs] = opt.s[revidxs]
-            opt.z[idxs] = opt.z[revidxs]
-        elseif cone.prmtvs[k] isa PositiveSemidefiniteCone
+        if cone.prmtvs[k] isa PosSemidef
             idxs = cone.idxs[k]
             scalevec = svecunscale(length(idxs))
             opt.s[idxs] .*= scalevec
