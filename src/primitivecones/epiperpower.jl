@@ -34,13 +34,11 @@ mutable struct EpiPerPower <: PrimitiveCone
         ialpha2 = 2.0*inv(alpha)
         function barfun(pnt)
             (u, v, w) = (pnt[1], pnt[2], pnt[3])
-            bar = -log(u^ialpha2*v^(2.0 - ialpha2) - abs2(w))
             if alpha >= 2.0
-                bar -= (1.0 - ialpha2)*log(u)
+                return -log(u*v^(2.0 - ialpha2) - abs2(w)*u^(1.0 - ialpha2))
             else
-                bar -= (ialpha2 - 1.0)*log(v)
+                return -log(u^ialpha2*v - abs2(w)*v^(ialpha2 - 1.0))
             end
-            return bar
         end
         prmtv.barfun = barfun
         prmtv.diffres = DiffResults.HessianResult(prmtv.g)
