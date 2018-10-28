@@ -11,6 +11,7 @@ TODO for efficiency, don't construct full H matrix (arrow fill)
 =#
 
 mutable struct EpiNormInf <: PrimitiveCone
+    usedual::Bool
     dim::Int
     pnt::AbstractVector{Float64}
     g::Vector{Float64}
@@ -18,8 +19,9 @@ mutable struct EpiNormInf <: PrimitiveCone
     H2::Matrix{Float64}
     F
 
-    function EpiNormInf(dim::Int)
+    function EpiNormInf(dim::Int, isdual::Bool)
         prmtv = new()
+        prmtv.usedual = isdual
         prmtv.dim = dim
         prmtv.g = Vector{Float64}(undef, dim)
         prmtv.H = similar(prmtv.g, dim, dim)
@@ -28,6 +30,8 @@ mutable struct EpiNormInf <: PrimitiveCone
         return prmtv
     end
 end
+
+EpiNormInf(dim::Int) = EpiNormInf(dim, false)
 
 dimension(prmtv::EpiNormInf) = prmtv.dim
 barrierpar_prmtv(prmtv::EpiNormInf) = prmtv.dim

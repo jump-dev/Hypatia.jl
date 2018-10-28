@@ -45,7 +45,7 @@ function build_lp!(
     G = Diagonal(-1.0I, n) # TODO uniformscaling
     h = zeros(n)
 
-    cone = Hypatia.Cone([Hypatia.NonnegativeCone(n)], [1:n])
+    cone = Hypatia.Cone([Hypatia.Nonnegative(n)], [1:n])
 
     return (c, A, b, G, h, cone)
 end

@@ -12,6 +12,7 @@ TODO eliminate allocations for inverse-finding
 =#
 
 mutable struct PosSemidef <: PrimitiveCone
+    usedual::Bool
     dim::Int
     side::Int
     pnt::AbstractVector{Float64}
@@ -20,8 +21,9 @@ mutable struct PosSemidef <: PrimitiveCone
     matpnt::Matrix{Float64}
     matinv::Matrix{Float64}
 
-    function PosSemidef(dim::Int)
+    function PosSemidef(dim::Int, isdual::Bool)
         prmtv = new()
+        prmtv.usedual = isdual
         prmtv.dim = dim
         prmtv.side = round(Int, sqrt(0.25 + 2*dim) - 0.5)
         prmtv.mat = Matrix{Float64}(undef, prmtv.side, prmtv.side)
@@ -30,6 +32,8 @@ mutable struct PosSemidef <: PrimitiveCone
         return prmtv
     end
 end
+
+PosSemidef(dim::Int) = PosSemidef(dim, false)
 
 dimension(prmtv::PosSemidef) = prmtv.dim
 barrierpar_prmtv(prmtv::PosSemidef) = prmtv.side

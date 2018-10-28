@@ -478,7 +478,7 @@ function solve!(mdl::Model)
         @. ls_ts = ts
         @. tmp_ts = tmp_tz
         for k in eachindex(cone.prmtvs)
-            (v1, v2) = (cone.useduals[k] ? (ts, tz) : (tz, ts))
+            (v1, v2) = (cone.prmtvs[k].usedual ? (ts, tz) : (tz, ts))
             @. @views tmp_tz[cone.idxs[k]] = -v1[cone.idxs[k]]
         end
         (tmp_kap, tmp_tau) = solvelinsys6!(tmp_tx, tmp_ty, tmp_tz, -kap, tmp_ts, kap + cx + by + hz, mu, tau, L)
@@ -578,7 +578,7 @@ function solve!(mdl::Model)
             @. tmp_tx = 0.0
             @. tmp_ty = 0.0
             for k in eachindex(cone.prmtvs)
-                (v1, v2) = (cone.useduals[k] ? (ts, tz) : (tz, ts))
+                (v1, v2) = (cone.prmtvs[k].usedual ? (ts, tz) : (tz, ts))
                 @. @views tmp_tz[cone.idxs[k]] = -v1[cone.idxs[k]]
             end
             calcg!(g, cone)

@@ -14,6 +14,7 @@ barrier from "Interior-Point Polynomial Algorithms in Convex Programming" by Nes
 =#
 
 mutable struct EpiNormSpectral <: PrimitiveCone
+    usedual::Bool
     dim::Int
     n::Int
     m::Int
@@ -26,10 +27,11 @@ mutable struct EpiNormSpectral <: PrimitiveCone
     barfun::Function
     diffres
 
-    function EpiNormSpectral(dim::Int, n::Int, m::Int)
-        @assert dim == n*m + 1
+    function EpiNormSpectral(n::Int, m::Int, isdual::Bool)
         @assert n <= m
+        dim = n*m + 1
         prmtv = new()
+        prmtv.usedual = isdual
         prmtv.dim = dim
         prmtv.n = n
         prmtv.m = m
@@ -47,6 +49,8 @@ mutable struct EpiNormSpectral <: PrimitiveCone
         return prmtv
     end
 end
+
+EpiNormSpectral(n::Int, m::Int) = EpiNormSpectral(n::Int, m::Int, false)
 
 dimension(prmtv::EpiNormSpectral) = prmtv.dim
 barrierpar_prmtv(prmtv::EpiNormSpectral) = prmtv.n + 1
