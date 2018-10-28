@@ -359,7 +359,7 @@ function MOI.copy_to(
 
     if q > nonnegstart
         # exists at least one nonnegative constraint
-        addprimitivecone!(cone, NonnegativeCone(q - nonnegstart), nonnegstart+1:q)
+        addprimitivecone!(cone, Nonnegative(q - nonnegstart), nonnegstart+1:q)
     end
 
     # build up one nonpositive cone
@@ -426,7 +426,7 @@ function MOI.copy_to(
 
     if q > nonposstart
         # exists at least one nonpositive constraint
-        addprimitivecone!(cone, NonpositiveCone(q - nonposstart), nonposstart+1:q)
+        addprimitivecone!(cone, Nonpositive(q - nonposstart), nonposstart+1:q)
     end
 
     # build up one L_infinity norm cone from two-sided interval constraints
@@ -584,6 +584,7 @@ function MOI.optimize!(opt::Optimizer)
     opt.z = get_z(mdl)
 
     for k in eachindex(cone.prmtvs)
+        # TODO this should be new power cone type
         if cone.prmtvs[k] isa HypoGeomean
             idxs = cone.idxs[k]
             revidxs = reverse(idxs)

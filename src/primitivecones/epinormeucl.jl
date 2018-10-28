@@ -9,20 +9,24 @@ barrier from "Self-Scaled Barriers and Interior-Point Methods for Convex Program
 =#
 
 mutable struct EpiNormEucl <: PrimitiveCone
+    usedual::Bool
     dim::Int
     pnt::AbstractVector{Float64}
     dist::Float64
     Hi::Matrix{Float64}
     H::Matrix{Float64}
 
-    function EpiNormEucl(dim::Int)
+    function EpiNormEucl(dim::Int, isdual::Bool)
         prmtv = new()
+        prmtv.usedual = isdual
         prmtv.dim = dim
         prmtv.Hi = Matrix{Float64}(undef, dim, dim)
         prmtv.H = similar(prmtv.Hi)
         return prmtv
     end
 end
+
+EpiNormEucl(dim::Int) = EpiNormEucl(dim, false)
 
 dimension(prmtv::EpiNormEucl) = prmtv.dim
 barrierpar_prmtv(prmtv::EpiNormEucl) = 1

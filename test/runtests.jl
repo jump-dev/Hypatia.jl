@@ -92,107 +92,107 @@ end
 # native interface tests
 include(joinpath(@__DIR__, "native.jl"))
 @info("starting native interface tests")
-verbose = true
+verbose = false
 lscachetypes = [
-    # Hypatia.QRSymmCache,
+    Hypatia.QRSymmCache,
     Hypatia.NaiveCache,
     ]
 testfuns = [
-    # _dimension1,
-    # _consistent1,
-    # _inconsistent1,
-    # _inconsistent2,
-    # _orthant1,
-    # _orthant2,
-    # _orthant3,
-    # _orthant4,
-    # _epinorminf1,
-    # _epinorminf2,
-    # _epinorminf3,
-    # _epinorminf4,
-    # _epinorminf5,
-    # _epinorminf6,
-    # _epinormeucl1,
-    # _epinormeucl2,
-    # _epipersquare1,
-    # _epipersquare2,
-    # _epipersquare3,
-    # _semidefinite1,
-    # _semidefinite2,
-    # _semidefinite3,
-    # _hypoperlog1,
-    # _hypoperlog2,
-    # _hypoperlog3,
-    # _hypoperlog4,
+    _dimension1,
+    _consistent1,
+    _inconsistent1,
+    _inconsistent2,
+    _orthant1,
+    _orthant2,
+    _orthant3,
+    _orthant4,
+    _epinorminf1,
+    _epinorminf2,
+    _epinorminf3,
+    _epinorminf4,
+    _epinorminf5,
+    _epinorminf6,
+    _epinormeucl1,
+    _epinormeucl2,
+    _epipersquare1,
+    _epipersquare2,
+    _epipersquare3,
+    _semidefinite1,
+    _semidefinite2,
+    _semidefinite3,
+    _hypoperlog1,
+    _hypoperlog2,
+    _hypoperlog3,
+    _hypoperlog4,
     _hypogeomean1,
     _hypogeomean2,
     _hypogeomean3,
     _hypogeomean4,
-    # _spectral1,
+    _spectral1,
     ]
 @testset "native tests: $testfun, $lscachetype" for testfun in testfuns, lscachetype in lscachetypes
     testfun(verbose=verbose, lscachetype=lscachetype)
 end
 
-#
-# # examples in src/examples/ folder
-# egs_dir = joinpath(@__DIR__, "../examples")
-# include(joinpath(egs_dir, "envelope/envelope.jl"))
-# include(joinpath(egs_dir, "lp/lp.jl"))
-# include(joinpath(egs_dir, "namedpoly/namedpoly.jl"))
-#
-# @info("starting default examples tests")
-# testfuns = [
-#     run_envelope,
-#     run_lp,
-#     run_namedpoly,
-#     ]
-# @testset "default examples: $testfun" for testfun in testfuns
-#     testfun()
-# end
-#
-# include(joinpath(@__DIR__, "examples.jl"))
-# @info("starting varied examples tests")
-# verbose = false
-# lscachetypes = [
-#     Hypatia.QRSymmCache,
-#     # Hypatia.NaiveCache, # slow
-#     ]
-# testfuns = [
-#     _envelope1,
-#     _envelope2,
-#     _envelope3,
-#     # _envelope4,
-#     _lp1,
-#     _lp2,
-#     _namedpoly1,
-#     _namedpoly2,
-#     _namedpoly3,
-#     # _namedpoly4,
-#     _namedpoly5,
-#     # _namedpoly6,
-#     _namedpoly7,
-#     _namedpoly8,
-#     _namedpoly9,
-#     # _namedpoly10,
-#     _namedpoly11,
-#     ]
-# @testset "varied examples: $testfun, $lscachetype" for testfun in testfuns, lscachetype in lscachetypes
-#     testfun(verbose=verbose, lscachetype=lscachetype)
-# end
 
-#
-# # MathOptInterface tests
-# include(joinpath(@__DIR__, "moi.jl"))
-# @info("starting MathOptInterface tests")
-# verbose = false
-# lscachetypes = [
-#     Hypatia.QRSymmCache,
-#     Hypatia.NaiveCache,
-#     ]
-# @testset "MOI tests: $lscachetype, $(usedense ? "dense" : "sparse")" for lscachetype in lscachetypes, usedense in [false, true]
-#     testmoi(verbose=verbose, lscachetype=lscachetype, usedense=usedense)
-# end
+# examples in src/examples/ folder
+egs_dir = joinpath(@__DIR__, "../examples")
+include(joinpath(egs_dir, "envelope/envelope.jl"))
+include(joinpath(egs_dir, "lp/lp.jl"))
+include(joinpath(egs_dir, "namedpoly/namedpoly.jl"))
+
+@info("starting default examples tests")
+testfuns = [
+    run_envelope,
+    run_lp,
+    run_namedpoly,
+    ]
+@testset "default examples: $testfun" for testfun in testfuns
+    testfun()
+end
+
+include(joinpath(@__DIR__, "examples.jl"))
+@info("starting varied examples tests")
+verbose = false
+lscachetypes = [
+    Hypatia.QRSymmCache,
+    # Hypatia.NaiveCache, # slow
+    ]
+testfuns = [
+    _envelope1,
+    _envelope2,
+    _envelope3,
+    # _envelope4,
+    _lp1,
+    _lp2,
+    _namedpoly1,
+    _namedpoly2,
+    _namedpoly3,
+    # _namedpoly4,
+    _namedpoly5,
+    # _namedpoly6,
+    _namedpoly7,
+    _namedpoly8,
+    _namedpoly9,
+    # _namedpoly10,
+    _namedpoly11,
+    ]
+@testset "varied examples: $testfun, $lscachetype" for testfun in testfuns, lscachetype in lscachetypes
+    testfun(verbose=verbose, lscachetype=lscachetype)
+end
+
+
+# MathOptInterface tests
+include(joinpath(@__DIR__, "moi.jl"))
+@info("starting MathOptInterface tests")
+verbose = false
+lscachetypes = [
+    Hypatia.QRSymmCache,
+    Hypatia.NaiveCache,
+    ]
+@testset "MOI tests: $lscachetype, $(usedense ? "dense" : "sparse")" for lscachetype in lscachetypes, usedense in [false, true]
+    testmoi(verbose=verbose, lscachetype=lscachetype, usedense=usedense)
+end
 
 
 return nothing

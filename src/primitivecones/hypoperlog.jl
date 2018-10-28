@@ -15,20 +15,24 @@ TODO choose a better interior direction
 =#
 
 mutable struct HypoPerLog <: PrimitiveCone
+    usedual::Bool
     pnt::AbstractVector{Float64}
     g::Vector{Float64}
     H::Matrix{Float64}
     H2::Matrix{Float64}
     F
 
-    function HypoPerLog()
+    function HypoPerLog(isdual::Bool)
         prmtv = new()
+        prmtv.usedual = isdual
         prmtv.g = Vector{Float64}(undef, 3)
         prmtv.H = similar(prmtv.g, 3, 3)
         prmtv.H2 = similar(prmtv.H)
         return prmtv
     end
 end
+
+HypoPerLog() = HypoPerLog(false)
 
 dimension(prmtv::HypoPerLog) = 3
 barrierpar_prmtv(prmtv::HypoPerLog) = 3

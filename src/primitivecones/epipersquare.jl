@@ -10,20 +10,24 @@ barrier from "Self-Scaled Barriers and Interior-Point Methods for Convex Program
 =#
 
 mutable struct EpiPerSquare <: PrimitiveCone
+    usedual::Bool
     dim::Int
     pnt::AbstractVector{Float64}
     dist::Float64
     Hi::Matrix{Float64}
     H::Matrix{Float64}
 
-    function EpiPerSquare(dim::Int)
+    function EpiPerSquare(dim::Int, isdual::Bool)
         prmtv = new()
+        prmtv.usedual = isdual
         prmtv.dim = dim
         prmtv.Hi = Matrix{Float64}(undef, dim, dim)
         prmtv.H = similar(prmtv.Hi)
         return prmtv
     end
 end
+
+EpiPerSquare(dim::Int) = EpiPerSquare(dim, false)
 
 dimension(prmtv::EpiPerSquare) = prmtv.dim
 barrierpar_prmtv(prmtv::EpiPerSquare) = 2

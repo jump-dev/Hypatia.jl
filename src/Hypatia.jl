@@ -23,7 +23,7 @@ module Hypatia
         "hypogeomean",
         "epinormspectral",
         "semidefinite",
-        "dualwsosinterp",
+        "wsospolyinterp",
         ]
         include(joinpath(@__DIR__, "primitivecones", primitivecone * ".jl"))
     end

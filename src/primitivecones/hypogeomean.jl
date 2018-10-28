@@ -12,6 +12,7 @@ TODO try to make barrier evaluation more efficient
 =#
 
 mutable struct HypoGeomean <: PrimitiveCone
+    usedual::Bool
     dim::Int
     alpha::Vector{Float64}
     ialpha::Vector{Float64}
@@ -23,12 +24,13 @@ mutable struct HypoGeomean <: PrimitiveCone
     barfun::Function
     diffres
 
-    function HypoGeomean(alpha::Vector{Float64})
+    function HypoGeomean(alpha::Vector{Float64}, isdual::Bool)
         dim = length(alpha) + 1
         @assert dim >= 3
         @assert all(ai >= 0.0 for ai in alpha)
         @assert sum(alpha) == 1.0
         prmtv = new()
+        prmtv.usedual = !isdual # using dual barrier
         prmtv.dim = dim
         prmtv.alpha = alpha
         ialpha = inv.(alpha)
@@ -46,6 +48,8 @@ mutable struct HypoGeomean <: PrimitiveCone
         return prmtv
     end
 end
+
+HypoGeomean(alpha::Vector{Float64}) = HypoGeomean(alpha, false)
 
 dimension(prmtv::HypoGeomean) = prmtv.dim
 barrierpar_prmtv(prmtv::HypoGeomean) = prmtv.dim
