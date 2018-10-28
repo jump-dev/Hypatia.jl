@@ -50,7 +50,7 @@ mutable struct EpiNormSpectral <: PrimitiveCone
     end
 end
 
-EpiNormSpectral(n::Int, m::Int) = EpiNormSpectral(n::Int, m::Int, false)
+EpiNormSpectral(n::Int, m::Int) = EpiNormSpectral(n, m, false)
 
 dimension(prmtv::EpiNormSpectral) = prmtv.dim
 barrierpar_prmtv(prmtv::EpiNormSpectral) = prmtv.n + 1
