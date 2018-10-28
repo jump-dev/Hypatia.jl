@@ -134,6 +134,7 @@ testfuns = [
     # _epinormspectral1,
     _hypoperlogdet1,
     _hypoperlogdet2,
+    _hypoperlogdet3,
     ]
 @testset "native tests: $testfun, $lscachetype" for testfun in testfuns, lscachetype in lscachetypes
     testfun(verbose=verbose, lscachetype=lscachetype)
