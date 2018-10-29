@@ -642,14 +642,15 @@ end
 function _hypoperlogdet1(; verbose, lscachetype)
     Random.seed!(1)
     side = 4
-    dim = 2 + side^2
+    dim = round(Int, 2 + side*(side + 1)/2)
     c = [-1.0, 0.0]
     A = [0.0 1.0]
     b = [1.0]
-    G = sparse(-1.0I, dim, 2)
+    G = SparseMatrixCSC(-1.0I, dim, 2)
     mathalf = rand(side, side)
     mat = mathalf*mathalf'
-    h = vcat(0.0, 0.0, vec(mat))
+    h = zeros(dim)
+    Hypatia.mattovec!(view(h, 3:dim), mat)
     mdl = Hypatia.Model(verbose=verbose)
     cone = Hypatia.Cone([Hypatia.HypoPerLogdet(dim)], [1:dim])
     r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
@@ -657,51 +658,29 @@ function _hypoperlogdet1(; verbose, lscachetype)
     @test r.niters <= 30
     @test r.x[1] ≈ -r.pobj atol=1e-4 rtol=1e-4
     @test r.x[2] ≈ 1 atol=1e-4 rtol=1e-4
-    @test r.s[2]*logdet(reshape(r.s[3:end], side, side)/r.s[2]) ≈ r.s[1] atol=1e-4 rtol=1e-4
-    @test r.z[1]*(logdet(-reshape(r.z[3:end], side, side)/r.z[1]) + side) ≈ r.z[2] atol=1e-4 rtol=1e-4
+    @test r.s[2]*logdet(Hypatia.vectomat!(zeros(side, side), r.s[3:end])/r.s[2]) ≈ r.s[1] atol=1e-4 rtol=1e-4
+    @test r.z[1]*(logdet(Hypatia.vectomat!(zeros(side, side), -r.z[3:end])/r.z[1]) + side) ≈ r.z[2] atol=1e-4 rtol=1e-4
 end
 
 function _hypoperlogdet2(; verbose, lscachetype)
     Random.seed!(1)
     side = 4
-    dim = 2 + side^2
-    c = [-1.0, 0.0]
-    A = [0.0 1.0]
-    b = [1.0]
-    G = sparse(-1.0I, dim, 2)
+    dim = round(Int, 2 + side*(side + 1)/2)
+    c = [0.0, 1.0]
+    A = [1.0 0.0]
+    b = [-1.0]
+    G = SparseMatrixCSC(-1.0I, dim, 2)
     mathalf = rand(side, side)
     mat = mathalf*mathalf'
-    h = vcat(0.0, 0.0, vec(mat))
+    h = zeros(dim)
+    Hypatia.mattovec!(view(h, 3:dim), mat)
     mdl = Hypatia.Model(verbose=verbose)
     cone = Hypatia.Cone([Hypatia.HypoPerLogdet(dim, true)], [1:dim])
-
-    # TODO dual cone checks
-    # r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
-    # @test r.status == :Optimal
-    # @test r.niters <= 30
-    # @test r.x[1] ≈ -r.pobj atol=1e-4 rtol=1e-4
-    # @test r.x[2] ≈ 1 atol=1e-4 rtol=1e-4
-    # @test r.s[2]*logdet(reshape(r.s[3:end], side, side)/r.s[2]) ≈ r.s[1] atol=1e-4 rtol=1e-4
-    # @test r.z[1]*(logdet(-reshape(r.z[3:end], side, side)/r.z[1]) + side) ≈ r.z[2] atol=1e-4 rtol=1e-4
-end
-
-function _hypoperlogdet3(; verbose, lscachetype)
-    Random.seed!(1)
-    side = 3
-    dim = 2 + side^2
-    c = [-1.0, 0.0]
-    A = [0.0 1.0]
-    b = [0.0]
-    G = sparse(-1.0I, dim, 2)
-    mathalf = rand(side, side)
-    mat = mathalf*mathalf'
-    h = vcat(0.0, 0.0, vec(mat))
-    mdl = Hypatia.Model(verbose=verbose)
-    cone = Hypatia.Cone([Hypatia.HypoPerLogdet(dim)], [1:dim])
     r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
     @test r.niters <= 30
-    @test r.x[1] ≈ -r.pobj atol=1e-4 rtol=1e-4
-    @test r.x[2] ≈ 0 atol=1e-4 rtol=1e-4
-    @test r.x[2]*logdet(mat/r.x[2]) ≈ r.x[1] atol=1e-4 rtol=1e-4
+    @test r.x[2] ≈ r.pobj atol=1e-4 rtol=1e-4
+    @test r.x[1] ≈ -1 atol=1e-4 rtol=1e-4
+    @test r.s[1]*(logdet(Hypatia.vectomat!(zeros(side, side), -r.s[3:end])/r.s[1]) + side) ≈ r.s[2] atol=1e-4 rtol=1e-4
+    @test r.z[2]*logdet(Hypatia.vectomat!(zeros(side, side), r.z[3:end])/r.z[2]) ≈ r.z[1] atol=1e-4 rtol=1e-4
 end

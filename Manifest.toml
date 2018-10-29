@@ -81,6 +81,12 @@ repo-url = "https://github.com/JuliaDiff/ForwardDiff.jl.git"
 uuid = "f6369f11-7733-5829-9624-2563aa707210"
 version = "0.10.0+"
 
+[[FunctionWrappers]]
+deps = ["Compat", "Pkg"]
+git-tree-sha1 = "49bf793ebd37db5adaa7ac1eae96c2c97ec86db5"
+uuid = "069b7b12-0de2-55c6-9aab-29f3d0a68a2e"
+version = "1.0.0"
+
 [[InteractiveUtils]]
 deps = ["LinearAlgebra", "Markdown"]
 uuid = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
@@ -116,11 +122,11 @@ uuid = "d6f4376e-aef5-505a-96c1-9c027394607a"
 
 [[MathOptInterface]]
 deps = ["Compat", "Unicode"]
-git-tree-sha1 = "e48809f59f48b5dc963e08fa383dc329089d8231"
+git-tree-sha1 = "dc3832b9a413fe7b5a13eb7db58ec7497f55575d"
 repo-rev = "master"
 repo-url = "https://github.com/JuliaOpt/MathOptInterface.jl.git"
 uuid = "b8f27783-ece8-5eb3-8dc8-9495eed66fee"
-version = "0.6.1+"
+version = "0.6.2+"
 
 [[Mmap]]
 uuid = "a63ad114-7e13-5084-954f-fe012c677804"
@@ -165,6 +171,14 @@ git-tree-sha1 = "7b1d07f411bc8ddb7977ec7f377b97b158514fe0"
 uuid = "189a3867-3050-52da-a836-e630ba90ab69"
 version = "0.2.0"
 
+[[ReverseDiff]]
+deps = ["DiffResults", "DiffRules", "ForwardDiff", "FunctionWrappers", "LinearAlgebra", "NaNMath", "Random", "SpecialFunctions", "StaticArrays", "Statistics", "Test"]
+git-tree-sha1 = "d44e80d815a1a5abaf1ff1def21bb629cabaffec"
+repo-rev = "master"
+repo-url = "https://github.com/JuliaDiff/ReverseDiff.jl.git"
+uuid = "37e2e3b7-166d-5795-8a7a-e32c996b4267"
+version = "0.3.1+"
+
 [[SHA]]
 uuid = "ea8e919c-243c-51af-8825-aaa63cd721ce"
 
@@ -184,17 +198,17 @@ uuid = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
 [[SpecialFunctions]]
 deps = ["BinDeps", "BinaryProvider", "Libdl", "Test"]
-git-tree-sha1 = "1696129f44266a343bbe33142fe0001c52777dab"
+git-tree-sha1 = "0b45dc2e45ed77f445617b99ff2adf0f5b0f23ea"
 repo-rev = "master"
 repo-url = "https://github.com/JuliaMath/SpecialFunctions.jl.git"
 uuid = "276daf66-3868-5448-9aa4-cd146d93841b"
-version = "0.7.1+"
+version = "0.7.2+"
 
 [[StaticArrays]]
 deps = ["InteractiveUtils", "LinearAlgebra", "Pkg", "Random", "Statistics", "Test"]
-git-tree-sha1 = "e4b174b7b0ad75ebfadb659dea43c56361b96ec8"
+git-tree-sha1 = "ebc5c2a27d91d5ec611a9861168182e2168effd3"
 uuid = "90137ffa-7385-5640-81b9-e52037218182"
-version = "0.9.1"
+version = "0.9.2"
 
 [[Statistics]]
 deps = ["LinearAlgebra", "SparseArrays"]
