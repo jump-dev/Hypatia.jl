@@ -1,13 +1,15 @@
 #=
 Copyright 2018, Chris Coey and contributors
 
-(u, v, W) : u >= v*logdet(W/v)
+(closure of) hypograph of perspective of (natural) log of determinant of a (row-wise lower triangle i.e. svec space) symmetric positive define matrix
+(smat space) (u in R, v in R_+, w in S_+) : u >= v*logdet(W/v)
+(see equivalent MathOptInterface LogDetConeConeTriangle definition)
 
-barrier
+barrier (guessed, based on analogy to hypoperlog barrier)
 -log(v*logdet(W/v) - u) - logdet(W) - log(v)
-which I just guessed, based on analogy to hypoperlog barrier
 
-TODO use triangle with rescaling
+TODO only use one decomposition on Symmetric(W) for isposdef and logdet
+TODO symbolically calculate gradient and Hessian
 =#
 
 mutable struct HypoPerLogdet <: PrimitiveCone
@@ -27,7 +29,7 @@ mutable struct HypoPerLogdet <: PrimitiveCone
         prmtv = new()
         prmtv.usedual = isdual
         prmtv.dim = dim
-        side = round(Int, sqrt(dim - 2))
+        side = round(Int, sqrt(0.25 + 2*(dim - 2)) - 0.5)
         prmtv.side = side
         prmtv.mat = Matrix{Float64}(undef, side, side)
         prmtv.g = Vector{Float64}(undef, dim)
@@ -36,7 +38,8 @@ mutable struct HypoPerLogdet <: PrimitiveCone
         function barfun(pnt)
             u = pnt[1]
             v = pnt[2]
-            W = reshape(pnt[3:end], side, side)
+            W = similar(pnt, side, side)
+            vectomat!(W, view(pnt, 3:dim))
             return -log(v*logdet(W/v) - u) - logdet(W) - log(v)
         end
         prmtv.barfun = barfun
@@ -53,7 +56,7 @@ barrierpar_prmtv(prmtv::HypoPerLogdet) = prmtv.side + 2
 function getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::HypoPerLogdet)
     arr[1] = -1.0
     arr[2] = 1.0
-    arr[3:end] = vec(Matrix(1.0I, prmtv.side, prmtv.side))
+    mattovec!(view(arr, 3:prmtv.dim), Matrix(1.0I, prmtv.side, prmtv.side))
     return arr
 end
 
@@ -63,8 +66,9 @@ function incone_prmtv(prmtv::HypoPerLogdet)
     pnt = prmtv.pnt
     u = pnt[1]
     v = pnt[2]
-    W = reshape(pnt[3:end], prmtv.side, prmtv.side)
-    if u >= v*logdet(W/v)
+    W = prmtv.mat
+    vectomat!(W, view(pnt, 3:prmtv.dim))
+    if v <= 0.0 || !isposdef(Symmetric(W)) || u >= v*logdet(Symmetric(W)/v) # TODO only use one decomposition on Symmetric(W) for isposdef and logdet
         return false
     end
 
