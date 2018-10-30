@@ -18,6 +18,7 @@ MOIU.@model(HypatiaModelData,
         MOI.SecondOrderCone, MOI.RotatedSecondOrderCone,
         MOI.ExponentialCone, MOI.PowerCone, MOI.GeometricMeanCone,
         MOI.PositiveSemidefiniteConeTriangle,
+        MOI.LogDetConeTriangle,
     ),
     (),
     (MOI.SingleVariable,),
@@ -81,7 +82,7 @@ function testmoi(; verbose, lscachetype, usedense)
     @testset "conic tests" begin
         MOIT.contconictest(
             MOIB.SquarePSD{Float64}(
-            MOIB.LogDet{Float64}(
+            MOIB.LogDet{Float64}( # TODO remove when MOI LogDet cone definition is fixed
             MOIB.RootDet{Float64}(
                 optimizer
             ))),
