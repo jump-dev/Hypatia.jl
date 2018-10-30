@@ -48,10 +48,10 @@ end
 
 function _envelope4(; verbose, lscachetype)
     mdl = Hypatia.Model(verbose=verbose) # tolrelopt=1e-5, tolabsopt=1e-6, tolfeas=1e-6
-    (c, A, b, G, h, cone) = build_envelope!(2, 3, 4, 4, dense=false)
+    (c, A, b, G, h, cone) = build_envelope!(2, 2, 4, 3, dense=false)
     r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
-    # @test r.niters <= 45
+    @test r.niters <= 65
 end
 
 function _lp1(; verbose, lscachetype)
@@ -133,7 +133,7 @@ function _namedpoly6(; verbose, lscachetype)
     (c, A, b, G, h, cone) = build_namedpoly!(:magnetism7, 2)
     r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
-    # @test r.niters <= 35
+    @test r.niters <= 35
     @test r.pobj ≈ -0.25 atol=1e-4 rtol=1e-4
 end
 

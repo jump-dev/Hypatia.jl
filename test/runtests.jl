@@ -168,15 +168,15 @@ testfuns = [
     _envelope1,
     _envelope2,
     _envelope3,
-    # _envelope4,
+    _envelope4,
     _lp1,
     _lp2,
     _namedpoly1,
     _namedpoly2,
     _namedpoly3,
-    # _namedpoly4,
+    # _namedpoly4, # interpolation memory usage excessive
     _namedpoly5,
-    # _namedpoly6,
+    # _namedpoly6, # interpolation memory usage excessive
     _namedpoly7,
     _namedpoly8,
     _namedpoly9,
