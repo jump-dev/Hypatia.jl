@@ -28,10 +28,10 @@ function calc_u(n, d, pts)
     u = Vector{Matrix{Float64}}(undef, n)
     for j in 1:n
         uj = u[j] = Matrix{Float64}(undef, size(pts, 1), d+1)
-        uj[:,1] .= 1
-        uj[:,2] .= pts[:,j]
+        uj[:,1] .= 1.0
+        @. @views uj[:,2] = pts[:,j]
         for t in 3:d+1
-            uj[:,t] .= 2 .* uj[:,2] .* uj[:,t-1] .- uj[:,t-2]
+            @. @views uj[:,t] = 2.0*uj[:,2]*uj[:,t-1] - uj[:,t-2]
         end
     end
     return u
@@ -159,25 +159,30 @@ function approxfekete_data(n::Int, d::Int, calc_w::Bool)
     end
 
     # evaluations on the initial interpolation grid
-    m = ones(U)
     u = calc_u(n, 2d, ipts)
-    M = ones(npts, U)
-    col = 0
-    for t in 0:2d
+    m = Vector{Float64}(undef, U)
+    m[1] = 2^n
+    M = Matrix{Float64}(undef, npts, U)
+    M[:,1] .= 1.0
+
+    col = 1
+    for t in 1:2d
         for xp in Combinatorics.multiexponents(n, t)
             col += 1
-            for j in 1:n
-                if iseven(xp[j])
-                    m[col] *= 2/(1 - xp[j]^2)
-                else
-                    m[col] = 0.0
-                end
-                M[:,col] .*= u[j][:,xp[j]+1]
+            if any(isodd, xp)
+                m[col] = 0.0
+            else
+                m[col] = m[1]/prod(1.0 - abs2(xp[j]) for j in 1:n)
+            end
+            @. @views M[:,col] = u[1][:,xp[1]+1]
+            for j in 2:n
+                @. @views M[:,col] *= u[j][:,xp[j]+1]
             end
         end
     end
 
-    F = qr(M', Val(true))
+    Mp = Array(M')
+    F = qr!(Mp, Val(true))
     keep_pnt = F.p[1:U]
 
     pts = ipts[keep_pnt,:] # subset of points indexed with the support of w
@@ -185,7 +190,8 @@ function approxfekete_data(n::Int, d::Int, calc_w::Bool)
     P = Array(qr(P0).Q)
 
     if calc_w
-        w = UpperTriangular(F.R[:,1:U])\(F.Q'*m)
+        Qtm = F.Q'*m
+        w = UpperTriangular(F.R[:,1:U])\Qtm
     else
         w = Float64[]
     end
