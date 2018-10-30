@@ -131,7 +131,10 @@ testfuns = [
     _hypogeomean2,
     _hypogeomean3,
     _hypogeomean4,
-    _spectral1,
+    _epinormspectral1,
+    _hypoperlogdet1,
+    _hypoperlogdet2,
+    _hypoperlogdet3,
     ]
 @testset "native tests: $testfun, $lscachetype" for testfun in testfuns, lscachetype in lscachetypes
     testfun(verbose=verbose, lscachetype=lscachetype)

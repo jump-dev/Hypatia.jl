@@ -80,7 +80,7 @@ end
 const rt2 = sqrt(2)
 const rt2i = inv(rt2)
 
-function mattovec!(vec::AbstractVector{Float64}, mat::AbstractMatrix{Float64})
+function mattovec!(vec::AbstractVector, mat::AbstractMatrix)
     k = 1
     m = size(mat, 1)
     for i in 1:m, j in 1:i
@@ -94,7 +94,7 @@ function mattovec!(vec::AbstractVector{Float64}, mat::AbstractMatrix{Float64})
     return vec
 end
 
-function vectomat!(mat::AbstractMatrix{Float64}, vec::AbstractVector{Float64})
+function vectomat!(mat::AbstractMatrix, vec::AbstractVector)
     k = 1
     m = size(mat, 1)
     for i in 1:m, j in 1:i
