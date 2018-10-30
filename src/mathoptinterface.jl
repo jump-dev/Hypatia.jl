@@ -83,6 +83,7 @@ SupportedSets = Union{
     MOI.GeometricMeanCone,
     MOI.PowerCone,
     MOI.PositiveSemidefiniteConeTriangle,
+    MOI.LogDetConeTriangle,
     }
 
 MOI.supports_constraint(::Optimizer, ::Type{<:SupportedFuns}, ::Type{<:SupportedSets}) = true
@@ -112,12 +113,11 @@ function buildconstrcone(fi::MOI.VectorAffineFunction{Float64}, si::MOI.Abstract
 end
 
 # MOI cones requiring transformations (eg rescaling, changing order)
-
-# PSD cone: convert from smat to svec form (scale off-diagonals)
-# TODO later remove if MOI gets a scaled triangle PSD set
+# TODO later remove if MOI gets a scaled triangle sets
 svecscale(dim) = [(i == j ? 1.0 : rt2) for i in 1:round(Int, sqrt(0.25 + 2*dim) - 0.5) for j in 1:i]
 svecunscale(dim) = [(i == j ? 1.0 : rt2i) for i in 1:round(Int, sqrt(0.25 + 2*dim) - 0.5) for j in 1:i]
 
+# PSD cone: convert from smat to svec form (scale off-diagonals)
 function buildvarcone(fi::MOI.VectorOfVariables, si::MOI.PositiveSemidefiniteConeTriangle, dim::Int, q::Int)
     IGi = q+1:q+dim
     VGi = -svecscale(dim)
@@ -132,6 +132,24 @@ function buildconstrcone(fi::MOI.VectorAffineFunction{Float64}, si::MOI.Positive
     Ihi = q+1:q+dim
     Vhi = scalevec .* fi.constants
     prmtvi = PosSemidef(dim)
+    return (IGi, VGi, Ihi, Vhi, prmtvi)
+end
+
+# logdet cone: convert from smat to svec form (scale off-diagonals)
+function buildvarcone(fi::MOI.VectorOfVariables, si::MOI.LogDetConeTriangle, dim::Int, q::Int)
+    IGi = q+1:q+dim
+    VGi = vcat(-1.0, -1.0, -svecscale(dim-2))
+    prmtvi = HypoPerLogdet(dim)
+    return (IGi, VGi, prmtvi)
+end
+
+function buildconstrcone(fi::MOI.VectorAffineFunction{Float64}, si::MOI.LogDetConeTriangle, dim::Int, q::Int)
+    scalevec = vcat(1.0, 1.0, svecscale(dim-2))
+    IGi = [q + vt.output_index for vt in fi.terms]
+    VGi = [-vt.scalar_term.coefficient*scalevec[vt.output_index] for vt in fi.terms]
+    Ihi = q+1:q+dim
+    Vhi = scalevec .* fi.constants
+    prmtvi = HypoPerLogdet(dim)
     return (IGi, VGi, Ihi, Vhi, prmtvi)
 end
 
@@ -568,6 +586,11 @@ function MOI.optimize!(opt::Optimizer)
     for k in eachindex(cone.prmtvs)
         if cone.prmtvs[k] isa PosSemidef
             idxs = cone.idxs[k]
+            scalevec = svecunscale(length(idxs))
+            opt.s[idxs] .*= scalevec
+            opt.z[idxs] .*= scalevec
+        elseif cone.prmtvs[k] isa HypoPerLogdet
+            idxs = cone.idxs[k][3:end]
             scalevec = svecunscale(length(idxs))
             opt.s[idxs] .*= scalevec
             opt.z[idxs] .*= scalevec
