@@ -10,6 +10,7 @@ using Hypatia
 using SparseArrays
 using DelimitedFiles
 using Random
+using Test
 
 function build_lp!(
     m::Int,
@@ -78,6 +79,7 @@ function run_lp()
     pobj = Hypatia.get_pobj(mdl)
     dobj = Hypatia.get_dobj(mdl)
 
+    @test status == :Optimal
     # @show status
     # @show x
     # @show pobj

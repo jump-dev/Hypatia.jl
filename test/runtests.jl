@@ -146,16 +146,7 @@ egs_dir = joinpath(@__DIR__, "../examples")
 include(joinpath(egs_dir, "envelope/envelope.jl"))
 include(joinpath(egs_dir, "lp/lp.jl"))
 include(joinpath(egs_dir, "namedpoly/namedpoly.jl"))
-
-@info("starting default examples tests")
-testfuns = [
-    run_envelope,
-    run_lp,
-    run_namedpoly,
-    ]
-@testset "default examples: $testfun" for testfun in testfuns
-    testfun()
-end
+include(joinpath(egs_dir, "expdesign/expdesign.jl"))
 
 include(joinpath(@__DIR__, "examples.jl"))
 @info("starting varied examples tests")
@@ -185,6 +176,18 @@ testfuns = [
     ]
 @testset "varied examples: $testfun, $lscachetype" for testfun in testfuns, lscachetype in lscachetypes
     testfun(verbose=verbose, lscachetype=lscachetype)
+end
+
+
+@info("starting default examples tests")
+testfuns = [
+    run_envelope,
+    run_lp,
+    run_namedpoly,
+    run_JuMP_expdesign,
+    ]
+@testset "default examples: $testfun" for testfun in testfuns
+    testfun()
 end
 
 

@@ -10,6 +10,7 @@ available at https://arxiv.org/abs/1712.01792
 
 using Hypatia
 using LinearAlgebra
+using Test
 
 # list of currently available named polynomials, see https://people.sc.fsu.edu/~jburkardt/py_src/polynomials/polynomials.html
 polys = Dict{Symbol,NamedTuple}(
@@ -116,6 +117,7 @@ function run_namedpoly()
     pobj = Hypatia.get_pobj(mdl)
     dobj = Hypatia.get_dobj(mdl)
 
+    @test status == :Optimal
     # @show status
     # @show x
     # @show pobj
