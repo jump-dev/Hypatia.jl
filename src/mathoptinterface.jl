@@ -511,6 +511,7 @@ function MOI.copy_to(
         MOI.PowerCone,
         MOI.GeometricMeanCone,
         MOI.PositiveSemidefiniteConeTriangle,
+        MOI.LogDetConeTriangle
         ),
         F in (MOI.VectorOfVariables, MOI.VectorAffineFunction{Float64})
         for ci in getsrccons(F, S)
