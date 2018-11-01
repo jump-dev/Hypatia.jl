@@ -113,7 +113,7 @@ function buildconstrcone(fi::MOI.VectorAffineFunction{Float64}, si::MOI.Abstract
 end
 
 # MOI cones requiring transformations (eg rescaling, changing order)
-# TODO later remove if MOI gets a scaled triangle sets
+# TODO later remove if MOI gets scaled triangle sets
 svecscale(dim) = [(i == j ? 1.0 : rt2) for i in 1:round(Int, sqrt(0.25 + 2*dim) - 0.5) for j in 1:i]
 svecunscale(dim) = [(i == j ? 1.0 : rt2i) for i in 1:round(Int, sqrt(0.25 + 2*dim) - 0.5) for j in 1:i]
 
@@ -153,8 +153,7 @@ function buildconstrcone(fi::MOI.VectorAffineFunction{Float64}, si::MOI.LogDetCo
     return (IGi, VGi, Ihi, Vhi, prmtvi)
 end
 
-# build representation as min c'x s.t. Ax = b, x in K
-# TODO what if some variables x are in multiple cone constraints?
+# build representation as min c'x s.t. A*x = b, h - G*x in K
 function MOI.copy_to(
     opt::Optimizer,
     src::MOI.ModelLike;
@@ -167,7 +166,6 @@ function MOI.copy_to(
 
     # variables
     n = MOI.get(src, MOI.NumberOfVariables()) # columns of A
-    # vattr_src = MOI.get(src, MOI.ListOfVariableAttributesSet())
     j = 0
     for vj in MOI.get(src, MOI.ListOfVariableIndices()) # MOI.VariableIndex
         j += 1
@@ -247,7 +245,7 @@ function MOI.copy_to(
         end
     end
 
-    # TODO can preprocess variables equal to zero
+    # TODO can preprocess variables equal to zero here
     for ci in getsrccons(MOI.VectorOfVariables, MOI.Zeros)
         i += 1
         idxmap[ci] = MOI.ConstraintIndex{MOI.VectorOfVariables, MOI.Zeros}(i)
@@ -462,7 +460,7 @@ function MOI.copy_to(
         push!(VG, -scal)
         push!(Ih, q)
         push!(Vh, -mid*scal)
-        push!(Vcpc, mid) # TODO more complicated: need to multiply by upper-lower
+        push!(Vcpc, mid)
         push!(Icpc, q)
         intervalcount += 1
         intervalscales[intervalcount] = scal
@@ -489,7 +487,7 @@ function MOI.copy_to(
         end
         push!(Ih, q)
         push!(Vh, (fi.constant - mid)*scal)
-        push!(Vcpc, mid) # TODO more complicated: need to multiply by upper-lower
+        push!(Vcpc, mid)
         push!(Icpc, q)
         intervalcount += 1
         intervalscales[intervalcount] = scal
