@@ -43,6 +43,7 @@ unit_exclude = [
     "solve_integer_edge_cases",
     "solve_objbound_edge_cases",
     ]
+
 conic_exclude = String[
     # "lin",
     # "soc",
@@ -50,7 +51,7 @@ conic_exclude = String[
     # "exp",
     # "geomean",
     # "sdp",
-    # "logdet",
+    "logdet", # TODO broken until https://github.com/JuliaOpt/MathOptInterface.jl/pull/553 is merged
     # "rootdet",
     # TODO MOI bridges don't support square logdet or rootdet
     "logdets",
@@ -70,23 +71,15 @@ function testmoi(; verbose, lscachetype, usedense)
             )
         )
     @testset "unit tests" begin
-        MOIT.unittest(MOIB.SplitInterval{Float64}(optimizer), config, unit_exclude)
         MOIT.unittest(optimizer, config, unit_exclude)
     end
 
     @testset "linear tests" begin
-        MOIT.contlineartest(MOIB.SplitInterval{Float64}(optimizer), config)
-        MOIT.linear10test(optimizer, config)
+        MOIT.contlineartest(optimizer, config)
     end
 
     @testset "conic tests" begin
-        MOIT.contconictest(
-            MOIB.SquarePSD{Float64}(
-            MOIB.LogDet{Float64}( # TODO remove when MOI LogDet cone definition is fixed
-            MOIB.RootDet{Float64}(
-                optimizer
-            ))),
-            config, conic_exclude)
+        MOIT.contconictest(MOIB.SquarePSD{Float64}(MOIB.RootDet{Float64}(optimizer)), config, conic_exclude)
     end
 
     return nothing

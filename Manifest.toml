@@ -87,7 +87,7 @@ version = "0.2.4"
 
 [[ForwardDiff]]
 deps = ["CommonSubexpressions", "DiffResults", "DiffRules", "InteractiveUtils", "LinearAlgebra", "NaNMath", "Random", "SparseArrays", "SpecialFunctions", "StaticArrays", "Test"]
-git-tree-sha1 = "c309b4a2e7f3050cfe84f6fcb475f9b51f5eb5c3"
+git-tree-sha1 = "b91250044374764e7c29af59a774c4b8d6100b6e"
 repo-rev = "master"
 repo-url = "https://github.com/JuliaDiff/ForwardDiff.jl.git"
 uuid = "f6369f11-7733-5829-9624-2563aa707210"
@@ -111,7 +111,7 @@ version = "0.19.0"
 
 [[JuMP]]
 deps = ["Calculus", "Compat", "DataStructures", "ForwardDiff", "LinearAlgebra", "MathOptInterface", "NaNMath", "Printf", "Statistics"]
-git-tree-sha1 = "bab5607b759aa0798dcf05ca586cf4ade792569b"
+git-tree-sha1 = "2c3eaa6a92a12d302e4143736423a4f94b543cf8"
 repo-rev = "master"
 repo-url = "https://github.com/JuliaOpt/JuMP.jl.git"
 uuid = "4076af6c-e467-56ae-b986-b466b2749572"
@@ -136,17 +136,11 @@ uuid = "d6f4376e-aef5-505a-96c1-9c027394607a"
 
 [[MathOptInterface]]
 deps = ["Compat", "Unicode"]
-git-tree-sha1 = "dc3832b9a413fe7b5a13eb7db58ec7497f55575d"
+git-tree-sha1 = "cc9eddfd5072797ec8f5319050d6bcebada3a728"
 repo-rev = "master"
 repo-url = "https://github.com/JuliaOpt/MathOptInterface.jl.git"
 uuid = "b8f27783-ece8-5eb3-8dc8-9495eed66fee"
 version = "0.6.2+"
-
-[[MathProgBase]]
-deps = ["Compat"]
-git-tree-sha1 = "3bf2e534e635df810e5f4b4f1a8b6de9004a0d53"
-uuid = "fdba3010-5040-5b88-9595-932c9decdf73"
-version = "0.7.7"
 
 [[Mmap]]
 uuid = "a63ad114-7e13-5084-954f-fe012c677804"
@@ -196,14 +190,6 @@ deps = ["Pkg"]
 git-tree-sha1 = "7b1d07f411bc8ddb7977ec7f377b97b158514fe0"
 uuid = "189a3867-3050-52da-a836-e630ba90ab69"
 version = "0.2.0"
-
-[[SCS]]
-deps = ["BinaryProvider", "Compat", "Libdl", "MathOptInterface", "MathProgBase"]
-git-tree-sha1 = "a226485732fcff702e15b3eaf0eadb40569d6750"
-repo-rev = "master"
-repo-url = "https://github.com/JuliaOpt/SCS.jl.git"
-uuid = "c946c3f1-0d1f-5ce8-9dea-7daa1f7e2d13"
-version = "0.4.1+"
 
 [[SHA]]
 uuid = "ea8e919c-243c-51af-8825-aaa63cd721ce"
