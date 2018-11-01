@@ -48,10 +48,11 @@ function solveandcheck(
     z = Hypatia.get_z(mdl)
     pobj = Hypatia.get_pobj(mdl)
     dobj = Hypatia.get_dobj(mdl)
-
     status = Hypatia.get_status(mdl)
 
     # check conic certificates are valid; conditions are described by CVXOPT at https://github.com/cvxopt/cvxopt/blob/master/src/python/coneprog.py
+    Hypatia.loadpnt!(cone, s, z)
+    @test Hypatia.incone(cone)
     if status == :Optimal
         @test pobj ≈ dobj atol=atol rtol=rtol
         @test A*x ≈ b atol=atol rtol=rtol
@@ -62,24 +63,17 @@ function solveandcheck(
         @test dot(b, y) + dot(h, z) ≈ -dobj atol=1e-8 rtol=1e-8
     elseif status == :PrimalInfeasible
         @test isnan(pobj)
-        @test dobj ≈ 1.0 atol=1e-8 rtol=1e-8
-        @test all(isnan, x)
-        @test all(isnan, s)
-        @test dot(b, y) + dot(h, z) ≈ -1.0 atol=1e-8 rtol=1e-8
+        @test dobj > 0
+        @test dot(b, y) + dot(h, z) ≈ -dobj atol=1e-8 rtol=1e-8
         @test G'*z ≈ -A'*y atol=atol rtol=rtol
     elseif status == :DualInfeasible
         @test isnan(dobj)
-        @test pobj ≈ -1.0 atol=1e-8 rtol=1e-8
-        @test all(isnan, y)
-        @test all(isnan, z)
-        @test dot(c, x) ≈ -1.0 atol=1e-8 rtol=1e-8
+        @test pobj < 0
+        @test dot(c, x) ≈ pobj atol=1e-8 rtol=1e-8
         @test G*x ≈ -s atol=atol rtol=rtol
         @test A*x ≈ zeros(length(y)) atol=atol rtol=rtol
     elseif status == :IllPosed
-        @test all(isnan, x)
-        @test all(isnan, s)
-        @test all(isnan, y)
-        @test all(isnan, z)
+        # TODO primal vs dual ill-posed statuses and conditions
     end
 
     stime = Hypatia.get_solvetime(mdl)

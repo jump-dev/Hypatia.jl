@@ -427,36 +427,18 @@ function solve!(mdl::Model)
         if nres_pr <= mdl.tolfeas && nres_du <= mdl.tolfeas && (gap <= mdl.tolabsopt || (!isnan(relgap) && relgap <= mdl.tolrelopt))
             mdl.verbose && println("optimal solution found; terminating")
             mdl.status = :Optimal
-            mdl.x = tx .*= invtau
-            mdl.s = ts .*= invtau
-            mdl.y = ty .*= invtau
-            mdl.z = tz .*= invtau
             break
         elseif !isnan(infres_pr) && infres_pr <= mdl.tolfeas
             mdl.verbose && println("primal infeasibility detected; terminating")
             mdl.status = :PrimalInfeasible
-            invobj = inv(-by - hz)
-            mdl.x = tx .= NaN
-            mdl.s = ts .= NaN
-            mdl.y = ty .*= invobj
-            mdl.z = tz .*= invobj
             break
         elseif !isnan(infres_du) && infres_du <= mdl.tolfeas
             mdl.verbose && println("dual infeasibility detected; terminating")
             mdl.status = :DualInfeasible
-            invobj = inv(-cx)
-            mdl.x = tx .*= invobj
-            mdl.s = ts .*= invobj
-            mdl.y = ty .= NaN
-            mdl.z = tz .= NaN
             break
         elseif mu <= mdl.tolfeas*1e-2 && tau <= mdl.tolfeas*1e-2*min(1.0, kap)
             mdl.verbose && println("ill-posedness detected; terminating")
             mdl.status = :IllPosed
-            mdl.x = tx .= NaN
-            mdl.s = ts .= NaN
-            mdl.y = ty .= NaN
-            mdl.z = tz .= NaN
             break
         end
 
@@ -465,10 +447,6 @@ function solve!(mdl::Model)
         if iter >= mdl.maxiter
             mdl.verbose && println("iteration limit reached; terminating")
             mdl.status = :IterationLimit
-            mdl.x = tx .*= invtau
-            mdl.s = ts .*= invtau
-            mdl.y = ty .*= invtau
-            mdl.z = tz .*= invtau
             break
         end
 
@@ -545,10 +523,6 @@ function solve!(mdl::Model)
         end
         if predfail
             mdl.status = :PredictorFail
-            mdl.x = tx .*= invtau
-            mdl.s = ts .*= invtau
-            mdl.y = ty .*= invtau
-            mdl.z = tz .*= invtau
             break
         end
 
@@ -654,21 +628,22 @@ function solve!(mdl::Model)
         if corrfail
             mdl.status = :CorrectorFail
             invtau = inv(tau)
-            mdl.x = tx .*= invtau
-            mdl.s = ts .*= invtau
-            mdl.y = ty .*= invtau
-            mdl.z = tz .*= invtau
             break
         end
     end
 
-    mdl.verbose && println("\nfinished in $iter iterations; internal status is $(mdl.status)\n")
+    mdl.verbose && println("\nterminated in $iter iterations with internal status $(mdl.status)\n")
 
-    # calculate solution and iteration statistics
-    mdl.niters = iter
+    # calculate result and iteration statistics
+    invtau = inv(tau)
+    mdl.x = tx .*= invtau
+    mdl.s = ts .*= invtau
+    mdl.y = ty .*= invtau
+    mdl.z = tz .*= invtau
     mdl.tau = tau
     mdl.kap = kap
     mdl.mu = mu
+    mdl.niters = iter
     mdl.solvetime = time() - starttime
 
     return nothing
