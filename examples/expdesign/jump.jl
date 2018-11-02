@@ -16,7 +16,7 @@ using JuMP
 using Random
 using Test
 
-function build_JuMP_expdesign!(
+function build_JuMP_expdesign(
     q::Int,
     p::Int,
     V::Matrix{Float64},
@@ -26,7 +26,7 @@ function build_JuMP_expdesign!(
     @assert (p > q) && (n > q) && (nmax <= n)
     @assert size(V) == (q, p)
 
-    model = Model(with_optimizer(Hypatia.Optimizer))
+    model = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true))
 
     @variable(model, hypo) # hypograph of logdet variable
     @objective(model, Max, hypo)
@@ -52,7 +52,7 @@ function run_JuMP_expdesign(;rseed::Int=1)
     Random.seed!(rseed)
     V = randn(q, p)
 
-    (model, np) = build_JuMP_expdesign!(q, p, V, n, nmax)
+    (model, np) = build_JuMP_expdesign(q, p, V, n, nmax)
     JuMP.optimize!(model)
 
     term_status = JuMP.termination_status(model)
