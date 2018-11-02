@@ -2,6 +2,8 @@
 Copyright 2018, Chris Coey and contributors
 
 see description in examples/namedpoly/native.jl
+
+TODO options to use standard PSD cone formulation vs interpolation-based WSOS cone formulation
 =#
 
 using Hypatia
@@ -62,6 +64,7 @@ function run_JuMP_namedpoly()
     return nothing
 end
 
+# TODO simplify domain creation when https://github.com/JuliaAlgebra/SemialgebraicSets.jl/issues/5 is fixed
 function getpolydata(polyname::Symbol)
     if polyname == :butcher
         @polyvar x[1:6]
