@@ -12,43 +12,6 @@ using Hypatia
 using LinearAlgebra
 using Test
 
-# list of currently available named polynomials, see https://people.sc.fsu.edu/~jburkardt/py_src/polynomials/polynomials.html
-polys = Dict{Symbol,NamedTuple}(
-    :butcher => (n=6, lbs=[-1,-0.1,-0.1,-1,-0.1,-0.1], ubs=[0,0.9,0.5,-0.1,-0.05,-0.03], deg=3,
-        fn=((u,v,w,x,y,z) -> z*v^2+y*w^2-u*x^2+x^3+x^2-(1/3)*u+(4/3)*x)
-        ),
-    :caprasse => (n=4, lbs=fill(-1/2,4), ubs=fill(1/2,4), deg=8,
-        fn=((w,x,y,z) -> -w*y^3+4x*y^2*z+4w*y*z^2+2x*z^3+4w*y+4y^2-10x*z-10z^2+2)
-        ),
-    :goldsteinprice => (n=2, lbs=fill(-2,2), ubs=fill(2,2), deg=8,
-        fn=((x,y) -> (1+(x+y+1)^2*(19-14x+3x^2-14y+6x*y+3y^2))*(30+(2x-3y)^2*(18-32x+12x^2+48y-36x*y+27y^2)))
-        ),
-    :heart => (n=8, lbs=[-0.1,0.4,-0.7,-0.7,0.1,-0.1,-0.3,-1.1], ubs=[0.4,1,-0.4,0.4,0.2,0.2,1.1,-0.3], deg=4,
-        fn=((s,t,u,v,w,x,y,z) -> z*v^2+y*w^2-u*x^2+x^3+x^2-(1/3)*u+(4/3)*x)
-        ),
-    :lotkavolterra => (n=4, lbs=fill(-2,4), ubs=fill(2,4), deg=3,
-        fn=((w,x,y,z) -> w*(x^2+y^2+z^2-1.1)+1)
-        ),
-    :magnetism7 => (n=7, lbs=fill(-1,7), ubs=fill(1,7), deg=2,
-        fn=((t,u,v,w,x,y,z) -> t^2+2u^2+2v^2+2w^2+2x^2+2y^2+2z^2-t)
-        ),
-    :motzkin => (n=2, lbs=fill(-1,2), ubs=fill(1,2), deg=6,
-        fn=((x,y) -> 1-48x^2*y^2+64x^2*y^4+64x^4*y^2)
-        ),
-    :reactiondiffusion => (n=3, lbs=fill(-5,3), ubs=fill(5,3), deg=2,
-        fn=((x,y,z) -> -x+2y-z-0.835634534y*(1+y))
-        ),
-    :robinson => (n=2, lbs=fill(-1,2), ubs=fill(1,2), deg=6,
-        fn=((x,y) -> 1+x^6+y^6-x^4*y^2+x^4-x^2*y^4+y^4-x^2+y^2+3x^2*y^2)
-        ),
-    :rosenbrock => (n=2, lbs=fill(-5,2), ubs=fill(10,2), deg=4,
-        fn=((x,y) -> (1-x)^2+100*(x^2-y)^2)
-        ),
-    :schwefel => (n=3, lbs=fill(-10,3), ubs=fill(10,3), deg=4,
-        fn=((x,y,z) -> (x-y^2)^2+(y-1)^2+(x-z^2)^2+(z-1)^2)
-        ),
-)
-
 function build_namedpoly!(
     polyname::Symbol,
     d::Int,
@@ -124,3 +87,40 @@ function run_namedpoly()
     # @show dobj
     return nothing
 end
+
+# list of currently available named polynomials, see https://people.sc.fsu.edu/~jburkardt/py_src/polynomials/polynomials.html
+polys = Dict{Symbol,NamedTuple}(
+    :butcher => (n=6, lbs=[-1,-0.1,-0.1,-1,-0.1,-0.1], ubs=[0,0.9,0.5,-0.1,-0.05,-0.03], deg=3,
+        fn=((u,v,w,x,y,z) -> z*v^2+y*w^2-u*x^2+x^3+x^2-(1/3)*u+(4/3)*x)
+        ),
+    :caprasse => (n=4, lbs=fill(-1/2,4), ubs=fill(1/2,4), deg=8,
+        fn=((w,x,y,z) -> -w*y^3+4x*y^2*z+4w*y*z^2+2x*z^3+4w*y+4y^2-10x*z-10z^2+2)
+        ),
+    :goldsteinprice => (n=2, lbs=fill(-2,2), ubs=fill(2,2), deg=8,
+        fn=((x,y) -> (1+(x+y+1)^2*(19-14x+3x^2-14y+6x*y+3y^2))*(30+(2x-3y)^2*(18-32x+12x^2+48y-36x*y+27y^2)))
+        ),
+    :heart => (n=8, lbs=[-0.1,0.4,-0.7,-0.7,0.1,-0.1,-0.3,-1.1], ubs=[0.4,1,-0.4,0.4,0.2,0.2,1.1,-0.3], deg=4,
+        fn=((s,t,u,v,w,x,y,z) -> s*x^3-3s*x*y^2+u*y^3-3u*y*x^2+t*w^3-3*t*w*z^2+v*z^3-3v*z*w^2)
+        ),
+    :lotkavolterra => (n=4, lbs=fill(-2,4), ubs=fill(2,4), deg=3,
+        fn=((w,x,y,z) -> w*(x^2+y^2+z^2-1.1)+1)
+        ),
+    :magnetism7 => (n=7, lbs=fill(-1,7), ubs=fill(1,7), deg=2,
+        fn=((t,u,v,w,x,y,z) -> t^2+2u^2+2v^2+2w^2+2x^2+2y^2+2z^2-t)
+        ),
+    :motzkin => (n=2, lbs=fill(-1,2), ubs=fill(1,2), deg=6,
+        fn=((x,y) -> 1-48x^2*y^2+64x^2*y^4+64x^4*y^2)
+        ),
+    :reactiondiffusion => (n=3, lbs=fill(-5,3), ubs=fill(5,3), deg=2,
+        fn=((x,y,z) -> -x+2y-z-0.835634534y*(1+y))
+        ),
+    :robinson => (n=2, lbs=fill(-1,2), ubs=fill(1,2), deg=6,
+        fn=((x,y) -> 1+x^6+y^6-x^4*y^2+x^4-x^2*y^4+y^4-x^2+y^2+3x^2*y^2)
+        ),
+    :rosenbrock => (n=2, lbs=fill(-5,2), ubs=fill(10,2), deg=4,
+        fn=((x,y) -> (1-x)^2+100*(x^2-y)^2)
+        ),
+    :schwefel => (n=3, lbs=fill(-10,3), ubs=fill(10,3), deg=4,
+        fn=((x,y,z) -> (x-y^2)^2+(y-1)^2+(x-z^2)^2+(z-1)^2)
+        ),
+)

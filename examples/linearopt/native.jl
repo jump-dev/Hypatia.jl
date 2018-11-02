@@ -3,7 +3,7 @@ Copyright 2018, Chris Coey and contributors
 Copyright 2018, David Papp, Sercan Yildiz
 
 modified from https://github.com/dpapp-github/alfonso/blob/master/random_lp.m
-solves a simple LP min c'x s.t. Ax = b, x >= 0
+solves a simple linear optimization problem (LP) min c'x s.t. Ax = b, x >= 0
 =#
 
 using Hypatia
@@ -12,7 +12,7 @@ using DelimitedFiles
 using Random
 using Test
 
-function build_lp!(
+function build_linearopt!(
     m::Int,
     n::Int;
     use_data::Bool = false,
@@ -51,13 +51,13 @@ function build_lp!(
     return (c, A, b, G, h, cone)
 end
 
-function run_lp()
+function run_linearopt()
     # optionally use fixed data in folder
     # select the random matrix size, dense/sparse, sparsity fraction
     (c, A, b, G, h, cone) =
-        # build_lp!(500, 1000, use_data=true)
-        # build_lp!(500, 1000)
-        build_lp!(15, 20)
+        # build_linearopt!(500, 1000, use_data=true)
+        # build_linearopt!(500, 1000)
+        build_linearopt!(15, 20)
 
     Hypatia.check_data(c, A, b, G, h, cone)
     (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = Hypatia.preprocess_data(c, A, b, G, useQR=true)
