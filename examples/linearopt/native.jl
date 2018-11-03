@@ -12,7 +12,7 @@ using DelimitedFiles
 using Random
 using Test
 
-function build_linearopt!(
+function build_linearopt(
     m::Int,
     n::Int;
     use_data::Bool = false,
@@ -21,7 +21,6 @@ function build_linearopt!(
     tosparse::Bool = false,
     rseed::Int = 1,
     )
-
     # set up problem data
     if use_data
         # use provided data in data folder
@@ -55,15 +54,15 @@ function run_linearopt()
     # optionally use fixed data in folder
     # select the random matrix size, dense/sparse, sparsity fraction
     (c, A, b, G, h, cone) =
-        # build_linearopt!(500, 1000, use_data=true)
-        # build_linearopt!(500, 1000)
-        build_linearopt!(15, 20)
+        # build_linearopt(500, 1000, use_data=true)
+        # build_linearopt(500, 1000)
+        build_linearopt(15, 20)
 
     Hypatia.check_data(c, A, b, G, h, cone)
     (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = Hypatia.preprocess_data(c, A, b, G, useQR=true)
     L = Hypatia.QRSymmCache(c1, A1, b1, G1, h, cone, Q2, RiQ1)
 
-    mdl = Hypatia.Model(maxiter=100, verbose=false)
+    mdl = Hypatia.Model(maxiter=100, verbose=true)
     Hypatia.load_data!(mdl, c1, A1, b1, G1, h, cone, L)
     Hypatia.solve!(mdl)
 
