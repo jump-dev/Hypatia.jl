@@ -138,10 +138,11 @@ end
 # examples in src/examples/ folder
 egs_dir = joinpath(@__DIR__, "../examples")
 include(joinpath(egs_dir, "envelope/native.jl"))
+include(joinpath(egs_dir, "envelope/jump.jl"))
+include(joinpath(egs_dir, "expdesign/jump.jl"))
 include(joinpath(egs_dir, "linearopt/native.jl"))
 include(joinpath(egs_dir, "namedpoly/native.jl"))
 include(joinpath(egs_dir, "namedpoly/jump.jl"))
-include(joinpath(egs_dir, "expdesign/jump.jl"))
 
 include(joinpath(@__DIR__, "examples.jl"))
 @info("starting varied examples tests")
@@ -174,13 +175,14 @@ testfuns = [
 end
 
 
-@info("starting default examples tests")
+@info("starting verbose default examples tests")
 testfuns = [
     run_envelope,
+    run_JuMP_envelope,
+    run_JuMP_expdesign,
     run_linearopt,
     run_namedpoly,
-    run_JuMP_expdesign, # verbose
-    run_JuMP_namedpoly, # verbose
+    run_JuMP_namedpoly,
     ]
 @testset "default examples: $testfun" for testfun in testfuns
     testfun()
