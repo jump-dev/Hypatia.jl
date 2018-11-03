@@ -12,11 +12,10 @@ using Hypatia
 using LinearAlgebra
 using Test
 
-function build_namedpoly!(
+function build_namedpoly(
     polyname::Symbol,
     d::Int,
     )
-
     # get data for named polynomial
     (n, lbs, ubs, deg, fn) = polys[polyname]
     if d < ceil(Int, deg/2)
@@ -48,23 +47,23 @@ end
 function run_namedpoly()
     # select the named polynomial to minimize and the SOS degree (to be squared)
     (c, A, b, G, h, cone) =
-        # build_namedpoly!(:butcher, 2)
-        # build_namedpoly!(:caprasse, 4)
-        # build_namedpoly!(:goldsteinprice, 7)
-        # build_namedpoly!(:heart, 2)
-        # build_namedpoly!(:lotkavolterra, 3)
-        # build_namedpoly!(:magnetism7, 2)
-        # build_namedpoly!(:motzkin, 7)
-        build_namedpoly!(:reactiondiffusion, 3)
-        # build_namedpoly!(:robinson, 8)
-        # build_namedpoly!(:rosenbrock, 4)
-        # build_namedpoly!(:schwefel, 3)
+        # build_namedpoly(:butcher, 2)
+        # build_namedpoly(:caprasse, 4)
+        # build_namedpoly(:goldsteinprice, 7)
+        # build_namedpoly(:heart, 2)
+        # build_namedpoly(:lotkavolterra, 3)
+        # build_namedpoly(:magnetism7, 2)
+        # build_namedpoly(:motzkin, 7)
+        build_namedpoly(:reactiondiffusion, 3)
+        # build_namedpoly(:robinson, 8)
+        # build_namedpoly(:rosenbrock, 4)
+        # build_namedpoly(:schwefel, 3)
 
     Hypatia.check_data(c, A, b, G, h, cone)
     (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = Hypatia.preprocess_data(c, A, b, G, useQR=true)
     L = Hypatia.QRSymmCache(c1, A1, b1, G1, h, cone, Q2, RiQ1)
 
-    mdl = Hypatia.Model(maxiter=100, verbose=false)
+    mdl = Hypatia.Model(maxiter=100, verbose=true)
     Hypatia.load_data!(mdl, c1, A1, b1, G1, h, cone, L)
     Hypatia.solve!(mdl)
 

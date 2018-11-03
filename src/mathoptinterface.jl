@@ -2,6 +2,13 @@
 Copyright 2018, Chris Coey and contributors
 =#
 
+export WSOSPolyInterpCone
+
+struct WSOSPolyInterpCone <: MOI.AbstractVectorSet
+    dimension::Int
+    ipwt::Vector{Matrix{Float64}}
+end
+
 mutable struct Optimizer <: MOI.AbstractOptimizer
     mdl::Model
     verbose::Bool
@@ -84,6 +91,7 @@ SupportedSets = Union{
     MOI.PowerCone,
     MOI.PositiveSemidefiniteConeTriangle,
     MOI.LogDetConeTriangle,
+    WSOSPolyInterpCone,
     }
 
 MOI.supports_constraint(::Optimizer, ::Type{<:SupportedFuns}, ::Type{<:SupportedSets}) = true
@@ -94,6 +102,7 @@ conefrommoi(s::MOI.RotatedSecondOrderCone) = EpiPerSquare(MOI.dimension(s))
 conefrommoi(s::MOI.ExponentialCone) = HypoPerLog()
 conefrommoi(s::MOI.GeometricMeanCone) = (l = MOI.dimension(s) - 1; HypoGeomean(fill(1.0/l, l)))
 conefrommoi(s::MOI.PowerCone) = EpiPerPower(inv(s.exponent))
+conefrommoi(s::WSOSPolyInterpCone) = WSOSPolyInterp(s.dimension, s.ipwt)
 conefrommoi(s::MOI.AbstractVectorSet) = error("MOI set $s is not recognized")
 
 function buildvarcone(fi::MOI.VectorOfVariables, si::MOI.AbstractVectorSet, dim::Int, q::Int)
@@ -509,7 +518,8 @@ function MOI.copy_to(
         MOI.PowerCone,
         MOI.GeometricMeanCone,
         MOI.PositiveSemidefiniteConeTriangle,
-        MOI.LogDetConeTriangle
+        MOI.LogDetConeTriangle,
+        WSOSPolyInterpCone,
         ),
         F in (MOI.VectorOfVariables, MOI.VectorAffineFunction{Float64})
         for ci in getsrccons(F, S)
