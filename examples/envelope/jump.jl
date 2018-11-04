@@ -1,7 +1,7 @@
 #=
 Copyright 2018, Chris Coey and contributors
 
-see description in examples/envelope/native.jl, which formulates the dual envelope problem in the native interface; here we formulate the corresponding primal problem
+see description in examples/envelope/native.jl
 =#
 
 using Hypatia
