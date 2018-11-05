@@ -52,8 +52,8 @@ function solveandcheck(
 
     # check conic certificates are valid; conditions are described by CVXOPT at https://github.com/cvxopt/cvxopt/blob/master/src/python/coneprog.py
     Hypatia.loadpnt!(cone, s, z)
-    @test Hypatia.incone(cone)
     if status == :Optimal
+        @test Hypatia.incone(cone)
         @test pobj ≈ dobj atol=atol rtol=rtol
         @test A*x ≈ b atol=atol rtol=rtol
         @test G*x + s ≈ h atol=atol rtol=rtol
@@ -62,17 +62,20 @@ function solveandcheck(
         @test dot(c, x) ≈ pobj atol=1e-8 rtol=1e-8
         @test dot(b, y) + dot(h, z) ≈ -dobj atol=1e-8 rtol=1e-8
     elseif status == :PrimalInfeasible
+        @test Hypatia.incone(cone)
         @test isnan(pobj)
         @test dobj > 0
         @test dot(b, y) + dot(h, z) ≈ -dobj atol=1e-8 rtol=1e-8
         @test G'*z ≈ -A'*y atol=atol rtol=rtol
     elseif status == :DualInfeasible
+        @test Hypatia.incone(cone)
         @test isnan(dobj)
         @test pobj < 0
         @test dot(c, x) ≈ pobj atol=1e-8 rtol=1e-8
         @test G*x ≈ -s atol=atol rtol=rtol
         @test A*x ≈ zeros(length(y)) atol=atol rtol=rtol
     elseif status == :IllPosed
+        @test Hypatia.incone(cone)
         # TODO primal vs dual ill-posed statuses and conditions
     end
 
@@ -129,6 +132,8 @@ testfuns = [
     _hypoperlogdet1,
     _hypoperlogdet2,
     _hypoperlogdet3,
+    _epipersumexp1,
+    _epipersumexp2,
     ]
 @testset "native tests: $testfun, $lscachetype" for testfun in testfuns, lscachetype in lscachetypes
     testfun(verbose=verbose, lscachetype=lscachetype)
@@ -167,8 +172,8 @@ testfuns = [
     _namedpoly7,
     _namedpoly8,
     _namedpoly9,
-    # _namedpoly10, # numerically unstable
-    _namedpoly11, # numerically unstable
+    _namedpoly10,
+    _namedpoly11,
     ]
 @testset "varied examples: $testfun, $lscachetype" for testfun in testfuns, lscachetype in lscachetypes
     testfun(verbose=verbose, lscachetype=lscachetype)
