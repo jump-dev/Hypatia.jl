@@ -38,7 +38,7 @@ function incone_prmtv(prmtv::EpiPerSquare)
     u = prmtv.pnt[1]
     v = prmtv.pnt[2]
     w = view(prmtv.pnt, 3:prmtv.dim)
-    if u <= 0 || v <= 0
+    if u <= 0.0 || v <= 0.0
         return false
     end
     nrm2 = 0.5*sum(abs2, w)

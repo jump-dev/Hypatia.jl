@@ -36,7 +36,7 @@ loadpnt_prmtv!(prmtv::EpiNormEucl, pnt::AbstractVector{Float64}) = (prmtv.pnt = 
 function incone_prmtv(prmtv::EpiNormEucl)
     u = prmtv.pnt[1]
     w = view(prmtv.pnt, 2:prmtv.dim)
-    if u <= 0
+    if u <= 0.0
         return false
     end
     dist = abs2(u) - sum(abs2, w)
