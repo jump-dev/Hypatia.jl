@@ -26,6 +26,7 @@ module Hypatia
         "semidefinite",
         "wsospolyinterp",
         "hypoperlogdet",
+        "epipersumexp",
         ]
         include(joinpath(@__DIR__, "primitivecones", primitivecone * ".jl"))
     end
