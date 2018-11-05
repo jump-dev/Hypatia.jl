@@ -2,7 +2,7 @@
 Copyright 2018, Chris Coey and contributors
 
 (closure of) hypograph of perspective of (natural) log of determinant of a (row-wise lower triangle i.e. svec space) symmetric positive define matrix
-(smat space) (u in R, v in R_+, w in S_+) : u >= v*logdet(W/v)
+(smat space) (u in R, v in R_+, w in S_+) : u <= v*logdet(W/v)
 (see equivalent MathOptInterface LogDetConeConeTriangle definition)
 
 barrier (guessed, based on analogy to hypoperlog barrier)

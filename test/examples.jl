@@ -124,7 +124,7 @@ function _namedpoly5(; verbose, lscachetype)
     (c, A, b, G, h, cone) = build_namedpoly(:lotkavolterra, 3)
     r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
-    @test r.niters <= 45
+    @test r.niters <= 40
     @test r.pobj ≈ -20.8 atol=1e-4 rtol=1e-4
 end
 
