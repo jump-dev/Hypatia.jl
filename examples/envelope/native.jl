@@ -27,9 +27,10 @@ function build_envelope(
     # generate interpolation
     @assert deg <= d
     (L, U, pts, P0, P, w) = Hypatia.interpolate(n, d, calc_w=true)
-    Wts = map(x -> sqrt(1.0 - abs2(x)), pts)
     Psub = view(P, :, 1:binomial(n+d-1, n))
-    PWts = [Array(qr!(view(Wts, :, j) .* Psub).Q) for j in 1:n] # TODO try zeroing epsilons
+    Wtsfun = (j -> sqrt.(1.0 .- abs2.(pts[:,j])))
+    PWts = [Wtsfun(j) .* Psub for j in 1:n]
+    # PWts = [Array(qr!(Wtsfun(j) .* Psub).Q) for j in 1:n] # alternatively, orthonormalize
 
     c = -w
     A = zeros(0, U)
