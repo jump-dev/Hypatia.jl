@@ -24,10 +24,11 @@ function build_namedpoly(
 
     # generate interpolation
     (L, U, pts, P0, P, w) = Hypatia.interpolate(n, d, calc_w=false)
-    pscale = 0.5*(ubs - lbs)
-    Wts = [sqrt(1.0 - abs2(pts[i,j]))*pscale[j] for i in 1:U, j in 1:n]
     P0sub = view(P0, :, 1:binomial(n+d-1, n))
-    PWts = [view(Wts, :, j) .* P0sub for j in 1:n] # TODO try zeroing epsilons
+    pscale = 0.5*(ubs - lbs)
+    Wtsfun = (j -> sqrt.(1.0 .- abs2.(pts[:,j]))*pscale[j])
+    PWts = [Wtsfun(j) .* P0sub for j in 1:n]
+    # PWts = [Array(qr!(Wtsfun(j) .* P0sub).Q) for j in 1:n] # alternatively, orthonormalize
 
     # transform points to fit the box domain
     trpts = pts .* pscale' .+ 0.5*(ubs + lbs)'

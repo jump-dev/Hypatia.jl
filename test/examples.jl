@@ -47,7 +47,7 @@ function _envelope3(; verbose, lscachetype)
 end
 
 function _envelope4(; verbose, lscachetype)
-    mdl = Hypatia.Model(verbose=verbose) # tolrelopt=1e-5, tolabsopt=1e-6, tolfeas=1e-6
+    mdl = Hypatia.Model(verbose=verbose)
     (c, A, b, G, h, cone) = build_envelope(2, 2, 4, 3, dense=false)
     r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
