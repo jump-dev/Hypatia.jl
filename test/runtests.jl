@@ -172,7 +172,7 @@ testfuns = [
     _namedpoly7,
     _namedpoly8,
     _namedpoly9,
-    _namedpoly10,
+    # _namedpoly10, # numerically unstable
     _namedpoly11,
     ]
 @testset "varied examples: $testfun, $lscachetype" for testfun in testfuns, lscachetype in lscachetypes
