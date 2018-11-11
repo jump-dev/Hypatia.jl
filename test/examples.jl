@@ -60,14 +60,14 @@ function _linearopt1(; verbose, lscachetype)
     (c, A, b, G, h, cone) = build_linearopt(25, 50, dense=true, tosparse=false)
     rd = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
     @test rd.status == :Optimal
-    @test rd.niters <= 45
+    @test rd.niters <= 35
 
     # sparse methods
     mdl = Hypatia.Model(verbose=verbose)
     (c, A, b, G, h, cone) = build_linearopt(25, 50, dense=true, tosparse=true)
     rs = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
     @test rs.status == :Optimal
-    @test rs.niters <= 45
+    @test rs.niters <= 35
 
     @test rs.pobj ≈ rd.pobj atol=1e-4 rtol=1e-4
 end
@@ -77,7 +77,7 @@ function _linearopt2(; verbose, lscachetype)
     (c, A, b, G, h, cone) = build_linearopt(500, 1000, use_data=true, dense=true)
     r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
-    @test r.niters <= 75
+    @test r.niters <= 70
     @test r.pobj ≈ 2055.807 atol=1e-4 rtol=1e-4
 end
 
