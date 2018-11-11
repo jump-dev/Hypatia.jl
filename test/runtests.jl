@@ -89,10 +89,10 @@ end
 # native interface tests
 include(joinpath(@__DIR__, "native.jl"))
 @info("starting native interface tests")
-verbose = false
+verbose = true
 lscachetypes = [
     Hypatia.QRSymmCache,
-    Hypatia.NaiveCache,
+    # Hypatia.NaiveCache,
     ]
 testfuns = [
     _dimension1,
@@ -151,7 +151,7 @@ include(joinpath(egs_dir, "namedpoly/jump.jl"))
 
 include(joinpath(@__DIR__, "examples.jl"))
 @info("starting varied examples tests")
-verbose = false
+verbose = true
 lscachetypes = [
     Hypatia.QRSymmCache,
     # Hypatia.NaiveCache, # slow
