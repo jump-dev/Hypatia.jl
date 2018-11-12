@@ -122,8 +122,8 @@ testfuns = [
     _hypoperlog3,
     _hypoperlog4,
     _epiperpower1,
-    _epiperpower2,
-    _epiperpower3, # numerically unstable
+    _epiperpower2, # numerically unstable
+    _epiperpower3,
     _hypogeomean1,
     _hypogeomean2,
     _hypogeomean3,
@@ -165,14 +165,14 @@ testfuns = [
     _linearopt2,
     _namedpoly1,
     _namedpoly2,
-    _namedpoly3,
+    _namedpoly3, # numerically unstable
     # _namedpoly4, # interpolation memory usage excessive
     _namedpoly5,
     # _namedpoly6, # interpolation memory usage excessive
     _namedpoly7,
     _namedpoly8,
     _namedpoly9,
-    # _namedpoly10, # numerically unstable
+    _namedpoly10, # numerically unstable
     _namedpoly11,
     ]
 @testset "varied examples: $testfun, $lscachetype" for testfun in testfuns, lscachetype in lscachetypes

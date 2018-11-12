@@ -66,9 +66,7 @@ function incone_prmtv(prmtv::EpiNormInf)
     g[1] = t1 - u*g1
     H[1,1] = -t1*invu + usqr*h1 - g1
 
-    @. prmtv.H2 = prmtv.H
-    prmtv.F = bunchkaufman!(Symmetric(prmtv.H2), true, check=false)
-    return issuccess(prmtv.F)
+    return factH(prmtv)
 end
 
 calcg_prmtv!(g::AbstractVector{Float64}, prmtv::EpiNormInf) = (@. g = prmtv.g; g)
