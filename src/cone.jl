@@ -44,13 +44,13 @@ function loadpnt!(cone::Cone, ts::Vector{Float64}, tz::Vector{Float64})
     return nothing
 end
 
-incone(cone::Cone) = all(incone_prmtv, cone.prmtvs)
+incone(cone::Cone, scal::Float64) = all(incone_prmtv(cone.prmtvs[k], scal) for k in eachindex(cone.prmtvs))
 
 function getinitsz!(ts, tz, cone)
     for k in eachindex(cone.prmtvs)
         (v1, v2) = (cone.prmtvs[k].usedual ? (ts, tz) : (tz, ts))
         getintdir_prmtv!(view(v2, cone.idxs[k]), cone.prmtvs[k])
-        @assert incone_prmtv(cone.prmtvs[k])
+        @assert incone_prmtv(cone.prmtvs[k], 1.0)
         calcg_prmtv!(view(v1, cone.idxs[k]), cone.prmtvs[k])
         @. @views v1[cone.idxs[k]] *= -1.0
     end
@@ -70,6 +70,7 @@ function calcnbhd!(g, ts, tz, mu, cone)
         calcg_prmtv!(view(g, cone.idxs[k]), cone.prmtvs[k])
         (v1, v2) = (cone.prmtvs[k].usedual ? (ts, tz) : (tz, ts))
         @. @views v1[cone.idxs[k]] += mu*g[cone.idxs[k]]
+        # @. @views v1[cone.idxs[k]] += g[cone.idxs[k]]
         calcHiarr_prmtv!(view(v2, cone.idxs[k]), view(v1, cone.idxs[k]), cone.prmtvs[k])
     end
     return dot(ts, tz)
@@ -111,12 +112,14 @@ end
 function factH(prmtv::PrimitiveCone)
     @. prmtv.H2 = prmtv.H
     prmtv.F = cholesky!(Symmetric(prmtv.H2), Val(true), check=false)
-
     if !isposdef(prmtv.F)
-        println("primitive cone hessian was singular")
+        println("primitive cone Hessian was singular")
         @. prmtv.H2 = prmtv.H
         prmtv.F = PositiveFactorizations.cholesky!(PositiveFactorizations.Positive, prmtv.H2)
     end
-
     return true
 end
+
+calcg_prmtv!(g::AbstractVector{Float64}, prmtv::PrimitiveCone) = (@. g = prmtv.g; lmul!(prmtv.iscal, g); g)
+calcHiarr_prmtv!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prmtv::PrimitiveCone) = (ldiv!(prod, prmtv.F, arr); lmul!(prmtv.scal, prod); lmul!(prmtv.scal, prod); prod)
+calcHarr_prmtv!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prmtv::PrimitiveCone) = (mul!(prod, prmtv.H, arr); lmul!(prmtv.iscal, prod); lmul!(prmtv.iscal, prod); prod)
