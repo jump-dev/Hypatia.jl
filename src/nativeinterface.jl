@@ -81,8 +81,8 @@ function Model(;
     maxcorrlsiters = 15,
     corrlsmulti = 0.5,
     )
-    if min(tolrelopt, tolabsopt, tolfeas) < 1e-10 || max(tolrelopt, tolabsopt, tolfeas) > 1e-2
-        error("tolrelopt, tolabsopt, tolfeas must be between 1e-10 and 1e-2")
+    if min(tolrelopt, tolabsopt, tolfeas) < 1e-12 || max(tolrelopt, tolabsopt, tolfeas) > 1e-2
+        error("tolrelopt, tolabsopt, tolfeas must be between 1e-12 and 1e-2")
     end
     if maxiter < 1
         error("maxiter must be at least 1")

@@ -26,7 +26,7 @@ function build_JuMP_expdesign(
     @assert (p > q) && (n > q) && (nmax <= n)
     @assert size(V) == (q, p)
 
-    model = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true))
+    model = Model(with_optimizer(Hypatia.Optimizer, verbose=true))
 
     @variable(model, hypo) # hypograph of logdet variable
     @objective(model, Max, hypo)
@@ -60,7 +60,7 @@ function run_JuMP_expdesign(;rseed::Int=1)
     dobj = JuMP.objective_bound(model)
     pr_status = JuMP.primal_status(model)
     du_status = JuMP.dual_status(model)
-    npval = JuMP.result_value.(np)
+    npval = JuMP.value.(np)
 
     @test term_status == MOI.Success
     @test pr_status == MOI.FeasiblePoint
