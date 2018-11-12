@@ -23,6 +23,8 @@ mutable struct WSOSPolyInterp <: PrimitiveCone
     tmp1::Vector{Matrix{Float64}}
     tmp2::Vector{Matrix{Float64}}
     tmp3::Matrix{Float64}
+    scal::Float64
+    iscal::Float64
 
     function WSOSPolyInterp(dim::Int, ipwt::Vector{Matrix{Float64}}, isdual::Bool)
         for ipwtj in ipwt
@@ -49,7 +51,16 @@ barrierpar_prmtv(prmtv::WSOSPolyInterp) = sum(size(ipwtj, 2) for ipwtj in prmtv.
 getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::WSOSPolyInterp) = (@. arr = 1.0; arr)
 loadpnt_prmtv!(prmtv::WSOSPolyInterp, pnt::AbstractVector{Float64}) = (prmtv.pnt = pnt)
 
-function incone_prmtv(prmtv::WSOSPolyInterp)
+function incone_prmtv(prmtv::WSOSPolyInterp, scal::Float64)
+    newpnt = copy(prmtv.pnt)
+    # @show newpnt
+    # prmtv.scal = norm(newpnt, Inf)
+    prmtv.scal = prmtv.dim*scal
+    prmtv.iscal = inv(prmtv.scal)
+    lmul!(prmtv.iscal, newpnt)
+    # @show newpnt
+    # @show prmtv.scal
+
     @. prmtv.g = 0.0
     @. prmtv.H = 0.0
     tmp3 = prmtv.tmp3
@@ -60,8 +71,10 @@ function incone_prmtv(prmtv::WSOSPolyInterp)
         tmp2j = prmtv.tmp2[j]
 
         # tmp1j = ipwtj'*Diagonal(pnt)*ipwtj
-        mul!(tmp2j, Diagonal(prmtv.pnt), ipwtj)
+        mul!(tmp2j, Diagonal(newpnt), ipwtj)
         mul!(tmp1j, ipwtj', tmp2j)
+
+        # @show norm(tmp1j)
 
         # pivoted cholesky, upper triangle solve
         F = cholesky!(Symmetric(tmp1j, :U), Val(true), check=false)
@@ -72,15 +85,21 @@ function incone_prmtv(prmtv::WSOSPolyInterp)
         rdiv!(tmp2j, F.U)
         mul!(tmp3, tmp2j, tmp2j')
 
+        # @show norm(tmp2j)
+        # @show norm(tmp3)
+
         for i in eachindex(prmtv.g)
             prmtv.g[i] -= tmp3[i,i]
         end
         @. prmtv.H += abs2(tmp3)
     end
 
+    # @show norm(prmtv.g)
+    # @show norm(prmtv.H)
+
     return factH(prmtv)
 end
 
-calcg_prmtv!(g::AbstractVector{Float64}, prmtv::WSOSPolyInterp) = (@. g = prmtv.g; g)
-calcHiarr_prmtv!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prmtv::WSOSPolyInterp) = ldiv!(prod, prmtv.F, arr)
-calcHarr_prmtv!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prmtv::WSOSPolyInterp) = mul!(prod, prmtv.H, arr)
+# calcg_prmtv!(g::AbstractVector{Float64}, prmtv::WSOSPolyInterp) = (@. g = prmtv.g; g)
+# calcHiarr_prmtv!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prmtv::WSOSPolyInterp) = ldiv!(prod, prmtv.F, arr)
+# calcHarr_prmtv!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prmtv::WSOSPolyInterp) = mul!(prod, prmtv.H, arr)
