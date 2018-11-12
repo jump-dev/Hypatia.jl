@@ -127,7 +127,7 @@ function check_data(
         error("c vector is empty, but number of variables must be positive")
     end
     if q == 0
-        @warn("no conic constraints were specified")
+        println("no conic constraints were specified; proceeding anyway")
     end
     if n < p
         println("number of equality constraints ($p) exceeds number of variables ($n)")
@@ -456,9 +456,10 @@ function solve!(mdl::Model)
         @. ls_ts = ts
         @. tmp_ts = tmp_tz
         for k in eachindex(cone.prmtvs)
-            (v1, v2) = (cone.prmtvs[k].usedual ? (ts, tz) : (tz, ts))
+            v1 = (cone.prmtvs[k].usedual ? ts : tz)
             @. @views tmp_tz[cone.idxs[k]] = -v1[cone.idxs[k]]
         end
+
         (tmp_kap, tmp_tau) = solvelinsys6!(tmp_tx, tmp_ty, tmp_tz, -kap, tmp_ts, kap + cx + by + hz, mu, tau, L)
 
         # determine step length alpha by line search
@@ -488,11 +489,13 @@ function solve!(mdl::Model)
             # accept primal iterate if
             # - decreased alpha and it is the first inside the cone and beta-neighborhood or
             # - increased alpha and it is inside the cone and the first to leave beta-neighborhood
-            if ls_mu > 0.0 && ls_tau > 0.0 && ls_kap > 0.0 && incone(cone)
+            if ls_mu > 0.0 && ls_tau > 0.0 && ls_kap > 0.0 && incone(cone, ls_mu)
                 # primal iterate is inside the cone
                 nbhd = calcnbhd!(g, ls_ts, ls_tz, ls_mu, cone) + (ls_tk - ls_mu)^2
+                # nbhd = calcnbhd!(g, ls_ts, ls_tz, ls_mu, cone) + abs2(ls_tk - ls_mu)/abs2(ls_mu)
 
                 if nbhd < abs2(beta*ls_mu)
+                # if nbhd < abs2(beta)
                     # iterate is inside the beta-neighborhood
                     if !alphaprevok || alpha > mdl.predlsmulti
                         # either the previous iterate was outside the beta-neighborhood or increasing alpha again will make it > 1
@@ -539,6 +542,7 @@ function solve!(mdl::Model)
 
         # skip correction phase if allowed and current iterate is in the eta-neighborhood
         if mdl.corrcheck && nbhd <= abs2(eta*mu)
+        # if mdl.corrcheck && nbhd <= abs2(eta)
             continue
         end
 
@@ -552,12 +556,14 @@ function solve!(mdl::Model)
             @. tmp_tx = 0.0
             @. tmp_ty = 0.0
             for k in eachindex(cone.prmtvs)
-                (v1, v2) = (cone.prmtvs[k].usedual ? (ts, tz) : (tz, ts))
+                v1 = (cone.prmtvs[k].usedual ? ts : tz)
                 @. @views tmp_tz[cone.idxs[k]] = -v1[cone.idxs[k]]
             end
             calcg!(g, cone)
             @. tmp_tz -= mu*g
+            # @. tmp_tz -= g
             @. tmp_ts = 0.0
+
             (tmp_kap, tmp_tau) = solvelinsys6!(tmp_tx, tmp_ty, tmp_tz, -kap + mu/tau, tmp_ts, 0.0, mu, tau, L)
 
             # determine step length alpha by line search
@@ -581,7 +587,7 @@ function solve!(mdl::Model)
                 @assert ls_kap > 0.0
                 ls_mu = (dot(ls_ts, ls_tz) + ls_tau*ls_kap)/bnu
 
-                if ls_mu > 0.0 && incone(cone)
+                if ls_mu > 0.0 && incone(cone, ls_mu)
                     # primal iterate tx is inside the cone, so terminate line search
                     break
                 end
@@ -612,10 +618,13 @@ function solve!(mdl::Model)
             # finish if allowed and current iterate is in the eta-neighborhood, or if taken max steps
             if ncorrsteps == mdl.maxcorrsteps || mdl.corrcheck
                 nbhd = calcnbhd!(g, ls_ts, ls_tz, mu, cone) + (tau*kap - mu)^2
+                # nbhd = calcnbhd!(g, ls_ts, ls_tz, mu, cone) + abs2(tau*kap - mu)/abs2(mu)
+
                 @. ls_tz = tz
                 @. ls_ts = ts
 
                 if nbhd <= abs2(eta*mu)
+                # if nbhd <= abs2(eta)
                     break
                 elseif ncorrsteps == mdl.maxcorrsteps
                     # outside eta neighborhood, so corrector failed
@@ -627,7 +636,6 @@ function solve!(mdl::Model)
         end
         if corrfail
             mdl.status = :CorrectorFail
-            invtau = inv(tau)
             break
         end
     end
