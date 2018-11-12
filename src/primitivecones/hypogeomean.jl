@@ -73,9 +73,7 @@ function incone_prmtv(prmtv::HypoGeomean)
     prmtv.g .= DiffResults.gradient(prmtv.diffres)
     prmtv.H .= DiffResults.hessian(prmtv.diffres)
 
-    @. prmtv.H2 = prmtv.H
-    prmtv.F = bunchkaufman!(Symmetric(prmtv.H2), true, check=false)
-    return issuccess(prmtv.F)
+    return factH(prmtv)
 end
 
 calcg_prmtv!(g::AbstractVector{Float64}, prmtv::HypoGeomean) = (@. g = prmtv.g; g)

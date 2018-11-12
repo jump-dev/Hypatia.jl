@@ -39,7 +39,7 @@ function _envelope2(; verbose, lscachetype)
 end
 
 function _envelope3(; verbose, lscachetype)
-    mdl = Hypatia.Model(verbose=verbose)
+    mdl = Hypatia.Model(verbose=verbose, tolfeas=5e-7)
     (c, A, b, G, h, cone) = build_envelope(2, 3, 3, 5, dense=false)
     r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
@@ -60,14 +60,14 @@ function _linearopt1(; verbose, lscachetype)
     (c, A, b, G, h, cone) = build_linearopt(25, 50, dense=true, tosparse=false)
     rd = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
     @test rd.status == :Optimal
-    @test rd.niters <= 45
+    @test rd.niters <= 35
 
     # sparse methods
     mdl = Hypatia.Model(verbose=verbose)
     (c, A, b, G, h, cone) = build_linearopt(25, 50, dense=true, tosparse=true)
     rs = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
     @test rs.status == :Optimal
-    @test rs.niters <= 45
+    @test rs.niters <= 35
 
     @test rs.pobj ≈ rd.pobj atol=1e-4 rtol=1e-4
 end
@@ -77,7 +77,7 @@ function _linearopt2(; verbose, lscachetype)
     (c, A, b, G, h, cone) = build_linearopt(500, 1000, use_data=true, dense=true)
     r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
-    @test r.niters <= 75
+    @test r.niters <= 70
     @test r.pobj ≈ 2055.807 atol=1e-4 rtol=1e-4
 end
 
@@ -102,11 +102,11 @@ function _namedpoly2(; verbose, lscachetype)
 end
 
 function _namedpoly3(; verbose, lscachetype)
-    mdl = Hypatia.Model(verbose=verbose, tolfeas=1e-10)
+    mdl = Hypatia.Model(verbose=verbose, tolfeas=1e-9)
     (c, A, b, G, h, cone) = build_namedpoly(:goldsteinprice, 6)
-    r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
+    r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype, atol=2e-3)
     @test r.status == :Optimal
-    @test r.niters <= 60
+    @test r.niters <= 65
     @test r.pobj ≈ 3 atol=1e-4 rtol=1e-4
 end
 
@@ -165,11 +165,11 @@ function _namedpoly9(; verbose, lscachetype)
 end
 
 function _namedpoly10(; verbose, lscachetype)
-    mdl = Hypatia.Model(verbose=verbose, tolfeas=1e-10)
+    mdl = Hypatia.Model(verbose=verbose, tolfeas=1e-9)
     (c, A, b, G, h, cone) = build_namedpoly(:rosenbrock, 5)
-    r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
+    r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype, atol=2e-3)
     @test r.status == :Optimal
-    @test r.niters <= 70
+    @test r.niters <= 65
     @test r.pobj ≈ 0 atol=1e-4 rtol=1e-4
 end
 
