@@ -69,9 +69,7 @@ function incone_prmtv(prmtv::HypoPerLog)
     H[2,3] = H[3,2] = vw*(lwv - 1.0)*ivlwvu2 - ivlwvu/w
     H[3,3] = abs2(vw)*ivlwvu2 + vw/w*ivlwvu + inv(abs2(w))
 
-    @. prmtv.H2 = prmtv.H
-    prmtv.F = bunchkaufman!(Symmetric(prmtv.H2), true, check=false)
-    return issuccess(prmtv.F)
+    return factH(prmtv)
 end
 
 calcg_prmtv!(g::AbstractVector{Float64}, prmtv::HypoPerLog) = (@. g = prmtv.g; g)

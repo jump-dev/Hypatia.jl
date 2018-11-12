@@ -36,7 +36,7 @@ mutable struct WSOSPolyInterp <: PrimitiveCone
         prmtv.H = similar(ipwt[1], dim, dim)
         prmtv.H2 = similar(prmtv.H)
         prmtv.tmp1 = [similar(ipwt[1], size(ipwtj, 2), size(ipwtj, 2)) for ipwtj in ipwt]
-        prmtv.tmp2 = [similar(ipwt[1], size(ipwtj, 2), dim) for ipwtj in ipwt]
+        prmtv.tmp2 = [similar(ipwt[1], dim, size(ipwtj, 2)) for ipwtj in ipwt]
         prmtv.tmp3 = similar(ipwt[1], dim, dim)
         return prmtv
     end
@@ -60,27 +60,17 @@ function incone_prmtv(prmtv::WSOSPolyInterp)
         tmp2j = prmtv.tmp2[j]
 
         # tmp1j = ipwtj'*Diagonal(pnt)*ipwtj
-        mul!(tmp2j, ipwtj', Diagonal(prmtv.pnt))
-        mul!(tmp1j, tmp2j, ipwtj)
+        mul!(tmp2j, Diagonal(prmtv.pnt), ipwtj)
+        mul!(tmp1j, ipwtj', tmp2j)
 
-        # # cholesky-based
-        # F = cholesky!(Symmetric(tmp1j), Val(false), check=false) # TODO try pivoted cholesky here, but need to reorder F.U
-        # if !isposdef(F)
-        #     return false
-        # end
-        # @. tmp2j = ipwtj'
-        # ldiv!(F.L, tmp2j)
-        # mul!(tmp3, tmp2j', tmp2j)
-
-        # bunch-kaufman-based
-        F = bunchkaufman!(Symmetric(tmp1j), true, check=false) # TODO remove allocations (use lower-level functions here)
-        if !issuccess(F)
+        # pivoted cholesky, upper triangle solve
+        F = cholesky!(Symmetric(tmp1j, :U), Val(true), check=false)
+        if !isposdef(F)
             return false
         end
-        # ipwtj * (tmp1j^-1 * ipwtj')
-        @. tmp2j = ipwtj'
-        ldiv!(F, tmp2j)
-        mul!(tmp3, ipwtj, tmp2j)
+        tmp2j .= view(ipwtj, :, F.p)
+        rdiv!(tmp2j, F.U)
+        mul!(tmp3, tmp2j, tmp2j')
 
         for i in eachindex(prmtv.g)
             prmtv.g[i] -= tmp3[i,i]
@@ -88,9 +78,7 @@ function incone_prmtv(prmtv::WSOSPolyInterp)
         @. prmtv.H += abs2(tmp3)
     end
 
-    @. prmtv.H2 = prmtv.H
-    prmtv.F = bunchkaufman!(Symmetric(prmtv.H2), true, check=false)
-    return issuccess(prmtv.F)
+    return factH(prmtv)
 end
 
 calcg_prmtv!(g::AbstractVector{Float64}, prmtv::WSOSPolyInterp) = (@. g = prmtv.g; g)

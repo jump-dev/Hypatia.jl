@@ -25,6 +25,7 @@ mutable struct QRSymmCache <: LinSysCache
     Q1x
     rhs
     Q2div
+    Q2divcopy
     Q2x
     GHGxi
     HGxi
@@ -85,6 +86,7 @@ mutable struct QRSymmCache <: LinSysCache
         L.Q1x = Matrix{Float64}(undef, n, 2)
         L.rhs = Matrix{Float64}(undef, n, 2)
         L.Q2div = Matrix{Float64}(undef, nmp, 2)
+        L.Q2divcopy = Matrix{Float64}(undef, nmp, 2)
         L.Q2x = Matrix{Float64}(undef, n, 2)
         L.GHGxi = Matrix{Float64}(undef, n, 2)
         L.HGxi = Matrix{Float64}(undef, q, 2)
@@ -193,18 +195,18 @@ function solvelinsys6!(
     # Q2x = Q2*(K22_F\(Q2'*(bxGHbz - GHG*Q1x)))
     mul!(L.rhs, L.GHG, L.Q1x)
     @. L.rhs = L.bxGHbz - L.rhs
-    mul!(L.Q2div, L.Q2', L.rhs)
+    mul!(L.Q2divcopy, L.Q2', L.rhs)
 
     # posdef = posv!('U', L.Q2GHGQ2, L.Q2div) # for no iterative refinement or equilibration
     if size(L.Q2div, 1) > 0
-        Q2div2 = copy(L.Q2div)
-        posdef = hypatia_posvx!(L.Q2div, L.Q2GHGQ2, Q2div2, L.lsferr, L.lsberr, L.lswork, L.lsiwork, L.lsAF, L.lsS)
+        posdef = hypatia_posvx!(L.Q2div, L.Q2GHGQ2, L.Q2divcopy, L.lsferr, L.lsberr, L.lswork, L.lsiwork, L.lsAF, L.lsS)
         if !posdef
             @warn("linear system matrix was not positive definite")
             # TODO improve recovery method for making LHS positive definite
             mul!(L.Q2GHGQ2, L.Q2', L.GHGQ2)
-            L.Q2GHGQ2 += 1e-4I
-            posdef = hypatia_posvx!(L.Q2div, L.Q2GHGQ2, Q2div2, L.lsferr, L.lsberr, L.lswork, L.lsiwork, L.lsAF, L.lsS)
+            L.Q2GHGQ2 += 1e-3I
+            mul!(L.Q2divcopy, L.Q2', L.rhs)
+            posdef = hypatia_posvx!(L.Q2div, L.Q2GHGQ2, L.Q2divcopy, L.lsferr, L.lsberr, L.lswork, L.lsiwork, L.lsAF, L.lsS)
             if !posdef
                 error("could not fix failure of positive definiteness; terminating")
             end
@@ -275,7 +277,7 @@ function hypatia_posvx!(
         ldb, X, n, rcond, ferr, berr, work, iwork, info)
 
     if info[] != 0 && info[] != n+1
-        @warn("posvx status $(info[])")
+        # @warn("failure to solve linear system (posvx status $(info[]))")
         return false
     end
     return true
