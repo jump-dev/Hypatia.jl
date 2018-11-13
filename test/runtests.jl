@@ -147,7 +147,8 @@ include(joinpath(egs_dir, "envelope/jump.jl"))
 include(joinpath(egs_dir, "expdesign/jump.jl"))
 include(joinpath(egs_dir, "linearopt/native.jl"))
 include(joinpath(egs_dir, "namedpoly/native.jl"))
-# include(joinpath(egs_dir, "namedpoly/jump.jl"))
+include(joinpath(egs_dir, "namedpoly/jump.jl"))
+include(joinpath(egs_dir, "shapeconregr/jump.jl"))
 
 include(joinpath(@__DIR__, "examples.jl"))
 @info("starting varied examples tests")
@@ -187,7 +188,8 @@ testfuns = [
     run_JuMP_expdesign,
     run_linearopt,
     run_namedpoly,
-    # run_JuMP_namedpoly, # broken until https://github.com/JuliaOpt/PolyJuMP.jl/pull/31
+    run_JuMP_namedpoly,
+    run_JuMP_shapeconregr,
     ]
 @testset "default examples: $testfun" for testfun in testfuns
     testfun()
