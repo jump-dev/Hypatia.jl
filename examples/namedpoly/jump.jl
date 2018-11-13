@@ -16,19 +16,136 @@ using SumOfSquares
 using LinearAlgebra
 using Test
 
-function build_JuMP_namedpoly_PSD(
-    x,
-    f::DynamicPolynomials.Polynomial{true,Float64},
-    dom::Box,
-    )
-    @show typeof(x)
+abstract type Domain end
 
-    # build domain BasicSemialgebraicSet representation
+mutable struct Box <: Domain
+    l::Vector{Float64}
+    u::Vector{Float64}
+    function Box(l::Vector{Float64}, u::Vector{Float64})
+        @assert length(l) == length(u)
+        d = new()
+        d.l = l
+        d.u = u
+        return d
+    end
+end
+function Box(l::Vector{T}, u::Vector{T}) where T <: Real
+    return Box(Float64.(l), Float64.(u))
+end
+
+
+# (x-c)'Q(x-c) \leq 1
+# struct Ellipsoid <: Domain
+#     c::Vector{Float64}
+#     Q::Matrix{Float64}
+#     function Ellipsoid(c::Vector{Float64}, Q::Matrix{Float64})
+#         @assert isposdef(Q)
+#         @assert length(c) == size(Q, 1)
+#         d = new()
+#         d.c = c
+#         d.Q = Q
+#         return d
+#     end
+# end
+# function Ball(c::Vector{Float64})
+#     dim = length(c)
+#     return Ellipsoid(c, Matrix{Float64}(I, dim, dim))
+# end
+
+# should be an ellipsoid
+struct Ball <: Domain
+    c::Vector{Float64}
+    r::Float64
+    function Ball(c::Vector{Float64}, r::Float64)
+        @assert length(c) == length(r)
+        d = new()
+        d.c = c
+        d.r = r
+        return d
+    end
+end
+
+dimension(d::Box) = length(d.l)
+dimension(d::Ball) = length(d.c)
+
+function sample(d::Box, npts::Int)
+    dim = dimension(d)
+    pts = rand(dim, npts)
+    return (d.u + d.l)/2.0 .+ (d.u - d.l) .* (pts .- 0.5)
+end
+
+# function sample(d::Ellipsoid, npts::Int)
+#     dim = dimension(d)
+#     random_radii = rand(dim, npts) * d.r
+#     random_thetas = rand(dim, npts) * 2pi
+#     pts = random_radii * cos.(random_thetas)
+#     return (d.u + d.l)/2.0 .+ (d.u - d.l) .* (pts .- 0.5)
+# end
+
+function sample(d::Ball, npts::Int)
+    dim = dimension(d)
+    pts = rand(dim, npts)
+    for i in 1:npts
+        pts[:, i] .= pts[:, i] / norm(pts) * d.r + d.c
+    end
+    return pts
+end
+
+# struct BoxSurf <: Domain
+#     l::Vector{Float64}
+#     u::Vector{Float64}
+# end
+#
+# dimension(d::Box) = length(d.l)
+#
+#
+# struct BallSurf <: Domain
+#     c::Vector{Float64}
+#     r::Float64
+# end
+#
+# struct Ellipse <: Domain
+#     c::Vector{Float64}
+#     Q::Matrix{Float64}
+# end
+#
+# struct EllipseSurf <: Domain
+#     c::Vector{Float64}
+#     Q::Matrix{Float64}
+# end
+
+
+get_domain(dom::Domain, x) = error("")
+
+function get_domain(dom::Box, x)
     bss = BasicSemialgebraicSet{Float64,Polynomial{true,Float64}}()
     for i in 1:dimension(dom)
         addinequality!(bss, -x[i] + dom.u[i])
         addinequality!(bss, x[i] - dom.l[i])
     end
+    return bss
+end
+
+# function get_domain(dom::Ellipsoid, x)
+#     bss = BasicSemialgebraicSet{Float64,Polynomial{true,Float64}}()
+#     lhs = (x - dom.c)' * dom.Q * (x - dom.c)
+#     addinequality!(bss, 1 - lhs)
+#     return bss
+# end
+
+function get_domain(dom::Ball, x)
+    return @set abs2(x - dom.c) <= dom.r^2
+end
+
+function build_JuMP_namedpoly_SDP(
+    x,
+    f::DynamicPolynomials.Polynomial{true,Float64},
+    dom::Domain,
+    )
+    @show typeof(x)
+
+    # build domain BasicSemialgebraicSet representation
+    bss = get_domain(dom, x)
 
     # build JuMP model
     model = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true))
@@ -39,7 +156,7 @@ function build_JuMP_namedpoly_PSD(
     return model
 end
 
-function build_JuMP_namedpoly_interp(
+function build_JuMP_namedpoly_WSOS(
     x,
     f::DynamicPolynomials.Polynomial{true,Float64},
     dom::Domain,
@@ -73,23 +190,23 @@ function run_JuMP_namedpoly()
         # :caprasse
         # :goldsteinprice
         # :heart
-        # :lotkavolterra
+        :lotkavolterra
         # :magnetism7
         # :motzkin
-        :reactiondiffusion
+        # :reactiondiffusion
         # :robinson
         # :rosenbrock
         # :schwefel
 
     # get data for named polynomial
-    (f, dom, truemin) = getpolydata(polyname)
+    (x, f, dom, truemin) = getpolydata(polyname)
 
     println("solving model with PSD cones")
-    model = build_JuMP_namedpoly_PSD(f, dom)
+    model = build_JuMP_namedpoly_SDP(x, f, dom)
     JuMP.optimize!(model)
 
     println("solving model with WSOS interpolation cones")
-    model = build_JuMP_namedpoly_PSD(f, dom)
+    model = build_JuMP_namedpoly_SDP(x, f, dom)
     JuMP.optimize!(model)
 
     println("done")
@@ -109,54 +226,6 @@ function run_JuMP_namedpoly()
 end
 
 
-abstract type Domain end
-
-struct Box <: Domain
-    l::Vector{Float64}
-    u::Vector{Float64}
-    function Box(l::Vector{Float64}, u::Vector{Float64})
-        @assert length(l) == length(u)
-        d = new()
-        d.l = l
-        d.u = u
-        return d
-    end
-end
-
-dimension(d::Box) = length(d.l)
-
-function sample(d::Box, npts::Int)
-    dim = dimension(d)
-    pts = rand(dim, npts)
-    return (d.u + d.l)/2.0 .+ (d.u - d.l) .* (pts .- 0.5)
-end
-
-# struct BoxSurf <: Domain
-#     l::Vector{Float64}
-#     u::Vector{Float64}
-# end
-#
-# dimension(d::Box) = length(d.l)
-#
-# struct Ball <: Domain
-#     c::Vector{Float64}
-#     r::Float64
-# end
-#
-# struct BallSurf <: Domain
-#     c::Vector{Float64}
-#     r::Float64
-# end
-#
-# struct Ellipse <: Domain
-#     c::Vector{Float64}
-#     Q::Matrix{Float64}
-# end
-#
-# struct EllipseSurf <: Domain
-#     c::Vector{Float64}
-#     Q::Matrix{Float64}
-# end
 
 
 
@@ -223,7 +292,7 @@ function getpolydata(polyname::Symbol)
         error("poly $polyname not recognized")
     end
 
-    return (f, dom, truemin)
+    return (x, f, dom, truemin)
 end
 
 
