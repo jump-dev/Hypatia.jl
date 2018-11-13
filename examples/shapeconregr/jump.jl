@@ -1,8 +1,18 @@
 #=
-Copyright 2018, Chris Coey and contributors
+Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 
-Given data (x_i, y_i) find a polynomial p such that
-rho * dp/dx_j ≥ 0 ∀ x ∈ B
+Given data (xᵢ, yᵢ), find a polynomial p to solve
+
+    minimize ∑ᵢℓ(p(xᵢ), yᵢ)
+    subject to ρⱼ × dᵏp/dtⱼᵏ ≥ 0 ∀ t ∈ D
+
+where
+    - dᵏp/dtⱼᵏ is the kᵗʰ derivative of p in direction j,
+    - ρⱼ determines the desired sign of the derivative,
+    - D is a domain such as a box or an ellipsoid,
+    - ℓ is a convex loss function.
+
+See e.g. Chapter 8 of thesis by G. Hall (2018).
 =#
 using LinearAlgebra
 using Random
@@ -16,7 +26,7 @@ using DynamicPolynomials
 using Hypatia
 using Test
 
-function regression_data(
+function shapeconregr_data(
     func::Function = (x -> sum(x.^3, dims=2));
     rseed::Int = 1,
     xmin::Float64 = -1.0,
@@ -39,7 +49,7 @@ function regression_data(
     return (X, y)
 end
 
-function build_regression_SDP(
+function build_shapeconregr_SDP(
     X,
     y,
     r::Int,
@@ -78,7 +88,7 @@ function build_regression_SDP(
     return mdl, p
 end
 
-function build_regression_WSOS(
+function build_shapeconregr_WSOS(
     X,
     y,
     r::Int,
@@ -131,7 +141,7 @@ function build_regression_WSOS(
     return mdl, p
 end
 
-function run_JuMP_regression()
+function run_JuMP_shapeconregr()
     # degree of regressor
     r = 5
     # dimensionality of observations
@@ -142,20 +152,20 @@ function run_JuMP_regression()
     # monotonicity everywhere
     monotonicity_profile = ones(n)
     f = (x -> sum(x.^4, dims=2))
-    (X, y) = regression_data(f, npoints=npoints, signal_ratio=0.0, n=n)
+    (X, y) = shapeconregr_data(f, npoints=npoints, signal_ratio=0.0, n=n)
 
-    sdp_mdl, sdp_p = build_regression_SDP(X, y, r, box_lower, box_upper, monotonicity_profile)
-    wsos_mdl, wsos_p = build_regression_WSOS(X, y, r, box_lower, box_upper, monotonicity_profile)
+    sdp_mdl, sdp_p = build_shapeconregr_SDP(X, y, r, box_lower, box_upper, monotonicity_profile)
+    wsos_mdl, wsos_p = build_shapeconregr_WSOS(X, y, r, box_lower, box_upper, monotonicity_profile)
     @test JuMP.objective_value(sdp_mdl) ≈ JuMP.objective_value(wsos_mdl) atol = 1e-4
 
     sdp_preds = [JuMP.value(sdp_p)(X[i,:]) for i in 1:npoints]
     wsos_preds = [JuMP.value(wsos_p)(X[i,:]) for i in 1:npoints]
     @test sdp_preds ≈ wsos_preds atol = 1e-4
 
-    (X, y) = regression_data(npoints=npoints, signal_ratio=50.0, n=n)
+    (X, y) = shapeconregr_data(npoints=npoints, signal_ratio=50.0, n=n)
 
-    sdp_mdl, sdp_p = build_regression_SDP(X, y, r, box_lower, box_upper, monotonicity_profile)
-    wsos_mdl, wsos_p = build_regression_WSOS(X, y, r, box_lower, box_upper, monotonicity_profile)
+    sdp_mdl, sdp_p = build_shapeconregr_SDP(X, y, r, box_lower, box_upper, monotonicity_profile)
+    wsos_mdl, wsos_p = build_shapeconregr_WSOS(X, y, r, box_lower, box_upper, monotonicity_profile)
 
     @test JuMP.objective_value(sdp_mdl) ≈ JuMP.objective_value(wsos_mdl) atol = 1e-5
 
