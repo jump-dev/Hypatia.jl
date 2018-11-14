@@ -7,7 +7,7 @@ const conemap_mpb_to_hypatia = Dict(
     :SOC => Hypatia.EpiNormEucl,
     :SOCRotated => Hypatia.EpiPerSquare,
     :ExpPrimal => Hypatia.HypoPerLog,
-    # :ExpDual => "EXP*"
+    # :ExpDual => TODO
     :SDP => Hypatia.PosSemidef,
     :Power => Hypatia.HypoGeomean
 )
@@ -24,7 +24,7 @@ end
 function get_hypatia_cone(t::T, alphas::Vector{Float64}) where T <: ParametricCones
     t(alphas ./ sum(alphas), false)
 end
-# function add_hypatia_cone!(hypatia_cone::Hypatia.Cone, conesym::Symbol, idxs::UnitRange{Int})
+
 function add_hypatia_cone!(hypatia_cone::Hypatia.Cone, conesym::Symbol, idxs::UnitRange{Int})
     conetype = conemap_mpb_to_hypatia[conesym]
     conedim = length(idxs)
@@ -67,7 +67,6 @@ function mbgtohypatia(c_in::Vector{Float64},
     b_in::Vector{Float64},
     con_cones::Vector{Tuple{Symbol,Vector{Int}}},
     var_cones::Vector{Tuple{Symbol,Vector{Int}}},
-    vartypes::Vector{Symbol},
     sense::Symbol,
     con_power_refs::Vector{Int},
     var_power_refs::Vector{Int},
@@ -189,11 +188,14 @@ function mbgtohypatia(c_in::Vector{Float64},
 end
 
 function cbftohypatia(dat::CBFData; remove_ints::Bool=false, dense::Bool=true)
+    if !isempty(dat.intlist)
+        @warn "Ingoring integrality constraints."
+    end
     c, A, b, con_cones, var_cones, vartypes, dat.sense, dat.objoffset = cbftompb(dat, col_major=true, roundints=true)
     (dat.sense == :Max) && (c .*= -1.0)
     if remove_ints
         (c, A, b, con_cones, var_cones, vartypes) = remove_ints_in_nonlinear_cones(c, A, b, con_cones, var_cones, vartypes)
     end
-    (c, A, b, G, h, hypatia_cone) = mbgtohypatia(c, A, b, con_cones, var_cones, vartypes, dat.sense, dat.con_power_refs, dat.var_power_refs, dat.power_cone_alphas, dat.objoffset, dense = dense)
+    (c, A, b, G, h, hypatia_cone) = mbgtohypatia(c, A, b, con_cones, var_cones, dat.sense, dat.con_power_refs, dat.var_power_refs, dat.power_cone_alphas, dat.objoffset, dense = dense)
     (c, A, b, G, h, hypatia_cone, dat.objoffset)
 end

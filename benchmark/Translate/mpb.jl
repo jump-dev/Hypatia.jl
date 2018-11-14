@@ -1,15 +1,27 @@
 # Contains code modified from https://github.com/JuliaOpt/ConicBenchmarkUtilities.jl
-# as at commit b127d60549ca9fcc6fb9ceb3e77259704eefa266
 
-const conemap = Dict("L=" => :Zero, "F" => :Free,
-                     "L-" => :NonPos, "L+" => :NonNeg,
-                     "Q" => :SOC, "QR" => :SOCRotated,
-                     "EXP" => :ExpPrimal, "EXP*" => :ExpDual,
-                     "POWER" => :Power)
-const conemap_rev = Dict(:Zero => "L=", :Free => "F",
-                     :NonPos => "L-", :NonNeg => "L+",
-                     :SOC => "Q", :SOCRotated => "QR",
-                     :ExpPrimal => "EXP", :ExpDual => "EXP*")
+const conemap = Dict(
+    "L=" => :Zero,
+    "F" => :Free,
+    "L-" => :NonPos,
+    "L+" => :NonNeg,
+    "Q" => :SOC,
+    "QR" => :SOCRotated,
+    "EXP" => :ExpPrimal,
+    "EXP*" => :ExpDual,
+    "POWER" => :Power,
+)
+
+const conemap_rev = Dict(
+    :Zero => "L=",
+    :Free => "F",
+    :NonPos => "L-",
+    :NonNeg => "L+",
+    :SOC => "Q",
+    :SOCRotated => "QR",
+    :ExpPrimal => "EXP",
+    :ExpDual => "EXP*"
+)
 
 function cbfcones_to_mpbcones(c::Vector{Tuple{String,Int}},total)
     i = 1

@@ -1,5 +1,4 @@
 # Contains code modified from https://github.com/JuliaOpt/ConicBenchmarkUtilities.jl
-# as at commit b127d60549ca9fcc6fb9ceb3e77259704eefa266
 
 mutable struct CBFData
     name::String
