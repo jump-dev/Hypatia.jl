@@ -57,66 +57,75 @@ sleep(5.0)
 
 
 # meta text file will contain information about the benchmarking process
-fdmeta = open(joinpath(outputpath, "META_$(instanceset).txt"), "w")
-println(fdmeta, "instance set $instanceset")
-println(fdmeta, "$lscachetype for linear systems")
-println(fdmeta, "$(usedense ? "dense" : "sparse") A and G")
-println(fdmeta, "Hypatia options:")
-for (k, v) in options
-    println(fdmeta, "  $k = $v")
+metafile = joinpath(outputpath, "META_$(instanceset).txt")
+# each line of csv file will summarize Hypatia performance on a particular instance
+csvfile = joinpath(outputpath, "RESULTS_$(instanceset).csv")
+
+open(metafile, "w") do fdmeta
+    println(fdmeta, "instance set:    $instanceset")
+    println(fdmeta, "linear systems:  $lscachetype")
+    println(fdmeta, "matrices A, G:   $(usedense ? "dense" : "sparse")")
+    println(fdmeta, "Hypatia options:")
+    for (k, v) in options
+        println(fdmeta, "  $k = $v")
+    end
 end
 
-# each line of csv file will summarize Hypatia performance on a particular instance
-fdcsv = open(joinpath(outputpath, "RESULTS_$(instanceset).csv"), "w")
-println(fdcsv, "instancename,status,runtime,niters,pobj,dobj\n")
+open(csvfile, "w") do fdcsv
+    println(fdcsv, "instancename,status,runtime,niters,pobj,dobj")
+end
 
 # run each instance, print Hypatia output to instance-specific file, and print metadata to a single csv file
-TT = stdout
+OUT = stdout
+ERR = stderr
 for instname in instances
     @info "starting instance $instname"
 
-    fdinst = open(joinpath(outputpath, instname * ".txt"), "w")
-    redirect_stdout(fdinst)
+    solveerror = nothing
+    (runtime, status, niters, pobj, dobj) = (NaN, :UnSolved, 0, NaN, NaN)
 
-    println("reading CBF data and constructing Hypatia model")
-    cbfdata = Translate.readcbfdata(joinpath(cbfpath, instname * ".cbf.gz"))
-    (c, A, b, G, h, cone) = Translate.cbftohypatia(cbfdata, dense=usedense)
-    Hypatia.check_data(c, A, b, G, h, cone)
-    if lscachetype == "QRSymmCache"
-        (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = Hypatia.preprocess_data(c, A, b, G, useQR=true)
-        ls = Hypatia.QRSymmCache(c1, A1, b1, G1, h, cone, Q2, RiQ1)
-    elseif lscachetype == "NaiveCache"
-        (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = Hypatia.preprocess_data(c, A, b, G, useQR=false)
-        ls = Hypatia.NaiveCache(c1, A1, b1, G1, h, cone)
+    instfile = joinpath(outputpath, instname * ".txt")
+    open(instfile, "w") do fdinst
+        redirect_stdout(fdinst)
+        redirect_stderr(fdinst)
+
+        println("reading CBF data and constructing Hypatia model")
+        cbfdata = Translate.readcbfdata(joinpath(cbfpath, instname * ".cbf.gz"))
+        (c, A, b, G, h, cone) = Translate.cbftohypatia(cbfdata, dense=usedense)
+        Hypatia.check_data(c, A, b, G, h, cone)
+        if lscachetype == "QRSymmCache"
+            (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = Hypatia.preprocess_data(c, A, b, G, useQR=true)
+            ls = Hypatia.QRSymmCache(c1, A1, b1, G1, h, cone, Q2, RiQ1)
+        elseif lscachetype == "NaiveCache"
+            (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = Hypatia.preprocess_data(c, A, b, G, useQR=false)
+            ls = Hypatia.NaiveCache(c1, A1, b1, G1, h, cone)
+        end
+        model = Hypatia.Model(; options...)
+        Hypatia.load_data!(model, c1, A1, b1, G1, h, cone, ls)
+
+        println("running Hypatia")
+        try
+            runtime = @elapsed Hypatia.solve!(model)
+            println("Hypatia finished")
+            status = Hypatia.get_status(model)
+            niters = model.niters
+            pobj = Hypatia.get_pobj(model)
+            dobj = Hypatia.get_dobj(model)
+        catch solveerror
+            println("Hypatia errored:")
+            println(solveerror)
+        end
+
+        redirect_stdout(OUT)
+        redirect_stderr(ERR)
     end
-    model = Hypatia.Model(; options...)
-    Hypatia.load_data!(model, c1, A1, b1, G1, h, cone, ls)
 
-    noerror = true
-    runtime = @elapsed try
-        println("running Hypatia\n")
-        Hypatia.solve!(model)
-        println("\nHypatia finished")
-        noerror = false
-    catch e
-        println("\nHypatia errored")
-        println(e)
+    if !isnothing(solveerror)
+        @info "Hypatia errored on $instname:"
+        println(solveerror)
     end
 
-    status = Hypatia.get_status(model)
-    niters = model.niters
-    pobj = Hypatia.get_pobj(model)
-    dobj = Hypatia.get_dobj(model)
-
-    redirect_stdout(TT)
-
-    if !noerror
-        @info "Hypatia errored on $instname"
+    open(csvfile, "a") do fdcsv
+        println(fdcsv, "$instname,$status,$runtime,$niters,$pobj,$dobj")
     end
-
-    println(fdcsv, "$instname,$status,$runtime,$niters,$pobj,$dobj\n")
 end
-
-
-close(fdmeta)
-close(fdcsv)

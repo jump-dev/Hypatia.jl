@@ -4,8 +4,8 @@ infeas_clean_10_10_1
 expdesign_D_8_4
 port_12_9_3_a_1
 tls4
-rsyn0805h
+# rsyn0805h
 # 10_0_1_w
-gams01
-HMCR-n20-m400
-LogExpCR-n20-m400
+# gams01
+# HMCR-n20-m400
+# LogExpCR-n20-m400

@@ -174,7 +174,6 @@ function mbgtohypatia(c_in::Vector{Float64},
     mpbcones_to_hypatiacones!(hypatia_cone, var_cones, var_power_refs, power_alphas, cone_constrs)
 
     return (c_in, A, b, G, h, hypatia_cone)
-
 end
 
 function cbftohypatia(dat::CBFData; remove_ints::Bool=false, dense::Bool=true)

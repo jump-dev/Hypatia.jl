@@ -230,7 +230,7 @@ function mpbtocbf(name, c, A, b, con_cones, var_cones, vartypes, sense=:Min)
     intlist = Int[]
     for i in 1:length(vartypes)
         if var_idx_old_to_new[i] == 0 && vartypes[i] != :Cont
-            error("CBF format does not support integer restrictions on PSD variables")
+            error("CBF does not support integer restrictions on PSD variables")
         end
         if vartypes[i] == :Cont
         elseif vartypes[i] == :Int
@@ -239,7 +239,7 @@ function mpbtocbf(name, c, A, b, con_cones, var_cones, vartypes, sense=:Min)
             # TODO: Check if we need to add variable bounds also
             push!(intlist,var_idx_old_to_new[i])
         else
-            error("Unrecognized variable category $(vartypes[i])")
+            error("unrecognized variable category $(vartypes[i])")
         end
     end
 
@@ -303,7 +303,7 @@ function mpbtocbf(name, c, A, b, con_cones, var_cones, vartypes, sense=:Min)
     for (i,j,v) in zip(A_I,A_J,A_V)
         if psdvar_idx_old_to_new[j] != (0,0,0)
             if psdcon_idx_old_to_new[i] != (0,0,0)
-                error("CBF format does not allow PSD variables to appear in affine expressions defining PSD constraints")
+                error("CBF does not allow PSD variables to appear in affine expressions defining PSD constraints")
             end
             newrow = con_idx_old_to_new[i]
             @assert newrow != 0

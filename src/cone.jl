@@ -113,7 +113,7 @@ function factH(prmtv::PrimitiveCone)
     prmtv.F = cholesky!(Symmetric(prmtv.H2), Val(true), check=false)
 
     if !isposdef(prmtv.F)
-        @warn("primitive cone hessian was singular")
+        println("primitive cone hessian was singular")
         @. prmtv.H2 = prmtv.H
         prmtv.F = PositiveFactorizations.cholesky!(PositiveFactorizations.Positive, prmtv.H2)
     end

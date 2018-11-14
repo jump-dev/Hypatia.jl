@@ -80,7 +80,7 @@ function readcbfdata(filename)
                 nextline = readline(fd)
                 if startswith(nextline,"@")
                     if isempty(dat.power_cone_alphas)
-                        error("Did not expect variables to be listed in file before power parameters.")
+                        error("did not expect variables to be listed in file before power cone parameters")
                     end
                     coneref, sz = split(nextline)
                     sz = parse(Int,strip(sz))
@@ -123,7 +123,7 @@ function readcbfdata(filename)
                 nextline = readline(fd)
                 if startswith(nextline,"@")
                     if isempty(dat.power_cone_alphas)
-                        error("Did not expect variables to be listed in file before power parameters.")
+                        error("did not expect variables to be listed in file before power cone parameters")
                     end
                     coneref, sz = split(nextline)
                     sz = parse(Int,strip(sz))
@@ -192,7 +192,7 @@ function readcbfdata(filename)
         if startswith(line,"OBJBCOORD")
             nextline = readline(fd)
             dat.objoffset = parse(Float64, strip(nextline))
-            @warn "Instance has objective offset"
+            @warn "instance has an objective offset"
         end
 
         if startswith(line,"BCOORD")
