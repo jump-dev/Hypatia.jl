@@ -16,14 +16,12 @@ if length(ARGS) != 3
     error("usage: julia runbenchmarks.jl instanceset cbfpath outputpath")
 end
 
-# instanceset = "easy"
 instanceset = ARGS[1]
 instsetfile = joinpath(@__DIR__, "instancesets", instanceset * ".txt")
 if !isfile(instsetfile)
     error("instance set not found: $instsetfile")
 end
 
-# cbfpath = "/home/coey/Dropbox/cblibeasy"
 cbfpath = ARGS[2]
 if !isdir(cbfpath)
     error("cbf path is not a valid directory: $cbfpath")
@@ -39,7 +37,6 @@ for instname in instances
     end
 end
 
-# outputpath = "/home/coey/benchtest"
 outputpath = ARGS[3]
 if !isdir(outputpath)
     error("output path is not a valid directory: $outputpath")
