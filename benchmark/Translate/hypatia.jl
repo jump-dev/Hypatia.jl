@@ -75,13 +75,6 @@ function mbgtohypatia(c_in::Vector{Float64},
     dense::Bool=true
     )
 
-    # cannot do integer variables yet
-    for v in vartypes
-        if v != :Cont
-            error("We cannot handle binary or integer variables yet.")
-        end
-    end
-
     # dimension of x
     n = length(c_in)
 
@@ -193,7 +186,7 @@ function cbftohypatia(dat::CBFData; remove_ints::Bool=false, dense::Bool=true)
     end
     c, A, b, con_cones, var_cones, vartypes, dat.sense, dat.objoffset = cbftompb(dat, col_major=true, roundints=true)
     if dat.sense == :Max
-        c .= -c
+        c .*= -1.0
     end
     if remove_ints
         (c, A, b, con_cones, var_cones, vartypes) = remove_ints_in_nonlinear_cones(c, A, b, con_cones, var_cones, vartypes)

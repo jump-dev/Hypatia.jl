@@ -160,17 +160,17 @@ function run_instances()
     for i in size(problems, 1)
         problem_name = problems[i, 1] * ".cbf.gz"
         problem_file = joinpath(path_to_input, problem_name)
+        @info "Testing problem: $problem_name"
 
         for cache in hypatia_cachetypes
-            @info "Testing problem $i: $problem"
             @info "Testing with $cache"
             dat = get_cblib_data(problem_file)
             (c, A, b, G, h, cone, prkeep, dukeep, mdl) = cblib_data_mdl(dat, cache, mdl_options)
             @info "Solving in Hypatia"
-            htime = @elapsed benchmarksolve!(mdl, problem)
+            htime = @elapsed benchmarksolve!(mdl, problem_name)
             cert = check_certificates(c, A, b, G, h, cone, prkeep, dukeep, mdl)
             @info "Checking certificates"
-            r = result(problem, cache, i, float(kb), htime, cert, mdl)
+            r = result(problem_name, cache, i, htime, cert, mdl)
             push!(results, r)
 
             if write_output
