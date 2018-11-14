@@ -62,7 +62,7 @@ function mpbcones_to_hypatiacones!(hypatia_cone::Hypatia.Cone, mpb_cones::Vector
     hypatia_cone
 end
 
-function mbgtohypatia(c_in::Vector{Float64},
+function mpbtohypatia(c_in::Vector{Float64},
     A_in::AbstractMatrix,
     b_in::Vector{Float64},
     con_cones::Vector{Tuple{Symbol,Vector{Int}}},
@@ -187,6 +187,6 @@ function cbftohypatia(dat::CBFData; remove_ints::Bool=false, dense::Bool=true)
     if remove_ints
         (c, A, b, con_cones, var_cones, vartypes) = remove_ints_in_nonlinear_cones(c, A, b, con_cones, var_cones, vartypes)
     end
-    (c, A, b, G, h, hypatia_cone) = mbgtohypatia(c, A, b, con_cones, var_cones, dat.sense, dat.con_power_refs, dat.var_power_refs, dat.power_cone_alphas, dat.objoffset, dense = dense)
+    (c, A, b, G, h, hypatia_cone) = mpbtohypatia(c, A, b, con_cones, var_cones, dat.sense, dat.con_power_refs, dat.var_power_refs, dat.power_cone_alphas, dat.objoffset, dense = dense)
     (c, A, b, G, h, hypatia_cone, dat.objoffset)
 end
