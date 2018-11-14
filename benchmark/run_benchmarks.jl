@@ -36,10 +36,10 @@ mdl_options = Dict()
 mdl_options[:maxiter] = 300
 mdl_options[:verbose] = true
 
-# For constructing CBLIB problems
-function get_cblib_data(problem::String)
+# For constructing CBLIB instances
+function get_cblib_data(instance::String)
     @info "Reading data"
-    return Translate.readcbfdata(joinpath(path_to_input, problem))
+    return Translate.readcbfdata(joinpath(path_to_input, instance))
 end
 
 function cblib_data_mdl(dat::Translate.CBFData, lscachetype::String, kwargs::Dict)
@@ -60,27 +60,27 @@ function cblib_data_mdl(dat::Translate.CBFData, lscachetype::String, kwargs::Dic
 end
 
 function check_certificates(c, A, b, G, h, cone, prkeep, dukeep, mdl)
-    # TODO 
+    # TODO
     return true
 end
 
-function benchmarksolve!(mdl::Hypatia.Model, problem::String)
+function benchmarksolve!(mdl::Hypatia.Model, instance::String)
     try
         Hypatia.solve!(mdl)
         status = Hypatia.get_status(mdl)
         if status != :Optimal
             open(joinpath(@__DIR__(), "error_log.txt"), "a") do f
-                println(f, problem, ",", string(status))
+                println(f, instance, ",", string(status))
             end
         end
     catch e
         open(joinpath(@__DIR__(), "error_log.txt"), "a") do f
-            println(f, problem, ",", e)
+            println(f, instance, ",", e)
         end
     end
 end
 
-function result(problem::String, cache::String, id::Int, tm::Float64, cert::Bool, mdl::Hypatia.Model)
+function result(instance::String, cache::String, id::Int, tm::Float64, cert::Bool, mdl::Hypatia.Model)
     niters = mdl.niters
     status = Hypatia.get_status(mdl)
     if status != :StartedIterating
@@ -90,13 +90,13 @@ function result(problem::String, cache::String, id::Int, tm::Float64, cert::Bool
         pobj = Inf
         dobj = -Inf
     end
-    (problem=problem, cahce=cache, id=id, time=tm, cert=cert, niters=niters, status=status, pobj=pobj, dobj=dobj)
+    (instance=instance, cahce=cache, id=id, time=tm, cert=cert, niters=niters, status=status, pobj=pobj, dobj=dobj)
 end
 
 function run_instances()
 
-    problems = readdlm(setfile, comments=true)
-    @assert size(problems, 2) == 1
+    instances = readdlm(setfile, comments=true)
+    @assert size(instances, 2) == 1
 
     if write_output
         open(results_file_name, "w") do f
@@ -104,35 +104,35 @@ function run_instances()
             for (k, v) in mdl_options
                 write(f, " $k = $v")
             end
-            write(f, "\nproblem,id,cache,hypatia_time,hypatia_iterations,pobj,dobj,certificate,status\n")
+            write(f, "\ninstance,id,cache,hypatia_time,hypatia_iterations,pobj,dobj,certificate,status\n")
         end
     end
 
     results = []
 
-    for i in 1:size(problems, 1)
-        problem_name = problems[i, 1] * ".cbf.gz"
-        problem_file = joinpath(path_to_input, problem_name)
-        @info "Testing problem: $problem_name"
+    for i in 1:size(instances, 1)
+        instance_name = instances[i, 1] * ".cbf.gz"
+        instance_file = joinpath(path_to_input, instance_name)
+        @info "Testing instance: $instance_name"
 
         for cache in hypatia_cachetypes
             @info "Testing with $cache"
-            dat = get_cblib_data(problem_file)
+            dat = get_cblib_data(instance_file)
             (c, A, b, G, h, cone, prkeep, dukeep, mdl) = cblib_data_mdl(dat, cache, mdl_options)
             @info "Solving in Hypatia"
-            htime = @elapsed benchmarksolve!(mdl, problem_name)
+            htime = @elapsed benchmarksolve!(mdl, instance_name)
             cert = check_certificates(c, A, b, G, h, cone, prkeep, dukeep, mdl)
             @info "Checking certificates"
-            r = result(problem_name, cache, i, htime, cert, mdl)
+            r = result(instance_name, cache, i, htime, cert, mdl)
             push!(results, r)
 
             if write_output
                 open(results_file_name, "a") do f
-                    write(f, "$problem_name,$i,$cache, $htime, $(r.niters), $(r.pobj), $(r.dobj),$cert,$(r.status)\n")
+                    write(f, "$instance_name,$i,$cache, $htime, $(r.niters), $(r.pobj), $(r.dobj),$cert,$(r.status)\n")
                 end
             end
         end # cache types
-    end # problems
+    end # instances
 
     return results
 end
