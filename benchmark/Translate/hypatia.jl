@@ -103,9 +103,6 @@ function mbgtohypatia(c_in::Vector{Float64},
             push!(zero_var_inds, inds...)
             push!(zero_var_cones, cone_count)
             zero_vars += length(inds)
-        elseif cone_type == :ExpPrimal
-            # take out if this ever happens
-            error("we didn't know CBF allows variables in exponential cones")
         elseif cone_type != :Free
             cone_vars += length(inds)
             push!(cone_var_inds, inds...)
