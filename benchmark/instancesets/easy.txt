@@ -1,9 +1,24 @@
 # a small number of instances that solve reliably and quickly
-
+# psd
 infeas_clean_10_10_1
 expdesign_D_8_4
+expdesign_D_12_6
+5x5_1bar
+2g_6_701_k4_9_9
+# soc and exponential
 port_12_9_3_a_1
+estein4_nr22
+# soc
 tls4
+classical_200_0
+# rsoc
+achtziger_stolpe06-6.5flowc
+# exponential
+syn40h
+rsyn0810h
+LogExpCR-n100-m400
+#
+#
 # rsyn0805h
 # 10_0_1_w
 # gams01
