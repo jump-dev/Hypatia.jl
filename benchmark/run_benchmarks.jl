@@ -60,55 +60,8 @@ function cblib_data_mdl(dat::Translate.CBFData, lscachetype::String, kwargs::Dic
 end
 
 function check_certificates(c, A, b, G, h, cone, prkeep, dukeep, mdl)
-    status = Hypatia.get_status(mdl)
-    # If we fail due to a numerical issue skip this, error should be logged
-    if status == :StartedIterating
-        return false
-    end
-    (atol, rtol) = (1e-4, 1e-4)
-    # construct solution
-    x = zeros(length(c))
-    x[dukeep] = Hypatia.get_x(mdl)
-    y = zeros(length(b))
-    y[prkeep] = Hypatia.get_y(mdl)
-    s = Hypatia.get_s(mdl)
-    z = Hypatia.get_z(mdl)
-    pobj = Hypatia.get_pobj(mdl)
-    dobj = Hypatia.get_dobj(mdl)
-
-    ret = true
-
-    # check conic certificates are valid; conditions are described by CVXOPT at https://github.com/cvxopt/cvxopt/blob/master/src/python/coneprog.py
-    if status == :Optimal
-        isapprox(pobj, dobj, atol=atol, rtol=rtol) || (ret = false)
-        isapprox(A*x, b, atol=atol, rtol=rtol) || (ret = false)
-        isapprox(G*x + s, h, atol=atol, rtol=rtol) || (ret = false)
-        isapprox(G'*z + A'*y, -c, atol=atol, rtol=rtol) || (ret = false)
-        isapprox(dot(s, z), 0.0, atol=atol, rtol=rtol) || (ret = false)
-        isapprox(dot(c, x), pobj, atol=1e-8, rtol=1e-8) || (ret = false)
-        isapprox(dot(b, y) + dot(h, z), -dobj, atol=1e-8, rtol=1e-8) || (ret = false)
-    elseif status == :PrimalInfeasible
-        (isnan(pobj)) || (ret = false)
-        isapprox(dobj, 1.0, atol=1e-8, rtol=1e-8) || (ret = false)
-        (all(isnan, x)) || (ret = false)
-        (all(isnan, s)) || (ret = false)
-        isapprox(dot(b, y) + dot(h, z), -1.0, atol=1e-8, rtol=1e-8) || (ret = false)
-        isapprox(G'*z, -A'*y, atol=atol, rtol=rtol) || (ret = false)
-    elseif status == :DualInfeasible
-        (isnan(dobj)) || (ret = false)
-        isapprox(pobj, -1.0, atol=1e-8, rtol=1e-8) || (ret = false)
-        (all(isnan, y)) || (ret = false)
-        (all(isnan, z)) || (ret = false)
-        isapprox(dot(c, x), -1.0, atol=1e-8, rtol=1e-8) || (ret = false)
-        isapprox(G*x, -s, atol=atol, rtol=rtol) || (ret = false)
-        isapprox(A*x, zeros(length(y)), atol=atol, rtol=rtol) || (ret = false)
-    elseif status == :IllPosed
-        (all(isnan, x)) || (ret = false)
-        (all(isnan, s)) || (ret = false)
-        (all(isnan, y)) || (ret = false)
-        (all(isnan, z)) || (ret = false)
-    end
-    return ret
+    # TODO 
+    return true
 end
 
 function benchmarksolve!(mdl::Hypatia.Model, problem::String)
