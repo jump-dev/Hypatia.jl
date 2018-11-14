@@ -15,7 +15,6 @@ include(joinpath(benchmark_dir, "Translate", "Translate.jl"))
 
 # Either use a directory of downloaded instances or download them on the fly
 dflt_cbf_dir = "D:/cblib/cblib.zib.de/download/all"
-include(joinpath(benchmark_dir, "sample_families.jl"))
 
 # Output
 write_output = true
@@ -194,7 +193,6 @@ function run_instances()
 
     results = []
 
-    sampled_problems = sample_families()
     for i in 1:size(problem_stats[1], 1)
         row = problem_stats[1][i, :]
         problem = string(row[1])

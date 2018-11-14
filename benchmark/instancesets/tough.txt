@@ -1,0 +1,10 @@
+# tough problem instances
+4x3_2bars_3scen.cbf.gz    # predictor fail 58d19d5
+bridge_3x7_2bars.cbf.gz    # predictor fail 58d19d5
+clay0203h.cbf.gz    # failed in factorization 58d19d5
+infeas_clean_10_10_39.cbf.gz    # failed in factorization 58d19d5
+infeas_messy_10_10_74.cbf.gz    # failed in factorization 58d19d5
+nql30    # iteration limit 58d19d5
+rt_4x3_2bars_3scen    # predictor fail 58d19d5
+rt_bridge_3x7_2bars    # predictor fail 58d19d5
+syn15m02m    # failed in factorization 58d19d5

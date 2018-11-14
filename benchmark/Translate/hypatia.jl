@@ -192,7 +192,9 @@ function cbftohypatia(dat::CBFData; remove_ints::Bool=false, dense::Bool=true)
         @warn "Ingoring integrality constraints."
     end
     c, A, b, con_cones, var_cones, vartypes, dat.sense, dat.objoffset = cbftompb(dat, col_major=true, roundints=true)
-    (dat.sense == :Max) && (c .*= -1.0)
+    if dat.sense == :Max
+        c .= -c
+    end
     if remove_ints
         (c, A, b, con_cones, var_cones, vartypes) = remove_ints_in_nonlinear_cones(c, A, b, con_cones, var_cones, vartypes)
     end
