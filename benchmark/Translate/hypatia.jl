@@ -177,9 +177,6 @@ function mpbtohypatia(c_in::Vector{Float64},
 end
 
 function cbftohypatia(dat::CBFData; remove_ints::Bool=false, dense::Bool=true)
-    if !isempty(dat.intlist)
-        @warn "ignoring integrality constraints"
-    end
     c, A, b, con_cones, var_cones, vartypes, dat.sense, dat.objoffset = cbftompb(dat, col_major=true, roundints=true)
     if dat.sense == :Max
         c .*= -1.0
@@ -187,6 +184,9 @@ function cbftohypatia(dat::CBFData; remove_ints::Bool=false, dense::Bool=true)
     if remove_ints
         (c, A, b, con_cones, var_cones, vartypes) = remove_ints_in_nonlinear_cones(c, A, b, con_cones, var_cones, vartypes)
     end
+
     (c, A, b, G, h, hypatia_cone) = mpbtohypatia(c, A, b, con_cones, var_cones, dat.sense, dat.con_power_refs, dat.var_power_refs, dat.power_cone_alphas, dat.objoffset, dense = dense)
-    (c, A, b, G, h, hypatia_cone, dat.objoffset)
+    hasintegervars = !isempty(dat.intlist)
+
+    return (c, A, b, G, h, hypatia_cone, dat.objoffset, hasintegervars)
 end

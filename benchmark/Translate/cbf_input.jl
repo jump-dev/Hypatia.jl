@@ -192,7 +192,6 @@ function readcbfdata(filename)
         if startswith(line,"OBJBCOORD")
             nextline = readline(fd)
             dat.objoffset = parse(Float64, strip(nextline))
-            @warn "instance has an objective offset"
         end
 
         if startswith(line,"BCOORD")

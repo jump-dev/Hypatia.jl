@@ -4,55 +4,70 @@ Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 TODO readme file for benchmarks and describe ARGS for running on command line
 =#
 
+using Pkg; Pkg.activate("Hypatia") # TODO delete later
 using Hypatia
+
 # TODO replace with by ConicBenchmarkUtilities -> MOI -> Hypatia when CBU is updated for MOI
 include(joinpath(@__DIR__, "Translate", "Translate.jl")) # module containing functions for translating from cbf to Hypatia native format
 
-benchpath = @__DIR__
-# benchpath = "/home/coey/.julia/dev/Hypatia/benchmark"
 
 # parse command line arguments
-# @assert length(ARGS) >= 2
+if length(ARGS) != 3
+    error("usage: julia runbenchmarks.jl instanceset cbfpath outputpath")
+end
 
-cbfpath = "/home/coey/Dropbox/cblibeasy" # ARGS[1]
+# instanceset = "easy"
+instanceset = ARGS[1]
+instsetfile = joinpath(@__DIR__, "instancesets", instanceset * ".txt")
+if !isfile(instsetfile)
+    error("instance set not found: $instsetfile")
+end
+
+# cbfpath = "/home/coey/Dropbox/cblibeasy"
+cbfpath = ARGS[2]
 if !isdir(cbfpath)
     error("cbf path is not a valid directory: $cbfpath")
 end
 
-instanceset = "easy" # ARGS[2]
-instsetfile = joinpath(benchpath, "instancesets", instanceset * ".txt")
-if !isfile(instsetfile)
-    error("instance set not found: instsetfile")
-end
 # check that each instance is in the cbfpath
 instances = filter(l -> !isempty(l) && !startswith(l, '#'), strip.(readlines(instsetfile)))
-@info "instance set $instanceset contains $(length(instances)) instances"
+println("instance set $instanceset contains $(length(instances)) instances")
 for instname in instances
     instfile = joinpath(cbfpath, instname * ".cbf.gz")
     if !isfile(instfile)
-        error("could not find instance at $instfile")
+        error("instance CBF file not found: $instfile")
     end
 end
 
-# timelimit = ARGS[3] # TODO add this
-
-outputpath = "/home/coey/benchtest"
-# @info "results will be saved in $outputfile"
-
-lscachetype = "QRSymmCache" # ARGS[4]
-if !in(lscachetype, ("QRSymmCache", "NaiveCache"))
-    error("linear system cache type $lscachetype is not recognized")
+# outputpath = "/home/coey/benchtest"
+outputpath = ARGS[3]
+if !isdir(outputpath)
+    error("output path is not a valid directory: $outputpath")
 end
-usedense = parse(Bool, "false") # ARGS[5]
 
+# TODO these options
+# timelimit = ARGS[4]
+lscachetype = "QRSymmCache"
+# if !in(lscachetype, ("QRSymmCache", "NaiveCache"))
+#     error("linear system cache type $lscachetype is not recognized")
+# end
+usedense = parse(Bool, "false")
+
+println("\nlinear systems using $lscachetype")
+println("matrices A, G will be $(usedense ? "dense" : "sparse")")
 
 # Hypatia options
 options = Dict()
 # options[:maxiter] = 300
 options[:verbose] = true
+# options[:timelimit] = # TODO args option
 
+println("Hypatia options are:")
+for (k, v) in options
+    println("  $k = $v")
+end
 
-@info "starting benchmark run in a few seconds"
+println("\nstarting benchmark run in 5 seconds\n")
 sleep(5.0)
 
 
@@ -79,7 +94,7 @@ end
 OUT = stdout
 ERR = stderr
 for instname in instances
-    @info "starting instance $instname"
+    println("$instname ...")
 
     solveerror = nothing
     (runtime, status, niters, pobj, dobj) = (NaN, :UnSolved, 0, NaN, NaN)
@@ -89,9 +104,17 @@ for instname in instances
         redirect_stdout(fdinst)
         redirect_stderr(fdinst)
 
-        println("reading CBF data and constructing Hypatia model")
+        println("reading CBF data")
         cbfdata = Translate.readcbfdata(joinpath(cbfpath, instname * ".cbf.gz"))
-        (c, A, b, G, h, cone) = Translate.cbftohypatia(cbfdata, dense=usedense)
+        (c, A, b, G, h, cone, objoffset, hasintvars) = Translate.cbftohypatia(cbfdata, dense=usedense)
+        if hasintvars
+            println("ignoring integrality constraints")
+        end
+        if !iszero(objoffset)
+            println("ignoring objective offset")
+        end
+
+        println("constructing Hypatia model")
         Hypatia.check_data(c, A, b, G, h, cone)
         if lscachetype == "QRSymmCache"
             (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = Hypatia.preprocess_data(c, A, b, G, useQR=true)
@@ -103,7 +126,7 @@ for instname in instances
         model = Hypatia.Model(; options...)
         Hypatia.load_data!(model, c1, A1, b1, G1, h, cone, ls)
 
-        println("running Hypatia")
+        println("solving Hypatia model")
         try
             runtime = @elapsed Hypatia.solve!(model)
             println("Hypatia finished")
@@ -121,7 +144,7 @@ for instname in instances
     end
 
     if !isnothing(solveerror)
-        @info "Hypatia errored on $instname:"
+        println("Hypatia errored on $instname:")
         println(solveerror)
     end
 
