@@ -16,6 +16,8 @@ using SumOfSquares
 using LinearAlgebra
 using Test
 
+import Combinatorics
+
 abstract type Domain end
 
 mutable struct Box <: Domain
@@ -117,7 +119,7 @@ end
 
 get_domain(dom::Domain, x) = error("")
 
-function get_domain(dom::Box, x)
+function get_bss(dom::Box, x)
     bss = BasicSemialgebraicSet{Float64,Polynomial{true,Float64}}()
     for i in 1:dimension(dom)
         addinequality!(bss, -x[i] + dom.u[i])
@@ -133,8 +135,20 @@ end
 #     return bss
 # end
 
-function get_domain(dom::Ball, x)
+function get_bss(dom::Ball, x)
     return @set abs2(x - dom.c) <= dom.r^2
+end
+
+# assumes we built the box ourselves for now, with known order of equations
+# TODO try only one equation, product_i{(u_i-x_i)(x_i-l_i)}
+function get_weight_equations(dom::Box, bss::BasicSemialgebraicSet{Float64,Polynomial{true,Float64}})
+    m = length(bss.p)
+    @assert mod(m, 2) == 0
+    g = Vector{Polynomial{true,Float64}}(undef, div(m, 2))
+    for i in eachindex(g)
+        g[i] = bss.p[2i-1] * bss.p[2i]
+    end
+    return g
 end
 
 function build_JuMP_namedpoly_SDP(
@@ -161,24 +175,55 @@ function build_JuMP_namedpoly_WSOS(
     f::DynamicPolynomials.Polynomial{true,Float64},
     dom::Domain,
     )
+
     # generate interpolation
     n = nvariables(f) # number of polyvars
-    d = degree(f) # let degree of interpolating polynomials match degree of given named polynomial
+    d =  div(length(x), 2) # let degree of interpolating polynomials match degree of given named polynomial
     L = binomial(n+d, n)
     U = binomial(n+2d, n)
     pts = sample(dom, U)
 
+    u = Hypatia.calc_u(n, d, pts')
+    P0 = Matrix{Float64}(undef, U, L)
+    P0[:,1] .= 1
+    col = 1
+    for t in 1:d
+        for xp in Combinatorics.multiexponents(2, t)
+            col += 1
+            @show size(P0), size(u[1]), size(u[2]), size(xp)
+            P0[:,col] .= u[1][:,xp[1]+1] .* u[2][:,xp[2]+1]
+        end
+    end
+    P = Array(qr(P0).Q)
 
+    P0sub = view(P0, :, 1:binomial(n+d-1, n))
 
+    bss = get_bss(dom, x)
 
+    # ignores mismatch between dimension of x and dimension of domain, need to check and deal with this correctly
+    gpolys = get_weight_equations(dom, bss)
+    g = Vector{Vector{Float64}}(undef, length(gpolys))
+    for i in eachindex(gpolys)
+        g[i] = gpolys[i].(pts[i,:])
+        @show gpolys[i]
+        @assert all(g[i] .> 0)
+    end
+    PWts = [sqrt.(g[i]) .* P0sub for i in 1:n]
+    # PWts = [P0sub for i in 1:n]
 
-
+    wsos_cone = WSOSPolyInterpCone(U, [P, PWts...])
 
     # build JuMP model
-    model = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true))
-    @variable(model, a)
+    model = Model(with_optimizer(Hypatia.Optimizer, verbose=true))
+    @variables(model, begin
+        a
+        q[1:U]
+    end)
     @objective(model, Max, a)
-    @constraint(model, fnn, f >= a, domain=dom)
+    @constraints(model, begin
+        q - a .* ones(U) in wsos_cone
+        [i in 1:U], f(pts[:,i]) == q[i]
+    end)
 
     return model
 end
@@ -205,8 +250,21 @@ function run_JuMP_namedpoly()
     model = build_JuMP_namedpoly_SDP(x, f, dom)
     JuMP.optimize!(model)
 
+    println("done")
+    term_status = JuMP.termination_status(model)
+    pobj = JuMP.objective_value(model)
+    dobj = JuMP.objective_bound(model)
+    pr_status = JuMP.primal_status(model)
+    du_status = JuMP.dual_status(model)
+
+    @test term_status == MOI.Success
+    @test pr_status == MOI.FeasiblePoint
+    @test du_status == MOI.FeasiblePoint
+    @test pobj ≈ dobj atol=1e-4 rtol=1e-4
+    @test pobj ≈ truemin atol=1e-4 rtol=1e-4
+
     println("solving model with WSOS interpolation cones")
-    model = build_JuMP_namedpoly_SDP(x, f, dom)
+    model = build_JuMP_namedpoly_WSOS(x, f, dom)
     JuMP.optimize!(model)
 
     println("done")
