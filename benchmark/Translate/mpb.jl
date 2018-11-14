@@ -1,4 +1,4 @@
-# Contains code modified from https://github.com/JuliaOpt/ConicBenchmarkUtilities.jl
+# Contains code modified from https://github.com/JuliaOpt/ConicBenchmarkUtilities.jl (Miles Lubin and contributors)
 
 const conemap = Dict(
     "L=" => :Zero,
