@@ -157,7 +157,7 @@ function run_instances()
 
     results = []
 
-    for i in size(problems, 1)
+    for i in 1:size(problems, 1)
         problem_name = problems[i, 1] * ".cbf.gz"
         problem_file = joinpath(path_to_input, problem_name)
         @info "Testing problem: $problem_name"
