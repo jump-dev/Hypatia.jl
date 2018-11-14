@@ -7,34 +7,31 @@ using LinearAlgebra
 using SparseArrays
 using DelimitedFiles
 
-Random.seed!(32)
-
-# Module for translation, can be replaced by CBU
 benchmark_dir = joinpath(dirname(dirname(pathof(Hypatia))), "benchmark")
+
+# Module for translation, can be replaced by CBU when updated
 include(joinpath(benchmark_dir, "Translate", "Translate.jl"))
 
-# Either use a directory of downloaded instances or download them on the fly
-dflt_cbf_dir = "D:/cblib/cblib.zib.de/download/all"
+# @assert length(ARGS[1]) >= 2
+path_to_input = "D:/cblib/cblib.zib.de/download/all"  # ARGS[1]
+set_to_run = "easy" # ARGS[2]
+# time_limit = ARGS[3] # TODO add this
+
+if !isdir(path_to_input)
+    error("Not a valid input directory.")
+end
+setfile = joinpath(benchmark_dir, "instancesets", set_to_run*".txt")
+if !isfile(setfile)
+    error("Not a valid input directory.")
+end
 
 # Output
 write_output = true
 results_file_name = joinpath(@__DIR__(), "benchmark_times_$(round(Int, time())).csv")
 
-# Problems of interest
-max_size = 100_000_000.0
-skip_cones = []
-hypatia_supported_cones = ["orthant", "exp", "soc", "rsoc", "psd", "sos","power"]
 hypatia_cachetypes = ["qrsym"]
-skip_problems = [
-    "as_conic_100_100_hard_set1_1_cap10.cbf.gz" # stalls on these problems
-    "chainsing-1000-3.cbf.gz" # took 3 hours then predictor fail
-    "uflquad-nopsc-20-100.cbf.gz" # taking a long time
-]
-# If concerned with certain instances
-only_chosen_problems = true
-chosen_problems = ["2x5_1scen_8bars.cbf.gz"]
-start_index = 0
-# Versions to test
+
+# Hypatia options
 mdl_options = Dict()
 mdl_options[:maxiter] = 300
 mdl_options[:verbose] = true
@@ -42,15 +39,9 @@ mdl_options[:verbose] = true
 # For constructing CBLIB problems
 function get_cblib_data(problem::String)
     @info "Reading data"
-    if isdir(dflt_cbf_dir)
-        return Translate.readcbfdata(joinpath(dflt_cbf_dir, problem))
-    else
-        run(`wget -l1 -np http://cblib.zib.de/download/all/$problem`)
-        dat = Translate.readcbfdata(problem)
-        rm(problem)
-        return dat
-    end
+    return Translate.readcbfdata(joinpath(path_to_input, problem))
 end
+
 function cblib_data_mdl(dat::Translate.CBFData, lscachetype::String, kwargs::Dict)
     (c, A, b, G, h, cone) = Translate.cbftohypatia(dat, dense=false)
     Hypatia.check_data(c, A, b, G, h, cone)
@@ -67,36 +58,6 @@ function cblib_data_mdl(dat::Translate.CBFData, lscachetype::String, kwargs::Dic
     Hypatia.load_data!(mdl, c1, A1, b1, G1, h, cone, L)
     return (c, A, b, G, h, cone, prkeep, dukeep, mdl)
 end
-
-function relevant(datarow, header)
-    for c in skip_cones
-        if datarow[header[:] .== c][1]
-            return false
-        end
-    end
-    if only_chosen_problems
-        if !(datarow[1] in chosen_problems)
-            return false
-        end
-    end
-    if datarow[1] in skip_problems
-        return false
-    end
-    # Some families we want to avoid
-    if startswith(datarow[1], "as_conic_100_100_hard")
-        return false
-    end
-    if startswith(datarow[1], "chainsing")
-        return false
-    end
-    if datarow[2] < start_index
-        return false
-    end
-    return datarow[10] < max_size
-end
-
-# saved details about each problem
-problem_stats = readdlm(joinpath(@__DIR__(), "data/cblib_problem_stats.csv"), ',', header = true)
 
 function check_certificates(c, A, b, G, h, cone, prkeep, dukeep, mdl)
     status = Hypatia.get_status(mdl)
@@ -166,7 +127,7 @@ function benchmarksolve!(mdl::Hypatia.Model, problem::String)
     end
 end
 
-function result(problem::String, cache::String, id::Int, size::Float64, tm::Float64, cert::Bool, mdl::Hypatia.Model)
+function result(problem::String, cache::String, id::Int, tm::Float64, cert::Bool, mdl::Hypatia.Model)
     niters = mdl.niters
     status = Hypatia.get_status(mdl)
     if status != :StartedIterating
@@ -176,10 +137,13 @@ function result(problem::String, cache::String, id::Int, size::Float64, tm::Floa
         pobj = Inf
         dobj = -Inf
     end
-    (problem=problem, cahce=cache, id=id, size=size, time=tm, cert=cert, niters=niters, status=status, pobj=pobj, dobj=dobj)
+    (problem=problem, cahce=cache, id=id, time=tm, cert=cert, niters=niters, status=status, pobj=pobj, dobj=dobj)
 end
 
 function run_instances()
+
+    problems = readdlm(setfile, comments=true)
+    @assert size(problems, 2) == 1
 
     if write_output
         open(results_file_name, "w") do f
@@ -187,51 +151,31 @@ function run_instances()
             for (k, v) in mdl_options
                 write(f, " $k = $v")
             end
-            write(f, "\nproblem,id,cache,size,hypatia_time,hypatia_iterations,pobj,dobj,certificate,status\n")
+            write(f, "\nproblem,id,cache,hypatia_time,hypatia_iterations,pobj,dobj,certificate,status\n")
         end
     end
 
     results = []
 
-    for i in 1:size(problem_stats[1], 1)
-        row = problem_stats[1][i, :]
-        problem = string(row[1])
-        @assert endswith(problem, ".cbf.gz")
-        # file size in kilobytes
-        kb = problem_stats[1][i, 10] / 1000.0
-        cones_involved = problem_stats[2][row .== true]
-        skip = false
-        # Cones in the problem. Last boolean is a flag for integers.
-        for c in cones_involved[1:end-1]
-            c in hypatia_supported_cones || (skip = true)
-        end
-        # Only use problems that were sampled from large families
-        sampled_problems[i] || (skip = true)
+    for i in size(problems, 1)
+        problem_name = problems[i, 1] * ".cbf.gz"
+        problem_file = joinpath(path_to_input, problem_name)
 
         for cache in hypatia_cachetypes
-            if !relevant(row, problem_stats[2]) || skip
-                @info "Skipping problem $i: $problem"
-                htime = 9999.0
-                niters = 9999.0
-                cert = false
-                status = :Skipped
-                r = (problem=problem, cache="NoCache", id=i, size=kb, time=htime, cert=cert, niters=niters, status=status, pobj=Inf, dobj=-Inf)
-            else
-                @info "Testing problem $i: $problem"
-                @info "Testing with $cache"
-                dat = get_cblib_data(problem)
-                (c, A, b, G, h, cone, prkeep, dukeep, mdl) = cblib_data_mdl(dat, cache, mdl_options)
-                @info "Solving in Hypatia"
-                htime = @elapsed benchmarksolve!(mdl, problem)
-                cert = check_certificates(c, A, b, G, h, cone, prkeep, dukeep, mdl)
-                @info "Checking certificates"
-                r = result(problem, cache, i, float(kb), htime, cert, mdl)
-            end
+            @info "Testing problem $i: $problem"
+            @info "Testing with $cache"
+            dat = get_cblib_data(problem_file)
+            (c, A, b, G, h, cone, prkeep, dukeep, mdl) = cblib_data_mdl(dat, cache, mdl_options)
+            @info "Solving in Hypatia"
+            htime = @elapsed benchmarksolve!(mdl, problem)
+            cert = check_certificates(c, A, b, G, h, cone, prkeep, dukeep, mdl)
+            @info "Checking certificates"
+            r = result(problem, cache, i, float(kb), htime, cert, mdl)
             push!(results, r)
 
             if write_output
                 open(results_file_name, "a") do f
-                    write(f, "$problem,$i,$cache,$kb, $htime, $(r.niters), $(r.pobj), $(r.dobj),$cert,$(r.status)\n")
+                    write(f, "$problem_name,$i,$cache, $htime, $(r.niters), $(r.pobj), $(r.dobj),$cert,$(r.status)\n")
                 end
             end
         end # cache types
