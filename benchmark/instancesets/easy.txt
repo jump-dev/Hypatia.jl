@@ -1,7 +1,11 @@
-5x5_1bar
-estein4_nr22
-classical_200_0
-achtziger_stolpe06-6.5flowc
-2g_6_701_k4_9_9
-expdesign_D_12_6
-syn40h
+# a small number of instances that solve reliably and quickly
+
+infeas_clean_10_10_1
+expdesign_D_8_4
+port_12_9_3_a_1
+tls4
+rsyn0805h
+# 10_0_1_w
+gams01
+HMCR-n20-m400
+LogExpCR-n20-m400

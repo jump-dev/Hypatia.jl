@@ -105,7 +105,7 @@ function mbgtohypatia(c_in::Vector{Float64},
             zero_vars += length(inds)
         elseif cone_type == :ExpPrimal
             # take out if this ever happens
-            error("We didn't know CBF allows variables in exponential cones.")
+            error("we didn't know CBF allows variables in exponential cones")
         elseif cone_type != :Free
             cone_vars += length(inds)
             push!(cone_var_inds, inds...)
@@ -182,7 +182,7 @@ end
 
 function cbftohypatia(dat::CBFData; remove_ints::Bool=false, dense::Bool=true)
     if !isempty(dat.intlist)
-        @warn "Ingoring integrality constraints."
+        @warn "ignoring integrality constraints"
     end
     c, A, b, con_cones, var_cones, vartypes, dat.sense, dat.objoffset = cbftompb(dat, col_major=true, roundints=true)
     if dat.sense == :Max
