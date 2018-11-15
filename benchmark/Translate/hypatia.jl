@@ -1,6 +1,7 @@
 #=
 Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 =#
+
 const conemap_mpb_to_hypatia = Dict(
     :NonPos => Hypatia.Nonpositive,
     :NonNeg =>  Hypatia.Nonnegative,
@@ -9,20 +10,19 @@ const conemap_mpb_to_hypatia = Dict(
     :ExpPrimal => Hypatia.HypoPerLog,
     # :ExpDual => TODO
     :SDP => Hypatia.PosSemidef,
-    :Power => Hypatia.HypoGeomean
+    :Power => Hypatia.EpiPerPower
 )
 
-const DimCones = Union{Type{Hypatia.Nonpositive}, Type{Hypatia.Nonnegative}, Type{Hypatia.EpiNormEucl}, Type{Hypatia.EpiPerSquare}, Type{Hypatia.PosSemidef}}
-const ParametricCones =  Union{Type{Hypatia.HypoGeomean}}
+get_hypatia_cone(t::Hypatia.PrimitiveCone, dim::Int) = t(dim, false)
 
-function get_hypatia_cone(t::T, dim::Int) where T <: DimCones
-    t(dim, false)
-end
-function get_hypatia_cone(t::Type{T}, ::Int) where T <: Hypatia.PrimitiveCone
-    t()
-end
-function get_hypatia_cone(t::T, alphas::Vector{Float64}) where T <: ParametricCones
-    t(alphas ./ sum(alphas), false)
+get_hypatia_cone(t::Hypatia.PrimitiveCone) = t(false)
+
+function get_hypatia_cone(t::Hypatia.EpiPerPower, dim::Int, alphas::Vector{Float64})
+    if dim != 3 || length(alphas) != 2
+        error("Translate module currently only handles 3-dim power cones")
+    end
+    @assert sum(alphas) == 1.0
+    return t(inv(alpha[1]), false)
 end
 
 function add_hypatia_cone!(hypatia_cone::Hypatia.Cone, conesym::Symbol, idxs::UnitRange{Int})
@@ -30,7 +30,7 @@ function add_hypatia_cone!(hypatia_cone::Hypatia.Cone, conesym::Symbol, idxs::Un
     conedim = length(idxs)
     push!(hypatia_cone.prmtvs, get_hypatia_cone(conetype, conedim))
     push!(hypatia_cone.idxs, idxs)
-    hypatia_cone
+    return hypatia_cone
 end
 
 function add_parametric_cone!(hypatia_cone::Hypatia.Cone, conesym::Symbol, alphas::Vector{Float64}, idxs::UnitRange{Int})
@@ -38,13 +38,18 @@ function add_parametric_cone!(hypatia_cone::Hypatia.Cone, conesym::Symbol, alpha
     conedim = length(idxs)
     push!(hypatia_cone.prmtvs, get_hypatia_cone(conetype, alphas))
     push!(hypatia_cone.idxs, idxs)
-    hypatia_cone
+    return hypatia_cone
 end
+
+
+
 
 function mpbcones_to_hypatiacones!(hypatia_cone::Hypatia.Cone, mpb_cones::Vector{Tuple{Symbol,Vector{Int}}}, parametric_refs::Vector{Int}, parameters::Vector{Vector{Float64}},offset::Int=0)
     power_cones_count = 0
     for (i, c) in enumerate(mpb_cones)
-        c[1] in (:Zero, :Free) && continue
+        if c[1] in (:Zero, :Free)
+            continue
+        end
         smallest_ind = minimum(c[2])
         start_ind = offset + 1
         end_ind = offset + maximum(c[2]) - minimum(c[2]) + 1

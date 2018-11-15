@@ -52,7 +52,6 @@ function readcbfdata(filename)
         length(line) == 1 && continue # blank lines
 
         # new block
-
         if startswith(line,"VER")
             nextline = readline(fd)
             @assert startswith(nextline,"1") || startswith(nextline,"2") || startswith(nextline,"3")
