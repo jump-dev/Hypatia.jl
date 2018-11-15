@@ -4,7 +4,7 @@ Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 TODO readme file for benchmarks and describe ARGS for running on command line
 =#
 
-using Pkg; Pkg.activate("Hypatia") # TODO delete later
+# using Pkg; Pkg.activate("Hypatia") # TODO delete later
 using Hypatia
 
 # TODO replace with by ConicBenchmarkUtilities -> MOI -> Hypatia when CBU is updated for MOI
@@ -12,6 +12,7 @@ include(joinpath(@__DIR__, "Translate", "Translate.jl")) # module containing fun
 
 
 # parse command line arguments
+println()
 if length(ARGS) != 3
     error("usage: julia runbenchmarks.jl instanceset cbfpath outputpath")
 end
@@ -28,7 +29,16 @@ if !isdir(cbfpath)
 end
 
 # check that each instance is in the cbfpath
-instances = filter(l -> !isempty(l) && !startswith(l, '#'), strip.(readlines(instsetfile)))
+instances = SubString[]
+for l in readlines(instsetfile)
+    str = split(strip(l))
+    if !isempty(str)
+        str1 = first(str)
+        if !startswith(str1, '#')
+            push!(instances, str1)
+        end
+    end
+end
 println("instance set $instanceset contains $(length(instances)) instances")
 for instname in instances
     instfile = joinpath(cbfpath, instname * ".cbf.gz")
@@ -84,7 +94,7 @@ open(metafile, "w") do fdmeta
 end
 
 open(csvfile, "w") do fdcsv
-    println(fdcsv, "instancename,status,runtime,niters,pobj,dobj")
+    println(fdcsv, "instname,status,pobj,dobj,niters,runtime,gctime,bytes")
 end
 
 # run each instance, print Hypatia output to instance-specific file, and print metadata to a single csv file
@@ -94,7 +104,7 @@ for instname in instances
     println("$instname ...")
 
     solveerror = nothing
-    (runtime, status, niters, pobj, dobj) = (NaN, :UnSolved, 0, NaN, NaN)
+    (status, pobj, dobj, niters, runtime, gctime, bytes) = (:UnSolved, NaN, NaN, -1, NaN, NaN, -1)
 
     instfile = joinpath(outputpath, instname * ".txt")
     open(instfile, "w") do fdinst
@@ -125,7 +135,7 @@ for instname in instances
 
         println("solving Hypatia model")
         try
-            runtime = @elapsed Hypatia.solve!(model)
+            (val, time, bytes, gctime, memallocs) = @timed Hypatia.solve!(model)
             println("Hypatia finished")
             status = Hypatia.get_status(model)
             niters = model.niters
@@ -146,6 +156,7 @@ for instname in instances
     end
 
     open(csvfile, "a") do fdcsv
-        println(fdcsv, "$instname,$status,$runtime,$niters,$pobj,$dobj")
+        # TODO optionally save more information from memallocs
+        println(fdcsv, "$instname,$status,$pobj,$dobj,$niters,$time,$gctime,$bytes")
     end
 end
