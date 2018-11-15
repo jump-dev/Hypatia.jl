@@ -59,7 +59,6 @@ function mpbtohypatia(
     var_power_refs::Vector{Int},
     power_alphas::Vector{Vector{Float64}},
     objoffset::Float64,
-    usedense::Bool,
     )
     # dimension of x
     n = length(c_in)
@@ -108,13 +107,12 @@ function mpbtohypatia(
     # NOTE the way we construct A and G is very inefficient in the sparse case, but it won't be used when we remove Translate and use CBU->MOI
     h = zeros(cone_constrs_count + cone_vars_count)
     b = zeros(zero_constrs_count)
-    if usedense
-        A = zeros(zero_constrs_count, n)
-        G = zeros(cone_constrs_count + cone_vars_count, n)
-    else
-        A = spzeros(zero_constrs_count, n)
-        G = spzeros(cone_constrs_count + cone_vars_count, n)
-    end
+
+
+
+    # TODO use I,J,V vectors for each A and G and reconstruct as sparse(I,J,V,m,n) at end
+    A = spzeros(zero_constrs_count, n)
+    G = spzeros(cone_constrs_count + cone_vars_count, n)
 
     # keep index of constraints in A and G
     i = 0
@@ -148,9 +146,10 @@ function mpbtohypatia(
     end
 
     # append G
-    G[cone_constrs_count+1:end, :] = Matrix(-1.0I, n, n)[cone_var_inds, :]
-    # G[cone_constrs_count .+ invperm(cone_var_inds), :] = Matrix(-1.0I, n, n)
-    # G[cone_constrs_count+1:end, cone_var_inds] .= -1.0
+    G[cone_constrs_count+1:end, cone_var_inds] = Matrix(-1.0I, n, n)
+
+
+
 
     # prepare Hypatia cone
     hypatia_cone = Hypatia.Cone()
@@ -163,7 +162,6 @@ end
 function cbftohypatia(
     dat::CBFData;
     remove_ints::Bool = false,
-    usedense::Bool = false,
     )
     c, A, b, con_cones, var_cones, vartypes, dat.sense, dat.objoffset = cbftompb(dat, col_major=true, roundints=true)
     if dat.sense == :Max
@@ -173,7 +171,7 @@ function cbftohypatia(
         (c, A, b, con_cones, var_cones, vartypes) = remove_ints_in_nonlinear_cones(c, A, b, con_cones, var_cones, vartypes)
     end
 
-    (c, A, b, G, h, hypatia_cone) = mpbtohypatia(c, A, b, con_cones, var_cones, dat.sense, dat.con_power_refs, dat.var_power_refs, dat.power_cone_alphas, dat.objoffset, usedense)
+    (c, A, b, G, h, hypatia_cone) = mpbtohypatia(c, A, b, con_cones, var_cones, dat.sense, dat.con_power_refs, dat.var_power_refs, dat.power_cone_alphas, dat.objoffset)
     hasintegervars = !isempty(dat.intlist)
 
     return (c, A, b, G, h, hypatia_cone, dat.objoffset, hasintegervars)

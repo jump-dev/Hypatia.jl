@@ -8,6 +8,7 @@ println("must run from Hypatia/benchmark directory") # TODO delete later
 
 using Pkg; Pkg.activate("..") # TODO delete later
 using Hypatia
+using Dates
 
 # module containing functions for translating from cbf to Hypatia native format
 # TODO replace with ConicBenchmarkUtilities -> MOI -> Hypatia when CBU is updated for MOI
@@ -81,26 +82,13 @@ println("\nstarting benchmark run in 5 seconds\n")
 sleep(5.0)
 
 
-# meta text file will contain information about the benchmarking process
-metafile = joinpath(outputpath, "META_$(instanceset).txt")
 # each line of csv file will summarize Hypatia performance on a particular instance
 csvfile = joinpath(outputpath, "RESULTS_$(instanceset).csv")
-
-open(metafile, "w") do fdmeta
-    println(fdmeta, "instance set:    $instanceset")
-    println(fdmeta, "linear systems:  $lscachetype")
-    println(fdmeta, "matrices A, G:   $(usedense ? "dense" : "sparse")")
-    println(fdmeta, "Hypatia options:")
-    for (k, v) in options
-        println(fdmeta, "  $k = $v")
-    end
-end
-
 open(csvfile, "w") do fdcsv
     println(fdcsv, "instname,status,pobj,dobj,niters,runtime,gctime,bytes")
 end
 
-# run each instance, print Hypatia output to instance-specific file, and print metadata to a single csv file
+# run each instance, print Hypatia output to instance-specific file, and print results to a single csv file
 OUT = stdout
 ERR = stderr
 for instname in instances
@@ -114,12 +102,25 @@ for instname in instances
     open(instfile, "w") do fdinst
         redirect_stdout(fdinst)
         redirect_stderr(fdinst)
+
         println("instance $instname")
+        println("ran at: ", Dates.now())
+        println()
+        println("linear systems:  $lscachetype")
+        println("matrices A, G:   $(usedense ? "dense" : "sparse")")
+        println("Hypatia options:")
+        for (k, v) in options
+            println("  $k = $v")
+        end
 
         println("\nreading CBF data...")
         cbftime = @elapsed begin
             cbfdata = Translate.readcbfdata(joinpath(cbfpath, instname * ".cbf.gz"))
-            (c, A, b, G, h, cone, objoffset, hasintvars) = Translate.cbftohypatia(cbfdata, usedense=usedense)
+            (c, A, b, G, h, cone, objoffset, hasintvars) = Translate.cbftohypatia(cbfdata)
+            if usedense
+                A = Array(A)
+                G = Array(G)
+            end
         end
         println("took $cbftime seconds")
         if hasintvars
