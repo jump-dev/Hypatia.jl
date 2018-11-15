@@ -1,49 +1,6 @@
 #=
 Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 =#
-
-const conemap_mpb_to_hypatia = Dict(
-    :NonPos => Hypatia.Nonpositive,
-    :NonNeg =>  Hypatia.Nonnegative,
-    :SOC => Hypatia.EpiNormEucl,
-    :SOCRotated => Hypatia.EpiPerSquare,
-    :ExpPrimal => Hypatia.HypoPerLog,
-    # :ExpDual => TODO
-    :SDP => Hypatia.PosSemidef,
-    :Power => Hypatia.EpiPerPower
-)
-
-get_hypatia_cone(t::Hypatia.PrimitiveCone, dim::Int) = t(dim, false)
-
-get_hypatia_cone(t::Hypatia.PrimitiveCone) = t(false)
-
-function get_hypatia_cone(t::Hypatia.EpiPerPower, dim::Int, alphas::Vector{Float64})
-    if dim != 3 || length(alphas) != 2
-        error("Translate module currently only handles 3-dim power cones")
-    end
-    @assert sum(alphas) == 1.0
-    return t(inv(alpha[1]), false)
-end
-
-function add_hypatia_cone!(hypatia_cone::Hypatia.Cone, conesym::Symbol, idxs::UnitRange{Int})
-    conetype = conemap_mpb_to_hypatia[conesym]
-    conedim = length(idxs)
-    push!(hypatia_cone.prmtvs, get_hypatia_cone(conetype, conedim))
-    push!(hypatia_cone.idxs, idxs)
-    return hypatia_cone
-end
-
-function add_parametric_cone!(hypatia_cone::Hypatia.Cone, conesym::Symbol, alphas::Vector{Float64}, idxs::UnitRange{Int})
-    conetype = conemap_mpb_to_hypatia[conesym]
-    conedim = length(idxs)
-    push!(hypatia_cone.prmtvs, get_hypatia_cone(conetype, alphas))
-    push!(hypatia_cone.idxs, idxs)
-    return hypatia_cone
-end
-
-
-
-
 function mpbcones_to_hypatiacones!(hypatia_cone::Hypatia.Cone, mpb_cones::Vector{Tuple{Symbol,Vector{Int}}}, parametric_refs::Vector{Int}, parameters::Vector{Vector{Float64}},offset::Int=0)
     power_cones_count = 0
     for (i, c) in enumerate(mpb_cones)
@@ -59,10 +16,23 @@ function mpbcones_to_hypatiacones!(hypatia_cone::Hypatia.Cone, mpb_cones::Vector
         if c[1] == :Power
             power_cones_count += 1
             alphas = parameters[parametric_refs[power_cones_count]]
-            add_parametric_cone!(hypatia_cone, c[1], alphas, output_idxs)
-        else
-            add_hypatia_cone!(hypatia_cone, c[1], output_idxs)
+            hypatia_alpha = sum(alphas) / alphas[1]
+            prmtv = Hypatia.EpiPerPower(hypatia_alpha, false)
+        elseif c[1] == :NonPos
+            prmtv = Hypatia.Nonpositive(length(output_idxs), false)
+        elseif c[1] == :NonNeg
+            prmtv = Hypatia.Nonnegative(length(output_idxs), false)
+        elseif c[1] == :SOC
+            prmtv = Hypatia.EpiNormEucl(length(output_idxs), false)
+        elseif c[1] == :SOCRotated
+            prmtv = Hypatia.EpiPerSquare(length(output_idxs), false)
+        elseif c[1] == :ExpPrimal
+            prmtv = Hypatia.HypoPerLog(false)
+        elseif c[1] == :SDP
+            prmtv = Hypatia.PosSemidef(length(output_idxs), false)
         end
+        push!(hypatia_cone.prmtvs, prmtv)
+        push!(hypatia_cone.idxs, output_idxs)
     end
     hypatia_cone
 end
@@ -82,6 +52,14 @@ function mpbtohypatia(c_in::Vector{Float64},
 
     # dimension of x
     n = length(c_in)
+
+    for p in power_alphas
+        if length(p) > 2
+            error("we cannot convert to a power cone with more than three variables yet")
+        else
+            @assert sum(p) ≈ 1.0
+        end
+    end
 
     # count the number of "zero" constraints
     zero_constrs = 0
