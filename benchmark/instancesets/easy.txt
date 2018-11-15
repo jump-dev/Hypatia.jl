@@ -3,6 +3,7 @@
 expdesign_D_8_4 # psd, exp
 port_12_9_3_a_1 # psd, soc, exp
 tls4 # soc
-achtziger_stolpe06-6.5flowc # rsoc
+ck_n25_m10_o1_1 # rsoc
 rsyn0805h # exp
-HMCR-n20-m400 # power
+infeas_clean_10_10_1 # psd
+HMCR-n20-m400 # 3d-power
