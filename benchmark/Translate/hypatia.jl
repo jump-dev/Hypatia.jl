@@ -70,18 +70,18 @@ function mpbtohypatia(
     end
 
     # count the number of "zero" constraints
-    zero_constrs = 0
-    cone_constrs = 0
+    zero_constrs_count = 0
+    zero_constrs_count = 0
     for (cone_type, inds) in con_cones
         if cone_type == :Zero
-            zero_constrs += length(inds)
+            zero_constrs_count += length(inds)
         else
-            cone_constrs += length(inds)
+            zero_constrs_count += length(inds)
         end
     end
 
     # count the number of cone variables
-    num_cone_vars = 0
+    cone_vars_count = 0
     zero_vars = 0
     cone_var_inds = Int[]
     zero_var_inds = Int[]
@@ -94,22 +94,22 @@ function mpbtohypatia(
             push!(zero_var_cones, cone_count)
             zero_vars += length(inds)
         elseif cone_type != :Free
-            num_cone_vars += length(inds)
+            cone_vars_count += length(inds)
             push!(cone_var_inds, inds...)
         end
     end
-    @assert length(cone_var_inds) == num_cone_vars
+    @assert length(cone_var_inds) == cone_vars_count
     # variables that are fixed at zero count as constraints
-    zero_constrs += zero_vars
+    zero_constrs_count += zero_vars
 
-    h = zeros(cone_constrs + num_cone_vars)
-    b = zeros(zero_constrs)
+    h = zeros(zero_constrs_count + cone_vars_count)
+    b = zeros(zero_constrs_count)
     if dense
-        A = zeros(zero_constrs, n)
-        G = zeros(cone_constrs + num_cone_vars, n)
+        A = zeros(zero_constrs_count, n)
+        G = zeros(zero_constrs_count + cone_vars_count, n)
     else
-        A = spzeros(zero_constrs, n)
-        G = spzeros(cone_constrs + num_cone_vars, n)
+        A = spzeros(zero_constrs_count, n)
+        G = spzeros(zero_constrs_count + cone_vars_count, n)
     end
 
     # keep index of constraints in A and G
@@ -133,7 +133,7 @@ function mpbtohypatia(
     end
     # corner case, add variables fixed at zero as constraints
     if zero_vars > 0
-        fixed_var_ref = zero_constrs-zero_vars+1:zero_constrs
+        fixed_var_ref = zero_constrs_count-zero_vars+1:zero_constrs_count
         @assert all(b[fixed_var_ref] .≈ 0.0)
         @assert all(A[fixed_var_ref, zero_var_inds] .≈ 0.0)
         @assert length(zero_var_inds) == zero_vars
@@ -144,12 +144,12 @@ function mpbtohypatia(
     end
 
     # append G
-    G[cone_constrs+1:end, :] = Matrix(-1.0I, n, n)[cone_var_inds, :]
+    G[zero_constrs_count+1:end, :] = Matrix(-1.0I, n, n)[cone_var_inds, :]
 
     # prepare cones
     hypatia_cone = Hypatia.Cone()
     mpbcones_to_hypatiacones!(hypatia_cone, con_cones, con_power_refs, power_alphas)
-    mpbcones_to_hypatiacones!(hypatia_cone, var_cones, var_power_refs, power_alphas, cone_constrs)
+    mpbcones_to_hypatiacones!(hypatia_cone, var_cones, var_power_refs, power_alphas, zero_constrs_count)
 
     return (c_in, A, b, G, h, hypatia_cone)
 end
