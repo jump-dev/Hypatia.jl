@@ -1,6 +1,7 @@
 #=
 Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 =#
+
 function mpbcones_to_hypatiacones!(
     hypatia_cone::Hypatia.Cone,
     mpb_cones::Vector{Tuple{Symbol,Vector{Int}}},
@@ -8,18 +9,19 @@ function mpbcones_to_hypatiacones!(
     parameters::Vector{Vector{Float64}},
     offset::Int=0,
     )
-
     power_cones_count = 0
     for (i, c) in enumerate(mpb_cones)
         (cone_symbol, idx_list) = (c[1], c[2])
         if cone_symbol in (:Zero, :Free)
             continue
         end
+
         smallest_ind = minimum(idx_list)
         start_ind = offset + 1
         end_ind = offset + maximum(idx_list) - minimum(idx_list) + 1
         output_idxs = UnitRange{Int}(start_ind, end_ind)
         offset += length(c[2])
+
         if cone_symbol == :Power
             power_cones_count += 1
             alphas = parameters[parametric_refs[power_cones_count]]
@@ -38,10 +40,12 @@ function mpbcones_to_hypatiacones!(
         elseif cone_symbol == :SDP
             prmtv = Hypatia.PosSemidef(length(output_idxs), false)
         end
+
         push!(hypatia_cone.prmtvs, prmtv)
         push!(hypatia_cone.idxs, output_idxs)
     end
-    hypatia_cone
+
+    return hypatia_cone
 end
 
 function mpbtohypatia(
@@ -54,10 +58,9 @@ function mpbtohypatia(
     con_power_refs::Vector{Int},
     var_power_refs::Vector{Int},
     power_alphas::Vector{Vector{Float64}},
-    objoffset::Float64;
-    dense::Bool=true
+    objoffset::Float64,
+    usedense::Bool,
     )
-
     # dimension of x
     n = length(c_in)
 
@@ -104,7 +107,7 @@ function mpbtohypatia(
 
     h = zeros(cone_constrs_count + cone_vars_count)
     b = zeros(zero_constrs_count)
-    if dense
+    if usedense
         A = zeros(zero_constrs_count, n)
         G = zeros(cone_constrs_count + cone_vars_count, n)
     else
@@ -126,8 +129,8 @@ function mpbtohypatia(
         else
             nextj = j + length(inds)
             out_inds = j+1:nextj
-            G[out_inds, :] .= A_in[inds, :]
-            h[out_inds] .= b_in[inds]
+            G[out_inds, :] = A_in[inds, :]
+            h[out_inds] = b_in[inds]
             j = nextj
         end
     end
@@ -146,7 +149,7 @@ function mpbtohypatia(
     # append G
     G[cone_constrs_count+1:end, :] = Matrix(-1.0I, n, n)[cone_var_inds, :]
 
-    # prepare cones
+    # prepare Hypatia cone
     hypatia_cone = Hypatia.Cone()
     mpbcones_to_hypatiacones!(hypatia_cone, con_cones, con_power_refs, power_alphas)
     mpbcones_to_hypatiacones!(hypatia_cone, var_cones, var_power_refs, power_alphas, cone_constrs_count)
@@ -154,7 +157,7 @@ function mpbtohypatia(
     return (c_in, A, b, G, h, hypatia_cone)
 end
 
-function cbftohypatia(dat::CBFData; remove_ints::Bool=false, dense::Bool=true)
+function cbftohypatia(dat::CBFData; remove_ints::Bool=false, usedense::Bool=false)
     c, A, b, con_cones, var_cones, vartypes, dat.sense, dat.objoffset = cbftompb(dat, col_major=true, roundints=true)
     if dat.sense == :Max
         c .*= -1.0
@@ -163,7 +166,7 @@ function cbftohypatia(dat::CBFData; remove_ints::Bool=false, dense::Bool=true)
         (c, A, b, con_cones, var_cones, vartypes) = remove_ints_in_nonlinear_cones(c, A, b, con_cones, var_cones, vartypes)
     end
 
-    (c, A, b, G, h, hypatia_cone) = mpbtohypatia(c, A, b, con_cones, var_cones, dat.sense, dat.con_power_refs, dat.var_power_refs, dat.power_cone_alphas, dat.objoffset, dense = dense)
+    (c, A, b, G, h, hypatia_cone) = mpbtohypatia(c, A, b, con_cones, var_cones, dat.sense, dat.con_power_refs, dat.var_power_refs, dat.power_cone_alphas, dat.objoffset, usedense)
     hasintegervars = !isempty(dat.intlist)
 
     return (c, A, b, G, h, hypatia_cone, dat.objoffset, hasintegervars)

@@ -57,11 +57,11 @@ end
 
 # TODO these options
 # timelimit = ARGS[4]
-lscachetype = "QRSymmCache"
+lscachetype = "QRSymmCache" # linear system solver cache type
 if !in(lscachetype, ("QRSymmCache", "NaiveCache"))
     error("linear system cache type $lscachetype is not recognized")
 end
-usedense = parse(Bool, "false")
+usedense = parse(Bool, "false") # whether A and G matrices are represented as dense or sparse
 
 println("\nlinear systems using $lscachetype")
 println("matrices A, G will be $(usedense ? "dense" : "sparse")")
@@ -116,7 +116,7 @@ for instname in instances
 
         println("reading CBF data")
         cbfdata = Translate.readcbfdata(joinpath(cbfpath, instname * ".cbf.gz"))
-        (c, A, b, G, h, cone, objoffset, hasintvars) = Translate.cbftohypatia(cbfdata, dense=usedense)
+        (c, A, b, G, h, cone, objoffset, hasintvars) = Translate.cbftohypatia(cbfdata, usedense=usedense)
         if hasintvars
             println("ignoring integrality constraints")
         end
