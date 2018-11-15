@@ -1,34 +1,41 @@
 #=
 Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 =#
-function mpbcones_to_hypatiacones!(hypatia_cone::Hypatia.Cone, mpb_cones::Vector{Tuple{Symbol,Vector{Int}}}, parametric_refs::Vector{Int}, parameters::Vector{Vector{Float64}},offset::Int=0)
+function mpbcones_to_hypatiacones!(
+    hypatia_cone::Hypatia.Cone,
+    mpb_cones::Vector{Tuple{Symbol,Vector{Int}}},
+    parametric_refs::Vector{Int},
+    parameters::Vector{Vector{Float64}},
+    offset::Int=0,
+    )
+
     power_cones_count = 0
     for (i, c) in enumerate(mpb_cones)
-        if c[1] in (:Zero, :Free)
+        (cone_symbol, idx_list) = (c[1], c[2])
+        if cone_symbol in (:Zero, :Free)
             continue
         end
-        smallest_ind = minimum(c[2])
+        smallest_ind = minimum(idx_list)
         start_ind = offset + 1
-        end_ind = offset + maximum(c[2]) - minimum(c[2]) + 1
+        end_ind = offset + maximum(idx_list) - minimum(idx_list) + 1
         output_idxs = UnitRange{Int}(start_ind, end_ind)
-        # output_idxs = (offset- smallest_ind + 1) .+ c[2]
         offset += length(c[2])
-        if c[1] == :Power
+        if cone_symbol == :Power
             power_cones_count += 1
             alphas = parameters[parametric_refs[power_cones_count]]
             hypatia_alpha = sum(alphas) / alphas[1]
             prmtv = Hypatia.EpiPerPower(hypatia_alpha, false)
-        elseif c[1] == :NonPos
+        elseif cone_symbol == :NonPos
             prmtv = Hypatia.Nonpositive(length(output_idxs), false)
-        elseif c[1] == :NonNeg
+        elseif cone_symbol == :NonNeg
             prmtv = Hypatia.Nonnegative(length(output_idxs), false)
-        elseif c[1] == :SOC
+        elseif cone_symbol == :SOC
             prmtv = Hypatia.EpiNormEucl(length(output_idxs), false)
-        elseif c[1] == :SOCRotated
+        elseif cone_symbol == :SOCRotated
             prmtv = Hypatia.EpiPerSquare(length(output_idxs), false)
-        elseif c[1] == :ExpPrimal
+        elseif cone_symbol == :ExpPrimal
             prmtv = Hypatia.HypoPerLog(false)
-        elseif c[1] == :SDP
+        elseif cone_symbol == :SDP
             prmtv = Hypatia.PosSemidef(length(output_idxs), false)
         end
         push!(hypatia_cone.prmtvs, prmtv)
@@ -37,7 +44,8 @@ function mpbcones_to_hypatiacones!(hypatia_cone::Hypatia.Cone, mpb_cones::Vector
     hypatia_cone
 end
 
-function mpbtohypatia(c_in::Vector{Float64},
+function mpbtohypatia(
+    c_in::Vector{Float64},
     A_in::AbstractMatrix,
     b_in::Vector{Float64},
     con_cones::Vector{Tuple{Symbol,Vector{Int}}},
@@ -73,7 +81,7 @@ function mpbtohypatia(c_in::Vector{Float64},
     end
 
     # count the number of cone variables
-    cone_vars = 0
+    num_cone_vars = 0
     zero_vars = 0
     cone_var_inds = Int[]
     zero_var_inds = Int[]
@@ -86,22 +94,22 @@ function mpbtohypatia(c_in::Vector{Float64},
             push!(zero_var_cones, cone_count)
             zero_vars += length(inds)
         elseif cone_type != :Free
-            cone_vars += length(inds)
+            num_cone_vars += length(inds)
             push!(cone_var_inds, inds...)
         end
     end
-    @assert length(cone_var_inds) == cone_vars
+    @assert length(cone_var_inds) == num_cone_vars
     # variables that are fixed at zero count as constraints
     zero_constrs += zero_vars
 
-    h = zeros(cone_constrs + cone_vars)
+    h = zeros(cone_constrs + num_cone_vars)
     b = zeros(zero_constrs)
     if dense
         A = zeros(zero_constrs, n)
-        G = zeros(cone_constrs + cone_vars, n)
+        G = zeros(cone_constrs + num_cone_vars, n)
     else
         A = spzeros(zero_constrs, n)
-        G = spzeros(cone_constrs + cone_vars, n)
+        G = spzeros(cone_constrs + num_cone_vars, n)
     end
 
     # keep index of constraints in A and G
@@ -136,7 +144,7 @@ function mpbtohypatia(c_in::Vector{Float64},
     end
 
     # append G
-    G[cone_constrs+1:end, :] = Matrix(-1I, n, n)[cone_var_inds, :]
+    G[cone_constrs+1:end, :] = Matrix(-1.0I, n, n)[cone_var_inds, :]
 
     # prepare cones
     hypatia_cone = Hypatia.Cone()
