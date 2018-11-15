@@ -81,7 +81,6 @@ function mpbtohypatia(c_in::Vector{Float64},
     cone_count = 0
     for (cone_type, inds) in var_cones
         cone_count += 1
-        # TODO treat fixed variables better
         if cone_type == :Zero
             push!(zero_var_inds, inds...)
             push!(zero_var_cones, cone_count)
@@ -113,7 +112,7 @@ function mpbtohypatia(c_in::Vector{Float64},
         if cone_type == :Zero
             nexti = i + length(inds)
             out_inds = i+1:nexti
-            A[out_inds, :] .= A_in[inds, :]
+            A[out_inds, :] = A_in[inds, :]
             b[out_inds] = b_in[inds]
             i = nexti
         else
@@ -124,7 +123,7 @@ function mpbtohypatia(c_in::Vector{Float64},
             j = nextj
         end
     end
-    # corner case, add variables fixed at zero as constraints TODO treat fixed variables better
+    # corner case, add variables fixed at zero as constraints
     if zero_vars > 0
         fixed_var_ref = zero_constrs-zero_vars+1:zero_constrs
         @assert all(b[fixed_var_ref] .≈ 0.0)
@@ -137,7 +136,7 @@ function mpbtohypatia(c_in::Vector{Float64},
     end
 
     # append G
-    G[cone_constrs+1:end, :] .= Matrix(-1I, n, n)[cone_var_inds, :]
+    G[cone_constrs+1:end, :] = Matrix(-1I, n, n)[cone_var_inds, :]
 
     # prepare cones
     hypatia_cone = Hypatia.Cone()
