@@ -111,8 +111,8 @@ for instname in instances
 
     instfile = joinpath(outputpath, instname * ".txt")
     open(instfile, "w") do fdinst
-        redirect_stdout(fdinst)
-        redirect_stderr(fdinst)
+        # redirect_stdout(fdinst)
+        # redirect_stderr(fdinst)
 
         println("reading CBF data")
         cbfdata = Translate.readcbfdata(joinpath(cbfpath, instname * ".cbf.gz"))

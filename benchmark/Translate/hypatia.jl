@@ -4,10 +4,10 @@ Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 
 function mpbcones_to_hypatiacones!(
     hypatia_cone::Hypatia.Cone,
-    mpb_cones::Vector{Tuple{Symbol,Vector{Int}}},
+    mpb_cones::Vector{Tuple{Symbol, Vector{Int}}},
     parametric_refs::Vector{Int},
     parameters::Vector{Vector{Float64}},
-    offset::Int=0,
+    offset::Int = 0,
     )
     power_cones_count = 0
     for (i, c) in enumerate(mpb_cones)
@@ -19,7 +19,7 @@ function mpbcones_to_hypatiacones!(
         smallest_ind = minimum(idx_list)
         start_ind = offset + 1
         end_ind = offset + maximum(idx_list) - minimum(idx_list) + 1
-        output_idxs = UnitRange{Int}(start_ind, end_ind)
+        output_idxs = start_ind:end_ind
         offset += length(c[2])
 
         if cone_symbol == :Power
@@ -52,8 +52,8 @@ function mpbtohypatia(
     c_in::Vector{Float64},
     A_in::AbstractMatrix,
     b_in::Vector{Float64},
-    con_cones::Vector{Tuple{Symbol,Vector{Int}}},
-    var_cones::Vector{Tuple{Symbol,Vector{Int}}},
+    con_cones::Vector{Tuple{Symbol, Vector{Int}}},
+    var_cones::Vector{Tuple{Symbol, Vector{Int}}},
     sense::Symbol,
     con_power_refs::Vector{Int},
     var_power_refs::Vector{Int},
@@ -105,6 +105,7 @@ function mpbtohypatia(
     # variables that are fixed at zero count as constraints
     zero_constrs_count += zero_vars
 
+    # NOTE the way we construct A and G is very inefficient in the sparse case, but it won't be used when we remove Translate and use CBU->MOI
     h = zeros(zero_constrs_count + cone_vars_count)
     b = zeros(zero_constrs_count)
     if usedense
@@ -148,6 +149,8 @@ function mpbtohypatia(
 
     # append G
     G[zero_constrs_count+1:end, :] = Matrix(-1.0I, n, n)[cone_var_inds, :]
+    # G[zero_constrs_count .+ invperm(cone_var_inds), :] = Matrix(-1.0I, n, n)
+    # G[zero_constrs_count+1:end, cone_var_inds] .= -1.0
 
     # prepare Hypatia cone
     hypatia_cone = Hypatia.Cone()
@@ -157,7 +160,11 @@ function mpbtohypatia(
     return (c_in, A, b, G, h, hypatia_cone)
 end
 
-function cbftohypatia(dat::CBFData; remove_ints::Bool=false, usedense::Bool=false)
+function cbftohypatia(
+    dat::CBFData;
+    remove_ints::Bool = false,
+    usedense::Bool = false,
+    )
     c, A, b, con_cones, var_cones, vartypes, dat.sense, dat.objoffset = cbftompb(dat, col_major=true, roundints=true)
     if dat.sense == :Max
         c .*= -1.0
