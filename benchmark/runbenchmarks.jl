@@ -4,11 +4,14 @@ Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 TODO readme file for benchmarks and describe ARGS for running on command line
 =#
 
-# using Pkg; Pkg.activate("Hypatia") # TODO delete later
+println("must run from Hypatia/benchmark directory") # TODO delete later
+
+using Pkg; Pkg.activate("..") # TODO delete later
 using Hypatia
 
-# TODO replace with by ConicBenchmarkUtilities -> MOI -> Hypatia when CBU is updated for MOI
-include(joinpath(@__DIR__, "Translate", "Translate.jl")) # module containing functions for translating from cbf to Hypatia native format
+# module containing functions for translating from cbf to Hypatia native format
+# TODO replace with ConicBenchmarkUtilities -> MOI -> Hypatia when CBU is updated for MOI
+include(joinpath(@__DIR__, "Translate", "Translate.jl"))
 
 
 # parse command line arguments
@@ -55,9 +58,9 @@ end
 # TODO these options
 # timelimit = ARGS[4]
 lscachetype = "QRSymmCache"
-# if !in(lscachetype, ("QRSymmCache", "NaiveCache"))
-#     error("linear system cache type $lscachetype is not recognized")
-# end
+if !in(lscachetype, ("QRSymmCache", "NaiveCache"))
+    error("linear system cache type $lscachetype is not recognized")
+end
 usedense = parse(Bool, "false")
 
 println("\nlinear systems using $lscachetype")
@@ -135,7 +138,7 @@ for instname in instances
 
         println("solving Hypatia model")
         try
-            (val, time, bytes, gctime, memallocs) = @timed Hypatia.solve!(model)
+            (val, runtime, bytes, gctime, memallocs) = @timed Hypatia.solve!(model)
             println("Hypatia finished")
             status = Hypatia.get_status(model)
             niters = model.niters
@@ -157,6 +160,6 @@ for instname in instances
 
     open(csvfile, "a") do fdcsv
         # TODO optionally save more information from memallocs
-        println(fdcsv, "$instname,$status,$pobj,$dobj,$niters,$time,$gctime,$bytes")
+        println(fdcsv, "$instname,$status,$pobj,$dobj,$niters,$runtime,$gctime,$bytes")
     end
 end
