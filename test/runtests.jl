@@ -206,9 +206,4 @@ lscachetypes = [
     testmoi(verbose=verbose, lscachetype=lscachetype, usedense=usedense)
 end
 
-@testset "benchmark problems" begin
-    include(joinpath(dirname(@__DIR__), "benchmark/run_benchmarks.jl"))
-end
-
-
 return nothing
