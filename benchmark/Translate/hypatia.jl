@@ -74,12 +74,12 @@ function mpbtohypatia(
 
     # count the number of "zero" constraints
     zero_constrs_count = 0
-    zero_constrs_count = 0
+    cone_constrs_count = 0
     for (cone_type, inds) in con_cones
         if cone_type == :Zero
             zero_constrs_count += length(inds)
         else
-            zero_constrs_count += length(inds)
+            cone_constrs_count += length(inds)
         end
     end
 
@@ -106,14 +106,14 @@ function mpbtohypatia(
     zero_constrs_count += zero_vars
 
     # NOTE the way we construct A and G is very inefficient in the sparse case, but it won't be used when we remove Translate and use CBU->MOI
-    h = zeros(zero_constrs_count + cone_vars_count)
+    h = zeros(cone_constrs_count + cone_vars_count)
     b = zeros(zero_constrs_count)
     if usedense
         A = zeros(zero_constrs_count, n)
-        G = zeros(zero_constrs_count + cone_vars_count, n)
+        G = zeros(cone_constrs_count + cone_vars_count, n)
     else
         A = spzeros(zero_constrs_count, n)
-        G = spzeros(zero_constrs_count + cone_vars_count, n)
+        G = spzeros(cone_constrs_count + cone_vars_count, n)
     end
 
     # keep index of constraints in A and G
@@ -148,14 +148,14 @@ function mpbtohypatia(
     end
 
     # append G
-    G[zero_constrs_count+1:end, :] = Matrix(-1.0I, n, n)[cone_var_inds, :]
-    # G[zero_constrs_count .+ invperm(cone_var_inds), :] = Matrix(-1.0I, n, n)
-    # G[zero_constrs_count+1:end, cone_var_inds] .= -1.0
+    G[cone_constrs_count+1:end, :] = Matrix(-1.0I, n, n)[cone_var_inds, :]
+    # G[cone_constrs_count .+ invperm(cone_var_inds), :] = Matrix(-1.0I, n, n)
+    # G[cone_constrs_count+1:end, cone_var_inds] .= -1.0
 
     # prepare Hypatia cone
     hypatia_cone = Hypatia.Cone()
     mpbcones_to_hypatiacones!(hypatia_cone, con_cones, con_power_refs, power_alphas)
-    mpbcones_to_hypatiacones!(hypatia_cone, var_cones, var_power_refs, power_alphas, zero_constrs_count)
+    mpbcones_to_hypatiacones!(hypatia_cone, var_cones, var_power_refs, power_alphas, cone_constrs_count)
 
     return (c_in, A, b, G, h, hypatia_cone)
 end
