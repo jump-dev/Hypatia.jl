@@ -139,9 +139,6 @@ function mpbtohypatia(c_in::Vector{Float64},
             b[out_inds] = b_in[inds]
             i = nexti
         else
-            if cone_type == :Power
-                inds .= [inds[end]; inds[1:end-1]]
-            end
             nextj = j + length(inds)
             out_inds = j+1:nextj
             G[out_inds, :] .= A_in[inds, :]
@@ -163,15 +160,6 @@ function mpbtohypatia(c_in::Vector{Float64},
 
     # append G
     G[cone_constrs+1:end, :] .= Matrix(-1I, n, n)[cone_var_inds, :]
-    # reorder any variables in the power cone
-    for (cone_type, inds) in var_cones
-        if cone_type == :Power
-            out_inds = [inds[end]; inds[1:end-1]]
-            A[:, inds] .= A[:, out_inds]
-            G[:, inds] .= G[:, out_inds]
-            c_in[inds] .= c_in[out_inds]
-        end
-    end
 
     # prepare cones
     hypatia_cone = Hypatia.Cone()
