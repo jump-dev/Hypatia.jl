@@ -104,19 +104,24 @@ end
 OUT = stdout
 ERR = stderr
 for instname in instances
-    println("$instname ...")
+    println("starting $instname")
 
     solveerror = nothing
     (status, pobj, dobj, niters, runtime, gctime, bytes) = (:UnSolved, NaN, NaN, -1, NaN, NaN, -1)
+    memallocs = nothing
 
     instfile = joinpath(outputpath, instname * ".txt")
     open(instfile, "w") do fdinst
-        # redirect_stdout(fdinst)
-        # redirect_stderr(fdinst)
+        redirect_stdout(fdinst)
+        redirect_stderr(fdinst)
+        println("instance $instname")
 
-        println("reading CBF data")
-        cbfdata = Translate.readcbfdata(joinpath(cbfpath, instname * ".cbf.gz"))
-        (c, A, b, G, h, cone, objoffset, hasintvars) = Translate.cbftohypatia(cbfdata, usedense=usedense)
+        println("\nreading CBF data...")
+        cbftime = @elapsed begin
+            cbfdata = Translate.readcbfdata(joinpath(cbfpath, instname * ".cbf.gz"))
+            (c, A, b, G, h, cone, objoffset, hasintvars) = Translate.cbftohypatia(cbfdata, usedense=usedense)
+        end
+        println("took $cbftime seconds")
         if hasintvars
             println("ignoring integrality constraints")
         end
@@ -124,42 +129,49 @@ for instname in instances
             println("ignoring objective offset")
         end
 
-        println("constructing Hypatia model")
-        Hypatia.check_data(c, A, b, G, h, cone)
-        if lscachetype == "QRSymmCache"
-            (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = Hypatia.preprocess_data(c, A, b, G, useQR=true)
-            ls = Hypatia.QRSymmCache(c1, A1, b1, G1, h, cone, Q2, RiQ1)
-        elseif lscachetype == "NaiveCache"
-            (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = Hypatia.preprocess_data(c, A, b, G, useQR=false)
-            ls = Hypatia.NaiveCache(c1, A1, b1, G1, h, cone)
+        println("\nconstructing Hypatia model...")
+        constructtime = @elapsed begin
+            Hypatia.check_data(c, A, b, G, h, cone)
+            if lscachetype == "QRSymmCache"
+                (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = Hypatia.preprocess_data(c, A, b, G, useQR=true)
+                ls = Hypatia.QRSymmCache(c1, A1, b1, G1, h, cone, Q2, RiQ1)
+            elseif lscachetype == "NaiveCache"
+                (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = Hypatia.preprocess_data(c, A, b, G, useQR=false)
+                ls = Hypatia.NaiveCache(c1, A1, b1, G1, h, cone)
+            end
+            model = Hypatia.Model(; options...)
+            Hypatia.load_data!(model, c1, A1, b1, G1, h, cone, ls)
         end
-        model = Hypatia.Model(; options...)
-        Hypatia.load_data!(model, c1, A1, b1, G1, h, cone, ls)
+        println("took $constructtime seconds")
 
-        println("solving Hypatia model")
+        println("\nsolving Hypatia model...")
         try
             (val, runtime, bytes, gctime, memallocs) = @timed Hypatia.solve!(model)
-            println("Hypatia finished")
+            println("\nHypatia finished")
             status = Hypatia.get_status(model)
             niters = model.niters
             pobj = Hypatia.get_pobj(model)
             dobj = Hypatia.get_dobj(model)
         catch solveerror
-            println("Hypatia errored:")
+            println("\nHypatia errored:")
             println(solveerror)
         end
+        println("took $runtime seconds")
+        println("memory allocation data:")
+        dump(memallocs)
+        println("\n")
 
         redirect_stdout(OUT)
         redirect_stderr(ERR)
     end
 
     if !isnothing(solveerror)
-        println("Hypatia errored on $instname:")
+        println("Hypatia errored:")
         println(solveerror)
+        println()
     end
 
     open(csvfile, "a") do fdcsv
-        # TODO optionally save more information from memallocs
         println(fdcsv, "$instname,$status,$pobj,$dobj,$niters,$runtime,$gctime,$bytes")
     end
 end
