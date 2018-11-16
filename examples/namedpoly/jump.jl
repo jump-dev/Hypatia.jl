@@ -55,11 +55,10 @@ end
 # end
 
 # should be an ellipsoid
-struct Ball <: Domain
+mutable struct Ball <: Domain
     c::Vector{Float64}
     r::Float64
     function Ball(c::Vector{Float64}, r::Float64)
-        @assert length(c) == length(r)
         d = new()
         d.c = c
         d.r = r
@@ -76,19 +75,16 @@ function sample(d::Box, npts::Int)
     return (d.u + d.l)/2.0 .+ (d.u - d.l) .* (pts .- 0.5)
 end
 
-# function sample(d::Ellipsoid, npts::Int)
-#     dim = dimension(d)
-#     random_radii = rand(dim, npts) * d.r
-#     random_thetas = rand(dim, npts) * 2pi
-#     pts = random_radii * cos.(random_thetas)
-#     return (d.u + d.l)/2.0 .+ (d.u - d.l) .* (pts .- 0.5)
-# end
-
 function sample(d::Ball, npts::Int)
+    # sample(Box(d.c), npts::Int)
+    n = length(d.c)
     dim = dimension(d)
-    pts = rand(dim, npts)
+    pts = 0.5 .- rand(dim, npts)
     for i in 1:npts
-        pts[:, i] .= pts[:, i] / norm(pts) * d.r + d.c
+        if norm(pts[:, i]) > 0.5
+            pts[:, i] .*= 0.4999 / norm(pts[:, i]) #* sqrt(n))
+        end
+        pts[:, i] .= pts[:, i] * 2 * d.r + d.c
     end
     return pts
 end
@@ -118,15 +114,17 @@ end
 
 
 get_bss(dom::Domain, x) = error("")
-
 function get_bss(dom::Box, x)
     bss = BasicSemialgebraicSet{Float64,Polynomial{true,Float64}}()
     for i in 1:dimension(dom)
-        addinequality!(bss, -x[i] + dom.u[i])
-        addinequality!(bss, x[i] - dom.l[i])
+        addinequality!(bss, (-x[i] + dom.u[i]) * (x[i] - dom.l[i]))
     end
     return bss
 end
+function get_bss(dom::Ball, x)
+    return @set sum((x - dom.c).^2) <= dom.r^2
+end
+
 
 # function get_domain(dom::Ellipsoid, x)
 #     bss = BasicSemialgebraicSet{Float64,Polynomial{true,Float64}}()
@@ -135,30 +133,28 @@ end
 #     return bss
 # end
 
-function get_bss(dom::Ball, x)
-    return @set abs2(x - dom.c) <= dom.r^2
-end
-
-# assumes we built the box ourselves for now, with known order of equations
 function get_weights(::Box, bss::BasicSemialgebraicSet{Float64,Polynomial{true,Float64}}, pts)
     m = length(bss.p)
     U = size(pts, 2)
-    @assert mod(m, 2) == 0
-    gpolys = Vector{Polynomial{true,Float64}}(undef, div(m, 2))
-    for i in eachindex(gpolys)
-        gpolys[i] = bss.p[2i-1] * bss.p[2i]
-    end
-    g = Vector{Vector{Float64}}(undef, length(gpolys))
-    for i in eachindex(gpolys)
-        g[i] = gpolys[i].(pts[i,:])
+    g = Vector{Vector{Float64}}(undef, m)
+    for i in 1:m
+        g[i] = bss.p[i].(pts[i,:])
         @assert all(g[i] .> -1e-6)
     end
     return g
 end
+function get_weights(::Ball, bss::BasicSemialgebraicSet{Float64,Polynomial{true,Float64}}, pts)
+    U = size(pts, 2)
+    @assert length(bss.p) == 1
+    # sub_func(j) = dom.r^2 - sum((dom.c - pts[:, j]).^2)
+    sub_func(j) = bss.p[1](pts[:, j])
+    g = [sub_func(j) for j in 1:U]
+    @show g
+    return [g]
+end
 
 function get_P(ipts, d::Int, U::Int)
     (n, npts) = size(ipts)
-    L = binomial(n+d,n)
     u = Hypatia.calc_u(n, 2d, ipts')
     m = Vector{Float64}(undef, U)
     m[1] = 2^n
@@ -180,16 +176,14 @@ function get_P(ipts, d::Int, U::Int)
             end
         end
     end
-    P0 = M[:,1:L]
-    P = Array(qr(P0).Q)
-    return (P0, P)
+    return M
 end
 
 function build_JuMP_namedpoly_SDP(
     x,
     f::DynamicPolynomials.Polynomial, #{true,Float64},
     dom::Domain,
-    d::Int = div(length(x), 2),
+    d::Int = div(maxdegree(f), 2),
     )
 
     # build domain BasicSemialgebraicSet representation
@@ -199,7 +193,7 @@ function build_JuMP_namedpoly_SDP(
     model = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true))
     @variable(model, a)
     @objective(model, Max, a)
-    @constraint(model, fnn, f >= a, domain=bss)
+    @constraint(model, fnn, f >= a, domain=bss, maxdegree=2d)
 
     return model
 end
@@ -208,18 +202,31 @@ function build_JuMP_namedpoly_WSOS(
     x,
     f::DynamicPolynomials.Polynomial, #{true,Float64},
     dom::Domain,
-    d::Int = div(length(x), 2),
+    d::Int = div(maxdegree(f), 2),
     )
 
     n = nvariables(f) # number of polyvars
+    L = binomial(n+d,n)
     U = binomial(n+2d, n)
+
+    pts_factor = n
 
     # toggle between sampling and current Hypatia method
     sample_pts = true
 
     if sample_pts
-        pts = sample(dom, U)
-        (P0, P) = get_P(pts, d, U)
+        candidate_pts = sample(dom, U * pts_factor)
+        M = get_P(candidate_pts, d, U)
+
+        Mp = Array(M')
+        F = qr!(Mp, Val(true))
+        keep_pnt = F.p[1:U]
+
+        pts = candidate_pts[:,keep_pnt] # subset of points indexed with the support of w
+        P0 = M[keep_pnt,1:L] # subset of polynomial evaluations up to total degree d
+        P = Array(qr(P0).Q)
+
+    # this is just for debugging purposes
     else
         L = binomial(n+d, n)
         (L, U, pts, P0, P, w) = Hypatia.interpolate(n, d, calc_w=false)
@@ -232,7 +239,8 @@ function build_JuMP_namedpoly_WSOS(
     bss = get_bss(dom, x)
 
     g = get_weights(dom, bss, pts)
-    PWts = [sqrt.(g[i]) .* P0sub for i in 1:n]
+    @assert length(g) == length(bss.p)
+    PWts = [sqrt.(g[i]) .* P0sub for i in 1:length(bss.p)]
 
     wsos_cone = WSOSPolyInterpCone(U, [P, PWts...])
 
@@ -253,55 +261,62 @@ end
 
 function run_JuMP_namedpoly()
     # select the named polynomial to minimize
-    polyname =
+    polynames = [
         # :butcher
-        # :caprasse
+        :caprasse
         :goldsteinprice
+        :goldsteinprice_ball
         # :heart
         # :lotkavolterra
         # :magnetism7
-        # :motzkin
+        :motzkin
+        # :motzkin_ball1
+        # # :motzkin_ball2  # runs into issues
         # :reactiondiffusion
         # :robinson
         # :rosenbrock
         # :schwefel
+    ]
 
-    # get data for named polynomial
-    (x, f, dom, truemin, d) = getpolydata(polyname)
+    for polyname in polynames
 
-    println("solving model with PSD cones")
-    model = build_JuMP_namedpoly_SDP(x, f, dom, d)
-    JuMP.optimize!(model)
+        # get data for named polynomial
+        (x, f, dom, truemin, d) = getpolydata(polyname)
 
-    println("done")
-    term_status = JuMP.termination_status(model)
-    pobj = JuMP.objective_value(model)
-    dobj = JuMP.objective_bound(model)
-    pr_status = JuMP.primal_status(model)
-    du_status = JuMP.dual_status(model)
+        println("solving model with PSD cones")
+        model = build_JuMP_namedpoly_SDP(x, f, dom)
+        JuMP.optimize!(model)
 
-    @test term_status == MOI.Success
-    @test pr_status == MOI.FeasiblePoint
-    @test du_status == MOI.FeasiblePoint
-    @test pobj ≈ dobj atol=1e-4 rtol=1e-4
-    @test pobj ≈ truemin atol=1e-4 rtol=1e-4
+        println("done")
+        term_status = JuMP.termination_status(model)
+        pobj = JuMP.objective_value(model)
+        dobj = JuMP.objective_bound(model)
+        pr_status = JuMP.primal_status(model)
+        du_status = JuMP.dual_status(model)
 
-    println("solving model with WSOS interpolation cones")
-    model = build_JuMP_namedpoly_WSOS(x, f, dom, d)
-    JuMP.optimize!(model)
+        @test term_status == MOI.Success
+        @test pr_status == MOI.FeasiblePoint
+        @test du_status == MOI.FeasiblePoint
+        @test pobj ≈ dobj atol=1e-4 rtol=1e-4
+        @test pobj ≈ truemin atol=1e-4 rtol=1e-4
 
-    println("done")
-    term_status = JuMP.termination_status(model)
-    pobj = JuMP.objective_value(model)
-    dobj = JuMP.objective_bound(model)
-    pr_status = JuMP.primal_status(model)
-    du_status = JuMP.dual_status(model)
+        println("solving model with WSOS interpolation cones")
+        model = build_JuMP_namedpoly_WSOS(x, f, dom, d)
+        JuMP.optimize!(model)
 
-    @test term_status == MOI.Success
-    @test pr_status == MOI.FeasiblePoint
-    @test du_status == MOI.FeasiblePoint
-    @test pobj ≈ dobj atol=1e-4 rtol=1e-4
-    @test pobj ≈ truemin atol=1e-4 rtol=1e-4
+        println("done")
+        term_status = JuMP.termination_status(model)
+        pobj = JuMP.objective_value(model)
+        dobj = JuMP.objective_bound(model)
+        pr_status = JuMP.primal_status(model)
+        du_status = JuMP.dual_status(model)
+
+        @test term_status == MOI.Success
+        @test pr_status == MOI.FeasiblePoint
+        @test du_status == MOI.FeasiblePoint
+        @test pobj ≈ dobj atol=1e-4 rtol=1e-4
+        @test pobj ≈ truemin atol=1e-4 rtol=1e-4
+    end
 
     return nothing
 end
@@ -332,6 +347,12 @@ function getpolydata(polyname::Symbol)
         dom = Box(fill(-2, 2), fill(2, 2))
         truemin = 3
         d = 7
+    elseif polyname == :goldsteinprice_ball
+        @polyvar x[1:2]
+        f = (1+(x[1]+x[2]+1)^2*(19-14x[1]+3x[1]^2-14x[2]+6x[1]*x[2]+3x[2]^2))*(30+(2x[1]-3x[2])^2*(18-32x[1]+12x[1]^2+48x[2]-36x[1]*x[2]+27x[2]^2))
+        dom = Ball(fill(0.0, 2), 4.0)
+        truemin = 3
+        d = 7
     elseif polyname == :heart
         @polyvar x[1:8]
         f = x[1]*x[6]^3-3x[1]*x[6]*x[7]^2+x[3]*x[7]^3-3x[3]*x[7]*x[6]^2+x[2]*x[5]^3-3*x[2]*x[5]*x[8]^2+x[4]*x[8]^3-3x[4]*x[8]*x[5]^2
@@ -355,6 +376,18 @@ function getpolydata(polyname::Symbol)
         f = 1-48x[1]^2*x[2]^2+64x[1]^2*x[2]^4+64x[1]^4*x[2]^2
         dom = Box(fill(-1, 2), fill(1, 2))
         truemin = 0
+        d = 7
+    elseif polyname == :motzkin_ball1
+        @polyvar x[1:2]
+        f = 1-48x[1]^2*x[2]^2+64x[1]^2*x[2]^4+64x[1]^4*x[2]^2
+        dom = Ball([0.0; 0.0], sqrt(0.5))
+        truemin = 0
+        d = 7
+    elseif polyname == :motzkin_ball2
+        @polyvar x[1:2]
+        f = 1-48x[1]^2*x[2]^2+64x[1]^2*x[2]^4+64x[1]^4*x[2]^2
+        dom = Ball([0.0; 0.0], 0.5*sqrt(0.5))
+        truemin = 0.84375
         d = 7
     elseif polyname == :reactiondiffusion
         @polyvar x[1:3]
