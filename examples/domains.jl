@@ -70,8 +70,9 @@ dimension(d::Ball) = length(d.c)
 
 function sample(d::Box, npts::Int)
     dim = dimension(d)
-    pts = rand(npts, dim)
-    return (d.u + d.l)/2.0 .+ (d.u - d.l) .* (pts .- 0.5)
+    pts = rand(dim, npts)
+    pts = (d.u + d.l)/2.0 .+ (d.u - d.l) .* (pts .- 0.5)
+    return pts'
 end
 # will be replaced with proper sampling function
 function sample(d::Ball, npts::Int)
