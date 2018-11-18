@@ -75,25 +75,42 @@ function sample(d::Box, npts::Int)
     return pts'
 end
 # will be replaced with proper sampling function
-function sample(d::Ball, npts::Int)
+function sample(d::Ball, npts::Int, strategy::Int=3)
     dim = dimension(d)
 
-    # generate uniformly distributed points in a ball, doesn't work well numerically
-    # pts = randn(npts, dim)
-    # norms = sum(pts.^2, dims=2)
-    # pts .*= d.r ./ sqrt.(norms)
-    # # sf_gamma_inc_Q is the normalized incomplete gamma function
-    # pts .*= sf_gamma_inc_Q(norms/2, dim/2).^(1/dim)
+    if strategy == 1
+        # generate uniformly distributed points in a ball, doesn't work well numerically
+        pts = randn(npts, dim)
+        norms = sum(pts.^2, dims=2)
+        pts .*= d.r ./ sqrt.(norms)
+        # sf_gamma_inc_Q is the normalized incomplete gamma function
+        pts .*= sf_gamma_inc_Q.(norms/2, dim/2).^(1/dim)
 
-    pts = 0.5 .- rand(npts, dim)
-    for i in 1:npts
-        if norm(pts[i, :]) > 0.5
-            pts[i, :] .*= 0.4999 / norm(pts[i, :]) #* sqrt(n))
+    elseif strategy == 2
+        # heuristic with 1-radius being truncated exponential
+        pts_on_sphere = randn(npts, dim)
+        norms = sqrt.(sum(pts_on_sphere.^2, dims=2))
+        pts_on_sphere ./= norms
+        if any(norm.(pts_on_sphere) .> 1) || any(norm.(pts_on_sphere) .< 0)
+            error()
         end
-        pts[i, :] .= pts[i, :] * 2 * d.r + d.c
+        lambda = dim * 10.0
+        rdist = Truncated(Exponential(lambda), 0, 1)
+        radii = (1.0 .- rand(rdist, npts)) .* d.r
+        pts = pts_on_sphere .* radii
+
+    elseif strategy == 3
+        # sample from box and project
+        pts = 0.5 .- rand(npts, dim)
+        for i in 1:npts
+            if norm(pts[i, :]) > 0.5
+                pts[i, :] .*= 0.4999 / norm(pts[i, :]) #* sqrt(n))
+            end
+            pts[i, :] .= pts[i, :] * 2 * d.r + d.c
+        end
+
     end
 
-    # @show pts'
     return pts
 end
 
@@ -146,7 +163,6 @@ function get_weights(::Box, bss::BasicSemialgebraicSet{Float64,Polynomial{true,F
     U = size(pts, 1)
     g = Vector{Vector{Float64}}(undef, m)
     for i in 1:m
-        @show bss.p[i]
         g[i] = bss.p[i].(pts[:,i])
         @assert all(g[i] .> -1e-6)
     end
@@ -155,7 +171,7 @@ end
 function get_weights(::Ball, bss::BasicSemialgebraicSet{Float64,Polynomial{true,Float64}}, pts)
     U = size(pts, 1)
     @assert length(bss.p) == 1
-    # sub_func(j) = dom.r^2 - sum((dom.c - pts[:, j]).^2)
+    # sub_func(j) = dom.r^2 - sum((dom.c - pts[j, :]).^2)
     sub_func(j) = bss.p[1](pts[j, :])
     g = [sub_func(j) for j in 1:U]
     return [g]
