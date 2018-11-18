@@ -5,6 +5,8 @@ see description in examples/namedpoly/native.jl
 =#
 include(joinpath(dirname(@__DIR__()), "domains.jl"))
 
+Random.seed!(1234)
+
 function build_JuMP_namedpoly_SDP(
     x,
     f::DynamicPolynomials.Polynomial, #{true,Float64},
@@ -87,29 +89,39 @@ end
 function run_JuMP_namedpoly()
     # select the named polynomial to minimize
     polynames = [
-        # :butcher
+        :butcher
         :caprasse
         :goldsteinprice
-        :goldsteinprice_ball
-        # :heart
-        # :lotkavolterra
-        # :magnetism7
+        # :goldsteinprice_ball # predictor/corrector failures
+        :heart
+        :lotkavolterra
+        :lotkavolterra_ball
+        :magnetism7
+        :magnetism7_ball
         :motzkin
-        # :motzkin_ball1
-        # # :motzkin_ball2  # runs into issues
-        # :reactiondiffusion
-        # :robinson
-        # :rosenbrock
-        # :schwefel
+        :motzkin_ball1
+        # :motzkin_ball2  # runs into issues
+        :reactiondiffusion
+        :robinson
+        :rosenbrock
+        :schwefel
+        :schwefel_ball
     ]
 
     for polyname in polynames
+
+        println(polyname)
 
         # get data for named polynomial
         (x, f, dom, truemin, d) = getpolydata(polyname)
 
         println("solving model with PSD cones")
-        model = build_JuMP_namedpoly_SDP(x, f, dom)
+
+        if polyname in [:caprasse_ball, :butcher, :lotkavolterra, :lotkavolterra_ball]
+            model = build_JuMP_namedpoly_SDP(x, f, dom, d)
+        else
+            model = build_JuMP_namedpoly_SDP(x, f, dom)
+        end
         JuMP.optimize!(model)
 
         println("done")
@@ -166,6 +178,12 @@ function getpolydata(polyname::Symbol)
         dom = Box(fill(-0.5, 4), fill(0.5, 4))
         truemin = -3.1800966258
         d = 4
+    elseif polyname == :caprasse_ball
+        @polyvar x[1:4]
+        f = -x[1]*x[3]^3+4x[2]*x[3]^2*x[4]+4x[1]*x[3]*x[4]^2+2x[2]*x[4]^3+4x[1]*x[3]+4x[3]^2-10x[2]*x[4]-10x[4]^2+2
+        dom = Ball(fill(0.0, 4), 1.0)
+        truemin = -3.1800966258
+        d = 4
     elseif polyname == :goldsteinprice
         @polyvar x[1:2]
         f = (1+(x[1]+x[2]+1)^2*(19-14x[1]+3x[1]^2-14x[2]+6x[1]*x[2]+3x[2]^2))*(30+(2x[1]-3x[2])^2*(18-32x[1]+12x[1]^2+48x[2]-36x[1]*x[2]+27x[2]^2))
@@ -175,25 +193,43 @@ function getpolydata(polyname::Symbol)
     elseif polyname == :goldsteinprice_ball
         @polyvar x[1:2]
         f = (1+(x[1]+x[2]+1)^2*(19-14x[1]+3x[1]^2-14x[2]+6x[1]*x[2]+3x[2]^2))*(30+(2x[1]-3x[2])^2*(18-32x[1]+12x[1]^2+48x[2]-36x[1]*x[2]+27x[2]^2))
-        dom = Ball(fill(0.0, 2), 4.0)
+        dom = Ball(fill(0.0, 2), 2.0 * sqrt(2))
         truemin = 3
         d = 7
     elseif polyname == :heart
         @polyvar x[1:8]
         f = x[1]*x[6]^3-3x[1]*x[6]*x[7]^2+x[3]*x[7]^3-3x[3]*x[7]*x[6]^2+x[2]*x[5]^3-3*x[2]*x[5]*x[8]^2+x[4]*x[8]^3-3x[4]*x[8]*x[5]^2
         dom = Box([-0.1,0.4,-0.7,-0.7,0.1,-0.1,-0.3,-1.1], [0.4,1,-0.4,0.4,0.2,0.2,1.1,-0.3])
-        truemin = -1.36775
+        truemin = -2.3241 # -1.36775 #TODO where did the previous solution come from?
         d = 2
+    # elseif polyname == :heart_ellipsoid
+    #     @polyvar x[1:8]
+    #     f = x[1]*x[6]^3-3x[1]*x[6]*x[7]^2+x[3]*x[7]^3-3x[3]*x[7]*x[6]^2+x[2]*x[5]^3-3*x[2]*x[5]*x[8]^2+x[4]*x[8]^3-3x[4]*x[8]*x[5]^2
+    #     dom = Box([-0.1,0.4,-0.7,-0.7,0.1,-0.1,-0.3,-1.1], [0.4,1,-0.4,0.4,0.2,0.2,1.1,-0.3])
+    #     truemin = -2.3241 # -1.36775
+    #     d = 2
     elseif polyname == :lotkavolterra
         @polyvar x[1:4]
         f = x[1]*(x[2]^2+x[3]^2+x[4]^2-1.1)+1
         dom = Box(fill(-2, 4), fill(2, 4))
         truemin = -20.8
         d = 3
+    elseif polyname == :lotkavolterra_ball
+        @polyvar x[1:4]
+        f = x[1]*(x[2]^2+x[3]^2+x[4]^2-1.1)+1
+        dom = Ball(fill(0.0, 4), 4.0)
+        truemin = -21.13744
+        d = 3
     elseif polyname == :magnetism7
         @polyvar x[1:7]
         f = x[1]^2+2x[2]^2+2x[3]^2+2x[4]^2+2x[5]^2+2x[6]^2+2x[7]^2-x[1]
         dom = Box(fill(-1, 7), fill(1, 7))
+        truemin = -0.25
+        d = 2
+    elseif polyname == :magnetism7_ball
+        @polyvar x[1:7]
+        f = x[1]^2+2x[2]^2+2x[3]^2+2x[4]^2+2x[5]^2+2x[6]^2+2x[7]^2-x[1]
+        dom = Ball(fill(0.0, 7), sqrt(7))
         truemin = -0.25
         d = 2
     elseif polyname == :motzkin
@@ -205,7 +241,7 @@ function getpolydata(polyname::Symbol)
     elseif polyname == :motzkin_ball1
         @polyvar x[1:2]
         f = 1-48x[1]^2*x[2]^2+64x[1]^2*x[2]^4+64x[1]^4*x[2]^2
-        dom = Ball([0.0; 0.0], sqrt(0.5))
+        dom = Ball([0.0; 0.0], sqrt(2.0))
         truemin = 0
         d = 7
     elseif polyname == :motzkin_ball2
@@ -236,6 +272,12 @@ function getpolydata(polyname::Symbol)
         @polyvar x[1:3]
         f = (x[1]-x[2]^2)^2+(x[2]-1)^2+(x[1]-x[3]^2)^2+(x[3]-1)^2
         dom = Box(fill(-10, 3), fill(10, 3))
+        truemin = 0
+        d = 3
+    elseif polyname == :schwefel_ball
+        @polyvar x[1:3]
+        f = (x[1]-x[2]^2)^2+(x[2]-1)^2+(x[1]-x[3]^2)^2+(x[3]-1)^2
+        dom = Ball(fill(0.0, 3), 10.0 * sqrt(3))
         truemin = 0
         d = 3
     else
