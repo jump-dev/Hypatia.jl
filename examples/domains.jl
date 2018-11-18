@@ -13,13 +13,14 @@ using SumOfSquares
 using LinearAlgebra
 using GSL
 using Distributions
+using ApproxFun
 using Test
 
 import Combinatorics
 
-abstract type Domain end
+abstract type InterpDomain end
 
-mutable struct Box <: Domain
+mutable struct Box <: InterpDomain
     l::Vector{Float64}
     u::Vector{Float64}
     function Box(l::Vector{Float64}, u::Vector{Float64})
@@ -36,7 +37,7 @@ end
 
 
 # (x-c)'Q(x-c) \leq 1
-# struct Ellipsoid <: Domain
+# struct Ellipsoid <: InterpDomain
 #     c::Vector{Float64}
 #     Q::Matrix{Float64}
 #     function Ellipsoid(c::Vector{Float64}, Q::Matrix{Float64})
@@ -54,7 +55,7 @@ end
 # end
 
 # should be an ellipsoid
-mutable struct Ball <: Domain
+mutable struct Ball <: InterpDomain
     c::Vector{Float64}
     r::Float64
     function Ball(c::Vector{Float64}, r::Float64)
@@ -68,14 +69,14 @@ end
 dimension(d::Box) = length(d.l)
 dimension(d::Ball) = length(d.c)
 
-function sample(d::Box, npts::Int)
+function interp_sample(d::Box, npts::Int)
     dim = dimension(d)
     pts = rand(dim, npts)
     pts = (d.u + d.l)/2.0 .+ (d.u - d.l) .* (pts .- 0.5)
     return pts'
 end
 # will be replaced with proper sampling function
-function sample(d::Ball, npts::Int, strategy::Int=3)
+function interp_sample(d::Ball, npts::Int, strategy::Int=3)
     dim = dimension(d)
 
     if strategy == 1
@@ -114,7 +115,7 @@ function sample(d::Ball, npts::Int, strategy::Int=3)
     return pts
 end
 
-# struct BoxSurf <: Domain
+# struct BoxSurf <: InterpDomain
 #     l::Vector{Float64}
 #     u::Vector{Float64}
 # end
@@ -122,23 +123,23 @@ end
 # dimension(d::Box) = length(d.l)
 #
 #
-# struct BallSurf <: Domain
+# struct BallSurf <: InterpDomain
 #     c::Vector{Float64}
 #     r::Float64
 # end
 #
-# struct Ellipse <: Domain
+# struct Ellipse <: InterpDomain
 #     c::Vector{Float64}
 #     Q::Matrix{Float64}
 # end
 #
-# struct EllipseSurf <: Domain
+# struct EllipseSurf <: InterpDomain
 #     c::Vector{Float64}
 #     Q::Matrix{Float64}
 # end
 
 
-get_bss(dom::Domain, x) = error("")
+get_bss(dom::InterpDomain, x) = error("")
 function get_bss(dom::Box, x)
     bss = BasicSemialgebraicSet{Float64,Polynomial{true,Float64}}()
     for i in 1:dimension(dom)
@@ -151,7 +152,7 @@ function get_bss(dom::Ball, x)
 end
 
 
-# function get_domain(dom::Ellipsoid, x)
+# function get_InterpDomain(dom::Ellipsoid, x)
 #     bss = BasicSemialgebraicSet{Float64,Polynomial{true,Float64}}()
 #     lhs = (x - dom.c)' * dom.Q * (x - dom.c)
 #     addinequality!(bss, 1 - lhs)

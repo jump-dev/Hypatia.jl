@@ -3,6 +3,7 @@ Copyright 2018, Chris Coey and contributors
 
 see description in examples/namedpoly/native.jl
 =#
+using Random
 include(joinpath(dirname(@__DIR__()), "domains.jl"))
 
 Random.seed!(1234)
@@ -10,7 +11,7 @@ Random.seed!(1234)
 function build_JuMP_namedpoly_SDP(
     x,
     f::DynamicPolynomials.Polynomial, #{true,Float64},
-    dom::Domain,
+    dom::InterpDomain,
     d::Int = div(maxdegree(f), 2),
     )
 
@@ -29,7 +30,7 @@ end
 function build_JuMP_namedpoly_WSOS(
     x,
     f::DynamicPolynomials.Polynomial, #{true,Float64},
-    dom::Domain,
+    dom::InterpDomain,
     d::Int = div(maxdegree(f), 2),
     )
 
@@ -43,7 +44,7 @@ function build_JuMP_namedpoly_WSOS(
     sample_pts = true
 
     if sample_pts
-        candidate_pts = sample(dom, U * pts_factor)
+        candidate_pts = interp_sample(dom, U * pts_factor)
         M = get_P(candidate_pts, d, U)
 
         Mp = Array(M')
