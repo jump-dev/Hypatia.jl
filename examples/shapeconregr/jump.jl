@@ -72,14 +72,15 @@ function build_shapeconregr_SDP(
         z[1:npoints]
     end)
     dp = [DynamicPolynomials.differentiate(p, x[i]) for i in 1:n]
-    Hp = [DynamicPolynomials.differentiate(DynamicPolynomials.differentiate(p, x[i]), x[j]) for i in 1:n, j in 1:n]
+    Hp = [DynamicPolynomials.differentiate(dp[i], x[j]) for i in 1:n, j in 1:n]
 
     for j in 1:n
         if abs(monotonicity_prfl[j]) > 0.5
             @constraint(mdl, monotonicity_prfl[j] * dp[j] >= 0, domain=monotonicity_bss)
         end
     end
-    @constraint(mdl, w' * Hp * w >= 0, domain=convexity_bss) # TODO think about what it means if w sos polynomials have degree > 2
+    # @constraint(mdl, w' * Hp * w >= 0, domain=convexity_bss) # TODO think about what it means if w sos polynomials have degree > 2
+    @constraint(mdl, [j=1:n, k=j:n], Hp[j, k] >= 0, domain=convexity_bss)
     @constraints(mdl, begin
         [i=1:npoints], z[i] >= y[i] - p(X[i, :])
         [i=1:npoints], z[i] >= -y[i] + p(X[i, :])
@@ -91,6 +92,10 @@ function build_shapeconregr_SDP(
 
     return (mdl, p)
 end
+
+# convexity formulation looking at each entry in the Hessian independently gives at most n^2 cones dim (n+2d-2 choose n)
+# convexity formulation looking at y'Hy gives one cone dim (2n+2d-2 choose 2n)
+# getratio(n, d) = binomial(2n+2d-2, 2n) / (binomial(n+2d-2, n) * n^2)
 
 function get_P_shapeconsregr(d::Int, npoints::Int, n::Int, dom::InterpDomain)
     L = binomial(n+d,n)
@@ -106,7 +111,7 @@ function get_P_shapeconsregr(d::Int, npoints::Int, n::Int, dom::InterpDomain)
     P = Array(qr(P0).Q)
     P0sub = view(P0, :, 1:binomial(n+d-1, n))
 
-    return (pts, P, P0sub)
+    return (U, pts, P, P0sub)
 end
 
 function build_shapeconregr_WSOS(
@@ -123,12 +128,13 @@ function build_shapeconregr_WSOS(
 
     (npoints, n) = size(X)
 
-    monotonicity_pts, monotonicity_P, monotonicity_P0sub = get_P_shapeconsregr(d, npoints, n, monotonicity_dom)
-    convexity_pts, convexity_P, convexity_P0sub = get_P_shapeconsregr(d, npoints, n, convexity_dom)
+    monotonicity_U, monotonicity_pts, monotonicity_P, monotonicity_P0sub = get_P_shapeconsregr(d, npoints, n, monotonicity_dom)
+    # TODO think about if it's ok to go up to d
+    convexity_U, convexity_pts, convexity_P, convexity_P0sub = get_P_shapeconsregr(d, npoints, n, convexity_dom)
 
     mdl = Model(with_optimizer(Hypatia.Optimizer, verbose=true))
     @polyvar x[1:n]
-    @polyvar w[1:n]
+    # @polyvar w[1:n]
     PX = monomials(x, 0:r)
 
     monotonicity_bss = get_bss(monotonicity_dom, x)
@@ -142,32 +148,41 @@ function build_shapeconregr_WSOS(
     monotonicity_PWts = [sqrt.(gi) .* monotonicity_P0sub for gi in monotonicity_g]
     convexity_PWts = [sqrt.(gi) .* convexity_P0sub for gi in convexity_g]
 
-    monotonicity_wsos_cone = WSOSPolyInterpCone(U, [monotonicity_P, monotonicity_PWts...])
-    convexity_wsos_cone = WSOSPolyInterpCone(U, [convexity_P, convexity_PWts...])
+    monotonicity_wsos_cone = WSOSPolyInterpCone(monotonicity_U, [monotonicity_P, monotonicity_PWts...])
+    convexity_wsos_cone = WSOSPolyInterpCone(convexity_U, [convexity_P, convexity_PWts...])
 
     # monomial basis coefficients
     @variable(mdl, p, PolyJuMP.Poly(PX))
     dp = [DynamicPolynomials.differentiate(p, x[j]) for j in 1:n]
+    Hp = [DynamicPolynomials.differentiate(dp[i], x[j]) for i in 1:n, j in 1:n]
 
     @variables(mdl, begin
         # residuals
         z[1:npoints]
         # interpolant basis coefficients
-        q[1:U, 1:n]
+        monotonicity_interp_coeffs[1:monotonicity_U, 1:n]
+        convexity_interp_coeffs[1:monotonicity_U, 1:n, 1:n] # TODO symmetry
     end)
 
     # Vandermonde matrix to relate coefficients
     for j in 1:n
-        for i in 1:U
+        for i in 1:monotonicity_U
             if abs(monotonicity_prfl[j]) > 0.5
-                @constraint(mdl, monotonicity_prfl[j] * dp[j](monotonicity_pts[i, :]) == q[i, j])
+                @constraint(mdl, monotonicity_prfl[j] * dp[j](monotonicity_pts[i, :]) == monotonicity_interp_coeffs[i, j])
+            end
+        end
+        # representation of convexity without additional polynomial variables will be used
+        for k in j:n
+            for i in 1:convexity_U
+                @constraint(mdl, Hp[j, k](convexity_pts[i, :]) == convexity_interp_coeffs[i, j, k])
             end
         end
     end
 
     @constraints(mdl, begin
-        [j=1:n], q[:, j] in monotonicity_wsos_cone
-        w'*H*w in convexity_wsos_cone
+        [j=1:n], monotonicity_interp_coeffs[:, j] in monotonicity_wsos_cone
+        [j=1:n, k=j:n], convexity_interp_coeffs[:, j, k] in convexity_wsos_cone
+        # w'*H*w in convexity_wsos_cone
         # minimize sum of absolute error
         [i=1:npoints], z[i] >= y[i] - p(X[i, :])
         [i=1:npoints], z[i] >= -y[i] + p(X[i, :])
@@ -182,22 +197,21 @@ end
 
 function run_JuMP_shapeconregr()
     # degree of regressor
-    r = 5
+    r = 3
     # dimensionality of observations
     n = 2
     npoints = binomial(n + r, n) * 10
     monotonicity_dom = Box(fill(-1.0, n), fill(1.0, n))
-    convexity_dom = Box(fill(-1.0, n), fill(1.0, n))
+    convexity_dom = Box(fill(0.0, n), fill(1.0, n))
     # domain = Ball(zeros(n), 1.0)
     # monotonicity everywhere
     monotonicity_prfl = zeros(n)
-    # f = (x -> sum(x .* (x .- 2), dims=2))
-    f = (x -> sum(-x.^2, dims=2))
+    f = (x -> sum(x.^2, dims=2))
     (X, y) = shapeconregr_data(f, npoints=npoints, signal_ratio=0.0, n=n)
 
     sdp_mdl, sdp_p = build_shapeconregr_SDP(X, y, r, monotonicity_dom, convexity_dom, monotonicity_prfl)
     wsos_mdl, wsos_p = build_shapeconregr_WSOS(X, y, r, monotonicity_dom, convexity_dom, monotonicity_prfl)
-    # @test JuMP.objective_value(sdp_mdl) ≈ JuMP.objective_value(wsos_mdl) atol = 1e-4
+    @test JuMP.objective_value(sdp_mdl) ≈ JuMP.objective_value(wsos_mdl) atol = 1e-4
 
     sdp_preds = [JuMP.value(sdp_p)(X[i,:]) for i in 1:npoints]
     wsos_preds = [JuMP.value(wsos_p)(X[i,:]) for i in 1:npoints]
@@ -217,6 +231,8 @@ function run_JuMP_shapeconregr()
 
     return nothing
 end
+
+run_JuMP_shapeconregr()
 
 function makeplot()
     data_trace = scatter3d(
