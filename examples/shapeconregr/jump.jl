@@ -62,7 +62,6 @@ function build_shapeconregr_SDP(
 
     mdl = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true))
     @polyvar x[1:n]
-    @polyvar w[1:n]
     PX = monomials(x, 0:r)
     monotonicity_bss = get_bss(monotonicity_dom, x)
     convexity_bss = get_bss(convexity_dom, x)
@@ -79,11 +78,11 @@ function build_shapeconregr_SDP(
             @constraint(mdl, monotonicity_prfl[j] * dp[j] >= 0, domain=monotonicity_bss)
         end
     end
-    # @constraint(mdl, w' * Hp * w >= 0, domain=convexity_bss) # TODO think about what it means if w sos polynomials have degree > 2
-    @constraint(mdl, [j=1:n, k=j:n], Hp[j, k] >= 0, domain=convexity_bss)
+    # TODO think about what it means if w sos polynomials have degree > 2
+    @SDconstraint(mdl, Hp >= 0, domain=convexity_bss)
     @constraints(mdl, begin
-        [i=1:npoints], z[i] >= y[i] - p(X[i, :])
-        [i=1:npoints], z[i] >= -y[i] + p(X[i, :])
+        [i in 1:npoints], z[i] >= y[i] - p(X[i, :])
+        [i in 1:npoints], z[i] >= -y[i] + p(X[i, :])
     end)
 
     @objective mdl Min sum(z)
@@ -93,15 +92,16 @@ function build_shapeconregr_SDP(
     return (mdl, p)
 end
 
-# convexity formulation looking at each entry in the Hessian independently gives at most n^2 cones dim (n+2d-2 choose n)
-# convexity formulation looking at y'Hy gives one cone dim (2n+2d-2 choose 2n)
-# getratio(n, d) = binomial(2n+2d-2, 2n) / (binomial(n+2d-2, n) * n^2)
-
-function get_P_shapeconsregr(d::Int, npoints::Int, n::Int, dom::InterpDomain)
+function get_P_shapeconsregr(d::Int, npoints::Int, n::Int, dom::InterpDomain, replicate_dimensions::Bool=false)
     L = binomial(n+d,n)
     U = binomial(n+2d, n)
     pts_factor = n
     candidate_pts = interp_sample(dom, U * pts_factor)
+    # TODO temporary hack, replace this with methods for unions of domains
+    if replicate_dimensions
+        candidate_pts2 = interp_sample(dom, U * pts_factor)
+        candidate_pts = hcat(candidate_pts, candidate_pts2)
+    end
     M = get_P(candidate_pts, d, U)
     Mp = Array(M')
     F = qr!(Mp, Val(true))
@@ -129,12 +129,12 @@ function build_shapeconregr_WSOS(
     (npoints, n) = size(X)
 
     monotonicity_U, monotonicity_pts, monotonicity_P, monotonicity_P0sub = get_P_shapeconsregr(d, npoints, n, monotonicity_dom)
-    # TODO think about if it's ok to go up to d
-    convexity_U, convexity_pts, convexity_P, convexity_P0sub = get_P_shapeconsregr(d, npoints, n, convexity_dom)
+    # TODO think about if it's ok to go up to d+1
+    convexity_U, convexity_pts, convexity_P, convexity_P0sub = get_P_shapeconsregr(d+1, npoints, 2n, convexity_dom, true)
 
     mdl = Model(with_optimizer(Hypatia.Optimizer, verbose=true))
     @polyvar x[1:n]
-    # @polyvar w[1:n]
+    @polyvar w[1:n]
     PX = monomials(x, 0:r)
 
     monotonicity_bss = get_bss(monotonicity_dom, x)
@@ -161,31 +161,27 @@ function build_shapeconregr_WSOS(
         z[1:npoints]
         # interpolant basis coefficients
         monotonicity_interp_coeffs[1:monotonicity_U, 1:n]
-        convexity_interp_coeffs[1:monotonicity_U, 1:n, 1:n] # TODO symmetry
+        convexity_interp_coeffs[1:convexity_U] # TODO symmetry
     end)
 
-    # Vandermonde matrix to relate coefficients
+    # Vandermonde matrix to relate coefficients for monotonicity
     for j in 1:n
         for i in 1:monotonicity_U
             if abs(monotonicity_prfl[j]) > 0.5
                 @constraint(mdl, monotonicity_prfl[j] * dp[j](monotonicity_pts[i, :]) == monotonicity_interp_coeffs[i, j])
             end
         end
-        # representation of convexity without additional polynomial variables will be used
-        for k in j:n
-            for i in 1:convexity_U
-                @constraint(mdl, Hp[j, k](convexity_pts[i, :]) == convexity_interp_coeffs[i, j, k])
-            end
-        end
     end
 
+    convex_condition = w'*Hp*w
     @constraints(mdl, begin
-        [j=1:n], monotonicity_interp_coeffs[:, j] in monotonicity_wsos_cone
-        [j=1:n, k=j:n], convexity_interp_coeffs[:, j, k] in convexity_wsos_cone
-        # w'*H*w in convexity_wsos_cone
+        # relate coefficients for convexity
+        [i in 1:convexity_U], convex_condition(convexity_pts[i, :]) == convexity_interp_coeffs[i]
+        [j in 1:n], monotonicity_interp_coeffs[:, j] in monotonicity_wsos_cone
+        convexity_interp_coeffs in convexity_wsos_cone
         # minimize sum of absolute error
-        [i=1:npoints], z[i] >= y[i] - p(X[i, :])
-        [i=1:npoints], z[i] >= -y[i] + p(X[i, :])
+        [i in 1:npoints], z[i] >= y[i] - p(X[i, :])
+        [i in 1:npoints], z[i] >= -y[i] + p(X[i, :])
     end)
 
     @objective mdl Min sum(z)
@@ -202,11 +198,11 @@ function run_JuMP_shapeconregr()
     n = 2
     npoints = binomial(n + r, n) * 10
     monotonicity_dom = Box(fill(-1.0, n), fill(1.0, n))
-    convexity_dom = Box(fill(0.0, n), fill(1.0, n))
+    convexity_dom = Box(fill(-1.0, n), fill(1.0, n))
     # domain = Ball(zeros(n), 1.0)
     # monotonicity everywhere
     monotonicity_prfl = zeros(n)
-    f = (x -> sum(x.^2, dims=2))
+    f = (x -> sum(x.^3, dims=2))
     (X, y) = shapeconregr_data(f, npoints=npoints, signal_ratio=0.0, n=n)
 
     sdp_mdl, sdp_p = build_shapeconregr_SDP(X, y, r, monotonicity_dom, convexity_dom, monotonicity_prfl)
@@ -222,7 +218,6 @@ function run_JuMP_shapeconregr()
 
     sdp_mdl, sdp_p = build_shapeconregr_SDP(X, y, r, monotonicity_dom, convexity_dom, monotonicity_prfl)
     wsos_mdl, wsos_p = build_shapeconregr_WSOS(X, y, r, monotonicity_dom,convexity_dom, monotonicity_prfl)
-
     @test JuMP.objective_value(sdp_mdl) ≈ JuMP.objective_value(wsos_mdl) atol = 1e-5
 
     sdp_preds = [JuMP.value(sdp_p)(X[i,:]) for i in 1:npoints]
@@ -271,9 +266,9 @@ function makeplot()
     )
     layout = Layout(margin=attr(l=0, r=0, t=0, b=0))
 
-    sdp_plot = plot([data_trace, sdp_trace], layout);
-    wsos_plot = plot([data_trace, wsos_trace], layout);
-    savefig(sdp_plot, "sdp_plot.pdf")
-    savefig(wsos_plot, "wsos_plot.pdf")
+    sdp_plot = plot([data_trace, sdp_trace], layout)
+    wsos_plot = plot([data_trace, wsos_trace], layout)
+    # savefig(sdp_plot, "sdp_plot.pdf")
+    # savefig(wsos_plot, "wsos_plot.pdf")
 
 end
