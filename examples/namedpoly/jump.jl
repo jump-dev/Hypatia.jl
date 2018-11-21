@@ -11,7 +11,7 @@ Random.seed!(1234)
 function build_JuMP_namedpoly_SDP(
     x,
     f::DynamicPolynomials.Polynomial, #{true,Float64},
-    dom::InterpDomain,
+    dom::InterpDomain;
     d::Int = div(maxdegree(f), 2),
     )
 
@@ -30,15 +30,14 @@ end
 function build_JuMP_namedpoly_WSOS(
     x,
     f::DynamicPolynomials.Polynomial, #{true,Float64},
-    dom::InterpDomain,
+    dom::InterpDomain;
     d::Int = div(maxdegree(f), 2),
+    pts_factor = nvariables(f),
     )
 
     n = nvariables(f) # number of polyvars
     L = binomial(n+d,n)
     U = binomial(n+2d, n)
-
-    pts_factor = n
 
     # toggle between new sampling and current Hypatia method, this is just for debugging purposes
     sample_pts = true
@@ -92,19 +91,24 @@ function run_JuMP_namedpoly()
     polynames = [
         :butcher
         :caprasse
+        # :caprasse_ball # incorrect solution
+        :caprasse_ellipsoid
         :goldsteinprice
-        # :goldsteinprice_ball # predictor/corrector failures
+        # :goldsteinprice_ball # predictor/corrector failures in SDP
         :heart
+        # :heart_ellipsoid
         :lotkavolterra
         :lotkavolterra_ball
         :magnetism7
         :magnetism7_ball
         :motzkin
         :motzkin_ball1
-        # :motzkin_ball2  # runs into issues
+        :motzkin_ball2  # runs into issues
         :reactiondiffusion
+        # :reactiondiffusion_ball # incorrect solution
         :robinson
         :rosenbrock
+        :rosenbrock_ball
         :schwefel
         :schwefel_ball
     ]
@@ -118,12 +122,11 @@ function run_JuMP_namedpoly()
 
         println("solving model with PSD cones")
 
-        if polyname in [:caprasse_ball, :butcher, :lotkavolterra, :lotkavolterra_ball]
-            model = build_JuMP_namedpoly_SDP(x, f, dom, d)
+        if polyname in [:butcher, :lotkavolterra, :lotkavolterra_ball, :caprasse_ball]
+            model = build_JuMP_namedpoly_SDP(x, f, dom, d=d)
         else
             model = build_JuMP_namedpoly_SDP(x, f, dom)
         end
-        JuMP.optimize!(model)
 
         println("done")
         term_status = JuMP.termination_status(model)
@@ -139,7 +142,13 @@ function run_JuMP_namedpoly()
         @test pobj ≈ truemin atol=1e-4 rtol=1e-4
 
         println("solving model with WSOS interpolation cones")
-        model = build_JuMP_namedpoly_WSOS(x, f, dom, d)
+        if polyname == :heart
+            model = build_JuMP_namedpoly_WSOS(x, f, dom, d=d, pts_factor=1)
+        elseif polyname in [:schwefel, :schwefel_ball, :caprasse_ellipsoid, :reactiondiffusion, :reactiondiffusion_ball]
+            model = build_JuMP_namedpoly_WSOS(x, f, dom, d=d, pts_factor=2*length(x))
+        else
+            model = build_JuMP_namedpoly_WSOS(x, f, dom, d=d, pts_factor=length(x))
+        end
         JuMP.optimize!(model)
 
         println("done")
@@ -182,7 +191,14 @@ function getpolydata(polyname::Symbol)
     elseif polyname == :caprasse_ball
         @polyvar x[1:4]
         f = -x[1]*x[3]^3+4x[2]*x[3]^2*x[4]+4x[1]*x[3]*x[4]^2+2x[2]*x[4]^3+4x[1]*x[3]+4x[3]^2-10x[2]*x[4]-10x[4]^2+2
+        # 0.5*sqrt(4) = 1
         dom = Ball(fill(0.0, 4), 1.0)
+        truemin = -3.1800966258
+        d = 4
+    elseif polyname == :caprasse_ellipsoid
+        @polyvar x[1:4]
+        f = -x[1]*x[3]^3+4x[2]*x[3]^2*x[4]+4x[1]*x[3]*x[4]^2+2x[2]*x[4]^3+4x[1]*x[3]+4x[3]^2-10x[2]*x[4]-10x[4]^2+2
+        dom = Ellipsoid(fill(0.0, 4), Matrix{Float64}(I, 4, 4))
         truemin = -3.1800966258
         d = 4
     elseif polyname == :goldsteinprice
@@ -202,13 +218,16 @@ function getpolydata(polyname::Symbol)
         f = x[1]*x[6]^3-3x[1]*x[6]*x[7]^2+x[3]*x[7]^3-3x[3]*x[7]*x[6]^2+x[2]*x[5]^3-3*x[2]*x[5]*x[8]^2+x[4]*x[8]^3-3x[4]*x[8]*x[5]^2+0.9563453
         dom = Box([-0.1,0.4,-0.7,-0.7,0.1,-0.1,-0.3,-1.1], [0.4,1,-0.4,0.4,0.2,0.2,1.1,-0.3])
         truemin = -1.36775
-        d = 4
-    # elseif polyname == :heart_ellipsoid
-    #     @polyvar x[1:8]
-    #     f = x[1]*x[6]^3-3x[1]*x[6]*x[7]^2+x[3]*x[7]^3-3x[3]*x[7]*x[6]^2+x[2]*x[5]^3-3*x[2]*x[5]*x[8]^2+x[4]*x[8]^3-3x[4]*x[8]*x[5]^2
-    #     dom = Box([-0.1,0.4,-0.7,-0.7,0.1,-0.1,-0.3,-1.1], [0.4,1,-0.4,0.4,0.2,0.2,1.1,-0.3])
-    #     truemin = -2.3241 # -1.36775
-    #     d = 2
+        d = 2
+    elseif polyname == :heart_ellipsoid
+        @polyvar x[1:8]
+        f = x[1]*x[6]^3-3x[1]*x[6]*x[7]^2+x[3]*x[7]^3-3x[3]*x[7]*x[6]^2+x[2]*x[5]^3-3*x[2]*x[5]*x[8]^2+x[4]*x[8]^3-3x[4]*x[8]*x[5]^2+0.9563453
+        semiradii = sqrt(8) * (0.5 * (-[-0.1,0.4,-0.7,-0.7,0.1,-0.1,-0.3,-1.1] + [0.4,1,-0.4,0.4,0.2,0.2,1.1,-0.3])).^2
+        centers = 0.5 * ([-0.1,0.4,-0.7,-0.7,0.1,-0.1,-0.3,-1.1] + [0.4,1,-0.4,0.4,0.2,0.2,1.1,-0.3])
+        Q = Diagonal(semiradii)
+        dom = Ellipsoid(centers, Q)
+        truemin = -1.36775
+        d = 2
     elseif polyname == :lotkavolterra
         @polyvar x[1:4]
         f = x[1]*(x[2]^2+x[3]^2+x[4]^2-1.1)+1
@@ -257,16 +276,34 @@ function getpolydata(polyname::Symbol)
         dom = Box(fill(-5, 3), fill(5, 3))
         truemin = -36.71269068
         d = 3
+    elseif polyname == :reactiondiffusion_ball
+        @polyvar x[1:3]
+        f = -x[1]+2x[2]-x[3]-0.835634534x[2]*(1+x[2])
+        dom = Ball(fill(0.0, 3), 5*sqrt(3))
+        truemin = -36.71269068
+        d = 5
     elseif polyname == :robinson
         @polyvar x[1:2]
         f = 1+x[1]^6+x[2]^6-x[1]^4*x[2]^2+x[1]^4-x[1]^2*x[2]^4+x[2]^4-x[1]^2+x[2]^2+3x[1]^2*x[2]^2
         dom = Box(fill(-1, 2), fill(1, 2))
         truemin = 0.814814
         d = 8
+    elseif polyname == :robinson_ball
+        @polyvar x[1:2]
+        f = 1+x[1]^6+x[2]^6-x[1]^4*x[2]^2+x[1]^4-x[1]^2*x[2]^4+x[2]^4-x[1]^2+x[2]^2+3x[1]^2*x[2]^2
+        dom = Box(fill(0.0, 2), sqrt(2.0))
+        truemin = 0.814814
+        d = 8
     elseif polyname == :rosenbrock
         @polyvar x[1:2]
         f = (1-x[1])^2+100*(x[1]^2-x[2])^2
         dom = Box(fill(-5, 2), fill(10, 2))
+        truemin = 0
+        d = 4
+    elseif polyname == :rosenbrock_ball
+        @polyvar x[1:2]
+        f = (1-x[1])^2+100*(x[1]^2-x[2])^2
+        dom = Ball(fill(2.5, 2), 7.5*sqrt(2.0))
         truemin = 0
         d = 4
     elseif polyname == :schwefel
