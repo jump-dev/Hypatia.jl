@@ -169,7 +169,6 @@ function MOI.copy_to(
     copy_names::Bool = false,
     warn_attributes::Bool = true,
     )
-
     @assert !copy_names
     idxmap = Dict{MOI.Index, MOI.Index}()
 
@@ -214,44 +213,36 @@ function MOI.copy_to(
     (Icpe, Vcpe) = (Int[], Float64[]) # constraint set constants for opt.constrprimeq
     constroffseteq = Vector{Int}()
 
-    for S in (MOI.EqualTo{Float64}, MOI.Zeros)
-        # TODO can preprocess variables equal to constant
-        for ci in getsrccons(MOI.SingleVariable, S)
-            i += 1
-            idxmap[ci] = MOI.ConstraintIndex{MOI.SingleVariable, S}(i)
-            push!(constroffseteq, p)
-            p += 1
-            push!(IA, p)
-            push!(JA, idxmap[getconfun(ci).variable].value)
-            push!(VA, -1.0)
-            if S == MOI.EqualTo{Float64}
-                push!(Ib, p)
-                push!(Vb, -getconset(ci).value)
-                push!(Icpe, p)
-                push!(Vcpe, getconset(ci).value)
-            end
-        end
+    # TODO can preprocess variables equal to constant
+    for ci in getsrccons(MOI.SingleVariable, MOI.EqualTo{Float64})
+        i += 1
+        idxmap[ci] = MOI.ConstraintIndex{MOI.SingleVariable, MOI.EqualTo{Float64}}(i)
+        push!(constroffseteq, p)
+        p += 1
+        push!(IA, p)
+        push!(JA, idxmap[getconfun(ci).variable].value)
+        push!(VA, -1.0)
+        push!(Ib, p)
+        push!(Vb, -getconset(ci).value)
+        push!(Icpe, p)
+        push!(Vcpe, getconset(ci).value)
+    end
 
-        for ci in getsrccons(MOI.ScalarAffineFunction{Float64}, S)
-            i += 1
-            idxmap[ci] = MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, S}(i)
-            push!(constroffseteq, p)
-            p += 1
-            fi = getconfun(ci)
-            for vt in fi.terms
-                push!(IA, p)
-                push!(JA, idxmap[vt.variable_index].value)
-                push!(VA, -vt.coefficient)
-            end
-            push!(Ib, p)
-            if S == MOI.EqualTo{Float64}
-                push!(Vb, fi.constant - getconset(ci).value)
-                push!(Icpe, p)
-                push!(Vcpe, getconset(ci).value)
-            else
-                push!(Vb, fi.constant)
-            end
+    for ci in getsrccons(MOI.ScalarAffineFunction{Float64}, MOI.EqualTo{Float64})
+        i += 1
+        idxmap[ci] = MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, MOI.EqualTo{Float64}}(i)
+        push!(constroffseteq, p)
+        p += 1
+        fi = getconfun(ci)
+        for vt in fi.terms
+            push!(IA, p)
+            push!(JA, idxmap[vt.variable_index].value)
+            push!(VA, -vt.coefficient)
         end
+        push!(Ib, p)
+        push!(Vb, fi.constant - getconset(ci).value)
+        push!(Icpe, p)
+        push!(Vcpe, getconset(ci).value)
     end
 
     # TODO can preprocess variables equal to zero here
