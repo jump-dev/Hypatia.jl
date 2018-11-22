@@ -63,10 +63,7 @@ function build_JuMP_namedpoly_WSOS(
 
     P0sub = view(P0, :, 1:binomial(n+d-1, n))
 
-    bss = get_bss(dom, x)
-
-    g = get_weights(dom, bss, pts)
-    @assert length(g) == length(bss.p)
+    g = get_weights(dom, pts)
     PWts = [sqrt.(gi) .* P0sub for gi in g]
 
     wsos_cone = WSOSPolyInterpCone(U, [P, PWts...])

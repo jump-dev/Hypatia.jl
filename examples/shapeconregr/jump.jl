@@ -140,9 +140,9 @@ function build_shapeconregr_WSOS(
     monotonicity_bss = get_bss(monotonicity_dom, x)
     convexity_bss = get_bss(convexity_dom, x)
 
-    monotonicity_g = get_weights(monotonicity_dom, monotonicity_bss, monotonicity_pts)
+    monotonicity_g = get_weights(monotonicity_dom, monotonicity_pts)
     @assert length(monotonicity_g) == length(monotonicity_bss.p)
-    convexity_g = get_weights(convexity_dom, convexity_bss, convexity_pts)
+    convexity_g = get_weights(convexity_dom, convexity_pts, 1:n)
     @assert length(convexity_g) == length(convexity_bss.p)
 
     monotonicity_PWts = [sqrt.(gi) .* monotonicity_P0sub for gi in monotonicity_g]
