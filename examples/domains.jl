@@ -119,41 +119,42 @@ function get_bss(dom::Ellipsoid, x)
 end
 
 function get_weights(
-    ::Box,
-    bss::BasicSemialgebraicSet{Float64,Polynomial{true,Float64}},
+    dom::Box,
     pts::Matrix{Float64},
     idxs::UnitRange{Int}=1:size(pts, 2)
     )
 
-    m = length(bss.p)
+    m = length(idxs)
+    @assert m == length(dom.l) == length(dom.u)
     U = size(pts, 1)
     g = Vector{Vector{Float64}}(undef, m)
+    for i in 1:m
+        g[i] = (pts[:,i] .- dom.l[i]) .* (dom.u[i] .- pts[:,i])
+    end
     return g
 end
 function get_weights(
-    ::Ball,
-    bss::BasicSemialgebraicSet{Float64,Polynomial{true,Float64}},
+    dom::Ball,
     pts::Matrix{Float64},
     idxs::UnitRange{Int}=1:size(pts, 2),
     )
 
     U = size(pts, 1)
-    @assert length(bss.p) == 1
-    sub_func(j) = bss.p[1](pts[j, idxs])
+    @assert length(idxs) == length(dom.c)
+    sub_func(j) = dom.r^2 - sum((pts[j, idxs] - dom.c).^2)
     g = [sub_func(j) for j in 1:U]
     return [g]
 end
 # copy of function for ball, I think Ball should be removed (LK)
 function get_weights(
-    ::Ellipsoid,
-    bss::BasicSemialgebraicSet{Float64,Polynomial{true,Float64}},
+    dom::Ellipsoid,
     pts::Matrix{Float64},
     idxs::UnitRange{Int}=1:size(pts, 2),
     )
 
     U = size(pts, 1)
-    @assert length(bss.p) == 1
-    sub_func(j) = bss.p[1](pts[j, idxs])
+    @assert length(idxs) == length(dom.c)
+    sub_func(j) = 1.0 - (pts[j, idxs] - dom.c)' * dom.Q * (pts[j, idxs] - dom.c)
     g = [sub_func(j) for j in 1:U]
     return [g]
 end
