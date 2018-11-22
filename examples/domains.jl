@@ -44,12 +44,7 @@ mutable struct Ellipsoid <: InterpDomain
         return d
     end
 end
-# function Ball(c::Vector{Float64})
-#     dim = length(c)
-#     return Ellipsoid(c, Matrix{Float64}(I, dim, dim))
-# end
 
-# should be an ellipsoid
 mutable struct Ball <: InterpDomain
     c::Vector{Float64}
     r::Float64
@@ -74,54 +69,22 @@ function interp_sample(d::Box, npts::Int)
     end
     return pts
 end
-# will be replaced with proper sampling function
-function interp_sample(d::Ball, npts::Int, strategy::Int=1)
+function interp_sample(d::Ball, npts::Int)
     dim = dimension(d)
-
-    if strategy == 1
-        pts = randn(npts, dim)
-        norms = sum(pts.^2, dims=2)
-        pts .*= d.r ./ sqrt.(norms)
-        # sf_gamma_inc_Q is the normalized incomplete gamma function
-        # perhaps this should be r ~ Unif(0,1)^{1/dim}
-        pts .*= sf_gamma_inc_Q.(norms/2, dim/2).^(1/dim)
-        for i in 1:dim
-            pts[:, i] .+= d.c[i]
-        end
-
-    elseif strategy == 2
-        # heuristic with 1-radius being truncated exponential
-        pts_on_sphere = randn(npts, dim)
-        norms = sqrt.(sum(pts_on_sphere.^2, dims=2))
-        pts_on_sphere ./= norms
-        if any(norm.(pts_on_sphere) .> 1) || any(norm.(pts_on_sphere) .< 0)
-            error()
-        end
-        lambda = dim * 10.0
-        rdist = Truncated(Exponential(lambda), 0, 1)
-        radii = (1.0 .- rand(rdist, npts)) .* d.r
-        pts = pts_on_sphere .* radii + d.c
-        for i in 1:dim
-            pts[:, i] .+= d.c[i]
-        end
-
-    elseif strategy == 3
-        # sample from box and project
-        pts = 0.5 .- rand(npts, dim)
-        for i in 1:npts
-            if norm(pts[i, :]) > 0.5
-                pts[i, :] .*= 0.4999 / norm(pts[i, :]) #* sqrt(n))
-            end
-            pts[i, :] .= pts[i, :] * 2 * d.r + d.c
-        end
-
+    pts = randn(npts, dim)
+    norms = sum(pts.^2, dims=2)
+    pts .*= d.r ./ sqrt.(norms)
+    # sf_gamma_inc_Q is the normalized incomplete gamma function
+    pts .*= sf_gamma_inc_Q.(norms/2, dim/2).^(1/dim)
+    for i in 1:dim
+        pts[:, i] .+= d.c[i]
     end
     return pts
 end
-
+# TODO test non diagonal Q matrices
 function interp_sample(d::Ellipsoid, npts::Int)
     dim = dimension(d)
-    Fchol = cholesky(d.Q)
+    fchol = cholesky(inv(d.Q))
     pts = randn(npts, dim)
     norms = sum(pts.^2, dims=2)
     for i in 1:npts
@@ -129,9 +92,10 @@ function interp_sample(d::Ellipsoid, npts::Int)
     end
     # sf_gamma_inc_Q is the normalized incomplete gamma function
     pts .*= sf_gamma_inc_Q.(norms/2, dim/2).^(1/dim)
-    # rotate/scalebn
+    # rotate/scale
     for i in 1:npts
-        pts[i,:] = Fchol.factors * pts[i,:]
+        @assert norm(pts[i,:]) < 1.0
+        pts[i,:] = fchol.factors * pts[i,:]
     end
     # shift
     for i in 1:dim
@@ -151,7 +115,6 @@ function get_bss(dom::Ball, x)
     return @set sum((x - dom.c).^2) <= dom.r^2
 end
 function get_bss(dom::Ellipsoid, x)
-    println(@set (x - dom.c)' * dom.Q * (x - dom.c) <= 1)
     return @set (x - dom.c)' * dom.Q * (x - dom.c) <= 1
 end
 
@@ -165,16 +128,6 @@ function get_weights(
     m = length(bss.p)
     U = size(pts, 1)
     g = Vector{Vector{Float64}}(undef, m)
-    for i in 1:m
-        g[i] = bss.p[i].(pts[:,i])
-        @assert all(g[i] .> -1e-6)
-        # zero any very small weights
-        for j in 1:U
-            if abs(g[i][j]) < 1e-6
-                g[i][j] = 0.0
-            end
-        end
-    end
     return g
 end
 function get_weights(
@@ -200,7 +153,6 @@ function get_weights(
 
     U = size(pts, 1)
     @assert length(bss.p) == 1
-    @show bss.p
     sub_func(j) = bss.p[1](pts[j, idxs])
     g = [sub_func(j) for j in 1:U]
     return [g]
