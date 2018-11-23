@@ -137,6 +137,7 @@ end
 
 # examples in src/examples/ folder
 egs_dir = joinpath(@__DIR__, "../examples")
+include(joinpath(@__DIR__, "../examples/domains.jl"))
 include(joinpath(egs_dir, "envelope/native.jl"))
 include(joinpath(egs_dir, "envelope/jump.jl"))
 include(joinpath(egs_dir, "expdesign/jump.jl"))
@@ -170,10 +171,17 @@ testfuns = [
     # _namedpoly10, # numerically unstable
     _namedpoly11, # numerically unstable
     ]
-@testset "varied examples: $testfun, $lscachetype" for testfun in testfuns, lscachetype in lscachetypes
-    testfun(verbose=verbose, lscachetype=lscachetype)
-end
+# @testset "varied examples: $testfun, $lscachetype" for testfun in testfuns, lscachetype in lscachetypes
+#     testfun(verbose=verbose, lscachetype=lscachetype)
+# end
 
+testfuns = [
+    _namedpoly4_JuMP,
+    _namedpoly11_JuMP,
+    ]
+@testset "varied examples JuMP: $testfun" for testfun in testfuns
+    testfun()
+end
 
 @info("starting verbose default examples tests")
 testfuns = [
@@ -182,7 +190,7 @@ testfuns = [
     run_JuMP_expdesign,
     run_linearopt,
     run_namedpoly,
-    run_JuMP_namedpoly,
+    # run_JuMP_namedpoly,
     ]
 @testset "default examples: $testfun" for testfun in testfuns
     testfun()

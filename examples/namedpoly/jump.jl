@@ -10,7 +10,7 @@ Random.seed!(1234)
 
 function build_JuMP_namedpoly_SDP(
     x,
-    f::DynamicPolynomials.Polynomial, #{true,Float64},
+    f::DynamicPolynomials.Polynomial,
     dom::InterpDomain;
     d::Int = div(maxdegree(f) + 1, 2),
     )
@@ -29,7 +29,7 @@ end
 
 function build_JuMP_namedpoly_WSOS(
     x,
-    f::DynamicPolynomials.Polynomial, #{true,Float64},
+    f::DynamicPolynomials.Polynomial,
     dom::InterpDomain;
     d::Int = div(maxdegree(f) + 1, 2),
     pts_factor = nvariables(f),
@@ -42,24 +42,16 @@ function build_JuMP_namedpoly_WSOS(
     # toggle between new sampling and current Hypatia method, this is just for debugging purposes
     sample_pts = true
 
-    if sample_pts
-        candidate_pts = interp_sample(dom, U * pts_factor)
-        M = get_P(candidate_pts, d, U)
+    candidate_pts = interp_sample(dom, U * pts_factor)
+    M = get_P(candidate_pts, d, U)
 
-        Mp = Array(M')
-        F = qr!(Mp, Val(true))
-        keep_pnt = F.p[1:U]
+    Mp = Array(M')
+    F = qr!(Mp, Val(true))
+    keep_pnt = F.p[1:U]
 
-        pts = candidate_pts[keep_pnt,:] # subset of points indexed with the support of w
-        P0 = M[keep_pnt,1:L] # subset of polynomial evaluations up to total degree d
-        P = Array(qr(P0).Q)
-
-    # this is just for debugging purposes
-    else
-        L = binomial(n+d, n)
-        (L, U, pts, P0, P, w) = Hypatia.interpolate(n, d, calc_w=false)
-        pts .*= 2.0
-    end
+    pts = candidate_pts[keep_pnt,:] # subset of points indexed with the support of w
+    P0 = M[keep_pnt,1:L] # subset of polynomial evaluations up to total degree d
+    P = Array(qr(P0).Q)
 
     P0sub = view(P0, :, 1:binomial(n+d-1, n))
 
@@ -355,4 +347,4 @@ end
 
 
 
-run_JuMP_namedpoly()
+# run_JuMP_namedpoly()

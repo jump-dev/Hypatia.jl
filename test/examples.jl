@@ -181,3 +181,37 @@ function _namedpoly11(; verbose, lscachetype)
     @test r.niters <= 60
     @test r.pobj ≈ 0 atol=1e-4 rtol=1e-4
 end
+
+function _namedpoly4_JuMP()
+    (x, f, dom, truemin) = getpolydata(:heart)
+    mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=2, pts_factor=3)
+    @time JuMP.optimize!(mdl)
+
+    term_status = JuMP.termination_status(mdl)
+    pobj = JuMP.objective_value(mdl)
+    dobj = JuMP.objective_bound(mdl)
+    pr_status = JuMP.primal_status(mdl)
+    du_status = JuMP.dual_status(mdl)
+    @test term_status == MOI.Success
+    @test pr_status == MOI.FeasiblePoint
+    @test du_status == MOI.FeasiblePoint
+    @test pobj ≈ dobj atol=1e-4 rtol=1e-4
+    @test pobj ≈ truemin atol=1e-4 rtol=1e-4
+end
+
+function _namedpoly11_JuMP()
+    (x, f, dom, truemin) = getpolydata(:schwefel)
+    mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=2, pts_factor=2*length(x))
+    @time JuMP.optimize!(mdl)
+
+    term_status = JuMP.termination_status(mdl)
+    pobj = JuMP.objective_value(mdl)
+    dobj = JuMP.objective_bound(mdl)
+    pr_status = JuMP.primal_status(mdl)
+    du_status = JuMP.dual_status(mdl)
+    @test term_status == MOI.Success
+    @test pr_status == MOI.FeasiblePoint
+    @test du_status == MOI.FeasiblePoint
+    @test pobj ≈ dobj atol=1e-4 rtol=1e-4
+    @test pobj ≈ truemin atol=1e-4 rtol=1e-4
+end
