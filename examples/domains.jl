@@ -22,7 +22,7 @@ abstract type InterpDomain end
 mutable struct Box <: InterpDomain
     l::Vector{Float64}
     u::Vector{Float64}
-    function Box(l::Vector{T}, u::Vector{T}) where T <: Real
+    function Box(l::Vector{T}, u::Vector{T}) where {T<:Real}
         @assert length(l) == length(u)
         d = new()
         d.l = Float64.(l)
@@ -31,27 +31,27 @@ mutable struct Box <: InterpDomain
     end
 end
 
+mutable struct Ball <: InterpDomain
+    c::Vector{Float64}
+    r::Float64
+    function Ball(c::Vector{T}, r::S) where {T<:Real, S<:Real}
+        d = new()
+        d.c = Float64.(c)
+        d.r = Float64(r)
+        return d
+    end
+end
+
 # (x-c)'Q(x-c) \leq 1
 mutable struct Ellipsoid <: InterpDomain
     c::Vector{Float64}
     Q::AbstractMatrix{Float64}
-    function Ellipsoid(c::Vector{T}, Q::AbstractMatrix{T}) where T <: Real
+    function Ellipsoid(c::Vector{T}, Q::AbstractMatrix{S}) where {T<:Real, S<:Real}
         @assert isposdef(Q)
         @assert length(c) == size(Q, 1)
         d = new()
         d.c = Float64.(c)
         d.Q = Float64.(Q)
-        return d
-    end
-end
-
-mutable struct Ball <: InterpDomain
-    c::Vector{Float64}
-    r::Float64
-    function Ball(c::Vector{T}, r::T) where T <: Real
-        d = new()
-        d.c = Float64.(c)
-        d.r = Float64(r)
         return d
     end
 end
@@ -120,7 +120,7 @@ end
 
 function get_weights(
     dom::Box,
-    pts::Matrix{Float64},
+    pts::AbstractArray{Float64},
     idxs::UnitRange{Int}=1:size(pts, 2)
     )
 
@@ -135,7 +135,7 @@ function get_weights(
 end
 function get_weights(
     dom::Ball,
-    pts::Matrix{Float64},
+    pts::AbstractArray{Float64},
     idxs::UnitRange{Int}=1:size(pts, 2),
     )
 
@@ -148,7 +148,7 @@ end
 # copy of function for ball, I think Ball should be removed (LK)
 function get_weights(
     dom::Ellipsoid,
-    pts::Matrix{Float64},
+    pts::AbstractArray{Float64},
     idxs::UnitRange{Int}=1:size(pts, 2),
     )
 
