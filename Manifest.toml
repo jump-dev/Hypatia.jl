@@ -231,8 +231,8 @@ uuid = "d6f4376e-aef5-505a-96c1-9c027394607a"
 
 [[MathOptInterface]]
 deps = ["Compat", "Unicode"]
-git-tree-sha1 = "d7427366a571b41214fa51e2e33b7a64c8950e5f"
-repo-rev = "9df0ad82df86cd54c9bc03d389be6d0842f9cb4c"
+git-tree-sha1 = "e8c270316580c2edbf7951f298b1a3de159837a7"
+repo-rev = "master"
 repo-url = "https://github.com/JuliaOpt/MathOptInterface.jl.git"
 uuid = "b8f27783-ece8-5eb3-8dc8-9495eed66fee"
 version = "0.6.3+"

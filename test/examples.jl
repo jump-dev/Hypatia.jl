@@ -185,9 +185,10 @@ end
 function _namedpoly1_JuMP()
     # the Heart polynomial in a box
     (x, f, dom, truemin) = getpolydata(:heart)
-    mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=2, pts_factor=3)
-    @time JuMP.optimize!(mdl)
 
+    # WSOS formulation
+    mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=2, pts_factor=3)
+    JuMP.optimize!(mdl)
     term_status = JuMP.termination_status(mdl)
     pobj = JuMP.objective_value(mdl)
     dobj = JuMP.objective_bound(mdl)
@@ -203,9 +204,24 @@ end
 function _namedpoly2_JuMP()
     # the Schwefel polynomial in a box
     (x, f, dom, truemin) = getpolydata(:schwefel)
-    mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=2, pts_factor=2*length(x))
-    @time JuMP.optimize!(mdl)
 
+    # WSOS formulation
+    mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=2, pts_factor=2*length(x))
+    JuMP.optimize!(mdl)
+    term_status = JuMP.termination_status(mdl)
+    pobj = JuMP.objective_value(mdl)
+    dobj = JuMP.objective_bound(mdl)
+    pr_status = JuMP.primal_status(mdl)
+    du_status = JuMP.dual_status(mdl)
+    @test term_status == MOI.Success
+    @test pr_status == MOI.FeasiblePoint
+    @test du_status == MOI.FeasiblePoint
+    @test pobj ≈ dobj atol=1e-4 rtol=1e-4
+    @test pobj ≈ truemin atol=1e-4 rtol=1e-4
+
+    # SDP formulation
+    mdl = build_JuMP_namedpoly_SDP(x, f, dom, d=2)
+    JuMP.optimize!(mdl)
     term_status = JuMP.termination_status(mdl)
     pobj = JuMP.objective_value(mdl)
     dobj = JuMP.objective_bound(mdl)
@@ -221,9 +237,24 @@ end
 function _namedpoly3_JuMP()
     # the Magnetism polynomial in a ball
     (x, f, dom, truemin) = getpolydata(:magnetism7_ball)
-    mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=2, pts_factor=length(x))
-    @time JuMP.optimize!(mdl)
 
+    # WSOS formulation
+    mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=2, pts_factor=length(x))
+    JuMP.optimize!(mdl)
+    term_status = JuMP.termination_status(mdl)
+    pobj = JuMP.objective_value(mdl)
+    dobj = JuMP.objective_bound(mdl)
+    pr_status = JuMP.primal_status(mdl)
+    du_status = JuMP.dual_status(mdl)
+    @test term_status == MOI.Success
+    @test pr_status == MOI.FeasiblePoint
+    @test du_status == MOI.FeasiblePoint
+    @test pobj ≈ dobj atol=1e-4 rtol=1e-4
+    @test pobj ≈ truemin atol=1e-4 rtol=1e-4
+
+    # SDP formulation
+    mdl = build_JuMP_namedpoly_SDP(x, f, dom, d=2)
+    JuMP.optimize!(mdl)
     term_status = JuMP.termination_status(mdl)
     pobj = JuMP.objective_value(mdl)
     dobj = JuMP.objective_bound(mdl)
@@ -239,9 +270,24 @@ end
 function _namedpoly4_JuMP()
     # the Motzkin polynomial in an ellipsoid containing two local minima in opposite orthants
     (x, f, dom, truemin) = getpolydata(:motzkin_ellipsoid)
-    mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=7, pts_factor=4*length(x))
-    @time JuMP.optimize!(mdl)
 
+    # WSOS formulation
+    mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=7, pts_factor=4*length(x))
+    JuMP.optimize!(mdl)
+    term_status = JuMP.termination_status(mdl)
+    pobj = JuMP.objective_value(mdl)
+    dobj = JuMP.objective_bound(mdl)
+    pr_status = JuMP.primal_status(mdl)
+    du_status = JuMP.dual_status(mdl)
+    @test term_status == MOI.Success
+    @test pr_status == MOI.FeasiblePoint
+    @test du_status == MOI.FeasiblePoint
+    @test pobj ≈ dobj atol=1e-4 rtol=1e-4
+    @test pobj ≈ truemin atol=1e-4 rtol=1e-4
+
+    # SDP formulation
+    mdl = build_JuMP_namedpoly_SDP(x, f, dom, d=7)
+    JuMP.optimize!(mdl)
     term_status = JuMP.termination_status(mdl)
     pobj = JuMP.objective_value(mdl)
     dobj = JuMP.objective_bound(mdl)
