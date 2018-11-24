@@ -39,11 +39,8 @@ function build_JuMP_namedpoly_WSOS(
     L = binomial(n+d,n)
     U = binomial(n+2d, n)
 
-    # toggle between new sampling and current Hypatia method, this is just for debugging purposes
-    sample_pts = true
-
     candidate_pts = interp_sample(dom, U * pts_factor)
-    M = get_P(candidate_pts, d, U)
+    M = get_large_P(candidate_pts, d, U)
 
     Mp = Array(M')
     F = qr!(Mp, Val(true))
@@ -87,7 +84,6 @@ function run_JuMP_namedpoly()
         :goldsteinprice_ball
         :goldsteinprice_ellipsoid # it is just a ball
         :heart
-        # :heart_ellipsoid #TODO tighter ellispoid
         :lotkavolterra
         :lotkavolterra_ball
         :magnetism7
@@ -95,7 +91,6 @@ function run_JuMP_namedpoly()
         :motzkin
         :motzkin_ball1
         :motzkin_ellipsoid
-        # :motzkin_ball2  # runs into issues
         :reactiondiffusion
         :reactiondiffusion_ball
         :robinson
@@ -107,7 +102,7 @@ function run_JuMP_namedpoly()
     ]
 
     # some polynomials run into predictor/corrector failusres with SDP but not WSOS formulation
-    sdp_skip = [:butcher_ball, :goldsteinprice_ball, :goldsteinprice_ellipsoid, :heart, :heart_ellipsoid]
+    sdp_skip = [:butcher_ball, :goldsteinprice_ball, :goldsteinprice_ellipsoid, :heart]
 
     for polyname in polynames
 
@@ -180,7 +175,6 @@ default_degrees = Dict(
     :goldsteinprice_ball => 7,
     :goldsteinprice_ellipsoid => 7,
     :heart => 2,
-    :heart_ellipsoid => 2,
     :lotkavolterra => 3,
     :lotkavolterra_ball => 3,
     :magnetism7 => 2,
@@ -256,15 +250,6 @@ function getpolydata(polyname::Symbol)
         f = x[1]*x[6]^3-3x[1]*x[6]*x[7]^2+x[3]*x[7]^3-3x[3]*x[7]*x[6]^2+x[2]*x[5]^3-3*x[2]*x[5]*x[8]^2+x[4]*x[8]^3-3x[4]*x[8]*x[5]^2+0.9563453
         dom = Box([-0.1,0.4,-0.7,-0.7,0.1,-0.1,-0.3,-1.1], [0.4,1,-0.4,0.4,0.2,0.2,1.1,-0.3])
         truemin = -1.36775
-    elseif polyname == :heart_ellipsoid
-        @polyvar x[1:8]
-        f = x[1]*x[6]^3-3x[1]*x[6]*x[7]^2+x[3]*x[7]^3-3x[3]*x[7]*x[6]^2+x[2]*x[5]^3-3*x[2]*x[5]*x[8]^2+x[4]*x[8]^3-3x[4]*x[8]*x[5]^2+0.9563453
-        # heuristically attained enclosing ellipsoid
-        semiradii_sqrd = 8.0 * (0.5 * (-[-0.1,0.4,-0.7,-0.7,0.1,-0.1,-0.3,-1.1] + [0.4,1,-0.4,0.4,0.2,0.2,1.1,-0.3])).^2
-        centers = 0.5 * ([-0.1,0.4,-0.7,-0.7,0.1,-0.1,-0.3,-1.1] + [0.4,1,-0.4,0.4,0.2,0.2,1.1,-0.3])
-        Q = Diagonal(semiradii_sqrd)
-        dom = Ellipsoid(centers, Q)
-        truemin = -306.46395
     elseif polyname == :lotkavolterra
         @polyvar x[1:4]
         f = x[1]*(x[2]^2+x[3]^2+x[4]^2-1.1)+1
@@ -304,11 +289,6 @@ function getpolydata(polyname::Symbol)
         S = Q * D * Q
         dom = Ellipsoid(fill(0, 2), S)
         truemin = 0
-    elseif polyname == :motzkin_ball2
-        @polyvar x[1:2]
-        f = 1-48x[1]^2*x[2]^2+64x[1]^2*x[2]^4+64x[1]^4*x[2]^2
-        dom = Ball([0.0; 0.0], 0.5*sqrt(0.5))
-        truemin = 0.84375
     elseif polyname == :reactiondiffusion
         @polyvar x[1:3]
         f = -x[1]+2x[2]-x[3]-0.835634534x[2]*(1+x[2])

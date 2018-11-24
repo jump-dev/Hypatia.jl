@@ -11,11 +11,11 @@ using JuMP
 using PolyJuMP
 using SumOfSquares
 using LinearAlgebra
-using GSL
 using Distributions
 using Test
 
 import Combinatorics
+import GSL: sf_gamma_inc_Q
 
 abstract type InterpDomain end
 
@@ -81,7 +81,6 @@ function interp_sample(d::Ball, npts::Int)
     end
     return pts
 end
-# TODO test non diagonal Q matrices
 function interp_sample(d::Ellipsoid, npts::Int)
     dim = dimension(d)
     fchol = cholesky(inv(d.Q))
@@ -145,7 +144,6 @@ function get_weights(
     g = [sub_func(j) for j in 1:U]
     return [g]
 end
-# copy of function for ball, I think Ball should be removed (LK)
 function get_weights(
     dom::Ellipsoid,
     pts::AbstractArray{Float64},
@@ -159,7 +157,7 @@ function get_weights(
     return [g]
 end
 
-function get_P(ipts, d::Int, U::Int)
+function get_large_P(ipts, d::Int, U::Int)
     (npts, n) = size(ipts)
     u = Hypatia.calc_u(n, 2d, ipts)
     m = Vector{Float64}(undef, U)
