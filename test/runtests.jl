@@ -171,13 +171,15 @@ testfuns = [
     # _namedpoly10, # numerically unstable
     _namedpoly11, # numerically unstable
     ]
-# @testset "varied examples: $testfun, $lscachetype" for testfun in testfuns, lscachetype in lscachetypes
-#     testfun(verbose=verbose, lscachetype=lscachetype)
-# end
+@testset "varied examples: $testfun, $lscachetype" for testfun in testfuns, lscachetype in lscachetypes
+    testfun(verbose=verbose, lscachetype=lscachetype)
+end
 
 testfuns = [
+    _namedpoly1_JuMP,
+    _namedpoly2_JuMP,
+    _namedpoly3_JuMP,
     _namedpoly4_JuMP,
-    _namedpoly11_JuMP,
     ]
 @testset "varied examples JuMP: $testfun" for testfun in testfuns
     testfun()
