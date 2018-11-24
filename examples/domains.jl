@@ -95,7 +95,7 @@ function interp_sample(d::Ellipsoid, npts::Int)
     # rotate/scale
     for i in 1:npts
         @assert norm(pts[i,:]) < 1.0
-        pts[i,:] = fchol.factors * pts[i,:]
+        pts[i,:] = fchol.L * pts[i,:]
     end
     # shift
     for i in 1:dim

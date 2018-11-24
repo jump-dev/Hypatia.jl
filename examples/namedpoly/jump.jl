@@ -87,13 +87,14 @@ function run_JuMP_namedpoly()
         :goldsteinprice_ball
         :goldsteinprice_ellipsoid # it is just a ball
         :heart
-        :heart_ellipsoid #TODO tighter ellispoid
+        # :heart_ellipsoid #TODO tighter ellispoid
         :lotkavolterra
         :lotkavolterra_ball
         :magnetism7
         :magnetism7_ball
         :motzkin
         :motzkin_ball1
+        :motzkin_ellipsoid
         # :motzkin_ball2  # runs into issues
         :reactiondiffusion
         :reactiondiffusion_ball
@@ -186,6 +187,7 @@ default_degrees = Dict(
     :magnetism7_ball => 2,
     :motzkin => 7,
     :motzkin_ball1 => 7,
+    :motzkin_ellipsoid => 7,
     :reactiondiffusion => 3,
     :reactiondiffusion_ball => 3,
     :robinson => 8,
@@ -292,6 +294,15 @@ function getpolydata(polyname::Symbol)
         @polyvar x[1:2]
         f = 1-48x[1]^2*x[2]^2+64x[1]^2*x[2]^4+64x[1]^4*x[2]^2
         dom = Ball([0.0; 0.0], sqrt(2.0))
+        truemin = 0
+    elseif polyname == :motzkin_ellipsoid
+        # ellipsoid contains two local minima in opposite orthants
+        @polyvar x[1:2]
+        f = 1-48x[1]^2*x[2]^2+64x[1]^2*x[2]^4+64x[1]^4*x[2]^2
+        Q = [1 1; 1 -1]
+        D = [1 0; 0 0.1]
+        S = Q * D * Q
+        dom = Ellipsoid(fill(0, 2), S)
         truemin = 0
     elseif polyname == :motzkin_ball2
         @polyvar x[1:2]
