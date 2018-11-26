@@ -149,9 +149,9 @@ include(joinpath(egs_dir, "linearopt/native.jl"))
 include(joinpath(egs_dir, "namedpoly/native.jl"))
 include(joinpath(egs_dir, "namedpoly/jump.jl"))
 include(joinpath(egs_dir, "shapeconregr/jump.jl"))
-
 include(joinpath(@__DIR__, "examples.jl"))
-@info("starting varied examples tests")
+
+@info("starting native examples tests")
 verbose = false
 lscachetypes = [
     Hypatia.QRSymmCache,
@@ -174,22 +174,36 @@ testfuns = [
     _namedpoly8,
     _namedpoly9,
     _namedpoly10, # numerically unstable
-    _namedpoly11,
+    # _namedpoly11,
     ]
-@testset "varied examples: $testfun, $lscachetype" for testfun in testfuns, lscachetype in lscachetypes
+@testset "native examples: $testfun, $lscachetype" for testfun in testfuns, lscachetype in lscachetypes
     testfun(verbose=verbose, lscachetype=lscachetype)
 end
 
+@info("starting JuMP examples tests")
+testfuns = [
+    _namedpoly1_JuMP,
+    # _namedpoly2_JuMP,
+    # _namedpoly3_JuMP,
+    # _namedpoly4_JuMP,
+    ]
+@testset "JuMP examples: $testfun" for testfun in testfuns
+    testfun()
+end
 
 @info("starting verbose default examples tests")
 testfuns = [
-    run_envelope,
-    run_JuMP_envelope,
     run_JuMP_expdesign,
     run_linearopt,
     run_namedpoly,
-    run_JuMP_namedpoly,
-    run_JuMP_shapeconregr,
+    run_JuMP_namedpoly_PSD,
+    run_JuMP_namedpoly_WSOS,
+    run_envelope,
+    run_JuMP_envelope_boxinterp,
+    run_JuMP_envelope_sampleinterp_box,
+    run_JuMP_envelope_sampleinterp_ball,
+    run_JuMP_shapeconregr_PSD,
+    run_JuMP_shapeconregr_WSOS,
     ]
 @testset "default examples: $testfun" for testfun in testfuns
     testfun()
