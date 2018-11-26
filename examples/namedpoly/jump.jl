@@ -121,8 +121,9 @@ function getpolydata(polyname::Symbol)
     elseif polyname == :butcher_ball
         @polyvar x[1:6]
         f = x[6]*x[2]^2+x[5]*x[3]^2-x[1]*x[4]^2+x[4]^3+x[4]^2-1/3*x[1]+4/3*x[4]
+        axes = 0.5 * ([0,0.9,0.5,-0.1,-0.05,-0.03] - [-1,-0.1,-0.1,-1,-0.1,-0.1])
         centers = 0.5 * ([-1,-0.1,-0.1,-1,-0.1,-0.1] + [0,0.9,0.5,-0.1,-0.05,-0.03])
-        dom = Hypatia.Ball(centers, sqrt(6) * maximum(centers))
+        dom = Hypatia.Ball(centers, sqrt(6) * maximum(axes))
         truemin = -4.10380
     elseif polyname == :butcher_ellipsoid
         @polyvar x[1:6]
