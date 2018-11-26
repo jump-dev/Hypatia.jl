@@ -22,15 +22,18 @@ function build_envelope(
     d::Int;
     use_data::Bool = false,
     dense::Bool = false,
+    ortho_wts::Bool = true,
     rseed::Int = 1,
     )
     # generate interpolation
     @assert deg <= d
-    (L, U, pts, P0, P, w) = Hypatia.interpolate(n, d, calc_w=true)
+    (L, U, pts, P0, P, w) = Hypatia.interp_box(n, d, calc_w=true)
     Psub = view(P, :, 1:binomial(n+d-1, n))
     Wtsfun = (j -> sqrt.(1.0 .- abs2.(pts[:,j])))
     PWts = [Wtsfun(j) .* Psub for j in 1:n]
-    # PWts = [Array(qr!(Wtsfun(j) .* Psub).Q) for j in 1:n] # alternatively, orthonormalize
+    if ortho_wts
+        PWts = [Array(qr!(W).Q) for W in PWts] # orthonormalize
+    end
 
     c = -w
     A = zeros(0, U)
