@@ -97,7 +97,7 @@ function getregrinterp(
         candidate_pts = hcat(candidate_pts, candidate_pts2)
     end
 
-    M = Hypatia.get_large_P(candidate_pts, d, U)
+    (M, _) = Hypatia.get_large_P(candidate_pts, d, U)
     F = qr!(Array(M'), Val(true))
     keep_pnt = F.p[1:U]
     pts = candidate_pts[keep_pnt,:] # subset of points indexed with the support of w
