@@ -22,7 +22,13 @@ function build_JuMP_envelope_boxinterp(
     )
     # generate interpolation
     @assert deg <= d
-    (L, U, pts, P0, P, PWts, w) = Hypatia.interp_sample(dom, n, d, calc_w=false, ortho_wts=ortho_wts)
+    (L, U, pts, P0, P, w) = Hypatia.interp_box(n, d, calc_w=true)
+    Psub = view(P, :, 1:binomial(n+d-1, n))
+    Wtsfun = (j -> sqrt.(1.0 .- abs2.(pts[:,j])))
+    PWts = [Wtsfun(j) .* Psub for j in 1:n]
+    if ortho_wts
+        PWts = [Array(qr!(W).Q) for W in PWts] # orthonormalize
+    end
 
     # generate random polynomials
     Random.seed!(rseed)
@@ -72,9 +78,9 @@ function build_JuMP_envelope_sampleinterp(
     )
     # generate interpolation
     @assert deg <= d
-
-    # TODO sample instead
+    # (Ldegs, U, pts, P0, P, PWts, w) = Hypatia.interp_sample(domain, n, d, calc_w=false, ortho_wts=ortho_wts)
     (L, U, pts, P0, P, w) = Hypatia.interp_box(n, d, calc_w=true)
+    # TODO sample instead
     P0sub = view(P0, :, 1:binomial(n+d-1, n))
     g = Hypatia.get_weights(domain, pts)
     PWts = [sqrt.(gi) .* P0sub for gi in g]
