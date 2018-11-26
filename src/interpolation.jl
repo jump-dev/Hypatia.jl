@@ -308,7 +308,7 @@ function interp_sample(d::Ellipsoid, npts::Int)
     pts .*= sf_gamma_inc_Q.(norms, dim/2) .^ inv(dim) # sf_gamma_inc_Q is the normalized incomplete gamma function
 
     # TODO rewrite this part
-    rotscale = cholesky(d.Q).L
+    rotscale = cholesky(d.Q).U
     # fchol = cholesky(inv(d.Q)) # TODO this is unnecessarily expensive and prone to numerical issues: take cholesky of Q then divide by it later
     for i in 1:npts
         # @assert norm(pts[i,:]) < 1.0
