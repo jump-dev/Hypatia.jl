@@ -10,100 +10,98 @@ where
     - ℓ is a convex loss function.
 See e.g. Chapter 8 of thesis by G. Hall (2018).
 =#
+
 using LinearAlgebra
 using Random
 using Distributions
-using JuMP
-using PolyJuMP
+using Hypatia
 using MultivariatePolynomials
+using DynamicPolynomials
 using SemialgebraicSets
 using SumOfSquares
-using DynamicPolynomials
-using Hypatia
+using PolyJuMP
 using Test
 
-include(joinpath(dirname(@__DIR__()), "domains.jl"))
-
-function shapeconregr_data(
-    func::Function = (x -> sum(x.^3, dims=2));
-    rseed::Int = 1,
-    xmin::Float64 = -1.0,
-    xmax::Float64 = 1.0,
-    n::Int = 1,
-    npoints::Int = 1,
+function generateregrdata(
+    func::Function,
+    xmin::Float64,
+    xmax::Float64,
+    n::Int,
+    npoints::Int;
     signal_ratio::Float64 = 1.0,
+    rseed::Int = 1,
     )
-
-    Random.seed!(1234)
-
+    @assert 0.0 <= signal_ratio < Inf
+    Random.seed!(rseed)
     X = rand(Uniform(xmin, xmax), npoints, n)
-    y = func(X)
-    if signal_ratio > 1e-3
+    y = [func(X[p,:]) for p in 1:npoints]
+
+    if !iszero(signal_ratio)
         noise = rand(Normal(), npoints)
-        noise .*= (norm(y) / ( sqrt(signal_ratio) * norm(noise)))
+        noise .*= norm(y)/sqrt(signal_ratio)/norm(noise)
         y .+= noise
     end
 
     return (X, y)
 end
 
-function build_shapeconregr_SDP(
-    X,
-    y,
+function build_shapeconregr_PSD(
+    X::Matrix{Float64},
+    y::Vector{Float64},
     r::Int,
-    monotonicity_dom::InterpDomain,
-    convexity_dom::InterpDomain,
-    monotonicity_prfl::Vector{Float64} = zeros(size(X, 2)),
+    mono_dom::Hypatia.InterpDomain,
+    conv_dom::Hypatia.InterpDomain,
+    mono_profile::Vector{Float64},
     )
-
     (npoints, n) = size(X)
-
-    mdl = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true))
     @polyvar x[1:n]
-    PX = monomials(x, 0:r)
-    monotonicity_bss = get_bss(monotonicity_dom, x)
-    convexity_bss = get_bss(convexity_dom, x)
+    mono_bss = Hypatia.Hypatia.get_bss(mono_dom, x)
+    conv_bss = Hypatia.Hypatia.get_bss(conv_dom, x)
 
-    @variables(mdl, begin
-        p, PolyJuMP.Poly(PX)
+    model = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true))
+    @variables(model, begin
+        p, PolyJuMP.Poly(monomials(x, 0:r))
         z[1:npoints]
     end)
-    dp = [DynamicPolynomials.differentiate(p, x[i]) for i in 1:n]
-    Hp = [DynamicPolynomials.differentiate(dp[i], x[j]) for i in 1:n, j in 1:n]
-
-    for j in 1:n
-        if abs(monotonicity_prfl[j]) > 0.5
-            @constraint(mdl, monotonicity_prfl[j] * dp[j] >= 0, domain=monotonicity_bss)
-        end
-    end
-    # TODO think about what it means if w sos polynomials have degree > 2
-    @SDconstraint(mdl, Hp >= 0, domain=convexity_bss)
-    @constraints(mdl, begin
+    @objective(model, Min, sum(z))
+    @constraints(model, begin
         [i in 1:npoints], z[i] >= y[i] - p(X[i, :])
         [i in 1:npoints], z[i] >= -y[i] + p(X[i, :])
     end)
 
-    @objective mdl Min sum(z)
+    dp = [DynamicPolynomials.differentiate(p, x[i]) for i in 1:n]
+    @constraint(model, [j in 1:n], mono_profile[j] * dp[j] >= 0, domain=mono_bss)
 
-    return (mdl, p)
+    # TODO think about what it means if wsos polynomials have degree > 2
+    Hp = [DynamicPolynomials.differentiate(dp[i], x[j]) for i in 1:n, j in 1:n]
+    @SDconstraint(model, Hp >= 0, domain=conv_bss)
+
+    return (model, p)
 end
 
-function get_P_shapeconsregr(d::Int, npoints::Int, n::Int, dom::InterpDomain, replicate_dimensions::Bool=false)
+function getregrinterp(
+    d::Int,
+    npoints::Int,
+    n::Int,
+    dom::Hypatia.InterpDomain,
+    replicate_dims::Bool,
+    pts_factor::Int,
+    )
     L = binomial(n+d,n)
     U = binomial(n+2d, n)
-    pts_factor = 2n
-    candidate_pts = interp_sample(dom, U * pts_factor)
+    candidate_pts = Hypatia.interp_sample(dom, U * pts_factor)
+
     # TODO temporary hack, replace this with methods for unions of domains
-    if replicate_dimensions
-        candidate_pts2 = interp_sample(dom, U * pts_factor)
+    if replicate_dims
+        candidate_pts2 = Hypatia.interp_sample(dom, U * pts_factor)
         candidate_pts = hcat(candidate_pts, candidate_pts2)
     end
-    M = get_large_P(candidate_pts, d, U)
-    Mp = Array(M')
-    F = qr!(Mp, Val(true))
+
+    M = Hypatia.get_large_P(candidate_pts, d, U)
+    F = qr!(Array(M'), Val(true))
     keep_pnt = F.p[1:U]
     pts = candidate_pts[keep_pnt,:] # subset of points indexed with the support of w
-    P0 = M[keep_pnt,1:L] # subset of polynomial evaluations up to total degree d
+    P0 = M[keep_pnt, 1:L] # subset of polynomial evaluations up to total degree d
     P = Array(qr(P0).Q)
     P0sub = view(P0, :, 1:binomial(n+d-1, n))
 
@@ -111,123 +109,106 @@ function get_P_shapeconsregr(d::Int, npoints::Int, n::Int, dom::InterpDomain, re
 end
 
 function build_shapeconregr_WSOS(
-    X,
-    y,
+    X::Matrix{Float64},
+    y::Vector{Float64},
     r::Int,
-    monotonicity_dom::InterpDomain,
-    convexity_dom::InterpDomain,
-    monotonicity_prfl::Vector{Float64} = zeros(size(X, 2)),
+    mono_dom::Hypatia.InterpDomain,
+    conv_dom::Hypatia.InterpDomain,
+    mono_profile::Vector{Float64};
+    ortho_wts::Bool = true,
     )
-
     @assert mod(r, 2) == 1
     d = div(r-1, 2)
-
     (npoints, n) = size(X)
-
-    monotonicity_U, monotonicity_pts, monotonicity_P, monotonicity_P0sub = get_P_shapeconsregr(d, npoints, n, monotonicity_dom)
-    # TODO think about if it's ok to go up to d+1
-    convexity_U, convexity_pts, convexity_P, convexity_P0sub = get_P_shapeconsregr(d+1, npoints, 2n, convexity_dom, true)
-
-    mdl = Model(with_optimizer(Hypatia.Optimizer, verbose=true))
     @polyvar x[1:n]
     @polyvar w[1:n]
-    PX = monomials(x, 0:r)
 
-    monotonicity_bss = get_bss(monotonicity_dom, x)
-    convexity_bss = get_bss(convexity_dom, x)
-
-    monotonicity_g = get_weights(monotonicity_dom, monotonicity_pts)
-    @assert length(monotonicity_g) == length(monotonicity_bss.p)
-    convexity_g = get_weights(convexity_dom, convexity_pts, 1:n)
-    @assert length(convexity_g) == length(convexity_bss.p)
-
-    monotonicity_PWts = [sqrt.(gi) .* monotonicity_P0sub for gi in monotonicity_g]
-    convexity_PWts = [sqrt.(gi) .* convexity_P0sub for gi in convexity_g]
-
-    monotonicity_wsos_cone = WSOSPolyInterpCone(monotonicity_U, [monotonicity_P, monotonicity_PWts...])
-    convexity_wsos_cone = WSOSPolyInterpCone(convexity_U, [convexity_P, convexity_PWts...])
-
-    # monomial basis coefficients
-    @variable(mdl, p, PolyJuMP.Poly(PX))
-    dp = [DynamicPolynomials.differentiate(p, x[j]) for j in 1:n]
-    Hp = [DynamicPolynomials.differentiate(dp[i], x[j]) for i in 1:n, j in 1:n]
-
-    @variables(mdl, begin
-        # residuals
-        z[1:npoints]
-        # interpolant basis coefficients
-        monotonicity_interp_coeffs[1:monotonicity_U, 1:n]
-        convexity_interp_coeffs[1:convexity_U] # TODO symmetry
-    end)
-
-    # Vandermonde matrix to relate coefficients for monotonicity
-    for j in 1:n
-        for i in 1:monotonicity_U
-            if abs(monotonicity_prfl[j]) > 0.5
-                @constraint(mdl, monotonicity_prfl[j] * dp[j](monotonicity_pts[i, :]) == monotonicity_interp_coeffs[i, j])
-            end
-        end
+    (mono_U, mono_pts, mono_P, mono_P0sub) = getregrinterp(d, npoints, n, mono_dom, false, 10n)
+    mono_bss = Hypatia.get_bss(mono_dom, x)
+    mono_g = Hypatia.get_weights(mono_dom, mono_pts)
+    @assert length(mono_g) == length(mono_bss.p)
+    mono_PWts = [sqrt.(gi) .* mono_P0sub for gi in mono_g]
+    if ortho_wts
+        mono_PWts = [Array(qr!(W).Q) for W in mono_PWts] # orthonormalize
     end
+    mono_wsos_cone = WSOSPolyInterpCone(mono_U, [mono_P, mono_PWts...])
 
-    convex_condition = w'*Hp*w
-    @constraints(mdl, begin
-        # relate coefficients for convexity
-        [i in 1:convexity_U], convex_condition(convexity_pts[i, :]) == convexity_interp_coeffs[i]
-        [j in 1:n], monotonicity_interp_coeffs[:, j] in monotonicity_wsos_cone
-        convexity_interp_coeffs in convexity_wsos_cone
-        # minimize sum of absolute error
+    # TODO think about if it's ok to go up to d+1
+    (conv_U, conv_pts, conv_P, conv_P0sub) = getregrinterp(d+1, npoints, 2n, conv_dom, true, 10n)
+    conv_bss = Hypatia.get_bss(conv_dom, x)
+    conv_g = Hypatia.get_weights(conv_dom, conv_pts; count=n)
+    @assert length(conv_g) == length(conv_bss.p)
+    conv_PWts = [sqrt.(gi) .* conv_P0sub for gi in conv_g]
+    if ortho_wts
+        conv_PWts = [Array(qr!(W).Q) for W in conv_PWts] # orthonormalize
+    end
+    conv_wsos_cone = WSOSPolyInterpCone(conv_U, [conv_P, conv_PWts...])
+
+    model = Model(with_optimizer(Hypatia.Optimizer, verbose=true))
+    @variables(model, begin
+        p, PolyJuMP.Poly(monomials(x, 0:r)) # monomial basis coefficients
+        z[1:npoints] # residuals
+        # interpolant basis coefficients
+        mono_interp_coeffs[1:mono_U, 1:n]
+        conv_interp_coeffs[1:conv_U] # TODO symmetry
+    end)
+    @objective(model, Min, sum(z))
+    @constraints(model, begin
         [i in 1:npoints], z[i] >= y[i] - p(X[i, :])
         [i in 1:npoints], z[i] >= -y[i] + p(X[i, :])
     end)
 
-    @objective mdl Min sum(z)
+    # relate coefficients for monotonicity
+    dp = [DynamicPolynomials.differentiate(p, x[j]) for j in 1:n]
+    for j in 1:n, i in 1:mono_U
+        @constraint(model, mono_profile[j] * dp[j](mono_pts[i, :]) == mono_interp_coeffs[i, j])
+    end
 
-    return (mdl, p)
+    # relate coefficients for convexity
+    Hp = [DynamicPolynomials.differentiate(dp[i], x[j]) for i in 1:n, j in 1:n]
+    conv_condition = w'*Hp*w
+    @constraints(model, begin
+        [i in 1:conv_U], conv_condition(conv_pts[i, :]) == conv_interp_coeffs[i]
+        [j in 1:n], mono_interp_coeffs[:, j] in mono_wsos_cone
+        conv_interp_coeffs in conv_wsos_cone
+    end)
+
+    return (model, p)
 end
 
-function run_JuMP_shapeconregr()
-    (r, n, npoints, signal_ratio, f) =
-        5, 2, 210, 0.0, x -> sum(x.^4, dims=2)    # no noise and non monotone function
-        # 3, 2, 100, 50.0, x -> sum(x.^3, dims=2)    # some noise but monotone function
+function run_JuMP_shapeconregr(use_wsos::Bool)
+    (n, deg, npoints, signal_ratio, f) =
+        (2, 3, 100, 0.0, x -> sum(x.^3)) # no noise, monotonic function
+        # (2, 3, 100, 0.0, x -> sum(x.^4)) # no noise, non-monotonic function
+        # (2, 3, 100, 50.0, x -> sum(x.^3)) # some noise, monotonic function
+        # (2, 3, 100, 50.0, x -> sum(x.^4)) # some noise, non-monotonic function
 
-    monotonicity_dom = Box(fill(-1.0, n), fill(1.0, n))
-    convexity_dom = Box(fill(-1.0, n), fill(1.0, n))
-    # monotonicity everywhere
-    monotonicity_prfl = ones(n)
-    (X, y) = shapeconregr_data(f, npoints=npoints, signal_ratio=signal_ratio, n=n)
+    conv_dom = mono_dom = Hypatia.Box(-ones(n), ones(n))
+    mono_profile = ones(n)
+    (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
 
-    sdp_mdl, sdp_p = build_shapeconregr_SDP(X, y, r, monotonicity_dom, convexity_dom, monotonicity_prfl)
-    wsos_mdl, wsos_p = build_shapeconregr_WSOS(X, y, r, monotonicity_dom, convexity_dom, monotonicity_prfl)
+    if use_wsos
+        (model, p) = build_shapeconregr_WSOS(X, y, deg, mono_dom, conv_dom, mono_profile)
+    else
+        (model, p) = build_shapeconregr_PSD(X, y, deg, mono_dom, conv_dom, mono_profile)
+    end
 
-    JuMP.optimize!(sdp_mdl)
-    term_status = JuMP.termination_status(sdp_mdl)
-    pobj = JuMP.objective_value(sdp_mdl)
-    dobj = JuMP.objective_bound(sdp_mdl)
-    pr_status = JuMP.primal_status(sdp_mdl)
-    du_status = JuMP.dual_status(sdp_mdl)
+    JuMP.optimize!(model)
+    term_status = JuMP.termination_status(model)
+    pobj = JuMP.objective_value(model)
+    dobj = JuMP.objective_bound(model)
+    pr_status = JuMP.primal_status(model)
+    du_status = JuMP.dual_status(model)
 
     @test term_status == MOI.Success
     @test pr_status == MOI.FeasiblePoint
     @test du_status == MOI.FeasiblePoint
     @test pobj ≈ dobj atol=1e-4 rtol=1e-4
 
-    JuMP.optimize!(wsos_mdl)
-    term_status = JuMP.termination_status(wsos_mdl)
-    pobj = JuMP.objective_value(wsos_mdl)
-    dobj = JuMP.objective_bound(wsos_mdl)
-    pr_status = JuMP.primal_status(wsos_mdl)
-    du_status = JuMP.dual_status(wsos_mdl)
+    preds = [JuMP.value(p)(X[i,:]) for i in 1:npoints]
 
-    @test term_status == MOI.Success
-    @test pr_status == MOI.FeasiblePoint
-    @test du_status == MOI.FeasiblePoint
-    @test pobj ≈ dobj atol=1e-4 rtol=1e-4
-
-    sdp_preds = [JuMP.value(sdp_p)(X[i,:]) for i in 1:npoints]
-    wsos_preds = [JuMP.value(wsos_p)(X[i,:]) for i in 1:npoints]
-
-    @test JuMP.objective_value(sdp_mdl) ≈ JuMP.objective_value(wsos_mdl) atol = 1e-4
-    @test sdp_preds ≈ wsos_preds atol = 1e-4
-
-    return nothing
+    return (pobj, preds)
 end
+
+run_JuMP_shapeconregr_PSD() = run_JuMP_shapeconregr(false)
+run_JuMP_shapeconregr_WSOS() = run_JuMP_shapeconregr(true)

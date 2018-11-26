@@ -179,9 +179,10 @@ function _namedpoly11(; verbose, lscachetype)
     r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
     @test r.niters <= 60
-    @test r.pobj ≈ 0 atol=1e-4 rtol=1e-4
+    @test r.pobj ≈ 0 atol=1e-3 rtol=1e-3
 end
 
+# TODO refactor duplicated code in namedpoly examples
 function _namedpoly1_JuMP()
     # the Heart polynomial in a box
     (x, f, dom, truemin) = getpolydata(:heart)

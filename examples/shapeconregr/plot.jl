@@ -9,7 +9,7 @@ using PlotlyJS
 using ORCA
 using Test
 
-function makeplot(sdp_p, wsos_p)
+function makeplot(psd_p, wsos_p)
     data_trace = scatter3d(
         x=X[:, 1],
         y=X[:, 2],
@@ -22,12 +22,12 @@ function makeplot(sdp_p, wsos_p)
     )
     randx = rand(Uniform(-1, 1), 200)
     randy = rand(Uniform(-1, 1), 200)
-    sdpz = [JuMP.value(sdp_p)(hcat(randx, randy)[i,:]) for i in 1:200]
+    psdz = [JuMP.value(psd_p)(hcat(randx, randy)[i,:]) for i in 1:200]
     wsosz = [JuMP.value(wsos_p)(hcat(randx, randy)[i,:]) for i in 1:200]
-    sdp_trace = mesh3d(
+    psd_trace = mesh3d(
         x=randx,
         y=randy,
-        z=sdpz,
+        z=psdz,
         mode="markers",
         opacity=0.4,
         marker_size=6,
@@ -46,9 +46,10 @@ function makeplot(sdp_p, wsos_p)
     )
     layout = Layout(margin=attr(l=0, r=0, t=0, b=0))
 
-    sdp_plot = plot([data_trace, sdp_trace], layout)
+    psd_plot = plot([data_trace, psd_trace], layout)
     wsos_plot = plot([data_trace, wsos_trace], layout)
-    # savefig(sdp_plot, "sdp_plot.pdf")
+    # savefig(psd_plot, "psd_plot.pdf")
     # savefig(wsos_plot, "wsos_plot.pdf")
 
+    return nothing
 end

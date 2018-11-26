@@ -201,7 +201,7 @@ function solvelinsys6!(
     if size(L.Q2div, 1) > 0
         posdef = hypatia_posvx!(L.Q2div, L.Q2GHGQ2, L.Q2divcopy, L.lsferr, L.lsberr, L.lswork, L.lsiwork, L.lsAF, L.lsS)
         if !posdef
-            @warn("linear system matrix was not positive definite")
+            println("linear system matrix was not positive definite")
             # TODO improve recovery method for making LHS positive definite
             mul!(L.Q2GHGQ2, L.Q2', L.GHGQ2)
             L.Q2GHGQ2 += 1e-3I
