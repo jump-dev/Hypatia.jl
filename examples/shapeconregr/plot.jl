@@ -51,4 +51,6 @@ function makeplot(sdp_p, wsos_p)
     # savefig(sdp_plot, "sdp_plot.pdf")
     # savefig(wsos_plot, "wsos_plot.pdf")
 
+    return nothing
+
 end
