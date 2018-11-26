@@ -31,12 +31,7 @@ function build_JuMP_envelope(
     # TODO this should be built into the modeling layer
     @assert deg <= d
     (L, U, pts, P0, P, w) = Hypatia.interpolate(n, d, calc_w=true)
-    Psub = view(P, :, 1:binomial(n+d-1, n))
-    Wtsfun = (j -> sqrt.(1.0 .- abs2.(pts[:,j])))
-    PWts = [Wtsfun(j) .* Psub for j in 1:n]
-
     P0sub = view(P0, :, 1:binomial(n+d-1, n))
-
     g = get_weights(domain, pts)
     PWts = [sqrt.(gi) .* P0sub for gi in g]
 
