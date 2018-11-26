@@ -83,7 +83,7 @@ function build_shapeconregr_SDP(
         [i in 1:npoints], z[i] >= -y[i] + p(X[i, :])
     end)
 
-    @objective mdl Min sum(z)
+    @objective(mdl, Min, sum(z))
 
     return (mdl, p)
 end
@@ -124,9 +124,9 @@ function build_shapeconregr_WSOS(
 
     (npoints, n) = size(X)
 
-    monotonicity_U, monotonicity_pts, monotonicity_P, monotonicity_P0sub = get_P_shapeconsregr(d, npoints, n, monotonicity_dom)
+    (monotonicity_U, monotonicity_pts, monotonicity_P, monotonicity_P0sub) = get_P_shapeconsregr(d, npoints, n, monotonicity_dom)
     # TODO think about if it's ok to go up to d+1
-    convexity_U, convexity_pts, convexity_P, convexity_P0sub = get_P_shapeconsregr(d+1, npoints, 2n, convexity_dom, true)
+    (convexity_U, convexity_pts, convexity_P, convexity_P0sub) = get_P_shapeconsregr(d+1, npoints, 2n, convexity_dom, true)
 
     mdl = Model(with_optimizer(Hypatia.Optimizer, verbose=true))
     @polyvar x[1:n]
@@ -180,15 +180,15 @@ function build_shapeconregr_WSOS(
         [i in 1:npoints], z[i] >= -y[i] + p(X[i, :])
     end)
 
-    @objective mdl Min sum(z)
+    @objective(mdl, Min, sum(z))
 
     return (mdl, p)
 end
 
 function run_JuMP_shapeconregr()
     (r, n, npoints, signal_ratio, f) =
-        5, 2, 210, 0.0, x -> sum(x.^4, dims=2)    # no noise and non monotone function
-        # 3, 2, 100, 50.0, x -> sum(x.^3, dims=2)    # some noise but monotone function
+        # 3, 2, 210, 0.0, x -> sum(x.^2, dims=2)    # no noise and non monotone function
+        3, 2, 100, 50.0, x -> sum(x.^3, dims=2)    # some noise but monotone function
 
     monotonicity_dom = Box(fill(-1.0, n), fill(1.0, n))
     convexity_dom = Box(fill(-1.0, n), fill(1.0, n))
