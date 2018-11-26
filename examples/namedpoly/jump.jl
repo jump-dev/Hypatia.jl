@@ -39,26 +39,8 @@ function build_JuMP_namedpoly_WSOS(
     rseed::Int = 1,
     )
     n = nvariables(f) # number of polyvars
-    L = binomial(n+d,n)
-    U = binomial(n+2d, n)
 
-    # TODO refactor the next 10 lines into Hypatia.interp_sample
-    Random.seed!(rseed)
-    candidate_pts = Hypatia.interp_sample(dom, U * pts_factor)
-    M = Hypatia.get_large_P(candidate_pts, d, U)
-    Mp = Array(M')
-    F = qr!(Mp, Val(true))
-    keep_pnt = F.p[1:U]
-    pts = candidate_pts[keep_pnt,:] # subset of points indexed with the support of w
-    P0 = M[keep_pnt, 1:L] # subset of polynomial evaluations up to total degree d
-    P = Array(qr(P0).Q)
-    P0sub = view(P0, :, 1:binomial(n+d-1, n))
-
-    g = Hypatia.get_weights(dom, pts)
-    PWts = [sqrt.(gi) .* P0sub for gi in g]
-    if ortho_wts
-        PWts = [Array(qr!(W).Q) for W in PWts] # orthonormalize
-    end
+    (L, U, pts, P0, P, PWts, w) = Hypatia.interp_sample(dom, n, d, calc_w=false, ortho_wts=ortho_wts)
 
     # build JuMP model
     model = Model(with_optimizer(Hypatia.Optimizer, verbose=true))

@@ -354,3 +354,44 @@ function get_large_P(ipts::Matrix{Float64}, d::Int, U::Int)
 
     return M
 end
+
+function interp_sample(
+    dom::InterpDomain,
+    n::Int,
+    d::Int;
+    calc_w::Bool = false,
+    pts_factor::Int = n,
+    ortho_wts::Bool = true,
+    )
+
+    L = binomial(n+d,n)
+    U = binomial(n+2d, n)
+    candidate_pts = interp_sample(dom, U * pts_factor)
+    M = get_large_P(candidate_pts, d, U)
+    Mp = Array(M')
+    F = qr!(Mp, Val(true))
+    keep_pnt = F.p[1:U]
+    pts = candidate_pts[keep_pnt,:] # subset of points indexed with the support of w
+    P0 = M[keep_pnt, 1:L] # subset of polynomial evaluations up to total degree d
+    P = Array(qr(P0).Q)
+    P0sub = view(P0, :, 1:binomial(n+d-1, n))
+
+    g = Hypatia.get_weights(dom, pts)
+    PWts = [sqrt.(gi) .* P0sub for gi in g]
+    if ortho_wts
+        PWts = [Array(qr!(W).Q) for W in PWts] # orthonormalize
+    end
+
+    # weights for Clenshaw-Curtis quadrature at pts
+    if calc_w
+        wa = Float64[2/(1 - j^2) for j in 0:2:U-1]
+        append!(wa, wa[floor(Int, U/2):-1:2])
+        w = real.(FFTW.ifft(wa))
+        w[1] = w[1]/2
+        push!(w, w[1])
+    else
+        w = Float64[]
+    end
+
+    return (L=L, U=U, pts=pts, P0=P0, P=P, PWts=PWts, w=w)
+end
