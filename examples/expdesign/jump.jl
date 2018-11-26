@@ -26,7 +26,7 @@ function build_JuMP_expdesign(
     @assert (p > q) && (n > q) && (nmax <= n)
     @assert size(V) == (q, p)
 
-    model = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true))
+    model = Model(with_optimizer(Hypatia.Optimizer, verbose=true))
 
     @variable(model, hypo) # hypograph of logdet variable
     @objective(model, Max, hypo)

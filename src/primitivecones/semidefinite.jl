@@ -54,8 +54,8 @@ function incone_prmtv(prmtv::PosSemidef)
     vectomat!(prmtv.mat, prmtv.pnt)
     @. prmtv.matpnt = prmtv.mat
 
-    F = bunchkaufman!(Symmetric(prmtv.mat), true, check=false)
-    if !issuccess(F)
+    F = cholesky!(Symmetric(prmtv.mat), Val(true), check=false)
+    if !isposdef(F)
         return false
     end
     prmtv.matinv = -inv(F) # TODO eliminate allocs
