@@ -338,6 +338,8 @@ end
 function get_large_P(ipts::Matrix{Float64}, d::Int, U::Int)
     (npts, n) = size(ipts)
     u = calc_u(n, 2d, ipts)
+    m = Vector{Float64}(undef, U)
+    m[1] = 2^n
     M = Matrix{Float64}(undef, npts, U)
     M[:,1] .= 1.0
 
@@ -345,6 +347,11 @@ function get_large_P(ipts::Matrix{Float64}, d::Int, U::Int)
     for t in 1:2d
         for xp in Combinatorics.multiexponents(n, t)
             col += 1
+            if any(isodd, xp)
+                m[col] = 0.0
+            else
+                m[col] = m[1]/prod(1.0 - abs2(xp[j]) for j in 1:n)
+            end
             @. @views M[:,col] = u[1][:,xp[1]+1]
             for j in 2:n
                 @. @views M[:,col] *= u[j][:,xp[j]+1]
@@ -352,7 +359,7 @@ function get_large_P(ipts::Matrix{Float64}, d::Int, U::Int)
         end
     end
 
-    return M
+    return (M, m)
 end
 
 function interp_sample(
@@ -367,7 +374,7 @@ function interp_sample(
     L = binomial(n+d,n)
     U = binomial(n+2d, n)
     candidate_pts = interp_sample(dom, U * pts_factor)
-    M = get_large_P(candidate_pts, d, U)
+    (M, m) = get_large_P(candidate_pts, d, U)
     Mp = Array(M')
     F = qr!(Mp, Val(true))
     keep_pnt = F.p[1:U]
@@ -382,13 +389,9 @@ function interp_sample(
         PWts = [Array(qr!(W).Q) for W in PWts] # orthonormalize
     end
 
-    # weights for Clenshaw-Curtis quadrature at pts
     if calc_w
-        wa = Float64[2/(1 - j^2) for j in 0:2:U-1]
-        append!(wa, wa[floor(Int, U/2):-1:2])
-        w = real.(FFTW.ifft(wa))
-        w[1] = w[1]/2
-        push!(w, w[1])
+        Qtm = F.Q'*m
+        w = UpperTriangular(F.R[:,1:U])\Qtm
     else
         w = Float64[]
     end
