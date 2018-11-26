@@ -85,22 +85,20 @@ function build_shapeconregr_SDP(
 
     @objective mdl Min sum(z)
 
-    JuMP.optimize!(mdl)
-
     return (mdl, p)
 end
 
 function get_P_shapeconsregr(d::Int, npoints::Int, n::Int, dom::InterpDomain, replicate_dimensions::Bool=false)
     L = binomial(n+d,n)
     U = binomial(n+2d, n)
-    pts_factor = n
+    pts_factor = 2n
     candidate_pts = interp_sample(dom, U * pts_factor)
     # TODO temporary hack, replace this with methods for unions of domains
     if replicate_dimensions
         candidate_pts2 = interp_sample(dom, U * pts_factor)
         candidate_pts = hcat(candidate_pts, candidate_pts2)
     end
-    M = get_P(candidate_pts, d, U)
+    M = get_large_P(candidate_pts, d, U)
     Mp = Array(M')
     F = qr!(Mp, Val(true))
     keep_pnt = F.p[1:U]
@@ -184,41 +182,51 @@ function build_shapeconregr_WSOS(
 
     @objective mdl Min sum(z)
 
-    JuMP.optimize!(mdl)
-
     return (mdl, p)
 end
 
 function run_JuMP_shapeconregr()
-    # degree of regressor
-    r = 3
-    # dimensionality of observations
-    n = 2
-    npoints = binomial(n + r, n) * 10
+    (r, n, npoints, signal_ratio, f) =
+        5, 2, 210, 0.0, x -> sum(x.^4, dims=2)    # no noise and non monotone function
+        # 3, 2, 100, 50.0, x -> sum(x.^3, dims=2)    # some noise but monotone function
+
     monotonicity_dom = Box(fill(-1.0, n), fill(1.0, n))
     convexity_dom = Box(fill(-1.0, n), fill(1.0, n))
-    # domain = Ball(zeros(n), 1.0)
     # monotonicity everywhere
-    monotonicity_prfl = zeros(n)
-    f = (x -> sum(x.^3, dims=2))
-    (X, y) = shapeconregr_data(f, npoints=npoints, signal_ratio=0.0, n=n)
+    monotonicity_prfl = ones(n)
+    (X, y) = shapeconregr_data(f, npoints=npoints, signal_ratio=signal_ratio, n=n)
 
     sdp_mdl, sdp_p = build_shapeconregr_SDP(X, y, r, monotonicity_dom, convexity_dom, monotonicity_prfl)
     wsos_mdl, wsos_p = build_shapeconregr_WSOS(X, y, r, monotonicity_dom, convexity_dom, monotonicity_prfl)
+
+    JuMP.optimize!(sdp_mdl)
+    term_status = JuMP.termination_status(sdp_mdl)
+    pobj = JuMP.objective_value(sdp_mdl)
+    dobj = JuMP.objective_bound(sdp_mdl)
+    pr_status = JuMP.primal_status(sdp_mdl)
+    du_status = JuMP.dual_status(sdp_mdl)
+
+    @test term_status == MOI.Success
+    @test pr_status == MOI.FeasiblePoint
+    @test du_status == MOI.FeasiblePoint
+    @test pobj ≈ dobj atol=1e-4 rtol=1e-4
+
+    JuMP.optimize!(wsos_mdl)
+    term_status = JuMP.termination_status(wsos_mdl)
+    pobj = JuMP.objective_value(wsos_mdl)
+    dobj = JuMP.objective_bound(wsos_mdl)
+    pr_status = JuMP.primal_status(wsos_mdl)
+    du_status = JuMP.dual_status(wsos_mdl)
+
+    @test term_status == MOI.Success
+    @test pr_status == MOI.FeasiblePoint
+    @test du_status == MOI.FeasiblePoint
+    @test pobj ≈ dobj atol=1e-4 rtol=1e-4
+
+    sdp_preds = [JuMP.value(sdp_p)(X[i,:]) for i in 1:npoints]
+    wsos_preds = [JuMP.value(wsos_p)(X[i,:]) for i in 1:npoints]
+
     @test JuMP.objective_value(sdp_mdl) ≈ JuMP.objective_value(wsos_mdl) atol = 1e-4
-
-    sdp_preds = [JuMP.value(sdp_p)(X[i,:]) for i in 1:npoints]
-    wsos_preds = [JuMP.value(wsos_p)(X[i,:]) for i in 1:npoints]
-    @test sdp_preds ≈ wsos_preds atol = 1e-4
-
-    (X, y) = shapeconregr_data(npoints=npoints, signal_ratio=50.0, n=n)
-
-    sdp_mdl, sdp_p = build_shapeconregr_SDP(X, y, r, monotonicity_dom, convexity_dom, monotonicity_prfl)
-    wsos_mdl, wsos_p = build_shapeconregr_WSOS(X, y, r, monotonicity_dom,convexity_dom, monotonicity_prfl)
-    @test JuMP.objective_value(sdp_mdl) ≈ JuMP.objective_value(wsos_mdl) atol = 1e-5
-
-    sdp_preds = [JuMP.value(sdp_p)(X[i,:]) for i in 1:npoints]
-    wsos_preds = [JuMP.value(wsos_p)(X[i,:]) for i in 1:npoints]
     @test sdp_preds ≈ wsos_preds atol = 1e-4
 
     return nothing
