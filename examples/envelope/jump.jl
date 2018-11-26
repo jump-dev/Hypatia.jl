@@ -51,9 +51,9 @@ end
 
 function run_JuMP_envelope()
     (npoly, deg, n, d) =
-        2, 3, 1, 4
+        # 2, 3, 1, 4
         # 2, 3, 2, 4
-        # 2, 3, 3, 4
+        2, 3, 3, 4
 
     boxdomain = Box(fill(-1.0, n), fill(1.0, n))
     balldomain = Ball(fill(0.0, n), sqrt(2.0))

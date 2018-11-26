@@ -2,7 +2,7 @@
 Copyright 2018, Chris Coey and contributors
 
 (closure of) hypograph of perspective of (natural) log of determinant of a (row-wise lower triangle i.e. svec space) symmetric positive define matrix
-(smat space) (u in R, v in R_+, w in S_+) : u >= v*logdet(W/v)
+(smat space) (u in R, v in R_+, w in S_+) : u <= v*logdet(W/v)
 (see equivalent MathOptInterface LogDetConeConeTriangle definition)
 
 barrier (guessed, based on analogy to hypoperlog barrier)
@@ -77,9 +77,7 @@ function incone_prmtv(prmtv::HypoPerLogdet)
     prmtv.g .= DiffResults.gradient(prmtv.diffres)
     prmtv.H .= DiffResults.hessian(prmtv.diffres)
 
-    @. prmtv.H2 = prmtv.H
-    prmtv.F = bunchkaufman!(Symmetric(prmtv.H2), true, check=false)
-    return issuccess(prmtv.F)
+    return factH(prmtv)
 end
 
 calcg_prmtv!(g::AbstractVector{Float64}, prmtv::HypoPerLogdet) = (@. g = prmtv.g; g)

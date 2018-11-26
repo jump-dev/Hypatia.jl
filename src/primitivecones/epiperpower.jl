@@ -49,7 +49,7 @@ end
 EpiPerPower(alpha::Vector{Float64}) = EpiPerPower(alpha, false)
 
 dimension(prmtv::EpiPerPower) = 3
-barrierpar_prmtv(prmtv::EpiPerPower) = 3 - 2*min(inv(prmtv.alpha), 1 - inv(prmtv.alpha))
+barrierpar_prmtv(prmtv::EpiPerPower) = 3 - 2*min(inv(prmtv.alpha), 1.0 - inv(prmtv.alpha))
 getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::EpiPerPower) = (arr[1] = 1.0; arr[2] = 1.0; arr[3] = 0.0; arr)
 loadpnt_prmtv!(prmtv::EpiPerPower, pnt::AbstractVector{Float64}) = (prmtv.pnt = pnt)
 
@@ -67,9 +67,7 @@ function incone_prmtv(prmtv::EpiPerPower)
     prmtv.g .= DiffResults.gradient(prmtv.diffres)
     prmtv.H .= DiffResults.hessian(prmtv.diffres)
 
-    @. prmtv.H2 = prmtv.H
-    prmtv.F = bunchkaufman!(Symmetric(prmtv.H2), true, check=false)
-    return issuccess(prmtv.F)
+    return factH(prmtv)
 end
 
 calcg_prmtv!(g::AbstractVector{Float64}, prmtv::EpiPerPower) = (@. g = prmtv.g; g)

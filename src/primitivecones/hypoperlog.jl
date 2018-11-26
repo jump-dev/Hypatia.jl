@@ -36,7 +36,7 @@ HypoPerLog() = HypoPerLog(false)
 
 dimension(prmtv::HypoPerLog) = 3
 barrierpar_prmtv(prmtv::HypoPerLog) = 3
-getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::HypoPerLog) = (arr[1] = 0.0; arr[2] = 0.5; arr[3] = 1.0; arr)
+getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::HypoPerLog) = (arr[1] = -1.0; arr[2] = 1.0; arr[3] = 1.0; arr)
 loadpnt_prmtv!(prmtv::HypoPerLog, pnt::AbstractVector{Float64}) = (prmtv.pnt = pnt)
 
 function incone_prmtv(prmtv::HypoPerLog)
@@ -69,9 +69,7 @@ function incone_prmtv(prmtv::HypoPerLog)
     H[2,3] = H[3,2] = vw*(lwv - 1.0)*ivlwvu2 - ivlwvu/w
     H[3,3] = abs2(vw)*ivlwvu2 + vw/w*ivlwvu + inv(abs2(w))
 
-    @. prmtv.H2 = prmtv.H
-    prmtv.F = bunchkaufman!(Symmetric(prmtv.H2), true, check=false)
-    return issuccess(prmtv.F)
+    return factH(prmtv)
 end
 
 calcg_prmtv!(g::AbstractVector{Float64}, prmtv::HypoPerLog) = (@. g = prmtv.g; g)

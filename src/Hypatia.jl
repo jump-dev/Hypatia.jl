@@ -13,6 +13,7 @@ module Hypatia
 
     import ForwardDiff
     import DiffResults
+    import PositiveFactorizations
     include("cone.jl")
     for primitivecone in [
         "orthant",
@@ -26,6 +27,7 @@ module Hypatia
         "semidefinite",
         "wsospolyinterp",
         "hypoperlogdet",
+        "epipersumexp",
         ]
         include(joinpath(@__DIR__, "primitivecones", primitivecone * ".jl"))
     end

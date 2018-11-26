@@ -24,18 +24,19 @@ function build_namedpoly(
 
     # generate interpolation
     (L, U, pts, P0, P, w) = Hypatia.interpolate(n, d, calc_w=false)
+    P0sub = view(P0, :, 1:binomial(n+d-1, n))
+    pscale = 0.5*(ubs - lbs)
+    Wtsfun = (j -> sqrt.(1.0 .- abs2.(pts[:,j]))*pscale[j])
+    PWts = [Wtsfun(j) .* P0sub for j in 1:n]
+    # PWts = [Array(qr!(Wtsfun(j) .* P0sub).Q) for j in 1:n] # alternatively, orthonormalize
 
     # transform points to fit the box domain
-    pts .*= (ubs - lbs)'/2
-    pts .+= (ubs + lbs)'/2
-    wtVals = (pts .- lbs') .* (ubs' .- pts)
-    LWts = fill(binomial(n+d-1, n), n)
-    PWts = [Diagonal(sqrt.(wtVals[:, j])) * P0[:, 1:LWts[j]] for j in 1:n]
+    trpts = pts .* pscale' .+ 0.5*(ubs + lbs)'
 
     # set up problem data
     A = ones(1, U)
     b = [1.0,]
-    c = [fn(pts[j, :]...) for j in 1:U]
+    c = [fn(trpts[j,:]...) for j in 1:U] # evaluate polynomial at transformed points
     G = Diagonal(-1.0I, U) # TODO uniformscaling?
     h = zeros(U)
 
@@ -54,7 +55,7 @@ function run_namedpoly()
         # build_namedpoly(:lotkavolterra, 3)
         # build_namedpoly(:magnetism7, 2)
         # build_namedpoly(:motzkin, 7)
-        build_namedpoly(:reactiondiffusion, 3)
+        build_namedpoly(:reactiondiffusion, 4)
         # build_namedpoly(:robinson, 8)
         # build_namedpoly(:rosenbrock, 4)
         # build_namedpoly(:schwefel, 3)

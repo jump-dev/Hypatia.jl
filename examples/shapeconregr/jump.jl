@@ -209,7 +209,6 @@ function run_JuMP_shapeconregr()
 
     sdp_preds = [JuMP.value(sdp_p)(X[i,:]) for i in 1:npoints]
     wsos_preds = [JuMP.value(wsos_p)(X[i,:]) for i in 1:npoints]
-
     @test sdp_preds ≈ wsos_preds atol = 1e-4
 
     (X, y) = shapeconregr_data(npoints=npoints, signal_ratio=50.0, n=n)

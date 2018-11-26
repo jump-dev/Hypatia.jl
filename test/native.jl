@@ -455,7 +455,7 @@ function _hypoperlog2(; verbose, lscachetype)
     cone = Hypatia.Cone([Hypatia.HypoPerLog()], [1:3])
     r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
-    @test r.niters <= 20
+    @test r.niters <= 25
     @test r.pobj ≈ 0 atol=1e-4 rtol=1e-4
 end
 
@@ -469,7 +469,7 @@ function _hypoperlog3(; verbose, lscachetype)
     cone = Hypatia.Cone([Hypatia.HypoPerLog(), Hypatia.Nonnegative(1)], [1:3, 4:4])
     r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
-    @test r.niters <= 15
+    @test r.niters <= 20
     @test r.pobj ≈ 0 atol=1e-4 rtol=1e-4
     @test r.x ≈ [0, 0, 0] atol=1e-4 rtol=1e-4
     @test isempty(r.y)
@@ -485,7 +485,7 @@ function _hypoperlog4(; verbose, lscachetype)
     cone = Hypatia.Cone([Hypatia.HypoPerLog(true)], [1:3])
     r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
-    @test r.niters <= 15
+    @test r.niters <= 20
     @test r.pobj ≈ exp(-2) atol=1e-4 rtol=1e-4
     @test r.x ≈ [-1, 1, exp(-2)] atol=1e-4 rtol=1e-4
 end
@@ -704,4 +704,38 @@ function _hypoperlogdet3(; verbose, lscachetype)
     @test r.niters <= 30
     @test r.x[1] ≈ -r.pobj atol=1e-4 rtol=1e-4
     @test r.x ≈ [0, 0] atol=1e-4 rtol=1e-4
+end
+
+function _epipersumexp1(; verbose, lscachetype)
+    l = 5
+    c = vcat(0.0, -ones(l))
+    A = [1.0 zeros(1, l)]
+    b = [1.0]
+    G = [-1.0 spzeros(1, l); spzeros(1, l+1); spzeros(l, 1) sparse(-1.0I, l, l)]
+    h = zeros(l+2)
+    mdl = Hypatia.Model(verbose=verbose)
+    cone = Hypatia.Cone([Hypatia.EpiPerSumExp(l+2)], [1:l+2])
+    r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
+    @test r.status == :Optimal
+    @test r.niters <= 30
+    @test r.x[1] ≈ 1 atol=1e-4 rtol=1e-4
+    @test r.s[2] ≈ 0 atol=1e-4 rtol=1e-4
+    @test r.s[1] ≈ 1 atol=1e-4 rtol=1e-4
+end
+
+function _epipersumexp2(; verbose, lscachetype)
+    l = 5
+    c = vcat(0.0, -ones(l))
+    A = [1.0 zeros(1, l)]
+    b = [1.0]
+    G = [-1.0 spzeros(1, l); spzeros(1, l+1); spzeros(l, 1) sparse(-1.0I, l, l)]
+    h = zeros(l+2); h[2] = 1.0
+    mdl = Hypatia.Model(verbose=verbose)
+    cone = Hypatia.Cone([Hypatia.EpiPerSumExp(l+2)], [1:l+2])
+    r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
+    @test r.status == :Optimal
+    @test r.niters <= 20
+    @test r.x[1] ≈ 1 atol=1e-4 rtol=1e-4
+    @test r.s[2] ≈ 1 atol=1e-4 rtol=1e-4
+    @test r.s[2]*sum(exp, r.s[3:end]/r.s[2]) ≈ r.s[1] atol=1e-4 rtol=1e-4
 end
