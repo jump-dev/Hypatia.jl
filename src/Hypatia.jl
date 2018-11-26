@@ -9,6 +9,10 @@ module Hypatia
 
     import FFTW
     import Combinatorics
+    import GSL: sf_gamma_inc_Q
+    import DynamicPolynomials
+    import SemialgebraicSets
+    # using Distributions
     include("interpolation.jl")
 
     import ForwardDiff

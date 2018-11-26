@@ -113,8 +113,14 @@ repo-url = "https://github.com/JuliaDiff/ForwardDiff.jl.git"
 uuid = "f6369f11-7733-5829-9624-2563aa707210"
 version = "0.10.1+"
 
+[[GSL]]
+deps = ["BinaryProvider", "Compat", "Libdl", "Test"]
+git-tree-sha1 = "b001d22c3d3efb302f74ee6b946a19f8e59a86c1"
+uuid = "92c85e6c-cbff-5e0c-80f7-495c94daaecd"
+version = "0.4.0"
+
 [[InteractiveUtils]]
-deps = ["Markdown"]
+deps = ["LinearAlgebra", "Markdown"]
 uuid = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
 
 [[IterativeSolvers]]
@@ -156,7 +162,7 @@ uuid = "d6f4376e-aef5-505a-96c1-9c027394607a"
 
 [[MathOptInterface]]
 deps = ["Compat", "Unicode"]
-git-tree-sha1 = "14c1b9a04a4123af8e68da53ee54505e4cca7218"
+git-tree-sha1 = "e8c270316580c2edbf7951f298b1a3de159837a7"
 repo-rev = "master"
 repo-url = "https://github.com/JuliaOpt/MathOptInterface.jl.git"
 uuid = "b8f27783-ece8-5eb3-8dc8-9495eed66fee"
@@ -334,7 +340,7 @@ uuid = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
 deps = ["Compat", "JuMP", "MathOptInterface", "MultivariateMoments", "MultivariatePolynomials", "PolyJuMP", "SemialgebraicSets"]
 git-tree-sha1 = "ce28f51afd268cbc8509554a07aacd2b147a704a"
 repo-rev = "master"
-repo-url = "https://github.com/JuliaOpt/SumOfSquares.jl.git"
+repo-url = "https://github.com/JuliaOpt/SumOfSquares.jl"
 uuid = "4b9e565b-77fc-50a5-a571-1244f986bda1"
 version = "0.2.1+"
 
@@ -349,7 +355,7 @@ uuid = "30578b45-9adc-5946-b283-645ec420af67"
 version = "0.4.0"
 
 [[UUIDs]]
-deps = ["Random", "SHA"]
+deps = ["Random"]
 uuid = "cf7118a7-6976-5b1a-9a39-7adc72f591a4"
 
 [[Unicode]]

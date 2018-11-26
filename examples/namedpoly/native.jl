@@ -14,7 +14,8 @@ using Test
 
 function build_namedpoly(
     polyname::Symbol,
-    d::Int,
+    d::Int;
+    ortho_wts::Bool = true,
     )
     # get data for named polynomial
     (n, lbs, ubs, deg, fn) = polys[polyname]
@@ -23,12 +24,14 @@ function build_namedpoly(
     end
 
     # generate interpolation
-    (L, U, pts, P0, P, w) = Hypatia.interpolate(n, d, calc_w=false)
+    (L, U, pts, P0, P, w) = Hypatia.interp_box(n, d, calc_w=false)
     P0sub = view(P0, :, 1:binomial(n+d-1, n))
     pscale = 0.5*(ubs - lbs)
     Wtsfun = (j -> sqrt.(1.0 .- abs2.(pts[:,j]))*pscale[j])
     PWts = [Wtsfun(j) .* P0sub for j in 1:n]
-    # PWts = [Array(qr!(Wtsfun(j) .* P0sub).Q) for j in 1:n] # alternatively, orthonormalize
+    if ortho_wts
+        PWts = [Array(qr!(W).Q) for W in PWts] # orthonormalize
+    end
 
     # transform points to fit the box domain
     trpts = pts .* pscale' .+ 0.5*(ubs + lbs)'
@@ -100,7 +103,7 @@ polys = Dict{Symbol,NamedTuple}(
         fn=((x,y) -> (1+(x+y+1)^2*(19-14x+3x^2-14y+6x*y+3y^2))*(30+(2x-3y)^2*(18-32x+12x^2+48y-36x*y+27y^2)))
         ),
     :heart => (n=8, lbs=[-0.1,0.4,-0.7,-0.7,0.1,-0.1,-0.3,-1.1], ubs=[0.4,1,-0.4,0.4,0.2,0.2,1.1,-0.3], deg=4,
-        fn=((s,t,u,v,w,x,y,z) -> s*x^3-3s*x*y^2+u*y^3-3u*y*x^2+t*w^3-3*t*w*z^2+v*z^3-3v*z*w^2)
+        fn=((s,t,u,v,w,x,y,z) -> s*x^3-3s*x*y^2+u*y^3-3u*y*x^2+t*w^3-3*t*w*z^2+v*z^3-3v*z*w^2+0.9563453)
         ),
     :lotkavolterra => (n=4, lbs=fill(-2,4), ubs=fill(2,4), deg=3,
         fn=((w,x,y,z) -> w*(x^2+y^2+z^2-1.1)+1)
