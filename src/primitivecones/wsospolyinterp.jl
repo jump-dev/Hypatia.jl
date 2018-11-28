@@ -76,30 +76,50 @@ function incone_prmtv(prmtv::WSOSPolyInterp, scal::Float64)
 
         # @show norm(tmp1j)
 
-        # # pivoted cholesky, upper triangle solve
-        # F = cholesky!(Symmetric(tmp1j, :U), Val(true), check=false)
-        # if !isposdef(F)
+        # pivoted cholesky, upper triangle solve
+        F = cholesky!(Symmetric(tmp1j, :U), Val(true), check=false)
+        if !isposdef(F)
+            return false
+        end
+        tmp2j .= view(ipwtj, :, F.p)
+        rdiv!(tmp2j, F.U)
+        mul!(tmp3, tmp2j, tmp2j')
+
+        # # bunch-kaufman-based
+        # F = bunchkaufman!(Symmetric(tmp1j), true, check=false)
+        # if !issuccess(F)
         #     return false
         # end
-        # tmp2j .= view(ipwtj, :, F.p)
-        # rdiv!(tmp2j, F.U)
-        # mul!(tmp3, tmp2j, tmp2j')
+        # # ipwtj * (tmp1j^-1 * ipwtj')
+        # tmp3 .= ipwtj * (F\ipwtj')
+        # # @. tmp2j = ipwtj
+        # # ldiv!(F, tmp2j')
+        # # mul!(tmp3, ipwtj, tmp2j)
 
-        # advanced bunch-kaufman solve
-        (Bcols, Brows) = size(tmp2j)
-        lsferr = Vector{Float64}(undef, Bcols)
-        lsberr = Vector{Float64}(undef, Bcols)
-        lswork = Vector{Float64}(undef, 3*Brows)
-        lsiwork = Vector{Float64}(undef, Brows)
-        lsAF = Matrix{Float64}(undef, Brows, Brows)
-        lsS = Vector{Float64}(undef, Brows)
-
-        newtmp = Matrix{Float64}(undef, Brows, Bcols)
-        posdef = hypatia_posvx!(newtmp, tmp1j, Array(ipwtj'), lsferr, lsberr, lswork, lsiwork, lsAF, lsS)
-        tmp3 .= tmp2j * newtmp
+        # # advanced bunch-kaufman solve
+        # # ipwtj * (tmp1j^-1 * ipwtj')
+        # B = Array(ipwtj')
+        # (Brows, Bcols) = size(B)
+        # lsferr = Vector{Float64}(undef, Bcols)
+        # lsberr = Vector{Float64}(undef, Bcols)
+        # lswork = Vector{Float64}(undef, 3*Brows)
+        # lsiwork = Vector{Float64}(undef, Brows)
+        # lsAF = Matrix{Float64}(undef, Brows, Brows)
+        # lsS = Vector{Float64}(undef, Brows)
+        #
+        # X = Matrix{Float64}(undef, Brows, Bcols)
+        # A = copy(tmp1j)
+        # # B = copy(ipwtj)
+        # posdef = hypatia_posvx!(X, A, B, lsferr, lsberr, lswork, lsiwork, lsAF, lsS)
+        # if !posdef
+        #     return false
+        # end
+        # # tmp3 .= ipwtj * X
+        # mul!(tmp3, ipwtj, X)
+        # @show norm(M - tmp3)
 
         # @show norm(tmp2j)
-        @show norm(tmp3)
+        # @show norm(tmp3)
 
         for i in eachindex(prmtv.g)
             prmtv.g[i] -= tmp3[i,i]
