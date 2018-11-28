@@ -111,6 +111,13 @@ function getregrinterp(
     return (U, pts, P, P0sub)
 end
 
+function doubledomains(conv_dom::Hypatia.Box)
+    full_conv_dom = conv_dom
+    append!(full_conv_dom.l, conv_dom.l)
+    append!(full_conv_dom.u, conv_dom.u)
+    return full_conv_dom
+end
+
 function build_shapeconregr_WSOS(
     X::Matrix{Float64},
     y::Vector{Float64},
@@ -126,25 +133,54 @@ function build_shapeconregr_WSOS(
     @polyvar x[1:n]
     @polyvar w[1:n]
 
-    (mono_U, mono_pts, mono_P, mono_P0sub) = getregrinterp(d, npoints, n, mono_dom, false, 10n)
-    mono_bss = Hypatia.get_bss(mono_dom, x)
-    mono_g = Hypatia.get_weights(mono_dom, mono_pts)
-    @assert length(mono_g) == length(mono_bss.p)
-    mono_PWts = [sqrt.(gi) .* mono_P0sub for gi in mono_g]
-    if ortho_wts
-        mono_PWts = [Array(qr!(W).Q) for W in mono_PWts] # orthonormalize
+    samplepts = false
+    full_conv_dom = doubledomains(conv_dom)
+    if samplepts
+        # monotonicity
+        (_, mono_U, mono_pts, _, mono_P, mono_PWts, _) = Hypatia.interp_sample(mono_dom, n, d, calc_w=false, ortho_wts=true, pts_factor=10n)
+        # convexity
+        (_, conv_U, conv_pts, _, conv_P, conv_PWts, _) = Hypatia.interp_sample(full_conv_dom, n, d+1, calc_w=false, ortho_wts=true, pts_factor=10n)
+    else
+        # monotonicity
+        @assert isa(mono_dom, Hypatia.Box)
+        @assert isa(conv_dom, Hypatia.Box)
+        (_, mono_U, mono_pts, P0, mono_P, _) = Hypatia.interp_box(n, d, calc_w=false)
+        P0sub = view(P0, :, 1:binomial(n+d-1, n))
+        pscale = 0.5*(mono_dom.u - mono_dom.l)
+        Wtsfun = (j -> sqrt.(1.0 .- abs2.(mono_pts[:,j]))*pscale[j])
+        mono_PWts = [Wtsfun(j) .* P0sub for j in 1:n]
+        if ortho_wts
+            mono_PWts = [Array(qr!(W).Q) for W in mono_PWts] # orthonormalize
+        end
+        # convexity
+        (_, conv_U, conv_pts, P0, conv_P, _) = Hypatia.interp_box(2n, d, calc_w=false)
+        P0sub = view(P0, :, 1:binomial(n+d-1, n))
+        pscale = 0.5*(full_conv_dom.u - full_conv_dom.l)
+        Wtsfun = (j -> sqrt.(1.0 .- abs2.(conv_pts[:,j]))*pscale[j])
+        conv_PWts = [Wtsfun(j) .* P0sub for j in 1:n]
+        if ortho_wts
+            conv_PWts = [Array(qr!(W).Q) for W in conv_PWts] # orthonormalize
+        end
     end
+
+    # (mono_U, mono_pts, mono_P, mono_P0sub) = getregrinterp(d, npoints, n, mono_dom, false, 10n)
+
+    # mono_bss = Hypatia.get_bss(mono_dom, x)
+    # mono_g = Hypatia.get_weights(mono_dom, mono_pts)
+    # @assert length(mono_g) == length(mono_bss.p)
+    # mono_PWts = [sqrt.(gi) .* mono_P0sub for gi in mono_g]
+    # if ortho_wts
+    #     mono_PWts = [Array(qr!(W).Q) for W in mono_PWts] # orthonormalize
+    # end
     mono_wsos_cone = WSOSPolyInterpCone(mono_U, [mono_P, mono_PWts...])
 
-    # TODO think about if it's ok to go up to d+1
-    (conv_U, conv_pts, conv_P, conv_P0sub) = getregrinterp(d+1, npoints, 2n, conv_dom, true, 10n)
-    conv_bss = Hypatia.get_bss(conv_dom, x)
-    conv_g = Hypatia.get_weights(conv_dom, conv_pts; count=n)
-    @assert length(conv_g) == length(conv_bss.p)
-    conv_PWts = [sqrt.(gi) .* conv_P0sub for gi in conv_g]
-    if ortho_wts
-        conv_PWts = [Array(qr!(W).Q) for W in conv_PWts] # orthonormalize
-    end
+    # # TODO think about if it's ok to go up to d+1
+    # (conv_U, conv_pts, conv_P, conv_P0sub) = getregrinterp(d+1, npoints, 2n, conv_dom, true, 10n)
+    # conv_g = Hypatia.get_weights(conv_dom, conv_pts; count=n)
+    # conv_PWts = [sqrt.(gi) .* conv_P0sub for gi in conv_g]
+    # if ortho_wts
+    #     conv_PWts = [Array(qr!(W).Q) for W in conv_PWts] # orthonormalize
+    # end
     conv_wsos_cone = WSOSPolyInterpCone(conv_U, [conv_P, conv_PWts...])
 
     model = Model(with_optimizer(Hypatia.Optimizer, verbose=true))
@@ -210,10 +246,10 @@ function run_JuMP_shapeconregr(use_wsos::Bool)
     @test du_status == MOI.FeasiblePoint
     @test pobj ≈ dobj atol=1e-4 rtol=1e-4
 
-    preds = [JuMP.value(p)(X[i,:]) for i in 1:npoints]
-
-    return (pobj, preds)
+    return (pobj, p)
 end
 
 run_JuMP_shapeconregr_PSD() = run_JuMP_shapeconregr(false)
 run_JuMP_shapeconregr_WSOS() = run_JuMP_shapeconregr(true)
+
+p = run_JuMP_shapeconregr_WSOS()
