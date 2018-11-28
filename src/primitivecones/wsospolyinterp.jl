@@ -97,9 +97,8 @@ function incone_prmtv(prmtv::WSOSPolyInterp, scal::Float64)
     # @show norm(prmtv.g)
     # @show norm(prmtv.H)
 
-    return factH(prmtv)
+    @. prmtv.H2 = prmtv.H
+    prmtv.F = cholesky!(Symmetric(prmtv.H2), Val(true), check=false)
+    return isposdef(prmtv.F)
+    # return factH(prmtv)
 end
-
-# calcg_prmtv!(g::AbstractVector{Float64}, prmtv::WSOSPolyInterp) = (@. g = prmtv.g; g)
-# calcHiarr_prmtv!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prmtv::WSOSPolyInterp) = ldiv!(prod, prmtv.F, arr)
-# calcHarr_prmtv!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prmtv::WSOSPolyInterp) = mul!(prod, prmtv.H, arr)
