@@ -14,6 +14,9 @@ See e.g. Chapter 8 of thesis by G. Hall (2018).
 using LinearAlgebra
 using Random
 using Distributions
+using MathOptInterface
+MOI = MathOptInterface
+using JuMP
 using Hypatia
 using MultivariatePolynomials
 using DynamicPolynomials
