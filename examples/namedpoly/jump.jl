@@ -36,7 +36,7 @@ function build_JuMP_namedpoly_WSOS(
     dom::Hypatia.InterpDomain;
     d::Int = div(maxdegree(f) + 1, 2),
     pts_factor = nvariables(f),
-    ortho_wts::Bool = true,
+    ortho_wts::Bool = false,
     rseed::Int = 1,
     )
     n = nvariables(f) # number of polyvars
