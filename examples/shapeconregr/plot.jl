@@ -9,7 +9,7 @@ using PlotlyJS
 using ORCA
 using Test
 
-function makeplot(psd_p, wsos_p)
+function makeplot(regressor, X, y)
     data_trace = scatter3d(
         x=X[:, 1],
         y=X[:, 2],
@@ -22,22 +22,11 @@ function makeplot(psd_p, wsos_p)
     )
     randx = rand(Uniform(-1, 1), 200)
     randy = rand(Uniform(-1, 1), 200)
-    psdz = [JuMP.value(psd_p)(hcat(randx, randy)[i,:]) for i in 1:200]
-    wsosz = [JuMP.value(wsos_p)(hcat(randx, randy)[i,:]) for i in 1:200]
-    psd_trace = mesh3d(
+    randz = [JuMP.value(regressor)(hcat(randx, randy)[i,:]) for i in 1:200]
+    mdl_trace = mesh3d(
         x=randx,
         y=randy,
-        z=psdz,
-        mode="markers",
-        opacity=0.4,
-        marker_size=6,
-        marker_line_width=0.5,
-        marker_line_color="rgba(217, 217, 217, 0.14)"
-    )
-    wsos_trace = mesh3d(
-        x=randx,
-        y=randy,
-        z=wsosz,
+        z=randz,
         mode="markers",
         opacity=0.4,
         marker_size=6,
@@ -46,10 +35,8 @@ function makeplot(psd_p, wsos_p)
     )
     layout = Layout(margin=attr(l=0, r=0, t=0, b=0))
 
-    psd_plot = plot([data_trace, psd_trace], layout)
-    wsos_plot = plot([data_trace, wsos_trace], layout)
-    # savefig(psd_plot, "psd_plot.pdf")
-    # savefig(wsos_plot, "wsos_plot.pdf")
+    p = plot([data_trace, mdl_trace], layout)
+    # savefig(p, "psd_plot.pdf")
 
-    return nothing
+    return p
 end
