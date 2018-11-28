@@ -24,7 +24,6 @@ mutable struct WSOSPolyInterp <: PrimitiveCone
     tmp2::Vector{Matrix{Float64}}
     tmp3::Matrix{Float64}
     scal::Float64
-    iscal::Float64
 
     function WSOSPolyInterp(dim::Int, ipwt::Vector{Matrix{Float64}}, isdual::Bool)
         for ipwtj in ipwt
@@ -56,8 +55,8 @@ function incone_prmtv(prmtv::WSOSPolyInterp, scal::Float64)
     # @show newpnt
     # prmtv.scal = norm(newpnt, Inf)
     prmtv.scal = prmtv.dim*scal
-    prmtv.iscal = inv(prmtv.scal)
-    lmul!(prmtv.iscal, newpnt)
+    newpnt ./= prmtv.scal
+    # lmul!(prmtv.iscal, newpnt)
     # @show newpnt
     # @show prmtv.scal
 
@@ -74,7 +73,7 @@ function incone_prmtv(prmtv::WSOSPolyInterp, scal::Float64)
         mul!(tmp2j, Diagonal(newpnt), ipwtj)
         mul!(tmp1j, ipwtj', tmp2j)
 
-        # @show norm(tmp1j)
+        @show norm(tmp1j)
 
         # pivoted cholesky, upper triangle solve
         F = cholesky!(Symmetric(tmp1j, :U), Val(true), check=false)
@@ -128,10 +127,14 @@ function incone_prmtv(prmtv::WSOSPolyInterp, scal::Float64)
     end
 
     # @show norm(prmtv.g)
-    # @show norm(prmtv.H)
+    @show norm(prmtv.H)
 
     @. prmtv.H2 = prmtv.H
     prmtv.F = cholesky!(Symmetric(prmtv.H2), Val(true), check=false)
     return isposdef(prmtv.F)
     # return factH(prmtv)
 end
+
+calcg_prmtv!(g::AbstractVector{Float64}, prmtv::WSOSPolyInterp) = (@. g = prmtv.g/prmtv.scal; g)
+calcHiarr_prmtv!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prmtv::WSOSPolyInterp) = (ldiv!(prod, prmtv.F, arr); @. prod = prod * prmtv.scal * prmtv.scal; prod)
+calcHarr_prmtv!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prmtv::WSOSPolyInterp) = (mul!(prod, prmtv.H, arr); @. prod = prod / prmtv.scal / prmtv.scal; prod)
