@@ -152,7 +152,7 @@ function build_shapeconregr_WSOS(
         p, PolyJuMP.Poly(monomials(x, 0:r)) # monomial basis coefficients
         z[1:npoints] # residuals
         # interpolant basis coefficients
-        mono_interp_coeffs[1:mono_U, 1:n]
+        # mono_interp_coeffs[1:mono_U, 1:n]
         conv_interp_coeffs[1:conv_U] # TODO symmetry
     end)
     @objective(model, Min, sum(z))
@@ -163,16 +163,18 @@ function build_shapeconregr_WSOS(
 
     # relate coefficients for monotonicity
     dp = [DynamicPolynomials.differentiate(p, x[j]) for j in 1:n]
-    for j in 1:n, i in 1:mono_U
-        @constraint(model, mono_profile[j] * dp[j](mono_pts[i, :]) == mono_interp_coeffs[i, j])
-    end
+    # for j in 1:n, i in 1:mono_U
+    #     @constraint(model, mono_profile[j] * dp[j](mono_pts[i, :]) == mono_interp_coeffs[i, j])
+    # end
 
     # relate coefficients for convexity
     Hp = [DynamicPolynomials.differentiate(dp[i], x[j]) for i in 1:n, j in 1:n]
     conv_condition = w'*Hp*w
     @constraints(model, begin
+        [j in 1:n], [mono_profile[j] * dp[j](mono_pts[i, :]) for i in 1:mono_U] in mono_wsos_cone
+        # [conv_condition(conv_pts[i, :]) for i in 1:conv_U] in conv_wsos_cone
         [i in 1:conv_U], conv_condition(conv_pts[i, :]) == conv_interp_coeffs[i]
-        [j in 1:n], mono_interp_coeffs[:, j] in mono_wsos_cone
+        # [j in 1:n], mono_interp_coeffs[:, j] in mono_wsos_cone
         conv_interp_coeffs in conv_wsos_cone
     end)
 
