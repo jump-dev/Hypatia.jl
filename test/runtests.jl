@@ -182,7 +182,7 @@ include(joinpath(@__DIR__, "examples.jl"))
 
 @info("starting JuMP examples tests")
 testfuns = [
-    # _namedpoly1_JuMP,
+    _namedpoly1_JuMP,
     _namedpoly2_JuMP,
     _namedpoly3_JuMP,
     _namedpoly4_JuMP,
