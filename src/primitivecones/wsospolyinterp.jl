@@ -76,17 +76,30 @@ function incone_prmtv(prmtv::WSOSPolyInterp, scal::Float64)
 
         # @show norm(tmp1j)
 
-        # pivoted cholesky, upper triangle solve
-        F = cholesky!(Symmetric(tmp1j, :U), Val(true), check=false)
-        if !isposdef(F)
-            return false
-        end
-        tmp2j .= view(ipwtj, :, F.p)
-        rdiv!(tmp2j, F.U)
-        mul!(tmp3, tmp2j, tmp2j')
+        # # pivoted cholesky, upper triangle solve
+        # F = cholesky!(Symmetric(tmp1j, :U), Val(true), check=false)
+        # if !isposdef(F)
+        #     return false
+        # end
+        # tmp2j .= view(ipwtj, :, F.p)
+        # rdiv!(tmp2j, F.U)
+        # mul!(tmp3, tmp2j, tmp2j')
+
+        # advanced bunch-kaufman solve
+        (Bcols, Brows) = size(tmp2j)
+        lsferr = Vector{Float64}(undef, Bcols)
+        lsberr = Vector{Float64}(undef, Bcols)
+        lswork = Vector{Float64}(undef, 3*Brows)
+        lsiwork = Vector{Float64}(undef, Brows)
+        lsAF = Matrix{Float64}(undef, Brows, Brows)
+        lsS = Vector{Float64}(undef, Brows)
+
+        newtmp = Matrix{Float64}(undef, Brows, Bcols)
+        posdef = hypatia_posvx!(newtmp, tmp1j, Array(ipwtj'), lsferr, lsberr, lswork, lsiwork, lsAF, lsS)
+        tmp3 .= tmp2j * newtmp
 
         # @show norm(tmp2j)
-        # @show norm(tmp3)
+        @show norm(tmp3)
 
         for i in eachindex(prmtv.g)
             prmtv.g[i] -= tmp3[i,i]
