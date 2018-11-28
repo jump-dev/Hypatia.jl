@@ -47,12 +47,10 @@ function build_JuMP_namedpoly_WSOS(
     model = Model(with_optimizer(Hypatia.Optimizer, verbose=true))
     @variables(model, begin
         a
-        q[1:U]
     end)
     @objective(model, Max, a)
     @constraints(model, begin
-        q - a .* ones(U) in WSOSPolyInterpCone(U, [P, PWts...])
-        [i in 1:U], f(pts[i,:]) == q[i]
+        [f(pts[i,:]) - a for i in 1:U] in WSOSPolyInterpCone(U, [P, PWts...])
     end)
 
     return model
@@ -64,7 +62,7 @@ function run_JuMP_namedpoly(use_wsos::Bool)
         # :butcher, 2
         # :butcher_ball, 2
         # :butcher_ellipsoid, 2
-        # :caprasse, 4
+        :caprasse, 4
         # :caprasse_ball, 4
         # :goldsteinprice, 7
         # :goldsteinprice_ball, 7
