@@ -236,3 +236,63 @@ function _namedpoly4_JuMP()
     # mdl = build_JuMP_namedpoly_PSD(x, f, dom, d=7)
     # solveandcheck_namedpoly(mdl, truemin)
 end
+
+function _namedpoly5_JuMP()
+    (x, f, dom, truemin) = getpolydata(:caprasse)
+    # WSOS formulation
+    mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=4, pts_factor=4*length(x))
+    solveandcheck_namedpoly(mdl, truemin)
+    # SDP formulation
+    # mdl = build_JuMP_namedpoly_PSD(x, f, dom, d=4)
+    # solveandcheck_namedpoly(mdl, truemin)
+end
+
+function _namedpoly6_JuMP()
+    (x, f, dom, truemin) = getpolydata(:goldsteinprice)
+    # WSOS formulation
+    mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=7, pts_factor=4*length(x))
+    solveandcheck_namedpoly(mdl, truemin)
+    # SDP formulation
+    # mdl = build_JuMP_namedpoly_PSD(x, f, dom, d=7)
+    # solveandcheck_namedpoly(mdl, truemin)
+end
+
+function _namedpoly7_JuMP()
+    (x, f, dom, truemin) = getpolydata(:lotkavolterra)
+    # WSOS formulation
+    mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=3, pts_factor=4*length(x))
+    solveandcheck_namedpoly(mdl, truemin)
+    # SDP formulation
+    # mdl = build_JuMP_namedpoly_PSD(x, f, dom, d=3)
+    # solveandcheck_namedpoly(mdl, truemin)
+end
+
+function _namedpoly8_JuMP()
+    (x, f, dom, truemin) = getpolydata(:robinson)
+    # WSOS formulation
+    mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=8, pts_factor=4*length(x))
+    solveandcheck_namedpoly(mdl, truemin)
+    # SDP formulation
+    # mdl = build_JuMP_namedpoly_PSD(x, f, dom, d=8)
+    # solveandcheck_namedpoly(mdl, truemin)
+end
+
+function _namedpoly9_JuMP()
+    (x, f, dom, truemin) = getpolydata(:reactiondiffusion_ball)
+    # WSOS formulation
+    mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=3, pts_factor=4*length(x))
+    solveandcheck_namedpoly(mdl, truemin)
+    # SDP formulation
+    # mdl = build_JuMP_namedpoly_PSD(x, f, dom, d=3)
+    # solveandcheck_namedpoly(mdl, truemin)
+end
+
+function _namedpoly10_JuMP()
+    (x, f, dom, truemin) = getpolydata(:rosenbrock)
+    # WSOS formulation
+    mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=4, pts_factor=4*length(x))
+    solveandcheck_namedpoly(mdl, truemin)
+    # SDP formulation
+    # mdl = build_JuMP_namedpoly_PSD(x, f, dom, d=4)
+    # solveandcheck_namedpoly(mdl, truemin)
+end
