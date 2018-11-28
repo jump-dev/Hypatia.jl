@@ -186,6 +186,12 @@ testfuns = [
     _namedpoly2_JuMP,
     _namedpoly3_JuMP,
     # _namedpoly4_JuMP,
+    # _namedpoly5_JuMP,
+    # _namedpoly6_JuMP,
+    # _namedpoly7_JuMP,
+    _namedpoly8_JuMP,
+    _namedpoly9_JuMP,
+    # _namedpoly10_JuMP,
     ]
 @testset "JuMP examples: $testfun" for testfun in testfuns
     testfun()
