@@ -9,7 +9,7 @@ using PlotlyJS
 using ORCA
 using Test
 
-function makeplot(regressor, wsos_p, X, y)
+function makeplot(regressor, X, y)
     data_trace = scatter3d(
         x=X[:, 1],
         y=X[:, 2],
