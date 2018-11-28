@@ -7,6 +7,7 @@ see description in examples/namedpoly/native.jl
 using LinearAlgebra
 using Random
 using Hypatia
+using JuMP
 import MathOptInterface
 MOI = MathOptInterface
 using MultivariatePolynomials
@@ -40,7 +41,7 @@ function build_JuMP_namedpoly_WSOS(
     )
     n = nvariables(f) # number of polyvars
 
-    (L, U, pts, P0, P, PWts, w) = Hypatia.interp_sample(dom, n, d, calc_w=false, ortho_wts=ortho_wts)
+    (L, U, pts, P0, P, PWts, w) = Hypatia.interp_sample(dom, n, d, calc_w=false, ortho_wts=ortho_wts, pts_factor=pts_factor)
 
     # build JuMP model
     model = Model(with_optimizer(Hypatia.Optimizer, verbose=true))
