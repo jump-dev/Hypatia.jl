@@ -151,34 +151,34 @@ include(joinpath(egs_dir, "namedpoly/jump.jl"))
 include(joinpath(egs_dir, "shapeconregr/jump.jl"))
 include(joinpath(@__DIR__, "examples.jl"))
 
-# @info("starting native examples tests")
-# verbose = true
-# lscachetypes = [
-#     Hypatia.QRSymmCache,
-#     # Hypatia.NaiveCache, # slow
-#     ]
-# testfuns = [
-#     _envelope1,
-#     _envelope2,
-#     _envelope3,
-#     _envelope4,
-#     # _linearopt1,
-#     # _linearopt2,
-#     _namedpoly1,
-#     _namedpoly2,
-#     _namedpoly3, # numerically unstable
-#     # _namedpoly4, # interpolation memory usage excessive
-#     _namedpoly5,
-#     # _namedpoly6, # interpolation memory usage excessive
-#     _namedpoly7,
-#     _namedpoly8,
-#     _namedpoly9,
-#     _namedpoly10, # numerically unstable
-#     _namedpoly11,
-#     ]
-# @testset "native examples: $testfun, $lscachetype" for testfun in testfuns, lscachetype in lscachetypes
-#     testfun(verbose=verbose, lscachetype=lscachetype)
-# end
+@info("starting native examples tests")
+verbose = true
+lscachetypes = [
+    Hypatia.QRSymmCache,
+    # Hypatia.NaiveCache, # slow
+    ]
+testfuns = [
+    # _envelope1,
+    # _envelope2,
+    # _envelope3,
+    # _envelope4,
+    # # _linearopt1,
+    # # _linearopt2,
+    # _namedpoly1,
+    # _namedpoly2,
+    # _namedpoly3, # numerically unstable
+    # # _namedpoly4, # interpolation memory usage excessive
+    # _namedpoly5,
+    # # _namedpoly6, # interpolation memory usage excessive
+    # _namedpoly7,
+    # _namedpoly8,
+    # _namedpoly9,
+    # _namedpoly10, # numerically unstable
+    # _namedpoly11,
+    ]
+@testset "native examples: $testfun, $lscachetype" for testfun in testfuns, lscachetype in lscachetypes
+    testfun(verbose=verbose, lscachetype=lscachetype)
+end
 
 @info("starting JuMP examples tests")
 testfuns = [
