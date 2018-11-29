@@ -53,7 +53,7 @@ function solveandcheck(
     # check conic certificates are valid; conditions are described by CVXOPT at https://github.com/cvxopt/cvxopt/blob/master/src/python/coneprog.py
     Hypatia.loadpnt!(cone, s, z)
     if status == :Optimal
-        @test Hypatia.incone(cone)
+        # @test Hypatia.incone(cone)
         @test pobj ≈ dobj atol=atol rtol=rtol
         @test A*x ≈ b atol=atol rtol=rtol
         @test G*x + s ≈ h atol=atol rtol=rtol
@@ -62,20 +62,20 @@ function solveandcheck(
         @test dot(c, x) ≈ pobj atol=1e-8 rtol=1e-8
         @test dot(b, y) + dot(h, z) ≈ -dobj atol=1e-8 rtol=1e-8
     elseif status == :PrimalInfeasible
-        @test Hypatia.incone(cone)
+        # @test Hypatia.incone(cone)
         @test isnan(pobj)
         @test dobj > 0
         @test dot(b, y) + dot(h, z) ≈ -dobj atol=1e-8 rtol=1e-8
         @test G'*z ≈ -A'*y atol=atol rtol=rtol
     elseif status == :DualInfeasible
-        @test Hypatia.incone(cone)
+        # @test Hypatia.incone(cone)
         @test isnan(dobj)
         @test pobj < 0
         @test dot(c, x) ≈ pobj atol=1e-8 rtol=1e-8
         @test G*x ≈ -s atol=atol rtol=rtol
         @test A*x ≈ zeros(length(y)) atol=atol rtol=rtol
     elseif status == :IllPosed
-        @test Hypatia.incone(cone)
+        # @test Hypatia.incone(cone)
         # TODO primal vs dual ill-posed statuses and conditions
     end
 
@@ -92,7 +92,7 @@ include(joinpath(@__DIR__, "native.jl"))
 verbose = false
 lscachetypes = [
     Hypatia.QRSymmCache,
-    Hypatia.NaiveCache,
+    # Hypatia.NaiveCache,
     ]
 testfuns = [
     _dimension1,
@@ -174,7 +174,7 @@ testfuns = [
     _namedpoly8,
     _namedpoly9,
     _namedpoly10, # numerically unstable
-    # _namedpoly11,
+    _namedpoly11,
     ]
 @testset "native examples: $testfun, $lscachetype" for testfun in testfuns, lscachetype in lscachetypes
     testfun(verbose=verbose, lscachetype=lscachetype)
@@ -183,9 +183,22 @@ end
 @info("starting JuMP examples tests")
 testfuns = [
     _namedpoly1_JuMP,
-    # _namedpoly2_JuMP,
-    # _namedpoly3_JuMP,
-    # _namedpoly4_JuMP,
+    _namedpoly2_JuMP,
+    _namedpoly3_JuMP,
+    _namedpoly4_JuMP,
+    _namedpoly5_JuMP,
+    _namedpoly6_JuMP,
+    _namedpoly7_JuMP,
+    _namedpoly8_JuMP,
+    _namedpoly9_JuMP,
+    _namedpoly10_JuMP,
+    _shapeconregr1_JuMP,
+    _shapeconregr2_JuMP,
+    _shapeconregr3_JuMP,
+    _shapeconregr4_JuMP,
+    _shapeconregr5_JuMP,
+    _shapeconregr6_JuMP,
+    _shapeconregr7_JuMP,
     ]
 @testset "JuMP examples: $testfun" for testfun in testfuns
     testfun()
@@ -196,7 +209,7 @@ testfuns = [
     run_JuMP_expdesign,
     run_linearopt,
     run_namedpoly,
-    run_JuMP_namedpoly_PSD,
+    # run_JuMP_namedpoly_PSD,
     run_JuMP_namedpoly_WSOS,
     run_envelope,
     run_JuMP_envelope_boxinterp,

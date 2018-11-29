@@ -35,23 +35,16 @@ function build_JuMP_namedpoly_WSOS(
     f,
     dom::Hypatia.InterpDomain;
     d::Int = div(maxdegree(f) + 1, 2),
-    pts_factor = nvariables(f),
-    ortho_wts::Bool = false,
+    pts_factor = 10,
     rseed::Int = 1,
     )
-    n = nvariables(f) # number of polyvars
-
-    (L, U, pts, P0, P, PWts, w) = Hypatia.interp_sample(dom, n, d, calc_w=false, ortho_wts=ortho_wts, pts_factor=pts_factor)
+    (L, U, pts, P0, PWts, w) = Hypatia.interp_sample(dom, nvariables(f), d, pts_factor=pts_factor)
 
     # build JuMP model
     model = Model(with_optimizer(Hypatia.Optimizer, verbose=true))
-    @variables(model, begin
-        a
-    end)
+    @variable(model, a)
     @objective(model, Max, a)
-    @constraints(model, begin
-        [f(pts[i,:]) - a for i in 1:U] in WSOSPolyInterpCone(U, [P, PWts...])
-    end)
+    @constraint(model, [f(pts[i,:]) - a for i in 1:U] in WSOSPolyInterpCone(U, [P0, PWts...]))
 
     return model
 end
@@ -62,7 +55,7 @@ function run_JuMP_namedpoly(use_wsos::Bool)
         # :butcher, 2
         # :butcher_ball, 2
         # :butcher_ellipsoid, 2
-        :caprasse, 4
+        # :caprasse, 4
         # :caprasse_ball, 4
         # :goldsteinprice, 7
         # :goldsteinprice_ball, 7
@@ -72,11 +65,11 @@ function run_JuMP_namedpoly(use_wsos::Bool)
         # :lotkavolterra_ball, 3
         # :magnetism7, 2
         # :magnetism7_ball, 2
-        :motzkin, 7
+        # :motzkin, 7
         # :motzkin_ball, 7
         # :motzkin_ellipsoid, 7
         # :reactiondiffusion, 3
-        # :reactiondiffusion_ball, 3
+        :reactiondiffusion_ball, 3
         # :robinson, 8
         # :robinson_ball, 8
         # :rosenbrock, 4
@@ -87,7 +80,7 @@ function run_JuMP_namedpoly(use_wsos::Bool)
     (x, f, dom, truemin) = getpolydata(polyname)
 
     if use_wsos
-        model = build_JuMP_namedpoly_WSOS(x, f, dom, d=deg, pts_factor=10*nvariables(x))
+        model = build_JuMP_namedpoly_WSOS(x, f, dom, d=deg)
     else
         model = build_JuMP_namedpoly_PSD(x, f, dom, d=deg)
     end

@@ -50,7 +50,7 @@ function getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::PosSemidef)
 end
 loadpnt_prmtv!(prmtv::PosSemidef, pnt::AbstractVector{Float64}) = (prmtv.pnt = pnt)
 
-function incone_prmtv(prmtv::PosSemidef)
+function incone_prmtv(prmtv::PosSemidef, scal::Float64)
     vectomat!(prmtv.mat, prmtv.pnt)
     @. prmtv.matpnt = prmtv.mat
 

@@ -39,7 +39,7 @@ barrierpar_prmtv(prmtv::HypoPerLog) = 3
 getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::HypoPerLog) = (arr[1] = -1.0; arr[2] = 1.0; arr[3] = 1.0; arr)
 loadpnt_prmtv!(prmtv::HypoPerLog, pnt::AbstractVector{Float64}) = (prmtv.pnt = pnt)
 
-function incone_prmtv(prmtv::HypoPerLog)
+function incone_prmtv(prmtv::HypoPerLog, scal::Float64)
     u = prmtv.pnt[1]; v = prmtv.pnt[2]; w = prmtv.pnt[3]
     if (v <= 0.0) || (w <= 0.0)
         return false
@@ -71,7 +71,3 @@ function incone_prmtv(prmtv::HypoPerLog)
 
     return factH(prmtv)
 end
-
-calcg_prmtv!(g::AbstractVector{Float64}, prmtv::HypoPerLog) = (@. g = prmtv.g; g)
-calcHiarr_prmtv!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prmtv::HypoPerLog) = ldiv!(prod, prmtv.F, arr)
-calcHarr_prmtv!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prmtv::HypoPerLog) = mul!(prod, prmtv.H, arr)

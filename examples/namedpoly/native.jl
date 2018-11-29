@@ -15,7 +15,6 @@ using Test
 function build_namedpoly(
     polyname::Symbol,
     d::Int;
-    ortho_wts::Bool = true,
     )
     # get data for named polynomial
     (n, lbs, ubs, deg, fn) = polys[polyname]
@@ -24,14 +23,11 @@ function build_namedpoly(
     end
 
     # generate interpolation
-    (L, U, pts, P0, P, w) = Hypatia.interp_box(n, d, calc_w=false)
+    (L, U, pts, P0, w) = Hypatia.interp_box(n, d, calc_w=false)
     P0sub = view(P0, :, 1:binomial(n+d-1, n))
     pscale = 0.5*(ubs - lbs)
     Wtsfun = (j -> sqrt.(1.0 .- abs2.(pts[:,j]))*pscale[j])
     PWts = [Wtsfun(j) .* P0sub for j in 1:n]
-    if ortho_wts
-        PWts = [Array(qr!(W).Q) for W in PWts] # orthonormalize
-    end
 
     # transform points to fit the box domain
     trpts = pts .* pscale' .+ 0.5*(ubs + lbs)'

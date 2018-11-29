@@ -57,7 +57,7 @@ barrierpar_prmtv(prmtv::EpiNormSpectral) = prmtv.n + 1
 getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::EpiNormSpectral) = (@. arr = 0.0; arr[1] = 1.0; arr)
 loadpnt_prmtv!(prmtv::EpiNormSpectral, pnt::AbstractVector{Float64}) = (prmtv.pnt = pnt)
 
-function incone_prmtv(prmtv::EpiNormSpectral)
+function incone_prmtv(prmtv::EpiNormSpectral, scal::Float64)
     prmtv.mat[:] = @view prmtv.pnt[2:end] # TODO a little slow
     F = svd!(prmtv.mat) # TODO reduce allocs further
     if F.S[1] >= prmtv.pnt[1]
@@ -71,7 +71,3 @@ function incone_prmtv(prmtv::EpiNormSpectral)
 
     return factH(prmtv)
 end
-
-calcg_prmtv!(g::AbstractVector{Float64}, prmtv::EpiNormSpectral) = (@. g = prmtv.g; g)
-calcHiarr_prmtv!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prmtv::EpiNormSpectral) = ldiv!(prod, prmtv.F, arr)
-calcHarr_prmtv!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prmtv::EpiNormSpectral) = mul!(prod, prmtv.H, arr)

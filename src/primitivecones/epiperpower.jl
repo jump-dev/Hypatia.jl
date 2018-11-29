@@ -53,12 +53,12 @@ barrierpar_prmtv(prmtv::EpiPerPower) = 3 - 2*min(inv(prmtv.alpha), 1.0 - inv(prm
 getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::EpiPerPower) = (arr[1] = 1.0; arr[2] = 1.0; arr[3] = 0.0; arr)
 loadpnt_prmtv!(prmtv::EpiPerPower, pnt::AbstractVector{Float64}) = (prmtv.pnt = pnt)
 
-function incone_prmtv(prmtv::EpiPerPower)
+function incone_prmtv(prmtv::EpiPerPower, scal::Float64)
     u = prmtv.pnt[1]
     v = prmtv.pnt[2]
     w = prmtv.pnt[3]
     alpha = prmtv.alpha
-    if u <= 0.0 || v <= 0.0 || u < v*(abs(w/v))^alpha
+    if u <= 0.0 || v <= 0.0 || u <= v*(abs(w/v))^alpha
         return false
     end
 
@@ -69,7 +69,3 @@ function incone_prmtv(prmtv::EpiPerPower)
 
     return factH(prmtv)
 end
-
-calcg_prmtv!(g::AbstractVector{Float64}, prmtv::EpiPerPower) = (@. g = prmtv.g; g)
-calcHiarr_prmtv!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prmtv::EpiPerPower) = ldiv!(prod, prmtv.F, arr)
-calcHarr_prmtv!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prmtv::EpiPerPower) = mul!(prod, prmtv.H, arr)
