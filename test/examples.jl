@@ -178,7 +178,7 @@ function _namedpoly11(; verbose, lscachetype)
     (c, A, b, G, h, cone) = build_namedpoly(:schwefel, 4)
     r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype, atol=2e-4)
     @test r.status == :Optimal
-    @test r.niters <= 60
+    @test r.niters <= 65
     @test r.pobj ≈ 0 atol=1e-3 rtol=1e-3
 end
 

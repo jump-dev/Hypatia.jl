@@ -15,7 +15,7 @@ using Test
 function build_namedpoly(
     polyname::Symbol,
     d::Int;
-    ortho_wts::Bool = true,
+    ortho_wts::Bool = false,
     )
     # get data for named polynomial
     (n, lbs, ubs, deg, fn) = polys[polyname]

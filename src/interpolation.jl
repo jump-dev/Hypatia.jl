@@ -380,15 +380,22 @@ function interp_sample(
     keep_pnt = F.p[1:U]
     pts = candidate_pts[keep_pnt,:] # subset of points indexed with the support of w
     P0 = M[keep_pnt, 1:L] # subset of polynomial evaluations up to total degree d
-    P = Array(qr(P0).Q)
+
+
+
+    P = copy(P0)#Array(qr(P0).Q)
+    # TODO don't use P ever
+
+
+
     # TODO take into account degree of g. Currently always 2 for balls, ellipsoids, and intervals by luck.
     P0sub = view(P0, :, 1:binomial(n+d-1, n))
 
     g = Hypatia.get_weights(dom, pts)
     PWts = [sqrt.(gi) .* P0sub for gi in g]
-    if ortho_wts
-        PWts = [Array(qr!(W).Q) for W in PWts] # orthonormalize
-    end
+    # if ortho_wts
+    #     PWts = [Array(qr!(W).Q) for W in PWts] # orthonormalize
+    # end
 
     if calc_w
         Qtm = F.Q'*m

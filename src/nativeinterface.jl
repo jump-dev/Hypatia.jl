@@ -327,7 +327,9 @@ function solve!(mdl::Model)
     kap = 1.0
     mu = (dot(tz, ts) + tau*kap)/bnu
     @assert !isnan(mu)
-    @assert abs(1.0 - mu) < 1e-10
+    if abs(1.0 - mu) > 1e-6
+        error("mu is $mu")
+    end
 
     # solve for tx and ty
     # A'y = -c - G'z

@@ -118,7 +118,7 @@ function build_shapeconregr_WSOS(
     mono_dom::Hypatia.InterpDomain,
     conv_dom::Hypatia.InterpDomain,
     mono_profile::Vector{Float64};
-    ortho_wts::Bool = true,
+    ortho_wts::Bool = false,
     )
     @assert mod(r, 2) == 1
     d = div(r-1, 2)
@@ -131,9 +131,9 @@ function build_shapeconregr_WSOS(
     mono_g = Hypatia.get_weights(mono_dom, mono_pts)
     @assert length(mono_g) == length(mono_bss.p)
     mono_PWts = [sqrt.(gi) .* mono_P0sub for gi in mono_g]
-    if ortho_wts
-        mono_PWts = [Array(qr!(W).Q) for W in mono_PWts] # orthonormalize
-    end
+    # if ortho_wts
+    #     mono_PWts = [Array(qr!(W).Q) for W in mono_PWts] # orthonormalize
+    # end
     mono_wsos_cone = WSOSPolyInterpCone(mono_U, [mono_P, mono_PWts...])
 
     # TODO think about if it's ok to go up to d+1
@@ -142,9 +142,9 @@ function build_shapeconregr_WSOS(
     conv_g = Hypatia.get_weights(conv_dom, conv_pts; count=n)
     @assert length(conv_g) == length(conv_bss.p)
     conv_PWts = [sqrt.(gi) .* conv_P0sub for gi in conv_g]
-    if ortho_wts
-        conv_PWts = [Array(qr!(W).Q) for W in conv_PWts] # orthonormalize
-    end
+    # if ortho_wts
+    #     conv_PWts = [Array(qr!(W).Q) for W in conv_PWts] # orthonormalize
+    # end
     conv_wsos_cone = WSOSPolyInterpCone(conv_U, [conv_P, conv_PWts...])
 
     model = Model(with_optimizer(Hypatia.Optimizer, verbose=true))
