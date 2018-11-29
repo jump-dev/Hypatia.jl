@@ -33,7 +33,7 @@ barrierpar_prmtv(prmtv::EpiNormEucl) = 1
 getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::EpiNormEucl) = (@. arr = 0.0; arr[1] = 1.0; arr)
 loadpnt_prmtv!(prmtv::EpiNormEucl, pnt::AbstractVector{Float64}) = (prmtv.pnt = pnt)
 
-function incone_prmtv(prmtv::EpiNormEucl)
+function incone_prmtv(prmtv::EpiNormEucl, scal::Float64)
     u = prmtv.pnt[1]
     w = view(prmtv.pnt, 2:prmtv.dim)
     if u <= 0.0

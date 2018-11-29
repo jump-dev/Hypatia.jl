@@ -10,7 +10,6 @@ nonnegative cone: -sum_i(log(u_i))
 nonpositive cone: -sum_i(log(-u_i))
 =#
 
-
 mutable struct Nonnegative <: PrimitiveCone
     usedual::Bool
     dim::Int
@@ -57,8 +56,8 @@ getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::Nonpositive) = (@. arr = -
 
 loadpnt_prmtv!(prmtv::OrthantCone, pnt::AbstractVector{Float64}) = (prmtv.pnt = pnt)
 
-incone_prmtv(prmtv::Nonnegative) = all(u -> (u > 0.0), prmtv.pnt)
-incone_prmtv(prmtv::Nonpositive) = all(u -> (u < 0.0), prmtv.pnt)
+incone_prmtv(prmtv::Nonnegative, scal::Float64) = all(u -> (u > 0.0), prmtv.pnt)
+incone_prmtv(prmtv::Nonpositive, scal::Float64) = all(u -> (u < 0.0), prmtv.pnt)
 
 function calcg_prmtv!(g::AbstractVector{Float64}, prmtv::OrthantCone)
     @. prmtv.invpnt = inv(prmtv.pnt)

@@ -62,7 +62,7 @@ end
 
 loadpnt_prmtv!(prmtv::HypoPerLogdet, pnt::AbstractVector{Float64}) = (prmtv.pnt = pnt)
 
-function incone_prmtv(prmtv::HypoPerLogdet)
+function incone_prmtv(prmtv::HypoPerLogdet, scal::Float64)
     pnt = prmtv.pnt
     u = pnt[1]
     v = pnt[2]
@@ -79,7 +79,3 @@ function incone_prmtv(prmtv::HypoPerLogdet)
 
     return factH(prmtv)
 end
-
-calcg_prmtv!(g::AbstractVector{Float64}, prmtv::HypoPerLogdet) = (@. g = prmtv.g; g)
-calcHiarr_prmtv!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prmtv::HypoPerLogdet) = ldiv!(prod, prmtv.F, arr)
-calcHarr_prmtv!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prmtv::HypoPerLogdet) = mul!(prod, prmtv.H, arr)

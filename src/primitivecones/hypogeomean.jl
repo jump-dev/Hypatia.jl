@@ -56,7 +56,7 @@ barrierpar_prmtv(prmtv::HypoGeomean) = prmtv.dim
 getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::HypoGeomean) = (@. arr = 1.0; arr[1] = -prod(prmtv.ialpha[i]^prmtv.alpha[i] for i in eachindex(prmtv.alpha))/prmtv.dim; arr)
 loadpnt_prmtv!(prmtv::HypoGeomean, pnt::AbstractVector{Float64}) = (prmtv.pnt = pnt)
 
-function incone_prmtv(prmtv::HypoGeomean)
+function incone_prmtv(prmtv::HypoGeomean, scal::Float64)
     u = prmtv.pnt[1]
     w = view(prmtv.pnt, 2:prmtv.dim)
     alpha = prmtv.alpha
@@ -75,7 +75,3 @@ function incone_prmtv(prmtv::HypoGeomean)
 
     return factH(prmtv)
 end
-
-calcg_prmtv!(g::AbstractVector{Float64}, prmtv::HypoGeomean) = (@. g = prmtv.g; g)
-calcHiarr_prmtv!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prmtv::HypoGeomean) = ldiv!(prod, prmtv.F, arr)
-calcHarr_prmtv!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prmtv::HypoGeomean) = mul!(prod, prmtv.H, arr)
