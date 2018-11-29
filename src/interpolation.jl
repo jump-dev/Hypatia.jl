@@ -371,6 +371,9 @@ function interp_sample(
     ortho_wts::Bool = true,
     )
 
+    # TODO remove this restriction
+    @assert dimension(dom) == n
+
     L = binomial(n+d,n)
     U = binomial(n+2d, n)
     candidate_pts = interp_sample(dom, U * pts_factor)
