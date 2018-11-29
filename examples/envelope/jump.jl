@@ -17,18 +17,18 @@ function build_JuMP_envelope_boxinterp(
     deg::Int,
     n::Int,
     d::Int;
-    ortho_wts::Bool = true,
+    # ortho_wts::Bool = false,
     rseed::Int = 1,
     )
     # generate interpolation
     @assert deg <= d
     (L, U, pts, P0, P, w) = Hypatia.interp_box(n, d, calc_w=true)
-    Psub = view(P, :, 1:binomial(n+d-1, n))
+    P0sub = view(P0, :, 1:binomial(n+d-1, n))
     Wtsfun = (j -> sqrt.(1.0 .- abs2.(pts[:,j])))
-    PWts = [Wtsfun(j) .* Psub for j in 1:n]
-    if ortho_wts
-        PWts = [Array(qr!(W).Q) for W in PWts] # orthonormalize
-    end
+    PWts = [Wtsfun(j) .* P0sub for j in 1:n]
+    # if ortho_wts
+    #     PWts = [Array(qr!(W).Q) for W in PWts] # orthonormalize
+    # end
 
     # generate random polynomials
     Random.seed!(rseed)
@@ -39,7 +39,7 @@ function build_JuMP_envelope_boxinterp(
     model = Model(with_optimizer(Hypatia.Optimizer, verbose=true))
     @variable(model, fpv[j in 1:U]) # values at Fekete points
     @objective(model, Max, dot(fpv, w)) # integral over domain (via quadrature)
-    @constraint(model, [i in 1:npoly], polys[:,i] .- fpv in WSOSPolyInterpCone(U, [P, PWts...]))
+    @constraint(model, [i in 1:npoly], polys[:,i] .- fpv in WSOSPolyInterpCone(U, [P0, PWts...]))
 
     return (model, fpv)
 end
@@ -73,7 +73,7 @@ function build_JuMP_envelope_sampleinterp(
     n::Int,
     d::Int,
     domain::Hypatia.InterpDomain;
-    ortho_wts::Bool = true,
+    ortho_wts::Bool = false,
     rseed::Int = 1,
     )
     # generate interpolation
@@ -89,7 +89,7 @@ function build_JuMP_envelope_sampleinterp(
     model = Model(with_optimizer(Hypatia.Optimizer, verbose=true))
     @variable(model, fpv[j in 1:U]) # values at Fekete points
     @objective(model, Max, dot(fpv, w)) # integral over domain (via quadrature)
-    @constraint(model, [i in 1:npoly], polys[:,i] .- fpv in WSOSPolyInterpCone(U, [P, PWts...]))
+    @constraint(model, [i in 1:npoly], polys[:,i] .- fpv in WSOSPolyInterpCone(U, [P0, PWts...]))
 
     return (model, fpv)
 end

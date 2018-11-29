@@ -22,18 +22,18 @@ function build_envelope(
     d::Int;
     use_data::Bool = false,
     dense::Bool = false,
-    ortho_wts::Bool = true,
+    ortho_wts::Bool = false,
     rseed::Int = 1,
     )
     # generate interpolation
     @assert deg <= d
     (L, U, pts, P0, P, w) = Hypatia.interp_box(n, d, calc_w=true)
-    Psub = view(P, :, 1:binomial(n+d-1, n))
+    P0sub = view(P0, :, 1:binomial(n+d-1, n))
     Wtsfun = (j -> sqrt.(1.0 .- abs2.(pts[:,j])))
-    PWts = [Wtsfun(j) .* Psub for j in 1:n]
-    if ortho_wts
-        PWts = [Array(qr!(W).Q) for W in PWts] # orthonormalize
-    end
+    PWts = [Wtsfun(j) .* P0sub for j in 1:n]
+    # if ortho_wts
+    #     PWts = [Array(qr!(W).Q) for W in PWts] # orthonormalize
+    # end
 
     c = -w
     A = zeros(0, U)
@@ -53,7 +53,7 @@ function build_envelope(
         h = vec(P0[:, 1:LDegs]*rand(-9:9, LDegs, npoly))
     end
 
-    cone = Hypatia.Cone([Hypatia.WSOSPolyInterp(U, [P, PWts...]) for k in 1:npoly], [1+(k-1)*U:k*U for k in 1:npoly])
+    cone = Hypatia.Cone([Hypatia.WSOSPolyInterp(U, [P0, PWts...]) for k in 1:npoly], [1+(k-1)*U:k*U for k in 1:npoly])
 
     return (c, A, b, G, h, cone)
 end

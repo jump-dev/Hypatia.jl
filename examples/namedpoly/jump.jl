@@ -45,13 +45,9 @@ function build_JuMP_namedpoly_WSOS(
 
     # build JuMP model
     model = Model(with_optimizer(Hypatia.Optimizer, verbose=true))
-    @variables(model, begin
-        a
-    end)
+    @variable(model, a)
     @objective(model, Max, a)
-    @constraints(model, begin
-        [f(pts[i,:]) - a for i in 1:U] in WSOSPolyInterpCone(U, [P, PWts...])
-    end)
+    @constraint(model, [f(pts[i,:]) - a for i in 1:U] in WSOSPolyInterpCone(U, [P0, PWts...]))
 
     return model
 end
