@@ -38,7 +38,7 @@ barrierpar_prmtv(prmtv::EpiNormInf) = prmtv.dim
 getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::EpiNormInf) = (@. arr = 0.0; arr[1] = 1.0; arr)
 loadpnt_prmtv!(prmtv::EpiNormInf, pnt::AbstractVector{Float64}) = (prmtv.pnt = pnt)
 
-function incone_prmtv(prmtv::EpiNormInf)
+function incone_prmtv(prmtv::EpiNormInf, scal::Float64)
     u = prmtv.pnt[1]
     w = view(prmtv.pnt, 2:prmtv.dim)
     if u <= maximum(abs, w)
@@ -68,7 +68,3 @@ function incone_prmtv(prmtv::EpiNormInf)
 
     return factH(prmtv)
 end
-
-calcg_prmtv!(g::AbstractVector{Float64}, prmtv::EpiNormInf) = (@. g = prmtv.g; g)
-calcHiarr_prmtv!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prmtv::EpiNormInf) = ldiv!(prod, prmtv.F, arr)
-calcHarr_prmtv!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prmtv::EpiNormInf) = mul!(prod, prmtv.H, arr)

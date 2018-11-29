@@ -56,7 +56,7 @@ function run_JuMP_namedpoly(use_wsos::Bool)
         # :butcher_ball, 2
         # :butcher_ellipsoid, 2
         # :caprasse, 4
-        :caprasse_ball, 4
+        # :caprasse_ball, 4
         # :goldsteinprice, 7
         # :goldsteinprice_ball, 7
         # :goldsteinprice_ellipsoid, 7
@@ -69,7 +69,7 @@ function run_JuMP_namedpoly(use_wsos::Bool)
         # :motzkin_ball, 7
         # :motzkin_ellipsoid, 7
         # :reactiondiffusion, 3
-        # :reactiondiffusion_ball, 3
+        :reactiondiffusion_ball, 3
         # :robinson, 8
         # :robinson_ball, 8
         # :rosenbrock, 4
