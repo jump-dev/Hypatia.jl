@@ -48,7 +48,6 @@ function cheb2_data(d::Int, calc_w::Bool)
 
     # evaluations
     P0 = calc_u(1, d, pts)[1]
-    P = Array(qr(P0).Q)
 
     # weights for Clenshaw-Curtis quadrature at pts
     if calc_w
@@ -61,7 +60,7 @@ function cheb2_data(d::Int, calc_w::Bool)
         w = Float64[]
     end
 
-    return (L=L, U=U, pts=pts, P0=P0, P=P, w=w)
+    return (L=L, U=U, pts=pts, P0=P0, w=w)
 end
 
 function padua_data(d::Int, calc_w::Bool)
@@ -95,7 +94,6 @@ function padua_data(d::Int, calc_w::Bool)
             P0[:,col] .= u[1][:,xp[1]+1] .* u[2][:,xp[2]+1]
         end
     end
-    P = Array(qr(P0).Q)
 
     # cubature weights at Padua points
     # even-degree Chebyshev polynomials on the subgrids
@@ -129,7 +127,7 @@ function padua_data(d::Int, calc_w::Bool)
         w = Float64[]
     end
 
-    return (L=L, U=U, pts=pts, P0=P0, P=P, w=w)
+    return (L=L, U=U, pts=pts, P0=P0, w=w)
 end
 
 function approxfekete_data(n::Int, d::Int, calc_w::Bool)
@@ -182,13 +180,11 @@ function approxfekete_data(n::Int, d::Int, calc_w::Bool)
         end
     end
 
-    Mp = Array(M')
-    F = qr!(Mp, Val(true))
+    F = qr!(Array(M'), Val(true))
     keep_pnt = F.p[1:U]
 
     pts = ipts[keep_pnt,:] # subset of points indexed with the support of w
     P0 = M[keep_pnt,1:L] # subset of polynomial evaluations up to total degree d
-    P = Array(qr(P0).Q)
 
     if calc_w
         Qtm = F.Q'*m
@@ -197,7 +193,7 @@ function approxfekete_data(n::Int, d::Int, calc_w::Bool)
         w = Float64[]
     end
 
-    return (L=L, U=U, pts=pts, P0=P0, P=P, w=w)
+    return (L=L, U=U, pts=pts, P0=P0, w=w)
 end
 
 
@@ -332,8 +328,6 @@ function get_weights(dom::Ellipsoid, pts::Matrix{Float64}; count::Int = size(pts
     return [g]
 end
 
-
-
 # TODO refactor common code here and in approxfekete_data
 function get_large_P(ipts::Matrix{Float64}, d::Int, U::Int)
     (npts, n) = size(ipts)
@@ -362,40 +356,29 @@ function get_large_P(ipts::Matrix{Float64}, d::Int, U::Int)
     return (M, m)
 end
 
+# TODO refactor common code here and in approxfekete_data
 function interp_sample(
     dom::InterpDomain,
     n::Int,
     d::Int;
     calc_w::Bool = false,
     pts_factor::Int = 10,
-    ortho_wts::Bool = false,
     )
-
     L = binomial(n+d,n)
     U = binomial(n+2d, n)
+
     candidate_pts = interp_sample(dom, U * pts_factor)
     (M, m) = get_large_P(candidate_pts, d, U)
-    Mp = Array(M')
-    F = qr!(Mp, Val(true))
+
+    F = qr!(Array(M'), Val(true))
     keep_pnt = F.p[1:U]
     pts = candidate_pts[keep_pnt,:] # subset of points indexed with the support of w
     P0 = M[keep_pnt, 1:L] # subset of polynomial evaluations up to total degree d
 
-
-
-    P = copy(P0)#Array(qr(P0).Q)
-    # TODO don't use P ever
-
-
-
-    # TODO take into account degree of g. Currently always 2 for balls, ellipsoids, and intervals by luck.
+    # TODO take into account degree of g; currently always 2 for balls, ellipsoids, and intervals by luck
     P0sub = view(P0, :, 1:binomial(n+d-1, n))
-
     g = Hypatia.get_weights(dom, pts)
     PWts = [sqrt.(gi) .* P0sub for gi in g]
-    # if ortho_wts
-    #     PWts = [Array(qr!(W).Q) for W in PWts] # orthonormalize
-    # end
 
     if calc_w
         Qtm = F.Q'*m
@@ -404,5 +387,5 @@ function interp_sample(
         w = Float64[]
     end
 
-    return (L=L, U=U, pts=pts, P0=P0, P=P, PWts=PWts, w=w)
+    return (L=L, U=U, pts=pts, P0=P0, PWts=PWts, w=w)
 end
