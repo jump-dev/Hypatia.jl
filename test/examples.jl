@@ -182,7 +182,7 @@ function _namedpoly11(; verbose, lscachetype)
     @test r.pobj ≈ 0 atol=1e-3 rtol=1e-3
 end
 
-function solveandcheck_namedpoly(mdl, truemin)
+function solveandcheck_JuMP(mdl, truemin)
     JuMP.optimize!(mdl)
     term_status = JuMP.termination_status(mdl)
     pobj = JuMP.objective_value(mdl)
@@ -201,7 +201,7 @@ function _namedpoly1_JuMP()
     (x, f, dom, truemin) = getpolydata(:heart)
     # WSOS formulation
     mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=2)
-    solveandcheck_namedpoly(mdl, truemin)
+    solveandcheck_JuMP(mdl, truemin)
 end
 
 function _namedpoly2_JuMP()
@@ -209,10 +209,10 @@ function _namedpoly2_JuMP()
     (x, f, dom, truemin) = getpolydata(:schwefel)
     # WSOS formulation
     mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=2)
-    solveandcheck_namedpoly(mdl, truemin)
+    solveandcheck_JuMP(mdl, truemin)
     # SDP formulation
     # mdl = build_JuMP_namedpoly_PSD(x, f, dom, d=2)
-    # solveandcheck_namedpoly(mdl, truemin)
+    # solveandcheck_JuMP(mdl, truemin)
 end
 
 function _namedpoly3_JuMP()
@@ -220,10 +220,10 @@ function _namedpoly3_JuMP()
     (x, f, dom, truemin) = getpolydata(:magnetism7_ball)
     # WSOS formulation
     mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=2)
-    solveandcheck_namedpoly(mdl, truemin)
+    solveandcheck_JuMP(mdl, truemin)
     # SDP formulation
     # mdl = build_JuMP_namedpoly_PSD(x, f, dom, d=2)
-    # solveandcheck_namedpoly(mdl, truemin)
+    # solveandcheck_JuMP(mdl, truemin)
 end
 
 function _namedpoly4_JuMP()
@@ -231,68 +231,124 @@ function _namedpoly4_JuMP()
     (x, f, dom, truemin) = getpolydata(:motzkin_ellipsoid)
     # WSOS formulation
     mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=7)
-    solveandcheck_namedpoly(mdl, truemin)
+    solveandcheck_JuMP(mdl, truemin)
     # SDP formulation
     # mdl = build_JuMP_namedpoly_PSD(x, f, dom, d=7)
-    # solveandcheck_namedpoly(mdl, truemin)
+    # solveandcheck_JuMP(mdl, truemin)
 end
 
 function _namedpoly5_JuMP()
     (x, f, dom, truemin) = getpolydata(:caprasse)
     # WSOS formulation
     mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=4)
-    solveandcheck_namedpoly(mdl, truemin)
+    solveandcheck_JuMP(mdl, truemin)
     # SDP formulation
     # mdl = build_JuMP_namedpoly_PSD(x, f, dom, d=4)
-    # solveandcheck_namedpoly(mdl, truemin)
+    # solveandcheck_JuMP(mdl, truemin)
 end
 
 function _namedpoly6_JuMP()
     (x, f, dom, truemin) = getpolydata(:goldsteinprice)
     # WSOS formulation
     mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=7)
-    solveandcheck_namedpoly(mdl, truemin)
+    solveandcheck_JuMP(mdl, truemin)
     # SDP formulation
     # mdl = build_JuMP_namedpoly_PSD(x, f, dom, d=7)
-    # solveandcheck_namedpoly(mdl, truemin)
+    # solveandcheck_JuMP(mdl, truemin)
 end
 
 function _namedpoly7_JuMP()
     (x, f, dom, truemin) = getpolydata(:lotkavolterra)
     # WSOS formulation
     mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=3)
-    solveandcheck_namedpoly(mdl, truemin)
+    solveandcheck_JuMP(mdl, truemin)
     # SDP formulation
     # mdl = build_JuMP_namedpoly_PSD(x, f, dom, d=3)
-    # solveandcheck_namedpoly(mdl, truemin)
+    # solveandcheck_JuMP(mdl, truemin)
 end
 
 function _namedpoly8_JuMP()
     (x, f, dom, truemin) = getpolydata(:robinson)
     # WSOS formulation
     mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=8)
-    solveandcheck_namedpoly(mdl, truemin)
+    solveandcheck_JuMP(mdl, truemin)
     # SDP formulation
     # mdl = build_JuMP_namedpoly_PSD(x, f, dom, d=8)
-    # solveandcheck_namedpoly(mdl, truemin)
+    # solveandcheck_JuMP(mdl, truemin)
 end
 
 function _namedpoly9_JuMP()
     (x, f, dom, truemin) = getpolydata(:reactiondiffusion_ball)
     # WSOS formulation
     mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=3)
-    solveandcheck_namedpoly(mdl, truemin)
+    solveandcheck_JuMP(mdl, truemin)
     # SDP formulation
     # mdl = build_JuMP_namedpoly_PSD(x, f, dom, d=3)
-    # solveandcheck_namedpoly(mdl, truemin)
+    # solveandcheck_JuMP(mdl, truemin)
 end
 
 function _namedpoly10_JuMP()
     (x, f, dom, truemin) = getpolydata(:rosenbrock)
     # WSOS formulation
     mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=4)
-    solveandcheck_namedpoly(mdl, truemin)
+    solveandcheck_JuMP(mdl, truemin)
     # SDP formulation
     # mdl = build_JuMP_namedpoly_PSD(x, f, dom, d=4)
-    # solveandcheck_namedpoly(mdl, truemin)
+    # solveandcheck_JuMP(mdl, truemin)
+end
+
+function _shapeconregr1_JuMP()
+    (n, deg, npoints, signal_ratio, f) = (2, 3, 100, 0.0, x -> exp(norm(x)))
+    (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
+    (mdl, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_leastsqobj=false)
+    truemin = 4.4065e1
+    solveandcheck_JuMP(mdl, truemin)
+end
+
+function _shapeconregr2_JuMP()
+    (n, deg, npoints, signal_ratio, f) = (2, 3, 100, 0.0, x -> sum(x.^3))
+    (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
+    (mdl, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_leastsqobj=false)
+    truemin = 1.3971e1
+    solveandcheck_JuMP(mdl, truemin)
+end
+
+function _shapeconregr3_JuMP()
+    (n, deg, npoints, signal_ratio, f) = (2, 3, 100, 0.0, x -> sum(x.^4))
+    (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
+    (mdl, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_leastsqobj=false)
+    truemin = 2.4577e1
+    solveandcheck_JuMP(mdl, truemin)
+end
+
+function _shapeconregr4_JuMP()
+    (n, deg, npoints, signal_ratio, f) = (2, 3, 100, 50.0, x -> sum(x.^3))
+    (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
+    (mdl, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_leastsqobj=false)
+    truemin = 1.5449e1
+    solveandcheck_JuMP(mdl, truemin)
+end
+
+function _shapeconregr5_JuMP()
+    (n, deg, npoints, signal_ratio, f) = (2, 3, 100, 50.0, x -> sum(x.^4))
+    (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
+    (mdl, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_leastsqobj=false)
+    truemin = 2.5200e1
+    solveandcheck_JuMP(mdl, truemin)
+end
+
+function _shapeconregr6_JuMP()
+    (n, deg, npoints, signal_ratio, f) = (2, 3, 100, 0.0, x -> exp(norm(x)))
+    (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
+    (mdl, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_leastsqobj=true)
+    truemin = 5.4584e0
+    solveandcheck_JuMP(mdl, truemin)
+end
+
+function _shapeconregr7_JuMP()
+    (n, deg, npoints, signal_ratio, f) = (2, 3, 100, 50.0, x -> sum(x.^4))
+    (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
+    (mdl, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_leastsqobj=true)
+    truemin = 3.3249e0
+    solveandcheck_JuMP(mdl, truemin)
 end
