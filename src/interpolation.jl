@@ -60,7 +60,7 @@ function cheb2_data(d::Int, calc_w::Bool)
         w = Float64[]
     end
 
-    return (L=L, U=U, pts=pts, P0=P0, w=w)
+    return (U=U, pts=pts, P0=P0, w=w)
 end
 
 function padua_data(d::Int, calc_w::Bool)
@@ -127,7 +127,7 @@ function padua_data(d::Int, calc_w::Bool)
         w = Float64[]
     end
 
-    return (L=L, U=U, pts=pts, P0=P0, w=w)
+    return (U=U, pts=pts, P0=P0, w=w)
 end
 
 function approxfekete_data(n::Int, d::Int, calc_w::Bool)
@@ -193,7 +193,7 @@ function approxfekete_data(n::Int, d::Int, calc_w::Bool)
         w = Float64[]
     end
 
-    return (L=L, U=U, pts=pts, P0=P0, w=w)
+    return (U=U, pts=pts, P0=P0, w=w)
 end
 
 
@@ -390,5 +390,5 @@ function interp_sample(
         w = Float64[]
     end
 
-    return (L=L, U=U, pts=pts, P0=P0, PWts=PWts, w=w)
+    return (U=U, pts=pts, P0=P0, PWts=PWts, w=w)
 end

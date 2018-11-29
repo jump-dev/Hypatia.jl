@@ -26,7 +26,7 @@ function build_envelope(
     )
     # generate interpolation
     @assert deg <= d
-    (L, U, pts, P0, w) = Hypatia.interp_box(n, d, calc_w=true)
+    (U, pts, P0, w) = Hypatia.interp_box(n, d, calc_w=true)
     P0sub = view(P0, :, 1:binomial(n+d-1, n))
     Wtsfun = (j -> sqrt.(1.0 .- abs2.(pts[:,j])))
     PWts = [Wtsfun(j) .* P0sub for j in 1:n]

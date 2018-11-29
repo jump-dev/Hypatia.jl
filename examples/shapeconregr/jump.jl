@@ -122,8 +122,8 @@ function build_shapeconregr_WSOS(
     (npoints, n) = size(X)
 
     doubledomain!(conv_dom)
-    (_, mono_U, mono_pts, mono_P0, mono_PWts, _) = Hypatia.interp_sample(mono_dom, n, d, pts_factor=20)
-    (_, conv_U, conv_pts, conv_P0, conv_PWts, _) = Hypatia.interp_sample(conv_dom, 2n, d+1, pts_factor=20) # TODO think about if it's ok to go up to d+1
+    (mono_U, mono_pts, mono_P0, mono_PWts, _) = Hypatia.interp_sample(mono_dom, n, d, pts_factor=20)
+    (conv_U, conv_pts, conv_P0, conv_PWts, _) = Hypatia.interp_sample(conv_dom, 2n, d+1, pts_factor=20) # TODO think about if it's ok to go up to d+1
     mono_wsos_cone = WSOSPolyInterpCone(mono_U, [mono_P0, mono_PWts...])
     conv_wsos_cone = WSOSPolyInterpCone(conv_U, [conv_P0, conv_PWts...])
     @polyvar x[1:n]
