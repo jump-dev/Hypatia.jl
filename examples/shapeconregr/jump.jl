@@ -105,10 +105,8 @@ function getregrinterp(
     keep_pnt = F.p[1:U]
     pts = candidate_pts[keep_pnt,:] # subset of points indexed with the support of w
     P0 = M[keep_pnt, 1:L] # subset of polynomial evaluations up to total degree d
-    P = Array(qr(P0).Q)
-    P0sub = view(P0, :, 1:binomial(n+d-1, n))
 
-    return (U, pts, P, P0sub)
+    return (U, pts, P0)
 end
 
 function build_shapeconregr_WSOS(
@@ -118,7 +116,6 @@ function build_shapeconregr_WSOS(
     mono_dom::Hypatia.InterpDomain,
     conv_dom::Hypatia.InterpDomain,
     mono_profile::Vector{Float64};
-    ortho_wts::Bool = false,
     )
     @assert mod(r, 2) == 1
     d = div(r-1, 2)
@@ -126,26 +123,23 @@ function build_shapeconregr_WSOS(
     @polyvar x[1:n]
     @polyvar w[1:n]
 
-    (mono_U, mono_pts, mono_P, mono_P0sub) = getregrinterp(d, npoints, n, mono_dom, false, 10n)
+    # TODO refactor repeated code below into getreprinterp function
+    (mono_U, mono_pts, mono_P0) = getregrinterp(d, npoints, n, mono_dom, false, 10n)
     mono_bss = Hypatia.get_bss(mono_dom, x)
     mono_g = Hypatia.get_weights(mono_dom, mono_pts)
     @assert length(mono_g) == length(mono_bss.p)
+    mono_P0sub = view(mono_P0, :, 1:binomial(n+d-1, n))
     mono_PWts = [sqrt.(gi) .* mono_P0sub for gi in mono_g]
-    # if ortho_wts
-    #     mono_PWts = [Array(qr!(W).Q) for W in mono_PWts] # orthonormalize
-    # end
-    mono_wsos_cone = WSOSPolyInterpCone(mono_U, [mono_P, mono_PWts...])
+    mono_wsos_cone = WSOSPolyInterpCone(mono_U, [mono_P0, mono_PWts...])
 
     # TODO think about if it's ok to go up to d+1
-    (conv_U, conv_pts, conv_P, conv_P0sub) = getregrinterp(d+1, npoints, 2n, conv_dom, true, 10n)
+    (conv_U, conv_pts, conv_P0) = getregrinterp(d+1, npoints, 2n, conv_dom, true, 10n)
     conv_bss = Hypatia.get_bss(conv_dom, x)
     conv_g = Hypatia.get_weights(conv_dom, conv_pts; count=n)
     @assert length(conv_g) == length(conv_bss.p)
+    conv_P0sub = view(conv_P0, :, 1:binomial(n+d-1, n))
     conv_PWts = [sqrt.(gi) .* conv_P0sub for gi in conv_g]
-    # if ortho_wts
-    #     conv_PWts = [Array(qr!(W).Q) for W in conv_PWts] # orthonormalize
-    # end
-    conv_wsos_cone = WSOSPolyInterpCone(conv_U, [conv_P, conv_PWts...])
+    conv_wsos_cone = WSOSPolyInterpCone(conv_U, [conv_P0, conv_PWts...])
 
     model = Model(with_optimizer(Hypatia.Optimizer, verbose=true))
     @variables(model, begin

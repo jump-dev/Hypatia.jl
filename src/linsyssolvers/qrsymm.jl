@@ -204,21 +204,13 @@ function solvelinsys6!(
         if !posdef
             println("linear system matrix was not positive definite")
             mul!(L.Q2GHGQ2, L.Q2', L.GHGQ2)
-            mul!(L.Q2divcopy, L.Q2', L.rhs)
-
-            # F = PositiveFactorizations.cholesky!(PositiveFactorizations.Positive, L.Q2GHGQ2, Val{true})
-            L.Q2GHGQ2 += 1e-3I
+            L.Q2GHGQ2 += 1e-4I
             F = bunchkaufman!(Symmetric(L.Q2GHGQ2), true, check=false)
             if !issuccess(F)
                 error("could not fix failure of positive definiteness; terminating")
             end
-            ldiv!(L.Q2div, F, L.Q2divcopy)
-
-            # L.Q2GHGQ2 += 1e-3I
-            # posdef = hypatia_posvx!(L.Q2div, L.Q2GHGQ2, L.Q2divcopy, L.lsferr, L.lsberr, L.lswork, L.lsiwork, L.lsAF, L.lsS)
-            # if !posdef
-            #     error("could not fix failure of positive definiteness; terminating")
-            # end
+            mul!(L.Q2div, L.Q2', L.rhs)
+            ldiv!(F, L.Q2div)
         end
     end
 
@@ -245,7 +237,7 @@ function solvelinsys6!(
     return (dir_kap, dir_tau)
 end
 
-
+# TODO maybe sysvx would be better
 # call LAPACK dposvx function (compare to dposv and dposvxx)
 # performs equilibration and iterative refinement
 # TODO not currently available in LinearAlgebra.LAPACK but should contribute
