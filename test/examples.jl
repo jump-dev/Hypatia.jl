@@ -170,13 +170,13 @@ function _namedpoly10(; verbose, lscachetype)
     r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype, atol=1e-3)
     @test r.status == :Optimal
     @test r.niters <= 65
-    @test r.pobj ≈ 0 atol=1e-4 rtol=1e-4
+    @test r.pobj ≈ 0 atol=1e-3 rtol=1e-3
 end
 
 function _namedpoly11(; verbose, lscachetype)
     mdl = Hypatia.Model(verbose=verbose, tolfeas=1e-9)
     (c, A, b, G, h, cone) = build_namedpoly(:schwefel, 4)
-    r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype, atol=2e-4)
+    r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype, atol=1e-3)
     @test r.status == :Optimal
     @test r.niters <= 65
     @test r.pobj ≈ 0 atol=1e-3 rtol=1e-3
@@ -192,15 +192,15 @@ function solveandcheck_namedpoly(mdl, truemin)
     @test term_status == MOI.Success
     @test pr_status == MOI.FeasiblePoint
     @test du_status == MOI.FeasiblePoint
-    # @test pobj ≈ dobj atol=1e-3 rtol=1e-3
-    # @test pobj ≈ truemin atol=1e-3 rtol=1e-3
+    @test pobj ≈ dobj atol=1e-3 rtol=1e-3
+    @test pobj ≈ truemin atol=1e-3 rtol=1e-3
 end
 
 function _namedpoly1_JuMP()
     # the Heart polynomial in a box
     (x, f, dom, truemin) = getpolydata(:heart)
     # WSOS formulation
-    mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=2, pts_factor=100*length(x))
+    mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=2)
     solveandcheck_namedpoly(mdl, truemin)
 end
 
@@ -208,7 +208,7 @@ function _namedpoly2_JuMP()
     # the Schwefel polynomial in a box
     (x, f, dom, truemin) = getpolydata(:schwefel)
     # WSOS formulation
-    mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=2, pts_factor=100*length(x))
+    mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=2)
     solveandcheck_namedpoly(mdl, truemin)
     # SDP formulation
     # mdl = build_JuMP_namedpoly_PSD(x, f, dom, d=2)
@@ -219,7 +219,7 @@ function _namedpoly3_JuMP()
     # the Magnetism polynomial in a ball
     (x, f, dom, truemin) = getpolydata(:magnetism7_ball)
     # WSOS formulation
-    mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=2, pts_factor=100*length(x))
+    mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=2)
     solveandcheck_namedpoly(mdl, truemin)
     # SDP formulation
     # mdl = build_JuMP_namedpoly_PSD(x, f, dom, d=2)
@@ -230,7 +230,7 @@ function _namedpoly4_JuMP()
     # the Motzkin polynomial in an ellipsoid containing two local minima in opposite orthants
     (x, f, dom, truemin) = getpolydata(:motzkin_ellipsoid)
     # WSOS formulation
-    mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=7, pts_factor=100*length(x))
+    mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=7)
     solveandcheck_namedpoly(mdl, truemin)
     # SDP formulation
     # mdl = build_JuMP_namedpoly_PSD(x, f, dom, d=7)
@@ -240,7 +240,7 @@ end
 function _namedpoly5_JuMP()
     (x, f, dom, truemin) = getpolydata(:caprasse)
     # WSOS formulation
-    mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=4, pts_factor=100*length(x))
+    mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=4)
     solveandcheck_namedpoly(mdl, truemin)
     # SDP formulation
     # mdl = build_JuMP_namedpoly_PSD(x, f, dom, d=4)
@@ -250,7 +250,7 @@ end
 function _namedpoly6_JuMP()
     (x, f, dom, truemin) = getpolydata(:goldsteinprice)
     # WSOS formulation
-    mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=7, pts_factor=100*length(x))
+    mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=7)
     solveandcheck_namedpoly(mdl, truemin)
     # SDP formulation
     # mdl = build_JuMP_namedpoly_PSD(x, f, dom, d=7)
@@ -260,7 +260,7 @@ end
 function _namedpoly7_JuMP()
     (x, f, dom, truemin) = getpolydata(:lotkavolterra)
     # WSOS formulation
-    mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=3, pts_factor=100*length(x))
+    mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=3)
     solveandcheck_namedpoly(mdl, truemin)
     # SDP formulation
     # mdl = build_JuMP_namedpoly_PSD(x, f, dom, d=3)
@@ -270,7 +270,7 @@ end
 function _namedpoly8_JuMP()
     (x, f, dom, truemin) = getpolydata(:robinson)
     # WSOS formulation
-    mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=8, pts_factor=100*length(x))
+    mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=8)
     solveandcheck_namedpoly(mdl, truemin)
     # SDP formulation
     # mdl = build_JuMP_namedpoly_PSD(x, f, dom, d=8)
@@ -280,7 +280,7 @@ end
 function _namedpoly9_JuMP()
     (x, f, dom, truemin) = getpolydata(:reactiondiffusion_ball)
     # WSOS formulation
-    mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=3, pts_factor=100*length(x))
+    mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=3)
     solveandcheck_namedpoly(mdl, truemin)
     # SDP formulation
     # mdl = build_JuMP_namedpoly_PSD(x, f, dom, d=3)
@@ -290,7 +290,7 @@ end
 function _namedpoly10_JuMP()
     (x, f, dom, truemin) = getpolydata(:rosenbrock)
     # WSOS formulation
-    mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=4, pts_factor=100*length(x))
+    mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=4)
     solveandcheck_namedpoly(mdl, truemin)
     # SDP formulation
     # mdl = build_JuMP_namedpoly_PSD(x, f, dom, d=4)

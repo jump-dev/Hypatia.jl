@@ -207,18 +207,18 @@ function solvelinsys6!(
             mul!(L.Q2divcopy, L.Q2', L.rhs)
 
             # F = PositiveFactorizations.cholesky!(PositiveFactorizations.Positive, L.Q2GHGQ2, Val{true})
-            # L.Q2GHGQ2 += 1e-3I
-            # F = bunchkaufman!(Symmetric(L.Q2GHGQ2), true, check=false)
-            # if !issuccess(F)
-            #     error("could not fix failure of positive definiteness; terminating")
-            # end
-            # ldiv!(L.Q2div, F, L.Q2divcopy)
-
             L.Q2GHGQ2 += 1e-3I
-            posdef = hypatia_posvx!(L.Q2div, L.Q2GHGQ2, L.Q2divcopy, L.lsferr, L.lsberr, L.lswork, L.lsiwork, L.lsAF, L.lsS)
-            if !posdef
+            F = bunchkaufman!(Symmetric(L.Q2GHGQ2), true, check=false)
+            if !issuccess(F)
                 error("could not fix failure of positive definiteness; terminating")
             end
+            ldiv!(L.Q2div, F, L.Q2divcopy)
+
+            # L.Q2GHGQ2 += 1e-3I
+            # posdef = hypatia_posvx!(L.Q2div, L.Q2GHGQ2, L.Q2divcopy, L.lsferr, L.lsberr, L.lswork, L.lsiwork, L.lsAF, L.lsS)
+            # if !posdef
+            #     error("could not fix failure of positive definiteness; terminating")
+            # end
         end
     end
 

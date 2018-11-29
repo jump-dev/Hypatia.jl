@@ -51,14 +51,8 @@ getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::WSOSPolyInterp) = (@. arr 
 loadpnt_prmtv!(prmtv::WSOSPolyInterp, pnt::AbstractVector{Float64}) = (prmtv.pnt = pnt)
 
 function incone_prmtv(prmtv::WSOSPolyInterp, scal::Float64)
-    newpnt = copy(prmtv.pnt)
-    # @show newpnt
-    # prmtv.scal = norm(newpnt, Inf)
     prmtv.scal = scal
-    newpnt ./= prmtv.scal
-    # lmul!(prmtv.iscal, newpnt)
-    # @show newpnt
-    # @show prmtv.scal
+    newpnt = prmtv.pnt/prmtv.scal # TODO preallocate
 
     @. prmtv.g = 0.0
     @. prmtv.H = 0.0
@@ -73,8 +67,6 @@ function incone_prmtv(prmtv::WSOSPolyInterp, scal::Float64)
         mul!(tmp2j, Diagonal(newpnt), ipwtj)
         mul!(tmp1j, ipwtj', tmp2j)
 
-        # @show norm(tmp1j)
-
         # pivoted cholesky, upper triangle solve
         F = cholesky!(Symmetric(tmp1j, :U), Val(true), check=false)
         if !isposdef(F)
@@ -84,40 +76,6 @@ function incone_prmtv(prmtv::WSOSPolyInterp, scal::Float64)
         rdiv!(tmp2j, F.U)
         mul!(tmp3, tmp2j, tmp2j')
 
-        # # bunch-kaufman-based
-        # F = bunchkaufman!(Symmetric(tmp1j), true, check=false)
-        # if !issuccess(F)
-        #     return false
-        # end
-        # # ipwtj * (tmp1j^-1 * ipwtj')
-        # tmp3 .= ipwtj * (F\ipwtj')
-        # # @. tmp2j = ipwtj
-        # # ldiv!(F, tmp2j')
-        # # mul!(tmp3, ipwtj, tmp2j)
-
-        # advanced cholesky solve
-        # ipwtj * (tmp1j^-1 * ipwtj')
-        # B = Matrix(ipwtj')
-        # (Brows, Bcols) = size(B)
-        # lsferr = Vector{Float64}(undef, Bcols)
-        # lsberr = Vector{Float64}(undef, Bcols)
-        # lswork = Vector{Float64}(undef, 3*Brows)
-        # lsiwork = Vector{Float64}(undef, Brows)
-        # lsAF = Matrix{Float64}(undef, Brows, Brows)
-        # lsS = Vector{Float64}(undef, Brows)
-        # X = similar(B)
-        # A = copy(tmp1j)
-        # posdef = hypatia_posvx!(X, A, B, lsferr, lsberr, lswork, lsiwork, lsAF, lsS)
-        # if !posdef
-        #     return false
-        # end
-        # # tmp3 .= ipwtj * X
-        # mul!(tmp3, ipwtj, X)
-        # # @show norm(M - tmp3)
-
-        # @show norm(tmp2j)
-        # @show norm(tmp3)
-
         for i in eachindex(prmtv.g)
             prmtv.g[i] -= tmp3[i,i]
         end
@@ -126,18 +84,17 @@ function incone_prmtv(prmtv::WSOSPolyInterp, scal::Float64)
 
     # @show norm(prmtv.g)
     # @show norm(prmtv.H)
-    # if norm(prmtv.H) > 1e15
-    #     return false
-    # end
-
     @. prmtv.H2 = prmtv.H
-    prmtv.F = cholesky!(Symmetric(prmtv.H2), Val(true), check=false)
+
+    # prmtv.F = cholesky!(Symmetric(prmtv.H2), Val(true), check=false)
     # @show isposdef(prmtv.F)
-    return isposdef(prmtv.F)
+    # return isposdef(prmtv.F)
+
+    prmtv.F = bunchkaufman!(Symmetric(prmtv.H2), true, check=false)
+    # @show issuccess(prmtv.F)
+    return issuccess(prmtv.F)
+
     # return factH(prmtv)
-    # prmtv.F = bunchkaufman!(Symmetric(prmtv.H2), true, check=false)
-    # return issuccess(prmtv.F)
-    return true
 end
 
 calcg_prmtv!(g::AbstractVector{Float64}, prmtv::WSOSPolyInterp) = (@. g = prmtv.g/prmtv.scal; g)
@@ -145,27 +102,3 @@ calcg_prmtv!(g::AbstractVector{Float64}, prmtv::WSOSPolyInterp) = (@. g = prmtv.
 calcHarr_prmtv!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prmtv::WSOSPolyInterp) = (mul!(prod, prmtv.H, arr); @. prod = prod / prmtv.scal / prmtv.scal; prod)
 
 calcHiarr_prmtv!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prmtv::WSOSPolyInterp) = (ldiv!(prod, prmtv.F, arr); @. prod = prod * prmtv.scal * prmtv.scal; prod)
-
-# function calcHiarr_prmtv!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prmtv::WSOSPolyInterp)
-#     if arr isa AbstractVector
-#         B = copy(reshape(arr, :, 1))
-#     else
-#         B = copy(arr)
-#     end
-#     (Brows, Bcols) = size(B)
-#     lsferr = Vector{Float64}(undef, Bcols)
-#     lsberr = Vector{Float64}(undef, Bcols)
-#     lswork = Vector{Float64}(undef, 3*Brows)
-#     lsiwork = Vector{Float64}(undef, Brows)
-#     lsAF = Matrix{Float64}(undef, Brows, Brows)
-#     lsS = Vector{Float64}(undef, Brows)
-#     X = similar(B)
-#     A = copy(prmtv.H)
-#     posdef = hypatia_posvx!(X, A, B, lsferr, lsberr, lswork, lsiwork, lsAF, lsS)
-#
-#     prod[:] = X
-#     # (ldiv!(prod, prmtv.F, arr)
-#     @. prod = prod * prmtv.scal * prmtv.scal
-#
-#     return prod
-# end
