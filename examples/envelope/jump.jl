@@ -73,7 +73,7 @@ function build_JuMP_envelope_sampleinterp(
     )
     # generate interpolation
     @assert deg <= d
-    (Ldegs, U, pts, P0, PWts, w) = Hypatia.interp_sample(domain, n, d, calc_w=true)
+    (U, pts, P0, PWts, w) = Hypatia.interp_sample(domain, n, d, calc_w=true)
 
     # generate random polynomials
     Random.seed!(rseed)

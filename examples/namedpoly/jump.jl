@@ -38,7 +38,7 @@ function build_JuMP_namedpoly_WSOS(
     pts_factor = 10,
     rseed::Int = 1,
     )
-    (L, U, pts, P0, PWts, w) = Hypatia.interp_sample(dom, nvariables(f), d, pts_factor=pts_factor)
+    (U, pts, P0, PWts, w) = Hypatia.interp_sample(dom, nvariables(f), d, pts_factor=pts_factor)
 
     # build JuMP model
     model = Model(with_optimizer(Hypatia.Optimizer, verbose=true))
