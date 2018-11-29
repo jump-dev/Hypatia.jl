@@ -82,19 +82,7 @@ function incone_prmtv(prmtv::WSOSPolyInterp, scal::Float64)
         @. prmtv.H += abs2(tmp3)
     end
 
-    # @show norm(prmtv.g)
-    # @show norm(prmtv.H)
-    @. prmtv.H2 = prmtv.H
-
-    # prmtv.F = cholesky!(Symmetric(prmtv.H2), Val(true), check=false)
-    # @show isposdef(prmtv.F)
-    # return isposdef(prmtv.F)
-
-    prmtv.F = bunchkaufman!(Symmetric(prmtv.H2), true, check=false)
-    # @show issuccess(prmtv.F)
-    return issuccess(prmtv.F)
-
-    # return factH(prmtv)
+    return factH(prmtv)
 end
 
 calcg_prmtv!(g::AbstractVector{Float64}, prmtv::WSOSPolyInterp) = (@. g = prmtv.g/prmtv.scal; g)

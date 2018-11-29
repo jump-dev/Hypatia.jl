@@ -22,8 +22,6 @@ mutable struct EpiPerPower <: PrimitiveCone
     F
     barfun::Function
     diffres
-    scal::Float64
-    iscal::Float64
 
     function EpiPerPower(alpha::Float64, isdual::Bool)
         @assert alpha > 1.0
@@ -55,30 +53,19 @@ barrierpar_prmtv(prmtv::EpiPerPower) = 3 - 2*min(inv(prmtv.alpha), 1.0 - inv(prm
 getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::EpiPerPower) = (arr[1] = 1.0; arr[2] = 1.0; arr[3] = 0.0; arr)
 loadpnt_prmtv!(prmtv::EpiPerPower, pnt::AbstractVector{Float64}) = (prmtv.pnt = pnt)
 
-function incone_prmtv(prmtv::EpiPerPower)
-    newpnt = copy(prmtv.pnt)
-    prmtv.scal = norm(newpnt)
-    prmtv.iscal = inv(prmtv.scal)
-    lmul!(prmtv.iscal, newpnt)
-    @show newpnt
-    @show prmtv.scal
-
-    u = newpnt[1]
-    v = newpnt[2]
-    w = newpnt[3]
+function incone_prmtv(prmtv::EpiPerPower, scal::Float64)
+    u = prmtv.pnt[1]
+    v = prmtv.pnt[2]
+    w = prmtv.pnt[3]
     alpha = prmtv.alpha
     if u <= 0.0 || v <= 0.0 || u <= v*(abs(w/v))^alpha
         return false
     end
 
     # TODO check allocations, check with Jarrett if this is most efficient way to use DiffResults
-    prmtv.diffres = ForwardDiff.hessian!(prmtv.diffres, prmtv.barfun, newpnt)
+    prmtv.diffres = ForwardDiff.hessian!(prmtv.diffres, prmtv.barfun, prmtv.pnt)
     prmtv.g .= DiffResults.gradient(prmtv.diffres)
     prmtv.H .= DiffResults.hessian(prmtv.diffres)
 
     return factH(prmtv)
 end
-
-# calcg_prmtv!(g::AbstractVector{Float64}, prmtv::EpiPerPower) = (@. g = prmtv.g; lmul!(prmtv.iscal, g); g)
-# calcHiarr_prmtv!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prmtv::EpiPerPower) = (ldiv!(prod, prmtv.F, arr); lmul!(prmtv.scal, prod); lmul!(prmtv.scal, prod); prod)
-# calcHarr_prmtv!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prmtv::EpiPerPower) = (mul!(prod, prmtv.H, arr); lmul!(prmtv.iscal, prod); lmul!(prmtv.iscal, prod); prod)

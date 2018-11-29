@@ -34,7 +34,7 @@ barrierpar_prmtv(prmtv::EpiPerSquare) = 2
 getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::EpiPerSquare) = (@. arr = 0.0; arr[1] = 1.0; arr[2] = 1.0; arr)
 loadpnt_prmtv!(prmtv::EpiPerSquare, pnt::AbstractVector{Float64}) = (prmtv.pnt = pnt)
 
-function incone_prmtv(prmtv::EpiPerSquare)
+function incone_prmtv(prmtv::EpiPerSquare, scal::Float64)
     u = prmtv.pnt[1]
     v = prmtv.pnt[2]
     w = view(prmtv.pnt, 3:prmtv.dim)
