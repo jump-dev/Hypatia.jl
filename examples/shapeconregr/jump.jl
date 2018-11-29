@@ -25,6 +25,21 @@ using SumOfSquares
 using PolyJuMP
 using Test
 
+# what we know about the shape of our regressor
+mutable struct ShapeData
+    mono_dom::Hypatia.InterpDomain
+    conv_dom::Hypatia.InterpDomain
+    mono_profile::Vector{Float64}
+    function ShapeData(n)
+        sd = new()
+        sd.mono_dom = Hypatia.Box(-ones(n), ones(n))
+        sd.conv_dom = Hypatia.Box(-ones(n), ones(n))
+        sd.mono_profile = ones(n)
+        return sd
+    end
+end
+
+# problem data
 function generateregrdata(
     func::Function,
     xmin::Float64,
@@ -52,11 +67,10 @@ function build_shapeconregr_PSD(
     X::Matrix{Float64},
     y::Vector{Float64},
     r::Int,
-    mono_dom::Hypatia.InterpDomain,
-    conv_dom::Hypatia.InterpDomain,
-    mono_profile::Vector{Float64};
+    sd::ShapeData;
     use_leastsqobj::Bool = false,
     )
+    (mono_dom, conv_dom, mono_profile) = (sd.mono_dom, sd.conv_dom, sd.mono_profile)
     (npoints, n) = size(X)
     @polyvar x[1:n]
     mono_bss = Hypatia.Hypatia.get_bss(mono_dom, x)
@@ -98,13 +112,12 @@ function build_shapeconregr_WSOS(
     X::Matrix{Float64},
     y::Vector{Float64},
     r::Int,
-    mono_dom::Hypatia.InterpDomain,
-    conv_dom::Hypatia.InterpDomain,
-    mono_profile::Vector{Float64};
-    ortho_wts::Bool = true,
+    sd::ShapeData;
+    ortho_wts::Bool = false,
     use_leastsqobj::Bool = false,
     )
     @assert mod(r, 2) == 1
+    (mono_dom, conv_dom, mono_profile) = (sd.mono_dom, sd.conv_dom, sd.mono_profile)
     d = div(r-1, 2)
     (npoints, n) = size(X)
     @polyvar x[1:n]
@@ -148,20 +161,20 @@ end
 
 function run_JuMP_shapeconregr(use_wsos::Bool)
     (n, deg, npoints, signal_ratio, f) =
+        # (2, 3, 100, 0.0, x -> exp(norm(x))) # no noise, monotonic function
         (2, 3, 100, 0.0, x -> sum(x.^3)) # no noise, monotonic function
         # (2, 3, 100, 0.0, x -> sum(x.^4)) # no noise, non-monotonic function
         # (2, 3, 100, 50.0, x -> sum(x.^3)) # some noise, monotonic function
         # (2, 3, 100, 50.0, x -> sum(x.^4)) # some noise, non-monotonic function
 
-    mono_dom = Hypatia.Box(-ones(n), ones(n))
-    conv_dom = Hypatia.Box(-ones(n), ones(n))
-    mono_profile = ones(n)
+    shapedata = ShapeData(n)
     (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
+    use_leastsqobj = true
 
     if use_wsos
-        (model, p) = build_shapeconregr_WSOS(X, y, deg, mono_dom, conv_dom, mono_profile)
+        (model, p) = build_shapeconregr_WSOS(X, y, deg, shapedata, use_leastsqobj=use_leastsqobj)
     else
-        (model, p) = build_shapeconregr_PSD(X, y, deg, mono_dom, conv_dom, mono_profile)
+        (model, p) = build_shapeconregr_PSD(X, y, deg, shapedata, use_leastsqobj=use_leastsqobj)
     end
 
     JuMP.optimize!(model)
@@ -182,4 +195,4 @@ end
 run_JuMP_shapeconregr_PSD() = run_JuMP_shapeconregr(false)
 run_JuMP_shapeconregr_WSOS() = run_JuMP_shapeconregr(true)
 
-p = run_JuMP_shapeconregr_WSOS()
+# p = run_JuMP_shapeconregr_PSD()

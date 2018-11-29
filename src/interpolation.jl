@@ -402,34 +402,3 @@ function interp_sample(
 
     return (L=L, U=U, pts=pts, P0=P0, P=P, PWts=PWts, w=w)
 end
-
-
-# u = calc_u(n, 2d, ipts)
-# m = Vector{Float64}(undef, U)
-# m[1] = 2^n
-# M = Matrix{Float64}(undef, npts, U)
-# M[:,1] .= 1.0
-#
-# col = 1
-# for t in 1:2d
-#     for xp in Combinatorics.multiexponents(n, t)
-#         col += 1
-#         if any(isodd, xp)
-#             m[col] = 0.0
-#         else
-#             m[col] = m[1]/prod(1.0 - abs2(xp[j]) for j in 1:n)
-#         end
-#         @. @views M[:,col] = u[1][:,xp[1]+1]
-#         for j in 2:n
-#             @. @views M[:,col] *= u[j][:,xp[j]+1]
-#         end
-#     end
-# end
-#
-# Mp = Array(M')
-# F = qr!(Mp, Val(true))
-# keep_pnt = F.p[1:U]
-#
-# pts = ipts[keep_pnt,:] # subset of points indexed with the support of w
-# P0 = M[keep_pnt,1:L] # subset of polynomial evaluations up to total degree d
-# P = Array(qr(P0).Q)
