@@ -13,7 +13,7 @@ See e.g. Chapter 8 of thesis by G. Hall (2018).
 
 using LinearAlgebra
 using Random
-using Distributions
+import Distributions
 using MathOptInterface
 MOI = MathOptInterface
 using JuMP
@@ -51,11 +51,11 @@ function generateregrdata(
     )
     @assert 0.0 <= signal_ratio < Inf
     Random.seed!(rseed)
-    X = rand(Uniform(xmin, xmax), npoints, n)
+    X = rand(Distributions.Uniform(xmin, xmax), npoints, n)
     y = [func(X[p,:]) for p in 1:npoints]
 
     if !iszero(signal_ratio)
-        noise = rand(Normal(), npoints)
+        noise = rand(Distributions.Normal(), npoints)
         noise .*= norm(y)/sqrt(signal_ratio)/norm(noise)
         y .+= noise
     end
@@ -122,8 +122,8 @@ function build_shapeconregr_WSOS(
     (npoints, n) = size(X)
 
     doubledomain!(conv_dom)
-    (_, mono_U, mono_pts, mono_P0, mono_PWts, _) = Hypatia.interp_sample(mono_dom, n, d, pts_factor=20)
-    (_, conv_U, conv_pts, conv_P0, conv_PWts, _) = Hypatia.interp_sample(conv_dom, 2n, d+1, pts_factor=20) # TODO think about if it's ok to go up to d+1
+    (mono_U, mono_pts, mono_P0, mono_PWts, _) = Hypatia.interp_sample(mono_dom, n, d, pts_factor=50)
+    (conv_U, conv_pts, conv_P0, conv_PWts, _) = Hypatia.interp_sample(conv_dom, 2n, d+1, pts_factor=50) # TODO think about if it's ok to go up to d+1
     mono_wsos_cone = WSOSPolyInterpCone(mono_U, [mono_P0, mono_PWts...])
     conv_wsos_cone = WSOSPolyInterpCone(conv_U, [conv_P0, conv_PWts...])
     @polyvar x[1:n]

@@ -35,10 +35,10 @@ function build_JuMP_namedpoly_WSOS(
     f,
     dom::Hypatia.InterpDomain;
     d::Int = div(maxdegree(f) + 1, 2),
-    pts_factor = 10,
+    pts_factor = 25,
     rseed::Int = 1,
     )
-    (L, U, pts, P0, PWts, w) = Hypatia.interp_sample(dom, nvariables(f), d, pts_factor=pts_factor)
+    (U, pts, P0, PWts, w) = Hypatia.interp_sample(dom, nvariables(f), d, pts_factor=pts_factor)
 
     # build JuMP model
     model = Model(with_optimizer(Hypatia.Optimizer, verbose=true))

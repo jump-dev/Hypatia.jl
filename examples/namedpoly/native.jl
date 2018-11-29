@@ -23,7 +23,7 @@ function build_namedpoly(
     end
 
     # generate interpolation
-    (L, U, pts, P0, w) = Hypatia.interp_box(n, d, calc_w=false)
+    (U, pts, P0, w) = Hypatia.interp_box(n, d, calc_w=false)
     P0sub = view(P0, :, 1:binomial(n+d-1, n))
     pscale = 0.5*(ubs - lbs)
     Wtsfun = (j -> sqrt.(1.0 .- abs2.(pts[:,j]))*pscale[j])
