@@ -17,7 +17,7 @@ module Hypatia
 
     import ForwardDiff
     import DiffResults
-    import PositiveFactorizations
+    # import PositiveFactorizations
     include("cone.jl")
     for primitivecone in [
         "orthant",
@@ -36,7 +36,7 @@ module Hypatia
         include(joinpath(@__DIR__, "primitivecones", primitivecone * ".jl"))
     end
 
-    import IterativeSolvers
+    # import IterativeSolvers
     include("linearsystem.jl")
     for linsyssolver in [
         "qrsymm",
