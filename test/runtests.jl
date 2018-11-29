@@ -209,7 +209,7 @@ testfuns = [
     run_JuMP_expdesign,
     run_linearopt,
     run_namedpoly,
-    # run_JuMP_namedpoly_PSD,
+    run_JuMP_namedpoly_PSD,
     run_JuMP_namedpoly_WSOS,
     run_envelope,
     run_JuMP_envelope_boxinterp,
