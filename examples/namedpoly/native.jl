@@ -29,9 +29,9 @@ function build_namedpoly(
     pscale = 0.5*(ubs - lbs)
     Wtsfun = (j -> sqrt.(1.0 .- abs2.(pts[:,j]))*pscale[j])
     PWts = [Wtsfun(j) .* P0sub for j in 1:n]
-    if ortho_wts
-        PWts = [Array(qr!(W).Q) for W in PWts] # orthonormalize
-    end
+    # if ortho_wts
+    #     PWts = [Array(qr!(W).Q) for W in PWts] # orthonormalize
+    # end
 
     # transform points to fit the box domain
     trpts = pts .* pscale' .+ 0.5*(ubs + lbs)'

@@ -367,8 +367,8 @@ function interp_sample(
     n::Int,
     d::Int;
     calc_w::Bool = false,
-    pts_factor::Int = n,
-    ortho_wts::Bool = true,
+    pts_factor::Int = 10,
+    ortho_wts::Bool = false,
     )
 
     L = binomial(n+d,n)
