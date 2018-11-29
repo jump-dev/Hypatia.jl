@@ -66,8 +66,8 @@ function generateregrdata(
 end
 
 function build_shapeconregr_PSD(
-    X::Matrix{Float64},
-    y::Vector{Float64},
+    X,
+    y,
     r::Int,
     sd::ShapeData;
     use_leastsqobj::Bool = false,
@@ -119,8 +119,8 @@ function doubledomain(conv_dom::Hypatia.Box)
 end
 
 function build_shapeconregr_WSOS(
-    X::Matrix{Float64},
-    y::Vector{Float64},
+    X,
+    y,
     r::Int,
     sd::ShapeData;
     use_leastsqobj::Bool = false,

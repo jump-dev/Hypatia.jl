@@ -53,28 +53,6 @@ function exprmnt1_mdl(
     return (rmse, tm, p)
 end
 
-# Example 3 from Chapter 8 of thesis by G. Hall (2018).
-function exprmnt3_data()
-    Random.seed!(seed)
-    df = CSV.read(joinpath(@__DIR__(), "wages/wages.csv"))
-    X = df[2:3]
-    y = df[1]
-    folds = kfolds((cv_X, cv_Y); k = 10)
-
-    # (big_X, big_y), (test_X, test_y) = splitobs(shuffleobs(X, y), at=0.75)
-    # (train_X, train_y), (valid_X, valid_y) = splitobs(shuffleobs(big_X, big_y), at=0.67)
-
-    education_interval = (l=0.0, u=18.0)
-    experience_interval = (l=-4.0, u=63.0)
-    mono_domain = Hypatia.Box([0.0, -4.0], [18.0, 63.0])
-    conv_domain = Hypatia.Box([0.0, -4.0], [18.0, 63.0])
-    mono_profile = ones(2)
-    conv_profile = 1.0
-    shape_data = ShapeData(mono_domain, conv_domain, mono_profile, conv_profile)
-
-    return (folds, shape_data)
-end
-
 
 # synthetic data
 function runexp1()
@@ -104,11 +82,33 @@ function runexp1()
     end # do
 end
 
+# Example 3 from Chapter 8 of thesis by G. Hall (2018).
+function exprmnt3_data()
+    Random.seed!(seed)
+    df = CSV.read(joinpath(@__DIR__(), "wages/wages.csv"))
+    X = df[2:3]
+    y = df[1]
+    folds = kfolds((X, y); k = 10)
+
+    # (big_X, big_y), (test_X, test_y) = splitobs(shuffleobs(X, y), at=0.75)
+    # (train_X, train_y), (valid_X, valid_y) = splitobs(shuffleobs(big_X, big_y), at=0.67)
+
+    education_interval = (l=0.0, u=18.0)
+    experience_interval = (l=-4.0, u=63.0)
+    mono_domain = Hypatia.Box([0.0, -4.0], [18.0, 63.0])
+    conv_domain = Hypatia.Box([0.0, -4.0], [18.0, 63.0])
+    mono_profile = ones(2)
+    conv_profile = 1.0
+    shape_data = ShapeData(mono_domain, conv_domain, mono_profile, conv_profile)
+
+    return (folds, shape_data)
+end
+
 # real data
 function runexp3()
     shape_options = [true, false]
     wsos_options = [true, false]
-    deg_options = 2:6
+    deg_options = 2:2
     outfilename = joinpath(@__DIR__(), "shapeconregr_$(round(Int, time()/10)).csv")
 
     open(outfilename, "w") do f
@@ -133,5 +133,5 @@ function runexp3()
     end # do
 end
 
-runmakeplot = false
-runexp1()
+# runmakeplot = false
+# runexp1()

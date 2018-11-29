@@ -4,7 +4,9 @@ authors = ["Chris Coey <coey.chris@gmail.com>"]
 version = "0.0.0"
 
 [deps]
+CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
 Combinatorics = "861a8166-3701-5b0c-9a16-15d98fcdc6aa"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 DiffResults = "163ba53b-c6d8-5494-b064-1a9d43ac40c5"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
@@ -14,6 +16,7 @@ ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 GSL = "92c85e6c-cbff-5e0c-80f7-495c94daaecd"
 JuMP = "4076af6c-e467-56ae-b986-b466b2749572"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+MLDataUtils = "cc2ba9b6-d476-5e6d-8eaf-a92d5412d41d"
 MathOptInterface = "b8f27783-ece8-5eb3-8dc8-9495eed66fee"
 MultivariatePolynomials = "102ac46a-7ee4-5c85-9060-abc95bfdeaa3"
 ORCA = "47be7bcc-f1a6-5447-8b36-7eeeff7534fd"

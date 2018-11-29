@@ -38,5 +38,5 @@ function makeplot(regressor, X, y, filename::String="plot.pdf")
     p = plot([data_trace, mdl_trace], layout)
     savefig(p, filename)
 
-    return nothing
+    return p
 end
