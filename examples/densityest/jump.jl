@@ -8,9 +8,10 @@ Given a sequence of observations X₁,...,Xₙ with each Xᵢ in Rᵈ, find a de
 where
     - zᵢ is in the hypograph of the log function of f
 ==#
+
 using LinearAlgebra
-using Random
-using Distributions
+import Random
+import Distributions
 using JuMP
 using MathOptInterface
 MOI = MathOptInterface
@@ -20,40 +21,32 @@ using DynamicPolynomials
 using Hypatia
 using Test
 
-Random.seed!(1234)
-
 function build_JuMP_densityest(
     X::Matrix{Float64},
     deg::Int,
     dom::Hypatia.InterpDomain;
-    pts_factor::Int = 10,
+    pts_factor::Int = 100,
     )
-
     (nobs, dim) = size(X)
     d = div(deg, 2)
 
-    (L, U, pts, P0, PWts, quad_w) = Hypatia.interp_sample(dom, dim, d, pts_factor=pts_factor, calc_w=true)
+    (U, pts, P0, PWts, w) = Hypatia.interp_sample(dom, dim, d, pts_factor=pts_factor, calc_w=true)
 
     @polyvar x[1:dim]
     PX = PolyJuMP.monomials(x, 1:deg)
     U = size(pts, 1)
 
-    model = Model(with_optimizer(Hypatia.Optimizer, verbose=true, tolrelopt=1e-5, tolabsopt=1e-2))
+    model = Model(with_optimizer(Hypatia.Optimizer, verbose=true))
 
     @variables(model, begin
-        # log(f(u_i)) at each observation
-        z[1:nobs]
-        # probability density function
-        f, PolyJuMP.Poly(PX)
+        z[1:nobs] # log(f(u_i)) at each observation
+        f, PolyJuMP.Poly(PX) # probability density function
     end)
 
     @constraints(model, begin
-        # integrate to 1
-        sum(quad_w[i] * f(pts[i,:]) for i in 1:U) == 1.0
-        # density must be nonnegative
-        [f(pts[i,:]) for i in 1:U] in Hypatia.WSOSPolyInterpCone(U, [P0, PWts...])
-        # define hypograph of log function variable
-        [i in 1:nobs], vcat(z[i], 1.0, f(X[i,:])) in MOI.ExponentialCone()
+        sum(w[i] * f(pts[i,:]) for i in 1:U) == 1.0 # integrate to 1
+        [f(pts[i,:]) for i in 1:U] in Hypatia.WSOSPolyInterpCone(U, [P0, PWts...]) # density nonnegative
+        [i in 1:nobs], vcat(z[i], 1.0, f(X[i,:])) in MOI.ExponentialCone() # hypograph of log
     end)
 
     # maximize log likelihood
@@ -62,13 +55,14 @@ function build_JuMP_densityest(
     return model
 end
 
-function run_JuMP_densityest()
-    nobs = 900
-    n = 2
-    dist = Truncated(Normal(), -1, 1)
-    X = rand(dist, nobs, n)
-    dom = Hypatia.Box(-ones(n), ones(n))
+function run_JuMP_densityest(; rseed::Int=1)
+    nobs = 200
+    n = 1
     deg = 4
+
+    Random.seed!(rseed)
+    X = rand(Distributions.Uniform(-1, 1), nobs, n)
+    dom = Hypatia.Box(-ones(n), ones(n))
 
     model = build_JuMP_densityest(X, deg, dom)
     JuMP.optimize!(model)
@@ -83,9 +77,6 @@ function run_JuMP_densityest()
     @test pr_status == MOI.FeasiblePoint
     @test du_status == MOI.FeasiblePoint
     @test pobj ≈ dobj atol=1e-4 rtol=1e-4
-    @test pobj ≈ truemin atol=1e-4 rtol=1e-4
 
     return nothing
 end
-
-# run_JuMP_densityest()
