@@ -111,10 +111,11 @@ function build_shapeconregr_PSD(
     return (model, p)
 end
 
-function doubledomain!(conv_dom::Hypatia.Box)
-    append!(conv_dom.l, conv_dom.l)
-    append!(conv_dom.u, conv_dom.u)
-    return conv_dom
+function doubledomain(conv_dom::Hypatia.Box)
+    full_conv_dom = deepcopy(conv_dom) # TODO rethink this whole setup
+    append!(full_conv_dom.l, conv_dom.l)
+    append!(full_conv_dom.u, conv_dom.u)
+    return full_conv_dom
 end
 
 function build_shapeconregr_WSOS(
@@ -125,15 +126,16 @@ function build_shapeconregr_WSOS(
     use_leastsqobj::Bool = false,
     ignore_mono::Bool = false,
     ignore_conv::Bool = false,
+    mono_maxd::Int = -1,
+    conv_maxd::Int = -1,
     )
-    @assert mod(r, 2) == 1
     (mono_dom, conv_dom, mono_profile, conv_profile) = (sd.mono_dom, sd.conv_dom, sd.mono_profile, sd.conv_profile)
-    d = div(r-1, 2)
+    d = div(r, 2)
     (npoints, n) = size(X)
 
-    doubledomain!(conv_dom)
-    (mono_U, mono_pts, mono_P0, mono_PWts, _) = Hypatia.interp_sample(mono_dom, n, d, pts_factor=50)
-    (conv_U, conv_pts, conv_P0, conv_PWts, _) = Hypatia.interp_sample(conv_dom, 2n, d+1, pts_factor=50) # TODO think about if it's ok to go up to d+1
+    full_conv_dom = doubledomain(conv_dom)
+    (_, mono_U, mono_pts, mono_P0, mono_PWts, _) = Hypatia.interp_sample(mono_dom, n, d, pts_factor=20)
+    (_, conv_U, conv_pts, conv_P0, conv_PWts, _) = Hypatia.interp_sample(full_conv_dom, 2n, d+1, pts_factor=20) # TODO think about if it's ok to go up to d+1
     mono_wsos_cone = WSOSPolyInterpCone(mono_U, [mono_P0, mono_PWts...])
     conv_wsos_cone = WSOSPolyInterpCone(conv_U, [conv_P0, conv_PWts...])
     @polyvar x[1:n]
