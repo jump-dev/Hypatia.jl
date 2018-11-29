@@ -54,7 +54,7 @@ function incone_prmtv(prmtv::WSOSPolyInterp, scal::Float64)
     newpnt = copy(prmtv.pnt)
     # @show newpnt
     # prmtv.scal = norm(newpnt, Inf)
-    prmtv.scal = prmtv.dim*scal
+    prmtv.scal = scal
     newpnt ./= prmtv.scal
     # lmul!(prmtv.iscal, newpnt)
     # @show newpnt
@@ -95,9 +95,9 @@ function incone_prmtv(prmtv::WSOSPolyInterp, scal::Float64)
         # # ldiv!(F, tmp2j')
         # # mul!(tmp3, ipwtj, tmp2j)
 
-        # # advanced bunch-kaufman solve
-        # # ipwtj * (tmp1j^-1 * ipwtj')
-        # B = Array(ipwtj')
+        # advanced cholesky solve
+        # ipwtj * (tmp1j^-1 * ipwtj')
+        # B = Matrix(ipwtj')
         # (Brows, Bcols) = size(B)
         # lsferr = Vector{Float64}(undef, Bcols)
         # lsberr = Vector{Float64}(undef, Bcols)
@@ -105,17 +105,15 @@ function incone_prmtv(prmtv::WSOSPolyInterp, scal::Float64)
         # lsiwork = Vector{Float64}(undef, Brows)
         # lsAF = Matrix{Float64}(undef, Brows, Brows)
         # lsS = Vector{Float64}(undef, Brows)
-        #
-        # X = Matrix{Float64}(undef, Brows, Bcols)
+        # X = similar(B)
         # A = copy(tmp1j)
-        # # B = copy(ipwtj)
         # posdef = hypatia_posvx!(X, A, B, lsferr, lsberr, lswork, lsiwork, lsAF, lsS)
         # if !posdef
         #     return false
         # end
         # # tmp3 .= ipwtj * X
         # mul!(tmp3, ipwtj, X)
-        # @show norm(M - tmp3)
+        # # @show norm(M - tmp3)
 
         # @show norm(tmp2j)
         # @show norm(tmp3)
@@ -128,17 +126,46 @@ function incone_prmtv(prmtv::WSOSPolyInterp, scal::Float64)
 
     # @show norm(prmtv.g)
     # @show norm(prmtv.H)
+    # if norm(prmtv.H) > 1e15
+    #     return false
+    # end
 
     @. prmtv.H2 = prmtv.H
-    # prmtv.F = cholesky!(Symmetric(prmtv.H2), Val(true), check=false)
+    prmtv.F = cholesky!(Symmetric(prmtv.H2), Val(true), check=false)
     # @show isposdef(prmtv.F)
-    # return isposdef(prmtv.F)
+    return isposdef(prmtv.F)
     # return factH(prmtv)
-    prmtv.F = bunchkaufman!(Symmetric(prmtv.H2), true, check=false)
-    # @show issuccess(prmtv.F)
-    return issuccess(prmtv.F)
+    # prmtv.F = bunchkaufman!(Symmetric(prmtv.H2), true, check=false)
+    # return issuccess(prmtv.F)
+    return true
 end
 
 calcg_prmtv!(g::AbstractVector{Float64}, prmtv::WSOSPolyInterp) = (@. g = prmtv.g/prmtv.scal; g)
-calcHiarr_prmtv!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prmtv::WSOSPolyInterp) = (ldiv!(prod, prmtv.F, arr); @. prod = prod * prmtv.scal * prmtv.scal; prod)
+
 calcHarr_prmtv!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prmtv::WSOSPolyInterp) = (mul!(prod, prmtv.H, arr); @. prod = prod / prmtv.scal / prmtv.scal; prod)
+
+calcHiarr_prmtv!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prmtv::WSOSPolyInterp) = (ldiv!(prod, prmtv.F, arr); @. prod = prod * prmtv.scal * prmtv.scal; prod)
+
+# function calcHiarr_prmtv!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prmtv::WSOSPolyInterp)
+#     if arr isa AbstractVector
+#         B = copy(reshape(arr, :, 1))
+#     else
+#         B = copy(arr)
+#     end
+#     (Brows, Bcols) = size(B)
+#     lsferr = Vector{Float64}(undef, Bcols)
+#     lsberr = Vector{Float64}(undef, Bcols)
+#     lswork = Vector{Float64}(undef, 3*Brows)
+#     lsiwork = Vector{Float64}(undef, Brows)
+#     lsAF = Matrix{Float64}(undef, Brows, Brows)
+#     lsS = Vector{Float64}(undef, Brows)
+#     X = similar(B)
+#     A = copy(prmtv.H)
+#     posdef = hypatia_posvx!(X, A, B, lsferr, lsberr, lswork, lsiwork, lsAF, lsS)
+#
+#     prod[:] = X
+#     # (ldiv!(prod, prmtv.F, arr)
+#     @. prod = prod * prmtv.scal * prmtv.scal
+#
+#     return prod
+# end
