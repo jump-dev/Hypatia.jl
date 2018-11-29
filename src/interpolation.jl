@@ -364,6 +364,9 @@ function interp_sample(
     calc_w::Bool = false,
     pts_factor::Int = 10,
     )
+    # TODO remove this restriction
+    @assert dimension(dom) == n
+
     L = binomial(n+d,n)
     U = binomial(n+2d, n)
 
