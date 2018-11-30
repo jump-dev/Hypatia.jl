@@ -236,7 +236,9 @@ function get_bss(dom::Box, x)
 end
 
 function get_weights(dom::Box, pts::Matrix{Float64}; count::Int = size(pts, 2))
-    @assert count == length(dom.l) == length(dom.u)
+    if !(count == length(dom.l) == length(dom.u))
+        error("dimensions of domain don't match points provided, could be caused by not providing `weights_count` in `interp_sample`.")
+    end
     g = [(pts[:,i] .- dom.l[i]) .* (dom.u[i] .- pts[:,i]) for i in 1:count]
     @assert all(all(gi .>= 0.0) for gi in g)
     return g
@@ -346,10 +348,7 @@ end
 get_bss(dom::SemiFreeDomain, x) = get_bss(dom.sampling_region, x)
 
 function get_weights(dom::SemiFreeDomain, pts::Matrix{Float64}; count::Int = size(pts, 2))
-    n = dimension(dom.sampling_region)
-    restricted_weights = get_weights(dom.sampling_region, pts[:,1:n], count=n)
-    free_weights = [ones(size(pts, 1)) for i in 1:n]
-    return vcat(restricted_weights, free_weights)
+    return get_weights(dom.sampling_region, pts[:,1:count], count=count)
 end
 
 
@@ -388,9 +387,11 @@ function interp_sample(
     d::Int;
     calc_w::Bool = false,
     pts_factor::Int = 10,
+    weights_count::Int = n,
     )
     # TODO remove this restriction
     @assert dimension(dom) == n
+    @assert 0 <= weights_count <= n
 
     L = binomial(n+d,n)
     U = binomial(n+2d, n)
@@ -405,7 +406,7 @@ function interp_sample(
 
     # TODO take into account degree of g; currently always 2 for balls, ellipsoids, and intervals by luck
     P0sub = view(P0, :, 1:binomial(n+d-1, n))
-    g = Hypatia.get_weights(dom, pts)
+    g = Hypatia.get_weights(dom, pts, count=weights_count)
     PWts = [sqrt.(gi) .* P0sub for gi in g]
 
     if calc_w

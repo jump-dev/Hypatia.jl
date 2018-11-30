@@ -75,7 +75,7 @@ function runexp1()
                 (rmse, tm, p) = exprmnt_mdl(X, y, shape_data, deg=deg, use_wsos=use_wsos, ignore_mono=ignore_mono, ignore_conv=ignore_conv)
                 println(f, "$signal_ratio,$refrmse,$deg,$ignore_mono,$ignore_conv,$use_wsos,$rmse,$tm")
                 if runmakeplot
-                    makeplot(p, X, y, joinpath(@__DIR__(), "plot$(signal_ratio)_$(deg)_$(ignore_mono)_$(ignore_conv)_$(use_wsos).pdf"))
+                    makeplot(p, X, y, joinpath(@__DIR__(), "plot$(signal_ratio)_$(deg)_$(ignore_mono)_$(ignore_conv)_$(use_wsos).pdf", l=(0.5, 0.5), u=(2.0, 2.0)))
                 end
             end # model
         end # data
@@ -87,10 +87,14 @@ function exprmnt3_data()
     Random.seed!(1)
     df = CSV.read(joinpath(@__DIR__(), "wages/wages.csv"))
     # df = CSV.read("examples/shapeconregr/wages/wages.csv")
-    X = convert(Array, df[:, 2:3])
-    y = convert(Array, df[:, 1])
+    inds = sample(1:size(df, 1), 2000, replace=false)
+    X = convert(Array, df[inds, 2:3])
+    y = convert(Array, df[inds, 1])
+    # normalize
+    X = (X .- minimum(X, dims=1)) ./ (maximum(X, dims=1) - minimum(X, dims=1))
+    y = (y .- minimum(y)) ./  (maximum(y, dims=1) - minimum(y, dims=1))
     println("making folds")
-    folds = kfolds((X', y); k = 10)
+    folds = kfolds((X', y); k = 3)
 
     # (big_X, big_y), (test_X, test_y) = splitobs(shuffleobs(X, y), at=0.75)
     # (train_X, train_y), (valid_X, valid_y) = splitobs(shuffleobs(big_X, big_y), at=0.67)
@@ -99,8 +103,8 @@ function exprmnt3_data()
     experience_interval = (l=-4.0, u=63.0)
     mono_domain = Hypatia.Box([0.0, -4.0], [18.0, 63.0])
     conv_domain = Hypatia.Box([0.0, -4.0], [18.0, 63.0])
-    mono_profile = ones(2)
-    conv_profile = 1.0
+    mono_profile = [1.0, 0.0]
+    conv_profile = -1.0
     shape_data = ShapeData(mono_domain, conv_domain, mono_profile, conv_profile)
 
     return (folds, shape_data)
@@ -114,8 +118,8 @@ function runexp3()
     deg_options = 2:2
     outfilename = joinpath(@__DIR__(), "shapeconregr_$(round(Int, time()/10)).csv")
 
-    open(outfilename, "w") do f
-        println(f, "fold,deg,ignore_mono,ignore_conv,use_wsos,train_rmse,test_rmse,test_rmse,tm")
+    # open(outfilename, "w") do f
+        # println(f, "fold,deg,ignore_mono,ignore_conv,use_wsos,train_rmse,test_rmse,test_rmse,tm")
 
             (folds, shape_data) = exprmnt3_data()
             foldcount = 0
@@ -128,26 +132,30 @@ function runexp3()
                     Xtemp = convert(Array{Float64,2}, Xtrain') # TODO p(X) less strictly typed
                     (train_rmse, tm, p) = exprmnt_mdl(Xtemp, ytrain, shape_data, deg=deg, use_wsos=use_wsos, ignore_mono=ignore_mono, ignore_conv=ignore_conv)
                     test_rmse = sum(abs2(ytest[i] - JuMP.value(p)(convert(Array{Float64,2}, Xtest)[:,i])) for i in 1:size(Xtest, 1))
-                    println(f, "$foldcount,$deg,$ignore_mono,$ignore_conv,$use_wsos,$train_rmse,$test_rmse,$tm")
+                    # println(f, "$foldcount,$deg,$ignore_mono,$ignore_conv,$use_wsos,$train_rmse,$test_rmse,$tm")
                     if runmakeplot
-                        makeplot(p, Xtrain, ytrain, joinpath(@__DIR__(), "plot$(deg)_$(ignore_mono)_$(ignore_conv)_$(use_wsos).pdf"))
+                        p = makeplot(p, Xtemp, ytrain, filename=joinpath(@__DIR__(), "plot$(deg)_$(ignore_mono)_$(ignore_conv)_$(use_wsos).pdf"), l=(0.0, 0.0), u=(1.0, 1.0))
+                        return p
                     end
                 end # model
 
             end
 
-    end # do
+    # end # do
 end
 
 runmakeplot = false
-runexp3()
+p = runexp3()
 
+# n = 5, d = 6 , use convexity both struggle
+# n = 4, d = 5, use both mosek
+# small n high d to replicate papp numerical difficulties
 
-# n = 4
+# n = 5
 # # degrees of freedom for data
 # signal_ratio = 0.0 # 10.0
 # (refrmse, X, y, shape_data) = exprmnt1_data(n=n, signal_ratio=signal_ratio)
 # # degrees of freedom in the model
-# deg = 5; ignore_mono = false; ignore_conv = false; use_wsos = true
-# (rmse, tm, p) = exprmnt_mdl(X, y, shape_data, deg=deg, use_wsos=use_wsos, ignore_mono=ignore_mono, ignore_conv=ignore_conv)
+# deg = 5; ignore_mono = true; ignore_conv = false; use_wsos = true
+# @time (rmse, tm, p) = exprmnt_mdl(X, y, shape_data, deg=deg, use_wsos=use_wsos, ignore_mono=ignore_mono, ignore_conv=ignore_conv)
 # p = makeplot(p, X, y, filename=joinpath(@__DIR__(), "mosek_both.pdf"), l=0.5, u=2.0)

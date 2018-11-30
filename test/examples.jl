@@ -301,7 +301,7 @@ function _shapeconregr1_JuMP()
     (n, deg, npoints, signal_ratio, f) = (2, 3, 100, 0.0, x -> exp(norm(x)))
     (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
     (mdl, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_leastsqobj=false)
-    truemin = 4.4065e1
+    truemin = 4.4065e-1
     solveandcheck_JuMP(mdl, truemin)
 end
 
@@ -309,7 +309,7 @@ function _shapeconregr2_JuMP()
     (n, deg, npoints, signal_ratio, f) = (2, 3, 100, 0.0, x -> sum(x.^3))
     (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
     (mdl, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_leastsqobj=false)
-    truemin = 1.3971e1
+    truemin = 1.3971e-1
     solveandcheck_JuMP(mdl, truemin)
 end
 
@@ -317,7 +317,7 @@ function _shapeconregr3_JuMP()
     (n, deg, npoints, signal_ratio, f) = (2, 3, 100, 0.0, x -> sum(x.^4))
     (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
     (mdl, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_leastsqobj=false)
-    truemin = 2.4577e1
+    truemin = 2.4577e-1
     solveandcheck_JuMP(mdl, truemin)
 end
 
@@ -325,7 +325,7 @@ function _shapeconregr4_JuMP()
     (n, deg, npoints, signal_ratio, f) = (2, 3, 100, 50.0, x -> sum(x.^3))
     (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
     (mdl, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_leastsqobj=false)
-    truemin = 1.5449e1
+    truemin = 1.5449e-1
     solveandcheck_JuMP(mdl, truemin)
 end
 
@@ -333,7 +333,7 @@ function _shapeconregr5_JuMP()
     (n, deg, npoints, signal_ratio, f) = (2, 3, 100, 50.0, x -> sum(x.^4))
     (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
     (mdl, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_leastsqobj=false)
-    truemin = 2.5200e1
+    truemin = 2.5200e-1
     solveandcheck_JuMP(mdl, truemin)
 end
 
@@ -341,7 +341,7 @@ function _shapeconregr6_JuMP()
     (n, deg, npoints, signal_ratio, f) = (2, 3, 100, 0.0, x -> exp(norm(x)))
     (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
     (mdl, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_leastsqobj=true)
-    truemin = 5.4584e0
+    truemin = 5.4584e-2
     solveandcheck_JuMP(mdl, truemin)
 end
 
@@ -349,6 +349,6 @@ function _shapeconregr7_JuMP()
     (n, deg, npoints, signal_ratio, f) = (2, 3, 100, 50.0, x -> sum(x.^4))
     (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
     (mdl, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_leastsqobj=true)
-    truemin = 3.3249e0
+    truemin = 3.3249e-2
     solveandcheck_JuMP(mdl, truemin)
 end
