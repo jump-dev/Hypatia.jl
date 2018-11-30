@@ -23,6 +23,7 @@ using DynamicPolynomials
 using SemialgebraicSets
 using SumOfSquares
 using PolyJuMP
+# using Mosek
 using Test
 
 # what we know about the shape of our regressor
@@ -73,13 +74,18 @@ function build_shapeconregr_PSD(
     use_leastsqobj::Bool = false,
     ignore_mono::Bool = false,
     ignore_conv::Bool = false,
+    use_hypatia::Bool = true,
     )
     (mono_dom, conv_dom, mono_profile, conv_profile) = (sd.mono_dom, sd.conv_dom, sd.mono_profile, sd.conv_profile)
     (npoints, n) = size(X)
 
     @polyvar x[1:n]
 
-    model = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true))
+    if use_hypatia
+        model = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true))
+    else
+        model = SOSModel(with_optimizer(Mosek.Optimizer, verbose=true))
+    end
     @variable(model, p, PolyJuMP.Poly(monomials(x, 0:r)))
     dp = [DynamicPolynomials.differentiate(p, x[i]) for i in 1:n]
 
@@ -129,6 +135,7 @@ function build_shapeconregr_WSOS(
     mono_maxd::Int = -1,
     conv_maxd::Int = -1,
     )
+    println("in jump model")
     (mono_dom, conv_dom, mono_profile, conv_profile) = (sd.mono_dom, sd.conv_dom, sd.mono_profile, sd.conv_profile)
     d = div(r, 2)
     (npoints, n) = size(X)

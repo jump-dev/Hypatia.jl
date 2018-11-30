@@ -28,7 +28,7 @@ function exprmnt1_data(;
     return (reference_rmse, X, y, shape_data)
 end
 
-function exprmnt1_mdl(
+function exprmnt_mdl(
     X,
     y,
     shapedata::ShapeData;
@@ -72,7 +72,7 @@ function runexp1()
             # degrees of freedom in the model
             for deg in deg_options, ignore_mono in shape_options, ignore_conv in shape_options, use_wsos in wsos_options
                 println("running ", "signal_ratio=$signal_ratio, deg=$deg, ignore_mono=$ignore_mono, ignore_conv=$ignore_conv, use_wsos=$use_wsos")
-                (rmse, tm, p) = exprmnt1_mdl(X, y, shape_data, deg=deg, use_wsos=use_wsos, ignore_mono=ignore_mono, ignore_conv=ignore_conv)
+                (rmse, tm, p) = exprmnt_mdl(X, y, shape_data, deg=deg, use_wsos=use_wsos, ignore_mono=ignore_mono, ignore_conv=ignore_conv)
                 println(f, "$signal_ratio,$refrmse,$deg,$ignore_mono,$ignore_conv,$use_wsos,$rmse,$tm")
                 if runmakeplot
                     makeplot(p, X, y, joinpath(@__DIR__(), "plot$(signal_ratio)_$(deg)_$(ignore_mono)_$(ignore_conv)_$(use_wsos).pdf"))
@@ -84,11 +84,13 @@ end
 
 # Example 3 from Chapter 8 of thesis by G. Hall (2018).
 function exprmnt3_data()
-    Random.seed!(seed)
+    Random.seed!(1)
     df = CSV.read(joinpath(@__DIR__(), "wages/wages.csv"))
-    X = df[2:3]
-    y = df[1]
-    folds = kfolds((X, y); k = 10)
+    # df = CSV.read("examples/shapeconregr/wages/wages.csv")
+    X = convert(Array, df[:, 2:3])
+    y = convert(Array, df[:, 1])
+    println("making folds")
+    folds = kfolds((X', y); k = 10)
 
     # (big_X, big_y), (test_X, test_y) = splitobs(shuffleobs(X, y), at=0.75)
     # (train_X, train_y), (valid_X, valid_y) = splitobs(shuffleobs(big_X, big_y), at=0.67)
@@ -106,23 +108,27 @@ end
 
 # real data
 function runexp3()
-    shape_options = [true, false]
-    wsos_options = [true, false]
+    n = 2
+    shape_options = [false]
+    wsos_options = [true]
     deg_options = 2:2
     outfilename = joinpath(@__DIR__(), "shapeconregr_$(round(Int, time()/10)).csv")
 
     open(outfilename, "w") do f
         println(f, "fold,deg,ignore_mono,ignore_conv,use_wsos,train_rmse,test_rmse,test_rmse,tm")
 
-            (folds, shape_data) = exprmnt3_data(n=n, signal_ratio=signal_ratio)
+            (folds, shape_data) = exprmnt3_data()
+            foldcount = 0
 
             for ((Xtrain, ytrain), (Xtest, ytest)) in folds
+                foldcount += 1
 
                 # degrees of freedom in the model
                 for deg in deg_options, ignore_mono in shape_options, ignore_conv in shape_options, use_wsos in wsos_options
-                    (train_rmse, tm, p) = exprmnt1_mdl(Xtrain, ytrain, shape_data, deg=deg, use_wsos=use_wsos, ignore_mono=ignore_mono, ignore_conv=ignore_conv)
-                    test_rmse = sum(abs2([ytest[i] - p(Xtest[i,:]) for i in 1:size(Xtest, 1)]))
-                    println(f, "$foldi,$deg,$ignore_mono,$ignore_conv,$use_wsos,$train_rmse,$test_rmse,$tm")
+                    Xtemp = convert(Array{Float64,2}, Xtrain') # TODO p(X) less strictly typed
+                    (train_rmse, tm, p) = exprmnt_mdl(Xtemp, ytrain, shape_data, deg=deg, use_wsos=use_wsos, ignore_mono=ignore_mono, ignore_conv=ignore_conv)
+                    test_rmse = sum(abs2(ytest[i] - JuMP.value(p)(convert(Array{Float64,2}, Xtest)[:,i])) for i in 1:size(Xtest, 1))
+                    println(f, "$foldcount,$deg,$ignore_mono,$ignore_conv,$use_wsos,$train_rmse,$test_rmse,$tm")
                     if runmakeplot
                         makeplot(p, Xtrain, ytrain, joinpath(@__DIR__(), "plot$(deg)_$(ignore_mono)_$(ignore_conv)_$(use_wsos).pdf"))
                     end
@@ -133,5 +139,5 @@ function runexp3()
     end # do
 end
 
-# runmakeplot = false
-# runexp1()
+runmakeplot = false
+runexp3()
