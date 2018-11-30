@@ -181,29 +181,29 @@ include(joinpath(@__DIR__, "examples.jl"))
 #     testfun(verbose=verbose, lscachetype=lscachetype)
 # end
 #
-# @info("starting JuMP examples tests")
-# testfuns = [
-#     _namedpoly1_JuMP,
-#     _namedpoly2_JuMP,
-#     _namedpoly3_JuMP,
-#     _namedpoly4_JuMP,
-#     _namedpoly5_JuMP,
-#     _namedpoly6_JuMP,
-#     _namedpoly7_JuMP,
-#     _namedpoly8_JuMP,
-#     _namedpoly9_JuMP,
-#     _namedpoly10_JuMP,
-#     _shapeconregr1_JuMP,
-#     _shapeconregr2_JuMP,
-#     _shapeconregr3_JuMP,
-#     _shapeconregr4_JuMP,
-#     _shapeconregr5_JuMP,
-#     _shapeconregr6_JuMP,
-#     _shapeconregr7_JuMP,
-#     ]
-# @testset "JuMP examples: $testfun" for testfun in testfuns
-#     testfun()
-# end
+@info("starting JuMP examples tests")
+testfuns = [
+    # _namedpoly1_JuMP,
+    _namedpoly2_JuMP,
+    _namedpoly3_JuMP,
+    _namedpoly4_JuMP,
+    _namedpoly5_JuMP,
+    _namedpoly6_JuMP,
+    _namedpoly7_JuMP,
+    _namedpoly8_JuMP,
+    _namedpoly9_JuMP,
+    # _namedpoly10_JuMP,
+    _shapeconregr1_JuMP,
+    _shapeconregr2_JuMP,
+    _shapeconregr3_JuMP,
+    _shapeconregr4_JuMP,
+    _shapeconregr5_JuMP,
+    _shapeconregr6_JuMP,
+    # _shapeconregr7_JuMP,
+    ]
+@testset "JuMP examples: $testfun" for testfun in testfuns
+    testfun()
+end
 
 @info("starting verbose default examples tests")
 testfuns = [
