@@ -23,6 +23,7 @@ using DynamicPolynomials
 using SemialgebraicSets
 using SumOfSquares
 using PolyJuMP
+# using Mosek
 using Test
 
 # what we know about the shape of our regressor
@@ -30,13 +31,15 @@ mutable struct ShapeData
     mono_dom::Hypatia.InterpDomain
     conv_dom::Hypatia.InterpDomain
     mono_profile::Vector{Float64}
-    function ShapeData(n)
-        sd = new()
-        sd.mono_dom = Hypatia.Box(-ones(n), ones(n))
-        sd.conv_dom = Hypatia.Box(-ones(n), ones(n))
-        sd.mono_profile = ones(n)
-        return sd
-    end
+    conv_profile::Float64
+end
+function ShapeData(n::Int)
+    return ShapeData(
+        Hypatia.Box(-ones(n), ones(n)),
+        Hypatia.Box(-ones(n), ones(n)),
+        ones(n),
+        1.0
+    )
 end
 
 # problem data
@@ -64,36 +67,47 @@ function generateregrdata(
 end
 
 function build_shapeconregr_PSD(
-    X::Matrix{Float64},
-    y::Vector{Float64},
+    X,
+    y,
     r::Int,
     sd::ShapeData;
     use_leastsqobj::Bool = false,
+    ignore_mono::Bool = false,
+    ignore_conv::Bool = false,
+    use_hypatia::Bool = true,
     )
-    (mono_dom, conv_dom, mono_profile) = (sd.mono_dom, sd.conv_dom, sd.mono_profile)
+    (mono_dom, conv_dom, mono_profile, conv_profile) = (sd.mono_dom, sd.conv_dom, sd.mono_profile, sd.conv_profile)
     (npoints, n) = size(X)
 
     @polyvar x[1:n]
-    mono_bss = Hypatia.Hypatia.get_bss(mono_dom, x)
-    conv_bss = Hypatia.Hypatia.get_bss(conv_dom, x)
 
-    model = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true))
+    if use_hypatia
+        model = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true))
+    else
+        model = SOSModel(with_optimizer(Mosek.Optimizer, verbose=true))
+    end
     @variable(model, p, PolyJuMP.Poly(monomials(x, 0:r)))
-
     dp = [DynamicPolynomials.differentiate(p, x[i]) for i in 1:n]
-    @constraint(model, [j in 1:n], mono_profile[j] * dp[j] >= 0, domain=mono_bss)
+
+    if !ignore_mono
+        mono_bss = Hypatia.Hypatia.get_bss(mono_dom, x)
+        @constraint(model, [j in 1:n], mono_profile[j] * dp[j] >= 0, domain=mono_bss)
+    end
 
     # TODO think about what it means if wsos polynomials have degree > 2
-    Hp = [DynamicPolynomials.differentiate(dp[i], x[j]) for i in 1:n, j in 1:n]
-    @SDconstraint(model, Hp >= 0, domain=conv_bss)
+    if !ignore_conv
+        conv_bss = Hypatia.Hypatia.get_bss(conv_dom, x)
+        Hp = [DynamicPolynomials.differentiate(dp[i], x[j]) for i in 1:n, j in 1:n]
+        @SDconstraint(model, conv_profile * Hp >= 0, domain=conv_bss)
+    end
 
     if use_leastsqobj
         @variable(model, z)
-        @objective(model, Min, z)
+        @objective(model, Min, z / npoints)
         @constraint(model, [z, [y[i] - p(X[i, :]) for i in 1:npoints]...] in MOI.SecondOrderCone(1+npoints))
      else
         @variable(model, z[1:npoints])
-        @objective(model, Min, sum(z))
+        @objective(model, Min, sum(z) / npoints)
         @constraints(model, begin
             [i in 1:npoints], z[i] >= y[i] - p(X[i, :])
             [i in 1:npoints], z[i] >= -y[i] + p(X[i, :])
@@ -103,27 +117,32 @@ function build_shapeconregr_PSD(
     return (model, p)
 end
 
-function doubledomain!(conv_dom::Hypatia.Box)
-    append!(conv_dom.l, conv_dom.l)
-    append!(conv_dom.u, conv_dom.u)
-    return conv_dom
+function doubledomain(conv_dom::Hypatia.Box)
+    full_conv_dom = deepcopy(conv_dom) # TODO rethink this whole setup
+    append!(full_conv_dom.l, conv_dom.l)
+    append!(full_conv_dom.u, conv_dom.u)
+    return full_conv_dom
 end
 
 function build_shapeconregr_WSOS(
-    X::Matrix{Float64},
-    y::Vector{Float64},
+    X,
+    y,
     r::Int,
     sd::ShapeData;
     use_leastsqobj::Bool = false,
+    ignore_mono::Bool = false,
+    ignore_conv::Bool = false,
+    mono_maxd::Int = -1,
+    conv_maxd::Int = -1,
     )
-    @assert mod(r, 2) == 1
-    (mono_dom, conv_dom, mono_profile) = (sd.mono_dom, sd.conv_dom, sd.mono_profile)
-    d = div(r-1, 2)
+    println("in jump model")
+    (mono_dom, conv_dom, mono_profile, conv_profile) = (sd.mono_dom, sd.conv_dom, sd.mono_profile, sd.conv_profile)
+    d = div(r, 2)
     (npoints, n) = size(X)
 
-    doubledomain!(conv_dom)
-    (mono_U, mono_pts, mono_P0, mono_PWts, _) = Hypatia.interp_sample(mono_dom, n, d, pts_factor=50)
-    (conv_U, conv_pts, conv_P0, conv_PWts, _) = Hypatia.interp_sample(conv_dom, 2n, d+1, pts_factor=50) # TODO think about if it's ok to go up to d+1
+    full_conv_dom = doubledomain(conv_dom)
+    (mono_U, mono_pts, mono_P0, mono_PWts, _) = Hypatia.interp_sample(mono_dom, n, d, pts_factor=20)
+    (conv_U, conv_pts, conv_P0, conv_PWts, _) = Hypatia.interp_sample(full_conv_dom, 2n, d+1, pts_factor=20) # TODO think about if it's ok to go up to d+1
     mono_wsos_cone = WSOSPolyInterpCone(mono_U, [mono_P0, mono_PWts...])
     conv_wsos_cone = WSOSPolyInterpCone(conv_U, [conv_P0, conv_PWts...])
     @polyvar x[1:n]
@@ -134,11 +153,11 @@ function build_shapeconregr_WSOS(
 
     if use_leastsqobj
         @variable(model, z)
-        @objective(model, Min, z)
+        @objective(model, Min, z / npoints)
         @constraint(model, [z, [y[i] - p(X[i, :]) for i in 1:npoints]...] in MOI.SecondOrderCone(1+npoints))
      else
         @variable(model, z[1:npoints])
-        @objective(model, Min, sum(z))
+        @objective(model, Min, sum(z) / npoints)
         @constraints(model, begin
             [i in 1:npoints], z[i] >= y[i] - p(X[i, :])
             [i in 1:npoints], z[i] >= -y[i] + p(X[i, :])
@@ -147,12 +166,16 @@ function build_shapeconregr_WSOS(
 
     # monotonicity
     dp = [DynamicPolynomials.differentiate(p, x[j]) for j in 1:n]
-    @constraint(model, [j in 1:n], [mono_profile[j] * dp[j](mono_pts[i, :]) for i in 1:mono_U] in mono_wsos_cone)
+    if !ignore_mono
+        @constraint(model, [j in 1:n], [mono_profile[j] * dp[j](mono_pts[i, :]) for i in 1:mono_U] in mono_wsos_cone)
+    end
 
     # convexity
-    Hp = [DynamicPolynomials.differentiate(dp[i], x[j]) for i in 1:n, j in 1:n]
-    conv_condition = w'*Hp*w
-    @constraint(model, [conv_condition(conv_pts[i, :]) for i in 1:conv_U] in conv_wsos_cone)
+    if !ignore_conv
+        Hp = [DynamicPolynomials.differentiate(dp[i], x[j]) for i in 1:n, j in 1:n]
+        conv_condition = w'*Hp*w
+        @constraint(model, [conv_profile * conv_condition(conv_pts[i, :]) for i in 1:conv_U] in conv_wsos_cone)
+    end
 
     return (model, p)
 end

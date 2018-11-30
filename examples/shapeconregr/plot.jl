@@ -9,7 +9,7 @@ using PlotlyJS
 using ORCA
 using Test
 
-function makeplot(regressor, X, y)
+function makeplot(regressor, X, y, filename::String="plot.pdf")
     data_trace = scatter3d(
         x=X[:, 1],
         y=X[:, 2],
@@ -36,7 +36,7 @@ function makeplot(regressor, X, y)
     layout = Layout(margin=attr(l=0, r=0, t=0, b=0))
 
     p = plot([data_trace, mdl_trace], layout)
-    # savefig(p, "psd_plot.pdf")
+    savefig(p, filename)
 
     return p
 end
