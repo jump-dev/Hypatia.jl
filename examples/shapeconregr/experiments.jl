@@ -56,7 +56,7 @@ end
 
 # synthetic data
 function runexp1()
-    n = 2
+    n = 4
     signal_options = [0.0, 100.0, 10.0, 2.0]
     shape_options = [true, false]
     wsos_options = [true, false]
@@ -141,3 +141,13 @@ end
 
 runmakeplot = false
 runexp3()
+
+
+# n = 4
+# # degrees of freedom for data
+# signal_ratio = 0.0 # 10.0
+# (refrmse, X, y, shape_data) = exprmnt1_data(n=n, signal_ratio=signal_ratio)
+# # degrees of freedom in the model
+# deg = 5; ignore_mono = false; ignore_conv = false; use_wsos = true
+# (rmse, tm, p) = exprmnt_mdl(X, y, shape_data, deg=deg, use_wsos=use_wsos, ignore_mono=ignore_mono, ignore_conv=ignore_conv)
+# p = makeplot(p, X, y, filename=joinpath(@__DIR__(), "mosek_both.pdf"), l=0.5, u=2.0)

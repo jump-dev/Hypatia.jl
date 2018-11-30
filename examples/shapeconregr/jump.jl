@@ -23,7 +23,7 @@ using DynamicPolynomials
 using SemialgebraicSets
 using SumOfSquares
 using PolyJuMP
-# using Mosek
+using MathOptInterfaceMosek
 using Test
 
 # what we know about the shape of our regressor
@@ -74,7 +74,7 @@ function build_shapeconregr_PSD(
     use_leastsqobj::Bool = false,
     ignore_mono::Bool = false,
     ignore_conv::Bool = false,
-    use_hypatia::Bool = true,
+    use_hypatia::Bool = false,
     )
     (mono_dom, conv_dom, mono_profile, conv_profile) = (sd.mono_dom, sd.conv_dom, sd.mono_profile, sd.conv_profile)
     (npoints, n) = size(X)
@@ -84,7 +84,7 @@ function build_shapeconregr_PSD(
     if use_hypatia
         model = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true))
     else
-        model = SOSModel(with_optimizer(Mosek.Optimizer, verbose=true))
+        model = SOSModel(with_optimizer(MosekOptimizer))
     end
     @variable(model, p, PolyJuMP.Poly(monomials(x, 0:r)))
     dp = [DynamicPolynomials.differentiate(p, x[i]) for i in 1:n]
@@ -140,21 +140,17 @@ function build_shapeconregr_WSOS(
     d = div(r, 2)
     (npoints, n) = size(X)
 
-    full_conv_dom = doubledomain(conv_dom)
-    (mono_U, mono_pts, mono_P0, mono_PWts, _) = Hypatia.interp_sample(mono_dom, n, d, pts_factor=20)
-    (conv_U, conv_pts, conv_P0, conv_PWts, _) = Hypatia.interp_sample(full_conv_dom, 2n, d+1, pts_factor=20) # TODO think about if it's ok to go up to d+1
-    mono_wsos_cone = WSOSPolyInterpCone(mono_U, [mono_P0, mono_PWts...])
-    conv_wsos_cone = WSOSPolyInterpCone(conv_U, [conv_P0, conv_PWts...])
     @polyvar x[1:n]
     @polyvar w[1:n]
 
     model = Model(with_optimizer(Hypatia.Optimizer, verbose=true))
-    @variable(model, p, PolyJuMP.Poly(monomials(x, 0:r)))
+    @elapsed @variable(model, p, PolyJuMP.Poly(monomials(x, 0:r)))
 
     if use_leastsqobj
+        println("least squares objective")
         @variable(model, z)
         @objective(model, Min, z / npoints)
-        @constraint(model, [z, [y[i] - p(X[i, :]) for i in 1:npoints]...] in MOI.SecondOrderCone(1+npoints))
+        @elapsed  @constraint(model, [z, [y[i] - p(X[i, :]) for i in 1:npoints]...] in MOI.SecondOrderCone(1+npoints))
      else
         @variable(model, z[1:npoints])
         @objective(model, Min, sum(z) / npoints)
@@ -167,11 +163,18 @@ function build_shapeconregr_WSOS(
     # monotonicity
     dp = [DynamicPolynomials.differentiate(p, x[j]) for j in 1:n]
     if !ignore_mono
-        @constraint(model, [j in 1:n], [mono_profile[j] * dp[j](mono_pts[i, :]) for i in 1:mono_U] in mono_wsos_cone)
+        println("monotonicity constraint")
+        (mono_U, mono_pts, mono_P0, mono_PWts, _) = Hypatia.interp_sample(mono_dom, n, d, pts_factor=2)
+        mono_wsos_cone = WSOSPolyInterpCone(mono_U, [mono_P0, mono_PWts...])
+        @elapsed @constraint(model, [j in 1:n], [mono_profile[j] * dp[j](mono_pts[i, :]) for i in 1:mono_U] in mono_wsos_cone)
     end
 
     # convexity
     if !ignore_conv
+        println("convexity constraint")
+        full_conv_dom = doubledomain(conv_dom)
+        (conv_U, conv_pts, conv_P0, conv_PWts, _) = Hypatia.interp_sample(full_conv_dom, 2n, d+1, pts_factor=2) # TODO think about if it's ok to go up to d+1
+        conv_wsos_cone = WSOSPolyInterpCone(conv_U, [conv_P0, conv_PWts...])
         Hp = [DynamicPolynomials.differentiate(dp[i], x[j]) for i in 1:n, j in 1:n]
         conv_condition = w'*Hp*w
         @constraint(model, [conv_profile * conv_condition(conv_pts[i, :]) for i in 1:conv_U] in conv_wsos_cone)

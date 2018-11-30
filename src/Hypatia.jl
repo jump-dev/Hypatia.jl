@@ -6,6 +6,8 @@ module Hypatia
     using Printf
     using LinearAlgebra
     using SparseArrays
+    using TimerOutputs
+    const to = TimerOutput()
 
     import FFTW
     import Combinatorics

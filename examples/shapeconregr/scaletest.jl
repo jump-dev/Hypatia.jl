@@ -4,14 +4,16 @@ Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 using JuMP, PolyJuMP, Hypatia, MultivariatePolynomials, DynamicPolynomials, Random
 using MathOptInterface
 MOI = MathOptInterface
+using MathOptInterfaceMosek
 
 function scaletest(X, y)
-    r = 2
+    r = 6
     (npoints, n) = size(X)
 
     @polyvar x[1:n]
 
-    model = Model(with_optimizer(Hypatia.Optimizer, verbose=true))
+    # model = Model(with_optimizer(Hypatia.Optimizer, verbose=true))
+    model = Model(with_optimizer(MosekOptimizer))
     @variable(model, p, PolyJuMP.Poly(monomials(x, 0:r)))
 
     @variable(model, z)
@@ -21,8 +23,8 @@ function scaletest(X, y)
     return (model, p)
 end
 
-for n in [10, 100, 1000, 10_000]
-    X = rand(n, 2)
+for n in [20_000]
+    X = rand(n, 4)
     y = sum(X, dims=2)
     (model, p) = scaletest(X, y)
     JuMP.optimize!(model)

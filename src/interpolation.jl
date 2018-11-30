@@ -373,7 +373,7 @@ function interp_sample(
     candidate_pts = interp_sample(dom, U * pts_factor)
     (M, m) = get_large_P(candidate_pts, d, U)
 
-    F = qr!(Array(M'), Val(true))
+    @timeit to "interpolation qr" F = qr!(Array(M'), Val(true))
     keep_pnt = F.p[1:U]
     pts = candidate_pts[keep_pnt,:] # subset of points indexed with the support of w
     P0 = M[keep_pnt, 1:L] # subset of polynomial evaluations up to total degree d
