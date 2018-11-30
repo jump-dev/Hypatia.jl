@@ -14,8 +14,8 @@ function makeplot(regressor,
     X,
     y;
     filename::String = "plot.pdf",
-    l::Float64 = -1.0,
-    u::Float64 = 1.0,
+    l::Tuple{Float64,Float64} = (-1.0, -1.0),
+    u::Tuple{Float64,Float64} = (1.0, 1.0),
     )
     data_trace = scatter3d(
         x=X[:, 1],
@@ -24,11 +24,11 @@ function makeplot(regressor,
         mode="markers",
         opacity=0.8,
         marker_size=6,
-        marker_line_width=0.5,
+        marker_line_width=0.0,
         marker_line_color="rgba(217, 217, 217, 0.14)"
     )
-    randx = rand(Uniform(l, u), 200)
-    randy = rand(Uniform(l, u), 200)
+    randx = rand(Uniform(l[1], u[1]), 200)
+    randy = rand(Uniform(l[2], u[2]), 200)
     randz = [JuMP.value(regressor)(hcat(randx, randy)[i,:]) for i in 1:200]
     mdl_trace = mesh3d(
         x=randx,

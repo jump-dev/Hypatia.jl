@@ -328,6 +328,31 @@ function get_weights(dom::Ellipsoid, pts::Matrix{Float64}; count::Int = size(pts
     return [g]
 end
 
+# assumes the free part has the same dimension as the restricted part
+mutable struct SemiFreeDomain <: InterpDomain
+    sampling_region::InterpDomain
+end
+
+function addfreevars(d::InterpDomain)
+    return SemiFreeDomain(d)
+end
+
+dimension(d::SemiFreeDomain) = 2*dimension(d.sampling_region)
+
+function interp_sample(d::SemiFreeDomain, npts::Int)
+    return hcat(interp_sample(d.sampling_region, npts), interp_sample(d.sampling_region, npts))
+end
+
+get_bss(dom::SemiFreeDomain, x) = get_bss(dom.sampling_region, x)
+
+function get_weights(dom::SemiFreeDomain, pts::Matrix{Float64}; count::Int = size(pts, 2))
+    n = dimension(dom.sampling_region)
+    restricted_weights = get_weights(dom.sampling_region, pts[:,1:n], count=n)
+    free_weights = [ones(size(pts, 1)) for i in 1:n]
+    return vcat(restricted_weights, free_weights)
+end
+
+
 # TODO refactor common code here and in approxfekete_data
 function get_large_P(ipts::Matrix{Float64}, d::Int, U::Int)
     (npts, n) = size(ipts)
