@@ -352,3 +352,35 @@ function _shapeconregr7_JuMP()
     truemin = 3.3249e-2
     solveandcheck_JuMP(mdl, truemin)
 end
+
+function _shapeconregr8_JuMP()
+    (n, deg, npoints, signal_ratio, f) = (2, 4, 100, 0.0, x -> -inv(1 + exp(-10.0 * norm(x))))
+    (X, y) = generateregrdata(f, 0.0, 1.0, n, npoints, signal_ratio=signal_ratio)
+    shapedata = ShapeData(Hypatia.Box(zeros(n), ones(n)), Hypatia.Box(zeros(n), ones(n)), ones(n), 1)
+    (mdl, p) = build_shapeconregr_WSOS(X, y, deg, shapedata, use_leastsqobj=true)
+    truemin = 3.7723e-03
+    solveandcheck_JuMP(mdl, truemin)
+end
+
+function _shapeconregr9_JuMP()
+    (n, deg, npoints, signal_ratio, f) = (2, 4, 100, 0.0, x -> exp(norm(x)))
+    (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
+    (mdl, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_leastsqobj=true)
+    truemin = 4.7430e-2 # <---- not verified with SDP like others
+    solveandcheck_JuMP(mdl, truemin)
+end
+
+function _shapeconregr10_JuMP()
+    (n, deg, npoints, signal_ratio, f) = (2, 6, 100, 1.0, x -> exp(norm(x)))
+    (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
+    (mdl, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_leastsqobj=false)
+    truemin = 1.7751 # <---- not verified with SDP like others
+    solveandcheck_JuMP(mdl, truemin)
+end
+
+# function _shapeconregr11_JuMP() # smallish n/d out of memory with PSD after model is built
+#     (n, deg, npoints, signal_ratio, f) = (5, 5, 1000, 0.0, x -> exp(norm(x)))
+#     (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
+#     (mdl, p) = build_shapeconregr_PSD(X, y, deg, ShapeData(n), use_leastsqobj=true)
+#     JuMP.optimize!(mdl)
+# end
