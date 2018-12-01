@@ -193,7 +193,7 @@ testfuns = [
     _namedpoly8_JuMP,
     _namedpoly9_JuMP,
     # _namedpoly10_JuMP,
-    _shapeconregr1_JuMP,
+    # _shapeconregr1_JuMP,
     _shapeconregr2_JuMP,
     _shapeconregr3_JuMP,
     _shapeconregr4_JuMP,
