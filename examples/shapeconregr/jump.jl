@@ -122,7 +122,7 @@ function build_shapeconregr_WSOS(
 
     full_conv_dom = Hypatia.addfreevars(conv_dom)
     (mono_U, mono_pts, mono_P0, mono_PWts, _) = Hypatia.interp_sample(mono_dom, n, d, pts_factor=50)
-    (conv_U, conv_pts, conv_P0, conv_PWts, _) = Hypatia.interp_sample(full_conv_dom, 2n, d+1, pts_factor=50, weights_count=n) # TODO think about if it's ok to go up to d+1
+    (conv_U, conv_pts, conv_P0, conv_PWts, _) = Hypatia.interp_sample(full_conv_dom, 2n, d+1, pts_factor=50) # TODO think about if it's ok to go up to d+1
     mono_wsos_cone = WSOSPolyInterpCone(mono_U, [mono_P0, mono_PWts...])
     conv_wsos_cone = WSOSPolyInterpCone(conv_U, [conv_P0, conv_PWts...])
     @polyvar x[1:n]

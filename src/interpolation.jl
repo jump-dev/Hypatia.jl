@@ -199,8 +199,6 @@ end
 
 # fast, sampling-based point selection for general domains
 
-dimerror() = error("domain dimension doesn't match dimension of interpolation points, you may need to provide `weights_count` to `interp_sample`.")
-
 # domains
 abstract type InterpDomain end
 
@@ -237,11 +235,8 @@ function get_bss(dom::Box, x)
     return bss
 end
 
-function get_weights(dom::Box, pts::Matrix{Float64}; count::Int = size(pts, 2))
-    if !(count == length(dom.l) == length(dom.u))
-        dimerror()
-    end
-    g = [(pts[:,i] .- dom.l[i]) .* (dom.u[i] .- pts[:,i]) for i in 1:count]
+function get_weights(dom::Box, pts::AbstractMatrix{Float64})
+    g = [(pts[:,i] .- dom.l[i]) .* (dom.u[i] .- pts[:,i]) for i in 1:size(pts, 2)]
     @assert all(all(gi .>= 0.0) for gi in g)
     return g
 end
@@ -275,11 +270,8 @@ end
 
 get_bss(dom::Ball, x) = SemialgebraicSets.@set(sum((x - dom.c).^2) <= dom.r^2)
 
-function get_weights(dom::Ball, pts::Matrix{Float64}; count::Int = size(pts, 2))
-    if !(count == length(dom.c))
-         dimerror()
-     end
-    g = [dom.r^2 - sum((pts[j, 1:count] - dom.c).^2) for j in 1:size(pts, 1)]
+function get_weights(dom::Ball, pts::AbstractMatrix{Float64})
+    g = [dom.r^2 - sum((pts[j,:] - dom.c).^2) for j in 1:size(pts, 1)]
     @assert all(g .>= 0.0)
     return [g]
 end
@@ -327,11 +319,8 @@ end
 
 get_bss(dom::Ellipsoid, x) = SemialgebraicSets.@set((x - dom.c)' * dom.Q * (x - dom.c) <= 1.0)
 
-function get_weights(dom::Ellipsoid, pts::Matrix{Float64}; count::Int = size(pts, 2))
-    if !(count == length(dom.c))
-        dimerror()
-    end
-    g = [1.0 - (pts[j, 1:count] - dom.c)' * dom.Q * (pts[j, 1:count] - dom.c) for j in 1:size(pts, 1)]
+function get_weights(dom::Ellipsoid, pts::AbstractMatrix{Float64})
+    g = [1.0 - (pts[j, :] - dom.c)' * dom.Q * (pts[j, :] - dom.c) for j in 1:size(pts, 1)]
     @assert all(g .>= 0.0)
     return [g]
 end
@@ -353,8 +342,9 @@ end
 
 get_bss(dom::SemiFreeDomain, x) = get_bss(dom.sampling_region, x)
 
-function get_weights(dom::SemiFreeDomain, pts::Matrix{Float64}; count::Int = size(pts, 2))
-    return get_weights(dom.sampling_region, pts[:,1:count], count=count)
+function get_weights(dom::SemiFreeDomain, pts::Matrix{Float64})
+    count = div(size(pts, 2), 2)
+    return get_weights(dom.sampling_region, view(pts, : ,1:count))
 end
 
 
@@ -393,11 +383,9 @@ function interp_sample(
     d::Int;
     calc_w::Bool = false,
     pts_factor::Int = 10,
-    weights_count::Int = n,
     )
     # TODO remove this restriction
     @assert dimension(dom) == n
-    @assert weights_count <= n
 
     L = binomial(n+d,n)
     U = binomial(n+2d, n)
@@ -412,7 +400,7 @@ function interp_sample(
 
     # TODO take into account degree of g; currently always 2 for balls, ellipsoids, and intervals by luck
     P0sub = view(P0, :, 1:binomial(n+d-1, n))
-    g = Hypatia.get_weights(dom, pts, count=weights_count)
+    g = Hypatia.get_weights(dom, pts)
     PWts = [sqrt.(gi) .* P0sub for gi in g]
 
     if calc_w
