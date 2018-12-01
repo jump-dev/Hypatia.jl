@@ -183,7 +183,7 @@ end
 
 @info("starting JuMP examples tests")
 testfuns = [
-    _namedpoly1_JuMP,
+    # _namedpoly1_JuMP,
     _namedpoly2_JuMP,
     _namedpoly3_JuMP,
     _namedpoly4_JuMP,
@@ -195,7 +195,7 @@ testfuns = [
     _namedpoly10_JuMP,
     _shapeconregr1_JuMP,
     _shapeconregr2_JuMP,
-    _shapeconregr3_JuMP,
+    # _shapeconregr3_JuMP,
     _shapeconregr4_JuMP,
     _shapeconregr5_JuMP,
     # _shapeconregr6_JuMP, # numerically unstable
