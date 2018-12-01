@@ -85,59 +85,59 @@ function solveandcheck(
     return (x=x, y=y, s=s, z=z, pobj=pobj, dobj=dobj, status=status, stime=stime, niters=niters)
 end
 
-#
-# # native interface tests
-# include(joinpath(@__DIR__, "native.jl"))
-# @info("starting native interface tests")
-# verbose = false
-# lscachetypes = [
-#     Hypatia.QRSymmCache,
-#     # Hypatia.NaiveCache,
-#     ]
-# testfuns = [
-#     _dimension1,
-#     _consistent1,
-#     _inconsistent1,
-#     _inconsistent2,
-#     _orthant1,
-#     _orthant2,
-#     _orthant3,
-#     _orthant4,
-#     _epinorminf1,
-#     _epinorminf2,
-#     _epinorminf3,
-#     _epinorminf4,
-#     _epinorminf5,
-#     _epinorminf6,
-#     _epinormeucl1,
-#     _epinormeucl2,
-#     _epipersquare1,
-#     _epipersquare2,
-#     _epipersquare3,
-#     _semidefinite1,
-#     _semidefinite2,
-#     _semidefinite3,
-#     _hypoperlog1,
-#     _hypoperlog2,
-#     _hypoperlog3,
-#     _hypoperlog4,
-#     _epiperpower1,
-#     _epiperpower2, # numerically unstable
-#     _epiperpower3,
-#     _hypogeomean1,
-#     _hypogeomean2,
-#     _hypogeomean3,
-#     _hypogeomean4,
-#     _epinormspectral1,
-#     _hypoperlogdet1,
-#     _hypoperlogdet2,
-#     _hypoperlogdet3,
-#     _epipersumexp1,
-#     _epipersumexp2,
-#     ]
-# @testset "native tests: $testfun, $lscachetype" for testfun in testfuns, lscachetype in lscachetypes
-#     testfun(verbose=verbose, lscachetype=lscachetype)
-# end
+
+# native interface tests
+include(joinpath(@__DIR__, "native.jl"))
+@info("starting native interface tests")
+verbose = false
+lscachetypes = [
+    Hypatia.QRSymmCache,
+    # Hypatia.NaiveCache,
+    ]
+testfuns = [
+    _dimension1,
+    _consistent1,
+    _inconsistent1,
+    _inconsistent2,
+    _orthant1,
+    _orthant2,
+    _orthant3,
+    _orthant4,
+    _epinorminf1,
+    _epinorminf2,
+    _epinorminf3,
+    _epinorminf4,
+    _epinorminf5,
+    _epinorminf6,
+    _epinormeucl1,
+    _epinormeucl2,
+    _epipersquare1,
+    _epipersquare2,
+    _epipersquare3,
+    _semidefinite1,
+    _semidefinite2,
+    _semidefinite3,
+    _hypoperlog1,
+    _hypoperlog2,
+    _hypoperlog3,
+    _hypoperlog4,
+    _epiperpower1,
+    _epiperpower2, # numerically unstable
+    _epiperpower3,
+    _hypogeomean1,
+    _hypogeomean2,
+    _hypogeomean3,
+    _hypogeomean4,
+    _epinormspectral1,
+    _hypoperlogdet1,
+    _hypoperlogdet2,
+    _hypoperlogdet3,
+    _epipersumexp1,
+    _epipersumexp2,
+    ]
+@testset "native tests: $testfun, $lscachetype" for testfun in testfuns, lscachetype in lscachetypes
+    testfun(verbose=verbose, lscachetype=lscachetype)
+end
 
 
 # examples in src/examples/ folder
@@ -152,38 +152,38 @@ include(joinpath(egs_dir, "shapeconregr/jump.jl"))
 include(joinpath(egs_dir, "densityest/jump.jl"))
 include(joinpath(@__DIR__, "examples.jl"))
 
-# @info("starting native examples tests")
-# verbose = false
-# lscachetypes = [
-#     Hypatia.QRSymmCache,
-#     # Hypatia.NaiveCache, # slow
-#     ]
-# testfuns = [
-#     _envelope1,
-#     _envelope2,
-#     _envelope3,
-#     _envelope4,
-#     _linearopt1,
-#     _linearopt2,
-#     _namedpoly1,
-#     _namedpoly2,
-#     _namedpoly3, # numerically unstable
-#     # _namedpoly4, # interpolation memory usage excessive
-#     _namedpoly5,
-#     # _namedpoly6, # interpolation memory usage excessive
-#     _namedpoly7,
-#     _namedpoly8,
-#     _namedpoly9,
-#     _namedpoly10, # numerically unstable
-#     _namedpoly11,
-#     ]
-# @testset "native examples: $testfun, $lscachetype" for testfun in testfuns, lscachetype in lscachetypes
-#     testfun(verbose=verbose, lscachetype=lscachetype)
-# end
-#
+@info("starting native examples tests")
+verbose = true
+lscachetypes = [
+    Hypatia.QRSymmCache,
+    # Hypatia.NaiveCache, # slow
+    ]
+testfuns = [
+    _envelope1,
+    _envelope2,
+    _envelope3,
+    _envelope4,
+    _linearopt1,
+    _linearopt2,
+    _namedpoly1,
+    _namedpoly2,
+    _namedpoly3, # numerically unstable
+    # _namedpoly4, # interpolation memory usage excessive
+    _namedpoly5,
+    # _namedpoly6, # interpolation memory usage excessive
+    _namedpoly7,
+    _namedpoly8,
+    _namedpoly9,
+    # _namedpoly10, # numerically unstable
+    _namedpoly11,
+    ]
+@testset "native examples: $testfun, $lscachetype" for testfun in testfuns, lscachetype in lscachetypes
+    testfun(verbose=verbose, lscachetype=lscachetype)
+end
+
 @info("starting JuMP examples tests")
 testfuns = [
-    # _namedpoly1_JuMP,
+    _namedpoly1_JuMP,
     _namedpoly2_JuMP,
     _namedpoly3_JuMP,
     _namedpoly4_JuMP,
@@ -192,14 +192,14 @@ testfuns = [
     _namedpoly7_JuMP,
     _namedpoly8_JuMP,
     _namedpoly9_JuMP,
-    # _namedpoly10_JuMP,
-    # _shapeconregr1_JuMP,
+    _namedpoly10_JuMP,
+    _shapeconregr1_JuMP,
     _shapeconregr2_JuMP,
     _shapeconregr3_JuMP,
     _shapeconregr4_JuMP,
     _shapeconregr5_JuMP,
-    _shapeconregr6_JuMP,
-    # _shapeconregr7_JuMP,
+    # _shapeconregr6_JuMP, # numerically unstable
+    _shapeconregr7_JuMP,
     ]
 @testset "JuMP examples: $testfun" for testfun in testfuns
     testfun()
@@ -207,16 +207,16 @@ end
 
 @info("starting verbose default examples tests")
 testfuns = [
-    # run_JuMP_expdesign,
-    # run_linearopt,
-    # run_namedpoly,
+    run_JuMP_expdesign,
+    run_linearopt,
+    run_namedpoly,
     # run_JuMP_namedpoly_PSD,
-    # run_JuMP_namedpoly_WSOS,
-    # run_envelope,
-    # run_JuMP_envelope_boxinterp,
-    # run_JuMP_envelope_sampleinterp_box,
-    # run_JuMP_envelope_sampleinterp_ball,
-    # run_JuMP_shapeconregr_PSD,
+    run_JuMP_namedpoly_WSOS,
+    run_envelope,
+    run_JuMP_envelope_boxinterp,
+    run_JuMP_envelope_sampleinterp_box,
+    run_JuMP_envelope_sampleinterp_ball,
+    run_JuMP_shapeconregr_PSD,
     run_JuMP_shapeconregr_WSOS,
     run_JuMP_densityest,
     ]
