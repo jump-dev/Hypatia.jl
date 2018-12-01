@@ -203,6 +203,7 @@ testfuns = [
     _shapeconregr8_JuMP,
     _shapeconregr9_JuMP,
     _shapeconregr10_JuMP,
+    _shapeconregr11_JuMP,
     ]
 @testset "JuMP examples: $testfun" for testfun in testfuns
     testfun()
