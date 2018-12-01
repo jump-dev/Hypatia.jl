@@ -85,59 +85,59 @@ function solveandcheck(
     return (x=x, y=y, s=s, z=z, pobj=pobj, dobj=dobj, status=status, stime=stime, niters=niters)
 end
 
-#
-# # native interface tests
-# include(joinpath(@__DIR__, "native.jl"))
-# @info("starting native interface tests")
-# verbose = false
-# lscachetypes = [
-#     Hypatia.QRSymmCache,
-#     # Hypatia.NaiveCache,
-#     ]
-# testfuns = [
-#     _dimension1,
-#     _consistent1,
-#     _inconsistent1,
-#     _inconsistent2,
-#     _orthant1,
-#     _orthant2,
-#     _orthant3,
-#     _orthant4,
-#     _epinorminf1,
-#     _epinorminf2,
-#     _epinorminf3,
-#     _epinorminf4,
-#     _epinorminf5,
-#     _epinorminf6,
-#     _epinormeucl1,
-#     _epinormeucl2,
-#     _epipersquare1,
-#     _epipersquare2,
-#     _epipersquare3,
-#     _semidefinite1,
-#     _semidefinite2,
-#     _semidefinite3,
-#     _hypoperlog1,
-#     _hypoperlog2,
-#     _hypoperlog3,
-#     _hypoperlog4,
-#     _epiperpower1,
-#     _epiperpower2, # numerically unstable
-#     _epiperpower3,
-#     _hypogeomean1,
-#     _hypogeomean2,
-#     _hypogeomean3,
-#     _hypogeomean4,
-#     _epinormspectral1,
-#     _hypoperlogdet1,
-#     _hypoperlogdet2,
-#     _hypoperlogdet3,
-#     _epipersumexp1,
-#     _epipersumexp2,
-#     ]
-# @testset "native tests: $testfun, $lscachetype" for testfun in testfuns, lscachetype in lscachetypes
-#     testfun(verbose=verbose, lscachetype=lscachetype)
-# end
+
+# native interface tests
+include(joinpath(@__DIR__, "native.jl"))
+@info("starting native interface tests")
+verbose = false
+lscachetypes = [
+    Hypatia.QRSymmCache,
+    # Hypatia.NaiveCache,
+    ]
+testfuns = [
+    _dimension1,
+    _consistent1,
+    _inconsistent1,
+    _inconsistent2,
+    _orthant1,
+    _orthant2,
+    _orthant3,
+    _orthant4,
+    _epinorminf1,
+    _epinorminf2,
+    _epinorminf3,
+    _epinorminf4,
+    _epinorminf5,
+    _epinorminf6,
+    _epinormeucl1,
+    _epinormeucl2,
+    _epipersquare1,
+    _epipersquare2,
+    _epipersquare3,
+    _semidefinite1,
+    _semidefinite2,
+    _semidefinite3,
+    _hypoperlog1,
+    _hypoperlog2,
+    _hypoperlog3,
+    _hypoperlog4,
+    _epiperpower1,
+    _epiperpower2, # numerically unstable
+    _epiperpower3,
+    _hypogeomean1,
+    _hypogeomean2,
+    _hypogeomean3,
+    _hypogeomean4,
+    _epinormspectral1,
+    _hypoperlogdet1,
+    _hypoperlogdet2,
+    _hypoperlogdet3,
+    _epipersumexp1,
+    _epipersumexp2,
+    ]
+@testset "native tests: $testfun, $lscachetype" for testfun in testfuns, lscachetype in lscachetypes
+    testfun(verbose=verbose, lscachetype=lscachetype)
+end
 
 
 # examples in src/examples/ folder
@@ -160,13 +160,13 @@ lscachetypes = [
     ]
 testfuns = [
     _envelope1,
-    # _envelope2,
-    # _envelope3,
-    # _envelope4,
-    # _linearopt1,
-    # _linearopt2,
+    _envelope2,
+    _envelope3,
+    _envelope4,
+    _linearopt1,
+    _linearopt2,
     _namedpoly1,
-    # _namedpoly2,
+    _namedpoly2,
     _namedpoly3, # numerically unstable
     # _namedpoly4, # interpolation memory usage excessive
     _namedpoly5,
@@ -228,18 +228,18 @@ testfuns = [
     testfun()
 end
 
-#
-# # MathOptInterface tests
-# include(joinpath(@__DIR__, "moi.jl"))
-# @info("starting MathOptInterface tests")
-# verbose = false
-# lscachetypes = [
-#     Hypatia.QRSymmCache,
-#     Hypatia.NaiveCache,
-#     ]
-# @testset "MOI tests: $lscachetype, $(usedense ? "dense" : "sparse")" for lscachetype in lscachetypes, usedense in [false, true]
-#     testmoi(verbose=verbose, lscachetype=lscachetype, usedense=usedense)
-# end
+
+# MathOptInterface tests
+include(joinpath(@__DIR__, "moi.jl"))
+@info("starting MathOptInterface tests")
+verbose = false
+lscachetypes = [
+    Hypatia.QRSymmCache,
+    Hypatia.NaiveCache,
+    ]
+@testset "MOI tests: $lscachetype, $(usedense ? "dense" : "sparse")" for lscachetype in lscachetypes, usedense in [false, true]
+    testmoi(verbose=verbose, lscachetype=lscachetype, usedense=usedense)
+end
 
 
 return nothing
