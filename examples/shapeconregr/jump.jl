@@ -30,13 +30,15 @@ mutable struct ShapeData
     mono_dom::Hypatia.InterpDomain
     conv_dom::Hypatia.InterpDomain
     mono_profile::Vector{Float64}
-    function ShapeData(n)
-        sd = new()
-        sd.mono_dom = Hypatia.Box(-ones(n), ones(n))
-        sd.conv_dom = Hypatia.Box(-ones(n), ones(n))
-        sd.mono_profile = ones(n)
-        return sd
-    end
+    conv_profile::Int
+end
+function ShapeData(n::Int)
+    return ShapeData(
+        Hypatia.Box(-ones(n), ones(n)),
+        Hypatia.Box(-ones(n), ones(n)),
+        ones(Int, n),
+        1
+    )
 end
 
 # problem data
@@ -116,9 +118,9 @@ function build_shapeconregr_WSOS(
     sd::ShapeData;
     use_leastsqobj::Bool = false,
     )
-    @assert mod(r, 2) == 1
+    # @assert mod(r, 2) == 1
     (mono_dom, conv_dom, mono_profile) = (sd.mono_dom, sd.conv_dom, sd.mono_profile)
-    d = div(r-1, 2)
+    d = div(r, 2)
     (npoints, n) = size(X)
 
     doubledomain!(conv_dom)
@@ -164,6 +166,8 @@ function run_JuMP_shapeconregr(use_wsos::Bool)
         # (2, 3, 100, 0.0, x -> sum(x.^4)) # no noise, non-monotonic function
         # (2, 3, 100, 50.0, x -> sum(x.^3)) # some noise, monotonic function
         # (2, 3, 100, 50.0, x -> sum(x.^4)) # some noise, non-monotonic function
+        # (2, 8, 100, 0.0, x -> exp(norm(x))) # low n high deg, numerically harder
+        # (5, 5, 100, 0.0, x -> exp(norm(x))) # moderate size, no noise, monotonic # out of memory with psd
 
     shapedata = ShapeData(n)
     (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
@@ -176,6 +180,7 @@ function run_JuMP_shapeconregr(use_wsos::Bool)
         (model, p) = build_shapeconregr_PSD(X, y, deg, shapedata, use_leastsqobj=use_leastsqobj)
     end
 
+    println("starting to solve JuMP model")
     JuMP.optimize!(model)
     term_status = JuMP.termination_status(model)
     pobj = JuMP.objective_value(model)

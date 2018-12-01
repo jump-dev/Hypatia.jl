@@ -377,3 +377,10 @@ function _shapeconregr10_JuMP()
     truemin = 1.7751e+02 # <---- not verified with SDP like others
     solveandcheck_JuMP(mdl, truemin)
 end
+
+# function _shapeconregr11_JuMP() # smallish n/d out of memory with PSD after model is built
+#     (n, deg, npoints, signal_ratio, f) = (5, 5, 1000, 0.0, x -> exp(norm(x)))
+#     (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
+#     (mdl, p) = build_shapeconregr_PSD(X, y, deg, ShapeData(n), use_leastsqobj=true)
+#     JuMP.optimize!(mdl)
+# end
