@@ -4,6 +4,10 @@ QR plus either Cholesky factorization or iterative conjugate gradients method
 (1) eliminate equality constraints via QR of A'
 (2) solve reduced symmetric system by Cholesky or iterative method
 =#
+
+using LinearAlgebra: BlasInt
+using LinearAlgebra.BLAS: @blasfunc
+
 mutable struct QRSymmCache <: LinSysCache
     # TODO can remove some of the intermediary prealloced arrays after github.com/JuliaLang/julia/issues/23919 is resolved
     useiterative
@@ -42,6 +46,7 @@ mutable struct QRSymmCache <: LinSysCache
     lsiwork
     lsAF
     lsS
+    ipiv
 
     # for iterative only
     # cgstate
@@ -99,10 +104,17 @@ mutable struct QRSymmCache <: LinSysCache
 
         L.lsferr = Vector{Float64}(undef, 2)
         L.lsberr = Vector{Float64}(undef, 2)
-        L.lswork = Vector{Float64}(undef, 3*nmp)
-        L.lsiwork = Vector{Float64}(undef, nmp)
         L.lsAF = Matrix{Float64}(undef, nmp, nmp)
-        L.lsS = Vector{Float64}(undef, nmp)
+
+        # # posvx
+        # L.lswork = Vector{Float64}(undef, 3*nmp)
+        # L.lsiwork = Vector{BlasInt}(undef, nmp)
+        # L.lsS = Vector{Float64}(undef, nmp)
+
+        # sysvx
+        L.lswork = Vector{Float64}(undef, 5*nmp)
+        L.lsiwork = Vector{BlasInt}(undef, nmp)
+        L.ipiv = Vector{BlasInt}(undef, nmp)
 
         # if useiterative
         #     cgu = zeros(nmp)
@@ -198,20 +210,32 @@ function solvelinsys6!(
     @. L.rhs = L.bxGHbz - L.rhs
     mul!(L.Q2divcopy, L.Q2', L.rhs)
 
-    # posdef = posv!('U', L.Q2GHGQ2, L.Q2div) # for no iterative refinement or equilibration
     if size(L.Q2div, 1) > 0
-        posdef = hypatia_posvx!(L.Q2div, L.Q2GHGQ2, L.Q2divcopy, L.lsferr, L.lsberr, L.lswork, L.lsiwork, L.lsAF, L.lsS)
-        if !posdef
-            println("linear system matrix was not positive definite")
+        success = hypatia_sysvx!(L.Q2div, L.Q2GHGQ2, L.Q2divcopy, L.lsferr, L.lsberr, L.lswork, L.lsiwork, L.lsAF, L.ipiv)
+        if !success
+            println("linear system matrix factorization failed")
             mul!(L.Q2GHGQ2, L.Q2', L.GHGQ2)
             L.Q2GHGQ2 += 1e-4I
-            F = bunchkaufman!(Symmetric(L.Q2GHGQ2), true, check=false)
-            if !issuccess(F)
-                error("could not fix failure of positive definiteness; terminating")
+            mul!(L.Q2divcopy, L.Q2', L.rhs)
+
+            success = hypatia_sysvx!(L.Q2div, L.Q2GHGQ2, L.Q2divcopy, L.lsferr, L.lsberr, L.lswork, L.lsiwork, L.lsAF, L.ipiv)
+            if !success
+                error("could not fix linear system solve failure; terminating")
             end
-            mul!(L.Q2div, L.Q2', L.rhs)
-            ldiv!(F, L.Q2div)
         end
+
+        # success = hypatia_posvx!(L.Q2div, L.Q2GHGQ2, L.Q2divcopy, L.lsferr, L.lsberr, L.lswork, L.lsiwork, L.lsAF, L.lsS)
+        # if !success
+        #     println("linear system matrix was not positive definite")
+        #     mul!(L.Q2GHGQ2, L.Q2', L.GHGQ2)
+        #     L.Q2GHGQ2 += 1e-4I
+        #     F = bunchkaufman!(Symmetric(L.Q2GHGQ2), true, check=false)
+        #     if !issuccess(F)
+        #         error("could not fix failure of positive definiteness; terminating")
+        #     end
+        #     mul!(L.Q2div, L.Q2', L.rhs)
+        #     ldiv!(F, L.Q2div)
+        # end
     end
 
     mul!(L.Q2x, L.Q2, L.Q2div)
@@ -237,13 +261,11 @@ function solvelinsys6!(
     return (dir_kap, dir_tau)
 end
 
-
-using LinearAlgebra: BlasInt
-using LinearAlgebra.BLAS: @blasfunc
+# LAPACK helper functions for linear systems
+# TODO put in a separate file, contribute to Julia LinearAlgebra
 
 # call LAPACK dposvx function (compare to dposv and dposvxx)
 # performs equilibration and iterative refinement
-# TODO not currently available in LinearAlgebra.LAPACK but should contribute
 function hypatia_posvx!(
     X::Matrix{Float64},
     A::Matrix{Float64},
@@ -279,15 +301,14 @@ function hypatia_posvx!(
         ldb, X, n, rcond, ferr, berr, work, iwork, info)
 
     if info[] != 0 && info[] != n+1
-        # @warn("failure to solve linear system (posvx status $(info[]))")
+        # println("failure to solve linear system (posvx status $(info[]))")
         return false
     end
     return true
 end
 
-# call LAPACK dsysvx function
+# call LAPACK dsysvx function (compare to dsysv and dsysvxx)
 # performs equilibration and iterative refinement
-# TODO not currently available in LinearAlgebra.LAPACK but should contribute
 function hypatia_sysvx!(
     X::Matrix{Float64},
     A::Matrix{Float64},
@@ -297,7 +318,7 @@ function hypatia_sysvx!(
     work,
     iwork,
     AF,
-    S,
+    ipiv,
     )
     n = size(A, 1)
     @assert n == size(A, 2) == size(B, 1)
@@ -306,24 +327,26 @@ function hypatia_sysvx!(
     nrhs = size(B, 2)
     ldb = stride(B, 2)
     rcond = Ref{Float64}()
-
-    fact = 'E'
+    lwork = Ref{BlasInt}(5n)
+    fact = 'N'
     uplo = 'U'
-    equed = 'Y'
 
     info = Ref{BlasInt}()
 
     ccall((@blasfunc(dsysvx_), Base.liblapack_name), Cvoid,
         (Ref{UInt8}, Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt},
         Ptr{Float64}, Ref{BlasInt}, Ptr{Float64}, Ref{BlasInt},
-        Ref{UInt8}, Ptr{Float64}, Ptr{Float64}, Ref{BlasInt},
-        Ptr{Float64}, Ref{BlasInt}, Ptr{Float64}, Ptr{Float64},
-        Ptr{Float64}, Ptr{Float64}, Ptr{BlasInt}, Ptr{BlasInt}),
-        fact, uplo, n, nrhs, A, lda, AF, lda, equed, S, B,
-        ldb, X, n, rcond, ferr, berr, work, iwork, info)
+        Ptr{BlasInt}, Ptr{Float64}, Ref{BlasInt}, Ptr{Float64},
+        Ref{BlasInt}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64},
+        Ptr{Float64}, Ptr{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt}),
+        fact, uplo, n, nrhs, A, lda, AF, lda, ipiv, B,
+        ldb, X, n, rcond, ferr, berr, work, lwork, iwork, info)
 
+    if lwork[] > 5n
+        println("in sysvx, lwork increased from $(5n) to $(lwork[])")
+    end
     if info[] != 0 && info[] != n+1
-        # @warn("failure to solve linear system (posvx status $(info[]))")
+        println("failure to solve linear system (sysvx status $(info[]))")
         return false
     end
     return true
