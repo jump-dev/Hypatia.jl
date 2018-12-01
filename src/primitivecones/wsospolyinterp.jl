@@ -68,13 +68,30 @@ function incone_prmtv(prmtv::WSOSPolyInterp, scal::Float64)
         mul!(tmp1j, ipwtj', tmp2j)
 
         # pivoted cholesky, upper triangle solve
-        F = cholesky!(Symmetric(tmp1j, :U), Val(true), check=false)
-        if !isposdef(F)
+        # F = cholesky!(Symmetric(tmp1j, :U), Val(true), check=false)
+        # if !isposdef(F)
+        #     return false
+        # end
+        # tmp2j .= view(ipwtj, :, F.p)
+        # rdiv!(tmp2j, F.U)
+        # mul!(tmp3, tmp2j, tmp2j')
+
+        (U, L) = size(ipwtj)
+        lsferr = Vector{Float64}(undef, U)
+        lsberr = Vector{Float64}(undef, U)
+        lsAF = Matrix{Float64}(undef, L, L)
+        lswork = Vector{Float64}(undef, 3L)
+        lsiwork = Vector{BlasInt}(undef, L)
+        lsS = Vector{Float64}(undef, L)
+
+        # posvx solve
+        Pp = Matrix(ipwtj')
+        PDPiP = similar(Pp)
+        success = hypatia_posvx!(PDPiP, tmp1j, Pp, lsferr, lsberr, lswork, lsiwork, lsAF, lsS)
+        if !success
             return false
         end
-        tmp2j .= view(ipwtj, :, F.p)
-        rdiv!(tmp2j, F.U)
-        mul!(tmp3, tmp2j, tmp2j')
+        mul!(tmp3, ipwtj, PDPiP)
 
         for i in eachindex(prmtv.g)
             prmtv.g[i] -= tmp3[i,i]
