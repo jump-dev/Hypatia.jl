@@ -120,7 +120,7 @@ uuid = "92c85e6c-cbff-5e0c-80f7-495c94daaecd"
 version = "0.4.0"
 
 [[InteractiveUtils]]
-deps = ["LinearAlgebra", "Markdown"]
+deps = ["Markdown"]
 uuid = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
 
 [[JSON]]
@@ -160,7 +160,7 @@ git-tree-sha1 = "bc8dffc05c4697addeb3c536b303be3f8b16b1ed"
 repo-rev = "master"
 repo-url = "https://github.com/JuliaOpt/MathOptInterface.jl.git"
 uuid = "b8f27783-ece8-5eb3-8dc8-9495eed66fee"
-version = "0.6.3+"
+version = "0.6.4+"
 
 [[Missings]]
 deps = ["Dates", "InteractiveUtils", "SparseArrays", "Test"]
@@ -304,9 +304,9 @@ uuid = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 
 [[StatsBase]]
 deps = ["DataStructures", "LinearAlgebra", "Missings", "Printf", "Random", "SortingAlgorithms", "SparseArrays", "Statistics", "Test"]
-git-tree-sha1 = "723193a13e8078cec6dcd0b8fe245c8bfd81690e"
+git-tree-sha1 = "2722397d88f8ffef551948f6c20e1d74a743298c"
 uuid = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
-version = "0.25.0"
+version = "0.26.0"
 
 [[StatsFuns]]
 deps = ["Rmath", "SpecialFunctions", "Test"]
@@ -337,7 +337,7 @@ uuid = "30578b45-9adc-5946-b283-645ec420af67"
 version = "0.4.0"
 
 [[UUIDs]]
-deps = ["Random"]
+deps = ["Random", "SHA"]
 uuid = "cf7118a7-6976-5b1a-9a39-7adc72f591a4"
 
 [[Unicode]]
