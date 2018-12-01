@@ -135,9 +135,9 @@ testfuns = [
     _epipersumexp1,
     _epipersumexp2,
     ]
-# @testset "native tests: $testfun, $lscachetype" for testfun in testfuns, lscachetype in lscachetypes
-#     testfun(verbose=verbose, lscachetype=lscachetype)
-# end
+@testset "native tests: $testfun, $lscachetype" for testfun in testfuns, lscachetype in lscachetypes
+    testfun(verbose=verbose, lscachetype=lscachetype)
+end
 
 
 # examples in src/examples/ folder

@@ -400,7 +400,7 @@ function interp_sample(
 
     # TODO take into account degree of g; currently always 2 for balls, ellipsoids, and intervals by luck
     P0sub = view(P0, :, 1:binomial(n+d-1, n))
-    g = Hypatia.get_weights(dom, pts)
+    g = get_weights(dom, pts)
     PWts = [sqrt.(gi) .* P0sub for gi in g]
 
     if calc_w
