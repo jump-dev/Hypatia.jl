@@ -89,9 +89,11 @@ function build_shapeconregr_PSD(
         end
     end
 
-    # TODO think about what it means if wsos polynomials have degree > 2
-    Hp = [DynamicPolynomials.differentiate(dp[i], x[j]) for i in 1:n, j in 1:n]
-    @SDconstraint(model, conv_profile * Hp >= 0, domain=conv_bss)
+    if abs(conv_profile) == 1
+        # TODO think about what it means if wsos polynomials have degree > 2
+        Hp = [DynamicPolynomials.differentiate(dp[i], x[j]) for i in 1:n, j in 1:n]
+        @SDconstraint(model, conv_profile * Hp >= 0, domain=conv_bss)
+    end
 
     if use_leastsqobj
         @variable(model, z)
@@ -153,9 +155,11 @@ function build_shapeconregr_WSOS(
     end
 
     # convexity
-    Hp = [DynamicPolynomials.differentiate(dp[i], x[j]) for i in 1:n, j in 1:n]
-    conv_condition = w'*Hp*w
-    @constraint(model, [conv_profile * conv_condition(conv_pts[i, :]) for i in 1:conv_U] in conv_wsos_cone)
+    if abs(conv_profile) == 1
+        Hp = [DynamicPolynomials.differentiate(dp[i], x[j]) for i in 1:n, j in 1:n]
+        conv_condition = w'*Hp*w
+        @constraint(model, [conv_profile * conv_condition(conv_pts[i, :]) for i in 1:conv_U] in conv_wsos_cone)
+    end
 
     return (model, p)
 end
