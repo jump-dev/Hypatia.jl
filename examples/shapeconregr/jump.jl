@@ -171,6 +171,8 @@ function run_JuMP_shapeconregr(use_wsos::Bool)
         # (2, 3, 100, 0.0, x -> sum(x.^4)) # no noise, non-monotonic function
         # (2, 3, 100, 50.0, x -> sum(x.^3)) # some noise, monotonic function
         # (2, 3, 100, 50.0, x -> sum(x.^4)) # some noise, non-monotonic function
+        # (2, 8, 100, 0.0, x -> exp(norm(x))) # low n high deg, numerically harder
+        # (5, 5, 100, 0.0, x -> exp(norm(x))) # moderate size, no noise, monotonic # out of memory with psd
 
     shapedata = ShapeData(n)
     (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
@@ -183,6 +185,7 @@ function run_JuMP_shapeconregr(use_wsos::Bool)
         (model, p) = build_shapeconregr_PSD(X, y, deg, shapedata, use_leastsqobj=use_leastsqobj)
     end
 
+    println("starting to solve JuMP model")
     JuMP.optimize!(model)
     term_status = JuMP.termination_status(model)
     pobj = JuMP.objective_value(model)
