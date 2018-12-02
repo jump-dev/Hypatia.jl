@@ -1,6 +1,7 @@
 #=
 Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 ==#
+
 using JuMP
 using PolyJuMP
 using MultivariatePolynomials

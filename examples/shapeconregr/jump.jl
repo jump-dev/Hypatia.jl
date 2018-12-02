@@ -1,5 +1,6 @@
 #=
 Copyright 2018, Chris Coey, Lea Kapelevich and contributors
+
 Given data (xᵢ, yᵢ), find a polynomial p to solve
     minimize ∑ᵢℓ(p(xᵢ), yᵢ)
     subject to ρⱼ × dᵏp/dtⱼᵏ ≥ 0 ∀ t ∈ D
@@ -26,21 +27,21 @@ using PolyJuMP
 using MathOptInterfaceMosek
 using Test
 
-# what we know about the shape of our regressor
+
+# a description of the shape of the regressor
 mutable struct ShapeData
     mono_dom::Hypatia.InterpDomain
     conv_dom::Hypatia.InterpDomain
-    mono_profile::Vector{Float64}
-    conv_profile::Float64
+    mono_profile::Vector{Int}
+    conv_profile::Int
 end
-function ShapeData(n::Int)
-    return ShapeData(
-        Hypatia.Box(-ones(n), ones(n)),
-        Hypatia.Box(-ones(n), ones(n)),
-        ones(n),
-        1.0
+
+ShapeData(n::Int) = ShapeData(
+    Hypatia.Box(-ones(n), ones(n)),
+    Hypatia.Box(-ones(n), ones(n)),
+    ones(Int, n),
+    1,
     )
-end
 
 # problem data
 function generateregrdata(
@@ -118,14 +119,16 @@ function build_shapeconregr_PSD(
         end)
     end
 
-    return (model, p)
-end
+    # monotonicity
+    dp = [DynamicPolynomials.differentiate(p, x[i]) for i in 1:n]
+    for j in 1:n
+        if !iszero(sd.mono_profile[j])
+            @constraint(model, sd.mono_profile[j] * dp[j] >= 0, domain=mono_bss)
+        end
+    end
 
-function doubledomain(conv_dom::Hypatia.Box)
-    full_conv_dom = deepcopy(conv_dom) # TODO rethink this whole setup
-    append!(full_conv_dom.l, conv_dom.l)
-    append!(full_conv_dom.u, conv_dom.u)
-    return full_conv_dom
+    return (model, p)
+>>>>>>> master
 end
 
 function build_shapeconregr_WSOS(
@@ -191,13 +194,15 @@ function build_shapeconregr_WSOS(
     return (model, p)
 end
 
-function run_JuMP_shapeconregr(use_wsos::Bool)
+function run_JuMP_shapeconregr(use_wsos::Bool; usedense::Bool=true)
     (n, deg, npoints, signal_ratio, f) =
         # (2, 3, 100, 0.0, x -> exp(norm(x))) # no noise, monotonic function
         (2, 3, 100, 0.0, x -> sum(x.^3)) # no noise, monotonic function
         # (2, 3, 100, 0.0, x -> sum(x.^4)) # no noise, non-monotonic function
         # (2, 3, 100, 50.0, x -> sum(x.^3)) # some noise, monotonic function
         # (2, 3, 100, 50.0, x -> sum(x.^4)) # some noise, non-monotonic function
+        # (2, 8, 100, 0.0, x -> exp(norm(x))) # low n high deg, numerically harder
+        # (5, 5, 100, 0.0, x -> exp(norm(x))) # moderate size, no noise, monotonic # out of memory with psd
 
     shapedata = ShapeData(n)
     (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
@@ -205,11 +210,12 @@ function run_JuMP_shapeconregr(use_wsos::Bool)
     use_leastsqobj = true
 
     if use_wsos
-        (model, p) = build_shapeconregr_WSOS(X, y, deg, shapedata, use_leastsqobj=use_leastsqobj)
+        (model, p) = build_shapeconregr_WSOS(X, y, deg, shapedata, use_leastsqobj=use_leastsqobj, usedense=usedense)
     else
-        (model, p) = build_shapeconregr_PSD(X, y, deg, shapedata, use_leastsqobj=use_leastsqobj)
+        (model, p) = build_shapeconregr_PSD(X, y, deg, shapedata, use_leastsqobj=use_leastsqobj, usedense=usedense)
     end
 
+    println("starting to solve JuMP model")
     JuMP.optimize!(model)
     term_status = JuMP.termination_status(model)
     pobj = JuMP.objective_value(model)

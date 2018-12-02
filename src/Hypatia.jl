@@ -9,17 +9,18 @@ module Hypatia
     using TimerOutputs
     const to = TimerOutput()
 
+    using LinearAlgebra: BlasInt
+    include("lapack.jl")
+
     import FFTW
     import Combinatorics
     import GSL: sf_gamma_inc_Q
     import DynamicPolynomials
     import SemialgebraicSets
-    # using Distributions
     include("interpolation.jl")
 
     import ForwardDiff
     import DiffResults
-    # import PositiveFactorizations
     include("cone.jl")
     for primitivecone in [
         "orthant",
