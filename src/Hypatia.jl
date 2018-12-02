@@ -13,8 +13,6 @@ module Hypatia
     import FFTW
     import Combinatorics
     import GSL: sf_gamma_inc_Q
-    import DynamicPolynomials
-    import SemialgebraicSets
     include("interpolation.jl")
 
     import ForwardDiff
