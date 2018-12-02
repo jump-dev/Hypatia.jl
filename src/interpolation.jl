@@ -156,7 +156,7 @@ function interpolate(
     if !sample
         @warn "accurate methods for interpolation points are only available for box domains, using sampling instead"
     end
-    return interp_sample(dom, d, calc_w=calc_w, sample_factor=sample_factor)
+    return wsos_sample_params(dom, d, calc_w=calc_w, sample_factor=sample_factor)
 end
 function interpolate(
     dom::Box,
@@ -166,14 +166,14 @@ function interpolate(
     sample_factor::Int = 10,
     )
     if sample
-        return interp_sample(dom, d, calc_w=calc_w, sample_factor=sample_factor)
+        return wsos_sample_params(dom, d, calc_w=calc_w, sample_factor=sample_factor)
     else
-        return interp_box(dom, dimension(dom), d, calc_w=calc_w)
+        return wsos_box_params(dom, dimension(dom), d, calc_w=calc_w)
     end
 end
 
 # slow but high-quality hyperrectangle/box point selections
-function interp_box(dom::Box, n::Int, d::Int; calc_w::Bool=false)
+function wsos_box_params(dom::Box, n::Int, d::Int; calc_w::Bool=false)
     if n == 1
         (U, pts, P0, P0sub, w) = cheb2_data(d, calc_w)
     elseif n == 2
@@ -379,7 +379,7 @@ function make_wsos_arrays(
 end
 
 # fast, sampling-based point selection for general domains
-function interp_sample(
+function wsos_sample_params(
     dom::InterpDomain,
     d::Int;
     calc_w::Bool = false,
