@@ -7,7 +7,9 @@ export WSOSPolyInterpCone
 struct WSOSPolyInterpCone <: MOI.AbstractVectorSet
     dimension::Int
     ipwt::Vector{Matrix{Float64}}
+    isdual::Bool
 end
+WSOSPolyInterpCone(dimension::Int, ipwt::Vector{Matrix{Float64}}) = WSOSPolyInterpCone(dimension, ipwt, false)
 
 mutable struct Optimizer <: MOI.AbstractOptimizer
     mdl::Model
@@ -102,7 +104,7 @@ conefrommoi(s::MOI.RotatedSecondOrderCone) = EpiPerSquare(MOI.dimension(s))
 conefrommoi(s::MOI.ExponentialCone) = HypoPerLog()
 conefrommoi(s::MOI.GeometricMeanCone) = (l = MOI.dimension(s) - 1; HypoGeomean(fill(1.0/l, l)))
 conefrommoi(s::MOI.PowerCone) = EpiPerPower(inv(s.exponent))
-conefrommoi(s::WSOSPolyInterpCone) = WSOSPolyInterp(s.dimension, s.ipwt)
+conefrommoi(s::WSOSPolyInterpCone) = WSOSPolyInterp(s.dimension, s.ipwt, s.isdual)
 conefrommoi(s::MOI.AbstractVectorSet) = error("MOI set $s is not recognized")
 
 function buildvarcone(fi::MOI.VectorOfVariables, si::MOI.AbstractVectorSet, dim::Int, q::Int)
