@@ -1,5 +1,6 @@
 #=
 Copyright 2018, Chris Coey, Lea Kapelevich and contributors
+
 Given data (xᵢ, yᵢ), find a polynomial p to solve
     minimize ∑ᵢℓ(p(xᵢ), yᵢ)
     subject to ρⱼ × dᵏp/dtⱼᵏ ≥ 0 ∀ t ∈ D
@@ -25,21 +26,21 @@ using SumOfSquares
 using PolyJuMP
 using Test
 
-# what we know about the shape of our regressor
+
+# a description of the shape of the regressor
 mutable struct ShapeData
     mono_dom::Hypatia.InterpDomain
     conv_dom::Hypatia.InterpDomain
     mono_profile::Vector{Int}
     conv_profile::Int
 end
-function ShapeData(n::Int)
-    return ShapeData(
-        Hypatia.Box(-ones(n), ones(n)),
-        Hypatia.Box(-ones(n), ones(n)),
-        ones(Int, n),
-        1
+
+ShapeData(n::Int) = ShapeData(
+    Hypatia.Box(-ones(n), ones(n)),
+    Hypatia.Box(-ones(n), ones(n)),
+    ones(Int, n),
+    1,
     )
-end
 
 # problem data
 function generateregrdata(
@@ -72,28 +73,14 @@ function build_shapeconregr_PSD(
     sd::ShapeData;
     use_leastsqobj::Bool = false,
     )
-    (mono_dom, conv_dom, mono_profile, conv_profile) = (sd.mono_dom, sd.conv_dom, sd.mono_profile, sd.conv_profile)
     (npoints, n) = size(X)
 
     @polyvar x[1:n]
-    mono_bss = Hypatia.Hypatia.get_bss(mono_dom, x)
-    conv_bss = Hypatia.Hypatia.get_bss(conv_dom, x)
+    mono_bss = Hypatia.Hypatia.get_bss(sd.mono_dom, x)
+    conv_bss = Hypatia.Hypatia.get_bss(sd.conv_dom, x)
 
     model = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true))
     @variable(model, p, PolyJuMP.Poly(monomials(x, 0:r)))
-
-    dp = [DynamicPolynomials.differentiate(p, x[i]) for i in 1:n]
-    for j in 1:n
-        if abs(mono_profile[j]) == 1
-            @constraint(model, mono_profile[j] * dp[j] >= 0, domain=mono_bss)
-        end
-    end
-
-    if abs(conv_profile) == 1
-        # TODO think about what it means if wsos polynomials have degree > 2
-        Hp = [DynamicPolynomials.differentiate(dp[i], x[j]) for i in 1:n, j in 1:n]
-        @SDconstraint(model, conv_profile * Hp >= 0, domain=conv_bss)
-    end
 
     if use_leastsqobj
         @variable(model, z)
@@ -108,6 +95,21 @@ function build_shapeconregr_PSD(
         end)
     end
 
+    # monotonicity
+    dp = [DynamicPolynomials.differentiate(p, x[i]) for i in 1:n]
+    for j in 1:n
+        if !iszero(sd.mono_profile[j])
+            @constraint(model, sd.mono_profile[j] * dp[j] >= 0, domain=mono_bss)
+        end
+    end
+
+    # convexity
+    if !iszero(sd.conv_profile)
+        # TODO think about what it means if wsos polynomials have degree > 2
+        Hp = [DynamicPolynomials.differentiate(dp[i], x[j]) for i in 1:n, j in 1:n]
+        @SDconstraint(model, sd.conv_profile * Hp >= 0, domain=conv_bss)
+    end
+
     return (model, p)
 end
 
@@ -118,12 +120,11 @@ function build_shapeconregr_WSOS(
     sd::ShapeData;
     use_leastsqobj::Bool = false,
     )
-    (mono_dom, conv_dom, mono_profile, conv_profile) = (sd.mono_dom, sd.conv_dom, sd.mono_profile, sd.conv_profile)
     d = div(r, 2)
     (npoints, n) = size(X)
 
-    full_conv_dom = Hypatia.addfreevars(conv_dom)
-    (mono_U, mono_pts, mono_P0, mono_PWts, _) = Hypatia.interp_sample(mono_dom, n, d, pts_factor=50)
+    full_conv_dom = Hypatia.addfreevars(sd.conv_dom)
+    (mono_U, mono_pts, mono_P0, mono_PWts, _) = Hypatia.interp_sample(sd.mono_dom, n, d, pts_factor=50)
     (conv_U, conv_pts, conv_P0, conv_PWts, _) = Hypatia.interp_sample(full_conv_dom, 2n, d+1, pts_factor=50) # TODO think about if it's ok to go up to d+1
     mono_wsos_cone = WSOSPolyInterpCone(mono_U, [mono_P0, mono_PWts...])
     conv_wsos_cone = WSOSPolyInterpCone(conv_U, [conv_P0, conv_PWts...])
@@ -149,16 +150,16 @@ function build_shapeconregr_WSOS(
     # monotonicity
     dp = [DynamicPolynomials.differentiate(p, x[j]) for j in 1:n]
     for j in 1:n
-        if abs(mono_profile[j]) == 1
-            @constraint(model, [mono_profile[j] * dp[j](mono_pts[i, :]) for i in 1:mono_U] in mono_wsos_cone)
+        if !iszero(sd.mono_profile[j])
+            @constraint(model, [sd.mono_profile[j] * dp[j](mono_pts[i, :]) for i in 1:mono_U] in mono_wsos_cone)
         end
     end
 
     # convexity
-    if abs(conv_profile) == 1
+    if !iszero(sd.conv_profile)
         Hp = [DynamicPolynomials.differentiate(dp[i], x[j]) for i in 1:n, j in 1:n]
         conv_condition = w'*Hp*w
-        @constraint(model, [conv_profile * conv_condition(conv_pts[i, :]) for i in 1:conv_U] in conv_wsos_cone)
+        @constraint(model, [sd.conv_profile * conv_condition(conv_pts[i, :]) for i in 1:conv_U] in conv_wsos_cone)
     end
 
     return (model, p)

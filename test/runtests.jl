@@ -11,6 +11,22 @@ using LinearAlgebra
 using SparseArrays
 
 
+# load examples functions in src/examples/
+egs_dir = joinpath(@__DIR__, "../examples")
+include(joinpath(egs_dir, "envelope/native.jl"))
+include(joinpath(egs_dir, "envelope/jump.jl"))
+include(joinpath(egs_dir, "expdesign/jump.jl"))
+include(joinpath(egs_dir, "linearopt/native.jl"))
+include(joinpath(egs_dir, "namedpoly/native.jl"))
+include(joinpath(egs_dir, "namedpoly/jump.jl"))
+include(joinpath(egs_dir, "shapeconregr/jump.jl"))
+include(joinpath(egs_dir, "densityest/jump.jl"))
+include(joinpath(@__DIR__, "examples.jl"))
+
+# load MathOptInterface test functions
+include(joinpath(@__DIR__, "moi.jl"))
+
+
 # TODO make first part a native interface function eventually
 # TODO maybe build a new high-level model struct; the current model struct is low-level
 function solveandcheck(
@@ -122,7 +138,7 @@ testfuns = [
     _hypoperlog3,
     _hypoperlog4,
     _epiperpower1,
-    _epiperpower2, # numerically unstable
+    _epiperpower2,
     _epiperpower3,
     _hypogeomean1,
     _hypogeomean2,
@@ -140,18 +156,6 @@ testfuns = [
 end
 
 
-# examples in src/examples/ folder
-egs_dir = joinpath(@__DIR__, "../examples")
-include(joinpath(egs_dir, "envelope/native.jl"))
-include(joinpath(egs_dir, "envelope/jump.jl"))
-include(joinpath(egs_dir, "expdesign/jump.jl"))
-include(joinpath(egs_dir, "linearopt/native.jl"))
-include(joinpath(egs_dir, "namedpoly/native.jl"))
-include(joinpath(egs_dir, "namedpoly/jump.jl"))
-include(joinpath(egs_dir, "shapeconregr/jump.jl"))
-include(joinpath(egs_dir, "densityest/jump.jl"))
-include(joinpath(@__DIR__, "examples.jl"))
-
 @info("starting native examples tests")
 verbose = true
 lscachetypes = [
@@ -167,7 +171,7 @@ testfuns = [
     _linearopt2,
     _namedpoly1,
     _namedpoly2,
-    _namedpoly3, # numerically unstable
+    _namedpoly3,
     # _namedpoly4, # interpolation memory usage excessive
     _namedpoly5,
     # _namedpoly6, # interpolation memory usage excessive
@@ -183,7 +187,7 @@ end
 
 @info("starting JuMP examples tests")
 testfuns = [
-    # _namedpoly1_JuMP,
+    _namedpoly1_JuMP,
     _namedpoly2_JuMP,
     _namedpoly3_JuMP,
     _namedpoly4_JuMP,
@@ -195,15 +199,15 @@ testfuns = [
     _namedpoly10_JuMP,
     _shapeconregr1_JuMP,
     _shapeconregr2_JuMP,
-    # _shapeconregr3_JuMP,
+    _shapeconregr3_JuMP,
     _shapeconregr4_JuMP,
     _shapeconregr5_JuMP,
     # _shapeconregr6_JuMP, # numerically unstable
     _shapeconregr7_JuMP,
     _shapeconregr8_JuMP,
-    _shapeconregr9_JuMP,
-    _shapeconregr10_JuMP,
-    _shapeconregr11_JuMP,
+    # _shapeconregr9_JuMP, # numerically unstable
+    # _shapeconregr10_JuMP, # numerically unstable
+    # _shapeconregr11_JuMP, # throws out-of-memory error
     ]
 @testset "JuMP examples: $testfun" for testfun in testfuns
     testfun()
@@ -214,7 +218,7 @@ testfuns = [
     run_JuMP_expdesign,
     run_linearopt,
     run_namedpoly,
-    # run_JuMP_namedpoly_PSD,
+    # run_JuMP_namedpoly_PSD, # numerically unstable
     run_JuMP_namedpoly_WSOS,
     run_envelope,
     run_JuMP_envelope_boxinterp,
@@ -230,7 +234,6 @@ end
 
 
 # MathOptInterface tests
-include(joinpath(@__DIR__, "moi.jl"))
 @info("starting MathOptInterface tests")
 verbose = false
 lscachetypes = [
