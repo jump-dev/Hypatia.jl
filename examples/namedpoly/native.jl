@@ -29,7 +29,7 @@ function build_namedpoly(
     # set up problem data
     A = ones(1, U)
     b = [1.0,]
-    c = [fn(trpts[j,:]...) for j in 1:U] # evaluate polynomial at transformed points
+    c = [fn(pts[j,:]...) for j in 1:U] # evaluate polynomial at transformed points
     G = Diagonal(-1.0I, U) # TODO uniformscaling?
     h = zeros(U)
 

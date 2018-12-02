@@ -26,6 +26,7 @@ function build_envelope(
     )
     # generate interpolation
     @assert deg <= d
+    domain = Hypatia.Box(-ones(n), ones(n))
     (U, pts, P0, PWts, w) = Hypatia.interpolate(domain, d, sample=false, calc_w=true)
 
     c = -w

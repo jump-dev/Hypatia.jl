@@ -15,7 +15,6 @@ using Test
 function build_JuMP_envelope(
     npoly::Int,
     deg::Int,
-    n::Int,
     d::Int,
     domain::Hypatia.InterpDomain;
     sample::Bool = true,
@@ -27,6 +26,7 @@ function build_JuMP_envelope(
 
     # generate random polynomials
     Random.seed!(rseed)
+    n = Hypatia.dimension(domain)
     LDegs = binomial(n+deg, n)
     polys = P0[:, 1:LDegs]*rand(-9:9, LDegs, npoly)
 
@@ -40,12 +40,12 @@ function build_JuMP_envelope(
 end
 
 function run_JuMP_envelope(dom::Hypatia.InterpDomain; sample::Bool=true)
-    (npoly, deg, n, d) =
-        # (2, 3, 1, 4)
-        # (2, 3, 2, 4)
-        (2, 3, 3, 4)
+    (npoly, deg, d) =
+        # (2, 3, 4)
+        # (2, 3, 4)
+        (2, 3, 4,)
 
-    (model, fpv) = build_JuMP_envelope(npoly, deg, n, d, dom, sample=sample)
+    (model, fpv) = build_JuMP_envelope(npoly, deg, d, dom, sample=sample)
     JuMP.optimize!(model)
 
     term_status = JuMP.termination_status(model)
