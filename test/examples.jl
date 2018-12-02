@@ -5,7 +5,7 @@ Copyright 2018, Chris Coey and contributors
 function _envelope1(; verbose, lscachetype)
     # dense methods
     mdl = Hypatia.Model(verbose=verbose)
-    (c, A, b, G, h, cone) = build_envelope(2, 5, 1, 5, use_data=true, dense=true)
+    (c, A, b, G, h, cone) = build_envelope(2, 5, 1, 5, use_data=true, usedense=true)
     r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
     @test r.pobj ≈ 25.502777 atol=1e-4 rtol=1e-4
@@ -13,7 +13,7 @@ function _envelope1(; verbose, lscachetype)
 
     # sparse methods
     mdl = Hypatia.Model(verbose=verbose)
-    (c, A, b, G, h, cone) = build_envelope(2, 5, 1, 5, use_data=true, dense=false)
+    (c, A, b, G, h, cone) = build_envelope(2, 5, 1, 5, use_data=true, usedense=false)
     r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
     @test r.pobj ≈ 25.502777 atol=1e-4 rtol=1e-4
@@ -23,14 +23,14 @@ end
 function _envelope2(; verbose, lscachetype)
     # dense methods
     mdl = Hypatia.Model(verbose=verbose)
-    (c, A, b, G, h, cone) = build_envelope(2, 4, 2, 7, dense=true)
+    (c, A, b, G, h, cone) = build_envelope(2, 4, 2, 7, usedense=true)
     rd = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
     @test rd.status == :Optimal
     @test rd.niters <= 60
 
     # sparse methods
     mdl = Hypatia.Model(verbose=verbose)
-    (c, A, b, G, h, cone) = build_envelope(2, 4, 2, 7, dense=false)
+    (c, A, b, G, h, cone) = build_envelope(2, 4, 2, 7, usedense=false)
     rs = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
     @test rs.status == :Optimal
     @test rs.niters <= 60
@@ -40,7 +40,7 @@ end
 
 function _envelope3(; verbose, lscachetype)
     mdl = Hypatia.Model(verbose=verbose)
-    (c, A, b, G, h, cone) = build_envelope(2, 3, 3, 5, dense=false)
+    (c, A, b, G, h, cone) = build_envelope(2, 3, 3, 5, usedense=false)
     r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
     @test r.niters <= 60
@@ -48,7 +48,7 @@ end
 
 function _envelope4(; verbose, lscachetype)
     mdl = Hypatia.Model(verbose=verbose)
-    (c, A, b, G, h, cone) = build_envelope(2, 2, 4, 3, dense=false)
+    (c, A, b, G, h, cone) = build_envelope(2, 2, 4, 3, usedense=false)
     r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
     @test r.niters <= 55
@@ -57,14 +57,14 @@ end
 function _linearopt1(; verbose, lscachetype)
     # dense methods
     mdl = Hypatia.Model(verbose=verbose)
-    (c, A, b, G, h, cone) = build_linearopt(25, 50, dense=true, tosparse=false)
+    (c, A, b, G, h, cone) = build_linearopt(25, 50, usedense=true, tosparse=false)
     rd = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
     @test rd.status == :Optimal
     @test rd.niters <= 35
 
     # sparse methods
     mdl = Hypatia.Model(verbose=verbose)
-    (c, A, b, G, h, cone) = build_linearopt(25, 50, dense=true, tosparse=true)
+    (c, A, b, G, h, cone) = build_linearopt(25, 50, usedense=true, tosparse=true)
     rs = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
     @test rs.status == :Optimal
     @test rs.niters <= 35
@@ -74,7 +74,7 @@ end
 
 function _linearopt2(; verbose, lscachetype)
     mdl = Hypatia.Model(verbose=verbose, tolfeas=1e-9)
-    (c, A, b, G, h, cone) = build_linearopt(500, 1000, use_data=true, dense=true)
+    (c, A, b, G, h, cone) = build_linearopt(500, 1000, use_data=true, usedense=true)
     r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
     @test r.status == :Optimal
     @test r.niters <= 70
