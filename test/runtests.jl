@@ -1,5 +1,6 @@
 #=
 Copyright 2018, Chris Coey and contributors
+
 # TODO add a progress meter to silent tests?
 # TODO don't print "Hypatia." before linsyscache types in testset printing
 =#
@@ -185,6 +186,7 @@ testfuns = [
     testfun(verbose=verbose, lscachetype=lscachetype)
 end
 
+
 @info("starting JuMP examples tests")
 testfuns = [
     _namedpoly1_JuMP,
@@ -207,8 +209,8 @@ testfuns = [
     _shapeconregr8_JuMP,
     # _shapeconregr9_JuMP, # numerically unstable
     # _shapeconregr10_JuMP, # numerically unstable
-    _shapeconregr11_JuMP, # throws out-of-memory error
-    _shapeconregr12_JuMP, # throws out-of-memory error
+    # _shapeconregr11_JuMP, # throws out-of-memory error
+    # _shapeconregr12_JuMP, # throws out-of-memory error
     ]
 @testset "JuMP examples: $testfun" for testfun in testfuns
     testfun()
@@ -220,8 +222,12 @@ testfuns = [
     run_linearopt,
     run_namedpoly,
     # run_JuMP_namedpoly_PSD, # numerically unstable
-    run_JuMP_namedpoly_WSOS,
-    run_envelope,
+    run_JuMP_namedpoly_WSOS_primal,
+    run_JuMP_namedpoly_WSOS_dual,
+    run_envelope_primal_dense,
+    run_envelope_dual_dense,
+    run_envelope_primal_sparse,
+    run_envelope_dual_sparse,
     run_JuMP_envelope_boxinterp,
     run_JuMP_envelope_sampleinterp_box,
     run_JuMP_envelope_sampleinterp_ball,
