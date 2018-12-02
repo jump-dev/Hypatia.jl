@@ -11,6 +11,38 @@ and Matlab files in the packages
 - Padua2DM by M. Caliari, S. De Marchi, A. Sommariva, and M. Vianello http://profs.sci.univr.it/~caliari/software.htm
 =#
 
+function get_LU(n::Int, d::Int)
+    L = binomial(n+d,n)
+    U = binomial(n+2d, n)
+    return (L, U)
+end
+
+function interpolate(
+    dom::InterpDomain,
+    d::Int;
+    sample::Bool = false,
+    calc_w::Bool = false,
+    sample_factor::Int = 10,
+    )
+    if !sample
+        @warn "exact procedures for interpolation points only available for box domains, using sampling instead"
+    end
+    return interp_sample(dom, d, calc_w=calc_w, sample_factor=sample_factor)
+end
+function interpolate(
+    dom::Box,
+    d::Int;
+    sample::Bool = false,
+    calc_w::Bool = false,
+    sample_factor::Int = 10,
+    )
+    if sample
+        return interp_sample(dom, d, calc_w=calc_w, sample_factor=sample_factor)
+    else
+        return interp_box(dimension(dom), d, calc_w=calc_w)
+    end
+end
+
 # slow but high-quality hyperrectangle/box point selections
 function interp_box(n::Int, d::Int; calc_w::Bool=false)
     if n == 1
@@ -40,8 +72,7 @@ end
 
 function cheb2_data(d::Int, calc_w::Bool)
     @assert d > 1
-    L = 1 + d
-    U = 1 + 2d
+    (L, U) = get_LU(n, d)
 
     # Chebyshev points for degree 2d
     pts = reshape(cheb2_pts(U), :, 1)
@@ -65,8 +96,7 @@ end
 
 function padua_data(d::Int, calc_w::Bool)
     @assert d > 1
-    L = binomial(2+d, 2)
-    U = binomial(2+2d, 2)
+    (L, U) = get_LU(n, d)
 
     # Padua points for degree 2d
     cheba = cheb2_pts(2d+1)
@@ -133,19 +163,18 @@ end
 function approxfekete_data(n::Int, d::Int, calc_w::Bool)
     @assert d > 1
     @assert n > 1
-    L = binomial(n+d, n)
-    U = binomial(n+2d, n)
+    (L, U) = get_LU(n, d)
 
     # points in the initial interpolation grid
     npts = prod(2d+1:2d+n)
-    ipts = Matrix{Float64}(undef, npts, n)
+    candidate_pts = Matrix{Float64}(undef, npts, n)
     for j in 1:n
         ig = prod(2d+1+j:2d+n)
         cs = cheb2_pts(2d+j)
         i = 1
         l = 1
         while true
-            ipts[i:i+ig-1,j] .= cs[l]
+            candidate_pts[i:i+ig-1,j] .= cs[l]
             i += ig
             l += 1
             if l >= 2d+1+j
@@ -156,44 +185,7 @@ function approxfekete_data(n::Int, d::Int, calc_w::Bool)
             end
         end
     end
-
-    # evaluations on the initial interpolation grid
-    u = calc_u(n, 2d, ipts)
-    m = Vector{Float64}(undef, U)
-    m[1] = 2^n
-    M = Matrix{Float64}(undef, npts, U)
-    M[:,1] .= 1.0
-
-    col = 1
-    for t in 1:2d
-        for xp in Combinatorics.multiexponents(n, t)
-            col += 1
-            if any(isodd, xp)
-                m[col] = 0.0
-            else
-                m[col] = m[1]/prod(1.0 - abs2(xp[j]) for j in 1:n)
-            end
-            @. @views M[:,col] = u[1][:,xp[1]+1]
-            for j in 2:n
-                @. @views M[:,col] *= u[j][:,xp[j]+1]
-            end
-        end
-    end
-
-    F = qr!(Array(M'), Val(true))
-    keep_pnt = F.p[1:U]
-
-    pts = ipts[keep_pnt,:] # subset of points indexed with the support of w
-    P0 = M[keep_pnt,1:L] # subset of polynomial evaluations up to total degree d
-
-    if calc_w
-        Qtm = F.Q'*m
-        w = UpperTriangular(F.R[:,1:U])\Qtm
-    else
-        w = Float64[]
-    end
-
-    return (U=U, pts=pts, P0=P0, w=w)
+    return make_wsos_arrays(candidate_pts, d, U)
 end
 
 
@@ -215,14 +207,14 @@ mutable struct Box <: InterpDomain
     end
 end
 
-dimension(d::Box) = length(d.l)
+dimension(dom::Box) = length(dom.l)
 
-function interp_sample(d::Box, npts::Int)
-    dim = dimension(d)
+function interp_sample(dom::Box, npts::Int)
+    dim = dimension(dom)
     pts = rand(npts, dim) .- 0.5
-    shift = (d.u + d.l)/2.0
+    shift = (dom.u + dom.l)/2.0
     for i in 1:npts
-        pts[i,:] = pts[i,:] .* (d.u - d.l) + shift
+        pts[i,:] = pts[i,:] .* (dom.u - dom.l) + shift
     end
     return pts
 end
@@ -246,24 +238,24 @@ mutable struct Ball <: InterpDomain
     c::Vector{Float64}
     r::Float64
     function Ball(c::Vector{Float64}, r::Float64)
-        d = new()
-        d.c = c
-        d.r = r
+        dom = new()
+        dom.c = c
+        dom.r = r
         return d
     end
 end
 
-dimension(d::Ball) = length(d.c)
+dimension(dom::Ball) = length(dom.c)
 
-function interp_sample(d::Ball, npts::Int)
-    dim = dimension(d)
+function interp_sample(dom::Ball, npts::Int)
+    dim = dimension(dom)
     pts = randn(npts, dim)
     norms = sum(abs2, pts, dims=2)
-    pts .*= d.r ./ sqrt.(norms) # scale
+    pts .*= dom.r ./ sqrt.(norms) # scale
     norms ./= 2.0
     pts .*= sf_gamma_inc_Q.(norms, dim/2) .^ inv(dim) # sf_gamma_inc_Q is the normalized incomplete gamma function
     for i in 1:dim
-        pts[:, i] .+= d.c[i] # shift
+        pts[:, i] .+= dom.c[i] # shift
     end
     return pts
 end
@@ -282,17 +274,17 @@ mutable struct Ellipsoid <: InterpDomain
     Q::AbstractMatrix{Float64}
     function Ellipsoid(c::Vector{Float64}, Q::AbstractMatrix{Float64})
         @assert length(c) == size(Q, 1)
-        d = new()
-        d.c = c
-        d.Q = Q
+        dom = new()
+        dom.c = c
+        dom.Q = Q
         return d
     end
 end
 
-dimension(d::Ellipsoid) = length(d.c)
+dimension(dom::Ellipsoid) = length(dom.c)
 
-function interp_sample(d::Ellipsoid, npts::Int)
-    dim = dimension(d)
+function interp_sample(dom::Ellipsoid, npts::Int)
+    dim = dimension(dom)
     pts = randn(npts, dim)
     norms = sum(abs2, pts, dims=2)
     for i in 1:npts
@@ -302,7 +294,7 @@ function interp_sample(d::Ellipsoid, npts::Int)
     pts .*= sf_gamma_inc_Q.(norms, dim/2) .^ inv(dim) # sf_gamma_inc_Q is the normalized incomplete gamma function
 
     # TODO rewrite this part
-    rotscale = cholesky(d.Q).U
+    rotscale = cholesky(dom.Q).U
     # fchol = cholesky(inv(d.Q)) # TODO this is unnecessarily expensive and prone to numerical issues: take cholesky of Q then divide by it later
     for i in 1:npts
         # @assert norm(pts[i,:]) < 1.0
@@ -310,9 +302,8 @@ function interp_sample(d::Ellipsoid, npts::Int)
         # pts[i,:] = fchol.L * pts[i,:] # rotate/scale
     end
 
-
     for i in 1:dim
-        pts[:, i] .+= d.c[i] # shift
+        pts[:, i] .+= dom.c[i] # shift
     end
     return pts
 end
@@ -330,14 +321,14 @@ mutable struct SemiFreeDomain <: InterpDomain
     sampling_region::InterpDomain
 end
 
-function addfreevars(d::InterpDomain)
-    return SemiFreeDomain(d)
+function add_free_vars(dom::InterpDomain)
+    return SemiFreeDomain(dom)
 end
 
-dimension(d::SemiFreeDomain) = 2*dimension(d.sampling_region)
+dimension(dom::SemiFreeDomain) = 2*dimension(dom.sampling_region)
 
-function interp_sample(d::SemiFreeDomain, npts::Int)
-    return hcat(interp_sample(d.sampling_region, npts), interp_sample(d.sampling_region, npts))
+function interp_sample(dom::SemiFreeDomain, npts::Int)
+    return hcat(interp_sample(dom.sampling_region, npts), interp_sample(dom.sampling_region, npts))
 end
 
 get_bss(dom::SemiFreeDomain, x) = get_bss(dom.sampling_region, x)
@@ -347,11 +338,9 @@ function get_weights(dom::SemiFreeDomain, pts::Matrix{Float64})
     return get_weights(dom.sampling_region, view(pts, : ,1:count))
 end
 
-
-# TODO refactor common code here and in approxfekete_data
-function get_large_P(ipts::Matrix{Float64}, d::Int, U::Int)
-    (npts, n) = size(ipts)
-    u = calc_u(n, 2d, ipts)
+function make_wsos_arrays(candidate_pts::Matrix{Float64}, d::Int, U::Int)
+    (npts, n) = size(candidate_pts)
+    u = calc_u(n, 2d, candidate_pts)
     m = Vector{Float64}(undef, U)
     m[1] = 2^n
     M = Matrix{Float64}(undef, npts, U)
@@ -373,26 +362,6 @@ function get_large_P(ipts::Matrix{Float64}, d::Int, U::Int)
         end
     end
 
-    return (M, m)
-end
-
-# TODO refactor common code here and in approxfekete_data
-function interp_sample(
-    dom::InterpDomain,
-    n::Int,
-    d::Int;
-    calc_w::Bool = false,
-    pts_factor::Int = 10,
-    )
-    # TODO remove this restriction
-    @assert dimension(dom) == n
-
-    L = binomial(n+d,n)
-    U = binomial(n+2d, n)
-
-    candidate_pts = interp_sample(dom, U * pts_factor)
-    (M, m) = get_large_P(candidate_pts, d, U)
-
     F = qr!(Array(M'), Val(true))
     keep_pnt = F.p[1:U]
     pts = candidate_pts[keep_pnt,:] # subset of points indexed with the support of w
@@ -411,4 +380,16 @@ function interp_sample(
     end
 
     return (U=U, pts=pts, P0=P0, PWts=PWts, w=w)
+end
+
+function interp_sample(
+    dom::InterpDomain,
+    d::Int;
+    calc_w::Bool = false,
+    sample_factor::Int = 10,
+    )
+    n = dimension(dom)
+    (L, U) = get_LU(n, d)
+    candidate_pts = interp_sample(dom, U * sample_factor)
+    return make_wsos_arrays(candidate_pts, d, U)
 end

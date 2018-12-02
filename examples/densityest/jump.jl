@@ -26,12 +26,12 @@ function build_JuMP_densityest(
     X::Matrix{Float64},
     deg::Int,
     dom::Hypatia.InterpDomain;
-    pts_factor::Int = 100,
+    sample_factor::Int = 100,
     )
     (nobs, dim) = size(X)
     d = div(deg, 2)
 
-    (U, pts, P0, PWts, w) = Hypatia.interp_sample(dom, dim, d, pts_factor=pts_factor, calc_w=true)
+    (U, pts, P0, PWts, w) = Hypatia.interpolate(dom, d, sample=true, calc_w=true, sample_factor=sample_factor)
 
     @polyvar x[1:dim]
     PX = PolyJuMP.monomials(x, 1:deg)
