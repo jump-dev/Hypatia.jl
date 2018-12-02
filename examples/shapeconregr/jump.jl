@@ -12,7 +12,6 @@ where
 See e.g. Chapter 8 of thesis by G. Hall (2018).
 =#
 
-using LinearAlgebra
 using Random
 import Distributions
 using MathOptInterface
@@ -21,11 +20,11 @@ using JuMP
 using Hypatia
 using MultivariatePolynomials
 using DynamicPolynomials
-using SemialgebraicSets
 using SumOfSquares
 using PolyJuMP
 using MathOptInterfaceMosek
 using Test
+include(joinpath(dirname(@__DIR__), "utils", "semialgebraicsets.jl"))
 
 
 # a description of the shape of the regressor
@@ -81,6 +80,8 @@ function build_shapeconregr_PSD(
     (npoints, n) = size(X)
 
     @polyvar x[1:n]
+    mono_bss = get_domain_inequalities(sd.mono_dom, x)
+    conv_bss = get_domain_inequalities(sd.conv_dom, x)
 
     if use_hypatia
         model = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true))
@@ -163,17 +164,7 @@ function build_shapeconregr_WSOS(
     dp = [DynamicPolynomials.differentiate(p, x[j]) for j in 1:n]
     if !ignore_mono
         println("monotonicity constraint")
-        if sample_pts
-            (mono_U, mono_pts, mono_P0, mono_PWts, _) = Hypatia.interp_sample(mono_dom, n, d, pts_factor=50)
-        else
-            (mono_U, mono_pts, mono_P0, _) = Hypatia.interp_box(n, d)
-            P0sub = view(mono_P0, :, 1:binomial(n+d-1, n))
-            (ubs, lbs) = (mono_dom.u, mono_dom.l)
-            pscale = 0.5*(ubs - lbs)
-            Wtsfun = (j -> sqrt.(1.0 .- abs2.(mono_pts[:,j]))*pscale[j])
-            mono_PWts = [Wtsfun(j) .* P0sub for j in 1:n]
-            mono_pts = mono_pts .* pscale' .+ 0.5*(ubs + lbs)'
-        end
+        (mono_U, mono_pts, mono_P0, mono_PWts, _) = Hypatia.interpolate(mono_dom, d, sample=sample_pts, sample_factor=50)
         mono_wsos_cone = WSOSPolyInterpCone(mono_U, [mono_P0, mono_PWts...])
         @elapsed for j in 1:n
             if abs(mono_profile[j]) > 0.5
@@ -186,17 +177,7 @@ function build_shapeconregr_WSOS(
     if !ignore_conv
         println("convexity constraint")
         full_conv_dom = Hypatia.addfreevars(conv_dom)
-        if sample_pts
-            (conv_U, conv_pts, conv_P0, conv_PWts, _) = Hypatia.interp_sample(full_conv_dom, 2n, d+1, pts_factor=50) # TODO think about if it's ok to go up to d+1
-        else
-            (conv_U, conv_pts, conv_P0, _) = Hypatia.interp_box(2n, d+1)
-            P0sub = view(conv_P0, :, 1:binomial(n+d-1, n))
-            (ubs, lbs) = (repeat(conv_dom.u, 2), repeat(conv_dom.l, 2))
-            pscale = 0.5*(ubs - lbs)
-            Wtsfun = (j -> sqrt.(1.0 .- abs2.(conv_pts[:,j]))*pscale[j])
-            conv_PWts = [Wtsfun(j) .* P0sub for j in 1:n]
-            conv_pts = conv_pts .* pscale' .+ 0.5*(ubs + lbs)'
-        end
+        (conv_U, conv_pts, conv_P0, conv_PWts, _) = Hypatia.interp_sample(full_conv_dom, d+1, sample=sample_pts, pts_factor=50)
 
         conv_wsos_cone = WSOSPolyInterpCone(conv_U, [conv_P0, conv_PWts...])
         Hp = [DynamicPolynomials.differentiate(dp[i], x[j]) for i in 1:n, j in 1:n]
