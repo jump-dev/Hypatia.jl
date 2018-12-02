@@ -5,9 +5,6 @@ QR plus either Cholesky factorization or iterative conjugate gradients method
 (2) solve reduced symmetric system by Cholesky or iterative method
 =#
 
-using LinearAlgebra: BlasInt
-using LinearAlgebra.BLAS: @blasfunc
-
 mutable struct QRSymmCache <: LinSysCache
     # TODO can remove some of the intermediary prealloced arrays after github.com/JuliaLang/julia/issues/23919 is resolved
     useiterative
@@ -259,95 +256,4 @@ function solvelinsys6!(
     dir_kap = -dot(L.c, rhs_tx) - dot(L.b, rhs_ty) - dot(L.h, rhs_tz) - rhs_tau
 
     return (dir_kap, dir_tau)
-end
-
-# LAPACK helper functions for linear systems
-# TODO put in a separate file, contribute to Julia LinearAlgebra
-
-# call LAPACK dposvx function (compare to dposv and dposvxx)
-# performs equilibration and iterative refinement
-function hypatia_posvx!(
-    X::Matrix{Float64},
-    A::Matrix{Float64},
-    B::Matrix{Float64},
-    ferr,
-    berr,
-    work,
-    iwork,
-    AF,
-    S,
-    )
-    n = size(A, 1)
-    @assert n == size(A, 2) == size(B, 1)
-
-    lda = stride(A, 2)
-    nrhs = size(B, 2)
-    ldb = stride(B, 2)
-    rcond = Ref{Float64}()
-
-    fact = 'E'
-    uplo = 'U'
-    equed = 'Y'
-
-    info = Ref{BlasInt}()
-
-    ccall((@blasfunc(dposvx_), Base.liblapack_name), Cvoid,
-        (Ref{UInt8}, Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt},
-        Ptr{Float64}, Ref{BlasInt}, Ptr{Float64}, Ref{BlasInt},
-        Ref{UInt8}, Ptr{Float64}, Ptr{Float64}, Ref{BlasInt},
-        Ptr{Float64}, Ref{BlasInt}, Ptr{Float64}, Ptr{Float64},
-        Ptr{Float64}, Ptr{Float64}, Ptr{BlasInt}, Ptr{BlasInt}),
-        fact, uplo, n, nrhs, A, lda, AF, lda, equed, S, B,
-        ldb, X, n, rcond, ferr, berr, work, iwork, info)
-
-    if info[] != 0 && info[] != n+1
-        # println("failure to solve linear system (posvx status $(info[]))")
-        return false
-    end
-    return true
-end
-
-# call LAPACK dsysvx function (compare to dsysv and dsysvxx)
-# performs equilibration and iterative refinement
-function hypatia_sysvx!(
-    X::Matrix{Float64},
-    A::Matrix{Float64},
-    B::Matrix{Float64},
-    ferr,
-    berr,
-    work,
-    iwork,
-    AF,
-    ipiv,
-    )
-    n = size(A, 1)
-    @assert n == size(A, 2) == size(B, 1)
-
-    lda = stride(A, 2)
-    nrhs = size(B, 2)
-    ldb = stride(B, 2)
-    rcond = Ref{Float64}()
-    lwork = Ref{BlasInt}(5n)
-    fact = 'N'
-    uplo = 'U'
-
-    info = Ref{BlasInt}()
-
-    ccall((@blasfunc(dsysvx_), Base.liblapack_name), Cvoid,
-        (Ref{UInt8}, Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt},
-        Ptr{Float64}, Ref{BlasInt}, Ptr{Float64}, Ref{BlasInt},
-        Ptr{BlasInt}, Ptr{Float64}, Ref{BlasInt}, Ptr{Float64},
-        Ref{BlasInt}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64},
-        Ptr{Float64}, Ptr{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt}),
-        fact, uplo, n, nrhs, A, lda, AF, lda, ipiv, B,
-        ldb, X, n, rcond, ferr, berr, work, lwork, iwork, info)
-
-    if lwork[] > 5n
-        println("in sysvx, lwork increased from $(5n) to $(lwork[])")
-    end
-    if info[] != 0 && info[] != n+1
-        println("failure to solve linear system (sysvx status $(info[]))")
-        return false
-    end
-    return true
 end
