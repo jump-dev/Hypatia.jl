@@ -363,6 +363,15 @@ function _shapeconregr8_JuMP()
 end
 
 function _shapeconregr9_JuMP()
+    (n, deg, npoints, signal_ratio, f) = (2, 4, 100, 10.0, x -> -inv(1 + exp(-10.0 * norm(x))))
+    (X, y) = generateregrdata(f, 0.0, 1.0, n, npoints, signal_ratio=signal_ratio)
+    shapedata = ShapeData(Hypatia.Box(zeros(n), ones(n)), Hypatia.Box(zeros(n), ones(n)), ones(n), 1)
+    (mdl, p) = build_shapeconregr_WSOS(X, y, deg, shapedata, use_leastsqobj=true)
+    truemin = 3.0995e-02 # <---- not verified with SDP like others
+    solveandcheck_JuMP(mdl, truemin)
+end
+
+function _shapeconregr10_JuMP()
     (n, deg, npoints, signal_ratio, f) = (2, 4, 100, 0.0, x -> exp(norm(x)))
     (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
     (mdl, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_leastsqobj=true)
@@ -370,7 +379,25 @@ function _shapeconregr9_JuMP()
     solveandcheck_JuMP(mdl, truemin)
 end
 
-function _shapeconregr10_JuMP()
+function _shapeconregr11_JuMP()
+    (n, deg, npoints, signal_ratio, f) = (2, 5, 100, 10.0, x -> exp(norm(x)))
+    (X, y) = generateregrdata(f, 0.5, 2.0, n, npoints, signal_ratio=signal_ratio)
+    shapedata = ShapeData(Hypatia.Box(0.5*ones(n), 2*ones(n)), Hypatia.Box(0.5*ones(n), 2*ones(n)), ones(n), 1)
+    (mdl, p) = build_shapeconregr_PSD(X, y, deg, shapedata, use_leastsqobj=true)
+    truemin = 2.2219e-1 # <---- may be inaccurate
+    solveandcheck_JuMP(mdl, truemin)
+end
+
+function _shapeconregr12_JuMP()
+    (n, deg, npoints, signal_ratio, f) = (2, 5, 100, 10.0, x -> exp(norm(x)))
+    (X, y) = generateregrdata(f, 0.5, 2.0, n, npoints, signal_ratio=signal_ratio)
+    shapedata = ShapeData(Hypatia.Box(0.5*ones(n), 2*ones(n)), Hypatia.Box(0.5*ones(n), 2*ones(n)), ones(n), 1)
+    (mdl, p) = build_shapeconregr_PSD(X, y, deg, shapedata, use_leastsqobj=true)
+    truemin = 2.2219e-1 # <---- may be inaccurate
+    solveandcheck_JuMP(mdl, truemin)
+end
+
+function _shapeconregr13_JuMP()
     (n, deg, npoints, signal_ratio, f) = (2, 6, 100, 1.0, x -> exp(norm(x)))
     (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
     (mdl, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_leastsqobj=false)
@@ -378,14 +405,14 @@ function _shapeconregr10_JuMP()
     solveandcheck_JuMP(mdl, truemin)
 end
 
-function _shapeconregr11_JuMP() # out of memory error when converting sparse to dense in MOI conversion
+function _shapeconregr14_JuMP() # out of memory error when converting sparse to dense in MOI conversion
     (n, deg, npoints, signal_ratio, f) = (5, 5, 1000, 0.0, x -> exp(norm(x)))
     (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
     (mdl, p) = build_shapeconregr_PSD(X, y, deg, ShapeData(n), use_leastsqobj=true, usedense=true)
     JuMP.optimize!(mdl)
 end
 
-function _shapeconregr12_JuMP() # out of memory error during preprocessing
+function _shapeconregr15_JuMP() # out of memory error during preprocessing
     (n, deg, npoints, signal_ratio, f) = (5, 5, 1000, 0.0, x -> exp(norm(x)))
     (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
     (mdl, p) = build_shapeconregr_PSD(X, y, deg, ShapeData(n), use_leastsqobj=true, usedense=false)
