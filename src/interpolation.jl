@@ -383,11 +383,9 @@ function interp_sample(
     d::Int;
     calc_w::Bool = false,
     pts_factor::Int = 10,
-    weights_count::Int = n,
     )
     # TODO remove this restriction
     @assert dimension(dom) == n
-    @assert 0 <= weights_count <= n
 
     L = binomial(n+d,n)
     U = binomial(n+2d, n)

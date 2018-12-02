@@ -93,7 +93,7 @@ function build_shapeconregr_PSD(
     if !ignore_mono
         mono_bss = Hypatia.Hypatia.get_bss(mono_dom, x)
         for j in 1:n
-            if abs(mono_profile[j]) > 0.5
+            if !iszero(sd.mono_profile[j])
                 @constraint(model, mono_profile[j] * dp[j] >= 0, domain=mono_bss)
             end
         end
@@ -119,16 +119,7 @@ function build_shapeconregr_PSD(
         end)
     end
 
-    # monotonicity
-    dp = [DynamicPolynomials.differentiate(p, x[i]) for i in 1:n]
-    for j in 1:n
-        if !iszero(sd.mono_profile[j])
-            @constraint(model, sd.mono_profile[j] * dp[j] >= 0, domain=mono_bss)
-        end
-    end
-
     return (model, p)
->>>>>>> master
 end
 
 function build_shapeconregr_WSOS(
@@ -184,7 +175,7 @@ function build_shapeconregr_WSOS(
     if !ignore_conv
         println("convexity constraint")
         full_conv_dom = Hypatia.addfreevars(conv_dom)
-        (conv_U, conv_pts, conv_P0, conv_PWts, _) = Hypatia.interp_sample(full_conv_dom, 2n, d+1, pts_factor=2, weights_count=n) # TODO think about if it's ok to go up to d+1
+        (conv_U, conv_pts, conv_P0, conv_PWts, _) = Hypatia.interp_sample(full_conv_dom, 2n, d+1, pts_factor=2) # TODO think about if it's ok to go up to d+1
         conv_wsos_cone = WSOSPolyInterpCone(conv_U, [conv_P0, conv_PWts...])
         Hp = [DynamicPolynomials.differentiate(dp[i], x[j]) for i in 1:n, j in 1:n]
         conv_condition = w'*Hp*w

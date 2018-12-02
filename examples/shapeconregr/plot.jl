@@ -44,7 +44,9 @@ function makeplot(regressor,
     layout = Layout(margin=attr(l=0, r=0, t=0, b=0))
 
     p = plot([data_trace, mdl_trace], layout)
-    savefig(p, filename)
+    if filename != ""
+        savefig(p, filename)
+    end
 
     return p
 end

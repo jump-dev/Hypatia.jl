@@ -144,18 +144,19 @@ function runexp3()
     # end # do
 end
 
-runmakeplot = false
-p = runexp3()
+# runmakeplot = false
+# p = runexp3()
 
 # n = 5, d = 6 , use convexity both struggle
 # n = 4, d = 5, use both mosek
 # small n high d to replicate papp numerical difficulties
 
-# n = 5
-# # degrees of freedom for data
-# signal_ratio = 0.0 # 10.0
-# (refrmse, X, y, shape_data) = exprmnt1_data(n=n, signal_ratio=signal_ratio)
-# # degrees of freedom in the model
-# deg = 5; ignore_mono = true; ignore_conv = false; use_wsos = true
-# @time (rmse, tm, p) = exprmnt_mdl(X, y, shape_data, deg=deg, use_wsos=use_wsos, ignore_mono=ignore_mono, ignore_conv=ignore_conv)
-# p = makeplot(p, X, y, filename=joinpath(@__DIR__(), "mosek_both.pdf"), l=0.5, u=2.0)
+n = 2
+# degrees of freedom for data
+signal_ratio = 10.0
+(refrmse, X, y, shape_data) = exprmnt1_data(n=n, signal_ratio=signal_ratio)
+# degrees of freedom in the model
+deg = 4; ignore_mono = true; ignore_conv = true; use_wsos = false
+@time (rmse, tm, p) = exprmnt_mdl(X, y, shape_data, deg=deg, use_wsos=use_wsos, ignore_mono=ignore_mono, ignore_conv=ignore_conv)
+filename = "" # joinpath(@__DIR__(), "mosek_both.pdf")
+p = makeplot(p, X, y, filename=filename, l=(0.5,0.5), u=(2.0,2.0))
