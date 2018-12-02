@@ -207,7 +207,8 @@ testfuns = [
     _shapeconregr8_JuMP,
     # _shapeconregr9_JuMP, # numerically unstable
     # _shapeconregr10_JuMP, # numerically unstable
-    # _shapeconregr11_JuMP, # throws out-of-memory error
+    _shapeconregr11_JuMP, # throws out-of-memory error
+    _shapeconregr12_JuMP, # throws out-of-memory error
     ]
 @testset "JuMP examples: $testfun" for testfun in testfuns
     testfun()

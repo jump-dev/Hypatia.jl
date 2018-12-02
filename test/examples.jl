@@ -378,9 +378,16 @@ function _shapeconregr10_JuMP()
     solveandcheck_JuMP(mdl, truemin)
 end
 
-function _shapeconregr11_JuMP() # smallish n/d out of memory with PSD after model is built
+function _shapeconregr11_JuMP() # out of memory error when converting sparse to dense in MOI conversion
     (n, deg, npoints, signal_ratio, f) = (5, 5, 1000, 0.0, x -> exp(norm(x)))
     (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
-    (mdl, p) = build_shapeconregr_PSD(X, y, deg, ShapeData(n), use_leastsqobj=true)
+    (mdl, p) = build_shapeconregr_PSD(X, y, deg, ShapeData(n), use_leastsqobj=true, usedense=true)
+    JuMP.optimize!(mdl)
+end
+
+function _shapeconregr12_JuMP() # out of memory error during preprocessing
+    (n, deg, npoints, signal_ratio, f) = (5, 5, 1000, 0.0, x -> exp(norm(x)))
+    (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
+    (mdl, p) = build_shapeconregr_PSD(X, y, deg, ShapeData(n), use_leastsqobj=true, usedense=false)
     JuMP.optimize!(mdl)
 end

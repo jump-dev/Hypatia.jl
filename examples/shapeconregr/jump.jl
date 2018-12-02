@@ -72,6 +72,7 @@ function build_shapeconregr_PSD(
     r::Int,
     sd::ShapeData;
     use_leastsqobj::Bool = false,
+    usedense::Bool = true,
     )
     (npoints, n) = size(X)
 
@@ -79,7 +80,7 @@ function build_shapeconregr_PSD(
     mono_bss = Hypatia.Hypatia.get_bss(sd.mono_dom, x)
     conv_bss = Hypatia.Hypatia.get_bss(sd.conv_dom, x)
 
-    model = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true))
+    model = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true, usedense=usedense))
     @variable(model, p, PolyJuMP.Poly(monomials(x, 0:r)))
 
     if use_leastsqobj
@@ -119,6 +120,7 @@ function build_shapeconregr_WSOS(
     r::Int,
     sd::ShapeData;
     use_leastsqobj::Bool = false,
+    usedense::Bool = true,
     )
     d = div(r, 2)
     (npoints, n) = size(X)
@@ -131,7 +133,7 @@ function build_shapeconregr_WSOS(
     @polyvar x[1:n]
     @polyvar w[1:n]
 
-    model = Model(with_optimizer(Hypatia.Optimizer, verbose=true))
+    model = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true, usedense=usedense))
     @variable(model, p, PolyJuMP.Poly(monomials(x, 0:r)))
 
     if use_leastsqobj
@@ -165,7 +167,7 @@ function build_shapeconregr_WSOS(
     return (model, p)
 end
 
-function run_JuMP_shapeconregr(use_wsos::Bool)
+function run_JuMP_shapeconregr(use_wsos::Bool; usedense::Bool=true)
     (n, deg, npoints, signal_ratio, f) =
         # (2, 3, 100, 0.0, x -> exp(norm(x))) # no noise, monotonic function
         (2, 3, 100, 0.0, x -> sum(x.^3)) # no noise, monotonic function
@@ -181,9 +183,9 @@ function run_JuMP_shapeconregr(use_wsos::Bool)
     use_leastsqobj = true
 
     if use_wsos
-        (model, p) = build_shapeconregr_WSOS(X, y, deg, shapedata, use_leastsqobj=use_leastsqobj)
+        (model, p) = build_shapeconregr_WSOS(X, y, deg, shapedata, use_leastsqobj=use_leastsqobj, usedense=usedense)
     else
-        (model, p) = build_shapeconregr_PSD(X, y, deg, shapedata, use_leastsqobj=use_leastsqobj)
+        (model, p) = build_shapeconregr_PSD(X, y, deg, shapedata, use_leastsqobj=use_leastsqobj, usedense=usedense)
     end
 
     println("starting to solve JuMP model")
