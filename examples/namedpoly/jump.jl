@@ -25,7 +25,7 @@ function build_JuMP_namedpoly_PSD(
     model = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true))
     @variable(model, a)
     @objective(model, Max, a)
-    @constraint(model, fnn, f >= a, domain=get_bss(dom, x), maxdegree=2d)
+    @constraint(model, fnn, f >= a, domain=get_domain_inequalities(dom, x), maxdegree=2d)
 
     return model
 end
