@@ -76,8 +76,8 @@ function build_shapeconregr_PSD(
     (npoints, n) = size(X)
 
     @polyvar x[1:n]
-    mono_bss = get_bss(sd.mono_dom, x)
-    conv_bss = get_bss(sd.conv_dom, x)
+    mono_bss = get_domain_inequalities(sd.mono_dom, x)
+    conv_bss = get_domain_inequalities(sd.conv_dom, x)
 
     model = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true, usedense=usedense))
     @variable(model, p, PolyJuMP.Poly(monomials(x, 0:r)))
