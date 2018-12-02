@@ -42,7 +42,7 @@ function build_JuMP_namedpoly_WSOS(
     (U, pts, P0, PWts, w) = Hypatia.interp_sample(dom, nvariables(f), d, pts_factor=pts_factor)
 
     # build JuMP model
-    model = Model(with_optimizer(Hypatia.Optimizer, verbose=true, tolfeas=1e-9))
+    model = Model(with_optimizer(Hypatia.Optimizer, verbose=true, tolfeas=1e-8))
     if primal_wsos
         @variable(model, a)
         @objective(model, Max, a)
