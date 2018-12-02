@@ -27,10 +27,8 @@ function build_envelope(
     )
     # generate interpolation
     @assert deg <= d
-    (U, pts, P0, w) = Hypatia.interp_box(n, d, calc_w=true)
-    P0sub = view(P0, :, 1:binomial(n+d-1, n))
-    Wtsfun = (j -> sqrt.(1.0 .- abs2.(pts[:,j])))
-    PWts = [Wtsfun(j) .* P0sub for j in 1:n]
+    domain = Hypatia.Box(-ones(n), ones(n))
+    (U, pts, P0, PWts, w) = Hypatia.interpolate(domain, d, sample=false, calc_w=true)
 
     if use_data
         # use provided data in data folder
