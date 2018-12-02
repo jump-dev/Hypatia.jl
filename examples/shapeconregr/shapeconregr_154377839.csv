@@ -1,0 +1,13 @@
+# n = 2
+signal_ratio,refrmse,deg,ignore_mono,ignore_conv,use_wsos,rmse,tm,status
+0.0,0.0,2,false,false,true,1.0568538840302528,0.653974112,Success
+0.0,0.0,2,false,false,false,1.0568547978126073,0.325087476,Success
+0.0,0.0,3,false,false,true,0.37169096579153593,0.358222001,NumericalError
+0.0,0.0,3,false,false,false,0.3716923358223023,0.257835996,Success
+0.0,0.0,4,false,false,true,0.9486456544012706,2.138471328,NumericalError
+0.0,0.0,4,false,false,false,0.12086992393578352,0.445955689,Success
+0.0,0.0,5,false,false,true,0.565785368913852,2.101573745,NumericalError
+0.0,0.0,5,false,false,false,0.03691497318299979,8.543012962,NumericalError
+0.0,0.0,6,false,false,true,2.269259126747762,20.814253232,NumericalError
+0.0,0.0,6,false,false,false,0.017353364872060753,13.826268468,NumericalError
+0.0,0.0,7,false,false,true,2.248710060702801,19.740374556,NumericalError
