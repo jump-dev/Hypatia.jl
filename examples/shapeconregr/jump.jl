@@ -12,7 +12,6 @@ where
 See e.g. Chapter 8 of thesis by G. Hall (2018).
 =#
 
-using LinearAlgebra
 using Random
 import Distributions
 using MathOptInterface
@@ -21,10 +20,10 @@ using JuMP
 using Hypatia
 using MultivariatePolynomials
 using DynamicPolynomials
-using SemialgebraicSets
 using SumOfSquares
 using PolyJuMP
 using Test
+include(joinpath(dirname(@__DIR__), "utils", "semialgebraicsets.jl"))
 
 
 # a description of the shape of the regressor
@@ -77,8 +76,8 @@ function build_shapeconregr_PSD(
     (npoints, n) = size(X)
 
     @polyvar x[1:n]
-    mono_bss = Hypatia.Hypatia.get_bss(sd.mono_dom, x)
-    conv_bss = Hypatia.Hypatia.get_bss(sd.conv_dom, x)
+    mono_bss = get_bss(sd.mono_dom, x)
+    conv_bss = get_bss(sd.conv_dom, x)
 
     model = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true, usedense=usedense))
     @variable(model, p, PolyJuMP.Poly(monomials(x, 0:r)))
