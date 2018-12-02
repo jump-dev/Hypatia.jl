@@ -37,19 +37,27 @@ function build_JuMP_namedpoly_WSOS(
     d::Int = div(maxdegree(f) + 1, 2),
     pts_factor = 25,
     rseed::Int = 1,
+    primal_wsos::Bool = false,
     )
     (U, pts, P0, PWts, w) = Hypatia.interp_sample(dom, nvariables(f), d, pts_factor=pts_factor)
 
     # build JuMP model
-    model = Model(with_optimizer(Hypatia.Optimizer, verbose=true))
-    @variable(model, a)
-    @objective(model, Max, a)
-    @constraint(model, [f(pts[i,:]) - a for i in 1:U] in WSOSPolyInterpCone(U, [P0, PWts...]))
+    model = Model(with_optimizer(Hypatia.Optimizer, verbose=true, tolfeas=1e-8))
+    if primal_wsos
+        @variable(model, a)
+        @objective(model, Max, a)
+        @constraint(model, [f(pts[j,:]) - a for j in 1:U] in WSOSPolyInterpCone(U, [P0, PWts...], false))
+    else
+        @variable(model, x[1:U])
+        @objective(model, Min, sum(x[j] * f(pts[j,:]...) for j in 1:U))
+        @constraint(model, sum(x) == 1.0)
+        @constraint(model, x in WSOSPolyInterpCone(U, [P0, PWts...], true))
+    end
 
     return model
 end
 
-function run_JuMP_namedpoly(use_wsos::Bool)
+function run_JuMP_namedpoly(use_wsos::Bool; primal_wsos::Bool=false)
     # select the named polynomial to minimize and degree of SOS interpolation
     (polyname, deg) =
         # :butcher, 2
@@ -80,7 +88,7 @@ function run_JuMP_namedpoly(use_wsos::Bool)
     (x, f, dom, truemin) = getpolydata(polyname)
 
     if use_wsos
-        model = build_JuMP_namedpoly_WSOS(x, f, dom, d=deg)
+        model = build_JuMP_namedpoly_WSOS(x, f, dom, d=deg, primal_wsos=primal_wsos)
     else
         model = build_JuMP_namedpoly_PSD(x, f, dom, d=deg)
     end
@@ -102,7 +110,8 @@ function run_JuMP_namedpoly(use_wsos::Bool)
 end
 
 run_JuMP_namedpoly_PSD() = run_JuMP_namedpoly(false)
-run_JuMP_namedpoly_WSOS() = run_JuMP_namedpoly(true)
+run_JuMP_namedpoly_WSOS_primal() = run_JuMP_namedpoly(true, primal_wsos=true)
+run_JuMP_namedpoly_WSOS_dual() = run_JuMP_namedpoly(true, primal_wsos=false)
 
 function getpolydata(polyname::Symbol)
     if polyname == :butcher

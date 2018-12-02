@@ -20,8 +20,9 @@ function build_envelope(
     deg::Int,
     n::Int,
     d::Int;
+    primal_wsos::Bool = true,
     use_data::Bool = false,
-    dense::Bool = false,
+    usedense::Bool = false,
     rseed::Int = 1,
     )
     # generate interpolation
@@ -31,38 +32,57 @@ function build_envelope(
     Wtsfun = (j -> sqrt.(1.0 .- abs2.(pts[:,j])))
     PWts = [Wtsfun(j) .* P0sub for j in 1:n]
 
-    c = -w
-    A = zeros(0, U)
-    b = Float64[]
-    if dense
-        G = repeat(Array(1.0I, U, U), outer=(npoly, 1))
-    else
-        G = repeat(sparse(1.0I, U, U), outer=(npoly, 1))
-    end
     if use_data
         # use provided data in data folder
-        h = vec(readdlm(joinpath(@__DIR__, "data/c$(size(G,1)).txt"), ',', Float64))
+        c_or_h = vec(readdlm(joinpath(@__DIR__, "data/c$(npoly*U).txt"), ',', Float64))
     else
         # generate random data
         Random.seed!(rseed)
         LDegs = binomial(n+deg, n)
-        h = vec(P0[:, 1:LDegs]*rand(-9:9, LDegs, npoly))
+        c_or_h = vec(P0[:, 1:LDegs]*rand(-9:9, LDegs, npoly))
     end
 
-    cone = Hypatia.Cone([Hypatia.WSOSPolyInterp(U, [P0, PWts...]) for k in 1:npoly], [1+(k-1)*U:k*U for k in 1:npoly])
+    if primal_wsos
+        # use formulation with WSOS cone in primal
+        c = -w
+        A = zeros(0, U)
+        b = Float64[]
+        if usedense
+            G = repeat(Array(1.0I, U, U), outer=(npoly, 1))
+        else
+            G = repeat(sparse(1.0I, U, U), outer=(npoly, 1))
+        end
+        h = c_or_h
+    else
+        # use formulation with WSOS cone in dual
+        c = c_or_h
+        if usedense
+            A = repeat(Array(1.0I, U, U), outer=(1, npoly))
+        else
+            A = repeat(sparse(1.0I, U, U), outer=(1, npoly))
+        end
+        b = w
+        G = Diagonal(-1.0I, npoly*U) # TODO uniformscaling
+        h = zeros(npoly*U)
+    end
+
+    cone = Hypatia.Cone(
+        [Hypatia.WSOSPolyInterp(U, [P0, PWts...], !primal_wsos) for k in 1:npoly],
+        [1+(k-1)*U:k*U for k in 1:npoly],
+        )
 
     return (c, A, b, G, h, cone)
 end
 
-function run_envelope()
+function run_envelope(primal_wsos::Bool, usedense::Bool)
     # optionally use fixed data in folder
     # select number of polynomials and degrees for the envelope
     # select dimension and SOS degree (to be squared)
     (c, A, b, G, h, cone) =
-        # build_envelope(2, 5, 1, 5, use_data=true)
-        # build_envelope(2, 5, 2, 8)
-        # build_envelope(3, 5, 3, 5)
-        build_envelope(2, 3, 1, 4, dense=false)
+        # build_envelope(2, 5, 1, 5, use_data=true, primal_wsos=primal_wsos, usedense=usedense)
+        build_envelope(2, 5, 2, 6, primal_wsos=primal_wsos, usedense=usedense)
+        # build_envelope(3, 5, 3, 5, primal_wsos=primal_wsos, usedense=usedense)
+        # build_envelope(2, 30, 1, 30, primal_wsos=primal_wsos, usedense=usedense)
 
     Hypatia.check_data(c, A, b, G, h, cone)
     (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = Hypatia.preprocess_data(c, A, b, G, useQR=true)
@@ -91,3 +111,8 @@ function run_envelope()
     # @show dobj
     return nothing
 end
+
+run_envelope_primal_dense() = run_envelope(true, true)
+run_envelope_dual_dense() = run_envelope(false, true)
+run_envelope_primal_sparse() = run_envelope(true, false)
+run_envelope_dual_sparse() = run_envelope(false, false)

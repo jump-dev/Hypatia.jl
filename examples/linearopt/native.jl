@@ -16,7 +16,7 @@ function build_linearopt(
     m::Int,
     n::Int;
     use_data::Bool = false,
-    dense::Bool = false,
+    usedense::Bool = false,
     nzfrac::Float64 = 1/sqrt(n),
     tosparse::Bool = false,
     rseed::Int = 1,
@@ -31,7 +31,7 @@ function build_linearopt(
     else
         # generate random data
         Random.seed!(rseed)
-        if dense
+        if usedense
             A = rand(-9.0:9.0, m, n)
         else
             A = 10.0.*sprandn(m, n, nzfrac)
