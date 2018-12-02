@@ -103,13 +103,9 @@ function interp_sample(dom::Ellipsoid, npts::Int)
     norms ./= 2.0
     pts .*= sf_gamma_inc_Q.(norms, dim/2) .^ inv(dim) # sf_gamma_inc_Q is the normalized incomplete gamma function
 
-    # TODO rewrite this part
     rotscale = cholesky(dom.Q).U
-    # fchol = cholesky(inv(d.Q)) # TODO this is unnecessarily expensive and prone to numerical issues: take cholesky of Q then divide by it later
     for i in 1:npts
-        # @assert norm(pts[i,:]) < 1.0
         pts[i,:] = rotscale\pts[i,:] # rotate/scale
-        # pts[i,:] = fchol.L * pts[i,:] # rotate/scale
     end
 
     for i in 1:dim
@@ -158,7 +154,7 @@ function interpolate(
     sample_factor::Int = 10,
     )
     if !sample
-        @warn "exact procedures for interpolation points only available for box domains, using sampling instead"
+        @warn "accurate methods for interpolation points are only available for box domains, using sampling instead"
     end
     return interp_sample(dom, d, calc_w=calc_w, sample_factor=sample_factor)
 end
@@ -186,6 +182,7 @@ function interp_box(dom::Box, n::Int, d::Int; calc_w::Bool=false)
         (U, pts, P0, P0sub, w) = approxfekete_data(n, d, calc_w)
     end
     # difference with sampling functions is that P0 is always formed using points in [-1, 1]
+    # scale and shift points, get WSOS matrices
     pscale = 0.5*(dom.u - dom.l)
     Wtsfun = (j -> sqrt.(1.0 .- abs2.(pts[:,j]))*pscale[j])
     PWts = [Wtsfun(j) .* P0sub for j in 1:n]
@@ -332,9 +329,6 @@ function approxfekete_data(n::Int, d::Int, calc_w::Bool)
     return (U, pts, P0, P0sub, w)
 end
 
-
-# fast, sampling-based point selection for general domains
-
 function make_wsos_arrays(
     dom::InterpDomain,
     candidate_pts::Matrix{Float64},
@@ -384,6 +378,7 @@ function make_wsos_arrays(
     return (pts, P0, P0sub, w)
 end
 
+# fast, sampling-based point selection for general domains
 function interp_sample(
     dom::InterpDomain,
     d::Int;
