@@ -4,7 +4,6 @@ Copyright 2018, Chris Coey and contributors
 see description in examples/namedpoly/native.jl
 =#
 
-using LinearAlgebra
 using Random
 using Hypatia
 using JuMP
@@ -15,6 +14,7 @@ using DynamicPolynomials
 using SumOfSquares
 using PolyJuMP
 using Test
+include(joinpath(dirname(@__DIR__), "utils", "semialgebraicsets.jl"))
 
 function build_JuMP_namedpoly_PSD(
     x,
@@ -25,7 +25,7 @@ function build_JuMP_namedpoly_PSD(
     model = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true))
     @variable(model, a)
     @objective(model, Max, a)
-    @constraint(model, fnn, f >= a, domain=Hypatia.get_bss(dom, x), maxdegree=2d)
+    @constraint(model, fnn, f >= a, domain=get_bss(dom, x), maxdegree=2d)
 
     return model
 end

@@ -39,14 +39,6 @@ function interp_sample(dom::Box, npts::Int)
     return pts
 end
 
-function get_bss(dom::Box, x)
-    bss = SemialgebraicSets.BasicSemialgebraicSet{Float64, DynamicPolynomials.Polynomial{true, Float64}}()
-    for i in 1:dimension(dom)
-        SemialgebraicSets.addinequality!(bss, (-x[i] + dom.u[i]) * (x[i] - dom.l[i]))
-    end
-    return bss
-end
-
 function get_weights(dom::Box, pts::AbstractMatrix{Float64})
     g = [(pts[:,i] .- dom.l[i]) .* (dom.u[i] .- pts[:,i]) for i in 1:size(pts, 2)]
     @assert all(all(gi .>= 0.0) for gi in g)
@@ -79,8 +71,6 @@ function interp_sample(dom::Ball, npts::Int)
     end
     return pts
 end
-
-get_bss(dom::Ball, x) = SemialgebraicSets.@set(sum((x - dom.c).^2) <= dom.r^2)
 
 function get_weights(dom::Ball, pts::AbstractMatrix{Float64})
     g = [dom.r^2 - sum((pts[j,:] - dom.c).^2) for j in 1:size(pts, 1)]
@@ -128,8 +118,6 @@ function interp_sample(dom::Ellipsoid, npts::Int)
     return pts
 end
 
-get_bss(dom::Ellipsoid, x) = SemialgebraicSets.@set((x - dom.c)' * dom.Q * (x - dom.c) <= 1.0)
-
 function get_weights(dom::Ellipsoid, pts::AbstractMatrix{Float64})
     g = [1.0 - (pts[j, :] - dom.c)' * dom.Q * (pts[j, :] - dom.c) for j in 1:size(pts, 1)]
     @assert all(g .>= 0.0)
@@ -150,8 +138,6 @@ dimension(dom::SemiFreeDomain) = 2*dimension(dom.sampling_region)
 function interp_sample(dom::SemiFreeDomain, npts::Int)
     return hcat(interp_sample(dom.sampling_region, npts), interp_sample(dom.sampling_region, npts))
 end
-
-get_bss(dom::SemiFreeDomain, x) = get_bss(dom.sampling_region, x)
 
 function get_weights(dom::SemiFreeDomain, pts::Matrix{Float64})
     count = div(size(pts, 2), 2)
