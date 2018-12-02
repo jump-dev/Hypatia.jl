@@ -1,5 +1,5 @@
 #=
-Copyright 2018, Chris Coey and contributors
+Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 =#
 
 function _envelope1(; verbose, lscachetype)
@@ -165,16 +165,16 @@ function _namedpoly9(; verbose, lscachetype)
 end
 
 function _namedpoly10(; verbose, lscachetype)
-    mdl = Hypatia.Model(verbose=verbose, tolfeas=5e-10)
+    mdl = Hypatia.Model(verbose=verbose, tolfeas=2e-10)
     (c, A, b, G, h, cone) = build_namedpoly(:rosenbrock, 5)
     r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype, atol=1e-3)
     @test r.status == :Optimal
-    @test r.niters <= 65
+    @test r.niters <= 70
     @test r.pobj ≈ 0 atol=1e-3 rtol=1e-3
 end
 
 function _namedpoly11(; verbose, lscachetype)
-    mdl = Hypatia.Model(verbose=verbose, tolfeas=1e-9)
+    mdl = Hypatia.Model(verbose=verbose, tolfeas=1e-10)
     (c, A, b, G, h, cone) = build_namedpoly(:schwefel, 4)
     r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype, atol=1e-3)
     @test r.status == :Optimal
