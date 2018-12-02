@@ -1,5 +1,6 @@
 #=
 Copyright 2018, Chris Coey, Lea Kapelevich and contributors
+
 Given a sequence of observations X₁,...,Xₙ with each Xᵢ in Rᵈ, find a density function f maximizing the log likelihood of the observations.
     minimize -∑ᵢzᵢ
     subject to -zᵢ + log(f(Xᵢ)) ≥ 0 ∀ i = 1,...,n
@@ -49,8 +50,7 @@ function build_JuMP_densityest(
         [i in 1:nobs], vcat(z[i], 1.0, f(X[i,:])) in MOI.ExponentialCone() # hypograph of log
     end)
 
-    # maximize log likelihood
-    @objective(model, Max, sum(z))
+    @objective(model, Max, sum(z)) # maximize log likelihood
 
     return model
 end
