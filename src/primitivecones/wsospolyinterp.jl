@@ -24,6 +24,7 @@ mutable struct WSOSPolyInterp <: PrimitiveCone
     tmp2::Vector{Matrix{Float64}}
     tmp3::Matrix{Float64}
     scal::Float64
+    # d::Vector{POSVXData}
 
     function WSOSPolyInterp(dim::Int, ipwt::Vector{Matrix{Float64}}, isdual::Bool)
         for ipwtj in ipwt
@@ -37,8 +38,9 @@ mutable struct WSOSPolyInterp <: PrimitiveCone
         prmtv.H = similar(ipwt[1], dim, dim)
         prmtv.H2 = similar(prmtv.H)
         prmtv.tmp1 = [similar(ipwt[1], size(ipwtj, 2), size(ipwtj, 2)) for ipwtj in ipwt]
-        prmtv.tmp2 = [similar(ipwt[1], dim, size(ipwtj, 2)) for ipwtj in ipwt]
+        prmtv.tmp2 = [similar(ipwt[1], size(ipwtj, 2), dim) for ipwtj in ipwt]
         prmtv.tmp3 = similar(ipwt[1], dim, dim)
+        # prmtv.d = [POSVXData(prmtv.tmp1[j], prmtv.tmp2[j]) for j in eachindex(ipwt)]
         return prmtv
     end
 end
@@ -64,17 +66,26 @@ function incone_prmtv(prmtv::WSOSPolyInterp, scal::Float64)
         tmp2j = prmtv.tmp2[j]
 
         # tmp1j = ipwtj'*Diagonal(pnt)*ipwtj
-        mul!(tmp2j, Diagonal(newpnt), ipwtj)
-        mul!(tmp1j, ipwtj', tmp2j)
+        mul!(tmp2j, ipwtj', Diagonal(newpnt))
+        mul!(tmp1j, tmp2j, ipwtj)
 
-        # pivoted cholesky, upper triangle solve
-        F = cholesky!(Symmetric(tmp1j, :U), Val(true), check=false)
+        # pivoted cholesky factorization method
+        F = cholesky!(Symmetric(tmp1j, :L), Val(true), check=false)
         if !isposdef(F)
             return false
         end
-        tmp2j .= view(ipwtj, :, F.p)
-        rdiv!(tmp2j, F.U)
-        mul!(tmp3, tmp2j, tmp2j')
+        tmp2j .= view(ipwtj', F.p, :)
+        ldiv!(F.L, tmp2j)
+        mul!(tmp3, tmp2j', tmp2j)
+
+        # posvx solve method
+        # tmp2j .= ipwtj' # TODO eliminate by transposing in construction
+        # PDPiP = similar(tmp2j)
+        # success = hypatia_posvx!(PDPiP, tmp1j, tmp2j, prmtv.d[j])
+        # if !success
+        #     return false
+        # end
+        # mul!(tmp3, ipwtj, PDPiP)
 
         for i in eachindex(prmtv.g)
             prmtv.g[i] -= tmp3[i,i]
