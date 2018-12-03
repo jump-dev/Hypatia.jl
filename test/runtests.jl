@@ -100,6 +100,8 @@ function solveandcheck(
 end
 
 
+@testset begin
+
 # native interface tests
 include(joinpath(@__DIR__, "native.jl"))
 @info("starting native interface tests")
@@ -204,11 +206,11 @@ testfuns = [
     _shapeconregr6_JuMP,
     _shapeconregr7_JuMP, # numerically unstable
     _shapeconregr8_JuMP,
-    # _shapeconregr9_JuMP, # numerically unstable
-    # _shapeconregr10_JuMP, # numerically unstable
-    # _shapeconregr11_JuMP, # numerically unstable
-    # _shapeconregr12_JuMP, # numerically unstable
-    # _shapeconregr13_JuMP, # numerically unstable
+    _shapeconregr9_JuMP, # numerically unstable
+    _shapeconregr10_JuMP, # numerically unstable
+    _shapeconregr11_JuMP, # numerically unstable
+    _shapeconregr12_JuMP, # numerically unstable
+    _shapeconregr13_JuMP, # numerically unstable
     # _shapeconregr14_JuMP, # throws out-of-memory error
     # _shapeconregr15_JuMP, # throws out-of-memory error
     ]
@@ -222,7 +224,7 @@ testfuns = [
     run_JuMP_expdesign,
     run_linearopt,
     run_namedpoly,
-    # run_JuMP_namedpoly_PSD, # final objective doesn't match
+    run_JuMP_namedpoly_PSD, # final objective doesn't match
     run_JuMP_namedpoly_WSOS_primal,
     run_JuMP_namedpoly_WSOS_dual,
     run_envelope_primal_dense,
@@ -252,5 +254,5 @@ lscachetypes = [
     testmoi(verbose=verbose, lscachetype=lscachetype, usedense=usedense)
 end
 
-
+end
 return nothing
