@@ -192,7 +192,7 @@ function solveandcheck_JuMP(mdl, truemin)
     @test term_status == MOI.Success
     @test pr_status == MOI.FeasiblePoint
     @test du_status == MOI.FeasiblePoint
-    # @test pobj ≈ dobj atol=1e-3 rtol=1e-3
+    @test pobj ≈ dobj atol=1e-3 rtol=1e-3
     @test pobj ≈ truemin atol=1e-3 rtol=1e-3
 end
 
