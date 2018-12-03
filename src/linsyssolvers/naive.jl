@@ -1,4 +1,6 @@
 #=
+Copyright 2018, Chris Coey and contributors
+
 naive method that simply performs one high-dimensional linear system solve
 TODO should allow LHS6 to be sparse
 =#
@@ -135,7 +137,7 @@ function solvelinsys6!(
         calcHarr_prmtv!(view(L.LHS6copy, L.tzk - 1 .+ L.cone.idxs[k], coloffset - 1 .+ L.cone.idxs[k]), Matrix(mu*I, dim, dim), L.cone.prmtvs[k])
     end
 
-    F = qr!(L.LHS6copy)
+    F = lu!(L.LHS6copy)
     ldiv!(F, rhs)
 
     @. @views begin

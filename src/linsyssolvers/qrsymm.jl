@@ -1,5 +1,7 @@
 #=
-CVXOPT method: solve two symmetric linear systems and combine solutions
+Copyright 2018, Chris Coey and contributors
+
+solve two symmetric linear systems and combine solutions (inspired by CVXOPT)
 QR plus either Cholesky factorization or iterative conjugate gradients method
 (1) eliminate equality constraints via QR of A'
 (2) solve reduced symmetric system by Cholesky or iterative method
@@ -99,19 +101,19 @@ mutable struct QRSymmCache <: LinSysCache
         L.yi = Matrix{Float64}(undef, p, 2)
         L.xi = Matrix{Float64}(undef, n, 2)
 
-        L.lsferr = Vector{Float64}(undef, 2)
-        L.lsberr = Vector{Float64}(undef, 2)
-        L.lsAF = Matrix{Float64}(undef, nmp, nmp)
+        # L.lsferr = Vector{Float64}(undef, 2)
+        # L.lsberr = Vector{Float64}(undef, 2)
+        # L.lsAF = Matrix{Float64}(undef, nmp, nmp)
 
         # # posvx
         # L.lswork = Vector{Float64}(undef, 3*nmp)
         # L.lsiwork = Vector{BlasInt}(undef, nmp)
         # L.lsS = Vector{Float64}(undef, nmp)
 
-        # sysvx
-        L.lswork = Vector{Float64}(undef, 5*nmp)
-        L.lsiwork = Vector{BlasInt}(undef, nmp)
-        L.ipiv = Vector{BlasInt}(undef, nmp)
+        # # sysvx
+        # L.lswork = Vector{Float64}(undef, 5*nmp)
+        # L.lsiwork = Vector{BlasInt}(undef, nmp)
+        # L.ipiv = Vector{BlasInt}(undef, nmp)
 
         # if useiterative
         #     cgu = zeros(nmp)
@@ -149,14 +151,12 @@ function solvelinsys6!(
     tau::Float64,
     L::QRSymmCache,
     )
-    invmu = inv(mu)
-
     # calculate or factorize LHS of symmetric positive definite linear system
     # TODO multiply H by G*Q2 (lower dimension than G)
     for k in eachindex(L.cone.prmtvs)
         if L.cone.prmtvs[k].usedual
             calcHiarr_prmtv!(view(L.HG, L.cone.idxs[k], :), view(L.G, L.cone.idxs[k], :), L.cone.prmtvs[k])
-            @. @views L.HG[L.cone.idxs[k], :] *= invmu
+            @. @views L.HG[L.cone.idxs[k], :] /= mu
         else
             calcHarr_prmtv!(view(L.HG, L.cone.idxs[k], :), view(L.G, L.cone.idxs[k], :), L.cone.prmtvs[k])
             @. @views L.HG[L.cone.idxs[k], :] *= mu
@@ -178,7 +178,7 @@ function solvelinsys6!(
         if L.cone.prmtvs[k].usedual
             @. @views z1[L.cone.idxs[k]] = z2[L.cone.idxs[k]] - rhs_ts[L.cone.idxs[k]]
             calcHiarr_prmtv!(view(z2, L.cone.idxs[k]), view(z1, L.cone.idxs[k]), L.cone.prmtvs[k])
-            @. @views z2[L.cone.idxs[k]] *= invmu
+            @. @views z2[L.cone.idxs[k]] /= mu
         elseif !iszero(rhs_ts[L.cone.idxs[k]]) # TODO rhs_ts = 0 for correction steps, so can just check if doing correction
             calcHarr_prmtv!(view(z1, L.cone.idxs[k]), view(rhs_ts, L.cone.idxs[k]), L.cone.prmtvs[k])
             @. @views z2[L.cone.idxs[k]] -= mu*z1[L.cone.idxs[k]]
@@ -190,7 +190,7 @@ function solvelinsys6!(
     for k in eachindex(L.cone.prmtvs)
         if L.cone.prmtvs[k].usedual
             calcHiarr_prmtv!(view(z1, L.cone.idxs[k]), view(L.h, L.cone.idxs[k]), L.cone.prmtvs[k])
-            @. @views z1[L.cone.idxs[k]] *= invmu
+            @. @views z1[L.cone.idxs[k]] /= mu
         else
             calcHarr_prmtv!(view(z1, L.cone.idxs[k]), view(L.h, L.cone.idxs[k]), L.cone.prmtvs[k])
             @. @views z1[L.cone.idxs[k]] *= mu
@@ -208,18 +208,31 @@ function solvelinsys6!(
     mul!(L.Q2divcopy, L.Q2', L.rhs)
 
     if size(L.Q2div, 1) > 0
-        success = hypatia_sysvx!(L.Q2div, L.Q2GHGQ2, L.Q2divcopy, L.lsferr, L.lsberr, L.lswork, L.lsiwork, L.lsAF, L.ipiv)
-        if !success
+        F = bunchkaufman!(Symmetric(L.Q2GHGQ2), true, check=false)
+        if !issuccess(F)
             println("linear system matrix factorization failed")
             mul!(L.Q2GHGQ2, L.Q2', L.GHGQ2)
             L.Q2GHGQ2 += 1e-4I
-            mul!(L.Q2divcopy, L.Q2', L.rhs)
-
-            success = hypatia_sysvx!(L.Q2div, L.Q2GHGQ2, L.Q2divcopy, L.lsferr, L.lsberr, L.lswork, L.lsiwork, L.lsAF, L.ipiv)
-            if !success
-                error("could not fix linear system solve failure; terminating")
+            F = bunchkaufman!(Symmetric(L.Q2GHGQ2), true, check=false)
+            if !issuccess(F)
+                error("could not fix failure of positive definiteness; terminating")
             end
         end
+        mul!(L.Q2div, L.Q2', L.rhs)
+        ldiv!(F, L.Q2div)
+
+        # success = hypatia_sysvx!(L.Q2div, L.Q2GHGQ2, L.Q2divcopy, L.lsferr, L.lsberr, L.lswork, L.lsiwork, L.lsAF, L.ipiv)
+        # if !success
+        #     println("linear system matrix factorization failed")
+        #     mul!(L.Q2GHGQ2, L.Q2', L.GHGQ2)
+        #     L.Q2GHGQ2 += 1e-4I
+        #     mul!(L.Q2divcopy, L.Q2', L.rhs)
+        #
+        #     success = hypatia_sysvx!(L.Q2div, L.Q2GHGQ2, L.Q2divcopy, L.lsferr, L.lsberr, L.lswork, L.lsiwork, L.lsAF, L.ipiv)
+        #     if !success
+        #         error("could not fix linear system solve failure; terminating")
+        #     end
+        # end
 
         # success = hypatia_posvx!(L.Q2div, L.Q2GHGQ2, L.Q2divcopy, L.lsferr, L.lsberr, L.lswork, L.lsiwork, L.lsAF, L.lsS)
         # if !success

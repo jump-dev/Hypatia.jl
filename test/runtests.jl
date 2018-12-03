@@ -1,8 +1,5 @@
 #=
-Copyright 2018, Chris Coey and contributors
-
-# TODO add a progress meter to silent tests?
-# TODO don't print "Hypatia." before linsyscache types in testset printing
+Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 =#
 
 using Hypatia
@@ -102,14 +99,13 @@ function solveandcheck(
     return (x=x, y=y, s=s, z=z, pobj=pobj, dobj=dobj, status=status, stime=stime, niters=niters)
 end
 
-
 # native interface tests
 include(joinpath(@__DIR__, "native.jl"))
 @info("starting native interface tests")
 verbose = false
 lscachetypes = [
     Hypatia.QRSymmCache,
-    # Hypatia.NaiveCache,
+    Hypatia.NaiveCache,
     ]
 testfuns = [
     _dimension1,
@@ -158,7 +154,7 @@ end
 
 
 @info("starting native examples tests")
-verbose = true
+verbose = false
 lscachetypes = [
     Hypatia.QRSymmCache,
     # Hypatia.NaiveCache, # slow
@@ -179,13 +175,12 @@ testfuns = [
     _namedpoly7,
     _namedpoly8,
     _namedpoly9,
-    # _namedpoly10, # numerically unstable
+    _namedpoly10, # numerically unstable
     _namedpoly11,
     ]
 @testset "native examples: $testfun, $lscachetype" for testfun in testfuns, lscachetype in lscachetypes
     testfun(verbose=verbose, lscachetype=lscachetype)
 end
-
 
 @info("starting JuMP examples tests")
 testfuns = [
@@ -204,7 +199,7 @@ testfuns = [
     _shapeconregr3_JuMP,
     _shapeconregr4_JuMP,
     _shapeconregr5_JuMP,
-    # _shapeconregr6_JuMP, # numerically unstable
+    _shapeconregr6_JuMP, # numerically unstable
     _shapeconregr7_JuMP,
     _shapeconregr8_JuMP,
     # _shapeconregr9_JuMP, # numerically unstable
@@ -218,6 +213,7 @@ testfuns = [
 @testset "JuMP examples: $testfun" for testfun in testfuns
     testfun()
 end
+
 
 @info("starting verbose default examples tests")
 testfuns = [
