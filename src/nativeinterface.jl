@@ -367,32 +367,30 @@ function solve!(mdl::Model)
     iter = 0
     while true
         # calculate residuals and convergence parameters
-        invtau = inv(tau)
-
         # tmp_tx = -A'*ty - G'*tz - c*tau
         mul!(tmp_tx2, A', ty)
         mul!(tmp_tx, G', tz)
         @. tmp_tx = -tmp_tx2 - tmp_tx
         nres_x = norm(tmp_tx)
         @. tmp_tx -= c*tau
-        nres_tx = norm(tmp_tx)*invtau
+        nres_tx = norm(tmp_tx)/tau
 
         # tmp_ty = A*tx - b*tau
         mul!(tmp_ty, A, tx)
         nres_y = norm(tmp_ty)
         @. tmp_ty -= b*tau
-        nres_ty = norm(tmp_ty)*invtau
+        nres_ty = norm(tmp_ty)/tau
 
         # tmp_tz = ts + G*tx - h*tau
         mul!(tmp_tz, G, tx)
         @. tmp_tz += ts
         nres_z = norm(tmp_tz)
         @. tmp_tz -= h*tau
-        nres_tz = norm(tmp_tz)*invtau
+        nres_tz = norm(tmp_tz)/tau
 
         (cx, by, hz) = (dot(c, tx), dot(b, ty), dot(h, tz))
-        obj_pr = cx*invtau
-        obj_du = -(by + hz)*invtau
+        obj_pr = cx/tau
+        obj_du = -(by + hz)/tau
         gap = dot(tz, ts) # TODO maybe should adapt original Alfonso condition instead of using this CVXOPT condition
 
         # TODO maybe add small epsilon to denominators that are zero to avoid NaNs, and get rid of isnans further down
@@ -462,7 +460,22 @@ function solve!(mdl::Model)
             @. @views tmp_tz[cone.idxs[k]] = -v1[cone.idxs[k]]
         end
 
+        # copy_x = copy(tmp_tx)
+        # copy_y = copy(tmp_ty)
+        # copy_z = copy(tmp_tz)
+
         (tmp_kap, tmp_tau) = solvelinsys6!(tmp_tx, tmp_ty, tmp_tz, -kap, tmp_ts, kap + cx + by + hz, mu, tau, L)
+
+        # # check residual
+        # res_x = -A'*tmp_ty - G'*tmp_tz - c*tmp_tau + copy_x
+        # res_y = A*tmp_tx - b*tmp_tau + copy_y
+        # # res_z = tmp_ts + G*tmp_tx - h*tmp_tau - copy_z
+        # res_obj = dot(c, tmp_tx) + dot(b, tmp_ty) + dot(h, tmp_tz) + tmp_kap + (kap + cx + by + hz)
+        #
+        # @show norm(res_x)
+        # @show norm(res_y)
+        # # @show norm(res_z)
+        # @show norm(res_obj)
 
         # determine step length alpha by line search
         alpha = alphapred
@@ -645,11 +658,10 @@ function solve!(mdl::Model)
     mdl.verbose && println("\nterminated in $iter iterations with internal status $(mdl.status)\n")
 
     # calculate result and iteration statistics
-    invtau = inv(tau)
-    mdl.x = tx .*= invtau
-    mdl.s = ts .*= invtau
-    mdl.y = ty .*= invtau
-    mdl.z = tz .*= invtau
+    mdl.x = tx ./= tau
+    mdl.s = ts ./= tau
+    mdl.y = ty ./= tau
+    mdl.z = tz ./= tau
     mdl.tau = tau
     mdl.kap = kap
     mdl.mu = mu
