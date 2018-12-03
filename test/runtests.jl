@@ -99,6 +99,7 @@ function solveandcheck(
     return (x=x, y=y, s=s, z=z, pobj=pobj, dobj=dobj, status=status, stime=stime, niters=niters)
 end
 
+
 # native interface tests
 include(joinpath(@__DIR__, "native.jl"))
 @info("starting native interface tests")
@@ -182,12 +183,13 @@ testfuns = [
     testfun(verbose=verbose, lscachetype=lscachetype)
 end
 
+
 @info("starting JuMP examples tests")
 testfuns = [
     _namedpoly1_JuMP,
     _namedpoly2_JuMP,
     _namedpoly3_JuMP,
-    _namedpoly4_JuMP,
+    _namedpoly4_JuMP, # numerically unstable
     _namedpoly5_JuMP,
     _namedpoly6_JuMP,
     _namedpoly7_JuMP,
@@ -199,8 +201,8 @@ testfuns = [
     _shapeconregr3_JuMP,
     _shapeconregr4_JuMP,
     _shapeconregr5_JuMP,
-    _shapeconregr6_JuMP, # numerically unstable
-    _shapeconregr7_JuMP,
+    _shapeconregr6_JuMP,
+    _shapeconregr7_JuMP, # numerically unstable
     _shapeconregr8_JuMP,
     # _shapeconregr9_JuMP, # numerically unstable
     # _shapeconregr10_JuMP, # numerically unstable
@@ -220,7 +222,7 @@ testfuns = [
     run_JuMP_expdesign,
     run_linearopt,
     run_namedpoly,
-    # run_JuMP_namedpoly_PSD, # numerically unstable
+    # run_JuMP_namedpoly_PSD, # final objective doesn't match
     run_JuMP_namedpoly_WSOS_primal,
     run_JuMP_namedpoly_WSOS_dual,
     run_envelope_primal_dense,
