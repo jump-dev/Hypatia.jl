@@ -85,7 +85,7 @@ function build_shapeconregr_PSD(
     conv_bss = get_domain_inequalities(sd.conv_dom, x)
 
     if use_hypatia
-        model = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true))
+        model = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true, lscachetype=Hypatia.QRSymmCache)))
     else
         model = SOSModel(with_optimizer(MosekOptimizer))
     end
@@ -144,7 +144,7 @@ function build_shapeconregr_WSOS(
     @polyvar x[1:n]
     @polyvar w[1:n]
 
-    model = Model(with_optimizer(Hypatia.Optimizer, verbose=true))
+    model = Model(with_optimizer(Hypatia.Optimizer, verbose=true, lscachetype=Hypatia.QRSymmCache))
     @elapsed @variable(model, p, PolyJuMP.Poly(monomials(x, 0:r)))
 
     if use_leastsqobj

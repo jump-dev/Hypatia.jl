@@ -1,8 +1,5 @@
 #=
-Copyright 2018, Chris Coey and contributors
-
-# TODO add a progress meter to silent tests?
-# TODO don't print "Hypatia." before linsyscache types in testset printing
+Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 =#
 
 using Hypatia
@@ -103,13 +100,15 @@ function solveandcheck(
 end
 
 
+@testset begin
+
 # native interface tests
 include(joinpath(@__DIR__, "native.jl"))
 @info("starting native interface tests")
 verbose = false
 lscachetypes = [
     Hypatia.QRSymmCache,
-    # Hypatia.NaiveCache,
+    Hypatia.NaiveCache,
     ]
 testfuns = [
     _dimension1,
@@ -158,7 +157,7 @@ end
 
 
 @info("starting native examples tests")
-verbose = true
+verbose = false
 lscachetypes = [
     Hypatia.QRSymmCache,
     # Hypatia.NaiveCache, # slow
@@ -179,7 +178,7 @@ testfuns = [
     _namedpoly7,
     _namedpoly8,
     _namedpoly9,
-    # _namedpoly10, # numerically unstable
+    _namedpoly10, # numerically unstable
     _namedpoly11,
     ]
 @testset "native examples: $testfun, $lscachetype" for testfun in testfuns, lscachetype in lscachetypes
@@ -192,7 +191,7 @@ testfuns = [
     _namedpoly1_JuMP,
     _namedpoly2_JuMP,
     _namedpoly3_JuMP,
-    _namedpoly4_JuMP,
+    _namedpoly4_JuMP, # numerically unstable
     _namedpoly5_JuMP,
     _namedpoly6_JuMP,
     _namedpoly7_JuMP,
@@ -204,14 +203,14 @@ testfuns = [
     _shapeconregr3_JuMP,
     _shapeconregr4_JuMP,
     _shapeconregr5_JuMP,
-    # _shapeconregr6_JuMP, # numerically unstable
-    _shapeconregr7_JuMP,
+    _shapeconregr6_JuMP,
+    _shapeconregr7_JuMP, # numerically unstable
     _shapeconregr8_JuMP,
-    # _shapeconregr9_JuMP, # numerically unstable
-    # _shapeconregr10_JuMP, # numerically unstable
-    # _shapeconregr11_JuMP, # numerically unstable
-    # _shapeconregr12_JuMP, # numerically unstable
-    # _shapeconregr13_JuMP, # numerically unstable
+    _shapeconregr9_JuMP, # numerically unstable
+    _shapeconregr10_JuMP, # numerically unstable
+    _shapeconregr11_JuMP, # numerically unstable
+    _shapeconregr12_JuMP, # numerically unstable
+    _shapeconregr13_JuMP, # numerically unstable
     # _shapeconregr14_JuMP, # throws out-of-memory error
     # _shapeconregr15_JuMP, # throws out-of-memory error
     ]
@@ -219,12 +218,13 @@ testfuns = [
     testfun()
 end
 
+
 @info("starting verbose default examples tests")
 testfuns = [
     run_JuMP_expdesign,
     run_linearopt,
     run_namedpoly,
-    # run_JuMP_namedpoly_PSD, # numerically unstable
+    run_JuMP_namedpoly_PSD, # final objective doesn't match
     run_JuMP_namedpoly_WSOS_primal,
     run_JuMP_namedpoly_WSOS_dual,
     run_envelope_primal_dense,
@@ -254,5 +254,5 @@ lscachetypes = [
     testmoi(verbose=verbose, lscachetype=lscachetype, usedense=usedense)
 end
 
-
+end
 return nothing

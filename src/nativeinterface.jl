@@ -7,6 +7,7 @@ Copyright 2018, David Papp, Sercan Yildiz
 mutable struct Model
     # options
     verbose::Bool           # if true, prints progress at each iteration
+    timelimit::Float64      # (approximate) time limit (in seconds) for algorithm in solve function
     tolrelopt::Float64      # relative optimality gap tolerance
     tolabsopt::Float64      # absolute optimality gap tolerance
     tolfeas::Float64        # feasibility tolerance
@@ -45,9 +46,10 @@ mutable struct Model
     pobj::Float64           # final primal objective value
     dobj::Float64           # final dual objective value
 
-    function Model(verbose, tolrelopt, tolabsopt, tolfeas, maxiter, predlinesearch, maxpredsmallsteps, predlsmulti, corrcheck, maxcorrsteps, alphacorr, maxcorrlsiters, corrlsmulti)
+    function Model(verbose, timelimit, tolrelopt, tolabsopt, tolfeas, maxiter, predlinesearch, maxpredsmallsteps, predlsmulti, corrcheck, maxcorrsteps, alphacorr, maxcorrlsiters, corrlsmulti)
         mdl = new()
         mdl.verbose = verbose
+        mdl.timelimit = timelimit
         mdl.tolrelopt = tolrelopt
         mdl.tolabsopt = tolabsopt
         mdl.tolfeas = tolfeas
@@ -68,10 +70,11 @@ end
 # initialize a model object
 function Model(;
     verbose = false,
+    timelimit = 3.6e3, # TODO should be Inf
     tolrelopt = 1e-6,
     tolabsopt = 1e-7,
     tolfeas = 1e-7,
-    maxiter = 5e2,
+    maxiter = 1e4,
     predlinesearch = true,
     maxpredsmallsteps = 15,
     predlsmulti = 0.7,
@@ -84,6 +87,9 @@ function Model(;
     if min(tolrelopt, tolabsopt, tolfeas) < 1e-12 || max(tolrelopt, tolabsopt, tolfeas) > 1e-2
         error("tolrelopt, tolabsopt, tolfeas must be between 1e-12 and 1e-2")
     end
+    if timelimit < 1e-2
+        error("timelimit must be at least 1e-2")
+    end
     if maxiter < 1
         error("maxiter must be at least 1")
     end
@@ -94,7 +100,7 @@ function Model(;
         error("maxcorrsteps must be at least 1")
     end
 
-    return Model(verbose, tolrelopt, tolabsopt, tolfeas, maxiter, predlinesearch, maxpredsmallsteps, predlsmulti, corrcheck, maxcorrsteps, alphacorr, maxcorrlsiters, corrlsmulti)
+    return Model(verbose, timelimit, tolrelopt, tolabsopt, tolfeas, maxiter, predlinesearch, maxpredsmallsteps, predlsmulti, corrcheck, maxcorrsteps, alphacorr, maxcorrlsiters, corrlsmulti)
 end
 
 get_status(mdl::Model) = mdl.status
@@ -335,10 +341,13 @@ function solve!(mdl::Model)
     # A'y = -c - G'z
     # Ax = b
     # Gx = h - ts
-    LHS = [zeros(n, n) A'; A zeros(p, p); G zeros(q, p)]
-    F = qr!(LHS)
+    # TODO do this more efficiently as a 3x3 system in the linsys solver files
     rhs = [-c - G'*tz; b; h - ts]
-    txty = F\rhs
+    if issparse(A) && issparse(G)
+        txty = [spzeros(n, n) A'; A spzeros(p, p); G spzeros(q, p)]\rhs
+    else
+        txty = [zeros(n, n) A'; A zeros(p, p); G zeros(q, p)]\rhs
+    end
     @. @views tx = txty[1:n]
     @. @views ty = txty[n+1:end]
 
@@ -351,9 +360,9 @@ function solve!(mdl::Model)
 
     # calculate prediction and correction step parameters
     (beta, eta, cpredfix) = getbetaeta(mdl.maxcorrsteps, bnu) # beta: large neighborhood parameter, eta: small neighborhood parameter
-    alphapredfix = cpredfix/(eta + sqrt(2*eta^2 + bnu)) # fixed predictor step size
+    alphapredfix = cpredfix/(eta + sqrt(2.0*abs2(eta) + bnu)) # fixed predictor step size
     alphapredthres = (mdl.predlsmulti^mdl.maxpredsmallsteps)*alphapredfix # minimum predictor step size
-    alphapredinit = (mdl.predlinesearch ? min(100*alphapredfix, 0.9999) : alphapredfix) # predictor step size
+    alphapredinit = (mdl.predlinesearch ? min(1e2*alphapredfix, 0.99999) : alphapredfix) # predictor step size
 
     # main loop
     if mdl.verbose
@@ -367,32 +376,30 @@ function solve!(mdl::Model)
     iter = 0
     while true
         # calculate residuals and convergence parameters
-        invtau = inv(tau)
-
         # tmp_tx = -A'*ty - G'*tz - c*tau
         mul!(tmp_tx2, A', ty)
         mul!(tmp_tx, G', tz)
         @. tmp_tx = -tmp_tx2 - tmp_tx
         nres_x = norm(tmp_tx)
         @. tmp_tx -= c*tau
-        nres_tx = norm(tmp_tx)*invtau
+        nres_tx = norm(tmp_tx)/tau
 
         # tmp_ty = A*tx - b*tau
         mul!(tmp_ty, A, tx)
         nres_y = norm(tmp_ty)
         @. tmp_ty -= b*tau
-        nres_ty = norm(tmp_ty)*invtau
+        nres_ty = norm(tmp_ty)/tau
 
         # tmp_tz = ts + G*tx - h*tau
         mul!(tmp_tz, G, tx)
         @. tmp_tz += ts
         nres_z = norm(tmp_tz)
         @. tmp_tz -= h*tau
-        nres_tz = norm(tmp_tz)*invtau
+        nres_tz = norm(tmp_tz)/tau
 
         (cx, by, hz) = (dot(c, tx), dot(b, ty), dot(h, tz))
-        obj_pr = cx*invtau
-        obj_du = -(by + hz)*invtau
+        obj_pr = cx/tau
+        obj_du = -(by + hz)/tau
         gap = dot(tz, ts) # TODO maybe should adapt original Alfonso condition instead of using this CVXOPT condition
 
         # TODO maybe add small epsilon to denominators that are zero to avoid NaNs, and get rid of isnans further down
@@ -452,6 +459,13 @@ function solve!(mdl::Model)
             break
         end
 
+        # check time limit
+        if (time() - starttime) >= mdl.timelimit
+            mdl.verbose && println("time limit reached; terminating")
+            mdl.status = :TimeLimit
+            break
+        end
+
         # prediction phase
         # calculate prediction direction
         @. ls_tz = tz
@@ -462,15 +476,30 @@ function solve!(mdl::Model)
             @. @views tmp_tz[cone.idxs[k]] = -v1[cone.idxs[k]]
         end
 
+        # copy_x = copy(tmp_tx)
+        # copy_y = copy(tmp_ty)
+        # copy_z = copy(tmp_tz)
+
         (tmp_kap, tmp_tau) = solvelinsys6!(tmp_tx, tmp_ty, tmp_tz, -kap, tmp_ts, kap + cx + by + hz, mu, tau, L)
+
+        # # check residual
+        # res_x = -A'*tmp_ty - G'*tmp_tz - c*tmp_tau + copy_x
+        # res_y = A*tmp_tx - b*tmp_tau + copy_y
+        # # res_z = tmp_ts + G*tmp_tx - h*tmp_tau - copy_z
+        # res_obj = dot(c, tmp_tx) + dot(b, tmp_ty) + dot(h, tmp_tz) + tmp_kap + (kap + cx + by + hz)
+        #
+        # @show norm(res_x)
+        # @show norm(res_y)
+        # # @show norm(res_z)
+        # @show norm(res_obj)
 
         # determine step length alpha by line search
         alpha = alphapred
         if tmp_kap < 0.0
-            alpha = min(alpha, -kap/tmp_kap*0.9999)
+            alpha = min(alpha, -kap/tmp_kap*0.99999)
         end
         if tmp_tau < 0.0
-            alpha = min(alpha, -tau/tmp_tau*0.9999)
+            alpha = min(alpha, -tau/tmp_tau*0.99999)
         end
 
         nbhd = Inf
@@ -493,7 +522,7 @@ function solve!(mdl::Model)
             # - increased alpha and it is inside the cone and the first to leave beta-neighborhood
             if ls_mu > 0.0 && ls_tau > 0.0 && ls_kap > 0.0 && incone(cone, ls_mu)
                 # primal iterate is inside the cone
-                nbhd = calcnbhd!(g, ls_ts, ls_tz, ls_mu, cone) + (ls_tk - ls_mu)^2
+                nbhd = calcnbhd!(g, ls_ts, ls_tz, ls_mu, cone) + abs2(ls_tk - ls_mu)
                 # nbhd = calcnbhd!(g, ls_ts, ls_tz, ls_mu, cone) + abs2(ls_tk - ls_mu)/abs2(ls_mu)
 
                 if nbhd < abs2(beta*ls_mu)
@@ -571,10 +600,10 @@ function solve!(mdl::Model)
             # determine step length alpha by line search
             alpha = mdl.alphacorr
             if tmp_kap < 0.0
-                alpha = min(alpha, -kap/tmp_kap*0.9999)
+                alpha = min(alpha, -kap/tmp_kap*0.99999)
             end
             if tmp_tau < 0.0
-                alpha = min(alpha, -tau/tmp_tau*0.9999)
+                alpha = min(alpha, -tau/tmp_tau*0.99999)
             end
 
             ncorrlsiters = 0
@@ -619,7 +648,7 @@ function solve!(mdl::Model)
 
             # finish if allowed and current iterate is in the eta-neighborhood, or if taken max steps
             if ncorrsteps == mdl.maxcorrsteps || mdl.corrcheck
-                nbhd = calcnbhd!(g, ls_ts, ls_tz, mu, cone) + (tau*kap - mu)^2
+                nbhd = calcnbhd!(g, ls_ts, ls_tz, mu, cone) + abs2(tau*kap - mu)
                 # nbhd = calcnbhd!(g, ls_ts, ls_tz, mu, cone) + abs2(tau*kap - mu)/abs2(mu)
 
                 @. ls_tz = tz
@@ -642,19 +671,18 @@ function solve!(mdl::Model)
         end
     end
 
-    mdl.verbose && println("\nterminated in $iter iterations with internal status $(mdl.status)\n")
-
     # calculate result and iteration statistics
-    invtau = inv(tau)
-    mdl.x = tx .*= invtau
-    mdl.s = ts .*= invtau
-    mdl.y = ty .*= invtau
-    mdl.z = tz .*= invtau
+    mdl.x = tx ./= tau
+    mdl.s = ts ./= tau
+    mdl.y = ty ./= tau
+    mdl.z = tz ./= tau
     mdl.tau = tau
     mdl.kap = kap
     mdl.mu = mu
     mdl.niters = iter
     mdl.solvetime = time() - starttime
+
+    mdl.verbose && println("\nstatus is $(mdl.status) after $iter iterations and $(trunc(mdl.solvetime, digits=3)) seconds\n")
 
     return nothing
 end
