@@ -1,0 +1,9 @@
+# n = 3
+signal_ratio,refrmse,deg,ignore_mono,ignore_conv,use_wsos,rmse,tm,status
+0.0,0.0,2,false,false,true,0.21122135210748788,1.628698648,Success
+0.0,0.0,2,false,false,false,0.21122136737155936,0.48710572,Success
+0.0,0.0,3,false,false,true,0.2112213497141947,1.336616239,Success
+0.0,0.0,3,false,false,false,0.21122134743132903,2.300680297,Success
+0.0,0.0,4,false,false,true,0.2112213441687444,81.670537911,Success
+0.0,0.0,4,false,false,false,0.21122134645946194,5.897596625,Success
+0.0,0.0,5,false,false,true,0.21122134454399732,84.898103885,Success

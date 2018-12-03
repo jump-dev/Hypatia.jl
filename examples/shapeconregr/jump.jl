@@ -23,6 +23,7 @@ using DynamicPolynomials
 using SumOfSquares
 using PolyJuMP
 using MathOptInterfaceMosek
+using LinearAlgebra
 using Test
 include(joinpath(dirname(@__DIR__), "utils", "semialgebraicsets.jl"))
 
@@ -92,7 +93,7 @@ function build_shapeconregr_PSD(
     dp = [DynamicPolynomials.differentiate(p, x[i]) for i in 1:n]
 
     if !ignore_mono
-        mono_bss = Hypatia.Hypatia.get_bss(mono_dom, x)
+        mono_bss = get_domain_inequalities(mono_dom, x)
         for j in 1:n
             if !iszero(sd.mono_profile[j])
                 @constraint(model, mono_profile[j] * dp[j] >= 0, domain=mono_bss)
@@ -102,7 +103,7 @@ function build_shapeconregr_PSD(
 
     # TODO think about what it means if wsos polynomials have degree > 2
     if !ignore_conv
-        conv_bss = Hypatia.Hypatia.get_bss(conv_dom, x)
+        conv_bss = get_domain_inequalities(conv_dom, x)
         Hp = [DynamicPolynomials.differentiate(dp[i], x[j]) for i in 1:n, j in 1:n]
         @SDconstraint(model, conv_profile * Hp >= 0, domain=conv_bss)
     end
@@ -165,6 +166,7 @@ function build_shapeconregr_WSOS(
     if !ignore_mono
         println("monotonicity constraint")
         (mono_U, mono_pts, mono_P0, mono_PWts, _) = Hypatia.interpolate(mono_dom, d, sample=sample_pts, sample_factor=50)
+        @show length(mono_PWts)
         mono_wsos_cone = WSOSPolyInterpCone(mono_U, [mono_P0, mono_PWts...])
         @elapsed for j in 1:n
             if abs(mono_profile[j]) > 0.5
@@ -176,8 +178,9 @@ function build_shapeconregr_WSOS(
     # convexity
     if !ignore_conv
         println("convexity constraint")
-        full_conv_dom = Hypatia.addfreevars(conv_dom)
-        (conv_U, conv_pts, conv_P0, conv_PWts, _) = Hypatia.interp_sample(full_conv_dom, d+1, sample=sample_pts, pts_factor=50)
+        full_conv_dom = Hypatia.add_free_vars(conv_dom)
+        (conv_U, conv_pts, conv_P0, conv_PWts, _) = Hypatia.interpolate(full_conv_dom, d+1, sample=sample_pts, sample_factor=50)
+        @show length(conv_PWts)
 
         conv_wsos_cone = WSOSPolyInterpCone(conv_U, [conv_P0, conv_PWts...])
         Hp = [DynamicPolynomials.differentiate(dp[i], x[j]) for i in 1:n, j in 1:n]

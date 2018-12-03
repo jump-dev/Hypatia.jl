@@ -171,6 +171,19 @@ function interpolate(
         return wsos_box_params(dom, dimension(dom), d, calc_w=calc_w)
     end
 end
+function interpolate(
+    dom::SemiFreeDomain,
+    d::Int;
+    sample::Bool = false,
+    calc_w::Bool = false,
+    sample_factor::Int = 10,
+    )
+    if sample
+        return wsos_sample_params(dom, d, calc_w=calc_w, sample_factor=sample_factor)
+    else
+        return wsos_box_params(dom, dimension(dom), d, calc_w=calc_w)
+    end
+end
 
 # slow but high-quality hyperrectangle/box point selections
 function wsos_box_params(dom::Box, n::Int, d::Int; calc_w::Bool=false)
@@ -187,6 +200,25 @@ function wsos_box_params(dom::Box, n::Int, d::Int; calc_w::Bool=false)
     Wtsfun = (j -> sqrt.(1.0 .- abs2.(pts[:,j]))*pscale[j])
     PWts = [Wtsfun(j) .* P0sub for j in 1:n]
     trpts = pts .* pscale' .+ 0.5*(dom.u + dom.l)'
+
+    return (U=U, pts=trpts, P0=P0, PWts=PWts, w=w)
+end
+
+# TODO properly fix this in master
+function wsos_box_params(dom::SemiFreeDomain, n::Int, d::Int; calc_w::Bool=false)
+    if n == 1
+        (U, pts, P0, P0sub, w) = cheb2_data(d, calc_w)
+    elseif n == 2
+        (U, pts, P0, P0sub, w) = padua_data(d, calc_w) # or approxfekete_data(n, d)
+    elseif n > 2
+        (U, pts, P0, P0sub, w) = approxfekete_data(n, d, calc_w)
+    end
+    # difference with sampling functions is that P0 is always formed using points in [-1, 1]
+    # scale and shift points, get WSOS matrices
+    pscale = 0.5*(repeat(dom.sampling_region.u, 2) - repeat(dom.sampling_region.l, 2))
+    Wtsfun = (j -> sqrt.(1.0 .- abs2.(pts[:,j]))*pscale[j])
+    PWts = [Wtsfun(j) .* P0sub for j in 1:div(n,2)]
+    trpts = pts .* pscale' .+ 0.5*(repeat(dom.sampling_region.u, 2) + repeat(dom.sampling_region.l, 2))'
 
     return (U=U, pts=trpts, P0=P0, PWts=PWts, w=w)
 end
@@ -209,7 +241,7 @@ end
 
 function cheb2_data(d::Int, calc_w::Bool)
     @assert d > 1
-    U = d + 1
+    (L, U) = get_LU(1, d)
 
     # Chebyshev points for degree 2d
     pts = reshape(cheb2_pts(U), :, 1)

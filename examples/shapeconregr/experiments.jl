@@ -77,20 +77,26 @@ end
 
 
 # synthetic data
-function runexp1()
-    n = 2
-    signal_options = [0.0]
+function runexp12(i::Int)
+    n = 3
+    signal_options = [0.0; 400.0]
     shape_options = [false]
     wsos_options = [true, false]
-    deg_options = 2:7
+    deg_options = 2:6
     outfilename = joinpath(@__DIR__(), "shapeconregr_$(round(Int, time()/10)).csv")
 
     open(outfilename, "w") do f
-        println(f, "# n = $n")
+        println(f, "# n = $n, sample_pts = $sample_pts, use_leastsqobj = $use_leastsqobj, testfunc = $i")
         println(f, "signal_ratio,refrmse,deg,ignore_mono,ignore_conv,use_wsos,rmse,tm,status")
         # degrees of freedom for data
         for signal_ratio in signal_options
-            (refrmse, X, y, shape_data) = exprmnt1_data(n=n, signal_ratio=signal_ratio)
+            if i == 1
+                (refrmse, X, y, shape_data) = exprmnt1_data(n=n, signal_ratio=signal_ratio)
+            elseif i == 2
+                (refrmse, X, y, shape_data) = exprmnt2_data(n=n, signal_ratio=signal_ratio)
+            else
+                error()
+            end
             # degrees of freedom in the model
             for deg in deg_options, ignore_mono in shape_options, ignore_conv in shape_options, use_wsos in wsos_options
                 println("running ", "signal_ratio=$signal_ratio, deg=$deg, ignore_mono=$ignore_mono, ignore_conv=$ignore_conv, use_wsos=$use_wsos")
@@ -167,20 +173,24 @@ function runexp3()
 end
 
 runmakeplot = false
-sample_pts = false
-use_leastsqobj = false
-# p = runexp1()
+sample_pts = true
+use_leastsqobj = true
+p = runexp12(2)
 
 # n = 5, d = 6 , use convexity both struggle
 # n = 4, d = 5, use both mosek
 # small n high d to replicate papp numerical difficulties
+# exprmnt2 works n=2,deg=4,domain0->1, any objtype, sampling method, no noise
+# go up to deg 5, noise 400 still ok
+# with no noise, deg 6 ok
+# exp2 with n=5, deg=5 worked with ls
 
-n = 2
-# degrees of freedom for data
-signal_ratio = 0.0
-(refrmse, X, y, shape_data) = exprmnt2_data(n=n, signal_ratio=signal_ratio)
-# degrees of freedom in the model
-deg = 4; ignore_mono = false; ignore_conv = false; use_wsos = true
-@time (mdl, rmse, tm, p) = exprmnt_mdl(X, y, shape_data, deg=deg, use_wsos=use_wsos, ignore_mono=ignore_mono, ignore_conv=ignore_conv)
-filename = "" # joinpath(@__DIR__(), "mosek_both.pdf")
-p = makeplot(p, X, y, filename=filename, l=(0.5,0.5), u=(2.0,2.0))
+# n = 1
+# # degrees of freedom for data
+# signal_ratio = 100.0
+# (refrmse, X, y, shape_data) = exprmnt2_data(n=n, signal_ratio=signal_ratio)
+# # degrees of freedom in the model
+# deg = 5; ignore_mono = false; ignore_conv = true; use_wsos = true
+# @time (mdl, rmse, tm, p) = exprmnt_mdl(X, y, shape_data, deg=deg, use_wsos=use_wsos, ignore_mono=ignore_mono, ignore_conv=ignore_conv)
+# filename = "" # joinpath(@__DIR__(), "mosek_both.pdf")
+# pl = makeplot(p, X, y, filename=filename, l=(0.5,0.5), u=(2.0,2.0))
