@@ -69,9 +69,9 @@ println("matrices A, G will be $(usedense ? "dense" : "sparse")")
 
 # Hypatia options
 options = Dict()
-# options[:maxiter] = 300
 options[:verbose] = true
-# options[:timelimit] = # TODO args option
+options[:timelimit] = 1.8e3
+options[:maxiter] = 1000
 
 println("Hypatia options are:")
 for (k, v) in options
