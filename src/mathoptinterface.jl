@@ -14,6 +14,7 @@ WSOSPolyInterpCone(dimension::Int, ipwt::Vector{Matrix{Float64}}) = WSOSPolyInte
 mutable struct Optimizer <: MOI.AbstractOptimizer
     mdl::Model
     verbose::Bool
+    timelimit::Float64
     lscachetype
     usedense::Bool
     c::Vector{Float64}          # linear cost vector, size n
@@ -40,10 +41,11 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     pobj::Float64
     dobj::Float64
 
-    function Optimizer(mdl::Model, verbose::Bool, lscachetype, usedense::Bool)
+    function Optimizer(mdl::Model, verbose::Bool, timelimit::Float64, lscachetype, usedense::Bool)
         opt = new()
         opt.mdl = mdl
         opt.verbose = verbose
+        opt.timelimit = timelimit
         opt.lscachetype = lscachetype
         opt.usedense = usedense
         return opt
@@ -52,12 +54,13 @@ end
 
 Optimizer(;
     verbose::Bool = false,
+    timelimit::Float64 = 3.6e3, # TODO should be Inf
     lscachetype = QRSymmCache,
     usedense::Bool = true,
     tolrelopt::Float64 = 1e-6,
     tolabsopt::Float64 = 1e-7,
     tolfeas::Float64 = 1e-7,
-    ) = Optimizer(Model(verbose=verbose, tolrelopt=tolrelopt, tolabsopt=tolabsopt, tolfeas=tolfeas), verbose, lscachetype, usedense)
+    ) = Optimizer(Model(verbose=verbose, timelimit=timelimit, tolrelopt=tolrelopt, tolabsopt=tolabsopt, tolfeas=tolfeas), verbose, timelimit, lscachetype, usedense)
 
 MOI.get(::Optimizer, ::MOI.SolverName) = "Hypatia"
 
@@ -616,6 +619,8 @@ function MOI.get(opt::Optimizer, ::MOI.TerminationStatus)
         return MOI.NumericalError
     elseif opt.status == :IterationLimit
         return MOI.IterationLimit
+    elseif opt.status == :TimeLimit
+        return MOI.TimeLimit
     else
         return MOI.OtherError
     end

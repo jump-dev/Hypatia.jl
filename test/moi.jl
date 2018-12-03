@@ -63,6 +63,7 @@ function testmoi(; verbose, lscachetype, usedense)
     optimizer = MOIU.CachingOptimizer(HypatiaModelData{Float64}(),
         Hypatia.Optimizer(
             verbose = verbose,
+            timelimit = 2e1,
             lscachetype = lscachetype,
             usedense = usedense,
             tolrelopt = 2e-8,

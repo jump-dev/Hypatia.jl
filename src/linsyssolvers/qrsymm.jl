@@ -244,7 +244,7 @@ function solvelinsys6!(
 
         success = hypatia_sysvx!(L.Q2divcopy, L.Q2GHGQ2, L.Q2div, L.lsferr, L.lsberr, L.lswork, L.lsiwork, L.lsAF, L.ipiv)
         if !success
-            println("linear system matrix factorization failed")
+            # println("linear system matrix factorization failed")
             mul!(L.Q2GHGQ2, L.GQ2', L.HGQ2)
             L.Q2GHGQ2 += 1e-4I
             mul!(L.Q2div, L.Q2', L.GHGQ1x)
