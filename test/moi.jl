@@ -28,7 +28,7 @@ MOIU.@model(HypatiaModelData,
     )
 
 config = MOIT.TestConfig(
-    atol = 1.2e-4,
+    atol = 1e-4,
     rtol = 1e-4,
     solve = true,
     query = true,
@@ -65,9 +65,9 @@ function testmoi(; verbose, lscachetype, usedense)
             verbose = verbose,
             lscachetype = lscachetype,
             usedense = usedense,
-            tolrelopt = 1e-8,
-            tolabsopt = 5e-8,
-            tolfeas = 1e-7,
+            tolrelopt = 2e-8,
+            tolabsopt = 2e-8,
+            tolfeas = 1e-8,
             )
         )
     @testset "unit tests" begin
