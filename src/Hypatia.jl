@@ -7,8 +7,8 @@ module Hypatia
     using LinearAlgebra
     using SparseArrays
 
-    # using LinearAlgebra: BlasInt
-    # include("lapack.jl")
+    using LinearAlgebra: BlasInt
+    include("lapack.jl")
 
     import FFTW
     import Combinatorics

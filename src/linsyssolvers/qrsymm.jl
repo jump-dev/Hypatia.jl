@@ -20,25 +20,25 @@ mutable struct QRSymmCache <: LinSysCache
     Q2
     RiQ1
 
-    HG
-    GHG
-    GHGQ2
-    Q2GHGQ2
     bxGHbz
     Q1x
-    rhs
+    GQ1x
+    HGQ1x
+    GHGQ1x
     Q2div
-    Q2divcopy
+    GQ2
+    HGQ2
+    Q2GHGQ2
     Q2x
-    GHGxi
+    Gxi
     HGxi
+    GHGxi
 
     zi
-    z1
-    z2
     yi
     xi
 
+    Q2divcopy
     lsferr
     lsberr
     lswork
@@ -47,7 +47,6 @@ mutable struct QRSymmCache <: LinSysCache
     lsS
     ipiv
 
-    # for iterative only
     # cgstate
     # lprecond
     # Q2sol
@@ -81,40 +80,39 @@ mutable struct QRSymmCache <: LinSysCache
         L.Q2 = Q2
         L.RiQ1 = RiQ1
 
-        # L.GQ2 = G*Q2 # TODO calculate H*(G*Q2)
-        L.HG = Matrix{Float64}(undef, q, n) # TODO don't enforce dense on some
-        L.GHG = Matrix{Float64}(undef, n, n)
-        L.GHGQ2 = Matrix{Float64}(undef, n, nmp)
-        L.Q2GHGQ2 = Matrix{Float64}(undef, nmp, nmp)
         L.bxGHbz = Matrix{Float64}(undef, n, 2)
-        L.Q1x = Matrix{Float64}(undef, n, 2)
-        L.rhs = Matrix{Float64}(undef, n, 2)
+        L.Q1x = similar(L.bxGHbz)
+        L.GQ1x = Matrix{Float64}(undef, q, 2)
+        L.HGQ1x = similar(L.GQ1x)
+        L.GHGQ1x = Matrix{Float64}(undef, n, 2)
         L.Q2div = Matrix{Float64}(undef, nmp, 2)
-        L.Q2divcopy = Matrix{Float64}(undef, nmp, 2)
-        L.Q2x = Matrix{Float64}(undef, n, 2)
-        L.GHGxi = Matrix{Float64}(undef, n, 2)
-        L.HGxi = Matrix{Float64}(undef, q, 2)
+        L.GQ2 = G*Q2
+        L.HGQ2 = similar(L.GQ2)
+        L.Q2GHGQ2 = Matrix{Float64}(undef, nmp, nmp)
+        L.Q2x = similar(L.Q1x)
+        L.Gxi = similar(L.GQ1x)
+        L.HGxi = similar(L.Gxi)
+        L.GHGxi = similar(L.GHGQ1x)
 
         L.zi = Matrix{Float64}(undef, q, 2)
-        L.z1 = view(L.zi, :, 1)
-        L.z2 = view(L.zi, :, 2)
         L.yi = Matrix{Float64}(undef, p, 2)
         L.xi = Matrix{Float64}(undef, n, 2)
 
-        # L.lsferr = Vector{Float64}(undef, 2)
-        # L.lsberr = Vector{Float64}(undef, 2)
-        # L.lsAF = Matrix{Float64}(undef, nmp, nmp)
-
+        # for linear system solve with refining
+        L.Q2divcopy = similar(L.Q2div)
+        L.lsferr = Vector{Float64}(undef, 2)
+        L.lsberr = Vector{Float64}(undef, 2)
+        L.lsAF = Matrix{Float64}(undef, nmp, nmp)
+        # sysvx
+        L.lswork = Vector{Float64}(undef, 5*nmp)
+        L.lsiwork = Vector{BlasInt}(undef, nmp)
+        L.ipiv = Vector{BlasInt}(undef, nmp)
         # # posvx
         # L.lswork = Vector{Float64}(undef, 3*nmp)
         # L.lsiwork = Vector{BlasInt}(undef, nmp)
         # L.lsS = Vector{Float64}(undef, nmp)
 
-        # # sysvx
-        # L.lswork = Vector{Float64}(undef, 5*nmp)
-        # L.lsiwork = Vector{BlasInt}(undef, nmp)
-        # L.ipiv = Vector{BlasInt}(undef, nmp)
-
+        # # for iterative only
         # if useiterative
         #     cgu = zeros(nmp)
         #     L.cgstate = IterativeSolvers.CGStateVariables{Float64, Vector{Float64}}(cgu, similar(cgu), similar(cgu))
@@ -126,6 +124,7 @@ mutable struct QRSymmCache <: LinSysCache
     end
 end
 
+
 QRSymmCache(
     c::Vector{Float64},
     A::AbstractMatrix{Float64},
@@ -136,6 +135,7 @@ QRSymmCache(
     useiterative::Bool = false,
     userefine::Bool = false,
     ) = error("to use a QRSymmCache for linear system solves, the data must be preprocessed and Q2 and RiQ1 must be passed into the QRSymmCache constructor")
+
 
 # solve two symmetric systems and combine the solutions for x, y, z, s, kap, tau
 # TODO update math description
@@ -151,112 +151,133 @@ function solvelinsys6!(
     tau::Float64,
     L::QRSymmCache,
     )
-    # calculate or factorize LHS of symmetric positive definite linear system
-    # TODO multiply H by G*Q2 (lower dimension than G)
-    for k in eachindex(L.cone.prmtvs)
-        if L.cone.prmtvs[k].usedual
-            calcHiarr_prmtv!(view(L.HG, L.cone.idxs[k], :), view(L.G, L.cone.idxs[k], :), L.cone.prmtvs[k])
-            @. @views L.HG[L.cone.idxs[k], :] /= mu
-        else
-            calcHarr_prmtv!(view(L.HG, L.cone.idxs[k], :), view(L.G, L.cone.idxs[k], :), L.cone.prmtvs[k])
-            @. @views L.HG[L.cone.idxs[k], :] *= mu
-        end
-    end
-    mul!(L.GHG, L.G', L.HG)
-    mul!(L.GHGQ2, L.GHG, L.Q2)
-    mul!(L.Q2GHGQ2, L.Q2', L.GHGQ2)
-
-    (zi, z1, z2, yi, xi) = (L.zi, L.z1, L.z2, L.yi, L.xi)
+    (zi, yi, xi) = (L.zi, L.yi, L.xi)
     @. yi[:,1] = L.b
     @. yi[:,2] = -rhs_ty
     @. xi[:,1] = -L.c
     @. xi[:,2] = rhs_tx
+    z1 = view(zi, :, 1)
+    z2 = view(zi, :, 2)
 
     # calculate z2
     @. z2 = -rhs_tz
     for k in eachindex(L.cone.prmtvs)
+        a1k = view(z1, L.cone.idxs[k])
+        a2k = view(z2, L.cone.idxs[k])
+        a3k = view(rhs_ts, L.cone.idxs[k])
         if L.cone.prmtvs[k].usedual
-            @. @views z1[L.cone.idxs[k]] = z2[L.cone.idxs[k]] - rhs_ts[L.cone.idxs[k]]
-            calcHiarr_prmtv!(view(z2, L.cone.idxs[k]), view(z1, L.cone.idxs[k]), L.cone.prmtvs[k])
-            @. @views z2[L.cone.idxs[k]] /= mu
-        elseif !iszero(rhs_ts[L.cone.idxs[k]]) # TODO rhs_ts = 0 for correction steps, so can just check if doing correction
-            calcHarr_prmtv!(view(z1, L.cone.idxs[k]), view(rhs_ts, L.cone.idxs[k]), L.cone.prmtvs[k])
-            @. @views z2[L.cone.idxs[k]] -= mu*z1[L.cone.idxs[k]]
-            # @. @views z2[L.cone.idxs[k]] -= z1[L.cone.idxs[k]]
+            @. a1k = a2k - a3k
+            calcHiarr_prmtv!(a2k, a1k, L.cone.prmtvs[k])
+            a2k ./= mu
+        elseif !iszero(a3k) # TODO rhs_ts = 0 for correction steps, so can just check if doing correction
+            calcHarr_prmtv!(a1k, a3k, L.cone.prmtvs[k])
+            @. a2k -= mu*a1k
         end
     end
 
-    # calculate z1 TODO don't need this if h is zero (can check once when creating cache)
-    for k in eachindex(L.cone.prmtvs)
-        if L.cone.prmtvs[k].usedual
-            calcHiarr_prmtv!(view(z1, L.cone.idxs[k]), view(L.h, L.cone.idxs[k]), L.cone.prmtvs[k])
-            @. @views z1[L.cone.idxs[k]] /= mu
-        else
-            calcHarr_prmtv!(view(z1, L.cone.idxs[k]), view(L.h, L.cone.idxs[k]), L.cone.prmtvs[k])
-            @. @views z1[L.cone.idxs[k]] *= mu
+    # calculate z1
+    if iszero(L.h) # TODO can check once when creating cache
+        z1 .= 0.0
+    else
+        for k in eachindex(L.cone.prmtvs)
+            a1k = view(L.h, L.cone.idxs[k])
+            a2k = view(z1, L.cone.idxs[k])
+            if L.cone.prmtvs[k].usedual
+                calcHiarr_prmtv!(a2k, a1k, L.cone.prmtvs[k])
+                a2k ./= mu
+            else
+                calcHarr_prmtv!(a2k, a1k, L.cone.prmtvs[k])
+                a2k .*= mu
+            end
         end
     end
 
     # bxGHbz = bx + G'*Hbz
     mul!(L.bxGHbz, L.G', zi)
     @. L.bxGHbz += xi
+
     # Q1x = Q1*Ri'*by
     mul!(L.Q1x, L.RiQ1', yi)
+
     # Q2x = Q2*(K22_F\(Q2'*(bxGHbz - GHG*Q1x)))
-    mul!(L.rhs, L.GHG, L.Q1x)
-    @. L.rhs = L.bxGHbz - L.rhs
-    mul!(L.Q2divcopy, L.Q2', L.rhs)
+    mul!(L.GQ1x, L.G, L.Q1x)
+    for k in eachindex(L.cone.prmtvs)
+        a1k = view(L.GQ1x, L.cone.idxs[k], :)
+        a2k = view(L.HGQ1x, L.cone.idxs[k], :)
+        if L.cone.prmtvs[k].usedual
+            calcHiarr_prmtv!(a2k, a1k, L.cone.prmtvs[k])
+            a2k ./= mu
+        else
+            calcHarr_prmtv!(a2k, a1k, L.cone.prmtvs[k])
+            a2k .*= mu
+        end
+    end
+    mul!(L.GHGQ1x, L.G', L.HGQ1x)
+    @. L.GHGQ1x = L.bxGHbz - L.GHGQ1x
+    mul!(L.Q2div, L.Q2', L.GHGQ1x)
 
     if size(L.Q2div, 1) > 0
-        F = bunchkaufman!(Symmetric(L.Q2GHGQ2), true, check=false)
-        if !issuccess(F)
-            println("linear system matrix factorization failed")
-            mul!(L.Q2GHGQ2, L.Q2', L.GHGQ2)
-            L.Q2GHGQ2 += 1e-4I
-            F = bunchkaufman!(Symmetric(L.Q2GHGQ2), true, check=false)
-            if !issuccess(F)
-                error("could not fix failure of positive definiteness; terminating")
+        for k in eachindex(L.cone.prmtvs)
+            a1k = view(L.GQ2, L.cone.idxs[k], :)
+            a2k = view(L.HGQ2, L.cone.idxs[k], :)
+            if L.cone.prmtvs[k].usedual
+                calcHiarr_prmtv!(a2k, a1k, L.cone.prmtvs[k])
+                a2k ./= mu
+            else
+                calcHarr_prmtv!(a2k, a1k, L.cone.prmtvs[k])
+                a2k .*= mu
             end
         end
-        mul!(L.Q2div, L.Q2', L.rhs)
-        ldiv!(F, L.Q2div)
+        mul!(L.Q2GHGQ2, L.GQ2', L.HGQ2)
 
-        # success = hypatia_sysvx!(L.Q2div, L.Q2GHGQ2, L.Q2divcopy, L.lsferr, L.lsberr, L.lswork, L.lsiwork, L.lsAF, L.ipiv)
-        # if !success
+        # F = bunchkaufman!(Symmetric(L.Q2GHGQ2), true, check=false)
+        # if !issuccess(F)
         #     println("linear system matrix factorization failed")
-        #     mul!(L.Q2GHGQ2, L.Q2', L.GHGQ2)
-        #     L.Q2GHGQ2 += 1e-4I
-        #     mul!(L.Q2divcopy, L.Q2', L.rhs)
-        #
-        #     success = hypatia_sysvx!(L.Q2div, L.Q2GHGQ2, L.Q2divcopy, L.lsferr, L.lsberr, L.lswork, L.lsiwork, L.lsAF, L.ipiv)
-        #     if !success
-        #         error("could not fix linear system solve failure; terminating")
-        #     end
-        # end
-
-        # success = hypatia_posvx!(L.Q2div, L.Q2GHGQ2, L.Q2divcopy, L.lsferr, L.lsberr, L.lswork, L.lsiwork, L.lsAF, L.lsS)
-        # if !success
-        #     println("linear system matrix was not positive definite")
-        #     mul!(L.Q2GHGQ2, L.Q2', L.GHGQ2)
-        #     L.Q2GHGQ2 += 1e-4I
+        #     mul!(L.Q2GHGQ2, L.GQ2', L.HGQ2)
+        #     L.Q2GHGQ2 += 1e-6I
         #     F = bunchkaufman!(Symmetric(L.Q2GHGQ2), true, check=false)
         #     if !issuccess(F)
         #         error("could not fix failure of positive definiteness; terminating")
         #     end
-        #     mul!(L.Q2div, L.Q2', L.rhs)
-        #     ldiv!(F, L.Q2div)
         # end
-    end
+        # ldiv!(F, L.Q2div)
 
+        success = hypatia_sysvx!(L.Q2divcopy, L.Q2GHGQ2, L.Q2div, L.lsferr, L.lsberr, L.lswork, L.lsiwork, L.lsAF, L.ipiv)
+        if !success
+            println("linear system matrix factorization failed")
+            mul!(L.Q2GHGQ2, L.GQ2', L.HGQ2)
+            L.Q2GHGQ2 += 1e-4I
+            mul!(L.Q2div, L.Q2', L.GHGQ1x)
+            success = hypatia_sysvx!(L.Q2divcopy, L.Q2GHGQ2, L.Q2div, L.lsferr, L.lsberr, L.lswork, L.lsiwork, L.lsAF, L.ipiv)
+            if !success
+                error("could not fix linear system solve failure; terminating")
+            end
+        end
+        L.Q2div .= L.Q2divcopy
+    end
     mul!(L.Q2x, L.Q2, L.Q2div)
+
     # xi = Q1x + Q2x
     @. xi = L.Q1x + L.Q2x
+
     # yi = Ri*Q1'*(bxGHbz - GHG*xi)
-    mul!(L.GHGxi, L.GHG, xi)
+    mul!(L.Gxi, L.G, xi)
+    for k in eachindex(L.cone.prmtvs)
+        a1k = view(L.Gxi, L.cone.idxs[k], :)
+        a2k = view(L.HGxi, L.cone.idxs[k], :)
+        if L.cone.prmtvs[k].usedual
+            calcHiarr_prmtv!(a2k, a1k, L.cone.prmtvs[k])
+            a2k ./= mu
+        else
+            calcHarr_prmtv!(a2k, a1k, L.cone.prmtvs[k])
+            a2k .*= mu
+        end
+    end
+    mul!(L.GHGxi, L.G', L.HGxi)
     @. L.bxGHbz -= L.GHGxi
     mul!(yi, L.RiQ1, L.bxGHbz)
+
     # zi = HG*xi - Hbz
-    mul!(L.HGxi, L.HG, xi)
     @. zi = L.HGxi - zi
 
     # combine

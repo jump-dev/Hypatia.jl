@@ -64,4 +64,4 @@ end
 
 run_JuMP_envelope_sampleinterp_box() = run_JuMP_envelope(Hypatia.Box(-ones(2), ones(2)))
 run_JuMP_envelope_sampleinterp_ball() = run_JuMP_envelope(Hypatia.Ball(zeros(2), sqrt(2)))
-run_JuMP_envelope_boxinterp() = run_JuMP_envelope(Hypatia.Box(-ones(2), ones(2)), false)
+run_JuMP_envelope_boxinterp() = run_JuMP_envelope(Hypatia.Box(-ones(2), ones(2)), sample=false)

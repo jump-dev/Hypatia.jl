@@ -209,7 +209,7 @@ end
 
 function cheb2_data(d::Int, calc_w::Bool)
     @assert d > 1
-    U = d + 1
+    U = 2d + 1
 
     # Chebyshev points for degree 2d
     pts = reshape(cheb2_pts(U), :, 1)
