@@ -1,0 +1,16 @@
+# tough problem instances
+
+# predictor fail 58d19d5
+4x3_2bars_3scen
+bridge_3x7_2bars
+rt_4x3_2bars_3scen
+rt_bridge_3x7_2bars
+
+# failed in factorization 58d19d5
+clay0203h
+infeas_clean_10_10_39
+infeas_messy_10_10_74
+syn15m02m
+
+# many iterations 58d19d
+nql30
