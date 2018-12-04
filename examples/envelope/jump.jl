@@ -11,6 +11,7 @@ using JuMP
 using LinearAlgebra
 using Random
 using Test
+using TimerOutputs
 
 function build_JuMP_envelope(
     npoly::Int,
@@ -39,14 +40,18 @@ function build_JuMP_envelope(
     return (model, fpv)
 end
 
-function run_JuMP_envelope(dom::Hypatia.InterpDomain; sample::Bool=true)
-    (npoly, deg, d) =
-        # (2, 3, 4)
-        # (2, 3, 4)
-        (2, 3, 4,)
-
+function run_JuMP_envelope(
+    npoly::Int,
+    deg::Int,
+    d::Int,
+    dom::Hypatia.InterpDomain;
+    sample::Bool = true,
+    )
     (model, fpv) = build_JuMP_envelope(npoly, deg, d, dom, sample=sample)
+
+    reset_timer!()
     JuMP.optimize!(model)
+    print_timer()
 
     term_status = JuMP.termination_status(model)
     pobj = JuMP.objective_value(model)
@@ -62,6 +67,6 @@ function run_JuMP_envelope(dom::Hypatia.InterpDomain; sample::Bool=true)
     return nothing
 end
 
-run_JuMP_envelope_sampleinterp_box() = run_JuMP_envelope(Hypatia.Box(-ones(2), ones(2)))
-run_JuMP_envelope_sampleinterp_ball() = run_JuMP_envelope(Hypatia.Ball(zeros(2), sqrt(2)))
-run_JuMP_envelope_boxinterp() = run_JuMP_envelope(Hypatia.Box(-ones(2), ones(2)), sample=false)
+run_JuMP_envelope_sampleinterp_box() = run_JuMP_envelope(2, 3, 4, Hypatia.Box(-ones(2), ones(2)))
+run_JuMP_envelope_sampleinterp_ball() = run_JuMP_envelope(2, 3, 4, Hypatia.Ball(zeros(2), sqrt(2)))
+run_JuMP_envelope_boxinterp() = run_JuMP_envelope(2, 3, 4, Hypatia.Box(-ones(2), ones(2)), sample=false)

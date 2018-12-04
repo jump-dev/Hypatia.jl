@@ -3,6 +3,8 @@ Copyright 2018, Chris Coey and contributors
 =#
 
 module Hypatia
+    using TimerOutputs
+
     using Printf
     using LinearAlgebra
     using SparseArrays

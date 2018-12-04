@@ -24,7 +24,6 @@ mutable struct WSOSPolyInterp <: PrimitiveCone
     tmp2::Vector{Matrix{Float64}}
     tmp3::Matrix{Float64}
     scal::Float64
-    # d::Vector{POSVXData}
 
     function WSOSPolyInterp(dim::Int, ipwt::Vector{Matrix{Float64}}, isdual::Bool)
         for ipwtj in ipwt
@@ -40,7 +39,6 @@ mutable struct WSOSPolyInterp <: PrimitiveCone
         prmtv.tmp1 = [similar(ipwt[1], size(ipwtj, 2), size(ipwtj, 2)) for ipwtj in ipwt]
         prmtv.tmp2 = [similar(ipwt[1], size(ipwtj, 2), dim) for ipwtj in ipwt]
         prmtv.tmp3 = similar(ipwt[1], dim, dim)
-        # prmtv.d = [POSVXData(prmtv.tmp1[j], prmtv.tmp2[j]) for j in eachindex(ipwt)]
         return prmtv
     end
 end
@@ -66,31 +64,40 @@ function incone_prmtv(prmtv::WSOSPolyInterp, scal::Float64)
         tmp2j = prmtv.tmp2[j]
 
         # tmp1j = ipwtj'*Diagonal(pnt)*ipwtj
-        mul!(tmp2j, ipwtj', Diagonal(newpnt))
+    # @timeit "inner matrix" begin
+
+        # mul!(tmp2j, ipwtj', Diagonal(newpnt)) # TODO dispatches to an extremely inefficient method
+        @. tmp2j = ipwtj' * newpnt'
         mul!(tmp1j, tmp2j, ipwtj)
+
+    # end
 
         # pivoted cholesky factorization method
         F = cholesky!(Symmetric(tmp1j, :L), Val(true), check=false)
+        # @timeit "cholesky" F = cholesky!(Symmetric(tmp1j, :L), Val(true), check=false)
         if !isposdef(F)
             return false
         end
+
+    # @timeit "backwards solve" begin
+
         tmp2j .= view(ipwtj', F.p, :)
         ldiv!(F.L, tmp2j)
         mul!(tmp3, tmp2j', tmp2j)
 
-        # posvx solve method
-        # tmp2j .= ipwtj' # TODO eliminate by transposing in construction
-        # PDPiP = similar(tmp2j)
-        # success = hypatia_posvx!(PDPiP, tmp1j, tmp2j, prmtv.d[j])
-        # if !success
-        #     return false
-        # end
-        # mul!(tmp3, ipwtj, PDPiP)
+        # @timeit "permute" tmp2j .= view(ipwtj', F.p, :)
+        # @timeit "ldiv" ldiv!(F.L, tmp2j)
+        # @timeit "gemm" mul!(tmp3, tmp2j', tmp2j)
+        #
+    # end
+
+    # @timeit "gradient and Hessian" begin
 
         for i in eachindex(prmtv.g)
             prmtv.g[i] -= tmp3[i,i]
         end
         @. prmtv.H += abs2(tmp3)
+    # end
     end
 
     return factH(prmtv)

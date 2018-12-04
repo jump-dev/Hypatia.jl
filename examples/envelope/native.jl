@@ -14,6 +14,7 @@ using SparseArrays
 using DelimitedFiles
 using Random
 using Test
+using TimerOutputs
 
 function build_envelope(
     npoly::Int,
@@ -78,17 +79,21 @@ function run_envelope(primal_wsos::Bool, usedense::Bool)
     # select dimension and SOS degree (to be squared)
     (c, A, b, G, h, cone) =
         # build_envelope(2, 5, 1, 5, use_data=true, primal_wsos=primal_wsos, usedense=usedense)
-        build_envelope(2, 5, 2, 6, primal_wsos=primal_wsos, usedense=usedense)
-        # build_envelope(3, 5, 3, 5, primal_wsos=primal_wsos, usedense=usedense)
+        # build_envelope(2, 5, 2, 6, primal_wsos=primal_wsos, usedense=usedense)
+        build_envelope(2, 7, 3, 7, primal_wsos=primal_wsos, usedense=usedense)
         # build_envelope(2, 30, 1, 30, primal_wsos=primal_wsos, usedense=usedense)
+        # build_envelope(2, 3, 1, 3, primal_wsos=primal_wsos, usedense=usedense)
 
     Hypatia.check_data(c, A, b, G, h, cone)
     (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = Hypatia.preprocess_data(c, A, b, G, useQR=true)
     L = Hypatia.QRSymmCache(c1, A1, b1, G1, h, cone, Q2, RiQ1)
 
-    mdl = Hypatia.Model(maxiter=100, verbose=true)
+    mdl = Hypatia.Model(maxiter=200, verbose=true)
     Hypatia.load_data!(mdl, c1, A1, b1, G1, h, cone, L)
+
+    reset_timer!()
     Hypatia.solve!(mdl)
+    print_timer()
 
     x = zeros(length(c))
     x[dukeep] = Hypatia.get_x(mdl)

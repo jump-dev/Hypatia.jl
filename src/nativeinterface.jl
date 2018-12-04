@@ -297,6 +297,7 @@ end
 
 # solve using predictor-corrector algorithm based on homogeneous self-dual embedding
 function solve!(mdl::Model)
+@timeit "solve" begin
     starttime = time()
     (c, A, b, G, h, cone, L) = (mdl.c, mdl.A, mdl.b, mdl.G, mdl.h, mdl.cone, mdl.L)
     (n, p, q) = (length(c), length(b), length(h))
@@ -323,6 +324,8 @@ function solve!(mdl::Model)
 
     # find initial primal-dual iterate
     mdl.verbose && println("\nfinding initial iterate")
+
+@timeit "initial iterate" begin
 
     # TODO scale like in alfonso?
     getinitsz!(ls_ts, ls_tz, cone)
@@ -351,6 +354,8 @@ function solve!(mdl::Model)
     @. @views tx = txty[1:n]
     @. @views ty = txty[n+1:end]
 
+end
+
     mdl.verbose && println("initial iterate found")
 
     # calculate tolerances for convergence
@@ -375,6 +380,9 @@ function solve!(mdl::Model)
     alphapred = alphapredinit
     iter = 0
     while true
+
+    @timeit "convergence check" begin
+
         # calculate residuals and convergence parameters
         # tmp_tx = -A'*ty - G'*tz - c*tau
         mul!(tmp_tx2, A', ty)
@@ -425,11 +433,15 @@ function solve!(mdl::Model)
             infres_du = NaN
         end
 
+    # @timeit "iter stats printing" begin
+
         if mdl.verbose
             # print iteration statistics
             @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n", iter, obj_pr, obj_du, gap, relgap, nres_pr, nres_du, tau, kap, mu)
             flush(stdout)
         end
+
+    # end
 
         # check convergence criteria
         # TODO nearly primal or dual infeasible or nearly optimal cases?
@@ -466,7 +478,12 @@ function solve!(mdl::Model)
             break
         end
 
+    end
+
         # prediction phase
+
+    @timeit "prediction phase" begin
+
         # calculate prediction direction
         @. ls_tz = tz
         @. ls_ts = ts
@@ -480,7 +497,7 @@ function solve!(mdl::Model)
         # copy_y = copy(tmp_ty)
         # copy_z = copy(tmp_tz)
 
-        (tmp_kap, tmp_tau) = solvelinsys6!(tmp_tx, tmp_ty, tmp_tz, -kap, tmp_ts, kap + cx + by + hz, mu, tau, L)
+        @timeit "linear system" (tmp_kap, tmp_tau) = solvelinsys6!(tmp_tx, tmp_ty, tmp_tz, -kap, tmp_ts, kap + cx + by + hz, mu, tau, L)
 
         # # check residual
         # res_x = -A'*tmp_ty - G'*tmp_tz - c*tmp_tau + copy_x
@@ -520,9 +537,9 @@ function solve!(mdl::Model)
             # accept primal iterate if
             # - decreased alpha and it is the first inside the cone and beta-neighborhood or
             # - increased alpha and it is inside the cone and the first to leave beta-neighborhood
-            if ls_mu > 0.0 && ls_tau > 0.0 && ls_kap > 0.0 && incone(cone, ls_mu)
+            if ls_mu > 0.0 && ls_tau > 0.0 && ls_kap > 0.0 && @timeit "in-cone check" incone(cone, ls_mu)
                 # primal iterate is inside the cone
-                nbhd = calcnbhd!(g, ls_ts, ls_tz, ls_mu, cone) + abs2(ls_tk - ls_mu)
+                @timeit "neighborhood check" nbhd = calcnbhd!(g, ls_ts, ls_tz, ls_mu, cone) + abs2(ls_tk - ls_mu)
                 # nbhd = calcnbhd!(g, ls_ts, ls_tz, ls_mu, cone) + abs2(ls_tk - ls_mu)/abs2(ls_mu)
 
                 if nbhd < abs2(beta*ls_mu)
@@ -571,6 +588,8 @@ function solve!(mdl::Model)
         kap = ls_kap
         mu = ls_mu
 
+    end
+
         # skip correction phase if allowed and current iterate is in the eta-neighborhood
         if mdl.corrcheck && nbhd <= abs2(eta*mu)
         # if mdl.corrcheck && nbhd <= abs2(eta)
@@ -578,6 +597,9 @@ function solve!(mdl::Model)
         end
 
         # correction phase
+
+    @timeit "correction phase" begin
+
         corrfail = false
         ncorrsteps = 0
         while true
@@ -595,7 +617,7 @@ function solve!(mdl::Model)
             # @. tmp_tz -= g
             @. tmp_ts = 0.0
 
-            (tmp_kap, tmp_tau) = solvelinsys6!(tmp_tx, tmp_ty, tmp_tz, -kap + mu/tau, tmp_ts, 0.0, mu, tau, L)
+            @timeit "linear system" (tmp_kap, tmp_tau) = solvelinsys6!(tmp_tx, tmp_ty, tmp_tz, -kap + mu/tau, tmp_ts, 0.0, mu, tau, L)
 
             # determine step length alpha by line search
             alpha = mdl.alphacorr
@@ -618,7 +640,7 @@ function solve!(mdl::Model)
                 @assert ls_kap > 0.0
                 ls_mu = (dot(ls_ts, ls_tz) + ls_tau*ls_kap)/bnu
 
-                if ls_mu > 0.0 && incone(cone, ls_mu)
+                if ls_mu > 0.0 && @timeit "in-cone check" incone(cone, ls_mu)
                     # primal iterate tx is inside the cone, so terminate line search
                     break
                 end
@@ -648,7 +670,7 @@ function solve!(mdl::Model)
 
             # finish if allowed and current iterate is in the eta-neighborhood, or if taken max steps
             if ncorrsteps == mdl.maxcorrsteps || mdl.corrcheck
-                nbhd = calcnbhd!(g, ls_ts, ls_tz, mu, cone) + abs2(tau*kap - mu)
+                @timeit "neighborhood check" nbhd = calcnbhd!(g, ls_ts, ls_tz, mu, cone) + abs2(tau*kap - mu)
                 # nbhd = calcnbhd!(g, ls_ts, ls_tz, mu, cone) + abs2(tau*kap - mu)/abs2(mu)
 
                 @. ls_tz = tz
@@ -669,6 +691,8 @@ function solve!(mdl::Model)
             mdl.status = :CorrectorFail
             break
         end
+
+    end
     end
 
     # calculate result and iteration statistics
@@ -684,6 +708,7 @@ function solve!(mdl::Model)
 
     mdl.verbose && println("\nstatus is $(mdl.status) after $iter iterations and $(trunc(mdl.solvetime, digits=3)) seconds\n")
 
+end
     return nothing
 end
 

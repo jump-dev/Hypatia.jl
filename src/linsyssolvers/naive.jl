@@ -4,6 +4,7 @@ Copyright 2018, Chris Coey and contributors
 naive method that simply performs one high-dimensional linear system solve
 TODO should allow LHS6 to be sparse
 =#
+
 mutable struct NaiveCache <: LinSysCache
     cone
     c
