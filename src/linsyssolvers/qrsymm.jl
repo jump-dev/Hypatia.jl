@@ -227,25 +227,23 @@ function solvelinsys6!(
 
     if size(L.Q2div, 1) > 0
 
-    # @timeit "setup symm matrix" begin
+    @timeit "setup symm matrix" begin
 
         for k in eachindex(L.cone.prmtvs)
             a1k = view(L.GQ2, L.cone.idxs[k], :)
             a2k = view(L.HGQ2, L.cone.idxs[k], :)
             if L.cone.prmtvs[k].usedual
-                calcHiarr_prmtv!(a2k, a1k, L.cone.prmtvs[k])
-                # @timeit "Hessian inv prod" calcHiarr_prmtv!(a2k, a1k, L.cone.prmtvs[k])
+                @timeit "Hessian inv prod" calcHiarr_prmtv!(a2k, a1k, L.cone.prmtvs[k])
                 a2k ./= mu
             else
-                calcHarr_prmtv!(a2k, a1k, L.cone.prmtvs[k])
-                # @timeit "Hessian prod" calcHarr_prmtv!(a2k, a1k, L.cone.prmtvs[k])
+                @timeit "Hessian prod" calcHarr_prmtv!(a2k, a1k, L.cone.prmtvs[k])
                 a2k .*= mu
             end
         end
-        mul!(L.Q2GHGQ2, L.GQ2', L.HGQ2)
-        # @timeit "mat prod" mul!(L.Q2GHGQ2, L.GQ2', L.HGQ2)
+        @timeit "mat prod" mul!(L.Q2GHGQ2, L.GQ2', L.HGQ2)
 
-    # end
+    end
+
         # F = bunchkaufman!(Symmetric(L.Q2GHGQ2), true, check=false)
         # if !issuccess(F)
         #     println("linear system matrix factorization failed")
@@ -258,7 +256,7 @@ function solvelinsys6!(
         # end
         # ldiv!(F, L.Q2div)
 
-    # @timeit "sysvx solve" begin
+    @timeit "sysvx solve" begin
 
         success = hypatia_sysvx!(L.Q2divcopy, L.Q2GHGQ2, L.Q2div, L.lsferr, L.lsberr, L.lswork, L.lsiwork, L.lsAF, L.ipiv)
         if !success
@@ -273,7 +271,7 @@ function solvelinsys6!(
         end
         L.Q2div .= L.Q2divcopy
 
-    # end
+    end
     end
 
 # @timeit "after ldiv" begin
@@ -304,8 +302,8 @@ function solvelinsys6!(
     @. zi = L.HGxi - zi
 
 # end
-#
-# @timeit "get final solutions" begin
+
+@timeit "get final solutions" begin
 
     # combine
     @views dir_tau = (rhs_tau + rhs_kap + dot(L.c, xi[:,2]) + dot(L.b, yi[:,2]) + dot(L.h, z2))/(mu/tau/tau - dot(L.c, xi[:,1]) - dot(L.b, yi[:,1]) - dot(L.h, z1))
@@ -316,7 +314,7 @@ function solvelinsys6!(
     @. rhs_ts = -z1 + L.h*dir_tau - rhs_ts
     dir_kap = -dot(L.c, rhs_tx) - dot(L.b, rhs_ty) - dot(L.h, rhs_tz) - rhs_tau
 
-# end
+end
 
     return (dir_kap, dir_tau)
 end

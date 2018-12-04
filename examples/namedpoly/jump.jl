@@ -14,6 +14,7 @@ using DynamicPolynomials
 using SumOfSquares
 using PolyJuMP
 using Test
+
 include(joinpath(dirname(@__DIR__), "utils", "semialgebraicsets.jl"))
 
 function build_JuMP_namedpoly_PSD(

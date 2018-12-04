@@ -11,6 +11,7 @@ available at https://arxiv.org/abs/1712.01792
 using Hypatia
 using LinearAlgebra
 using Test
+using TimerOutputs
 
 function build_namedpoly(
     polyname::Symbol,
@@ -42,13 +43,13 @@ function run_namedpoly()
     # select the named polynomial to minimize and the SOS degree (to be squared)
     (c, A, b, G, h, cone) =
         # build_namedpoly(:butcher, 2)
-        # build_namedpoly(:caprasse, 4)
+        build_namedpoly(:caprasse, 4)
         # build_namedpoly(:goldsteinprice, 7)
         # build_namedpoly(:heart, 2)
         # build_namedpoly(:lotkavolterra, 3)
         # build_namedpoly(:magnetism7, 2)
         # build_namedpoly(:motzkin, 7)
-        build_namedpoly(:reactiondiffusion, 4)
+        # build_namedpoly(:reactiondiffusion, 4)
         # build_namedpoly(:robinson, 8)
         # build_namedpoly(:rosenbrock, 4)
         # build_namedpoly(:schwefel, 3)
@@ -57,9 +58,12 @@ function run_namedpoly()
     (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = Hypatia.preprocess_data(c, A, b, G, useQR=true)
     L = Hypatia.QRSymmCache(c1, A1, b1, G1, h, cone, Q2, RiQ1)
 
-    mdl = Hypatia.Model(maxiter=100, verbose=true)
+    mdl = Hypatia.Model(maxiter=200, verbose=false)
     Hypatia.load_data!(mdl, c1, A1, b1, G1, h, cone, L)
+
+    reset_timer!()
     Hypatia.solve!(mdl)
+    print_timer()
 
     x = zeros(length(c))
     x[dukeep] = Hypatia.get_x(mdl)
