@@ -114,6 +114,7 @@ end
 
 function factH(prmtv::PrimitiveCone)
     @. prmtv.H2 = prmtv.H
+
     prmtv.F = bunchkaufman!(Symmetric(prmtv.H2), true, check=false)
     return issuccess(prmtv.F)
 
