@@ -571,7 +571,7 @@ function MOI.optimize!(opt::Optimizer)
         error("linear system cache type $(opt.lscachetype) is not recognized")
     end
     load_data!(mdl, c1, A1, b1, G1, h, cone, L)
-    solve!(mdl)
+    @timeit to "solving time" solve!(mdl)
 
     opt.status = get_status(mdl)
     opt.solvetime = get_solvetime(mdl)

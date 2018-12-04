@@ -60,7 +60,7 @@ function incone_prmtv(prmtv::WSOSPolyInterp, scal::Float64)
     @. prmtv.H = 0.0
     tmp3 = prmtv.tmp3
 
-    for j in eachindex(prmtv.ipwt) # TODO can be done in parallel, but need multiple tmp3s
+    @timeit to "incone wsos" for j in eachindex(prmtv.ipwt) # TODO can be done in parallel, but need multiple tmp3s
         ipwtj = prmtv.ipwt[j]
         tmp1j = prmtv.tmp1[j]
         tmp2j = prmtv.tmp2[j]
@@ -70,7 +70,7 @@ function incone_prmtv(prmtv::WSOSPolyInterp, scal::Float64)
         mul!(tmp1j, tmp2j, ipwtj)
 
         # pivoted cholesky factorization method
-        F = cholesky!(Symmetric(tmp1j, :L), Val(true), check=false)
+        @timeit to "wsos chol" F = cholesky!(Symmetric(tmp1j, :L), Val(true), check=false)
         if !isposdef(F)
             return false
         end

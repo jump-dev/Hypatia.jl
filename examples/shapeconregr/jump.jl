@@ -85,7 +85,7 @@ function build_shapeconregr_PSD(
     conv_bss = get_domain_inequalities(sd.conv_dom, x)
 
     if use_hypatia
-        model = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true, lscachetype=Hypatia.QRSymmCache)))
+        model = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true, lscachetype=Hypatia.QRSymmCache, timelimit=300.0, tolabsopt=1e-4, tolrelopt=1e-4, tolfeas=1e-5))
     else
         model = SOSModel(with_optimizer(MosekOptimizer))
     end
@@ -144,7 +144,7 @@ function build_shapeconregr_WSOS(
     @polyvar x[1:n]
     @polyvar w[1:n]
 
-    model = Model(with_optimizer(Hypatia.Optimizer, verbose=true, lscachetype=Hypatia.QRSymmCache))
+    model = Model(with_optimizer(Hypatia.Optimizer, verbose=true, lscachetype=Hypatia.QRSymmCache, timelimit=300.0, tolabsopt=1e-3, tolrelopt=1e-3, tolfeas=1e-5))
     @elapsed @variable(model, p, PolyJuMP.Poly(monomials(x, 0:r)))
 
     if use_leastsqobj
@@ -166,7 +166,6 @@ function build_shapeconregr_WSOS(
     if !ignore_mono
         println("monotonicity constraint")
         (mono_U, mono_pts, mono_P0, mono_PWts, _) = Hypatia.interpolate(mono_dom, d, sample=sample_pts, sample_factor=50)
-        @show length(mono_PWts)
         mono_wsos_cone = WSOSPolyInterpCone(mono_U, [mono_P0, mono_PWts...])
         @elapsed for j in 1:n
             if abs(mono_profile[j]) > 0.5
@@ -180,7 +179,6 @@ function build_shapeconregr_WSOS(
         println("convexity constraint")
         full_conv_dom = Hypatia.add_free_vars(conv_dom)
         (conv_U, conv_pts, conv_P0, conv_PWts, _) = Hypatia.interpolate(full_conv_dom, d+1, sample=sample_pts, sample_factor=50)
-        @show length(conv_PWts)
 
         conv_wsos_cone = WSOSPolyInterpCone(conv_U, [conv_P0, conv_PWts...])
         Hp = [DynamicPolynomials.differentiate(dp[i], x[j]) for i in 1:n, j in 1:n]

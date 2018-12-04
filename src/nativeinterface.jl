@@ -480,7 +480,7 @@ function solve!(mdl::Model)
         # copy_y = copy(tmp_ty)
         # copy_z = copy(tmp_tz)
 
-        (tmp_kap, tmp_tau) = solvelinsys6!(tmp_tx, tmp_ty, tmp_tz, -kap, tmp_ts, kap + cx + by + hz, mu, tau, L)
+        @timeit to "linsys pred" (tmp_kap, tmp_tau) = solvelinsys6!(tmp_tx, tmp_ty, tmp_tz, -kap, tmp_ts, kap + cx + by + hz, mu, tau, L)
 
         # # check residual
         # res_x = -A'*tmp_ty - G'*tmp_tz - c*tmp_tau + copy_x
@@ -507,7 +507,7 @@ function solve!(mdl::Model)
         alphaprevok = true
         predfail = false
         nprediters = 0
-        while true
+        @timeit to "linsearch pred" while true
             nprediters += 1
 
             @. ls_tz = tz + alpha*tmp_tz
@@ -522,7 +522,7 @@ function solve!(mdl::Model)
             # - increased alpha and it is inside the cone and the first to leave beta-neighborhood
             if ls_mu > 0.0 && ls_tau > 0.0 && ls_kap > 0.0 && incone(cone, ls_mu)
                 # primal iterate is inside the cone
-                nbhd = calcnbhd!(g, ls_ts, ls_tz, ls_mu, cone) + abs2(ls_tk - ls_mu)
+                @timeit to "calcnbhd" nbhd = calcnbhd!(g, ls_ts, ls_tz, ls_mu, cone) + abs2(ls_tk - ls_mu)
                 # nbhd = calcnbhd!(g, ls_ts, ls_tz, ls_mu, cone) + abs2(ls_tk - ls_mu)/abs2(ls_mu)
 
                 if nbhd < abs2(beta*ls_mu)
@@ -580,7 +580,7 @@ function solve!(mdl::Model)
         # correction phase
         corrfail = false
         ncorrsteps = 0
-        while true
+        @timeit to "corr phase" while true
             ncorrsteps += 1
 
             # calculate correction direction
@@ -595,7 +595,7 @@ function solve!(mdl::Model)
             # @. tmp_tz -= g
             @. tmp_ts = 0.0
 
-            (tmp_kap, tmp_tau) = solvelinsys6!(tmp_tx, tmp_ty, tmp_tz, -kap + mu/tau, tmp_ts, 0.0, mu, tau, L)
+            @timeit to "linsys corr" (tmp_kap, tmp_tau) = solvelinsys6!(tmp_tx, tmp_ty, tmp_tz, -kap + mu/tau, tmp_ts, 0.0, mu, tau, L)
 
             # determine step length alpha by line search
             alpha = mdl.alphacorr
@@ -607,7 +607,7 @@ function solve!(mdl::Model)
             end
 
             ncorrlsiters = 0
-            while ncorrlsiters <= mdl.maxcorrlsiters
+            @timeit to "linsearch corr" while ncorrlsiters <= mdl.maxcorrlsiters
                 ncorrlsiters += 1
 
                 @. ls_tz = tz + alpha*tmp_tz
@@ -648,7 +648,7 @@ function solve!(mdl::Model)
 
             # finish if allowed and current iterate is in the eta-neighborhood, or if taken max steps
             if ncorrsteps == mdl.maxcorrsteps || mdl.corrcheck
-                nbhd = calcnbhd!(g, ls_ts, ls_tz, mu, cone) + abs2(tau*kap - mu)
+                @timeit to "calcnbhd" nbhd = calcnbhd!(g, ls_ts, ls_tz, mu, cone) + abs2(tau*kap - mu)
                 # nbhd = calcnbhd!(g, ls_ts, ls_tz, mu, cone) + abs2(tau*kap - mu)/abs2(mu)
 
                 @. ls_tz = tz

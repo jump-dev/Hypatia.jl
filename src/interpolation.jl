@@ -422,6 +422,7 @@ function wsos_sample_params(
     candidate_pts = interp_sample(dom, U * sample_factor)
     (pts, P0, P0sub, w) = make_wsos_arrays(dom, candidate_pts, d, U, L, calc_w=calc_w)
     g = get_weights(dom, pts)
+    # PWts = [Array(qr(sqrt.(gi) .* P0sub).Q) for gi in g]
     PWts = [sqrt.(gi) .* P0sub for gi in g]
     return (U=U, pts=pts, P0=P0, PWts=PWts, w=w)
 end
