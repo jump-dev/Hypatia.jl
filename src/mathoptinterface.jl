@@ -555,9 +555,29 @@ function MOI.copy_to(
     return idxmap
 end
 
-function MOI.optimize!(opt::Optimizer)
+# 5 minute hack
+function optarrays(opt::Optimizer; getdual::Bool=false)
+    if !getdual
+        return (opt.c, opt.A, opt.b, opt.G, opt.h, opt.cone)
+    else
+        c = vcat(opt.h, opt.b)
+        A = hcat(opt.G', opt.A')
+        b = -opt.c
+        n = length(opt.h)
+        G = -Matrix{Float64}(I, n, n)
+        h = zeros(n)
+        cone = opt.cone
+        for prmtv in cone.prmtvs
+            prmtv.usedual = !(prmtv.usedual)
+        end
+        return (c, A, b, G, h, cone)
+    end
+end
+
+function MOI.optimize!(opt::Optimizer; getdual::Bool=true)
     mdl = opt.mdl
-    (c, A, b, G, h, cone) = (opt.c, opt.A, opt.b, opt.G, opt.h, opt.cone)
+    (c, A, b, G, h, cone) = optarrays(opt, getdual=getdual)
+    # (c, A, b, G, h, cone) = (opt.c, opt.A, opt.b, opt.G, opt.h, opt.cone)
 
     # check, preprocess, load, and solve
     check_data(c, A, b, G, h, cone)
