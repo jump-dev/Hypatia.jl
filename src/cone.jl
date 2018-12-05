@@ -114,7 +114,8 @@ end
 
 function factH(prmtv::PrimitiveCone)
     @. prmtv.H2 = prmtv.H
-    @timeit to "factH" prmtv.F = bunchkaufman!(Symmetric(prmtv.H2), true, check=false)
+
+    prmtv.F = bunchkaufman!(Symmetric(prmtv.H2, :U), true, check=false)
     return issuccess(prmtv.F)
 
     # prmtv.F = cholesky!(Symmetric(prmtv.H2), Val(true), check=false)
