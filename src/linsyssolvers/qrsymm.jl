@@ -8,7 +8,7 @@ QR plus either Cholesky factorization or iterative conjugate gradients method
 =#
 
 mutable struct QRSymmCache <: LinSysCache
-    # TODO can remove some of the intermediary prealloced arrays after github.com/JuliaLang/julia/issues/23919 is resolved
+    # TODO can remove some of the prealloced arrays after github.com/JuliaLang/julia/issues/23919 is resolved
     useiterative
     userefine
 
