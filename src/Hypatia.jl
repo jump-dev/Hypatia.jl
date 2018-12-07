@@ -29,6 +29,7 @@ module Hypatia
         "epinormspectral",
         "semidefinite",
         "wsospolyinterp",
+        "wsospolyinterpmat",
         "hypoperlogdet",
         "epipersumexp",
         ]

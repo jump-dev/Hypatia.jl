@@ -124,13 +124,11 @@ function build_shapeconregr_WSOS(
     d = div(r, 2)
     (npoints, n) = size(X)
 
-    full_conv_dom = Hypatia.add_free_vars(sd.conv_dom)
     (mono_U, mono_pts, mono_P0, mono_PWts, _) = Hypatia.interpolate(sd.mono_dom, d, sample=true, sample_factor=50)
-    (conv_U, conv_pts, conv_P0, conv_PWts, _) = Hypatia.interpolate(full_conv_dom, d+1, sample=true, sample_factor=50) # TODO think about if it's ok to go up to d+1
+    (conv_U, conv_pts, conv_P0, conv_PWts, _) = Hypatia.interpolate(sd.conv_dom, d-1, sample=true, sample_factor=50)
     mono_wsos_cone = WSOSPolyInterpCone(mono_U, [mono_P0, mono_PWts...])
-    conv_wsos_cone = WSOSPolyInterpCone(conv_U, [conv_P0, conv_PWts...])
+    conv_wsos_cone = WSOSPolyInterpMatCone(n, conv_U, [conv_P0, conv_PWts...])
     @polyvar x[1:n]
-    @polyvar w[1:n]
 
     model = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true, usedense=usedense, lscachetype=Hypatia.QRSymmCache))
     @variable(model, p, PolyJuMP.Poly(monomials(x, 0:r)))
@@ -159,8 +157,7 @@ function build_shapeconregr_WSOS(
     # convexity
     if !iszero(sd.conv_profile)
         Hp = [DynamicPolynomials.differentiate(dp[i], x[j]) for i in 1:n, j in 1:n]
-        conv_condition = w'*Hp*w
-        @constraint(model, [sd.conv_profile * conv_condition(conv_pts[i, :]) for i in 1:conv_U] in conv_wsos_cone)
+        @constraint(model, sd.conv_profile * [Hp[i,j](conv_pts[u, :]) for i in 1:n, j in 1:n, u in 1:conv_U][:] in conv_wsos_cone)
     end
 
     return (model, p)
@@ -169,7 +166,7 @@ end
 function run_JuMP_shapeconregr(use_wsos::Bool; usedense::Bool=true)
     (n, deg, npoints, signal_ratio, f) =
         # (2, 3, 100, 0.0, x -> exp(norm(x))) # no noise, monotonic function
-        (2, 3, 100, 0.0, x -> sum(x.^3)) # no noise, monotonic function
+        (2, 4, 100, 0.0, x -> sum(x.^3)) # no noise, monotonic function
         # (2, 3, 100, 0.0, x -> sum(x.^4)) # no noise, non-monotonic function
         # (2, 3, 100, 50.0, x -> sum(x.^3)) # some noise, monotonic function
         # (2, 3, 100, 50.0, x -> sum(x.^4)) # some noise, non-monotonic function

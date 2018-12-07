@@ -195,6 +195,7 @@ end
 cheb2_pts(k::Int) = [-cospi(j/(k-1)) for j in 0:k-1]
 
 function calc_u(n::Int, d::Int, pts::Matrix{Float64})
+    @assert d > 0
     u = Vector{Matrix{Float64}}(undef, n)
     for j in 1:n
         uj = u[j] = Matrix{Float64}(undef, size(pts, 1), d+1)
