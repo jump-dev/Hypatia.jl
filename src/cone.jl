@@ -115,7 +115,7 @@ end
 function factH(prmtv::PrimitiveCone)
     @. prmtv.H2 = prmtv.H
 
-    prmtv.F = bunchkaufman!(Symmetric(prmtv.H2, :U), true, check=false)
+    @timeit to "Hessian factorize" prmtv.F = bunchkaufman!(Symmetric(prmtv.H2, :U), true, check=false)
     return issuccess(prmtv.F)
 
     # prmtv.F = cholesky!(Symmetric(prmtv.H2), Val(true), check=false)

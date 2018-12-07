@@ -62,26 +62,30 @@ function incone_prmtv(prmtv::WSOSPolyInterp, scal::Float64)
     @. prmtv.H = 0.0
     tmp3 = prmtv.tmp3
 
-    @timeit to "incone wsos" for j in eachindex(prmtv.ipwt) # TODO can be done in parallel, but need multiple tmp3s
+    for j in eachindex(prmtv.ipwt) # TODO can be done in parallel, but need multiple tmp3s
         ipwtj = prmtv.ipwt[j]
         tmp1j = prmtv.tmp1[j]
         tmp2j = prmtv.tmp2[j]
 
+        @timeit to "inner matrix" begin
         # tmp1j = ipwtj'*Diagonal(pnt)*ipwtj
         # mul!(tmp2j, ipwtj', Diagonal(prmtv.scalpnt)) # TODO dispatches to an extremely inefficient method
         @. tmp2j = ipwtj' * prmtv.scalpnt'
         mul!(tmp1j, tmp2j, ipwtj)
+        end
 
         # pivoted cholesky and triangular solve method
-        F = cholesky!(Symmetric(tmp1j, :L), Val(true), check=false)
+        @timeit to "cholesky" F = cholesky!(Symmetric(tmp1j, :L), Val(true), check=false)
         if !isposdef(F)
             return false
         end
 
-        tmp2j .= view(ipwtj', F.p, :)
-        ldiv!(F.L, tmp2j) # TODO make sure calls best triangular solve
+        @timeit to "backwards solve" begin
+        @timeit to "permute" tmp2j .= view(ipwtj', F.p, :)
+        @timeit to "ldiv" ldiv!(F.L, tmp2j) # TODO make sure calls best triangular solve
         # mul!(tmp3, tmp2j', tmp2j)
-        BLAS.syrk!('U', 'T', 1.0, tmp2j, 0.0, tmp3)
+        @timeit to "syrk!" BLAS.syrk!('U', 'T', 1.0, tmp2j, 0.0, tmp3)
+        end
 
         # posvx solve method
         # tmp2j .= ipwtj' # TODO eliminate by transposing in construction
@@ -91,6 +95,7 @@ function incone_prmtv(prmtv::WSOSPolyInterp, scal::Float64)
         #     return false
         # end
         # mul!(tmp3, ipwtj, PDPiP)
+        @timeit to "gradient and Hessian" begin
 
         @inbounds for j in eachindex(prmtv.g)
             prmtv.g[j] -= tmp3[j,j]
@@ -98,9 +103,11 @@ function incone_prmtv(prmtv::WSOSPolyInterp, scal::Float64)
                 prmtv.H[i,j] += abs2(tmp3[i,j])
             end
         end
+        end
     end
-
-    return factH(prmtv)
+    @. prmtv.H2 = prmtv.H
+    @timeit to "Hessian factorize" prmtv.F = bunchkaufman!(Symmetric(prmtv.H2), true, check=false)
+    return issuccess(prmtv.F)
 end
 
 calcg_prmtv!(g::AbstractVector{Float64}, prmtv::WSOSPolyInterp) = (@. g = prmtv.g/prmtv.scal; g)

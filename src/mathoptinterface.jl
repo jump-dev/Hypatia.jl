@@ -574,7 +574,7 @@ function optarrays(opt::Optimizer; getdual::Bool=false)
     end
 end
 
-function MOI.optimize!(opt::Optimizer; getdual::Bool=true)
+function MOI.optimize!(opt::Optimizer; getdual::Bool=false)
     mdl = opt.mdl
     (c, A, b, G, h, cone) = optarrays(opt, getdual=getdual)
     # (c, A, b, G, h, cone) = (opt.c, opt.A, opt.b, opt.G, opt.h, opt.cone)

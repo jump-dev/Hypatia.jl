@@ -217,18 +217,20 @@ function solvelinsys6!(
     mul!(L.Q2div, L.Q2', L.GHGQ1x)
 
     if size(L.Q2div, 1) > 0
+        @timeit to "setup symm matrix" begin
         for k in eachindex(L.cone.prmtvs)
             a1k = view(L.GQ2, L.cone.idxs[k], :)
             a2k = view(L.HGQ2, L.cone.idxs[k], :)
             if L.cone.prmtvs[k].usedual
-                calcHiarr_prmtv!(a2k, a1k, L.cone.prmtvs[k])
+                @timeit to "Hessian inv prod" calcHiarr_prmtv!(a2k, a1k, L.cone.prmtvs[k])
                 a2k ./= mu
             else
-                calcHarr_prmtv!(a2k, a1k, L.cone.prmtvs[k])
+                @timeit to "Hessian prod" calcHarr_prmtv!(a2k, a1k, L.cone.prmtvs[k])
                 a2k .*= mu
             end
         end
-        mul!(L.Q2GHGQ2, L.GQ2', L.HGQ2)
+        @timeit to "mat prod" mul!(L.Q2GHGQ2, L.GQ2', L.HGQ2)
+        end
 
         # F = bunchkaufman!(Symmetric(L.Q2GHGQ2), true, check=false)
         # if !issuccess(F)
@@ -242,6 +244,7 @@ function solvelinsys6!(
         # end
         # ldiv!(F, L.Q2div)
 
+        @timeit to "sysvx solve" begin
         success = hypatia_sysvx!(L.Q2divcopy, L.Q2GHGQ2, L.Q2div, L.lsferr, L.lsberr, L.lswork, L.lsiwork, L.lsAF, L.ipiv)
         if !success
             # println("linear system matrix factorization failed")
@@ -254,6 +257,7 @@ function solvelinsys6!(
             end
         end
         L.Q2div .= L.Q2divcopy
+        end
     end
     mul!(L.Q2x, L.Q2, L.Q2div)
 
@@ -280,6 +284,7 @@ function solvelinsys6!(
     # zi = HG*xi - Hbz
     @. zi = L.HGxi - zi
 
+    @timeit to "get final solutions" begin
     # combine
     @views dir_tau = (rhs_tau + rhs_kap + dot(L.c, xi[:,2]) + dot(L.b, yi[:,2]) + dot(L.h, z2))/(mu/tau/tau - dot(L.c, xi[:,1]) - dot(L.b, yi[:,1]) - dot(L.h, z1))
     @. @views rhs_tx = xi[:,2] + dir_tau*xi[:,1]
@@ -288,6 +293,7 @@ function solvelinsys6!(
     mul!(z1, L.G, rhs_tx)
     @. rhs_ts = -z1 + L.h*dir_tau - rhs_ts
     dir_kap = -dot(L.c, rhs_tx) - dot(L.b, rhs_ty) - dot(L.h, rhs_tz) - rhs_tau
+    end
 
     return (dir_kap, dir_tau)
 end
