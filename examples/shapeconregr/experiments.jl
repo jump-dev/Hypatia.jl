@@ -89,9 +89,10 @@ end
 
 # synthetic data
 function runexp12(i::Int)
-    for n in 1:6
-        signal_options = [100.0]
-        shape_options = [false]
+    for n in 6:6
+        signal_options = [10.0]
+        mono_options = [true, false]
+        conv_options = [true]
         wsos_options = [true, false]
         deg_options = 2:6
         outfilename = joinpath(@__DIR__(), "shapeconregr_$(round(Int, time()/10)).csv")
@@ -115,8 +116,7 @@ function runexp12(i::Int)
                     Xtemp = convert(Array{Float64,2}, Xtrain')
 
                     # degrees of freedom in the model
-                    for deg in deg_options, ignore_mono in shape_options, ignore_conv in shape_options, use_wsos in wsos_options
-                        ignore_conv = true
+                    for deg in deg_options, ignore_mono in mono_options, ignore_conv in conv_options, use_wsos in wsos_options
                         println("running ", "signal_ratio=$signal_ratio, deg=$deg, ignore_mono=$ignore_mono, ignore_conv=$ignore_conv, use_wsos=$use_wsos")
                         (mdl, tr_rmse, tm, regr) = exprmnt_mdl(Xtemp, ytrain, shape_data, deg=deg, use_wsos=use_wsos, ignore_mono=ignore_mono, ignore_conv=ignore_conv)
                         ts_rmse = sum(abs2(ytest[i] - JuMP.value(regr)(convert(Array{Float64,2}, Xtest)[:,i])) for i in 1:size(Xtest, 1))
@@ -206,12 +206,14 @@ p = runexp12(1)
 # with no noise, deg 6 ok
 # exp2 with n=5, deg=5 worked with ls
 
-# n = 6
+# reset_timer!(Hypatia.to)
+# n = 5
 # # degrees of freedom for data
-# signal_ratio = 100.0
-# (refrmse, X, y, shape_data) = exprmnt1_data(n=n, signal_ratio=signal_ratio)
+# signal_ratio = 10.0
+# (refrmse, folds, shape_data) = exprmnt1_data(n=n, signal_ratio=signal_ratio)
+# ((Xtrain, ytrain), (_, _)) = folds[1]
 # # degrees of freedom in the model
 # deg = 6; ignore_mono = false; ignore_conv = true; use_wsos = false
-# @time (mdl, rmse, tm, p) = exprmnt_mdl(X, y, shape_data, deg=deg, use_wsos=use_wsos, ignore_mono=ignore_mono, ignore_conv=ignore_conv)
+# @time (mdl, rmse, tm, p) = exprmnt_mdl(convert(Array{Float64,2}, Xtrain'), ytrain, shape_data, deg=deg, use_wsos=use_wsos, ignore_mono=ignore_mono, ignore_conv=ignore_conv)
 # filename = "" # joinpath(@__DIR__(), "mosek_both.pdf")
-# # pl = makeplot(p, X, y, filename=filename, l=(0.0,0.0), u=(2.0,2.0))
+# # pl = makeplot(p, convert(Array{Float64,2}, Xtrain'), ytrain, filename=filename, l=(0.5,0.5), u=(2.0,2.0))
