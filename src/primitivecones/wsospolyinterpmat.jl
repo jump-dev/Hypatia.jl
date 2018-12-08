@@ -57,6 +57,7 @@ function barfun(matpnt, ipwt::Vector{Matrix{Float64}}, r::Int, u::Int)
         for j in 1:l, i in 1:l
             mat[(i-1)*r+1:i*r, (j-1)*r+1:j*r] .+= sum(ipwtj[ui,i] * ipwtj[ui,j] * matpnt[:,:,ui] for ui in 1:u)
         end
+        # @show logdet(mat)
         ret -= logdet(mat)
     end
     return ret
@@ -69,8 +70,8 @@ function inconefun(matpnt, ipwt::Vector{Matrix{Float64}}, r::Int, u::Int)
         for j in 1:l, i in 1:l
             # @show [ipwtj[ui,i] * ipwtj[ui,j] for ui in 1:u]
             mat[(i-1)*r+1:i*r, (j-1)*r+1:j*r] .+= sum(ipwtj[ui,i] * ipwtj[ui,j] * matpnt[:,:,ui] for ui in 1:u)
-            # @show mat
         end
+        @show mat
         if !isposdef(mat)
             ret = false
         end
@@ -85,6 +86,7 @@ dimension(prmtv::WSOSPolyInterpMat) = prmtv.dim
 barrierpar_prmtv(prmtv::WSOSPolyInterpMat) = prmtv.r * sum(size(ipwtj, 2) for ipwtj in prmtv.ipwt)
 # sum of diagonal matrices with interpolant polynomial repeating on the diagonal
 function getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::WSOSPolyInterpMat)
+    # arr .= 1.0
     arr .= vcat([Matrix{Float64}(I, prmtv.r, prmtv.r)[:] for ui in 1:prmtv.u]...) # TODO tidy
     return arr
 end
