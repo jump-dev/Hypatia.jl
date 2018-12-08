@@ -122,6 +122,7 @@ function build_shapeconregr_WSOS(
     usedense::Bool = true,
     )
     d = div(r, 2)
+    @assert mod(r, 2) == 0 # TODO fix so d for convexity is right
     (npoints, n) = size(X)
 
     (mono_U, mono_pts, mono_P0, mono_PWts, _) = Hypatia.interpolate(sd.mono_dom, d, sample=true, sample_factor=50)
