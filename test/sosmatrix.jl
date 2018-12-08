@@ -10,17 +10,18 @@ using DynamicPolynomials
 using PolyJuMP
 using Test
 
-n = 1
-deg = 6
+n = 2
+deg = 4
 d = div(deg-2, 2)
 
 domain = Hypatia.Box(-ones(n), ones(n))
 (U, pts, P0, PWts, _) = Hypatia.interpolate(domain, d, sample=true, sample_factor=50)
 wsos_mat_cone = WSOSPolyInterpMatCone(n, U, [P0, PWts...])
 
-model = Model(with_optimizer(Hypatia.Optimizer))
+model = Model(with_optimizer(Hypatia.Optimizer, verbose=true))
 @polyvar x[1:n]
 @variable(model, p, PolyJuMP.Poly(monomials(x, 0:deg)))
+# @variable(model, z)
 dp = [DynamicPolynomials.differentiate(p, x[j]) for j in 1:n]
 Hp = [DynamicPolynomials.differentiate(dp[i], x[j]) for i in 1:n, j in 1:n]
 
@@ -30,11 +31,16 @@ Hp = [DynamicPolynomials.differentiate(dp[i], x[j]) for i in 1:n, j in 1:n]
 # what we want
 @constraint(model, [Hp[i,j](pts[u, :]) for i in 1:n, j in 1:n, u in 1:U][:] in wsos_mat_cone)
 
-# hard coded for n=1 example
-@constraint(model, [u in 1:U], Hp[1,1](pts[u,1]) == 30 * pts[u,1][1]^4)
-# should be feasible, x^6 is a solution
+# working with monomials, fix some function we like
+# @constraint(model, [u in 1:U, i in 1:n, j in 1:n], Hp[i,j](pts[u,:]) == 30 * pts[u,i]^4 * Float64(i == j))
+@constraint(model, [u in 1:U, i in 1:n, j in 1:n], Hp[i,j](pts[u,:]) == 12 * pts[u,i]^2 * Float64(i == j))
+# should be feasible, sum_i(x_1 ^6) is a solution
 
-# @objective(model, Min, p[1])
+# @constraint(model, z >=  p([1.0]))
+# @constraint(model, z >=  -p([1.0]))
+
+# @objective(model, Min, z)
 
 JuMP.optimize!(model)
 JuMP.value(p)
+JuMP.value.(Hp)
