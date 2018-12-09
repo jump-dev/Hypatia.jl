@@ -89,9 +89,9 @@ function build_shapeconregr_PSD(
             verbose=true,
             lscachetype=Hypatia.QRSymmCache,
             timelimit=600.0,
-            tolabsopt=1e-7,
+            tolabsopt=1e-6,
             tolrelopt=1e-5,
-            tolfeas=1e-7,
+            tolfeas=1e-6,
             usedense=false
             )
         )
@@ -157,9 +157,9 @@ function build_shapeconregr_WSOS(
         verbose=true,
         lscachetype=Hypatia.QRSymmCache,
         timelimit=600.0,
-        tolabsopt=1e-7,
+        tolabsopt=1e-6,
         tolrelopt=1e-5,
-        tolfeas=1e-7,
+        tolfeas=1e-6,
         usedense=false,
         # maxiter=2,
         ))

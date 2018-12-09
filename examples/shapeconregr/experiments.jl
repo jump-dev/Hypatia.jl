@@ -16,9 +16,9 @@ function exprmnt1_data(;
 
     (l, u) = (0.5, 2.0)
     # mono_domain = Hypatia.Box(l*ones(n), u*ones(n))
-    mono_domain = Hypatia.Ball(zeros(n), sqrt(n))
+    mono_domain = Hypatia.Ball(1.25*ones(n), 1.25*sqrt(n))
     # conv_domain = Hypatia.Box(l*ones(n), u*ones(n))
-    conv_domain = Hypatia.Ball(zeros(n), sqrt(n))
+    conv_domain = Hypatia.Ball(1.25*ones(n), 1.25*sqrt(n))
     mono_profile = ones(Int, n)
     conv_profile = 1
     shape_data = ShapeData(mono_domain, conv_domain, mono_profile, conv_profile)
@@ -72,34 +72,37 @@ function exprmnt_mdl(
 
     if use_wsos
         tm = @elapsed begin
-            (model, p) =
-                build_shapeconregr_WSOS(X, y, deg, shapedata, use_leastsqobj=use_leastsqobj, ignore_mono=ignore_mono, ignore_conv=ignore_conv, sample_pts=sample_pts)
-            JuMP.optimize!(model)
+            build_tm = @elapsed begin
+                (model, p) = build_shapeconregr_WSOS(X, y, deg, shapedata, use_leastsqobj=use_leastsqobj, ignore_mono=ignore_mono, ignore_conv=ignore_conv, sample_pts=sample_pts)
+            end
+            solve_tm = @elapsed JuMP.optimize!(model)
         end
     else
         tm = @elapsed begin
-            (model, p) = build_shapeconregr_PSD(X, y, deg, shapedata, use_leastsqobj=use_leastsqobj, ignore_mono=ignore_mono, ignore_conv=ignore_conv)
-            JuMP.optimize!(model)
+            build_tm = @elapsed begin
+                (model, p) = build_shapeconregr_PSD(X, y, deg, shapedata, use_leastsqobj=use_leastsqobj, ignore_mono=ignore_mono, ignore_conv=ignore_conv)
+            end
+            solve_tm = @elapsed JuMP.optimize!(model)
         end
     end
     rmse = sqrt(JuMP.objective_value(model)) * sqrt(size(X, 1))
-    return (model, rmse, tm, p)
+    return (model, rmse, tm, build_tm, solve_tm, p)
 end
 
 
 # synthetic data
 function runexp12(i::Int)
-    for n in 6:6
+    for n in 1:6
         signal_options = [10.0]
         mono_options = [true, false]
         conv_options = [true]
         wsos_options = [true, false]
-        deg_options = 2:6
+        deg_options = 2:7
         outfilename = joinpath(@__DIR__(), "shapeconregr_$(round(Int, time()/10)).csv")
 
         open(outfilename, "w") do f
             println(f, "# n = $n, sample_pts = $sample_pts, use_leastsqobj = $use_leastsqobj, testfunc = $i")
-            println(f, "fold,signal_ratio,refrmse,deg,ignore_mono,ignore_conv,use_wsos,tr_rmse,ts_rmse,tm,status")
+            println(f, "fold,signal_ratio,refrmse,deg,ignore_mono,ignore_conv,use_wsos,tr_rmse,ts_rmse,tm,b_tm,s_tm,status")
             # degrees of freedom for data
             for signal_ratio in signal_options
                 if i == 1
@@ -118,9 +121,9 @@ function runexp12(i::Int)
                     # degrees of freedom in the model
                     for deg in deg_options, ignore_mono in mono_options, ignore_conv in conv_options, use_wsos in wsos_options
                         println("running ", "signal_ratio=$signal_ratio, deg=$deg, ignore_mono=$ignore_mono, ignore_conv=$ignore_conv, use_wsos=$use_wsos")
-                        (mdl, tr_rmse, tm, regr) = exprmnt_mdl(Xtemp, ytrain, shape_data, deg=deg, use_wsos=use_wsos, ignore_mono=ignore_mono, ignore_conv=ignore_conv)
+                        (mdl, tr_rmse, tm, b_tm, s_tm, regr) = exprmnt_mdl(Xtemp, ytrain, shape_data, deg=deg, use_wsos=use_wsos, ignore_mono=ignore_mono, ignore_conv=ignore_conv)
                         ts_rmse = sum(abs2(ytest[i] - JuMP.value(regr)(convert(Array{Float64,2}, Xtest)[:,i])) for i in 1:size(Xtest, 1))
-                        println(f, "$foldcount,$signal_ratio,$refrmse,$deg,$ignore_mono,$ignore_conv,$use_wsos,$tr_rmse,$ts_rmse,$tm,$(JuMP.termination_status(mdl))")
+                        println(f, "$foldcount,$signal_ratio,$refrmse,$deg,$ignore_mono,$ignore_conv,$use_wsos,$tr_rmse,$ts_rmse,$tm,$b_tm,$s_tm,$(JuMP.termination_status(mdl))")
                         if runmakeplot
                             makeplot(regr, Xtemp, ytrain, joinpath(@__DIR__(), "plot$(signal_ratio)_$(deg)_$(ignore_mono)_$(ignore_conv)_$(use_wsos).pdf", l=(0.5, 0.5), u=(2.0, 2.0)))
                         end
@@ -214,6 +217,6 @@ p = runexp12(1)
 # ((Xtrain, ytrain), (_, _)) = folds[1]
 # # degrees of freedom in the model
 # deg = 6; ignore_mono = false; ignore_conv = true; use_wsos = false
-# @time (mdl, rmse, tm, p) = exprmnt_mdl(convert(Array{Float64,2}, Xtrain'), ytrain, shape_data, deg=deg, use_wsos=use_wsos, ignore_mono=ignore_mono, ignore_conv=ignore_conv)
+# @time (mdl, rmse, tm, b_tm, s_tm, p) = exprmnt_mdl(convert(Array{Float64,2}, Xtrain'), ytrain, shape_data, deg=deg, use_wsos=use_wsos, ignore_mono=ignore_mono, ignore_conv=ignore_conv)
 # filename = "" # joinpath(@__DIR__(), "mosek_both.pdf")
 # # pl = makeplot(p, convert(Array{Float64,2}, Xtrain'), ytrain, filename=filename, l=(0.5,0.5), u=(2.0,2.0))
