@@ -9,6 +9,7 @@ using MultivariatePolynomials
 using DynamicPolynomials
 using PolyJuMP
 using Test
+using LinearAlgebra
 
 n = 2
 deg = 4
