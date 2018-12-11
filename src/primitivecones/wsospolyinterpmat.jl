@@ -55,12 +55,27 @@ function barfun(matpnt, ipwt::Vector{Matrix{Float64}}, r::Int, u::Int)
         mat = similar(matpnt, l*r, l*r)
         mat .= 0.0
         for j in 1:l, i in 1:l
-            mat[(i-1)*r+1:i*r, (j-1)*r+1:j*r] .+= sum(ipwtj[ui,i] * ipwtj[ui,j] * matpnt[:,:,ui] for ui in 1:u)
+            mat[(i-1)*r+1:i*r, (j-1)*r+1:j*r] .+= sum(ipwtj[ui,i] * ipwtj[ui,j] * 0.5*(matpnt[:,:,ui] + matpnt[:,:,ui]') for ui in 1:u)
         end
         # @show logdet(mat)
         ret -= logdet(mat)
     end
     return ret
+    # # predictor fails
+    # for ipwtj in ipwt
+    #     l = size(ipwtj, 2)
+    #     mat = similar(matpnt, l*r, l*r)
+    #     for si in 1:r, ri in 1:r
+    #         (offsetrow, offsetcol) = (l*(ri-1), l*(si-1))
+    #         for j in 1:l, i in 1:l
+    #             mat[offsetrow+i,offsetcol+j] = sum(ipwtj[ui,i] * ipwtj[ui,j] * matpnt[ri,si,ui] for ui in 1:u)
+    #             # mat[offsetrow+i,offsetcol+j] = sum(ipwtj[ui,i] * ipwtj[ui,j] * 0.5 * (matpnt[ri,si,ui]+matpnt[si,ri,ui]) for ui in 1:u)
+    #         end
+    #     end
+    #     # @show logdet(mat)
+    #     ret -= logdet(mat)
+    # end
+    # return ret
 end
 function inconefun(matpnt, ipwt::Vector{Matrix{Float64}}, r::Int, u::Int)
     ret = true
@@ -69,14 +84,32 @@ function inconefun(matpnt, ipwt::Vector{Matrix{Float64}}, r::Int, u::Int)
         mat = zeros(l*r, l*r)
         for j in 1:l, i in 1:l
             # @show [ipwtj[ui,i] * ipwtj[ui,j] for ui in 1:u]
-            mat[(i-1)*r+1:i*r, (j-1)*r+1:j*r] .+= sum(ipwtj[ui,i] * ipwtj[ui,j] * matpnt[:,:,ui] for ui in 1:u)
+            mat[(i-1)*r+1:i*r, (j-1)*r+1:j*r] .+= sum(ipwtj[ui,i] * ipwtj[ui,j] * 0.5*(matpnt[:,:,ui] + matpnt[:,:,ui]') for ui in 1:u)
         end
-        @show mat
+        # @show mat
         if !isposdef(mat)
+            @show mat
             ret = false
         end
     end
     return ret
+    # # predictor fails
+    # for ipwtj in ipwt
+    #     l = size(ipwtj, 2)
+    #     mat = zeros(l*r, l*r)
+    #     for si in 1:r, ri in 1:r
+    #         (offsetrow, offsetcol) = (l*(ri-1), l*(si-1))
+    #         for j in 1:l, i in 1:l
+    #             mat[offsetrow+i,offsetcol+j] = sum(ipwtj[ui,i] * ipwtj[ui,j] * matpnt[ri,si,ui] for ui in 1:u)
+    #             # mat[offsetrow+i,offsetcol+j] += sum(ipwtj[ui,i] * ipwtj[ui,j] * 0.5 * (matpnt[ri,si,ui]+matpnt[si,ri,ui]) for ui in 1:u)
+    #         end
+    #     end
+    #     @show mat
+    #     if !isposdef(mat)
+    #         ret = false
+    #     end
+    # end
+    # return ret
 end
 
 
@@ -106,6 +139,7 @@ function incone_prmtv(prmtv::WSOSPolyInterpMat, scal::Float64)
     prmtv.g .= DiffResults.gradient(prmtv.diffres)
     prmtv.H .= DiffResults.hessian(prmtv.diffres)
     # factorization of Hessian used later
+    @show prmtv.H
     return factH(prmtv)
 end
 
