@@ -53,9 +53,14 @@ function barfun(matpnt, ipwt::Vector{Matrix{Float64}}, r::Int, u::Int)
     for ipwtj in ipwt
         l = size(ipwtj, 2)
         mat = similar(matpnt, l*r, l*r)
+        # mat = similar(matpnt, l, l)
+        # mat = similar(matpnt, r, r)
         mat .= 0.0
         for j in 1:l, i in 1:l
             mat[(i-1)*r+1:i*r, (j-1)*r+1:j*r] .+= sum(ipwtj[ui,i] * ipwtj[ui,j] * 0.5*(matpnt[:,:,ui] + matpnt[:,:,ui]') for ui in 1:u)
+            # mat[i,j] = sum(sum(ipwtj[ui,i] * ipwtj[ui,j] * 0.5*(matpnt[:,:,ui] + matpnt[:,:,ui]') for ui in 1:u))
+            # mat += sum(ipwtj[ui,i] * ipwtj[ui,j] * 0.5*(matpnt[:,:,ui] + matpnt[:,:,ui]') for ui in 1:u)
+            # mat[i,j] = det(sum(ipwtj[ui,i] * ipwtj[ui,j] * 0.5*(matpnt[:,:,ui] + matpnt[:,:,ui]') for ui in 1:u))
         end
         # @show logdet(mat)
         ret -= logdet(mat)
@@ -82,9 +87,13 @@ function inconefun(matpnt, ipwt::Vector{Matrix{Float64}}, r::Int, u::Int)
     for ipwtj in ipwt
         l = size(ipwtj, 2)
         mat = zeros(l*r, l*r)
+        # mat = zeros(l, l)
+        # mat = zeros(r, r)
         for j in 1:l, i in 1:l
-            # @show [ipwtj[ui,i] * ipwtj[ui,j] for ui in 1:u]
             mat[(i-1)*r+1:i*r, (j-1)*r+1:j*r] .+= sum(ipwtj[ui,i] * ipwtj[ui,j] * 0.5*(matpnt[:,:,ui] + matpnt[:,:,ui]') for ui in 1:u)
+            # mat[i,j] = sum(sum(ipwtj[ui,i] * ipwtj[ui,j] * 0.5*(matpnt[:,:,ui] + matpnt[:,:,ui]') for ui in 1:u))
+            # mat += sum(ipwtj[ui,i] * ipwtj[ui,j] * 0.5*(matpnt[:,:,ui] + matpnt[:,:,ui]') for ui in 1:u)
+            # mat[i,j] = det(sum(ipwtj[ui,i] * ipwtj[ui,j] * 0.5*(matpnt[:,:,ui] + matpnt[:,:,ui]') for ui in 1:u))
         end
         # @show mat
         if !isposdef(mat)
@@ -141,6 +150,9 @@ function incone_prmtv(prmtv::WSOSPolyInterpMat, scal::Float64)
     # factorization of Hessian used later
     @show prmtv.H
     return factH(prmtv)
+    # @. prmtv.H2 = prmtv.H
+    # prmtv.F = cholesky!(Symmetric(prmtv.H2, :U), Val(true), check=false)
+    # return true
 end
 
 calcg_prmtv!(g::AbstractVector{Float64}, prmtv::WSOSPolyInterpMat) = (@. g = prmtv.g/prmtv.scal; g)
