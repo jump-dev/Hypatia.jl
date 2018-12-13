@@ -29,6 +29,7 @@ mutable struct Box <: InterpDomain
 end
 
 dimension(dom::Box) = length(dom.l)
+degree(::Box) = 2
 
 function interp_sample(dom::Box, npts::Int)
     dim = dimension(dom)
@@ -59,6 +60,7 @@ mutable struct Ball <: InterpDomain
 end
 
 dimension(dom::Ball) = length(dom.c)
+degree(::Ball) = 2
 
 function interp_sample(dom::Ball, npts::Int)
     dim = dimension(dom)
@@ -93,6 +95,7 @@ mutable struct Ellipsoid <: InterpDomain
 end
 
 dimension(dom::Ellipsoid) = length(dom.c)
+degree(::Ellipsoid) = 2
 
 function interp_sample(dom::Ellipsoid, npts::Int)
     dim = dimension(dom)
@@ -133,6 +136,7 @@ function add_free_vars(dom::InterpDomain)
 end
 
 dimension(dom::SemiFreeDomain) = 2*dimension(dom.sampling_region)
+degree(dom::SemiFreeDomain) = degree(dom.sampling_region)
 
 function interp_sample(dom::SemiFreeDomain, npts::Int)
     return hcat(interp_sample(dom.sampling_region, npts), interp_sample(dom.sampling_region, npts))
@@ -362,8 +366,8 @@ function make_wsos_arrays(
     pts = candidate_pts[keep_pnt,:] # subset of points indexed with the support of w
     P0 = M[keep_pnt, 1:L] # subset of polynomial evaluations up to total degree d
 
-    # TODO take into account degree of g; currently always 2 for balls, ellipsoids, and intervals by luck
-    P0sub = view(P0, :, 1:binomial(n+d-1, n))
+    subd = d - div(degree(dom), 2)
+    P0sub = view(P0, :, 1:binomial(n+subd, n))
 
     if calc_w
         Qtm = F.Q'*m
