@@ -65,23 +65,16 @@ function generateregrdata(
     return (X, y)
 end
 
-function build_shapeconregr_PSD(
+function add_loss_and_polys!(
+    model::Model,
     X::Matrix{Float64},
     y::Vector{Float64},
     r::Int,
-    sd::ShapeData;
-    use_leastsqobj::Bool = false,
-    usedense::Bool = true,
+    use_leastsqobj::Bool
     )
     (npoints, n) = size(X)
-
     @polyvar x[1:n]
-    mono_bss = get_domain_inequalities(sd.mono_dom, x)
-    conv_bss = get_domain_inequalities(sd.conv_dom, x)
-
-    model = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true, usedense=usedense, lscachetype=Hypatia.QRSymmCache))
     @variable(model, p, PolyJuMP.Poly(monomials(x, 0:r)))
-
     if use_leastsqobj
         @variable(model, z)
         @objective(model, Min, z / npoints)
@@ -94,6 +87,24 @@ function build_shapeconregr_PSD(
             [i in 1:npoints], z[i] >= -y[i] + p(X[i, :])
         end)
     end
+    return (x, p)
+end
+
+function build_shapeconregr_PSD(
+    X::Matrix{Float64},
+    y::Vector{Float64},
+    r::Int,
+    sd::ShapeData;
+    use_leastsqobj::Bool = false,
+    usedense::Bool = true,
+    )
+    n = size(X, 2)
+
+    model = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true, usedense=usedense, lscachetype=Hypatia.QRSymmCache))
+    (x, p) = add_loss_and_polys!(model, X, y, r, use_leastsqobj)
+    
+    mono_bss = get_domain_inequalities(sd.mono_dom, x)
+    conv_bss = get_domain_inequalities(sd.conv_dom, x)
 
     # monotonicity
     dp = [DynamicPolynomials.differentiate(p, x[i]) for i in 1:n]
@@ -123,31 +134,17 @@ function build_shapeconregr_WSOS(
     sample::Bool = true,
     )
     d = div(r, 2)
-    (npoints, n) = size(X)
+    n = size(X, 2)
 
     full_conv_dom = Hypatia.add_free_vars(sd.conv_dom)
     (mono_U, mono_pts, mono_P0, mono_PWts, _) = Hypatia.interpolate(sd.mono_dom, d, sample=sample, sample_factor=50)
     (conv_U, conv_pts, conv_P0, conv_PWts, _) = Hypatia.interpolate(full_conv_dom, d+1, sample=sample, sample_factor=50) # TODO think about if it's ok to go up to d+1
     mono_wsos_cone = WSOSPolyInterpCone(mono_U, [mono_P0, mono_PWts...])
     conv_wsos_cone = WSOSPolyInterpCone(conv_U, [conv_P0, conv_PWts...])
-    @polyvar x[1:n]
-    @polyvar w[1:n]
 
     model = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true, usedense=usedense, lscachetype=Hypatia.QRSymmCache))
-    @variable(model, p, PolyJuMP.Poly(monomials(x, 0:r)))
-
-    if use_leastsqobj
-        @variable(model, z)
-        @objective(model, Min, z / npoints)
-        @constraint(model, [z, [y[i] - p(X[i, :]) for i in 1:npoints]...] in MOI.SecondOrderCone(1+npoints))
-     else
-        @variable(model, z[1:npoints])
-        @objective(model, Min, sum(z) / npoints)
-        @constraints(model, begin
-            [i in 1:npoints], z[i] >= y[i] - p(X[i, :])
-            [i in 1:npoints], z[i] >= -y[i] + p(X[i, :])
-        end)
-    end
+    (x, p) = add_loss_and_polys!(model, X, y, r, use_leastsqobj)
+    @polyvar w[1:n]
 
     # monotonicity
     dp = [DynamicPolynomials.differentiate(p, x[j]) for j in 1:n]
