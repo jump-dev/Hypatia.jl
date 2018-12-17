@@ -379,6 +379,7 @@ function _shapeconregr10_JuMP()
     (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
     (mdl, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_leastsqobj=true)
     truemin = 4.7430e-2 # <---- not verified with SDP like others
+    # getting 5.0209e-02
     solveandcheck_JuMP(mdl, truemin)
 end
 
