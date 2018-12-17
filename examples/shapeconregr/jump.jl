@@ -99,6 +99,7 @@ function build_shapeconregr_PSD(
     usedense::Bool = true,
     )
     n = size(X, 2)
+    d = div(r+1, 2)
 
     model = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true, usedense=usedense, lscachetype=Hypatia.QRSymmCache))
     (x, p) = add_loss_and_polys!(model, X, y, r, use_leastsqobj)
@@ -155,7 +156,6 @@ function build_shapeconregr_WSOS(
     # end
 
     # convexity
-    trimat_len(n) = div(n*(n+1),2)
     if !iszero(sd.conv_profile)
         Hp = [DynamicPolynomials.differentiate(dp[i], x[j]) for i in 1:n, j in 1:n]
         @constraint(model, sd.conv_profile * [Hp[i,j](conv_pts[ui, :]) for j in 1:n, i in 1:n, ui in 1:conv_U if i >= j] in conv_wsos_cone)
@@ -194,10 +194,10 @@ function run_JuMP_shapeconregr(use_wsos::Bool; usedense::Bool=true)
     pr_status = JuMP.primal_status(model)
     du_status = JuMP.dual_status(model)
 
-    # @test term_status == MOI.Success
-    # @test pr_status == MOI.FeasiblePoint
-    # @test du_status == MOI.FeasiblePoint
-    # @test pobj ≈ dobj atol=1e-4 rtol=1e-4
+    @test term_status == MOI.Optimal
+    @test pr_status == MOI.FeasiblePoint
+    @test du_status == MOI.FeasiblePoint
+    @test pobj ≈ dobj atol=1e-4 rtol=1e-4
 
     return (pobj, p)
 end

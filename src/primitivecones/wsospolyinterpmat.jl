@@ -43,10 +43,6 @@ mutable struct WSOSPolyInterpMat <: PrimitiveCone
     end
 end
 
-# temporary wrapper
-function mattowsosvec()
-end
-
 function vectomatidx(blockind::Int)
     i = floor(Int, (1+sqrt(8*blockind-7))/2)
     j = blockind - div(i*(i-1), 2)
@@ -73,7 +69,7 @@ function barfun(scalpnt, ipwt::Vector{Matrix{Float64}}, r::Int, u::Int)
                     mat[(li-1)*r+ri, (lj-1)*r+rj] += ipwtj[ui,li] * ipwtj[ui,lj] * scalpnt[vecind] # matpnt[ri,rj,ui]
                 end # l
                 # TODO don't duplicate
-                if li < lj
+                if li < lj && ui == u
                     mat[(li-1)*r+1:li*r, (lj-1)*r+1:lj*r] = Symmetric(mat[(li-1)*r+1:li*r, (lj-1)*r+1:lj*r])
                 end
             end # dim
@@ -83,18 +79,6 @@ function barfun(scalpnt, ipwt::Vector{Matrix{Float64}}, r::Int, u::Int)
     return ret
 end
 
-# matpnt = reshape(scalpnt, r, r, u)
-# for ipwtj in ipwt
-#     l = size(ipwtj, 2)
-#     mat = similar(matpnt, l*r, l*r)
-#     mat .= 0.0
-#         for j in 1:l, i in 1:j
-#             mat[(i-1)*r+1:i*r, (j-1)*r+1:j*r] .+= sum(ipwtj[ui,i] * ipwtj[ui,j] * 0.5*(matpnt[:,:,ui] + matpnt[:,:,ui]') for ui in 1:u)
-#         end
-#         ret -= logdet(Symmetric(mat))
-#     end
-#     return ret
-# end
 function inconefun(scalpnt, ipwt::Vector{Matrix{Float64}}, r::Int, u::Int)
     dim = div(r*(r+1), 2)
     for ipwtj in ipwt
@@ -112,7 +96,7 @@ function inconefun(scalpnt, ipwt::Vector{Matrix{Float64}}, r::Int, u::Int)
                     mat[(li-1)*r+ri, (lj-1)*r+rj] += ipwtj[ui,li] * ipwtj[ui,lj] * scalpnt[vecind] # matpnt[ri,rj,ui]
                 end # l
                 # TODO don't duplicate
-                if li < lj
+                if li < lj && ui == u
                     mat[(li-1)*r+1:li*r, (lj-1)*r+1:lj*r] = Symmetric(mat[(li-1)*r+1:li*r, (lj-1)*r+1:lj*r])
                 end
             end # dim
@@ -122,22 +106,6 @@ function inconefun(scalpnt, ipwt::Vector{Matrix{Float64}}, r::Int, u::Int)
         end
     end # ipwt
     return true
-
-
-    # matpnt = reshape(scalpnt, r, r, u)
-    # # @show matpnt
-    # ret = true
-    # for ipwtj in ipwt
-    #     l = size(ipwtj, 2)
-    #     mat = zeros(l*r, l*r)
-    #     for j in 1:l, i in 1:j
-    #         mat[(i-1)*r+1:i*r, (j-1)*r+1:j*r] .+= sum(ipwtj[ui,i] * ipwtj[ui,j] * 0.5*(matpnt[:,:,ui] + matpnt[:,:,ui]') for ui in 1:u)
-    #     end
-    #     if !isposdef(Symmetric(mat))
-    #         ret = false
-    #     end
-    # end
-    # return ret
 end
 
 WSOSPolyInterpMat(r::Int, u::Int, ipwt::Vector{Matrix{Float64}}) = WSOSPolyInterpMat(r, u, ipwt, false)
@@ -168,9 +136,7 @@ function incone_prmtv(prmtv::WSOSPolyInterpMat, scal::Float64)
     if !inconefun(prmtv.scalpnt, prmtv.ipwt, prmtv.r, prmtv.u)
         return false
     end
-    # prmtv.mat = makemat(prmtv.matpnt, prmtv.ipwt, prmtv.r, prmtv.u)
     prmtv.diffres = ForwardDiff.hessian!(prmtv.diffres, prmtv.barfun, prmtv.scalpnt)
-    # prmtv.diffres = ForwardDiff.hessian!(prmtv.diffres, prmtv.barfun, prmtv.matpnt)
     prmtv.g .= DiffResults.gradient(prmtv.diffres)
     prmtv.H .= DiffResults.hessian(prmtv.diffres)
     return factH(prmtv)
