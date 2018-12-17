@@ -135,17 +135,16 @@ function build_shapeconregr_WSOS(
     )
     d = div(r, 2)
     @assert mod(r, 2) == 0 # TODO fix so d for convexity is right
-    (npoints, n) = size(X)
+    n = size(X, 2)
 
-    (mono_U, mono_pts, mono_P0, mono_PWts, _) = Hypatia.interpolate(sd.mono_dom, d, sample=true, sample_factor=50)
-    (conv_U, conv_pts, conv_P0, conv_PWts, _) = Hypatia.interpolate(sd.conv_dom, d-1, sample=true, sample_factor=50)
+    (mono_U, mono_pts, mono_P0, mono_PWts, _) = Hypatia.interpolate(sd.mono_dom, d, sample=sample, sample_factor=50)
+    (conv_U, conv_pts, conv_P0, conv_PWts, _) = Hypatia.interpolate(sd.conv_dom, d-1, sample=sample, sample_factor=50)
     mono_wsos_cone = WSOSPolyInterpCone(mono_U, [mono_P0, mono_PWts...])
     conv_wsos_cone = WSOSPolyInterpMatCone(n, conv_U, [conv_P0, conv_PWts...])
     @polyvar x[1:n]
 
     model = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true, usedense=usedense, lscachetype=Hypatia.QRSymmCache))
     (x, p) = add_loss_and_polys!(model, X, y, r, use_leastsqobj)
-    @polyvar w[1:n]
 
     # monotonicity
     dp = [DynamicPolynomials.differentiate(p, x[j]) for j in 1:n]
