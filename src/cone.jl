@@ -114,6 +114,11 @@ end
 
 function factH(prmtv::PrimitiveCone)
     @. prmtv.H2 = prmtv.H
+    temp = similar(prmtv.H)
+    temp .= 0.0
+    temp .+= Matrix(I, size(temp)) * 1e-6
+    @. prmtv.H2 += temp
+    # @show prmtv.H
 
     prmtv.F = bunchkaufman!(Symmetric(prmtv.H2, :U), true, check=false)
     return issuccess(prmtv.F)
