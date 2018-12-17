@@ -76,10 +76,10 @@ function barfun(scalpnt, ipwt::Vector{Matrix{Float64}}, r::Int, u::Int)
         l = size(ipwtj, 2)
         mat = similar(matpnt, l*r, l*r)
         mat .= 0.0
-        for j in 1:l, i in 1:l
+        for j in 1:l, i in 1:j
             mat[(i-1)*r+1:i*r, (j-1)*r+1:j*r] .+= sum(ipwtj[ui,i] * ipwtj[ui,j] * 0.5*(matpnt[:,:,ui] + matpnt[:,:,ui]') for ui in 1:u)
         end
-        ret -= logdet(mat)
+        ret -= logdet(Symmetric(mat, :L))
     end
     return ret
 end
@@ -90,11 +90,11 @@ function inconefun(scalpnt, ipwt::Vector{Matrix{Float64}}, r::Int, u::Int)
     for ipwtj in ipwt
         l = size(ipwtj, 2)
         mat = zeros(l*r, l*r)
-        for j in 1:l, i in 1:l
+        for j in 1:l, i in 1:j
             mat[(i-1)*r+1:i*r, (j-1)*r+1:j*r] .+= sum(ipwtj[ui,i] * ipwtj[ui,j] * 0.5*(matpnt[:,:,ui] + matpnt[:,:,ui]') for ui in 1:u)
         end
         # @show mat
-        if !isposdef(mat)
+        if !isposdef(Symmetric(mat, :L))
             # @show mat
             ret = false
         end
@@ -127,10 +127,10 @@ function incone_prmtv(prmtv::WSOSPolyInterpMat, scal::Float64)
     prmtv.H .= DiffResults.hessian(prmtv.diffres)
     # factorization of Hessian used later
     # @show prmtv.H
-    return factH(prmtv)
+    # return factH(prmtv)
     # @. prmtv.H2 = prmtv.H
     # prmtv.F = cholesky!(Symmetric(prmtv.H2, :U), Val(true), check=false)
-    return true
+    # return true
 
 
 
@@ -160,8 +160,8 @@ function incone_prmtv(prmtv::WSOSPolyInterpMat, scal::Float64)
     #         end
     #     end
     # end
-    #
-    # return factH(prmtv)
+
+    return factH(prmtv)
 end
 
 calcg_prmtv!(g::AbstractVector{Float64}, prmtv::WSOSPolyInterpMat) = (@. g = prmtv.g/prmtv.scal; g)
