@@ -102,7 +102,7 @@ function build_shapeconregr_PSD(
 
     model = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true, usedense=usedense, lscachetype=Hypatia.QRSymmCache))
     (x, p) = add_loss_and_polys!(model, X, y, r, use_leastsqobj)
-    
+
     mono_bss = get_domain_inequalities(sd.mono_dom, x)
     conv_bss = get_domain_inequalities(sd.conv_dom, x)
 
@@ -134,13 +134,14 @@ function build_shapeconregr_WSOS(
     sample::Bool = true,
     )
     d = div(r, 2)
-    n = size(X, 2)
+    @assert mod(r, 2) == 0 # TODO fix so d for convexity is right
+    (npoints, n) = size(X)
 
-    full_conv_dom = Hypatia.add_free_vars(sd.conv_dom)
-    (mono_U, mono_pts, mono_P0, mono_PWts, _) = Hypatia.interpolate(sd.mono_dom, d, sample=sample, sample_factor=50)
-    (conv_U, conv_pts, conv_P0, conv_PWts, _) = Hypatia.interpolate(full_conv_dom, d+1, sample=sample, sample_factor=50) # TODO think about if it's ok to go up to d+1
+    (mono_U, mono_pts, mono_P0, mono_PWts, _) = Hypatia.interpolate(sd.mono_dom, d, sample=true, sample_factor=50)
+    (conv_U, conv_pts, conv_P0, conv_PWts, _) = Hypatia.interpolate(sd.conv_dom, d-1, sample=true, sample_factor=50)
     mono_wsos_cone = WSOSPolyInterpCone(mono_U, [mono_P0, mono_PWts...])
-    conv_wsos_cone = WSOSPolyInterpCone(conv_U, [conv_P0, conv_PWts...])
+    conv_wsos_cone = WSOSPolyInterpMatCone(n, conv_U, [conv_P0, conv_PWts...])
+    @polyvar x[1:n]
 
     model = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true, usedense=usedense, lscachetype=Hypatia.QRSymmCache))
     (x, p) = add_loss_and_polys!(model, X, y, r, use_leastsqobj)
@@ -148,17 +149,16 @@ function build_shapeconregr_WSOS(
 
     # monotonicity
     dp = [DynamicPolynomials.differentiate(p, x[j]) for j in 1:n]
-    for j in 1:n
-        if !iszero(sd.mono_profile[j])
-            @constraint(model, [sd.mono_profile[j] * dp[j](mono_pts[i, :]) for i in 1:mono_U] in mono_wsos_cone)
-        end
-    end
+    # for j in 1:n
+    #     if !iszero(sd.mono_profile[j])
+    #         @constraint(model, [sd.mono_profile[j] * dp[j](mono_pts[i, :]) for i in 1:mono_U] in mono_wsos_cone)
+    #     end
+    # end
 
     # convexity
     if !iszero(sd.conv_profile)
         Hp = [DynamicPolynomials.differentiate(dp[i], x[j]) for i in 1:n, j in 1:n]
-        conv_condition = w'*Hp*w
-        @constraint(model, [sd.conv_profile * conv_condition(conv_pts[i, :]) for i in 1:conv_U] in conv_wsos_cone)
+        @constraint(model, sd.conv_profile * [Hp[i,j](conv_pts[u, :]) for i in 1:n, j in 1:n, u in 1:conv_U][:] in conv_wsos_cone)
     end
 
     return (model, p)
@@ -167,12 +167,13 @@ end
 function run_JuMP_shapeconregr(use_wsos::Bool; usedense::Bool=true)
     (n, deg, npoints, signal_ratio, f) =
         # (2, 3, 100, 0.0, x -> exp(norm(x))) # no noise, monotonic function
-        (2, 3, 100, 0.0, x -> sum(x.^3)) # no noise, monotonic function
+        # (2, 4, 100, 0.0, x -> sum(x.^3)) # no noise, monotonic function
         # (2, 3, 100, 0.0, x -> sum(x.^4)) # no noise, non-monotonic function
         # (2, 3, 100, 50.0, x -> sum(x.^3)) # some noise, monotonic function
         # (2, 3, 100, 50.0, x -> sum(x.^4)) # some noise, non-monotonic function
         # (2, 8, 100, 0.0, x -> exp(norm(x))) # low n high deg, numerically harder
         # (5, 5, 100, 0.0, x -> exp(norm(x))) # moderate size, no noise, monotonic # out of memory with psd
+        (2, 4, 100, 0.0, x -> sum(x.^4))
 
     shapedata = ShapeData(n)
     (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
@@ -193,10 +194,10 @@ function run_JuMP_shapeconregr(use_wsos::Bool; usedense::Bool=true)
     pr_status = JuMP.primal_status(model)
     du_status = JuMP.dual_status(model)
 
-    @test term_status == MOI.Optimal
-    @test pr_status == MOI.FeasiblePoint
-    @test du_status == MOI.FeasiblePoint
-    @test pobj ≈ dobj atol=1e-4 rtol=1e-4
+    # @test term_status == MOI.Success
+    # @test pr_status == MOI.FeasiblePoint
+    # @test du_status == MOI.FeasiblePoint
+    # @test pobj ≈ dobj atol=1e-4 rtol=1e-4
 
     return (pobj, p)
 end
