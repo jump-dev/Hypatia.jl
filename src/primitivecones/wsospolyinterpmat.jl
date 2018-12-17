@@ -49,25 +49,6 @@ mutable struct WSOSPolyInterpMat <: PrimitiveCone
     end
 end
 
-function naive_blow_up(P::Matrix{Float64}, r::Int)
-    (u, l) = size(P)
-    Pbig = zeros(u*r, l*r)
-    id = Matrix{Float64}(I, r, r)
-    for j in 1:l, i in 1:u
-        Pbig[(i-1)*r+1:i*r, (j-1)*r+1:j*r] = P[i,j] * id
-    end
-    return Pbig
-end
-
-function naive_diagonalizeQ(q::Vector{Float64}, u::Int, r::Int)
-    Qbig = zeros(u*r, u*r)
-    Q = reshape(q, r, r, u)
-    for i in 1:u
-        Qbig[(i-1)*r+1:i*r, (i-1)*r+1:i*r] = Q[:,:,i]
-    end
-    return Qbig
-end
-
 # naively separate calculating barrier from calculating in cone
 function barfun(scalpnt, ipwt::Vector{Matrix{Float64}}, r::Int, u::Int)
     matpnt = reshape(scalpnt, r, r, u)
@@ -93,9 +74,7 @@ function inconefun(scalpnt, ipwt::Vector{Matrix{Float64}}, r::Int, u::Int)
         for j in 1:l, i in 1:j
             mat[(i-1)*r+1:i*r, (j-1)*r+1:j*r] .+= sum(ipwtj[ui,i] * ipwtj[ui,j] * 0.5*(matpnt[:,:,ui] + matpnt[:,:,ui]') for ui in 1:u)
         end
-        # @show mat
         if !isposdef(Symmetric(mat, :L))
-            # @show mat
             ret = false
         end
     end
@@ -125,42 +104,6 @@ function incone_prmtv(prmtv::WSOSPolyInterpMat, scal::Float64)
     # prmtv.diffres = ForwardDiff.hessian!(prmtv.diffres, prmtv.barfun, prmtv.matpnt)
     prmtv.g .= DiffResults.gradient(prmtv.diffres)
     prmtv.H .= DiffResults.hessian(prmtv.diffres)
-    # factorization of Hessian used later
-    # @show prmtv.H
-    # return factH(prmtv)
-    # @. prmtv.H2 = prmtv.H
-    # prmtv.F = cholesky!(Symmetric(prmtv.H2, :U), Val(true), check=false)
-    # return true
-
-
-
-
-    # @. prmtv.g = 0.0
-    # @. prmtv.H = 0.0
-    # r = prmtv.r
-    # bigQ = naive_diagonalizeQ(prmtv.scalpnt, prmtv.u, r)
-    #
-    # for P in prmtv.ipwt
-    #     bigP = naive_blow_up(P, prmtv.r)
-    #
-    #     level1 = bigP' * bigQ * bigP
-    #     F = cholesky(Symmetric(level1, :L), Val(true), check=false)
-    #     if !isposdef(F)
-    #         @show level1
-    #         return false
-    #     end
-    #     level1r = view(bigP', F.p, :)
-    #     level2 = bigP * ldiv!(F.L, level1r)
-    #
-    #     vector_ind = 0
-    #     @inbounds for ui in 1:prmtv.u
-    #         for rj in 1:r, ri in 1:r
-    #             vector_ind += 1
-    #             prmtv.g[vector_ind] -= level2[(ui-1)*r+ri, (ui-1)*r+rj]
-    #         end
-    #     end
-    # end
-
     return factH(prmtv)
 end
 
