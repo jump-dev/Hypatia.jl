@@ -30,15 +30,8 @@ Hp = [DynamicPolynomials.differentiate(dp[i], x[j]) for i in 1:n, j in 1:n]
 # @constraint(model, [Hp[1,1](pts[u, :]) for u in 1:U][:] in WSOSPolyInterpCone(U, [P0, PWts...]))
 
 # what we want
-@variable(model, dummy[1:U*div(n*(n+1), 2)])
 trimat_len(n) = div(n*(n+1),2)
-@constraint(model, dummy in wsos_mat_cone)
-for ui in 1:U
-    for j in 1:n, i in 1:n
-        @constraint(model, Hp[i,j](pts[ui, :]) == dummy[(ui-1)*trimat_len(n) + trimat_len(max(i,j)-1) + min(i,j)])
-    end
-end
-# @constraint(model, [Hp[i,j](pts[u, :]) for i in 1:n, j in 1:n, u in 1:U][:] in wsos_mat_cone)
+@constraint(model, [Hp[i,j](pts[ui, :]) for j in 1:n, i in 1:n, ui in 1:U if i >= j] in wsos_mat_cone)
 
 # working with monomials, fix some function we like
 # @constraint(model, [u in 1:U, i in 1:n, j in 1:n], Hp[i,j](pts[u,:]) == 30 * pts[u,i]^4 * Float64(i == j))
