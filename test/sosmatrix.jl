@@ -15,7 +15,7 @@ n = 2
 deg = 4
 d = div(deg-2, 2)
 
-domain = Hypatia.Box(-ones(n), ones(n))
+domain = Hypatia.Ball(zeros(n), 1.0)
 (U, pts, P0, PWts, _) = Hypatia.interpolate(domain, d, sample=true, sample_factor=50)
 wsos_mat_cone = WSOSPolyInterpMatCone(n, U, [P0, PWts...])
 
