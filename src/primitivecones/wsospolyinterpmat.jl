@@ -65,7 +65,7 @@ function barfun(scalpnt, ipwt::Vector{Matrix{Float64}}, r::Int, u::Int)
                 outervecind = dim * (ui-1)
                 for blockind in 1:dim
                     vecind = outervecind + blockind
-                    (ri, rj) = vectomatidx(blockind)
+                    (rj, ri) = vectomatidx(blockind)
                     mat[(li-1)*r+ri, (lj-1)*r+rj] += ipwtj[ui,li] * ipwtj[ui,lj] * scalpnt[vecind] # matpnt[ri,rj,ui]
                 end # l
                 # TODO don't duplicate
@@ -92,7 +92,7 @@ function inconefun(scalpnt, ipwt::Vector{Matrix{Float64}}, r::Int, u::Int)
                 outervecind = dim * (ui-1)
                 for blockind in 1:dim
                     vecind = outervecind + blockind
-                    (ri, rj) = vectomatidx(blockind)
+                    (rj, ri) = vectomatidx(blockind)
                     mat[(li-1)*r+ri, (lj-1)*r+rj] += ipwtj[ui,li] * ipwtj[ui,lj] * scalpnt[vecind] # matpnt[ri,rj,ui]
                 end # l
                 # TODO don't duplicate
