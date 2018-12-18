@@ -101,6 +101,7 @@ function inconefun(scalpnt, ipwt::Vector{Matrix{Float64}}, r::Int, u::Int)
                 end
             end # dim
         end # u
+        # @show Symmetric(mat)
         if !isposdef(Symmetric(mat))
             return false
         end
@@ -124,8 +125,6 @@ function getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::WSOSPolyInterpMat
             end
         end
     end
-    # arr .= 1.0 # would give a positive semidefinite matrix but not positive definite which we want to begin with
-    # arr .= vcat([Matrix{Float64}(I, prmtv.r, prmtv.r)[:] for ui in 1:prmtv.u]...) # TODO tidy
     return arr
 end
 loadpnt_prmtv!(prmtv::WSOSPolyInterpMat, pnt::AbstractVector{Float64}) = (prmtv.pnt = pnt)
