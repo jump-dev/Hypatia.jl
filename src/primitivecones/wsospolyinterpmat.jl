@@ -4,6 +4,10 @@ Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 interpolation-based weighted-sum-of-squares (multivariate) polynomial matrix cone parametrized by interpolation points ipwt
 
 definition and dual barrier extended from "Sum-of-squares optimization without semidefinite programming" by D. Papp and S. Yildiz, available at https://arxiv.org/abs/1712.01792
+
+An an r-by-r matrix of polynomials, given a basis of size U is represented by a vectors of size r*(r+1)/2*U.
+The first r*(r+1)/2 elements correspond to the first matrix of coefficients, the second  r*(r+1)/2 elements correspond to the second matrix of coefficients, and so on.
+The coefficients within each matrix are ordered row wise from the lower triangle of the matrix.
 =#
 
 mutable struct WSOSPolyInterpMat <: PrimitiveCone
