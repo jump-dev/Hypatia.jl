@@ -3,22 +3,6 @@ Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 
 Example taken from https://github.com/JuliaOpt/SumOfSquares.jl/blob/master/test/choi.jl
 =#
-
-
-# @polyvar x y z
-#
-# m = SOSModel(with_optimizer(Hypatia.Optimizer))
-#
-# C = [x^2+2y^2 -x*y -x*z;
-#      -x*y y^2+2z^2 -y*z;
-#      -x*z -y*z z^2+2x^2]
-#
-# @SDconstraint m C >= 0
-#
-# JuMP.optimize!(m)
-# @test JuMP.dual_status(m) == MOI.InfeasibilityCertificate
-
-
 using JuMP
 using MathOptInterface
 MOI = MathOptInterface
