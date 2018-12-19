@@ -130,7 +130,7 @@ function check_data(
     )
     (n, p, q) = (length(c), length(b), length(h))
     if n == 0
-        error("c vector is empty, but number of variables must be positive")
+        println("c vector is empty, but number of variables must be positive")
     end
     if q == 0
         println("no conic constraints were specified; proceeding anyway")
