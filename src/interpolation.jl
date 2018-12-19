@@ -158,7 +158,7 @@ function interp_sample(dom::FreeDomain, npts::Int)
     return interp_sample(Box(-ones(dom.n), ones(dom.n)), npts)
 end
 
-function get_weights(::FreeDomain, ::Matrix{Float64})
+function get_weights(::FreeDomain, ::AbstractMatrix{Float64})
     return []
 end
 
