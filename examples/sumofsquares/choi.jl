@@ -36,7 +36,7 @@ function scalarWSOS()
          -x*y y^2+2z^2 -y*z;
          -x*z -y*z z^2+2x^2]
 
-    n = size(C, 1)
+    n = 3
     @polyvar w[1:n]
     d = maximum(DynamicPolynomials.maxdegree.(C))
 
