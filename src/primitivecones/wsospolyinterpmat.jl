@@ -41,102 +41,74 @@ mutable struct WSOSPolyInterpMat <: PrimitiveCone
         prmtv.g = similar(ipwt[1], dim)
         prmtv.H = similar(ipwt[1], dim, dim)
         prmtv.H2 = similar(prmtv.H)
-        prmtv.barfun = (x -> barfun(x, ipwt, r, u))
+        prmtv.barfun = (x -> barfun(x, ipwt, r, u, true))
         prmtv.diffres = DiffResults.HessianResult(prmtv.g)
         return prmtv
     end
 end
 
-function vectomatidx(blockind::Int)
-    i = floor(Int, (1+sqrt(8*blockind-7))/2)
-    j = blockind - div(i*(i-1), 2)
-    return (i, j)
-end
-
-# naively separate calculating barrier from calculating in cone
-function barfun(scalpnt, ipwt::Vector{Matrix{Float64}}, r::Int, u::Int)
-    ret = 0.0
-    dim = div(r*(r+1), 2)
+# calculate barrier value
+function barfun(pnt, ipwt::Vector{Matrix{Float64}}, R::Int, U::Int, calc_barval::Bool)
+    barval = 0.0
     for ipwtj in ipwt
-        l = size(ipwtj, 2)
-        mat = similar(scalpnt, l*r, l*r)
+        L = size(ipwtj, 2)
+        mat = similar(pnt, L*R, L*R)
         mat .= 0.0
-        # loop over degree 2d basis polynomials
-        for ui in 1:u
-            # loop over indices of degree d basis polynomials
-            for lj in 1:l, li in 1:lj
-                # loop over indices inside triangle slice
-                outervecind = dim * (ui-1)
-                for blockind in 1:dim
-                    vecind = outervecind + blockind
-                    (rj, ri) = vectomatidx(blockind)
-                    mat[(li-1)*r+ri, (lj-1)*r+rj] += ipwtj[ui,li] * ipwtj[ui,lj] * scalpnt[vecind] # matpnt[ri,rj,ui]
-                end # l
-                # TODO don't duplicate
-                if li < lj && ui == u
-                    mat[(li-1)*r+1:li*r, (lj-1)*r+1:lj*r] = Symmetric(mat[(li-1)*r+1:li*r, (lj-1)*r+1:lj*r])
-                end
-            end # dim
-        end # u
-        ret -= logdet(Symmetric(mat))
-    end # ipwt
-    return ret
-end
 
-function inconefun(scalpnt, ipwt::Vector{Matrix{Float64}}, r::Int, u::Int)
-    dim = div(r*(r+1), 2)
-    for ipwtj in ipwt
-        l = size(ipwtj, 2)
-        mat = zeros(l*r, l*r)
-        # loop over degree 2d basis polynomials
-        for ui in 1:u
-            # loop over indices of degree d basis polynomials
-            for lj in 1:l, li in 1:lj
-                # loop over indices inside triangle slice
-                outervecind = dim * (ui-1)
-                for blockind in 1:dim
-                    vecind = outervecind + blockind
-                    (rj, ri) = vectomatidx(blockind)
-                    mat[(li-1)*r+ri, (lj-1)*r+rj] += ipwtj[ui,li] * ipwtj[ui,lj] * scalpnt[vecind] # matpnt[ri,rj,ui]
-                end # l
-                # TODO don't duplicate
-                if li < lj && ui == u
-                    mat[(li-1)*r+1:li*r, (lj-1)*r+1:lj*r] = Symmetric(mat[(li-1)*r+1:li*r, (lj-1)*r+1:lj*r])
+        for l in 1:L, k in 1:l
+            (bl, bk) = ((l-1)*R, (k-1)*R)
+            uo = 0
+            t = 0
+            for p in 1:R, q in 1:p
+                val = sum(ipwtj[u,l] * ipwtj[u,k] * pnt[uo+u] for u in 1:U)
+                bp = bl + p
+                bq = bk + q
+                if p == q
+                    mat[bp,bq] = val
+                else
+                    mat[bp,bq] = mat[bq,bp] = val
                 end
-            end # dim
-        end # u
-        # @show Symmetric(mat)
-        if !isposdef(Symmetric(mat))
-            return false
+                uo += U
+                t += 1
+            end
         end
-    end # ipwt
-    return true
+
+        F = cholesky!(Symmetric(mat, :L), check=false)
+        if !isposdef(F)
+            return NaN
+        end
+        if calc_barval
+            barval -= logdet(F)
+        end
+    end
+    return barval
 end
 
 WSOSPolyInterpMat(r::Int, u::Int, ipwt::Vector{Matrix{Float64}}) = WSOSPolyInterpMat(r, u, ipwt, false)
 
 dimension(prmtv::WSOSPolyInterpMat) = prmtv.dim
 barrierpar_prmtv(prmtv::WSOSPolyInterpMat) = prmtv.r * sum(size(ipwtj, 2) for ipwtj in prmtv.ipwt)
-# sum of diagonal matrices with interpolant polynomial repeating on the diagonal
+
 function getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::WSOSPolyInterpMat)
-    arr .= 0.0
-    vecind = 0
-    for ui in 1:prmtv.u
-        for j in 1:prmtv.r, i in 1:j
-            vecind += 1
-            if i == j
-                arr[vecind] = 1.0
-            end
+    # sum of diagonal matrices with interpolant polynomial repeating on the diagonal
+    idx = 1
+    for i in 1:prmtv.r, j in 1:i, u in 1:prmtv.u
+        if i == j
+            arr[idx] = 1.0
+        else
+            arr[idx] = 0.0
         end
+        idx += 1
     end
     return arr
 end
+
 loadpnt_prmtv!(prmtv::WSOSPolyInterpMat, pnt::AbstractVector{Float64}) = (prmtv.pnt = pnt)
 
 function incone_prmtv(prmtv::WSOSPolyInterpMat, scal::Float64)
-    prmtv.scal = 1.0
+    prmtv.scal = scal
     @. prmtv.scalpnt = prmtv.pnt/prmtv.scal
-    if !inconefun(prmtv.scalpnt, prmtv.ipwt, prmtv.r, prmtv.u)
+    if isnan(barfun(prmtv.scalpnt, prmtv.ipwt, prmtv.r, prmtv.u, false))
         return false
     end
     prmtv.diffres = ForwardDiff.hessian!(prmtv.diffres, prmtv.barfun, prmtv.scalpnt)
@@ -147,8 +119,4 @@ end
 
 calcg_prmtv!(g::AbstractVector{Float64}, prmtv::WSOSPolyInterpMat) = (@. g = prmtv.g/prmtv.scal; g)
 calcHarr_prmtv!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prmtv::WSOSPolyInterpMat) = (mul!(prod, Symmetric(prmtv.H), arr); @. prod = prod / prmtv.scal / prmtv.scal; prod)
-function calcHiarr_prmtv!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prmtv::WSOSPolyInterpMat)
-    ldiv!(prod, prmtv.F, arr)
-    @. prod = prod * prmtv.scal * prmtv.scal
-    return prod
-end
+calcHiarr_prmtv!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prmtv::WSOSPolyInterpMat) = (ldiv!(prod, prmtv.F, arr); @. prod = prod * prmtv.scal * prmtv.scal; prod)

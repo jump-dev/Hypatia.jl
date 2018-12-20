@@ -99,9 +99,34 @@ function solveandcheck(
     return (x=x, y=y, s=s, z=z, pobj=pobj, dobj=dobj, status=status, stime=stime, niters=niters)
 end
 
-include("interpolation.jl")
+
+function solveandcheck_JuMP(
+    mdl::Hypatia.Model,
+    truemin::Float64,
+    atol = 1e-4,
+    rtol = 1e-4,
+    )
+    JuMP.optimize!(mdl)
+
+    term_status = JuMP.termination_status(mdl)
+    pobj = JuMP.objective_value(mdl)
+    dobj = JuMP.objective_bound(mdl)
+    pr_status = JuMP.primal_status(mdl)
+    du_status = JuMP.dual_status(mdl)
+    @test term_status == MOI.OPTIMAL
+    @test pr_status == MOI.FEASIBLE_POINT
+    @test du_status == MOI.FEASIBLE_POINT
+
+    @test pobj ≈ dobj atol=1e-3 rtol=1e-3
+    @test pobj ≈ truemin atol=1e-3 rtol=1e-3
+    @test dot(Hypatia.get_s(mdl), Hypatia.get_z(mdl)) ≈ 0.0 atol=atol rtol=rtol
+end
+
 
 @testset begin
+
+include("interpolation.jl")
+
 
 # native interface tests
 include(joinpath(@__DIR__, "native.jl"))

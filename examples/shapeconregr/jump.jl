@@ -149,14 +149,14 @@ function build_shapeconregr_WSOS(
     dp = [DynamicPolynomials.differentiate(p, x[j]) for j in 1:n]
     for j in 1:n
         if !iszero(sd.mono_profile[j])
-            @constraint(model, [sd.mono_profile[j] * dp[j](mono_pts[i, :]) for i in 1:mono_U] in mono_wsos_cone)
+            @constraint(model, [sd.mono_profile[j] * dp[j](mono_pts[u, :]) for u in 1:mono_U] in mono_wsos_cone)
         end
     end
 
     # convexity
     if !iszero(sd.conv_profile)
         Hp = [DynamicPolynomials.differentiate(dp[i], x[j]) for i in 1:n, j in 1:n]
-        @constraint(model, sd.conv_profile * [Hp[i,j](conv_pts[ui, :]) for j in 1:n, i in 1:n, ui in 1:conv_U if i >= j] in conv_wsos_cone)
+        @constraint(model, sd.conv_profile * [Hp[i,j](conv_pts[u, :]) for i in 1:n for j in 1:i for u in 1:conv_U] in conv_wsos_cone)
     end
 
     return (model, p)
