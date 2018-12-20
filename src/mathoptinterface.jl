@@ -210,7 +210,7 @@ function MOI.copy_to(
         push!(Jc, idxmap[t.variable_index].value)
         push!(Vc, t.coefficient)
     end
-    if MOI.get(src, MOI.ObjectiveSense()) == MOI.MaxSense
+    if MOI.get(src, MOI.ObjectiveSense()) == MOI.MAX_SENSE
         Vc .*= -1.0
     end
     opt.objconst = obj.constant
@@ -627,7 +627,7 @@ end
 function MOI.get(opt::Optimizer, ::MOI.TerminationStatus)
     # TODO time limit etc
     if opt.status in (:Optimal, :PrimalInfeasible, :DualInfeasible, :IllPosed)
-        return MOI.Optimal
+        return MOI.OPTIMAL
     elseif opt.status in (:PredictorFail, :CorrectorFail)
         return MOI.NumericalError
     elseif opt.status == :IterationLimit
@@ -640,9 +640,9 @@ function MOI.get(opt::Optimizer, ::MOI.TerminationStatus)
 end
 
 function MOI.get(opt::Optimizer, ::MOI.ObjectiveValue)
-    if opt.objsense == MOI.MinSense
+    if opt.objsense == MOI.MIN_SENSE
         return opt.pobj + opt.objconst
-    elseif opt.objsense == MOI.MaxSense
+    elseif opt.objsense == MOI.MAX_SENSE
         return -opt.pobj + opt.objconst
     else
         error("no objective sense is set")
@@ -650,9 +650,9 @@ function MOI.get(opt::Optimizer, ::MOI.ObjectiveValue)
 end
 
 function MOI.get(opt::Optimizer, ::MOI.ObjectiveBound)
-    if opt.objsense == MOI.MinSense
+    if opt.objsense == MOI.MIN_SENSE
         return opt.dobj + opt.objconst
-    elseif opt.objsense == MOI.MaxSense
+    elseif opt.objsense == MOI.MAX_SENSE
         return -opt.dobj + opt.objconst
     else
         error("no objective sense is set")
@@ -668,29 +668,29 @@ end
 
 function MOI.get(opt::Optimizer, ::MOI.PrimalStatus)
     if opt.status == :Optimal
-        return MOI.FeasiblePoint
+        return MOI.FEASIBLE_POINT
     elseif opt.status == :PrimalInfeasible
-        return MOI.InfeasiblePoint
+        return MOI.INFEASIBLE_POINT
     elseif opt.status == :DualInfeasible
-        return MOI.InfeasibilityCertificate
+        return MOI.INFEASIBILITY_CERTIFICATE
     elseif opt.status == :IllPosed
-        return MOI.UnknownResultStatus # TODO later distinguish primal/dual ill posed certificates
+        return MOI.UNKNOWN_RESULT_STATUS # TODO later distinguish primal/dual ill posed certificates
     else
-        return MOI.UnknownResultStatus
+        return MOI.UNKNOWN_RESULT_STATUS
     end
 end
 
 function MOI.get(opt::Optimizer, ::MOI.DualStatus)
     if opt.status == :Optimal
-        return MOI.FeasiblePoint
+        return MOI.FEASIBLE_POINT
     elseif opt.status == :PrimalInfeasible
-        return MOI.InfeasibilityCertificate
+        return MOI.INFEASIBILITY_CERTIFICATE
     elseif opt.status == :DualInfeasible
-        return MOI.InfeasiblePoint
+        return MOI.INFEASIBLE_POINT
     elseif opt.status == :IllPosed
-        return MOI.UnknownResultStatus # TODO later distinguish primal/dual ill posed certificates
+        return MOI.UNKNOWN_RESULT_STATUS # TODO later distinguish primal/dual ill posed certificates
     else
-        return MOI.UnknownResultStatus
+        return MOI.UNKNOWN_RESULT_STATUS
     end
 end
 
