@@ -18,22 +18,21 @@ using Test
 function run_JuMP_choi_wsos(use_matrixwsos::Bool)
     @polyvar x y z
     C = [x^2+2y^2 -x*y -x*z; -x*y y^2+2z^2 -y*z; -x*z -y*z z^2+2x^2] .* (x*y*z)^0
-    n = 3
-    @polyvar w[1:n]
     d = maximum(DynamicPolynomials.maxdegree.(C))
-    dom = Hypatia.FreeDomain(n)
+    dom = Hypatia.FreeDomain(3)
 
     model = Model(with_optimizer(Hypatia.Optimizer, verbose=true))
     if use_matrixwsos
         (U, pts, P0, _, _) = Hypatia.interpolate(dom, d, sample_factor=10, sample=true)
-        mat_wsos_cone = WSOSPolyInterpMatCone(n, U, [P0])
-        @constraint(model, [AffExpr(C[i,j](pts[u, :])) for i in 1:n for j in 1:i for u in 1:U] in mat_wsos_cone)
+        mat_wsos_cone = WSOSPolyInterpMatCone(3, U, [P0])
+        @constraint(model, [AffExpr(C[i,j](pts[u, :])) for i in 1:3 for j in 1:i for u in 1:U] in mat_wsos_cone)
     else
-        full_dom = Hypatia.add_free_vars(dom)
-        (U, pts, P0, _, _) = Hypatia.interpolate(full_dom, d+2, sample_factor=10, sample=true)
+        dom2 = Hypatia.add_free_vars(dom)
+        (U, pts, P0, _, _) = Hypatia.interpolate(dom2, d+2, sample_factor=10, sample=true)
         scalar_wsos_cone = WSOSPolyInterpCone(U, [P0])
-        conv_condition = w'*C*w
-        @constraint(model, [AffExpr(conv_condition(pts[u, :])) for u in 1:U] in scalar_wsos_cone)
+        @polyvar w[1:3]
+        wCw = w'*C*w
+        @constraint(model, [AffExpr(wCw(pts[u, :])) for u in 1:U] in scalar_wsos_cone)
     end
 
     JuMP.optimize!(model)
