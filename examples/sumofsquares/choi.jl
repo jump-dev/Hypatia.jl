@@ -2,18 +2,10 @@
 Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 
 Example taken from https://github.com/JuliaOpt/SumOfSquares.jl/blob/master/test/choi.jl
-A polynomial matrix that is not a Sum-of-Squares matrix given in
-[C15] as the following biquadratic form:
-
-F(x; y) = (x_1^2 + 2 x_3^2) * y_1^2
-        + (x_2^2 + 2 x_1^2) * y_2^2
-        + (x_3^2 + 2 x_2^2) * y_3^2
-        - 2 (x_1x_2 y_1y_2 + x_2x_3 y_2y_3 + x_3x_1 y_3y_1)
-
-[C15] Choi, M. D.
-*Positive semidefinite biquadratic forms*.
-Linear Algebra and its Applications, **1975**, 12(2), 95-100.
+Verifies that a given polynomial matrix is not a Sum-of-Squares matrix
+See Choi, M. D., "Positive semidefinite biquadratic forms", Linear Algebra and its Applications, 1975, 12(2), 95-100
 =#
+
 using JuMP
 using MathOptInterface
 MOI = MathOptInterface
@@ -23,7 +15,7 @@ using DynamicPolynomials
 using PolyJuMP
 using Test
 
-function scalarWSOS()
+function run_JuMP_choi_scalarwsos()
     model = Model(with_optimizer(Hypatia.Optimizer, verbose=true))
     @polyvar x y z
 
