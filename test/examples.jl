@@ -387,7 +387,7 @@ function _shapeconregr11_JuMP()
     (X, y) = generateregrdata(f, 0.5, 2.0, n, npoints, signal_ratio=signal_ratio)
     shapedata = ShapeData(Hypatia.Box(0.5*ones(n), 2*ones(n)), Hypatia.Box(0.5*ones(n), 2*ones(n)), ones(n), 1)
     (mdl, p) = build_shapeconregr_WSOS(X, y, deg, shapedata, use_leastsqobj=true)
-    truemin = 2.2219e-1 # <---- may be inaccurate
+    truemin = 0.2283 # <---- not verified with SDP like others
     solveandcheck_JuMP(mdl, truemin)
 end
 
@@ -396,7 +396,7 @@ function _shapeconregr12_JuMP()
     (X, y) = generateregrdata(f, 0.5, 2.0, n, npoints, signal_ratio=signal_ratio)
     shapedata = ShapeData(Hypatia.Box(0.5*ones(n), 2*ones(n)), Hypatia.Box(0.5*ones(n), 2*ones(n)), ones(n), 1)
     (mdl, p) = build_shapeconregr_PSD(X, y, deg, shapedata, use_leastsqobj=true)
-    truemin = 2.2219e-1 # <---- may be inaccurate
+    truemin = 0.2283 # <---- not verified with SDP
     solveandcheck_JuMP(mdl, truemin)
 end
 
