@@ -322,7 +322,7 @@ uuid = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
 deps = ["JuMP", "LinearAlgebra", "MathOptInterface", "MultivariateMoments", "MultivariatePolynomials", "PolyJuMP", "SemialgebraicSets", "SparseArrays", "Test"]
 git-tree-sha1 = "279157410225a9b10b686ddcea4edebce576b741"
 repo-rev = "master"
-repo-url = "https://github.com/JuliaOpt/SumOfSquares.jl"
+repo-url = "https://github.com/JuliaOpt/SumOfSquares.jl.git"
 uuid = "4b9e565b-77fc-50a5-a571-1244f986bda1"
 version = "0.2.1+"
 
