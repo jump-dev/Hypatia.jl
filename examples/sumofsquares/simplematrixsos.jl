@@ -20,7 +20,7 @@ function run_JuMP_simplemat(use_matrixwsos::Bool)
     @polyvar dummy
     # TODO get rid of dummy, unnecessary for matrix case
     P = [x^2-2x+2 x; x x^2] .* dummy^0
-    d = maximum(DynamicPolynomials.maxdegree.(P))
+    d = div(maximum(DynamicPolynomials.maxdegree.(P)), 2)
     dom = Hypatia.FreeDomain(2)
 
     model = Model(with_optimizer(Hypatia.Optimizer, verbose=true))
