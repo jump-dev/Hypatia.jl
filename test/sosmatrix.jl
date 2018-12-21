@@ -47,3 +47,8 @@ Hp = [DynamicPolynomials.differentiate(dp[i], x[j]) for i in 1:n, j in 1:n]
 JuMP.optimize!(model)
 JuMP.value(p)
 JuMP.value.(Hp)
+
+# using JLD2, FileIO
+# mat = load("mat_48.jld2", "mat")
+# mat = Symmetric(mat, :L)
+# coeffs2 = repeat(Matrix{Float64}(I, 2, 2), 3) .* [ones(2); x[1] .* ones(2); x[2] .* ones(2)]
