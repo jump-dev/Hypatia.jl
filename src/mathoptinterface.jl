@@ -612,17 +612,25 @@ end
 # function MOI.free!(opt::Optimizer) # TODO call gc on opt.mdl?
 
 function MOI.get(opt::Optimizer, ::MOI.TerminationStatus)
-    # TODO time limit etc
-    if opt.status in (:Optimal, :PrimalInfeasible, :DualInfeasible, :IllPosed)
+    if opt.status in (:NotLoaded, :Loaded)
+        return MOI.OPTIMIZE_NOT_CALLED
+    elseif opt.status == :Optimal
         return MOI.OPTIMAL
+    elseif opt.status == :PrimalInfeasible
+        return MOI.INFEASIBLE
+    elseif opt.status == :DualInfeasible
+        return MOI.DUAL_INFEASIBLE
+    elseif opt.status == :IllPosed
+        error("MOI did not have a TerminationStatusCode for ill-posed")
     elseif opt.status in (:PredictorFail, :CorrectorFail)
-        return MOI.NumericalError
+        return MOI.SLOW_PROGRESS
     elseif opt.status == :IterationLimit
-        return MOI.IterationLimit
+        return MOI.ITERATION_LIMIT
     elseif opt.status == :TimeLimit
-        return MOI.TimeLimit
+        return MOI.TIME_LIMIT
     else
-        return MOI.OtherError
+        @warn("Hypatia status $(opt.status) not handled")
+        return MOI.OTHER_ERROR
     end
 end
 
