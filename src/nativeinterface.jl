@@ -297,7 +297,9 @@ end
 
 # solve using predictor-corrector algorithm based on homogeneous self-dual embedding
 function solve!(mdl::Model)
+    mdl.status = :SolveCalled
     starttime = time()
+    
     (c, A, b, G, h, cone, L) = (mdl.c, mdl.A, mdl.b, mdl.G, mdl.h, mdl.cone, mdl.L)
     (n, p, q) = (length(c), length(b), length(h))
     bnu = 1.0 + barrierpar(cone) # complexity parameter nu-bar of the augmented barrier (sum of the primitive cone barrier parameters plus 1)
@@ -371,7 +373,6 @@ function solve!(mdl::Model)
         flush(stdout)
     end
 
-    mdl.status = :StartedIterating
     alphapred = alphapredinit
     iter = 0
     while true

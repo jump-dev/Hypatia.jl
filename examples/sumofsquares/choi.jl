@@ -32,5 +32,5 @@ function run_JuMP_choi_scalarwsos()
     model = Model(with_optimizer(Hypatia.Optimizer, verbose=true))
     @constraint(model, [AffExpr(conv_condition(pts[i, :])) for i in 1:U] in scalar_wsos_cone)
     JuMP.optimize!(model)
-    @test JuMP.dual_status(model) == MOI.InfeasibilityCertificate
+    @test JuMP.dual_status(model) == MOI.INFEASIBILITY_CERTIFICATE
 end
