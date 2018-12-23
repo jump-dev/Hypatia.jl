@@ -244,7 +244,7 @@ end
 
 
 @info("starting MathOptInterface tests")
-include(joinpath(@__DIR__, "moi.jl"))
+include(joinpath(@__DIR__, "MOI_wrapper.jl"))
 verbose = false
 lscachetypes = [
     Hypatia.QRSymmCache,
