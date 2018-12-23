@@ -102,7 +102,7 @@ function build_shapeconregr_PSD(
 
     model = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true, usedense=usedense, lscachetype=Hypatia.QRSymmCache))
     (x, p) = add_loss_and_polys!(model, X, y, r, use_leastsqobj)
-    
+
     mono_bss = get_domain_inequalities(sd.mono_dom, x)
     conv_bss = get_domain_inequalities(sd.conv_dom, x)
 
@@ -193,9 +193,9 @@ function run_JuMP_shapeconregr(use_wsos::Bool; usedense::Bool=true)
     pr_status = JuMP.primal_status(model)
     du_status = JuMP.dual_status(model)
 
-    @test term_status == MOI.Optimal
-    @test pr_status == MOI.FeasiblePoint
-    @test du_status == MOI.FeasiblePoint
+    @test term_status == MOI.OPTIMAL
+    @test pr_status == MOI.FEASIBLE_POINT
+    @test du_status == MOI.FEASIBLE_POINT
     @test pobj ≈ dobj atol=1e-4 rtol=1e-4
 
     return (pobj, p)
