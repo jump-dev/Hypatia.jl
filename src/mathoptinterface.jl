@@ -48,6 +48,7 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
         opt.timelimit = timelimit
         opt.lscachetype = lscachetype
         opt.usedense = usedense
+        opt.status = :NotLoaded
         return opt
     end
 end
@@ -64,8 +65,8 @@ Optimizer(;
 
 MOI.get(::Optimizer, ::MOI.SolverName) = "Hypatia"
 
-MOI.is_empty(opt::Optimizer) = (get_status(opt.mdl) == :NotLoaded)
-MOI.empty!(opt::Optimizer) = Optimizer() # TODO empty the data and results, or just create a new one? keep options?
+MOI.is_empty(opt::Optimizer) = (opt.status == :NotLoaded)
+MOI.empty!(opt::Optimizer) = (opt.status = :NotLoaded) # TODO empty the data and results? keep options?
 
 MOI.supports(::Optimizer, ::Union{
     MOI.ObjectiveSense,
@@ -551,6 +552,7 @@ function MOI.copy_to(
     opt.cone = cone
     opt.constroffsetcone = constroffsetcone
     opt.constrprimcone = Vector(sparsevec(Icpc, Vcpc, q))
+    opt.status = :Loaded
 
     return idxmap
 end
@@ -665,11 +667,11 @@ function MOI.get(opt::Optimizer, ::MOI.PrimalStatus)
     if opt.status == :Optimal
         return MOI.FEASIBLE_POINT
     elseif opt.status == :PrimalInfeasible
-        return MOI.InfeasiblePoint
+        return MOI.INFEASIBLE_POINT
     elseif opt.status == :DualInfeasible
         return MOI.INFEASIBILITY_CERTIFICATE
     elseif opt.status == :IllPosed
-        return MOI.UNKNOWN_RESULT_STATUS # TODO later distinguish primal/dual ill posed certificates
+        return MOI.OTHER_RESULT_STATUS # TODO later distinguish primal/dual ill posed certificates
     else
         return MOI.UNKNOWN_RESULT_STATUS
     end
@@ -681,9 +683,9 @@ function MOI.get(opt::Optimizer, ::MOI.DualStatus)
     elseif opt.status == :PrimalInfeasible
         return MOI.INFEASIBILITY_CERTIFICATE
     elseif opt.status == :DualInfeasible
-        return MOI.InfeasiblePoint
+        return MOI.INFEASIBLE_POINT
     elseif opt.status == :IllPosed
-        return MOI.UNKNOWN_RESULT_STATUS # TODO later distinguish primal/dual ill posed certificates
+        return MOI.OTHER_RESULT_STATUS # TODO later distinguish primal/dual ill posed certificates
     else
         return MOI.UNKNOWN_RESULT_STATUS
     end
