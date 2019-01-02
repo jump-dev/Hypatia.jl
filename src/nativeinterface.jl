@@ -515,7 +515,7 @@ function solve!(mdl::Model)
             # accept primal iterate if
             # - decreased alpha and it is the first inside the cone and beta-neighborhood or
             # - increased alpha and it is inside the cone and the first to leave beta-neighborhood
-            if ls_mu > 0.0 && incone(cone, mu)
+            if ls_mu > 0.0 && incone(cone, ls_mu)
                 # primal iterate is inside the cone
                 nbhd = calcnbhd!(g, ls_s, ls_z, ls_mu, cone)
                 # @show sqrt(nbhd)/ls_mu, beta
@@ -598,7 +598,7 @@ function solve!(mdl::Model)
                 @. ls_s = s + alpha*tmp_s
                 ls_mu = dot(ls_s, ls_z)/bnu
 
-                if ls_mu > 0.0 && incone(cone, mu)
+                if ls_mu > 0.0 && incone(cone, ls_mu)
                     # primal iterate x is inside the cone, so terminate line search
                     break
                 end
