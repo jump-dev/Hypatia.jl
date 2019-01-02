@@ -66,7 +66,7 @@ function barfun(pnt, ipwt::Vector{Matrix{Float64}}, R::Int, U::Int, calc_barval:
                 if p == q
                     mat[bp,bq] = val
                 else
-                    mat[bp,bq] = mat[bq,bp] = val
+                    mat[bp,bq] = mat[bq,bp] = rt2i*val
                 end
                 uo += U
                 t += 1

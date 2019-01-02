@@ -15,6 +15,8 @@ using DynamicPolynomials
 using PolyJuMP
 using Test
 
+const rt2 = sqrt(2)
+
 function run_JuMP_choi_wsos_dual()
     @polyvar x y z
     model = Model(with_optimizer(Hypatia.Optimizer, verbose=true))
@@ -28,14 +30,15 @@ function run_JuMP_choi_wsos_dual()
     @variable(model, z[i=1:3, j=1:i, 1:U])
 
     mat_wsos_cone = WSOSPolyInterpMatCone(3, U, [P0], true)
-    @constraint(model, [z[i,j,u] for i in 1:3 for j in 1:i for u in 1:U] in mat_wsos_cone)
+    @constraint(model, [z[i,j,u] * (i == j ? 1.0 : rt2) for i in 1:3 for j in 1:i for u in 1:U] in mat_wsos_cone)
 
-    @objective(model, Max, 2*sum(z[i,j,u] * C[i,j](pts[u, :]...) for i in 1:3 for j in 1:i-1 for u in 1:U) +
+    @objective(model, Max,
+        2*sum(z[i,j,u] * C[i,j](pts[u, :]...) for i in 1:3 for j in 1:i-1 for u in 1:U) +
         sum(z[i,i,u] * C[i,i](pts[u, :]...) for i in 1:3 for u in 1:U)
         )
 
     JuMP.optimize!(model)
 
     @test JuMP.primal_status(model) == MOI.INFEASIBILITY_CERTIFICATE
-    return nothing
+    return
 end
