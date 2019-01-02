@@ -1,9 +1,10 @@
 #=
 Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 
-test whether a given polynomial is convex or concave
+test whether a given polynomial is convex
 =#
 
+using Random
 using JuMP
 using MathOptInterface
 MOI = MathOptInterface
@@ -16,9 +17,7 @@ using Test
 
 const rt2 = sqrt(2)
 
-function run_JuMP_sosmat4(x, poly, use_wsos::Bool)
-    H = differentiate(poly, x, 2)
-
+function run_JuMP_sosmat4_matrix(x::Vector, H::Matrix, use_wsos::Bool)
     if use_wsos
         n = nvariables(x)
         d = div(maximum(maxdegree.(H)), 2)
@@ -38,8 +37,34 @@ function run_JuMP_sosmat4(x, poly, use_wsos::Bool)
     return (JuMP.termination_status(model) == MOI.OPTIMAL)
 end
 
-run_JuMP_sosmat4_a(use_wsos::Bool) = (@polyvar x[1:1]; run_JuMP_sosmat4(x, x[1]^4+2x[1]^2, use_wsos))
-run_JuMP_sosmat4_b(use_wsos::Bool) = (@polyvar x[1:1]; run_JuMP_sosmat4(x, -x[1]^4-2x[1]^2, use_wsos))
-run_JuMP_sosmat4_c(use_wsos::Bool) = (@polyvar x[1:2]; run_JuMP_sosmat4(x, (x[1]*x[2]-x[1]+2x[2]-x[2]^2)^2, use_wsos))
-run_JuMP_sosmat4_d(use_wsos::Bool) = (@polyvar x[1:2]; run_JuMP_sosmat4(x, (x[1]+x[2])^4 + (x[1]+x[2])^2, use_wsos))
-run_JuMP_sosmat4_e(use_wsos::Bool) = (@polyvar x[1:2]; run_JuMP_sosmat4(x, -(x[1]+x[2])^4 + (x[1]+x[2])^2, use_wsos))
+function run_JuMP_sosmat4_matrix_a(use_wsos::Bool)
+    @polyvar x[1:1]
+    M = [x[1]+2x[1]^3 1; -x[1]^2+2 3x[1]^2-x[1]+1]
+    MM = M'*M
+    @show MM
+    return run_JuMP_sosmat4_matrix(x, MM, use_wsos)
+end
+
+function run_JuMP_sosmat4_matrix_b(use_wsos::Bool; rseed::Int=1)
+    n = 2
+    m = 2
+    d = 3
+
+    @polyvar x[1:n]
+    Z = monomials(x, 0:d)
+    nZ = length(Z)
+    Random.seed!(rseed)
+    M = [sum(rand() * Z[l] for l in 1:nZ) for i in 1:m, j in 1:m]
+    MM = M'*M
+    MM += MM'
+
+    return run_JuMP_sosmat4_matrix(x, MM, use_wsos)
+end
+
+run_JuMP_sosmat4_poly(x::Vector, poly, use_wsos::Bool) = run_JuMP_sosmat4_matrix(x, differentiate(poly, x, 2), use_wsos)
+
+run_JuMP_sosmat4_poly_a(use_wsos::Bool) = (@polyvar x[1:1]; run_JuMP_sosmat4_poly(x, x[1]^4+2x[1]^2, use_wsos))
+run_JuMP_sosmat4_poly_b(use_wsos::Bool) = (@polyvar x[1:1]; run_JuMP_sosmat4_poly(x, -x[1]^4-2x[1]^2, use_wsos))
+run_JuMP_sosmat4_poly_c(use_wsos::Bool) = (@polyvar x[1:2]; run_JuMP_sosmat4_poly(x, (x[1]*x[2]-x[1]+2x[2]-x[2]^2)^2, use_wsos))
+run_JuMP_sosmat4_poly_d(use_wsos::Bool) = (@polyvar x[1:2]; run_JuMP_sosmat4_poly(x, (x[1]+x[2])^4 + (x[1]+x[2])^2, use_wsos))
+run_JuMP_sosmat4_poly_e(use_wsos::Bool) = (@polyvar x[1:2]; run_JuMP_sosmat4_poly(x, -(x[1]+x[2])^4 + (x[1]+x[2])^2, use_wsos))
