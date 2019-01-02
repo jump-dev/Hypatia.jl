@@ -2,9 +2,7 @@
 Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 
 Example modified from https://github.com/JuliaOpt/SumOfSquares.jl/blob/master/test/simplematrixsos.jl
-Example 3.77 and 3.79 of
-Blekherman, G., Parrilo, P. A., & Thomas, R. R. (Eds.).
-Semidefinite optimization and convex algebraic geometry SIAM 2013
+Example 3.77 and 3.79 of Blekherman, G., Parrilo, P. A., & Thomas, R. R. (Eds.), Semidefinite optimization and convex algebraic geometry SIAM 2013
 =#
 
 using JuMP
@@ -18,7 +16,7 @@ using Test
 
 const rt2 = sqrt(2)
 
-function run_JuMP_simplemat(use_matrixwsos::Bool)
+function run_JuMP_sosmat1(use_matrixwsos::Bool)
     @polyvar x
     P = [x^2-2x+2 x; x x^2]
     d = 1 # div(maximum(DynamicPolynomials.maxdegree.(P)), 2)
@@ -45,5 +43,5 @@ function run_JuMP_simplemat(use_matrixwsos::Bool)
     return
 end
 
-run_JuMP_scalar_simplemat() = run_JuMP_simplemat(false)
-run_JuMP_matrix_simplemat() = run_JuMP_simplemat(true)
+run_JuMP_sosmat1_scalar() = run_JuMP_sosmat1(false)
+run_JuMP_sosmat1_matrix() = run_JuMP_sosmat1(true)
