@@ -193,10 +193,17 @@ function run_JuMP_shapeconregr(use_wsos::Bool; usedense::Bool=true)
     pr_status = JuMP.primal_status(model)
     du_status = JuMP.dual_status(model)
 
+<<<<<<< HEAD
     # @test term_status == MOI.OPTIMAL
     # @test pr_status == MOI.FEASIBLE_POINT
     # @test du_status == MOI.FEASIBLE_POINT
     # @test pobj ≈ dobj atol=1e-4 rtol=1e-4
+=======
+    @test term_status == MOI.OPTIMAL
+    @test pr_status == MOI.FEASIBLE_POINT
+    @test du_status == MOI.FEASIBLE_POINT
+    @test pobj ≈ dobj atol=1e-4 rtol=1e-4
+>>>>>>> master
 
     return (pobj, p)
 end

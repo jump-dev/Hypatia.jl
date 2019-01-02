@@ -49,5 +49,5 @@ module Hypatia
 
     import MathOptInterface
     const MOI = MathOptInterface
-    include("mathoptinterface.jl")
+    include("MOI_wrapper.jl")
 end

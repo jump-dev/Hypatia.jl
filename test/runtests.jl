@@ -21,9 +21,6 @@ include(joinpath(egs_dir, "shapeconregr/jump.jl"))
 include(joinpath(egs_dir, "densityest/jump.jl"))
 include(joinpath(@__DIR__, "examples.jl"))
 
-# load MathOptInterface test functions
-include(joinpath(@__DIR__, "moi.jl"))
-
 
 # TODO make first part a native interface function eventually
 # TODO maybe build a new high-level model struct; the current model struct is low-level
@@ -100,35 +97,12 @@ function solveandcheck(
 end
 
 
-function solveandcheck_JuMP(
-    mdl::Hypatia.Model,
-    truemin::Float64,
-    atol = 1e-4,
-    rtol = 1e-4,
-    )
-    JuMP.optimize!(mdl)
-
-    term_status = JuMP.termination_status(mdl)
-    pobj = JuMP.objective_value(mdl)
-    dobj = JuMP.objective_bound(mdl)
-    pr_status = JuMP.primal_status(mdl)
-    du_status = JuMP.dual_status(mdl)
-    @test term_status == MOI.OPTIMAL
-    @test pr_status == MOI.FEASIBLE_POINT
-    @test du_status == MOI.FEASIBLE_POINT
-
-    @test pobj ≈ dobj atol=1e-3 rtol=1e-3
-    @test pobj ≈ truemin atol=1e-3 rtol=1e-3
-    @test dot(Hypatia.get_s(mdl), Hypatia.get_z(mdl)) ≈ 0.0 atol=atol rtol=rtol
-end
-
-
 @testset begin
 
-include("interpolation.jl")
+@info("starting interpolation tests")
+include(joinpath(@__DIR__, "interpolation.jl"))
 
 
-# native interface tests
 include(joinpath(@__DIR__, "native.jl"))
 @info("starting native interface tests")
 verbose = false
@@ -269,8 +243,8 @@ testfuns = [
 # end
 
 
-# MathOptInterface tests
 @info("starting MathOptInterface tests")
+include(joinpath(@__DIR__, "MOI_wrapper.jl"))
 verbose = false
 lscachetypes = [
     Hypatia.QRSymmCache,
@@ -281,4 +255,3 @@ lscachetypes = [
 # end
 
 end
-return nothing

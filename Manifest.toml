@@ -131,7 +131,7 @@ version = "0.20.0"
 
 [[JuMP]]
 deps = ["Calculus", "DataStructures", "ForwardDiff", "LinearAlgebra", "MathOptInterface", "NaNMath", "Printf", "Random", "SparseArrays", "Statistics", "Test"]
-git-tree-sha1 = "f7785b6c404b5bf1a697f4f8fdb45c0e648552f9"
+git-tree-sha1 = "f66e3d42b79195f99107d61cd87e5eca3fab5fee"
 repo-rev = "master"
 repo-url = "https://github.com/JuliaOpt/JuMP.jl.git"
 uuid = "4076af6c-e467-56ae-b986-b466b2749572"
@@ -320,7 +320,7 @@ uuid = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
 
 [[SumOfSquares]]
 deps = ["JuMP", "LinearAlgebra", "MathOptInterface", "MultivariateMoments", "MultivariatePolynomials", "PolyJuMP", "SemialgebraicSets", "SparseArrays", "Test"]
-git-tree-sha1 = "279157410225a9b10b686ddcea4edebce576b741"
+git-tree-sha1 = "272113c8da055d4e5d0db45b9569d1462d3f0b2d"
 repo-rev = "master"
 repo-url = "https://github.com/JuliaOpt/SumOfSquares.jl.git"
 uuid = "4b9e565b-77fc-50a5-a571-1244f986bda1"
