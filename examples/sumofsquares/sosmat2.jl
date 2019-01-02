@@ -17,7 +17,7 @@ using Test
 
 const rt2 = sqrt(2)
 
-function run_JuMP_choi_wsos(use_matrixwsos::Bool)
+function run_JuMP_sosmat2(use_matrixwsos::Bool, use_dual::Bool)
     @polyvar x y z
     C = [x^2+2y^2 -x*y -x*z; -x*y y^2+2z^2 -y*z; -x*z -y*z z^2+2x^2] .* (x*y*z)^0
     d = div(maximum(DynamicPolynomials.maxdegree.(C)), 2)
@@ -26,9 +26,18 @@ function run_JuMP_choi_wsos(use_matrixwsos::Bool)
     model = Model(with_optimizer(Hypatia.Optimizer, verbose=true)) #, tolabsopt=1e-9, tolrelopt=1e-7, tolfeas=1e-9))
     if use_matrixwsos
         (U, pts, P0, _, _) = Hypatia.interpolate(dom, d, sample_factor=20, sample=true)
-        mat_wsos_cone = WSOSPolyInterpMatCone(3, U, [P0])
-        @constraint(model, [AffExpr(C[i,j](pts[u, :])) * (i == j ? 1.0 : rt2) for i in 1:3 for j in 1:i for u in 1:U] in mat_wsos_cone)
+        mat_wsos_cone = WSOSPolyInterpMatCone(3, U, [P0], use_dual)
+        if use_dual
+            @variable(model, z[i=1:3, j=1:i, 1:U])
+            @constraint(model, [z[i,j,u] * (i == j ? 1.0 : rt2) for i in 1:3 for j in 1:i for u in 1:U] in mat_wsos_cone)
+            @objective(model, Min, sum(z[i,j,u] * C[i,j](pts[u, :]...) * (i == j ? 1.0 : 2.0) for i in 1:3 for j in 1:i for u in 1:U))
+        else
+            @constraint(model, [AffExpr(C[i,j](pts[u, :])) * (i == j ? 1.0 : rt2) for i in 1:3 for j in 1:i for u in 1:U] in mat_wsos_cone)
+        end
     else
+        if use_dual
+            error("dual formulation not implemented for scalar SOS formulation")
+        end
         dom2 = Hypatia.add_free_vars(dom)
         (U, pts, P0, _, _) = Hypatia.interpolate(dom2, d+2, sample_factor=20, sample=true)
         scalar_wsos_cone = WSOSPolyInterpCone(U, [P0])
@@ -38,8 +47,14 @@ function run_JuMP_choi_wsos(use_matrixwsos::Bool)
     end
 
     JuMP.optimize!(model)
-    @test JuMP.dual_status(model) == MOI.INFEASIBILITY_CERTIFICATE
+
+    if use_dual
+        @test JuMP.primal_status(model) == MOI.INFEASIBILITY_CERTIFICATE
+    else
+        @test JuMP.dual_status(model) == MOI.INFEASIBILITY_CERTIFICATE
+    end
 end
 
-run_JuMP_choi_scalarwsos() = run_JuMP_choi_wsos(false)
-run_JuMP_choi_matrixwsos() = run_JuMP_choi_wsos(true)
+run_JuMP_sosmat2_scalar() = run_JuMP_sosmat2(false, false)
+run_JuMP_sosmat2_matrix() = run_JuMP_sosmat2(true, false)
+run_JuMP_sosmat2_matrix_dual() = run_JuMP_sosmat2(true, true)
