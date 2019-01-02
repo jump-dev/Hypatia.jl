@@ -627,11 +627,6 @@ end
 # function MOI.free!(opt::Optimizer) # TODO call gc on opt.mdl?
 
 function MOI.get(opt::Optimizer, ::MOI.TerminationStatus)
-<<<<<<< HEAD:src/mathoptinterface.jl
-    # TODO time limit etc
-    if opt.status in (:Optimal, :PrimalInfeasible, :DualInfeasible, :IllPosed)
-        return MOI.OPTIMAL
-=======
     if opt.status in (:NotLoaded, :Loaded)
         return MOI.OPTIMIZE_NOT_CALLED
     elseif opt.status == :Optimal
@@ -642,7 +637,6 @@ function MOI.get(opt::Optimizer, ::MOI.TerminationStatus)
         return MOI.DUAL_INFEASIBLE
     elseif opt.status == :IllPosed
         error("MOI did not have a TerminationStatusCode for ill-posed")
->>>>>>> master:src/MOI_wrapper.jl
     elseif opt.status in (:PredictorFail, :CorrectorFail)
         return MOI.SLOW_PROGRESS
     elseif opt.status == :IterationLimit
@@ -690,11 +684,7 @@ function MOI.get(opt::Optimizer, ::MOI.PrimalStatus)
     elseif opt.status == :DualInfeasible
         return MOI.INFEASIBILITY_CERTIFICATE
     elseif opt.status == :IllPosed
-<<<<<<< HEAD:src/mathoptinterface.jl
-        return MOI.UNKNOWN_RESULT_STATUS # TODO later distinguish primal/dual ill posed certificates
-=======
         return MOI.OTHER_RESULT_STATUS # TODO later distinguish primal/dual ill posed certificates
->>>>>>> master:src/MOI_wrapper.jl
     else
         return MOI.UNKNOWN_RESULT_STATUS
     end
@@ -708,11 +698,7 @@ function MOI.get(opt::Optimizer, ::MOI.DualStatus)
     elseif opt.status == :DualInfeasible
         return MOI.INFEASIBLE_POINT
     elseif opt.status == :IllPosed
-<<<<<<< HEAD:src/mathoptinterface.jl
-        return MOI.UNKNOWN_RESULT_STATUS # TODO later distinguish primal/dual ill posed certificates
-=======
         return MOI.OTHER_RESULT_STATUS # TODO later distinguish primal/dual ill posed certificates
->>>>>>> master:src/MOI_wrapper.jl
     else
         return MOI.UNKNOWN_RESULT_STATUS
     end
