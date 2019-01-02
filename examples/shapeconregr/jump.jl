@@ -25,6 +25,8 @@ using PolyJuMP
 using Test
 include(joinpath(dirname(@__DIR__), "utils", "semialgebraicsets.jl"))
 
+const rt2 = sqrt(2)
+
 
 # a description of the shape of the regressor
 mutable struct ShapeData
@@ -156,7 +158,7 @@ function build_shapeconregr_WSOS(
     # convexity
     if !iszero(sd.conv_profile)
         Hp = [DynamicPolynomials.differentiate(dp[i], x[j]) for i in 1:n, j in 1:n]
-        @constraint(model, sd.conv_profile * [Hp[i,j](conv_pts[u, :]) for i in 1:n for j in 1:i for u in 1:conv_U] in conv_wsos_cone)
+        @constraint(model, sd.conv_profile * [Hp[i,j](conv_pts[u, :]) * (i == j ? 1.0 : rt2) for i in 1:n for j in 1:i for u in 1:conv_U] in conv_wsos_cone)
     end
 
     return (model, p)
