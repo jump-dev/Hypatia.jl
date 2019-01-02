@@ -19,7 +19,7 @@ const rt2 = sqrt(2)
 function run_JuMP_sosmat1(use_matrixwsos::Bool)
     @polyvar x
     P = [x^2-2x+2 x; x x^2]
-    d = 1 # div(maximum(DynamicPolynomials.maxdegree.(P)), 2)
+    d = div(maximum(DynamicPolynomials.maxdegree.(P)), 2)
     dom = Hypatia.FreeDomain(1)
 
     model = Model(with_optimizer(Hypatia.Optimizer, verbose=true))
@@ -39,6 +39,7 @@ function run_JuMP_sosmat1(use_matrixwsos::Bool)
 
     JuMP.optimize!(model)
 
+    @test JuMP.termination_status(model) == MOI.OPTIMAL
     @test JuMP.primal_status(model) == MOI.FEASIBLE_POINT
     return
 end

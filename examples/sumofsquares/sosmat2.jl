@@ -19,11 +19,11 @@ const rt2 = sqrt(2)
 
 function run_JuMP_sosmat2(use_matrixwsos::Bool, use_dual::Bool)
     @polyvar x y z
-    C = [x^2+2y^2 -x*y -x*z; -x*y y^2+2z^2 -y*z; -x*z -y*z z^2+2x^2] .* (x*y*z)^0
+    C = [x^2+2y^2 -x*y -x*z; -x*y y^2+2z^2 -y*z; -x*z -y*z z^2+2x^2]
     d = div(maximum(DynamicPolynomials.maxdegree.(C)), 2)
     dom = Hypatia.FreeDomain(3)
 
-    model = Model(with_optimizer(Hypatia.Optimizer, verbose=true)) #, tolabsopt=1e-9, tolrelopt=1e-7, tolfeas=1e-9))
+    model = Model(with_optimizer(Hypatia.Optimizer, verbose=true))
     if use_matrixwsos
         (U, pts, P0, _, _) = Hypatia.interpolate(dom, d, sample_factor=20, sample=true)
         mat_wsos_cone = WSOSPolyInterpMatCone(3, U, [P0], use_dual)
@@ -49,8 +49,10 @@ function run_JuMP_sosmat2(use_matrixwsos::Bool, use_dual::Bool)
     JuMP.optimize!(model)
 
     if use_dual
+        @test JuMP.termination_status(model) == MOI.DUAL_INFEASIBLE
         @test JuMP.primal_status(model) == MOI.INFEASIBILITY_CERTIFICATE
     else
+        @test JuMP.termination_status(model) == MOI.INFEASIBLE
         @test JuMP.dual_status(model) == MOI.INFEASIBILITY_CERTIFICATE
     end
 end
