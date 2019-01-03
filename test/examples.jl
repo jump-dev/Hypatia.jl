@@ -192,8 +192,8 @@ function solveandcheck_JuMP(mdl, truemin)
     @test term_status == MOI.OPTIMAL
     @test pr_status == MOI.FEASIBLE_POINT
     @test du_status == MOI.FEASIBLE_POINT
-    @test pobj ≈ dobj atol=1e-3 rtol=1e-3
-    @test pobj ≈ truemin atol=1e-3 rtol=1e-3
+    @test pobj ≈ dobj atol=1e-4 rtol=1e-4
+    @test pobj ≈ truemin atol=1e-4 rtol=1e-4
 end
 
 function _namedpoly1_JuMP()
