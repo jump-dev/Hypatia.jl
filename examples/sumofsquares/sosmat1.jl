@@ -26,7 +26,7 @@ function run_JuMP_sosmat1(use_matrixwsos::Bool)
     if use_matrixwsos
         (U, pts, P0, _, _) = Hypatia.interpolate(dom, d, sample_factor=20, sample=true)
         mat_wsos_cone = WSOSPolyInterpMatCone(2, U, [P0])
-        @constraint(model, [AffExpr(P[i,j](pts[u, :])) * (i == j ? 1.0 : rt2) for i in 1:2 for j in 1:i for u in 1:U] in mat_wsos_cone)
+        @constraint(model, [AffExpr(P[i,j](pts[u, :]) * (i == j ? 1.0 : rt2)) for i in 1:2 for j in 1:i for u in 1:U] in mat_wsos_cone)
     else
         error("scalar WSOS implementation not currently working for this example; see issue #163")
         # dom2 = Hypatia.add_free_vars(dom)

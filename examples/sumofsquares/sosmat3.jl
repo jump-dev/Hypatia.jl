@@ -25,7 +25,7 @@ function run_JuMP_sosmat3()
     model = Model(with_optimizer(Hypatia.Optimizer, verbose=true, tolabsopt=1e-6, tolrelopt=1e-6, tolfeas=1e-6))
     (U, pts, P0, _, _) = Hypatia.interpolate(dom, d, sample_factor=20, sample=true)
     mat_wsos_cone = WSOSPolyInterpMatCone(2, U, [P0])
-    @constraint(model, [AffExpr(P[i,j](pts[u, :])) * (i == j ? 1.0 : rt2) for i in 1:2 for j in 1:i for u in 1:U] in mat_wsos_cone)
+    @constraint(model, [AffExpr(P[i,j](pts[u, :]) * (i == j ? 1.0 : rt2)) for i in 1:2 for j in 1:i for u in 1:U] in mat_wsos_cone)
 
     JuMP.optimize!(model)
 

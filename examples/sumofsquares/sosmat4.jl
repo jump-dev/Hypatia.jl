@@ -23,10 +23,10 @@ function run_JuMP_sosmat4_matrix(x::Vector, H::Matrix, use_wsos::Bool)
         d = div(maximum(maxdegree.(H)), 2)
         dom = Hypatia.FreeDomain(n)
 
-        model = Model(with_optimizer(Hypatia.Optimizer, verbose=true))
+        model = Model(with_optimizer(Hypatia.Optimizer, verbose=true, tolabsopt=1e-9, tolrelopt=1e-9, tolfeas=1e-9))
         (U, pts, P0, _, _) = Hypatia.interpolate(dom, d, sample_factor=20, sample=true)
         mat_wsos_cone = WSOSPolyInterpMatCone(n, U, [P0])
-        @constraint(model, [AffExpr(H[i,j](pts[u, :])) * (i == j ? 1.0 : rt2) for i in 1:n for j in 1:i for u in 1:U] in mat_wsos_cone)
+        @constraint(model, [AffExpr(H[i,j](pts[u, :]) * (i == j ? 1.0 : rt2)) for i in 1:n for j in 1:i for u in 1:U] in mat_wsos_cone)
     else
         model = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true))
         @constraint(model, H in PSDCone())
@@ -48,15 +48,15 @@ end
 function run_JuMP_sosmat4_matrix_b(use_wsos::Bool; rseed::Int=1)
     n = 2
     m = 2
-    d = 3
+    d = 1
 
     @polyvar x[1:n]
     Z = monomials(x, 0:d)
-    nZ = length(Z)
-    Random.seed!(rseed)
-    M = [sum(rand() * Z[l] for l in 1:nZ) for i in 1:m, j in 1:m]
+    # Random.seed!(rseed)
+    M = [sum(rand() * Z[l] for l in 1:length(Z)) for i in 1:m, j in 1:m]
+
     MM = M'*M
-    MM += MM'
+    MM = 0.5*(MM + MM')
 
     return run_JuMP_sosmat4_matrix(x, MM, use_wsos)
 end
