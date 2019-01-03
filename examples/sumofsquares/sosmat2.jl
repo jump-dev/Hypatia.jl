@@ -30,7 +30,7 @@ function run_JuMP_sosmat2(use_matrixwsos::Bool, use_dual::Bool)
         if use_dual
             @variable(model, z[i in 1:3, 1:i, 1:U])
             @constraint(model, [z[i,j,u] * (i == j ? 1.0 : rt2) for i in 1:3 for j in 1:i for u in 1:U] in mat_wsos_cone)
-            @objective(model, Min, sum(z[i,j,u] * C[i,j](pts[u, :]...) * (i == j ? 1.0 : rt2) for i in 1:3 for j in 1:i for u in 1:U))
+            @objective(model, Min, sum(z[i,j,u] * C[i,j](pts[u, :]...) * (i == j ? 1.0 : 2.0) for i in 1:3 for j in 1:i for u in 1:U))
         else
             @constraint(model, [AffExpr(C[i,j](pts[u, :]) * (i == j ? 1.0 : rt2)) for i in 1:3 for j in 1:i for u in 1:U] in mat_wsos_cone)
         end
