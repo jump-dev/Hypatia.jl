@@ -58,7 +58,6 @@ function barfun(pnt, ipwt::Vector{Matrix{Float64}}, R::Int, U::Int, calc_barval:
         for l in 1:L, k in 1:l
             (bl, bk) = ((l-1)*R, (k-1)*R)
             uo = 0
-            t = 0
             for p in 1:R, q in 1:p
                 val = sum(ipwtj[u,l] * ipwtj[u,k] * pnt[uo+u] for u in 1:U)
                 bp = bl + p
@@ -66,14 +65,19 @@ function barfun(pnt, ipwt::Vector{Matrix{Float64}}, R::Int, U::Int, calc_barval:
                 if p == q
                     mat[bp,bq] = val
                 else
-                    mat[bp,bq] = mat[bq,bp] = rt2i*val
+                    mat[bl+p, bk+q] = mat[bl+q, bk+p] = rt2i*val
                 end
                 uo += U
-                t += 1
             end
         end
 
+        # if !calc_barval
+        #     @show eigvals(Symmetric(mat, :L))
+        #     @show cond(Symmetric(mat, :L))
+        # end
+
         F = cholesky!(Symmetric(mat, :L), check=false)
+
         if !isposdef(F)
             return NaN
         end
