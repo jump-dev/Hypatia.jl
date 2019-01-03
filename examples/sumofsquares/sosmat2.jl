@@ -24,6 +24,7 @@ function run_JuMP_sosmat2(use_matrixwsos::Bool, use_dual::Bool)
     dom = Hypatia.FreeDomain(3)
 
     model = Model(with_optimizer(Hypatia.Optimizer, verbose=true, tolabsopt=1e-6, tolrelopt=1e-6, tolfeas=1e-6))
+    
     if use_matrixwsos
         (U, pts, P0, _, _) = Hypatia.interpolate(dom, d, sample=false)
         mat_wsos_cone = WSOSPolyInterpMatCone(3, U, [P0], use_dual)

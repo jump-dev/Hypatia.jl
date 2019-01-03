@@ -4,7 +4,6 @@ Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 test whether a given polynomial is convex
 =#
 
-using Random
 using JuMP
 using MathOptInterface
 MOI = MathOptInterface
@@ -14,6 +13,7 @@ using DynamicPolynomials
 using SumOfSquares
 using PolyJuMP
 using Test
+using Random
 
 const rt2 = sqrt(2)
 
@@ -23,17 +23,18 @@ function run_JuMP_sosmat4_matrix(
     use_wsos::Bool,
     is_SOS::Bool,
     )
+    model = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true))
+
     if use_wsos
         n = nvariables(x)
         d = div(maximum(maxdegree.(H)), 2)
         dom = Hypatia.FreeDomain(n)
-
-        model = Model(with_optimizer(Hypatia.Optimizer, verbose=true, tolabsopt=1e-9, tolrelopt=1e-9, tolfeas=1e-9))
         (U, pts, P0, _, _) = Hypatia.interpolate(dom, d, sample_factor=20, sample=true)
         mat_wsos_cone = WSOSPolyInterpMatCone(n, U, [P0])
+
         @constraint(model, [AffExpr(H[i,j](pts[u, :]) * (i == j ? 1.0 : rt2)) for i in 1:n for j in 1:i for u in 1:U] in mat_wsos_cone)
     else
-        model = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true))
+        PolyJuMP.setpolymodule!(model, SumOfSquares)
         @constraint(model, H in PSDCone())
     end
 
