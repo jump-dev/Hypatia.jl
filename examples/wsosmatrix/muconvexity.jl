@@ -36,11 +36,13 @@ function run_JuMP_muconvexity(x::Vector, poly, dom, use_wsos::Bool)
 
         @constraint(model, [H[i,j](x => pts[u, :]) * (i == j ? 1.0 : rt2) for i in 1:n for j in 1:i for u in 1:U] in mat_wsos_cone)
     else
-        if !(dom isa Hypatia.FreeDomain)
-            error("implement domains with polyjump syntax")
-        end
         PolyJuMP.setpolymodule!(model, SumOfSquares)
-        @SDconstraint(model, H >= 0)# TODO domain=get_domain_inequalities(dom, x))
+
+        if dom isa Hypatia.FreeDomain
+            @constraint(model, H in PSDCone())
+        else
+            @constraint(model, H in PSDCone(), domain=get_domain_inequalities(dom, x))
+        end
     end
 
     JuMP.optimize!(model)
@@ -71,10 +73,10 @@ function run_JuMP_muconvexity_rand(;rseed::Int=1)
 
     dom = Hypatia.Ball(zeros(n), 1.0)
     (term1, prim1, mu1) = run_JuMP_muconvexity(x, poly, dom, true)
-    # (term2, prim2, mu2) = run_JuMP_muconvexity(x, poly, dom, false)
-    # @test term1 == term2 == MOI.OPTIMAL
-    # @test prim1 == prim2 == MOI.OPTIMAL
-    # @test mu1 ≈ mu2 atol=1e-4 rtol=1e-4
+    (term2, prim2, mu2) = run_JuMP_muconvexity(x, poly, dom, false)
+    @test term1 == term2 == MOI.OPTIMAL
+    @test prim1 == prim2 == MOI.FEASIBLE_POINT
+    @test mu1 ≈ mu2 atol=1e-4 rtol=1e-4
     muball = mu1
 
     @test mufree - muball <= 1e-4
