@@ -53,7 +53,7 @@ function run_JuMP_muconvexity_rand(;rseed::Int=1)
     d = 4
     @polyvar x[1:n]
 
-    # Random.seed!(rseed)
+    Random.seed!(rseed)
     poly = sum(rand() * z for z in monomials(x, 0:d))
     @show poly
 
