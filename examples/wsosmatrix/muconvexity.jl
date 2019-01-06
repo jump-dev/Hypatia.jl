@@ -50,7 +50,7 @@ function run_JuMP_muconvexity(x::Vector, poly, dom, use_wsos::Bool)
     return (JuMP.termination_status(model), JuMP.primal_status(model), JuMP.value(mu))
 end
 
-function run_JuMP_muconvexity_rand(;rseed::Int=1)
+function run_JuMP_muconvexity_rand(; rseed::Int=1)
     n = 2
     d = 4
     @polyvar x[1:n]
@@ -82,7 +82,7 @@ function run_JuMP_muconvexity_rand(;rseed::Int=1)
     @test mufree - muball <= 1e-4
 end
 
-function run_JuMP_muconvexity_a(use_wsos::Bool)
+function run_JuMP_muconvexity_a(; use_wsos::Bool=true)
     @polyvar x[1:1]
     poly = (x[1] + 1)^2*(x[1] - 1)^2
     dom = Hypatia.FreeDomain(1)
@@ -93,7 +93,7 @@ function run_JuMP_muconvexity_a(use_wsos::Bool)
     @test mu ≈ -4 atol=1e-4 rtol=1e-4
 end
 
-function run_JuMP_muconvexity_b(use_wsos::Bool)
+function run_JuMP_muconvexity_b(; use_wsos::Bool=true)
     n = 3
     @polyvar x[1:n]
     poly = sum(x.^4) - sum(x.^2)
@@ -105,7 +105,7 @@ function run_JuMP_muconvexity_b(use_wsos::Bool)
     @test mu ≈ -2 atol=1e-4 rtol=1e-4
 end
 
-function run_JuMP_muconvexity_c(use_wsos::Bool)
+function run_JuMP_muconvexity_c(; use_wsos::Bool=true)
     @polyvar x[1:1]
     poly = (x[1] + 1)^2*(x[1] - 1)^2
     dom = Hypatia.Box([-1.0], [1.0])
@@ -116,7 +116,7 @@ function run_JuMP_muconvexity_c(use_wsos::Bool)
     @test mu ≈ -4 atol=1e-4 rtol=1e-4
 end
 
-function run_JuMP_muconvexity_d(use_wsos::Bool)
+function run_JuMP_muconvexity_d(; use_wsos::Bool=true)
     n = 3
     @polyvar x[1:n]
     poly = sum(x.^4) - sum(x.^2)
