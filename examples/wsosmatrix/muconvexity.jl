@@ -57,7 +57,6 @@ function run_JuMP_muconvexity_rand(; rseed::Int=1)
 
     Random.seed!(rseed)
     poly = sum(rand() * z for z in monomials(x, 0:d))
-    @show poly
 
     dom = Hypatia.FreeDomain(n)
     (term1, prim1, mu1) = run_JuMP_muconvexity(x, poly, dom, true)
