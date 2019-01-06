@@ -192,8 +192,8 @@ function solveandcheck_JuMP(mdl, truemin)
     @test term_status == MOI.OPTIMAL
     @test pr_status == MOI.FEASIBLE_POINT
     @test du_status == MOI.FEASIBLE_POINT
-    @test pobj ≈ dobj atol=1e-3 rtol=1e-3
-    @test pobj ≈ truemin atol=1e-3 rtol=1e-3
+    @test pobj ≈ dobj atol=1e-4 rtol=1e-4
+    @test pobj ≈ truemin atol=1e-4 rtol=1e-4
 end
 
 function _namedpoly1_JuMP()
@@ -387,7 +387,7 @@ function _shapeconregr11_JuMP()
     (X, y) = generateregrdata(f, 0.5, 2.0, n, npoints, signal_ratio=signal_ratio)
     shapedata = ShapeData(Hypatia.Box(0.5*ones(n), 2*ones(n)), Hypatia.Box(0.5*ones(n), 2*ones(n)), ones(n), 1)
     (mdl, p) = build_shapeconregr_WSOS(X, y, deg, shapedata, use_leastsqobj=true)
-    truemin = 0.2283 # <---- not verified with SDP like others
+    truemin = 0.22206 # <---- not verified with SDP like others
     solveandcheck_JuMP(mdl, truemin)
 end
 
@@ -396,7 +396,7 @@ function _shapeconregr12_JuMP()
     (X, y) = generateregrdata(f, 0.5, 2.0, n, npoints, signal_ratio=signal_ratio)
     shapedata = ShapeData(Hypatia.Box(0.5*ones(n), 2*ones(n)), Hypatia.Box(0.5*ones(n), 2*ones(n)), ones(n), 1)
     (mdl, p) = build_shapeconregr_PSD(X, y, deg, shapedata, use_leastsqobj=true)
-    truemin = 0.2283 # <---- not verified with SDP
+    truemin = 0.22206 # <---- not verified with SDP
     solveandcheck_JuMP(mdl, truemin)
 end
 

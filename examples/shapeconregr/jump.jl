@@ -25,6 +25,8 @@ using PolyJuMP
 using Test
 include(joinpath(dirname(@__DIR__), "utils", "semialgebraicsets.jl"))
 
+const rt2 = sqrt(2)
+
 
 # a description of the shape of the regressor
 mutable struct ShapeData
@@ -99,6 +101,7 @@ function build_shapeconregr_PSD(
     usedense::Bool = true,
     )
     n = size(X, 2)
+    d = div(r+1, 2)
 
     model = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true, usedense=usedense, lscachetype=Hypatia.QRSymmCache))
     (x, p) = add_loss_and_polys!(model, X, y, r, use_leastsqobj)
@@ -133,32 +136,29 @@ function build_shapeconregr_WSOS(
     usedense::Bool = true,
     sample::Bool = true,
     )
-    d = div(r, 2)
+    d = div(r+1, 2)
     n = size(X, 2)
 
-    full_conv_dom = Hypatia.add_free_vars(sd.conv_dom)
     (mono_U, mono_pts, mono_P0, mono_PWts, _) = Hypatia.interpolate(sd.mono_dom, d, sample=sample, sample_factor=50)
-    (conv_U, conv_pts, conv_P0, conv_PWts, _) = Hypatia.interpolate(full_conv_dom, d+1, sample=sample, sample_factor=50) # TODO think about if it's ok to go up to d+1
+    (conv_U, conv_pts, conv_P0, conv_PWts, _) = Hypatia.interpolate(sd.conv_dom, d-1, sample=sample, sample_factor=50)
     mono_wsos_cone = WSOSPolyInterpCone(mono_U, [mono_P0, mono_PWts...])
-    conv_wsos_cone = WSOSPolyInterpCone(conv_U, [conv_P0, conv_PWts...])
+    conv_wsos_cone = WSOSPolyInterpMatCone(n, conv_U, [conv_P0, conv_PWts...])
 
-    model = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true, usedense=usedense, lscachetype=Hypatia.QRSymmCache))
+    model = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true, usedense=usedense, lscachetype=Hypatia.QRSymmCache, tolabsopt=1e-6, tolrelopt=1e-5, tolfeas=1e-6))
     (x, p) = add_loss_and_polys!(model, X, y, r, use_leastsqobj)
-    @polyvar w[1:n]
 
     # monotonicity
     dp = [DynamicPolynomials.differentiate(p, x[j]) for j in 1:n]
     for j in 1:n
         if !iszero(sd.mono_profile[j])
-            @constraint(model, [sd.mono_profile[j] * dp[j](mono_pts[i, :]) for i in 1:mono_U] in mono_wsos_cone)
+            @constraint(model, [sd.mono_profile[j] * dp[j](mono_pts[u, :]) for u in 1:mono_U] in mono_wsos_cone)
         end
     end
 
     # convexity
     if !iszero(sd.conv_profile)
         Hp = [DynamicPolynomials.differentiate(dp[i], x[j]) for i in 1:n, j in 1:n]
-        conv_condition = w'*Hp*w
-        @constraint(model, [sd.conv_profile * conv_condition(conv_pts[i, :]) for i in 1:conv_U] in conv_wsos_cone)
+        @constraint(model, [sd.conv_profile * Hp[i,j](conv_pts[u, :]) * (i == j ? 1.0 : rt2) for i in 1:n for j in 1:i for u in 1:conv_U] in conv_wsos_cone)
     end
 
     return (model, p)
@@ -173,6 +173,8 @@ function run_JuMP_shapeconregr(use_wsos::Bool; usedense::Bool=true)
         # (2, 3, 100, 50.0, x -> sum(x.^4)) # some noise, non-monotonic function
         # (2, 8, 100, 0.0, x -> exp(norm(x))) # low n high deg, numerically harder
         # (5, 5, 100, 0.0, x -> exp(norm(x))) # moderate size, no noise, monotonic # out of memory with psd
+        # (2, 4, 100, 0.0, x -> -sum(x.^4))
+        # (2, 4, 100, 0.0, x -> sum(x)^2)
 
     shapedata = ShapeData(n)
     (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
