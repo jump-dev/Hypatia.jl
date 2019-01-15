@@ -21,6 +21,17 @@ struct WSOSPolyInterpMatCone <: MOI.AbstractVectorSet
 end
 WSOSPolyInterpMatCone(r::Int, u::Int, ipwt::Vector{Matrix{Float64}}) = WSOSPolyInterpMatCone(r, u, ipwt, false)
 
+export WSOSConvexPolyInterpCone
+
+struct WSOSConvexPolyInterpCone <: MOI.AbstractVectorSet
+    r::Int
+    u::Int
+    ipwt::Vector{Matrix{Float64}}
+    isdual::Bool
+end
+WSOSConvexPolyInterpCone(r::Int, u::Int, ipwt::Vector{Matrix{Float64}}) = WSOSConvexPolyInterpCone(r, u, ipwt, false)
+
+
 mutable struct Optimizer <: MOI.AbstractOptimizer
     mdl::Model
     verbose::Bool
@@ -108,7 +119,8 @@ SupportedSets = Union{
     MOI.PositiveSemidefiniteConeTriangle,
     MOI.LogDetConeTriangle,
     WSOSPolyInterpCone,
-    WSOSPolyInterpMatCone
+    WSOSPolyInterpMatCone,
+    WSOSConvexPolyInterpCone,
     }
 
 MOI.supports_constraint(::Optimizer, ::Type{<:SupportedFuns}, ::Type{<:SupportedSets}) = true
@@ -121,6 +133,7 @@ conefrommoi(s::MOI.GeometricMeanCone) = (l = MOI.dimension(s) - 1; HypoGeomean(f
 conefrommoi(s::MOI.PowerCone) = EpiPerPower(inv(s.exponent))
 conefrommoi(s::WSOSPolyInterpCone) = WSOSPolyInterp(s.dimension, s.ipwt, s.isdual)
 conefrommoi(s::WSOSPolyInterpMatCone) = WSOSPolyInterpMat(s.r, s.u, s.ipwt, s.isdual)
+conefrommoi(s::WSOSConvexPolyInterpCone) = WSOSConvexPolyInterp(s.r, s.u, s.ipwt, s.isdual)
 conefrommoi(s::MOI.AbstractVectorSet) = error("MOI set $s is not recognized")
 
 function buildvarcone(fi::MOI.VectorOfVariables, si::MOI.AbstractVectorSet, dim::Int, q::Int)
@@ -530,6 +543,7 @@ function MOI.copy_to(
         MOI.LogDetConeTriangle,
         WSOSPolyInterpCone,
         WSOSPolyInterpMatCone,
+        WSOSConvexPolyInterpCone,
         ),
         F in (MOI.VectorOfVariables, MOI.VectorAffineFunction{Float64})
         for ci in getsrccons(F, S)

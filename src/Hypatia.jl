@@ -30,6 +30,7 @@ module Hypatia
         "semidefinite",
         "wsospolyinterp",
         "wsospolyinterpmat",
+        "wsosconvexpolyinterp",
         "hypoperlogdet",
         "epipersumexp",
         ]
