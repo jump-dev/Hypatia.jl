@@ -6,6 +6,8 @@ TODO readme for benchmarks and describe ARGS for running on command line
 
 println("must run from Hypatia/benchmark directory") # TODO delete later
 
+using Pkg; Pkg.activate("..") # TODO delete later
+
 using Hypatia
 using MathOptFormat
 using Dates
@@ -18,7 +20,7 @@ if length(ARGS) != 3
 end
 
 instanceset = ARGS[1]
-instsetfile = joinpath(@__DIR__, "instancesets", instanceset * ".txt")
+instsetfile = joinpath(@__DIR__, "instancesets", instanceset)
 if !isfile(instsetfile)
     error("instance set file not found: $instsetfile")
 end
@@ -53,28 +55,11 @@ if !isdir(outputpath)
 end
 
 
-# TODO these options
-# timelimit = ARGS[4]
-lscachetype = "QRSymmCache" # linear system solver cache type
-if !in(lscachetype, ("QRSymmCache", "NaiveCache"))
-    error("linear system cache type $lscachetype is not recognized")
-end
-usedense = parse(Bool, "false") # whether A and G matrices are represented as dense or sparse
-
-println("\nlinear systems using $lscachetype")
-println("matrices A, G will be $(usedense ? "dense" : "sparse")")
-
 # Hypatia options
-options = Dict()
-options[:verbose] = true
-options[:timelimit] = 1.8e3
-options[:maxiter] = 1000
-
-println("Hypatia options are:")
-for (k, v) in options
-    println("  $k = $v")
-end
-
+verbose = true
+timelimit = 1e2
+lscachetype = Hypatia.QRSymmCache
+usedense = false
 
 using MathOptInterface
 MOI = MathOptInterface
@@ -83,29 +68,31 @@ MOIB = MOI.Bridges
 MOIU = MOI.Utilities
 
 MOIU.@model(HypatiaModelData,
-    (),
-    (
-        MOI.EqualTo, MOI.GreaterThan, MOI.LessThan, MOI.Interval,
-    ),
-    (
-        MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives,
+    (MOI.Integer,), # integer constraints will be ignored by Hypatia
+    (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan, MOI.Interval),
+    (MOI.Reals, MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives,
         MOI.SecondOrderCone, MOI.RotatedSecondOrderCone,
-        MOI.ExponentialCone, MOI.PowerCone, MOI.GeometricMeanCone,
         MOI.PositiveSemidefiniteConeTriangle,
-        MOI.LogDetConeTriangle,
-    ),
-    (),
+        MOI.ExponentialCone),
+    (MOI.PowerCone,),
     (MOI.SingleVariable,),
     (MOI.ScalarAffineFunction,),
     (MOI.VectorOfVariables,),
     (MOI.VectorAffineFunction,),
     )
 
-
-
+optimizer = MOIU.CachingOptimizer(HypatiaModelData{Float64}(), Hypatia.Optimizer(
+    verbose = verbose,
+    timelimit = timelimit,
+    lscachetype = lscachetype,
+    usedense = usedense,
+    tolrelopt = 1e-6,
+    tolabsopt = 1e-7,
+    tolfeas = 1e-7,
+    ))
 
 println("\nstarting benchmark run in 5 seconds\n")
-sleep(5.0)
+# sleep(5.0)
 
 # each line of csv file will summarize Hypatia performance on a particular instance
 csvfile = joinpath(outputpath, "RESULTS_$(instanceset).csv")
@@ -131,41 +118,25 @@ for instname in instances
         println("instance $instname")
         println("ran at: ", Dates.now())
         println()
-        println("linear systems:  $lscachetype")
-        println("matrices A, G:   $(usedense ? "dense" : "sparse")")
-        println("Hypatia options:")
-        for (k, v) in options
-            println("  $k = $v")
-        end
 
         println("\nreading instance and constructing model...")
-        optimizer = MOIU.CachingOptimizer(HypatiaModelData{Float64}(), Hypatia.Optimizer(
-            verbose = verbose,
-            timelimit = 2e1,
-            lscachetype = lscachetype,
-            usedense = usedense,
-            tolrelopt = 1e-6,
-            tolabsopt = 1e-7,
-            tolfeas = 1e-7,
-            ))
-        readtime = @elapsed MOI.read_from_file(optimizer, joinpath(inputpath, instname))
+        modeldata = MathOptFormat.CBF.Model()
+        readtime = @elapsed MOI.read_from_file(modeldata, joinpath(inputpath, instname))
         println("took $readtime seconds")
-        # if hasintvars
-        #     println("ignoring integrality constraints")
-        # end
+
+        MOI.empty!(optimizer)
+        MOI.copy_to(optimizer, modeldata)
 
         println("\nsolving model...")
         try
             (val, runtime, bytes, gctime, memallocs) = @timed MOI.optimize!(optimizer)
             println("\nHypatia finished")
             status = MOI.get(optimizer, MOI.TerminationStatus())
-            # niters = MOI.get(optimizer, MOI.BarrierIterations())
-            niters = -1 # TODO
+            niters = -1 # TODO niters = MOI.get(optimizer, MOI.BarrierIterations())
             pobj = MOI.get(optimizer, MOI.ObjectiveValue())
             dobj = MOI.get(optimizer, MOI.ObjectiveBound())
         catch solveerror
-            println("\nHypatia errored:")
-            println(solveerror)
+            println("\nHypatia errored: ", solveerror)
         end
         println("took $runtime seconds")
         println("memory allocation data:")
@@ -177,9 +148,7 @@ for instname in instances
     end
 
     if !isnothing(solveerror)
-        println("Hypatia errored:")
-        println(solveerror)
-        println()
+        println("Hypatia errored: ", solveerror)
     end
 
     open(csvfile, "a") do fdcsv
