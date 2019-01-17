@@ -46,7 +46,7 @@ mutable struct EpiPerPower <: PrimitiveCone
     end
 end
 
-EpiPerPower(alpha::Vector{Float64}) = EpiPerPower(alpha, false)
+EpiPerPower(alpha::Float64) = EpiPerPower(alpha, false)
 
 dimension(prmtv::EpiPerPower) = 3
 barrierpar_prmtv(prmtv::EpiPerPower) = 3 - 2*min(inv(prmtv.alpha), 1.0 - inv(prmtv.alpha))
