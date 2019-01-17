@@ -1,0 +1,16 @@
+# a selection of CBF instances that fail to solve or cause slow progress
+
+# predictor fail 58d19d5
+4x3_2bars_3scen.cbf.gz
+bridge_3x7_2bars.cbf.gz
+rt_4x3_2bars_3scen.cbf.gz
+rt_bridge_3x7_2bars.cbf.gz
+
+# failed in factorization 58d19d5
+clay0203h.cbf.gz
+infeas_clean_10_10_39.cbf.gz
+infeas_messy_10_10_74.cbf.gz
+syn15m02m.cbf.gz
+
+# many iterations 58d19d
+nql30.cbf.gz
