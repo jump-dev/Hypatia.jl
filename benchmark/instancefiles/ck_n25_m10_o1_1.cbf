@@ -1,7 +1,7 @@
 #<CBLIB:AUTOGEN>
 # Contributor: Alper Atamtürk
 # Chance constrained knapsack problem.
-# 
+#
 # @article{Atamturk2009,
 # author = {Atamt\"{u}rk, Alper and Narayanan, Vishnu},
 # doi = {10.1016/j.disopt.2009.03.002},
@@ -1024,4 +1024,3 @@ BCOORD
 552 -1
 553 -1
 554 -1
-
