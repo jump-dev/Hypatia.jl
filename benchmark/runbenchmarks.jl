@@ -4,31 +4,12 @@ Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 TODO readme for benchmarks and describe ARGS for running on command line
 =#
 
-using Pkg; Pkg.activate("..") # TODO delete later
-
 using Hypatia
 using MathOptFormat
 using MathOptInterface
 MOI = MathOptInterface
 using GZip
 using Dates
-
-function read_into_model(filename::String)
-    if endswith(filename, ".gz")
-        io = GZip.open(filename, "r")
-    else
-        io = open(filename, "r")
-    end
-    if endswith(filename, ".cbf.gz") || endswith(filename, ".cbf")
-        model = MathOptFormat.CBF.Model()
-    elseif endswith(filename, ".mof.json.gz") || endswith(filename, ".mof.json")
-        model = MathOptFormat.MOF.Model()
-    else
-        error("MathOptInterface.read_from_file is not implemented for this filetype: $filename")
-    end
-    MOI.read_from_file(model, io)
-    return model
-end
 
 # parse command line arguments
 println()
@@ -122,8 +103,8 @@ for instname in instances
 
     instfile = joinpath(outputpath, instname * ".txt")
     open(instfile, "w") do fdinst
-        redirect_stdout(fdinst)
-        redirect_stderr(fdinst)
+        # redirect_stdout(fdinst)
+        # redirect_stderr(fdinst)
 
         println("instance $instname")
         println("ran at: ", Dates.now())
@@ -131,7 +112,7 @@ for instname in instances
 
         println("\nreading instance and constructing model...")
         readtime = @elapsed begin
-            model = read_into_model(joinpath(inputpath, instname))
+            model = MathOptFormat.read_into_model(joinpath(inputpath, instname))
             MOI.empty!(optimizer)
             MOI.copy_to(optimizer, model)
         end
