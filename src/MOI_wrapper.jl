@@ -104,7 +104,7 @@ SupportedSets = Union{
     MOI.RotatedSecondOrderCone,
     MOI.ExponentialCone,
     MOI.GeometricMeanCone,
-    MOI.PowerCone,
+    MOI.PowerCone{Float64},
     MOI.PositiveSemidefiniteConeTriangle,
     MOI.LogDetConeTriangle,
     WSOSPolyInterpCone,
@@ -118,7 +118,7 @@ conefrommoi(s::MOI.SecondOrderCone) = EpiNormEucl(MOI.dimension(s))
 conefrommoi(s::MOI.RotatedSecondOrderCone) = EpiPerSquare(MOI.dimension(s))
 conefrommoi(s::MOI.ExponentialCone) = HypoPerLog()
 conefrommoi(s::MOI.GeometricMeanCone) = (l = MOI.dimension(s) - 1; HypoGeomean(fill(1.0/l, l)))
-conefrommoi(s::MOI.PowerCone) = EpiPerPower(inv(s.exponent))
+conefrommoi(s::MOI.PowerCone{Float64}) = EpiPerPower(inv(s.exponent))
 conefrommoi(s::WSOSPolyInterpCone) = WSOSPolyInterp(s.dimension, s.ipwt, s.isdual)
 conefrommoi(s::WSOSPolyInterpMatCone) = WSOSPolyInterpMat(s.r, s.u, s.ipwt, s.isdual)
 conefrommoi(s::MOI.AbstractVectorSet) = error("MOI set $s is not recognized")
@@ -524,7 +524,7 @@ function MOI.copy_to(
         MOI.SecondOrderCone,
         MOI.RotatedSecondOrderCone,
         MOI.ExponentialCone,
-        MOI.PowerCone,
+        MOI.PowerCone{Float64},
         MOI.GeometricMeanCone,
         MOI.PositiveSemidefiniteConeTriangle,
         MOI.LogDetConeTriangle,
