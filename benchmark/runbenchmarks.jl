@@ -4,14 +4,31 @@ Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 TODO readme for benchmarks and describe ARGS for running on command line
 =#
 
-println("must run from Hypatia/benchmark directory") # TODO delete later
-
 using Pkg; Pkg.activate("..") # TODO delete later
 
 using Hypatia
 using MathOptFormat
+using MathOptInterface
+MOI = MathOptInterface
+using GZip
 using Dates
 
+function read_into_model(filename::String)
+    if endswith(filename, ".gz")
+        io = GZip.open(filename, "r")
+    else
+        io = open(filename, "r")
+    end
+    if endswith(filename, ".cbf.gz") || endswith(filename, ".cbf")
+        model = MathOptFormat.CBF.Model()
+    elseif endswith(filename, ".mof.json.gz") || endswith(filename, ".mof.json")
+        model = MathOptFormat.MOF.Model()
+    else
+        error("MathOptInterface.read_from_file is not implemented for this filetype: $filename")
+    end
+    MOI.read_from_file(model, io)
+    return model
+end
 
 # parse command line arguments
 println()
@@ -54,20 +71,13 @@ if !isdir(outputpath)
     error("output path is not a valid directory: $outputpath")
 end
 
-
 # Hypatia options
 verbose = true
 timelimit = 1e2
 lscachetype = Hypatia.QRSymmCache
 usedense = false
 
-using MathOptInterface
-MOI = MathOptInterface
-MOIT = MOI.Test
-MOIB = MOI.Bridges
-MOIU = MOI.Utilities
-
-MOIU.@model(HypatiaModelData,
+MOI.Utilities.@model(HypatiaModelData,
     (MOI.Integer,), # integer constraints will be ignored by Hypatia
     (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan, MOI.Interval),
     (MOI.Reals, MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives,
@@ -81,7 +91,7 @@ MOIU.@model(HypatiaModelData,
     (MOI.VectorAffineFunction,),
     )
 
-optimizer = MOIU.CachingOptimizer(HypatiaModelData{Float64}(), Hypatia.Optimizer(
+optimizer = MOI.Utilities.CachingOptimizer(HypatiaModelData{Float64}(), Hypatia.Optimizer(
     verbose = verbose,
     timelimit = timelimit,
     lscachetype = lscachetype,
@@ -92,7 +102,7 @@ optimizer = MOIU.CachingOptimizer(HypatiaModelData{Float64}(), Hypatia.Optimizer
     ))
 
 println("\nstarting benchmark run in 5 seconds\n")
-# sleep(5.0)
+sleep(5.0)
 
 # each line of csv file will summarize Hypatia performance on a particular instance
 csvfile = joinpath(outputpath, "RESULTS_$(instanceset).csv")
@@ -120,12 +130,12 @@ for instname in instances
         println()
 
         println("\nreading instance and constructing model...")
-        modeldata = MathOptFormat.CBF.Model()
-        readtime = @elapsed MOI.read_from_file(modeldata, joinpath(inputpath, instname))
+        readtime = @elapsed begin
+            model = read_into_model(joinpath(inputpath, instname))
+            MOI.empty!(optimizer)
+            MOI.copy_to(optimizer, model)
+        end
         println("took $readtime seconds")
-
-        MOI.empty!(optimizer)
-        MOI.copy_to(optimizer, modeldata)
 
         println("\nsolving model...")
         try
@@ -155,3 +165,5 @@ for instname in instances
         println(fdcsv, "$instname,$status,$pobj,$dobj,$niters,$runtime,$gctime,$bytes")
     end
 end
+
+println("\ndone\n")

@@ -158,9 +158,9 @@ uuid = "d6f4376e-aef5-505a-96c1-9c027394607a"
 
 [[MathOptFormat]]
 deps = ["Compat", "DataStructures", "JSON", "MathOptInterface"]
-git-tree-sha1 = "959d57f8525ad8ef6f5d7f508c60ff73cf8064ca"
-repo-rev = "master"
-repo-url = "../MathOptFormat/"
+git-tree-sha1 = "fb61bfb6e8f9a968cf3826d516e0ebe8f4d9f678"
+repo-rev = "readwriteio"
+repo-url = "../MathOptFormat"
 uuid = "54bc58d1-11ba-502a-845d-f421086f2369"
 version = "0.0.0"
 
