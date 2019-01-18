@@ -103,8 +103,8 @@ for instname in instances
 
     instfile = joinpath(outputpath, instname * ".txt")
     open(instfile, "w") do fdinst
-        # redirect_stdout(fdinst)
-        # redirect_stderr(fdinst)
+        redirect_stdout(fdinst)
+        redirect_stderr(fdinst)
 
         println("instance $instname")
         println("ran at: ", Dates.now())
