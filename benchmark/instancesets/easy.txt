@@ -5,5 +5,5 @@ port_12_9_3_a_1.cbf # psd, soc, exp
 tls4.cbf # soc
 ck_n25_m10_o1_1.cbf # rsoc
 rsyn0805h.cbf # exp
-infeas_clean_10_10_1.cbf # psd
+2x3_3bars.cbf # psd
 HMCR-n20-m400.cbf # power
