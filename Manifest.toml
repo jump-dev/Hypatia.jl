@@ -1,3 +1,5 @@
+# This file is machine-generated - editing it directly is not advised
+
 [[AbstractFFTs]]
 deps = ["Compat", "LinearAlgebra"]
 git-tree-sha1 = "8d59c3b1463b5e0ad05a3698167f85fac90e184d"
@@ -82,7 +84,7 @@ uuid = "b552c78f-8df3-52c6-915a-8e097449b14b"
 version = "0.0.7"
 
 [[Distributed]]
-deps = ["LinearAlgebra", "Random", "Serialization", "Sockets"]
+deps = ["Random", "Serialization", "Sockets"]
 uuid = "8ba89e20-285c-5b6f-9357-94700520ee1b"
 
 [[Distributions]]
@@ -120,7 +122,7 @@ uuid = "92c85e6c-cbff-5e0c-80f7-495c94daaecd"
 version = "0.4.0"
 
 [[InteractiveUtils]]
-deps = ["LinearAlgebra", "Markdown"]
+deps = ["Markdown"]
 uuid = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
 
 [[JSON]]
@@ -131,7 +133,7 @@ version = "0.20.0"
 
 [[JuMP]]
 deps = ["Calculus", "DataStructures", "ForwardDiff", "LinearAlgebra", "MathOptInterface", "NaNMath", "Random", "SparseArrays", "Statistics", "Test"]
-git-tree-sha1 = "8b4d812790771d758207496805124dcb61a307a5"
+git-tree-sha1 = "d9c2526a5f69389a6b95191f9db3794083652afa"
 repo-rev = "master"
 repo-url = "https://github.com/JuliaOpt/JuMP.jl.git"
 uuid = "4076af6c-e467-56ae-b986-b466b2749572"
@@ -154,9 +156,17 @@ uuid = "56ddb016-857b-54e1-b83d-db4d58db5568"
 deps = ["Base64"]
 uuid = "d6f4376e-aef5-505a-96c1-9c027394607a"
 
+[[MathOptFormat]]
+deps = ["Compat", "DataStructures", "JSON", "MathOptInterface"]
+git-tree-sha1 = "fb61bfb6e8f9a968cf3826d516e0ebe8f4d9f678"
+repo-rev = "readwriteio"
+repo-url = "../MathOptFormat"
+uuid = "54bc58d1-11ba-502a-845d-f421086f2369"
+version = "0.0.0"
+
 [[MathOptInterface]]
 deps = ["Compat", "Unicode"]
-git-tree-sha1 = "3b8a09325b1f34337e0d760b5f940ff6b26efa51"
+git-tree-sha1 = "798461173d7c6f8c7b0bd66ac8ba7c8832e7a959"
 repo-rev = "master"
 repo-url = "https://github.com/JuliaOpt/MathOptInterface.jl.git"
 uuid = "b8f27783-ece8-5eb3-8dc8-9495eed66fee"
@@ -320,7 +330,7 @@ uuid = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
 
 [[SumOfSquares]]
 deps = ["JuMP", "LinearAlgebra", "MathOptInterface", "MultivariateMoments", "MultivariatePolynomials", "PolyJuMP", "Reexport", "SemialgebraicSets", "SparseArrays", "Test"]
-git-tree-sha1 = "929da11a80d03a26c1e11887c1d9e136ee344492"
+git-tree-sha1 = "9fc92ecc049a090783773cd74d8fa1eb98032b73"
 repo-rev = "master"
 repo-url = "https://github.com/JuliaOpt/SumOfSquares.jl.git"
 uuid = "4b9e565b-77fc-50a5-a571-1244f986bda1"
@@ -337,7 +347,7 @@ uuid = "30578b45-9adc-5946-b283-645ec420af67"
 version = "0.4.0"
 
 [[UUIDs]]
-deps = ["Random"]
+deps = ["Random", "SHA"]
 uuid = "cf7118a7-6976-5b1a-9a39-7adc72f591a4"
 
 [[Unicode]]

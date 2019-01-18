@@ -1,0 +1,9 @@
+# a selection of CBF instances that solve reliably and quickly
+
+expdesign_D_8_4.cbf # psd, exp
+port_12_9_3_a_1.cbf # psd, soc, exp
+tls4.cbf # soc
+ck_n25_m10_o1_1.cbf # rsoc
+rsyn0805h.cbf # exp
+2x3_3bars.cbf # psd
+HMCR-n20-m400.cbf # power

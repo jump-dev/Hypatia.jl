@@ -4,3 +4,4 @@
 deps/deps.jl
 scratch.jl
 */scratch.jl
+benchmark/outputs/*
