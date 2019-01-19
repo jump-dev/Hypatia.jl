@@ -13,6 +13,7 @@ using Hypatia
 import MathOptInterface
 MOI = MathOptInterface
 import JuMP
+using LinearAlgebra
 using Random
 using Test
 
@@ -26,21 +27,18 @@ function build_JuMP_expdesign(
     @assert (p > q) && (n > q) && (nmax <= n)
     @assert size(V) == (q, p)
 
-    model = Model(with_optimizer(Hypatia.Optimizer, verbose=true))
-
-    @variable(model, hypo) # hypograph of logdet variable
-    @objective(model, Max, hypo)
-
-    @variable(model, 0 <= np[1:p] <= nmax) # number of each experiment
-    @constraint(model, sum(np) == n) # n experiments total
-
-    Q = V*diagm(np)*V' # information matrix
-    @constraint(model, vcat(hypo, 1.0, [Q[i,j] for i in 1:q for j in 1:i]) in MOI.LogDetConeTriangle(q)) # hypograph of logdet of information matrix
+    model = JuMP.Model(JuMP.with_optimizer(Hypatia.Optimizer, verbose=true))
+    JuMP.@variable(model, hypo) # hypograph of logdet variable
+    JuMP.@objective(model, Max, hypo)
+    JuMP.@variable(model, 0 <= np[1:p] <= nmax) # number of each experiment
+    JuMP.@constraint(model, sum(np) == n) # n experiments total
+    Q = V * diagm(np) * V' # information matrix
+    JuMP.@constraint(model, vcat(hypo, 1.0, [Q[i,j] for i in 1:q for j in 1:i]) in MOI.LogDetConeTriangle(q)) # hypograph of logdet of information matrix
 
     return (model, np)
 end
 
-function run_JuMP_expdesign(;rseed::Int=1)
+function run_JuMP_expdesign(; rseed::Int=1)
     (q, p, n, nmax) =
         # 25, 75, 125, 5     # large
         # 10, 30, 50, 5      # medium
@@ -66,7 +64,7 @@ function run_JuMP_expdesign(;rseed::Int=1)
     @test pr_status == MOI.FEASIBLE_POINT
     @test du_status == MOI.FEASIBLE_POINT
     @test pobj ≈ dobj atol=1e-4 rtol=1e-4
-    @test pobj ≈ logdet(V*Diagonal(npval)*V') atol=1e-4 rtol=1e-4
+    @test pobj ≈ logdet(V * Diagonal(npval) * V') atol=1e-4 rtol=1e-4
     @test sum(npval) ≈ n atol=1e-4 rtol=1e-4
     @test all(-1e-4 .<= npval .<= nmax + 1e-4)
 
