@@ -1,299 +1,3 @@
-#=
-Copyright 2018, Chris Coey and contributors
-Copyright 2018, David Papp, Sercan Yildiz
-=#
-
-# model object containing options, problem data, linear system cache, and solution
-mutable struct Model
-    # options
-    verbose::Bool           # if true, prints progress at each iteration
-    timelimit::Float64      # (approximate) time limit (in seconds) for algorithm in solve function
-    tolrelopt::Float64      # relative optimality gap tolerance
-    tolabsopt::Float64      # absolute optimality gap tolerance
-    tolfeas::Float64        # feasibility tolerance
-    maxiter::Int            # maximum number of iterations
-    predlinesearch::Bool    # if false, predictor step uses a fixed step size, else step size is determined via line search
-    maxpredsmallsteps::Int  # maximum number of predictor step size reductions allowed with respect to the safe fixed step size
-    predlsmulti::Float64    # predictor line search step size multiplier
-    corrcheck::Bool         # if false, maxcorrsteps corrector steps are performed at each corrector phase, else the corrector phase can be terminated before maxcorrsteps corrector steps if the iterate is in the eta-neighborhood
-    maxcorrsteps::Int       # maximum number of corrector steps (possible values: 1, 2, or 4)
-    alphacorr::Float64      # corrector step size
-    maxcorrlsiters::Int     # maximum number of line search iterations in each corrector step
-    corrlsmulti::Float64    # corrector line search step size multiplier
-
-    # problem data
-    c::Vector{Float64}          # linear cost vector, size n
-    A::AbstractMatrix{Float64}  # equality constraint matrix, size p*n
-    b::Vector{Float64}          # equality constraint vector, size p
-    G::AbstractMatrix{Float64}  # cone constraint matrix, size q*n
-    h::Vector{Float64}          # cone constraint vector, size q
-    cone::Cone                  # primal constraint cone object
-
-    L::LinSysCache  # cache for linear system solves
-
-    # results
-    status::Symbol          # solver status
-    solvetime::Float64      # total solve time
-    niters::Int             # total number of iterations
-
-    x::Vector{Float64}      # final value of the primal free variables
-    s::Vector{Float64}      # final value of the primal cone variables
-    y::Vector{Float64}      # final value of the dual free variables
-    z::Vector{Float64}      # final value of the dual cone variables
-    tau::Float64            # final value of the tau variable
-    kap::Float64            # final value of the kappa variable
-    mu::Float64             # final value of mu
-    pobj::Float64           # final primal objective value
-    dobj::Float64           # final dual objective value
-
-    function Model(verbose, timelimit, tolrelopt, tolabsopt, tolfeas, maxiter, predlinesearch, maxpredsmallsteps, predlsmulti, corrcheck, maxcorrsteps, alphacorr, maxcorrlsiters, corrlsmulti)
-        mdl = new()
-        mdl.verbose = verbose
-        mdl.timelimit = timelimit
-        mdl.tolrelopt = tolrelopt
-        mdl.tolabsopt = tolabsopt
-        mdl.tolfeas = tolfeas
-        mdl.maxiter = maxiter
-        mdl.predlinesearch = predlinesearch
-        mdl.maxpredsmallsteps = maxpredsmallsteps
-        mdl.predlsmulti = predlsmulti
-        mdl.corrcheck = corrcheck
-        mdl.maxcorrsteps = maxcorrsteps
-        mdl.alphacorr = alphacorr
-        mdl.maxcorrlsiters = maxcorrlsiters
-        mdl.corrlsmulti = corrlsmulti
-        mdl.status = :NotLoaded
-        return mdl
-    end
-end
-
-# initialize a model object
-function Model(;
-    verbose = false,
-    timelimit = 3.6e3, # TODO should be Inf
-    tolrelopt = 1e-6,
-    tolabsopt = 1e-7,
-    tolfeas = 1e-7,
-    maxiter = 1e4,
-    predlinesearch = true,
-    maxpredsmallsteps = 15,
-    predlsmulti = 0.7,
-    corrcheck = true,
-    maxcorrsteps = 15,
-    alphacorr = 1.0,
-    maxcorrlsiters = 15,
-    corrlsmulti = 0.5,
-    )
-    if min(tolrelopt, tolabsopt, tolfeas) < 1e-12 || max(tolrelopt, tolabsopt, tolfeas) > 1e-2
-        error("tolrelopt, tolabsopt, tolfeas must be between 1e-12 and 1e-2")
-    end
-    if timelimit < 1e-2
-        error("timelimit must be at least 1e-2")
-    end
-    if maxiter < 1
-        error("maxiter must be at least 1")
-    end
-    if maxpredsmallsteps < 1
-        error("maxpredsmallsteps must be at least 1")
-    end
-    if maxcorrsteps < 1
-        error("maxcorrsteps must be at least 1")
-    end
-
-    return Model(verbose, timelimit, tolrelopt, tolabsopt, tolfeas, maxiter, predlinesearch, maxpredsmallsteps, predlsmulti, corrcheck, maxcorrsteps, alphacorr, maxcorrlsiters, corrlsmulti)
-end
-
-get_status(mdl::Model) = mdl.status
-get_solvetime(mdl::Model) = mdl.solvetime
-get_niters(mdl::Model) = mdl.niters
-
-get_x(mdl::Model) = copy(mdl.x)
-get_s(mdl::Model) = copy(mdl.s)
-get_y(mdl::Model) = copy(mdl.y)
-get_z(mdl::Model) = copy(mdl.z)
-
-get_tau(mdl::Model) = mdl.tau
-get_kappa(mdl::Model) = mdl.kappa
-get_mu(mdl::Model) = mdl.mu
-
-get_pobj(mdl::Model) = dot(mdl.c, mdl.x)
-get_dobj(mdl::Model) = -dot(mdl.b, mdl.y) - dot(mdl.h, mdl.z)
-
-# check data for consistency
-function check_data(
-    c::Vector{Float64},
-    A::AbstractMatrix{Float64},
-    b::Vector{Float64},
-    G::AbstractMatrix{Float64},
-    h::Vector{Float64},
-    cone::Cone,
-    )
-    (n, p, q) = (length(c), length(b), length(h))
-    if n == 0
-        println("no variables were specified; proceeding anyway")
-    end
-    if q == 0
-        println("no conic constraints were specified; proceeding anyway")
-    end
-    if n < p
-        println("number of equality constraints ($p) exceeds number of variables ($n)")
-    end
-    if n != size(A, 2) || n != size(G, 2)
-        error("number of variables is not consistent in A, G, and c")
-    end
-    if p != size(A, 1)
-        error("number of constraint rows is not consistent in A and b")
-    end
-    if q != size(G, 1)
-        error("number of constraint rows is not consistent in G and h")
-    end
-
-    if length(cone.prmtvs) != length(cone.idxs)
-        error("number of primitive cones does not match number of index ranges")
-    end
-    qcone = 0
-    for k in eachindex(cone.prmtvs)
-        if dimension(cone.prmtvs[k]) != length(cone.idxs[k])
-            error("dimension of cone $k does not match number of indices in the corresponding range")
-        end
-        qcone += dimension(cone.prmtvs[k])
-    end
-    if qcone != q
-        error("dimension of cone is not consistent with number of rows in G and h")
-    end
-
-    return nothing
-end
-
-# preprocess data (optional)
-function preprocess_data(
-    c::Vector{Float64},
-    A::AbstractMatrix{Float64},
-    b::Vector{Float64},
-    G::AbstractMatrix{Float64};
-    tol::Float64 = 1e-13, # presolve tolerance
-    useQR::Bool = false, # returns QR fact of A' for use in a QR-based linear system solver
-    )
-    (n, p) = (length(c), length(b))
-    q = size(G, 1)
-
-    # NOTE (pivoted) QR factorizations are usually rank-revealing but may be unreliable, see http://www.math.sjsu.edu/~foster/rankrevealingcode.html
-    # rank of a matrix is number of nonzero diagonal elements of R
-
-    # preprocess dual equality constraints
-    dukeep = 1:n
-    AG = vcat(A, G)
-
-    # get pivoted QR # TODO when Julia has a unified QR interface, replace this
-    if issparse(AG)
-        AGF = qr(AG, tol=tol)
-    else
-        AGF = qr(AG, Val(true))
-    end
-    AGR = AGF.R
-    AGrank = 0
-    for i in 1:size(AGR, 1) # TODO could replace this with rank(AF) when available for both dense and sparse
-        if abs(AGR[i,i]) > tol
-            AGrank += 1
-        end
-    end
-
-    if AGrank < n
-        if issparse(AG)
-            dukeep = AGF.pcol[1:AGrank]
-            AGQ1 = Matrix{Float64}(undef, p + q, AGrank)
-            AGQ1[AGF.prow,:] = AGF.Q*Matrix{Float64}(I, p + q, AGrank) # TODO could eliminate this allocation
-        else
-            dukeep = AGF.p[1:AGrank]
-            AGQ1 = AGF.Q*Matrix{Float64}(I, p + q, AGrank) # TODO could eliminate this allocation
-        end
-        AGRiQ1 = UpperTriangular(AGR[1:AGrank,1:AGrank])\AGQ1'
-
-        A1 = A[:,dukeep]
-        G1 = G[:,dukeep]
-        c1 = c[dukeep]
-
-        if norm(AG'*AGRiQ1'*c1 - c, Inf) > tol
-            error("some dual equality constraints are inconsistent")
-        end
-
-        A = A1
-        G = G1
-        c = c1
-        println("removed $(n - AGrank) out of $n dual equality constraints")
-        n = AGrank
-    end
-
-    if p == 0
-        # no primal equality constraints to preprocess
-        # TODO use I instead of dense for Q2
-        return (c, A, b, G, 1:0, dukeep, Matrix{Float64}(I, n, n), Matrix{Float64}(I, 0, n))
-    end
-
-    # preprocess primal equality constraints
-    # get pivoted QR # TODO when Julia has a unified QR interface, replace this
-    if issparse(A)
-        AF = qr(sparse(A'), tol=tol)
-    else
-        AF = qr(A', Val(true))
-    end
-    AR = AF.R
-    Arank = 0
-    for i in 1:size(AR, 1) # TODO could replace this with rank(AF) when available for both dense and sparse
-        if abs(AR[i,i]) > tol
-            Arank += 1
-        end
-    end
-
-    if !useQR && Arank == p
-        # no primal equalities to remove and QR of A' not needed
-        return (c, A, b, G, 1:p, dukeep, Matrix{Float64}(undef, 0, 0), Matrix{Float64}(undef, 0, 0))
-    end
-
-    # using QR of A' (requires reordering rows) and/or some primal equalities are dependent
-    if issparse(A)
-        prkeep = AF.pcol[1:Arank]
-        AQ = Matrix{Float64}(undef, n, n)
-        AQ[AF.prow,:] = AF.Q*Matrix{Float64}(I, n, n) # TODO could eliminate this allocation
-    else
-        prkeep = AF.p[1:Arank]
-        AQ = AF.Q*Matrix{Float64}(I, n, n) # TODO could eliminate this allocation
-    end
-    AQ2 = AQ[:,Arank+1:n]
-    ARiQ1 = UpperTriangular(AR[1:Arank,1:Arank])\AQ[:,1:Arank]'
-
-    A1 = A[prkeep,:]
-    b1 = b[prkeep]
-
-    if Arank < p
-        # some dependent primal equalities, so check if they are consistent
-        x1 = ARiQ1'*b1
-        if norm(A*x1 - b, Inf) > tol
-            error("some primal equality constraints are inconsistent")
-        end
-        println("removed $(p - Arank) out of $p primal equality constraints")
-    end
-
-    A = A1
-    b = b1
-    return (c, A, b, G, prkeep, dukeep, AQ2, ARiQ1)
-end
-
-# verify problem data and load into model object
-function load_data!(
-    mdl::Model,
-    c::Vector{Float64},
-    A::AbstractMatrix{Float64},
-    b::Vector{Float64},
-    G::AbstractMatrix{Float64},
-    h::Vector{Float64},
-    cone::Cone,
-    L::LinSysCache, # linear system solver cache (see linsyssolvers folder)
-    )
-    (mdl.c, mdl.A, mdl.b, mdl.G, mdl.h, mdl.cone, mdl.L) = (c, A, b, G, h, cone, L)
-    mdl.status = :Loaded
-    return mdl
-end
 
 # solve using predictor-corrector algorithm based on homogeneous self-dual embedding
 function solve!(mdl::Model)
@@ -302,7 +6,7 @@ function solve!(mdl::Model)
 
     (c, A, b, G, h, cone, L) = (mdl.c, mdl.A, mdl.b, mdl.G, mdl.h, mdl.cone, mdl.L)
     (n, p, q) = (length(c), length(b), length(h))
-    bnu = 1.0 + barrierpar(cone) # complexity parameter nu-bar of the augmented barrier (sum of the primitive cone barrier parameters plus 1)
+    bnu = 1.0 + Cones.barrierpar(cone) # complexity parameter nu-bar of the augmented barrier (sum of the primitive cone barrier parameters plus 1)
 
     # preallocate arrays
     # primal and dual variables multiplied by tau
@@ -314,7 +18,7 @@ function solve!(mdl::Model)
     ls_tz = similar(tz)
     ls_ts = similar(ts)
     # cone functions evaluate barrier derivatives
-    loadpnt!(cone, ls_ts, ls_tz)
+    Cones.loadpnt!(cone, ls_ts, ls_tz)
     g = similar(ts)
     # helper arrays for residuals, right-hand-sides, and search directions
     tmp_tx = similar(tx)
@@ -327,7 +31,7 @@ function solve!(mdl::Model)
     mdl.verbose && println("\nfinding initial iterate")
 
     # TODO scale like in alfonso?
-    getinitsz!(ls_ts, ls_tz, cone)
+    Cones.getinitsz!(ls_ts, ls_tz, cone)
     @. ts = ls_ts
     @. tz = ls_tz
 
@@ -481,7 +185,7 @@ function solve!(mdl::Model)
         # copy_y = copy(tmp_ty)
         # copy_z = copy(tmp_tz)
 
-        (tmp_kap, tmp_tau) = solvelinsys6!(tmp_tx, tmp_ty, tmp_tz, -kap, tmp_ts, kap + cx + by + hz, mu, tau, L)
+        (tmp_kap, tmp_tau) = LinearSystems.solvelinsys6!(tmp_tx, tmp_ty, tmp_tz, -kap, tmp_ts, kap + cx + by + hz, mu, tau, L)
 
         # # check residual
         # res_x = -A'*tmp_ty - G'*tmp_tz - c*tmp_tau + copy_x
@@ -521,10 +225,10 @@ function solve!(mdl::Model)
             # accept primal iterate if
             # - decreased alpha and it is the first inside the cone and beta-neighborhood or
             # - increased alpha and it is inside the cone and the first to leave beta-neighborhood
-            if ls_mu > 0.0 && ls_tau > 0.0 && ls_kap > 0.0 && incone(cone, ls_mu)
+            if ls_mu > 0.0 && ls_tau > 0.0 && ls_kap > 0.0 && Cones.incone(cone, ls_mu)
                 # primal iterate is inside the cone
-                nbhd = calcnbhd!(g, ls_ts, ls_tz, ls_mu, cone) + abs2(ls_tk - ls_mu)
-                # nbhd = calcnbhd!(g, ls_ts, ls_tz, ls_mu, cone) + abs2(ls_tk - ls_mu)/abs2(ls_mu)
+                nbhd = Cones.calcnbhd!(g, ls_ts, ls_tz, ls_mu, cone) + abs2(ls_tk - ls_mu)
+                # nbhd = Cones.calcnbhd!(g, ls_ts, ls_tz, ls_mu, cone) + abs2(ls_tk - ls_mu)/abs2(ls_mu)
 
                 if nbhd < abs2(beta*ls_mu)
                 # if nbhd < abs2(beta)
@@ -591,12 +295,12 @@ function solve!(mdl::Model)
                 v1 = (cone.prmtvs[k].usedual ? ts : tz)
                 @. @views tmp_tz[cone.idxs[k]] = -v1[cone.idxs[k]]
             end
-            calcg!(g, cone)
+            Cones.calcg!(g, cone)
             @. tmp_tz -= mu*g
             # @. tmp_tz -= g
             @. tmp_ts = 0.0
 
-            (tmp_kap, tmp_tau) = solvelinsys6!(tmp_tx, tmp_ty, tmp_tz, -kap + mu/tau, tmp_ts, 0.0, mu, tau, L)
+            (tmp_kap, tmp_tau) = LinearSystems.solvelinsys6!(tmp_tx, tmp_ty, tmp_tz, -kap + mu/tau, tmp_ts, 0.0, mu, tau, L)
 
             # determine step length alpha by line search
             alpha = mdl.alphacorr
@@ -619,7 +323,7 @@ function solve!(mdl::Model)
                 @assert ls_kap > 0.0
                 ls_mu = (dot(ls_ts, ls_tz) + ls_tau*ls_kap)/bnu
 
-                if ls_mu > 0.0 && incone(cone, ls_mu)
+                if ls_mu > 0.0 && Cones.incone(cone, ls_mu)
                     # primal iterate tx is inside the cone, so terminate line search
                     break
                 end
@@ -649,8 +353,8 @@ function solve!(mdl::Model)
 
             # finish if allowed and current iterate is in the eta-neighborhood, or if taken max steps
             if ncorrsteps == mdl.maxcorrsteps || mdl.corrcheck
-                nbhd = calcnbhd!(g, ls_ts, ls_tz, mu, cone) + abs2(tau*kap - mu)
-                # nbhd = calcnbhd!(g, ls_ts, ls_tz, mu, cone) + abs2(tau*kap - mu)/abs2(mu)
+                nbhd = Cones.calcnbhd!(g, ls_ts, ls_tz, mu, cone) + abs2(tau*kap - mu)
+                # nbhd = Cones.calcnbhd!(g, ls_ts, ls_tz, mu, cone) + abs2(tau*kap - mu)/abs2(mu)
 
                 @. ls_tz = tz
                 @. ls_ts = ts

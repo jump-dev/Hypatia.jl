@@ -3,73 +3,60 @@ Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 =#
 
 using Hypatia
+const HYP = Hypatia
+const CO = HYP.Cones
+const LS = HYP.LinearSystems
+const MU = HYP.ModelUtilities
 using Test
 using Random
 using LinearAlgebra
 using SparseArrays
 
-
-# load examples functions in src/examples/
 egs_dir = joinpath(@__DIR__, "../examples")
-include(joinpath(egs_dir, "envelope/native.jl"))
-include(joinpath(egs_dir, "envelope/jump.jl"))
-include(joinpath(egs_dir, "expdesign/jump.jl"))
-include(joinpath(egs_dir, "linearopt/native.jl"))
-include(joinpath(egs_dir, "namedpoly/native.jl"))
-include(joinpath(egs_dir, "namedpoly/jump.jl"))
-include(joinpath(egs_dir, "shapeconregr/jump.jl"))
-include(joinpath(egs_dir, "densityest/jump.jl"))
-include(joinpath(egs_dir, "wsosmatrix/sosmatrix.jl"))
-include(joinpath(egs_dir, "wsosmatrix/muconvexity.jl"))
-include(joinpath(egs_dir, "wsosmatrix/sosmat1.jl"))
-include(joinpath(egs_dir, "wsosmatrix/sosmat2.jl"))
-include(joinpath(egs_dir, "wsosmatrix/sosmat3.jl"))
-include(joinpath(@__DIR__, "examples.jl"))
-
 
 # TODO make first part a native interface function eventually
 # TODO maybe build a new high-level model struct; the current model struct is low-level
 function solveandcheck(
-    mdl::Hypatia.Model,
+    mdl::HYP.Model,
     c,
     A,
     b,
     G,
     h,
     cone,
-    lscachetype;
+    linearsystem;
     atol = 1e-4,
     rtol = 1e-4,
     )
     # check, preprocess, load, and solve
-    Hypatia.check_data(c, A, b, G, h, cone)
-    if lscachetype == Hypatia.QRSymmCache
-        (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = Hypatia.preprocess_data(c, A, b, G, useQR=true)
-        L = Hypatia.QRSymmCache(c1, A1, b1, G1, h, cone, Q2, RiQ1)
-    elseif lscachetype == Hypatia.NaiveCache
-        (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = Hypatia.preprocess_data(c, A, b, G, useQR=false)
-        L = Hypatia.NaiveCache(c1, A1, b1, G1, h, cone)
+    HYP.check_data(c, A, b, G, h, cone)
+    if linearsystem == LS.QRSymm
+        (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = HYP.preprocess_data(c, A, b, G, useQR=true)
+        L = LS.QRSymm(c1, A1, b1, G1, h, cone, Q2, RiQ1)
+    elseif linearsystem == LS.Naive
+        (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = HYP.preprocess_data(c, A, b, G, useQR=false)
+        L = LS.Naive(c1, A1, b1, G1, h, cone)
     else
-        error("linear system cache type $lscachetype is not recognized")
+        error("linear system cache type $linearsystem is not recognized")
     end
-    Hypatia.load_data!(mdl, c1, A1, b1, G1, h, cone, L)
-    Hypatia.solve!(mdl)
+    HYP.load_data!(mdl, c1, A1, b1, G1, h, cone, L)
+    HYP.solve!(mdl)
 
     # construct solution
     x = zeros(length(c))
-    x[dukeep] = Hypatia.get_x(mdl)
+    x[dukeep] = HYP.get_x(mdl)
     y = zeros(length(b))
-    y[prkeep] = Hypatia.get_y(mdl)
-    s = Hypatia.get_s(mdl)
-    z = Hypatia.get_z(mdl)
-    pobj = Hypatia.get_pobj(mdl)
-    dobj = Hypatia.get_dobj(mdl)
-    status = Hypatia.get_status(mdl)
+    y[prkeep] = HYP.get_y(mdl)
+    s = HYP.get_s(mdl)
+    z = HYP.get_z(mdl)
+    pobj = HYP.get_pobj(mdl)
+    dobj = HYP.get_dobj(mdl)
+    status = HYP.get_status(mdl)
 
     # check conic certificates are valid; conditions are described by CVXOPT at https://github.com/cvxopt/cvxopt/blob/master/src/python/coneprog.py
-    Hypatia.loadpnt!(cone, s, z)
+    # CO.loadpnt!(cone, s, z)
     if status == :Optimal
-        # @test Hypatia.incone(cone)
+        # @test HYP.incone(cone)
         @test pobj ≈ dobj atol=atol rtol=rtol
         @test A*x ≈ b atol=atol rtol=rtol
         @test G*x + s ≈ h atol=atol rtol=rtol
@@ -78,25 +65,25 @@ function solveandcheck(
         @test dot(c, x) ≈ pobj atol=1e-8 rtol=1e-8
         @test dot(b, y) + dot(h, z) ≈ -dobj atol=1e-8 rtol=1e-8
     elseif status == :PrimalInfeasible
-        # @test Hypatia.incone(cone)
+        # @test HYP.incone(cone)
         @test isnan(pobj)
         @test dobj > 0
         @test dot(b, y) + dot(h, z) ≈ -dobj atol=1e-8 rtol=1e-8
         @test G'*z ≈ -A'*y atol=atol rtol=rtol
     elseif status == :DualInfeasible
-        # @test Hypatia.incone(cone)
+        # @test HYP.incone(cone)
         @test isnan(dobj)
         @test pobj < 0
         @test dot(c, x) ≈ pobj atol=1e-8 rtol=1e-8
         @test G*x ≈ -s atol=atol rtol=rtol
         @test A*x ≈ zeros(length(y)) atol=atol rtol=rtol
     elseif status == :IllPosed
-        # @test Hypatia.incone(cone)
+        # @test HYP.incone(cone)
         # TODO primal vs dual ill-posed statuses and conditions
     end
 
-    stime = Hypatia.get_solvetime(mdl)
-    niters = Hypatia.get_niters(mdl)
+    stime = HYP.get_solvetime(mdl)
+    niters = HYP.get_niters(mdl)
 
     return (x=x, y=y, s=s, z=z, pobj=pobj, dobj=dobj, status=status, stime=stime, niters=niters)
 end
@@ -111,9 +98,9 @@ include(joinpath(@__DIR__, "interpolation.jl"))
 include(joinpath(@__DIR__, "native.jl"))
 @info("starting native interface tests")
 verbose = false
-lscachetypes = [
-    Hypatia.QRSymmCache,
-    Hypatia.NaiveCache,
+linearsystems = [
+    LS.QRSymm,
+    LS.Naive,
     ]
 testfuns = [
     _dimension1,
@@ -156,121 +143,137 @@ testfuns = [
     _epipersumexp1,
     _epipersumexp2,
     ]
-@testset "native tests: $testfun, $lscachetype" for testfun in testfuns, lscachetype in lscachetypes
-    testfun(verbose=verbose, lscachetype=lscachetype)
+@testset "native tests: $t, $l" for t in testfuns, l in linearsystems
+    t(verbose=verbose, linearsystem=l)
 end
 
-
-@info("starting native examples tests")
-verbose = false
-lscachetypes = [
-    Hypatia.QRSymmCache,
-    # Hypatia.NaiveCache, # slow
-    ]
-testfuns = [
-    _envelope1,
-    _envelope2,
-    _envelope3,
-    _envelope4,
-    _linearopt1,
-    _linearopt2,
-    _namedpoly1,
-    _namedpoly2,
-    _namedpoly3,
-    # _namedpoly4, # interpolation memory usage excessive
-    _namedpoly5,
-    # _namedpoly6, # interpolation memory usage excessive
-    _namedpoly7,
-    _namedpoly8,
-    _namedpoly9,
-    _namedpoly10, # numerically unstable
-    _namedpoly11,
-    ]
-@testset "native examples: $testfun, $lscachetype" for testfun in testfuns, lscachetype in lscachetypes
-    testfun(verbose=verbose, lscachetype=lscachetype)
-end
-
-
-@info("starting JuMP examples tests")
-testfuns = [
-    _namedpoly1_JuMP,
-    _namedpoly2_JuMP,
-    _namedpoly3_JuMP,
-    _namedpoly4_JuMP, # numerically unstable
-    _namedpoly5_JuMP,
-    _namedpoly6_JuMP,
-    _namedpoly7_JuMP,
-    _namedpoly8_JuMP,
-    _namedpoly9_JuMP,
-    _namedpoly10_JuMP,
-    _shapeconregr1_JuMP,
-    _shapeconregr2_JuMP,
-    _shapeconregr3_JuMP,
-    _shapeconregr4_JuMP,
-    _shapeconregr5_JuMP,
-    _shapeconregr6_JuMP,
-    _shapeconregr7_JuMP, # numerically unstable
-    _shapeconregr8_JuMP,
-    _shapeconregr9_JuMP, # numerically unstable
-    _shapeconregr10_JuMP, # numerically unstable
-    _shapeconregr11_JuMP, # numerically unstable
-    _shapeconregr12_JuMP, # numerically unstable
-    _shapeconregr13_JuMP, # numerically unstable
-    # _shapeconregr14_JuMP, # throws out-of-memory error
-    # _shapeconregr15_JuMP, # throws out-of-memory error
-    ]
-@testset "JuMP examples: $testfun" for testfun in testfuns
-    testfun()
-end
+#
+# @info("starting native examples tests")
+# include(joinpath(egs_dir, "envelope/native.jl"))
+# include(joinpath(egs_dir, "linearopt/native.jl"))
+# include(joinpath(egs_dir, "namedpoly/native.jl"))
+# include(joinpath(@__DIR__, "examples.jl"))
+# verbose = false
+# linearsystems = [
+#     LS.QRSymm,
+#     # LS.Naive, # slow
+#     ]
+# testfuns = [
+#     _envelope1,
+#     _envelope2,
+#     _envelope3,
+#     _envelope4,
+#     _linearopt1,
+#     _linearopt2,
+#     _namedpoly1,
+#     _namedpoly2,
+#     _namedpoly3,
+#     # _namedpoly4, # interpolation memory usage excessive
+#     _namedpoly5,
+#     # _namedpoly6, # interpolation memory usage excessive
+#     _namedpoly7,
+#     _namedpoly8,
+#     _namedpoly9,
+#     _namedpoly10, # numerically unstable
+#     _namedpoly11,
+#     ]
+# @testset "native examples: $t, $l" for t in testfuns, l in linearsystems
+#     t(verbose=verbose, linearsystem=l)
+# end
 
 
-@info("starting verbose default examples tests")
-testfuns = [
-    run_JuMP_expdesign,
-    run_linearopt,
-    run_namedpoly,
-    run_JuMP_namedpoly_PSD, # final objective doesn't match
-    run_JuMP_namedpoly_WSOS_primal,
-    run_JuMP_namedpoly_WSOS_dual,
-    run_envelope_primal_dense,
-    run_envelope_dual_dense,
-    run_envelope_primal_sparse,
-    run_envelope_dual_sparse,
-    run_JuMP_envelope_boxinterp,
-    run_JuMP_envelope_sampleinterp_box,
-    run_JuMP_envelope_sampleinterp_ball,
-    run_JuMP_shapeconregr_PSD,
-    run_JuMP_shapeconregr_WSOS,
-    run_JuMP_densityest,
-    run_JuMP_sosmat4_matrix_rand,
-    run_JuMP_sosmat4_matrix_a,
-    run_JuMP_sosmat4_poly_a,
-    run_JuMP_sosmat4_poly_b,
-    run_JuMP_muconvexity_rand,
-    run_JuMP_muconvexity_a,
-    run_JuMP_muconvexity_b,
-    run_JuMP_muconvexity_c,
-    run_JuMP_muconvexity_d,
-    run_JuMP_sosmat1,
-    run_JuMP_sosmat2_scalar,
-    run_JuMP_sosmat2_matrix,
-    run_JuMP_sosmat2_matrix_dual,
-    run_JuMP_sosmat3, # slow
-    ]
-@testset "default examples: $testfun" for testfun in testfuns
-    testfun()
-end
+# load JuMP examples functions in src/examples/
+# include(joinpath(egs_dir, "envelope/jump.jl"))
+# include(joinpath(egs_dir, "expdesign/jump.jl"))
+# include(joinpath(egs_dir, "namedpoly/jump.jl"))
+# include(joinpath(egs_dir, "shapeconregr/jump.jl"))
+# include(joinpath(egs_dir, "densityest/jump.jl"))
+# include(joinpath(egs_dir, "wsosmatrix/sosmatrix.jl"))
+# include(joinpath(egs_dir, "wsosmatrix/muconvexity.jl"))
+# include(joinpath(egs_dir, "wsosmatrix/sosmat1.jl"))
+# include(joinpath(egs_dir, "wsosmatrix/sosmat2.jl"))
+# include(joinpath(egs_dir, "wsosmatrix/sosmat3.jl"))
 
+# @info("starting verbose default examples tests")
+# testfuns = [
+#     run_JuMP_expdesign,
+#     run_linearopt,
+#     run_namedpoly,
+#     run_JuMP_namedpoly_PSD, # final objective doesn't match
+#     run_JuMP_namedpoly_WSOS_primal,
+#     run_JuMP_namedpoly_WSOS_dual,
+#     run_envelope_primal_dense,
+#     run_envelope_dual_dense,
+#     run_envelope_primal_sparse,
+#     run_envelope_dual_sparse,
+#     run_JuMP_envelope_boxinterp,
+#     run_JuMP_envelope_sampleinterp_box,
+#     run_JuMP_envelope_sampleinterp_ball,
+#     run_JuMP_shapeconregr_PSD,
+#     run_JuMP_shapeconregr_WSOS,
+#     run_JuMP_densityest,
+#     run_JuMP_sosmat4_matrix_rand,
+#     run_JuMP_sosmat4_matrix_a,
+#     run_JuMP_sosmat4_poly_a,
+#     run_JuMP_sosmat4_poly_b,
+#     run_JuMP_muconvexity_rand,
+#     run_JuMP_muconvexity_a,
+#     run_JuMP_muconvexity_b,
+#     run_JuMP_muconvexity_c,
+#     run_JuMP_muconvexity_d,
+#     run_JuMP_sosmat1,
+#     run_JuMP_sosmat2_scalar,
+#     run_JuMP_sosmat2_matrix,
+#     run_JuMP_sosmat2_matrix_dual,
+#     run_JuMP_sosmat3, # slow
+#     ]
+# @testset "default examples: $t" for t in testfuns
+#     t()
+# end
+#
+#
+# @info("starting JuMP examples tests")
+# testfuns = [
+#     _namedpoly1_JuMP,
+#     _namedpoly2_JuMP,
+#     _namedpoly3_JuMP,
+#     _namedpoly4_JuMP, # numerically unstable
+#     _namedpoly5_JuMP,
+#     _namedpoly6_JuMP,
+#     _namedpoly7_JuMP,
+#     _namedpoly8_JuMP,
+#     _namedpoly9_JuMP,
+#     _namedpoly10_JuMP,
+#     _shapeconregr1_JuMP,
+#     _shapeconregr2_JuMP,
+#     _shapeconregr3_JuMP,
+#     _shapeconregr4_JuMP,
+#     _shapeconregr5_JuMP,
+#     _shapeconregr6_JuMP,
+#     _shapeconregr7_JuMP, # numerically unstable
+#     _shapeconregr8_JuMP,
+#     _shapeconregr9_JuMP, # numerically unstable
+#     _shapeconregr10_JuMP, # numerically unstable
+#     _shapeconregr11_JuMP, # numerically unstable
+#     _shapeconregr12_JuMP, # numerically unstable
+#     _shapeconregr13_JuMP, # numerically unstable
+#     # _shapeconregr14_JuMP, # throws out-of-memory error
+#     # _shapeconregr15_JuMP, # throws out-of-memory error
+#     ]
+# @testset "JuMP examples: $t" for t in testfuns
+#     t()
+# end
+#
 
 @info("starting MathOptInterface tests")
 include(joinpath(@__DIR__, "MOI_wrapper.jl"))
 verbose = false
-lscachetypes = [
-    Hypatia.QRSymmCache,
-    Hypatia.NaiveCache,
+linearsystems = [
+    LS.QRSymm,
+    LS.Naive,
     ]
-@testset "MOI tests: $lscachetype, $(usedense ? "dense" : "sparse")" for lscachetype in lscachetypes, usedense in [false, true]
-    testmoi(verbose=verbose, lscachetype=lscachetype, usedense=usedense)
+@testset "MOI tests: $l, $(d ? "dense" : "sparse")" for l in linearsystems, d in [false, true]
+    testmoi(verbose=verbose, linearsystem=l, usedense=d)
 end
 
 end

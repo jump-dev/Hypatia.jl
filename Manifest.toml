@@ -133,7 +133,7 @@ version = "0.20.0"
 
 [[JuMP]]
 deps = ["Calculus", "DataStructures", "ForwardDiff", "LinearAlgebra", "MathOptInterface", "NaNMath", "Random", "SparseArrays", "Statistics", "Test"]
-git-tree-sha1 = "d9c2526a5f69389a6b95191f9db3794083652afa"
+git-tree-sha1 = "250b18f8bd32e3aa1a7979e05d2c304a21362ea7"
 repo-rev = "master"
 repo-url = "https://github.com/JuliaOpt/JuMP.jl.git"
 uuid = "4076af6c-e467-56ae-b986-b466b2749572"
@@ -156,17 +156,9 @@ uuid = "56ddb016-857b-54e1-b83d-db4d58db5568"
 deps = ["Base64"]
 uuid = "d6f4376e-aef5-505a-96c1-9c027394607a"
 
-[[MathOptFormat]]
-deps = ["Compat", "DataStructures", "JSON", "MathOptInterface"]
-git-tree-sha1 = "fb61bfb6e8f9a968cf3826d516e0ebe8f4d9f678"
-repo-rev = "readwriteio"
-repo-url = "../MathOptFormat"
-uuid = "54bc58d1-11ba-502a-845d-f421086f2369"
-version = "0.0.0"
-
 [[MathOptInterface]]
 deps = ["Compat", "Unicode"]
-git-tree-sha1 = "798461173d7c6f8c7b0bd66ac8ba7c8832e7a959"
+git-tree-sha1 = "e72eff1b88f8485f9eaca4ca301d53346faf46e6"
 repo-rev = "master"
 repo-url = "https://github.com/JuliaOpt/MathOptInterface.jl.git"
 uuid = "b8f27783-ece8-5eb3-8dc8-9495eed66fee"
@@ -174,9 +166,9 @@ version = "0.8.1+"
 
 [[Missings]]
 deps = ["Dates", "InteractiveUtils", "SparseArrays", "Test"]
-git-tree-sha1 = "adc26d2ee85a49c413464110d922cf21efc9d233"
+git-tree-sha1 = "d1d2585677f2bd93a97cfeb8faa7a0de0f982042"
 uuid = "e1d29d7a-bbdc-5cf2-9ac0-f12de2c33e28"
-version = "0.3.1"
+version = "0.4.0"
 
 [[Mmap]]
 uuid = "a63ad114-7e13-5084-954f-fe012c677804"
@@ -225,9 +217,9 @@ version = "0.2.1+"
 
 [[Polynomials]]
 deps = ["LinearAlgebra", "SparseArrays", "Test"]
-git-tree-sha1 = "1a1eae52956658a6acae6fa1b6d6c3d488192895"
+git-tree-sha1 = "62142bd65d3f8aeb2226ec64dd8493349147df94"
 uuid = "f27b6e38-b328-58d1-80ce-0feddd5e7a45"
-version = "0.5.1"
+version = "0.5.2"
 
 [[Printf]]
 deps = ["Unicode"]

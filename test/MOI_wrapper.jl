@@ -10,17 +10,12 @@ MOIU = MOI.Utilities
 
 MOIU.@model(HypatiaModelData,
     (),
-    (
-        MOI.EqualTo, MOI.GreaterThan, MOI.LessThan, MOI.Interval,
-    ),
-    (
-        MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives,
+    (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan, MOI.Interval),
+    (MOI.Reals, MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives,
         MOI.SecondOrderCone, MOI.RotatedSecondOrderCone,
-        MOI.ExponentialCone, MOI.PowerCone, MOI.GeometricMeanCone,
         MOI.PositiveSemidefiniteConeTriangle,
-        MOI.LogDetConeTriangle,
-    ),
-    (),
+        MOI.ExponentialCone, MOI.GeometricMeanCone, MOI.LogDetConeTriangle),
+    (MOI.PowerCone,),
     (MOI.SingleVariable,),
     (MOI.ScalarAffineFunction,),
     (MOI.VectorOfVariables,),
@@ -58,14 +53,13 @@ conic_exclude = String[
     "rootdets",
     ]
 
-
-function testmoi(; verbose, lscachetype, usedense)
+function testmoi(; verbose, linearsystem, usedense)
     optimizer = MOIU.CachingOptimizer(
         MOIU.UniversalFallback(HypatiaModelData{Float64}()),
-        Hypatia.Optimizer(
+        HYP.Optimizer(
             verbose = verbose,
             timelimit = 2e1,
-            lscachetype = lscachetype,
+            linearsystem = linearsystem,
             usedense = usedense,
             tolrelopt = 2e-8,
             tolabsopt = 2e-8,
@@ -75,14 +69,11 @@ function testmoi(; verbose, lscachetype, usedense)
     @testset "unit tests" begin
         MOIT.unittest(optimizer, config, unit_exclude)
     end
-
     @testset "linear tests" begin
         MOIT.contlineartest(optimizer, config)
     end
-
     @testset "conic tests" begin
         MOIT.contconictest(MOIB.SquarePSD{Float64}(MOIB.RootDet{Float64}(optimizer)), config, conic_exclude)
     end
-
     return nothing
 end

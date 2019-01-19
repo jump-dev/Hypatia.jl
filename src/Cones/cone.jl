@@ -1,13 +1,11 @@
 #=
 Copyright 2018, Chris Coey and contributors
 
-# TODO can parallelize expensive functions mapped over primitive cones
+TODO can parallelize expensive functions mapped over primitive cones
+TODO order primitive cones so easiest ones to check incone are first
 =#
 
 # cone object
-abstract type PrimitiveCone end
-
-# TODO order primitive cones so easiest ones to check incone are first
 mutable struct Cone
     prmtvs::Vector{PrimitiveCone}
     idxs::Vector{UnitRange{Int}}

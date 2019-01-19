@@ -4,7 +4,7 @@ Copyright 2018, Chris Coey and contributors
 naive method that simply performs one 4x4 linear system solve
 =#
 
-mutable struct Naive4 <: LinSysCache
+mutable struct Naive4 <: LinearSystemSolver
     n
     p
     q

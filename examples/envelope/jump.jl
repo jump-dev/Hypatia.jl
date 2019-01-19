@@ -16,7 +16,7 @@ function build_JuMP_envelope(
     npoly::Int,
     deg::Int,
     d::Int,
-    domain::Hypatia.InterpDomain;
+    domain::Hypatia.Domain;
     sample::Bool = true,
     rseed::Int = 1,
     )
@@ -43,7 +43,7 @@ function run_JuMP_envelope(
     npoly::Int,
     deg::Int,
     d::Int,
-    dom::Hypatia.InterpDomain;
+    dom::Hypatia.Domain;
     sample::Bool = true,
     )
     (model, fpv) = build_JuMP_envelope(npoly, deg, d, dom, sample=sample)

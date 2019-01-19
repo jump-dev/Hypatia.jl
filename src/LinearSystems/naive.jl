@@ -5,7 +5,7 @@ naive method that simply performs one high-dimensional linear system solve
 TODO should allow LHS6 to be sparse
 =#
 
-mutable struct NaiveCache <: LinSysCache
+mutable struct Naive <: LinearSystemSolver
     cone
     c
     A
@@ -24,13 +24,13 @@ mutable struct NaiveCache <: LinSysCache
     tsk
     ttk
 
-    function NaiveCache(
+    function Naive(
         c::Vector{Float64},
         A::AbstractMatrix{Float64},
         b::Vector{Float64},
         G::AbstractMatrix{Float64},
         h::Vector{Float64},
-        cone::Cone,
+        cone::Cones.Cone,
         )
 
         (n, p, q) = (length(c), length(b), length(h))
@@ -76,7 +76,7 @@ end
 #     rhs_ty::Vector{Float64},
 #     rhs_tz::Vector{Float64},
 #     mu::Float64,
-#     L::NaiveCache;
+#     L::Naive;
 #     identityH::Bool = false,
 #     )
 #
@@ -118,7 +118,7 @@ function solvelinsys6!(
     rhs_tau::Float64,
     mu::Float64,
     tau::Float64,
-    L::NaiveCache,
+    L::Naive,
     )
 
     rhs = L.rhs6
@@ -132,10 +132,10 @@ function solvelinsys6!(
     @. L.LHS6copy = L.LHS6
     L.LHS6copy[L.tkk, end] = mu/tau/tau # TODO note in CVXOPT coneprog doc, there is no rescaling by tau, they to kap*dtau + tau*dkap = -rhskap
     for k in eachindex(L.cone.prmtvs)
-        dim = dimension(L.cone.prmtvs[k])
+        dim = Cones.dimension(L.cone.prmtvs[k])
         coloffset = (L.cone.prmtvs[k].usedual ? L.tzk : L.tsk)
         # TODO don't use Matrix(mu*I, dim, dim) because it allocates and is slow
-        calcHarr_prmtv!(view(L.LHS6copy, L.tzk - 1 .+ L.cone.idxs[k], coloffset - 1 .+ L.cone.idxs[k]), Matrix(mu*I, dim, dim), L.cone.prmtvs[k])
+        Cones.calcHarr_prmtv!(view(L.LHS6copy, L.tzk - 1 .+ L.cone.idxs[k], coloffset - 1 .+ L.cone.idxs[k]), Matrix(mu*I, dim, dim), L.cone.prmtvs[k])
     end
 
     F = lu!(L.LHS6copy)

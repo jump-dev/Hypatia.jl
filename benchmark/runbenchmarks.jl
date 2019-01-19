@@ -55,7 +55,7 @@ end
 # Hypatia options
 verbose = true
 timelimit = 1e2
-lscachetype = Hypatia.QRSymmCache
+linearsystem = Hypatia.QRSymm
 usedense = false
 
 MOI.Utilities.@model(HypatiaModelData,
@@ -75,7 +75,7 @@ MOI.Utilities.@model(HypatiaModelData,
 optimizer = MOI.Utilities.CachingOptimizer(HypatiaModelData{Float64}(), Hypatia.Optimizer(
     verbose = verbose,
     timelimit = timelimit,
-    lscachetype = lscachetype,
+    linearsystem = linearsystem,
     usedense = usedense,
     tolrelopt = 1e-6,
     tolabsopt = 1e-7,

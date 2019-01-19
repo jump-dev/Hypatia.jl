@@ -14,12 +14,12 @@ using DynamicPolynomials
 using SumOfSquares
 using PolyJuMP
 using Test
-include(joinpath(dirname(@__DIR__), "utils", "semialgebraicsets.jl"))
+include(joinpath(@__DIR__, "utilities", "semialgebraicsets.jl"))
 
 function build_JuMP_namedpoly_PSD(
     x,
     f,
-    dom::Hypatia.InterpDomain;
+    dom::Hypatia.Domain;
     d::Int = div(maxdegree(f) + 1, 2),
     )
     model = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true))
@@ -33,7 +33,7 @@ end
 function build_JuMP_namedpoly_WSOS(
     x,
     f,
-    dom::Hypatia.InterpDomain;
+    dom::Hypatia.Domain;
     d::Int = div(maxdegree(f) + 1, 2),
     sample_factor = 25,
     rseed::Int = 1,
