@@ -6,7 +6,7 @@ TODO readme for benchmarks and describe ARGS for running on command line
 
 using Hypatia
 using MathOptFormat
-using MathOptInterface
+import MathOptInterface
 MOI = MathOptInterface
 using GZip
 using Dates

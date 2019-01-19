@@ -6,8 +6,8 @@ ie the largest mu such that p(x) - mu/2*||x||^2 is convex everywhere on given do
 see https://en.wikipedia.org/wiki/Convex_function#Strongly_convex_functions
 =#
 
-using JuMP
-using MathOptInterface
+import JuMP
+import MathOptInterface
 MOI = MathOptInterface
 using Hypatia
 using MultivariatePolynomials
@@ -30,7 +30,7 @@ function run_JuMP_muconvexity(x::Vector, poly, dom, use_wsos::Bool)
 
     if use_wsos
         n = nvariables(x)
-        d = div(maximum(maxdegree.(H)), 2)
+        d = div(maximum(maxdegree.(H)) + 1, 2)
         (U, pts, P0, PWts, _) = Hypatia.interpolate(dom, d, sample=true)
         mat_wsos_cone = WSOSPolyInterpMatCone(n, U, [P0, PWts...])
 

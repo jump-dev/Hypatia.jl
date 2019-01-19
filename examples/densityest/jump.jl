@@ -10,16 +10,21 @@ where
     - zᵢ is in the hypograph of the log function of f
 ==#
 
+using Hypatia
+const HYP = Hypatia
+const CO = HYP.Cones
+const LS = HYP.LinearSystems
+const MU = HYP.ModelUtilities
+
 using LinearAlgebra
 import Random
 import Distributions
-using JuMP
-using MathOptInterface
+import JuMP
+import MathOptInterface
 MOI = MathOptInterface
 using PolyJuMP
 using MultivariatePolynomials
 using DynamicPolynomials
-using Hypatia
 using Test
 
 function build_JuMP_densityest(
@@ -29,7 +34,7 @@ function build_JuMP_densityest(
     sample_factor::Int = 100,
     )
     (nobs, dim) = size(X)
-    d = div(deg, 2)
+    d = div(deg + 1, 2)
 
     (U, pts, P0, PWts, w) = Hypatia.interpolate(dom, d, sample=true, calc_w=true, sample_factor=sample_factor)
 
@@ -78,5 +83,5 @@ function run_JuMP_densityest(; rseed::Int=1)
     @test du_status == MOI.FEASIBLE_POINT
     @test pobj ≈ dobj atol=1e-4 rtol=1e-4
 
-    return nothing
+    return
 end

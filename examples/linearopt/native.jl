@@ -7,6 +7,11 @@ solves a simple linear optimization problem (LP) min c'x s.t. Ax = b, x >= 0
 =#
 
 using Hypatia
+const HYP = Hypatia
+const CO = HYP.Cones
+const LS = HYP.LinearSystems
+const MU = HYP.ModelUtilities
+
 using SparseArrays
 using DelimitedFiles
 using Random
@@ -17,7 +22,7 @@ function build_linearopt(
     n::Int;
     use_data::Bool = false,
     usedense::Bool = false,
-    nzfrac::Float64 = 1/sqrt(n),
+    nzfrac::Float64 = inv(sqrt(n)),
     tosparse::Bool = false,
     rseed::Int = 1,
     )
@@ -31,12 +36,8 @@ function build_linearopt(
     else
         # generate random data
         Random.seed!(rseed)
-        if usedense
-            A = rand(-9.0:9.0, m, n)
-        else
-            A = 10.0.*sprandn(m, n, nzfrac)
-        end
-        b = A*ones(n)
+        A = usedense ? rand(-9.0:9.0, m, n) : 10.0 .* sprandn(m, n, nzfrac)
+        b = A * ones(n)
         c = rand(0.0:9.0, n)
     end
     if tosparse && !issparse(A)
@@ -45,7 +46,7 @@ function build_linearopt(
     G = Diagonal(-1.0I, n) # TODO uniformscaling
     h = zeros(n)
 
-    cone = Hypatia.Cone([Hypatia.Nonnegative(n)], [1:n])
+    cone = CO.Cone([CO.Nonnegative(n)], [1:n])
 
     return (c, A, b, G, h, cone)
 end
@@ -58,30 +59,27 @@ function run_linearopt()
         # build_linearopt(500, 1000)
         build_linearopt(15, 20)
 
-    Hypatia.check_data(c, A, b, G, h, cone)
-    (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = Hypatia.preprocess_data(c, A, b, G, useQR=true)
-    L = Hypatia.QRSymm(c1, A1, b1, G1, h, cone, Q2, RiQ1)
+    HYP.check_data(c, A, b, G, h, cone)
+    (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = HYP.preprocess_data(c, A, b, G, useQR=true)
+    L = LS.QRSymm(c1, A1, b1, G1, h, cone, Q2, RiQ1)
 
-    mdl = Hypatia.Model(maxiter=100, verbose=true)
-    Hypatia.load_data!(mdl, c1, A1, b1, G1, h, cone, L)
-    Hypatia.solve!(mdl)
+    mdl = HYP.Model(verbose=true)
+    HYP.load_data!(mdl, c1, A1, b1, G1, h, cone, L)
+    HYP.solve!(mdl)
 
     x = zeros(length(c))
-    x[dukeep] = Hypatia.get_x(mdl)
+    x[dukeep] = HYP.get_x(mdl)
     y = zeros(length(b))
-    y[prkeep] = Hypatia.get_y(mdl)
-    s = Hypatia.get_s(mdl)
-    z = Hypatia.get_z(mdl)
+    y[prkeep] = HYP.get_y(mdl)
+    s = HYP.get_s(mdl)
+    z = HYP.get_z(mdl)
 
-    status = Hypatia.get_status(mdl)
-    solvetime = Hypatia.get_solvetime(mdl)
-    pobj = Hypatia.get_pobj(mdl)
-    dobj = Hypatia.get_dobj(mdl)
+    status = HYP.get_status(mdl)
+    solvetime = HYP.get_solvetime(mdl)
+    pobj = HYP.get_pobj(mdl)
+    dobj = HYP.get_dobj(mdl)
 
     @test status == :Optimal
-    # @show status
-    # @show x
-    # @show pobj
-    # @show dobj
-    return nothing
+
+    return
 end

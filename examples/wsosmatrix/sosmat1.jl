@@ -5,8 +5,8 @@ Example modified from https://github.com/JuliaOpt/SumOfSquares.jl/blob/master/te
 Example 3.77 and 3.79 of Blekherman, G., Parrilo, P. A., & Thomas, R. R. (Eds.), Semidefinite optimization and convex algebraic geometry SIAM 2013
 =#
 
-using JuMP
-using MathOptInterface
+import JuMP
+import MathOptInterface
 MOI = MathOptInterface
 using Hypatia
 using MultivariatePolynomials
@@ -21,7 +21,7 @@ function run_JuMP_sosmat1()
     P = [x^2-2x+2 x; x x^2]
     dom = Hypatia.FreeDomain(1)
 
-    d = div(maximum(DynamicPolynomials.maxdegree.(P)), 2)
+    d = div(maximum(DynamicPolynomials.maxdegree.(P)) + 1, 2)
     (U, pts, P0, _, _) = Hypatia.interpolate(dom, d, sample_factor=20, sample=true)
     mat_wsos_cone = WSOSPolyInterpMatCone(2, U, [P0])
 

@@ -6,8 +6,8 @@ see description in examples/envelope/native.jl
 
 using Hypatia
 import MathOptInterface
-MOI = MathOptInterface
-using JuMP
+const MOI = MathOptInterface
+import JuMP
 using LinearAlgebra
 using Random
 using Test
@@ -60,7 +60,7 @@ function run_JuMP_envelope(
     @test du_status == MOI.FEASIBLE_POINT
     @test pobj ≈ dobj atol=1e-4 rtol=1e-4
 
-    return nothing
+    return
 end
 
 run_JuMP_envelope_sampleinterp_box() = run_JuMP_envelope(2, 3, 4, Hypatia.Box(-ones(2), ones(2)))

@@ -9,79 +9,16 @@ available at https://arxiv.org/abs/1712.01792
 =#
 
 using Hypatia
+const HYP = Hypatia
+const CO = HYP.Cones
+const LS = HYP.LinearSystems
+const MU = HYP.ModelUtilities
+
 using LinearAlgebra
 using Test
 
-function build_namedpoly(
-    polyname::Symbol,
-    d::Int;
-    )
-    # get data for named polynomial
-    (n, lbs, ubs, deg, fn) = polys[polyname]
-    if d < ceil(Int, deg/2)
-        error("requires d >= $(ceil(Int, deg/2))")
-    end
-
-    # generate interpolation
-    dom = Hypatia.Box(lbs, ubs)
-    (U, pts, P0, PWts, _) = Hypatia.interpolate(dom, d, sample=false)
-
-    # set up problem data
-    A = ones(1, U)
-    b = [1.0,]
-    c = [fn(pts[j,:]...) for j in 1:U] # evaluate polynomial at transformed points
-    G = Diagonal(-1.0I, U) # TODO uniformscaling?
-    h = zeros(U)
-
-    cone = Hypatia.Cone([Hypatia.WSOSPolyInterp(U, [P0, PWts...], true)], [1:U])
-
-    return (c, A, b, G, h, cone)
-end
-
-function run_namedpoly()
-    # select the named polynomial to minimize and the SOS degree (to be squared)
-    (c, A, b, G, h, cone) =
-        # build_namedpoly(:butcher, 2)
-        # build_namedpoly(:caprasse, 4)
-        # build_namedpoly(:goldsteinprice, 7)
-        # build_namedpoly(:heart, 2)
-        # build_namedpoly(:lotkavolterra, 3)
-        # build_namedpoly(:magnetism7, 2)
-        # build_namedpoly(:motzkin, 7)
-        build_namedpoly(:reactiondiffusion, 4)
-        # build_namedpoly(:robinson, 8)
-        # build_namedpoly(:rosenbrock, 4)
-        # build_namedpoly(:schwefel, 3)
-
-    Hypatia.check_data(c, A, b, G, h, cone)
-    (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = Hypatia.preprocess_data(c, A, b, G, useQR=true)
-    L = Hypatia.QRSymm(c1, A1, b1, G1, h, cone, Q2, RiQ1)
-
-    mdl = Hypatia.Model(maxiter=200, verbose=false)
-    Hypatia.load_data!(mdl, c1, A1, b1, G1, h, cone, L)
-    Hypatia.solve!(mdl)
-
-    x = zeros(length(c))
-    x[dukeep] = Hypatia.get_x(mdl)
-    y = zeros(length(b))
-    y[prkeep] = Hypatia.get_y(mdl)
-    s = Hypatia.get_s(mdl)
-    z = Hypatia.get_z(mdl)
-
-    status = Hypatia.get_status(mdl)
-    solvetime = Hypatia.get_solvetime(mdl)
-    pobj = Hypatia.get_pobj(mdl)
-    dobj = Hypatia.get_dobj(mdl)
-
-    @test status == :Optimal
-    # @show status
-    # @show x
-    # @show pobj
-    # @show dobj
-    return nothing
-end
-
-# list of currently available named polynomials, see https://people.sc.fsu.edu/~jburkardt/py_src/polynomials/polynomials.html
+# list of predefined polynomials from various applications
+# see https://people.sc.fsu.edu/~jburkardt/py_src/polynomials/polynomials.html
 polys = Dict{Symbol,NamedTuple}(
     :butcher => (n=6, lbs=[-1.0,-0.1,-0.1,-1.0,-0.1,-0.1], ubs=[0.0,0.9,0.5,-0.1,-0.05,-0.03], deg=3,
         fn=((u,v,w,x,y,z) -> z*v^2+y*w^2-u*x^2+x^3+x^2-(1/3)*u+(4/3)*x)
@@ -117,3 +54,67 @@ polys = Dict{Symbol,NamedTuple}(
         fn=((x,y,z) -> (x-y^2)^2+(y-1)^2+(x-z^2)^2+(z-1)^2)
         ),
 )
+
+function build_namedpoly(
+    polyname::Symbol,
+    d::Int;
+    )
+    # get data for named polynomial
+    (n, lbs, ubs, deg, fn) = polys[polyname]
+    @assert d >= div(deg + 1, 2)
+
+    # generate interpolation; use random sampling if n is large
+    dom = MU.Box(lbs, ubs)
+    (U, pts, P0, PWts, _) = MU.interpolate(dom, d, sample=(n >= 5))
+
+    # set up problem data
+    A = ones(1, U)
+    b = [1.0,]
+    c = [fn(pts[j,:]...) for j in 1:U] # evaluate polynomial at transformed points
+    G = Diagonal(-1.0I, U) # TODO uniformscaling?
+    h = zeros(U)
+
+    cone = CO.Cone([CO.WSOSPolyInterp(U, [P0, PWts...], true)], [1:U])
+
+    return (c, A, b, G, h, cone)
+end
+
+function run_namedpoly()
+    # select the named polynomial to minimize and the SOS degree (to be squared)
+    (c, A, b, G, h, cone) =
+        # build_namedpoly(:butcher, 2)
+        # build_namedpoly(:caprasse, 4)
+        # build_namedpoly(:goldsteinprice, 7)
+        # build_namedpoly(:heart, 2)
+        # build_namedpoly(:lotkavolterra, 3)
+        # build_namedpoly(:magnetism7, 2)
+        # build_namedpoly(:motzkin, 7)
+        build_namedpoly(:reactiondiffusion, 4)
+        # build_namedpoly(:robinson, 8)
+        # build_namedpoly(:rosenbrock, 4)
+        # build_namedpoly(:schwefel, 3)
+
+    HYP.check_data(c, A, b, G, h, cone)
+    (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = HYP.preprocess_data(c, A, b, G, useQR=true)
+    L = LS.QRSymm(c1, A1, b1, G1, h, cone, Q2, RiQ1)
+
+    mdl = HYP.Model(maxiter=200, verbose=false)
+    HYP.load_data!(mdl, c1, A1, b1, G1, h, cone, L)
+    HYP.solve!(mdl)
+
+    x = zeros(length(c))
+    x[dukeep] = HYP.get_x(mdl)
+    y = zeros(length(b))
+    y[prkeep] = HYP.get_y(mdl)
+    s = HYP.get_s(mdl)
+    z = HYP.get_z(mdl)
+
+    status = HYP.get_status(mdl)
+    solvetime = HYP.get_solvetime(mdl)
+    pobj = HYP.get_pobj(mdl)
+    dobj = HYP.get_dobj(mdl)
+
+    @test status == :Optimal
+
+    return
+end

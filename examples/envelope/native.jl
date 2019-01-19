@@ -9,6 +9,11 @@ available at https://arxiv.org/abs/1712.01792
 =#
 
 using Hypatia
+const HYP = Hypatia
+const CO = HYP.Cones
+const LS = HYP.LinearSystems
+const MU = HYP.ModelUtilities
+
 using LinearAlgebra
 using SparseArrays
 using DelimitedFiles
@@ -27,8 +32,8 @@ function build_envelope(
     )
     # generate interpolation
     @assert deg <= d
-    domain = Hypatia.Box(-ones(n), ones(n))
-    (U, pts, P0, PWts, w) = Hypatia.interpolate(domain, d, sample=false, calc_w=true)
+    domain = MU.Box(-ones(n), ones(n))
+    (U, pts, P0, PWts, w) = MU.interpolate(domain, d, sample=false, calc_w=true)
 
     if use_data
         # use provided data in data folder
@@ -37,36 +42,29 @@ function build_envelope(
         # generate random data
         Random.seed!(rseed)
         LDegs = binomial(n+deg, n)
-        c_or_h = vec(P0[:, 1:LDegs]*rand(-9:9, LDegs, npoly))
+        c_or_h = vec(P0[:, 1:LDegs] * rand(-9:9, LDegs, npoly))
     end
 
+    subI = usedense ? Array(1.0I, U, U) : sparse(1.0I, U, U)
     if primal_wsos
         # use formulation with WSOS cone in primal
         c = -w
         A = zeros(0, U)
         b = Float64[]
-        if usedense
-            G = repeat(Array(1.0I, U, U), outer=(npoly, 1))
-        else
-            G = repeat(sparse(1.0I, U, U), outer=(npoly, 1))
-        end
+        G = repeat(subI, outer=(npoly, 1))
         h = c_or_h
     else
         # use formulation with WSOS cone in dual
         c = c_or_h
-        if usedense
-            A = repeat(Array(1.0I, U, U), outer=(1, npoly))
-        else
-            A = repeat(sparse(1.0I, U, U), outer=(1, npoly))
-        end
+        A = repeat(subI, outer=(1, npoly))
         b = w
-        G = Diagonal(-1.0I, npoly*U) # TODO uniformscaling
+        G = Diagonal(-1.0I, npoly * U) # TODO uniformscaling
         h = zeros(npoly*U)
     end
 
-    cone = Hypatia.Cone(
-        [Hypatia.WSOSPolyInterp(U, [P0, PWts...], !primal_wsos) for k in 1:npoly],
-        [1+(k-1)*U:k*U for k in 1:npoly],
+    cone = CO.Cone(
+        [CO.WSOSPolyInterp(U, [P0, PWts...], !primal_wsos) for k in 1:npoly],
+        [(1 + (k - 1) * U):(k * U) for k in 1:npoly]
         )
 
     return (c, A, b, G, h, cone)
@@ -82,32 +80,29 @@ function run_envelope(primal_wsos::Bool, usedense::Bool)
         # build_envelope(3, 5, 3, 5, primal_wsos=primal_wsos, usedense=usedense)
         # build_envelope(2, 30, 1, 30, primal_wsos=primal_wsos, usedense=usedense)
 
-    Hypatia.check_data(c, A, b, G, h, cone)
-    (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = Hypatia.preprocess_data(c, A, b, G, useQR=true)
-    L = Hypatia.QRSymm(c1, A1, b1, G1, h, cone, Q2, RiQ1)
+    HYP.check_data(c, A, b, G, h, cone)
+    (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = HYP.preprocess_data(c, A, b, G, useQR=true)
+    L = LS.QRSymm(c1, A1, b1, G1, h, cone, Q2, RiQ1)
 
-    mdl = Hypatia.Model(maxiter=200, verbose=true)
-    Hypatia.load_data!(mdl, c1, A1, b1, G1, h, cone, L)
-    Hypatia.solve!(mdl)
+    mdl = HYP.Model(maxiter=200, verbose=true)
+    HYP.load_data!(mdl, c1, A1, b1, G1, h, cone, L)
+    HYP.solve!(mdl)
 
     x = zeros(length(c))
-    x[dukeep] = Hypatia.get_x(mdl)
+    x[dukeep] = HYP.get_x(mdl)
     y = zeros(length(b))
-    y[prkeep] = Hypatia.get_y(mdl)
-    s = Hypatia.get_s(mdl)
-    z = Hypatia.get_z(mdl)
+    y[prkeep] = HYP.get_y(mdl)
+    s = HYP.get_s(mdl)
+    z = HYP.get_z(mdl)
 
-    status = Hypatia.get_status(mdl)
-    solvetime = Hypatia.get_solvetime(mdl)
-    pobj = Hypatia.get_pobj(mdl)
-    dobj = Hypatia.get_dobj(mdl)
+    status = HYP.get_status(mdl)
+    solvetime = HYP.get_solvetime(mdl)
+    pobj = HYP.get_pobj(mdl)
+    dobj = HYP.get_dobj(mdl)
 
     @test status == :Optimal
-    # @show status
-    # @show x
-    # @show pobj
-    # @show dobj
-    return nothing
+
+    return
 end
 
 run_envelope_primal_dense() = run_envelope(true, true)

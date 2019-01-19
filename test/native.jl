@@ -2,7 +2,7 @@
 Copyright 2018, Chris Coey and contributors
 =#
 
-function _dimension1(; verbose, linearsystem)
+function dimension1(; verbose, linearsystem)
     A = Matrix{Float64}(undef, 0, 2)
     b = Float64[]
     G = [1.0 0.0]
@@ -36,7 +36,7 @@ function _dimension1(; verbose, linearsystem)
     @test_throws ErrorException("some dual equality constraints are inconsistent") HYP.preprocess_data(c, A, b, G, useQR=true)
 end
 
-function _consistent1(; verbose, linearsystem)
+function consistent1(; verbose, linearsystem)
     mdl = HYP.Model(verbose=verbose)
     Random.seed!(1)
     (n, p, q) = (30, 15, 30)
@@ -58,7 +58,7 @@ function _consistent1(; verbose, linearsystem)
     @test r.status == :Optimal
 end
 
-function _inconsistent1(; verbose, linearsystem)
+function inconsistent1(; verbose, linearsystem)
     mdl = HYP.Model(verbose=verbose)
     Random.seed!(1)
     (n, p, q) = (30, 15, 30)
@@ -75,7 +75,7 @@ function _inconsistent1(; verbose, linearsystem)
     @test_throws ErrorException("some primal equality constraints are inconsistent") solveandcheck(mdl, c, A, b, G, h, cone, linearsystem)
 end
 
-function _inconsistent2(; verbose, linearsystem)
+function inconsistent2(; verbose, linearsystem)
     mdl = HYP.Model(verbose=verbose)
     Random.seed!(1)
     (n, p, q) = (30, 15, 30)
@@ -93,7 +93,7 @@ function _inconsistent2(; verbose, linearsystem)
     @test_throws ErrorException("some dual equality constraints are inconsistent") solveandcheck(mdl, c, A, b, G, h, cone, linearsystem)
 end
 
-function _orthant1(; verbose, linearsystem)
+function orthant1(; verbose, linearsystem)
     Random.seed!(1)
     (n, p, q) = (6, 3, 6)
     c = rand(0.0:9.0, n)
@@ -118,7 +118,7 @@ function _orthant1(; verbose, linearsystem)
     @test rnp.pobj ≈ rnn.pobj atol=1e-4 rtol=1e-4
 end
 
-function _orthant2(; verbose, linearsystem)
+function orthant2(; verbose, linearsystem)
     Random.seed!(1)
     (n, p, q) = (5, 2, 10)
     c = rand(0.0:9.0, n)
@@ -140,7 +140,7 @@ function _orthant2(; verbose, linearsystem)
     @test r1.pobj ≈ r2.pobj atol=1e-4 rtol=1e-4
 end
 
-function _orthant3(; verbose, linearsystem)
+function orthant3(; verbose, linearsystem)
     Random.seed!(1)
     (n, p, q) = (15, 6, 15)
     c = rand(0.0:9.0, n)
@@ -162,7 +162,7 @@ function _orthant3(; verbose, linearsystem)
     @test r1.pobj ≈ r2.pobj atol=1e-4 rtol=1e-4
 end
 
-function _orthant4(; verbose, linearsystem)
+function orthant4(; verbose, linearsystem)
     Random.seed!(1)
     (n, p, q) = (5, 2, 10)
     c = rand(0.0:9.0, n)
@@ -184,7 +184,7 @@ function _orthant4(; verbose, linearsystem)
     @test r1.pobj ≈ r2.pobj atol=1e-4 rtol=1e-4
 end
 
-function _epinorminf1(; verbose, linearsystem)
+function epinorminf1(; verbose, linearsystem)
     mdl = HYP.Model(verbose=verbose)
     c = Float64[0, -1, -1]
     A = Float64[1 0 0; 0 1 0]
@@ -200,7 +200,7 @@ function _epinorminf1(; verbose, linearsystem)
     @test r.y ≈ [1, 1] atol=1e-4 rtol=1e-4
 end
 
-function _epinorminf2(; verbose, linearsystem)
+function epinorminf2(; verbose, linearsystem)
     mdl = HYP.Model(verbose=verbose)
     Random.seed!(1)
     c = Float64[1, 0, 0, 0, 0, 0]
@@ -215,7 +215,7 @@ function _epinorminf2(; verbose, linearsystem)
     @test r.pobj ≈ 1 atol=1e-4 rtol=1e-4
 end
 
-function _epinorminf3(; verbose, linearsystem)
+function epinorminf3(; verbose, linearsystem)
     mdl = HYP.Model(verbose=verbose)
     Random.seed!(1)
     c = Float64[1, 0, 0, 0, 0, 0]
@@ -231,7 +231,7 @@ function _epinorminf3(; verbose, linearsystem)
     @test r.x ≈ zeros(6) atol=1e-4 rtol=1e-4
 end
 
-function _epinorminf4(; verbose, linearsystem)
+function epinorminf4(; verbose, linearsystem)
     mdl = HYP.Model(verbose=verbose)
     c = Float64[0, 1, -1]
     A = Float64[1 0 0; 0 1 0]
@@ -247,7 +247,7 @@ function _epinorminf4(; verbose, linearsystem)
     @test r.y ≈ [1, 0] atol=1e-4 rtol=1e-4
 end
 
-function _epinorminf5(; verbose, linearsystem)
+function epinorminf5(; verbose, linearsystem)
     mdl = HYP.Model(verbose=verbose)
     Random.seed!(1)
     c = Float64[1, 0, 0, 0, 0, 0]
@@ -262,7 +262,7 @@ function _epinorminf5(; verbose, linearsystem)
     @test r.pobj ≈ 1 atol=1e-4 rtol=1e-4
 end
 
-function _epinorminf6(; verbose, linearsystem)
+function epinorminf6(; verbose, linearsystem)
     Random.seed!(1)
     l = 3
     L = 2l + 1
@@ -283,7 +283,7 @@ function _epinorminf6(; verbose, linearsystem)
     @test sum(abs, r.x) ≈ 1.0 atol=1e-4 rtol=1e-4
 end
 
-function _epinormeucl1(; verbose, linearsystem)
+function epinormeucl1(; verbose, linearsystem)
     c = Float64[0, -1, -1]
     A = Float64[1 0 0; 0 1 0]
     b = Float64[1, 1/sqrt(2)]
@@ -302,7 +302,7 @@ function _epinormeucl1(; verbose, linearsystem)
     end
 end
 
-function _epinormeucl2(; verbose, linearsystem)
+function epinormeucl2(; verbose, linearsystem)
     c = Float64[0, -1, -1]
     A = Float64[1 0 0]
     b = Float64[0]
@@ -320,7 +320,7 @@ function _epinormeucl2(; verbose, linearsystem)
     end
 end
 
-function _epipersquare1(; verbose, linearsystem)
+function epipersquare1(; verbose, linearsystem)
     c = Float64[0, 0, -1, -1]
     A = Float64[1 0 0 0; 0 1 0 0]
     b = Float64[1/2, 1]
@@ -338,7 +338,7 @@ function _epipersquare1(; verbose, linearsystem)
     end
 end
 
-function _epipersquare2(; verbose, linearsystem)
+function epipersquare2(; verbose, linearsystem)
     c = Float64[0, 0, -1]
     A = Float64[1 0 0; 0 1 0]
     b = Float64[1/2, 1]/sqrt(2)
@@ -356,7 +356,7 @@ function _epipersquare2(; verbose, linearsystem)
     end
 end
 
-function _epipersquare3(; verbose, linearsystem)
+function epipersquare3(; verbose, linearsystem)
     c = Float64[0, 1, -1, -1]
     A = Float64[1 0 0 0]
     b = Float64[0]
@@ -374,7 +374,7 @@ function _epipersquare3(; verbose, linearsystem)
     end
 end
 
-function _semidefinite1(; verbose, linearsystem)
+function semidefinite1(; verbose, linearsystem)
     c = Float64[0, -1, 0]
     A = Float64[1 0 0; 0 0 1]
     b = Float64[1/2, 1]
@@ -392,7 +392,7 @@ function _semidefinite1(; verbose, linearsystem)
     end
 end
 
-function _semidefinite2(; verbose, linearsystem)
+function semidefinite2(; verbose, linearsystem)
     c = Float64[0, -1, 0]
     A = Float64[1 0 1]
     b = Float64[0]
@@ -410,7 +410,7 @@ function _semidefinite2(; verbose, linearsystem)
     end
 end
 
-function _semidefinite3(; verbose, linearsystem)
+function semidefinite3(; verbose, linearsystem)
     c = Float64[1, 0, 1, 0, 0, 1]
     A = Float64[1 2 3 4 5 6; 1 1 1 1 1 1]
     b = Float64[10, 3]
@@ -428,7 +428,7 @@ function _semidefinite3(; verbose, linearsystem)
     end
 end
 
-function _hypoperlog1(; verbose, linearsystem)
+function hypoperlog1(; verbose, linearsystem)
     mdl = HYP.Model(verbose=verbose)
     c = Float64[1, 1, 1]
     A = Float64[0 1 0; 1 0 0]
@@ -445,7 +445,7 @@ function _hypoperlog1(; verbose, linearsystem)
     @test r.z ≈ c+A'*r.y atol=1e-4 rtol=1e-4
 end
 
-function _hypoperlog2(; verbose, linearsystem)
+function hypoperlog2(; verbose, linearsystem)
     mdl = HYP.Model(verbose=verbose)
     c = Float64[-1, 0, 0]
     A = Float64[0 1 0]
@@ -459,7 +459,7 @@ function _hypoperlog2(; verbose, linearsystem)
     @test r.pobj ≈ 0 atol=1e-4 rtol=1e-4
 end
 
-function _hypoperlog3(; verbose, linearsystem)
+function hypoperlog3(; verbose, linearsystem)
     mdl = HYP.Model(verbose=verbose)
     c = Float64[1, 1, 1]
     A = Matrix{Float64}(undef, 0, 3)
@@ -475,7 +475,7 @@ function _hypoperlog3(; verbose, linearsystem)
     @test isempty(r.y)
 end
 
-function _hypoperlog4(; verbose, linearsystem)
+function hypoperlog4(; verbose, linearsystem)
     mdl = HYP.Model(verbose=verbose)
     c = Float64[0, 0, 1]
     A = Float64[0 1 0; 1 0 0]
@@ -490,7 +490,7 @@ function _hypoperlog4(; verbose, linearsystem)
     @test r.x ≈ [-1, 1, exp(-2)] atol=1e-4 rtol=1e-4
 end
 
-function _epiperpower1(; verbose, linearsystem)
+function epiperpower1(; verbose, linearsystem)
     mdl = HYP.Model(verbose=verbose)
     c = Float64[1, 0, -1, 0, 0, -1]
     A = Float64[1 1 0 1/2 0 0; 0 0 0 0 1 0]
@@ -505,7 +505,7 @@ function _epiperpower1(; verbose, linearsystem)
     @test r.x[[1,2,4]] ≈ [0.0639314, 0.783361, 2.30542] atol=1e-4 rtol=1e-4
 end
 
-function _epiperpower2(; verbose, linearsystem)
+function epiperpower2(; verbose, linearsystem)
     c = Float64[0, 0, -1]
     A = Float64[1 0 0; 0 1 0]
     b = Float64[1/2, 1]
@@ -523,7 +523,7 @@ function _epiperpower2(; verbose, linearsystem)
     end
 end
 
-function _epiperpower3(; verbose, linearsystem)
+function epiperpower3(; verbose, linearsystem)
     c = Float64[0, 0, 1]
     A = Float64[1 0 0; 0 1 0]
     b = Float64[0, 1]
@@ -541,7 +541,7 @@ function _epiperpower3(; verbose, linearsystem)
     end
 end
 
-function _hypogeomean1(; verbose, linearsystem)
+function hypogeomean1(; verbose, linearsystem)
     mdl = HYP.Model(verbose=verbose)
     c = Float64[1, 0, 0, -1, -1, 0]
     A = Float64[1 1 1/2 0 0 0; 0 0 0 0 0 1]
@@ -556,7 +556,7 @@ function _hypogeomean1(; verbose, linearsystem)
     @test r.x[1:3] ≈ [0.0639314, 0.783361, 2.30542] atol=1e-4 rtol=1e-4
 end
 
-function _hypogeomean2(; verbose, linearsystem)
+function hypogeomean2(; verbose, linearsystem)
     c = Float64[-1, 0, 0]
     A = Float64[0 0 1; 0 1 0]
     b = Float64[1/2, 1]
@@ -574,7 +574,7 @@ function _hypogeomean2(; verbose, linearsystem)
     end
 end
 
-function _hypogeomean3(; verbose, linearsystem)
+function hypogeomean3(; verbose, linearsystem)
     l = 4
     c = vcat(0.0, ones(l))
     A = [1.0 zeros(1, l)]
@@ -593,7 +593,7 @@ function _hypogeomean3(; verbose, linearsystem)
     end
 end
 
-function _hypogeomean4(; verbose, linearsystem)
+function hypogeomean4(; verbose, linearsystem)
     l = 4
     c = ones(l)
     A = zeros(0, l)
@@ -612,7 +612,7 @@ function _hypogeomean4(; verbose, linearsystem)
     end
 end
 
-function _epinormspectral1(; verbose, linearsystem)
+function epinormspectral1(; verbose, linearsystem)
     Random.seed!(1)
     (Xn, Xm) = (3, 4)
     Xnm = Xn*Xm
@@ -639,7 +639,7 @@ function _epinormspectral1(; verbose, linearsystem)
     end
 end
 
-function _hypoperlogdet1(; verbose, linearsystem)
+function hypoperlogdet1(; verbose, linearsystem)
     Random.seed!(1)
     side = 4
     dim = round(Int, 2 + side*(side + 1)/2)
@@ -662,7 +662,7 @@ function _hypoperlogdet1(; verbose, linearsystem)
     @test r.z[1]*(logdet(CO.vectomat!(zeros(side, side), -r.z[3:end])/r.z[1]) + side) ≈ r.z[2] atol=1e-4 rtol=1e-4
 end
 
-function _hypoperlogdet2(; verbose, linearsystem)
+function hypoperlogdet2(; verbose, linearsystem)
     Random.seed!(1)
     side = 3
     dim = round(Int, 2 + side*(side + 1)/2)
@@ -685,7 +685,7 @@ function _hypoperlogdet2(; verbose, linearsystem)
     @test r.z[2]*logdet(CO.vectomat!(zeros(side, side), r.z[3:end])/r.z[2]) ≈ r.z[1] atol=1e-4 rtol=1e-4
 end
 
-function _hypoperlogdet3(; verbose, linearsystem)
+function hypoperlogdet3(; verbose, linearsystem)
     Random.seed!(1)
     side = 3
     dim = round(Int, 2 + side*(side + 1)/2)
@@ -706,7 +706,7 @@ function _hypoperlogdet3(; verbose, linearsystem)
     @test r.x ≈ [0, 0] atol=1e-4 rtol=1e-4
 end
 
-function _epipersumexp1(; verbose, linearsystem)
+function epipersumexp1(; verbose, linearsystem)
     l = 5
     c = vcat(0.0, -ones(l))
     A = [1.0 zeros(1, l)]
@@ -723,7 +723,7 @@ function _epipersumexp1(; verbose, linearsystem)
     @test r.s[1] ≈ 1 atol=1e-4 rtol=1e-4
 end
 
-function _epipersumexp2(; verbose, linearsystem)
+function epipersumexp2(; verbose, linearsystem)
     l = 5
     c = vcat(0.0, -ones(l))
     A = [1.0 zeros(1, l)]
