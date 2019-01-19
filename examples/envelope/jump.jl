@@ -5,6 +5,11 @@ see description in examples/envelope/native.jl
 =#
 
 using Hypatia
+const HYP = Hypatia
+const CO = HYP.Cones
+const LS = HYP.LinearSystems
+const MU = HYP.ModelUtilities
+
 import MathOptInterface
 const MOI = MathOptInterface
 import JuMP
@@ -16,25 +21,25 @@ function build_JuMP_envelope(
     npoly::Int,
     deg::Int,
     d::Int,
-    domain::Hypatia.Domain;
+    domain::MU.Domain;
     sample::Bool = true,
     rseed::Int = 1,
     )
     # generate interpolation
     @assert deg <= d
-    (U, pts, P0, PWts, w) = Hypatia.interpolate(domain, d, sample=sample, calc_w=true)
+    (U, pts, P0, PWts, w) = MU.interpolate(domain, d, sample=sample, calc_w=true)
 
     # generate random polynomials
     Random.seed!(rseed)
-    n = Hypatia.dimension(domain)
-    LDegs = binomial(n+deg, n)
-    polys = P0[:, 1:LDegs]*rand(-9:9, LDegs, npoly)
+    n = MU.dimension(domain)
+    LDegs = binomial(n + deg, n)
+    polys = P0[:, 1:LDegs] * rand(-9:9, LDegs, npoly)
 
     # build JuMP model
-    model = Model(with_optimizer(Hypatia.Optimizer, verbose=true))
-    @variable(model, fpv[j in 1:U]) # values at Fekete points
-    @objective(model, Max, dot(fpv, w)) # integral over domain (via quadrature)
-    @constraint(model, [i in 1:npoly], polys[:,i] .- fpv in WSOSPolyInterpCone(U, [P0, PWts...]))
+    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose=true))
+    JuMP.@variable(model, fpv[j in 1:U]) # values at Fekete points
+    JuMP.@objective(model, Max, dot(fpv, w)) # integral over domain (via quadrature)
+    JuMP.@constraint(model, [i in 1:npoly], polys[:,i] .- fpv in HYP.WSOSPolyInterpCone(U, [P0, PWts...]))
 
     return (model, fpv)
 end
@@ -43,7 +48,7 @@ function run_JuMP_envelope(
     npoly::Int,
     deg::Int,
     d::Int,
-    dom::Hypatia.Domain;
+    dom::MU.Domain;
     sample::Bool = true,
     )
     (model, fpv) = build_JuMP_envelope(npoly, deg, d, dom, sample=sample)
@@ -63,6 +68,6 @@ function run_JuMP_envelope(
     return
 end
 
-run_JuMP_envelope_sampleinterp_box() = run_JuMP_envelope(2, 3, 4, Hypatia.Box(-ones(2), ones(2)))
-run_JuMP_envelope_sampleinterp_ball() = run_JuMP_envelope(2, 3, 4, Hypatia.Ball(zeros(2), sqrt(2)))
-run_JuMP_envelope_boxinterp() = run_JuMP_envelope(2, 3, 4, Hypatia.Box(-ones(2), ones(2)), sample=false)
+run_JuMP_envelope_sampleinterp_box() = run_JuMP_envelope(2, 3, 4, MU.Box(-ones(2), ones(2)))
+run_JuMP_envelope_sampleinterp_ball() = run_JuMP_envelope(2, 3, 4, MU.Ball(zeros(2), sqrt(2)))
+run_JuMP_envelope_boxinterp() = run_JuMP_envelope(2, 3, 4, MU.Box(-ones(2), ones(2)), sample=false)
