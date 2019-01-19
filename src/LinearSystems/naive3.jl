@@ -11,7 +11,7 @@ G*x - (mu*H)\z = zrhs - (mu*H)\srhs  (primal barrier)
 G*x - mu*H*z = zrhs - srhs           (dual barrier)
 =#
 
-mutable struct Naive3 <: LinSysCache
+mutable struct Naive3 <: LinearSystemSolver
     n
     p
     q

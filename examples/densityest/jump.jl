@@ -25,7 +25,7 @@ using Test
 function build_JuMP_densityest(
     X::Matrix{Float64},
     deg::Int,
-    dom::Hypatia.InterpDomain;
+    dom::Hypatia.Domain;
     sample_factor::Int = 100,
     )
     (nobs, dim) = size(X)

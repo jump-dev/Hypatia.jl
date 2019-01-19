@@ -2,80 +2,80 @@
 Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 =#
 
-function _envelope1(; verbose, lscachetype)
+function _envelope1(; verbose, linearsystem)
     # dense methods
-    mdl = Hypatia.Model(verbose=verbose)
+    mdl = HYP.Model(verbose=verbose)
     (c, A, b, G, h, cone) = build_envelope(2, 5, 1, 5, use_data=true, usedense=true)
-    r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
+    r = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem)
     @test r.status == :Optimal
     @test r.pobj ≈ 25.502777 atol=1e-4 rtol=1e-4
     @test r.niters <= 35
 
     # sparse methods
-    mdl = Hypatia.Model(verbose=verbose)
+    mdl = HYP.Model(verbose=verbose)
     (c, A, b, G, h, cone) = build_envelope(2, 5, 1, 5, use_data=true, usedense=false)
-    r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
+    r = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem)
     @test r.status == :Optimal
     @test r.pobj ≈ 25.502777 atol=1e-4 rtol=1e-4
     @test r.niters <= 35
 end
 
-function _envelope2(; verbose, lscachetype)
+function _envelope2(; verbose, linearsystem)
     # dense methods
-    mdl = Hypatia.Model(verbose=verbose)
+    mdl = HYP.Model(verbose=verbose)
     (c, A, b, G, h, cone) = build_envelope(2, 4, 2, 7, usedense=true)
-    rd = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
+    rd = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem)
     @test rd.status == :Optimal
     @test rd.niters <= 60
 
     # sparse methods
-    mdl = Hypatia.Model(verbose=verbose)
+    mdl = HYP.Model(verbose=verbose)
     (c, A, b, G, h, cone) = build_envelope(2, 4, 2, 7, usedense=false)
-    rs = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
+    rs = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem)
     @test rs.status == :Optimal
     @test rs.niters <= 60
 
     @test rs.pobj ≈ rd.pobj atol=1e-4 rtol=1e-4
 end
 
-function _envelope3(; verbose, lscachetype)
-    mdl = Hypatia.Model(verbose=verbose)
+function _envelope3(; verbose, linearsystem)
+    mdl = HYP.Model(verbose=verbose)
     (c, A, b, G, h, cone) = build_envelope(2, 3, 3, 5, usedense=false)
-    r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
+    r = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem)
     @test r.status == :Optimal
     @test r.niters <= 60
 end
 
-function _envelope4(; verbose, lscachetype)
-    mdl = Hypatia.Model(verbose=verbose)
+function _envelope4(; verbose, linearsystem)
+    mdl = HYP.Model(verbose=verbose)
     (c, A, b, G, h, cone) = build_envelope(2, 2, 4, 3, usedense=false)
-    r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
+    r = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem)
     @test r.status == :Optimal
     @test r.niters <= 55
 end
 
-function _linearopt1(; verbose, lscachetype)
+function _linearopt1(; verbose, linearsystem)
     # dense methods
-    mdl = Hypatia.Model(verbose=verbose)
+    mdl = HYP.Model(verbose=verbose)
     (c, A, b, G, h, cone) = build_linearopt(25, 50, usedense=true, tosparse=false)
-    rd = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
+    rd = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem)
     @test rd.status == :Optimal
     @test rd.niters <= 35
 
     # sparse methods
-    mdl = Hypatia.Model(verbose=verbose)
+    mdl = HYP.Model(verbose=verbose)
     (c, A, b, G, h, cone) = build_linearopt(25, 50, usedense=true, tosparse=true)
-    rs = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
+    rs = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem)
     @test rs.status == :Optimal
     @test rs.niters <= 35
 
     @test rs.pobj ≈ rd.pobj atol=1e-4 rtol=1e-4
 end
 
-function _linearopt2(; verbose, lscachetype)
-    mdl = Hypatia.Model(verbose=verbose, tolfeas=1e-9)
+function _linearopt2(; verbose, linearsystem)
+    mdl = HYP.Model(verbose=verbose, tolfeas=1e-9)
     (c, A, b, G, h, cone) = build_linearopt(500, 1000, use_data=true, usedense=true)
-    r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
+    r = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem)
     @test r.status == :Optimal
     @test r.niters <= 70
     @test r.pobj ≈ 2055.807 atol=1e-4 rtol=1e-4
@@ -83,100 +83,100 @@ end
 
 # for namedpoly tests, most optimal values are taken from https://people.sc.fsu.edu/~jburkardt/py_src/polynomials/polynomials.html
 
-function _namedpoly1(; verbose, lscachetype)
-    mdl = Hypatia.Model(verbose=verbose)
+function _namedpoly1(; verbose, linearsystem)
+    mdl = HYP.Model(verbose=verbose)
     (c, A, b, G, h, cone) = build_namedpoly(:butcher, 2)
-    r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
+    r = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem)
     @test r.status == :Optimal
     @test r.niters <= 45
     @test r.pobj ≈ -1.4393333333 atol=1e-4 rtol=1e-4
 end
 
-function _namedpoly2(; verbose, lscachetype)
-    mdl = Hypatia.Model(verbose=verbose)
+function _namedpoly2(; verbose, linearsystem)
+    mdl = HYP.Model(verbose=verbose)
     (c, A, b, G, h, cone) = build_namedpoly(:caprasse, 4)
-    r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
+    r = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem)
     @test r.status == :Optimal
     @test r.niters <= 45
     @test r.pobj ≈ -3.1800966258 atol=1e-4 rtol=1e-4
 end
 
-function _namedpoly3(; verbose, lscachetype)
-    mdl = Hypatia.Model(verbose=verbose, tolfeas=1e-9)
+function _namedpoly3(; verbose, linearsystem)
+    mdl = HYP.Model(verbose=verbose, tolfeas=1e-9)
     (c, A, b, G, h, cone) = build_namedpoly(:goldsteinprice, 6)
-    r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype, atol=2e-3)
+    r = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem, atol=2e-3)
     @test r.status == :Optimal
     @test r.niters <= 70
     @test r.pobj ≈ 3 atol=1e-4 rtol=1e-4
 end
 
-function _namedpoly4(; verbose, lscachetype)
-    mdl = Hypatia.Model(verbose=verbose)
+function _namedpoly4(; verbose, linearsystem)
+    mdl = HYP.Model(verbose=verbose)
     (c, A, b, G, h, cone) = build_namedpoly(:heart, 2)
-    r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
+    r = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem)
     @test r.status == :Optimal
     # @test r.niters <= 40
     @test r.pobj ≈ -1.36775 atol=1e-4 rtol=1e-4
 end
 
-function _namedpoly5(; verbose, lscachetype)
-    mdl = Hypatia.Model(verbose=verbose)
+function _namedpoly5(; verbose, linearsystem)
+    mdl = HYP.Model(verbose=verbose)
     (c, A, b, G, h, cone) = build_namedpoly(:lotkavolterra, 3)
-    r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
+    r = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem)
     @test r.status == :Optimal
     @test r.niters <= 40
     @test r.pobj ≈ -20.8 atol=1e-4 rtol=1e-4
 end
 
-function _namedpoly6(; verbose, lscachetype)
-    mdl = Hypatia.Model(verbose=verbose)
+function _namedpoly6(; verbose, linearsystem)
+    mdl = HYP.Model(verbose=verbose)
     (c, A, b, G, h, cone) = build_namedpoly(:magnetism7, 2)
-    r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
+    r = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem)
     @test r.status == :Optimal
     @test r.niters <= 35
     @test r.pobj ≈ -0.25 atol=1e-4 rtol=1e-4
 end
 
-function _namedpoly7(; verbose, lscachetype)
-    mdl = Hypatia.Model(verbose=verbose)
+function _namedpoly7(; verbose, linearsystem)
+    mdl = HYP.Model(verbose=verbose)
     (c, A, b, G, h, cone) = build_namedpoly(:motzkin, 7)
-    r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
+    r = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem)
     @test r.status == :Optimal
     @test r.niters <= 45
     @test r.pobj ≈ 0 atol=1e-4 rtol=1e-4
 end
 
-function _namedpoly8(; verbose, lscachetype)
-    mdl = Hypatia.Model(verbose=verbose)
+function _namedpoly8(; verbose, linearsystem)
+    mdl = HYP.Model(verbose=verbose)
     (c, A, b, G, h, cone) = build_namedpoly(:reactiondiffusion, 4)
-    r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
+    r = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem)
     @test r.status == :Optimal
     @test r.niters <= 40
     @test r.pobj ≈ -36.71269068 atol=1e-4 rtol=1e-4
 end
 
-function _namedpoly9(; verbose, lscachetype)
-    mdl = Hypatia.Model(verbose=verbose)
+function _namedpoly9(; verbose, linearsystem)
+    mdl = HYP.Model(verbose=verbose)
     (c, A, b, G, h, cone) = build_namedpoly(:robinson, 8)
-    r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype)
+    r = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem)
     @test r.status == :Optimal
     @test r.niters <= 40
     @test r.pobj ≈ 0.814814 atol=1e-4 rtol=1e-4
 end
 
-function _namedpoly10(; verbose, lscachetype)
-    mdl = Hypatia.Model(verbose=verbose, tolfeas=2e-10)
+function _namedpoly10(; verbose, linearsystem)
+    mdl = HYP.Model(verbose=verbose, tolfeas=2e-10)
     (c, A, b, G, h, cone) = build_namedpoly(:rosenbrock, 5)
-    r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype, atol=1e-3)
+    r = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem, atol=1e-3)
     @test r.status == :Optimal
     @test r.niters <= 70
     @test r.pobj ≈ 0 atol=1e-3 rtol=1e-3
 end
 
-function _namedpoly11(; verbose, lscachetype)
-    mdl = Hypatia.Model(verbose=verbose, tolfeas=1e-10)
+function _namedpoly11(; verbose, linearsystem)
+    mdl = HYP.Model(verbose=verbose, tolfeas=1e-10)
     (c, A, b, G, h, cone) = build_namedpoly(:schwefel, 4)
-    r = solveandcheck(mdl, c, A, b, G, h, cone, lscachetype, atol=1e-3)
+    r = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem, atol=1e-3)
     @test r.status == :Optimal
     @test r.niters <= 65
     @test r.pobj ≈ 0 atol=1e-3 rtol=1e-3
@@ -359,7 +359,7 @@ end
 function _shapeconregr8_JuMP()
     (n, deg, npoints, signal_ratio, f) = (2, 4, 100, 0.0, x -> -inv(1 + exp(-10.0 * norm(x))))
     (X, y) = generateregrdata(f, 0.0, 1.0, n, npoints, signal_ratio=signal_ratio)
-    shapedata = ShapeData(Hypatia.Box(zeros(n), ones(n)), Hypatia.Box(zeros(n), ones(n)), ones(n), 1)
+    shapedata = ShapeData(MU.Box(zeros(n), ones(n)), MU.Box(zeros(n), ones(n)), ones(n), 1)
     (mdl, p) = build_shapeconregr_WSOS(X, y, deg, shapedata, use_leastsqobj=true)
     truemin = 3.7723e-03
     solveandcheck_JuMP(mdl, truemin)
@@ -368,9 +368,9 @@ end
 function _shapeconregr9_JuMP()
     (n, deg, npoints, signal_ratio, f) = (2, 4, 100, 10.0, x -> -inv(1 + exp(-10.0 * norm(x))))
     (X, y) = generateregrdata(f, 0.0, 1.0, n, npoints, signal_ratio=signal_ratio)
-    shapedata = ShapeData(Hypatia.Box(zeros(n), ones(n)), Hypatia.Box(zeros(n), ones(n)), ones(n), 1)
+    shapedata = ShapeData(MU.Box(zeros(n), ones(n)), MU.Box(zeros(n), ones(n)), ones(n), 1)
     (mdl, p) = build_shapeconregr_WSOS(X, y, deg, shapedata, use_leastsqobj=true)
-    truemin = 3.0995e-02 # <---- not verified with SDP like others
+    truemin = 3.0995e-02 # not verified with SDP
     solveandcheck_JuMP(mdl, truemin)
 end
 
@@ -378,25 +378,25 @@ function _shapeconregr10_JuMP()
     (n, deg, npoints, signal_ratio, f) = (2, 4, 100, 0.0, x -> exp(norm(x)))
     (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
     (mdl, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_leastsqobj=true)
-    truemin = 5.0209e-02 # <---- not verified with SDP like others
+    truemin = 5.0209e-02 # not verified with SDP
     solveandcheck_JuMP(mdl, truemin)
 end
 
 function _shapeconregr11_JuMP()
     (n, deg, npoints, signal_ratio, f) = (2, 5, 100, 10.0, x -> exp(norm(x)))
     (X, y) = generateregrdata(f, 0.5, 2.0, n, npoints, signal_ratio=signal_ratio)
-    shapedata = ShapeData(Hypatia.Box(0.5*ones(n), 2*ones(n)), Hypatia.Box(0.5*ones(n), 2*ones(n)), ones(n), 1)
+    shapedata = ShapeData(MU.Box(0.5*ones(n), 2*ones(n)), MU.Box(0.5*ones(n), 2*ones(n)), ones(n), 1)
     (mdl, p) = build_shapeconregr_WSOS(X, y, deg, shapedata, use_leastsqobj=true)
-    truemin = 0.22206 # <---- not verified with SDP like others
+    truemin = 0.22206 # not verified with SDP
     solveandcheck_JuMP(mdl, truemin)
 end
 
 function _shapeconregr12_JuMP()
     (n, deg, npoints, signal_ratio, f) = (2, 5, 100, 10.0, x -> exp(norm(x)))
     (X, y) = generateregrdata(f, 0.5, 2.0, n, npoints, signal_ratio=signal_ratio)
-    shapedata = ShapeData(Hypatia.Box(0.5*ones(n), 2*ones(n)), Hypatia.Box(0.5*ones(n), 2*ones(n)), ones(n), 1)
+    shapedata = ShapeData(MU.Box(0.5*ones(n), 2*ones(n)), MU.Box(0.5*ones(n), 2*ones(n)), ones(n), 1)
     (mdl, p) = build_shapeconregr_PSD(X, y, deg, shapedata, use_leastsqobj=true)
-    truemin = 0.22206 # <---- not verified with SDP
+    truemin = 0.22206 # not verified with SDP
     solveandcheck_JuMP(mdl, truemin)
 end
 
@@ -404,7 +404,7 @@ function _shapeconregr13_JuMP()
     (n, deg, npoints, signal_ratio, f) = (2, 6, 100, 1.0, x -> exp(norm(x)))
     (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
     (mdl, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_leastsqobj=false)
-    truemin = 1.7751 # <---- not verified with SDP like others
+    truemin = 1.7751 # not verified with SDP
     solveandcheck_JuMP(mdl, truemin)
 end
 

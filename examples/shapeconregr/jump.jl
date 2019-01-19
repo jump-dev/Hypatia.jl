@@ -30,8 +30,8 @@ const rt2 = sqrt(2)
 
 # a description of the shape of the regressor
 mutable struct ShapeData
-    mono_dom::Hypatia.InterpDomain
-    conv_dom::Hypatia.InterpDomain
+    mono_dom::Hypatia.Domain
+    conv_dom::Hypatia.Domain
     mono_profile::Vector{Int}
     conv_profile::Int
 end
@@ -103,7 +103,7 @@ function build_shapeconregr_PSD(
     n = size(X, 2)
     d = div(r+1, 2)
 
-    model = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true, usedense=usedense, lscachetype=Hypatia.QRSymmCache))
+    model = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true, usedense=usedense, linearsystem=Hypatia.QRSymm))
     (x, p) = add_loss_and_polys!(model, X, y, r, use_leastsqobj)
 
     mono_bss = get_domain_inequalities(sd.mono_dom, x)
@@ -144,7 +144,7 @@ function build_shapeconregr_WSOS(
     mono_wsos_cone = WSOSPolyInterpCone(mono_U, [mono_P0, mono_PWts...])
     conv_wsos_cone = WSOSPolyInterpMatCone(n, conv_U, [conv_P0, conv_PWts...])
 
-    model = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true, usedense=usedense, lscachetype=Hypatia.QRSymmCache, tolabsopt=1e-6, tolrelopt=1e-5, tolfeas=1e-6))
+    model = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true, usedense=usedense, linearsystem=Hypatia.QRSymm, tolabsopt=1e-6, tolrelopt=1e-5, tolfeas=1e-6))
     (x, p) = add_loss_and_polys!(model, X, y, r, use_leastsqobj)
 
     # monotonicity

@@ -1,38 +1,21 @@
 #=
 Copyright 2018, Chris Coey and contributors
+
+MathOptInterface wrapper of Hypatia solver
 =#
-
-export WSOSPolyInterpCone
-
-struct WSOSPolyInterpCone <: MOI.AbstractVectorSet
-    dimension::Int
-    ipwt::Vector{Matrix{Float64}}
-    isdual::Bool
-end
-WSOSPolyInterpCone(dimension::Int, ipwt::Vector{Matrix{Float64}}) = WSOSPolyInterpCone(dimension, ipwt, false)
-
-export WSOSPolyInterpMatCone
-
-struct WSOSPolyInterpMatCone <: MOI.AbstractVectorSet
-    r::Int
-    u::Int
-    ipwt::Vector{Matrix{Float64}}
-    isdual::Bool
-end
-WSOSPolyInterpMatCone(r::Int, u::Int, ipwt::Vector{Matrix{Float64}}) = WSOSPolyInterpMatCone(r, u, ipwt, false)
 
 mutable struct Optimizer <: MOI.AbstractOptimizer
     mdl::Model
     verbose::Bool
     timelimit::Float64
-    lscachetype
+    linearsystem::Type{<:LinearSystems.LinearSystemSolver}
     usedense::Bool
     c::Vector{Float64}          # linear cost vector, size n
     A::AbstractMatrix{Float64}  # equality constraint matrix, size p*n
     b::Vector{Float64}          # equality constraint vector, size p
     G::AbstractMatrix{Float64}  # cone constraint matrix, size q*n
     h::Vector{Float64}          # cone constraint vector, size q
-    cone::Cone                  # primal constraint cone object
+    cone::Cones.Cone                  # primal constraint cone object
     objsense::MOI.OptimizationSense
     objconst::Float64
     numeqconstrs::Int
@@ -51,12 +34,12 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     pobj::Float64
     dobj::Float64
 
-    function Optimizer(mdl::Model, verbose::Bool, timelimit::Float64, lscachetype, usedense::Bool)
+    function Optimizer(mdl::Model, verbose::Bool, timelimit::Float64, linearsystem, usedense::Bool)
         opt = new()
         opt.mdl = mdl
         opt.verbose = verbose
         opt.timelimit = timelimit
-        opt.lscachetype = lscachetype
+        opt.linearsystem = linearsystem
         opt.usedense = usedense
         opt.status = :NotLoaded
         return opt
@@ -66,12 +49,12 @@ end
 Optimizer(;
     verbose::Bool = false,
     timelimit::Float64 = 3.6e3, # TODO should be Inf
-    lscachetype = QRSymmCache,
+    linearsystem = LinearSystems.QRSymm,
     usedense::Bool = true,
     tolrelopt::Float64 = 1e-6,
     tolabsopt::Float64 = 1e-7,
     tolfeas::Float64 = 1e-7,
-    ) = Optimizer(Model(verbose=verbose, timelimit=timelimit, tolrelopt=tolrelopt, tolabsopt=tolabsopt, tolfeas=tolfeas), verbose, timelimit, lscachetype, usedense)
+    ) = Optimizer(Model(verbose=verbose, timelimit=timelimit, tolrelopt=tolrelopt, tolabsopt=tolabsopt, tolfeas=tolfeas), verbose, timelimit, linearsystem, usedense)
 
 MOI.get(::Optimizer, ::MOI.SolverName) = "Hypatia"
 
@@ -86,99 +69,19 @@ MOI.supports(::Optimizer, ::Union{
 
 # TODO don't restrict to Float64 type
 SupportedFuns = Union{
-    MOI.SingleVariable,
-    MOI.ScalarAffineFunction{Float64},
-    MOI.VectorOfVariables,
-    MOI.VectorAffineFunction{Float64},
+    MOI.SingleVariable, MOI.ScalarAffineFunction{Float64},
+    MOI.VectorOfVariables, MOI.VectorAffineFunction{Float64},
     }
 
 SupportedSets = Union{
-    MOI.EqualTo{Float64},
-    MOI.Zeros,
-    MOI.GreaterThan{Float64},
-    MOI.Nonnegatives,
-    MOI.LessThan{Float64},
-    MOI.Nonpositives,
+    MOI.EqualTo{Float64}, MOI.Zeros,
+    MOI.GreaterThan{Float64}, MOI.Nonnegatives,
+    MOI.LessThan{Float64}, MOI.Nonpositives,
     MOI.Interval{Float64},
-    MOI.SecondOrderCone,
-    MOI.RotatedSecondOrderCone,
-    MOI.ExponentialCone,
-    MOI.GeometricMeanCone,
-    MOI.PowerCone{Float64},
-    MOI.PositiveSemidefiniteConeTriangle,
-    MOI.LogDetConeTriangle,
-    WSOSPolyInterpCone,
-    WSOSPolyInterpMatCone
+    MOIOtherCones...
     }
 
 MOI.supports_constraint(::Optimizer, ::Type{<:SupportedFuns}, ::Type{<:SupportedSets}) = true
-
-# MOI cones for which no transformation is needed
-conefrommoi(s::MOI.SecondOrderCone) = EpiNormEucl(MOI.dimension(s))
-conefrommoi(s::MOI.RotatedSecondOrderCone) = EpiPerSquare(MOI.dimension(s))
-conefrommoi(s::MOI.ExponentialCone) = HypoPerLog()
-conefrommoi(s::MOI.GeometricMeanCone) = (l = MOI.dimension(s) - 1; HypoGeomean(fill(1.0/l, l)))
-conefrommoi(s::MOI.PowerCone{Float64}) = EpiPerPower(inv(s.exponent))
-conefrommoi(s::WSOSPolyInterpCone) = WSOSPolyInterp(s.dimension, s.ipwt, s.isdual)
-conefrommoi(s::WSOSPolyInterpMatCone) = WSOSPolyInterpMat(s.r, s.u, s.ipwt, s.isdual)
-conefrommoi(s::MOI.AbstractVectorSet) = error("MOI set $s is not recognized")
-
-function buildvarcone(fi::MOI.VectorOfVariables, si::MOI.AbstractVectorSet, dim::Int, q::Int)
-    IGi = q+1:q+dim
-    VGi = -ones(dim)
-    prmtvi = conefrommoi(si)
-    return (IGi, VGi, prmtvi)
-end
-
-function buildconstrcone(fi::MOI.VectorAffineFunction{Float64}, si::MOI.AbstractVectorSet, dim::Int, q::Int)
-    IGi = [q + vt.output_index for vt in fi.terms]
-    VGi = [-vt.scalar_term.coefficient for vt in fi.terms]
-    Ihi = q+1:q+dim
-    Vhi = fi.constants
-    prmtvi = conefrommoi(si)
-    return (IGi, VGi, Ihi, Vhi, prmtvi)
-end
-
-# MOI cones requiring transformations (eg rescaling, changing order)
-# TODO later remove if MOI gets scaled triangle sets
-svecscale(dim) = [(i == j ? 1.0 : rt2) for i in 1:round(Int, sqrt(0.25 + 2*dim) - 0.5) for j in 1:i]
-svecunscale(dim) = [(i == j ? 1.0 : rt2i) for i in 1:round(Int, sqrt(0.25 + 2*dim) - 0.5) for j in 1:i]
-
-# PSD cone: convert from smat to svec form (scale off-diagonals)
-function buildvarcone(fi::MOI.VectorOfVariables, si::MOI.PositiveSemidefiniteConeTriangle, dim::Int, q::Int)
-    IGi = q+1:q+dim
-    VGi = -svecscale(dim)
-    prmtvi = PosSemidef(dim)
-    return (IGi, VGi, prmtvi)
-end
-
-function buildconstrcone(fi::MOI.VectorAffineFunction{Float64}, si::MOI.PositiveSemidefiniteConeTriangle, dim::Int, q::Int)
-    scalevec = svecscale(dim)
-    IGi = [q + vt.output_index for vt in fi.terms]
-    VGi = [-vt.scalar_term.coefficient*scalevec[vt.output_index] for vt in fi.terms]
-    Ihi = q+1:q+dim
-    Vhi = scalevec .* fi.constants
-    prmtvi = PosSemidef(dim)
-    return (IGi, VGi, Ihi, Vhi, prmtvi)
-end
-
-# logdet cone: convert from smat to svec form (scale off-diagonals)
-function buildvarcone(fi::MOI.VectorOfVariables, si::MOI.LogDetConeTriangle, dim::Int, q::Int)
-    IGi = q+1:q+dim
-    VGi = vcat(-1.0, -1.0, -svecscale(dim-2))
-    prmtvi = HypoPerLogdet(dim)
-    return (IGi, VGi, prmtvi)
-end
-
-function buildconstrcone(fi::MOI.VectorAffineFunction{Float64}, si::MOI.LogDetConeTriangle, dim::Int, q::Int)
-    scalevec = vcat(1.0, 1.0, svecscale(dim-2))
-    IGi = [q + vt.output_index for vt in fi.terms]
-    VGi = [-vt.scalar_term.coefficient*scalevec[vt.output_index] for vt in fi.terms]
-    Ihi = q+1:q+dim
-    Vhi = scalevec .* fi.constants
-    prmtvi = HypoPerLogdet(dim)
-    return (IGi, VGi, Ihi, Vhi, prmtvi)
-end
 
 # build representation as min c'x s.t. A*x = b, h - G*x in K
 function MOI.copy_to(
@@ -309,7 +212,7 @@ function MOI.copy_to(
     (Ih, Vh) = (Int[], Float64[])
     (Icpc, Vcpc) = (Int[], Float64[]) # constraint set constants for opt.constrprimeq
     constroffsetcone = Vector{Int}()
-    cone = Cone()
+    cone = Cones.Cone()
 
     # build up one nonnegative cone
     nonnegstart = q
@@ -375,7 +278,7 @@ function MOI.copy_to(
 
     if q > nonnegstart
         # exists at least one nonnegative constraint
-        addprimitivecone!(cone, Nonnegative(q - nonnegstart), nonnegstart+1:q)
+        Cones.addprimitivecone!(cone, Cones.Nonnegative(q - nonnegstart), nonnegstart+1:q)
     end
 
     # build up one nonpositive cone
@@ -442,7 +345,7 @@ function MOI.copy_to(
 
     if q > nonposstart
         # exists at least one nonpositive constraint
-        addprimitivecone!(cone, Nonpositive(q - nonposstart), nonposstart+1:q)
+        Cones.addprimitivecone!(cone, Cones.Nonpositive(q - nonposstart), nonposstart+1:q)
     end
 
     # build up one L_infinity norm cone from two-sided interval constraints
@@ -515,23 +418,12 @@ function MOI.copy_to(
     opt.intervalscales = intervalscales
     if q > intervalstart
         # exists at least one interval-type constraint
-        addprimitivecone!(cone, EpiNormInf(q - intervalstart), intervalstart+1:q)
+        Cones.addprimitivecone!(cone, Cones.EpiNormInf(q - intervalstart), intervalstart+1:q)
     end
 
     # add non-LP conic constraints
 
-    for S in (
-        MOI.SecondOrderCone,
-        MOI.RotatedSecondOrderCone,
-        MOI.ExponentialCone,
-        MOI.PowerCone{Float64},
-        MOI.GeometricMeanCone,
-        MOI.PositiveSemidefiniteConeTriangle,
-        MOI.LogDetConeTriangle,
-        WSOSPolyInterpCone,
-        WSOSPolyInterpMatCone,
-        ),
-        F in (MOI.VectorOfVariables, MOI.VectorAffineFunction{Float64})
+    for S in MOIOtherCones, F in (MOI.VectorOfVariables, MOI.VectorAffineFunction{Float64})
         for ci in getsrccons(F, S)
             i += 1
             idxmap[ci] = MOI.ConstraintIndex{F, S}(i)
@@ -550,7 +442,7 @@ function MOI.copy_to(
             end
             append!(IG, IGi)
             append!(VG, VGi)
-            addprimitivecone!(cone, prmtvi, q+1:q+dim)
+            Cones.addprimitivecone!(cone, prmtvi, q+1:q+dim)
             q += dim
         end
     end
@@ -576,14 +468,14 @@ function MOI.optimize!(opt::Optimizer)
 
     # check, preprocess, load, and solve
     check_data(c, A, b, G, h, cone)
-    if opt.lscachetype == QRSymmCache
+    if opt.linearsystem == LinearSystems.QRSymm
         (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = preprocess_data(c, A, b, G, useQR=true)
-        L = QRSymmCache(c1, A1, b1, G1, h, cone, Q2, RiQ1)
-    elseif opt.lscachetype == NaiveCache
+        L = LinearSystems.QRSymm(c1, A1, b1, G1, h, cone, Q2, RiQ1)
+    elseif opt.linearsystem == LinearSystems.Naive
         (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = preprocess_data(c, A, b, G, useQR=false)
-        L = NaiveCache(c1, A1, b1, G1, h, cone)
+        L = LinearSystems.Naive(c1, A1, b1, G1, h, cone)
     else
-        error("linear system cache type $(opt.lscachetype) is not recognized")
+        error("linear system cache type $(opt.linearsystem) is not recognized")
     end
     load_data!(mdl, c1, A1, b1, G1, h, cone, L)
     solve!(mdl)
@@ -603,13 +495,14 @@ function MOI.optimize!(opt::Optimizer)
     opt.s = get_s(mdl)
     opt.z = get_z(mdl)
 
+    # TODO refac out primitive cone untransformations
     for k in eachindex(cone.prmtvs)
-        if cone.prmtvs[k] isa PosSemidef
+        if cone.prmtvs[k] isa Cones.PosSemidef
             idxs = cone.idxs[k]
             scalevec = svecunscale(length(idxs))
             opt.s[idxs] .*= scalevec
             opt.z[idxs] .*= scalevec
-        elseif cone.prmtvs[k] isa HypoPerLogdet
+        elseif cone.prmtvs[k] isa Cones.HypoPerLogdet
             idxs = cone.idxs[k][3:end]
             scalevec = svecunscale(length(idxs))
             opt.s[idxs] .*= scalevec

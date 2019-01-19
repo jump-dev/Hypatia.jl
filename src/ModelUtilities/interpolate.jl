@@ -1,6 +1,8 @@
 #=
-Copyright 2018, Chris Coey and contributors
+Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 Copyright 2018, David Papp, Sercan Yildiz
+
+utilities for interpolation on canonical domains
 
 modified/inspired from files in https://github.com/dpapp-github/alfonso/
 - https://github.com/dpapp-github/alfonso/blob/master/ChebInterval.m
@@ -11,25 +13,9 @@ and Matlab files in the packages
 - Padua2DM by M. Caliari, S. De Marchi, A. Sommariva, and M. Vianello http://profs.sci.univr.it/~caliari/software.htm
 =#
 
-# domains
-abstract type InterpDomain end
-sampling_region(dom::InterpDomain) = dom
+sampling_region(dom::SemiFreeDomain) = dom.restricted_halfregion
+sampling_region(dom::Domain) = dom
 
-# hyperrectangle/box domain
-mutable struct Box <: InterpDomain
-    l::Vector{Float64}
-    u::Vector{Float64}
-    function Box(l::Vector{Float64}, u::Vector{Float64})
-        @assert length(l) == length(u)
-        dom = new()
-        dom.l = l
-        dom.u = u
-        return dom
-    end
-end
-
-dimension(dom::Box) = length(dom.l)
-degree(::Box) = 2
 
 function interp_sample(dom::Box, npts::Int)
     dim = dimension(dom)
@@ -47,20 +33,6 @@ function get_weights(dom::Box, pts::AbstractMatrix{Float64})
     return g
 end
 
-# Euclidean hyperball domain
-mutable struct Ball <: InterpDomain
-    c::Vector{Float64}
-    r::Float64
-    function Ball(c::Vector{Float64}, r::Float64)
-        dom = new()
-        dom.c = c
-        dom.r = r
-        return dom
-    end
-end
-
-dimension(dom::Ball) = length(dom.c)
-degree(::Ball) = 2
 
 function interp_sample(dom::Ball, npts::Int)
     dim = dimension(dom)
@@ -81,21 +53,6 @@ function get_weights(dom::Ball, pts::AbstractMatrix{Float64})
     return [g]
 end
 
-# hyperellipse domain: (x-c)'Q(x-c) \leq 1
-mutable struct Ellipsoid <: InterpDomain
-    c::Vector{Float64}
-    Q::AbstractMatrix{Float64}
-    function Ellipsoid(c::Vector{Float64}, Q::AbstractMatrix{Float64})
-        @assert length(c) == size(Q, 1)
-        dom = new()
-        dom.c = c
-        dom.Q = Q
-        return dom
-    end
-end
-
-dimension(dom::Ellipsoid) = length(dom.c)
-degree(::Ellipsoid) = 2
 
 function interp_sample(dom::Ellipsoid, npts::Int)
     dim = dimension(dom)
@@ -124,19 +81,6 @@ function get_weights(dom::Ellipsoid, pts::AbstractMatrix{Float64})
     return [g]
 end
 
-# assumes the free part has the same dimension as the restricted part
-mutable struct SemiFreeDomain <: InterpDomain
-    sampling_region::InterpDomain
-end
-
-sampling_region(dom::SemiFreeDomain) = dom.sampling_region
-
-function add_free_vars(dom::InterpDomain)
-    return SemiFreeDomain(dom)
-end
-
-dimension(dom::SemiFreeDomain) = 2*dimension(dom.sampling_region)
-degree(dom::SemiFreeDomain) = degree(dom.sampling_region)
 
 function interp_sample(dom::SemiFreeDomain, npts::Int)
     return hcat(interp_sample(dom.sampling_region, npts), interp_sample(dom.sampling_region, npts))
@@ -147,12 +91,6 @@ function get_weights(dom::SemiFreeDomain, pts::Matrix{Float64})
     return get_weights(dom.sampling_region, view(pts, : ,1:count))
 end
 
-mutable struct FreeDomain <: InterpDomain
-    n::Int
-end
-
-dimension(dom::FreeDomain) = dom.n
-degree(::FreeDomain) = 0
 
 function interp_sample(dom::FreeDomain, npts::Int)
     return interp_sample(Box(-ones(dom.n), ones(dom.n)), npts)
@@ -162,6 +100,7 @@ function get_weights(::FreeDomain, ::AbstractMatrix{Float64})
     return []
 end
 
+
 function get_LU(n::Int, d::Int)
     L = binomial(n+d,n)
     U = binomial(n+2d, n)
@@ -169,7 +108,7 @@ function get_LU(n::Int, d::Int)
 end
 
 function interpolate(
-    dom::InterpDomain,
+    dom::Domain,
     d::Int;
     sample::Bool = false,
     calc_w::Bool = false,
@@ -183,7 +122,7 @@ function interpolate(
 end
 
 # slow but high-quality hyperrectangle/box point selections
-function wsos_box_params(::InterpDomain, ::Int, ::Int)
+function wsos_box_params(::Domain, ::Int, ::Int)
     error("accurate methods for interpolation points are only available for box domains, use sampling instead")
 end
 
@@ -357,7 +296,7 @@ function approxfekete_data(n::Int, d::Int, calc_w::Bool)
 end
 
 function make_wsos_arrays(
-    dom::InterpDomain,
+    dom::Domain,
     candidate_pts::Matrix{Float64},
     d::Int,
     U::Int,
@@ -407,7 +346,7 @@ end
 
 # fast, sampling-based point selection for general domains
 function wsos_sample_params(
-    dom::InterpDomain,
+    dom::Domain,
     d::Int;
     calc_w::Bool = false,
     sample_factor::Int = 10,

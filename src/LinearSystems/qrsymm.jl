@@ -7,7 +7,7 @@ QR plus either Cholesky factorization or iterative conjugate gradients method
 (2) solve reduced symmetric system by Cholesky or iterative method
 =#
 
-mutable struct QRSymmCache <: LinSysCache
+mutable struct QRSymm <: LinearSystemSolver
     # TODO can remove some of the prealloced arrays after github.com/JuliaLang/julia/issues/23919 is resolved
     useiterative
     userefine
@@ -51,13 +51,13 @@ mutable struct QRSymmCache <: LinSysCache
     # lprecond
     # Q2sol
 
-    function QRSymmCache(
+    function QRSymm(
         c::Vector{Float64},
         A::AbstractMatrix{Float64},
         b::Vector{Float64},
         G::AbstractMatrix{Float64},
         h::Vector{Float64},
-        cone::Cone,
+        cone::Cones.Cone,
         Q2::AbstractMatrix{Float64},
         RiQ1::AbstractMatrix{Float64};
         useiterative::Bool = false,
@@ -125,16 +125,16 @@ mutable struct QRSymmCache <: LinSysCache
 end
 
 
-QRSymmCache(
+QRSymm(
     c::Vector{Float64},
     A::AbstractMatrix{Float64},
     b::Vector{Float64},
     G::AbstractMatrix{Float64},
     h::Vector{Float64},
-    cone::Cone;
+    cone::Cones.Cone;
     useiterative::Bool = false,
     userefine::Bool = false,
-    ) = error("to use a QRSymmCache for linear system solves, the data must be preprocessed and Q2 and RiQ1 must be passed into the QRSymmCache constructor")
+    ) = error("to use a QRSymm for linear system solves, the data must be preprocessed and Q2 and RiQ1 must be passed into the QRSymm constructor")
 
 
 # solve two symmetric systems and combine the solutions for x, y, z, s, kap, tau
@@ -149,7 +149,7 @@ function solvelinsys6!(
     rhs_tau::Float64,
     mu::Float64,
     tau::Float64,
-    L::QRSymmCache,
+    L::QRSymm,
     )
     (zi, yi, xi) = (L.zi, L.yi, L.xi)
     @. yi[:,1] = L.b
@@ -167,10 +167,10 @@ function solvelinsys6!(
         a3k = view(rhs_ts, L.cone.idxs[k])
         if L.cone.prmtvs[k].usedual
             @. a1k = a2k - a3k
-            calcHiarr_prmtv!(a2k, a1k, L.cone.prmtvs[k])
+            Cones.calcHiarr_prmtv!(a2k, a1k, L.cone.prmtvs[k])
             a2k ./= mu
         elseif !iszero(a3k) # TODO rhs_ts = 0 for correction steps, so can just check if doing correction
-            calcHarr_prmtv!(a1k, a3k, L.cone.prmtvs[k])
+            Cones.calcHarr_prmtv!(a1k, a3k, L.cone.prmtvs[k])
             @. a2k -= mu*a1k
         end
     end
@@ -183,10 +183,10 @@ function solvelinsys6!(
             a1k = view(L.h, L.cone.idxs[k])
             a2k = view(z1, L.cone.idxs[k])
             if L.cone.prmtvs[k].usedual
-                calcHiarr_prmtv!(a2k, a1k, L.cone.prmtvs[k])
+                Cones.calcHiarr_prmtv!(a2k, a1k, L.cone.prmtvs[k])
                 a2k ./= mu
             else
-                calcHarr_prmtv!(a2k, a1k, L.cone.prmtvs[k])
+                Cones.calcHarr_prmtv!(a2k, a1k, L.cone.prmtvs[k])
                 a2k .*= mu
             end
         end
@@ -205,10 +205,10 @@ function solvelinsys6!(
         a1k = view(L.GQ1x, L.cone.idxs[k], :)
         a2k = view(L.HGQ1x, L.cone.idxs[k], :)
         if L.cone.prmtvs[k].usedual
-            calcHiarr_prmtv!(a2k, a1k, L.cone.prmtvs[k])
+            Cones.calcHiarr_prmtv!(a2k, a1k, L.cone.prmtvs[k])
             a2k ./= mu
         else
-            calcHarr_prmtv!(a2k, a1k, L.cone.prmtvs[k])
+            Cones.calcHarr_prmtv!(a2k, a1k, L.cone.prmtvs[k])
             a2k .*= mu
         end
     end
@@ -221,10 +221,10 @@ function solvelinsys6!(
             a1k = view(L.GQ2, L.cone.idxs[k], :)
             a2k = view(L.HGQ2, L.cone.idxs[k], :)
             if L.cone.prmtvs[k].usedual
-                calcHiarr_prmtv!(a2k, a1k, L.cone.prmtvs[k])
+                Cones.calcHiarr_prmtv!(a2k, a1k, L.cone.prmtvs[k])
                 a2k ./= mu
             else
-                calcHarr_prmtv!(a2k, a1k, L.cone.prmtvs[k])
+                Cones.calcHarr_prmtv!(a2k, a1k, L.cone.prmtvs[k])
                 a2k .*= mu
             end
         end
@@ -266,10 +266,10 @@ function solvelinsys6!(
         a1k = view(L.Gxi, L.cone.idxs[k], :)
         a2k = view(L.HGxi, L.cone.idxs[k], :)
         if L.cone.prmtvs[k].usedual
-            calcHiarr_prmtv!(a2k, a1k, L.cone.prmtvs[k])
+            Cones.calcHiarr_prmtv!(a2k, a1k, L.cone.prmtvs[k])
             a2k ./= mu
         else
-            calcHarr_prmtv!(a2k, a1k, L.cone.prmtvs[k])
+            Cones.calcHarr_prmtv!(a2k, a1k, L.cone.prmtvs[k])
             a2k .*= mu
         end
     end
