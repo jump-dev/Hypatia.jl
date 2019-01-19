@@ -2,7 +2,7 @@
 Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 =#
 
-function _envelope1(; verbose, linearsystem)
+function envelope1(; verbose, linearsystem)
     # dense methods
     mdl = HYP.Model(verbose=verbose)
     (c, A, b, G, h, cone) = build_envelope(2, 5, 1, 5, use_data=true, usedense=true)
@@ -20,7 +20,7 @@ function _envelope1(; verbose, linearsystem)
     @test r.niters <= 35
 end
 
-function _envelope2(; verbose, linearsystem)
+function envelope2(; verbose, linearsystem)
     # dense methods
     mdl = HYP.Model(verbose=verbose)
     (c, A, b, G, h, cone) = build_envelope(2, 4, 2, 7, usedense=true)
@@ -38,7 +38,7 @@ function _envelope2(; verbose, linearsystem)
     @test rs.pobj ≈ rd.pobj atol=1e-4 rtol=1e-4
 end
 
-function _envelope3(; verbose, linearsystem)
+function envelope3(; verbose, linearsystem)
     mdl = HYP.Model(verbose=verbose)
     (c, A, b, G, h, cone) = build_envelope(2, 3, 3, 5, usedense=false)
     r = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem)
@@ -46,15 +46,15 @@ function _envelope3(; verbose, linearsystem)
     @test r.niters <= 60
 end
 
-function _envelope4(; verbose, linearsystem)
-    mdl = HYP.Model(verbose=verbose)
+function envelope4(; verbose, linearsystem)
+    mdl = HYP.Model(verbose=verbose, tolrelopt=2e-8, tolabsopt=2e-8, tolfeas=1e-8)
     (c, A, b, G, h, cone) = build_envelope(2, 2, 4, 3, usedense=false)
     r = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem)
     @test r.status == :Optimal
     @test r.niters <= 55
 end
 
-function _linearopt1(; verbose, linearsystem)
+function linearopt1(; verbose, linearsystem)
     # dense methods
     mdl = HYP.Model(verbose=verbose)
     (c, A, b, G, h, cone) = build_linearopt(25, 50, usedense=true, tosparse=false)
@@ -72,8 +72,8 @@ function _linearopt1(; verbose, linearsystem)
     @test rs.pobj ≈ rd.pobj atol=1e-4 rtol=1e-4
 end
 
-function _linearopt2(; verbose, linearsystem)
-    mdl = HYP.Model(verbose=verbose, tolfeas=1e-9)
+function linearopt2(; verbose, linearsystem)
+    mdl = HYP.Model(verbose=verbose, tolrelopt=2e-8, tolabsopt=2e-8, tolfeas=1e-8)
     (c, A, b, G, h, cone) = build_linearopt(500, 1000, use_data=true, usedense=true)
     r = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem)
     @test r.status == :Optimal
@@ -83,7 +83,7 @@ end
 
 # for namedpoly tests, most optimal values are taken from https://people.sc.fsu.edu/~jburkardt/py_src/polynomials/polynomials.html
 
-function _namedpoly1(; verbose, linearsystem)
+function namedpoly1(; verbose, linearsystem)
     mdl = HYP.Model(verbose=verbose)
     (c, A, b, G, h, cone) = build_namedpoly(:butcher, 2)
     r = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem)
@@ -92,7 +92,7 @@ function _namedpoly1(; verbose, linearsystem)
     @test r.pobj ≈ -1.4393333333 atol=1e-4 rtol=1e-4
 end
 
-function _namedpoly2(; verbose, linearsystem)
+function namedpoly2(; verbose, linearsystem)
     mdl = HYP.Model(verbose=verbose)
     (c, A, b, G, h, cone) = build_namedpoly(:caprasse, 4)
     r = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem)
@@ -101,7 +101,7 @@ function _namedpoly2(; verbose, linearsystem)
     @test r.pobj ≈ -3.1800966258 atol=1e-4 rtol=1e-4
 end
 
-function _namedpoly3(; verbose, linearsystem)
+function namedpoly3(; verbose, linearsystem)
     mdl = HYP.Model(verbose=verbose, tolfeas=1e-9)
     (c, A, b, G, h, cone) = build_namedpoly(:goldsteinprice, 6)
     r = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem, atol=2e-3)
@@ -110,7 +110,7 @@ function _namedpoly3(; verbose, linearsystem)
     @test r.pobj ≈ 3 atol=1e-4 rtol=1e-4
 end
 
-function _namedpoly4(; verbose, linearsystem)
+function namedpoly4(; verbose, linearsystem)
     mdl = HYP.Model(verbose=verbose)
     (c, A, b, G, h, cone) = build_namedpoly(:heart, 2)
     r = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem)
@@ -119,7 +119,7 @@ function _namedpoly4(; verbose, linearsystem)
     @test r.pobj ≈ -1.36775 atol=1e-4 rtol=1e-4
 end
 
-function _namedpoly5(; verbose, linearsystem)
+function namedpoly5(; verbose, linearsystem)
     mdl = HYP.Model(verbose=verbose)
     (c, A, b, G, h, cone) = build_namedpoly(:lotkavolterra, 3)
     r = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem)
@@ -128,7 +128,7 @@ function _namedpoly5(; verbose, linearsystem)
     @test r.pobj ≈ -20.8 atol=1e-4 rtol=1e-4
 end
 
-function _namedpoly6(; verbose, linearsystem)
+function namedpoly6(; verbose, linearsystem)
     mdl = HYP.Model(verbose=verbose)
     (c, A, b, G, h, cone) = build_namedpoly(:magnetism7, 2)
     r = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem)
@@ -137,7 +137,7 @@ function _namedpoly6(; verbose, linearsystem)
     @test r.pobj ≈ -0.25 atol=1e-4 rtol=1e-4
 end
 
-function _namedpoly7(; verbose, linearsystem)
+function namedpoly7(; verbose, linearsystem)
     mdl = HYP.Model(verbose=verbose)
     (c, A, b, G, h, cone) = build_namedpoly(:motzkin, 7)
     r = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem)
@@ -146,7 +146,7 @@ function _namedpoly7(; verbose, linearsystem)
     @test r.pobj ≈ 0 atol=1e-4 rtol=1e-4
 end
 
-function _namedpoly8(; verbose, linearsystem)
+function namedpoly8(; verbose, linearsystem)
     mdl = HYP.Model(verbose=verbose)
     (c, A, b, G, h, cone) = build_namedpoly(:reactiondiffusion, 4)
     r = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem)
@@ -155,7 +155,7 @@ function _namedpoly8(; verbose, linearsystem)
     @test r.pobj ≈ -36.71269068 atol=1e-4 rtol=1e-4
 end
 
-function _namedpoly9(; verbose, linearsystem)
+function namedpoly9(; verbose, linearsystem)
     mdl = HYP.Model(verbose=verbose)
     (c, A, b, G, h, cone) = build_namedpoly(:robinson, 8)
     r = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem)
@@ -164,7 +164,7 @@ function _namedpoly9(; verbose, linearsystem)
     @test r.pobj ≈ 0.814814 atol=1e-4 rtol=1e-4
 end
 
-function _namedpoly10(; verbose, linearsystem)
+function namedpoly10(; verbose, linearsystem)
     mdl = HYP.Model(verbose=verbose, tolfeas=2e-10)
     (c, A, b, G, h, cone) = build_namedpoly(:rosenbrock, 5)
     r = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem, atol=1e-3)
@@ -173,7 +173,7 @@ function _namedpoly10(; verbose, linearsystem)
     @test r.pobj ≈ 0 atol=1e-3 rtol=1e-3
 end
 
-function _namedpoly11(; verbose, linearsystem)
+function namedpoly11(; verbose, linearsystem)
     mdl = HYP.Model(verbose=verbose, tolfeas=1e-10)
     (c, A, b, G, h, cone) = build_namedpoly(:schwefel, 4)
     r = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem, atol=1e-3)
@@ -196,7 +196,7 @@ function solveandcheck_JuMP(mdl, truemin)
     @test pobj ≈ truemin atol=1e-4 rtol=1e-4
 end
 
-function _namedpoly1_JuMP()
+function namedpoly1_JuMP()
     # the Heart polynomial in a box
     (x, f, dom, truemin) = getpolydata(:heart)
     # WSOS formulation
@@ -204,7 +204,7 @@ function _namedpoly1_JuMP()
     solveandcheck_JuMP(mdl, truemin)
 end
 
-function _namedpoly2_JuMP()
+function namedpoly2_JuMP()
     # the Schwefel polynomial in a box
     (x, f, dom, truemin) = getpolydata(:schwefel)
     # WSOS formulation
@@ -215,7 +215,7 @@ function _namedpoly2_JuMP()
     # solveandcheck_JuMP(mdl, truemin)
 end
 
-function _namedpoly3_JuMP()
+function namedpoly3_JuMP()
     # the Magnetism polynomial in a ball
     (x, f, dom, truemin) = getpolydata(:magnetism7_ball)
     # WSOS formulation
@@ -226,7 +226,7 @@ function _namedpoly3_JuMP()
     # solveandcheck_JuMP(mdl, truemin)
 end
 
-function _namedpoly4_JuMP()
+function namedpoly4_JuMP()
     # the Motzkin polynomial in an ellipsoid containing two local minima in opposite orthants
     (x, f, dom, truemin) = getpolydata(:motzkin_ellipsoid)
     # WSOS formulation
@@ -237,7 +237,7 @@ function _namedpoly4_JuMP()
     # solveandcheck_JuMP(mdl, truemin)
 end
 
-function _namedpoly5_JuMP()
+function namedpoly5_JuMP()
     (x, f, dom, truemin) = getpolydata(:caprasse)
     # WSOS formulation
     mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=4)
@@ -247,7 +247,7 @@ function _namedpoly5_JuMP()
     # solveandcheck_JuMP(mdl, truemin)
 end
 
-function _namedpoly6_JuMP()
+function namedpoly6_JuMP()
     (x, f, dom, truemin) = getpolydata(:goldsteinprice)
     # WSOS formulation
     mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=7)
@@ -257,7 +257,7 @@ function _namedpoly6_JuMP()
     # solveandcheck_JuMP(mdl, truemin)
 end
 
-function _namedpoly7_JuMP()
+function namedpoly7_JuMP()
     (x, f, dom, truemin) = getpolydata(:lotkavolterra)
     # WSOS formulation
     mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=3)
@@ -267,7 +267,7 @@ function _namedpoly7_JuMP()
     # solveandcheck_JuMP(mdl, truemin)
 end
 
-function _namedpoly8_JuMP()
+function namedpoly8_JuMP()
     (x, f, dom, truemin) = getpolydata(:robinson)
     # WSOS formulation
     mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=8)
@@ -277,7 +277,7 @@ function _namedpoly8_JuMP()
     # solveandcheck_JuMP(mdl, truemin)
 end
 
-function _namedpoly9_JuMP()
+function namedpoly9_JuMP()
     (x, f, dom, truemin) = getpolydata(:reactiondiffusion_ball)
     # WSOS formulation
     mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=3)
@@ -287,7 +287,7 @@ function _namedpoly9_JuMP()
     # solveandcheck_JuMP(mdl, truemin)
 end
 
-function _namedpoly10_JuMP()
+function namedpoly10_JuMP()
     (x, f, dom, truemin) = getpolydata(:rosenbrock)
     # WSOS formulation
     mdl = build_JuMP_namedpoly_WSOS(x, f, dom, d=4)
@@ -297,7 +297,7 @@ function _namedpoly10_JuMP()
     # solveandcheck_JuMP(mdl, truemin)
 end
 
-function _shapeconregr1_JuMP()
+function shapeconregr1_JuMP()
     (n, deg, npoints, signal_ratio, f) = (2, 3, 100, 0.0, x -> exp(norm(x)))
     (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
     (mdl, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_leastsqobj=false)
@@ -305,7 +305,7 @@ function _shapeconregr1_JuMP()
     solveandcheck_JuMP(mdl, truemin)
 end
 
-function _shapeconregr2_JuMP()
+function shapeconregr2_JuMP()
     (n, deg, npoints, signal_ratio, f) = (2, 3, 100, 0.0, x -> sum(x.^3))
     (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
     (mdl, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_leastsqobj=false)
@@ -316,7 +316,7 @@ function _shapeconregr2_JuMP()
     solveandcheck_JuMP(mdl, truemin)
 end
 
-function _shapeconregr3_JuMP()
+function shapeconregr3_JuMP()
     (n, deg, npoints, signal_ratio, f) = (2, 3, 100, 0.0, x -> sum(x.^4))
     (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
     (mdl, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_leastsqobj=false)
@@ -324,7 +324,7 @@ function _shapeconregr3_JuMP()
     solveandcheck_JuMP(mdl, truemin)
 end
 
-function _shapeconregr4_JuMP()
+function shapeconregr4_JuMP()
     (n, deg, npoints, signal_ratio, f) = (2, 3, 100, 50.0, x -> sum(x.^3))
     (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
     (mdl, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_leastsqobj=false)
@@ -332,7 +332,7 @@ function _shapeconregr4_JuMP()
     solveandcheck_JuMP(mdl, truemin)
 end
 
-function _shapeconregr5_JuMP()
+function shapeconregr5_JuMP()
     (n, deg, npoints, signal_ratio, f) = (2, 3, 100, 50.0, x -> sum(x.^4))
     (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
     (mdl, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_leastsqobj=false)
@@ -340,7 +340,7 @@ function _shapeconregr5_JuMP()
     solveandcheck_JuMP(mdl, truemin)
 end
 
-function _shapeconregr6_JuMP()
+function shapeconregr6_JuMP()
     (n, deg, npoints, signal_ratio, f) = (2, 3, 100, 0.0, x -> exp(norm(x)))
     (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
     (mdl, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_leastsqobj=true)
@@ -348,7 +348,7 @@ function _shapeconregr6_JuMP()
     solveandcheck_JuMP(mdl, truemin)
 end
 
-function _shapeconregr7_JuMP()
+function shapeconregr7_JuMP()
     (n, deg, npoints, signal_ratio, f) = (2, 3, 100, 50.0, x -> sum(x.^4))
     (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
     (mdl, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_leastsqobj=true)
@@ -356,7 +356,7 @@ function _shapeconregr7_JuMP()
     solveandcheck_JuMP(mdl, truemin)
 end
 
-function _shapeconregr8_JuMP()
+function shapeconregr8_JuMP()
     (n, deg, npoints, signal_ratio, f) = (2, 4, 100, 0.0, x -> -inv(1 + exp(-10.0 * norm(x))))
     (X, y) = generateregrdata(f, 0.0, 1.0, n, npoints, signal_ratio=signal_ratio)
     shapedata = ShapeData(MU.Box(zeros(n), ones(n)), MU.Box(zeros(n), ones(n)), ones(n), 1)
@@ -365,7 +365,7 @@ function _shapeconregr8_JuMP()
     solveandcheck_JuMP(mdl, truemin)
 end
 
-function _shapeconregr9_JuMP()
+function shapeconregr9_JuMP()
     (n, deg, npoints, signal_ratio, f) = (2, 4, 100, 10.0, x -> -inv(1 + exp(-10.0 * norm(x))))
     (X, y) = generateregrdata(f, 0.0, 1.0, n, npoints, signal_ratio=signal_ratio)
     shapedata = ShapeData(MU.Box(zeros(n), ones(n)), MU.Box(zeros(n), ones(n)), ones(n), 1)
@@ -374,7 +374,7 @@ function _shapeconregr9_JuMP()
     solveandcheck_JuMP(mdl, truemin)
 end
 
-function _shapeconregr10_JuMP()
+function shapeconregr10_JuMP()
     (n, deg, npoints, signal_ratio, f) = (2, 4, 100, 0.0, x -> exp(norm(x)))
     (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
     (mdl, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_leastsqobj=true)
@@ -382,7 +382,7 @@ function _shapeconregr10_JuMP()
     solveandcheck_JuMP(mdl, truemin)
 end
 
-function _shapeconregr11_JuMP()
+function shapeconregr11_JuMP()
     (n, deg, npoints, signal_ratio, f) = (2, 5, 100, 10.0, x -> exp(norm(x)))
     (X, y) = generateregrdata(f, 0.5, 2.0, n, npoints, signal_ratio=signal_ratio)
     shapedata = ShapeData(MU.Box(0.5*ones(n), 2*ones(n)), MU.Box(0.5*ones(n), 2*ones(n)), ones(n), 1)
@@ -391,7 +391,7 @@ function _shapeconregr11_JuMP()
     solveandcheck_JuMP(mdl, truemin)
 end
 
-function _shapeconregr12_JuMP()
+function shapeconregr12_JuMP()
     (n, deg, npoints, signal_ratio, f) = (2, 5, 100, 10.0, x -> exp(norm(x)))
     (X, y) = generateregrdata(f, 0.5, 2.0, n, npoints, signal_ratio=signal_ratio)
     shapedata = ShapeData(MU.Box(0.5*ones(n), 2*ones(n)), MU.Box(0.5*ones(n), 2*ones(n)), ones(n), 1)
@@ -400,7 +400,7 @@ function _shapeconregr12_JuMP()
     solveandcheck_JuMP(mdl, truemin)
 end
 
-function _shapeconregr13_JuMP()
+function shapeconregr13_JuMP()
     (n, deg, npoints, signal_ratio, f) = (2, 6, 100, 1.0, x -> exp(norm(x)))
     (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
     (mdl, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_leastsqobj=false)
@@ -408,14 +408,14 @@ function _shapeconregr13_JuMP()
     solveandcheck_JuMP(mdl, truemin)
 end
 
-function _shapeconregr14_JuMP() # out of memory error when converting sparse to dense in MOI conversion
+function shapeconregr14_JuMP() # out of memory error when converting sparse to dense in MOI conversion
     (n, deg, npoints, signal_ratio, f) = (5, 5, 1000, 0.0, x -> exp(norm(x)))
     (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
     (mdl, p) = build_shapeconregr_PSD(X, y, deg, ShapeData(n), use_leastsqobj=true, usedense=true)
     JuMP.optimize!(mdl)
 end
 
-function _shapeconregr15_JuMP() # out of memory error during preprocessing
+function shapeconregr15_JuMP() # out of memory error during preprocessing
     (n, deg, npoints, signal_ratio, f) = (5, 5, 1000, 0.0, x -> exp(norm(x)))
     (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
     (mdl, p) = build_shapeconregr_PSD(X, y, deg, ShapeData(n), use_leastsqobj=true, usedense=false)

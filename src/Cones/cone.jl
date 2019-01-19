@@ -39,7 +39,7 @@ function loadpnt!(cone::Cone, ts::Vector{Float64}, tz::Vector{Float64})
         (v1, v2) = (cone.prmtvs[k].usedual ? (ts, tz) : (tz, ts))
         loadpnt_prmtv!(cone.prmtvs[k], view(v2, cone.idxs[k]))
     end
-    return nothing
+    return
 end
 
 incone(cone::Cone, scal::Float64) = all(incone_prmtv(cone.prmtvs[k], scal) for k in eachindex(cone.prmtvs))

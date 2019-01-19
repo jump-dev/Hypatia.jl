@@ -162,7 +162,7 @@ function check_data(
         error("dimension of cone is not consistent with number of rows in G and h")
     end
 
-    return nothing
+    return
 end
 
 # verify problem data and load into model object

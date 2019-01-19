@@ -514,7 +514,7 @@ function MOI.optimize!(opt::Optimizer)
     opt.constrprimcone += opt.s
     opt.z[opt.intervalidxs] .*= opt.intervalscales
 
-    return nothing
+    return
 end
 
 # function MOI.free!(opt::Optimizer) # TODO call gc on opt.mdl?

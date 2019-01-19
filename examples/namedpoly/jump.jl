@@ -6,7 +6,7 @@ see description in examples/namedpoly/native.jl
 
 using Random
 using Hypatia
-using JuMP
+import JuMP
 import MathOptInterface
 MOI = MathOptInterface
 using MultivariatePolynomials
@@ -106,7 +106,7 @@ function run_JuMP_namedpoly(use_wsos::Bool; primal_wsos::Bool=false)
     @test pobj ≈ dobj atol=1e-4 rtol=1e-4
     @test pobj ≈ truemin atol=1e-4 rtol=1e-4
 
-    return nothing
+    return
 end
 
 run_JuMP_namedpoly_PSD() = run_JuMP_namedpoly(false)

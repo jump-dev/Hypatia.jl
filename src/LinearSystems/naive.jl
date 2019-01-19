@@ -105,7 +105,7 @@ end
 #         rhs_tz = rhs[L.tzk:L.tkk-1]
 #     end
 #
-#     return nothing
+#     return
 # end
 
 # solve system for x, y, z, kap, s, tau

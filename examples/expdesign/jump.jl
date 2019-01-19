@@ -10,9 +10,9 @@ where np is a vector of variables representing the number of experiment p to run
 =#
 
 using Hypatia
-using MathOptInterface
+import MathOptInterface
 MOI = MathOptInterface
-using JuMP
+import JuMP
 using Random
 using Test
 
@@ -70,5 +70,5 @@ function run_JuMP_expdesign(;rseed::Int=1)
     @test sum(npval) ≈ n atol=1e-4 rtol=1e-4
     @test all(-1e-4 .<= npval .<= nmax + 1e-4)
 
-    return nothing
+    return
 end

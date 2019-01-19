@@ -28,7 +28,7 @@ mutable struct WSOSPolyInterpMat <: PrimitiveCone
         end
         prmtv = new()
         prmtv.usedual = !isdual # using dual barrier
-        dim = u * div(r * (r+1), 2)
+        dim = u * div(r * (r + 1), 2)
         prmtv.dim = dim
         prmtv.r = r
         prmtv.u = u
@@ -46,7 +46,7 @@ end
 # calculate barrier value
 function barfun(pnt, ipwt::Vector{Matrix{Float64}}, R::Int, U::Int, calc_barval::Bool)
     barval = 0.0
-    
+
     for ipwtj in ipwt
         L = size(ipwtj, 2)
         mat = similar(pnt, L*R, L*R)
@@ -74,7 +74,7 @@ function barfun(pnt, ipwt::Vector{Matrix{Float64}}, R::Int, U::Int, calc_barval:
             barval -= logdet(F)
         end
     end
-    
+
     return barval
 end
 

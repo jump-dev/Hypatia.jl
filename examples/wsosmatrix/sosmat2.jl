@@ -6,8 +6,8 @@ Verifies that a given polynomial matrix is not a Sum-of-Squares matrix
 See Choi, M. D., "Positive semidefinite biquadratic forms", Linear Algebra and its Applications, 1975, 12(2), 95-100
 =#
 
-using JuMP
-using MathOptInterface
+import JuMP
+import MathOptInterface
 MOI = MathOptInterface
 using Hypatia
 using MultivariatePolynomials
@@ -21,7 +21,7 @@ function run_JuMP_sosmat2(use_matrixwsos::Bool, use_dual::Bool)
     @polyvar x y z
     C = [x^2+2y^2 -x*y -x*z; -x*y y^2+2z^2 -y*z; -x*z -y*z z^2+2x^2] .* (x*y*z)^0
     dom = Hypatia.FreeDomain(3)
-    d = div(maximum(DynamicPolynomials.maxdegree.(C)), 2)
+    d = div(maximum(DynamicPolynomials.maxdegree.(C)) + 1, 2)
 
     model = Model(with_optimizer(Hypatia.Optimizer, verbose=true, tolabsopt=1e-6, tolrelopt=1e-6, tolfeas=1e-6))
 

@@ -14,9 +14,9 @@ See e.g. Chapter 8 of thesis by G. Hall (2018).
 
 using Random
 import Distributions
-using MathOptInterface
+import MathOptInterface
 MOI = MathOptInterface
-using JuMP
+import JuMP
 using Hypatia
 using MultivariatePolynomials
 using DynamicPolynomials
@@ -101,7 +101,7 @@ function build_shapeconregr_PSD(
     usedense::Bool = true,
     )
     n = size(X, 2)
-    d = div(r+1, 2)
+    d = div(r + 1, 2)
 
     model = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true, usedense=usedense, linearsystem=Hypatia.QRSymm))
     (x, p) = add_loss_and_polys!(model, X, y, r, use_leastsqobj)
@@ -136,7 +136,7 @@ function build_shapeconregr_WSOS(
     usedense::Bool = true,
     sample::Bool = true,
     )
-    d = div(r+1, 2)
+    d = div(r + 1, 2)
     n = size(X, 2)
 
     (mono_U, mono_pts, mono_P0, mono_PWts, _) = Hypatia.interpolate(sd.mono_dom, d, sample=sample, sample_factor=50)

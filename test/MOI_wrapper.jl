@@ -2,7 +2,7 @@
 Copyright 2018, Chris Coey and contributors
 =#
 
-using MathOptInterface
+import MathOptInterface
 MOI = MathOptInterface
 MOIT = MOI.Test
 MOIB = MOI.Bridges
@@ -75,5 +75,5 @@ function testmoi(; verbose, linearsystem, usedense)
     @testset "conic tests" begin
         MOIT.contconictest(MOIB.SquarePSD{Float64}(MOIB.RootDet{Float64}(optimizer)), config, conic_exclude)
     end
-    return nothing
+    return
 end

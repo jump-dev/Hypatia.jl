@@ -389,7 +389,7 @@ function solve!(mdl::Model)
 
     mdl.verbose && println("\nstatus is $(mdl.status) after $iter iterations and $(trunc(mdl.solvetime, digits=3)) seconds\n")
 
-    return nothing
+    return
 end
 
 # get neighborhood parameters depending on magnitude of barrier parameter and maximum number of correction steps

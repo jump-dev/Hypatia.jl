@@ -4,8 +4,8 @@ Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 test whether a given matrix has a SOS decomposition, and use this procedure to check whether a polynomial is globally convex
 =#
 
-using JuMP
-using MathOptInterface
+import JuMP
+import MathOptInterface
 MOI = MathOptInterface
 using Hypatia
 using MultivariatePolynomials
@@ -27,7 +27,7 @@ function run_JuMP_sosmat4_matrix(
 
     if use_wsos
         n = nvariables(x)
-        d = div(maximum(maxdegree.(H)), 2)
+        d = div(maximum(maxdegree.(H)) + 1, 2)
         dom = Hypatia.FreeDomain(n)
         (U, pts, P0, _, _) = Hypatia.interpolate(dom, d, sample_factor=20, sample=true)
         mat_wsos_cone = WSOSPolyInterpMatCone(n, U, [P0])
