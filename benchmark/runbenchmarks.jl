@@ -4,12 +4,12 @@ Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 TODO readme for benchmarks and describe ARGS for running on command line
 =#
 
-using Hypatia
-using MathOptFormat
+import Hypatia
+import MathOptFormat
 import MathOptInterface
-MOI = MathOptInterface
-using GZip
-using Dates
+const MOI = MathOptInterface
+import GZip
+import Dates
 
 # parse command line arguments
 println()
@@ -55,7 +55,7 @@ end
 # Hypatia options
 verbose = true
 timelimit = 1e2
-linearsystem = Hypatia.QRSymm
+linearsystem = Hypatia.LinearSystems.QRSymm
 usedense = false
 
 MOI.Utilities.@model(HypatiaModelData,

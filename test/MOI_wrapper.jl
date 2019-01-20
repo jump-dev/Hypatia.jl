@@ -3,7 +3,7 @@ Copyright 2018, Chris Coey and contributors
 =#
 
 import MathOptInterface
-MOI = MathOptInterface
+const MOI = MathOptInterface
 MOIT = MOI.Test
 MOIB = MOI.Bridges
 MOIU = MOI.Utilities

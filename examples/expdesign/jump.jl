@@ -6,15 +6,16 @@ adapted from Boyd and Vandenberghe, "Convex Optimization", section 7.5
   maximize    logdet(V*diagm(np)*V')
   subject to  sum(np) == n
               0 .<= np .<= nmax
-where np is a vector of variables representing the number of experiment p to run (fractional), and the columns of V are the vectors representing each experiment
+where np is a vector of variables representing the number of experiment p to run (fractional),
+and the columns of V are the vectors representing each experiment
 =#
 
-using Hypatia
+import Hypatia
 import MathOptInterface
-MOI = MathOptInterface
+const MOI = MathOptInterface
 import JuMP
 using LinearAlgebra
-using Random
+import Random
 using Test
 
 function build_JuMP_expdesign(

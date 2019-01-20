@@ -1,47 +1,46 @@
 #=
 Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 
-Given data (xᵢ, yᵢ), find a polynomial p to solve
-    minimize ∑ᵢℓ(p(xᵢ), yᵢ)
-    subject to ρⱼ × dᵏp/dtⱼᵏ ≥ 0 ∀ t ∈ D
+given data (xᵢ, yᵢ), find a polynomial p to solve
+    min ∑ᵢℓ(p(xᵢ), yᵢ)
+    ρⱼ × dᵏp/dtⱼᵏ ≥ 0 ∀ t ∈ D
 where
     - dᵏp/dtⱼᵏ is the kᵗʰ derivative of p in direction j,
     - ρⱼ determines the desired sign of the derivative,
     - D is a domain such as a box or an ellipsoid,
     - ℓ is a convex loss function.
-See e.g. Chapter 8 of thesis by G. Hall (2018).
+see e.g. Chapter 8 of thesis by G. Hall (2018)
 =#
 
-using Random
-import Distributions
+import Hypatia
+const HYP = Hypatia
+const CO = HYP.Cones
+const LS = HYP.LinearSystems
+const MU = HYP.ModelUtilities
+
 import MathOptInterface
-MOI = MathOptInterface
+const MOI = MathOptInterface
 import JuMP
-using Hypatia
-using MultivariatePolynomials
-using DynamicPolynomials
-using SumOfSquares
-using PolyJuMP
+import MultivariatePolynomials
+import DynamicPolynomials
+import SumOfSquares
+import PolyJuMP
+import Random
+import Distributions
 using Test
-include(joinpath(dirname(@__DIR__), "utils", "semialgebraicsets.jl"))
 
 const rt2 = sqrt(2)
 
-
 # a description of the shape of the regressor
 mutable struct ShapeData
-    mono_dom::Hypatia.Domain
-    conv_dom::Hypatia.Domain
+    mono_dom::MU.Domain
+    conv_dom::MU.Domain
     mono_profile::Vector{Int}
     conv_profile::Int
 end
-
 ShapeData(n::Int) = ShapeData(
-    Hypatia.Box(-ones(n), ones(n)),
-    Hypatia.Box(-ones(n), ones(n)),
-    ones(Int, n),
-    1,
-    )
+    MU.Box(-ones(n), ones(n)), MU.Box(-ones(n), ones(n)),
+    ones(Int, n), 1)
 
 # problem data
 function generateregrdata(
@@ -56,35 +55,33 @@ function generateregrdata(
     @assert 0.0 <= signal_ratio < Inf
     Random.seed!(rseed)
     X = rand(Distributions.Uniform(xmin, xmax), npoints, n)
-    y = [func(X[p,:]) for p in 1:npoints]
-
+    y = [func(X[p, :]) for p in 1:npoints]
     if !iszero(signal_ratio)
         noise = rand(Distributions.Normal(), npoints)
-        noise .*= norm(y)/sqrt(signal_ratio)/norm(noise)
+        noise .*= norm(y) / sqrt(signal_ratio) / norm(noise)
         y .+= noise
     end
-
     return (X, y)
 end
 
 function add_loss_and_polys!(
-    model::Model,
+    model::JuMP.Model,
     X::Matrix{Float64},
     y::Vector{Float64},
     r::Int,
     use_leastsqobj::Bool
     )
     (npoints, n) = size(X)
-    @polyvar x[1:n]
-    @variable(model, p, PolyJuMP.Poly(monomials(x, 0:r)))
+    DynamicPolynomials.@polyvar x[1:n]
+    JuMP.@variable(model, p, PolyJuMP.Poly(DynamicPolynomials.monomials(x, 0:r)))
     if use_leastsqobj
-        @variable(model, z)
-        @objective(model, Min, z / npoints)
-        @constraint(model, [z, [y[i] - p(X[i, :]) for i in 1:npoints]...] in MOI.SecondOrderCone(1+npoints))
+        JuMP.@variable(model, z)
+        JuMP.@objective(model, Min, z / npoints)
+        JuMP.@constraint(model, [z, [y[i] - p(X[i, :]) for i in 1:npoints]...] in MOI.SecondOrderCone(1+npoints))
      else
-        @variable(model, z[1:npoints])
-        @objective(model, Min, sum(z) / npoints)
-        @constraints(model, begin
+        JuMP.@variable(model, z[1:npoints])
+        JuMP.@objective(model, Min, sum(z) / npoints)
+        JuMP.@constraints(model, begin
             [i in 1:npoints], z[i] >= y[i] - p(X[i, :])
             [i in 1:npoints], z[i] >= -y[i] + p(X[i, :])
         end)
@@ -103,25 +100,25 @@ function build_shapeconregr_PSD(
     n = size(X, 2)
     d = div(r + 1, 2)
 
-    model = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true, usedense=usedense, linearsystem=Hypatia.QRSymm))
+    model = SumOfSquares.SOSModel(JuMP.with_optimizer(HYP.Optimizer, verbose=true, usedense=usedense, linearsystem=LS.QRSymm))
     (x, p) = add_loss_and_polys!(model, X, y, r, use_leastsqobj)
 
-    mono_bss = get_domain_inequalities(sd.mono_dom, x)
-    conv_bss = get_domain_inequalities(sd.conv_dom, x)
+    mono_bss = MU.get_domain_inequalities(sd.mono_dom, x)
+    conv_bss = MU.get_domain_inequalities(sd.conv_dom, x)
 
     # monotonicity
-    dp = [DynamicPolynomials.differentiate(p, x[i]) for i in 1:n]
     for j in 1:n
         if !iszero(sd.mono_profile[j])
-            @constraint(model, sd.mono_profile[j] * dp[j] >= 0, domain=mono_bss)
+            dpj = DynamicPolynomials.differentiate(p, x[j])
+            JuMP.@constraint(model, sd.mono_profile[j] * dpj >= 0, domain=mono_bss)
         end
     end
 
     # convexity
     if !iszero(sd.conv_profile)
         # TODO think about what it means if wsos polynomials have degree > 2
-        Hp = [DynamicPolynomials.differentiate(dp[i], x[j]) for i in 1:n, j in 1:n]
-        @SDconstraint(model, sd.conv_profile * Hp >= 0, domain=conv_bss)
+        Hp = DynamicPolynomials.differentiate(p, x, 2)
+        JuMP.@SDconstraint(model, sd.conv_profile * Hp >= 0, domain=conv_bss)
     end
 
     return (model, p)
@@ -139,26 +136,26 @@ function build_shapeconregr_WSOS(
     d = div(r + 1, 2)
     n = size(X, 2)
 
-    (mono_U, mono_pts, mono_P0, mono_PWts, _) = Hypatia.interpolate(sd.mono_dom, d, sample=sample, sample_factor=50)
-    (conv_U, conv_pts, conv_P0, conv_PWts, _) = Hypatia.interpolate(sd.conv_dom, d-1, sample=sample, sample_factor=50)
-    mono_wsos_cone = WSOSPolyInterpCone(mono_U, [mono_P0, mono_PWts...])
-    conv_wsos_cone = WSOSPolyInterpMatCone(n, conv_U, [conv_P0, conv_PWts...])
+    (mono_U, mono_pts, mono_P0, mono_PWts, _) = MU.interpolate(sd.mono_dom, d, sample=sample, sample_factor=50)
+    (conv_U, conv_pts, conv_P0, conv_PWts, _) = MU.interpolate(sd.conv_dom, d - 1, sample=sample, sample_factor=50)
+    mono_wsos_cone = HYP.WSOSPolyInterpCone(mono_U, [mono_P0, mono_PWts...])
+    conv_wsos_cone = HYP.WSOSPolyInterpMatCone(n, conv_U, [conv_P0, conv_PWts...])
 
-    model = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true, usedense=usedense, linearsystem=Hypatia.QRSymm, tolabsopt=1e-6, tolrelopt=1e-5, tolfeas=1e-6))
+    model = SumOfSquares.SOSModel(JuMP.with_optimizer(HYP.Optimizer, verbose=true, usedense=usedense, linearsystem=LS.QRSymm, tolabsopt=1e-6, tolrelopt=1e-5, tolfeas=1e-6))
     (x, p) = add_loss_and_polys!(model, X, y, r, use_leastsqobj)
 
     # monotonicity
-    dp = [DynamicPolynomials.differentiate(p, x[j]) for j in 1:n]
     for j in 1:n
         if !iszero(sd.mono_profile[j])
-            @constraint(model, [sd.mono_profile[j] * dp[j](mono_pts[u, :]) for u in 1:mono_U] in mono_wsos_cone)
+            dpj = DynamicPolynomials.differentiate(p, x[j])
+            JuMP.@constraint(model, [sd.mono_profile[j] * dpj(mono_pts[u, :]) for u in 1:mono_U] in mono_wsos_cone)
         end
     end
 
     # convexity
     if !iszero(sd.conv_profile)
-        Hp = [DynamicPolynomials.differentiate(dp[i], x[j]) for i in 1:n, j in 1:n]
-        @constraint(model, [sd.conv_profile * Hp[i,j](conv_pts[u, :]) * (i == j ? 1.0 : rt2) for i in 1:n for j in 1:i for u in 1:conv_U] in conv_wsos_cone)
+        Hp = DynamicPolynomials.differentiate(p, x, 2)
+        JuMP.@constraint(model, [sd.conv_profile * Hp[i,j](conv_pts[u, :]) * (i == j ? 1.0 : rt2) for i in 1:n for j in 1:i for u in 1:conv_U] in conv_wsos_cone)
     end
 
     return (model, p)

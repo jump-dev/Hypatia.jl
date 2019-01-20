@@ -4,7 +4,7 @@ Copyright 2018, Chris Coey and contributors
 see description in examples/envelope/native.jl
 =#
 
-using Hypatia
+import Hypatia
 const HYP = Hypatia
 const CO = HYP.Cones
 const LS = HYP.LinearSystems
@@ -14,7 +14,7 @@ import MathOptInterface
 const MOI = MathOptInterface
 import JuMP
 using LinearAlgebra
-using Random
+import Random
 using Test
 
 function build_JuMP_envelope(

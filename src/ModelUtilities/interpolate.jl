@@ -83,12 +83,12 @@ end
 
 
 function interp_sample(dom::SemiFreeDomain, npts::Int)
-    return hcat(interp_sample(dom.sampling_region, npts), interp_sample(dom.sampling_region, npts))
+    return hcat(interp_sample(dom.restricted_halfregion, npts), interp_sample(dom.restricted_halfregion, npts))
 end
 
 function get_weights(dom::SemiFreeDomain, pts::Matrix{Float64})
     count = div(size(pts, 2), 2)
-    return get_weights(dom.sampling_region, view(pts, : ,1:count))
+    return get_weights(dom.restricted_halfregion, view(pts, : ,1:count))
 end
 
 
