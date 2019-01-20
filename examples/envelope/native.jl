@@ -8,7 +8,7 @@ D. Papp and S. Yildiz. Sum-of-squares optimization without semidefinite programm
 available at https://arxiv.org/abs/1712.01792
 =#
 
-using Hypatia
+import Hypatia
 const HYP = Hypatia
 const CO = HYP.Cones
 const LS = HYP.LinearSystems
@@ -17,7 +17,7 @@ const MU = HYP.ModelUtilities
 using LinearAlgebra
 using SparseArrays
 using DelimitedFiles
-using Random
+import Random
 using Test
 
 function build_envelope(

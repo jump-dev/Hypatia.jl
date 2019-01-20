@@ -2,6 +2,67 @@
 Copyright 2018, Chris Coey and contributors
 =#
 
+# TODO make first part a native interface function eventually
+# TODO maybe build a new high-level model struct; the current model struct is low-level
+function solveandcheck(mdl, c, A, b, G, h, cone, linearsystem; atol=1e-4, rtol=1e-4)
+    HYP.check_data(c, A, b, G, h, cone)
+    if linearsystem == LS.QRSymm
+        (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = HYP.preprocess_data(c, A, b, G, useQR=true)
+        L = LS.QRSymm(c1, A1, b1, G1, h, cone, Q2, RiQ1)
+    elseif linearsystem == LS.Naive
+        (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = HYP.preprocess_data(c, A, b, G, useQR=false)
+        L = LS.Naive(c1, A1, b1, G1, h, cone)
+    else
+        error("linear system cache type $linearsystem is not recognized")
+    end
+    HYP.load_data!(mdl, c1, A1, b1, G1, h, cone, L)
+    HYP.solve!(mdl)
+
+    # construct solution
+    x = zeros(length(c))
+    x[dukeep] = HYP.get_x(mdl)
+    y = zeros(length(b))
+    y[prkeep] = HYP.get_y(mdl)
+    s = HYP.get_s(mdl)
+    z = HYP.get_z(mdl)
+    pobj = HYP.get_pobj(mdl)
+    dobj = HYP.get_dobj(mdl)
+    status = HYP.get_status(mdl)
+    stime = HYP.get_solvetime(mdl)
+    niters = HYP.get_niters(mdl)
+
+    # check conic certificates are valid; conditions are described by CVXOPT at https://github.com/cvxopt/cvxopt/blob/master/src/python/coneprog.py
+    # CO.loadpnt!(cone, s, z)
+    if status == :Optimal
+        # @test HYP.incone(cone)
+        @test pobj ≈ dobj atol=atol rtol=rtol
+        @test A*x ≈ b atol=atol rtol=rtol
+        @test G*x + s ≈ h atol=atol rtol=rtol
+        @test G'*z + A'*y ≈ -c atol=atol rtol=rtol
+        @test dot(s, z) ≈ 0.0 atol=atol rtol=rtol
+        @test dot(c, x) ≈ pobj atol=1e-8 rtol=1e-8
+        @test dot(b, y) + dot(h, z) ≈ -dobj atol=1e-8 rtol=1e-8
+    elseif status == :PrimalInfeasible
+        # @test HYP.incone(cone)
+        @test isnan(pobj)
+        @test dobj > 0
+        @test dot(b, y) + dot(h, z) ≈ -dobj atol=1e-8 rtol=1e-8
+        @test G'*z ≈ -A'*y atol=atol rtol=rtol
+    elseif status == :DualInfeasible
+        # @test HYP.incone(cone)
+        @test isnan(dobj)
+        @test pobj < 0
+        @test dot(c, x) ≈ pobj atol=1e-8 rtol=1e-8
+        @test G*x ≈ -s atol=atol rtol=rtol
+        @test A*x ≈ zeros(length(y)) atol=atol rtol=rtol
+    elseif status == :IllPosed
+        # @test HYP.incone(cone)
+        # TODO primal vs dual ill-posed statuses and conditions
+    end
+
+    return (x=x, y=y, s=s, z=z, pobj=pobj, dobj=dobj, status=status, stime=stime, niters=niters)
+end
+
 function dimension1(; verbose, linearsystem)
     A = Matrix{Float64}(undef, 0, 2)
     b = Float64[]
@@ -738,4 +799,185 @@ function epipersumexp2(; verbose, linearsystem)
     @test r.x[1] ≈ 1 atol=1e-4 rtol=1e-4
     @test r.s[2] ≈ 1 atol=1e-4 rtol=1e-4
     @test r.s[2]*sum(exp, r.s[3:end]/r.s[2]) ≈ r.s[1] atol=1e-4 rtol=1e-4
+end
+
+
+function envelope1(; verbose, linearsystem)
+    # dense methods
+    mdl = HYP.Model(verbose=verbose)
+    (c, A, b, G, h, cone) = build_envelope(2, 5, 1, 5, use_data=true, usedense=true)
+    r = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem)
+    @test r.status == :Optimal
+    @test r.pobj ≈ 25.502777 atol=1e-4 rtol=1e-4
+    @test r.niters <= 35
+
+    # sparse methods
+    mdl = HYP.Model(verbose=verbose)
+    (c, A, b, G, h, cone) = build_envelope(2, 5, 1, 5, use_data=true, usedense=false)
+    r = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem)
+    @test r.status == :Optimal
+    @test r.pobj ≈ 25.502777 atol=1e-4 rtol=1e-4
+    @test r.niters <= 35
+end
+
+function envelope2(; verbose, linearsystem)
+    # dense methods
+    mdl = HYP.Model(verbose=verbose)
+    (c, A, b, G, h, cone) = build_envelope(2, 4, 2, 7, usedense=true)
+    rd = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem)
+    @test rd.status == :Optimal
+    @test rd.niters <= 60
+
+    # sparse methods
+    mdl = HYP.Model(verbose=verbose)
+    (c, A, b, G, h, cone) = build_envelope(2, 4, 2, 7, usedense=false)
+    rs = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem)
+    @test rs.status == :Optimal
+    @test rs.niters <= 60
+
+    @test rs.pobj ≈ rd.pobj atol=1e-4 rtol=1e-4
+end
+
+function envelope3(; verbose, linearsystem)
+    mdl = HYP.Model(verbose=verbose)
+    (c, A, b, G, h, cone) = build_envelope(2, 3, 3, 5, usedense=false)
+    r = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem)
+    @test r.status == :Optimal
+    @test r.niters <= 60
+end
+
+function envelope4(; verbose, linearsystem)
+    mdl = HYP.Model(verbose=verbose, tolrelopt=2e-8, tolabsopt=2e-8, tolfeas=1e-8)
+    (c, A, b, G, h, cone) = build_envelope(2, 2, 4, 3, usedense=false)
+    r = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem)
+    @test r.status == :Optimal
+    @test r.niters <= 55
+end
+
+function linearopt1(; verbose, linearsystem)
+    # dense methods
+    mdl = HYP.Model(verbose=verbose)
+    (c, A, b, G, h, cone) = build_linearopt(25, 50, usedense=true, tosparse=false)
+    rd = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem)
+    @test rd.status == :Optimal
+    @test rd.niters <= 35
+
+    # sparse methods
+    mdl = HYP.Model(verbose=verbose)
+    (c, A, b, G, h, cone) = build_linearopt(25, 50, usedense=true, tosparse=true)
+    rs = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem)
+    @test rs.status == :Optimal
+    @test rs.niters <= 35
+
+    @test rs.pobj ≈ rd.pobj atol=1e-4 rtol=1e-4
+end
+
+function linearopt2(; verbose, linearsystem)
+    mdl = HYP.Model(verbose=verbose, tolrelopt=2e-8, tolabsopt=2e-8, tolfeas=1e-8)
+    (c, A, b, G, h, cone) = build_linearopt(500, 1000, use_data=true, usedense=true)
+    r = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem)
+    @test r.status == :Optimal
+    @test r.niters <= 70
+    @test r.pobj ≈ 2055.807 atol=1e-4 rtol=1e-4
+end
+
+# for namedpoly tests, most optimal values are taken from https://people.sc.fsu.edu/~jburkardt/py_src/polynomials/polynomials.html
+
+function namedpoly1(; verbose, linearsystem)
+    mdl = HYP.Model(verbose=verbose)
+    (c, A, b, G, h, cone) = build_namedpoly(:butcher, 2)
+    r = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem)
+    @test r.status == :Optimal
+    @test r.niters <= 45
+    @test r.pobj ≈ -1.4393333333 atol=1e-4 rtol=1e-4
+end
+
+function namedpoly2(; verbose, linearsystem)
+    mdl = HYP.Model(verbose=verbose)
+    (c, A, b, G, h, cone) = build_namedpoly(:caprasse, 4)
+    r = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem)
+    @test r.status == :Optimal
+    @test r.niters <= 45
+    @test r.pobj ≈ -3.1800966258 atol=1e-4 rtol=1e-4
+end
+
+function namedpoly3(; verbose, linearsystem)
+    mdl = HYP.Model(verbose=verbose, tolfeas=1e-9)
+    (c, A, b, G, h, cone) = build_namedpoly(:goldsteinprice, 6)
+    r = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem, atol=2e-3)
+    @test r.status == :Optimal
+    @test r.niters <= 70
+    @test r.pobj ≈ 3 atol=1e-4 rtol=1e-4
+end
+
+function namedpoly4(; verbose, linearsystem)
+    mdl = HYP.Model(verbose=verbose)
+    (c, A, b, G, h, cone) = build_namedpoly(:heart, 2)
+    r = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem)
+    @test r.status == :Optimal
+    # @test r.niters <= 40
+    @test r.pobj ≈ -1.36775 atol=1e-4 rtol=1e-4
+end
+
+function namedpoly5(; verbose, linearsystem)
+    mdl = HYP.Model(verbose=verbose)
+    (c, A, b, G, h, cone) = build_namedpoly(:lotkavolterra, 3)
+    r = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem)
+    @test r.status == :Optimal
+    @test r.niters <= 40
+    @test r.pobj ≈ -20.8 atol=1e-4 rtol=1e-4
+end
+
+function namedpoly6(; verbose, linearsystem)
+    mdl = HYP.Model(verbose=verbose)
+    (c, A, b, G, h, cone) = build_namedpoly(:magnetism7, 2)
+    r = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem)
+    @test r.status == :Optimal
+    @test r.niters <= 35
+    @test r.pobj ≈ -0.25 atol=1e-4 rtol=1e-4
+end
+
+function namedpoly7(; verbose, linearsystem)
+    mdl = HYP.Model(verbose=verbose)
+    (c, A, b, G, h, cone) = build_namedpoly(:motzkin, 7)
+    r = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem)
+    @test r.status == :Optimal
+    @test r.niters <= 45
+    @test r.pobj ≈ 0 atol=1e-4 rtol=1e-4
+end
+
+function namedpoly8(; verbose, linearsystem)
+    mdl = HYP.Model(verbose=verbose)
+    (c, A, b, G, h, cone) = build_namedpoly(:reactiondiffusion, 4)
+    r = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem)
+    @test r.status == :Optimal
+    @test r.niters <= 40
+    @test r.pobj ≈ -36.71269068 atol=1e-4 rtol=1e-4
+end
+
+function namedpoly9(; verbose, linearsystem)
+    mdl = HYP.Model(verbose=verbose)
+    (c, A, b, G, h, cone) = build_namedpoly(:robinson, 8)
+    r = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem)
+    @test r.status == :Optimal
+    @test r.niters <= 40
+    @test r.pobj ≈ 0.814814 atol=1e-4 rtol=1e-4
+end
+
+function namedpoly10(; verbose, linearsystem)
+    mdl = HYP.Model(verbose=verbose, tolfeas=2e-10)
+    (c, A, b, G, h, cone) = build_namedpoly(:rosenbrock, 5)
+    r = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem, atol=1e-3)
+    @test r.status == :Optimal
+    @test r.niters <= 70
+    @test r.pobj ≈ 0 atol=1e-3 rtol=1e-3
+end
+
+function namedpoly11(; verbose, linearsystem)
+    mdl = HYP.Model(verbose=verbose, tolfeas=1e-10)
+    (c, A, b, G, h, cone) = build_namedpoly(:schwefel, 4)
+    r = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem, atol=1e-3)
+    @test r.status == :Optimal
+    @test r.niters <= 65
+    @test r.pobj ≈ 0 atol=1e-3 rtol=1e-3
 end

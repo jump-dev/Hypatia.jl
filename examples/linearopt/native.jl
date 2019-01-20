@@ -6,7 +6,7 @@ modified from https://github.com/dpapp-github/alfonso/blob/master/random_lp.m
 solves a simple linear optimization problem (LP) min c'x s.t. Ax = b, x >= 0
 =#
 
-using Hypatia
+import Hypatia
 const HYP = Hypatia
 const CO = HYP.Cones
 const LS = HYP.LinearSystems
@@ -14,7 +14,7 @@ const MU = HYP.ModelUtilities
 
 using SparseArrays
 using DelimitedFiles
-using Random
+import Random
 using Test
 
 function build_linearopt(
