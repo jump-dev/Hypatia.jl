@@ -8,6 +8,8 @@ module InteriorPoints
 
 using LinearAlgebra
 
+abstract type IPMSolver end
+
 abstract type InteriorPoint end
 
 

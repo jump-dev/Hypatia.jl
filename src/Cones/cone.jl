@@ -62,6 +62,7 @@ function calcg!(g::Vector{Float64}, cone::Cone)
     return g
 end
 
+# TODO does not belong in the Cone module
 # calculate neighborhood distance to central path
 function calcnbhd!(g, ts, tz, mu, cone)
     for k in eachindex(cone.prmtvs)
