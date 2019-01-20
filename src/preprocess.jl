@@ -31,7 +31,7 @@ function preprocess_data(
     AGR = AGF.R
     AGrank = 0
     for i in 1:size(AGR, 1) # TODO could replace this with rank(AF) when available for both dense and sparse
-        if abs(AGR[i,i]) > tol
+        if abs(AGR[i, i]) > tol
             AGrank += 1
         end
     end
@@ -40,18 +40,18 @@ function preprocess_data(
         if issparse(AG)
             dukeep = AGF.pcol[1:AGrank]
             AGQ1 = Matrix{Float64}(undef, p + q, AGrank)
-            AGQ1[AGF.prow,:] = AGF.Q*Matrix{Float64}(I, p + q, AGrank) # TODO could eliminate this allocation
+            AGQ1[AGF.prow, :] = AGF.Q * Matrix{Float64}(I, p + q, AGrank) # TODO could eliminate this allocation
         else
             dukeep = AGF.p[1:AGrank]
-            AGQ1 = AGF.Q*Matrix{Float64}(I, p + q, AGrank) # TODO could eliminate this allocation
+            AGQ1 = AGF.Q * Matrix{Float64}(I, p + q, AGrank) # TODO could eliminate this allocation
         end
-        AGRiQ1 = UpperTriangular(AGR[1:AGrank,1:AGrank])\AGQ1'
+        AGRiQ1 = UpperTriangular(AGR[1:AGrank, 1:AGrank]) \ AGQ1'
 
-        A1 = A[:,dukeep]
-        G1 = G[:,dukeep]
+        A1 = A[:, dukeep]
+        G1 = G[:, dukeep]
         c1 = c[dukeep]
 
-        if norm(AG'*AGRiQ1'*c1 - c, Inf) > tol
+        if norm(AG' * AGRiQ1' * c1 - c, Inf) > tol
             error("some dual equality constraints are inconsistent")
         end
 
@@ -78,7 +78,7 @@ function preprocess_data(
     AR = AF.R
     Arank = 0
     for i in 1:size(AR, 1) # TODO could replace this with rank(AF) when available for both dense and sparse
-        if abs(AR[i,i]) > tol
+        if abs(AR[i, i]) > tol
             Arank += 1
         end
     end
@@ -92,21 +92,21 @@ function preprocess_data(
     if issparse(A)
         prkeep = AF.pcol[1:Arank]
         AQ = Matrix{Float64}(undef, n, n)
-        AQ[AF.prow,:] = AF.Q*Matrix{Float64}(I, n, n) # TODO could eliminate this allocation
+        AQ[AF.prow, :] = AF.Q * Matrix{Float64}(I, n, n) # TODO could eliminate this allocation
     else
         prkeep = AF.p[1:Arank]
-        AQ = AF.Q*Matrix{Float64}(I, n, n) # TODO could eliminate this allocation
+        AQ = AF.Q * Matrix{Float64}(I, n, n) # TODO could eliminate this allocation
     end
-    AQ2 = AQ[:,Arank+1:n]
-    ARiQ1 = UpperTriangular(AR[1:Arank,1:Arank])\AQ[:,1:Arank]'
+    AQ2 = AQ[:, Arank+1:n]
+    ARiQ1 = UpperTriangular(AR[1:Arank, 1:Arank]) \ AQ[:, 1:Arank]'
 
-    A1 = A[prkeep,:]
+    A1 = A[prkeep, :]
     b1 = b[prkeep]
 
     if Arank < p
         # some dependent primal equalities, so check if they are consistent
-        x1 = ARiQ1'*b1
-        if norm(A*x1 - b, Inf) > tol
+        x1 = ARiQ1' * b1
+        if norm(A * x1 - b, Inf) > tol
             error("some primal equality constraints are inconsistent")
         end
         println("removed $(p - Arank) out of $p primal equality constraints")
@@ -114,5 +114,6 @@ function preprocess_data(
 
     A = A1
     b = b1
+
     return (c, A, b, G, prkeep, dukeep, AQ2, ARiQ1)
 end

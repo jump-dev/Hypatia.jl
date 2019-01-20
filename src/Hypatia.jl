@@ -14,9 +14,9 @@ include("LinearSystems/LinearSystems.jl")
 include("ModelUtilities/ModelUtilities.jl")
 
 # core
-include("models.jl")
 include("preprocess.jl")
-include("algorithms.jl")
+include("model.jl")
+include("solve.jl")
 
 # MathOptInterface
 import MathOptInterface

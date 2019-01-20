@@ -1,6 +1,5 @@
 #=
 Copyright 2018, Chris Coey and contributors
-Copyright 2018, David Papp, Sercan Yildiz
 =#
 
 # model object containing options, problem data, linear system cache, and solution
@@ -27,7 +26,7 @@ mutable struct Model
     b::Vector{Float64}          # equality constraint vector, size p
     G::AbstractMatrix{Float64}  # cone constraint matrix, size q*n
     h::Vector{Float64}          # cone constraint vector, size q
-    cone::Cones.Cone                  # primal constraint cone object
+    cone::Cones.Cone            # primal constraint cone object
 
     L::LinearSystems.LinearSystemSolver  # cache for linear system solves
 
@@ -99,25 +98,8 @@ function Model(;
     if maxcorrsteps < 1
         error("maxcorrsteps must be at least 1")
     end
-
     return Model(verbose, timelimit, tolrelopt, tolabsopt, tolfeas, maxiter, predlinesearch, maxpredsmallsteps, predlsmulti, corrcheck, maxcorrsteps, alphacorr, maxcorrlsiters, corrlsmulti)
 end
-
-get_status(mdl::Model) = mdl.status
-get_solvetime(mdl::Model) = mdl.solvetime
-get_niters(mdl::Model) = mdl.niters
-
-get_x(mdl::Model) = copy(mdl.x)
-get_s(mdl::Model) = copy(mdl.s)
-get_y(mdl::Model) = copy(mdl.y)
-get_z(mdl::Model) = copy(mdl.z)
-
-get_tau(mdl::Model) = mdl.tau
-get_kappa(mdl::Model) = mdl.kappa
-get_mu(mdl::Model) = mdl.mu
-
-get_pobj(mdl::Model) = dot(mdl.c, mdl.x)
-get_dobj(mdl::Model) = -dot(mdl.b, mdl.y) - dot(mdl.h, mdl.z)
 
 # check data for consistency
 function check_data(
@@ -161,7 +143,6 @@ function check_data(
     if qcone != q
         error("dimension of cone is not consistent with number of rows in G and h")
     end
-
     return
 end
 
@@ -174,9 +155,25 @@ function load_data!(
     G::AbstractMatrix{Float64},
     h::Vector{Float64},
     cone::Cones.Cone,
-    L::LinearSystems.LinearSystemSolver, # linear system solver cache (see linsyssolvers folder)
+    L::LinearSystems.LinearSystemSolver, 
     )
     (mdl.c, mdl.A, mdl.b, mdl.G, mdl.h, mdl.cone, mdl.L) = (c, A, b, G, h, cone, L)
     mdl.status = :Loaded
     return mdl
 end
+
+get_status(mdl::Model) = mdl.status
+get_solvetime(mdl::Model) = mdl.solvetime
+get_niters(mdl::Model) = mdl.niters
+
+get_x(mdl::Model) = copy(mdl.x)
+get_s(mdl::Model) = copy(mdl.s)
+get_y(mdl::Model) = copy(mdl.y)
+get_z(mdl::Model) = copy(mdl.z)
+
+get_tau(mdl::Model) = mdl.tau
+get_kappa(mdl::Model) = mdl.kappa
+get_mu(mdl::Model) = mdl.mu
+
+get_pobj(mdl::Model) = dot(mdl.c, mdl.x)
+get_dobj(mdl::Model) = -dot(mdl.b, mdl.y) - dot(mdl.h, mdl.z)
