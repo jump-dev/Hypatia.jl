@@ -118,7 +118,7 @@ function build_shapeconregr_PSD(
     if !iszero(sd.conv_profile)
         # TODO think about what it means if wsos polynomials have degree > 2
         Hp = DynamicPolynomials.differentiate(p, x, 2)
-        JuMP.@SDconstraint(model, sd.conv_profile * Hp >= 0, domain=conv_bss)
+        JuMP.@constraint(model, sd.conv_profile * Hp in JuMP.PSDCone(), domain=conv_bss)
     end
 
     return (model, p)
