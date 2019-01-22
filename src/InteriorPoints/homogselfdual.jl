@@ -1,16 +1,39 @@
 #=
 Copyright 2018, Chris Coey and contributors
 
-interior point type and functions for homogeneous self dual embedding algorithms
+interior point type and functions for algorithms based on homogeneous self dual embedding
 =#
 
 mutable struct HSDESolver <: IPMSolver
     model::Models.LinearObjConic # TODO the cone LP type model data
+    linsolver::LinearSystems.LinearSystemSolver
+
+    status::Symbol
 
     # options
-    
-end
 
+
+    # points
+    point
+    point2
+
+    # result
+    x
+    y
+    z
+    s
+    tau
+    kappa
+    mu
+
+    # solve info
+    iterations
+    solve_time
+    primal_obj
+    dual_obj
+
+
+end
 
 
 mutable struct HSDEPoint <: InteriorPoint
@@ -63,7 +86,7 @@ function solve(solver::HSDESolver)
     return
 end
 
-function check_converged(point::HSDEPoint, solver::HSDESolver)
+function check_converged(point::HSDEPoint, solver::HSDESolver, num_iters::Int)
     # TODO delete these if not so useful
     model = solver.model
     (c, A, b, G, h, cone) = (model.c, model.A, model.b, model.G, model.h, model.cone)
@@ -128,15 +151,14 @@ function check_converged(point::HSDEPoint, solver::HSDESolver)
     nres_pr = max(nres_ty * tol_res_ty, nres_tz * tol_res_tz)
     nres_du = nres_tx * tol_res_tx
 
-
+    # print iteration statistics
     if solver.verbose
-        if iszero(solver.iter)
+        if iszero(num_iters)
             @printf("\n%5s %12s %12s %9s %9s %9s %9s %9s %9s %9s\n",
                 "iter", "p_obj", "d_obj", "abs_gap", "rel_gap", "p_inf", "d_inf", "tau", "kap", "mu")
         end
-        # print iteration statistics
         @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n",
-            solver.iter, obj_pr, obj_du, gap, relgap, nres_pr, nres_du, tau, kap, mu)
+            num_iters, obj_pr, obj_du, gap, relgap, nres_pr, nres_du, tau, kap, mu)
         flush(stdout)
     end
 
