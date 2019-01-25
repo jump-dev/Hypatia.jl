@@ -12,7 +12,7 @@ TODO use the numerically safer way to evaluate LSE function
 TODO compare alternative barrier -log(u - v*sum(wi -> exp(wi/v), w)) - log(u) - log(v)
 =#
 
-mutable struct EpiPerSumExp <: PrimitiveCone
+mutable struct EpiPerSumExp <: Cone
     usedual::Bool
     dim::Int
     pnt::AbstractVector{Float64}
@@ -24,12 +24,12 @@ mutable struct EpiPerSumExp <: PrimitiveCone
     diffres
 
     function EpiPerSumExp(dim::Int, isdual::Bool)
-        prmtv = new()
-        prmtv.usedual = isdual
-        prmtv.dim = dim
-        prmtv.g = Vector{Float64}(undef, dim)
-        prmtv.H = similar(prmtv.g, dim, dim)
-        prmtv.H2 = similar(prmtv.H)
+        cone = new()
+        cone.usedual = isdual
+        cone.dim = dim
+        cone.g = Vector{Float64}(undef, dim)
+        cone.H = similar(cone.g, dim, dim)
+        cone.H2 = similar(cone.H)
         function barfun(pnt)
             u = pnt[1]
             v = pnt[2]
@@ -37,32 +37,32 @@ mutable struct EpiPerSumExp <: PrimitiveCone
             # return -log(u - v*sum(wi -> exp(wi/v), w)) - log(u) - log(v)
             return -log(log(u) - log(v) - log(sum(wi -> exp(wi/v), w))) - log(u) - 2.0*log(v) # TODO use the numerically safer way to evaluate LSE function
         end
-        prmtv.barfun = barfun
-        prmtv.diffres = DiffResults.HessianResult(prmtv.g)
-        return prmtv
+        cone.barfun = barfun
+        cone.diffres = DiffResults.HessianResult(cone.g)
+        return cone
     end
 end
 
 EpiPerSumExp(dim::Int) = EpiPerSumExp(dim, false)
 
-dimension(prmtv::EpiPerSumExp) = prmtv.dim
-barrierpar_prmtv(prmtv::EpiPerSumExp) = 3
-getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::EpiPerSumExp) = (@. arr = -log(prmtv.dim - 2); arr[1] = 2.0; arr[2] = 1.0; arr)
-loadpnt_prmtv!(prmtv::EpiPerSumExp, pnt::AbstractVector{Float64}) = (prmtv.pnt = pnt)
+dimension(cone::EpiPerSumExp) = cone.dim
+get_nu(cone::EpiPerSumExp) = 3
+set_initial_point(arr::AbstractVector{Float64}, cone::EpiPerSumExp) = (@. arr = -log(cone.dim - 2); arr[1] = 2.0; arr[2] = 1.0; arr)
+loadpnt!(cone::EpiPerSumExp, pnt::AbstractVector{Float64}) = (cone.pnt = pnt)
 
-function incone_prmtv(prmtv::EpiPerSumExp, scal::Float64)
-    pnt = prmtv.pnt
+function incone(cone::EpiPerSumExp, scal::Float64)
+    pnt = cone.pnt
     u = pnt[1]
     v = pnt[2]
-    w = view(prmtv.pnt, 3:prmtv.dim)
+    w = view(cone.pnt, 3:cone.dim)
     if u <= 0.0 || v <= 0.0 || u <= v*sum(wi -> exp(wi/v), w) # TODO use the numerically safer way to evaluate LSE function
         return false
     end
 
     # TODO check allocations, check with Jarrett if this is most efficient way to use DiffResults
-    prmtv.diffres = ForwardDiff.hessian!(prmtv.diffres, prmtv.barfun, prmtv.pnt)
-    prmtv.g .= DiffResults.gradient(prmtv.diffres)
-    prmtv.H .= DiffResults.hessian(prmtv.diffres)
+    cone.diffres = ForwardDiff.hessian!(cone.diffres, cone.barfun, cone.pnt)
+    cone.g .= DiffResults.gradient(cone.diffres)
+    cone.H .= DiffResults.hessian(cone.diffres)
 
-    return factH(prmtv)
+    return factH(cone)
 end

@@ -14,6 +14,9 @@ include("lapack.jl")
 
 import Hypatia.Cones
 
+# TODO just solve the 3x3 systems from last chapter of coneprog document,
+# with any number of columns in RHS
+
 abstract type LinearSystemSolver end
 
 include("naive.jl")

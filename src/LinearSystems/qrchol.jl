@@ -63,26 +63,26 @@ function solvelinsys4!(
 
     # TODO refactor the conversion to 3x3 system and back (start and end)
     zrhs3 = copy(zrhs)
-    for k in eachindex(cone.prmtvs)
+    for k in eachindex(cone.cones)
         sview = view(srhs, cone.idxs[k])
         zview = view(zrhs3, cone.idxs[k])
-        if cone.prmtvs[k].usedual # G*x - mu*H*z = zrhs - srhs
+        if cone.cones[k].usedual # G*x - mu*H*z = zrhs - srhs
             zview .-= sview
         else # G*x - (mu*H)\z = zrhs - (mu*H)\srhs
-            calcHiarr_prmtv!(sview, cone.prmtvs[k])
+            calcHiarr!(sview, cone.cones[k])
             @. zview -= sview / mu
         end
     end
 
     HG = Matrix{Float64}(undef, q, n)
-    for k in eachindex(cone.prmtvs)
+    for k in eachindex(cone.cones)
         Gview = view(G, cone.idxs[k], :)
         HGview = view(HG, cone.idxs[k], :)
-        if cone.prmtvs[k].usedual
-            calcHiarr_prmtv!(HGview, Gview, cone.prmtvs[k])
+        if cone.cones[k].usedual
+            calcHiarr!(HGview, Gview, cone.cones[k])
             HGview ./= mu
         else
-            calcHarr_prmtv!(HGview, Gview, cone.prmtvs[k])
+            calcHarr!(HGview, Gview, cone.cones[k])
             HGview .*= mu
         end
     end
@@ -109,14 +109,14 @@ function solvelinsys4!(
     end
 
     Hz = similar(zrhs3)
-    for k in eachindex(cone.prmtvs)
+    for k in eachindex(cone.cones)
         zview = view(zrhs3, cone.idxs[k], :)
         Hzview = view(Hz, cone.idxs[k], :)
-        if cone.prmtvs[k].usedual
-            calcHiarr_prmtv!(Hzview, zview, cone.prmtvs[k])
+        if cone.cones[k].usedual
+            calcHiarr!(Hzview, zview, cone.cones[k])
             Hzview ./= mu
         else
-            calcHarr_prmtv!(Hzview, zview, cone.prmtvs[k])
+            calcHarr!(Hzview, zview, cone.cones[k])
             Hzview .*= mu
         end
     end
@@ -134,14 +134,14 @@ function solvelinsys4!(
 
     z = similar(zrhs3)
     Gxz = G*x - zrhs3
-    for k in eachindex(cone.prmtvs)
+    for k in eachindex(cone.cones)
         Gxzview = view(Gxz, cone.idxs[k], :)
         zview = view(z, cone.idxs[k], :)
-        if cone.prmtvs[k].usedual
-            calcHiarr_prmtv!(zview, Gxzview, cone.prmtvs[k])
+        if cone.cones[k].usedual
+            calcHiarr!(zview, Gxzview, cone.cones[k])
             zview ./= mu
         else
-            calcHarr_prmtv!(zview, Gxzview, cone.prmtvs[k])
+            calcHarr!(zview, Gxzview, cone.cones[k])
             zview .*= mu
         end
     end

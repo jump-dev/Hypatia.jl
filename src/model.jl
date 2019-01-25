@@ -130,15 +130,15 @@ function check_data(
         error("number of constraint rows is not consistent in G and h")
     end
 
-    if length(cone.prmtvs) != length(cone.idxs)
+    if length(cone.cones) != length(cone.idxs)
         error("number of primitive cones does not match number of index ranges")
     end
     qcone = 0
-    for k in eachindex(cone.prmtvs)
-        if Cones.dimension(cone.prmtvs[k]) != length(cone.idxs[k])
+    for k in eachindex(cone.cones)
+        if Cones.dimension(cone.cones[k]) != length(cone.idxs[k])
             error("dimension of cone $k does not match number of indices in the corresponding range")
         end
-        qcone += Cones.dimension(cone.prmtvs[k])
+        qcone += Cones.dimension(cone.cones[k])
     end
     if qcone != q
         error("dimension of cone is not consistent with number of rows in G and h")

@@ -10,7 +10,7 @@ barrier from "Barrier Functions in Interior Point Methods" by Osman Guler
 TODO for efficiency, don't construct full H matrix (arrow fill)
 =#
 
-mutable struct EpiNormInf <: PrimitiveCone
+mutable struct EpiNormInf <: Cone
     usedual::Bool
     dim::Int
     pnt::AbstractVector{Float64}
@@ -20,34 +20,34 @@ mutable struct EpiNormInf <: PrimitiveCone
     F
 
     function EpiNormInf(dim::Int, isdual::Bool)
-        prmtv = new()
-        prmtv.usedual = isdual
-        prmtv.dim = dim
-        prmtv.g = Vector{Float64}(undef, dim)
-        prmtv.H = similar(prmtv.g, dim, dim)
-        @. prmtv.H = 0.0
-        prmtv.H2 = copy(prmtv.H)
-        return prmtv
+        cone = new()
+        cone.usedual = isdual
+        cone.dim = dim
+        cone.g = Vector{Float64}(undef, dim)
+        cone.H = similar(cone.g, dim, dim)
+        @. cone.H = 0.0
+        cone.H2 = copy(cone.H)
+        return cone
     end
 end
 
 EpiNormInf(dim::Int) = EpiNormInf(dim, false)
 
-dimension(prmtv::EpiNormInf) = prmtv.dim
-barrierpar_prmtv(prmtv::EpiNormInf) = prmtv.dim
-getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::EpiNormInf) = (@. arr = 0.0; arr[1] = 1.0; arr)
-loadpnt_prmtv!(prmtv::EpiNormInf, pnt::AbstractVector{Float64}) = (prmtv.pnt = pnt)
+dimension(cone::EpiNormInf) = cone.dim
+get_nu(cone::EpiNormInf) = cone.dim
+set_initial_point(arr::AbstractVector{Float64}, cone::EpiNormInf) = (@. arr = 0.0; arr[1] = 1.0; arr)
+loadpnt!(cone::EpiNormInf, pnt::AbstractVector{Float64}) = (cone.pnt = pnt)
 
-function incone_prmtv(prmtv::EpiNormInf, scal::Float64)
-    u = prmtv.pnt[1]
-    w = view(prmtv.pnt, 2:prmtv.dim)
+function incone(cone::EpiNormInf, scal::Float64)
+    u = cone.pnt[1]
+    w = view(cone.pnt, 2:cone.dim)
     if u <= maximum(abs, w)
         return false
     end
 
     # TODO don't explicitly construct full matrix
-    g = prmtv.g
-    H = prmtv.H
+    g = cone.g
+    H = cone.H
     usqr = abs2(u)
     g1 = 0.0
     h1 = 0.0
@@ -62,9 +62,9 @@ function incone_prmtv(prmtv::EpiNormInf, scal::Float64)
         H[1,jp1] = H[jp1,1] = -iuwj*wiuwj*u
     end
     invu = inv(u)
-    t1 = (prmtv.dim - 2)*invu
+    t1 = (cone.dim - 2)*invu
     g[1] = t1 - u*g1
     H[1,1] = -t1*invu + usqr*h1 - g1
 
-    return factH(prmtv)
+    return factH(cone)
 end

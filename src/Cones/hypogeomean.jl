@@ -11,7 +11,7 @@ dual barrier (modified by reflecting around u = 0 and using dual cone definition
 TODO try to make barrier evaluation more efficient
 =#
 
-mutable struct HypoGeomean <: PrimitiveCone
+mutable struct HypoGeomean <: Cone
     usedual::Bool
     dim::Int
     alpha::Vector{Float64}
@@ -29,38 +29,38 @@ mutable struct HypoGeomean <: PrimitiveCone
         @assert dim >= 3
         @assert all(ai >= 0.0 for ai in alpha)
         @assert sum(alpha) == 1.0
-        prmtv = new()
-        prmtv.usedual = !isdual # using dual barrier
-        prmtv.dim = dim
-        prmtv.alpha = alpha
+        cone = new()
+        cone.usedual = !isdual # using dual barrier
+        cone.dim = dim
+        cone.alpha = alpha
         ialpha = inv.(alpha)
-        prmtv.ialpha = ialpha
-        prmtv.g = Vector{Float64}(undef, dim)
-        prmtv.H = similar(prmtv.g, dim, dim)
-        prmtv.H2 = similar(prmtv.H)
+        cone.ialpha = ialpha
+        cone.g = Vector{Float64}(undef, dim)
+        cone.H = similar(cone.g, dim, dim)
+        cone.H2 = similar(cone.H)
         function barfun(pnt)
             u = pnt[1]
             w = view(pnt, 2:dim)
             return -log(prod((w[i]*ialpha[i])^alpha[i] for i in eachindex(alpha)) + u) - sum((1.0 - alpha[i])*log(w[i]*ialpha[i]) for i in eachindex(alpha)) - log(-u)
         end
-        prmtv.barfun = barfun
-        prmtv.diffres = DiffResults.HessianResult(prmtv.g)
-        return prmtv
+        cone.barfun = barfun
+        cone.diffres = DiffResults.HessianResult(cone.g)
+        return cone
     end
 end
 
 HypoGeomean(alpha::Vector{Float64}) = HypoGeomean(alpha, false)
 
-dimension(prmtv::HypoGeomean) = prmtv.dim
-barrierpar_prmtv(prmtv::HypoGeomean) = prmtv.dim
-getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::HypoGeomean) = (@. arr = 1.0; arr[1] = -prod(prmtv.ialpha[i]^prmtv.alpha[i] for i in eachindex(prmtv.alpha))/prmtv.dim; arr)
-loadpnt_prmtv!(prmtv::HypoGeomean, pnt::AbstractVector{Float64}) = (prmtv.pnt = pnt)
+dimension(cone::HypoGeomean) = cone.dim
+get_nu(cone::HypoGeomean) = cone.dim
+set_initial_point(arr::AbstractVector{Float64}, cone::HypoGeomean) = (@. arr = 1.0; arr[1] = -prod(cone.ialpha[i]^cone.alpha[i] for i in eachindex(cone.alpha))/cone.dim; arr)
+loadpnt!(cone::HypoGeomean, pnt::AbstractVector{Float64}) = (cone.pnt = pnt)
 
-function incone_prmtv(prmtv::HypoGeomean, scal::Float64)
-    u = prmtv.pnt[1]
-    w = view(prmtv.pnt, 2:prmtv.dim)
-    alpha = prmtv.alpha
-    ialpha = prmtv.ialpha
+function incone(cone::HypoGeomean, scal::Float64)
+    u = cone.pnt[1]
+    w = view(cone.pnt, 2:cone.dim)
+    alpha = cone.alpha
+    ialpha = cone.ialpha
     if u >= 0.0 || any(wi <= 0.0 for wi in w)
         return false
     end
@@ -69,9 +69,9 @@ function incone_prmtv(prmtv::HypoGeomean, scal::Float64)
     end
 
     # TODO check allocations, check with Jarrett if this is most efficient way to use DiffResults
-    prmtv.diffres = ForwardDiff.hessian!(prmtv.diffres, prmtv.barfun, prmtv.pnt)
-    prmtv.g .= DiffResults.gradient(prmtv.diffres)
-    prmtv.H .= DiffResults.hessian(prmtv.diffres)
+    cone.diffres = ForwardDiff.hessian!(cone.diffres, cone.barfun, cone.pnt)
+    cone.g .= DiffResults.gradient(cone.diffres)
+    cone.H .= DiffResults.hessian(cone.diffres)
 
-    return factH(prmtv)
+    return factH(cone)
 end

@@ -29,12 +29,38 @@ The primal-dual optimality conditions are:
 =#
 
 mutable struct LinearObjConic <: Model
+    n::Int
+    p::Int
+    q::Int
     c::Vector{Float64}
     A::AbstractMatrix{Float64}
     b::Vector{Float64}
     G::AbstractMatrix{Float64}
     h::Vector{Float64}
-    cone::Cones.Cone
+    cones::Vector{Cones.Cone}
+    cone_idxs::Vector{UnitRange{Int}}
+    nu::Float64
+
+    # initial_x::Vector{Float64}
+    # initial_y::Vector{Float64}
+    # initial_z::Vector{Float64}
+    # initial_s::Vector{Float64}
+
+    function LinearObjConic(c, A, b, G, h, cones, cone_idxs)
+        model = new()
+        model.n = length(c)
+        model.p = length(b)
+        model.q = length(h)
+        model.c = c
+        model.A = A
+        model.b = b
+        model.G = G
+        model.h = h
+        model.cones = cones
+        model.cone_idxs = cone_idxs
+        model.nu = isempty(cones) ? 0.0 : sum(Cones.get_nu, cones)
+        return model
+    end
 end
 
 # TODO check model data consistency function

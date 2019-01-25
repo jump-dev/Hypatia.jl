@@ -161,16 +161,16 @@ function solvelinsys6!(
 
     # calculate z2
     @. z2 = -rhs_tz
-    for k in eachindex(L.cone.prmtvs)
+    for k in eachindex(L.cone.cones)
         a1k = view(z1, L.cone.idxs[k])
         a2k = view(z2, L.cone.idxs[k])
         a3k = view(rhs_ts, L.cone.idxs[k])
-        if L.cone.prmtvs[k].usedual
+        if L.cone.cones[k].usedual
             @. a1k = a2k - a3k
-            Cones.calcHiarr_prmtv!(a2k, a1k, L.cone.prmtvs[k])
+            Cones.calcHiarr!(a2k, a1k, L.cone.cones[k])
             a2k ./= mu
         elseif !iszero(a3k) # TODO rhs_ts = 0 for correction steps, so can just check if doing correction
-            Cones.calcHarr_prmtv!(a1k, a3k, L.cone.prmtvs[k])
+            Cones.calcHarr!(a1k, a3k, L.cone.cones[k])
             @. a2k -= mu*a1k
         end
     end
@@ -179,14 +179,14 @@ function solvelinsys6!(
     if iszero(L.h) # TODO can check once when creating cache
         z1 .= 0.0
     else
-        for k in eachindex(L.cone.prmtvs)
+        for k in eachindex(L.cone.cones)
             a1k = view(L.h, L.cone.idxs[k])
             a2k = view(z1, L.cone.idxs[k])
-            if L.cone.prmtvs[k].usedual
-                Cones.calcHiarr_prmtv!(a2k, a1k, L.cone.prmtvs[k])
+            if L.cone.cones[k].usedual
+                Cones.calcHiarr!(a2k, a1k, L.cone.cones[k])
                 a2k ./= mu
             else
-                Cones.calcHarr_prmtv!(a2k, a1k, L.cone.prmtvs[k])
+                Cones.calcHarr!(a2k, a1k, L.cone.cones[k])
                 a2k .*= mu
             end
         end
@@ -201,14 +201,14 @@ function solvelinsys6!(
 
     # Q2x = Q2*(K22_F\(Q2'*(bxGHbz - GHG*Q1x)))
     mul!(L.GQ1x, L.G, L.Q1x)
-    for k in eachindex(L.cone.prmtvs)
+    for k in eachindex(L.cone.cones)
         a1k = view(L.GQ1x, L.cone.idxs[k], :)
         a2k = view(L.HGQ1x, L.cone.idxs[k], :)
-        if L.cone.prmtvs[k].usedual
-            Cones.calcHiarr_prmtv!(a2k, a1k, L.cone.prmtvs[k])
+        if L.cone.cones[k].usedual
+            Cones.calcHiarr!(a2k, a1k, L.cone.cones[k])
             a2k ./= mu
         else
-            Cones.calcHarr_prmtv!(a2k, a1k, L.cone.prmtvs[k])
+            Cones.calcHarr!(a2k, a1k, L.cone.cones[k])
             a2k .*= mu
         end
     end
@@ -217,14 +217,14 @@ function solvelinsys6!(
     mul!(L.Q2div, L.Q2', L.GHGQ1x)
 
     if size(L.Q2div, 1) > 0
-        for k in eachindex(L.cone.prmtvs)
+        for k in eachindex(L.cone.cones)
             a1k = view(L.GQ2, L.cone.idxs[k], :)
             a2k = view(L.HGQ2, L.cone.idxs[k], :)
-            if L.cone.prmtvs[k].usedual
-                Cones.calcHiarr_prmtv!(a2k, a1k, L.cone.prmtvs[k])
+            if L.cone.cones[k].usedual
+                Cones.calcHiarr!(a2k, a1k, L.cone.cones[k])
                 a2k ./= mu
             else
-                Cones.calcHarr_prmtv!(a2k, a1k, L.cone.prmtvs[k])
+                Cones.calcHarr!(a2k, a1k, L.cone.cones[k])
                 a2k .*= mu
             end
         end
@@ -262,14 +262,14 @@ function solvelinsys6!(
 
     # yi = Ri*Q1'*(bxGHbz - GHG*xi)
     mul!(L.Gxi, L.G, xi)
-    for k in eachindex(L.cone.prmtvs)
+    for k in eachindex(L.cone.cones)
         a1k = view(L.Gxi, L.cone.idxs[k], :)
         a2k = view(L.HGxi, L.cone.idxs[k], :)
-        if L.cone.prmtvs[k].usedual
-            Cones.calcHiarr_prmtv!(a2k, a1k, L.cone.prmtvs[k])
+        if L.cone.cones[k].usedual
+            Cones.calcHiarr!(a2k, a1k, L.cone.cones[k])
             a2k ./= mu
         else
-            Cones.calcHarr_prmtv!(a2k, a1k, L.cone.prmtvs[k])
+            Cones.calcHarr!(a2k, a1k, L.cone.cones[k])
             a2k .*= mu
         end
     end

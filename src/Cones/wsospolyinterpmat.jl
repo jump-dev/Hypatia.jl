@@ -6,7 +6,7 @@ interpolation-based weighted-sum-of-squares (multivariate) polynomial matrix con
 definition and dual barrier extended from "Sum-of-squares optimization without semidefinite programming" by D. Papp and S. Yildiz, available at https://arxiv.org/abs/1712.01792
 =#
 
-mutable struct WSOSPolyInterpMat <: PrimitiveCone
+mutable struct WSOSPolyInterpMat <: Cone
     usedual::Bool
     dim::Int
     r::Int
@@ -26,20 +26,20 @@ mutable struct WSOSPolyInterpMat <: PrimitiveCone
         for ipwtj in ipwt
             @assert size(ipwtj, 1) == u
         end
-        prmtv = new()
-        prmtv.usedual = !isdual # using dual barrier
+        cone = new()
+        cone.usedual = !isdual # using dual barrier
         dim = u * div(r * (r + 1), 2)
-        prmtv.dim = dim
-        prmtv.r = r
-        prmtv.u = u
-        prmtv.ipwt = ipwt
-        prmtv.scalpnt = similar(ipwt[1], dim)
-        prmtv.g = similar(ipwt[1], dim)
-        prmtv.H = similar(ipwt[1], dim, dim)
-        prmtv.H2 = similar(prmtv.H)
-        prmtv.barfun = (x -> barfun(x, ipwt, r, u, true))
-        prmtv.diffres = DiffResults.HessianResult(prmtv.g)
-        return prmtv
+        cone.dim = dim
+        cone.r = r
+        cone.u = u
+        cone.ipwt = ipwt
+        cone.scalpnt = similar(ipwt[1], dim)
+        cone.g = similar(ipwt[1], dim)
+        cone.H = similar(ipwt[1], dim, dim)
+        cone.H2 = similar(cone.H)
+        cone.barfun = (x -> barfun(x, ipwt, r, u, true))
+        cone.diffres = DiffResults.HessianResult(cone.g)
+        return cone
     end
 end
 
@@ -80,13 +80,13 @@ end
 
 WSOSPolyInterpMat(r::Int, u::Int, ipwt::Vector{Matrix{Float64}}) = WSOSPolyInterpMat(r, u, ipwt, false)
 
-dimension(prmtv::WSOSPolyInterpMat) = prmtv.dim
-barrierpar_prmtv(prmtv::WSOSPolyInterpMat) = prmtv.r * sum(size(ipwtj, 2) for ipwtj in prmtv.ipwt)
+dimension(cone::WSOSPolyInterpMat) = cone.dim
+get_nu(cone::WSOSPolyInterpMat) = cone.r * sum(size(ipwtj, 2) for ipwtj in cone.ipwt)
 
-function getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::WSOSPolyInterpMat)
+function set_initial_point(arr::AbstractVector{Float64}, cone::WSOSPolyInterpMat)
     # sum of diagonal matrices with interpolant polynomial repeating on the diagonal
     idx = 1
-    for i in 1:prmtv.r, j in 1:i, u in 1:prmtv.u
+    for i in 1:cone.r, j in 1:i, u in 1:cone.u
         if i == j
             arr[idx] = 1.0
         else
@@ -97,20 +97,20 @@ function getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::WSOSPolyInterpMat
     return arr
 end
 
-loadpnt_prmtv!(prmtv::WSOSPolyInterpMat, pnt::AbstractVector{Float64}) = (prmtv.pnt = pnt)
+loadpnt!(cone::WSOSPolyInterpMat, pnt::AbstractVector{Float64}) = (cone.pnt = pnt)
 
-function incone_prmtv(prmtv::WSOSPolyInterpMat, scal::Float64)
-    prmtv.scal = 1.0
-    @. prmtv.scalpnt = prmtv.pnt/prmtv.scal
-    if isnan(barfun(prmtv.scalpnt, prmtv.ipwt, prmtv.r, prmtv.u, false))
+function incone(cone::WSOSPolyInterpMat, scal::Float64)
+    cone.scal = 1.0
+    @. cone.scalpnt = cone.pnt/cone.scal
+    if isnan(barfun(cone.scalpnt, cone.ipwt, cone.r, cone.u, false))
         return false
     end
-    prmtv.diffres = ForwardDiff.hessian!(prmtv.diffres, prmtv.barfun, prmtv.scalpnt)
-    prmtv.g .= DiffResults.gradient(prmtv.diffres)
-    prmtv.H .= DiffResults.hessian(prmtv.diffres)
-    return factH(prmtv)
+    cone.diffres = ForwardDiff.hessian!(cone.diffres, cone.barfun, cone.scalpnt)
+    cone.g .= DiffResults.gradient(cone.diffres)
+    cone.H .= DiffResults.hessian(cone.diffres)
+    return factH(cone)
 end
 
-# calcg_prmtv!(g::AbstractVector{Float64}, prmtv::WSOSPolyInterpMat) = (@. g = prmtv.g/prmtv.scal; g)
-# calcHarr_prmtv!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prmtv::WSOSPolyInterpMat) = (mul!(prod, Symmetric(prmtv.H), arr); @. prod = prod / prmtv.scal / prmtv.scal; prod)
-# calcHiarr_prmtv!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prmtv::WSOSPolyInterpMat) = (ldiv!(prod, prmtv.F, arr); @. prod = prod * prmtv.scal * prmtv.scal; prod)
+# calcg!(g::AbstractVector{Float64}, cone::WSOSPolyInterpMat) = (@. g = cone.g/cone.scal; g)
+# calcHarr!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::WSOSPolyInterpMat) = (mul!(prod, Symmetric(cone.H), arr); @. prod = prod / cone.scal / cone.scal; prod)
+# calcHiarr!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::WSOSPolyInterpMat) = (ldiv!(prod, cone.F, arr); @. prod = prod * cone.scal * cone.scal; prod)
