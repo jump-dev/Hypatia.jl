@@ -51,8 +51,8 @@ conefrommoi(s::MOI.AbstractVectorSet) = error("MOI set $s is not recognized")
 function buildvarcone(fi::MOI.VectorOfVariables, si::MOI.AbstractVectorSet, dim::Int, q::Int)
     IGi = q+1:q+dim
     VGi = -ones(dim)
-    prmtvi = conefrommoi(si)
-    return (IGi, VGi, prmtvi)
+    conei = conefrommoi(si)
+    return (IGi, VGi, conei)
 end
 
 function buildconstrcone(fi::MOI.VectorAffineFunction{Float64}, si::MOI.AbstractVectorSet, dim::Int, q::Int)
@@ -60,8 +60,8 @@ function buildconstrcone(fi::MOI.VectorAffineFunction{Float64}, si::MOI.Abstract
     VGi = [-vt.scalar_term.coefficient for vt in fi.terms]
     Ihi = q+1:q+dim
     Vhi = fi.constants
-    prmtvi = conefrommoi(si)
-    return (IGi, VGi, Ihi, Vhi, prmtvi)
+    conei = conefrommoi(si)
+    return (IGi, VGi, Ihi, Vhi, conei)
 end
 
 # MOI cones requiring transformations (eg rescaling, changing order)
@@ -76,8 +76,8 @@ svecunscale(dim) = [(i == j ? 1.0 : rt2i) for i in 1:round(Int, sqrt(0.25 + 2*di
 function buildvarcone(fi::MOI.VectorOfVariables, si::MOI.PositiveSemidefiniteConeTriangle, dim::Int, q::Int)
     IGi = q+1:q+dim
     VGi = -svecscale(dim)
-    prmtvi = Cones.PosSemidef(dim)
-    return (IGi, VGi, prmtvi)
+    conei = Cones.PosSemidef(dim)
+    return (IGi, VGi, conei)
 end
 
 function buildconstrcone(fi::MOI.VectorAffineFunction{Float64}, si::MOI.PositiveSemidefiniteConeTriangle, dim::Int, q::Int)
@@ -86,16 +86,16 @@ function buildconstrcone(fi::MOI.VectorAffineFunction{Float64}, si::MOI.Positive
     VGi = [-vt.scalar_term.coefficient*scalevec[vt.output_index] for vt in fi.terms]
     Ihi = q+1:q+dim
     Vhi = scalevec .* fi.constants
-    prmtvi = Cones.PosSemidef(dim)
-    return (IGi, VGi, Ihi, Vhi, prmtvi)
+    conei = Cones.PosSemidef(dim)
+    return (IGi, VGi, Ihi, Vhi, conei)
 end
 
 # logdet cone: convert from smat to svec form (scale off-diagonals)
 function buildvarcone(fi::MOI.VectorOfVariables, si::MOI.LogDetConeTriangle, dim::Int, q::Int)
     IGi = q+1:q+dim
     VGi = vcat(-1.0, -1.0, -svecscale(dim-2))
-    prmtvi = Cones.HypoPerLogdet(dim)
-    return (IGi, VGi, prmtvi)
+    conei = Cones.HypoPerLogdet(dim)
+    return (IGi, VGi, conei)
 end
 
 function buildconstrcone(fi::MOI.VectorAffineFunction{Float64}, si::MOI.LogDetConeTriangle, dim::Int, q::Int)
@@ -104,6 +104,6 @@ function buildconstrcone(fi::MOI.VectorAffineFunction{Float64}, si::MOI.LogDetCo
     VGi = [-vt.scalar_term.coefficient*scalevec[vt.output_index] for vt in fi.terms]
     Ihi = q+1:q+dim
     Vhi = scalevec .* fi.constants
-    prmtvi = Cones.HypoPerLogdet(dim)
-    return (IGi, VGi, Ihi, Vhi, prmtvi)
+    conei = Cones.HypoPerLogdet(dim)
+    return (IGi, VGi, Ihi, Vhi, conei)
 end

@@ -278,7 +278,7 @@ function MOI.copy_to(
 
     if q > nonnegstart
         # exists at least one nonnegative constraint
-        Cones.addprimitivecone!(cone, Cones.Nonnegative(q - nonnegstart), nonnegstart+1:q)
+        Cones.addCone!(cone, Cones.Nonnegative(q - nonnegstart), nonnegstart+1:q)
     end
 
     # build up one nonpositive cone
@@ -345,7 +345,7 @@ function MOI.copy_to(
 
     if q > nonposstart
         # exists at least one nonpositive constraint
-        Cones.addprimitivecone!(cone, Cones.Nonpositive(q - nonposstart), nonposstart+1:q)
+        Cones.addCone!(cone, Cones.Nonpositive(q - nonposstart), nonposstart+1:q)
     end
 
     # build up one L_infinity norm cone from two-sided interval constraints
@@ -418,7 +418,7 @@ function MOI.copy_to(
     opt.intervalscales = intervalscales
     if q > intervalstart
         # exists at least one interval-type constraint
-        Cones.addprimitivecone!(cone, Cones.EpiNormInf(q - intervalstart), intervalstart+1:q)
+        Cones.addCone!(cone, Cones.EpiNormInf(q - intervalstart), intervalstart+1:q)
     end
 
     # add non-LP conic constraints
@@ -433,16 +433,16 @@ function MOI.copy_to(
             dim = MOI.output_dimension(fi)
             if F == MOI.VectorOfVariables
                 append!(JG, idxmap[vj].value for vj in fi.variables)
-                (IGi, VGi, prmtvi) = buildvarcone(fi, si, dim, q)
+                (IGi, VGi, conei) = buildvarcone(fi, si, dim, q)
             else
                 append!(JG, idxmap[vt.scalar_term.variable_index].value for vt in fi.terms)
-                (IGi, VGi, Ihi, Vhi, prmtvi) = buildconstrcone(fi, si, dim, q)
+                (IGi, VGi, Ihi, Vhi, conei) = buildconstrcone(fi, si, dim, q)
                 append!(Ih, Ihi)
                 append!(Vh, Vhi)
             end
             append!(IG, IGi)
             append!(VG, VGi)
-            Cones.addprimitivecone!(cone, prmtvi, q+1:q+dim)
+            Cones.addCone!(cone, conei, q+1:q+dim)
             q += dim
         end
     end
@@ -496,13 +496,13 @@ function MOI.optimize!(opt::Optimizer)
     opt.z = get_z(mdl)
 
     # TODO refac out primitive cone untransformations
-    for k in eachindex(cone.prmtvs)
-        if cone.prmtvs[k] isa Cones.PosSemidef
+    for k in eachindex(cone.cones)
+        if cone.cones[k] isa Cones.PosSemidef
             idxs = cone.idxs[k]
             scalevec = svecunscale(length(idxs))
             opt.s[idxs] .*= scalevec
             opt.z[idxs] .*= scalevec
-        elseif cone.prmtvs[k] isa Cones.HypoPerLogdet
+        elseif cone.cones[k] isa Cones.HypoPerLogdet
             idxs = cone.idxs[k][3:end]
             scalevec = svecunscale(length(idxs))
             opt.s[idxs] .*= scalevec

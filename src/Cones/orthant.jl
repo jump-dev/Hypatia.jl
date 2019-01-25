@@ -10,36 +10,32 @@ nonnegative cone: -sum_i(log(u_i))
 nonpositive cone: -sum_i(log(-u_i))
 =#
 
-mutable struct Nonnegative <: PrimitiveCone
+mutable struct Nonnegative <: Cone
     usedual::Bool
     dim::Int
-    pnt::AbstractVector{Float64}
-    invpnt::Vector{Float64}
+    primals::AbstractVector{Float64}
 
     function Nonnegative(dim::Int, isdual::Bool)
-        prmtv = new()
-        prmtv.usedual = isdual
-        prmtv.dim = dim
-        prmtv.invpnt = Vector{Float64}(undef, dim)
-        return prmtv
+        cone = new()
+        cone.usedual = isdual
+        cone.dim = dim
+        return cone
     end
 end
 
 Nonnegative(dim::Int) = Nonnegative(dim, false)
 Nonnegative() = Nonnegative(1)
 
-mutable struct Nonpositive <: PrimitiveCone
+mutable struct Nonpositive <: Cone
     usedual::Bool
     dim::Int
-    pnt::AbstractVector{Float64}
-    invpnt::Vector{Float64}
+    primals::AbstractVector{Float64}
 
     function Nonpositive(dim::Int, isdual::Bool)
-        prmtv = new()
-        prmtv.usedual = isdual
-        prmtv.dim = dim
-        prmtv.invpnt = Vector{Float64}(undef, dim)
-        return prmtv
+        cone = new()
+        cone.usedual = isdual
+        cone.dim = dim
+        return cone
     end
 end
 
@@ -48,22 +44,30 @@ Nonpositive() = Nonpositive(1)
 
 OrthantCone = Union{Nonnegative, Nonpositive}
 
-dimension(prmtv::OrthantCone) = prmtv.dim
-barrierpar_prmtv(prmtv::OrthantCone) = prmtv.dim
+get_nu(cone::OrthantCone) = cone.dim
 
-getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::Nonnegative) = (@. arr = 1.0; arr)
-getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::Nonpositive) = (@. arr = -1.0; arr)
+set_initial_point(arr::AbstractVector{Float64}, cone::Nonnegative) = (@. arr = 1.0; arr)
+set_initial_point(arr::AbstractVector{Float64}, cone::Nonpositive) = (@. arr = -1.0; arr)
 
-loadpnt_prmtv!(prmtv::OrthantCone, pnt::AbstractVector{Float64}) = (prmtv.pnt = pnt)
+check_in_cone(cone::Nonnegative) = all(u -> (u > 0.0), cone.primals)
+check_in_cone(cone::Nonpositive) = all(u -> (u < 0.0), cone.primals)
 
-incone_prmtv(prmtv::Nonnegative, scal::Float64) = all(u -> (u > 0.0), prmtv.pnt)
-incone_prmtv(prmtv::Nonpositive, scal::Float64) = all(u -> (u < 0.0), prmtv.pnt)
+# function calcg!(g::AbstractVector{Float64}, cone::OrthantCone)
+#     @. cone.invpnt = inv(cone.pnt)
+#     @. g = -cone.invpnt
+#     return g
+# end
+#
+# calcHiarr!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::OrthantCone) = (@. prod = abs2(cone.pnt) * arr; prod)
+# calcHarr!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::OrthantCone) = (@. prod = abs2(cone.invpnt) * arr; prod)
 
-function calcg_prmtv!(g::AbstractVector{Float64}, prmtv::OrthantCone)
-    @. prmtv.invpnt = inv(prmtv.pnt)
-    @. g = -prmtv.invpnt
-    return g
+grad(cone::OrthantCone) = -inv.(cone.primals)
+hess(cone::OrthantCone) = Diagonal(abs2.(inv.(cone.primals)))
+inv_hess(cone::OrthantCone) = Diagonal(abs2.(cone.primals))
+
+function get_max_alpha(cone::Nonnegative, direction::AbstractVector{Float64})
+    if all(u -> (u > 0.0), direction)
+        return Inf
+    end
+    return -maximum(cone.primals[l] / direction[l] for l in eachindex(direction) if direction[l] < 0.0)
 end
-
-calcHiarr_prmtv!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prmtv::OrthantCone) = (@. prod = abs2(prmtv.pnt)*arr; prod)
-calcHarr_prmtv!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prmtv::OrthantCone) = (@. prod = abs2(prmtv.invpnt)*arr; prod)

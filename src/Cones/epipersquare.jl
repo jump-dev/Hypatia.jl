@@ -9,7 +9,7 @@ barrier from "Self-Scaled Barriers and Interior-Point Methods for Convex Program
 -log(2*u*v - norm_2(w)^2)
 =#
 
-mutable struct EpiPerSquare <: PrimitiveCone
+mutable struct EpiPerSquare <: Cone
     usedual::Bool
     dim::Int
     pnt::AbstractVector{Float64}
@@ -18,26 +18,26 @@ mutable struct EpiPerSquare <: PrimitiveCone
     H::Matrix{Float64}
 
     function EpiPerSquare(dim::Int, isdual::Bool)
-        prmtv = new()
-        prmtv.usedual = isdual
-        prmtv.dim = dim
-        prmtv.Hi = Matrix{Float64}(undef, dim, dim)
-        prmtv.H = similar(prmtv.Hi)
-        return prmtv
+        cone = new()
+        cone.usedual = isdual
+        cone.dim = dim
+        cone.Hi = Matrix{Float64}(undef, dim, dim)
+        cone.H = similar(cone.Hi)
+        return cone
     end
 end
 
 EpiPerSquare(dim::Int) = EpiPerSquare(dim, false)
 
-dimension(prmtv::EpiPerSquare) = prmtv.dim
-barrierpar_prmtv(prmtv::EpiPerSquare) = 2
-getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::EpiPerSquare) = (@. arr = 0.0; arr[1] = 1.0; arr[2] = 1.0; arr)
-loadpnt_prmtv!(prmtv::EpiPerSquare, pnt::AbstractVector{Float64}) = (prmtv.pnt = pnt)
+dimension(cone::EpiPerSquare) = cone.dim
+get_nu(cone::EpiPerSquare) = 2
+set_initial_point(arr::AbstractVector{Float64}, cone::EpiPerSquare) = (@. arr = 0.0; arr[1] = 1.0; arr[2] = 1.0; arr)
+loadpnt!(cone::EpiPerSquare, pnt::AbstractVector{Float64}) = (cone.pnt = pnt)
 
-function incone_prmtv(prmtv::EpiPerSquare, scal::Float64)
-    u = prmtv.pnt[1]
-    v = prmtv.pnt[2]
-    w = view(prmtv.pnt, 3:prmtv.dim)
+function incone(cone::EpiPerSquare, scal::Float64)
+    u = cone.pnt[1]
+    v = cone.pnt[2]
+    w = view(cone.pnt, 3:cone.dim)
     if u <= 0.0 || v <= 0.0
         return false
     end
@@ -46,17 +46,17 @@ function incone_prmtv(prmtv::EpiPerSquare, scal::Float64)
     if dist <= 0.0
         return false
     end
-    prmtv.dist = dist
+    cone.dist = dist
 
-    H = prmtv.H
-    Hi = prmtv.Hi
-    mul!(Hi, prmtv.pnt, prmtv.pnt')
+    H = cone.H
+    Hi = cone.Hi
+    mul!(Hi, cone.pnt, cone.pnt')
     Hi[2,1] = Hi[1,2] = nrm2
-    for j in 3:prmtv.dim
+    for j in 3:cone.dim
         Hi[j,j] += dist
     end
     @. H = Hi
-    for j in 3:prmtv.dim
+    for j in 3:cone.dim
         H[1,j] = H[j,1] = -Hi[2,j]
         H[2,j] = H[j,2] = -Hi[1,j]
     end
@@ -66,6 +66,6 @@ function incone_prmtv(prmtv::EpiPerSquare, scal::Float64)
     return true
 end
 
-calcg_prmtv!(g::AbstractVector{Float64}, prmtv::EpiPerSquare) = (@. g = prmtv.pnt/prmtv.dist; tmp = g[1]; g[1] = -g[2]; g[2] = -tmp; g)
-calcHiarr_prmtv!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prmtv::EpiPerSquare) = mul!(prod, prmtv.Hi, arr)
-calcHarr_prmtv!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, prmtv::EpiPerSquare) = mul!(prod, prmtv.H, arr)
+calcg!(g::AbstractVector{Float64}, cone::EpiPerSquare) = (@. g = cone.pnt/cone.dist; tmp = g[1]; g[1] = -g[2]; g[2] = -tmp; g)
+calcHiarr!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::EpiPerSquare) = mul!(prod, cone.Hi, arr)
+calcHarr!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::EpiPerSquare) = mul!(prod, cone.H, arr)

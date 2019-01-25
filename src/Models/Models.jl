@@ -6,6 +6,8 @@ functions and types for model data
 
 module Models
 
+import Hypatia.Cones
+
 abstract type Model end
 
 include("linearobjconic.jl")

@@ -11,7 +11,7 @@ function solve!(mdl::Model)
     (c, A, b, G, h, cone, L) = (mdl.c, mdl.A, mdl.b, mdl.G, mdl.h, mdl.cone, mdl.L)
     (n, p, q) = (length(c), length(b), length(h))
 
-    bnu = 1.0 + Cones.barrierpar(cone) # complexity parameter nu-bar of the augmented barrier (sum of the primitive cone barrier parameters plus 1)
+    bnu = 1.0 + Cones.get_nu(cone) # complexity parameter nu-bar of the augmented barrier (sum of the primitive cone barrier parameters plus 1)
 
     # calculate prediction and correction step parameters
     (beta, eta, cpredfix) = getbetaeta(mdl.maxcorrsteps, bnu) # beta: large neighborhood parameter, eta: small neighborhood parameter
@@ -184,8 +184,8 @@ function solve!(mdl::Model)
         @. ls_tz = tz
         @. ls_ts = ts
         @. tmp_ts = tmp_tz
-        for k in eachindex(cone.prmtvs)
-            v1 = (cone.prmtvs[k].usedual ? ts : tz)
+        for k in eachindex(cone.cones)
+            v1 = (cone.cones[k].usedual ? ts : tz)
             @. @views tmp_tz[cone.idxs[k]] = -v1[cone.idxs[k]]
         end
 
@@ -282,8 +282,8 @@ function solve!(mdl::Model)
             # calculate correction direction
             @. tmp_tx = 0.0
             @. tmp_ty = 0.0
-            for k in eachindex(cone.prmtvs)
-                v1 = (cone.prmtvs[k].usedual ? ts : tz)
+            for k in eachindex(cone.cones)
+                v1 = (cone.cones[k].usedual ? ts : tz)
                 @. @views tmp_tz[cone.idxs[k]] = -v1[cone.idxs[k]]
             end
             Cones.calcg!(g, cone)

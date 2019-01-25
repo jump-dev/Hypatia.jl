@@ -2,39 +2,9 @@
 Copyright 2018, Chris Coey and contributors
 
 interior point type and functions for algorithms based on homogeneous self dual embedding
+
+TODO make internal statuses types
 =#
-
-mutable struct HSDESolver <: IPMSolver
-    model::Models.LinearObjConic # TODO the cone LP type model data
-    linsolver::LinearSystems.LinearSystemSolver
-
-    status::Symbol
-
-    # options
-
-
-    # points
-    point
-    point2
-
-    # result
-    x
-    y
-    z
-    s
-    tau
-    kappa
-    mu
-
-    # solve info
-    iterations
-    solve_time
-    primal_obj
-    dual_obj
-
-
-end
-
 
 mutable struct HSDEPoint <: InteriorPoint
     tx::Vector{Float64}
@@ -43,208 +13,380 @@ mutable struct HSDEPoint <: InteriorPoint
     ts::Vector{Float64}
     tau::Float64
     kap::Float64
-    # TODO possibly keep mu here too, if it would save recalculating mu a few times
+    # mu::Float64
+    tz_views::Vector{SubArray{Float64,1,Vector{Float64},Tuple{UnitRange{Int}},true}}
+    ts_views::Vector{SubArray{Float64,1,Vector{Float64},Tuple{UnitRange{Int}},true}}
+    dual_views::Vector{SubArray{Float64,1,Vector{Float64},Tuple{UnitRange{Int}},true}}
+    primal_views::Vector{SubArray{Float64,1,Vector{Float64},Tuple{UnitRange{Int}},true}}
+
+    function HSDEPoint(model::Models.LinearObjConic)
+        point = new()
+        point.tx = zeros(length(model.c))
+        point.ty = zeros(length(model.b))
+        point.tz = zeros(length(model.h))
+        point.ts = zeros(length(model.h))
+        point.tau = 1.0
+        point.kap = 1.0
+        # point.mu = 1.0
+        point.tz_views = [view(point.tz, idxs) for idxs in model.cone_idxs]
+        point.ts_views = [view(point.ts, idxs) for idxs in model.cone_idxs]
+        point.dual_views = [Cones.use_dual(model.cones[k]) ? point.ts_views[k] : point.tz_views[k] for k in eachindex(model.cones)]
+        point.primal_views = [Cones.use_dual(model.cones[k]) ? point.tz_views[k] : point.ts_views[k] for k in eachindex(model.cones)]
+        return point
+    end
 end
-HSDEPoint(n::Int, p::Int, q::Int) = HSDEPoint(zeros(n), zeros(p), zeros(q), zeros(q), 1.0, 1.0)
+
+function unscale_point(point::HSDEPoint)
+    point.tx ./= point.tau
+    point.ty ./= point.tau
+    point.tz ./= point.tau
+    point.ts ./= point.tau
+    return point
+end
+
+mutable struct HSDESolver <: IPMSolver
+    model::Models.LinearObjConic # TODO the cone LP type model data
+    # linear_solver::LinearSystems.LinearSystemSolver
+
+    # options
+    verbose::Bool
+    tol_rel_opt::Float64
+    tol_abs_opt::Float64
+    tol_feas::Float64
+    max_iters::Int
+    time_limit::Float64
+    combined_nbhd::Float64
+
+    # point
+    point::HSDEPoint
+    # aux_point::HSDEPoint
+
+    # result
+    # result_point::HSDEPoint
+
+    # solve info
+    status::Symbol
+    num_iters
+    solve_time
+    primal_obj
+    dual_obj
+
+    function HSDESolver(
+        model::Models.LinearObjConic,
+        # linear_solver::LinearSystems.LinearSystemSolver,
+        ;
+        verbose::Bool = true,
+        tol_rel_opt = 1e-6,
+        tol_abs_opt = 1e-7,
+        tol_feas = 1e-7,
+        max_iters::Int = 100,
+        time_limit::Float64 = 3e2,
+        combined_nbhd::Float64 = 0.5,
+        )
+        solver = new()
+        solver.model = model
+        # solver.linear_solver = linear_solver
+        solver.verbose = verbose
+        solver.tol_rel_opt = tol_rel_opt
+        solver.tol_abs_opt = tol_abs_opt
+        solver.tol_feas = tol_feas
+        solver.max_iters = max_iters
+        solver.time_limit = time_limit
+        solver.combined_nbhd = combined_nbhd
+        # solver.point = HSDEPoint(model)
+        solver.status = :SolveNotCalled
+        return solver
+    end
+end
 
 function solve(solver::HSDESolver)
+    model = solver.model
+    cones = model.cones
     solver.status = :SolveCalled
     time0 = time()
 
-    point = get_initial_point(solver)
-
-    iter = 0
-    check_converged(point, solver, iter)
-
-    # iterate while solve time remains
-    while time() - time0 < solver.timelimit
-        iter += 1
-
-        point = predict_then_correct(point, solver) # TODO may use different function, or function could change during some iteration eg if numerical difficulties
-
-        check_converged(point, solver, iter) && break
-
-        if iter == solver.maxiter
-            solver.verbose && println("iteration limit reached; terminating")
-            solver.status = :IterationLimit
-        end
+    # initial point
+    point = get_initial_point(model)
+    mu = get_mu(point, model)
+    if isnan(mu) || abs(1.0 - mu) > 1e-6
+        error("initial mu is $mu (should be 1.0)")
     end
 
-    # calculate result and iteration statistics
-    @. solver.x = tx / tau
-    @. solver.y = ty / tau
-    @. solver.z = tz / tau
-    @. solver.s = ts / tau
-    solver.tau = tau
-    solver.kap = kap
-    solver.mu = mu
-    solver.niters = iter
-    solver.solvetime = time() - time0
+    residual_x = similar(model.c)
+    residual_y = similar(model.b)
+    residual_z = similar(model.h)
 
-    solver.verbose && println("\nstatus is $(solver.status) after $iter iterations and $(trunc(solver.solvetime, digits=3)) seconds\n")
+    (n, p, q) = (model.n, model.p, model.q)
+    LHS = [
+        zeros(n,n)  model.A'    model.G'          zeros(n)  zeros(n,q)         model.c;
+        -model.A    zeros(p,p)  zeros(p,q)        zeros(p)  zeros(p,q)         model.b;
+        zeros(q,n)  zeros(q,p)  Matrix(1.0I,q,q)  zeros(q)  Matrix(1.0I,q,q)   zeros(q);
+        zeros(1,n)  zeros(1,p)  zeros(1,q)        1.0       zeros(1,q)         1.0;
+        -model.G    zeros(q,p)  zeros(q,q)        zeros(q)  Matrix(-1.0I,q,q)  model.h;
+        -model.c'   -model.b'   -model.h'         -1.0      zeros(1,q)         0.0;
+        ]
+
+    # convergence tols
+    converge_tol_x = _get_tol(model.c)
+    converge_tol_y = _get_tol(model.b)
+    converge_tol_z = _get_tol(model.h)
+
+    predict = HSDEPoint(model)
+    correct = HSDEPoint(model)
+
+    # print iteration statistics headers
+    if solver.verbose
+        @printf("\n%5s %12s %12s %9s %9s %9s %9s %9s %9s %9s\n",
+            "iter", "p_obj", "d_obj", "abs_gap", "rel_gap", "p_inf", "d_inf", "tau", "kap", "mu")
+    end
+
+    solver.num_iters = 0
+    while true
+        # TODO maybe instead store all the convergence details of the point inside the point
+        (norm_res_x, norm_res_tx) = _get_residual_x(residual_x, point, model)
+        (norm_res_y, norm_res_ty) = _get_residual_y(residual_y, point, model)
+        (norm_res_z, norm_res_tz) = _get_residual_z(residual_z, point, model)
+        norm_res_primal = max(norm_res_ty * converge_tol_y, norm_res_tz * converge_tol_z)
+        norm_res_dual = norm_res_tx * converge_tol_x
+
+        obj_t_primal = dot(model.c, point.tx)
+        obj_t_dual = -dot(model.b, point.ty) - dot(model.h, point.tz)
+        obj_primal = obj_t_primal / point.tau
+        obj_dual = obj_t_dual / point.tau
+        gap = dot(point.tz, point.ts) # TODO maybe should adapt original Alfonso condition instead of using this CVXOPT condition
+        rel_gap = _get_rel_gap(obj_primal, obj_dual, gap)
+
+        # print iteration statistics
+        if solver.verbose
+            @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n",
+                solver.num_iters, obj_primal, obj_dual, gap, rel_gap,
+                norm_res_primal, norm_res_dual, point.tau, point.kap, mu
+                )
+            flush(stdout)
+        end
+
+        # check convergence criteria
+        # TODO nearly primal or dual infeasible or nearly optimal cases?
+        if norm_res_primal <= solver.tol_feas && norm_res_dual <= solver.tol_feas &&
+            (gap <= solver.tol_abs_opt || (!isnan(rel_gap) && rel_gap <= solver.tol_rel_opt))
+            solver.verbose && println("optimal solution found; terminating")
+            solver.status = :Optimal
+            break
+        end
+        if obj_t_dual > 0.0
+            infres_pr = norm_res_x * converge_tol_x / obj_t_dual
+            if infres_pr <= solver.tol_feas
+                solver.verbose && println("primal infeasibility detected; terminating")
+                solver.status = :PrimalInfeasible
+                break
+            end
+        end
+        if obj_t_primal < 0.0
+            infres_du = -max(norm_res_y * converge_tol_y, norm_res_z * converge_tol_z) / obj_t_primal
+            if infres_du <= solver.tol_feas
+                solver.verbose && println("dual infeasibility detected; terminating")
+                solver.status = :DualInfeasible
+                break
+            end
+        end
+        if mu <= solver.tol_feas * 1e-2 && point.tau <= solver.tol_feas * 1e-2 * min(1.0, point.kap)
+            solver.verbose && println("ill-posedness detected; terminating")
+            solver.status = :IllPosed
+            break
+        end
+
+        if solver.num_iters == solver.max_iters
+            solver.verbose && println("iteration limit reached; terminating")
+            solver.status = :IterationLimit
+            break
+        end
+        if time() - time0 >= solver.time_limit
+            solver.verbose && println("time limit reached; terminating")
+            solver.status = :TimeLimit
+            break
+        end
+
+        # (stepped, point) = combined_predict_correct(point, residual, mu, solver) # TODO may use different function, or function could change during some iteration eg if numerical difficulties
+
+        # calculate prediction and correction directions
+        # TODO using qrsymm with 3 columns:
+        # 1) fixed c b h
+        # 2) predictor rhs (residual)
+        # 3) corrector rhs (zero)
+        # TODO prealloc, also note first col and some of 3rd col don't change
+        # rhs_x = [-model.c residual_x zeros(model.n)]
+        # rhs_y = [-model.b residual_y zeros(model.p)]
+        # rhs_z = [-model.h residual_z zeros(model.q)]
+        # direction_solution = solve_linear_system(point, rhs_x, rhs_y, rhs_z, mu, solver)
+
+        LHS[n+p+q+1, end] = mu / point.tau / point.tau
+        for k in eachindex(cones)
+            cone_k = cones[k]
+            Cones.load_primals(cone_k, point.primal_views[k])
+            @assert Cones.check_in_cone(cone_k)
+            rows = (n + p) .+ model.cone_idxs[k]
+            cols = Cones.use_dual(cone_k) ? rows : (q + 1) .+ rows
+            LHS[rows, cols] = Cones.hess(cone_k)
+        end
+
+        rhs = [
+            residual_x  zeros(n);
+            residual_y  zeros(p);
+            zeros(q)    zeros(q);
+            -point.kap  -point.kap + mu / point.tau;
+            residual_z  zeros(q);
+            point.kap + obj_t_primal - obj_t_dual  0.0;
+            ]
+        for k in eachindex(cones)
+            rows = (n + p) .+ model.cone_idxs[k]
+            rhs[rows, 1] = -point.dual_views[k]
+            rhs[rows, 2] = -point.dual_views[k] - mu * Cones.grad(cones[k])
+        end
+
+        F = lu(LHS)
+        ldiv!(F, rhs)
+
+        # affine phase
+        # affine_direction = construct_affine_direction(direction_solution, mu, solver)
+        @. @views begin
+            predict.tx = rhs[1:n, 1]
+            predict.ty = rhs[(n + 1):(n + p), 1]
+            predict.tz = rhs[(n + p + 1):(n + p + q), 1]
+            predict.ts = rhs[(n + p + q + 2):(n + p + 2q + 1), 1]
+        end
+        predict.kap = rhs[n + p + q + 1, 1]
+        predict.tau = rhs[n + p + 2q + 2, 1]
+
+        # affine_alpha = get_max_alpha(point, predict, solver)
+        affine_alpha = get_max_alpha_in_nbhd(point, predict, mu, 0.99, solver)
+
+
+        # NOTE step in corrector direction here: not in description of algorithms?
+        @. @views begin
+            correct.tx = rhs[1:n, 2]
+            correct.ty = rhs[(n + 1):(n + p), 2]
+            correct.tz = rhs[(n + p + 1):(n + p + q), 2]
+            correct.ts = rhs[(n + p + q + 2):(n + p + 2q + 1), 2]
+        end
+        correct.kap = rhs[n + p + q + 1, 2]
+        correct.tau = rhs[n + p + 2q + 2, 2]
+
+        point = step_in_direction(point, correct, 1.0)
+        mu = get_mu(point, model)
+
+
+        # combined phase
+        gamma = (1.0 - affine_alpha)^3 # TODO allow different function (heuristic)
+        @show gamma
+
+        # direction = construct_combined_direction(direction_solution, mu, gamma, solver)
+        combined_rhs = rhs * vcat(1.0 - gamma, gamma)
+        combined = predict
+        @. @views begin
+            combined.tx = combined_rhs[1:n]
+            combined.ty = combined_rhs[(n + 1):(n + p)]
+            combined.tz = combined_rhs[(n + p + 1):(n + p + q)]
+            combined.ts = combined_rhs[(n + p + q + 2):(n + p + 2q + 1)]
+        end
+        combined.kap = combined_rhs[n + p + q + 1]
+        combined.tau = combined_rhs[n + p + 2q + 2]
+
+        alpha = get_max_alpha_in_nbhd(point, combined, mu, solver.combined_nbhd, solver)
+
+        point = step_in_direction(point, combined, alpha)
+        mu = get_mu(point, model)
+
+        solver.num_iters += 1
+    end
+
+    # calculate result and iteration statistics and finish
+    solver.point = unscale_point(point)
+    solver.solve_time = time() - time0
+
+    if solver.verbose
+        println("\nstatus is $(solver.status) after $(solver.num_iters) iterations and $(trunc(solver.solve_time, digits=3)) seconds\n")
+    end
 
     return
 end
 
-function check_converged(point::HSDEPoint, solver::HSDESolver, num_iters::Int)
-    # TODO delete these if not so useful
-    model = solver.model
-    (c, A, b, G, h, cone) = (model.c, model.A, model.b, model.G, model.h, model.cone)
-    (tx, ty, tz, ts) = (point.tx, point.ty, point.tz, point.ts)
+_get_tol(v::Vector{Float64}) = inv(max(1.0, norm(v)))
 
-    # TODO rename tol variables to reflect which constraints they refer to
-    # TODO consider 3 tolerances, one for primal equalities, one for primal cone constraint, and one for dual equalities
-
-
-    # TODO calculate only once. put in solver
-    # calculate tolerances for convergence
-    tol_res_tx = inv(max(1.0, norm(c)))
-    tol_res_ty = inv(max(1.0, norm(b)))
-    tol_res_tz = inv(max(1.0, norm(h)))
-
-
-    # TODO preallocate. can use the unused point. so then the residual is essentially a direction
-    # helper arrays for residuals, right-hand-sides, and search directions
-    tmp_tx = similar(tx)
-    tmp_tx2 = similar(tx) # TODO can delete once have mul-add in-place
-    tmp_ty = similar(ty)
-    tmp_tz = similar(tz)
-    tmp_ts = similar(ts)
-
-
-    # calculate residuals and convergence parameters
-    # tmp_tx = -A'*ty - G'*tz - c*tau
-    mul!(tmp_tx2, A', ty)
-    mul!(tmp_tx, G', tz)
-    @. tmp_tx = -tmp_tx2 - tmp_tx
-    nres_x = norm(tmp_tx)
-    @. tmp_tx -= c * tau
-    nres_tx = norm(tmp_tx) / tau
-
-    # tmp_ty = A*tx - b*tau
-    mul!(tmp_ty, A, tx)
-    nres_y = norm(tmp_ty)
-    @. tmp_ty -= b * tau
-    nres_ty = norm(tmp_ty) / tau
-
-    # tmp_tz = ts + G*tx - h*tau
-    mul!(tmp_tz, G, tx)
-    @. tmp_tz += ts
-    nres_z = norm(tmp_tz)
-    @. tmp_tz -= h * tau
-    nres_tz = norm(tmp_tz) / tau
-
-    (cx, by, hz) = (dot(c, tx), dot(b, ty), dot(h, tz))
-    obj_pr = cx / tau
-    obj_du = -(by + hz) / tau
-    gap = dot(tz, ts) # TODO maybe should adapt original Alfonso condition instead of using this CVXOPT condition
-
-    # TODO maybe add small epsilon to denominators that are zero to avoid NaNs, and get rid of isnans further down
-    if obj_pr < 0.0
-        relgap = gap / -obj_pr
-    elseif obj_du > 0.0
-        relgap = gap / obj_du
+function _get_rel_gap(obj_primal::Float64, obj_dual::Float64, gap::Float64)
+    if obj_primal < 0.0
+        return gap / -obj_primal
+    elseif obj_dual > 0.0
+        return gap / obj_dual
     else
-        relgap = NaN
+        return NaN
     end
-
-    nres_pr = max(nres_ty * tol_res_ty, nres_tz * tol_res_tz)
-    nres_du = nres_tx * tol_res_tx
-
-    # print iteration statistics
-    if solver.verbose
-        if iszero(num_iters)
-            @printf("\n%5s %12s %12s %9s %9s %9s %9s %9s %9s %9s\n",
-                "iter", "p_obj", "d_obj", "abs_gap", "rel_gap", "p_inf", "d_inf", "tau", "kap", "mu")
-        end
-        @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n",
-            num_iters, obj_pr, obj_du, gap, relgap, nres_pr, nres_du, tau, kap, mu)
-        flush(stdout)
-    end
-
-    # check convergence criteria
-    # TODO nearly primal or dual infeasible or nearly optimal cases?
-    if nres_pr <= solver.tolfeas && nres_du <= solver.tolfeas &&
-        (gap <= solver.tolabsopt || (!isnan(relgap) && relgap <= solver.tolrelopt))
-        solver.verbose && println("optimal solution found; terminating")
-        solver.status = :Optimal
-        return true
-    end
-    if hz + by < 0.0
-        infres_pr = nres_x * tol_res_tx / (-hz - by)
-        if infres_pr <= solver.tolfeas
-            solver.verbose && println("primal infeasibility detected; terminating")
-            solver.status = :PrimalInfeasible
-            return true
-        end
-    end
-    if cx < 0.0
-        infres_du = -max(nres_y * tol_res_ty, nres_z * tol_res_tz) / cx
-        if infres_du <= solver.tolfeas
-            solver.verbose && println("dual infeasibility detected; terminating")
-            solver.status = :DualInfeasible
-            return true
-        end
-    end
-    if mu <= solver.tolfeas * 1e-2 && tau <= solver.tolfeas * 1e-2 * min(1.0, kap)
-        solver.verbose && println("ill-posedness detected; terminating")
-        solver.status = :IllPosed
-        return true
-    end
-
-    return false
 end
 
-get_mu(point::HSDEPoint, cone::Cones.Cone) = (dot(point.tz, point.ts) + point.tau * point.kap) / (1.0 + cone.barrier_param)
-
-# calculate neighborhood distance to central path
-function get_neighborhood(point::HSDEPoint, solver::HSDESolver)
-
-    (g, ts, tz, mu, cone) =
-
-    for k in eachindex(cone.prmtvs)
-        calcg_prmtv!(view(g, cone.idxs[k]), cone.prmtvs[k])
-        (v1, v2) = (cone.prmtvs[k].usedual ? (ts, tz) : (tz, ts))
-        @. @views v1[cone.idxs[k]] += mu*g[cone.idxs[k]]
-        # @. @views v1[cone.idxs[k]] += g[cone.idxs[k]]
-        Cones.calcHiarr_prmtv!(view(v2, cone.idxs[k]), view(v1, cone.idxs[k]), cone.prmtvs[k])
-    end
-    return dot(ts, tz)
+function _get_residual_x(residual_x::Vector{Float64}, point::HSDEPoint, model::Models.LinearObjConic)
+    # residual_x = -A'*ty - G'*tz - c*tau
+    residual_x .= -model.A' * point.ty - model.G' * point.tz # TODO remove allocs
+    norm_res_x = norm(residual_x)
+    @. residual_x -= model.c * point.tau
+    norm_res_tx = norm(residual_x) / point.tau
+    return (norm_res_x, norm_res_tx)
 end
 
-function get_initial_point(solver::HSDESolver)
-    # TODO delete these if not so useful
-    model = solver.model
-    (c, A, b, G, h, cone) = (model.c, model.A, model.b, model.G, model.h, model.cone)
-    (n, p, q) = (length(c), length(b), length(h))
+function _get_residual_y(residual_y::Vector{Float64}, point::HSDEPoint, model::Models.LinearObjConic)
+    # residual_y = A*tx - b*tau
+    mul!(residual_y, model.A, point.tx)
+    norm_res_y = norm(residual_y)
+    @. residual_y -= model.b * point.tau
+    norm_res_ty = norm(residual_y) / point.tau
+    return (norm_res_y, norm_res_ty)
+end
 
-    point = HSDEPoint(n, p, q)
-    (tx, ty, tz, ts) = (point.tx, point.ty, point.tz, point.ts)
+function _get_residual_z(residual_z::Vector{Float64}, point::HSDEPoint, model::Models.LinearObjConic)
+    # residual_z = ts + G*tx - h*tau
+    mul!(residual_z, model.G, point.tx)
+    @. residual_z += point.ts
+    norm_res_z = norm(residual_z)
+    @. residual_z -= model.h * point.tau
+    norm_res_tz = norm(residual_z) / point.tau
+    return (norm_res_z, norm_res_tz)
+end
 
-    Cones.set_central_point!(ts, tz, cone) # TODO scale like in alfonso?
-    mu = get_mu(point, cone)
-    if isnan(mu) || abs(1.0 - mu) > 1e-6
-        error("initial mu is $mu")
+function get_mu(point::HSDEPoint, model::Models.LinearObjConic)
+    return (dot(point.tz, point.ts) + point.tau * point.kap) / (1.0 + model.nu)
+end
+
+function get_initial_point(model::Models.LinearObjConic)
+    point = HSDEPoint(model)
+
+    cones = model.cones
+    for k in eachindex(cones)
+        cone_k = cones[k]
+        primal_k = point.primal_views[k]
+        Cones.set_initial_point(primal_k, cone_k)
+        Cones.load_primals(cone_k, primal_k)
+        @assert Cones.check_in_cone(cone_k)
+        point.dual_views[k] .= -Cones.grad(cone_k)
     end
 
     # solve for ty
     # A'y = -c - G'z
-    # TODO re-use factorization of A' from preprocessing
-    # TODO remove allocs
-    if issparse(A)
-        if !isempty(ty)
-            ty .= sparse(A') \ (-c - G' * tz)
-        end
-    else
-        ty .= A' \ (-c - G' * tz)
-    end
-
     # solve for tx
     # Ax = b
     # Gx = h - ts
-    # TODO re-use factorization of [A; G] from preprocessing
-    # TODO remove allocs
-    tx .= [A; G] \ [b; h - ts]
+    temp_n = -model.c - model.G' * point.tz # TODO remove allocs
+    temp_p_q = vcat(model.b, model.h - point.ts) # TODO remove allocs
+    # if has_QR(model) # TODO reuse QR from preprocessing
+    #     ldiv!(point.ty, model.At_qr, temp_n)
+    #     ldiv!(point.tx, model.AG_qr, temp_p_q)
+    # else
+        if !isempty(point.ty)
+            At_fact = factorize(issparse(model.A) ? sparse(model.A') : Matrix(model.A'))
+            ldiv!(point.ty, At_fact, temp_n)
+            point.ty .= At_fact \ temp_n
+        end
+        AG_fact = factorize(vcat(model.A, model.G))
+        # ldiv!(point.tx, AG_fact, temp_p_q)
+        point.tx .= AG_fact \ temp_p_q
+    # end
 
     return point
 end
@@ -259,215 +401,203 @@ function step_in_direction(point::HSDEPoint, direction::HSDEPoint, alpha::Float6
     return point
 end
 
-function get_prediction_direction(point::HSDEPoint, direction::HSDEPoint, solver::HSDESolver)
-
-    # TODO direction is another helper point (with preallocated space)
-
-    # calculate prediction direction
-    @. ls_tz = tz
-    @. ls_ts = ts
-    @. tmp_ts = tmp_tz
-    for k in eachindex(cone.prmtvs)
-        v1 = (cone.prmtvs[k].usedual ? ts : tz)
-        @. @views tmp_tz[cone.idxs[k]] = -v1[cone.idxs[k]]
+function get_max_alpha(point::HSDEPoint, direction::HSDEPoint, solver::HSDESolver)
+    cones = solver.model.cones
+    alpha = 1.0
+    if direction.kap < 0.0
+        alpha = min(alpha, -point.kap / direction.kap)
     end
-
-    (tmp_kap, tmp_tau) = LinearSystems.solvelinsys6!(tmp_tx, tmp_ty, tmp_tz, -kap, tmp_ts, kap + cx + by + hz, mu, tau, L)
-
-
-    return direction
+    if direction.tau < 0.0
+        alpha = min(alpha, -point.tau / direction.tau)
+    end
+    # TODO what about mu? quadratic equation. need dot(ls_ts, ls_tz) + ls_tau * ls_kap > 0
+    for k in eachindex(cones)
+        alpha_k = Cones.get_max_alpha(cones[k], direction.primal_views[k])
+        alpha = min(alpha, alpha_k)
+    end
+    @assert alpha > 1e-5
+    return alpha
 end
 
-function perform_prediction(point::HSDEPoint, point2::HSDEPoint, direction::HSDEPoint, solver::HSDESolver)
+function get_max_alpha_in_nbhd(point::HSDEPoint, direction::HSDEPoint, mu::Float64, nbhd::Float64, solver::HSDESolver)
+    model = solver.model
+    cones = model.cones
 
-    # determine step length alpha by line search
-    alpha = alphapred
-    if tmp_kap < 0.0
-        alpha = min(alpha, -kap / tmp_kap * 0.99999)
+    alpha = 1.0 # TODO maybe start at previous alpha but increased slightly, or use affine_alpha
+    if direction.kap < 0.0
+        alpha = min(alpha, -point.kap / direction.kap)
     end
-    if tmp_tau < 0.0
-        alpha = min(alpha, -tau / tmp_tau * 0.99999)
+    if direction.tau < 0.0
+        alpha = min(alpha, -point.tau / direction.tau)
     end
+    # TODO what about mu? quadratic equation. need dot(ls_ts, ls_tz) + ls_tau * ls_kap > 0
+    alpha *= 0.99
 
-    nbhd = Inf
+    # ONLY BACKTRACK, NO FORWARDTRACK
+
+    ls_tz = similar(point.tz) # TODO prealloc
+    ls_ts = similar(point.ts)
+    primal_views = [view(Cones.use_dual(cones[k]) ? ls_tz : ls_ts, model.cone_idxs[k]) for k in eachindex(cones)]
+    dual_views = [view(Cones.use_dual(cones[k]) ? ls_ts : ls_tz, model.cone_idxs[k]) for k in eachindex(cones)]
+
+    # cones_outside_nbhd = trues(length(cones))
+    # TODO sort cones so that check the ones that failed in-cone check last iteration first
+
     ls_tau = ls_kap = ls_tk = ls_mu = 0.0
-    alphaprevok = true
-    predfail = false
-    nprediters = 0
-    while true
-        nprediters += 1
+    num_pred_iters = 0
+    while num_pred_iters < 100
+        num_pred_iters += 1
 
-        # @. ls_tz = tz + alpha * tmp_tz
-        # @. ls_ts = ts + alpha * tmp_ts
-        # ls_tau = tau + alpha * tmp_tau
-        # ls_kap = kap + alpha * tmp_kap
-        # ls_tk = ls_tau * ls_kap
-        # ls_mu = (dot(ls_ts, ls_tz) + ls_tk)/bnu
-
-        step_in_direction(point, direction, alpha)
+        @. ls_tz = point.tz + alpha * direction.tz
+        @. ls_ts = point.ts + alpha * direction.ts
+        ls_tau = point.tau + alpha * direction.tau
+        ls_kap = point.kap + alpha * direction.kap
+        ls_tk = ls_tau * ls_kap
+        ls_mu = (dot(ls_ts, ls_tz) + ls_tk) / (1.0 + model.nu)
 
         # accept primal iterate if
         # - decreased alpha and it is the first inside the cone and beta-neighborhood or
         # - increased alpha and it is inside the cone and the first to leave beta-neighborhood
-        if ls_mu > 0.0 && ls_tau > 0.0 && ls_kap > 0.0 && Cones.incone(cone, ls_mu)
-            # primal iterate is inside the cone
-            # nbhd = Cones.calcnbhd!(g, ls_ts, ls_tz, ls_mu, cone) + abs2(ls_tk - ls_mu)
-            nbhd = get_neighborhood(point2, solver)
-
-            if nbhd < abs2(beta * ls_mu)
-            # if nbhd < abs2(beta)
-                # iterate is inside the beta-neighborhood
-                if !alphaprevok || alpha > solver.predlsmulti
-                    # either the previous iterate was outside the beta-neighborhood or increasing alpha again will make it > 1
-                    if solver.predlinesearch
-                        alphapred = alpha
-                    end
+        # if ls_mu > 0.0 && abs(ls_tk - ls_mu) / ls_mu < nbhd # condition for 1-dim nonneg cone for tau and kap
+        #     in_nbhds = true
+        #     for k in eachindex(cones)
+        #         cone_k = cones[k]
+        #         Cones.load_primals(cone_k, primal_views[k])
+        #         if !Cones.check_in_cone(cone_k) || get_nbhd(cone_k, dual_views[k], ls_mu) > nbhd
+        #             in_nbhds = false
+        #             break
+        #         end
+        #     end
+        #     if in_nbhds
+        #         break
+        #     end
+        # end
+        if ls_mu > 0.0
+            full_nbhd_sqr = abs2(ls_tk - ls_mu)
+            in_nbhds = true
+            for k in eachindex(cones)
+                cone_k = cones[k]
+                Cones.load_primals(cone_k, primal_views[k])
+                if !Cones.check_in_cone(cone_k)
+                    in_nbhds = false
                     break
                 end
-
-                alphaprevok = true
-                alpha = alpha / solver.predlsmulti # increase alpha
-                continue
+                full_nbhd_sqr += get_nbhd(cone_k, dual_views[k], ls_mu)
+                if full_nbhd_sqr > nbhd
+                    in_nbhds = false
+                    break
+                end
             end
-        end
-
-        # primal iterate is either
-        # - outside the cone or
-        # - inside the cone and outside the beta-neighborhood and previous iterate was outside the beta-neighborhood
-        if alpha < alphapredthres
-            # alpha is very small, so predictor has failed
-            predfail = true
-            solver.verbose && println("predictor could not improve the solution ($nprediters line search steps); terminating")
-            break
-        end
-
-        alphaprevok = false
-        alpha = solver.predlsmulti * alpha # decrease alpha
-    end
-    if predfail
-        solver.status = :PredictorFail
-        break
-    end
-
-
-    # TODO two points, return the one we want
-    return point
-end
-
-function get_correction_direction(point::HSDEPoint, direction::HSDEPoint, solver::HSDESolver)
-
-    # TODO direction is another helper point (with preallocated space)
-
-    # calculate correction direction
-    @. tmp_tx = 0.0
-    @. tmp_ty = 0.0
-    for k in eachindex(cone.prmtvs)
-        v1 = (cone.prmtvs[k].usedual ? ts : tz)
-        @. @views tmp_tz[cone.idxs[k]] = -v1[cone.idxs[k]]
-    end
-    Cones.calcg!(g, cone)
-    @. tmp_tz -= mu * g
-    @. tmp_ts = 0.0
-
-    (tmp_kap, tmp_tau) = LinearSystems.solvelinsys6!(tmp_tx, tmp_ty, tmp_tz, -kap + mu / tau, tmp_ts, 0.0, mu, tau, L)
-
-
-    return direction
-end
-
-function perform_correction(point::HSDEPoint, point2::HSDEPoint, direction::HSDEPoint, solver::HSDESolver)
-
-    # determine step length alpha by line search
-    alpha = solver.alphacorr
-    if tmp_kap < 0.0
-        alpha = min(alpha, -kap / tmp_kap * 0.99999)
-    end
-    if tmp_tau < 0.0
-        alpha = min(alpha, -tau / tmp_tau * 0.99999)
-    end
-
-    ncorrlsiters = 0
-    while ncorrlsiters <= solver.maxcorrlsiters
-        ncorrlsiters += 1
-
-        # @. ls_tz = tz + alpha * tmp_tz
-        # @. ls_ts = ts + alpha * tmp_ts
-        # ls_tau = tau + alpha * tmp_tau
-        # @assert ls_tau > 0.0
-        # ls_kap = kap + alpha * tmp_kap
-        # @assert ls_kap > 0.0
-        # ls_mu = (dot(ls_ts, ls_tz) + ls_tau * ls_kap) / bnu
-
-        step_in_direction(point, direction, alpha)
-
-
-        if ls_mu > 0.0 && Cones.incone(cone, ls_mu)
-            # primal iterate tx is inside the cone, so terminate line search
-            break
-        end
-
-        # primal iterate tx is outside the cone
-        if ncorrlsiters == solver.maxcorrlsiters
-            # corrector failed
-            corrfail = true
-            solver.verbose && println("corrector could not improve the solution ($ncorrlsiters line search steps); terminating")
-            break
-        end
-
-        alpha = solver.corrlsmulti * alpha # decrease alpha
-    end
-    if corrfail
-        break
-    end
-
-    # TODO two points, return the one we want
-    return point
-end
-
-function predict_then_correct(point::HSDEPoint, solver::HSDESolver)
-
-
-    # prediction phase
-    direction = get_prediction_direction(point, direction, solver)
-    point = perform_prediction(point, point2, direction, solver)
-
-
-    # skip correction phase if allowed and current iterate is in the eta-neighborhood
-    if solver.corrcheck && nbhd <= abs2(eta * mu)
-        continue
-    end
-
-
-    # correction phase
-    ncorrsteps = 0
-    while true # TODO maybe use for loop
-        ncorrsteps += 1
-
-        direction = get_correction_direction(point, direction, solver)
-        point = perform_correction(point, point2, direction, solver)
-
-        # finish if allowed and current iterate is in the eta-neighborhood, or if taken max steps
-        if ncorrsteps == solver.maxcorrsteps || solver.corrcheck
-            # nbhd = Cones.calcnbhd!(g, ls_ts, ls_tz, mu, cone) + abs2(tau * kap - mu)
-            nbhd = get_neighborhood(point, solver)
-
-            @. ls_tz = tz
-            @. ls_ts = ts
-            if nbhd <= abs2(eta * mu)
-                break
-            elseif ncorrsteps == solver.maxcorrsteps
-                # outside eta neighborhood, so corrector failed
-                corrfail = true
-                solver.verbose && println("corrector phase finished outside the eta-neighborhood ($ncorrsteps correction steps); terminating")
+            if in_nbhds
                 break
             end
         end
 
-        if corrfail
-            solver.status = :CorrectorFail
-            break
-        end
+
+        # iterate is outside the neighborhood: decrease alpha
+        alpha *= 0.8 # TODO option for parameter
     end
 
-    return point
+    @assert alpha > 1e-6
+    return alpha
 end
+
+function get_nbhd(cone::Cones.Cone, duals::AbstractVector{Float64}, mu::Float64)
+    # TODO no allocs
+    temp = duals + mu * Cones.grad(cone)
+    # TODO use cholesky L
+    # nbhd = sqrt(temp' * Cones.inv_hess(cone) * temp) / mu
+    nbhd = temp' * Cones.inv_hess(cone) * temp
+    # @show nbhd
+    return nbhd
+end
+
+
+
+# # calculate neighborhood distance to central path
+# function get_nbhd(point::HSDEPoint, mu::Float64, model::Models.LinearObjConic)
+#     cones = model.cones
+#     for k in eachindex(cones)
+#         cone_k = cones[k]
+#         temp_q_k = model.temp_q_views[k]
+#         @. temp_q_k = point.dual_views[k] + mu * Cones.grad(cone_k)
+#         Cones.inv_hessL_prod!(temp_q_k, cone_k)
+#     end
+#     return norm(model.temp_q) / mu
+# end
+
+
+# function get_prediction_direction(point::HSDEPoint, residual::HSDEPoint, solver::HSDESolver)
+#     for k in eachindex(solver.model.cones)
+#         @. residual.tz_views[k] = -point.primal_views[k]
+#     end
+#     residual.tau = kap + cx + by + hz
+#     residual.kap = -kap
+#     return LinearSystems.solvelinsys6!(point, residual, mu, solver)
+# end
+
+# function get_correction_direction(point::HSDEPoint, solver::HSDESolver)
+#     corr_rhs = solver.aux_point
+#     @. corr_rhs.tx = 0.0
+#     @. corr_rhs.ty = 0.0
+#     cones = solver.model.cones
+#     for k in eachindex(cones)
+#         @. corr_rhs.tz_views[k] = -point.primal_views[k] - mu * Cones.grad(cones[k])
+#     end
+#     @. corr_rhs.ts = 0.0
+#     corr_rhs.tau = 0.0
+#     corr_rhs.kap = -point.kap + mu / point.tau
+#     return LinearSystems.solvelinsys6!(point, corr_rhs, mu, solver)
+# end
+
+# function predict_then_correct(point::HSDEPoint, residual::HSDEPoint, mu::Float64, solver::HSDESolver)
+#     cones = solver.model.cones
+#
+#     # prediction phase
+#     direction = get_prediction_direction(point, residual, solver)
+#     alpha = 0.9999 * get_max_alpha(point, direction, solver)
+#     point = step_in_direction(point, direction, alpha)
+#
+#     # correction phase
+#     num_corr_steps = 0
+#     while nbhd > eta && num_corr_steps < solver.max_corr_steps
+#         direction = get_correction_direction(point, solver)
+#         point = step_in_direction(point, direction, 0.9999)
+#         for k in eachindex(cones)
+#             @assert Cones.check_in_cone(cones[k], point.primal_views[k])
+#         end
+#         num_corr_steps += 1
+#     end
+#     if num_corr_steps == solver.max_corr_steps
+#         solver.verbose && println("corrector phase finished outside the eta-neighborhood; terminating")
+#         solver.status = :CorrectorFail
+#         return (false, point)
+#     end
+#
+#     return (true, point)
+# end
+
+# function combined_predict_correct(point::HSDEPoint, residual::HSDEPoint, mu::Float64, solver::HSDESolver)
+#     cones = solver.model.cones
+#
+#     # calculate prediction and correction directions
+#     # TODO using qrsymm with 3 columns:
+#     # 1) fixed c b h
+#     # 2) predictor rhs (residual)
+#     # 3) corrector rhs (zero)
+#     combined_rhs =
+#     direction_solution = solve_linear_system(point, residual, mu, solver)
+#
+#     # affine phase
+#     affine_direction = construct_affine_direction(direction_solution, mu, solver)
+#     affine_alpha = 0.99 * get_max_alpha(point, direction, solver)
+#
+#     # combined phase
+#     gamma = (1.0 - affine_alpha)^3 # TODO allow different function (heuristic)
+#     direction = construct_combined_direction(direction_solution, mu, gamma, solver)
+#     alpha = get_max_alpha_in_neighborhood(point, direction, solver)
+#     point = step_in_direction(point, direction, alpha)
+#
+#     return point
+# end
+#

@@ -13,7 +13,7 @@ barrier from "Interior-Point Polynomial Algorithms in Convex Programming" by Nes
 # TODO eliminate allocations for incone check
 =#
 
-mutable struct EpiNormSpectral <: PrimitiveCone
+mutable struct EpiNormSpectral <: Cone
     usedual::Bool
     dim::Int
     n::Int
@@ -30,44 +30,44 @@ mutable struct EpiNormSpectral <: PrimitiveCone
     function EpiNormSpectral(n::Int, m::Int, isdual::Bool)
         @assert n <= m
         dim = n*m + 1
-        prmtv = new()
-        prmtv.usedual = isdual
-        prmtv.dim = dim
-        prmtv.n = n
-        prmtv.m = m
-        prmtv.mat = Matrix{Float64}(undef, n, m)
-        prmtv.g = Vector{Float64}(undef, dim)
-        prmtv.H = similar(prmtv.g, dim, dim)
-        prmtv.H2 = similar(prmtv.H)
+        cone = new()
+        cone.usedual = isdual
+        cone.dim = dim
+        cone.n = n
+        cone.m = m
+        cone.mat = Matrix{Float64}(undef, n, m)
+        cone.g = Vector{Float64}(undef, dim)
+        cone.H = similar(cone.g, dim, dim)
+        cone.H2 = similar(cone.H)
         function barfun(pnt)
             W = reshape(pnt[2:end], n, m)
             u = pnt[1]
             return -logdet(u*I - W*W'/u) - log(u)
         end
-        prmtv.barfun = barfun
-        prmtv.diffres = DiffResults.HessianResult(prmtv.g)
-        return prmtv
+        cone.barfun = barfun
+        cone.diffres = DiffResults.HessianResult(cone.g)
+        return cone
     end
 end
 
 EpiNormSpectral(n::Int, m::Int) = EpiNormSpectral(n, m, false)
 
-dimension(prmtv::EpiNormSpectral) = prmtv.dim
-barrierpar_prmtv(prmtv::EpiNormSpectral) = prmtv.n + 1
-getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::EpiNormSpectral) = (@. arr = 0.0; arr[1] = 1.0; arr)
-loadpnt_prmtv!(prmtv::EpiNormSpectral, pnt::AbstractVector{Float64}) = (prmtv.pnt = pnt)
+dimension(cone::EpiNormSpectral) = cone.dim
+get_nu(cone::EpiNormSpectral) = cone.n + 1
+set_initial_point(arr::AbstractVector{Float64}, cone::EpiNormSpectral) = (@. arr = 0.0; arr[1] = 1.0; arr)
+loadpnt!(cone::EpiNormSpectral, pnt::AbstractVector{Float64}) = (cone.pnt = pnt)
 
-function incone_prmtv(prmtv::EpiNormSpectral, scal::Float64)
-    prmtv.mat[:] = @view prmtv.pnt[2:end] # TODO a little slow
-    F = svd!(prmtv.mat) # TODO reduce allocs further
-    if F.S[1] >= prmtv.pnt[1]
+function incone(cone::EpiNormSpectral, scal::Float64)
+    cone.mat[:] = @view cone.pnt[2:end] # TODO a little slow
+    F = svd!(cone.mat) # TODO reduce allocs further
+    if F.S[1] >= cone.pnt[1]
         return false
     end
 
     # TODO check allocations, check with Jarrett if this is most efficient way to use DiffResults
-    prmtv.diffres = ForwardDiff.hessian!(prmtv.diffres, prmtv.barfun, prmtv.pnt)
-    prmtv.g .= DiffResults.gradient(prmtv.diffres)
-    prmtv.H .= DiffResults.hessian(prmtv.diffres)
+    cone.diffres = ForwardDiff.hessian!(cone.diffres, cone.barfun, cone.pnt)
+    cone.g .= DiffResults.gradient(cone.diffres)
+    cone.H .= DiffResults.hessian(cone.diffres)
 
-    return factH(prmtv)
+    return factH(cone)
 end

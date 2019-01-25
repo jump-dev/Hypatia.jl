@@ -14,7 +14,7 @@ TODO could write the inverse hessian analytically rather than factorizing
 TODO choose a better interior direction
 =#
 
-mutable struct HypoPerLog <: PrimitiveCone
+mutable struct HypoPerLog <: Cone
     usedual::Bool
     pnt::AbstractVector{Float64}
     g::Vector{Float64}
@@ -23,24 +23,24 @@ mutable struct HypoPerLog <: PrimitiveCone
     F
 
     function HypoPerLog(isdual::Bool)
-        prmtv = new()
-        prmtv.usedual = isdual
-        prmtv.g = Vector{Float64}(undef, 3)
-        prmtv.H = similar(prmtv.g, 3, 3)
-        prmtv.H2 = similar(prmtv.H)
-        return prmtv
+        cone = new()
+        cone.usedual = isdual
+        cone.g = Vector{Float64}(undef, 3)
+        cone.H = similar(cone.g, 3, 3)
+        cone.H2 = similar(cone.H)
+        return cone
     end
 end
 
 HypoPerLog() = HypoPerLog(false)
 
-dimension(prmtv::HypoPerLog) = 3
-barrierpar_prmtv(prmtv::HypoPerLog) = 3
-getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::HypoPerLog) = (arr[1] = -1.0; arr[2] = 1.0; arr[3] = 1.0; arr)
-loadpnt_prmtv!(prmtv::HypoPerLog, pnt::AbstractVector{Float64}) = (prmtv.pnt = pnt)
+dimension(cone::HypoPerLog) = 3
+get_nu(cone::HypoPerLog) = 3
+set_initial_point(arr::AbstractVector{Float64}, cone::HypoPerLog) = (arr[1] = -1.0; arr[2] = 1.0; arr[3] = 1.0; arr)
+loadpnt!(cone::HypoPerLog, pnt::AbstractVector{Float64}) = (cone.pnt = pnt)
 
-function incone_prmtv(prmtv::HypoPerLog, scal::Float64)
-    u = prmtv.pnt[1]; v = prmtv.pnt[2]; w = prmtv.pnt[3]
+function incone(cone::HypoPerLog, scal::Float64)
+    u = cone.pnt[1]; v = cone.pnt[2]; w = cone.pnt[3]
     if (v <= 0.0) || (w <= 0.0)
         return false
     end
@@ -53,7 +53,7 @@ function incone_prmtv(prmtv::HypoPerLog, scal::Float64)
 
     # gradient
     ivlwvu = inv(vlwvu)
-    g = prmtv.g
+    g = cone.g
     g[1] = ivlwvu
     g[2] = ivlwvu*(v - u - 2.0*vlwvu)/v
     g[3] = -(1.0 + v*ivlwvu)/w
@@ -61,7 +61,7 @@ function incone_prmtv(prmtv::HypoPerLog, scal::Float64)
     # Hessian
     vw = v/w
     ivlwvu2 = abs2(ivlwvu)
-    H = prmtv.H
+    H = cone.H
     H[1,1] = ivlwvu2
     H[1,2] = H[2,1] = -(lwv - 1.0)*ivlwvu2
     H[1,3] = H[3,1] = -vw*ivlwvu2
@@ -69,5 +69,5 @@ function incone_prmtv(prmtv::HypoPerLog, scal::Float64)
     H[2,3] = H[3,2] = vw*(lwv - 1.0)*ivlwvu2 - ivlwvu/w
     H[3,3] = abs2(vw)*ivlwvu2 + vw/w*ivlwvu + inv(abs2(w))
 
-    return factH(prmtv)
+    return factH(cone)
 end

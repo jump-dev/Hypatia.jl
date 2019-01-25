@@ -77,16 +77,16 @@ function solvelinsys4!(
 
     @. L.LHScopy = L.LHS
 
-    for k in eachindex(cone.prmtvs)
+    for k in eachindex(cone.cones)
         idxs = (n + p) .+ cone.idxs[k]
         Hview = view(L.LHScopy, idxs, idxs)
-        if cone.prmtvs[k].usedual # G*x - mu*H*z = zrhs - srhs
-            calcHarr_prmtv!(Hview, -mu*I, cone.prmtvs[k])
+        if cone.cones[k].usedual # G*x - mu*H*z = zrhs - srhs
+            calcHarr!(Hview, -mu*I, cone.cones[k])
             @. @views L.rhs[idxs] -= srhs[cone.idxs[k]]
         else # G*x - (mu*H)\z = zrhs - (mu*H)\srhs
-            calcHiarr_prmtv!(Hview, -inv(mu)*I, cone.prmtvs[k])
+            calcHiarr!(Hview, -inv(mu)*I, cone.cones[k])
             sview = view(srhs, cone.idxs[k])
-            calcHiarr_prmtv!(sview, cone.prmtvs[k])
+            calcHiarr!(sview, cone.cones[k])
             @. L.rhs[idxs] -= sview / mu
         end
     end

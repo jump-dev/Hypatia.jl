@@ -711,7 +711,7 @@ function hypoperlogdet1(; verbose, linearsystem)
     mathalf = rand(side, side)
     mat = mathalf*mathalf'
     h = zeros(dim)
-    CO.mattovec!(view(h, 3:dim), mat)
+    CO.smat_to_svec!(view(h, 3:dim), mat)
     mdl = HYP.Model(verbose=verbose)
     cone = CO.Cone([CO.HypoPerLogdet(dim)], [1:dim])
     r = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem)
@@ -719,8 +719,8 @@ function hypoperlogdet1(; verbose, linearsystem)
     @test r.niters <= 30
     @test r.x[1] ≈ -r.pobj atol=1e-4 rtol=1e-4
     @test r.x[2] ≈ 1 atol=1e-4 rtol=1e-4
-    @test r.s[2]*logdet(CO.vectomat!(zeros(side, side), r.s[3:end])/r.s[2]) ≈ r.s[1] atol=1e-4 rtol=1e-4
-    @test r.z[1]*(logdet(CO.vectomat!(zeros(side, side), -r.z[3:end])/r.z[1]) + side) ≈ r.z[2] atol=1e-4 rtol=1e-4
+    @test r.s[2]*logdet(CO.svec_to_smat!(zeros(side, side), r.s[3:end])/r.s[2]) ≈ r.s[1] atol=1e-4 rtol=1e-4
+    @test r.z[1]*(logdet(CO.svec_to_smat!(zeros(side, side), -r.z[3:end])/r.z[1]) + side) ≈ r.z[2] atol=1e-4 rtol=1e-4
 end
 
 function hypoperlogdet2(; verbose, linearsystem)
@@ -734,7 +734,7 @@ function hypoperlogdet2(; verbose, linearsystem)
     mathalf = rand(side, side)
     mat = mathalf*mathalf'
     h = zeros(dim)
-    CO.mattovec!(view(h, 3:dim), mat)
+    CO.smat_to_svec!(view(h, 3:dim), mat)
     mdl = HYP.Model(verbose=verbose)
     cone = CO.Cone([CO.HypoPerLogdet(dim, true)], [1:dim])
     r = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem)
@@ -742,8 +742,8 @@ function hypoperlogdet2(; verbose, linearsystem)
     @test r.niters <= 25
     @test r.x[2] ≈ r.pobj atol=1e-4 rtol=1e-4
     @test r.x[1] ≈ -1 atol=1e-4 rtol=1e-4
-    @test r.s[1]*(logdet(CO.vectomat!(zeros(side, side), -r.s[3:end])/r.s[1]) + side) ≈ r.s[2] atol=1e-4 rtol=1e-4
-    @test r.z[2]*logdet(CO.vectomat!(zeros(side, side), r.z[3:end])/r.z[2]) ≈ r.z[1] atol=1e-4 rtol=1e-4
+    @test r.s[1]*(logdet(CO.svec_to_smat!(zeros(side, side), -r.s[3:end])/r.s[1]) + side) ≈ r.s[2] atol=1e-4 rtol=1e-4
+    @test r.z[2]*logdet(CO.svec_to_smat!(zeros(side, side), r.z[3:end])/r.z[2]) ≈ r.z[1] atol=1e-4 rtol=1e-4
 end
 
 function hypoperlogdet3(; verbose, linearsystem)
@@ -757,7 +757,7 @@ function hypoperlogdet3(; verbose, linearsystem)
     mathalf = rand(side, side)
     mat = mathalf*mathalf'
     h = zeros(dim)
-    CO.mattovec!(view(h, 3:dim), mat)
+    CO.smat_to_svec!(view(h, 3:dim), mat)
     mdl = HYP.Model(verbose=verbose)
     cone = CO.Cone([CO.HypoPerLogdet(dim)], [1:dim])
     r = solveandcheck(mdl, c, A, b, G, h, cone, linearsystem)

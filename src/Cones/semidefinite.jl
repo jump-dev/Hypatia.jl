@@ -11,7 +11,7 @@ barrier from "Self-Scaled Barriers and Interior-Point Methods for Convex Program
 TODO eliminate allocations for inverse-finding
 =#
 
-mutable struct PosSemidef <: PrimitiveCone
+mutable struct PosSemidef <: Cone
     usedual::Bool
     dim::Int
     side::Int
@@ -22,80 +22,80 @@ mutable struct PosSemidef <: PrimitiveCone
     matinv::Matrix{Float64}
 
     function PosSemidef(dim::Int, isdual::Bool)
-        prmtv = new()
-        prmtv.usedual = isdual
-        prmtv.dim = dim
-        prmtv.side = round(Int, sqrt(0.25 + 2*dim) - 0.5)
-        prmtv.mat = Matrix{Float64}(undef, prmtv.side, prmtv.side)
-        prmtv.mat2 = similar(prmtv.mat)
-        prmtv.matpnt = similar(prmtv.mat)
-        return prmtv
+        cone = new()
+        cone.usedual = isdual
+        cone.dim = dim
+        cone.side = round(Int, sqrt(0.25 + 2*dim) - 0.5)
+        cone.mat = Matrix{Float64}(undef, cone.side, cone.side)
+        cone.mat2 = similar(cone.mat)
+        cone.matpnt = similar(cone.mat)
+        return cone
     end
 end
 
 PosSemidef(dim::Int) = PosSemidef(dim, false)
 
-dimension(prmtv::PosSemidef) = prmtv.dim
-barrierpar_prmtv(prmtv::PosSemidef) = prmtv.side
-function getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::PosSemidef)
-    for i in 1:prmtv.side, j in i:prmtv.side
+dimension(cone::PosSemidef) = cone.dim
+get_nu(cone::PosSemidef) = cone.side
+function set_initial_point(arr::AbstractVector{Float64}, cone::PosSemidef)
+    for i in 1:cone.side, j in i:cone.side
         if i == j
-            prmtv.mat[i,j] = 1.0
+            cone.mat[i,j] = 1.0
         else
-            prmtv.mat[i,j] = prmtv.mat[j,i] = 0.0
+            cone.mat[i,j] = cone.mat[j,i] = 0.0
         end
     end
-    mattovec!(arr, prmtv.mat)
+    smat_to_svec!(arr, cone.mat)
     return arr
 end
-loadpnt_prmtv!(prmtv::PosSemidef, pnt::AbstractVector{Float64}) = (prmtv.pnt = pnt)
+loadpnt!(cone::PosSemidef, pnt::AbstractVector{Float64}) = (cone.pnt = pnt)
 
-function incone_prmtv(prmtv::PosSemidef, scal::Float64)
-    vectomat!(prmtv.mat, prmtv.pnt)
-    @. prmtv.matpnt = prmtv.mat
+function incone(cone::PosSemidef, scal::Float64)
+    svec_to_smat!(cone.mat, cone.pnt)
+    @. cone.matpnt = cone.mat
 
-    F = cholesky!(Symmetric(prmtv.mat), Val(true), check=false)
+    F = cholesky!(Symmetric(cone.mat), Val(true), check=false)
     if !isposdef(F)
         return false
     end
-    prmtv.matinv = -inv(F) # TODO eliminate allocs
+    cone.matinv = -inv(F) # TODO eliminate allocs
     return true
 end
 
-calcg_prmtv!(g::AbstractVector{Float64}, prmtv::PosSemidef) = (mattovec!(g, prmtv.matinv); g)
+calcg!(g::AbstractVector{Float64}, cone::PosSemidef) = (smat_to_svec!(g, cone.matinv); g)
 
-function calcHiarr_prmtv!(prod::AbstractVector{Float64}, arr::AbstractVector{Float64}, prmtv::PosSemidef)
-    vectomat!(prmtv.mat, arr)
-    mul!(prmtv.mat2, prmtv.mat, prmtv.matpnt)
-    mul!(prmtv.mat, prmtv.matpnt, prmtv.mat2)
-    mattovec!(prod, prmtv.mat)
+function calcHiarr!(prod::AbstractVector{Float64}, arr::AbstractVector{Float64}, cone::PosSemidef)
+    svec_to_smat!(cone.mat, arr)
+    mul!(cone.mat2, cone.mat, cone.matpnt)
+    mul!(cone.mat, cone.matpnt, cone.mat2)
+    smat_to_svec!(prod, cone.mat)
     return prod
 end
 
-function calcHiarr_prmtv!(prod::AbstractMatrix{Float64}, arr::AbstractMatrix{Float64}, prmtv::PosSemidef)
+function calcHiarr!(prod::AbstractMatrix{Float64}, arr::AbstractMatrix{Float64}, cone::PosSemidef)
     for j in 1:size(arr, 2)
-        vectomat!(prmtv.mat, view(arr, :, j))
-        mul!(prmtv.mat2, prmtv.mat, prmtv.matpnt)
-        mul!(prmtv.mat, prmtv.matpnt, prmtv.mat2)
-        mattovec!(view(prod, :, j), prmtv.mat)
+        svec_to_smat!(cone.mat, view(arr, :, j))
+        mul!(cone.mat2, cone.mat, cone.matpnt)
+        mul!(cone.mat, cone.matpnt, cone.mat2)
+        smat_to_svec!(view(prod, :, j), cone.mat)
     end
     return prod
 end
 
-function calcHarr_prmtv!(prod::AbstractVector{Float64}, arr::AbstractVector{Float64}, prmtv::PosSemidef)
-    vectomat!(prmtv.mat, arr)
-    mul!(prmtv.mat2, prmtv.mat, prmtv.matinv)
-    mul!(prmtv.mat, prmtv.matinv, prmtv.mat2)
-    mattovec!(prod, prmtv.mat)
+function calcHarr!(prod::AbstractVector{Float64}, arr::AbstractVector{Float64}, cone::PosSemidef)
+    svec_to_smat!(cone.mat, arr)
+    mul!(cone.mat2, cone.mat, cone.matinv)
+    mul!(cone.mat, cone.matinv, cone.mat2)
+    smat_to_svec!(prod, cone.mat)
     return prod
 end
 
-function calcHarr_prmtv!(prod::AbstractMatrix{Float64}, arr::AbstractMatrix{Float64}, prmtv::PosSemidef)
+function calcHarr!(prod::AbstractMatrix{Float64}, arr::AbstractMatrix{Float64}, cone::PosSemidef)
     for j in 1:size(arr, 2)
-        vectomat!(prmtv.mat, view(arr, :, j))
-        mul!(prmtv.mat2, prmtv.mat, prmtv.matinv)
-        mul!(prmtv.mat, prmtv.matinv, prmtv.mat2)
-        mattovec!(view(prod, :, j), prmtv.mat)
+        svec_to_smat!(cone.mat, view(arr, :, j))
+        mul!(cone.mat2, cone.mat, cone.matinv)
+        mul!(cone.mat, cone.matinv, cone.mat2)
+        smat_to_svec!(view(prod, :, j), cone.mat)
     end
     return prod
 end

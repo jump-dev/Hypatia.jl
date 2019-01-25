@@ -89,10 +89,10 @@ end
 #     @assert identityH
 #     # TODO update for prim or dual cones
 #     # if !identityH
-#     #     for k in eachindex(L.cone.prmtvs)
+#     #     for k in eachindex(L.cone.cones)
 #     #         idxs = L.tzk - 1 .+ L.cone.idxs[k]
-#     #         dim = dimension(L.cone.prmtvs[k])
-#     #         calcHiarr_prmtv!(view(L.LHS3copy, idxs, idxs), Matrix(-inv(mu)*I, dim, dim), L.cone.prmtvs[k])
+#     #         dim = dimension(L.cone.cones[k])
+#     #         calcHiarr!(view(L.LHS3copy, idxs, idxs), Matrix(-inv(mu)*I, dim, dim), L.cone.cones[k])
 #     #     end
 #     # end
 #
@@ -131,11 +131,11 @@ function solvelinsys6!(
 
     @. L.LHS6copy = L.LHS6
     L.LHS6copy[L.tkk, end] = mu/tau/tau # TODO note in CVXOPT coneprog doc, there is no rescaling by tau, they to kap*dtau + tau*dkap = -rhskap
-    for k in eachindex(L.cone.prmtvs)
-        dim = Cones.dimension(L.cone.prmtvs[k])
-        coloffset = (L.cone.prmtvs[k].usedual ? L.tzk : L.tsk)
+    for k in eachindex(L.cone.cones)
+        dim = Cones.dimension(L.cone.cones[k])
+        coloffset = (L.cone.cones[k].usedual ? L.tzk : L.tsk)
         # TODO don't use Matrix(mu*I, dim, dim) because it allocates and is slow
-        Cones.calcHarr_prmtv!(view(L.LHS6copy, L.tzk - 1 .+ L.cone.idxs[k], coloffset - 1 .+ L.cone.idxs[k]), Matrix(mu*I, dim, dim), L.cone.prmtvs[k])
+        Cones.calcHarr!(view(L.LHS6copy, L.tzk - 1 .+ L.cone.idxs[k], coloffset - 1 .+ L.cone.idxs[k]), Matrix(mu*I, dim, dim), L.cone.cones[k])
     end
 
     F = lu!(L.LHS6copy)
