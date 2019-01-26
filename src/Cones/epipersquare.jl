@@ -12,7 +12,7 @@ barrier from "Self-Scaled Barriers and Interior-Point Methods for Convex Program
 mutable struct EpiPerSquare <: Cone
     usedual::Bool
     dim::Int
-    primals::AbstractVector{Float64}
+    point::AbstractVector{Float64}
     g::Vector{Float64}
     H::Matrix{Float64}
     Hi::Matrix{Float64}
@@ -35,9 +35,9 @@ get_nu(cone::EpiPerSquare) = 2
 set_initial_point(arr::AbstractVector{Float64}, cone::EpiPerSquare) = (@. arr = 0.0; arr[1] = 1.0; arr[2] = 1.0; arr)
 
 function check_in_cone(cone::EpiPerSquare)
-    u = cone.primals[1]
-    v = cone.primals[2]
-    w = view(cone.primals, 3:cone.dim)
+    u = cone.point[1]
+    v = cone.point[2]
+    w = view(cone.point, 3:cone.dim)
     if u <= 0.0 || v <= 0.0
         return false
     end
@@ -47,11 +47,11 @@ function check_in_cone(cone::EpiPerSquare)
         return false
     end
 
-    @. cone.g = cone.primals / dist
+    @. cone.g = cone.point / dist
     (cone.g[1], cone.g[2]) = (-cone.g[2], -cone.g[1])
 
     Hi = cone.Hi
-    mul!(Hi, cone.primals, cone.primals') # TODO syrk
+    mul!(Hi, cone.point, cone.point') # TODO syrk
     Hi[2, 1] = Hi[1, 2] = nrm2
     for j in 3:cone.dim
         Hi[j, j] += dist
@@ -70,7 +70,7 @@ function check_in_cone(cone::EpiPerSquare)
     return true
 end
 
-# calcg!(g::AbstractVector{Float64}, cone::EpiPerSquare) = (@. g = cone.primals/cone.dist; tmp = g[1]; g[1] = -g[2]; g[2] = -tmp; g)
+# calcg!(g::AbstractVector{Float64}, cone::EpiPerSquare) = (@. g = cone.point/cone.dist; tmp = g[1]; g[1] = -g[2]; g[2] = -tmp; g)
 # calcHiarr!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::EpiPerSquare) = mul!(prod, cone.Hi, arr)
 # calcHarr!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::EpiPerSquare) = mul!(prod, cone.H, arr)
 

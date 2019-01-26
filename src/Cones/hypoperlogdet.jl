@@ -16,7 +16,7 @@ mutable struct HypoPerLogdet <: Cone
     usedual::Bool
     dim::Int
     side::Int
-    primals::AbstractVector{Float64}
+    point::AbstractVector{Float64}
     mat::Matrix{Float64}
     g::Vector{Float64}
     H::Matrix{Float64}
@@ -35,11 +35,11 @@ mutable struct HypoPerLogdet <: Cone
         cone.g = Vector{Float64}(undef, dim)
         cone.H = Matrix{Float64}(undef, dim, dim)
         cone.H2 = similar(cone.H)
-        function barfun(primals)
-            u = primals[1]
-            v = primals[2]
-            W = similar(primals, side, side)
-            svec_to_smat!(W, view(primals, 3:dim))
+        function barfun(point)
+            u = point[1]
+            v = point[2]
+            W = similar(point, side, side)
+            svec_to_smat!(W, view(point, 3:dim))
             return -log(v * logdet(W / v) - u) - logdet(W) - log(v)
         end
         cone.barfun = barfun
@@ -60,16 +60,16 @@ function set_initial_point(arr::AbstractVector{Float64}, cone::HypoPerLogdet)
 end
 
 function check_in_cone(cone::HypoPerLogdet)
-    u = cone.primals[1]
-    v = cone.primals[2]
+    u = cone.point[1]
+    v = cone.point[2]
     W = cone.mat
-    svec_to_smat!(W, view(cone.primals, 3:cone.dim))
+    svec_to_smat!(W, view(cone.point, 3:cone.dim))
     if v <= 0.0 || !isposdef(Symmetric(W)) || u >= v * logdet(Symmetric(W) / v) # TODO only use one decomposition on Symmetric(W) for isposdef and logdet
         return false
     end
 
     # TODO check allocations, check with Jarrett if this is most efficient way to use DiffResults
-    cone.diffres = ForwardDiff.hessian!(cone.diffres, cone.barfun, cone.primals)
+    cone.diffres = ForwardDiff.hessian!(cone.diffres, cone.barfun, cone.point)
     cone.g .= DiffResults.gradient(cone.diffres)
     cone.H .= DiffResults.hessian(cone.diffres)
 

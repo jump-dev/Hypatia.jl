@@ -9,7 +9,7 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     verbose::Bool
     timelimit::Float64
     linearsystem::Type{<:LinearSystems.LinearSystemSolver}
-    usedense::Bool
+    dense::Bool
     c::Vector{Float64}          # linear cost vector, size n
     A::AbstractMatrix{Float64}  # equality constraint matrix, size p*n
     b::Vector{Float64}          # equality constraint vector, size p
@@ -34,13 +34,13 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     primal_obj::Float64
     dual_obj::Float64
 
-    function Optimizer(model::Model, verbose::Bool, timelimit::Float64, linearsystem, usedense::Bool)
+    function Optimizer(model::Model, verbose::Bool, timelimit::Float64, linearsystem, dense::Bool)
         opt = new()
         opt.model = model
         opt.verbose = verbose
         opt.timelimit = timelimit
         opt.linearsystem = linearsystem
-        opt.usedense = usedense
+        opt.dense = dense
         opt.status = :NotLoaded
         return opt
     end
@@ -50,11 +50,11 @@ Optimizer(;
     verbose::Bool = false,
     timelimit::Float64 = 3.6e3, # TODO should be Inf
     linearsystem = LinearSystems.QRSymm,
-    usedense::Bool = true,
+    dense::Bool = true,
     tolrelopt::Float64 = 1e-6,
     tolabsopt::Float64 = 1e-7,
     tolfeas::Float64 = 1e-7,
-    ) = Optimizer(Model(verbose=verbose, timelimit=timelimit, tolrelopt=tolrelopt, tolabsopt=tolabsopt, tolfeas=tolfeas), verbose, timelimit, linearsystem, usedense)
+    ) = Optimizer(Model(verbose = verbose, timelimit=timelimit, tolrelopt=tolrelopt, tolabsopt=tolabsopt, tolfeas=tolfeas), verbose, timelimit, linearsystem, dense)
 
 MOI.get(::Optimizer, ::MOI.SolverName) = "Hypatia"
 
@@ -196,7 +196,7 @@ function MOI.copy_to(
     end
 
     push!(constroffseteq, p)
-    if opt.usedense
+    if opt.dense
         opt.A = Matrix(sparse(IA, JA, VA, p, n))
     else
         opt.A = dropzeros!(sparse(IA, JA, VA, p, n))
@@ -448,7 +448,7 @@ function MOI.copy_to(
     end
 
     push!(constroffsetcone, q)
-    if opt.usedense
+    if opt.dense
         opt.G = Matrix(sparse(IG, JG, VG, q, n))
     else
         opt.G = dropzeros!(sparse(IG, JG, VG, q, n))

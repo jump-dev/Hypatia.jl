@@ -78,12 +78,12 @@ mutable struct HSDESolver <: IPMSolver
         # linear_solver::LinearSystems.LinearSystemSolver,
         ;
         verbose::Bool = true,
-        tol_rel_opt = 1e-7,
-        tol_abs_opt = 1e-8,
-        tol_feas = 1e-8,
+        tol_rel_opt = 1e-6,
+        tol_abs_opt = 1e-7,
+        tol_feas = 1e-7,
         max_iters::Int = 100,
         time_limit::Float64 = 3e2,
-        combined_nbhd::Float64 = 0.5,
+        combined_nbhd::Float64 = 0.1,
         )
         solver = new()
         solver.model = model
@@ -231,7 +231,7 @@ function solve(solver::HSDESolver)
         for k in eachindex(cones)
             cone_k = cones[k]
             # TODO stepped to this point so should already have called check_in_cone for the point
-            Cones.load_primals(cone_k, point.primal_views[k])
+            Cones.load_point(cone_k, point.primal_views[k])
             @assert Cones.check_in_cone(cone_k)
             rows = (n + p) .+ model.cone_idxs[k]
             cols = Cones.use_dual(cone_k) ? rows : (q + 1) .+ rows
@@ -286,7 +286,7 @@ function solve(solver::HSDESolver)
 
         # combined phase
         gamma = (1.0 - affine_alpha)^3 # TODO allow different function (heuristic)
-        @show gamma
+        # @show gamma
 
         # direction = construct_combined_direction(direction_solution, mu, gamma, solver)
         combined_rhs = rhs * vcat(1.0 - gamma, gamma)
@@ -371,7 +371,7 @@ function get_initial_point(model::Models.LinearObjConic)
         cone_k = cones[k]
         primal_k = point.primal_views[k]
         Cones.set_initial_point(primal_k, cone_k)
-        Cones.load_primals(cone_k, primal_k)
+        Cones.load_point(cone_k, primal_k)
         @assert Cones.check_in_cone(cone_k)
         point.dual_views[k] .= -Cones.grad(cone_k)
     end
@@ -471,7 +471,7 @@ function get_max_alpha_in_nbhd(point::HSDEPoint, direction::HSDEPoint, mu::Float
         #     in_nbhds = true
         #     for k in eachindex(cones)
         #         cone_k = cones[k]
-        #         Cones.load_primals(cone_k, primal_views[k])
+        #         Cones.load_point(cone_k, primal_views[k])
         #         if !Cones.check_in_cone(cone_k) || get_nbhd(cone_k, dual_views[k], ls_mu) > nbhd
         #             in_nbhds = false
         #             break
@@ -486,7 +486,7 @@ function get_max_alpha_in_nbhd(point::HSDEPoint, direction::HSDEPoint, mu::Float
             in_nbhds = true
             for k in eachindex(cones)
                 cone_k = cones[k]
-                Cones.load_primals(cone_k, primal_views[k])
+                Cones.load_point(cone_k, primal_views[k])
                 if !Cones.check_in_cone(cone_k)
                     in_nbhds = false
                     break

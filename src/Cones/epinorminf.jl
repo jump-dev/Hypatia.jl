@@ -13,7 +13,7 @@ TODO for efficiency, don't construct full H matrix (arrow fill)
 mutable struct EpiNormInf <: Cone
     usedual::Bool
     dim::Int
-    primals::AbstractVector{Float64}
+    point::AbstractVector{Float64}
     g::Vector{Float64}
     H::Matrix{Float64}
     H2::Matrix{Float64}
@@ -37,8 +37,8 @@ get_nu(cone::EpiNormInf) = cone.dim
 set_initial_point(arr::AbstractVector{Float64}, cone::EpiNormInf) = (@. arr = 0.0; arr[1] = 1.0; arr)
 
 function check_in_cone(cone::EpiNormInf)
-    u = cone.primals[1]
-    w = view(cone.primals, 2:cone.dim)
+    u = cone.point[1]
+    w = view(cone.point, 2:cone.dim)
     if u <= maximum(abs, w)
         return false
     end

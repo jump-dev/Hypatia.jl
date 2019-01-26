@@ -15,7 +15,7 @@ TODO compare alternative barrier -log(u - v*sum(wi -> exp(wi/v), w)) - log(u) - 
 mutable struct EpiPerSumExp <: Cone
     usedual::Bool
     dim::Int
-    primals::AbstractVector{Float64}
+    point::AbstractVector{Float64}
     g::Vector{Float64}
     H::Matrix{Float64}
     H2::Matrix{Float64}
@@ -30,10 +30,10 @@ mutable struct EpiPerSumExp <: Cone
         cone.g = Vector{Float64}(undef, dim)
         cone.H = Matrix{Float64}(undef, dim, dim)
         cone.H2 = similar(cone.H)
-        function barfun(primals)
-            u = primals[1]
-            v = primals[2]
-            w = view(primals, 3:dim)
+        function barfun(point)
+            u = point[1]
+            v = point[2]
+            w = view(point, 3:dim)
             # return -log(u - v*sum(wi -> exp(wi/v), w)) - log(u) - log(v)
             return -log(log(u) - log(v) - log(sum(wi -> exp(wi / v), w))) - log(u) - 2.0 * log(v) # TODO use the numerically safer way to evaluate LSE function
         end
@@ -50,15 +50,15 @@ get_nu(cone::EpiPerSumExp) = 3 # TODO does this increase with dim > 3?
 set_initial_point(arr::AbstractVector{Float64}, cone::EpiPerSumExp) = (@. arr = -log(cone.dim - 2); arr[1] = 2.0; arr[2] = 1.0; arr)
 
 function check_in_cone(cone::EpiPerSumExp)
-    u = cone.primals[1]
-    v = cone.primals[2]
-    w = view(cone.primals, 3:cone.dim)
+    u = cone.point[1]
+    v = cone.point[2]
+    w = view(cone.point, 3:cone.dim)
     if u <= 0.0 || v <= 0.0 || u <= v * sum(wi -> exp(wi / v), w) # TODO use the numerically safer way to evaluate LSE function
         return false
     end
 
     # TODO check allocations, check with Jarrett if this is most efficient way to use DiffResults
-    cone.diffres = ForwardDiff.hessian!(cone.diffres, cone.barfun, cone.primals)
+    cone.diffres = ForwardDiff.hessian!(cone.diffres, cone.barfun, cone.point)
     cone.g .= DiffResults.gradient(cone.diffres)
     cone.H .= DiffResults.hessian(cone.diffres)
 
