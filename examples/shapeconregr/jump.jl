@@ -15,7 +15,7 @@ see e.g. Chapter 8 of thesis by G. Hall (2018)
 import Hypatia
 const HYP = Hypatia
 const CO = HYP.Cones
-const LS = HYP.LinearSystems
+# const LS = HYP.LinearSystems
 const MU = HYP.ModelUtilities
 
 import MathOptInterface
@@ -38,12 +38,10 @@ mutable struct ShapeData
     mono_profile::Vector{Int}
     conv_profile::Int
 end
-ShapeData(n::Int) = ShapeData(
-    MU.Box(-ones(n), ones(n)), MU.Box(-ones(n), ones(n)),
-    ones(Int, n), 1)
+ShapeData(n::Int) = ShapeData(MU.Box(-ones(n), ones(n)), MU.Box(-ones(n), ones(n)), ones(Int, n), 1)
 
 # problem data
-function generateregrdata(
+function generate_regr_data(
     func::Function,
     xmin::Float64,
     xmax::Float64,
@@ -52,8 +50,9 @@ function generateregrdata(
     signal_ratio::Float64 = 1.0,
     rseed::Int = 1,
     )
-    @assert 0.0 <= signal_ratio < Inf
     Random.seed!(rseed)
+    @assert 0.0 <= signal_ratio < Inf
+
     X = rand(Distributions.Uniform(xmin, xmax), npoints, n)
     y = [func(X[p, :]) for p in 1:npoints]
     if !iszero(signal_ratio)
@@ -61,23 +60,25 @@ function generateregrdata(
         noise .*= norm(y) / sqrt(signal_ratio) / norm(noise)
         y .+= noise
     end
+
     return (X, y)
 end
 
-function add_loss_and_polys!(
+function add_loss_and_polys(
     model::JuMP.Model,
     X::Matrix{Float64},
     y::Vector{Float64},
     r::Int,
-    use_leastsqobj::Bool
+    use_leastsqobj::Bool,
     )
     (npoints, n) = size(X)
     DynamicPolynomials.@polyvar x[1:n]
+
     JuMP.@variable(model, p, PolyJuMP.Poly(DynamicPolynomials.monomials(x, 0:r)))
     if use_leastsqobj
         JuMP.@variable(model, z)
         JuMP.@objective(model, Min, z / npoints)
-        JuMP.@constraint(model, [z, [y[i] - p(X[i, :]) for i in 1:npoints]...] in MOI.SecondOrderCone(1+npoints))
+        JuMP.@constraint(model, [z, [y[i] - p(X[i, :]) for i in 1:npoints]...] in MOI.SecondOrderCone(1 + npoints))
      else
         JuMP.@variable(model, z[1:npoints])
         JuMP.@objective(model, Min, sum(z) / npoints)
@@ -86,6 +87,7 @@ function add_loss_and_polys!(
             [i in 1:npoints], z[i] >= -y[i] + p(X[i, :])
         end)
     end
+
     return (x, p)
 end
 
@@ -100,8 +102,8 @@ function build_shapeconregr_PSD(
     n = size(X, 2)
     d = div(r + 1, 2)
 
-    model = SumOfSquares.SOSModel(JuMP.with_optimizer(HYP.Optimizer, verbose=true, dense = dense, linearsystem=LS.QRSymm))
-    (x, p) = add_loss_and_polys!(model, X, y, r, use_leastsqobj)
+    model = SumOfSquares.SOSModel(JuMP.with_optimizer(HYP.Optimizer, verbose = true, dense = dense, linearsystem=LS.QRSymm))
+    (x, p) = add_loss_and_polys(model, X, y, r, use_leastsqobj)
 
     mono_bss = MU.get_domain_inequalities(sd.mono_dom, x)
     conv_bss = MU.get_domain_inequalities(sd.conv_dom, x)
@@ -110,7 +112,7 @@ function build_shapeconregr_PSD(
     for j in 1:n
         if !iszero(sd.mono_profile[j])
             dpj = DynamicPolynomials.differentiate(p, x[j])
-            JuMP.@constraint(model, sd.mono_profile[j] * dpj >= 0, domain=mono_bss)
+            JuMP.@constraint(model, sd.mono_profile[j] * dpj >= 0, domain = mono_bss)
         end
     end
 
@@ -118,7 +120,7 @@ function build_shapeconregr_PSD(
     if !iszero(sd.conv_profile)
         # TODO think about what it means if wsos polynomials have degree > 2
         Hp = DynamicPolynomials.differentiate(p, x, 2)
-        JuMP.@constraint(model, sd.conv_profile * Hp in JuMP.PSDCone(), domain=conv_bss)
+        JuMP.@constraint(model, sd.conv_profile * Hp in JuMP.PSDCone(), domain = conv_bss)
     end
 
     return (model, p)
@@ -132,17 +134,19 @@ function build_shapeconregr_WSOS(
     use_leastsqobj::Bool = false,
     dense::Bool = true,
     sample::Bool = true,
+    rseed::Int = 1,
     )
+    Random.seed!(rseed)
     d = div(r + 1, 2)
     n = size(X, 2)
 
-    (mono_U, mono_pts, mono_P0, mono_PWts, _) = MU.interpolate(sd.mono_dom, d, sample=sample, sample_factor=50)
-    (conv_U, conv_pts, conv_P0, conv_PWts, _) = MU.interpolate(sd.conv_dom, d - 1, sample=sample, sample_factor=50)
+    (mono_U, mono_pts, mono_P0, mono_PWts, _) = MU.interpolate(sd.mono_dom, d, sample = sample, sample_factor = 50)
+    (conv_U, conv_pts, conv_P0, conv_PWts, _) = MU.interpolate(sd.conv_dom, d - 1, sample = sample, sample_factor = 50)
     mono_wsos_cone = HYP.WSOSPolyInterpCone(mono_U, [mono_P0, mono_PWts...])
     conv_wsos_cone = HYP.WSOSPolyInterpMatCone(n, conv_U, [conv_P0, conv_PWts...])
 
-    model = SumOfSquares.SOSModel(JuMP.with_optimizer(HYP.Optimizer, verbose=true, dense = dense, linearsystem=LS.QRSymm, tolabsopt=1e-6, tolrelopt=1e-5, tolfeas=1e-6))
-    (x, p) = add_loss_and_polys!(model, X, y, r, use_leastsqobj)
+    model = SumOfSquares.SOSModel(JuMP.with_optimizer(HYP.Optimizer, verbose = true, dense = dense, linearsystem=LS.QRSymm, tol_abs_opt = 1e-6, tol_rel_opt = 1e-5, tol_feas = 1e-6))
+    (x, p) = add_loss_and_polys(model, X, y, r, use_leastsqobj)
 
     # monotonicity
     for j in 1:n
@@ -155,13 +159,13 @@ function build_shapeconregr_WSOS(
     # convexity
     if !iszero(sd.conv_profile)
         Hp = DynamicPolynomials.differentiate(p, x, 2)
-        JuMP.@constraint(model, [sd.conv_profile * Hp[i,j](conv_pts[u, :]) * (i == j ? 1.0 : rt2) for i in 1:n for j in 1:i for u in 1:conv_U] in conv_wsos_cone)
+        JuMP.@constraint(model, [sd.conv_profile * Hp[i, j](conv_pts[u, :]) * (i == j ? 1.0 : rt2) for i in 1:n for j in 1:i for u in 1:conv_U] in conv_wsos_cone)
     end
 
     return (model, p)
 end
 
-function run_JuMP_shapeconregr(use_wsos::Bool; dense::Bool=true)
+function run_JuMP_shapeconregr(use_wsos::Bool; dense::Bool = true)
     (n, deg, npoints, signal_ratio, f) =
         # (2, 3, 100, 0.0, x -> exp(norm(x))) # no noise, monotonic function
         (2, 3, 100, 0.0, x -> sum(x.^3)) # no noise, monotonic function
@@ -174,14 +178,14 @@ function run_JuMP_shapeconregr(use_wsos::Bool; dense::Bool=true)
         # (2, 4, 100, 0.0, x -> sum(x)^2)
 
     shapedata = ShapeData(n)
-    (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
+    (X, y) = generate_regr_data(f, -1.0, 1.0, n, npoints, signal_ratio = signal_ratio)
 
     use_leastsqobj = true
 
     if use_wsos
-        (model, p) = build_shapeconregr_WSOS(X, y, deg, shapedata, use_leastsqobj=use_leastsqobj, dense = dense)
+        (model, p) = build_shapeconregr_WSOS(X, y, deg, shapedata, use_leastsqobj = use_leastsqobj, dense = dense)
     else
-        (model, p) = build_shapeconregr_PSD(X, y, deg, shapedata, use_leastsqobj=use_leastsqobj, dense = dense)
+        (model, p) = build_shapeconregr_PSD(X, y, deg, shapedata, use_leastsqobj = use_leastsqobj, dense = dense)
     end
 
     println("starting to solve JuMP model")

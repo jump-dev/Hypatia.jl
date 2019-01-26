@@ -72,15 +72,15 @@ function solvelinsys4!(
     end
     GHG = Symmetric(G'*HG)
     PGHG = Symmetric(P + GHG)
-    # F1 = cholesky!(PGHG, Val(true), check=false)
-    F1 = cholesky(PGHG, check=false) # TODO allow pivot
+    # F1 = cholesky!(PGHG, Val(true), check = false)
+    F1 = cholesky(PGHG, check = false) # TODO allow pivot
     singular = !isposdef(F1)
 
     if singular
         println("singular PGHG")
         PGHGAA = Symmetric(P + GHG + A'*A)
-        # F1 = cholesky!(PGHGAA, Val(true), check=false)
-        F1 = cholesky(PGHGAA, check=false) # TODO allow pivot
+        # F1 = cholesky!(PGHGAA, Val(true), check = false)
+        F1 = cholesky(PGHGAA, check = false) # TODO allow pivot
         if !isposdef(F1)
             error("could not fix singular PGHG")
         end
@@ -91,8 +91,8 @@ function solvelinsys4!(
     # ldiv!(F1.L, LA)
     LA = F1.L \ LA
     ALLA = Symmetric(LA'*LA)
-    # F2 = cholesky!(ALLA, Val(fal), check=false) # TODO avoid if no equalities?
-    F2 = cholesky(ALLA, check=false) # TODO allow pivot; TODO avoid if no equalities?
+    # F2 = cholesky!(ALLA, Val(fal), check = false) # TODO avoid if no equalities?
+    F2 = cholesky(ALLA, check = false) # TODO allow pivot; TODO avoid if no equalities?
     if !isposdef(F2)
         error("singular ALLA")
     end

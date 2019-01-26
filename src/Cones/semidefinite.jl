@@ -53,7 +53,7 @@ function check_in_cone(cone::PosSemidef)
     svec_to_smat!(cone.mat, cone.point)
     @. cone.matpnt = cone.mat
 
-    F = cholesky!(Symmetric(cone.mat), Val(true), check=false)
+    F = cholesky!(Symmetric(cone.mat), Val(true), check = false)
     if !isposdef(F)
         return false
     end

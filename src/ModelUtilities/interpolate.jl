@@ -115,9 +115,9 @@ function interpolate(
     sample_factor::Int = 10,
     )
     if sample
-        return wsos_sample_params(dom, d, calc_w=calc_w, sample_factor=sample_factor)
+        return wsos_sample_params(dom, d, calc_w = calc_w, sample_factor = sample_factor)
     else
-        return wsos_box_params(sampling_region(dom), dimension(dom), d, calc_w=calc_w)
+        return wsos_box_params(sampling_region(dom), dimension(dom), d, calc_w = calc_w)
     end
 end
 
@@ -127,7 +127,7 @@ function wsos_box_params(::Domain, ::Int, ::Int)
 end
 
 # difference with sampling functions is that P0 is always formed using points in [-1, 1]
-function wsos_box_params(dom::Box, n::Int, d::Int; calc_w::Bool=false)
+function wsos_box_params(dom::Box, n::Int, d::Int; calc_w::Bool = false)
     # n could be larger than the dimension of dom if the original domain was a SemiFreeDomain
     (U, pts, P0, P0sub, w) = wsos_box_params(n, d, calc_w)
     # scale and shift points, get WSOS matrices
@@ -140,7 +140,7 @@ function wsos_box_params(dom::Box, n::Int, d::Int; calc_w::Bool=false)
     return (U=U, pts=trpts, P0=P0, PWts=PWts, w=w)
 end
 
-function wsos_box_params(dom::FreeDomain, n::Int, d::Int; calc_w::Bool=false)
+function wsos_box_params(dom::FreeDomain, n::Int, d::Int; calc_w::Bool = false)
     # n could be larger than the dimension of dom if the original domain was a SemiFreeDomain
     (U, pts, P0, P0sub, w) = wsos_box_params(n, d, calc_w)
     return (U=U, pts=pts, P0=P0, PWts=[], w=w)
@@ -247,7 +247,7 @@ function padua_data(d::Int, calc_w::Bool)
         Mmom = zeros(d+1, d+1)
         f = 1/(d*(2d+1))
         for j in 1:d+1, i in 1:d+2-j
-            Mmom[i,j] = mom[i]*mom[j]*f
+            Mmom[i, j] = mom[i]*mom[j]*f
         end
         Mmom[1,d+1] /= 2
         # cubature weights as matrices on the subgrids
@@ -291,7 +291,7 @@ function approxfekete_data(n::Int, d::Int, calc_w::Bool)
         end
     end
     dom = Box(-ones(n), ones(n))
-    (pts, P0, P0sub, w) = make_wsos_arrays(dom, candidate_pts, d, U, L, calc_w=calc_w)
+    (pts, P0, P0sub, w) = make_wsos_arrays(dom, candidate_pts, d, U, L, calc_w = calc_w)
     return (U, pts, P0, P0sub, w)
 end
 
@@ -354,7 +354,7 @@ function wsos_sample_params(
     n = dimension(dom)
     (L, U) = get_LU(n, d)
     candidate_pts = interp_sample(dom, U * sample_factor)
-    (pts, P0, P0sub, w) = make_wsos_arrays(dom, candidate_pts, d, U, L, calc_w=calc_w)
+    (pts, P0, P0sub, w) = make_wsos_arrays(dom, candidate_pts, d, U, L, calc_w = calc_w)
     g = get_weights(dom, pts)
     PWts = [sqrt.(gi) .* P0sub for gi in g]
     return (U=U, pts=pts, P0=P0, PWts=PWts, w=w)

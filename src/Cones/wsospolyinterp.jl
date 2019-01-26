@@ -64,7 +64,7 @@ function check_in_cone(cone::WSOSPolyInterp)
         mul!(tmp1j, tmp2j, ipwtj)
 
         # pivoted cholesky and triangular solve method
-        F = cholesky!(Symmetric(tmp1j, :L), Val(true), check=false)
+        F = cholesky!(Symmetric(tmp1j, :L), Val(true), check = false)
         if !isposdef(F)
             return false
         end

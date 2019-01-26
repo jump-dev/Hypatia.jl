@@ -33,10 +33,10 @@ dimension(cone::Cone) = cone.dim
 function factorize_hess(cone::Cone)
     @. cone.H2 = cone.H
 
-    cone.F = bunchkaufman!(Symmetric(cone.H2, :U), true, check=false)
+    cone.F = bunchkaufman!(Symmetric(cone.H2, :U), true, check = false)
     return issuccess(cone.F)
 
-    # cone.F = cholesky!(Symmetric(cone.H2), Val(true), check=false)
+    # cone.F = cholesky!(Symmetric(cone.H2), Val(true), check = false)
     # return isposdef(cone.F)
 end
 
@@ -61,9 +61,9 @@ function smat_to_svec!(vec::AbstractVector, mat::AbstractMatrix)
     m = size(mat, 1)
     for i in 1:m, j in 1:i
         if i == j
-            vec[k] = mat[i,j]
+            vec[k] = mat[i, j]
         else
-            vec[k] = rt2*mat[i,j]
+            vec[k] = rt2 * mat[i, j]
         end
         k += 1
     end
@@ -75,9 +75,9 @@ function svec_to_smat!(mat::AbstractMatrix, vec::AbstractVector)
     m = size(mat, 1)
     for i in 1:m, j in 1:i
         if i == j
-            mat[i,j] = vec[k]
+            mat[i, j] = vec[k]
         else
-            mat[i,j] = mat[j,i] = rt2i*vec[k]
+            mat[i, j] = mat[j,i] = rt2i * vec[k]
         end
         k += 1
     end

@@ -30,7 +30,7 @@ function makeplot(regressor, X, y)
         marker_line_width = 0.5,
         marker_line_color = "rgba(217, 217, 217, 0.14)"
     )
-    layout = Layout(margin=attr(l=0, r=0, t=0, b=0))
+    layout = Layout(margin = attr(l = 0, r = 0, t = 0, b = 0))
 
     p = plot([data_trace, model_trace], layout)
     # savefig(p, "psd_plot.pdf")

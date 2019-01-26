@@ -26,6 +26,8 @@ function build_linearopt(
     tosparse::Bool = false,
     rseed::Int = 1,
     )
+    Random.seed!(rseed)
+
     # set up problem data
     if use_data
         # use provided data in data folder
@@ -35,7 +37,6 @@ function build_linearopt(
         c = vec(readdlm(joinpath(datapath, "c$n.txt"), ',', Float64))
     else
         # generate random data
-        Random.seed!(rseed)
         A = dense ? rand(-9.0:9.0, m, n) : 10.0 .* sprandn(m, n, nzfrac)
         b = A * ones(n)
         c = rand(0.0:9.0, n)

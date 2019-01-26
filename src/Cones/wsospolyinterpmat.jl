@@ -66,7 +66,7 @@ function barfun(pnt, ipwt::Vector{Matrix{Float64}}, R::Int, U::Int, calc_barval:
             end
         end
 
-        F = cholesky!(Symmetric(mat, :L), check=false)
+        F = cholesky!(Symmetric(mat, :L), check = false)
         if !isposdef(F)
             return NaN
         end

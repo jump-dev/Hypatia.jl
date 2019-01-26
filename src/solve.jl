@@ -146,19 +146,19 @@ function solve!(model::Model)
 
         # check convergence criteria
         # TODO nearly primal or dual infeasible or nearly optimal cases?
-        if nres_pr <= model.tolfeas && nres_du <= model.tolfeas && (gap <= model.tolabsopt || (!isnan(relgap) && relgap <= model.tolrelopt))
+        if nres_pr <= model.tol_feas && nres_du <= model.tol_feas && (gap <= model.tol_abs_opt || (!isnan(relgap) && relgap <= model.tol_rel_opt))
             model.verbose && println("optimal solution found; terminating")
             model.status = :Optimal
             break
-        elseif !isnan(infres_pr) && infres_pr <= model.tolfeas
+        elseif !isnan(infres_pr) && infres_pr <= model.tol_feas
             model.verbose && println("primal infeasibility detected; terminating")
             model.status = :PrimalInfeasible
             break
-        elseif !isnan(infres_du) && infres_du <= model.tolfeas
+        elseif !isnan(infres_du) && infres_du <= model.tol_feas
             model.verbose && println("dual infeasibility detected; terminating")
             model.status = :DualInfeasible
             break
-        elseif mu <= model.tolfeas * 1e-2 && tau <= model.tolfeas * 1e-2 * min(1.0, kap)
+        elseif mu <= model.tol_feas * 1e-2 && tau <= model.tol_feas * 1e-2 * min(1.0, kap)
             model.verbose && println("ill-posedness detected; terminating")
             model.status = :IllPosed
             break

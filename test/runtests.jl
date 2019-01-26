@@ -6,9 +6,9 @@ import Hypatia
 const HYP = Hypatia
 const CO = HYP.Cones
 # const LS = HYP.LinearSystems
-# const MU = HYP.ModelUtilities
 const MO = HYP.Models
 const IP = HYP.InteriorPoints
+const MU = HYP.ModelUtilities
 
 import Random
 using LinearAlgebra
@@ -16,7 +16,7 @@ using SparseArrays
 using Test
 
 
-# include(joinpath(@__DIR__, "interpolation.jl"))
+include(joinpath(@__DIR__, "interpolation.jl"))
 
 examples_dir = joinpath(@__DIR__, "../examples")
 
@@ -44,109 +44,108 @@ include(joinpath(@__DIR__, "native.jl"))
 
 @testset "Hypatia tests" begin
 
-# @info("starting interpolation tests")
-# @testset "interpolation tests" begin
-#     interp_sample()
-#     interp_nosample()
+@info("starting interpolation tests")
+@testset "interpolation tests" begin
+    fekete_sample()
+end
+
+# # @info("starting native interface tests")
+# verbose = true
+# # linearsystems = [
+# #     LS.QRSymm,
+# #     # LS.Naive,
+# #     ]
+# testfuns = [
+#     # dimension1, # TODO needs preprocessing
+#     # consistent1,
+#     # inconsistent1,
+#     # inconsistent2,
+#     orthant1,
+#     orthant2,
+#     orthant3,
+#     orthant4,
+#     epinorminf1,
+#     epinorminf2,
+#     epinorminf3,
+#     epinorminf4,
+#     epinorminf5,
+#     epinorminf6,
+#     epinormeucl1,
+#     epinormeucl2,
+#     epipersquare1,
+#     epipersquare2,
+#     epipersquare3,
+#     # semidefinite1,
+#     # semidefinite2,
+#     # semidefinite3,
+#     hypoperlog1,
+#     hypoperlog2,
+#     hypoperlog3,
+#     hypoperlog4,
+#     epiperpower1,
+#     epiperpower2,
+#     epiperpower3,
+#     hypogeomean1,
+#     hypogeomean2,
+#     hypogeomean3,
+#     hypogeomean4,
+#     epinormspectral1,
+#     hypoperlogdet1,
+#     hypoperlogdet2,
+#     hypoperlogdet3,
+#     epipersumexp1,
+#     epipersumexp2,
+#     ]
+# # @testset "native tests: $t, $l" for t in testfuns, l in linearsystems
+# @testset "native tests: $t" for t in testfuns
+#     # t(verbose = verbose, linearsystem=l)
+#     t(verbose = verbose)
 # end
-
-# @info("starting native interface tests")
-verbose = true
-# linearsystems = [
-#     LS.QRSymm,
-#     # LS.Naive,
+#
+# @info("starting default native examples tests")
+# testfuns = [
+#     run_envelope_primal_dense,
+#     run_envelope_dual_dense,
+#     run_envelope_primal_sparse,
+#     run_envelope_dual_sparse,
+#     run_linearopt,
+#     run_namedpoly,
 #     ]
-testfuns = [
-    # dimension1, # TODO needs preprocessing
-    # consistent1,
-    # inconsistent1,
-    # inconsistent2,
-    orthant1,
-    orthant2,
-    orthant3,
-    orthant4,
-    epinorminf1,
-    epinorminf2,
-    epinorminf3,
-    epinorminf4,
-    epinorminf5,
-    epinorminf6,
-    epinormeucl1,
-    epinormeucl2,
-    epipersquare1,
-    epipersquare2,
-    epipersquare3,
-    # semidefinite1,
-    # semidefinite2,
-    # semidefinite3,
-    hypoperlog1,
-    hypoperlog2,
-    hypoperlog3,
-    hypoperlog4,
-    epiperpower1,
-    epiperpower2,
-    epiperpower3,
-    hypogeomean1,
-    hypogeomean2,
-    hypogeomean3,
-    hypogeomean4,
-    epinormspectral1,
-    hypoperlogdet1,
-    hypoperlogdet2,
-    hypoperlogdet3,
-    epipersumexp1,
-    epipersumexp2,
-    ]
-# @testset "native tests: $t, $l" for t in testfuns, l in linearsystems
-@testset "native tests: $t" for t in testfuns
-    # t(verbose = verbose, linearsystem=l)
-    t(verbose = verbose)
-end
-
-@info("starting default native examples tests")
-testfuns = [
-    run_envelope_primal_dense,
-    run_envelope_dual_dense,
-    run_envelope_primal_sparse,
-    run_envelope_dual_sparse,
-    run_linearopt,
-    run_namedpoly,
-    ]
-@testset "default examples: $t" for t in testfuns
-    t()
-end
-
-@info("starting additional native examples tests")
-verbose = false
-# linearsystems = [
-#     LS.QRSymm,
-#     # LS.Naive, # slow
+# @testset "default examples: $t" for t in testfuns
+#     t()
+# end
+#
+# @info("starting additional native examples tests")
+# verbose = false
+# # linearsystems = [
+# #     LS.QRSymm,
+# #     # LS.Naive, # slow
+# #     ]
+# testfuns = [
+#     # TODO test primal and dual formulations of envelope
+#     # envelope1, # TODO check slight obj disagreement
+#     envelope2,
+#     envelope3,
+#     envelope4,
+#     linearopt1,
+#     linearopt2,
+#     # namedpoly1,
+#     # namedpoly2,
+#     namedpoly3,
+#     # namedpoly4,
+#     namedpoly5,
+#     # namedpoly6,
+#     namedpoly7,
+#     # namedpoly8,
+#     namedpoly9,
+#     namedpoly10,
+#     namedpoly11,
 #     ]
-testfuns = [
-    # TODO test primal and dual formulations of envelope
-    # envelope1, # TODO check slight obj disagreement
-    envelope2,
-    envelope3,
-    envelope4,
-    linearopt1,
-    linearopt2,
-    # namedpoly1,
-    # namedpoly2,
-    namedpoly3,
-    # namedpoly4,
-    namedpoly5,
-    # namedpoly6,
-    namedpoly7,
-    # namedpoly8,
-    namedpoly9,
-    namedpoly10,
-    namedpoly11,
-    ]
-# @testset "native examples: $t, $l" for t in testfuns, l in linearsystems
-@testset "native examples: $t" for t in testfuns#, l in linearsystems
-    # t(verbose = verbose, linearsystem=l)
-    t(verbose = verbose)
-end
+# # @testset "native examples: $t, $l" for t in testfuns, l in linearsystems
+# @testset "native examples: $t" for t in testfuns#, l in linearsystems
+#     # t(verbose = verbose, linearsystem=l)
+#     t(verbose = verbose)
+# end
 
 # @info("starting default JuMP examples tests")
 # testfuns = [
