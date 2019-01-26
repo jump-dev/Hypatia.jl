@@ -15,7 +15,7 @@ mutable struct PosSemidef <: Cone
     usedual::Bool
     dim::Int
     side::Int
-    pnt::AbstractVector{Float64}
+    primals::AbstractVector{Float64}
     mat::Matrix{Float64}
     mat2::Matrix{Float64}
     matpnt::Matrix{Float64}
@@ -25,7 +25,7 @@ mutable struct PosSemidef <: Cone
         cone = new()
         cone.usedual = isdual
         cone.dim = dim
-        cone.side = round(Int, sqrt(0.25 + 2*dim) - 0.5)
+        cone.side = round(Int, sqrt(0.25 + 2 * dim) - 0.5)
         cone.mat = Matrix{Float64}(undef, cone.side, cone.side)
         cone.mat2 = similar(cone.mat)
         cone.matpnt = similar(cone.mat)
@@ -35,23 +35,22 @@ end
 
 PosSemidef(dim::Int) = PosSemidef(dim, false)
 
-dimension(cone::PosSemidef) = cone.dim
 get_nu(cone::PosSemidef) = cone.side
+
 function set_initial_point(arr::AbstractVector{Float64}, cone::PosSemidef)
     for i in 1:cone.side, j in i:cone.side
         if i == j
-            cone.mat[i,j] = 1.0
+            cone.mat[i, j] = 1.0
         else
-            cone.mat[i,j] = cone.mat[j,i] = 0.0
+            cone.mat[i, j] = cone.mat[j, i] = 0.0
         end
     end
     smat_to_svec!(arr, cone.mat)
     return arr
 end
-loadpnt!(cone::PosSemidef, pnt::AbstractVector{Float64}) = (cone.pnt = pnt)
 
-function incone(cone::PosSemidef, scal::Float64)
-    svec_to_smat!(cone.mat, cone.pnt)
+function check_in_cone(cone::PosSemidef)
+    svec_to_smat!(cone.mat, cone.primals)
     @. cone.matpnt = cone.mat
 
     F = cholesky!(Symmetric(cone.mat), Val(true), check=false)
@@ -61,6 +60,8 @@ function incone(cone::PosSemidef, scal::Float64)
     cone.matinv = -inv(F) # TODO eliminate allocs
     return true
 end
+
+
 
 calcg!(g::AbstractVector{Float64}, cone::PosSemidef) = (smat_to_svec!(g, cone.matinv); g)
 
