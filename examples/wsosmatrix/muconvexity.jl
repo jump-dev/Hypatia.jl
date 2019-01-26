@@ -9,7 +9,7 @@ see https://en.wikipedia.org/wiki/Convex_function#Strongly_convex_functions
 import Hypatia
 const HYP = Hypatia
 const CO = HYP.Cones
-const LS = HYP.LinearSystems
+# const LS = HYP.LinearSystems
 const MU = HYP.ModelUtilities
 
 import MathOptInterface
@@ -25,7 +25,9 @@ import Random
 const rt2 = sqrt(2)
 
 function run_JuMP_muconvexity(x::Vector, poly, dom, use_wsos::Bool)
-    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose=true, tolabsopt=1e-8, tolrelopt=1e-8, tolfeas=1e-8))
+    Random.seed!(1)
+
+    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, tol_abs_opt = 1e-8, tol_rel_opt = 1e-8, tol_feas = 1e-8))
     JuMP.@variable(model, mu)
     JuMP.@objective(model, Max, mu)
 
@@ -35,17 +37,17 @@ function run_JuMP_muconvexity(x::Vector, poly, dom, use_wsos::Bool)
     if use_wsos
         n = DynamicPolynomials.nvariables(x)
         d = div(maximum(DynamicPolynomials.maxdegree.(H)) + 1, 2)
-        (U, pts, P0, PWts, _) = MU.interpolate(dom, d, sample=true)
+        (U, pts, P0, PWts, _) = MU.interpolate(dom, d, sample = true)
         mat_wsos_cone = HYP.WSOSPolyInterpMatCone(n, U, [P0, PWts...])
 
-        JuMP.@constraint(model, [H[i,j](x => pts[u, :]) * (i == j ? 1.0 : rt2) for i in 1:n for j in 1:i for u in 1:U] in mat_wsos_cone)
+        JuMP.@constraint(model, [H[i, j](x => pts[u, :]) * (i == j ? 1.0 : rt2) for i in 1:n for j in 1:i for u in 1:U] in mat_wsos_cone)
     else
         PolyJuMP.setpolymodule!(model, SumOfSquares)
 
         if dom isa MU.FreeDomain
             JuMP.@constraint(model, H in JuMP.PSDCone())
         else
-            JuMP.@constraint(model, H in JuMP.PSDCone(), domain=MU.get_domain_inequalities(dom, x))
+            JuMP.@constraint(model, H in JuMP.PSDCone(), domain = MU.get_domain_inequalities(dom, x))
         end
     end
 
@@ -54,12 +56,13 @@ function run_JuMP_muconvexity(x::Vector, poly, dom, use_wsos::Bool)
     return (JuMP.termination_status(model), JuMP.primal_status(model), JuMP.value(mu))
 end
 
-function run_JuMP_muconvexity_rand(; rseed::Int=1)
+function run_JuMP_muconvexity_rand(; rseed::Int = 1)
+    Random.seed!(rseed)
+
     n = 2
     d = 4
     DynamicPolynomials.@polyvar x[1:n]
 
-    Random.seed!(rseed)
     poly = sum(rand() * z for z in DynamicPolynomials.monomials(x, 0:d))
 
     dom = MU.FreeDomain(n)
@@ -85,7 +88,7 @@ function run_JuMP_muconvexity_rand(; rseed::Int=1)
     @test mufree - muball <= 1e-4
 end
 
-function run_JuMP_muconvexity_a(; use_wsos::Bool=true)
+function run_JuMP_muconvexity_a(; use_wsos::Bool = true)
     DynamicPolynomials.@polyvar x[1:1]
     poly = (x[1] + 1)^2 * (x[1] - 1)^2
     dom = MU.FreeDomain(1)
@@ -96,7 +99,7 @@ function run_JuMP_muconvexity_a(; use_wsos::Bool=true)
     @test mu ≈ -4 atol=1e-4 rtol=1e-4
 end
 
-function run_JuMP_muconvexity_b(; use_wsos::Bool=true)
+function run_JuMP_muconvexity_b(; use_wsos::Bool = true)
     n = 3
     DynamicPolynomials.@polyvar x[1:n]
     poly = sum(x.^4) - sum(x.^2)
@@ -108,7 +111,7 @@ function run_JuMP_muconvexity_b(; use_wsos::Bool=true)
     @test mu ≈ -2 atol=1e-4 rtol=1e-4
 end
 
-function run_JuMP_muconvexity_c(; use_wsos::Bool=true)
+function run_JuMP_muconvexity_c(; use_wsos::Bool = true)
     DynamicPolynomials.@polyvar x[1:1]
     poly = (x[1] + 1)^2 * (x[1] - 1)^2
     dom = MU.Box([-1.0], [1.0])
@@ -119,7 +122,7 @@ function run_JuMP_muconvexity_c(; use_wsos::Bool=true)
     @test mu ≈ -4 atol=1e-4 rtol=1e-4
 end
 
-function run_JuMP_muconvexity_d(; use_wsos::Bool=true)
+function run_JuMP_muconvexity_d(; use_wsos::Bool = true)
     n = 3
     DynamicPolynomials.@polyvar x[1:n]
     poly = sum(x.^4) - sum(x.^2)

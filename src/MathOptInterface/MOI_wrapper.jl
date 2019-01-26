@@ -51,10 +51,10 @@ Optimizer(;
     timelimit::Float64 = 3.6e3, # TODO should be Inf
     linearsystem = LinearSystems.QRSymm,
     dense::Bool = true,
-    tolrelopt::Float64 = 1e-6,
-    tolabsopt::Float64 = 1e-7,
-    tolfeas::Float64 = 1e-7,
-    ) = Optimizer(Model(verbose = verbose, timelimit=timelimit, tolrelopt=tolrelopt, tolabsopt=tolabsopt, tolfeas=tolfeas), verbose, timelimit, linearsystem, dense)
+    tol_rel_opt::Float64 = 1e-6,
+    tol_abs_opt::Float64 = 1e-7,
+    tol_feas::Float64 = 1e-7,
+    ) = Optimizer(Model(verbose = verbose, timelimit=timelimit, tol_rel_opt = tol_rel_opt, tol_abs_opt = tol_abs_opt, tol_feas = tol_feas), verbose, timelimit, linearsystem, dense)
 
 MOI.get(::Optimizer, ::MOI.SolverName) = "Hypatia"
 
@@ -469,10 +469,10 @@ function MOI.optimize!(opt::Optimizer)
     # check, preprocess, load, and solve
     check_data(c, A, b, G, h, cone)
     if opt.linearsystem == LinearSystems.QRSymm
-        (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = preprocess_data(c, A, b, G, useQR=true)
+        (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = preprocess_data(c, A, b, G, useQR = true)
         L = LinearSystems.QRSymm(c1, A1, b1, G1, h, cone, Q2, RiQ1)
     elseif opt.linearsystem == LinearSystems.Naive
-        (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = preprocess_data(c, A, b, G, useQR=false)
+        (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = preprocess_data(c, A, b, G, useQR = false)
         L = LinearSystems.Naive(c1, A1, b1, G1, h, cone)
     else
         error("linear system cache type $(opt.linearsystem) is not recognized")

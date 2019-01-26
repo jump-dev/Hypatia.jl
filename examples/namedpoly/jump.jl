@@ -46,7 +46,7 @@ function getpolydata(polyname::Symbol)
     elseif polyname == :caprasse
         DynamicPolynomials.@polyvar x[1:4]
         f = -x[1]*x[3]^3+4x[2]*x[3]^2*x[4]+4x[1]*x[3]*x[4]^2+2x[2]*x[4]^3+4x[1]*x[3]+4x[3]^2-10x[2]*x[4]-10x[4]^2+2
-        dom = MU.Box(-0.5*ones(4), 0.5*ones(4))
+        dom = MU.Box(-0.5 * ones(4), 0.5 * ones(4))
         truemin = -3.1800966258
     elseif polyname == :caprasse_ball
         DynamicPolynomials.@polyvar x[1:4]
@@ -56,7 +56,7 @@ function getpolydata(polyname::Symbol)
     elseif polyname == :goldsteinprice
         DynamicPolynomials.@polyvar x[1:2]
         f = (1+(x[1]+x[2]+1)^2*(19-14x[1]+3x[1]^2-14x[2]+6x[1]*x[2]+3x[2]^2))*(30+(2x[1]-3x[2])^2*(18-32x[1]+12x[1]^2+48x[2]-36x[1]*x[2]+27x[2]^2))
-        dom = MU.Box(-2*ones(2), 2*ones(2))
+        dom = MU.Box(-2 * ones(2), 2 * ones(2))
         truemin = 3
     elseif polyname == :goldsteinprice_ball
         DynamicPolynomials.@polyvar x[1:2]
@@ -67,7 +67,7 @@ function getpolydata(polyname::Symbol)
         DynamicPolynomials.@polyvar x[1:2]
         f = (1+(x[1]+x[2]+1)^2*(19-14x[1]+3x[1]^2-14x[2]+6x[1]*x[2]+3x[2]^2))*(30+(2x[1]-3x[2])^2*(18-32x[1]+12x[1]^2+48x[2]-36x[1]*x[2]+27x[2]^2))
         centers = zeros(2)
-        Q = Diagonal(0.25*ones(2))
+        Q = Diagonal(0.25 * ones(2))
         dom = MU.Ellipsoid(centers, Q)
         truemin = 3
     elseif polyname == :heart
@@ -78,7 +78,7 @@ function getpolydata(polyname::Symbol)
     elseif polyname == :lotkavolterra
         DynamicPolynomials.@polyvar x[1:4]
         f = x[1]*(x[2]^2+x[3]^2+x[4]^2-1.1)+1
-        dom = MU.Box(-2*ones(4), 2*ones(4))
+        dom = MU.Box(-2 * ones(4), 2 * ones(4))
         truemin = -20.8
     elseif polyname == :lotkavolterra_ball
         DynamicPolynomials.@polyvar x[1:4]
@@ -117,7 +117,7 @@ function getpolydata(polyname::Symbol)
     elseif polyname == :reactiondiffusion
         DynamicPolynomials.@polyvar x[1:3]
         f = -x[1]+2x[2]-x[3]-0.835634534x[2]*(1+x[2])
-        dom = MU.Box(-5*ones(3), 5*ones(3))
+        dom = MU.Box(-5 * ones(3), 5 * ones(3))
         truemin = -36.71269068
     elseif polyname == :reactiondiffusion_ball
         DynamicPolynomials.@polyvar x[1:3]
@@ -137,17 +137,17 @@ function getpolydata(polyname::Symbol)
     elseif polyname == :rosenbrock
         DynamicPolynomials.@polyvar x[1:2]
         f = (1-x[1])^2+100*(x[1]^2-x[2])^2
-        dom = MU.Box(-5*ones(2), 10*ones(2))
+        dom = MU.Box(-5 * ones(2), 10 * ones(2))
         truemin = 0
     elseif polyname == :rosenbrock_ball
         DynamicPolynomials.@polyvar x[1:2]
         f = (1-x[1])^2+100*(x[1]^2-x[2])^2
-        dom = MU.Ball(2.5*ones(2), 7.5*sqrt(2))
+        dom = MU.Ball(2.5 * ones(2), 7.5*sqrt(2))
         truemin = 0
     elseif polyname == :schwefel
         DynamicPolynomials.@polyvar x[1:3]
         f = (x[1]-x[2]^2)^2+(x[2]-1)^2+(x[1]-x[3]^2)^2+(x[3]-1)^2
-        dom = MU.Box(-10*ones(3), 10*ones(3))
+        dom = MU.Box(-10 * ones(3), 10 * ones(3))
         truemin = 0
     elseif polyname == :schwefel_ball
         DynamicPolynomials.@polyvar x[1:3]
@@ -167,10 +167,10 @@ function build_JuMP_namedpoly_PSD(
     dom::MU.Domain;
     d::Int = div(maxdegree(f) + 1, 2),
     )
-    model = SumOfSquares.SOSModel(JuMP.with_optimizer(HYP.Optimizer, verbose=true))
+    model = SumOfSquares.SOSModel(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
     JuMP.@variable(model, a)
     JuMP.@objective(model, Max, a)
-    JuMP.@constraint(model, fnn, f >= a, domain=MU.get_domain_inequalities(dom, x), maxdegree=2d)
+    JuMP.@constraint(model, fnn, f >= a, domain = MU.get_domain_inequalities(dom, x), maxdegree=2d)
 
     return model
 end
@@ -180,14 +180,16 @@ function build_JuMP_namedpoly_WSOS(
     f,
     dom::MU.Domain;
     d::Int = div(DynamicPolynomials.maxdegree(f) + 1, 2),
-    sample_factor = 25,
-    primal_wsos::Bool = false,
+    sample::Bool = false,
+    primal_wsos::Bool = true,
     rseed::Int = 1,
     )
-    (U, pts, P0, PWts, _) = MU.interpolate(dom, d, sample=true)
+    Random.seed!(rseed)
+
+    (U, pts, P0, PWts, _) = MU.interpolate(dom, d, sample = sample)
 
     # build JuMP model
-    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose=true, tolrelopt=1e-7, tolfeas=1e-8))
+    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
     if primal_wsos
         JuMP.@variable(model, a)
         JuMP.@objective(model, Max, a)
@@ -202,7 +204,7 @@ function build_JuMP_namedpoly_WSOS(
     return model
 end
 
-function run_JuMP_namedpoly(use_wsos::Bool; primal_wsos::Bool=false)
+function run_JuMP_namedpoly(use_wsos::Bool; primal_wsos::Bool = false)
     # select the named polynomial to minimize and degree of SOS interpolation
     (polyname, deg) =
         # :butcher, 2
@@ -233,9 +235,9 @@ function run_JuMP_namedpoly(use_wsos::Bool; primal_wsos::Bool=false)
     (x, f, dom, truemin) = getpolydata(polyname)
 
     if use_wsos
-        model = build_JuMP_namedpoly_WSOS(x, f, dom, d=deg, primal_wsos = primal_wsos)
+        model = build_JuMP_namedpoly_WSOS(x, f, dom, d = deg, primal_wsos = primal_wsos)
     else
-        model = build_JuMP_namedpoly_PSD(x, f, dom, d=deg)
+        model = build_JuMP_namedpoly_PSD(x, f, dom, d = deg)
     end
     JuMP.optimize!(model)
 
@@ -255,5 +257,5 @@ function run_JuMP_namedpoly(use_wsos::Bool; primal_wsos::Bool=false)
 end
 
 run_JuMP_namedpoly_PSD() = run_JuMP_namedpoly(false)
-run_JuMP_namedpoly_WSOS_primal() = run_JuMP_namedpoly(true, primal_wsos=true)
-run_JuMP_namedpoly_WSOS_dual() = run_JuMP_namedpoly(true, primal_wsos=false)
+run_JuMP_namedpoly_WSOS_primal() = run_JuMP_namedpoly(true, primal_wsos = true)
+run_JuMP_namedpoly_WSOS_dual() = run_JuMP_namedpoly(true, primal_wsos = false)

@@ -77,9 +77,9 @@ optimizer = MOI.Utilities.CachingOptimizer(HypatiaModelData{Float64}(), Hypatia.
     timelimit = timelimit,
     linearsystem = linearsystem,
     dense = dense,
-    tolrelopt = 1e-6,
-    tolabsopt = 1e-7,
-    tolfeas = 1e-7,
+    tol_rel_opt = 1e-6,
+    tol_abs_opt = 1e-7,
+    tol_feas = 1e-7,
     ))
 
 println("\nstarting benchmark run in 5 seconds\n")

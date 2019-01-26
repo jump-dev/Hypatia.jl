@@ -61,9 +61,9 @@ function testmoi(; verbose, linearsystem, dense)
             timelimit = 2e1,
             linearsystem = linearsystem,
             dense = dense,
-            tolrelopt = 2e-8,
-            tolabsopt = 2e-8,
-            tolfeas = 1e-8,
+            tol_rel_opt = 2e-8,
+            tol_abs_opt = 2e-8,
+            tol_feas = 1e-8,
             )
         )
     @testset "unit tests" begin

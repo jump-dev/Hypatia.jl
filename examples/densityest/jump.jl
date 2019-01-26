@@ -35,13 +35,13 @@ function build_JuMP_densityest(
     (nobs, dim) = size(X)
     d = div(deg + 1, 2)
 
-    (U, pts, P0, PWts, w) = MU.interpolate(dom, d, sample=true, calc_w=true, sample_factor=sample_factor)
+    (U, pts, P0, PWts, w) = MU.interpolate(dom, d, sample = true, calc_w = true, sample_factor = sample_factor)
 
     DynamicPolynomials.@polyvar x[1:dim]
     PX = DynamicPolynomials.monomials(x, 1:deg)
     U = size(pts, 1)
 
-    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose=true))
+    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
     JuMP.@variables(model, begin
         z[1:nobs] # log(f(u_i)) at each observation
         f, PolyJuMP.Poly(PX) # probability density function
@@ -56,12 +56,13 @@ function build_JuMP_densityest(
     return model
 end
 
-function run_JuMP_densityest(; rseed::Int=1)
+function run_JuMP_densityest(; rseed::Int = 1)
+    Random.seed!(rseed)
+
     nobs = 200
     n = 1
     deg = 4
 
-    Random.seed!(rseed)
     X = rand(Distributions.Uniform(-1, 1), nobs, n)
     dom = MU.Box(-ones(n), ones(n))
 

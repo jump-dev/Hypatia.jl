@@ -89,20 +89,20 @@ function solvelinsys4!(
     GHG = Symmetric(G'*HG)
     PGHG = Symmetric(P + GHG)
     Q2PGHGQ2 = Symmetric(Q2'*PGHG*Q2)
-    F = cholesky!(Q2PGHGQ2, Val(true), check=false)
+    F = cholesky!(Q2PGHGQ2, Val(true), check = false)
     singular = !isposdef(F)
-    # F = bunchkaufman!(Q2PGHGQ2, true, check=false)
+    # F = bunchkaufman!(Q2PGHGQ2, true, check = false)
     # singular = !issuccess(F)
 
     if singular
         println("singular Q2PGHGQ2")
         Q2PGHGQ2 = Symmetric(Q2'*(PGHG + A'*A)*Q2)
         # @show eigvals(Q2PGHGQ2)
-        F = cholesky!(Q2PGHGQ2, Val(true), check=false)
+        F = cholesky!(Q2PGHGQ2, Val(true), check = false)
         if !isposdef(F)
             error("could not fix singular Q2PGHGQ2")
         end
-        # F = bunchkaufman!(Q2PGHGQ2, true, check=false)
+        # F = bunchkaufman!(Q2PGHGQ2, true, check = false)
         # if !issuccess(F)
         #     error("could not fix singular Q2PGHGQ2")
         # end

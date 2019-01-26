@@ -230,12 +230,12 @@ function solvelinsys6!(
         end
         mul!(L.Q2GHGQ2, L.GQ2', L.HGQ2)
 
-        # F = bunchkaufman!(Symmetric(L.Q2GHGQ2), true, check=false)
+        # F = bunchkaufman!(Symmetric(L.Q2GHGQ2), true, check = false)
         # if !issuccess(F)
         #     println("linear system matrix factorization failed")
         #     mul!(L.Q2GHGQ2, L.GQ2', L.HGQ2)
         #     L.Q2GHGQ2 += 1e-6I
-        #     F = bunchkaufman!(Symmetric(L.Q2GHGQ2), true, check=false)
+        #     F = bunchkaufman!(Symmetric(L.Q2GHGQ2), true, check = false)
         #     if !issuccess(F)
         #         error("could not fix failure of positive definiteness; terminating")
         #     end

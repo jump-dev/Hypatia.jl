@@ -30,6 +30,8 @@ function build_envelope(
     dense::Bool = false,
     rseed::Int = 1,
     )
+    Random.seed!(rseed)
+
     # generate interpolation
     @assert deg <= d
     domain = MU.Box(-ones(n), ones(n))
@@ -40,7 +42,6 @@ function build_envelope(
         c_or_h = vec(readdlm(joinpath(@__DIR__, "data/c$(npoly * U).txt"), ',', Float64))
     else
         # generate random data
-        Random.seed!(rseed)
         LDegs = binomial(n + deg, n)
         c_or_h = vec(P0[:, 1:LDegs] * rand(-9:9, LDegs, npoly))
     end

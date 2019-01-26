@@ -120,7 +120,7 @@ end
 function shapeconregr1_JuMP()
     (n, deg, npoints, signal_ratio, f) = (2, 3, 100, 0.0, x -> exp(norm(x)))
     (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
-    (model, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_leastsqobj=false)
+    (model, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_leastsqobj = false)
     truemin = 4.4065e-1
     solveandcheck_JuMP(model, truemin)
 end
@@ -128,18 +128,18 @@ end
 function shapeconregr2_JuMP()
     (n, deg, npoints, signal_ratio, f) = (2, 3, 100, 0.0, x -> sum(x.^3))
     (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
-    (model, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_leastsqobj=false)
+    (model, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_leastsqobj = false)
     truemin = 1.3971e-1
     solveandcheck_JuMP(model, truemin)
     # test with non-sampling based interpolation
-    (model, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_leastsqobj=false, sample=false)
+    (model, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_leastsqobj = false, sample = false)
     solveandcheck_JuMP(model, truemin)
 end
 
 function shapeconregr3_JuMP()
     (n, deg, npoints, signal_ratio, f) = (2, 3, 100, 0.0, x -> sum(x.^4))
     (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
-    (model, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_leastsqobj=false)
+    (model, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_leastsqobj = false)
     truemin = 2.4577e-1
     solveandcheck_JuMP(model, truemin)
 end
@@ -147,7 +147,7 @@ end
 function shapeconregr4_JuMP()
     (n, deg, npoints, signal_ratio, f) = (2, 3, 100, 50.0, x -> sum(x.^3))
     (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
-    (model, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_leastsqobj=false)
+    (model, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_leastsqobj = false)
     truemin = 1.5449e-1
     solveandcheck_JuMP(model, truemin)
 end
@@ -155,7 +155,7 @@ end
 function shapeconregr5_JuMP()
     (n, deg, npoints, signal_ratio, f) = (2, 3, 100, 50.0, x -> sum(x.^4))
     (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
-    (model, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_leastsqobj=false)
+    (model, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_leastsqobj = false)
     truemin = 2.5200e-1
     solveandcheck_JuMP(model, truemin)
 end
@@ -163,7 +163,7 @@ end
 function shapeconregr6_JuMP()
     (n, deg, npoints, signal_ratio, f) = (2, 3, 100, 0.0, x -> exp(norm(x)))
     (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
-    (model, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_leastsqobj=true)
+    (model, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_leastsqobj = true)
     truemin = 5.4584e-2
     solveandcheck_JuMP(model, truemin)
 end
@@ -171,7 +171,7 @@ end
 function shapeconregr7_JuMP()
     (n, deg, npoints, signal_ratio, f) = (2, 3, 100, 50.0, x -> sum(x.^4))
     (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
-    (model, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_leastsqobj=true)
+    (model, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_leastsqobj = true)
     truemin = 3.3249e-2
     solveandcheck_JuMP(model, truemin)
 end
@@ -180,7 +180,7 @@ function shapeconregr8_JuMP()
     (n, deg, npoints, signal_ratio, f) = (2, 4, 100, 0.0, x -> -inv(1 + exp(-10.0 * norm(x))))
     (X, y) = generateregrdata(f, 0.0, 1.0, n, npoints, signal_ratio=signal_ratio)
     shapedata = ShapeData(MU.Box(zeros(n), ones(n)), MU.Box(zeros(n), ones(n)), ones(n), 1)
-    (model, p) = build_shapeconregr_WSOS(X, y, deg, shapedata, use_leastsqobj=true)
+    (model, p) = build_shapeconregr_WSOS(X, y, deg, shapedata, use_leastsqobj = true)
     truemin = 3.7723e-03
     solveandcheck_JuMP(model, truemin)
 end
@@ -189,7 +189,7 @@ function shapeconregr9_JuMP()
     (n, deg, npoints, signal_ratio, f) = (2, 4, 100, 10.0, x -> -inv(1 + exp(-10.0 * norm(x))))
     (X, y) = generateregrdata(f, 0.0, 1.0, n, npoints, signal_ratio=signal_ratio)
     shapedata = ShapeData(MU.Box(zeros(n), ones(n)), MU.Box(zeros(n), ones(n)), ones(n), 1)
-    (model, p) = build_shapeconregr_WSOS(X, y, deg, shapedata, use_leastsqobj=true)
+    (model, p) = build_shapeconregr_WSOS(X, y, deg, shapedata, use_leastsqobj = true)
     truemin = 3.0995e-02 # not verified with SDP
     solveandcheck_JuMP(model, truemin)
 end
@@ -197,7 +197,7 @@ end
 function shapeconregr10_JuMP()
     (n, deg, npoints, signal_ratio, f) = (2, 4, 100, 0.0, x -> exp(norm(x)))
     (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
-    (model, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_leastsqobj=true)
+    (model, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_leastsqobj = true)
     truemin = 5.0209e-02 # not verified with SDP
     solveandcheck_JuMP(model, truemin)
 end
@@ -205,8 +205,8 @@ end
 function shapeconregr11_JuMP()
     (n, deg, npoints, signal_ratio, f) = (2, 5, 100, 10.0, x -> exp(norm(x)))
     (X, y) = generateregrdata(f, 0.5, 2.0, n, npoints, signal_ratio=signal_ratio)
-    shapedata = ShapeData(MU.Box(0.5*ones(n), 2*ones(n)), MU.Box(0.5*ones(n), 2*ones(n)), ones(n), 1)
-    (model, p) = build_shapeconregr_WSOS(X, y, deg, shapedata, use_leastsqobj=true)
+    shapedata = ShapeData(MU.Box(0.5 * ones(n), 2 * ones(n)), MU.Box(0.5 * ones(n), 2 * ones(n)), ones(n), 1)
+    (model, p) = build_shapeconregr_WSOS(X, y, deg, shapedata, use_leastsqobj = true)
     truemin = 0.22206 # not verified with SDP
     solveandcheck_JuMP(model, truemin)
 end
@@ -214,8 +214,8 @@ end
 function shapeconregr12_JuMP()
     (n, deg, npoints, signal_ratio, f) = (2, 5, 100, 10.0, x -> exp(norm(x)))
     (X, y) = generateregrdata(f, 0.5, 2.0, n, npoints, signal_ratio=signal_ratio)
-    shapedata = ShapeData(MU.Box(0.5*ones(n), 2*ones(n)), MU.Box(0.5*ones(n), 2*ones(n)), ones(n), 1)
-    (model, p) = build_shapeconregr_PSD(X, y, deg, shapedata, use_leastsqobj=true)
+    shapedata = ShapeData(MU.Box(0.5 * ones(n), 2 * ones(n)), MU.Box(0.5 * ones(n), 2 * ones(n)), ones(n), 1)
+    (model, p) = build_shapeconregr_PSD(X, y, deg, shapedata, use_leastsqobj = true)
     truemin = 0.22206 # not verified with SDP
     solveandcheck_JuMP(model, truemin)
 end
@@ -223,7 +223,7 @@ end
 function shapeconregr13_JuMP()
     (n, deg, npoints, signal_ratio, f) = (2, 6, 100, 1.0, x -> exp(norm(x)))
     (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
-    (model, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_leastsqobj=false)
+    (model, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_leastsqobj = false)
     truemin = 1.7751 # not verified with SDP
     solveandcheck_JuMP(model, truemin)
 end
@@ -231,13 +231,13 @@ end
 function shapeconregr14_JuMP() # out of memory error when converting sparse to dense in MOI conversion
     (n, deg, npoints, signal_ratio, f) = (5, 5, 1000, 0.0, x -> exp(norm(x)))
     (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
-    (model, p) = build_shapeconregr_PSD(X, y, deg, ShapeData(n), use_leastsqobj=true, dense=true)
+    (model, p) = build_shapeconregr_PSD(X, y, deg, ShapeData(n), use_leastsqobj = true, dense = true)
     JuMP.optimize!(model)
 end
 
 function shapeconregr15_JuMP() # out of memory error during preprocessing
     (n, deg, npoints, signal_ratio, f) = (5, 5, 1000, 0.0, x -> exp(norm(x)))
     (X, y) = generateregrdata(f, -1.0, 1.0, n, npoints, signal_ratio=signal_ratio)
-    (model, p) = build_shapeconregr_PSD(X, y, deg, ShapeData(n), use_leastsqobj=true, dense=false)
+    (model, p) = build_shapeconregr_PSD(X, y, deg, ShapeData(n), use_leastsqobj = true, dense = false)
     JuMP.optimize!(model)
 end

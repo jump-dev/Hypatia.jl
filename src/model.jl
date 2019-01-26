@@ -7,9 +7,9 @@ mutable struct Model
     # options
     verbose::Bool           # if true, prints progress at each iteration
     timelimit::Float64      # (approximate) time limit (in seconds) for algorithm in solve function
-    tolrelopt::Float64      # relative optimality gap tolerance
-    tolabsopt::Float64      # absolute optimality gap tolerance
-    tolfeas::Float64        # feasibility tolerance
+    tol_rel_opt::Float64      # relative optimality gap tolerance
+    tol_abs_opt::Float64      # absolute optimality gap tolerance
+    tol_feas::Float64        # feasibility tolerance
     maxiter::Int            # maximum number of iterations
     predlinesearch::Bool    # if false, predictor step uses a fixed step size, else step size is determined via line search
     maxpredsmallsteps::Int  # maximum number of predictor step size reductions allowed with respect to the safe fixed step size
@@ -45,13 +45,13 @@ mutable struct Model
     primal_obj::Float64           # final primal objective value
     dual_obj::Float64           # final dual objective value
 
-    function Model(verbose, timelimit, tolrelopt, tolabsopt, tolfeas, maxiter, predlinesearch, maxpredsmallsteps, predlsmulti, corrcheck, maxcorrsteps, alphacorr, maxcorrlsiters, corrlsmulti)
+    function Model(verbose, timelimit, tol_rel_opt, tol_abs_opt, tol_feas, maxiter, predlinesearch, maxpredsmallsteps, predlsmulti, corrcheck, maxcorrsteps, alphacorr, maxcorrlsiters, corrlsmulti)
         model = new()
         model.verbose = verbose
         model.timelimit = timelimit
-        model.tolrelopt = tolrelopt
-        model.tolabsopt = tolabsopt
-        model.tolfeas = tolfeas
+        model.tol_rel_opt = tol_rel_opt
+        model.tol_abs_opt = tol_abs_opt
+        model.tol_feas = tol_feas
         model.maxiter = maxiter
         model.predlinesearch = predlinesearch
         model.maxpredsmallsteps = maxpredsmallsteps
@@ -70,9 +70,9 @@ end
 function Model(;
     verbose = false,
     timelimit = 3.6e3, # TODO should be Inf
-    tolrelopt = 1e-6,
-    tolabsopt = 1e-7,
-    tolfeas = 1e-7,
+    tol_rel_opt = 1e-6,
+    tol_abs_opt = 1e-7,
+    tol_feas = 1e-7,
     maxiter = 1e4,
     predlinesearch = true,
     maxpredsmallsteps = 15,
@@ -83,8 +83,8 @@ function Model(;
     maxcorrlsiters = 15,
     corrlsmulti = 0.5,
     )
-    if min(tolrelopt, tolabsopt, tolfeas) < 1e-12 || max(tolrelopt, tolabsopt, tolfeas) > 1e-2
-        error("tolrelopt, tolabsopt, tolfeas must be between 1e-12 and 1e-2")
+    if min(tol_rel_opt, tol_abs_opt, tol_feas) < 1e-12 || max(tol_rel_opt, tol_abs_opt, tol_feas) > 1e-2
+        error("tol_rel_opt, tol_abs_opt, tol_feas must be between 1e-12 and 1e-2")
     end
     if timelimit < 1e-2
         error("timelimit must be at least 1e-2")
@@ -98,7 +98,7 @@ function Model(;
     if maxcorrsteps < 1
         error("maxcorrsteps must be at least 1")
     end
-    return Model(verbose, timelimit, tolrelopt, tolabsopt, tolfeas, maxiter, predlinesearch, maxpredsmallsteps, predlsmulti, corrcheck, maxcorrsteps, alphacorr, maxcorrlsiters, corrlsmulti)
+    return Model(verbose, timelimit, tol_rel_opt, tol_abs_opt, tol_feas, maxiter, predlinesearch, maxpredsmallsteps, predlsmulti, corrcheck, maxcorrsteps, alphacorr, maxcorrlsiters, corrlsmulti)
 end
 
 # check data for consistency
