@@ -19,6 +19,7 @@ mutable struct WSOSPolyInterpMat <: PrimitiveCone
     H::Matrix{Float64}
     H2::Matrix{Float64}
     F
+    mat::Vector{Matrix{Float64}}
     barfun::Function
     diffres
 
@@ -37,6 +38,7 @@ mutable struct WSOSPolyInterpMat <: PrimitiveCone
         prmtv.g = similar(ipwt[1], dim)
         prmtv.H = similar(ipwt[1], dim, dim)
         prmtv.H2 = similar(prmtv.H)
+        prmtv.mat = [similar(ipwt[1], size(ipwtj, 2) * r, size(ipwtj, 2) * r) for ipwtj in ipwt]
         prmtv.barfun = (x -> barfun(x, ipwt, r, u, true))
         prmtv.diffres = DiffResults.HessianResult(prmtv.g)
         return prmtv
@@ -84,6 +86,33 @@ function barfun(pnt, ipwt::Vector{Matrix{Float64}}, R::Int, U::Int, calc_barval:
     return barval
 end
 
+function barfun!(pnt, prmtv::WSOSPolyInterpMat)
+    (R, U) = (prmtv.r, prmtv.u)
+    for (j, ipwtj) in enumerate(prmtv.ipwt)
+        L = size(ipwtj, 2)
+        mat = prmtv.mat[j]
+        mat .= 0.0
+
+        for l in 1:L, k in 1:l
+            (bl, bk) = ((l-1)*R, (k-1)*R)
+            uo = 0
+            for p in 1:R, q in 1:p
+                val = sum(ipwtj[u,l] * ipwtj[u,k] * pnt[uo+u] for u in 1:U)
+                bp = bl + p
+                bq = bk + q
+                if p == q
+                    mat[bp,bq] = val
+                else
+                    mat[bl+p, bk+q] = mat[bl+q, bk+p] = rt2i*val
+                end
+                uo += U
+            end
+        end
+        mat .= Symmetric(mat, :L)
+    end
+    return nothing
+end
+
 WSOSPolyInterpMat(r::Int, u::Int, ipwt::Vector{Matrix{Float64}}) = WSOSPolyInterpMat(r, u, ipwt, false)
 
 dimension(prmtv::WSOSPolyInterpMat) = prmtv.dim
@@ -111,8 +140,29 @@ function incone_prmtv(prmtv::WSOSPolyInterpMat, scal::Float64)
     if isnan(barfun(prmtv.scalpnt, prmtv.ipwt, prmtv.r, prmtv.u, false))
         return false
     end
+    barfun!(prmtv.scalpnt, prmtv)
     prmtv.diffres = ForwardDiff.hessian!(prmtv.diffres, prmtv.barfun, prmtv.scalpnt)
-    prmtv.g .= DiffResults.gradient(prmtv.diffres)
+
+    prmtv.g .= 0.0
+    for (j, ipwtj) in enumerate(prmtv.ipwt)
+        Winv = inv(prmtv.mat[j])
+        L = size(ipwtj, 2)
+        idx = 0
+        # outer indices for W
+        for p in 1:prmtv.r,  q in 1:p,  u in 1:prmtv.u
+            idx += 1
+            for k in 1:L, l in 1:L
+                (bk, bl) = ((k-1)*prmtv.r, (l-1)*prmtv.r)
+                # TODO avoid some doubling up
+                if p == q
+                    prmtv.g[idx] -= ipwtj[u,k] * ipwtj[u,l] * Winv[bk+p, bl+q]
+                else
+                    prmtv.g[idx] -= ipwtj[u,k] * ipwtj[u,l] * Winv[bk+p, bl+q] * rt2i
+                end
+            end
+        end
+    end
+
     prmtv.H .= DiffResults.hessian(prmtv.diffres)
     return factH(prmtv)
 end
