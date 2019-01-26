@@ -46,7 +46,7 @@ end
 function dimension1(; verbose::Bool = true)
     c = [-1, 0]
     A = Matrix{Float64}(undef, 0, 2)
-    b = Float64[]
+    b = []
     G = [1 0]
     h = [1]
     cones = [CO.Nonnegative(1, false)]
@@ -218,216 +218,228 @@ function orthant4(; verbose::Bool = true)
 
     @test r1.primal_obj ≈ r2.primal_obj atol=1e-4 rtol=1e-4
 end
-#
-# function epinorminf1(; verbose::Bool = true)
-#     model = MO.LinearObjConic(c, A, b, G, h, cones, cone_idxs)
-#     c = Float64[0, -1, -1]
-#     A = Float64[1 0 0; 0 1 0]
-#     b = Float64[1, 1/sqrt(2)]
-#     G = SparseMatrixCSC(-1.0I, 3, 3)
-#     h = zeros(3)
-#     cone = CO.Cone([CO.EpiNormInf(3)], [1:3])
-#     solver = IP.HSDESolver(model, verbose=verbose)
-    # r = solveandcheck(model, solver)
-#     @test r.status == :Optimal
-#     @test r.num_iters <= 20
-#     @test r.primal_obj ≈ -1 - 1/sqrt(2) atol=1e-4 rtol=1e-4
-#     @test r.x ≈ [1, 1/sqrt(2), 1] atol=1e-4 rtol=1e-4
-#     @test r.y ≈ [1, 1] atol=1e-4 rtol=1e-4
-# end
-#
-# function epinorminf2(; verbose::Bool = true)
-#     model = MO.LinearObjConic(c, A, b, G, h, cones, cone_idxs)
-#     Random.seed!(1)
-#     c = Float64[1, 0, 0, 0, 0, 0]
-#     A = rand(-9.0:9.0, 3, 6)
-#     b = A*ones(6)
-#     G = rand(6, 6)
-#     h = G*ones(6)
-#     cone = CO.Cone([CO.EpiNormInf(6)], [1:6])
-#     solver = IP.HSDESolver(model, verbose=verbose)
-    # r = solveandcheck(model, solver)
-#     @test r.status == :Optimal
-#     @test r.num_iters <= 20
-#     @test r.primal_obj ≈ 1 atol=1e-4 rtol=1e-4
-# end
-#
-# function epinorminf3(; verbose::Bool = true)
-#     model = MO.LinearObjConic(c, A, b, G, h, cones, cone_idxs)
-#     Random.seed!(1)
-#     c = Float64[1, 0, 0, 0, 0, 0]
-#     A = zeros(0, 6)
-#     b = zeros(0)
-#     G = SparseMatrixCSC(-1.0I, 6, 6)
-#     h = zeros(6)
-#     cone = CO.Cone([CO.EpiNormInf(6)], [1:6])
-#     solver = IP.HSDESolver(model, verbose=verbose)
-    # r = solveandcheck(model, solver)
-#     @test r.status == :Optimal
-#     @test r.num_iters <= 20
-#     @test r.primal_obj ≈ 0 atol=1e-4 rtol=1e-4
-#     @test r.x ≈ zeros(6) atol=1e-4 rtol=1e-4
-# end
-#
-# function epinorminf4(; verbose::Bool = true)
-#     model = MO.LinearObjConic(c, A, b, G, h, cones, cone_idxs)
-#     c = Float64[0, 1, -1]
-#     A = Float64[1 0 0; 0 1 0]
-#     b = Float64[1, -0.4]
-#     G = SparseMatrixCSC(-1.0I, 3, 3)
-#     h = zeros(3)
-#     cone = CO.Cone([CO.EpiNormInf(3, true)], [1:3])
-#     solver = IP.HSDESolver(model, verbose=verbose)
-    # r = solveandcheck(model, solver)
-#     @test r.status == :Optimal
-#     @test r.num_iters <= 20
-#     @test r.primal_obj ≈ -1 atol=1e-4 rtol=1e-4
-#     @test r.x ≈ [1, -0.4, 0.6] atol=1e-4 rtol=1e-4
-#     @test r.y ≈ [1, 0] atol=1e-4 rtol=1e-4
-# end
-#
-# function epinorminf5(; verbose::Bool = true)
-#     model = MO.LinearObjConic(c, A, b, G, h, cones, cone_idxs)
-#     Random.seed!(1)
-#     c = Float64[1, 0, 0, 0, 0, 0]
-#     A = rand(-9.0:9.0, 3, 6)
-#     b = A*ones(6)
-#     G = rand(6, 6)
-#     h = G*ones(6)
-#     cone = CO.Cone([CO.EpiNormInf(6, true)], [1:6])
-#     solver = IP.HSDESolver(model, verbose=verbose)
-    # r = solveandcheck(model, solver)
-#     @test r.status == :Optimal
-#     @test r.num_iters <= 15
-#     @test r.primal_obj ≈ 1 atol=1e-4 rtol=1e-4
-# end
-#
-# function epinorminf6(; verbose::Bool = true)
-#     Random.seed!(1)
-#     l = 3
-#     L = 2l + 1
-#     c = collect(-Float64(l):Float64(l))
-#     A = spzeros(2, L)
-#     A[1,1] = A[1,L] = A[2,1] = 1.0; A[2,L] = -1.0
-#     b = [0.0, 0.0]
-#     G = [spzeros(1, L); sparse(1.0I, L, L); spzeros(1, L); sparse(2.0I, L, L)]
-#     h = zeros(2L+2); h[1] = 1.0; h[L+2] = 1.0
-#     model = MO.LinearObjConic(c, A, b, G, h, cones, cone_idxs)
-#     cone = CO.Cone([CO.EpiNormInf(L+1, true), CO.EpiNormInf(L+1, false)], [1:L+1, L+2:2L+2])
-#     solver = IP.HSDESolver(model, verbose=verbose)
-    # r = solveandcheck(model, solver)
-#     @test r.status == :Optimal
-#     @test r.num_iters <= 25
-#     @test r.primal_obj ≈ -l + 1 atol=1e-4 rtol=1e-4
-#     @test r.x[2] ≈ 0.5 atol=1e-4 rtol=1e-4
-#     @test r.x[end-1] ≈ -0.5 atol=1e-4 rtol=1e-4
-#     @test sum(abs, r.x) ≈ 1.0 atol=1e-4 rtol=1e-4
-# end
-#
-# function epinormeucl1(; verbose::Bool = true)
-#     c = Float64[0, -1, -1]
-#     A = Float64[1 0 0; 0 1 0]
-#     b = Float64[1, 1/sqrt(2)]
-#     G = SparseMatrixCSC(-1.0I, 3, 3)
-#     h = zeros(3)
-#
-#     for isdual in [true, false]
-#         model = MO.LinearObjConic(c, A, b, G, h, cones, cone_idxs)
-#         cone = CO.Cone([CO.EpiNormEucl(3, isdual)], [1:3])
-#         solver = IP.HSDESolver(model, verbose=verbose)
-    # r = solveandcheck(model, solver)
-#         @test r.status == :Optimal
-#         @test r.num_iters <= 20
-#         @test r.primal_obj ≈ -sqrt(2) atol=1e-4 rtol=1e-4
-#         @test r.x ≈ [1, 1/sqrt(2), 1/sqrt(2)] atol=1e-4 rtol=1e-4
-#         @test r.y ≈ [sqrt(2), 0] atol=1e-4 rtol=1e-4
-#     end
-# end
-#
-# function epinormeucl2(; verbose::Bool = true)
-#     c = Float64[0, -1, -1]
-#     A = Float64[1 0 0]
-#     b = Float64[0]
-#     G = SparseMatrixCSC(-1.0I, 3, 3)
-#     h = zeros(3)
-#
-#     for isdual in [true, false]
-#         model = MO.LinearObjConic(c, A, b, G, h, cones, cone_idxs)
-#         cone = CO.Cone([CO.EpiNormEucl(3, isdual)], [1:3])
-#         solver = IP.HSDESolver(model, verbose=verbose)
-    # r = solveandcheck(model, solver)
-#         @test r.status == :Optimal
-#         @test r.num_iters <= 20
-#         @test r.primal_obj ≈ 0 atol=1e-4 rtol=1e-4
-#         @test r.x ≈ zeros(3) atol=1e-4 rtol=1e-4
-#     end
-# end
-#
-# function epipersquare1(; verbose::Bool = true)
-#     c = Float64[0, 0, -1, -1]
-#     A = Float64[1 0 0 0; 0 1 0 0]
-#     b = Float64[1/2, 1]
-#     G = SparseMatrixCSC(-1.0I, 4, 4)
-#     h = zeros(4)
-#
-#     for isdual in [true, false]
-#         model = MO.LinearObjConic(c, A, b, G, h, cones, cone_idxs)
-#         cone = CO.Cone([CO.EpiPerSquare(4, isdual)], [1:4])
-#         solver = IP.HSDESolver(model, verbose=verbose)
-    # r = solveandcheck(model, solver)
-#         @test r.status == :Optimal
-#         @test r.num_iters <= 20
-#         @test r.primal_obj ≈ -sqrt(2) atol=1e-4 rtol=1e-4
-#         @test r.x[3:4] ≈ [1, 1]/sqrt(2) atol=1e-4 rtol=1e-4
-#     end
-# end
-#
-# function epipersquare2(; verbose::Bool = true)
-#     c = Float64[0, 0, -1]
-#     A = Float64[1 0 0; 0 1 0]
-#     b = Float64[1/2, 1]/sqrt(2)
-#     G = SparseMatrixCSC(-1.0I, 3, 3)
-#     h = zeros(3)
-#
-#     for isdual in [true, false]
-#         model = MO.LinearObjConic(c, A, b, G, h, cones, cone_idxs)
-#         cone = CO.Cone([CO.EpiPerSquare(3, isdual)], [1:3])
-#         solver = IP.HSDESolver(model, verbose=verbose)
-    # r = solveandcheck(model, solver)
-#         @test r.status == :Optimal
-#         @test r.num_iters <= 15
-#         @test r.primal_obj ≈ -1/sqrt(2) atol=1e-4 rtol=1e-4
-#         @test r.x[2] ≈ 1/sqrt(2) atol=1e-4 rtol=1e-4
-#     end
-# end
-#
-# function epipersquare3(; verbose::Bool = true)
-#     c = Float64[0, 1, -1, -1]
-#     A = Float64[1 0 0 0]
-#     b = Float64[0]
-#     G = SparseMatrixCSC(-1.0I, 4, 4)
-#     h = zeros(4)
-#
-#     for isdual in [true, false]
-#         model = MO.LinearObjConic(c, A, b, G, h, cones, cone_idxs)
-#         cone = CO.Cone([CO.EpiPerSquare(4, isdual)], [1:4])
-#         solver = IP.HSDESolver(model, verbose=verbose)
-    # r = solveandcheck(model, solver)
-#         @test r.status == :Optimal
-#         @test r.num_iters <= 20
-#         @test r.primal_obj ≈ 0 atol=1e-4 rtol=1e-4
-#         @test r.x ≈ zeros(4) atol=1e-4 rtol=1e-4
-#     end
-# end
-#
+
+function epinorminf1(; verbose::Bool = true)
+    c = [0, -1, -1]
+    A = [1 0 0; 0 1 0]
+    b = [1, inv(sqrt(2))]
+    G = SparseMatrixCSC(-1.0I, 3, 3)
+    h = zeros(3)
+    cones = [CO.EpiNormInf(3)]
+    cone_idxs = [1:3]
+    model = MO.LinearObjConic(c, A, b, G, h, cones, cone_idxs)
+
+    solver = IP.HSDESolver(model, verbose=verbose)
+    r = solveandcheck(model, solver)
+    @test r.status == :Optimal
+    @test r.num_iters <= 20
+    @test r.primal_obj ≈ -1 - inv(sqrt(2)) atol=1e-4 rtol=1e-4
+    @test r.x ≈ [1, inv(sqrt(2)), 1] atol=1e-4 rtol=1e-4
+    @test r.y ≈ [1, 1] atol=1e-4 rtol=1e-4
+end
+
+function epinorminf2(; verbose::Bool = true)
+    Random.seed!(1)
+    c = [1, 0, 0, 0, 0, 0]
+    A = rand(-9.0:9.0, 3, 6)
+    b = A * ones(6)
+    G = rand(6, 6)
+    h = G * ones(6)
+    cones = [CO.EpiNormInf(6)]
+    cone_idxs = [1:6]
+    model = MO.LinearObjConic(c, A, b, G, h, cones, cone_idxs)
+
+    solver = IP.HSDESolver(model, verbose=verbose)
+    r = solveandcheck(model, solver)
+    @test r.status == :Optimal
+    @test r.num_iters <= 20
+    @test r.primal_obj ≈ 1 atol=1e-4 rtol=1e-4
+end
+
+function epinorminf3(; verbose::Bool = true)
+    Random.seed!(1)
+    c = [1, 0, 0, 0, 0, 0]
+    A = zeros(0, 6)
+    b = zeros(0)
+    G = SparseMatrixCSC(-1.0I, 6, 6)
+    h = zeros(6)
+    cones = [CO.EpiNormInf(6)]
+    cone_idxs = [1:6]
+    model = MO.LinearObjConic(c, A, b, G, h, cones, cone_idxs)
+
+    solver = IP.HSDESolver(model, verbose=verbose)
+    r = solveandcheck(model, solver)
+    @test r.status == :Optimal
+    @test r.num_iters <= 20
+    @test r.primal_obj ≈ 0 atol=1e-4 rtol=1e-4
+    @test r.x ≈ zeros(6) atol=1e-4 rtol=1e-4
+end
+
+function epinorminf4(; verbose::Bool = true)
+    c = [0, 1, -1]
+    A = [1 0 0; 0 1 0]
+    b = [1, -0.4]
+    G = SparseMatrixCSC(-1.0I, 3, 3)
+    h = zeros(3)
+    cones = [CO.EpiNormInf(3, true)]
+    cone_idxs = [1:3]
+    model = MO.LinearObjConic(c, A, b, G, h, cones, cone_idxs)
+
+    solver = IP.HSDESolver(model, verbose=verbose)
+    r = solveandcheck(model, solver)
+    @test r.status == :Optimal
+    @test r.num_iters <= 20
+    @test r.primal_obj ≈ -1 atol=1e-4 rtol=1e-4
+    @test r.x ≈ [1, -0.4, 0.6] atol=1e-4 rtol=1e-4
+    @test r.y ≈ [1, 0] atol=1e-4 rtol=1e-4
+end
+
+function epinorminf5(; verbose::Bool = true)
+    Random.seed!(1)
+    c = [1, 0, 0, 0, 0, 0]
+    A = rand(-9.0:9.0, 3, 6)
+    b = A * ones(6)
+    G = rand(6, 6)
+    h = G * ones(6)
+    cones = [CO.EpiNormInf(6, true)]
+    cone_idxs = [1:6]
+    model = MO.LinearObjConic(c, A, b, G, h, cones, cone_idxs)
+
+    solver = IP.HSDESolver(model, verbose=verbose)
+    r = solveandcheck(model, solver)
+    @test r.status == :Optimal
+    @test r.num_iters <= 15
+    @test r.primal_obj ≈ 1 atol=1e-4 rtol=1e-4
+end
+
+function epinorminf6(; verbose::Bool = true)
+    Random.seed!(1)
+    l = 3
+    L = 2l + 1
+    c = collect(-l:l)
+    A = spzeros(2, L)
+    A[1, 1] = A[1, L] = A[2, 1] = 1.0; A[2, L] = -1.0
+    b = [0.0, 0.0]
+    G = [spzeros(1, L); sparse(1.0I, L, L); spzeros(1, L); sparse(2.0I, L, L)]
+    h = zeros(2L + 2); h[1] = 1.0; h[L + 2] = 1.0
+    cones = [CO.EpiNormInf(L + 1, true), CO.EpiNormInf(L + 1, false)]
+    cone_idxs = [1:(L + 1), (L + 2):(2L + 2)]
+    model = MO.LinearObjConic(c, A, b, G, h, cones, cone_idxs)
+
+    solver = IP.HSDESolver(model, verbose=verbose)
+    r = solveandcheck(model, solver)
+    @test r.status == :Optimal
+    @test r.num_iters <= 25
+    @test r.primal_obj ≈ -l + 1 atol=1e-4 rtol=1e-4
+    @test r.x[2] ≈ 0.5 atol=1e-4 rtol=1e-4
+    @test r.x[end - 1] ≈ -0.5 atol=1e-4 rtol=1e-4
+    @test sum(abs, r.x) ≈ 1.0 atol=1e-4 rtol=1e-4
+end
+
+function epinormeucl1(; verbose::Bool = true)
+    c = [0, -1, -1]
+    A = [1 0 0; 0 1 0]
+    b = [1, inv(sqrt(2))]
+    G = SparseMatrixCSC(-1.0I, 3, 3)
+    h = zeros(3)
+    cone_idxs = [1:3]
+
+    for isdual in (true, false)
+        model = MO.LinearObjConic(c, A, b, G, h, [CO.EpiNormEucl(3, isdual)], cone_idxs)
+        solver = IP.HSDESolver(model, verbose=verbose)
+        r = solveandcheck(model, solver)
+        @test r.status == :Optimal
+        @test r.num_iters <= 20
+        @test r.primal_obj ≈ -sqrt(2) atol=1e-4 rtol=1e-4
+        @test r.x ≈ [1, inv(sqrt(2)), inv(sqrt(2))] atol=1e-4 rtol=1e-4
+        @test r.y ≈ [sqrt(2), 0] atol=1e-4 rtol=1e-4
+    end
+end
+
+function epinormeucl2(; verbose::Bool = true)
+    c = [0, -1, -1]
+    A = [1 0 0]
+    b = [0]
+    G = SparseMatrixCSC(-1.0I, 3, 3)
+    h = zeros(3)
+    cone_idxs = [1:3]
+
+    for isdual in (true, false)
+        model = MO.LinearObjConic(c, A, b, G, h, [CO.EpiNormEucl(3, isdual)], cone_idxs)
+        solver = IP.HSDESolver(model, verbose=verbose)
+        r = solveandcheck(model, solver)
+        @test r.status == :Optimal
+        @test r.num_iters <= 20
+        @test r.primal_obj ≈ 0 atol=1e-4 rtol=1e-4
+        @test r.x ≈ zeros(3) atol=1e-4 rtol=1e-4
+    end
+end
+
+function epipersquare1(; verbose::Bool = true)
+    c = [0, 0, -1, -1]
+    A = [1 0 0 0; 0 1 0 0]
+    b = [1/2, 1]
+    G = SparseMatrixCSC(-1.0I, 4, 4)
+    h = zeros(4)
+    cone_idxs = [1:4]
+
+    for isdual in (true, false)
+        model = MO.LinearObjConic(c, A, b, G, h, [CO.EpiPerSquare(4, isdual)], cone_idxs)
+        solver = IP.HSDESolver(model, verbose=verbose)
+        r = solveandcheck(model, solver)
+        @test r.status == :Optimal
+        @test r.num_iters <= 20
+        @test r.primal_obj ≈ -sqrt(2) atol=1e-4 rtol=1e-4
+        @test r.x[3:4] ≈ [1, 1] / sqrt(2) atol=1e-4 rtol=1e-4
+    end
+end
+
+function epipersquare2(; verbose::Bool = true)
+    c = [0, 0, -1]
+    A = [1 0 0; 0 1 0]
+    b = [1/2, 1] / sqrt(2)
+    G = SparseMatrixCSC(-1.0I, 3, 3)
+    h = zeros(3)
+    cone_idxs = [1:3]
+
+    for isdual in (true, false)
+        model = MO.LinearObjConic(c, A, b, G, h, [CO.EpiPerSquare(3, isdual)], cone_idxs)
+        solver = IP.HSDESolver(model, verbose=verbose)
+        r = solveandcheck(model, solver)
+        @test r.status == :Optimal
+        @test r.num_iters <= 15
+        @test r.primal_obj ≈ -inv(sqrt(2)) atol=1e-4 rtol=1e-4
+        @test r.x[2] ≈ inv(sqrt(2)) atol=1e-4 rtol=1e-4
+    end
+end
+
+function epipersquare3(; verbose::Bool = true)
+    c = [0, 1, -1, -1]
+    A = [1 0 0 0]
+    b = [0]
+    G = SparseMatrixCSC(-1.0I, 4, 4)
+    h = zeros(4)
+    cone_idxs = [1:4]
+
+    for isdual in (true, false)
+        model = MO.LinearObjConic(c, A, b, G, h, [CO.EpiPerSquare(4, isdual)], cone_idxs)
+        solver = IP.HSDESolver(model, verbose=verbose)
+        r = solveandcheck(model, solver)
+        @test r.status == :Optimal
+        @test r.num_iters <= 20
+        @test r.primal_obj ≈ 0 atol=1e-4 rtol=1e-4
+        @test r.x ≈ zeros(4) atol=1e-4 rtol=1e-4
+    end
+end
+
 # function semidefinite1(; verbose::Bool = true)
-#     c = Float64[0, -1, 0]
-#     A = Float64[1 0 0; 0 0 1]
-#     b = Float64[1/2, 1]
+#     c = [0, -1, 0]
+#     A = [1 0 0; 0 0 1]
+#     b = [1/2, 1]
 #     G = SparseMatrixCSC(-1.0I, 3, 3)
 #     h = zeros(3)
 #
-#     for isdual in [true, false]
+#     for isdual in (true, false)
 #         model = MO.LinearObjConic(c, A, b, G, h, cones, cone_idxs)
 #         cone = CO.Cone([CO.PosSemidef(3, isdual)], [1:3])
 #         solver = IP.HSDESolver(model, verbose=verbose)
@@ -440,13 +452,13 @@ end
 # end
 #
 # function semidefinite2(; verbose::Bool = true)
-#     c = Float64[0, -1, 0]
-#     A = Float64[1 0 1]
-#     b = Float64[0]
+#     c = [0, -1, 0]
+#     A = [1 0 1]
+#     b = [0]
 #     G = SparseMatrixCSC(-1.0I, 3, 3)
 #     h = zeros(3)
 #
-#     for isdual in [true, false]
+#     for isdual in (true, false)
 #         model = MO.LinearObjConic(c, A, b, G, h, cones, cone_idxs)
 #         cone = CO.Cone([CO.PosSemidef(3, isdual)], [1:3])
 #         solver = IP.HSDESolver(model, verbose=verbose)
@@ -459,13 +471,13 @@ end
 # end
 #
 # function semidefinite3(; verbose::Bool = true)
-#     c = Float64[1, 0, 1, 0, 0, 1]
-#     A = Float64[1 2 3 4 5 6; 1 1 1 1 1 1]
-#     b = Float64[10, 3]
+#     c = [1, 0, 1, 0, 0, 1]
+#     A = [1 2 3 4 5 6; 1 1 1 1 1 1]
+#     b = [10, 3]
 #     G = SparseMatrixCSC(-1.0I, 6, 6)
 #     h = zeros(6)
 #
-#     for isdual in [true, false]
+#     for isdual in (true, false)
 #         model = MO.LinearObjConic(c, A, b, G, h, cones, cone_idxs)
 #         cone = CO.Cone([CO.PosSemidef(6, isdual)], [1:6])
 #         solver = IP.HSDESolver(model, verbose=verbose)
@@ -479,9 +491,9 @@ end
 #
 # function hypoperlog1(; verbose::Bool = true)
 #     model = MO.LinearObjConic(c, A, b, G, h, cones, cone_idxs)
-#     c = Float64[1, 1, 1]
-#     A = Float64[0 1 0; 1 0 0]
-#     b = Float64[2, 1]
+#     c = [1, 1, 1]
+#     A = [0 1 0; 1 0 0]
+#     b = [2, 1]
 #     G = SparseMatrixCSC(-1.0I, 3, 3)
 #     h = zeros(3)
 #     cone = CO.Cone([CO.HypoPerLog()], [1:3])
@@ -497,9 +509,9 @@ end
 #
 # function hypoperlog2(; verbose::Bool = true)
 #     model = MO.LinearObjConic(c, A, b, G, h, cones, cone_idxs)
-#     c = Float64[-1, 0, 0]
-#     A = Float64[0 1 0]
-#     b = Float64[0]
+#     c = [-1, 0, 0]
+#     A = [0 1 0]
+#     b = [0]
 #     G = SparseMatrixCSC(-1.0I, 3, 3)
 #     h = zeros(3)
 #     cone = CO.Cone([CO.HypoPerLog()], [1:3])
@@ -512,7 +524,7 @@ end
 #
 # function hypoperlog3(; verbose::Bool = true)
 #     model = MO.LinearObjConic(c, A, b, G, h, cones, cone_idxs)
-#     c = Float64[1, 1, 1]
+#     c = [1, 1, 1]
 #     A = Matrix{Float64}(undef, 0, 3)
 #     b = Vector{Float64}(undef, 0)
 #     G = sparse([1, 2, 3, 4], [1, 2, 3, 1], -ones(4))
@@ -529,9 +541,9 @@ end
 #
 # function hypoperlog4(; verbose::Bool = true)
 #     model = MO.LinearObjConic(c, A, b, G, h, cones, cone_idxs)
-#     c = Float64[0, 0, 1]
-#     A = Float64[0 1 0; 1 0 0]
-#     b = Float64[1, -1]
+#     c = [0, 0, 1]
+#     A = [0 1 0; 1 0 0]
+#     b = [1, -1]
 #     G = SparseMatrixCSC(-1.0I, 3, 3)
 #     h = zeros(3)
 #     cone = CO.Cone([CO.HypoPerLog(true)], [1:3])
@@ -545,9 +557,9 @@ end
 #
 # function epiperpower1(; verbose::Bool = true)
 #     model = MO.LinearObjConic(c, A, b, G, h, cones, cone_idxs)
-#     c = Float64[1, 0, -1, 0, 0, -1]
-#     A = Float64[1 1 0 1/2 0 0; 0 0 0 0 1 0]
-#     b = Float64[2, 1]
+#     c = [1, 0, -1, 0, 0, -1]
+#     A = [1 1 0 1/2 0 0; 0 0 0 0 1 0]
+#     b = [2, 1]
 #     G = SparseMatrixCSC(-1.0I, 6, 6)
 #     h = zeros(6)
 #     cone = CO.Cone([CO.EpiPerPower(5.0, false), CO.EpiPerPower(2.5, false)], [1:3, 4:6])
@@ -560,32 +572,32 @@ end
 # end
 #
 # function epiperpower2(; verbose::Bool = true)
-#     c = Float64[0, 0, -1]
-#     A = Float64[1 0 0; 0 1 0]
-#     b = Float64[1/2, 1]
+#     c = [0, 0, -1]
+#     A = [1 0 0; 0 1 0]
+#     b = [1/2, 1]
 #     G = SparseMatrixCSC(-1.0I, 3, 3)
 #     h = zeros(3)
 #
-#     for isdual in [true, false]
+#     for isdual in (true, false)
 #         model = MO.LinearObjConic(c, A, b, G, h, cones, cone_idxs)
 #         cone = CO.Cone([CO.EpiPerPower(2.0, isdual)], [1:3])
 #         solver = IP.HSDESolver(model, verbose=verbose)
     # r = solveandcheck(model, solver)
 #         @test r.status == :Optimal
 #         @test r.num_iters <= 20
-#         @test r.primal_obj ≈ (isdual ? -sqrt(2) : -1/sqrt(2)) atol=1e-4 rtol=1e-4
+#         @test r.primal_obj ≈ (isdual ? -sqrt(2) : -inv(sqrt(2))) atol=1e-4 rtol=1e-4
 #         @test r.x[1:2] ≈ [1/2, 1] atol=1e-4 rtol=1e-4
 #     end
 # end
 #
 # function epiperpower3(; verbose::Bool = true)
-#     c = Float64[0, 0, 1]
-#     A = Float64[1 0 0; 0 1 0]
-#     b = Float64[0, 1]
+#     c = [0, 0, 1]
+#     A = [1 0 0; 0 1 0]
+#     b = [0, 1]
 #     G = SparseMatrixCSC(-1.0I, 3, 3)
 #     h = zeros(3)
 #
-#     for isdual in [true, false]
+#     for isdual in (true, false)
 #         model = HYP.Model(verbose=verbose, tolfeas=1e-9)
 #         cone = CO.Cone([CO.EpiPerPower(2.0, isdual)], [1:3])
 #         solver = IP.HSDESolver(model, verbose=verbose)
@@ -599,9 +611,9 @@ end
 #
 # function hypogeomean1(; verbose::Bool = true)
 #     model = MO.LinearObjConic(c, A, b, G, h, cones, cone_idxs)
-#     c = Float64[1, 0, 0, -1, -1, 0]
-#     A = Float64[1 1 1/2 0 0 0; 0 0 0 0 0 1]
-#     b = Float64[2, 1]
+#     c = [1, 0, 0, -1, -1, 0]
+#     A = [1 1 1/2 0 0 0; 0 0 0 0 0 1]
+#     b = [2, 1]
 #     G = SparseMatrixCSC(-1.0I, 6, 6)[[4, 1, 2, 5, 3, 6], :]
 #     h = zeros(6)
 #     cone = CO.Cone([CO.HypoGeomean([0.2, 0.8], false), CO.HypoGeomean([0.4, 0.6], false)], [1:3, 4:6])
@@ -614,20 +626,20 @@ end
 # end
 #
 # function hypogeomean2(; verbose::Bool = true)
-#     c = Float64[-1, 0, 0]
-#     A = Float64[0 0 1; 0 1 0]
-#     b = Float64[1/2, 1]
+#     c = [-1, 0, 0]
+#     A = [0 0 1; 0 1 0]
+#     b = [1/2, 1]
 #     G = SparseMatrixCSC(-1.0I, 3, 3)
 #     h = zeros(3)
 #
-#     for isdual in [true, false]
+#     for isdual in (true, false)
 #         model = MO.LinearObjConic(c, A, b, G, h, cones, cone_idxs)
 #         cone = CO.Cone([CO.HypoGeomean([0.5, 0.5], isdual)], [1:3])
 #         solver = IP.HSDESolver(model, verbose=verbose)
     # r = solveandcheck(model, solver)
 #         @test r.status == :Optimal
 #         @test r.num_iters <= 20
-#         @test r.primal_obj ≈ (isdual ? 0 : -1/sqrt(2)) atol=1e-4 rtol=1e-4
+#         @test r.primal_obj ≈ (isdual ? 0 : -inv(sqrt(2))) atol=1e-4 rtol=1e-4
 #         @test r.x[2:3] ≈ [1, 0.5] atol=1e-4 rtol=1e-4
 #     end
 # end
@@ -639,7 +651,7 @@ end
 #     G = SparseMatrixCSC(-1.0I, l+1, l+1)
 #     h = zeros(l+1)
 #
-#     for isdual in [true, false]
+#     for isdual in (true, false)
 #         b = (isdual ? [-1.0] : [1.0])
 #         model = MO.LinearObjConic(c, A, b, G, h, cones, cone_idxs)
 #         cone = CO.Cone([CO.HypoGeomean(fill(1/l, l), isdual)], [1:l+1])
@@ -660,7 +672,7 @@ end
 #     G = [zeros(1, l); Matrix(-1.0I, l, l)]
 #     h = zeros(l+1)
 #
-#     for isdual in [true, false]
+#     for isdual in (true, false)
 #         model = MO.LinearObjConic(c, A, b, G, h, cones, cone_idxs)
 #         cone = CO.Cone([CO.HypoGeomean(fill(1/l, l), isdual)], [1:l+1])
 #         solver = IP.HSDESolver(model, verbose=verbose)
@@ -683,7 +695,7 @@ end
 #     G = sparse(-1.0I, Xnm+1, Xnm+1)
 #     h = vcat(0.0, rand(Xnm))
 #
-#     for isdual in [true, false]
+#     for isdual in (true, false)
 #         model = MO.LinearObjConic(c, A, b, G, h, cones, cone_idxs)
 #         cone = CO.Cone([CO.EpiNormSpectral(Xn, Xm, isdual)], [1:Xnm+1])
 #         solver = IP.HSDESolver(model, verbose=verbose)

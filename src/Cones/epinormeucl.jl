@@ -11,31 +11,31 @@ barrier from "Self-Scaled Barriers and Interior-Point Methods for Convex Program
 mutable struct EpiNormEucl <: Cone
     usedual::Bool
     dim::Int
-    pnt::AbstractVector{Float64}
-    dist::Float64
-    Hi::Matrix{Float64}
+    primals::AbstractVector{Float64}
+    g::Vector{Float64}
     H::Matrix{Float64}
+    Hi::Matrix{Float64}
 
     function EpiNormEucl(dim::Int, isdual::Bool)
         cone = new()
         cone.usedual = isdual
         cone.dim = dim
-        cone.Hi = Matrix{Float64}(undef, dim, dim)
-        cone.H = similar(cone.Hi)
+        cone.g = Vector{Float64}(undef, dim)
+        cone.H = Matrix{Float64}(undef, dim, dim)
+        cone.Hi = similar(cone.H)
         return cone
     end
 end
 
 EpiNormEucl(dim::Int) = EpiNormEucl(dim, false)
 
-dimension(cone::EpiNormEucl) = cone.dim
 get_nu(cone::EpiNormEucl) = 1
-set_initial_point(arr::AbstractVector{Float64}, cone::EpiNormEucl) = (@. arr = 0.0; arr[1] = 1.0; arr)
-loadpnt!(cone::EpiNormEucl, pnt::AbstractVector{Float64}) = (cone.pnt = pnt)
 
-function incone(cone::EpiNormEucl, scal::Float64)
-    u = cone.pnt[1]
-    w = view(cone.pnt, 2:cone.dim)
+set_initial_point(arr::AbstractVector{Float64}, cone::EpiNormEucl) = (@. arr = 0.0; arr[1] = 1.0; arr)
+
+function check_in_cone(cone::EpiNormEucl)
+    u = cone.primals[1]
+    w = view(cone.primals, 2:cone.dim)
     if u <= 0.0
         return false
     end
@@ -43,24 +43,30 @@ function incone(cone::EpiNormEucl, scal::Float64)
     if dist <= 0.0
         return false
     end
-    cone.dist = dist
+
+    @. cone.g = cone.primals / dist
+    cone.g[1] *= -1.0
+
+    Hi = cone.Hi
+    mul!(Hi, cone.primals, cone.primals') # TODO syrk
+    @. Hi += Hi
+    Hi[1, 1] -= dist
+    for j in 2:cone.dim
+        Hi[j, j] += dist
+    end
 
     H = cone.H
-    Hi = cone.Hi
-    mul!(Hi, cone.pnt, cone.pnt')
-    @. Hi += Hi
-    Hi[1,1] -= dist
-    for j in 2:cone.dim
-        Hi[j,j] += dist
-    end
     @. H = Hi
     for j in 2:cone.dim
-        H[1,j] = H[j,1] = -H[j,1]
+        H[1, j] = H[j, 1] = -H[j, 1]
     end
     @. H *= abs2(inv(dist))
+
     return true
 end
 
-calcg!(g::AbstractVector{Float64}, cone::EpiNormEucl) = (@. g = cone.pnt/cone.dist; g[1] = -g[1]; g)
-calcHiarr!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::EpiNormEucl) = mul!(prod, cone.Hi, arr)
-calcHarr!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::EpiNormEucl) = mul!(prod, cone.H, arr)
+# calcg!(g::AbstractVector{Float64}, cone::EpiNormEucl) = (@. g = cone.primals / dist; g[1] = -g[1]; g)
+# calcHiarr!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::EpiNormEucl) = mul!(prod, cone.Hi, arr)
+# calcHarr!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::EpiNormEucl) = mul!(prod, cone.H, arr)
+
+inv_hess(cone::EpiNormEucl) = Symmetric(cone.Hi)

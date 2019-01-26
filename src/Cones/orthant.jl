@@ -65,16 +65,16 @@ grad(cone::OrthantCone) = -inv.(cone.primals)
 hess(cone::OrthantCone) = Diagonal(abs2.(inv.(cone.primals)))
 inv_hess(cone::OrthantCone) = Diagonal(abs2.(cone.primals))
 
-function get_max_alpha(cone::Nonnegative, direction::AbstractVector{Float64})
-    if all(u -> (u > 0.0), direction)
-        return Inf
-    end
-    return -maximum(cone.primals[l] / direction[l] for l in eachindex(direction) if direction[l] < 0.0)
-end
-
-function get_max_alpha(cone::Nonpositive, direction::AbstractVector{Float64})
-    if all(u -> (u < 0.0), direction)
-        return Inf
-    end
-    return minimum(cone.primals[l] / direction[l] for l in eachindex(direction) if direction[l] > 0.0)
-end
+# function get_max_alpha(cone::Nonnegative, direction::AbstractVector{Float64})
+#     if all(u -> (u > 0.0), direction)
+#         return Inf
+#     end
+#     return -maximum(cone.primals[l] / direction[l] for l in eachindex(direction) if direction[l] < 0.0)
+# end
+#
+# function get_max_alpha(cone::Nonpositive, direction::AbstractVector{Float64})
+#     if all(u -> (u < 0.0), direction)
+#         return Inf
+#     end
+#     return minimum(cone.primals[l] / direction[l] for l in eachindex(direction) if direction[l] > 0.0)
+# end

@@ -78,9 +78,9 @@ mutable struct HSDESolver <: IPMSolver
         # linear_solver::LinearSystems.LinearSystemSolver,
         ;
         verbose::Bool = true,
-        tol_rel_opt = 1e-6,
-        tol_abs_opt = 1e-7,
-        tol_feas = 1e-7,
+        tol_rel_opt = 1e-7,
+        tol_abs_opt = 1e-8,
+        tol_feas = 1e-8,
         max_iters::Int = 100,
         time_limit::Float64 = 3e2,
         combined_nbhd::Float64 = 0.5,
@@ -389,7 +389,7 @@ function get_initial_point(model::Models.LinearObjConic)
     # else
         if !isempty(point.ty)
             At_fact = factorize(issparse(model.A) ? sparse(model.A') : Matrix(model.A'))
-            ldiv!(point.ty, At_fact, temp_n)
+            # ldiv!(point.ty, At_fact, temp_n)
             point.ty .= At_fact \ temp_n
         end
         AG_fact = factorize(vcat(model.A, model.G))

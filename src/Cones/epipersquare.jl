@@ -12,32 +12,32 @@ barrier from "Self-Scaled Barriers and Interior-Point Methods for Convex Program
 mutable struct EpiPerSquare <: Cone
     usedual::Bool
     dim::Int
-    pnt::AbstractVector{Float64}
-    dist::Float64
-    Hi::Matrix{Float64}
+    primals::AbstractVector{Float64}
+    g::Vector{Float64}
     H::Matrix{Float64}
+    Hi::Matrix{Float64}
 
     function EpiPerSquare(dim::Int, isdual::Bool)
         cone = new()
         cone.usedual = isdual
         cone.dim = dim
-        cone.Hi = Matrix{Float64}(undef, dim, dim)
-        cone.H = similar(cone.Hi)
+        cone.g = Vector{Float64}(undef, dim)
+        cone.H = Matrix{Float64}(undef, dim, dim)
+        cone.Hi = similar(cone.H)
         return cone
     end
 end
 
 EpiPerSquare(dim::Int) = EpiPerSquare(dim, false)
 
-dimension(cone::EpiPerSquare) = cone.dim
 get_nu(cone::EpiPerSquare) = 2
-set_initial_point(arr::AbstractVector{Float64}, cone::EpiPerSquare) = (@. arr = 0.0; arr[1] = 1.0; arr[2] = 1.0; arr)
-loadpnt!(cone::EpiPerSquare, pnt::AbstractVector{Float64}) = (cone.pnt = pnt)
 
-function incone(cone::EpiPerSquare, scal::Float64)
-    u = cone.pnt[1]
-    v = cone.pnt[2]
-    w = view(cone.pnt, 3:cone.dim)
+set_initial_point(arr::AbstractVector{Float64}, cone::EpiPerSquare) = (@. arr = 0.0; arr[1] = 1.0; arr[2] = 1.0; arr)
+
+function check_in_cone(cone::EpiPerSquare)
+    u = cone.primals[1]
+    v = cone.primals[2]
+    w = view(cone.primals, 3:cone.dim)
     if u <= 0.0 || v <= 0.0
         return false
     end
@@ -46,26 +46,32 @@ function incone(cone::EpiPerSquare, scal::Float64)
     if dist <= 0.0
         return false
     end
-    cone.dist = dist
+
+    @. cone.g = cone.primals / dist
+    (cone.g[1], cone.g[2]) = (-cone.g[2], -cone.g[1])
+
+    Hi = cone.Hi
+    mul!(Hi, cone.primals, cone.primals') # TODO syrk
+    Hi[2, 1] = Hi[1, 2] = nrm2
+    for j in 3:cone.dim
+        Hi[j, j] += dist
+    end
 
     H = cone.H
-    Hi = cone.Hi
-    mul!(Hi, cone.pnt, cone.pnt')
-    Hi[2,1] = Hi[1,2] = nrm2
-    for j in 3:cone.dim
-        Hi[j,j] += dist
-    end
     @. H = Hi
     for j in 3:cone.dim
-        H[1,j] = H[j,1] = -Hi[2,j]
-        H[2,j] = H[j,2] = -Hi[1,j]
+        H[1, j] = H[j, 1] = -Hi[2, j]
+        H[2, j] = H[j, 2] = -Hi[1, j]
     end
-    H[1,1] = Hi[2,2]
-    H[2,2] = Hi[1,1]
+    H[1, 1] = Hi[2, 2]
+    H[2, 2] = Hi[1, 1]
     @. H *= abs2(inv(dist))
+
     return true
 end
 
-calcg!(g::AbstractVector{Float64}, cone::EpiPerSquare) = (@. g = cone.pnt/cone.dist; tmp = g[1]; g[1] = -g[2]; g[2] = -tmp; g)
-calcHiarr!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::EpiPerSquare) = mul!(prod, cone.Hi, arr)
-calcHarr!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::EpiPerSquare) = mul!(prod, cone.H, arr)
+# calcg!(g::AbstractVector{Float64}, cone::EpiPerSquare) = (@. g = cone.primals/cone.dist; tmp = g[1]; g[1] = -g[2]; g[2] = -tmp; g)
+# calcHiarr!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::EpiPerSquare) = mul!(prod, cone.Hi, arr)
+# calcHarr!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::EpiPerSquare) = mul!(prod, cone.H, arr)
+
+inv_hess(cone::EpiPerSquare) = Symmetric(cone.Hi)
