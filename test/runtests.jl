@@ -16,25 +16,6 @@ using SparseArrays
 using Test
 
 
-
-Random.seed!(1)
-(n, p, q) = (6, 3, 6)
-c = rand(0.0:9.0, n)
-A = rand(-9.0:9.0, p, n)
-b = A * ones(n)
-G = SparseMatrixCSC(-1.0I, q, n)
-h = zeros(q)
-cones = CO.Cone[CO.Nonnegative(q)]
-cone_idxs = [1:q]
-
-model = MO.LinearObjConic(c, A, b, G, h, cones, cone_idxs)
-
-solver = IP.HSDESolver(model)
-
-IP.solve(solver)
-
-
-
 # include(joinpath(@__DIR__, "interpolation.jl"))
 
 # examples_dir = joinpath(@__DIR__, "../examples")
@@ -43,7 +24,7 @@ IP.solve(solver)
 # include(joinpath(examples_dir, "linearopt/native.jl"))
 # include(joinpath(examples_dir, "namedpoly/native.jl"))
 
-# include(joinpath(@__DIR__, "native.jl"))
+include(joinpath(@__DIR__, "native.jl"))
 
 # include(joinpath(examples_dir, "envelope/jump.jl"))
 # include(joinpath(examples_dir, "expdesign/jump.jl"))
@@ -61,7 +42,7 @@ IP.solve(solver)
 # include(joinpath(@__DIR__, "MOI_wrapper.jl"))
 
 
-# @testset "Hypatia tests" begin
+@testset "Hypatia tests" begin
 
 # @info("starting interpolation tests")
 # @testset "interpolation tests" begin
@@ -69,56 +50,58 @@ IP.solve(solver)
 #     interp_nosample()
 # end
 
-# @info("starting native interface tests")
-# verbose = false
+@info("starting native interface tests")
+verbose = true
 # linearsystems = [
 #     LS.QRSymm,
-#     LS.Naive,
+#     # LS.Naive,
 #     ]
-# testfuns = [
-#     dimension1,
-#     consistent1,
-#     inconsistent1,
-#     inconsistent2,
-#     orthant1,
-#     orthant2,
-#     orthant3,
-#     orthant4,
-#     epinorminf1,
-#     epinorminf2,
-#     epinorminf3,
-#     epinorminf4,
-#     epinorminf5,
-#     epinorminf6,
-#     epinormeucl1,
-#     epinormeucl2,
-#     epipersquare1,
-#     epipersquare2,
-#     epipersquare3,
-#     semidefinite1,
-#     semidefinite2,
-#     semidefinite3,
-#     hypoperlog1,
-#     hypoperlog2,
-#     hypoperlog3,
-#     hypoperlog4,
-#     epiperpower1,
-#     epiperpower2,
-#     epiperpower3,
-#     hypogeomean1,
-#     hypogeomean2,
-#     hypogeomean3,
-#     hypogeomean4,
-#     epinormspectral1,
-#     hypoperlogdet1,
-#     hypoperlogdet2,
-#     hypoperlogdet3,
-#     epipersumexp1,
-#     epipersumexp2,
-#     ]
+testfuns = [
+    # dimension1, # TODO needs preprocessing
+    # consistent1,
+    # inconsistent1,
+    # inconsistent2,
+    orthant1,
+    orthant2,
+    orthant3,
+    orthant4,
+    # epinorminf1,
+    # epinorminf2,
+    # epinorminf3,
+    # epinorminf4,
+    # epinorminf5,
+    # epinorminf6,
+    # epinormeucl1,
+    # epinormeucl2,
+    # epipersquare1,
+    # epipersquare2,
+    # epipersquare3,
+    # semidefinite1,
+    # semidefinite2,
+    # semidefinite3,
+    # hypoperlog1,
+    # hypoperlog2,
+    # hypoperlog3,
+    # hypoperlog4,
+    # epiperpower1,
+    # epiperpower2,
+    # epiperpower3,
+    # hypogeomean1,
+    # hypogeomean2,
+    # hypogeomean3,
+    # hypogeomean4,
+    # epinormspectral1,
+    # hypoperlogdet1,
+    # hypoperlogdet2,
+    # hypoperlogdet3,
+    # epipersumexp1,
+    # epipersumexp2,
+    ]
 # @testset "native tests: $t, $l" for t in testfuns, l in linearsystems
-#     t(verbose=verbose, linearsystem=l)
-# end
+@testset "native tests: $t" for t in testfuns
+    # t(verbose=verbose, linearsystem=l)
+    t(verbose=verbose)
+end
 #
 # @info("starting default native examples tests")
 # testfuns = [
@@ -235,4 +218,4 @@ IP.solve(solver)
 #     testmoi(verbose=verbose, linearsystem=l, usedense=d)
 # end
 
-# end
+end

@@ -98,21 +98,21 @@ function run_namedpoly()
     (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = HYP.preprocess_data(c, A, b, G, useQR=true)
     L = LS.QRSymm(c1, A1, b1, G1, h, cone, Q2, RiQ1)
 
-    mdl = HYP.Model(maxiter=200, verbose=false)
-    HYP.load_data!(mdl, c1, A1, b1, G1, h, cone, L)
-    HYP.solve!(mdl)
+    model = HYP.Model(maxiter=200, verbose=false)
+    HYP.load_data!(model, c1, A1, b1, G1, h, cone, L)
+    HYP.solve!(model)
 
     x = zeros(length(c))
-    x[dukeep] = HYP.get_x(mdl)
+    x[dukeep] = HYP.get_x(model)
     y = zeros(length(b))
-    y[prkeep] = HYP.get_y(mdl)
-    s = HYP.get_s(mdl)
-    z = HYP.get_z(mdl)
+    y[prkeep] = HYP.get_y(model)
+    s = HYP.get_s(model)
+    z = HYP.get_z(model)
 
-    status = HYP.get_status(mdl)
-    solvetime = HYP.get_solvetime(mdl)
-    pobj = HYP.get_pobj(mdl)
-    dobj = HYP.get_dobj(mdl)
+    status = HYP.get_status(model)
+    solvetime = HYP.get_solve_time(model)
+    primal_obj = HYP.get_primal_obj(model)
+    dual_obj = HYP.get_dual_obj(model)
 
     @test status == :Optimal
 

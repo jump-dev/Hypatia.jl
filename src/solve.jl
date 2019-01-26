@@ -4,20 +4,20 @@ Copyright 2018, David Papp, Sercan Yildiz
 =#
 
 # solve using predictor-corrector algorithm based on homogeneous self-dual embedding
-function solve!(mdl::Model)
-    mdl.status = :SolveCalled
+function solve!(model::Model)
+    model.status = :SolveCalled
     starttime = time()
 
-    (c, A, b, G, h, cone, L) = (mdl.c, mdl.A, mdl.b, mdl.G, mdl.h, mdl.cone, mdl.L)
+    (c, A, b, G, h, cone, L) = (model.c, model.A, model.b, model.G, model.h, model.cone, model.L)
     (n, p, q) = (length(c), length(b), length(h))
 
     bnu = 1.0 + Cones.get_nu(cone) # complexity parameter nu-bar of the augmented barrier (sum of the primitive cone barrier parameters plus 1)
 
     # calculate prediction and correction step parameters
-    (beta, eta, cpredfix) = getbetaeta(mdl.maxcorrsteps, bnu) # beta: large neighborhood parameter, eta: small neighborhood parameter
+    (beta, eta, cpredfix) = getbetaeta(model.maxcorrsteps, bnu) # beta: large neighborhood parameter, eta: small neighborhood parameter
     alphapredfix = cpredfix / (eta + sqrt(2.0 * abs2(eta) + bnu)) # fixed predictor step size
-    alphapredthres = alphapredfix * mdl.predlsmulti^mdl.maxpredsmallsteps # minimum predictor step size
-    alphapredinit = mdl.predlinesearch ? min(1e2 * alphapredfix, 0.99999) : alphapredfix # predictor step size
+    alphapredthres = alphapredfix * model.predlsmulti^model.maxpredsmallsteps # minimum predictor step size
+    alphapredinit = model.predlinesearch ? min(1e2 * alphapredfix, 0.99999) : alphapredfix # predictor step size
 
     # preallocate arrays
     # primal and dual variables multiplied by tau
@@ -39,7 +39,7 @@ function solve!(mdl::Model)
     tmp_ts = similar(ts)
 
     # find initial primal-dual iterate
-    mdl.verbose && println("\nfinding initial iterate")
+    model.verbose && println("\nfinding initial iterate")
 
     # TODO scale like in alfonso?
     Cones.getinitsz!(ls_ts, ls_tz, cone)
@@ -71,7 +71,7 @@ function solve!(mdl::Model)
     # TODO re-use factorization of [A; G] from preprocessing
     tx .= [A; G] \ [b; h - ts]
 
-    mdl.verbose && println("initial iterate found")
+    model.verbose && println("initial iterate found")
 
     # calculate tolerances for convergence
     tol_res_tx = inv(max(1.0, norm(c)))
@@ -79,7 +79,7 @@ function solve!(mdl::Model)
     tol_res_tz = inv(max(1.0, norm(h)))
 
     # main loop
-    if mdl.verbose
+    if model.verbose
         println("starting iteration")
         @printf("\n%5s %12s %12s %9s %9s %9s %9s %9s %9s %9s\n", "iter", "p_obj", "d_obj", "abs_gap", "rel_gap", "p_inf", "d_inf", "tau", "kap", "mu")
         flush(stdout)
@@ -138,7 +138,7 @@ function solve!(mdl::Model)
             infres_du = NaN
         end
 
-        if mdl.verbose
+        if model.verbose
             # print iteration statistics
             @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n", iter, obj_pr, obj_du, gap, relgap, nres_pr, nres_du, tau, kap, mu)
             flush(stdout)
@@ -146,36 +146,36 @@ function solve!(mdl::Model)
 
         # check convergence criteria
         # TODO nearly primal or dual infeasible or nearly optimal cases?
-        if nres_pr <= mdl.tolfeas && nres_du <= mdl.tolfeas && (gap <= mdl.tolabsopt || (!isnan(relgap) && relgap <= mdl.tolrelopt))
-            mdl.verbose && println("optimal solution found; terminating")
-            mdl.status = :Optimal
+        if nres_pr <= model.tolfeas && nres_du <= model.tolfeas && (gap <= model.tolabsopt || (!isnan(relgap) && relgap <= model.tolrelopt))
+            model.verbose && println("optimal solution found; terminating")
+            model.status = :Optimal
             break
-        elseif !isnan(infres_pr) && infres_pr <= mdl.tolfeas
-            mdl.verbose && println("primal infeasibility detected; terminating")
-            mdl.status = :PrimalInfeasible
+        elseif !isnan(infres_pr) && infres_pr <= model.tolfeas
+            model.verbose && println("primal infeasibility detected; terminating")
+            model.status = :PrimalInfeasible
             break
-        elseif !isnan(infres_du) && infres_du <= mdl.tolfeas
-            mdl.verbose && println("dual infeasibility detected; terminating")
-            mdl.status = :DualInfeasible
+        elseif !isnan(infres_du) && infres_du <= model.tolfeas
+            model.verbose && println("dual infeasibility detected; terminating")
+            model.status = :DualInfeasible
             break
-        elseif mu <= mdl.tolfeas * 1e-2 && tau <= mdl.tolfeas * 1e-2 * min(1.0, kap)
-            mdl.verbose && println("ill-posedness detected; terminating")
-            mdl.status = :IllPosed
+        elseif mu <= model.tolfeas * 1e-2 && tau <= model.tolfeas * 1e-2 * min(1.0, kap)
+            model.verbose && println("ill-posedness detected; terminating")
+            model.status = :IllPosed
             break
         end
 
         # check iteration limit
         iter += 1
-        if iter >= mdl.maxiter
-            mdl.verbose && println("iteration limit reached; terminating")
-            mdl.status = :IterationLimit
+        if iter >= model.maxiter
+            model.verbose && println("iteration limit reached; terminating")
+            model.status = :IterationLimit
             break
         end
 
         # check time limit
-        if (time() - starttime) >= mdl.timelimit
-            mdl.verbose && println("time limit reached; terminating")
-            mdl.status = :TimeLimit
+        if (time() - starttime) >= model.timelimit
+            model.verbose && println("time limit reached; terminating")
+            model.status = :TimeLimit
             break
         end
 
@@ -225,16 +225,16 @@ function solve!(mdl::Model)
                 if nbhd < abs2(beta * ls_mu)
                 # if nbhd < abs2(beta)
                     # iterate is inside the beta-neighborhood
-                    if !alphaprevok || alpha > mdl.predlsmulti
+                    if !alphaprevok || alpha > model.predlsmulti
                         # either the previous iterate was outside the beta-neighborhood or increasing alpha again will make it > 1
-                        if mdl.predlinesearch
+                        if model.predlinesearch
                             alphapred = alpha
                         end
                         break
                     end
 
                     alphaprevok = true
-                    alpha = alpha / mdl.predlsmulti # increase alpha
+                    alpha = alpha / model.predlsmulti # increase alpha
                     continue
                 end
             end
@@ -245,15 +245,15 @@ function solve!(mdl::Model)
             if alpha < alphapredthres
                 # alpha is very small, so predictor has failed
                 predfail = true
-                mdl.verbose && println("predictor could not improve the solution ($nprediters line search steps); terminating")
+                model.verbose && println("predictor could not improve the solution ($nprediters line search steps); terminating")
                 break
             end
 
             alphaprevok = false
-            alpha = mdl.predlsmulti * alpha # decrease alpha
+            alpha = model.predlsmulti * alpha # decrease alpha
         end
         if predfail
-            mdl.status = :PredictorFail
+            model.status = :PredictorFail
             break
         end
 
@@ -269,7 +269,7 @@ function solve!(mdl::Model)
         mu = ls_mu
 
         # skip correction phase if allowed and current iterate is in the eta-neighborhood
-        if mdl.corrcheck && nbhd <= abs2(eta * mu)
+        if model.corrcheck && nbhd <= abs2(eta * mu)
             continue
         end
 
@@ -293,7 +293,7 @@ function solve!(mdl::Model)
             (tmp_kap, tmp_tau) = LinearSystems.solvelinsys6!(tmp_tx, tmp_ty, tmp_tz, -kap + mu / tau, tmp_ts, 0.0, mu, tau, L)
 
             # determine step length alpha by line search
-            alpha = mdl.alphacorr
+            alpha = model.alphacorr
             if tmp_kap < 0.0
                 alpha = min(alpha, -kap / tmp_kap * 0.99999)
             end
@@ -302,7 +302,7 @@ function solve!(mdl::Model)
             end
 
             ncorrlsiters = 0
-            while ncorrlsiters <= mdl.maxcorrlsiters
+            while ncorrlsiters <= model.maxcorrlsiters
                 ncorrlsiters += 1
 
                 @. ls_tz = tz + alpha * tmp_tz
@@ -319,14 +319,14 @@ function solve!(mdl::Model)
                 end
 
                 # primal iterate tx is outside the cone
-                if ncorrlsiters == mdl.maxcorrlsiters
+                if ncorrlsiters == model.maxcorrlsiters
                     # corrector failed
                     corrfail = true
-                    mdl.verbose && println("corrector could not improve the solution ($ncorrlsiters line search steps); terminating")
+                    model.verbose && println("corrector could not improve the solution ($ncorrlsiters line search steps); terminating")
                     break
                 end
 
-                alpha = mdl.corrlsmulti * alpha # decrease alpha
+                alpha = model.corrlsmulti * alpha # decrease alpha
             end
             if corrfail
                 break
@@ -342,38 +342,38 @@ function solve!(mdl::Model)
             mu = ls_mu
 
             # finish if allowed and current iterate is in the eta-neighborhood, or if taken max steps
-            if ncorrsteps == mdl.maxcorrsteps || mdl.corrcheck
+            if ncorrsteps == model.maxcorrsteps || model.corrcheck
                 nbhd = Cones.calcnbhd!(g, ls_ts, ls_tz, mu, cone) + abs2(tau * kap - mu)
                 @. ls_tz = tz
                 @. ls_ts = ts
                 if nbhd <= abs2(eta * mu)
                     break
-                elseif ncorrsteps == mdl.maxcorrsteps
+                elseif ncorrsteps == model.maxcorrsteps
                     # outside eta neighborhood, so corrector failed
                     corrfail = true
-                    mdl.verbose && println("corrector phase finished outside the eta-neighborhood ($ncorrsteps correction steps); terminating")
+                    model.verbose && println("corrector phase finished outside the eta-neighborhood ($ncorrsteps correction steps); terminating")
                     break
                 end
             end
         end
         if corrfail
-            mdl.status = :CorrectorFail
+            model.status = :CorrectorFail
             break
         end
     end
 
     # calculate result and iteration statistics
-    mdl.x = tx ./= tau
-    mdl.s = ts ./= tau
-    mdl.y = ty ./= tau
-    mdl.z = tz ./= tau
-    mdl.tau = tau
-    mdl.kap = kap
-    mdl.mu = mu
-    mdl.niters = iter
-    mdl.solvetime = time() - starttime
+    model.x = tx ./= tau
+    model.s = ts ./= tau
+    model.y = ty ./= tau
+    model.z = tz ./= tau
+    model.tau = tau
+    model.kap = kap
+    model.mu = mu
+    model.niters = iter
+    model.solvetime = time() - starttime
 
-    mdl.verbose && println("\nstatus is $(mdl.status) after $iter iterations and $(trunc(mdl.solvetime, digits=3)) seconds\n")
+    model.verbose && println("\nstatus is $(model.status) after $iter iterations and $(trunc(model.solvetime, digits=3)) seconds\n")
 
     return
 end

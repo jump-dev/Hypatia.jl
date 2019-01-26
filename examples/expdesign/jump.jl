@@ -55,8 +55,8 @@ function run_JuMP_expdesign(; rseed::Int=1)
     JuMP.optimize!(model)
 
     term_status = JuMP.termination_status(model)
-    pobj = JuMP.objective_value(model)
-    dobj = JuMP.objective_bound(model)
+    primal_obj = JuMP.objective_value(model)
+    dual_obj = JuMP.objective_bound(model)
     pr_status = JuMP.primal_status(model)
     du_status = JuMP.dual_status(model)
     npval = JuMP.value.(np)
@@ -64,8 +64,8 @@ function run_JuMP_expdesign(; rseed::Int=1)
     @test term_status == MOI.OPTIMAL
     @test pr_status == MOI.FEASIBLE_POINT
     @test du_status == MOI.FEASIBLE_POINT
-    @test pobj ≈ dobj atol=1e-4 rtol=1e-4
-    @test pobj ≈ logdet(V * Diagonal(npval) * V') atol=1e-4 rtol=1e-4
+    @test primal_obj ≈ dual_obj atol=1e-4 rtol=1e-4
+    @test primal_obj ≈ logdet(V * Diagonal(npval) * V') atol=1e-4 rtol=1e-4
     @test sum(npval) ≈ n atol=1e-4 rtol=1e-4
     @test all(-1e-4 .<= npval .<= nmax + 1e-4)
 

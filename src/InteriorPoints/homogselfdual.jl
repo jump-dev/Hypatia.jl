@@ -6,6 +6,8 @@ interior point type and functions for algorithms based on homogeneous self dual 
 TODO make internal statuses types
 =#
 
+# TODO maybe have point defined in model, and keep tau and kappa outside the point in hsde alg
+
 mutable struct HSDEPoint <: InteriorPoint
     tx::Vector{Float64}
     ty::Vector{Float64}
@@ -99,6 +101,12 @@ mutable struct HSDESolver <: IPMSolver
     end
 end
 
+
+get_tau(solver::HSDESolver) = solver.tau
+get_kappa(solver::HSDESolver) = solver.kappa
+get_mu(solver::HSDESolver) = solver.mu
+
+
 function solve(solver::HSDESolver)
     model = solver.model
     cones = model.cones
@@ -132,7 +140,7 @@ function solve(solver::HSDESolver)
     converge_tol_z = _get_tol(model.h)
 
     predict = HSDEPoint(model)
-    correct = HSDEPoint(model)
+    # correct = HSDEPoint(model)
 
     # print iteration statistics headers
     if solver.verbose
@@ -222,11 +230,12 @@ function solve(solver::HSDESolver)
         LHS[n+p+q+1, end] = mu / point.tau / point.tau
         for k in eachindex(cones)
             cone_k = cones[k]
+            # TODO stepped to this point so should already have called check_in_cone for the point
             Cones.load_primals(cone_k, point.primal_views[k])
             @assert Cones.check_in_cone(cone_k)
             rows = (n + p) .+ model.cone_idxs[k]
             cols = Cones.use_dual(cone_k) ? rows : (q + 1) .+ rows
-            LHS[rows, cols] = Cones.hess(cone_k)
+            LHS[rows, cols] = mu * Cones.hess(cone_k)
         end
 
         rhs = [
@@ -261,18 +270,18 @@ function solve(solver::HSDESolver)
         affine_alpha = get_max_alpha_in_nbhd(point, predict, mu, 0.99, solver)
 
 
-        # NOTE step in corrector direction here: not in description of algorithms?
-        @. @views begin
-            correct.tx = rhs[1:n, 2]
-            correct.ty = rhs[(n + 1):(n + p), 2]
-            correct.tz = rhs[(n + p + 1):(n + p + q), 2]
-            correct.ts = rhs[(n + p + q + 2):(n + p + 2q + 1), 2]
-        end
-        correct.kap = rhs[n + p + q + 1, 2]
-        correct.tau = rhs[n + p + 2q + 2, 2]
-
-        point = step_in_direction(point, correct, 1.0)
-        mu = get_mu(point, model)
+        # # NOTE step in corrector direction here: not in description of algorithms?
+        # @. @views begin
+        #     correct.tx = rhs[1:n, 2]
+        #     correct.ty = rhs[(n + 1):(n + p), 2]
+        #     correct.tz = rhs[(n + p + 1):(n + p + q), 2]
+        #     correct.ts = rhs[(n + p + q + 2):(n + p + 2q + 1), 2]
+        # end
+        # correct.kap = rhs[n + p + q + 1, 2]
+        # correct.tau = rhs[n + p + 2q + 2, 2]
+        #
+        # point = step_in_direction(point, correct, 1.0)
+        # mu = get_mu(point, model)
 
 
         # combined phase
@@ -401,23 +410,23 @@ function step_in_direction(point::HSDEPoint, direction::HSDEPoint, alpha::Float6
     return point
 end
 
-function get_max_alpha(point::HSDEPoint, direction::HSDEPoint, solver::HSDESolver)
-    cones = solver.model.cones
-    alpha = 1.0
-    if direction.kap < 0.0
-        alpha = min(alpha, -point.kap / direction.kap)
-    end
-    if direction.tau < 0.0
-        alpha = min(alpha, -point.tau / direction.tau)
-    end
-    # TODO what about mu? quadratic equation. need dot(ls_ts, ls_tz) + ls_tau * ls_kap > 0
-    for k in eachindex(cones)
-        alpha_k = Cones.get_max_alpha(cones[k], direction.primal_views[k])
-        alpha = min(alpha, alpha_k)
-    end
-    @assert alpha > 1e-5
-    return alpha
-end
+# function get_max_alpha(point::HSDEPoint, direction::HSDEPoint, solver::HSDESolver)
+#     cones = solver.model.cones
+#     alpha = 1.0
+#     if direction.kap < 0.0
+#         alpha = min(alpha, -point.kap / direction.kap)
+#     end
+#     if direction.tau < 0.0
+#         alpha = min(alpha, -point.tau / direction.tau)
+#     end
+#     # TODO what about mu? quadratic equation. need dot(ls_ts, ls_tz) + ls_tau * ls_kap > 0
+#     for k in eachindex(cones)
+#         alpha_k = Cones.get_max_alpha(cones[k], direction.primal_views[k])
+#         alpha = min(alpha, alpha_k)
+#     end
+#     @assert alpha > 1e-5
+#     return alpha
+# end
 
 function get_max_alpha_in_nbhd(point::HSDEPoint, direction::HSDEPoint, mu::Float64, nbhd::Float64, solver::HSDESolver)
     model = solver.model
@@ -498,7 +507,9 @@ function get_max_alpha_in_nbhd(point::HSDEPoint, direction::HSDEPoint, mu::Float
         alpha *= 0.8 # TODO option for parameter
     end
 
-    @assert alpha > 1e-6
+    if alpha < 1e-6
+        @warn("alpha is $alpha")
+    end
     return alpha
 end
 

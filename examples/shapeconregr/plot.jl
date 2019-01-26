@@ -20,7 +20,7 @@ function makeplot(regressor, X, y)
     randx = rand(Distributions.Uniform(-1, 1), 200)
     randy = rand(Distributions.Uniform(-1, 1), 200)
     randz = [regressor(hcat(randx, randy)[i, :]) for i in 1:200]
-    mdl_trace = mesh3d(
+    model_trace = mesh3d(
         x = randx,
         y = randy,
         z = randz,
@@ -32,7 +32,7 @@ function makeplot(regressor, X, y)
     )
     layout = Layout(margin=attr(l=0, r=0, t=0, b=0))
 
-    p = plot([data_trace, mdl_trace], layout)
+    p = plot([data_trace, model_trace], layout)
     # savefig(p, "psd_plot.pdf")
 
     return p
