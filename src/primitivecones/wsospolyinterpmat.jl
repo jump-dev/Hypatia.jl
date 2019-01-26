@@ -48,6 +48,7 @@ end
 # calculate barrier value
 function barfun(pnt, ipwt::Vector{Matrix{Float64}}, R::Int, U::Int, calc_barval::Bool)
     barval = 0.0
+    
     for ipwtj in ipwt
         L = size(ipwtj, 2)
         mat = similar(pnt, L*R, L*R)
@@ -58,10 +59,8 @@ function barfun(pnt, ipwt::Vector{Matrix{Float64}}, R::Int, U::Int, calc_barval:
             uo = 0
             for p in 1:R, q in 1:p
                 val = sum(ipwtj[u,l] * ipwtj[u,k] * pnt[uo+u] for u in 1:U)
-                bp = bl + p
-                bq = bk + q
                 if p == q
-                    mat[bp,bq] = val
+                    mat[bl+p, bk+q] = val
                 else
                     mat[bl+p, bk+q] = mat[bl+q, bk+p] = rt2i*val
                 end
@@ -69,13 +68,7 @@ function barfun(pnt, ipwt::Vector{Matrix{Float64}}, R::Int, U::Int, calc_barval:
             end
         end
 
-        # if !calc_barval
-        #     @show eigvals(Symmetric(mat, :L))
-        #     @show cond(Symmetric(mat, :L))
-        # end
-
         F = cholesky!(Symmetric(mat, :L), check=false)
-
         if !isposdef(F)
             return NaN
         end
@@ -83,6 +76,7 @@ function barfun(pnt, ipwt::Vector{Matrix{Float64}}, R::Int, U::Int, calc_barval:
             barval -= logdet(F)
         end
     end
+    
     return barval
 end
 
