@@ -6,7 +6,7 @@ Copyright 2018, Chris Coey and contributors
 mutable struct Model
     # options
     verbose::Bool           # if true, prints progress at each iteration
-    timelimit::Float64      # (approximate) time limit (in seconds) for algorithm in solve function
+    time_limit::Float64      # (approximate) time limit (in seconds) for algorithm in solve function
     tol_rel_opt::Float64      # relative optimality gap tolerance
     tol_abs_opt::Float64      # absolute optimality gap tolerance
     tol_feas::Float64        # feasibility tolerance
@@ -32,7 +32,7 @@ mutable struct Model
 
     # results
     status::Symbol          # solver status
-    solvetime::Float64      # total solve time
+    solve_time::Float64      # total solve time
     niters::Int             # total number of iterations
 
     x::Vector{Float64}      # final value of the primal free variables
@@ -45,10 +45,10 @@ mutable struct Model
     primal_obj::Float64           # final primal objective value
     dual_obj::Float64           # final dual objective value
 
-    function Model(verbose, timelimit, tol_rel_opt, tol_abs_opt, tol_feas, maxiter, predlinesearch, maxpredsmallsteps, predlsmulti, corrcheck, maxcorrsteps, alphacorr, maxcorrlsiters, corrlsmulti)
+    function Model(verbose, time_limit, tol_rel_opt, tol_abs_opt, tol_feas, maxiter, predlinesearch, maxpredsmallsteps, predlsmulti, corrcheck, maxcorrsteps, alphacorr, maxcorrlsiters, corrlsmulti)
         model = new()
         model.verbose = verbose
-        model.timelimit = timelimit
+        model.time_limit = time_limit
         model.tol_rel_opt = tol_rel_opt
         model.tol_abs_opt = tol_abs_opt
         model.tol_feas = tol_feas
@@ -69,7 +69,7 @@ end
 # initialize a model object
 function Model(;
     verbose = false,
-    timelimit = 3.6e3, # TODO should be Inf
+    time_limit = 3.6e3, # TODO should be Inf
     tol_rel_opt = 1e-6,
     tol_abs_opt = 1e-7,
     tol_feas = 1e-7,
@@ -86,8 +86,8 @@ function Model(;
     if min(tol_rel_opt, tol_abs_opt, tol_feas) < 1e-12 || max(tol_rel_opt, tol_abs_opt, tol_feas) > 1e-2
         error("tol_rel_opt, tol_abs_opt, tol_feas must be between 1e-12 and 1e-2")
     end
-    if timelimit < 1e-2
-        error("timelimit must be at least 1e-2")
+    if time_limit < 1e-2
+        error("time_limit must be at least 1e-2")
     end
     if maxiter < 1
         error("maxiter must be at least 1")
@@ -98,7 +98,7 @@ function Model(;
     if maxcorrsteps < 1
         error("maxcorrsteps must be at least 1")
     end
-    return Model(verbose, timelimit, tol_rel_opt, tol_abs_opt, tol_feas, maxiter, predlinesearch, maxpredsmallsteps, predlsmulti, corrcheck, maxcorrsteps, alphacorr, maxcorrlsiters, corrlsmulti)
+    return Model(verbose, time_limit, tol_rel_opt, tol_abs_opt, tol_feas, maxiter, predlinesearch, maxpredsmallsteps, predlsmulti, corrcheck, maxcorrsteps, alphacorr, maxcorrlsiters, corrlsmulti)
 end
 
 # check data for consistency
@@ -163,7 +163,7 @@ function load_data!(
 end
 
 get_status(model::Model) = model.status
-get_solve_time(model::Model) = model.solvetime
+get_solve_time(model::Model) = model.solve_time
 get_num_iters(model::Model) = model.niters
 
 get_x(model::Model) = copy(model.x)

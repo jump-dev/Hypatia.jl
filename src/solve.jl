@@ -173,7 +173,7 @@ function solve!(model::Model)
         end
 
         # check time limit
-        if (time() - starttime) >= model.timelimit
+        if (time() - starttime) >= model.time_limit
             model.verbose && println("time limit reached; terminating")
             model.status = :TimeLimit
             break
@@ -371,9 +371,9 @@ function solve!(model::Model)
     model.kap = kap
     model.mu = mu
     model.niters = iter
-    model.solvetime = time() - starttime
+    model.solve_time = time() - starttime
 
-    model.verbose && println("\nstatus is $(model.status) after $iter iterations and $(trunc(model.solvetime, digits=3)) seconds\n")
+    model.verbose && println("\nstatus is $(model.status) after $iter iterations and $(trunc(model.solve_time, digits=3)) seconds\n")
 
     return
 end
