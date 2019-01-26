@@ -88,7 +88,7 @@ sleep(5.0)
 # each line of csv file will summarize Hypatia performance on a particular instance
 csvfile = joinpath(outputpath, "RESULTS_$(instanceset).csv")
 open(csvfile, "w") do fdcsv
-    println(fdcsv, "instname,status,pobj,dobj,niters,runtime,gctime,bytes")
+    println(fdcsv, "instname,status,primal_obj,dual_obj,niters,runtime,gctime,bytes")
 end
 
 # run each instance, print Hypatia output to instance-specific file, and print results to a single csv file
@@ -98,7 +98,7 @@ for instname in instances
     println("starting $instname")
 
     solveerror = nothing
-    (status, pobj, dobj, niters, runtime, gctime, bytes) = (:UnSolved, NaN, NaN, -1, NaN, NaN, -1)
+    (status, primal_obj, dual_obj, niters, runtime, gctime, bytes) = (:UnSolved, NaN, NaN, -1, NaN, NaN, -1)
     memallocs = nothing
 
     instfile = joinpath(outputpath, instname * ".txt")
@@ -124,8 +124,8 @@ for instname in instances
             println("\nHypatia finished")
             status = MOI.get(optimizer, MOI.TerminationStatus())
             niters = -1 # TODO niters = MOI.get(optimizer, MOI.BarrierIterations())
-            pobj = MOI.get(optimizer, MOI.ObjectiveValue())
-            dobj = MOI.get(optimizer, MOI.ObjectiveBound())
+            primal_obj = MOI.get(optimizer, MOI.ObjectiveValue())
+            dual_obj = MOI.get(optimizer, MOI.ObjectiveBound())
         catch solveerror
             println("\nHypatia errored: ", solveerror)
         end
@@ -143,7 +143,7 @@ for instname in instances
     end
 
     open(csvfile, "a") do fdcsv
-        println(fdcsv, "$instname,$status,$pobj,$dobj,$niters,$runtime,$gctime,$bytes")
+        println(fdcsv, "$instname,$status,$primal_obj,$dual_obj,$niters,$runtime,$gctime,$bytes")
     end
 end
 

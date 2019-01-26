@@ -5,7 +5,7 @@ MathOptInterface wrapper of Hypatia solver
 =#
 
 mutable struct Optimizer <: MOI.AbstractOptimizer
-    mdl::Model
+    model::Model
     verbose::Bool
     timelimit::Float64
     linearsystem::Type{<:LinearSystems.LinearSystemSolver}
@@ -31,12 +31,12 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     z::Vector{Float64}
     status::Symbol
     solvetime::Float64
-    pobj::Float64
-    dobj::Float64
+    primal_obj::Float64
+    dual_obj::Float64
 
-    function Optimizer(mdl::Model, verbose::Bool, timelimit::Float64, linearsystem, usedense::Bool)
+    function Optimizer(model::Model, verbose::Bool, timelimit::Float64, linearsystem, usedense::Bool)
         opt = new()
-        opt.mdl = mdl
+        opt.model = model
         opt.verbose = verbose
         opt.timelimit = timelimit
         opt.linearsystem = linearsystem
@@ -463,7 +463,7 @@ function MOI.copy_to(
 end
 
 function MOI.optimize!(opt::Optimizer)
-    mdl = opt.mdl
+    model = opt.model
     (c, A, b, G, h, cone) = (opt.c, opt.A, opt.b, opt.G, opt.h, opt.cone)
 
     # check, preprocess, load, and solve
@@ -477,23 +477,23 @@ function MOI.optimize!(opt::Optimizer)
     else
         error("linear system cache type $(opt.linearsystem) is not recognized")
     end
-    load_data!(mdl, c1, A1, b1, G1, h, cone, L)
-    solve!(mdl)
+    load_data!(model, c1, A1, b1, G1, h, cone, L)
+    solve!(model)
 
-    opt.status = get_status(mdl)
-    opt.solvetime = get_solvetime(mdl)
-    opt.pobj = get_pobj(mdl)
-    opt.dobj = get_dobj(mdl)
+    opt.status = get_status(model)
+    opt.solvetime = get_solve_time(model)
+    opt.primal_obj = get_primal_obj(model)
+    opt.dual_obj = get_dual_obj(model)
 
     # get solution and transform for MOI
     opt.x = zeros(length(c))
-    opt.x[dukeep] = get_x(mdl)
+    opt.x[dukeep] = get_x(model)
     opt.constrprimeq += opt.b - opt.A*opt.x
     opt.y = zeros(length(b))
-    opt.y[prkeep] = get_y(mdl)
+    opt.y[prkeep] = get_y(model)
 
-    opt.s = get_s(mdl)
-    opt.z = get_z(mdl)
+    opt.s = get_s(model)
+    opt.z = get_z(model)
 
     # TODO refac out primitive cone untransformations
     for k in eachindex(cone.cones)
@@ -517,7 +517,7 @@ function MOI.optimize!(opt::Optimizer)
     return
 end
 
-# function MOI.free!(opt::Optimizer) # TODO call gc on opt.mdl?
+# function MOI.free!(opt::Optimizer) # TODO call gc on opt.model?
 
 function MOI.get(opt::Optimizer, ::MOI.TerminationStatus)
     if opt.status in (:NotLoaded, :Loaded)
@@ -544,9 +544,9 @@ end
 
 function MOI.get(opt::Optimizer, ::MOI.ObjectiveValue)
     if opt.objsense == MOI.MIN_SENSE
-        return opt.pobj + opt.objconst
+        return opt.primal_obj + opt.objconst
     elseif opt.objsense == MOI.MAX_SENSE
-        return -opt.pobj + opt.objconst
+        return -opt.primal_obj + opt.objconst
     else
         error("no objective sense is set")
     end
@@ -554,9 +554,9 @@ end
 
 function MOI.get(opt::Optimizer, ::MOI.ObjectiveBound)
     if opt.objsense == MOI.MIN_SENSE
-        return opt.dobj + opt.objconst
+        return opt.dual_obj + opt.objconst
     elseif opt.objsense == MOI.MAX_SENSE
-        return -opt.dobj + opt.objconst
+        return -opt.dual_obj + opt.objconst
     else
         error("no objective sense is set")
     end

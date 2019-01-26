@@ -42,27 +42,27 @@ mutable struct Model
     tau::Float64            # final value of the tau variable
     kap::Float64            # final value of the kappa variable
     mu::Float64             # final value of mu
-    pobj::Float64           # final primal objective value
-    dobj::Float64           # final dual objective value
+    primal_obj::Float64           # final primal objective value
+    dual_obj::Float64           # final dual objective value
 
     function Model(verbose, timelimit, tolrelopt, tolabsopt, tolfeas, maxiter, predlinesearch, maxpredsmallsteps, predlsmulti, corrcheck, maxcorrsteps, alphacorr, maxcorrlsiters, corrlsmulti)
-        mdl = new()
-        mdl.verbose = verbose
-        mdl.timelimit = timelimit
-        mdl.tolrelopt = tolrelopt
-        mdl.tolabsopt = tolabsopt
-        mdl.tolfeas = tolfeas
-        mdl.maxiter = maxiter
-        mdl.predlinesearch = predlinesearch
-        mdl.maxpredsmallsteps = maxpredsmallsteps
-        mdl.predlsmulti = predlsmulti
-        mdl.corrcheck = corrcheck
-        mdl.maxcorrsteps = maxcorrsteps
-        mdl.alphacorr = alphacorr
-        mdl.maxcorrlsiters = maxcorrlsiters
-        mdl.corrlsmulti = corrlsmulti
-        mdl.status = :NotLoaded
-        return mdl
+        model = new()
+        model.verbose = verbose
+        model.timelimit = timelimit
+        model.tolrelopt = tolrelopt
+        model.tolabsopt = tolabsopt
+        model.tolfeas = tolfeas
+        model.maxiter = maxiter
+        model.predlinesearch = predlinesearch
+        model.maxpredsmallsteps = maxpredsmallsteps
+        model.predlsmulti = predlsmulti
+        model.corrcheck = corrcheck
+        model.maxcorrsteps = maxcorrsteps
+        model.alphacorr = alphacorr
+        model.maxcorrlsiters = maxcorrlsiters
+        model.corrlsmulti = corrlsmulti
+        model.status = :NotLoaded
+        return model
     end
 end
 
@@ -148,32 +148,32 @@ end
 
 # verify problem data and load into model object
 function load_data!(
-    mdl::Model,
+    model::Model,
     c::Vector{Float64},
     A::AbstractMatrix{Float64},
     b::Vector{Float64},
     G::AbstractMatrix{Float64},
     h::Vector{Float64},
     cone::Cones.Cone,
-    L::LinearSystems.LinearSystemSolver, 
+    L::LinearSystems.LinearSystemSolver,
     )
-    (mdl.c, mdl.A, mdl.b, mdl.G, mdl.h, mdl.cone, mdl.L) = (c, A, b, G, h, cone, L)
-    mdl.status = :Loaded
-    return mdl
+    (model.c, model.A, model.b, model.G, model.h, model.cone, model.L) = (c, A, b, G, h, cone, L)
+    model.status = :Loaded
+    return model
 end
 
-get_status(mdl::Model) = mdl.status
-get_solvetime(mdl::Model) = mdl.solvetime
-get_niters(mdl::Model) = mdl.niters
+get_status(model::Model) = model.status
+get_solve_time(model::Model) = model.solvetime
+get_num_iters(model::Model) = model.niters
 
-get_x(mdl::Model) = copy(mdl.x)
-get_s(mdl::Model) = copy(mdl.s)
-get_y(mdl::Model) = copy(mdl.y)
-get_z(mdl::Model) = copy(mdl.z)
+get_x(model::Model) = copy(model.x)
+get_s(model::Model) = copy(model.s)
+get_y(model::Model) = copy(model.y)
+get_z(model::Model) = copy(model.z)
 
-get_tau(mdl::Model) = mdl.tau
-get_kappa(mdl::Model) = mdl.kappa
-get_mu(mdl::Model) = mdl.mu
+get_tau(model::Model) = model.tau
+get_kappa(model::Model) = model.kappa
+get_mu(model::Model) = model.mu
 
-get_pobj(mdl::Model) = dot(mdl.c, mdl.x)
-get_dobj(mdl::Model) = -dot(mdl.b, mdl.y) - dot(mdl.h, mdl.z)
+get_primal_obj(model::Model) = dot(model.c, model.x)
+get_dual_obj(model::Model) = -dot(model.b, model.y) - dot(model.h, model.z)
