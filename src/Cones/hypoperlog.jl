@@ -69,5 +69,5 @@ function incone(cone::HypoPerLog, scal::Float64)
     H[2,3] = H[3,2] = vw*(lwv - 1.0)*ivlwvu2 - ivlwvu/w
     H[3,3] = abs2(vw)*ivlwvu2 + vw/w*ivlwvu + inv(abs2(w))
 
-    return factH(cone)
+    return factorize_hess(cone)
 end

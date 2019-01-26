@@ -81,5 +81,5 @@ function check_in_cone(cone::WSOSPolyInterp, dual_vec::Vector{Float64})
         end
     end
 
-    return factH(cone)
+    return factorize_hess(cone)
 end

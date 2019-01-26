@@ -64,5 +64,5 @@ function incone(cone::EpiPerSumExp, scal::Float64)
     cone.g .= DiffResults.gradient(cone.diffres)
     cone.H .= DiffResults.hessian(cone.diffres)
 
-    return factH(cone)
+    return factorize_hess(cone)
 end

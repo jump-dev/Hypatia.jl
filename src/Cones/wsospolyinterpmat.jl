@@ -108,7 +108,7 @@ function incone(cone::WSOSPolyInterpMat, scal::Float64)
     cone.diffres = ForwardDiff.hessian!(cone.diffres, cone.barfun, cone.scalpnt)
     cone.g .= DiffResults.gradient(cone.diffres)
     cone.H .= DiffResults.hessian(cone.diffres)
-    return factH(cone)
+    return factorize_hess(cone)
 end
 
 # calcg!(g::AbstractVector{Float64}, cone::WSOSPolyInterpMat) = (@. g = cone.g/cone.scal; g)
