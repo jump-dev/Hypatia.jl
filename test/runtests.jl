@@ -16,15 +16,15 @@ using SparseArrays
 using Test
 
 
-include(joinpath(@__DIR__, "interpolation.jl"))
-
-examples_dir = joinpath(@__DIR__, "../examples")
-
-include(joinpath(examples_dir, "envelope/native.jl"))
-include(joinpath(examples_dir, "linearopt/native.jl"))
-include(joinpath(examples_dir, "namedpoly/native.jl"))
-
-include(joinpath(@__DIR__, "native.jl"))
+# include(joinpath(@__DIR__, "interpolation.jl"))
+#
+# examples_dir = joinpath(@__DIR__, "../examples")
+#
+# include(joinpath(examples_dir, "envelope/native.jl"))
+# include(joinpath(examples_dir, "linearopt/native.jl"))
+# include(joinpath(examples_dir, "namedpoly/native.jl"))
+#
+# include(joinpath(@__DIR__, "native.jl"))
 
 # include(joinpath(examples_dir, "envelope/jump.jl"))
 # include(joinpath(examples_dir, "expdesign/jump.jl"))
@@ -39,19 +39,19 @@ include(joinpath(@__DIR__, "native.jl"))
 #
 # include(joinpath(@__DIR__, "JuMP.jl"))
 #
-# include(joinpath(@__DIR__, "MOI_wrapper.jl"))
+include(joinpath(@__DIR__, "MathOptInterface.jl"))
 
 
 @testset "Hypatia tests" begin
 
-@info("starting interpolation tests")
-@testset "interpolation tests" begin
-    fekete_sample()
-end
+# @info("starting interpolation tests")
+# @testset "interpolation tests" begin
+#     fekete_sample()
+# end
 
 # # @info("starting native interface tests")
 # verbose = true
-# # linearsystems = [
+# # linear_solvers = [
 # #     LS.QRSymm,
 # #     # LS.Naive,
 # #     ]
@@ -96,9 +96,9 @@ end
 #     epipersumexp1,
 #     epipersumexp2,
 #     ]
-# # @testset "native tests: $t, $l" for t in testfuns, l in linearsystems
+# # @testset "native tests: $t, $l" for t in testfuns, l in linear_solvers
 # @testset "native tests: $t" for t in testfuns
-#     # t(verbose = verbose, linearsystem=l)
+#     # t(verbose = verbose, linear_solver=l)
 #     t(verbose = verbose)
 # end
 #
@@ -117,7 +117,7 @@ end
 #
 # @info("starting additional native examples tests")
 # verbose = false
-# # linearsystems = [
+# # linear_solvers = [
 # #     LS.QRSymm,
 # #     # LS.Naive, # slow
 # #     ]
@@ -141,9 +141,9 @@ end
 #     namedpoly10,
 #     namedpoly11,
 #     ]
-# # @testset "native examples: $t, $l" for t in testfuns, l in linearsystems
-# @testset "native examples: $t" for t in testfuns#, l in linearsystems
-#     # t(verbose = verbose, linearsystem=l)
+# # @testset "native examples: $t, $l" for t in testfuns, l in linear_solvers
+# @testset "native examples: $t" for t in testfuns#, l in linear_solvers
+#     # t(verbose = verbose, linear_solver=l)
 #     t(verbose = verbose)
 # end
 
@@ -210,14 +210,16 @@ end
 #     t()
 # end
 #
-# @info("starting MathOptInterface tests")
-# verbose = false
-# linearsystems = [
+@info("starting MathOptInterface tests")
+verbose = false
+# linear_solvers = [
 #     LS.QRSymm,
 #     LS.Naive,
 #     ]
-# @testset "MOI tests: $l, $(d ? "dense" : "sparse")" for l in linearsystems, d in [false, true]
-#     testmoi(verbose = verbose, linearsystem=l, dense=d)
-# end
+@testset "MOI tests: $(d ? "dense" : "sparse")" for d in (false, true)
+# @testset "MOI tests: $l, $(d ? "dense" : "sparse")" for l in linear_solvers, d in (false, true)
+    test_moi(verbose = verbose, dense = d)
+    # test_moi(verbose = verbose, linear_solver = l, dense = d)
+end
 
 end

@@ -11,10 +11,18 @@ include("Models/Models.jl")
 include("InteriorPoints/InteriorPoints.jl")
 include("ModelUtilities/ModelUtilities.jl")
 
+const HYP = Hypatia
+const CO = HYP.Cones
+# const LS = HYP.LinearSystems
+const MO = HYP.Models
+const IP = HYP.InteriorPoints
+
 # MathOptInterface
-# import MathOptInterface
-# const MOI = MathOptInterface
-# include("MathOptInterface/MOI_cones.jl")
-# include("MathOptInterface/MOI_wrapper.jl")
+using LinearAlgebra
+using SparseArrays
+import MathOptInterface
+const MOI = MathOptInterface
+include("MathOptInterface/cones.jl")
+include("MathOptInterface/wrapper.jl")
 
 end
