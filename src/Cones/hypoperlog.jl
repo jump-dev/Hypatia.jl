@@ -16,7 +16,7 @@ TODO choose a better interior direction
 
 mutable struct HypoPerLog <: Cone
     usedual::Bool
-    pnt::AbstractVector{Float64}
+    primals::AbstractVector{Float64}
     g::Vector{Float64}
     H::Matrix{Float64}
     H2::Matrix{Float64}
@@ -26,7 +26,7 @@ mutable struct HypoPerLog <: Cone
         cone = new()
         cone.usedual = isdual
         cone.g = Vector{Float64}(undef, 3)
-        cone.H = similar(cone.g, 3, 3)
+        cone.H = Matrix{Float64}(undef, 3, 3)
         cone.H2 = similar(cone.H)
         return cone
     end
@@ -35,17 +35,18 @@ end
 HypoPerLog() = HypoPerLog(false)
 
 dimension(cone::HypoPerLog) = 3
-get_nu(cone::HypoPerLog) = 3
-set_initial_point(arr::AbstractVector{Float64}, cone::HypoPerLog) = (arr[1] = -1.0; arr[2] = 1.0; arr[3] = 1.0; arr)
-loadpnt!(cone::HypoPerLog, pnt::AbstractVector{Float64}) = (cone.pnt = pnt)
 
-function incone(cone::HypoPerLog, scal::Float64)
-    u = cone.pnt[1]; v = cone.pnt[2]; w = cone.pnt[3]
+get_nu(cone::HypoPerLog) = 3
+
+set_initial_point(arr::AbstractVector{Float64}, cone::HypoPerLog) = (arr[1] = -1.0; arr[2] = 1.0; arr[3] = 1.0; arr)
+
+function check_in_cone(cone::HypoPerLog)
+    (u, v, w) = cone.primals
     if (v <= 0.0) || (w <= 0.0)
         return false
     end
-    lwv = log(w/v)
-    vlwv = v*lwv
+    lwv = log(w / v)
+    vlwv = v * lwv
     vlwvu = vlwv - u
     if vlwvu <= 0.0
         return false
@@ -55,19 +56,19 @@ function incone(cone::HypoPerLog, scal::Float64)
     ivlwvu = inv(vlwvu)
     g = cone.g
     g[1] = ivlwvu
-    g[2] = ivlwvu*(v - u - 2.0*vlwvu)/v
-    g[3] = -(1.0 + v*ivlwvu)/w
+    g[2] = ivlwvu * (v - u - 2.0 * vlwvu) / v
+    g[3] = -(1.0 + v * ivlwvu) / w
 
     # Hessian
-    vw = v/w
+    vw = v / w
     ivlwvu2 = abs2(ivlwvu)
     H = cone.H
-    H[1,1] = ivlwvu2
-    H[1,2] = H[2,1] = -(lwv - 1.0)*ivlwvu2
-    H[1,3] = H[3,1] = -vw*ivlwvu2
-    H[2,2] = abs2(lwv - 1.0)*ivlwvu2 + ivlwvu/v + inv(abs2(v))
-    H[2,3] = H[3,2] = vw*(lwv - 1.0)*ivlwvu2 - ivlwvu/w
-    H[3,3] = abs2(vw)*ivlwvu2 + vw/w*ivlwvu + inv(abs2(w))
+    H[1, 1] = ivlwvu2
+    H[1, 2] = H[2, 1] = -(lwv - 1.0) * ivlwvu2
+    H[1, 3] = H[3, 1] = -vw * ivlwvu2
+    H[2, 2] = abs2(lwv - 1.0) * ivlwvu2 + ivlwvu / v + inv(abs2(v))
+    H[2, 3] = H[3, 2] = vw * (lwv - 1.0) * ivlwvu2 - ivlwvu / w
+    H[3, 3] = abs2(vw) * ivlwvu2 + vw / w * ivlwvu + inv(abs2(w))
 
     return factorize_hess(cone)
 end
