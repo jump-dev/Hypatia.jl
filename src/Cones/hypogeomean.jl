@@ -16,7 +16,7 @@ mutable struct HypoGeomean <: Cone
     dim::Int
     alpha::Vector{Float64}
     ialpha::Vector{Float64}
-    pnt::AbstractVector{Float64}
+    primals::AbstractVector{Float64}
     g::Vector{Float64}
     H::Matrix{Float64}
     H2::Matrix{Float64}
@@ -36,12 +36,12 @@ mutable struct HypoGeomean <: Cone
         ialpha = inv.(alpha)
         cone.ialpha = ialpha
         cone.g = Vector{Float64}(undef, dim)
-        cone.H = similar(cone.g, dim, dim)
+        cone.H = Matrix{Float64}(undef, dim, dim)
         cone.H2 = similar(cone.H)
-        function barfun(pnt)
-            u = pnt[1]
-            w = view(pnt, 2:dim)
-            return -log(prod((w[i]*ialpha[i])^alpha[i] for i in eachindex(alpha)) + u) - sum((1.0 - alpha[i])*log(w[i]*ialpha[i]) for i in eachindex(alpha)) - log(-u)
+        function barfun(primals)
+            u = primals[1]
+            w = view(primals, 2:dim)
+            return -log(prod((w[i] * ialpha[i])^alpha[i] for i in eachindex(alpha)) + u) - sum((1.0 - alpha[i]) * log(w[i] * ialpha[i]) for i in eachindex(alpha)) - log(-u)
         end
         cone.barfun = barfun
         cone.diffres = DiffResults.HessianResult(cone.g)
@@ -51,25 +51,22 @@ end
 
 HypoGeomean(alpha::Vector{Float64}) = HypoGeomean(alpha, false)
 
-dimension(cone::HypoGeomean) = cone.dim
 get_nu(cone::HypoGeomean) = cone.dim
-set_initial_point(arr::AbstractVector{Float64}, cone::HypoGeomean) = (@. arr = 1.0; arr[1] = -prod(cone.ialpha[i]^cone.alpha[i] for i in eachindex(cone.alpha))/cone.dim; arr)
-loadpnt!(cone::HypoGeomean, pnt::AbstractVector{Float64}) = (cone.pnt = pnt)
 
-function incone(cone::HypoGeomean, scal::Float64)
-    u = cone.pnt[1]
-    w = view(cone.pnt, 2:cone.dim)
-    alpha = cone.alpha
-    ialpha = cone.ialpha
+set_initial_point(arr::AbstractVector{Float64}, cone::HypoGeomean) = (@. arr = 1.0; arr[1] = -prod(cone.ialpha[i]^cone.alpha[i] for i in eachindex(cone.alpha)) / cone.dim; arr)
+
+function check_in_cone(cone::HypoGeomean)
+    u = cone.primals[1]
+    w = view(cone.primals, 2:cone.dim)
     if u >= 0.0 || any(wi <= 0.0 for wi in w)
         return false
     end
-    if sum(alpha[i]*log(w[i]*ialpha[i]) for i in eachindex(alpha)) <= log(-u)
+    if sum(cone.alpha[i] * log(w[i] * cone.ialpha[i]) for i in eachindex(cone.alpha)) <= log(-u)
         return false
     end
 
     # TODO check allocations, check with Jarrett if this is most efficient way to use DiffResults
-    cone.diffres = ForwardDiff.hessian!(cone.diffres, cone.barfun, cone.pnt)
+    cone.diffres = ForwardDiff.hessian!(cone.diffres, cone.barfun, cone.primals)
     cone.g .= DiffResults.gradient(cone.diffres)
     cone.H .= DiffResults.hessian(cone.diffres)
 

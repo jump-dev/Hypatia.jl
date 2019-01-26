@@ -18,7 +18,7 @@ mutable struct EpiNormSpectral <: Cone
     dim::Int
     n::Int
     m::Int
-    pnt::AbstractVector{Float64}
+    primals::AbstractVector{Float64}
     mat::Matrix{Float64}
     g::Vector{Float64}
     H::Matrix{Float64}
@@ -29,7 +29,7 @@ mutable struct EpiNormSpectral <: Cone
 
     function EpiNormSpectral(n::Int, m::Int, isdual::Bool)
         @assert n <= m
-        dim = n*m + 1
+        dim = n * m + 1
         cone = new()
         cone.usedual = isdual
         cone.dim = dim
@@ -37,12 +37,12 @@ mutable struct EpiNormSpectral <: Cone
         cone.m = m
         cone.mat = Matrix{Float64}(undef, n, m)
         cone.g = Vector{Float64}(undef, dim)
-        cone.H = similar(cone.g, dim, dim)
+        cone.H = Matrix{Float64}(undef, dim, dim)
         cone.H2 = similar(cone.H)
-        function barfun(pnt)
-            W = reshape(pnt[2:end], n, m)
-            u = pnt[1]
-            return -logdet(u*I - W*W'/u) - log(u)
+        function barfun(primals)
+            W = reshape(primals[2:end], n, m)
+            u = primals[1]
+            return -logdet(u * I - W * W' / u) - log(u)
         end
         cone.barfun = barfun
         cone.diffres = DiffResults.HessianResult(cone.g)
@@ -52,20 +52,19 @@ end
 
 EpiNormSpectral(n::Int, m::Int) = EpiNormSpectral(n, m, false)
 
-dimension(cone::EpiNormSpectral) = cone.dim
 get_nu(cone::EpiNormSpectral) = cone.n + 1
-set_initial_point(arr::AbstractVector{Float64}, cone::EpiNormSpectral) = (@. arr = 0.0; arr[1] = 1.0; arr)
-loadpnt!(cone::EpiNormSpectral, pnt::AbstractVector{Float64}) = (cone.pnt = pnt)
 
-function incone(cone::EpiNormSpectral, scal::Float64)
-    cone.mat[:] = @view cone.pnt[2:end] # TODO a little slow
+set_initial_point(arr::AbstractVector{Float64}, cone::EpiNormSpectral) = (@. arr = 0.0; arr[1] = 1.0; arr)
+
+function check_in_cone(cone::EpiNormSpectral)
+    cone.mat[:] = view(cone.primals, 2:cone.dim) # TODO a little slow
     F = svd!(cone.mat) # TODO reduce allocs further
-    if F.S[1] >= cone.pnt[1]
+    if F.S[1] >= cone.primals[1]
         return false
     end
 
     # TODO check allocations, check with Jarrett if this is most efficient way to use DiffResults
-    cone.diffres = ForwardDiff.hessian!(cone.diffres, cone.barfun, cone.pnt)
+    cone.diffres = ForwardDiff.hessian!(cone.diffres, cone.barfun, cone.primals)
     cone.g .= DiffResults.gradient(cone.diffres)
     cone.H .= DiffResults.hessian(cone.diffres)
 
