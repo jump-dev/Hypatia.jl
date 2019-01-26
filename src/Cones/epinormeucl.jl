@@ -11,7 +11,7 @@ barrier from "Self-Scaled Barriers and Interior-Point Methods for Convex Program
 mutable struct EpiNormEucl <: Cone
     usedual::Bool
     dim::Int
-    primals::AbstractVector{Float64}
+    point::AbstractVector{Float64}
     g::Vector{Float64}
     H::Matrix{Float64}
     Hi::Matrix{Float64}
@@ -34,8 +34,8 @@ get_nu(cone::EpiNormEucl) = 1
 set_initial_point(arr::AbstractVector{Float64}, cone::EpiNormEucl) = (@. arr = 0.0; arr[1] = 1.0; arr)
 
 function check_in_cone(cone::EpiNormEucl)
-    u = cone.primals[1]
-    w = view(cone.primals, 2:cone.dim)
+    u = cone.point[1]
+    w = view(cone.point, 2:cone.dim)
     if u <= 0.0
         return false
     end
@@ -44,11 +44,11 @@ function check_in_cone(cone::EpiNormEucl)
         return false
     end
 
-    @. cone.g = cone.primals / dist
+    @. cone.g = cone.point / dist
     cone.g[1] *= -1.0
 
     Hi = cone.Hi
-    mul!(Hi, cone.primals, cone.primals') # TODO syrk
+    mul!(Hi, cone.point, cone.point') # TODO syrk
     @. Hi += Hi
     Hi[1, 1] -= dist
     for j in 2:cone.dim
@@ -65,7 +65,7 @@ function check_in_cone(cone::EpiNormEucl)
     return true
 end
 
-# calcg!(g::AbstractVector{Float64}, cone::EpiNormEucl) = (@. g = cone.primals / dist; g[1] = -g[1]; g)
+# calcg!(g::AbstractVector{Float64}, cone::EpiNormEucl) = (@. g = cone.point / dist; g[1] = -g[1]; g)
 # calcHiarr!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::EpiNormEucl) = mul!(prod, cone.Hi, arr)
 # calcHarr!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::EpiNormEucl) = mul!(prod, cone.H, arr)
 

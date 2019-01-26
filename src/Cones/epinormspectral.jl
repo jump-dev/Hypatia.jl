@@ -18,7 +18,7 @@ mutable struct EpiNormSpectral <: Cone
     dim::Int
     n::Int
     m::Int
-    primals::AbstractVector{Float64}
+    point::AbstractVector{Float64}
     mat::Matrix{Float64}
     g::Vector{Float64}
     H::Matrix{Float64}
@@ -39,9 +39,9 @@ mutable struct EpiNormSpectral <: Cone
         cone.g = Vector{Float64}(undef, dim)
         cone.H = Matrix{Float64}(undef, dim, dim)
         cone.H2 = similar(cone.H)
-        function barfun(primals)
-            W = reshape(primals[2:end], n, m)
-            u = primals[1]
+        function barfun(point)
+            W = reshape(point[2:end], n, m)
+            u = point[1]
             return -logdet(u * I - W * W' / u) - log(u)
         end
         cone.barfun = barfun
@@ -57,14 +57,14 @@ get_nu(cone::EpiNormSpectral) = cone.n + 1
 set_initial_point(arr::AbstractVector{Float64}, cone::EpiNormSpectral) = (@. arr = 0.0; arr[1] = 1.0; arr)
 
 function check_in_cone(cone::EpiNormSpectral)
-    cone.mat[:] = view(cone.primals, 2:cone.dim) # TODO a little slow
+    cone.mat[:] = view(cone.point, 2:cone.dim) # TODO a little slow
     F = svd!(cone.mat) # TODO reduce allocs further
-    if F.S[1] >= cone.primals[1]
+    if F.S[1] >= cone.point[1]
         return false
     end
 
     # TODO check allocations, check with Jarrett if this is most efficient way to use DiffResults
-    cone.diffres = ForwardDiff.hessian!(cone.diffres, cone.barfun, cone.primals)
+    cone.diffres = ForwardDiff.hessian!(cone.diffres, cone.barfun, cone.point)
     cone.g .= DiffResults.gradient(cone.diffres)
     cone.H .= DiffResults.hessian(cone.diffres)
 

@@ -27,7 +27,7 @@ include("wsospolyinterp.jl")
 include("wsospolyinterpmat.jl")
 
 use_dual(cone::Cone) = cone.usedual
-load_primals(cone::Cone, primals::AbstractVector{Float64}) = (cone.primals = primals)
+load_point(cone::Cone, point::AbstractVector{Float64}) = (cone.point = point)
 dimension(cone::Cone) = cone.dim
 
 function factorize_hess(cone::Cone)

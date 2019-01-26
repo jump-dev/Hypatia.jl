@@ -16,7 +16,7 @@ mutable struct HypoGeomean <: Cone
     dim::Int
     alpha::Vector{Float64}
     ialpha::Vector{Float64}
-    primals::AbstractVector{Float64}
+    point::AbstractVector{Float64}
     g::Vector{Float64}
     H::Matrix{Float64}
     H2::Matrix{Float64}
@@ -38,9 +38,9 @@ mutable struct HypoGeomean <: Cone
         cone.g = Vector{Float64}(undef, dim)
         cone.H = Matrix{Float64}(undef, dim, dim)
         cone.H2 = similar(cone.H)
-        function barfun(primals)
-            u = primals[1]
-            w = view(primals, 2:dim)
+        function barfun(point)
+            u = point[1]
+            w = view(point, 2:dim)
             return -log(prod((w[i] * ialpha[i])^alpha[i] for i in eachindex(alpha)) + u) - sum((1.0 - alpha[i]) * log(w[i] * ialpha[i]) for i in eachindex(alpha)) - log(-u)
         end
         cone.barfun = barfun
@@ -56,8 +56,8 @@ get_nu(cone::HypoGeomean) = cone.dim
 set_initial_point(arr::AbstractVector{Float64}, cone::HypoGeomean) = (@. arr = 1.0; arr[1] = -prod(cone.ialpha[i]^cone.alpha[i] for i in eachindex(cone.alpha)) / cone.dim; arr)
 
 function check_in_cone(cone::HypoGeomean)
-    u = cone.primals[1]
-    w = view(cone.primals, 2:cone.dim)
+    u = cone.point[1]
+    w = view(cone.point, 2:cone.dim)
     if u >= 0.0 || any(wi <= 0.0 for wi in w)
         return false
     end
@@ -66,7 +66,7 @@ function check_in_cone(cone::HypoGeomean)
     end
 
     # TODO check allocations, check with Jarrett if this is most efficient way to use DiffResults
-    cone.diffres = ForwardDiff.hessian!(cone.diffres, cone.barfun, cone.primals)
+    cone.diffres = ForwardDiff.hessian!(cone.diffres, cone.barfun, cone.point)
     cone.g .= DiffResults.gradient(cone.diffres)
     cone.H .= DiffResults.hessian(cone.diffres)
 

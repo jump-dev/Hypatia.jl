@@ -53,14 +53,14 @@ conic_exclude = String[
     "rootdets",
     ]
 
-function testmoi(; verbose, linearsystem, usedense)
+function testmoi(; verbose, linearsystem, dense)
     optimizer = MOIU.CachingOptimizer(
         MOIU.UniversalFallback(HypatiaModelData{Float64}()),
         HYP.Optimizer(
             verbose = verbose,
             timelimit = 2e1,
             linearsystem = linearsystem,
-            usedense = usedense,
+            dense = dense,
             tolrelopt = 2e-8,
             tolabsopt = 2e-8,
             tolfeas = 1e-8,

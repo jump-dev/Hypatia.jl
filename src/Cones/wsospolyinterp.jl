@@ -15,6 +15,7 @@ mutable struct WSOSPolyInterp <: Cone
     usedual::Bool
     dim::Int
     ipwt::Vector{Matrix{Float64}}
+    point::AbstractVector{Float64}
     g::Vector{Float64}
     H::Matrix{Float64}
     H2::Matrix{Float64}
@@ -43,11 +44,11 @@ end
 
 WSOSPolyInterp(dim::Int, ipwt::Vector{Matrix{Float64}}) = WSOSPolyInterp(dim, ipwt, false)
 
-dimension(cone::WSOSPolyInterp) = cone.dim
 get_nu(cone::WSOSPolyInterp) = sum(size(ipwtj, 2) for ipwtj in cone.ipwt)
+
 set_initial_point(arr::AbstractVector{Float64}, cone::WSOSPolyInterp) = (@. arr = 1.0; arr)
 
-function check_in_cone(cone::WSOSPolyInterp, dual_vec::Vector{Float64})
+function check_in_cone(cone::WSOSPolyInterp)
     @. cone.g = 0.0
     @. cone.H = 0.0
     tmp3 = cone.tmp3
@@ -58,8 +59,8 @@ function check_in_cone(cone::WSOSPolyInterp, dual_vec::Vector{Float64})
         tmp2j = cone.tmp2[j]
 
         # tmp1j = ipwtj'*Diagonal(pnt)*ipwtj
-        # mul!(tmp2j, ipwtj', Diagonal(dual_vec)) # TODO dispatches to an extremely inefficient method
-        @. tmp2j = ipwtj' * dual_vec'
+        # mul!(tmp2j, ipwtj', Diagonal(cone.point)) # TODO dispatches to an extremely inefficient method
+        @. tmp2j = ipwtj' * cone.point'
         mul!(tmp1j, tmp2j, ipwtj)
 
         # pivoted cholesky and triangular solve method

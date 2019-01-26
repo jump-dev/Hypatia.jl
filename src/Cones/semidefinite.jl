@@ -15,7 +15,7 @@ mutable struct PosSemidef <: Cone
     usedual::Bool
     dim::Int
     side::Int
-    primals::AbstractVector{Float64}
+    point::AbstractVector{Float64}
     mat::Matrix{Float64}
     mat2::Matrix{Float64}
     matpnt::Matrix{Float64}
@@ -50,7 +50,7 @@ function set_initial_point(arr::AbstractVector{Float64}, cone::PosSemidef)
 end
 
 function check_in_cone(cone::PosSemidef)
-    svec_to_smat!(cone.mat, cone.primals)
+    svec_to_smat!(cone.mat, cone.point)
     @. cone.matpnt = cone.mat
 
     F = cholesky!(Symmetric(cone.mat), Val(true), check=false)

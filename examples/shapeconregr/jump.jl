@@ -95,12 +95,12 @@ function build_shapeconregr_PSD(
     r::Int,
     sd::ShapeData;
     use_leastsqobj::Bool = false,
-    usedense::Bool = true,
+    dense::Bool = true,
     )
     n = size(X, 2)
     d = div(r + 1, 2)
 
-    model = SumOfSquares.SOSModel(JuMP.with_optimizer(HYP.Optimizer, verbose=true, usedense=usedense, linearsystem=LS.QRSymm))
+    model = SumOfSquares.SOSModel(JuMP.with_optimizer(HYP.Optimizer, verbose=true, dense = dense, linearsystem=LS.QRSymm))
     (x, p) = add_loss_and_polys!(model, X, y, r, use_leastsqobj)
 
     mono_bss = MU.get_domain_inequalities(sd.mono_dom, x)
@@ -130,7 +130,7 @@ function build_shapeconregr_WSOS(
     r::Int,
     sd::ShapeData;
     use_leastsqobj::Bool = false,
-    usedense::Bool = true,
+    dense::Bool = true,
     sample::Bool = true,
     )
     d = div(r + 1, 2)
@@ -141,7 +141,7 @@ function build_shapeconregr_WSOS(
     mono_wsos_cone = HYP.WSOSPolyInterpCone(mono_U, [mono_P0, mono_PWts...])
     conv_wsos_cone = HYP.WSOSPolyInterpMatCone(n, conv_U, [conv_P0, conv_PWts...])
 
-    model = SumOfSquares.SOSModel(JuMP.with_optimizer(HYP.Optimizer, verbose=true, usedense=usedense, linearsystem=LS.QRSymm, tolabsopt=1e-6, tolrelopt=1e-5, tolfeas=1e-6))
+    model = SumOfSquares.SOSModel(JuMP.with_optimizer(HYP.Optimizer, verbose=true, dense = dense, linearsystem=LS.QRSymm, tolabsopt=1e-6, tolrelopt=1e-5, tolfeas=1e-6))
     (x, p) = add_loss_and_polys!(model, X, y, r, use_leastsqobj)
 
     # monotonicity
@@ -161,7 +161,7 @@ function build_shapeconregr_WSOS(
     return (model, p)
 end
 
-function run_JuMP_shapeconregr(use_wsos::Bool; usedense::Bool=true)
+function run_JuMP_shapeconregr(use_wsos::Bool; dense::Bool=true)
     (n, deg, npoints, signal_ratio, f) =
         # (2, 3, 100, 0.0, x -> exp(norm(x))) # no noise, monotonic function
         (2, 3, 100, 0.0, x -> sum(x.^3)) # no noise, monotonic function
@@ -179,9 +179,9 @@ function run_JuMP_shapeconregr(use_wsos::Bool; usedense::Bool=true)
     use_leastsqobj = true
 
     if use_wsos
-        (model, p) = build_shapeconregr_WSOS(X, y, deg, shapedata, use_leastsqobj=use_leastsqobj, usedense=usedense)
+        (model, p) = build_shapeconregr_WSOS(X, y, deg, shapedata, use_leastsqobj=use_leastsqobj, dense = dense)
     else
-        (model, p) = build_shapeconregr_PSD(X, y, deg, shapedata, use_leastsqobj=use_leastsqobj, usedense=usedense)
+        (model, p) = build_shapeconregr_PSD(X, y, deg, shapedata, use_leastsqobj=use_leastsqobj, dense = dense)
     end
 
     println("starting to solve JuMP model")

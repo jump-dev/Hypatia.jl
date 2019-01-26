@@ -233,7 +233,7 @@ function run_JuMP_namedpoly(use_wsos::Bool; primal_wsos::Bool=false)
     (x, f, dom, truemin) = getpolydata(polyname)
 
     if use_wsos
-        model = build_JuMP_namedpoly_WSOS(x, f, dom, d=deg, primal_wsos=primal_wsos)
+        model = build_JuMP_namedpoly_WSOS(x, f, dom, d=deg, primal_wsos = primal_wsos)
     else
         model = build_JuMP_namedpoly_PSD(x, f, dom, d=deg)
     end

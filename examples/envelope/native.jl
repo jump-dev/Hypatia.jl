@@ -11,7 +11,7 @@ available at https://arxiv.org/abs/1712.01792
 import Hypatia
 const HYP = Hypatia
 const CO = HYP.Cones
-const LS = HYP.LinearSystems
+# const LS = HYP.LinearSystems
 const MU = HYP.ModelUtilities
 
 using LinearAlgebra
@@ -27,80 +27,61 @@ function build_envelope(
     d::Int;
     primal_wsos::Bool = true,
     use_data::Bool = false,
-    usedense::Bool = false,
+    dense::Bool = false,
     rseed::Int = 1,
     )
     # generate interpolation
     @assert deg <= d
     domain = MU.Box(-ones(n), ones(n))
-    (U, pts, P0, PWts, w) = MU.interpolate(domain, d, sample=false, calc_w=true)
+    (U, pts, P0, PWts, w) = MU.interpolate(domain, d, sample = false, calc_w = true)
 
     if use_data
         # use provided data in data folder
-        c_or_h = vec(readdlm(joinpath(@__DIR__, "data/c$(npoly*U).txt"), ',', Float64))
+        c_or_h = vec(readdlm(joinpath(@__DIR__, "data/c$(npoly * U).txt"), ',', Float64))
     else
         # generate random data
         Random.seed!(rseed)
-        LDegs = binomial(n+deg, n)
+        LDegs = binomial(n + deg, n)
         c_or_h = vec(P0[:, 1:LDegs] * rand(-9:9, LDegs, npoly))
     end
 
-    subI = usedense ? Array(1.0I, U, U) : sparse(1.0I, U, U)
+    subI = dense ? Array(1.0I, U, U) : sparse(1.0I, U, U)
     if primal_wsos
         # use formulation with WSOS cone in primal
         c = -w
         A = zeros(0, U)
         b = Float64[]
-        G = repeat(subI, outer=(npoly, 1))
+        G = repeat(subI, outer = (npoly, 1))
         h = c_or_h
     else
         # use formulation with WSOS cone in dual
         c = c_or_h
-        A = repeat(subI, outer=(1, npoly))
+        A = repeat(subI, outer = (1, npoly))
         b = w
         G = Diagonal(-1.0I, npoly * U) # TODO uniformscaling
-        h = zeros(npoly*U)
+        h = zeros(npoly * U)
     end
 
-    cone = CO.Cone(
-        [CO.WSOSPolyInterp(U, [P0, PWts...], !primal_wsos) for k in 1:npoly],
-        [(1 + (k - 1) * U):(k * U) for k in 1:npoly]
-        )
+    cones = [CO.WSOSPolyInterp(U, [P0, PWts...], !primal_wsos) for k in 1:npoly]
+    cone_idxs = [(1 + (k - 1) * U):(k * U) for k in 1:npoly]
 
-    return (c, A, b, G, h, cone)
+    return (c, A, b, G, h, cones, cone_idxs)
 end
 
-function run_envelope(primal_wsos::Bool, usedense::Bool)
+function run_envelope(primal_wsos::Bool, dense::Bool)
     # optionally use fixed data in folder
     # select number of polynomials and degrees for the envelope
     # select dimension and SOS degree (to be squared)
-    (c, A, b, G, h, cone) =
-        # build_envelope(2, 5, 1, 5, use_data=true, primal_wsos=primal_wsos, usedense=usedense)
-        build_envelope(2, 5, 2, 6, primal_wsos=primal_wsos, usedense=usedense)
-        # build_envelope(3, 5, 3, 5, primal_wsos=primal_wsos, usedense=usedense)
-        # build_envelope(2, 30, 1, 30, primal_wsos=primal_wsos, usedense=usedense)
+    (c, A, b, G, h, cones, cone_idxs) =
+        # build_envelope(2, 5, 1, 5, use_data = true, primal_wsos = primal_wsos, dense = dense)
+        # build_envelope(2, 5, 2, 6, primal_wsos = primal_wsos, dense = dense)
+        # build_envelope(3, 5, 3, 5, primal_wsos = primal_wsos, dense = dense)
+        build_envelope(2, 30, 1, 30, primal_wsos = primal_wsos, dense = dense)
 
-    HYP.check_data(c, A, b, G, h, cone)
-    (c1, A1, b1, G1, prkeep, dukeep, Q2, RiQ1) = HYP.preprocess_data(c, A, b, G, useQR=true)
-    L = LS.QRSymm(c1, A1, b1, G1, h, cone, Q2, RiQ1)
-
-    model = HYP.Model(maxiter=200, verbose=true)
-    HYP.load_data!(model, c1, A1, b1, G1, h, cone, L)
-    HYP.solve!(model)
-
-    x = zeros(length(c))
-    x[dukeep] = HYP.get_x(model)
-    y = zeros(length(b))
-    y[prkeep] = HYP.get_y(model)
-    s = HYP.get_s(model)
-    z = HYP.get_z(model)
-
-    status = HYP.get_status(model)
-    solvetime = HYP.get_solve_time(model)
-    primal_obj = HYP.get_primal_obj(model)
-    dual_obj = HYP.get_dual_obj(model)
-
-    @test status == :Optimal
+    model = MO.LinearObjConic(c, A, b, G, h, cones, cone_idxs)
+    solver = IP.HSDESolver(model, verbose = true)
+    IP.solve(solver)
+    @test IP.get_status(solver) == :Optimal
 
     return
 end

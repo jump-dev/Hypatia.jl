@@ -18,11 +18,11 @@ using Test
 
 # include(joinpath(@__DIR__, "interpolation.jl"))
 
-# examples_dir = joinpath(@__DIR__, "../examples")
-#
-# include(joinpath(examples_dir, "envelope/native.jl"))
-# include(joinpath(examples_dir, "linearopt/native.jl"))
-# include(joinpath(examples_dir, "namedpoly/native.jl"))
+examples_dir = joinpath(@__DIR__, "../examples")
+
+include(joinpath(examples_dir, "envelope/native.jl"))
+include(joinpath(examples_dir, "linearopt/native.jl"))
+include(joinpath(examples_dir, "namedpoly/native.jl"))
 
 include(joinpath(@__DIR__, "native.jl"))
 
@@ -50,7 +50,7 @@ include(joinpath(@__DIR__, "native.jl"))
 #     interp_nosample()
 # end
 
-@info("starting native interface tests")
+# @info("starting native interface tests")
 verbose = true
 # linearsystems = [
 #     LS.QRSymm,
@@ -99,52 +99,55 @@ testfuns = [
     ]
 # @testset "native tests: $t, $l" for t in testfuns, l in linearsystems
 @testset "native tests: $t" for t in testfuns
-    # t(verbose=verbose, linearsystem=l)
-    t(verbose=verbose)
+    # t(verbose = verbose, linearsystem=l)
+    t(verbose = verbose)
 end
-#
-# @info("starting default native examples tests")
-# testfuns = [
-#     run_envelope_primal_dense,
-#     run_envelope_dual_dense,
-#     run_envelope_primal_sparse,
-#     run_envelope_dual_sparse,
-#     run_linearopt,
-#     run_namedpoly,
-#     ]
-# @testset "default examples: $t" for t in testfuns
-#     t()
-# end
-#
-# @info("starting additional native examples tests")
-# verbose = false
+
+@info("starting default native examples tests")
+testfuns = [
+    run_envelope_primal_dense,
+    run_envelope_dual_dense,
+    run_envelope_primal_sparse,
+    run_envelope_dual_sparse,
+    run_linearopt,
+    run_namedpoly,
+    ]
+@testset "default examples: $t" for t in testfuns
+    t()
+end
+
+@info("starting additional native examples tests")
+verbose = false
 # linearsystems = [
 #     LS.QRSymm,
 #     # LS.Naive, # slow
 #     ]
-# testfuns = [
-#     envelope1,
-#     envelope2,
-#     envelope3,
-#     envelope4,
-#     linearopt1,
-#     linearopt2,
-#     namedpoly1,
-#     namedpoly2,
-#     namedpoly3,
-#     namedpoly4,
-#     namedpoly5,
-#     namedpoly6,
-#     namedpoly7,
-#     namedpoly8,
-#     namedpoly9,
-#     namedpoly10,
-#     namedpoly11,
-#     ]
+testfuns = [
+    # TODO test primal and dual formulations of envelope
+    # envelope1, # TODO check slight obj disagreement
+    envelope2,
+    envelope3,
+    envelope4,
+    linearopt1,
+    linearopt2,
+    # namedpoly1,
+    # namedpoly2,
+    namedpoly3,
+    # namedpoly4,
+    namedpoly5,
+    # namedpoly6,
+    namedpoly7,
+    # namedpoly8,
+    namedpoly9,
+    namedpoly10,
+    namedpoly11,
+    ]
 # @testset "native examples: $t, $l" for t in testfuns, l in linearsystems
-#     t(verbose=verbose, linearsystem=l)
-# end
-#
+@testset "native examples: $t" for t in testfuns#, l in linearsystems
+    # t(verbose = verbose, linearsystem=l)
+    t(verbose = verbose)
+end
+
 # @info("starting default JuMP examples tests")
 # testfuns = [
 #     run_JuMP_envelope_boxinterp,
@@ -215,7 +218,7 @@ end
 #     LS.Naive,
 #     ]
 # @testset "MOI tests: $l, $(d ? "dense" : "sparse")" for l in linearsystems, d in [false, true]
-#     testmoi(verbose=verbose, linearsystem=l, usedense=d)
+#     testmoi(verbose = verbose, linearsystem=l, dense=d)
 # end
 
 end

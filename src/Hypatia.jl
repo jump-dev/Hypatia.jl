@@ -9,7 +9,7 @@ include("Cones/Cones.jl")
 # include("LinearSystems/LinearSystems.jl")
 include("Models/Models.jl")
 include("InteriorPoints/InteriorPoints.jl")
-# include("ModelUtilities/ModelUtilities.jl")
+include("ModelUtilities/ModelUtilities.jl")
 
 # MathOptInterface
 # import MathOptInterface

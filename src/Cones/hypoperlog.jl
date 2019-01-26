@@ -16,7 +16,7 @@ TODO choose a better interior direction
 
 mutable struct HypoPerLog <: Cone
     usedual::Bool
-    primals::AbstractVector{Float64}
+    point::AbstractVector{Float64}
     g::Vector{Float64}
     H::Matrix{Float64}
     H2::Matrix{Float64}
@@ -41,7 +41,7 @@ get_nu(cone::HypoPerLog) = 3
 set_initial_point(arr::AbstractVector{Float64}, cone::HypoPerLog) = (arr[1] = -1.0; arr[2] = 1.0; arr[3] = 1.0; arr)
 
 function check_in_cone(cone::HypoPerLog)
-    (u, v, w) = cone.primals
+    (u, v, w) = cone.point
     if (v <= 0.0) || (w <= 0.0)
         return false
     end

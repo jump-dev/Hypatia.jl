@@ -67,7 +67,7 @@ mutable struct SemiFreeDomain <: Domain
     restricted_halfregion::Domain
 end
 
-dimension(dom::SemiFreeDomain) = 2*dimension(dom.restricted_halfregion)
+dimension(dom::SemiFreeDomain) = 2 * dimension(dom.restricted_halfregion)
 degree(dom::SemiFreeDomain) = degree(dom.restricted_halfregion)
 
 add_free_vars(dom::Domain) = SemiFreeDomain(dom)

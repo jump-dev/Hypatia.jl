@@ -56,7 +56,7 @@ end
 verbose = true
 timelimit = 1e2
 linearsystem = Hypatia.LinearSystems.QRSymm
-usedense = false
+dense = false
 
 MOI.Utilities.@model(HypatiaModelData,
     (MOI.Integer,), # integer constraints will be ignored by Hypatia
@@ -76,7 +76,7 @@ optimizer = MOI.Utilities.CachingOptimizer(HypatiaModelData{Float64}(), Hypatia.
     verbose = verbose,
     timelimit = timelimit,
     linearsystem = linearsystem,
-    usedense = usedense,
+    dense = dense,
     tolrelopt = 1e-6,
     tolabsopt = 1e-7,
     tolfeas = 1e-7,
