@@ -13,7 +13,7 @@ TODO symbolically calculate gradient and Hessian
 =#
 
 mutable struct HypoPerLogdet <: Cone
-    usedual::Bool
+    use_dual::Bool
     dim::Int
     side::Int
     point::AbstractVector{Float64}
@@ -25,9 +25,9 @@ mutable struct HypoPerLogdet <: Cone
     barfun::Function
     diffres
 
-    function HypoPerLogdet(dim::Int, isdual::Bool)
+    function HypoPerLogdet(dim::Int, is_dual::Bool)
         cone = new()
-        cone.usedual = isdual
+        cone.use_dual = is_dual
         cone.dim = dim
         side = round(Int, sqrt(0.25 + 2 * (dim - 2)) - 0.5)
         cone.side = side

@@ -41,7 +41,7 @@ mutable struct Naive4 <: LinearSystemSolver
         # end
         L.LHScopy = similar(L.LHS)
         L.rhs = zeros(n+p+2q)
-        L.issymm = !any(cone.cones[k].usedual for k in eachindex(cone.cones))
+        L.issymm = !any(cone.cones[k].use_dual for k in eachindex(cone.cones))
         return L
     end
 end
@@ -66,7 +66,7 @@ function solvelinsys4!(
 
     for k in eachindex(cone.cones)
         rows = (n + p + q) .+ cone.idxs[k]
-        cols = cone.cones[k].usedual ? (rows .- q) : rows
+        cols = cone.cones[k].use_dual ? (rows .- q) : rows
         # Hview = view(L.LHScopy, rows, cols)
         # calcHarr!(Hview, mu*I, cone.cones[k])
         # calcHarr!(Hview, I, cone.cones[k])

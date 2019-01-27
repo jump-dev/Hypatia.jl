@@ -10,7 +10,7 @@ export WSOSPolyInterpCone
 struct WSOSPolyInterpCone <: MOI.AbstractVectorSet
     dimension::Int
     ipwt::Vector{Matrix{Float64}}
-    isdual::Bool
+    is_dual::Bool
 end
 WSOSPolyInterpCone(dimension::Int, ipwt::Vector{Matrix{Float64}}) = WSOSPolyInterpCone(dimension, ipwt, false)
 
@@ -20,7 +20,7 @@ struct WSOSPolyInterpMatCone <: MOI.AbstractVectorSet
     r::Int
     u::Int
     ipwt::Vector{Matrix{Float64}}
-    isdual::Bool
+    is_dual::Bool
 end
 WSOSPolyInterpMatCone(r::Int, u::Int, ipwt::Vector{Matrix{Float64}}) = WSOSPolyInterpMatCone(r, u, ipwt, false)
 
@@ -42,8 +42,8 @@ cone_from_moi(s::MOI.RotatedSecondOrderCone) = CO.EpiPerSquare(MOI.dimension(s))
 cone_from_moi(s::MOI.ExponentialCone) = CO.HypoPerLog()
 cone_from_moi(s::MOI.GeometricMeanCone) = (l = MOI.dimension(s) - 1; CO.HypoGeomean(fill(inv(l), l)))
 cone_from_moi(s::MOI.PowerCone{Float64}) = CO.EpiPerPower(inv(s.exponent))
-cone_from_moi(s::WSOSPolyInterpCone) = CO.WSOSPolyInterp(s.dimension, s.ipwt, s.isdual)
-cone_from_moi(s::WSOSPolyInterpMatCone) = CO.WSOSPolyInterpMat(s.r, s.u, s.ipwt, s.isdual)
+cone_from_moi(s::WSOSPolyInterpCone) = CO.WSOSPolyInterp(s.dimension, s.ipwt, s.is_dual)
+cone_from_moi(s::WSOSPolyInterpMatCone) = CO.WSOSPolyInterpMat(s.r, s.u, s.ipwt, s.is_dual)
 cone_from_moi(s::MOI.AbstractVectorSet) = error("MOI set $s is not recognized")
 
 function build_var_cone(fi::MOI.VectorOfVariables, si::MOI.AbstractVectorSet, dim::Int, q::Int)

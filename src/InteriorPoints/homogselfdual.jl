@@ -507,8 +507,8 @@ function get_max_alpha_in_nbhd(point::HSDEPoint, direction::HSDEPoint, mu::Float
         alpha *= 0.8 # TODO option for parameter
     end
 
-    if alpha < 1e-6
-        @warn("alpha is $alpha")
+    if alpha < 1e-7 # TODO return slow progress status or find a workaround
+        error("alpha is $alpha")
     end
     return alpha
 end
@@ -612,3 +612,36 @@ end
 #     return point
 # end
 #
+
+
+
+#
+# # get neighborhood parameters depending on magnitude of barrier parameter and maximum number of correction steps
+# # TODO calculate values from the formulae given in Papp & Yildiz "On A Homogeneous Interior-Point Algorithm for Non-Symmetric Convex Conic Optimization"
+# function getbetaeta(maxcorrsteps::Int, bnu::Float64)
+#     if maxcorrsteps <= 2
+#         if bnu < 10.0
+#             return (0.1810, 0.0733, 0.0225)
+#         elseif bnu < 100.0
+#             return (0.2054, 0.0806, 0.0263)
+#         else
+#             return (0.2190, 0.0836, 0.0288)
+#         end
+#     elseif maxcorrsteps <= 4
+#         if bnu < 10.0
+#             return (0.2084, 0.0502, 0.0328)
+#         elseif bnu < 100.0
+#             return (0.2356, 0.0544, 0.0380)
+#         else
+#             return (0.2506, 0.0558, 0.0411)
+#         end
+#     else
+#         if bnu < 10.0
+#             return (0.2387, 0.0305, 0.0429)
+#         elseif bnu < 100.0
+#             return (0.2683, 0.0327, 0.0489)
+#         else
+#             return (0.2844, 0.0332, 0.0525)
+#         end
+#     end
+# end

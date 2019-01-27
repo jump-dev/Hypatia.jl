@@ -29,7 +29,11 @@ function run_JuMP_sosmat2(use_matrixwsos::Bool, use_dual::Bool)
     Random.seed!(1)
 
     DynamicPolynomials.@polyvar x y z
-    C = [x^2+2y^2 -x*y -x*z; -x*y y^2+2z^2 -y*z; -x*z -y*z z^2+2x^2] .* (x*y*z)^0
+    C = [
+        (x^2 + 2y^2) (-x * y) (-x * z);
+        (-x * y) (y^2 + 2z^2) (-y * z);
+        (-x * z) (-y * z) (z^2 + 2x^2);
+        ] .* (x * y * z)^0
     dom = MU.FreeDomain(3)
     d = div(maximum(DynamicPolynomials.maxdegree.(C)) + 1, 2)
 
@@ -40,8 +44,8 @@ function run_JuMP_sosmat2(use_matrixwsos::Bool, use_dual::Bool)
         mat_wsos_cone = HYP.WSOSPolyInterpMatCone(3, U, [P0], use_dual)
         if use_dual
             JuMP.@variable(model, z[i in 1:3, 1:i, 1:U])
-            JuMP.@constraint(model, [z[i,j,u] * (i == j ? 1.0 : rt2) for i in 1:3 for j in 1:i for u in 1:U] in mat_wsos_cone)
-            JuMP.@objective(model, Min, sum(z[i,j,u] * C[i, j](pts[u, :]...) * (i == j ? 1.0 : 2.0) for i in 1:3 for j in 1:i for u in 1:U))
+            JuMP.@constraint(model, [z[i, j, u] * (i == j ? 1.0 : rt2) for i in 1:3 for j in 1:i for u in 1:U] in mat_wsos_cone)
+            JuMP.@objective(model, Min, sum(z[i, j, u] * C[i, j](pts[u, :]...) * (i == j ? 1.0 : 2.0) for i in 1:3 for j in 1:i for u in 1:U))
         else
             JuMP.@constraint(model, [C[i, j](pts[u, :]) * (i == j ? 1.0 : rt2) for i in 1:3 for j in 1:i for u in 1:U] in mat_wsos_cone)
         end

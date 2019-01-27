@@ -9,16 +9,16 @@ barrier from "Self-Scaled Barriers and Interior-Point Methods for Convex Program
 =#
 
 mutable struct EpiNormEucl <: Cone
-    usedual::Bool
+    use_dual::Bool
     dim::Int
     point::AbstractVector{Float64}
     g::Vector{Float64}
     H::Matrix{Float64}
     Hi::Matrix{Float64}
 
-    function EpiNormEucl(dim::Int, isdual::Bool)
+    function EpiNormEucl(dim::Int, is_dual::Bool)
         cone = new()
-        cone.usedual = isdual
+        cone.use_dual = is_dual
         cone.dim = dim
         cone.g = Vector{Float64}(undef, dim)
         cone.H = Matrix{Float64}(undef, dim, dim)

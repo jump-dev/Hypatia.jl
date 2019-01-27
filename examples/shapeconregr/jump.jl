@@ -46,17 +46,17 @@ function generate_regr_data(
     xmin::Float64,
     xmax::Float64,
     n::Int,
-    npoints::Int;
+    num_points::Int;
     signal_ratio::Float64 = 1.0,
     rseed::Int = 1,
     )
     Random.seed!(rseed)
     @assert 0.0 <= signal_ratio < Inf
 
-    X = rand(Distributions.Uniform(xmin, xmax), npoints, n)
-    y = [func(X[p, :]) for p in 1:npoints]
+    X = rand(Distributions.Uniform(xmin, xmax), num_points, n)
+    y = [func(X[p, :]) for p in 1:num_points]
     if !iszero(signal_ratio)
-        noise = rand(Distributions.Normal(), npoints)
+        noise = rand(Distributions.Normal(), num_points)
         noise .*= norm(y) / sqrt(signal_ratio) / norm(noise)
         y .+= noise
     end
@@ -69,22 +69,22 @@ function add_loss_and_polys(
     X::Matrix{Float64},
     y::Vector{Float64},
     r::Int,
-    use_leastsqobj::Bool,
+    use_lsq_obj::Bool,
     )
-    (npoints, n) = size(X)
+    (num_points, n) = size(X)
     DynamicPolynomials.@polyvar x[1:n]
 
     JuMP.@variable(model, p, PolyJuMP.Poly(DynamicPolynomials.monomials(x, 0:r)))
-    if use_leastsqobj
+    if use_lsq_obj
         JuMP.@variable(model, z)
-        JuMP.@objective(model, Min, z / npoints)
-        JuMP.@constraint(model, [z, [y[i] - p(X[i, :]) for i in 1:npoints]...] in MOI.SecondOrderCone(1 + npoints))
+        JuMP.@objective(model, Min, z / num_points)
+        JuMP.@constraint(model, [z, [y[i] - p(X[i, :]) for i in 1:num_points]...] in MOI.SecondOrderCone(1 + num_points))
      else
-        JuMP.@variable(model, z[1:npoints])
-        JuMP.@objective(model, Min, sum(z) / npoints)
+        JuMP.@variable(model, z[1:num_points])
+        JuMP.@objective(model, Min, sum(z) / num_points)
         JuMP.@constraints(model, begin
-            [i in 1:npoints], z[i] >= y[i] - p(X[i, :])
-            [i in 1:npoints], z[i] >= -y[i] + p(X[i, :])
+            [i in 1:num_points], z[i] >= y[i] - p(X[i, :])
+            [i in 1:num_points], z[i] >= -y[i] + p(X[i, :])
         end)
     end
 
@@ -96,14 +96,14 @@ function build_shapeconregr_PSD(
     y::Vector{Float64},
     r::Int,
     sd::ShapeData;
-    use_leastsqobj::Bool = false,
+    use_lsq_obj::Bool = false,
     dense::Bool = true,
     )
     n = size(X, 2)
     d = div(r + 1, 2)
 
-    model = SumOfSquares.SOSModel(JuMP.with_optimizer(HYP.Optimizer, verbose = true, dense = dense, linear_solver=LS.QRSymm))
-    (x, p) = add_loss_and_polys(model, X, y, r, use_leastsqobj)
+    model = SumOfSquares.SOSModel(JuMP.with_optimizer(HYP.Optimizer, verbose = true, dense = dense))
+    (x, p) = add_loss_and_polys(model, X, y, r, use_lsq_obj)
 
     mono_bss = MU.get_domain_inequalities(sd.mono_dom, x)
     conv_bss = MU.get_domain_inequalities(sd.conv_dom, x)
@@ -131,7 +131,7 @@ function build_shapeconregr_WSOS(
     y::Vector{Float64},
     r::Int,
     sd::ShapeData;
-    use_leastsqobj::Bool = false,
+    use_lsq_obj::Bool = false,
     dense::Bool = true,
     sample::Bool = true,
     rseed::Int = 1,
@@ -145,8 +145,8 @@ function build_shapeconregr_WSOS(
     mono_wsos_cone = HYP.WSOSPolyInterpCone(mono_U, [mono_P0, mono_PWts...])
     conv_wsos_cone = HYP.WSOSPolyInterpMatCone(n, conv_U, [conv_P0, conv_PWts...])
 
-    model = SumOfSquares.SOSModel(JuMP.with_optimizer(HYP.Optimizer, verbose = true, dense = dense, linear_solver=LS.QRSymm, tol_abs_opt = 1e-6, tol_rel_opt = 1e-5, tol_feas = 1e-6))
-    (x, p) = add_loss_and_polys(model, X, y, r, use_leastsqobj)
+    model = SumOfSquares.SOSModel(JuMP.with_optimizer(HYP.Optimizer, verbose = true, dense = dense))
+    (x, p) = add_loss_and_polys(model, X, y, r, use_lsq_obj)
 
     # monotonicity
     for j in 1:n
@@ -166,7 +166,7 @@ function build_shapeconregr_WSOS(
 end
 
 function run_JuMP_shapeconregr(use_wsos::Bool; dense::Bool = true)
-    (n, deg, npoints, signal_ratio, f) =
+    (n, deg, num_points, signal_ratio, f) =
         # (2, 3, 100, 0.0, x -> exp(norm(x))) # no noise, monotonic function
         (2, 3, 100, 0.0, x -> sum(x.^3)) # no noise, monotonic function
         # (2, 3, 100, 0.0, x -> sum(x.^4)) # no noise, non-monotonic function
@@ -178,14 +178,14 @@ function run_JuMP_shapeconregr(use_wsos::Bool; dense::Bool = true)
         # (2, 4, 100, 0.0, x -> sum(x)^2)
 
     shapedata = ShapeData(n)
-    (X, y) = generate_regr_data(f, -1.0, 1.0, n, npoints, signal_ratio = signal_ratio)
+    (X, y) = generate_regr_data(f, -1.0, 1.0, n, num_points, signal_ratio = signal_ratio)
 
-    use_leastsqobj = true
+    use_lsq_obj = true
 
     if use_wsos
-        (model, p) = build_shapeconregr_WSOS(X, y, deg, shapedata, use_leastsqobj = use_leastsqobj, dense = dense)
+        (model, p) = build_shapeconregr_WSOS(X, y, deg, shapedata, use_lsq_obj = use_lsq_obj, dense = dense)
     else
-        (model, p) = build_shapeconregr_PSD(X, y, deg, shapedata, use_leastsqobj = use_leastsqobj, dense = dense)
+        (model, p) = build_shapeconregr_PSD(X, y, deg, shapedata, use_lsq_obj = use_lsq_obj, dense = dense)
     end
 
     println("starting to solve JuMP model")

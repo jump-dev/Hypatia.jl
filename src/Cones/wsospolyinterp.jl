@@ -12,7 +12,7 @@ TODO scale the interior direction
 =#
 
 mutable struct WSOSPolyInterp <: Cone
-    usedual::Bool
+    use_dual::Bool
     dim::Int
     ipwt::Vector{Matrix{Float64}}
     point::AbstractVector{Float64}
@@ -24,12 +24,12 @@ mutable struct WSOSPolyInterp <: Cone
     tmp2::Vector{Matrix{Float64}}
     tmp3::Matrix{Float64}
 
-    function WSOSPolyInterp(dim::Int, ipwt::Vector{Matrix{Float64}}, isdual::Bool)
+    function WSOSPolyInterp(dim::Int, ipwt::Vector{Matrix{Float64}}, is_dual::Bool)
         for ipwtj in ipwt
             @assert size(ipwtj, 1) == dim
         end
         cone = new()
-        cone.usedual = !isdual # using dual barrier
+        cone.use_dual = !is_dual # using dual barrier
         cone.dim = dim
         cone.ipwt = ipwt
         cone.g = similar(ipwt[1], dim)
@@ -58,7 +58,7 @@ function check_in_cone(cone::WSOSPolyInterp)
         tmp1j = cone.tmp1[j]
         tmp2j = cone.tmp2[j]
 
-        # tmp1j = ipwtj'*Diagonal(pnt)*ipwtj
+        # tmp1j = ipwtj'*Diagonal(point)*ipwtj
         # mul!(tmp2j, ipwtj', Diagonal(cone.point)) # TODO dispatches to an extremely inefficient method
         @. tmp2j = ipwtj' * cone.point'
         mul!(tmp1j, tmp2j, ipwtj)

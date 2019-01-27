@@ -20,15 +20,15 @@ sampling_region(dom::Domain) = dom
 function interp_sample(dom::Box, npts::Int)
     dim = dimension(dom)
     pts = rand(npts, dim) .- 0.5
-    shift = (dom.u + dom.l)/2.0
+    shift = (dom.u + dom.l) .* 0.5
     for i in 1:npts
-        pts[i,:] = pts[i,:] .* (dom.u - dom.l) + shift
+        pts[i, :] = pts[i, :] .* (dom.u - dom.l) + shift
     end
     return pts
 end
 
 function get_weights(dom::Box, pts::AbstractMatrix{Float64})
-    g = [(pts[:,i] .- dom.l[i]) .* (dom.u[i] .- pts[:,i]) for i in 1:size(pts, 2)]
+    g = [(pts[:, i] .- dom.l[i]) .* (dom.u[i] .- pts[:, i]) for i in 1:size(pts, 2)]
     @assert all(all(gi .>= 0.0) for gi in g)
     return g
 end
@@ -37,10 +37,10 @@ end
 function interp_sample(dom::Ball, npts::Int)
     dim = dimension(dom)
     pts = randn(npts, dim)
-    norms = sum(abs2, pts, dims=2)
+    norms = sum(abs2, pts, dims = 2)
     pts .*= dom.r ./ sqrt.(norms) # scale
-    norms ./= 2.0
-    pts .*= sf_gamma_inc_Q.(norms, dim/2) .^ inv(dim) # sf_gamma_inc_Q is the normalized incomplete gamma function
+    norms .*= 0.5
+    pts .*= sf_gamma_inc_Q.(norms, dim * 0.5) .^ inv(dim) # sf_gamma_inc_Q is the normalized incomplete gamma function
     for i in 1:dim
         pts[:, i] .+= dom.c[i] # shift
     end
@@ -48,7 +48,7 @@ function interp_sample(dom::Ball, npts::Int)
 end
 
 function get_weights(dom::Ball, pts::AbstractMatrix{Float64})
-    g = [dom.r^2 - sum((pts[j,:] - dom.c).^2) for j in 1:size(pts, 1)]
+    g = [dom.r^2 - sum((pts[j, :] - dom.c) .^ 2) for j in 1:size(pts, 1)]
     @assert all(g .>= 0.0)
     return [g]
 end
@@ -57,16 +57,16 @@ end
 function interp_sample(dom::Ellipsoid, npts::Int)
     dim = dimension(dom)
     pts = randn(npts, dim)
-    norms = sum(abs2, pts, dims=2)
+    norms = sum(abs2, pts, dims = 2)
     for i in 1:npts
-        pts[i,:] ./= sqrt(norms[i]) # scale
+        pts[i, :] ./= sqrt(norms[i]) # scale
     end
-    norms ./= 2.0
-    pts .*= sf_gamma_inc_Q.(norms, dim/2) .^ inv(dim) # sf_gamma_inc_Q is the normalized incomplete gamma function
+    norms .*= 0.5
+    pts .*= sf_gamma_inc_Q.(norms, dim * 0.5) .^ inv(dim) # sf_gamma_inc_Q is the normalized incomplete gamma function
 
-    rotscale = cholesky(dom.Q).U
+    F_rotate_scale = cholesky(dom.Q).U
     for i in 1:npts
-        pts[i,:] = rotscale\pts[i,:] # rotate/scale
+        pts[i, :] = F_rotate_scale \ pts[i, :] # rotate/scale
     end
 
     for i in 1:dim
@@ -82,30 +82,19 @@ function get_weights(dom::Ellipsoid, pts::AbstractMatrix{Float64})
 end
 
 
-function interp_sample(dom::SemiFreeDomain, npts::Int)
-    return hcat(interp_sample(dom.restricted_halfregion, npts), interp_sample(dom.restricted_halfregion, npts))
-end
+interp_sample(dom::SemiFreeDomain, npts::Int) =
+    hcat(interp_sample(dom.restricted_halfregion, npts), interp_sample(dom.restricted_halfregion, npts))
 
-function get_weights(dom::SemiFreeDomain, pts::Matrix{Float64})
-    count = div(size(pts, 2), 2)
-    return get_weights(dom.restricted_halfregion, view(pts, : ,1:count))
-end
+get_weights(dom::SemiFreeDomain, pts::Matrix{Float64}) =
+    get_weights(dom.restricted_halfregion, view(pts, :, 1:div(size(pts, 2), 2)))
 
 
-function interp_sample(dom::FreeDomain, npts::Int)
-    return interp_sample(Box(-ones(dom.n), ones(dom.n)), npts)
-end
+interp_sample(dom::FreeDomain, npts::Int) = interp_sample(Box(-ones(dom.n), ones(dom.n)), npts)
 
-function get_weights(::FreeDomain, ::AbstractMatrix{Float64})
-    return []
-end
+get_weights(::FreeDomain, ::AbstractMatrix{Float64}) = []
 
 
-function get_LU(n::Int, d::Int)
-    L = binomial(n+d,n)
-    U = binomial(n+2d, n)
-    return (L, U)
-end
+get_L_U(n::Int, d::Int) = (binomial(n + d, n), binomial(n + 2d, n))
 
 function interpolate(
     dom::Domain,
@@ -122,28 +111,28 @@ function interpolate(
 end
 
 # slow but high-quality hyperrectangle/box point selections
-function wsos_box_params(::Domain, ::Int, ::Int)
-    error("accurate methods for interpolation points are only available for box domains, use sampling instead")
-end
+wsos_box_params(dom::Domain, n::Int, d::Int; calc_w::Bool) = error("accurate methods for interpolation points are only available for box domains, use sampling instead")
 
 # difference with sampling functions is that P0 is always formed using points in [-1, 1]
 function wsos_box_params(dom::Box, n::Int, d::Int; calc_w::Bool = false)
     # n could be larger than the dimension of dom if the original domain was a SemiFreeDomain
     (U, pts, P0, P0sub, w) = wsos_box_params(n, d, calc_w)
+
+    # TODO refactor/cleanup below
     # scale and shift points, get WSOS matrices
-    pscale = [0.5*(dom.u[mod(j-1,dimension(dom))+1] - dom.l[mod(j-1,dimension(dom))+1]) for j in 1:n]
-    pshift = [0.5*(dom.u[mod(j-1,dimension(dom))+1] + dom.l[mod(j-1,dimension(dom))+1]) for j in 1:n]
-    Wtsfun = (j -> sqrt.(1.0 .- abs2.(pts[:,j]))*pscale[j])
+    pscale = [0.5 * (dom.u[mod(j - 1, dimension(dom)) + 1] - dom.l[mod(j - 1,dimension(dom)) + 1]) for j in 1:n]
+    pshift = [0.5 * (dom.u[mod(j - 1, dimension(dom)) + 1] + dom.l[mod(j - 1,dimension(dom)) + 1]) for j in 1:n]
+    Wtsfun = (j -> sqrt.(1.0 .- abs2.(pts[:, j])) * pscale[j])
     PWts = [Wtsfun(j) .* P0sub for j in 1:dimension(dom)]
     trpts = pts .* pscale' .+ pshift'
 
-    return (U=U, pts=trpts, P0=P0, PWts=PWts, w=w)
+    return (U = U, pts = trpts, P0 = P0, PWts = PWts, w = w)
 end
 
 function wsos_box_params(dom::FreeDomain, n::Int, d::Int; calc_w::Bool = false)
     # n could be larger than the dimension of dom if the original domain was a SemiFreeDomain
     (U, pts, P0, P0sub, w) = wsos_box_params(n, d, calc_w)
-    return (U=U, pts=pts, P0=P0, PWts=[], w=w)
+    return (U = U, pts = pts, P0 = P0, PWts = [], w = w)
 end
 
 function wsos_box_params(n::Int, d::Int, calc_w::Bool)
@@ -157,17 +146,17 @@ function wsos_box_params(n::Int, d::Int, calc_w::Bool)
 end
 
 # return k Chebyshev points of the second kind
-cheb2_pts(k::Int) = [-cospi(j/(k-1)) for j in 0:k-1]
+cheb2_pts(k::Int) = [-cospi(j / (k - 1)) for j in 0:(k - 1)]
 
 function calc_u(n::Int, d::Int, pts::Matrix{Float64})
     @assert d > 0
     u = Vector{Matrix{Float64}}(undef, n)
     for j in 1:n
-        uj = u[j] = Matrix{Float64}(undef, size(pts, 1), d+1)
-        uj[:,1] .= 1.0
-        @. @views uj[:,2] = pts[:,j]
-        for t in 3:d+1
-            @. @views uj[:,t] = 2.0*uj[:,2]*uj[:,t-1] - uj[:,t-2]
+        uj = u[j] = Matrix{Float64}(undef, size(pts, 1), d + 1)
+        uj[:, 1] .= 1.0
+        @. @views uj[:, 2] = pts[:, j]
+        for t in 3:(d + 1)
+            @. @views uj[:, t] = 2.0 * uj[:, 2] * uj[:, t - 1] - uj[:, t - 2]
         end
     end
     return u
@@ -186,10 +175,10 @@ function cheb2_data(d::Int, calc_w::Bool)
 
     # weights for Clenshaw-Curtis quadrature at pts
     if calc_w
-        wa = Float64[2/(1 - j^2) for j in 0:2:U-1]
-        append!(wa, wa[floor(Int, U/2):-1:2])
+        wa = [2.0 / (1 - j^2) for j in 0:2:(U - 1)]
+        append!(wa, wa[div(U, 2):-1:2])
         w = real.(FFTW.ifft(wa))
-        w[1] = w[1]/2
+        w[1] *= 0.5
         push!(w, w[1])
     else
         w = Float64[]
@@ -200,18 +189,18 @@ end
 
 function padua_data(d::Int, calc_w::Bool)
     @assert d > 0
-    (L, U) = get_LU(2, d)
+    (L, U) = get_L_U(2, d)
 
     # Padua points for degree 2d
-    cheba = cheb2_pts(2d+1)
-    chebb = cheb2_pts(2d+2)
+    cheba = cheb2_pts(2d + 1)
+    chebb = cheb2_pts(2d + 2)
     pts = Matrix{Float64}(undef, U, 2)
     j = 1
     for a in 0:2d
         for b in 0:2d+1
-            if iseven(a+b)
-                pts[j,1] = -cheba[a+1]
-                pts[U+1-j,2] = -chebb[2d+2-b]
+            if iseven(a + b)
+                pts[j, 1] = -cheba[a + 1]
+                pts[(U + 1 - j), 2] = -chebb[2d + 2 - b]
                 j += 1
             end
         end
@@ -220,43 +209,43 @@ function padua_data(d::Int, calc_w::Bool)
     # evaluations
     u = calc_u(2, d, pts)
     P0 = Matrix{Float64}(undef, U, L)
-    P0[:,1] .= 1
+    P0[:, 1] .= 1
     col = 1
     for t in 1:d
         for xp in Combinatorics.multiexponents(2, t)
             col += 1
-            P0[:,col] .= u[1][:,xp[1]+1] .* u[2][:,xp[2]+1]
+            P0[:, col] .= u[1][:, xp[1] + 1] .* u[2][:, xp[2] + 1]
         end
     end
-    P0sub = view(P0, :, 1:binomial(1+d, 2))
+    P0sub = view(P0, :, 1:binomial(1 + d, 2))
 
     # cubature weights at Padua points
     # even-degree Chebyshev polynomials on the subgrids
     if calc_w
-        te1 = [cospi(i*j/(2d)) for i in 0:2:2d, j in 0:2:2d]
-        to1 = [cospi(i*j/(2d)) for i in 0:2:2d, j in 1:2:2d]
-        te2 = [cospi(i*j/(2d+1)) for i in 0:2:2d, j in 0:2:2d+1]
-        to2 = [cospi(i*j/(2d+1)) for i in 0:2:2d, j in 1:2:2d+1]
-        te1[2:d+1,:] .*= sqrt(2)
-        to1[2:d+1,:] .*= sqrt(2)
-        te2[2:d+1,:] .*= sqrt(2)
-        to2[2:d+1,:] .*= sqrt(2)
+        te1 = [cospi(i * j / (2d)) for i in 0:2:2d, j in 0:2:2d]
+        to1 = [cospi(i * j / (2d)) for i in 0:2:2d, j in 1:2:2d]
+        te2 = [cospi(i * j / (2d + 1)) for i in 0:2:2d, j in 0:2:(2d + 1)]
+        to2 = [cospi(i * j / (2d + 1)) for i in 0:2:2d, j in 1:2:(2d + 1)]
+        te1[2:(d + 1), :] .*= sqrt(2)
+        to1[2:(d + 1), :] .*= sqrt(2)
+        te2[2:(d + 1), :] .*= sqrt(2)
+        to2[2:(d + 1), :] .*= sqrt(2)
         # even, even moments matrix
-        mom = 2*sqrt(2)./[1 - i^2 for i in 0:2:2d]
+        mom = 2 * sqrt(2) ./ [1.0 - i^2 for i in 0:2:2d]
         mom[1] = 2
-        Mmom = zeros(d+1, d+1)
-        f = 1/(d*(2d+1))
-        for j in 1:d+1, i in 1:d+2-j
-            Mmom[i, j] = mom[i]*mom[j]*f
+        Mmom = zeros(d + 1, d + 1)
+        f = inv(d * (2d + 1))
+        for j in 1:(d + 1), i in 1:(d + 2 - j)
+            Mmom[i, j] = mom[i] * mom[j] * f
         end
-        Mmom[1,d+1] /= 2
+        Mmom[1, d + 1] *= 0.5
         # cubature weights as matrices on the subgrids
-        W = Matrix{Float64}(undef, d+1, 2d+1)
-        W[:,1:2:2d+1] .= to2'*Mmom*te1
-        W[:,2:2:2d+1] .= te2'*Mmom*to1
-        W[:,[1,2d+1]] ./= 2
-        W[1,2:2:2d+1] ./= 2
-        W[d+1,1:2:2d+1] ./= 2
+        W = Matrix{Float64}(undef, d + 1, 2d + 1)
+        W[:, 1:2:(2d + 1)] .= to2' * Mmom * te1
+        W[:, 2:2:(2d + 1)] .= te2' * Mmom * to1
+        W[:, [1, (2d + 1)]] .*= 0.5
+        W[1, 2:2:(2d + 1)] .*= 0.5
+        W[d + 1, 1:2:(2d + 1)] .*= 0.5
         w = vec(W)
     else
         w = Float64[]
@@ -268,21 +257,21 @@ end
 function approxfekete_data(n::Int, d::Int, calc_w::Bool)
     @assert d > 0
     @assert n > 1
-    (L, U) = get_LU(n, d)
+    (L, U) = get_L_U(n, d)
 
     # points in the initial interpolation grid
-    npts = prod(2d+1:2d+n)
+    npts = prod((2d + 1):(2d + n))
     candidate_pts = Matrix{Float64}(undef, npts, n)
     for j in 1:n
-        ig = prod(2d+1+j:2d+n)
-        cs = cheb2_pts(2d+j)
+        ig = prod((2d + 1 + j):(2d + n))
+        cs = cheb2_pts(2d + j)
         i = 1
         l = 1
         while true
-            candidate_pts[i:i+ig-1,j] .= cs[l]
+            candidate_pts[i:(i + ig - 1), j] .= cs[l]
             i += ig
             l += 1
-            if l >= 2d+1+j
+            if l >= 2d + 1 + j
                 if i >= npts
                     break
                 end
@@ -317,26 +306,26 @@ function make_wsos_arrays(
             if any(isodd, xp)
                 m[col] = 0.0
             else
-                m[col] = m[1]/prod(1.0 - abs2(xp[j]) for j in 1:n)
+                m[col] = m[1] / prod(1.0 - abs2(xp[j]) for j in 1:n)
             end
-            @. @views M[:,col] = u[1][:,xp[1]+1]
+            @. @views M[:, col] = u[1][:, xp[1] + 1]
             for j in 2:n
-                @. @views M[:,col] *= u[j][:,xp[j]+1]
+                @. @views M[:, col] *= u[j][:, xp[j] + 1]
             end
         end
     end
 
     F = qr!(Array(M'), Val(true))
     keep_pnt = F.p[1:U]
-    pts = candidate_pts[keep_pnt,:] # subset of points indexed with the support of w
+    pts = candidate_pts[keep_pnt, :] # subset of points indexed with the support of w
     P0 = M[keep_pnt, 1:L] # subset of polynomial evaluations up to total degree d
 
     subd = d - div(degree(dom), 2)
-    P0sub = view(P0, :, 1:binomial(n+subd, n))
+    P0sub = view(P0, :, 1:binomial(n + subd, n))
 
     if calc_w
-        Qtm = F.Q'*m
-        w = UpperTriangular(F.R[:,1:U])\Qtm
+        Qtm = F.Q' * m
+        w = UpperTriangular(F.R[:, 1:U]) \ Qtm
     else
         w = Float64[]
     end
@@ -352,10 +341,10 @@ function wsos_sample_params(
     sample_factor::Int = 10,
     )
     n = dimension(dom)
-    (L, U) = get_LU(n, d)
+    (L, U) = get_L_U(n, d)
     candidate_pts = interp_sample(dom, U * sample_factor)
     (pts, P0, P0sub, w) = make_wsos_arrays(dom, candidate_pts, d, U, L, calc_w = calc_w)
     g = get_weights(dom, pts)
     PWts = [sqrt.(gi) .* P0sub for gi in g]
-    return (U=U, pts=pts, P0=P0, PWts=PWts, w=w)
+    return (U = U, pts = pts, P0 = P0, PWts = PWts, w = w)
 end

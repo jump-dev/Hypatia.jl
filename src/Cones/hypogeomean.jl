@@ -12,7 +12,7 @@ TODO try to make barrier evaluation more efficient
 =#
 
 mutable struct HypoGeomean <: Cone
-    usedual::Bool
+    use_dual::Bool
     dim::Int
     alpha::Vector{Float64}
     ialpha::Vector{Float64}
@@ -24,13 +24,13 @@ mutable struct HypoGeomean <: Cone
     barfun::Function
     diffres
 
-    function HypoGeomean(alpha::Vector{Float64}, isdual::Bool)
+    function HypoGeomean(alpha::Vector{Float64}, is_dual::Bool)
         dim = length(alpha) + 1
         @assert dim >= 3
         @assert all(ai >= 0.0 for ai in alpha)
         @assert sum(alpha) == 1.0
         cone = new()
-        cone.usedual = !isdual # using dual barrier
+        cone.use_dual = !is_dual # using dual barrier
         cone.dim = dim
         cone.alpha = alpha
         ialpha = inv.(alpha)

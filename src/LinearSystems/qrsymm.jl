@@ -165,7 +165,7 @@ function solvelinsys6!(
         a1k = view(z1, L.cone.idxs[k])
         a2k = view(z2, L.cone.idxs[k])
         a3k = view(rhs_ts, L.cone.idxs[k])
-        if L.cone.cones[k].usedual
+        if L.cone.cones[k].use_dual
             @. a1k = a2k - a3k
             Cones.calcHiarr!(a2k, a1k, L.cone.cones[k])
             a2k ./= mu
@@ -182,7 +182,7 @@ function solvelinsys6!(
         for k in eachindex(L.cone.cones)
             a1k = view(L.h, L.cone.idxs[k])
             a2k = view(z1, L.cone.idxs[k])
-            if L.cone.cones[k].usedual
+            if L.cone.cones[k].use_dual
                 Cones.calcHiarr!(a2k, a1k, L.cone.cones[k])
                 a2k ./= mu
             else
@@ -204,7 +204,7 @@ function solvelinsys6!(
     for k in eachindex(L.cone.cones)
         a1k = view(L.GQ1x, L.cone.idxs[k], :)
         a2k = view(L.HGQ1x, L.cone.idxs[k], :)
-        if L.cone.cones[k].usedual
+        if L.cone.cones[k].use_dual
             Cones.calcHiarr!(a2k, a1k, L.cone.cones[k])
             a2k ./= mu
         else
@@ -220,7 +220,7 @@ function solvelinsys6!(
         for k in eachindex(L.cone.cones)
             a1k = view(L.GQ2, L.cone.idxs[k], :)
             a2k = view(L.HGQ2, L.cone.idxs[k], :)
-            if L.cone.cones[k].usedual
+            if L.cone.cones[k].use_dual
                 Cones.calcHiarr!(a2k, a1k, L.cone.cones[k])
                 a2k ./= mu
             else
@@ -265,7 +265,7 @@ function solvelinsys6!(
     for k in eachindex(L.cone.cones)
         a1k = view(L.Gxi, L.cone.idxs[k], :)
         a2k = view(L.HGxi, L.cone.idxs[k], :)
-        if L.cone.cones[k].usedual
+        if L.cone.cones[k].use_dual
             Cones.calcHiarr!(a2k, a1k, L.cone.cones[k])
             a2k ./= mu
         else

@@ -15,16 +15,16 @@ TODO choose a better interior direction
 =#
 
 mutable struct HypoPerLog <: Cone
-    usedual::Bool
+    use_dual::Bool
     point::AbstractVector{Float64}
     g::Vector{Float64}
     H::Matrix{Float64}
     H2::Matrix{Float64}
     F
 
-    function HypoPerLog(isdual::Bool)
+    function HypoPerLog(is_dual::Bool)
         cone = new()
-        cone.usedual = isdual
+        cone.use_dual = is_dual
         cone.g = Vector{Float64}(undef, 3)
         cone.H = Matrix{Float64}(undef, 3, 3)
         cone.H2 = similar(cone.H)
