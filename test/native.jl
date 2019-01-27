@@ -80,7 +80,7 @@ end
 #     c = rand(0.0:9.0, n)
 #     rnd1 = rand()
 #     rnd2 = rand()
-#     A[11:15,:] = rnd1*A[1:5,:] - rnd2*A[6:10,:]
+#     A[11:15, :] = rnd1*A[1:5, :] - rnd2*A[6:10, :]
 #     b = A * ones(n)
 #     rnd1 = rand()
 #     rnd2 = rand()
@@ -104,7 +104,7 @@ end
 #     b = rand(p)
 #     rnd1 = rand()
 #     rnd2 = rand()
-#     A[11:15,:] = rnd1*A[1:5,:] - rnd2*A[6:10,:]
+#     A[11:15, :] = rnd1*A[1:5, :] - rnd2*A[6:10, :]
 #     b[11:15] = 2*(rnd1*b[1:5] - rnd2*b[6:10])
 #     h = zeros(q)
 #     cone = CO.Cone([CO.Nonnegative(q)], [1:q])
@@ -340,8 +340,8 @@ function epinormeucl1(; verbose::Bool = true)
     G = SparseMatrixCSC(-1.0I, 3, 3)
     h = zeros(3)
 
-    for isdual in (true, false)
-        model = MO.LinearObjConic(c, A, b, G, h, [CO.EpiNormEucl(3, isdual)], [1:3])
+    for is_dual in (true, false)
+        model = MO.LinearObjConic(c, A, b, G, h, [CO.EpiNormEucl(3, is_dual)], [1:3])
         solver = IP.HSDESolver(model, verbose = verbose)
         r = solveandcheck(model, solver)
         @test r.status == :Optimal
@@ -359,8 +359,8 @@ function epinormeucl2(; verbose::Bool = true)
     G = SparseMatrixCSC(-1.0I, 3, 3)
     h = zeros(3)
 
-    for isdual in (true, false)
-        model = MO.LinearObjConic(c, A, b, G, h, [CO.EpiNormEucl(3, isdual)], [1:3])
+    for is_dual in (true, false)
+        model = MO.LinearObjConic(c, A, b, G, h, [CO.EpiNormEucl(3, is_dual)], [1:3])
         solver = IP.HSDESolver(model, verbose = verbose)
         r = solveandcheck(model, solver)
         @test r.status == :Optimal
@@ -377,8 +377,8 @@ function epipersquare1(; verbose::Bool = true)
     G = SparseMatrixCSC(-1.0I, 4, 4)
     h = zeros(4)
 
-    for isdual in (true, false)
-        model = MO.LinearObjConic(c, A, b, G, h, [CO.EpiPerSquare(4, isdual)], [1:4])
+    for is_dual in (true, false)
+        model = MO.LinearObjConic(c, A, b, G, h, [CO.EpiPerSquare(4, is_dual)], [1:4])
         solver = IP.HSDESolver(model, verbose = verbose)
         r = solveandcheck(model, solver)
         @test r.status == :Optimal
@@ -395,8 +395,8 @@ function epipersquare2(; verbose::Bool = true)
     G = SparseMatrixCSC(-1.0I, 3, 3)
     h = zeros(3)
 
-    for isdual in (true, false)
-        model = MO.LinearObjConic(c, A, b, G, h, [CO.EpiPerSquare(3, isdual)], [1:3])
+    for is_dual in (true, false)
+        model = MO.LinearObjConic(c, A, b, G, h, [CO.EpiPerSquare(3, is_dual)], [1:3])
         solver = IP.HSDESolver(model, verbose = verbose)
         r = solveandcheck(model, solver)
         @test r.status == :Optimal
@@ -413,8 +413,8 @@ function epipersquare3(; verbose::Bool = true)
     G = SparseMatrixCSC(-1.0I, 4, 4)
     h = zeros(4)
 
-    for isdual in (true, false)
-        model = MO.LinearObjConic(c, A, b, G, h, [CO.EpiPerSquare(4, isdual)], [1:4])
+    for is_dual in (true, false)
+        model = MO.LinearObjConic(c, A, b, G, h, [CO.EpiPerSquare(4, is_dual)], [1:4])
         solver = IP.HSDESolver(model, verbose = verbose)
         r = solveandcheck(model, solver)
         @test r.status == :Optimal
@@ -431,8 +431,8 @@ function semidefinite1(; verbose::Bool = true)
     G = SparseMatrixCSC(-1.0I, 3, 3)
     h = zeros(3)
 
-    for isdual in (true, false)
-        model = MO.LinearObjConic(c, A, b, G, h, [CO.PosSemidef(3, isdual)], [1:3])
+    for is_dual in (true, false)
+        model = MO.LinearObjConic(c, A, b, G, h, [CO.PosSemidef(3, is_dual)], [1:3])
         solver = IP.HSDESolver(model, verbose = verbose)
         r = solveandcheck(model, solver)
         @test r.status == :Optimal
@@ -449,8 +449,8 @@ function semidefinite2(; verbose::Bool = true)
     G = SparseMatrixCSC(-1.0I, 3, 3)
     h = zeros(3)
 
-    for isdual in (true, false)
-        model = MO.LinearObjConic(c, A, b, G, h, [CO.PosSemidef(3, isdual)], [1:3])
+    for is_dual in (true, false)
+        model = MO.LinearObjConic(c, A, b, G, h, [CO.PosSemidef(3, is_dual)], [1:3])
         solver = IP.HSDESolver(model, verbose = verbose)
         r = solveandcheck(model, solver)
         @test r.status == :Optimal
@@ -467,8 +467,8 @@ function semidefinite3(; verbose::Bool = true)
     G = SparseMatrixCSC(-1.0I, 6, 6)
     h = zeros(6)
 
-    for isdual in (true, false)
-        model = MO.LinearObjConic(c, A, b, G, h, [CO.PosSemidef(6, isdual)], [1:6])
+    for is_dual in (true, false)
+        model = MO.LinearObjConic(c, A, b, G, h, [CO.PosSemidef(6, is_dual)], [1:6])
         solver = IP.HSDESolver(model, verbose = verbose)
         r = solveandcheck(model, solver)
         @test r.status == :Optimal
@@ -578,13 +578,13 @@ function epiperpower2(; verbose::Bool = true)
     G = SparseMatrixCSC(-1.0I, 3, 3)
     h = zeros(3)
 
-    for isdual in (true, false)
-        model = MO.LinearObjConic(c, A, b, G, h, [CO.EpiPerPower(2.0, isdual)], [1:3])
+    for is_dual in (true, false)
+        model = MO.LinearObjConic(c, A, b, G, h, [CO.EpiPerPower(2.0, is_dual)], [1:3])
         solver = IP.HSDESolver(model, verbose = verbose)
         r = solveandcheck(model, solver)
         @test r.status == :Optimal
         @test r.num_iters <= 20
-        @test r.primal_obj ≈ (isdual ? -sqrt(2) : -inv(sqrt(2))) atol=1e-4 rtol=1e-4
+        @test r.primal_obj ≈ (is_dual ? -sqrt(2) : -inv(sqrt(2))) atol=1e-4 rtol=1e-4
         @test r.x[1:2] ≈ [1/2, 1] atol=1e-4 rtol=1e-4
     end
 end
@@ -596,8 +596,8 @@ function epiperpower3(; verbose::Bool = true)
     G = SparseMatrixCSC(-1.0I, 3, 3)
     h = zeros(3)
 
-    for isdual in (true, false)
-        model = MO.LinearObjConic(c, A, b, G, h, [CO.EpiPerPower(2.0, isdual)], [1:3])
+    for is_dual in (true, false)
+        model = MO.LinearObjConic(c, A, b, G, h, [CO.EpiPerPower(2.0, is_dual)], [1:3])
 
         solver = IP.HSDESolver(model, verbose = verbose, tol_feas = 1e-9)
         r = solveandcheck(model, solver)
@@ -633,13 +633,13 @@ function hypogeomean2(; verbose::Bool = true)
     G = SparseMatrixCSC(-1.0I, 3, 3)
     h = zeros(3)
 
-    for isdual in (true, false)
-        model = MO.LinearObjConic(c, A, b, G, h, [CO.HypoGeomean([0.5, 0.5], isdual)], [1:3])
+    for is_dual in (true, false)
+        model = MO.LinearObjConic(c, A, b, G, h, [CO.HypoGeomean([0.5, 0.5], is_dual)], [1:3])
         solver = IP.HSDESolver(model, verbose = verbose)
         r = solveandcheck(model, solver)
         @test r.status == :Optimal
         @test r.num_iters <= 20
-        @test r.primal_obj ≈ (isdual ? 0 : -inv(sqrt(2))) atol=1e-4 rtol=1e-4
+        @test r.primal_obj ≈ (is_dual ? 0 : -inv(sqrt(2))) atol=1e-4 rtol=1e-4
         @test r.x[2:3] ≈ [1, 0.5] atol=1e-4 rtol=1e-4
     end
 end
@@ -651,15 +651,15 @@ function hypogeomean3(; verbose::Bool = true)
     G = SparseMatrixCSC(-1.0I, l + 1, l + 1)
     h = zeros(l + 1)
 
-    for isdual in (true, false)
-        b = (isdual ? [-1] : [1])
-        model = MO.LinearObjConic(c, A, b, G, h, [CO.HypoGeomean(fill(inv(l), l), isdual)], [1:(l + 1)])
+    for is_dual in (true, false)
+        b = (is_dual ? [-1] : [1])
+        model = MO.LinearObjConic(c, A, b, G, h, [CO.HypoGeomean(fill(inv(l), l), is_dual)], [1:(l + 1)])
         solver = IP.HSDESolver(model, verbose = verbose)
         r = solveandcheck(model, solver)
         @test r.status == :Optimal
         @test r.num_iters <= 25
-        @test r.primal_obj ≈ (isdual ? 1.0 : l) atol=1e-4 rtol=1e-4
-        @test r.x[2:end] ≈ (isdual ? inv(l) : 1.0) * ones(l) atol=1e-4 rtol=1e-4
+        @test r.primal_obj ≈ (is_dual ? 1.0 : l) atol=1e-4 rtol=1e-4
+        @test r.x[2:end] ≈ (is_dual ? inv(l) : 1.0) * ones(l) atol=1e-4 rtol=1e-4
     end
 end
 
@@ -671,8 +671,8 @@ function hypogeomean4(; verbose::Bool = true)
     G = [zeros(1, l); Matrix(-1.0I, l, l)]
     h = zeros(l + 1)
 
-    for isdual in (true, false)
-        model = MO.LinearObjConic(c, A, b, G, h, [CO.HypoGeomean(fill(inv(l), l), isdual)], [1:(l + 1)])
+    for is_dual in (true, false)
+        model = MO.LinearObjConic(c, A, b, G, h, [CO.HypoGeomean(fill(inv(l), l), is_dual)], [1:(l + 1)])
         solver = IP.HSDESolver(model, verbose = verbose)
         r = solveandcheck(model, solver)
         @test r.status == :Optimal
@@ -692,13 +692,13 @@ function epinormspectral1(; verbose::Bool = true)
     G = sparse(-1.0I, Xnm + 1, Xnm + 1)
     h = vcat(0.0, rand(Xnm))
 
-    for isdual in (true, false)
-        model = MO.LinearObjConic(c, A, b, G, h, [CO.EpiNormSpectral(Xn, Xm, isdual)], [1:(Xnm + 1)])
+    for is_dual in (true, false)
+        model = MO.LinearObjConic(c, A, b, G, h, [CO.EpiNormSpectral(Xn, Xm, is_dual)], [1:(Xnm + 1)])
         solver = IP.HSDESolver(model, verbose = verbose)
         r = solveandcheck(model, solver)
         @test r.status == :Optimal
         @test r.num_iters <= 20
-        if isdual
+        if is_dual
             @test sum(svdvals!(reshape(r.s[2:end], Xn, Xm))) ≈ r.s[1] atol=1e-4 rtol=1e-4
             @test svdvals!(reshape(r.z[2:end], Xn, Xm))[1] ≈ r.z[1] atol=1e-4 rtol=1e-4
         else

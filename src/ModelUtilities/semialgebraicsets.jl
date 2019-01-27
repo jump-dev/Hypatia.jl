@@ -14,7 +14,7 @@ function get_domain_inequalities(dom::Box, x)
     return bss
 end
 
-get_domain_inequalities(dom::Ball, x) = SAS.@set(sum((x - dom.c).^2) <= dom.r^2)
+get_domain_inequalities(dom::Ball, x) = SAS.@set(sum((x - dom.c) .^ 2) <= dom.r^2)
 
 get_domain_inequalities(dom::Ellipsoid, x) = SAS.@set((x - dom.c)' * dom.Q * (x - dom.c) <= 1.0)
 

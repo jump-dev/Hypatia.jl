@@ -66,7 +66,7 @@ function solvelinsys4!(
     for k in eachindex(cone.cones)
         sview = view(srhs, cone.idxs[k])
         zview = view(zrhs3, cone.idxs[k])
-        if cone.cones[k].usedual # G*x - mu*H*z = zrhs - srhs
+        if cone.cones[k].use_dual # G*x - mu*H*z = zrhs - srhs
             zview .-= sview
         else # G*x - (mu*H)\z = zrhs - (mu*H)\srhs
             calcHiarr!(sview, cone.cones[k])
@@ -78,7 +78,7 @@ function solvelinsys4!(
     for k in eachindex(cone.cones)
         Gview = view(G, cone.idxs[k], :)
         HGview = view(HG, cone.idxs[k], :)
-        if cone.cones[k].usedual
+        if cone.cones[k].use_dual
             calcHiarr!(HGview, Gview, cone.cones[k])
             HGview ./= mu
         else
@@ -112,7 +112,7 @@ function solvelinsys4!(
     for k in eachindex(cone.cones)
         zview = view(zrhs3, cone.idxs[k], :)
         Hzview = view(Hz, cone.idxs[k], :)
-        if cone.cones[k].usedual
+        if cone.cones[k].use_dual
             calcHiarr!(Hzview, zview, cone.cones[k])
             Hzview ./= mu
         else
@@ -137,7 +137,7 @@ function solvelinsys4!(
     for k in eachindex(cone.cones)
         Gxzview = view(Gxz, cone.idxs[k], :)
         zview = view(z, cone.idxs[k], :)
-        if cone.cones[k].usedual
+        if cone.cones[k].use_dual
             calcHiarr!(zview, Gxzview, cone.cones[k])
             zview ./= mu
         else

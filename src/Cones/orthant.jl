@@ -11,13 +11,13 @@ nonpositive cone: -sum_i(log(-u_i))
 =#
 
 mutable struct Nonnegative <: Cone
-    usedual::Bool
+    use_dual::Bool
     dim::Int
     point::AbstractVector{Float64}
 
-    function Nonnegative(dim::Int, isdual::Bool)
+    function Nonnegative(dim::Int, is_dual::Bool)
         cone = new()
-        cone.usedual = isdual
+        cone.use_dual = is_dual
         cone.dim = dim
         return cone
     end
@@ -27,13 +27,13 @@ Nonnegative(dim::Int) = Nonnegative(dim, false)
 Nonnegative() = Nonnegative(1)
 
 mutable struct Nonpositive <: Cone
-    usedual::Bool
+    use_dual::Bool
     dim::Int
     point::AbstractVector{Float64}
 
-    function Nonpositive(dim::Int, isdual::Bool)
+    function Nonpositive(dim::Int, is_dual::Bool)
         cone = new()
-        cone.usedual = isdual
+        cone.use_dual = is_dual
         cone.dim = dim
         return cone
     end

@@ -7,7 +7,7 @@ see description in examples/namedpoly/native.jl
 import Hypatia
 const HYP = Hypatia
 const CO = HYP.Cones
-const LS = HYP.LinearSystems
+# const LS = HYP.LinearSystems
 const MU = HYP.ModelUtilities
 
 import MathOptInterface
@@ -165,12 +165,12 @@ function build_JuMP_namedpoly_PSD(
     x,
     f,
     dom::MU.Domain;
-    d::Int = div(maxdegree(f) + 1, 2),
+    d::Int = div(max_degree(f) + 1, 2),
     )
     model = SumOfSquares.SOSModel(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
     JuMP.@variable(model, a)
     JuMP.@objective(model, Max, a)
-    JuMP.@constraint(model, fnn, f >= a, domain = MU.get_domain_inequalities(dom, x), maxdegree=2d)
+    JuMP.@constraint(model, fnn, f >= a, domain = MU.get_domain_inequalities(dom, x), max_degree = 2d)
 
     return model
 end
@@ -180,23 +180,23 @@ function build_JuMP_namedpoly_WSOS(
     f,
     dom::MU.Domain;
     d::Int = div(DynamicPolynomials.maxdegree(f) + 1, 2),
-    sample::Bool = false,
+    sample::Bool = true,
     primal_wsos::Bool = true,
     rseed::Int = 1,
     )
     Random.seed!(rseed)
 
-    (U, pts, P0, PWts, _) = MU.interpolate(dom, d, sample = sample)
+    (U, pts, P0, PWts, _) = MU.interpolate(dom, d, sample = sample, sample_factor = 100)
 
     # build JuMP model
     model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
     if primal_wsos
         JuMP.@variable(model, a)
         JuMP.@objective(model, Max, a)
-        JuMP.@constraint(model, [f(pts[j,:]) - a for j in 1:U] in HYP.WSOSPolyInterpCone(U, [P0, PWts...], false))
+        JuMP.@constraint(model, [f(pts[j, :]) - a for j in 1:U] in HYP.WSOSPolyInterpCone(U, [P0, PWts...], false))
     else
         JuMP.@variable(model, x[1:U])
-        JuMP.@objective(model, Min, sum(x[j] * f(pts[j,:]...) for j in 1:U))
+        JuMP.@objective(model, Min, sum(x[j] * f(pts[j, :]...) for j in 1:U))
         JuMP.@constraint(model, sum(x) == 1.0)
         JuMP.@constraint(model, x in HYP.WSOSPolyInterpCone(U, [P0, PWts...], true))
     end

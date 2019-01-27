@@ -56,11 +56,11 @@ function run_JuMP_sosmatrix(
     return
 end
 
-run_JuMP_sosmatrix_poly(x::Vector, poly, use_wsos::Bool, is_SOS::Bool) = run_JuMP_sosmatrix(x, DynamicPolynomials.differentiate(poly, x, 2), use_wsos, is_SOS)
+run_JuMP_sosmatrix_poly(x::Vector, poly, use_wsos::Bool, is_SOS::Bool) =
+    run_JuMP_sosmatrix(x, DynamicPolynomials.differentiate(poly, x, 2), use_wsos, is_SOS)
 
 function run_JuMP_sosmatrix_rand(; use_wsos::Bool = true, rseed::Int = 1)
     Random.seed!(rseed)
-
     n = 3
     m = 3
     d = 1

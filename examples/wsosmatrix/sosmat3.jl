@@ -27,14 +27,17 @@ function run_JuMP_sosmat3()
     Random.seed!(1)
 
     DynamicPolynomials.@polyvar x1 x2 x3
-    P = [x1^4+x1^2*x2^2+x1^2*x3^2 x1*x2*x3^2-x1^3*x2-x1*x2*(x2^2+2*x3^2); x1*x2*x3^2-x1^3*x2-x1*x2*(x2^2+2*x3^2) x1^2*x2^2+x2^2*x3^2+(x2^2+2*x3^2)^2]
+    P = [
+        (x1^4 + x1^2 * x2^2 + x1^2 * x3^2) (x1 * x2 * x3^2 - x1^3 * x2 - x1 * x2 * (x2^2 + 2 * x3^2));
+        (x1 * x2 * x3^2 - x1^3 * x2 - x1 * x2 * (x2^2 + 2 * x3^2)) (x1^2 * x2^2 + x2^2 * x3^2 + (x2^2 + 2 * x3^2)^2);
+        ]
     dom = MU.FreeDomain(3)
 
     d = div(maximum(DynamicPolynomials.maxdegree.(P)) + 1, 2)
     (U, pts, P0, _, _) = MU.interpolate(dom, d, sample = false)
     mat_wsos_cone = HYP.WSOSPolyInterpMatCone(2, U, [P0])
 
-    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, tol_abs_opt = 1e-6, tol_rel_opt = 1e-6, tol_feas = 1e-6))
+    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
     JuMP.@constraint(model, [P[i, j](pts[u, :] * (i == j ? 1.0 : rt2)) for i in 1:2 for j in 1:i for u in 1:U] in mat_wsos_cone)
 
     JuMP.optimize!(model)

@@ -7,7 +7,7 @@ see description in examples/envelope/native.jl
 import Hypatia
 const HYP = Hypatia
 const CO = HYP.Cones
-const LS = HYP.LinearSystems
+# const LS = HYP.LinearSystems
 const MU = HYP.ModelUtilities
 
 import MathOptInterface
@@ -40,7 +40,7 @@ function build_JuMP_envelope(
     model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
     JuMP.@variable(model, fpv[j in 1:U]) # values at Fekete points
     JuMP.@objective(model, Max, dot(fpv, w)) # integral over domain (via quadrature)
-    JuMP.@constraint(model, [i in 1:npoly], polys[:,i] .- fpv in HYP.WSOSPolyInterpCone(U, [P0, PWts...]))
+    JuMP.@constraint(model, [i in 1:npoly], polys[:, i] .- fpv in HYP.WSOSPolyInterpCone(U, [P0, PWts...]))
 
     return (model, fpv)
 end

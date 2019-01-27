@@ -133,7 +133,7 @@ function solvelinsys6!(
     L.LHS6copy[L.tkk, end] = mu/tau/tau # TODO note in CVXOPT coneprog doc, there is no rescaling by tau, they to kap*dtau + tau*dkap = -rhskap
     for k in eachindex(L.cone.cones)
         dim = Cones.dimension(L.cone.cones[k])
-        coloffset = (L.cone.cones[k].usedual ? L.tzk : L.tsk)
+        coloffset = (L.cone.cones[k].use_dual ? L.tzk : L.tsk)
         # TODO don't use Matrix(mu*I, dim, dim) because it allocates and is slow
         Cones.calcHarr!(view(L.LHS6copy, L.tzk - 1 .+ L.cone.idxs[k], coloffset - 1 .+ L.cone.idxs[k]), Matrix(mu*I, dim, dim), L.cone.cones[k])
     end

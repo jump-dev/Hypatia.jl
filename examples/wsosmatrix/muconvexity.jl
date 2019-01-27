@@ -27,7 +27,7 @@ const rt2 = sqrt(2)
 function run_JuMP_muconvexity(x::Vector, poly, dom, use_wsos::Bool)
     Random.seed!(1)
 
-    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, tol_abs_opt = 1e-8, tol_rel_opt = 1e-8, tol_feas = 1e-8))
+    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
     JuMP.@variable(model, mu)
     JuMP.@objective(model, Max, mu)
 

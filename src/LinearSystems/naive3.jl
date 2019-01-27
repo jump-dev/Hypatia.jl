@@ -80,7 +80,7 @@ function solvelinsys4!(
     for k in eachindex(cone.cones)
         idxs = (n + p) .+ cone.idxs[k]
         Hview = view(L.LHScopy, idxs, idxs)
-        if cone.cones[k].usedual # G*x - mu*H*z = zrhs - srhs
+        if cone.cones[k].use_dual # G*x - mu*H*z = zrhs - srhs
             calcHarr!(Hview, -mu*I, cone.cones[k])
             @. @views L.rhs[idxs] -= srhs[cone.idxs[k]]
         else # G*x - (mu*H)\z = zrhs - (mu*H)\srhs

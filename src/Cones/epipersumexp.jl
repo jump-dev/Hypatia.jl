@@ -13,7 +13,7 @@ TODO compare alternative barrier -log(u - v*sum(wi -> exp(wi/v), w)) - log(u) - 
 =#
 
 mutable struct EpiPerSumExp <: Cone
-    usedual::Bool
+    use_dual::Bool
     dim::Int
     point::AbstractVector{Float64}
     g::Vector{Float64}
@@ -23,9 +23,9 @@ mutable struct EpiPerSumExp <: Cone
     barfun::Function
     diffres
 
-    function EpiPerSumExp(dim::Int, isdual::Bool)
+    function EpiPerSumExp(dim::Int, is_dual::Bool)
         cone = new()
-        cone.usedual = isdual
+        cone.use_dual = is_dual
         cone.dim = dim
         cone.g = Vector{Float64}(undef, dim)
         cone.H = Matrix{Float64}(undef, dim, dim)

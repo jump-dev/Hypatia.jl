@@ -13,7 +13,7 @@ TODO although this barrier has a lower parameter, maybe the more standard barrie
 =#
 
 mutable struct EpiPerPower <: Cone
-    usedual::Bool
+    use_dual::Bool
     alpha::Float64
     point::AbstractVector{Float64}
     g::Vector{Float64}
@@ -23,10 +23,10 @@ mutable struct EpiPerPower <: Cone
     barfun::Function
     diffres
 
-    function EpiPerPower(alpha::Float64, isdual::Bool)
+    function EpiPerPower(alpha::Float64, is_dual::Bool)
         @assert alpha > 1.0
         cone = new()
-        cone.usedual = isdual
+        cone.use_dual = is_dual
         cone.alpha = alpha
         cone.g = Vector{Float64}(undef, 3)
         cone.H = Matrix{Float64}(undef, 3, 3)

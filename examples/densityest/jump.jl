@@ -12,7 +12,7 @@ find a density function f maximizing the log likelihood of the observations
 import Hypatia
 const HYP = Hypatia
 const CO = HYP.Cones
-const LS = HYP.LinearSystems
+# const LS = HYP.LinearSystems
 const MU = HYP.ModelUtilities
 
 import JuMP
@@ -48,9 +48,9 @@ function build_JuMP_densityest(
     end)
     JuMP.@objective(model, Max, sum(z)) # maximize log likelihood
     JuMP.@constraints(model, begin
-        sum(w[i] * f(pts[i,:]) for i in 1:U) == 1.0 # integrate to 1
-        [f(pts[i,:]) for i in 1:U] in HYP.WSOSPolyInterpCone(U, [P0, PWts...]) # density nonnegative
-        [i in 1:nobs], vcat(z[i], 1.0, f(X[i,:])) in MOI.ExponentialCone() # hypograph of log
+        sum(w[i] * f(pts[i, :]) for i in 1:U) == 1.0 # integrate to 1
+        [f(pts[i, :]) for i in 1:U] in HYP.WSOSPolyInterpCone(U, [P0, PWts...]) # density nonnegative
+        [i in 1:nobs], vcat(z[i], 1.0, f(X[i, :])) in MOI.ExponentialCone() # hypograph of log
     end)
 
     return model

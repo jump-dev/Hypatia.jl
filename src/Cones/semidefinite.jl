@@ -12,7 +12,7 @@ TODO eliminate allocations for inverse-finding
 =#
 
 mutable struct PosSemidef <: Cone
-    usedual::Bool
+    use_dual::Bool
     dim::Int
     side::Int
     point::AbstractVector{Float64}
@@ -21,9 +21,9 @@ mutable struct PosSemidef <: Cone
     matpnt::Matrix{Float64}
     matinv::Matrix{Float64}
 
-    function PosSemidef(dim::Int, isdual::Bool)
+    function PosSemidef(dim::Int, is_dual::Bool)
         cone = new()
-        cone.usedual = isdual
+        cone.use_dual = is_dual
         cone.dim = dim
         cone.side = round(Int, sqrt(0.25 + 2 * dim) - 0.5)
         cone.mat = Matrix{Float64}(undef, cone.side, cone.side)
