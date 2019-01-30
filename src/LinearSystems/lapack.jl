@@ -35,7 +35,7 @@ mutable struct POSVXData
         d.S = Vector{Float64}(undef, d.n)
         d.ferr = Vector{Float64}(undef, d.nrhs)
         d.berr = Vector{Float64}(undef, d.nrhs)
-        d.work = Vector{Float64}(undef, 3*d.n)
+        d.work = Vector{Float64}(undef, 3 * d.n)
         d.iwork = Vector{BlasInt}(undef, d.n)
         d.rcond = Ref{Float64}()
         d.info = Ref{BlasInt}()

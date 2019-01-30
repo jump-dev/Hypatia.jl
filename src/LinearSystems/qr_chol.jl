@@ -2,23 +2,25 @@
 Copyright 2018, Chris Coey and contributors
 
 eliminates the s row and column from the 4x4 system and performs one 3x3 linear system solve (see naive3 method)
-reduces 3x3 system to a 2x2 system and solves via two sequential (dense) choleskys (see CVXOPT)
-if there are no equality constraints, only one cholesky is needed
+requires QR-based preprocessing of A', uses resulting Q2 and RiQ1 matrices to eliminate equality constraints
+uses a Cholesky to solve a reduced symmetric linear system
 
-TODO are there cases where a sparse cholesky would perform better?
-TODO refactor many common elements with qrchol
+TODO option for solving linear system with positive definite matrix using iterative method (eg CG)
+TODO refactor many common elements with chol2
 =#
 
-mutable struct Chol2 <: LinearSystemSolver
+mutable struct QRChol <: LinearSystemSolver
     n
     p
     q
     P
     A
     G
+    Q2
+    RiQ1
     cone
 
-    function Chol2(
+    function QRChol(
         P::AbstractMatrix{Float64},
         c::Vector{Float64},
         A::AbstractMatrix{Float64},
@@ -26,13 +28,27 @@ mutable struct Chol2 <: LinearSystemSolver
         G::AbstractMatrix{Float64},
         h::Vector{Float64},
         cone::Cone,
+        Q2::AbstractMatrix{Float64},
+        RiQ1::AbstractMatrix{Float64},
         )
         L = new()
         (n, p, q) = (length(c), length(b), length(h))
-        (L.n, L.p, L.q, L.P, L.A, L.G, L.cone) = (n, p, q, P, A, G, cone)
+        (L.n, L.p, L.q, L.P, L.A, L.G, L.Q2, L.RiQ1, L.cone) = (n, p, q, P, A, G, Q2, RiQ1, cone)
         return L
     end
 end
+
+QRChol(
+    c::Vector{Float64},
+    A::AbstractMatrix{Float64},
+    b::Vector{Float64},
+    G::AbstractMatrix{Float64},
+    h::Vector{Float64},
+    cone::Cone,
+    Q2::AbstractMatrix{Float64},
+    RiQ1::AbstractMatrix{Float64},
+    ) = QRChol(Symmetric(spzeros(length(c), length(c))), c, A, b, G, h, cone, Q2, RiQ1)
+
 
 # solve system for x, y, z, s
 function solvelinsys4!(
@@ -41,9 +57,9 @@ function solvelinsys4!(
     zrhs::Vector{Float64},
     srhs::Vector{Float64},
     mu::Float64,
-    L::Chol2,
+    L::QRChol,
     )
-    (n, p, q, P, A, G, cone) = (L.n, L.p, L.q, L.P, L.A, L.G, L.cone)
+    (n, p, q, P, A, G, Q2, RiQ1, cone) = (L.n, L.p, L.q, L.P, L.A, L.G, L.Q2, L.RiQ1, L.cone)
 
     # TODO refactor the conversion to 3x3 system and back (start and end)
     zrhs3 = copy(zrhs)
@@ -70,31 +86,26 @@ function solvelinsys4!(
             HGview .*= mu
         end
     end
-    GHG = Symmetric(G'*HG)
+    GHG = Symmetric(G' * HG)
     PGHG = Symmetric(P + GHG)
-    # F1 = cholesky!(PGHG, Val(true), check = false)
-    F1 = cholesky(PGHG, check = false) # TODO allow pivot
-    singular = !isposdef(F1)
+    Q2PGHGQ2 = Symmetric(Q2' * PGHG * Q2)
+    F = cholesky!(Q2PGHGQ2, Val(true), check = false)
+    singular = !isposdef(F)
+    # F = bunchkaufman!(Q2PGHGQ2, true, check = false)
+    # singular = !issuccess(F)
 
     if singular
-        println("singular PGHG")
-        PGHGAA = Symmetric(P + GHG + A'*A)
-        # F1 = cholesky!(PGHGAA, Val(true), check = false)
-        F1 = cholesky(PGHGAA, check = false) # TODO allow pivot
-        if !isposdef(F1)
-            error("could not fix singular PGHG")
+        println("singular Q2PGHGQ2")
+        Q2PGHGQ2 = Symmetric(Q2' * (PGHG + A' * A) * Q2)
+        # @show eigvals(Q2PGHGQ2)
+        F = cholesky!(Q2PGHGQ2, Val(true), check = false)
+        if !isposdef(F)
+            error("could not fix singular Q2PGHGQ2")
         end
-    end
-
-    # LA = A'[F1.p, :]
-    LA = A'
-    # ldiv!(F1.L, LA)
-    LA = F1.L \ LA
-    ALLA = Symmetric(LA'*LA)
-    # F2 = cholesky!(ALLA, Val(fal), check = false) # TODO avoid if no equalities?
-    F2 = cholesky(ALLA, check = false) # TODO allow pivot; TODO avoid if no equalities?
-    if !isposdef(F2)
-        error("singular ALLA")
+        # F = bunchkaufman!(Q2PGHGQ2, true, check = false)
+        # if !issuccess(F)
+        #     error("could not fix singular Q2PGHGQ2")
+        # end
     end
 
     Hz = similar(zrhs3)
@@ -109,26 +120,20 @@ function solvelinsys4!(
             Hzview .*= mu
         end
     end
-    xGHz = xrhs + G'*Hz
+    xGHz = xrhs + G' * Hz
     if singular
-        xGHz += A'*yrhs # TODO should this be minus
+        xGHz += A' * yrhs # TODO should this be minus
     end
 
-    # LxGHz = xGHz[F1.p]
-    # LxGHz = copy(xGHz)
-    # ldiv!(F1.L, LxGHz)
-    LxGHz = F1.L \ xGHz
+    x = RiQ1' * yrhs
+    Q2div = Q2' * (xGHz - GHG * x)
+    ldiv!(F, Q2div)
+    x += Q2 * Q2div
 
-    y = LA'*LxGHz - yrhs
-    # ldiv!(F2, y)
-    y = F2 \ y
-
-    x = xGHz - A'*y
-    # ldiv!(F1, x)
-    x = F1 \ x
+    y = RiQ1 * (xGHz - GHG * x)
 
     z = similar(zrhs3)
-    Gxz = G*x - zrhs3
+    Gxz = G * x - zrhs3
     for k in eachindex(cone.cones)
         Gxzview = view(Gxz, cone.idxs[k], :)
         zview = view(z, cone.idxs[k], :)
@@ -145,7 +150,7 @@ function solvelinsys4!(
     xrhs .= x
     yrhs .= y
     zrhs .= z
-    srhs .-= G*x
+    srhs .-= G * x1
 
     return
 end

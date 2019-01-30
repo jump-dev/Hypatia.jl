@@ -67,7 +67,7 @@ end
 
 # TODO preprocess function - maybe wraps a model
 
-# 
+#
 # function preprocess_data(
 #     c::Vector{Float64},
 #     A::AbstractMatrix{Float64},
@@ -181,3 +181,27 @@ end
 #
 #     return (c, A, b, G, prkeep, dukeep, AQ2, ARiQ1)
 # end
+
+
+
+
+# eliminate s
+s_sol = copy(z_rhs)
+
+z_rhs3 = copy(z_rhs)
+for k in eachindex(cone.cones)
+    sview = view(srhs, cone.idxs[k])
+    zview = view(z_rhs3, cone.idxs[k])
+    if cone.cones[k].use_dual # G*x - mu*H*z = z_rhs - srhs
+        zview .-= sview
+    else # G*x - (mu*H)\z = z_rhs - (mu*H)\srhs
+        calcHiarr!(sview, cone.cones[k])
+        @. zview -= sview / mu
+    end
+end
+
+(x_sol, y_sol, z_sol) = solve_linear(3 rhs)
+
+# TODO get s back
+# G*x + s = z_rhs
+s_sol .-= G * x

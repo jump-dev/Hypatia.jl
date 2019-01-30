@@ -152,10 +152,10 @@ function solvelinsys6!(
     L::QRSymm,
     )
     (zi, yi, xi) = (L.zi, L.yi, L.xi)
-    @. yi[:,1] = L.b
-    @. yi[:,2] = -rhs_ty
-    @. xi[:,1] = -L.c
-    @. xi[:,2] = rhs_tx
+    @. yi[:, 1] = L.b
+    @. yi[:, 2] = -rhs_ty
+    @. xi[:, 1] = -L.c
+    @. xi[:, 2] = rhs_tx
     z1 = view(zi, :, 1)
     z2 = view(zi, :, 2)
 
@@ -171,7 +171,7 @@ function solvelinsys6!(
             a2k ./= mu
         elseif !iszero(a3k) # TODO rhs_ts = 0 for correction steps, so can just check if doing correction
             Cones.calcHarr!(a1k, a3k, L.cone.cones[k])
-            @. a2k -= mu*a1k
+            @. a2k -= mu * a1k
         end
     end
 
@@ -281,12 +281,13 @@ function solvelinsys6!(
     @. zi = L.HGxi - zi
 
     # combine
-    @views dir_tau = (rhs_tau + rhs_kap + dot(L.c, xi[:,2]) + dot(L.b, yi[:,2]) + dot(L.h, z2))/(mu/tau/tau - dot(L.c, xi[:,1]) - dot(L.b, yi[:,1]) - dot(L.h, z1))
-    @. @views rhs_tx = xi[:,2] + dir_tau*xi[:,1]
-    @. @views rhs_ty = yi[:,2] + dir_tau*yi[:,1]
-    @. rhs_tz = z2 + dir_tau*z1
+    @views dir_tau = (rhs_tau + rhs_kap + dot(L.c, xi[:, 2]) + dot(L.b, yi[:, 2]) + dot(L.h, z2)) /
+        (mu / tau / tau - dot(L.c, xi[:, 1]) - dot(L.b, yi[:, 1]) - dot(L.h, z1))
+    @. @views rhs_tx = xi[:, 2] + dir_tau * xi[:, 1]
+    @. @views rhs_ty = yi[:, 2] + dir_tau * yi[:, 1]
+    @. rhs_tz = z2 + dir_tau * z1
     mul!(z1, L.G, rhs_tx)
-    @. rhs_ts = -z1 + L.h*dir_tau - rhs_ts
+    @. rhs_ts = -z1 + L.h * dir_tau - rhs_ts
     dir_kap = -dot(L.c, rhs_tx) - dot(L.b, rhs_ty) - dot(L.h, rhs_tz) - rhs_tau
 
     return (dir_kap, dir_tau)

@@ -68,7 +68,7 @@ function solvelinsys4!(
         rows = (n + p + q) .+ cone.idxs[k]
         cols = cone.cones[k].use_dual ? (rows .- q) : rows
         # Hview = view(L.LHScopy, rows, cols)
-        # calcHarr!(Hview, mu*I, cone.cones[k])
+        # calcHarr!(Hview, mu * I, cone.cones[k])
         # calcHarr!(Hview, I, cone.cones[k])
         L.LHScopy[rows, cols] = Symmetric(cone.cones[k].H) * mu
     end
