@@ -48,7 +48,7 @@ end
 # calculate barrier value
 function barfun(pnt, ipwt::Vector{Matrix{Float64}}, R::Int, U::Int, calc_barval::Bool)
     barval = 0.0
-    
+
     for ipwtj in ipwt
         L = size(ipwtj, 2)
         mat = similar(pnt, L*R, L*R)
@@ -59,6 +59,7 @@ function barfun(pnt, ipwt::Vector{Matrix{Float64}}, R::Int, U::Int, calc_barval:
             uo = 0
             for p in 1:R, q in 1:p
                 val = sum(ipwtj[u,l] * ipwtj[u,k] * pnt[uo+u] for u in 1:U)
+                # FIXME inconsistency between ordering of the variables in the outer/inner indexing between this mat and the point in the cone differentiating more confusing
                 if p == q
                     mat[bl+p, bk+q] = val
                 else
@@ -76,7 +77,7 @@ function barfun(pnt, ipwt::Vector{Matrix{Float64}}, R::Int, U::Int, calc_barval:
             barval -= logdet(F)
         end
     end
-    
+
     return barval
 end
 
@@ -138,9 +139,14 @@ function incone_prmtv(prmtv::WSOSPolyInterpMat, scal::Float64)
     prmtv.diffres = ForwardDiff.hessian!(prmtv.diffres, prmtv.barfun, prmtv.scalpnt)
 
     prmtv.g .= 0.0
+    prmtv.H .= 0.0
+    der11 = 0.0
+    der14 = 0.0
     for (j, ipwtj) in enumerate(prmtv.ipwt)
         Winv = inv(prmtv.mat[j])
         L = size(ipwtj, 2)
+        der11 += sum(ipwtj[1,k] * ipwtj[1,l] * Winv[(k-1)*prmtv.r+1, (l-1)*prmtv.r+1] for k in 1:L, l in 1:L)^2
+        der14 += sum(ipwtj[1,k] * ipwtj[1,l] * Winv[(k-1)*prmtv.r+1, (l-1)*prmtv.r+1] for k in 1:L, l in 1:L)^2
         idx = 0
         # outer indices for W
         for p in 1:prmtv.r,  q in 1:p,  u in 1:prmtv.u
@@ -151,12 +157,30 @@ function incone_prmtv(prmtv::WSOSPolyInterpMat, scal::Float64)
                 if p == q
                     prmtv.g[idx] -= ipwtj[u,k] * ipwtj[u,l] * Winv[bk+p, bl+q]
                 else
-                    prmtv.g[idx] -= ipwtj[u,k] * ipwtj[u,l] * Winv[bk+p, bl+q] * rt2i
+                    prmtv.g[idx] -= ipwtj[u,k] * ipwtj[u,l] * Winv[bk+p, bl+q] * rt2
+                end
+                idx2 = 0
+                for p2 in 1:prmtv.r,  q2 in 1:p2,  u2 in 1:prmtv.u
+                    idx2 += 1
+                    # prmtv.H[idx,idx2] += sum(ipwtj[u1,k] * ipwtj[u2,l] * Winv[(k-1)*prmtv.r+p, (l-1)*prmtv.r+q] for k in 1:L, l in 1:L)*
+                    for k2 in 1:L, l2 in 1:L
+                        (bk2, bl2) = ((k2-1)*prmtv.r, (l2-1)*prmtv.r)
+                        if p == q
+                            prmtv.H[idx, idx2] += ipwtj[u,k] * ipwtj[u,l] * Winv[bk+p, bl+q] * Winv[bk2+p2, bl2+q2] * ipwtj[u2,k2] * ipwtj[u2,l2]
+                        else
+                            prmtv.H[idx, idx2] += ipwtj[u,k] * ipwtj[u,l] * Winv[bk+p, bl+q] * Winv[bk2+p2, bl2+q2] * ipwtj[u2,k2] * ipwtj[u2,l2]
+                        end
+                    end
                 end
             end
         end
     end
-
+    # tempg = DiffResults.gradient(prmtv.diffres)
+    tempH  = DiffResults.hessian(prmtv.diffres)
+    @show prmtv.H[1,4]
+    @show tempH[1,4]
+    @show der14
+    # @show tempH[1,2]
     prmtv.H .= DiffResults.hessian(prmtv.diffres)
     return factH(prmtv)
 end
