@@ -22,3 +22,25 @@ Copyright 2018, Chris Coey, Lea Kapelevich and contributors
     @test norm(box_P0) ≈ norm(free_P0)
     @test isempty(free_PWts)
 end
+
+function scaling_mwe(dom::Hypatia.InterpDomain)
+    @polyvar x[1:2]
+    (U, pts, P0, PWts, _) = Hypatia.interpolate(dom, 3, sample = true, sample_factor = 50)
+    wsos_cone = WSOSPolyInterpCone(U, [P0, PWts...])
+    model = Model(with_optimizer(Hypatia.Optimizer, verbose = true))
+    @variable(model, v, PolyJuMP.Poly(monomials(x, 0:5)))
+    @constraint(model, [v(pts[u, :]) for u in 1:U] in wsos_cone)
+    return model
+end
+
+@testset "domain scaling" begin
+    for dom in [
+        Hypatia.Box(-0.01 * ones(2), 0.01 * ones(2)),
+        Hypatia.Ball([0.0, 0.0], 0.01),
+        Hypatia.Ellipsoid([0.0, 0.0], ones(2, 2) * 0.01)
+        ]
+        model = scaling_mwe(dom)
+        JuMP.optimize!(model)
+        @test JuMP.termination_status(model) == MOI.OPTIMAL
+    end
+end
