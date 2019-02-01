@@ -14,6 +14,7 @@ and Matlab files in the packages
 # domains
 abstract type InterpDomain end
 sampling_region(dom::InterpDomain) = dom
+scale_factor(dom::InterpDomain) = [1.0 for _ in 1:dimension(dom)]
 
 # hyperrectangle/box domain
 mutable struct Box <: InterpDomain
@@ -30,6 +31,22 @@ end
 
 dimension(dom::Box) = length(dom.l)
 degree(::Box) = 2
+scale_factor(dom::Box) = (dom.u - dom.l) * 0.5
+
+# points to construct P0, PWts to come from [-1, 1] box
+# function interp_sample(dom::Box, npts::Int)
+#     dim = dimension(dom)
+#     pts = (rand(npts, dim) .- 0.5) * 2.0
+#     return pts
+# end
+#
+# function shift_and_scale!(pts::AbstractMatrix{Float64}, dom::Box)
+#     shift = (dom.u + dom.l)/2.0
+#     for i in 1:npts
+#         pts[i,:] = pts[i,:] .* (dom.u - dom.l) / 2.0 + shift
+#     end
+#     return pts
+# end
 
 function interp_sample(dom::Box, npts::Int)
     dim = dimension(dom)
@@ -61,6 +78,24 @@ end
 
 dimension(dom::Ball) = length(dom.c)
 degree(::Ball) = 2
+scale_factor(dom::Ball) = [dom.r for _ in 1:dimension(dom)]
+
+# function interp_sample(dom::Ball, npts::Int)
+#     dim = dimension(dom)
+#     pts = (randn(npts, dim) .- 0.5) * 2.0
+#     return pts
+# end
+#
+# function shift_and_scale!(pts::AbstractMatrix{Float64}, dom::Ball)
+#     norms = sum(abs2, pts, dims=2)
+#     pts .*= dom.r ./ sqrt.(norms) # scale
+#     norms .*= 0.5
+#     pts .*= sf_gamma_inc_Q.(norms, dim/2) .^ inv(dim) # sf_gamma_inc_Q is the normalized incomplete gamma function
+#     for i in 1:dim
+#         pts[:, i] .+= dom.c[i] # shift
+#     end
+#     return pts
+# end
 
 function interp_sample(dom::Ball, npts::Int)
     dim = dimension(dom)
@@ -96,6 +131,27 @@ end
 
 dimension(dom::Ellipsoid) = length(dom.c)
 degree(::Ellipsoid) = 2
+scale_factor(dom::Ellipsoid) = eigen(dom.Q).values
+
+# function shift_and_scale!(pts::AbstractMatrix{Float64}, dom::Ellipsoid)
+#     dim = dimension(dom)
+#     norms = sum(abs2, pts, dims=2)
+#     for i in 1:npts
+#         pts[i,:] ./= (sqrt(norms[i]) * 2.0) # scale
+#     end
+#     norms ./= 2.0
+#     pts .*= sf_gamma_inc_Q.(norms, dim/2) .^ inv(dim) # sf_gamma_inc_Q is the normalized incomplete gamma function
+#
+#     rotscale = cholesky(dom.Q).U
+#     for i in 1:npts
+#         pts[i,:] = rotscale\pts[i,:] # rotate/scale
+#     end
+#
+#     for i in 1:dim
+#         pts[:, i] .+= dom.c[i] # shift
+#     end
+#     return pts
+# end
 
 function interp_sample(dom::Ellipsoid, npts::Int)
     dim = dimension(dom)
@@ -363,9 +419,14 @@ function make_wsos_arrays(
     U::Int,
     L::Int;
     calc_w::Bool = false,
+    scale::Bool = false,
     )
     (npts, n) = size(candidate_pts)
-    u = calc_u(n, 2d, candidate_pts)
+    if scale
+        u = calc_u(n, 2d, candidate_pts ./ scale_factor(dom)')
+    else
+        u = calc_u(n, 2d, candidate_pts)
+    end
     m = Vector{Float64}(undef, U)
     m[1] = 2^n
     M = Matrix{Float64}(undef, npts, U)
@@ -415,7 +476,7 @@ function wsos_sample_params(
     n = dimension(dom)
     (L, U) = get_LU(n, d)
     candidate_pts = interp_sample(dom, U * sample_factor)
-    (pts, P0, P0sub, w) = make_wsos_arrays(dom, candidate_pts, d, U, L, calc_w=calc_w)
+    (pts, P0, P0sub, w) = make_wsos_arrays(dom, candidate_pts, d, U, L, calc_w=calc_w, scale = true)
     g = get_weights(dom, pts)
     PWts = [sqrt.(gi) .* P0sub for gi in g]
     return (U=U, pts=pts, P0=P0, PWts=PWts, w=w)
