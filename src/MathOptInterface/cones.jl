@@ -37,13 +37,13 @@ MOIOtherCones = (
 )
 
 # MOI cones for which no transformation is needed
-cone_from_moi(s::MOI.SecondOrderCone) = CO.EpiNormEucl(MOI.dimension(s))
-cone_from_moi(s::MOI.RotatedSecondOrderCone) = CO.EpiPerSquare(MOI.dimension(s))
-cone_from_moi(s::MOI.ExponentialCone) = CO.HypoPerLog()
-cone_from_moi(s::MOI.GeometricMeanCone) = (l = MOI.dimension(s) - 1; CO.HypoGeomean(fill(inv(l), l)))
-cone_from_moi(s::MOI.PowerCone{Float64}) = CO.EpiPerPower(inv(s.exponent))
-cone_from_moi(s::WSOSPolyInterpCone) = CO.WSOSPolyInterp(s.dimension, s.ipwt, s.is_dual)
-cone_from_moi(s::WSOSPolyInterpMatCone) = CO.WSOSPolyInterpMat(s.r, s.u, s.ipwt, s.is_dual)
+cone_from_moi(s::MOI.SecondOrderCone) = Cones.EpiNormEucl(MOI.dimension(s))
+cone_from_moi(s::MOI.RotatedSecondOrderCone) = Cones.EpiPerSquare(MOI.dimension(s))
+cone_from_moi(s::MOI.ExponentialCone) = Cones.HypoPerLog()
+cone_from_moi(s::MOI.GeometricMeanCone) = (l = MOI.dimension(s) - 1; Cones.HypoGeomean(fill(inv(l), l)))
+cone_from_moi(s::MOI.PowerCone{Float64}) = Cones.EpiPerPower(inv(s.exponent))
+cone_from_moi(s::WSOSPolyInterpCone) = Cones.WSOSPolyInterp(s.dimension, s.ipwt, s.is_dual)
+cone_from_moi(s::WSOSPolyInterpMatCone) = Cones.WSOSPolyInterpMat(s.r, s.u, s.ipwt, s.is_dual)
 cone_from_moi(s::MOI.AbstractVectorSet) = error("MOI set $s is not recognized")
 
 function build_var_cone(fi::MOI.VectorOfVariables, si::MOI.AbstractVectorSet, dim::Int, q::Int)
@@ -74,7 +74,7 @@ svec_unscale(dim) = [(i == j ? 1.0 : rt2i) for i in 1:round(Int, sqrt(0.25 + 2.0
 function build_var_cone(fi::MOI.VectorOfVariables, si::MOI.PositiveSemidefiniteConeTriangle, dim::Int, q::Int)
     IGi = (q + 1):(q + dim)
     VGi = -svec_scale(dim)
-    conei = CO.PosSemidef(dim)
+    conei = Cones.PosSemidef(dim)
     return (IGi, VGi, conei)
 end
 
@@ -84,7 +84,7 @@ function build_constr_cone(fi::MOI.VectorAffineFunction{Float64}, si::MOI.Positi
     VGi = [-vt.scalar_term.coefficient * scalevec[vt.output_index] for vt in fi.terms]
     Ihi = (q + 1):(q + dim)
     Vhi = scalevec .* fi.constants
-    conei = CO.PosSemidef(dim)
+    conei = Cones.PosSemidef(dim)
     return (IGi, VGi, Ihi, Vhi, conei)
 end
 
@@ -92,7 +92,7 @@ end
 function build_var_cone(fi::MOI.VectorOfVariables, si::MOI.LogDetConeTriangle, dim::Int, q::Int)
     IGi = (q + 1):(q + dim)
     VGi = vcat(-1.0, -1.0, -svec_scale(dim - 2))
-    conei = CO.HypoPerLogdet(dim)
+    conei = Cones.HypoPerLogdet(dim)
     return (IGi, VGi, conei)
 end
 
@@ -102,6 +102,6 @@ function build_constr_cone(fi::MOI.VectorAffineFunction{Float64}, si::MOI.LogDet
     VGi = [-vt.scalar_term.coefficient * scalevec[vt.output_index] for vt in fi.terms]
     Ihi = (q + 1):(q + dim)
     Vhi = scalevec .* fi.constants
-    conei = CO.HypoPerLogdet(dim)
+    conei = Cones.HypoPerLogdet(dim)
     return (IGi, VGi, Ihi, Vhi, conei)
 end
