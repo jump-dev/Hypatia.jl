@@ -7,11 +7,11 @@ MathOptInterface wrapper of Hypatia solver
 mutable struct Optimizer <: MOI.AbstractOptimizer
     verbose::Bool
     time_limit::Float64
-    # linear_solver::Type{<:LinearSystems.LinearSystemSolver}
+    # linear_solver_type::Type{<:LinearSystems.LinearSystemSolver}
     dense::Bool
 
-    model::MO.LinearObjConic
-    solver::IP.HSDESolver
+    model::Models.LinearObjConic
+    solver::InteriorPoints.HSDESolver
 
     obj_sense::MOI.OptimizationSense
     obj_const::Float64
@@ -36,7 +36,7 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
         opt = new()
         opt.verbose = verbose
         opt.time_limit = time_limit
-        # opt.linear_solver = linear_solver
+        # opt.linear_solver_type = linear_solver_type
         opt.dense = dense
         opt.status = :NotLoaded
         return opt
@@ -46,7 +46,7 @@ end
 Optimizer(;
     verbose::Bool = false,
     time_limit::Float64 = 3.6e3, # TODO should be Inf
-    # linear_solver = LinearSystems.QRSymm,
+    # linear_solver_type = LinearSystems.QRSymm,
     dense::Bool = true,
     # tol_rel_opt::Float64 = 1e-6,
     # tol_abs_opt::Float64 = 1e-7,
@@ -209,7 +209,7 @@ function MOI.copy_to(
     (Ih, Vh) = (Int[], Float64[])
     (Icpc, Vcpc) = (Int[], Float64[]) # constraint set constants for opt.constr_prim_eq
     constr_offset_cone = Vector{Int}()
-    cones = CO.Cone[]
+    cones = Cones.Cone[]
     cone_idxs = UnitRange{Int}[]
 
     # build up one nonnegative cone
@@ -276,7 +276,7 @@ function MOI.copy_to(
 
     if q > nonneg_start
         # exists at least one nonnegative constraint
-        push!(cones, CO.Nonnegative(q - nonneg_start))
+        push!(cones, Cones.Nonnegative(q - nonneg_start))
         push!(cone_idxs, (nonneg_start + 1):q)
     end
 
@@ -344,7 +344,7 @@ function MOI.copy_to(
 
     if q > nonpos_start
         # exists at least one nonpositive constraint
-        push!(cones, CO.Nonpositive(q - nonpos_start))
+        push!(cones, Cones.Nonpositive(q - nonpos_start))
         push!(cone_idxs, (nonpos_start + 1):q)
     end
 
@@ -419,7 +419,7 @@ function MOI.copy_to(
     opt.interval_scales = interval_scales
     if q > interval_start
         # exists at least one interval-type constraint
-        push!(cones, CO.EpiNormInf(q - interval_start))
+        push!(cones, Cones.EpiNormInf(q - interval_start))
         push!(cone_idxs, (interval_start + 1):q)
     end
 
@@ -459,7 +459,7 @@ function MOI.copy_to(
     end
     model_h = Vector(sparsevec(Ih, Vh, q))
 
-    opt.model = MO.LinearObjConic(model_c, model_A, model_b, model_G, model_h, cones, cone_idxs)
+    opt.model = Models.LinearObjConic(model_c, model_A, model_b, model_G, model_h, cones, cone_idxs)
 
     opt.constr_offset_cone = constr_offset_cone
     opt.constr_prim_cone = Vector(sparsevec(Icpc, Vcpc, q))
@@ -474,35 +474,35 @@ function MOI.optimize!(opt::Optimizer)
     (c, A, b, G, h, cones, cone_idxs) = (model.c, model.A, model.b, model.G, model.h, model.cones, model.cone_idxs)
 
     # check, preprocess, load, and solve
-    model = MO.LinearObjConic(c, A, b, G, h, cones, cone_idxs)
-    solver = IP.HSDESolver(model, verbose = true) # TODO other options
-    IP.solve(solver)
+    model = Models.LinearObjConic(c, A, b, G, h, cones, cone_idxs)
+    solver = InteriorPoints.HSDESolver(model, verbose = true) # TODO other options
+    InteriorPoints.solve(solver)
 
-    opt.status = IP.get_status(solver)
-    opt.solve_time = IP.get_solve_time(solver)
-    opt.primal_obj = IP.get_primal_obj(solver)
-    opt.dual_obj = IP.get_dual_obj(solver)
+    opt.status = InteriorPoints.get_status(solver)
+    opt.solve_time = InteriorPoints.get_solve_time(solver)
+    opt.primal_obj = InteriorPoints.get_primal_obj(solver)
+    opt.dual_obj = InteriorPoints.get_dual_obj(solver)
 
     # get solution and transform for MOI
     # opt.x = zeros(length(c))
-    # opt.x[dukeep] = IP.get_x(solver)
-    opt.x = IP.get_x(solver)
+    # opt.x[dukeep] = InteriorPoints.get_x(solver)
+    opt.x = InteriorPoints.get_x(solver)
     opt.constr_prim_eq += b - A * opt.x
     # opt.y = zeros(length(b))
-    # opt.y[prkeep] = IP.get_y(solver)
-    opt.y = IP.get_y(solver)
+    # opt.y[prkeep] = InteriorPoints.get_y(solver)
+    opt.y = InteriorPoints.get_y(solver)
 
-    opt.s = IP.get_s(solver)
-    opt.z = IP.get_z(solver)
+    opt.s = InteriorPoints.get_s(solver)
+    opt.z = InteriorPoints.get_z(solver)
 
     # TODO refac out primitive cone untransformations
     for k in eachindex(cones)
-        if cones[k] isa CO.PosSemidef
+        if cones[k] isa Cones.PosSemidef
             idxs = cone_idxs[k]
             scale_vec = svec_unscale(length(idxs))
             opt.s[idxs] .*= scale_vec
             opt.z[idxs] .*= scale_vec
-        elseif cones[k] isa CO.HypoPerLogdet
+        elseif cones[k] isa Cones.HypoPerLogdet
             idxs = cone_idxs[k][3:end]
             scale_vec = svec_unscale(length(idxs))
             opt.s[idxs] .*= scale_vec

@@ -6,49 +6,9 @@ interior point type and functions for algorithms based on homogeneous self dual 
 TODO make internal statuses types
 =#
 
-# TODO maybe have point defined in model, and keep tau and kappa outside the point in hsde alg
-
-mutable struct HSDEPoint <: InteriorPoint
-    tx::Vector{Float64}
-    ty::Vector{Float64}
-    tz::Vector{Float64}
-    ts::Vector{Float64}
-    tau::Float64
-    kap::Float64
-    # mu::Float64
-    tz_views::Vector{SubArray{Float64,1,Vector{Float64},Tuple{UnitRange{Int}},true}}
-    ts_views::Vector{SubArray{Float64,1,Vector{Float64},Tuple{UnitRange{Int}},true}}
-    dual_views::Vector{SubArray{Float64,1,Vector{Float64},Tuple{UnitRange{Int}},true}}
-    primal_views::Vector{SubArray{Float64,1,Vector{Float64},Tuple{UnitRange{Int}},true}}
-
-    function HSDEPoint(model::Models.LinearObjConic)
-        point = new()
-        point.tx = zeros(length(model.c))
-        point.ty = zeros(length(model.b))
-        point.tz = zeros(length(model.h))
-        point.ts = zeros(length(model.h))
-        point.tau = 1.0
-        point.kap = 1.0
-        # point.mu = 1.0
-        point.tz_views = [view(point.tz, idxs) for idxs in model.cone_idxs]
-        point.ts_views = [view(point.ts, idxs) for idxs in model.cone_idxs]
-        point.dual_views = [Cones.use_dual(model.cones[k]) ? point.ts_views[k] : point.tz_views[k] for k in eachindex(model.cones)]
-        point.primal_views = [Cones.use_dual(model.cones[k]) ? point.tz_views[k] : point.ts_views[k] for k in eachindex(model.cones)]
-        return point
-    end
-end
-
-function unscale_point(point::HSDEPoint)
-    point.tx ./= point.tau
-    point.ty ./= point.tau
-    point.tz ./= point.tau
-    point.ts ./= point.tau
-    return point
-end
-
 mutable struct HSDESolver <: IPMSolver
-    model::Models.LinearObjConic # TODO the cone LP type model data
-    # linear_solver::LinearSystems.LinearSystemSolver
+    model::Models.LinearObjConic
+    linear_solver::LinearSystems.LinearSystemSolver
 
     # options
     verbose::Bool
@@ -59,29 +19,44 @@ mutable struct HSDESolver <: IPMSolver
     time_limit::Float64
     combined_nbhd::Float64
 
+    x_conv_tol::Float64
+    y_conv_tol::Float64
+    z_conv_tol::Float64
+
     # point
-    point::HSDEPoint
-    # aux_point::HSDEPoint
+    point::Models.Point
+    tau::Float64
+    kap::Float64
+    mu::Float64
 
-    converge_tol_x::Float64
-    converge_tol_y::Float64
-    converge_tol_z::Float64
+    x_residual::Vector{Float64}
+    y_residual::Vector{Float64}
+    z_residual::Vector{Float64}
+    x_norm_res_t::Float64
+    y_norm_res_t::Float64
+    z_norm_res_t::Float64
+    x_norm_res::Float64
+    y_norm_res::Float64
+    z_norm_res::Float64
 
-    residual_x::Vector{Float64}
-    residual_y::Vector{Float64}
-    residual_z::Vector{Float64}
+    obj_primal_t::Float64
+    obj_dual_t::Float64
+    obj_primal::Float64
+    obj_dual::Float64
+    gap::Float64
+    rel_gap::Float64
 
     # solve info
     status::Symbol
-    num_iters
-    solve_time
-    primal_obj
-    dual_obj
+    num_iters::Int
+    solve_time::Float64
+    primal_obj::Float64
+    dual_obj::Float64
 
     function HSDESolver(
         model::Models.LinearObjConic,
-        # linear_solver::LinearSystems.LinearSystemSolver,
         ;
+        linear_solver_type::Type{<:LinearSystems.LinearSystemSolver} = LinearSystems.CholChol,
         verbose::Bool = true,
         tol_rel_opt = 1e-6,
         tol_abs_opt = 1e-7,
@@ -91,8 +66,9 @@ mutable struct HSDESolver <: IPMSolver
         combined_nbhd::Float64 = 0.1,
         )
         solver = new()
+
         solver.model = model
-        # solver.linear_solver = linear_solver
+        solver.linear_solver = linear_solver_type(model)
 
         solver.verbose = verbose
         solver.tol_rel_opt = tol_rel_opt
@@ -102,39 +78,66 @@ mutable struct HSDESolver <: IPMSolver
         solver.time_limit = time_limit
         solver.combined_nbhd = combined_nbhd
 
-        solver.point = get_initial_point(solver.model)
+        solver.x_conv_tol = inv(max(1.0, norm(model.c)))
+        solver.y_conv_tol = inv(max(1.0, norm(model.b)))
+        solver.z_conv_tol = inv(max(1.0, norm(model.h)))
 
-        # solver.prediction_dir = HSDEPoint(model)
-        # solver.correction_dir = HSDEPoint(model)
+        solver.point = find_initial_point(solver)
+        solver.tau = 1.0
+        solver.kap = 1.0
+        solver.mu = NaN
 
-        solver.converge_tol_x = _get_tol(model.c)
-        solver.converge_tol_y = _get_tol(model.b)
-        solver.converge_tol_z = _get_tol(model.h)
+        solver.x_residual = similar(model.c)
+        solver.y_residual = similar(model.b)
+        solver.z_residual = similar(model.h)
+        solver.x_norm_res_t = NaN
+        solver.y_norm_res_t = NaN
+        solver.z_norm_res_t = NaN
+        solver.x_norm_res = NaN
+        solver.y_norm_res = NaN
+        solver.z_norm_res = NaN
 
-        solver.residual_x = similar(model.c)
-        solver.residual_y = similar(model.b)
-        solver.residual_z = similar(model.h)
+        solver.obj_primal_t = NaN
+        solver.obj_dual_t = NaN
+        solver.obj_primal = NaN
+        solver.obj_dual = NaN
+        solver.gap = NaN
+        solver.rel_gap = NaN
 
         solver.status = :SolveNotCalled
+        solver.num_iters = 0
+        solver.solve_time = NaN
+        solver.primal_obj = NaN
+        solver.dual_obj = NaN
+
         return solver
     end
 end
 
+get_tau(solver::HSDESolver) = solver.tau
+get_kappa(solver::HSDESolver) = solver.kappa
+get_mu(solver::HSDESolver) = solver.mu
 
-get_tau(solver::HSDESolver) = solver.point.tau
-get_kappa(solver::HSDESolver) = solver.point.kappa
-get_mu(solver::HSDESolver) = solver.point.mu
-
-
+# TODO maybe use iteration interface rather than while loop
 function solve(solver::HSDESolver)
     solver.status = :SolveCalled
     start_time = time()
 
-    solver.verbose && @printf("\n%5s %12s %12s %9s %9s %9s %9s %9s %9s %9s\n",
-            "iter", "p_obj", "d_obj", "abs_gap", "rel_gap", "p_inf", "d_inf", "tau", "kap", "mu")
+    calc_mu(solver)
+    if isnan(solver.mu) || abs(1.0 - solver.mu) > 1e-6
+        error("initial mu is $(solver.mu) (should be 1.0)")
+    end
 
-    solver.num_iters = 0
-    while check_convergence(solver)
+    solver.verbose && @printf("\n%5s %12s %12s %9s %9s %9s %9s %9s %9s %9s\n",
+        "iter", "p_obj", "d_obj", "abs_gap", "rel_gap", "p_inf", "d_inf", "tau", "kap", "mu")
+
+    while true
+        calc_residual(solver)
+
+        if check_convergence(solver)
+            break
+        end
+
         if solver.num_iters == solver.max_iters
             solver.verbose && println("iteration limit reached; terminating")
             solver.status = :IterationLimit
@@ -148,13 +151,18 @@ function solve(solver::HSDESolver)
         end
 
         # TODO may use different function, or function could change during some iteration eg if numerical difficulties
-        (point, mu) = combined_predict_correct(point, residual, mu, solver)
+        combined_predict_correct(solver)
 
         solver.num_iters += 1
     end
 
     # calculate result and iteration statistics and finish
-    unscale_point(solver.point)
+    point = solver.point
+    point.x ./= solver.tau
+    point.y ./= solver.tau
+    point.z ./= solver.tau
+    point.s ./= solver.tau
+
     solver.solve_time = time() - start_time
 
     if solver.verbose
@@ -165,25 +173,30 @@ function solve(solver::HSDESolver)
 end
 
 function check_convergence(solver::HSDESolver)
-    # TODO maybe instead store all the convergence details of the point inside the point
-    (norm_res_x, norm_res_tx) = _get_residual_x(residual_x, point, model)
-    (norm_res_y, norm_res_ty) = _get_residual_y(residual_y, point, model)
-    (norm_res_z, norm_res_tz) = _get_residual_z(residual_z, point, model)
-    norm_res_primal = max(norm_res_ty * converge_tol_y, norm_res_tz * converge_tol_z)
-    norm_res_dual = norm_res_tx * converge_tol_x
+    model = solver.model
+    point = solver.point
 
-    obj_t_primal = dot(model.c, point.tx)
-    obj_t_dual = -dot(model.b, point.ty) - dot(model.h, point.tz)
-    obj_primal = obj_t_primal / point.tau
-    obj_dual = obj_t_dual / point.tau
-    gap = dot(point.tz, point.ts) # TODO maybe should adapt original Alfonso condition instead of using this CVXOPT condition
-    rel_gap = _get_rel_gap(obj_primal, obj_dual, gap)
+    norm_res_primal = max(solver.y_norm_res * solver.y_conv_tol, solver.z_norm_res * solver.z_conv_tol)
+    norm_res_dual = solver.x_norm_res * solver.x_conv_tol
+
+    solver.obj_primal_t = dot(model.c, point.x)
+    solver.obj_dual_t = -dot(model.b, point.y) - dot(model.h, point.z)
+    solver.obj_primal = solver.obj_primal_t / solver.tau
+    solver.obj_dual = solver.obj_dual_t / solver.tau
+    solver.gap = dot(point.z, point.s) # TODO maybe should adapt original Alfonso condition instead of using this CVXOPT condition
+    if solver.obj_primal < 0.0
+        solver.rel_gap = solver.gap / -solver.obj_primal
+    elseif solver.obj_dual > 0.0
+        solver.rel_gap = solver.gap / solver.obj_dual
+    else
+        solver.rel_gap = NaN
+    end
 
     # print iteration statistics
     if solver.verbose
         @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n",
-            solver.num_iters, obj_primal, obj_dual, gap, rel_gap,
-            norm_res_primal, norm_res_dual, point.tau, point.kap, mu
+            solver.num_iters, solver.obj_primal, solver.obj_dual, solver.gap, solver.rel_gap,
+            norm_res_primal, norm_res_dual, solver.tau, solver.kap, solver.mu
             )
         flush(stdout)
     end
@@ -191,297 +204,180 @@ function check_convergence(solver::HSDESolver)
     # check convergence criteria
     # TODO nearly primal or dual infeasible or nearly optimal cases?
     if norm_res_primal <= solver.tol_feas && norm_res_dual <= solver.tol_feas &&
-        (gap <= solver.tol_abs_opt || (!isnan(rel_gap) && rel_gap <= solver.tol_rel_opt))
+        (solver.gap <= solver.tol_abs_opt || (!isnan(solver.rel_gap) && solver.rel_gap <= solver.tol_rel_opt))
         solver.verbose && println("optimal solution found; terminating")
         solver.status = :Optimal
-        return false
+        return true
     end
-    if obj_t_dual > 0.0
-        infres_pr = norm_res_x * converge_tol_x / obj_t_dual
+    if solver.obj_dual_t > 0.0
+        infres_pr = solver.x_norm_res_t * solver.x_conv_tol / solver.obj_dual_t
         if infres_pr <= solver.tol_feas
             solver.verbose && println("primal infeasibility detected; terminating")
             solver.status = :PrimalInfeasible
-            return false
+            return true
         end
     end
-    if obj_t_primal < 0.0
-        infres_du = -max(norm_res_y * converge_tol_y, norm_res_z * converge_tol_z) / obj_t_primal
+    if solver.obj_primal_t < 0.0
+        infres_du = -max(solver.y_norm_res_t * solver.y_conv_tol, solver.z_norm_res_t * solver.z_conv_tol) / solver.obj_primal_t
         if infres_du <= solver.tol_feas
             solver.verbose && println("dual infeasibility detected; terminating")
             solver.status = :DualInfeasible
-            return false
+            return true
         end
     end
-    if mu <= solver.tol_feas * 1e-2 && point.tau <= solver.tol_feas * 1e-2 * min(1.0, point.kap)
+    if solver.mu <= solver.tol_feas * 1e-2 && solver.tau <= solver.tol_feas * 1e-2 * min(1.0, solver.kap)
         solver.verbose && println("ill-posedness detected; terminating")
         solver.status = :IllPosed
-        return false
+        return true
     end
 
-    return true
+    return false
 end
 
-
-function combined_predict_correct(point::HSDEPoint, residual::HSDEPoint, mu::Float64, solver::HSDESolver)
-    cones = solver.model.cones
-    (n, p, q) = (model.n, model.p, model.q)
-
+function combined_predict_correct(solver::HSDESolver)
     # calculate prediction and correction directions
+    (x_dirs, y_dirs, z_dirs, s_dirs, tau_dirs, kap_dirs) = get_combined_directions(solver)
 
-    LHS[n+p+q+1, end] = mu / point.tau / point.tau
-    for k in eachindex(cones)
-        cone_k = cones[k]
-        # TODO stepped to this point so should already have called check_in_cone for the point
-        Cones.load_point(cone_k, point.primal_views[k])
-        @assert Cones.check_in_cone(cone_k)
-        rows = (n + p) .+ model.cone_idxs[k]
-        cols = Cones.use_dual(cone_k) ? rows : (q + 1) .+ rows
-        LHS[rows, cols] = mu * Cones.hess(cone_k)
-    end
-
-    rhs = [
-        residual_x  zeros(n);
-        residual_y  zeros(p);
-        zeros(q)    zeros(q);
-        -point.kap  -point.kap + mu / point.tau;
-        residual_z  zeros(q);
-        point.kap + obj_t_primal - obj_t_dual  0.0;
-        ]
-    for k in eachindex(cones)
-        rows = (n + p) .+ model.cone_idxs[k]
-        rhs[rows, 1] = -point.dual_views[k]
-        rhs[rows, 2] = -point.dual_views[k] - mu * Cones.grad(cones[k])
-    end
-
-    F = lu(LHS)
-    ldiv!(F, rhs)
-
-    # affine phase
-    # affine_direction = construct_affine_direction(direction_solution, mu, solver)
-    @. @views begin
-        predict.tx = rhs[1:n, 1]
-        predict.ty = rhs[(n + 1):(n + p), 1]
-        predict.tz = rhs[(n + p + 1):(n + p + q), 1]
-        predict.ts = rhs[(n + p + q + 2):(n + p + 2q + 1), 1]
-    end
-    predict.kap = rhs[n + p + q + 1, 1]
-    predict.tau = rhs[n + p + 2q + 2, 1]
-
-    # affine_alpha = get_max_alpha(point, predict, solver)
-    affine_alpha = get_max_alpha_in_nbhd(point, predict, mu, 0.99, solver)
-
-
-    # # NOTE step in corrector direction here: not in description of algorithms?
-    # @. @views begin
-    #     correct.tx = rhs[1:n, 2]
-    #     correct.ty = rhs[(n + 1):(n + p), 2]
-    #     correct.tz = rhs[(n + p + 1):(n + p + q), 2]
-    #     correct.ts = rhs[(n + p + q + 2):(n + p + 2q + 1), 2]
-    # end
-    # correct.kap = rhs[n + p + q + 1, 2]
-    # correct.tau = rhs[n + p + 2q + 2, 2]
-    #
-    # point = step_in_direction(point, correct, 1.0)
-    # mu = get_mu(point, model)
-
-
-    # combined phase
+    affine_alpha = find_max_alpha_in_nbhd(view(z_dirs, :, 1), view(s_dirs, :, 1), tau_dirs[1], kap_dirs[1], 0.99, solver)
     gamma = (1.0 - affine_alpha)^3 # TODO allow different function (heuristic)
     # @show gamma
 
-    # direction = construct_combined_direction(direction_solution, mu, gamma, solver)
-    combined_rhs = rhs * vcat(1.0 - gamma, gamma)
-    combined = predict
-    @. @views begin
-        combined.tx = combined_rhs[1:n]
-        combined.ty = combined_rhs[(n + 1):(n + p)]
-        combined.tz = combined_rhs[(n + p + 1):(n + p + q)]
-        combined.ts = combined_rhs[(n + p + q + 2):(n + p + 2q + 1)]
-    end
-    combined.kap = combined_rhs[n + p + q + 1]
-    combined.tau = combined_rhs[n + p + 2q + 2]
+    comb_scaling = vcat(1.0 - gamma, gamma)
+    z_comb = z_dirs * comb_scaling
+    s_comb = s_dirs * comb_scaling
+    tau_comb = (tau_dirs * comb_scaling)[1]
+    kap_comb = (kap_dirs * comb_scaling)[1]
+    alpha = find_max_alpha_in_nbhd(z_comb, s_comb, tau_comb, kap_comb, solver.combined_nbhd, solver)
 
-    alpha = get_max_alpha_in_nbhd(point, combined, mu, solver.combined_nbhd, solver)
-
-    point = step_in_direction(point, combined, alpha)
-    mu = get_mu(point, model)
+    point = solver.point
+    x_comb = x_dirs * comb_scaling
+    y_comb = y_dirs * comb_scaling
+    @. point.x += alpha * x_comb
+    @. point.y += alpha * y_comb
+    @. point.z += alpha * z_comb
+    @. point.s += alpha * s_comb
+    solver.tau += alpha * tau_comb
+    solver.kap += alpha * kap_comb
+    calc_mu(solver)
 
     return point
 end
 
-function solve_linear_system(mu, solver)
+function get_combined_directions(solver::HSDESolver)
+    model = solver.model
+    cones = model.cones
+    cone_idxs = model.cone_idxs
+    mu = solver.mu
 
     # 3 columns:
     # 1) fixed c b h
     # 2) predictor rhs (residual)
     # 3) corrector rhs (zero)
     # TODO prealloc, also note first col and some of 3rd col don't change
-    # rhs_x = [-model.c residual_x zeros(model.n)]
-    # rhs_y = [-model.b residual_y zeros(model.p)]
-    # rhs_z = [-model.h residual_z zeros(model.q)]
+    x_rhs = [-model.c  solver.x_residual   zeros(model.n)]
+    y_rhs = [model.b   -solver.y_residual  zeros(model.p)]
+    z_rhs = zeros(model.q, 3)
 
-    # TODO cache
-    @. yi[:, 1] = L.b
-    @. yi[:, 2] = -rhs_ty
-    @. xi[:, 1] = -L.c
-    @. xi[:, 2] = rhs_tx
-    z1 = view(zi, :, 1)
-    z2 = view(zi, :, 2)
+    for k in eachindex(cones)
+        cone_k = cones[k]
+        idxs = cone_idxs[k]
 
+        # first column
+        z1_k = view(z_rhs, idxs, 1)
+        h_k = view(model.h, idxs)
+        if cone_k.use_dual
+            z1_k .= Cones.inv_hess(cone_k) * (h_k ./ mu)
+        else
+            z1_k .= Cones.hess(cone_k) * (h_k .* mu)
+        end
 
+        # second column
+        z2_k = view(z_rhs, idxs, 2)
+        z_k = solver.point.dual_views[k]
+        s_k = solver.z_residual[idxs]
+        if cone_k.use_dual
+            z2_k .= Cones.inv_hess(cone_k) * ((z_k - s_k) ./ mu)
+        else
+            z2_k .= z_k - Cones.hess(cone_k) * (s_k .* mu)
+        end
 
-
-    # eliminate
-
-    # calculate z2
-    @. z2 = -rhs_tz
-    for k in eachindex(L.cone.cones)
-        a1k = view(z1, L.cone.idxs[k])
-        a2k = view(z2, L.cone.idxs[k])
-        a3k = view(rhs_ts, L.cone.idxs[k])
-        if L.cone.cones[k].use_dual
-            @. a1k = a2k - a3k
-            Cones.calcHiarr!(a2k, a1k, L.cone.cones[k])
-            a2k ./= mu
-        elseif !iszero(a3k) # TODO rhs_ts = 0 for correction steps, so can just check if doing correction
-            Cones.calcHarr!(a1k, a3k, L.cone.cones[k])
-            @. a2k -= mu * a1k
+        # third column
+        z3_k = view(z_rhs, idxs, 3)
+        z_k = solver.point.dual_views[k] + (Cones.grad(cones[k]) .* mu)
+        if cone_k.use_dual
+            z3_k .= Cones.inv_hess(cone_k) * (z_k ./ mu)
+        else
+            z3_k .= Cones.hess(cone_k) * (z_k .* mu)
         end
     end
-
-    # calculate z1
-    if iszero(L.h) # TODO can check once when creating cache
-        z1 .= 0.0
-    else
-        for k in eachindex(L.cone.cones)
-            a1k = view(L.h, L.cone.idxs[k])
-            a2k = view(z1, L.cone.idxs[k])
-            if L.cone.cones[k].use_dual
-                Cones.calcHiarr!(a2k, a1k, L.cone.cones[k])
-                a2k ./= mu
-            else
-                Cones.calcHarr!(a2k, a1k, L.cone.cones[k])
-                a2k .*= mu
-            end
-        end
-    end
-
 
     # call 3x3 solve routine
-    (x_sol, y_sol, z_sol) = LinearSystems.solve(solver.linear_solver, x_rhs, y_rhs, z_rhs)
+    (x_sol, y_sol, z_sol) = LinearSystems.solve_linear_system(x_rhs, y_rhs, z_rhs, mu, model, solver.linear_solver)
 
-
-
+    x1 = view(x_sol, :, 1)
+    y1 = view(y_sol, :, 1)
+    z1 = view(z_sol, :, 1)
+    x23 = view(x_sol, :, 2:3)
+    y23 = view(y_sol, :, 2:3)
+    z23 = view(z_sol, :, 2:3)
 
     # reconstruct using matrix operations
-    dir_tau = (rhs_tau + rhs_kap + dot(L.c, xi[:, 2]) + dot(L.b, yi[:, 2]) + dot(L.h, z2)) /
-        (mu / tau / tau - dot(L.c, xi[:, 1]) - dot(L.b, yi[:, 1]) - dot(L.h, z1))
+    tau_rhs = [solver.kap + solver.obj_primal_t - solver.obj_dual_t  0.0]
+    kap_rhs = [-solver.kap  -solver.kap + mu / solver.tau]
+    tau_dirs_num = tau_rhs + kap_rhs + model.c' * x23 + model.b' * y23 + model.h' * z23
+    tau_dirs_den = mu / solver.tau / solver.tau - dot(model.c, x1) - dot(model.b, y1) - dot(model.h, z1)
+    tau_dirs = tau_dirs_num ./ tau_dirs_den
 
-    rhs_tx = xi[:, 2] + dir_tau * xi[:, 1]
-    rhs_ty = yi[:, 2] + dir_tau * yi[:, 1]
-    rhs_tz = z2 + dir_tau * z1
+    x_dirs = x23 + x1 * tau_dirs
+    y_dirs = y23 + y1 * tau_dirs
+    z_dirs = z23 + z1 * tau_dirs
 
-    mul!(z1, L.G, rhs_tx)
-    @. rhs_ts = -z1 + L.h * dir_tau - rhs_ts
-    dir_kap = -dot(L.c, rhs_tx) - dot(L.b, rhs_ty) - dot(L.h, rhs_tz) - rhs_tau
+    s_dirs = -model.G * x_dirs + model.h * tau_dirs - [solver.z_residual  zeros(model.q)]
+    kap_dirs = -model.c' * x_dirs - model.b' * y_dirs - model.h' * z_dirs - tau_rhs
 
-
-
-
-
-
-    # combine for full prediction and correction directions
-    # TODO maybe prealloc the views
-    x_fix = view(x_sol, :, 1)
-    y_fix = view(y_sol, :, 1)
-    z_fix = view(z_sol, :, 1)
-
-    x_pred = view(x_sol, :, 2)
-    y_pred = view(y_sol, :, 2)
-    z_pred = view(z_sol, :, 2)
-    prediction_direction = construct_direction(prediction_direction, x_fix, y_fix, z_fix, x_pred, y_pred, z_pred, solver)
-
-    x_corr = view(x_sol, :, 3)
-    y_corr = view(y_sol, :, 3)
-    z_corr = view(z_sol, :, 3)
-    correction_direction = construct_direction(correction_direction, x_fix, y_fix, z_fix, x_corr, y_corr, z_corr, solver)
-
-
-
-
-
-    # combine for correction direction
-
-
-
-    return (prediction_direction, correction_direction)
+    return (x_dirs, y_dirs, z_dirs, s_dirs, tau_dirs, kap_dirs)
 end
 
-function construct_direction(direction, x_fix, y_fix, z_fix, x_var, y_var, z_var, solver)
+function calc_residual(solver::HSDESolver)
     model = solver.model
+    point = solver.point
 
-    direction.tau = (rhs_tau + rhs_kap + dot(L.c, xi[:, 2]) + dot(L.b, yi[:, 2]) + dot(L.h, z2)) /
-        (mu / tau / tau - dot(L.c, xi[:, 1]) - dot(L.b, yi[:, 1]) - dot(L.h, z1))
-    @. @views rhs_tx = xi[:, 2] + dir_tau * xi[:, 1]
-    @. @views rhs_ty = yi[:, 2] + dir_tau * yi[:, 1]
-    @. rhs_tz = z2 + dir_tau * z1
+    # x_residual = -A'*y - G'*z - c*tau
+    x_residual = solver.x_residual
+    x_residual .= -model.A' * point.y - model.G' * point.z # TODO remove allocs
+    solver.x_norm_res_t = norm(x_residual)
+    @. x_residual -= model.c * solver.tau
+    solver.x_norm_res = norm(x_residual) / solver.tau
 
-    mul!(z1, L.G, rhs_tx)
-    @. rhs_ts = -z1 + L.h * dir_tau - rhs_ts
-    dir_kap = -dot(L.c, rhs_tx) - dot(L.b, rhs_ty) - dot(L.h, rhs_tz) - rhs_tau
+    # y_residual = A*x - b*tau
+    y_residual = solver.y_residual
+    mul!(y_residual, model.A, point.x)
+    solver.y_norm_res_t = norm(y_residual)
+    @. y_residual -= model.b * solver.tau
+    solver.y_norm_res = norm(y_residual) / solver.tau
 
-    return direction
+    # z_residual = s + G*x - h*tau
+    z_residual = solver.z_residual
+    mul!(z_residual, model.G, point.x)
+    @. z_residual += point.s
+    solver.z_norm_res_t = norm(z_residual)
+    @. z_residual -= model.h * solver.tau
+    solver.z_norm_res = norm(z_residual) / solver.tau
+
+    return
 end
 
-
-
-_get_tol(v::Vector{Float64}) = inv(max(1.0, norm(v)))
-
-function _get_rel_gap(obj_primal::Float64, obj_dual::Float64, gap::Float64)
-    if obj_primal < 0.0
-        return gap / -obj_primal
-    elseif obj_dual > 0.0
-        return gap / obj_dual
-    else
-        return NaN
-    end
+function calc_mu(solver::HSDESolver)
+    solver.mu = (dot(solver.point.z, solver.point.s) + solver.tau * solver.kap) /
+        (1.0 + solver.model.nu)
+    return solver.mu
 end
 
-function _get_residual_x(residual_x::Vector{Float64}, point::HSDEPoint, model::Models.LinearObjConic)
-    # residual_x = -A'*ty - G'*tz - c*tau
-    residual_x .= -model.A' * point.ty - model.G' * point.tz # TODO remove allocs
-    norm_res_x = norm(residual_x)
-    @. residual_x -= model.c * point.tau
-    norm_res_tx = norm(residual_x) / point.tau
-    return (norm_res_x, norm_res_tx)
-end
-
-function _get_residual_y(residual_y::Vector{Float64}, point::HSDEPoint, model::Models.LinearObjConic)
-    # residual_y = A*tx - b*tau
-    mul!(residual_y, model.A, point.tx)
-    norm_res_y = norm(residual_y)
-    @. residual_y -= model.b * point.tau
-    norm_res_ty = norm(residual_y) / point.tau
-    return (norm_res_y, norm_res_ty)
-end
-
-function _get_residual_z(residual_z::Vector{Float64}, point::HSDEPoint, model::Models.LinearObjConic)
-    # residual_z = ts + G*tx - h*tau
-    mul!(residual_z, model.G, point.tx)
-    @. residual_z += point.ts
-    norm_res_z = norm(residual_z)
-    @. residual_z -= model.h * point.tau
-    norm_res_tz = norm(residual_z) / point.tau
-    return (norm_res_z, norm_res_tz)
-end
-
-get_mu(point::HSDEPoint, model::Models.LinearObjConic) =
-    (dot(point.tz, point.ts) + point.tau * point.kap) / (1.0 + model.nu)
-
-function get_initial_point(model::Models.LinearObjConic)
-    point = HSDEPoint(model)
-
+function find_initial_point(solver::HSDESolver)
+    model = solver.model
     cones = model.cones
+    point = Models.Point(model)
+
     for k in eachindex(cones)
         cone_k = cones[k]
         primal_k = point.primal_views[k]
@@ -491,65 +387,51 @@ function get_initial_point(model::Models.LinearObjConic)
         point.dual_views[k] .= -Cones.grad(cone_k)
     end
 
-    # solve for ty
+    # solve for y
     # A'y = -c - G'z
-    # solve for tx
+    # solve for x
     # Ax = b
-    # Gx = h - ts
-    temp_n = -model.c - model.G' * point.tz # TODO remove allocs
-    temp_p_q = vcat(model.b, model.h - point.ts) # TODO remove allocs
+    # Gx = h - s
+    temp_n = -model.c - model.G' * point.z # TODO remove allocs
+    temp_p_q = vcat(model.b, model.h - point.s) # TODO remove allocs
     # if has_QR(model) # TODO reuse QR from preprocessing
-    #     ldiv!(point.ty, model.At_qr, temp_n)
-    #     ldiv!(point.tx, model.AG_qr, temp_p_q)
+    #     ldiv!(point.y, model.At_qr, temp_n)
+    #     ldiv!(point.x, model.AG_qr, temp_p_q)
     # else
-        if !isempty(point.ty)
+        if !isempty(point.y)
             At_fact = factorize(issparse(model.A) ? sparse(model.A') : Matrix(model.A'))
-            # ldiv!(point.ty, At_fact, temp_n)
-            point.ty .= At_fact \ temp_n
+            # ldiv!(point.y, At_fact, temp_n)
+            point.y .= At_fact \ temp_n
         end
         AG_fact = factorize(vcat(model.A, model.G))
-        # ldiv!(point.tx, AG_fact, temp_p_q)
-        point.tx .= AG_fact \ temp_p_q
+        # ldiv!(point.x, AG_fact, temp_p_q)
+        point.x .= AG_fact \ temp_p_q
     # end
 
-    solver.mu = get_mu(solver.point, solver.model)
-    if isnan(solver.) || abs(1.0 - solver.mu) > 1e-6
-        error("initial mu is $(solver.mu) (should be 1.0)")
-    end
-
     return point
 end
 
-function step_in_direction(point::HSDEPoint, direction::HSDEPoint, alpha::Float64)
-    @. point.tx += alpha * direction.tx
-    @. point.ty += alpha * direction.ty
-    @. point.tz += alpha * direction.tz
-    @. point.ts += alpha * direction.ts
-    point.tau += alpha * direction.tau
-    point.kap += alpha * direction.kap
-    return point
-end
-
-function get_max_alpha_in_nbhd(point::HSDEPoint, direction::HSDEPoint, mu::Float64, nbhd::Float64, solver::HSDESolver)
+function find_max_alpha_in_nbhd(z_dir::AbstractVector{Float64}, s_dir::AbstractVector{Float64}, tau_dir::Float64, kap_dir::Float64, nbhd::Float64, solver::HSDESolver)
+    point = solver.point
     model = solver.model
     cones = model.cones
 
     alpha = 1.0 # TODO maybe start at previous alpha but increased slightly, or use affine_alpha
-    if direction.kap < 0.0
-        alpha = min(alpha, -point.kap / direction.kap)
+    if kap_dir < 0.0
+        alpha = min(alpha, -solver.kap / kap_dir)
     end
-    if direction.tau < 0.0
-        alpha = min(alpha, -point.tau / direction.tau)
+    if tau_dir < 0.0
+        alpha = min(alpha, -solver.tau / tau_dir)
     end
-    # TODO what about mu? quadratic equation. need dot(ls_ts, ls_tz) + ls_tau * ls_kap > 0
+    # TODO what about mu? quadratic equation. need dot(ls_s, ls_z) + ls_tau * ls_kap > 0
     alpha *= 0.99
 
     # ONLY BACKTRACK, NO FORWARDTRACK
 
-    ls_tz = similar(point.tz) # TODO prealloc
-    ls_ts = similar(point.ts)
-    primal_views = [view(Cones.use_dual(cones[k]) ? ls_tz : ls_ts, model.cone_idxs[k]) for k in eachindex(cones)]
-    dual_views = [view(Cones.use_dual(cones[k]) ? ls_ts : ls_tz, model.cone_idxs[k]) for k in eachindex(cones)]
+    ls_z = similar(point.z) # TODO prealloc
+    ls_s = similar(point.s)
+    primal_views = [view(Cones.use_dual(cones[k]) ? ls_z : ls_s, model.cone_idxs[k]) for k in eachindex(cones)]
+    dual_views = [view(Cones.use_dual(cones[k]) ? ls_s : ls_z, model.cone_idxs[k]) for k in eachindex(cones)]
 
     # cones_outside_nbhd = trues(length(cones))
     # TODO sort cones so that check the ones that failed in-cone check last iteration first
@@ -559,12 +441,12 @@ function get_max_alpha_in_nbhd(point::HSDEPoint, direction::HSDEPoint, mu::Float
     while num_pred_iters < 100
         num_pred_iters += 1
 
-        @. ls_tz = point.tz + alpha * direction.tz
-        @. ls_ts = point.ts + alpha * direction.ts
-        ls_tau = point.tau + alpha * direction.tau
-        ls_kap = point.kap + alpha * direction.kap
+        @. ls_z = point.z + alpha * z_dir
+        @. ls_s = point.s + alpha * s_dir
+        ls_tau = solver.tau + alpha * tau_dir
+        ls_kap = solver.kap + alpha * kap_dir
         ls_tk = ls_tau * ls_kap
-        ls_mu = (dot(ls_ts, ls_tz) + ls_tk) / (1.0 + model.nu)
+        ls_mu = (dot(ls_s, ls_z) + ls_tk) / (1.0 + model.nu)
 
         # accept primal iterate if
         # - decreased alpha and it is the first inside the cone and beta-neighborhood or
@@ -574,7 +456,7 @@ function get_max_alpha_in_nbhd(point::HSDEPoint, direction::HSDEPoint, mu::Float
         #     for k in eachindex(cones)
         #         cone_k = cones[k]
         #         Cones.load_point(cone_k, primal_views[k])
-        #         if !Cones.check_in_cone(cone_k) || get_nbhd(cone_k, dual_views[k], ls_mu) > nbhd
+        #         if !Cones.check_in_cone(cone_k) || calc_neighborhood(cone_k, dual_views[k], ls_mu) > nbhd
         #             in_nbhds = false
         #             break
         #         end
@@ -593,7 +475,13 @@ function get_max_alpha_in_nbhd(point::HSDEPoint, direction::HSDEPoint, mu::Float
                     in_nbhds = false
                     break
                 end
-                full_nbhd_sqr += get_nbhd(cone_k, dual_views[k], ls_mu)
+
+                # TODO no allocs
+                temp = dual_views[k] + ls_mu * Cones.grad(cone_k)
+                # TODO use cholesky L
+                # nbhd = sqrt(temp' * Cones.inv_hess(cone) * temp) / mu
+                full_nbhd_sqr += temp' * Cones.inv_hess(cone_k) * temp
+
                 if full_nbhd_sqr > abs2(ls_mu * nbhd)
                     in_nbhds = false
                     break
@@ -603,7 +491,6 @@ function get_max_alpha_in_nbhd(point::HSDEPoint, direction::HSDEPoint, mu::Float
                 break
             end
         end
-
 
         # iterate is outside the neighborhood: decrease alpha
         alpha *= 0.8 # TODO option for parameter
@@ -616,18 +503,21 @@ function get_max_alpha_in_nbhd(point::HSDEPoint, direction::HSDEPoint, mu::Float
     return alpha
 end
 
-function get_nbhd(cone::Cones.Cone, duals::AbstractVector{Float64}, mu::Float64)
-    # TODO no allocs
-    temp = duals + mu * Cones.grad(cone)
-    # TODO use cholesky L
-    # nbhd = sqrt(temp' * Cones.inv_hess(cone) * temp) / mu
-    nbhd = temp' * Cones.inv_hess(cone) * temp
-    # @show nbhd
-    return nbhd
-end
 
 
-# function get_prediction_direction(point::HSDEPoint, residual::HSDEPoint, solver::HSDESolver)
+
+# function calc_neighborhood(cone::Cones.Cone, duals::AbstractVector{Float64}, mu::Float64)
+#     # TODO no allocs
+#     temp = duals + mu * Cones.grad(cone)
+#     # TODO use cholesky L
+#     # nbhd = sqrt(temp' * Cones.inv_hess(cone) * temp) / mu
+#     nbhd = temp' * Cones.inv_hess(cone) * temp
+#     # @show nbhd
+#     return nbhd
+# end
+
+
+# function get_prediction_direction(point::Models.Point, residual::Models.Point, solver::HSDESolver)
 #     for k in eachindex(solver.model.cones)
 #         @. residual.tz_views[k] = -point.primal_views[k]
 #     end
@@ -636,7 +526,7 @@ end
 #     return LinearSystems.solvelinsys6!(point, residual, mu, solver)
 # end
 
-# function get_correction_direction(point::HSDEPoint, solver::HSDESolver)
+# function get_correction_direction(point::Models.Point, solver::HSDESolver)
 #     corr_rhs = solver.aux_point
 #     @. corr_rhs.tx = 0.0
 #     @. corr_rhs.ty = 0.0
@@ -650,7 +540,7 @@ end
 #     return LinearSystems.solvelinsys6!(point, corr_rhs, mu, solver)
 # end
 
-# function predict_then_correct(point::HSDEPoint, residual::HSDEPoint, mu::Float64, solver::HSDESolver)
+# function predict_then_correct(point::Models.Point, residual::Models.Point, mu::Float64, solver::HSDESolver)
 #     cones = solver.model.cones
 #
 #     # prediction phase
@@ -710,4 +600,119 @@ end
 #             return (0.2844, 0.0332, 0.0525)
 #         end
 #     end
+# end
+
+
+# function construct_direction(direction, x_fix, y_fix, z_fix, x_var, y_var, z_var, solver)
+#     model = solver.model
+#
+#     direction.tau = (rhs_tau + rhs_kap + dot(L.c, xi[:, 2]) + dot(L.b, yi[:, 2]) + dot(L.h, z2)) /
+#         (mu / tau / tau - dot(L.c, xi[:, 1]) - dot(L.b, yi[:, 1]) - dot(L.h, z1))
+#     @. @views rhs_tx = xi[:, 2] + tau_dirs * xi[:, 1]
+#     @. @views rhs_ty = yi[:, 2] + tau_dirs * yi[:, 1]
+#     @. rhs_tz = z2 + tau_dirs * z1
+#
+#     mul!(z1, L.G, rhs_tx)
+#     @. rhs_ts = -z1 + L.h * tau_dirs - rhs_ts
+#     kap_dirs = -dot(L.c, rhs_tx) - dot(L.b, rhs_ty) - dot(L.h, rhs_tz) - rhs_tau
+#
+#     return direction
+# end
+
+
+# function step_in_direction(point::Models.Point, direction::Models.Point, alpha::Float64)
+#     @. point.tx += alpha * direction.tx
+#     @. point.ty += alpha * direction.ty
+#     @. point.tz += alpha * direction.tz
+#     @. point.ts += alpha * direction.ts
+#     point.tau += alpha * direction.tau
+#     point.kap += alpha * direction.kap
+#     return point
+# end
+
+# function combined_predict_correct(point::Models.Point, residual::Models.Point, mu::Float64, solver::HSDESolver)
+#     cones = solver.model.cones
+#     (n, p, q) = (model.n, model.p, model.q)
+#
+#     # calculate prediction and correction directions
+#
+#     LHS[n+p+q+1, end] = mu / point.tau / point.tau
+#     for k in eachindex(cones)
+#         cone_k = cones[k]
+#         # TODO stepped to this point so should already have called check_in_cone for the point
+#         Cones.load_point(cone_k, point.primal_views[k])
+#         @assert Cones.check_in_cone(cone_k)
+#         rows = (n + p) .+ model.cone_idxs[k]
+#         cols = Cones.use_dual(cone_k) ? rows : (q + 1) .+ rows
+#         LHS[rows, cols] = mu * Cones.hess(cone_k)
+#     end
+#
+#     rhs = [
+#         x_residual  zeros(n);
+#         y_residual  zeros(p);
+#         zeros(q)    zeros(q);
+#         -point.kap  -point.kap + mu / point.tau;
+#         z_residual  zeros(q);
+#         point.kap + obj_primal_t - obj_dual_t  0.0;
+#         ]
+#     for k in eachindex(cones)
+#         rows = (n + p) .+ model.cone_idxs[k]
+#         rhs[rows, 1] = -point.dual_views[k]
+#         rhs[rows, 2] = -point.dual_views[k] - mu * Cones.grad(cones[k])
+#     end
+#
+#     F = lu(LHS)
+#     ldiv!(F, rhs)
+#
+#     # affine phase
+#     # affine_direction = construct_affine_direction(direction_solution, mu, solver)
+#     @. @views begin
+#         predict.tx = rhs[1:n, 1]
+#         predict.ty = rhs[(n + 1):(n + p), 1]
+#         predict.tz = rhs[(n + p + 1):(n + p + q), 1]
+#         predict.ts = rhs[(n + p + q + 2):(n + p + 2q + 1), 1]
+#     end
+#     predict.kap = rhs[n + p + q + 1, 1]
+#     predict.tau = rhs[n + p + 2q + 2, 1]
+#
+#     # affine_alpha = get_max_alpha(point, predict, solver)
+#     affine_alpha = find_max_alpha_in_nbhd(point, predict, mu, 0.99, solver)
+#
+#
+#     # # NOTE step in corrector direction here: not in description of algorithms?
+#     # @. @views begin
+#     #     correct.tx = rhs[1:n, 2]
+#     #     correct.ty = rhs[(n + 1):(n + p), 2]
+#     #     correct.tz = rhs[(n + p + 1):(n + p + q), 2]
+#     #     correct.ts = rhs[(n + p + q + 2):(n + p + 2q + 1), 2]
+#     # end
+#     # correct.kap = rhs[n + p + q + 1, 2]
+#     # correct.tau = rhs[n + p + 2q + 2, 2]
+#     #
+#     # point = step_in_direction(point, correct, 1.0)
+#     # mu = get_mu(point, model)
+#
+#
+#     # combined phase
+#     gamma = (1.0 - affine_alpha)^3 # TODO allow different function (heuristic)
+#     # @show gamma
+#
+#     # direction = construct_combined_direction(direction_solution, mu, gamma, solver)
+#     combined_rhs = rhs * vcat(1.0 - gamma, gamma)
+#     combined = predict
+#     @. @views begin
+#         combined.tx = combined_rhs[1:n]
+#         combined.ty = combined_rhs[(n + 1):(n + p)]
+#         combined.tz = combined_rhs[(n + p + 1):(n + p + q)]
+#         combined.ts = combined_rhs[(n + p + q + 2):(n + p + 2q + 1)]
+#     end
+#     combined.kap = combined_rhs[n + p + q + 1]
+#     combined.tau = combined_rhs[n + p + 2q + 2]
+#
+#     alpha = find_max_alpha_in_nbhd(point, combined, mu, solver.combined_nbhd, solver)
+#
+#     point = step_in_direction(point, combined, alpha)
+#     mu = get_mu(point, model)
+#
+#     return point
 # end
