@@ -115,7 +115,7 @@ mutable struct HSDESolver <: IPMSolver
 end
 
 get_tau(solver::HSDESolver) = solver.tau
-get_kappa(solver::HSDESolver) = solver.kappa
+get_kappa(solver::HSDESolver) = solver.kap
 get_mu(solver::HSDESolver) = solver.mu
 
 # TODO maybe use iteration interface rather than while loop
@@ -269,68 +269,78 @@ function get_combined_directions(solver::HSDESolver)
     cone_idxs = model.cone_idxs
     mu = solver.mu
 
-    # 3 columns:
-    # 1) fixed c b h
-    # 2) predictor rhs (residual)
-    # 3) corrector rhs (zero)
+    # 2 columns:
+    # 1) predictor/affine rhs
+    # 2) corrector rhs
     # TODO prealloc, also note first col and some of 3rd col don't change
-    x_rhs = [-model.c  solver.x_residual   zeros(model.n)]
-    y_rhs = [model.b   -solver.y_residual  zeros(model.p)]
-
+    x_rhss = hcat(solver.x_residual, zeros(model.n))
+    y_rhss = hcat(solver.y_residual, zeros(model.p))
+    z_rhss = zeros(model.q, 2)
     for k in eachindex(cones)
-        cone_k = cones[k]
-        idxs = cone_idxs[k]
-
-        # first column
-        h_k = view(model.h, idxs)
-        if cone_k.use_dual
-            z_rhs[idxs, 1] = Cones.inv_hess(cone_k) * (h_k ./ mu)
-        else
-            z_rhs[idxs, 1] = Cones.hess(cone_k) * (h_k .* mu)
-        end
-
-        # second column
-        z_k = solver.point.dual_views[k]
-        s_k = solver.z_residual[idxs]
-        if cone_k.use_dual
-            z_rhs[idxs, 2] = Cones.inv_hess(cone_k) * ((z_k - s_k) ./ mu)
-        else
-            z_rhs[idxs, 2] = z_k - Cones.hess(cone_k) * (s_k .* mu)
-        end
-
-        # third column
-        z_k = solver.point.dual_views[k] + (Cones.grad(cones[k]) .* mu)
-        if cone_k.use_dual
-            z_rhs[idxs, 3] = Cones.inv_hess(cone_k) * (z_k ./ mu)
-        else
-            # z_rhs[idxs, 3] = Cones.hess(cone_k) * (z_k .* mu)
-            z_rhs[idxs, 3] = z_k
-        end
+        idxs = model.cone_idxs[k]
+        z_rhss[idxs, 1] = -point.dual_views[k]
+        z_rhss[idxs, 2] = -point.dual_views[k] - mu * Cones.grad(cones[k])
     end
+    s_rhss = hcat(solver.z_residual, zeros(model.q))
+    kap_rhss = hcat(-solver.kap, -solver.kap + mu / solver.tau)
+    tau_rhss = hcat(solver.kap + solver.obj_primal_t - solver.obj_dual_t, 0.0)
 
-    # call 3x3 solve routine
-    (x_sol, y_sol, z_sol) = LinearSystems.solve_linear_system(x_rhs, y_rhs, z_rhs, mu, model, solver.linear_solver)
+    (x_dirs, y_dirs, z_dirs, s_dirs, tau_dirs, kap_dirs) = LinearSystems.solve_linear_system(x_rhss, y_rhss, z_rhss, s_rhss, kap_rhss, tau_rhss, solver.linear_solver, solver)
 
-    x1 = view(x_sol, :, 1)
-    y1 = view(y_sol, :, 1)
-    z1 = view(z_sol, :, 1)
-    x23 = view(x_sol, :, 2:3)
-    y23 = view(y_sol, :, 2:3)
-    z23 = view(z_sol, :, 2:3)
+    # for k in eachindex(cones)
+    #     cone_k = cones[k]
+    #     idxs = cone_idxs[k]
+    #
+    #     # first column
+    #     h_k = view(model.h, idxs)
+    #     if cone_k.use_dual
+    #         z_rhs[idxs, 1] = Cones.inv_hess(cone_k) * (h_k ./ mu)
+    #     else
+    #         z_rhs[idxs, 1] = Cones.hess(cone_k) * (h_k .* mu)
+    #     end
+    #
+    #     # second column
+    #     z_k = solver.point.dual_views[k]
+    #     s_k = solver.z_residual[idxs]
+    #     if cone_k.use_dual
+    #         z_rhs[idxs, 2] = Cones.inv_hess(cone_k) * ((z_k - s_k) ./ mu)
+    #     else
+    #         z_rhs[idxs, 2] = z_k - Cones.hess(cone_k) * (s_k .* mu)
+    #     end
+    #
+    #     # third column
+    #     z_k = solver.point.dual_views[k] + (Cones.grad(cones[k]) .* mu)
+    #     if cone_k.use_dual
+    #         z_rhs[idxs, 3] = Cones.inv_hess(cone_k) * (z_k ./ mu)
+    #     else
+    #         # z_rhs[idxs, 3] = Cones.hess(cone_k) * (z_k .* mu)
+    #         z_rhs[idxs, 3] = z_k
+    #     end
+    # end
 
-    # reconstruct using matrix operations
-    tau_rhs = [solver.kap + solver.obj_primal_t - solver.obj_dual_t  0.0]
-    kap_rhs = [-solver.kap  -solver.kap + mu / solver.tau]
-    tau_dirs_num = tau_rhs + kap_rhs + model.c' * x23 + model.b' * y23 + model.h' * z23
-    tau_dirs_den = mu / solver.tau / solver.tau - dot(model.c, x1) - dot(model.b, y1) - dot(model.h, z1)
-    tau_dirs = tau_dirs_num ./ tau_dirs_den
-
-    x_dirs = x23 + x1 * tau_dirs
-    y_dirs = y23 + y1 * tau_dirs
-    z_dirs = z23 + z1 * tau_dirs
-
-    s_dirs = -model.G * x_dirs + model.h * tau_dirs - [solver.z_residual  zeros(model.q)]
-    kap_dirs = -model.c' * x_dirs - model.b' * y_dirs - model.h' * z_dirs - tau_rhs
+    # # call 3x3 solve routine
+    # (x_sol, y_sol, z_sol) = LinearSystems.solve_linear_system(x_rhs, y_rhs, z_rhs, mu, model, solver.linear_solver)
+    #
+    # x1 = view(x_sol, :, 1)
+    # y1 = view(y_sol, :, 1)
+    # z1 = view(z_sol, :, 1)
+    # x23 = view(x_sol, :, 2:3)
+    # y23 = view(y_sol, :, 2:3)
+    # z23 = view(z_sol, :, 2:3)
+    #
+    # # reconstruct using matrix operations
+    # tau_rhs = [solver.kap + solver.obj_primal_t - solver.obj_dual_t  0.0]
+    # kap_rhs = [-solver.kap  -solver.kap + mu / solver.tau]
+    # tau_dirs_num = tau_rhs + kap_rhs + model.c' * x23 + model.b' * y23 + model.h' * z23
+    # tau_dirs_den = mu / solver.tau / solver.tau - dot(model.c, x1) - dot(model.b, y1) - dot(model.h, z1)
+    # tau_dirs = tau_dirs_num ./ tau_dirs_den
+    #
+    # x_dirs = x23 + x1 * tau_dirs
+    # y_dirs = y23 + y1 * tau_dirs
+    # z_dirs = z23 + z1 * tau_dirs
+    #
+    # s_dirs = -model.G * x_dirs + model.h * tau_dirs - [solver.z_residual  zeros(model.q)]
+    # kap_dirs = -model.c' * x_dirs - model.b' * y_dirs - model.h' * z_dirs - tau_rhs
 
     return (x_dirs, y_dirs, z_dirs, s_dirs, tau_dirs, kap_dirs)
 end
