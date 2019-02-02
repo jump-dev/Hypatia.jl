@@ -276,38 +276,35 @@ function get_combined_directions(solver::HSDESolver)
     # TODO prealloc, also note first col and some of 3rd col don't change
     x_rhs = [-model.c  solver.x_residual   zeros(model.n)]
     y_rhs = [model.b   -solver.y_residual  zeros(model.p)]
-    z_rhs = zeros(model.q, 3)
 
     for k in eachindex(cones)
         cone_k = cones[k]
         idxs = cone_idxs[k]
 
         # first column
-        z1_k = view(z_rhs, idxs, 1)
         h_k = view(model.h, idxs)
         if cone_k.use_dual
-            z1_k .= Cones.inv_hess(cone_k) * (h_k ./ mu)
+            z_rhs[idxs, 1] = Cones.inv_hess(cone_k) * (h_k ./ mu)
         else
-            z1_k .= Cones.hess(cone_k) * (h_k .* mu)
+            z_rhs[idxs, 1] = Cones.hess(cone_k) * (h_k .* mu)
         end
 
         # second column
-        z2_k = view(z_rhs, idxs, 2)
         z_k = solver.point.dual_views[k]
         s_k = solver.z_residual[idxs]
         if cone_k.use_dual
-            z2_k .= Cones.inv_hess(cone_k) * ((z_k - s_k) ./ mu)
+            z_rhs[idxs, 2] = Cones.inv_hess(cone_k) * ((z_k - s_k) ./ mu)
         else
-            z2_k .= z_k - Cones.hess(cone_k) * (s_k .* mu)
+            z_rhs[idxs, 2] = z_k - Cones.hess(cone_k) * (s_k .* mu)
         end
 
         # third column
-        z3_k = view(z_rhs, idxs, 3)
         z_k = solver.point.dual_views[k] + (Cones.grad(cones[k]) .* mu)
         if cone_k.use_dual
-            z3_k .= Cones.inv_hess(cone_k) * (z_k ./ mu)
+            z_rhs[idxs, 3] = Cones.inv_hess(cone_k) * (z_k ./ mu)
         else
-            z3_k .= Cones.hess(cone_k) * (z_k .* mu)
+            # z_rhs[idxs, 3] = Cones.hess(cone_k) * (z_k .* mu)
+            z_rhs[idxs, 3] = z_k
         end
     end
 
