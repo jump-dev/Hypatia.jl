@@ -7,11 +7,10 @@ MathOptInterface wrapper of Hypatia solver
 mutable struct Optimizer <: MOI.AbstractOptimizer
     verbose::Bool
     time_limit::Float64
-    # linear_solver_type::Type{<:LinearSystems.LinearSystemSolver}
     dense::Bool
 
-    model::Models.LinearObjConic
-    solver::InteriorPoints.HSDESolver
+    model::Models.Linear
+    solver::Solvers.HSDSolver
 
     obj_sense::MOI.OptimizationSense
     obj_const::Float64
@@ -36,7 +35,6 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
         opt = new()
         opt.verbose = verbose
         opt.time_limit = time_limit
-        # opt.linear_solver_type = linear_solver_type
         opt.dense = dense
         opt.status = :NotLoaded
         return opt
@@ -46,7 +44,6 @@ end
 Optimizer(;
     verbose::Bool = false,
     time_limit::Float64 = 3.6e3, # TODO should be Inf
-    # linear_solver_type = LinearSystems.QRSymm,
     dense::Bool = true,
     # tol_rel_opt::Float64 = 1e-6,
     # tol_abs_opt::Float64 = 1e-7,
@@ -459,7 +456,7 @@ function MOI.copy_to(
     end
     model_h = Vector(sparsevec(Ih, Vh, q))
 
-    opt.model = Models.LinearObjConic(model_c, model_A, model_b, model_G, model_h, cones, cone_idxs)
+    opt.model = Models.Linear(model_c, model_A, model_b, model_G, model_h, cones, cone_idxs)
 
     opt.constr_offset_cone = constr_offset_cone
     opt.constr_prim_cone = Vector(sparsevec(Icpc, Vcpc, q))
@@ -474,26 +471,26 @@ function MOI.optimize!(opt::Optimizer)
     (c, A, b, G, h, cones, cone_idxs) = (model.c, model.A, model.b, model.G, model.h, model.cones, model.cone_idxs)
 
     # check, preprocess, load, and solve
-    model = Models.LinearObjConic(c, A, b, G, h, cones, cone_idxs)
-    solver = InteriorPoints.HSDESolver(model, verbose = true) # TODO other options
-    InteriorPoints.solve(solver)
+    model = Models.Linear(c, A, b, G, h, cones, cone_idxs)
+    solver = Solvers.HSDSolver(model, verbose = true) # TODO other options
+    Solvers.solve(solver)
 
-    opt.status = InteriorPoints.get_status(solver)
-    opt.solve_time = InteriorPoints.get_solve_time(solver)
-    opt.primal_obj = InteriorPoints.get_primal_obj(solver)
-    opt.dual_obj = InteriorPoints.get_dual_obj(solver)
+    opt.status = Solvers.get_status(solver)
+    opt.solve_time = Solvers.get_solve_time(solver)
+    opt.primal_obj = Solvers.get_primal_obj(solver)
+    opt.dual_obj = Solvers.get_dual_obj(solver)
 
     # get solution and transform for MOI
     # opt.x = zeros(length(c))
-    # opt.x[dukeep] = InteriorPoints.get_x(solver)
-    opt.x = InteriorPoints.get_x(solver)
+    # opt.x[dukeep] = Solvers.get_x(solver)
+    opt.x = Solvers.get_x(solver)
     opt.constr_prim_eq += b - A * opt.x
     # opt.y = zeros(length(b))
-    # opt.y[prkeep] = InteriorPoints.get_y(solver)
-    opt.y = InteriorPoints.get_y(solver)
+    # opt.y[prkeep] = Solvers.get_y(solver)
+    opt.y = Solvers.get_y(solver)
 
-    opt.s = InteriorPoints.get_s(solver)
-    opt.z = InteriorPoints.get_z(solver)
+    opt.s = Solvers.get_s(solver)
+    opt.z = Solvers.get_z(solver)
 
     # TODO refac out primitive cone untransformations
     for k in eachindex(cones)

@@ -9,7 +9,6 @@ Semidefinite optimization and convex algebraic geometry SIAM 2013
 import Hypatia
 const HYP = Hypatia
 const CO = HYP.Cones
-# const LS = HYP.LinearSystems
 const MU = HYP.ModelUtilities
 
 import MathOptInterface

@@ -8,7 +8,6 @@ and use this procedure to check whether a polynomial is globally convex
 import Hypatia
 const HYP = Hypatia
 const CO = HYP.Cones
-# const LS = HYP.LinearSystems
 const MU = HYP.ModelUtilities
 
 import MathOptInterface

@@ -7,7 +7,6 @@ see description in examples/envelope/native.jl
 import Hypatia
 const HYP = Hypatia
 const CO = HYP.Cones
-# const LS = HYP.LinearSystems
 const MU = HYP.ModelUtilities
 
 import MathOptInterface

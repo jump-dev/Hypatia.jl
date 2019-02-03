@@ -8,7 +8,6 @@ Section 3.9 of SOSTOOLS User's Manual, see https://www.cds.caltech.edu/sostools/
 import Hypatia
 const HYP = Hypatia
 const CO = HYP.Cones
-# const LS = HYP.LinearSystems
 const MU = HYP.ModelUtilities
 
 import MathOptInterface

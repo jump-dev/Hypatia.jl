@@ -9,7 +9,6 @@ solves a simple linear optimization problem (LP) min c'x s.t. Ax = b, x >= 0
 import Hypatia
 const HYP = Hypatia
 const CO = HYP.Cones
-# const LS = HYP.LinearSystems
 const MU = HYP.ModelUtilities
 
 using SparseArrays
@@ -61,10 +60,10 @@ function run_linearopt()
         # build_linearopt(500, 1000)
         build_linearopt(15, 20)
 
-    model = MO.LinearObjConic(c, A, b, G, h, cones, cone_idxs)
-    solver = IP.HSDESolver(model, verbose = true)
-    IP.solve(solver)
-    @test IP.get_status(solver) == :Optimal
+    model = MO.Linear(c, A, b, G, h, cones, cone_idxs)
+    solver = SO.HSDSolver(model, verbose = true)
+    SO.solve(solver)
+    @test SO.get_status(solver) == :Optimal
 
     return
 end

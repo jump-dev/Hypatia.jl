@@ -5,9 +5,8 @@ Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 import Hypatia
 const HYP = Hypatia
 const CO = HYP.Cones
-const LS = HYP.LinearSystems
 const MO = HYP.Models
-const IP = HYP.InteriorPoints
+const SO = HYP.Solvers
 const MU = HYP.ModelUtilities
 
 import Random

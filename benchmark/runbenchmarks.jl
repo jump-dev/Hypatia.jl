@@ -55,7 +55,6 @@ end
 # Hypatia options
 verbose = true
 time_limit = 1e2
-linear_solver = Hypatia.LinearSystems.QRSymm
 dense = false
 
 MOI.Utilities.@model(HypatiaModelData,
@@ -75,7 +74,6 @@ MOI.Utilities.@model(HypatiaModelData,
 optimizer = MOI.Utilities.CachingOptimizer(HypatiaModelData{Float64}(), Hypatia.Optimizer(
     verbose = verbose,
     time_limit = time_limit,
-    linear_solver = linear_solver,
     dense = dense,
     tol_rel_opt = 1e-6,
     tol_abs_opt = 1e-7,

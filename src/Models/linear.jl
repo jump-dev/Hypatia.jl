@@ -28,7 +28,7 @@ The primal-dual optimality conditions are:
 ```
 =#
 
-mutable struct LinearObjConic <: Model
+mutable struct Linear <: Model
     n::Int
     p::Int
     q::Int
@@ -46,7 +46,7 @@ mutable struct LinearObjConic <: Model
     # initial_z::Vector{Float64}
     # initial_s::Vector{Float64}
 
-    function LinearObjConic(c, A, b, G, h, cones, cone_idxs)
+    function Linear(c, A, b, G, h, cones, cone_idxs)
         model = new()
         model.n = length(c)
         model.p = length(b)
@@ -181,3 +181,42 @@ end
 #
 #     return (c, A, b, G, prkeep, dukeep, AQ2, ARiQ1)
 # end
+
+
+
+function find_initial_point(model::Linear)
+    point = Point(model)
+
+    cones = model.cones
+    for k in eachindex(cones)
+        cone_k = cones[k]
+        primal_k = point.primal_views[k]
+        Cones.set_initial_point(primal_k, cone_k)
+        Cones.load_point(cone_k, primal_k)
+        @assert Cones.check_in_cone(cone_k)
+        point.dual_views[k] .= -Cones.grad(cone_k)
+    end
+
+    # solve for y
+    # A'y = -c - G'z
+    # solve for x
+    # Ax = b
+    # Gx = h - s
+    temp_n = -model.c - model.G' * point.z # TODO remove allocs
+    temp_p_q = vcat(model.b, model.h - point.s) # TODO remove allocs
+    # if has_QR(model) # TODO reuse QR from preprocessing
+    #     ldiv!(point.y, model.At_qr, temp_n)
+    #     ldiv!(point.x, model.AG_qr, temp_p_q)
+    # else
+        if !isempty(point.y)
+            At_fact = factorize(issparse(model.A) ? sparse(model.A') : Matrix(model.A'))
+            # ldiv!(point.y, At_fact, temp_n)
+            point.y .= At_fact \ temp_n
+        end
+        AG_fact = factorize(vcat(model.A, model.G))
+        # ldiv!(point.x, AG_fact, temp_p_q)
+        point.x .= AG_fact \ temp_p_q
+    # end
+
+    return point
+end

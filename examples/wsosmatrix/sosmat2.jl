@@ -10,7 +10,6 @@ Linear Algebra and its Applications, 1975, 12(2), 95-100
 import Hypatia
 const HYP = Hypatia
 const CO = HYP.Cones
-# const LS = HYP.LinearSystems
 const MU = HYP.ModelUtilities
 
 import MathOptInterface

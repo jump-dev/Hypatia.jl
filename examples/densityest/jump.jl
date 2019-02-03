@@ -12,7 +12,6 @@ find a density function f maximizing the log likelihood of the observations
 import Hypatia
 const HYP = Hypatia
 const CO = HYP.Cones
-# const LS = HYP.LinearSystems
 const MU = HYP.ModelUtilities
 
 import JuMP
