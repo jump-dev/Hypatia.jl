@@ -24,11 +24,12 @@ Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 end
 
 function scaling_mwe(dom::Hypatia.InterpDomain)
+    # test fix for https://github.com/chriscoey/Hypatia.jl/issues/172
     @polyvar x[1:2]
-    (U, pts, P0, PWts, _) = Hypatia.interpolate(dom, 3, sample = true, sample_factor = 50)
+    (U, pts, P0, PWts, _) = Hypatia.interpolate(dom, 4, sample = true, sample_factor = 50)
     wsos_cone = WSOSPolyInterpCone(U, [P0, PWts...])
     model = Model(with_optimizer(Hypatia.Optimizer, verbose = true))
-    @variable(model, v, PolyJuMP.Poly(monomials(x, 0:5)))
+    @variable(model, v, PolyJuMP.Poly(monomials(x, 0:8)))
     @constraint(model, [v(pts[u, :]) for u in 1:U] in wsos_cone)
     return model
 end
@@ -37,7 +38,8 @@ end
     for dom in [
         Hypatia.Box(-0.01 * ones(2), 0.01 * ones(2)),
         Hypatia.Ball([0.0, 0.0], 0.01),
-        Hypatia.Ellipsoid([0.0, 0.0], ones(2, 2) * 0.01)
+        Hypatia.Ellipsoid([100.0, 100.0], [2.0 0.0; 0.0 2.0] * 0.01),
+        Hypatia.Box(-1000.0 * ones(2), -500.0 * ones(2)),
         ]
         model = scaling_mwe(dom)
         JuMP.optimize!(model)
