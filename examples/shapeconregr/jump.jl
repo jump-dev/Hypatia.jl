@@ -15,7 +15,6 @@ see e.g. Chapter 8 of thesis by G. Hall (2018)
 import Hypatia
 const HYP = Hypatia
 const CO = HYP.Cones
-# const LS = HYP.LinearSystems
 const MU = HYP.ModelUtilities
 
 import MathOptInterface

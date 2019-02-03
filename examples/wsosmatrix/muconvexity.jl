@@ -9,7 +9,6 @@ see https://en.wikipedia.org/wiki/Convex_function#Strongly_convex_functions
 import Hypatia
 const HYP = Hypatia
 const CO = HYP.Cones
-# const LS = HYP.LinearSystems
 const MU = HYP.ModelUtilities
 
 import MathOptInterface

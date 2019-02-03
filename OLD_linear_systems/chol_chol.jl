@@ -22,7 +22,7 @@ function solve_linear_system(
     y_rhs::Matrix{Float64},
     z_rhs::Matrix{Float64},
     mu::Float64,
-    model::Models.LinearObjConic,
+    model::Models.Linear,
     linear_solver::CholChol,
     )
     (n, p, q, A, G, cones, cone_idxs) = (model.n, model.p, model.q, model.A, model.G, model.cones, model.cone_idxs)

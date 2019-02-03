@@ -11,7 +11,6 @@ available at https://arxiv.org/abs/1712.01792
 import Hypatia
 const HYP = Hypatia
 const CO = HYP.Cones
-# const LS = HYP.LinearSystems
 const MU = HYP.ModelUtilities
 
 using LinearAlgebra
@@ -105,10 +104,10 @@ function run_namedpoly()
         # build_namedpoly(:rosenbrock, 4)
         # build_namedpoly(:schwefel, 3)
 
-    model = MO.LinearObjConic(c, A, b, G, h, cones, cone_idxs)
-    solver = IP.HSDESolver(model, verbose = true)
-    IP.solve(solver)
-    @test IP.get_status(solver) == :Optimal
+    model = MO.Linear(c, A, b, G, h, cones, cone_idxs)
+    solver = SO.HSDSolver(model, verbose = true)
+    SO.solve(solver)
+    @test SO.get_status(solver) == :Optimal
 
     return
 end
