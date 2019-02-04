@@ -30,8 +30,10 @@ const rt2 = sqrt(2)
 
 # a description of the shape of the regressor
 mutable struct ShapeData
-    mono_dom::Hypatia.InterpDomain
-    conv_dom::Hypatia.InterpDomain
+    # mono_dom::Hypatia.InterpDomain
+    # conv_dom::Hypatia.InterpDomain
+    mono_dom::Hypatia.Domain
+    conv_dom::Hypatia.Domain
     mono_profile::Vector{Int}
     conv_profile::Int
 end

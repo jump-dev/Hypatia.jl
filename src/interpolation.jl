@@ -12,6 +12,8 @@ and Matlab files in the packages
 =#
 
 function interpolate(n::Int, d::Int; sample::Bool = true, sample_factor::Int = 50, calc_w::Bool = false)
+    # if sample
+        # return approxfekete_data(n, d, true, sample_factor, calc_w)
     if n == 1
         return cheb2_data(d, calc_w)
     elseif n == 2
@@ -135,8 +137,8 @@ function padua_data(d::Int, calc_w::Bool)
 end
 
 function approxfekete_data(n::Int, d::Int, sample::Bool, sample_factor::Int, calc_w::Bool)
-    @assert d > 0
-    @assert n > 1
+    @assert d >= 1
+    @assert n >= 1
     (L, U) = get_LU(n, d)
 
     if sample
@@ -258,6 +260,12 @@ function Ball(c::Vector{Float64}, r::Float64, idxs::Vector{Int})
     f(x) = r^2 - sum(abs2, (x - c)) # TODO check dims
     return Domain([w1; SemialgebraicSet(f, idxs, 2)])
 end
+function Ball(c::Vector{Float64}, r::Float64)
+    idxs = collect(1:length(c))
+    w1 = SemialgebraicSet(x -> 1.0, idxs, 0) # TODO remove
+    f(x) = r^2 - sum(abs2, (x - c)) # TODO check dims
+    return Domain([w1; SemialgebraicSet(f, idxs, 2)])
+end
 
 function Ellipsoid(c::Vector{Float64}, Q::AbstractMatrix{Float64}, idxs::Vector{Int})
     w1 = SemialgebraicSet(x -> 1.0, idxs, 0) # TODO remove
@@ -271,6 +279,7 @@ end
 
 function interpolate(dom::Domain, n::Int, d::Int; sample::Bool = true, sample_factor::Int = 10, calc_w::Bool = false)
     (U, pts, P0, w) = interpolate(n, d, sample = sample, sample_factor = sample_factor, calc_w = calc_w)
+    # pts .*= 0.01
     (weight_vecs, lower_dims) = build_weights(pts, dom, d)
     return (U, pts, P0, weight_vecs, lower_dims, w)
 end

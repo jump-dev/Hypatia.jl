@@ -16,17 +16,18 @@ function build_JuMP_envelope(
     npoly::Int,
     deg::Int,
     d::Int,
-    domain::Hypatia.InterpDomain;
+    n::Int,
+    domain::Hypatia.Domain;
     sample::Bool = true,
     rseed::Int = 1,
     )
     # generate interpolation
     @assert deg <= d
-    (U, pts, P0, PWts, w) = Hypatia.interpolate(domain, d, sample=sample, calc_w=true)
+    (U, pts, P0, weight_vecs, lower_dims, w) = Hypatia.interpolate(domain, n, d, sample=sample, calc_w=true)
 
     # generate random polynomials
     Random.seed!(rseed)
-    n = Hypatia.dimension(domain)
+    # n = Hypatia.dimension(domain)
     LDegs = binomial(n+deg, n)
     polys = P0[:, 1:LDegs]*rand(-9:9, LDegs, npoly)
 
@@ -34,7 +35,7 @@ function build_JuMP_envelope(
     model = Model(with_optimizer(Hypatia.Optimizer, verbose=true))
     @variable(model, fpv[j in 1:U]) # values at Fekete points
     @objective(model, Max, dot(fpv, w)) # integral over domain (via quadrature)
-    @constraint(model, [i in 1:npoly], polys[:,i] .- fpv in WSOSPolyInterpCone(U, [P0, PWts...]))
+    @constraint(model, [i in 1:npoly], polys[:,i] .- fpv in WSOSPolyInterpCone(U, P0, weight_vecs, lower_dims))
 
     return (model, fpv)
 end
@@ -43,10 +44,10 @@ function run_JuMP_envelope(
     npoly::Int,
     deg::Int,
     d::Int,
-    dom::Hypatia.InterpDomain;
+    dom::Hypatia.Domain;
     sample::Bool = true,
     )
-    (model, fpv) = build_JuMP_envelope(npoly, deg, d, dom, sample=sample)
+    (model, fpv) = build_JuMP_envelope(npoly, deg, d, 2, dom, sample=sample)
     JuMP.optimize!(model)
 
     term_status = JuMP.termination_status(model)
@@ -63,6 +64,6 @@ function run_JuMP_envelope(
     return nothing
 end
 
-run_JuMP_envelope_sampleinterp_box() = run_JuMP_envelope(2, 3, 4, Hypatia.Box(-ones(2), ones(2)))
-run_JuMP_envelope_sampleinterp_ball() = run_JuMP_envelope(2, 3, 4, Hypatia.Ball(zeros(2), sqrt(2)))
-run_JuMP_envelope_boxinterp() = run_JuMP_envelope(2, 3, 4, Hypatia.Box(-ones(2), ones(2)), sample=false)
+run_JuMP_envelope_sampleinterp_box() = run_JuMP_envelope(2, 3, 4, Hypatia.Box(-ones(2), ones(2), [1; 2]))
+run_JuMP_envelope_sampleinterp_ball() = run_JuMP_envelope(2, 3, 4, Hypatia.Ball(zeros(2), sqrt(2), [1; 2]))
+run_JuMP_envelope_boxinterp() = run_JuMP_envelope(2, 3, 4, Hypatia.Box(-ones(2), ones(2), [1; 2]), sample=false)

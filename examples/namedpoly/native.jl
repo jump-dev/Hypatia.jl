@@ -23,8 +23,9 @@ function build_namedpoly(
     end
 
     # generate interpolation
-    dom = Hypatia.Box(lbs, ubs)
-    (U, pts, P0, PWts, _) = Hypatia.interpolate(dom, d, sample=false)
+    dom = Hypatia.Box(lbs, ubs, collect(1:n))
+    # (U, pts, P0, PWts, _) = Hypatia.interpolate(dom, d, sample=false)
+    (U, pts, P0, weight_vecs, lower_dims, _) = Hypatia.interpolate(dom, n, d, sample = false)
 
     # set up problem data
     A = ones(1, U)
@@ -33,7 +34,7 @@ function build_namedpoly(
     G = Diagonal(-1.0I, U) # TODO uniformscaling?
     h = zeros(U)
 
-    cone = Hypatia.Cone([Hypatia.WSOSPolyInterp(U, [P0, PWts...], true)], [1:U])
+    cone = Hypatia.Cone([Hypatia.WSOSPolyInterp(U, P0, weight_vecs, lower_dims, true)], [1:U])
 
     return (c, A, b, G, h, cone)
 end

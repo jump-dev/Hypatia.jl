@@ -42,8 +42,8 @@ end
     n = 2
     for dom in [
         Hypatia.Box(-0.01 * ones(2), 0.01 * ones(2), collect(1:n)),
-        Hypatia.Ball([0.0, 0.0], 0.01, collect(1:n)),
-        Hypatia.Ellipsoid([100.0, 100.0], [2.0 0.0; 0.0 2.0] * 0.01, collect(1:n)),
+        # Hypatia.Ball([0.0, 0.0], 0.01, collect(1:n)),
+        # Hypatia.Ellipsoid([100.0, 100.0], [2.0 0.0; 0.0 2.0] * 0.01, collect(1:n)),
         Hypatia.Box(-1000.0 * ones(2), -900.0 * ones(2), collect(1:n)),
         ]
         model = domain_scaling_mwe(dom)

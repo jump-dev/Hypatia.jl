@@ -14,44 +14,44 @@ using DynamicPolynomials
 using SumOfSquares
 using PolyJuMP
 using Test
-include(joinpath(dirname(@__DIR__), "utils", "semialgebraicsets.jl"))
+# include(joinpath(dirname(@__DIR__), "utils", "semialgebraicsets.jl"))
 
-function build_JuMP_namedpoly_PSD(
-    x,
-    f,
-    dom::Hypatia.InterpDomain;
-    d::Int = div(maxdegree(f) + 1, 2),
-    )
-    model = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true))
-    @variable(model, a)
-    @objective(model, Max, a)
-    @constraint(model, fnn, f >= a, domain=get_domain_inequalities(dom, x), maxdegree=2d)
-
-    return model
-end
+# function build_JuMP_namedpoly_PSD(
+#     x,
+#     f,
+#     dom::Hypatia.InterpDomain;
+#     d::Int = div(maxdegree(f) + 1, 2),
+#     )
+#     model = SOSModel(with_optimizer(Hypatia.Optimizer, verbose=true))
+#     @variable(model, a)
+#     @objective(model, Max, a)
+#     @constraint(model, fnn, f >= a, domain=get_domain_inequalities(dom, x), maxdegree=2d)
+#
+#     return model
+# end
 
 function build_JuMP_namedpoly_WSOS(
     x,
     f,
-    dom::Hypatia.InterpDomain;
+    dom::Hypatia.Domain;
     d::Int = div(maxdegree(f) + 1, 2),
     sample_factor = 25,
     rseed::Int = 1,
     primal_wsos::Bool = false,
     )
-    (U, pts, P0, PWts, _) = Hypatia.interpolate(dom, d, sample=true)
+    (U, pts, P0, weight_vecs, lower_dims, _) = Hypatia.interpolate(dom, length(dom.sets[1].idxs), d, sample=true)
 
     # build JuMP model
     model = Model(with_optimizer(Hypatia.Optimizer, verbose=true, tolrelopt=1e-7, tolfeas=1e-8))
     if primal_wsos
         @variable(model, a)
         @objective(model, Max, a)
-        @constraint(model, [f(pts[j,:]) - a for j in 1:U] in WSOSPolyInterpCone(U, [P0, PWts...], false))
+        @constraint(model, [f(pts[j,:]) - a for j in 1:U] in WSOSPolyInterpCone(U, P0, weight_vecs, lower_dims, false))
     else
         @variable(model, x[1:U])
         @objective(model, Min, sum(x[j] * f(pts[j,:]...) for j in 1:U))
         @constraint(model, sum(x) == 1.0)
-        @constraint(model, x in WSOSPolyInterpCone(U, [P0, PWts...], true))
+        @constraint(model, x in WSOSPolyInterpCone(U, P0, weight_vecs, lower_dims, true))
     end
 
     return model
