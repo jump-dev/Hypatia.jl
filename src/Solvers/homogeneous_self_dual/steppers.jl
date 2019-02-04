@@ -82,12 +82,13 @@ function find_max_alpha_in_nbhd(z_dir::AbstractVector{Float64}, s_dir::AbstractV
             end
         end
 
+        if alpha < 1e-5
+            # alpha is very small
+            return 0.0
+        end
+
         # iterate is outside the neighborhood: decrease alpha
         alpha *= 0.8 # TODO option for parameter
-    end
-
-    if alpha < 1e-7 # TODO return slow progress status or find a workaround
-        error("alpha is $alpha")
     end
 
     return alpha

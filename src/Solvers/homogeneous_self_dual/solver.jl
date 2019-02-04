@@ -17,6 +17,7 @@ mutable struct HSDSolver <: Solver
     tol_feas::Float64
     max_iters::Int
     time_limit::Float64
+    max_nbhd::Float64
 
     x_conv_tol::Float64
     y_conv_tol::Float64
@@ -37,19 +38,16 @@ mutable struct HSDSolver <: Solver
     y_norm_res::Float64
     z_norm_res::Float64
 
-    obj_primal_t::Float64
-    obj_dual_t::Float64
-    obj_primal::Float64
-    obj_dual::Float64
+    primal_obj_t::Float64
+    dual_obj_t::Float64
+    primal_obj::Float64
+    dual_obj::Float64
     gap::Float64
     rel_gap::Float64
 
-    # solve info
     status::Symbol
     num_iters::Int
     solve_time::Float64
-    primal_obj::Float64
-    dual_obj::Float64
 
     function HSDSolver(
         model::Models.Linear,
@@ -62,12 +60,13 @@ mutable struct HSDSolver <: Solver
         tol_feas = 1e-7,
         max_iters::Int = 100,
         time_limit::Float64 = 3e2,
+        max_nbhd::Float64 = 1e-1,
         )
         solver = new()
 
         solver.model = model
 
-        solver.stepper = CombinedCholCholStepper(model)
+        # solver.stepper = CombinedCholCholStepper(model)
 
         solver.verbose = verbose
         solver.tol_rel_opt = tol_rel_opt
@@ -75,6 +74,7 @@ mutable struct HSDSolver <: Solver
         solver.tol_feas = tol_feas
         solver.max_iters = max_iters
         solver.time_limit = time_limit
+        solver.max_nbhd = max_nbhd
 
         solver.x_conv_tol = inv(max(1.0, norm(model.c)))
         solver.y_conv_tol = inv(max(1.0, norm(model.b)))
@@ -95,10 +95,10 @@ mutable struct HSDSolver <: Solver
         solver.y_norm_res = NaN
         solver.z_norm_res = NaN
 
-        solver.obj_primal_t = NaN
-        solver.obj_dual_t = NaN
-        solver.obj_primal = NaN
-        solver.obj_dual = NaN
+        solver.primal_obj_t = NaN
+        solver.dual_obj_t = NaN
+        solver.primal_obj = NaN
+        solver.dual_obj = NaN
         solver.gap = NaN
         solver.rel_gap = NaN
 
@@ -177,15 +177,15 @@ function check_convergence(solver::HSDSolver)
     norm_res_primal = max(solver.y_norm_res * solver.y_conv_tol, solver.z_norm_res * solver.z_conv_tol)
     norm_res_dual = solver.x_norm_res * solver.x_conv_tol
 
-    solver.obj_primal_t = dot(model.c, point.x)
-    solver.obj_dual_t = -dot(model.b, point.y) - dot(model.h, point.z)
-    solver.obj_primal = solver.obj_primal_t / solver.tau
-    solver.obj_dual = solver.obj_dual_t / solver.tau
+    solver.primal_obj_t = dot(model.c, point.x)
+    solver.dual_obj_t = -dot(model.b, point.y) - dot(model.h, point.z)
+    solver.primal_obj = solver.primal_obj_t / solver.tau
+    solver.dual_obj = solver.dual_obj_t / solver.tau
     solver.gap = dot(point.z, point.s) # TODO maybe should adapt original Alfonso condition instead of using this CVXOPT condition
-    if solver.obj_primal < 0.0
-        solver.rel_gap = solver.gap / -solver.obj_primal
-    elseif solver.obj_dual > 0.0
-        solver.rel_gap = solver.gap / solver.obj_dual
+    if solver.primal_obj < 0.0
+        solver.rel_gap = solver.gap / -solver.primal_obj
+    elseif solver.dual_obj > 0.0
+        solver.rel_gap = solver.gap / solver.dual_obj
     else
         solver.rel_gap = NaN
     end
@@ -193,7 +193,7 @@ function check_convergence(solver::HSDSolver)
     # print iteration statistics
     if solver.verbose
         @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n",
-            solver.num_iters, solver.obj_primal, solver.obj_dual, solver.gap, solver.rel_gap,
+            solver.num_iters, solver.primal_obj, solver.dual_obj, solver.gap, solver.rel_gap,
             norm_res_primal, norm_res_dual, solver.tau, solver.kap, solver.mu
             )
         flush(stdout)
@@ -207,16 +207,16 @@ function check_convergence(solver::HSDSolver)
         solver.status = :Optimal
         return true
     end
-    if solver.obj_dual_t > 0.0
-        infres_pr = solver.x_norm_res_t * solver.x_conv_tol / solver.obj_dual_t
+    if solver.dual_obj_t > 0.0
+        infres_pr = solver.x_norm_res_t * solver.x_conv_tol / solver.dual_obj_t
         if infres_pr <= solver.tol_feas
             solver.verbose && println("primal infeasibility detected; terminating")
             solver.status = :PrimalInfeasible
             return true
         end
     end
-    if solver.obj_primal_t < 0.0
-        infres_du = -max(solver.y_norm_res_t * solver.y_conv_tol, solver.z_norm_res_t * solver.z_conv_tol) / solver.obj_primal_t
+    if solver.primal_obj_t < 0.0
+        infres_du = -max(solver.y_norm_res_t * solver.y_conv_tol, solver.z_norm_res_t * solver.z_conv_tol) / solver.primal_obj_t
         if infres_du <= solver.tol_feas
             solver.verbose && println("dual infeasibility detected; terminating")
             solver.status = :DualInfeasible
@@ -231,7 +231,6 @@ function check_convergence(solver::HSDSolver)
 
     return false
 end
-
 
 function calc_residual(solver::HSDSolver)
     model = solver.model
