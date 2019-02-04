@@ -7,7 +7,9 @@ using Test
 using Random
 using LinearAlgebra
 using SparseArrays
+using TimerOutputs
 
+reset_timer!(Hypatia.to)
 
 # load examples functions in src/examples/
 egs_dir = joinpath(@__DIR__, "../examples")
@@ -224,39 +226,39 @@ testfuns = [
 # end
 
 
-@info("starting verbose default examples tests")
-testfuns = [
-    run_JuMP_expdesign,
-    run_linearopt,
-    run_namedpoly,
-    run_JuMP_namedpoly_PSD, # final objective doesn't match
-    run_JuMP_namedpoly_WSOS_primal,
-    run_JuMP_namedpoly_WSOS_dual,
-    run_envelope_primal_dense,
-    run_envelope_dual_dense,
-    run_envelope_primal_sparse,
-    run_envelope_dual_sparse,
-    run_JuMP_envelope_boxinterp,
-    run_JuMP_envelope_sampleinterp_box,
-    run_JuMP_envelope_sampleinterp_ball,
-    run_JuMP_shapeconregr_PSD,
-    run_JuMP_shapeconregr_WSOS,
-    run_JuMP_densityest,
-    run_JuMP_sosmat4_matrix_rand,
-    run_JuMP_sosmat4_matrix_a,
-    run_JuMP_sosmat4_poly_a,
-    run_JuMP_sosmat4_poly_b,
-    run_JuMP_muconvexity_rand,
-    run_JuMP_muconvexity_a,
-    run_JuMP_muconvexity_b,
-    run_JuMP_muconvexity_c,
-    run_JuMP_muconvexity_d,
-    run_JuMP_sosmat1,
-    run_JuMP_sosmat2_scalar,
-    run_JuMP_sosmat2_matrix,
-    run_JuMP_sosmat2_matrix_dual,
-    run_JuMP_sosmat3, # slow
-    ]
+# @info("starting verbose default examples tests")
+# testfuns = [
+#     run_JuMP_expdesign,
+#     run_linearopt,
+#     run_namedpoly,
+#     run_JuMP_namedpoly_PSD, # final objective doesn't match
+#     run_JuMP_namedpoly_WSOS_primal,
+#     run_JuMP_namedpoly_WSOS_dual,
+#     run_envelope_primal_dense,
+#     run_envelope_dual_dense,
+#     run_envelope_primal_sparse,
+#     run_envelope_dual_sparse,
+#     run_JuMP_envelope_boxinterp,
+#     run_JuMP_envelope_sampleinterp_box,
+#     run_JuMP_envelope_sampleinterp_ball,
+#     run_JuMP_shapeconregr_PSD,
+#     run_JuMP_shapeconregr_WSOS,
+#     run_JuMP_densityest,
+#     run_JuMP_sosmat4_matrix_rand,
+#     run_JuMP_sosmat4_matrix_a,
+#     run_JuMP_sosmat4_poly_a,
+#     run_JuMP_sosmat4_poly_b,
+#     run_JuMP_muconvexity_rand,
+#     run_JuMP_muconvexity_a,
+#     run_JuMP_muconvexity_b,
+#     run_JuMP_muconvexity_c,
+#     run_JuMP_muconvexity_d,
+#     run_JuMP_sosmat1,
+#     run_JuMP_sosmat2_scalar,
+#     run_JuMP_sosmat2_matrix,
+#     run_JuMP_sosmat2_matrix_dual,
+#     run_JuMP_sosmat3, # slow
+#     ]
 # @testset "default examples: $testfun" for testfun in testfuns
 #     testfun()
 # end

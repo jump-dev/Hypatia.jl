@@ -28,8 +28,7 @@ function build_envelope(
     # generate interpolation
     @assert deg <= d
     domain = Hypatia.Box(-ones(n), ones(n), collect(1:n))
-    (U, pts, P0, w) = Hypatia.interpolate(n, d, calc_w=true)
-    (weight_vecs, lower_dims) = Hypatia.build_weights(pts, domain, d)
+    (U, pts, P0, weight_vecs, lower_dims, w) = Hypatia.interpolate(domain, n, d, calc_w=true)
 
     if use_data
         # use provided data in data folder

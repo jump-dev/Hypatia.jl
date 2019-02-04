@@ -1,5 +1,5 @@
 #=
-Copyright 2018, Chris Coey and contributors
+Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 Copyright 2018, David Papp, Sercan Yildiz
 
 modified/inspired from files in https://github.com/dpapp-github/alfonso/
@@ -11,18 +11,24 @@ and Matlab files in the packages
 - Padua2DM by M. Caliari, S. De Marchi, A. Sommariva, and M. Vianello http://profs.sci.univr.it/~caliari/software.htm
 =#
 
-function interpolate(n::Int, d::Int; calc_w::Bool=false)
+function interpolate(n::Int, d::Int; sample::Bool = true, sample_factor::Int = 50, calc_w::Bool = false)
     if n == 1
         return cheb2_data(d, calc_w)
     elseif n == 2
         return padua_data(d, calc_w) # or approxfekete_data(n, d)
     elseif n > 2
-        return approxfekete_data(n, d, calc_w)
+        return approxfekete_data(n, d, sample, sample_factor, calc_w)
     end
 end
 
 # return k Chebyshev points of the second kind
 cheb2_pts(k::Int) = [-cospi(j/(k-1)) for j in 0:k-1]
+
+function get_LU(n::Int, d::Int)
+    L = binomial(n + d, n)
+    U = binomial(n + 2d, n)
+    return (L, U)
+end
 
 function calc_u(n::Int, d::Int, pts::Matrix{Float64})
     @assert d > 0
@@ -128,32 +134,37 @@ function padua_data(d::Int, calc_w::Bool)
     return (U, pts, P0, w)
 end
 
-function approxfekete_data(n::Int, d::Int, calc_w::Bool)
+function approxfekete_data(n::Int, d::Int, sample::Bool, sample_factor::Int, calc_w::Bool)
     @assert d > 0
     @assert n > 1
     (L, U) = get_LU(n, d)
+    @show L, U
 
-    # points in the initial interpolation grid
-    npts = prod(2d+1:2d+n)
-    candidate_pts = Matrix{Float64}(undef, npts, n)
-    for j in 1:n
-        ig = prod(2d+1+j:2d+n)
-        cs = cheb2_pts(2d+j)
-        i = 1
-        l = 1
-        while true
-            candidate_pts[i:i+ig-1,j] .= cs[l]
-            i += ig
-            l += 1
-            if l >= 2d+1+j
-                if i >= npts
-                    break
+    if sample
+        candidate_pts = 2.0 * (rand(sample_factor * U, n) .- 0.5)
+    else
+        # points in the initial interpolation grid
+        num_pts = prod(2d+1:2d+n)
+        candidate_pts = Matrix{Float64}(undef, num_pts, n)
+        for j in 1:n
+            ig = prod(2d+1+j:2d+n)
+            cs = cheb2_pts(2d+j)
+            i = 1
+            l = 1
+            while true
+                candidate_pts[i:i+ig-1,j] .= cs[l]
+                i += ig
+                l += 1
+                if l >= 2d+1+j
+                    if i >= num_pts
+                        break
+                    end
+                    l = 1
                 end
-                l = 1
             end
         end
     end
-    (pts, P0, w) = select_points(candidate_pts, d, U, L, calc_w=calc_w)
+    (pts, P0, w) = select_points(candidate_pts, d, U, L, calc_w)
     return (U, pts, P0, w)
 end
 
@@ -161,14 +172,14 @@ function select_points(
     candidate_pts::Matrix{Float64},
     d::Int,
     U::Int,
-    L::Int;
-    calc_w::Bool = false,
+    L::Int,
+    calc_w::Bool,
     )
-    (npts, n) = size(candidate_pts)
+    (num_pts, n) = size(candidate_pts)
     u = calc_u(n, 2d, candidate_pts)
     m = Vector{Float64}(undef, U)
     m[1] = 2^n
-    M = Matrix{Float64}(undef, npts, U)
+    M = Matrix{Float64}(undef, num_pts, U)
     M[:,1] .= 1.0
 
     col = 1
@@ -191,8 +202,6 @@ function select_points(
     keep_pnt = F.p[1:U]
     pts = candidate_pts[keep_pnt,:] # subset of points indexed with the support of w
     P0 = M[keep_pnt, 1:L] # subset of polynomial evaluations up to total degree d
-
-    subd = d - div(degree(dom), 2)
 
     if calc_w
         Qtm = F.Q'*m
@@ -226,8 +235,7 @@ function build_weights(pts::Matrix{Float64}, dom::Domain, d::Int)
     for i in eachindex(dom.sets)
         subd = d - div(dom.sets[i].degree, 2)
         lower_dims[i] = binomial(n + subd, n)
-        # TODO tidy [:]
-        weight_vecs[i] = dom.sets[i].poly.(pts[:, dom.sets[i].idxs])[:]
+        weight_vecs[i] = [dom.sets[i].poly(pts[j, dom.sets[i].idxs]) for j in 1:U]
     end
     return (weight_vecs, lower_dims)
 end
@@ -240,7 +248,7 @@ function Box(l::Vector{Float64}, u::Vector{Float64}, idxs::Vector{Int})
     dom = Domain(Vector{SemialgebraicSet}(undef, n + 1))
     dom.sets[1] = SemialgebraicSet(x -> 1.0, idxs, 0) # TODO remove
     for i in 2:n+1
-        f(x) = (x - l[i - 1]) * (u[i - 1] - x)
+        f(x) = (@assert length(x) == 1; (x[1] - l[i - 1]) * (u[i - 1] - x[1]))
         dom.sets[i] = SemialgebraicSet(f, [i - 1], 2)
     end
     return dom
@@ -256,4 +264,14 @@ function Ellipsoid(c::Vector{Float64}, Q::AbstractMatrix{Float64}, idxs::Vector{
     w1 = SemialgebraicSet(x -> 1.0, idxs, 0) # TODO remove
     f(x) = 1.0 - (x - c)' * Q * (x - c) # TODO check dims
     return Domain([w1; SemialgebraicSet(f, idxs, 2)])
+end
+
+function FreeDomain(idxs::Vector{Int})
+    return Domain(SemialgebraicSet(x -> 1.0, idxs, 0))
+end
+
+function interpolate(dom::Domain, n::Int, d::Int; sample::Bool = true, sample_factor::Int = 10, calc_w::Bool = false)
+    (U, pts, P0, w) = interpolate(n, d, sample = sample, sample_factor = sample_factor, calc_w = calc_w)
+    (weight_vecs, lower_dims) = build_weights(pts, dom, d)
+    return (U, pts, P0, weight_vecs, lower_dims, w)
 end

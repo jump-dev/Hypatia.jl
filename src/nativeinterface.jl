@@ -297,6 +297,9 @@ end
 
 # solve using predictor-corrector algorithm based on homogeneous self-dual embedding
 function solve!(mdl::Model)
+
+    @timeit to "solving" begin
+
     mdl.status = :SolveCalled
     starttime = time()
 
@@ -684,6 +687,8 @@ function solve!(mdl::Model)
     mdl.solvetime = time() - starttime
 
     mdl.verbose && println("\nstatus is $(mdl.status) after $iter iterations and $(trunc(mdl.solvetime, digits=3)) seconds\n")
+
+    end # timeit solving
 
     return nothing
 end

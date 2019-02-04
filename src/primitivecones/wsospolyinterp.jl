@@ -38,6 +38,9 @@ mutable struct WSOSPolyInterp <: PrimitiveCone
         )
 
         @assert size(P0, 1) == dim
+        for wv in weight_vecs
+            @assert length(wv) == dim
+        end
         prmtv = new()
         prmtv.usedual = !isdual # using dual barrier
         prmtv.dim = dim
@@ -85,9 +88,6 @@ function incone_prmtv(prmtv::WSOSPolyInterp, scal::Float64)
         end
 
         # pivoted cholesky and triangular solve method
-        @show size(tmp1j)
-        @show size(tmp2j)
-        @show size(P0j)
         F = cholesky!(Symmetric(tmp1j, :L), Val(true), check=false)
         if !isposdef(F)
             return false
@@ -96,7 +96,7 @@ function incone_prmtv(prmtv::WSOSPolyInterp, scal::Float64)
         tmp2j .= view(P0j', F.p, :)
         ldiv!(F.L, tmp2j) # TODO make sure calls best triangular solve
         # mul!(tmp3, tmp2j', tmp2j)
-        Blower_dimsAS.syrk!('U', 'T', 1.0, tmp2j, 0.0, tmp3)
+        BLAS.syrk!('U', 'T', 1.0, tmp2j, 0.0, tmp3)
 
         # posvx solve method
         # tmp2j .= ipwtj' # TODO eliminate by transposing in construction

@@ -34,6 +34,9 @@ mutable struct WSOSPolyInterpMat <: PrimitiveCone
         )
 
         @assert size(P0, 1) == u
+        for wv in weight_vecs
+            @assert length(wv) == u
+        end
         prmtv = new()
         prmtv.usedual = !isdual # using dual barrier
         dim = u * div(r * (r+1), 2)
