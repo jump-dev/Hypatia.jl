@@ -138,7 +138,6 @@ function approxfekete_data(n::Int, d::Int, sample::Bool, sample_factor::Int, cal
     @assert d > 0
     @assert n > 1
     (L, U) = get_LU(n, d)
-    @show L, U
 
     if sample
         candidate_pts = 2.0 * (rand(sample_factor * U, n) .- 0.5)

@@ -106,8 +106,8 @@ end
 
 @testset begin
 
-# @info("starting interpolation tests")
-# include(joinpath(@__DIR__, "interpolation.jl"))
+@info("starting interpolation tests")
+include(joinpath(@__DIR__, "interpolation.jl"))
 
 
 include(joinpath(@__DIR__, "native.jl"))

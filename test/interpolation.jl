@@ -1,6 +1,10 @@
 #=
 Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 =#
+using JuMP
+using PolyJuMP
+using MultivariatePolynomials
+using DynamicPolynomials
 
 # @testset "free domains" begin
 #     n = 5
@@ -23,11 +27,11 @@ Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 #     @test isempty(free_PWts)
 # end
 
-function domain_scaling_mwe(dom::Hypatia.InterpDomain)
+function domain_scaling_mwe(dom::Hypatia.Domain)
     # test fix for https://github.com/chriscoey/Hypatia.jl/issues/172
     @polyvar x[1:2]
-    (U, pts, P0, PWts, _) = Hypatia.interpolate(dom, 2, 4, sample = true, sample_factor = 50)
-    wsos_cone = WSOSPolyInterpCone(U, [P0, PWts...])
+    (U, pts, P0, weight_vecs, lower_dims, _) = Hypatia.interpolate(dom, 2, 4, sample = false, sample_factor = 50)
+    wsos_cone = WSOSPolyInterpCone(U, P0, weight_vecs, lower_dims)
     model = Model(with_optimizer(Hypatia.Optimizer, verbose = true))
     @variable(model, v, PolyJuMP.Poly(monomials(x, 0:8)))
     @constraint(model, [v(pts[u, :]) for u in 1:U] in wsos_cone)
@@ -35,14 +39,16 @@ function domain_scaling_mwe(dom::Hypatia.InterpDomain)
 end
 
 @testset "domain scaling" begin
+    n = 2
     for dom in [
-        Hypatia.Box(-0.01 * ones(2), 0.01 * ones(2)),
-        Hypatia.Ball([0.0, 0.0], 0.01),
-        Hypatia.Ellipsoid([100.0, 100.0], [2.0 0.0; 0.0 2.0] * 0.01),
-        Hypatia.Box(-1000.0 * ones(2), -900.0 * ones(2)),
+        Hypatia.Box(-0.01 * ones(2), 0.01 * ones(2), collect(1:n)),
+        Hypatia.Ball([0.0, 0.0], 0.01, collect(1:n)),
+        Hypatia.Ellipsoid([100.0, 100.0], [2.0 0.0; 0.0 2.0] * 0.01, collect(1:n)),
+        Hypatia.Box(-1000.0 * ones(2), -900.0 * ones(2), collect(1:n)),
         ]
-        model = scaling_mwe(dom)
-        @test_throws Exception JuMP.optimize!(model)
-        # @test JuMP.termination_status(model) == MOI.OPTIMAL
+        model = domain_scaling_mwe(dom)
+        # @test_throws Exception JuMP.optimize!(model)
+        JuMP.optimize!(model)
+        @test JuMP.termination_status(model) == MOI.OPTIMAL
     end
 end
