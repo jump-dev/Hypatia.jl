@@ -27,8 +27,9 @@ function build_envelope(
     )
     # generate interpolation
     @assert deg <= d
-    domain = Hypatia.Box(-ones(n), ones(n))
-    (U, pts, P0, PWts, w) = Hypatia.interpolate(domain, d, sample=false, calc_w=true)
+    domain = Hypatia.Box(-ones(n), ones(n), collect(1:n))
+    (U, pts, P0, w) = Hypatia.interpolate(n, d, calc_w=true)
+    (weight_vecs, lower_dims) = Hypatia.build_weights(pts, domain, d)
 
     if use_data
         # use provided data in data folder
@@ -65,7 +66,7 @@ function build_envelope(
     end
 
     cone = Hypatia.Cone(
-        [Hypatia.WSOSPolyInterp(U, [P0, PWts...], !primal_wsos) for k in 1:npoly],
+        [Hypatia.WSOSPolyInterp(U, P0, weight_vecs, lower_dims, !primal_wsos) for k in 1:npoly],
         [1+(k-1)*U:k*U for k in 1:npoly],
         )
 

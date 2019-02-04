@@ -12,18 +12,18 @@ using SparseArrays
 # load examples functions in src/examples/
 egs_dir = joinpath(@__DIR__, "../examples")
 include(joinpath(egs_dir, "envelope/native.jl"))
-include(joinpath(egs_dir, "envelope/jump.jl"))
-include(joinpath(egs_dir, "expdesign/jump.jl"))
-include(joinpath(egs_dir, "linearopt/native.jl"))
-include(joinpath(egs_dir, "namedpoly/native.jl"))
-include(joinpath(egs_dir, "namedpoly/jump.jl"))
-include(joinpath(egs_dir, "shapeconregr/jump.jl"))
-include(joinpath(egs_dir, "densityest/jump.jl"))
-include(joinpath(egs_dir, "wsosmatrix/sosmatrix.jl"))
-include(joinpath(egs_dir, "wsosmatrix/muconvexity.jl"))
-include(joinpath(egs_dir, "wsosmatrix/sosmat1.jl"))
-include(joinpath(egs_dir, "wsosmatrix/sosmat2.jl"))
-include(joinpath(egs_dir, "wsosmatrix/sosmat3.jl"))
+# include(joinpath(egs_dir, "envelope/jump.jl"))
+# include(joinpath(egs_dir, "expdesign/jump.jl"))
+# include(joinpath(egs_dir, "linearopt/native.jl"))
+# include(joinpath(egs_dir, "namedpoly/native.jl"))
+# include(joinpath(egs_dir, "namedpoly/jump.jl"))
+# include(joinpath(egs_dir, "shapeconregr/jump.jl"))
+# include(joinpath(egs_dir, "densityest/jump.jl"))
+# include(joinpath(egs_dir, "wsosmatrix/sosmatrix.jl"))
+# include(joinpath(egs_dir, "wsosmatrix/muconvexity.jl"))
+# include(joinpath(egs_dir, "wsosmatrix/sosmat1.jl"))
+# include(joinpath(egs_dir, "wsosmatrix/sosmat2.jl"))
+# include(joinpath(egs_dir, "wsosmatrix/sosmat3.jl"))
 include(joinpath(@__DIR__, "examples.jl"))
 
 
@@ -104,8 +104,8 @@ end
 
 @testset begin
 
-@info("starting interpolation tests")
-include(joinpath(@__DIR__, "interpolation.jl"))
+# @info("starting interpolation tests")
+# include(joinpath(@__DIR__, "interpolation.jl"))
 
 
 include(joinpath(@__DIR__, "native.jl"))
@@ -172,23 +172,23 @@ testfuns = [
     _envelope2,
     _envelope3,
     _envelope4,
-    _linearopt1,
-    _linearopt2,
-    _namedpoly1,
-    _namedpoly2,
-    _namedpoly3,
-    # _namedpoly4, # interpolation memory usage excessive
-    _namedpoly5,
-    # _namedpoly6, # interpolation memory usage excessive
-    _namedpoly7,
-    _namedpoly8,
-    _namedpoly9,
-    _namedpoly10, # numerically unstable
-    _namedpoly11,
+    # _linearopt1,
+    # _linearopt2,
+    # _namedpoly1,
+    # _namedpoly2,
+    # _namedpoly3,
+    # # _namedpoly4, # interpolation memory usage excessive
+    # _namedpoly5,
+    # # _namedpoly6, # interpolation memory usage excessive
+    # _namedpoly7,
+    # _namedpoly8,
+    # _namedpoly9,
+    # _namedpoly10, # numerically unstable
+    # _namedpoly11,
     ]
-# @testset "native examples: $testfun, $lscachetype" for testfun in testfuns, lscachetype in lscachetypes
-#     testfun(verbose=verbose, lscachetype=lscachetype)
-# end
+@testset "native examples: $testfun, $lscachetype" for testfun in testfuns, lscachetype in lscachetypes
+    testfun(verbose=verbose, lscachetype=lscachetype)
+end
 
 
 @info("starting JuMP examples tests")

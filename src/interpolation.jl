@@ -11,203 +11,7 @@ and Matlab files in the packages
 - Padua2DM by M. Caliari, S. De Marchi, A. Sommariva, and M. Vianello http://profs.sci.univr.it/~caliari/software.htm
 =#
 
-# domains
-abstract type InterpDomain end
-sampling_region(dom::InterpDomain) = dom
-
-# hyperrectangle/box domain
-mutable struct Box <: InterpDomain
-    l::Vector{Float64}
-    u::Vector{Float64}
-    function Box(l::Vector{Float64}, u::Vector{Float64})
-        @assert length(l) == length(u)
-        dom = new()
-        dom.l = l
-        dom.u = u
-        return dom
-    end
-end
-
-dimension(dom::Box) = length(dom.l)
-degree(::Box) = 2
-
-function interp_sample(dom::Box, npts::Int)
-    dim = dimension(dom)
-    pts = rand(npts, dim) .- 0.5
-    shift = (dom.u + dom.l)/2.0
-    for i in 1:npts
-        pts[i,:] = pts[i,:] .* (dom.u - dom.l) + shift
-    end
-    return pts
-end
-
-function get_weights(dom::Box, pts::AbstractMatrix{Float64})
-    g = [(pts[:,i] .- dom.l[i]) .* (dom.u[i] .- pts[:,i]) for i in 1:size(pts, 2)]
-    @assert all(all(gi .>= 0.0) for gi in g)
-    return g
-end
-
-# Euclidean hyperball domain
-mutable struct Ball <: InterpDomain
-    c::Vector{Float64}
-    r::Float64
-    function Ball(c::Vector{Float64}, r::Float64)
-        dom = new()
-        dom.c = c
-        dom.r = r
-        return dom
-    end
-end
-
-dimension(dom::Ball) = length(dom.c)
-degree(::Ball) = 2
-
-function interp_sample(dom::Ball, npts::Int)
-    dim = dimension(dom)
-    pts = randn(npts, dim)
-    norms = sum(abs2, pts, dims=2)
-    pts .*= dom.r ./ sqrt.(norms) # scale
-    norms ./= 2.0
-    pts .*= sf_gamma_inc_Q.(norms, dim/2) .^ inv(dim) # sf_gamma_inc_Q is the normalized incomplete gamma function
-    for i in 1:dim
-        pts[:, i] .+= dom.c[i] # shift
-    end
-    return pts
-end
-
-function get_weights(dom::Ball, pts::AbstractMatrix{Float64})
-    g = [dom.r^2 - sum((pts[j,:] - dom.c).^2) for j in 1:size(pts, 1)]
-    @assert all(g .>= 0.0)
-    return [g]
-end
-
-# hyperellipse domain: (x-c)'Q(x-c) \leq 1
-mutable struct Ellipsoid <: InterpDomain
-    c::Vector{Float64}
-    Q::AbstractMatrix{Float64}
-    function Ellipsoid(c::Vector{Float64}, Q::AbstractMatrix{Float64})
-        @assert length(c) == size(Q, 1)
-        dom = new()
-        dom.c = c
-        dom.Q = Q
-        return dom
-    end
-end
-
-dimension(dom::Ellipsoid) = length(dom.c)
-degree(::Ellipsoid) = 2
-
-function interp_sample(dom::Ellipsoid, npts::Int)
-    dim = dimension(dom)
-    pts = randn(npts, dim)
-    norms = sum(abs2, pts, dims=2)
-    for i in 1:npts
-        pts[i,:] ./= sqrt(norms[i]) # scale
-    end
-    norms ./= 2.0
-    pts .*= sf_gamma_inc_Q.(norms, dim/2) .^ inv(dim) # sf_gamma_inc_Q is the normalized incomplete gamma function
-
-    rotscale = cholesky(dom.Q).U
-    for i in 1:npts
-        pts[i,:] = rotscale\pts[i,:] # rotate/scale
-    end
-
-    for i in 1:dim
-        pts[:, i] .+= dom.c[i] # shift
-    end
-    return pts
-end
-
-function get_weights(dom::Ellipsoid, pts::AbstractMatrix{Float64})
-    g = [1.0 - (pts[j, :] - dom.c)' * dom.Q * (pts[j, :] - dom.c) for j in 1:size(pts, 1)]
-    @assert all(g .>= 0.0)
-    return [g]
-end
-
-# assumes the free part has the same dimension as the restricted part
-mutable struct SemiFreeDomain <: InterpDomain
-    sampling_region::InterpDomain
-end
-
-sampling_region(dom::SemiFreeDomain) = dom.sampling_region
-
-function add_free_vars(dom::InterpDomain)
-    return SemiFreeDomain(dom)
-end
-
-dimension(dom::SemiFreeDomain) = 2*dimension(dom.sampling_region)
-degree(dom::SemiFreeDomain) = degree(dom.sampling_region)
-
-function interp_sample(dom::SemiFreeDomain, npts::Int)
-    return hcat(interp_sample(dom.sampling_region, npts), interp_sample(dom.sampling_region, npts))
-end
-
-function get_weights(dom::SemiFreeDomain, pts::Matrix{Float64})
-    count = div(size(pts, 2), 2)
-    return get_weights(dom.sampling_region, view(pts, : ,1:count))
-end
-
-mutable struct FreeDomain <: InterpDomain
-    n::Int
-end
-
-dimension(dom::FreeDomain) = dom.n
-degree(::FreeDomain) = 0
-
-function interp_sample(dom::FreeDomain, npts::Int)
-    return interp_sample(Box(-ones(dom.n), ones(dom.n)), npts)
-end
-
-function get_weights(::FreeDomain, ::AbstractMatrix{Float64})
-    return []
-end
-
-function get_LU(n::Int, d::Int)
-    L = binomial(n+d,n)
-    U = binomial(n+2d, n)
-    return (L, U)
-end
-
-function interpolate(
-    dom::InterpDomain,
-    d::Int;
-    sample::Bool = false,
-    calc_w::Bool = false,
-    sample_factor::Int = 10,
-    )
-    if sample
-        return wsos_sample_params(dom, d, calc_w=calc_w, sample_factor=sample_factor)
-    else
-        return wsos_box_params(sampling_region(dom), dimension(dom), d, calc_w=calc_w)
-    end
-end
-
-# slow but high-quality hyperrectangle/box point selections
-function wsos_box_params(::InterpDomain, ::Int, ::Int)
-    error("accurate methods for interpolation points are only available for box domains, use sampling instead")
-end
-
-# difference with sampling functions is that P0 is always formed using points in [-1, 1]
-function wsos_box_params(dom::Box, n::Int, d::Int; calc_w::Bool=false)
-    # n could be larger than the dimension of dom if the original domain was a SemiFreeDomain
-    (U, pts, P0, P0sub, w) = wsos_box_params(n, d, calc_w)
-    # scale and shift points, get WSOS matrices
-    pscale = [0.5*(dom.u[mod(j-1,dimension(dom))+1] - dom.l[mod(j-1,dimension(dom))+1]) for j in 1:n]
-    pshift = [0.5*(dom.u[mod(j-1,dimension(dom))+1] + dom.l[mod(j-1,dimension(dom))+1]) for j in 1:n]
-    Wtsfun = (j -> sqrt.(1.0 .- abs2.(pts[:,j]))*pscale[j])
-    PWts = [Wtsfun(j) .* P0sub for j in 1:dimension(dom)]
-    trpts = pts .* pscale' .+ pshift'
-
-    return (U=U, pts=trpts, P0=P0, PWts=PWts, w=w)
-end
-
-function wsos_box_params(dom::FreeDomain, n::Int, d::Int; calc_w::Bool=false)
-    # n could be larger than the dimension of dom if the original domain was a SemiFreeDomain
-    (U, pts, P0, P0sub, w) = wsos_box_params(n, d, calc_w)
-    return (U=U, pts=pts, P0=P0, PWts=[], w=w)
-end
-
-function wsos_box_params(n::Int, d::Int, calc_w::Bool)
+function interpolate(n::Int, d::Int; calc_w::Bool=false)
     if n == 1
         return cheb2_data(d, calc_w)
     elseif n == 2
@@ -243,7 +47,6 @@ function cheb2_data(d::Int, calc_w::Bool)
 
     # evaluations
     P0 = calc_u(1, d, pts)[1]
-    P0sub = view(P0, :, 1:d)
 
     # weights for Clenshaw-Curtis quadrature at pts
     if calc_w
@@ -256,7 +59,7 @@ function cheb2_data(d::Int, calc_w::Bool)
         w = Float64[]
     end
 
-    return (U, pts, P0, P0sub, w)
+    return (U, pts, P0, w)
 end
 
 function padua_data(d::Int, calc_w::Bool)
@@ -289,7 +92,6 @@ function padua_data(d::Int, calc_w::Bool)
             P0[:,col] .= u[1][:,xp[1]+1] .* u[2][:,xp[2]+1]
         end
     end
-    P0sub = view(P0, :, 1:binomial(1+d, 2))
 
     # cubature weights at Padua points
     # even-degree Chebyshev polynomials on the subgrids
@@ -323,7 +125,7 @@ function padua_data(d::Int, calc_w::Bool)
         w = Float64[]
     end
 
-    return (U, pts, P0, P0sub, w)
+    return (U, pts, P0, w)
 end
 
 function approxfekete_data(n::Int, d::Int, calc_w::Bool)
@@ -351,13 +153,11 @@ function approxfekete_data(n::Int, d::Int, calc_w::Bool)
             end
         end
     end
-    dom = Box(-ones(n), ones(n))
-    (pts, P0, P0sub, w) = make_wsos_arrays(dom, candidate_pts, d, U, L, calc_w=calc_w)
-    return (U, pts, P0, P0sub, w)
+    (pts, P0, w) = select_points(candidate_pts, d, U, L, calc_w=calc_w)
+    return (U, pts, P0, w)
 end
 
-function make_wsos_arrays(
-    dom::InterpDomain,
+function select_points(
     candidate_pts::Matrix{Float64},
     d::Int,
     U::Int,
@@ -393,7 +193,6 @@ function make_wsos_arrays(
     P0 = M[keep_pnt, 1:L] # subset of polynomial evaluations up to total degree d
 
     subd = d - div(degree(dom), 2)
-    P0sub = view(P0, :, 1:binomial(n+subd, n))
 
     if calc_w
         Qtm = F.Q'*m
@@ -402,21 +201,59 @@ function make_wsos_arrays(
         w = Float64[]
     end
 
-    return (pts, P0, P0sub, w)
+    return (pts, P0, w)
 end
 
-# fast, sampling-based point selection for general domains
-function wsos_sample_params(
-    dom::InterpDomain,
-    d::Int;
-    calc_w::Bool = false,
-    sample_factor::Int = 10,
-    )
-    n = dimension(dom)
-    (L, U) = get_LU(n, d)
-    candidate_pts = interp_sample(dom, U * sample_factor)
-    (pts, P0, P0sub, w) = make_wsos_arrays(dom, candidate_pts, d, U, L, calc_w=calc_w)
-    g = get_weights(dom, pts)
-    PWts = [sqrt.(gi) .* P0sub for gi in g]
-    return (U=U, pts=pts, P0=P0, PWts=PWts, w=w)
+# TODO decide what kind of object this should be, or if it should be a SemialgebraicSets semialgebraicset
+struct SemialgebraicSet
+    poly::Function
+    idxs::Vector{Int}
+    degree::Int
+    function SemialgebraicSet(poly::Function, idxs::Vector{Int}, degree::Int)
+        @assert mod(degree, 2) == 0 # TODO decide what to do otherwise
+        return new(poly, idxs, degree)
+    end
+end
+
+struct Domain
+    sets::Vector{SemialgebraicSet}
+end
+
+function build_weights(pts::Matrix{Float64}, dom::Domain, d::Int)
+    (U, n) = size(pts)
+    lower_dims = Vector{Int}(undef, length(dom.sets))
+    weight_vecs = [Vector{Float64}(undef, U) for _ in 1:length(dom.sets)]
+    for i in eachindex(dom.sets)
+        subd = d - div(dom.sets[i].degree, 2)
+        lower_dims[i] = binomial(n + subd, n)
+        # TODO tidy [:]
+        weight_vecs[i] = dom.sets[i].poly.(pts[:, dom.sets[i].idxs])[:]
+    end
+    return (weight_vecs, lower_dims)
+end
+
+# TODO assumes ball/box/ellipsoid means in all dimensions
+
+function Box(l::Vector{Float64}, u::Vector{Float64}, idxs::Vector{Int})
+    @assert length(l) == length(u) == length(idxs)
+    n = length(idxs)
+    dom = Domain(Vector{SemialgebraicSet}(undef, n + 1))
+    dom.sets[1] = SemialgebraicSet(x -> 1.0, idxs, 0) # TODO remove
+    for i in 2:n+1
+        f(x) = (x - l[i - 1]) * (u[i - 1] - x)
+        dom.sets[i] = SemialgebraicSet(f, [i - 1], 2)
+    end
+    return dom
+end
+
+function Ball(c::Vector{Float64}, r::Float64, idxs::Vector{Int})
+    w1 = SemialgebraicSet(x -> 1.0, idxs, 0) # TODO remove
+    f(x) = r^2 - sum(abs2, (x - c)) # TODO check dims
+    return Domain([w1; SemialgebraicSet(f, idxs, 2)])
+end
+
+function Ellipsoid(c::Vector{Float64}, Q::AbstractMatrix{Float64}, idxs::Vector{Int})
+    w1 = SemialgebraicSet(x -> 1.0, idxs, 0) # TODO remove
+    f(x) = 1.0 - (x - c)' * Q * (x - c) # TODO check dims
+    return Domain([w1; SemialgebraicSet(f, idxs, 2)])
 end

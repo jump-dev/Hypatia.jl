@@ -11,9 +11,7 @@ mutable struct WSOSPolyInterpMat <: PrimitiveCone
     dim::Int
     r::Int
     u::Int
-    P0::Matrix{Float64}
-    weight_vecs::Vector{Vector{Float64}}
-    lower_dims::Vector{Int}
+    ipwt::Vector{Matrix{Float64}}
     pnt::AbstractVector{Float64}
     scalpnt::Vector{Float64}
     scal::Float64
@@ -24,49 +22,32 @@ mutable struct WSOSPolyInterpMat <: PrimitiveCone
     barfun::Function
     diffres
 
-    function WSOSPolyInterpMat(
-        r::Int,
-        u::Int,
-        P0::Matrix{Float64},
-        weight_vecs::Vector{Vector{Float64}},
-        lower_dims::Vector{Int},
-        isdual::Bool
-        )
-
-        @assert size(P0, 1) == u
+    function WSOSPolyInterpMat(r::Int, u::Int, ipwt::Vector{Matrix{Float64}}, isdual::Bool)
+        for ipwtj in ipwt
+            @assert size(ipwtj, 1) == u
+        end
         prmtv = new()
         prmtv.usedual = !isdual # using dual barrier
         dim = u * div(r * (r+1), 2)
         prmtv.dim = dim
         prmtv.r = r
         prmtv.u = u
-        prmtv.P0 = P0
-        prmtv.weight_vecs = weight_vecs
-        prmtv.lower_dims = lower_dims
-        prmtv.scalpnt = similar(P0, dim)
-        prmtv.g = similar(P0, dim)
-        prmtv.H = similar(P0, dim, dim)
+        prmtv.ipwt = ipwt
+        prmtv.scalpnt = similar(ipwt[1], dim)
+        prmtv.g = similar(ipwt[1], dim)
+        prmtv.H = similar(ipwt[1], dim, dim)
         prmtv.H2 = similar(prmtv.H)
-        prmtv.barfun = (x -> barfun(x, P0, weight_vecs, lower_dims, r, u, true))
+        prmtv.barfun = (x -> barfun(x, ipwt, r, u, true))
         prmtv.diffres = DiffResults.HessianResult(prmtv.g)
         return prmtv
     end
 end
 
 # calculate barrier value
-function barfun(
-    pnt,
-    P0::Matrix{Float64},
-    weight_vecs::Vector{Vector{Float64}},
-    lower_dims::Vector{Int},
-    R::Int,
-    U::Int,
-    calc_barval::Bool
-    )
-
+function barfun(pnt, ipwt::Vector{Matrix{Float64}}, R::Int, U::Int, calc_barval::Bool)
     barval = 0.0
-    for j in eachindex(weight_vecs)
-        L = lower_dims[j]
+    for ipwtj in ipwt
+        L = size(ipwtj, 2)
         mat = similar(pnt, L*R, L*R)
         mat .= 0.0
 
@@ -74,7 +55,7 @@ function barfun(
             (bl, bk) = ((l-1)*R, (k-1)*R)
             uo = 0
             for p in 1:R, q in 1:p
-                val = sum(ipwtj[u,l] * ipwtj[u,k] * pnt[uo+u] * weight_vecs[uo+u] for u in 1:U)
+                val = sum(ipwtj[u,l] * ipwtj[u,k] * pnt[uo+u] for u in 1:U)
                 bp = bl + p
                 bq = bk + q
                 if p == q
@@ -103,10 +84,10 @@ function barfun(
     return barval
 end
 
-WSOSPolyInterpMat(r::Int, u::Int, P0::Matrix{Float64}, weight_vecs::Vector{Vector{Float64}}, lower_dims::Vector{Int}) = WSOSPolyInterpMat(r, u, P0, weight_vecs, lower_dims, false)
+WSOSPolyInterpMat(r::Int, u::Int, ipwt::Vector{Matrix{Float64}}) = WSOSPolyInterpMat(r, u, ipwt, false)
 
 dimension(prmtv::WSOSPolyInterpMat) = prmtv.dim
-barrierpar_prmtv(prmtv::WSOSPolyInterpMat) = prmtv.r * sum(prmtv.lower_dims) # TODO exclude P0
+barrierpar_prmtv(prmtv::WSOSPolyInterpMat) = prmtv.r * sum(size(ipwtj, 2) for ipwtj in prmtv.ipwt)
 
 function getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::WSOSPolyInterpMat)
     # sum of diagonal matrices with interpolant polynomial repeating on the diagonal
@@ -127,7 +108,7 @@ loadpnt_prmtv!(prmtv::WSOSPolyInterpMat, pnt::AbstractVector{Float64}) = (prmtv.
 function incone_prmtv(prmtv::WSOSPolyInterpMat, scal::Float64)
     prmtv.scal = 1.0
     @. prmtv.scalpnt = prmtv.pnt/prmtv.scal
-    if isnan(barfun(prmtv.scalpnt, prmtv.P0, prmtv.weight_vecs, prmtv.lower_dims, prmtv.r, prmtv.u, false))
+    if isnan(barfun(prmtv.scalpnt, prmtv.ipwt, prmtv.r, prmtv.u, false))
         return false
     end
     prmtv.diffres = ForwardDiff.hessian!(prmtv.diffres, prmtv.barfun, prmtv.scalpnt)

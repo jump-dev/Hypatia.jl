@@ -14,9 +14,7 @@ TODO scale the interior direction
 mutable struct WSOSPolyInterp <: PrimitiveCone
     usedual::Bool
     dim::Int
-    P0::Matrix{Float64}
-    weight_vecs::Vector{Vector{Float64}}
-    lower_dims::Vector{Int}
+    ipwt::Vector{Matrix{Float64}}
     pnt::AbstractVector{Float64}
     scalpnt::Vector{Float64}
     g::Vector{Float64}
@@ -29,74 +27,61 @@ mutable struct WSOSPolyInterp <: PrimitiveCone
     scal::Float64
     # d::Vector{POSVXData}
 
-    function WSOSPolyInterp(
-        dim::Int,
-        P0::Matrix{Float64},
-        weight_vecs::Vector{Vector{Float64}},
-        lower_dims::Vector{Int},
-        isdual::Bool
-        )
-
-        @assert size(P0, 1) == dim
+    function WSOSPolyInterp(dim::Int, ipwt::Vector{Matrix{Float64}}, isdual::Bool)
+        for ipwtj in ipwt
+            @assert size(ipwtj, 1) == dim
+        end
         prmtv = new()
         prmtv.usedual = !isdual # using dual barrier
         prmtv.dim = dim
-        prmtv.P0 = P0
-        prmtv.weight_vecs = weight_vecs
-        prmtv.lower_dims = lower_dims
-        prmtv.scalpnt = similar(P0, dim)
-        prmtv.g = similar(P0, dim)
-        prmtv.H = similar(P0, dim, dim)
+        prmtv.ipwt = ipwt
+        prmtv.scalpnt = similar(ipwt[1], dim)
+        prmtv.g = similar(ipwt[1], dim)
+        prmtv.H = similar(ipwt[1], dim, dim)
         prmtv.H2 = similar(prmtv.H)
-        prmtv.tmp1 = [similar(P0, l, l) for l in lower_dims]
-        prmtv.tmp2 = [similar(P0, l, dim) for l in lower_dims]
-        prmtv.tmp3 = similar(P0, dim, dim)
+        prmtv.tmp1 = [similar(ipwt[1], size(ipwtj, 2), size(ipwtj, 2)) for ipwtj in ipwt]
+        prmtv.tmp2 = [similar(ipwt[1], size(ipwtj, 2), dim) for ipwtj in ipwt]
+        prmtv.tmp3 = similar(ipwt[1], dim, dim)
+        # prmtv.d = [POSVXData(prmtv.tmp1[j], prmtv.tmp2[j]) for j in eachindex(ipwt)]
         return prmtv
     end
 end
 
-WSOSPolyInterp(dim::Int, P0::Matrix{Float64}, weight_vecs::Vector{Vector{Float64}}, lower_dims::Vector{Int}) = WSOSPolyInterp(dim, P0, weight_vecs, lower_dims, false)
+WSOSPolyInterp(dim::Int, ipwt::Vector{Matrix{Float64}}) = WSOSPolyInterp(dim, ipwt, false)
 
 dimension(prmtv::WSOSPolyInterp) = prmtv.dim
-barrierpar_prmtv(prmtv::WSOSPolyInterp) = sum(prmtv.lower_dims) # TODO exclude P0
+barrierpar_prmtv(prmtv::WSOSPolyInterp) = sum(size(ipwtj, 2) for ipwtj in prmtv.ipwt)
 getintdir_prmtv!(arr::AbstractVector{Float64}, prmtv::WSOSPolyInterp) = (@. arr = 1.0; arr)
 loadpnt_prmtv!(prmtv::WSOSPolyInterp, pnt::AbstractVector{Float64}) = (prmtv.pnt = pnt)
 
 function incone_prmtv(prmtv::WSOSPolyInterp, scal::Float64)
     prmtv.scal = scal
-    @. prmtv.scalpnt = prmtv.pnt / prmtv.scal
+    @. prmtv.scalpnt = prmtv.pnt/prmtv.scal
 
     @. prmtv.g = 0.0
     @. prmtv.H = 0.0
     tmp3 = prmtv.tmp3
 
-    for j in eachindex(prmtv.weight_vecs) # TODO can be done in parallel, but need multiple tmp3s
-        lower_dimsj = prmtv.lower_dims[j]
-        P0j = prmtv.P0[:, 1:lower_dimsj] # TODO compare with views
-        weight_vecsj = prmtv.weight_vecs[j]
+    for j in eachindex(prmtv.ipwt) # TODO can be done in parallel, but need multiple tmp3s
+        ipwtj = prmtv.ipwt[j]
         tmp1j = prmtv.tmp1[j]
         tmp2j = prmtv.tmp2[j]
 
         # tmp1j = ipwtj'*Diagonal(pnt)*ipwtj
         # mul!(tmp2j, ipwtj', Diagonal(prmtv.scalpnt)) # TODO dispatches to an extremely inefficient method
-        @timeit to "incone multiplications" begin
-        @. tmp2j = P0j' * (prmtv.scalpnt .* weight_vecsj)'
-        mul!(tmp1j, tmp2j, P0j)
-        end
+        @. tmp2j = ipwtj' * prmtv.scalpnt'
+        mul!(tmp1j, tmp2j, ipwtj)
 
         # pivoted cholesky and triangular solve method
-        @show size(tmp1j)
-        @show size(tmp2j)
-        @show size(P0j)
         F = cholesky!(Symmetric(tmp1j, :L), Val(true), check=false)
         if !isposdef(F)
             return false
         end
 
-        tmp2j .= view(P0j', F.p, :)
+        tmp2j .= view(ipwtj', F.p, :)
         ldiv!(F.L, tmp2j) # TODO make sure calls best triangular solve
         # mul!(tmp3, tmp2j', tmp2j)
-        Blower_dimsAS.syrk!('U', 'T', 1.0, tmp2j, 0.0, tmp3)
+        BLAS.syrk!('U', 'T', 1.0, tmp2j, 0.0, tmp3)
 
         # posvx solve method
         # tmp2j .= ipwtj' # TODO eliminate by transposing in construction
@@ -106,12 +91,11 @@ function incone_prmtv(prmtv::WSOSPolyInterp, scal::Float64)
         #     return false
         # end
         # mul!(tmp3, ipwtj, PDPiP)
-        # TODO ask @chriscoey if we need to keep ^^
 
-        @inbounds for i in eachindex(prmtv.g)
-            prmtv.g[i] -= tmp3[i, i] * weight_vecsj[i]
-            @inbounds for k in 1:i
-                prmtv.H[k, i] += abs2(tmp3[k, i]) * weight_vecsj[k] * weight_vecsj[i]
+        @inbounds for j in eachindex(prmtv.g)
+            prmtv.g[j] -= tmp3[j,j]
+            @inbounds for i in 1:j
+                prmtv.H[i,j] += abs2(tmp3[i,j])
             end
         end
     end
