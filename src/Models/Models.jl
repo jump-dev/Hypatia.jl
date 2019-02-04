@@ -6,6 +6,9 @@ functions and types for model data
 
 module Models
 
+using LinearAlgebra
+using SparseArrays
+
 import Hypatia.Cones
 
 abstract type Model end

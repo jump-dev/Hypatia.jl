@@ -81,6 +81,12 @@ version = "0.0.8"
 deps = ["Random", "Serialization", "Sockets"]
 uuid = "8ba89e20-285c-5b6f-9357-94700520ee1b"
 
+[[DynamicPolynomials]]
+deps = ["LinearAlgebra", "MultivariatePolynomials", "Pkg", "Reexport", "Test"]
+git-tree-sha1 = "6cfaf56193f5bf6ac6b1b033b994ef3808c5d831"
+uuid = "7c1d4256-1411-5781-91ec-d7bc3513ac07"
+version = "0.1.2"
+
 [[FFTW]]
 deps = ["AbstractFFTs", "BinaryProvider", "Compat", "Conda", "Libdl", "LinearAlgebra", "Reexport", "Test"]
 git-tree-sha1 = "29cda58afbf62f35b1a094882ad6c745a47b2eaa"
