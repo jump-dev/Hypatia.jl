@@ -31,7 +31,7 @@ end
 
 dimension(dom::Box) = length(dom.l)
 degree(::Box) = 2
-scale_factor(dom::Box) = (dom.u - dom.l) * 0.5
+scale_factor(dom::Box) = [1.0 for _ in 1:dimension(dom)] # (dom.u - dom.l) * 0.5
 
 # points to construct P0, PWts to come from [-1, 1] box
 # function interp_sample(dom::Box, npts::Int)
@@ -78,7 +78,7 @@ end
 
 dimension(dom::Ball) = length(dom.c)
 degree(::Ball) = 2
-scale_factor(dom::Ball) = [dom.r for _ in 1:dimension(dom)]
+scale_factor(dom::Ball) = [1.0 for _ in 1:dimension(dom)] # [dom.r for _ in 1:dimension(dom)]
 
 # function interp_sample(dom::Ball, npts::Int)
 #     dim = dimension(dom)
@@ -131,7 +131,7 @@ end
 
 dimension(dom::Ellipsoid) = length(dom.c)
 degree(::Ellipsoid) = 2
-scale_factor(dom::Ellipsoid) = eigen(dom.Q).values
+scale_factor(dom::Ellipsoid) = [1.0 for _ in 1:dimension(dom)] # eigen(dom.Q).values
 
 # function shift_and_scale!(pts::AbstractMatrix{Float64}, dom::Ellipsoid)
 #     dim = dimension(dom)
