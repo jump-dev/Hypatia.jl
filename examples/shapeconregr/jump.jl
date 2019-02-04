@@ -69,8 +69,8 @@ end
 
 function add_loss_and_polys!(
     model::Model,
-    X::Matrix{Float64},
-    y::Vector{Float64},
+    X,
+    y,
     r::Int,
     use_leastsqobj::Bool
     )
@@ -98,7 +98,7 @@ function build_shapeconregr_PSD(
     r::Int,
     sd::ShapeData;
     use_leastsqobj::Bool = false,
-    usedense::Bool = true,
+    usedense::Bool = false,
     )
     n = size(X, 2)
     d = div(r+1, 2)
@@ -128,12 +128,12 @@ function build_shapeconregr_PSD(
 end
 
 function build_shapeconregr_WSOS(
-    X::Matrix{Float64},
-    y::Vector{Float64},
+    X,
+    y,
     r::Int,
     sd::ShapeData;
     use_leastsqobj::Bool = false,
-    usedense::Bool = true,
+    usedense::Bool = false,
     sample::Bool = true,
     )
     d = div(r+1, 2)
@@ -164,7 +164,7 @@ function build_shapeconregr_WSOS(
     return (model, p)
 end
 
-function run_JuMP_shapeconregr(use_wsos::Bool; usedense::Bool=true)
+function run_JuMP_shapeconregr(use_wsos::Bool; usedense::Bool=false)
     (n, deg, npoints, signal_ratio, f) =
         # (2, 3, 100, 0.0, x -> exp(norm(x))) # no noise, monotonic function
         (2, 3, 100, 0.0, x -> sum(x.^3)) # no noise, monotonic function
