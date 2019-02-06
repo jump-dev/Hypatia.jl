@@ -139,7 +139,7 @@ function incone_prmtv(prmtv::WSOSPolyInterpMat, scal::Float64)
     end
     end
     @timeit to "needless barfun" barfun!(prmtv.scalpnt, prmtv)
-    @timeit to "autodiff" prmtv.diffres = ForwardDiff.hessian!(prmtv.diffres, prmtv.barfun, prmtv.scalpnt)
+    # @timeit to "autodiff" prmtv.diffres = ForwardDiff.hessian!(prmtv.diffres, prmtv.barfun, prmtv.scalpnt)
 
     prmtv.g .= 0.0
     prmtv.H .= 0.0
@@ -151,7 +151,9 @@ function incone_prmtv(prmtv::WSOSPolyInterpMat, scal::Float64)
         L = size(ipwtj, 2)
         # der11 += sum(ipwtj[1,k] * ipwtj[1,l] * Winv[(k-1)*prmtv.r+1, (l-1)*prmtv.r+1] for k in 1:L, l in 1:L)^2
         # der44 += sum(ipwtj[1,k] * ipwtj[1,l] * Winv[(k-1)*prmtv.r+1, (l-1)*prmtv.r+1] for k in 1:L, l in 1:L) *
-                 # sum(ipwtj[1,k] * ipwtj[1,l] * Winv[(k-1)*prmtv.r+2, (l-1)*prmtv.r+2] for k in 1:L, l in 1:L) * 2.0
+        #          sum(ipwtj[1,k] * ipwtj[1,l] * Winv[(k-1)*prmtv.r+2, (l-1)*prmtv.r+2] for k in 1:L, l in 1:L) +
+        #          sum(ipwtj[1,k] * ipwtj[1,l] * Winv[(k-1)*prmtv.r+1, (l-1)*prmtv.r+2] for k in 1:L, l in 1:L) *
+        #          sum(ipwtj[1,k] * ipwtj[1,l] * Winv[(k-1)*prmtv.r+2, (l-1)*prmtv.r+1] for k in 1:L, l in 1:L)
 
         idx = 0
         # outer indices for W
@@ -169,27 +171,31 @@ function incone_prmtv(prmtv::WSOSPolyInterpMat, scal::Float64)
             end
             # hessian
             idx2 = 0
-            @timeit "computing H" begin
+            @timeit to "computing H" begin
             for p2 in 1:prmtv.r,  q2 in 1:p2,  u2 in 1:prmtv.u
                 idx2 += 1
                 sum1 = 0.0
                 sum2 = 0.0
+                sum3 = 0.0
+                sum4 = 0.0
                 for k2 in 1:L, l2 in 1:L
                     (bk2, bl2) = ((k2-1)*prmtv.r, (l2-1)*prmtv.r)
                     sum1 += Winv[bk2+p, bl2+p2] * ipwtj[u,k2] * ipwtj[u2,l2]
                     sum2 += Winv[bk2+q, bl2+q2] * ipwtj[u,k2] * ipwtj[u2,l2]
+                    sum3 += Winv[bk2+p, bl2+q2] * ipwtj[u,k2] * ipwtj[u2,l2]
+                    sum4 += Winv[bk2+q, bl2+p2] * ipwtj[u,k2] * ipwtj[u2,l2]
                 end
                 if p == q
                     if p2 == q2
                         prmtv.H[idx, idx2] += sum1 * sum2
                     else
-                        prmtv.H[idx, idx2] += (sum1 * sum2) * rt2
+                        prmtv.H[idx, idx2] += (sum1 * sum2) * rt2i + (sum3 * sum4) * rt2i
                     end
                 else
                     if p2 == q2
-                        prmtv.H[idx, idx2] += (sum1 * sum2) * rt2
+                        prmtv.H[idx, idx2] += (sum1 * sum2) * rt2i + (sum3 * sum4) * rt2i
                     else
-                        prmtv.H[idx, idx2] += (sum1 * sum2) * 2.0
+                        prmtv.H[idx, idx2] += (sum1 * sum2) + (sum3 * sum4)
                     end
                 end
             end
@@ -200,12 +206,13 @@ function incone_prmtv(prmtv::WSOSPolyInterpMat, scal::Float64)
     # tempg = DiffResults.gradient(prmtv.diffres)
     tempH = DiffResults.hessian(prmtv.diffres)
     # @show prmtv.H
-    # @show tempH
-    @show prmtv.H ./ tempH
+    # @show tempH[4,4]
+    # @show prmtv.H ./ tempH
+    # @show prmtv.g
     # @show der44
-    # @show  tempH[4,4] / prmtv.H[4,4]
+    # @show  tempH[4,4] / der44
     # @show tempH[1,2]
-    prmtv.H .= DiffResults.hessian(prmtv.diffres)
+    # prmtv.H .= DiffResults.hessian(prmtv.diffres)
     end # timing incone
     return factH(prmtv)
 end
