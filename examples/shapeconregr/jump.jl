@@ -101,7 +101,7 @@ function build_shapeconregr_PSD(
     n = size(X, 2)
     d = div(r + 1, 2)
 
-    model = SumOfSquares.SOSModel(JuMP.with_optimizer(HYP.Optimizer, verbose = true, dense = dense))
+    model = SumOfSquares.SOSModel(JuMP.with_optimizer(HYP.Optimizer, verbose = true, use_dense = dense))
     (x, p) = add_loss_and_polys(model, X, y, r, use_lsq_obj)
 
     mono_bss = MU.get_domain_inequalities(sd.mono_dom, x)
@@ -144,7 +144,7 @@ function build_shapeconregr_WSOS(
     mono_wsos_cone = HYP.WSOSPolyInterpCone(mono_U, [mono_P0, mono_PWts...])
     conv_wsos_cone = HYP.WSOSPolyInterpMatCone(n, conv_U, [conv_P0, conv_PWts...])
 
-    model = SumOfSquares.SOSModel(JuMP.with_optimizer(HYP.Optimizer, verbose = true, dense = dense))
+    model = SumOfSquares.SOSModel(JuMP.with_optimizer(HYP.Optimizer, verbose = true, use_dense = dense))
     (x, p) = add_loss_and_polys(model, X, y, r, use_lsq_obj)
 
     # monotonicity
