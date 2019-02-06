@@ -45,26 +45,26 @@ conic_exclude = String[
     # "rsoc",
     # "exp",
     # "geomean",
-    # "sdp",
-    # "logdet",
-    # "rootdet",
+    "sdp",
+    "logdet",
+    "rootdet",
     # TODO MOI bridges don't support square logdet or rootdet
     "logdets",
     "rootdets",
     ]
 
-# function test_moi(; verbose, linear_solver, dense)
-function test_moi(; verbose, dense)
+# function test_moi(; verbose, linear_solver, use_dense)
+function test_moi(; verbose, use_dense)
     optimizer = MOIU.CachingOptimizer(
         MOIU.UniversalFallback(HypatiaModelData{Float64}()),
         HYP.Optimizer(
+            use_dense = use_dense,
             verbose = verbose,
             time_limit = 2e1,
             # linear_solver = linear_solver,
-            dense = dense,
-            # tol_rel_opt = 2e-8,
-            # tol_abs_opt = 2e-8,
-            # tol_feas = 1e-8,
+            tol_rel_opt = 2e-8,
+            tol_abs_opt = 2e-8,
+            tol_feas = 1e-8,
             )
         )
     @testset "unit tests" begin
