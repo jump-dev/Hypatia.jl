@@ -37,126 +37,126 @@ include(joinpath(examples_dir, "wsosmatrix/sosmat2.jl"))
 include(joinpath(examples_dir, "wsosmatrix/sosmat3.jl"))
 
 include(joinpath(@__DIR__, "JuMP.jl"))
-#
+
 include(joinpath(@__DIR__, "MathOptInterface.jl"))
 
 
 @testset "Hypatia tests" begin
 
-# @info("starting interpolation tests")
-# @testset "interpolation tests" begin
-#     fekete_sample()
-# end
+@info("starting interpolation tests")
+@testset "interpolation tests" begin
+    fekete_sample()
+end
 
-# # @info("starting native interface tests")
-# verbose = true
-# # linear_solvers = [
-# #     LS.QRSymm,
-# #     # LS.Naive,
-# #     ]
-# testfuns = [
-#     # dimension1, # TODO needs preprocessing
-#     # consistent1,
-#     # inconsistent1,
-#     # inconsistent2,
-#     orthant1,
-#     orthant2,
-#     orthant3,
-#     orthant4,
-#     epinorminf1,
-#     epinorminf2,
-#     epinorminf3,
-#     epinorminf4,
-#     epinorminf5,
-#     epinorminf6,
-#     epinormeucl1,
-#     epinormeucl2,
-#     epipersquare1,
-#     epipersquare2,
-#     epipersquare3,
-#     # semidefinite1,
-#     # semidefinite2,
-#     # semidefinite3,
-#     hypoperlog1,
-#     hypoperlog2,
-#     hypoperlog3,
-#     hypoperlog4,
-#     epiperpower1,
-#     epiperpower2,
-#     epiperpower3,
-#     hypogeomean1,
-#     hypogeomean2,
-#     hypogeomean3,
-#     hypogeomean4,
-#     epinormspectral1,
-#     hypoperlogdet1,
-#     hypoperlogdet2,
-#     hypoperlogdet3,
-#     epipersumexp1,
-#     epipersumexp2,
+# @info("starting native interface tests")
+verbose = true
+# linear_solvers = [
+#     LS.QRSymm,
+#     # LS.Naive,
 #     ]
-# # @testset "native tests: $t, $l" for t in testfuns, l in linear_solvers
-# @testset "native tests: $t" for t in testfuns
-#     # t(verbose = verbose, linear_solver = l)
-#     t(verbose = verbose)
-# end
-#
-# @info("starting default native examples tests")
-# testfuns = [
-#     run_envelope_primal_dense,
-#     run_envelope_dual_dense,
-#     run_envelope_primal_sparse,
-#     run_envelope_dual_sparse,
-#     run_linearopt,
-#     run_namedpoly,
-#     ]
-# @testset "default examples: $t" for t in testfuns
-#     t()
-# end
-#
-# @info("starting additional native examples tests")
-# verbose = false
-# # linear_solvers = [
-# #     LS.QRSymm,
-# #     # LS.Naive, # slow
-# #     ]
-# testfuns = [
-#     # TODO test primal and dual formulations of envelope
-#     envelope1, # TODO check slight obj disagreement
-#     envelope2,
-#     envelope3,
-#     envelope4,
-#     linearopt1,
-#     linearopt2,
-#     namedpoly1,
-#     namedpoly2,
-#     namedpoly3,
-#     namedpoly4,
-#     namedpoly5,
-#     namedpoly6,
-#     namedpoly7,
-#     namedpoly8,
-#     namedpoly9,
-#     namedpoly10,
-#     namedpoly11,
-#     ]
-# # @testset "native examples: $t, $l" for t in testfuns, l in linear_solvers
-# @testset "native examples: $t" for t in testfuns#, l in linear_solvers
-#     # t(verbose = verbose, linear_solver = l)
-#     t(verbose = verbose)
-# end
+testfuns = [
+    # dimension1, # TODO needs preprocessing
+    # consistent1,
+    # inconsistent1,
+    # inconsistent2,
+    orthant1,
+    orthant2,
+    orthant3,
+    orthant4,
+    epinorminf1,
+    epinorminf2,
+    epinorminf3,
+    epinorminf4,
+    epinorminf5,
+    epinorminf6,
+    epinormeucl1,
+    epinormeucl2,
+    epipersquare1,
+    epipersquare2,
+    epipersquare3,
+    # semidefinite1,
+    # semidefinite2,
+    # semidefinite3,
+    hypoperlog1,
+    hypoperlog2,
+    hypoperlog3,
+    hypoperlog4,
+    epiperpower1,
+    epiperpower2,
+    epiperpower3,
+    hypogeomean1,
+    hypogeomean2,
+    hypogeomean3,
+    hypogeomean4,
+    epinormspectral1,
+    hypoperlogdet1,
+    hypoperlogdet2,
+    hypoperlogdet3,
+    epipersumexp1,
+    epipersumexp2,
+    ]
+# @testset "native tests: $t, $l" for t in testfuns, l in linear_solvers
+@testset "native tests: $t" for t in testfuns
+    # t(verbose = verbose, linear_solver = l)
+    t(verbose = verbose)
+end
 
-# @info("starting MathOptInterface tests")
-# verbose = false
-# # linear_solvers = [
-# #     LS.QRSymm,
-# #     LS.Naive,
-# #     ]
-# @testset "MOI tests: $(d ? "dense" : "sparse")" for d in (false, true)
-# # @testset "MOI tests: $l, $(d ? "dense" : "sparse")" for l in linear_solvers, d in (false, true)
-#     test_moi(verbose = verbose, use_dense = d)
-#     # test_moi(verbose = verbose, linear_solver = l, use_dense = d)
-# end
+@info("starting default native examples tests")
+testfuns = [
+    run_envelope_primal_dense,
+    run_envelope_dual_dense,
+    run_envelope_primal_sparse,
+    run_envelope_dual_sparse,
+    run_linearopt,
+    run_namedpoly,
+    ]
+@testset "default examples: $t" for t in testfuns
+    t()
+end
+
+@info("starting additional native examples tests")
+verbose = false
+# linear_solvers = [
+#     LS.QRSymm,
+#     # LS.Naive, # slow
+#     ]
+testfuns = [
+    # TODO test primal and dual formulations of envelope
+    envelope1, # TODO check slight obj disagreement
+    envelope2,
+    envelope3,
+    envelope4,
+    linearopt1,
+    linearopt2,
+    namedpoly1,
+    namedpoly2,
+    namedpoly3,
+    namedpoly4,
+    namedpoly5,
+    namedpoly6,
+    namedpoly7,
+    namedpoly8,
+    namedpoly9,
+    namedpoly10,
+    namedpoly11,
+    ]
+# @testset "native examples: $t, $l" for t in testfuns, l in linear_solvers
+@testset "native examples: $t" for t in testfuns#, l in linear_solvers
+    # t(verbose = verbose, linear_solver = l)
+    t(verbose = verbose)
+end
+
+@info("starting MathOptInterface tests")
+verbose = false
+# linear_solvers = [
+#     LS.QRSymm,
+#     LS.Naive,
+#     ]
+@testset "MOI tests: $(d ? "dense" : "sparse")" for d in (false, true)
+# @testset "MOI tests: $l, $(d ? "dense" : "sparse")" for l in linear_solvers, d in (false, true)
+    test_moi(verbose = verbose, use_dense = d)
+    # test_moi(verbose = verbose, linear_solver = l, use_dense = d)
+end
 
 @info("starting default JuMP examples tests")
 testfuns = [
@@ -189,36 +189,36 @@ testfuns = [
     t()
 end
 
-# @info("starting additional JuMP examples tests")
-# testfuns = [
-#     namedpoly1_JuMP,
-#     namedpoly2_JuMP,
-#     namedpoly3_JuMP,
-#     namedpoly4_JuMP, # numerically unstable
-#     namedpoly5_JuMP,
-#     namedpoly6_JuMP,
-#     namedpoly7_JuMP,
-#     namedpoly8_JuMP,
-#     namedpoly9_JuMP,
-#     namedpoly10_JuMP,
-#     shapeconregr1_JuMP,
-#     shapeconregr2_JuMP,
-#     shapeconregr3_JuMP,
-#     shapeconregr4_JuMP,
-#     shapeconregr5_JuMP,
-#     shapeconregr6_JuMP,
-#     shapeconregr7_JuMP, # numerically unstable
-#     shapeconregr8_JuMP,
-#     shapeconregr9_JuMP, # numerically unstable
-#     shapeconregr10_JuMP, # numerically unstable
-#     shapeconregr11_JuMP, # numerically unstable
-#     shapeconregr12_JuMP, # numerically unstable
-#     shapeconregr13_JuMP, # numerically unstable
-#     # shapeconregr14_JuMP, # throws out-of-memory error
-#     # shapeconregr15_JuMP, # throws out-of-memory error
-#     ]
-# @testset "JuMP examples: $t" for t in testfuns
-#     t()
-# end
-#
+@info("starting additional JuMP examples tests")
+testfuns = [
+    namedpoly1_JuMP,
+    namedpoly2_JuMP,
+    namedpoly3_JuMP,
+    namedpoly4_JuMP, # numerically unstable
+    namedpoly5_JuMP,
+    namedpoly6_JuMP,
+    namedpoly7_JuMP,
+    namedpoly8_JuMP,
+    namedpoly9_JuMP,
+    namedpoly10_JuMP,
+    shapeconregr1_JuMP,
+    shapeconregr2_JuMP,
+    shapeconregr3_JuMP,
+    shapeconregr4_JuMP,
+    shapeconregr5_JuMP,
+    shapeconregr6_JuMP,
+    shapeconregr7_JuMP, # numerically unstable
+    shapeconregr8_JuMP,
+    shapeconregr9_JuMP, # numerically unstable
+    shapeconregr10_JuMP, # numerically unstable
+    shapeconregr11_JuMP, # numerically unstable
+    shapeconregr12_JuMP, # numerically unstable
+    shapeconregr13_JuMP, # numerically unstable
+    # shapeconregr14_JuMP, # throws out-of-memory error
+    # shapeconregr15_JuMP, # throws out-of-memory error
+    ]
+@testset "JuMP examples: $t" for t in testfuns
+    t()
+end
+
 end
