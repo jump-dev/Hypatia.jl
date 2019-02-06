@@ -73,7 +73,9 @@ function find_max_alpha_in_nbhd(z_dir::AbstractVector{Float64}, s_dir::AbstractV
                 nbhd_sqr_k = temp' * Cones.inv_hess(cone_k) * temp
 
                 if nbhd_sqr_k <= -1e-5
-                    error("nbhd_sqr_k is $nbhd_sqr_k")
+                    println("numerical issue for cone: nbhd_sqr_k is $nbhd_sqr_k")
+                    in_nbhds = false
+                    break
                 elseif nbhd_sqr_k > 0.0
                     full_nbhd_sqr += nbhd_sqr_k
                     if full_nbhd_sqr > abs2(ls_mu * nbhd)
