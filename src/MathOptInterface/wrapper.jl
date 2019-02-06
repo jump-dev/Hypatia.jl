@@ -7,7 +7,10 @@ MathOptInterface wrapper of Hypatia solver
 mutable struct Optimizer <: MOI.AbstractOptimizer
     verbose::Bool
     time_limit::Float64
-    dense::Bool
+    use_dense::Bool
+    tol_rel_opt::Float64
+    tol_abs_opt::Float64
+    tol_feas::Float64
 
     model::Models.Linear
     solver::Solvers.HSDSolver
@@ -31,24 +34,27 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     primal_obj::Float64
     dual_obj::Float64
 
-    function Optimizer(verbose::Bool, time_limit::Float64, dense::Bool)
+    function Optimizer(use_dense::Bool, verbose::Bool, time_limit::Float64, tol_rel_opt::Float64, tol_abs_opt::Float64, tol_feas::Float64)
         opt = new()
         opt.verbose = verbose
         opt.time_limit = time_limit
-        opt.dense = dense
+        opt.use_dense = use_dense
+        opt.tol_rel_opt = tol_rel_opt
+        opt.tol_abs_opt = tol_abs_opt
+        opt.tol_feas = tol_feas
         opt.status = :NotLoaded
         return opt
     end
 end
 
 Optimizer(;
+    use_dense::Bool = true,
     verbose::Bool = false,
     time_limit::Float64 = 3.6e3, # TODO should be Inf
-    dense::Bool = true,
-    # tol_rel_opt::Float64 = 1e-6,
-    # tol_abs_opt::Float64 = 1e-7,
-    # tol_feas::Float64 = 1e-7,
-    ) = Optimizer(verbose, time_limit, dense)
+    tol_rel_opt::Float64 = 1e-6,
+    tol_abs_opt::Float64 = 1e-7,
+    tol_feas::Float64 = 1e-7,
+    ) = Optimizer(use_dense, verbose, time_limit, tol_rel_opt, tol_abs_opt, tol_feas)
 
 MOI.get(::Optimizer, ::MOI.SolverName) = "Hypatia"
 
@@ -190,7 +196,7 @@ function MOI.copy_to(
     end
 
     push!(constr_offset_eq, p)
-    if opt.dense
+    if opt.use_dense
         model_A = Matrix(sparse(IA, JA, VA, p, n))
     else
         model_A = dropzeros!(sparse(IA, JA, VA, p, n))
@@ -449,7 +455,7 @@ function MOI.copy_to(
 
     push!(constr_offset_cone, q)
 
-    if opt.dense
+    if opt.use_dense
         model_G = Matrix(sparse(IG, JG, VG, q, n))
     else
         model_G = dropzeros!(sparse(IG, JG, VG, q, n))
@@ -472,7 +478,8 @@ function MOI.optimize!(opt::Optimizer)
 
     # check, preprocess, load, and solve
     model = Models.Linear(c, A, b, G, h, cones, cone_idxs)
-    solver = Solvers.HSDSolver(model, verbose = true) # TODO other options
+    solver = Solvers.HSDSolver(model, verbose = opt.verbose, time_limit = opt.time_limit,
+        tol_rel_opt = opt.tol_rel_opt, tol_abs_opt = opt.tol_abs_opt, tol_feas = opt.tol_feas)
     Solvers.solve(solver)
 
     opt.status = Solvers.get_status(solver)

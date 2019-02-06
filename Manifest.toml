@@ -117,7 +117,7 @@ version = "0.20.0"
 
 [[JuMP]]
 deps = ["Calculus", "DataStructures", "ForwardDiff", "LinearAlgebra", "MathOptInterface", "NaNMath", "Random", "SparseArrays", "Statistics", "Test"]
-git-tree-sha1 = "db897ea06270247f45992c4e543a7d8a4948f5f9"
+git-tree-sha1 = "5669f2a04aeed4b78cb8ac0c1535da77dc24c095"
 repo-rev = "master"
 repo-url = "https://github.com/JuliaOpt/JuMP.jl.git"
 uuid = "4076af6c-e467-56ae-b986-b466b2749572"
@@ -142,7 +142,7 @@ uuid = "d6f4376e-aef5-505a-96c1-9c027394607a"
 
 [[MathOptInterface]]
 deps = ["Compat", "Unicode"]
-git-tree-sha1 = "1ed0b3a78c74612e92441e81d250e9737e180262"
+git-tree-sha1 = "7d513731b3fa5b515f38ebcfd53f795d73607c30"
 repo-rev = "master"
 repo-url = "https://github.com/JuliaOpt/MathOptInterface.jl.git"
 uuid = "b8f27783-ece8-5eb3-8dc8-9495eed66fee"
@@ -226,7 +226,7 @@ git-tree-sha1 = "0b45dc2e45ed77f445617b99ff2adf0f5b0f23ea"
 repo-rev = "master"
 repo-url = "https://github.com/JuliaMath/SpecialFunctions.jl.git"
 uuid = "276daf66-3868-5448-9aa4-cd146d93841b"
-version = "0.7.2"
+version = "0.7.2+"
 
 [[StaticArrays]]
 deps = ["InteractiveUtils", "LinearAlgebra", "Random", "Statistics", "Test"]
