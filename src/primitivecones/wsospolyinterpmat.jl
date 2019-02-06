@@ -130,24 +130,28 @@ end
 loadpnt_prmtv!(prmtv::WSOSPolyInterpMat, pnt::AbstractVector{Float64}) = (prmtv.pnt = pnt)
 
 function incone_prmtv(prmtv::WSOSPolyInterpMat, scal::Float64)
+    @timeit to "incone" begin
     prmtv.scal = 1.0
     @. prmtv.scalpnt = prmtv.pnt/prmtv.scal
+    @timeit to "actual barfun" begin
     if isnan(barfun(prmtv.scalpnt, prmtv.ipwt, prmtv.r, prmtv.u, false))
         return false
     end
-    barfun!(prmtv.scalpnt, prmtv)
-    prmtv.diffres = ForwardDiff.hessian!(prmtv.diffres, prmtv.barfun, prmtv.scalpnt)
+    end
+    @timeit to "needless barfun" barfun!(prmtv.scalpnt, prmtv)
+    @timeit to "autodiff" prmtv.diffres = ForwardDiff.hessian!(prmtv.diffres, prmtv.barfun, prmtv.scalpnt)
 
     prmtv.g .= 0.0
     prmtv.H .= 0.0
     der11 = 0.0
     der44 = 0.0
     for (j, ipwtj) in enumerate(prmtv.ipwt)
-        Winv = inv(prmtv.mat[j])
+        @timeit to "getting g" begin
+        @timeit to "needless inversion" Winv = inv(prmtv.mat[j])
         L = size(ipwtj, 2)
         # der11 += sum(ipwtj[1,k] * ipwtj[1,l] * Winv[(k-1)*prmtv.r+1, (l-1)*prmtv.r+1] for k in 1:L, l in 1:L)^2
-        der44 += sum(ipwtj[1,k] * ipwtj[1,l] * Winv[(k-1)*prmtv.r+1, (l-1)*prmtv.r+1] for k in 1:L, l in 1:L) *
-                 sum(ipwtj[1,k] * ipwtj[1,l] * Winv[(k-1)*prmtv.r+2, (l-1)*prmtv.r+2] for k in 1:L, l in 1:L) * 2.0
+        # der44 += sum(ipwtj[1,k] * ipwtj[1,l] * Winv[(k-1)*prmtv.r+1, (l-1)*prmtv.r+1] for k in 1:L, l in 1:L) *
+                 # sum(ipwtj[1,k] * ipwtj[1,l] * Winv[(k-1)*prmtv.r+2, (l-1)*prmtv.r+2] for k in 1:L, l in 1:L) * 2.0
 
         idx = 0
         # outer indices for W
@@ -165,6 +169,7 @@ function incone_prmtv(prmtv::WSOSPolyInterpMat, scal::Float64)
             end
             # hessian
             idx2 = 0
+            @timeit "computing H" begin
             for p2 in 1:prmtv.r,  q2 in 1:p2,  u2 in 1:prmtv.u
                 idx2 += 1
                 sum1 = 0.0
@@ -188,16 +193,20 @@ function incone_prmtv(prmtv::WSOSPolyInterpMat, scal::Float64)
                     end
                 end
             end
+            end #timing hessian
         end
+        end # timing getting g
     end
     # tempg = DiffResults.gradient(prmtv.diffres)
-    tempH  = DiffResults.hessian(prmtv.diffres)
-    @show prmtv.H[4,4]
-    @show tempH[4,4]
-    @show der44
-    @show  tempH[4,4] / prmtv.H[4,4]
+    tempH = DiffResults.hessian(prmtv.diffres)
+    # @show prmtv.H
+    # @show tempH
+    @show prmtv.H ./ tempH
+    # @show der44
+    # @show  tempH[4,4] / prmtv.H[4,4]
     # @show tempH[1,2]
     prmtv.H .= DiffResults.hessian(prmtv.diffres)
+    end # timing incone
     return factH(prmtv)
 end
 
