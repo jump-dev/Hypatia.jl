@@ -20,8 +20,6 @@ mutable struct WSOSPolyInterpMat <: PrimitiveCone
     H2::Matrix{Float64}
     F
     mat::Vector{Matrix{Float64}}
-    barfun::Function
-    diffres
 
     function WSOSPolyInterpMat(r::Int, u::Int, ipwt::Vector{Matrix{Float64}}, isdual::Bool)
         for ipwtj in ipwt
@@ -39,46 +37,8 @@ mutable struct WSOSPolyInterpMat <: PrimitiveCone
         prmtv.H = similar(ipwt[1], dim, dim)
         prmtv.H2 = similar(prmtv.H)
         prmtv.mat = [similar(ipwt[1], size(ipwtj, 2) * r, size(ipwtj, 2) * r) for ipwtj in ipwt]
-        prmtv.barfun = (x -> barfun(x, ipwt, r, u, true))
-        prmtv.diffres = DiffResults.HessianResult(prmtv.g)
         return prmtv
     end
-end
-
-# calculate barrier value
-function barfun(pnt, ipwt::Vector{Matrix{Float64}}, R::Int, U::Int, calc_barval::Bool)
-    barval = 0.0
-
-    for ipwtj in ipwt
-        L = size(ipwtj, 2)
-        mat = similar(pnt, L*R, L*R)
-        mat .= 0.0
-
-        for l in 1:L, k in 1:l
-            (bl, bk) = ((l-1)*R, (k-1)*R)
-            uo = 0
-            for p in 1:R, q in 1:p
-                val = sum(ipwtj[u,l] * ipwtj[u,k] * pnt[uo+u] for u in 1:U)
-                # FIXME inconsistency between ordering of the variables in the outer/inner indexing between this mat and the point in the cone differentiating more confusing
-                if p == q
-                    mat[bl+p, bk+q] = val
-                else
-                    mat[bl+p, bk+q] = mat[bl+q, bk+p] = rt2i*val
-                end
-                uo += U
-            end
-        end
-
-        F = cholesky!(Symmetric(mat, :L), check=false)
-        if !isposdef(F)
-            return NaN
-        end
-        if calc_barval
-            barval -= logdet(F)
-        end
-    end
-
-    return barval
 end
 
 function barfun!(pnt, prmtv::WSOSPolyInterpMat)
@@ -104,8 +64,11 @@ function barfun!(pnt, prmtv::WSOSPolyInterpMat)
             end
         end
         mat .= Symmetric(mat, :L)
+        if !isposdef(mat)
+            return false
+        end
     end
-    return nothing
+    return true
 end
 
 WSOSPolyInterpMat(r::Int, u::Int, ipwt::Vector{Matrix{Float64}}) = WSOSPolyInterpMat(r, u, ipwt, false)
@@ -133,27 +96,18 @@ function incone_prmtv(prmtv::WSOSPolyInterpMat, scal::Float64)
     @timeit to "incone" begin
     prmtv.scal = 1.0
     @. prmtv.scalpnt = prmtv.pnt/prmtv.scal
-    @timeit to "actual barfun" begin
-    if isnan(barfun(prmtv.scalpnt, prmtv.ipwt, prmtv.r, prmtv.u, false))
-        return false
+    @timeit to "buildmat" begin
+        if !(barfun!(prmtv.scalpnt, prmtv))
+            return false
+        end
     end
-    end
-    @timeit to "needless barfun" barfun!(prmtv.scalpnt, prmtv)
-    # @timeit to "autodiff" prmtv.diffres = ForwardDiff.hessian!(prmtv.diffres, prmtv.barfun, prmtv.scalpnt)
 
     prmtv.g .= 0.0
     prmtv.H .= 0.0
-    der11 = 0.0
-    der44 = 0.0
     for (j, ipwtj) in enumerate(prmtv.ipwt)
         @timeit to "getting g" begin
         @timeit to "needless inversion" Winv = inv(prmtv.mat[j])
         L = size(ipwtj, 2)
-        # der11 += sum(ipwtj[1,k] * ipwtj[1,l] * Winv[(k-1)*prmtv.r+1, (l-1)*prmtv.r+1] for k in 1:L, l in 1:L)^2
-        # der44 += sum(ipwtj[1,k] * ipwtj[1,l] * Winv[(k-1)*prmtv.r+1, (l-1)*prmtv.r+1] for k in 1:L, l in 1:L) *
-        #          sum(ipwtj[1,k] * ipwtj[1,l] * Winv[(k-1)*prmtv.r+2, (l-1)*prmtv.r+2] for k in 1:L, l in 1:L) +
-        #          sum(ipwtj[1,k] * ipwtj[1,l] * Winv[(k-1)*prmtv.r+1, (l-1)*prmtv.r+2] for k in 1:L, l in 1:L) *
-        #          sum(ipwtj[1,k] * ipwtj[1,l] * Winv[(k-1)*prmtv.r+2, (l-1)*prmtv.r+1] for k in 1:L, l in 1:L)
 
         idx = 0
         # outer indices for W
@@ -203,16 +157,6 @@ function incone_prmtv(prmtv::WSOSPolyInterpMat, scal::Float64)
         end
         end # timing getting g
     end
-    # tempg = DiffResults.gradient(prmtv.diffres)
-    tempH = DiffResults.hessian(prmtv.diffres)
-    # @show prmtv.H
-    # @show tempH[4,4]
-    # @show prmtv.H ./ tempH
-    # @show prmtv.g
-    # @show der44
-    # @show  tempH[4,4] / der44
-    # @show tempH[1,2]
-    # prmtv.H .= DiffResults.hessian(prmtv.diffres)
     end # timing incone
     return factH(prmtv)
 end
