@@ -70,11 +70,16 @@ function find_max_alpha_in_nbhd(z_dir::AbstractVector{Float64}, s_dir::AbstractV
                 temp = dual_views[k] + ls_mu * Cones.grad(cone_k)
                 # TODO use cholesky L
                 # nbhd = sqrt(temp' * Cones.inv_hess(cone) * temp) / mu
-                full_nbhd_sqr += temp' * Cones.inv_hess(cone_k) * temp
+                nbhd_sqr_k = temp' * Cones.inv_hess(cone_k) * temp
 
-                if full_nbhd_sqr > abs2(ls_mu * nbhd)
-                    in_nbhds = false
-                    break
+                if nbhd_sqr_k <= -1e-5
+                    error("nbhd_sqr_k is $nbhd_sqr_k")
+                elseif nbhd_sqr_k > 0.0
+                    full_nbhd_sqr += nbhd_sqr_k
+                    if full_nbhd_sqr > abs2(ls_mu * nbhd)
+                        in_nbhds = false
+                        break
+                    end
                 end
             end
             if in_nbhds
@@ -82,7 +87,7 @@ function find_max_alpha_in_nbhd(z_dir::AbstractVector{Float64}, s_dir::AbstractV
             end
         end
 
-        if alpha < 1e-5
+        if alpha < 1e-3
             # alpha is very small
             return 0.0
         end
