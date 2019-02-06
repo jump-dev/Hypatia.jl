@@ -22,8 +22,8 @@ function combined_predict_correct(solver::HSDSolver)
     for k in eachindex(cones)
         cone_k = cones[k]
         # TODO stepped to this point so should already have called check_in_cone for the point
-        # Cones.load_point(cone_k, point.primal_views[k])
-        # @assert Cones.check_in_cone(cone_k)
+        Cones.load_point(cone_k, point.primal_views[k])
+        @assert Cones.check_in_cone(cone_k)
         rows = (n + p) .+ model.cone_idxs[k]
         cols = Cones.use_dual(cone_k) ? rows : (q + 1) .+ rows
         LHS[rows, cols] = solver.mu * Cones.hess(cone_k)
@@ -33,9 +33,9 @@ function combined_predict_correct(solver::HSDSolver)
         solver.x_residual  zeros(n);
         solver.y_residual  zeros(p);
         zeros(q)    zeros(q);
-        -solver.kap  -solver.kap + solver.mu / solver.tau;
+        -solver.kap  (-solver.kap + solver.mu / solver.tau);
         solver.z_residual  zeros(q);
-        solver.kap + solver.primal_obj_t - solver.dual_obj_t  0.0;
+        (solver.kap + solver.primal_obj_t - solver.dual_obj_t)  0.0;
         ]
     for k in eachindex(cones)
         rows = (n + p) .+ model.cone_idxs[k]
@@ -61,7 +61,8 @@ function combined_predict_correct(solver::HSDSolver)
     # # calculate prediction and correction directions
     # (x_dirs, y_dirs, z_dirs, s_dirs, tau_dirs, kap_dirs) = get_combined_directions(solver)
 
-    affine_alpha = find_max_alpha_in_nbhd(view(z_dirs, :, 1), view(s_dirs, :, 1), tau_dirs[1], kap_dirs[1], 0.99, solver)
+    # affine_alpha = find_max_alpha_in_nbhd(view(z_dirs, :, 1), view(s_dirs, :, 1), tau_dirs[1], kap_dirs[1], 0.99, solver)
+    affine_alpha = find_max_alpha_in_nbhd(z_dirs[:, 1], s_dirs[:, 1], tau_dirs[1], kap_dirs[1], 0.999, solver)
     gamma = (1.0 - affine_alpha)^3 # TODO allow different function (heuristic)
     @show gamma
 
@@ -71,6 +72,18 @@ function combined_predict_correct(solver::HSDSolver)
     tau_comb = dot(tau_dirs, comb_scaling)
     kap_comb = dot(kap_dirs, comb_scaling)
     alpha = find_max_alpha_in_nbhd(z_comb, s_comb, tau_comb, kap_comb, solver.max_nbhd, solver)
+    @show alpha
+
+    if iszero(alpha)
+        alpha = 0.999
+        gamma = 1.0
+        comb_scaling = vcat(1.0 - gamma, gamma)
+
+        z_comb = z_dirs * comb_scaling
+        s_comb = s_dirs * comb_scaling
+        tau_comb = dot(tau_dirs, comb_scaling)
+        kap_comb = dot(kap_dirs, comb_scaling)
+    end
 
     # point = solver.point
     x_comb = x_dirs * comb_scaling

@@ -58,9 +58,9 @@ mutable struct HSDSolver <: Solver
         tol_rel_opt = 1e-6,
         tol_abs_opt = 1e-7,
         tol_feas = 1e-7,
-        max_iters::Int = 100,
+        max_iters::Int = 500,
         time_limit::Float64 = 3e2,
-        max_nbhd::Float64 = 1e-1,
+        max_nbhd::Float64 = 0.8,
         )
         solver = new()
 
