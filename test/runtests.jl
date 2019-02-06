@@ -122,20 +122,20 @@ verbose = false
 #     ]
 testfuns = [
     # TODO test primal and dual formulations of envelope
-    # envelope1, # TODO check slight obj disagreement
+    envelope1, # TODO check slight obj disagreement
     envelope2,
     envelope3,
     envelope4,
     linearopt1,
     linearopt2,
-    # namedpoly1,
-    # namedpoly2,
+    namedpoly1,
+    namedpoly2,
     namedpoly3,
-    # namedpoly4,
+    namedpoly4,
     namedpoly5,
-    # namedpoly6,
+    namedpoly6,
     namedpoly7,
-    # namedpoly8,
+    namedpoly8,
     namedpoly9,
     namedpoly10,
     namedpoly11,
