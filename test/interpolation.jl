@@ -2,23 +2,20 @@
 Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 =#
 
-@testset "free domains" begin
-    n = 5
+function fekete_sample()
+    Random.seed!(1)
+    n = 3
     d = 2
-    box = Hypatia.Box(-ones(n), ones(n))
-    free = Hypatia.FreeDomain(n)
-    (box_U, box_pts, box_P0, box_PWts, _) = Hypatia.interpolate(box, d, sample=true, sample_factor=200)
-    (free_U, free_pts, free_P0, free_PWts, _) = Hypatia.interpolate(free, d, sample=true, sample_factor=200)
-    @test box_U == free_U
-    @test size(box_pts) == size(free_pts)
-    @test size(box_P0) == size(free_P0)
-    @test norm(box_P0) ≈ norm(free_P0) atol=1.0
-    @test isempty(free_PWts)
+    box = MU.Box(-ones(n), ones(n))
+    free = MU.FreeDomain(n)
 
-    (box_U, box_pts, box_P0, box_PWts, _) = Hypatia.interpolate(box, d, sample=false)
-    (free_U, free_pts, free_P0, free_PWts, _) = Hypatia.interpolate(free, d, sample=false)
-    @test box_U == free_U
-    @test size(box_pts) == size(free_pts)
-    @test norm(box_P0) ≈ norm(free_P0)
-    @test isempty(free_PWts)
+    for sample in (true, false)
+        (box_U, box_pts, box_P0, box_PWts, _) = MU.interpolate(box, d, sample = sample, sample_factor = 20)
+        (free_U, free_pts, free_P0, free_PWts, _) = MU.interpolate(free, d, sample = sample, sample_factor = 20)
+        @test isempty(free_PWts)
+        @test box_U == free_U
+        @test size(box_pts) == size(free_pts)
+        @test size(box_P0) == size(free_P0)
+        @test norm(box_P0) ≈ norm(free_P0) atol=1e-1 rtol=1e-1
+    end
 end
