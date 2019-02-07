@@ -129,7 +129,7 @@ version = "0.20.0"
 
 [[JuMP]]
 deps = ["Calculus", "DataStructures", "ForwardDiff", "LinearAlgebra", "MathOptInterface", "NaNMath", "Random", "SparseArrays", "Statistics", "Test"]
-git-tree-sha1 = "5669f2a04aeed4b78cb8ac0c1535da77dc24c095"
+git-tree-sha1 = "be340c5286bc653261663a4e9379d6252ee27801"
 repo-rev = "master"
 repo-url = "https://github.com/JuliaOpt/JuMP.jl.git"
 uuid = "4076af6c-e467-56ae-b986-b466b2749572"
@@ -154,7 +154,7 @@ uuid = "d6f4376e-aef5-505a-96c1-9c027394607a"
 
 [[MathOptInterface]]
 deps = ["Compat", "Unicode"]
-git-tree-sha1 = "7d513731b3fa5b515f38ebcfd53f795d73607c30"
+git-tree-sha1 = "e3c7fb842078f5cd9a21ecb911dc59a4282e3d01"
 repo-rev = "master"
 repo-url = "https://github.com/JuliaOpt/MathOptInterface.jl.git"
 uuid = "b8f27783-ece8-5eb3-8dc8-9495eed66fee"
@@ -179,9 +179,9 @@ version = "0.1.2"
 
 [[MultivariatePolynomials]]
 deps = ["LinearAlgebra", "Test"]
-git-tree-sha1 = "1d8f77292707c262acfa3659336426bbb153df50"
+git-tree-sha1 = "f88a674a9857b7ecda5adc405b8353f19ea0ac46"
 uuid = "102ac46a-7ee4-5c85-9060-abc95bfdeaa3"
-version = "0.2.5"
+version = "0.2.6"
 
 [[NaNMath]]
 deps = ["Compat"]
