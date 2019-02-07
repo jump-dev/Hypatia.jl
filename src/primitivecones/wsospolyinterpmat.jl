@@ -43,7 +43,7 @@ mutable struct WSOSPolyInterpMat <: PrimitiveCone
     end
 end
 
-function buildmat!(prmtv::WSOSPolyInterpMat, pnt)
+function buildmat!(prmtv::WSOSPolyInterpMat, pnt::AbstractVector{Float64})
     (R, U) = (prmtv.r, prmtv.u)
     for (j, ipwtj) in enumerate(prmtv.ipwt)
         L = size(ipwtj, 2)
@@ -69,6 +69,65 @@ function buildmat!(prmtv::WSOSPolyInterpMat, pnt)
         end
     end
     return true
+end
+
+function update_gradient_hessian!(prmtv::WSOSPolyInterpMat, ipwtj::Matrix{Float64}, Winv::Matrix{Float64})
+    L = size(ipwtj, 2)
+    idx = 0
+    # outer indices for W
+    for p in 1:prmtv.r, q in 1:p
+        (bp, bq) = ((p - 1) * L, (q - 1) * L)
+        for u in 1:prmtv.u
+            idx += 1
+            # sum for gradient
+            for k in 1:L, l in 1:k
+                if k > l
+                    Wcomp = Winv[bp + k, bq + l] + Winv[bp + l, bq + k]
+                else
+                    Wcomp = Winv[bp + k, bq + l]
+                end
+                if p == q
+                    fact = 1.0
+                else
+                    fact = rt2
+                end
+                prmtv.g[idx] -= ipwtj[u, k] * ipwtj[u, l] * Wcomp * fact
+            end
+            # hessian
+            idx2 = 0
+            for p2 in 1:prmtv.r, q2 in 1:p2
+                (bp2, bq2) = ((p2 - 1) * L, (q2 - 1) * L)
+                for u2 in 1:prmtv.u
+                    idx2 += 1
+                    idx2 < idx && continue
+                    sum1 = 0.0
+                    sum2 = 0.0
+                    sum3 = 0.0
+                    sum4 = 0.0
+                    for k2 in 1:L, l2 in 1:L
+                        sum1 += Winv[bp + k2, bp2 + l2] * ipwtj[u, k2] * ipwtj[u2, l2]
+                        sum2 += Winv[bq + k2, bq2 + l2] * ipwtj[u, k2] * ipwtj[u2, l2]
+                        sum3 += Winv[bp + k2, bq2 + l2] * ipwtj[u, k2] * ipwtj[u2, l2]
+                        sum4 += Winv[bq + k2, bp2 + l2] * ipwtj[u, k2] * ipwtj[u2, l2]
+                    end
+                    if p == q
+                        if p2 == q2
+                            prmtv.H[idx, idx2] += sum1 * sum2
+                        else
+                            prmtv.H[idx, idx2] += (sum1 * sum2) * rt2i + (sum3 * sum4) * rt2i
+                        end
+                    else
+                        if p2 == q2
+                            prmtv.H[idx, idx2] += (sum1 * sum2) * rt2i + (sum3 * sum4) * rt2i
+                        else
+                            prmtv.H[idx, idx2] += (sum1 * sum2) + (sum3 * sum4)
+                        end
+                    end
+                end # u2
+            end # p2, q2
+        end # u
+    end # p, q
+    return nothing
 end
 
 WSOSPolyInterpMat(r::Int, u::Int, ipwt::Vector{Matrix{Float64}}) = WSOSPolyInterpMat(r, u, ipwt, false)
@@ -98,67 +157,12 @@ function incone_prmtv(prmtv::WSOSPolyInterpMat, scal::Float64)
     if !(buildmat!(prmtv, prmtv.scalpnt))
         return false
     end
-
     prmtv.g .= 0.0
     prmtv.H .= 0.0
     for (j, ipwtj) in enumerate(prmtv.ipwt)
         Winv = inv(prmtv.matfact[j])
-        L = size(ipwtj, 2)
-
-        idx = 0
-        # outer indices for W
-        for p in 1:prmtv.r, q in 1:p
-            (bp, bq) = ((p - 1) * L, (q - 1) * L)
-            for u in 1:prmtv.u
-                idx += 1
-                # sum for gradient
-                for k in 1:L, l in 1:k
-                    if k > l
-                        Wcomp = Winv[bp + k, bq + l] + Winv[bp + l, bq + k]
-                    else
-                        Wcomp = Winv[bp + k, bq + l]
-                    end
-                    if p == q
-                        prmtv.g[idx] -= ipwtj[u, k] * ipwtj[u, l] * Wcomp
-                    else
-                        prmtv.g[idx] -= ipwtj[u, k] * ipwtj[u, l] * Wcomp * rt2
-                    end
-                end
-                # hessian
-                idx2 = 0
-                for p2 in 1:prmtv.r, q2 in 1:p2
-                    (bp2, bq2) = ((p2 - 1) * L, (q2 - 1) * L)
-                    for u2 in 1:prmtv.u
-                        idx2 += 1
-                        idx2 < idx && continue
-                        sum1 = 0.0
-                        sum2 = 0.0
-                        sum3 = 0.0
-                        sum4 = 0.0
-                        for k2 in 1:L, l2 in 1:L
-                            sum1 += Winv[bp + k2, bp2 + l2] * ipwtj[u, k2] * ipwtj[u2, l2]
-                            sum2 += Winv[bq + k2, bq2 + l2] * ipwtj[u, k2] * ipwtj[u2, l2]
-                            sum3 += Winv[bp + k2, bq2 + l2] * ipwtj[u, k2] * ipwtj[u2, l2]
-                            sum4 += Winv[bq + k2, bp2 + l2] * ipwtj[u, k2] * ipwtj[u2, l2]
-                        end
-                        if p == q
-                            if p2 == q2
-                                prmtv.H[idx, idx2] += sum1 * sum2
-                            else
-                                prmtv.H[idx, idx2] += (sum1 * sum2) * rt2i + (sum3 * sum4) * rt2i
-                            end
-                        else
-                            if p2 == q2
-                                prmtv.H[idx, idx2] += (sum1 * sum2) * rt2i + (sum3 * sum4) * rt2i
-                            else
-                                prmtv.H[idx, idx2] += (sum1 * sum2) + (sum3 * sum4)
-                            end
-                        end
-                    end # u2
-                end # p2, q2
-            end # u
-        end # p, q
-    end # ipwt
+        update_gradient_hessian!(prmtv, ipwtj, Winv)
+    end
     return factH(prmtv)
 end
 
