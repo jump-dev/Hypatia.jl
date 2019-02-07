@@ -16,7 +16,7 @@ using SparseArrays
 import MathOptInterface
 const MOI = MathOptInterface
 
-include("MathOptInterface/cones.jl")
+include("MathOptInterface/Cones.jl")
 include("MathOptInterface/wrapper.jl")
 
 end
