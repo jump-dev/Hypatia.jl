@@ -3,15 +3,16 @@ function combined_predict_correct(solver::HSDSolver)
     model = solver.model
     point = solver.point
 
-    # calculate prediction and correction directions
+    # calculate affine/prediction and correction directions
     (x_dirs, y_dirs, z_dirs, s_dirs, tau_dirs, kap_dirs) = get_combined_directions(solver, solver.stepper)
 
-    # affine_alpha = find_max_alpha_in_nbhd(view(z_dirs, :, 1), view(s_dirs, :, 1), tau_dirs[1], kap_dirs[1], 0.99, solver)
+    # calculate correction factor gamma by finding distance affine_alpha for stepping in affine direction
     affine_alpha = find_max_alpha_in_nbhd(z_dirs[:, 1], s_dirs[:, 1], tau_dirs[1], kap_dirs[1], 0.999, solver)
     gamma = (1.0 - affine_alpha)^3 # TODO allow different function (heuristic)
     @show gamma
 
-    comb_scaling = vcat(1.0 - gamma, gamma)
+    # find distance alpha for stepping in combined direction
+    comb_scaling = [1.0 - gamma, gamma]
     z_comb = z_dirs * comb_scaling
     s_comb = s_dirs * comb_scaling
     tau_comb = dot(tau_dirs, comb_scaling)
@@ -20,17 +21,16 @@ function combined_predict_correct(solver::HSDSolver)
     @show alpha
 
     if iszero(alpha)
+        # could not step far in combined direction, so perform a pure correction step
         alpha = 0.999
-        gamma = 1.0
-        comb_scaling = vcat(1.0 - gamma, gamma)
-
+        comb_scaling = [0.0, 1.0]
         z_comb = z_dirs * comb_scaling
         s_comb = s_dirs * comb_scaling
         tau_comb = dot(tau_dirs, comb_scaling)
         kap_comb = dot(kap_dirs, comb_scaling)
     end
 
-    # point = solver.point
+    # step distance alpha in combined direction
     x_comb = x_dirs * comb_scaling
     y_comb = y_dirs * comb_scaling
     @. point.x += alpha * x_comb
