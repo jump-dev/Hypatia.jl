@@ -2,7 +2,7 @@
 Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 =#
 
-function solveandcheck_JuMP(model, true_obj; atol = 1e-4, rtol = 1e-4)
+function solveandcheck_JuMP(model, true_obj; atol = 1e-3, rtol = 1e-3)
     JuMP.optimize!(model)
     @test JuMP.termination_status(model) == MOI.OPTIMAL
     @test JuMP.primal_status(model) == MOI.FEASIBLE_POINT

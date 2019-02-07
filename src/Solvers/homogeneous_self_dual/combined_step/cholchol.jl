@@ -1,16 +1,16 @@
 
-mutable struct CombinedCholCholStepper <: HSDStepper
+mutable struct CholCholCombinedHSDSystemSolver <: CombinedHSDSystemSolver
 
     function CombinedNaiveStepper(model::Models.Linear)
         (n, p, q) = (model.n, model.p, model.q)
-        stepper = new()
+        system_solver = new()
 
 
-        return stepper
+        return system_solver
     end
 end
 
-function get_combined_directions(solver::HSDSolver, stepper::CombinedCholCholStepper)
+function get_combined_directions(solver::HSDSolver, system_solver::CholCholCombinedHSDSystemSolver)
     model = solver.model
     cones = model.cones
     point = solver.point

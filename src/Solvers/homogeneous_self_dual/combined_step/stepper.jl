@@ -1,15 +1,34 @@
 
-function combined_predict_correct(solver::HSDSolver)
+mutable struct CombinedHSDStepper <: HSDStepper
+    system_solver::CombinedHSDSystemSolver
+    max_nbhd::Float64
+    prev_alpha::Float64
+    prev_gamma::Float64
+
+    function CombinedHSDStepper(
+        model::Models.Linear;
+        system_solver::CombinedHSDSystemSolver = NaiveCombinedHSDSystemSolver(model),
+        max_nbhd::Float64 = 0.75,
+        )
+        stepper = new()
+        stepper.system_solver = system_solver
+        stepper.max_nbhd = max_nbhd
+        stepper.prev_alpha = NaN
+        stepper.prev_gamma = NaN
+        return stepper
+    end
+end
+
+function combined_predict_correct(solver::HSDSolver, stepper::CombinedHSDStepper)
     model = solver.model
     point = solver.point
 
     # calculate affine/prediction and correction directions
-    (x_dirs, y_dirs, z_dirs, s_dirs, tau_dirs, kap_dirs) = get_combined_directions(solver, solver.stepper)
+    (x_dirs, y_dirs, z_dirs, s_dirs, tau_dirs, kap_dirs) = get_combined_directions(solver, stepper.system_solver)
 
     # calculate correction factor gamma by finding distance affine_alpha for stepping in affine direction
     affine_alpha = find_max_alpha_in_nbhd(z_dirs[:, 1], s_dirs[:, 1], tau_dirs[1], kap_dirs[1], 0.999, solver)
     gamma = (1.0 - affine_alpha)^3 # TODO allow different function (heuristic)
-    @show gamma
 
     # find distance alpha for stepping in combined direction
     comb_scaling = [1.0 - gamma, gamma]
@@ -17,8 +36,7 @@ function combined_predict_correct(solver::HSDSolver)
     s_comb = s_dirs * comb_scaling
     tau_comb = dot(tau_dirs, comb_scaling)
     kap_comb = dot(kap_dirs, comb_scaling)
-    alpha = find_max_alpha_in_nbhd(z_comb, s_comb, tau_comb, kap_comb, solver.max_nbhd, solver)
-    @show alpha
+    alpha = find_max_alpha_in_nbhd(z_comb, s_comb, tau_comb, kap_comb, stepper.max_nbhd, solver)
 
     if iszero(alpha)
         # could not step far in combined direction, so perform a pure correction step
@@ -41,96 +59,26 @@ function combined_predict_correct(solver::HSDSolver)
     solver.kap += alpha * kap_comb
     calc_mu(solver)
 
+    stepper.prev_gamma = gamma
+    stepper.prev_alpha = alpha
+
     return point
 end
 
+function print_iter_header(solver::HSDSolver, stepper::CombinedHSDStepper)
+    @printf("\n%5s %12s %12s %9s %9s %9s %9s %9s %9s %9s %9s %9s %9s\n",
+        "iter", "p_obj", "d_obj", "abs_gap", "rel_gap",
+        "x_feas", "y_feas", "z_feas", "tau", "kap", "mu",
+        "gamma", "alpha",
+        )
+    flush(stdout)
+end
 
-
-
-
-# function combined_predict_correct(point::Models.Point, residual::Models.Point, mu::Float64, solver::HSDSolver)
-#     cones = solver.model.cones
-#     (n, p, q) = (model.n, model.p, model.q)
-#
-#     # calculate prediction and correction directions
-#
-#     LHS[n+p+q+1, end] = mu / point.tau / point.tau
-#     for k in eachindex(cones)
-#         cone_k = cones[k]
-#         # TODO stepped to this point so should already have called check_in_cone for the point
-#         Cones.load_point(cone_k, point.primal_views[k])
-#         @assert Cones.check_in_cone(cone_k)
-#         rows = (n + p) .+ model.cone_idxs[k]
-#         cols = Cones.use_dual(cone_k) ? rows : (q + 1) .+ rows
-#         LHS[rows, cols] = mu * Cones.hess(cone_k)
-#     end
-#
-#     rhs = [
-#         x_residual  zeros(n);
-#         y_residual  zeros(p);
-#         zeros(q)    zeros(q);
-#         -point.kap  -point.kap + mu / point.tau;
-#         z_residual  zeros(q);
-#         point.kap + primal_obj_t - dual_obj_t  0.0;
-#         ]
-#     for k in eachindex(cones)
-#         rows = (n + p) .+ model.cone_idxs[k]
-#         rhs[rows, 1] = -point.dual_views[k]
-#         rhs[rows, 2] = -point.dual_views[k] - mu * Cones.grad(cones[k])
-#     end
-#
-#     F = lu(LHS)
-#     ldiv!(F, rhs)
-#
-#     # affine phase
-#     # affine_direction = construct_affine_direction(direction_solution, mu, solver)
-#     @. @views begin
-#         predict.tx = rhs[1:n, 1]
-#         predict.ty = rhs[(n + 1):(n + p), 1]
-#         predict.tz = rhs[(n + p + 1):(n + p + q), 1]
-#         predict.ts = rhs[(n + p + q + 2):(n + p + 2q + 1), 1]
-#     end
-#     predict.kap = rhs[n + p + q + 1, 1]
-#     predict.tau = rhs[n + p + 2q + 2, 1]
-#
-#     # affine_alpha = get_max_alpha(point, predict, solver)
-#     affine_alpha = find_max_alpha_in_nbhd(point, predict, mu, 0.99, solver)
-#
-#
-#     # # NOTE step in corrector direction here: not in description of algorithms?
-#     # @. @views begin
-#     #     correct.tx = rhs[1:n, 2]
-#     #     correct.ty = rhs[(n + 1):(n + p), 2]
-#     #     correct.tz = rhs[(n + p + 1):(n + p + q), 2]
-#     #     correct.ts = rhs[(n + p + q + 2):(n + p + 2q + 1), 2]
-#     # end
-#     # correct.kap = rhs[n + p + q + 1, 2]
-#     # correct.tau = rhs[n + p + 2q + 2, 2]
-#     #
-#     # point = step_in_direction(point, correct, 1.0)
-#     # mu = get_mu(point, model)
-#
-#
-#     # combined phase
-#     gamma = (1.0 - affine_alpha)^3 # TODO allow different function (heuristic)
-#     # @show gamma
-#
-#     # direction = construct_combined_direction(direction_solution, mu, gamma, solver)
-#     combined_rhs = rhs * vcat(1.0 - gamma, gamma)
-#     combined = predict
-#     @. @views begin
-#         combined.tx = combined_rhs[1:n]
-#         combined.ty = combined_rhs[(n + 1):(n + p)]
-#         combined.tz = combined_rhs[(n + p + 1):(n + p + q)]
-#         combined.ts = combined_rhs[(n + p + q + 2):(n + p + 2q + 1)]
-#     end
-#     combined.kap = combined_rhs[n + p + q + 1]
-#     combined.tau = combined_rhs[n + p + 2q + 2]
-#
-#     alpha = find_max_alpha_in_nbhd(point, combined, mu, solver.combined_nbhd, solver)
-#
-#     point = step_in_direction(point, combined, alpha)
-#     mu = get_mu(point, model)
-#
-#     return point
-# end
+function print_iter_summary(solver::HSDSolver, stepper::CombinedHSDStepper)
+    @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n",
+        solver.num_iters, solver.primal_obj, solver.dual_obj, solver.gap, solver.rel_gap,
+        solver.x_feas, solver.y_feas, solver.z_feas, solver.tau, solver.kap, solver.mu,
+        stepper.prev_gamma, stepper.prev_alpha,
+        )
+    flush(stdout)
+end
