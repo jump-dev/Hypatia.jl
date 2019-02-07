@@ -116,13 +116,17 @@ function incone_prmtv(prmtv::WSOSPolyInterpMat, scal::Float64)
         for p in 1:prmtv.r,  q in 1:p,  u in 1:prmtv.u
             idx += 1
             # sum for gradient
-            for k in 1:L, l in 1:L
+            for k in 1:L, l in 1:k
                 (bk, bl) = ((k-1)*prmtv.r, (l-1)*prmtv.r)
-                # TODO avoid some doubling up
-                if p == q
-                    prmtv.g[idx] -= ipwtj[u,k] * ipwtj[u,l] * Winv[bk+p, bl+q]
+                if k > l
+                    Wcomp = Winv[bk+p, bl+q] + Winv[bl+p, bk+q]
                 else
-                    prmtv.g[idx] -= ipwtj[u,k] * ipwtj[u,l] * Winv[bk+p, bl+q] * rt2
+                    Wcomp = Winv[bk+p, bl+q]
+                end
+                if p == q
+                    prmtv.g[idx] -= ipwtj[u,k] * ipwtj[u,l] * Wcomp
+                else
+                    prmtv.g[idx] -= ipwtj[u,k] * ipwtj[u,l] * Wcomp * rt2
                 end
             end
             # hessian
