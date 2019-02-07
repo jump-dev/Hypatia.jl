@@ -110,17 +110,15 @@ function update_gradient_hessian!(prmtv::WSOSPolyInterpMat, ipwtj::Matrix{Float6
                         sum3 += Winv[bp + k2, bq2 + l2] * ipwtj[u, k2] * ipwtj[u2, l2]
                         sum4 += Winv[bq + k2, bp2 + l2] * ipwtj[u, k2] * ipwtj[u2, l2]
                     end
-                    if p == q
-                        if p2 == q2
-                            prmtv.H[idx, idx2] += sum1 * sum2
-                        else
-                            prmtv.H[idx, idx2] += (sum1 * sum2) * rt2i + (sum3 * sum4) * rt2i
-                        end
+                    sum12 = sum1 * sum2
+                    if (p == q) && (p2 == q2)
+                        prmtv.H[idx, idx2] += sum12
                     else
-                        if p2 == q2
-                            prmtv.H[idx, idx2] += (sum1 * sum2) * rt2i + (sum3 * sum4) * rt2i
+                        sum34 = sum3 * sum4
+                        if (p != q) && (p2 != q2)
+                            prmtv.H[idx, idx2] += sum12 + sum34
                         else
-                            prmtv.H[idx, idx2] += (sum1 * sum2) + (sum3 * sum4)
+                            prmtv.H[idx, idx2] += rt2i * (sum12 + sum34)
                         end
                     end
                 end # u2
