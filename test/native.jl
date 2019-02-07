@@ -890,7 +890,7 @@ end
 function namedpoly3(; verbose::Bool = true)
     (c, A, b, G, h, cones, cone_idxs) = build_namedpoly(:goldsteinprice, 6)
     model = MO.Linear(c, A, b, G, h, cones, cone_idxs)
-    solver = SO.HSDSolver(model, verbose = verbose, tol_feas = 1e-8)
+    solver = SO.HSDSolver(model, verbose = verbose, tol_feas = 1e-9, tol_rel_opt = 1e-8, tol_abs_opt = 1e-8)
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
     @test abs(r.primal_obj) ≈ 3 atol=1e-4 rtol=1e-4
@@ -953,7 +953,7 @@ end
 function namedpoly10(; verbose::Bool = true)
     (c, A, b, G, h, cones, cone_idxs) = build_namedpoly(:rosenbrock, 5)
     model = MO.Linear(c, A, b, G, h, cones, cone_idxs)
-    solver = SO.HSDSolver(model, verbose = verbose, tol_feas = 1e-8)
+    solver = SO.HSDSolver(model, verbose = verbose, tol_feas = 1e-9, tol_rel_opt = 1e-8, tol_abs_opt = 1e-8)
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
     @test abs(r.primal_obj) ≈ 0 atol=1e-3 rtol=1e-3

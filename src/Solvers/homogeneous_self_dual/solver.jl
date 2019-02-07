@@ -44,6 +44,9 @@ mutable struct HSDSolver <: Solver
     dual_obj::Float64
     gap::Float64
     rel_gap::Float64
+    x_feas::Float64
+    y_feas::Float64
+    z_feas::Float64
 
     status::Symbol
     num_iters::Int
@@ -52,7 +55,7 @@ mutable struct HSDSolver <: Solver
     function HSDSolver(
         model::Models.Linear,
         ;
-        stepper::HSDStepper = CombinedNaiveStepper(model),
+        stepper::HSDStepper = CombinedHSDStepper(model),
         verbose::Bool = true,
         tol_rel_opt = 1e-6,
         tol_abs_opt = 1e-7,
@@ -100,6 +103,9 @@ mutable struct HSDSolver <: Solver
         solver.dual_obj = NaN
         solver.gap = NaN
         solver.rel_gap = NaN
+        solver.x_feas = NaN
+        solver.y_feas = NaN
+        solver.z_feas = NaN
 
         solver.status = :SolveNotCalled
         solver.num_iters = 0
@@ -125,15 +131,16 @@ function solve(solver::HSDSolver)
         error("initial mu is $(solver.mu) (should be 1.0)")
     end
 
-    solver.verbose && @printf("\n%5s %12s %12s %9s %9s %9s %9s %9s %9s %9s\n",
-        "iter", "p_obj", "d_obj", "abs_gap", "rel_gap", "p_inf", "d_inf", "tau", "kap", "mu")
+    solver.verbose && print_iter_header(solver, solver.stepper)
 
     while true
         calc_residual(solver)
 
-        if check_convergence(solver)
-            break
-        end
+        calc_convergence_params(solver)
+
+        solver.verbose && print_iter_summary(solver, solver.stepper)
+
+        check_convergence(solver) && break
 
         if solver.num_iters == solver.max_iters
             solver.verbose && println("iteration limit reached; terminating")
@@ -148,7 +155,7 @@ function solve(solver::HSDSolver)
         end
 
         # TODO may use different function, or function could change during some iteration eg if numerical difficulties
-        combined_predict_correct(solver)
+        combined_predict_correct(solver, solver.stepper)
 
         solver.num_iters += 1
     end
@@ -162,19 +169,14 @@ function solve(solver::HSDSolver)
 
     solver.solve_time = time() - start_time
 
-    if solver.verbose
-        println("\nstatus is $(solver.status) after $(solver.num_iters) iterations and $(trunc(solver.solve_time, digits=3)) seconds\n")
-    end
+    solver.verbose && println("\nstatus is $(solver.status) after $(solver.num_iters) iterations and $(trunc(solver.solve_time, digits=3)) seconds\n")
 
     return
 end
 
-function check_convergence(solver::HSDSolver)
+function calc_convergence_params(solver::HSDSolver)
     model = solver.model
     point = solver.point
-
-    norm_res_primal = max(solver.y_norm_res * solver.y_conv_tol, solver.z_norm_res * solver.z_conv_tol)
-    norm_res_dual = solver.x_norm_res * solver.x_conv_tol
 
     solver.primal_obj_t = dot(model.c, point.x)
     solver.dual_obj_t = -dot(model.b, point.y) - dot(model.h, point.z)
@@ -189,18 +191,17 @@ function check_convergence(solver::HSDSolver)
         solver.rel_gap = NaN
     end
 
-    # print iteration statistics
-    if solver.verbose
-        @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n",
-            solver.num_iters, solver.primal_obj, solver.dual_obj, solver.gap, solver.rel_gap,
-            norm_res_primal, norm_res_dual, solver.tau, solver.kap, solver.mu
-            )
-        flush(stdout)
-    end
+    solver.x_feas = solver.x_norm_res * solver.x_conv_tol
+    solver.y_feas = solver.y_norm_res * solver.y_conv_tol
+    solver.z_feas = solver.z_norm_res * solver.z_conv_tol
 
+    return
+end
+
+function check_convergence(solver::HSDSolver)
     # check convergence criteria
     # TODO nearly primal or dual infeasible or nearly optimal cases?
-    if norm_res_primal <= solver.tol_feas && norm_res_dual <= solver.tol_feas &&
+    if max(solver.x_feas, solver.y_feas, solver.z_feas) <= solver.tol_feas &&
         (solver.gap <= solver.tol_abs_opt || (!isnan(solver.rel_gap) && solver.rel_gap <= solver.tol_rel_opt))
         solver.verbose && println("optimal solution found; terminating")
         solver.status = :Optimal
@@ -265,35 +266,3 @@ function calc_mu(solver::HSDSolver)
         (1.0 + solver.model.nu)
     return solver.mu
 end
-
-
-
-# # get neighborhood parameters depending on magnitude of barrier parameter and maximum number of correction steps
-# # TODO calculate values from the formulae given in Papp & Yildiz "On A Homogeneous Interior-Point Algorithm for Non-Symmetric Convex Conic Optimization"
-# function getbetaeta(maxcorrsteps::Int, bnu::Float64)
-#     if maxcorrsteps <= 2
-#         if bnu < 10.0
-#             return (0.1810, 0.0733, 0.0225)
-#         elseif bnu < 100.0
-#             return (0.2054, 0.0806, 0.0263)
-#         else
-#             return (0.2190, 0.0836, 0.0288)
-#         end
-#     elseif maxcorrsteps <= 4
-#         if bnu < 10.0
-#             return (0.2084, 0.0502, 0.0328)
-#         elseif bnu < 100.0
-#             return (0.2356, 0.0544, 0.0380)
-#         else
-#             return (0.2506, 0.0558, 0.0411)
-#         end
-#     else
-#         if bnu < 10.0
-#             return (0.2387, 0.0305, 0.0429)
-#         elseif bnu < 100.0
-#             return (0.2683, 0.0327, 0.0489)
-#         else
-#             return (0.2844, 0.0332, 0.0525)
-#         end
-#     end
-# end

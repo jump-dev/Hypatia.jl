@@ -166,7 +166,7 @@ function build_JuMP_namedpoly_PSD(
     dom::MU.Domain;
     d::Int = div(max_degree(f) + 1, 2),
     )
-    model = SumOfSquares.SOSModel(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
+    model = SumOfSquares.SOSModel(JuMP.with_optimizer(HYP.Optimizer, verbose = true, tol_feas = 1e-9, tol_rel_opt = 1e-8, tol_abs_opt = 1e-8))
     JuMP.@variable(model, a)
     JuMP.@objective(model, Max, a)
     JuMP.@constraint(model, fnn, f >= a, domain = MU.get_domain_inequalities(dom, x), max_degree = 2d)
@@ -188,7 +188,7 @@ function build_JuMP_namedpoly_WSOS(
     (U, pts, P0, PWts, _) = MU.interpolate(dom, d, sample = sample, sample_factor = 100)
 
     # build JuMP model
-    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
+    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, tol_feas = 1e-9, tol_rel_opt = 1e-8, tol_abs_opt = 1e-8))
     if primal_wsos
         JuMP.@variable(model, a)
         JuMP.@objective(model, Max, a)

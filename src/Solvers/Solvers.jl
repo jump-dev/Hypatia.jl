@@ -17,6 +17,7 @@ abstract type Solver end
 
 # homogeneous self-dual embedding algorithm
 abstract type HSDStepper end
+abstract type CombinedHSDSystemSolver end
 include("homogeneous_self_dual/solver.jl")
 include("homogeneous_self_dual/steppers.jl")
 include("homogeneous_self_dual/combined_step/stepper.jl")

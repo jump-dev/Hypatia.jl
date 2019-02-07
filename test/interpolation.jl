@@ -10,8 +10,8 @@ function fekete_sample()
     free = MU.FreeDomain(n)
 
     for sample in (true, false)
-        (box_U, box_pts, box_P0, box_PWts, _) = MU.interpolate(box, d, sample = sample, sample_factor = 100)
-        (free_U, free_pts, free_P0, free_PWts, _) = MU.interpolate(free, d, sample = sample, sample_factor = 100)
+        (box_U, box_pts, box_P0, box_PWts, _) = MU.interpolate(box, d, sample = sample, sample_factor = 20)
+        (free_U, free_pts, free_P0, free_PWts, _) = MU.interpolate(free, d, sample = sample, sample_factor = 20)
         @test isempty(free_PWts)
         @test box_U == free_U
         @test size(box_pts) == size(free_pts)
