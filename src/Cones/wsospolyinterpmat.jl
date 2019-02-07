@@ -13,7 +13,6 @@ mutable struct WSOSPolyInterpMat <: Cone
     u::Int
     ipwt::Vector{Matrix{Float64}}
     point::Vector{Float64}
-    scal::Float64
     g::Vector{Float64}
     H::Matrix{Float64}
     H2::Matrix{Float64}
@@ -27,7 +26,7 @@ mutable struct WSOSPolyInterpMat <: Cone
         end
         cone = new()
         cone.use_dual = !is_dual # using dual barrier
-        dim = u * div(r * (r+1), 2)
+        dim = u * div(r * (r + 1), 2)
         cone.dim = dim
         cone.r = r
         cone.u = u
@@ -73,12 +72,10 @@ end
 function update_gradient_hessian!(cone::WSOSPolyInterpMat, ipwtj::Matrix{Float64}, Winv::Matrix{Float64})
     L = size(ipwtj, 2)
     idx = 0
-    # outer indices for W
     for p in 1:cone.r, q in 1:p
         (bp, bq) = ((p - 1) * L, (q - 1) * L)
         for u in 1:cone.u
             idx += 1
-            # sum for gradient
             for k in 1:L, l in 1:k
                 if k > l
                     Wcomp = Winv[bp + k, bq + l] + Winv[bp + l, bq + k]
@@ -144,8 +141,6 @@ function set_initial_point(arr::AbstractVector{Float64}, cone::WSOSPolyInterpMat
     end
     return arr
 end
-
-loadpoint_cone!(cone::WSOSPolyInterpMat, point::AbstractVector{Float64}) = (cone.point = point)
 
 function check_in_cone(cone::WSOSPolyInterpMat)
     if !(buildmat!(cone, cone.point))
