@@ -1,5 +1,165 @@
-#
-#
+
+mutable struct QRCholCombinedHSDSystemSolver <: CombinedHSDSystemSolver
+
+    function CombinedNaiveStepper(model::Models.Linear)
+        @assert has_QR(model) # need access to QR factorization from preprocessing
+        (n, p, q) = (model.n, model.p, model.q)
+        system_solver = new()
+
+
+        return system_solver
+    end
+end
+
+function get_combined_directions(solver::HSDSolver, system_solver::QRCholCombinedHSDSystemSolver)
+    model = solver.model
+    cones = model.cones
+    cone_idxs = model.cone_idxs
+    point = solver.point
+    (n, p, q) = (model.n, model.p, model.q) # TODO delete if not needed
+
+    # TODO
+    xi = hcat(-model.c, solver.x_residual, zeros(n))
+    yi = hcat(model.b, -solver.y_residual, zeros(p))
+    zi = hcat(model.h, zeros(q, 2))
+    for k in eachindex(cones)
+        zi[cone_idxs[k], 2] .= -point.dual_views[k]
+        zi[cone_idxs[k], 3] .= -point.dual_views[k] - solver.mu * Cones.grad(cones[k])
+    end
+
+    # eliminate s rows
+
+
+
+    # calculate z2
+    @. z2 = -rhs_tz
+    for k in eachindex(L.cone.cones)
+        a1k = view(z1, L.cone.idxs[k])
+        a2k = view(z2, L.cone.idxs[k])
+        a3k = view(rhs_ts, L.cone.idxs[k])
+        if L.cone.cones[k].use_dual
+            @. a1k = a2k - a3k
+            Cones.calcHiarr!(a2k, a1k, L.cone.cones[k])
+            a2k ./= mu
+        elseif !iszero(a3k) # TODO rhs_ts = 0 for correction steps, so can just check if doing correction
+            Cones.calcHarr!(a1k, a3k, L.cone.cones[k])
+            @. a2k -= mu * a1k
+        end
+    end
+
+    # calculate z1
+    if iszero(L.h) # TODO can check once when creating cache
+        z1 .= 0.0
+    else
+        for k in eachindex(L.cone.cones)
+            a1k = view(L.h, L.cone.idxs[k])
+            a2k = view(z1, L.cone.idxs[k])
+            if L.cone.cones[k].use_dual
+                Cones.calcHiarr!(a2k, a1k, L.cone.cones[k])
+                a2k ./= mu
+            else
+                Cones.calcHarr!(a2k, a1k, L.cone.cones[k])
+                a2k .*= mu
+            end
+        end
+    end
+
+    # bxGHbz = bx + G'*Hbz
+    mul!(L.bxGHbz, L.G', zi)
+    @. L.bxGHbz += xi
+
+    # Q1x = Q1*Ri'*by
+    mul!(L.Q1x, L.RiQ1', yi)
+
+    # Q2x = Q2*(K22_F\(Q2'*(bxGHbz - GHG*Q1x)))
+    mul!(L.GQ1x, L.G, L.Q1x)
+    for k in eachindex(L.cone.cones)
+        a1k = view(L.GQ1x, L.cone.idxs[k], :)
+        a2k = view(L.HGQ1x, L.cone.idxs[k], :)
+        if L.cone.cones[k].use_dual
+            Cones.calcHiarr!(a2k, a1k, L.cone.cones[k])
+            a2k ./= mu
+        else
+            Cones.calcHarr!(a2k, a1k, L.cone.cones[k])
+            a2k .*= mu
+        end
+    end
+    mul!(L.GHGQ1x, L.G', L.HGQ1x)
+    @. L.GHGQ1x = L.bxGHbz - L.GHGQ1x
+    mul!(L.Q2div, L.Q2', L.GHGQ1x)
+
+    if size(L.Q2div, 1) > 0
+        for k in eachindex(L.cone.cones)
+            a1k = view(L.GQ2, L.cone.idxs[k], :)
+            a2k = view(L.HGQ2, L.cone.idxs[k], :)
+            if L.cone.cones[k].use_dual
+                Cones.calcHiarr!(a2k, a1k, L.cone.cones[k])
+                a2k ./= mu
+            else
+                Cones.calcHarr!(a2k, a1k, L.cone.cones[k])
+                a2k .*= mu
+            end
+        end
+        mul!(L.Q2GHGQ2, L.GQ2', L.HGQ2)
+
+        F = bunchkaufman!(Symmetric(L.Q2GHGQ2), true, check = false)
+        if !issuccess(F)
+            println("linear system matrix factorization failed")
+            mul!(L.Q2GHGQ2, L.GQ2', L.HGQ2)
+            L.Q2GHGQ2 += 1e-6I
+            F = bunchkaufman!(Symmetric(L.Q2GHGQ2), true, check = false)
+            if !issuccess(F)
+                error("could not fix failure of positive definiteness; terminating")
+            end
+        end
+        ldiv!(F, L.Q2div)
+        L.Q2div .= L.Q2divcopy
+    end
+    mul!(L.Q2x, L.Q2, L.Q2div)
+
+    # xi = Q1x + Q2x
+    @. xi = L.Q1x + L.Q2x
+
+    # yi = Ri*Q1'*(bxGHbz - GHG*xi)
+    mul!(L.Gxi, L.G, xi)
+    for k in eachindex(L.cone.cones)
+        a1k = view(L.Gxi, L.cone.idxs[k], :)
+        a2k = view(L.HGxi, L.cone.idxs[k], :)
+        if L.cone.cones[k].use_dual
+            Cones.calcHiarr!(a2k, a1k, L.cone.cones[k])
+            a2k ./= mu
+        else
+            Cones.calcHarr!(a2k, a1k, L.cone.cones[k])
+            a2k .*= mu
+        end
+    end
+    mul!(L.GHGxi, L.G', L.HGxi)
+    @. L.bxGHbz -= L.GHGxi
+    mul!(yi, L.RiQ1, L.bxGHbz)
+
+    # zi = HG*xi - Hbz
+    @. zi = L.HGxi - zi
+
+    # combine
+    @views dir_tau = (rhs_tau + rhs_kap + dot(L.c, xi[:, 2]) + dot(L.b, yi[:, 2]) + dot(L.h, z2)) /
+        (mu / tau / tau - dot(L.c, xi[:, 1]) - dot(L.b, yi[:, 1]) - dot(L.h, z1))
+    @. @views rhs_tx = xi[:, 2] + dir_tau * xi[:, 1]
+    @. @views rhs_ty = yi[:, 2] + dir_tau * yi[:, 1]
+    @. rhs_tz = z2 + dir_tau * z1
+    mul!(z1, L.G, rhs_tx)
+    @. rhs_ts = -z1 + L.h * dir_tau - rhs_ts
+    dir_kap = -dot(L.c, rhs_tx) - dot(L.b, rhs_ty) - dot(L.h, rhs_tz) - rhs_tau
+
+
+
+
+
+    return (x_sol, y_sol, z_sol, s_sol, tau_sol, kap_sol)
+end
+
+
+
+
 # #=
 # Copyright 2018, Chris Coey and contributors
 #
