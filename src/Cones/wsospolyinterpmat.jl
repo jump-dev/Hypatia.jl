@@ -12,13 +12,13 @@ mutable struct WSOSPolyInterpMat <: Cone
     r::Int
     u::Int
     ipwt::Vector{Matrix{Float64}}
-    point::AbstractVector{Float64}
+    point::Vector{Float64}
     g::Vector{Float64}
     H::Matrix{Float64}
     H2::Matrix{Float64}
     F
-    barfun::Function
-    diffres
+    mat::Vector{Matrix{Float64}}
+    matfact::Vector{CholeskyPivoted{Float64,Array{Float64,2}}}
 
     function WSOSPolyInterpMat(r::Int, u::Int, ipwt::Vector{Matrix{Float64}}, is_dual::Bool)
         for ipwtj in ipwt
@@ -31,48 +31,97 @@ mutable struct WSOSPolyInterpMat <: Cone
         cone.r = r
         cone.u = u
         cone.ipwt = ipwt
+        cone.point = similar(ipwt[1], dim)
         cone.g = similar(ipwt[1], dim)
         cone.H = similar(ipwt[1], dim, dim)
         cone.H2 = similar(cone.H)
-        cone.barfun = (point -> barfun(point, ipwt, r, u, true))
-        cone.diffres = DiffResults.HessianResult(cone.g)
+        cone.mat = [similar(ipwt[1], size(ipwtj, 2) * r, size(ipwtj, 2) * r) for ipwtj in ipwt]
+        cone.matfact = Vector{CholeskyPivoted{Float64,Array{Float64,2}}}(undef, length(ipwt))
         return cone
     end
 end
 
-# calculate barrier value
-function barfun(point::AbstractVector, ipwt::Vector{Matrix{Float64}}, R::Int, U::Int, calc_barval::Bool)
-    barval = 0.0
-
-    for ipwtj in ipwt
+function buildmat!(cone::WSOSPolyInterpMat, point::AbstractVector{Float64})
+    (R, U) = (cone.r, cone.u)
+    for (j, ipwtj) in enumerate(cone.ipwt)
         L = size(ipwtj, 2)
-        mat = similar(point, L * R, L * R)
+        mat = cone.mat[j]
         mat .= 0.0
 
         for l in 1:L, k in 1:l
-            (bl, bk) = ((l - 1) * R, (k - 1) * R)
             uo = 0
             for p in 1:R, q in 1:p
-                val = sum(ipwtj[u, l] * ipwtj[u, k] * point[uo + u] for u in 1:U)
+                (bp, bq) = ((p - 1) * L, (q - 1) * L)
+                val = sum(ipwtj[u, l] * ipwtj[u, k] * point[uo+u] for u in 1:U)
                 if p == q
-                    mat[bl + p, bk + q] = val
+                    mat[bp + l, bq + k] = val
                 else
-                    mat[bl + p, bk + q] = mat[bl + q, bk + p] = rt2i * val
+                    mat[bp + l, bq + k] = mat[bp + k, bq + l] = rt2i * val
                 end
                 uo += U
             end
         end
-
-        F = cholesky!(Symmetric(mat, :L), check = false)
-        if !isposdef(F)
-            return NaN
-        end
-        if calc_barval
-            barval -= logdet(F)
+        cone.matfact[j] = cholesky!(Symmetric(mat, :L), Val(true), check=false)
+        if !isposdef(cone.matfact[j])
+            return false
         end
     end
+    return true
+end
 
-    return barval
+function update_gradient_hessian!(cone::WSOSPolyInterpMat, ipwtj::Matrix{Float64}, Winv::Matrix{Float64})
+    L = size(ipwtj, 2)
+    idx = 0
+    for p in 1:cone.r, q in 1:p
+        (bp, bq) = ((p - 1) * L, (q - 1) * L)
+        for u in 1:cone.u
+            idx += 1
+            for k in 1:L, l in 1:k
+                if k > l
+                    Wcomp = Winv[bp + k, bq + l] + Winv[bp + l, bq + k]
+                else
+                    Wcomp = Winv[bp + k, bq + l]
+                end
+                if p == q
+                    fact = 1.0
+                else
+                    fact = rt2
+                end
+                cone.g[idx] -= ipwtj[u, k] * ipwtj[u, l] * Wcomp * fact
+            end
+            # hessian
+            idx2 = 0
+            for p2 in 1:cone.r, q2 in 1:p2
+                (bp2, bq2) = ((p2 - 1) * L, (q2 - 1) * L)
+                for u2 in 1:cone.u
+                    idx2 += 1
+                    idx2 < idx && continue
+                    sum1 = 0.0
+                    sum2 = 0.0
+                    sum3 = 0.0
+                    sum4 = 0.0
+                    for k2 in 1:L, l2 in 1:L
+                        sum1 += Winv[bp + k2, bp2 + l2] * ipwtj[u, k2] * ipwtj[u2, l2]
+                        sum2 += Winv[bq + k2, bq2 + l2] * ipwtj[u, k2] * ipwtj[u2, l2]
+                        sum3 += Winv[bp + k2, bq2 + l2] * ipwtj[u, k2] * ipwtj[u2, l2]
+                        sum4 += Winv[bq + k2, bp2 + l2] * ipwtj[u, k2] * ipwtj[u2, l2]
+                    end
+                    sum12 = sum1 * sum2
+                    if (p == q) && (p2 == q2)
+                        cone.H[idx, idx2] += sum12
+                    else
+                        sum34 = sum3 * sum4
+                        if (p != q) && (p2 != q2)
+                            cone.H[idx, idx2] += sum12 + sum34
+                        else
+                            cone.H[idx, idx2] += rt2i * (sum12 + sum34)
+                        end
+                    end
+                end # u2
+            end # p2, q2
+        end # u
+    end # p, q
+    return nothing
 end
 
 WSOSPolyInterpMat(r::Int, u::Int, ipwt::Vector{Matrix{Float64}}) = WSOSPolyInterpMat(r, u, ipwt, false)
@@ -94,13 +143,14 @@ function set_initial_point(arr::AbstractVector{Float64}, cone::WSOSPolyInterpMat
 end
 
 function check_in_cone(cone::WSOSPolyInterpMat)
-    if isnan(barfun(cone.point, cone.ipwt, cone.r, cone.u, false))
+    if !(buildmat!(cone, cone.point))
         return false
     end
-
-    cone.diffres = ForwardDiff.hessian!(cone.diffres, cone.barfun, cone.point)
-    cone.g .= DiffResults.gradient(cone.diffres)
-    cone.H .= DiffResults.hessian(cone.diffres)
-
+    cone.g .= 0.0
+    cone.H .= 0.0
+    for (j, ipwtj) in enumerate(cone.ipwt)
+        Winv = inv(cone.matfact[j])
+        update_gradient_hessian!(cone, ipwtj, Winv)
+    end
     return factorize_hess(cone)
 end
