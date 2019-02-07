@@ -102,43 +102,44 @@ function incone_prmtv(prmtv::WSOSPolyInterpMat, scal::Float64)
     prmtv.g .= 0.0
     prmtv.H .= 0.0
     for (j, ipwtj) in enumerate(prmtv.ipwt)
-        @timeit to "inversion" Winv = inv(prmtv.matfact[j])
+        Winv = inv(prmtv.matfact[j])
         L = size(ipwtj, 2)
 
         idx = 0
         # outer indices for W
         for p in 1:prmtv.r, q in 1:p
-            (bp, bq) = ((p-1)*L, (q-1)*L)
+            (bp, bq) = ((p - 1) * L, (q - 1) * L)
             for u in 1:prmtv.u
                 idx += 1
                 # sum for gradient
                 for k in 1:L, l in 1:k
                     if k > l
-                        Wcomp = Winv[bp+k, bq+l] + Winv[bp+l, bq+k]
+                        Wcomp = Winv[bp + k, bq + l] + Winv[bp + l, bq + k]
                     else
-                        Wcomp = Winv[bp+k, bq+l]
+                        Wcomp = Winv[bp + k, bq + l]
                     end
                     if p == q
-                        prmtv.g[idx] -= ipwtj[u,k] * ipwtj[u,l] * Wcomp
+                        prmtv.g[idx] -= ipwtj[u, k] * ipwtj[u, l] * Wcomp
                     else
-                        prmtv.g[idx] -= ipwtj[u,k] * ipwtj[u,l] * Wcomp * rt2
+                        prmtv.g[idx] -= ipwtj[u, k] * ipwtj[u, l] * Wcomp * rt2
                     end
                 end
                 # hessian
                 idx2 = 0
                 for p2 in 1:prmtv.r, q2 in 1:p2
-                    (bp2, bq2) = ((p2-1)*L, (q2-1)*L)
+                    (bp2, bq2) = ((p2 - 1) * L, (q2 - 1) * L)
                     for u2 in 1:prmtv.u
                         idx2 += 1
+                        idx2 < idx && continue
                         sum1 = 0.0
                         sum2 = 0.0
                         sum3 = 0.0
                         sum4 = 0.0
                         for k2 in 1:L, l2 in 1:L
-                            sum1 += Winv[bp+k2, bp2+l2] * ipwtj[u,k2] * ipwtj[u2,l2]
-                            sum2 += Winv[bq+k2, bq2+l2] * ipwtj[u,k2] * ipwtj[u2,l2]
-                            sum3 += Winv[bp+k2, bq2+l2] * ipwtj[u,k2] * ipwtj[u2,l2]
-                            sum4 += Winv[bq+k2, bp2+l2] * ipwtj[u,k2] * ipwtj[u2,l2]
+                            sum1 += Winv[bp + k2, bp2 + l2] * ipwtj[u, k2] * ipwtj[u2, l2]
+                            sum2 += Winv[bq + k2, bq2 + l2] * ipwtj[u, k2] * ipwtj[u2, l2]
+                            sum3 += Winv[bp + k2, bq2 + l2] * ipwtj[u, k2] * ipwtj[u2, l2]
+                            sum4 += Winv[bq + k2, bp2 + l2] * ipwtj[u, k2] * ipwtj[u2, l2]
                         end
                         if p == q
                             if p2 == q2

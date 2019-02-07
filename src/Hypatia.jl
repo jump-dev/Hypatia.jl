@@ -6,8 +6,6 @@ module Hypatia
     using Printf
     using LinearAlgebra
     using SparseArrays
-    using TimerOutputs
-    const to = TimerOutput()
 
     using LinearAlgebra: BlasInt
     include("lapack.jl")
