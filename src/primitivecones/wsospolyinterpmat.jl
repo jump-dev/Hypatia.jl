@@ -51,16 +51,14 @@ function buildmat!(prmtv::WSOSPolyInterpMat, pnt)
         mat .= 0.0
 
         for l in 1:L, k in 1:l
-            (bl, bk) = ((l-1)*R, (k-1)*R)
             uo = 0
             for p in 1:R, q in 1:p
-                val = sum(ipwtj[u,l] * ipwtj[u,k] * pnt[uo+u] for u in 1:U)
-                bp = bl + p
-                bq = bk + q
+                (bp, bq) = ((p - 1) * L, (q - 1) * L)
+                val = sum(ipwtj[u, l] * ipwtj[u, k] * pnt[uo+u] for u in 1:U)
                 if p == q
-                    mat[bp,bq] = val
+                    mat[bp + l, bq + k] = val
                 else
-                    mat[bl+p, bk+q] = mat[bl+q, bk+p] = rt2i*val
+                    mat[bp + l, bq + k] = mat[bp + k, bq + l] = rt2i * val
                 end
                 uo += U
             end
@@ -95,75 +93,71 @@ end
 loadpnt_prmtv!(prmtv::WSOSPolyInterpMat, pnt::AbstractVector{Float64}) = (prmtv.pnt = pnt)
 
 function incone_prmtv(prmtv::WSOSPolyInterpMat, scal::Float64)
-    @timeit to "incone" begin
     prmtv.scal = 1.0
     @. prmtv.scalpnt = prmtv.pnt/prmtv.scal
-    @timeit to "buildmat" begin
-        if !(buildmat!(prmtv, prmtv.scalpnt))
-            return false
-        end
+    if !(buildmat!(prmtv, prmtv.scalpnt))
+        return false
     end
 
     prmtv.g .= 0.0
     prmtv.H .= 0.0
     for (j, ipwtj) in enumerate(prmtv.ipwt)
-        @timeit to "getting g" begin
         @timeit to "inversion" Winv = inv(prmtv.matfact[j])
         L = size(ipwtj, 2)
 
         idx = 0
         # outer indices for W
-        for p in 1:prmtv.r,  q in 1:p,  u in 1:prmtv.u
-            idx += 1
-            # sum for gradient
-            for k in 1:L, l in 1:k
-                (bk, bl) = ((k-1)*prmtv.r, (l-1)*prmtv.r)
-                if k > l
-                    Wcomp = Winv[bk+p, bl+q] + Winv[bl+p, bk+q]
-                else
-                    Wcomp = Winv[bk+p, bl+q]
-                end
-                if p == q
-                    prmtv.g[idx] -= ipwtj[u,k] * ipwtj[u,l] * Wcomp
-                else
-                    prmtv.g[idx] -= ipwtj[u,k] * ipwtj[u,l] * Wcomp * rt2
-                end
-            end
-            # hessian
-            idx2 = 0
-            @timeit to "computing H" begin
-            for p2 in 1:prmtv.r,  q2 in 1:p2,  u2 in 1:prmtv.u
-                idx2 += 1
-                sum1 = 0.0
-                sum2 = 0.0
-                sum3 = 0.0
-                sum4 = 0.0
-                for k2 in 1:L, l2 in 1:L
-                    (bk2, bl2) = ((k2-1)*prmtv.r, (l2-1)*prmtv.r)
-                    sum1 += Winv[bk2+p, bl2+p2] * ipwtj[u,k2] * ipwtj[u2,l2]
-                    sum2 += Winv[bk2+q, bl2+q2] * ipwtj[u,k2] * ipwtj[u2,l2]
-                    sum3 += Winv[bk2+p, bl2+q2] * ipwtj[u,k2] * ipwtj[u2,l2]
-                    sum4 += Winv[bk2+q, bl2+p2] * ipwtj[u,k2] * ipwtj[u2,l2]
-                end
-                if p == q
-                    if p2 == q2
-                        prmtv.H[idx, idx2] += sum1 * sum2
+        for p in 1:prmtv.r, q in 1:p
+            (bp, bq) = ((p-1)*L, (q-1)*L)
+            for u in 1:prmtv.u
+                idx += 1
+                # sum for gradient
+                for k in 1:L, l in 1:k
+                    if k > l
+                        Wcomp = Winv[bp+k, bq+l] + Winv[bp+l, bq+k]
                     else
-                        prmtv.H[idx, idx2] += (sum1 * sum2) * rt2i + (sum3 * sum4) * rt2i
+                        Wcomp = Winv[bp+k, bq+l]
                     end
-                else
-                    if p2 == q2
-                        prmtv.H[idx, idx2] += (sum1 * sum2) * rt2i + (sum3 * sum4) * rt2i
+                    if p == q
+                        prmtv.g[idx] -= ipwtj[u,k] * ipwtj[u,l] * Wcomp
                     else
-                        prmtv.H[idx, idx2] += (sum1 * sum2) + (sum3 * sum4)
+                        prmtv.g[idx] -= ipwtj[u,k] * ipwtj[u,l] * Wcomp * rt2
                     end
                 end
-            end
-            end #timing hessian
-        end
-        end # timing getting g
-    end
-    end # timing incone
+                # hessian
+                idx2 = 0
+                for p2 in 1:prmtv.r, q2 in 1:p2
+                    (bp2, bq2) = ((p2-1)*L, (q2-1)*L)
+                    for u2 in 1:prmtv.u
+                        idx2 += 1
+                        sum1 = 0.0
+                        sum2 = 0.0
+                        sum3 = 0.0
+                        sum4 = 0.0
+                        for k2 in 1:L, l2 in 1:L
+                            sum1 += Winv[bp+k2, bp2+l2] * ipwtj[u,k2] * ipwtj[u2,l2]
+                            sum2 += Winv[bq+k2, bq2+l2] * ipwtj[u,k2] * ipwtj[u2,l2]
+                            sum3 += Winv[bp+k2, bq2+l2] * ipwtj[u,k2] * ipwtj[u2,l2]
+                            sum4 += Winv[bq+k2, bp2+l2] * ipwtj[u,k2] * ipwtj[u2,l2]
+                        end
+                        if p == q
+                            if p2 == q2
+                                prmtv.H[idx, idx2] += sum1 * sum2
+                            else
+                                prmtv.H[idx, idx2] += (sum1 * sum2) * rt2i + (sum3 * sum4) * rt2i
+                            end
+                        else
+                            if p2 == q2
+                                prmtv.H[idx, idx2] += (sum1 * sum2) * rt2i + (sum3 * sum4) * rt2i
+                            else
+                                prmtv.H[idx, idx2] += (sum1 * sum2) + (sum3 * sum4)
+                            end
+                        end
+                    end # u2
+                end # p2, q2
+            end # u
+        end # p, q
+    end # ipwt
     return factH(prmtv)
 end
 
