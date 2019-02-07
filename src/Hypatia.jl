@@ -3,51 +3,20 @@ Copyright 2018, Chris Coey and contributors
 =#
 
 module Hypatia
-    using Printf
-    using LinearAlgebra
-    using SparseArrays
 
-    using LinearAlgebra: BlasInt
-    include("lapack.jl")
+# submodules
+include("ModelUtilities/ModelUtilities.jl")
+include("Cones/Cones.jl")
+include("Models/Models.jl")
+include("Solvers/Solvers.jl")
 
-    import FFTW
-    import Combinatorics
-    import GSL: sf_gamma_inc_Q
-    include("interpolation.jl")
+# MathOptInterface
+using LinearAlgebra
+using SparseArrays
+import MathOptInterface
+const MOI = MathOptInterface
 
-    import ForwardDiff
-    import DiffResults
-    include("cone.jl")
-    for primitivecone in [
-        "orthant",
-        "epinorminf",
-        "epinormeucl",
-        "epipersquare",
-        "hypoperlog",
-        "epiperpower",
-        "hypogeomean",
-        "epinormspectral",
-        "semidefinite",
-        "wsospolyinterp",
-        "wsospolyinterpmat",
-        "hypoperlogdet",
-        "epipersumexp",
-        ]
-        include(joinpath(@__DIR__, "primitivecones", primitivecone * ".jl"))
-    end
+include("MathOptInterface/cones.jl")
+include("MathOptInterface/wrapper.jl")
 
-    # import IterativeSolvers
-    include("linearsystem.jl")
-    for linsyssolver in [
-        "qrsymm",
-        "naive",
-        ]
-        include(joinpath(@__DIR__, "linsyssolvers", linsyssolver * ".jl"))
-    end
-
-    include("nativeinterface.jl")
-
-    import MathOptInterface
-    const MOI = MathOptInterface
-    include("MOI_wrapper.jl")
 end

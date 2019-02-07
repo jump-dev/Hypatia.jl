@@ -4,12 +4,12 @@ Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 TODO readme for benchmarks and describe ARGS for running on command line
 =#
 
-using Hypatia
-using MathOptFormat
-using MathOptInterface
-MOI = MathOptInterface
-using GZip
-using Dates
+import Hypatia
+import MathOptFormat
+import MathOptInterface
+const MOI = MathOptInterface
+import GZip
+import Dates
 
 # parse command line arguments
 println()
@@ -54,9 +54,8 @@ end
 
 # Hypatia options
 verbose = true
-timelimit = 1e2
-lscachetype = Hypatia.QRSymmCache
-usedense = false
+time_limit = 1e2
+dense = false
 
 MOI.Utilities.@model(HypatiaModelData,
     (MOI.Integer,), # integer constraints will be ignored by Hypatia
@@ -74,12 +73,11 @@ MOI.Utilities.@model(HypatiaModelData,
 
 optimizer = MOI.Utilities.CachingOptimizer(HypatiaModelData{Float64}(), Hypatia.Optimizer(
     verbose = verbose,
-    timelimit = timelimit,
-    lscachetype = lscachetype,
-    usedense = usedense,
-    tolrelopt = 1e-6,
-    tolabsopt = 1e-7,
-    tolfeas = 1e-7,
+    time_limit = time_limit,
+    dense = dense,
+    tol_rel_opt = 1e-6,
+    tol_abs_opt = 1e-7,
+    tol_feas = 1e-7,
     ))
 
 println("\nstarting benchmark run in 5 seconds\n")
@@ -88,7 +86,7 @@ sleep(5.0)
 # each line of csv file will summarize Hypatia performance on a particular instance
 csvfile = joinpath(outputpath, "RESULTS_$(instanceset).csv")
 open(csvfile, "w") do fdcsv
-    println(fdcsv, "instname,status,pobj,dobj,niters,runtime,gctime,bytes")
+    println(fdcsv, "instname,status,primal_obj,dual_obj,niters,runtime,gctime,bytes")
 end
 
 # run each instance, print Hypatia output to instance-specific file, and print results to a single csv file
@@ -98,7 +96,7 @@ for instname in instances
     println("starting $instname")
 
     solveerror = nothing
-    (status, pobj, dobj, niters, runtime, gctime, bytes) = (:UnSolved, NaN, NaN, -1, NaN, NaN, -1)
+    (status, primal_obj, dual_obj, niters, runtime, gctime, bytes) = (:UnSolved, NaN, NaN, -1, NaN, NaN, -1)
     memallocs = nothing
 
     instfile = joinpath(outputpath, instname * ".txt")
@@ -124,8 +122,8 @@ for instname in instances
             println("\nHypatia finished")
             status = MOI.get(optimizer, MOI.TerminationStatus())
             niters = -1 # TODO niters = MOI.get(optimizer, MOI.BarrierIterations())
-            pobj = MOI.get(optimizer, MOI.ObjectiveValue())
-            dobj = MOI.get(optimizer, MOI.ObjectiveBound())
+            primal_obj = MOI.get(optimizer, MOI.ObjectiveValue())
+            dual_obj = MOI.get(optimizer, MOI.ObjectiveBound())
         catch solveerror
             println("\nHypatia errored: ", solveerror)
         end
@@ -143,7 +141,7 @@ for instname in instances
     end
 
     open(csvfile, "a") do fdcsv
-        println(fdcsv, "$instname,$status,$pobj,$dobj,$niters,$runtime,$gctime,$bytes")
+        println(fdcsv, "$instname,$status,$primal_obj,$dual_obj,$niters,$runtime,$gctime,$bytes")
     end
 end
 
