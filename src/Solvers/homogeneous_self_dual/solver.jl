@@ -9,7 +9,7 @@ TODO make internal statuses types
 mutable struct HSDSolver <: Solver
     model::Models.Linear
 
-    step_cache::HSDStepper
+    stepper::HSDStepper
 
     verbose::Bool
     tol_rel_opt::Float64
@@ -51,9 +51,8 @@ mutable struct HSDSolver <: Solver
 
     function HSDSolver(
         model::Models.Linear,
-        # step_cache::HSDStepper,
-        # point::Models.Point,
         ;
+        stepper::HSDStepper = CombinedNaiveStepper(model),
         verbose::Bool = true,
         tol_rel_opt = 1e-6,
         tol_abs_opt = 1e-7,
@@ -66,7 +65,7 @@ mutable struct HSDSolver <: Solver
 
         solver.model = model
 
-        # solver.stepper = CombinedCholCholStepper(model)
+        solver.stepper = stepper
 
         solver.verbose = verbose
         solver.tol_rel_opt = tol_rel_opt

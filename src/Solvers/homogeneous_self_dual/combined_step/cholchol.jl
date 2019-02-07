@@ -3,7 +3,7 @@ mutable struct CombinedCholCholStepper <: HSDStepper
 
 end
 
-function get_combined_directions(solver::HSDSolver)
+function get_combined_directions(solver::HSDSolver, stepper::CombinedCholCholStepper)
     model = solver.model
     cones = model.cones
     cone_idxs = model.cone_idxs

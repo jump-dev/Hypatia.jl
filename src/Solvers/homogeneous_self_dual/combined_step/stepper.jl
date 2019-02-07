@@ -1,65 +1,10 @@
 
-
-
-
 function combined_predict_correct(solver::HSDSolver)
-
     model = solver.model
-    cones = model.cones
     point = solver.point
-    (n, p, q) = (model.n, model.p, model.q)
 
-    LHS = [
-        zeros(n,n)  model.A'    model.G'          zeros(n)  zeros(n,q)         model.c;
-        -model.A    zeros(p,p)  zeros(p,q)        zeros(p)  zeros(p,q)         model.b;
-        zeros(q,n)  zeros(q,p)  Matrix(1.0I,q,q)  zeros(q)  Matrix(1.0I,q,q)   zeros(q);
-        zeros(1,n)  zeros(1,p)  zeros(1,q)        1.0       zeros(1,q)         1.0;
-        -model.G    zeros(q,p)  zeros(q,q)        zeros(q)  Matrix(-1.0I,q,q)  model.h;
-        -model.c'   -model.b'   -model.h'         -1.0      zeros(1,q)         0.0;
-    ]
-
-    LHS[n+p+q+1, end] = solver.mu / solver.tau / solver.tau
-    for k in eachindex(cones)
-        cone_k = cones[k]
-        # TODO stepped to this point so should already have called check_in_cone for the point
-        Cones.load_point(cone_k, point.primal_views[k])
-        @assert Cones.check_in_cone(cone_k)
-        rows = (n + p) .+ model.cone_idxs[k]
-        cols = Cones.use_dual(cone_k) ? rows : (q + 1) .+ rows
-        LHS[rows, cols] = solver.mu * Cones.hess(cone_k)
-    end
-
-    rhs = [
-        solver.x_residual  zeros(n);
-        solver.y_residual  zeros(p);
-        zeros(q)    zeros(q);
-        -solver.kap  (-solver.kap + solver.mu / solver.tau);
-        solver.z_residual  zeros(q);
-        (solver.kap + solver.primal_obj_t - solver.dual_obj_t)  0.0;
-        ]
-    for k in eachindex(cones)
-        rows = (n + p) .+ model.cone_idxs[k]
-        rhs[rows, 1] = -point.dual_views[k]
-        rhs[rows, 2] = -point.dual_views[k] - solver.mu * Cones.grad(cones[k])
-    end
-
-    F = lu(LHS)
-    ldiv!(F, rhs)
-
-    # affine phase
-    # affine_direction = construct_affine_direction(direction_solution, mu, solver)
-    # @views begin
-        x_dirs = rhs[1:n, :]
-        y_dirs = rhs[(n + 1):(n + p), :]
-        z_dirs = rhs[(n + p + 1):(n + p + q), :]
-        s_dirs = rhs[(n + p + q + 2):(n + p + 2q + 1), :]
-        kap_dirs = rhs[n + p + q + 1, :]
-        tau_dirs = rhs[n + p + 2q + 2, :]
-    # end
-
-
-    # # calculate prediction and correction directions
-    # (x_dirs, y_dirs, z_dirs, s_dirs, tau_dirs, kap_dirs) = get_combined_directions(solver)
+    # calculate prediction and correction directions
+    (x_dirs, y_dirs, z_dirs, s_dirs, tau_dirs, kap_dirs) = get_combined_directions(solver, solver.stepper)
 
     # affine_alpha = find_max_alpha_in_nbhd(view(z_dirs, :, 1), view(s_dirs, :, 1), tau_dirs[1], kap_dirs[1], 0.99, solver)
     affine_alpha = find_max_alpha_in_nbhd(z_dirs[:, 1], s_dirs[:, 1], tau_dirs[1], kap_dirs[1], 0.999, solver)
