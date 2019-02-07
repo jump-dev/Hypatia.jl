@@ -20,6 +20,7 @@ mutable struct WSOSPolyInterpMat <: PrimitiveCone
     H2::Matrix{Float64}
     F
     mat::Vector{Matrix{Float64}}
+    matfact::Vector{CholeskyPivoted{Float64,Array{Float64,2}}}
 
     function WSOSPolyInterpMat(r::Int, u::Int, ipwt::Vector{Matrix{Float64}}, isdual::Bool)
         for ipwtj in ipwt
@@ -37,11 +38,12 @@ mutable struct WSOSPolyInterpMat <: PrimitiveCone
         prmtv.H = similar(ipwt[1], dim, dim)
         prmtv.H2 = similar(prmtv.H)
         prmtv.mat = [similar(ipwt[1], size(ipwtj, 2) * r, size(ipwtj, 2) * r) for ipwtj in ipwt]
+        prmtv.matfact = Vector{CholeskyPivoted{Float64,Array{Float64,2}}}(undef, length(ipwt))
         return prmtv
     end
 end
 
-function barfun!(pnt, prmtv::WSOSPolyInterpMat)
+function buildmat!(prmtv::WSOSPolyInterpMat, pnt)
     (R, U) = (prmtv.r, prmtv.u)
     for (j, ipwtj) in enumerate(prmtv.ipwt)
         L = size(ipwtj, 2)
@@ -63,8 +65,8 @@ function barfun!(pnt, prmtv::WSOSPolyInterpMat)
                 uo += U
             end
         end
-        mat .= Symmetric(mat, :L)
-        if !isposdef(mat)
+        prmtv.matfact[j] = cholesky!(Symmetric(mat, :L), Val(true), check=false)
+        if !isposdef(prmtv.matfact[j])
             return false
         end
     end
@@ -97,7 +99,7 @@ function incone_prmtv(prmtv::WSOSPolyInterpMat, scal::Float64)
     prmtv.scal = 1.0
     @. prmtv.scalpnt = prmtv.pnt/prmtv.scal
     @timeit to "buildmat" begin
-        if !(barfun!(prmtv.scalpnt, prmtv))
+        if !(buildmat!(prmtv, prmtv.scalpnt))
             return false
         end
     end
@@ -106,7 +108,7 @@ function incone_prmtv(prmtv::WSOSPolyInterpMat, scal::Float64)
     prmtv.H .= 0.0
     for (j, ipwtj) in enumerate(prmtv.ipwt)
         @timeit to "getting g" begin
-        @timeit to "needless inversion" Winv = inv(prmtv.mat[j])
+        @timeit to "inversion" Winv = inv(prmtv.matfact[j])
         L = size(ipwtj, 2)
 
         idx = 0
