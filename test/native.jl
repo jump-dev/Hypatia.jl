@@ -13,7 +13,6 @@ function solveandcheck(model::MO.Model, solver::SO.Solver; atol=1e-4, rtol=1e-4)
     dual_obj = SO.get_dual_obj(solver)
     status = SO.get_status(solver)
     solve_time = SO.get_solve_time(solver)
-    num_iters = SO.get_num_iters(solver)
 
     # check conic certificates are valid
     (c, A, b, G, h) = (model.c, model.A, model.b, model.G, model.h)
@@ -40,7 +39,7 @@ function solveandcheck(model::MO.Model, solver::SO.Solver; atol=1e-4, rtol=1e-4)
         # TODO primal vs dual ill-posed statuses and conditions
     end
 
-    return (x=x, y=y, s=s, z=z, primal_obj=primal_obj, dual_obj=dual_obj, status=status, solve_time=solve_time, num_iters=num_iters)
+    return (x=x, y=y, s=s, z=z, primal_obj=primal_obj, dual_obj=dual_obj, status=status, solve_time=solve_time)
 end
 
 function dimension1(; verbose::Bool = true)
@@ -229,7 +228,6 @@ function epinorminf1(; verbose::Bool = true)
     solver = SO.HSDSolver(model, verbose = verbose)
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
-    @test r.num_iters <= 20
     @test r.primal_obj ≈ -1 - inv(sqrt(2)) atol=1e-4 rtol=1e-4
     @test r.x ≈ [1, inv(sqrt(2)), 1] atol=1e-4 rtol=1e-4
     @test r.y ≈ [1, 1] atol=1e-4 rtol=1e-4
@@ -249,7 +247,6 @@ function epinorminf2(; verbose::Bool = true)
     solver = SO.HSDSolver(model, verbose = verbose)
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
-    @test r.num_iters <= 20
     @test r.primal_obj ≈ 1 atol=1e-4 rtol=1e-4
 end
 
@@ -267,7 +264,6 @@ function epinorminf3(; verbose::Bool = true)
     solver = SO.HSDSolver(model, verbose = verbose)
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
-    @test r.num_iters <= 20
     @test r.primal_obj ≈ 0 atol=1e-4 rtol=1e-4
     @test r.x ≈ zeros(6) atol=1e-4 rtol=1e-4
 end
@@ -285,7 +281,6 @@ function epinorminf4(; verbose::Bool = true)
     solver = SO.HSDSolver(model, verbose = verbose)
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
-    @test r.num_iters <= 25
     @test r.primal_obj ≈ -1 atol=1e-4 rtol=1e-4
     @test r.x ≈ [1, -0.4, 0.6] atol=1e-4 rtol=1e-4
     @test r.y ≈ [1, 0] atol=1e-4 rtol=1e-4
@@ -305,7 +300,6 @@ function epinorminf5(; verbose::Bool = true)
     solver = SO.HSDSolver(model, verbose = verbose)
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
-    @test r.num_iters <= 15
     @test r.primal_obj ≈ 1 atol=1e-4 rtol=1e-4
 end
 
@@ -326,7 +320,6 @@ function epinorminf6(; verbose::Bool = true)
     solver = SO.HSDSolver(model, verbose = verbose)
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
-    @test r.num_iters <= 25
     @test r.primal_obj ≈ -l + 1 atol=1e-4 rtol=1e-4
     @test r.x[2] ≈ 0.5 atol=1e-4 rtol=1e-4
     @test r.x[end - 1] ≈ -0.5 atol=1e-4 rtol=1e-4
@@ -345,7 +338,6 @@ function epinormeucl1(; verbose::Bool = true)
         solver = SO.HSDSolver(model, verbose = verbose)
         r = solveandcheck(model, solver)
         @test r.status == :Optimal
-        @test r.num_iters <= 20
         @test r.primal_obj ≈ -sqrt(2) atol=1e-4 rtol=1e-4
         @test r.x ≈ [1, inv(sqrt(2)), inv(sqrt(2))] atol=1e-4 rtol=1e-4
         @test r.y ≈ [sqrt(2), 0] atol=1e-4 rtol=1e-4
@@ -364,7 +356,6 @@ function epinormeucl2(; verbose::Bool = true)
         solver = SO.HSDSolver(model, verbose = verbose)
         r = solveandcheck(model, solver)
         @test r.status == :Optimal
-        @test r.num_iters <= 20
         @test r.primal_obj ≈ 0 atol=1e-4 rtol=1e-4
         @test r.x ≈ zeros(3) atol=1e-4 rtol=1e-4
     end
@@ -382,7 +373,6 @@ function epipersquare1(; verbose::Bool = true)
         solver = SO.HSDSolver(model, verbose = verbose)
         r = solveandcheck(model, solver)
         @test r.status == :Optimal
-        @test r.num_iters <= 20
         @test r.primal_obj ≈ -sqrt(2) atol=1e-4 rtol=1e-4
         @test r.x[3:4] ≈ [1, 1] / sqrt(2) atol=1e-4 rtol=1e-4
     end
@@ -400,7 +390,6 @@ function epipersquare2(; verbose::Bool = true)
         solver = SO.HSDSolver(model, verbose = verbose)
         r = solveandcheck(model, solver)
         @test r.status == :Optimal
-        @test r.num_iters <= 15
         @test r.primal_obj ≈ -inv(sqrt(2)) atol=1e-4 rtol=1e-4
         @test r.x[2] ≈ inv(sqrt(2)) atol=1e-4 rtol=1e-4
     end
@@ -418,7 +407,6 @@ function epipersquare3(; verbose::Bool = true)
         solver = SO.HSDSolver(model, verbose = verbose)
         r = solveandcheck(model, solver)
         @test r.status == :Optimal
-        @test r.num_iters <= 20
         @test r.primal_obj ≈ 0 atol=1e-4 rtol=1e-4
         @test r.x ≈ zeros(4) atol=1e-4 rtol=1e-4
     end
@@ -436,7 +424,6 @@ function semidefinite1(; verbose::Bool = true)
         solver = SO.HSDSolver(model, verbose = verbose)
         r = solveandcheck(model, solver)
         @test r.status == :Optimal
-        @test r.num_iters <= 20
         @test r.primal_obj ≈ -1 atol=1e-4 rtol=1e-4
         @test r.x[2] ≈ 1 atol=1e-4 rtol=1e-4
     end
@@ -454,7 +441,6 @@ function semidefinite2(; verbose::Bool = true)
         solver = SO.HSDSolver(model, verbose = verbose)
         r = solveandcheck(model, solver)
         @test r.status == :Optimal
-        @test r.num_iters <= 20
         @test r.primal_obj ≈ 0 atol=1e-4 rtol=1e-4
         @test r.x ≈ zeros(3) atol=1e-4 rtol=1e-4
     end
@@ -472,7 +458,6 @@ function semidefinite3(; verbose::Bool = true)
         solver = SO.HSDSolver(model, verbose = verbose)
         r = solveandcheck(model, solver)
         @test r.status == :Optimal
-        @test r.num_iters <= 20
         @test r.primal_obj ≈ 1.249632 atol=1e-4 rtol=1e-4
         @test r.x ≈ [0.491545, 0.647333, 0.426249, 0.571161, 0.531874, 0.331838] atol=1e-4 rtol=1e-4
     end
@@ -491,7 +476,6 @@ function hypoperlog1(; verbose::Bool = true)
     solver = SO.HSDSolver(model, verbose = verbose)
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
-    @test r.num_iters <= 20
     ehalf = exp(1 / 2)
     @test r.primal_obj ≈ 2 * ehalf + 3 atol=1e-4 rtol=1e-4
     @test r.x ≈ [1, 2, 2 * ehalf] atol=1e-4 rtol=1e-4
@@ -512,7 +496,6 @@ function hypoperlog2(; verbose::Bool = true)
     solver = SO.HSDSolver(model, verbose = verbose)
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
-    @test r.num_iters <= 25
     @test r.primal_obj ≈ 0 atol=1e-4 rtol=1e-4
 end
 
@@ -529,7 +512,6 @@ function hypoperlog3(; verbose::Bool = true)
     solver = SO.HSDSolver(model, verbose = verbose)
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
-    @test r.num_iters <= 20
     @test r.primal_obj ≈ 0 atol=1e-4 rtol=1e-4
     @test r.x ≈ [0, 0, 0] atol=1e-4 rtol=1e-4
     @test isempty(r.y)
@@ -548,7 +530,6 @@ function hypoperlog4(; verbose::Bool = true)
     solver = SO.HSDSolver(model, verbose = verbose)
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
-    @test r.num_iters <= 20
     @test r.primal_obj ≈ exp(-2) atol=1e-4 rtol=1e-4
     @test r.x ≈ [-1, 1, exp(-2)] atol=1e-4 rtol=1e-4
 end
@@ -566,7 +547,6 @@ function epiperpower1(; verbose::Bool = true)
     solver = SO.HSDSolver(model, verbose = verbose)
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
-    @test r.num_iters <= 20
     @test r.primal_obj ≈ -1.80734 atol=1e-4 rtol=1e-4
     @test r.x[[1, 2, 4]] ≈ [0.0639314, 0.783361, 2.30542] atol=1e-4 rtol=1e-4
 end
@@ -583,7 +563,6 @@ function epiperpower2(; verbose::Bool = true)
         solver = SO.HSDSolver(model, verbose = verbose)
         r = solveandcheck(model, solver)
         @test r.status == :Optimal
-        @test r.num_iters <= 20
         @test r.primal_obj ≈ (is_dual ? -sqrt(2) : -inv(sqrt(2))) atol=1e-4 rtol=1e-4
         @test r.x[1:2] ≈ [1/2, 1] atol=1e-4 rtol=1e-4
     end
@@ -602,7 +581,6 @@ function epiperpower3(; verbose::Bool = true)
         solver = SO.HSDSolver(model, verbose = verbose, tol_feas = 1e-9)
         r = solveandcheck(model, solver)
         @test r.status == :Optimal
-        @test r.num_iters <= 50
         @test r.primal_obj ≈ 0 atol=1e-4 rtol=1e-4
         @test r.x[1:2] ≈ [0, 1] atol=1e-4 rtol=1e-4
     end
@@ -621,7 +599,6 @@ function hypogeomean1(; verbose::Bool = true)
     solver = SO.HSDSolver(model, verbose = verbose)
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
-    @test r.num_iters <= 25
     @test r.primal_obj ≈ -1.80734 atol=1e-4 rtol=1e-4
     @test r.x[1:3] ≈ [0.0639314, 0.783361, 2.30542] atol=1e-4 rtol=1e-4
 end
@@ -638,7 +615,6 @@ function hypogeomean2(; verbose::Bool = true)
         solver = SO.HSDSolver(model, verbose = verbose)
         r = solveandcheck(model, solver)
         @test r.status == :Optimal
-        @test r.num_iters <= 20
         @test r.primal_obj ≈ (is_dual ? 0 : -inv(sqrt(2))) atol=1e-4 rtol=1e-4
         @test r.x[2:3] ≈ [1, 0.5] atol=1e-4 rtol=1e-4
     end
@@ -657,7 +633,6 @@ function hypogeomean3(; verbose::Bool = true)
         solver = SO.HSDSolver(model, verbose = verbose)
         r = solveandcheck(model, solver)
         @test r.status == :Optimal
-        @test r.num_iters <= 25
         @test r.primal_obj ≈ (is_dual ? 1.0 : l) atol=1e-4 rtol=1e-4
         @test r.x[2:end] ≈ (is_dual ? inv(l) : 1.0) * ones(l) atol=1e-4 rtol=1e-4
     end
@@ -676,7 +651,6 @@ function hypogeomean4(; verbose::Bool = true)
         solver = SO.HSDSolver(model, verbose = verbose)
         r = solveandcheck(model, solver)
         @test r.status == :Optimal
-        @test r.num_iters <= 15
         @test r.primal_obj ≈ 0 atol=1e-4 rtol=1e-4
         @test r.x ≈ zeros(l) atol=1e-4 rtol=1e-4
     end
@@ -697,7 +671,6 @@ function epinormspectral1(; verbose::Bool = true)
         solver = SO.HSDSolver(model, verbose = verbose)
         r = solveandcheck(model, solver)
         @test r.status == :Optimal
-        @test r.num_iters <= 20
         if is_dual
             @test sum(svdvals!(reshape(r.s[2:end], Xn, Xm))) ≈ r.s[1] atol=1e-4 rtol=1e-4
             @test svdvals!(reshape(r.z[2:end], Xn, Xm))[1] ≈ r.z[1] atol=1e-4 rtol=1e-4
@@ -727,7 +700,6 @@ function hypoperlogdet1(; verbose::Bool = true)
     solver = SO.HSDSolver(model, verbose = verbose)
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
-    @test r.num_iters <= 30
     @test r.x[1] ≈ -r.primal_obj atol=1e-4 rtol=1e-4
     @test r.x[2] ≈ 1 atol=1e-4 rtol=1e-4
     @test r.s[2] * logdet(CO.svec_to_smat!(zeros(side, side), r.s[3:end]) / r.s[2]) ≈ r.s[1] atol=1e-4 rtol=1e-4
@@ -753,7 +725,6 @@ function hypoperlogdet2(; verbose::Bool = true)
     solver = SO.HSDSolver(model, verbose = verbose)
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
-    @test r.num_iters <= 30
     @test r.x[2] ≈ r.primal_obj atol=1e-4 rtol=1e-4
     @test r.x[1] ≈ -1 atol=1e-4 rtol=1e-4
     @test r.s[1] * (logdet(CO.svec_to_smat!(zeros(side, side), -r.s[3:end]) / r.s[1]) + side) ≈ r.s[2] atol=1e-4 rtol=1e-4
@@ -779,7 +750,6 @@ function hypoperlogdet3(; verbose::Bool = true)
     solver = SO.HSDSolver(model, verbose = verbose)
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
-    @test r.num_iters <= 30
     @test r.x[1] ≈ -r.primal_obj atol=1e-4 rtol=1e-4
     @test r.x ≈ [0, 0] atol=1e-4 rtol=1e-4
 end
@@ -798,7 +768,6 @@ function epipersumexp1(; verbose::Bool = true)
     solver = SO.HSDSolver(model, verbose = verbose)
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
-    @test r.num_iters <= 30
     @test r.x[1] ≈ 1 atol=1e-4 rtol=1e-4
     @test r.s[2] ≈ 0 atol=1e-4 rtol=1e-4
     @test r.s[1] ≈ 1 atol=1e-4 rtol=1e-4
@@ -818,7 +787,6 @@ function epipersumexp2(; verbose::Bool = true)
     solver = SO.HSDSolver(model, verbose = verbose)
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
-    @test r.num_iters <= 20
     @test r.x[1] ≈ 1 atol=1e-4 rtol=1e-4
     @test r.s[2] ≈ 1 atol=1e-4 rtol=1e-4
     @test r.s[2] * sum(exp, r.s[3:end] / r.s[2]) ≈ r.s[1] atol=1e-4 rtol=1e-4
@@ -832,7 +800,6 @@ function envelope1(; verbose::Bool = true)
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
     @test r.primal_obj ≈ 25.502777 atol=1e-4 rtol=1e-4
-    @test r.num_iters <= 35
 
     # sparse methods
     (c, A, b, G, h, cones, cone_idxs) = build_envelope(2, 5, 1, 5, use_data = true, dense = false)
@@ -841,7 +808,6 @@ function envelope1(; verbose::Bool = true)
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
     @test r.primal_obj ≈ 25.502777 atol=1e-4 rtol=1e-4
-    @test r.num_iters <= 35
 end
 
 function envelope2(; verbose::Bool = true)
@@ -850,14 +816,12 @@ function envelope2(; verbose::Bool = true)
     model = MO.Linear(c, A, b, G, h, cones, cone_idxs)
     rd = solveandcheck(model, SO.HSDSolver(model, verbose = verbose))
     @test rd.status == :Optimal
-    @test rd.num_iters <= 60
 
     # sparse methods
     (c, A, b, G, h, cones, cone_idxs) = build_envelope(2, 4, 2, 7, dense = false)
     model = MO.Linear(c, A, b, G, h, cones, cone_idxs)
     rs = solveandcheck(model, SO.HSDSolver(model, verbose = verbose))
     @test rs.status == :Optimal
-    @test rs.num_iters <= 60
 
     @test rs.primal_obj ≈ rd.primal_obj atol=1e-4 rtol=1e-4
 end
@@ -868,7 +832,6 @@ function envelope3(; verbose::Bool = true)
     solver = SO.HSDSolver(model, verbose = verbose)
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
-    @test r.num_iters <= 60
 end
 
 function envelope4(; verbose::Bool = true)
@@ -877,7 +840,6 @@ function envelope4(; verbose::Bool = true)
     solver = SO.HSDSolver(model, verbose = verbose)
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
-    @test r.num_iters <= 55
 end
 
 function linearopt1(; verbose::Bool = true)
@@ -886,14 +848,12 @@ function linearopt1(; verbose::Bool = true)
     model = MO.Linear(c, A, b, G, h, cones, cone_idxs)
     rd = solveandcheck(model, SO.HSDSolver(model, verbose = verbose))
     @test rd.status == :Optimal
-    @test rd.num_iters <= 35
 
     # sparse methods
     (c, A, b, G, h, cones, cone_idxs) = build_linearopt(25, 50, dense = true, tosparse = true)
     model = MO.Linear(c, A, b, G, h, cones, cone_idxs)
     rs = solveandcheck(model, SO.HSDSolver(model, verbose = verbose))
     @test rs.status == :Optimal
-    @test rs.num_iters <= 35
 
     @test rs.primal_obj ≈ rd.primal_obj atol=1e-4 rtol=1e-4
 end
@@ -904,7 +864,6 @@ function linearopt2(; verbose::Bool = true)
     solver = SO.HSDSolver(model, verbose = verbose, tol_feas = 1e-8)
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
-    @test r.num_iters <= 70
     @test r.primal_obj ≈ 2055.807 atol=1e-4 rtol=1e-4
 end
 
@@ -916,7 +875,6 @@ function namedpoly1(; verbose::Bool = true)
     solver = SO.HSDSolver(model, verbose = verbose, tol_feas = 1e-8)
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
-    @test r.num_iters <= 45
     @test abs(r.primal_obj) ≈ 1.4393333333 atol=1e-4 rtol=1e-4
 end
 
@@ -926,7 +884,6 @@ function namedpoly2(; verbose::Bool = true)
     solver = SO.HSDSolver(model, verbose = verbose, tol_feas = 1e-8)
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
-    @test r.num_iters <= 45
     @test abs(r.primal_obj) ≈ 3.1800966258 atol=1e-4 rtol=1e-4
 end
 
@@ -936,7 +893,6 @@ function namedpoly3(; verbose::Bool = true)
     solver = SO.HSDSolver(model, verbose = verbose, tol_feas = 1e-8)
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
-    @test r.num_iters <= 70
     @test abs(r.primal_obj) ≈ 3 atol=1e-4 rtol=1e-4
 end
 
@@ -946,7 +902,6 @@ function namedpoly4(; verbose::Bool = true)
     solver = SO.HSDSolver(model, verbose = verbose, tol_feas = 1e-8)
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
-    # @test r.num_iters <= 40
     @test abs(r.primal_obj) ≈ 1.36775 atol=1e-4 rtol=1e-4
 end
 
@@ -956,7 +911,6 @@ function namedpoly5(; verbose::Bool = true)
     solver = SO.HSDSolver(model, verbose = verbose, tol_feas = 1e-8)
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
-    @test r.num_iters <= 40
     @test abs(r.primal_obj) ≈ 20.8 atol=1e-4 rtol=1e-4
 end
 
@@ -966,7 +920,6 @@ function namedpoly6(; verbose::Bool = true)
     solver = SO.HSDSolver(model, verbose = verbose, tol_feas = 1e-8)
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
-    @test r.num_iters <= 35
     @test abs(r.primal_obj) ≈ 0.25 atol=1e-4 rtol=1e-4
 end
 
@@ -976,7 +929,6 @@ function namedpoly7(; verbose::Bool = true)
     solver = SO.HSDSolver(model, verbose = verbose, tol_feas = 1e-8)
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
-    @test r.num_iters <= 45
     @test abs(r.primal_obj) ≈ 0 atol=1e-4 rtol=1e-4
 end
 
@@ -986,7 +938,6 @@ function namedpoly8(; verbose::Bool = true)
     solver = SO.HSDSolver(model, verbose = verbose, tol_feas = 1e-8)
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
-    @test r.num_iters <= 40
     @test abs(r.primal_obj) ≈ 36.71269068 atol=1e-4 rtol=1e-4
 end
 
@@ -996,7 +947,6 @@ function namedpoly9(; verbose::Bool = true)
     solver = SO.HSDSolver(model, verbose = verbose, tol_feas = 1e-8)
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
-    @test r.num_iters <= 40
     @test abs(r.primal_obj) ≈ 0.814814 atol=1e-4 rtol=1e-4
 end
 
@@ -1006,7 +956,6 @@ function namedpoly10(; verbose::Bool = true)
     solver = SO.HSDSolver(model, verbose = verbose, tol_feas = 1e-8)
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
-    @test r.num_iters <= 70
     @test abs(r.primal_obj) ≈ 0 atol=1e-3 rtol=1e-3
 end
 
@@ -1016,6 +965,5 @@ function namedpoly11(; verbose::Bool = true)
     solver = SO.HSDSolver(model, verbose = verbose, tol_feas = 1e-8)
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
-    @test r.num_iters <= 65
     @test abs(r.primal_obj) ≈ 0 atol=1e-3 rtol=1e-3
 end
