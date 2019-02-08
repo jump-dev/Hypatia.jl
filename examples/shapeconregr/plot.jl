@@ -7,7 +7,7 @@ using PolyJuMP
 using MultivariatePolynomials
 using DynamicPolynomials
 using PlotlyJS
-using ORCA
+# using ORCA
 using Distributions
 using Test
 

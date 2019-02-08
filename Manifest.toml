@@ -301,7 +301,7 @@ git-tree-sha1 = "d7090a225c923ce784386b7b65be3dc1c28bde62"
 repo-rev = "master"
 repo-url = "https://github.com/JuliaOpt/MathOptInterface.jl.git"
 uuid = "b8f27783-ece8-5eb3-8dc8-9495eed66fee"
-version = "0.8.1+"
+version = "0.8.2+"
 
 [[MbedTLS]]
 deps = ["BinaryProvider", "Dates", "Libdl", "Random", "Sockets", "Test"]
@@ -332,9 +332,9 @@ version = "0.2.5"
 
 [[Mustache]]
 deps = ["Printf", "Tables", "Test"]
-git-tree-sha1 = "9a548a873a8de9f982284817b89ae0c5faa5a80b"
+git-tree-sha1 = "3cc9a0b673519c5c39186e636d747facb12bf075"
 uuid = "ffc61752-8dc7-55ee-8c37-f3e9cdd09e70"
-version = "0.5.10"
+version = "0.5.11"
 
 [[Mux]]
 deps = ["AssetRegistry", "Base64", "HTTP", "Hiccup", "Lazy", "Pkg", "Sockets", "Test", "WebSockets"]
@@ -347,12 +347,6 @@ deps = ["Compat"]
 git-tree-sha1 = "ce3b85e484a5d4c71dd5316215069311135fa9f2"
 uuid = "77ba4419-2d1f-58cd-9bb1-8ffee604a2e3"
 version = "0.3.2"
-
-[[ORCA]]
-deps = ["Conda", "HTTP", "JSON", "PlotlyBase", "Test"]
-git-tree-sha1 = "8b5d61c0a8ec3390f4d3c7c085170eec9be187cf"
-uuid = "47be7bcc-f1a6-5447-8b36-7eeeff7534fd"
-version = "0.2.0"
 
 [[Observables]]
 deps = ["Test"]
@@ -491,7 +485,7 @@ uuid = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
 [[SpecialFunctions]]
 deps = ["BinDeps", "BinaryProvider", "Libdl", "Test"]
-git-tree-sha1 = "e7d9dba9e82638950bdc8cd162a19d3b6d75b74f"
+git-tree-sha1 = "0b45dc2e45ed77f445617b99ff2adf0f5b0f23ea"
 repo-rev = "master"
 repo-url = "https://github.com/JuliaMath/SpecialFunctions.jl.git"
 uuid = "276daf66-3868-5448-9aa4-cd146d93841b"
@@ -515,9 +509,9 @@ version = "0.27.0"
 
 [[StatsFuns]]
 deps = ["Rmath", "SpecialFunctions", "Test"]
-git-tree-sha1 = "7e7658a6adf28c91db1290c84483e07cc59ea3a4"
+git-tree-sha1 = "b3a4e86aa13c732b8a8c0ba0c3d3264f55e6bb3e"
 uuid = "4c63d2b9-4356-54db-8cca-17b64c39e42c"
-version = "0.7.1"
+version = "0.8.0"
 
 [[SuiteSparse]]
 deps = ["Libdl", "LinearAlgebra", "SparseArrays"]
@@ -574,9 +568,9 @@ version = "1.1.3"
 
 [[WeakRefStrings]]
 deps = ["Missings", "Random", "Test"]
-git-tree-sha1 = "7f8ba9345c80121e49944a9c7d9c2bc76da5f623"
+git-tree-sha1 = "bccf012a0e8815410ad8b6846944a33903992fc3"
 uuid = "ea10d353-3f73-51f8-a26c-33c1cb351aa5"
-version = "0.5.5"
+version = "0.5.6"
 
 [[WebIO]]
 deps = ["AssetRegistry", "Base64", "Compat", "FunctionalCollections", "JSON", "Logging", "Observables", "Random", "Requires", "Sockets", "Test", "UUIDs", "Widgets"]

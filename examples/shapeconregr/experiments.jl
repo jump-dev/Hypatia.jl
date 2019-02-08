@@ -119,7 +119,7 @@ function syn3_data(;
     shape_data = ShapeData(mono_domain, conv_domain, mono_profile, conv_profile)
 
     f = x -> sum(abs2, x)
-    (X, y) = generateregrdata(f, -1.0, 1.0, n, num_points, signal_ratio = 3.0)
+    (X, y) = generateregrdata(f, -1.0, 1.0, n, num_points, signal_ratio = 9.0)
     reference_rmse = sqrt(sum(abs2.([y[i] - f(X[i,:]) for i in 1:num_points])) / num_points)
 
     folds = kfolds((X', y); k = 5)
@@ -134,7 +134,7 @@ end
 
 # Example 5 from https://arxiv.org/pdf/1509.08165v1.pdf
 function syn5_data(;
-    num_points::Int = 1000,
+    num_points::Int = 100, # should be 1000
     n::Int = 5,
     )
     mono_domain = Hypatia.FreeDomain(n)
@@ -144,7 +144,7 @@ function syn5_data(;
     shape_data = ShapeData(mono_domain, conv_domain, mono_profile, conv_profile)
 
     f = x -> (5x[1] + 0.5x[2] + x[3])^2 + sqrt(x[4]^2 + x[5]^2)
-    (X, y) = generateregrdata(f, -1.0, 1.0, n, num_points, signal_ratio = 3.0)
+    (X, y) = generateregrdata(f, -1.0, 1.0, n, num_points, signal_ratio = 9.0)
     reference_rmse = sqrt(sum(abs2.([y[i] - f(X[i,:]) for i in 1:num_points])) / num_points)
 
     folds = kfolds((X', y); k = 5)
