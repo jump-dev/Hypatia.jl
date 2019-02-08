@@ -1,7 +1,7 @@
 
 mutable struct CholCholCombinedHSDSystemSolver <: CombinedHSDSystemSolver
 
-    function CombinedNaiveStepper(model::Models.Linear)
+    function CombinedNaiveStepper(model::Models.LinearModel)
         (n, p, q) = (model.n, model.p, model.q)
         system_solver = new()
 

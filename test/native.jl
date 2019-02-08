@@ -50,7 +50,7 @@ function dimension1(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemSol
     h = [1]
     cones = [CO.Nonnegative(1, false)]
     cone_idxs = [1:1]
-    model = MO.Linear(c, A, b, G, h, cones, cone_idxs)
+    model = MO.LinearModel(c, A, b, G, h, cones, cone_idxs)
 
     for dense in (true, false)
         if !dense
@@ -71,7 +71,7 @@ function dimension1(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemSol
 end
 
 # function consistent1(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemSolver})
-#     model = MO.Linear(c, A, b, G, h, cones, cone_idxs)
+#     model = MO.LinearModel(c, A, b, G, h, cones, cone_idxs)
 #     Random.seed!(1)
 #     (n, p, q) = (30, 15, 30)
 #     A = rand(-9.0:9.0, p, n)
@@ -94,7 +94,7 @@ end
 # end
 #
 # function inconsistent1(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemSolver})
-#     model = MO.Linear(c, A, b, G, h, cones, cone_idxs)
+#     model = MO.LinearModel(c, A, b, G, h, cones, cone_idxs)
 #     Random.seed!(1)
 #     (n, p, q) = (30, 15, 30)
 #     A = rand(-9.0:9.0, p, n)
@@ -111,7 +111,7 @@ end
 # end
 #
 # function inconsistent2(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemSolver})
-#     model = MO.Linear(c, A, b, G, h, cones, cone_idxs)
+#     model = MO.LinearModel(c, A, b, G, h, cones, cone_idxs)
 #     Random.seed!(1)
 #     (n, p, q) = (30, 15, 30)
 #     A = rand(-9.0:9.0, p, n)
@@ -137,12 +137,12 @@ function orthant1(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemSolve
     h = zeros(q)
 
     # nonnegative cone
-    model = MO.Linear(c, A, b, SparseMatrixCSC(-1.0I, q, n), h, [CO.Nonnegative(q)], [1:q])
+    model = MO.LinearModel(c, A, b, SparseMatrixCSC(-1.0I, q, n), h, [CO.Nonnegative(q)], [1:q])
     rnn = solveandcheck(model, SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model))))
     @test rnn.status == :Optimal
 
     # nonpositive cone
-    model = MO.Linear(c, A, b, SparseMatrixCSC(1.0I, q, n), h, [CO.Nonpositive(q)], [1:q])
+    model = MO.LinearModel(c, A, b, SparseMatrixCSC(1.0I, q, n), h, [CO.Nonpositive(q)], [1:q])
     rnp = solveandcheck(model, SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model))))
     @test rnp.status == :Optimal
 
@@ -159,12 +159,12 @@ function orthant2(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemSolve
     h = G * ones(n)
 
     # use dual barrier
-    model = MO.Linear(c, A, b, G, h, [CO.Nonnegative(q, true)], [1:q])
+    model = MO.LinearModel(c, A, b, G, h, [CO.Nonnegative(q, true)], [1:q])
     r1 = solveandcheck(model, SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model))))
     @test r1.status == :Optimal
 
     # use primal barrier
-    model = MO.Linear(c, A, b, G, h, [CO.Nonnegative(q, false)], [1:q])
+    model = MO.LinearModel(c, A, b, G, h, [CO.Nonnegative(q, false)], [1:q])
     r2 = solveandcheck(model, SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model))))
     @test r2.status == :Optimal
 
@@ -181,12 +181,12 @@ function orthant3(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemSolve
     h = zeros(q)
 
     # use dual barrier
-    model = MO.Linear(c, A, b, G, h, [CO.Nonpositive(q, true)], [1:q])
+    model = MO.LinearModel(c, A, b, G, h, [CO.Nonpositive(q, true)], [1:q])
     r1 = solveandcheck(model, SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model))))
     @test r1.status == :Optimal
 
     # use primal barrier
-    model = MO.Linear(c, A, b, G, h, [CO.Nonpositive(q, false)], [1:q])
+    model = MO.LinearModel(c, A, b, G, h, [CO.Nonpositive(q, false)], [1:q])
     r2 = solveandcheck(model, SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model))))
     @test r2.status == :Optimal
 
@@ -203,12 +203,12 @@ function orthant4(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemSolve
     h = G * ones(n)
 
     # mixture of nonnegative and nonpositive cones
-    model = MO.Linear(c, A, b, G, h, [CO.Nonnegative(4, false), CO.Nonnegative(6, true)], [1:4, 5:10])
+    model = MO.LinearModel(c, A, b, G, h, [CO.Nonnegative(4, false), CO.Nonnegative(6, true)], [1:4, 5:10])
     r1 = solveandcheck(model, SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model))))
     @test r1.status == :Optimal
 
     # only nonnegative cone
-    model = MO.Linear(c, A, b, G, h, [CO.Nonnegative(10, false)], [1:10])
+    model = MO.LinearModel(c, A, b, G, h, [CO.Nonnegative(10, false)], [1:10])
     r2 = solveandcheck(model, SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model))))
     @test r2.status == :Optimal
 
@@ -223,7 +223,7 @@ function epinorminf1(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemSo
     h = zeros(3)
     cones = [CO.EpiNormInf(3)]
     cone_idxs = [1:3]
-    model = MO.Linear(c, A, b, G, h, cones, cone_idxs)
+    model = MO.LinearModel(c, A, b, G, h, cones, cone_idxs)
 
     solver = SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model)))
     r = solveandcheck(model, solver)
@@ -242,7 +242,7 @@ function epinorminf2(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemSo
     h = G * ones(6)
     cones = [CO.EpiNormInf(6)]
     cone_idxs = [1:6]
-    model = MO.Linear(c, A, b, G, h, cones, cone_idxs)
+    model = MO.LinearModel(c, A, b, G, h, cones, cone_idxs)
 
     solver = SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model)))
     r = solveandcheck(model, solver)
@@ -259,7 +259,7 @@ function epinorminf3(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemSo
     h = zeros(6)
     cones = [CO.EpiNormInf(6)]
     cone_idxs = [1:6]
-    model = MO.Linear(c, A, b, G, h, cones, cone_idxs)
+    model = MO.LinearModel(c, A, b, G, h, cones, cone_idxs)
 
     solver = SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model)))
     r = solveandcheck(model, solver)
@@ -276,7 +276,7 @@ function epinorminf4(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemSo
     h = zeros(3)
     cones = [CO.EpiNormInf(3, true)]
     cone_idxs = [1:3]
-    model = MO.Linear(c, A, b, G, h, cones, cone_idxs)
+    model = MO.LinearModel(c, A, b, G, h, cones, cone_idxs)
 
     solver = SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model)))
     r = solveandcheck(model, solver)
@@ -295,7 +295,7 @@ function epinorminf5(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemSo
     h = G * ones(6)
     cones = [CO.EpiNormInf(6, true)]
     cone_idxs = [1:6]
-    model = MO.Linear(c, A, b, G, h, cones, cone_idxs)
+    model = MO.LinearModel(c, A, b, G, h, cones, cone_idxs)
 
     solver = SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model)))
     r = solveandcheck(model, solver)
@@ -315,7 +315,7 @@ function epinorminf6(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemSo
     h = zeros(2L + 2); h[1] = 1.0; h[L + 2] = 1.0
     cones = [CO.EpiNormInf(L + 1, true), CO.EpiNormInf(L + 1, false)]
     cone_idxs = [1:(L + 1), (L + 2):(2L + 2)]
-    model = MO.Linear(c, A, b, G, h, cones, cone_idxs)
+    model = MO.LinearModel(c, A, b, G, h, cones, cone_idxs)
 
     solver = SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model)))
     r = solveandcheck(model, solver)
@@ -334,7 +334,7 @@ function epinormeucl1(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemS
     h = zeros(3)
 
     for is_dual in (true, false)
-        model = MO.Linear(c, A, b, G, h, [CO.EpiNormEucl(3, is_dual)], [1:3])
+        model = MO.LinearModel(c, A, b, G, h, [CO.EpiNormEucl(3, is_dual)], [1:3])
         solver = SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model)))
         r = solveandcheck(model, solver)
         @test r.status == :Optimal
@@ -352,7 +352,7 @@ function epinormeucl2(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemS
     h = zeros(3)
 
     for is_dual in (true, false)
-        model = MO.Linear(c, A, b, G, h, [CO.EpiNormEucl(3, is_dual)], [1:3])
+        model = MO.LinearModel(c, A, b, G, h, [CO.EpiNormEucl(3, is_dual)], [1:3])
         solver = SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model)))
         r = solveandcheck(model, solver)
         @test r.status == :Optimal
@@ -369,7 +369,7 @@ function epipersquare1(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystem
     h = zeros(4)
 
     for is_dual in (true, false)
-        model = MO.Linear(c, A, b, G, h, [CO.EpiPerSquare(4, is_dual)], [1:4])
+        model = MO.LinearModel(c, A, b, G, h, [CO.EpiPerSquare(4, is_dual)], [1:4])
         solver = SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model)))
         r = solveandcheck(model, solver)
         @test r.status == :Optimal
@@ -386,7 +386,7 @@ function epipersquare2(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystem
     h = zeros(3)
 
     for is_dual in (true, false)
-        model = MO.Linear(c, A, b, G, h, [CO.EpiPerSquare(3, is_dual)], [1:3])
+        model = MO.LinearModel(c, A, b, G, h, [CO.EpiPerSquare(3, is_dual)], [1:3])
         solver = SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model)))
         r = solveandcheck(model, solver)
         @test r.status == :Optimal
@@ -403,7 +403,7 @@ function epipersquare3(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystem
     h = zeros(4)
 
     for is_dual in (true, false)
-        model = MO.Linear(c, A, b, G, h, [CO.EpiPerSquare(4, is_dual)], [1:4])
+        model = MO.LinearModel(c, A, b, G, h, [CO.EpiPerSquare(4, is_dual)], [1:4])
         solver = SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model)))
         r = solveandcheck(model, solver)
         @test r.status == :Optimal
@@ -420,7 +420,7 @@ function semidefinite1(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystem
     h = zeros(3)
 
     for is_dual in (true, false)
-        model = MO.Linear(c, A, b, G, h, [CO.PosSemidef(3, is_dual)], [1:3])
+        model = MO.LinearModel(c, A, b, G, h, [CO.PosSemidef(3, is_dual)], [1:3])
         solver = SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model)))
         r = solveandcheck(model, solver)
         @test r.status == :Optimal
@@ -437,7 +437,7 @@ function semidefinite2(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystem
     h = zeros(3)
 
     for is_dual in (true, false)
-        model = MO.Linear(c, A, b, G, h, [CO.PosSemidef(3, is_dual)], [1:3])
+        model = MO.LinearModel(c, A, b, G, h, [CO.PosSemidef(3, is_dual)], [1:3])
         solver = SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model)))
         r = solveandcheck(model, solver)
         @test r.status == :Optimal
@@ -454,7 +454,7 @@ function semidefinite3(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystem
     h = zeros(6)
 
     for is_dual in (true, false)
-        model = MO.Linear(c, A, b, G, h, [CO.PosSemidef(6, is_dual)], [1:6])
+        model = MO.LinearModel(c, A, b, G, h, [CO.PosSemidef(6, is_dual)], [1:6])
         solver = SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model)))
         r = solveandcheck(model, solver)
         @test r.status == :Optimal
@@ -471,7 +471,7 @@ function hypoperlog1(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemSo
     h = zeros(3)
     cones = [CO.HypoPerLog()]
     cone_idxs = [1:3]
-    model = MO.Linear(c, A, b, G, h, cones, cone_idxs)
+    model = MO.LinearModel(c, A, b, G, h, cones, cone_idxs)
 
     solver = SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model)))
     r = solveandcheck(model, solver)
@@ -491,7 +491,7 @@ function hypoperlog2(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemSo
     h = zeros(3)
     cones = [CO.HypoPerLog()]
     cone_idxs = [1:3]
-    model = MO.Linear(c, A, b, G, h, cones, cone_idxs)
+    model = MO.LinearModel(c, A, b, G, h, cones, cone_idxs)
 
     solver = SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model)))
     r = solveandcheck(model, solver)
@@ -507,7 +507,7 @@ function hypoperlog3(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemSo
     h = zeros(4)
     cones = [CO.HypoPerLog(), CO.Nonnegative(1)]
     cone_idxs = [1:3, 4:4]
-    model = MO.Linear(c, A, b, G, h, cones, cone_idxs)
+    model = MO.LinearModel(c, A, b, G, h, cones, cone_idxs)
 
     solver = SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model)))
     r = solveandcheck(model, solver)
@@ -525,7 +525,7 @@ function hypoperlog4(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemSo
     h = zeros(3)
     cones = [CO.HypoPerLog(true)]
     cone_idxs = [1:3]
-    model = MO.Linear(c, A, b, G, h, cones, cone_idxs)
+    model = MO.LinearModel(c, A, b, G, h, cones, cone_idxs)
 
     solver = SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model)))
     r = solveandcheck(model, solver)
@@ -542,7 +542,7 @@ function epiperpower1(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemS
     h = zeros(6)
     cones = [CO.EpiPerPower(5.0, false), CO.EpiPerPower(2.5, false)]
     cone_idxs = [1:3, 4:6]
-    model = MO.Linear(c, A, b, G, h, cones, cone_idxs)
+    model = MO.LinearModel(c, A, b, G, h, cones, cone_idxs)
 
     solver = SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model)))
     r = solveandcheck(model, solver)
@@ -559,7 +559,7 @@ function epiperpower2(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemS
     h = zeros(3)
 
     for is_dual in (true, false)
-        model = MO.Linear(c, A, b, G, h, [CO.EpiPerPower(2.0, is_dual)], [1:3])
+        model = MO.LinearModel(c, A, b, G, h, [CO.EpiPerPower(2.0, is_dual)], [1:3])
         solver = SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model)))
         r = solveandcheck(model, solver)
         @test r.status == :Optimal
@@ -576,7 +576,7 @@ function epiperpower3(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemS
     h = zeros(3)
 
     for is_dual in (true, false)
-        model = MO.Linear(c, A, b, G, h, [CO.EpiPerPower(2.0, is_dual)], [1:3])
+        model = MO.LinearModel(c, A, b, G, h, [CO.EpiPerPower(2.0, is_dual)], [1:3])
 
         solver = SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model)), tol_feas = 1e-9)
         r = solveandcheck(model, solver)
@@ -594,7 +594,7 @@ function hypogeomean1(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemS
     h = zeros(6)
     cones = [CO.HypoGeomean([0.2, 0.8], false), CO.HypoGeomean([0.4, 0.6], false)]
     cone_idxs = [1:3, 4:6]
-    model = MO.Linear(c, A, b, G, h, cones, cone_idxs)
+    model = MO.LinearModel(c, A, b, G, h, cones, cone_idxs)
 
     solver = SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model)))
     r = solveandcheck(model, solver)
@@ -611,7 +611,7 @@ function hypogeomean2(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemS
     h = zeros(3)
 
     for is_dual in (true, false)
-        model = MO.Linear(c, A, b, G, h, [CO.HypoGeomean([0.5, 0.5], is_dual)], [1:3])
+        model = MO.LinearModel(c, A, b, G, h, [CO.HypoGeomean([0.5, 0.5], is_dual)], [1:3])
         solver = SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model)))
         r = solveandcheck(model, solver)
         @test r.status == :Optimal
@@ -629,7 +629,7 @@ function hypogeomean3(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemS
 
     for is_dual in (true, false)
         b = (is_dual ? [-1] : [1])
-        model = MO.Linear(c, A, b, G, h, [CO.HypoGeomean(fill(inv(l), l), is_dual)], [1:(l + 1)])
+        model = MO.LinearModel(c, A, b, G, h, [CO.HypoGeomean(fill(inv(l), l), is_dual)], [1:(l + 1)])
         solver = SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model)))
         r = solveandcheck(model, solver)
         @test r.status == :Optimal
@@ -647,7 +647,7 @@ function hypogeomean4(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemS
     h = zeros(l + 1)
 
     for is_dual in (true, false)
-        model = MO.Linear(c, A, b, G, h, [CO.HypoGeomean(fill(inv(l), l), is_dual)], [1:(l + 1)])
+        model = MO.LinearModel(c, A, b, G, h, [CO.HypoGeomean(fill(inv(l), l), is_dual)], [1:(l + 1)])
         solver = SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model)))
         r = solveandcheck(model, solver)
         @test r.status == :Optimal
@@ -667,7 +667,7 @@ function epinormspectral1(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSys
     h = vcat(0.0, rand(Xnm))
 
     for is_dual in (true, false)
-        model = MO.Linear(c, A, b, G, h, [CO.EpiNormSpectral(Xn, Xm, is_dual)], [1:(Xnm + 1)])
+        model = MO.LinearModel(c, A, b, G, h, [CO.EpiNormSpectral(Xn, Xm, is_dual)], [1:(Xnm + 1)])
         solver = SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model)))
         r = solveandcheck(model, solver)
         @test r.status == :Optimal
@@ -695,7 +695,7 @@ function hypoperlogdet1(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSyste
     CO.smat_to_svec!(view(h, 3:dim), mat)
     cones = [CO.HypoPerLogdet(dim)]
     cone_idxs = [1:dim]
-    model = MO.Linear(c, A, b, G, h, cones, cone_idxs)
+    model = MO.LinearModel(c, A, b, G, h, cones, cone_idxs)
 
     solver = SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model)))
     r = solveandcheck(model, solver)
@@ -720,7 +720,7 @@ function hypoperlogdet2(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSyste
     CO.smat_to_svec!(view(h, 3:dim), mat)
     cones = [CO.HypoPerLogdet(dim, true)]
     cone_idxs = [1:dim]
-    model = MO.Linear(c, A, b, G, h, cones, cone_idxs)
+    model = MO.LinearModel(c, A, b, G, h, cones, cone_idxs)
 
     solver = SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model)))
     r = solveandcheck(model, solver)
@@ -745,7 +745,7 @@ function hypoperlogdet3(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSyste
     CO.smat_to_svec!(view(h, 3:dim), mat)
     cones = [CO.HypoPerLogdet(dim)]
     cone_idxs = [1:dim]
-    model = MO.Linear(c, A, b, G, h, cones, cone_idxs)
+    model = MO.LinearModel(c, A, b, G, h, cones, cone_idxs)
 
     solver = SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model)))
     r = solveandcheck(model, solver)
@@ -763,7 +763,7 @@ function epipersumexp1(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystem
     h = zeros(l + 2)
     cones = [CO.EpiPerSumExp(l + 2)]
     cone_idxs = [1:(l + 2)]
-    model = MO.Linear(c, A, b, G, h, cones, cone_idxs)
+    model = MO.LinearModel(c, A, b, G, h, cones, cone_idxs)
 
     solver = SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model)))
     r = solveandcheck(model, solver)
@@ -782,7 +782,7 @@ function epipersumexp2(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystem
     h = zeros(l + 2); h[2] = 1.0
     cones = [CO.EpiPerSumExp(l + 2)]
     cone_idxs = [1:(l + 2)]
-    model = MO.Linear(c, A, b, G, h, cones, cone_idxs)
+    model = MO.LinearModel(c, A, b, G, h, cones, cone_idxs)
 
     solver = SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model)))
     r = solveandcheck(model, solver)
@@ -795,7 +795,7 @@ end
 function envelope1(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemSolver})
     # dense methods
     (c, A, b, G, h, cones, cone_idxs) = build_envelope(2, 5, 1, 5, use_data = true, dense = true)
-    model = MO.Linear(c, A, b, G, h, cones, cone_idxs)
+    model = MO.LinearModel(c, A, b, G, h, cones, cone_idxs)
     solver = SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model)), tol_feas = 1e-10)
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
@@ -803,7 +803,7 @@ function envelope1(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemSolv
 
     # sparse methods
     (c, A, b, G, h, cones, cone_idxs) = build_envelope(2, 5, 1, 5, use_data = true, dense = false)
-    model = MO.Linear(c, A, b, G, h, cones, cone_idxs)
+    model = MO.LinearModel(c, A, b, G, h, cones, cone_idxs)
     solver = SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model)), tol_feas = 1e-10)
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
@@ -813,13 +813,13 @@ end
 function envelope2(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemSolver})
     # dense methods
     (c, A, b, G, h, cones, cone_idxs) = build_envelope(2, 4, 2, 7, dense = true)
-    model = MO.Linear(c, A, b, G, h, cones, cone_idxs)
+    model = MO.LinearModel(c, A, b, G, h, cones, cone_idxs)
     rd = solveandcheck(model, SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model))))
     @test rd.status == :Optimal
 
     # sparse methods
     (c, A, b, G, h, cones, cone_idxs) = build_envelope(2, 4, 2, 7, dense = false)
-    model = MO.Linear(c, A, b, G, h, cones, cone_idxs)
+    model = MO.LinearModel(c, A, b, G, h, cones, cone_idxs)
     rs = solveandcheck(model, SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model))))
     @test rs.status == :Optimal
 
@@ -828,7 +828,7 @@ end
 
 function envelope3(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemSolver})
     (c, A, b, G, h, cones, cone_idxs) = build_envelope(2, 3, 3, 5, dense = false)
-    model = MO.Linear(c, A, b, G, h, cones, cone_idxs)
+    model = MO.LinearModel(c, A, b, G, h, cones, cone_idxs)
     solver = SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model)))
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
@@ -836,7 +836,7 @@ end
 
 function envelope4(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemSolver})
     (c, A, b, G, h, cones, cone_idxs) = build_envelope(2, 2, 4, 3, dense = false)
-    model = MO.Linear(c, A, b, G, h, cones, cone_idxs)
+    model = MO.LinearModel(c, A, b, G, h, cones, cone_idxs)
     solver = SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model)))
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
@@ -845,13 +845,13 @@ end
 function linearopt1(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemSolver})
     # dense methods
     (c, A, b, G, h, cones, cone_idxs) = build_linearopt(25, 50, dense = true, tosparse = false)
-    model = MO.Linear(c, A, b, G, h, cones, cone_idxs)
+    model = MO.LinearModel(c, A, b, G, h, cones, cone_idxs)
     rd = solveandcheck(model, SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model))))
     @test rd.status == :Optimal
 
     # sparse methods
     (c, A, b, G, h, cones, cone_idxs) = build_linearopt(25, 50, dense = true, tosparse = true)
-    model = MO.Linear(c, A, b, G, h, cones, cone_idxs)
+    model = MO.LinearModel(c, A, b, G, h, cones, cone_idxs)
     rs = solveandcheck(model, SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model))))
     @test rs.status == :Optimal
 
@@ -860,7 +860,7 @@ end
 
 function linearopt2(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemSolver})
     (c, A, b, G, h, cones, cone_idxs) = build_linearopt(500, 1000, use_data = true, dense = true)
-    model = MO.Linear(c, A, b, G, h, cones, cone_idxs)
+    model = MO.LinearModel(c, A, b, G, h, cones, cone_idxs)
     solver = SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model)), tol_feas = 1e-8)
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
@@ -871,7 +871,7 @@ end
 
 function namedpoly1(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemSolver})
     (c, A, b, G, h, cones, cone_idxs) = build_namedpoly(:butcher, 2)
-    model = MO.Linear(c, A, b, G, h, cones, cone_idxs)
+    model = MO.LinearModel(c, A, b, G, h, cones, cone_idxs)
     solver = SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model)), tol_feas = 1e-8)
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
@@ -880,7 +880,7 @@ end
 
 function namedpoly2(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemSolver})
     (c, A, b, G, h, cones, cone_idxs) = build_namedpoly(:caprasse, 4)
-    model = MO.Linear(c, A, b, G, h, cones, cone_idxs)
+    model = MO.LinearModel(c, A, b, G, h, cones, cone_idxs)
     solver = SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model)), tol_feas = 1e-8)
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
@@ -889,7 +889,7 @@ end
 
 function namedpoly3(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemSolver})
     (c, A, b, G, h, cones, cone_idxs) = build_namedpoly(:goldsteinprice, 6)
-    model = MO.Linear(c, A, b, G, h, cones, cone_idxs)
+    model = MO.LinearModel(c, A, b, G, h, cones, cone_idxs)
     solver = SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model)), tol_feas = 1e-9, tol_rel_opt = 1e-8, tol_abs_opt = 1e-8)
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
@@ -898,7 +898,7 @@ end
 
 function namedpoly4(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemSolver})
     (c, A, b, G, h, cones, cone_idxs) = build_namedpoly(:heart, 2)
-    model = MO.Linear(c, A, b, G, h, cones, cone_idxs)
+    model = MO.LinearModel(c, A, b, G, h, cones, cone_idxs)
     solver = SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model)), tol_feas = 1e-8)
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
@@ -907,7 +907,7 @@ end
 
 function namedpoly5(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemSolver})
     (c, A, b, G, h, cones, cone_idxs) = build_namedpoly(:lotkavolterra, 3)
-    model = MO.Linear(c, A, b, G, h, cones, cone_idxs)
+    model = MO.LinearModel(c, A, b, G, h, cones, cone_idxs)
     solver = SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model)), tol_feas = 1e-8)
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
@@ -916,7 +916,7 @@ end
 
 function namedpoly6(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemSolver})
     (c, A, b, G, h, cones, cone_idxs) = build_namedpoly(:magnetism7, 2)
-    model = MO.Linear(c, A, b, G, h, cones, cone_idxs)
+    model = MO.LinearModel(c, A, b, G, h, cones, cone_idxs)
     solver = SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model)), tol_feas = 1e-8)
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
@@ -925,7 +925,7 @@ end
 
 function namedpoly7(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemSolver})
     (c, A, b, G, h, cones, cone_idxs) = build_namedpoly(:motzkin, 7)
-    model = MO.Linear(c, A, b, G, h, cones, cone_idxs)
+    model = MO.LinearModel(c, A, b, G, h, cones, cone_idxs)
     solver = SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model)), tol_feas = 1e-8)
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
@@ -934,7 +934,7 @@ end
 
 function namedpoly8(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemSolver})
     (c, A, b, G, h, cones, cone_idxs) = build_namedpoly(:reactiondiffusion, 4)
-    model = MO.Linear(c, A, b, G, h, cones, cone_idxs)
+    model = MO.LinearModel(c, A, b, G, h, cones, cone_idxs)
     solver = SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model)), tol_feas = 1e-8)
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
@@ -943,7 +943,7 @@ end
 
 function namedpoly9(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemSolver})
     (c, A, b, G, h, cones, cone_idxs) = build_namedpoly(:robinson, 8)
-    model = MO.Linear(c, A, b, G, h, cones, cone_idxs)
+    model = MO.LinearModel(c, A, b, G, h, cones, cone_idxs)
     solver = SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model)), tol_feas = 1e-8)
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
@@ -952,7 +952,7 @@ end
 
 function namedpoly10(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemSolver})
     (c, A, b, G, h, cones, cone_idxs) = build_namedpoly(:rosenbrock, 5)
-    model = MO.Linear(c, A, b, G, h, cones, cone_idxs)
+    model = MO.LinearModel(c, A, b, G, h, cones, cone_idxs)
     solver = SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model)), tol_feas = 1e-10, tol_rel_opt = 1e-9, tol_abs_opt = 1e-9)
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
@@ -961,7 +961,7 @@ end
 
 function namedpoly11(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemSolver})
     (c, A, b, G, h, cones, cone_idxs) = build_namedpoly(:schwefel, 4)
-    model = MO.Linear(c, A, b, G, h, cones, cone_idxs)
+    model = MO.LinearModel(c, A, b, G, h, cones, cone_idxs)
     solver = SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model)), tol_feas = 1e-8)
     r = solveandcheck(model, solver)
     @test r.status == :Optimal
