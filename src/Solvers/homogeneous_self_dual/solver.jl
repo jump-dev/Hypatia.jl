@@ -7,7 +7,7 @@ TODO make internal statuses types
 =#
 
 mutable struct HSDSolver <: Solver
-    model::Models.Linear
+    model::Models.LinearModel
 
     stepper::HSDStepper
 
@@ -53,7 +53,7 @@ mutable struct HSDSolver <: Solver
     solve_time::Float64
 
     function HSDSolver(
-        model::Models.Linear,
+        model::Models.LinearModel,
         ;
         stepper::HSDStepper = CombinedHSDStepper(model),
         verbose::Bool = true,

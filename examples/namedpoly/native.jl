@@ -104,7 +104,7 @@ function run_namedpoly()
         # build_namedpoly(:rosenbrock, 4)
         # build_namedpoly(:schwefel, 3)
 
-    model = MO.Linear(c, A, b, G, h, cones, cone_idxs)
+    model = MO.LinearModel(c, A, b, G, h, cones, cone_idxs)
     solver = SO.HSDSolver(model, verbose = true)
     SO.solve(solver)
     @test SO.get_status(solver) == :Optimal

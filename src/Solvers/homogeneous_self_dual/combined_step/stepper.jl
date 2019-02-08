@@ -6,7 +6,7 @@ mutable struct CombinedHSDStepper <: HSDStepper
     prev_gamma::Float64
 
     function CombinedHSDStepper(
-        model::Models.Linear;
+        model::Models.LinearModel;
         system_solver::CombinedHSDSystemSolver = NaiveCombinedHSDSystemSolver(model),
         max_nbhd::Float64 = 0.75,
         )

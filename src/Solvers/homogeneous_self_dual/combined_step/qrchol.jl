@@ -1,7 +1,7 @@
 
 mutable struct QRCholCombinedHSDSystemSolver <: CombinedHSDSystemSolver
 
-    function CombinedNaiveStepper(model::Models.Linear)
+    function CombinedNaiveStepper(model::Models.LinearModel)
         @assert has_QR(model) # need access to QR factorization from preprocessing
         (n, p, q) = (model.n, model.p, model.q)
         system_solver = new()

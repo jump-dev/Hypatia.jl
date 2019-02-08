@@ -12,7 +12,7 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     tol_abs_opt::Float64
     tol_feas::Float64
 
-    model::Models.Linear
+    model::Models.LinearModel
     solver::Solvers.HSDSolver
 
     obj_sense::MOI.OptimizationSense
@@ -462,7 +462,7 @@ function MOI.copy_to(
     end
     model_h = Vector(sparsevec(Ih, Vh, q))
 
-    opt.model = Models.Linear(model_c, model_A, model_b, model_G, model_h, cones, cone_idxs)
+    opt.model = Models.LinearModel(model_c, model_A, model_b, model_G, model_h, cones, cone_idxs)
 
     opt.constr_offset_cone = constr_offset_cone
     opt.constr_prim_cone = Vector(sparsevec(Icpc, Vcpc, q))
@@ -477,7 +477,7 @@ function MOI.optimize!(opt::Optimizer)
     (c, A, b, G, h, cones, cone_idxs) = (model.c, model.A, model.b, model.G, model.h, model.cones, model.cone_idxs)
 
     # check, preprocess, load, and solve
-    model = Models.Linear(c, A, b, G, h, cones, cone_idxs)
+    model = Models.LinearModel(c, A, b, G, h, cones, cone_idxs)
     solver = Solvers.HSDSolver(model, verbose = opt.verbose, time_limit = opt.time_limit,
         tol_rel_opt = opt.tol_rel_opt, tol_abs_opt = opt.tol_abs_opt, tol_feas = opt.tol_feas)
     Solvers.solve(solver)

@@ -18,7 +18,7 @@ mutable struct NaiveCombinedHSDSystemSolver <: CombinedHSDSystemSolver
     s_sol
     tau_sol
 
-    function NaiveCombinedHSDSystemSolver(model::Models.Linear)
+    function NaiveCombinedHSDSystemSolver(model::Models.LinearModel)
         (n, p, q) = (model.n, model.p, model.q)
         system_solver = new()
 
