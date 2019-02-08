@@ -13,6 +13,7 @@ See e.g. Chapter 8 of thesis by G. Hall (2018).
 =#
 
 using Random
+using LinearAlgebra
 import Distributions
 using MathOptInterface
 MOI = MathOptInterface
@@ -60,7 +61,7 @@ function generateregrdata(
 
     if !iszero(signal_ratio)
         noise = rand(Distributions.Normal(), npoints)
-        noise .*= norm(y)/sqrt(signal_ratio)/norm(noise)
+        noise *= norm(y)/sqrt(signal_ratio)/norm(noise)
         y .+= noise
     end
 
@@ -93,8 +94,8 @@ function add_loss_and_polys!(
 end
 
 function build_shapeconregr_PSD(
-    X::Matrix{Float64},
-    y::Vector{Float64},
+    X,
+    y,
     r::Int,
     sd::ShapeData;
     use_leastsqobj::Bool = false,
