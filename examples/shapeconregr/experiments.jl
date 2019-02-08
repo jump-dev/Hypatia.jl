@@ -135,7 +135,7 @@ function exprmnt3_data()
     df = CSV.read(joinpath(@__DIR__(), "wages/wages.csv"))
     # df = CSV.read("examples/shapeconregr/wages/wages.csv")
     inds = sample(1:size(df, 1), 2000, replace=false)
-    X = convert(Array, df[inds, 2:3])
+    X = convert(Matrix, df[inds, 2:3])
     y = convert(Array, df[inds, 1])
     # normalize
     X = (X .- minimum(X, dims=1)) ./ (maximum(X, dims=1) - minimum(X, dims=1))
@@ -155,6 +155,33 @@ function exprmnt3_data()
     shape_data = ShapeData(mono_domain, conv_domain, mono_profile, conv_profile)
 
     return (folds, shape_data)
+end
+
+function exprmnt4_data()
+    df = CSV.read(joinpath(dirname(dirname(Base.find_package("Hypatia"))), "data", "naics5811.csv"))
+    # following Example 3 https://arxiv.org/pdf/1509.08165v1.pdf
+    df[:prode] .= df[:emp] - df[:prode]
+    dfagg = aggregate(dropmissing(df), :naics, sum) # TODO ask what Rahul did with missing values
+    X = convert(Matrix, dfagg[[:prode_sum, :prodh_sum, :prodw_sum, :cap_sum]])
+    y = convert(Array, dfagg[:vship_sum])
+    Xlog = log.(X)
+    # normalize
+    Xlog .-= sum(Xlog, dims = 1) / size(Xlog, 1)
+    y .-= sum(y) / length(y)
+    Xlog ./= sqrt.(sum(abs2, Xlog, dims = 1))
+    y ./= sqrt(sum(abs2, y))
+
+    println("making folds")
+    folds = kfolds((X', y); k = 3)
+
+    mono_domain = Hypatia.Box(-ones(4), ones(4))
+    conv_domain = Hypatia.Box(-ones(4), ones(4))
+    mono_profile = zeros(4)
+    conv_profile = 1.0
+    shape_data = ShapeData(mono_domain, conv_domain, mono_profile, conv_profile)
+
+    return (folds, shape_data)
+
 end
 
 # real data
