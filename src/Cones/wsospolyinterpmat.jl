@@ -52,7 +52,7 @@ function buildmat!(cone::WSOSPolyInterpMat, point::AbstractVector{Float64})
             uo = 0
             for p in 1:R, q in 1:p
                 (bp, bq) = ((p - 1) * L, (q - 1) * L)
-                val = sum(ipwtj[u, l] * ipwtj[u, k] * point[uo+u] for u in 1:U)
+                val = sum(ipwtj[u, l] * ipwtj[u, k] * point[uo + u] for u in 1:U)
                 if p == q
                     mat[bp + l, bq + k] = val
                 else

@@ -14,6 +14,16 @@ struct WSOSPolyInterpCone <: MOI.AbstractVectorSet
 end
 WSOSPolyInterpCone(dimension::Int, ipwt::Vector{Matrix{Float64}}) = WSOSPolyInterpCone(dimension, ipwt, false)
 
+export MonotonicPolyCone
+
+struct MonotonicPolyCone <: MOI.AbstractVectorSet
+    dimension::Int
+    ipwt::Vector{Matrix{Float64}}
+    transform::Matrix{Float64}
+    is_dual::Bool
+end
+MonotonicPolyCone(dimension::Int, ipwt::Vector{Matrix{Float64}}, transform::Matrix{Float64}) = MonotonicPolyCone(dimension, ipwt, transform, false)
+
 export WSOSPolyInterpMatCone
 
 struct WSOSPolyInterpMatCone <: MOI.AbstractVectorSet
@@ -34,6 +44,7 @@ MOIOtherCones = (
     MOI.LogDetConeTriangle,
     WSOSPolyInterpCone,
     WSOSPolyInterpMatCone,
+    MonotonicPolyCone,
 )
 
 # MOI cones for which no transformation is needed
@@ -44,6 +55,7 @@ cone_from_moi(s::MOI.GeometricMeanCone) = (l = MOI.dimension(s) - 1; Cones.HypoG
 cone_from_moi(s::MOI.PowerCone{Float64}) = Cones.EpiPerPower(inv(s.exponent))
 cone_from_moi(s::WSOSPolyInterpCone) = Cones.WSOSPolyInterp(s.dimension, s.ipwt, s.is_dual)
 cone_from_moi(s::WSOSPolyInterpMatCone) = Cones.WSOSPolyInterpMat(s.r, s.u, s.ipwt, s.is_dual)
+cone_from_moi(s::MonotonicPolyCone) = Cones.MonotonicPoly(s.dimension, s.ipwt, s.transform, s.is_dual)
 cone_from_moi(s::MOI.AbstractVectorSet) = error("MOI set $s is not recognized")
 
 function build_var_cone(fi::MOI.VectorOfVariables, si::MOI.AbstractVectorSet, dim::Int, q::Int)
