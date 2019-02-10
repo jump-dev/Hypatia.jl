@@ -158,7 +158,7 @@ git-tree-sha1 = "7d513731b3fa5b515f38ebcfd53f795d73607c30"
 repo-rev = "master"
 repo-url = "https://github.com/JuliaOpt/MathOptInterface.jl.git"
 uuid = "b8f27783-ece8-5eb3-8dc8-9495eed66fee"
-version = "0.8.1+"
+version = "0.8.2+"
 
 [[Missings]]
 deps = ["Dates", "InteractiveUtils", "SparseArrays", "Test"]
