@@ -183,7 +183,8 @@ testfuns = [
     run_JuMP_sosmat2_scalar,
     run_JuMP_sosmat2_matrix,
     run_JuMP_sosmat2_matrix_dual,
-    run_JuMP_sosmat3, # numerically unstable
+    run_JuMP_sosmat3_primal, # numerically unstable
+    run_JuMP_sosmat3_dual,
     ]
 @testset "default examples: $t" for t in testfuns
     t()
