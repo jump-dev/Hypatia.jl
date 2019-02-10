@@ -7,13 +7,13 @@ Copyright 2018, David Papp, Sercan Yildiz
 definition and dual barrier extended from from "Sum-of-squares optimization without semidefinite programming" by D. Papp and S. Yildiz, available at https://arxiv.org/abs/1712.01792
 =#
 
-# Affine transofrm of a function in the wsos cone. Rather than this being its own cone could adapt functions from here to act upon other cones.
+# Affine transform of a function in the wsos cone. Rather than this being its own cone could adapt functions from here to act upon other cones.
 
 mutable struct MonotonicPoly <: Cone # not properly named
     use_dual::Bool
     dim::Int
     ipwt::Vector{Matrix{Float64}}
-    transform::Matrix{Float64} # can be an operator
+    transform::Vector{Matrix{Float64}} # can be an operator
     point::AbstractVector{Float64}
     g::Vector{Float64}
     H::Matrix{Float64}
@@ -23,11 +23,14 @@ mutable struct MonotonicPoly <: Cone # not properly named
     tmp2::Vector{Matrix{Float64}}
     tmp3::Matrix{Float64}
 
-    function MonotonicPoly(dim::Int, ipwt::Vector{Matrix{Float64}}, transform::Matrix{Float64}, is_dual::Bool)
+    function MonotonicPoly(dim::Int, ipwt::Vector{Matrix{Float64}}, transform::Vector{Matrix{Float64}}, is_dual::Bool)
         for ipwtj in ipwt
             @assert size(ipwtj, 1) == dim
         end
-        @assert size(transform) == (dim, dim)
+        for tr in transform
+            @assert size(tr) == (dim, dim)
+            # @assert transform invertible, transforms will need to be consistent by assumption
+        end
         cone = new()
         cone.use_dual = !is_dual # using dual barrier
         cone.dim = dim
@@ -43,11 +46,11 @@ mutable struct MonotonicPoly <: Cone # not properly named
     end
 end
 
-MonotonicPoly(dim::Int, ipwt::Vector{Matrix{Float64}}, transform::Matrix{Float64}) = MonotonicPoly(dim, ipwt, transform, false)
+MonotonicPoly(dim::Int, ipwt::Vector{Matrix{Float64}}, transform::Vector{Matrix{Float64}}) = MonotonicPoly(dim, ipwt, transform, false)
 
 get_nu(cone::MonotonicPoly) = sum(size(ipwtj, 2) for ipwtj in cone.ipwt)
 
-set_initial_point(arr::AbstractVector{Float64}, cone::MonotonicPoly) = (@. arr = 1.0; arr)
+set_initial_point(arr::AbstractVector{Float64}, cone::MonotonicPoly) = (@. arr = 1.0; arr .= cone.transform[1] \ arr; arr)
 
 function check_in_cone(cone::MonotonicPoly)
     @. cone.g = 0.0
@@ -55,14 +58,14 @@ function check_in_cone(cone::MonotonicPoly)
     tmp3 = cone.tmp3
     transform = cone.transform
 
-    for j in eachindex(cone.ipwt) # TODO can be done in parallel, but need multiple tmp3s
+    for tr in transform, j in eachindex(cone.ipwt) # TODO can be done in parallel, but need multiple tmp3s
         ipwtj = cone.ipwt[j]
         tmp1j = cone.tmp1[j]
         tmp2j = cone.tmp2[j]
 
         # tmp1j = ipwtj'*Diagonal(point)*ipwtj
         # mul!(tmp2j, ipwtj', Diagonal(cone.point)) # TODO dispatches to an extremely inefficient method
-        tmp2j .= ipwtj' .* (cone.transform * cone.point)' # transform(cone.point)
+        tmp2j .= ipwtj' .* (tr * cone.point)' # transform(cone.point)
         mul!(tmp1j, tmp2j, ipwtj)
 
         # pivoted cholesky and triangular solve method
@@ -77,9 +80,9 @@ function check_in_cone(cone::MonotonicPoly)
         BLAS.syrk!('U', 'T', 1.0, tmp2j, 0.0, tmp3)
 
         @inbounds for i in eachindex(cone.g)
-            cone.g[i] -= dot(diag(tmp3), transform[:, i])
+            cone.g[i] -= dot(diag(tmp3), tr[:, i])
             @inbounds for k in 1:i
-                cone.H[k, i] += sum(abs2(tmp3[k, i]) * transform[p, i] * transform[q, k] for p in 1:cone.dim, q in 1:cone.dim)
+                cone.H[k, i] += sum(abs2(tmp3[p, q]) * tr[p, k] * tr[q, i] for p in 1:cone.dim, q in 1:cone.dim)
             end
         end
     end

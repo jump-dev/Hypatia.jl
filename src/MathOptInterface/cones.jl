@@ -19,10 +19,10 @@ export MonotonicPolyCone
 struct MonotonicPolyCone <: MOI.AbstractVectorSet
     dimension::Int
     ipwt::Vector{Matrix{Float64}}
-    transform::Matrix{Float64}
+    transform::Vector{Matrix{Float64}}
     is_dual::Bool
 end
-MonotonicPolyCone(dimension::Int, ipwt::Vector{Matrix{Float64}}, transform::Matrix{Float64}) = MonotonicPolyCone(dimension, ipwt, transform, false)
+MonotonicPolyCone(dimension::Int, ipwt::Vector{Matrix{Float64}}, transform::Vector{Matrix{Float64}}) = MonotonicPolyCone(dimension, ipwt, transform, false)
 
 export WSOSPolyInterpMatCone
 
