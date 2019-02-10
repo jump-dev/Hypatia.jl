@@ -146,22 +146,21 @@ mutable struct PreprocessedLinearModel <: LinearModel
                 end
             end
 
-            point.x = AG_fact \ vcat(b, h - point.s)
-
             if AG_rank == n
                 # no dual equalities to remove
                 x_keep_idxs = 1:n
+                point.x = AG_fact \ vcat(b, h - point.s)
             else
                 # TODO optimize all below
                 if issparse(AG)
                     x_keep_idxs = AG_fact.pcol[1:AG_rank]
                     AG_Q1 = Matrix{Float64}(undef, p + q, AG_rank)
-                    # AG_Q1[AG_fact.prow, :] = AG_fact.Q * Matrix{Float64}(I, p + q, AG_rank) # TODO could eliminate this allocation
-                    AG_Q1[AG_fact.prow, :] = Matrix(AG_fact.Q)
+                    AG_Q1[AG_fact.prow, :] = AG_fact.Q * Matrix{Float64}(I, p + q, AG_rank) # TODO could eliminate this allocation
+                    # AG_Q1[AG_fact.prow, :] = Matrix(AG_fact.Q)
                 else
                     x_keep_idxs = AG_fact.p[1:AG_rank]
-                    # AG_Q1 = AG_fact.Q * Matrix{Float64}(I, p + q, AG_rank) # TODO could eliminate this allocation
-                    AG_Q1 = Matrix(AG_fact.Q)
+                    AG_Q1 = AG_fact.Q * Matrix{Float64}(I, p + q, AG_rank) # TODO could eliminate this allocation
+                    # AG_Q1 = Matrix(AG_fact.Q)
                 end
                 AG_R = UpperTriangular(AG_R[1:AG_rank, 1:AG_rank])
 
@@ -175,7 +174,8 @@ mutable struct PreprocessedLinearModel <: LinearModel
                 A = A[:, x_keep_idxs]
                 G = G[:, x_keep_idxs]
                 n = AG_rank
-                point.x = point.x[x_keep_idxs]
+
+                point.x = AG_R \ (AG_Q1' * vcat(b, h - point.s))
             end
         else
             x_keep_idxs = Int[]
@@ -199,7 +199,6 @@ mutable struct PreprocessedLinearModel <: LinearModel
                 end
             end
 
-            point.y = Ap_fact \ (-c - G' * point.z) # TODO remove allocs
 
             # TODO optimize all below
             if issparse(A)
@@ -226,7 +225,7 @@ mutable struct PreprocessedLinearModel <: LinearModel
             A = A[y_keep_idxs, :]
             b = b_sub
             p = Ap_rank
-            point.y = point.y[y_keep_idxs]
+            point.y = Ap_R \ (Ap_Q1' * (-c - G' * point.z)) # TODO remove allocs
 
             model.Ap_R = Ap_R
             model.Ap_Q1 = Ap_Q1
