@@ -78,7 +78,7 @@ function run_envelope(primal_wsos::Bool, dense::Bool)
         # build_envelope(3, 5, 3, 5, primal_wsos = primal_wsos, dense = dense)
         build_envelope(2, 30, 1, 30, primal_wsos = primal_wsos, dense = dense)
 
-    model = MO.LinearModel(c, A, b, G, h, cones, cone_idxs)
+    model = MO.PreprocessedLinearModel(c, A, b, G, h, cones, cone_idxs)
     solver = SO.HSDSolver(model, verbose = true)
     SO.solve(solver)
     @test SO.get_status(solver) == :Optimal

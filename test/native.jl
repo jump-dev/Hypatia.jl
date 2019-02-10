@@ -51,8 +51,8 @@ function dimension1(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemSol
     cones = [CO.Nonnegative(1, false)]
     cone_idxs = [1:1]
 
-    for dense in (true, false)
-        if !dense
+    for use_sparse in (false, true)
+        if use_sparse
             A = sparse(A)
             G = sparse(G)
         end
@@ -64,68 +64,61 @@ function dimension1(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemSol
         @test r.x ≈ [1, 0] atol = 1e-4 rtol = 1e-4
         @test isempty(r.y)
 
-        c = Float64[-1, -1]
-        @test_throws ErrorException("some dual equality constraints are inconsistent") linear_model(c, A, b, G, h, cones, cone_idxs)
+        @test_throws ErrorException("some dual equality constraints are inconsistent") linear_model(Float64[-1, -1], A, b, G, h, cones, cone_idxs)
     end
 end
 
-# function consistent1(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel})
-#     model = linear_model(c, A, b, G, h, cones, cone_idxs)
-#     Random.seed!(1)
-#     (n, p, q) = (30, 15, 30)
-#     A = rand(-9.0:9.0, p, n)
-#     G = Matrix(1.0I, q, n)
-#     c = rand(0.0:9.0, n)
-#     rnd1 = rand()
-#     rnd2 = rand()
-#     A[11:15, :] = rnd1*A[1:5, :] - rnd2*A[6:10, :]
-#     b = A * ones(n)
-#     rnd1 = rand()
-#     rnd2 = rand()
-#     A[:,11:15] = rnd1*A[:,1:5] - rnd2*A[:,6:10]
-#     G[:,11:15] = rnd1*G[:,1:5] - rnd2*G[:,6:10]
-#     c[11:15] = rnd1*c[1:5] - rnd2*c[6:10]
-#     h = zeros(q)
-#     cone = CO.Cone([CO.Nonpositive(q)], [1:q])
-#     solver = SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model)))
-    # r = solveandcheck(model, solver)
-#     @test r.status == :Optimal
-# end
-#
-# function inconsistent1(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel})
-#     model = linear_model(c, A, b, G, h, cones, cone_idxs)
-#     Random.seed!(1)
-#     (n, p, q) = (30, 15, 30)
-#     A = rand(-9.0:9.0, p, n)
-#     G = Matrix(-1.0I, q, n)
-#     c = rand(0.0:9.0, n)
-#     b = rand(p)
-#     rnd1 = rand()
-#     rnd2 = rand()
-#     A[11:15, :] = rnd1*A[1:5, :] - rnd2*A[6:10, :]
-#     b[11:15] = 2*(rnd1*b[1:5] - rnd2*b[6:10])
-#     h = zeros(q)
-#     cone = CO.Cone([CO.Nonnegative(q)], [1:q])
-#     @test_throws ErrorException("some primal equality constraints are inconsistent") solveandcheck(model, SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model))))
-# end
-#
-# function inconsistent2(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel})
-#     model = linear_model(c, A, b, G, h, cones, cone_idxs)
-#     Random.seed!(1)
-#     (n, p, q) = (30, 15, 30)
-#     A = rand(-9.0:9.0, p, n)
-#     G = Matrix(-1.0I, q, n)
-#     c = rand(0.0:9.0, n)
-#     b = rand(p)
-#     rnd1 = rand()
-#     rnd2 = rand()
-#     A[:,11:15] = rnd1*A[:,1:5] - rnd2*A[:,6:10]
-#     G[:,11:15] = rnd1*G[:,1:5] - rnd2*G[:,6:10]
-#     c[11:15] = 2*(rnd1*c[1:5] - rnd2*c[6:10])
-#     h = zeros(q)
-#     cone = CO.Cone([CO.Nonnegative(q)], [1:q])
-#     @test_throws ErrorException("some dual equality constraints are inconsistent") solveandcheck(model, SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model))))
-# end
+function consistent1(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel})
+    Random.seed!(1)
+    (n, p, q) = (30, 15, 30)
+    A = rand(-9.0:9.0, p, n)
+    G = Matrix(1.0I, q, n)
+    c = rand(0.0:9.0, n)
+    rnd1 = rand()
+    rnd2 = rand()
+    A[11:15, :] = rnd1 * A[1:5, :] - rnd2 * A[6:10, :]
+    b = A * ones(n)
+    rnd1 = rand()
+    rnd2 = rand()
+    A[:, 11:15] = rnd1 * A[:, 1:5] - rnd2 * A[:, 6:10]
+    G[:, 11:15] = rnd1 * G[:, 1:5] - rnd2 * G[:, 6:10]
+    c[11:15] = rnd1 * c[1:5] - rnd2 * c[6:10]
+    h = zeros(q)
+    model = linear_model(c, A, b, G, h, [CO.Nonpositive(q)], [1:q])
+    r = solveandcheck(model, SO.HSDSolver(model, verbose = verbose, stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model))))
+    @test r.status == :Optimal
+end
+
+function inconsistent1(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel})
+    Random.seed!(1)
+    (n, p, q) = (30, 15, 30)
+    A = rand(-9.0:9.0, p, n)
+    G = Matrix(-1.0I, q, n)
+    c = rand(0.0:9.0, n)
+    b = rand(p)
+    rnd1 = rand()
+    rnd2 = rand()
+    A[11:15, :] = rnd1 * A[1:5, :] - rnd2 * A[6:10, :]
+    b[11:15] = 2 * (rnd1 * b[1:5] - rnd2 * b[6:10])
+    h = zeros(q)
+    @test_throws ErrorException("some primal equality constraints are inconsistent") linear_model(c, A, b, G, h, [CO.Nonnegative(q)], [1:q])
+end
+
+function inconsistent2(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel})
+    Random.seed!(1)
+    (n, p, q) = (30, 15, 30)
+    A = rand(-9.0:9.0, p, n)
+    G = Matrix(-1.0I, q, n)
+    c = rand(0.0:9.0, n)
+    b = rand(p)
+    rnd1 = rand()
+    rnd2 = rand()
+    A[:,11:15] = rnd1 * A[:,1:5] - rnd2 * A[:,6:10]
+    G[:,11:15] = rnd1 * G[:,1:5] - rnd2 * G[:,6:10]
+    c[11:15] = 2 * (rnd1 * c[1:5] - rnd2 * c[6:10])
+    h = zeros(q)
+    @test_throws ErrorException("some dual equality constraints are inconsistent") linear_model(c, A, b, G, h, [CO.Nonnegative(q)], [1:q])
+end
 
 function orthant1(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel})
     Random.seed!(1)
