@@ -82,7 +82,7 @@ mutable struct HSDSolver <: Solver
         solver.y_conv_tol = inv(max(1.0, norm(model.b)))
         solver.z_conv_tol = inv(max(1.0, norm(model.h)))
 
-        solver.point = Models.find_initial_point(model)
+        solver.point = model.initial_point
         solver.tau = 1.0
         solver.kap = 1.0
         solver.mu = NaN
