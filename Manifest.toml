@@ -129,7 +129,7 @@ version = "0.20.0"
 
 [[JuMP]]
 deps = ["Calculus", "DataStructures", "ForwardDiff", "LinearAlgebra", "MathOptInterface", "NaNMath", "Random", "SparseArrays", "Statistics", "Test"]
-git-tree-sha1 = "be340c5286bc653261663a4e9379d6252ee27801"
+git-tree-sha1 = "7c531ca01bd2aac0b58dc29dd6ec00e6c89356a9"
 repo-rev = "master"
 repo-url = "https://github.com/JuliaOpt/JuMP.jl.git"
 uuid = "4076af6c-e467-56ae-b986-b466b2749572"
@@ -175,7 +175,7 @@ git-tree-sha1 = "a12298dfafb8ead54949f32b36d6c007cc61ed07"
 repo-rev = "master"
 repo-url = "https://github.com/JuliaAlgebra/MultivariateMoments.jl.git"
 uuid = "f4abf1af-0426-5881-a0da-e2f168889b5e"
-version = "0.1.2+"
+version = "0.1.2"
 
 [[MultivariatePolynomials]]
 deps = ["LinearAlgebra", "Test"]
@@ -290,7 +290,7 @@ git-tree-sha1 = "0b45dc2e45ed77f445617b99ff2adf0f5b0f23ea"
 repo-rev = "master"
 repo-url = "https://github.com/JuliaMath/SpecialFunctions.jl.git"
 uuid = "276daf66-3868-5448-9aa4-cd146d93841b"
-version = "0.7.2+"
+version = "0.7.2"
 
 [[StaticArrays]]
 deps = ["InteractiveUtils", "LinearAlgebra", "Random", "Statistics", "Test"]
