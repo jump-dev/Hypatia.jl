@@ -65,9 +65,9 @@ function run_JuMP_expdesign(; rseed::Int = 1)
     @test term_status == MOI.OPTIMAL
     @test pr_status == MOI.FEASIBLE_POINT
     @test du_status == MOI.FEASIBLE_POINT
-    @test primal_obj ≈ dual_obj atol=1e-4 rtol=1e-4
-    @test primal_obj ≈ logdet(V * Diagonal(npval) * V') atol=1e-4 rtol=1e-4
-    @test sum(npval) ≈ n atol=1e-4 rtol=1e-4
+    @test primal_obj ≈ dual_obj atol = 1e-4 rtol = 1e-4
+    @test primal_obj ≈ logdet(V * Diagonal(npval) * V') atol = 1e-4 rtol = 1e-4
+    @test sum(npval) ≈ n atol = 1e-4 rtol = 1e-4
     @test all(-1e-4 .<= npval .<= nmax + 1e-4)
 
     return
