@@ -6,13 +6,22 @@ MathOptInterface wrapper of Hypatia solver
 
 mutable struct Optimizer <: MOI.AbstractOptimizer
     verbose::Bool
+    system_solver::Type{<:Solvers.CombinedHSDSystemSolver}
+    linear_model::Type{<:Models.LinearModel}
     time_limit::Float64
     use_dense::Bool
     tol_rel_opt::Float64
     tol_abs_opt::Float64
     tol_feas::Float64
 
-    model::Models.Linear
+    c
+    A
+    b
+    G
+    h
+    cones
+    cone_idxs
+
     solver::Solvers.HSDSolver
 
     obj_sense::MOI.OptimizationSense
@@ -34,9 +43,11 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     primal_obj::Float64
     dual_obj::Float64
 
-    function Optimizer(use_dense::Bool, verbose::Bool, time_limit::Float64, tol_rel_opt::Float64, tol_abs_opt::Float64, tol_feas::Float64)
+    function Optimizer(use_dense::Bool, verbose::Bool, system_solver::Type{<:Solvers.CombinedHSDSystemSolver}, linear_model::Type{<:Models.LinearModel}, time_limit::Float64, tol_rel_opt::Float64, tol_abs_opt::Float64, tol_feas::Float64)
         opt = new()
         opt.verbose = verbose
+        opt.system_solver = system_solver
+        opt.linear_model = linear_model
         opt.time_limit = time_limit
         opt.use_dense = use_dense
         opt.tol_rel_opt = tol_rel_opt
@@ -50,11 +61,13 @@ end
 Optimizer(;
     use_dense::Bool = true,
     verbose::Bool = false,
+    system_solver::Type{<:Solvers.CombinedHSDSystemSolver} = Solvers.QRCholCombinedHSDSystemSolver,
+    linear_model::Type{<:Models.LinearModel} = Models.PreprocessedLinearModel,
     time_limit::Float64 = 3.6e3, # TODO should be Inf
     tol_rel_opt::Float64 = 1e-6,
     tol_abs_opt::Float64 = 1e-7,
     tol_feas::Float64 = 1e-7,
-    ) = Optimizer(use_dense, verbose, time_limit, tol_rel_opt, tol_abs_opt, tol_feas)
+    ) = Optimizer(use_dense, verbose, system_solver, linear_model, time_limit, tol_rel_opt, tol_abs_opt, tol_feas)
 
 MOI.get(::Optimizer, ::MOI.SolverName) = "Hypatia"
 
@@ -462,7 +475,13 @@ function MOI.copy_to(
     end
     model_h = Vector(sparsevec(Ih, Vh, q))
 
-    opt.model = Models.Linear(model_c, model_A, model_b, model_G, model_h, cones, cone_idxs)
+    opt.c = model_c
+    opt.A = model_A
+    opt.b = model_b
+    opt.G = model_G
+    opt.h = model_h
+    opt.cones = cones
+    opt.cone_idxs = cone_idxs
 
     opt.constr_offset_cone = constr_offset_cone
     opt.constr_prim_cone = Vector(sparsevec(Icpc, Vcpc, q))
@@ -473,13 +492,11 @@ function MOI.copy_to(
 end
 
 function MOI.optimize!(opt::Optimizer)
-    model = opt.model
-    (c, A, b, G, h, cones, cone_idxs) = (model.c, model.A, model.b, model.G, model.h, model.cones, model.cone_idxs)
-
-    # check, preprocess, load, and solve
-    model = Models.Linear(c, A, b, G, h, cones, cone_idxs)
-    solver = Solvers.HSDSolver(model, verbose = opt.verbose, time_limit = opt.time_limit,
-        tol_rel_opt = opt.tol_rel_opt, tol_abs_opt = opt.tol_abs_opt, tol_feas = opt.tol_feas)
+    preprocessed_model = opt.linear_model(copy(opt.c), copy(opt.A), copy(opt.b), copy(opt.G), copy(opt.h), opt.cones, opt.cone_idxs)
+    solver = Solvers.HSDSolver(preprocessed_model, verbose = opt.verbose, time_limit = opt.time_limit,
+        tol_rel_opt = opt.tol_rel_opt, tol_abs_opt = opt.tol_abs_opt, tol_feas = opt.tol_feas,
+        stepper = Solvers.CombinedHSDStepper(preprocessed_model, system_solver = opt.system_solver(preprocessed_model)),
+        )
     Solvers.solve(solver)
 
     opt.status = Solvers.get_status(solver)
@@ -488,26 +505,24 @@ function MOI.optimize!(opt::Optimizer)
     opt.dual_obj = Solvers.get_dual_obj(solver)
 
     # get solution and transform for MOI
-    # opt.x = zeros(length(c))
-    # opt.x[dukeep] = Solvers.get_x(solver)
-    opt.x = Solvers.get_x(solver)
-    opt.constr_prim_eq += b - A * opt.x
-    # opt.y = zeros(length(b))
-    # opt.y[prkeep] = Solvers.get_y(solver)
-    opt.y = Solvers.get_y(solver)
+    opt.x = zeros(length(opt.c))
+    opt.x[preprocessed_model.x_keep_idxs] = Solvers.get_x(solver)
+    opt.constr_prim_eq += opt.b - opt.A * opt.x
+    opt.y = zeros(length(opt.b))
+    opt.y[preprocessed_model.y_keep_idxs] = Solvers.get_y(solver)
 
     opt.s = Solvers.get_s(solver)
     opt.z = Solvers.get_z(solver)
 
     # TODO refac out primitive cone untransformations
-    for k in eachindex(cones)
-        if cones[k] isa Cones.PosSemidef
-            idxs = cone_idxs[k]
+    for k in eachindex(opt.cones)
+        if opt.cones[k] isa Cones.PosSemidef
+            idxs = opt.cone_idxs[k]
             scale_vec = svec_unscale(length(idxs))
             opt.s[idxs] .*= scale_vec
             opt.z[idxs] .*= scale_vec
-        elseif cones[k] isa Cones.HypoPerLogdet
-            idxs = cone_idxs[k][3:end]
+        elseif opt.cones[k] isa Cones.HypoPerLogdet
+            idxs = opt.cone_idxs[k][3:end]
             scale_vec = svec_unscale(length(idxs))
             opt.s[idxs] .*= scale_vec
             opt.z[idxs] .*= scale_vec
@@ -521,7 +536,7 @@ function MOI.optimize!(opt::Optimizer)
     return
 end
 
-# function MOI.free!(opt::Optimizer) # TODO call gc on opt.model?
+# function MOI.free!(opt::Optimizer) # TODO ?
 
 function MOI.get(opt::Optimizer, ::MOI.TerminationStatus)
     if opt.status in (:NotLoaded, :Loaded)

@@ -33,7 +33,7 @@ function find_max_alpha_in_nbhd(z_dir::AbstractVector{Float64}, s_dir::AbstractV
         ls_kap = solver.kap + alpha * kap_dir
         ls_tk = ls_tau * ls_kap
         ls_mu = (dot(ls_s, ls_z) + ls_tk) / (1.0 + model.nu)
-
+        
         if ls_mu > 0.0
             # accept primal iterate if it is inside the cone and neighborhood
             full_nbhd_sqr = abs2(ls_tk - ls_mu)

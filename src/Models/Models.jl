@@ -24,23 +24,24 @@ mutable struct Point
     dual_views::Vector{SubArray{Float64,1,Vector{Float64},Tuple{UnitRange{Int}},true}}
     primal_views::Vector{SubArray{Float64,1,Vector{Float64},Tuple{UnitRange{Int}},true}}
 
-    function Point(model::Model)
+    function Point(x, y, z, s, cones, cone_idxs)
         point = new()
 
-        point.x = zeros(length(model.c))
-        point.y = zeros(length(model.b))
-        point.z = zeros(length(model.h))
-        point.s = zeros(length(model.h))
+        point.x = x
+        point.y = y
+        point.z = z
+        point.s = s
 
-        point.z_views = [view(point.z, idxs) for idxs in model.cone_idxs]
-        point.s_views = [view(point.s, idxs) for idxs in model.cone_idxs]
-        point.dual_views = [Cones.use_dual(model.cones[k]) ? point.s_views[k] : point.z_views[k] for k in eachindex(model.cones)]
-        point.primal_views = [Cones.use_dual(model.cones[k]) ? point.z_views[k] : point.s_views[k] for k in eachindex(model.cones)]
+        point.z_views = [view(point.z, idxs) for idxs in cone_idxs]
+        point.s_views = [view(point.s, idxs) for idxs in cone_idxs]
+        point.dual_views = [Cones.use_dual(cones[k]) ? point.s_views[k] : point.z_views[k] for k in eachindex(cones)]
+        point.primal_views = [Cones.use_dual(cones[k]) ? point.z_views[k] : point.s_views[k] for k in eachindex(cones)]
 
         return point
     end
 end
 
+abstract type LinearModel end
 include("linear.jl")
 
 # include("smooth_convex.jl") # TODO convex quadratic or smooth nonlinear objectives

@@ -25,6 +25,8 @@ include(joinpath(examples_dir, "namedpoly/native.jl"))
 
 include(joinpath(@__DIR__, "native.jl"))
 
+include(joinpath(@__DIR__, "MathOptInterface.jl"))
+
 include(joinpath(examples_dir, "envelope/jump.jl"))
 include(joinpath(examples_dir, "expdesign/jump.jl"))
 include(joinpath(examples_dir, "namedpoly/jump.jl"))
@@ -38,8 +40,6 @@ include(joinpath(examples_dir, "wsosmatrix/sosmat3.jl"))
 
 include(joinpath(@__DIR__, "JuMP.jl"))
 
-include(joinpath(@__DIR__, "MathOptInterface.jl"))
-
 
 @testset "Hypatia tests" begin
 
@@ -48,17 +48,26 @@ include(joinpath(@__DIR__, "MathOptInterface.jl"))
     fekete_sample()
 end
 
-# @info("starting native interface tests")
+@info("starting native interface tests")
 verbose = true
-# linear_solvers = [
-#     LS.QRSymm,
-#     # LS.Naive,
-#     ]
-testfuns = [
-    # dimension1, # TODO needs preprocessing
-    # consistent1,
-    # inconsistent1,
-    # inconsistent2,
+system_solvers = [
+    SO.NaiveCombinedHSDSystemSolver,
+    SO.QRCholCombinedHSDSystemSolver,
+    ]
+testfuns_singular = [
+    dimension1,
+    consistent1,
+    inconsistent1,
+    inconsistent2,
+    ]
+@testset "preprocessing tests: $t, $s" for t in testfuns_singular, s in system_solvers
+    t(verbose, s, MO.PreprocessedLinearModel)
+end
+linear_models = [
+    # MO.RawLinearModel,
+    MO.PreprocessedLinearModel,
+    ]
+testfuns_nonsingular = [
     orthant1,
     orthant2,
     orthant3,
@@ -95,10 +104,8 @@ testfuns = [
     epipersumexp1,
     epipersumexp2,
     ]
-# @testset "native tests: $t, $l" for t in testfuns, l in linear_solvers
-@testset "native tests: $t" for t in testfuns
-    # t(verbose = verbose, linear_solver = l)
-    t(verbose = verbose)
+@testset "native tests: $t, $s, $m" for t in testfuns_nonsingular, s in system_solvers, m in linear_models
+    t(verbose, s, m)
 end
 
 @info("starting default native examples tests")
@@ -116,13 +123,17 @@ end
 
 @info("starting additional native examples tests")
 verbose = false
-# linear_solvers = [
-#     LS.QRSymm,
-#     # LS.Naive, # slow
-#     ]
+system_solvers = [
+    # SO.NaiveCombinedHSDSystemSolver,
+    SO.QRCholCombinedHSDSystemSolver,
+    ]
+linear_models = [
+    # MO.RawLinearModel,
+    MO.PreprocessedLinearModel,
+    ]
 testfuns = [
     # TODO test primal and dual formulations of envelope
-    envelope1, # TODO check slight obj disagreement
+    envelope1,
     envelope2,
     envelope3,
     envelope4,
@@ -140,22 +151,22 @@ testfuns = [
     namedpoly10,
     namedpoly11,
     ]
-# @testset "native examples: $t, $l" for t in testfuns, l in linear_solvers
-@testset "native examples: $t" for t in testfuns#, l in linear_solvers
-    # t(verbose = verbose, linear_solver = l)
-    t(verbose = verbose)
+@testset "native examples: $t, $s, $m" for t in testfuns, s in system_solvers, m in linear_models
+    t(verbose, s, m)
 end
 
 @info("starting MathOptInterface tests")
 verbose = false
-# linear_solvers = [
-#     LS.QRSymm,
-#     LS.Naive,
-#     ]
-@testset "MOI tests: $(d ? "dense" : "sparse")" for d in (false, true)
-# @testset "MOI tests: $l, $(d ? "dense" : "sparse")" for l in linear_solvers, d in (false, true)
-    test_moi(verbose = verbose, use_dense = d)
-    # test_moi(verbose = verbose, linear_solver = l, use_dense = d)
+system_solvers = [
+    SO.NaiveCombinedHSDSystemSolver,
+    SO.QRCholCombinedHSDSystemSolver,
+    ]
+linear_models = [
+    # MO.RawLinearModel,
+    MO.PreprocessedLinearModel,
+    ]
+@testset "MOI tests: $(d ? "dense" : "sparse"), $s, $m" for d in (false, true), s in system_solvers, m in linear_models
+    test_moi(verbose, d, s, m)
 end
 
 @info("starting default JuMP examples tests")
