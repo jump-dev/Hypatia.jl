@@ -66,6 +66,7 @@ function check_in_cone(cone::MonotonicPoly)
         # tmp1j = ipwtj'*Diagonal(point)*ipwtj
         # mul!(tmp2j, ipwtj', Diagonal(cone.point)) # TODO dispatches to an extremely inefficient method
         tmp2j .= ipwtj' .* (tr * cone.point)' # transform(cone.point)
+        # @. tmp2j = ipwtj' * cone.point'
         mul!(tmp1j, tmp2j, ipwtj)
 
         # pivoted cholesky and triangular solve method
@@ -82,10 +83,14 @@ function check_in_cone(cone::MonotonicPoly)
         @inbounds for i in eachindex(cone.g)
             cone.g[i] -= dot(diag(tmp3), tr[:, i])
             @inbounds for k in 1:i
+                # cone.H[k, i] += abs2(tmp3[k, i])
                 cone.H[k, i] += sum(abs2(tmp3[p, q]) * tr[p, k] * tr[q, i] for p in 1:cone.dim, q in 1:cone.dim)
             end
         end
     end
+    # cone.g .= transform[1] * cone.g
+    # cone.H .= Symmetric(cone.H, :U)
+    # cone.H .= transform[1] * cone.H * transform[1]'
 
     return factorize_hess(cone)
 end

@@ -44,7 +44,7 @@ function run_transformed_wsospoly(use_dual::Bool)
         # JuMP.@constraint(model, y in HYP.WSOSPolyInterpCone(U, [P0], use_dual))
         # JuMP.@objective(model, Min, JuMP.dot(y, V * [1; 2; 1]))
     else
-        mono_primal_cone = HYP.MonotonicPolyCone(U, [P0], transform, use_dual)
+        mono_primal_cone = HYP.MonotonicPolyCone(U, [P0], [inv(tr') for tr in transform], use_dual)
         JuMP.@constraint(model, JuMP.AffExpr.([1; 2; 1]) in mono_primal_cone)
         # JuMP.@constraint(model, JuMP.AffExpr.(V * [1; 2; 1]) in HYP.WSOSPolyInterpCone(U, [P0], use_dual))
 
@@ -58,8 +58,44 @@ function run_transformed_wsospoly(use_dual::Bool)
     return model
 end
 
-model = run_transformed_wsospoly(true)
-model = run_transformed_wsospoly(false)
+function run_transformed_dualnamedpoly()
+    dom = MU.FreeDomain(1)
+    d = 1
+    (U, pts, P0, _, _) = MU.interpolate(dom, d, sample_factor = 20, sample = true)
+
+    # ==
+    V = [pts[i]^(j) for i in 1:U, j in 0:2]
+    transform = [V]
+    # transform = [Matrix{Float64}(LinearAlgebra.I, 3, 3)]
+    mono_dual_cone = HYP.MonotonicPolyCone(U, [P0], [inv(tr') for tr in transform], true)
+    # mono_dual_cone = HYP.MonotonicPolyCone(U, [P0], transform, true)
+
+    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
+    JuMP.@variable(model, x[1:3])
+    JuMP.@constraint(model, sum(x) == 1)
+    JuMP.@constraint(model, x in mono_dual_cone)
+    JuMP.@objective(model, Min, x[1] + x[3])
+    JuMP.optimize!(model)
+    @show JuMP.primal_status(model)
+    return model, x
+
+    # ==
+    # V = [pts[i]^(j) for i in 1:U, j in 0:2]
+    # # cone = HYP.WSOSPolyInterpCone(U, [P0], true)
+    # cone = HYP.MonotonicPolyCone(U, [P0], [Matrix{Float64}(LinearAlgebra.I, 3, 3)], true)
+    # model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
+    # JuMP.@variable(model, x[1:3])
+    # JuMP.@constraint(model, sum(x) == 1)
+    # JuMP.@constraint(model, x in cone)
+    # JuMP.@objective(model, Min, JuMP.dot(V * [2; 0; 1], x))
+    # JuMP.optimize!(model)
+    # @show JuMP.primal_status(model)
+    # return model, x
+end
+
+# model = run_transformed_wsospoly(true)
+# model = run_transformed_wsospoly(false)
+model, x = run_transformed_dualnamedpoly()
 
 # function build_JuMP_namedpoly_WSOS(
 #     x,
