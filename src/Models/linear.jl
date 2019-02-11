@@ -180,7 +180,7 @@ mutable struct PreprocessedLinearModel <: LinearModel
         end
 
         # solve for y as least squares solution to A'y = -c - G'z
-        if !isempty(point.y)
+        # if !isempty(point.y)
             # get pivoted QR # TODO when Julia has a unified QR interface, replace this
             if issparse(A)
                 Ap_fact = qr(sparse(A'), tol = tol_QR)
@@ -227,9 +227,9 @@ mutable struct PreprocessedLinearModel <: LinearModel
             model.Ap_R = Ap_R
             model.Ap_Q1 = Ap_Q1
             model.Ap_Q2 = Ap_Q2
-        else
-            y_keep_idxs = Int[]
-        end
+        # else
+        #     y_keep_idxs = Int[]
+        # end
 
         model.n = n
         model.p = p

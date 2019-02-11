@@ -243,7 +243,6 @@ function epinorminf2(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemSo
 end
 
 function epinorminf3(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel})
-    Random.seed!(1)
     c = Float64[1, 0, 0, 0, 0, 0]
     A = zeros(0, 6)
     b = zeros(0)
@@ -296,7 +295,6 @@ function epinorminf5(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemSo
 end
 
 function epinorminf6(verbose::Bool, system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel})
-    Random.seed!(1)
     l = 3
     L = 2l + 1
     c = collect(Float64, -l:l)

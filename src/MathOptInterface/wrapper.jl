@@ -61,7 +61,7 @@ end
 Optimizer(;
     use_dense::Bool = true,
     verbose::Bool = false,
-    system_solver::Type{<:Solvers.CombinedHSDSystemSolver} = Solvers.NaiveCombinedHSDSystemSolver,
+    system_solver::Type{<:Solvers.CombinedHSDSystemSolver} = Solvers.QRCholCombinedHSDSystemSolver,
     linear_model::Type{<:Models.LinearModel} = Models.PreprocessedLinearModel,
     time_limit::Float64 = 3.6e3, # TODO should be Inf
     tol_rel_opt::Float64 = 1e-6,
