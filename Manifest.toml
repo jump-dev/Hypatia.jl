@@ -129,7 +129,7 @@ version = "0.20.0"
 
 [[JuMP]]
 deps = ["Calculus", "DataStructures", "ForwardDiff", "LinearAlgebra", "MathOptInterface", "NaNMath", "Random", "SparseArrays", "Statistics", "Test"]
-git-tree-sha1 = "7c531ca01bd2aac0b58dc29dd6ec00e6c89356a9"
+git-tree-sha1 = "7dccc2ff790db719400698b07fd69666f138c202"
 repo-rev = "master"
 repo-url = "https://github.com/JuliaOpt/JuMP.jl.git"
 uuid = "4076af6c-e467-56ae-b986-b466b2749572"
@@ -154,7 +154,7 @@ uuid = "d6f4376e-aef5-505a-96c1-9c027394607a"
 
 [[MathOptInterface]]
 deps = ["Compat", "Unicode"]
-git-tree-sha1 = "e3c7fb842078f5cd9a21ecb911dc59a4282e3d01"
+git-tree-sha1 = "b32c1921853f559c1070a706c75d312ce413de7e"
 repo-rev = "master"
 repo-url = "https://github.com/JuliaOpt/MathOptInterface.jl.git"
 uuid = "b8f27783-ece8-5eb3-8dc8-9495eed66fee"
@@ -206,8 +206,8 @@ deps = ["Dates", "LibGit2", "Markdown", "Printf", "REPL", "Random", "SHA", "UUID
 uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 
 [[PolyJuMP]]
-deps = ["JuMP", "MathOptInterface", "MultivariateMoments", "MultivariatePolynomials", "SemialgebraicSets", "Test"]
-git-tree-sha1 = "0ad2fe722d124f6f2da3bc9d21936e58e47e7166"
+deps = ["JuMP", "LinearAlgebra", "MathOptInterface", "MultivariateMoments", "MultivariatePolynomials", "SemialgebraicSets", "Test"]
+git-tree-sha1 = "d8055dcd18f1c0370b63eb55d5987200e533d231"
 repo-rev = "master"
 repo-url = "https://github.com/JuliaOpt/PolyJuMP.jl.git"
 uuid = "ddf597a6-d67e-5340-b84c-e37d84115374"
@@ -320,7 +320,7 @@ uuid = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
 
 [[SumOfSquares]]
 deps = ["JuMP", "LinearAlgebra", "MathOptInterface", "MultivariateMoments", "MultivariatePolynomials", "PolyJuMP", "Reexport", "SemialgebraicSets", "SparseArrays", "Test"]
-git-tree-sha1 = "9fc92ecc049a090783773cd74d8fa1eb98032b73"
+git-tree-sha1 = "125fdebce4e270932624cd71b3e4b25293c4015e"
 repo-rev = "master"
 repo-url = "https://github.com/JuliaOpt/SumOfSquares.jl.git"
 uuid = "4b9e565b-77fc-50a5-a571-1244f986bda1"

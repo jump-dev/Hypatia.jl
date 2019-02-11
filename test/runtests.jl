@@ -43,16 +43,16 @@ include(joinpath(@__DIR__, "JuMP.jl"))
 
 @testset "Hypatia tests" begin
 
-# @info("starting interpolation tests")
-# @testset "interpolation tests" begin
-#     fekete_sample()
-# end
+@info("starting interpolation tests")
+@testset "interpolation tests" begin
+    fekete_sample()
+end
 
 @info("starting native interface tests")
 verbose = true
 system_solvers = [
     SO.NaiveCombinedHSDSystemSolver,
-    # SO.NaiveCholCholHSDSystemSolver,
+    SO.QRCholCombinedHSDSystemSolver,
     ]
 testfuns_singular = [
     dimension1,
@@ -64,7 +64,7 @@ testfuns_singular = [
     t(verbose, s, MO.PreprocessedLinearModel)
 end
 linear_models = [
-    MO.RawLinearModel,
+    # MO.RawLinearModel,
     MO.PreprocessedLinearModel,
     ]
 testfuns_nonsingular = [
@@ -124,8 +124,8 @@ end
 @info("starting additional native examples tests")
 verbose = false
 system_solvers = [
-    SO.NaiveCombinedHSDSystemSolver,
-    # SO.NaiveCholCholHSDSystemSolver,
+    # SO.NaiveCombinedHSDSystemSolver,
+    SO.QRCholCombinedHSDSystemSolver,
     ]
 linear_models = [
     # MO.RawLinearModel,
@@ -159,7 +159,7 @@ end
 verbose = false
 system_solvers = [
     SO.NaiveCombinedHSDSystemSolver,
-    # SO.NaiveCholCholHSDSystemSolver,
+    SO.QRCholCombinedHSDSystemSolver,
     ]
 linear_models = [
     # MO.RawLinearModel,
