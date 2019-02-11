@@ -1,8 +1,7 @@
 
 mutable struct QRCholCombinedHSDSystemSolver <: CombinedHSDSystemSolver
 
-    function CombinedNaiveStepper(model::Models.LinearModel)
-        @assert has_QR(model) # need access to QR factorization from preprocessing
+    function QRCholCombinedHSDSystemSolver(model::Models.PreprocessedLinearModel)
         (n, p, q) = (model.n, model.p, model.q)
         system_solver = new()
 
@@ -21,13 +20,27 @@ function get_combined_directions(solver::HSDSolver, system_solver::QRCholCombine
     # TODO
     xi = hcat(-model.c, solver.x_residual, zeros(n))
     yi = hcat(model.b, -solver.y_residual, zeros(p))
-    zi = hcat(model.h, zeros(q, 2))
+
+    zi = zeros(q, 3)
     for k in eachindex(cones)
-        zi[cone_idxs[k], 2] .= -point.dual_views[k]
-        zi[cone_idxs[k], 3] .= -point.dual_views[k] - solver.mu * Cones.grad(cones[k])
+        cone_k = cones[k]
+        idxs = cone_idxs[k]
+
+        if Cones.use_dual(cone_k)
+            zi[idxs, 1] .= Cones.inv_hess(cone_k) * (model.h[idxs] / solver.mu)
+            zi[idxs, 2] .= Cones.inv_hess(cone_k) * ((-point.dual_views[k] - solver.z_residual)) / solver.mu)
+
+        else
+            zi[idxs, 1] .= Cones.hess(cone_k) * (model.h[idxs] * solver.mu)
+            zi[idxs, 2] .= Cones.hess(cone_k) * solver.z_residual * solver.mu
+        end
+
+        zi[idxs, 2] .= -point.dual_views[k]
+        zi[idxs, 3] .= -point.dual_views[k] - solver.mu * Cones.grad(cone_k)
     end
 
     # eliminate s rows
+    for k in eachindex(cones)
 
 
 

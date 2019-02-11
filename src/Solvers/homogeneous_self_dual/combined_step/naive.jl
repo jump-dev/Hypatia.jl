@@ -22,7 +22,7 @@ mutable struct NaiveCombinedHSDSystemSolver <: CombinedHSDSystemSolver
         (n, p, q) = (model.n, model.p, model.q)
         system_solver = new()
 
-        # TODO allow sparse lhs
+        # TODO eliminate s and allow sparse lhs?
         system_solver.lhs_copy = [
             zeros(n,n)  model.A'    model.G'          zeros(n)  zeros(n,q)         model.c;
             -model.A    zeros(p,p)  zeros(p,q)        zeros(p)  zeros(p,q)         model.b;

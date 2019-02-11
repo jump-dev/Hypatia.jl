@@ -155,12 +155,10 @@ mutable struct PreprocessedLinearModel <: LinearModel
                 if issparse(AG)
                     x_keep_idxs = AG_fact.pcol[1:AG_rank]
                     AG_Q1 = Matrix{Float64}(undef, p + q, AG_rank)
-                    AG_Q1[AG_fact.prow, :] = AG_fact.Q * Matrix{Float64}(I, p + q, AG_rank) # TODO could eliminate this allocation
-                    # AG_Q1[AG_fact.prow, :] = Matrix(AG_fact.Q)
+                    AG_Q1[AG_fact.prow, :] = AG_fact.Q * Matrix{Float64}(I, p + q, AG_rank)
                 else
                     x_keep_idxs = AG_fact.p[1:AG_rank]
-                    AG_Q1 = AG_fact.Q * Matrix{Float64}(I, p + q, AG_rank) # TODO could eliminate this allocation
-                    # AG_Q1 = Matrix(AG_fact.Q)
+                    AG_Q1 = AG_fact.Q * Matrix{Float64}(I, p + q, AG_rank)
                 end
                 AG_R = UpperTriangular(AG_R[1:AG_rank, 1:AG_rank])
 
@@ -199,19 +197,18 @@ mutable struct PreprocessedLinearModel <: LinearModel
                 end
             end
 
-
             # TODO optimize all below
             if issparse(A)
                 y_keep_idxs = Ap_fact.pcol[1:Ap_rank]
                 A_Q = Matrix{Float64}(undef, n, n)
-                A_Q[Ap_fact.prow, :] = Ap_fact.Q * Matrix{Float64}(I, n, n) # TODO could eliminate this allocation
+                A_Q[Ap_fact.prow, :] = Ap_fact.Q * Matrix{Float64}(I, n, n)
             else
                 y_keep_idxs = Ap_fact.p[1:Ap_rank]
-                A_Q = Ap_fact.Q * Matrix{Float64}(I, n, n) # TODO could eliminate this allocation
+                A_Q = Ap_fact.Q * Matrix{Float64}(I, n, n)
             end
             Ap_Q1 = A_Q[:, 1:Ap_rank]
             Ap_Q2 = A_Q[:, (Ap_rank + 1):n]
-            Ap_R = UpperTriangular(Ap_R[1:Ap_rank, 1:Ap_rank]) # TODO could eliminate this allocation
+            Ap_R = UpperTriangular(Ap_R[1:Ap_rank, 1:Ap_rank])
 
             b_sub = b[y_keep_idxs]
             if Ap_rank < p
