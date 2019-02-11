@@ -249,8 +249,8 @@ function run_JuMP_namedpoly(use_wsos::Bool; primal_wsos::Bool = false)
     @test term_status == MOI.OPTIMAL
     @test pr_status == MOI.FEASIBLE_POINT
     @test du_status == MOI.FEASIBLE_POINT
-    @test primal_obj ≈ dual_obj atol=1e-4 rtol=1e-4
-    @test primal_obj ≈ truemin atol=1e-4 rtol=1e-4
+    @test primal_obj ≈ dual_obj atol = 1e-4 rtol = 1e-4
+    @test primal_obj ≈ truemin atol = 1e-4 rtol = 1e-4
 
     return
 end

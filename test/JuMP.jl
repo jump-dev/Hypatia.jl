@@ -7,8 +7,8 @@ function solveandcheck_JuMP(model, true_obj; atol = 1e-3, rtol = 1e-3)
     @test JuMP.termination_status(model) == MOI.OPTIMAL
     @test JuMP.primal_status(model) == MOI.FEASIBLE_POINT
     @test JuMP.dual_status(model) == MOI.FEASIBLE_POINT
-    @test JuMP.objective_value(model) ≈ JuMP.objective_bound(model) atol=atol rtol=rtol
-    @test JuMP.objective_value(model) ≈ true_obj atol=atol rtol=rtol
+    @test JuMP.objective_value(model) ≈ JuMP.objective_bound(model) atol = atol rtol = rtol
+    @test JuMP.objective_value(model) ≈ true_obj atol = atol rtol = rtol
 end
 
 function namedpoly1_JuMP()
@@ -106,10 +106,10 @@ function namedpoly10_JuMP()
     (x, f, dom, true_obj) = getpolydata(:rosenbrock)
     # WSOS formulation
     model = build_JuMP_namedpoly_WSOS(x, f, dom, d = 5)
-    solveandcheck_JuMP(model, true_obj, atol=1e-3)
+    solveandcheck_JuMP(model, true_obj, atol = 1e-3)
     # SDP formulation
     # model = build_JuMP_namedpoly_PSD(x, f, dom, d = 5)
-    # solveandcheck_JuMP(model, true_obj, atol=1e-3)
+    # solveandcheck_JuMP(model, true_obj, atol = 1e-3)
 end
 
 function shapeconregr1_JuMP()

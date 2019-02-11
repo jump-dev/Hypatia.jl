@@ -6,8 +6,8 @@ mutable struct CombinedHSDStepper <: HSDStepper
     prev_gamma::Float64
 
     function CombinedHSDStepper(
-        model::Models.Linear;
-        system_solver::CombinedHSDSystemSolver = NaiveCombinedHSDSystemSolver(model),
+        model::Models.LinearModel;
+        system_solver::CombinedHSDSystemSolver = (model isa Models.PreprocessedLinearModel ? QRCholCombinedHSDSystemSolver(model) : NaiveCombinedHSDSystemSolver(model)),
         max_nbhd::Float64 = 0.75,
         )
         stepper = new()
@@ -40,7 +40,7 @@ function combined_predict_correct(solver::HSDSolver, stepper::CombinedHSDStepper
 
     if iszero(alpha)
         # could not step far in combined direction, so perform a pure correction step
-        alpha = 0.999
+        alpha = 0.999 # TODO assumes this maintains feasibility
         comb_scaling = [0.0, 1.0]
         z_comb = z_dirs * comb_scaling
         s_comb = s_dirs * comb_scaling

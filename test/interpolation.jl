@@ -16,6 +16,6 @@ function fekete_sample()
         @test box_U == free_U
         @test size(box_pts) == size(free_pts)
         @test size(box_P0) == size(free_P0)
-        @test norm(box_P0) ≈ norm(free_P0) atol=1e-1 rtol=1e-1
+        @test norm(box_P0) ≈ norm(free_P0) atol = 1e-1 rtol = 1e-1
     end
 end
