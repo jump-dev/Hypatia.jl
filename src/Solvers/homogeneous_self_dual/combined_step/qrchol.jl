@@ -36,6 +36,7 @@ function get_combined_directions(solver::HSDSolver, system_solver::QRCholCombine
         end
     end
 
+    # TODO can use Cholesky L factor and syrk to get Q2GHGQ2
     HG = Matrix{Float64}(undef, model.q, model.n)
     for k in eachindex(cones)
         cone_k = cones[k]
