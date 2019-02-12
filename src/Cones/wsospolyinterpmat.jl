@@ -19,6 +19,9 @@ mutable struct WSOSPolyInterpMat <: Cone
     F
     mat::Vector{Matrix{Float64}}
     matfact::Vector{CholeskyPivoted{Float64,Array{Float64,2}}}
+    tmp2::Vector{Matrix{Float64}}
+    tmp3::Matrix{Float64}
+    tmp4::Matrix{Float64}
 
     function WSOSPolyInterpMat(r::Int, u::Int, ipwt::Vector{Matrix{Float64}}, is_dual::Bool)
         for ipwtj in ipwt
@@ -37,13 +40,21 @@ mutable struct WSOSPolyInterpMat <: Cone
         cone.H2 = similar(cone.H)
         cone.mat = [similar(ipwt[1], size(ipwtj, 2) * r, size(ipwtj, 2) * r) for ipwtj in ipwt]
         cone.matfact = Vector{CholeskyPivoted{Float64,Array{Float64,2}}}(undef, length(ipwt))
+        cone.tmp2 = [similar(ipwt[1], size(ipwtj, 2), u) for ipwtj in ipwt]
+        cone.tmp3 = similar(ipwt[1], u, u)
+        cone.tmp4 = similar(ipwt[1], u, u)
         return cone
     end
 end
 
+blockrange(i::Int, o::Int) = (o * (i - 1) + 1):(o * i)
+
 function buildmat!(cone::WSOSPolyInterpMat, point::AbstractVector{Float64})
     (R, U) = (cone.r, cone.u)
-    for (j, ipwtj) in enumerate(cone.ipwt)
+    tmp3 = cone.tmp3
+    for j in eachindex(cone.ipwt)
+        ipwtj = cone.ipwt[j]
+        tmp2j = cone.tmp2[j]
         L = size(ipwtj, 2)
         mat = cone.mat[j]
         mat .= 0.0
@@ -51,9 +62,10 @@ function buildmat!(cone::WSOSPolyInterpMat, point::AbstractVector{Float64})
         uo = 0
         for p in 1:R, q in 1:p # seems like blocks unrelated could be v parallel
             (p == q) ? fact = 1.0 : fact = rt2i
-            xinds = (p - 1) * L + 1:p * L
-            yinds = (q - 1) * L + 1:q * L
-            mat[xinds, yinds] = ipwtj' * Diagonal(cone.point[uo + 1:uo + U]) * ipwtj * fact
+            rinds = blockrange(p, L)
+            cinds = blockrange(q, L)
+            @. tmp2j = ipwtj' * cone.point[uo + 1:uo + U]' * fact
+            mul!(view(mat, rinds, cinds), tmp2j, ipwtj)
             uo += U
         end
         cone.matfact[j] = cholesky!(Symmetric(mat, :L), Val(true), check=false)
@@ -64,36 +76,48 @@ function buildmat!(cone::WSOSPolyInterpMat, point::AbstractVector{Float64})
     return true
 end
 
-function update_gradient_hessian!(cone::WSOSPolyInterpMat, ipwtj::Matrix{Float64}, Winv::Matrix{Float64})
+function update_gradient_hessian!(cone::WSOSPolyInterpMat, j::Int, Winv::Matrix{Float64})
+    ipwtj = cone.ipwt[j]
+    tmp2j = cone.tmp2[j]
+    tmp3 = cone.tmp3
+    tmp4 = cone.tmp4
+
     L = size(ipwtj, 2)
 
     uo = 0
     for p in 1:cone.r, q in 1:p
+        uo += 1
         (p == q) ? fact = 1.0 : fact = rt2
-        xinds = (p - 1) * L + 1:p * L
-        yinds = (q - 1) * L + 1:q * L
-        idxs = uo + 1:uo + cone.u
-        cone.g[idxs] .-= diag(ipwtj * Winv[xinds, yinds] * ipwtj') * fact
-        uo += cone.u
+        rinds = blockrange(p, L)
+        cinds = blockrange(q, L)
+        idxs = blockrange(uo, cone.u)
+        mul!(tmp2j, view(Winv, rinds, cinds), ipwtj')
+        mul!(tmp3, ipwtj, tmp2j)
+        cone.g[idxs] .-= diag(tmp3) * fact
         uo2 = 0
         for p2 in 1:cone.r, q2 in 1:p2
-            # uo2 <= uo && continue
-            xinds2 = (p2 - 1) * L + 1:p2 * L
-            yinds2 = (q2 - 1) * L + 1:q2 * L
-            idxs2 = uo2 + 1:uo2 + cone.u
+            uo2 += 1
+            uo2 < uo && continue
+            rinds2 = blockrange(p2, L)
+            cinds2 = blockrange(q2, L)
+            idxs2 = blockrange(uo2, cone.u)
 
-            prod12 = (ipwtj * Winv[xinds, xinds2] * ipwtj') .* (ipwtj * Winv[yinds, yinds2] * ipwtj')
-            if (p == q) && (p2 == q2)
-                cone.H[idxs, idxs2] += prod12
-            else
-                prod34 = (ipwtj * Winv[xinds, yinds2] * ipwtj') .* (ipwtj * Winv[yinds, xinds2] * ipwtj')
-                if (p != q) && (p2 != q2)
-                    cone.H[idxs, idxs2] += prod12 + prod34
-                else
-                    cone.H[idxs, idxs2] += rt2i * (prod12 + prod34)
-                end
+            mul!(tmp2j, view(Winv, rinds, rinds2), ipwtj')
+            mul!(tmp3, ipwtj, tmp2j)
+            mul!(tmp2j, view(Winv, cinds, cinds2), ipwtj')
+            mul!(tmp4, ipwtj, tmp2j)
+            xor(p == q, p2 == q2) ? fact = rt2i : fact = 1.0
+            @. cone.H[idxs, idxs2] += tmp3 * tmp4 * fact
+
+            if (p != q) || (p2 != q2)
+                mul!(tmp2j, view(Winv, rinds, cinds2), ipwtj')
+                mul!(tmp3, ipwtj, tmp2j)
+                mul!(tmp2j, view(Winv, cinds, rinds2), ipwtj')
+                mul!(tmp4, ipwtj, tmp2j)
+                @. cone.H[idxs, idxs2] += tmp3 * tmp4 * fact
+                # prod34 = (ipwtj * Winv[rinds, cinds2] * ipwtj') .* (ipwtj * Winv[cinds, rinds2] * ipwtj')
+                # cone.H[idxs, idxs2] += prod34 * fact
             end
-            uo2 += cone.u
         end
     end
     return nothing
@@ -125,7 +149,7 @@ function check_in_cone(cone::WSOSPolyInterpMat)
     cone.H .= 0.0
     for (j, ipwtj) in enumerate(cone.ipwt)
         Winv = inv(cone.matfact[j])
-        update_gradient_hessian!(cone, ipwtj, Winv)
+        update_gradient_hessian!(cone, j, Winv)
     end
     return factorize_hess(cone)
 end
