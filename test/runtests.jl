@@ -60,9 +60,9 @@ testfuns_singular = [
     inconsistent1,
     inconsistent2,
     ]
-# @testset "preprocessing tests: $t, $s" for t in testfuns_singular, s in system_solvers
-#     t(verbose, s, MO.PreprocessedLinearModel)
-# end
+@testset "preprocessing tests: $t, $s" for t in testfuns_singular, s in system_solvers
+    t(verbose, s, MO.PreprocessedLinearModel)
+end
 linear_models = [
     # MO.RawLinearModel,
     MO.PreprocessedLinearModel,
@@ -104,9 +104,9 @@ testfuns_nonsingular = [
     epipersumexp1,
     epipersumexp2,
     ]
-# @testset "native tests: $t, $s, $m" for t in testfuns_nonsingular, s in system_solvers, m in linear_models
-#     t(verbose, s, m)
-# end
+@testset "native tests: $t, $s, $m" for t in testfuns_nonsingular, s in system_solvers, m in linear_models
+    t(verbose, s, m)
+end
 
 @info("starting default native examples tests")
 testfuns = [
@@ -117,9 +117,9 @@ testfuns = [
     run_linearopt,
     run_namedpoly,
     ]
-# @testset "default examples: $t" for t in testfuns
-#     t()
-# end
+@testset "default examples: $t" for t in testfuns
+    t()
+end
 
 @info("starting additional native examples tests")
 verbose = false
@@ -151,9 +151,9 @@ testfuns = [
     namedpoly10,
     namedpoly11,
     ]
-# @testset "native examples: $t, $s, $m" for t in testfuns, s in system_solvers, m in linear_models
-#     t(verbose, s, m)
-# end
+@testset "native examples: $t, $s, $m" for t in testfuns, s in system_solvers, m in linear_models
+    t(verbose, s, m)
+end
 
 @info("starting MathOptInterface tests")
 verbose = false
@@ -165,9 +165,9 @@ linear_models = [
     # MO.RawLinearModel,
     MO.PreprocessedLinearModel,
     ]
-# @testset "MOI tests: $(d ? "dense" : "sparse"), $s, $m" for d in (false, true), s in system_solvers, m in linear_models
-#     test_moi(verbose, d, s, m)
-# end
+@testset "MOI tests: $(d ? "dense" : "sparse"), $s, $m" for d in (false, true), s in system_solvers, m in linear_models
+    test_moi(verbose, d, s, m)
+end
 
 @info("starting default JuMP examples tests")
 testfuns = [
@@ -197,9 +197,9 @@ testfuns = [
     run_JuMP_sosmat3_primal, # numerically unstable
     run_JuMP_sosmat3_dual,
     ]
-# @testset "default examples: $t" for t in testfuns
-#     t()
-# end
+@testset "default examples: $t" for t in testfuns
+    t()
+end
 
 @info("starting additional JuMP examples tests")
 testfuns = [

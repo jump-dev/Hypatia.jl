@@ -47,7 +47,7 @@ mutable struct WSOSPolyInterpMat <: Cone
     end
 end
 
-blockrange(i::Int, o::Int) = (o * (i - 1) + 1):(o * i)
+_blockrange(inner::Int, outer::Int) = (outer * (inner - 1) + 1):(outer * inner)
 
 function buildmat!(cone::WSOSPolyInterpMat, point::AbstractVector{Float64})
     (R, U) = (cone.r, cone.u)
@@ -62,8 +62,8 @@ function buildmat!(cone::WSOSPolyInterpMat, point::AbstractVector{Float64})
         uo = 0
         for p in 1:R, q in 1:p # seems like blocks unrelated could be v parallel
             (p == q) ? fact = 1.0 : fact = rt2i
-            rinds = blockrange(p, L)
-            cinds = blockrange(q, L)
+            rinds = _blockrange(p, L)
+            cinds = _blockrange(q, L)
             @. tmp1j = ipwtj' * cone.point[uo + 1:uo + U]' * fact
             mul!(view(mat, rinds, cinds), tmp1j, ipwtj)
             uo += U
@@ -88,9 +88,9 @@ function update_gradient_hessian!(cone::WSOSPolyInterpMat, j::Int, Winv::Matrix{
     for p in 1:cone.r, q in 1:p
         uo += 1
         (p == q) ? fact = 1.0 : fact = rt2
-        rinds = blockrange(p, L)
-        cinds = blockrange(q, L)
-        idxs = blockrange(uo, cone.u)
+        rinds = _blockrange(p, L)
+        cinds = _blockrange(q, L)
+        idxs = _blockrange(uo, cone.u)
         mul!(tmp1j, view(Winv, rinds, cinds), ipwtj')
         mul!(tmp2, ipwtj, tmp1j)
         cone.g[idxs] .-= diag(tmp2) * fact
@@ -98,9 +98,9 @@ function update_gradient_hessian!(cone::WSOSPolyInterpMat, j::Int, Winv::Matrix{
         for p2 in 1:cone.r, q2 in 1:p2
             uo2 += 1
             uo2 < uo && continue
-            rinds2 = blockrange(p2, L)
-            cinds2 = blockrange(q2, L)
-            idxs2 = blockrange(uo2, cone.u)
+            rinds2 = _blockrange(p2, L)
+            cinds2 = _blockrange(q2, L)
+            idxs2 = _blockrange(uo2, cone.u)
 
             mul!(tmp1j, view(Winv, rinds, rinds2), ipwtj')
             mul!(tmp2, ipwtj, tmp1j)
