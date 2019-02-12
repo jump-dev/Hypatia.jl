@@ -10,7 +10,7 @@ include(joinpath(@__DIR__(), "jump.jl"))
 
 # Example 1 from https://arxiv.org/pdf/1509.08165v1.pdf
 function normfunction_data(num_points::Int = 500)
-    n = 5
+    n = 5 # try up to 10
     f = x -> sum(abs2, x)
     (X, y) = generate_regr_data(f, -1.0, 1.0, n, num_points, signal_ratio = 9.0)
     return (X, y, n)
@@ -56,6 +56,11 @@ function build_model(X::Matrix{Float64}, y::Vector{Float64}, n::Int, deg::Int)
     return build_shapeconregr_WSOS(X, y, deg, shape_data)
 end
 
-# (X, y, n) = normfunction_data()
-# (model, poly) = build_model(X, y, n, 4)
-# JuMP.optimize!(model)
+function run_all()
+    for deg in 4:2:8, f in [normfunction_data, customfunction_data, production_data]
+        (X, y, n) = f()
+        (model, poly) = build_model(X, y, n, deg)
+        JuMP.optimize!(model)
+    end
+end
+run_all()
