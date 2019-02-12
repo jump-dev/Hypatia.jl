@@ -1,7 +1,7 @@
 #=
 Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 
-# Data obtained from http://www.nber.org/data/nbprod2005.html
+Data obtained from http://www.nber.org/data/nbprod2005.html
 =#
 
 using DataFrames
@@ -47,16 +47,7 @@ function production_data()
     return (X, y, n)
 end
 
-function build_model(dataset::Int, deg::Int)
-    if dataset == 1
-        (X, y, n) = normfunction_data()
-    elseif dataset == 2
-        (X, y, n) = customfunction_data()
-    elseif dataset == 3
-        (X, y, n) = production_data()
-    else
-        error()
-    end
+function build_model(X::Matrix{Float64}, y::Vector{Float64}, n::Int, deg::Int)
     mono_domain = MU.FreeDomain(n)
     conv_domain = MU.FreeDomain(n)
     mono_profile = zeros(n)
@@ -65,5 +56,6 @@ function build_model(dataset::Int, deg::Int)
     return build_shapeconregr_WSOS(X, y, deg, shape_data)
 end
 
-(model, poly) = build_model(1, 4)
-JuMP.optimize!(model)
+# (X, y, n) = normfunction_data()
+# (model, poly) = build_model(X, y, n, 4)
+# JuMP.optimize!(model)
