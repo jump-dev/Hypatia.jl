@@ -48,18 +48,13 @@ function buildmat!(cone::WSOSPolyInterpMat, point::AbstractVector{Float64})
         mat = cone.mat[j]
         mat .= 0.0
 
-        for l in 1:L, k in 1:l
-            uo = 0
-            for p in 1:R, q in 1:p
-                (bp, bq) = ((p - 1) * L, (q - 1) * L)
-                val = sum(ipwtj[u, l] * ipwtj[u, k] * point[uo+u] for u in 1:U)
-                if p == q
-                    mat[bp + l, bq + k] = val
-                else
-                    mat[bp + l, bq + k] = mat[bp + k, bq + l] = rt2i * val
-                end
-                uo += U
-            end
+        uo = 0
+        for p in 1:R, q in 1:p # seems like blocks unrelated could be v parallel
+            (p == q) ? fact = 1.0 : fact = rt2i
+            xinds = (p - 1) * L + 1:p * L
+            yinds = (q - 1) * L + 1:q * L
+            mat[xinds, yinds] = ipwtj' * Diagonal(cone.point[uo + 1:uo + U]) * ipwtj * fact
+            uo += U
         end
         cone.matfact[j] = cholesky!(Symmetric(mat, :L), Val(true), check=false)
         if !isposdef(cone.matfact[j])
@@ -71,56 +66,36 @@ end
 
 function update_gradient_hessian!(cone::WSOSPolyInterpMat, ipwtj::Matrix{Float64}, Winv::Matrix{Float64})
     L = size(ipwtj, 2)
-    idx = 0
+
+    uo = 0
     for p in 1:cone.r, q in 1:p
-        (bp, bq) = ((p - 1) * L, (q - 1) * L)
-        for u in 1:cone.u
-            idx += 1
-            for k in 1:L, l in 1:k
-                if k > l
-                    Wcomp = Winv[bp + k, bq + l] + Winv[bp + l, bq + k]
+        (p == q) ? fact = 1.0 : fact = rt2
+        xinds = (p - 1) * L + 1:p * L
+        yinds = (q - 1) * L + 1:q * L
+        idxs = uo + 1:uo + cone.u
+        cone.g[idxs] .-= diag(ipwtj * Winv[xinds, yinds] * ipwtj') * fact
+        uo += cone.u
+        uo2 = 0
+        for p2 in 1:cone.r, q2 in 1:p2
+            # uo2 <= uo && continue
+            xinds2 = (p2 - 1) * L + 1:p2 * L
+            yinds2 = (q2 - 1) * L + 1:q2 * L
+            idxs2 = uo2 + 1:uo2 + cone.u
+
+            prod12 = (ipwtj * Winv[xinds, xinds2] * ipwtj') .* (ipwtj * Winv[yinds, yinds2] * ipwtj')
+            if (p == q) && (p2 == q2)
+                cone.H[idxs, idxs2] += prod12
+            else
+                prod34 = (ipwtj * Winv[xinds, yinds2] * ipwtj') .* (ipwtj * Winv[yinds, xinds2] * ipwtj')
+                if (p != q) && (p2 != q2)
+                    cone.H[idxs, idxs2] += prod12 + prod34
                 else
-                    Wcomp = Winv[bp + k, bq + l]
+                    cone.H[idxs, idxs2] += rt2i * (prod12 + prod34)
                 end
-                if p == q
-                    fact = 1.0
-                else
-                    fact = rt2
-                end
-                cone.g[idx] -= ipwtj[u, k] * ipwtj[u, l] * Wcomp * fact
             end
-            # hessian
-            idx2 = 0
-            for p2 in 1:cone.r, q2 in 1:p2
-                (bp2, bq2) = ((p2 - 1) * L, (q2 - 1) * L)
-                for u2 in 1:cone.u
-                    idx2 += 1
-                    idx2 < idx && continue
-                    sum1 = 0.0
-                    sum2 = 0.0
-                    sum3 = 0.0
-                    sum4 = 0.0
-                    for k2 in 1:L, l2 in 1:L
-                        sum1 += Winv[bp + k2, bp2 + l2] * ipwtj[u, k2] * ipwtj[u2, l2]
-                        sum2 += Winv[bq + k2, bq2 + l2] * ipwtj[u, k2] * ipwtj[u2, l2]
-                        sum3 += Winv[bp + k2, bq2 + l2] * ipwtj[u, k2] * ipwtj[u2, l2]
-                        sum4 += Winv[bq + k2, bp2 + l2] * ipwtj[u, k2] * ipwtj[u2, l2]
-                    end
-                    sum12 = sum1 * sum2
-                    if (p == q) && (p2 == q2)
-                        cone.H[idx, idx2] += sum12
-                    else
-                        sum34 = sum3 * sum4
-                        if (p != q) && (p2 != q2)
-                            cone.H[idx, idx2] += sum12 + sum34
-                        else
-                            cone.H[idx, idx2] += rt2i * (sum12 + sum34)
-                        end
-                    end
-                end # u2
-            end # p2, q2
-        end # u
-    end # p, q
+            uo2 += cone.u
+        end
+    end
     return nothing
 end
 
