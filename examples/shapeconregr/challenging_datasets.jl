@@ -9,16 +9,14 @@ using CSV
 include(joinpath(@__DIR__(), "jump.jl"))
 
 # Example 1 from https://arxiv.org/pdf/1509.08165v1.pdf
-function normfunction_data(num_points::Int = 500)
-    n = 5 # try up to 10
+function normfunction_data(; n::Int = 5, num_points::Int = 100)
     f = x -> sum(abs2, x)
     (X, y) = generate_regr_data(f, -1.0, 1.0, n, num_points, signal_ratio = 9.0)
     return (X, y, n)
 end
 
 # Example 5 from https://arxiv.org/pdf/1509.08165v1.pdf
-function customfunction_data(num_points::Int = 500)
-    n = 5
+function customfunction_data(; n::Int = 5, num_points::Int = 100)
     f = x -> (5x[1] + 0.5x[2] + x[3])^2 + sqrt(x[4]^2 + x[5]^2)
     (X, y) = generate_regr_data(f, -1.0, 1.0, n, num_points, signal_ratio = 9.0)
     return (X, y, n)
@@ -27,7 +25,8 @@ end
 # Example 3 from https://arxiv.org/pdf/1509.08165v1.pdf
 function production_data()
     df = CSV.read(joinpath(@__DIR__, "data", "naics5811.csv"))
-     # number of non production employees
+    deleterows!(df, 157) # outlier
+    # number of non production employees
     df[:prode] .= df[:emp] - df[:prode]
     # group by industry codes
     dfagg = aggregate(dropmissing(df), :naics, sum)
@@ -44,23 +43,49 @@ function production_data()
     # normalize to unit norm
     Xlog ./= sqrt.(sum(abs2, Xlog, dims = 1))
     y /= sqrt(sum(abs2, y))
-    return (X, y, n)
+    return (Xlog, y, n)
 end
 
-function build_model(X::Matrix{Float64}, y::Vector{Float64}, n::Int, deg::Int)
-    mono_domain = MU.FreeDomain(n)
-    conv_domain = MU.FreeDomain(n)
-    mono_profile = zeros(n)
-    conv_profile = 1
-    shape_data = ShapeData(mono_domain, conv_domain, mono_profile, conv_profile)
-    return build_shapeconregr_WSOS(X, y, deg, shape_data)
-end
+function run_hard_shapeconregr()
+    degrees = 4:2:6
 
-function run_all()
-    for deg in 4:2:8, f in [normfunction_data, customfunction_data, production_data]
-        (X, y, n) = f()
-        (model, poly) = build_model(X, y, n, deg)
-        JuMP.optimize!(model)
+    datasets = [
+        normfunction_data,
+        customfunction_data,
+        production_data,
+        ]
+
+    for d in degrees, s in datasets
+        model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer,
+            use_dense = true,
+            verbose = true,
+            system_solver = SO.QRCholCombinedHSDSystemSolver,
+            linear_model = MO.PreprocessedLinearModel,
+            max_iters = 250,
+            time_limit = 3.6e3,
+            tol_rel_opt = 1e-5,
+            tol_abs_opt = 1e-6,
+            tol_feas = 1e-6,
+            ))
+
+        println()
+        @show d
+        @show s
+        println()
+
+        (X, y, n) = s()
+        shape_data = ShapeData(MU.FreeDomain(n), MU.FreeDomain(n), zeros(n), 1)
+        build_shapeconregr_WSOS(model, X, y, d, shape_data)
+
+        (val, runtime, bytes, gctime, memallocs) = @timed JuMP.optimize!(model)
+
+        println()
+        @show runtime
+        @show bytes
+        @show gctime
+        @show memallocs
+        println("\n\n")
     end
 end
-run_all()
+
+run_hard_shapeconregr()
