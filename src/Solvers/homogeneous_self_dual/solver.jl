@@ -17,7 +17,6 @@ mutable struct HSDSolver <: Solver
     tol_feas::Float64
     max_iters::Int
     time_limit::Float64
-    max_nbhd::Float64
 
     x_conv_tol::Float64
     y_conv_tol::Float64
@@ -62,7 +61,6 @@ mutable struct HSDSolver <: Solver
         tol_feas = 1e-7,
         max_iters::Int = 500,
         time_limit::Float64 = 3e2,
-        max_nbhd::Float64 = 0.8,
         )
         solver = new()
 
@@ -76,7 +74,6 @@ mutable struct HSDSolver <: Solver
         solver.tol_feas = tol_feas
         solver.max_iters = max_iters
         solver.time_limit = time_limit
-        solver.max_nbhd = max_nbhd
 
         solver.x_conv_tol = inv(max(1.0, norm(model.c)))
         solver.y_conv_tol = inv(max(1.0, norm(model.b)))
