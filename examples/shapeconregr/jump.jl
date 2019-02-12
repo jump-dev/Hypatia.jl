@@ -26,6 +26,7 @@ import SumOfSquares
 import PolyJuMP
 import Random
 import Distributions
+import LinearAlgebra: norm
 using Test
 
 const rt2 = sqrt(2)
