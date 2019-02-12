@@ -25,7 +25,7 @@ import Random
 import Distributions
 using Test
 
-function build_JuMP_densityest(
+function build_JuMP_densityest_monomials(
     X::Matrix{Float64},
     deg::Int,
     dom::MU.Domain;
@@ -44,6 +44,58 @@ function build_JuMP_densityest(
     JuMP.@variables(model, begin
         z[1:nobs] # log(f(u_i)) at each observation
         f, PolyJuMP.Poly(PX) # probability density function
+    end)
+    JuMP.@objective(model, Max, sum(z)) # maximize log likelihood
+    JuMP.@constraints(model, begin
+        sum(w[i] * f(pts[i, :]) for i in 1:U) == 1.0 # integrate to 1
+        [f(pts[i, :]) for i in 1:U] in HYP.WSOSPolyInterpCone(U, [P0, PWts...]) # density nonnegative
+        [i in 1:nobs], vcat(z[i], 1.0, f(X[i, :])) in MOI.ExponentialCone() # hypograph of log
+    end)
+
+    return model
+end
+
+function build_JuMP_densityest_interp(
+    X::Matrix{Float64},
+    deg::Int,
+    dom::MU.Domain;
+    sample_factor::Int = 100,
+    )
+    (nobs, dim) = size(X)
+    d = div(deg + 1, 2)
+
+    (U, pts, P0, PWts, w) = MU.interpolate(dom, d, sample = true, calc_w = true, sample_factor = sample_factor)
+    # for point u lagrange(t_u) = V p(t_u) where V is U by U, polynomials in the columns are chebyshev polynomials (for orthogonality)
+    # for point i f(x_i) = sum_u lagrnage_u(x_i) = V' l where v holds lagrange_u and l is the variable
+    # V_cheb2interp_data = zeros(U, U)
+    # V_cheb2interp_data[:, 1] .= 1.0
+    #
+    # u = MU.calc_u(n, 2d, pts)
+    # col = 1
+    # for t in 1:2d
+    #     for xp in Combinatorics.multiexponents(n, t)
+    #         col += 1
+    #         if any(isodd, xp)
+    #             m[col] = 0.0
+    #         else
+    #             m[col] = m[1] / prod(1.0 - abs2(xp[j]) for j in 1:n)
+    #         end
+    #         @. @views V_cheb2interp_data[:, col] = u[1][:, xp[1] + 1]
+    #         for j in 2:n
+    #             @. @views V_cheb2interp_data[:, col] *= u[j][:, xp[j] + 1]
+    #         end
+    #     end
+    # end
+    Q = LinearAlgebra.qr(P0).Q
+
+    DynamicPolynomials.@polyvar x[1:dim]
+    PX = DynamicPolynomials.monomials(x, 1:deg)
+    U = size(pts, 1)
+
+    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
+    JuMP.@variables(model, begin
+        z[1:nobs] # log(f(u_i)) at each observation
+        f # probability density function
     end)
     JuMP.@objective(model, Max, sum(z)) # maximize log likelihood
     JuMP.@constraints(model, begin
