@@ -5,14 +5,15 @@ MathOptInterface wrapper of Hypatia solver
 =#
 
 mutable struct Optimizer <: MOI.AbstractOptimizer
+    use_dense::Bool
     verbose::Bool
     system_solver::Type{<:Solvers.CombinedHSDSystemSolver}
     linear_model::Type{<:Models.LinearModel}
-    time_limit::Float64
-    use_dense::Bool
     tol_rel_opt::Float64
     tol_abs_opt::Float64
     tol_feas::Float64
+    max_iters::Int
+    time_limit::Float64
 
     c
     A
@@ -43,13 +44,14 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     primal_obj::Float64
     dual_obj::Float64
 
-    function Optimizer(use_dense::Bool, verbose::Bool, system_solver::Type{<:Solvers.CombinedHSDSystemSolver}, linear_model::Type{<:Models.LinearModel}, time_limit::Float64, tol_rel_opt::Float64, tol_abs_opt::Float64, tol_feas::Float64)
+    function Optimizer(use_dense::Bool, verbose::Bool, system_solver::Type{<:Solvers.CombinedHSDSystemSolver}, linear_model::Type{<:Models.LinearModel}, max_iters::Int, time_limit::Float64, tol_rel_opt::Float64, tol_abs_opt::Float64, tol_feas::Float64)
         opt = new()
+        opt.use_dense = use_dense
         opt.verbose = verbose
         opt.system_solver = system_solver
         opt.linear_model = linear_model
+        opt.max_iters = max_iters
         opt.time_limit = time_limit
-        opt.use_dense = use_dense
         opt.tol_rel_opt = tol_rel_opt
         opt.tol_abs_opt = tol_abs_opt
         opt.tol_feas = tol_feas
@@ -63,11 +65,12 @@ Optimizer(;
     verbose::Bool = false,
     system_solver::Type{<:Solvers.CombinedHSDSystemSolver} = Solvers.QRCholCombinedHSDSystemSolver,
     linear_model::Type{<:Models.LinearModel} = Models.PreprocessedLinearModel,
+    max_iters::Int = 1000,
     time_limit::Float64 = 3.6e3, # TODO should be Inf
     tol_rel_opt::Float64 = 1e-6,
     tol_abs_opt::Float64 = 1e-7,
     tol_feas::Float64 = 1e-7,
-    ) = Optimizer(use_dense, verbose, system_solver, linear_model, time_limit, tol_rel_opt, tol_abs_opt, tol_feas)
+    ) = Optimizer(use_dense, verbose, system_solver, linear_model, max_iters, time_limit, tol_rel_opt, tol_abs_opt, tol_feas)
 
 MOI.get(::Optimizer, ::MOI.SolverName) = "Hypatia"
 
@@ -493,7 +496,7 @@ end
 
 function MOI.optimize!(opt::Optimizer)
     preprocessed_model = opt.linear_model(copy(opt.c), copy(opt.A), copy(opt.b), copy(opt.G), copy(opt.h), opt.cones, opt.cone_idxs)
-    solver = Solvers.HSDSolver(preprocessed_model, verbose = opt.verbose, time_limit = opt.time_limit,
+    solver = Solvers.HSDSolver(preprocessed_model, verbose = opt.verbose, max_iters = opt.max_iters, time_limit = opt.time_limit,
         tol_rel_opt = opt.tol_rel_opt, tol_abs_opt = opt.tol_abs_opt, tol_feas = opt.tol_feas,
         stepper = Solvers.CombinedHSDStepper(preprocessed_model, system_solver = opt.system_solver(preprocessed_model)),
         )
