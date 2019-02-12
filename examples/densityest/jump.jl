@@ -12,6 +12,8 @@ find a density function f maximizing the log likelihood of the observations
 import Hypatia
 const HYP = Hypatia
 const CO = HYP.Cones
+const SO = HYP.Solvers
+const MO = HYP.Models
 const MU = HYP.ModelUtilities
 
 import JuMP
@@ -26,6 +28,7 @@ import Distributions
 using Test
 
 function build_JuMP_densityest(
+    model,
     X::Matrix{Float64},
     deg::Int,
     dom::MU.Domain;
@@ -40,7 +43,6 @@ function build_JuMP_densityest(
     PX = DynamicPolynomials.monomials(x, 1:deg)
     U = size(pts, 1)
 
-    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
     JuMP.@variables(model, begin
         z[1:nobs] # log(f(u_i)) at each observation
         f, PolyJuMP.Poly(PX) # probability density function
@@ -65,7 +67,8 @@ function run_JuMP_densityest(; rseed::Int = 1)
     X = rand(Distributions.Uniform(-1, 1), nobs, n)
     dom = MU.Box(-ones(n), ones(n))
 
-    model = build_JuMP_densityest(X, deg, dom)
+    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
+    build_JuMP_densityest(model, X, deg, dom)
     JuMP.optimize!(model)
 
     term_status = JuMP.termination_status(model)
