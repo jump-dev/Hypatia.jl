@@ -46,6 +46,7 @@ include(joinpath(@__DIR__, "JuMP.jl"))
 @info("starting interpolation tests")
 @testset "interpolation tests" begin
     fekete_sample()
+    test_recover_interpolant_polys()
 end
 
 @info("starting native interface tests")
