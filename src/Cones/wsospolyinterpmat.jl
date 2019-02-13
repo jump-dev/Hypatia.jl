@@ -87,7 +87,7 @@ function update_gradient_hessian!(cone::WSOSPolyInterpMat, j::Int, Winv::Matrix{
     uo = 0
     for p in 1:cone.r, q in 1:p
         uo += 1
-        (p == q) ? fact = 1.0 : fact = rt2
+        fact = (p == q) ? 1.0 : rt2
         rinds = _blockrange(p, L)
         cinds = _blockrange(q, L)
         idxs = _blockrange(uo, cone.u)
