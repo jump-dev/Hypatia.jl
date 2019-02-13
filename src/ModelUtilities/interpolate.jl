@@ -348,3 +348,33 @@ function wsos_sample_params(
     PWts = [sqrt.(gi) .* P0sub for gi in g]
     return (U = U, pts = pts, P0 = P0, PWts = PWts, w = w)
 end
+
+function recover_interpolant_polys(pts::Matrix{Float64}, n::Int, deg::Int)
+    U = binomial(n + 2 * deg, n)
+    M = Matrix{Monomial{true}}(undef, U, U)
+    dataM = Matrix{Float64}(undef, U, U)
+    lagrange_polys = Vector(undef, U)
+    @polyvar x[1:n]
+    monos = DynamicPolynomials.monomials(x, 0:(2 * deg))
+    for i in 1:U
+        M[i, :] = monos .* prod(monos)^0
+    end
+
+    for j in 1:U, i in 1:U
+        dataM[i, j] = M[i, j](pts[i, :])
+    end
+    det_dataM = LinearAlgebra.det(dataM)
+
+    # bases
+    for i in 1:U
+        detj = Polynomial{true,Int64}(0.0)
+        # columns
+        for j in 1:U
+            detj += monos[j] * (-1)^(i + j) * LinearAlgebra.det(dataM[1:end .!= j, 1:end .!= j])
+        end
+        lagrange_polys[i] = detj / det_dataM
+    end
+
+    return lagrange_polys
+
+end
