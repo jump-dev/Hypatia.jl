@@ -91,8 +91,9 @@ function update_gradient_hessian!(cone::WSOSPolyInterpMat, j::Int, Winv::Matrix{
         rinds = _blockrange(p, L)
         cinds = _blockrange(q, L)
         idxs = _blockrange(uo, cone.u)
-        mul!(tmp1j, view(Winv, rinds, cinds), ipwtj')
-        mul!(tmp2, ipwtj, tmp1j)
+        # mul!(tmp1j, view(Winv, rinds, cinds), ipwtj')
+        # mul!(tmp2, ipwtj, tmp1j)
+        tmp2 = ipwtj * view(Winv, rinds, cinds) * ipwtj'
         cone.g[idxs] .-= diag(tmp2) * fact
         uo2 = 0
         for p2 in 1:cone.r, q2 in 1:p2
@@ -104,16 +105,20 @@ function update_gradient_hessian!(cone::WSOSPolyInterpMat, j::Int, Winv::Matrix{
 
             mul!(tmp1j, view(Winv, rinds, rinds2), ipwtj')
             mul!(tmp2, ipwtj, tmp1j)
+            # tmp2 = Symmetric(ipwtj * view(Winv, rinds, rinds2) * ipwtj')
             mul!(tmp1j, view(Winv, cinds, cinds2), ipwtj')
             mul!(tmp3, ipwtj, tmp1j)
-            xor(p == q, p2 == q2) ? fact = rt2i : fact = 1.0
+            # tmp3 = Symmetric(ipwtj * view(Winv, cinds, cinds2) * ipwtj')
+            fact = xor(p == q, p2 == q2) ? rt2i : 1.0
             @. cone.H[idxs, idxs2] += tmp2 * tmp3 * fact
 
             if (p != q) || (p2 != q2)
                 mul!(tmp1j, view(Winv, rinds, cinds2), ipwtj')
                 mul!(tmp2, ipwtj, tmp1j)
+                # tmp2 = Symmetric(ipwtj * view(Winv, rinds, cinds2) * ipwtj')
                 mul!(tmp1j, view(Winv, cinds, rinds2), ipwtj')
                 mul!(tmp3, ipwtj, tmp1j)
+                # tmp3 = Symmetric(ipwtj * view(Winv, cinds, rinds2) * ipwtj')
                 @. cone.H[idxs, idxs2] += tmp2 * tmp3 * fact
             end
         end
