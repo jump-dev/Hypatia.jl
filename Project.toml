@@ -34,4 +34,4 @@ SumOfSquares = "4b9e565b-77fc-50a5-a571-1244f986bda1"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["JuMP", "MultivariatePolynomials", "PolyJuMP", "SumOfSquares"]
+test = ["MultivariatePolynomials", "PolyJuMP", "SumOfSquares"]
