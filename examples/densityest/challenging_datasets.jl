@@ -6,16 +6,20 @@ using DataFrames
 using CSV
 include(joinpath(@__DIR__(), "jump.jl"))
 
+function scale_X!(X)
+    X .-= 0.5 * (minimum(X, dims=1) + maximum(X, dims=1))
+    X ./= (0.5 * (maximum(X, dims=1) - minimum(X, dims=1)))
+    return nothing
+end
+
 # iris dataset
 function iris_data()
     df = CSV.read(joinpath(@__DIR__, "data", "iris.csv"))
     dropmissing!(df, disallowmissing = true)
     # only use setosa species
-    xcols = [:sepal_length, :sepal_width, :petal_length, :petal_width]
-    dfsub = df[df.species .== "setosa", xcols]
+    dfsub = df[df.species .== "setosa", [:sepal_length, :sepal_width, :petal_length, :petal_width]]
     X = convert(Matrix{Float64}, dfsub)
-    X .-= 0.5 * (minimum(X, dims=1) + maximum(X, dims=1))
-    X ./= (0.5 * (maximum(X, dims=1) - minimum(X, dims=1)))
+    scale_X!(X)
     n = 4
     return (X, n)
 end
@@ -28,8 +32,7 @@ function cancer_data()
     dfsub = df[df.status .== 2, :]
     dfsub = dfsub[dfsub.sex .== 1, [:time, :age, :ph_ecog, :ph_karno, :pat_karno, :meal_cal, :wt_loss]]
     X = convert(Matrix{Float64}, dfsub)
-    X .-= 0.5 * (minimum(X, dims=1) + maximum(X, dims=1))
-    X ./= (0.5 * (maximum(X, dims=1) - minimum(X, dims=1)))
+    scale_X!(X)
     n = 7
     return (X, n)
 end
