@@ -19,3 +19,39 @@ function fekete_sample()
         @test norm(box_P0) ≈ norm(free_P0) atol = 1e-1 rtol = 1e-1
     end
 end
+
+function test_recover_interpolant_polys()
+    n = 1
+    deg = 1
+    pts = Matrix{Float64}(undef, 2, 1)
+    pts .= [0; 1]
+    interpolant_polys = recover_interpolant_polys(pts, n, deg)
+
+    random_pts = rand(5)
+    @test interpolant_polys[1].(random_pts) ≈ 1 .- random_pts
+    @test interpolant_polys[2].(random_pts) ≈ random_pts
+
+    deg = 2
+    pts = Matrix{Float64}(undef, 3, 1)
+    pts .= [0; 1; 2]
+    interpolant_polys = recover_interpolant_polys(pts, n, deg)
+
+    random_pts = rand(5)
+    @test interpolant_polys[1].(random_pts) ≈ (random_pts .- 1.0) .* (random_pts .- 2.0) * 0.5
+    @test interpolant_polys[2].(random_pts) ≈ random_pts .* (random_pts .- 2.0) * (-1.0)
+    @test interpolant_polys[3].(random_pts) ≈ random_pts .* (random_pts .- 1.0) * 0.5
+
+    n = 2
+    deg = 2
+    pts = rand(6, 2)
+    interpolant_polys = recover_interpolant_polys(pts, n, deg)
+
+    for i in 1:6, j in 1:6
+        if j == i
+            @test interpolant_polys[i](pts[j, :]) ≈ 1.0 atol = 1e-9
+        else
+            @test interpolant_polys[i](pts[j, :]) ≈ 0.0 atol = 1e-9
+        end
+    end
+
+end
