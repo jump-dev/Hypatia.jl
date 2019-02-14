@@ -355,7 +355,7 @@ function recover_interpolant_polys(pts::Matrix{Float64}, n::Int, deg::Int)
     dataM = Matrix{Float64}(undef, U, U)
     interpolant_polys = Vector(undef, U)
     @polyvar x[1:n]
-    monos = DynamicPolynomials.monomials(x, 0:deg)
+    monos = monomials(x, 0:deg)
     for i in 1:U
         M[i, :] = monos .* prod(monos)^0
     end
@@ -376,5 +376,4 @@ function recover_interpolant_polys(pts::Matrix{Float64}, n::Int, deg::Int)
     end
 
     return interpolant_polys
-
 end
