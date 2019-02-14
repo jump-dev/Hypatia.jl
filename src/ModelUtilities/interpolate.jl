@@ -352,28 +352,28 @@ end
 function recover_interpolant_polys(pts::Matrix{Float64}, deg::Int)
     n = size(pts, 2)
     U = binomial(n + deg, n)
-    M = Matrix{Monomial{true}}(undef, U, U)
-    dataM = Matrix{Float64}(undef, U, U)
+    polymat = Matrix{Monomial{true}}(undef, U, U)
+    data_mat = Matrix{Float64}(undef, U, U)
     interpolant_polys = Vector(undef, U)
     @polyvar x[1:n]
     monos = monomials(x, 0:deg)
     for i in 1:U
-        M[i, :] = monos .* prod(monos)^0
+        polymat[i, :] = monos
     end
 
     for j in 1:U, i in 1:U
-        dataM[i, j] = M[i, j](pts[i, :])
+        data_mat[i, j] = polymat[i, j](pts[i, :])
     end
-    det_dataM = LinearAlgebra.det(dataM)
+    data_mat_inv = inv(LinearAlgebra.det(data_mat))
 
     # bases
     for i in 1:U
         deti = Polynomial{true,Int64}(0.0)
         # columns
         for j in 1:U
-            deti += monos[j] * (-1)^(i + j) * LinearAlgebra.det(dataM[1:end .!= i, 1:end .!= j])
+            deti += monos[j] * (-1)^(i + j) * LinearAlgebra.det(data_mat[1:end .!= i, 1:end .!= j])
         end
-        interpolant_polys[i] = deti / det_dataM
+        interpolant_polys[i] = deti * data_mat_inv
     end
 
     return interpolant_polys

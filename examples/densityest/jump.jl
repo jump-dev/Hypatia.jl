@@ -28,23 +28,23 @@ import Distributions
 using Test
 
 function build_JuMP_densityest(
+    model,
     X::Matrix{Float64},
     deg::Int,
     dom::MU.Domain;
     sample_factor::Int = 100,
-    use_monomials::Bool = false,
+    use_monomials::Bool = true,
     )
 
     (nobs, dim) = size(X)
     d = div(deg + 1, 2)
     (U, pts, P0, PWts, w) = MU.interpolate(dom, d, sample = true, calc_w = true, sample_factor = sample_factor)
-    lagrange_polys = MU.recover_interpolant_polys(pts, 2 * d)
 
-    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
     JuMP.@variable(model, z[1:nobs])
     JuMP.@objective(model, Max, sum(z))
 
     if use_monomials
+        lagrange_polys = []
         DynamicPolynomials.@polyvar x[1:dim]
         PX = DynamicPolynomials.monomials(x, 0:(2 * d))
         JuMP.@variable(model, f, PolyJuMP.Poly(PX))
@@ -54,6 +54,7 @@ function build_JuMP_densityest(
             [i in 1:nobs], vcat(z[i], 1.0, f(X[i, :])) in MOI.ExponentialCone() # hypograph of log
         end)
     else
+        lagrange_polys = MU.recover_interpolant_polys(pts, 2 * d)
         basis_evals = Matrix{Float64}(undef, nobs, U)
         for i in 1:nobs, j in 1:U
             basis_evals[i, j] = lagrange_polys[j](X[i, :])
@@ -65,7 +66,7 @@ function build_JuMP_densityest(
             [i in 1:nobs], vcat(z[i], 1.0, dot(f, basis_evals[i, :])) in MOI.ExponentialCone() # hypograph of log
         end)
     end
-    return (model, lagrange_polys, f)
+    return (lagrange_polys, f)
 end
 
 function run_JuMP_densityest(; rseed::Int = 1)
@@ -77,10 +78,9 @@ function run_JuMP_densityest(; rseed::Int = 1)
     X = rand(Distributions.Uniform(-1, 1), nobs, n)
     dom = MU.Box(-ones(n), ones(n))
 
-    (interp_model, interp_bases, interp_coeffs) = build_JuMP_densityest(X, deg, dom, use_monomials = false)
-    (monomials_model, _, monomials_poly) = build_JuMP_densityest(X, deg, dom, use_monomials = true)
-
-    for model in [interp_model, monomials_model]
+    for use_monomials in [true, false]
+        model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
+        (interp_bases, coeffs) = build_JuMP_densityest(model, X, deg, dom, use_monomials = use_monomials)
         JuMP.optimize!(model)
 
         term_status = JuMP.termination_status(model)
@@ -93,11 +93,6 @@ function run_JuMP_densityest(; rseed::Int = 1)
         @test pr_status == MOI.FEASIBLE_POINT
         @test du_status == MOI.FEASIBLE_POINT
         @test primal_obj ≈ dual_obj atol = 1e-4 rtol = 1e-4
-    end
-
-    for i in 1:10
-        x = rand(n)
-        @test dot(interp_bases, JuMP.value.(interp_coeffs))(x) ≈ JuMP.value.(monomials_poly)(x)
     end
 
     return nothing
