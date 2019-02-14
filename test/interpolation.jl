@@ -34,7 +34,7 @@ function test_recover_interpolant_polys()
     deg = 2
     pts = Matrix{Float64}(undef, 3, 1)
     pts .= [0; 1; 2]
-    interpolant_polys = recover_interpolant_polys(pts, n, deg)
+    interpolant_polys = MU.recover_interpolant_polys(pts, n, deg)
 
     random_pts = rand(5)
     @test interpolant_polys[1].(random_pts) ≈ (random_pts .- 1.0) .* (random_pts .- 2.0) * 0.5
@@ -44,7 +44,7 @@ function test_recover_interpolant_polys()
     n = 2
     deg = 2
     pts = rand(6, 2)
-    interpolant_polys = recover_interpolant_polys(pts, n, deg)
+    interpolant_polys = MU.recover_interpolant_polys(pts, n, deg)
 
     for i in 1:6, j in 1:6
         if j == i
@@ -52,6 +52,18 @@ function test_recover_interpolant_polys()
         else
             @test interpolant_polys[i](pts[j, :]) ≈ 0.0 atol = 1e-9
         end
+    end
+
+    for n in 1:3, sample in [true, false]
+        d = 2
+        (U, pts, P0, PWts, w) = MU.interpolate(MU.FreeDomain(n), d, sample = sample, calc_w = true)
+        DynamicPolynomials.@polyvar x[1:n]
+        monos = DynamicPolynomials.monomials(x, 0:(2 * d))
+        interpolant_polys = MU.recover_interpolant_polys(pts, n, 2 * d)
+
+        @test sum(interpolant_polys) ≈ 1.0
+        @test sum(w[i] * interpolant_polys[j](pts[i, :]) for j in 1:U, i in 1:U) ≈ sum(w)
+        @test sum(w) ≈ 2^n
     end
 
 end
