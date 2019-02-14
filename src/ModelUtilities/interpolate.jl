@@ -349,7 +349,8 @@ function wsos_sample_params(
     return (U = U, pts = pts, P0 = P0, PWts = PWts, w = w)
 end
 
-function recover_interpolant_polys(pts::Matrix{Float64}, n::Int, deg::Int)
+function recover_interpolant_polys(pts::Matrix{Float64}, deg::Int)
+    n = size(pts, 2)
     U = binomial(n + deg, n)
     M = Matrix{Monomial{true}}(undef, U, U)
     dataM = Matrix{Float64}(undef, U, U)
