@@ -65,7 +65,7 @@ function run_hard_densityest()
 
         (X, n) = s()
         dom = MU.Box(-ones(n), ones(n))
-        build_JuMP_densityest(model, X, d, dom)
+        build_JuMP_densityest(model, X, d, dom, use_monomials = true)
 
         (val, runtime, bytes, gctime, memallocs) = @timed JuMP.optimize!(model)
 
