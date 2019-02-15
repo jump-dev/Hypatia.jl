@@ -12,6 +12,7 @@ using LinearAlgebra
 import FFTW
 import Combinatorics
 import GSL: sf_gamma_inc_Q
+import DynamicPolynomials: Monomial, Polynomial, monomials, @polyvar
 include("interpolate.jl")
 
 import DynamicPolynomials
