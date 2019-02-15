@@ -371,7 +371,7 @@ function recover_interpolant_polys(pts::Matrix{Float64}, deg::Int)
         deti = Polynomial{true,Int64}(0.0)
         # columns
         for j in 1:U
-            deti += monos[j] * (-1)^(i + j) * LinearAlgebra.det(data_mat[1:end .!= i, 1:end .!= j])
+            deti += monos[j] * (-1)^(i + j) * LinearAlgebra.det(view(data_mat, 1:U .!= i, 1:U .!= j))
         end
         interpolant_polys[i] = deti * data_mat_inv
     end

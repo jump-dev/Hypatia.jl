@@ -25,7 +25,7 @@ function test_recover_interpolant_polys()
     deg = 1
     pts = Matrix{Float64}(undef, 2, 1)
     pts .= [0; 1]
-    interpolant_polys = recover_interpolant_polys(pts, deg)
+    interpolant_polys = MU.recover_interpolant_polys(pts, deg)
 
     random_pts = rand(5)
     @test interpolant_polys[1].(random_pts) ≈ 1 .- random_pts
