@@ -17,10 +17,12 @@ function iris_data()
     df = CSV.read(joinpath(@__DIR__, "data", "iris.csv"))
     dropmissing!(df, disallowmissing = true)
     # only use setosa species
-    dfsub = df[df.species .== "setosa", [:sepal_length, :sepal_width, :petal_length, :petal_width]]
+    # xcols = [:sepal_length, :sepal_width, :petal_length, :petal_width]
+    xcols = [:sepal_length, :sepal_width]
+    dfsub = df[df.species .== "setosa", xcols]
     X = convert(Matrix{Float64}, dfsub)
     scale_X!(X)
-    n = 4
+    n = length(xcols)
     return (X, n)
 end
 
@@ -30,10 +32,11 @@ function cancer_data()
     dropmissing!(df, disallowmissing = true)
     # only use males with status 2
     dfsub = df[df.status .== 2, :]
-    dfsub = dfsub[dfsub.sex .== 1, [:time, :age, :ph_ecog, :ph_karno, :pat_karno, :meal_cal, :wt_loss]]
+    xcols = [:time, :age, :ph_ecog, :ph_karno, :pat_karno, :meal_cal, :wt_loss]
+    dfsub = dfsub[dfsub.sex .== 1, xcols]
     X = convert(Matrix{Float64}, dfsub)
     scale_X!(X)
-    n = 7
+    n = length(xcols)
     return (X, n)
 end
 
@@ -65,7 +68,7 @@ function run_hard_densityest()
 
         (X, n) = s()
         dom = MU.Box(-ones(n), ones(n))
-        build_JuMP_densityest(model, X, d, dom, use_monomials = true)
+        (_, f) = build_JuMP_densityest(model, X, d, dom, use_monomials = true)
 
         (val, runtime, bytes, gctime, memallocs) = @timed JuMP.optimize!(model)
 
@@ -78,4 +81,5 @@ function run_hard_densityest()
     end
 end
 
-run_hard_densityest()
+# run_hard_densityest()
+# pl = densityest_plot(JuMP.value.(f), X, use_contour = true, random_data = false)
