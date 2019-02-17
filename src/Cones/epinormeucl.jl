@@ -69,4 +69,4 @@ end
 # calcHiarr!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::EpiNormEucl) = mul!(prod, cone.Hi, arr)
 # calcHarr!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::EpiNormEucl) = mul!(prod, cone.H, arr)
 
-inv_hess(cone::EpiNormEucl) = Symmetric(cone.Hi)
+inv_hess(cone::EpiNormEucl) = Symmetric(cone.Hi, :U)
