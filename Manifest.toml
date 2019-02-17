@@ -169,11 +169,11 @@ version = "0.20.0"
 
 [[JuMP]]
 deps = ["Calculus", "DataStructures", "ForwardDiff", "LinearAlgebra", "MathOptInterface", "NaNMath", "Random", "SparseArrays", "Statistics", "Test"]
-git-tree-sha1 = "4988f293da8512113cc8789f069356d410bd082f"
+git-tree-sha1 = "fb99de072d9692e6038103b4a3eaf21593fe774b"
 repo-rev = "master"
 repo-url = "https://github.com/JuliaOpt/JuMP.jl.git"
 uuid = "4076af6c-e467-56ae-b986-b466b2749572"
-version = "0.18.5+"
+version = "0.19.0+"
 
 [[LibGit2]]
 uuid = "76f85450-5226-5b5a-8eaa-529ad045b433"
@@ -194,7 +194,7 @@ uuid = "d6f4376e-aef5-505a-96c1-9c027394607a"
 
 [[MathOptInterface]]
 deps = ["Compat", "Unicode"]
-git-tree-sha1 = "b32c1921853f559c1070a706c75d312ce413de7e"
+git-tree-sha1 = "c20659155661abdb5b5ebaa64bfb48cb0b223ca2"
 repo-rev = "master"
 repo-url = "https://github.com/JuliaOpt/MathOptInterface.jl.git"
 uuid = "b8f27783-ece8-5eb3-8dc8-9495eed66fee"
@@ -215,13 +215,13 @@ git-tree-sha1 = "a12298dfafb8ead54949f32b36d6c007cc61ed07"
 repo-rev = "master"
 repo-url = "https://github.com/JuliaAlgebra/MultivariateMoments.jl.git"
 uuid = "f4abf1af-0426-5881-a0da-e2f168889b5e"
-version = "0.1.2+"
+version = "0.1.2"
 
 [[MultivariatePolynomials]]
 deps = ["LinearAlgebra", "Test"]
-git-tree-sha1 = "f88a674a9857b7ecda5adc405b8353f19ea0ac46"
+git-tree-sha1 = "0d5ed30ccedad7fec9d30e10841a5a16ebc20d55"
 uuid = "102ac46a-7ee4-5c85-9060-abc95bfdeaa3"
-version = "0.2.6"
+version = "0.2.7"
 
 [[NaNMath]]
 deps = ["Compat"]
@@ -253,7 +253,7 @@ uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 
 [[PolyJuMP]]
 deps = ["JuMP", "LinearAlgebra", "MathOptInterface", "MultivariateMoments", "MultivariatePolynomials", "SemialgebraicSets", "Test"]
-git-tree-sha1 = "d8055dcd18f1c0370b63eb55d5987200e533d231"
+git-tree-sha1 = "2410602af6decba519d2ea891f956ea803652ce1"
 repo-rev = "master"
 repo-url = "https://github.com/JuliaOpt/PolyJuMP.jl.git"
 uuid = "ddf597a6-d67e-5340-b84c-e37d84115374"
@@ -346,7 +346,7 @@ git-tree-sha1 = "0b45dc2e45ed77f445617b99ff2adf0f5b0f23ea"
 repo-rev = "master"
 repo-url = "https://github.com/JuliaMath/SpecialFunctions.jl.git"
 uuid = "276daf66-3868-5448-9aa4-cd146d93841b"
-version = "0.7.2+"
+version = "0.7.2"
 
 [[StaticArrays]]
 deps = ["InteractiveUtils", "LinearAlgebra", "Random", "Statistics", "Test"]
@@ -371,12 +371,12 @@ uuid = "4c63d2b9-4356-54db-8cca-17b64c39e42c"
 version = "0.8.0"
 
 [[SuiteSparse]]
-deps = ["Libdl", "LinearAlgebra", "SparseArrays"]
+deps = ["Libdl", "LinearAlgebra", "Serialization", "SparseArrays"]
 uuid = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
 
 [[SumOfSquares]]
 deps = ["JuMP", "LinearAlgebra", "MathOptInterface", "MultivariateMoments", "MultivariatePolynomials", "PolyJuMP", "Reexport", "SemialgebraicSets", "SparseArrays", "Test"]
-git-tree-sha1 = "125fdebce4e270932624cd71b3e4b25293c4015e"
+git-tree-sha1 = "f2f21556fdeea0531d9222be4d78b514aca8cbe1"
 repo-rev = "master"
 repo-url = "https://github.com/JuliaOpt/SumOfSquares.jl.git"
 uuid = "4b9e565b-77fc-50a5-a571-1244f986bda1"
