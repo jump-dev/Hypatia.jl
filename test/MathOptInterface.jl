@@ -45,9 +45,9 @@ conic_exclude = String[
     # "rsoc",
     # "exp",
     # "geomean",
-    "sdp",
-    "logdet",
-    "rootdet",
+    # "sdp",
+    # "logdet",
+    # "rootdet",
     # TODO MOI bridges don't support square logdet or rootdet
     "logdets",
     "rootdets",
