@@ -65,7 +65,7 @@ Optimizer(;
     verbose::Bool = false,
     system_solver::Type{<:Solvers.CombinedHSDSystemSolver} = Solvers.QRCholCombinedHSDSystemSolver,
     linear_model::Type{<:Models.LinearModel} = Models.PreprocessedLinearModel,
-    max_iters::Int = 1000,
+    max_iters::Int = 500,
     time_limit::Float64 = 3.6e3, # TODO should be Inf
     tol_rel_opt::Float64 = 1e-6,
     tol_abs_opt::Float64 = 1e-7,

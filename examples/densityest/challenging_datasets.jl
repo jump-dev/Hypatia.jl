@@ -27,6 +27,7 @@ function iris_data()
 end
 
 # lung cancer dataset from https://github.com/therneau/survival (cancer.rda)
+# description at https://github.com/therneau/survival/blob/master/man/lung.Rd
 function cancer_data()
     df = CSV.read(joinpath(@__DIR__, "data", "cancer.csv"), missingstring = "NA")
     dropmissing!(df, disallowmissing = true)
