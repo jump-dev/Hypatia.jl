@@ -18,7 +18,7 @@ function iris_data()
     dropmissing!(df, disallowmissing = true)
     # only use setosa species
     # xcols = [:sepal_length, :sepal_width, :petal_length, :petal_width]
-    xcols = [:sepal_length, :sepal_width]
+    xcols = [:petal_length, :sepal_length]
     dfsub = df[df.species .== "setosa", xcols]
     X = convert(Matrix{Float64}, dfsub)
     scale_X!(X)
@@ -32,7 +32,8 @@ function cancer_data()
     dropmissing!(df, disallowmissing = true)
     # only use males with status 2
     dfsub = df[df.status .== 2, :]
-    xcols = [:time, :age, :ph_ecog, :ph_karno, :pat_karno, :meal_cal, :wt_loss]
+    # xcols = [:time, :age, :ph_ecog, :ph_karno, :pat_karno, :meal_cal, :wt_loss]
+    xcols = [:time, :meal_cal]
     dfsub = dfsub[dfsub.sex .== 1, xcols]
     X = convert(Matrix{Float64}, dfsub)
     scale_X!(X)

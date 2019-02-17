@@ -31,15 +31,27 @@ function densityest_plot(
             y = x[:, 2],
             z = z,
             mode = "markers",
-            opacity = 0.7,
+            opacity = 0.4,
             marker_size = 6,
             marker_line_width = 0.5,
             marker_line_color = "rgba(217, 217, 217, 0.14)",
         )
     end
+    data_trace = scatter(
+        x = X[:, 1],
+        y = X[:, 2],
+        mode = "markers",
+        opacity = 0.8,
+        color = "black",
+        marker_size = 8,
+        marker_line_width = 0.5,
+        marker_line_color = "rgba(217, 217, 217, 0.14)",
+        # marker_line_color = "rgba(0, 0, 0, 0.4)",
+    )
     layout = Layout(
         margin = attr(l = 0, r = 0, t = 0, b = 0),
-        title = "Density for sepal length and width"
+        title = "Density for sepal length and width",
+        xlabel = "not working",
         )
-    return plot([model_trace], layout)
+    return plot([model_trace, data_trace], layout)
 end

@@ -68,8 +68,8 @@ end
 
 function add_loss_and_polys(
     model::JuMP.Model,
-    X::Matrix{Float64},
-    y::Vector{Float64},
+    X,
+    y,
     r::Int,
     use_lsq_obj::Bool,
     )
@@ -95,8 +95,8 @@ end
 
 function build_shapeconregr_PSD(
     model,
-    X::Matrix{Float64},
-    y::Vector{Float64},
+    X,
+    y,
     r::Int,
     sd::ShapeData;
     use_lsq_obj::Bool = true,
@@ -129,8 +129,8 @@ end
 
 function build_shapeconregr_WSOS(
     model,
-    X::Matrix{Float64},
-    y::Vector{Float64},
+    X,
+    y,
     r::Int,
     sd::ShapeData;
     use_lsq_obj::Bool = true,
