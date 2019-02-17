@@ -5,12 +5,12 @@ TODO reference paper for model
 TODO options to use standard PSD cone formulation vs interpolation-based WSOS cone formulation
 =#
 
-# import Hypatia
-# const HYP = Hypatia
-# const CO = HYP.Cones
-# const SO = HYP.Solvers
-# const MO = HYP.Models
-# const MU = HYP.ModelUtilities
+import Hypatia
+const HYP = Hypatia
+const CO = HYP.Cones
+const SO = HYP.Solvers
+const MO = HYP.Models
+const MU = HYP.ModelUtilities
 
 import MathOptInterface
 const MOI = MathOptInterface
@@ -23,12 +23,6 @@ import PolyJuMP
 using LinearAlgebra
 import GSL: sf_gamma
 using Test
-
-
-using MathOptInterfaceMosek
-using DifferentialEquations
-using Plots
-
 
 function integrate_ball_monomial(mon, n)
     as = DynamicPolynomials.exponents(mon)
@@ -45,8 +39,7 @@ integrate_ball(p, n) = sum(DynamicPolynomials.coefficient(t) * integrate_ball_mo
 
 function build_lotkavolterra_PSD(model)
     # parameters
-    d = 6 # degree
-    @info("degree $d")
+    d = 4 # degree
     n = 4 # number of species
     m = 2 * n # number of control inputs (u)
     Q = 0.475
@@ -61,7 +54,6 @@ function build_lotkavolterra_PSD(model)
     A = [1.0 0.3 0.4 0.2; -0.2 1.0 0.4 -0.1; -0.1 -0.2 1.0 0.3; -0.1 -0.2 -0.3 1.0]
     M = (sum(abs, l_u) + sum(l_u)) / 2.0 + l_x
     M *= 0.01 # upper bound on the total cost
-    @show M
     f = r .* x_o .* (1.0 .- A * x_o)
     f_u = hcat(Matrix(-1.0I, n, n), Matrix(1.0I, n, n))
     brho = 1.0
@@ -73,9 +65,9 @@ function build_lotkavolterra_PSD(model)
     JuMP.@variable(model, rho_T, PolyJuMP.Poly(x_mon))
     JuMP.@variable(model, sigma[1:m], PolyJuMP.Poly(x_mon))
 
-    JuMP.@objective(model, Min, Q * (integrate_ball(l_x * rho, n) +
+    JuMP.@objective(model, Min, integrate_ball(l_x * rho, n) +
         sum(integrate_ball(sigma[i] * l_u[i], n) for i in 1:m) +
-        M * integrate_ball(rho_T, n)))
+        M * integrate_ball(rho_T, n))
 
     JuMP.@constraint(model, rho <= 0, domain = delta_X)
     JuMP.@constraint(model, rho_T + brho * rho +
@@ -86,68 +78,24 @@ function build_lotkavolterra_PSD(model)
     JuMP.@constraint(model, rho_T >= 0, domain = X)
     JuMP.@constraint(model, [i in 1:m], sigma[i] >= 0, domain = X)
 
-
-    JuMP.optimize!(model)
-
-    (sigmav, rhov) = (JuMP.value.(sigma), JuMP.value(rho))
-
-
-    # solve ODE problem to get x and u vectors to plot
-    tvs = Float64[]
-    uvs = Vector{Float64}[]
-    xhv = zeros(n)
-    uv = 0.0
-
-    function f_dx!(dx, xv, p, t)
-        xhv = (xv .- q) / Q
-        uv = sum(f_u[:, i] * sigmav[i](x_h => xhv) for i in 1:m) / rhov(x_h => xhv)
-        dx[1:n] = r .* xv .* (1.0 .- A * xv) + uv
-        push!(tvs, t)
-        push!(uvs, -uv)
-        println()
-        println("t  = ", t)
-        println("x  = ", xv)
-        println("u  = ", uv)
-    end
-
-    tspan = (0.0, 30.0)
-    x0 = [0.75, 0.3, 0.3, 0.3]
-    prob = ODEProblem(f_dx!, x0, tspan)
-    sol_x = DifferentialEquations.solve(prob)
-    sol_u = hcat(uvs...)'
-
-
-    # plot
-    plt_x = plot(sol_x, ylims = (0, 1), xlabel = "t", label = ["x_$(i)" for i in 1:n])
-    plt_u = plot(tvs, ylims = (0, 1), sol_u, xlabel = "t", label = ["u_$(i)" for i in 1:n])
-
-    # savefig(plt_x, "figures/x_d=$(d)_$(now()).png")
-    # savefig(plt_u, "figures/u_d=$(d)_$(now()).png")
-    # println("figs saved")
-
-
     return (sigma, rho)
 end
 
-
-
-
 function run_JuMP_lotkavolterra()
-    # model = SumOfSquares.SOSModel(JuMP.with_optimizer(HYP.Optimizer,
-    #     use_dense = true,
-    #     verbose = true,
-    #     system_solver = SO.QRCholCombinedHSDSystemSolver,
-    #     linear_model = MO.PreprocessedLinearModel,
-    #     max_iters = 1000,
-    #     time_limit = 3.6e4,
-    #     tol_rel_opt = 1e-5,
-    #     tol_abs_opt = 1e-6,
-    #     tol_feas = 1e-6,
-    #     ))
-
-    model = SumOfSquares.SOSModel(JuMP.with_optimizer(MosekOptimizer))
+    model = SumOfSquares.SOSModel(JuMP.with_optimizer(HYP.Optimizer,
+        use_dense = true,
+        verbose = true,
+        system_solver = SO.QRCholCombinedHSDSystemSolver,
+        linear_model = MO.PreprocessedLinearModel,
+        max_iters = 1000,
+        time_limit = 3.6e4,
+        tol_rel_opt = 1e-5,
+        tol_abs_opt = 1e-6,
+        tol_feas = 1e-6,
+        ))
 
     (sigma, rho) = build_lotkavolterra_PSD(model)
+    JuMP.optimize!(model)
 
     term_status = JuMP.termination_status(model)
     primal_obj = JuMP.objective_value(model)
@@ -158,11 +106,9 @@ function run_JuMP_lotkavolterra()
     @test term_status == MOI.OPTIMAL
     @test pr_status == MOI.FEASIBLE_POINT
     @test du_status == MOI.FEASIBLE_POINT
-    # @test primal_obj ≈ dual_obj atol = 1e-4 rtol = 1e-4
+    @test primal_obj ≈ dual_obj atol = 1e-4 rtol = 1e-4
 
     return
 end
 
-
-
-run_JuMP_lotkavolterra();
+# run_JuMP_lotkavolterra()
