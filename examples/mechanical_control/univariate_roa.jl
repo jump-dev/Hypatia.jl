@@ -1,8 +1,10 @@
 #=
 Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 
-Univariate cubic dynamical system example from "Convex computation of the region of attraction of polynomial control systems" by D. Henrion and M. Korda
+univariate cubic dynamical system
+example taken from "Convex computation of the region of attraction of polynomial control systems" by D. Henrion and M. Korda
 =#
+
 import Hypatia
 const HYP = Hypatia
 const CO = HYP.Cones
@@ -37,7 +39,7 @@ function get_bss(dom1, dom2, dom3, x, t)
 end
 
 
-function build_univariate(deg::Int; use_wsos::Bool = true)
+function build_univariate_roa(deg::Int; use_wsos::Bool = true)
     T = 100.0
 
     DynamicPolynomials.@polyvar x
@@ -83,7 +85,7 @@ end
 
 function run_JuMP_univariate_roa()
     for use_wsos in [true, false]
-        model = build_univariate(3, use_wsos = use_wsos)
+        model = build_univariate_roa(4, use_wsos = use_wsos)
         JuMP.optimize!(model)
 
         term_status = JuMP.termination_status(model)
