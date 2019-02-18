@@ -7,7 +7,7 @@ utilities for Hypatia domains and SemialgebraicSets.jl
 # construct domain inequalities for SumOfSquares models from Hypatia domains
 
 function get_domain_inequalities(dom::Box, x)
-    bss = SAS.BasicSemialgebraicSet{Float64, DynamicPolynomials.Polynomial{true, Float64}}()
+    bss = SAS.BasicSemialgebraicSet{Float64, DP.Polynomial{true, Float64}}()
     for i in 1:dimension(dom)
         SAS.addinequality!(bss, (-x[i] + dom.u[i]) * (x[i] - dom.l[i]))
     end
