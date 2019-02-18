@@ -13,8 +13,16 @@ function densityest_plot(
     )
     (num_obs, dim) = size(X)
     if random_data
-        x = rand(Distributions.Uniform(-1, 1), 5000, dim)
-        z = [regressor(x[i, :]) for i in 1:5000]
+        s = 10
+        a = collect(range(-1, stop = 1, length = s))
+        x = zeros(s^2, 2)
+        k = 0
+        for i in 1:s, j in 1:s
+            k += 1
+            x[k, 1] = a[i]
+            x[k, 2] = a[j]
+        end
+        z = [regressor(x[i, :]) for i in 1:100]
     else
         x = X[:, 1:2]
         z = [regressor(X[i, :]) for i in 1:num_obs]
