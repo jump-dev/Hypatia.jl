@@ -33,7 +33,7 @@ function get_bss(dom1, dom2, dom3, x, t)
     bss1 = MU.get_domain_inequalities(dom1, x)
     bss2 = MU.get_domain_inequalities(dom2, [x; t])
     bss3 = MU.get_domain_inequalities(dom3, x)
-    return (bss1, bss2, bss2)
+    return (bss1, bss2, bss3)
 end
 
 
@@ -63,7 +63,7 @@ function build_univariate(deg::Int; use_wsos::Bool = true)
     vT = DynamicPolynomials.subs(v, t => 1.0)
 
     if use_wsos
-        (wsos_cone2, wsos_cone3, U2, U3, pts2, pts3) = get_cones_WSOS(dom1, dom2, dom3, deg)
+        (wsos_cone2, wsos_cone3, U2, U3, pts2, pts3) = get_WSOS_cones(dom1, dom2, dom3, deg)
         JuMP.@constraints(model, begin
             [-dvdt(pts2[u, :]) for u in 1:U2] in wsos_cone2
             [diffwv(pts1[u, :]) for u in 1:U1] in wsos_cone1
@@ -71,30 +71,32 @@ function build_univariate(deg::Int; use_wsos::Bool = true)
             [w(pts1[u, :]) for u in 1:U1] in wsos_cone1
         end)
     else
-        (bss1, bss2, bss2) = get_bss(dom1, dom2, dom3, x, t)
-        # JuMP.@constraint(model, -dvdt in JuMP.PSDCone(), domain = bss2)
-        JuMP.@constraint(model, diffwv in JuMP.PSDCone(), domain = bss1)
-        JuMP.@constraint(model, vT in JuMP.PSDCone(), domain = bss3)
-        JuMP.@constraint(model, w in JuMP.PSDCone(), domain = bss1)
+        (bss1, bss2, bss3) = get_bss(dom1, dom2, dom3, x, t)
+        JuMP.@constraint(model, -dvdt >= 0, domain = bss2)
+        JuMP.@constraint(model, diffwv >= 0, domain = bss1)
+        JuMP.@constraint(model, vT >= 0, domain = bss3)
+        JuMP.@constraint(model, w >= 0, domain = bss1)
     end
 
     return model
 end
 
 function run_JuMP_univariate_roa()
-    model = build_univariate(4, use_wsos = true)
-    JuMP.optimize!(model)
+    for use_wsos in [true, false]
+        model = build_univariate(3, use_wsos = use_wsos)
+        JuMP.optimize!(model)
 
-    term_status = JuMP.termination_status(model)
-    primal_obj = JuMP.objective_value(model)
-    dual_obj = JuMP.objective_bound(model)
-    pr_status = JuMP.primal_status(model)
-    du_status = JuMP.dual_status(model)
+        term_status = JuMP.termination_status(model)
+        primal_obj = JuMP.objective_value(model)
+        dual_obj = JuMP.objective_bound(model)
+        pr_status = JuMP.primal_status(model)
+        du_status = JuMP.dual_status(model)
 
-    @test term_status == MOI.OPTIMAL
-    @test pr_status == MOI.FEASIBLE_POINT
-    @test du_status == MOI.FEASIBLE_POINT
-    @test primal_obj ≈ dual_obj atol = 1e-4 rtol = 1e-4
+        @test term_status == MOI.OPTIMAL
+        @test pr_status == MOI.FEASIBLE_POINT
+        @test du_status == MOI.FEASIBLE_POINT
+        @test primal_obj ≈ dual_obj atol = 1e-4 rtol = 1e-4
+    end
 
     return nothing
 end
