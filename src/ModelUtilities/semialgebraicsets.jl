@@ -16,7 +16,7 @@ end
 
 function get_domain_inequalities(dom::Box, x::DP.PolyVar{true})
     @assert dimension(dom) == 1
-    return SAS.@set((x - dom.l[1]) * (dom.u[1] - x) <= 0)
+    return SAS.@set((x - dom.l[1]) * (dom.u[1] - x) >= 0)
 end
 
 get_domain_inequalities(dom::Ball, x) = SAS.@set(sum((x - dom.c) .^ 2) <= dom.r^2)
