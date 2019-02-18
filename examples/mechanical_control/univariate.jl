@@ -21,9 +21,7 @@ import Random
 import Distributions
 using Test
 
-T = 100.0
-
-function get_cones_WSOS(dom1, dom2, dom3, deg)
+function get_WSOS_cones(dom1, dom2, dom3, deg)
     (U2, pts2, P02, PWts2, _) = MU.interpolate(dom2, div(deg, 2) + 1, sample = false)
     (U3, pts3, P03, PWts3, _) = MU.interpolate(dom3, div(deg, 2), sample = false)
     wsos_cone2 = HYP.WSOSPolyInterpCone(U2, [P02, PWts2...])
@@ -40,17 +38,19 @@ end
 
 
 function build_univariate(deg::Int; use_wsos::Bool = true)
+    T = 100.0
+
     DynamicPolynomials.@polyvar x
     DynamicPolynomials.@polyvar t
     f = x * (x - 0.5) * (x + 0.5) * T
     dom1 = MU.Box([-1.0], [1.0]) # just state
-    dom2 = MU.Box([-1.0, 0.0], [1.0, 1.0]) # sate and time
+    dom2 = MU.Box([-1.0, 0.0], [1.0, 1.0]) # state and time
     dom3 = MU.Box([-0.01], [0.01]) # state at the end
 
     (U1, pts1, P01, PWts1, quad_weights) = MU.interpolate(dom1, div(deg, 2) + 1, sample = false, calc_w = true)
     wsos_cone1 = HYP.WSOSPolyInterpCone(U1, [P01, PWts1...])
 
-    model = SumOfSquares.SOSModel(JuMP.with_optimizer(Hypatia.Optimizer, verbose=true))
+    model = SumOfSquares.SOSModel(JuMP.with_optimizer(Hypatia.Optimizer, verbose = true))
     JuMP.@variables(model, begin
         v, PolyJuMP.Poly(DynamicPolynomials.monomials([x; t], 0:deg)) # TODO issue reverse order
         w, PolyJuMP.Poly(DynamicPolynomials.monomials(x, 0:deg))
@@ -58,9 +58,7 @@ function build_univariate(deg::Int; use_wsos::Bool = true)
 
     JuMP.@objective(model, Min, sum(quad_weights[u] * w(pts1[u, :]) for u in 1:U1))
 
-    delvdelx = DynamicPolynomials.differentiate(v, x)
-    delvdelt = DynamicPolynomials.differentiate(v, t)
-    dvdt = delvdelt + delvdelx * f
+    dvdt = DynamicPolynomials.differentiate(v, t) + DynamicPolynomials.differentiate(v, x) * f
     diffwv = w - DynamicPolynomials.subs(v, t => 0.0) - 1.0
     vT = DynamicPolynomials.subs(v, t => 1.0)
 
@@ -84,7 +82,7 @@ function build_univariate(deg::Int; use_wsos::Bool = true)
 end
 
 function run_JuMP_univariate_roa()
-    model = build_univariate(4, use_wsos = false)
+    model = build_univariate(4, use_wsos = true)
     JuMP.optimize!(model)
 
     term_status = JuMP.termination_status(model)
