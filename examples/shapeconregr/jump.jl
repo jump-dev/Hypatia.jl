@@ -113,7 +113,7 @@ function build_shapeconregr_PSD(
     for j in 1:n
         if !iszero(sd.mono_profile[j])
             dpj = DynamicPolynomials.differentiate(p, x[j])
-            JuMP.@constraint(model, sd.mono_profile[j] * dpj >= 0) #, domain = mono_bss)
+            JuMP.@constraint(model, sd.mono_profile[j] * dpj >= 0, domain = mono_bss)
         end
     end
 
@@ -121,7 +121,7 @@ function build_shapeconregr_PSD(
     if !iszero(sd.conv_profile)
         # TODO think about what it means if wsos polynomials have degree > 2
         Hp = DynamicPolynomials.differentiate(p, x, 2)
-        JuMP.@constraint(model, sd.conv_profile * Hp in JuMP.PSDCone()) #, domain = conv_bss)
+        JuMP.@constraint(model, sd.conv_profile * Hp in JuMP.PSDCone(), domain = conv_bss)
     end
 
     return p
@@ -136,15 +136,14 @@ function build_shapeconregr_WSOS(
     use_lsq_obj::Bool = true,
     sample::Bool = true,
     rseed::Int = 1,
+    use_naive::Bool = false,
     )
     Random.seed!(rseed)
     d = div(r + 1, 2)
     n = size(X, 2)
 
     (mono_U, mono_pts, mono_P0, mono_PWts, _) = MU.interpolate(sd.mono_dom, d, sample = sample, sample_factor = 50)
-    (conv_U, conv_pts, conv_P0, conv_PWts, _) = MU.interpolate(sd.conv_dom, d - 1, sample = sample, sample_factor = 50)
     mono_wsos_cone = HYP.WSOSPolyInterpCone(mono_U, [mono_P0, mono_PWts...])
-    conv_wsos_cone = HYP.WSOSPolyInterpMatCone(n, conv_U, [conv_P0, conv_PWts...])
 
     (x, p) = add_loss_and_polys(model, X, y, r, use_lsq_obj)
 
@@ -159,7 +158,17 @@ function build_shapeconregr_WSOS(
     # convexity
     if !iszero(sd.conv_profile)
         Hp = DynamicPolynomials.differentiate(p, x, 2)
-        JuMP.@constraint(model, [sd.conv_profile * Hp[i, j](conv_pts[u, :]) * (i == j ? 1.0 : rt2) for i in 1:n for j in 1:i for u in 1:conv_U] in conv_wsos_cone)
+        if use_naive
+            @polyvar y
+            naive_dom = MU.SemiFreeDomain(conv_dom)
+            (conv_U, conv_pts, conv_P0, conv_PWts, _) = MU.interpolate(naive_dom, d + 1, sample = sample, sample_factor = 50)
+            naive_wsos_cone = HYP.WSOSPolyInterpCone(conv_U, [conv_P0, conv_PWts...])
+            JuMP.@constraint(model, y' * Hp * y in naive_wsos_cone)
+        else
+            (conv_U, conv_pts, conv_P0, conv_PWts, _) = MU.interpolate(sd.conv_dom, d - 1, sample = sample, sample_factor = 50)
+            conv_wsos_cone = HYP.WSOSPolyInterpMatCone(n, conv_U, [conv_P0, conv_PWts...])
+            JuMP.@constraint(model, [sd.conv_profile * Hp[i, j](conv_pts[u, :]) * (i == j ? 1.0 : rt2) for i in 1:n for j in 1:i for u in 1:conv_U] in conv_wsos_cone)
+        end
     end
 
     return p

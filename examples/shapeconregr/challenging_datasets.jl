@@ -13,20 +13,21 @@ include(joinpath(@__DIR__(), "jump.jl"))
 function normfunction_data(; n::Int = 5, num_points::Int = 100)
     f = x -> sum(abs2, x)
     (X, y) = generate_regr_data(f, -1.0, 1.0, n, num_points, signal_ratio = 9.0)
-    return (X, y, n, f)
+    return (X, y, f)
 end
 
 function expfunction_data(; n::Int = 5, num_points::Int = 100)
     f = x -> exp(sum(abs2, x))
     (X, y) = generate_regr_data(f, -1.0, 1.0, n, num_points, signal_ratio = 9.0)
-    return (X, y, n, f)
+    return (X, y, f)
 end
 
 # Example 5 from https://arxiv.org/pdf/1509.08165v1.pdf
 function customfunction_data(; n::Int = 5, num_points::Int = 100)
+    @assert n = 5
     f = x -> (5x[1] + 0.5x[2] + x[3])^2 + sqrt(x[4]^2 + x[5]^2)
     (X, y) = generate_regr_data(f, -1.0, 1.0, n, num_points, signal_ratio = 9.0)
-    return (X, y, n, f)
+    return (X, y, f)
 end
 
 # Example 3 from https://arxiv.org/pdf/1509.08165v1.pdf
@@ -50,7 +51,7 @@ function production_data()
     # normalize to unit norm
     Xlog ./= sqrt.(sum(abs2, Xlog, dims = 1))
     y /= sqrt(sum(abs2, y))
-    return (Xlog, y, n)
+    return (Xlog, y)
 end
 
 function build_solve_model(X, y, shapedata, deg, use_wsos)
@@ -68,37 +69,52 @@ function build_solve_model(X, y, shapedata, deg, use_wsos)
         ))
 
     if use_wsos
-        p = build_shapeconregr_WSOS(model, X, y, deg, shapedata)
-        solve_tm = @elapsed JuMP.optimize!(model)
+        poly = build_shapeconregr_WSOS(model, X, y, deg, shapedata)
+        (val, runtime, bytes, gctime, memallocs) = @timed JuMP.optimize!(model)
     else
-        p = build_shapeconregr_PSD(model, X, y, deg, shapedata)
-        solve_tm = @elapsed JuMP.optimize!(model)
+        poly = build_shapeconregr_PSD(model, X, y, deg, shapedata)
+        (val, runtime, bytes, gctime, memallocs) = @timed JuMP.optimize!(model)
     end
     rmse = sqrt(max(JuMP.objective_value(model), 0)) * sqrt(size(X, 1))
-    return (model, rmse, solve_tm, p)
+    return (model, rmse, runtime, poly)
 end
 
-function run_synthetic()
+function rmse(X, y, func)
+    num_points = size(X, 1)
+    return sqrt(sum(abs2.([y[i] - func(X[i,:]) for i in 1:num_points])) / num_points)
+end
+
+function run_experiments(issynthetic = true)
     deg_options = [3; 4; 5]
     wsos_options = [false]
     conv_options = ["conv", "mono", "neither"]
-    for n in [4]
-        outfilename = joinpath(@__DIR__(), "shapeconregr_$(round(Int, time() / 10)).csv")
-        (X, y, _, func) = expfunction_data(n = n)
+    nrange = [4]
+    for n in nrange # data options
+        outfilename = joinpath(@__DIR__(), "shapecon_$(round(Int, time() / 10)).csv")
+        if issynthetic
+            (X, y, func) = expfunction_data(n = n)
+        else
+            (X, y) = production_data()
+        end
         folds = kfolds((X', y), k = 5)
         open(outfilename, "w") do f
             println(f, "# n = $n")
-            println(f, "fold,refrmse,deg,use_wsos,tr_rmse,ts_rmse,time,conv,status")
+            println(f, "fold,tr_refrmse,ts_refrmse,deg,use_wsos,tr_rmse,ts_rmse,time,conv,status")
             foldcount = 0
 
             for ((Xtrain, ytrain), (Xtest, ytest)) in folds
                 foldcount += 1
-                Xtemp = convert(Array{Float64,2}, Xtrain')
-                num_points = size(Xtemp, 1)
-                refrmse = sqrt(sum(abs2.([ytrain[i] - func(Xtemp[i,:]) for i in 1:num_points])) / num_points)
+                tr_Xarr = convert(Array{Float64,2}, Xtrain')
+                ts_Xarr = convert(Array{Float64,2}, Xtest')
+                if issynthetic
+                    tr_refrmse = rmse(tr_Xarr, ytrain, func)
+                    ts_refrmse = rmse(ts_Xarr, ytest, func)
+                else
+                    tr_refrmse = 0
+                    ts_refrmse = 0
+                end
 
-                # degrees of freedom in the model
-                for deg in deg_options, use_wsos in wsos_options, conv in conv_options
+                for deg in deg_options, use_wsos in wsos_options, conv in conv_options # model options
                     if conv == "mono"
                         shape_data = ShapeData(MU.Box(-ones(n), ones(n)), MU.Box(-ones(n), ones(n)), ones(Int, n), 0)
                     elseif conv == "conv"
@@ -107,9 +123,9 @@ function run_synthetic()
                         shape_data = ShapeData(MU.Box(-ones(n), ones(n)), MU.Box(-ones(n), ones(n)), zeros(Int, n), 0)
                     end
                     println("running ", "deg = $deg, use_wsos = $use_wsos, n = $n, conv = $conv")
-                    (mdl, tr_rmse, s_tm, regr) = build_solve_model(Xtemp, ytrain, shape_data, deg, use_wsos)
-                    ts_rmse = sum(abs2(ytest[i] - JuMP.value(regr)(convert(Array{Float64,2}, Xtest)[:,i])) for i in 1:size(Xtest, 1))
-                    println(f, "$foldcount,$refrmse,$deg,$use_wsos,$tr_rmse,$ts_rmse,$s_tm,$conv,$(JuMP.termination_status(mdl))")
+                    (mdl, tr_rmse, s_tm, regr) = build_solve_model(tr_Xarr, ytrain, shape_data, deg, use_wsos)
+                    ts_rmse = rmse(ts_Xarr, ytest, JuMP.value(regr))
+                    println(f, "$foldcount,$tr_refrmse,$ts_refrmse,$deg,$use_wsos,$tr_rmse,$ts_rmse,$s_tm,$conv,$(JuMP.termination_status(mdl))")
                 end # model
             end # folds
         end # do
@@ -143,7 +159,8 @@ function run_hard_shapeconregr()
         @show s
         println()
 
-        (X, y, n) = s()
+        (X, y) = s()
+        n = size(X, 2)
         shape_data = ShapeData(MU.FreeDomain(n), MU.FreeDomain(n), zeros(n), 1)
         build_shapeconregr_WSOS(model, X, y, d, shape_data)
 
