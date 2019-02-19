@@ -81,7 +81,7 @@ end
 function run_synthetic()
     deg_options = [3; 4; 5]
     wsos_options = [false]
-    conv_options = [true, false]
+    conv_options = ["conv", "mono", "neither"]
     for n in [4]
         outfilename = joinpath(@__DIR__(), "shapeconregr_$(round(Int, time() / 10)).csv")
         (X, y, _, func) = expfunction_data(n = n)
@@ -99,10 +99,12 @@ function run_synthetic()
 
                 # degrees of freedom in the model
                 for deg in deg_options, use_wsos in wsos_options, conv in conv_options
-                    if conv == false
-                        shape_data = ShapeData(MU.Box(-ones(n), ones(n)), MU.Box(-ones(n), ones(n)), ones(n), 0)
+                    if conv == "mono"
+                        shape_data = ShapeData(MU.Box(-ones(n), ones(n)), MU.Box(-ones(n), ones(n)), ones(Int, n), 0)
+                    elseif conv == "conv"
+                        shape_data = ShapeData(MU.Box(-ones(n), ones(n)), MU.Box(-ones(n), ones(n)), zeros(Int, n), 1)
                     else
-                        shape_data = ShapeData(MU.Box(-ones(n), ones(n)), MU.Box(-ones(n), ones(n)), zeros(n), 1)
+                        shape_data = ShapeData(MU.Box(-ones(n), ones(n)), MU.Box(-ones(n), ones(n)), zeros(Int, n), 0)
                     end
                     println("running ", "deg = $deg, use_wsos = $use_wsos, n = $n, conv = $conv")
                     (mdl, tr_rmse, s_tm, regr) = build_solve_model(Xtemp, ytrain, shape_data, deg, use_wsos)

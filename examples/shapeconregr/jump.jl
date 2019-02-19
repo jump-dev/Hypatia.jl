@@ -113,7 +113,7 @@ function build_shapeconregr_PSD(
     for j in 1:n
         if !iszero(sd.mono_profile[j])
             dpj = DynamicPolynomials.differentiate(p, x[j])
-            JuMP.@constraint(model, sd.mono_profile[j] * dpj >= 0, domain = mono_bss)
+            JuMP.@constraint(model, sd.mono_profile[j] * dpj >= 0) #, domain = mono_bss)
         end
     end
 
@@ -121,7 +121,7 @@ function build_shapeconregr_PSD(
     if !iszero(sd.conv_profile)
         # TODO think about what it means if wsos polynomials have degree > 2
         Hp = DynamicPolynomials.differentiate(p, x, 2)
-        JuMP.@constraint(model, sd.conv_profile * Hp in JuMP.PSDCone(), domain = conv_bss)
+        JuMP.@constraint(model, sd.conv_profile * Hp in JuMP.PSDCone()) #, domain = conv_bss)
     end
 
     return p
