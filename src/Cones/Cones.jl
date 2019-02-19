@@ -78,7 +78,7 @@ function svec_to_smat!(mat::AbstractMatrix, vec::AbstractVector)
         if i == j
             mat[i, j] = vec[k]
         else
-            mat[i, j] = mat[j,i] = rt2i * vec[k]
+            mat[i, j] = mat[j, i] = rt2i * vec[k]
         end
         k += 1
     end

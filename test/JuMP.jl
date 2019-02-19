@@ -7,8 +7,8 @@ function solveandcheck_JuMP(model, true_obj; atol = 1e-3, rtol = 1e-3)
     @test JuMP.termination_status(model) == MOI.OPTIMAL
     @test JuMP.primal_status(model) == MOI.FEASIBLE_POINT
     @test JuMP.dual_status(model) == MOI.FEASIBLE_POINT
-    @test JuMP.objective_value(model) ≈ JuMP.objective_bound(model) atol=atol rtol=rtol
-    @test JuMP.objective_value(model) ≈ true_obj atol=atol rtol=rtol
+    @test JuMP.objective_value(model) ≈ JuMP.objective_bound(model) atol = atol rtol = rtol
+    @test JuMP.objective_value(model) ≈ true_obj atol = atol rtol = rtol
 end
 
 function namedpoly1_JuMP()
@@ -106,16 +106,17 @@ function namedpoly10_JuMP()
     (x, f, dom, true_obj) = getpolydata(:rosenbrock)
     # WSOS formulation
     model = build_JuMP_namedpoly_WSOS(x, f, dom, d = 5)
-    solveandcheck_JuMP(model, true_obj, atol=1e-3)
+    solveandcheck_JuMP(model, true_obj, atol = 1e-3)
     # SDP formulation
     # model = build_JuMP_namedpoly_PSD(x, f, dom, d = 5)
-    # solveandcheck_JuMP(model, true_obj, atol=1e-3)
+    # solveandcheck_JuMP(model, true_obj, atol = 1e-3)
 end
 
 function shapeconregr1_JuMP()
     (n, deg, num_points, signal_ratio, f) = (2, 3, 100, 0.0, x -> exp(norm(x)))
     (X, y) = generate_regr_data(f, -1.0, 1.0, n, num_points, signal_ratio = signal_ratio)
-    (model, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_lsq_obj = false)
+    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
+    p = build_shapeconregr_WSOS(model, X, y, deg, ShapeData(n), use_lsq_obj = false)
     true_obj = 4.4065e-1
     solveandcheck_JuMP(model, true_obj)
 end
@@ -123,18 +124,21 @@ end
 function shapeconregr2_JuMP()
     (n, deg, num_points, signal_ratio, f) = (2, 3, 100, 0.0, x -> sum(x.^3))
     (X, y) = generate_regr_data(f, -1.0, 1.0, n, num_points, signal_ratio = signal_ratio)
-    (model, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_lsq_obj = false)
+    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
+    p = build_shapeconregr_WSOS(model, X, y, deg, ShapeData(n), use_lsq_obj = false)
     true_obj = 1.3971e-1
     solveandcheck_JuMP(model, true_obj)
     # test with non-sampling based interpolation
-    (model, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_lsq_obj = false, sample = false)
+    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
+    p = build_shapeconregr_WSOS(model, X, y, deg, ShapeData(n), use_lsq_obj = false, sample = false)
     solveandcheck_JuMP(model, true_obj)
 end
 
 function shapeconregr3_JuMP()
     (n, deg, num_points, signal_ratio, f) = (2, 3, 100, 0.0, x -> sum(x.^4))
     (X, y) = generate_regr_data(f, -1.0, 1.0, n, num_points, signal_ratio = signal_ratio)
-    (model, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_lsq_obj = false)
+    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
+    p = build_shapeconregr_WSOS(model, X, y, deg, ShapeData(n), use_lsq_obj = false)
     true_obj = 2.4577e-1
     solveandcheck_JuMP(model, true_obj)
 end
@@ -142,7 +146,8 @@ end
 function shapeconregr4_JuMP()
     (n, deg, num_points, signal_ratio, f) = (2, 3, 100, 50.0, x -> sum(x.^3))
     (X, y) = generate_regr_data(f, -1.0, 1.0, n, num_points, signal_ratio = signal_ratio)
-    (model, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_lsq_obj = false)
+    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
+    p = build_shapeconregr_WSOS(model, X, y, deg, ShapeData(n), use_lsq_obj = false)
     true_obj = 1.5449e-1
     solveandcheck_JuMP(model, true_obj)
 end
@@ -150,7 +155,8 @@ end
 function shapeconregr5_JuMP()
     (n, deg, num_points, signal_ratio, f) = (2, 3, 100, 50.0, x -> sum(x.^4))
     (X, y) = generate_regr_data(f, -1.0, 1.0, n, num_points, signal_ratio = signal_ratio)
-    (model, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_lsq_obj = false)
+    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
+    p = build_shapeconregr_WSOS(model, X, y, deg, ShapeData(n), use_lsq_obj = false)
     true_obj = 2.5200e-1
     solveandcheck_JuMP(model, true_obj)
 end
@@ -158,7 +164,8 @@ end
 function shapeconregr6_JuMP()
     (n, deg, num_points, signal_ratio, f) = (2, 3, 100, 0.0, x -> exp(norm(x)))
     (X, y) = generate_regr_data(f, -1.0, 1.0, n, num_points, signal_ratio = signal_ratio)
-    (model, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_lsq_obj = true)
+    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
+    p = build_shapeconregr_WSOS(model, X, y, deg, ShapeData(n), use_lsq_obj = true)
     true_obj = 5.4584e-2
     solveandcheck_JuMP(model, true_obj)
 end
@@ -166,7 +173,8 @@ end
 function shapeconregr7_JuMP()
     (n, deg, num_points, signal_ratio, f) = (2, 3, 100, 50.0, x -> sum(x.^4))
     (X, y) = generate_regr_data(f, -1.0, 1.0, n, num_points, signal_ratio = signal_ratio)
-    (model, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_lsq_obj = true)
+    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
+    p = build_shapeconregr_WSOS(model, X, y, deg, ShapeData(n), use_lsq_obj = true)
     true_obj = 3.3249e-2
     solveandcheck_JuMP(model, true_obj)
 end
@@ -175,7 +183,8 @@ function shapeconregr8_JuMP()
     (n, deg, num_points, signal_ratio, f) = (2, 4, 100, 0.0, x -> -inv(1 + exp(-10.0 * norm(x))))
     (X, y) = generate_regr_data(f, 0.0, 1.0, n, num_points, signal_ratio = signal_ratio)
     shape_data = ShapeData(MU.Box(zeros(n), ones(n)), MU.Box(zeros(n), ones(n)), ones(n), 1)
-    (model, p) = build_shapeconregr_WSOS(X, y, deg, shape_data, use_lsq_obj = true)
+    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
+    p = build_shapeconregr_WSOS(model, X, y, deg, shape_data, use_lsq_obj = true)
     true_obj = 3.7723e-03
     solveandcheck_JuMP(model, true_obj)
 end
@@ -184,7 +193,8 @@ function shapeconregr9_JuMP()
     (n, deg, num_points, signal_ratio, f) = (2, 4, 100, 10.0, x -> -inv(1 + exp(-10.0 * norm(x))))
     (X, y) = generate_regr_data(f, 0.0, 1.0, n, num_points, signal_ratio = signal_ratio)
     shape_data = ShapeData(MU.Box(zeros(n), ones(n)), MU.Box(zeros(n), ones(n)), ones(n), 1)
-    (model, p) = build_shapeconregr_WSOS(X, y, deg, shape_data, use_lsq_obj = true)
+    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
+    p = build_shapeconregr_WSOS(model, X, y, deg, shape_data, use_lsq_obj = true)
     true_obj = 3.0995e-02 # not verified with SDP
     solveandcheck_JuMP(model, true_obj)
 end
@@ -192,7 +202,8 @@ end
 function shapeconregr10_JuMP()
     (n, deg, num_points, signal_ratio, f) = (2, 4, 100, 0.0, x -> exp(norm(x)))
     (X, y) = generate_regr_data(f, -1.0, 1.0, n, num_points, signal_ratio = signal_ratio)
-    (model, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_lsq_obj = true)
+    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
+    p = build_shapeconregr_WSOS(model, X, y, deg, ShapeData(n), use_lsq_obj = true)
     true_obj = 5.0209e-02 # not verified with SDP
     solveandcheck_JuMP(model, true_obj)
 end
@@ -201,7 +212,8 @@ function shapeconregr11_JuMP()
     (n, deg, num_points, signal_ratio, f) = (2, 5, 100, 10.0, x -> exp(norm(x)))
     (X, y) = generate_regr_data(f, 0.5, 2.0, n, num_points, signal_ratio = signal_ratio)
     shape_data = ShapeData(MU.Box(0.5 * ones(n), 2 * ones(n)), MU.Box(0.5 * ones(n), 2 * ones(n)), ones(n), 1)
-    (model, p) = build_shapeconregr_WSOS(X, y, deg, shape_data, use_lsq_obj = true)
+    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
+    p = build_shapeconregr_WSOS(model, X, y, deg, shape_data, use_lsq_obj = true)
     true_obj = 0.22206 # not verified with SDP
     solveandcheck_JuMP(model, true_obj)
 end
@@ -210,7 +222,8 @@ function shapeconregr12_JuMP()
     (n, deg, num_points, signal_ratio, f) = (2, 5, 100, 10.0, x -> exp(norm(x)))
     (X, y) = generate_regr_data(f, 0.5, 2.0, n, num_points, signal_ratio = signal_ratio)
     shape_data = ShapeData(MU.Box(0.5 * ones(n), 2 * ones(n)), MU.Box(0.5 * ones(n), 2 * ones(n)), ones(n), 1)
-    (model, p) = build_shapeconregr_PSD(X, y, deg, shape_data, use_lsq_obj = true)
+    model = SumOfSquares.SOSModel(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
+    p = build_shapeconregr_PSD(model, X, y, deg, shape_data, use_lsq_obj = true)
     true_obj = 0.22206 # not verified with SDP
     solveandcheck_JuMP(model, true_obj)
 end
@@ -218,7 +231,8 @@ end
 function shapeconregr13_JuMP()
     (n, deg, num_points, signal_ratio, f) = (2, 6, 100, 1.0, x -> exp(norm(x)))
     (X, y) = generate_regr_data(f, -1.0, 1.0, n, num_points, signal_ratio = signal_ratio)
-    (model, p) = build_shapeconregr_WSOS(X, y, deg, ShapeData(n), use_lsq_obj = false)
+    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
+    p = build_shapeconregr_WSOS(model, X, y, deg, ShapeData(n), use_lsq_obj = false)
     true_obj = 1.7751 # not verified with SDP
     solveandcheck_JuMP(model, true_obj)
 end
@@ -226,13 +240,15 @@ end
 function shapeconregr14_JuMP() # out of memory error when converting sparse to dense in MOI conversion
     (n, deg, num_points, signal_ratio, f) = (5, 5, 1000, 0.0, x -> exp(norm(x)))
     (X, y) = generate_regr_data(f, -1.0, 1.0, n, num_points, signal_ratio = signal_ratio)
-    (model, p) = build_shapeconregr_PSD(X, y, deg, ShapeData(n), use_lsq_obj = true, dense = true)
+    model = SumOfSquares.SOSModel(JuMP.with_optimizer(HYP.Optimizer, verbose = true, use_dense = true))
+    p = build_shapeconregr_PSD(model, X, y, deg, ShapeData(n), use_lsq_obj = true)
     JuMP.optimize!(model)
 end
 
 function shapeconregr15_JuMP() # out of memory error during preprocessing
     (n, deg, num_points, signal_ratio, f) = (5, 5, 1000, 0.0, x -> exp(norm(x)))
     (X, y) = generate_regr_data(f, -1.0, 1.0, n, num_points, signal_ratio = signal_ratio)
-    (model, p) = build_shapeconregr_PSD(X, y, deg, ShapeData(n), use_lsq_obj = true, dense = false)
+    model = SumOfSquares.SOSModel(JuMP.with_optimizer(HYP.Optimizer, verbose = true, use_dense = false))
+    p = build_shapeconregr_PSD(model, X, y, deg, ShapeData(n), use_lsq_obj = true)
     JuMP.optimize!(model)
 end

@@ -15,6 +15,8 @@ see e.g. Chapter 8 of thesis by G. Hall (2018)
 import Hypatia
 const HYP = Hypatia
 const CO = HYP.Cones
+const SO = HYP.Solvers
+const MO = HYP.Models
 const MU = HYP.ModelUtilities
 
 import MathOptInterface
@@ -26,6 +28,7 @@ import SumOfSquares
 import PolyJuMP
 import Random
 import Distributions
+import LinearAlgebra: norm
 using Test
 
 const rt2 = sqrt(2)
@@ -77,7 +80,7 @@ function add_loss_and_polys(
     if use_lsq_obj
         JuMP.@variable(model, z)
         JuMP.@objective(model, Min, z / num_points)
-        JuMP.@constraint(model, [z, [y[i] - p(X[i, :]) for i in 1:num_points]...] in MOI.SecondOrderCone(1 + num_points))
+        JuMP.@constraint(model, vcat([z], [y[i] - p(X[i, :]) for i in 1:num_points]) in MOI.SecondOrderCone(1 + num_points))
      else
         JuMP.@variable(model, z[1:num_points])
         JuMP.@objective(model, Min, sum(z) / num_points)
@@ -91,17 +94,16 @@ function add_loss_and_polys(
 end
 
 function build_shapeconregr_PSD(
+    model,
     X::Matrix{Float64},
     y::Vector{Float64},
     r::Int,
     sd::ShapeData;
-    use_lsq_obj::Bool = false,
-    dense::Bool = true,
+    use_lsq_obj::Bool = true,
     )
     n = size(X, 2)
     d = div(r + 1, 2)
 
-    model = SumOfSquares.SOSModel(JuMP.with_optimizer(HYP.Optimizer, verbose = true, use_dense = dense))
     (x, p) = add_loss_and_polys(model, X, y, r, use_lsq_obj)
 
     mono_bss = MU.get_domain_inequalities(sd.mono_dom, x)
@@ -122,16 +124,16 @@ function build_shapeconregr_PSD(
         JuMP.@constraint(model, sd.conv_profile * Hp in JuMP.PSDCone(), domain = conv_bss)
     end
 
-    return (model, p)
+    return p
 end
 
 function build_shapeconregr_WSOS(
+    model,
     X::Matrix{Float64},
     y::Vector{Float64},
     r::Int,
     sd::ShapeData;
-    use_lsq_obj::Bool = false,
-    dense::Bool = true,
+    use_lsq_obj::Bool = true,
     sample::Bool = true,
     rseed::Int = 1,
     )
@@ -144,7 +146,6 @@ function build_shapeconregr_WSOS(
     mono_wsos_cone = HYP.WSOSPolyInterpCone(mono_U, [mono_P0, mono_PWts...])
     conv_wsos_cone = HYP.WSOSPolyInterpMatCone(n, conv_U, [conv_P0, conv_PWts...])
 
-    model = SumOfSquares.SOSModel(JuMP.with_optimizer(HYP.Optimizer, verbose = true, use_dense = dense))
     (x, p) = add_loss_and_polys(model, X, y, r, use_lsq_obj)
 
     # monotonicity
@@ -161,7 +162,7 @@ function build_shapeconregr_WSOS(
         JuMP.@constraint(model, [sd.conv_profile * Hp[i, j](conv_pts[u, :]) * (i == j ? 1.0 : rt2) for i in 1:n for j in 1:i for u in 1:conv_U] in conv_wsos_cone)
     end
 
-    return (model, p)
+    return p
 end
 
 function run_JuMP_shapeconregr(use_wsos::Bool; dense::Bool = true)
@@ -179,15 +180,14 @@ function run_JuMP_shapeconregr(use_wsos::Bool; dense::Bool = true)
     shapedata = ShapeData(n)
     (X, y) = generate_regr_data(f, -1.0, 1.0, n, num_points, signal_ratio = signal_ratio)
 
-    use_lsq_obj = true
-
     if use_wsos
-        (model, p) = build_shapeconregr_WSOS(X, y, deg, shapedata, use_lsq_obj = use_lsq_obj, dense = dense)
+        model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, use_dense = dense))
+        p = build_shapeconregr_WSOS(model, X, y, deg, shapedata)
     else
-        (model, p) = build_shapeconregr_PSD(X, y, deg, shapedata, use_lsq_obj = use_lsq_obj, dense = dense)
+        model = SumOfSquares.SOSModel(JuMP.with_optimizer(HYP.Optimizer, verbose = true, use_dense = dense))
+        p = build_shapeconregr_PSD(model, X, y, deg, shapedata)
     end
 
-    println("starting to solve JuMP model")
     JuMP.optimize!(model)
     term_status = JuMP.termination_status(model)
     primal_obj = JuMP.objective_value(model)
@@ -198,7 +198,7 @@ function run_JuMP_shapeconregr(use_wsos::Bool; dense::Bool = true)
     @test term_status == MOI.OPTIMAL
     @test pr_status == MOI.FEASIBLE_POINT
     @test du_status == MOI.FEASIBLE_POINT
-    @test primal_obj ≈ dual_obj atol=1e-4 rtol=1e-4
+    @test primal_obj ≈ dual_obj atol = 1e-4 rtol = 1e-4
 
     return (primal_obj, p)
 end

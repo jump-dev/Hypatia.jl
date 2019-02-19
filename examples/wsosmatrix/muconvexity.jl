@@ -70,7 +70,7 @@ function run_JuMP_muconvexity_rand(; rseed::Int = 1)
     @test term1 == term2
     @test prim1 == prim2
     if term1 == MOI.OPTIMAL || term2 == MOI.OPTIMAL
-        @test mu1 ≈ mu2 atol=1e-4 rtol=1e-4
+        @test mu1 ≈ mu2 atol = 1e-4 rtol = 1e-4
         mufree = mu1
     else
         mufree = -Inf
@@ -81,7 +81,7 @@ function run_JuMP_muconvexity_rand(; rseed::Int = 1)
     (term2, prim2, mu2) = run_JuMP_muconvexity(x, poly, dom, false)
     @test term1 == term2 == MOI.OPTIMAL
     @test prim1 == prim2 == MOI.FEASIBLE_POINT
-    @test mu1 ≈ mu2 atol=1e-4 rtol=1e-4
+    @test mu1 ≈ mu2 atol = 1e-4 rtol = 1e-4
     muball = mu1
 
     @test mufree - muball <= 1e-4
@@ -95,7 +95,7 @@ function run_JuMP_muconvexity_a(; use_wsos::Bool = true)
     (term, prim, mu) = run_JuMP_muconvexity(x, poly, dom, use_wsos)
     @test term == MOI.OPTIMAL
     @test prim == MOI.FEASIBLE_POINT
-    @test mu ≈ -4 atol=1e-4 rtol=1e-4
+    @test mu ≈ -4 atol = 1e-4 rtol = 1e-4
 end
 
 function run_JuMP_muconvexity_b(; use_wsos::Bool = true)
@@ -107,7 +107,7 @@ function run_JuMP_muconvexity_b(; use_wsos::Bool = true)
     (term, prim, mu) = run_JuMP_muconvexity(x, poly, dom, use_wsos)
     @test term == MOI.OPTIMAL
     @test prim == MOI.FEASIBLE_POINT
-    @test mu ≈ -2 atol=1e-4 rtol=1e-4
+    @test mu ≈ -2 atol = 1e-4 rtol = 1e-4
 end
 
 function run_JuMP_muconvexity_c(; use_wsos::Bool = true)
@@ -118,7 +118,7 @@ function run_JuMP_muconvexity_c(; use_wsos::Bool = true)
     (term, prim, mu) = run_JuMP_muconvexity(x, poly, dom, use_wsos)
     @test term == MOI.OPTIMAL
     @test prim == MOI.FEASIBLE_POINT
-    @test mu ≈ -4 atol=1e-4 rtol=1e-4
+    @test mu ≈ -4 atol = 1e-4 rtol = 1e-4
 end
 
 function run_JuMP_muconvexity_d(; use_wsos::Bool = true)
@@ -130,5 +130,5 @@ function run_JuMP_muconvexity_d(; use_wsos::Bool = true)
     (term, prim, mu) = run_JuMP_muconvexity(x, poly, dom, use_wsos)
     @test term == MOI.OPTIMAL
     @test prim == MOI.FEASIBLE_POINT
-    @test mu ≈ -2 atol=1e-4 rtol=1e-4
+    @test mu ≈ -2 atol = 1e-4 rtol = 1e-4
 end

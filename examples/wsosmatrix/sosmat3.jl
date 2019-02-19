@@ -22,7 +22,7 @@ import Random
 
 const rt2 = sqrt(2)
 
-function run_JuMP_sosmat3()
+function run_JuMP_sosmat3(use_dual::Bool)
     Random.seed!(1)
 
     DynamicPolynomials.@polyvar x1 x2 x3
@@ -34,13 +34,21 @@ function run_JuMP_sosmat3()
 
     d = div(maximum(DynamicPolynomials.maxdegree.(P)) + 1, 2)
     (U, pts, P0, _, _) = MU.interpolate(dom, d, sample = false)
-    mat_wsos_cone = HYP.WSOSPolyInterpMatCone(2, U, [P0])
-
     model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
-    JuMP.@constraint(model, [P[i, j](pts[u, :] * (i == j ? 1.0 : rt2)) for i in 1:2 for j in 1:i for u in 1:U] in mat_wsos_cone)
+    mat_wsos_cone = HYP.WSOSPolyInterpMatCone(2, U, [P0], use_dual)
 
+    if use_dual
+        JuMP.@variable(model, z[i in 1:2, 1:i, 1:U])
+        JuMP.@constraint(model, [z[i, j, u] * (i == j ? 1.0 : rt2) for i in 1:2 for j in 1:i for u in 1:U] in mat_wsos_cone)
+        JuMP.@objective(model, Min, sum(z[i, j, u] * P[i, j](pts[u, :]...) * (i == j ? 1.0 : 2.0) for i in 1:2 for j in 1:i for u in 1:U))
+    else
+        JuMP.@constraint(model, [P[i, j](pts[u, :]) * (i == j ? 1.0 : rt2) for i in 1:2 for j in 1:i for u in 1:U] in mat_wsos_cone)
+    end
     JuMP.optimize!(model)
     @test JuMP.termination_status(model) == MOI.OPTIMAL
     @test JuMP.primal_status(model) == MOI.FEASIBLE_POINT
-    return
+    return nothing
 end
+
+run_JuMP_sosmat3_primal() = run_JuMP_sosmat3(false)
+run_JuMP_sosmat3_dual() = run_JuMP_sosmat3(true)
