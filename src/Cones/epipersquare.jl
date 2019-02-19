@@ -74,4 +74,4 @@ end
 # calcHiarr!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::EpiPerSquare) = mul!(prod, cone.Hi, arr)
 # calcHarr!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::EpiPerSquare) = mul!(prod, cone.H, arr)
 
-inv_hess(cone::EpiPerSquare) = Symmetric(cone.Hi)
+inv_hess(cone::EpiPerSquare) = Symmetric(cone.Hi, :U)
