@@ -14,6 +14,8 @@ const MU = HYP.ModelUtilities
 
 import JuMP
 import SumOfSquares
+import SemialgebraicSets
+const SAS = SemialgebraicSets
 import MathOptInterface
 const MOI = MathOptInterface
 import PolyJuMP
@@ -23,23 +25,7 @@ import Random
 import Distributions
 using Test
 
-function get_WSOS_cones(dom1, dom2, dom3, deg)
-    (U2, pts2, P02, PWts2, _) = MU.interpolate(dom2, div(deg, 2) + 1, sample = false)
-    (U3, pts3, P03, PWts3, _) = MU.interpolate(dom3, div(deg, 2), sample = false)
-    wsos_cone2 = HYP.WSOSPolyInterpCone(U2, [P02, PWts2...])
-    wsos_cone3 = HYP.WSOSPolyInterpCone(U3, [P03, PWts3...])
-    return (wsos_cone2, wsos_cone3, U2, U3, pts2, pts3)
-end
-
-function get_bss(dom1, dom2, dom3, x, t)
-    bss1 = MU.get_domain_inequalities(dom1, x)
-    bss2 = MU.get_domain_inequalities(dom2, [x; t])
-    bss3 = MU.get_domain_inequalities(dom3, x)
-    return (bss1, bss2, bss3)
-end
-
-
-function build_univariate_roa(deg::Int; use_wsos::Bool = true)
+function univariate_WSOS(deg::Int)
     T = 100.0
 
     DynamicPolynomials.@polyvar x
@@ -50,7 +36,45 @@ function build_univariate_roa(deg::Int; use_wsos::Bool = true)
     dom3 = MU.Box([-0.01], [0.01]) # state at the end
 
     (U1, pts1, P01, PWts1, quad_weights) = MU.interpolate(dom1, div(deg, 2) + 1, sample = false, calc_w = true)
+    (U2, pts2, P02, PWts2, _) = MU.interpolate(dom2, div(deg, 2) + 1, sample = false)
+    (U3, pts3, P03, PWts3, _) = MU.interpolate(dom3, div(deg, 2), sample = false)
     wsos_cone1 = HYP.WSOSPolyInterpCone(U1, [P01, PWts1...])
+    wsos_cone2 = HYP.WSOSPolyInterpCone(U2, [P02, PWts2...])
+    wsos_cone3 = HYP.WSOSPolyInterpCone(U3, [P03, PWts3...])
+
+    model = SumOfSquares.Model(JuMP.with_optimizer(Hypatia.Optimizer, verbose = true))
+    JuMP.@variables(model, begin
+        v, PolyJuMP.Poly(DynamicPolynomials.monomials([x; t], 0:deg)) # TODO issue reverse order
+        w, PolyJuMP.Poly(DynamicPolynomials.monomials(x, 0:deg))
+    end)
+
+    JuMP.@objective(model, Min, sum(quad_weights[u] * w(pts1[u, :]) for u in 1:U1))
+
+    dvdt = DynamicPolynomials.differentiate(v, t) + DynamicPolynomials.differentiate(v, x) * f
+    diffwv = w - DynamicPolynomials.subs(v, t => 0.0) - 1.0
+    vT = DynamicPolynomials.subs(v, t => 1.0)
+
+    JuMP.@constraints(model, begin
+        [-dvdt(pts2[u, :]) for u in 1:U2] in wsos_cone2
+        [diffwv(pts1[u, :]) for u in 1:U1] in wsos_cone1
+        [vT(pts3[u, :]) for u in 1:U3] in wsos_cone3
+        [w(pts1[u, :]) for u in 1:U1] in wsos_cone1
+    end)
+
+    return model
+end
+
+function univariate_PSD(deg::Int)
+    T = 100.0
+
+    DynamicPolynomials.@polyvar x
+    DynamicPolynomials.@polyvar t
+    f = x * (x - 0.5) * (x + 0.5) * T
+    dom1 = MU.Box([-1.0], [1.0]) # just state
+    dom2 = MU.Box([-1.0, 0.0], [1.0, 1.0]) # state and time
+    dom3 = MU.Box([-0.01], [0.01]) # state at the end
+
+    (U1, pts1, _, _, quad_weights) = MU.interpolate(dom1, div(deg, 2) + 1, sample = false, calc_w = true)
 
     model = SumOfSquares.SOSModel(JuMP.with_optimizer(Hypatia.Optimizer, verbose = true))
     JuMP.@variables(model, begin
@@ -64,28 +88,18 @@ function build_univariate_roa(deg::Int; use_wsos::Bool = true)
     diffwv = w - DynamicPolynomials.subs(v, t => 0.0) - 1.0
     vT = DynamicPolynomials.subs(v, t => 1.0)
 
-    if use_wsos
-        (wsos_cone2, wsos_cone3, U2, U3, pts2, pts3) = get_WSOS_cones(dom1, dom2, dom3, deg)
-        JuMP.@constraints(model, begin
-            [-dvdt(pts2[u, :]) for u in 1:U2] in wsos_cone2
-            [diffwv(pts1[u, :]) for u in 1:U1] in wsos_cone1
-            [vT(pts3[u, :]) for u in 1:U3] in wsos_cone3
-            [w(pts1[u, :]) for u in 1:U1] in wsos_cone1
-        end)
-    else
-        (bss1, bss2, bss3) = get_bss(dom1, dom2, dom3, x, t)
-        JuMP.@constraint(model, -dvdt >= 0, domain = bss2)
-        JuMP.@constraint(model, diffwv >= 0, domain = bss1)
-        JuMP.@constraint(model, vT >= 0, domain = bss3)
-        JuMP.@constraint(model, w >= 0, domain = bss1)
-    end
+    JuMP.@constraint(model, -dvdt >= 0, domain = (SAS.@set -1 <= x  && x <= 1 && 0 <= t && t <= 1))
+    JuMP.@constraint(model, diffwv >= 0, domain = (SAS.@set -1 <= x && x <= 1))
+    JuMP.@constraint(model, vT >= 0, domain = (SAS.@set -0.01 <= x && x <= 0.01))
+    JuMP.@constraint(model, w >= 0, domain = (SAS.@set -1 <= x && x <= 1))
 
     return model
 end
 
-function run_JuMP_univariate_roa()
-    for use_wsos in [true, false]
-        model = build_univariate_roa(4, use_wsos = use_wsos)
+
+function run_JuMP_univariate()
+    for func in [univariate_WSOS, univariate_PSD]
+        model = func(4)
         JuMP.optimize!(model)
 
         term_status = JuMP.termination_status(model)
