@@ -188,7 +188,6 @@ function run_JuMP_shapeconregr(use_wsos::Bool; dense::Bool = true)
         p = build_shapeconregr_PSD(model, X, y, deg, shapedata)
     end
 
-    println("starting to solve JuMP model")
     JuMP.optimize!(model)
     term_status = JuMP.termination_status(model)
     primal_obj = JuMP.objective_value(model)
