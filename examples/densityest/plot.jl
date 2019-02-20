@@ -22,7 +22,7 @@ function densityest_plot(
             x[k, 1] = a[i]
             x[k, 2] = a[j]
         end
-        z = [regressor(x[i, :]) for i in 1:100]
+        z = [regressor(x[i, :]) for i in 1:s^2]
     else
         x = X[:, 1:2]
         z = [regressor(X[i, :]) for i in 1:num_obs]

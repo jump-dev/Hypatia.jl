@@ -159,11 +159,12 @@ function build_shapeconregr_WSOS(
     if !iszero(sd.conv_profile)
         Hp = DynamicPolynomials.differentiate(p, x, 2)
         if use_naive
-            @polyvar y
-            naive_dom = MU.SemiFreeDomain(conv_dom)
+            DynamicPolynomials.@polyvar y[1:n]
+            naive_dom = MU.SemiFreeDomain(sd.conv_dom)
             (conv_U, conv_pts, conv_P0, conv_PWts, _) = MU.interpolate(naive_dom, d + 1, sample = sample, sample_factor = 50)
             naive_wsos_cone = HYP.WSOSPolyInterpCone(conv_U, [conv_P0, conv_PWts...])
-            JuMP.@constraint(model, y' * Hp * y in naive_wsos_cone)
+            conv_condition = y' * Hp * y
+            JuMP.@constraint(model, [conv_condition(conv_pts[u, :]) for u in 1:conv_U] in naive_wsos_cone)
         else
             (conv_U, conv_pts, conv_P0, conv_PWts, _) = MU.interpolate(sd.conv_dom, d - 1, sample = sample, sample_factor = 50)
             conv_wsos_cone = HYP.WSOSPolyInterpMatCone(n, conv_U, [conv_P0, conv_PWts...])
@@ -191,7 +192,7 @@ function run_JuMP_shapeconregr(use_wsos::Bool; dense::Bool = true)
 
     if use_wsos
         model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, use_dense = dense))
-        p = build_shapeconregr_WSOS(model, X, y, deg, shapedata)
+        p = build_shapeconregr_WSOS(model, X, y, deg, shapedata, use_naive = true)
     else
         model = SumOfSquares.SOSModel(JuMP.with_optimizer(HYP.Optimizer, verbose = true, use_dense = dense))
         p = build_shapeconregr_PSD(model, X, y, deg, shapedata)

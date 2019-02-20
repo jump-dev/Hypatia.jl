@@ -62,7 +62,7 @@ function build_solve_model(X, y, shapedata, deg, use_wsos)
         system_solver = SO.QRCholCombinedHSDSystemSolver,
         linear_model = MO.PreprocessedLinearModel,
         max_iters = 750,
-        time_limit = 3.6e3,
+        time_limit = 300.0,
         tol_rel_opt = 1e-5,
         tol_abs_opt = 1e-6,
         tol_feas = 1e-6,
@@ -85,9 +85,9 @@ function rmse(X, y, func)
 end
 
 function run_experiments(issynthetic = true)
-    deg_options = [3; 4; 5]
-    wsos_options = [false]
-    conv_options = ["conv", "mono", "neither"]
+    deg_options = [4; 5]
+    wsos_options = [true, false]
+    conv_options = ["mono"]
     nrange = [4]
     for n in nrange # data options
         outfilename = joinpath(@__DIR__(), "shapecon_$(round(Int, time() / 10)).csv")
@@ -97,7 +97,7 @@ function run_experiments(issynthetic = true)
             (X, y) = production_data()
         end
         folds = kfolds((X', y), k = 5)
-        open(outfilename, "w") do f
+        open(outfilename, "a") do f
             println(f, "# n = $n")
             println(f, "fold,tr_refrmse,ts_refrmse,deg,use_wsos,tr_rmse,ts_rmse,time,conv,status")
             foldcount = 0
