@@ -192,7 +192,7 @@ function run_JuMP_shapeconregr(use_wsos::Bool; dense::Bool = true)
 
     if use_wsos
         model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, use_dense = dense))
-        p = build_shapeconregr_WSOS(model, X, y, deg, shapedata, use_naive = true)
+        p = build_shapeconregr_WSOS(model, X, y, deg, shapedata, use_naive = false)
     else
         model = SumOfSquares.SOSModel(JuMP.with_optimizer(HYP.Optimizer, verbose = true, use_dense = dense))
         p = build_shapeconregr_PSD(model, X, y, deg, shapedata)
