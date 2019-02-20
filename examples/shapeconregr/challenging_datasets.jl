@@ -70,12 +70,16 @@ function build_solve_model(X, y, shapedata, deg, use_wsos)
 
     if use_wsos
         poly = build_shapeconregr_WSOS(model, X, y, deg, shapedata)
-        (val, runtime, bytes, gctime, memallocs) = @timed JuMP.optimize!(model)
+        (val, runtime, bytes, gctime, memallocs) = try_to_solve(model)
     else
         poly = build_shapeconregr_PSD(model, X, y, deg, shapedata)
-        (val, runtime, bytes, gctime, memallocs) = @timed JuMP.optimize!(model)
+        (val, runtime, bytes, gctime, memallocs) = try_to_solve(model)
     end
-    rmse = sqrt(max(JuMP.objective_value(model), 0)) * sqrt(size(X, 1))
+    if isfinite(runtime)
+        rmse = sqrt(max(JuMP.objective_value(model), 0)) * sqrt(size(X, 1))
+    else
+        rmse = Inf
+    end
     return (model, rmse, runtime, poly)
 end
 
@@ -84,11 +88,20 @@ function rmse(X, y, func)
     return sqrt(sum(abs2.([y[i] - func(X[i,:]) for i in 1:num_points])) / num_points)
 end
 
+function try_to_solve(model)
+    try
+        (val, runtime, bytes, gctime, memallocs) = @timed JuMP.optimize!(model)
+        return (val, runtime, bytes, gctime, memallocs)
+    catch
+        return (Inf, Inf, Inf, Inf, Inf)
+    end
+end
+
 function run_experiments(issynthetic = true)
-    deg_options = [4; 5]
+    deg_options = [3]
     wsos_options = [true, false]
-    conv_options = ["mono"]
-    nrange = [4]
+    conv_options = ["mono", "conv", "neither"]
+    nrange = [3]
     for n in nrange # data options
         outfilename = joinpath(@__DIR__(), "shapecon_$(round(Int, time() / 10)).csv")
         if issynthetic
@@ -124,7 +137,11 @@ function run_experiments(issynthetic = true)
                     end
                     println("running ", "deg = $deg, use_wsos = $use_wsos, n = $n, conv = $conv")
                     (mdl, tr_rmse, s_tm, regr) = build_solve_model(tr_Xarr, ytrain, shape_data, deg, use_wsos)
-                    ts_rmse = rmse(ts_Xarr, ytest, JuMP.value(regr))
+                    if isfinite(s_tm)
+                        ts_rmse = rmse(ts_Xarr, ytest, JuMP.value(regr))
+                    else
+                        ts_rmse = Inf
+                    end
                     println(f, "$foldcount,$tr_refrmse,$ts_refrmse,$deg,$use_wsos,$tr_rmse,$ts_rmse,$s_tm,$conv,$(JuMP.termination_status(mdl))")
                 end # model
             end # folds
