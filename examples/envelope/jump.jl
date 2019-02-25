@@ -41,7 +41,7 @@ function build_JuMP_envelope(
     JuMP.@objective(model, Max, dot(fpv, w)) # integral over domain (via quadrature)
     JuMP.@constraint(model, [i in 1:npoly], polys[:, i] .- fpv in HYP.WSOSPolyInterpCone(U, [P0, PWts...]))
 
-    return (model, fpv)
+    return (model, fpv, polys, pts)
 end
 
 function run_JuMP_envelope(
@@ -71,3 +71,27 @@ end
 run_JuMP_envelope_sampleinterp_box() = run_JuMP_envelope(2, 3, 4, MU.Box(-ones(2), ones(2)))
 run_JuMP_envelope_sampleinterp_ball() = run_JuMP_envelope(2, 3, 4, MU.Ball(zeros(2), sqrt(2)))
 run_JuMP_envelope_boxinterp() = run_JuMP_envelope(2, 3, 4, MU.Box(-ones(2), ones(2)), sample = false)
+
+
+
+(model, fpv, polys, pts) = build_JuMP_envelope(3, 4, 4, MU.Box(-[1.0], [1.0]))
+JuMP.optimize!(model)
+using Plots
+plotlyjs()
+lagrange_polys = MU.recover_interpolant_polys(pts, 8)
+pl = plot(
+    x -> x,
+    x -> dot(JuMP.value.(fpv), lagrange_polys).(x),
+    -1,
+    1,
+    line=4,
+    )
+plot!(
+    pl,
+    x -> x,
+    x -> dot(polys[:, 3], lagrange_polys).(x),
+    color = "orange",
+    -1,
+    1,
+    line=4,
+    )

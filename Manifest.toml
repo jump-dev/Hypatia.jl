@@ -364,9 +364,9 @@ uuid = "a63ad114-7e13-5084-954f-fe012c677804"
 
 [[Mosek]]
 deps = ["Libdl", "MathProgBase", "Pkg", "Printf", "SparseArrays", "Test"]
-git-tree-sha1 = "d8d0bafb73b8c77d79b51b45f636034d93921732"
+git-tree-sha1 = "eae97e18c971edfcb68af3e0c8c370af9ecc426f"
 uuid = "6405355b-0ac2-5fba-af84-adbd65488c0e"
-version = "0.9.8"
+version = "0.9.10"
 
 [[MultivariateMoments]]
 deps = ["LinearAlgebra", "MultivariatePolynomials", "RowEchelon", "SemialgebraicSets"]
@@ -399,6 +399,12 @@ deps = ["Compat"]
 git-tree-sha1 = "ce3b85e484a5d4c71dd5316215069311135fa9f2"
 uuid = "77ba4419-2d1f-58cd-9bb1-8ffee604a2e3"
 version = "0.3.2"
+
+[[ORCA]]
+deps = ["Conda", "HTTP", "JSON", "PlotlyBase", "Test"]
+git-tree-sha1 = "0718acdf588e57865efc041023827c885a6d36cd"
+uuid = "47be7bcc-f1a6-5447-8b36-7eeeff7534fd"
+version = "0.2.1"
 
 [[Observables]]
 deps = ["Test"]
