@@ -61,7 +61,7 @@ function buildmat!(cone::WSOSPolyInterpMat, point::AbstractVector{Float64})
 
         uo = 0
         for p in 1:R, q in 1:p # seems like blocks unrelated could be v parallel
-            (p == q) ? fact = 1.0 : fact = rt2i
+            fact = (p == q) ? 1.0 : rt2i
             rinds = _blockrange(p, L)
             cinds = _blockrange(q, L)
             @. tmp1j = ipwtj' * cone.point[uo + 1:uo + U]' * fact
@@ -91,10 +91,9 @@ function update_gradient_hessian!(cone::WSOSPolyInterpMat, j::Int, Winv::Matrix{
         rinds = _blockrange(p, L)
         cinds = _blockrange(q, L)
         idxs = _blockrange(uo, cone.u)
-        # mul!(tmp1j, view(Winv, rinds, cinds), ipwtj')
-        # mul!(tmp2, ipwtj, tmp1j)
-        tmp2 = ipwtj * view(Winv, rinds, cinds) * ipwtj'
-        cone.g[idxs] .-= diag(tmp2) * fact
+        for i in 1:cone.u
+            cone.g[idxs[i]] -= ipwtj[i, :]' * view(Winv, rinds, cinds) * ipwtj[i, :] * fact
+        end
         uo2 = 0
         for p2 in 1:cone.r, q2 in 1:p2
             uo2 += 1

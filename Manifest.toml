@@ -109,9 +109,9 @@ version = "0.0.4"
 
 [[DiffRules]]
 deps = ["Random", "Test"]
-git-tree-sha1 = "26b96a1a506b06cb272ef60568d478adab039b96"
+git-tree-sha1 = "dc0869fb2f5b23466b32ea799bd82c76480167f7"
 uuid = "b552c78f-8df3-52c6-915a-8e097449b14b"
-version = "0.0.9"
+version = "0.0.10"
 
 [[Distributed]]
 deps = ["Random", "Serialization", "Sockets"]
@@ -210,8 +210,8 @@ version = "0.4.0"
 uuid = "a63ad114-7e13-5084-954f-fe012c677804"
 
 [[MultivariateMoments]]
-deps = ["Compat", "MultivariatePolynomials", "RowEchelon", "SemialgebraicSets"]
-git-tree-sha1 = "a12298dfafb8ead54949f32b36d6c007cc61ed07"
+deps = ["LinearAlgebra", "MultivariatePolynomials", "RowEchelon", "SemialgebraicSets"]
+git-tree-sha1 = "d85604b2068aa8806d14bf4a2c08df5a732cad57"
 repo-rev = "master"
 repo-url = "https://github.com/JuliaAlgebra/MultivariateMoments.jl.git"
 uuid = "f4abf1af-0426-5881-a0da-e2f168889b5e"
@@ -390,9 +390,9 @@ version = "0.4.1"
 
 [[Tables]]
 deps = ["IteratorInterfaceExtensions", "LinearAlgebra", "Requires", "TableTraits", "Test"]
-git-tree-sha1 = "37be2ed169d5771c1ac8d516d3bcb0093c49966e"
+git-tree-sha1 = "5aa45584645393c1717e0cc1f0362c2ea81470a9"
 uuid = "bd369af6-aec1-5ad0-b16a-f7cc5008161c"
-version = "0.1.15"
+version = "0.1.17"
 
 [[Test]]
 deps = ["Distributed", "InteractiveUtils", "Logging", "Random"]
