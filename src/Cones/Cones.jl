@@ -36,7 +36,7 @@ function factorize_hess(cone::Cone)
     cone.F = bunchkaufman!(Symmetric(cone.H2, :U), true, check = false)
     return issuccess(cone.F)
 
-    # cone.F = cholesky!(Symmetric(cone.H2), Val(true), check = false)
+    # cone.F = cholesky!(Symmetric(cone.H2, :U), Val(true), check = false)
     # return isposdef(cone.F)
 end
 
