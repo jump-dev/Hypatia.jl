@@ -351,14 +351,9 @@ end
 
 function recover_interpolant_polys(pts::Matrix{Float64}, deg::Int)
     (U, n) = size(pts)
-    interpolant_polys = Vector(undef, U)
     DP.@polyvar x[1:n]
     monos = DP.monomials(x, 0:deg)
-
     vandermonde_inv = inv([monos[j](pts[i, :]) for i in 1:U, j in 1:U])
-    for i in 1:U
-        interpolant_polys[i] = dot(vandermonde_inv[:, i], monos)
-    end
-
+    interpolant_polys = [dot(vandermonde_inv[:, i], monos) for i in 1:U]
     return interpolant_polys
 end
