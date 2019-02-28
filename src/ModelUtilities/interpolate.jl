@@ -350,30 +350,14 @@ function wsos_sample_params(
 end
 
 function recover_interpolant_polys(pts::Matrix{Float64}, deg::Int)
-    n = size(pts, 2)
-    U = binomial(n + deg, n)
-    polymat = Matrix{DP.Monomial{true}}(undef, U, U)
-    data_mat = Matrix{Float64}(undef, U, U)
+    (U, n) = size(pts)
     interpolant_polys = Vector(undef, U)
     DP.@polyvar x[1:n]
     monos = DP.monomials(x, 0:deg)
-    for i in 1:U
-        polymat[i, :] = monos
-    end
 
-    for j in 1:U, i in 1:U
-        data_mat[i, j] = polymat[i, j](pts[i, :])
-    end
-    data_mat_inv = inv(LinearAlgebra.det(data_mat))
-
-    # bases
+    vandermonde_inv = inv([monos[j](pts[i, :]) for i in 1:U, j in 1:U])
     for i in 1:U
-        deti = DP.Polynomial{true,Int64}(0.0)
-        # columns
-        for j in 1:U
-            deti += monos[j] * (-1)^(i + j) * LinearAlgebra.det(view(data_mat, 1:U .!= i, 1:U .!= j))
-        end
-        interpolant_polys[i] = deti * data_mat_inv
+        interpolant_polys[i] = dot(vandermonde_inv[:, i], monos)
     end
 
     return interpolant_polys
