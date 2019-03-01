@@ -215,7 +215,7 @@ git-tree-sha1 = "d85604b2068aa8806d14bf4a2c08df5a732cad57"
 repo-rev = "master"
 repo-url = "https://github.com/JuliaAlgebra/MultivariateMoments.jl.git"
 uuid = "f4abf1af-0426-5881-a0da-e2f168889b5e"
-version = "0.2.0"
+version = "0.2.0+"
 
 [[MultivariatePolynomials]]
 deps = ["LinearAlgebra", "Test"]
