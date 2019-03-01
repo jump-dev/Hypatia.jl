@@ -82,6 +82,8 @@ function combined_predict_correct(solver::HSDSolver, stepper::CombinedHSDStepper
     solver.kap += alpha * kap_comb
     calc_mu(solver)
 
+    @assert solver.tau > 0.0 && solver.kap > 0.0 && solver.mu > 0.0
+
     return point
 end
 
@@ -168,7 +170,10 @@ function find_max_alpha_in_nbhd(z_dir::AbstractVector{Float64}, s_dir::AbstractV
                         cone_k = cones[k]
                         if !stepper.cones_loaded[k]
                             Cones.load_point(cone_k, stepper.primal_views[k])
-                            @assert Cones.check_in_cone(cone_k)
+                            if !Cones.check_in_cone(cone_k)
+                                in_nbhds = false
+                                break
+                            end
                         end
 
                         # modifies dual_views
