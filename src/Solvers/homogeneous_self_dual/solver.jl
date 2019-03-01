@@ -128,14 +128,12 @@ function solve(solver::HSDSolver)
         error("initial mu is $(solver.mu) (should be 1.0)")
     end
 
-    solver.verbose && print_iter_header(solver, solver.stepper)
-
     while true
         calc_residual(solver)
 
         calc_convergence_params(solver)
 
-        solver.verbose && print_iter_summary(solver, solver.stepper)
+        solver.verbose && print_iteration_stats(solver, solver.stepper)
 
         check_convergence(solver) && break
 

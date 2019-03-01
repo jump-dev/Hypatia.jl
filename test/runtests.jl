@@ -37,6 +37,7 @@ include(joinpath(examples_dir, "wsosmatrix/muconvexity.jl"))
 include(joinpath(examples_dir, "wsosmatrix/sosmat1.jl"))
 include(joinpath(examples_dir, "wsosmatrix/sosmat2.jl"))
 include(joinpath(examples_dir, "wsosmatrix/sosmat3.jl"))
+include(joinpath(examples_dir, "regionofattraction/univariate.jl"))
 
 include(joinpath(@__DIR__, "JuMP.jl"))
 
@@ -142,15 +143,15 @@ testfuns = [
     linearopt2,
     namedpoly1,
     namedpoly2,
-    namedpoly3,
-    namedpoly4,
+    # namedpoly3,
+    # namedpoly4,
     namedpoly5,
     namedpoly6,
     namedpoly7,
     namedpoly8,
     namedpoly9,
-    namedpoly10,
-    namedpoly11,
+    # namedpoly10,
+    # namedpoly11,
     ]
 @testset "native examples: $t, $s, $m" for t in testfuns, s in system_solvers, m in linear_models
     t(verbose, s, m)
