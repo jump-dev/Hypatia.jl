@@ -19,7 +19,6 @@ abstract type Solver end
 abstract type HSDStepper end
 abstract type CombinedHSDSystemSolver end
 include("homogeneous_self_dual/solver.jl")
-include("homogeneous_self_dual/steppers.jl")
 include("homogeneous_self_dual/combined_step/stepper.jl")
 include("homogeneous_self_dual/combined_step/naive.jl")
 include("homogeneous_self_dual/combined_step/qrchol.jl")
