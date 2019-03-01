@@ -44,132 +44,132 @@ include(joinpath(@__DIR__, "JuMP.jl"))
 
 @testset "Hypatia tests" begin
 
-# @info("starting interpolation tests")
-# @testset "interpolation tests" begin
-#     fekete_sample()
-#     test_recover_interpolant_polys()
-# end
-#
-# @info("starting native interface tests")
-# verbose = true
-# system_solvers = [
-#     SO.NaiveCombinedHSDSystemSolver,
-#     SO.QRCholCombinedHSDSystemSolver,
-#     ]
-# testfuns_singular = [
-#     dimension1,
-#     consistent1,
-#     inconsistent1,
-#     inconsistent2,
-#     ]
-# @testset "preprocessing tests: $t, $s" for t in testfuns_singular, s in system_solvers
-#     t(verbose, s, MO.PreprocessedLinearModel)
-# end
-# linear_models = [
-#     # MO.RawLinearModel,
-#     MO.PreprocessedLinearModel,
-#     ]
-# testfuns_nonsingular = [
-#     orthant1,
-#     orthant2,
-#     orthant3,
-#     orthant4,
-#     epinorminf1,
-#     epinorminf2,
-#     epinorminf3,
-#     epinorminf4,
-#     epinorminf5,
-#     epinorminf6,
-#     epinormeucl1,
-#     epinormeucl2,
-#     epipersquare1,
-#     epipersquare2,
-#     epipersquare3,
-#     semidefinite1,
-#     semidefinite2,
-#     semidefinite3,
-#     hypoperlog1,
-#     hypoperlog2,
-#     hypoperlog3,
-#     hypoperlog4,
-#     epiperpower1,
-#     epiperpower2,
-#     epiperpower3,
-#     hypogeomean1,
-#     hypogeomean2,
-#     hypogeomean3,
-#     hypogeomean4,
-#     epinormspectral1,
-#     hypoperlogdet1,
-#     hypoperlogdet2,
-#     hypoperlogdet3,
-#     epipersumexp1,
-#     epipersumexp2,
-#     ]
-# @testset "native tests: $t, $s, $m" for t in testfuns_nonsingular, s in system_solvers, m in linear_models
-#     t(verbose, s, m)
-# end
-#
-# @info("starting default native examples tests")
-# testfuns = [
-#     run_envelope_primal_dense,
-#     run_envelope_dual_dense,
-#     run_envelope_primal_sparse,
-#     run_envelope_dual_sparse,
-#     run_linearopt,
-#     run_namedpoly,
-#     ]
-# @testset "default examples: $t" for t in testfuns
-#     t()
-# end
-#
-# @info("starting additional native examples tests")
-# verbose = false
-# system_solvers = [
-#     # SO.NaiveCombinedHSDSystemSolver,
-#     SO.QRCholCombinedHSDSystemSolver,
-#     ]
-# linear_models = [
-#     # MO.RawLinearModel,
-#     MO.PreprocessedLinearModel,
-#     ]
-# testfuns = [
-#     # TODO test primal and dual formulations of envelope
-#     envelope1,
-#     envelope2,
-#     envelope3,
-#     envelope4,
-#     linearopt1,
-#     linearopt2,
-#     namedpoly1,
-#     namedpoly2,
-#     namedpoly3,
-#     namedpoly4,
-#     namedpoly5,
-#     namedpoly6,
-#     namedpoly7,
-#     namedpoly8,
-#     namedpoly9,
-#     namedpoly10,
-#     namedpoly11,
-#     ]
-# @testset "native examples: $t, $s, $m" for t in testfuns, s in system_solvers, m in linear_models
-#     t(verbose, s, m)
-# end
-#
-# @info("starting MathOptInterface tests")
-# verbose = false
-# system_solvers = [
-#     SO.NaiveCombinedHSDSystemSolver,
-#     SO.QRCholCombinedHSDSystemSolver,
-#     ]
-# linear_models = [
-#     # MO.RawLinearModel,
-#     MO.PreprocessedLinearModel,
-#     ]
-# @testset "MOI tests: $(d ? "dense" : "sparse"), $s, $m" for d in (false, true), s in system_solvers, m in linear_models
-#     test_moi(verbose, d, s, m)
-# end
+@info("starting interpolation tests")
+@testset "interpolation tests" begin
+    fekete_sample()
+    test_recover_interpolant_polys()
+end
+
+@info("starting native interface tests")
+verbose = true
+system_solvers = [
+    SO.NaiveCombinedHSDSystemSolver,
+    SO.QRCholCombinedHSDSystemSolver,
+    ]
+testfuns_singular = [
+    dimension1,
+    consistent1,
+    inconsistent1,
+    inconsistent2,
+    ]
+@testset "preprocessing tests: $t, $s" for t in testfuns_singular, s in system_solvers
+    t(verbose, s, MO.PreprocessedLinearModel)
+end
+linear_models = [
+    # MO.RawLinearModel,
+    MO.PreprocessedLinearModel,
+    ]
+testfuns_nonsingular = [
+    orthant1,
+    orthant2,
+    orthant3,
+    orthant4,
+    epinorminf1,
+    epinorminf2,
+    epinorminf3,
+    epinorminf4,
+    epinorminf5,
+    epinorminf6,
+    epinormeucl1,
+    epinormeucl2,
+    epipersquare1,
+    epipersquare2,
+    epipersquare3,
+    semidefinite1,
+    semidefinite2,
+    semidefinite3,
+    hypoperlog1,
+    hypoperlog2,
+    hypoperlog3,
+    hypoperlog4,
+    epiperpower1,
+    epiperpower2,
+    epiperpower3,
+    hypogeomean1,
+    hypogeomean2,
+    hypogeomean3,
+    hypogeomean4,
+    epinormspectral1,
+    hypoperlogdet1,
+    hypoperlogdet2,
+    hypoperlogdet3,
+    epipersumexp1,
+    epipersumexp2,
+    ]
+@testset "native tests: $t, $s, $m" for t in testfuns_nonsingular, s in system_solvers, m in linear_models
+    t(verbose, s, m)
+end
+
+@info("starting default native examples tests")
+testfuns = [
+    run_envelope_primal_dense,
+    run_envelope_dual_dense,
+    run_envelope_primal_sparse,
+    run_envelope_dual_sparse,
+    run_linearopt,
+    run_namedpoly,
+    ]
+@testset "default examples: $t" for t in testfuns
+    t()
+end
+
+@info("starting additional native examples tests")
+verbose = false
+system_solvers = [
+    # SO.NaiveCombinedHSDSystemSolver,
+    SO.QRCholCombinedHSDSystemSolver,
+    ]
+linear_models = [
+    # MO.RawLinearModel,
+    MO.PreprocessedLinearModel,
+    ]
+testfuns = [
+    # TODO test primal and dual formulations of envelope
+    envelope1,
+    envelope2,
+    envelope3,
+    envelope4,
+    linearopt1,
+    linearopt2,
+    namedpoly1,
+    namedpoly2,
+    # namedpoly3,
+    # namedpoly4,
+    namedpoly5,
+    namedpoly6,
+    namedpoly7,
+    namedpoly8,
+    namedpoly9,
+    # namedpoly10,
+    # namedpoly11,
+    ]
+@testset "native examples: $t, $s, $m" for t in testfuns, s in system_solvers, m in linear_models
+    t(verbose, s, m)
+end
+
+@info("starting MathOptInterface tests")
+verbose = false
+system_solvers = [
+    SO.NaiveCombinedHSDSystemSolver,
+    SO.QRCholCombinedHSDSystemSolver,
+    ]
+linear_models = [
+    # MO.RawLinearModel,
+    MO.PreprocessedLinearModel,
+    ]
+@testset "MOI tests: $(d ? "dense" : "sparse"), $s, $m" for d in (false, true), s in system_solvers, m in linear_models
+    test_moi(verbose, d, s, m)
+end
 
 @info("starting default JuMP examples tests")
 testfuns = [

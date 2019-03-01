@@ -7,7 +7,6 @@ mutable struct QRCholCombinedHSDSystemSolver <: CombinedHSDSystemSolver
         system_solver = new()
         system_solver.Ap_RiQ1t = model.Ap_R \ (model.Ap_Q1')
 
-
         return system_solver
     end
 end
