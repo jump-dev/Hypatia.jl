@@ -148,16 +148,22 @@ end
 
 function check_in_cone(cone::WSOSPolyInterpMat)
     # TODO remove the inner loop over ipwt from buildmat and put it here (that's what we do for add_grad_hess_j below)
+    @timeit "buildmat" begin
     if !(buildmat!(cone, cone.point))
         return false
     end
+    end
 
+    @timeit "gradhess" begin
     cone.g .= 0.0
     cone.H .= 0.0
     for (j, ipwtj) in enumerate(cone.ipwt)
         W_inv_j = inv(cone.matfact[j])
         add_grad_hess_j!(cone, j, W_inv_j)
     end
+    end
 
-    return factorize_hess(cone)
+    ret = @timeit "facthess" factorize_hess(cone)
+    return ret
+    # return factorize_hess(cone)
 end
