@@ -363,11 +363,11 @@ function get_interp_pts(dom::Domain, deg::Int; sample_factor::Int = 10)
     return candidate_pts[keep_pnt, :]
 end
 
-function recover_interpolant_polys(pts::Matrix{Float64}, deg::Int)
+function recover_lagrange_polys(pts::Matrix{Float64}, deg::Int)
     (U, n) = size(pts)
     DP.@polyvar x[1:n]
     monos = DP.monomials(x, 0:deg)
     vandermonde_inv = inv([monos[j](pts[i, :]) for i in 1:U, j in 1:U])
-    interpolant_polys = [dot(vandermonde_inv[:, i], monos) for i in 1:U]
-    return interpolant_polys
+    lagrange_polys = [dot(vandermonde_inv[:, i], monos) for i in 1:U]
+    return lagrange_polys
 end

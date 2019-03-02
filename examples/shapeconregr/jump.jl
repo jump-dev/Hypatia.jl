@@ -152,8 +152,8 @@ function build_shapeconregr_WSOS(
     conv_wsos_cone = HYP.WSOSPolyInterpMatCone(n, conv_U, [conv_P0, conv_PWts...])
 
     JuMP.@variable(model, regressor[1:regressor_U])
-    interpolant_polys = MU.recover_interpolant_polys(regressor_points, regressor_deg)
-    JuMP.@expression(model, regressor_poly, JuMP.dot(regressor, interpolant_polys))
+    lagrange_polys = MU.recover_lagrange_polys(regressor_points, regressor_deg)
+    JuMP.@expression(model, regressor_poly, JuMP.dot(regressor, lagrange_polys))
     if use_lsq_obj
         JuMP.@variable(model, z)
         JuMP.@objective(model, Min, z / num_points)
@@ -182,7 +182,7 @@ function build_shapeconregr_WSOS(
             for i in 1:n for j in 1:i for u in 1:conv_U] in conv_wsos_cone)
     end
 
-    return regressor, interpolant_polys
+    return regressor, lagrange_polys
 end
 
 function run_JuMP_shapeconregr(use_wsos::Bool; dense::Bool = true)
