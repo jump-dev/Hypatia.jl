@@ -2,9 +2,15 @@
 mutable struct CombinedHSDStepper <: HSDStepper
     system_solver::CombinedHSDSystemSolver
     max_nbhd::Float64
-    prev_alpha::Float64
-    prev_gamma::Float64
+
+    z_dir::Vector{Float64}
+    s_dir::Vector{Float64}
     prev_affine_alpha::Float64
+    prev_affine_alpha_iters::Int
+    prev_gamma::Float64
+    prev_alpha::Float64
+    prev_alpha_iters::Int
+
     z_temp::Vector{Float64}
     s_temp::Vector{Float64}
     primal_views
@@ -22,16 +28,20 @@ mutable struct CombinedHSDStepper <: HSDStepper
 
         stepper.system_solver = system_solver
         stepper.max_nbhd = max_nbhd
-        stepper.prev_alpha = 0.9999
-        stepper.prev_gamma = 0.9999
+
+        stepper.z_dir = similar(model.h)
+        stepper.s_dir = similar(model.h)
         stepper.prev_affine_alpha = 0.9999
+        stepper.prev_affine_alpha_iters = 0
+        stepper.prev_gamma = 0.9999
+        stepper.prev_alpha = 0.9999
+        stepper.prev_alpha_iters = 0
 
         stepper.z_temp = similar(model.h)
         stepper.s_temp = similar(model.h)
         stepper.primal_views = [view(Cones.use_dual(model.cones[k]) ? stepper.z_temp : stepper.s_temp, model.cone_idxs[k]) for k in eachindex(model.cones)]
         stepper.dual_views = [view(Cones.use_dual(model.cones[k]) ? stepper.s_temp : stepper.z_temp, model.cone_idxs[k]) for k in eachindex(model.cones)]
         stepper.nbhd_temp = [Vector{Float64}(undef, length(model.cone_idxs[k])) for k in eachindex(model.cones)]
-
         stepper.cones_outside_nbhd = trues(length(model.cones))
         stepper.cones_loaded = trues(length(model.cones))
 
@@ -39,45 +49,52 @@ mutable struct CombinedHSDStepper <: HSDStepper
     end
 end
 
-function combined_predict_correct(solver::HSDSolver, stepper::CombinedHSDStepper)
+function step(solver::HSDSolver, stepper::CombinedHSDStepper)
     model = solver.model
     point = solver.point
+    z_dir = stepper.z_dir
+    s_dir = stepper.s_dir
 
     # calculate affine/prediction and correction directions
-    (x_dirs, y_dirs, z_dirs, s_dirs, tau_dirs, kap_dirs) = get_combined_directions(solver, stepper.system_solver)
+    @timeit "directions" (x_dirs, y_dirs, z_dirs, s_dirs, tau_dirs, kap_dirs) = get_combined_directions(solver, stepper.system_solver)
 
     # calculate correction factor gamma by finding distance affine_alpha for stepping in affine direction
-    affine_alpha = find_max_alpha_in_nbhd(z_dirs[:, 1], s_dirs[:, 1], tau_dirs[1], kap_dirs[1], 0.9999, stepper.prev_affine_alpha, stepper, solver)
-    stepper.prev_affine_alpha = affine_alpha
+    @. @views z_dir = z_dirs[:, 1]
+    @. @views s_dir = s_dirs[:, 1]
+    @timeit "aff alpha" (affine_alpha, affine_alpha_iters) = find_max_alpha_in_nbhd(z_dir, s_dir, tau_dirs[1], kap_dirs[1], 0.9999, stepper.prev_affine_alpha, stepper, solver)
     gamma = (1.0 - affine_alpha)^3 # TODO allow different function (heuristic)
+    stepper.prev_affine_alpha = affine_alpha
+    stepper.prev_affine_alpha_iters = affine_alpha_iters
     stepper.prev_gamma = gamma
 
     # find distance alpha for stepping in combined direction
     comb_scaling = [1.0 - gamma, gamma]
-    z_comb = z_dirs * comb_scaling
-    s_comb = s_dirs * comb_scaling
+    mul!(z_dir, z_dirs, comb_scaling)
+    mul!(s_dir, s_dirs, comb_scaling)
     tau_comb = dot(tau_dirs, comb_scaling)
     kap_comb = dot(kap_dirs, comb_scaling)
-    alpha = find_max_alpha_in_nbhd(z_comb, s_comb, tau_comb, kap_comb, stepper.max_nbhd, stepper.prev_alpha, stepper, solver)
-
+    @timeit "comb alpha" (alpha, alpha_iters) = find_max_alpha_in_nbhd(z_dir, s_dir, tau_comb, kap_comb, stepper.max_nbhd, stepper.prev_alpha, stepper, solver)
     if iszero(alpha)
         # could not step far in combined direction, so perform a pure correction step
-        alpha = 0.99 # TODO assumes this maintains feasibility
+        println("performing correction step")
         comb_scaling = [0.0, 1.0]
-        z_comb = z_dirs * comb_scaling
-        s_comb = s_dirs * comb_scaling
+        @. @views z_dir = z_dirs[:, 2]
+        @. @views s_dir = s_dirs[:, 2]
         tau_comb = dot(tau_dirs, comb_scaling)
         kap_comb = dot(kap_dirs, comb_scaling)
+        @timeit "corr alpha" (alpha, corr_alpha_iters) = find_max_alpha_in_nbhd(z_dir, s_dir, tau_comb, kap_comb, stepper.max_nbhd, 0.9999, stepper, solver)
+        alpha_iters += corr_alpha_iters
     end
     stepper.prev_alpha = alpha
+    stepper.prev_alpha_iters = alpha_iters
 
     # step distance alpha in combined direction
-    x_comb = x_dirs * comb_scaling
-    y_comb = y_dirs * comb_scaling
-    @. point.x += alpha * x_comb
-    @. point.y += alpha * y_comb
-    @. point.z += alpha * z_comb
-    @. point.s += alpha * s_comb
+    # BLAS.gemv!(tA, alpha, A, x, beta, y)
+    # Update the vector y as alpha*A*x + beta*y or alpha*A'x + beta*y according to tA. alpha and beta are scalars. Return the updated y.
+    BLAS.gemv!('N', alpha, x_dirs, comb_scaling, 1.0, point.x)
+    BLAS.gemv!('N', alpha, y_dirs, comb_scaling, 1.0, point.y)
+    @. point.z += alpha * z_dir
+    @. point.s += alpha * s_dir
     solver.tau += alpha * tau_comb
     solver.kap += alpha * kap_comb
     calc_mu(solver)
@@ -203,12 +220,13 @@ function find_max_alpha_in_nbhd(z_dir::AbstractVector{Float64}, s_dir::AbstractV
 
         if alpha < 1e-3
             # alpha is very small so just let it be zero
-            return 0.0
+            alpha = 0.0
+            break
         end
 
         # iterate is outside the neighborhood: decrease alpha
         alpha *= 0.8 # TODO option for parameter
     end
 
-    return alpha
+    return (alpha, num_pred_iters)
 end
