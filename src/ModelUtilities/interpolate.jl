@@ -18,7 +18,7 @@ sampling_region(dom::Domain) = dom
 
 
 function interp_sample(dom::Box, npts::Int)
-    dim = dimension(dom)
+    dim = get_dimension(dom)
     pts = rand(npts, dim) .- 0.5
     shift = (dom.u + dom.l) .* 0.5
     for i in 1:npts
@@ -35,7 +35,7 @@ end
 
 
 function interp_sample(dom::Ball, npts::Int)
-    dim = dimension(dom)
+    dim = get_dimension(dom)
     pts = randn(npts, dim)
     norms = sum(abs2, pts, dims = 2)
     pts .*= dom.r ./ sqrt.(norms) # scale
@@ -55,7 +55,7 @@ end
 
 
 function interp_sample(dom::Ellipsoid, npts::Int)
-    dim = dimension(dom)
+    dim = get_dimension(dom)
     pts = randn(npts, dim)
     norms = sum(abs2, pts, dims = 2)
     for i in 1:npts
@@ -98,7 +98,7 @@ get_L_U(n::Int, d::Int) = (binomial(n + d, n), binomial(n + 2d, n))
 
 function interpolate(
     dom::Domain,
-    d::Int;
+    d::Int; # TODO make this 2d
     sample::Bool = false,
     calc_w::Bool = false,
     sample_factor::Int = 10,
@@ -106,7 +106,7 @@ function interpolate(
     if sample
         return wsos_sample_params(dom, d, calc_w = calc_w, sample_factor = sample_factor)
     else
-        return wsos_box_params(sampling_region(dom), dimension(dom), d, calc_w = calc_w)
+        return wsos_box_params(sampling_region(dom), get_dimension(dom), d, calc_w = calc_w)
     end
 end
 
@@ -120,10 +120,10 @@ function wsos_box_params(dom::Box, n::Int, d::Int; calc_w::Bool = false)
 
     # TODO refactor/cleanup below
     # scale and shift points, get WSOS matrices
-    pscale = [0.5 * (dom.u[mod(j - 1, dimension(dom)) + 1] - dom.l[mod(j - 1,dimension(dom)) + 1]) for j in 1:n]
-    pshift = [0.5 * (dom.u[mod(j - 1, dimension(dom)) + 1] + dom.l[mod(j - 1,dimension(dom)) + 1]) for j in 1:n]
+    pscale = [0.5 * (dom.u[mod(j - 1, get_dimension(dom)) + 1] - dom.l[mod(j - 1,get_dimension(dom)) + 1]) for j in 1:n]
+    pshift = [0.5 * (dom.u[mod(j - 1, get_dimension(dom)) + 1] + dom.l[mod(j - 1,get_dimension(dom)) + 1]) for j in 1:n]
     Wtsfun = (j -> sqrt.(1.0 .- abs2.(pts[:, j])) * pscale[j])
-    PWts = [Wtsfun(j) .* P0sub for j in 1:dimension(dom)]
+    PWts = [Wtsfun(j) .* P0sub for j in 1:get_dimension(dom)]
     trpts = pts .* pscale' .+ pshift'
 
     return (U = U, pts = trpts, P0 = P0, PWts = PWts, w = w)
@@ -280,27 +280,19 @@ function approxfekete_data(n::Int, d::Int, calc_w::Bool)
         end
     end
     dom = Box(-ones(n), ones(n))
-    (pts, P0, P0sub, w) = make_wsos_arrays(dom, candidate_pts, d, U, L, calc_w = calc_w)
+    (pts, P0, P0sub, w) = make_wsos_arrays(dom, candidate_pts, 2d, U, L, calc_w = calc_w)
     return (U, pts, P0, P0sub, w)
 end
 
-function make_wsos_arrays(
-    dom::Domain,
-    candidate_pts::Matrix{Float64},
-    d::Int,
-    U::Int,
-    L::Int;
-    calc_w::Bool = false,
-    )
-    (npts, n) = size(candidate_pts)
-    u = calc_u(n, 2d, candidate_pts)
+function choose_interp_pts!(M::Matrix{Float64}, candidate_pts::Matrix{Float64}, deg::Int, U::Int)
+    n = size(candidate_pts, 2)
+    u = calc_u(n, deg, candidate_pts)
     m = Vector{Float64}(undef, U)
     m[1] = 2^n
-    M = Matrix{Float64}(undef, npts, U)
     M[:,1] .= 1.0
 
     col = 1
-    for t in 1:2d
+    for t in 1:deg
         for xp in Combinatorics.multiexponents(n, t)
             col += 1
             if any(isodd, xp)
@@ -314,13 +306,25 @@ function make_wsos_arrays(
             end
         end
     end
-
     F = qr!(Array(M'), Val(true))
-    keep_pnt = F.p[1:U]
-    pts = candidate_pts[keep_pnt, :] # subset of points indexed with the support of w
-    P0 = M[keep_pnt, 1:L] # subset of polynomial evaluations up to total degree d
+    return F.p[1:U]
+end
 
-    subd = d - div(degree(dom), 2)
+function make_wsos_arrays(
+    dom::Domain,
+    candidate_pts::Matrix{Float64},
+    deg::Int,
+    U::Int,
+    L::Int;
+    calc_w::Bool = false,
+    )
+
+    (npts, n) = size(candidate_pts)
+    M = Matrix{Float64}(undef, npts, U)
+    keep_pnt = choose_interp_pts!(M, candidate_pts, deg, U)
+    pts = candidate_pts[keep_pnt, :]
+    P0 = M[keep_pnt, 1:L] # subset of polynomial evaluations up to total degree d
+    subd = div(deg - get_degree(dom), 2)
     P0sub = view(P0, :, 1:binomial(n + subd, n))
 
     if calc_w
@@ -340,13 +344,23 @@ function wsos_sample_params(
     calc_w::Bool = false,
     sample_factor::Int = 10,
     )
-    n = dimension(dom)
+    n = get_dimension(dom)
     (L, U) = get_L_U(n, d)
     candidate_pts = interp_sample(dom, U * sample_factor)
-    (pts, P0, P0sub, w) = make_wsos_arrays(dom, candidate_pts, d, U, L, calc_w = calc_w)
+    (pts, P0, P0sub, w) = make_wsos_arrays(dom, candidate_pts, 2d, U, L, calc_w = calc_w)
     g = get_weights(dom, pts)
     PWts = [sqrt.(gi) .* P0sub for gi in g]
     return (U = U, pts = pts, P0 = P0, PWts = PWts, w = w)
+end
+
+# TODO should work without sampling too
+function get_interp_pts(dom::Domain, deg::Int; sample_factor::Int = 10)
+    n = get_dimension(dom)
+    U = binomial(n + deg, n)
+    candidate_pts = interp_sample(dom, U * sample_factor)
+    M = Matrix{Float64}(undef, size(candidate_pts, 1), U)
+    keep_pnt = choose_interp_pts!(M, candidate_pts, deg, U)
+    return candidate_pts[keep_pnt, :]
 end
 
 function recover_interpolant_polys(pts::Matrix{Float64}, deg::Int)
