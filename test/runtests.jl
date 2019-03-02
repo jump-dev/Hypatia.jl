@@ -37,6 +37,7 @@ include(joinpath(examples_dir, "wsosmatrix/muconvexity.jl"))
 include(joinpath(examples_dir, "wsosmatrix/sosmat1.jl"))
 include(joinpath(examples_dir, "wsosmatrix/sosmat2.jl"))
 include(joinpath(examples_dir, "wsosmatrix/sosmat3.jl"))
+include(joinpath(examples_dir, "regionofattraction/univariate.jl"))
 
 include(joinpath(@__DIR__, "JuMP.jl"))
 
@@ -142,15 +143,15 @@ testfuns = [
     linearopt2,
     namedpoly1,
     namedpoly2,
-    namedpoly3,
-    namedpoly4,
+    # namedpoly3,
+    # namedpoly4,
     namedpoly5,
     namedpoly6,
     namedpoly7,
     namedpoly8,
     namedpoly9,
-    namedpoly10,
-    namedpoly11,
+    # namedpoly10,
+    # namedpoly11,
     ]
 @testset "native examples: $t, $s, $m" for t in testfuns, s in system_solvers, m in linear_models
     t(verbose, s, m)
@@ -172,16 +173,16 @@ end
 
 @info("starting default JuMP examples tests")
 testfuns = [
-    run_JuMP_envelope_boxinterp,
-    run_JuMP_envelope_sampleinterp_box,
-    run_JuMP_envelope_sampleinterp_ball,
-    run_JuMP_expdesign,
-    run_JuMP_namedpoly_PSD, # TODO check: final objective doesn't match
-    run_JuMP_namedpoly_WSOS_primal,
-    run_JuMP_namedpoly_WSOS_dual,
-    run_JuMP_shapeconregr_PSD,
-    run_JuMP_shapeconregr_WSOS,
-    run_JuMP_densityest,
+    # run_JuMP_envelope_boxinterp,
+    # run_JuMP_envelope_sampleinterp_box,
+    # run_JuMP_envelope_sampleinterp_ball,
+    # run_JuMP_expdesign,
+    # run_JuMP_namedpoly_PSD, # TODO check: final objective doesn't match
+    # run_JuMP_namedpoly_WSOS_primal,
+    # run_JuMP_namedpoly_WSOS_dual,
+    # run_JuMP_shapeconregr_PSD,
+    # run_JuMP_shapeconregr_WSOS,
+    # run_JuMP_densityest,
     run_JuMP_sosmatrix_rand,
     run_JuMP_sosmatrix_a,
     run_JuMP_sosmatrix_poly_a,
@@ -204,36 +205,36 @@ testfuns = [
     t()
 end
 
-@info("starting additional JuMP examples tests")
-testfuns = [
-    namedpoly1_JuMP,
-    namedpoly2_JuMP,
-    namedpoly3_JuMP,
-    namedpoly4_JuMP, # numerically unstable
-    namedpoly5_JuMP,
-    namedpoly6_JuMP,
-    namedpoly7_JuMP,
-    namedpoly8_JuMP,
-    namedpoly9_JuMP,
-    namedpoly10_JuMP,
-    shapeconregr1_JuMP,
-    shapeconregr2_JuMP,
-    shapeconregr3_JuMP,
-    shapeconregr4_JuMP,
-    shapeconregr5_JuMP,
-    shapeconregr6_JuMP,
-    shapeconregr7_JuMP, # numerically unstable
-    shapeconregr8_JuMP,
-    shapeconregr9_JuMP, # numerically unstable
-    shapeconregr10_JuMP, # numerically unstable
-    shapeconregr11_JuMP, # numerically unstable
-    shapeconregr12_JuMP, # numerically unstable
-    shapeconregr13_JuMP, # numerically unstable
-    # shapeconregr14_JuMP, # throws out-of-memory error
-    # shapeconregr15_JuMP, # throws out-of-memory error
-    ]
-@testset "JuMP examples: $t" for t in testfuns
-    t()
-end
+# # @info("starting additional JuMP examples tests")
+# testfuns = [
+#     # namedpoly1_JuMP,
+#     # namedpoly2_JuMP,
+#     # namedpoly3_JuMP,
+#     # namedpoly4_JuMP, # numerically unstable
+#     # namedpoly5_JuMP,
+#     # namedpoly6_JuMP,
+#     # namedpoly7_JuMP,
+#     # namedpoly8_JuMP,
+#     # namedpoly9_JuMP,
+#     # namedpoly10_JuMP,
+#     shapeconregr1_JuMP,
+#     shapeconregr2_JuMP,
+#     shapeconregr3_JuMP,
+#     shapeconregr4_JuMP,
+#     shapeconregr5_JuMP,
+#     shapeconregr6_JuMP,
+#     shapeconregr7_JuMP, # numerically unstable
+#     shapeconregr8_JuMP,
+#     shapeconregr9_JuMP, # numerically unstable
+#     shapeconregr10_JuMP, # numerically unstable
+#     shapeconregr11_JuMP, # numerically unstable
+#     shapeconregr12_JuMP, # numerically unstable
+#     shapeconregr13_JuMP, # numerically unstable
+#     # shapeconregr14_JuMP, # throws out-of-memory error
+#     # shapeconregr15_JuMP, # throws out-of-memory error
+#     ]
+# @testset "JuMP examples: $t" for t in testfuns
+#     t()
+# end
 
 end
