@@ -2,10 +2,73 @@
 mutable struct QRCholCombinedHSDSystemSolver <: CombinedHSDSystemSolver
     Ap_RiQ1t # TODO maybe do this lazily
 
+    xi::Matrix{Float64}
+    yi::Matrix{Float64}
+    zi::Matrix{Float64}
+
+    x1
+    y1
+    z1
+    x2
+    y2
+    z2
+    x3
+    y3
+    z3
+    z_k
+    z1_k
+    z2_k
+    z3_k
+    zi_temp
+    z1_temp
+    z2_temp
+    z_temp_k
+    z1_temp_k
+    z2_temp_k
+    z3_temp_k
+
+    G_k
+    HG::Matrix{Float64}
+    HG_k
+
     function QRCholCombinedHSDSystemSolver(model::Models.PreprocessedLinearModel)
-        # (n, p, q) = (model.n, model.p, model.q)
+        (n, p, q) = (model.n, model.p, model.q)
         system_solver = new()
+
         system_solver.Ap_RiQ1t = model.Ap_R \ (model.Ap_Q1')
+
+        xi = Matrix{Float64}(undef, n, 3)
+        yi = Matrix{Float64}(undef, p, 3)
+        zi = Matrix{Float64}(undef, q, 3)
+        system_solver.xi = xi
+        system_solver.yi = yi
+        system_solver.zi = zi
+
+        system_solver.x1 = view(xi, :, 1)
+        system_solver.y1 = view(yi, :, 1)
+        system_solver.z1 = view(zi, :, 1)
+        system_solver.x2 = view(xi, :, 2)
+        system_solver.y2 = view(yi, :, 2)
+        system_solver.z2 = view(zi, :, 2)
+        system_solver.x3 = view(xi, :, 3)
+        system_solver.y3 = view(yi, :, 3)
+        system_solver.z3 = view(zi, :, 3)
+        system_solver.z_k = [view(zi, idxs, :) for idxs in model.cone_idxs]
+        system_solver.z1_k = [view(zi, idxs, 1) for idxs in model.cone_idxs]
+        system_solver.z2_k = [view(zi, idxs, 2) for idxs in model.cone_idxs]
+        system_solver.z3_k = [view(zi, idxs, 3) for idxs in model.cone_idxs]
+        zi_temp = similar(zi)
+        system_solver.zi_temp = zi_temp
+        system_solver.z1_temp = view(zi_temp, :, 1)
+        system_solver.z2_temp = view(zi_temp, :, 2)
+        system_solver.z_temp_k = [view(zi_temp, idxs, :) for idxs in model.cone_idxs]
+        system_solver.z1_temp_k = [view(zi_temp, idxs, 1) for idxs in model.cone_idxs]
+        system_solver.z2_temp_k = [view(zi_temp, idxs, 2) for idxs in model.cone_idxs]
+        system_solver.z3_temp_k = [view(zi_temp, idxs, 3) for idxs in model.cone_idxs]
+
+        system_solver.G_k = [view(model.G, idxs, :) for idxs in model.cone_idxs]
+        system_solver.HG = similar(model.G)
+        system_solver.HG_k = [view(system_solver.HG, idxs, :) for idxs in model.cone_idxs]
 
         return system_solver
     end
@@ -16,37 +79,92 @@ function get_combined_directions(solver::HSDSolver, system_solver::QRCholCombine
     cones = model.cones
     cone_idxs = model.cone_idxs
 
-    # TODO reduce allocs
-    xi = hcat(-model.c, solver.x_residual, zeros(model.n))
-    yi = hcat(model.b, -solver.y_residual, zeros(model.p))
-    zi = Matrix{Float64}(undef, model.q, 3)
+    xi = system_solver.xi
+    yi = system_solver.yi
+    zi = system_solver.zi
+    x1 = system_solver.x1
+    y1 = system_solver.y1
+    z1 = system_solver.z1
+    x2 = system_solver.x2
+    y2 = system_solver.y2
+    z2 = system_solver.z2
+    x3 = system_solver.x3
+    y3 = system_solver.y3
+    z3 = system_solver.z3
+    z_k = system_solver.z_k
+    z1_k = system_solver.z1_k
+    z2_k = system_solver.z2_k
+    z3_k = system_solver.z3_k
+    zi_temp = system_solver.zi_temp
+    z1_temp = system_solver.z1_temp
+    z2_temp = system_solver.z2_temp
+    z_temp_k = system_solver.z_temp_k
+    z1_temp_k = system_solver.z1_temp_k
+    z2_temp_k = system_solver.z2_temp_k
+    z3_temp_k = system_solver.z3_temp_k
+
+    G_k = system_solver.G_k
+    HG = system_solver.HG
+    HG_k = system_solver.HG_k
+
+    @timeit "setup xy" begin
+    @. x1 = -model.c
+    @. x2 = solver.x_residual
+    @. x3 = 0.0
+    @. y1 = model.b
+    @. y2 = -solver.y_residual
+    @. y3 = 0.0
+    end
+
+    @timeit "setup z" begin
+    @. z1_temp = model.h
+    @. z2_temp = -solver.z_residual
     for k in eachindex(cones)
         cone_k = cones[k]
         idxs = cone_idxs[k]
         duals_k = solver.point.dual_views[k]
+        grad_k = Cones.grad(cone_k)
         if Cones.use_dual(cone_k)
-            zi[idxs, 1] .= Cones.inv_hess(cone_k) * (model.h[idxs] / solver.mu)
-            zi[idxs, 2] .= Cones.inv_hess(cone_k) * ((duals_k - solver.z_residual[idxs]) / solver.mu)
-            zi[idxs, 3] .= Cones.inv_hess(cone_k) * (duals_k / solver.mu + Cones.grad(cone_k))
+            @. z1_temp_k[k] /= solver.mu
+            @. z2_temp_k[k] = (duals_k + z2_temp_k[k]) / solver.mu
+            @. z3_temp_k[k] = duals_k / solver.mu + grad_k
+            ldiv!(z_k[k], Cones.hess_fact(cone_k), z_temp_k[k])
         else
-            zi[idxs, 1] .= Cones.hess(cone_k) * (model.h[idxs] * solver.mu)
-            zi[idxs, 2] .= duals_k - Cones.hess(cone_k) * (solver.z_residual[idxs] * solver.mu)
-            zi[idxs, 3] .= duals_k + Cones.grad(cone_k) * solver.mu
+            @. z1_temp_k[k] *= solver.mu
+            @. z2_temp_k[k] *= solver.mu
+            mul!(z1_k[k], Cones.hess(cone_k), z1_temp_k[k])
+            mul!(z2_k[k], Cones.hess(cone_k), z2_temp_k[k])
+            @. z2_k[k] += duals_k
+            @. z3_k[k] = duals_k + grad_k * solver.mu
         end
     end
+    end
 
-    HG = Matrix{Float64}(undef, model.q, model.n)
+
+
+
+    # TODO multiply G by Ap_Q2 first, but then need to use hessian inverse etc later instead of HG or GHG
+    @timeit "HG" begin
     for k in eachindex(cones)
         cone_k = cones[k]
         idxs = cone_idxs[k]
         if Cones.use_dual(cone_k)
-            HG[idxs, :] .= Cones.inv_hess(cone_k) * model.G[idxs, :] / solver.mu
+            ldiv!(HG_k[k], Cones.hess_fact(cone_k), G_k[k])
+            @. HG_k[k] /= solver.mu
         else
-            HG[idxs, :] .= Cones.hess(cone_k) * model.G[idxs, :] * solver.mu
+            mul!(HG_k[k], Cones.hess(cone_k), G_k[k])
+            @. HG_k[k] *= solver.mu
         end
     end
+    end
+
+    # TODO remove allocs here
+    @timeit "GHG" begin
     GHG = Symmetric(model.G' * HG)
     Q2GHGQ2 = Symmetric(model.Ap_Q2' * GHG * model.Ap_Q2)
+    end
+
+    @timeit "fact" begin
     Q2GHGQ2_fact = cholesky!(Q2GHGQ2, Val(true), check = false)
     singular = !isposdef(Q2GHGQ2_fact)
     # Q2GHGQ2_fact = bunchkaufman!(Q2GHGQ2, true, check = false)
@@ -68,7 +186,9 @@ function get_combined_directions(solver::HSDSolver, system_solver::QRCholCombine
             error("could not fix singular Q2GHGQ2")
         end
     end
+    end
 
+    @timeit "post fact" begin
     xGHz = xi + model.G' * zi
     # if singular
     #     xGHz += model.A' * yi # TODO should this be minus
@@ -82,8 +202,10 @@ function get_combined_directions(solver::HSDSolver, system_solver::QRCholCombine
     y = system_solver.Ap_RiQ1t * (xGHz - GHG * x)
 
     z = HG * x - zi
+    end
 
     # combine
+    @timeit "lift" begin
     x1 = view(x, :, 1)
     y1 = view(y, :, 1)
     z1 = view(z, :, 1)
@@ -103,6 +225,7 @@ function get_combined_directions(solver::HSDSolver, system_solver::QRCholCombine
     s_sol = -model.G * x_sol + model.h * tau_sol - [solver.z_residual  zeros(model.q)]
 
     kap_sol = -model.c' * x_sol - model.b' * y_sol - model.h' * z_sol - tau_rhs
+    end
 
     return (x_sol, y_sol, z_sol, s_sol, tau_sol, kap_sol)
 end
