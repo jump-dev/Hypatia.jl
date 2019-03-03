@@ -47,7 +47,7 @@ function production_data()
 end
 
 function run_hard_shapeconregr()
-    degrees = 4:2:4
+    degrees = 6:2:8
 
     datasets = [
         production_data,

@@ -3,8 +3,6 @@ mutable struct CombinedHSDStepper <: HSDStepper
     system_solver::CombinedHSDSystemSolver
     max_nbhd::Float64
 
-    z_dir::Vector{Float64}
-    s_dir::Vector{Float64}
     prev_affine_alpha::Float64
     prev_affine_alpha_iters::Int
     prev_gamma::Float64
@@ -29,8 +27,6 @@ mutable struct CombinedHSDStepper <: HSDStepper
         stepper.system_solver = system_solver
         stepper.max_nbhd = max_nbhd
 
-        stepper.z_dir = similar(model.h)
-        stepper.s_dir = similar(model.h)
         stepper.prev_affine_alpha = 0.9999
         stepper.prev_affine_alpha_iters = 0
         stepper.prev_gamma = 0.9999
@@ -52,49 +48,47 @@ end
 function step(solver::HSDSolver, stepper::CombinedHSDStepper)
     model = solver.model
     point = solver.point
-    z_dir = stepper.z_dir
-    s_dir = stepper.s_dir
 
     # calculate affine/prediction and correction directions
-    @timeit "directions" (x_dirs, y_dirs, z_dirs, s_dirs, tau_dirs, kap_dirs) = get_combined_directions(solver, stepper.system_solver)
+    @timeit "directions" (x_pred, x_corr, y_pred, y_corr, z_pred, z_corr, s_pred, s_corr, tau_pred, tau_corr, kap_pred, kap_corr) = get_combined_directions(solver, stepper.system_solver)
 
     # calculate correction factor gamma by finding distance affine_alpha for stepping in affine direction
-    @. @views z_dir = z_dirs[:, 1]
-    @. @views s_dir = s_dirs[:, 1]
-    @timeit "aff alpha" (affine_alpha, affine_alpha_iters) = find_max_alpha_in_nbhd(z_dir, s_dir, tau_dirs[1], kap_dirs[1], 0.9999, stepper.prev_affine_alpha, stepper, solver)
+    @timeit "aff alpha" (affine_alpha, affine_alpha_iters) = find_max_alpha_in_nbhd(z_pred, s_pred, tau_pred, kap_pred, 0.9999, stepper.prev_affine_alpha, stepper, solver)
     gamma = (1.0 - affine_alpha)^3 # TODO allow different function (heuristic)
     stepper.prev_affine_alpha = affine_alpha
     stepper.prev_affine_alpha_iters = affine_alpha_iters
     stepper.prev_gamma = gamma
 
     # find distance alpha for stepping in combined direction
-    comb_scaling = [1.0 - gamma, gamma]
-    mul!(z_dir, z_dirs, comb_scaling)
-    mul!(s_dir, s_dirs, comb_scaling)
-    tau_comb = dot(tau_dirs, comb_scaling)
-    kap_comb = dot(kap_dirs, comb_scaling)
-    @timeit "comb alpha" (alpha, alpha_iters) = find_max_alpha_in_nbhd(z_dir, s_dir, tau_comb, kap_comb, stepper.max_nbhd, stepper.prev_alpha, stepper, solver)
+    z_comb = z_pred
+    s_comb = s_pred
+    pred_factor = 1.0 - gamma
+    @. z_comb = pred_factor * z_pred + gamma * z_corr
+    @. s_comb = pred_factor * s_pred + gamma * s_corr
+    tau_comb = pred_factor * tau_pred + gamma * tau_corr
+    kap_comb = pred_factor * kap_pred + gamma * kap_corr
+    @timeit "comb alpha" (alpha, alpha_iters) = find_max_alpha_in_nbhd(z_comb, s_comb, tau_comb, kap_comb, stepper.max_nbhd, stepper.prev_alpha, stepper, solver)
     if iszero(alpha)
         # could not step far in combined direction, so perform a pure correction step
         println("performing correction step")
-        comb_scaling = [0.0, 1.0]
-        @. @views z_dir = z_dirs[:, 2]
-        @. @views s_dir = s_dirs[:, 2]
-        tau_comb = dot(tau_dirs, comb_scaling)
-        kap_comb = dot(kap_dirs, comb_scaling)
-        @timeit "corr alpha" (alpha, corr_alpha_iters) = find_max_alpha_in_nbhd(z_dir, s_dir, tau_comb, kap_comb, stepper.max_nbhd, 0.9999, stepper, solver)
+        z_comb = z_corr
+        s_comb = s_corr
+        tau_comb = tau_corr
+        kap_comb = kap_corr
+        @timeit "corr alpha" (alpha, corr_alpha_iters) = find_max_alpha_in_nbhd(z_comb, s_comb, tau_comb, kap_comb, stepper.max_nbhd, 0.9999, stepper, solver)
         alpha_iters += corr_alpha_iters
+        @. point.x += alpha * x_corr
+        @. point.y += alpha * y_corr
+    else
+        @. point.x += alpha * (pred_factor * x_pred + gamma * x_corr)
+        @. point.y += alpha * (pred_factor * y_pred + gamma * y_corr)
     end
     stepper.prev_alpha = alpha
     stepper.prev_alpha_iters = alpha_iters
 
     # step distance alpha in combined direction
-    # BLAS.gemv!(tA, alpha, A, x, beta, y)
-    # Update the vector y as alpha*A*x + beta*y or alpha*A'x + beta*y according to tA. alpha and beta are scalars. Return the updated y.
-    BLAS.gemv!('N', alpha, x_dirs, comb_scaling, 1.0, point.x)
-    BLAS.gemv!('N', alpha, y_dirs, comb_scaling, 1.0, point.y)
-    @. point.z += alpha * z_dir
-    @. point.s += alpha * s_dir
+    @. point.z += alpha * z_comb
+    @. point.s += alpha * s_comb
     solver.tau += alpha * tau_comb
     solver.kap += alpha * kap_comb
     calc_mu(solver)
