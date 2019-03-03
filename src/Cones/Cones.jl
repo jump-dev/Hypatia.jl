@@ -45,7 +45,7 @@ end
 grad(cone::Cone) = cone.g
 hess(cone::Cone) = Symmetric(cone.H, :U)
 inv_hess(cone::Cone) = inv(cone.F)
-# hess_fact(cone::Cone) = cone.F
+hess_fact(cone::Cone) = cone.F
 # hessL(cone::Cone) = cone.F.L
 # inv_hessL(cone::Cone) = inv(cone.F.L)
 # hess_prod!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::Cone) = mul!(prod, cone.H, arr)
