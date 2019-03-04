@@ -284,12 +284,20 @@ function approxfekete_data(n::Int, d::Int, calc_w::Bool)
     return (U, pts, P0, P0sub, w)
 end
 
-function choose_interp_pts!(M::Matrix{Float64}, candidate_pts::Matrix{Float64}, deg::Int, U::Int)
+# indices of points to keep and quadrature weights at those points
+function choose_interp_pts!(
+    M::Matrix{Float64},
+    candidate_pts::Matrix{Float64},
+    deg::Int,
+    U::Int,
+    calc_w::Bool,
+    )
+
     n = size(candidate_pts, 2)
     u = calc_u(n, deg, candidate_pts)
     m = Vector{Float64}(undef, U)
     m[1] = 2^n
-    M[:,1] .= 1.0
+    M[:, 1] .= 1.0
 
     col = 1
     for t in 1:deg
@@ -307,7 +315,13 @@ function choose_interp_pts!(M::Matrix{Float64}, candidate_pts::Matrix{Float64}, 
         end
     end
     F = qr!(Array(M'), Val(true))
-    return F.p[1:U]
+    if calc_w
+        Qtm = F.Q' * m
+        w = UpperTriangular(F.R[:, 1:U]) \ Qtm
+    else
+        w = Float64[]
+    end
+    return (F.p[1:U], w)
 end
 
 function make_wsos_arrays(
@@ -321,18 +335,11 @@ function make_wsos_arrays(
 
     (npts, n) = size(candidate_pts)
     M = Matrix{Float64}(undef, npts, U)
-    keep_pnt = choose_interp_pts!(M, candidate_pts, deg, U)
-    pts = candidate_pts[keep_pnt, :]
-    P0 = M[keep_pnt, 1:L] # subset of polynomial evaluations up to total degree d
+    (keep_pts, w) = choose_interp_pts!(M, candidate_pts, deg, U, calc_w)
+    pts = candidate_pts[keep_pts, :]
+    P0 = M[keep_pts, 1:L] # subset of polynomial evaluations up to total degree d
     subd = div(deg - get_degree(dom), 2)
     P0sub = view(P0, :, 1:binomial(n + subd, n))
-
-    if calc_w
-        Qtm = F.Q' * m
-        w = UpperTriangular(F.R[:, 1:U]) \ Qtm
-    else
-        w = Float64[]
-    end
 
     return (pts, P0, P0sub, w)
 end
@@ -354,13 +361,13 @@ function wsos_sample_params(
 end
 
 # TODO should work without sampling too
-function get_interp_pts(dom::Domain, deg::Int; sample_factor::Int = 10)
+function get_interp_pts(dom::Domain, deg::Int; sample_factor::Int = 10, calc_w::Bool = false)
     n = get_dimension(dom)
     U = binomial(n + deg, n)
     candidate_pts = interp_sample(dom, U * sample_factor)
     M = Matrix{Float64}(undef, size(candidate_pts, 1), U)
-    keep_pnt = choose_interp_pts!(M, candidate_pts, deg, U)
-    return candidate_pts[keep_pnt, :]
+    (keep_pts, w) = choose_interp_pts!(M, candidate_pts, deg, U, calc_w)
+    return (candidate_pts[keep_pts, :], w)
 end
 
 function recover_lagrange_polys(pts::Matrix{Float64}, deg::Int)
