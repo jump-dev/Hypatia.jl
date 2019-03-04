@@ -50,16 +50,21 @@ function step(solver::HSDSolver, stepper::CombinedHSDStepper)
     point = solver.point
 
     # calculate affine/prediction and correction directions
-    @timeit "directions" (x_pred, x_corr, y_pred, y_corr, z_pred, z_corr, s_pred, s_corr, tau_pred, tau_corr, kap_pred, kap_corr) = get_combined_directions(solver, stepper.system_solver)
+    # @timeit "directions" begin
+    (x_pred, x_corr, y_pred, y_corr, z_pred, z_corr, s_pred, s_corr, tau_pred, tau_corr, kap_pred, kap_corr) = get_combined_directions(solver, stepper.system_solver)
+    # end
 
     # calculate correction factor gamma by finding distance affine_alpha for stepping in affine direction
-    @timeit "aff alpha" (affine_alpha, affine_alpha_iters) = find_max_alpha_in_nbhd(z_pred, s_pred, tau_pred, kap_pred, 0.9999, stepper.prev_affine_alpha, stepper, solver)
+    # @timeit "aff alpha" begin
+    (affine_alpha, affine_alpha_iters) = find_max_alpha_in_nbhd(z_pred, s_pred, tau_pred, kap_pred, 0.9999, stepper.prev_affine_alpha, stepper, solver)
     gamma = (1.0 - affine_alpha)^3 # TODO allow different function (heuristic)
     stepper.prev_affine_alpha = affine_alpha
     stepper.prev_affine_alpha_iters = affine_alpha_iters
     stepper.prev_gamma = gamma
+    # end
 
     # find distance alpha for stepping in combined direction
+    # @timeit "comb alpha"
     z_comb = z_pred
     s_comb = s_pred
     pred_factor = 1.0 - gamma
@@ -67,16 +72,21 @@ function step(solver::HSDSolver, stepper::CombinedHSDStepper)
     @. s_comb = pred_factor * s_pred + gamma * s_corr
     tau_comb = pred_factor * tau_pred + gamma * tau_corr
     kap_comb = pred_factor * kap_pred + gamma * kap_corr
-    @timeit "comb alpha" (alpha, alpha_iters) = find_max_alpha_in_nbhd(z_comb, s_comb, tau_comb, kap_comb, stepper.max_nbhd, stepper.prev_alpha, stepper, solver)
+    (alpha, alpha_iters) = find_max_alpha_in_nbhd(z_comb, s_comb, tau_comb, kap_comb, stepper.max_nbhd, stepper.prev_alpha, stepper, solver)
+    # end
+
     if iszero(alpha)
         # could not step far in combined direction, so perform a pure correction step
         println("performing correction step")
+        # @timeit "corr alpha" begin
         z_comb = z_corr
         s_comb = s_corr
         tau_comb = tau_corr
         kap_comb = kap_corr
-        @timeit "corr alpha" (alpha, corr_alpha_iters) = find_max_alpha_in_nbhd(z_comb, s_comb, tau_comb, kap_comb, stepper.max_nbhd, 0.9999, stepper, solver)
+        (alpha, corr_alpha_iters) = find_max_alpha_in_nbhd(z_comb, s_comb, tau_comb, kap_comb, stepper.max_nbhd, 0.9999, stepper, solver)
         alpha_iters += corr_alpha_iters
+        # end
+
         @. point.x += alpha * x_corr
         @. point.y += alpha * y_corr
     else

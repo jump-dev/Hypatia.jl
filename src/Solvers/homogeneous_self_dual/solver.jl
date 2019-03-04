@@ -118,7 +118,7 @@ get_tau(solver::HSDSolver) = solver.tau
 get_kappa(solver::HSDSolver) = solver.kap
 get_mu(solver::HSDSolver) = solver.mu
 
-using TimerOutputs
+# using TimerOutputs
 
 # TODO maybe use iteration interface rather than while loop
 function solve(solver::HSDSolver)
@@ -130,16 +130,22 @@ function solve(solver::HSDSolver)
         error("initial mu is $(solver.mu) (should be 1.0)")
     end
 
-    reset_timer!()
+    # reset_timer!()
 
     while true
-        @timeit "res" calc_residual(solver)
+        # @timeit "res" begin
+        calc_residual(solver)
+        # end
 
-        @timeit "conv" calc_convergence_params(solver)
+        # @timeit "conv" begin
+        calc_convergence_params(solver)
+        # end
 
         solver.verbose && print_iteration_stats(solver, solver.stepper)
 
-        @timeit "check" check_convergence(solver) && break
+        # @timeit "check" begin
+        check_convergence(solver) && break
+        # end
 
         if solver.num_iters == solver.max_iters
             solver.verbose && println("iteration limit reached; terminating")
@@ -154,12 +160,14 @@ function solve(solver::HSDSolver)
         end
 
         # TODO may use different function, or function could change during some iteration eg if numerical difficulties
-        @timeit "step" step(solver, solver.stepper)
+        # @timeit "step" begin
+        step(solver, solver.stepper)
+        # end
 
         solver.num_iters += 1
     end
 
-    print_timer()
+    # print_timer()
 
     # calculate result and iteration statistics and finish
     point = solver.point
