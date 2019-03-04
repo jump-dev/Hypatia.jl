@@ -84,14 +84,12 @@ function check_in_cone(cone::WSOSPolyInterp)
         end
     end
 
-    @timeit "inv hess" begin
     @. cone.H2 = cone.H
     cone.F = cholesky!(Symmetric(cone.H2, :U), Val(true), check = false)
     if !isposdef(cone.F)
         return false
     end
     cone.Hi .= inv(cone.F)
-    end
 
     return true
 end

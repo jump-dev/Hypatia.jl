@@ -44,11 +44,11 @@ include(joinpath(@__DIR__, "JuMP.jl"))
 
 @testset "Hypatia tests" begin
 
-# @info("starting interpolation tests")
-# @testset "interpolation tests" begin
-#     fekete_sample()
-#     test_recover_lagrange_polys()
-# end
+@info("starting interpolation tests")
+@testset "interpolation tests" begin
+    fekete_sample()
+    test_recover_lagrange_polys()
+end
 
 @info("starting native interface tests")
 verbose = true
@@ -211,36 +211,36 @@ testfuns = [
     t()
 end
 
-# # @info("starting additional JuMP examples tests")
-# testfuns = [
-#     namedpoly1_JuMP,
-#     namedpoly2_JuMP,
-#     namedpoly3_JuMP,
-#     namedpoly4_JuMP, # numerically unstable
-#     namedpoly5_JuMP,
-#     namedpoly6_JuMP,
-#     namedpoly7_JuMP,
-#     namedpoly8_JuMP,
-#     namedpoly9_JuMP,
-#     namedpoly10_JuMP,
-#     shapeconregr1_JuMP,
-#     shapeconregr2_JuMP,
-#     shapeconregr3_JuMP,
-#     shapeconregr4_JuMP,
-#     shapeconregr5_JuMP,
-#     shapeconregr6_JuMP,
-#     shapeconregr7_JuMP, # numerically unstable
-#     shapeconregr8_JuMP,
-#     shapeconregr9_JuMP, # numerically unstable
-#     shapeconregr10_JuMP, # numerically unstable
-#     shapeconregr11_JuMP, # numerically unstable
-#     shapeconregr12_JuMP, # numerically unstable
-#     shapeconregr13_JuMP, # numerically unstable
-#     # shapeconregr14_JuMP, # throws out-of-memory error
-#     # shapeconregr15_JuMP, # throws out-of-memory error
-#     ]
-# @testset "JuMP examples: $t" for t in testfuns
-#     t()
-# end
+# @info("starting additional JuMP examples tests")
+testfuns = [
+    namedpoly1_JuMP,
+    namedpoly2_JuMP,
+    namedpoly3_JuMP,
+    namedpoly4_JuMP, # numerically unstable
+    namedpoly5_JuMP,
+    namedpoly6_JuMP,
+    namedpoly7_JuMP,
+    namedpoly8_JuMP,
+    namedpoly9_JuMP,
+    namedpoly10_JuMP,
+    shapeconregr1_JuMP,
+    shapeconregr2_JuMP,
+    shapeconregr3_JuMP,
+    shapeconregr4_JuMP,
+    shapeconregr5_JuMP,
+    shapeconregr6_JuMP,
+    shapeconregr7_JuMP, # numerically unstable
+    shapeconregr8_JuMP,
+    shapeconregr9_JuMP, # numerically unstable
+    shapeconregr10_JuMP, # numerically unstable
+    shapeconregr11_JuMP, # numerically unstable
+    shapeconregr12_JuMP, # numerically unstable
+    shapeconregr13_JuMP, # numerically unstable
+    # shapeconregr14_JuMP, # throws out-of-memory error
+    # shapeconregr15_JuMP, # throws out-of-memory error
+    ]
+@testset "JuMP examples: $t" for t in testfuns
+    t()
+end
 
 end
