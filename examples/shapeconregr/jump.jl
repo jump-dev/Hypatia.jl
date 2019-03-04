@@ -107,21 +107,21 @@ function build_shapeconregr_PSD(
 
     (x, p) = add_loss_and_polys(model, X, y, regressor_deg, use_lsq_obj)
 
-    mono_bss = MU.get_domain_inequalities(shape_data.mono_dom, x)
-    conv_bss = MU.get_domain_inequalities(shape_data.conv_dom, x)
+    monotonic_set = MU.get_domain_inequalities(shape_data.mono_dom, x)
+    convex_set = MU.get_domain_inequalities(shape_data.conv_dom, x)
 
     # monotonicity
     for j in 1:n
         if !iszero(shape_data.mono_profile[j])
             gradient = DP.differentiate(p, x[j])
-            JuMP.@constraint(model, shape_data.mono_profile[j] * gradient >= 0, domain = mono_bss)
+            JuMP.@constraint(model, shape_data.mono_profile[j] * gradient >= 0, domain = monotonic_set)
         end
     end
 
     # convexity
     if !iszero(shape_data.conv_profile)
         hessian = DP.differentiate(p, x, 2)
-        JuMP.@constraint(model, shape_data.conv_profile * hessian in JuMP.PSDCone(), domain = conv_bss)
+        JuMP.@constraint(model, shape_data.conv_profile * hessian in JuMP.PSDCone(), domain = convex_set)
     end
 
     return p
@@ -132,7 +132,7 @@ function build_shapeconregr_WSOS_PolyJuMP(
     X::Matrix{Float64},
     y::Vector{Float64},
     r::Int,
-    shapedata::ShapeData;
+    shape_data::ShapeData;
     use_lsq_obj::Bool = true,
     sample::Bool = true,
     rseed::Int = 1,
@@ -141,8 +141,8 @@ function build_shapeconregr_WSOS_PolyJuMP(
     d = div(r + 1, 2)
     n = size(X, 2)
 
-    (mono_U, mono_pts, mono_P0, mono_PWts, _) = MU.interpolate(shapedata.mono_dom, d, sample = sample, sample_factor = 50)
-    (conv_U, conv_pts, conv_P0, conv_PWts, _) = MU.interpolate(shapedata.conv_dom, d - 1, sample = sample, sample_factor = 50)
+    (mono_U, mono_pts, mono_P0, mono_PWts, _) = MU.interpolate(shape_data.mono_dom, d, sample = sample, sample_factor = 50)
+    (conv_U, conv_pts, conv_P0, conv_PWts, _) = MU.interpolate(shape_data.conv_dom, d - 1, sample = sample, sample_factor = 50)
     mono_wsos_cone = HYP.WSOSPolyInterpCone(mono_U, [mono_P0, mono_PWts...])
     conv_wsos_cone = HYP.WSOSPolyInterpMatCone(n, conv_U, [conv_P0, conv_PWts...])
 
@@ -150,16 +150,16 @@ function build_shapeconregr_WSOS_PolyJuMP(
 
     # monotonicity
     for j in 1:n
-        if !iszero(shapedata.mono_profile[j])
+        if !iszero(shape_data.mono_profile[j])
             dpj = DynamicPolynomials.differentiate(p, x[j])
-            JuMP.@constraint(model, [shapedata.mono_profile[j] * dpj(mono_pts[u, :]) for u in 1:mono_U] in mono_wsos_cone)
+            JuMP.@constraint(model, [shape_data.mono_profile[j] * dpj(mono_pts[u, :]) for u in 1:mono_U] in mono_wsos_cone)
         end
     end
 
     # convexity
-    if !iszero(shapedata.conv_profile)
+    if !iszero(shape_data.conv_profile)
         Hp = DynamicPolynomials.differentiate(p, x, 2)
-        JuMP.@constraint(model, [shapedata.conv_profile * Hp[i, j](conv_pts[u, :]) * (i == j ? 1.0 : rt2) for i in 1:n for j in 1:i for u in 1:conv_U] in conv_wsos_cone)
+        JuMP.@constraint(model, [shape_data.conv_profile * Hp[i, j](conv_pts[u, :]) * (i == j ? 1.0 : rt2) for i in 1:n for j in 1:i for u in 1:conv_U] in conv_wsos_cone)
     end
 
     return p
@@ -177,14 +177,14 @@ function build_shapeconregr_WSOS(
     )
     Random.seed!(rseed)
 
-    derivative_d = div(regressor_deg, 2)
+    gradient_d = div(regressor_deg, 2)
     hessian_d = div(regressor_deg - 1, 2)
     (num_points, n) = size(X)
 
     regressor_points = MU.get_interp_pts(MU.FreeDomain(n), regressor_deg, sample_factor = 50)
     regressor_U = size(regressor_points, 1)
 
-    (mono_U, mono_points, mono_P0, mono_PWts, _) = MU.interpolate(shape_data.mono_dom, derivative_d, sample = sample, sample_factor = 50)
+    (mono_U, mono_points, mono_P0, mono_PWts, _) = MU.interpolate(shape_data.mono_dom, gradient_d, sample = sample, sample_factor = 50)
     (conv_U, conv_points, conv_P0, conv_PWts, _) = MU.interpolate(shape_data.conv_dom, hessian_d, sample = sample, sample_factor = 50)
     mono_wsos_cone = HYP.WSOSPolyInterpCone(mono_U, [mono_P0, mono_PWts...])
     conv_wsos_cone = HYP.WSOSPolyInterpMatCone(n, conv_U, [conv_P0, conv_PWts...])
@@ -208,7 +208,7 @@ function build_shapeconregr_WSOS(
     # monotonicity
     for j in 1:n
         if !iszero(shape_data.mono_profile[j])
-            gradient = DP.differentiate(regressor_poly, DP.variables(regressor_poly)[j]) # TODO hack because lagrange polynomial may not have vars in all dimensions although unlikely
+            gradient = DP.differentiate(regressor_poly, DP.variables(regressor_poly)[j])
             JuMP.@constraint(model, [shape_data.mono_profile[j] * gradient(mono_points[u, :]) for u in 1:mono_U] in mono_wsos_cone)
         end
     end
@@ -220,7 +220,7 @@ function build_shapeconregr_WSOS(
             for i in 1:n for j in 1:i for u in 1:conv_U] in conv_wsos_cone)
     end
 
-    return regressor, lagrange_polys
+    return (regressor, lagrange_polys)
 end
 
 function run_JuMP_shapeconregr(use_wsos::Bool; dense::Bool = true, use_PolyJuMP::Bool = false)
@@ -235,21 +235,21 @@ function run_JuMP_shapeconregr(use_wsos::Bool; dense::Bool = true, use_PolyJuMP:
         # (2, 4, 100, 0.0, x -> -sum(x.^4))
         # (2, 4, 100, 0.0, x -> sum(x)^2)
 
-    shapedata = ShapeData(n)
+    shape_data = ShapeData(n)
     (X, y) = generate_regr_data(f, -1.0, 1.0, n, num_points, signal_ratio = signal_ratio)
 
     if use_wsos
         if use_PolyJuMP
             model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, use_dense = dense))
-            p = build_shapeconregr_WSOS_PolyJuMP(model, X, y, deg, shapedata)
+            p = build_shapeconregr_WSOS_PolyJuMP(model, X, y, deg, shape_data)
         else
             model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, use_dense = dense))
-            (coeffs, polys) = build_shapeconregr_WSOS(model, X, y, deg, shapedata)
+            (coeffs, polys) = build_shapeconregr_WSOS(model, X, y, deg, shape_data)
             p = JuMP.dot(coeffs, polys)
         end
     else
         model = SumOfSquares.SOSModel(JuMP.with_optimizer(HYP.Optimizer, verbose = true, use_dense = dense))
-        p = build_shapeconregr_PSD(model, X, y, deg, shapedata)
+        p = build_shapeconregr_PSD(model, X, y, deg, shape_data)
     end
 
     JuMP.optimize!(model)
