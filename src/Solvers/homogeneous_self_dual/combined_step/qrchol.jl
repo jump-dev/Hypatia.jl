@@ -189,7 +189,8 @@ function get_combined_directions(solver::HSDSolver, system_solver::QRCholCombine
             @. z1_temp_k[k] /= mu
             @. z2_temp_k[k] = (duals_k + z2_temp_k[k]) / mu
             @. z3_temp_k[k] = duals_k / mu + grad_k
-            ldiv!(z_k[k], Cones.hess_fact(cone_k), z_temp_k[k])
+            # ldiv!(z_k[k], Cones.hess_fact(cone_k), z_temp_k[k])
+            mul!(z_k[k], Cones.inv_hess(cone_k), z_temp_k[k])
         else
             @. z1_temp_k[k] *= mu
             @. z2_temp_k[k] *= mu
@@ -205,7 +206,8 @@ function get_combined_directions(solver::HSDSolver, system_solver::QRCholCombine
         for k in eachindex(cones)
             cone_k = cones[k]
             if Cones.use_dual(cone_k)
-                ldiv!(prod_k[k], Cones.hess_fact(cone_k), arr_k[k])
+                # ldiv!(prod_k[k], Cones.hess_fact(cone_k), arr_k[k])
+                mul!(prod_k[k], Cones.inv_hess(cone_k), arr_k[k])
                 prod_k[k] ./= mu
             else
                 mul!(prod_k[k], Cones.hess(cone_k), arr_k[k])

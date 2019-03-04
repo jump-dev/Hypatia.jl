@@ -44,7 +44,8 @@ end
 
 grad(cone::Cone) = cone.g
 hess(cone::Cone) = Symmetric(cone.H, :U)
-inv_hess(cone::Cone) = inv(cone.F)
+# inv_hess(cone::Cone) = inv(cone.F)
+inv_hess(cone::Cone) = Symmetric(cone.Hi, :U)
 hess_fact(cone::Cone) = cone.F
 # hessL(cone::Cone) = cone.F.L
 # inv_hessL(cone::Cone) = inv(cone.F.L)
