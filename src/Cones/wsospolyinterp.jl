@@ -18,7 +18,6 @@ mutable struct WSOSPolyInterp <: Cone
     point::AbstractVector{Float64}
     g::Vector{Float64}
     H::Matrix{Float64}
-    Hi::Matrix{Float64}
     H2::Matrix{Float64}
     Hi::Matrix{Float64}
     F # TODO prealloc
@@ -36,7 +35,6 @@ mutable struct WSOSPolyInterp <: Cone
         cone.ipwt = ipwt
         cone.g = similar(ipwt[1], dim)
         cone.H = similar(ipwt[1], dim, dim)
-        cone.Hi = similar(ipwt[1], dim, dim)
         cone.H2 = similar(cone.H)
         cone.Hi = similar(cone.H)
         cone.tmp1 = [similar(ipwt[1], size(ipwtj, 2), size(ipwtj, 2)) for ipwtj in ipwt]
@@ -53,6 +51,7 @@ get_nu(cone::WSOSPolyInterp) = sum(size(ipwtj, 2) for ipwtj in cone.ipwt)
 set_initial_point(arr::AbstractVector{Float64}, cone::WSOSPolyInterp) = (@. arr = 1.0; arr)
 
 function check_in_cone(cone::WSOSPolyInterp)
+    @timeit "in scalar cone" begin
     @. cone.g = 0.0
     @. cone.H = 0.0
     @. cone.Hi = 0.0
@@ -80,7 +79,7 @@ function check_in_cone(cone::WSOSPolyInterp)
         BLAS.syrk!('U', 'T', 1.0, tmp2j, 0.0, tmp3)
 
         # inv_Hj = (ipwtj * ipwtj' * Diagonal(cone.point) * ipwtj * ipwtj').^2
-        cone.Hi += inv((ipwtj * inv(ipwtj' * Diagonal(cone.point) * ipwtj) * ipwtj').^2)
+        # cone.Hi += inv((ipwtj * inv(ipwtj' * Diagonal(cone.point) * ipwtj) * ipwtj').^2)
 
         @inbounds for j in eachindex(cone.g)
             cone.g[j] -= tmp3[j, j]
@@ -91,14 +90,52 @@ function check_in_cone(cone::WSOSPolyInterp)
     end
 
     @. cone.H2 = cone.H
-    cone.F = cholesky!(Symmetric(cone.H2, :U), Val(true), check = false)
+    @timeit "cone cholesky" cone.F = cholesky!(Symmetric(cone.H2, :U), Val(true), check = false)
     if !isposdef(cone.F)
         return false
     end
-    cone.Hi .= inv(cone.F)
+    @timeit "hessian inv" cone.Hi .= inv(cone.F)
+    # @show cone.Hi -  (cone.ipwt[1] \ cone.ipwt[1] * Diagonal(cone.point) * cone.ipwt[1]' * cone.ipwt[1]' \ Matrix(I, cone.dim, cone.dim))
+    @show cone.Hi ./ Hinvid(cone.ipwt[1], cone.point)
+
+end
 
     return true
     # return factorize_hess(cone)
 end
 
-inv_hess(cone::WSOSPolyInterp) = Symmetric(cone.Hi, :U)
+
+function Harr(ipwtj, x, arr)
+    lambda_arr = ipwtj' * Diagonal(arr) * ipwtj
+    lambda_x = ipwtj' * Diagonal(x) * ipwtj
+    lambda_x_inv = inv(lambda_x)
+    return diag(ipwtj * lambda_x_inv * lambda_arr * lambda_x_inv * ipwtj')
+end
+
+function Hinvarr(ipwtj, x, arr)
+    lambda_arr = ipwtj' * Diagonal(arr) * ipwtj
+    lambda_x = ipwtj' * Diagonal(x) * ipwtj
+    return diag(ipwtj * lambda_x * lambda_arr * lambda_x * ipwtj')
+end
+
+function Hid(ipwtj, x)
+    U = size(ipwtj, 1)
+    H = zeros(U, U)
+    for i in 1:U
+        ei = zeros(U)
+        ei[i] = 1.0
+        H[:, i] = Harr(ipwtj, x, ei)
+    end
+    H
+end
+
+function Hinvid(ipwtj, x)
+    U = size(ipwtj, 1)
+    H = zeros(U, U)
+    for i in 1:U
+        ei = zeros(U)
+        ei[i] = 1.0
+        H[:, i] = Hinvarr(ipwtj, x, ei)
+    end
+    H
+end
