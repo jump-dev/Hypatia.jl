@@ -65,8 +65,6 @@ function check_in_cone(cone::EpiNormEucl)
     return true
 end
 
-# calcg!(g::AbstractVector{Float64}, cone::EpiNormEucl) = (@. g = cone.point / dist; g[1] = -g[1]; g)
-# calcHiarr!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::EpiNormEucl) = mul!(prod, cone.Hi, arr)
-# calcHarr!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::EpiNormEucl) = mul!(prod, cone.H, arr)
-
 inv_hess(cone::EpiNormEucl) = Symmetric(cone.Hi, :U)
+
+inv_hess_prod!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::EpiNormEucl) = mul!(prod, Symmetric(cone.Hi, :U), arr)

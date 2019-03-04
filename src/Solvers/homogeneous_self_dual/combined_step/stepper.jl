@@ -189,8 +189,8 @@ function find_max_alpha_in_nbhd(z_dir::AbstractVector{Float64}, s_dir::AbstractV
 
                         # modifies dual_views
                         stepper.dual_views[k] .+= mu_temp .* Cones.grad(cone_k)
-                        # TODO use cholesky L
-                        mul!(stepper.nbhd_temp[k], Cones.inv_hess(cone_k), stepper.dual_views[k])
+                        Cones.inv_hess_prod!(stepper.nbhd_temp[k], stepper.dual_views[k], cone_k)
+                        # mul!(stepper.nbhd_temp[k], Cones.inv_hess(cone_k), stepper.dual_views[k])
                         nbhd_sqr_k = dot(stepper.dual_views[k], stepper.nbhd_temp[k])
 
                         if nbhd_sqr_k <= -1e-5

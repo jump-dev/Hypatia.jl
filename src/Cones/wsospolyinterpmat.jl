@@ -158,8 +158,8 @@ function check_in_cone(cone::WSOSPolyInterpMat)
     end
     cone.Hi .= inv(cone.F)
     end
-    
+
     return true
-    # ret = @timeit "fact hess" factorize_hess(cone)
-    # return ret
 end
+
+inv_hess_prod!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::WSOSPolyInterpMat) = mul!(prod, Symmetric(cone.Hi, :U), arr)

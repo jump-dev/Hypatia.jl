@@ -44,13 +44,12 @@ end
 
 grad(cone::Cone) = cone.g
 hess(cone::Cone) = Symmetric(cone.H, :U)
-# inv_hess(cone::Cone) = inv(cone.F)
-inv_hess(cone::Cone) = Symmetric(cone.Hi, :U)
+inv_hess(cone::Cone) = inv(cone.F)
 hess_fact(cone::Cone) = cone.F
 # hessL(cone::Cone) = cone.F.L
 # inv_hessL(cone::Cone) = inv(cone.F.L)
-# hess_prod!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::Cone) = mul!(prod, cone.H, arr)
-# inv_hess_prod!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::Cone) = ldiv!(prod, cone.F, arr)
+hess_prod!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::Cone) = mul!(prod, Symmetric(cone.H, :U), arr)
+inv_hess_prod!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::Cone) = ldiv!(prod, cone.F, arr)
 # hessL_prod!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::Cone) = mul!(prod, cone.F.L, arr)
 # inv_hessL_prod!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::Cone) = ldiv!(prod, cone.F.L, arr)
 

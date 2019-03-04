@@ -47,13 +47,13 @@ include(joinpath(@__DIR__, "JuMP.jl"))
 # @info("starting interpolation tests")
 # @testset "interpolation tests" begin
 #     fekete_sample()
-#     test_recover_interpolant_polys()
+#     test_recover_lagrange_polys()
 # end
 
 @info("starting native interface tests")
 verbose = true
 system_solvers = [
-    SO.NaiveCombinedHSDSystemSolver,
+    # SO.NaiveCombinedHSDSystemSolver,
     SO.QRCholCombinedHSDSystemSolver,
     ]
 testfuns_singular = [
@@ -66,7 +66,7 @@ testfuns_singular = [
 #     t(verbose, s, MO.PreprocessedLinearModel)
 # end
 linear_models = [
-    # MO.RawLinearModel,
+    MO.RawLinearModel,
     MO.PreprocessedLinearModel,
     ]
 testfuns_nonsingular = [
@@ -107,6 +107,9 @@ testfuns_nonsingular = [
     epipersumexp2,
     ]
 @testset "native tests: $t, $s, $m" for t in testfuns_nonsingular, s in system_solvers, m in linear_models
+    if s == SO.QRCholCombinedHSDSystemSolver && m == MO.RawLinearModel
+        continue # QRChol linear system solver needs preprocessed model
+    end
     t(verbose, s, m)
 end
 
@@ -154,18 +157,20 @@ testfuns = [
     # namedpoly11,
     ]
 @testset "native examples: $t, $s, $m" for t in testfuns, s in system_solvers, m in linear_models
+    if s == SO.QRCholCombinedHSDSystemSolver && m == MO.RawLinearModel
+        continue # QRChol linear system solver needs preprocessed model
+    end
     t(verbose, s, m)
 end
 
 @info("starting MathOptInterface tests")
 verbose = false
 system_solvers = [
-    SO.NaiveCombinedHSDSystemSolver,
+    # SO.NaiveCombinedHSDSystemSolver,
     SO.QRCholCombinedHSDSystemSolver,
     ]
 linear_models = [
-    # MO.RawLinearModel,
-    MO.PreprocessedLinearModel,
+    MO.PreprocessedLinearModel, # MOI tests require preprocessing
     ]
 @testset "MOI tests: $(d ? "dense" : "sparse"), $s, $m" for d in (false, true), s in system_solvers, m in linear_models
     test_moi(verbose, d, s, m)
@@ -173,22 +178,22 @@ end
 
 @info("starting default JuMP examples tests")
 testfuns = [
-    # run_JuMP_envelope_boxinterp,
-    # run_JuMP_envelope_sampleinterp_box,
-    # run_JuMP_envelope_sampleinterp_ball,
-    # run_JuMP_expdesign,
+    run_JuMP_envelope_boxinterp,
+    run_JuMP_envelope_sampleinterp_box,
+    run_JuMP_envelope_sampleinterp_ball,
+    run_JuMP_expdesign,
     # run_JuMP_namedpoly_PSD, # TODO check: final objective doesn't match
-    # run_JuMP_namedpoly_WSOS_primal,
-    # run_JuMP_namedpoly_WSOS_dual,
+    run_JuMP_namedpoly_WSOS_primal,
+    run_JuMP_namedpoly_WSOS_dual,
     # run_JuMP_shapeconregr_PSD,
-    # run_JuMP_shapeconregr_WSOS,
-    # run_JuMP_shapeconregr_WSOS_PolyJuMP,
-    # run_JuMP_densityest,
+    run_JuMP_shapeconregr_WSOS,
+    run_JuMP_shapeconregr_WSOS_PolyJuMP,
+    run_JuMP_densityest,
     run_JuMP_sosmatrix_rand,
     run_JuMP_sosmatrix_a,
     run_JuMP_sosmatrix_poly_a,
     run_JuMP_sosmatrix_poly_b,
-    run_JuMP_muconvexity_rand,
+    # run_JuMP_muconvexity_rand,
     run_JuMP_muconvexity_a,
     run_JuMP_muconvexity_b,
     run_JuMP_muconvexity_c,
@@ -200,7 +205,7 @@ testfuns = [
     run_JuMP_sosmat3_primal, # numerically unstable
     run_JuMP_sosmat3_dual,
     run_JuMP_univariate_WSOS,
-    run_JuMP_univariate_PSD,
+    # run_JuMP_univariate_PSD,
     ]
 @testset "default examples: $t" for t in testfuns
     t()
