@@ -19,8 +19,8 @@ mutable struct Box <: Domain
     end
 end
 
-dimension(dom::Box) = length(dom.l)
-degree(::Box) = 2
+get_dimension(dom::Box) = length(dom.l)
+get_degree(::Box) = 2
 
 # Euclidean hyperball
 mutable struct Ball <: Domain
@@ -34,8 +34,8 @@ mutable struct Ball <: Domain
     end
 end
 
-dimension(dom::Ball) = length(dom.c)
-degree(::Ball) = 2
+get_dimension(dom::Ball) = length(dom.c)
+get_degree(::Ball) = 2
 
 # hyperellipse: (x-c)'Q(x-c) \leq 1
 mutable struct Ellipsoid <: Domain
@@ -50,16 +50,16 @@ mutable struct Ellipsoid <: Domain
     end
 end
 
-dimension(dom::Ellipsoid) = length(dom.c)
-degree(::Ellipsoid) = 2
+get_dimension(dom::Ellipsoid) = length(dom.c)
+get_degree(::Ellipsoid) = 2
 
 # All reals of dimension n
 mutable struct FreeDomain <: Domain
     n::Int
 end
 
-dimension(dom::FreeDomain) = dom.n
-degree(::FreeDomain) = 0
+get_dimension(dom::FreeDomain) = dom.n
+get_degree(::FreeDomain) = 0
 
 # TODO replace this domain with a more general cartesian product
 # assumes the free part has the same dimension as the restricted part
@@ -67,7 +67,7 @@ mutable struct SemiFreeDomain <: Domain
     restricted_halfregion::Domain
 end
 
-dimension(dom::SemiFreeDomain) = 2 * dimension(dom.restricted_halfregion)
-degree(dom::SemiFreeDomain) = degree(dom.restricted_halfregion)
+get_dimension(dom::SemiFreeDomain) = 2 * get_dimension(dom.restricted_halfregion)
+get_degree(dom::SemiFreeDomain) = get_degree(dom.restricted_halfregion)
 
 add_free_vars(dom::Domain) = SemiFreeDomain(dom)

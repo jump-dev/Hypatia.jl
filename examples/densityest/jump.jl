@@ -54,7 +54,7 @@ function build_JuMP_densityest(
             [i in 1:nobs], vcat(z[i], 1.0, f(X[i, :])) in MOI.ExponentialCone() # hypograph of log
         end)
     else
-        lagrange_polys = MU.recover_interpolant_polys(pts, 2 * d)
+        lagrange_polys = MU.recover_lagrange_polys(pts, 2 * d)
         basis_evals = Matrix{Float64}(undef, nobs, U)
         for i in 1:nobs, j in 1:U
             basis_evals[i, j] = lagrange_polys[j](X[i, :])
