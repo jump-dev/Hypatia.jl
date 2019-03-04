@@ -16,6 +16,7 @@ mutable struct WSOSPolyInterpMat <: Cone
     g::Vector{Float64}
     H::Matrix{Float64}
     H2::Matrix{Float64}
+    Hi::Matrix{Float64}
     F
     mat::Vector{Matrix{Float64}}
     matfact::Vector{CholeskyPivoted{Float64, Matrix{Float64}}}
@@ -38,6 +39,7 @@ mutable struct WSOSPolyInterpMat <: Cone
         cone.g = similar(ipwt[1], dim)
         cone.H = similar(ipwt[1], dim, dim)
         cone.H2 = similar(cone.H)
+        cone.Hi = similar(cone.H)
         cone.mat = [similar(ipwt[1], size(ipwtj, 2) * R, size(ipwtj, 2) * R) for ipwtj in ipwt]
         cone.matfact = Vector{CholeskyPivoted{Float64, Matrix{Float64}}}(undef, length(ipwt))
         cone.tmp1 = [similar(ipwt[1], size(ipwtj, 2), U) for ipwtj in ipwt]
@@ -148,6 +150,16 @@ function check_in_cone(cone::WSOSPolyInterpMat)
     end
     end
 
-    ret = @timeit "fact hess" factorize_hess(cone)
-    return ret
+    @timeit "inv hess" begin
+    @. cone.H2 = cone.H
+    cone.F = cholesky!(Symmetric(cone.H2, :U), Val(true), check = false)
+    if !isposdef(cone.F)
+        return false
+    end
+    cone.Hi .= inv(cone.F)
+    end
+    
+    return true
+    # ret = @timeit "fact hess" factorize_hess(cone)
+    # return ret
 end

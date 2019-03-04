@@ -166,10 +166,11 @@ function build_JuMP_namedpoly_PSD(
     dom::MU.Domain;
     d::Int = div(max_degree(f) + 1, 2),
     )
-    model = SumOfSquares.SOSModel(JuMP.with_optimizer(HYP.Optimizer, verbose = true, tol_feas = 1e-9, tol_rel_opt = 1e-8, tol_abs_opt = 1e-8))
+    model = SumOfSquares.SOSModel(JuMP.with_optimizer(HYP.Optimizer, verbose = true, tol_feas = 1e-7, tol_rel_opt = 1e-7, tol_abs_opt = 1e-7))
     JuMP.@variable(model, a)
     JuMP.@objective(model, Max, a)
-    JuMP.@constraint(model, fnn, f >= a, domain = MU.get_domain_inequalities(dom, x), max_degree = 2d)
+    bss = MU.get_domain_inequalities(dom, x)
+    JuMP.@constraint(model, f >= a, domain = bss, maxdegree = 2d)
 
     return model
 end
@@ -188,7 +189,7 @@ function build_JuMP_namedpoly_WSOS(
     (U, pts, P0, PWts, _) = MU.interpolate(dom, d, sample = sample, sample_factor = 100)
 
     # build JuMP model
-    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, tol_feas = 1e-9, tol_rel_opt = 1e-8, tol_abs_opt = 1e-8))
+    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, tol_feas = 1e-7, tol_rel_opt = 1e-7, tol_abs_opt = 1e-7))
     if primal_wsos
         JuMP.@variable(model, a)
         JuMP.@objective(model, Max, a)
@@ -209,7 +210,7 @@ function run_JuMP_namedpoly(use_wsos::Bool; primal_wsos::Bool = false)
         # :butcher, 2
         # :butcher_ball, 2
         # :butcher_ellipsoid, 2
-        # :caprasse, 4
+        :caprasse, 4
         # :caprasse_ball, 4
         # :goldsteinprice, 7
         # :goldsteinprice_ball, 7
@@ -223,7 +224,7 @@ function run_JuMP_namedpoly(use_wsos::Bool; primal_wsos::Bool = false)
         # :motzkin_ball, 7
         # :motzkin_ellipsoid, 7
         # :reactiondiffusion, 3
-        :reactiondiffusion_ball, 3
+        # :reactiondiffusion_ball, 3
         # :robinson, 8
         # :robinson_ball, 8
         # :rosenbrock, 4
