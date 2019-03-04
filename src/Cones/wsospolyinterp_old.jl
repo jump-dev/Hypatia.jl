@@ -18,7 +18,6 @@ mutable struct WSOSPolyInterp <: Cone
     point::AbstractVector{Float64}
     g::Vector{Float64}
     H::Matrix{Float64}
-    Hi::Matrix{Float64}
     H2::Matrix{Float64}
     F # TODO prealloc
     tmp1::Vector{Matrix{Float64}}
@@ -35,7 +34,6 @@ mutable struct WSOSPolyInterp <: Cone
         cone.ipwt = ipwt
         cone.g = similar(ipwt[1], dim)
         cone.H = similar(ipwt[1], dim, dim)
-        cone.Hi = similar(ipwt[1], dim, dim)
         cone.H2 = similar(cone.H)
         cone.tmp1 = [similar(ipwt[1], size(ipwtj, 2), size(ipwtj, 2)) for ipwtj in ipwt]
         cone.tmp2 = [similar(ipwt[1], size(ipwtj, 2), dim) for ipwtj in ipwt]
@@ -53,7 +51,6 @@ set_initial_point(arr::AbstractVector{Float64}, cone::WSOSPolyInterp) = (@. arr 
 function check_in_cone(cone::WSOSPolyInterp)
     @. cone.g = 0.0
     @. cone.H = 0.0
-    @. cone.Hi = 0.0
     tmp3 = cone.tmp3
 
     for j in eachindex(cone.ipwt) # TODO can be done in parallel, but need multiple tmp3s
@@ -77,9 +74,6 @@ function check_in_cone(cone::WSOSPolyInterp)
         # mul!(tmp3, tmp2j', tmp2j)
         BLAS.syrk!('U', 'T', 1.0, tmp2j, 0.0, tmp3)
 
-        # inv_Hj = (ipwtj * ipwtj' * Diagonal(cone.point) * ipwtj * ipwtj').^2
-        cone.Hi += inv((ipwtj * inv(ipwtj' * Diagonal(cone.point) * ipwtj) * ipwtj').^2)
-
         @inbounds for j in eachindex(cone.g)
             cone.g[j] -= tmp3[j, j]
             @inbounds for i in 1:j
@@ -90,5 +84,3 @@ function check_in_cone(cone::WSOSPolyInterp)
 
     return factorize_hess(cone)
 end
-
-inv_hess(cone::WSOSPolyInterp) = Symmetric(cone.Hi, :U)
