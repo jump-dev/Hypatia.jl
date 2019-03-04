@@ -42,9 +42,12 @@ mutable struct QRCholCombinedHSDSystemSolver <: CombinedHSDSystemSolver
     HGxi
     GHGxi
 
-    # G_k
-    # HG::Matrix{Float64}
-    # HG_k
+    HGQ1x_k
+    GQ1x_k
+    HGQ2_k
+    GQ2_k
+    HGxi_k
+    Gxi_k
 
     function QRCholCombinedHSDSystemSolver(model::Models.PreprocessedLinearModel)
         (n, p, q) = (model.n, model.p, model.q)
@@ -82,7 +85,6 @@ mutable struct QRCholCombinedHSDSystemSolver <: CombinedHSDSystemSolver
         system_solver.z2_temp_k = [view(zi_temp, idxs, 2) for idxs in model.cone_idxs]
         system_solver.z3_temp_k = [view(zi_temp, idxs, 3) for idxs in model.cone_idxs]
 
-
         nmp = n - p
         system_solver.bxGHbz = Matrix{Float64}(undef, n, 3)
         system_solver.Q1x = similar(system_solver.bxGHbz)
@@ -98,13 +100,22 @@ mutable struct QRCholCombinedHSDSystemSolver <: CombinedHSDSystemSolver
         system_solver.HGxi = similar(system_solver.Gxi)
         system_solver.GHGxi = similar(system_solver.GHGQ1x)
 
-        # system_solver.G_k = [view(model.G, idxs, :) for idxs in model.cone_idxs]
-        # system_solver.HG = similar(model.G)
-        # system_solver.HG_k = [view(system_solver.HG, idxs, :) for idxs in model.cone_idxs]
+        system_solver.HGQ1x_k = [view(system_solver.HGQ1x, idxs, :) for idxs in model.cone_idxs]
+        system_solver.GQ1x_k = [view(system_solver.GQ1x, idxs, :) for idxs in model.cone_idxs]
+        system_solver.HGQ2_k = [view(system_solver.HGQ2, idxs, :) for idxs in model.cone_idxs]
+        system_solver.GQ2_k = [view(system_solver.GQ2, idxs, :) for idxs in model.cone_idxs]
+        system_solver.HGxi_k = [view(system_solver.HGxi, idxs, :) for idxs in model.cone_idxs]
+        system_solver.Gxi_k = [view(system_solver.Gxi, idxs, :) for idxs in model.cone_idxs]
 
         return system_solver
     end
 end
+
+# TODO use BLAS
+# gemv!(tA, alpha, A, x, beta, y)
+# Update the vector y as alpha*A*x + beta*y or alpha*A'x + beta*y according to tA. alpha and beta are scalars. Return the updated y.
+# gemm!(tA, tB, alpha, A, B, beta, C)
+# Update C as alpha*A*B + beta*C or the other three variants according to tA and tB. Return the updated C.
 
 function get_combined_directions(solver::HSDSolver, system_solver::QRCholCombinedHSDSystemSolver)
     model = solver.model
@@ -151,9 +162,12 @@ function get_combined_directions(solver::HSDSolver, system_solver::QRCholCombine
     HGxi = system_solver.HGxi
     GHGxi = system_solver.GHGxi
 
-    # G_k = system_solver.G_k
-    # HG = system_solver.HG
-    # HG_k = system_solver.HG_k
+    HGQ1x_k = system_solver.HGQ1x_k
+    GQ1x_k = system_solver.GQ1x_k
+    HGQ2_k = system_solver.HGQ2_k
+    GQ2_k = system_solver.GQ2_k
+    HGxi_k = system_solver.HGxi_k
+    Gxi_k = system_solver.Gxi_k
 
     @timeit "setup xy" begin
     @. x1 = -model.c
@@ -175,7 +189,8 @@ function get_combined_directions(solver::HSDSolver, system_solver::QRCholCombine
             @. z1_temp_k[k] /= mu
             @. z2_temp_k[k] = (duals_k + z2_temp_k[k]) / mu
             @. z3_temp_k[k] = duals_k / mu + grad_k
-            ldiv!(z_k[k], Cones.hess_fact(cone_k), z_temp_k[k])
+            # ldiv!(z_k[k], Cones.hess_fact(cone_k), z_temp_k[k])
+            mul!(z_k[k], Cones.inv_hess(cone_k), z_temp_k[k])
         else
             @. z1_temp_k[k] *= mu
             @. z2_temp_k[k] *= mu
@@ -187,14 +202,19 @@ function get_combined_directions(solver::HSDSolver, system_solver::QRCholCombine
     end
     end
 
-    # TODO use BLAS
-    # gemv!(tA, alpha, A, x, beta, y)
-    # Update the vector y as alpha*A*x + beta*y or alpha*A'x + beta*y according to tA. alpha and beta are scalars. Return the updated y.
-    # gemm!(tA, tB, alpha, A, B, beta, C)
-    # Update C as alpha*A*B + beta*C or the other three variants according to tA and tB. Return the updated C.
-    # TODO prealloc views
-    # TODO refac the cone loops
-    # TODO prealloc cholesky
+    function block_hessian_product!(prod_k, arr_k)
+        for k in eachindex(cones)
+            cone_k = cones[k]
+            if Cones.use_dual(cone_k)
+                # ldiv!(prod_k[k], Cones.hess_fact(cone_k), arr_k[k])
+                mul!(prod_k[k], Cones.inv_hess(cone_k), arr_k[k])
+                prod_k[k] ./= mu
+            else
+                mul!(prod_k[k], Cones.hess(cone_k), arr_k[k])
+                prod_k[k] .*= mu
+            end
+        end
+    end
 
     @timeit "pre fact" begin
     # bxGHbz = bx + G'*Hbz
@@ -206,42 +226,19 @@ function get_combined_directions(solver::HSDSolver, system_solver::QRCholCombine
 
     # Q2x = Q2*(K22_F\(Q2'*(bxGHbz - GHG*Q1x)))
     mul!(GQ1x, model.G, Q1x)
-    # TODO refac this loop - used in 3 places below
-    for k in eachindex(cones)
-        cone_k = cones[k]
-        a1k = view(GQ1x, cone_idxs[k], :)
-        a2k = view(HGQ1x, cone_idxs[k], :)
-        if Cones.use_dual(cone_k)
-            ldiv!(a2k, Cones.hess_fact(cone_k), a1k)
-            a2k ./= mu
-        else
-            mul!(a2k, Cones.hess(cone_k), a1k)
-            a2k .*= mu
-        end
-    end
+    block_hessian_product!(HGQ1x_k, GQ1x_k)
     mul!(GHGQ1x, model.G', HGQ1x)
     @. GHGQ1x = bxGHbz - GHGQ1x
     mul!(Q2div, model.Ap_Q2', GHGQ1x)
     end
 
-    @timeit "fact" begin
     if !iszero(size(Q2div, 1))
         @timeit "mat" begin
-        for k in eachindex(cones)
-            cone_k = cones[k]
-            a1k = view(GQ2, cone_idxs[k], :)
-            a2k = view(HGQ2, cone_idxs[k], :)
-            if Cones.use_dual(cone_k)
-                @timeit "H ldiv" ldiv!(a2k, Cones.hess_fact(cone_k), a1k)
-                a2k ./= mu
-            else
-                mul!(a2k, Cones.hess(cone_k), a1k)
-                a2k .*= mu
-            end
-        end
+        block_hessian_product!(HGQ2_k, GQ2_k)
         mul!(Q2GHGQ2, GQ2', HGQ2)
         end
 
+        # TODO prealloc cholesky auxiliary vectors using posvx
         # TODO use old sysvx code
         # F = bunchkaufman!(Symmetric(Q2GHGQ2), true, check = false)
         # if !issuccess(F)
@@ -259,27 +256,16 @@ function get_combined_directions(solver::HSDSolver, system_solver::QRCholCombine
         end
         @timeit "ldiv" ldiv!(F, Q2div)
     end
-    mul!(Q2x, model.Ap_Q2, Q2div)
-    end
 
     @timeit "post fact" begin
+    mul!(Q2x, model.Ap_Q2, Q2div)
+
     # xi = Q1x + Q2x
     @. xi = Q1x + Q2x
 
     # yi = Ri*Q1'*(bxGHbz - GHG*xi)
     mul!(Gxi, model.G, xi)
-    for k in eachindex(cones)
-        cone_k = cones[k]
-        a1k = view(Gxi, cone_idxs[k], :)
-        a2k = view(HGxi, cone_idxs[k], :)
-        if Cones.use_dual(cone_k)
-            ldiv!(a2k, Cones.hess_fact(cone_k), a1k)
-            a2k ./= mu
-        else
-            mul!(a2k, Cones.hess(cone_k), a1k)
-            a2k .*= mu
-        end
-    end
+    block_hessian_product!(HGxi_k, Gxi_k)
     mul!(GHGxi, model.G', HGxi)
     @. bxGHbz -= GHGxi
     mul!(yi, system_solver.Ap_RiQ1t, bxGHbz)
