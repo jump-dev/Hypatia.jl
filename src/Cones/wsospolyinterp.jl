@@ -20,6 +20,7 @@ mutable struct WSOSPolyInterp <: Cone
     H::Matrix{Float64}
     H2::Matrix{Float64}
     Hi::Matrix{Float64}
+    Hitemp::Matrix{Float64}
     F # TODO prealloc
     tmp1::Vector{Matrix{Float64}}
     tmp2::Vector{Matrix{Float64}}
@@ -37,6 +38,7 @@ mutable struct WSOSPolyInterp <: Cone
         cone.H = similar(ipwt[1], dim, dim)
         cone.H2 = similar(cone.H)
         cone.Hi = similar(cone.H)
+        cone.Hitemp = similar(cone.H)
         cone.tmp1 = [similar(ipwt[1], size(ipwtj, 2), size(ipwtj, 2)) for ipwtj in ipwt]
         cone.tmp2 = [similar(ipwt[1], size(ipwtj, 2), dim) for ipwtj in ipwt]
         cone.tmp3 = similar(ipwt[1], dim, dim)
@@ -55,6 +57,7 @@ function check_in_cone(cone::WSOSPolyInterp)
     @. cone.g = 0.0
     @. cone.H = 0.0
     @. cone.Hi = 0.0
+    @. cone.Hitemp = 0.0
     tmp3 = cone.tmp3
 
     for j in eachindex(cone.ipwt) # TODO can be done in parallel, but need multiple tmp3s
@@ -80,11 +83,16 @@ function check_in_cone(cone::WSOSPolyInterp)
 
         # inv_Hj = (ipwtj * ipwtj' * Diagonal(cone.point) * ipwtj * ipwtj').^2
         # cone.Hi += inv((ipwtj * inv(ipwtj' * Diagonal(cone.point) * ipwtj) * ipwtj').^2)
+        W = ipwtj' * Diagonal(cone.point) * ipwtj
+        Winv = inv(W)
+        L = size(ipwtj, 2)
 
         @inbounds for j in eachindex(cone.g)
             cone.g[j] -= tmp3[j, j]
             @inbounds for i in 1:j
-                cone.H[i, j] += abs2(tmp3[i, j])
+                # cone.H[i, j] += abs2(tmp3[i, j])
+                cone.H[i, j] += sum(Winv[k, l] * ipwtj[i, k] * ipwtj[j, l] for k in 1:L, l in 1:L)^2
+                cone.Hitemp[i, j] += sum(W[k, l] * ipwtj[i, k] * ipwtj[j, l] for k in 1:L, l in 1:L)^2
             end
         end
     end
@@ -96,7 +104,7 @@ function check_in_cone(cone::WSOSPolyInterp)
     end
     @timeit "hessian inv" cone.Hi .= inv(cone.F)
     # @show cone.Hi -  (cone.ipwt[1] \ cone.ipwt[1] * Diagonal(cone.point) * cone.ipwt[1]' * cone.ipwt[1]' \ Matrix(I, cone.dim, cone.dim))
-    @show cone.Hi ./ Hinvid(cone.ipwt[1], cone.point)
+    @show Symmetric(cone.Hi, :U) ./ Symmetric(cone.Hitemp, :U)
 
 end
 
@@ -110,6 +118,7 @@ function Harr(ipwtj, x, arr)
     lambda_x = ipwtj' * Diagonal(x) * ipwtj
     lambda_x_inv = inv(lambda_x)
     return diag(ipwtj * lambda_x_inv * lambda_arr * lambda_x_inv * ipwtj')
+    # return diag((lambda_x_inv * lambda_arr * lambda_x_inv) .* (ipwtj' * ipwtj))
 end
 
 function Hinvarr(ipwtj, x, arr)
