@@ -101,3 +101,5 @@ function check_in_cone(cone::PosSemidef)
 end
 
 inv_hess(cone::PosSemidef) = Symmetric(cone.Hi, :U)
+
+inv_hess_prod!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::PosSemidef) = mul!(prod, Symmetric(cone.Hi, :U), arr)

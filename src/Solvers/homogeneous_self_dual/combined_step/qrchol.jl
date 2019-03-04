@@ -190,12 +190,15 @@ function get_combined_directions(solver::HSDSolver, system_solver::QRCholCombine
             @. z2_temp_k[k] = (duals_k + z2_temp_k[k]) / mu
             @. z3_temp_k[k] = duals_k / mu + grad_k
             # ldiv!(z_k[k], Cones.hess_fact(cone_k), z_temp_k[k])
-            mul!(z_k[k], Cones.inv_hess(cone_k), z_temp_k[k])
+            # mul!(z_k[k], Cones.inv_hess(cone_k), z_temp_k[k])
+            Cones.inv_hess_prod!(z_k[k], z_temp_k[k], cone_k)
         else
             @. z1_temp_k[k] *= mu
             @. z2_temp_k[k] *= mu
-            mul!(z1_k[k], Cones.hess(cone_k), z1_temp_k[k])
-            mul!(z2_k[k], Cones.hess(cone_k), z2_temp_k[k])
+            # mul!(z1_k[k], Cones.hess(cone_k), z1_temp_k[k])
+            # mul!(z2_k[k], Cones.hess(cone_k), z2_temp_k[k])
+            Cones.hess_prod!(z1_k[k], z1_temp_k[k], cone_k)
+            Cones.hess_prod!(z2_k[k], z2_temp_k[k], cone_k)
             @. z2_k[k] += duals_k
             @. z3_k[k] = duals_k + grad_k * mu
         end
@@ -207,10 +210,12 @@ function get_combined_directions(solver::HSDSolver, system_solver::QRCholCombine
             cone_k = cones[k]
             if Cones.use_dual(cone_k)
                 # ldiv!(prod_k[k], Cones.hess_fact(cone_k), arr_k[k])
-                mul!(prod_k[k], Cones.inv_hess(cone_k), arr_k[k])
+                # mul!(prod_k[k], Cones.inv_hess(cone_k), arr_k[k])
+                Cones.inv_hess_prod!(prod_k[k], arr_k[k], cone_k)
                 prod_k[k] ./= mu
             else
-                mul!(prod_k[k], Cones.hess(cone_k), arr_k[k])
+                # mul!(prod_k[k], Cones.hess(cone_k), arr_k[k])
+                Cones.hess_prod!(prod_k[k], arr_k[k], cone_k)
                 prod_k[k] .*= mu
             end
         end
