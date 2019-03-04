@@ -8,7 +8,7 @@ utilities for Hypatia domains and SemialgebraicSets.jl
 
 function get_domain_inequalities(dom::Box, x)
     bss = SAS.BasicSemialgebraicSet{Float64, DynamicPolynomials.Polynomial{true, Float64}}()
-    for i in 1:dimension(dom)
+    for i in 1:get_dimension(dom)
         SAS.addinequality!(bss, (-x[i] + dom.u[i]) * (x[i] - dom.l[i]))
     end
     return bss
@@ -21,6 +21,6 @@ get_domain_inequalities(dom::Ellipsoid, x) = SAS.@set((x - dom.c)' * dom.Q * (x 
 get_domain_inequalities(dom::SemiFreeDomain, x) = get_domain_inequalities(dom.sampling_region, x)
 
 function get_domain_inequalities(dom::Box, x::DP.PolyVar{true})
-    @assert dimension(dom) == 1
+    @assert get_dimension(dom) == 1
     return get_domain_inequalities(dom, [x])
 end
