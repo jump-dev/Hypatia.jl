@@ -181,7 +181,7 @@ function build_shapeconregr_WSOS(
     hessian_d = div(regressor_deg - 1, 2)
     (num_points, n) = size(X)
 
-    regressor_points = MU.get_interp_pts(MU.FreeDomain(n), regressor_deg, sample_factor = 50)
+    (regressor_points, _) = MU.get_interp_pts(MU.FreeDomain(n), regressor_deg, sample_factor = 50)
     regressor_U = size(regressor_points, 1)
 
     (mono_U, mono_points, mono_P0, mono_PWts, _) = MU.interpolate(shape_data.mono_dom, gradient_d, sample = sample, sample_factor = 50)
