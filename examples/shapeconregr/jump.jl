@@ -151,15 +151,15 @@ function build_shapeconregr_WSOS_PolyJuMP(
     # monotonicity
     for j in 1:n
         if !iszero(shape_data.mono_profile[j])
-            dpj = DynamicPolynomials.differentiate(p, x[j])
-            JuMP.@constraint(model, [shape_data.mono_profile[j] * dpj(mono_pts[u, :]) for u in 1:mono_U] in mono_wsos_cone)
+            gradient = DynamicPolynomials.differentiate(p, x[j])
+            JuMP.@constraint(model, [shape_data.mono_profile[j] * gradient(mono_pts[u, :]) for u in 1:mono_U] in mono_wsos_cone)
         end
     end
 
     # convexity
     if !iszero(shape_data.conv_profile)
-        Hp = DynamicPolynomials.differentiate(p, x, 2)
-        JuMP.@constraint(model, [shape_data.conv_profile * Hp[i, j](conv_pts[u, :]) * (i == j ? 1.0 : rt2) for i in 1:n for j in 1:i for u in 1:conv_U] in conv_wsos_cone)
+        hessian = DynamicPolynomials.differentiate(p, x, 2)
+        JuMP.@constraint(model, [shape_data.conv_profile * hessian[i, j](conv_pts[u, :]) * (i == j ? 1.0 : rt2) for i in 1:n for j in 1:i for u in 1:conv_U] in conv_wsos_cone)
     end
 
     return p
