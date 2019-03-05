@@ -93,7 +93,7 @@ mutable struct QRCholCombinedHSDSystemSolver <: CombinedHSDSystemSolver
         system_solver.GHGQ1x = Matrix{Float64}(undef, n, 3)
         system_solver.Q2div = Matrix{Float64}(undef, nmp, 3)
         system_solver.GQ2 = model.G * model.Ap_Q2
-        system_solver.HGQ2 = similar(system_solver.GQ2)
+        system_solver.HGQ2 = Matrix{Float64}(undef, q, nmp)
         system_solver.Q2GHGQ2 = Matrix{Float64}(undef, nmp, nmp)
         system_solver.Q2x = similar(system_solver.Q1x)
         system_solver.Gxi = similar(system_solver.GQ1x)
@@ -249,10 +249,10 @@ function get_combined_directions(solver::HSDSolver, system_solver::QRCholCombine
             # @timeit "recover" begin
             println("linear system matrix factorization failed")
             mul!(Q2GHGQ2, GQ2', HGQ2)
-            Q2GHGQ2 += 1e-6I
+            Q2GHGQ2 += 1e-4I
             F = bunchkaufman!(Symmetric(Q2GHGQ2), true, check = false)
             if !issuccess(F)
-                error("could not fix failure of positive definiteness; terminating")
+                error("could not fix failure of positive definiteness (mu is $mu); terminating")
             end
             # end
         end

@@ -62,9 +62,9 @@ testfuns_singular = [
     inconsistent1,
     inconsistent2,
     ]
-@testset "preprocessing tests: $t, $s" for t in testfuns_singular, s in system_solvers
-    t(verbose, s, MO.PreprocessedLinearModel)
-end
+# @testset "preprocessing tests: $t, $s" for t in testfuns_singular, s in system_solvers
+#     t(verbose, s, MO.PreprocessedLinearModel)
+# end
 linear_models = [
     MO.RawLinearModel,
     MO.PreprocessedLinearModel,
@@ -166,7 +166,7 @@ testfuns_nonsingular = [
 @info("starting MathOptInterface tests")
 verbose = false
 system_solvers = [
-    SO.NaiveCombinedHSDSystemSolver,
+    # SO.NaiveCombinedHSDSystemSolver,
     SO.QRCholCombinedHSDSystemSolver,
     ]
 linear_models = [
