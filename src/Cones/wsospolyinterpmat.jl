@@ -104,6 +104,74 @@ function check_in_cone(cone::WSOSPolyInterpMat)
         W_inv_j = inv(cone.matfact[j])
         # end
 
+        ipwtj = cone.ipwt[j]
+        tmp1j = cone.tmp1[j]
+        tmp2 = cone.tmp2
+        tmp3 = cone.tmp3
+
+        L = size(ipwtj, 2)
+
+        kron_ipwtj = kron(Matrix(I, cone.R, cone.R), ipwtj')
+        kron_Winv = cone.matfact[j] \ kron_ipwtj
+        # big_PLambdaP = kron(Matrix(I, cone.R, cone.R), ipwtj) * cone.matfact[j] \ kron(Matrix(I, cone.R, cone.R), ipwtj')
+        big_PLambdaP = kron(Matrix(I, cone.R, cone.R), ipwtj) * _block_uppertrisolve(cone.matfact[j].U, _block_lowertrisolve(cone.matfact[j].L, ipwtj, cone.R, L, cone.U), cone.R, L, cone.U)
+
+        uo = 0
+        for p in 1:cone.R, q in 1:p
+            uo += 1
+            fact = (p == q) ? 1.0 : rt2
+            rinds = _blockrange(p, L)
+            cinds = _blockrange(q, L)
+            idxs = _blockrange(uo, cone.U)
+
+            for i in 1:cone.U
+                cone.g[idxs[i]] -= ipwtj[i, :]' * view(W_inv_j, rinds, cinds) * ipwtj[i, :] * fact
+            end
+
+            uo2 = 0
+            for p2 in 1:cone.R, q2 in 1:p2
+                uo2 += 1
+                if uo2 < uo
+                    continue
+                end
+
+                rinds2 = _blockrange(p2, L)
+                cinds2 = _blockrange(q2, L)
+                idxs2 = _blockrange(uo2, cone.U)
+
+                mul!(tmp1j, view(W_inv_j, rinds, rinds2), ipwtj')
+                mul!(tmp2, ipwtj, tmp1j)
+                @show tmp2 ./ big_PLambdaP[_blockrange(p, cone.U), _blockrange(p2, cone.U)]
+                mul!(tmp1j, view(W_inv_j, cinds, cinds2), ipwtj')
+                mul!(tmp3, ipwtj, tmp1j)
+                fact = xor(p == q, p2 == q2) ? rt2i : 1.0
+                @. cone.H[idxs, idxs2] += tmp2 * tmp3 * fact
+
+                if (p != q) || (p2 != q2)
+                    mul!(tmp1j, view(W_inv_j, rinds, cinds2), ipwtj')
+                    mul!(tmp2, ipwtj, tmp1j)
+                    mul!(tmp1j, view(W_inv_j, cinds, rinds2), ipwtj')
+                    mul!(tmp3, ipwtj, tmp1j)
+                    @. cone.H[idxs, idxs2] += tmp2 * tmp3 * fact
+                end
+            end
+        end
+    end
+    # end
+
+    # @timeit "inv hess" begin
+    @. cone.H2 = cone.H
+    cone.F = cholesky!(Symmetric(cone.H2, :U), Val(true), check = false)
+    if !isposdef(cone.F)
+        return false
+    end
+    cone.Hi .= inv(cone.F)
+    # end
+
+    return true
+end
+
+
 # left hand side always a kronecker with the identity
 function _block_lowertrisolve(Lmat, ipwt, blocknum, R, L, U)
     resvec = zeros(R * L, U)
@@ -117,7 +185,6 @@ function _block_lowertrisolve(Lmat, ipwt, blocknum, R, L, U)
         elseif r > blocknum
             tmp .= 0.0
             for s in blocknum:(r - 1)
-                @show size(tmp), size(Lmatij(r, s)), size(resi(s))
                 tmp -= Lmatij(r, s) * resi(s)
             end
             resvec[_blockrange(r, L), :] = LowerTriangular(Lmatij(r, r)) \ tmp
@@ -160,90 +227,17 @@ function _block_uppertrisolve(Umat, rhs, R, L, U)
     return resmat
 end
 
-using Test
-R = 3; U = 5; L = 4;
-ipwt = rand(U, L)
-kron_ipwt = kron(Matrix(I, R, R), ipwt')
-blocklambda = rand(R * L, R * L)
-blocklambda = blocklambda * blocklambda'
-F = cholesky(blocklambda)
-Ux = _block_lowertrisolve(F.L, ipwt, R, L, U)
-@test Ux ≈ F.L \ kron_ipwt
-x = _block_uppertrisolve(F.U, Ux, R, L, U)
-@test x ≈ F \ kron_ipwt
+# using Test
+# R = 3; U = 5; L = 4;
+# ipwt = rand(U, L)
+# kron_ipwt = kron(Matrix(I, R, R), ipwt')
+# blocklambda = rand(R * L, R * L)
+# blocklambda = blocklambda * blocklambda'
+# F = cholesky(blocklambda)
+# Ux = _block_lowertrisolve(F.L, ipwt, R, L, U)
+# @test Ux ≈ F.L \ kron_ipwt
+# x = _block_uppertrisolve(F.U, Ux, R, L, U)
+# @test x ≈ F \ kron_ipwt
 
-
-function add_grad_hess_j!(cone::WSOSPolyInterpMat, j::Int, W_inv_j::Matrix{Float64})
-    ipwtj = cone.ipwt[j]
-    tmp1j = cone.tmp1[j]
-    tmp2 = cone.tmp2
-    tmp3 = cone.tmp3
-    kron_ipwtj = kron(Matrix(I, cone.R, cone.R), ipwtj')
-    kron_Winv = cone.matfact[j] \ kron_ipwtj
-    big_PLambdaP = kron(Matrix(I, cone.R, cone.R), ipwtj) * cone.matfact[j] \ kron(Matrix(I, cone.R, cone.R), ipwtj')
-
-    L = size(ipwtj, 2)
-    uo = 0
-    for p in 1:cone.R, q in 1:p
-        uo += 1
-        fact = (p == q) ? 1.0 : rt2
-        rinds = _blockrange(p, L)
-        cinds = _blockrange(q, L)
-        idxs = _blockrange(uo, cone.U)
-
-        # TODO the view for W_inv_j can be allocated just once in the cone definition
-        for i in 1:cone.U
-            cone.g[idxs[i]] -= ipwtj[i, :]' * view(W_inv_j, rinds, cinds) * ipwtj[i, :] * fact
-        end
-
-            for i in 1:cone.U
-                cone.g[idxs[i]] -= ipwtj[i, :]' * view(W_inv_j, rinds, cinds) * ipwtj[i, :] * fact
-            end
-
-            uo2 = 0
-            for p2 in 1:cone.R, q2 in 1:p2
-                uo2 += 1
-                if uo2 < uo
-                    continue
-                end
-
-            mul!(tmp1j, view(W_inv_j, rinds, rinds2), ipwtj')
-            mul!(tmp2, ipwtj, tmp1j)
-            # @show tmp2 ./ big_PLambdaP[_blockrange(p, cone.U), _blockrange(p2, cone.U)]
-            mul!(tmp1j, view(W_inv_j, cinds, cinds2), ipwtj')
-            mul!(tmp3, ipwtj, tmp1j)
-            fact = xor(p == q, p2 == q2) ? rt2i : 1.0
-            @. cone.H[idxs, idxs2] += tmp2 * tmp3 * fact
-
-                mul!(tmp1j, view(W_inv_j, rinds, rinds2), ipwtj')
-                mul!(tmp2, ipwtj, tmp1j)
-                mul!(tmp1j, view(W_inv_j, cinds, cinds2), ipwtj')
-                mul!(tmp3, ipwtj, tmp1j)
-                fact = xor(p == q, p2 == q2) ? rt2i : 1.0
-                @. cone.H[idxs, idxs2] += tmp2 * tmp3 * fact
-
-                if (p != q) || (p2 != q2)
-                    mul!(tmp1j, view(W_inv_j, rinds, cinds2), ipwtj')
-                    mul!(tmp2, ipwtj, tmp1j)
-                    mul!(tmp1j, view(W_inv_j, cinds, rinds2), ipwtj')
-                    mul!(tmp3, ipwtj, tmp1j)
-                    @. cone.H[idxs, idxs2] += tmp2 * tmp3 * fact
-                end
-            end
-        end
-    end
-    # end
-
-    # @timeit "inv hess" begin
-    @. cone.H2 = cone.H
-    cone.F = cholesky!(Symmetric(cone.H2, :U), Val(true), check = false)
-    if !isposdef(cone.F)
-        return false
-    end
-    cone.Hi .= inv(cone.F)
-    # end
-
-    return true
-end
 
 inv_hess_prod!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::WSOSPolyInterpMat) = mul!(prod, Symmetric(cone.Hi, :U), arr)
