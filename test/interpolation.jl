@@ -20,35 +20,35 @@ function fekete_sample()
     end
 end
 
-function test_recover_interpolant_polys()
+function test_recover_lagrange_polys()
     n = 1
     deg = 1
     pts = reshape(Float64[0, 1], 2, 1)
-    interpolant_polys = MU.recover_interpolant_polys(pts, deg)
+    lagrange_polys = MU.recover_lagrange_polys(pts, deg)
 
     random_pts = rand(5)
-    @test interpolant_polys[1].(random_pts) ≈ 1 .- random_pts
-    @test interpolant_polys[2].(random_pts) ≈ random_pts
+    @test lagrange_polys[1].(random_pts) ≈ 1 .- random_pts
+    @test lagrange_polys[2].(random_pts) ≈ random_pts
 
     deg = 2
     pts = reshape(Float64[0, 1, 2], 3, 1)
-    interpolant_polys = MU.recover_interpolant_polys(pts, deg)
+    lagrange_polys = MU.recover_lagrange_polys(pts, deg)
 
     random_pts = rand(5)
-    @test interpolant_polys[1].(random_pts) ≈ (random_pts .- 1.0) .* (random_pts .- 2.0) * 0.5
-    @test interpolant_polys[2].(random_pts) ≈ random_pts .* (random_pts .- 2.0) * -1.0
-    @test interpolant_polys[3].(random_pts) ≈ random_pts .* (random_pts .- 1.0) * 0.5
+    @test lagrange_polys[1].(random_pts) ≈ (random_pts .- 1.0) .* (random_pts .- 2.0) * 0.5
+    @test lagrange_polys[2].(random_pts) ≈ random_pts .* (random_pts .- 2.0) * -1.0
+    @test lagrange_polys[3].(random_pts) ≈ random_pts .* (random_pts .- 1.0) * 0.5
 
     n = 2
     deg = 2
     pts = rand(6, 2)
-    interpolant_polys = MU.recover_interpolant_polys(pts, deg)
+    lagrange_polys = MU.recover_lagrange_polys(pts, deg)
 
     for i in 1:6, j in 1:6
         if j == i
-            @test interpolant_polys[i](pts[j, :]) ≈ 1.0 atol = 1e-9
+            @test lagrange_polys[i](pts[j, :]) ≈ 1.0 atol = 1e-9
         else
-            @test interpolant_polys[i](pts[j, :]) ≈ 0.0 atol = 1e-9
+            @test lagrange_polys[i](pts[j, :]) ≈ 0.0 atol = 1e-9
         end
     end
 
@@ -58,10 +58,10 @@ function test_recover_interpolant_polys()
     #     (U, pts, P0, PWts, w) = MU.interpolate(MU.FreeDomain(n), d, sample = sample, calc_w = true)
     #     DynamicPolynomials.@polyvar x[1:n]
     #     monos = DynamicPolynomials.monomials(x, 0:(2 * d))
-    #     interpolant_polys = MU.recover_interpolant_polys(pts, 2 * d)
+    #     lagrange_polys = MU.recover_lagrange_polys(pts, 2 * d)
     #
-    #     @test sum(interpolant_polys) ≈ 1.0
-    #     @test sum(w[i] * interpolant_polys[j](pts[i, :]) for j in 1:U, i in 1:U) ≈ sum(w)
+    #     @test sum(lagrange_polys) ≈ 1.0
+    #     @test sum(w[i] * lagrange_polys[j](pts[i, :]) for j in 1:U, i in 1:U) ≈ sum(w)
     #     @test sum(w) ≈ 2^n
     # end
 end

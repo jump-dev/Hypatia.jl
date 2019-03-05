@@ -109,9 +109,7 @@ function check_in_cone(cone::WSOSPolyInterp)
 end
 
     return true
-    # return factorize_hess(cone)
 end
-
 
 function Harr(ipwtj, x, arr)
     lambda_arr = ipwtj' * Diagonal(arr) * ipwtj
@@ -148,3 +146,5 @@ function Hinvid(ipwtj, x)
     end
     H
 end
+
+inv_hess_prod!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::WSOSPolyInterp) = mul!(prod, Symmetric(cone.Hi, :U), arr)

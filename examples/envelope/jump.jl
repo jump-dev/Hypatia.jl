@@ -31,7 +31,7 @@ function build_JuMP_envelope(
     (U, pts, P0, PWts, w) = MU.interpolate(domain, d, sample = sample, calc_w = true)
 
     # generate random polynomials
-    n = MU.dimension(domain)
+    n = MU.get_dimension(domain)
     LDegs = binomial(n + deg, n)
     polys = P0[:, 1:LDegs] * rand(-9:9, LDegs, npoly)
 

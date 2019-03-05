@@ -67,7 +67,7 @@ _blockrange(inner::Int, outer::Int) = (outer * (inner - 1) + 1):(outer * inner)
 
 # TODO all views can be allocated just once in the cone definition (delete _blockrange too)
 function check_in_cone(cone::WSOSPolyInterpMat)
-    @timeit "build mat" begin
+    # @timeit "build mat" begin
     for j in eachindex(cone.ipwt)
         ipwtj = cone.ipwt[j]
         tmp1j = cone.tmp1[j]
@@ -94,13 +94,15 @@ function check_in_cone(cone::WSOSPolyInterpMat)
             return false
         end
     end
-    end
+    # end
 
-    @timeit "grad hess" begin
+    # @timeit "grad hess" begin
     cone.g .= 0.0
     cone.H .= 0.0
     for j in eachindex(cone.ipwt)
-        @timeit "W_inv" W_inv_j = inv(cone.matfact[j])
+        # @timeit "W_inv" begin
+        W_inv_j = inv(cone.matfact[j])
+        # end
 
         ipwtj = cone.ipwt[j]
         tmp1j = cone.tmp1[j]
@@ -148,18 +150,18 @@ function check_in_cone(cone::WSOSPolyInterpMat)
             end
         end
     end
-    end
+    # end
 
-    @timeit "inv hess" begin
+    # @timeit "inv hess" begin
     @. cone.H2 = cone.H
     cone.F = cholesky!(Symmetric(cone.H2, :U), Val(true), check = false)
     if !isposdef(cone.F)
         return false
     end
     cone.Hi .= inv(cone.F)
-    end
-    
+    # end
+
     return true
-    # ret = @timeit "fact hess" factorize_hess(cone)
-    # return ret
 end
+
+inv_hess_prod!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::WSOSPolyInterpMat) = mul!(prod, Symmetric(cone.Hi, :U), arr)
