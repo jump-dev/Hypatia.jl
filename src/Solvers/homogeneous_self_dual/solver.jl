@@ -118,6 +118,8 @@ get_tau(solver::HSDSolver) = solver.tau
 get_kappa(solver::HSDSolver) = solver.kap
 get_mu(solver::HSDSolver) = solver.mu
 
+# using TimerOutputs
+
 # TODO maybe use iteration interface rather than while loop
 function solve(solver::HSDSolver)
     solver.status = :SolveCalled
@@ -128,14 +130,22 @@ function solve(solver::HSDSolver)
         error("initial mu is $(solver.mu) (should be 1.0)")
     end
 
-    while true
-        calc_residual(solver)
+    # reset_timer!()
 
+    while true
+        # @timeit "res" begin
+        calc_residual(solver)
+        # end
+
+        # @timeit "conv" begin
         calc_convergence_params(solver)
+        # end
 
         solver.verbose && print_iteration_stats(solver, solver.stepper)
 
+        # @timeit "check" begin
         check_convergence(solver) && break
+        # end
 
         if solver.num_iters == solver.max_iters
             solver.verbose && println("iteration limit reached; terminating")
@@ -150,10 +160,14 @@ function solve(solver::HSDSolver)
         end
 
         # TODO may use different function, or function could change during some iteration eg if numerical difficulties
-        combined_predict_correct(solver, solver.stepper)
+        # @timeit "step" begin
+        step(solver, solver.stepper)
+        # end
 
         solver.num_iters += 1
     end
+
+    # print_timer()
 
     # calculate result and iteration statistics and finish
     point = solver.point
@@ -233,7 +247,8 @@ function calc_residual(solver::HSDSolver)
 
     # x_residual = -A'*y - G'*z - c*tau
     x_residual = solver.x_residual
-    x_residual .= -model.A' * point.y - model.G' * point.z # TODO remove allocs
+    mul!(x_residual, model.G', point.z)
+    x_residual .= -model.A' * point.y - x_residual # TODO remove allocs
     solver.x_norm_res_t = norm(x_residual)
     @. x_residual -= model.c * solver.tau
     solver.x_norm_res = norm(x_residual) / solver.tau
