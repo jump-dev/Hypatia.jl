@@ -92,7 +92,7 @@ function check_in_cone(cone::WSOSPolyInterp)
             @inbounds for i in 1:j
                 # cone.H[i, j] += abs2(tmp3[i, j])
                 cone.H[i, j] += sum(Winv[k, l] * ipwtj[i, k] * ipwtj[j, l] for k in 1:L, l in 1:L)^2
-                cone.Hitemp[i, j] += sum(W[k, l] * ipwtj[i, k] * ipwtj[j, l] for k in 1:L, l in 1:L)^2
+                # cone.Hitemp[i, j] += sum(W[k, l] * ipwtj[i, k] * ipwtj[j, l] for k in 1:L, l in 1:L)^2
             end
         end
     end
@@ -104,7 +104,7 @@ function check_in_cone(cone::WSOSPolyInterp)
     end
     @timeit "hessian inv" cone.Hi .= inv(cone.F)
     # @show cone.Hi -  (cone.ipwt[1] \ cone.ipwt[1] * Diagonal(cone.point) * cone.ipwt[1]' * cone.ipwt[1]' \ Matrix(I, cone.dim, cone.dim))
-    @show Symmetric(cone.Hi, :U) ./ Symmetric(cone.Hitemp, :U)
+    @show Symmetric(cone.Hi, :U) ./ Hinvid(cone.ipwt[1], cone.point)
 
 end
 
@@ -122,7 +122,7 @@ end
 function Hinvarr(ipwtj, x, arr)
     lambda_arr = ipwtj' * Diagonal(arr) * ipwtj
     lambda_x = ipwtj' * Diagonal(x) * ipwtj
-    return diag(ipwtj * lambda_x * lambda_arr * lambda_x * ipwtj')
+    return diag((ipwtj * ipwtj') \ ipwtj * lambda_x * lambda_arr * lambda_x * ipwtj' * inv(ipwtj * ipwtj'))
 end
 
 function Hid(ipwtj, x)
