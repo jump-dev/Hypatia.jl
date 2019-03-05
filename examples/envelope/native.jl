@@ -75,8 +75,8 @@ function run_envelope(primal_wsos::Bool, dense::Bool)
     (c, A, b, G, h, cones, cone_idxs) =
         # build_envelope(2, 5, 1, 5, use_data = true, primal_wsos = primal_wsos, dense = dense)
         # build_envelope(2, 5, 2, 6, primal_wsos = primal_wsos, dense = dense)
-        # build_envelope(3, 5, 3, 5, primal_wsos = primal_wsos, dense = dense)
-        build_envelope(2, 30, 1, 30, primal_wsos = primal_wsos, dense = dense)
+        build_envelope(3, 5, 3, 5, primal_wsos = primal_wsos, dense = dense)
+        # build_envelope(2, 30, 1, 30, primal_wsos = primal_wsos, dense = dense)
 
     model = MO.PreprocessedLinearModel(c, A, b, G, h, cones, cone_idxs)
     solver = SO.HSDSolver(model, verbose = true)

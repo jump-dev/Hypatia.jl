@@ -12,6 +12,8 @@ using DiffResults
 
 abstract type Cone end
 
+using TimerOutputs
+
 include("orthant.jl")
 include("epinorminf.jl")
 include("epinormeucl.jl")
@@ -33,21 +35,21 @@ dimension(cone::Cone) = cone.dim
 function factorize_hess(cone::Cone)
     @. cone.H2 = cone.H
 
-    cone.F = bunchkaufman!(Symmetric(cone.H2, :U), true, check = false)
-    return issuccess(cone.F)
+    # cone.F = bunchkaufman!(Symmetric(cone.H2, :U), true, check = false)
+    # return issuccess(cone.F)
 
-    # cone.F = cholesky!(Symmetric(cone.H2, :U), Val(true), check = false)
-    # return isposdef(cone.F)
+    cone.F = cholesky!(Symmetric(cone.H2, :U), Val(true), check = false)
+    return isposdef(cone.F)
 end
 
 grad(cone::Cone) = cone.g
 hess(cone::Cone) = Symmetric(cone.H, :U)
 inv_hess(cone::Cone) = inv(cone.F)
-# hess_fact(cone::Cone) = cone.F
+hess_fact(cone::Cone) = cone.F
 # hessL(cone::Cone) = cone.F.L
 # inv_hessL(cone::Cone) = inv(cone.F.L)
-# hess_prod!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::Cone) = mul!(prod, cone.H, arr)
-# inv_hess_prod!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::Cone) = ldiv!(prod, cone.F, arr)
+hess_prod!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::Cone) = mul!(prod, Symmetric(cone.H, :U), arr)
+inv_hess_prod!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::Cone) = ldiv!(prod, cone.F, arr)
 # hessL_prod!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::Cone) = mul!(prod, cone.F.L, arr)
 # inv_hessL_prod!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::Cone) = ldiv!(prod, cone.F.L, arr)
 
