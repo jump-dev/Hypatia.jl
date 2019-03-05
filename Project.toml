@@ -22,6 +22,7 @@ Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 SemialgebraicSets = "8e049039-38e8-557d-ae3a-bc521ccf6204"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 SumOfSquares = "4b9e565b-77fc-50a5-a571-1244f986bda1"
+TimerOutputs = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
 
 [extras]
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"

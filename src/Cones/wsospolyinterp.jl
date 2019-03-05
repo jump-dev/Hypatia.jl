@@ -19,6 +19,7 @@ mutable struct WSOSPolyInterp <: Cone
     g::Vector{Float64}
     H::Matrix{Float64}
     H2::Matrix{Float64}
+    Hi::Matrix{Float64}
     F # TODO prealloc
     tmp1::Vector{Matrix{Float64}}
     tmp2::Vector{Matrix{Float64}}
@@ -35,6 +36,7 @@ mutable struct WSOSPolyInterp <: Cone
         cone.g = similar(ipwt[1], dim)
         cone.H = similar(ipwt[1], dim, dim)
         cone.H2 = similar(cone.H)
+        cone.Hi = similar(cone.H)
         cone.tmp1 = [similar(ipwt[1], size(ipwtj, 2), size(ipwtj, 2)) for ipwtj in ipwt]
         cone.tmp2 = [similar(ipwt[1], size(ipwtj, 2), dim) for ipwtj in ipwt]
         cone.tmp3 = similar(ipwt[1], dim, dim)
@@ -82,5 +84,14 @@ function check_in_cone(cone::WSOSPolyInterp)
         end
     end
 
-    return factorize_hess(cone)
+    @. cone.H2 = cone.H
+    cone.F = cholesky!(Symmetric(cone.H2, :U), Val(true), check = false)
+    if !isposdef(cone.F)
+        return false
+    end
+    cone.Hi .= inv(cone.F)
+
+    return true
 end
+
+inv_hess_prod!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::WSOSPolyInterp) = mul!(prod, Symmetric(cone.Hi, :U), arr)

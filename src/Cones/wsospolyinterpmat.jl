@@ -16,6 +16,7 @@ mutable struct WSOSPolyInterpMat <: Cone
     g::Vector{Float64}
     H::Matrix{Float64}
     H2::Matrix{Float64}
+    Hi::Matrix{Float64}
     F
     mat::Vector{Matrix{Float64}}
     matfact::Vector{CholeskyPivoted{Float64, Matrix{Float64}}}
@@ -38,6 +39,7 @@ mutable struct WSOSPolyInterpMat <: Cone
         cone.g = similar(ipwt[1], dim)
         cone.H = similar(ipwt[1], dim, dim)
         cone.H2 = similar(cone.H)
+        cone.Hi = similar(cone.H)
         cone.mat = [similar(ipwt[1], size(ipwtj, 2) * R, size(ipwtj, 2) * R) for ipwtj in ipwt]
         cone.matfact = Vector{CholeskyPivoted{Float64, Matrix{Float64}}}(undef, length(ipwt))
         cone.tmp1 = [similar(ipwt[1], size(ipwtj, 2), U) for ipwtj in ipwt]
@@ -47,24 +49,39 @@ mutable struct WSOSPolyInterpMat <: Cone
     end
 end
 
+WSOSPolyInterpMat(R::Int, U::Int, ipwt::Vector{Matrix{Float64}}) = WSOSPolyInterpMat(R, U, ipwt, false)
+
+get_nu(cone::WSOSPolyInterpMat) = cone.R * sum(size(ipwtj, 2) for ipwtj in cone.ipwt)
+
+function set_initial_point(arr::AbstractVector{Float64}, cone::WSOSPolyInterpMat)
+    # sum of diagonal matrices with interpolant polynomial repeating on the diagonal
+    idx = 1
+    for i in 1:cone.R, j in 1:i
+        arr[idx:(idx + cone.U - 1)] .= (i == j) ? 1.0 : 0.0
+        idx += cone.U
+    end
+    return arr
+end
+
 _blockrange(inner::Int, outer::Int) = (outer * (inner - 1) + 1):(outer * inner)
 
-function buildmat!(cone::WSOSPolyInterpMat, point::AbstractVector{Float64})
+# TODO all views can be allocated just once in the cone definition (delete _blockrange too)
+function check_in_cone(cone::WSOSPolyInterpMat)
+    # @timeit "build mat" begin
     for j in eachindex(cone.ipwt)
         ipwtj = cone.ipwt[j]
         tmp1j = cone.tmp1[j]
         L = size(ipwtj, 2)
         mat = cone.mat[j]
-        mat .= 0.0
 
         uo = 1
         for p in 1:cone.R, q in 1:p
-            @. tmp1j = ipwtj' * cone.point[uo:(uo + cone.U - 1)]' # TODO does this allocate?
+            point_pq = cone.point[uo:(uo + cone.U - 1)] # TODO prealloc
             if p != q
-                @. tmp1j *= rt2i
+                @. point_pq *= rt2i
             end
+            @. tmp1j = ipwtj' * point_pq'
 
-            # TODO the view can be allocated just once in the cone definition
             rinds = _blockrange(p, L)
             cinds = _blockrange(q, L)
             mul!(view(mat, rinds, cinds), tmp1j, ipwtj)
@@ -72,14 +89,20 @@ function buildmat!(cone::WSOSPolyInterpMat, point::AbstractVector{Float64})
             uo += cone.U
         end
 
-        cone.matfact[j] = cholesky!(Symmetric(mat, :L), Val(true), check=false)
+        cone.matfact[j] = cholesky!(Symmetric(mat, :L), Val(true), check = false)
         if !isposdef(cone.matfact[j])
             return false
         end
     end
+    # end
 
-    return true
-end
+    # @timeit "grad hess" begin
+    cone.g .= 0.0
+    cone.H .= 0.0
+    for j in eachindex(cone.ipwt)
+        # @timeit "W_inv" begin
+        W_inv_j = inv(cone.matfact[j])
+        # end
 
 function _block_lowertrisolve(Lmat, ipwt, blocknum, R, L, U)
     resvec = zeros(R * L, U)
@@ -161,16 +184,16 @@ function add_grad_hess_j!(cone::WSOSPolyInterpMat, j::Int, W_inv_j::Matrix{Float
             cone.g[idxs[i]] -= ipwtj[i, :]' * view(W_inv_j, rinds, cinds) * ipwtj[i, :] * fact
         end
 
-        uo2 = 0
-        for p2 in 1:cone.R, q2 in 1:p2
-            uo2 += 1
-            if uo2 < uo
-                continue
+            for i in 1:cone.U
+                cone.g[idxs[i]] -= ipwtj[i, :]' * view(W_inv_j, rinds, cinds) * ipwtj[i, :] * fact
             end
 
-            rinds2 = _blockrange(p2, L)
-            cinds2 = _blockrange(q2, L)
-            idxs2 = _blockrange(uo2, cone.U)
+            uo2 = 0
+            for p2 in 1:cone.R, q2 in 1:p2
+                uo2 += 1
+                if uo2 < uo
+                    continue
+                end
 
             mul!(tmp1j, view(W_inv_j, rinds, rinds2), ipwtj')
             mul!(tmp2, ipwtj, tmp1j)
@@ -180,45 +203,35 @@ function add_grad_hess_j!(cone::WSOSPolyInterpMat, j::Int, W_inv_j::Matrix{Float
             fact = xor(p == q, p2 == q2) ? rt2i : 1.0
             @. cone.H[idxs, idxs2] += tmp2 * tmp3 * fact
 
-            if (p != q) || (p2 != q2)
-                mul!(tmp1j, view(W_inv_j, rinds, cinds2), ipwtj')
+                mul!(tmp1j, view(W_inv_j, rinds, rinds2), ipwtj')
                 mul!(tmp2, ipwtj, tmp1j)
-                mul!(tmp1j, view(W_inv_j, cinds, rinds2), ipwtj')
+                mul!(tmp1j, view(W_inv_j, cinds, cinds2), ipwtj')
                 mul!(tmp3, ipwtj, tmp1j)
+                fact = xor(p == q, p2 == q2) ? rt2i : 1.0
                 @. cone.H[idxs, idxs2] += tmp2 * tmp3 * fact
+
+                if (p != q) || (p2 != q2)
+                    mul!(tmp1j, view(W_inv_j, rinds, cinds2), ipwtj')
+                    mul!(tmp2, ipwtj, tmp1j)
+                    mul!(tmp1j, view(W_inv_j, cinds, rinds2), ipwtj')
+                    mul!(tmp3, ipwtj, tmp1j)
+                    @. cone.H[idxs, idxs2] += tmp2 * tmp3 * fact
+                end
             end
         end
     end
+    # end
 
-    return nothing
-end
-
-WSOSPolyInterpMat(R::Int, U::Int, ipwt::Vector{Matrix{Float64}}) = WSOSPolyInterpMat(R, U, ipwt, false)
-
-get_nu(cone::WSOSPolyInterpMat) = cone.R * sum(size(ipwtj, 2) for ipwtj in cone.ipwt)
-
-function set_initial_point(arr::AbstractVector{Float64}, cone::WSOSPolyInterpMat)
-    # sum of diagonal matrices with interpolant polynomial repeating on the diagonal
-    idx = 1
-    for i in 1:cone.R, j in 1:i
-        arr[idx:(idx + cone.U - 1)] .= (i == j) ? 1.0 : 0.0
-        idx += cone.U
-    end
-    return arr
-end
-
-function check_in_cone(cone::WSOSPolyInterpMat)
-    # TODO remove the inner loop over ipwt from buildmat and put it here (that's what we do for add_grad_hess_j below)
-    if !(buildmat!(cone, cone.point))
+    # @timeit "inv hess" begin
+    @. cone.H2 = cone.H
+    cone.F = cholesky!(Symmetric(cone.H2, :U), Val(true), check = false)
+    if !isposdef(cone.F)
         return false
     end
+    cone.Hi .= inv(cone.F)
+    # end
 
-    cone.g .= 0.0
-    cone.H .= 0.0
-    for (j, ipwtj) in enumerate(cone.ipwt)
-        W_inv_j = inv(cone.matfact[j])
-        add_grad_hess_j!(cone, j, W_inv_j)
-    end
-
-    return factorize_hess(cone)
+    return true
 end
+
+inv_hess_prod!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::WSOSPolyInterpMat) = mul!(prod, Symmetric(cone.Hi, :U), arr)
