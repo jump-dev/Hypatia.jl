@@ -224,7 +224,7 @@ mutable struct PreprocessedLinearModel <: LinearModel
             model.Ap_Q2 = Ap_Q2
         else
             y_keep_idxs = Int[]
-            model.Ap_R = zeros(0, 0)
+            model.Ap_R = UpperTriangular(zeros(0, 0))
             model.Ap_Q1 = zeros(n, 0)
             model.Ap_Q2 = 1.0I(n)
         end
