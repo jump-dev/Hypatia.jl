@@ -81,11 +81,71 @@ function buildmat!(cone::WSOSPolyInterpMat, point::AbstractVector{Float64})
     return true
 end
 
+function _block_lowertrisolve(Lmat, ipwt, blocknum, R, L, U)
+    resvec = zeros(R * L, U)
+    resi(i) = resvec[_blockrange(i, L), :]
+    Lmatij(i, j) = Lmat[_blockrange(i, L), _blockrange(j, L)]
+    tmp = zeros(L, U)
+    for r in 1:R
+        if r == blocknum
+            @show size(LowerTriangular(Lmatij(r, r)) \ ipwt'), size(resvec[_blockrange(r, L), :])
+            resvec[_blockrange(r, L), :] = LowerTriangular(Lmatij(r, r)) \ ipwt'
+        elseif r > blocknum
+            tmp .= 0.0
+            for s in blocknum:(r - 1)
+                @show size(tmp), size(Lmatij(r, s)), size(resi(s))
+                tmp -= Lmatij(r, s) * resi(s)
+            end
+            resvec[_blockrange(r, L), :] = LowerTriangular(Lmatij(r, r)) \ tmp
+        end
+    end
+    return resvec
+end
+function _block_lowertrisolve(Lmat, ipwt, R, L, U)
+    resmat = zeros(R * L, R * U)
+    for r in 1:R
+        resmat[:, _blockrange(r, U)] = _block_lowertrisolve(Lmat, ipwt, r, R, L, U)
+    end
+    return resmat
+end
+function _block_uppertrisolve(Lmat, ipwt, blocknum, R, L, U)
+    resvec = zeros(R * L, U)
+    resi(i) = resvec[_blockrange(i, L)]
+    Lmatij(i, j) = Lmat[_blockrange(i, L), _blockrange(j, L)]
+    tmp = zeros(L, U)
+    for r in reverse(1:R)
+        if r == blocknum
+            resvec[_blockrange(r, L), :] = LowerTriangular(Lmatij(r, r)) \ ipwt'
+        elseif r < blocknum
+            tmp .= 0.0
+            for s in reverse(blocknum:(r - 1))
+                tmp -= Lmatij(r, s) * resi(s)
+            end
+            resvec[_blockrange(r, L), :] = LowerTriangular(Lmatij(r, r)) \ tmp
+        end
+    end
+    return resvec
+end
+
+using Test
+R = 3; U = 5; L = 4;
+ipwt = rand(U, L)
+kron_ipwt = kron(Matrix(I, R, R), ipwt')
+blocklambda = rand(R * L, R * L)
+blocklambda = blocklambda * blocklambda'
+F = cholesky(blocklambda)
+Ux = _block_lowertrisolve(F.L, ipwt, R, L, U)
+@test Ux ≈ F.L \ kron_ipwt
+
+
 function add_grad_hess_j!(cone::WSOSPolyInterpMat, j::Int, W_inv_j::Matrix{Float64})
     ipwtj = cone.ipwt[j]
     tmp1j = cone.tmp1[j]
     tmp2 = cone.tmp2
     tmp3 = cone.tmp3
+    kron_ipwtj = kron(Matrix(I, cone.R, cone.R), ipwtj')
+    kron_Winv = cone.matfact[j] \ kron_ipwtj
+    big_PLambdaP = kron(Matrix(I, cone.R, cone.R), ipwtj) * cone.matfact[j] \ kron(Matrix(I, cone.R, cone.R), ipwtj')
 
     L = size(ipwtj, 2)
     uo = 0
@@ -114,6 +174,7 @@ function add_grad_hess_j!(cone::WSOSPolyInterpMat, j::Int, W_inv_j::Matrix{Float
 
             mul!(tmp1j, view(W_inv_j, rinds, rinds2), ipwtj')
             mul!(tmp2, ipwtj, tmp1j)
+            # @show tmp2 ./ big_PLambdaP[_blockrange(p, cone.U), _blockrange(p2, cone.U)]
             mul!(tmp1j, view(W_inv_j, cinds, cinds2), ipwtj')
             mul!(tmp3, ipwtj, tmp1j)
             fact = xor(p == q, p2 == q2) ? rt2i : 1.0
