@@ -1,6 +1,6 @@
 
 mutable struct QRCholCombinedHSDSystemSolver <: CombinedHSDSystemSolver
-    Ap_RiQ1t # TODO maybe do this lazily
+    # Ap_RiQ1t
 
     xi::Matrix{Float64}
     yi::Matrix{Float64}
@@ -53,7 +53,7 @@ mutable struct QRCholCombinedHSDSystemSolver <: CombinedHSDSystemSolver
         (n, p, q) = (model.n, model.p, model.q)
         system_solver = new()
 
-        system_solver.Ap_RiQ1t = model.Ap_R \ (model.Ap_Q1')
+        # system_solver.Ap_RiQ1t = model.Ap_R \ (model.Ap_Q1')
 
         xi = Matrix{Float64}(undef, n, 3)
         yi = Matrix{Float64}(undef, p, 3)
@@ -110,12 +110,6 @@ mutable struct QRCholCombinedHSDSystemSolver <: CombinedHSDSystemSolver
         return system_solver
     end
 end
-
-# TODO use BLAS
-# gemv!(tA, alpha, A, x, beta, y)
-# Update the vector y as alpha*A*x + beta*y or alpha*A'x + beta*y according to tA. alpha and beta are scalars. Return the updated y.
-# gemm!(tA, tB, alpha, A, B, beta, C)
-# Update C as alpha*A*B + beta*C or the other three variants according to tA and tB. Return the updated C.
 
 function get_combined_directions(solver::HSDSolver, system_solver::QRCholCombinedHSDSystemSolver)
     model = solver.model
@@ -227,7 +221,8 @@ function get_combined_directions(solver::HSDSolver, system_solver::QRCholCombine
     @. bxGHbz += xi
 
     # Q1x = Q1*Ri'*by
-    mul!(Q1x, system_solver.Ap_RiQ1t', yi)
+    ldiv!(model.Ap_R', yi)
+    mul!(Q1x, model.Ap_Q1, yi)
 
     # Q2x = Q2*(K22_F\(Q2'*(bxGHbz - GHG*Q1x)))
     mul!(GQ1x, model.G, Q1x)
@@ -277,7 +272,9 @@ function get_combined_directions(solver::HSDSolver, system_solver::QRCholCombine
     block_hessian_product!(HGxi_k, Gxi_k)
     mul!(GHGxi, model.G', HGxi)
     @. bxGHbz -= GHGxi
-    mul!(yi, system_solver.Ap_RiQ1t, bxGHbz)
+    # mul!(yi, system_solver.Ap_RiQ1t, bxGHbz)
+    mul!(yi, model.Ap_Q1', bxGHbz)
+    ldiv!(model.Ap_R, yi)
 
     # zi = HG*xi - Hbz
     @. zi = HGxi - zi

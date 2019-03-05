@@ -25,7 +25,7 @@ include(joinpath(examples_dir, "namedpoly/native.jl"))
 
 include(joinpath(@__DIR__, "native.jl"))
 
-# include(joinpath(@__DIR__, "MathOptInterface.jl"))
+include(joinpath(@__DIR__, "MathOptInterface.jl"))
 #
 # include(joinpath(examples_dir, "envelope/jump.jl"))
 # include(joinpath(examples_dir, "expdesign/jump.jl"))
@@ -54,7 +54,7 @@ include(joinpath(@__DIR__, "native.jl"))
 verbose = true
 system_solvers = [
     SO.NaiveCombinedHSDSystemSolver,
-    # SO.QRCholCombinedHSDSystemSolver,
+    SO.QRCholCombinedHSDSystemSolver,
     ]
 testfuns_singular = [
     dimension1,
@@ -106,12 +106,12 @@ testfuns_nonsingular = [
     epipersumexp1,
     epipersumexp2,
     ]
-@testset "native tests: $t, $s, $m" for t in testfuns_nonsingular, s in system_solvers, m in linear_models
-    if s == SO.QRCholCombinedHSDSystemSolver && m == MO.RawLinearModel
-        continue # QRChol linear system solver needs preprocessed model
-    end
-    t(verbose, s, m)
-end
+# @testset "native tests: $t, $s, $m" for t in testfuns_nonsingular, s in system_solvers, m in linear_models
+#     if s == SO.QRCholCombinedHSDSystemSolver && m == MO.RawLinearModel
+#         continue # QRChol linear system solver needs preprocessed model
+#     end
+#     t(verbose, s, m)
+# end
 #
 # @info("starting default native examples tests")
 # testfuns = [
@@ -162,20 +162,20 @@ end
 #     end
 #     t(verbose, s, m)
 # end
-#
-# @info("starting MathOptInterface tests")
-# verbose = false
-# system_solvers = [
-#     # SO.NaiveCombinedHSDSystemSolver,
-#     SO.QRCholCombinedHSDSystemSolver,
-#     ]
-# linear_models = [
-#     MO.PreprocessedLinearModel, # MOI tests require preprocessing
-#     ]
-# @testset "MOI tests: $(d ? "dense" : "sparse"), $s, $m" for d in (false, true), s in system_solvers, m in linear_models
-#     test_moi(verbose, d, s, m)
-# end
-#
+
+@info("starting MathOptInterface tests")
+verbose = false
+system_solvers = [
+    SO.NaiveCombinedHSDSystemSolver,
+    SO.QRCholCombinedHSDSystemSolver,
+    ]
+linear_models = [
+    MO.PreprocessedLinearModel, # MOI tests require preprocessing
+    ]
+@testset "MOI tests: $(d ? "dense" : "sparse"), $s, $m" for d in (false, true), s in system_solvers, m in linear_models
+    test_moi(verbose, d, s, m)
+end
+
 # @info("starting default JuMP examples tests")
 # testfuns = [
 #     run_JuMP_envelope_boxinterp,
