@@ -104,6 +104,7 @@ function check_in_cone(cone::WSOSPolyInterpMat)
         W_inv_j = inv(cone.matfact[j])
         # end
 
+# left hand side always a kronecker with the identity
 function _block_lowertrisolve(Lmat, ipwt, blocknum, R, L, U)
     resvec = zeros(R * L, U)
     resi(i) = resvec[_blockrange(i, L), :]
@@ -131,23 +132,32 @@ function _block_lowertrisolve(Lmat, ipwt, R, L, U)
     end
     return resmat
 end
-function _block_uppertrisolve(Lmat, ipwt, blocknum, R, L, U)
+# left hand side always upper triangular block matrix
+function _block_uppertrisolve(Umat, rhs, blocknum, R, L, U)
     resvec = zeros(R * L, U)
-    resi(i) = resvec[_blockrange(i, L)]
-    Lmatij(i, j) = Lmat[_blockrange(i, L), _blockrange(j, L)]
+    resi(i) = resvec[_blockrange(i, L), :]
+    Umatij(i, j) = Umat[_blockrange(i, L), _blockrange(j, L)]
+    rhsi(i) = rhs[_blockrange(i, L), :]
     tmp = zeros(L, U)
     for r in reverse(1:R)
-        if r == blocknum
-            resvec[_blockrange(r, L), :] = LowerTriangular(Lmatij(r, r)) \ ipwt'
-        elseif r < blocknum
-            tmp .= 0.0
-            for s in reverse(blocknum:(r - 1))
-                tmp -= Lmatij(r, s) * resi(s)
+        if r == R
+            resvec[_blockrange(r, L), :] = UpperTriangular(Umatij(r, r)) \ rhsi(r)
+        else
+            tmp .= rhsi(r)
+            for s in reverse((r + 1):R)
+                tmp -= Umatij(r, s) * resi(s)
             end
-            resvec[_blockrange(r, L), :] = LowerTriangular(Lmatij(r, r)) \ tmp
+            resvec[_blockrange(r, L), :] = UpperTriangular(Umatij(r, r)) \ tmp
         end
     end
     return resvec
+end
+function _block_uppertrisolve(Umat, rhs, R, L, U)
+    resmat = zeros(R * L, R * U)
+    for r in 1:R
+        resmat[:, _blockrange(r, U)] = _block_uppertrisolve(Umat, rhs[:, _blockrange(r, U)], r, R, L, U)
+    end
+    return resmat
 end
 
 using Test
@@ -159,6 +169,8 @@ blocklambda = blocklambda * blocklambda'
 F = cholesky(blocklambda)
 Ux = _block_lowertrisolve(F.L, ipwt, R, L, U)
 @test Ux ≈ F.L \ kron_ipwt
+x = _block_uppertrisolve(F.U, Ux, R, L, U)
+@test x ≈ F \ kron_ipwt
 
 
 function add_grad_hess_j!(cone::WSOSPolyInterpMat, j::Int, W_inv_j::Matrix{Float64})
