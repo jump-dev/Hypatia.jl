@@ -114,7 +114,8 @@ function check_in_cone(cone::WSOSPolyInterpMat)
         kron_ipwtj = kron(Matrix(I, cone.R, cone.R), ipwtj')
         kron_Winv = cone.matfact[j] \ kron_ipwtj
         # big_PLambdaP = kron(Matrix(I, cone.R, cone.R), ipwtj) * cone.matfact[j] \ kron(Matrix(I, cone.R, cone.R), ipwtj')
-        big_PLambdaP = kron(Matrix(I, cone.R, cone.R), ipwtj) * _block_uppertrisolve(cone.matfact[j].U, _block_lowertrisolve(cone.matfact[j].L, ipwtj, cone.R, L, cone.U), cone.R, L, cone.U)
+        # big_PLambdaP = kron(Matrix(I, cone.R, cone.R), ipwtj) * _block_uppertrisolve(cone.matfact[j].U, _block_lowertrisolve(cone.matfact[j].L, ipwtj, cone.R, L, cone.U), cone.R, L, cone.U)
+        big_PLambdaP = PLmabdaP(cone.matfact[j], ipwtj, cone.R, cone.L, cone.U)
 
         uo = 0
         for p in 1:cone.R, q in 1:p
@@ -226,18 +227,33 @@ function _block_uppertrisolve(Umat, rhs, R, L, U)
     end
     return resmat
 end
+function mul_ipwtkron(ipwt, x, R)
+    res = Matrix(undef, R * U, R * U)
+    for r in 1:R
+        for s in 1:R # will actually be symmetric
+            res[_blockrange(r, U), _blockrange(s, U)] = ipwt * x[_blockrange(r, L), _blockrange(s, U)]
+        end
+    end
+    return res
+end
+function PLmabdaP(fact, ipwtj, R, L, U)
+    mul_ipwtkron(ipwt, _block_uppertrisolve(fact.U, _block_lowertrisolve(fact.L, ipwtj, R, L, U), R, L, U), R)
+end
+
 
 # using Test
+# using LinearAlgebra
 # R = 3; U = 5; L = 4;
 # ipwt = rand(U, L)
-# kron_ipwt = kron(Matrix(I, R, R), ipwt')
+# kron_ipwt = kron(Matrix(I, R, R), ipwt)
 # blocklambda = rand(R * L, R * L)
 # blocklambda = blocklambda * blocklambda'
 # F = cholesky(blocklambda)
 # Ux = _block_lowertrisolve(F.L, ipwt, R, L, U)
-# @test Ux ≈ F.L \ kron_ipwt
+# @test Ux ≈ F.L \ kron_ipwt'
 # x = _block_uppertrisolve(F.U, Ux, R, L, U)
-# @test x ≈ F \ kron_ipwt
+# @test x ≈ F \ kron_ipwt'
+# @test kron_ipwt * inv(F) * kron_ipwt' ≈ mul_ipwtkron(ipwt, x, R)
 
 
 inv_hess_prod!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::WSOSPolyInterpMat) = mul!(prod, Symmetric(cone.Hi, :U), arr)
