@@ -28,6 +28,8 @@ The primal-dual optimality conditions are:
 ```
 =#
 
+# TODO check model data consistency
+
 mutable struct RawLinearModel <: LinearModel
     n::Int
     p::Int
@@ -42,7 +44,7 @@ mutable struct RawLinearModel <: LinearModel
     nu::Float64
 
     initial_point::Point
-    final_point::Point
+    result_point::Point
 
     function RawLinearModel(c::Vector{Float64}, A::AbstractMatrix{Float64}, b::Vector{Float64}, G::AbstractMatrix{Float64}, h::Vector{Float64}, cones::Vector{<:Cones.Cone}, cone_idxs::Vector{UnitRange{Int}})
         model = new()
@@ -60,27 +62,24 @@ mutable struct RawLinearModel <: LinearModel
         model.nu = isempty(cones) ? 0.0 : sum(Cones.get_nu, cones)
 
         # get initial point
-        point = Point(similar(c), similar(b), similar(h), similar(h), cones, cone_idxs)
+        point = Point(Float64[], Float64[], similar(h), similar(h), cones, cone_idxs)
         set_initial_cone_point(point, model.cones)
-        if !isempty(point.y)
-            # solve for y as least squares solution to A'y = -c - G'z
-            # TODO reduce allocs
-            y_rhs = -c - G' * point.z
-            point.y .= (issparse(A) ? sparse(A') : A') \ y_rhs
+
+        # solve for y as least squares solution to A'y = -c - G'z
+        if !iszero(model.p)
+            point.y = (issparse(A) ? sparse(A') : A') \ (-c - G' * point.z)
         end
-        if !isempty(point.x)
-            # solve for x as least squares solution to Ax = b, Gx = h - s
-            # TODO reduce allocs
-            x_rhs = vcat(b, h - point.s)
-            point.x .= vcat(A, G) \ x_rhs
+
+        # solve for x as least squares solution to Ax = b, Gx = h - s
+        if !iszero(model.n)
+            point.x = vcat(A, G) \ vcat(b, h - point.s)
         end
+
         model.initial_point = point
 
         return model
     end
 end
-
-# TODO check model data consistency function
 
 mutable struct PreprocessedLinearModel <: LinearModel
     n::Int
@@ -99,13 +98,15 @@ mutable struct PreprocessedLinearModel <: LinearModel
     p_raw::Int
     x_keep_idxs::AbstractVector{Int}
     y_keep_idxs::AbstractVector{Int}
-    Ap_R
-    Ap_Q1
-    Ap_Q2
+    Ap_R::AbstractMatrix{Float64}
+    Ap_Q1::AbstractMatrix{Float64}
+    Ap_Q2::AbstractMatrix{Float64}
 
     initial_point::Point
-    final_point::Point
+    result_point::Point
 
+    # TODO could optionally rescale rows of [A, b] and [G, h] and [A', G', c] and variables
+    # NOTE (pivoted) QR factorizations are usually rank-revealing but may be unreliable, see http://www.math.sjsu.edu/~foster/rankrevealingcode.html
     function PreprocessedLinearModel(c::Vector{Float64}, A::AbstractMatrix{Float64}, b::Vector{Float64}, G::AbstractMatrix{Float64}, h::Vector{Float64}, cones::Vector{<:Cones.Cone}, cone_idxs::Vector{UnitRange{Int}}; tol_QR::Float64 = 1e-13)
         model = new()
         n = length(c)
@@ -119,16 +120,12 @@ mutable struct PreprocessedLinearModel <: LinearModel
         model.cone_idxs = cone_idxs
         model.nu = isempty(cones) ? 0.0 : sum(Cones.get_nu, cones)
 
-        # TODO could optionally rescale rows of [A, b] and [G, h] and [A', G', c] and variables
-
         # get initial point and preprocess
-        point = Point(similar(c), similar(b), similar(h), similar(h), cones, cone_idxs)
+        point = Point(Float64[], Float64[], similar(h), similar(h), cones, cone_idxs)
         set_initial_cone_point(point, model.cones)
 
-        # NOTE (pivoted) QR factorizations are usually rank-revealing but may be unreliable, see http://www.math.sjsu.edu/~foster/rankrevealingcode.html
-
         # solve for x as least squares solution to Ax = b, Gx = h - s
-        if !isempty(point.x)
+        if !iszero(n)
             # get pivoted QR # TODO when Julia has a unified QR interface, replace this
             AG = vcat(A, G)
             if issparse(AG)
@@ -172,7 +169,6 @@ mutable struct PreprocessedLinearModel <: LinearModel
                 A = A[:, x_keep_idxs]
                 G = G[:, x_keep_idxs]
                 n = AG_rank
-
                 point.x = AG_R \ (AG_Q1' * vcat(b, h - point.s))
             end
         else
@@ -180,7 +176,7 @@ mutable struct PreprocessedLinearModel <: LinearModel
         end
 
         # solve for y as least squares solution to A'y = -c - G'z
-        # if !isempty(point.y)
+        if !iszero(p)
             # get pivoted QR # TODO when Julia has a unified QR interface, replace this
             if issparse(A)
                 Ap_fact = qr(sparse(A'), tol = tol_QR)
@@ -223,13 +219,15 @@ mutable struct PreprocessedLinearModel <: LinearModel
             b = b_sub
             p = Ap_rank
             point.y = Ap_R \ (Ap_Q1' * (-c - G' * point.z)) # TODO remove allocs
-
             model.Ap_R = Ap_R
             model.Ap_Q1 = Ap_Q1
             model.Ap_Q2 = Ap_Q2
-        # else
-        #     y_keep_idxs = Int[]
-        # end
+        else
+            y_keep_idxs = Int[]
+            model.Ap_R = zeros(0, 0)
+            model.Ap_Q1 = zeros(n, 0)
+            model.Ap_Q2 = 1.0I(n)
+        end
 
         model.n = n
         model.p = p
@@ -255,7 +253,7 @@ function set_initial_cone_point(point, cones)
         @assert Cones.check_in_cone(cone_k)
         point.dual_views[k] .= -Cones.grad(cone_k)
     end
-    return
+    return point
 end
 
 # function x_unprocess(x_processed::Vector{Float64}, model::PreprocessedLinearModel)
