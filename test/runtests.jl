@@ -53,8 +53,8 @@ include(joinpath(@__DIR__, "native.jl"))
 @info("starting native interface tests")
 verbose = true
 system_solvers = [
-    # SO.NaiveCombinedHSDSystemSolver,
-    SO.QRCholCombinedHSDSystemSolver,
+    SO.NaiveCombinedHSDSystemSolver,
+    # SO.QRCholCombinedHSDSystemSolver,
     ]
 testfuns_singular = [
     dimension1,
