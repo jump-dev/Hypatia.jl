@@ -251,7 +251,8 @@ function set_initial_cone_point(point, cones)
         Cones.set_initial_point(primal_k, cone_k)
         Cones.load_point(cone_k, primal_k)
         @assert Cones.check_in_cone(cone_k)
-        point.dual_views[k] .= -Cones.grad(cone_k)
+        g = Cones.grad(cone_k)
+        @. point.dual_views[k] = -g
     end
     return point
 end
