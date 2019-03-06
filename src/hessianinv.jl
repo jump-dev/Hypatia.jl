@@ -7,7 +7,7 @@ const MU = HYP.ModelUtilities
 using LinearAlgebra
 
 n = 1
-d = 4
+d = 2
 domain = MU.FreeDomain(n)
 (U, pts, P, PWts, w) = MU.interpolate(domain, d)
 L = size(P, 2)
@@ -60,9 +60,6 @@ end
 # @show Hid()
 
 
-P * (W * lambda(y) * W) * P'
-
-
 gradient(y) = -diag(P * (lambda(y) \ P'))
 H_opi(y) = diag(P * inv(lambda(gradient(x))) * lambda(y) * inv(lambda(gradient(x))) * P')
 # H_opi(y) = diag(P * inv(lambda(1 ./ x)) * lambda(y) * inv(lambda(1 ./ x)) * P')
@@ -70,7 +67,6 @@ H_opi(y) = diag(P * inv(lambda(gradient(x))) * lambda(y) * inv(lambda(gradient(x
 # PWii = pinv(P * Wi)'
 # H_opi(y) = diag(PWii * lambda(y) * PWii')
 
-H_opi(y) =
 
 function Hidi()
     U = size(P, 1)
