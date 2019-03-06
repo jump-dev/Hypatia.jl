@@ -53,7 +53,7 @@ end
 @info("starting native interface tests")
 verbose = true
 system_solvers = [
-    # SO.NaiveCombinedHSDSystemSolver,
+    SO.NaiveCombinedHSDSystemSolver,
     SO.QRCholCombinedHSDSystemSolver,
     ]
 testfuns_singular = [
@@ -62,9 +62,9 @@ testfuns_singular = [
     inconsistent1,
     inconsistent2,
     ]
-# @testset "preprocessing tests: $t, $s" for t in testfuns_singular, s in system_solvers
-#     t(verbose, s, MO.PreprocessedLinearModel)
-# end
+@testset "preprocessing tests: $t, $s" for t in testfuns_singular, s in system_solvers
+    t(verbose, s, MO.PreprocessedLinearModel)
+end
 linear_models = [
     MO.RawLinearModel,
     MO.PreprocessedLinearModel,
@@ -166,7 +166,7 @@ end
 @info("starting MathOptInterface tests")
 verbose = false
 system_solvers = [
-    # SO.NaiveCombinedHSDSystemSolver,
+    SO.NaiveCombinedHSDSystemSolver,
     SO.QRCholCombinedHSDSystemSolver,
     ]
 linear_models = [
@@ -212,35 +212,35 @@ testfuns = [
 end
 
 # @info("starting additional JuMP examples tests")
-testfuns = [
-    namedpoly1_JuMP,
-    namedpoly2_JuMP,
-    namedpoly3_JuMP,
-    namedpoly4_JuMP, # numerically unstable
-    namedpoly5_JuMP,
-    namedpoly6_JuMP,
-    namedpoly7_JuMP,
-    namedpoly8_JuMP,
-    namedpoly9_JuMP,
-    namedpoly10_JuMP,
-    shapeconregr1_JuMP,
-    shapeconregr2_JuMP,
-    shapeconregr3_JuMP,
-    shapeconregr4_JuMP,
-    shapeconregr5_JuMP,
-    shapeconregr6_JuMP,
-    shapeconregr7_JuMP, # numerically unstable
-    shapeconregr8_JuMP,
-    shapeconregr9_JuMP, # numerically unstable
-    shapeconregr10_JuMP, # numerically unstable
-    shapeconregr11_JuMP, # numerically unstable
-    shapeconregr12_JuMP, # numerically unstable
-    shapeconregr13_JuMP, # numerically unstable
-    # shapeconregr14_JuMP, # throws out-of-memory error
-    # shapeconregr15_JuMP, # throws out-of-memory error
-    ]
-@testset "JuMP examples: $t" for t in testfuns
-    t()
-end
+# testfuns = [
+#     namedpoly1_JuMP,
+#     namedpoly2_JuMP,
+#     namedpoly3_JuMP,
+#     namedpoly4_JuMP, # numerically unstable
+#     namedpoly5_JuMP,
+#     namedpoly6_JuMP,
+#     namedpoly7_JuMP,
+#     namedpoly8_JuMP,
+#     namedpoly9_JuMP,
+#     namedpoly10_JuMP,
+#     shapeconregr1_JuMP,
+#     shapeconregr2_JuMP,
+#     shapeconregr3_JuMP,
+#     shapeconregr4_JuMP,
+#     shapeconregr5_JuMP,
+#     shapeconregr6_JuMP,
+#     shapeconregr7_JuMP, # numerically unstable
+#     shapeconregr8_JuMP,
+#     shapeconregr9_JuMP, # numerically unstable
+#     shapeconregr10_JuMP, # numerically unstable
+#     shapeconregr11_JuMP, # numerically unstable
+#     shapeconregr12_JuMP, # numerically unstable
+#     shapeconregr13_JuMP, # numerically unstable
+#     # shapeconregr14_JuMP, # throws out-of-memory error
+#     # shapeconregr15_JuMP, # throws out-of-memory error
+#     ]
+# @testset "JuMP examples: $t" for t in testfuns
+#     t()
+# end
 
 end
