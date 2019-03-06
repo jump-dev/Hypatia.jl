@@ -4,19 +4,17 @@ mutable struct NaiveCombinedHSDSystemSolver <: CombinedHSDSystemSolver
     lhs::Matrix{Float64}
     lhs_H_k
     rhs::Matrix{Float64}
-    sol::Matrix{Float64}
-    x_rhs1
-    x_sol
-    y_rhs1
-    y_sol
-    z_rhs1_k
-    z_rhs2_k
-    z_sol
-    kap_sol
-    s_rhs1
-    s_rhs2
-    s_sol
-    tau_sol
+    x1
+    x2
+    y1
+    y2
+    z1
+    z2
+    z1_k
+    z2_k
+    s1
+    s2
+    kap_row::Int
 
     function NaiveCombinedHSDSystemSolver(model::Models.LinearModel)
         (n, p, q) = (model.n, model.p, model.q)
@@ -40,21 +38,22 @@ mutable struct NaiveCombinedHSDSystemSolver <: CombinedHSDSystemSolver
         system_solver.lhs_H_k = [view_k(k) for k in eachindex(model.cones)]
 
         system_solver.rhs = zeros(size(system_solver.lhs, 1), 2)
-        system_solver.sol = similar(system_solver.rhs)
         rows = 1:n
-        system_solver.x_rhs1 = view(system_solver.rhs, rows, 1)
-        system_solver.x_sol = view(system_solver.sol, rows, :)
+        system_solver.x1 = view(system_solver.rhs, rows, 1)
+        system_solver.x2 = view(system_solver.rhs, rows, 2)
         rows = (n + 1):(n + p)
-        system_solver.y_rhs1 = view(system_solver.rhs, rows, 1)
-        system_solver.y_sol = view(system_solver.sol, rows, :)
-        system_solver.z_rhs1_k = [view(system_solver.rhs, (n + p) .+ model.cone_idxs[k], 1) for k in eachindex(model.cones)]
-        system_solver.z_rhs2_k = [view(system_solver.rhs, (n + p) .+ model.cone_idxs[k], 2) for k in eachindex(model.cones)]
-        system_solver.z_sol = view(system_solver.sol, (n + p + 1):(n + p + q), :)
-        system_solver.kap_sol = view(system_solver.sol, n + p + q + 1, :)
+        system_solver.y1 = view(system_solver.rhs, rows, 1)
+        system_solver.y2 = view(system_solver.rhs, rows, 2)
+        rows = (n + p + 1):(n + p + q)
+        system_solver.z1 = view(system_solver.rhs, rows, 1)
+        system_solver.z2 = view(system_solver.rhs, rows, 2)
+        z_start = n + p
+        system_solver.z1_k = [view(system_solver.rhs, z_start .+ model.cone_idxs[k], 1) for k in eachindex(model.cones)]
+        system_solver.z2_k = [view(system_solver.rhs, z_start .+ model.cone_idxs[k], 2) for k in eachindex(model.cones)]
         rows = (n + p + q + 2):(n + p + 2q + 1)
-        system_solver.s_rhs1 = view(system_solver.rhs, rows, 1)
-        system_solver.s_sol = view(system_solver.sol, rows, :)
-        system_solver.tau_sol = view(system_solver.sol, n + p + 2q + 2, :)
+        system_solver.s1 = view(system_solver.rhs, rows, 1)
+        system_solver.s2 = view(system_solver.rhs, rows, 2)
+        system_solver.kap_row = n + p + q + 1
 
         return system_solver
     end
@@ -63,33 +62,38 @@ end
 function get_combined_directions(solver::HSDSolver, system_solver::NaiveCombinedHSDSystemSolver)
     model = solver.model
     cones = model.cones
-    point = solver.point
     lhs = system_solver.lhs
     rhs = system_solver.rhs
-    (n, p, q) = (model.n, model.p, model.q)
+    kap_row = system_solver.kap_row
 
     # update lhs matrix
     copyto!(lhs, system_solver.lhs_copy)
-    lhs[n + p + q + 1, end] = solver.mu / solver.tau / solver.tau
+    lhs[kap_row, end] = solver.mu / solver.tau / solver.tau
     for k in eachindex(cones)
-        system_solver.lhs_H_k[k] .= solver.mu * Cones.hess(cones[k])
+        H = Cones.hess(cones[k])
+        @. system_solver.lhs_H_k[k] = solver.mu * H
     end
 
     # update rhs matrix
-    row = n + p + q + 1
-    rhs[row, 1] = -solver.kap
-    rhs[row, 2] = -solver.kap + solver.mu / solver.tau
-    rhs[row + q + 1, 1] = solver.kap + solver.primal_obj_t - solver.dual_obj_t
-    system_solver.x_rhs1 .= solver.x_residual
-    system_solver.y_rhs1 .= solver.y_residual
-    system_solver.s_rhs1 .= solver.z_residual
+    system_solver.x1 .= solver.x_residual
+    system_solver.x2 .= 0.0
+    system_solver.y1 .= solver.y_residual
+    system_solver.y2 .= 0.0
     for k in eachindex(cones)
-        system_solver.z_rhs1_k[k] .= -point.dual_views[k]
-        system_solver.z_rhs2_k[k] .= -point.dual_views[k] - solver.mu * Cones.grad(cones[k])
+        duals_k = solver.point.dual_views[k]
+        g = Cones.grad(cones[k])
+        @. system_solver.z1_k[k] = -duals_k
+        @. system_solver.z2_k[k] = -duals_k - solver.mu * g
     end
+    system_solver.s1 .= solver.z_residual
+    system_solver.s2 .= 0.0
+    rhs[kap_row, 1] = -solver.kap
+    rhs[kap_row, 2] = -solver.kap + solver.mu / solver.tau
+    rhs[end, 1] = solver.kap + solver.primal_obj_t - solver.dual_obj_t
+    rhs[end, 2] = 0.0
 
     # solve linear system_solver
-    ldiv!(system_solver.sol, lu!(lhs), rhs)
+    ldiv!(lu!(lhs), rhs)
 
-    return (system_solver.x_sol, system_solver.y_sol, system_solver.z_sol, system_solver.s_sol, system_solver.tau_sol, system_solver.kap_sol)
+    return (system_solver.x1, system_solver.x2, system_solver.y1, system_solver.y2, system_solver.z1, system_solver.z2, system_solver.s1, system_solver.s2, rhs[end, 1], rhs[end, 2], rhs[kap_row, 1], rhs[kap_row, 2])
 end
