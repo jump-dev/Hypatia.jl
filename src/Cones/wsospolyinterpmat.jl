@@ -41,7 +41,7 @@ mutable struct WSOSPolyInterpMat <: Cone
         cone.H2 = similar(cone.H)
         cone.Hi = similar(cone.H)
         cone.mat = [similar(ipwt[1], size(ipwtj, 2) * R, size(ipwtj, 2) * R) for ipwtj in ipwt]
-        cone.matfact = Vector{Cholesky{Float64,Array{Float64,2}}}(undef, length(ipwt)) # {CholeskyPivoted{Float64, Matrix{Float64}}}(undef, length(ipwt))
+        cone.matfact = Vector{CholeskyPivoted{Float64, Matrix{Float64}}}(undef, length(ipwt))
         cone.tmp1 = [similar(ipwt[1], size(ipwtj, 2), U) for ipwtj in ipwt]
         cone.tmp2 = similar(ipwt[1], U, U)
         cone.tmp3 = similar(cone.tmp2)
@@ -176,30 +176,46 @@ function check_in_cone(cone::WSOSPolyInterpMat)
     return true
 end
 
-
+# get block after pivoting, this is dumb don't do it
+# function getblock(fact, ipwt, blocknum, R, L, U, r)
+#     block = zeros(L, U)
+#     row = (r - 1) * L
+#     for l in 1:L
+#         row += 1
+#         if fact.p[row] in _blockrange(blocknum, L)
+#             block[l, :] = ipwt[:, l]
+#         end
+#     end
+#     return block
+# end
 # left hand side always a kronecker with the identity
-function _block_lowertrisolve(Lmat, ipwt, blocknum, R, L, U)
-    resvec = zeros(R * L, U)
-    resi(i) = resvec[_blockrange(i, L), :]
-    Lmatij(i, j) = Lmat[_blockrange(i, L), _blockrange(j, L)]
-    tmp = zeros(L, U)
-    for r in 1:R
-        if r == blocknum
-            resvec[_blockrange(r, L), :] = LowerTriangular(Lmatij(r, r)) \ ipwt'
-        elseif r > blocknum
-            tmp .= 0.0
-            for s in blocknum:(r - 1)
-                tmp -= Lmatij(r, s) * resi(s)
-            end
-            resvec[_blockrange(r, L), :] = LowerTriangular(Lmatij(r, r)) \ tmp
-        end
-    end
-    return resvec
+function _block_lowertrisolve(fact, ipwt, blocknum, R, L, U)
+    Lmat = fact.L
+    ei = zeros(R)
+    ei[blocknum] = 1.0
+    rhs = kron(ei, ipwt')
+    return Lmat \ view(rhs, fact.p, :)
+    # resvec = zeros(R * L, U)
+    # resi(i) = resvec[_blockrange(i, L), :]
+    # Lmatij(i, j) = Lmat[_blockrange(i, L), _blockrange(j, L)]
+    # tmp = zeros(L, U)
+    # for r in 1:R
+    #     if r == blocknum
+    #         resvec[_blockrange(r, L), :] = LowerTriangular(Lmatij(r, r)) \ ipwt'
+    #     elseif r > blocknum
+    #         tmp .= 0.0
+    #         for s in blocknum:(r - 1)
+    #             tmp -= Lmatij(r, s) * resi(s)
+    #         end
+    #         resvec[_blockrange(r, L), :] = LowerTriangular(Lmatij(r, r)) \ tmp
+    #     end
+    # end
+    # return resvec
 end
-function _block_lowertrisolve(Lmat, ipwt, R, L, U)
+function _block_lowertrisolve(fact, ipwt, R, L, U)
     resmat = zeros(R * L, R * U)
     for r in 1:R
-        resmat[:, _blockrange(r, U)] = _block_lowertrisolve(Lmat, ipwt, r, R, L, U)
+        resmat[:, _blockrange(r, U)] = _block_lowertrisolve(fact, ipwt, r, R, L, U)
     end
     return resmat
 end
@@ -219,6 +235,7 @@ function mulblocks(Ux, R, L, U)
     #         tmp .= 0.0
     #         # since Ux is block lower triangular rows only from max(i,j) start making a nonzero contribution to the product
     #         for k = j:R
+    #             # actually each block is symmetric so could make this better
     #             tmp += Ux[_blockrange(k, L), _blockrange(i, U)]' * Ux[_blockrange(k, L), _blockrange(j, U)]
     #         end
     #         res[rinds, cinds] = tmp
@@ -229,29 +246,81 @@ end
 
 function PLmabdaP(fact, ipwtj, R, L, U)
     # mul_ipwtkron(ipwtj, _block_uppertrisolve(fact.U, _block_lowertrisolve(fact.L, ipwtj, R, L, U), R, L, U), R, L, U)
-    ux = _block_lowertrisolve(fact.L, ipwtj, R, L, U)
+    ux = _block_lowertrisolve(fact, ipwtj, R, L, U)
     return mulblocks(ux, R, L, U)
+end
+
+# function blockcholesky(A, R, L)
+#     res = zeros(R * L, R * L)
+#     tmp = zeros(L, L)
+#     for i in 1:R
+#         @show i
+#         for j in 1:i
+#             tmp .= 0.0
+#             @show j
+#             if i == j
+#                 for k in 1:(j - 1)
+#                     @show k
+#                     tmp += res[_blockrange(i, L), _blockrange(k, L)] * res[_blockrange(i, L), _blockrange(k, L)]'
+#                 end
+#                 res[_blockrange(i, L), _blockrange(i, L)] = cholesky(A[_blockrange(i, L), _blockrange(i, L)] - tmp, Val(false)).L
+#             else
+#                 for k in 1:(j - 1)
+#                     @show k
+#                     tmp += res[_blockrange(i, L), _blockrange(k, L)] * res[_blockrange(j, L), _blockrange(k, L)]'
+#                 end
+#                 res[_blockrange(i, L), _blockrange(j, L)] = LowerTriangular(res[_blockrange(j, L), _blockrange(j, L)]) \ (A[_blockrange(i, L), _blockrange(j, L)] - tmp)
+#             end
+#         end
+#     end
+#     return res
+# end
+
+function blockcholesky(A, R, L)
+    res = zeros(R * L, R * L)
+    tmp = zeros(L, L)
+    for i in 1:R
+        @show i
+        for j in i:R
+            tmp .= 0.0
+            @show j
+            if i == j
+                for k in 1:(i - 1)
+                    @show k
+                    tmp += res[_blockrange(k, L), _blockrange(i, L)]' * res[_blockrange(k, L), _blockrange(i, L)]
+                end
+                res[_blockrange(i, L), _blockrange(i, L)] = cholesky(A[_blockrange(i, L), _blockrange(i, L)] - tmp, Val(false)).U
+            else
+                for k in 1:(i - 1)
+                    @show k
+                    tmp += res[_blockrange(k, L), _blockrange(i, L)]' * res[_blockrange(k, L), _blockrange(j, L)]
+                end
+                res[_blockrange(i, L), _blockrange(j, L)] = LowerTriangular(res[_blockrange(i, L), _blockrange(i, L)]') \ (A[_blockrange(i, L), _blockrange(j, L)] - tmp)
+            end
+        end
+    end
+    return res
 end
 
 _blockrange(inner::Int, outer::Int) = (outer * (inner - 1) + 1):(outer * inner)
 
-# using Test
-# using LinearAlgebra
-# R = 3; U = 5; L = 4;
-# ipwt = rand(U, L)
-# kron_ipwt = kron(Matrix(I, R, R), ipwt)
-# blocklambda = rand(R * L, R * L)
-# blocklambda = blocklambda * blocklambda'
-# F = cholesky(blocklambda, Val(true))
-# Ux = _block_lowertrisolve(F.L, ipwt, R, L, U)
-# @test Ux ≈ F.L \ kron_ipwt'
-# # x = _block_uppertrisolve(F.U, Ux, R, L, U) # this is not being used, not needed
-# # @test x ≈ F \ kron_ipwt' # this is not being used, not needed
-# # # @test kron_ipwt * inv(F) * kron_ipwt' ≈ mul_ipwtkron(ipwt, x, R, L, U) # this is not being used, not needed
-#
-# res = zeros(U * R, U * R)
-# BLAS.syrk!('U', 'T', 1.0, Ux, 0.0, res)
-# @test Symmetric(res) ≈ Symmetric(PLmabdaP(F, ipwt, R, L, U))
+using Test
+using LinearAlgebra
+R = 3; U = 5; L = 4;
+ipwt = rand(U, L)
+kron_ipwt = kron(Matrix(I, R, R), ipwt)
+blocklambda = rand(R * L, R * L)
+blocklambda = blocklambda * blocklambda'
+F = cholesky(blocklambda, Val(true))
+Ux = _block_lowertrisolve(F, ipwt, R, L, U)
+@test Ux ≈ F.L \ view(kron_ipwt', F.p, :)
+# x = _block_uppertrisolve(F.U, Ux, R, L, U) # this is not being used, not needed
+# @test x ≈ F \ kron_ipwt' # this is not being used, not needed
+# # @test kron_ipwt * inv(F) * kron_ipwt' ≈ mul_ipwtkron(ipwt, x, R, L, U) # this is not being used, not needed
+
+res = zeros(U * R, U * R)
+BLAS.syrk!('U', 'T', 1.0, Ux, 0.0, res)
+@test Symmetric(res) ≈ Symmetric(PLmabdaP(F, ipwt, R, L, U))
 
 
 inv_hess_prod!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::WSOSPolyInterpMat) = mul!(prod, Symmetric(cone.Hi, :U), arr)
