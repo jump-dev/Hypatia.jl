@@ -53,8 +53,9 @@ include(joinpath(@__DIR__, "MathOptInterface.jl"))
 @info("starting native interface tests")
 verbose = true
 system_solvers = [
-    SO.NaiveCombinedHSDSystemSolver,
-    SO.NaiveElimCombinedHSDSystemSolver,
+    # SO.NaiveCombinedHSDSystemSolver,
+    # SO.NaiveElimCombinedHSDSystemSolver,
+    SO.SymIndefCombinedHSDSystemSolver,
     # SO.QRCholCombinedHSDSystemSolver,
     ]
 testfuns_singular = [
