@@ -155,10 +155,10 @@ function get_combined_directions(solver::HSDSolver, system_solver::NaiveElimComb
     # -c'x - b'y - h'z + mu/(taubar^2)*tau = taurhs + kaprhs
     rhs[end, :] .= kap_rhs + tau_rhs
 
-    # solve linear system_solver
+    # solve system
     ldiv!(lu!(lhs), rhs)
 
-    # lift
+    # lift to get s and kap
     tau1 = rhs[end, 1]
     tau2 = rhs[end, 2]
 

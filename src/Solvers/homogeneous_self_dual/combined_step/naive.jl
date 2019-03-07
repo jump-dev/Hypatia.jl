@@ -96,7 +96,7 @@ function get_combined_directions(solver::HSDSolver, system_solver::NaiveCombined
     rhs[end, 1] = kap + solver.primal_obj_t - solver.dual_obj_t
     rhs[end, 2] = 0.0
 
-    # solve linear system_solver
+    # solve system
     ldiv!(lu!(lhs), rhs)
 
     return (system_solver.x1, system_solver.x2, system_solver.y1, system_solver.y2, system_solver.z1, system_solver.z2, system_solver.s1, system_solver.s2, rhs[end, 1], rhs[end, 2], rhs[kap_row, 1], rhs[kap_row, 2])
