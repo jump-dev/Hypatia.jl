@@ -87,7 +87,7 @@ function check_in_cone(cone::WSOSPolyInterpMat)
             uo += cone.U
         end
 
-        cone.matfact[j] = cholesky!(Symmetric(mat, :L), Val(false), check = false) # TODO turn pivoting back on
+        cone.matfact[j] = cholesky!(Symmetric(mat, :L), Val(true), check = false)
         if !isposdef(cone.matfact[j])
             return false
         end
@@ -203,63 +203,27 @@ function _block_lowertrisolve(Lmat, ipwt, R, L, U)
     end
     return resmat
 end
-# left hand side always upper triangular block matrix
-# this function is not used and actually not needed
-function _block_uppertrisolve(Umat, rhs, blocknum, R, L, U)
-    resvec = zeros(R * L, U)
-    resi(i) = resvec[_blockrange(i, L), :]
-    Umatij(i, j) = Umat[_blockrange(i, L), _blockrange(j, L)]
-    rhsi(i) = rhs[_blockrange(i, L), :]
-    tmp = zeros(L, U)
-    for r in reverse(1:R)
-        if r == R
-            resvec[_blockrange(r, L), :] = UpperTriangular(Umatij(r, r)) \ rhsi(r)
-        else
-            tmp .= rhsi(r)
-            for s in reverse((r + 1):R)
-                tmp -= Umatij(r, s) * resi(s)
-            end
-            resvec[_blockrange(r, L), :] = UpperTriangular(Umatij(r, r)) \ tmp
-        end
-    end
-    return resvec
-end
-# this function is not used and actually not needed
-function _block_uppertrisolve(Umat, rhs, R, L, U)
-    resmat = zeros(R * L, R * U)
-    for r in 1:R
-        resmat[:, _blockrange(r, U)] = _block_uppertrisolve(Umat, rhs[:, _blockrange(r, U)], r, R, L, U)
-    end
-    return resmat
-end
-function mul_ipwtkron(ipwt, x, R, L, U)
-    res = Matrix(undef, R * U, R * U)
-    for r in 1:R
-        for s in 1:R # will actually be symmetric
-            res[_blockrange(r, U), _blockrange(s, U)] = ipwt * x[_blockrange(r, L), _blockrange(s, U)]
-        end
-    end
-    return res
-end
+
 
 # because Ux only has blocks on the lower triangle, don't need to multiply all combinations for blocks
 # This is the same thing as BLAS.syrk!('U', 'T', 1.0, Ux, 0.0, res)
 # a lot could improve. for one the elements on the diagonal are symmetric so don't need to compute entire block.
 function mulblocks(Ux, R, L, U)
     res = Matrix{Float64}(undef, R * U, R * U)
-    tmp = zeros(U, U)
-    for i in 1:R
-        rinds = _blockrange(i, U)
-        for j in i:R
-            cinds = _blockrange(j, U)
-            tmp .= 0.0
-            # since Ux is block lower triangular rows only from max(i,j) start making a nonzero contribution to the product
-            for k = j:R
-                tmp += Ux[_blockrange(k, L), _blockrange(i, U)]' * Ux[_blockrange(k, L), _blockrange(j, U)]
-            end
-            res[rinds, cinds] = tmp
-        end
-    end
+    BLAS.syrk!('U', 'T', 1.0, Ux, 0.0, res)
+    # tmp = zeros(U, U)
+    # for i in 1:R
+    #     rinds = _blockrange(i, U)
+    #     for j in i:R
+    #         cinds = _blockrange(j, U)
+    #         tmp .= 0.0
+    #         # since Ux is block lower triangular rows only from max(i,j) start making a nonzero contribution to the product
+    #         for k = j:R
+    #             tmp += Ux[_blockrange(k, L), _blockrange(i, U)]' * Ux[_blockrange(k, L), _blockrange(j, U)]
+    #         end
+    #         res[rinds, cinds] = tmp
+    #     end
+    # end
     return Symmetric(res)
 end
 
@@ -278,7 +242,7 @@ _blockrange(inner::Int, outer::Int) = (outer * (inner - 1) + 1):(outer * inner)
 # kron_ipwt = kron(Matrix(I, R, R), ipwt)
 # blocklambda = rand(R * L, R * L)
 # blocklambda = blocklambda * blocklambda'
-# F = cholesky(blocklambda)
+# F = cholesky(blocklambda, Val(true))
 # Ux = _block_lowertrisolve(F.L, ipwt, R, L, U)
 # @test Ux ≈ F.L \ kron_ipwt'
 # # x = _block_uppertrisolve(F.U, Ux, R, L, U) # this is not being used, not needed
