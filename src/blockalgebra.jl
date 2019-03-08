@@ -168,3 +168,4 @@ BLAS.syrk!('U', 'T', 1.0, Ux, 0.0, res)
 
 (uppertri, Fvec, _) = blockcholesky(blocklambda, R, L)
 ux_pivoted = _block_uppertrisolve(uppertri, Fvec, ipwt, R, L, U)
+@test ux_pivoted' * ux_pivoted ≈ Ux' * Ux

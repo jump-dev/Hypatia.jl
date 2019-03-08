@@ -23,6 +23,9 @@ mutable struct WSOSPolyInterpMat <: Cone
     tmp1::Vector{Matrix{Float64}}
     tmp2::Matrix{Float64}
     tmp3::Matrix{Float64}
+    blockmats::Vector{Matrix{Float64}}
+    blockfacts::Vector{Vector{CholeskyPivoted{Float64, Matrix{Float64}}}}
+    PlambdaP::Matrix{Float64}
 
     function WSOSPolyInterpMat(R::Int, U::Int, ipwt::Vector{Matrix{Float64}}, is_dual::Bool)
         for ipwtj in ipwt
@@ -45,6 +48,10 @@ mutable struct WSOSPolyInterpMat <: Cone
         cone.tmp1 = [similar(ipwt[1], size(ipwtj, 2), U) for ipwtj in ipwt]
         cone.tmp2 = similar(ipwt[1], U, U)
         cone.tmp3 = similar(cone.tmp2)
+        # could compute gradient and hessian after lambda one weight at a time, then fewer allocations but more work if turns out point is not in the cone
+        cone.blockmats = [Matrix{Float64}(undef, R * size(ipwtj, 2), R * size(ipwtj, 2)) for ipwtj in ipwt] # TODO no reason not to cache in a vector of vectors for each i,j since matrix never used as a matrix
+        cone.blockfacts = [Vector{CholeskyPivoted{Float64, Matrix{Float64}}}(undef, R) for _ in 1:length(ipwt)]
+        cone.PlambdaP = similar(ipwt[1], U, U)
         return cone
     end
 end
@@ -87,7 +94,7 @@ function check_in_cone(cone::WSOSPolyInterpMat)
             uo += cone.U
         end
 
-        cone.matfact[j] = cholesky!(Symmetric(mat, :L), Val(true), check = false)
+        cone.matfact[j] = cholesky(Symmetric(mat, :L), Val(true), check = false)
         if !isposdef(cone.matfact[j])
             return false
         end
@@ -109,13 +116,11 @@ function check_in_cone(cone::WSOSPolyInterpMat)
 
         L = size(ipwtj, 2)
 
-        # kron_ipwtj = kron(Matrix(I, cone.R, cone.R), ipwtj')
-        # kron_Winv = cone.matfact[j] \ kron_ipwtj
-        # big_PLambdaP = kron(Matrix(I, cone.R, cone.R), ipwtj) * cone.matfact[j] \ kron(Matrix(I, cone.R, cone.R), ipwtj')
-        # big_PLambdaP = kron(Matrix(I, cone.R, cone.R), ipwtj) * _block_uppertrisolve(cone.matfact[j].U, _block_lowertrisolve(cone.matfact[j].L, ipwtj, cone.R, L, cone.U), cone.R, L, cone.U)
-        big_PLambdaP = PLmabdaP(cone.matfact[j], ipwtj, cone.R, L, cone.U)
-        # @show kron(Matrix(I, cone.R, cone.R), ipwtj) * (cone.matfact[j] \ kron(Matrix(I, cone.R, cone.R), ipwtj'))
-        # @show big_PLambdaP ./ (kron(Matrix(I, cone.R, cone.R), ipwtj) * (cone.matfact[j] \ kron(Matrix(I, cone.R, cone.R), ipwtj')))
+        # big_PLambdaP = PLmabdaP(cone.matfact[j], ipwtj, cone.R, L, cone.U)
+        @assert blockcholesky!(cone, L, j)
+        ldivp = _block_uppertrisolve(cone, L, j)
+        # @show ldivp' * ldivp - big_PLambdaP
+        big_PLambdaP = ldivp' * ldivp
 
         uo = 0
         for p in 1:cone.R, q in 1:p
@@ -125,10 +130,6 @@ function check_in_cone(cone::WSOSPolyInterpMat)
             cinds = _blockrange(q, cone.U)
             idxs = _blockrange(uo, cone.U)
 
-            # for i in 1:cone.U
-            #     cone.g[idxs[i]] -= ipwtj[i, :]' * view(W_inv_j, _blockrange(p, L), _blockrange(q, L)) * ipwtj[i, :] * fact
-            # end
-            # @show cone.g[idxs] ./ (-diag(big_PLambdaP[rinds, cinds]) .* fact)
             cone.g[idxs] -= diag(big_PLambdaP[rinds, cinds]) .* fact
 
             uo2 = 0
@@ -142,21 +143,11 @@ function check_in_cone(cone::WSOSPolyInterpMat)
                 cinds2 = _blockrange(q2, cone.U)
                 idxs2 = _blockrange(uo2, cone.U)
 
-                # mul!(tmp1j, view(W_inv_j, rinds, rinds2), ipwtj')
-                # mul!(tmp2, ipwtj, tmp1j)
-                # @show tmp2 ./ big_PLambdaP[_blockrange(p, cone.U), _blockrange(p2, cone.U)]
-                # mul!(tmp1j, view(W_inv_j, cinds, cinds2), ipwtj')
-                # mul!(tmp3, ipwtj, tmp1j)
+
                 fact = xor(p == q, p2 == q2) ? rt2i : 1.0
-                # @. cone.H[idxs, idxs2] += tmp2 * tmp3 * fact
                 @. cone.H[idxs, idxs2] += big_PLambdaP[rinds, rinds2] * big_PLambdaP[cinds, cinds2] * fact
 
                 if (p != q) || (p2 != q2)
-                    # mul!(tmp1j, view(W_inv_j, rinds, cinds2), ipwtj')
-                    # mul!(tmp2, ipwtj, tmp1j)
-                    # mul!(tmp1j, view(W_inv_j, cinds, rinds2), ipwtj')
-                    # mul!(tmp3, ipwtj, tmp1j)
-                    # @. cone.H[idxs, idxs2] += tmp2 * tmp3 * fact
                     @. cone.H[idxs, idxs2] += big_PLambdaP[rinds, cinds2] * big_PLambdaP[cinds, rinds2] * fact
                 end
             end
@@ -176,151 +167,67 @@ function check_in_cone(cone::WSOSPolyInterpMat)
     return true
 end
 
-# get block after pivoting, this is dumb don't do it
-# function getblock(fact, ipwt, blocknum, R, L, U, r)
-#     block = zeros(L, U)
-#     row = (r - 1) * L
-#     for l in 1:L
-#         row += 1
-#         if fact.p[row] in _blockrange(blocknum, L)
-#             block[l, :] = ipwt[:, l]
-#         end
-#     end
-#     return block
-# end
-# left hand side always a kronecker with the identity
-function _block_lowertrisolve(fact, ipwt, blocknum, R, L, U)
-    Lmat = fact.L
-    ei = zeros(R)
-    ei[blocknum] = 1.0
-    rhs = kron(ei, ipwt')
-    return Lmat \ view(rhs, fact.p, :)
-    # resvec = zeros(R * L, U)
-    # resi(i) = resvec[_blockrange(i, L), :]
-    # Lmatij(i, j) = Lmat[_blockrange(i, L), _blockrange(j, L)]
-    # tmp = zeros(L, U)
-    # for r in 1:R
-    #     if r == blocknum
-    #         resvec[_blockrange(r, L), :] = LowerTriangular(Lmatij(r, r)) \ ipwt'
-    #     elseif r > blocknum
-    #         tmp .= 0.0
-    #         for s in blocknum:(r - 1)
-    #             tmp -= Lmatij(r, s) * resi(s)
-    #         end
-    #         resvec[_blockrange(r, L), :] = LowerTriangular(Lmatij(r, r)) \ tmp
-    #     end
-    # end
-    # return resvec
+_blockrange(inner::Int, outer::Int) = (outer * (inner - 1) + 1):(outer * inner)
+
+function blockcholesky!(cone::WSOSPolyInterpMat, L::Int, j::Int)
+    R = cone.R
+    res = cone.blockmats[j]
+    tmp = zeros(L, L)
+    facts = cone.blockfacts[j]
+    mat = Symmetric(cone.mat[j], :L)
+    for i in 1:R, j in i:R
+        tmp .= 0.0
+        if i == j
+            for k in 1:(i - 1)
+                tmp += res[_blockrange(k, L), _blockrange(i, L)]' * res[_blockrange(k, L), _blockrange(i, L)]
+            end
+            F = cholesky(mat[_blockrange(i, L), _blockrange(i, L)] - tmp, Val(true))
+            if !(isposdef(F))
+                return false
+            end
+            facts[i] = F
+        else
+            for k in 1:(i - 1)
+                tmp += res[_blockrange(k, L), _blockrange(i, L)]' * res[_blockrange(k, L), _blockrange(j, L)]
+            end
+            rhs = mat[_blockrange(i, L), _blockrange(j, L)] - tmp
+            res[_blockrange(i, L), _blockrange(j, L)] = facts[i].L \ view(rhs, facts[i].p, :)
+        end
+    end
+    return true
 end
-function _block_lowertrisolve(fact, ipwt, R, L, U)
+
+# TODO make this an actual uppertriangular solve
+function _block_uppertrisolve(cone::WSOSPolyInterpMat, blocknum::Int, L::Int, j::Int)
+    Lmat = LowerTriangular(Symmetric(cone.blockmats[j], :U))
+    R = cone.R
+    U = cone.U
+    Fvec = cone.blockfacts[j]
+    resvec = zeros(R * L, U)
+    resi(i) = resvec[_blockrange(i, L), :]
+    Lmatij(i, j) = Lmat[_blockrange(i, L), _blockrange(j, L)]
+    tmp = zeros(L, U)
+    for r in 1:R
+        if r == blocknum
+            resvec[_blockrange(r, L), :] = Fvec[r].L \ view(cone.ipwt[j]', Fvec[r].p, :)
+        elseif r > blocknum
+            tmp .= 0.0
+            for s in blocknum:(r - 1)
+                tmp -= Lmatij(r, s) * resi(s)
+            end
+            resvec[_blockrange(r, L), :] = Fvec[r].L \ view(tmp, Fvec[r].p, :)
+        end
+    end
+    return resvec
+end
+function _block_uppertrisolve(cone::WSOSPolyInterpMat, L::Int, j::Int)
+    R = cone.R
+    U = cone.U
     resmat = zeros(R * L, R * U)
     for r in 1:R
-        resmat[:, _blockrange(r, U)] = _block_lowertrisolve(fact, ipwt, r, R, L, U)
+        resmat[:, _blockrange(r, U)] = _block_uppertrisolve(cone, r, L, j)
     end
     return resmat
 end
-
-
-# because Ux only has blocks on the lower triangle, don't need to multiply all combinations for blocks
-# This is the same thing as BLAS.syrk!('U', 'T', 1.0, Ux, 0.0, res)
-# a lot could improve. for one the elements on the diagonal are symmetric so don't need to compute entire block.
-function mulblocks(Ux, R, L, U)
-    res = Matrix{Float64}(undef, R * U, R * U)
-    BLAS.syrk!('U', 'T', 1.0, Ux, 0.0, res)
-    # tmp = zeros(U, U)
-    # for i in 1:R
-    #     rinds = _blockrange(i, U)
-    #     for j in i:R
-    #         cinds = _blockrange(j, U)
-    #         tmp .= 0.0
-    #         # since Ux is block lower triangular rows only from max(i,j) start making a nonzero contribution to the product
-    #         for k = j:R
-    #             # actually each block is symmetric so could make this better
-    #             tmp += Ux[_blockrange(k, L), _blockrange(i, U)]' * Ux[_blockrange(k, L), _blockrange(j, U)]
-    #         end
-    #         res[rinds, cinds] = tmp
-    #     end
-    # end
-    return Symmetric(res)
-end
-
-function PLmabdaP(fact, ipwtj, R, L, U)
-    # mul_ipwtkron(ipwtj, _block_uppertrisolve(fact.U, _block_lowertrisolve(fact.L, ipwtj, R, L, U), R, L, U), R, L, U)
-    ux = _block_lowertrisolve(fact, ipwtj, R, L, U)
-    return mulblocks(ux, R, L, U)
-end
-
-# function blockcholesky(A, R, L)
-#     res = zeros(R * L, R * L)
-#     tmp = zeros(L, L)
-#     for i in 1:R
-#         @show i
-#         for j in 1:i
-#             tmp .= 0.0
-#             @show j
-#             if i == j
-#                 for k in 1:(j - 1)
-#                     @show k
-#                     tmp += res[_blockrange(i, L), _blockrange(k, L)] * res[_blockrange(i, L), _blockrange(k, L)]'
-#                 end
-#                 res[_blockrange(i, L), _blockrange(i, L)] = cholesky(A[_blockrange(i, L), _blockrange(i, L)] - tmp, Val(false)).L
-#             else
-#                 for k in 1:(j - 1)
-#                     @show k
-#                     tmp += res[_blockrange(i, L), _blockrange(k, L)] * res[_blockrange(j, L), _blockrange(k, L)]'
-#                 end
-#                 res[_blockrange(i, L), _blockrange(j, L)] = LowerTriangular(res[_blockrange(j, L), _blockrange(j, L)]) \ (A[_blockrange(i, L), _blockrange(j, L)] - tmp)
-#             end
-#         end
-#     end
-#     return res
-# end
-
-function blockcholesky(A, R, L)
-    res = zeros(R * L, R * L)
-    tmp = zeros(L, L)
-    for i in 1:R
-        @show i
-        for j in i:R
-            tmp .= 0.0
-            @show j
-            if i == j
-                for k in 1:(i - 1)
-                    @show k
-                    tmp += res[_blockrange(k, L), _blockrange(i, L)]' * res[_blockrange(k, L), _blockrange(i, L)]
-                end
-                res[_blockrange(i, L), _blockrange(i, L)] = cholesky(A[_blockrange(i, L), _blockrange(i, L)] - tmp, Val(false)).U
-            else
-                for k in 1:(i - 1)
-                    @show k
-                    tmp += res[_blockrange(k, L), _blockrange(i, L)]' * res[_blockrange(k, L), _blockrange(j, L)]
-                end
-                res[_blockrange(i, L), _blockrange(j, L)] = LowerTriangular(res[_blockrange(i, L), _blockrange(i, L)]') \ (A[_blockrange(i, L), _blockrange(j, L)] - tmp)
-            end
-        end
-    end
-    return res
-end
-
-_blockrange(inner::Int, outer::Int) = (outer * (inner - 1) + 1):(outer * inner)
-
-using Test
-using LinearAlgebra
-R = 3; U = 5; L = 4;
-ipwt = rand(U, L)
-kron_ipwt = kron(Matrix(I, R, R), ipwt)
-blocklambda = rand(R * L, R * L)
-blocklambda = blocklambda * blocklambda'
-F = cholesky(blocklambda, Val(true))
-Ux = _block_lowertrisolve(F, ipwt, R, L, U)
-@test Ux ≈ F.L \ view(kron_ipwt', F.p, :)
-# x = _block_uppertrisolve(F.U, Ux, R, L, U) # this is not being used, not needed
-# @test x ≈ F \ kron_ipwt' # this is not being used, not needed
-# # @test kron_ipwt * inv(F) * kron_ipwt' ≈ mul_ipwtkron(ipwt, x, R, L, U) # this is not being used, not needed
-
-res = zeros(U * R, U * R)
-BLAS.syrk!('U', 'T', 1.0, Ux, 0.0, res)
-@test Symmetric(res) ≈ Symmetric(PLmabdaP(F, ipwt, R, L, U))
-
 
 inv_hess_prod!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::WSOSPolyInterpMat) = mul!(prod, Symmetric(cone.Hi, :U), arr)
