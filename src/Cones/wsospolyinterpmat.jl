@@ -21,10 +21,11 @@ mutable struct WSOSPolyInterpMat <: Cone
     mat::Vector{Matrix{Float64}}
     matfact::Vector{CholeskyPivoted{Float64, Matrix{Float64}}}
     tmp1::Vector{Matrix{Float64}}
-    # tmp2::Matrix{Float64}
+    tmp2::Matrix{Float64}
     # tmp3::Matrix{Float64}
     blockmats::Vector{Vector{Vector{Matrix{Float64}}}}
     blockfacts::Vector{Vector{CholeskyPivoted{Float64, Matrix{Float64}}}}
+    PlambdaP::Matrix{Float64}
 
     function WSOSPolyInterpMat(R::Int, U::Int, ipwt::Vector{Matrix{Float64}}, is_dual::Bool)
         for ipwtj in ipwt
@@ -45,7 +46,7 @@ mutable struct WSOSPolyInterpMat <: Cone
         cone.mat = [similar(ipwt[1], size(ipwtj, 2) * R, size(ipwtj, 2) * R) for ipwtj in ipwt]
         cone.matfact = Vector{CholeskyPivoted{Float64, Matrix{Float64}}}(undef, length(ipwt))
         cone.tmp1 = [similar(ipwt[1], size(ipwtj, 2), U) for ipwtj in ipwt]
-        # cone.tmp2 = similar(ipwt[1], U, U)
+        cone.tmp2 = similar(ipwt[1], U, U)
         # cone.tmp3 = similar(cone.tmp2)
         cone.blockmats = [Vector{Vector{Matrix{Float64}}}(undef, R) for ipwtj in ipwt]
         for i in eachindex(ipwt), j in 1:R # TODO actually store 1 fewer (no diagonal) and also make this less confusing
@@ -55,7 +56,8 @@ mutable struct WSOSPolyInterpMat <: Cone
                 cone.blockmats[i][j][k] = Matrix{Float64}(undef, L, L)
             end
         end
-        cone.blockfacts = [Vector{CholeskyPivoted{Float64, Matrix{Float64}}}(undef, R) for _ in 1:length(ipwt)]
+        cone.blockfacts = [Vector{CholeskyPivoted{Float64, Matrix{Float64}}}(undef, R) for _ in eachindex(ipwt)]
+        cone.PlambdaP = Matrix{Float64}(undef, R * U,  R * U)
         return cone
     end
 end
@@ -117,7 +119,9 @@ function check_in_cone(cone::WSOSPolyInterpMat)
 
         # perform L \ kron(ipwt)
         ldivp = _block_trisolve(cone, L, j)
-        big_PLambdaP = ldivp' * ldivp
+        # ldivp' * ldivp
+        _mulblocks!(cone, ldivp, L)
+        PlambdaP = cone.PlambdaP
 
         uo = 0
         for p in 1:cone.R, q in 1:p
@@ -127,7 +131,7 @@ function check_in_cone(cone::WSOSPolyInterpMat)
             cinds = _blockrange(q, cone.U)
             idxs = _blockrange(uo, cone.U)
 
-            cone.g[idxs] -= diag(big_PLambdaP[rinds, cinds]) .* fact
+            cone.g[idxs] -= diag(PlambdaP[rinds, cinds]) .* fact
 
             uo2 = 0
             for p2 in 1:cone.R, q2 in 1:p2
@@ -142,10 +146,10 @@ function check_in_cone(cone::WSOSPolyInterpMat)
 
 
                 fact = xor(p == q, p2 == q2) ? rt2i : 1.0
-                @. cone.H[idxs, idxs2] += big_PLambdaP[rinds, rinds2] * big_PLambdaP[cinds, cinds2] * fact
+                @. cone.H[idxs, idxs2] += PlambdaP[rinds, rinds2] * PlambdaP[cinds, cinds2] * fact
 
                 if (p != q) || (p2 != q2)
-                    @. cone.H[idxs, idxs2] += big_PLambdaP[rinds, cinds2] * big_PLambdaP[cinds, rinds2] * fact
+                    @. cone.H[idxs, idxs2] += PlambdaP[rinds, cinds2] * PlambdaP[cinds, rinds2] * fact
                 end
             end
         end
@@ -178,7 +182,7 @@ function blockcholesky!(cone::WSOSPolyInterpMat, L::Int, j::Int)
         for k in 1:(r - 1)
             tmp += res[r][k] * res[r][k]'
         end
-        F = cholesky(mat[_blockrange(r, L), _blockrange(r, L)] - tmp, Val(true), check = false)
+        F = cholesky!(mat[_blockrange(r, L), _blockrange(r, L)] - tmp, Val(true), check = false)
         if !(isposdef(F))
             return false
         end
@@ -220,6 +224,26 @@ function _block_trisolve(cone::WSOSPolyInterpMat, L::Int, j::Int)
         resmat[:, _blockrange(r, U)] = _block_trisolve(cone, r, L, j)
     end
     return resmat
+end
+# multiply lower triangular block matrix transposed by itself
+function _mulblocks!(cone::WSOSPolyInterpMat, mat::Matrix{Float64}, L::Int)
+    R = cone.R
+    U = cone.U
+    tmp = cone.tmp2
+    for i in 1:R
+        rinds = _blockrange(i, U)
+        for j in i:R
+            cinds = _blockrange(j, U)
+            tmp .= 0.0
+            # since mat is block lower triangular rows only from max(i,j) start making a nonzero contribution to the product
+            for k = j:R
+                tmp += mat[_blockrange(k, L), _blockrange(i, U)]' * mat[_blockrange(k, L), _blockrange(j, U)]
+            end
+            cone.PlambdaP[rinds, cinds] = tmp
+        end
+    end
+    cone.PlambdaP .= Symmetric(cone.PlambdaP)
+    return nothing
 end
 
 
