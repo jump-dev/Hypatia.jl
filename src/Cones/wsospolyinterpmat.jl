@@ -111,6 +111,7 @@ function check_in_cone(cone::WSOSPolyInterpMat)
 
         L = size(ipwtj, 2)
 
+        # perform L \ kron(ipwt)
         ldivp = _block_uppertrisolve(cone, L, j)
         big_PLambdaP = ldivp' * ldivp
 
@@ -196,7 +197,6 @@ function _block_uppertrisolve(cone::WSOSPolyInterpMat, blocknum::Int, L::Int, j:
     U = cone.U
     Fvec = cone.blockfacts[j]
     resvec = zeros(R * L, U)
-    resi(i) = resvec[_blockrange(i, L), :]
     tmp = zeros(L, U)
     for r in 1:R
         if r == blocknum
@@ -204,7 +204,7 @@ function _block_uppertrisolve(cone::WSOSPolyInterpMat, blocknum::Int, L::Int, j:
         elseif r > blocknum
             tmp .= 0.0
             for s in blocknum:(r - 1)
-                tmp -= Lmat[r][s] * resi(s)
+                tmp -= Lmat[r][s] * resvec[_blockrange(s, L), :]
             end
             resvec[_blockrange(r, L), :] = Fvec[r].L \ view(tmp, Fvec[r].p, :)
         end
