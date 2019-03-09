@@ -19,11 +19,10 @@ mutable struct WSOSPolyInterpMat <: Cone
     Hi::Matrix{Float64}
     F
     mat::Vector{Matrix{Float64}}
-    # matfact #::Vector{CholeskyPivoted{Float64, Matrix{Float64}}}
     tmp1::Vector{Matrix{Float64}}
     # tmp2::Matrix{Float64}
     # tmp3::Matrix{Float64}
-    blockmats::Vector{Matrix{Float64}}
+    blockmats::Vector{Vector{Vector{Matrix{Float64}}}}
     blockfacts::Vector{Vector{CholeskyPivoted{Float64, Matrix{Float64}}}}
     PlambdaP::Matrix{Float64}
 
@@ -44,12 +43,15 @@ mutable struct WSOSPolyInterpMat <: Cone
         cone.H2 = similar(cone.H)
         cone.Hi = similar(cone.H)
         cone.mat = [similar(ipwt[1], size(ipwtj, 2) * R, size(ipwtj, 2) * R) for ipwtj in ipwt]
-        # cone.matfact = Vector{CholeskyPivoted{Float64, Matrix{Float64}}}(undef, length(ipwt))
         cone.tmp1 = [similar(ipwt[1], size(ipwtj, 2), U) for ipwtj in ipwt]
-        # cone.tmp2 = similar(ipwt[1], U, U)
-        # cone.tmp3 = similar(cone.tmp2)
-        # could compute gradient and hessian after lambda one weight at a time, then fewer allocations but more work if turns out point is not in the cone
-        cone.blockmats = [Matrix{Float64}(undef, R * size(ipwtj, 2), R * size(ipwtj, 2)) for ipwtj in ipwt] # TODO no reason not to cache in a vector of vectors for each i,j since matrix never used as a matrix
+        cone.blockmats = [Vector{Vector{Matrix{Float64}}}(undef, R) for ipwtj in ipwt]
+        for i in eachindex(ipwt), j in 1:R # TODO actually 1 fewer
+            cone.blockmats[i][j] = Vector{Matrix{Float64}}(undef, j)
+            for k in 1:j # TODO actually need to only go up to j-1
+                L = size(ipwt[i], 2)
+                cone.blockmats[i][j][k] = Matrix{Float64}(undef, L, L)
+            end
+        end
         cone.blockfacts = [Vector{CholeskyPivoted{Float64, Matrix{Float64}}}(undef, R) for _ in 1:length(ipwt)]
         cone.PlambdaP = similar(ipwt[1], U, U)
         return cone
@@ -106,9 +108,6 @@ function check_in_cone(cone::WSOSPolyInterpMat)
     for j in eachindex(cone.ipwt)
 
         ipwtj = cone.ipwt[j]
-        # tmp1j = cone.tmp1[j]
-        # tmp2 = cone.tmp2
-        # tmp3 = cone.tmp3
 
         L = size(ipwtj, 2)
 
@@ -162,43 +161,42 @@ end
 
 _blockrange(inner::Int, outer::Int) = (outer * (inner - 1) + 1):(outer * inner)
 
+# res stored lower triangle
 function blockcholesky!(cone::WSOSPolyInterpMat, L::Int, j::Int)
     R = cone.R
     res = cone.blockmats[j]
     tmp = zeros(L, L)
     facts = cone.blockfacts[j]
     mat = Symmetric(cone.mat[j], :L)
-    for i in 1:R, j in i:R
+    for r in 1:R, s in r:R
         tmp .= 0.0
-        if i == j
-            for k in 1:(i - 1)
-                tmp += res[_blockrange(k, L), _blockrange(i, L)]' * res[_blockrange(k, L), _blockrange(i, L)]
+        if r == s
+            for k in 1:(r - 1)
+                tmp += res[r][k] * res[r][k]'
             end
-            F = cholesky(mat[_blockrange(i, L), _blockrange(i, L)] - tmp, Val(true), check = false)
+            F = cholesky(mat[_blockrange(r, L), _blockrange(r, L)] - tmp, Val(true), check = false)
             if !(isposdef(F))
                 return false
             end
-            facts[i] = F
+            facts[r] = F
         else
-            for k in 1:(i - 1)
-                tmp += res[_blockrange(k, L), _blockrange(i, L)]' * res[_blockrange(k, L), _blockrange(j, L)]
+            for k in 1:(r - 1)
+                tmp += res[r][k] * res[s][k]'
             end
-            rhs = mat[_blockrange(i, L), _blockrange(j, L)] - tmp
-            res[_blockrange(i, L), _blockrange(j, L)] = facts[i].L \ view(rhs, facts[i].p, :)
+            rhs = mat[_blockrange(r, L), _blockrange(s, L)] - tmp
+            res[s][r] = (facts[r].L \ view(rhs, facts[r].p, :))'
         end
     end
     return true
 end
 
-# TODO make this an actual uppertriangular solve
 function _block_uppertrisolve(cone::WSOSPolyInterpMat, blocknum::Int, L::Int, j::Int)
-    Lmat = LowerTriangular(Symmetric(cone.blockmats[j], :U))
+    Lmat = cone.blockmats[j]
     R = cone.R
     U = cone.U
     Fvec = cone.blockfacts[j]
     resvec = zeros(R * L, U)
     resi(i) = resvec[_blockrange(i, L), :]
-    Lmatij(i, j) = Lmat[_blockrange(i, L), _blockrange(j, L)]
     tmp = zeros(L, U)
     for r in 1:R
         if r == blocknum
@@ -206,13 +204,14 @@ function _block_uppertrisolve(cone::WSOSPolyInterpMat, blocknum::Int, L::Int, j:
         elseif r > blocknum
             tmp .= 0.0
             for s in blocknum:(r - 1)
-                tmp -= Lmatij(r, s) * resi(s)
+                tmp -= Lmat[r][s] * resi(s)
             end
             resvec[_blockrange(r, L), :] = Fvec[r].L \ view(tmp, Fvec[r].p, :)
         end
     end
     return resvec
 end
+# one block-column at a time on the RHS
 function _block_uppertrisolve(cone::WSOSPolyInterpMat, L::Int, j::Int)
     R = cone.R
     U = cone.U
