@@ -19,10 +19,10 @@ mutable struct WSOSPolyInterpMat <: Cone
     Hi::Matrix{Float64}
     F
     mat::Vector{Matrix{Float64}}
-    matfact #::Vector{CholeskyPivoted{Float64, Matrix{Float64}}}
+    # matfact #::Vector{CholeskyPivoted{Float64, Matrix{Float64}}}
     tmp1::Vector{Matrix{Float64}}
-    tmp2::Matrix{Float64}
-    tmp3::Matrix{Float64}
+    # tmp2::Matrix{Float64}
+    # tmp3::Matrix{Float64}
     blockmats::Vector{Matrix{Float64}}
     blockfacts::Vector{Vector{CholeskyPivoted{Float64, Matrix{Float64}}}}
     PlambdaP::Matrix{Float64}
@@ -44,10 +44,10 @@ mutable struct WSOSPolyInterpMat <: Cone
         cone.H2 = similar(cone.H)
         cone.Hi = similar(cone.H)
         cone.mat = [similar(ipwt[1], size(ipwtj, 2) * R, size(ipwtj, 2) * R) for ipwtj in ipwt]
-        cone.matfact = Vector{CholeskyPivoted{Float64, Matrix{Float64}}}(undef, length(ipwt))
+        # cone.matfact = Vector{CholeskyPivoted{Float64, Matrix{Float64}}}(undef, length(ipwt))
         cone.tmp1 = [similar(ipwt[1], size(ipwtj, 2), U) for ipwtj in ipwt]
-        cone.tmp2 = similar(ipwt[1], U, U)
-        cone.tmp3 = similar(cone.tmp2)
+        # cone.tmp2 = similar(ipwt[1], U, U)
+        # cone.tmp3 = similar(cone.tmp2)
         # could compute gradient and hessian after lambda one weight at a time, then fewer allocations but more work if turns out point is not in the cone
         cone.blockmats = [Matrix{Float64}(undef, R * size(ipwtj, 2), R * size(ipwtj, 2)) for ipwtj in ipwt] # TODO no reason not to cache in a vector of vectors for each i,j since matrix never used as a matrix
         cone.blockfacts = [Vector{CholeskyPivoted{Float64, Matrix{Float64}}}(undef, R) for _ in 1:length(ipwt)]
@@ -94,8 +94,7 @@ function check_in_cone(cone::WSOSPolyInterpMat)
             uo += cone.U
         end
 
-        cone.matfact[j] = cholesky(Symmetric(mat, :L), Val(true), check = false)
-        if !isposdef(cone.matfact[j])
+        if !(blockcholesky!(cone, L, j))
             return false
         end
     end
@@ -105,21 +104,15 @@ function check_in_cone(cone::WSOSPolyInterpMat)
     cone.g .= 0.0
     cone.H .= 0.0
     for j in eachindex(cone.ipwt)
-        # @timeit "W_inv" begin
-        W_inv_j = inv(cone.matfact[j])
-        # end
 
         ipwtj = cone.ipwt[j]
-        tmp1j = cone.tmp1[j]
-        tmp2 = cone.tmp2
-        tmp3 = cone.tmp3
+        # tmp1j = cone.tmp1[j]
+        # tmp2 = cone.tmp2
+        # tmp3 = cone.tmp3
 
         L = size(ipwtj, 2)
 
-        # big_PLambdaP = PLmabdaP(cone.matfact[j], ipwtj, cone.R, L, cone.U)
-        @assert blockcholesky!(cone, L, j)
         ldivp = _block_uppertrisolve(cone, L, j)
-        # @show ldivp' * ldivp - big_PLambdaP
         big_PLambdaP = ldivp' * ldivp
 
         uo = 0
@@ -181,7 +174,7 @@ function blockcholesky!(cone::WSOSPolyInterpMat, L::Int, j::Int)
             for k in 1:(i - 1)
                 tmp += res[_blockrange(k, L), _blockrange(i, L)]' * res[_blockrange(k, L), _blockrange(i, L)]
             end
-            F = cholesky(mat[_blockrange(i, L), _blockrange(i, L)] - tmp, Val(true))
+            F = cholesky(mat[_blockrange(i, L), _blockrange(i, L)] - tmp, Val(true), check = false)
             if !(isposdef(F))
                 return false
             end
