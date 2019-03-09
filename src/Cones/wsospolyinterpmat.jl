@@ -168,21 +168,19 @@ function check_in_cone(cone::WSOSPolyInterpMat)
     return true
 end
 
-_blockrange(inner::Int, outer::Int) = (outer * (inner - 1) + 1):(outer * inner)
-
 # res stored lower triangle
 function blockcholesky!(cone::WSOSPolyInterpMat, L::Int, j::Int)
     R = cone.R
     res = cone.blockmats[j]
     tmp = zeros(L, L)
     facts = cone.blockfacts[j]
-    mat = Symmetric(cone.mat[j], :L)
     for r in 1:R
         tmp .= 0.0
         for k in 1:(r - 1)
             tmp += res[r][k] * res[r][k]'
         end
-        F = cholesky!(mat[_blockrange(r, L), _blockrange(r, L)] - tmp, Val(true), check = false)
+        # TODO unclear why "Symmetric(.)" is needed
+        F = cholesky!(Symmetric(cone.mat[j][_blockrange(r, L), _blockrange(r, L)]) - tmp, Val(true), check = false)
         if !(isposdef(F))
             return false
         end
@@ -191,7 +189,7 @@ function blockcholesky!(cone::WSOSPolyInterpMat, L::Int, j::Int)
             for k in 1:(r - 1)
                 tmp += res[r][k] * res[s][k]'
             end
-            rhs = mat[_blockrange(r, L), _blockrange(s, L)] - tmp
+            rhs = cone.mat[j][_blockrange(s, L), _blockrange(r, L)] - tmp
             res[s][r] = (facts[r].L \ view(rhs, facts[r].p, :))'
         end
     end
@@ -242,7 +240,7 @@ function _mulblocks!(cone::WSOSPolyInterpMat, mat::Matrix{Float64}, L::Int)
             cone.PlambdaP[rinds, cinds] = tmp
         end
     end
-    cone.PlambdaP .= Symmetric(cone.PlambdaP)
+    cone.PlambdaP .= Symmetric(cone.PlambdaP) # TODO make the rest of the code only query indices from the upper triangle
     return nothing
 end
 
