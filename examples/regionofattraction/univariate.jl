@@ -22,7 +22,6 @@ import PolyJuMP
 import DynamicPolynomials
 const DP = DynamicPolynomials
 using LinearAlgebra
-import Distributions
 using Test
 
 function univariate_WSOS(deg::Int)
