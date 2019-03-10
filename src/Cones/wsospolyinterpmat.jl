@@ -22,7 +22,7 @@ mutable struct WSOSPolyInterpMat <: Cone
     matfact::Vector{CholeskyPivoted{Float64, Matrix{Float64}}}
     tmp1::Vector{Matrix{Float64}}
     tmp2::Matrix{Float64}
-    # tmp3::Matrix{Float64}
+    tmp3::Matrix{Float64}
     blockmats::Vector{Vector{Vector{Matrix{Float64}}}}
     blockfacts::Vector{Vector{CholeskyPivoted{Float64, Matrix{Float64}}}}
     PlambdaP::Matrix{Float64}
@@ -47,7 +47,7 @@ mutable struct WSOSPolyInterpMat <: Cone
         cone.matfact = Vector{CholeskyPivoted{Float64, Matrix{Float64}}}(undef, length(ipwt))
         cone.tmp1 = [similar(ipwt[1], size(ipwtj, 2), U) for ipwtj in ipwt]
         cone.tmp2 = similar(ipwt[1], U, U)
-        # cone.tmp3 = similar(cone.tmp2)
+        cone.tmp3 = similar(cone.tmp2)
         cone.blockmats = [Vector{Vector{Matrix{Float64}}}(undef, R) for ipwtj in ipwt]
         for i in eachindex(ipwt), j in 1:R # TODO actually store 1 fewer (no diagonal) and also make this less confusing
             cone.blockmats[i][j] = Vector{Matrix{Float64}}(undef, j)
@@ -78,8 +78,13 @@ end
 
 _blockrange(inner::Int, outer::Int) = (outer * (inner - 1) + 1):(outer * inner)
 
-# TODO all views can be allocated just once in the cone definition (delete _blockrange too)
 function check_in_cone(cone::WSOSPolyInterpMat)
+    # check_in_cone_nowinv(cone)
+    check_in_cone_master(cone)
+end
+
+# TODO all views can be allocated just once in the cone definition (delete _blockrange too)
+function check_in_cone_nowinv(cone::WSOSPolyInterpMat)
     # @timeit "build mat" begin
     for j in eachindex(cone.ipwt)
         ipwtj = cone.ipwt[j]
@@ -245,102 +250,102 @@ function _mulblocks!(cone::WSOSPolyInterpMat, mat::Matrix{Float64}, L::Int)
 end
 
 
-# function check_in_cone(cone::WSOSPolyInterpMat)
-#     # @timeit "build mat" begin
-#     for j in eachindex(cone.ipwt)
-#         ipwtj = cone.ipwt[j]
-#         tmp1j = cone.tmp1[j]
-#         L = size(ipwtj, 2)
-#         mat = cone.mat[j]
-#
-#         uo = 1
-#         for p in 1:cone.R, q in 1:p
-#             point_pq = cone.point[uo:(uo + cone.U - 1)] # TODO prealloc
-#             if p != q
-#                 @. point_pq *= rt2i
-#             end
-#             @. tmp1j = ipwtj' * point_pq'
-#
-#             rinds = _blockrange(p, L)
-#             cinds = _blockrange(q, L)
-#             mul!(view(mat, rinds, cinds), tmp1j, ipwtj)
-#
-#             uo += cone.U
-#         end
-#
-#         cone.matfact[j] = cholesky!(Symmetric(mat, :L), Val(true), check = false)
-#         if !isposdef(cone.matfact[j])
-#             return false
-#         end
-#     end
-#     # end
-#
-#     # @timeit "grad hess" begin
-#     cone.g .= 0.0
-#     cone.H .= 0.0
-#     for j in eachindex(cone.ipwt)
-#         # @timeit "W_inv" begin
-#         W_inv_j = inv(cone.matfact[j])
-#         # end
-#
-#         ipwtj = cone.ipwt[j]
-#         tmp1j = cone.tmp1[j]
-#         tmp2 = cone.tmp2
-#         tmp3 = cone.tmp3
-#
-#         L = size(ipwtj, 2)
-#         uo = 0
-#         for p in 1:cone.R, q in 1:p
-#             uo += 1
-#             fact = (p == q) ? 1.0 : rt2
-#             rinds = _blockrange(p, L)
-#             cinds = _blockrange(q, L)
-#             idxs = _blockrange(uo, cone.U)
-#
-#             for i in 1:cone.U
-#                 cone.g[idxs[i]] -= ipwtj[i, :]' * view(W_inv_j, rinds, cinds) * ipwtj[i, :] * fact
-#             end
-#
-#             uo2 = 0
-#             for p2 in 1:cone.R, q2 in 1:p2
-#                 uo2 += 1
-#                 if uo2 < uo
-#                     continue
-#                 end
-#
-#                 rinds2 = _blockrange(p2, L)
-#                 cinds2 = _blockrange(q2, L)
-#                 idxs2 = _blockrange(uo2, cone.U)
-#
-#                 mul!(tmp1j, view(W_inv_j, rinds, rinds2), ipwtj')
-#                 mul!(tmp2, ipwtj, tmp1j)
-#                 mul!(tmp1j, view(W_inv_j, cinds, cinds2), ipwtj')
-#                 mul!(tmp3, ipwtj, tmp1j)
-#                 fact = xor(p == q, p2 == q2) ? rt2i : 1.0
-#                 @. cone.H[idxs, idxs2] += tmp2 * tmp3 * fact
-#
-#                 if (p != q) || (p2 != q2)
-#                     mul!(tmp1j, view(W_inv_j, rinds, cinds2), ipwtj')
-#                     mul!(tmp2, ipwtj, tmp1j)
-#                     mul!(tmp1j, view(W_inv_j, cinds, rinds2), ipwtj')
-#                     mul!(tmp3, ipwtj, tmp1j)
-#                     @. cone.H[idxs, idxs2] += tmp2 * tmp3 * fact
-#                 end
-#             end
-#         end
-#     end
-#     # end
-#
-#     # @timeit "inv hess" begin
-#     @. cone.H2 = cone.H
-#     cone.F = cholesky!(Symmetric(cone.H2, :U), Val(true), check = false)
-#     if !isposdef(cone.F)
-#         return false
-#     end
-#     cone.Hi .= inv(cone.F)
-#     # end
-#
-#     return true
-# end
+function check_in_cone_master(cone::WSOSPolyInterpMat)
+    # @timeit "build mat" begin
+    for j in eachindex(cone.ipwt)
+        ipwtj = cone.ipwt[j]
+        tmp1j = cone.tmp1[j]
+        L = size(ipwtj, 2)
+        mat = cone.mat[j]
+
+        uo = 1
+        for p in 1:cone.R, q in 1:p
+            point_pq = cone.point[uo:(uo + cone.U - 1)] # TODO prealloc
+            if p != q
+                @. point_pq *= rt2i
+            end
+            @. tmp1j = ipwtj' * point_pq'
+
+            rinds = _blockrange(p, L)
+            cinds = _blockrange(q, L)
+            mul!(view(mat, rinds, cinds), tmp1j, ipwtj)
+
+            uo += cone.U
+        end
+
+        cone.matfact[j] = cholesky!(Symmetric(mat, :L), Val(true), check = false)
+        if !isposdef(cone.matfact[j])
+            return false
+        end
+    end
+    # end
+
+    # @timeit "grad hess" begin
+    cone.g .= 0.0
+    cone.H .= 0.0
+    for j in eachindex(cone.ipwt)
+        # @timeit "W_inv" begin
+        W_inv_j = inv(cone.matfact[j])
+        # end
+
+        ipwtj = cone.ipwt[j]
+        tmp1j = cone.tmp1[j]
+        tmp2 = cone.tmp2
+        tmp3 = cone.tmp3
+
+        L = size(ipwtj, 2)
+        uo = 0
+        for p in 1:cone.R, q in 1:p
+            uo += 1
+            fact = (p == q) ? 1.0 : rt2
+            rinds = _blockrange(p, L)
+            cinds = _blockrange(q, L)
+            idxs = _blockrange(uo, cone.U)
+
+            for i in 1:cone.U
+                cone.g[idxs[i]] -= ipwtj[i, :]' * view(W_inv_j, rinds, cinds) * ipwtj[i, :] * fact
+            end
+
+            uo2 = 0
+            for p2 in 1:cone.R, q2 in 1:p2
+                uo2 += 1
+                if uo2 < uo
+                    continue
+                end
+
+                rinds2 = _blockrange(p2, L)
+                cinds2 = _blockrange(q2, L)
+                idxs2 = _blockrange(uo2, cone.U)
+
+                mul!(tmp1j, view(W_inv_j, rinds, rinds2), ipwtj')
+                mul!(tmp2, ipwtj, tmp1j)
+                mul!(tmp1j, view(W_inv_j, cinds, cinds2), ipwtj')
+                mul!(tmp3, ipwtj, tmp1j)
+                fact = xor(p == q, p2 == q2) ? rt2i : 1.0
+                @. cone.H[idxs, idxs2] += tmp2 * tmp3 * fact
+
+                if (p != q) || (p2 != q2)
+                    mul!(tmp1j, view(W_inv_j, rinds, cinds2), ipwtj')
+                    mul!(tmp2, ipwtj, tmp1j)
+                    mul!(tmp1j, view(W_inv_j, cinds, rinds2), ipwtj')
+                    mul!(tmp3, ipwtj, tmp1j)
+                    @. cone.H[idxs, idxs2] += tmp2 * tmp3 * fact
+                end
+            end
+        end
+    end
+    # end
+
+    # @timeit "inv hess" begin
+    @. cone.H2 = cone.H
+    cone.F = cholesky!(Symmetric(cone.H2, :U), Val(true), check = false)
+    if !isposdef(cone.F)
+        return false
+    end
+    cone.Hi .= inv(cone.F)
+    # end
+
+    return true
+end
 
 inv_hess_prod!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::WSOSPolyInterpMat) = mul!(prod, Symmetric(cone.Hi, :U), arr)
