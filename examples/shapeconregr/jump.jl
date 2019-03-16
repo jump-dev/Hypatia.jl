@@ -27,6 +27,7 @@ import DynamicPolynomials
 const DP = DynamicPolynomials
 import SumOfSquares
 import PolyJuMP
+const PJ = PolyJuMP
 import Random
 import Distributions
 import LinearAlgebra: norm
@@ -77,7 +78,7 @@ function add_loss_and_polys(
     (num_points, n) = size(X)
     DP.@polyvar x[1:n]
 
-    JuMP.@variable(model, p, PolyJuMP.Poly(DP.monomials(x, 0:deg)))
+    JuMP.@variable(model, p, PJ.Poly(DP.monomials(x, 0:deg)))
     if use_lsq_obj
         JuMP.@variable(model, z)
         JuMP.@objective(model, Min, z / num_points)
@@ -189,33 +190,33 @@ function build_shapeconregr_WSOS(
     mono_wsos_cone = HYP.WSOSPolyInterpCone(mono_U, [mono_P0, mono_PWts...])
     conv_wsos_cone = HYP.WSOSPolyInterpMatCone(n, conv_U, [conv_P0, conv_PWts...])
 
-    JuMP.@variable(model, regressor[1:regressor_U])
     lagrange_polys = MU.recover_lagrange_polys(regressor_points, regressor_deg)
-    JuMP.@expression(model, regressor_poly, JuMP.dot(regressor, lagrange_polys))
+
+    JuMP.@variable(model, regressor, variable_type = PJ.Poly(PJ.FixedPolynomialBasis(lagrange_polys)))
     if use_lsq_obj
         JuMP.@variable(model, z)
         JuMP.@objective(model, Min, z / num_points)
-        JuMP.@constraint(model, vcat([z], [y[i] - regressor_poly(X[i, :]) for i in 1:num_points]) in MOI.SecondOrderCone(1 + num_points))
+        JuMP.@constraint(model, vcat([z], [y[i] - regressor(X[i, :]) for i in 1:num_points]) in MOI.SecondOrderCone(1 + num_points))
      else
         JuMP.@variable(model, z[1:num_points])
         JuMP.@objective(model, Min, sum(z) / num_points)
         JuMP.@constraints(model, begin
-            [i in 1:num_points], z[i] >= y[i] - regressor_poly(X[i, :])
-            [i in 1:num_points], z[i] >= -y[i] + regressor_poly(X[i, :])
+            [i in 1:num_points], z[i] >= y[i] - regressor(X[i, :])
+            [i in 1:num_points], z[i] >= -y[i] + regressor(X[i, :])
         end)
     end
 
     # monotonicity
     for j in 1:n
         if !iszero(shape_data.mono_profile[j])
-            gradient = DP.differentiate(regressor_poly, DP.variables(regressor_poly)[j])
+            gradient = DP.differentiate(regressor, DP.variables(regressor)[j])
             JuMP.@constraint(model, [shape_data.mono_profile[j] * gradient(mono_points[u, :]) for u in 1:mono_U] in mono_wsos_cone)
         end
     end
 
     # convexity
     if !iszero(shape_data.conv_profile)
-        hessian = DP.differentiate(regressor_poly, DP.variables(regressor_poly), 2)
+        hessian = DP.differentiate(regressor, DP.variables(regressor), 2)
         JuMP.@constraint(model, [shape_data.conv_profile * hessian[i, j](conv_points[u, :]) * (i == j ? 1.0 : rt2)
             for i in 1:n for j in 1:i for u in 1:conv_U] in conv_wsos_cone)
     end
