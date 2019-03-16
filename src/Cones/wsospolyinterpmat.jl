@@ -152,16 +152,5 @@ function check_in_cone(cone::WSOSPolyInterpMat)
     end
     # end
 
-    # @timeit "inv hess" begin
-    @. cone.H2 = cone.H
-    cone.F = cholesky!(Symmetric(cone.H2, :U), Val(true), check = false)
-    if !isposdef(cone.F)
-        return false
-    end
-    cone.Hi .= inv(cone.F)
-    # end
-
-    return true
+    return factorize_hess(cone)
 end
-
-inv_hess_prod!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::WSOSPolyInterpMat) = mul!(prod, Symmetric(cone.Hi, :U), arr)
