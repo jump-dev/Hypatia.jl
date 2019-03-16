@@ -240,12 +240,12 @@ function get_combined_directions(solver::HSDSolver, system_solver::QRCholCombine
 
         # TODO prealloc cholesky auxiliary vectors using posvx
         # TODO use old sysvx code
-        # F = bunchkaufman!(Symmetric(Q2GHGQ2), true, check = false)
-        # if !issuccess(F)
+        F = bunchkaufman!(Symmetric(Q2GHGQ2), true, check = false)
+        if !issuccess(F)
         # @timeit "chol" begin
-        F = cholesky!(Symmetric(Q2GHGQ2), Val(true), check = false)
+        # F = cholesky!(Symmetric(Q2GHGQ2), Val(true), check = false)
         # end
-        if !isposdef(F)
+        # if !isposdef(F)
             # @timeit "recover" begin
             println("linear system matrix factorization failed")
             mul!(Q2GHGQ2, GQ2', HGQ2)
