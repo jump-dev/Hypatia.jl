@@ -79,8 +79,8 @@ end
 _blockrange(inner::Int, outer::Int) = (outer * (inner - 1) + 1):(outer * inner)
 
 function check_in_cone(cone::WSOSPolyInterpMat)
-    # check_in_cone_nowinv(cone)
-    check_in_cone_master(cone)
+    check_in_cone_nowinv(cone)
+    # check_in_cone_master(cone)
 end
 
 # TODO all views can be allocated just once in the cone definition (delete _blockrange too)
@@ -149,7 +149,6 @@ function check_in_cone_nowinv(cone::WSOSPolyInterpMat)
                 cinds2 = _blockrange(q2, cone.U)
                 idxs2 = _blockrange(uo2, cone.U)
 
-
                 fact = xor(p == q, p2 == q2) ? rt2i : 1.0
                 @. cone.H[idxs, idxs2] += PlambdaP[rinds, rinds2] * PlambdaP[cinds, cinds2] * fact
 
@@ -161,16 +160,7 @@ function check_in_cone_nowinv(cone::WSOSPolyInterpMat)
     end
     # end
 
-    # @timeit "inv hess" begin
-    @. cone.H2 = cone.H
-    cone.F = cholesky!(Symmetric(cone.H2, :U), Val(true), check = false)
-    if !isposdef(cone.F)
-        return false
-    end
-    cone.Hi .= inv(cone.F)
-    # end
-
-    return true
+    return factorize_hess(cone)
 end
 
 # res stored lower triangle
@@ -218,6 +208,7 @@ function _block_trisolve(cone::WSOSPolyInterpMat, blocknum::Int, L::Int, j::Int)
     end
     return resvec
 end
+
 # one block-column at a time on the RHS
 function _block_trisolve(cone::WSOSPolyInterpMat, L::Int, j::Int)
     R = cone.R
@@ -228,6 +219,7 @@ function _block_trisolve(cone::WSOSPolyInterpMat, L::Int, j::Int)
     end
     return resmat
 end
+
 # multiply lower triangular block matrix transposed by itself
 function _mulblocks!(cone::WSOSPolyInterpMat, mat::Matrix{Float64}, L::Int)
     R = cone.R
@@ -248,7 +240,6 @@ function _mulblocks!(cone::WSOSPolyInterpMat, mat::Matrix{Float64}, L::Int)
     cone.PlambdaP .= Symmetric(cone.PlambdaP) # TODO make the rest of the code only query indices from the upper triangle
     return nothing
 end
-
 
 function check_in_cone_master(cone::WSOSPolyInterpMat)
     # @timeit "build mat" begin
