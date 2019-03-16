@@ -175,41 +175,41 @@ include(joinpath(@__DIR__, "JuMP.jl"))
 # @testset "MOI tests: $(d ? "dense" : "sparse"), $s, $m" for d in (false, true), s in system_solvers, m in linear_models
 #     test_moi(verbose, d, s, m)
 # end
-#
-# @info("starting default JuMP examples tests")
-# testfuns = [
-#     run_JuMP_envelope_boxinterp,
-#     run_JuMP_envelope_sampleinterp_box,
-#     run_JuMP_envelope_sampleinterp_ball,
-#     run_JuMP_expdesign,
-#     # run_JuMP_namedpoly_PSD, # TODO check: final objective doesn't match
-#     run_JuMP_namedpoly_WSOS_primal,
-#     run_JuMP_namedpoly_WSOS_dual,
-#     # run_JuMP_shapeconregr_PSD,
-#     run_JuMP_shapeconregr_WSOS,
-#     run_JuMP_shapeconregr_WSOS_PolyJuMP,
-#     run_JuMP_densityest,
-#     run_JuMP_sosmatrix_rand,
-#     run_JuMP_sosmatrix_a,
-#     run_JuMP_sosmatrix_poly_a,
-#     run_JuMP_sosmatrix_poly_b,
-#     # run_JuMP_muconvexity_rand,
-#     run_JuMP_muconvexity_a,
-#     run_JuMP_muconvexity_b,
-#     run_JuMP_muconvexity_c,
-#     run_JuMP_muconvexity_d,
-#     run_JuMP_sosmat1,
-#     run_JuMP_sosmat2_scalar,
-#     run_JuMP_sosmat2_matrix,
-#     run_JuMP_sosmat2_matrix_dual,
-#     run_JuMP_sosmat3_primal, # numerically unstable
-#     run_JuMP_sosmat3_dual,
-#     run_JuMP_univariate_WSOS,
-#     # run_JuMP_univariate_PSD,
-#     ]
-# @testset "default examples: $t" for t in testfuns
-#     t()
-# end
+
+@info("starting default JuMP examples tests")
+testfuns = [
+    # run_JuMP_envelope_boxinterp,
+    # run_JuMP_envelope_sampleinterp_box,
+    # run_JuMP_envelope_sampleinterp_ball,
+    # run_JuMP_expdesign,
+    # # run_JuMP_namedpoly_PSD, # TODO check: final objective doesn't match
+    # run_JuMP_namedpoly_WSOS_primal,
+    # run_JuMP_namedpoly_WSOS_dual,
+    # # run_JuMP_shapeconregr_PSD,
+    run_JuMP_shapeconregr_WSOS,
+    run_JuMP_shapeconregr_WSOS_PolyJuMP,
+    # run_JuMP_densityest,
+    run_JuMP_sosmatrix_rand,
+    run_JuMP_sosmatrix_a,
+    run_JuMP_sosmatrix_poly_a,
+    run_JuMP_sosmatrix_poly_b,
+    # run_JuMP_muconvexity_rand,
+    run_JuMP_muconvexity_a,
+    run_JuMP_muconvexity_b,
+    run_JuMP_muconvexity_c,
+    run_JuMP_muconvexity_d,
+    run_JuMP_sosmat1,
+    run_JuMP_sosmat2_scalar,
+    run_JuMP_sosmat2_matrix,
+    run_JuMP_sosmat2_matrix_dual,
+    run_JuMP_sosmat3_primal, # numerically unstable
+    run_JuMP_sosmat3_dual,
+    # run_JuMP_univariate_WSOS,
+    # # run_JuMP_univariate_PSD,
+    ]
+@testset "default examples: $t" for t in testfuns
+    t()
+end
 
 @info("starting additional JuMP examples tests")
 testfuns = [
