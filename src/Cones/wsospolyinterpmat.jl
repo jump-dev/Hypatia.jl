@@ -124,9 +124,9 @@ function check_in_cone_nowinv(cone::WSOSPolyInterpMat)
 
         # perform L \ kron(ipwt)
         ldivp = _block_trisolve(cone, L, j)
-        # ldivp' * ldivp
+        # ldivp' * ldivp, only fills upper triangle
         _mulblocks!(cone, ldivp, L)
-        PlambdaP = cone.PlambdaP
+        PlambdaP = Symmetric(cone.PlambdaP, :U)
 
         uo = 0
         for p in 1:cone.R, q in 1:p
@@ -172,10 +172,9 @@ function blockcholesky!(cone::WSOSPolyInterpMat, L::Int, j::Int)
     for r in 1:R
         tmp .= 0.0
         for k in 1:(r - 1)
-            tmp += res[r][k] * res[r][k]'
+            BLAS.syrk!('U', 'N', 1.0, res[r][k], 1.0, tmp)
         end
-        # TODO unclear why "Symmetric(.)" is needed
-        F = cholesky!(Symmetric(cone.mat[j][_blockrange(r, L), _blockrange(r, L)]) - tmp, Val(true), check = false)
+        F = cholesky!(Symmetric(cone.mat[j][_blockrange(r, L), _blockrange(r, L)] - tmp, :U), Val(true), check = false)
         if !(isposdef(F))
             return false
         end
@@ -222,6 +221,7 @@ end
 
 # multiply lower triangular block matrix transposed by itself
 function _mulblocks!(cone::WSOSPolyInterpMat, mat::Matrix{Float64}, L::Int)
+    # cone.PlambdaP = mat' * mat
     R = cone.R
     U = cone.U
     tmp = cone.tmp2
@@ -237,7 +237,6 @@ function _mulblocks!(cone::WSOSPolyInterpMat, mat::Matrix{Float64}, L::Int)
             cone.PlambdaP[rinds, cinds] = tmp
         end
     end
-    cone.PlambdaP .= Symmetric(cone.PlambdaP) # TODO make the rest of the code only query indices from the upper triangle
     return nothing
 end
 
