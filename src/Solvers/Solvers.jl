@@ -21,6 +21,8 @@ abstract type CombinedHSDSystemSolver end
 include("homogeneous_self_dual/solver.jl")
 include("homogeneous_self_dual/combined_step/stepper.jl")
 include("homogeneous_self_dual/combined_step/naive.jl")
+include("homogeneous_self_dual/combined_step/naiveelim.jl")
+include("homogeneous_self_dual/combined_step/symindef.jl")
 include("homogeneous_self_dual/combined_step/qrchol.jl")
 # include("homogeneous_self_dual/combined_step/cholchol.jl")
 

@@ -52,6 +52,23 @@ function step(solver::HSDSolver, stepper::CombinedHSDStepper)
     # calculate affine/prediction and correction directions
     # @timeit "directions" begin
     (x_pred, x_corr, y_pred, y_corr, z_pred, z_corr, s_pred, s_corr, tau_pred, tau_corr, kap_pred, kap_corr) = get_combined_directions(solver, stepper.system_solver)
+
+    # st = SymIndefCombinedHSDSystemSolver(model)
+    # (_x_pred, _x_corr, _y_pred, _y_corr, _z_pred, _z_corr, _s_pred, _s_corr, _tau_pred, _tau_corr, _kap_pred, _kap_corr) = get_combined_directions(solver, st)
+    #
+    # @show norm(x_pred - _x_pred)
+    # @show norm(y_pred - _y_pred)
+    # @show norm(z_pred - _z_pred)
+    # @show norm(s_pred - _s_pred)
+    # @show norm(tau_pred - _tau_pred)
+    # @show norm(kap_pred - _kap_pred)
+    #
+    # @show norm(x_corr - _x_corr)
+    # @show norm(y_corr - _y_corr)
+    # @show norm(z_corr - _z_corr)
+    # @show norm(s_corr - _s_corr)
+    # @show norm(tau_corr - _tau_corr)
+    # @show norm(kap_corr - _kap_corr)
     # end
 
     # calculate correction factor gamma by finding distance affine_alpha for stepping in affine direction

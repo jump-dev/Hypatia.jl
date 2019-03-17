@@ -21,6 +21,7 @@ mutable struct NaiveCombinedHSDSystemSolver <: CombinedHSDSystemSolver
         system_solver = new()
 
         # TODO eliminate s and allow sparse lhs?
+        # x y z kap s tau
         system_solver.lhs_copy = [
             zeros(n,n)  model.A'    model.G'          zeros(n)  zeros(n,q)         model.c;
             -model.A    zeros(p,p)  zeros(p,q)        zeros(p)  zeros(p,q)         model.b;
@@ -65,13 +66,16 @@ function get_combined_directions(solver::HSDSolver, system_solver::NaiveCombined
     lhs = system_solver.lhs
     rhs = system_solver.rhs
     kap_row = system_solver.kap_row
+    mu = solver.mu
+    tau = solver.tau
+    kap = solver.kap
 
     # update lhs matrix
     copyto!(lhs, system_solver.lhs_copy)
-    lhs[kap_row, end] = solver.mu / solver.tau / solver.tau
+    lhs[kap_row, end] = mu / tau / tau
     for k in eachindex(cones)
         H = Cones.hess(cones[k])
-        @. system_solver.lhs_H_k[k] = solver.mu * H
+        @. system_solver.lhs_H_k[k] = mu * H
     end
 
     # update rhs matrix
@@ -83,16 +87,16 @@ function get_combined_directions(solver::HSDSolver, system_solver::NaiveCombined
         duals_k = solver.point.dual_views[k]
         g = Cones.grad(cones[k])
         @. system_solver.z1_k[k] = -duals_k
-        @. system_solver.z2_k[k] = -duals_k - solver.mu * g
+        @. system_solver.z2_k[k] = -duals_k - mu * g
     end
     system_solver.s1 .= solver.z_residual
     system_solver.s2 .= 0.0
-    rhs[kap_row, 1] = -solver.kap
-    rhs[kap_row, 2] = -solver.kap + solver.mu / solver.tau
-    rhs[end, 1] = solver.kap + solver.primal_obj_t - solver.dual_obj_t
+    rhs[kap_row, 1] = -kap
+    rhs[kap_row, 2] = -kap + mu / tau
+    rhs[end, 1] = kap + solver.primal_obj_t - solver.dual_obj_t
     rhs[end, 2] = 0.0
 
-    # solve linear system_solver
+    # solve system
     ldiv!(lu!(lhs), rhs)
 
     return (system_solver.x1, system_solver.x2, system_solver.y1, system_solver.y2, system_solver.z1, system_solver.z2, system_solver.s1, system_solver.s2, rhs[end, 1], rhs[end, 2], rhs[kap_row, 1], rhs[kap_row, 2])
