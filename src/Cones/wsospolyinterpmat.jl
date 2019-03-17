@@ -79,8 +79,8 @@ end
 _blockrange(inner::Int, outer::Int) = (outer * (inner - 1) + 1):(outer * inner)
 
 function check_in_cone(cone::WSOSPolyInterpMat)
-    check_in_cone_nowinv(cone)
-    # check_in_cone_master(cone)
+    # check_in_cone_nowinv(cone)
+    check_in_cone_master(cone)
 end
 
 # TODO all views can be allocated just once in the cone definition (delete _blockrange too)
