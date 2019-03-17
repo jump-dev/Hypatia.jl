@@ -117,9 +117,7 @@ function check_in_cone_nowinv(cone::WSOSPolyInterpMat)
     cone.g .= 0.0
     cone.H .= 0.0
     for j in eachindex(cone.ipwt)
-
         ipwtj = cone.ipwt[j]
-
         L = size(ipwtj, 2)
 
         # perform L \ kron(ipwt)
@@ -171,17 +169,22 @@ function blockcholesky!(cone::WSOSPolyInterpMat, L::Int, j::Int)
     facts = cone.blockfacts[j]
     for r in 1:R
         tmp .= 0.0
+        # blocks on the diagonal come from cholesky decomposition after back-substitution, result stored in cone.blockfacts
         for k in 1:(r - 1)
             BLAS.syrk!('U', 'N', 1.0, res[r][k], 1.0, tmp)
         end
-        F = cholesky!(Symmetric(cone.mat[j][_blockrange(r, L), _blockrange(r, L)] - tmp, :U), Val(true), check = false)
+        diag_block = cone.mat[j][_blockrange(r, L), _blockrange(r, L)] - tmp
+        F = cholesky!(Symmetric(diag_block, :U), Val(true), check = false)
         if !(isposdef(F))
             return false
         end
         facts[r] = F
+
+        # blocks off the diagonal come from back-substitution, contigous blocks stored in cone.blockmats
         for s in (r + 1):R
             for k in 1:(r - 1)
-                tmp += res[r][k] * res[s][k]'
+                # tmp += res[r][k] * res[s][k]'
+                BLAS.gemm!('N', 'T', 1.0, res[r][k], res[s][k], 1.0, tmp)
             end
             rhs = cone.mat[j][_blockrange(s, L), _blockrange(r, L)] - tmp
             res[s][r] = (facts[r].L \ view(rhs, facts[r].p, :))'
@@ -201,7 +204,9 @@ function _block_trisolve(cone::WSOSPolyInterpMat, blocknum::Int, L::Int, j::Int)
     for r in (blocknum + 1):R
         tmp .= 0.0
         for s in blocknum:(r - 1)
-            tmp -= Lmat[r][s] * resvec[_blockrange(s, L), :]
+            # tmp -= Lmat[r][s] * resvec[_blockrange(s, L), :]
+            resblock = resvec[_blockrange(s, L), :]
+            BLAS.gemm!('N', 'N', -1.0, Lmat[r][s], resblock, 1.0, tmp)
         end
         resvec[_blockrange(r, L), :] = Fvec[r].L \ view(tmp, Fvec[r].p, :)
     end
@@ -224,17 +229,14 @@ function _mulblocks!(cone::WSOSPolyInterpMat, mat::Matrix{Float64}, L::Int)
     # cone.PlambdaP = mat' * mat
     R = cone.R
     U = cone.U
-    tmp = cone.tmp2
     for i in 1:R
         rinds = _blockrange(i, U)
         for j in i:R
             cinds = _blockrange(j, U)
             tmp .= 0.0
             # since mat is block lower triangular rows only from max(i,j) start making a nonzero contribution to the product
-            for k = j:R
-                tmp += mat[_blockrange(k, L), _blockrange(i, U)]' * mat[_blockrange(k, L), _blockrange(j, U)]
-            end
-            cone.PlambdaP[rinds, cinds] = tmp
+            mulrange = ((j - 1) * L + 1):(L * R)
+            mul!(view(cone.PlambdaP, rinds, cinds), mat[mulrange, _blockrange(i, U)]',  mat[mulrange, _blockrange(j, U)])
         end
     end
     return nothing
