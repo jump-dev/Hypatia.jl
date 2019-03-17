@@ -7,7 +7,6 @@ interpolation-based weighted-sum-of-squares (multivariate) polynomial cone param
 definition and dual barrier from "Sum-of-squares optimization without semidefinite programming" by D. Papp and S. Yildiz, available at https://arxiv.org/abs/1712.01792
 
 TODO can perform loop for calculating g and H in parallel
-TODO maybe can avoid final factorization?
 TODO scale the interior direction
 =#
 
@@ -84,14 +83,5 @@ function check_in_cone(cone::WSOSPolyInterp)
         end
     end
 
-    @. cone.H2 = cone.H
-    cone.F = cholesky!(Symmetric(cone.H2, :U), Val(true), check = false)
-    if !isposdef(cone.F)
-        return false
-    end
-    cone.Hi .= inv(cone.F)
-
-    return true
+    return factorize_hess(cone)
 end
-
-inv_hess_prod!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::WSOSPolyInterp) = mul!(prod, Symmetric(cone.Hi, :U), arr)
