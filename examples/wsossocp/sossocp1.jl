@@ -22,22 +22,22 @@ function JuMP_polysoc(P)
     Random.seed!(1)
     dom = MU.FreeDomain(1)
     d = div(maximum(DynamicPolynomials.maxdegree.(P)) + 1, 2)
-    (U, pts, P0, _, _) = MU.interpolate(dom, d, sample_factor = 20, sample = true)
-    mat_wsos_cone = HYP.WSOSPolyInterpSOCCone(2, U, [P0])
+    (U, pts, P0, _, _) = MU.interpolate(dom, d, sample = false)
+    mat_wsos_cone = HYP.WSOSPolyInterpSOCCone(length(P), U, [P0])
     model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
-    JuMP.@constraint(model, [P[i](pts[u, :]) for i in 1:2 for u in 1:U] in mat_wsos_cone)
+    JuMP.@constraint(model, [P[i](pts[u, :]) for i in 1:length(P) for u in 1:U] in mat_wsos_cone)
     return model
 end
 
 DynamicPolynomials.@polyvar x
-for socpoly in [[x + 1; x]]
+for socpoly in [[2x^2 + 2x; x; x], [x + 1; x]]
     model = JuMP_polysoc(socpoly)
     JuMP.optimize!(model)
     @test JuMP.termination_status(model) == MOI.OPTIMAL
     @test JuMP.primal_status(model) == MOI.FEASIBLE_POINT
 end
 
-for socpoly in [[x; x + 1]]
+for socpoly in [[x; x^2 + x], [x; x + 1]]
     model = JuMP_polysoc(socpoly)
     JuMP.optimize!(model)
     @test JuMP.termination_status(model) == MOI.INFEASIBLE
