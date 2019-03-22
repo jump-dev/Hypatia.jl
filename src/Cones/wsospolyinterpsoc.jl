@@ -26,8 +26,6 @@ mutable struct WSOSPolyInterpSOC <: Cone
     tmp1::Vector{Matrix{Float64}}
     tmp2::Matrix{Float64}
     tmp3::Matrix{Float64}
-    barfun::Function
-    diffres
 
     function WSOSPolyInterpSOC(R::Int, U::Int, ipwt::Vector{Matrix{Float64}}, is_dual::Bool)
         for ipwtj in ipwt
@@ -52,11 +50,6 @@ mutable struct WSOSPolyInterpSOC <: Cone
         cone.tmp1 = [similar(ipwt[1], size(ipwtj, 2), U) for ipwtj in ipwt]
         cone.tmp2 = similar(ipwt[1], U, U)
         cone.tmp3 = similar(cone.tmp2)
-        function barfun(lambda)
-            return -log(det(Symmetric(lambda, :L)))
-        end
-        cone.barfun = barfun
-        cone.diffres = DiffResults.HessianResult(cone.g)
         return cone
     end
 end
@@ -72,33 +65,6 @@ function set_initial_point(arr::AbstractVector{Float64}, cone::WSOSPolyInterpSOC
 end
 
 _blockrange(inner::Int, outer::Int) = (outer * (inner - 1) + 1):(outer * inner)
-
-function lambda(point, cone, j)
-    ipwtj = cone.ipwt[j]
-    tmp1j = cone.tmp1[j]
-    L = size(ipwtj, 2)
-    mat = similar(point, cone.R * L, cone.R * L)
-    mat .= 0.0
-    first_lambda = zeros(L, L)
-
-    # populate diagonal
-    first_lambda = ipwtj' * Diagonal(point[1:cone.U]) * ipwtj
-    for p in 1:cone.R
-        inds = _blockrange(p, L)
-        mat[inds, inds] = first_lambda
-    end
-    # populate first column
-    uo = cone.U + 1
-    for p in 2:cone.R
-        point_pq = point[uo:(uo + cone.U - 1)] # TODO prealloc
-        inds = _blockrange(p, L)
-        mat[inds, 1:L] = mat[1:L, inds] = ipwtj' * Diagonal(point_pq) * ipwtj
-        uo += cone.U
-    end
-
-    return Symmetric(mat, :L)
-end
-
 
 function check_in_cone(cone::WSOSPolyInterpSOC)
     # naive build of lambda. pretty sure there should be an soc analogy more efficient than the current sdp analogy.
@@ -197,12 +163,6 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
                 end
             end
         end # p
-        cone.gtry .= 0.0
-        cone.Htry .= 0.0
-        cone.diffres = ForwardDiff.hessian!(cone.diffres, x -> cone.barfun(lambda(x, cone, j)), cone.point)
-        cone.gtry .+= DiffResults.gradient(cone.diffres)
-        cone.Htry .+= DiffResults.hessian(cone.diffres)
-        @show norm(cone.Htry - Symmetric(cone.H, :U))
     end # j
     # end
 

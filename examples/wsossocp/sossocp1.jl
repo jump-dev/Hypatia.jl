@@ -30,14 +30,14 @@ function JuMP_polysoc(P)
 end
 
 DynamicPolynomials.@polyvar x
-for socpoly in [[2x^2 + 2x; x; x], [x + 1; x]]
+for socpoly in [[2x^2 + 2; x; x], [x^2 + 2; x]]
     model = JuMP_polysoc(socpoly)
     JuMP.optimize!(model)
     @test JuMP.termination_status(model) == MOI.OPTIMAL
     @test JuMP.primal_status(model) == MOI.FEASIBLE_POINT
 end
 
-for socpoly in [[x; x^2 + x], [x; x + 1]]
+for socpoly in [[x; x^2 + x], [x; x + 1], [x^2; x], [x + 2, x], [x - 1, x, x]]
     model = JuMP_polysoc(socpoly)
     JuMP.optimize!(model)
     @test JuMP.termination_status(model) == MOI.INFEASIBLE
