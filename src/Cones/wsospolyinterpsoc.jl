@@ -16,6 +16,8 @@ mutable struct WSOSPolyInterpSOC <: Cone
     point::Vector{Float64}
     g::Vector{Float64}
     H::Matrix{Float64}
+    gtry::Vector{Float64}
+    Htry::Matrix{Float64}
     H2::Matrix{Float64}
     Hi::Matrix{Float64}
     F
@@ -24,6 +26,8 @@ mutable struct WSOSPolyInterpSOC <: Cone
     tmp1::Vector{Matrix{Float64}}
     tmp2::Matrix{Float64}
     tmp3::Matrix{Float64}
+    barfun::Function
+    diffres
 
     function WSOSPolyInterpSOC(R::Int, U::Int, ipwt::Vector{Matrix{Float64}}, is_dual::Bool)
         for ipwtj in ipwt
@@ -39,6 +43,8 @@ mutable struct WSOSPolyInterpSOC <: Cone
         cone.point = similar(ipwt[1], dim)
         cone.g = similar(ipwt[1], dim)
         cone.H = similar(ipwt[1], dim, dim)
+        cone.gtry = similar(ipwt[1], dim)
+        cone.Htry = similar(ipwt[1], dim, dim)
         cone.H2 = similar(cone.H)
         cone.Hi = similar(cone.H)
         cone.mat = [similar(ipwt[1], size(ipwtj, 2) * R, size(ipwtj, 2) * R) for ipwtj in ipwt]
@@ -46,6 +52,11 @@ mutable struct WSOSPolyInterpSOC <: Cone
         cone.tmp1 = [similar(ipwt[1], size(ipwtj, 2), U) for ipwtj in ipwt]
         cone.tmp2 = similar(ipwt[1], U, U)
         cone.tmp3 = similar(cone.tmp2)
+        function barfun(lambda)
+            return -log(det(Symmetric(lambda, :L)))
+        end
+        cone.barfun = barfun
+        cone.diffres = DiffResults.HessianResult(cone.g)
         return cone
     end
 end
@@ -61,6 +72,32 @@ function set_initial_point(arr::AbstractVector{Float64}, cone::WSOSPolyInterpSOC
 end
 
 _blockrange(inner::Int, outer::Int) = (outer * (inner - 1) + 1):(outer * inner)
+
+function lambda(point, cone, j)
+    ipwtj = cone.ipwt[j]
+    tmp1j = cone.tmp1[j]
+    L = size(ipwtj, 2)
+    mat = similar(point, cone.R * L, cone.R * L)
+    mat .= 0.0
+    first_lambda = zeros(L, L)
+
+    # populate diagonal
+    first_lambda = ipwtj' * Diagonal(point[1:cone.U]) * ipwtj
+    for p in 1:cone.R
+        inds = _blockrange(p, L)
+        mat[inds, inds] = first_lambda
+    end
+    # populate first column
+    uo = cone.U + 1
+    for p in 2:cone.R
+        point_pq = point[uo:(uo + cone.U - 1)] # TODO prealloc
+        inds = _blockrange(p, L)
+        mat[inds, 1:L] = mat[1:L, inds] = ipwtj' * Diagonal(point_pq) * ipwtj
+        uo += cone.U
+    end
+
+    return Symmetric(mat, :L)
+end
 
 
 function check_in_cone(cone::WSOSPolyInterpSOC)
@@ -94,7 +131,7 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
             uo += cone.U
         end
 
-        cone.matfact[j] = cholesky!(Symmetric(mat, :L), Val(true), check = false)
+        cone.matfact[j] = cholesky(Symmetric(mat, :L), Val(true), check = false)
         if !isposdef(cone.matfact[j])
             return false
         end
@@ -159,9 +196,14 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
                                            2 * (ipwtj * view(W_inv_j, 1:L, rinds) * ipwtj') .* (ipwtj * view(W_inv_j, 1:L, rinds2) * ipwtj')
                 end
             end
-
-        end
-    end
+        end # p
+        cone.gtry .= 0.0
+        cone.Htry .= 0.0
+        cone.diffres = ForwardDiff.hessian!(cone.diffres, x -> cone.barfun(lambda(x, cone, j)), cone.point)
+        cone.gtry .+= DiffResults.gradient(cone.diffres)
+        cone.Htry .+= DiffResults.hessian(cone.diffres)
+        @show norm(cone.Htry - Symmetric(cone.H, :U))
+    end # j
     # end
 
     return factorize_hess(cone)
