@@ -77,7 +77,6 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
         first_lambda = zeros(L, L)
 
         # populate diagonal
-        @show cone.point
         point_pq = cone.point[1:cone.U]
         @. tmp1j = ipwtj' * point_pq'
         mul!(first_lambda, tmp1j, ipwtj)
@@ -96,7 +95,6 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
         end
 
         cone.matfact[j] = cholesky!(Symmetric(mat, :L), Val(true), check = false)
-        @show cone.mat[1]
         if !isposdef(cone.matfact[j])
             return false
         end
@@ -133,7 +131,7 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
                 end
             end
 
-            @show "hessian"
+            # @show "hessian"
 
             uo2 = 0
             for p2 in 1:cone.R
@@ -146,18 +144,19 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
 
                 if p == 1 && p2 == 1
                     for r in 1:cone.R, s in 1:cone.R
-                        cone.H[idxs, idxs2] += (ipwtj * view(W_inv_j, _blockrange(r, L), _blockrange(r, L)) * ipwtj') .* (ipwtj * view(W_inv_j, _blockrange(s, L), _blockrange(s, L)) * ipwtj')
+                        cone.H[idxs, idxs2] += (ipwtj * view(W_inv_j, _blockrange(r, L), _blockrange(s, L)) * ipwtj').^2
                     end
                 elseif p == 1 && p2 != 1
                     for r in 1:cone.R
-                        cone.H[idxs, idxs2] += 2 * (ipwtj * view(W_inv_j, _blockrange(r, L), _blockrange(r, L)) * ipwtj') .* (ipwtj * view(W_inv_j, 1:L, rinds2) * ipwtj')
+                        cone.H[idxs, idxs2] += 2 * (ipwtj * view(W_inv_j, _blockrange(1, L), _blockrange(r, L)) * ipwtj') .* (ipwtj * view(W_inv_j, _blockrange(r, L), rinds2) * ipwtj')
                     end
                 elseif p != 1 && p2 == 1
                     for r in 1:cone.R
-                        cone.H[idxs, idxs2] += 2 * (ipwtj * view(W_inv_j, _blockrange(r, L), _blockrange(r, L)) * ipwtj') .* (ipwtj * view(W_inv_j, 1:L, rinds) * ipwtj')
+                        cone.H[idxs, idxs2] += 2 * (ipwtj * view(W_inv_j, _blockrange(1, L), _blockrange(r, L)) * ipwtj') .* (ipwtj * view(W_inv_j, _blockrange(r, L), rinds) * ipwtj')
                     end
                 else
-                    cone.H[idxs, idxs2] += 2 * (ipwtj * view(W_inv_j, 1:L, rinds) * ipwtj') .* (ipwtj * view(W_inv_j, 1:L, rinds2) * ipwtj')
+                    cone.H[idxs, idxs2] += 2 * (ipwtj * view(W_inv_j, 1:L, 1:L) * ipwtj') .* (ipwtj * view(W_inv_j, rinds, rinds2) * ipwtj') +
+                                           2 * (ipwtj * view(W_inv_j, 1:L, rinds) * ipwtj') .* (ipwtj * view(W_inv_j, 1:L, rinds2) * ipwtj')
                 end
             end
 
