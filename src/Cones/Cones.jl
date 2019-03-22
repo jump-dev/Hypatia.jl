@@ -27,6 +27,7 @@ include("semidefinite.jl")
 include("hypoperlogdet.jl")
 include("wsospolyinterp.jl")
 include("wsospolyinterpmat.jl")
+include("wsospolyinterpsoc.jl")
 
 use_dual(cone::Cone) = cone.use_dual
 load_point(cone::Cone, point::AbstractVector{Float64}) = (cone.point = point)
