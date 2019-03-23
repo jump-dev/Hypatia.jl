@@ -26,6 +26,8 @@ mutable struct WSOSPolyInterpSOC <: Cone
     tmp1::Vector{Matrix{Float64}}
     tmp2::Matrix{Float64}
     tmp3::Matrix{Float64}
+    first_lambda::Vector{Matrix{Float64}}
+    lambdafact::Vector{CholeskyPivoted{Float64, Matrix{Float64}}}
 
     function WSOSPolyInterpSOC(R::Int, U::Int, ipwt::Vector{Matrix{Float64}}, is_dual::Bool)
         for ipwtj in ipwt
@@ -50,6 +52,8 @@ mutable struct WSOSPolyInterpSOC <: Cone
         cone.tmp1 = [similar(ipwt[1], size(ipwtj, 2), U) for ipwtj in ipwt]
         cone.tmp2 = similar(ipwt[1], U, U)
         cone.tmp3 = similar(cone.tmp2)
+        cone.first_lambda = [similar(ipwt[1], size(ipwtj, 2), size(ipwtj, 2)) for ipwtj in ipwt]
+        cone.lambdafact = Vector{CholeskyPivoted{Float64, Matrix{Float64}}}(undef, length(ipwt))
         return cone
     end
 end
@@ -76,17 +80,24 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
         L = size(ipwtj, 2)
         mat = cone.mat[j]
         mat .= 0.0
-        # TODO this won't stay
-        first_lambda = zeros(L, L)
+        first_lambda = cone.first_lambda[j]
 
         # populate diagonal
         point_pq = cone.point[1:cone.U]
         @. tmp1j = ipwtj' * point_pq'
         mul!(first_lambda, tmp1j, ipwtj)
+        lambdafact = cholesky(Symmetric(first_lambda, :L), Val(true), check = false)
+        if !isposdef(lambdafact)
+            return false
+        end
+
+        # TODO kill this code
         for p in 1:cone.R
             inds = _blockrange(p, L)
             mat[inds, inds] = first_lambda
         end
+        first_lambda_inv = inv(lambdafact)
+
         # populate first column
         uo = cone.U + 1
         for p in 2:cone.R
@@ -94,13 +105,22 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
             @. tmp1j = ipwtj' * point_pq'
             inds = _blockrange(p, L)
             mul!(view(mat, inds, 1:L), tmp1j, ipwtj)
+            first_lambda -= view(mat, inds, 1:L) * first_lambda_inv * view(mat, inds, 1:L)'
             uo += cone.U
         end
 
         cone.matfact[j] = cholesky(Symmetric(mat, :L), Val(true), check = false)
-        if !isposdef(cone.matfact[j])
+
+        fact1 = isposdef(cone.matfact[j])
+        fact2 = isposdef(first_lambda)
+        # @show fact2 == fact3
+        if !fact2
             return false
         end
+
+        # if !isposdef(cone.matfact[j])
+        #     return false
+        # end
     end
     # end
 
