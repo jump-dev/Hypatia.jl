@@ -60,7 +60,7 @@ end
     simple_infeasibility()
 
     Random.seed!(1234)
-    for deg in 1:2, n in 1:1, npolys in 1:2
+    for deg in 1:2, n in 1:2, npolys in 1:2
         println()
         @show deg, n, npolys
 

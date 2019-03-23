@@ -64,7 +64,7 @@ end
 
 WSOSPolyInterpSOC(R::Int, U::Int, ipwt::Vector{Matrix{Float64}}) = WSOSPolyInterpSOC(R, U, ipwt, false)
 
-get_nu(cone::WSOSPolyInterpSOC) = sum(size(ipwtj, 2) for ipwtj in cone.ipwt)
+get_nu(cone::WSOSPolyInterpSOC) = 2 * sum(size(ipwtj, 2) for ipwtj in cone.ipwt)
 
 function set_initial_point(arr::AbstractVector{Float64}, cone::WSOSPolyInterpSOC)
     arr .= 0.0
@@ -76,27 +76,45 @@ function lambda(point, cone, j)
     ipwtj = cone.ipwt[j]
     L = size(ipwtj, 2)
     mat = similar(point, L, L)
-    mat .= 0.0
 
     # first lambda
     point_pq = point[1:cone.U]
-    # tmp = ipwtj' * Diagonal(point_pq) * ipwtj
-    # mat += Symmetric(tmp * tmp')
     first_lambda = ipwtj' * Diagonal(point_pq) * ipwtj
-    mat += Symmetric(first_lambda)
+    mat = Symmetric(first_lambda)
     first_lambda_inv = inv(Symmetric(first_lambda))
+
+    # minus other lambdas
+    uo = cone.U + 1
+    for p in 2:cone.R
+        point_pq = point[uo:(uo + cone.U - 1)]
+        tmp = ipwtj' * Diagonal(point_pq) * ipwtj
+        mat -= Symmetric(tmp * first_lambda_inv * tmp')
+        uo += cone.U
+    end
+    return mat
+end
+
+function lambda2(point, cone, j)
+    ipwtj = cone.ipwt[j]
+    L = size(ipwtj, 2)
+    mat = similar(point, L, L)
+
+    # first lambda
+    point_pq = point[1:cone.U]
+    tmp = ipwtj' * Diagonal(point_pq) * ipwtj
+    mat = Symmetric(tmp * tmp')
 
     # minus other lambdas^2
     uo = cone.U + 1
     for p in 2:cone.R
         point_pq = point[uo:(uo + cone.U - 1)]
         tmp = ipwtj' * Diagonal(point_pq) * ipwtj
-        # mat -= Symmetric(tmp * tmp')
-        mat -= Symmetric(tmp * first_lambda_inv * tmp')
+        mat -= Symmetric(tmp * tmp')
         uo += cone.U
     end
     return mat
 end
+
 
 function check_in_cone(cone::WSOSPolyInterpSOC)
 
@@ -112,7 +130,7 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
         point_pq = cone.point[1:cone.U]
         @. tmp1j = ipwtj' * point_pq'
         mul!(tmp4, tmp1j, ipwtj)
-        lambdafact = cholesky!(Symmetric(tmp4, :L), Val(true), check = false)
+        lambdafact = cholesky(Symmetric(tmp4, :L), Val(true), check = false)
         if !isposdef(lambdafact)
             return false
         end
@@ -135,6 +153,9 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
         if !isposdef(cone.matfact[j])
             return false
         end
+        # @show Symmetric(mat, :U) - lambda2(cone.point, cone, j)
+        @assert isposdef(Symmetric(lambda2(cone.point, cone, j)))
+        @assert isposdef(Symmetric(lambda(cone.point, cone, j)))
     end
     # end
 
@@ -142,7 +163,7 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
     cone.H .= 0.0
 
     for j in eachindex(cone.ipwt)
-        cone.diffres = ForwardDiff.hessian!(cone.diffres, x -> cone.barfun(lambda(x, cone, j)), cone.point)
+        cone.diffres = ForwardDiff.hessian!(cone.diffres, x -> -log(det(lambda2(x, cone, j))), cone.point)
         cone.g += DiffResults.gradient(cone.diffres)
         cone.H += DiffResults.hessian(cone.diffres)
     end
