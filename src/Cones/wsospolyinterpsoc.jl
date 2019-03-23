@@ -26,8 +26,10 @@ mutable struct WSOSPolyInterpSOC <: Cone
     tmp1::Vector{Matrix{Float64}}
     tmp2::Matrix{Float64}
     tmp3::Matrix{Float64}
-    first_lambda::Vector{Matrix{Float64}}
+    tmp4::Vector{Matrix{Float64}}
     lambdafact::Vector{CholeskyPivoted{Float64, Matrix{Float64}}}
+    barfun::Function
+    diffres
 
     function WSOSPolyInterpSOC(R::Int, U::Int, ipwt::Vector{Matrix{Float64}}, is_dual::Bool)
         for ipwtj in ipwt
@@ -47,20 +49,22 @@ mutable struct WSOSPolyInterpSOC <: Cone
         cone.Htry = similar(ipwt[1], dim, dim)
         cone.H2 = similar(cone.H)
         cone.Hi = similar(cone.H)
-        cone.mat = [similar(ipwt[1], size(ipwtj, 2) * R, size(ipwtj, 2) * R) for ipwtj in ipwt]
+        cone.mat = [similar(ipwt[1], size(ipwtj, 2), size(ipwtj, 2)) for ipwtj in ipwt]
         cone.matfact = Vector{CholeskyPivoted{Float64, Matrix{Float64}}}(undef, length(ipwt))
         cone.tmp1 = [similar(ipwt[1], size(ipwtj, 2), U) for ipwtj in ipwt]
         cone.tmp2 = similar(ipwt[1], U, U)
         cone.tmp3 = similar(cone.tmp2)
-        cone.first_lambda = [similar(ipwt[1], size(ipwtj, 2), size(ipwtj, 2)) for ipwtj in ipwt]
+        cone.tmp4 = [similar(ipwt[1], size(ipwtj, 2), size(ipwtj, 2)) for ipwtj in ipwt]
         cone.lambdafact = Vector{CholeskyPivoted{Float64, Matrix{Float64}}}(undef, length(ipwt))
+        cone.barfun = x -> -log(det(Symmetric(x, :L)))
+        cone.diffres = DiffResults.HessianResult(cone.g)
         return cone
     end
 end
 
 WSOSPolyInterpSOC(R::Int, U::Int, ipwt::Vector{Matrix{Float64}}) = WSOSPolyInterpSOC(R, U, ipwt, false)
 
-get_nu(cone::WSOSPolyInterpSOC) = cone.R * sum(size(ipwtj, 2) for ipwtj in cone.ipwt)
+get_nu(cone::WSOSPolyInterpSOC) = sum(size(ipwtj, 2) for ipwtj in cone.ipwt)
 
 function set_initial_point(arr::AbstractVector{Float64}, cone::WSOSPolyInterpSOC)
     arr .= 0.0
@@ -68,10 +72,33 @@ function set_initial_point(arr::AbstractVector{Float64}, cone::WSOSPolyInterpSOC
     return arr
 end
 
-_blockrange(inner::Int, outer::Int) = (outer * (inner - 1) + 1):(outer * inner)
+function lambda(point, cone, j)
+    ipwtj = cone.ipwt[j]
+    L = size(ipwtj, 2)
+    mat = similar(point, L, L)
+    mat .= 0.0
+
+    # first lambda
+    point_pq = point[1:cone.U]
+    # tmp = ipwtj' * Diagonal(point_pq) * ipwtj
+    # mat += Symmetric(tmp * tmp')
+    first_lambda = ipwtj' * Diagonal(point_pq) * ipwtj
+    mat += Symmetric(first_lambda)
+    first_lambda_inv = inv(Symmetric(first_lambda))
+
+    # minus other lambdas^2
+    uo = cone.U + 1
+    for p in 2:cone.R
+        point_pq = point[uo:(uo + cone.U - 1)]
+        tmp = ipwtj' * Diagonal(point_pq) * ipwtj
+        # mat -= Symmetric(tmp * tmp')
+        mat -= Symmetric(tmp * first_lambda_inv * tmp')
+        uo += cone.U
+    end
+    return mat
+end
 
 function check_in_cone(cone::WSOSPolyInterpSOC)
-    # naive build of lambda. pretty sure there should be an soc analogy more efficient than the current sdp analogy.
 
     # @timeit "build mat" begin
     for j in eachindex(cone.ipwt)
@@ -79,111 +106,107 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
         tmp1j = cone.tmp1[j]
         L = size(ipwtj, 2)
         mat = cone.mat[j]
-        mat .= 0.0
-        first_lambda = cone.first_lambda[j]
+        tmp4 = cone.tmp4[j]
 
-        # populate diagonal
+        # first lambda
         point_pq = cone.point[1:cone.U]
         @. tmp1j = ipwtj' * point_pq'
-        mul!(first_lambda, tmp1j, ipwtj)
-        lambdafact = cholesky(Symmetric(first_lambda, :L), Val(true), check = false)
+        mul!(tmp4, tmp1j, ipwtj)
+        lambdafact = cholesky!(Symmetric(tmp4, :L), Val(true), check = false)
         if !isposdef(lambdafact)
             return false
         end
+        BLAS.syrk!('U', 'N', 1.0, tmp4, 0.0, mat)
+        # mat = tmp4 * tmp4'
+        # first_lambda_inv = inv(lambdafact)
 
-        # TODO kill this code
-        for p in 1:cone.R
-            inds = _blockrange(p, L)
-            mat[inds, inds] = first_lambda
-        end
-        first_lambda_inv = inv(lambdafact)
-
-        # populate first column
+        # minus other lambdas^2
         uo = cone.U + 1
         for p in 2:cone.R
             point_pq = cone.point[uo:(uo + cone.U - 1)] # TODO prealloc
             @. tmp1j = ipwtj' * point_pq'
-            inds = _blockrange(p, L)
-            mul!(view(mat, inds, 1:L), tmp1j, ipwtj)
-            first_lambda -= view(mat, inds, 1:L) * first_lambda_inv * view(mat, inds, 1:L)'
+            mul!(tmp4, tmp1j, ipwtj)
+            BLAS.syrk!('U', 'N', -1.0, tmp4, 1.0, mat)
+            # mat -= Symmetric(tmp4 * first_lambda_inv * tmp4')
             uo += cone.U
         end
 
-        cone.matfact[j] = cholesky(Symmetric(mat, :L), Val(true), check = false)
-
-        fact1 = isposdef(cone.matfact[j])
-        fact2 = isposdef(first_lambda)
-        # @show fact2 == fact3
-        if !fact2
+        cone.matfact[j] = cholesky(Symmetric(mat, :U), Val(true), check = false)
+        if !isposdef(cone.matfact[j])
             return false
         end
-
-        # if !isposdef(cone.matfact[j])
-        #     return false
-        # end
     end
     # end
 
-    # @timeit "grad hess" begin
     cone.g .= 0.0
     cone.H .= 0.0
+
     for j in eachindex(cone.ipwt)
-        # @timeit "W_inv" begin
-        W_inv_j = inv(cone.matfact[j])
-        # end
+        cone.diffres = ForwardDiff.hessian!(cone.diffres, x -> cone.barfun(lambda(x, cone, j)), cone.point)
+        cone.g += DiffResults.gradient(cone.diffres)
+        cone.H += DiffResults.hessian(cone.diffres)
+    end
 
-        ipwtj = cone.ipwt[j]
-        tmp1j = cone.tmp1[j]
-        tmp2 = cone.tmp2
-        tmp3 = cone.tmp3
-
-        L = size(ipwtj, 2)
-        uo = 0
-        for p in 1:cone.R
-            uo += 1
-            rinds = _blockrange(p, L)
-            idxs = _blockrange(uo, cone.U)
-
-            for i in 1:cone.U
-                if p == 1
-                    for r in 1:cone.R
-                        cone.g[idxs[i]] -= ipwtj[i, :]' * view(W_inv_j, _blockrange(r, L), _blockrange(r, L)) * ipwtj[i, :]
-                    end
-                else
-                    cone.g[idxs[i]] -= 2 * ipwtj[i, :]' * view(W_inv_j, 1:L, rinds) * ipwtj[i, :]
-                end
-            end
-
-            # @show "hessian"
-
-            uo2 = 0
-            for p2 in 1:cone.R
-                uo2 += 1
-                if uo2 < uo
-                    continue
-                end
-                rinds2 = _blockrange(p2, L)
-                idxs2 = _blockrange(uo2, cone.U)
-
-                if p == 1 && p2 == 1
-                    for r in 1:cone.R, s in 1:cone.R
-                        cone.H[idxs, idxs2] += (ipwtj * view(W_inv_j, _blockrange(r, L), _blockrange(s, L)) * ipwtj').^2
-                    end
-                elseif p == 1 && p2 != 1
-                    for r in 1:cone.R
-                        cone.H[idxs, idxs2] += 2 * (ipwtj * view(W_inv_j, _blockrange(1, L), _blockrange(r, L)) * ipwtj') .* (ipwtj * view(W_inv_j, _blockrange(r, L), rinds2) * ipwtj')
-                    end
-                elseif p != 1 && p2 == 1
-                    for r in 1:cone.R
-                        cone.H[idxs, idxs2] += 2 * (ipwtj * view(W_inv_j, _blockrange(1, L), _blockrange(r, L)) * ipwtj') .* (ipwtj * view(W_inv_j, _blockrange(r, L), rinds) * ipwtj')
-                    end
-                else
-                    cone.H[idxs, idxs2] += 2 * (ipwtj * view(W_inv_j, 1:L, 1:L) * ipwtj') .* (ipwtj * view(W_inv_j, rinds, rinds2) * ipwtj') +
-                                           2 * (ipwtj * view(W_inv_j, 1:L, rinds) * ipwtj') .* (ipwtj * view(W_inv_j, 1:L, rinds2) * ipwtj')
-                end
-            end
-        end # p
-    end # j
+    # @timeit "grad hess" begin
+    # cone.g .= 0.0
+    # cone.H .= 0.0
+    # for j in eachindex(cone.ipwt)
+    #     # @timeit "W_inv" begin
+    #     W_inv_j = inv(cone.matfact[j])
+    #     # end
+    #
+    #     ipwtj = cone.ipwt[j]
+    #     tmp1j = cone.tmp1[j]
+    #     tmp2 = cone.tmp2
+    #     tmp3 = cone.tmp3
+    #
+    #     L = size(ipwtj, 2)
+    #     uo = 0
+    #     for p in 1:cone.R
+    #         uo += 1
+    #         rinds = _blockrange(p, L)
+    #         idxs = _blockrange(uo, cone.U)
+    #
+    #         for i in 1:cone.U
+    #             if p == 1
+    #                 for r in 1:cone.R
+    #                     cone.g[idxs[i]] -= ipwtj[i, :]' * view(W_inv_j, _blockrange(r, L), _blockrange(r, L)) * ipwtj[i, :]
+    #                 end
+    #             else
+    #                 cone.g[idxs[i]] -= 2 * ipwtj[i, :]' * view(W_inv_j, 1:L, rinds) * ipwtj[i, :]
+    #             end
+    #         end
+    #
+    #         # @show "hessian"
+    #
+    #         uo2 = 0
+    #         for p2 in 1:cone.R
+    #             uo2 += 1
+    #             if uo2 < uo
+    #                 continue
+    #             end
+    #             rinds2 = _blockrange(p2, L)
+    #             idxs2 = _blockrange(uo2, cone.U)
+    #
+    #             if p == 1 && p2 == 1
+    #                 for r in 1:cone.R, s in 1:cone.R
+    #                     cone.H[idxs, idxs2] += (ipwtj * view(W_inv_j, _blockrange(r, L), _blockrange(s, L)) * ipwtj').^2
+    #                 end
+    #             elseif p == 1 && p2 != 1
+    #                 for r in 1:cone.R
+    #                     cone.H[idxs, idxs2] += 2 * (ipwtj * view(W_inv_j, _blockrange(1, L), _blockrange(r, L)) * ipwtj') .* (ipwtj * view(W_inv_j, _blockrange(r, L), rinds2) * ipwtj')
+    #                 end
+    #             elseif p != 1 && p2 == 1
+    #                 for r in 1:cone.R
+    #                     cone.H[idxs, idxs2] += 2 * (ipwtj * view(W_inv_j, _blockrange(1, L), _blockrange(r, L)) * ipwtj') .* (ipwtj * view(W_inv_j, _blockrange(r, L), rinds) * ipwtj')
+    #                 end
+    #             else
+    #                 cone.H[idxs, idxs2] += 2 * (ipwtj * view(W_inv_j, 1:L, 1:L) * ipwtj') .* (ipwtj * view(W_inv_j, rinds, rinds2) * ipwtj') +
+    #                                        2 * (ipwtj * view(W_inv_j, 1:L, rinds) * ipwtj') .* (ipwtj * view(W_inv_j, 1:L, rinds2) * ipwtj')
+    #             end
+    #         end
+    #     end # p
+    # end # j
     # end
 
     return factorize_hess(cone)
