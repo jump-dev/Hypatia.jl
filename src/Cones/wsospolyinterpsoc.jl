@@ -28,7 +28,6 @@ mutable struct WSOSPolyInterpSOC <: Cone
     tmp3::Matrix{Float64}
     tmp4::Vector{Matrix{Float64}}
     lambdafact::Vector{CholeskyPivoted{Float64, Matrix{Float64}}}
-    barfun::Function
     diffres
 
     function WSOSPolyInterpSOC(R::Int, U::Int, ipwt::Vector{Matrix{Float64}}, is_dual::Bool)
@@ -56,7 +55,6 @@ mutable struct WSOSPolyInterpSOC <: Cone
         cone.tmp3 = similar(cone.tmp2)
         cone.tmp4 = [similar(ipwt[1], size(ipwtj, 2), size(ipwtj, 2)) for ipwtj in ipwt]
         cone.lambdafact = Vector{CholeskyPivoted{Float64, Matrix{Float64}}}(undef, length(ipwt))
-        cone.barfun = x -> -log(det(Symmetric(x, :L)))
         cone.diffres = DiffResults.HessianResult(cone.g)
         return cone
     end
@@ -159,14 +157,41 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
     end
     # end
 
+    g_try = zeros(cone.U * cone.R)
+    for j in eachindex(cone.ipwt)
+        ipwtj = cone.ipwt[j]
+        L = size(ipwtj, 2)
+        Winv = inv(cone.matfact[j])
+        ur = 0
+        for r in 1:cone.R, u in 1:cone.U
+            ur += 1
+            if ur <= cone.U
+                fact = 1.0
+            else
+                fact = -1.0
+            end
+            for wi in 1:L, wj in 1:L, k in 1:L
+                for u2 in 1:cone.U
+                    pntu2 = cone.point[(r - 1) * cone.U + u2]
+                    if u == u2
+                        g_try[ur] -= 2 * Winv[wi, wj] * ipwtj[u, wi] * ipwtj[u, wj] * ipwtj[u, k]^2 * cone.point[ur] * fact
+                    else
+                        g_try[ur] -= 2 * Winv[wi, wj] * ipwtj[u2, wi] * ipwtj[u, wj] * ipwtj[u2, k] * ipwtj[u, k] * pntu2 * fact
+                    end
+                end
+            end
+        end # u
+    end # j
+
     cone.g .= 0.0
     cone.H .= 0.0
-
     for j in eachindex(cone.ipwt)
-        cone.diffres = ForwardDiff.hessian!(cone.diffres, x -> -log(det(lambda2(x, cone, j))), cone.point)
+        cone.diffres = ForwardDiff.hessian!(cone.diffres, x -> -logdet(lambda2(x, cone, j)), cone.point)
         cone.g += DiffResults.gradient(cone.diffres)
         cone.H += DiffResults.hessian(cone.diffres)
     end
+
+    @show cone.g ./ g_try
 
     # @timeit "grad hess" begin
     # cone.g .= 0.0
