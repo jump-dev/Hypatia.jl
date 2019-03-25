@@ -131,18 +131,21 @@ function dlambda_dx(cone::WSOSPolyInterpSOC, r::Int, u::Int, j::Int)
     if r != 1
         fact = -1
     end
-    return sum(linsubmap(ipwtj, r, u, v) * 2 * cone.point[offset + v] for v in 1:cone.U) * fact
+    return fact * (sum(linsubmap(ipwtj, r, u, v) * cone.point[offset + v] for v in 1:cone.U) +
+                   sum(linsubmap(ipwtj, r, v, u) * cone.point[offset + v] for v in 1:cone.U) #TODO check u=v case handled correctly
+                  )
 end
 
 function calchessian(cone::WSOSPolyInterpSOC, r1::Int, r2::Int, u1::Int, u2::Int, j::Int)
     Winv = inv(cone.matfact[j])
-    tmp1 = Winv * dlambda_dx(cone, r2, u2, j) * Winv
+    # tmp1 = Winv * dlambda_dx(cone, r2, u2, j) * Winv
+    tmp1 = (cone.matfact[j] \ dlambda_dx(cone, r2, u2, j)) * Winv
     tmp2 = dlambda_dx(cone, r1, u1, j)
     tmp3 = sum(tmp1 .* tmp2)
     # @assert isapprox(sum(tmp1 .* tmp2), sum((Winv * dlambda_dx(cone, r1, u1, j) * Winv) .* dlambda_dx(cone, r2, u2, j)))
-    if (r1 == r2) && (u1 == u2)
-        fact = (r1 == 1 ? -1 : 1)
-        tmp4 = linsubmap(cone.ipwt[j], r1, u1, u2) * 2 * fact
+    if r1 == r2
+        fact = (r1 == 1 ? 1 : -1)
+        tmp4 = fact * (linsubmap(cone.ipwt[j], r1, u1, u2) + linsubmap(cone.ipwt[j], r1, u2, u1))
         return tmp3 - sum(Winv .* tmp4)
     else
         return tmp3
@@ -233,8 +236,6 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
         ur2 = 0
         for r2 in 1:cone.R, u2 in 1:cone.U
             ur2 += 1
-            # @show r, u, r2, u2
-            # @show ur, ur2
             h_try[ur, ur2] += calchessian(cone, r, r2, u, u2, 1)
         end
     end
@@ -247,9 +248,14 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
         cone.g += DiffResults.gradient(cone.diffres)
         cone.H += DiffResults.hessian(cone.diffres)
     end
+    # cone.H .= h_try
 
     # @show cone.g ./ g_try2
     @show  cone.H ./ h_try
+    # @show cone.point
+    # @show abs.(cone.H - h_try) ./ (1 .+ min.(cone.H, h_try))
+    # @show cone.point
+    # @show h_try
 
     # @timeit "grad hess" begin
     # cone.g .= 0.0
