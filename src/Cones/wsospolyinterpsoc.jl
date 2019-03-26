@@ -120,7 +120,7 @@ function linsubmap(
     v::Int,
     )
     L = size(ipwtj, 2)
-    return ipwtj[u, :] * ipwtj[v, :]' * sum(ipwtj[u, k] * ipwtj[v, k] for k in 1:L)
+    return ipwtj[u, :] * ipwtj[v, :]' * dot(ipwtj[u, :], ipwtj[v, :])
 end
 
 
@@ -131,9 +131,7 @@ function dlambda_dx(cone::WSOSPolyInterpSOC, r::Int, u::Int, j::Int)
     if r != 1
         fact = -1
     end
-    return fact * (sum(linsubmap(ipwtj, r, u, v) * cone.point[offset + v] for v in 1:cone.U) +
-                   sum(linsubmap(ipwtj, r, v, u) * cone.point[offset + v] for v in 1:cone.U) #TODO check u=v case handled correctly
-                  )
+    return fact * sum(cone.point[offset + v] * (linsubmap(ipwtj, r, u, v) + linsubmap(ipwtj, r, v, u)) for v in 1:cone.U)
 end
 
 function calchessian(cone::WSOSPolyInterpSOC, r1::Int, r2::Int, u1::Int, u2::Int, j::Int)
@@ -155,8 +153,33 @@ end
 
 
 function gradient_try2(cone::WSOSPolyInterpSOC, r::Int, u::Int, j::Int)
+    # gr = 0.0
+    # offset = (r - 1) * cone.U
+    # Winv = Symmetric(inv(cone.matfact[j]))
+    # ipwtj = cone.ipwt[j]
+    # for v in 1:cone.U
+    #     gr -= 2 * cone.point[offset + v] * dot(ipwtj[u, :], ipwtj[v, :]) * (ipwtj[u, :]' * Winv * ipwtj[v, :])
+    # end
+    # if r != 1
+    #     gr *= -1
+    # end
+    # return gr
     return -sum(inv(cone.matfact[j]) .* dlambda_dx(cone, r, u, j))
 end
+
+# function gradient_try3(cone::WSOSPolyInterpSOC, r::Int, j::Int)
+#     offset = (r - 1) * cone.U
+#     gr = zeros(cone.U)
+#     Winv = inv(cone.matfact[j])
+#     ipwtj = cone.ipwt[j]
+#     for v in 1:cone.U
+#         gr -= 2 * cone.point[offset + v] * (ipwtj * ipwtj[v, :]) .* (ipwtj * Winv * ipwtj[v, :])
+#     end
+#     if r != 1
+#         gr *= -1
+#     end
+#     return gr
+# end
 
 function check_in_cone(cone::WSOSPolyInterpSOC)
 

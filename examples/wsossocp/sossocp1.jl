@@ -46,7 +46,13 @@ end
 
 function simple_infeasibility()
     DP.@polyvar x
-    for socpoly in [[x; x^2 + x], [x; x + 1], [x^2; x], [x + 2, x], [x - 1, x, x]]
+    for socpoly in [
+        [x; x^2 + x],
+        [x; x + 1],
+        [x^2; x],
+        [x + 2, x],
+        [x - 1, x, x],
+        ]
         @show socpoly
         model = JuMP_polysoc_monomial(socpoly, 1)
         JuMP.optimize!(model)
