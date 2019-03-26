@@ -27,6 +27,8 @@ mutable struct WSOSPolyInterpSOC <: Cone
     tmp2::Matrix{Float64} # unused
     tmp3::Matrix{Float64} # unused
     tmp4::Vector{Matrix{Float64}}
+    tmp5::Vector{Matrix{Float64}}
+    lambda::Vector{Vector{Matrix{Float64}}}
     lambdafact::Vector{CholeskyPivoted{Float64, Matrix{Float64}}}
     diffres
 
@@ -54,6 +56,11 @@ mutable struct WSOSPolyInterpSOC <: Cone
         cone.tmp2 = similar(ipwt[1], U, U)
         cone.tmp3 = similar(cone.tmp2)
         cone.tmp4 = [similar(ipwt[1], size(ipwtj, 2), size(ipwtj, 2)) for ipwtj in ipwt]
+        cone.tmp5 = [similar(ipwt[1], size(ipwtj, 2), size(ipwtj, 2)) for ipwtj in ipwt]
+        cone.lambda = [Vector{Matrix{Float64}}(undef, R) for ipwtj in ipwt]
+        for j in eachindex(ipwt), r in 1:R
+            cone.lambda[j][r] = similar(ipwt[1], size(ipwt[j], 2), size(ipwt[j], 2))
+        end
         cone.lambdafact = Vector{CholeskyPivoted{Float64, Matrix{Float64}}}(undef, length(ipwt))
         cone.diffres = DiffResults.HessianResult(cone.g)
         return cone
@@ -92,20 +99,27 @@ function lambda(point, cone, j)
     return mat
 end
 
+function rank_one_inv_update()
+
+end
+
 function check_in_cone(cone::WSOSPolyInterpSOC)
 
     # @timeit "build mat" begin
     for j in eachindex(cone.ipwt)
         ipwtj = cone.ipwt[j]
         tmp1j = cone.tmp1[j]
+        lambda = cone.lambda[j]
         L = size(ipwtj, 2)
         mat = cone.mat[j]
         tmp4 = cone.tmp4[j]
+        tmp5 = cone.tmp5[j]
 
         # first lambda
         point_pq = cone.point[1:cone.U]
         @. tmp1j = ipwtj' * point_pq'
         mul!(mat, tmp1j, ipwtj)
+        lambda[1] .= mat
         lambdafact = cholesky(Symmetric(mat, :L), Val(true), check = false)
         if !isposdef(lambdafact)
             return false
@@ -117,8 +131,10 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
             point_pq = cone.point[uo:(uo + cone.U - 1)] # TODO prealloc
             @. tmp1j = ipwtj' * point_pq'
             mul!(tmp4, tmp1j, ipwtj)
-            ldiv!(lambdafact.L, tmp4)
-            BLAS.syrk!('U', 'T', -1.0, tmp4, 1.0, mat)
+            tmp5 .= view(tmp4, lambdafact.p, :)
+            ldiv!(lambdafact.L, tmp5)
+            BLAS.syrk!('U', 'T', 1.0, tmp5, 0.0, lambda[p])
+            mat -= lambda[p]
             uo += cone.U
         end
 
@@ -137,7 +153,15 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
         cone.H += DiffResults.hessian(cone.diffres)
     end
 
-    # @timeit "grad hess" begin
+    # fdg .= 0.0
+    # fdh .= 0.0
+    # for j in eachindex(cone.ipwt)
+    #     cone.diffres = ForwardDiff.hessian!(cone.diffres, x -> -logdet(lambda(x, cone, j)), cone.point)
+    #     fdg += DiffResults.gradient(cone.diffres)
+    #     fdh += DiffResults.hessian(cone.diffres)
+    # end
+    #
+    # # @timeit "grad hess" begin
     # cone.g .= 0.0
     # cone.H .= 0.0
     # for j in eachindex(cone.ipwt)
@@ -157,10 +181,16 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
     #         rinds = _blockrange(p, L)
     #         idxs = _blockrange(uo, cone.U)
     #
+    #         # part of gradient/hessian when p=1
+    #         tmp2j .= view(ipwtj', F.p, :)
+    #         ldiv!(lambdafact.L, tmp2j) # TODO make sure calls best triangular solve
+    #         mul!(tmp3, tmp2j', tmp2j)
+    #         BLAS.syrk!('U', 'T', 1.0, tmp2j, 0.0, tmp3)
+    #
     #         for i in 1:cone.U
     #             if p == 1
     #                 for r in 1:cone.R
-    #                     cone.g[idxs[i]] -= ipwtj[i, :]' * view(W_inv_j, _blockrange(r, L), _blockrange(r, L)) * ipwtj[i, :]
+    #                     cone.g[idxs[i]] -= ipwtj[i, :]' * view(W_inv_j, _blockrange(r, L), _blockrange(r, L)) * ipwtj[i, :] - tmp3[i, i]
     #                 end
     #             else
     #                 cone.g[idxs[i]] -= 2 * ipwtj[i, :]' * view(W_inv_j, 1:L, rinds) * ipwtj[i, :]
