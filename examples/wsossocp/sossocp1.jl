@@ -35,7 +35,7 @@ function simple_feasibility()
     for socpoly in [
             [2x^2 + 2, x, x],
             [x^2 + 2, x], [x^2 + 2, x, x],
-            [2 * x^4 + 8 * x^2 + 4, x + 2 + (x + 1)^2, x], # numerically unstable
+            [2 * x^4 + 8 * x^2 + 4, x + 2 + (x + 1)^2, x],
             ]
         model = JuMP_polysoc_monomial(socpoly, 1)
         JuMP.optimize!(model)
