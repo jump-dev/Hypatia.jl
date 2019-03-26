@@ -117,6 +117,7 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
             point_pq = cone.point[uo:(uo + cone.U - 1)] # TODO prealloc
             @. tmp1j = ipwtj' * point_pq'
             mul!(tmp4, tmp1j, ipwtj)
+            tmp4 = tmp4[lambdafact.p, :] # TODO remove allocs
             ldiv!(lambdafact.L, tmp4)
             BLAS.syrk!('U', 'T', -1.0, tmp4, 1.0, mat)
             uo += cone.U
