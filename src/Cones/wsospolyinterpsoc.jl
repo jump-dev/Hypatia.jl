@@ -77,7 +77,7 @@ function set_initial_point(arr::AbstractVector{Float64}, cone::WSOSPolyInterpSOC
     return arr
 end
 
-function lambda(point, cone, j)
+function getlambda(point, cone, j)
     ipwtj = cone.ipwt[j]
     L = size(ipwtj, 2)
     mat = similar(point, L, L)
@@ -99,9 +99,47 @@ function lambda(point, cone, j)
     return mat
 end
 
-function rank_one_inv_update()
-
+function rank_one_inv_update(cone::WSOSPolyInterpSOC, r1::Int, r2::Int, j::Int)
+    # TODO change cholesky in incone to first_lambda  / other lambdas and cache it since it'll be reused here
+    L = size(cone.ipwt[j], 2)
+    lambda_inv = inv(cone.lambdafact[j])
+    if r1 != 1
+        u1 = lambda_inv * Symmetric(cone.lambda[j][r1])
+    else
+        u1 = -Matrix{Float64}(I, L, L)
+    end
+    if r2 != 1
+        u2 = lambda_inv * Symmetric(cone.lambda[j][r2])
+    else
+        u2 = -Matrix{Float64}(I, L, L)
+    end
+    return u1 * inv(cone.matfact[j]) * u2'
 end
+
+function mat_inv(cone::WSOSPolyInterpSOC, r1::Int, r2::Int, j::Int)
+    ret = rank_one_inv_update(cone, r1, r2, j)
+    if (r1 == r2) && (r1 != 1)
+        ret += inv(cone.lambdafact[j])
+    end
+    return Symmetric(ret)
+end
+
+
+# TODO figure out how to make feasible dual points and move out into test folder
+# TODO think about if the inversion is legitimate if one of the lambdas is zero (or maybe indefinite in this analogy?)
+function inversion_test(cone, L, R, j)
+    arrow_mat = kron(Matrix{Float64}(I, R, R), cone.lambda[j][1])
+    for r in 2:R
+        arrow_mat[((r - 1) * L + 1):(r * L), 1:L] .= cone.lambda[j][r]
+    end
+    arrow_mat_inv = zeros(R * L, R * L)
+    for r1 in 1:R, r2 in 1:r1
+        arrow_mat_inv[((r1 - 1) * L + 1):(r1 * L), ((r2 - 1) * L + 1):(r2 * L)] = mat_inv(cone, r1, r2, j)
+    end
+    # @assert Symmetric(arrow_mat_inv, :L) * Symmetric(arrow_mat, :L) ≈ I
+    return true
+end
+
 
 function check_in_cone(cone::WSOSPolyInterpSOC)
 
@@ -113,28 +151,33 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
         L = size(ipwtj, 2)
         mat = cone.mat[j]
         tmp4 = cone.tmp4[j]
-        tmp5 = cone.tmp5[j]
+        tmp5 = cone.tmp5[j] # TODO, unneeded
+
+        lambdafact = cone.lambdafact
 
         # first lambda
         point_pq = cone.point[1:cone.U]
         @. tmp1j = ipwtj' * point_pq'
         mul!(mat, tmp1j, ipwtj)
         lambda[1] .= mat
-        lambdafact = cholesky(Symmetric(mat, :L), Val(true), check = false)
-        if !isposdef(lambdafact)
+        lambdafact[j] = cholesky(Symmetric(mat, :L), Val(true), check = false)
+        if !isposdef(lambdafact[j])
             return false
         end
 
         # minus others
         uo = cone.U + 1
         for p in 2:cone.R
+            # store lambda
             point_pq = cone.point[uo:(uo + cone.U - 1)] # TODO prealloc
             @. tmp1j = ipwtj' * point_pq'
             mul!(tmp4, tmp1j, ipwtj)
-            tmp5 .= view(tmp4, lambdafact.p, :)
-            ldiv!(lambdafact.L, tmp5)
-            BLAS.syrk!('U', 'T', 1.0, tmp5, 0.0, lambda[p])
-            mat -= lambda[p]
+            lambda[p] .= tmp4
+            # update mat
+            tmp5 .= view(tmp4, lambdafact[j].p, :)
+            ldiv!(lambdafact[j].L, tmp5)
+            BLAS.syrk!('U', 'T', 1.0, tmp5, 0.0, tmp4)
+            mat .-= Symmetric(tmp4, :U)
             uo += cone.U
         end
 
@@ -142,13 +185,14 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
         if !isposdef(cone.matfact[j])
             return false
         end
+        @assert inversion_test(cone, L, cone.R, j)
     end
     # end
 
     cone.g .= 0.0
     cone.H .= 0.0
     for j in eachindex(cone.ipwt)
-        cone.diffres = ForwardDiff.hessian!(cone.diffres, x -> -logdet(lambda(x, cone, j)), cone.point)
+        cone.diffres = ForwardDiff.hessian!(cone.diffres, x -> -logdet(getlambda(x, cone, j)), cone.point)
         cone.g += DiffResults.gradient(cone.diffres)
         cone.H += DiffResults.hessian(cone.diffres)
     end
