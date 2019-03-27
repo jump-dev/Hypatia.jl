@@ -4,7 +4,6 @@ Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 interpolation-based weighted-sum-of-squares (multivariate) polynomial second order cone parametrized by interpolation points ipwt
 
 definition and dual barrier extended from "Sum-of-squares optimization without semidefinite programming" by D. Papp and S. Yildiz, available at https://arxiv.org/abs/1712.01792
-and "Semidefinite characterization of sum-of-squares cones in algebras" by D. Papp and F. Alizadeh, SIAM Journal on Optimization.
 =#
 
 mutable struct WSOSPolyInterpSOC <: Cone
@@ -24,7 +23,7 @@ mutable struct WSOSPolyInterpSOC <: Cone
     mat::Vector{Matrix{Float64}}
     matfact::Vector{CholeskyPivoted{Float64, Matrix{Float64}}}
     tmp1::Vector{Matrix{Float64}}
-    tmp2::Matrix{Float64} # unused
+    tmp2::Vector{Matrix{Float64}}
     tmp3::Matrix{Float64} # unused
     tmp4::Vector{Matrix{Float64}}
     tmp5::Vector{Matrix{Float64}}
@@ -53,8 +52,8 @@ mutable struct WSOSPolyInterpSOC <: Cone
         cone.mat = [similar(ipwt[1], size(ipwtj, 2), size(ipwtj, 2)) for ipwtj in ipwt]
         cone.matfact = Vector{CholeskyPivoted{Float64, Matrix{Float64}}}(undef, length(ipwt))
         cone.tmp1 = [similar(ipwt[1], size(ipwtj, 2), U) for ipwtj in ipwt]
-        cone.tmp2 = similar(ipwt[1], U, U)
-        cone.tmp3 = similar(cone.tmp2)
+        cone.tmp2 = [similar(ipwt[1], size(ipwtj, 2), U) for ipwtj in ipwt]
+        cone.tmp3 = similar(ipwt[1], U, U)
         cone.tmp4 = [similar(ipwt[1], size(ipwtj, 2), size(ipwtj, 2)) for ipwtj in ipwt]
         cone.tmp5 = [similar(ipwt[1], size(ipwtj, 2), size(ipwtj, 2)) for ipwtj in ipwt]
         cone.lambda = [Vector{Matrix{Float64}}(undef, R) for ipwtj in ipwt]
@@ -196,7 +195,8 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
         cone.g += DiffResults.gradient(cone.diffres)
         cone.H += DiffResults.hessian(cone.diffres)
     end
-    fdg = cone.g
+    fdg = similar(cone.g, length(cone.g))
+    fdg .= cone.g
 
     # fdg .= 0.0
     # fdh .= 0.0
@@ -205,73 +205,74 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
     #     fdg += DiffResults.gradient(cone.diffres)
     #     fdh += DiffResults.hessian(cone.diffres)
     # end
-    #
-    #
+
+
     # @timeit "grad hess" begin
-    # cone.g .= 0.0
+    cone.g .= 0.0
     # cone.H .= 0.0
-    # for j in eachindex(cone.ipwt)
-    #
-    #     Winv(r1, r2) = mat_inv(cone, r1, r2, j)
-    #
-    #     ipwtj = cone.ipwt[j]
-    #     tmp1j = cone.tmp1[j]
-    #     tmp2 = cone.tmp2
-    #     tmp3 = cone.tmp3
-    #
-    #     L = size(ipwtj, 2)
-    #     uo = 0
-    #     for p in 1:cone.R
-    #         uo += 1
-    #         idxs = _blockrange(uo, cone.U)
-    #
-    #         # part of gradient/hessian when p=1
-    #         tmp2j .= view(ipwtj', lambdafact.p, :)
-    #         ldiv!(lambdafact.L, tmp2j) # TODO make sure calls best triangular solve
-    #         mul!(tmp3, tmp2j', tmp2j)
-    #         BLAS.syrk!('U', 'T', 1.0, tmp2j, 0.0, tmp3)
-    #
-    #         for i in 1:cone.U
-    #             if p == 1
-    #                 for r in 1:cone.R
-    #                     cone.g[idxs[i]] -= ipwtj[i, :]' * Winv(r, r) * ipwtj[i, :] - tmp3[i, i]
-    #                 end
-    #             else
-    #                 cone.g[idxs[i]] -= 2 * ipwtj[i, :]' * Winv(1, p) * ipwtj[i, :]
-    #             end
-    #         end
-    #
-    #         # @show "hessian"
-    #
-    #         uo2 = 0
-    #         for p2 in 1:cone.R
-    #             uo2 += 1
-    #             if uo2 < uo
-    #                 continue
-    #             end
-    #             idxs2 = _blockrange(uo2, cone.U)
-    #
-    #             if p == 1 && p2 == 1
-    #                 for r in 1:cone.R, s in 1:cone.R
-    #                     cone.H[idxs, idxs2] += (ipwtj * Winv(r, s) * ipwtj').^2
-    #                 end
-    #             elseif p == 1 && p2 != 1
-    #                 for r in 1:cone.R
-    #                     cone.H[idxs, idxs2] += 2 * (ipwtj * Winv(1, r) * ipwtj') .* (ipwtj * Winv(r, p2) * ipwtj')
-    #                 end
-    #             elseif p != 1 && p2 == 1
-    #                 for r in 1:cone.R
-    #                     cone.H[idxs, idxs2] += 2 * (ipwtj * Winv(1, r) * ipwtj') .* (ipwtj * Winv(r, p) * ipwtj')
-    #                 end
-    #             else
-    #                 cone.H[idxs, idxs2] += 2 * (ipwtj * Winv(1, 1) * ipwtj') .* (ipwtj * Winv(p, p2) * ipwtj') +
-    #                                        2 * (ipwtj * Winv(1, p) * ipwtj') .* (ipwtj * Winv(1, p2) * ipwtj')
-    #             end
-    #         end
-    #     end # p
-    # end # j
+    for j in eachindex(cone.ipwt)
+
+        Winv(r1, r2) = mat_inv(cone, r1, r2, j)
+
+        ipwtj = cone.ipwt[j]
+        tmp1j = cone.tmp1[j]
+        tmp2j = cone.tmp2[j]
+        tmp3 = cone.tmp3
+
+        L = size(ipwtj, 2)
+        uo = 0
+
+        # part of gradient/hessian when p=1 TODO rest of the blocks should also look like this
+        tmp2j .= view(ipwtj', cone.lambdafact[j].p, :)
+        ldiv!(cone.lambdafact[j].L, tmp2j)
+        BLAS.syrk!('U', 'T', 1.0, tmp2j, 0.0, tmp3)
+
+        for p in 1:cone.R
+            uo += 1
+            idxs = _blockrange(uo, cone.U)
+            for i in 1:cone.U
+                if p == 1
+                    cone.g[idxs[i]] += tmp3[i, i] * (cone.R - 1)
+                    for r in 1:cone.R
+                        cone.g[idxs[i]] -= ipwtj[i, :]' * Winv(r, r) * ipwtj[i, :]
+                    end
+                else
+                    cone.g[idxs[i]] -= 2 * ipwtj[i, :]' * Winv(p, 1) * ipwtj[i, :]
+                end
+            end
+
+            # # @show "hessian"
+            #
+            # uo2 = 0
+            # for p2 in 1:cone.R
+            #     uo2 += 1
+            #     if uo2 < uo
+            #         continue
+            #     end
+            #     idxs2 = _blockrange(uo2, cone.U)
+            #
+            #     if p == 1 && p2 == 1
+            #         for r in 1:cone.R, s in 1:cone.R
+            #             cone.H[idxs, idxs2] += (ipwtj * Winv(r, s) * ipwtj').^2
+            #         end
+            #     elseif p == 1 && p2 != 1
+            #         for r in 1:cone.R
+            #             cone.H[idxs, idxs2] += 2 * (ipwtj * Winv(1, r) * ipwtj') .* (ipwtj * Winv(r, p2) * ipwtj')
+            #         end
+            #     elseif p != 1 && p2 == 1
+            #         for r in 1:cone.R
+            #             cone.H[idxs, idxs2] += 2 * (ipwtj * Winv(1, r) * ipwtj') .* (ipwtj * Winv(r, p) * ipwtj')
+            #         end
+            #     else
+            #         cone.H[idxs, idxs2] += 2 * (ipwtj * Winv(1, 1) * ipwtj') .* (ipwtj * Winv(p, p2) * ipwtj') +
+            #                                2 * (ipwtj * Winv(1, p) * ipwtj') .* (ipwtj * Winv(1, p2) * ipwtj')
+            #     end
+            # end
+        end # p
+    end # j
     # end
-    # @show fdg ./ cone.g
+    @show fdg ./ cone.g
+    @show fdg, cone.g
 
     return factorize_hess(cone)
 end
