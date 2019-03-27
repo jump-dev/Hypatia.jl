@@ -27,20 +27,20 @@ function build_quadrature(
     B_dom::MU.Domain,
     ppar,
     )
-    # generate interpolation for K
-    (U, pts, P0, PWts, _) = MU.interpolate(K_dom, d, sample = true, calc_w = false)
+    # generate interpolation for B
+    (U, pts, P0, PWts, w) = MU.interpolate(B_dom, d, sample = true, calc_w = true)
 
-    # get quadrature weights for B
+    # get weights for B
     y2 = # TODO
 
     # build JuMP model
     model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
-    JuMP.@variable(model, y1[1:U]) # moments of μ1
-    JuMP.@objective(model, Max, sum(y1[i] * ppar(pts[i, :]) for i in 1:U))
-    JuMP.@constraint(model, y1 in HYP.WSOSPolyInterpCone(U, [P0, PWts...], true))
-    JuMP.@constraint(model, y2 .- y1 in HYP.WSOSPolyInterpCone(U, [P0], true))
+    JuMP.@variable(model, y[1:U]) # moments of μ1
+    JuMP.@objective(model, Max, sum(y[i] * ppar(pts[i, :]) for i in 1:U))
+    JuMP.@constraint(model, y in HYP.WSOSPolyInterpCone(U, [P0, PWts...], true))
+    JuMP.@constraint(model, w - y in HYP.WSOSPolyInterpCone(U, [P0], true))
 
-    return (model, y1, pts)
+    return (model, y, pts)
 end
 
 function integrate_poly(
@@ -51,10 +51,10 @@ function integrate_poly(
     ppar, # polynomial as the parameter in objective of moment problem
     )
     # optimize to get quadrature weights
-    (model, y1, pts) = build_quadrature(d, K_dom, B_dom, ppar)
+    (model, y, pts) = build_quadrature(d, K_dom, B_dom, ppar)
     JuMP.optimize!(model)
 
-    w = JuMP.value.(y1)
+    w = JuMP.value.(y)
     integral = sum(w[i] * p(pts[i, :]) for i in eachindex(w))
 
     println(w)
