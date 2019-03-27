@@ -103,27 +103,27 @@ function rank_one_inv_update(cone::WSOSPolyInterpSOC, r1::Int, r2::Int, j::Int)
     # TODO change cholesky in incone to first_lambda  / other lambdas and cache it since it'll be reused here
     L = size(cone.ipwt[j], 2)
     lambda_inv = inv(cone.lambdafact[j])
-    if r1 != 1
+    @assert r1 >= r2
+    if (r1 != 1) && (r2 != 1)
         u1 = lambda_inv * Symmetric(cone.lambda[j][r1])
-    else
-        u1 = -Matrix{Float64}(I, L, L)
-    end
-    if r2 != 1
         u2 = lambda_inv * Symmetric(cone.lambda[j][r2])
+        return u1 * (cone.matfact[j] \ u2')
+    elseif (r1 != 1) && (r2 == 1)
+        u1 = lambda_inv * Symmetric(cone.lambda[j][r1])
+        return -u1 * Symmetric(inv(cone.matfact[j]))
     else
-        u2 = -Matrix{Float64}(I, L, L)
+        return Symmetric(inv(cone.matfact[j]))
     end
-    return u1 * inv(cone.matfact[j]) * u2'
+
 end
 
 function mat_inv(cone::WSOSPolyInterpSOC, r1::Int, r2::Int, j::Int)
     ret = rank_one_inv_update(cone, r1, r2, j)
     if (r1 == r2) && (r1 != 1)
-        ret += inv(cone.lambdafact[j])
+        ret += Symmetric(inv(cone.lambdafact[j]))
     end
-    return Symmetric(ret)
+    return ret
 end
-
 
 # TODO figure out how to make feasible dual points and move out into test folder
 # TODO think about if the inversion is legitimate if one of the lambdas is zero (or maybe indefinite in this analogy?)
@@ -136,7 +136,7 @@ function inversion_test(cone, L, R, j)
     for r1 in 1:R, r2 in 1:r1
         arrow_mat_inv[((r1 - 1) * L + 1):(r1 * L), ((r2 - 1) * L + 1):(r2 * L)] = mat_inv(cone, r1, r2, j)
     end
-    # @assert Symmetric(arrow_mat_inv, :L) * Symmetric(arrow_mat, :L) ≈ I
+    @assert Symmetric(arrow_mat_inv, :L) * Symmetric(arrow_mat, :L) ≈ I # TODO move out to a test
     return true
 end
 
@@ -196,6 +196,7 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
         cone.g += DiffResults.gradient(cone.diffres)
         cone.H += DiffResults.hessian(cone.diffres)
     end
+    fdg = cone.g
 
     # fdg .= 0.0
     # fdh .= 0.0
@@ -205,13 +206,13 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
     #     fdh += DiffResults.hessian(cone.diffres)
     # end
     #
-    # # @timeit "grad hess" begin
+    #
+    # @timeit "grad hess" begin
     # cone.g .= 0.0
     # cone.H .= 0.0
     # for j in eachindex(cone.ipwt)
-    #     # @timeit "W_inv" begin
-    #     W_inv_j = inv(cone.matfact[j])
-    #     # end
+    #
+    #     Winv(r1, r2) = mat_inv(cone, r1, r2, j)
     #
     #     ipwtj = cone.ipwt[j]
     #     tmp1j = cone.tmp1[j]
@@ -222,11 +223,10 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
     #     uo = 0
     #     for p in 1:cone.R
     #         uo += 1
-    #         rinds = _blockrange(p, L)
     #         idxs = _blockrange(uo, cone.U)
     #
     #         # part of gradient/hessian when p=1
-    #         tmp2j .= view(ipwtj', F.p, :)
+    #         tmp2j .= view(ipwtj', lambdafact.p, :)
     #         ldiv!(lambdafact.L, tmp2j) # TODO make sure calls best triangular solve
     #         mul!(tmp3, tmp2j', tmp2j)
     #         BLAS.syrk!('U', 'T', 1.0, tmp2j, 0.0, tmp3)
@@ -234,10 +234,10 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
     #         for i in 1:cone.U
     #             if p == 1
     #                 for r in 1:cone.R
-    #                     cone.g[idxs[i]] -= ipwtj[i, :]' * view(W_inv_j, _blockrange(r, L), _blockrange(r, L)) * ipwtj[i, :] - tmp3[i, i]
+    #                     cone.g[idxs[i]] -= ipwtj[i, :]' * Winv(r, r) * ipwtj[i, :] - tmp3[i, i]
     #                 end
     #             else
-    #                 cone.g[idxs[i]] -= 2 * ipwtj[i, :]' * view(W_inv_j, 1:L, rinds) * ipwtj[i, :]
+    #                 cone.g[idxs[i]] -= 2 * ipwtj[i, :]' * Winv(1, p) * ipwtj[i, :]
     #             end
     #         end
     #
@@ -249,29 +249,29 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
     #             if uo2 < uo
     #                 continue
     #             end
-    #             rinds2 = _blockrange(p2, L)
     #             idxs2 = _blockrange(uo2, cone.U)
     #
     #             if p == 1 && p2 == 1
     #                 for r in 1:cone.R, s in 1:cone.R
-    #                     cone.H[idxs, idxs2] += (ipwtj * view(W_inv_j, _blockrange(r, L), _blockrange(s, L)) * ipwtj').^2
+    #                     cone.H[idxs, idxs2] += (ipwtj * Winv(r, s) * ipwtj').^2
     #                 end
     #             elseif p == 1 && p2 != 1
     #                 for r in 1:cone.R
-    #                     cone.H[idxs, idxs2] += 2 * (ipwtj * view(W_inv_j, _blockrange(1, L), _blockrange(r, L)) * ipwtj') .* (ipwtj * view(W_inv_j, _blockrange(r, L), rinds2) * ipwtj')
+    #                     cone.H[idxs, idxs2] += 2 * (ipwtj * Winv(1, r) * ipwtj') .* (ipwtj * Winv(r, p2) * ipwtj')
     #                 end
     #             elseif p != 1 && p2 == 1
     #                 for r in 1:cone.R
-    #                     cone.H[idxs, idxs2] += 2 * (ipwtj * view(W_inv_j, _blockrange(1, L), _blockrange(r, L)) * ipwtj') .* (ipwtj * view(W_inv_j, _blockrange(r, L), rinds) * ipwtj')
+    #                     cone.H[idxs, idxs2] += 2 * (ipwtj * Winv(1, r) * ipwtj') .* (ipwtj * Winv(r, p) * ipwtj')
     #                 end
     #             else
-    #                 cone.H[idxs, idxs2] += 2 * (ipwtj * view(W_inv_j, 1:L, 1:L) * ipwtj') .* (ipwtj * view(W_inv_j, rinds, rinds2) * ipwtj') +
-    #                                        2 * (ipwtj * view(W_inv_j, 1:L, rinds) * ipwtj') .* (ipwtj * view(W_inv_j, 1:L, rinds2) * ipwtj')
+    #                 cone.H[idxs, idxs2] += 2 * (ipwtj * Winv(1, 1) * ipwtj') .* (ipwtj * Winv(p, p2) * ipwtj') +
+    #                                        2 * (ipwtj * Winv(1, p) * ipwtj') .* (ipwtj * Winv(1, p2) * ipwtj')
     #             end
     #         end
     #     end # p
     # end # j
     # end
+    # @show fdg ./ cone.g
 
     return factorize_hess(cone)
 end
