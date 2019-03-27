@@ -91,18 +91,18 @@ function getlambda(point, cone, j)
     uo = cone.U + 1
     for p in 2:cone.R
         point_pq = point[uo:(uo + cone.U - 1)]
-        tmp = ipwtj' * Diagonal(point_pq) * ipwtj
+        tmp = Symmetric(ipwtj' * Diagonal(point_pq) * ipwtj)
         mat -= Symmetric(tmp * first_lambda_inv * tmp')
         uo += cone.U
     end
-    return mat
+    return Symmetric(mat, :U)
 end
 
 function rank_one_inv_update(cone::WSOSPolyInterpSOC, r1::Int, r2::Int, j::Int)
     # TODO change cholesky in incone to first_lambda  / other lambdas and cache it since it'll be reused here
     L = size(cone.ipwt[j], 2)
     lambda_inv = inv(cone.lambdafact[j])
-    @assert r1 >= r2
+    # @assert r1 >= r2
     if (r1 != 1) && (r2 != 1)
         u1 = lambda_inv * Symmetric(cone.lambda[j][r1])
         u2 = lambda_inv * Symmetric(cone.lambda[j][r2])
@@ -110,6 +110,9 @@ function rank_one_inv_update(cone::WSOSPolyInterpSOC, r1::Int, r2::Int, j::Int)
     elseif (r1 != 1) && (r2 == 1)
         u1 = lambda_inv * Symmetric(cone.lambda[j][r1])
         return -u1 * Symmetric(inv(cone.matfact[j]))
+    elseif (r1 == 1) && (r2 != 1)
+        u2 = lambda_inv * Symmetric(cone.lambda[j][r2])
+        return -(cone.matfact[j] \ u2')
     else
         return Symmetric(inv(cone.matfact[j]))
     end
@@ -132,10 +135,10 @@ function inversion_test(cone, L, R, j)
         arrow_mat[((r - 1) * L + 1):(r * L), 1:L] .= cone.lambda[j][r]
     end
     arrow_mat_inv = zeros(R * L, R * L)
-    for r1 in 1:R, r2 in 1:r1
+    for r1 in 1:R, r2 in 1:R
         arrow_mat_inv[((r1 - 1) * L + 1):(r1 * L), ((r2 - 1) * L + 1):(r2 * L)] = mat_inv(cone, r1, r2, j)
     end
-    @assert Symmetric(arrow_mat_inv, :L) * Symmetric(arrow_mat, :L) ≈ I # TODO move out to a test
+    @assert arrow_mat_inv * Symmetric(arrow_mat, :L) ≈ I # TODO move out to a test
     return true
 end
 
@@ -188,29 +191,20 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
     end
     # end
 
-    cone.g .= 0.0
-    cone.H .= 0.0
+    fdg = zeros(length(cone.g))
+    fdh = zeros(size(cone.H))
     for j in eachindex(cone.ipwt)
         cone.diffres = ForwardDiff.hessian!(cone.diffres, x -> -logdet(getlambda(x, cone, j)), cone.point)
-        cone.g += DiffResults.gradient(cone.diffres)
-        cone.H += DiffResults.hessian(cone.diffres)
+        fdg += DiffResults.gradient(cone.diffres)
+        fdh += DiffResults.hessian(cone.diffres)
     end
-    fdg = similar(cone.g, length(cone.g))
-    fdg .= cone.g
-
-    # fdg .= 0.0
-    # fdh .= 0.0
-    # for j in eachindex(cone.ipwt)
-    #     cone.diffres = ForwardDiff.hessian!(cone.diffres, x -> -logdet(lambda(x, cone, j)), cone.point)
-    #     fdg += DiffResults.gradient(cone.diffres)
-    #     fdh += DiffResults.hessian(cone.diffres)
-    # end
 
 
     # @timeit "grad hess" begin
     cone.g .= 0.0
-    # cone.H .= 0.0
+    cone.H .= 0.0
     for j in eachindex(cone.ipwt)
+
 
         Winv(r1, r2) = mat_inv(cone, r1, r2, j)
 
@@ -237,42 +231,44 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
                         cone.g[idxs[i]] -= ipwtj[i, :]' * Winv(r, r) * ipwtj[i, :]
                     end
                 else
-                    cone.g[idxs[i]] -= 2 * ipwtj[i, :]' * Winv(p, 1) * ipwtj[i, :]
+                    cone.g[idxs[i]] -= ipwtj[i, :]' * Winv(p, 1) * ipwtj[i, :] + ipwtj[i, :]' * Winv(1, p) * ipwtj[i, :]
                 end
             end
 
-            # # @show "hessian"
-            #
-            # uo2 = 0
-            # for p2 in 1:cone.R
-            #     uo2 += 1
-            #     if uo2 < uo
-            #         continue
-            #     end
-            #     idxs2 = _blockrange(uo2, cone.U)
-            #
-            #     if p == 1 && p2 == 1
-            #         for r in 1:cone.R, s in 1:cone.R
-            #             cone.H[idxs, idxs2] += (ipwtj * Winv(r, s) * ipwtj').^2
-            #         end
-            #     elseif p == 1 && p2 != 1
-            #         for r in 1:cone.R
-            #             cone.H[idxs, idxs2] += 2 * (ipwtj * Winv(1, r) * ipwtj') .* (ipwtj * Winv(r, p2) * ipwtj')
-            #         end
-            #     elseif p != 1 && p2 == 1
-            #         for r in 1:cone.R
-            #             cone.H[idxs, idxs2] += 2 * (ipwtj * Winv(1, r) * ipwtj') .* (ipwtj * Winv(r, p) * ipwtj')
-            #         end
-            #     else
-            #         cone.H[idxs, idxs2] += 2 * (ipwtj * Winv(1, 1) * ipwtj') .* (ipwtj * Winv(p, p2) * ipwtj') +
-            #                                2 * (ipwtj * Winv(1, p) * ipwtj') .* (ipwtj * Winv(1, p2) * ipwtj')
-            #     end
-            # end
+            uo2 = 0
+            for p2 in 1:cone.R
+                uo2 += 1
+                if uo2 < uo
+                    continue
+                end
+                idxs2 = _blockrange(uo2, cone.U)
+
+                if p == 1 && p2 == 1
+                    cone.H[idxs, idxs2] -= tmp3.^2 * (cone.R - 1)
+                    for r in 1:cone.R, s in 1:cone.R
+                        cone.H[idxs, idxs2] += (ipwtj * Winv(r, s) * ipwtj').^2
+                    end
+                elseif p == 1 && p2 != 1
+                    for r in 1:cone.R
+                        cone.H[idxs, idxs2] += (ipwtj * Winv(r, 1) * ipwtj') .* (ipwtj * Winv(p2, r) * ipwtj') +
+                                               (ipwtj * Winv(r, p2) * ipwtj') .* (ipwtj * Winv(1, r) * ipwtj')
+                    end
+                else
+                    cone.H[idxs, idxs2] += (ipwtj * Winv(1, 1) * ipwtj') .* (ipwtj * Winv(p, p2) * ipwtj') +
+                                           (ipwtj * Winv(1, 1) * ipwtj') .* (ipwtj * Winv(p2, p) * ipwtj') +
+                                           (ipwtj * Winv(1, p) * ipwtj') .* (ipwtj * Winv(1, p2) * ipwtj') +
+                                           (ipwtj * Winv(p, 1) * ipwtj') .* (ipwtj * Winv(p2, 1) * ipwtj')
+                end
+            end
         end # p
     end # j
     # end
-    @show fdg ./ cone.g
-    @show fdg, cone.g
+    # @show fdg ./ cone.g
+    @show fdh ./ Symmetric(cone.H, :U)
+    @show fdh - Symmetric(cone.H, :U)
+    @show fdh
+    # @show Symmetric(cone.H, :U)
+    # @show Symmetric(cone.H, :U)
 
     return factorize_hess(cone)
 end
