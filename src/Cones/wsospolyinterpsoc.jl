@@ -24,10 +24,10 @@ mutable struct WSOSPolyInterpSOC <: Cone
     matfact::Vector{CholeskyPivoted{Float64, Matrix{Float64}}}
     tmp1::Vector{Matrix{Float64}}
     tmp2::Vector{Matrix{Float64}}
-    tmp3::Matrix{Float64} # unused
+    tmp3::Matrix{Float64}
     tmp4::Vector{Matrix{Float64}}
-    tmp5::Vector{Matrix{Float64}}
     lambda::Vector{Vector{Matrix{Float64}}}
+    li_lambda::Vector{Vector{Matrix{Float64}}}
     lambdafact::Vector{CholeskyPivoted{Float64, Matrix{Float64}}}
     diffres
 
@@ -55,10 +55,13 @@ mutable struct WSOSPolyInterpSOC <: Cone
         cone.tmp2 = [similar(ipwt[1], size(ipwtj, 2), U) for ipwtj in ipwt]
         cone.tmp3 = similar(ipwt[1], U, U)
         cone.tmp4 = [similar(ipwt[1], size(ipwtj, 2), size(ipwtj, 2)) for ipwtj in ipwt]
-        cone.tmp5 = [similar(ipwt[1], size(ipwtj, 2), size(ipwtj, 2)) for ipwtj in ipwt]
         cone.lambda = [Vector{Matrix{Float64}}(undef, R) for ipwtj in ipwt]
         for j in eachindex(ipwt), r in 1:R
             cone.lambda[j][r] = similar(ipwt[1], size(ipwt[j], 2), size(ipwt[j], 2))
+        end
+        cone.li_lambda = [Vector{Matrix{Float64}}(undef, R) for ipwtj in ipwt]
+        for j in eachindex(ipwt), r in 1:(R - 1)
+            cone.li_lambda[j][r] = similar(ipwt[1], size(ipwt[j], 2), size(ipwt[j], 2))
         end
         cone.lambdafact = Vector{CholeskyPivoted{Float64, Matrix{Float64}}}(undef, length(ipwt))
         cone.diffres = DiffResults.HessianResult(cone.g)
@@ -92,7 +95,6 @@ function getlambda(point, cone, j)
         point_pq = point[uo:(uo + cone.U - 1)]
         tmp = Symmetric(ipwtj' * Diagonal(point_pq) * ipwtj)
         mat -= Symmetric(tmp * (Symmetric(first_lambda, :U) \ tmp'))
-        @assert issymmetric(mat)
         uo += cone.U
     end
     @assert issymmetric(mat)
@@ -139,7 +141,7 @@ function inversion_test(cone, L, R, j)
     for r1 in 1:R, r2 in 1:R
         arrow_mat_inv[((r1 - 1) * L + 1):(r1 * L), ((r2 - 1) * L + 1):(r2 * L)] = mat_inv(cone, r1, r2, j)
     end
-    @assert arrow_mat_inv * Symmetric(arrow_mat, :L) ≈ I # TODO move out to a test
+    # @assert arrow_mat_inv * Symmetric(arrow_mat, :L) ≈ I # TODO move out to a test
     return true
 end
 
@@ -151,10 +153,9 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
         ipwtj = cone.ipwt[j]
         tmp1j = cone.tmp1[j]
         lambda = cone.lambda[j]
+        li_lambda = cone.li_lambda[j]
         L = size(ipwtj, 2)
         mat = cone.mat[j]
-        tmp4 = cone.tmp4[j]
-        tmp5 = cone.tmp5[j] # TODO, unneeded
 
         lambdafact = cone.lambdafact
 
@@ -174,17 +175,15 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
             # store lambda
             point_pq = cone.point[uo:(uo + cone.U - 1)] # TODO prealloc
             @. tmp1j = ipwtj' * point_pq'
-            mul!(tmp4, tmp1j, ipwtj)
-            lambda[p] .= tmp4
+            mul!(lambda[p], tmp1j, ipwtj)
             # update mat
-            tmp5 .= view(tmp4, lambdafact[j].p, :)
-            ldiv!(lambdafact[j].L, tmp5)
-            BLAS.syrk!('U', 'T', 1.0, tmp5, 0.0, tmp4)
-            mat .-= Symmetric(tmp4, :U)
+            li_lambda[p - 1] .= view(lambda[p], lambdafact[j].p, :)
+            ldiv!(lambdafact[j].L, li_lambda[p - 1])
+            BLAS.syrk!('U', 'T', -1.0, li_lambda[p - 1], 1.0, mat)
             uo += cone.U
         end
 
-        cone.matfact[j] = cholesky(Symmetric(mat, :U), Val(true), check = false)
+        cone.matfact[j] = cholesky!(Symmetric(mat, :U), Val(true), check = false)
         if !isposdef(cone.matfact[j])
             return false
         end
@@ -266,7 +265,7 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
     # end
     # @show fdg ./ cone.g
     @show fdh ./ Symmetric(cone.H, :U)
-    @show fdh - Symmetric(cone.H, :U)
+    # @show fdh - Symmetric(cone.H, :U)
     @show fdh
     # @show Symmetric(cone.H, :U)
     # @show Symmetric(cone.H, :U)
