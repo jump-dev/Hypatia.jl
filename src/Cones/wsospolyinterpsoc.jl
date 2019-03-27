@@ -84,17 +84,18 @@ function getlambda(point, cone, j)
     # first lambda
     point_pq = point[1:cone.U]
     first_lambda = ipwtj' * Diagonal(point_pq) * ipwtj
-    mat = Symmetric(first_lambda)
-    first_lambda_inv = inv(Symmetric(first_lambda))
+    mat = Symmetric(first_lambda, :U)
 
     # minus other lambdas
     uo = cone.U + 1
     for p in 2:cone.R
         point_pq = point[uo:(uo + cone.U - 1)]
         tmp = Symmetric(ipwtj' * Diagonal(point_pq) * ipwtj)
-        mat -= Symmetric(tmp * first_lambda_inv * tmp')
+        mat -= Symmetric(tmp * (Symmetric(first_lambda, :U) \ tmp'))
+        @assert issymmetric(mat)
         uo += cone.U
     end
+    @assert issymmetric(mat)
     return Symmetric(mat, :U)
 end
 
