@@ -1,5 +1,5 @@
 #=
-Copyright 2018, Chris Coey and contributors
+Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
 approximate integration (upper bound) of a polynomial over a basic semialgebraic set
 adapted from "Approximate volume and integration for basic semialgebraic sets"
@@ -15,30 +15,59 @@ const MU = HYP.ModelUtilities
 import MathOptInterface
 const MOI = MathOptInterface
 import JuMP
-using LinearAlgebra
-import Random
+import MultivariatePolynomials
+import DynamicPolynomials
+import SemialgebraicSets
+# import Random
 using Test
 
 function build_quadrature(
     d::Int,
-    p, # polynomial parameter (in objective of moment problem; must be positive on K)
     K_dom::MU.Domain,
-    B_dom::MU.Domain; # canonical set (for which we have quadrature weights) containing K_dom
+    B_dom::MU.Domain,
+    ppar,
     )
     # generate interpolation for K
     (U, pts, P0, PWts, _) = MU.interpolate(K_dom, d, sample = true, calc_w = false)
 
     # get quadrature weights for B
-    y2 = MU.get_weights(B_dom, pts)
+    y2 = # TODO
 
     # build JuMP model
     model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
     JuMP.@variable(model, y1[1:U]) # moments of μ1
-    JuMP.@objective(model, Max, sum(y1[i] * p(pts[i, :]) for i in 1:U))
+    JuMP.@objective(model, Max, sum(y1[i] * ppar(pts[i, :]) for i in 1:U))
     JuMP.@constraint(model, y1 in HYP.WSOSPolyInterpCone(U, [P0, PWts...], true))
-    JuMP.@constraint(model, y2 - y1 in HYP.WSOSPolyInterpCone(U, [P0], true))
+    JuMP.@constraint(model, y2 .- y1 in HYP.WSOSPolyInterpCone(U, [P0], true))
 
     return (model, y1, pts)
 end
 
- 
+function integrate_poly(
+    p, # poly to integrate
+    d::Int, # degree of moment problem
+    K_dom::MU.Domain, # domain on which quadrature weights are valid
+    B_dom::MU.Domain, # canonical set (for which we have quadrature weights) containing K_dom
+    ppar, # polynomial as the parameter in objective of moment problem
+    )
+    # optimize to get quadrature weights
+    (model, y1, pts) = build_quadrature(d, K_dom, B_dom, ppar)
+    JuMP.optimize!(model)
+
+    w = JuMP.value.(y1)
+    integral = sum(w[i] * p(pts[i, :]) for i in eachindex(w))
+
+    println(w)
+    println(integral)
+end
+
+
+n = 1
+DynamicPolynomials.@polyvar x
+d = 10
+p = 1.0 + 0.0x
+K_dom = MU.Box([0.0], [0.5]) # TODO SemialgebraicSets.@set(x * (1/2 - x) >= 0)
+B_dom = MU.Box([-1.0], [1.0])
+ppar = 1.0 + 0.0x
+
+integrate_poly(p, d, K_dom, B_dom, ppar)
