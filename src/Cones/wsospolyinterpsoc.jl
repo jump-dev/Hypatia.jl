@@ -248,8 +248,9 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
         for p2 in 2:cone.R
             idxs2 = ((p2 - 1) * cone.U + 1):(p2 * cone.U)
             for r in 1:cone.R
-                cone.H[1:cone.U, idxs2] += (ipwtj * Winv(r, 1) * ipwtj') .* (ipwtj * Winv(p2, r) * ipwtj') +
-                    (ipwtj * Winv(r, p2) * ipwtj') .* (ipwtj * Winv(1, r) * ipwtj')
+                for u in 1:cone.U, u2 in 1:cone.U
+                    cone.H[u, idxs2[u2]] += 2 * (ipwtj[u2, :]' * Winv(1, r) * ipwtj[u, :]) * (ipwtj[u, :]' * Winv(r, p2) * ipwtj[u2, :])
+                end
             end
         end
 
@@ -268,26 +269,26 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
                 # mul!(tmp2, ipwtj, getinv(1, 1))
                 # mul!(tmp3, ipwtj, getinv(p, p2))
                 # @.cone.H[idxs, idxs2] += tmp2 * tmp3 etc.
-                cone.H[idxs, idxs2] += (ipwtj * Winv(1, 1) * ipwtj') .* (ipwtj * Winv(p, p2) * ipwtj') +
-                    (ipwtj * Winv(1, 1) * ipwtj') .* (ipwtj * Winv(p2, p) * ipwtj') +
-                    (ipwtj * Winv(1, p) * ipwtj') .* (ipwtj * Winv(1, p2) * ipwtj') +
-                    (ipwtj * Winv(p, 1) * ipwtj') .* (ipwtj * Winv(p2, 1) * ipwtj')
+                for u in 1:cone.U, u2 in 1:cone.U
+                    cone.H[idxs[u], idxs2[u2]] += 2 * (ipwtj[u2, :]' * Winv(1, 1) * ipwtj[u, :]) .* (ipwtj[u, :]' * Winv(p, p2) * ipwtj[u2, :]) +
+                        2 * (ipwtj[u2, :]' * Winv(1, p) * ipwtj[u, :]) .* (ipwtj[u, :]' * Winv(1, p2) * ipwtj[u2, :])
+                end
             end
         end # p
     end # j
     # end
     # @show fdg ./ cone.g
-    @show fdh ./ Symmetric(cone.H, :U)
+    # @show fdh ./ Symmetric(cone.H, :U)
     # @show fdh - Symmetric(cone.H, :U)
     # @show fdh
     # if !isapprox(fdh * cone.point, -fdg)
     #     @show fdh * cone.point, -fdg
     #     # error()
     # end
-    # if !isapprox(Symmetric(cone.H, :U) * cone.point, -cone.g)
-    #     @show Symmetric(cone.H, :U) * cone.point, -cone.g
-    #     error()
-    # end
+    if !isapprox(Symmetric(cone.H, :U) * cone.point, -cone.g)
+        @show Symmetric(cone.H, :U) * cone.point, -cone.g
+        error()
+    end
     # @show Symmetric(cone.H, :U)
     # @show Symmetric(cone.H, :U)
 
