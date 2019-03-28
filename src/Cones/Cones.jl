@@ -26,6 +26,7 @@ include("epinormspectral.jl")
 include("semidefinite.jl")
 include("hypoperlogdet.jl")
 include("wsospolyinterp.jl")
+include("wsospolyinterp_2.jl")
 include("wsospolyinterpmat.jl")
 
 use_dual(cone::Cone) = cone.use_dual

@@ -14,6 +14,8 @@ const CO = HYP.Cones
 const MU = HYP.ModelUtilities
 
 using LinearAlgebra
+# import SemialgebraicSets
+import DynamicPolynomials
 using Test
 
 # list of predefined polynomials from various applications
@@ -83,7 +85,20 @@ function build_namedpoly(
         h = zeros(U)
     end
 
-    cones = [CO.WSOSPolyInterp(U, [P0, PWts...], !primal_wsos)]
+    # cones = [CO.WSOSPolyInterp(U, [P0, PWts...], !primal_wsos)]
+
+    Ls = Int[size(P0, 2)]
+    gs = Vector{Float64}[ones(U)]
+    for i in 1:n
+        Li = size(PWts[i], 2) # TODO may be wrong
+        gi = [(-pts[u, i] + dom.u[i]) * (pts[u, i] - dom.l[i]) for u in 1:U]
+        push!(Ls, Li)
+        push!(gs, gi)
+    end
+    cones = [CO.WSOSPolyInterp_2(U, P0, Ls, gs, !primal_wsos)]
+
+    # cones = [CO.WSOSPolyInterp(U, P0, Ls, gs, !primal_wsos)]
+
     cone_idxs = [1:U]
 
     return (c, A, b, G, h, cones, cone_idxs)
