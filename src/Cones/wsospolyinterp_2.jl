@@ -81,18 +81,14 @@ function check_in_cone(cone::WSOSPolyInterp_2)
             return false
         end
 
-        PΛiPi_a = Symmetric(Pi * inv(F) * Pi')
+        # PΛiPi = Symmetric(Pi * inv(F) * Pi') # TODO maybe better to take inv, because only LxL vs UxL
         # half
         Pitp = Matrix((Pi')[F.p, :])
         PΛiPi_half = LowerTriangular(F.L) \ Pitp
-        PΛiPi_b = Symmetric(PΛiPi_half' * PΛiPi_half)
-        # check consistency
-        # @show norm(PΛiPi_a - PΛiPi_b)
-        # @show PΛiPi_a ./ PΛiPi_b
-        # @show F.p
+        PΛiPi = Symmetric(PΛiPi_half' * PΛiPi_half)
 
-        cone.g -= gi .* diag(PΛiPi_b)
-        cone.H += Symmetric(gi * gi') .* abs2.(PΛiPi_b)
+        cone.g -= gi .* diag(PΛiPi)
+        cone.H += Symmetric(gi * gi') .* abs2.(PΛiPi)
     end
 
     return factorize_hess(cone)

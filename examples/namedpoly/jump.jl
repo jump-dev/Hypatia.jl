@@ -187,7 +187,8 @@ function build_JuMP_namedpoly_WSOS(
     )
     Random.seed!(rseed)
 
-    (U, pts, P0, PWts, _) = MU.interpolate(dom, d, sample = sample, sample_factor = 100)
+    # (U, pts, P0, PWts, _) = MU.interpolate(dom, d, sample = sample, sample_factor = 100)
+    (U, pts, P0, _, _) = MU.wsos_box_params(n, d, false)
 
     # build JuMP model
     model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, tol_feas = 1e-8, tol_rel_opt = 1e-7, tol_abs_opt = 1e-8))
@@ -195,15 +196,19 @@ function build_JuMP_namedpoly_WSOS(
     # cone = HYP.WSOSPolyInterpCone(U, [P0, PWts...], !primal_wsos)
 
     Ls = Int[size(P0, 2)]
+    @assert Ls[1] == binomial(n + d, n)
     gs = Vector{Float64}[ones(U)]
     g_polys = SemialgebraicSets.inequalities(MU.get_domain_inequalities(dom, x))
     for i in eachindex(g_polys)
-        Li = size(PWts[i], 2) # TODO may be wrong
+        # Li = size(PWts[i], 2) # TODO may be wrong
+        di = d - div(DynamicPolynomials.degree(g_polys[i]), 2) # degree of gi is ...
+        Li = binomial(n + di, n)
         gi = [g_polys[i](x => pts[u, :]) for u in 1:U]
         push!(Ls, Li)
         push!(gs, gi)
     end
     cone = HYP.WSOSPolyInterpCone_2(U, P0, Ls, gs, !primal_wsos)
+    @show Ls
 
     if primal_wsos
         JuMP.@variable(model, a)
