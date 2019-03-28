@@ -29,7 +29,7 @@ include(joinpath(@__DIR__, "native.jl"))
 #
 # include(joinpath(examples_dir, "envelope/jump.jl"))
 # include(joinpath(examples_dir, "expdesign/jump.jl"))
-# include(joinpath(examples_dir, "namedpoly/jump.jl"))
+include(joinpath(examples_dir, "namedpoly/jump.jl"))
 # include(joinpath(examples_dir, "shapeconregr/jump.jl"))
 # include(joinpath(examples_dir, "densityest/jump.jl"))
 # include(joinpath(examples_dir, "wsosmatrix/sosmatrix.jl"))
@@ -39,7 +39,7 @@ include(joinpath(@__DIR__, "native.jl"))
 # include(joinpath(examples_dir, "wsosmatrix/sosmat3.jl"))
 # include(joinpath(examples_dir, "regionofattraction/univariate.jl"))
 #
-# include(joinpath(@__DIR__, "JuMP.jl"))
+include(joinpath(@__DIR__, "JuMP.jl"))
 
 
 # @testset "Hypatia tests" begin
@@ -126,42 +126,42 @@ include(joinpath(@__DIR__, "native.jl"))
 #     t()
 # end
 
-@info("starting additional native examples tests")
-verbose = true
-system_solvers = [
-    # SO.NaiveCombinedHSDSystemSolver,
-    SO.QRCholCombinedHSDSystemSolver,
-    ]
-linear_models = [
-    # MO.RawLinearModel,
-    MO.PreprocessedLinearModel,
-    ]
-testfuns = [
-    # TODO test primal and dual formulations of envelope
-    # envelope1,
-    # envelope2,
-    # envelope3,
-    # envelope4,
-    # linearopt1,
-    # linearopt2,
-    namedpoly1,
-    namedpoly2,
-    namedpoly3,
-    namedpoly4,
-    namedpoly5,
-    namedpoly6,
-    namedpoly7,
-    namedpoly8,
-    namedpoly9,
-    namedpoly10,
-    namedpoly11,
-    ]
-@testset "native examples: $t, $s, $m" for t in testfuns, s in system_solvers, m in linear_models
-    if s == SO.QRCholCombinedHSDSystemSolver && m == MO.RawLinearModel
-        continue # QRChol linear system solver needs preprocessed model
-    end
-    t(verbose, s, m)
-end
+# @info("starting additional native examples tests")
+# verbose = true
+# system_solvers = [
+#     # SO.NaiveCombinedHSDSystemSolver,
+#     SO.QRCholCombinedHSDSystemSolver,
+#     ]
+# linear_models = [
+#     # MO.RawLinearModel,
+#     MO.PreprocessedLinearModel,
+#     ]
+# testfuns = [
+#     # TODO test primal and dual formulations of envelope
+#     # envelope1,
+#     # envelope2,
+#     # envelope3,
+#     # envelope4,
+#     # linearopt1,
+#     # linearopt2,
+#     namedpoly1,
+#     namedpoly2,
+#     namedpoly3,
+#     namedpoly4,
+#     namedpoly5,
+#     namedpoly6,
+#     namedpoly7,
+#     namedpoly8,
+#     namedpoly9,
+#     namedpoly10,
+#     namedpoly11,
+#     ]
+# @testset "native examples: $t, $s, $m" for t in testfuns, s in system_solvers, m in linear_models
+#     if s == SO.QRCholCombinedHSDSystemSolver && m == MO.RawLinearModel
+#         continue # QRChol linear system solver needs preprocessed model
+#     end
+#     t(verbose, s, m)
+# end
 
 # @info("starting MathOptInterface tests")
 # verbose = false
@@ -211,36 +211,36 @@ end
 #     t()
 # end
 #
-# @info("starting additional JuMP examples tests")
-# testfuns = [
-#     namedpoly1_JuMP,
-#     namedpoly2_JuMP,
-#     namedpoly3_JuMP,
-#     namedpoly4_JuMP, # numerically unstable
-#     namedpoly5_JuMP,
-#     namedpoly6_JuMP,
-#     namedpoly7_JuMP,
-#     namedpoly8_JuMP,
-#     namedpoly9_JuMP,
-#     namedpoly10_JuMP,
-#     shapeconregr1_JuMP,
-#     shapeconregr2_JuMP,
-#     shapeconregr3_JuMP,
-#     shapeconregr4_JuMP,
-#     shapeconregr5_JuMP,
-#     shapeconregr6_JuMP,
-#     shapeconregr7_JuMP, # numerically unstable
-#     shapeconregr8_JuMP,
-#     shapeconregr9_JuMP, # numerically unstable
-#     shapeconregr10_JuMP, # numerically unstable
-#     shapeconregr11_JuMP, # numerically unstable
-#     # shapeconregr12_JuMP, # numerically unstable
-#     shapeconregr13_JuMP, # numerically unstable
-#     # shapeconregr14_JuMP, # throws out-of-memory error
-#     # shapeconregr15_JuMP, # throws out-of-memory error
-#     ]
-# @testset "JuMP examples: $t" for t in testfuns
-#     t()
-# end
+@info("starting additional JuMP examples tests")
+testfuns = [
+    namedpoly1_JuMP,
+    namedpoly2_JuMP,
+    namedpoly3_JuMP,
+    namedpoly4_JuMP, # numerically unstable
+    namedpoly5_JuMP,
+    namedpoly6_JuMP,
+    namedpoly7_JuMP,
+    namedpoly8_JuMP,
+    namedpoly9_JuMP,
+    namedpoly10_JuMP,
+    # shapeconregr1_JuMP,
+    # shapeconregr2_JuMP,
+    # shapeconregr3_JuMP,
+    # shapeconregr4_JuMP,
+    # shapeconregr5_JuMP,
+    # shapeconregr6_JuMP,
+    # shapeconregr7_JuMP, # numerically unstable
+    # shapeconregr8_JuMP,
+    # shapeconregr9_JuMP, # numerically unstable
+    # shapeconregr10_JuMP, # numerically unstable
+    # shapeconregr11_JuMP, # numerically unstable
+    # # shapeconregr12_JuMP, # numerically unstable
+    # shapeconregr13_JuMP, # numerically unstable
+    # # shapeconregr14_JuMP, # throws out-of-memory error
+    # # shapeconregr15_JuMP, # throws out-of-memory error
+    ]
+@testset "JuMP examples: $t" for t in testfuns
+    t()
+end
 
 # end
