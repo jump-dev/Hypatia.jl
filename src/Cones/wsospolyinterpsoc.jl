@@ -136,20 +136,6 @@ function mat_inv(cone::WSOSPolyInterpSOC, r1::Int, r2::Int, j::Int)
     return ret
 end
 
-# TODO figure out how to make feasible dual points and move out into test folder
-function inversion_test(cone, L, R, j)
-    arrow_mat = kron(Matrix{Float64}(I, R, R), cone.lambda[j][1])
-    for r in 2:R
-        arrow_mat[((r - 1) * L + 1):(r * L), 1:L] .= cone.lambda[j][r]
-    end
-    arrow_mat_inv = zeros(R * L, R * L)
-    for r1 in 1:R, r2 in 1:R
-        arrow_mat_inv[((r1 - 1) * L + 1):(r1 * L), ((r2 - 1) * L + 1):(r2 * L)] = mat_inv(cone, r1, r2, j)
-    end
-    @assert arrow_mat_inv * Symmetric(arrow_mat, :L) ≈ I # TODO move out to a test
-    return true
-end
-
 
 function check_in_cone(cone::WSOSPolyInterpSOC)
 
@@ -193,7 +179,6 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
         if !isposdef(cone.matfact[j])
             return false
         end
-        @assert inversion_test(cone, L, cone.R, j)
     end
     # end
 
@@ -248,9 +233,7 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
         for p2 in 2:cone.R
             idxs2 = ((p2 - 1) * cone.U + 1):(p2 * cone.U)
             for r in 1:cone.R
-                for u in 1:cone.U, u2 in 1:cone.U
-                    cone.H[u, idxs2[u2]] += 2 * (ipwtj[u2, :]' * Winv(1, r) * ipwtj[u, :]) * (ipwtj[u, :]' * Winv(r, p2) * ipwtj[u2, :])
-                end
+                cone.H[1:cone.U, idxs2] += 2 * (ipwtj * Winv(r, 1) * ipwtj') .* (ipwtj * Winv(r, p2) * ipwtj')
             end
         end
 
@@ -269,10 +252,7 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
                 # mul!(tmp2, ipwtj, getinv(1, 1))
                 # mul!(tmp3, ipwtj, getinv(p, p2))
                 # @.cone.H[idxs, idxs2] += tmp2 * tmp3 etc.
-                for u in 1:cone.U, u2 in 1:cone.U
-                    cone.H[idxs[u], idxs2[u2]] += 2 * (ipwtj[u2, :]' * Winv(1, 1) * ipwtj[u, :]) .* (ipwtj[u, :]' * Winv(p, p2) * ipwtj[u2, :]) +
-                        2 * (ipwtj[u2, :]' * Winv(1, p) * ipwtj[u, :]) .* (ipwtj[u, :]' * Winv(1, p2) * ipwtj[u2, :])
-                end
+                cone.H[idxs, idxs2] += 2 * (ipwtj * Winv(1, 1) * ipwtj') .* (ipwtj * Winv(p, p2) * ipwtj') + 2 * (ipwtj * Winv(p, 1) * ipwtj') .* (ipwtj * Winv(1, p2) * ipwtj')
             end
         end # p
     end # j
