@@ -222,65 +222,56 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
         tmp3 = cone.tmp3
 
         L = size(ipwtj, 2)
-        uo = 0
 
         # part of gradient/hessian when p=1
         tmp2j .= view(ipwtj', cone.lambdafact[j].p, :)
         ldiv!(cone.lambdafact[j].L, tmp2j)
         BLAS.syrk!('U', 'T', 1.0, tmp2j, 0.0, tmp3)
 
-        for p in 1:cone.R
-            uo += 1
-            idxs = _blockrange(uo, cone.U)
+        for i in 1:cone.U
+            cone.g[i] += tmp3[i, i] * (cone.R - 1)
+            for r in 1:cone.R
+                cone.g[i] -= ipwtj[i, :]' * Winv(r, r) * ipwtj[i, :]
+            end
+            for k in 1:i
+                cone.H[k, i] -= abs2(tmp3[k, i]) * (cone.R - 1)
+            end
+        end
 
-            # block (1, 1) has a special gradient/hessian adjustment
-            if p == 1
-                @inbounds for i in 1:cone.U
-                    cone.g[idxs[i]] += tmp3[i, i] * (cone.R - 1)
-                    for r in 1:cone.R
-                        cone.g[idxs[i]] -= ipwtj[i, :]' * Winv(r, r) * ipwtj[i, :]
-                    end
-                    @inbounds for k in 1:i
-                        cone.H[idxs[k], idxs[i]] -= abs2(tmp3[k, i]) * (cone.R - 1)
-                    end
-                end
-            else
-                @inbounds for i in 1:cone.U
-                    # TODO view(getinv(p, 1), i, :) etc.
-                    cone.g[idxs[i]] -= ipwtj[i, :]' * Winv(p, 1) * ipwtj[i, :] + ipwtj[i, :]' * Winv(1, p) * ipwtj[i, :]
-                end
+        for r in 1:cone.R, s in 1:cone.R
+            # TODO
+            # mul!(tmp2, ipwtj, getinv(r, s))
+            # @.cone.H[idxs, idxs2] += tmp2
+            cone.H[1:cone.U, 1:cone.U] += (ipwtj * Winv(r, s) * ipwtj').^2
+        end
+
+        for p2 in 2:cone.R
+            idxs2 = ((p2 - 1) * cone.U + 1):(p2 * cone.U)
+            for r in 1:cone.R
+                cone.H[1:cone.U, idxs2] += (ipwtj * Winv(r, 1) * ipwtj') .* (ipwtj * Winv(p2, r) * ipwtj') +
+                    (ipwtj * Winv(r, p2) * ipwtj') .* (ipwtj * Winv(1, r) * ipwtj')
+            end
+        end
+
+        for p in 2:cone.R
+            idxs = ((p - 1) * cone.U + 1):(p * cone.U)
+            for i in 1:cone.U
+                # TODO view(getinv(p, 1), i, :) etc.
+                cone.g[idxs[i]] -= ipwtj[i, :]' * Winv(p, 1) * ipwtj[i, :] + ipwtj[i, :]' * Winv(1, p) * ipwtj[i, :]
             end
 
-            uo2 = 0
-            for p2 in 1:cone.R
-                uo2 += 1
-                if uo2 < uo
-                    continue
-                end
-                idxs2 = _blockrange(uo2, cone.U)
 
-                if p == 1 && p2 == 1
-                    for r in 1:cone.R, s in 1:cone.R
-                        # TODO
-                        # mul!(tmp2, ipwtj, getinv(r, s))
-                        # @.cone.H[idxs, idxs2] += tmp2
-                        cone.H[idxs, idxs2] += (ipwtj * Winv(r, s) * ipwtj').^2
-                    end
-                elseif p == 1 && p2 != 1
-                    for r in 1:cone.R
-                        cone.H[idxs, idxs2] += (ipwtj * Winv(r, 1) * ipwtj') .* (ipwtj * Winv(p2, r) * ipwtj') +
-                                               (ipwtj * Winv(r, p2) * ipwtj') .* (ipwtj * Winv(1, r) * ipwtj')
-                    end
-                else
-                    # TODO
-                    # mul!(tmp2, ipwtj, getinv(1, 1))
-                    # mul!(tmp3, ipwtj, getinv(p, p2))
-                    # @.cone.H[idxs, idxs2] += tmp2 * tmp3 etc.
-                    cone.H[idxs, idxs2] += (ipwtj * Winv(1, 1) * ipwtj') .* (ipwtj * Winv(p, p2) * ipwtj') +
-                                           (ipwtj * Winv(1, 1) * ipwtj') .* (ipwtj * Winv(p2, p) * ipwtj') +
-                                           (ipwtj * Winv(1, p) * ipwtj') .* (ipwtj * Winv(1, p2) * ipwtj') +
-                                           (ipwtj * Winv(p, 1) * ipwtj') .* (ipwtj * Winv(p2, 1) * ipwtj')
-                end
+            for p2 in 2:cone.R
+                idxs2 = ((p2 - 1) * cone.U + 1):(p2 * cone.U)
+
+                # TODO
+                # mul!(tmp2, ipwtj, getinv(1, 1))
+                # mul!(tmp3, ipwtj, getinv(p, p2))
+                # @.cone.H[idxs, idxs2] += tmp2 * tmp3 etc.
+                cone.H[idxs, idxs2] += (ipwtj * Winv(1, 1) * ipwtj') .* (ipwtj * Winv(p, p2) * ipwtj') +
+                    (ipwtj * Winv(1, 1) * ipwtj') .* (ipwtj * Winv(p2, p) * ipwtj') +
+                    (ipwtj * Winv(1, p) * ipwtj') .* (ipwtj * Winv(1, p2) * ipwtj') +
+                    (ipwtj * Winv(p, 1) * ipwtj') .* (ipwtj * Winv(p2, 1) * ipwtj')
             end
         end # p
     end # j
@@ -288,7 +279,15 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
     # @show fdg ./ cone.g
     @show fdh ./ Symmetric(cone.H, :U)
     # @show fdh - Symmetric(cone.H, :U)
-    @show fdh
+    # @show fdh
+    # if !isapprox(fdh * cone.point, -fdg)
+    #     @show fdh * cone.point, -fdg
+    #     # error()
+    # end
+    # if !isapprox(Symmetric(cone.H, :U) * cone.point, -cone.g)
+    #     @show Symmetric(cone.H, :U) * cone.point, -cone.g
+    #     error()
+    # end
     # @show Symmetric(cone.H, :U)
     # @show Symmetric(cone.H, :U)
 
