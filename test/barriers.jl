@@ -61,8 +61,11 @@ function test_dependencies(cone::CO.WSOSPolyInterpSOC)
         arrow_mat[((r - 1) * L + 1):(r * L), 1:L] = lambda1 * cone.li_lambda[1][r - 1]
     end
     arrow_mat_inv = inv(Symmetric(arrow_mat, :L))
-    for r in 1:R, r2 in 1:r
-        @test cone.PlambdaiP[1][r][r2] ≈ ipwtj * arrow_mat_inv[((r - 1) * L + 1):(r * L), ((r2 - 1) * L + 1):(r2 * L)] * ipwtj'
+    for r in 1:R
+        for r2 in 1:(r - 1)
+            @test cone.PlambdaiP[1][r][r2] ≈ ipwtj * arrow_mat_inv[((r - 1) * L + 1):(r * L), ((r2 - 1) * L + 1):(r2 * L)] * ipwtj'
+        end
+        @test Symmetric(cone.PlambdaiP[1][r][r], :U) ≈ ipwtj * arrow_mat_inv[((r - 1) * L + 1):(r * L), ((r - 1) * L + 1):(r * L)] * ipwtj'
     end
     return nothing
 end
@@ -98,7 +101,7 @@ function pass_through_cone(cone::CO.Cone)
         load_feasible_point!(cone)
         @test CO.check_in_cone(cone)
         test_dependencies(cone)
-        # compare_autodiff(cone)
+        compare_autodiff(cone)
         @testset "gradient/hessian" begin
             @test -dot(cone.point, cone.g) ≈ CO.get_nu(cone) atol = 1e-9 rtol = 1e-9
             @test Symmetric(cone.H, :U) * cone.point ≈ -cone.g atol = 1e-9 rtol = 1e-9
