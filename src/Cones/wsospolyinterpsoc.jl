@@ -30,7 +30,6 @@ mutable struct WSOSPolyInterpSOC <: Cone
     li_lambda::Vector{Vector{Matrix{Float64}}}
     PlambdaiP::Vector{Vector{Vector{Matrix{Float64}}}}
     lambdafact::Vector{CholeskyPivoted{Float64, Matrix{Float64}}}
-    diffres
 
     function WSOSPolyInterpSOC(R::Int, U::Int, ipwt::Vector{Matrix{Float64}}, is_dual::Bool)
         for ipwtj in ipwt
@@ -72,7 +71,6 @@ mutable struct WSOSPolyInterpSOC <: Cone
             end
         end
         cone.lambdafact = Vector{CholeskyPivoted{Float64, Matrix{Float64}}}(undef, length(ipwt))
-        cone.diffres = DiffResults.HessianResult(cone.g)
         return cone
     end
 end
@@ -87,42 +85,16 @@ function set_initial_point(arr::AbstractVector{Float64}, cone::WSOSPolyInterpSOC
     return arr
 end
 
-# ForwardDiff function only TODO remove
-function getlambda(point, cone, j)
-    ipwtj = cone.ipwt[j]
-    L = size(ipwtj, 2)
-    mat = similar(point, L, L)
-
-    # first lambda
-    point_pq = point[1:cone.U]
-    first_lambda = ipwtj' * Diagonal(point_pq) * ipwtj
-    mat = Symmetric(first_lambda, :U)
-
-    # minus other lambdas
-    uo = cone.U + 1
-    for p in 2:cone.R
-        point_pq = point[uo:(uo + cone.U - 1)]
-        tmp = Symmetric(ipwtj' * Diagonal(point_pq) * ipwtj)
-        mat -= Symmetric(tmp * (Symmetric(first_lambda, :U) \ tmp'))
-        uo += cone.U
-    end
-    return Symmetric(mat, :U)
-end
-
 function check_in_cone(cone::WSOSPolyInterpSOC)
-
     # @timeit "build mat" begin
     for j in eachindex(cone.ipwt)
         ipwtj = cone.ipwt[j]
-        tmp1 = cone.tmp1[j]
-        # lambda = cone.lambda[j]
         li_lambda = cone.li_lambda[j]
         PlambdaiP = cone.PlambdaiP[j]
         tmp1 = cone.tmp1[j]
         tmp2 = cone.tmp2[j]
         tmp4 = cone.tmp4[j]
         mat = cone.mat[j]
-
         lambdafact = cone.lambdafact
         L = size(ipwtj, 2)
 
@@ -148,7 +120,6 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
             # avoiding lambdafact.L \ lambda because lambdafact \ lambda is useful later
             li_lambda[r - 1] .= lambdafact[j] \ tmp4
             mat -= tmp4 * li_lambda[r - 1]
-
             uo += cone.U
         end
 
@@ -178,22 +149,18 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
             end
             PlambdaiP[r][r] .+= ipwtj * tmp1
         end
-
     end
     # end
-
 
     # @timeit "grad hess" begin
     cone.g .= 0.0
     cone.H .= 0.0
     for j in eachindex(cone.ipwt)
-
         ipwtj = cone.ipwt[j]
         tmp1 = cone.tmp1[j]
         tmp2 = cone.tmp2[j]
         tmp3 = cone.tmp3
         PlambdaiP = cone.PlambdaiP[j]
-
         L = size(ipwtj, 2)
 
         # part of gradient/hessian when p=1
