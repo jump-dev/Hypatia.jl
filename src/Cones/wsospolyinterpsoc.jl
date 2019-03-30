@@ -21,14 +21,14 @@ mutable struct WSOSPolyInterpSOC <: Cone
     Hi::Matrix{Float64}
     F
     mat::Vector{Matrix{Float64}}
-    matfact::Vector{CholeskyPivoted{Float64, Matrix{Float64}}}
+    # matfact # CholeskyPivoted{Float64, Matrix{Float64}}
     tmp1::Vector{Matrix{Float64}}
     tmp2::Vector{Matrix{Float64}}
     tmp3::Matrix{Float64}
     tmp4::Vector{Matrix{Float64}}
     lambda::Vector{Vector{Matrix{Float64}}}
-    li_lambda::Vector{Vector{Matrix{Float64}}} #TODO unused currently, but could store lambdafact.L \ lambda_i
-    PlambdaiP::Vector{Vector{Vector{Matrix{Float64}}}} # TODO usused currently, but could store Winv(i, j) \ ipwtj
+    li_lambda::Vector{Vector{Matrix{Float64}}}
+    PlambdaiP::Vector{Vector{Vector{Matrix{Float64}}}}
     lambdafact::Vector{CholeskyPivoted{Float64, Matrix{Float64}}}
     diffres
 
@@ -51,7 +51,7 @@ mutable struct WSOSPolyInterpSOC <: Cone
         cone.H2 = similar(cone.H)
         cone.Hi = similar(cone.H)
         cone.mat = [similar(ipwt[1], size(ipwtj, 2), size(ipwtj, 2)) for ipwtj in ipwt]
-        cone.matfact = Vector{CholeskyPivoted{Float64, Matrix{Float64}}}(undef, length(ipwt))
+        # cone.matfact = TODO
         cone.tmp1 = [similar(ipwt[1], size(ipwtj, 2), U) for ipwtj in ipwt]
         cone.tmp2 = [similar(ipwt[1], size(ipwtj, 2), U) for ipwtj in ipwt]
         cone.tmp3 = similar(ipwt[1], U, U)
@@ -109,34 +109,6 @@ function getlambda(point, cone, j)
     return Symmetric(mat, :U)
 end
 
-# TODO update cone.PlambdaiP(r1, r2) in place, general form of update is (u1 * inv(matfact) * u2') \ ipwtj
-function rank_one_inv_update(cone::WSOSPolyInterpSOC, r1::Int, r2::Int, j::Int)
-    lambda_inv = inv(cone.lambdafact[j])
-    if (r1 != 1) && (r2 != 1)
-        u1 = lambda_inv * Symmetric(cone.lambda[j][r1])
-        u2 = lambda_inv * Symmetric(cone.lambda[j][r2])
-        return u1 * (cone.matfact[j] \ u2')
-    elseif (r1 != 1) && (r2 == 1)
-        u1 = lambda_inv * Symmetric(cone.lambda[j][r1])
-        return -u1 * Symmetric(inv(cone.matfact[j]))
-    elseif (r1 == 1) && (r2 != 1)
-        u2 = lambda_inv * Symmetric(cone.lambda[j][r2])
-        return -(cone.matfact[j] \ u2')
-    else
-        return Symmetric(inv(cone.matfact[j]))
-    end
-end
-
-# TODO should update cone.PlambdaiP, with Winv(r1, r2) \ ipwtj, return nothing, see above
-function mat_inv(cone::WSOSPolyInterpSOC, r1::Int, r2::Int, j::Int)
-    ret = rank_one_inv_update(cone, r1, r2, j)
-    if (r1 == r2) && (r1 != 1)
-        ret += Symmetric(inv(cone.lambdafact[j]))
-    end
-    return ret
-end
-
-
 function check_in_cone(cone::WSOSPolyInterpSOC)
 
     # @timeit "build mat" begin
@@ -149,18 +121,19 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
         tmp1 = cone.tmp1[j]
         tmp2 = cone.tmp2[j]
         tmp4 = cone.tmp4[j]
-        L = size(ipwtj, 2)
         mat = cone.mat[j]
 
         lambdafact = cone.lambdafact
+        L = size(ipwtj, 2)
 
         # first lambda
         point_pq = cone.point[1:cone.U]
         @. tmp1 = ipwtj' * point_pq'
-        mul!(mat, tmp1, ipwtj)
-        lambda[1] .= mat
-        # TODO in-place
-        lambdafact[j] = cholesky(Symmetric(mat, :L), Val(true), check = false)
+        mul!(lambda[1], tmp1, ipwtj)
+        # interestingly lambda[1] is the only lambda not used later
+        mat .= lambda[1]
+        lambdafact[j] = cholesky!(Symmetric(lambda[1], :L), Val(true), check = false)
+
         if !isposdef(lambdafact[j])
             return false
         end
@@ -173,46 +146,37 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
             @. tmp1 = ipwtj' * point_pq'
             mul!(lambda[r], tmp1, ipwtj)
 
+            # avoiding lambdafact.L \ lambda[r] because lambdafact \ lambda[r] is useful later
             li_lambda[r - 1] .= lambdafact[j] \ lambda[r]
             mat .-= lambda[r] * li_lambda[r - 1]
 
-            # li_lambda[r - 1] .= view(lambda[r], lambdafact[j].p, :)
-            # ldiv!(lambdafact[j].L, li_lambda[r - 1])
-            # BLAS.syrk!('U', 'T', -1.0, li_lambda[r - 1], 1.0, mat)
             uo += cone.U
         end
 
-        cone.matfact[j] = cholesky!(Symmetric(mat, :U), Val(true), check = false)
-        if !isposdef(cone.matfact[j])
+        matfact = cholesky!(Symmetric(mat, :U), Val(true), check = false)
+        if !isposdef(matfact)
             return false
         end
 
         # prep PlambdaiP
 
-        tmp1 .= view(ipwtj', cone.matfact[j].p, :)
-        ldiv!(cone.matfact[j].L, tmp1)
-        # BLAS.syrk!('U', 'T', 1.0, tmp1, 0.0, PlambdaiP[1][1])
+        # block-(1,1) is P*inv(mat)*P'
+        tmp1 .= view(ipwtj', matfact.p, :)
+        ldiv!(matfact.L, tmp1)
+        # only on-diagonal PlambdaiP are symmetric, messy to make special cases for these
         PlambdaiP[1][1] = tmp1' * tmp1
 
         # cache lambda0 \ ipwtj' in tmp1
         tmp1 .= lambdafact[j] \ ipwtj'
         for r in 2:cone.R
-            # mul!(tmp2, lambda[r], tmp1)
-            # ldiv!(cone.matfact[j], tmp2)
-            # mul!(PlambdaiP[r][1], -ipwtj, tmp2)
-
-            PlambdaiP[r][1] = -ipwtj * li_lambda[r - 1] * (cone.matfact[j] \ ipwtj')
-
+            PlambdaiP[r][1] = -ipwtj * li_lambda[r - 1] * (matfact \ ipwtj')
             for r2 in 2:r
-                PlambdaiP[r][r2] .= ipwtj * li_lambda[r - 1] * inv(cone.matfact[j]) * li_lambda[r2 - 1]' * ipwtj'
-                # mul!(PlambdaiP[r][r2], li_lambda[r - 1], tmp4)
-                # tmp4 .= view(li_lambda[r - 1], cone.matfact[j].p, :)
-                # BLAS.syrk!('U', 'T', 1.0, tmp4, 0.0, PlambdaiP[r][r2])
+                PlambdaiP[r][r2] .= ipwtj * li_lambda[r - 1] * (matfact \ (li_lambda[r2 - 1]' * ipwtj'))
+                # mul!(tmp2, li_lambda[r2 - 1]', ipwtj')
+                # ldiv!(matfact, tmp2)
+                # mul!(tmp5, li_lambda[r - 1], tmp2)
+                # mul!(PlambdaiP[r][r2], ipwtj, tmp5)
             end
-            # additional term on main diagonal
-            # tmp2 .= view(ipwtj', lambdafact[j].p, :)
-            # ldiv!(lambdafact[j].L, tmp2)
-            # BLAS.syrk!('U', 'T', 1.0, tmp2, 1.0, PlambdaiP[r][r])
             PlambdaiP[r][r] .+= ipwtj * tmp1
         end
 
@@ -224,11 +188,6 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
     cone.g .= 0.0
     cone.H .= 0.0
     for j in eachindex(cone.ipwt)
-
-
-        Winv(r1, r2) = mat_inv(cone, r1, r2, j)
-        # TODO
-        # getinv(r1::Int, r2::Int) = cone.PlambdaiP[j][r1][r2] or cone.PlambdaiP[j][r2][r1]' if r1
 
         ipwtj = cone.ipwt[j]
         tmp1 = cone.tmp1[j]
@@ -262,8 +221,11 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
 
         for p2 in 2:cone.R
             idxs2 = ((p2 - 1) * cone.U + 1):(p2 * cone.U)
-            for r in 1:cone.R
-                cone.H[1:cone.U, idxs2] += 2 * (ipwtj * Winv(r, 1) * ipwtj') .* (ipwtj * Winv(r, p2) * ipwtj')
+            for r in 1:p2
+                cone.H[1:cone.U, idxs2] += 2 * PlambdaiP[r][1] .* PlambdaiP[p2][r]'
+            end
+            for r in (p2 + 1):cone.R
+                cone.H[1:cone.U, idxs2] += 2 * PlambdaiP[r][1] .* PlambdaiP[r][p2]
             end
         end
 
@@ -273,42 +235,19 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
                 cone.g[idxs[i]] -= 2 * PlambdaiP[p][1][i, i]
             end
 
-
             for p2 in p:cone.R
                 idxs2 = ((p2 - 1) * cone.U + 1):(p2 * cone.U)
-
-                # TODO
-                # mul!(tmp2, ipwtj, getinv(1, 1))
-                # mul!(tmp3, ipwtj, getinv(p, p2))
-                # @.cone.H[idxs, idxs2] += tmp2 * tmp3 etc.
-                # cone.H[idxs, idxs2] += 2 * (ipwtj * Winv(1, 1) * ipwtj') .* (ipwtj * Winv(p, p2) * ipwtj') + 2 * (ipwtj * Winv(p, 1) * ipwtj') .* (ipwtj * Winv(1, p2) * ipwtj')
-                if !isapprox(
-                2 * (ipwtj * Winv(1, 1) * ipwtj') .* (ipwtj * Winv(p, p2) * ipwtj') + 2 * (ipwtj * Winv(p, 1) * ipwtj') .* (ipwtj * Winv(1, p2) * ipwtj'),
-                2 * (PlambdaiP[1][1] .* PlambdaiP[p2][p]' + PlambdaiP[p][1] .* PlambdaiP[p2][1]')
-                )
-                    @show ipwtj * Winv(1, p2) * ipwtj'
-                    @show PlambdaiP[p2][1]'
-                end
                 cone.H[idxs, idxs2] .+= 2 * (PlambdaiP[1][1] .* PlambdaiP[p2][p]' + PlambdaiP[p][1] .* PlambdaiP[p2][1]')
             end
         end # p
     end # j
     # end
-    # @show fdg ./ cone.g
-    # @show fdh ./ Symmetric(cone.H, :U)
-    # @show fdh - Symmetric(cone.H, :U)
-    # @show fdh
-    # if !isapprox(fdh * cone.point, -fdg)
-    #     @show fdh * cone.point, -fdg
-    #     # error()
-    # end
+
     if !isapprox(Symmetric(cone.H, :U) * cone.point, -cone.g)
         @show Symmetric(cone.H, :U) * cone.point, -cone.g
         @show cone.point
         error()
     end
-    # @show Symmetric(cone.H, :U)
-    # @show Symmetric(cone.H, :U)
 
     return factorize_hess(cone)
 end
