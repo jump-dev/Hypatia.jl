@@ -55,11 +55,10 @@ function test_dependencies(cone::CO.WSOSPolyInterpSOC)
     R = cone.R
     L = size(cone.ipwt[1], 2)
     ipwtj = cone.ipwt[1]
-    # first lambda not kept in `incone_check`
     lambda1 = ipwtj' * Diagonal(cone.point[1:cone.U]) * ipwtj
     arrow_mat = kron(Matrix{Float64}(I, R, R), lambda1)
     for r in 2:R
-        arrow_mat[((r - 1) * L + 1):(r * L), 1:L] = cone.lambda[1][r]
+        arrow_mat[((r - 1) * L + 1):(r * L), 1:L] = lambda1 * cone.li_lambda[1][r - 1]
     end
     arrow_mat_inv = inv(Symmetric(arrow_mat, :L))
     for r in 1:R, r2 in 1:r

@@ -26,7 +26,7 @@ mutable struct WSOSPolyInterpSOC <: Cone
     tmp2::Vector{Matrix{Float64}}
     tmp3::Matrix{Float64}
     tmp4::Vector{Matrix{Float64}}
-    lambda::Vector{Vector{Matrix{Float64}}}
+    # lambda::Vector{Vector{Matrix{Float64}}}
     li_lambda::Vector{Vector{Matrix{Float64}}}
     PlambdaiP::Vector{Vector{Vector{Matrix{Float64}}}}
     lambdafact::Vector{CholeskyPivoted{Float64, Matrix{Float64}}}
@@ -56,10 +56,10 @@ mutable struct WSOSPolyInterpSOC <: Cone
         cone.tmp2 = [similar(ipwt[1], size(ipwtj, 2), U) for ipwtj in ipwt]
         cone.tmp3 = similar(ipwt[1], U, U)
         cone.tmp4 = [similar(ipwt[1], size(ipwtj, 2), size(ipwtj, 2)) for ipwtj in ipwt]
-        cone.lambda = [Vector{Matrix{Float64}}(undef, R) for ipwtj in ipwt]
-        for j in eachindex(ipwt), r in 1:R
-            cone.lambda[j][r] = similar(ipwt[1], size(ipwt[j], 2), size(ipwt[j], 2))
-        end
+        # cone.lambda = [Vector{Matrix{Float64}}(undef, R) for ipwtj in ipwt]
+        # for j in eachindex(ipwt), r in 1:R
+        #     cone.lambda[j][r] = similar(ipwt[1], size(ipwt[j], 2), size(ipwt[j], 2))
+        # end
         cone.li_lambda = [Vector{Matrix{Float64}}(undef, R - 1) for ipwtj in ipwt]
         for j in eachindex(ipwt), r in 1:(R - 1)
             cone.li_lambda[j][r] = similar(ipwt[1], size(ipwt[j], 2), size(ipwt[j], 2))
@@ -115,7 +115,7 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
     for j in eachindex(cone.ipwt)
         ipwtj = cone.ipwt[j]
         tmp1 = cone.tmp1[j]
-        lambda = cone.lambda[j]
+        # lambda = cone.lambda[j]
         li_lambda = cone.li_lambda[j]
         PlambdaiP = cone.PlambdaiP[j]
         tmp1 = cone.tmp1[j]
@@ -129,10 +129,9 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
         # first lambda
         point_pq = cone.point[1:cone.U]
         @. tmp1 = ipwtj' * point_pq'
-        mul!(lambda[1], tmp1, ipwtj)
-        # interestingly lambda[1] is the only lambda not used later
-        mat .= lambda[1]
-        lambdafact[j] = cholesky!(Symmetric(lambda[1], :L), Val(true), check = false)
+        mul!(tmp4, tmp1, ipwtj)
+        mat .= tmp4
+        lambdafact[j] = cholesky!(Symmetric(tmp4, :L), Val(true), check = false)
 
         if !isposdef(lambdafact[j])
             return false
@@ -141,14 +140,14 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
         # minus others
         uo = cone.U + 1
         for r in 2:cone.R
-            # store lambda
             point_pq = cone.point[uo:(uo + cone.U - 1)] # TODO prealloc
             @. tmp1 = ipwtj' * point_pq'
-            mul!(lambda[r], tmp1, ipwtj)
+            tmp4 = tmp1 * ipwtj
+            # mul!(tmp4, tmp1, ipwtj)
 
-            # avoiding lambdafact.L \ lambda[r] because lambdafact \ lambda[r] is useful later
-            li_lambda[r - 1] .= lambdafact[j] \ lambda[r]
-            mat .-= lambda[r] * li_lambda[r - 1]
+            # avoiding lambdafact.L \ lambda because lambdafact \ lambda is useful later
+            li_lambda[r - 1] .= lambdafact[j] \ tmp4
+            mat -= tmp4 * li_lambda[r - 1]
 
             uo += cone.U
         end
