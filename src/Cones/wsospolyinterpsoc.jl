@@ -26,7 +26,6 @@ mutable struct WSOSPolyInterpSOC <: Cone
     tmp2::Vector{Matrix{Float64}}
     tmp3::Matrix{Float64}
     tmp4::Vector{Matrix{Float64}}
-    # lambda::Vector{Vector{Matrix{Float64}}}
     li_lambda::Vector{Vector{Matrix{Float64}}}
     PlambdaiP::Vector{Vector{Vector{Matrix{Float64}}}}
     lambdafact::Vector{CholeskyPivoted{Float64, Matrix{Float64}}}
@@ -55,10 +54,6 @@ mutable struct WSOSPolyInterpSOC <: Cone
         cone.tmp2 = [similar(ipwt[1], size(ipwtj, 2), U) for ipwtj in ipwt]
         cone.tmp3 = similar(ipwt[1], U, U)
         cone.tmp4 = [similar(ipwt[1], size(ipwtj, 2), size(ipwtj, 2)) for ipwtj in ipwt]
-        # cone.lambda = [Vector{Matrix{Float64}}(undef, R) for ipwtj in ipwt]
-        # for j in eachindex(ipwt), r in 1:R
-        #     cone.lambda[j][r] = similar(ipwt[1], size(ipwt[j], 2), size(ipwt[j], 2))
-        # end
         cone.li_lambda = [Vector{Matrix{Float64}}(undef, R - 1) for ipwtj in ipwt]
         for j in eachindex(ipwt), r in 1:(R - 1)
             cone.li_lambda[j][r] = similar(ipwt[1], size(ipwt[j], 2), size(ipwt[j], 2))
@@ -160,7 +155,11 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
                 # mul!(tmp5, li_lambda[r - 1], tmp2)
                 # mul!(PlambdaiP[r][r2], ipwtj, tmp5)
             end
-            PlambdaiP[r][r] .= Symmetric(ipwtj * li_lambda[r - 1] * (matfact[j] \ (li_lambda[r - 1]' * ipwtj')), :U) # TODO special treatment
+            # PlambdaiP[r][r] .= Symmetric(ipwtj * li_lambda[r - 1] * (matfact[j] \ (li_lambda[r - 1]' * ipwtj')), :U)
+            mul!(tmp2, li_lambda[r - 1]', ipwtj')
+            tmp2 .= view(tmp2, matfact[j].p, :)
+            ldiv!(matfact[j].L, tmp2)
+            BLAS.syrk!('U', 'T', 1.0, tmp2, 0.0, PlambdaiP[r][r])
             PlambdaiP[r][r] .+= Symmetric(ipwtj * tmp1, :U)
         end
 
@@ -209,27 +208,14 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
                 cone.H[idxs, idxs2] .+= 2 * (PlambdaiP[1][1] .* PlambdaiP[r2][r]' + PlambdaiP[r][1] .* PlambdaiP[r2][1]')
             end
         end
-
-        # # blocks (p, p2)
-        # for p in 2:cone.R
-        #     idxs = ((p - 1) * cone.U + 1):(p * cone.U)
-        #     for i in 1:cone.U
-        #         cone.g[idxs[i]] -= 2 * PlambdaiP[p][1][i, i]
-        #     end
-        #
-        #     for p2 in p:cone.R
-        #         idxs2 = ((p2 - 1) * cone.U + 1):(p2 * cone.U)
-        #         cone.H[idxs, idxs2] .+= 2 * (PlambdaiP[1][1] .* PlambdaiP[p2][p]' + PlambdaiP[p][1] .* PlambdaiP[p2][1]')
-        #     end
-        # end # p
     end # j
     # end
 
-    if !isapprox(Symmetric(cone.H, :U) * cone.point, -cone.g)
-        @show Symmetric(cone.H, :U) * cone.point, -cone.g
-        @show cone.point
-        error()
-    end
+    # if !isapprox(Symmetric(cone.H, :U) * cone.point, -cone.g)
+    #     @show Symmetric(cone.H, :U) * cone.point, -cone.g
+    #     @show cone.point
+    #     error()
+    # end
 
     return factorize_hess(cone)
 end
