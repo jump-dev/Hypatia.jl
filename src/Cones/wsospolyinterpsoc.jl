@@ -21,7 +21,7 @@ mutable struct WSOSPolyInterpSOC <: Cone
     Hi::Matrix{Float64}
     F
     mat::Vector{Matrix{Float64}}
-    # matfact # CholeskyPivoted{Float64, Matrix{Float64}}
+    matfact::Vector{CholeskyPivoted{Float64, Matrix{Float64}}}
     tmp1::Vector{Matrix{Float64}}
     tmp2::Vector{Matrix{Float64}}
     tmp3::Matrix{Float64}
@@ -50,7 +50,7 @@ mutable struct WSOSPolyInterpSOC <: Cone
         cone.H2 = similar(cone.H)
         cone.Hi = similar(cone.H)
         cone.mat = [similar(ipwt[1], size(ipwtj, 2), size(ipwtj, 2)) for ipwtj in ipwt]
-        # cone.matfact = TODO
+        cone.matfact = Vector{CholeskyPivoted{Float64, Matrix{Float64}}}(undef, length(ipwt))
         cone.tmp1 = [similar(ipwt[1], size(ipwtj, 2), U) for ipwtj in ipwt]
         cone.tmp2 = [similar(ipwt[1], size(ipwtj, 2), U) for ipwtj in ipwt]
         cone.tmp3 = similar(ipwt[1], U, U)
@@ -90,12 +90,12 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
     for j in eachindex(cone.ipwt)
         ipwtj = cone.ipwt[j]
         li_lambda = cone.li_lambda[j]
-        PlambdaiP = cone.PlambdaiP[j]
         tmp1 = cone.tmp1[j]
         tmp2 = cone.tmp2[j]
         tmp4 = cone.tmp4[j]
         mat = cone.mat[j]
         lambdafact = cone.lambdafact
+        matfact = cone.matfact
         L = size(ipwtj, 2)
 
         # first lambda
@@ -123,34 +123,13 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
             uo += cone.U
         end
 
-        matfact = cholesky!(Symmetric(mat, :U), Val(true), check = false)
-        if !isposdef(matfact)
+        matfact[j] = cholesky!(Symmetric(mat, :U), Val(true), check = false)
+        if !isposdef(matfact[j])
             return false
-        end
-
-        # prep PlambdaiP
-
-        # block-(1,1) is P*inv(mat)*P'
-        tmp1 .= view(ipwtj', matfact.p, :)
-        ldiv!(matfact.L, tmp1)
-        # only on-diagonal PlambdaiP are symmetric, messy to make special cases for these
-        PlambdaiP[1][1] = tmp1' * tmp1
-
-        # cache lambda0 \ ipwtj' in tmp1
-        tmp1 .= lambdafact[j] \ ipwtj'
-        for r in 2:cone.R
-            PlambdaiP[r][1] = -ipwtj * li_lambda[r - 1] * (matfact \ ipwtj')
-            for r2 in 2:r
-                PlambdaiP[r][r2] .= ipwtj * li_lambda[r - 1] * (matfact \ (li_lambda[r2 - 1]' * ipwtj'))
-                # mul!(tmp2, li_lambda[r2 - 1]', ipwtj')
-                # ldiv!(matfact, tmp2)
-                # mul!(tmp5, li_lambda[r - 1], tmp2)
-                # mul!(PlambdaiP[r][r2], ipwtj, tmp5)
-            end
-            PlambdaiP[r][r] .+= ipwtj * tmp1
         end
     end
     # end
+
 
     # @timeit "grad hess" begin
     cone.g .= 0.0
@@ -161,7 +140,30 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
         tmp2 = cone.tmp2[j]
         tmp3 = cone.tmp3
         PlambdaiP = cone.PlambdaiP[j]
-        L = size(ipwtj, 2)
+        li_lambda = cone.li_lambda[j]
+        lambdafact = cone.lambdafact
+        matfact = cone.matfact
+
+        # prep PlambdaiP
+        # block-(1,1) is P*inv(mat)*P'
+        tmp1 .= view(ipwtj', matfact[j].p, :)
+        ldiv!(matfact[j].L, tmp1)
+        # only on-diagonal PlambdaiP are symmetric, messy to make special cases for these
+        PlambdaiP[1][1] = tmp1' * tmp1
+
+        # cache lambda0 \ ipwtj' in tmp1
+        tmp1 .= lambdafact[j] \ ipwtj'
+        for r in 2:cone.R
+            PlambdaiP[r][1] = -ipwtj * li_lambda[r - 1] * (matfact[j] \ ipwtj')
+            for r2 in 2:r
+                PlambdaiP[r][r2] .= ipwtj * li_lambda[r - 1] * (matfact[j] \ (li_lambda[r2 - 1]' * ipwtj'))
+                # mul!(tmp2, li_lambda[r2 - 1]', ipwtj')
+                # ldiv!(matfact[j], tmp2)
+                # mul!(tmp5, li_lambda[r - 1], tmp2)
+                # mul!(PlambdaiP[r][r2], ipwtj, tmp5)
+            end
+            PlambdaiP[r][r] .+= ipwtj * tmp1
+        end
 
         # part of gradient/hessian when p=1
         tmp2 .= view(ipwtj', cone.lambdafact[j].p, :)
