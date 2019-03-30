@@ -130,7 +130,6 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
     end
     # end
 
-
     # @timeit "grad hess" begin
     cone.g .= 0.0
     cone.H .= 0.0
@@ -148,21 +147,21 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
         # block-(1,1) is P*inv(mat)*P'
         tmp1 .= view(ipwtj', matfact[j].p, :)
         ldiv!(matfact[j].L, tmp1)
-        # only on-diagonal PlambdaiP are symmetric, messy to make special cases for these
-        PlambdaiP[1][1] = tmp1' * tmp1
+        PlambdaiP[1][1] = Symmetric(tmp1' * tmp1)
 
         # cache lambda0 \ ipwtj' in tmp1
         tmp1 .= lambdafact[j] \ ipwtj'
         for r in 2:cone.R
             PlambdaiP[r][1] = -ipwtj * li_lambda[r - 1] * (matfact[j] \ ipwtj')
-            for r2 in 2:r
+            for r2 in 2:(r - 1)
                 PlambdaiP[r][r2] .= ipwtj * li_lambda[r - 1] * (matfact[j] \ (li_lambda[r2 - 1]' * ipwtj'))
                 # mul!(tmp2, li_lambda[r2 - 1]', ipwtj')
                 # ldiv!(matfact[j], tmp2)
                 # mul!(tmp5, li_lambda[r - 1], tmp2)
                 # mul!(PlambdaiP[r][r2], ipwtj, tmp5)
             end
-            PlambdaiP[r][r] .+= ipwtj * tmp1
+            PlambdaiP[r][r] .= Symmetric(ipwtj * li_lambda[r - 1] * (matfact[j] \ (li_lambda[r - 1]' * ipwtj')), :U) # TODO special treatment
+            PlambdaiP[r][r] .+= Symmetric(ipwtj * tmp1, :U)
         end
 
         # part of gradient/hessian when p=1
@@ -180,34 +179,49 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
             end
         end
 
-        for r in 1:cone.R
+        cone.H[1:cone.U, 1:cone.U] .+= Symmetric(PlambdaiP[1][1], :U).^2
+        for r in 2:cone.R
+            idxs2 = ((r - 1) * cone.U + 1):(r * cone.U)
             for s in 1:(r - 1)
-                cone.H[1:cone.U, 1:cone.U] .+= PlambdaiP[r][s].^2 + (PlambdaiP[r][s]').^2
+                # block (1,1)
+                tmp3 .= PlambdaiP[r][s].^2
+                cone.H[1:cone.U, 1:cone.U] .+= Symmetric(tmp3 + tmp3', :U)
+                # blocks (1,r)
+                cone.H[1:cone.U, idxs2] += 2 * PlambdaiP[s][1] .* PlambdaiP[r][s]'
             end
+            # block (1,1)
             cone.H[1:cone.U, 1:cone.U] .+= PlambdaiP[r][r].^2
-        end
-
-        for p2 in 2:cone.R
-            idxs2 = ((p2 - 1) * cone.U + 1):(p2 * cone.U)
-            for r in 1:p2
-                cone.H[1:cone.U, idxs2] += 2 * PlambdaiP[r][1] .* PlambdaiP[p2][r]'
+            # blocks (1,r)
+            cone.H[1:cone.U, idxs2] += 2 * PlambdaiP[r][1] .* Symmetric(PlambdaiP[r][r], :U)
+            # blocks (1,r)
+            for s in (r + 1):cone.R
+                cone.H[1:cone.U, idxs2] += 2 * PlambdaiP[s][1] .* PlambdaiP[s][r]
             end
-            for r in (p2 + 1):cone.R
-                cone.H[1:cone.U, idxs2] += 2 * PlambdaiP[r][1] .* PlambdaiP[r][p2]
-            end
-        end
 
-        for p in 2:cone.R
-            idxs = ((p - 1) * cone.U + 1):(p * cone.U)
+            # blocks (r, r2)
+            idxs = ((r - 1) * cone.U + 1):(r * cone.U)
             for i in 1:cone.U
-                cone.g[idxs[i]] -= 2 * PlambdaiP[p][1][i, i]
+                cone.g[idxs[i]] -= 2 * PlambdaiP[r][1][i, i]
             end
+            cone.H[idxs, idxs2] .+= 2 * Symmetric(Symmetric(PlambdaiP[1][1], :U) .* Symmetric(PlambdaiP[r][r], :U) + PlambdaiP[r][1] .* PlambdaiP[r][1]', :U)
+            for r2 in (r + 1):cone.R
+                idxs2 = ((r2 - 1) * cone.U + 1):(r2 * cone.U)
+                cone.H[idxs, idxs2] .+= 2 * (PlambdaiP[1][1] .* PlambdaiP[r2][r]' + PlambdaiP[r][1] .* PlambdaiP[r2][1]')
+            end
+        end
 
-            for p2 in p:cone.R
-                idxs2 = ((p2 - 1) * cone.U + 1):(p2 * cone.U)
-                cone.H[idxs, idxs2] .+= 2 * (PlambdaiP[1][1] .* PlambdaiP[p2][p]' + PlambdaiP[p][1] .* PlambdaiP[p2][1]')
-            end
-        end # p
+        # # blocks (p, p2)
+        # for p in 2:cone.R
+        #     idxs = ((p - 1) * cone.U + 1):(p * cone.U)
+        #     for i in 1:cone.U
+        #         cone.g[idxs[i]] -= 2 * PlambdaiP[p][1][i, i]
+        #     end
+        #
+        #     for p2 in p:cone.R
+        #         idxs2 = ((p2 - 1) * cone.U + 1):(p2 * cone.U)
+        #         cone.H[idxs, idxs2] .+= 2 * (PlambdaiP[1][1] .* PlambdaiP[p2][p]' + PlambdaiP[p][1] .* PlambdaiP[p2][1]')
+        #     end
+        # end # p
     end # j
     # end
 
