@@ -2,19 +2,18 @@
 Copyright 2018, Chris Coey and contributors
 Copyright 2018, David Papp, Sercan Yildiz
 
-interpolation-based weighted-sum-of-squares (multivariate) polynomial cone parametrized by interpolation points ipwt
+interpolation-based weighted-sum-of-squares (multivariate) polynomial cone parametrized by
+- interpolation points
+- domain polynomials g_i (evaluated at interpolation points)
+- basis polynomials P_i (evaluated at interpolation points)
 
 definition and dual barrier from "Sum-of-squares optimization without semidefinite programming" by D. Papp and S. Yildiz, available at https://arxiv.org/abs/1712.01792
-
-TODO can perform loop for calculating g and H in parallel
-TODO scale the interior direction
 =#
 
 mutable struct WSOSPolyInterp_2 <: Cone
     use_dual::Bool
     dim::Int
-    P::Matrix{Float64}
-    Ls::Vector{Int}
+    Ps::Vector{Matrix{Float64}}
     gs::Vector{Vector{Float64}}
 
     point::AbstractVector{Float64}
@@ -22,57 +21,42 @@ mutable struct WSOSPolyInterp_2 <: Cone
     H::Matrix{Float64}
     H2::Matrix{Float64}
     Hi::Matrix{Float64}
-    F # TODO prealloc
-    # tmp1::Vector{Matrix{Float64}}
-    # tmp2::Vector{Matrix{Float64}}
-    # tmp3::Matrix{Float64}
+    F
 
-    function WSOSPolyInterp_2(dim::Int, P::Matrix{Float64}, Ls::Vector{Int}, gs::Vector{Vector{Float64}}, is_dual::Bool)
-        @assert length(Ls) == length(gs)
-        @assert size(P, 1) == length(gs[1])
-        @assert size(P, 2) == Ls[1]
-
+    function WSOSPolyInterp_2(dim::Int, Ps::Vector{Matrix{Float64}}, gs::Vector{Vector{Float64}}, is_dual::Bool)
+        for i in eachindex(Ps)
+            @assert size(Ps[i], 1) == length(gs[i]) == dim
+        end
         cone = new()
         cone.use_dual = !is_dual # using dual barrier
         cone.dim = dim
-        cone.P = P
-        cone.Ls = Ls
+        cone.Ps = Ps
         cone.gs = gs
-
-        cone.g = similar(P, dim)
-        cone.H = similar(P, dim, dim)
+        cone.g = similar(Ps[1], dim)
+        cone.H = similar(Ps[1], dim, dim)
         cone.H2 = similar(cone.H)
         cone.Hi = similar(cone.H)
-        # cone.tmp1 = [similar(P[1], L, L) for L in Ls]
-        # cone.tmp2 = [similar(P[1], L, dim) for L in Ls]
-        # cone.tmp3 = similar(P[1], dim, dim)
         return cone
     end
 end
 
-WSOSPolyInterp_2(dim::Int, P::Matrix{Float64}, Ls::Vector{Int}, gs::Vector{Vector{Float64}}) = WSOSPolyInterp_2(dim, P, Ls, gs, false)
+WSOSPolyInterp_2(dim::Int, Ps::Vector{Matrix{Float64}}, gs::Vector{Vector{Float64}}) = WSOSPolyInterp_2(dim, Ps, gs, false)
 
-get_nu(cone::WSOSPolyInterp_2) = sum(cone.Ls)
+get_nu(cone::WSOSPolyInterp_2) = sum(size(cone.Ps[i], 2) for i in eachindex(cone.Ps))
 
 set_initial_point(arr::AbstractVector{Float64}, cone::WSOSPolyInterp_2) = (@. arr = 1.0; arr)
 
 function check_in_cone(cone::WSOSPolyInterp_2)
     U = cone.dim
-    P = cone.P
-    Ls = cone.Ls
+    Ps = cone.Ps
     gs = cone.gs
     x = cone.point
 
     @. cone.g = 0.0
     @. cone.H = 0.0
-    # tmp3 = cone.tmp3
 
-    for i in eachindex(Ls)
-        # ipwtj = cone.ipwt[j]
-        # tmp1j = cone.tmp1[j]
-        # tmp2j = cone.tmp2[j]
-        Li = Ls[i]
-        Pi = view(P, :, 1:Li)
+    for i in eachindex(Ps)
+        Pi = Ps[i]
         gi = gs[i]
         Λi = Symmetric(Pi' * Diagonal(gi .* x) * Pi)
 
@@ -81,14 +65,12 @@ function check_in_cone(cone::WSOSPolyInterp_2)
             return false
         end
 
-        # PΛiPi = Symmetric(Pi * inv(F) * Pi') # TODO maybe better to take inv, because only LxL vs UxL
-        # half
-        Pitp = Matrix((Pi')[F.p, :])
-        PΛiPi_half = LowerTriangular(F.L) \ Pitp
-        PΛiPi = Symmetric(PΛiPi_half' * PΛiPi_half)
+        # PΛinvPt = Symmetric(Pi * inv(F) * Pi')
+        PΛinvPt_half = LowerTriangular(F.L) \ Matrix((Pi')[F.p, :])
+        PΛinvPt = Symmetric(PΛinvPt_half' * PΛinvPt_half)
 
-        cone.g -= gi .* diag(PΛiPi)
-        cone.H += Symmetric(gi * gi') .* abs2.(PΛiPi)
+        cone.g -= gi .* diag(PΛinvPt)
+        cone.H += Symmetric(gi * gi') .* abs2.(PΛinvPt) # TODO simplify math here?
     end
 
     return factorize_hess(cone)
