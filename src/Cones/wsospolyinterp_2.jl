@@ -55,22 +55,30 @@ function check_in_cone(cone::WSOSPolyInterp_2)
     @. cone.g = 0.0
     @. cone.H = 0.0
 
+    ΛFs = Vector{CholeskyPivoted{Float64, Matrix{Float64}}}(undef, length(Ps))
+
     for i in eachindex(Ps)
         Pi = Ps[i]
         gi = gs[i]
         Λi = Symmetric(Pi' * Diagonal(gi .* x) * Pi)
 
-        F = cholesky!(Λi, Val(true), check = false)
-        if !isposdef(F)
+        ΛFs[i] = cholesky!(Λi, Val(true), check = false)
+        if !isposdef(ΛFs[i])
             return false
         end
+    end
 
-        # PΛinvPt = Symmetric(Pi * inv(F) * Pi')
-        PΛinvPt_half = LowerTriangular(F.L) \ Matrix((Pi')[F.p, :])
-        PΛinvPt = Symmetric(PΛinvPt_half' * PΛinvPt_half)
+    for i in eachindex(Ps)
+        Pi = Ps[i]
+        gi = gs[i]
+        ΛFi = ΛFs[i]
 
-        cone.g -= gi .* diag(PΛinvPt)
-        cone.H += Symmetric(gi * gi') .* abs2.(PΛinvPt) # TODO simplify math here?
+        # PΛinvPt = Symmetric(Pi * inv(ΛFs[i]) * Pi')
+        PΛinvPthi = LowerTriangular(ΛFi.L) \ Matrix((Pi')[ΛFi.p, :])
+        PΛinvPti = Symmetric(PΛinvPthi' * PΛinvPthi)
+
+        cone.g -= gi .* diag(PΛinvPti)
+        cone.H += Symmetric(gi * gi') .* abs2.(PΛinvPti) # TODO simplify math here?
     end
 
     return factorize_hess(cone)
