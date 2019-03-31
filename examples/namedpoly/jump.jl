@@ -186,39 +186,42 @@ function build_JuMP_namedpoly_WSOS(
     rseed::Int = 1,
     )
     Random.seed!(rseed)
+    n = DynamicPolynomials.nvariables(f)
+    (U, pts, P0, _, _) = MU.interpolate(dom, d, sample = sample, sample_factor = 100)
 
-    # (U, pts, P0, PWts, _) = MU.interpolate(dom, d, sample = sample, sample_factor = 100)
-    (U, pts, P0, _, _) = MU.wsos_box_params(n, d, false)
+    g_polys = SemialgebraicSets.inequalities(MU.get_domain_inequalities(dom, x))
+    # P_polys =
 
-    # build JuMP model
-    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, tol_feas = 1e-8, tol_rel_opt = 1e-7, tol_abs_opt = 1e-8))
+    # Ps =
+    Ps = Matrix{Float64}[P0]
+    gs = Vector{Float64}[ones(U)]
+    for i in eachindex(g_polys)
+        # P_polys_i = P_polys[i]
+        # Pi = [P_poly_ij(pts[u, :]) for u in 1:U, P_poly_ij in P_polys[i])
+        # push!(Ps, Pi)
+        di = d - div(DynamicPolynomials.maxdegree(g_polys[i]), 2) # degree of gi is ...
+        Li = binomial(n + di, n)
+        push!(Ps, P0[:, 1:Li])
+
+        gi = [g_polys[i](x => pts[u, :]) for u in 1:U]
+        push!(gs, gi)
+    end
+    cone = HYP.WSOSPolyInterpCone_2(U, Ps, gs, !primal_wsos)
 
     # cone = HYP.WSOSPolyInterpCone(U, [P0, PWts...], !primal_wsos)
 
-    Ls = Int[size(P0, 2)]
-    @assert Ls[1] == binomial(n + d, n)
-    gs = Vector{Float64}[ones(U)]
-    g_polys = SemialgebraicSets.inequalities(MU.get_domain_inequalities(dom, x))
-    for i in eachindex(g_polys)
-        # Li = size(PWts[i], 2) # TODO may be wrong
-        di = d - div(DynamicPolynomials.degree(g_polys[i]), 2) # degree of gi is ...
-        Li = binomial(n + di, n)
-        gi = [g_polys[i](x => pts[u, :]) for u in 1:U]
-        push!(Ls, Li)
-        push!(gs, gi)
-    end
-    cone = HYP.WSOSPolyInterpCone_2(U, P0, Ls, gs, !primal_wsos)
-    @show Ls
+    # build JuMP model
+    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, tol_feas = 1e-8, tol_rel_opt = 1e-7, tol_abs_opt = 1e-8))
 
     if primal_wsos
         JuMP.@variable(model, a)
         JuMP.@objective(model, Max, a)
         JuMP.@constraint(model, [f(pts[j, :]) - a for j in 1:U] in cone)
     else
-        JuMP.@variable(model, x[1:U])
-        JuMP.@objective(model, Min, sum(x[j] * f(pts[j, :]...) for j in 1:U))
-        JuMP.@constraint(model, sum(x) == 1.0)
-        JuMP.@constraint(model, x in cone)
+        JuMP.@variable(model, μ[1:U])
+        JuMP.@objective(model, Min, sum(μ[j] * f(pts[j, :]) for j in 1:U))
+        JuMP.@constraint(model, sum(μ) == 1.0)
+        JuMP.@constraint(model, μ in cone)
     end
 
     return model

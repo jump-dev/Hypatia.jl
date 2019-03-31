@@ -125,43 +125,43 @@ include(joinpath(@__DIR__, "JuMP.jl"))
 # @testset "default examples: $t" for t in testfuns
 #     t()
 # end
-
-@info("starting additional native examples tests")
-verbose = true
-system_solvers = [
-    # SO.NaiveCombinedHSDSystemSolver,
-    SO.QRCholCombinedHSDSystemSolver,
-    ]
-linear_models = [
-    # MO.RawLinearModel,
-    MO.PreprocessedLinearModel,
-    ]
-testfuns = [
-    # TODO test primal and dual formulations of envelope
-    # envelope1,
-    # envelope2,
-    # envelope3,
-    # envelope4,
-    # linearopt1,
-    # linearopt2,
-    namedpoly1,
-    namedpoly2,
-    namedpoly3,
-    namedpoly4,
-    namedpoly5,
-    namedpoly6,
-    namedpoly7,
-    namedpoly8,
-    namedpoly9,
-    namedpoly10,
-    namedpoly11,
-    ]
-@testset "native examples: $t, $s, $m" for t in testfuns, s in system_solvers, m in linear_models
-    if s == SO.QRCholCombinedHSDSystemSolver && m == MO.RawLinearModel
-        continue # QRChol linear system solver needs preprocessed model
-    end
-    t(verbose, s, m)
-end
+#
+# @info("starting additional native examples tests")
+# verbose = true
+# system_solvers = [
+#     # SO.NaiveCombinedHSDSystemSolver,
+#     SO.QRCholCombinedHSDSystemSolver,
+#     ]
+# linear_models = [
+#     # MO.RawLinearModel,
+#     MO.PreprocessedLinearModel,
+#     ]
+# testfuns = [
+#     # TODO test primal and dual formulations of envelope
+#     # envelope1,
+#     # envelope2,
+#     # envelope3,
+#     # envelope4,
+#     # linearopt1,
+#     # linearopt2,
+#     namedpoly1,
+#     namedpoly2,
+#     namedpoly3,
+#     namedpoly4,
+#     namedpoly5,
+#     namedpoly6,
+#     namedpoly7,
+#     namedpoly8,
+#     namedpoly9,
+#     namedpoly10,
+#     namedpoly11,
+#     ]
+# @testset "native examples: $t, $s, $m" for t in testfuns, s in system_solvers, m in linear_models
+#     if s == SO.QRCholCombinedHSDSystemSolver && m == MO.RawLinearModel
+#         continue # QRChol linear system solver needs preprocessed model
+#     end
+#     t(verbose, s, m)
+# end
 
 # @info("starting MathOptInterface tests")
 # verbose = false
