@@ -24,7 +24,7 @@ struct WSOSPolyInterpMatCone <: MOI.AbstractVectorSet
 end
 WSOSPolyInterpMatCone(R::Int, U::Int, ipwt::Vector{Matrix{Float64}}) = WSOSPolyInterpMatCone(R, U, ipwt, false)
 
-export WSOSPolyInterpSOCCone # TODO rename, terrible name
+export WSOSPolyInterpSOCCone
 
 struct WSOSPolyInterpSOCCone <: MOI.AbstractVectorSet
     R::Int
@@ -33,6 +33,17 @@ struct WSOSPolyInterpSOCCone <: MOI.AbstractVectorSet
     is_dual::Bool
 end
 WSOSPolyInterpSOCCone(R::Int, U::Int, ipwt::Vector{Matrix{Float64}}) = WSOSPolyInterpSOCCone(R, U, ipwt, false)
+
+export WSOSPolyInterpRSOCCone
+
+struct WSOSPolyInterpRSOCCone <: MOI.AbstractVectorSet
+    R::Int
+    U::Int
+    rotated::Bool
+    ipwt::Vector{Matrix{Float64}}
+    is_dual::Bool
+end
+WSOSPolyInterpRSOCCone(R::Int, U::Int, rotated::Bool, ipwt::Vector{Matrix{Float64}}) = WSOSPolyInterpRSOCCone(R, U, rotated, ipwt, false)
 
 MOIOtherCones = (
     MOI.SecondOrderCone,
@@ -45,6 +56,7 @@ MOIOtherCones = (
     WSOSPolyInterpCone,
     WSOSPolyInterpMatCone,
     WSOSPolyInterpSOCCone,
+    WSOSPolyInterpRSOCCone,
 )
 
 # MOI cones for which no transformation is needed
@@ -56,6 +68,7 @@ cone_from_moi(s::MOI.PowerCone{Float64}) = Cones.EpiPerPower(inv(s.exponent))
 cone_from_moi(s::WSOSPolyInterpCone) = Cones.WSOSPolyInterp(s.dimension, s.ipwt, s.is_dual)
 cone_from_moi(s::WSOSPolyInterpMatCone) = Cones.WSOSPolyInterpMat(s.R, s.U, s.ipwt, s.is_dual)
 cone_from_moi(s::WSOSPolyInterpSOCCone) = Cones.WSOSPolyInterpSOC(s.R, s.U, s.ipwt, s.is_dual)
+cone_from_moi(s::WSOSPolyInterpRSOCCone) = Cones.WSOSPolyInterpRSOC(s.R, s.U, s.rotated, s.ipwt, s.is_dual)
 cone_from_moi(s::MOI.AbstractVectorSet) = error("MOI set $s is not recognized")
 
 function build_var_cone(fi::MOI.VectorOfVariables, si::MOI.AbstractVectorSet, dim::Int, q::Int)
