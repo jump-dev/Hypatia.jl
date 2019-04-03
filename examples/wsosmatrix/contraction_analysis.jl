@@ -32,18 +32,7 @@ function build_dynamics(x)
     return [dx1dt; dx2dt]
 end
 
-function build_matrices(polys, dynamics, beta, x)
-    @assert length(polys) == 3
-    n = length(x)
-    dfdx = DP.differentiate(dynamics, x)'
-    M = [polys[1] polys[2]; polys[2] polys[3]]
-    dMdt = [JuMP.dot(DP.differentiate(M[i, j], x), dynamics) for i in 1:n, j in 1:n]
-    Mdfdx = [sum(M[i, k] * dfdx[k, j] for k in 1:n) for i in 1:n, j in 1:n]
-    R = Mdfdx + Mdfdx' + dMdt + beta * M
-    return (M, R)
-end
-
-function jet_engine_WSOS(beta::Float64, deg_M::Int; delta::Float64 = 1e-3)
+function jet_engine_common(beta::Float64, deg_M::Int, delta::Float64 = 1e-3)
     n = 2
     dom = MU.FreeDomain(n)
 
@@ -56,45 +45,54 @@ function jet_engine_WSOS(beta::Float64, deg_M::Int; delta::Float64 = 1e-3)
     x = DP.variables(lagrange_polys[1])
     dynamics = build_dynamics(x)
 
-    # for the matrix R
-    deg_R = deg_M + maximum(DP.maxdegree.(dfdx))
+    model = SumOfSquares.SOSModel(JuMP.with_optimizer(Hypatia.Optimizer, verbose = true, tol_feas = 1e-4, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6))
+    JuMP.@variable(model, polys[1:3], PJ.Poly(polyjump_basis))
+
+    @assert length(polys) == 3
+    n = length(x)
+    dfdx = DP.differentiate(dynamics, x)'
+    M = [polys[1] polys[2]; polys[2] polys[3]]
+    dMdt = [JuMP.dot(DP.differentiate(M[i, j], x), dynamics) for i in 1:n, j in 1:n]
+    Mdfdx = [sum(M[i, k] * dfdx[k, j] for k in 1:n) for i in 1:n, j in 1:n]
+    R = Mdfdx + Mdfdx' + dMdt + beta * M
+
+    deg_R = maximum(DP.maxdegree.(R))
     d_R = div(deg_R + 1, 2)
     (U_R, pts_R, P0_R, _, _) = MU.interpolate(dom, deg_R, sample = false)
 
-    model = JuMP.Model(JuMP.with_optimizer(Hypatia.Optimizer, verbose = true, tol_feas = 1e-4, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6))
-    JuMP.@variable(model, polys[1:3], PJ.Poly(polyjump_basis))
-    (M, R) = build_matrices(polys, dynamics, beta, x)
-    JuMP.@constraint(model, [M[i, j](pts_M[u, :]) * (i == j ? 1.0 : rt2) - (i == j ? delta : 0.0) for i in 1:n for j in 1:i for u in 1:U_M] in HYP.WSOSPolyInterpMatCone(n, U_M, [P0_M]))
-    JuMP.@constraint(model, [-R[i, j](pts_R[u, :]) * (i == j ? 1.0 : rt2) - (i == j ? delta : 0.0) for i in 1:n for j in 1:i for u in 1:U_R] in HYP.WSOSPolyInterpMatCone(n, U_R, [P0_R]))
-    JuMP.optimize!(model)
-
-    return model
-
+    return (model, M, R, pts_M, pts_R, U_M, U_R, P0_M, P0_R)
 end
 
-function jet_engine_SDP(beta::Float64, deg_M::Int; delta::Float64 = 1e-3)
-    n = 2
-    DP.@polyvar x[1:n]
-    dynamics = build_dynamics(x)
-
-    model = SumOfSquares.SOSModel(JuMP.with_optimizer(MathOptInterfaceMosek.MosekOptimizer))
-    JuMP.@variable(model, polys[1:3], PJ.Poly(DP.monomials(x, 0:deg_M))) # TODO find proper way to create polynomial matrix
-    (M, R) = build_matrices(polys, dynamics, beta, x)
-    JuMP.@constraint(model, M - delta * Matrix{Float64}(I, n, n) in JuMP.PSDCone())
-    JuMP.@constraint(model, -R - delta * Matrix{Float64}(I, n, n) in JuMP.PSDCone())
-    JuMP.optimize!(model)
-    JuMP.termination_status(model)
-
-    for i in 1:20
+function check_solution(M, R)
+    for i in 1:200
         x = rand(2)
         mcheck = JuMP.value.([M[1, 1](x) M[1, 2](x); M[2, 1](x) M[2, 2](x)])
         @assert isposdef(mcheck)
         rcheck = JuMP.value.([R[1, 1](x) R[1, 2](x); R[1, 2](x) R[2, 2](x)])
         @assert isposdef(-rcheck)
     end
+    @show maximum(PJ.maxdegree.(M))
+end
 
+function jet_engine_WSOS(beta::Float64, deg_M::Int; delta::Float64 = 1e-3)
+    n = 2
+    (model, M, R, pts_M, pts_R, U_M, U_R, P0_M, P0_R) = jet_engine_common(beta, deg_M, delta)
+    JuMP.@constraint(model, [M[i, j](pts_M[u, :]) * (i == j ? 1.0 : rt2) - (i == j ? delta : 0.0) for i in 1:n for j in 1:i for u in 1:U_M] in HYP.WSOSPolyInterpMatCone(n, U_M, [P0_M]))
+    JuMP.@constraint(model, [-R[i, j](pts_R[u, :]) * (i == j ? 1.0 : rt2) - (i == j ? delta : 0.0) for i in 1:n for j in 1:i for u in 1:U_R] in HYP.WSOSPolyInterpMatCone(n, U_R, [P0_R]))
+    JuMP.optimize!(model)
+    check_solution(M, R)
     return model
+end
 
+function jet_engine_SDP(beta::Float64, deg_M::Int; delta::Float64 = 1e-3)
+    n = 2
+    (model, M, R, pts_M, pts_R, U_M, U_R, P0_M, P0_R) = jet_engine_common(beta, deg_M, delta)
+    JuMP.@constraint(model, M - delta * Matrix{Float64}(I, n, n) in JuMP.PSDCone())
+    JuMP.@constraint(model, -R - delta * Matrix{Float64}(I, n, n) in JuMP.PSDCone())
+    JuMP.optimize!(model)
+    @show JuMP.termination_status(model)
+    check_solution(M, R)
+    return model
 end
 
 function find_beta()
