@@ -100,7 +100,6 @@ function build_namedpoly(
         push!(gs, gi)
     end
     cones = [CO.WSOSPolyInterp_2(U, P0, Ls, gs, !primal_wsos)]
-    @show Ls
 
     cone_idxs = [1:U]
 

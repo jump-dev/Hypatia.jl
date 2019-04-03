@@ -190,12 +190,13 @@ function build_JuMP_namedpoly_WSOS(
     (U, pts, P0, _, _) = MU.interpolate(dom, d, sample = sample, sample_factor = 100)
 
     g_polys = SemialgebraicSets.inequalities(MU.get_domain_inequalities(dom, x))
-    # P_polys =
+    # P_polys = TODO
 
-    # Ps =
+    # Ps = TODO
     Ps = Matrix{Float64}[P0]
     gs = Vector{Float64}[ones(U)]
     for i in eachindex(g_polys)
+        # TODO
         # P_polys_i = P_polys[i]
         # Pi = [P_poly_ij(pts[u, :]) for u in 1:U, P_poly_ij in P_polys[i])
         # push!(Ps, Pi)

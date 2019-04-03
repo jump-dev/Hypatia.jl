@@ -8,6 +8,8 @@ interpolation-based weighted-sum-of-squares (multivariate) polynomial cone param
 - basis polynomials P_i (evaluated at interpolation points)
 
 definition and dual barrier from "Sum-of-squares optimization without semidefinite programming" by D. Papp and S. Yildiz, available at https://arxiv.org/abs/1712.01792
+
+TODO remove allocations
 =#
 
 mutable struct WSOSPolyInterp_2 <: Cone
