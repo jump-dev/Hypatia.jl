@@ -79,13 +79,13 @@ end
 _blockrange(inner::Int, outer::Int) = (outer * (inner - 1) + 1):(outer * inner)
 
 function check_in_cone(cone::WSOSPolyInterpMat)
-    # check_in_cone_nowinv(cone)
-    check_in_cone_master(cone)
+    check_in_cone_nowinv(cone)
+    # check_in_cone_master(cone)
 end
 
 # TODO all views can be allocated just once in the cone definition (delete _blockrange too)
 function check_in_cone_nowinv(cone::WSOSPolyInterpMat)
-    # @timeit "build mat" begin
+    @timeit to "membership check" begin
     for j in eachindex(cone.ipwt)
         ipwtj = cone.ipwt[j]
         tmp1j = cone.tmp1[j]
@@ -111,9 +111,9 @@ function check_in_cone_nowinv(cone::WSOSPolyInterpMat)
             return false
         end
     end
-    # end
+    end
 
-    # @timeit "grad hess" begin
+    @timeit to "grad/hessian" begin
     cone.g .= 0.0
     cone.H .= 0.0
     for j in eachindex(cone.ipwt)
@@ -156,7 +156,7 @@ function check_in_cone_nowinv(cone::WSOSPolyInterpMat)
             end
         end
     end
-    # end
+    end
 
     return factorize_hess(cone)
 end
@@ -233,7 +233,7 @@ function _mulblocks!(cone::WSOSPolyInterpMat, mat::Matrix{Float64}, L::Int)
         rinds = _blockrange(i, U)
         for j in i:R
             cinds = _blockrange(j, U)
-            tmp .= 0.0
+            # tmp .= 0.0
             # since mat is block lower triangular rows only from max(i,j) start making a nonzero contribution to the product
             mulrange = ((j - 1) * L + 1):(L * R)
             mul!(view(cone.PlambdaP, rinds, cinds), mat[mulrange, _blockrange(i, U)]',  mat[mulrange, _blockrange(j, U)])
@@ -243,7 +243,7 @@ function _mulblocks!(cone::WSOSPolyInterpMat, mat::Matrix{Float64}, L::Int)
 end
 
 function check_in_cone_master(cone::WSOSPolyInterpMat)
-    # @timeit "build mat" begin
+    @timeit to "membership check" begin
     for j in eachindex(cone.ipwt)
         ipwtj = cone.ipwt[j]
         tmp1j = cone.tmp1[j]
@@ -270,13 +270,13 @@ function check_in_cone_master(cone::WSOSPolyInterpMat)
             return false
         end
     end
-    # end
+    end
 
-    # @timeit "grad hess" begin
+    @timeit to "grad/hessian" begin
     cone.g .= 0.0
     cone.H .= 0.0
     for j in eachindex(cone.ipwt)
-        # @timeit "W_inv" begin
+        # @timeit to "W_inv" begin
         W_inv_j = inv(cone.matfact[j])
         # end
 
@@ -326,7 +326,7 @@ function check_in_cone_master(cone::WSOSPolyInterpMat)
             end
         end
     end
-    # end
+    end
 
     return factorize_hess(cone)
 end

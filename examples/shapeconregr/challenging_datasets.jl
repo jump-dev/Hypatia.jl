@@ -6,6 +6,7 @@ Data obtained from http://www.nber.org/data/nbprod2005.html
 
 using DataFrames
 using CSV
+using TimerOutputs
 include(joinpath(@__DIR__(), "jump.jl"))
 
 # Example 1 from https://arxiv.org/pdf/1509.08165v1.pdf
@@ -47,11 +48,12 @@ function production_data()
 end
 
 function run_hard_shapeconregr()
+    reset_timer!(Hypatia.to)
     degrees = 4:2:4
 
     datasets = [
-        production_data,
-        customfunction_data,
+        # production_data,
+        # customfunction_data,
         normfunction_data,
         ]
 

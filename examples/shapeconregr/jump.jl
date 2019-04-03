@@ -74,6 +74,7 @@ function add_loss_and_polys(
     y::Vector{Float64},
     deg::Int,
     use_lsq_obj::Bool,
+    add_regularization::Bool,
     )
     (num_points, n) = size(X)
     DP.@polyvar x[1:n]
@@ -91,6 +92,14 @@ function add_loss_and_polys(
             [i in 1:num_points], z[i] >= -y[i] + p(X[i, :])
         end)
     end
+    if add_regularization
+        @warn "assuming [-1 1] box domain was used" # TODO
+        domain = MU.Box(-ones(n), ones(n))
+        d = div(deg + 1, 2)
+        (U, pts, P0, PWts, w) = MU.interpolate(domain, d, sample = false)
+        cone = HYP.WSOSPolyInterpSOCCone(3, U, [P0, PWts...])
+        JuMP.@variable(model, g, PJ.Poly(DP.monomials(x, 0:deg)))
+    end
 
     return (x, p)
 end
@@ -102,11 +111,12 @@ function build_shapeconregr_PSD(
     regressor_deg::Int,
     shape_data::ShapeData;
     use_lsq_obj::Bool = true,
+    add_regularization::Bool = false,
     )
     n = size(X, 2)
     d = div(regressor_deg + 1, 2)
 
-    (x, p) = add_loss_and_polys(model, X, y, regressor_deg, use_lsq_obj)
+    (x, p) = add_loss_and_polys(model, X, y, regressor_deg, use_lsq_obj, add_regularization)
 
     monotonic_set = MU.get_domain_inequalities(shape_data.mono_dom, x)
     convex_set = MU.get_domain_inequalities(shape_data.conv_dom, x)
@@ -135,6 +145,7 @@ function build_shapeconregr_WSOS_PolyJuMP(
     r::Int,
     shape_data::ShapeData;
     use_lsq_obj::Bool = true,
+    add_regularization::Bool = false,
     sample::Bool = true,
     rseed::Int = 1,
     )
@@ -147,7 +158,7 @@ function build_shapeconregr_WSOS_PolyJuMP(
     mono_wsos_cone = HYP.WSOSPolyInterpCone(mono_U, [mono_P0, mono_PWts...])
     conv_wsos_cone = HYP.WSOSPolyInterpMatCone(n, conv_U, [conv_P0, conv_PWts...])
 
-    (x, p) = add_loss_and_polys(model, X, y, r, use_lsq_obj)
+    (x, p) = add_loss_and_polys(model, X, y, r, use_lsq_obj, add_regularization)
 
     # monotonicity
     for j in 1:n
@@ -173,6 +184,7 @@ function build_shapeconregr_WSOS(
     regressor_deg::Int,
     shape_data::ShapeData;
     use_lsq_obj::Bool = true,
+    add_regularization::Bool = false,
     sample::Bool = true,
     rseed::Int = 1,
     )
@@ -204,6 +216,22 @@ function build_shapeconregr_WSOS(
             [i in 1:num_points], z[i] >= y[i] - regressor(X[i, :])
             [i in 1:num_points], z[i] >= -y[i] + regressor(X[i, :])
         end)
+    end
+    if add_regularization
+        @warn "assuming [-1 1] box domain was used" # TODO
+        domain = MU.Box(-ones(n), ones(n))
+        d = div(deg + 1, 2)
+        (U, pts, P0, PWts, w) = MU.interpolate(domain, d, sample = false)
+        soccone = HYP.WSOSPolyInterpSOCCone(3, U, [P0, PWts...])
+        JuMP.@variable(model, g[1:U])
+        one_poly = zeros(U)
+        one_poly[1] = 1.0
+        var1 = regressor + one_poly
+        var2 = regressor - one_poly
+        var3 = 2 * g
+        JuMP.@constraint(model, vcat(var1, var2, var3) in soccone)
+        regularization = dot(w, g)
+        JuMP.@objective(model, Min, z / num_points + regularization)
     end
 
     # monotonicity

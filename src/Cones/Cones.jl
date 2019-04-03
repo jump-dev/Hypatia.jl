@@ -13,6 +13,7 @@ using DiffResults
 abstract type Cone end
 
 using TimerOutputs
+import Hypatia.to
 
 include("orthant.jl")
 include("epinorminf.jl")

@@ -52,13 +52,16 @@ function set_initial_point(arr::AbstractVector{Float64}, cone::PosSemidef)
 end
 
 function check_in_cone(cone::PosSemidef)
+    @timeit to "membership check" begin
     mat = cone.mat
     svec_to_smat!(mat, cone.point)
     F = cholesky!(Symmetric(mat), Val(true), check = false)
     if !isposdef(F)
         return false
     end
+    end # membership
 
+    @timeit to "grad/hessian" begin
     inv_mat = inv(F) # TODO eliminate allocs
     smat_to_svec!(cone.g, inv_mat)
     cone.g .*= -1.0
@@ -96,6 +99,7 @@ function check_in_cone(cone::PosSemidef)
         end
         k += 1
     end
+    end # grad/hessian
 
     return true
 end

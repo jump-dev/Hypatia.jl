@@ -163,7 +163,7 @@ function get_combined_directions(solver::HSDSolver, system_solver::QRCholCombine
     HGxi_k = system_solver.HGxi_k
     Gxi_k = system_solver.Gxi_k
 
-    # @timeit "setup xy" begin
+    # @timeit to "setup xy" begin
     @. x1 = -model.c
     @. x2 = solver.x_residual
     @. x3 = 0.0
@@ -172,7 +172,7 @@ function get_combined_directions(solver::HSDSolver, system_solver::QRCholCombine
     @. y3 = 0.0
     # end
 
-    # @timeit "setup z" begin
+    # @timeit to "setup z" begin
     @. z1_temp = model.h
     @. z2_temp = -solver.z_residual
     for k in eachindex(cones)
@@ -215,7 +215,7 @@ function get_combined_directions(solver::HSDSolver, system_solver::QRCholCombine
         end
     end
 
-    # @timeit "pre fact" begin
+    # @timeit to "pre fact" begin
     # bxGHbz = bx + G'*Hbz
     mul!(bxGHbz, model.G', zi)
     @. bxGHbz += xi
@@ -233,7 +233,7 @@ function get_combined_directions(solver::HSDSolver, system_solver::QRCholCombine
     # end
 
     if !iszero(size(Q2div, 1))
-        # @timeit "mat" begin
+        # @timeit to "mat" begin
         block_hessian_product!(HGQ2_k, GQ2_k)
         mul!(Q2GHGQ2, GQ2', HGQ2)
         # end
@@ -242,11 +242,11 @@ function get_combined_directions(solver::HSDSolver, system_solver::QRCholCombine
         # TODO use old sysvx code
         F = bunchkaufman!(Symmetric(Q2GHGQ2), true, check = false)
         if !issuccess(F)
-        # @timeit "chol" begin
+        # @timeit to "chol" begin
         # F = cholesky!(Symmetric(Q2GHGQ2), Val(true), check = false)
         # end
         # if !isposdef(F)
-            # @timeit "recover" begin
+            # @timeit to "recover" begin
             println("linear system matrix factorization failed")
             mul!(Q2GHGQ2, GQ2', HGQ2)
             Q2GHGQ2 += 1e-4I
@@ -256,12 +256,12 @@ function get_combined_directions(solver::HSDSolver, system_solver::QRCholCombine
             end
             # end
         end
-        # @timeit "ldiv" begin
+        # @timeit to "ldiv" begin
         ldiv!(F, Q2div)
         # end
     end
 
-    # @timeit "post fact" begin
+    # @timeit to "post fact" begin
     mul!(Q2x, model.Ap_Q2, Q2div)
 
     # xi = Q1x + Q2x
@@ -281,7 +281,7 @@ function get_combined_directions(solver::HSDSolver, system_solver::QRCholCombine
     # end
 
     # lift to HSDE space
-    # @timeit "lift" begin
+    # @timeit to "lift" begin
     tau_denom = mu / solver.tau / solver.tau - dot(model.c, x1) - dot(model.b, y1) - dot(model.h, z1)
 
     function lift!(x, y, z, s, tau_rhs, kap_rhs)

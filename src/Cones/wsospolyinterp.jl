@@ -55,6 +55,7 @@ function check_in_cone(cone::WSOSPolyInterp)
     tmp3 = cone.tmp3
 
     for j in eachindex(cone.ipwt) # TODO can be done in parallel, but need multiple tmp3s
+        @timeit to "membership check" begin
         ipwtj = cone.ipwt[j]
         tmp1j = cone.tmp1[j]
         tmp2j = cone.tmp2[j]
@@ -69,7 +70,9 @@ function check_in_cone(cone::WSOSPolyInterp)
         if !isposdef(F)
             return false
         end
+        end # membership
 
+        @timeit to "grad/hessian" begin
         tmp2j .= view(ipwtj', F.p, :)
         ldiv!(F.L, tmp2j) # TODO make sure calls best triangular solve
         # mul!(tmp3, tmp2j', tmp2j)
@@ -81,6 +84,7 @@ function check_in_cone(cone::WSOSPolyInterp)
                 cone.H[i, j] += abs2(tmp3[i, j])
             end
         end
+        end # grad hessian
     end
 
     return factorize_hess(cone)

@@ -81,7 +81,7 @@ function set_initial_point(arr::AbstractVector{Float64}, cone::WSOSPolyInterpSOC
 end
 
 function check_in_cone(cone::WSOSPolyInterpSOC)
-    # @timeit "build mat" begin
+    # @timeit to "build mat" begin
     for j in eachindex(cone.ipwt)
         ipwtj = cone.ipwt[j]
         li_lambda = cone.li_lambda[j]
@@ -125,7 +125,7 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
     end
     # end
 
-    # @timeit "grad hess" begin
+    # @timeit to "grad hess" begin
     cone.g .= 0.0
     cone.H .= 0.0
     for j in eachindex(cone.ipwt)

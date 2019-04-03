@@ -10,8 +10,13 @@ using Printf
 using LinearAlgebra
 using SparseArrays
 
+# using Hypatia
+using TimerOutputs
+# const to = Hypatia.TimerOutput()
+
 import Hypatia.Cones
 import Hypatia.Models
+import Hypatia.to
 
 abstract type Solver end
 
