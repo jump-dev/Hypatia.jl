@@ -64,11 +64,14 @@ function jet_engine_common(beta::Float64, deg_M::Int, delta::Float64 = 1e-3)
 end
 
 function check_solution(M, R)
-    for i in 1:200
-        x = rand(2)
+    for i in 1:2000
+        x = randn(2)
         mcheck = JuMP.value.([M[1, 1](x) M[1, 2](x); M[2, 1](x) M[2, 2](x)])
         @assert isposdef(mcheck)
         rcheck = JuMP.value.([R[1, 1](x) R[1, 2](x); R[1, 2](x) R[2, 2](x)])
+        if !isposdef(-rcheck)
+            @show eigen(-rcheck).values
+        end
         @assert isposdef(-rcheck)
     end
     @show maximum(PJ.maxdegree.(M))
