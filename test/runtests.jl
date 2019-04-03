@@ -127,7 +127,7 @@ testfuns = [
 end
 
 @info("starting additional native examples tests")
-verbose = false
+verbose = true
 system_solvers = [
     # SO.NaiveCombinedHSDSystemSolver,
     SO.QRCholCombinedHSDSystemSolver,
