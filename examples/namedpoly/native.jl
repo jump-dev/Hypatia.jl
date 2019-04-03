@@ -14,6 +14,8 @@ const CO = HYP.Cones
 const MU = HYP.ModelUtilities
 
 using LinearAlgebra
+# import SemialgebraicSets
+import DynamicPolynomials
 using Test
 
 # list of predefined polynomials from various applications
@@ -63,9 +65,10 @@ function build_namedpoly(
     (n, lbs, ubs, deg, fn) = polys[polyname]
     @assert d >= div(deg + 1, 2)
 
-    # generate interpolation; use random sampling if n is large
-    dom = MU.Box(lbs, ubs)
-    (U, pts, P0, PWts, _) = MU.interpolate(dom, d, sample = (n >= 5))
+    # generate interpolation
+    (U, pts, P0, _, _) = MU.wsos_box_params(n, d, false)
+    # dom = MU.Box(lbs, ubs)
+    # (U, pts, P0, PWts, _) = MU.interpolate(dom, d, sample = (n >= 5))
 
     # TODO algorithm may perform better if function evaluations are rescaled to have more reasonable norm
     # set up problem data
@@ -83,7 +86,21 @@ function build_namedpoly(
         h = zeros(U)
     end
 
-    cones = [CO.WSOSPolyInterp(U, [P0, PWts...], !primal_wsos)]
+    # cones = [CO.WSOSPolyInterp(U, [P0, PWts...], !primal_wsos)]
+
+    Ls = Int[size(P0, 2)]
+    @assert Ls[1] == binomial(n + d, n)
+    gs = Vector{Float64}[ones(U)]
+    for i in 1:n
+        # Li = size(PWts[i], 2) # TODO may be wrong
+        di = d - 1 # degree of gi is 2
+        Li = binomial(n + di, n)
+        gi = [(-pts[u, i] + ubs[i]) * (pts[u, i] - lbs[i]) for u in 1:U]
+        push!(Ls, Li)
+        push!(gs, gi)
+    end
+    cones = [CO.WSOSPolyInterp_2(U, P0, Ls, gs, !primal_wsos)]
+
     cone_idxs = [1:U]
 
     return (c, A, b, G, h, cones, cone_idxs)
