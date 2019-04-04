@@ -79,7 +79,7 @@ function run_hard_shapeconregr()
         (X, y, n) = s()
         dom = MU.Box(-ones(n), ones(n))
         shape_data = ShapeData(dom, dom, zeros(n), 1)
-        build_shapeconregr_PSD(model, X, y, d, shape_data)
+        build_shapeconregr_WSOS(model, X, y, d, shape_data)
 
         (val, runtime, bytes, gctime, memallocs) = @timed JuMP.optimize!(model)
 

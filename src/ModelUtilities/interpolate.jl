@@ -378,3 +378,6 @@ function recover_lagrange_polys(pts::Matrix{Float64}, deg::Int)
     lagrange_polys = [dot(vandermonde_inv[:, i], monos) for i in 1:U]
     return lagrange_polys
 end
+
+function bilinear_terms()
+end

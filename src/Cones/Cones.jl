@@ -38,7 +38,11 @@ dimension(cone::Cone) = cone.dim
 function factorize_hess(cone::Cone)
     @. cone.H2 = cone.H
 
-    # @show cond(Symmetric(cone.H2, :U))
+    if (cone isa WSOSPolyInterpMat)
+        open("conditioning.csv", "a") do f
+            println(f, cond(Symmetric(cone.H2, :U)))
+        end
+    end
     cone.F = bunchkaufman!(Symmetric(cone.H2, :U), true, check = false)
     return issuccess(cone.F)
 
