@@ -58,45 +58,29 @@ function jet_engine_common(beta::Float64, deg_M::Int, delta::Float64 = 1e-3)
 
     deg_R = maximum(DP.maxdegree.(R))
     d_R = div(deg_R + 1, 2)
-    (U_R, pts_R, P0_R, _, _) = MU.interpolate(dom, deg_R, sample = false)
+    (U_R, pts_R, P0_R, _, _) = MU.interpolate(dom, d_R, sample = true)
 
     return (model, M, R, pts_M, pts_R, U_M, U_R, P0_M, P0_R)
 end
 
-function check_solution(M, R, pts_R, cone)
+function check_solution(M, R)
     for i in 1:2000
-        x = randn(2)
+        x = randn(2) * 10
         mcheck = JuMP.value.([M[1, 1](x) M[1, 2](x); M[2, 1](x) M[2, 2](x)])
         @assert isposdef(mcheck)
         rcheck = JuMP.value.([R[1, 1](x) R[1, 2](x); R[1, 2](x) R[2, 2](x)])
-        if !isposdef(-rcheck)
-            @show eigen(-rcheck).values
-            @show x
-            @show i
-            idx = 0
-            for i in 1:cone.R, j in 1:i, u in 1:cone.U
-                idx += 1
-                if i == j
-                    cone.point[idx] = -JuMP.value(R[i, j])(pts_R[u, :])
-                else
-                    cone.point[idx] = -JuMP.value(R[i, j])(pts_R[u, :]) * sqrt(2)
-                end
-            end
-            @show CO.check_in_cone(cone)
-        end
-        # @assert isposdef(-rcheck)
+        @assert isposdef(-rcheck)
     end
-    @show maximum(PJ.maxdegree.(M))
 end
 
 function jet_engine_WSOS(beta::Float64, deg_M::Int; delta::Float64 = 1e-3)
     n = 2
     (model, M, R, pts_M, pts_R, U_M, U_R, P0_M, P0_R) = jet_engine_common(beta, deg_M, delta)
     JuMP.@constraint(model, [M[i, j](pts_M[u, :]) * (i == j ? 1.0 : rt2) - (i == j ? delta : 0.0) for i in 1:n for j in 1:i for u in 1:U_M] in HYP.WSOSPolyInterpMatCone(n, U_M, [P0_M]))
-    JuMP.@constraint(model, [-R[i, j](pts_R[u, :]) * (i == j ? 1.0 : rt2) - (i == j ? delta : 0.0) for i in 1:n for j in 1:i for u in 1:U_R] in HYP.WSOSPolyInterpMatCone(n, U_R, [P0_R]))
+    JuMP.@constraint(model, [-1 * R[i, j](pts_R[u, :]) * (i == j ? 1.0 : rt2) - (i == j ? delta : 0.0) for i in 1:n for j in 1:i for u in 1:U_R] in HYP.WSOSPolyInterpMatCone(n, U_R, [P0_R]))
     JuMP.optimize!(model)
     dummy_cone = CO.WSOSPolyInterpMat(2, U_R, [P0_R], false)
-    check_solution(M, R, pts_R, dummy_cone)
+    check_solution(M, R)
     return model
 end
 
@@ -107,7 +91,7 @@ function jet_engine_SDP(beta::Float64, deg_M::Int; delta::Float64 = 1e-3)
     JuMP.@constraint(model, -R - delta * Matrix{Float64}(I, n, n) in JuMP.PSDCone())
     JuMP.optimize!(model)
     @show JuMP.termination_status(model)
-    # check_solution(M, R)
+    check_solution(M, R)
     return model
 end
 
