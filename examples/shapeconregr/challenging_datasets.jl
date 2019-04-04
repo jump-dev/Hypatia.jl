@@ -7,6 +7,7 @@ Data obtained from http://www.nber.org/data/nbprod2005.html
 using DataFrames
 using CSV
 using TimerOutputs
+using SumOfSquares
 include(joinpath(@__DIR__(), "jump.jl"))
 
 # Example 1 from https://arxiv.org/pdf/1509.08165v1.pdf
@@ -58,7 +59,7 @@ function run_hard_shapeconregr()
         ]
 
     for d in degrees, s in datasets
-        model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer,
+        model = SumOfSquares.SOSModel(JuMP.with_optimizer(HYP.Optimizer,
             use_dense = true,
             verbose = true,
             system_solver = SO.QRCholCombinedHSDSystemSolver,
@@ -76,8 +77,9 @@ function run_hard_shapeconregr()
         println()
 
         (X, y, n) = s()
-        shape_data = ShapeData(MU.FreeDomain(n), MU.FreeDomain(n), zeros(n), 1)
-        build_shapeconregr_WSOS(model, X, y, d, shape_data)
+        dom = MU.Box(-ones(n), ones(n))
+        shape_data = ShapeData(dom, dom, zeros(n), 1)
+        build_shapeconregr_PSD(model, X, y, d, shape_data)
 
         (val, runtime, bytes, gctime, memallocs) = @timed JuMP.optimize!(model)
 

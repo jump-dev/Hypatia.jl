@@ -27,6 +27,12 @@ git-tree-sha1 = "055eb2690182ebc31087859c3dd8598371d3ef9e"
 uuid = "b99e7846-7c00-51b0-8f62-c81ae34c0232"
 version = "0.5.3"
 
+[[CSDP]]
+deps = ["BinDeps", "Compat", "Glob", "Libdl", "MathOptInterface", "MathProgBase", "SemidefiniteModels", "SemidefiniteOptInterface"]
+git-tree-sha1 = "66711cc526861b5d5d6801a0778140e58f3d4e78"
+uuid = "0a46da34-8e4b-519e-b418-48813639ff34"
+version = "0.4.1"
+
 [[CSV]]
 deps = ["CategoricalArrays", "DataFrames", "DataStreams", "Dates", "Mmap", "Parsers", "Profile", "Random", "Tables", "Test", "Unicode", "WeakRefStrings"]
 git-tree-sha1 = "b92c6f626a044cc9619156d54994b94084d40abe"
@@ -157,6 +163,18 @@ git-tree-sha1 = "b001d22c3d3efb302f74ee6b946a19f8e59a86c1"
 uuid = "92c85e6c-cbff-5e0c-80f7-495c94daaecd"
 version = "0.4.0"
 
+[[GZip]]
+deps = ["Libdl", "Test"]
+git-tree-sha1 = "ee443ef166b29282301468d8af403e1ed8f5412e"
+uuid = "92fee26a-97fe-5a0c-ad85-20a5f3185b63"
+version = "0.5.0"
+
+[[Glob]]
+deps = ["Compat", "Test"]
+git-tree-sha1 = "c72f1fcb7d17426de1e8af2e948dfb3de1116eed"
+uuid = "c27321d9-0574-5035-807b-f59d2c89b15c"
+version = "1.2.0"
+
 [[InteractiveUtils]]
 deps = ["Markdown"]
 uuid = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
@@ -202,6 +220,12 @@ git-tree-sha1 = "5d3de69c9220610d0336ab45d3eb8b6ac7a7c807"
 uuid = "b8f27783-ece8-5eb3-8dc8-9495eed66fee"
 version = "0.8.4"
 
+[[MathProgBase]]
+deps = ["Compat"]
+git-tree-sha1 = "3bf2e534e635df810e5f4b4f1a8b6de9004a0d53"
+uuid = "fdba3010-5040-5b88-9595-932c9decdf73"
+version = "0.7.7"
+
 [[Missings]]
 deps = ["Dates", "InteractiveUtils", "SparseArrays", "Test"]
 git-tree-sha1 = "d1d2585677f2bd93a97cfeb8faa7a0de0f982042"
@@ -211,11 +235,21 @@ version = "0.4.0"
 [[Mmap]]
 uuid = "a63ad114-7e13-5084-954f-fe012c677804"
 
+[[Mosek]]
+deps = ["Libdl", "MathProgBase", "Pkg", "Printf", "SparseArrays", "Test"]
+git-tree-sha1 = "032bd53d5d2c1a28ca4b684d0bcb43bf50ed1d5f"
+uuid = "6405355b-0ac2-5fba-af84-adbd65488c0e"
+version = "0.9.11"
+
+[[MosekTools]]
+deps = ["Compat", "MathOptInterface", "Mosek", "Printf", "Test"]
+git-tree-sha1 = "215e3b6460b265631ee2848a4b9d1997f3f0b479"
+uuid = "1ec41992-ff65-5c91-ac43-2df89e9693a4"
+version = "0.7.1"
+
 [[MultivariateMoments]]
 deps = ["LinearAlgebra", "MultivariatePolynomials", "RowEchelon", "SemialgebraicSets"]
 git-tree-sha1 = "d85604b2068aa8806d14bf4a2c08df5a732cad57"
-repo-rev = "master"
-repo-url = "https://github.com/JuliaAlgebra/MultivariateMoments.jl.git"
 uuid = "f4abf1af-0426-5881-a0da-e2f168889b5e"
 version = "0.2.0"
 
@@ -319,6 +353,18 @@ deps = ["Compat", "MultivariatePolynomials"]
 git-tree-sha1 = "6ad555a2facdba4634cf23176e8a9d4903412df6"
 uuid = "8e049039-38e8-557d-ae3a-bc521ccf6204"
 version = "0.1.0"
+
+[[SemidefiniteModels]]
+deps = ["Compat", "GZip", "MathProgBase"]
+git-tree-sha1 = "9bda87fca08de6601f0ecbb5e812de14cd878b4a"
+uuid = "169818f4-1a3d-53bf-95b3-11177825b1e3"
+version = "0.1.1"
+
+[[SemidefiniteOptInterface]]
+deps = ["Compat", "MathOptInterface"]
+git-tree-sha1 = "8566a20d38a1e75dae7b20a9ee86949e33a1adf8"
+uuid = "f0680fed-b2cd-5302-98f9-f4da282d86b5"
+version = "0.5.1"
 
 [[Serialization]]
 uuid = "9e88b42a-f829-5b0c-bbe9-9e923198166b"
