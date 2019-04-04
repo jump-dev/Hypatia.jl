@@ -198,18 +198,6 @@ git-tree-sha1 = "5d3de69c9220610d0336ab45d3eb8b6ac7a7c807"
 uuid = "b8f27783-ece8-5eb3-8dc8-9495eed66fee"
 version = "0.8.4"
 
-[[MathOptInterfaceMosek]]
-deps = ["Compat", "MathOptInterface", "Mosek", "Printf", "Test"]
-git-tree-sha1 = "d73dc866267bea94a5c4285453aeed187bfe35d7"
-uuid = "0087ddc6-3964-5e57-817f-9937aefb0357"
-version = "0.5.2"
-
-[[MathProgBase]]
-deps = ["Compat"]
-git-tree-sha1 = "3bf2e534e635df810e5f4b4f1a8b6de9004a0d53"
-uuid = "fdba3010-5040-5b88-9595-932c9decdf73"
-version = "0.7.7"
-
 [[Missings]]
 deps = ["Dates", "InteractiveUtils", "SparseArrays", "Test"]
 git-tree-sha1 = "d1d2585677f2bd93a97cfeb8faa7a0de0f982042"
@@ -218,12 +206,6 @@ version = "0.4.0"
 
 [[Mmap]]
 uuid = "a63ad114-7e13-5084-954f-fe012c677804"
-
-[[Mosek]]
-deps = ["Libdl", "MathProgBase", "Pkg", "Printf", "SparseArrays", "Test"]
-git-tree-sha1 = "032bd53d5d2c1a28ca4b684d0bcb43bf50ed1d5f"
-uuid = "6405355b-0ac2-5fba-af84-adbd65488c0e"
-version = "0.9.11"
 
 [[MultivariateMoments]]
 deps = ["LinearAlgebra", "MultivariatePolynomials", "RowEchelon", "SemialgebraicSets"]
