@@ -38,6 +38,7 @@ include(joinpath(examples_dir, "wsosmatrix/sosmat1.jl"))
 include(joinpath(examples_dir, "wsosmatrix/sosmat2.jl"))
 include(joinpath(examples_dir, "wsosmatrix/sosmat3.jl"))
 include(joinpath(examples_dir, "regionofattraction/univariate.jl"))
+include(joinpath(examples_dir, "contraction_analysis/jump.jl"))
 
 include(joinpath(@__DIR__, "JuMP.jl"))
 
@@ -206,6 +207,8 @@ testfuns = [
     run_JuMP_sosmat3_dual,
     run_JuMP_univariate_WSOS,
     # run_JuMP_univariate_PSD,
+    run_JuMP_contraction_analysis_PSD,
+    run_JuMP_contraction_analysis_WSOS,
     ]
 @testset "default examples: $t" for t in testfuns
     t()
