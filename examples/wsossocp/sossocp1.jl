@@ -20,6 +20,40 @@ using Test
 
 const rt2 = sqrt(2)
 
+function JuMP_polysoc_small(; rsoc = false)
+    dom = MU.FreeDomain(n)
+    DP.@polyvar x
+    poly = x^6 + 3.5x^3 - 17x^2 - 6
+    d = 3
+    (U, pts, P0, _, w) = MU.interpolate(dom, d, sample = false, calc_w = true)
+    lagrange_polys = MU.recover_lagrange_polys(pts, 2d)
+    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, max_iters = 400, tol_feas = 1e-5))
+    JuMP.@variable(model, f[1:U])
+    JuMP.@objective(model, Min, dot(w, f))
+    if rsoc
+        var1 = f + 0.5 * ones(U)
+        var2 = f - 0.5 * ones(U)
+        var3 = 2 * [poly(pts[u, :]) for u in 1:U]
+        cone = HYP.WSOSPolyInterpSOCCone(3, U, [P0])
+        JuMP.@constraint(model, vcat(var1, var2, var3) in cone)
+        JuMP.optimize!(model)
+        sqr_poly = dot(JuMP.value.(f), lagrange_polys)
+        poly2 = poly^2
+        for _ in 1:2000
+            x = randn() * 2 # need higher feasibility tolerance for crazier numbers
+            if !(poly2(x) <= sqr_poly(x))
+                @show x, poly2(x), sqr_poly(x)
+            end
+        end
+    else
+        cone = HYP.WSOSPolyInterpSOCCone(2, U, [P0])
+        JuMP.@constraint(model, vcat(f, [poly(pts[u, :]) for u in 1:U]...) in cone)
+        JuMP.optimize!(model)
+    end
+    @show dot(JuMP.value.(f), lagrange_polys)
+    return model
+end
+
 function JuMP_polysoc_monomial(P, n)
     dom = MU.FreeDomain(n)
     d = div(maximum(DP.maxdegree.(P)) + 1, 2)

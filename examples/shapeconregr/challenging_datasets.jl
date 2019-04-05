@@ -8,10 +8,11 @@ using DataFrames
 using CSV
 using TimerOutputs
 using SumOfSquares
+using LinearAlgebra
 include(joinpath(@__DIR__(), "jump.jl"))
 
 # Example 1 from https://arxiv.org/pdf/1509.08165v1.pdf
-function normfunction_data(; n::Int = 5, num_points::Int = 100)
+function normfunction_data(; n::Int = 1, num_points::Int = 100)
     f = x -> sum(abs2, x)
     (X, y) = generate_regr_data(f, -1.0, 1.0, n, num_points, signal_ratio = 9.0)
     return (X, y, n)
@@ -48,9 +49,10 @@ function production_data()
     return (Xlog, y, n)
 end
 
-function run_hard_shapeconregr()
+# function run_hard_shapeconregr()
     reset_timer!(Hypatia.to)
-    degrees = 4:2:4
+    # degrees = 4:2:4
+    d = 6; s = normfunction_data
 
     datasets = [
         # production_data,
@@ -58,7 +60,7 @@ function run_hard_shapeconregr()
         normfunction_data,
         ]
 
-    for d in degrees, s in datasets
+    # for d in degrees, s in datasets
         model = SumOfSquares.SOSModel(JuMP.with_optimizer(HYP.Optimizer,
             use_dense = true,
             verbose = true,
@@ -78,8 +80,9 @@ function run_hard_shapeconregr()
 
         (X, y, n) = s()
         dom = MU.Box(-ones(n), ones(n))
-        shape_data = ShapeData(dom, dom, zeros(n), 1)
-        build_shapeconregr_WSOS(model, X, y, d, shape_data)
+        shape_data = ShapeData(dom, dom, zeros(n), 0)
+        (regressor, lagrange_polys, g) = build_shapeconregr_WSOS(model, X, y, d, shape_data, use_scalar = true, add_regularization = true)
+        # build_shapeconregr_PSD(model, X, y, d, shape_data)
 
         (val, runtime, bytes, gctime, memallocs) = @timed JuMP.optimize!(model)
 
@@ -89,7 +92,16 @@ function run_hard_shapeconregr()
         @show gctime
         @show memallocs
         println("\n\n")
-    end
-end
 
-run_hard_shapeconregr()
+        # @show JuMP.value(model[:regressor])
+        # @show JuMP.value.(model[:g])
+
+        using Plots
+        plotlyjs()
+        regfun(x) =JuMP.value(regressor)(x)
+        # regfun([1., 1.])
+        plot(regfun, -1, 1)
+    # end
+# end
+
+# run_hard_shapeconregr()

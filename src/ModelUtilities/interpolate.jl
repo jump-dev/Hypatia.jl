@@ -379,5 +379,22 @@ function recover_lagrange_polys(pts::Matrix{Float64}, deg::Int)
     return lagrange_polys
 end
 
-function bilinear_terms()
+function bilinear_terms(U, pts, P0, PWts, n)
+    U_y = div(n * (n + 1), 2)
+    ypts = zeros(U_y, n)
+    naive_pts = zeros(U * U_y, 2n)
+    row = 0
+    for i in 1:n, j in i:n
+        row += 1
+        ypts[row, i] = 1
+        ypts[row, j] = 1
+        pt_range = ((row - 1) * U + 1):(row * U)
+        naive_pts[pt_range, 1:n] = pts
+        naive_pts[pt_range, n + i] .= 1
+        naive_pts[pt_range, n + j] .= 1
+    end
+    naive_U = U_y * U
+    naive_P0 = kron(ypts, P0)
+    naive_PWts = [kron(ypts, pwt) for pwt in PWts]
+    return (naive_U, naive_pts, naive_P0, naive_PWts)
 end

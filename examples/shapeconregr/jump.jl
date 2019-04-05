@@ -187,6 +187,7 @@ function build_shapeconregr_WSOS(
     add_regularization::Bool = false,
     sample::Bool = true,
     rseed::Int = 1,
+    use_scalar::Bool = false,
     )
     Random.seed!(rseed)
 
@@ -220,18 +221,18 @@ function build_shapeconregr_WSOS(
     if add_regularization
         @warn "assuming [-1 1] box domain was used" # TODO
         domain = MU.Box(-ones(n), ones(n))
-        d = div(deg + 1, 2)
-        (U, pts, P0, PWts, w) = MU.interpolate(domain, d, sample = false)
+        d = div(regressor_deg + 1, 2)
+        (U, pts, P0, PWts, w) = MU.interpolate(domain, d, sample = false, calc_w = true)
         soccone = HYP.WSOSPolyInterpSOCCone(3, U, [P0, PWts...])
         JuMP.@variable(model, g[1:U])
-        one_poly = zeros(U)
-        one_poly[1] = 1.0
-        var1 = regressor + one_poly
-        var2 = regressor - one_poly
-        var3 = 2 * g
+        # one_poly = zeros(U)
+        # one_poly[1] = 1.0
+        var1 = g + 0.5 * ones(U) # AffExpr.(g + ones(U))
+        var2 = g - 0.5 * ones(U) # AffExpr.(b - ones(U))
+        var3 = 2 * [regressor(regressor_points[u, :]) for u in 1:regressor_U]
         JuMP.@constraint(model, vcat(var1, var2, var3) in soccone)
-        regularization = dot(w, g)
-        JuMP.@objective(model, Min, z / num_points + regularization)
+        regularization = JuMP.dot(w, g)
+        JuMP.@objective(model, Min, 0.9 * z / num_points + 0.1 * regularization)
     end
 
     # monotonicity
@@ -245,11 +246,19 @@ function build_shapeconregr_WSOS(
     # convexity
     if !iszero(shape_data.conv_profile)
         hessian = DP.differentiate(regressor, DP.variables(regressor), 2)
-        JuMP.@constraint(model, [shape_data.conv_profile * hessian[i, j](conv_points[u, :]) * (i == j ? 1.0 : rt2)
-            for i in 1:n for j in 1:i for u in 1:conv_U] in conv_wsos_cone)
+        if use_scalar
+            DP.@polyvar y[1:n]
+            conv_condition = y' * hessian * y
+            (naive_U, naive_points, naive_P0, naive_PWts) = MU.bilinear_terms(conv_U, conv_points, conv_P0, conv_PWts, n)
+            wsos_cone = HYP.WSOSPolyInterpCone(naive_U, [naive_P0, naive_PWts...])
+            JuMP.@constraint(model, [conv_condition(naive_points[u, :]) for u in 1:naive_U] in wsos_cone)
+        else
+            JuMP.@constraint(model, [shape_data.conv_profile * hessian[i, j](conv_points[u, :]) * (i == j ? 1.0 : rt2)
+                for i in 1:n for j in 1:i for u in 1:conv_U] in conv_wsos_cone)
+        end
     end
 
-    return (regressor, lagrange_polys)
+    return (regressor, lagrange_polys, g)
 end
 
 function run_JuMP_shapeconregr(use_wsos::Bool; dense::Bool = true, use_PolyJuMP::Bool = false)
@@ -273,7 +282,7 @@ function run_JuMP_shapeconregr(use_wsos::Bool; dense::Bool = true, use_PolyJuMP:
             p = build_shapeconregr_WSOS_PolyJuMP(model, X, y, deg, shape_data)
         else
             model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, use_dense = dense))
-            (coeffs, polys) = build_shapeconregr_WSOS(model, X, y, deg, shape_data)
+            (coeffs, polys) = build_shapeconregr_WSOS(model, X, y, deg, shape_data, use_scalar = false)
             p = JuMP.dot(coeffs, polys)
         end
     else
