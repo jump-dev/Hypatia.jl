@@ -122,18 +122,18 @@ end
 function run_JuMP_muconvexity_rand(; rseed::Int = 1)
     Random.seed!(rseed)
 
-    n = 2
+    n = 4
     d = 4
     DynamicPolynomials.@polyvar x[1:n]
 
     poly = sum(rand() * z for z in DynamicPolynomials.monomials(x, 0:d))
 
     dom = MU.FreeDomain(n)
-    (term1, prim1, mu1) = run_JuMP_muconvexity(x, poly, dom, true)
+    # (term1, prim1, mu1) = run_JuMP_muconvexity(x, poly, dom, true)
     (term2, prim2, mu2) = run_JuMP_muconvexity_scalar(x, poly, dom, true)
-    # (term2, prim2, mu2) = run_JuMP_muconvexity(x, poly, dom, false)
-    @test term1 == term2
-    @test prim1 == prim2
+    # # (term2, prim2, mu2) = run_JuMP_muconvexity(x, poly, dom, false)
+    # @test term1 == term2
+    # @test prim1 == prim2
     if term1 == MOI.OPTIMAL || term2 == MOI.OPTIMAL
         @test mu1 ≈ mu2 atol = 1e-4 rtol = 1e-4
         mufree = mu1
@@ -157,8 +157,8 @@ function run_JuMP_muconvexity_a(; use_wsos::Bool = true)
     poly = (x[1] + 1)^2 * (x[1] - 1)^2
     dom = MU.FreeDomain(1)
 
-    # (term, prim, mu) = run_JuMP_muconvexity(x, poly, dom, use_wsos)
-    (term, prim, mu) = run_JuMP_muconvexity_scalar(x, poly, dom, use_wsos)
+    (term, prim, mu) = run_JuMP_muconvexity(x, poly, dom, use_wsos)
+    # (term, prim, mu) = run_JuMP_muconvexity_scalar(x, poly, dom, use_wsos)
     @test term == MOI.OPTIMAL
     @test prim == MOI.FEASIBLE_POINT
     @test mu ≈ -4 atol = 1e-4 rtol = 1e-4
@@ -170,8 +170,8 @@ function run_JuMP_muconvexity_b(; use_wsos::Bool = true)
     poly = sum(x.^4) - sum(x.^2)
     dom = MU.FreeDomain(n)
 
-    # (term, prim, mu) = run_JuMP_muconvexity(x, poly, dom, use_wsos)
-    (term, prim, mu) = run_JuMP_muconvexity_scalar(x, poly, dom, use_wsos)
+    (term, prim, mu) = run_JuMP_muconvexity(x, poly, dom, use_wsos)
+    # (term, prim, mu) = run_JuMP_muconvexity_scalar(x, poly, dom, use_wsos)
     @test term == MOI.OPTIMAL
     @test prim == MOI.FEASIBLE_POINT
     @test mu ≈ -2 atol = 1e-4 rtol = 1e-4

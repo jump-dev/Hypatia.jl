@@ -24,7 +24,7 @@ function JuMP_polysoc_small(; rsoc = false)
     dom = MU.FreeDomain(n)
     DP.@polyvar x
     poly = x^6 + 3.5x^3 - 17x^2 - 6
-    d = 3
+    d = 6
     (U, pts, P0, _, w) = MU.interpolate(dom, d, sample = false, calc_w = true)
     lagrange_polys = MU.recover_lagrange_polys(pts, 2d)
     model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, max_iters = 400, tol_feas = 1e-5))
@@ -40,7 +40,7 @@ function JuMP_polysoc_small(; rsoc = false)
         sqr_poly = dot(JuMP.value.(f), lagrange_polys)
         poly2 = poly^2
         for _ in 1:2000
-            x = randn() * 2 # need higher feasibility tolerance for crazier numbers
+            x = randn() * 10 # need higher feasibility tolerance for crazier numbers
             if !(poly2(x) <= sqr_poly(x))
                 @show x, poly2(x), sqr_poly(x)
             end
@@ -53,6 +53,46 @@ function JuMP_polysoc_small(; rsoc = false)
     @show dot(JuMP.value.(f), lagrange_polys)
     return model
 end
+
+
+function JuMP_polysoc_envelope(; use_scalar = false)
+    Random.seed!(1)
+    dom = MU.FreeDomain(n)
+    DP.@polyvar x
+    d = 6
+    (U, pts, P0, _, w) = MU.interpolate(dom, d, sample = false, calc_w = true)
+    lagrange_polys = MU.recover_lagrange_polys(pts, 2d)
+    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, max_iters = 400, tol_feas = 1e-5))
+    JuMP.@variable(model, f[1:U])
+    JuMP.@objective(model, Min, dot(w, f))
+
+    vec_length = 10
+    npoly = vec_length - 1
+    LDegs = size(P0, 2)
+    polys = P0[:, 1:LDegs] * rand(-9:9, LDegs, npoly)
+    # @show [dot(polys[:, i], lagrange_polys) for i in 1:npoly]
+
+    if use_scalar
+        fpoly = dot(f, lagrange_polys)
+        rand_polys = [dot(polys[:, i], lagrange_polys) for i in 1:npoly]
+        DP.@polyvar y[1:vec_length]
+        soc_condition = fpoly * sum(y[i]^2 for i in 1:vec_length) + 2 * sum(rand_polys[i - 1] * y[1] * y[i] for i in 2:vec_length)
+        (naive_U, naive_pts, naive_P0, _) = MU.soc_terms(U, pts, P0, [], vec_length)
+        cone = HYP.WSOSPolyInterpCone(naive_U, [naive_P0])
+        JuMP.@constraint(model, [soc_condition(naive_pts[u, :]) for u in 1:naive_U] in cone)
+    else
+        cone = HYP.WSOSPolyInterpSOCCone(vec_length, U, [P0])
+        JuMP.@constraint(model, vcat(f, [polys[:, i] for i in 1:npoly]...) in cone)
+        # JuMP.@constraint(model, [i in 1:npoly], polys[:, i] .- fpv in HYP.WSOSPolyInterpCone(U, [P0, PWts...]))
+    end
+    JuMP.optimize!(model)
+
+    @show dot(JuMP.value.(f), lagrange_polys)
+    @show JuMP.objective_value(model)
+    return model
+end
+
+
 
 function JuMP_polysoc_monomial(P, n)
     dom = MU.FreeDomain(n)
@@ -97,37 +137,37 @@ function simple_infeasibility()
 end
 
 
-@testset "everything" begin
-    simple_feasibility()
-    simple_infeasibility()
-
-    Random.seed!(1)
-    for deg in 1:2, n in 1:2, npolys in 1:2
-        println()
-        @show deg, n, npolys
-
-        dom = MU.FreeDomain(n)
-        d = div(deg + 1, 2)
-        (U, pts, P0, _, w) = MU.interpolate(dom, d, sample = false, calc_w = true)
-        lagrange_polys = MU.recover_lagrange_polys(pts, 2d)
-
-        # generate vector of random polys using the Lagrange basis
-        random_coeffs = Random.rand(npolys, U)
-        subpolys = [LinearAlgebra.dot(random_coeffs[i, :], lagrange_polys) for i in 1:npolys]
-        random_vec = [random_coeffs[i, u] for i in 1:npolys for u in 1:U]
-
-        model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, max_iters = 100))
-        JuMP.@variable(model, coeffs[1:U])
-        JuMP.@constraint(model, [coeffs; random_vec...] in HYP.WSOSPolyInterpSOCCone(npolys + 1, U, [P0]))
-        # JuMP.@objective(model, Min, dot(quad_weights, coeffs))
-        JuMP.optimize!(model)
-        upper_bound = LinearAlgebra.dot(JuMP.value.(coeffs), lagrange_polys)
-        @test JuMP.termination_status(model) == MOI.OPTIMAL
-        @test JuMP.primal_status(model) == MOI.FEASIBLE_POINT
-
-        for i in 1:50
-            pt = randn(n)
-            @test (upper_bound(pt))^2 >= sum(subpolys.^2)(pt)
-        end
-    end
-end
+# @testset "everything" begin
+#     simple_feasibility()
+#     simple_infeasibility()
+#
+#     Random.seed!(1)
+#     for deg in 1:2, n in 1:2, npolys in 1:2
+#         println()
+#         @show deg, n, npolys
+#
+#         dom = MU.FreeDomain(n)
+#         d = div(deg + 1, 2)
+#         (U, pts, P0, _, w) = MU.interpolate(dom, d, sample = false, calc_w = true)
+#         lagrange_polys = MU.recover_lagrange_polys(pts, 2d)
+#
+#         # generate vector of random polys using the Lagrange basis
+#         random_coeffs = Random.rand(npolys, U)
+#         subpolys = [LinearAlgebra.dot(random_coeffs[i, :], lagrange_polys) for i in 1:npolys]
+#         random_vec = [random_coeffs[i, u] for i in 1:npolys for u in 1:U]
+#
+#         model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, max_iters = 100))
+#         JuMP.@variable(model, coeffs[1:U])
+#         JuMP.@constraint(model, [coeffs; random_vec...] in HYP.WSOSPolyInterpSOCCone(npolys + 1, U, [P0]))
+#         # JuMP.@objective(model, Min, dot(quad_weights, coeffs))
+#         JuMP.optimize!(model)
+#         upper_bound = LinearAlgebra.dot(JuMP.value.(coeffs), lagrange_polys)
+#         @test JuMP.termination_status(model) == MOI.OPTIMAL
+#         @test JuMP.primal_status(model) == MOI.FEASIBLE_POINT
+#
+#         for i in 1:50
+#             pt = randn(n)
+#             @test (upper_bound(pt))^2 >= sum(subpolys.^2)(pt)
+#         end
+#     end
+# end

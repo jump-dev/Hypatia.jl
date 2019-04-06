@@ -38,8 +38,8 @@ dimension(cone::Cone) = cone.dim
 function factorize_hess(cone::Cone)
     @. cone.H2 = cone.H
 
-    if (cone isa WSOSPolyInterpMat) || (cone isa WSOSPolyInterp)
-        open("conditioning.csv", "a") do f
+    if (cone isa WSOSPolyInterpMat) || (cone isa WSOSPolyInterp) || (cone isa WSOSPolyInterpSOC)
+        open("cond_muconv/soc.csv", "a") do f
             println(f, cond(Symmetric(cone.H2, :U)))
         end
     end

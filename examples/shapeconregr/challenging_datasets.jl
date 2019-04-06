@@ -12,8 +12,8 @@ using LinearAlgebra
 include(joinpath(@__DIR__(), "jump.jl"))
 
 # Example 1 from https://arxiv.org/pdf/1509.08165v1.pdf
-function normfunction_data(; n::Int = 1, num_points::Int = 100)
-    f = x -> sum(abs2, x)
+function normfunction_data(; n::Int = 1, num_points::Int = 500)
+    f = x -> exp(sum(abs2, x))
     (X, y) = generate_regr_data(f, -1.0, 1.0, n, num_points, signal_ratio = 9.0)
     return (X, y, n)
 end
@@ -78,10 +78,10 @@ end
         @show s
         println()
 
-        (X, y, n) = s()
+        (X, y, n) = s(6)
         dom = MU.Box(-ones(n), ones(n))
-        shape_data = ShapeData(dom, dom, zeros(n), 0)
-        (regressor, lagrange_polys, g) = build_shapeconregr_WSOS(model, X, y, d, shape_data, use_scalar = true, add_regularization = true)
+        shape_data = ShapeData(dom, dom, ones(n), 0)
+        (regressor, lagrange_polys, g) = build_shapeconregr_WSOS(model, X, y, d, shape_data, use_scalar = false, add_regularization = false)
         # build_shapeconregr_PSD(model, X, y, d, shape_data)
 
         (val, runtime, bytes, gctime, memallocs) = @timed JuMP.optimize!(model)
@@ -96,11 +96,11 @@ end
         # @show JuMP.value(model[:regressor])
         # @show JuMP.value.(model[:g])
 
-        using Plots
-        plotlyjs()
-        regfun(x) =JuMP.value(regressor)(x)
-        # regfun([1., 1.])
-        plot(regfun, -1, 1)
+        # using Plots
+        # plotlyjs()
+        # regfun(x) =JuMP.value(regressor)(x)
+        # # regfun([1., 1.])
+        # plot(regfun, -1, 1)
     # end
 # end
 

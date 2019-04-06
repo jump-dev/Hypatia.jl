@@ -221,7 +221,7 @@ function build_shapeconregr_WSOS(
     if add_regularization
         @warn "assuming [-1 1] box domain was used" # TODO
         domain = MU.Box(-ones(n), ones(n))
-        d = div(regressor_deg + 1, 2)
+        d = regressor_deg
         (U, pts, P0, PWts, w) = MU.interpolate(domain, d, sample = false, calc_w = true)
         soccone = HYP.WSOSPolyInterpSOCCone(3, U, [P0, PWts...])
         JuMP.@variable(model, g[1:U])
@@ -229,10 +229,10 @@ function build_shapeconregr_WSOS(
         # one_poly[1] = 1.0
         var1 = g + 0.5 * ones(U) # AffExpr.(g + ones(U))
         var2 = g - 0.5 * ones(U) # AffExpr.(b - ones(U))
-        var3 = 2 * [regressor(regressor_points[u, :]) for u in 1:regressor_U]
+        var3 = 2 * [regressor(pts[u, :]) for u in 1:U]
         JuMP.@constraint(model, vcat(var1, var2, var3) in soccone)
         regularization = JuMP.dot(w, g)
-        JuMP.@objective(model, Min, 0.9 * z / num_points + 0.1 * regularization)
+        JuMP.@objective(model, Min, 0.99 * z / num_points + 0.01 * regularization)
     end
 
     # monotonicity

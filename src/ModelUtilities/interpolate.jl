@@ -395,6 +395,40 @@ function bilinear_terms(U, pts, P0, PWts, n)
     end
     naive_U = U_y * U
     naive_P0 = kron(ypts, P0)
-    naive_PWts = [kron(ypts, pwt) for pwt in PWts]
-    return (naive_U, naive_pts, naive_P0, naive_PWts)
+    if !isempty(PWts)
+        naive_PWts = [kron(ypts, pwt) for pwt in PWts]
+        return (naive_U, naive_pts, naive_P0, naive_PWts)
+    else
+        return (naive_U, naive_pts, naive_P0, [])
+    end
+end
+
+function soc_terms(U, pts, P0, PWts, m)
+    U_y = m
+    n = size(pts, 2)
+    ypts = zeros(U_y, m)
+    naive_pts = zeros(U * U_y, n + m)
+
+    naive_pts[1:U, 1:n] = pts
+    naive_pts[1:U, n + 1] .= 1
+
+    ypts[1, 1] = 1
+    naive_pts[1:U, 1:n] = pts
+    naive_pts[1:U, 1] .= 1
+    for i in 2:m
+        ypts[i, i] = 1
+        ypts[i, 1] = 1
+        pt_range = ((i - 1) * U + 1):(i * U)
+        naive_pts[pt_range, 1:n] = pts
+        naive_pts[pt_range, n + i] .= 1
+        naive_pts[pt_range, n + 1] .= 1
+    end
+    naive_U = U_y * U
+    naive_P0 = kron(ypts, P0)
+    if !isempty(PWts)
+        naive_PWts = [kron(ypts, pwt) for pwt in PWts]
+        return (naive_U, naive_pts, naive_P0, naive_PWts)
+    else
+        return (naive_U, naive_pts, naive_P0, [])
+    end
 end

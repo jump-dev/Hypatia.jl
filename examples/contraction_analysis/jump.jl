@@ -5,7 +5,6 @@ example taken from "Stability and robustness analysis of nonlinear systems via c
 =#
 
 import Hypatia
-import MathOptInterfaceMosek
 const HYP = Hypatia
 const CO = HYP.Cones
 const SO = HYP.Solvers
@@ -59,17 +58,30 @@ function contraction_analysis_common(beta::Float64, deg_M::Int, delta::Float64 =
     return (model, M, R, pts_M, pts_R, U_M, U_R, P0_M, P0_R)
 end
 
-function contraction_analysis_WSOS(beta::Float64, deg_M::Int; delta::Float64 = 1e-3)
+function contraction_analysis_WSOS(beta::Float64, deg_M::Int; delta::Float64 = 1e-3, use_scalar::Bool = true)
     n = 2
-    (model, M, R, pts_M, pts_R, U_M, U_R, P0_M, P0_R) = jet_engine_common(beta, deg_M, delta)
-    JuMP.@constraint(model, [M[i, j](pts_M[u, :]) * (i == j ? 1.0 : rt2) - (i == j ? delta : 0.0) for i in 1:n for j in 1:i for u in 1:U_M] in HYP.WSOSPolyInterpMatCone(n, U_M, [P0_M]))
-    JuMP.@constraint(model, [-1 * R[i, j](pts_R[u, :]) * (i == j ? 1.0 : rt2) - (i == j ? delta : 0.0) for i in 1:n for j in 1:i for u in 1:U_R] in HYP.WSOSPolyInterpMatCone(n, U_R, [P0_R]))
+    (model, M, R, pts_M, pts_R, U_M, U_R, P0_M, P0_R) = contraction_analysis_common(beta, deg_M, delta)
+    if use_scalar
+        DP.@polyvar y[1:n]
+        conv_condition_M = y' * M * y
+        (naive_U_M, naive_points_M, naive_P0_M, _) = MU.bilinear_terms(U_M, pts_M, P0_M, [], n)
+        wsos_cone_M = HYP.WSOSPolyInterpCone(naive_U_M, [naive_P0_M])
+        JuMP.@constraint(model, [conv_condition_M(naive_points_M[u, :]) - delta for u in 1:naive_U_M] in wsos_cone_M)
+
+        conv_condition_R = -y' * R * y
+        (naive_U_R, naive_points_R, naive_P0_R, _) = MU.bilinear_terms(U_R, pts_R, P0_R, [], n)
+        wsos_cone_R = HYP.WSOSPolyInterpCone(naive_U_R, [naive_P0_R])
+        JuMP.@constraint(model, [conv_condition_R(naive_points_R[u, :]) - delta for u in 1:naive_U_R] in wsos_cone_R)
+    else
+        JuMP.@constraint(model, [M[i, j](pts_M[u, :]) * (i == j ? 1.0 : rt2) - (i == j ? delta : 0.0) for i in 1:n for j in 1:i for u in 1:U_M] in HYP.WSOSPolyInterpMatCone(n, U_M, [P0_M]))
+        JuMP.@constraint(model, [-1 * R[i, j](pts_R[u, :]) * (i == j ? 1.0 : rt2) - (i == j ? delta : 0.0) for i in 1:n for j in 1:i for u in 1:U_R] in HYP.WSOSPolyInterpMatCone(n, U_R, [P0_R]))
+    end
     return model
 end
 
 function contraction_analysis_PSD(beta::Float64, deg_M::Int; delta::Float64 = 1e-3)
     n = 2
-    (model, M, R, _, _, _, _, _, _) = jet_engine_common(beta, deg_M, delta)
+    (model, M, R, _, _, _, _, _, _) = contraction_analysis_common(beta, deg_M, delta)
     JuMP.@constraint(model, M - delta * Matrix{Float64}(I, n, n) in JuMP.PSDCone())
     JuMP.@constraint(model, -R - delta * Matrix{Float64}(I, n, n) in JuMP.PSDCone())
     return model
