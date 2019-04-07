@@ -379,12 +379,13 @@ function recover_lagrange_polys(pts::Matrix{Float64}, deg::Int)
     return lagrange_polys
 end
 
-function bilinear_terms(U, pts, P0, PWts, n)
-    U_y = div(n * (n + 1), 2)
-    ypts = zeros(U_y, n)
-    naive_pts = zeros(U * U_y, 2n)
+function bilinear_terms(U, pts, P0, PWts, sidelength)
+    n = size(pts, 2)
+    U_y = div(sidelength * (sidelength + 1), 2)
+    ypts = zeros(U_y, sidelength)
+    naive_pts = zeros(U * U_y, n + sidelength)
     row = 0
-    for i in 1:n, j in i:n
+    for i in 1:sidelength, j in i:sidelength
         row += 1
         ypts[row, i] = 1
         ypts[row, j] = 1
@@ -404,25 +405,57 @@ function bilinear_terms(U, pts, P0, PWts, n)
 end
 
 function soc_terms(U, pts, P0, PWts, m)
-    U_y = m
+    U_y = 2m - 1
     n = size(pts, 2)
     ypts = zeros(U_y, m)
     naive_pts = zeros(U * U_y, n + m)
 
-    naive_pts[1:U, 1:n] = pts
-    naive_pts[1:U, n + 1] .= 1
+    # naive_pts[1:U, 1:n] = pts
+    # naive_pts[1:U, n + 1] .= 1
+    #
+    # ypts[1, 1] = 1
+    # naive_pts[1:U, 1:n] = pts
+    # naive_pts[1:U, 1] .= 1
+    # for i in 2:m
+    #     ypts[i, i] = 1
+    #     ypts[i, 1] = 1
+    #     pt_range = ((i - 1) * U + 1):(i * U)
+    #     naive_pts[pt_range, 1:n] = pts
+    #     naive_pts[pt_range, n + i] .= 1
+    #     naive_pts[pt_range, n + 1] .= 1
+    # end
 
-    ypts[1, 1] = 1
-    naive_pts[1:U, 1:n] = pts
-    naive_pts[1:U, 1] .= 1
-    for i in 2:m
-        ypts[i, i] = 1
-        ypts[i, 1] = 1
-        pt_range = ((i - 1) * U + 1):(i * U)
+    row = 0
+    for i in 1:m
+        row += 1
+        ypts[row, i] = 1
+        ypts[row, 1] = 1
+        pt_range = ((row - 1) * U + 1):(row * U)
         naive_pts[pt_range, 1:n] = pts
         naive_pts[pt_range, n + i] .= 1
         naive_pts[pt_range, n + 1] .= 1
     end
+    for i in 2:m
+        row += 1
+        ypts[row, i] = 1
+        pt_range = ((row - 1) * U + 1):(row * U)
+        naive_pts[pt_range, 1:n] = pts
+        naive_pts[pt_range, n + i] .= 1
+    end
+
+
+    # random_pool = randn(2m - 1, m)
+    # row = 0
+    # for i in 1:(2m - 1)
+    #     row += 1
+    #     ypts[row, :] = random_pool[row, :]
+    #     pt_range = ((row - 1) * U + 1):(row * U)
+    #     naive_pts[pt_range, 1:n] = pts
+    #     for j in 1:U
+    #         naive_pts[pt_range[j], (n + 1):(n + m)] .= random_pool[row, :]
+    #     end
+    # end
+
     naive_U = U_y * U
     naive_P0 = kron(ypts, P0)
     if !isempty(PWts)

@@ -57,41 +57,60 @@ end
 
 function JuMP_polysoc_envelope(; use_scalar = false)
     Random.seed!(1)
+    n = 1
     dom = MU.FreeDomain(n)
-    DP.@polyvar x
-    d = 6
+    DP.@polyvar x[1:n]
+    d = 2
     (U, pts, P0, _, w) = MU.interpolate(dom, d, sample = false, calc_w = true)
     lagrange_polys = MU.recover_lagrange_polys(pts, 2d)
-    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, max_iters = 400, tol_feas = 1e-5))
+    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, max_iters = 400, tol_feas = 1e-7))
     JuMP.@variable(model, f[1:U])
     JuMP.@objective(model, Min, dot(w, f))
 
-    vec_length = 10
+    vec_length = 3
     npoly = vec_length - 1
     LDegs = size(P0, 2)
     polys = P0[:, 1:LDegs] * rand(-9:9, LDegs, npoly)
-    # @show [dot(polys[:, i], lagrange_polys) for i in 1:npoly]
+    rand_polys = [dot(polys[:, i], lagrange_polys) for i in 1:npoly]
+    # @show sum(rand_polys.^2)
 
+    fpoly = dot(f, lagrange_polys)
+    rand_polys = [dot(polys[:, i], lagrange_polys) for i in 1:npoly]
+    DP.@polyvar y[1:vec_length]
+    soc_condition = fpoly * sum(y[i]^2 for i in 1:vec_length) + 2 * sum(rand_polys[i - 1] * y[1] * y[i] for i in 2:vec_length)
     if use_scalar
-        fpoly = dot(f, lagrange_polys)
-        rand_polys = [dot(polys[:, i], lagrange_polys) for i in 1:npoly]
-        DP.@polyvar y[1:vec_length]
-        soc_condition = fpoly * sum(y[i]^2 for i in 1:vec_length) + 2 * sum(rand_polys[i - 1] * y[1] * y[i] for i in 2:vec_length)
-        (naive_U, naive_pts, naive_P0, _) = MU.soc_terms(U, pts, P0, [], vec_length)
-        cone = HYP.WSOSPolyInterpCone(naive_U, [naive_P0])
-        JuMP.@constraint(model, [soc_condition(naive_pts[u, :]) for u in 1:naive_U] in cone)
+        # (naive_U, naive_pts, naive_P0, _) = MU.soc_terms(U, pts, P0, [], vec_length)
+        # cone = HYP.WSOSPolyInterpCone(naive_U, [naive_P0])
+        # JuMP.@constraint(model, [soc_condition(naive_pts[u, :]) for u in 1:naive_U] in cone)
+        (naive_U, naive_pts, naive_P0, naive_PWts) = MU.bilinear_terms(U, pts, P0, [], vec_length)
+        wsos_cone = HYP.WSOSPolyInterpCone(naive_U, [naive_P0, naive_PWts...])
+        DP.@polyvar z[1:vec_length]
+        sdp_condition = sum(z)^0 * (fpoly * sum(z[i]^2 for i in 1:vec_length) + 2 * sum(rand_polys[i - 1] * z[1] * z[i] for i in 2:vec_length))
+        JuMP.@constraint(model, [sdp_condition(naive_pts[u, :]) for u in 1:naive_U] in wsos_cone)
     else
         cone = HYP.WSOSPolyInterpSOCCone(vec_length, U, [P0])
         JuMP.@constraint(model, vcat(f, [polys[:, i] for i in 1:npoly]...) in cone)
-        # JuMP.@constraint(model, [i in 1:npoly], polys[:, i] .- fpv in HYP.WSOSPolyInterpCone(U, [P0, PWts...]))
     end
     JuMP.optimize!(model)
+
+    # for _ in 1:20000
+    #     rndpt = randn(n + vec_length) * 10
+    #     if JuMP.value(soc_condition)(rndpt) <= 0
+    #         @show rndpt
+    #     end
+    # end
 
     @show dot(JuMP.value.(f), lagrange_polys)
     @show JuMP.objective_value(model)
     return model
 end
 
+using Plots
+plotlyjs()
+func1(x) = sum(rand_polys.^2)(x)
+func2(x) = dot(JuMP.value.(f), lagrange_polys)(x)^2
+plot(func1, -1, 1)
+plot!(func2, -1, 1)
 
 
 function JuMP_polysoc_monomial(P, n)

@@ -218,21 +218,29 @@ function build_shapeconregr_WSOS(
             [i in 1:num_points], z[i] >= -y[i] + regressor(X[i, :])
         end)
     end
+    hessian = DP.differentiate(regressor, DP.variables(regressor), 2)
     if add_regularization
         @warn "assuming [-1 1] box domain was used" # TODO
         domain = MU.Box(-ones(n), ones(n))
-        d = regressor_deg
-        (U, pts, P0, PWts, w) = MU.interpolate(domain, d, sample = false, calc_w = true)
-        soccone = HYP.WSOSPolyInterpSOCCone(3, U, [P0, PWts...])
+        # d = regressor_deg
+        # (U, pts, P0, PWts, w) = MU.interpolate(domain, d, sample = true, calc_w = true)
+        # soccone = HYP.WSOSPolyInterpSOCCone(3, U, [P0, PWts...])
+        # JuMP.@variable(model, g[1:U])
+        # # one_poly[1] = 1.0
+        # var1 = g + 0.5 * ones(U) # AffExpr.(g + ones(U))
+        # var2 = g - 0.5 * ones(U) # AffExpr.(b - ones(U))
+        # var3 = 2 * [regressor(pts[u, :]) for u in 1:U]
+        # JuMP.@constraint(model, vcat(var1, var2, var3) in soccone)
+        # regularization = JuMP.dot(w, g)
+        # JuMP.@objective(model, Min, 0.99 * z / num_points + 0.01 * regularization)
+        d = div(regressor_deg + 1, 2)
+        (U, pts, P0, PWts, w) = MU.interpolate(domain, d, sample = true, calc_w = true)
+        soccone = HYP.WSOSPolyInterpSOCCone(div(n * (n + 1), 2) + 1, U, [P0, PWts...])
         JuMP.@variable(model, g[1:U])
-        # one_poly = zeros(U)
-        # one_poly[1] = 1.0
-        var1 = g + 0.5 * ones(U) # AffExpr.(g + ones(U))
-        var2 = g - 0.5 * ones(U) # AffExpr.(b - ones(U))
-        var3 = 2 * [regressor(pts[u, :]) for u in 1:U]
-        JuMP.@constraint(model, vcat(var1, var2, var3) in soccone)
+        var2 = [hessian[i, j](pts[u, :]) * (i == j ? 1 : 2) for i in 1:n for j in 1:i for u in 1:U]
+        JuMP.@constraint(model, vcat(g, var2...) in soccone)
         regularization = JuMP.dot(w, g)
-        JuMP.@objective(model, Min, 0.99 * z / num_points + 0.01 * regularization)
+        JuMP.@objective(model, Min, z / num_points + 0.001 * regularization)
     end
 
     # monotonicity
@@ -245,7 +253,6 @@ function build_shapeconregr_WSOS(
 
     # convexity
     if !iszero(shape_data.conv_profile)
-        hessian = DP.differentiate(regressor, DP.variables(regressor), 2)
         if use_scalar
             DP.@polyvar y[1:n]
             conv_condition = y' * hessian * y
@@ -258,7 +265,7 @@ function build_shapeconregr_WSOS(
         end
     end
 
-    return (regressor, lagrange_polys, g)
+    return (regressor, lagrange_polys)
 end
 
 function run_JuMP_shapeconregr(use_wsos::Bool; dense::Bool = true, use_PolyJuMP::Bool = false)
