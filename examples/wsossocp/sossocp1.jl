@@ -14,7 +14,7 @@ import JuMP
 import DynamicPolynomials
 const DP = DynamicPolynomials
 # import SumOfSquares
-import LinearAlgebra
+using LinearAlgebra
 import Random
 using Test
 
@@ -99,27 +99,27 @@ function JuMP_polysoc_envelope(; use_scalar = false)
     #         @show rndpt
     #     end
     # end
-    for _ in 1:20000
-        rndpt = randn(n + vec_length) * 10
-        if JuMP.value(sdp_condition)(rndpt) < 0
-            @show rndpt, JuMP.value(sdp_condition)(rndpt)
-        end
-        if (dot(JuMP.value.(f), lagrange_polys)(rndpt[1:n]))^2 - sum(abs2(rp(rndpt[1:n])) for rp in rand_polys)  < 0
-            @show rndpt, JuMP.value(sdp_condition)(rndpt)
-        end
-    end
+    # for _ in 1:20000
+    #     rndpt = randn(n + vec_length) * 10
+    #     if JuMP.value(sdp_condition)(rndpt) < 0
+    #         @show rndpt, JuMP.value(sdp_condition)(rndpt)
+    #     end
+    #     if (dot(JuMP.value.(f), lagrange_polys)(rndpt[1:n]))^2 - sum(abs2(rp(rndpt[1:n])) for rp in rand_polys)  < 0
+    #         @show rndpt, JuMP.value(sdp_condition)(rndpt)
+    #     end
+    # end
 
     @show dot(JuMP.value.(f), lagrange_polys)
     @show JuMP.objective_value(model)
     return model
 end
 
-using Plots
-plotlyjs()
-func1(x) = sum(rand_polys.^2)(x)
-func2(x) = dot(JuMP.value.(f), lagrange_polys)(x)^2
-plot(func1, -1, 1)
-plot!(func2, -1, 1)
+# using Plots
+# plotlyjs()
+# func1(x) = sum(rand_polys.^2)(x)
+# func2(x) = dot(JuMP.value.(f), lagrange_polys)(x)^2
+# plot(func1, -1, 1)
+# plot!(func2, -1, 1)
 
 
 function JuMP_polysoc_monomial(P, n)

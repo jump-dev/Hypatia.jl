@@ -9,10 +9,12 @@ using CSV
 using TimerOutputs
 using SumOfSquares
 using LinearAlgebra
+using Plots
+plotlyjs()
 include(joinpath(@__DIR__(), "jump.jl"))
 
 # Example 1 from https://arxiv.org/pdf/1509.08165v1.pdf
-function normfunction_data(; n::Int = 1, num_points::Int = 500)
+function normfunction_data(; n::Int = 1, num_points::Int = 1000)
     f = x -> exp(sum(abs2, x))
     (X, y) = generate_regr_data(f, -1.0, 1.0, n, num_points, signal_ratio = 9.0)
     return (X, y, n)
@@ -49,6 +51,21 @@ function production_data()
     return (Xlog, y, n)
 end
 
+
+function make_model()
+    return SumOfSquares.SOSModel(JuMP.with_optimizer(HYP.Optimizer,
+        use_dense = true,
+        verbose = true,
+        system_solver = SO.QRCholCombinedHSDSystemSolver,
+        linear_model = MO.PreprocessedLinearModel,
+        max_iters = 1000,
+        time_limit = 3.6e3,
+        tol_rel_opt = 1e-5,
+        tol_abs_opt = 1e-6,
+        tol_feas = 1e-4,
+        ))
+end
+
 # function run_hard_shapeconregr()
     reset_timer!(Hypatia.to)
     # degrees = 4:2:4
@@ -61,30 +78,31 @@ end
         ]
 
     # for d in degrees, s in datasets
-        model = SumOfSquares.SOSModel(JuMP.with_optimizer(HYP.Optimizer,
-            use_dense = true,
-            verbose = true,
-            system_solver = SO.QRCholCombinedHSDSystemSolver,
-            linear_model = MO.PreprocessedLinearModel,
-            max_iters = 250,
-            time_limit = 3.6e3,
-            tol_rel_opt = 1e-5,
-            tol_abs_opt = 1e-6,
-            tol_feas = 1e-4,
-            ))
 
         println()
         @show d
         @show s
         println()
 
-        (X, y, n) = s(n = 5)
+        (X, y, n) = s(n = 4)
         dom = MU.Box(-ones(n), ones(n))
-        shape_data = ShapeData(dom, dom, ones(n), 0)
-        (regressor, lagrange_polys) = build_shapeconregr_WSOS(model, X, y, d, shape_data, use_scalar = false, add_regularization = false)
-        # build_shapeconregr_PSD(model, X, y, d, shape_data)
 
+        shape_data = ShapeData(dom, dom, zeros(n), 0)
+
+        model = make_model()
+        (regressor, lagrange_polys) = build_shapeconregr_WSOS(model, X, y, d, shape_data, use_scalar = false, add_regularization = true)
         (val, runtime, bytes, gctime, memallocs) = @timed JuMP.optimize!(model)
+        # regfun1(x) = JuMP.value(regressor)(x)
+        # pl = plot(regfun1, -1, 1, lab = "No penalty")
+
+        # model = make_model()
+        # (regressor, lagrange_polys) = build_shapeconregr_WSOS(model, X, y, d, shape_data, use_scalar = false, add_regularization = true)
+        # (val, runtime, bytes, gctime, memallocs) = @timed JuMP.optimize!(model)
+        # regfun2(x) = JuMP.value(regressor)(x)
+        # plot!(pl, regfun2, -1, 1, lab = "With penalty")
+        #
+        # realfun(x) = exp(sum(abs2, x))
+        # plot(pl, realfun, -1, 1, lab = "Truth")
 
         println()
         @show runtime
@@ -93,14 +111,9 @@ end
         @show memallocs
         println("\n\n")
 
-        # @show JuMP.value(model[:regressor])
-        # @show JuMP.value.(model[:g])
 
-        # using Plots
-        # plotlyjs()
-        # regfun(x) =JuMP.value(regressor)(x)
-        # # regfun([1., 1.])
-        # plot(regfun, -1, 1)
+
+
     # end
 # end
 
