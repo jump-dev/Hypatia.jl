@@ -152,10 +152,12 @@ deps = ["Random"]
 uuid = "9fa8497b-333b-5362-9e8d-4d0656e87820"
 
 [[GSL]]
-deps = ["BinaryProvider", "Compat", "Libdl", "LinearAlgebra", "Markdown", "Printf", "Random", "Test"]
-git-tree-sha1 = "96048e9db673b38968fd279db00ee45a16520add"
+deps = ["BinaryProvider", "Compat", "Libdl", "Test"]
+git-tree-sha1 = "b001d22c3d3efb302f74ee6b946a19f8e59a86c1"
+repo-rev = "v0.4.0"
+repo-url = "https://github.com/JuliaMath/GSL.jl.git"
 uuid = "92c85e6c-cbff-5e0c-80f7-495c94daaecd"
-version = "0.5.0"
+version = "0.5.0+"
 
 [[InteractiveUtils]]
 deps = ["Markdown"]
@@ -374,11 +376,9 @@ uuid = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
 
 [[SumOfSquares]]
 deps = ["JuMP", "LinearAlgebra", "MathOptInterface", "MultivariateMoments", "MultivariatePolynomials", "Pkg", "PolyJuMP", "Reexport", "SemialgebraicSets", "SparseArrays", "Test"]
-git-tree-sha1 = "cd4bfdb4a36c4ef0c17996da508eac8dae8637c5"
-repo-rev = "master"
-repo-url = "https://github.com/JuliaOpt/SumOfSquares.jl.git"
+git-tree-sha1 = "d114c69112e4f2b474452792edd036f709565e56"
 uuid = "4b9e565b-77fc-50a5-a571-1244f986bda1"
-version = "0.3.0+"
+version = "0.3.0"
 
 [[TableTraits]]
 deps = ["IteratorInterfaceExtensions", "Test"]

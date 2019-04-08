@@ -27,6 +27,7 @@ include("semidefinite.jl")
 include("hypoperlogdet.jl")
 include("wsospolyinterp.jl")
 include("wsospolyinterp_2.jl")
+include("wsospolyinterp_complex.jl")
 include("wsospolyinterpmat.jl")
 include("wsospolyinterpsoc.jl")
 
