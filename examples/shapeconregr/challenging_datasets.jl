@@ -70,7 +70,7 @@ end
             time_limit = 3.6e3,
             tol_rel_opt = 1e-5,
             tol_abs_opt = 1e-6,
-            tol_feas = 1e-6,
+            tol_feas = 1e-4,
             ))
 
         println()
@@ -78,10 +78,10 @@ end
         @show s
         println()
 
-        (X, y, n) = s(6)
+        (X, y, n) = s(n = 5)
         dom = MU.Box(-ones(n), ones(n))
         shape_data = ShapeData(dom, dom, ones(n), 0)
-        (regressor, lagrange_polys, g) = build_shapeconregr_WSOS(model, X, y, d, shape_data, use_scalar = false, add_regularization = false)
+        (regressor, lagrange_polys) = build_shapeconregr_WSOS(model, X, y, d, shape_data, use_scalar = false, add_regularization = false)
         # build_shapeconregr_PSD(model, X, y, d, shape_data)
 
         (val, runtime, bytes, gctime, memallocs) = @timed JuMP.optimize!(model)

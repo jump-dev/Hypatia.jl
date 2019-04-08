@@ -57,7 +57,7 @@ end
 
 function JuMP_polysoc_envelope(; use_scalar = false)
     Random.seed!(1)
-    n = 1
+    n = 2
     dom = MU.FreeDomain(n)
     DP.@polyvar x[1:n]
     d = 2
@@ -67,7 +67,7 @@ function JuMP_polysoc_envelope(; use_scalar = false)
     JuMP.@variable(model, f[1:U])
     JuMP.@objective(model, Min, dot(w, f))
 
-    vec_length = 3
+    vec_length = 5
     npoly = vec_length - 1
     LDegs = size(P0, 2)
     polys = P0[:, 1:LDegs] * rand(-9:9, LDegs, npoly)
@@ -78,14 +78,14 @@ function JuMP_polysoc_envelope(; use_scalar = false)
     rand_polys = [dot(polys[:, i], lagrange_polys) for i in 1:npoly]
     DP.@polyvar y[1:vec_length]
     soc_condition = fpoly * sum(y[i]^2 for i in 1:vec_length) + 2 * sum(rand_polys[i - 1] * y[1] * y[i] for i in 2:vec_length)
+    DP.@polyvar z[1:vec_length]
+    sdp_condition = fpoly * sum(z[i]^2 for i in 1:vec_length) + 2 * sum(rand_polys[i - 1] * z[1] * z[i] for i in 2:vec_length)
     if use_scalar
         # (naive_U, naive_pts, naive_P0, _) = MU.soc_terms(U, pts, P0, [], vec_length)
         # cone = HYP.WSOSPolyInterpCone(naive_U, [naive_P0])
         # JuMP.@constraint(model, [soc_condition(naive_pts[u, :]) for u in 1:naive_U] in cone)
-        (naive_U, naive_pts, naive_P0, naive_PWts) = MU.bilinear_terms(U, pts, P0, [], vec_length)
-        wsos_cone = HYP.WSOSPolyInterpCone(naive_U, [naive_P0, naive_PWts...])
-        DP.@polyvar z[1:vec_length]
-        sdp_condition = sum(z)^0 * (fpoly * sum(z[i]^2 for i in 1:vec_length) + 2 * sum(rand_polys[i - 1] * z[1] * z[i] for i in 2:vec_length))
+        (naive_U, naive_pts, naive_P0, _) = MU.bilinear_terms(U, pts, P0, [], vec_length)
+        wsos_cone = HYP.WSOSPolyInterpCone(naive_U, [naive_P0])
         JuMP.@constraint(model, [sdp_condition(naive_pts[u, :]) for u in 1:naive_U] in wsos_cone)
     else
         cone = HYP.WSOSPolyInterpSOCCone(vec_length, U, [P0])
@@ -99,6 +99,15 @@ function JuMP_polysoc_envelope(; use_scalar = false)
     #         @show rndpt
     #     end
     # end
+    for _ in 1:20000
+        rndpt = randn(n + vec_length) * 10
+        if JuMP.value(sdp_condition)(rndpt) < 0
+            @show rndpt, JuMP.value(sdp_condition)(rndpt)
+        end
+        if (dot(JuMP.value.(f), lagrange_polys)(rndpt[1:n]))^2 - sum(abs2(rp(rndpt[1:n])) for rp in rand_polys)  < 0
+            @show rndpt, JuMP.value(sdp_condition)(rndpt)
+        end
+    end
 
     @show dot(JuMP.value.(f), lagrange_polys)
     @show JuMP.objective_value(model)
