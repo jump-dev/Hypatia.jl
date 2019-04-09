@@ -98,7 +98,9 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
         @. tmp1 = ipwtj' * point_pq'
         mul!(tmp4, tmp1, ipwtj)
         mat .= tmp4
+        @show eigen(Symmetric(tmp4, :L)).values
         lambdafact[j] = cholesky!(Symmetric(tmp4, :L), Val(true), check = false)
+
 
         if !isposdef(lambdafact[j])
             return false
@@ -117,6 +119,8 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
             mat -= tmp4 * li_lambda[r - 1]
             uo += cone.U
         end
+
+        @show eigen(Symmetric(mat, :U)).values
 
         matfact[j] = cholesky!(Symmetric(mat, :U), Val(true), check = false)
         if !isposdef(matfact[j])

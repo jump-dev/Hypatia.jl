@@ -265,6 +265,7 @@ function check_in_cone_master(cone::WSOSPolyInterpMat)
             uo += cone.U
         end
 
+        @show "mat eigens", eigen(Symmetric(mat, :L)).values
         cone.matfact[j] = cholesky!(Symmetric(mat, :L), Val(true), check = false)
         if !isposdef(cone.matfact[j])
             return false

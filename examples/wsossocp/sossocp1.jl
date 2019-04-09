@@ -57,13 +57,13 @@ end
 
 function JuMP_polysoc_envelope(; use_scalar = false)
     Random.seed!(1)
-    n = 2
+    n = 1
     dom = MU.FreeDomain(n)
     DP.@polyvar x[1:n]
     d = 2
     (U, pts, P0, _, w) = MU.interpolate(dom, d, sample = false, calc_w = true)
     lagrange_polys = MU.recover_lagrange_polys(pts, 2d)
-    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, max_iters = 400, tol_feas = 1e-7))
+    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, max_iters = 400, tol_feas = 1e-12, tol_abs_opt = 1e-12, tol_rel_opt = 1e-12))
     JuMP.@variable(model, f[1:U])
     JuMP.@objective(model, Min, dot(w, f))
 
@@ -84,14 +84,25 @@ function JuMP_polysoc_envelope(; use_scalar = false)
         # (naive_U, naive_pts, naive_P0, _) = MU.soc_terms(U, pts, P0, [], vec_length)
         # cone = HYP.WSOSPolyInterpCone(naive_U, [naive_P0])
         # JuMP.@constraint(model, [soc_condition(naive_pts[u, :]) for u in 1:naive_U] in cone)
-        (naive_U, naive_pts, naive_P0, _) = MU.bilinear_terms(U, pts, P0, [], vec_length)
-        wsos_cone = HYP.WSOSPolyInterpCone(naive_U, [naive_P0])
-        JuMP.@constraint(model, [sdp_condition(naive_pts[u, :]) for u in 1:naive_U] in wsos_cone)
+        # (naive_U, naive_pts, naive_P0, _) = MU.bilinear_terms(U, pts, P0, [], vec_length)
+        # wsos_cone = HYP.WSOSPolyInterpCone(naive_U, [naive_P0])
+        # JuMP.@constraint(model, [sdp_condition(naive_pts[u, :]) for u in 1:naive_U] in wsos_cone)
+
+        matrix_condition = GenericAffExpr{Float64,VariableRef}[]
+        push!(matrix_condition, f...)
+        for i in 2:vec_length
+            push!(matrix_condition, rt2 * polys[:, i - 1]...)
+            for j in 2:(i - 1)
+                push!(matrix_condition, zeros(U)...)
+            end
+            push!(matrix_condition, f...)
+        end
+        wsos_cone_mat = HYP.WSOSPolyInterpMatCone(vec_length, U, [P0])
+        JuMP.@constraint(model, matrix_condition in wsos_cone_mat)
     else
         cone = HYP.WSOSPolyInterpSOCCone(vec_length, U, [P0])
         JuMP.@constraint(model, vcat(f, [polys[:, i] for i in 1:npoly]...) in cone)
     end
-    JuMP.optimize!(model)
 
     # for _ in 1:20000
     #     rndpt = randn(n + vec_length) * 10
@@ -114,12 +125,12 @@ function JuMP_polysoc_envelope(; use_scalar = false)
     return model
 end
 
-# using Plots
-# plotlyjs()
-# func1(x) = sum(rand_polys.^2)(x)
-# func2(x) = dot(JuMP.value.(f), lagrange_polys)(x)^2
-# plot(func1, -1, 1)
-# plot!(func2, -1, 1)
+using Plots
+plotlyjs()
+func1(x) = sum(rand_polys.^2)(x)
+func2(x) = dot(JuMP.value.(f), lagrange_polys)(x)^2
+plot(func1, -2, 2)
+plot!(func2, -2, 2)
 
 
 function JuMP_polysoc_monomial(P, n)
