@@ -30,23 +30,22 @@ deg = 2
 U = deg + 1
 basis = [x -> x^j for j in 0:deg]
 
-# points are the roots of unity
-points = [cospi(2k / U) + sinpi(2k / U) * im for k = 0:(U - 1)]
-@show points
-V = [b(p) for p in points, b in basis]
-@test rank(V) == U
-
-# # sample
-# sample_factor = 100
-# points = randn(ComplexF64, sample_factor * U)
-# points ./= (abs.(points) .+ 1e-3)
-# @assert all(abs2.(points) .<= 1)
+# # points are the roots of unity
+# points = [cospi(2k / U) + sinpi(2k / U) * im for k = 0:(U - 1)]
+# @show points
 # V = [b(p) for p in points, b in basis]
 # @test rank(V) == U
-# F = qr(Matrix(V'), Val(true))
-# keep = F.p[1:U]
-# points = points[keep]
-# V = V[keep, :]
+
+# sample
+sample_factor = 100
+points = rand(ComplexF64, sample_factor * U) .- 0.5 * (1 + im)
+@assert all(abs2.(points) .<= 1)
+V = [b(p) for p in points, b in basis]
+@test rank(V) == U
+F = qr(Matrix(V'), Val(true))
+keep = F.p[1:U]
+points = points[keep]
+V = V[keep, :]
 
 # setup P0
 L0 = 2
