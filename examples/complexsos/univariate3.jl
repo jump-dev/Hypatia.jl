@@ -24,22 +24,22 @@ d = 2
 # f(z) = -1 + 4*real(z) + abs(z)^2 + real(z^2) + abs(z)^3 # + sum(abs(z)^i for i in 2:2:d))
 # f(z) = 1 + real(z) + abs(z)^2 + real(z^2) + real(z^2 * conj(z)) + 8abs(z)^4
 
-f(z) = 1 + 0.2real(z) + abs(z)^2 + 0.2real(z^2) + 0.2real(z^2 * conj(z)) + abs(z)^4
+# f(z) = 1 + 0.2real(z) + abs(z)^2 + 0.2real(z^2) + 0.2real(z^2 * conj(z)) + abs(z)^4
 # mathematica:
 # Minimize[1+2x+x^2+y^2+2(x^2-y^2)+2(x^3+x*y^2)+(x^2+y^2)^2,{x,y}]
 # min is 0
 
 
-# # inf random f
-# Fh = randn(ComplexF64, d + 1, d + 1)
-# if rand() > 0.5
-#     F = Hermitian(Fh)
-# else
-#     F = Hermitian(Fh * Fh')
-# end
-# @show isposdef(F)
-#
-# f(z) = real(sum(F[i+1, j+1] * z^i * conj(z)^j for i in 0:d, j in 0:d))
+# inf random f
+Fh = randn(ComplexF64, d + 1, d + 1)
+if rand() > 0.5
+    F = Hermitian(Fh)
+else
+    F = Hermitian(Fh * Fh')
+end
+@show isposdef(F)
+
+f(z) = real(sum(F[i+1, j+1] * z^i * conj(z)^j for i in 0:d, j in 0:d))
 
 
 # sample
@@ -68,8 +68,9 @@ V = V[keep, :]
 # setup P0
 L0 = d + 1
 v0 = ones(U)
-P0 = V[:, 1:L0]
-# P0 = [p^i for p in points, i in 0:d]
+# P0 = V[:, 1:L0]
+P0 = [p^i for p in points, i in 0:d]
+# P0 = Matrix(qr(P0).Q)
 
 # setup problem data
 if primal_wsos
@@ -124,17 +125,17 @@ for s in system_solvers, m in linear_models
     # @show isposdef(F)
     # @show F
 
-    # testmin = minimum(f(z) for z in randn(ComplexF64, 1000))
-    # @show testmin
+    testmin = minimum(f(z) for z in randn(ComplexF64, 1000))
+    @show testmin
     obj = primal_wsos ? -SO.get_primal_obj(solver) : SO.get_primal_obj(solver)
     @show obj
 
     # if isposdef(F)
-        @test SO.get_status(solver) == :Optimal
-        # @test obj > 0.0
-        # @test testmin > 0.0
-        # @test testmin > obj
-        # @test obj ≈ -1 atol=1e-3
+    #     @test SO.get_status(solver) == :Optimal
+    #     @test obj > 0.0
+    #     @test testmin > 0.0
+    #     @test testmin > obj
+    #     # @test obj ≈ -1 atol=1e-3
     # else
     #     stat = primal_wsos ? :PrimalInfeasible : :DualInfeasible
     #     @test SO.get_status(solver) == stat
