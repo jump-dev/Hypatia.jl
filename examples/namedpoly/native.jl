@@ -80,7 +80,7 @@ function build_namedpoly(
         h = [fn(pts[j, :]...) for j in 1:U]
     else
         c = [fn(pts[j, :]...) for j in 1:U] # evaluate polynomial at transformed points
-        A = ones(1, U)
+        A = ones(1, U) # TODO eliminate constraint and first variable
         b = [1.0]
         G = Diagonal(-1.0I, U) # TODO uniformscaling?
         h = zeros(U)

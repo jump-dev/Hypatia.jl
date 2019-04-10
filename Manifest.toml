@@ -177,7 +177,7 @@ version = "0.20.0"
 
 [[JuMP]]
 deps = ["Calculus", "DataStructures", "ForwardDiff", "LinearAlgebra", "MathOptInterface", "NaNMath", "Random", "SparseArrays", "Statistics", "Test"]
-git-tree-sha1 = "2b06dfdd07fc96d903da5a4a88d8095ee9670911"
+git-tree-sha1 = "2f28ce63710bff960494f6c6436f2df8e9da839b"
 repo-rev = "master"
 repo-url = "https://github.com/JuliaOpt/JuMP.jl.git"
 uuid = "4076af6c-e467-56ae-b986-b466b2749572"
@@ -376,9 +376,9 @@ uuid = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
 
 [[SumOfSquares]]
 deps = ["JuMP", "LinearAlgebra", "MathOptInterface", "MultivariateMoments", "MultivariatePolynomials", "Pkg", "PolyJuMP", "Reexport", "SemialgebraicSets", "SparseArrays", "Test"]
-git-tree-sha1 = "d114c69112e4f2b474452792edd036f709565e56"
+git-tree-sha1 = "2fde6e851a9b9b5d1f33b108d8fa71857346051b"
 uuid = "4b9e565b-77fc-50a5-a571-1244f986bda1"
-version = "0.3.0"
+version = "0.3.1"
 
 [[TableTraits]]
 deps = ["IteratorInterfaceExtensions", "Test"]

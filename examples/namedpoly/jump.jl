@@ -221,7 +221,7 @@ function build_JuMP_namedpoly_WSOS(
     else
         JuMP.@variable(model, μ[1:U])
         JuMP.@objective(model, Min, sum(μ[j] * f(pts[j, :]) for j in 1:U))
-        JuMP.@constraint(model, sum(μ) == 1.0)
+        JuMP.@constraint(model, sum(μ) == 1.0) # TODO eliminate constraint and first variable
         JuMP.@constraint(model, μ in cone)
     end
 
