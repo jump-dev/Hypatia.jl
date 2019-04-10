@@ -50,7 +50,7 @@ Md1[2, 2] = yr[1, 1] - yr[2, 2]
 Md1[3:4, 3:4] = Md1[1:2, 1:2]
 Md1[4, 1] = yi[1, 0] - yi[2, 1]
 Md1[3, 2] = -Md1[4, 1]
-@show Symmetric(Md1, :L)
+# @show Symmetric(Md1, :L)
 @constraint(model, Symmetric(Md1, :L) in PSDCone())
 
 # solve

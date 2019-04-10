@@ -14,7 +14,7 @@ using Combinatorics
 # optimal value 1/18
 # at order 2 of hierarchy
 n = 2
-deg = 4
+deg = 2
 αs = [α for t in 0:deg for α in Combinatorics.multiexponents(n, t)]
 T = binomial(n + deg, n)
 @assert length(αs) == T
@@ -28,10 +28,10 @@ T = binomial(n + deg, n)
 model = Model(with_optimizer(HYP.Optimizer, verbose = true, tol_feas = 1e-8, tol_rel_opt = 1e-7, tol_abs_opt = 1e-8))
 
 # TODO make matrix of AffExpr for yr and yi?
-@variable(model, yr[a in 1:T, b in 1:a; a > 1 || b > 1]) # real part lower triangle
+@variable(model, yr[a in 0:T, b in 0:a; a > 0 || b > 0]) # real part lower triangle no yr[0, 0]
 @variable(model, yi[a in 0:T, b in 0:(a - 1)]) # complex part lower triangle no diagonal
 
-@objective(model, Min, 1 - 4/3 * )
+@objective(model, Min, 1 - 4/3*yr[1, 1] + 7/18*yr[2, 2])
 
 # Md0(y) constraint
 # lower triangle of real PSD formulation
