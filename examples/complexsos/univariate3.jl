@@ -14,10 +14,10 @@ import Random
 using Test
 
 
-primal_wsos = false
-# primal_wsos = true
+# primal_wsos = false
+primal_wsos = true
 
-d = 2
+d = 5
 
 # inf -1 + |z|² + ... + |z|ᵈ
 # optimal value -1, for z = 0
@@ -25,26 +25,26 @@ d = 2
 # f(z) = 1 + real(z) + abs(z)^2 + real(z^2) + real(z^2 * conj(z)) + 8abs(z)^4
 
 # f(z) = 1 + 2real(z) + abs(z)^2 + 2real(z^2) + 2real(z^2 * conj(z)) + abs(z)^4
-# f(z) = 1 + 2real(z)
-f(z) = -1 + 2.5abs(z)^2 + 0.5abs(z)^4
+f(z) = 1 + 2real(z)
+# f(z) = -1 + 2.5abs(z)^2 + 0.5abs(z)^4
 # mathematica:
 # Minimize[1+2x+x^2+y^2+2(x^2-y^2)+2(x^3+x*y^2)+(x^2+y^2)^2,{x,y}]
 # min is 0
 
-#
+# #
+# df = d - 1
 # # inf random f
-# Fh = randn(ComplexF64, d + 1, d + 1)
+# Fh = randn(ComplexF64, df + 1, df + 1)
 # # if rand() > 0.5
 #     F = Hermitian(Fh)
 # # else
 # #     F = Hermitian(Fh * Fh')
 # # end
 # # @show isposdef(F)
+#
+# f(z) = real(sum(F[i+1, j+1] * z^i * conj(z)^j for i in 0:df, j in 0:df))
 
-# f(z) = real(sum(F[i+1, j+1] * z^i * conj(z)^j for i in 0:d, j in 0:d))
 
-
-# sample
 U = (d + 1)^2
 # U = div((d+1)*(d+2), 2)
 V_basis = [z -> z^i * conj(z)^j for j in 0:d for i in 0:d] # TODO columns are dependent if not doing j in 0:i
@@ -56,13 +56,18 @@ V_basis = [z -> z^i * conj(z)^j for j in 0:d for i in 0:d] # TODO columns are de
 # V = [b(p) for p in points, b in V_basis]
 
 # sample
-sample_factor = 1000
-all_points = rand(ComplexF64, sample_factor * U) .- 0.5 * (1 + im)
-for i in eachindex(all_points)
-    if abs(all_points[i]) >= 1
-        all_points[i] /= abs(all_points[i])
-    end
-end
+sample_factor = 100
+# all_points = rand(ComplexF64, sample_factor * U) .- 0.5 * (1 + im)
+# for i in eachindex(all_points)
+#     if abs(all_points[i]) >= 1
+#         all_points[i] /= abs(all_points[i])
+#     end
+# end
+radii = sqrt.(rand(sample_factor * U))
+angles = rand(sample_factor * U) * 2pi
+all_points = radii .* (cos.(angles) .+ (sin.(angles) .* im))
+@show all_points[1:10]
+
 V = [b(p) for p in all_points, b in V_basis]
 @test rank(V) == U
 VF = qr(Matrix(transpose(V)), Val(true))
@@ -78,7 +83,7 @@ L0 = d + 1
 v0 = ones(U)
 # P0 = V[:, 1:L0]
 P0 = [p^i for p in points, i in 0:L0]
-P0 = Matrix(qr(P0).Q)
+# P0 = Matrix(qr(P0).Q)
 
 # setup P1
 L1 = d
@@ -86,7 +91,7 @@ g1(z) = 1 - abs2(z)
 v1 = [g1(p) for p in points]
 # @show v1
 P1 = [p^i for p in points, i in 0:L1]
-P1 = Matrix(qr(P1).Q)
+# P1 = Matrix(qr(P1).Q)
 
 # setup problem data
 if primal_wsos
@@ -129,9 +134,9 @@ for s in system_solvers, m in linear_models
     solver = SO.HSDSolver(model,
         verbose = true,
         max_iters = 100,
-        tol_rel_opt = 1e-9,
-        tol_abs_opt = 1e-9,
-        tol_feas = 1e-9,
+        # tol_rel_opt = 1e-9,
+        # tol_abs_opt = 1e-9,
+        # tol_feas = 1e-9,
         stepper = SO.CombinedHSDStepper(model, system_solver = s(model)),
         )
 
@@ -139,9 +144,9 @@ for s in system_solvers, m in linear_models
 
     # @test SO.get_status(solver) == :Optimal
     # @show SO.get_primal_obj(solver)
-    println(F)
-    println()
-    @show isposdef(F)
+    # println(F)
+    # println()
+    # @show isposdef(F)
 
     testmin = minimum(f(z) for z in all_points)
     @show testmin
