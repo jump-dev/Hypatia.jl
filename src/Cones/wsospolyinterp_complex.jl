@@ -55,13 +55,13 @@ function check_in_cone(cone::WSOSPolyInterp_Complex)
     for i in eachindex(Ps)
         Pi = Ps[i]
         gi = gs[i]
-        if !ishermitian(Pi' * Diagonal(gi .* x) * Pi) # TODO delete
-            tmp = Pi' * Diagonal(gi .* x) * Pi
-            diff = norm(tmp - tmp')
-            if diff > 1e-10
-                @show diff
-            end
-        end
+        # if !ishermitian(Pi' * Diagonal(gi .* x) * Pi) # TODO delete
+        #     tmp = Pi' * Diagonal(gi .* x) * Pi
+        #     diff = norm(tmp - tmp')
+        #     if diff > 1e-10
+        #         @show diff
+        #     end
+        # end
         Λi = Hermitian(Pi' * Diagonal(gi .* x) * Pi)
         # @show Λi # TODO delete
 
@@ -86,6 +86,9 @@ function check_in_cone(cone::WSOSPolyInterp_Complex)
     end
 
     # @show cone.H # TODO delete
+
+    # @show maximum(Symmetric(cone.H, :U) * cone.point + cone.g)
+    # @show dot(cone.point, cone.g) + sum(size(cone.Ps[i], 2) for i in eachindex(cone.Ps))
 
     return factorize_hess(cone)
 end
