@@ -24,28 +24,31 @@ d = 2
 # f(z) = -1 + 4*real(z) + abs(z)^2 + real(z^2) + abs(z)^3 # + sum(abs(z)^i for i in 2:2:d))
 # f(z) = 1 + real(z) + abs(z)^2 + real(z^2) + real(z^2 * conj(z)) + 8abs(z)^4
 
-# f(z) = 1 + 0.2real(z) + abs(z)^2 + 0.2real(z^2) + 0.2real(z^2 * conj(z)) + abs(z)^4
+# f(z) = 1 + 2real(z) + abs(z)^2 + 2real(z^2) + 2real(z^2 * conj(z)) + abs(z)^4
+# f(z) = 1 + 2real(z)
+f(z) = -1 + 2.5abs(z)^2 + 0.5abs(z)^4
 # mathematica:
 # Minimize[1+2x+x^2+y^2+2(x^2-y^2)+2(x^3+x*y^2)+(x^2+y^2)^2,{x,y}]
 # min is 0
 
+#
+# # inf random f
+# Fh = randn(ComplexF64, d + 1, d + 1)
+# # if rand() > 0.5
+#     F = Hermitian(Fh)
+# # else
+# #     F = Hermitian(Fh * Fh')
+# # end
+# # @show isposdef(F)
 
-# inf random f
-Fh = randn(ComplexF64, d + 1, d + 1)
-if rand() > 0.5
-    F = Hermitian(Fh)
-else
-    F = Hermitian(Fh * Fh')
-end
-@show isposdef(F)
-
-f(z) = real(sum(F[i+1, j+1] * z^i * conj(z)^j for i in 0:d, j in 0:d))
+# f(z) = real(sum(F[i+1, j+1] * z^i * conj(z)^j for i in 0:d, j in 0:d))
 
 
 # sample
-# U = (d + 1)^2
-U = div((d+1)*(d+2), 2)
-V_basis = [z -> z^i * conj(z)^j for j in 0:d for i in 0:j] # TODO columns are dependent if not doing j in 0:i
+U = (d + 1)^2
+# U = div((d+1)*(d+2), 2)
+V_basis = [z -> z^i * conj(z)^j for j in 0:d for i in 0:d] # TODO columns are dependent if not doing j in 0:i
+# V_basis = [z -> z^i * conj(z)^j for j in 0:d for i in 0:j]
 
 # # roots of unity do not seem to be unisolvent
 # points = [cospi(2k / U) + sinpi(2k / U) * im for k = 0:(U - 1)]
@@ -54,12 +57,17 @@ V_basis = [z -> z^i * conj(z)^j for j in 0:d for i in 0:j] # TODO columns are de
 
 # sample
 sample_factor = 1000
-points = 2 * rand(ComplexF64, sample_factor * U) .- (1 + im)
-V = [b(p) for p in points, b in V_basis]
+all_points = rand(ComplexF64, sample_factor * U) .- 0.5 * (1 + im)
+for i in eachindex(all_points)
+    if abs(all_points[i]) >= 1
+        all_points[i] /= abs(all_points[i])
+    end
+end
+V = [b(p) for p in all_points, b in V_basis]
 @test rank(V) == U
 VF = qr(Matrix(transpose(V)), Val(true))
 keep = VF.p[1:U]
-points = points[keep]
+points = all_points[keep]
 V = V[keep, :]
 
 @test rank(V) == U
@@ -69,8 +77,16 @@ V = V[keep, :]
 L0 = d + 1
 v0 = ones(U)
 # P0 = V[:, 1:L0]
-P0 = [p^i for p in points, i in 0:d]
-# P0 = Matrix(qr(P0).Q)
+P0 = [p^i for p in points, i in 0:L0]
+P0 = Matrix(qr(P0).Q)
+
+# setup P1
+L1 = d
+g1(z) = 1 - abs2(z)
+v1 = [g1(p) for p in points]
+# @show v1
+P1 = [p^i for p in points, i in 0:L1]
+P1 = Matrix(qr(P1).Q)
 
 # setup problem data
 if primal_wsos
@@ -86,7 +102,8 @@ else
     G = Diagonal(-1.0I, U)
     h = zeros(U)
 end
-cones = [CO.WSOSPolyInterp_Complex(U, [P0], [v0], !primal_wsos)]
+# cones = [CO.WSOSPolyInterp_Complex(U, [P0], [v0], !primal_wsos)]
+cones = [CO.WSOSPolyInterp_Complex(U, [P0, P1], [v0, v1], !primal_wsos)]
 cone_idxs = [1:U]
 
 # solve
@@ -103,18 +120,18 @@ for s in system_solvers, m in linear_models
         continue # QRChol linear system solver needs preprocessed model
     end
     println()
-    println(s)
-    println(m)
-    println()
+    # println(s)
+    # println(m)
+    # println()
 
     model = m(c, A, b, G, h, cones, cone_idxs)
 
     solver = SO.HSDSolver(model,
         verbose = true,
         max_iters = 100,
-        # tol_rel_opt = 1e-5,
-        # tol_abs_opt = 1e-5,
-        # tol_feas = 1e-5,
+        tol_rel_opt = 1e-9,
+        tol_abs_opt = 1e-9,
+        tol_feas = 1e-9,
         stepper = SO.CombinedHSDStepper(model, system_solver = s(model)),
         )
 
@@ -122,13 +139,15 @@ for s in system_solvers, m in linear_models
 
     # @test SO.get_status(solver) == :Optimal
     # @show SO.get_primal_obj(solver)
-    # @show isposdef(F)
-    # @show F
+    println(F)
+    println()
+    @show isposdef(F)
 
-    testmin = minimum(f(z) for z in randn(ComplexF64, 1000))
+    testmin = minimum(f(z) for z in all_points)
     @show testmin
     obj = primal_wsos ? -SO.get_primal_obj(solver) : SO.get_primal_obj(solver)
     @show obj
+    @test testmin > obj
 
     # if isposdef(F)
     #     @test SO.get_status(solver) == :Optimal
