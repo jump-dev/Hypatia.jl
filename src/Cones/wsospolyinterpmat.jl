@@ -262,11 +262,25 @@ function check_in_cone_master(cone::WSOSPolyInterpMat)
             cinds = _blockrange(q, L)
             mul!(view(mat, rinds, cinds), tmp1j, ipwtj)
 
+            if p == q == 1
+                # @show eigen(view(mat, rinds, cinds)).values
+            end
+
             uo += cone.U
         end
 
-        @show "mat eigens", eigen(Symmetric(mat, :L)).values
+        mat1 = Symmetric(mat[1:L, 1:L])
+        schur_complement = copy(mat1)
+        for i in 2:cone.R
+            lambdai = Symmetric(mat[((i - 1) * L + 1):(i * L), 1:L], :U)
+            schur_complement -= lambdai * (mat1 \ lambdai)
+        end
+
+        # @show "mat eigens", eigen(Symmetric(mat, :L)).values
+        # @show "schur eigens", eigen(Symmetric(schur_complement, :L)).values
         cone.matfact[j] = cholesky!(Symmetric(mat, :L), Val(true), check = false)
+        # @show isposdef(cone.matfact[j])
+        # if !(isposdef(schur_complement) && isposdef(mat1))
         if !isposdef(cone.matfact[j])
             return false
         end

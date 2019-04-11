@@ -72,7 +72,7 @@ end
 
 WSOSPolyInterpSOC(R::Int, U::Int, ipwt::Vector{Matrix{Float64}}) = WSOSPolyInterpSOC(R, U, ipwt, false)
 
-get_nu(cone::WSOSPolyInterpSOC) = sum(size(ipwtj, 2) for ipwtj in cone.ipwt)
+get_nu(cone::WSOSPolyInterpSOC) = sum(size(ipwtj, 2) for ipwtj in cone.ipwt) #* cone.R
 
 function set_initial_point(arr::AbstractVector{Float64}, cone::WSOSPolyInterpSOC)
     arr .= 0.0
@@ -98,7 +98,7 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
         @. tmp1 = ipwtj' * point_pq'
         mul!(tmp4, tmp1, ipwtj)
         mat .= tmp4
-        @show eigen(Symmetric(tmp4, :L)).values
+        # @show eigen(Symmetric(tmp4, :L)).values
         lambdafact[j] = cholesky!(Symmetric(tmp4, :L), Val(true), check = false)
 
 
@@ -120,7 +120,7 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
             uo += cone.U
         end
 
-        @show eigen(Symmetric(mat, :U)).values
+        # @show eigen(Symmetric(mat, :U)).values
 
         matfact[j] = cholesky!(Symmetric(mat, :U), Val(true), check = false)
         if !isposdef(matfact[j])
