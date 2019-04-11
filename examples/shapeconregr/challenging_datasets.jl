@@ -36,7 +36,7 @@ function production_data()
     # group by industry codes
     dfagg = aggregate(dropmissing(df), :naics, sum)
     # four covariates: non production employees, production worker hours, production workers, total capital stock
-    n = 4
+    n = 3
     X = convert(Matrix, dfagg[[:prode_sum, :prodh_sum, :prodw_sum, :cap_sum]])
     # value of shipment
     y = convert(Array, dfagg[:vship_sum])
@@ -87,10 +87,10 @@ end
         (X, y, n) = s(n = 4)
         dom = MU.Box(-ones(n), ones(n))
 
-        shape_data = ShapeData(dom, dom, zeros(n), 0)
+        shape_data = ShapeData(dom, dom, zeros(n), 1)
 
         model = make_model()
-        (regressor, lagrange_polys) = build_shapeconregr_WSOS(model, X, y, d, shape_data, use_scalar = false, add_regularization = true)
+        (regressor, lagrange_polys) = build_shapeconregr_WSOS(model, X, y, d, shape_data, use_scalar = false, add_regularization = false)
         (val, runtime, bytes, gctime, memallocs) = @timed JuMP.optimize!(model)
         # regfun1(x) = JuMP.value(regressor)(x)
         # pl = plot(regfun1, -1, 1, lab = "No penalty")

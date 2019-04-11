@@ -22,14 +22,14 @@ function JuMP_polysoc_envelope(; use_soc = false)
     n = 2
     dom = MU.FreeDomain(n)
     DP.@polyvar x[1:n]
-    d = 3
+    d = 5
     (U, pts, P0, _, w) = MU.interpolate(dom, d, sample = false, calc_w = true)
     lagrange_polys = MU.recover_lagrange_polys(pts, 2d)
     model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, max_iters = 400, tol_feas = 1e-12, tol_abs_opt = 1e-12, tol_rel_opt = 1e-12))
     JuMP.@variable(model, f[1:U])
     JuMP.@objective(model, Min, dot(w, f))
 
-    vec_length = 5
+    vec_length = 10
     npoly = vec_length - 1
     LDegs = size(P0, 2)
     polys = P0[:, 1:LDegs] * rand(-9:9, LDegs, npoly)
@@ -164,7 +164,7 @@ function JuMP_polysoc_envelope(; use_soc = false)
 end
 
 
-function jordan_mul(x, y)
-    res = [dot(x, y); x[end] .* y[1:(end - 1)] + y[end] .* x[1:(end - 1)]]
-    return res
-end
+# function jordan_mul(x, y)
+#     res = [dot(x, y); x[end] .* y[1:(end - 1)] + y[end] .* x[1:(end - 1)]]
+#     return res
+# end

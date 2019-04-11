@@ -21,6 +21,7 @@ import PolyJuMP
 using Test
 import Random
 using TimerOutputs
+using LinearAlgebra
 
 const rt2 = sqrt(2)
 
@@ -57,6 +58,7 @@ function run_JuMP_muconvexity(x::Vector, poly, dom, use_wsos::Bool)
         n = DynamicPolynomials.nvariables(x)
         d = div(maximum(DynamicPolynomials.maxdegree.(H)) + 1, 2)
         (U, pts, P0, PWts, _) = MU.interpolate(dom, d, sample = true)
+        @show cond(P0)
         mat_wsos_cone = HYP.WSOSPolyInterpMatCone(n, U, [P0, PWts...])
 
         JuMP.@constraint(model, [H[i, j](x => pts[u, :]) * (i == j ? 1.0 : rt2) for i in 1:n for j in 1:i for u in 1:U] in mat_wsos_cone)
@@ -75,6 +77,16 @@ function run_JuMP_muconvexity(x::Vector, poly, dom, use_wsos::Bool)
     return (JuMP.termination_status(model), JuMP.primal_status(model), JuMP.value(mu))
 end
 
+function randconvfun(n, d)
+    L = binomial(n + d, n)
+    randmat = randn(L, L)
+    randmat = Symmetric(randmat * randmat')
+    DynamicPolynomials.@polyvar x[1:n]
+    monos = DynamicPolynomials.monomials(x, 0:d)
+    poly = monos' * randmat * monos
+    return poly
+end
+
 function run_JuMP_muconvexity_scalar(x::Vector, poly, dom, use_wsos::Bool)
     Random.seed!(1)
     reset_timer!(Hypatia.to)
@@ -91,10 +103,19 @@ function run_JuMP_muconvexity_scalar(x::Vector, poly, dom, use_wsos::Bool)
 
     conv_condition = y' * H * y
 
+    fulldim = false
+
     if use_wsos
         d = div(maximum(DynamicPolynomials.maxdegree.(H)) + 1, 2)
         (U, pts, P0, PWts, _) = MU.interpolate(dom, d, sample = true)
-        (naive_U, naive_pts, naive_P0, naive_PWts) = MU.bilinear_terms(U, pts, P0, PWts, n)
+        if fulldim
+            naive_domain = MU.FreeDomain(2n)
+            (naive_U, naive_pts, naive_P0, naive_PWts) = MU.interpolate(naive_domain, d + 1, sample = true)
+            @show cond(naive_P0)
+        else
+            (naive_U, naive_pts, naive_P0, naive_PWts) = MU.bilinear_terms(U, pts, P0, PWts, n)
+        end
+        @show cond(naive_P0)
         wsos_cone = HYP.WSOSPolyInterpCone(naive_U, [naive_P0, naive_PWts...])
 
         @show DynamicPolynomials.variables(conv_condition) # order OK
@@ -122,18 +143,20 @@ end
 function run_JuMP_muconvexity_rand(; rseed::Int = 1)
     Random.seed!(rseed)
 
-    n = 4
-    d = 4
-    DynamicPolynomials.@polyvar x[1:n]
+    n = 2
+    d = 6
+    # DynamicPolynomials.@polyvar x[1:n]
 
-    poly = sum(rand() * z for z in DynamicPolynomials.monomials(x, 0:d))
+    # poly = sum(rand() * z for z in DynamicPolynomials.monomials(x, 0:d))
+    poly = randconvfun(n, d)
+    x = DynamicPolynomials.variables(poly)
 
     dom = MU.FreeDomain(n)
     # (term1, prim1, mu1) = run_JuMP_muconvexity(x, poly, dom, true)
     (term2, prim2, mu2) = run_JuMP_muconvexity_scalar(x, poly, dom, true)
     # # (term2, prim2, mu2) = run_JuMP_muconvexity(x, poly, dom, false)
-    # @test term1 == term2
-    # @test prim1 == prim2
+    @test term1 == term2
+    @test prim1 == prim2
     if term1 == MOI.OPTIMAL || term2 == MOI.OPTIMAL
         @test mu1 ≈ mu2 atol = 1e-4 rtol = 1e-4
         mufree = mu1

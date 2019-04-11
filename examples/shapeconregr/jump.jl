@@ -200,6 +200,7 @@ function build_shapeconregr_WSOS(
 
     (mono_U, mono_points, mono_P0, mono_PWts, _) = MU.interpolate(shape_data.mono_dom, gradient_d, sample = sample, sample_factor = 50)
     (conv_U, conv_points, conv_P0, conv_PWts, _) = MU.interpolate(shape_data.conv_dom, hessian_d, sample = sample, sample_factor = 50)
+    @show cond(conv_P0)
     mono_wsos_cone = HYP.WSOSPolyInterpCone(mono_U, [mono_P0, mono_PWts...])
     conv_wsos_cone = HYP.WSOSPolyInterpMatCone(n, conv_U, [conv_P0, conv_PWts...])
 
@@ -257,6 +258,7 @@ function build_shapeconregr_WSOS(
             DP.@polyvar y[1:n]
             conv_condition = y' * hessian * y
             (naive_U, naive_points, naive_P0, naive_PWts) = MU.bilinear_terms(conv_U, conv_points, conv_P0, conv_PWts, n)
+            @show cond(naive_P0)
             wsos_cone = HYP.WSOSPolyInterpCone(naive_U, [naive_P0, naive_PWts...])
             JuMP.@constraint(model, [conv_condition(naive_points[u, :]) for u in 1:naive_U] in wsos_cone)
         else

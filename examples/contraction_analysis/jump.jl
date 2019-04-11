@@ -21,6 +21,9 @@ import DynamicPolynomials
 const DP = DynamicPolynomials
 using LinearAlgebra
 using Test
+using Random
+
+Random.seed!(1)
 
 const rt2 = sqrt(2)
 
@@ -61,15 +64,29 @@ end
 function contraction_analysis_WSOS(beta::Float64, deg_M::Int; delta::Float64 = 1e-3, use_scalar::Bool = true)
     n = 2
     (model, M, R, pts_M, pts_R, U_M, U_R, P0_M, P0_R) = contraction_analysis_common(beta, deg_M, delta)
+    @show cond(P0_M)
     if use_scalar
         DP.@polyvar y[1:n]
         conv_condition_M = y' * M * y
-        (naive_U_M, naive_points_M, naive_P0_M, _) = MU.bilinear_terms(U_M, pts_M, P0_M, [], n)
+        fulldim = true
+        if fulldim
+            naive_domain = MU.FreeDomain(2n)
+            (naive_U_M, naive_points_M, naive_P0_M, _) = MU.interpolate(naive_domain, div(deg_M, 2) + 1, sample = true)
+        else
+            (naive_U_M, naive_points_M, naive_P0_M, _) = MU.bilinear_terms(U_M, pts_M, P0_M, [], n)
+        end
         wsos_cone_M = HYP.WSOSPolyInterpCone(naive_U_M, [naive_P0_M])
         JuMP.@constraint(model, [conv_condition_M(naive_points_M[u, :]) - delta for u in 1:naive_U_M] in wsos_cone_M)
 
         conv_condition_R = -y' * R * y
-        (naive_U_R, naive_points_R, naive_P0_R, _) = MU.bilinear_terms(U_R, pts_R, P0_R, [], n)
+        if fulldim
+            naive_domain = MU.FreeDomain(2n)
+            deg_R = maximum(DP.maxdegree.(R))
+            (naive_U_R, naive_points_R, naive_P0_R, _) = MU.interpolate(naive_domain, div(deg_R, 2) + 1, sample = true)
+        else
+            (naive_U_R, naive_points_R, naive_P0_R, _) = MU.bilinear_terms(U_R, pts_R, P0_R, [], n)
+        end
+        @show cond(naive_P0_R)
         wsos_cone_R = HYP.WSOSPolyInterpCone(naive_U_R, [naive_P0_R])
         JuMP.@constraint(model, [conv_condition_R(naive_points_R[u, :]) - delta for u in 1:naive_U_R] in wsos_cone_R)
     else
