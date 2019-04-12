@@ -17,7 +17,7 @@ using Test
 # primal_wsos = false
 primal_wsos = true
 
-d = 5
+d = 2
 
 # inf -1 + |z|² + ... + |z|ᵈ
 # optimal value -1, for z = 0
@@ -45,10 +45,10 @@ f(z) = 1 + 2real(z)
 # f(z) = real(sum(F[i+1, j+1] * z^i * conj(z)^j for i in 0:df, j in 0:df))
 
 
-U = (d + 1)^2
-# U = div((d+1)*(d+2), 2)
-V_basis = [z -> z^i * conj(z)^j for j in 0:d for i in 0:d] # TODO columns are dependent if not doing j in 0:i
-# V_basis = [z -> z^i * conj(z)^j for j in 0:d for i in 0:j]
+# U = (d + 1)^2
+# V_basis = [z -> z^i * conj(z)^j for j in 0:d for i in 0:d] # TODO columns are dependent if not doing j in 0:i
+U = div((d+1)*(d+2), 2)
+V_basis = [z -> z^i * conj(z)^j for j in 0:d for i in 0:j]
 
 # # roots of unity do not seem to be unisolvent
 # points = [cospi(2k / U) + sinpi(2k / U) * im for k = 0:(U - 1)]
@@ -74,9 +74,9 @@ VF = qr(Matrix(transpose(V)), Val(true))
 keep = VF.p[1:U]
 points = all_points[keep]
 V = V[keep, :]
-
 @test rank(V) == U
 # @show eigvals(V)
+
 
 # setup P0
 L0 = d + 1
@@ -111,14 +111,15 @@ end
 cones = [CO.WSOSPolyInterp_Complex(U, [P0, P1], [v0, v1], !primal_wsos)]
 cone_idxs = [1:U]
 
+
 # solve
 system_solvers = [
-    SO.NaiveCombinedHSDSystemSolver,
-    # SO.QRCholCombinedHSDSystemSolver,
+    # SO.NaiveCombinedHSDSystemSolver,
+    SO.QRCholCombinedHSDSystemSolver,
     ]
 linear_models = [
-    MO.RawLinearModel,
-    # MO.PreprocessedLinearModel,
+    # MO.RawLinearModel,
+    MO.PreprocessedLinearModel,
     ]
 for s in system_solvers, m in linear_models
     if s == SO.QRCholCombinedHSDSystemSolver && m == MO.RawLinearModel
