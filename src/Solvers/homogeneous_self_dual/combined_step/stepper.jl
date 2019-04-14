@@ -50,7 +50,7 @@ function step(solver::HSDSolver, stepper::CombinedHSDStepper)
     point = solver.point
 
     # calculate affine/prediction and correction directions
-    # @timeit to "directions" begin
+    @timeit to "directions" begin
     (x_pred, x_corr, y_pred, y_corr, z_pred, z_corr, s_pred, s_corr, tau_pred, tau_corr, kap_pred, kap_corr) = get_combined_directions(solver, stepper.system_solver)
 
     # st = SymIndefCombinedHSDSystemSolver(model)
@@ -69,19 +69,19 @@ function step(solver::HSDSolver, stepper::CombinedHSDStepper)
     # @show norm(s_corr - _s_corr)
     # @show norm(tau_corr - _tau_corr)
     # @show norm(kap_corr - _kap_corr)
-    # end
+    end
 
     # calculate correction factor gamma by finding distance affine_alpha for stepping in affine direction
-    # @timeit to "aff alpha" begin
+    @timeit to "aff alpha" begin
     (affine_alpha, affine_alpha_iters) = find_max_alpha_in_nbhd(z_pred, s_pred, tau_pred, kap_pred, 0.9999, stepper.prev_affine_alpha, stepper, solver)
     gamma = (1.0 - affine_alpha)^3 # TODO allow different function (heuristic)
     stepper.prev_affine_alpha = affine_alpha
     stepper.prev_affine_alpha_iters = affine_alpha_iters
     stepper.prev_gamma = gamma
-    # end
+    end
 
     # find distance alpha for stepping in combined direction
-    # @timeit to "comb alpha"
+    @timeit to "comb alpha" begin
     z_comb = z_pred
     s_comb = s_pred
     pred_factor = 1.0 - gamma
@@ -90,7 +90,7 @@ function step(solver::HSDSolver, stepper::CombinedHSDStepper)
     tau_comb = pred_factor * tau_pred + gamma * tau_corr
     kap_comb = pred_factor * kap_pred + gamma * kap_corr
     (alpha, alpha_iters) = find_max_alpha_in_nbhd(z_comb, s_comb, tau_comb, kap_comb, stepper.max_nbhd, stepper.prev_alpha, stepper, solver)
-    # end
+    end
 
     if iszero(alpha)
         # could not step far in combined direction, so perform a pure correction step

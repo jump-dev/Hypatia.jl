@@ -621,7 +621,7 @@ git-tree-sha1 = "cd4bfdb4a36c4ef0c17996da508eac8dae8637c5"
 repo-rev = "master"
 repo-url = "https://github.com/JuliaOpt/SumOfSquares.jl.git"
 uuid = "4b9e565b-77fc-50a5-a571-1244f986bda1"
-version = "0.3.0+"
+version = "0.3.1+"
 
 [[TableTraits]]
 deps = ["IteratorInterfaceExtensions", "Test"]

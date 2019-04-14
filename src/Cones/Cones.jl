@@ -39,11 +39,14 @@ function factorize_hess(cone::Cone)
     @. cone.H2 = cone.H
 
     if (cone isa WSOSPolyInterpMat) || (cone isa WSOSPolyInterp) || (cone isa WSOSPolyInterpSOC)
-        open("socenv/n2d4v10/mat.csv", "a") do f
+        open("soc_n3_d6_m5/soc.csv", "a") do f
             println(f, cond(Symmetric(cone.H2, :U)))
         end
     end
+    @timeit to "hess inv" begin
     cone.F = bunchkaufman!(Symmetric(cone.H2, :U), true, check = false)
+    end
+
     return issuccess(cone.F)
 
     # cone.F = cholesky!(Symmetric(cone.H2, :U), Val(true), check = false)

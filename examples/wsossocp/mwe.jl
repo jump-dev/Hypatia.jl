@@ -22,47 +22,47 @@ function JuMP_polysoc_envelope(; use_soc = false)
     n = 2
     dom = MU.FreeDomain(n)
     DP.@polyvar x[1:n]
-    d = 5
+    d = 4
     (U, pts, P0, _, w) = MU.interpolate(dom, d, sample = false, calc_w = true)
     lagrange_polys = MU.recover_lagrange_polys(pts, 2d)
     model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, max_iters = 400, tol_feas = 1e-12, tol_abs_opt = 1e-12, tol_rel_opt = 1e-12))
     JuMP.@variable(model, f[1:U])
     JuMP.@objective(model, Min, dot(w, f))
 
-    vec_length = 10
+    vec_length = 5
     npoly = vec_length - 1
     LDegs = size(P0, 2)
     polys = P0[:, 1:LDegs] * rand(-9:9, LDegs, npoly)
 
     if !use_soc
-        # matrix_condition = JuMP.GenericAffExpr{Float64,VariableRef}[]
-        # push!(matrix_condition, f...)
-        # for i in 2:vec_length
-        #     push!(matrix_condition, rt2 * polys[:, i - 1]...)
-        #     for j in 2:(i - 1)
-        #         push!(matrix_condition, zeros(U)...)
-        #     end
-        #     push!(matrix_condition, f...)
-        # end
-        wsos_cone_mat = HYP.WSOSPolyInterpMatCone(vec_length, U, [P0])
-        # sqrconstr = JuMP.@constraint(model, matrix_condition in wsos_cone_mat)
-
-
-        JuMP.@variable(model, matvar[1:(div(vec_length * (vec_length + 1), 2) * U)])
-        JuMP.@constraint(model, matvar in wsos_cone_mat)
-        tmp = Vector{JuMP.GenericAffExpr{Float64,VariableRef}}(undef, vec_length * U)
-        tmp .= 0
-        ind = 0
-        for i in 1:vec_length, j in 1:i, u in 1:U
-            ind += 1
-            if i == j
-                tmp[u] += matvar[ind]
-            elseif j == 1
-                tmp[(i - 1) * U + u] = matvar[ind] * 2 * inv(rt2)
+        matrix_condition = JuMP.GenericAffExpr{Float64,VariableRef}[]
+        push!(matrix_condition, f...)
+        for i in 2:vec_length
+            push!(matrix_condition, rt2 * polys[:, i - 1]...)
+            for j in 2:(i - 1)
+                push!(matrix_condition, zeros(U)...)
             end
+            push!(matrix_condition, f...)
         end
-        JuMP.@constraint(model, f .== tmp[1:U])
-        JuMP.@constraint(model, [i in 2:vec_length], polys[:, i - 1] .== tmp[((i - 1) * U + 1):(i * U)])
+        wsos_cone_mat = HYP.WSOSPolyInterpMatCone(vec_length, U, [P0])
+        sqrconstr = JuMP.@constraint(model, matrix_condition in wsos_cone_mat)
+
+
+        # JuMP.@variable(model, matvar[1:(div(vec_length * (vec_length + 1), 2) * U)])
+        # JuMP.@constraint(model, matvar in wsos_cone_mat)
+        # tmp = Vector{JuMP.GenericAffExpr{Float64,VariableRef}}(undef, vec_length * U)
+        # tmp .= 0
+        # ind = 0
+        # for i in 1:vec_length, j in 1:i, u in 1:U
+        #     ind += 1
+        #     if i == j
+        #         tmp[u] += matvar[ind]
+        #     elseif j == 1
+        #         tmp[(i - 1) * U + u] = matvar[ind] * 2 * inv(rt2)
+        #     end
+        # end
+        # JuMP.@constraint(model, f .== tmp[1:U])
+        # JuMP.@constraint(model, [i in 2:vec_length], polys[:, i - 1] .== tmp[((i - 1) * U + 1):(i * U)])
 
     else
         cone = HYP.WSOSPolyInterpSOCCone(vec_length, U, [P0])
