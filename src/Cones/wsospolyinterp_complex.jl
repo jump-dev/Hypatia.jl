@@ -65,6 +65,8 @@ function check_in_cone(cone::WSOSPolyInterp_Complex)
         Λi = Hermitian(Pi' * Diagonal(gi .* x) * Pi)
         # @show Λi # TODO delete
 
+        # @show det(Λi)
+
         ΛFs[i] = cholesky!(Λi, Val(true), check = false)
         if !isposdef(ΛFs[i])
             # @show eigvals(Λi) # TODO delete
@@ -83,6 +85,14 @@ function check_in_cone(cone::WSOSPolyInterp_Complex)
 
         cone.g -= gi .* diag(PΛinvPti)
         cone.H += Symmetric(gi * gi') .* abs2.(PΛinvPti) # TODO simplify math here?
+
+        # # TODO delete
+        # f(y) = -logdet(Hermitian(Pi' * Diagonal(gi .* y) * Pi))
+        # gFD = ForwardDiff.gradient(f, cone.point)
+        # HFD = ForwardDiff.hessian(f, cone.point)
+        #
+        # @show norm(gi .* diag(PΛinvPti) + gFD)
+        # @show norm(Symmetric(gi * gi') .* abs2.(PΛinvPti) - HFD)
     end
 
     # @show cone.H # TODO delete
