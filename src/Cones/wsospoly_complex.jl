@@ -14,7 +14,7 @@ mutable struct WSOSComplex <: Cone
     H2::Matrix{Float64}
     F
     barfun::Function
-    diffres
+    # diffres
 
     function WSOSComplex(dim::Int, sidedims::Vector{Int}, initpoint::Vector{Float64}, Mfuncs::Vector{Function}, is_dual::Bool)
         cone = new()
@@ -26,17 +26,19 @@ mutable struct WSOSComplex <: Cone
         cone.g = Vector{Float64}(undef, dim)
         cone.H = Matrix{Float64}(undef, dim, dim)
         cone.H2 = similar(cone.H)
-        realify(X) = Symmetric([real.(X) -imag.(X)'; imag.(X) real.(X)], :L)
-        barfun(point) = -sum(logdet(cholesky(realify(f(point)))) for f in Mfuncs)
+        # realify(X) = Symmetric([real.(X) -imag.(X)'; imag.(X) real.(X)], :L)
+        # barfun(point) = -sum(logdet(cholesky(realify(f(point)))) for f in Mfuncs)
+        barfun(point) = -sum(logdetchol(f(point)) for f in Mfuncs)
         cone.barfun = barfun
-        cone.diffres = DiffResults.HessianResult(cone.g)
+        # cone.diffres = DiffResults.HessianResult(cone.g)
         return cone
     end
 end
 
 WSOSComplex(dim::Int, sidedims::Vector{Int}, initpoint::Vector{Float64}, Mfuncs::Vector{Function}) = WSOSComplex(dim, sidedims, initpoint, Mfuncs, false)
 
-get_nu(cone::WSOSComplex) = 2 * sum(cone.sidedims)
+# get_nu(cone::WSOSComplex) = 2 * sum(cone.sidedims)
+get_nu(cone::WSOSComplex) = sum(cone.sidedims)
 
 set_initial_point(arr::AbstractVector{Float64}, cone::WSOSComplex) = (@. arr = cone.initpoint; arr)
 
@@ -49,10 +51,10 @@ function check_in_cone(cone::WSOSComplex)
         end
     end
 
-    # TODO check allocations, check with Jarrett if this is most efficient way to use DiffResults
-    cone.diffres = ForwardDiff.hessian!(cone.diffres, cone.barfun, cone.point)
-    cone.g .= DiffResults.gradient(cone.diffres)
-    cone.H .= DiffResults.hessian(cone.diffres)
+    # # TODO check allocations, check with Jarrett if this is most efficient way to use DiffResults
+    # cone.diffres = ForwardDiff.hessian!(cone.diffres, cone.barfun, cone.point)
+    # cone.g .= DiffResults.gradient(cone.diffres)
+    # cone.H .= DiffResults.hessian(cone.diffres)
 
     return factorize_hess(cone)
 end
