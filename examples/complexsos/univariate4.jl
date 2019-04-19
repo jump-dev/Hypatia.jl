@@ -93,3 +93,57 @@ du_status = dual_status(model)
 
 @show primal_obj
 ;
+
+
+
+# complex differentiation using Zygote
+using Zygote
+using LinearAlgebra
+
+logdetchol(A) = logdet(cholesky(Hermitian(A)))
+Zygote.@adjoint function logdetchol(A)
+    ch = cholesky(Hermitian(A))
+    # logdet(ch), Δ -> (Δ * transpose(inv(ch)),)
+    logdet(ch), Δ -> (Δ * inv(ch),)
+end
+
+m = 4
+n = 3
+W = randn(ComplexF64, m, n);
+y = rand(m);
+
+f(x) = -logdetchol(W' * Diagonal(x) * W)
+
+f(y)
+gradient(f, y)
+
+# TODO gradient comes out complex but imag parts are epsilon or zero
+# can we just take the real parts?
+
+# barfun(point) = -sum(logdetchol(f(point)) for f in Mfuncs)
+
+m = 4
+
+Yh = randn(ComplexF64, m, m)
+Y = Hermitian(Yh * Yh')
+
+logdetchol(Y)
+
+# gradient of hermitian logdet
+g = -Hermitian(inv(Y))
+
+norm(-dot(Y, g) - m)
+
+(gtest,) = gradient(X -> -logdetchol(X), Y)
+norm(g - gtest)
+
+# Hessian of hermitian logdet, 4th order tensor
+# can't check with zygote
+H = Array{ComplexF64}(undef, m, m, m, m);
+for i in 1:m, j in 1:m
+    for i2 in 1:m, j2 in 1:m
+        H[i, j, i2, j2] = g[i, i2] * conj(g[j, j2])
+    end
+end
+
+norm([dot(H[:, :, i, j], Y) for i in 1:m, j in 1:m] + g)
