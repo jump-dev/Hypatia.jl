@@ -18,16 +18,16 @@ using Test
 primal_wsos = false
 # primal_wsos = true
 
-d = 2
+d = 6
 
 # inf -1 + |z|² + ... + |z|ᵈ
 # optimal value -1, for z = 0
-# f(z) = -1 + 4*real(z) + abs(z)^2 + real(z^2) + abs(z)^3 # + sum(abs(z)^i for i in 2:2:d))
-# f(z) = 1 + real(z) + abs(z)^2 + real(z^2) + real(z^2 * conj(z)) + 8abs(z)^4
+# f(z) = -1 + 4*real(z)# + abs(z)^2 + real(z^2) + abs(z)^3 # + sum(abs(z)^i for i in 2:2:d))
+# f(z) = 1 + real(z) + abs(z)^2 + real(z^2) + real(z^2 * conj(z)) + abs(z)^4
 
-# f(z) = 1 + 2real(z) + abs(z)^2 + 2real(z^2) + 2real(z^2 * conj(z)) + abs(z)^4
-# f(z) = 1 + real(z) + 3abs(z)^2
-f(z) = -1 + 2.5abs(z)^2 + 0.5abs(z)^4
+f(z) = 1 + 2real(z) + abs(z)^2 + 2real(z^2) + 2real(z^2 * conj(z)) + abs(z)^4
+# f(z) = 1 + real(z)# + 3abs(z)^2
+# f(z) = -1 + 2.5abs(z)^2 + 0.5abs(z)^4
 # mathematica:
 # Minimize[1+2x+x^2+y^2+2(x^2-y^2)+2(x^3+x*y^2)+(x^2+y^2)^2,{x,y}]
 # min is 0
@@ -57,7 +57,7 @@ V_basis = [z -> z^i * conj(z)^j for j in 0:d for i in 0:d] # TODO columns are de
 # V = [b(p) for p in points, b in V_basis]
 
 # sample
-sample_factor = 10
+sample_factor = 1000
 # all_points = rand(ComplexF64, sample_factor * U) .- 0.5 * (1 + im)
 # for i in eachindex(all_points)
 #     if abs(all_points[i]) >= 1
@@ -67,7 +67,7 @@ sample_factor = 10
 radii = sqrt.(rand(sample_factor * U))
 angles = rand(sample_factor * U) * 2pi
 all_points = radii .* (cos.(angles) .+ (sin.(angles) .* im))
-@show all_points[1:10]
+# @show all_points[1:10]
 
 V = [b(p) for p in all_points, b in V_basis]
 # @test rank(V) == U
@@ -80,18 +80,18 @@ V = V[keep, :]
 
 
 # setup P0
-L0 = d + 1
+# L0 = d + 1
 v0 = ones(U)
 # P0 = V[:, 1:L0]
-P0 = [p^i for p in points, i in 0:L0]
+P0 = [p^i for p in points, i in 0:d]
 # P0 = Matrix(qr(P0).Q)
 
 # # setup P1
 # L1 = d
-# g1(z) = 1 - abs2(z)
-# v1 = [g1(p) for p in points]
+g1(z) = 1 - abs2(z)
+v1 = [g1(p) for p in points]
 # # @show v1
-# P1 = [p^i for p in points, i in 0:L1]
+P1 = [p^i for p in points, i in 0:d-1]
 # # P1 = Matrix(qr(P1).Q)
 
 # setup problem data
@@ -108,8 +108,8 @@ else
     G = Diagonal(-1.0I, U)
     h = zeros(U)
 end
-cones = [CO.WSOSPolyInterp_Complex(U, [P0], [v0], !primal_wsos)]
-# cones = [CO.WSOSPolyInterp_Complex(U, [P0, P1], [v0, v1], !primal_wsos)]
+# cones = [CO.WSOSPolyInterp_Complex(U, [P0], [v0], !primal_wsos)]
+cones = [CO.WSOSPolyInterp_Complex(U, [P0, P1], [v0, v1], !primal_wsos)]
 cone_idxs = [1:U]
 
 
