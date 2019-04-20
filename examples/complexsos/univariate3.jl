@@ -58,7 +58,7 @@ for rerun in 1:num_reruns
 
     # sample
     radii = sqrt.(rand(sample_factor * U))
-    angles = rand(sample_factor * U) * 2pi
+    angles = rand(sample_factor * U) .* 2pi
     all_points = radii .* (cos.(angles) .+ (sin.(angles) .* im))
     # @show all_points[1:10]
     V = [b(p) for p in all_points, b in V_basis]
@@ -71,6 +71,7 @@ for rerun in 1:num_reruns
     @test rank(V) == U
     # @show eigvals(V)
 
+
     # setup P0
     # L0 = d + 1
     v0 = ones(U)
@@ -82,9 +83,9 @@ for rerun in 1:num_reruns
     # L1 = d
     g1(z) = 1 - abs2(z)
     v1 = [g1(p) for p in points]
-    # # @show v1
+    # @show v1
     P1 = [p^i for p in points, i in 0:d-1]
-    # # P1 = Matrix(qr(P1).Q)
+    # P1 = Matrix(qr(P1).Q)
 
     # setup problem data
     if primal_wsos
