@@ -4,7 +4,7 @@ using Test
 
 
 # univariate
-d = 1
+d = 2
 
 # # full vandermonde
 # # V_basis = [x -> x^i * conj(x)^j for j in 0:d for i in 0:d] # TODO columns are dependent if not doing j in 0:i
@@ -15,11 +15,12 @@ d = 1
 
 
 
-V_basis = [z -> z^i * conj(z)^j for j in 0:d for i in 0:j]
-U = div((d + 1) * (d + 2), 2)
+# V_basis = [z -> z^i * conj(z)^j for j in 0:d for i in 0:j]
+# U = div((d + 1) * (d + 2), 2)
 
-# V_basis = [z -> z^i * conj(z)^j for j in 0:d for i in 0:d]
-# U = (d + 1)^2
+V_basis_mat = [z -> z^i * conj(z)^j for i in 0:d, j in 0:d]
+V_basis = vec(V_basis_mat)
+U = (d + 1)^2
 
 # points are randomly sampled
 # points = 2 * rand(ComplexF64, U) .- (1 + im)
@@ -31,37 +32,41 @@ points = radii .* (cos.(angles) .+ (sin.(angles) .* im))
 # points = [cospi(2k / U) + sinpi(2k / U) * im for k = 0:(U - 1)]
 
 
-P = [p^i for p in points, i in 0:d]
-@assert rank(P) == d + 1
+# P = [p^i for p in points, i in 0:d]
+# @assert rank(P) == d + 1
 
 # # @show points
 V = [b(p) for p in points, b in V_basis]
-@show rank(V)
-# @test rank(V) == U
+# @show rank(V)
+@test rank(V) == U
 
 
-make_psd = true
-# make_psd = false
+# make_psd = true
+make_psd = false
 
-# rand solution
-fh = randn(ComplexF64, d + 1, d + 1)
-if make_psd
-    F = Hermitian(fh * fh')
-else
-    F = Hermitian(fh)
-end
+# rand dual solution
+Yh = randn(ComplexF64, d + 1, d + 1)
+Y = Hermitian(make_psd ? Yh * Yh' : Yh)
 
-@assert isposdef(F) == isposdef(Hermitian(P * F * P'))
+
+
+
+
+
+
+
+
+# @assert isposdef(F) == isposdef(Hermitian(P * F * P'))
 
 # values at points given coefs
 # vals = [sum(F[i+1, j+1] * p^i * conj(p)^j for i in 0:d, j in 0:d) for p in points]
-vals = [sum(F[i+1, j+1] * p^i * conj(p)^j for j in 0:d for i in 0:d) for p in points]
+# vals = [sum(F[i+1, j+1] * p^i * conj(p)^j for j in 0:d for i in 0:d) for p in points]
 # @assert real(vals) ≈ vals
 # vals = real(vals)
 # @show vals
 
 
-@test isposdef(Hermitian(P' * Diagonal(vals) * P)) == isposdef(F)
+# @test isposdef(Hermitian(P' * Diagonal(vals) * P)) == isposdef(F)
 
 #
 # # fvec = vec(F)
