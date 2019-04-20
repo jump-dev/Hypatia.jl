@@ -103,7 +103,7 @@ function run_JuMP_muconvexity_scalar(x::Vector, poly, dom, use_wsos::Bool)
 
     conv_condition = y' * H * y
 
-    fulldim = false
+    fulldim = true
 
     if use_wsos
         d = div(maximum(DynamicPolynomials.maxdegree.(H)) + 1, 2)
@@ -143,7 +143,7 @@ end
 function run_JuMP_muconvexity_rand(; rseed::Int = 1)
     Random.seed!(rseed)
 
-    n = 2
+    n = 3
     d = 6
     # DynamicPolynomials.@polyvar x[1:n]
 

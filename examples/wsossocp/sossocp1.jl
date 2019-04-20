@@ -84,21 +84,21 @@ function JuMP_polysoc_envelope(; use_scalar = false)
         # (naive_U, naive_pts, naive_P0, _) = MU.soc_terms(U, pts, P0, [], vec_length)
         # cone = HYP.WSOSPolyInterpCone(naive_U, [naive_P0])
         # JuMP.@constraint(model, [soc_condition(naive_pts[u, :]) for u in 1:naive_U] in cone)
-        # (naive_U, naive_pts, naive_P0, _) = MU.bilinear_terms(U, pts, P0, [], vec_length)
-        # wsos_cone = HYP.WSOSPolyInterpCone(naive_U, [naive_P0])
-        # JuMP.@constraint(model, [sdp_condition(naive_pts[u, :]) for u in 1:naive_U] in wsos_cone)
+        (naive_U, naive_pts, naive_P0, _) = MU.bilinear_terms(U, pts, P0, [], vec_length)
+        wsos_cone = HYP.WSOSPolyInterpCone(naive_U, [naive_P0])
+        JuMP.@constraint(model, [sdp_condition(naive_pts[u, :]) for u in 1:naive_U] in wsos_cone)
 
-        matrix_condition = GenericAffExpr{Float64,VariableRef}[]
-        push!(matrix_condition, f...)
-        for i in 2:vec_length
-            push!(matrix_condition, rt2 * polys[:, i - 1]...)
-            for j in 2:(i - 1)
-                push!(matrix_condition, zeros(U)...)
-            end
-            push!(matrix_condition, f...)
-        end
-        wsos_cone_mat = HYP.WSOSPolyInterpMatCone(vec_length, U, [P0])
-        JuMP.@constraint(model, matrix_condition in wsos_cone_mat)
+        # matrix_condition = GenericAffExpr{Float64,VariableRef}[]
+        # push!(matrix_condition, f...)
+        # for i in 2:vec_length
+        #     push!(matrix_condition, rt2 * polys[:, i - 1]...)
+        #     for j in 2:(i - 1)
+        #         push!(matrix_condition, zeros(U)...)
+        #     end
+        #     push!(matrix_condition, f...)
+        # end
+        # wsos_cone_mat = HYP.WSOSPolyInterpMatCone(vec_length, U, [P0])
+        # JuMP.@constraint(model, matrix_condition in wsos_cone_mat)
     else
         cone = HYP.WSOSPolyInterpSOCCone(vec_length, U, [P0])
         JuMP.@constraint(model, vcat(f, [polys[:, i] for i in 1:npoly]...) in cone)

@@ -15,7 +15,7 @@ include(joinpath(@__DIR__(), "jump.jl"))
 # Example 1 from https://arxiv.org/pdf/1509.08165v1.pdf
 function normfunction_data(; n::Int = 1, num_points::Int = 1000)
     f = x -> sum(abs2, x)
-    (X, y) = generate_regr_data(f, -1.0, 1.0, n, num_points, signal_ratio = 3.0)
+    (X, y) = generate_regr_data(f, -1.0, 1.0, n, num_points, signal_ratio = 9.0)
     return (X, y, n)
 end
 
@@ -68,7 +68,7 @@ end
 # function run_hard_shapeconregr()
     reset_timer!(Hypatia.to)
     # degrees = 4:2:4
-    d = 3; s = normfunction_data
+    d = 5; s = normfunction_data
 
     datasets = [
         # production_data,
@@ -83,7 +83,7 @@ end
         @show s
         println()
 
-        (X, y, n) = s(n = 5)
+        (X, y, n) = s(n = 2)
         dom = MU.Box(-ones(n), ones(n))
 
         shape_data = ShapeData(dom, dom, zeros(n), 0)
@@ -149,8 +149,10 @@ function makeplot(regressor, X, y)
         marker_line_width = 0.5,
         marker_line_color = "rgba(217, 217, 217, 0.14)"
     )
+    # regressor(x) = x -> sum(abs2, x)
     randx = rand(Distributions.Uniform(-1, 1), 200)
     randy = rand(Distributions.Uniform(-1, 1), 200)
+    # randz = [regressor([randx[i]; randy[i]]) for i in 1:200]
     randz = [JuMP.value(regressor)([randx[i]; randy[i]]) for i in 1:200]
     # randz = [regressor(hcat(randx, randy)[i, :]) for i in 1:200]
     model_trace = mesh3d(

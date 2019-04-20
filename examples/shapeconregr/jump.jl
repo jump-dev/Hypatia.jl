@@ -241,7 +241,7 @@ function build_shapeconregr_WSOS(
         var2 = [hessian[i, j](pts[u, :]) * (i == j ? 1 : 2) for i in 1:n for j in 1:i for u in 1:U]
         JuMP.@constraint(model, vcat(g, var2...) in soccone)
         regularization = JuMP.dot(w, g)
-        JuMP.@objective(model, Min, z / num_points + 0.0001 * regularization)
+        JuMP.@objective(model, Min, z / num_points + 0.001 * regularization)
     end
 
     # monotonicity

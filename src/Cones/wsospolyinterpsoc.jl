@@ -81,7 +81,7 @@ function set_initial_point(arr::AbstractVector{Float64}, cone::WSOSPolyInterpSOC
 end
 
 function check_in_cone(cone::WSOSPolyInterpSOC)
-    @timeit to "build mat" begin
+    # @timeit to "build mat" begin
     for j in eachindex(cone.ipwt)
         ipwtj = cone.ipwt[j]
         li_lambda = cone.li_lambda[j]
@@ -127,9 +127,9 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
             return false
         end
     end
-    end
+    # end
 
-    @timeit to "grad hess" begin
+    # @timeit to "grad hess" begin
     cone.g .= 0.0
     cone.H .= 0.0
     for j in eachindex(cone.ipwt)
@@ -142,7 +142,7 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
         lambdafact = cone.lambdafact
         matfact = cone.matfact
 
-        @timeit to "build plp" begin
+        # @timeit to "build plp" begin
 
         # prep PlambdaiP
         # block-(1,1) is P*inv(mat)*P'
@@ -169,7 +169,7 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
             PlambdaiP[r][r] .+= Symmetric(ipwtj * tmp1, :U)
         end
 
-        end
+        # end
 
         # part of gradient/hessian when p=1
         tmp2 .= view(ipwtj', cone.lambdafact[j].p, :)
@@ -217,7 +217,7 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
             end
         end
     end # j
-    end
+    # end
 
     # if !isapprox(Symmetric(cone.H, :U) * cone.point, -cone.g)
     #     @show Symmetric(cone.H, :U) * cone.point, -cone.g
