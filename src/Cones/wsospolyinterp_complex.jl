@@ -43,13 +43,7 @@ function check_in_cone(cone::WSOSPolyInterp_Complex)
     Ps = cone.Ps
     gs = cone.gs
     x = cone.point
-
-    # println() # TODO delete
-    # @show x # TODO delete
-
-    @. cone.g = 0.0
-    @. cone.H = 0.0
-
+    # TODO prealloc:
     ΛFs = Vector{CholeskyPivoted{ComplexF64, Matrix{ComplexF64}}}(undef, length(Ps))
 
     for i in eachindex(Ps)
@@ -62,9 +56,8 @@ function check_in_cone(cone::WSOSPolyInterp_Complex)
         #         @show diff
         #     end
         # end
-        Λi = Hermitian(Pi' * Diagonal(gi .* x) * Pi)
+        Λi = Hermitian(Pi' * Diagonal(gi .* x) * Pi) # TODO prealloc
         # @show Λi # TODO delete
-
         # @show det(Λi)
 
         ΛFs[i] = cholesky!(Λi, Val(true), check = false)
@@ -74,28 +67,22 @@ function check_in_cone(cone::WSOSPolyInterp_Complex)
         end
     end
 
+    @. cone.g = 0.0
+    @. cone.H = 0.0
+
     for i in eachindex(Ps)
         Pi = Ps[i]
         gi = gs[i]
         ΛFi = ΛFs[i]
 
+        # TODO prealloc below
         PΛinvPti = Hermitian(Pi * Hermitian(inv(ΛFs[i])) * Pi')
         # PΛinvPthi = LowerTriangular(ΛFi.L) \ Matrix((Pi')[ΛFi.p, :])
         # PΛinvPti = Hermitian(PΛinvPthi' * PΛinvPthi)
 
         cone.g -= gi .* diag(PΛinvPti)
         cone.H += Symmetric(gi * gi') .* abs2.(PΛinvPti) # TODO simplify math here?
-
-        # # TODO delete
-        # f(y) = -logdet(Hermitian(Pi' * Diagonal(gi .* y) * Pi))
-        # gFD = ForwardDiff.gradient(f, cone.point)
-        # HFD = ForwardDiff.hessian(f, cone.point)
-        #
-        # @show norm(gi .* diag(PΛinvPti) + gFD)
-        # @show norm(Symmetric(gi * gi') .* abs2.(PΛinvPti) - HFD)
     end
-
-    # @show cone.H # TODO delete
 
     # @show maximum(Symmetric(cone.H, :U) * cone.point + cone.g)
     # @show dot(cone.point, cone.g) + sum(size(cone.Ps[i], 2) for i in eachindex(cone.Ps))
