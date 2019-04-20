@@ -18,33 +18,29 @@ using Test
 primal_wsos = false
 # primal_wsos = true
 
-d = 3
+d = 2
 
 # inf -1 + |z|² + ... + |z|ᵈ
 # optimal value -1, for z = 0
+
 # f(z) = -1 + 4*real(z)# + abs(z)^2 + real(z^2) + abs(z)^3 # + sum(abs(z)^i for i in 2:2:d))
 # f(z) = 1 + real(z) + abs(z)^2 + real(z^2) + real(z^2 * conj(z)) + abs(z)^4
-
-# f(z) = 1 + 2real(z) + abs(z)^2 + 2real(z^2) + 2real(z^2 * conj(z)) + abs(z)^4
 # f(z) = 1 + real(z)# + 3abs(z)^2
 # f(z) = -1 + 2.5abs(z)^2 + 0.5abs(z)^4
-# mathematica:
+
+f(z) = 1 + 2real(z) + abs(z)^2 + 2real(z^2) + 2real(z^2 * conj(z)) + abs(z)^4
+# mathematica: min is 0
 # Minimize[1+2x+x^2+y^2+2(x^2-y^2)+2(x^3+x*y^2)+(x^2+y^2)^2,{x,y}]
-# min is 0
 
-# random
-Fh = randn(ComplexF64, d + 1, d + 1)
-if rand() > 0.5
-    F = Hermitian(Fh)
-else
-    F = Hermitian(Fh * Fh')
-end
+
+# # random
+# Fh = randn(ComplexF64, d + 1, d + 1)
+# F = Hermitian((rand() > 0.5) ? Fh * Fh' : Fh)
 # @show isposdef(F)
+# f(z) = real(sum(F[i+1, j+1] * z^i * conj(z)^j for i in 0:d, j in 0:d))
 
-f(z) = real(sum(F[i+1, j+1] * z^i * conj(z)^j for i in 0:d, j in 0:d))
 
-
-sample_factor = 10
+sample_factor = 1000
 num_reruns = 5
 rerun_objvals = Float64[]
 
@@ -58,28 +54,22 @@ for rerun in 1:num_reruns
     # points = [cospi(2k / U) + sinpi(2k / U) * im for k = 0:(U - 1)]
     # # @show points
     # V = [b(p) for p in points, b in V_basis]
+    # @show V
 
     # sample
-    # all_points = rand(ComplexF64, sample_factor * U) .- 0.5 * (1 + im)
-    # for i in eachindex(all_points)
-    #     if abs(all_points[i]) >= 1
-    #         all_points[i] /= abs(all_points[i])
-    #     end
-    # end
     radii = sqrt.(rand(sample_factor * U))
     angles = rand(sample_factor * U) * 2pi
     all_points = radii .* (cos.(angles) .+ (sin.(angles) .* im))
     # @show all_points[1:10]
-
     V = [b(p) for p in all_points, b in V_basis]
     # @test rank(V) == U
     VF = qr(Matrix(transpose(V)), Val(true))
     keep = VF.p[1:U]
     points = all_points[keep]
     V = V[keep, :]
-    # @test rank(V) == U
-    # @show eigvals(V)
 
+    @test rank(V) == U
+    # @show eigvals(V)
 
     # setup P0
     # L0 = d + 1
@@ -153,7 +143,7 @@ for rerun in 1:num_reruns
         @show obj
         @test testmin > obj
         if isposdef(F)
-            @test obj > 0.0
+            @test obj > -1e-5
             @test testmin > 0.0
         end
 
