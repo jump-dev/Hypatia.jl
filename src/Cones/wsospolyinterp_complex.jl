@@ -1,7 +1,12 @@
 #=
 Copyright 2018, Chris Coey and contributors
 
-TODO essentially the same operations as the real case, so maybe delete this and generalize the real WSOS interp cone slightly
+real WSOS or hermitian WSOS interpolation-based cone
+
+TODO decide whether to keep this version with the gi specified or the old version without gi
+does it work if gi are negative for some points? some confusion here
+should the cone be parametrized by real vs complex?
+check if gradient and hessian are correct for complex case
 =#
 
 mutable struct WSOSPolyInterp_Complex <: Cone
@@ -45,26 +50,15 @@ function check_in_cone(cone::WSOSPolyInterp_Complex)
     Ps = cone.Ps
     gs = cone.gs
     x = cone.point
-    # TODO prealloc:
-    ΛFs = Vector{CholeskyPivoted{ComplexF64, Matrix{ComplexF64}}}(undef, length(Ps))
+    ΛFs = Vector{CholeskyPivoted{ComplexF64, Matrix{ComplexF64}}}(undef, length(Ps)) # TODO prealloc
 
     for i in eachindex(Ps)
         Pi = Ps[i]
         gi = gs[i]
-        # if !ishermitian(Pi' * Diagonal(gi .* x) * Pi) # TODO delete
-        #     tmp = Pi' * Diagonal(gi .* x) * Pi
-        #     diff = norm(tmp - tmp')
-        #     if diff > 1e-10
-        #         @show diff
-        #     end
-        # end
         Λi = Hermitian(Pi' * Diagonal(gi .* x) * Pi) # TODO prealloc
-        # @show Λi # TODO delete
-        # @show det(Λi)
 
         ΛFs[i] = cholesky!(Λi, Val(true), check = false)
         if !isposdef(ΛFs[i])
-            # @show eigvals(Λi) # TODO delete
             return false
         end
     end
@@ -78,16 +72,13 @@ function check_in_cone(cone::WSOSPolyInterp_Complex)
         ΛFi = ΛFs[i]
 
         # TODO prealloc below
-        PΛinvPti = Hermitian(Pi * Hermitian(inv(ΛFs[i])) * Pi')
-        # PΛinvPthi = LowerTriangular(ΛFi.L) \ Matrix((Pi')[ΛFi.p, :])
-        # PΛinvPti = Hermitian(PΛinvPthi' * PΛinvPthi)
+        # PΛinvPti = Hermitian(Pi * Hermitian(inv(ΛFs[i])) * Pi')
+        PΛinvPthi = LowerTriangular(ΛFi.L) \ Matrix((Pi')[ΛFi.p, :])
+        PΛinvPti = Hermitian(PΛinvPthi' * PΛinvPthi) # TODO syrk
 
         cone.g -= gi .* diag(PΛinvPti)
         cone.H += Symmetric(gi * gi') .* abs2.(PΛinvPti) # TODO simplify math here?
     end
-
-    # @show maximum(Symmetric(cone.H, :U) * cone.point + cone.g)
-    # @show dot(cone.point, cone.g) + sum(size(cone.Ps[i], 2) for i in eachindex(cone.Ps))
 
     return factorize_hess(cone)
 end

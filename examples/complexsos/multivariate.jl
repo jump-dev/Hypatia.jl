@@ -7,12 +7,13 @@ const HYP = Hypatia
 const CO = HYP.Cones
 const MO = HYP.Models
 const SO = HYP.Solvers
-# const MU = HYP.ModelUtilities
 
 using LinearAlgebra
 using Random
 import Combinatorics
 using Test
+
+Random.seed!(1)
 
 # primal_wsos = false
 primal_wsos = true
@@ -24,6 +25,7 @@ sample_factor = 10
 L = binomial(n + d, n)
 U = L^2
 num_samp = sample_factor * U
+@show U
 
 # setup Vandermonde
 mon_pow(z, ex) = prod(z[i]^ex[i] for i in eachindex(ex))

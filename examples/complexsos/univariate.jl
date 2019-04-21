@@ -8,6 +8,10 @@ using JuMP
 using LinearAlgebra
 using Test
 
+# TODO tidy up 2 formulations (herm PSD and interp-herm-wsos). maybe refac into 2 functions
+# use given or random f (requires automatic construction of M0, M1 - see old code in univarite4.jl)
+# check objective values of 2 formulations match
+
 
 # inf z + ̄z : |z|² ≤ 1
 # ≡ inf f(z) = 2Re(z) : g₁(z) = 1 - |z|² ≥ 0
