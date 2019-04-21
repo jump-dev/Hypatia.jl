@@ -5,17 +5,6 @@ definitions of conic sets not already defined by MathOptInterface
 and functions for converting between Hypatia and MOI cone definitions
 =#
 
-export WSOSComplexCone
-
-struct WSOSComplexCone <: MOI.AbstractVectorSet
-    dimension::Int
-    sidedims::Vector{Int}
-    initpoint::Vector{Float64}
-    Mfuncs::Vector{Function}
-    is_dual::Bool
-end
-WSOSComplexCone(dimension::Int, sidedims::Vector{Int}, initpoint::Vector{Float64}, Mfuncs::Vector{Function}) = WSOSComplexCone(dimension, sidedims, initpoint, Mfuncs, false)
-
 export WSOSPolyInterpCone
 
 struct WSOSPolyInterpCone <: MOI.AbstractVectorSet
@@ -24,16 +13,6 @@ struct WSOSPolyInterpCone <: MOI.AbstractVectorSet
     is_dual::Bool
 end
 WSOSPolyInterpCone(dimension::Int, ipwt::Vector{Matrix{Float64}}) = WSOSPolyInterpCone(dimension, ipwt, false)
-
-export WSOSPolyInterpCone_2
-
-struct WSOSPolyInterpCone_2 <: MOI.AbstractVectorSet
-    dimension::Int
-    Ps::Vector{Matrix{Float64}}
-    gs::Vector{Vector{Float64}}
-    is_dual::Bool
-end
-WSOSPolyInterpCone_2(dimension::Int, Ps::Vector{Matrix{Float64}}, gs::Vector{Vector{Float64}}) = WSOSPolyInterpCone_2(dimension, Ps, gs, false)
 
 export WSOSPolyInterp_Complex
 
@@ -73,9 +52,7 @@ MOIOtherCones = (
     MOI.GeometricMeanCone,
     MOI.PositiveSemidefiniteConeTriangle,
     MOI.LogDetConeTriangle,
-    WSOSComplexCone,
     WSOSPolyInterpCone,
-    WSOSPolyInterpCone_2,
     WSOSPolyInterp_Complex,
     WSOSPolyInterpMatCone,
     WSOSPolyInterpSOCCone,
@@ -87,9 +64,7 @@ cone_from_moi(s::MOI.RotatedSecondOrderCone) = Cones.EpiPerSquare(MOI.dimension(
 cone_from_moi(s::MOI.ExponentialCone) = Cones.HypoPerLog()
 cone_from_moi(s::MOI.GeometricMeanCone) = (l = MOI.dimension(s) - 1; Cones.HypoGeomean(fill(inv(l), l)))
 cone_from_moi(s::MOI.PowerCone{Float64}) = Cones.EpiPerPower(inv(s.exponent))
-cone_from_moi(s::WSOSComplexCone) = Cones.WSOSComplex(s.dimension, s.sidedims, s.initpoint, s.Mfuncs, s.is_dual)
 cone_from_moi(s::WSOSPolyInterpCone) = Cones.WSOSPolyInterp(s.dimension, s.ipwt, s.is_dual)
-cone_from_moi(s::WSOSPolyInterpCone_2) = Cones.WSOSPolyInterp_2(s.dimension, s.Ps, s.gs, s.is_dual)
 cone_from_moi(s::WSOSPolyInterp_Complex) = Cones.WSOSPolyInterp_Complex(s.dimension, s.Ps, s.gs, s.is_dual)
 cone_from_moi(s::WSOSPolyInterpMatCone) = Cones.WSOSPolyInterpMat(s.R, s.U, s.ipwt, s.is_dual)
 cone_from_moi(s::WSOSPolyInterpSOCCone) = Cones.WSOSPolyInterpSOC(s.R, s.U, s.ipwt, s.is_dual)
