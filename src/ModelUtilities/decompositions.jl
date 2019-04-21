@@ -16,7 +16,14 @@ function get_decomposition(
         )
     s = JuMP.value(constraint)
     x = JuMP.dual(constraint) # check sign
-    w = Symmetric(hessian_oracle(x), :U) \ s
+    (g, H) = hessian_oracle(x)
+    delta = 1e-3
+    @show eigen(Symmetric(H, :U)).values
+    @show cond(Symmetric(H, :U))
+    fH = cholesky(Symmetric(H, :U))
+    @show norm(fH.L \ (s + delta * g))
+
+    w = Symmetric(H, :U) \ s
     lambda_inv = inv(Symmetric(lambda_oracle(x), :U))
     @show eigen(lambda_oracle(w)).values
     S = Symmetric(lambda_inv * lambda_oracle(w) * lambda_inv, :U)
@@ -87,23 +94,28 @@ monos = PolyJuMP.monomials([x; y], 0:d)
 random_poly = JuMP.dot(rand(length(monos)), monos)
 random_poly_sqr = random_poly^2
 (U, pts, P0, _, _) = MU.interpolate(MU.FreeDomain(2n), d, sample_factor = 20, sample = true)
-model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
+model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, tol_feas = 1e-9))
 cone = HYP.WSOSPolyInterpCone(U, [P0])
 sqrconstr = JuMP.@constraint(model, [random_poly_sqr(pts[u, :]) for u in 1:U] in cone)
 JuMP.optimize!(model)
 
-model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
-cone = HYP.WSOSPolyInterpCone(U, [P0])
-JuMP.@variable(model, dummy[1:U])
-sqrconstr2 = JuMP.@constraint(model, dummy in cone)
-JuMP.optimize!(model)
+# model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
+# cone = HYP.WSOSPolyInterpCone(U, [P0])
+# JuMP.@variable(model, dummy[1:U])
+# sqrconstr2 = JuMP.@constraint(model, dummy in cone)
+# JuMP.optimize!(model)
 
 lambda_oracle(point) = Symmetric(P0' * Diagonal(point) * P0, :U)
 function hessian_oracle(point)
     cone = model.moi_backend.optimizer.model.optimizer.cones[1]
     cone.point .= point
-    HYP.Cones.check_in_cone(cone)
-    return cone.H
+    @assert HYP.Cones.check_in_cone(cone)
+    H = cone.H
+    # if !(isposdef(Symmetric(H, :U)))
+    #     H += 1e-3I
+    # end
+    @show isposdef(H)
+    return cone.g, H
 end
 
 get_decomposition(sqrconstr, lambda_oracle, hessian_oracle, 2n, d)
