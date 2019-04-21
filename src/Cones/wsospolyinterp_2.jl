@@ -10,6 +10,7 @@ interpolation-based weighted-sum-of-squares (multivariate) polynomial cone param
 definition and dual barrier from "Sum-of-squares optimization without semidefinite programming" by D. Papp and S. Yildiz, available at https://arxiv.org/abs/1712.01792
 
 TODO remove allocations
+TODO decide whether to use this cone definition or the old one without g_is
 =#
 
 mutable struct WSOSPolyInterp_2 <: Cone

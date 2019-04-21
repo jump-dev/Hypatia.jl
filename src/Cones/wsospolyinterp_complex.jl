@@ -1,5 +1,7 @@
 #=
 Copyright 2018, Chris Coey and contributors
+
+TODO essentially the same operations as the real case, so maybe delete this and generalize the real WSOS interp cone slightly
 =#
 
 mutable struct WSOSPolyInterp_Complex <: Cone

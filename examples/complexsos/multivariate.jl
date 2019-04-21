@@ -14,34 +14,27 @@ using Random
 import Combinatorics
 using Test
 
-
 # primal_wsos = false
 primal_wsos = true
 
 d = 3
 n = 3
+sample_factor = 10
 
 L = binomial(n + d, n)
 U = L^2
+num_samp = sample_factor * U
 
+# setup Vandermonde
 mon_pow(z, ex) = prod(z[i]^ex[i] for i in eachindex(ex))
-
 L_basis = [a for t in 0:d for a in Combinatorics.multiexponents(n, t)]
 V_basis = [z -> mon_pow(z, L_basis[k]) * mon_pow(conj(z), L_basis[l]) for l in eachindex(L_basis) for k in eachindex(L_basis)]
 @test length(V_basis) == U
 
+# restrict to the unit complex hyperball
+g1(z) = 1 - sum(abs2, z)
 
-# # inf 1 - 4/3 * |z₁|² + 7/18 * |z₁|⁴ : 1 - |z₁|² - |z₂|² = 0
-# # f - γ - σg is Hermitian-SOS, σ is an unconstrained poly
-# # optimal value 1/18
-# # at order 2 of hierarchy
-# but with equality changed to equality, only achieves -1/3 at all orders (Josz & Molzahn)
-# n = 2
-# f(z) = 1 - 4/3 * abs2(z[1]) + 7/18 * abs2(abs2(z[1]))
-# g1(z) = 1 - abs2(z[1]) - abs2(z[2])
-
-
-# random
+# random objective
 Fh = randn(ComplexF64, L, L)
 F = (rand() > 0.5) ? Fh * Fh' : Fh
 F ./= norm(F)
@@ -49,62 +42,40 @@ F = Hermitian(F)
 @show isposdef(F)
 f(z) = real(sum(F[k, l] * mon_pow(z, L_basis[k]) * mon_pow(conj(z), L_basis[l]) for l in eachindex(L_basis) for k in eachindex(L_basis)))
 
-g1(z) = 1 - sum(abs2, z)
-
-
-sample_factor = 10
+# rerun multiple times with different random interpolation points and check consistency
 num_reruns = 5
 rerun_objvals = Float64[]
-
 for rerun in 1:num_reruns
-    # # roots of unity do not seem to be unisolvent
-    # nrts1 = 10
-    # rts1 = ComplexF64[cospi(2k / nrts1) + sinpi(2k / nrts1) * im for k = 0:(nrts1 - 1)]
-    # points = Matrix{ComplexF64}(undef, nrts1^2, 2)
-    # idx = 1
-    # for i in 1:nrts1, j in 1:nrts1
-    #     points[idx, 1] = rts1[i]
-    #     points[idx, 2] = rts1[j]
-    #     global idx += 1
-    # end
-
-    # sample
-    num_samp = sample_factor * U
+    # sample from cartesian product of n complex unit balls
+    # TODO expo vs unif give different distributions it seems
+    # TODO look up theory of ideal interpolation points analogous to Fekete points in real case
     X = randn(num_samp, 2n)
     # Y = randexp(num_samp)
     # all_points_real = [X[p, :] ./ sqrt(Y[p] + sum(abs2, X)) for p in 1:num_samp]
     Y = rand(num_samp).^inv(2n)
     all_points_real = [Y[p] * X[p, :] ./ norm(X[p, :]) for p in 1:num_samp]
     all_points = [[p[i] + im * p[i+1] for i in 1:2:2n] for p in all_points_real]
-    # @show all_points[1:10]
-    # @show [g1(z) for z in all_points]
 
+    # select subset of points to maximize |det(V)| in heuristic QR-based procedure (analogous to real case)
+    # TODO extend the theory from the real case to the complex case
     V = [b(z) for z in all_points, b in V_basis]
     @test rank(V) == U
     VF = qr(Matrix(transpose(V)), Val(true))
     keep = VF.p[1:U]
     points = all_points[keep]
     V = V[keep, :]
-
     @test rank(V) == U
-    # @show eigvals(V)
-
-    @show U
-    @show length(points)
 
     # setup P0
     L0 = binomial(n + d, n)
     v0 = ones(U)
     P0 = V[:, 1:L0]
-    # P0 = [prod(p[i]^a[i] for i in eachindex(a)) for p in eachrow(points), t in 0:d for a in Combinatorics.multiexponents(n, t)]
     # P0 = Matrix(qr(P0).Q)
 
     # setup P1
     L1 = binomial(n + d - 1, n)
     v1 = [g1(z) for z in points]
-    # @show v1
     P1 = V[:, 1:L1]
-    # P1 = [prod(p[i]^a[i] for i in eachindex(a)) for p in eachrow(points), t in 0:d-1 for a in Combinatorics.multiexponents(n, t)]
     # P1 = Matrix(qr(P1).Q)
 
     # setup problem data
@@ -121,10 +92,8 @@ for rerun in 1:num_reruns
         G = Diagonal(-1.0I, U)
         h = zeros(U)
     end
-    # cones = [CO.WSOSPolyInterp_Complex(U, [P0], [v0], !primal_wsos)]
     cones = [CO.WSOSPolyInterp_Complex(U, [P0, P1], [v0, v1], !primal_wsos)]
     cone_idxs = [1:U]
-
 
     # solve
     system_solvers = [
