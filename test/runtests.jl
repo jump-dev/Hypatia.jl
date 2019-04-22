@@ -64,7 +64,7 @@ testfuns_singular = [
     inconsistent2,
     ]
 @testset "preprocessing tests: $t, $s" for t in testfuns_singular, s in system_solvers
-    t(verbose, s, MO.PreprocessedLinearModel)
+    t(s, MO.PreprocessedLinearModel, verbose)
 end
 linear_models = [
     MO.RawLinearModel,
@@ -111,7 +111,7 @@ testfuns_nonsingular = [
     if s == SO.QRCholCombinedHSDSystemSolver && m == MO.RawLinearModel
         continue # QRChol linear system solver needs preprocessed model
     end
-    t(verbose, s, m)
+    t(s, m, verbose)
 end
 
 @info("starting default native examples tests")
@@ -161,7 +161,7 @@ testfuns = [
     if s == SO.QRCholCombinedHSDSystemSolver && m == MO.RawLinearModel
         continue # QRChol linear system solver needs preprocessed model
     end
-    t(verbose, s, m)
+    t(s, m, verbose)
 end
 
 @info("starting MathOptInterface tests")
@@ -174,7 +174,7 @@ linear_models = [
     MO.PreprocessedLinearModel, # MOI tests require preprocessing
     ]
 @testset "MOI tests: $(d ? "dense" : "sparse"), $s, $m" for d in (false, true), s in system_solvers, m in linear_models
-    test_moi(verbose, d, s, m)
+    test_moi(d, s, m, verbose)
 end
 
 @info("starting default JuMP examples tests")

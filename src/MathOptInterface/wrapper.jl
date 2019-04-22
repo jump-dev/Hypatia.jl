@@ -495,10 +495,12 @@ function MOI.copy_to(
 end
 
 function MOI.optimize!(opt::Optimizer)
-    preprocessed_model = opt.linear_model(copy(opt.c), copy(opt.A), copy(opt.b), copy(opt.G), copy(opt.h), opt.cones, opt.cone_idxs)
-    solver = Solvers.HSDSolver(preprocessed_model, verbose = opt.verbose, max_iters = opt.max_iters, time_limit = opt.time_limit,
+    model = opt.linear_model(copy(opt.c), copy(opt.A), copy(opt.b), copy(opt.G), copy(opt.h), opt.cones, opt.cone_idxs)
+    stepper = Solvers.CombinedHSDStepper(model, system_solver = opt.system_solver(model))
+    solver = Solvers.HSDSolver(
+        model, stepper = stepper,
+        verbose = opt.verbose, max_iters = opt.max_iters, time_limit = opt.time_limit,
         tol_rel_opt = opt.tol_rel_opt, tol_abs_opt = opt.tol_abs_opt, tol_feas = opt.tol_feas,
-        stepper = Solvers.CombinedHSDStepper(preprocessed_model, system_solver = opt.system_solver(preprocessed_model)),
         )
     Solvers.solve(solver)
 
@@ -508,14 +510,12 @@ function MOI.optimize!(opt::Optimizer)
     opt.dual_obj = Solvers.get_dual_obj(solver)
 
     # get solution and transform for MOI
-    opt.x = zeros(length(opt.c))
-    opt.x[preprocessed_model.x_keep_idxs] = Solvers.get_x(solver)
+    opt.x = Solvers.get_x(solver, model)
     opt.constr_prim_eq += opt.b - opt.A * opt.x
-    opt.y = zeros(length(opt.b))
-    opt.y[preprocessed_model.y_keep_idxs] = Solvers.get_y(solver)
+    opt.y = Solvers.get_y(solver, model)
 
-    opt.s = Solvers.get_s(solver)
-    opt.z = Solvers.get_z(solver)
+    opt.s = Solvers.get_s(solver, model)
+    opt.z = Solvers.get_z(solver, model)
 
     # TODO refac out primitive cone untransformations
     for k in eachindex(opt.cones)

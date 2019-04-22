@@ -2,7 +2,7 @@
 Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 =#
 
-function solveandcheck_JuMP(model, true_obj; atol = 1e-3, rtol = 1e-3)
+function solve_and_check_JuMP(model, true_obj; atol = 1e-3, rtol = 1e-3)
     JuMP.optimize!(model)
     @test JuMP.termination_status(model) == MOI.OPTIMAL
     @test JuMP.primal_status(model) == MOI.FEASIBLE_POINT
@@ -16,7 +16,7 @@ function namedpoly1_JuMP()
     (x, f, dom, true_obj) = getpolydata(:heart)
     # WSOS formulation
     model = build_JuMP_namedpoly_WSOS(x, f, dom, d = 2)
-    solveandcheck_JuMP(model, true_obj)
+    solve_and_check_JuMP(model, true_obj)
 end
 
 function namedpoly2_JuMP()
@@ -24,10 +24,10 @@ function namedpoly2_JuMP()
     (x, f, dom, true_obj) = getpolydata(:schwefel)
     # WSOS formulation
     model = build_JuMP_namedpoly_WSOS(x, f, dom, d = 2)
-    solveandcheck_JuMP(model, true_obj)
+    solve_and_check_JuMP(model, true_obj)
     # SDP formulation
     # model = build_JuMP_namedpoly_PSD(x, f, dom, d = 2)
-    # solveandcheck_JuMP(model, true_obj)
+    # solve_and_check_JuMP(model, true_obj)
 end
 
 function namedpoly3_JuMP()
@@ -35,10 +35,10 @@ function namedpoly3_JuMP()
     (x, f, dom, true_obj) = getpolydata(:magnetism7_ball)
     # WSOS formulation
     model = build_JuMP_namedpoly_WSOS(x, f, dom, d = 2)
-    solveandcheck_JuMP(model, true_obj)
+    solve_and_check_JuMP(model, true_obj)
     # SDP formulation
     # model = build_JuMP_namedpoly_PSD(x, f, dom, d = 2)
-    # solveandcheck_JuMP(model, true_obj)
+    # solve_and_check_JuMP(model, true_obj)
 end
 
 function namedpoly4_JuMP()
@@ -46,70 +46,70 @@ function namedpoly4_JuMP()
     (x, f, dom, true_obj) = getpolydata(:motzkin_ellipsoid)
     # WSOS formulation
     model = build_JuMP_namedpoly_WSOS(x, f, dom, d = 4)
-    solveandcheck_JuMP(model, true_obj)
+    solve_and_check_JuMP(model, true_obj)
     # SDP formulation
     # model = build_JuMP_namedpoly_PSD(x, f, dom, d = 4)
-    # solveandcheck_JuMP(model, true_obj)
+    # solve_and_check_JuMP(model, true_obj)
 end
 
 function namedpoly5_JuMP()
     (x, f, dom, true_obj) = getpolydata(:caprasse)
     # WSOS formulation
     model = build_JuMP_namedpoly_WSOS(x, f, dom, d = 4)
-    solveandcheck_JuMP(model, true_obj)
+    solve_and_check_JuMP(model, true_obj)
     # SDP formulation
     # model = build_JuMP_namedpoly_PSD(x, f, dom, d = 4)
-    # solveandcheck_JuMP(model, true_obj)
+    # solve_and_check_JuMP(model, true_obj)
 end
 
 function namedpoly6_JuMP()
     (x, f, dom, true_obj) = getpolydata(:goldsteinprice)
     # WSOS formulation
     model = build_JuMP_namedpoly_WSOS(x, f, dom, d = 7)
-    solveandcheck_JuMP(model, true_obj)
+    solve_and_check_JuMP(model, true_obj)
     # SDP formulation
     # model = build_JuMP_namedpoly_PSD(x, f, dom, d = 7)
-    # solveandcheck_JuMP(model, true_obj)
+    # solve_and_check_JuMP(model, true_obj)
 end
 
 function namedpoly7_JuMP()
     (x, f, dom, true_obj) = getpolydata(:lotkavolterra)
     # WSOS formulation
     model = build_JuMP_namedpoly_WSOS(x, f, dom, d = 3)
-    solveandcheck_JuMP(model, true_obj)
+    solve_and_check_JuMP(model, true_obj)
     # SDP formulation
     # model = build_JuMP_namedpoly_PSD(x, f, dom, d = 3)
-    # solveandcheck_JuMP(model, true_obj)
+    # solve_and_check_JuMP(model, true_obj)
 end
 
 function namedpoly8_JuMP()
     (x, f, dom, true_obj) = getpolydata(:robinson)
     # WSOS formulation
     model = build_JuMP_namedpoly_WSOS(x, f, dom, d = 8)
-    solveandcheck_JuMP(model, true_obj)
+    solve_and_check_JuMP(model, true_obj)
     # SDP formulation
     # model = build_JuMP_namedpoly_PSD(x, f, dom, d = 8)
-    # solveandcheck_JuMP(model, true_obj)
+    # solve_and_check_JuMP(model, true_obj)
 end
 
 function namedpoly9_JuMP()
     (x, f, dom, true_obj) = getpolydata(:reactiondiffusion_ball)
     # WSOS formulation
     model = build_JuMP_namedpoly_WSOS(x, f, dom, d = 3)
-    solveandcheck_JuMP(model, true_obj)
+    solve_and_check_JuMP(model, true_obj)
     # SDP formulation
     # model = build_JuMP_namedpoly_PSD(x, f, dom, d = 3)
-    # solveandcheck_JuMP(model, true_obj)
+    # solve_and_check_JuMP(model, true_obj)
 end
 
 function namedpoly10_JuMP()
     (x, f, dom, true_obj) = getpolydata(:rosenbrock)
     # WSOS formulation
     model = build_JuMP_namedpoly_WSOS(x, f, dom, d = 5)
-    solveandcheck_JuMP(model, true_obj, atol = 1e-3)
+    solve_and_check_JuMP(model, true_obj, atol = 1e-3)
     # SDP formulation
     # model = build_JuMP_namedpoly_PSD(x, f, dom, d = 5)
-    # solveandcheck_JuMP(model, true_obj, atol = 1e-3)
+    # solve_and_check_JuMP(model, true_obj, atol = 1e-3)
 end
 
 function shapeconregr1_JuMP()
@@ -118,7 +118,7 @@ function shapeconregr1_JuMP()
     model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
     p = build_shapeconregr_WSOS(model, X, y, deg, ShapeData(n), use_lsq_obj = false)
     true_obj = 4.4065e-1
-    solveandcheck_JuMP(model, true_obj)
+    solve_and_check_JuMP(model, true_obj)
 end
 
 function shapeconregr2_JuMP()
@@ -127,11 +127,11 @@ function shapeconregr2_JuMP()
     model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
     p = build_shapeconregr_WSOS(model, X, y, deg, ShapeData(n), use_lsq_obj = false)
     true_obj = 1.3971e-1
-    solveandcheck_JuMP(model, true_obj)
+    solve_and_check_JuMP(model, true_obj)
     # test with non-sampling based interpolation
     model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
     p = build_shapeconregr_WSOS(model, X, y, deg, ShapeData(n), use_lsq_obj = false, sample = false)
-    solveandcheck_JuMP(model, true_obj)
+    solve_and_check_JuMP(model, true_obj)
 end
 
 function shapeconregr3_JuMP()
@@ -140,7 +140,7 @@ function shapeconregr3_JuMP()
     model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
     p = build_shapeconregr_WSOS(model, X, y, deg, ShapeData(n), use_lsq_obj = false)
     true_obj = 2.4577e-1
-    solveandcheck_JuMP(model, true_obj)
+    solve_and_check_JuMP(model, true_obj)
 end
 
 function shapeconregr4_JuMP()
@@ -149,7 +149,7 @@ function shapeconregr4_JuMP()
     model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
     p = build_shapeconregr_WSOS(model, X, y, deg, ShapeData(n), use_lsq_obj = false)
     true_obj = 1.5449e-1
-    solveandcheck_JuMP(model, true_obj)
+    solve_and_check_JuMP(model, true_obj)
 end
 
 function shapeconregr5_JuMP()
@@ -158,7 +158,7 @@ function shapeconregr5_JuMP()
     model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
     p = build_shapeconregr_WSOS(model, X, y, deg, ShapeData(n), use_lsq_obj = false)
     true_obj = 2.5200e-1
-    solveandcheck_JuMP(model, true_obj)
+    solve_and_check_JuMP(model, true_obj)
 end
 
 function shapeconregr6_JuMP()
@@ -167,7 +167,7 @@ function shapeconregr6_JuMP()
     model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
     p = build_shapeconregr_WSOS(model, X, y, deg, ShapeData(n), use_lsq_obj = true)
     true_obj = 5.4584e-2
-    solveandcheck_JuMP(model, true_obj)
+    solve_and_check_JuMP(model, true_obj)
 end
 
 function shapeconregr7_JuMP()
@@ -176,7 +176,7 @@ function shapeconregr7_JuMP()
     model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
     p = build_shapeconregr_WSOS(model, X, y, deg, ShapeData(n), use_lsq_obj = true)
     true_obj = 3.3249e-2
-    solveandcheck_JuMP(model, true_obj)
+    solve_and_check_JuMP(model, true_obj)
 end
 
 function shapeconregr8_JuMP()
@@ -186,7 +186,7 @@ function shapeconregr8_JuMP()
     model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
     p = build_shapeconregr_WSOS(model, X, y, deg, shape_data, use_lsq_obj = true)
     true_obj = 3.7723e-03
-    solveandcheck_JuMP(model, true_obj)
+    solve_and_check_JuMP(model, true_obj)
 end
 
 function shapeconregr9_JuMP()
@@ -196,7 +196,7 @@ function shapeconregr9_JuMP()
     model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
     p = build_shapeconregr_WSOS(model, X, y, deg, shape_data, use_lsq_obj = true)
     true_obj = 3.0995e-02 # not verified with SDP
-    solveandcheck_JuMP(model, true_obj)
+    solve_and_check_JuMP(model, true_obj)
 end
 
 function shapeconregr10_JuMP()
@@ -205,7 +205,7 @@ function shapeconregr10_JuMP()
     model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
     p = build_shapeconregr_WSOS(model, X, y, deg, ShapeData(n), use_lsq_obj = true)
     true_obj = 5.0209e-02 # not verified with SDP
-    solveandcheck_JuMP(model, true_obj)
+    solve_and_check_JuMP(model, true_obj)
 end
 
 function shapeconregr11_JuMP()
@@ -215,7 +215,7 @@ function shapeconregr11_JuMP()
     model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
     p = build_shapeconregr_WSOS(model, X, y, deg, shape_data, use_lsq_obj = true)
     true_obj = 0.22206 # not verified with SDP
-    solveandcheck_JuMP(model, true_obj)
+    solve_and_check_JuMP(model, true_obj)
 end
 
 function shapeconregr12_JuMP()
@@ -225,7 +225,7 @@ function shapeconregr12_JuMP()
     model = SumOfSquares.SOSModel(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
     p = build_shapeconregr_PSD(model, X, y, deg, shape_data, use_lsq_obj = true)
     true_obj = 0.22206 # not verified with SDP
-    solveandcheck_JuMP(model, true_obj)
+    solve_and_check_JuMP(model, true_obj)
 end
 
 function shapeconregr13_JuMP()
@@ -234,7 +234,7 @@ function shapeconregr13_JuMP()
     model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
     p = build_shapeconregr_WSOS(model, X, y, deg, ShapeData(n), use_lsq_obj = false)
     true_obj = 1.7751 # not verified with SDP
-    solveandcheck_JuMP(model, true_obj)
+    solve_and_check_JuMP(model, true_obj)
 end
 
 function shapeconregr14_JuMP() # out of memory error when converting sparse to dense in MOI conversion
