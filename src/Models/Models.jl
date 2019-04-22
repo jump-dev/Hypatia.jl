@@ -44,6 +44,6 @@ end
 abstract type LinearModel end
 include("linear.jl")
 
-# include("smooth_convex.jl") # TODO convex quadratic or smooth nonlinear objectives
+# TODO other model types eg quadratic obj, convex differentiable obj
 
 end

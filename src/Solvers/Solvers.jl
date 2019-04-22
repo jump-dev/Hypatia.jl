@@ -26,8 +26,7 @@ include("homogeneous_self_dual/combined_step/symindef.jl")
 include("homogeneous_self_dual/combined_step/qrchol.jl")
 # include("homogeneous_self_dual/combined_step/cholchol.jl")
 
-# TODO sequential quadratic algorithm for linear and smooth_convex models
-# include("sequential_quadratic/solver.jl")
+# TODO sequential quadratic algorithm for linear, quadratic, and smooth convex models
 
 get_status(solver::Solver) = solver.status
 get_solve_time(solver::Solver) = solver.solve_time
