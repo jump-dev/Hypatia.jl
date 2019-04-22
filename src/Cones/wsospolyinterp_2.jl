@@ -54,9 +54,6 @@ function check_in_cone(cone::WSOSPolyInterp_2)
     gs = cone.gs
     x = cone.point
 
-    @. cone.g = 0.0
-    @. cone.H = 0.0
-
     ΛFs = Vector{CholeskyPivoted{Float64, Matrix{Float64}}}(undef, length(Ps))
 
     for i in eachindex(Ps)
@@ -69,6 +66,9 @@ function check_in_cone(cone::WSOSPolyInterp_2)
             return false
         end
     end
+
+    @. cone.g = 0.0
+    @. cone.H = 0.0
 
     for i in eachindex(Ps)
         Pi = Ps[i]
