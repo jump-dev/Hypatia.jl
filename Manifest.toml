@@ -371,8 +371,10 @@ deps = ["Libdl", "LinearAlgebra", "Serialization", "SparseArrays"]
 uuid = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
 
 [[SumOfSquares]]
-deps = ["JuMP", "LinearAlgebra", "MathOptInterface", "MultivariateMoments", "MultivariatePolynomials", "Pkg", "PolyJuMP", "Reexport", "SemialgebraicSets", "SparseArrays", "Test"]
-git-tree-sha1 = "2fde6e851a9b9b5d1f33b108d8fa71857346051b"
+deps = ["JuMP", "LinearAlgebra", "MathOptInterface", "MultivariateMoments", "MultivariatePolynomials", "Pkg", "PolyJuMP", "Reexport", "SemialgebraicSets", "SparseArrays"]
+git-tree-sha1 = "b07e8f5302b0c320eef7aa6150ff4162ed46a0b8"
+repo-rev = "master"
+repo-url = "https://github.com/JuliaOpt/SumOfSquares.jl.git"
 uuid = "4b9e565b-77fc-50a5-a571-1244f986bda1"
 version = "0.3.1"
 
