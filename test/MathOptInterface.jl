@@ -53,7 +53,12 @@ conic_exclude = String[
     "rootdets",
     ]
 
-function test_moi(verbose, use_dense, system_solver, linear_model)
+function test_moi(
+    use_dense::Bool,
+    system_solver::Type{<:SO.CombinedHSDSystemSolver},
+    linear_model::Type{<:MO.LinearModel},
+    verbose::Bool,
+    )
     optimizer = MOIU.CachingOptimizer(
         MOIU.UniversalFallback(HypatiaModelData{Float64}()),
         HYP.Optimizer(
@@ -67,6 +72,7 @@ function test_moi(verbose, use_dense, system_solver, linear_model)
             tol_feas = 1e-8,
             )
         )
+
     @testset "unit tests" begin
         MOIT.unittest(optimizer, config, unit_exclude)
     end
@@ -76,5 +82,6 @@ function test_moi(verbose, use_dense, system_solver, linear_model)
     @testset "conic tests" begin
         MOIT.contconictest(MOIB.SquarePSD{Float64}(MOIB.RootDet{Float64}(optimizer)), config, conic_exclude)
     end
+
     return
 end

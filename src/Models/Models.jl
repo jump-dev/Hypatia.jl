@@ -11,8 +11,6 @@ using SparseArrays
 
 import Hypatia.Cones
 
-abstract type Model end
-
 mutable struct Point
     x::Vector{Float64}
     y::Vector{Float64}
@@ -41,7 +39,9 @@ mutable struct Point
     end
 end
 
-abstract type LinearModel end
+abstract type Model end
+
+abstract type LinearModel <: Model end
 include("linear.jl")
 
 # TODO other model types eg quadratic obj, convex differentiable obj
