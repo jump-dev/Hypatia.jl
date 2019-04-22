@@ -257,6 +257,22 @@ function set_initial_cone_point(point, cones)
     return point
 end
 
+
+
+# TODO implement for the two model types above
+# get_status(solver::Solver) = solver.status
+# get_solve_time(solver::Solver) = solver.solve_time
+# get_num_iters(solver::Solver) = solver.num_iters
+#
+# get_x(solver::Solver) = copy(solver.point.x)
+# get_s(solver::Solver) = copy(solver.point.s)
+# get_y(solver::Solver) = copy(solver.point.y)
+# get_z(solver::Solver) = copy(solver.point.z)
+#
+# get_primal_obj(solver::Solver) = solver.primal_obj
+# get_dual_obj(solver::Solver) = solver.dual_obj
+
+
 # function x_unprocess(x_processed::Vector{Float64}, model::PreprocessedLinearModel)
 #     x = zeros(model.n_raw)
 #     x[model.x_keep_idxs] = x_processed
