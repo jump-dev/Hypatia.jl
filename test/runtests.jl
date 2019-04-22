@@ -64,7 +64,7 @@ testfuns_singular = [
     inconsistent2,
     ]
 @testset "preprocessing tests: $t, $s" for t in testfuns_singular, s in system_solvers
-    t(verbose, s, MO.PreprocessedLinearModel)
+    t(s, MO.PreprocessedLinearModel, verbose)
 end
 linear_models = [
     MO.RawLinearModel,
@@ -111,7 +111,7 @@ testfuns_nonsingular = [
     if s == SO.QRCholCombinedHSDSystemSolver && m == MO.RawLinearModel
         continue # QRChol linear system solver needs preprocessed model
     end
-    t(verbose, s, m)
+    t(s, m, verbose)
 end
 
 @info("starting default native examples tests")
@@ -161,7 +161,7 @@ testfuns = [
     if s == SO.QRCholCombinedHSDSystemSolver && m == MO.RawLinearModel
         continue # QRChol linear system solver needs preprocessed model
     end
-    t(verbose, s, m)
+    t(s, m, verbose)
 end
 
 @info("starting MathOptInterface tests")
@@ -174,7 +174,7 @@ linear_models = [
     MO.PreprocessedLinearModel, # MOI tests require preprocessing
     ]
 @testset "MOI tests: $(d ? "dense" : "sparse"), $s, $m" for d in (false, true), s in system_solvers, m in linear_models
-    test_moi(verbose, d, s, m)
+    test_moi(d, s, m, verbose)
 end
 
 @info("starting default JuMP examples tests")
@@ -183,18 +183,18 @@ testfuns = [
     run_JuMP_envelope_sampleinterp_box,
     run_JuMP_envelope_sampleinterp_ball,
     run_JuMP_expdesign,
-    # run_JuMP_namedpoly_PSD, # TODO check: final objective doesn't match
+    # run_JuMP_namedpoly_PSD, # too slow TODO check: final objective doesn't match
     run_JuMP_namedpoly_WSOS_primal,
     run_JuMP_namedpoly_WSOS_dual,
-    # run_JuMP_shapeconregr_PSD,
+    run_JuMP_shapeconregr_PSD,
     run_JuMP_shapeconregr_WSOS,
     run_JuMP_shapeconregr_WSOS_PolyJuMP,
     run_JuMP_densityest,
-    run_JuMP_sosmatrix_rand, # TODO numerical issues
+    run_JuMP_sosmatrix_rand,
     run_JuMP_sosmatrix_a,
     run_JuMP_sosmatrix_poly_a,
     run_JuMP_sosmatrix_poly_b,
-    # run_JuMP_muconvexity_rand,
+    run_JuMP_muconvexity_rand,
     run_JuMP_muconvexity_a,
     run_JuMP_muconvexity_b,
     run_JuMP_muconvexity_c,
@@ -204,9 +204,9 @@ testfuns = [
     run_JuMP_sosmat2_matrix,
     run_JuMP_sosmat2_matrix_dual,
     run_JuMP_sosmat3_primal, # numerically unstable
-    run_JuMP_sosmat3_dual,
+    run_JuMP_sosmat3_dual, # numerically unstable
     run_JuMP_univariate_WSOS,
-    # run_JuMP_univariate_PSD,
+    run_JuMP_univariate_PSD,
     run_JuMP_contraction_analysis_PSD,
     run_JuMP_contraction_analysis_WSOS,
     ]
@@ -219,7 +219,7 @@ testfuns = [
     namedpoly1_JuMP,
     namedpoly2_JuMP,
     namedpoly3_JuMP,
-    namedpoly4_JuMP, # numerically unstable
+    namedpoly4_JuMP,
     namedpoly5_JuMP,
     namedpoly6_JuMP,
     namedpoly7_JuMP,
@@ -232,13 +232,13 @@ testfuns = [
     shapeconregr4_JuMP,
     shapeconregr5_JuMP,
     shapeconregr6_JuMP,
-    shapeconregr7_JuMP, # numerically unstable
+    shapeconregr7_JuMP,
     shapeconregr8_JuMP,
-    shapeconregr9_JuMP, # numerically unstable
-    shapeconregr10_JuMP, # numerically unstable
-    shapeconregr11_JuMP, # numerically unstable
-    # shapeconregr12_JuMP, # numerically unstable
-    shapeconregr13_JuMP, # numerically unstable
+    shapeconregr9_JuMP,
+    shapeconregr10_JuMP,
+    shapeconregr11_JuMP,
+    shapeconregr12_JuMP, # numerically unstable
+    shapeconregr13_JuMP,
     # shapeconregr14_JuMP, # throws out-of-memory error
     # shapeconregr15_JuMP, # throws out-of-memory error
     ]

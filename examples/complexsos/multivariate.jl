@@ -15,11 +15,11 @@ using Test
 
 Random.seed!(1)
 
-# primal_wsos = false
-primal_wsos = true
+primal_wsos = false
+# primal_wsos = true
 
 d = 3
-n = 3
+n = 2
 sample_factor = 10
 
 L = binomial(n + d, n)
@@ -94,7 +94,7 @@ for rerun in 1:num_reruns
         G = Diagonal(-1.0I, U)
         h = zeros(U)
     end
-    cones = [CO.WSOSPolyInterp_Complex(U, [P0, P1], [v0, v1], !primal_wsos)]
+    cones = [CO.WSOSPolyInterp_2(U, [P0, P1], [v0, v1], !primal_wsos)]
     cone_idxs = [1:U]
 
     # solve

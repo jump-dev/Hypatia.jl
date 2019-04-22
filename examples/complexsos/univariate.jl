@@ -130,5 +130,5 @@ else
     G = Diagonal(-1.0I, U)
     h = zeros(U)
 end
-cones = [CO.WSOSPolyInterp_Complex(U, [P0, P1], [v0, v1], !primal_wsos)]
+cones = [CO.WSOSPolyInterp_2(U, [P0, P1], [v0, v1], !primal_wsos)]
 cone_idxs = [1:U]
