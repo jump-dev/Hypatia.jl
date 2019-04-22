@@ -61,14 +61,15 @@ function check_in_cone(cone::EpiNormSpectral)
     u = cone.point[1]
     X = Symmetric(W * W')
     Z = Symmetric(u * I - X / u)
-    Zi = inv(Z)
+    Zi = Symmetric(inv(Z))
     Eu = Symmetric(I + X / u^2)
 
     cone.g[1] = -sum(Zi .* Eu) - 1 / u
     cone.g[2:end] = vec(2 * Zi * W / u)
 
-    cone.H[1, 1] = sum((Zi * Eu * Zi) .* Eu) + sum(2 * Zi .* X / u^3) + (1 / u)^2
-    cone.H[1, 2:end] = vec(-2 * Zi * Eu * Zi * W / u - 2 * Zi * W / u^2)
+    ZiEuZi = Zi * Eu * Zi
+    cone.H[1, 1] = dot(ZiEuZi, Eu) + sum(2 * Zi .* X / u^3) + (1 / u)^2
+    cone.H[1, 2:end] = vec(-2 * ZiEuZi * W / u - 2 * Zi * W / u^2)
 
     idx1 = 0
     for j in 1:m, i in 1:n
@@ -85,7 +86,7 @@ function check_in_cone(cone::EpiNormSpectral)
             dzdwkl = zeros(n, n)
             dzdwkl[k, :] += W[:, j] / u
             dzdwkl[:, k] += W[:, j] / u
-            cone.H[idx1 + 1, idx2 + 1] = sum(term1 .* dzdwkl) + 2 * Zi[i, k] / u
+            cone.H[idx1 + 1, idx2 + 1] = dot(term1, dzdwkl) + 2 * Zi[i, k] / u
         end
 
         for l in (j + 1):m, k in 1:n
@@ -93,7 +94,7 @@ function check_in_cone(cone::EpiNormSpectral)
             dzdwkl = zeros(n, n)
             dzdwkl[k, :] += W[:, l] / u
             dzdwkl[:, k] += W[:, l] / u
-            cone.H[idx1 + 1, idx2 + 1] = sum(term1 .* dzdwkl)
+            cone.H[idx1 + 1, idx2 + 1] = dot(term1, dzdwkl)
         end
     end
 
