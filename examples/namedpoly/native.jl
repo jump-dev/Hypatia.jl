@@ -86,9 +86,7 @@ function build_namedpoly(
         G = Diagonal(-1.0I, U) # TODO uniformscaling?
         h = zeros(U)
     end
-
     cones = [CO.WSOSPolyInterp(U, [P0, PWts...], !primal_wsos)]
-
     # Ls = Int[size(P0, 2)]
     # @assert Ls[1] == binomial(n + d, n)
     # gs = Vector{Float64}[ones(U)]
@@ -101,7 +99,6 @@ function build_namedpoly(
     #     push!(gs, gi)
     # end
     # cones = [CO.WSOSPolyInterp_2(U, P0, Ls, gs, !primal_wsos)]
-
     cone_idxs = [1:U]
 
     return (c, A, b, G, h, cones, cone_idxs)
