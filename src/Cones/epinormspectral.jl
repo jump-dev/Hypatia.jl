@@ -59,24 +59,23 @@ function check_in_cone(cone::EpiNormSpectral)
     m = cone.m
     W = reshape(cone.point[2:end], cone.n, cone.m)
     u = cone.point[1]
-    ui = 1 / u
     X = Symmetric(W * W')
-    Z = Symmetric(u * I - X * ui)
+    Z = Symmetric(u * I - X / u)
     Zi = inv(Z)
-    Eu = Symmetric(I + X * ui^2)
+    Eu = Symmetric(I + X / u^2)
 
-    cone.g[1] = -sum(Zi .* Eu) - ui
-    cone.g[2:end] = vec(2 * Zi * W * ui)
+    cone.g[1] = -sum(Zi .* Eu) - 1 / u
+    cone.g[2:end] = vec(2 * Zi * W / u)
 
-    cone.H[1, 1] = sum((Zi * Eu * Zi) .* Eu) + sum(-Zi .* X * (-2 * ui^3)) + ui^2
-    cone.H[1, 2:end] = vec(-2 * Zi * Eu * Zi * W * ui - 2 * Zi * W * ui^2)
+    cone.H[1, 1] = sum((Zi * Eu * Zi) .* Eu) + sum(2 * Zi .* X / u^3) + (1 / u)^2
+    cone.H[1, 2:end] = vec(-2 * Zi * Eu * Zi * W / u - 2 * Zi * W / u^2)
 
     idx1 = 0
     for j in 1:m, i in 1:n
         idx1 += 1
         dzdwij = zeros(n, n)
-        dzdwij[i, :] += W[:, j] * ui
-        dzdwij[:, i] += W[:, j] * ui
+        dzdwij[i, :] += W[:, j] / u
+        dzdwij[:, i] += W[:, j] / u
         term1 = Zi * dzdwij * Zi
 
         idx2 = idx1 - 1
@@ -84,21 +83,21 @@ function check_in_cone(cone::EpiNormSpectral)
         for k in i:n
             idx2 += 1
             dzdwkl = zeros(n, n)
-            dzdwkl[k, :] += W[:, j] * ui
-            dzdwkl[:, k] += W[:, j] * ui
-            cone.H[idx1 + 1, idx2 + 1] = sum(term1 .* dzdwkl) + 2 * ui * Zi[i, k]
+            dzdwkl[k, :] += W[:, j] / u
+            dzdwkl[:, k] += W[:, j] / u
+            cone.H[idx1 + 1, idx2 + 1] = sum(term1 .* dzdwkl) + 2 * Zi[i, k] / u
         end
 
         for l in (j + 1):m, k in 1:n
             idx2 += 1
             dzdwkl = zeros(n, n)
-            dzdwkl[k, :] += W[:, l] * ui
-            dzdwkl[:, k] += W[:, l] * ui
+            dzdwkl[k, :] += W[:, l] / u
+            dzdwkl[:, k] += W[:, l] / u
             cone.H[idx1 + 1, idx2 + 1] = sum(term1 .* dzdwkl)
         end
     end
 
-    @assert isapprox(Symmetric(cone.H, :U) * cone.point, -cone.g, atol = 1e-7, rtol = 1e-7)
+    @assert isapprox(Symmetric(cone.H, :U) * cone.point, -cone.g, atol = 1e-7, rtol = 1e-7) # TODO remove
 
     return factorize_hess(cone)
 end
