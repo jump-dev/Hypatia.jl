@@ -79,52 +79,51 @@ function check_in_cone(cone::EpiNormSpectral)
     H11 = sum((Zi * Eu * Zi) .* Eu) + sum(-Zi .* X * (-2 * ui^3)) + ui^2
     H1W = -2 * Zi * Eu * Zi * W * ui - 2 * Zi * W * ui^2
     HWW = zeros(cone.m * cone.n, cone.m * cone.n)
-    function d2zdw2(ki, li, mi, ni)
-        ret = zeros(cone.n, cone.n)
-        if li == ni
-            ret[ki, mi] -= inv(u)
-            ret[mi, ki] -= inv(u)
-        end
-        return ret
-    end
+
     idx1 = 0
     for j in 1:m, i in 1:n
         idx1 += 1
-        idx2 = 0
-        for l in 1:m, k in 1:n
+        dzdwij = zeros(n, n)
+        dzdwij[i, :] += W[:, j] * ui
+        dzdwij[:, i] += W[:, j] * ui
+        term1 = (Zi * dzdwij * Zi)
+
+        idx2 = idx1 - 1
+        # l = j
+        for k in i:n
             idx2 += 1
-            if idx2 < idx1
-                continue
-            end
-            dzdwij = zeros(n, n)
-            dzdwij[i, :] += W[:, j] * ui
-            dzdwij[:, i] += W[:, j] * ui
+            dzdwkl = zeros(n, n)
+            dzdwkl[k, :] += W[:, j] * ui
+            dzdwkl[:, k] += W[:, j] * ui
+            HWW[idx1, idx2] = sum(term1 .* dzdwkl) + 2 * ui * Zi[i, k]
+        end
+
+
+        for l in (j + 1):m, k in 1:n
+            idx2 += 1
             dzdwkl = zeros(n, n)
             dzdwkl[k, :] += W[:, l] * ui
             dzdwkl[:, k] += W[:, l] * ui
-            term1 = sum((Zi * dzdwij * Zi)' .* dzdwkl)
-            term2 = sum(Zi .* d2zdw2(i, j, k, l))
-            HWW[idx1, idx2] = term1 - term2
+            HWW[idx1, idx2] = sum(term1 .* dzdwkl)
         end
     end
 
-    # HWW = 2 * inv(u) * (Zi .* Zi .* )
 
     # TODO check allocations, check with Jarrett if this is most efficient way to use DiffResults
-    # cone.diffres = ForwardDiff.hessian!(cone.diffres, cone.barfun, cone.point)
+    cone.diffres = ForwardDiff.hessian!(cone.diffres, cone.barfun, cone.point)
     # cone.g .= DiffResults.gradient(cone.diffres) # [g1; gW...]
-    # cone.H .= DiffResults.hessian(cone.diffres)
+    cone.H .= DiffResults.hessian(cone.diffres)
     # cone.g = [g1; gW...]
-    cone.H = [H11 vec(H1W)'; vec(H1W) Symmetric(HWW, :U)]
+    H = [H11 vec(H1W)'; vec(H1W) Symmetric(HWW, :U)]
 
 
     # @show H11
     # @show cone.H[1, 1] / H11
-    # if !isapprox(cone.H, H)
-    #     # @show HWW
-    #     # @show cone.H[2:end, 2:end]
-    #     @show cone.H[2:end, 2:end] ./ HWW
-    # end
+    if !isapprox(cone.H, H)
+        # @show HWW
+        # @show cone.H[2:end, 2:end]
+        @show cone.H[2:end, 2:end] ./ HWW
+    end
     @assert isapprox(cone.H * cone.point, -cone.g, atol = 1e-6, rtol = 1e-6)
 
     return factorize_hess(cone)
