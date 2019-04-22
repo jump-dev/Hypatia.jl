@@ -42,9 +42,8 @@ mutable struct RawLinearModel <: LinearModel
     cones::Vector{Cones.Cone}
     cone_idxs::Vector{UnitRange{Int}}
     nu::Float64
-
+    
     initial_point::Point
-    result_point::Point
 
     function RawLinearModel(c::Vector{Float64}, A::AbstractMatrix{Float64}, b::Vector{Float64}, G::AbstractMatrix{Float64}, h::Vector{Float64}, cones::Vector{<:Cones.Cone}, cone_idxs::Vector{UnitRange{Int}})
         model = new()
@@ -103,7 +102,6 @@ mutable struct PreprocessedLinearModel <: LinearModel
     Ap_Q2::AbstractMatrix{Float64}
 
     initial_point::Point
-    result_point::Point
 
     # TODO could optionally rescale rows of [A, b] and [G, h] and [A', G', c] and variables
     # NOTE (pivoted) QR factorizations are usually rank-revealing but may be unreliable, see http://www.math.sjsu.edu/~foster/rankrevealingcode.html
@@ -256,34 +254,3 @@ function set_initial_cone_point(point, cones)
     end
     return point
 end
-
-
-
-# TODO implement for the two model types above
-# get_status(solver::Solver) = solver.status
-# get_solve_time(solver::Solver) = solver.solve_time
-# get_num_iters(solver::Solver) = solver.num_iters
-#
-# get_x(solver::Solver) = copy(solver.point.x)
-# get_s(solver::Solver) = copy(solver.point.s)
-# get_y(solver::Solver) = copy(solver.point.y)
-# get_z(solver::Solver) = copy(solver.point.z)
-#
-# get_primal_obj(solver::Solver) = solver.primal_obj
-# get_dual_obj(solver::Solver) = solver.dual_obj
-
-
-# function x_unprocess(x_processed::Vector{Float64}, model::PreprocessedLinearModel)
-#     x = zeros(model.n_raw)
-#     x[model.x_keep_idxs] = x_processed
-#     return x
-# end
-#
-# function y_unprocess(y_processed::Vector{Float64}, model::PreprocessedLinearModel)
-#     y = zeros(model.p_raw)
-#     y[model.y_keep_idxs] = y_processed
-#     return y
-# end
-#
-# x_unprocess(x::Vector{Float64}, model::RawLinearModel) = x
-# y_unprocess(y::Vector{Float64}, model::RawLinearModel) = y
