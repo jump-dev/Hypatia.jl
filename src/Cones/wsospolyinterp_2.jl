@@ -1,7 +1,10 @@
 #=
 Copyright 2018, Chris Coey and contributors
 
-real WSOS or hermitian WSOS interpolation-based cone
+-real or hermitian interpolation-based weighted-sum-of-squares (multivariate) polynomial cone parametrized by
+-- interpolation points
+-- domain polynomials g_i (evaluated at interpolation points)
+-- basis polynomials P_i (evaluated at interpolation points)
 
 TODO decide whether to keep this version with the gi specified or the old version without gi
 does it work if gi are negative for some points? some confusion here
@@ -9,10 +12,12 @@ should the cone be parametrized by real vs complex?
 check if gradient and hessian are correct for complex case
 =#
 
-mutable struct WSOSPolyInterp_Complex <: Cone
+RealOrComplexF64 = Union{Float64, ComplexF64}
+
+mutable struct WSOSPolyInterp_2{T <: RealOrComplexF64} <: Cone
     use_dual::Bool
     dim::Int
-    Ps::Vector{Matrix{ComplexF64}}
+    Ps::Vector{Matrix{T}}
     gs::Vector{Vector{Float64}}
 
     point::AbstractVector{Float64}
@@ -22,11 +27,11 @@ mutable struct WSOSPolyInterp_Complex <: Cone
     Hi::Matrix{Float64}
     F
 
-    function WSOSPolyInterp_Complex(dim::Int, Ps::Vector{Matrix{ComplexF64}}, gs::Vector{Vector{Float64}}, is_dual::Bool)
+    function WSOSPolyInterp_2(dim::Int, Ps::Vector{Matrix{T}}, gs::Vector{Vector{Float64}}, is_dual::Bool) where {T <: RealOrComplexF64}
         for i in eachindex(Ps)
             @assert size(Ps[i], 1) == length(gs[i]) == dim
         end
-        cone = new()
+        cone = new{T}()
         cone.use_dual = !is_dual # using dual barrier
         cone.dim = dim
         cone.Ps = Ps
@@ -39,18 +44,18 @@ mutable struct WSOSPolyInterp_Complex <: Cone
     end
 end
 
-WSOSPolyInterp_Complex(dim::Int, Ps::Vector{Matrix{ComplexF64}}, gs::Vector{Vector{Float64}}) = WSOSPolyInterp_Complex(dim, Ps, gs, false)
+WSOSPolyInterp_2(dim::Int, Ps::Vector{Matrix{T}}, gs::Vector{Vector{Float64}}) where {T <: RealOrComplexF64} = WSOSPolyInterp_2{T}(dim, Ps, gs, false)
 
-get_nu(cone::WSOSPolyInterp_Complex) = sum(size(cone.Ps[i], 2) for i in eachindex(cone.Ps))
+get_nu(cone::WSOSPolyInterp_2) = sum(size(cone.Ps[i], 2) for i in eachindex(cone.Ps))
 
-set_initial_point(arr::AbstractVector{Float64}, cone::WSOSPolyInterp_Complex) = (@. arr = 1.0; arr)
+set_initial_point(arr::AbstractVector{Float64}, cone::WSOSPolyInterp_2) = (@. arr = 1.0; arr)
 
-function check_in_cone(cone::WSOSPolyInterp_Complex)
+function check_in_cone(cone::WSOSPolyInterp_2{T}) where T
     U = cone.dim
     Ps = cone.Ps
     gs = cone.gs
     x = cone.point
-    ΛFs = Vector{CholeskyPivoted{ComplexF64, Matrix{ComplexF64}}}(undef, length(Ps)) # TODO prealloc
+    ΛFs = Vector{CholeskyPivoted{T, Matrix{T}}}(undef, length(Ps)) # TODO prealloc
 
     for i in eachindex(Ps)
         Pi = Ps[i]

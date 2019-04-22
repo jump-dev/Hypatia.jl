@@ -1,6 +1,5 @@
 #=
 Copyright 2018, Chris Coey and contributors
-
 see description in examples/namedpoly/native.jl
 =#
 
@@ -207,7 +206,7 @@ function build_JuMP_namedpoly_WSOS(
         gi = [g_polys[i](x => pts[u, :]) for u in 1:U]
         push!(gs, gi)
     end
-    cone = HYP.WSOSPolyInterpCone_2(U, Ps, gs, !primal_wsos)
+    cone = HYP.WSOSPolyInterp2Cone(U, Ps, gs, !primal_wsos)
 
     # cone = HYP.WSOSPolyInterpCone(U, [P0, PWts...], !primal_wsos)
 
@@ -221,7 +220,7 @@ function build_JuMP_namedpoly_WSOS(
     else
         JuMP.@variable(model, μ[1:U])
         JuMP.@objective(model, Min, sum(μ[j] * f(pts[j, :]) for j in 1:U))
-        JuMP.@constraint(model, sum(μ) == 1.0) # TODO eliminate constraint and first variable
+        JuMP.@constraint(model, sum(μ) == 1.0) # TODO can remove this constraint and a variable
         JuMP.@constraint(model, μ in cone)
     end
 

@@ -5,6 +5,8 @@ definitions of conic sets not already defined by MathOptInterface
 and functions for converting between Hypatia and MOI cone definitions
 =#
 
+RealOrComplexF64 = Union{Float64, ComplexF64}
+
 export WSOSPolyInterpCone
 
 struct WSOSPolyInterpCone <: MOI.AbstractVectorSet
@@ -14,15 +16,15 @@ struct WSOSPolyInterpCone <: MOI.AbstractVectorSet
 end
 WSOSPolyInterpCone(dimension::Int, ipwt::Vector{Matrix{Float64}}) = WSOSPolyInterpCone(dimension, ipwt, false)
 
-export WSOSPolyInterp_Complex
+export WSOSPolyInterp2Cone
 
-struct WSOSPolyInterp_Complex <: MOI.AbstractVectorSet
+struct WSOSPolyInterp2Cone{T <: RealOrComplexF64} <: MOI.AbstractVectorSet
     dimension::Int
-    Ps::Vector{Matrix{ComplexF64}}
+    Ps::Vector{Matrix{T}}
     gs::Vector{Vector{Float64}}
     is_dual::Bool
 end
-WSOSPolyInterp_Complex(dimension::Int, Ps::Vector{Matrix{ComplexF64}}, gs::Vector{Vector{Float64}}) = WSOSPolyInterp_Complex(dimension, Ps, gs, false)
+WSOSPolyInterp2Cone(dimension::Int, Ps::Vector{Matrix{T}}, gs::Vector{Vector{Float64}}) where {T <: RealOrComplexF64} = WSOSPolyInterp2Cone{T}(dimension, Ps, gs, false)
 
 export WSOSPolyInterpMatCone
 
@@ -53,7 +55,7 @@ MOIOtherCones = (
     MOI.PositiveSemidefiniteConeTriangle,
     MOI.LogDetConeTriangle,
     WSOSPolyInterpCone,
-    WSOSPolyInterp_Complex,
+    WSOSPolyInterp2Cone,
     WSOSPolyInterpMatCone,
     WSOSPolyInterpSOCCone,
 )
@@ -65,7 +67,7 @@ cone_from_moi(s::MOI.ExponentialCone) = Cones.HypoPerLog()
 cone_from_moi(s::MOI.GeometricMeanCone) = (l = MOI.dimension(s) - 1; Cones.HypoGeomean(fill(inv(l), l)))
 cone_from_moi(s::MOI.PowerCone{Float64}) = Cones.EpiPerPower(inv(s.exponent))
 cone_from_moi(s::WSOSPolyInterpCone) = Cones.WSOSPolyInterp(s.dimension, s.ipwt, s.is_dual)
-cone_from_moi(s::WSOSPolyInterp_Complex) = Cones.WSOSPolyInterp_Complex(s.dimension, s.Ps, s.gs, s.is_dual)
+cone_from_moi(s::WSOSPolyInterp2Cone{T}) where {T <: RealOrComplexF64} = Cones.WSOSPolyInterp_2{T}(s.dimension, s.Ps, s.gs, s.is_dual)
 cone_from_moi(s::WSOSPolyInterpMatCone) = Cones.WSOSPolyInterpMat(s.R, s.U, s.ipwt, s.is_dual)
 cone_from_moi(s::WSOSPolyInterpSOCCone) = Cones.WSOSPolyInterpSOC(s.R, s.U, s.ipwt, s.is_dual)
 cone_from_moi(s::MOI.AbstractVectorSet) = error("MOI set $s is not recognized")

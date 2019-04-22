@@ -131,9 +131,9 @@ version = "0.19.1"
 
 [[DynamicPolynomials]]
 deps = ["LinearAlgebra", "MultivariatePolynomials", "Pkg", "Reexport", "Test"]
-git-tree-sha1 = "d5f0b3b68d3359d629742406579862a1407d9548"
+git-tree-sha1 = "3fd493369bf7f973ffba0411d9983020e925d77f"
 uuid = "7c1d4256-1411-5781-91ec-d7bc3513ac07"
-version = "0.1.4"
+version = "0.2.0"
 
 [[FFTW]]
 deps = ["AbstractFFTs", "BinaryProvider", "Compat", "Conda", "Libdl", "LinearAlgebra", "Reexport", "Test"]

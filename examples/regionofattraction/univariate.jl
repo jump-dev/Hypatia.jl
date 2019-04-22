@@ -41,7 +41,7 @@ function univariate_WSOS(deg::Int)
     wsos_cone2 = HYP.WSOSPolyInterpCone(U2, [P02, PWts2...])
     wsos_cone3 = HYP.WSOSPolyInterpCone(U3, [P03, PWts3...])
 
-    model = Model(JuMP.with_optimizer(Hypatia.Optimizer, verbose = true))
+    model = JuMP.Model(JuMP.with_optimizer(Hypatia.Optimizer, verbose = true))
     JuMP.@variables(model, begin
         v, PolyJuMP.Poly(DP.monomials([x; t], 0:deg))
         w, PolyJuMP.Poly(DP.monomials(x, 0:deg))
