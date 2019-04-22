@@ -76,15 +76,9 @@ function check_in_cone(cone::EpiNormSpectral)
     cone.g[1] = -sum(Zi .* Eu) - ui
     cone.g[2:end] = vec(2 * Zi * W * ui)
 
-    H11 = sum((Zi * Eu * Zi) .* Eu) + sum(-Zi .* X * (-2 * inv(u^3))) + inv(u^2)
-    H1W = -2 * Zi * Eu * Zi * W * inv(u) - 2 * Zi * W * inv(u^2) # correct
+    H11 = sum((Zi * Eu * Zi) .* Eu) + sum(-Zi .* X * (-2 * ui^3)) + ui^2
+    H1W = -2 * Zi * Eu * Zi * W * ui - 2 * Zi * W * ui^2
     HWW = zeros(cone.m * cone.n, cone.m * cone.n)
-    function dzdw(k, l)
-        ret = zeros(cone.n, cone.n)
-        ret[k, :] -= -inv(u) * W[:, l]
-        ret[:, k] -= -inv(u) * W[:, l]
-        return ret
-    end
     function d2zdw2(ki, li, mi, ni)
         ret = zeros(cone.n, cone.n)
         if li == ni
@@ -99,7 +93,18 @@ function check_in_cone(cone::EpiNormSpectral)
         idx2 = 0
         for l in 1:m, k in 1:n
             idx2 += 1
-            HWW[idx1, idx2] = sum((Zi * dzdw(i, j) * Zi)' .* dzdw(k, l)) - sum(Zi .* d2zdw2(i, j, k, l))
+            if idx2 < idx1
+                continue
+            end
+            dzdwij = zeros(n, n)
+            dzdwij[i, :] += W[:, j] * ui
+            dzdwij[:, i] += W[:, j] * ui
+            dzdwkl = zeros(n, n)
+            dzdwkl[k, :] += W[:, l] * ui
+            dzdwkl[:, k] += W[:, l] * ui
+            term1 = sum((Zi * dzdwij * Zi)' .* dzdwkl)
+            term2 = sum(Zi .* d2zdw2(i, j, k, l))
+            HWW[idx1, idx2] = term1 - term2
         end
     end
 
@@ -110,7 +115,7 @@ function check_in_cone(cone::EpiNormSpectral)
     # cone.g .= DiffResults.gradient(cone.diffres) # [g1; gW...]
     # cone.H .= DiffResults.hessian(cone.diffres)
     # cone.g = [g1; gW...]
-    cone.H = [H11 vec(H1W)'; vec(H1W) HWW]
+    cone.H = [H11 vec(H1W)'; vec(H1W) Symmetric(HWW, :U)]
 
 
     # @show H11
@@ -120,7 +125,7 @@ function check_in_cone(cone::EpiNormSpectral)
     #     # @show cone.H[2:end, 2:end]
     #     @show cone.H[2:end, 2:end] ./ HWW
     # end
-    @assert isapprox(cone.H * cone.point, -cone.g, atol = 1e-7, rtol = 1e-7)
+    @assert isapprox(cone.H * cone.point, -cone.g, atol = 1e-6, rtol = 1e-6)
 
     return factorize_hess(cone)
 end
