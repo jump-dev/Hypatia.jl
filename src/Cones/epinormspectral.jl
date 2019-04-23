@@ -64,12 +64,12 @@ function check_in_cone(cone::EpiNormSpectral)
     Zi = Symmetric(inv(Z))
     Eu = Symmetric(I + X / u^2)
 
-    cone.g[1] = -sum(Zi .* Eu) - 1 / u
+    cone.g[1] = -dot(Zi, Eu) - 1 / u
     cone.g[2:end] = vec(2 * Zi * W / u)
 
-    ZiEuZi = Zi * Eu * Zi
-    cone.H[1, 1] = dot(ZiEuZi, Eu) + sum(2 * Zi .* X / u^3) + (1 / u)^2
-    cone.H[1, 2:end] = vec(-2 * ZiEuZi * W / u - 2 * Zi * W / u^2)
+    ZiEuZi = Symmetric(Zi * Eu * Zi)
+    cone.H[1, 1] = dot(ZiEuZi, Eu) + (2 * dot(Zi, X) + u) / u / u / u
+    cone.H[1, 2:end] = vec((ZiEuZi * u + Zi) * -2 *  W / u / u)
 
     idx1 = 0
     for j in 1:m, i in 1:n
