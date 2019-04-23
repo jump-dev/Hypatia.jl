@@ -1,7 +1,9 @@
 #=
 Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 
-example taken from "Stability and robustness analysis of nonlinear systems via contraction metrics and SOS programming" by Aylward, E.M., Parrilo, P.A. and Slotine, J.J.E.
+example taken from
+"Stability and robustness analysis of nonlinear systems via contraction metrics and SOS programming"
+Aylward, E.M., Parrilo, P.A. and Slotine, J.J.E
 =#
 
 import Hypatia
@@ -31,7 +33,7 @@ function build_dynamics(x)
     return [dx1dt; dx2dt]
 end
 
-function contraction_analysis_common(beta::Float64, deg_M::Int, delta::Float64 = 1e-3)
+function contraction_common(beta::Float64, deg_M::Int, delta::Float64 = 1e-3)
     n = 2
     dom = MU.FreeDomain(n)
 
@@ -58,27 +60,27 @@ function contraction_analysis_common(beta::Float64, deg_M::Int, delta::Float64 =
     return (model, M, R, pts_M, pts_R, U_M, U_R, P0_M, P0_R)
 end
 
-function contraction_analysis_WSOS(beta::Float64, deg_M::Int; delta::Float64 = 1e-3)
+function contraction_WSOS(beta::Float64, deg_M::Int; delta::Float64 = 1e-3)
     n = 2
-    (model, M, R, pts_M, pts_R, U_M, U_R, P0_M, P0_R) = contraction_analysis_common(beta, deg_M, delta)
+    (model, M, R, pts_M, pts_R, U_M, U_R, P0_M, P0_R) = contraction_common(beta, deg_M, delta)
     JuMP.@constraint(model, [M[i, j](pts_M[u, :]) * (i == j ? 1.0 : rt2) - (i == j ? delta : 0.0) for i in 1:n for j in 1:i for u in 1:U_M] in HYP.WSOSPolyInterpMatCone(n, U_M, [P0_M]))
     JuMP.@constraint(model, [-1 * R[i, j](pts_R[u, :]) * (i == j ? 1.0 : rt2) - (i == j ? delta : 0.0) for i in 1:n for j in 1:i for u in 1:U_R] in HYP.WSOSPolyInterpMatCone(n, U_R, [P0_R]))
     return model
 end
 
-function contraction_analysis_PSD(beta::Float64, deg_M::Int; delta::Float64 = 1e-3)
+function contraction_PSD(beta::Float64, deg_M::Int; delta::Float64 = 1e-3)
     n = 2
-    (model, M, R, _, _, _, _, _, _) = contraction_analysis_common(beta, deg_M, delta)
+    (model, M, R, _, _, _, _, _, _) = contraction_common(beta, deg_M, delta)
     JuMP.@constraint(model, M - delta * Matrix{Float64}(I, n, n) in JuMP.PSDCone())
     JuMP.@constraint(model, -R - delta * Matrix{Float64}(I, n, n) in JuMP.PSDCone())
     return model
 end
 
-function run_JuMP_contraction_analysis(use_wsos::Bool)
+function run_JuMP_contraction(use_wsos::Bool)
     if use_wsos
-        model = contraction_analysis_WSOS(0.79, 4)
+        model = contraction_WSOS(0.79, 4)
     else
-        model = contraction_analysis_PSD(0.79, 4)
+        model = contraction_PSD(0.79, 4)
     end
     JuMP.optimize!(model)
     term_status = JuMP.termination_status(model)
@@ -92,5 +94,5 @@ function run_JuMP_contraction_analysis(use_wsos::Bool)
     return nothing
 end
 
-run_JuMP_contraction_analysis_PSD() = run_JuMP_contraction_analysis(false)
-run_JuMP_contraction_analysis_WSOS() = run_JuMP_contraction_analysis(true)
+run_JuMP_contraction_PSD() = run_JuMP_contraction(false)
+run_JuMP_contraction_WSOS() = run_JuMP_contraction(true)
