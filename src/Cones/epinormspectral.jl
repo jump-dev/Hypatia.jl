@@ -19,7 +19,7 @@ mutable struct EpiNormSpectral <: Cone
     n::Int
     m::Int
     point::AbstractVector{Float64}
-    mat::Matrix{Float64}
+    W::Matrix{Float64}
     g::Vector{Float64}
     H::Matrix{Float64}
     H2::Matrix{Float64}
@@ -33,7 +33,7 @@ mutable struct EpiNormSpectral <: Cone
         cone.dim = dim
         cone.n = n
         cone.m = m
-        cone.mat = Matrix{Float64}(undef, n, m)
+        cone.W = Matrix{Float64}(undef, n, m)
         cone.g = Vector{Float64}(undef, dim)
         cone.H = Matrix{Float64}(undef, dim, dim)
         cone.H2 = similar(cone.H)
@@ -52,8 +52,8 @@ function check_in_cone(cone::EpiNormSpectral)
     if u <= 0
         return false
     end
-    W = cone.mat
-    cone.mat[:] = view(cone.point, 2:cone.dim) # TODO a little slow
+    W = cone.W
+    W[:] = view(cone.point, 2:cone.dim)
     n = cone.n
     m = cone.m
     X = Symmetric(W * W')
@@ -62,6 +62,7 @@ function check_in_cone(cone::EpiNormSpectral)
     if !isposdef(F)
         return false
     end
+    # TODO figure out structured form of inverse? could simplify algebra
     Zi = Symmetric(inv(F))
     Eu = Symmetric(I + X / u^2)
     cone.H .= 0.0
@@ -71,14 +72,13 @@ function check_in_cone(cone::EpiNormSpectral)
 
     ZiEuZi = Symmetric(Zi * Eu * Zi)
     cone.H[1, 1] = dot(ZiEuZi, Eu) + (2 * dot(Zi, X) / u + 1) / u / u
-    cone.H[1, 2:end] = vec((ZiEuZi + Zi / u) * -2 *  W / u)
+    cone.H[1, 2:end] = vec(-2 * (ZiEuZi + Zi / u) *  W / u)
 
     tmpvec = zeros(n)
     tmpmat = zeros(n, n)
 
     p = 2
     for j in 1:m, i in 1:n
-        
         for d in 1:n
             tmpvec[d] = sum(W[c, j] / u * Zi[c, d] for c in 1:n)
             for c in 1:n
@@ -86,8 +86,10 @@ function check_in_cone(cone::EpiNormSpectral)
             end
         end
 
+        # Zi * dZdWij * Zi
         term1 = Symmetric(tmpmat + tmpmat')
 
+        # TODO matrixify
         q = p
         # l = j
         for k in i:n
@@ -101,7 +103,7 @@ function check_in_cone(cone::EpiNormSpectral)
         p += 1
     end
 
-    @assert isapprox(Symmetric(cone.H, :U) * cone.point, -cone.g, atol = 1e-7, rtol = 1e-7) # TODO remove
+    # @assert isapprox(Symmetric(cone.H, :U) * cone.point, -cone.g, atol = 1e-6, rtol = 1e-6)
 
     return factorize_hess(cone)
 end
