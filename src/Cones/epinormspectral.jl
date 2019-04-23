@@ -48,20 +48,21 @@ get_nu(cone::EpiNormSpectral) = cone.n + 1
 set_initial_point(arr::AbstractVector{Float64}, cone::EpiNormSpectral) = (@. arr = 0.0; arr[1] = 1.0; arr)
 
 function check_in_cone(cone::EpiNormSpectral)
-    cone.mat[:] = view(cone.point, 2:cone.dim) # TODO a little slow
-    F = svd!(cone.mat) # TODO reduce allocs further
-    if F.S[1] >= cone.point[1]
+    u = cone.point[1]
+    if u <= 0
         return false
     end
-
-    # -logdet(u * I - W * W' / u) - log(u)
+    cone.mat[:] = view(cone.point, 2:cone.dim) # TODO a little slow
     n = cone.n
     m = cone.m
-    W = reshape(cone.point[2:end], cone.n, cone.m)
-    u = cone.point[1]
+    W = cone.mat
     X = Symmetric(W * W')
     Z = Symmetric(u * I - X / u)
-    Zi = Symmetric(inv(Z))
+    F = cholesky(Z, Val(true), check = false) # TODO in place
+    if !isposdef(F)
+        return false
+    end
+    Zi = Symmetric(inv(F))
     Eu = Symmetric(I + X / u^2)
 
     cone.g[1] = -dot(Zi, Eu) - 1 / u
@@ -69,27 +70,26 @@ function check_in_cone(cone::EpiNormSpectral)
 
     ZiEuZi = Symmetric(Zi * Eu * Zi)
     cone.H[1, 1] = dot(ZiEuZi, Eu) + (2 * dot(Zi, X) / u + 1) / u / u
-    cone.H[1, 2:end] = vec((ZiEuZi * u + Zi) * -2 *  W / u / u)
+    cone.H[1, 2:end] = vec((ZiEuZi + Zi / u) * -2 *  W / u)
 
-    idx1 = 1
+    p = 2
     for j in 1:m, i in 1:n
-        idx1 += 1
         dzdwij = zeros(n, n)
         dzdwij[i, :] += W[:, j] / u
         V = Zi * dzdwij * Zi
         term1 = Symmetric(V + V')
 
-        idx2 = idx1 - 1
+        q = p - 1
         # l = j
         for k in i:n
-            idx2 += 1
-            cone.H[idx1, idx2] = 2 * (sum(term1[ni, k] * W[ni, j] for ni in 1:n) + Zi[i, k]) / u
+            q += 1
+            cone.H[p, q] = 2 * (sum(term1[ni, k] * W[ni, j] for ni in 1:n) + Zi[i, k]) / u
         end
-
         for l in (j + 1):m, k in 1:n
-            idx2 += 1
-            cone.H[idx1, idx2] = 2 * sum(term1[ni, k] * W[ni, l] for ni in 1:n) / u
+            q += 1
+            cone.H[p, q] = 2 * sum(term1[ni, k] * W[ni, l] for ni in 1:n) / u
         end
+        p += 1
     end
 
     @assert isapprox(Symmetric(cone.H, :U) * cone.point, -cone.g, atol = 1e-7, rtol = 1e-7) # TODO remove
