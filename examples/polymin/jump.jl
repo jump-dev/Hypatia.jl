@@ -1,6 +1,6 @@
 #=
 Copyright 2018, Chris Coey and contributors
-see description in examples/namedpoly/native.jl
+see description in examples/polymin/native.jl
 =#
 
 import Hypatia
@@ -19,7 +19,7 @@ import SemialgebraicSets
 import Random
 using Test
 
-# list of predefined polynomials from various applications
+# list of predefined polynomials and domains from various applications
 # see https://people.sc.fsu.edu/~jburkardt/py_src/polynomials/polynomials.html
 function getpolydata(polyname::Symbol)
     if polyname == :butcher
@@ -160,7 +160,7 @@ function getpolydata(polyname::Symbol)
     return (x, f, dom, truemin)
 end
 
-function build_JuMP_namedpoly_PSD(
+function build_JuMP_polymin_PSD(
     x,
     f,
     dom::MU.Domain;
@@ -175,7 +175,7 @@ function build_JuMP_namedpoly_PSD(
     return model
 end
 
-function build_JuMP_namedpoly_WSOS(
+function build_JuMP_polymin_WSOS(
     x,
     f,
     dom::MU.Domain;
@@ -205,7 +205,7 @@ function build_JuMP_namedpoly_WSOS(
     return model
 end
 
-function run_JuMP_namedpoly(use_wsos::Bool; primal_wsos::Bool = false)
+function run_JuMP_polymin(use_wsos::Bool; primal_wsos::Bool = false)
     # select the named polynomial to minimize and degree of SOS interpolation
     (polyname, deg) =
         # :butcher, 2
@@ -236,9 +236,9 @@ function run_JuMP_namedpoly(use_wsos::Bool; primal_wsos::Bool = false)
     (x, f, dom, truemin) = getpolydata(polyname)
 
     if use_wsos
-        model = build_JuMP_namedpoly_WSOS(x, f, dom, d = deg, primal_wsos = primal_wsos)
+        model = build_JuMP_polymin_WSOS(x, f, dom, d = deg, primal_wsos = primal_wsos)
     else
-        model = build_JuMP_namedpoly_PSD(x, f, dom, d = deg)
+        model = build_JuMP_polymin_PSD(x, f, dom, d = deg)
     end
     JuMP.optimize!(model)
 
@@ -257,6 +257,6 @@ function run_JuMP_namedpoly(use_wsos::Bool; primal_wsos::Bool = false)
     return
 end
 
-run_JuMP_namedpoly_PSD() = run_JuMP_namedpoly(false)
-run_JuMP_namedpoly_WSOS_primal() = run_JuMP_namedpoly(true, primal_wsos = true)
-run_JuMP_namedpoly_WSOS_dual() = run_JuMP_namedpoly(true, primal_wsos = false)
+run_JuMP_polymin_PSD() = run_JuMP_polymin(false)
+run_JuMP_polymin_WSOS_primal() = run_JuMP_polymin(true, primal_wsos = true)
+run_JuMP_polymin_WSOS_dual() = run_JuMP_polymin(true, primal_wsos = false)
