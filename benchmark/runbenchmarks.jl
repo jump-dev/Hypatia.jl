@@ -4,6 +4,9 @@ Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 TODO readme for benchmarks and describe ARGS for running on command line
 =#
 
+# julia benchmark/runbenchmarks.jl easy.txt benchmark/instancefiles tmp
+
+Pkg.activate(".")
 import Hypatia
 import MathOptFormat
 import MathOptInterface
@@ -19,6 +22,7 @@ end
 
 instanceset = ARGS[1]
 instsetfile = joinpath(@__DIR__, "instancesets", instanceset)
+# instsetfile = "benchmark/instancesets/easy.txt"
 if !isfile(instsetfile)
     error("instance set file not found: $instsetfile")
 end
@@ -48,6 +52,7 @@ for instname in instances
 end
 
 outputpath = ARGS[3]
+# outputpath = "tmp"
 if !isdir(outputpath)
     error("output path is not a valid directory: $outputpath")
 end
@@ -74,7 +79,7 @@ MOI.Utilities.@model(HypatiaModelData,
 optimizer = MOI.Utilities.CachingOptimizer(HypatiaModelData{Float64}(), Hypatia.Optimizer(
     verbose = verbose,
     time_limit = time_limit,
-    dense = dense,
+    use_dense = dense,
     tol_rel_opt = 1e-6,
     tol_abs_opt = 1e-7,
     tol_feas = 1e-7,
@@ -110,7 +115,7 @@ for instname in instances
 
         println("\nreading instance and constructing model...")
         readtime = @elapsed begin
-            model = MathOptFormat.read_into_model(joinpath(inputpath, instname))
+            model = MathOptFormat.read_from_file(joinpath(inputpath, instname))
             MOI.empty!(optimizer)
             MOI.copy_to(optimizer, model)
         end
