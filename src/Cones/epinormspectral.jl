@@ -52,10 +52,10 @@ function check_in_cone(cone::EpiNormSpectral)
     if u <= 0
         return false
     end
+    W = cone.mat
     cone.mat[:] = view(cone.point, 2:cone.dim) # TODO a little slow
     n = cone.n
     m = cone.m
-    W = cone.mat
     X = Symmetric(W * W')
     Z = Symmetric(u * I - X / u)
     F = cholesky(Z, Val(true), check = false) # TODO in place
@@ -64,6 +64,7 @@ function check_in_cone(cone::EpiNormSpectral)
     end
     Zi = Symmetric(inv(F))
     Eu = Symmetric(I + X / u^2)
+    cone.H .= 0.0
 
     cone.g[1] = -dot(Zi, Eu) - 1 / u
     cone.g[2:end] = vec(2 * Zi * W / u)
@@ -72,22 +73,30 @@ function check_in_cone(cone::EpiNormSpectral)
     cone.H[1, 1] = dot(ZiEuZi, Eu) + (2 * dot(Zi, X) / u + 1) / u / u
     cone.H[1, 2:end] = vec((ZiEuZi + Zi / u) * -2 *  W / u)
 
+    tmpvec = zeros(n)
+    tmpmat = zeros(n, n)
+
     p = 2
     for j in 1:m, i in 1:n
-        dzdwij = zeros(n, n)
-        dzdwij[i, :] += W[:, j] / u
-        V = Zi * dzdwij * Zi
-        term1 = Symmetric(V + V')
+        
+        for d in 1:n
+            tmpvec[d] = sum(W[c, j] / u * Zi[c, d] for c in 1:n)
+            for c in 1:n
+                tmpmat[c, d] = Zi[c, i] * tmpvec[d]
+            end
+        end
 
-        q = p - 1
+        term1 = Symmetric(tmpmat + tmpmat')
+
+        q = p
         # l = j
         for k in i:n
+            cone.H[p, q] += 2 * (sum(term1[ni, k] * W[ni, j] for ni in 1:n) + Zi[i, k]) / u
             q += 1
-            cone.H[p, q] = 2 * (sum(term1[ni, k] * W[ni, j] for ni in 1:n) + Zi[i, k]) / u
         end
         for l in (j + 1):m, k in 1:n
+            cone.H[p, q] += 2 * sum(term1[ni, k] * W[ni, l] for ni in 1:n) / u
             q += 1
-            cone.H[p, q] = 2 * sum(term1[ni, k] * W[ni, l] for ni in 1:n) / u
         end
         p += 1
     end
