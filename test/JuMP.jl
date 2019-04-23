@@ -11,104 +11,104 @@ function solve_and_check_JuMP(model, true_obj; atol = 1e-3, rtol = 1e-3)
     @test JuMP.objective_value(model) ≈ true_obj atol = atol rtol = rtol
 end
 
-function namedpoly1_JuMP()
+function polymin1_JuMP()
     # the Heart polynomial in a box
     (x, f, dom, true_obj) = getpolydata(:heart)
     # WSOS formulation
-    model = build_JuMP_namedpoly_WSOS(x, f, dom, d = 2)
+    model = build_JuMP_polymin_WSOS(x, f, dom, d = 2)
     solve_and_check_JuMP(model, true_obj)
 end
 
-function namedpoly2_JuMP()
+function polymin2_JuMP()
     # the Schwefel polynomial in a box
     (x, f, dom, true_obj) = getpolydata(:schwefel)
     # WSOS formulation
-    model = build_JuMP_namedpoly_WSOS(x, f, dom, d = 2)
+    model = build_JuMP_polymin_WSOS(x, f, dom, d = 2)
     solve_and_check_JuMP(model, true_obj)
     # SDP formulation
-    # model = build_JuMP_namedpoly_PSD(x, f, dom, d = 2)
+    # model = build_JuMP_polymin_PSD(x, f, dom, d = 2)
     # solve_and_check_JuMP(model, true_obj)
 end
 
-function namedpoly3_JuMP()
+function polymin3_JuMP()
     # the Magnetism polynomial in a ball
     (x, f, dom, true_obj) = getpolydata(:magnetism7_ball)
     # WSOS formulation
-    model = build_JuMP_namedpoly_WSOS(x, f, dom, d = 2)
+    model = build_JuMP_polymin_WSOS(x, f, dom, d = 2)
     solve_and_check_JuMP(model, true_obj)
     # SDP formulation
-    # model = build_JuMP_namedpoly_PSD(x, f, dom, d = 2)
+    # model = build_JuMP_polymin_PSD(x, f, dom, d = 2)
     # solve_and_check_JuMP(model, true_obj)
 end
 
-function namedpoly4_JuMP()
+function polymin4_JuMP()
     # the Motzkin polynomial in an ellipsoid containing two local minima in opposite orthants
     (x, f, dom, true_obj) = getpolydata(:motzkin_ellipsoid)
     # WSOS formulation
-    model = build_JuMP_namedpoly_WSOS(x, f, dom, d = 4)
+    model = build_JuMP_polymin_WSOS(x, f, dom, d = 4)
     solve_and_check_JuMP(model, true_obj)
     # SDP formulation
-    # model = build_JuMP_namedpoly_PSD(x, f, dom, d = 4)
+    # model = build_JuMP_polymin_PSD(x, f, dom, d = 4)
     # solve_and_check_JuMP(model, true_obj)
 end
 
-function namedpoly5_JuMP()
+function polymin5_JuMP()
     (x, f, dom, true_obj) = getpolydata(:caprasse)
     # WSOS formulation
-    model = build_JuMP_namedpoly_WSOS(x, f, dom, d = 4)
+    model = build_JuMP_polymin_WSOS(x, f, dom, d = 4)
     solve_and_check_JuMP(model, true_obj)
     # SDP formulation
-    # model = build_JuMP_namedpoly_PSD(x, f, dom, d = 4)
+    # model = build_JuMP_polymin_PSD(x, f, dom, d = 4)
     # solve_and_check_JuMP(model, true_obj)
 end
 
-function namedpoly6_JuMP()
+function polymin6_JuMP()
     (x, f, dom, true_obj) = getpolydata(:goldsteinprice)
     # WSOS formulation
-    model = build_JuMP_namedpoly_WSOS(x, f, dom, d = 7)
+    model = build_JuMP_polymin_WSOS(x, f, dom, d = 7)
     solve_and_check_JuMP(model, true_obj)
     # SDP formulation
-    # model = build_JuMP_namedpoly_PSD(x, f, dom, d = 7)
+    # model = build_JuMP_polymin_PSD(x, f, dom, d = 7)
     # solve_and_check_JuMP(model, true_obj)
 end
 
-function namedpoly7_JuMP()
+function polymin7_JuMP()
     (x, f, dom, true_obj) = getpolydata(:lotkavolterra)
     # WSOS formulation
-    model = build_JuMP_namedpoly_WSOS(x, f, dom, d = 3)
+    model = build_JuMP_polymin_WSOS(x, f, dom, d = 3)
     solve_and_check_JuMP(model, true_obj)
     # SDP formulation
-    # model = build_JuMP_namedpoly_PSD(x, f, dom, d = 3)
+    # model = build_JuMP_polymin_PSD(x, f, dom, d = 3)
     # solve_and_check_JuMP(model, true_obj)
 end
 
-function namedpoly8_JuMP()
+function polymin8_JuMP()
     (x, f, dom, true_obj) = getpolydata(:robinson)
     # WSOS formulation
-    model = build_JuMP_namedpoly_WSOS(x, f, dom, d = 8)
+    model = build_JuMP_polymin_WSOS(x, f, dom, d = 8)
     solve_and_check_JuMP(model, true_obj)
     # SDP formulation
-    # model = build_JuMP_namedpoly_PSD(x, f, dom, d = 8)
+    # model = build_JuMP_polymin_PSD(x, f, dom, d = 8)
     # solve_and_check_JuMP(model, true_obj)
 end
 
-function namedpoly9_JuMP()
+function polymin9_JuMP()
     (x, f, dom, true_obj) = getpolydata(:reactiondiffusion_ball)
     # WSOS formulation
-    model = build_JuMP_namedpoly_WSOS(x, f, dom, d = 3)
+    model = build_JuMP_polymin_WSOS(x, f, dom, d = 3)
     solve_and_check_JuMP(model, true_obj)
     # SDP formulation
-    # model = build_JuMP_namedpoly_PSD(x, f, dom, d = 3)
+    # model = build_JuMP_polymin_PSD(x, f, dom, d = 3)
     # solve_and_check_JuMP(model, true_obj)
 end
 
-function namedpoly10_JuMP()
+function polymin10_JuMP()
     (x, f, dom, true_obj) = getpolydata(:rosenbrock)
     # WSOS formulation
-    model = build_JuMP_namedpoly_WSOS(x, f, dom, d = 5)
+    model = build_JuMP_polymin_WSOS(x, f, dom, d = 5)
     solve_and_check_JuMP(model, true_obj, atol = 1e-3)
     # SDP formulation
-    # model = build_JuMP_namedpoly_PSD(x, f, dom, d = 5)
+    # model = build_JuMP_polymin_PSD(x, f, dom, d = 5)
     # solve_and_check_JuMP(model, true_obj, atol = 1e-3)
 end
 
