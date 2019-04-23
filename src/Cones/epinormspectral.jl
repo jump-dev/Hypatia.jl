@@ -76,25 +76,19 @@ function check_in_cone(cone::EpiNormSpectral)
         idx1 += 1
         dzdwij = zeros(n, n)
         dzdwij[i, :] += W[:, j] / u
-        dzdwij[:, i] += W[:, j] / u
-        term1 = Zi * dzdwij * Zi
+        V = Zi * dzdwij * Zi
+        term1 = Symmetric(V + V')
 
         idx2 = idx1 - 1
         # l = j
         for k in i:n
             idx2 += 1
-            dzdwkl = zeros(n, n)
-            dzdwkl[k, :] += W[:, j] / u
-            dzdwkl[:, k] += W[:, j] / u
-            cone.H[idx1 + 1, idx2 + 1] = dot(term1, dzdwkl) + 2 * Zi[i, k] / u
+            cone.H[idx1 + 1, idx2 + 1] = 2 * (dot(term1[:, k], W[:, j]) + Zi[i, k]) / u
         end
 
         for l in (j + 1):m, k in 1:n
             idx2 += 1
-            dzdwkl = zeros(n, n)
-            dzdwkl[k, :] += W[:, l] / u
-            dzdwkl[:, k] += W[:, l] / u
-            cone.H[idx1 + 1, idx2 + 1] = dot(term1, dzdwkl)
+            cone.H[idx1 + 1, idx2 + 1] = 2 * dot(term1[:, k], W[:, l]) / u
         end
     end
 
