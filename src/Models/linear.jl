@@ -42,7 +42,7 @@ mutable struct RawLinearModel <: LinearModel
     cones::Vector{Cones.Cone}
     cone_idxs::Vector{UnitRange{Int}}
     nu::Float64
-    
+
     initial_point::Point
 
     function RawLinearModel(c::Vector{Float64}, A::AbstractMatrix{Float64}, b::Vector{Float64}, G::AbstractMatrix{Float64}, h::Vector{Float64}, cones::Vector{<:Cones.Cone}, cone_idxs::Vector{UnitRange{Int}})

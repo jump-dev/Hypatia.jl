@@ -11,14 +11,14 @@ available at https://arxiv.org/abs/1712.01792
 import Hypatia
 const HYP = Hypatia
 const CO = HYP.Cones
+const MO = HYP.Models
+const SO = HYP.Solvers
 const MU = HYP.ModelUtilities
 
 using LinearAlgebra
-# import SemialgebraicSets
-import DynamicPolynomials
 using Test
 
-# list of predefined polynomials from various applications
+# list of predefined polynomials and domains from various applications
 # see https://people.sc.fsu.edu/~jburkardt/py_src/polynomials/polynomials.html
 polys = Dict{Symbol, NamedTuple}(
     :butcher => (n=6, lbs=[-1.0,-0.1,-0.1,-1.0,-0.1,-0.1], ubs=[0.0,0.9,0.5,-0.1,-0.05,-0.03], deg=3,
@@ -56,15 +56,16 @@ polys = Dict{Symbol, NamedTuple}(
         ),
 )
 
-function build_namedpoly(
+function build_polymin(
     polyname::Symbol,
     d::Int;
     primal_wsos::Bool = true,
     )
-    # get data for named polynomial
+    # get data for polynomial and domain
     (n, lbs, ubs, deg, fn) = polys[polyname]
     @assert d >= div(deg + 1, 2)
 
+    # TODO choose which cone definition to use and cleanup below
     # generate interpolation
     # (U, pts, P0, _, _) = MU.wsos_box_params(n, d, false)
     dom = MU.Box(lbs, ubs)
@@ -80,14 +81,12 @@ function build_namedpoly(
         h = [fn(pts[j, :]...) for j in 1:U]
     else
         c = [fn(pts[j, :]...) for j in 1:U] # evaluate polynomial at transformed points
-        A = ones(1, U)
+        A = ones(1, U) # TODO eliminate constraint and first variable
         b = [1.0]
         G = Diagonal(-1.0I, U) # TODO uniformscaling?
         h = zeros(U)
     end
-
     cones = [CO.WSOSPolyInterp(U, [P0, PWts...], !primal_wsos)]
-
     # Ls = Int[size(P0, 2)]
     # @assert Ls[1] == binomial(n + d, n)
     # gs = Vector{Float64}[ones(U)]
@@ -100,26 +99,25 @@ function build_namedpoly(
     #     push!(gs, gi)
     # end
     # cones = [CO.WSOSPolyInterp_2(U, P0, Ls, gs, !primal_wsos)]
-
     cone_idxs = [1:U]
 
     return (c, A, b, G, h, cones, cone_idxs)
 end
 
-function run_namedpoly()
-    # select the named polynomial to minimize and the SOS degree (to be squared)
+function run_polymin()
+    # select the polynomial/domain to minimize over and the SOS degree (to be squared)
     (c, A, b, G, h, cones, cone_idxs) =
-        # build_namedpoly(:butcher, 2)
-        # build_namedpoly(:caprasse, 4)
-        # build_namedpoly(:goldsteinprice, 7)
-        # build_namedpoly(:heart, 2)
-        # build_namedpoly(:lotkavolterra, 3)
-        # build_namedpoly(:magnetism7, 2)
-        # build_namedpoly(:motzkin, 7)
-        build_namedpoly(:reactiondiffusion, 4)
-        # build_namedpoly(:robinson, 8)
-        # build_namedpoly(:rosenbrock, 4)
-        # build_namedpoly(:schwefel, 3)
+        # build_polymin(:butcher, 2)
+        # build_polymin(:caprasse, 4)
+        # build_polymin(:goldsteinprice, 7)
+        # build_polymin(:heart, 2)
+        # build_polymin(:lotkavolterra, 3)
+        # build_polymin(:magnetism7, 2)
+        # build_polymin(:motzkin, 7)
+        build_polymin(:reactiondiffusion, 4)
+        # build_polymin(:robinson, 8)
+        # build_polymin(:rosenbrock, 4)
+        # build_polymin(:schwefel, 3)
 
     model = MO.PreprocessedLinearModel(c, A, b, G, h, cones, cone_idxs)
     solver = SO.HSDSolver(model, verbose = true)
