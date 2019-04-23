@@ -4,7 +4,7 @@ Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 TODO readme for benchmarks and describe ARGS for running on command line
 =#
 
-# julia benchmark/runbenchmarks.jl easy.txt benchmark/instancefiles tmp
+# julia benchmark/runbenchmarks.jl easy.txt benchmark/instancefiles/cbf tmp
 
 Pkg.activate(".")
 import Hypatia
@@ -28,6 +28,7 @@ if !isfile(instsetfile)
 end
 
 inputpath = ARGS[2]
+# inputpath = instancefiles/cbf
 if !isdir(inputpath)
     error("input path is not a valid directory: $inputpath")
 end

@@ -12,6 +12,7 @@ import Hypatia
 const HYP = Hypatia
 const CO = HYP.Cones
 const MU = HYP.ModelUtilities
+const MO = HYP.Models
 
 using LinearAlgebra
 using SparseArrays
