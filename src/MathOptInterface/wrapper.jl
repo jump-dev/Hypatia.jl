@@ -44,7 +44,10 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     primal_obj::Float64
     dual_obj::Float64
 
-    function Optimizer(use_dense::Bool, verbose::Bool, system_solver::Type{<:Solvers.CombinedHSDSystemSolver}, linear_model::Type{<:Models.LinearModel}, max_iters::Int, time_limit::Float64, tol_rel_opt::Float64, tol_abs_opt::Float64, tol_feas::Float64)
+    load_only::Bool
+
+    function Optimizer(use_dense::Bool, verbose::Bool, system_solver::Type{<:Solvers.CombinedHSDSystemSolver},
+            linear_model::Type{<:Models.LinearModel}, max_iters::Int, time_limit::Float64, tol_rel_opt::Float64, tol_abs_opt::Float64, tol_feas::Float64, load_only::Bool)
         opt = new()
         opt.use_dense = use_dense
         opt.verbose = verbose
@@ -56,6 +59,7 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
         opt.tol_abs_opt = tol_abs_opt
         opt.tol_feas = tol_feas
         opt.status = :NotLoaded
+        opt.load_only = false
         return opt
     end
 end
@@ -70,7 +74,9 @@ Optimizer(;
     tol_rel_opt::Float64 = 1e-6,
     tol_abs_opt::Float64 = 1e-7,
     tol_feas::Float64 = 1e-7,
-    ) = Optimizer(use_dense, verbose, system_solver, linear_model, max_iters, time_limit, tol_rel_opt, tol_abs_opt, tol_feas)
+    load_only::Bool = false,
+    ) =
+    Optimizer(use_dense, verbose, system_solver, linear_model, max_iters, time_limit, tol_rel_opt, tol_abs_opt, tol_feas, load_only)
 
 MOI.get(::Optimizer, ::MOI.SolverName) = "Hypatia"
 
@@ -495,6 +501,9 @@ function MOI.copy_to(
 end
 
 function MOI.optimize!(opt::Optimizer)
+    if opt.load_only
+        return nothing
+    end
     model = opt.linear_model(copy(opt.c), copy(opt.A), copy(opt.b), copy(opt.G), copy(opt.h), opt.cones, opt.cone_idxs)
     stepper = Solvers.CombinedHSDStepper(model, system_solver = opt.system_solver(model))
     solver = Solvers.HSDSolver(

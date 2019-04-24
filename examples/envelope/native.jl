@@ -13,6 +13,7 @@ const HYP = Hypatia
 const CO = HYP.Cones
 const MU = HYP.ModelUtilities
 const MO = HYP.Models
+const SO = HYP.Solvers
 
 using LinearAlgebra
 using SparseArrays
