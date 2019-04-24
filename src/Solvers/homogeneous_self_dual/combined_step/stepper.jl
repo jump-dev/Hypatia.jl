@@ -201,8 +201,10 @@ function find_max_alpha_in_nbhd(z_dir::AbstractVector{Float64}, s_dir::AbstractV
             end
 
             if in_cones
-                full_nbhd_sqr = abs2(taukap_temp - mu_temp)
-                if full_nbhd_sqr < abs2(mu_temp * nbhd)
+                # full_nbhd_sqr = abs2(taukap_temp - mu_temp)
+                # TODO can remove all the abs2s
+                inf_nbhd_sqr = abs2(taukap_temp - mu_temp)
+                if inf_nbhd_sqr < abs2(mu_temp * nbhd)
                     in_nbhds = true
                     for k in eachindex(cones)
                         cone_k = cones[k]
@@ -214,23 +216,50 @@ function find_max_alpha_in_nbhd(z_dir::AbstractVector{Float64}, s_dir::AbstractV
                             end
                         end
 
+                        # old code
                         # modifies dual_views
-                        stepper.dual_views[k] .+= mu_temp .* Cones.grad(cone_k)
-                        Cones.inv_hess_prod!(stepper.nbhd_temp[k], stepper.dual_views[k], cone_k)
-                        # mul!(stepper.nbhd_temp[k], Cones.inv_hess(cone_k), stepper.dual_views[k])
-                        nbhd_sqr_k = dot(stepper.dual_views[k], stepper.nbhd_temp[k])
+                        # stepper.dual_views[k] .+= mu_temp .* Cones.grad(cone_k)
+                        # Cones.inv_hess_prod!(stepper.nbhd_temp[k], stepper.dual_views[k], cone_k)
+                        # # mul!(stepper.nbhd_temp[k], Cones.inv_hess(cone_k), stepper.dual_views[k])
+                        # nbhd_sqr_k = dot(stepper.dual_views[k], stepper.nbhd_temp[k])
 
-                        if nbhd_sqr_k <= -1e-5
-                            println("numerical issue for cone: nbhd_sqr_k is $nbhd_sqr_k")
+                        # TODO do nbhd calculations in cone procedures, because for some cones the inverse hessian norm nbhd is cheap (eg orthant) but for others it is too expensive to derive hessian so can use approximation
+                        # TODO new code allocates
+                        g = Cones.grad(cone_k)
+                        res_k = stepper.dual_views[k] + mu_temp * g
+
+                        # # old inverse hessian norm
+                        # res2_k = similar(res_k)
+                        # Cones.inv_hess_prod!(res2_k, res_k, cone_k)
+                        # invH_k = dot(res2_k, res_k)
+                        # # @show invH_k
+
+                        # try infinity gradient norm by-cone
+                        infg_k = abs2(norm(res_k, Inf) / norm(g, Inf))
+                        # infg2_k = abs2(norm(res_k, Inf) * norm(inv.(g), Inf))
+                        # @show infg_k
+
+                        # @show invH_k / infg_k
+                        # @show invH_k / infg2_k
+
+                        nbhd_sqr_k = infg_k
+                        # nbhd_sqr_k = invH_k
+
+                        # if nbhd_sqr_k <= -1e-5
+                        #     println("numerical issue for cone: nbhd_sqr_k is $nbhd_sqr_k")
+                        #     in_nbhds = false
+                        #     break
+                        # else
+                        # if nbhd_sqr_k > 0.0
+                        # full_nbhd_sqr += nbhd_sqr_k
+                        inf_nbhd_sqr = max(inf_nbhd_sqr, nbhd_sqr_k)
+                        # @show full_nbhd_sqr / inf_nbhd_sqr
+                        # if full_nbhd_sqr > abs2(mu_temp * nbhd)
+                        if inf_nbhd_sqr > abs2(mu_temp * nbhd)
                             in_nbhds = false
                             break
-                        elseif nbhd_sqr_k > 0.0
-                            full_nbhd_sqr += nbhd_sqr_k
-                            if full_nbhd_sqr > abs2(mu_temp * nbhd)
-                                in_nbhds = false
-                                break
-                            end
                         end
+                        # end
                     end
                     if in_nbhds
                         break

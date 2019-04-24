@@ -52,127 +52,127 @@ include(joinpath(@__DIR__, "JuMP.jl"))
 #     test_recover_lagrange_polys()
 # end
 
-@info("starting native interface tests")
-verbose = true
-system_solvers = [
-    SO.NaiveCombinedHSDSystemSolver,
-    SO.QRCholCombinedHSDSystemSolver,
-    ]
-# testfuns_singular = [
-#     dimension1,
-#     consistent1,
-#     inconsistent1,
-#     inconsistent2,
-#     ]
-# @testset "preprocessing tests: $t, $s" for t in testfuns_singular, s in system_solvers
-#     t(s, MO.PreprocessedLinearModel, verbose)
-# end
-linear_models = [
-    MO.RawLinearModel,
-    MO.PreprocessedLinearModel,
-    ]
-testfuns_nonsingular = [
-    # orthant1,
-    # orthant2,
-    # orthant3,
-    # orthant4,
-    # epinorminf1,
-    # epinorminf2,
-    # epinorminf3,
-    # epinorminf4,
-    # epinorminf5,
-    # epinorminf6,
-    # epinormeucl1,
-    # epinormeucl2,
-    # epipersquare1,
-    # epipersquare2,
-    # epipersquare3,
-    # semidefinite1,
-    # semidefinite2,
-    # semidefinite3,
-    # hypoperlog1,
-    # hypoperlog2,
-    # hypoperlog3,
-    # hypoperlog4,
-    # epiperpower1,
-    # epiperpower2,
-    # epiperpower3,
-    # hypogeomean1,
-    # hypogeomean2,
-    # hypogeomean3,
-    # hypogeomean4,
-    epinormspectral1,
-    # hypoperlogdet1,
-    # hypoperlogdet2,
-    # hypoperlogdet3,
-    # epipersumexp1,
-    # epipersumexp2,
-    ]
-@testset "native tests: $t, $s, $m" for t in testfuns_nonsingular, s in system_solvers, m in linear_models
-    if s == SO.QRCholCombinedHSDSystemSolver && m == MO.RawLinearModel
-        continue # QRChol linear system solver needs preprocessed model
-    end
-    t(s, m, verbose)
-end
-
-# @info("starting default native examples tests")
-# testfuns = [
-#     run_envelope_primal_dense,
-#     run_envelope_dual_dense,
-#     run_envelope_primal_sparse,
-#     run_envelope_dual_sparse,
-#     run_linearopt,
-#     run_polymin,
-#     run_complexpolymin_primal,
-#     run_complexpolymin_dual,
-#     ]
-# @testset "default examples: $t" for t in testfuns
-#     t()
-# end
-#
-# @info("starting additional native examples tests")
+# @info("starting native interface tests")
 # verbose = true
 # system_solvers = [
-#     # SO.NaiveCombinedHSDSystemSolver,
-#     SO.QRCholCombinedHSDSystemSolver,
+#     SO.NaiveCombinedHSDSystemSolver,
+#     # SO.QRCholCombinedHSDSystemSolver,
 #     ]
+# # testfuns_singular = [
+# #     dimension1,
+# #     consistent1,
+# #     inconsistent1,
+# #     inconsistent2,
+# #     ]
+# # @testset "preprocessing tests: $t, $s" for t in testfuns_singular, s in system_solvers
+# #     t(s, MO.PreprocessedLinearModel, verbose)
+# # end
 # linear_models = [
-#     # MO.RawLinearModel,
-#     MO.PreprocessedLinearModel,
+#     MO.RawLinearModel,
+#     # MO.PreprocessedLinearModel,
 #     ]
-# testfuns = [
-#     # TODO test primal and dual formulations of envelope
-#     envelope1,
-#     envelope2,
-#     envelope3,
-#     envelope4,
-#     linearopt1,
-#     linearopt2,
-#     polymin1,
-#     polymin2,
-#     polymin3,
-#     polymin4,
-#     polymin5,
-#     polymin6,
-#     polymin7,
-#     polymin8,
-#     polymin9,
-#     polymin10,
-#     polymin11,
-#     complexpolymin1,
-#     complexpolymin2,
-#     complexpolymin3,
-#     complexpolymin4,
-#     complexpolymin5,
-#     complexpolymin6,
-#     complexpolymin7,
+# testfuns_nonsingular = [
+#     orthant1,
+#     orthant2,
+#     orthant3,
+#     orthant4,
+#     epinorminf1,
+#     epinorminf2,
+#     epinorminf3,
+#     epinorminf4,
+#     epinorminf5,
+#     epinorminf6,
+#     epinormeucl1,
+#     epinormeucl2,
+#     epipersquare1,
+#     epipersquare2,
+#     epipersquare3,
+#     semidefinite1,
+#     semidefinite2,
+#     semidefinite3,
+#     hypoperlog1,
+#     hypoperlog2,
+#     hypoperlog3,
+#     hypoperlog4,
+#     epiperpower1,
+#     epiperpower2,
+#     epiperpower3,
+#     hypogeomean1,
+#     hypogeomean2,
+#     hypogeomean3,
+#     hypogeomean4,
+#     epinormspectral1,
+#     hypoperlogdet1,
+#     hypoperlogdet2,
+#     hypoperlogdet3,
+#     epipersumexp1,
+#     epipersumexp2,
 #     ]
-# @testset "native examples: $t, $s, $m" for t in testfuns, s in system_solvers, m in linear_models
+# @testset "native tests: $t, $s, $m" for t in testfuns_nonsingular, s in system_solvers, m in linear_models
 #     if s == SO.QRCholCombinedHSDSystemSolver && m == MO.RawLinearModel
 #         continue # QRChol linear system solver needs preprocessed model
 #     end
 #     t(s, m, verbose)
 # end
+
+@info("starting default native examples tests")
+testfuns = [
+    run_envelope_primal_dense,
+    run_envelope_dual_dense,
+    run_envelope_primal_sparse,
+    run_envelope_dual_sparse,
+    run_linearopt,
+    run_polymin,
+    run_complexpolymin_primal,
+    run_complexpolymin_dual,
+    ]
+@testset "default examples: $t" for t in testfuns
+    t()
+end
+
+@info("starting additional native examples tests")
+verbose = true
+system_solvers = [
+    # SO.NaiveCombinedHSDSystemSolver,
+    SO.QRCholCombinedHSDSystemSolver,
+    ]
+linear_models = [
+    # MO.RawLinearModel,
+    MO.PreprocessedLinearModel,
+    ]
+testfuns = [
+    # TODO test primal and dual formulations of envelope
+    envelope1,
+    envelope2,
+    envelope3,
+    envelope4,
+    linearopt1,
+    linearopt2,
+    polymin1,
+    polymin2,
+    polymin3,
+    polymin4,
+    polymin5,
+    polymin6,
+    polymin7,
+    polymin8,
+    polymin9,
+    polymin10,
+    polymin11,
+    complexpolymin1,
+    complexpolymin2,
+    complexpolymin3,
+    complexpolymin4,
+    complexpolymin5,
+    complexpolymin6,
+    complexpolymin7,
+    ]
+@testset "native examples: $t, $s, $m" for t in testfuns, s in system_solvers, m in linear_models
+    if s == SO.QRCholCombinedHSDSystemSolver && m == MO.RawLinearModel
+        continue # QRChol linear system solver needs preprocessed model
+    end
+    t(s, m, verbose)
+end
 #
 # @info("starting MathOptInterface tests")
 # verbose = false
