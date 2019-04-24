@@ -69,6 +69,9 @@ function check_in_cone(cone::HypoPerLogdet)
     if v <= 0.0 || !isposdef(Symmetric(W)) || u >= v * logdet(Symmetric(W) / v) # TODO only use one decomposition on Symmetric(W) for isposdef and logdet
         return false
     end
+    # if v <= 0.0 || !isposdef(W) || u >= v * logdet(W / v) # TODO only use one decomposition on Symmetric(W) for isposdef and logdet
+    #     return false
+    # end
 
     L = logdet(W / v)
     z = v * L - u
@@ -91,14 +94,15 @@ function check_in_cone(cone::HypoPerLogdet)
     Hww = zeros(n^2, n^2)
     vzi = v / z
     fact = vzi * (1 + vzi)
-    k = 0
+    k = 1
     for j in 1:n, i in 1:n
-        k += 1
-        k2 = 0
+        k2 = 1
         for j2 in 1:n, i2 in 1:n
+            # Hww[k, k2] = Wi[i, i2] * Wi[j, j2] * v / z + Wi[i, j] * Wi[i2, j2] * v^2 / z^2 +  Wi[i, i2] * Wi[j, j2]
+            Hww[k, k2] = Wi[i, j2] * Wi[i2, j] * v / z + Wi[i, j] * Wi[i2, j2] * v^2 / z^2 +  Wi[i, j2] * Wi[i2, j]
             k2 += 1
-            Hww[k, k2] = Wi[i2, j] * Wi[i, j2] * v / z + Wi[i, j] * Wi[i2, j2] * v^2 / z^2 +  Wi[i2, j] * Wi[i, j2]
         end
+        k += 1
     end
     # Hww *= (1 + fact)
 
@@ -110,8 +114,19 @@ function check_in_cone(cone::HypoPerLogdet)
     cone.g .= DiffResults.gradient(cone.diffres)
     cone.H .= DiffResults.hessian(cone.diffres)
 
+    H = zeros(cone.dim, cone.dim)
+    H[1, 1] = Huu
+    H[1, 2] = Huv
+    H[2, 2] = Hvv
+    H[1, 3:end] = Huw
+    H[2, 3:end] = Hvw
+    H[3:end, 3:end] = Hww
+    @assert isapprox(Symmetric(H, :U) * cone.point, -g, atol = 1e-6, rtol = 1e-6)
+
     # @show size(cone.g), size(g)
-    @show cone.H[(2 + n^2):end, (2 + n^2):end] ./ vec(Hww)
+    # @show cone.g[3:end] ./ gw
+    # @show cone.H[3:end, 3:end] ./ Hww
+    # @show Wi[end, end]
 
     return factorize_hess(cone)
 end
