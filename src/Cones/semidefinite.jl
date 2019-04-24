@@ -68,6 +68,8 @@ function check_in_cone(cone::PosSemidef)
     H = cone.H
     Hi = cone.Hi
 
+    # TODO remove ifs
+
     k = 1
     for i in 1:cone.side, j in 1:i
         k2 = 1
