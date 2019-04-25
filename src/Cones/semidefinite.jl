@@ -68,8 +68,6 @@ function check_in_cone(cone::PosSemidef)
     H = cone.H
     Hi = cone.Hi
 
-    # TODO remove ifs
-
     k = 1
     for i in 1:cone.side
         for j in 1:(i - 1)
@@ -84,11 +82,13 @@ function check_in_cone(cone::PosSemidef)
                 # i < j and i2 == j2
                 H[k2, k] = rt2 * inv_mat[i2, i] * inv_mat[j, i2]
                 Hi[k2, k] = rt2 * mat[i2, i] * mat[j, i2]
+                if k2 == k
+                    break
+                end
                 k2 += 1
             end
             k += 1
         end
-
         k2 = 1
         for i2 in 1:cone.side
             for j2 in 1:(i2 - 1)
@@ -100,13 +100,13 @@ function check_in_cone(cone::PosSemidef)
             # i == j, i2 == j2
             H[k2, k] = abs2(inv_mat[i2, i])
             Hi[k2, k] = abs2(mat[i2, i])
+            if k2 == k
+                break
+            end
             k2 += 1
         end
-
         k += 1
-
     end
-
     return true
 end
 

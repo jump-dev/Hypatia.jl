@@ -22,8 +22,6 @@ mutable struct HypoPerLogdet <: Cone
     H::Matrix{Float64}
     H2::Matrix{Float64}
     F
-    barfun::Function
-    diffres
 
     function HypoPerLogdet(dim::Int, is_dual::Bool)
         cone = new()
@@ -35,15 +33,6 @@ mutable struct HypoPerLogdet <: Cone
         cone.g = Vector{Float64}(undef, dim)
         cone.H = Matrix{Float64}(undef, dim, dim)
         cone.H2 = similar(cone.H)
-        function barfun(point)
-            u = point[1]
-            v = point[2]
-            W = similar(point, side, side)
-            svec_to_smat!(W, view(point, 3:dim))
-            return -log(v * logdet(W / v) - u) - logdet(W) - log(v)
-        end
-        cone.barfun = barfun
-        cone.diffres = DiffResults.HessianResult(cone.g)
         return cone
     end
 end
@@ -73,70 +62,61 @@ function check_in_cone(cone::HypoPerLogdet)
     Wi = inv(W)
     n = cone.side
     dim = cone.dim
+    vzi = v / z
 
     cone.g[1] = 1 / z
     cone.g[2] = (n - L) / z - 1 / v
-    gwmat = -v / z * Wi - Wi
+    gwmat = -vzi * Wi - Wi
     smat_to_svec!(view(cone.g, 3:dim), gwmat)
 
     cone.H[1, 1] = 1 / z / z
     cone.H[1, 2] = (n - L) / z / z
-    Huwmat = -(v * Wi) / z / z
+    Huwmat = -vzi * Wi / z
     smat_to_svec!(view(cone.H, 1, 3:dim), Huwmat)
 
     cone.H[2, 2] = (-n + L)^2 / z / z + n / (v * z) + 1 / v / v
-    Hvwmat = (-n + L) * v * Wi / z / z - Wi / z
+    Hvwmat = (-n + L) * Wi * vzi / z - Wi / z
     smat_to_svec!(view(cone.H, 2, 3:dim), Hvwmat)
 
-    Hww = zeros((dim - 2), (dim - 2))
-    k = 1
+    cone.H[3:end, 3:end] .= 0
+    k = 3
     for i in 1:n
         for j in 1:(i - 1)
-            k2 = 1
+            k2 = 3
             for i2 in 1:n
                 for j2 in 1:(i2 - 1)
                     # i < j and i2 < j2
-                    Hww[k2, k] += 2 * Wi[i, j] * Wi[i2, j2] * v^2 / z^2
-                    Hww[k2, k] += (Wi[i2, i] * Wi[j, j2] + Wi[j2, i] * Wi[j, i2]) * v / z +  (Wi[i2, i] * Wi[j, j2] + Wi[j2, i] * Wi[j, i2])
+                    cone.H[k2, k] += 2 * Wi[i, j] * Wi[i2, j2] * vzi^2
+                    cone.H[k2, k] += (Wi[i2, i] * Wi[j, j2] + Wi[j2, i] * Wi[j, i2]) * (vzi +  1)
                     k2 += 1
                 end
                 # i < j and i2 == j2
-                Hww[k2, k] += rt2 * Wi[i, j] * Wi[i2, i2] * v^2 / z^2
-                Hww[k2, k] += rt2 * (Wi[i2, i] * Wi[j, i2] * v / z +  Wi[i2, i] * Wi[j, i2])
+                cone.H[k2, k] += rt2 * (Wi[i2, i] * Wi[j, i2] * (vzi +  1) + Wi[i, j] * Wi[i2, i2] * vzi^2)
+                if k2 == k
+                    break
+                end
                 k2 += 1
             end
             k += 1
         end
-        k2 = 1
-
+        k2 = 3
         for i2 in 1:n
             for j2 in 1:(i2 - 1)
                 # i = j, i2 < j2
-                Hww[k2, k] += rt2 * Wi[i, i] * Wi[i2, j2] * v^2 / z^2
-                Hww[k2, k] += rt2 * (Wi[i2, i] * Wi[i, j2] * v / z +  Wi[i2, i] * Wi[i, j2])
+                cone.H[k2, k] += rt2 * (Wi[i2, i] * Wi[i, j2] * (vzi +  1) +  Wi[i, i] * Wi[i2, j2] * vzi^2)
                 k2 += 1
             end
             # i == j, i2 == j2
-            Hww[k2, k] += Wi[i, i] * Wi[i2, i2] * v^2 / z^2
-            Hww[k2, k] += abs2(Wi[i2, i]) * v / z +  abs2(Wi[i2, i])
+            cone.H[k2, k] += abs2(Wi[i2, i]) * (vzi +  1) + Wi[i, i] * Wi[i2, i2] * vzi^2
+            if k2 == k
+                break
+            end
             k2 += 1
         end
         k += 1
-
     end
-    cone.H[3:end, 3:end] .= Hww
 
-
-
-    # TODO check allocations, check with Jarrett if this is most efficient way to use DiffResults
-    cone.diffres = ForwardDiff.hessian!(cone.diffres, cone.barfun, cone.point)
-    # g = DiffResults.gradient(cone.diffres)
-    H = DiffResults.hessian(cone.diffres)
-
-    # @show cone.H[3:end, 3:end] ./ Hww
-    # @show cone.H[3:end, 3:end] ./ H[3:end, 3:end]
-    # @show Symmetric(cone.H, :U) ./ H
-    @assert isapprox(Symmetric(cone.H, :U) * cone.point, -cone.g, atol = 1e-6, rtol = 1e-6)
+    @assert isapprox(Symmetric(cone.H, :U) * cone.point, -cone.g, atol = 1e-6, rtol = 1e-6) # TODO remove later
 
     return factorize_hess(cone)
 end
