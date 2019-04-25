@@ -71,32 +71,40 @@ function check_in_cone(cone::PosSemidef)
     # TODO remove ifs
 
     k = 1
-    for i in 1:cone.side, j in 1:i
-        k2 = 1
-        for i2 in 1:cone.side, j2 in 1:i2
-            if i == j
-                if i2 == j2
-                    H[k2, k] = abs2(inv_mat[i2, i])
-                    Hi[k2, k] = abs2(mat[i2, i])
-                else
-                    H[k2, k] = rt2 * inv_mat[i2, i] * inv_mat[j, j2]
-                    Hi[k2, k] = rt2 * mat[i2, i] * mat[j, j2]
-                end
-            else
-                if i2 == j2
-                    H[k2, k] = rt2 * inv_mat[i2, i] * inv_mat[j, j2]
-                    Hi[k2, k] = rt2 * mat[i2, i] * mat[j, j2]
-                else
+    for i in 1:cone.side
+        for j in 1:(i - 1)
+            k2 = 1
+            for i2 in 1:cone.side
+                for j2 in 1:(i2 - 1)
+                    # i < j and i2 < j2
                     H[k2, k] = inv_mat[i2, i] * inv_mat[j, j2] + inv_mat[j2, i] * inv_mat[j, i2]
                     Hi[k2, k] = mat[i2, i] * mat[j, j2] + mat[j2, i] * mat[j, i2]
+                    k2 += 1
                 end
+                # i < j and i2 == j2
+                H[k2, k] = rt2 * inv_mat[i2, i] * inv_mat[j, i2]
+                Hi[k2, k] = rt2 * mat[i2, i] * mat[j, i2]
+                k2 += 1
             end
-            if k2 == k
-                break
+            k += 1
+        end
+
+        k2 = 1
+        for i2 in 1:cone.side
+            for j2 in 1:(i2 - 1)
+                # i == j, j2 < i2
+                H[k2, k] = rt2 * inv_mat[i2, i] * inv_mat[i, j2]
+                Hi[k2, k] = rt2 * mat[i2, i] * mat[i, j2]
+                k2 += 1
             end
+            # i == j, i2 == j2
+            H[k2, k] = abs2(inv_mat[i2, i])
+            Hi[k2, k] = abs2(mat[i2, i])
             k2 += 1
         end
+
         k += 1
+
     end
 
     return true
