@@ -690,7 +690,6 @@ function hypoperlogdet1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linea
     Random.seed!(1)
     side = 4
     dim = 2 + div(side * (side + 1), 2)
-    # dim = 2 + side^2
     c = Float64[-1, 0]
     A = Float64[0 1]
     b = Float64[1]
