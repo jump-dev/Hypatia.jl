@@ -82,18 +82,12 @@ function check_in_cone(cone::HypoPerLogdet)
     for i in 1:n, j in 1:i
         k2 = 3
         for i2 in 1:n, j2 in 1:i2
-            if i == j
-                if i2 == j2
-                    cone.H[k2, k] = abs2(Wi[i2, i]) * (vzi + 1) + Wi[i, i] * Wi[i2, i2] * vzi^2
-                else
-                    cone.H[k2, k] = rt2 * (Wi[i2, i] * Wi[i, j2] * (vzi + 1) + Wi[i, i] * Wi[i2, j2] * vzi^2)
-                end
+            if (i == j) && (i2 == j2)
+                cone.H[k2, k] = abs2(Wi[i2, i]) * (vzi + 1) + Wi[i, i] * Wi[i2, i2] * vzi^2
+            elseif (i != j) && (i2 != j2)
+                cone.H[k2, k] = (Wi[i2, i] * Wi[j, j2] + Wi[j2, i] * Wi[j, i2]) * (vzi + 1) + 2 * Wi[i, j] * Wi[i2, j2] * vzi^2
             else
-                if i2 == j2
-                    cone.H[k2, k] = rt2 * (Wi[i2, i] * Wi[j, i2] * (vzi + 1) + Wi[i, j] * Wi[i2, i2] * vzi^2)
-                else
-                    cone.H[k2, k] = (Wi[i2, i] * Wi[j, j2] + Wi[j2, i] * Wi[j, i2]) * (vzi + 1) + 2 * Wi[i, j] * Wi[i2, j2] * vzi^2
-                end
+                cone.H[k2, k] = rt2 * (Wi[i2, i] * Wi[j, j2] * (vzi + 1) + Wi[i, j] * Wi[i2, j2] * vzi^2)
             end
             if k2 == k
                 break
