@@ -17,12 +17,12 @@ function barfun(point)
 end
 
 Random.seed!(1)
-n = 2
-u = -5
-v = 1
+n = 4
+u = -50
+v = 2
 r = rand(n, n)
 W = r * r' # Matrix{Float64}(I, n, n)
-Wvec = zeros(3)
+Wvec = zeros(10)
 point = vcat(u, v, Hypatia.Cones.smat_to_svec!(Wvec, W)...)
 
 dim = length(point)
@@ -61,28 +61,43 @@ k = 1
 for i in 1:n, j in 1:i
     k2 = 1
     for i2 in 1:n, j2 in 1:i2
-        Hww[k2, k] += Wi[i, j] * Wi[i2, j2] * v^2 / z^2 # this guy's indices should't behave like the other part because he involves only 1 derivative wrt w
-        Hww[k2, k] += Wi[i, j2] * Wi[i2, j] * v / z +  Wi[i, j2] * Wi[i2, j]
-        if xor(i == i2, j == j2)
-            Hww[k2, k] *= sqrt(2)
-        end
+        # Hww[k2, k] += Wi[i, j] * Wi[i2, j2] * v^2 / z^2 # this guy's indices should't behave like the other part because he involves only 1 derivative wrt w
 
-        # if i == j
-        #     if i2 == j2
-        #         Hww[k2, k] += abs2(Wi[i2, i]) * v / z +  abs2(Wi[i2, i]) # = abs2(inv_mat[i2, i])
-        #     else
-        #         Hww[k2, k] += rt2 * (Wi[i2, i] * Wi[j, j2] * v / z +  Wi[i2, i] * Wi[j, j2]) # = rt2 * inv_mat[i2, i] * inv_mat[j, j2]
-        #     end
+        if (i == j) && (i2 == j2)
+            fact = 1
+        elseif xor(i == j, i2 == j2)
+            fact = sqrt(2)
+        else
+            fact = 2
+        end
+        Hww[k2, k] += fact * Wi[i, j] * Wi[i2, j2] * v^2 / z^2
+
+        # if xor(i == i2, j == j2)
+        #     Hww[k2, k] += Wi[i, j2] * Wi[i2, j] * v / z +  Wi[i, j2] * Wi[i2, j]
+        #     Hww[k2, k] *= sqrt(2)
         # else
-        #     if i2 == j2
-        #         Hww[k2, k] += rt2 * (Wi[i2, i] * Wi[j, j2] * v / z +  Wi[i2, i] * Wi[j, j2]) # = rt2 * inv_mat[i2, i] * inv_mat[j, j2]
-        #     else
-        #         Hww[k2, k] += (Wi[i2, i] * Wi[j, j2] + Wi[j2, i] * Wi[j, i2]) * v / z +  (Wi[i2, i] * Wi[j, j2] + Wi[j2, i] * Wi[j, i2]) # = inv_mat[i2, i] * inv_mat[j, j2] + inv_mat[j2, i] * inv_mat[j, i2]
-        #     end
+        #     Hww[k2, k] += Wi[i, j2] * Wi[i2, j] * v / z +  Wi[i, j2] * Wi[i2, j]
         # end
-        # # if k2 == k
-        # #     break
-        # # end
+
+        if i == j
+            if i2 == j2
+                Hww[k2, k] += abs2(Wi[i2, i]) * v / z +  abs2(Wi[i2, i]) # = abs2(inv_mat[i2, i])
+            else
+                Hww[k2, k] += rt2 * (Wi[i2, i] * Wi[j, j2] * v / z +  Wi[i2, i] * Wi[j, j2]) # = rt2 * inv_mat[i2, i] * inv_mat[j, j2]
+                # Hww[k2, k] += rt2 * (Wi[i2, j] * Wi[j, i2] * v / z +  Wi[i2, j] * Wi[j, i2]) # = rt2 * inv_mat[i2, i] * inv_mat[j, j2]
+            end
+        else
+            if i2 == j2
+                Hww[k2, k] += rt2 * (Wi[i2, i] * Wi[j, j2] * v / z +  Wi[i2, i] * Wi[j, j2]) # = rt2 * inv_mat[i2, i] * inv_mat[j, j2]
+                # Hww[k2, k] += rt2 * (Wi[i2, j] * Wi[j, i2] * v / z +  Wi[i2, j] * Wi[j, i2]) # = rt2 * inv_mat[i2, i] * inv_mat[j, j2]
+            else
+                Hww[k2, k] += (Wi[i2, i] * Wi[j, j2] + Wi[j2, i] * Wi[j, i2]) * v / z +  (Wi[i2, i] * Wi[j, j2] + Wi[j2, i] * Wi[j, i2]) # = inv_mat[i2, i] * inv_mat[j, j2] + inv_mat[j2, i] * inv_mat[j, i2]
+                # Hww[k2, k] += (Wi[i2, i] * Wi[j, j2] + Wi[j2, i] * Wi[j, i2]) * v / z +  (Wi[i2, i] * Wi[j, j2] + Wi[j2, i] * Wi[j, i2])
+            end
+        end
+        # if k2 == k
+        #     break
+        # end
         k2 += 1
     end
     global k += 1

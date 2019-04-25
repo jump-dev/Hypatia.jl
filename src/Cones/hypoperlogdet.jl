@@ -10,8 +10,6 @@ barrier (guessed, based on analogy to hypoperlog barrier)
 
 TODO only use one decomposition on Symmetric(W) for isposdef and logdet
 TODO symbolically calculate gradient and Hessian
-
-TODO symmetrize
 =#
 
 mutable struct HypoPerLogdet <: Cone
@@ -31,7 +29,7 @@ mutable struct HypoPerLogdet <: Cone
         cone = new()
         cone.use_dual = is_dual
         cone.dim = dim
-        side = round(Int, sqrt(dim - 2))
+        side = round(Int, sqrt(0.25 + 2 * (dim - 2)) - 0.5)
         cone.side = side
         cone.mat = Matrix{Float64}(undef, side, side)
         cone.g = Vector{Float64}(undef, dim)
@@ -40,8 +38,8 @@ mutable struct HypoPerLogdet <: Cone
         function barfun(point)
             u = point[1]
             v = point[2]
-            Wvec = view(point, 3:dim)
-            W = reshape(Wvec, side, side)
+            W = similar(point, side, side)
+            svec_to_smat!(W, view(point, 3:dim))
             return -log(v * logdet(W / v) - u) - logdet(W) - log(v)
         end
         cone.barfun = barfun
@@ -57,76 +55,88 @@ get_nu(cone::HypoPerLogdet) = cone.side + 2
 function set_initial_point(arr::AbstractVector{Float64}, cone::HypoPerLogdet)
     arr[1] = -1.0
     arr[2] = 1.0
-    arr[3:end] .= vec(Matrix(1.0I, cone.side, cone.side))
-    # smat_to_svec!(view(arr, 3:cone.dim), Matrix(1.0I, cone.side, cone.side))
+    smat_to_svec!(view(arr, 3:cone.dim), Matrix(1.0I, cone.side, cone.side))
     return arr
 end
 
 function check_in_cone(cone::HypoPerLogdet)
     u = cone.point[1]
     v = cone.point[2]
-    W = reshape(cone.point[3:end], cone.side, cone.side)
+    W = cone.mat
+    svec_to_smat!(W, view(cone.point, 3:cone.dim))
     if v <= 0.0 || !isposdef(Symmetric(W)) || u >= v * logdet(Symmetric(W) / v) # TODO only use one decomposition on Symmetric(W) for isposdef and logdet
         return false
     end
-    # if v <= 0.0 || !isposdef(W) || u >= v * logdet(W / v) # TODO only use one decomposition on Symmetric(W) for isposdef and logdet
-    #     return false
-    # end
 
     L = logdet(W / v)
     z = v * L - u
-    n = cone.side
     Wi = inv(W)
+    n = cone.side
+    dim = cone.dim
 
-    gu = 1 / z
-    gv = (n - L) / z - 1 / v
+    cone.g[1] = 1 / z
+    cone.g[2] = (n - L) / z - 1 / v
     gwmat = -v / z * Wi - Wi
-    gw = vec(gwmat)
+    smat_to_svec!(view(cone.g, 3:dim), gwmat)
 
-    Huu = 1 / z / z
-    Huv = (n - L) / z / z
-    Huw = -(v * Wi) / z / z
+    cone.H[1, 1] = 1 / z / z
+    cone.H[1, 2] = (n - L) / z / z
+    Huwmat = -(v * Wi) / z / z
+    smat_to_svec!(view(cone.H, 1, 3:dim), Huwmat)
 
-    # Hvv = (-n + L) * (-n * v + L) / z / z + n / z + 1 / v^2 # TODO figure out why this is wrong...
-    Hvv = (-n + L)^2 / z / z + n / (v * z) + 1 / v^2
-    Hvw = (-n + L) * v * Wi / z / z - Wi / z
+    cone.H[2, 2] = (-n + L)^2 / z / z + n / (v * z) + 1 / v / v
+    Hvwmat = (-n + L) * v * Wi / z / z - Wi / z
+    smat_to_svec!(view(cone.H, 2, 3:dim), Hvwmat)
 
-    Hww = zeros(n^2, n^2)
-    vzi = v / z
-    fact = vzi * (1 + vzi)
+    Hww = zeros((dim - 2), (dim - 2))
     k = 1
-    for j in 1:n, i in 1:n
+    for i in 1:n
+        for j in 1:(i - 1)
+            k2 = 1
+            for i2 in 1:n
+                for j2 in 1:(i2 - 1)
+                    # i < j and i2 < j2
+                    Hww[k2, k] += 2 * Wi[i, j] * Wi[i2, j2] * v^2 / z^2
+                    Hww[k2, k] += (Wi[i2, i] * Wi[j, j2] + Wi[j2, i] * Wi[j, i2]) * v / z +  (Wi[i2, i] * Wi[j, j2] + Wi[j2, i] * Wi[j, i2])
+                    k2 += 1
+                end
+                # i < j and i2 == j2
+                Hww[k2, k] += rt2 * Wi[i, j] * Wi[i2, i2] * v^2 / z^2
+                Hww[k2, k] += rt2 * (Wi[i2, i] * Wi[j, i2] * v / z +  Wi[i2, i] * Wi[j, i2])
+                k2 += 1
+            end
+            k += 1
+        end
         k2 = 1
-        for j2 in 1:n, i2 in 1:n
-            # Hww[k, k2] = Wi[i, i2] * Wi[j, j2] * v / z + Wi[i, j] * Wi[i2, j2] * v^2 / z^2 +  Wi[i, i2] * Wi[j, j2]
-            Hww[k, k2] = Wi[i, j2] * Wi[i2, j] * v / z + Wi[i, j] * Wi[i2, j2] * v^2 / z^2 +  Wi[i, j2] * Wi[i2, j]
+
+        for i2 in 1:n
+            for j2 in 1:(i2 - 1)
+                # i = j, i2 < j2
+                Hww[k2, k] += rt2 * Wi[i, i] * Wi[i2, j2] * v^2 / z^2
+                Hww[k2, k] += rt2 * (Wi[i2, i] * Wi[i, j2] * v / z +  Wi[i2, i] * Wi[i, j2])
+                k2 += 1
+            end
+            # i == j, i2 == j2
+            Hww[k2, k] += Wi[i, i] * Wi[i2, i2] * v^2 / z^2
+            Hww[k2, k] += abs2(Wi[i2, i]) * v / z +  abs2(Wi[i2, i])
             k2 += 1
         end
         k += 1
-    end
-    # Hww *= (1 + fact)
 
-    g = [gu, gv, gw...]
+    end
+    cone.H[3:end, 3:end] .= Hww
+
 
 
     # TODO check allocations, check with Jarrett if this is most efficient way to use DiffResults
     cone.diffres = ForwardDiff.hessian!(cone.diffres, cone.barfun, cone.point)
-    cone.g .= DiffResults.gradient(cone.diffres)
-    cone.H .= DiffResults.hessian(cone.diffres)
+    # g = DiffResults.gradient(cone.diffres)
+    H = DiffResults.hessian(cone.diffres)
 
-    H = zeros(cone.dim, cone.dim)
-    H[1, 1] = Huu
-    H[1, 2] = Huv
-    H[2, 2] = Hvv
-    H[1, 3:end] = Huw
-    H[2, 3:end] = Hvw
-    H[3:end, 3:end] = Hww
-    @assert isapprox(Symmetric(H, :U) * cone.point, -g, atol = 1e-6, rtol = 1e-6)
-
-    # @show size(cone.g), size(g)
-    # @show cone.g[3:end] ./ gw
     # @show cone.H[3:end, 3:end] ./ Hww
-    # @show Wi[end, end]
+    # @show cone.H[3:end, 3:end] ./ H[3:end, 3:end]
+    # @show Symmetric(cone.H, :U) ./ H
+    @assert isapprox(Symmetric(cone.H, :U) * cone.point, -cone.g, atol = 1e-6, rtol = 1e-6)
 
     return factorize_hess(cone)
 end
