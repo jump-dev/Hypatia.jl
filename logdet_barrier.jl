@@ -63,11 +63,9 @@ for i in 1:n, j in 1:i
     for i2 in 1:n, j2 in 1:i2
         Hww[k2, k] += Wi[i, j] * Wi[i2, j2] * v^2 / z^2 # this guy's indices should't behave like the other part because he involves only 1 derivative wrt w
         Hww[k2, k] += Wi[i, j2] * Wi[i2, j] * v / z +  Wi[i, j2] * Wi[i2, j]
-        # if xor(i == i2, j == j2)
-        #     Hww[k2, k] *= sqrt(2)
-        # end
-        fact = xor(i == j, i2 == j2) ? rt2i : 1.0
-        Hww[k2, k] *= rt2i
+        if xor(i == i2, j == j2)
+            Hww[k2, k] *= sqrt(2)
+        end
 
         # if i == j
         #     if i2 == j2
