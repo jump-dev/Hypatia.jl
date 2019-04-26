@@ -697,7 +697,6 @@ function hypoperlogdet1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linea
     mat_half = randn(side, side)
     mat = mat_half * mat_half'
     h = zeros(dim)
-    # h[3:end] = vec(mat)
     CO.smat_to_svec!(view(h, 3:dim), mat)
     cones = [CO.HypoPerLogdet(dim)]
     cone_idxs = [1:dim]
@@ -706,8 +705,6 @@ function hypoperlogdet1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linea
     @test r.status == :Optimal
     @test r.x[1] ≈ -r.primal_obj atol = 1e-4 rtol = 1e-4
     @test r.x[2] ≈ 1 atol = 1e-4 rtol = 1e-4
-    # @test r.s[2] * logdet(reshape(r.s[3:end], side, side) / r.s[2]) ≈ r.s[1] atol = 1e-4 rtol = 1e-4
-    # @test r.z[1] * (logdet(reshape(-r.z[3:end], side, side) / r.z[1]) + side) ≈ r.z[2] atol = 1e-4 rtol = 1e-4
     @test r.s[2] * logdet(CO.svec_to_smat!(zeros(side, side), r.s[3:end]) / r.s[2]) ≈ r.s[1] atol = 1e-4 rtol = 1e-4
     @test r.z[1] * (logdet(CO.svec_to_smat!(zeros(side, side), -r.z[3:end]) / r.z[1]) + side) ≈ r.z[2] atol = 1e-4 rtol = 1e-4
 end
