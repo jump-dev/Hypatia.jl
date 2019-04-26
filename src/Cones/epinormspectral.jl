@@ -49,7 +49,7 @@ set_initial_point(arr::AbstractVector{Float64}, cone::EpiNormSpectral) = (@. arr
 
 function check_in_cone(cone::EpiNormSpectral)
     u = cone.point[1]
-    if u <= 0
+    if u <= 0.0
         return false
     end
     W = cone.W
