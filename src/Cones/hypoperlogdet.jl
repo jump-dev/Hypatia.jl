@@ -48,11 +48,11 @@ end
 function check_in_cone(cone::HypoPerLogdet)
     u = cone.point[1]
     v = cone.point[2]
-    W = cone.mat
-    svec_to_smat!(W, view(cone.point, 3:cone.dim))
     if v <= 0.0
         return false
     end
+    W = cone.mat
+    svec_to_smat!(W, view(cone.point, 3:cone.dim))
     F = cholesky(Symmetric(W), Val(true), check = false)
     if !isposdef(F) || u >= v * (logdet(F) - cone.side * log(v))
         return false
@@ -98,7 +98,7 @@ function check_in_cone(cone::HypoPerLogdet)
         k += 1
     end
 
-    @assert isapprox(Symmetric(cone.H, :U) * cone.point, -cone.g, atol = 1e-6, rtol = 1e-6) # TODO remove later
+    # @assert isapprox(Symmetric(cone.H, :U) * cone.point, -cone.g, atol = 1e-6, rtol = 1e-6)
 
     return factorize_hess(cone)
 end
