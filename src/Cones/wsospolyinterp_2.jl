@@ -36,15 +36,20 @@ mutable struct WSOSPolyInterp_2{T <: RealOrComplexF64} <: Cone
         cone.dim = dim
         cone.Ps = Ps
         cone.gs = gs
-        cone.g = Vector{Float64}(undef, dim)
-        cone.H = similar(cone.g, dim, dim)
-        cone.H2 = similar(cone.H)
-        cone.Hi = similar(cone.H)
         return cone
     end
 end
 
 WSOSPolyInterp_2(dim::Int, Ps::Vector{Matrix{T}}, gs::Vector{Vector{Float64}}) where {T <: RealOrComplexF64} = WSOSPolyInterp_2{T}(dim, Ps, gs, false)
+
+function setup_data(cone::WSOSPolyInterp_2)
+    dim = cone.dim
+    cone.g = Vector{Float64}(undef, dim)
+    cone.H = similar(cone.g, dim, dim)
+    cone.H2 = similar(cone.H)
+    cone.Hi = similar(cone.H)
+    return
+end
 
 get_nu(cone::WSOSPolyInterp_2) = sum(size(cone.Ps[i], 2) for i in eachindex(cone.Ps))
 

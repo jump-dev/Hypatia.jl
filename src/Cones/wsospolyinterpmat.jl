@@ -12,7 +12,8 @@ mutable struct WSOSPolyInterpMat <: Cone
     R::Int
     U::Int
     ipwt::Vector{Matrix{Float64}}
-    point::Vector{Float64}
+
+    point::AbstractVector{Float64}
     g::Vector{Float64}
     H::Matrix{Float64}
     H2::Matrix{Float64}
@@ -38,31 +39,38 @@ mutable struct WSOSPolyInterpMat <: Cone
         cone.R = R
         cone.U = U
         cone.ipwt = ipwt
-        cone.point = similar(ipwt[1], dim)
-        cone.g = similar(ipwt[1], dim)
-        cone.H = similar(ipwt[1], dim, dim)
-        cone.H2 = similar(cone.H)
-        cone.Hi = similar(cone.H)
-        cone.mat = [similar(ipwt[1], size(ipwtj, 2) * R, size(ipwtj, 2) * R) for ipwtj in ipwt]
-        cone.matfact = Vector{CholeskyPivoted{Float64, Matrix{Float64}}}(undef, length(ipwt))
-        cone.tmp1 = [similar(ipwt[1], size(ipwtj, 2), U) for ipwtj in ipwt]
-        cone.tmp2 = similar(ipwt[1], U, U)
-        cone.tmp3 = similar(cone.tmp2)
-        cone.blockmats = [Vector{Vector{Matrix{Float64}}}(undef, R) for ipwtj in ipwt]
-        for i in eachindex(ipwt), j in 1:R # TODO actually store 1 fewer (no diagonal) and also make this less confusing
-            cone.blockmats[i][j] = Vector{Matrix{Float64}}(undef, j)
-            for k in 1:j # TODO actually need to only go up to j-1
-                L = size(ipwt[i], 2)
-                cone.blockmats[i][j][k] = Matrix{Float64}(undef, L, L)
-            end
-        end
-        cone.blockfacts = [Vector{CholeskyPivoted{Float64, Matrix{Float64}}}(undef, R) for _ in eachindex(ipwt)]
-        cone.PlambdaP = Matrix{Float64}(undef, R * U,  R * U)
         return cone
     end
 end
 
 WSOSPolyInterpMat(R::Int, U::Int, ipwt::Vector{Matrix{Float64}}) = WSOSPolyInterpMat(R, U, ipwt, false)
+
+function setup_data(cone::WSOSPolyInterpMat)
+    dim = cone.dim
+    U = cone.U
+    R = cone.R
+    ipwt = cone.ipwt
+    cone.g = similar(ipwt[1], dim)
+    cone.H = similar(ipwt[1], dim, dim)
+    cone.H2 = similar(cone.H)
+    cone.Hi = similar(cone.H)
+    cone.mat = [similar(ipwt[1], size(ipwtj, 2) * R, size(ipwtj, 2) * R) for ipwtj in ipwt]
+    cone.matfact = Vector{CholeskyPivoted{Float64, Matrix{Float64}}}(undef, length(ipwt))
+    cone.tmp1 = [similar(ipwt[1], size(ipwtj, 2), U) for ipwtj in ipwt]
+    cone.tmp2 = similar(ipwt[1], U, U)
+    cone.tmp3 = similar(cone.tmp2)
+    cone.blockmats = [Vector{Vector{Matrix{Float64}}}(undef, R) for ipwtj in ipwt]
+    for i in eachindex(ipwt), j in 1:R # TODO actually store 1 fewer (no diagonal) and also make this less confusing
+        cone.blockmats[i][j] = Vector{Matrix{Float64}}(undef, j)
+        for k in 1:j # TODO actually need to only go up to j-1
+            L = size(ipwt[i], 2)
+            cone.blockmats[i][j][k] = Matrix{Float64}(undef, L, L)
+        end
+    end
+    cone.blockfacts = [Vector{CholeskyPivoted{Float64, Matrix{Float64}}}(undef, R) for _ in eachindex(ipwt)]
+    cone.PlambdaP = Matrix{Float64}(undef, R * U,  R * U)
+    return
+end
 
 get_nu(cone::WSOSPolyInterpMat) = cone.R * sum(size(ipwtj, 2) for ipwtj in cone.ipwt)
 
