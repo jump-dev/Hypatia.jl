@@ -7,9 +7,6 @@ Copyright 2018, Chris Coey and contributors
 
 barrier (guessed, based on analogy to hypoperlog barrier)
 -log(v*logdet(W/v) - u) - logdet(W) - log(v)
-
-TODO only use one decomposition on Symmetric(W) for isposdef and logdet
-TODO symbolically calculate gradient and Hessian
 =#
 
 mutable struct HypoPerLogdet <: Cone
@@ -53,7 +50,11 @@ function check_in_cone(cone::HypoPerLogdet)
     v = cone.point[2]
     W = cone.mat
     svec_to_smat!(W, view(cone.point, 3:cone.dim))
-    if v <= 0.0 || !isposdef(Symmetric(W)) || u >= v * logdet(Symmetric(W) / v) # TODO only use one decomposition on Symmetric(W) for isposdef and logdet
+    if v <= 0.0
+        return false
+    end
+    F = cholesky(Symmetric(W), Val(true), check = false)
+    if !isposdef(F) || u >= v * (logdet(F) - cone.side * log(v))
         return false
     end
 
