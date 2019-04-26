@@ -15,6 +15,7 @@ mutable struct HypoGeomean <: Cone
     use_dual::Bool
     dim::Int
     alpha::Vector{Float64}
+
     ialpha::Vector{Float64}
     point::AbstractVector{Float64}
     g::Vector{Float64}
@@ -33,23 +34,29 @@ mutable struct HypoGeomean <: Cone
         cone.use_dual = !is_dual # using dual barrier
         cone.dim = dim
         cone.alpha = alpha
-        ialpha = inv.(alpha)
-        cone.ialpha = ialpha
-        cone.g = Vector{Float64}(undef, dim)
-        cone.H = Matrix{Float64}(undef, dim, dim)
-        cone.H2 = similar(cone.H)
-        function barfun(point)
-            u = point[1]
-            w = view(point, 2:dim)
-            return -log(prod((w[i] * ialpha[i])^alpha[i] for i in eachindex(alpha)) + u) - sum((1.0 - alpha[i]) * log(w[i] * ialpha[i]) for i in eachindex(alpha)) - log(-u)
-        end
-        cone.barfun = barfun
-        cone.diffres = DiffResults.HessianResult(cone.g)
         return cone
     end
 end
 
 HypoGeomean(alpha::Vector{Float64}) = HypoGeomean(alpha, false)
+
+function setup_data(cone::HypoGeomean)
+    dim = cone.dim
+    alpha = cone.alpha
+    ialpha = inv.(alpha)
+    cone.ialpha = ialpha
+    cone.g = Vector{Float64}(undef, dim)
+    cone.H = Matrix{Float64}(undef, dim, dim)
+    cone.H2 = similar(cone.H)
+    function barfun(point)
+        u = point[1]
+        w = view(point, 2:dim)
+        return -log(prod((w[i] * ialpha[i])^alpha[i] for i in eachindex(alpha)) + u) - sum((1.0 - alpha[i]) * log(w[i] * ialpha[i]) for i in eachindex(alpha)) - log(-u)
+    end
+    cone.barfun = barfun
+    cone.diffres = DiffResults.HessianResult(cone.g)
+    return
+end
 
 get_nu(cone::HypoGeomean) = cone.dim
 

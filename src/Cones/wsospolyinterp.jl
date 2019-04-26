@@ -14,6 +14,7 @@ mutable struct WSOSPolyInterp <: Cone
     use_dual::Bool
     dim::Int
     ipwt::Vector{Matrix{Float64}}
+
     point::AbstractVector{Float64}
     g::Vector{Float64}
     H::Matrix{Float64}
@@ -32,18 +33,24 @@ mutable struct WSOSPolyInterp <: Cone
         cone.use_dual = !is_dual # using dual barrier
         cone.dim = dim
         cone.ipwt = ipwt
-        cone.g = similar(ipwt[1], dim)
-        cone.H = similar(ipwt[1], dim, dim)
-        cone.H2 = similar(cone.H)
-        cone.Hi = similar(cone.H)
-        cone.tmp1 = [similar(ipwt[1], size(ipwtj, 2), size(ipwtj, 2)) for ipwtj in ipwt]
-        cone.tmp2 = [similar(ipwt[1], size(ipwtj, 2), dim) for ipwtj in ipwt]
-        cone.tmp3 = similar(ipwt[1], dim, dim)
         return cone
     end
 end
 
 WSOSPolyInterp(dim::Int, ipwt::Vector{Matrix{Float64}}) = WSOSPolyInterp(dim, ipwt, false)
+
+function setup_data(cone::WSOSPolyInterp)
+    dim = cone.dim
+    ipwt = cone.ipwt
+    cone.g = similar(ipwt[1], dim)
+    cone.H = similar(ipwt[1], dim, dim)
+    cone.H2 = similar(cone.H)
+    cone.Hi = similar(cone.H)
+    cone.tmp1 = [similar(ipwt[1], size(ipwtj, 2), size(ipwtj, 2)) for ipwtj in ipwt]
+    cone.tmp2 = [similar(ipwt[1], size(ipwtj, 2), dim) for ipwtj in ipwt]
+    cone.tmp3 = similar(ipwt[1], dim, dim)
+    return
+end
 
 get_nu(cone::WSOSPolyInterp) = sum(size(ipwtj, 2) for ipwtj in cone.ipwt)
 

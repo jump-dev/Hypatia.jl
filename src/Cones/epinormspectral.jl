@@ -18,6 +18,7 @@ mutable struct EpiNormSpectral <: Cone
     dim::Int
     n::Int
     m::Int
+    
     point::AbstractVector{Float64}
     W::Matrix{Float64}
     g::Vector{Float64}
@@ -33,15 +34,20 @@ mutable struct EpiNormSpectral <: Cone
         cone.dim = dim
         cone.n = n
         cone.m = m
-        cone.W = Matrix{Float64}(undef, n, m)
-        cone.g = Vector{Float64}(undef, dim)
-        cone.H = Matrix{Float64}(undef, dim, dim)
-        cone.H2 = similar(cone.H)
         return cone
     end
 end
 
 EpiNormSpectral(n::Int, m::Int) = EpiNormSpectral(n, m, false)
+
+function setup_data(cone::EpiNormSpectral)
+    dim = cone.dim
+    cone.W = Matrix{Float64}(undef, cone.n, cone.m)
+    cone.g = Vector{Float64}(undef, dim)
+    cone.H = Matrix{Float64}(undef, dim, dim)
+    cone.H2 = similar(cone.H)
+    return
+end
 
 get_nu(cone::EpiNormSpectral) = cone.n + 1
 

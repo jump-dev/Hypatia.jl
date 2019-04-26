@@ -13,6 +13,7 @@ mutable struct HypoPerLogdet <: Cone
     use_dual::Bool
     dim::Int
     side::Int
+
     point::AbstractVector{Float64}
     mat::Matrix{Float64}
     g::Vector{Float64}
@@ -24,17 +25,23 @@ mutable struct HypoPerLogdet <: Cone
         cone = new()
         cone.use_dual = is_dual
         cone.dim = dim
-        side = round(Int, sqrt(0.25 + 2 * (dim - 2)) - 0.5)
-        cone.side = side
-        cone.mat = Matrix{Float64}(undef, side, side)
-        cone.g = Vector{Float64}(undef, dim)
-        cone.H = Matrix{Float64}(undef, dim, dim)
-        cone.H2 = similar(cone.H)
+        cone.side = round(Int, sqrt(0.25 + 2 * (dim - 2)) - 0.5)
         return cone
     end
 end
 
 HypoPerLogdet(dim::Int) = HypoPerLogdet(dim, false)
+
+function setup_data(cone::HypoPerLogdet)
+    dim = cone.dim
+    side = round(Int, sqrt(0.25 + 2 * (dim - 2)) - 0.5)
+    side = cone.side
+    cone.mat = Matrix{Float64}(undef, side, side)
+    cone.g = Vector{Float64}(undef, dim)
+    cone.H = Matrix{Float64}(undef, dim, dim)
+    cone.H2 = similar(cone.H)
+    return
+end
 
 get_nu(cone::HypoPerLogdet) = cone.side + 2
 

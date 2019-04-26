@@ -13,6 +13,7 @@ nonpositive cone: -sum_i(log(-u_i))
 mutable struct Nonnegative <: Cone
     use_dual::Bool
     dim::Int
+
     point::AbstractVector{Float64}
 
     function Nonnegative(dim::Int, is_dual::Bool)
@@ -29,6 +30,7 @@ Nonnegative() = Nonnegative(1)
 mutable struct Nonpositive <: Cone
     use_dual::Bool
     dim::Int
+
     point::AbstractVector{Float64}
 
     function Nonpositive(dim::Int, is_dual::Bool)
@@ -43,6 +45,8 @@ Nonpositive(dim::Int) = Nonpositive(dim, false)
 Nonpositive() = Nonpositive(1)
 
 OrthantCone = Union{Nonnegative, Nonpositive}
+
+setup_data(cone::OrthantCone) = nothing
 
 get_nu(cone::OrthantCone) = cone.dim
 
