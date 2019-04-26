@@ -13,6 +13,7 @@ TODO for efficiency, don't construct full H matrix (arrow fill)
 mutable struct EpiNormInf <: Cone
     use_dual::Bool
     dim::Int
+    
     point::AbstractVector{Float64}
     g::Vector{Float64}
     H::Matrix{Float64}
@@ -23,14 +24,19 @@ mutable struct EpiNormInf <: Cone
         cone = new()
         cone.use_dual = is_dual
         cone.dim = dim
-        cone.g = Vector{Float64}(undef, dim)
-        cone.H = Matrix{Float64}(undef, dim, dim)
-        cone.H2 = similar(cone.H)
         return cone
     end
 end
 
 EpiNormInf(dim::Int) = EpiNormInf(dim, false)
+
+function setup_data(cone::EpiNormInf)
+    dim = cone.dim
+    cone.g = Vector{Float64}(undef, dim)
+    cone.H = Matrix{Float64}(undef, dim, dim)
+    cone.H2 = similar(cone.H)
+    return
+end
 
 get_nu(cone::EpiNormInf) = cone.dim
 

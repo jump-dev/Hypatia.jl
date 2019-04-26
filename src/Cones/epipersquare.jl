@@ -12,6 +12,7 @@ barrier from "Self-Scaled Barriers and Interior-Point Methods for Convex Program
 mutable struct EpiPerSquare <: Cone
     use_dual::Bool
     dim::Int
+    
     point::AbstractVector{Float64}
     g::Vector{Float64}
     H::Matrix{Float64}
@@ -21,14 +22,19 @@ mutable struct EpiPerSquare <: Cone
         cone = new()
         cone.use_dual = is_dual
         cone.dim = dim
-        cone.g = Vector{Float64}(undef, dim)
-        cone.H = Matrix{Float64}(undef, dim, dim)
-        cone.Hi = similar(cone.H)
         return cone
     end
 end
 
 EpiPerSquare(dim::Int) = EpiPerSquare(dim, false)
+
+function setup_data(cone::EpiPerSquare)
+    dim = cone.dim
+    cone.g = Vector{Float64}(undef, dim)
+    cone.H = Matrix{Float64}(undef, dim, dim)
+    cone.Hi = similar(cone.H)
+    return
+end
 
 get_nu(cone::EpiPerSquare) = 2
 
