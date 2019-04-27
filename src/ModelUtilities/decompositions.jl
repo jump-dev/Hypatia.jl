@@ -6,6 +6,8 @@ import JuMP
 import DynamicPolynomials
 DP = DynamicPolynomials
 import Combinatorics
+import MathOptInterface
+const MOI = MathOptInterface
 
 function get_decomposition(
         constraint,
@@ -31,6 +33,33 @@ function get_decomposition(
     basis = build_basis(n, d)
     decomposition = f.U * basis
     return decomposition
+end
+
+function get_decomposition(constraint, ipwt::Vector{Matrix{Float64}}, n::Int, d::Int)
+    nwts = length(ipwt)
+    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, tol_feas = 1e-8))
+    s = JuMP.value(constraint)
+    U = length(s)
+    # TODO proper way to make array of PSD vars?
+    G = Vector{Symmetric{JuMP.VariableRef,Array{JuMP.VariableRef,2}}}(undef, nwts)
+    for p in eachindex(ipwt)
+        L = size(ipwt[p], 2)
+        G[p] = JuMP.@variable(model, [1:L, 1:L], Symmetric)
+        JuMP.@constraint(model, [G[p][i, j] for i in 1:L for j in 1:i] in MOI.PositiveSemidefiniteConeTriangle(L))
+    end
+    JuMP.@constraint(model, [u in 1:U], s[u] == sum(sum(ipwt[p][u, i] * ipwt[p][u, j] * G[p][i, j] for i in 1:size(ipwt[p], 2), j in 1:size(ipwt[p], 2)) for p in 1:nwts)) # TODO collapse
+
+    JuMP.optimize!(model)
+    for p in eachindex(ipwt)
+        Gval = JuMP.value.(G[p])
+        @show isposdef(Gval)
+        f = cholesky(Symmetric(Gval))
+        # basis = build_basis(n, d) # FIXME pass in an array of degrees, used different basis for each
+        # @show U, size(ipwt[p])
+        # @show f.U, basis
+        # @show f.U[1, :] * basis
+        # decomposition = sum((f.U * basis).^2)
+    end
 end
 
 function calc_u(d, monovec)
@@ -89,15 +118,32 @@ using LinearAlgebra
 n = 2
 DP.@polyvar x[1:n]
 DP.@polyvar y[1:n]
+
+# numerically unstable
+# d = 3
+# monos = PolyJuMP.monomials([x; y], 0:d)
+# random_poly = JuMP.dot(rand(length(monos)), monos)
+# random_poly_sqr = random_poly^2
+# (U, pts, P0, _, _) = MU.interpolate(MU.FreeDomain(2n), d, sample_factor = 100, sample = true)
+# model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, tol_feas = 1e-6, tol_abs_opt = 1e-6))
+# cone = HYP.WSOSPolyInterpCone(U, [P0])
+# sqrconstr = JuMP.@constraint(model, [random_poly_sqr(pts[u, :]) for u in 1:U] in cone)
+# JuMP.optimize!(model)
+# get_decomposition(sqrconstr, lambda_oracle, hessian_oracle, 2n, d)
+# get_decomposition(sqrconstr, [P0, PWts...], 2n, d)
+
+# polymin example
+motzkin = 1-48x[1]^2*x[2]^2+64x[1]^2*x[2]^4+64x[1]^4*x[2]^2
 d = 3
-monos = PolyJuMP.monomials([x; y], 0:d)
-random_poly = JuMP.dot(rand(length(monos)), monos)
-random_poly_sqr = random_poly^2
-(U, pts, P0, _, _) = MU.interpolate(MU.FreeDomain(2n), d, sample_factor = 20, sample = true)
-model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, tol_feas = 1e-9))
-cone = HYP.WSOSPolyInterpCone(U, [P0])
-sqrconstr = JuMP.@constraint(model, [random_poly_sqr(pts[u, :]) for u in 1:U] in cone)
+dom = MU.Box(-ones(2), ones(2))
+(U, pts, P0, PWts, _) = MU.interpolate(dom, d, sample = true, sample_factor = 100)
+cone = HYP.WSOSPolyInterpCone(U, [P0, PWts...])
+model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, tol_feas = 1e-6, tol_abs_opt = 1e-6))
+JuMP.@variable(model, a)
+JuMP.@constraint(model, sqrconstr, [motzkin(x => pts[j, :]) - a for j in 1:U] in cone)
+JuMP.@objective(model, Max, a)
 JuMP.optimize!(model)
+get_decomposition(sqrconstr, [P0, PWts...], n, d)
 
 # model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
 # cone = HYP.WSOSPolyInterpCone(U, [P0])
@@ -118,11 +164,8 @@ function hessian_oracle(point)
     return cone.g, H
 end
 
-get_decomposition(sqrconstr, lambda_oracle, hessian_oracle, 2n, d)
 
 
 
 
-
-# conobj = JuMP.constraint_object(sqrconstr)
-# @show random_poly
+;
