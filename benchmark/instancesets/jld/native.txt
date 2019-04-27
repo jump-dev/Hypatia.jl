@@ -1,0 +1,9 @@
+# examples saved in Hypatia native format
+
+densityest.jld
+envelope.jld
+linearopt.jld
+polyminreal.jld
+polymincomplex.jld
+expdesign.jld
+shapeconregr.jld

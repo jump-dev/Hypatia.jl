@@ -9,8 +9,8 @@ import MathOptInterface
 const MOI = MathOptInterface
 import JuMP
 import Hypatia
-import Hypatia.Cones # TODO remove
-import SparseArrays # TODO remove, for lading
+import Hypatia.Cones # TODO remove, for loading
+import SparseArrays # TODO remove, for loading
 
 instanceset = "easy"
 instsetfile = "benchmark/instancesets/easy.txt"
@@ -50,6 +50,8 @@ for instname in instances
     MOI.empty!(optimizer)
     MOI.copy_to(optimizer, model)
     nativedata = optimizer.optimizer
+    # just load, don't actually optimize
+    nativedata.use_dense = false
     nativedata.load_only = true
     MOI.optimize!(optimizer)
     (c, A, b, G, h, cones, cone_idxs) = (nativedata.c, nativedata.A, nativedata.b, nativedata.G, nativedata.h, nativedata.cones, nativedata.cone_idxs)
@@ -57,9 +59,6 @@ for instname in instances
     # FileIO.save(fullpathout, "modeldata", (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs))
     JLD.save(fullpathout, "c", c, "A", A, "b", b, "G", G, "h", h, "cones", cones, "cone_idxs", cone_idxs)
 end
-
-# fullpathout = joinpath(outputpath, chop(instname, tail = 4) * ".jld2")
-# md = FileIO.load(fullpathout, "modeldata")
 
 
 ;

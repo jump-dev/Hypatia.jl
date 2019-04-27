@@ -6,28 +6,29 @@ TODO readme for benchmarks and describe ARGS for running on command line
 
 # julia benchmark/runbenchmarks.jl easy.txt benchmark/instancefiles/cbf tmp
 
-# Pkg.activate(".")
+Pkg.activate(".")
 import Hypatia
-const CO = Hypatia.Cones
-const MO = Hypatia.Models
-import JLD
+import MathOptFormat
+import MathOptInterface
+const MOI = MathOptInterface
+import GZip
 import Dates
 
 # parse command line arguments
 println()
-# if length(ARGS) != 3
-#     error("usage: julia runbenchmarks.jl instance_set input_path output_path")
-# end
+if length(ARGS) != 3
+    error("usage: julia runbenchmarks.jl instance_set input_path output_path")
+end
 
-# instanceset = ARGS[1]
-# instsetfile = joinpath(@__DIR__, "instancesets", instanceset)
-instsetfile = joinpath(@__DIR__, "instancesets", "jld", "easy.txt")
+instanceset = ARGS[1]
+instsetfile = joinpath(@__DIR__, "instancesets", instanceset)
+# instsetfile = "benchmark/instancesets/easy.txt"
 if !isfile(instsetfile)
     error("instance set file not found: $instsetfile")
 end
 
-# inputpath = ARGS[2]
-inputpath = joinpath(@__DIR__, "instancefiles", "jld")
+inputpath = ARGS[2]
+# inputpath = instancefiles/cbf
 if !isdir(inputpath)
     error("input path is not a valid directory: $inputpath")
 end
@@ -51,8 +52,8 @@ for instname in instances
     end
 end
 
-# outputpath = ARGS[3]
-outputpath = "tmp"
+outputpath = ARGS[3]
+# outputpath = "tmp"
 if !isdir(outputpath)
     error("output path is not a valid directory: $outputpath")
 end
@@ -60,6 +61,30 @@ end
 # Hypatia options
 verbose = true
 time_limit = 1e2
+dense = false
+
+MOI.Utilities.@model(HypatiaModelData,
+    (MOI.Integer,), # integer constraints will be ignored by Hypatia
+    (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan, MOI.Interval),
+    (MOI.Reals, MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives,
+        MOI.SecondOrderCone, MOI.RotatedSecondOrderCone,
+        MOI.PositiveSemidefiniteConeTriangle,
+        MOI.ExponentialCone),
+    (MOI.PowerCone,),
+    (MOI.SingleVariable,),
+    (MOI.ScalarAffineFunction,),
+    (MOI.VectorOfVariables,),
+    (MOI.VectorAffineFunction,),
+    )
+
+optimizer = MOI.Utilities.CachingOptimizer(HypatiaModelData{Float64}(), Hypatia.Optimizer(
+    verbose = verbose,
+    time_limit = time_limit,
+    use_dense = dense,
+    tol_rel_opt = 1e-6,
+    tol_abs_opt = 1e-7,
+    tol_feas = 1e-7,
+    ))
 
 println("\nstarting benchmark run in 5 seconds\n")
 sleep(5.0)
@@ -80,7 +105,7 @@ for instname in instances
     (status, primal_obj, dual_obj, niters, runtime, gctime, bytes) = (:UnSolved, NaN, NaN, -1, NaN, NaN, -1)
     memallocs = nothing
 
-    instfile = joinpath(outputpath, chop(instname, tail = 4) * ".txt")
+    instfile = joinpath(outputpath, instname * ".txt")
     open(instfile, "w") do fdinst
         redirect_stdout(fdinst)
         redirect_stderr(fdinst)
@@ -91,24 +116,20 @@ for instname in instances
 
         println("\nreading instance and constructing model...")
         readtime = @elapsed begin
-            md = JLD.load(joinpath(inputpath, instname))
-            (c, A, b, G, h, cones, cone_idxs) = (md["c"], md["A"], md["b"], md["G"], md["h"], md["cones"], md["cone_idxs"])
-            for c in cones
-                CO.setup_data(c)
-            end
-            plmodel = MO.PreprocessedLinearModel(c, A, b, G, h, cones, cone_idxs)
-            solver = SO.HSDSolver(plmodel, verbose = verbose, time_limit = time_limit)
+            model = MathOptFormat.read_from_file(joinpath(inputpath, instname))
+            MOI.empty!(optimizer)
+            MOI.copy_to(optimizer, model)
         end
         println("took $readtime seconds")
 
         println("\nsolving model...")
         try
-            (val, runtime, bytes, gctime, memallocs) = @timed SO.solve(solver)
+            (val, runtime, bytes, gctime, memallocs) = @timed MOI.optimize!(optimizer)
             println("\nHypatia finished")
-            status = solver.status
-            niters = solver.num_iters
-            primal_obj = solver.primal_obj
-            dual_obj = solver.dual_obj
+            status = MOI.get(optimizer, MOI.TerminationStatus())
+            niters = -1 # TODO niters = MOI.get(optimizer, MOI.BarrierIterations())
+            primal_obj = MOI.get(optimizer, MOI.ObjectiveValue())
+            dual_obj = MOI.get(optimizer, MOI.ObjectiveBound())
         catch solveerror
             println("\nHypatia errored: ", solveerror)
         end

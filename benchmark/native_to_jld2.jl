@@ -9,10 +9,9 @@ import JuMP
 import Hypatia
 const HYP = Hypatia
 const CO = HYP.Cones
-const MO = HYP.Models
-const SO = HYP.Solvers
-import Hypatia.Cones # TODO remove, for lading
-import SparseArrays # TODO remove, for lading
+const MO = HYP.Models # TODO remove, for loading
+const SO = HYP.Solvers # TODO remove, for loading
+import SparseArrays # TODO remove, for loading
 import Random
 import Distributions
 
@@ -100,6 +99,9 @@ function make_model(modelname::String)
     # md = FileIO.load(joinpath(outputpath, modelname * ".jld2"), "modeldata")
     md = JLD.load(joinpath(outputpath, modelname * ".jld"))
     (c, A, b, G, h, cones, cone_idxs) = (md["c"], md["A"], md["b"], md["G"], md["h"], md["cones"], md["cone_idxs"])
+    for c in cones
+        CO.setup_data(c)
+    end
     # plmodel = MO.PreprocessedLinearModel(md.c, md.A, md.b, md.G, md.h, md.cones, md.cone_idxs)
     plmodel = MO.PreprocessedLinearModel(c, A, b, G, h, cones, cone_idxs)
     solver = SO.HSDSolver(plmodel, verbose = true)
