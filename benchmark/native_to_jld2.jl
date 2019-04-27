@@ -2,15 +2,17 @@
 Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 =#
 
-using JLD2, FileIO
+# import JLD2
+import JLD
+# import FileIO
 import JuMP
 import Hypatia
-# import MathOptInterface
-# const MOI = MathOptInterface
-# const MOIU = MOI.Utilities
 const HYP = Hypatia
+const CO = HYP.Cones
 const MO = HYP.Models
 const SO = HYP.Solvers
+import Hypatia.Cones # TODO remove, for lading
+import SparseArrays # TODO remove, for lading
 import Random
 import Distributions
 
@@ -36,18 +38,17 @@ include(joinpath(examples_dir, "densityest/jump.jl"))
 # TODO account for use_dense
 # TODO add families of instances for each model
 
-instancedir = joinpath(@__DIR__, "instancefiles", "jld")
+outputpath = joinpath(@__DIR__, "instancefiles", "jld")
 
 Random.seed!(1234)
 
 function make_JLD(modelname::String)
-    outputpath = joinpath(instancedir, modelname)
     if modelname == "envelope"
         (c, A, b, G, h, cones, cone_idxs) = build_envelope(3, 5, 3, 5, primal_wsos = true, dense = true)
     elseif modelname == "linearopt"
         (c, A, b, G, h, cones, cone_idxs) = build_linearopt(15, 20)
     elseif modelname == "polyminreal"
-        (c, A, b, G, h, cones, cone_idxs) =  build_polymin(:reactiondiffusion, 4)
+        (c, A, b, G, h, cones, cone_idxs) = build_polymin(:reactiondiffusion, 4)
     elseif modelname == "polymincomplex"
         (n, deg, f, gs, gdegs, _) = complexpolys[:negabsbox2d]
         d = deg # no less than
@@ -57,8 +58,6 @@ function make_JLD(modelname::String)
             (q, p, n, nmax) = (5, 15, 25, 5)
             V = randn(q, p)
             (model, _) = build_JuMP_expdesign(q, p, V, n, nmax)
-            # load_only_optimizer = JuMP.with_optimizer(HYP.Optimizer, verbose = true, load_only = true)
-            # JuMP.set_optimizer(model, load_only_optimizer)
         elseif modelname == "shapeconregr"
             (n, deg, num_points, signal_ratio, f) = (2, 3, 100, 0.0, x -> sum(x.^3))
             shape_data = ShapeData(n)
@@ -77,7 +76,9 @@ function make_JLD(modelname::String)
         nativedata = model.moi_backend.optimizer.model.optimizer
         (c, A, b, G, h, cones, cone_idxs) = (nativedata.c, nativedata.A, nativedata.b, nativedata.G, nativedata.h, nativedata.cones, nativedata.cone_idxs)
     end
-    @save outputpath * ".jld2" c A b G h cones cone_idxs
+    fullpathout = joinpath(outputpath, modelname * ".jld")
+    # JLD.save(fullpathout, "modeldata", (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs))
+    JLD.save(fullpathout, "c", c, "A", A, "b", b, "G", G, "h", h, "cones", cones, "cone_idxs", cone_idxs)
     return nothing
 end
 
@@ -94,18 +95,26 @@ for modelname in [
 end
 
 
-modelname = "densityest"
+modelname = "envelope"
 function make_model(modelname::String)
-    load(joinpath(instancedir, modelname * ".jld2"), "c", "A", "b", "G", "h", "cones", "cone_idxs")
-    model = MO.PreprocessedLinearModel(c, A, b, G, h, cones, cone_idxs)
-    solver = SO.HSDSolver(model, verbose = true)
+    # md = FileIO.load(joinpath(outputpath, modelname * ".jld2"), "modeldata")
+    md = JLD.load(joinpath(outputpath, modelname * ".jld"))
+    (c, A, b, G, h, cones, cone_idxs) = (md["c"], md["A"], md["b"], md["G"], md["h"], md["cones"], md["cone_idxs"])
+    # plmodel = MO.PreprocessedLinearModel(md.c, md.A, md.b, md.G, md.h, md.cones, md.cone_idxs)
+    plmodel = MO.PreprocessedLinearModel(c, A, b, G, h, cones, cone_idxs)
+    solver = SO.HSDSolver(plmodel, verbose = true)
     SO.solve(solver)
-    return model
+    return nothing
 end
 
-# for modelname in [
-#     "envelope",
-#     "expdesign",
-#     ]
-#     make_model(modelname)
-# end
+for modelname in [
+    "envelope",
+    "linearopt",
+    "polyminreal",
+    "polymincomplex",
+    "expdesign",
+    "shapeconregr",
+    "densityest",
+    ]
+    make_model(modelname)
+end
