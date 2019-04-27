@@ -15,6 +15,7 @@ mutable struct PosSemidef <: Cone
     use_dual::Bool
     dim::Int
     side::Int
+    
     point::AbstractVector{Float64}
     mat::Matrix{Float64}
     g::Vector{Float64}
@@ -26,15 +27,20 @@ mutable struct PosSemidef <: Cone
         cone.use_dual = is_dual
         cone.dim = dim
         cone.side = round(Int, sqrt(0.25 + 2.0 * dim) - 0.5)
-        cone.mat = Matrix{Float64}(undef, cone.side, cone.side)
-        cone.g = Vector{Float64}(undef, dim)
-        cone.H = zeros(dim, dim)
-        cone.Hi = copy(cone.H)
         return cone
     end
 end
 
 PosSemidef(dim::Int) = PosSemidef(dim, false)
+
+function setup_data(cone::PosSemidef)
+    dim = cone.dim
+    cone.mat = Matrix{Float64}(undef, cone.side, cone.side)
+    cone.g = Vector{Float64}(undef, dim)
+    cone.H = zeros(dim, dim)
+    cone.Hi = copy(cone.H)
+    return
+end
 
 get_nu(cone::PosSemidef) = cone.side
 

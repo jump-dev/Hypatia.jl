@@ -15,6 +15,7 @@ TODO compare alternative barrier -log(u - v*sum(wi -> exp(wi/v), w)) - log(u) - 
 mutable struct EpiPerSumExp <: Cone
     use_dual::Bool
     dim::Int
+
     point::AbstractVector{Float64}
     g::Vector{Float64}
     H::Matrix{Float64}
@@ -27,23 +28,28 @@ mutable struct EpiPerSumExp <: Cone
         cone = new()
         cone.use_dual = is_dual
         cone.dim = dim
-        cone.g = Vector{Float64}(undef, dim)
-        cone.H = Matrix{Float64}(undef, dim, dim)
-        cone.H2 = similar(cone.H)
-        function barfun(point)
-            u = point[1]
-            v = point[2]
-            w = view(point, 3:dim)
-            # return -log(u - v*sum(wi -> exp(wi/v), w)) - log(u) - log(v)
-            return -log(log(u) - log(v) - log(sum(wi -> exp(wi / v), w))) - log(u) - 2.0 * log(v) # TODO use the numerically safer way to evaluate LSE function
-        end
-        cone.barfun = barfun
-        cone.diffres = DiffResults.HessianResult(cone.g)
         return cone
     end
 end
 
 EpiPerSumExp(dim::Int) = EpiPerSumExp(dim, false)
+
+function setup_data(cone::EpiPerSumExp)
+    dim = cone.dim
+    cone.g = Vector{Float64}(undef, dim)
+    cone.H = Matrix{Float64}(undef, dim, dim)
+    cone.H2 = similar(cone.H)
+    function barfun(point)
+        u = point[1]
+        v = point[2]
+        w = view(point, 3:dim)
+        # return -log(u - v*sum(wi -> exp(wi/v), w)) - log(u) - log(v)
+        return -log(log(u) - log(v) - log(sum(wi -> exp(wi / v), w))) - log(u) - 2.0 * log(v) # TODO use the numerically safer way to evaluate LSE function
+    end
+    cone.barfun = barfun
+    cone.diffres = DiffResults.HessianResult(cone.g)
+    return
+end
 
 get_nu(cone::EpiPerSumExp) = 3 # TODO does this increase with dim > 3?
 
