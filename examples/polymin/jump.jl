@@ -1,7 +1,6 @@
 #=
 Copyright 2018, Chris Coey and contributors
-
-see description in examples/namedpoly/native.jl
+see description in examples/polymin/native.jl
 =#
 
 import Hypatia
@@ -20,7 +19,7 @@ import SemialgebraicSets
 import Random
 using Test
 
-# list of predefined polynomials from various applications
+# list of predefined polynomials and domains from various applications
 # see https://people.sc.fsu.edu/~jburkardt/py_src/polynomials/polynomials.html
 function getpolydata(polyname::Symbol)
     if polyname == :butcher
@@ -161,7 +160,7 @@ function getpolydata(polyname::Symbol)
     return (x, f, dom, truemin)
 end
 
-function build_JuMP_namedpoly_PSD(
+function build_JuMP_polymin_PSD(
     x,
     f,
     dom::MU.Domain;
@@ -176,7 +175,7 @@ function build_JuMP_namedpoly_PSD(
     return model
 end
 
-function build_JuMP_namedpoly_WSOS(
+function build_JuMP_polymin_WSOS(
     x,
     f,
     dom::MU.Domain;
@@ -187,54 +186,32 @@ function build_JuMP_namedpoly_WSOS(
     )
     Random.seed!(rseed)
     n = DynamicPolynomials.nvariables(f)
-    (U, pts, P0, _, _) = MU.interpolate(dom, d, sample = sample, sample_factor = 100)
-
-    g_polys = SemialgebraicSets.inequalities(MU.get_domain_inequalities(dom, x))
-    # P_polys = TODO
-
-    # Ps = TODO
-    Ps = Matrix{Float64}[P0]
-    gs = Vector{Float64}[ones(U)]
-    for i in eachindex(g_polys)
-        # TODO
-        # P_polys_i = P_polys[i]
-        # Pi = [P_poly_ij(pts[u, :]) for u in 1:U, P_poly_ij in P_polys[i])
-        # push!(Ps, Pi)
-        di = d - div(DynamicPolynomials.maxdegree(g_polys[i]), 2) # degree of gi is ...
-        Li = binomial(n + di, n)
-        push!(Ps, P0[:, 1:Li])
-
-        gi = [g_polys[i](x => pts[u, :]) for u in 1:U]
-        push!(gs, gi)
-    end
-    cone = HYP.WSOSPolyInterpCone_2(U, Ps, gs, !primal_wsos)
-
-    # cone = HYP.WSOSPolyInterpCone(U, [P0, PWts...], !primal_wsos)
+    (U, pts, P0, PWts, _) = MU.interpolate(dom, d, sample = sample, sample_factor = 100)
+    cone = HYP.WSOSPolyInterpCone(U, [P0, PWts...], !primal_wsos)
 
     # build JuMP model
     model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, tol_feas = 1e-8, tol_rel_opt = 1e-7, tol_abs_opt = 1e-8))
-
     if primal_wsos
         JuMP.@variable(model, a)
         JuMP.@objective(model, Max, a)
-        JuMP.@constraint(model, [f(pts[j, :]) - a for j in 1:U] in cone)
+        JuMP.@constraint(model, [f(x => pts[j, :]) - a for j in 1:U] in cone)
     else
         JuMP.@variable(model, μ[1:U])
-        JuMP.@objective(model, Min, sum(μ[j] * f(pts[j, :]) for j in 1:U))
-        JuMP.@constraint(model, sum(μ) == 1.0)
+        JuMP.@objective(model, Min, sum(μ[j] * f(x => pts[j, :]) for j in 1:U))
+        JuMP.@constraint(model, sum(μ) == 1.0) # TODO can remove this constraint and a variable
         JuMP.@constraint(model, μ in cone)
     end
 
     return model
 end
 
-function run_JuMP_namedpoly(use_wsos::Bool; primal_wsos::Bool = false)
+function run_JuMP_polymin(use_wsos::Bool; primal_wsos::Bool = false)
     # select the named polynomial to minimize and degree of SOS interpolation
     (polyname, deg) =
         # :butcher, 2
         # :butcher_ball, 2
         # :butcher_ellipsoid, 2
-        :caprasse, 4
+        # :caprasse, 4
         # :caprasse_ball, 4
         # :goldsteinprice, 7
         # :goldsteinprice_ball, 7
@@ -244,7 +221,7 @@ function run_JuMP_namedpoly(use_wsos::Bool; primal_wsos::Bool = false)
         # :lotkavolterra_ball, 3
         # :magnetism7, 2
         # :magnetism7_ball, 2
-        # :motzkin, 7
+        :motzkin, 3
         # :motzkin_ball, 7
         # :motzkin_ellipsoid, 7
         # :reactiondiffusion, 3
@@ -259,9 +236,9 @@ function run_JuMP_namedpoly(use_wsos::Bool; primal_wsos::Bool = false)
     (x, f, dom, truemin) = getpolydata(polyname)
 
     if use_wsos
-        model = build_JuMP_namedpoly_WSOS(x, f, dom, d = deg, primal_wsos = primal_wsos)
+        model = build_JuMP_polymin_WSOS(x, f, dom, d = deg, primal_wsos = primal_wsos)
     else
-        model = build_JuMP_namedpoly_PSD(x, f, dom, d = deg)
+        model = build_JuMP_polymin_PSD(x, f, dom, d = deg)
     end
     JuMP.optimize!(model)
 
@@ -280,6 +257,6 @@ function run_JuMP_namedpoly(use_wsos::Bool; primal_wsos::Bool = false)
     return
 end
 
-run_JuMP_namedpoly_PSD() = run_JuMP_namedpoly(false)
-run_JuMP_namedpoly_WSOS_primal() = run_JuMP_namedpoly(true, primal_wsos = true)
-run_JuMP_namedpoly_WSOS_dual() = run_JuMP_namedpoly(true, primal_wsos = false)
+run_JuMP_polymin_PSD() = run_JuMP_polymin(false)
+run_JuMP_polymin_WSOS_primal() = run_JuMP_polymin(true, primal_wsos = true)
+run_JuMP_polymin_WSOS_dual() = run_JuMP_polymin(true, primal_wsos = false)

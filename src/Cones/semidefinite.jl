@@ -15,6 +15,7 @@ mutable struct PosSemidef <: Cone
     use_dual::Bool
     dim::Int
     side::Int
+    
     point::AbstractVector{Float64}
     mat::Matrix{Float64}
     g::Vector{Float64}
@@ -26,15 +27,20 @@ mutable struct PosSemidef <: Cone
         cone.use_dual = is_dual
         cone.dim = dim
         cone.side = round(Int, sqrt(0.25 + 2.0 * dim) - 0.5)
-        cone.mat = Matrix{Float64}(undef, cone.side, cone.side)
-        cone.g = Vector{Float64}(undef, dim)
-        cone.H = zeros(dim, dim)
-        cone.Hi = copy(cone.H)
         return cone
     end
 end
 
 PosSemidef(dim::Int) = PosSemidef(dim, false)
+
+function setup_data(cone::PosSemidef)
+    dim = cone.dim
+    cone.mat = Matrix{Float64}(undef, cone.side, cone.side)
+    cone.g = Vector{Float64}(undef, dim)
+    cone.H = zeros(dim, dim)
+    cone.Hi = copy(cone.H)
+    return
+end
 
 get_nu(cone::PosSemidef) = cone.side
 
@@ -72,22 +78,15 @@ function check_in_cone(cone::PosSemidef)
     for i in 1:cone.side, j in 1:i
         k2 = 1
         for i2 in 1:cone.side, j2 in 1:i2
-            if i == j
-                if i2 == j2
-                    H[k2, k] = abs2(inv_mat[i2, i])
-                    Hi[k2, k] = abs2(mat[i2, i])
-                else
-                    H[k2, k] = rt2 * inv_mat[i2, i] * inv_mat[j, j2]
-                    Hi[k2, k] = rt2 * mat[i2, i] * mat[j, j2]
-                end
+            if (i == j) && (i2 == j2)
+                H[k2, k] = abs2(inv_mat[i2, i])
+                Hi[k2, k] = abs2(mat[i2, i])
+            elseif (i != j) && (i2 != j2)
+                H[k2, k] = inv_mat[i2, i] * inv_mat[j, j2] + inv_mat[j2, i] * inv_mat[j, i2]
+                Hi[k2, k] = mat[i2, i] * mat[j, j2] + mat[j2, i] * mat[j, i2]
             else
-                if i2 == j2
-                    H[k2, k] = rt2 * inv_mat[i2, i] * inv_mat[j, j2]
-                    Hi[k2, k] = rt2 * mat[i2, i] * mat[j, j2]
-                else
-                    H[k2, k] = inv_mat[i2, i] * inv_mat[j, j2] + inv_mat[j2, i] * inv_mat[j, i2]
-                    Hi[k2, k] = mat[i2, i] * mat[j, j2] + mat[j2, i] * mat[j, i2]
-                end
+                H[k2, k] = rt2 * inv_mat[i2, i] * inv_mat[j, j2]
+                Hi[k2, k] = rt2 * mat[i2, i] * mat[j, j2]
             end
             if k2 == k
                 break
@@ -96,7 +95,6 @@ function check_in_cone(cone::PosSemidef)
         end
         k += 1
     end
-
     return true
 end
 
