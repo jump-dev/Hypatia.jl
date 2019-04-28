@@ -65,3 +65,7 @@ function test_recover_lagrange_polys()
     #     @test sum(w) ≈ 2^n
     # end
 end
+
+function test_get_chebyshev_polys()
+    return true
+end
