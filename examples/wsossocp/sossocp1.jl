@@ -57,7 +57,7 @@ end
 
 function JuMP_polysoc_envelope(; use_scalar = false)
     Random.seed!(1)
-    n = 2
+    n = 1
     dom = MU.FreeDomain(n)
     DP.@polyvar x[1:n]
     d = 6
@@ -124,15 +124,20 @@ function JuMP_polysoc_envelope(; use_scalar = false)
 
     @show dot(JuMP.value.(f), lagrange_polys)
     @show JuMP.objective_value(model)
-    return model
+    return model, f, lagrange_polys, rand_polys
 end
 
-# using Plots
-# plotlyjs()
-# func1(x) = sum(rand_polys.^2)(x)
-# func2(x) = dot(JuMP.value.(f), lagrange_polys)(x)^2
-# plot(func1, -2, 2)
-# plot!(func2, -2, 2)
+using Plots
+plotlyjs()
+(model, f, lagrange_polys, rand_polys) = JuMP_polysoc_envelope(use_scalar = false)
+func1(x) = sum(rand_polys.^2)(x)
+func2(x) = dot(JuMP.value.(f), lagrange_polys)(x)^2
+
+plot(x -> rand_polys[1](x), -1, 1)
+plot!(x -> rand_polys[2](x), -1, 1)
+
+plot(func1, -1, 1, label = "sum rand polys squared")
+plot!(func2, -1, 1, label = "sos bound")
 
 
 function JuMP_polysoc_monomial(P, n)
