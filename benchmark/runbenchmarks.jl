@@ -10,8 +10,11 @@ TODO readme for benchmarks and describe ARGS for running on command line
 import Hypatia
 const CO = Hypatia.Cones
 const MO = Hypatia.Models
+const SO = Hypatia.Solvers
 import JLD
 import Dates
+import SparseArrays
+import LinearAlgebra
 
 # parse command line arguments
 println()
@@ -21,7 +24,8 @@ println()
 
 # instanceset = ARGS[1]
 # instsetfile = joinpath(@__DIR__, "instancesets", instanceset)
-instsetfile = joinpath(@__DIR__, "instancesets", "jld", "easy.txt")
+instanceset = "native_all.txt"
+instsetfile = joinpath(@__DIR__, "instancesets", "jld", instanceset)
 if !isfile(instsetfile)
     error("instance set file not found: $instsetfile")
 end
@@ -117,8 +121,8 @@ for instname in instances
         dump(memallocs)
         println()
 
-        redirect_stdout(OUT)
-        redirect_stderr(ERR)
+        # redirect_stdout(OUT)
+        # redirect_stderr(ERR)
     end
 
     if !isnothing(solveerror)
