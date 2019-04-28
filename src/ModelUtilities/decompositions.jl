@@ -16,6 +16,8 @@ function get_decomposition(
         hessian_oracle,
         n,
         degs,
+        basisvars,
+        weight_funs,
         )
     sprimal = JuMP.value(sqrconstr)
     sdual = JuMP.dual(sqrconstr) # check sign
@@ -30,26 +32,28 @@ function get_decomposition(
     w = Symmetric(H, :U) \ sprimal
     factorizations = Vector{Matrix{Float64}}(undef, nwts)
     gram_matrices = Vector{Matrix{Float64}}(undef, nwts)
+    bases = Vector{Any}(undef, nwts)
     for p in 1:nwts
         lambda_inv = inv(Symmetric(lambda_oracle(sdual, ipwt[p]), :U))
         # @show eigen(lambda_oracle(sdual, ipwt[p])).values
-        lambdaw = lambda_oracle(w, ipwt[p]) + 1e-6I
+        lambdaw = lambda_oracle(w, ipwt[p]) #+ 1e-6I
         S = Symmetric(lambda_inv * lambdaw * lambda_inv, :U)
         f = cholesky(S)
         gram_matrices[p] = S
         factorizations[p] = f.U
+        basis = build_basis(basisvars, degs[p])
+        bases[p] = basis
     end
-    basis = build_basis(n, degs[1])
-    @show basis' * gram_matrices[1] * basis
+    @show sum(bases[p]' * gram_matrices[p] * bases[p] * weight_funs[p] for p in 1:nwts)
+    # @show sum(bases[p]' * gram_matrices[p] * bases[p] * weight_funs[p] for p in 1:nwts) - motzkin
     lagrange_polys = MU.recover_lagrange_polys(pts, 6)
     @show first_poly = dot(lagrange_polys, sprimal)
-
 
     # decomposition = f.U * basis
     return decomposition
 end
 
-function get_decomposition(sqrconstr, ipwt::Vector{Matrix{Float64}}, n::Int, degs::Vector{Int})
+function get_decomposition(sqrconstr, ipwt::Vector{Matrix{Float64}}, n::Int, degs::Vector{Int}, basisvars, weight_funs)
     nwts = length(ipwt)
     model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, tol_feas = 1e-8))
     sprimal = JuMP.value(sqrconstr)
@@ -76,7 +80,7 @@ function get_decomposition(sqrconstr, ipwt::Vector{Matrix{Float64}}, n::Int, deg
     end
     bases = Vector{Any}(undef, nwts)
     for p in eachindex(ipwt)
-        basis = build_basis(n, degs[p])
+        basis = build_basis(basisvars, degs[p])
         bases[p] = basis
         decompositions[p] = factorizations[p] * basis
         # @show U, size(ipwt[p])
@@ -89,7 +93,7 @@ function get_decomposition(sqrconstr, ipwt::Vector{Matrix{Float64}}, n::Int, deg
     # sum((decompositions[1][i])^2 for i in 1:10)
     lagrange_polys = MU.recover_lagrange_polys(pts, 6)
     @show first_poly = dot(lagrange_polys, sprimal)
-    @show bases[1]' * JuMP.value.(G[1]) * bases[1]
+    @show sum(bases[p]' * JuMP.value.(G[p]) * bases[p] * weight_funs[p] for p in 1:nwts)
 
 end
 
@@ -108,8 +112,8 @@ function calc_u(d, monovec)
 end
 
 # returns the basis dynamic polynomials
-function build_basis(n, d)
-    DP.@polyvar x[1:n]
+function build_basis(x, d)
+    n = length(x)
     u = calc_u(d, x)
     L = binomial(n + d, n)
     m = Vector{Float64}(undef, L)
@@ -148,10 +152,10 @@ using LinearAlgebra
 import SumOfSquares
 
 n = 2
-# DP.@polyvar x[1:n]
-# DP.@polyvar y[1:n]
-#
-# # numerically unstable
+DP.@polyvar x[1:n]
+DP.@polyvar y[1:n]
+
+# numerically unstable
 # d = 3
 # monos = PolyJuMP.monomials([x; y], 0:d)
 # random_poly = JuMP.dot(rand(length(monos)), monos)
@@ -161,8 +165,10 @@ n = 2
 # cone = HYP.WSOSPolyInterpCone(U, [P0])
 # sqrconstr = JuMP.@constraint(model, [random_poly_sqr(pts[u, :]) for u in 1:U] in cone)
 # JuMP.optimize!(model)
-# get_decomposition(sqrconstr, lambda_oracle, hessian_oracle, 2n, d)
-# get_decomposition(sqrconstr, [P0, PWts...], 2n, d)
+# # get_decomposition(sqrconstr, lambda_oracle, hessian_oracle, 2n, d)
+# ipwt = [P0]
+# basisvars = [x; y]
+# get_decomposition(sqrconstr, ipwt, 2n, degs, basisvars)
 
 # polymin example
 DP.@polyvar x[1:n]
@@ -178,7 +184,9 @@ JuMP.@objective(model, Max, a)
 JuMP.optimize!(model)
 degs = [3; 2; 2]
 ipwt = [P0, PWts...]
-get_decomposition(sqrconstr, ipwt, n, degs)
+basisvars = x
+weight_funs = [1; 1 - x[1]^2; 1 - x[2]^2]
+get_decomposition(sqrconstr, ipwt, n, degs, basisvars, weight_funs)
 
 # model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
 # cone = HYP.WSOSPolyInterpCone(U, [P0])
