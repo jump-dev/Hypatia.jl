@@ -15,7 +15,8 @@ using SparseArrays
 using Test
 
 
-include(joinpath(@__DIR__, "interpolation.jl"))
+include(joinpath(@__DIR__, "ModelUtilities", "interpolation.jl"))
+include(joinpath(@__DIR__, "ModelUtilities", "decompositions.jl"))
 
 examples_dir = joinpath(@__DIR__, "../examples")
 
@@ -50,6 +51,10 @@ include(joinpath(@__DIR__, "JuMP.jl"))
 @testset "interpolation tests" begin
     fekete_sample()
     test_recover_lagrange_polys()
+end
+
+@info("starting decomposition tests")
+@testset "interpolation tests" begin
 end
 
 @info("starting native interface tests")

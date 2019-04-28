@@ -24,10 +24,6 @@ function get_decomposition(
     (g, H) = hessian_oracle(sdual)
     delta = 1e-3
     nwts = length(degs)
-    # @show eigen(Symmetric(H, :U)).values
-    # @show cond(Symmetric(H, :U))
-    # fH = cholesky(Symmetric(H, :U))
-    # @show norm(fH.L \ (sprimal + delta * g))
 
     w = Symmetric(H, :U) \ sprimal
     factorizations = Vector{Matrix{Float64}}(undef, nwts)
@@ -57,7 +53,7 @@ function get_decomposition(sqrconstr, ipwt::Vector{Matrix{Float64}}, n::Int, deg
     nwts = length(ipwt)
     model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, tol_feas = 1e-8))
     sprimal = JuMP.value(sqrconstr)
-    U = length(s)
+    U = length(sprimal)
     # TODO proper way to make array of PSD vars?
     G = Vector{Symmetric{JuMP.VariableRef,Array{JuMP.VariableRef,2}}}(undef, nwts)
     for p in eachindex(ipwt)
@@ -82,6 +78,7 @@ function get_decomposition(sqrconstr, ipwt::Vector{Matrix{Float64}}, n::Int, deg
     for p in eachindex(ipwt)
         basis = build_basis(basisvars, degs[p])
         bases[p] = basis
+        @show size(factorizations[p]), size(basis)
         decompositions[p] = factorizations[p] * basis
         # @show U, size(ipwt[p])
         # @show f.U, basis
@@ -156,37 +153,40 @@ DP.@polyvar x[1:n]
 DP.@polyvar y[1:n]
 
 # numerically unstable
-# d = 3
-# monos = PolyJuMP.monomials([x; y], 0:d)
-# random_poly = JuMP.dot(rand(length(monos)), monos)
-# random_poly_sqr = random_poly^2
-# (U, pts, P0, _, _) = MU.interpolate(MU.FreeDomain(2n), d, sample_factor = 100, sample = true)
-# model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, tol_feas = 1e-6, tol_abs_opt = 1e-6))
-# cone = HYP.WSOSPolyInterpCone(U, [P0])
-# sqrconstr = JuMP.@constraint(model, [random_poly_sqr(pts[u, :]) for u in 1:U] in cone)
-# JuMP.optimize!(model)
-# # get_decomposition(sqrconstr, lambda_oracle, hessian_oracle, 2n, d)
-# ipwt = [P0]
-# basisvars = [x; y]
-# get_decomposition(sqrconstr, ipwt, 2n, degs, basisvars)
+d = 3
+monos = PolyJuMP.monomials([x; y], 0:d)
+random_poly = JuMP.dot(rand(length(monos)), monos)
+random_poly_sqr = random_poly^2
+dom = MU.Box(-ones(2n), ones(2n))
+(U, pts, P0, Pwts, _) = MU.interpolate(dom, d, sample_factor = 100, sample = true)
+model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, tol_feas = 1e-6, tol_abs_opt = 1e-6))
+cone = HYP.WSOSPolyInterpCone(U, [P0])
+sqrconstr = JuMP.@constraint(model, [random_poly_sqr(pts[u, :]) for u in 1:U] in cone)
+JuMP.optimize!(model)
+# get_decomposition(sqrconstr, lambda_oracle, hessian_oracle, 2n, d)
+ipwt = [P0, Pwts...]
+basisvars = [x; y]
+weight_funs = vcat(1, [x -> 1 - x[i]^2 for i in 1:2n])
+degs = [6; 5; 5; 5; 5]
+get_decomposition(sqrconstr, ipwt, 2n, degs, basisvars, weight_funs)
 
 # polymin example
-DP.@polyvar x[1:n]
-motzkin = 1-48x[1]^2*x[2]^2+64x[1]^2*x[2]^4+64x[1]^4*x[2]^2
-d = 3
-dom = MU.Box(-ones(2), ones(2))
-(U, pts, P0, PWts, _) = MU.interpolate(dom, d, sample = true, sample_factor = 100)
-cone = HYP.WSOSPolyInterpCone(U, [P0, PWts...])
-model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, tol_feas = 1e-6, tol_abs_opt = 1e-6))
-JuMP.@variable(model, a)
-JuMP.@constraint(model, sqrconstr, [motzkin(x => pts[j, :]) - a for j in 1:U] in cone)
-JuMP.@objective(model, Max, a)
-JuMP.optimize!(model)
-degs = [3; 2; 2]
-ipwt = [P0, PWts...]
-basisvars = x
-weight_funs = [1; 1 - x[1]^2; 1 - x[2]^2]
-get_decomposition(sqrconstr, ipwt, n, degs, basisvars, weight_funs)
+# DP.@polyvar x[1:n]
+# motzkin = 1-48x[1]^2*x[2]^2+64x[1]^2*x[2]^4+64x[1]^4*x[2]^2
+# d = 3
+# dom = MU.Box(-ones(2), ones(2))
+# (U, pts, P0, PWts, _) = MU.interpolate(dom, d, sample = true, sample_factor = 100)
+# cone = HYP.WSOSPolyInterpCone(U, [P0, PWts...])
+# model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, tol_feas = 1e-6, tol_abs_opt = 1e-6))
+# JuMP.@variable(model, a)
+# JuMP.@constraint(model, sqrconstr, [motzkin(x => pts[j, :]) - a for j in 1:U] in cone)
+# JuMP.@objective(model, Max, a)
+# JuMP.optimize!(model)
+# degs = [3; 2; 2]
+# ipwt = [P0, PWts...]
+# basisvars = x
+# weight_funs = [1; 1 - x[1]^2; 1 - x[2]^2]
+# get_decomposition(sqrconstr, ipwt, n, degs, basisvars, weight_funs)
 
 # model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
 # cone = HYP.WSOSPolyInterpCone(U, [P0])
