@@ -12,7 +12,8 @@ mutable struct WSOSPolyInterpSOC <: Cone
     R::Int
     U::Int
     ipwt::Vector{Matrix{Float64}}
-    point::Vector{Float64}
+
+    point::AbstractVector{Float64}
     g::Vector{Float64}
     H::Matrix{Float64}
     gtry::Vector{Float64}
@@ -41,36 +42,43 @@ mutable struct WSOSPolyInterpSOC <: Cone
         cone.R = R
         cone.U = U
         cone.ipwt = ipwt
-        cone.point = similar(ipwt[1], dim)
-        cone.g = similar(ipwt[1], dim)
-        cone.H = similar(ipwt[1], dim, dim)
-        cone.gtry = similar(ipwt[1], dim)
-        cone.Htry = similar(ipwt[1], dim, dim)
-        cone.H2 = similar(cone.H)
-        cone.Hi = similar(cone.H)
-        cone.mat = [similar(ipwt[1], size(ipwtj, 2), size(ipwtj, 2)) for ipwtj in ipwt]
-        cone.matfact = Vector{CholeskyPivoted{Float64, Matrix{Float64}}}(undef, length(ipwt))
-        cone.tmp1 = [similar(ipwt[1], size(ipwtj, 2), U) for ipwtj in ipwt]
-        cone.tmp2 = [similar(ipwt[1], size(ipwtj, 2), U) for ipwtj in ipwt]
-        cone.tmp3 = similar(ipwt[1], U, U)
-        cone.tmp4 = [similar(ipwt[1], size(ipwtj, 2), size(ipwtj, 2)) for ipwtj in ipwt]
-        cone.li_lambda = [Vector{Matrix{Float64}}(undef, R - 1) for ipwtj in ipwt]
-        for j in eachindex(ipwt), r in 1:(R - 1)
-            cone.li_lambda[j][r] = similar(ipwt[1], size(ipwt[j], 2), size(ipwt[j], 2))
-        end
-        cone.PlambdaiP = [Vector{Vector{Matrix{Float64}}}(undef, R) for ipwtj in ipwt]
-        for j in eachindex(ipwt), r1 in 1:R
-            cone.PlambdaiP[j][r1] = Vector{Matrix{Float64}}(undef, r1)
-            for r2 in 1:r1
-                cone.PlambdaiP[j][r1][r2] = similar(ipwt[1], U, U)
-            end
-        end
-        cone.lambdafact = Vector{CholeskyPivoted{Float64, Matrix{Float64}}}(undef, length(ipwt))
         return cone
     end
 end
 
 WSOSPolyInterpSOC(R::Int, U::Int, ipwt::Vector{Matrix{Float64}}) = WSOSPolyInterpSOC(R, U, ipwt, false)
+
+function setup_data(cone::WSOSPolyInterpSOC)
+    dim = cone.dim
+    U = cone.U
+    R = cone.R
+    ipwt = cone.ipwt
+    cone.g = similar(ipwt[1], dim)
+    cone.H = similar(ipwt[1], dim, dim)
+    cone.gtry = similar(ipwt[1], dim)
+    cone.Htry = similar(ipwt[1], dim, dim)
+    cone.H2 = similar(cone.H)
+    cone.Hi = similar(cone.H)
+    cone.mat = [similar(ipwt[1], size(ipwtj, 2), size(ipwtj, 2)) for ipwtj in ipwt]
+    cone.matfact = Vector{CholeskyPivoted{Float64, Matrix{Float64}}}(undef, length(ipwt))
+    cone.tmp1 = [similar(ipwt[1], size(ipwtj, 2), U) for ipwtj in ipwt]
+    cone.tmp2 = [similar(ipwt[1], size(ipwtj, 2), U) for ipwtj in ipwt]
+    cone.tmp3 = similar(ipwt[1], U, U)
+    cone.tmp4 = [similar(ipwt[1], size(ipwtj, 2), size(ipwtj, 2)) for ipwtj in ipwt]
+    cone.li_lambda = [Vector{Matrix{Float64}}(undef, R - 1) for ipwtj in ipwt]
+    for j in eachindex(ipwt), r in 1:(R - 1)
+        cone.li_lambda[j][r] = similar(ipwt[1], size(ipwt[j], 2), size(ipwt[j], 2))
+    end
+    cone.PlambdaiP = [Vector{Vector{Matrix{Float64}}}(undef, R) for ipwtj in ipwt]
+    for j in eachindex(ipwt), r1 in 1:R
+        cone.PlambdaiP[j][r1] = Vector{Matrix{Float64}}(undef, r1)
+        for r2 in 1:r1
+            cone.PlambdaiP[j][r1][r2] = similar(ipwt[1], U, U)
+        end
+    end
+    cone.lambdafact = Vector{CholeskyPivoted{Float64, Matrix{Float64}}}(undef, length(ipwt))
+    return
+end
 
 get_nu(cone::WSOSPolyInterpSOC) = sum(size(ipwtj, 2) for ipwtj in cone.ipwt)
 

@@ -245,6 +245,7 @@ end
 function set_initial_cone_point(point, cones)
     for k in eachindex(cones)
         cone_k = cones[k]
+        Cones.setup_data(cone_k)
         primal_k = point.primal_views[k]
         Cones.set_initial_point(primal_k, cone_k)
         Cones.load_point(cone_k, primal_k)

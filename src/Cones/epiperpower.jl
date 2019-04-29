@@ -15,6 +15,7 @@ TODO although this barrier has a lower parameter, maybe the more standard barrie
 mutable struct EpiPerPower <: Cone
     use_dual::Bool
     alpha::Float64
+
     point::AbstractVector{Float64}
     g::Vector{Float64}
     H::Matrix{Float64}
@@ -28,21 +29,27 @@ mutable struct EpiPerPower <: Cone
         cone = new()
         cone.use_dual = is_dual
         cone.alpha = alpha
-        cone.g = Vector{Float64}(undef, 3)
-        cone.H = Matrix{Float64}(undef, 3, 3)
-        cone.H2 = similar(cone.H)
-        ialpha2 = 2.0 * inv(alpha)
-        if alpha >= 2.0
-            cone.barfun = point -> -log(point[1] * point[2]^(2.0 - ialpha2) - abs2(point[3]) * point[1]^(1.0 - ialpha2))
-        else
-            cone.barfun = point -> -log(point[1]^ialpha2 * point[2] - abs2(point[3]) * point[2]^(ialpha2 - 1.0))
-        end
-        cone.diffres = DiffResults.HessianResult(cone.g)
         return cone
     end
 end
 
 EpiPerPower(alpha::Float64) = EpiPerPower(alpha, false)
+
+function setup_data(cone::EpiPerPower)
+    cone.g = Vector{Float64}(undef, 3)
+    cone.H = Matrix{Float64}(undef, 3, 3)
+    cone.H2 = similar(cone.H)
+
+    alpha = cone.alpha
+    ialpha2 = 2.0 * inv(alpha)
+    if alpha >= 2.0
+        cone.barfun = point -> -log(point[1] * point[2]^(2.0 - ialpha2) - abs2(point[3]) * point[1]^(1.0 - ialpha2))
+    else
+        cone.barfun = point -> -log(point[1]^ialpha2 * point[2] - abs2(point[3]) * point[2]^(ialpha2 - 1.0))
+    end
+    cone.diffres = DiffResults.HessianResult(cone.g)
+    return
+end
 
 dimension(cone::EpiPerPower) = 3
 
