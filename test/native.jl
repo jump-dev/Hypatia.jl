@@ -579,8 +579,8 @@ function epiperpower3(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_
     h = zeros(3)
     cone_idxs = [1:3]
 
-    for is_dual in (true, false)
-        cones = [CO.EpiPerPower(2.0, is_dual)]
+    for is_dual in (true, false), alpha in [1.5; 2.0] # TODO objective gap is large when alpha is different e.g. 2.5, investigate why
+        cones = [CO.EpiPerPower(alpha, is_dual)]
 
         r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose, atol = 1e-3, rtol = 1e-3)
         @test r.status == :Optimal
