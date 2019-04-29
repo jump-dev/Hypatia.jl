@@ -15,7 +15,7 @@ TODO although this barrier has a lower parameter, maybe the more standard barrie
 mutable struct EpiPerPower <: Cone
     use_dual::Bool
     alpha::Float64
-    
+
     point::AbstractVector{Float64}
     g::Vector{Float64}
     H::Matrix{Float64}
@@ -45,7 +45,7 @@ function setup_data(cone::EpiPerPower)
     if alpha >= 2.0
         cone.barfun = point -> -log(point[1] * point[2]^(2.0 - ialpha2) - abs2(point[3]) * point[1]^(1.0 - ialpha2))
     else
-        cone.barfun = point -> -log(point[1] * point[2]^(2.0 - ialpha2) - abs2(point[3]) * point[1]^(1.0 - ialpha2))
+        cone.barfun = point -> -log(point[1]^ialpha2 * point[2] - abs2(point[3]) * point[2]^(ialpha2 - 1.0))
     end
     cone.diffres = DiffResults.HessianResult(cone.g)
     return
