@@ -378,3 +378,44 @@ function recover_lagrange_polys(pts::Matrix{Float64}, deg::Int)
     lagrange_polys = [dot(vandermonde_inv[:, i], monos) for i in 1:U]
     return lagrange_polys
 end
+
+function calc_u(monovec::Vector{DynamicPolynomials.PolyVar{true}}, d::Int)
+    n = length(monovec)
+    u = Vector{Vector}(undef, n)
+    for j in 1:n
+        uj = u[j] = Vector{DP.Polynomial{true,Int64}}(undef, d + 1)
+        uj[1] = DP.Monomial(1)
+        uj[2] = monovec[j]
+        for t in 3:(d + 1)
+            uj[t] = 2.0 * uj[2] * uj[t - 1] - uj[t - 2]
+        end
+    end
+    return u
+end
+
+# returns the multivariate Chebyshev polynomials in x up to degree d
+function get_chebyshev_polys(x::Vector{DynamicPolynomials.PolyVar{true}}, d::Int)
+    n = length(x)
+    u = calc_u(x, d)
+    L = binomial(n + d, n)
+    m = Vector{Float64}(undef, L)
+    m[1] = 2^n
+    M = Vector{DP.Polynomial{true,Int64}}(undef, L)
+    M[1] = DP.Monomial(1)
+    col = 1
+    for t in 1:d
+        for xp in Combinatorics.multiexponents(n, t)
+            col += 1
+            if any(isodd, xp)
+                m[col] = 0.0
+            else
+                m[col] = m[1] / prod(1.0 - abs2(xp[j]) for j in 1:n)
+            end
+            M[col] = u[1][xp[1] + 1]
+            for j in 2:n
+                M[col] *= u[j][xp[j] + 1]
+            end
+        end
+    end
+    return M
+end
