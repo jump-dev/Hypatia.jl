@@ -398,23 +398,14 @@ function get_chebyshev_polys(x::Vector{DynamicPolynomials.PolyVar{true}}, d::Int
     n = length(x)
     u = calc_u(x, d)
     L = binomial(n + d, n)
-    m = Vector{Float64}(undef, L)
-    m[1] = 2^n
     M = Vector{DP.Polynomial{true,Int64}}(undef, L)
     M[1] = DP.Monomial(1)
     col = 1
-    for t in 1:d
-        for xp in Combinatorics.multiexponents(n, t)
-            col += 1
-            if any(isodd, xp)
-                m[col] = 0.0
-            else
-                m[col] = m[1] / prod(1.0 - abs2(xp[j]) for j in 1:n)
-            end
-            M[col] = u[1][xp[1] + 1]
-            for j in 2:n
-                M[col] *= u[j][xp[j] + 1]
-            end
+    for t in 1:d, xp in Combinatorics.multiexponents(n, t)
+        col += 1
+        M[col] = u[1][xp[1] + 1]
+        for j in 2:n
+            M[col] *= u[j][xp[j] + 1]
         end
     end
     return M
