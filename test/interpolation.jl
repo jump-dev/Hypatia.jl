@@ -1,6 +1,7 @@
 #=
 Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 =#
+import DynamicPolynomials
 
 function fekete_sample()
     Random.seed!(1)
@@ -52,16 +53,23 @@ function test_recover_lagrange_polys()
         end
     end
 
-    # TODO remove dependency on DynamicPolynomials
-    # for n in 1:3, sample in [true, false]
-    #     d = 2
-    #     (U, pts, P0, PWts, w) = MU.interpolate(MU.FreeDomain(n), d, sample = sample, calc_w = true)
-    #     DynamicPolynomials.@polyvar x[1:n]
-    #     monos = DynamicPolynomials.monomials(x, 0:(2 * d))
-    #     lagrange_polys = MU.recover_lagrange_polys(pts, 2 * d)
-    #
-    #     @test sum(lagrange_polys) ≈ 1.0
-    #     @test sum(w[i] * lagrange_polys[j](pts[i, :]) for j in 1:U, i in 1:U) ≈ sum(w)
-    #     @test sum(w) ≈ 2^n
-    # end
+    for n in 1:3, sample in [true, false]
+        d = 2
+        (U, pts, P0, PWts, w) = MU.interpolate(MU.FreeDomain(n), d, sample = sample, calc_w = true)
+        DynamicPolynomials.@polyvar x[1:n]
+        monos = DynamicPolynomials.monomials(x, 0:(2 * d))
+        lagrange_polys = MU.recover_lagrange_polys(pts, 2 * d)
+
+        @test sum(lagrange_polys) ≈ 1.0
+        @test sum(w[i] * lagrange_polys[j](pts[i, :]) for j in 1:U, i in 1:U) ≈ sum(w)
+        @test sum(w) ≈ 2^n
+    end
+end
+
+function test_recover_cheb_polys()
+    DynamicPolynomials.@polyvar x[1:2]
+    d = 2
+    monos = DynamicPolynomials.monomials(x, 0:d)
+    cheb_polys = MU.get_chebyshev_polys(x, d)
+    @test cheb_polys == [1; x[1]; x[2]; 2x[1]^2 - 1; x[1] * x[2]; 2x[2]^2 - 1]
 end
