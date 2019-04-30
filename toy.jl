@@ -32,11 +32,14 @@ M = Matrix{Float64}(undef, npts, U)
 pts_kept = pts0[keep_pts, :]
 P0 = M[keep_pts, 1:L]
 
-# scaled points
-pts1 = zeros(size(pts_kept))
-pts1 .= pts_kept
-pts1[:, 1] = pts_kept[:, 1] * (ubs[1] - lbs[1]) / 2
-g1vec = [sqrt(g1(pts1[i, :])) for i in 1:U]
+# try either this
+# pts1 = zeros(size(pts_kept))
+# pts1 .= pts_kept
+# pts1[:, 1] = pts_kept[:, 1] * (ubs[1] - lbs[1]) / 2
+# g1vec = [sqrt(g1(pts1[i, :])) for i in 1:U]
+# or this
+g1vec = [sqrt(g1(pts_kept[i, :])) for i in 1:U]
+#
 L1 = binomial(n + d - 1, n)
 P1 = Diagonal(g1vec) * M[keep_pts, 1:L1]
 
