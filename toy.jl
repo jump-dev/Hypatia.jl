@@ -14,8 +14,8 @@ motzkin = ((x,y) -> 1-48x^2*y^2+64x^2*y^4+64x^4*y^2)
 # box on domain [-10,10], [-0.1, 0.1]
 
 n = 2
-lbs = [-10; -0.1]
-ubs = [10; 0.1]
+lbs = [-4; -1]
+ubs = [4; 1]
 deg = 6
 d = 3
 L = binomial(n + d, n)
@@ -33,12 +33,12 @@ pts_kept = pts0[keep_pts, :]
 P0 = M[keep_pts, 1:L]
 
 # try either this
-# pts1 = zeros(size(pts_kept))
-# pts1 .= pts_kept
-# pts1[:, 1] = pts_kept[:, 1] * (ubs[1] - lbs[1]) / 2
-# g1vec = [sqrt(g1(pts1[i, :])) for i in 1:U]
+pts1 = zeros(size(pts_kept))
+pts1 .= pts_kept
+pts1[:, 1] = pts_kept[:, 1] * (ubs[1] - lbs[1]) / 2
+g1vec = [sqrt(g1(pts1[i, :])) for i in 1:U]
 # or this
-g1vec = [sqrt(g1(pts_kept[i, :])) for i in 1:U]
+# g1vec = [sqrt(g1(pts_kept[i, :])) for i in 1:U]
 #
 L1 = binomial(n + d - 1, n)
 P1 = Diagonal(g1vec) * M[keep_pts, 1:L1]
@@ -61,6 +61,8 @@ cone_idxs = [1:U]
 model = MO.PreprocessedLinearModel(c, A, b, G, h, cones, cone_idxs)
 solver = SO.HSDSolver(model, verbose = true)
 SO.solve(solver)
+s2 = solver.point.s
+z2 = solver.point.z
 # @test SO.get_status(solver) == :Optimal
 
 # make P0 from pts
