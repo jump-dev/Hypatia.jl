@@ -383,7 +383,7 @@ function calc_u(monovec::Vector{DynamicPolynomials.PolyVar{true}}, d::Int)
     n = length(monovec)
     u = Vector{Vector}(undef, n)
     for j in 1:n
-        uj = u[j] = Vector{DP.Polynomial{true,Int64}}(undef, d + 1)
+        uj = u[j] = Vector{DP.Polynomial{true,Float64}}(undef, d + 1)
         uj[1] = DP.Monomial(1)
         uj[2] = monovec[j]
         for t in 3:(d + 1)
@@ -398,8 +398,8 @@ function get_chebyshev_polys(x::Vector{DynamicPolynomials.PolyVar{true}}, d::Int
     n = length(x)
     u = calc_u(x, d)
     L = binomial(n + d, n)
-    M = Vector{DP.Polynomial{true,Int64}}(undef, L)
-    M[1] = DP.Monomial(1)
+    M = Vector{DP.Polynomial{true,Float64}}(undef, L)
+    M[1] = DP.Monomial(1.0)
     col = 1
     for t in 1:d, xp in Combinatorics.multiexponents(n, t)
         col += 1

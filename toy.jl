@@ -30,6 +30,7 @@ polyname = :motzkin # [-1,1]^n
 # polyname = :rosenbrock # [-1,1]^n
 # polyname = :schwefel # [-10,10]^n
 # polyname = :caprasse # [-0.5, 0.5]^n
+# polyname = :lotkavolterra
 # alfonso not included
 # polyname = :butcher
 
@@ -37,7 +38,7 @@ polyname = :motzkin # [-1,1]^n
 d = div(deg + 1, 2)
 L = binomial(n + d, n)
 U = binomial(n + 2d, n)
-lbs = -ones(n) * 1.2; ubs = ones(n) * 1.2 ################################## CAREFUL
+# lbs = -ones(n) * 0.2; ubs = ones(n) * 0.2  ################################## CAREFUL
 g(x, n) = (x[n] - lbs[n]) * (ubs[n] - x[n])
 nwts = n + 1 # boxes only
 
@@ -116,14 +117,17 @@ z2 = solver.point.z
 
 
 lagrange_polys = MU.recover_lagrange_polys(ptsi, 2d)
-dot(lagrange_polys, solver.point.s) # yep motzkin
+@show dot(lagrange_polys, solver.point.s) + Monomial(1) * solver.point.x[1] # yep motzkin
 @polyvar x[1:n]
 
 ds = vcat(d, ones(Int, n) * (d - 1))
 cheb_polys = [MU.get_chebyshev_polys(x, d) for d in ds]
 # cheb of inverse transform
-Tinv(x) = (x - (ubs + lbs) / 2) ./ ((ubs - lbs) / 2)
-# basis_polys = [cheb_polys[d](Tinv(x)) for d in 1:nwts]
+for cps in cheb_polys, p in eachindex(cps), i in 1:n
+    if x[i] in cps[p].x
+        cps[p] = subs(cps[p], x[i] => (x[i] - (ubs[i] + lbs[i]) / 2) ./ ((ubs[i] - lbs[i]) / 2))
+    end
+end
 
 get_lambda(pt, P) = P' * Diagonal(pt) * P
 ipwt = [P0, PWts...]
@@ -143,9 +147,12 @@ for p in 1:nwts
 end
 # box_weights = [(-x[ni]^2 + 1) * (ubs[ni] - lbs[ni])^2 / 4 for ni in 1:n]
 # weight_funs = [1; box_weights...]
-box_weights = [(ubs[ni] - x[ni]) * (x[ni] - lbs[ni]) for ni in 1:n]
+box_weights = [g(x, ni) for ni in 1:n]
+# for i in eachindex(box_weights)
+#     box_weights[i] = subs(box_weights[i], x[i] => x[i] * (ubs[i] - lbs[i]) / 2 .+ (ubs[i] + lbs[i]) / 2)
+# end
 weight_funs = [1; box_weights...]
-@show sum(cheb_polys[p]' * gram_matrices[p] * cheb_polys[p] * weight_funs[p] for p in 1:nwts)
+@show sum(cheb_polys[p]' * gram_matrices[p] * cheb_polys[p] * weight_funs[p] for p in 1:nwts) + Monomial(1) * solver.point.x[1]
 
 
 # ub2 = 13
