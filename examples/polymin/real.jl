@@ -24,7 +24,7 @@ polys = Dict{Symbol, NamedTuple}(
     :butcher => (n=6, lbs=[-1.0,-0.1,-0.1,-1.0,-0.1,-0.1], ubs=[0.0,0.9,0.5,-0.1,-0.05,-0.03], deg=3,
         fn=((u,v,w,x,y,z) -> z*v^2+y*w^2-u*x^2+x^3+x^2-(1/3)*u+(4/3)*x)
         ),
-    :caprasse => (n=4, lbs=-0.5 * ones(4), ubs=0.5 * ones(4), deg=8,
+    :caprasse => (n=4, lbs=-0.5 * ones(4), ubs=0.5 * ones(4), deg=4, # changed from 8
         fn=((w,x,y,z) -> -w*y^3+4x*y^2*z+4w*y*z^2+2x*z^3+4w*y+4y^2-10x*z-10z^2+2)
         ),
     :goldsteinprice => (n=2, lbs=-2.0 * ones(2), ubs=2.0 * ones(2), deg=8,
@@ -108,12 +108,12 @@ function run_polymin()
     # select the polynomial/domain to minimize over and the SOS degree (to be squared)
     (c, A, b, G, h, cones, cone_idxs) =
         # build_polymin(:butcher, 2)
-        # build_polymin(:caprasse, 4)
+        build_polymin(:caprasse, 4)
         # build_polymin(:goldsteinprice, 7)
         # build_polymin(:heart, 2)
         # build_polymin(:lotkavolterra, 3)
         # build_polymin(:magnetism7, 2)
-        build_polymin(:motzkin, 6, primal_wsos = false)
+        # build_polymin(:motzkin, 6, primal_wsos = false)
         # build_polymin(:reactiondiffusion, 4)
         # build_polymin(:robinson, 8)
         # build_polymin(:rosenbrock, 4)

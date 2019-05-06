@@ -395,6 +395,9 @@ end
 
 # returns the multivariate Chebyshev polynomials in x up to degree d
 function get_chebyshev_polys(x::Vector{DynamicPolynomials.PolyVar{true}}, d::Int)
+    # if d == 0
+    #     return [DP.Monomial(1.0) * 0.0]
+    # end
     n = length(x)
     u = calc_u(x, d)
     L = binomial(n + d, n)
