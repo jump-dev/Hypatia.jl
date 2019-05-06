@@ -4,17 +4,10 @@ Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 # TODO test errors for incompatible inputs e.g. dim is too small
 =#
 
-# using Test
-# using Random
-# using LinearAlgebra
-# using ForwardDiff
-# using DiffResults
-# import Hypatia
-# const HYP = Hypatia
-# const CO = HYP.Cones
-# const MU = HYP.ModelUtilities
+import DiffResults
+import ForwardDiff
 
-Random.seed!(1)
+Random.seed!(1234)
 
 test_dependencies(::CO.Cone) = nothing
 compare_autodiff(::CO.Cone) = nothing
