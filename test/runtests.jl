@@ -51,6 +51,7 @@ include(joinpath(@__DIR__, "JuMP.jl"))
 @testset "interpolation tests" begin
     fekete_sample()
     test_recover_lagrange_polys()
+    test_recover_cheb_polys()
 end
 
 @info("starting barrier tests")
