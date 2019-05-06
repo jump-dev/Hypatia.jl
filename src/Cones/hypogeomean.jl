@@ -29,7 +29,7 @@ mutable struct HypoGeomean <: Cone
         dim = length(alpha) + 1
         @assert dim >= 3
         @assert all(ai >= 0.0 for ai in alpha)
-        @assert sum(alpha) ≈ 1.0 atol=1e-9 rtol=1e-6
+        @assert sum(alpha) == 1.0
         cone = new()
         cone.use_dual = !is_dual # using dual barrier
         cone.dim = dim
