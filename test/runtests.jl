@@ -71,7 +71,7 @@ barrier_testfuns = [
     test_wsospolyinterpmat_barrier,
     test_wsospolyinterpsoc_barrier,
 ]
-@testset "barrier functions" for t in barrier_testfuns
+@testset "barrier functions tests: $t" for t in barrier_testfuns
     t()
 end
 
