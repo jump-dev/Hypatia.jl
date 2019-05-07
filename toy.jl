@@ -30,6 +30,15 @@ include("examples/polymin/real.jl")
 #     solveandcheck(polyname)
 # end
 
+function shiftpts(pts, lbs, ubs)
+    shifted_pts = similar(pts, size(pts))
+    n = length(lbs)
+    for ni in 1:n
+        shifted_pts[:, ni] = pts[:, ni] * (ubs[ni] - lbs[ni]) / 2 .+ (ubs[ni] + lbs[ni]) / 2
+    end
+    return shifted_pts
+end
+
 function solveandcheck(polyname)
     (n, lbs, ubs, deg, fn) = polys[polyname]
     (_, dppoly, _, truemin) = getpolydata(polyname)
@@ -62,17 +71,31 @@ function solveandcheck(polyname)
     #     end
     # end
 
+    compose_cheb = false
+    qrP0 = true
     M = Matrix{Float64}(undef, npts, U)
+
+    if !compose_cheb
+        pts0 = shiftpts(pts0, lbs, ubs)
+    end
+
     (keep_pts, _) = MU.choose_interp_pts!(M, pts0, 2d, U, false)
     pts_kept = pts0[keep_pts, :]
     P0 = M[keep_pts, 1:L]
 
-    ptsi = zeros(size(pts_kept))
-    ptsi .= pts_kept
+    if qrP0
+        P0 = Array(qr(P0).Q)
+    end
+
+    if !compose_cheb
+        shifted_pts = pts_kept # already shifted them
+    else
+        shifted_pts = shiftpts(pts_kept, lbs, ubs)
+    end
+
     PWts = Vector{Matrix{Float64}}(undef, nwts - 1)
     for ni in 1:(nwts - 1)
-        ptsi[:, ni] = pts_kept[:, ni] * (ubs[ni] - lbs[ni]) / 2 .+ (ubs[ni] + lbs[ni]) / 2
-        g1vec = [sqrt(g(ptsi[i, :], ni)) for i in 1:U]
+        g1vec = [sqrt(g(shifted_pts[i, :], ni)) for i in 1:U]
         L1 = binomial(n + d - 1, n)
         PWts[ni] = Diagonal(g1vec) * P0[:, 1:L1]
     end
@@ -81,7 +104,7 @@ function solveandcheck(polyname)
     A = zeros(0, 1)
     b = Float64[]
     G = ones(U, 1)
-    h = [fn(ptsi[j, :]...) for j in 1:U]
+    h = [fn(shifted_pts[j, :]...) for j in 1:U]
 
     cones = [CO.WSOSPolyInterp(U, [P0, PWts...], false)]
     cone_idxs = [1:U]
@@ -97,7 +120,7 @@ function solveandcheck(polyname)
 
 
 
-    lagrange_polys = MU.recover_lagrange_polys(ptsi, 2d)
+    lagrange_polys = MU.recover_lagrange_polys(shifted_pts, 2d)
     @show dot(lagrange_polys, solver.point.s) + Monomial(1) * solver.point.x[1] # yep motzkin
     @polyvar x[1:n]
 
@@ -136,6 +159,10 @@ function solveandcheck(polyname)
 
     return
 end
+
+# bk/chol, qr/not, cheb/cheb(Tinv)
+# niters, % solved, time, accuracy of soln
+# double check not possible to change to shifting after qr
 
 
 for polyname in keys(polys)
