@@ -502,7 +502,7 @@ end
 
 function MOI.optimize!(opt::Optimizer)
     if opt.load_only
-        return nothing
+        return
     end
     model = opt.linear_model(copy(opt.c), copy(opt.A), copy(opt.b), copy(opt.G), copy(opt.h), opt.cones, opt.cone_idxs)
     stepper = Solvers.CombinedHSDStepper(model, system_solver = opt.system_solver(model))

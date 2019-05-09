@@ -2,16 +2,11 @@
 Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 =#
 
-# import JLD2
 import JLD
-# import FileIO
 import JuMP
 import Hypatia
 const HYP = Hypatia
 const CO = HYP.Cones
-const MO = HYP.Models # TODO remove, for loading
-const SO = HYP.Solvers # TODO remove, for loading
-import SparseArrays # TODO remove, for loading
 import Random
 import Distributions
 
@@ -21,20 +16,11 @@ include(joinpath(examples_dir, "envelope/native.jl"))
 include(joinpath(examples_dir, "linearopt/native.jl"))
 include(joinpath(examples_dir, "polymin/real.jl"))
 include(joinpath(examples_dir, "polymin/complex.jl"))
-# include(joinpath(examples_dir, "envelope/jump.jl"))
 include(joinpath(examples_dir, "expdesign/jump.jl"))
-# include(joinpath(examples_dir, "polymin/jump.jl"))
 include(joinpath(examples_dir, "shapeconregr/jump.jl"))
 include(joinpath(examples_dir, "densityest/jump.jl"))
-# include(joinpath(examples_dir, "wsosmatrix/sosmatrix.jl"))
-# include(joinpath(examples_dir, "wsosmatrix/muconvexity.jl"))
-# include(joinpath(examples_dir, "wsosmatrix/sosmat1.jl"))
-# include(joinpath(examples_dir, "wsosmatrix/sosmat2.jl"))
-# include(joinpath(examples_dir, "wsosmatrix/sosmat3.jl"))
 include(joinpath(examples_dir, "regionofattraction/univariate.jl"))
-# include(joinpath(examples_dir, "contractionanalysis/jump.jl"))
 
-# TODO account for use_dense
 # TODO add families of instances for each model
 
 outputpath = joinpath(@__DIR__, "instancefiles", "jld")
@@ -45,9 +31,9 @@ function make_JLD(modelname::String)
     if modelname == "envelope"
         (c, A, b, G, h, cones, cone_idxs) = build_envelope(3, 5, 3, 5, primal_wsos = true, dense = true)
     elseif modelname == "linearopt"
-        (c, A, b, G, h, cones, cone_idxs) = build_linearopt(15, 20)
+        (c, A, b, G, h, cones, cone_idxs) = build_linearopt(15, 20, dense = true)
     elseif modelname == "polyminreal1"
-        (c, A, b, G, h, cones, cone_idxs) = build_polymin(:butcher, 2)
+        (c, A, b, G, h, cones, cone_idxs) = build_polymin(:butcher, 2) # only dense for this family
     elseif modelname == "polyminreal2"
         (c, A, b, G, h, cones, cone_idxs) = build_polymin(:caprasse, 4)
     elseif modelname == "polyminreal3"
@@ -129,7 +115,7 @@ function make_JLD(modelname::String)
     fullpathout = joinpath(outputpath, modelname * ".jld")
     # JLD.save(fullpathout, "modeldata", (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs))
     JLD.save(fullpathout, "c", c, "A", A, "b", b, "G", G, "h", h, "cones", cones, "cone_idxs", cone_idxs)
-    return nothing
+    return
 end
 
 for modelname in [
@@ -161,31 +147,3 @@ for modelname in [
     ]
     make_JLD(modelname)
 end
-
-
-modelname = "envelope"
-function make_model(modelname::String)
-    # md = FileIO.load(joinpath(outputpath, modelname * ".jld2"), "modeldata")
-    md = JLD.load(joinpath(outputpath, modelname * ".jld"))
-    (c, A, b, G, h, cones, cone_idxs) = (md["c"], md["A"], md["b"], md["G"], md["h"], md["cones"], md["cone_idxs"])
-    for c in cones
-        CO.setup_data(c)
-    end
-    # plmodel = MO.PreprocessedLinearModel(md.c, md.A, md.b, md.G, md.h, md.cones, md.cone_idxs)
-    plmodel = MO.PreprocessedLinearModel(c, A, b, G, h, cones, cone_idxs)
-    solver = SO.HSDSolver(plmodel, verbose = true)
-    SO.solve(solver)
-    return nothing
-end
-
-# for modelname in [
-#     "envelope",
-#     "linearopt",
-#     "polyminreal",
-#     "polymincomplex",
-#     "expdesign",
-#     "shapeconregr",
-#     "densityest",
-#     ]
-#     make_model(modelname)
-# end

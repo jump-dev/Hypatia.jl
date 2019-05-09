@@ -4,9 +4,9 @@ Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 TODO readme for benchmarks and describe ARGS for running on command line
 =#
 
-# julia benchmark/runbenchmarks.jl easy.txt benchmark/instancefiles/cbf tmp
+# julia benchmark/runbenchmarks.jl native_all.txt benchmark/instancefiles/jld tmp
 
-# Pkg.activate(".")
+Pkg.activate(".")
 import Hypatia
 const CO = Hypatia.Cones
 const MO = Hypatia.Models
@@ -18,20 +18,19 @@ import LinearAlgebra
 
 # parse command line arguments
 println()
-# if length(ARGS) != 3
-#     error("usage: julia runbenchmarks.jl instance_set input_path output_path")
-# end
+if length(ARGS) != 3
+    error("usage: julia runbenchmarks.jl instance_set input_path output_path")
+end
 
-# instanceset = ARGS[1]
-# instsetfile = joinpath(@__DIR__, "instancesets", instanceset)
-instanceset = "native_all.txt"
+instanceset = ARGS[1]
+# instanceset = "native_all.txt"
 instsetfile = joinpath(@__DIR__, "instancesets", "jld", instanceset)
 if !isfile(instsetfile)
     error("instance set file not found: $instsetfile")
 end
 
-# inputpath = ARGS[2]
-inputpath = joinpath(@__DIR__, "instancefiles", "jld")
+inputpath = ARGS[2]
+# inputpath = joinpath(@__DIR__, "instancefiles", "jld")
 if !isdir(inputpath)
     error("input path is not a valid directory: $inputpath")
 end
@@ -55,8 +54,8 @@ for instname in instances
     end
 end
 
-# outputpath = ARGS[3]
-outputpath = "tmp"
+outputpath = ARGS[3]
+# outputpath = "tmp"
 if !isdir(outputpath)
     error("output path is not a valid directory: $outputpath")
 end
