@@ -178,14 +178,14 @@ function make_model(modelname::String)
     return nothing
 end
 
-for modelname in [
-    "envelope",
-    "linearopt",
-    "polyminreal",
-    "polymincomplex",
-    "expdesign",
-    "shapeconregr",
-    "densityest",
-    ]
-    make_model(modelname)
-end
+# for modelname in [
+#     "envelope",
+#     "linearopt",
+#     "polyminreal",
+#     "polymincomplex",
+#     "expdesign",
+#     "shapeconregr",
+#     "densityest",
+#     ]
+#     make_model(modelname)
+# end
