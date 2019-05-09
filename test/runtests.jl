@@ -16,6 +16,7 @@ using Test
 
 
 include(joinpath(@__DIR__, "interpolation.jl"))
+include(joinpath(@__DIR__, "barriers.jl"))
 
 examples_dir = joinpath(@__DIR__, "../examples")
 
@@ -50,6 +51,28 @@ include(joinpath(@__DIR__, "JuMP.jl"))
 @testset "interpolation tests" begin
     fekete_sample()
     test_recover_lagrange_polys()
+    test_recover_cheb_polys()
+end
+
+@info("starting barrier tests")
+barrier_testfuns = [
+    test_epinormeucl_barrier,
+    test_epinorinf_barrier,
+    test_epinormspectral_barrier,
+    test_epiperpower_barrier,
+    test_epipersquare_barrier,
+    test_epipersumexp_barrier,
+    test_hypogeomean_barrier,
+    test_hypoperlog_barrier,
+    test_hypoperlogdet_barrier,
+    test_semidefinite_barrier,
+    test_wsospolyinterp_2_barrier,
+    test_wsospolyinterp_barrier,
+    test_wsospolyinterpmat_barrier,
+    test_wsospolyinterpsoc_barrier,
+]
+@testset "barrier functions tests: $t" for t in barrier_testfuns
+    t()
 end
 
 @info("starting native interface tests")
