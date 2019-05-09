@@ -85,7 +85,7 @@ hard_polys = Dict{Symbol, NamedTuple}(
     :rosenbrock => (n=2, lbs=[0.9, -10.0], ubs=[1.1, 10.0], deg=4, # min at (1,1)
         fn=((x,y) -> (1-x)^2+100*(x^2-y)^2)
         ),
-    :schwefel => (n=3, lbs=[-5.0, -10.0, -10.0], ubs=[5.0, 10.0, 10.0], deg=4, # min at (1,1,1)
+    :schwefel => (n=3, lbs=[0.9, -10.0, -10.0], ubs=[1.1, 10.0, 10.0], deg=4, # min at (1,1,1)
         fn=((x,y,z) -> (x-y^2)^2+(y-1)^2+(x-z^2)^2+(z-1)^2)
         ),
 )
