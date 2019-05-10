@@ -179,11 +179,11 @@ for modelname in [
     "expdesign_large",
     "shapeconregr0",
     "shapeconregr11",
-    "shapeconregr12",
+    # "shapeconregr12",
     "shapeconregr13",
     "densityest",
     "roa",
-    "lotkavolterra",
+    # "lotkavolterra",
     ]
     make_JLD(modelname)
 end

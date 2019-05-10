@@ -8,4 +8,4 @@ polymincomplex4.jld
 expdesign_medium.jld
 shapeconregr0.jld
 roa.jld
-lotkavolterra.jld hard
+# lotkavolterra.jld big
