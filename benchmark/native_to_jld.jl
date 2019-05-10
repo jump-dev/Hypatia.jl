@@ -9,6 +9,8 @@ const HYP = Hypatia
 const CO = HYP.Cones
 import Random
 import Distributions
+import JuMP
+import SumOfSquares
 
 examples_dir = joinpath(@__DIR__, "../examples")
 
@@ -20,6 +22,7 @@ include(joinpath(examples_dir, "expdesign/jump.jl"))
 include(joinpath(examples_dir, "shapeconregr/jump.jl"))
 include(joinpath(examples_dir, "densityest/jump.jl"))
 include(joinpath(examples_dir, "regionofattraction/univariate.jl"))
+include(joinpath(examples_dir, "lotkavolterra/jump.jl"))
 
 # TODO add families of instances for each model
 
@@ -28,12 +31,18 @@ outputpath = joinpath(@__DIR__, "instancefiles", "jld")
 Random.seed!(1234)
 
 function make_JLD(modelname::String)
-    if modelname == "envelope"
+    if modelname == "envelope1"
+        (c, A, b, G, h, cones, cone_idxs) = build_envelope(2, 5, 1, 5, use_data = true, primal_wsos = true, dense = false)
+    elseif modelname == "envelope2"
+        (c, A, b, G, h, cones, cone_idxs) = build_envelope(2, 5, 2, 6, primal_wsos = true, dense = true)
+    elseif modelname == "envelope3"
         (c, A, b, G, h, cones, cone_idxs) = build_envelope(3, 5, 3, 5, primal_wsos = true, dense = true)
+    elseif modelname == "envelope4"
+        (c, A, b, G, h, cones, cone_idxs) = build_envelope(2, 30, 1, 30, primal_wsos = true, dense = true)
     elseif modelname == "linearopt"
-        (c, A, b, G, h, cones, cone_idxs) = build_linearopt(15, 20, dense = true)
+        (c, A, b, G, h, cones, cone_idxs) = build_linearopt(500, 1000, dense = false)
     elseif modelname == "polyminreal1"
-        (c, A, b, G, h, cones, cone_idxs) = build_polymin(:butcher, 2) # only dense for this family
+        (c, A, b, G, h, cones, cone_idxs) = build_polymin(:butcher, 2) # TODO use sparse for this family
     elseif modelname == "polyminreal2"
         (c, A, b, G, h, cones, cone_idxs) = build_polymin(:caprasse, 4)
     elseif modelname == "polyminreal3"
@@ -91,12 +100,32 @@ function make_JLD(modelname::String)
             (q, p, n, nmax) = (10, 30, 50, 5)
             V = randn(q, p)
             (model, _) = build_JuMP_expdesign(q, p, V, n, nmax)
-        elseif modelname == "shapeconregr"
-            (n, deg, num_points, signal_ratio, f) = (2, 3, 100, 0.0, x -> sum(x.^3))
-            shape_data = ShapeData(n)
-            (X, y) = generate_regr_data(f, -1.0, 1.0, n, num_points, signal_ratio = 3.0)
+        elseif modelname == "expdesign_large"
+            (q, p, n, nmax) = (25, 75, 125, 5)
+            V = randn(q, p)
+            (model, _) = build_JuMP_expdesign(q, p, V, n, nmax)
+        elseif modelname == "shapeconregr0"
+            (n, deg, num_points, signal_ratio, f) = (2, 3, 100, 3.0, x -> sum(x.^3))
+            (X, y) = generate_regr_data(f, -1.0, 1.0, n, num_points, signal_ratio = signal_ratio)
             model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, use_dense = true))
-            (coeffs, polys) = build_shapeconregr_WSOS(model, X, y, deg, shape_data)
+            (coeffs, polys) = build_shapeconregr_WSOS(model, X, y, deg, ShapeData(n))
+        elseif modelname == "shapeconregr11"
+            (n, deg, num_points, signal_ratio, f) = (2, 5, 100, 10.0, x -> exp(norm(x)))
+            (X, y) = generate_regr_data(f, 0.5, 2.0, n, num_points, signal_ratio = signal_ratio)
+            shape_data = ShapeData(MU.Box(0.5 * ones(n), 2 * ones(n)), MU.Box(0.5 * ones(n), 2 * ones(n)), ones(n), 1)
+            model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, use_dense = true))
+            p = build_shapeconregr_WSOS(model, X, y, deg, shape_data, use_lsq_obj = true)
+        elseif modelname == "shapeconregr12"
+            (n, deg, num_points, signal_ratio, f) = (2, 5, 100, 10.0, x -> exp(norm(x)))
+            (X, y) = generate_regr_data(f, 0.5, 2.0, n, num_points, signal_ratio = signal_ratio)
+            shape_data = ShapeData(MU.Box(0.5 * ones(n), 2 * ones(n)), MU.Box(0.5 * ones(n), 2 * ones(n)), ones(n), 1)
+            model = SumOfSquares.SOSModel(JuMP.with_optimizer(HYP.Optimizer, use_dense = true))
+            p = build_shapeconregr_PSD(model, X, y, deg, shape_data, use_lsq_obj = true)
+        elseif modelname == "shapeconregr13"
+            (n, deg, num_points, signal_ratio, f) = (2, 6, 100, 1.0, x -> exp(norm(x)))
+            (X, y) = generate_regr_data(f, -1.0, 1.0, n, num_points, signal_ratio = signal_ratio)
+            model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, use_dense = true))
+            (coeffs, polys) = build_shapeconregr_WSOS(model, X, y, deg, ShapeData(n), use_lsq_obj = false)
         elseif modelname == "densityest"
             nobs = 200; n = 1; deg = 4; X = rand(Distributions.Uniform(-1, 1), nobs, n); dom = MU.Box(-ones(n), ones(n))
             model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer))
@@ -104,6 +133,9 @@ function make_JLD(modelname::String)
         elseif modelname == "roa"
             deg = 4
             model = univariate_WSOS(deg)
+        elseif modelname == "lotkavolterra"
+            model = SumOfSquares.SOSModel(JuMP.with_optimizer(HYP.Optimizer))
+            (sigma, rho) = build_lotkavolterra_PSD(model)
         else
             error("unknown model name")
         end
@@ -119,7 +151,10 @@ function make_JLD(modelname::String)
 end
 
 for modelname in [
-    "envelope",
+    "envelope1",
+    "envelope2",
+    "envelope3",
+    "envelope4",
     "linearopt",
     "polyminreal1",
     "polyminreal2",
@@ -141,9 +176,14 @@ for modelname in [
     "polymincomplex7",
     "expdesign_small",
     "expdesign_medium",
-    "shapeconregr",
+    "expdesign_large",
+    "shapeconregr0",
+    "shapeconregr11",
+    "shapeconregr12",
+    "shapeconregr13",
     "densityest",
     "roa",
+    "lotkavolterra",
     ]
     make_JLD(modelname)
 end

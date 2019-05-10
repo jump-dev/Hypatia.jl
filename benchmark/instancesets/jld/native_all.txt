@@ -1,7 +1,10 @@
 # examples saved in Hypatia native format
 
 densityest.jld
-envelope.jld
+envelope1.jld
+envelope2.jld
+envelope3.jld
+envelope4.jld
 linearopt.jld
 polyminreal1.jld
 polyminreal2.jld
@@ -23,5 +26,10 @@ polymincomplex6.jld
 polymincomplex7.jld
 expdesign_small.jld
 expdesign_medium.jld
-shapeconregr.jld
+expdesign_large.jld
+shapeconregr0.jld
+shapeconregr11.jld
+shapeconregr12.jld
+shapeconregr13.jld
 roa.jld
+lotkavolterra.jld
