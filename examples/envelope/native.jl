@@ -68,15 +68,31 @@ function build_envelope(
     return (c, A, b, G, h, cones, cone_idxs)
 end
 
+function envelope1(; primal_wsos::Bool = true, dense::Bool = false)
+    return build_envelope(2, 5, 1, 5, use_data = true, primal_wsos = primal_wsos, dense = dense)
+end
+
+function envelope2(; primal_wsos::Bool = true, dense::Bool = false)
+    return build_envelope(2, 5, 2, 6, primal_wsos = primal_wsos, dense = dense)
+end
+
+function envelope3(; primal_wsos::Bool = true, dense::Bool = false)
+    return build_envelope(3, 5, 3, 5, primal_wsos = primal_wsos, dense = dense)
+end
+
+function envelope4(; primal_wsos::Bool = true, dense::Bool = false)
+    return build_envelope(2, 30, 1, 30, primal_wsos = primal_wsos, dense = dense)
+end
+
 function run_envelope(primal_wsos::Bool, dense::Bool)
     # optionally use fixed data in folder
     # select number of polynomials and degrees for the envelope
     # select dimension and SOS degree (to be squared)
     (c, A, b, G, h, cones, cone_idxs) =
-        # build_envelope(2, 5, 1, 5, use_data = true, primal_wsos = primal_wsos, dense = dense)
-        # build_envelope(2, 5, 2, 6, primal_wsos = primal_wsos, dense = dense)
-        build_envelope(3, 5, 3, 5, primal_wsos = primal_wsos, dense = dense)
-        # build_envelope(2, 30, 1, 30, primal_wsos = primal_wsos, dense = dense)
+        # envelope1(primal_wsos = primal_wsos, dense = dense)
+        # envelope2(primal_wsos = primal_wsos, dense = dense)
+        envelope3(primal_wsos = primal_wsos, dense = dense)
+        # envelope4(primal_wsos = primal_wsos, dense = dense)
 
     model = MO.PreprocessedLinearModel(c, A, b, G, h, cones, cone_idxs)
     solver = SO.HSDSolver(model, verbose = true)

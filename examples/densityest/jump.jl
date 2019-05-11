@@ -66,21 +66,24 @@ function build_JuMP_densityest(
             [i in 1:nobs], vcat(z[i], 1.0, dot(f, basis_evals[i, :])) in MOI.ExponentialCone() # hypograph of log
         end)
     end
-    return (lagrange_polys, f)
+    return
 end
 
-function run_JuMP_densityest(; rseed::Int = 1)
-    Random.seed!(rseed)
-
+function densityest1(; use_monomials::Bool = false)
     nobs = 200
     n = 1
     deg = 4
     X = rand(Distributions.Uniform(-1, 1), nobs, n)
     dom = MU.Box(-ones(n), ones(n))
+    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
+    build_JuMP_densityest(model, X, deg, dom, use_monomials = use_monomials)
+    return model
+end
 
+function run_JuMP_densityest(; rseed::Int = 1)
+    Random.seed!(rseed)
     for use_monomials in [true, false]
-        model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
-        (interp_bases, coeffs) = build_JuMP_densityest(model, X, deg, dom, use_monomials = use_monomials)
+        model = densityest1(use_monomials = use_monomials)
         JuMP.optimize!(model)
 
         term_status = JuMP.termination_status(model)
@@ -95,5 +98,5 @@ function run_JuMP_densityest(; rseed::Int = 1)
         @test primal_obj ≈ dual_obj atol = 1e-4 rtol = 1e-4
     end
 
-    return nothing
+    return
 end
