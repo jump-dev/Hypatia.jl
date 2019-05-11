@@ -26,7 +26,7 @@ function build_envelope(
     d::Int;
     primal_wsos::Bool = true,
     use_data::Bool = false,
-    dense::Bool = false,
+    use_dense::Bool = false,
     rseed::Int = 1,
     )
     Random.seed!(rseed)
@@ -45,7 +45,7 @@ function build_envelope(
         c_or_h = vec(P0[:, 1:LDegs] * rand(-9:9, LDegs, npoly))
     end
 
-    subI = dense ? Array(1.0I, U, U) : sparse(1.0I, U, U)
+    subI = use_dense ? Array(1.0I, U, U) : sparse(1.0I, U, U)
     if primal_wsos
         # use formulation with WSOS cone in primal
         c = -w
@@ -68,31 +68,25 @@ function build_envelope(
     return (c, A, b, G, h, cones, cone_idxs)
 end
 
-function envelope1(; primal_wsos::Bool = true, dense::Bool = false)
-    return build_envelope(2, 5, 1, 5, use_data = true, primal_wsos = primal_wsos, dense = dense)
+function envelope1(; primal_wsos::Bool = true, use_dense::Bool = true)
+    # uses fixed data in folder
+    return build_envelope(2, 5, 1, 5, use_data = true, primal_wsos = primal_wsos, use_dense = use_dense)
 end
 
-function envelope2(; primal_wsos::Bool = true, dense::Bool = false)
-    return build_envelope(2, 5, 2, 6, primal_wsos = primal_wsos, dense = dense)
+function envelope2(; primal_wsos::Bool = true, use_dense::Bool = true)
+    return build_envelope(2, 5, 2, 6, primal_wsos = primal_wsos, use_dense = use_dense)
 end
 
-function envelope3(; primal_wsos::Bool = true, dense::Bool = false)
-    return build_envelope(3, 5, 3, 5, primal_wsos = primal_wsos, dense = dense)
+function envelope3(; primal_wsos::Bool = true, use_dense::Bool = true)
+    return build_envelope(3, 5, 3, 5, primal_wsos = primal_wsos, use_dense = use_dense)
 end
 
-function envelope4(; primal_wsos::Bool = true, dense::Bool = false)
-    return build_envelope(2, 30, 1, 30, primal_wsos = primal_wsos, dense = dense)
+function envelope4(; primal_wsos::Bool = true, use_dense::Bool = true)
+    return build_envelope(2, 30, 1, 30, primal_wsos = primal_wsos, use_dense = use_dense)
 end
 
-function run_envelope(primal_wsos::Bool, dense::Bool)
-    # optionally use fixed data in folder
-    # select number of polynomials and degrees for the envelope
-    # select dimension and SOS degree (to be squared)
-    (c, A, b, G, h, cones, cone_idxs) =
-        # envelope1(primal_wsos = primal_wsos, dense = dense)
-        # envelope2(primal_wsos = primal_wsos, dense = dense)
-        envelope3(primal_wsos = primal_wsos, dense = dense)
-        # envelope4(primal_wsos = primal_wsos, dense = dense)
+function run_envelope(primal_wsos::Bool, use_dense::Bool)
+    (c, A, b, G, h, cones, cone_idxs) = envelope3(primal_wsos = primal_wsos, use_dense = use_dense)
 
     model = MO.PreprocessedLinearModel(c, A, b, G, h, cones, cone_idxs)
     solver = SO.HSDSolver(model, verbose = true)

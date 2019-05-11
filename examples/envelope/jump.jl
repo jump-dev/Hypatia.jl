@@ -23,6 +23,7 @@ function build_JuMP_envelope(
     domain::MU.Domain;
     sample::Bool = true,
     rseed::Int = 1,
+    use_dense::Bool = true,
     )
     Random.seed!(rseed)
 
@@ -36,7 +37,7 @@ function build_JuMP_envelope(
     polys = P0[:, 1:LDegs] * rand(-9:9, LDegs, npoly)
 
     # build JuMP model
-    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
+    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, use_dense = use_dense))
     JuMP.@variable(model, fpv[j in 1:U]) # values at Fekete points
     JuMP.@objective(model, Max, dot(fpv, w)) # integral over domain (via quadrature)
     JuMP.@constraint(model, [i in 1:npoly], polys[:, i] .- fpv in HYP.WSOSPolyInterpCone(U, [P0, PWts...]))
@@ -44,12 +45,12 @@ function build_JuMP_envelope(
     return model
 end
 
-function JuMP_envelope1(; sample::Bool = true)
-    return build_JuMP_envelope(2, 3, 4, MU.Box(-ones(2), ones(2)))
+function JuMP_envelope1(; sample::Bool = true, use_dense::Bool = true)
+    return build_JuMP_envelope(2, 3, 4, MU.Box(-ones(2), ones(2)), use_dense = use_dense)
 end
 
-function JuMP_envelope2(; sample::Bool = true)
-    return build_JuMP_envelope(2, 3, 4, MU.Ball(zeros(2), sqrt(2)))
+function JuMP_envelope2(; sample::Bool = true, use_dense::Bool = true)
+    return build_JuMP_envelope(2, 3, 4, MU.Ball(zeros(2), sqrt(2)), use_dense = use_dense)
 end
 
 function run_JuMP_envelope(; sample::Bool = true, box::Bool = true)

@@ -789,13 +789,13 @@ end
 
 function envelope1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
     # dense methods
-    (c, A, b, G, h, cones, cone_idxs) = build_envelope(2, 5, 1, 5, use_data = true, dense = true)
+    (c, A, b, G, h, cones, cone_idxs) = build_envelope(2, 5, 1, 5, use_data = true, use_dense = true)
     r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
     @test r.status == :Optimal
     @test r.primal_obj ≈ 25.502777 atol = 1e-4 rtol = 1e-4
 
     # sparse methods
-    (c, A, b, G, h, cones, cone_idxs) = build_envelope(2, 5, 1, 5, use_data = true, dense = false)
+    (c, A, b, G, h, cones, cone_idxs) = build_envelope(2, 5, 1, 5, use_data = true, use_dense = false)
     r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
     @test r.status == :Optimal
     @test r.primal_obj ≈ 25.502777 atol = 1e-4 rtol = 1e-4
@@ -803,12 +803,12 @@ end
 
 function envelope2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
     # dense methods
-    (c, A, b, G, h, cones, cone_idxs) = build_envelope(2, 4, 2, 7, dense = true)
+    (c, A, b, G, h, cones, cone_idxs) = build_envelope(2, 4, 2, 7, use_dense = true)
     rd = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
     @test rd.status == :Optimal
 
     # sparse methods
-    (c, A, b, G, h, cones, cone_idxs) = build_envelope(2, 4, 2, 7, dense = false)
+    (c, A, b, G, h, cones, cone_idxs) = build_envelope(2, 4, 2, 7, use_dense = false)
     rs = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
     @test rs.status == :Optimal
 
@@ -816,13 +816,13 @@ function envelope2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_mod
 end
 
 function envelope3(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
-    (c, A, b, G, h, cones, cone_idxs) = build_envelope(2, 3, 3, 5, dense = false)
+    (c, A, b, G, h, cones, cone_idxs) = build_envelope(2, 3, 3, 5, use_dense = false)
     r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
     @test r.status == :Optimal
 end
 
 function envelope4(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
-    (c, A, b, G, h, cones, cone_idxs) = build_envelope(2, 2, 4, 3, dense = false)
+    (c, A, b, G, h, cones, cone_idxs) = build_envelope(2, 2, 4, 3, use_dense = false)
     r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
     @test r.status == :Optimal
 end

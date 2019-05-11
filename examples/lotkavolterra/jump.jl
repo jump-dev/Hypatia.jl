@@ -81,9 +81,9 @@ function build_JuMP_lotkavolterra_PSD(model)
     return (sigma, rho)
 end
 
-function JuMP_lotkavolterra()
+function JuMP_lotkavolterra(; use_dense::Bool = true)
     model = SumOfSquares.SOSModel(JuMP.with_optimizer(HYP.Optimizer,
-        use_dense = true,
+        use_dense = use_dense,
         verbose = true,
         system_solver = SO.QRCholCombinedHSDSystemSolver,
         linear_model = MO.PreprocessedLinearModel,

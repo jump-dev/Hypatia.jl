@@ -52,9 +52,9 @@ function build_linearopt(
     return (c, A, b, G, h, cones, cone_idxs)
 end
 
-linearopt1() = build_linearopt(500, 1000, use_data = true)
-linearopt2() = build_linearopt(500, 1000)
-linearopt3() = build_linearopt(15, 20)
+linearopt1(; use_dense::Bool = true) = build_linearopt(500, 1000, use_data = true, tosparse = !use_dense)
+linearopt2(; use_dense::Bool = true) = build_linearopt(500, 1000, tosparse = !use_dense)
+linearopt3(; use_dense::Bool = true) = build_linearopt(15, 20, tosparse = !use_dense)
 
 function run_linearopt()
     # optionally use fixed data in folder

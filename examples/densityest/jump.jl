@@ -69,13 +69,13 @@ function build_JuMP_densityest(
     return
 end
 
-function JuMP_densityest1(; use_monomials::Bool = false)
+function JuMP_densityest1(; use_monomials::Bool = false, use_dense::Bool = true)
     nobs = 200
     n = 1
     deg = 4
     X = rand(Distributions.Uniform(-1, 1), nobs, n)
     dom = MU.Box(-ones(n), ones(n))
-    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true))
+    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, use_dense = use_dense))
     build_JuMP_densityest(model, X, deg, dom, use_monomials = use_monomials)
     return model
 end

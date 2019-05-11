@@ -24,7 +24,7 @@ const DP = DynamicPolynomials
 using LinearAlgebra
 using Test
 
-function build_JuMP_univariate_roa_WSOS(deg::Int)
+function build_JuMP_univariate_roa_WSOS(deg::Int; use_dense::Bool = true)
     T = 100.0
 
     DP.@polyvar x
@@ -41,7 +41,7 @@ function build_JuMP_univariate_roa_WSOS(deg::Int)
     wsos_cone2 = HYP.WSOSPolyInterpCone(U2, [P02, PWts2...])
     wsos_cone3 = HYP.WSOSPolyInterpCone(U3, [P03, PWts3...])
 
-    model = JuMP.Model(JuMP.with_optimizer(Hypatia.Optimizer, verbose = true))
+    model = JuMP.Model(JuMP.with_optimizer(Hypatia.Optimizer, verbose = true, use_dense = use_dense))
     JuMP.@variables(model, begin
         v, PolyJuMP.Poly(DP.monomials([x; t], 0:deg))
         w, PolyJuMP.Poly(DP.monomials(x, 0:deg))
@@ -63,7 +63,7 @@ function build_JuMP_univariate_roa_WSOS(deg::Int)
     return model
 end
 
-function build_JuMP_univariate_roa_PSD(deg::Int)
+function build_JuMP_univariate_roa_PSD(deg::Int; use_dense::Bool = true)
     T = 100.0
 
     DP.@polyvar x
@@ -73,7 +73,7 @@ function build_JuMP_univariate_roa_PSD(deg::Int)
     int_box_mon(mon) = prod(1 / (p + 1) - (-1)^(p + 1) / (p + 1) for p in DP.exponents(mon))
     int_box(pol) = sum(DP.coefficient(t) * int_box_mon(t) for t in DP.terms(pol))
 
-    model = SumOfSquares.SOSModel(JuMP.with_optimizer(Hypatia.Optimizer, verbose = true))
+    model = SumOfSquares.SOSModel(JuMP.with_optimizer(Hypatia.Optimizer, verbose = true, use_dense = use_dense))
     JuMP.@variables(model, begin
         v, PolyJuMP.Poly(DP.monomials([x; t], 0:deg))
         w, PolyJuMP.Poly(DP.monomials(x, 0:deg))
@@ -93,8 +93,8 @@ function build_JuMP_univariate_roa_PSD(deg::Int)
     return model
 end
 
-univariate_roa1() = build_JuMP_univariate_roa_WSOS(4)
-univariate_roa2() = build_JuMP_univariate_roa_PSD(4)
+univariate_roa1(; use_dense::Bool = true) = build_JuMP_univariate_roa_WSOS(4, use_dense = use_dense)
+univariate_roa2(; use_dense::Bool = true) = build_JuMP_univariate_roa_PSD(4, use_dense = use_dense)
 
 function run_JuMP_univariate_roa(; use_WSOS::Bool = true)
     if use_WSOS
