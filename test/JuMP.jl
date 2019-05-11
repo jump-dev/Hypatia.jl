@@ -11,69 +11,70 @@ function solve_and_check_JuMP(model, true_obj; atol = 1e-3, rtol = 1e-3)
     @test JuMP.objective_value(model) ≈ true_obj atol = atol rtol = rtol
 end
 
-function test_JuMP_polymin1()
-    # the Heart polynomial in a box
-    true_obj = -1.36775
-    model = JuMP_polymin1()
-    solve_and_check_JuMP(model, true_obj)
-end
 
-function test_JuMP_polymin2()
-    # the Schwefel polynomial in a box
-    true_obj = -0
-    model = JuMP_polymin2()
-    solve_and_check_JuMP(model, true_obj)
-end
-
-function test_JuMP_polymin3()
-    # the Magnetism polynomial in a ball
-    true_obj = -0.25
-    model = JuMP_polymin3()
-    solve_and_check_JuMP(model, true_obj)
-end
-
-function test_JuMP_polymin4()
-    # the Motzkin polynomial in an ellipsoid containing two local minima in opposite orthants
-    true_obj = 0
-    model = JuMP_polymin4()
-    solve_and_check_JuMP(model, true_obj)
-end
-
-function test_JuMP_polymin5()
-    true_obj = -3.1800966258
-    model = JuMP_polymin5()
-    solve_and_check_JuMP(model, true_obj)
-end
-
-function test_JuMP_polymin6()
-    true_obj = 3
-    model = JuMP_polymin6()
-    solve_and_check_JuMP(model, true_obj)
-end
-
-function test_JuMP_polymin7()
-    true_obj = -20.8
-    model = JuMP_polymin7()
-    solve_and_check_JuMP(model, true_obj)
-end
-
-function test_JuMP_polymin8()
-    true_obj = 0.814814
-    model =JuMP_polymin8()
-    solve_and_check_JuMP(model, true_obj)
-end
-
-function test_JuMP_polymin9()
-    true_obj = -73.31
-    model = JuMP_polymin9()
-    solve_and_check_JuMP(model, true_obj)
-end
-
-function test_JuMP_polymin10()
-    true_obj = 0
-    model = JuMP_polymin10()
-    solve_and_check_JuMP(model, true_obj, atol = 1e-3)
-end
+# function test_JuMP_polymin1()
+#     # the Heart polynomial in a box
+#     true_obj = -1.36775
+#     model = JuMP_polymin1()
+#     solve_and_check_JuMP(model, true_obj)
+# end
+#
+# function test_JuMP_polymin2()
+#     # the Schwefel polynomial in a box
+#     true_obj = -0
+#     model = JuMP_polymin2()
+#     solve_and_check_JuMP(model, true_obj)
+# end
+#
+# function test_JuMP_polymin3()
+#     # the Magnetism polynomial in a ball
+#     true_obj = -0.25
+#     model = JuMP_polymin3()
+#     solve_and_check_JuMP(model, true_obj)
+# end
+#
+# function test_JuMP_polymin4()
+#     # the Motzkin polynomial in an ellipsoid containing two local minima in opposite orthants
+#     true_obj = 0
+#     model = JuMP_polymin4()
+#     solve_and_check_JuMP(model, true_obj)
+# end
+#
+# function test_JuMP_polymin5()
+#     true_obj = -3.1800966258
+#     model = JuMP_polymin5()
+#     solve_and_check_JuMP(model, true_obj)
+# end
+#
+# function test_JuMP_polymin6()
+#     true_obj = 3
+#     model = JuMP_polymin6()
+#     solve_and_check_JuMP(model, true_obj)
+# end
+#
+# function test_JuMP_polymin7()
+#     true_obj = -20.8
+#     model = JuMP_polymin7()
+#     solve_and_check_JuMP(model, true_obj)
+# end
+#
+# function test_JuMP_polymin8()
+#     true_obj = 0.814814
+#     model =JuMP_polymin8()
+#     solve_and_check_JuMP(model, true_obj)
+# end
+#
+# function test_JuMP_polymin9()
+#     true_obj = -73.31
+#     model = JuMP_polymin9()
+#     solve_and_check_JuMP(model, true_obj)
+# end
+#
+# function test_JuMP_polymin10()
+#     true_obj = 0
+#     model = JuMP_polymin10()
+#     solve_and_check_JuMP(model, true_obj, atol = 1e-3)
+# end
 
 function test_JuMP_shapeconregr1()
     true_obj = 4.4065e-1

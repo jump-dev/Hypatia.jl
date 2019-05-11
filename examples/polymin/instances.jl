@@ -4,59 +4,59 @@ Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
 # JuMP examples, real
 
-function JuMP_polymin1(; use_dense = false)
-    # the Heart polynomial in a box
-    (x, f, dom, true_obj) = getpolydata(:heart)
-    return build_JuMP_polymin_WSOS(x, f, dom, d = 2)
-end
-
-function JuMP_polymin2(; use_dense = false)
-    # the Schwefel polynomial in a box
-    (x, f, dom, true_obj) = getpolydata(:schwefel)
-    return build_JuMP_polymin_WSOS(x, f, dom, d = 2)
-end
-
-function JuMP_polymin3(; use_dense = false)
-    # the Magnetism polynomial in a ball
-    (x, f, dom, true_obj) = getpolydata(:magnetism7_ball)
-    return build_JuMP_polymin_WSOS(x, f, dom, d = 2)
-end
-
-function JuMP_polymin4(; use_dense = false)
-    # the Motzkin polynomial in an ellipsoid containing two local minima in opposite orthants
-    (x, f, dom, true_obj) = getpolydata(:motzkin_ellipsoid)
-    return build_JuMP_polymin_WSOS(x, f, dom, d = 4)
-end
-
-function JuMP_polymin5(; use_dense = false)
-    (x, f, dom, true_obj) = getpolydata(:caprasse)
-    return build_JuMP_polymin_WSOS(x, f, dom, d = 4)
-end
-
-function JuMP_polymin6(; use_dense = false)
-    (x, f, dom, true_obj) = getpolydata(:goldsteinprice)
-    return build_JuMP_polymin_WSOS(x, f, dom, d = 7)
-end
-
-function JuMP_polymin7(; use_dense = false)
-    (x, f, dom, true_obj) = getpolydata(:lotkavolterra)
-    return build_JuMP_polymin_WSOS(x, f, dom, d = 3)
-end
-
-function JuMP_polymin8(; use_dense = false)
-    (x, f, dom, true_obj) = getpolydata(:robinson)
-    return build_JuMP_polymin_WSOS(x, f, dom, d = 8)
-end
-
-function JuMP_polymin9(; use_dense = false)
-    (x, f, dom, true_obj) = getpolydata(:reactiondiffusion_ball)
-    return build_JuMP_polymin_WSOS(x, f, dom, d = 3)
-end
-
-function JuMP_polymin10(; use_dense = false)
-    (x, f, dom, true_obj) = getpolydata(:rosenbrock)
-    return = build_JuMP_polymin_WSOS(x, f, dom, d = 5)
-end
+# function JuMP_polymin1(; use_dense = false)
+#     # the Heart polynomial in a box
+#     (x, f, dom, true_obj) = getpolydata(:heart)
+#     return build_JuMP_polymin_WSOS(x, f, dom, d = 2)
+# end
+#
+# function JuMP_polymin2(; use_dense = false)
+#     # the Schwefel polynomial in a box
+#     (x, f, dom, true_obj) = getpolydata(:schwefel)
+#     return build_JuMP_polymin_WSOS(x, f, dom, d = 2)
+# end
+#
+# function JuMP_polymin3(; use_dense = false)
+#     # the Magnetism polynomial in a ball
+#     (x, f, dom, true_obj) = getpolydata(:magnetism7_ball)
+#     return build_JuMP_polymin_WSOS(x, f, dom, d = 2)
+# end
+#
+# function JuMP_polymin4(; use_dense = false)
+#     # the Motzkin polynomial in an ellipsoid containing two local minima in opposite orthants
+#     (x, f, dom, true_obj) = getpolydata(:motzkin_ellipsoid)
+#     return build_JuMP_polymin_WSOS(x, f, dom, d = 4)
+# end
+#
+# function JuMP_polymin5(; use_dense = false)
+#     (x, f, dom, true_obj) = getpolydata(:caprasse)
+#     return build_JuMP_polymin_WSOS(x, f, dom, d = 4)
+# end
+#
+# function JuMP_polymin6(; use_dense = false)
+#     (x, f, dom, true_obj) = getpolydata(:goldsteinprice)
+#     return build_JuMP_polymin_WSOS(x, f, dom, d = 7)
+# end
+#
+# function JuMP_polymin7(; use_dense = false)
+#     (x, f, dom, true_obj) = getpolydata(:lotkavolterra)
+#     return build_JuMP_polymin_WSOS(x, f, dom, d = 3)
+# end
+#
+# function JuMP_polymin8(; use_dense = false)
+#     (x, f, dom, true_obj) = getpolydata(:robinson)
+#     return build_JuMP_polymin_WSOS(x, f, dom, d = 8)
+# end
+#
+# function JuMP_polymin9(; use_dense = false)
+#     (x, f, dom, true_obj) = getpolydata(:reactiondiffusion_ball)
+#     return build_JuMP_polymin_WSOS(x, f, dom, d = 3)
+# end
+#
+# function JuMP_polymin10(; use_dense = false)
+#     (x, f, dom, true_obj) = getpolydata(:rosenbrock)
+#     return build_JuMP_polymin_WSOS(x, f, dom, d = 5)
+# end
 
 # native examples, complex
 

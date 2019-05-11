@@ -205,58 +205,112 @@ function build_JuMP_polymin_WSOS(
     return model
 end
 
-function run_JuMP_polymin(use_wsos::Bool; primal_wsos::Bool = false)
-    # select the named polynomial to minimize and degree of SOS interpolation
-    (polyname, deg) =
-        # :butcher, 2
-        # :butcher_ball, 2
-        # :butcher_ellipsoid, 2
-        # :caprasse, 4
-        # :caprasse_ball, 4
-        # :goldsteinprice, 7
-        # :goldsteinprice_ball, 7
-        # :goldsteinprice_ellipsoid, 7
-        # :heart, 2
-        # :lotkavolterra, 3
-        # :lotkavolterra_ball, 3
-        # :magnetism7, 2
-        # :magnetism7_ball, 2
-        :motzkin, 3
-        # :motzkin_ball, 7
-        # :motzkin_ellipsoid, 7
-        # :reactiondiffusion, 3
-        # :reactiondiffusion_ball, 3
-        # :robinson, 8
-        # :robinson_ball, 8
-        # :rosenbrock, 4
-        # :rosenbrock_ball, 4
-        # :schwefel, 3
-        # :schwefel_ball, 3
+# function run_JuMP_polymin(use_wsos::Bool; primal_wsos::Bool = false)
+#     # select the named polynomial to minimize and degree of SOS interpolation
+#     (polyname, deg) =
+#         # :butcher, 2
+#         # :butcher_ball, 2
+#         # :butcher_ellipsoid, 2
+#         # :caprasse, 4
+#         # :caprasse_ball, 4
+#         # :goldsteinprice, 7
+#         # :goldsteinprice_ball, 7
+#         # :goldsteinprice_ellipsoid, 7
+#         # :heart, 2
+#         # :lotkavolterra, 3
+#         # :lotkavolterra_ball, 3
+#         # :magnetism7, 2
+#         # :magnetism7_ball, 2
+#         :motzkin, 3
+#         # :motzkin_ball, 7
+#         # :motzkin_ellipsoid, 7
+#         # :reactiondiffusion, 3
+#         # :reactiondiffusion_ball, 3
+#         # :robinson, 8
+#         # :robinson_ball, 8
+#         # :rosenbrock, 4
+#         # :rosenbrock_ball, 4
+#         # :schwefel, 3
+#         # :schwefel_ball, 3
+#
+#     (x, f, dom, truemin) = getpolydata(polyname)
+#
+#     if use_wsos
+#         model = build_JuMP_polymin_WSOS(x, f, dom, d = deg, primal_wsos = primal_wsos)
+#     else
+#         model = build_JuMP_polymin_PSD(x, f, dom, d = deg)
+#     end
+#     JuMP.optimize!(model)
+#
+#     term_status = JuMP.termination_status(model)
+#     primal_obj = JuMP.objective_value(model)
+#     dual_obj = JuMP.objective_bound(model)
+#     pr_status = JuMP.primal_status(model)
+#     du_status = JuMP.dual_status(model)
+#
+#     @test term_status == MOI.OPTIMAL
+#     @test pr_status == MOI.FEASIBLE_POINT
+#     @test du_status == MOI.FEASIBLE_POINT
+#     @test primal_obj ≈ dual_obj atol = 1e-4 rtol = 1e-4
+#     @test primal_obj ≈ truemin atol = 1e-4 rtol = 1e-4
+#
+#     return
+# end
 
-    (x, f, dom, truemin) = getpolydata(polyname)
-
+function polyminj(polyname::Symbol, d::Int; use_wsos::Bool = true, primal_wsos::Bool = false)
+    (x, f, dom, true_obj) = getpolydata(polyname)
     if use_wsos
-        model = build_JuMP_polymin_WSOS(x, f, dom, d = deg, primal_wsos = primal_wsos)
+        model = build_JuMP_polymin_WSOS(x, f, dom, d = d, primal_wsos = primal_wsos)
     else
-        model = build_JuMP_polymin_PSD(x, f, dom, d = deg)
+        model = build_JuMP_polymin_PSD(x, f, dom, d = d)
     end
-    JuMP.optimize!(model)
+    return (model = model, true_obj = true_obj)
+end
 
-    term_status = JuMP.termination_status(model)
-    primal_obj = JuMP.objective_value(model)
-    dual_obj = JuMP.objective_bound(model)
-    pr_status = JuMP.primal_status(model)
-    du_status = JuMP.dual_status(model)
+polymin1j() = polyminj(:heart, 2)
+polymin2j() = polyminj(:schwefel, 2)
+polymin3j() = polyminj(:magnetism7_ball, 2)
+polymin4j() = polyminj(:motzkin_ellipsoid, 4)
+polymin5j() = polyminj(:caprasse, 4)
+polymin6j() = polyminj(:goldsteinprice, 7)
+polymin7j() = polyminj(:lotkavolterra, 3)
+polymin8j() = polyminj(:robinson, 8)
+polymin9j() = polyminj(:reactiondiffusion_ball, 3)
+polymin10j() = polyminj(:rosenbrock, 5)
+polymin11j() = polyminj(:motzkin, 3, use_wsos = false)
+polymin12j() = polyminj(:motzkin, 3, primal_wsos = true)
 
-    @test term_status == MOI.OPTIMAL
-    @test pr_status == MOI.FEASIBLE_POINT
-    @test du_status == MOI.FEASIBLE_POINT
-    @test primal_obj ≈ dual_obj atol = 1e-4 rtol = 1e-4
-    @test primal_obj ≈ truemin atol = 1e-4 rtol = 1e-4
+function test_polyminj()
+    instances = [
+        polymin1j,
+        polymin2j,
+        polymin3j,
+        polymin4j,
+        polymin5j,
+        polymin6j,
+        polymin7j,
+        polymin8j,
+        polymin9j,
+        polymin10j,
+        polymin11j,
+        polymin12j,
+        ]
+    for inst in instances
+        (model, true_obj) = inst()
+
+        JuMP.optimize!(model)
+        term_status = JuMP.termination_status(model)
+        primal_obj = JuMP.objective_value(model)
+        dual_obj = JuMP.objective_bound(model)
+        pr_status = JuMP.primal_status(model)
+        du_status = JuMP.dual_status(model)
+
+        @test term_status == MOI.OPTIMAL
+        @test pr_status == MOI.FEASIBLE_POINT
+        @test du_status == MOI.FEASIBLE_POINT
+        @test primal_obj ≈ dual_obj atol = 1e-4 rtol = 1e-4
+        @test primal_obj ≈ true_obj atol = 1e-4 rtol = 1e-4
+    end
 
     return
 end
-
-run_JuMP_polymin_PSD() = run_JuMP_polymin(false)
-run_JuMP_polymin_WSOS_primal() = run_JuMP_polymin(true, primal_wsos = true)
-run_JuMP_polymin_WSOS_dual() = run_JuMP_polymin(true, primal_wsos = false)
