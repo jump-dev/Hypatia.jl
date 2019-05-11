@@ -41,17 +41,23 @@ function build_JuMP_envelope(
     JuMP.@objective(model, Max, dot(fpv, w)) # integral over domain (via quadrature)
     JuMP.@constraint(model, [i in 1:npoly], polys[:, i] .- fpv in HYP.WSOSPolyInterpCone(U, [P0, PWts...]))
 
-    return (model, fpv)
+    return model
 end
 
-function run_JuMP_envelope(
-    npoly::Int,
-    deg::Int,
-    d::Int,
-    dom::MU.Domain;
-    sample::Bool = true,
-    )
-    (model, fpv) = build_JuMP_envelope(npoly, deg, d, dom, sample = sample)
+function JuMP_envelope1(; sample::Bool = true)
+    return build_JuMP_envelope(2, 3, 4, MU.Box(-ones(2), ones(2)))
+end
+
+function JuMP_envelope2(; sample::Bool = true)
+    return build_JuMP_envelope(2, 3, 4, MU.Ball(zeros(2), sqrt(2)))
+end
+
+function run_JuMP_envelope(; sample::Bool = true, box::Bool = true)
+    if box
+        model = JuMP_envelope1(sample = sample)
+    else
+        model = JuMP_envelope2(sample = sample)
+    end
     JuMP.optimize!(model)
 
     term_status = JuMP.termination_status(model)
@@ -68,6 +74,6 @@ function run_JuMP_envelope(
     return
 end
 
-run_JuMP_envelope_sampleinterp_box() = run_JuMP_envelope(2, 3, 4, MU.Box(-ones(2), ones(2)))
-run_JuMP_envelope_sampleinterp_ball() = run_JuMP_envelope(2, 3, 4, MU.Ball(zeros(2), sqrt(2)))
-run_JuMP_envelope_boxinterp() = run_JuMP_envelope(2, 3, 4, MU.Box(-ones(2), ones(2)), sample = false)
+run_JuMP_envelope_sampleinterp_box() = run_JuMP_envelope(sample = true, box = true)
+run_JuMP_envelope_sampleinterp_ball() = run_JuMP_envelope(sample = true, box = false)
+run_JuMP_envelope_boxinterp() = run_JuMP_envelope(sample = false, box = true)

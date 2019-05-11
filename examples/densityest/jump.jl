@@ -69,7 +69,7 @@ function build_JuMP_densityest(
     return
 end
 
-function densityest1(; use_monomials::Bool = false)
+function JuMP_densityest1(; use_monomials::Bool = false)
     nobs = 200
     n = 1
     deg = 4
@@ -83,7 +83,7 @@ end
 function run_JuMP_densityest(; rseed::Int = 1)
     Random.seed!(rseed)
     for use_monomials in [true, false]
-        model = densityest1(use_monomials = use_monomials)
+        model = JuMP_densityest1(use_monomials = use_monomials)
         JuMP.optimize!(model)
 
         term_status = JuMP.termination_status(model)
