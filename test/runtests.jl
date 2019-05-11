@@ -33,6 +33,7 @@ include(joinpath(examples_dir, "envelope/jump.jl"))
 include(joinpath(examples_dir, "expdesign/jump.jl"))
 include(joinpath(examples_dir, "polymin/jump.jl"))
 include(joinpath(examples_dir, "shapeconregr/jump.jl"))
+include(joinpath(examples_dir, "shapeconregr/instances.jl"))
 include(joinpath(examples_dir, "densityest/jump.jl"))
 include(joinpath(examples_dir, "wsosmatrix/sosmatrix.jl"))
 include(joinpath(examples_dir, "wsosmatrix/muconvexity.jl"))
@@ -259,21 +260,21 @@ testfuns = [
     polymin8_JuMP,
     polymin9_JuMP,
     polymin10_JuMP,
-    shapeconregr1_JuMP,
-    shapeconregr2_JuMP,
-    shapeconregr3_JuMP,
-    shapeconregr4_JuMP,
-    shapeconregr5_JuMP,
-    shapeconregr6_JuMP,
-    shapeconregr7_JuMP,
-    shapeconregr8_JuMP,
-    shapeconregr9_JuMP,
-    shapeconregr10_JuMP,
-    shapeconregr11_JuMP,
-    shapeconregr12_JuMP, # numerically unstable
-    shapeconregr13_JuMP,
-    # shapeconregr14_JuMP, # throws out-of-memory error
-    # shapeconregr15_JuMP, # throws out-of-memory error
+    test_JuMP_shapeconregr1,
+    test_JuMP_shapeconregr2,
+    test_JuMP_shapeconregr3_JuMP,
+    test_JuMP_shapeconregr4_JuMP,
+    test_JuMP_shapeconregr5_JuMP,
+    test_JuMP_shapeconregr6_JuMP,
+    test_JuMP_shapeconregr7_JuMP,
+    test_JuMP_shapeconregr8_JuMP,
+    test_JuMP_shapeconregr9_JuMP,
+    test_JuMP_shapeconregr10_JuMP,
+    test_JuMP_shapeconregr11_JuMP,
+    test_JuMP_shapeconregr12_JuMP, # numerically unstable
+    test_JuMP_shapeconregr13_JuMP,
+    # test_JuMP_shapeconregr14_JuMP, # throws out-of-memory error
+    # test_JuMP_shapeconregr15_JuMP, # throws out-of-memory error
     ]
 @testset "JuMP examples: $t" for t in testfuns
     t()

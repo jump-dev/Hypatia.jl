@@ -268,4 +268,4 @@ end
 
 run_JuMP_shapeconregr_PSD() = run_JuMP_shapeconregr(false)
 run_JuMP_shapeconregr_WSOS() = run_JuMP_shapeconregr(true)
-run_JuMP_shapeconregr_WSOS_PolyJuMP() = run_JuMP_shapeconregr(true, use_PolyJuMP = true)
+run_JuMP_shapeconregr_WSOS_PolyJuMP() = run_JuMP_shapeconregr(true, use_PolyJuMP = true) 
