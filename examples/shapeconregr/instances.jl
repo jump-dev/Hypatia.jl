@@ -1,5 +1,5 @@
 #=
-Copyright 2018, Chris Coey, Lea Kapelevich and contributors
+Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 =#
 
 function JuMP_shapeconregr1(; sample = true, use_dense = true)
