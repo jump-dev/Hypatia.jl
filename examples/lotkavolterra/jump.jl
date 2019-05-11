@@ -81,7 +81,7 @@ function build_JuMP_lotkavolterra_PSD(model)
     return (sigma, rho)
 end
 
-function lotkavolterra()
+function JuMP_lotkavolterra()
     model = SumOfSquares.SOSModel(JuMP.with_optimizer(HYP.Optimizer,
         use_dense = true,
         verbose = true,
@@ -98,7 +98,7 @@ function lotkavolterra()
 end
 
 function run_JuMP_lotkavolterra()
-    model = lotkavolterra()
+    model = JuMP_lotkavolterra()
     JuMP.optimize!(model)
 
     term_status = JuMP.termination_status(model)

@@ -93,11 +93,14 @@ function build_JuMP_univariate_roa_PSD(deg::Int)
     return model
 end
 
-function run_JuMP_univariate_roa(deg::Int; use_WSOS::Bool = true)
+univariate_roa1() = build_JuMP_univariate_roa_WSOS(4)
+univariate_roa2() = build_JuMP_univariate_roa_PSD(4)
+
+function run_JuMP_univariate_roa(; use_WSOS::Bool = true)
     if use_WSOS
-        model = build_JuMP_univariate_roa_WSOS(deg)
+        model = univariate_roa1()
     else
-        model = build_JuMP_univariate_roa_PSD(deg)
+        model = univariate_roa2()
     end
     JuMP.optimize!(model)
 
@@ -115,6 +118,5 @@ function run_JuMP_univariate_roa(deg::Int; use_WSOS::Bool = true)
     return
 end
 
-run_JuMP_univariate_roa_WSOS() = run_JuMP_univariate_roa(4, use_WSOS = true)
-run_JuMP_univariate_roa_PSD() = run_JuMP_univariate_roa(4, use_WSOS = false)
-univariate_roa1() = build_JuMP_univariate_roa_WSOS(4)
+run_JuMP_univariate_roa_WSOS() = run_JuMP_univariate_roa(use_WSOS = true)
+run_JuMP_univariate_roa_PSD() = run_JuMP_univariate_roa(use_WSOS = false)

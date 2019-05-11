@@ -76,17 +76,20 @@ function build_JuMP_contraction_PSD(beta::Float64, deg_M::Int; delta::Float64 = 
     return model
 end
 
-function contraction1(; use_wsos::Bool = true)
-    if use_wsos
-        model = build_JuMP_contraction_WSOS(0.79, 4)
-    else
-        model = build_JuMP_contraction_PSD(0.79, 4)
-    end
-    return model
+function JuMP_contraction1()
+    return build_JuMP_contraction_WSOS(0.79, 4)
+end
+
+function JuMP_contraction2()
+    return build_JuMP_contraction_PSD(0.79, 4)
 end
 
 function run_JuMP_contraction(use_wsos::Bool)
-    model = contraction1(use_wsos = use_wsos)
+    if use_wsos
+        model = JuMP_contraction1()
+    else
+        model = JuMP_contraction2()
+    end
     JuMP.optimize!(model)
     term_status = JuMP.termination_status(model)
     pr_status = JuMP.primal_status(model)
