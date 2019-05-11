@@ -23,12 +23,13 @@ function build_JuMP_expdesign(
     p::Int,
     V::Matrix{Float64},
     n::Int,
-    nmax::Int,
+    nmax::Int;
+    use_dense::Bool = true,
     )
     @assert (p > q) && (n > q) && (nmax <= n)
     @assert size(V) == (q, p)
 
-    model = JuMP.Model(JuMP.with_optimizer(Hypatia.Optimizer, verbose = true))
+    model = JuMP.Model(JuMP.with_optimizer(Hypatia.Optimizer, verbose = true, use_dense = use_dense))
     JuMP.@variable(model, hypo) # hypograph of logdet variable
     JuMP.@objective(model, Max, hypo)
     JuMP.@variable(model, 0 <= np[1:p] <= nmax) # number of each experiment
@@ -39,39 +40,41 @@ function build_JuMP_expdesign(
     return (model, np)
 end
 
-function JuMP_expdesign1()
+function JuMP_expdesign1(; use_dense::Bool = false)
     (q, p, n, nmax) = (25, 75, 125, 5) # large
     V = randn(q, p)
-    return build_JuMP_expdesign(q, p, V, n, nmax)
+    return build_JuMP_expdesign(q, p, V, n, nmax, use_dense = use_dense)
 end
 
-function JuMP_expdesign2()
+function JuMP_expdesign2(; use_dense::Bool = false)
     (q, p, n, nmax) = (10, 30, 50, 5) # medium
     V = randn(q, p)
-    return build_JuMP_expdesign(q, p, V, n, nmax)
+    return build_JuMP_expdesign(q, p, V, n, nmax, use_dense = use_dense)
 end
 
-function JuMP_expdesign3()
+function JuMP_expdesign3(; use_dense::Bool = false)
     (q, p, n, nmax) = (5, 15, 25, 5) # small
     V = randn(q, p)
-    return build_JuMP_expdesign(q, p, V, n, nmax)
+    return build_JuMP_expdesign(q, p, V, n, nmax, use_dense = use_dense)
 end
 
-function JuMP_expdesign4()
+function JuMP_expdesign4(; use_dense::Bool = false)
     (q, p, n, nmax) = (4, 8, 12, 3) # tiny
     V = randn(q, p)
-    return build_JuMP_expdesign(q, p, V, n, nmax)
+    return build_JuMP_expdesign(q, p, V, n, nmax, use_dense = use_dense)
 end
 
-function JuMP_expdesign5()
+function JuMP_expdesign5(; use_dense::Bool = false)
     (q, p, n, nmax) = (3, 5, 7, 2) # miniscule
     V = randn(q, p)
-    return build_JuMP_expdesign(q, p, V, n, nmax)
+    return build_JuMP_expdesign(q, p, V, n, nmax, use_dense = use_dense)
 end
 
 function run_JuMP_expdesign(; rseed::Int = 1)
     Random.seed!(rseed)
-    (model, np) = JuMP_expdesign3()
+    (q, p, n, nmax) = (5, 15, 25, 5) # small
+    V = randn(q, p)
+    (model, np) = build_JuMP_expdesign(q, p, V, n, nmax, use_dense = use_dense)
     JuMP.optimize!(model)
 
     term_status = JuMP.termination_status(model)

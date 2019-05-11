@@ -33,7 +33,7 @@ function build_dynamics(x)
     return [dx1dt; dx2dt]
 end
 
-function contraction_common(beta::Float64, deg_M::Int, delta::Float64 = 1e-3)
+function contraction_common(beta::Float64, deg_M::Int, delta::Float64 = 1e-3; use_dense::Bool = true)
     n = 2
     dom = MU.FreeDomain(n)
 
@@ -45,7 +45,7 @@ function contraction_common(beta::Float64, deg_M::Int, delta::Float64 = 1e-3)
     x = DP.variables(lagrange_polys[1])
     dynamics = build_dynamics(x)
 
-    model = SumOfSquares.SOSModel(JuMP.with_optimizer(Hypatia.Optimizer, verbose = true, tol_feas = 1e-4, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6))
+    model = JuMP.Model(JuMP.with_optimizer(Hypatia.Optimizer, verbose = true, tol_feas = 1e-4, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6, use_dense = use_dense))
     JuMP.@variable(model, polys[1:3], PJ.Poly(polyjump_basis))
 
     dfdx = DP.differentiate(dynamics, x)'
@@ -71,16 +71,17 @@ end
 function build_JuMP_contraction_PSD(beta::Float64, deg_M::Int; delta::Float64 = 1e-3)
     n = 2
     (model, M, R, _, _, _, _, _, _) = contraction_common(beta, deg_M, delta)
+    PJ.setpolymodule!(model, SumOfSquares)
     JuMP.@constraint(model, M - delta * Matrix{Float64}(I, n, n) in JuMP.PSDCone())
     JuMP.@constraint(model, -R - delta * Matrix{Float64}(I, n, n) in JuMP.PSDCone())
     return model
 end
 
-function JuMP_contraction1()
+function JuMP_contraction1(; use_dense::Bool = true)
     return build_JuMP_contraction_WSOS(0.79, 4)
 end
 
-function JuMP_contraction2()
+function JuMP_contraction2(; use_dense::Bool = true)
     return build_JuMP_contraction_PSD(0.79, 4)
 end
 

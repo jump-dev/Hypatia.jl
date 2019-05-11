@@ -224,7 +224,7 @@ function build_shapeconregr_WSOS(
     return model
 end
 
-function run_JuMP_shapeconregr(use_wsos::Bool; dense::Bool = true, use_PolyJuMP::Bool = false)
+function run_JuMP_shapeconregr(use_wsos::Bool; use_dense::Bool = true, use_PolyJuMP::Bool = false)
     (n, deg, num_points, signal_ratio, f) =
         # (2, 3, 100, 0.0, x -> exp(norm(x))) # no noise, monotonic function
         (2, 3, 100, 0.0, x -> sum(x.^3)) # no noise, monotonic function
@@ -238,17 +238,16 @@ function run_JuMP_shapeconregr(use_wsos::Bool; dense::Bool = true, use_PolyJuMP:
 
     shape_data = ShapeData(n)
     (X, y) = generate_regr_data(f, -1.0, 1.0, n, num_points, signal_ratio = signal_ratio)
+    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, use_dense = use_dense))
 
     if use_wsos
         if use_PolyJuMP
-            model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, use_dense = dense))
             build_shapeconregr_WSOS_PolyJuMP(model, X, y, deg, shape_data)
         else
-            model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, use_dense = dense))
             build_shapeconregr_WSOS(model, X, y, deg, shape_data)
         end
     else
-        model = SumOfSquares.SOSModel(JuMP.with_optimizer(HYP.Optimizer, verbose = true, use_dense = dense))
+        PJ.setpolymodule!(model, SumOfSquares)
         build_shapeconregr_PSD(model, X, y, deg, shape_data)
     end
 
