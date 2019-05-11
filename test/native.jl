@@ -929,84 +929,70 @@ end
 
 # complex polymin test optimal values were found analytically in most cases
 
-function complexpolymin1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
-    (n, deg, f, gs, gdegs, truemin) = complexpolys[:abs1d]
-    d = 1
-
+function test_complexpolymin1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+    truemin = 1
     for primal_wsos in [false, true]
-        (c, A, b, G, h, cones, cone_idxs) = build_complexpolymin(n, d, f, gs, gdegs, primal_wsos)
+        (c, A, b, G, h, cones, cone_idxs) = complexpolymin1(primal_wsos = primal_wsos)
         r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
         @test r.status == :Optimal
         @test r.primal_obj ≈ (primal_wsos ? -truemin : truemin) atol = 1e-4 rtol = 1e-4
     end
 end
 
-function complexpolymin2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
-    (n, deg, f, gs, gdegs, truemin) = complexpolys[:absunit1d]
-    d = 1
-
+function test_complexpolymin2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+    truemin = 1
     for primal_wsos in [false, true]
-        (c, A, b, G, h, cones, cone_idxs) = build_complexpolymin(n, d, f, gs, gdegs, primal_wsos)
+        (c, A, b, G, h, cones, cone_idxs) = complexpolymin2(primal_wsos = primal_wsos)
         r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
         @test r.status == :Optimal
         @test r.primal_obj ≈ (primal_wsos ? -truemin : truemin) atol = 1e-4 rtol = 1e-4
     end
 end
 
-function complexpolymin3(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
-    (n, deg, f, gs, gdegs, truemin) = complexpolys[:negabsunit1d]
-    d = 2
-
+function test_complexpolymin3(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+    truemin = -1
     for primal_wsos in [false, true]
-        (c, A, b, G, h, cones, cone_idxs) = build_complexpolymin(n, d, f, gs, gdegs, primal_wsos)
+        (c, A, b, G, h, cones, cone_idxs) = complexpolymin3(primal_wsos = primal_wsos)
         r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
         @test r.status == :Optimal
         @test r.primal_obj ≈ (primal_wsos ? -truemin : truemin) atol = 1e-4 rtol = 1e-4
     end
 end
 
-function complexpolymin4(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
-    (n, deg, f, gs, gdegs, truemin) = complexpolys[:absball2d]
-    d = 1
-
+function test_complexpolymin4(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+    truemin = 1
     for primal_wsos in [false, true]
-        (c, A, b, G, h, cones, cone_idxs) = build_complexpolymin(n, d, f, gs, gdegs, primal_wsos)
+        (c, A, b, G, h, cones, cone_idxs) = complexpolymin4(primal_wsos = primal_wsos)
         r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
         @test r.status == :Optimal
         @test r.primal_obj ≈ (primal_wsos ? -truemin : truemin) atol = 1e-4 rtol = 1e-4
     end
 end
 
-function complexpolymin5(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
-    (n, deg, f, gs, gdegs, truemin) = complexpolys[:absbox2d]
-    d = 2
-
+function test_complexpolymin5(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+    truemin = 1
     for primal_wsos in [false, true]
-        (c, A, b, G, h, cones, cone_idxs) = build_complexpolymin(n, d, f, gs, gdegs, primal_wsos)
+        (c, A, b, G, h, cones, cone_idxs) = complexpolymin5(primal_wsos = primal_wsos)
         r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
         @test r.status == :Optimal
         @test r.primal_obj ≈ (primal_wsos ? -truemin : truemin) atol = 1e-4 rtol = 1e-4
     end
 end
 
-function complexpolymin6(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
-    (n, deg, f, gs, gdegs, truemin) = complexpolys[:negabsbox2d]
-    d = 1
-
+function test_complexpolymin6(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+    truemin = -2
     for primal_wsos in [false, true]
-        (c, A, b, G, h, cones, cone_idxs) = build_complexpolymin(n, d, f, gs, gdegs, primal_wsos)
+        (c, A, b, G, h, cones, cone_idxs) = complexpolymin6(primal_wsos = primal_wsos)
         r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
         @test r.status == :Optimal
         @test r.primal_obj ≈ (primal_wsos ? -truemin : truemin) atol = 1e-4 rtol = 1e-4
     end
 end
 
-function complexpolymin7(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
-    (n, deg, f, gs, gdegs, truemin) = complexpolys[:denseunit1d]
-    d = 2
-
+function test_complexpolymin7(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+    truemin = 0
     for primal_wsos in [false, true]
-        (c, A, b, G, h, cones, cone_idxs) = build_complexpolymin(n, d, f, gs, gdegs, primal_wsos)
+        (c, A, b, G, h, cones, cone_idxs) = complexpolymin7(primal_wsos = primal_wsos)
         r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
         @test r.status == :Optimal
         @test r.primal_obj ≈ (primal_wsos ? -truemin : truemin) atol = 1e-4 rtol = 1e-4
