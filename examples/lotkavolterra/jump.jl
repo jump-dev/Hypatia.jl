@@ -37,7 +37,7 @@ end
 
 integrate_ball(p, n) = sum(DynamicPolynomials.coefficient(t) * integrate_ball_monomial(t, n) for t in DynamicPolynomials.terms(p))
 
-function build_lotkavolterra_PSD(model)
+function build_JuMP_lotkavolterra_PSD(model)
     # parameters
     d = 4 # degree
     n = 4 # number of species
@@ -81,7 +81,7 @@ function build_lotkavolterra_PSD(model)
     return (sigma, rho)
 end
 
-function run_JuMP_lotkavolterra()
+function lotkavolterra()
     model = SumOfSquares.SOSModel(JuMP.with_optimizer(HYP.Optimizer,
         use_dense = true,
         verbose = true,
@@ -93,8 +93,12 @@ function run_JuMP_lotkavolterra()
         tol_abs_opt = 1e-6,
         tol_feas = 1e-6,
         ))
+    build_JuMP_lotkavolterra_PSD(model)
+    return model
+end
 
-    (sigma, rho) = build_lotkavolterra_PSD(model)
+function run_JuMP_lotkavolterra()
+    model = lotkavolterra()
     JuMP.optimize!(model)
 
     term_status = JuMP.termination_status(model)

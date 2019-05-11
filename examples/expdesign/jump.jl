@@ -39,20 +39,39 @@ function build_JuMP_expdesign(
     return (model, np)
 end
 
+function expdesign1()
+    (q, p, n, nmax) = (25, 75, 125, 5) # large
+    V = randn(q, p)
+    return build_JuMP_expdesign(q, p, V, n, nmax)
+end
+
+function expdesign2()
+    (q, p, n, nmax) = (10, 30, 50, 5) # medium
+    V = randn(q, p)
+    return build_JuMP_expdesign(q, p, V, n, nmax)
+end
+
+function expdesign3()
+    (q, p, n, nmax) = (5, 15, 25, 5) # small
+    V = randn(q, p)
+    return build_JuMP_expdesign(q, p, V, n, nmax)
+end
+
+function expdesign4()
+    (q, p, n, nmax) = (4, 8, 12, 3) # tiny
+    V = randn(q, p)
+    return build_JuMP_expdesign(q, p, V, n, nmax)
+end
+
+function expdesign5()
+    (q, p, n, nmax) = (3, 5, 7, 2) # miniscule
+    V = randn(q, p)
+    return build_JuMP_expdesign(q, p, V, n, nmax)
+end
+
 function run_JuMP_expdesign(; rseed::Int = 1)
     Random.seed!(rseed)
-
-    (q, p, n, nmax) =
-        # 25, 75, 125, 5     # large
-        # 10, 30, 50, 5      # medium
-        5, 15, 25, 5       # small
-        # 4, 8, 12, 3        # tiny
-        # 3, 5, 7, 2         # miniscule
-
-    # generate random experiment vectors
-    V = randn(q, p)
-
-    (model, np) = build_JuMP_expdesign(q, p, V, n, nmax)
+    (model, np) = expdesign3()
     JuMP.optimize!(model)
 
     term_status = JuMP.termination_status(model)

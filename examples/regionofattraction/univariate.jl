@@ -24,7 +24,7 @@ const DP = DynamicPolynomials
 using LinearAlgebra
 using Test
 
-function univariate_WSOS(deg::Int)
+function build_JuMP_univariate_roa_WSOS(deg::Int)
     T = 100.0
 
     DP.@polyvar x
@@ -63,7 +63,7 @@ function univariate_WSOS(deg::Int)
     return model
 end
 
-function univariate_PSD(deg::Int)
+function build_JuMP_univariate_roa_PSD(deg::Int)
     T = 100.0
 
     DP.@polyvar x
@@ -93,12 +93,11 @@ function univariate_PSD(deg::Int)
     return model
 end
 
-
-function run_JuMP_univariate(deg::Int; use_WSOS::Bool = true)
+function run_JuMP_univariate_roa(deg::Int; use_WSOS::Bool = true)
     if use_WSOS
-        model = univariate_WSOS(deg)
+        model = build_JuMP_univariate_roa_WSOS(deg)
     else
-        model = univariate_PSD(deg)
+        model = build_JuMP_univariate_roa_PSD(deg)
     end
     JuMP.optimize!(model)
 
@@ -113,8 +112,9 @@ function run_JuMP_univariate(deg::Int; use_WSOS::Bool = true)
     @test du_status == MOI.FEASIBLE_POINT
     @test primal_obj ≈ dual_obj atol = 1e-4 rtol = 1e-4
 
-    return nothing
+    return
 end
 
-run_JuMP_univariate_WSOS() = run_JuMP_univariate(4, use_WSOS = true)
-run_JuMP_univariate_PSD() = run_JuMP_univariate(4, use_WSOS = false)
+run_JuMP_univariate_roa_WSOS() = run_JuMP_univariate_roa(4, use_WSOS = true)
+run_JuMP_univariate_roa_PSD() = run_JuMP_univariate_roa(4, use_WSOS = false)
+univariate_roa1() = build_JuMP_univariate_roa_WSOS(4)
