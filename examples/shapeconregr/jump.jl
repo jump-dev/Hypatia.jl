@@ -125,7 +125,7 @@ function build_shapeconregr_PSD(
         JuMP.@constraint(model, shape_data.conv_profile * hessian in JuMP.PSDCone(), domain = convex_set)
     end
 
-    return p
+    return model
 end
 
 function build_shapeconregr_WSOS_PolyJuMP(
@@ -163,7 +163,7 @@ function build_shapeconregr_WSOS_PolyJuMP(
         JuMP.@constraint(model, [shape_data.conv_profile * hessian[i, j](conv_pts[u, :]) * (i == j ? 1.0 : rt2) for i in 1:n for j in 1:i for u in 1:conv_U] in conv_wsos_cone)
     end
 
-    return p
+    return model
 end
 
 function build_shapeconregr_WSOS(
@@ -221,7 +221,7 @@ function build_shapeconregr_WSOS(
             for i in 1:n for j in 1:i for u in 1:conv_U] in conv_wsos_cone)
     end
 
-    return (regressor, lagrange_polys)
+    return model
 end
 
 function run_JuMP_shapeconregr(use_wsos::Bool; dense::Bool = true, use_PolyJuMP::Bool = false)
@@ -242,15 +242,14 @@ function run_JuMP_shapeconregr(use_wsos::Bool; dense::Bool = true, use_PolyJuMP:
     if use_wsos
         if use_PolyJuMP
             model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, use_dense = dense))
-            p = build_shapeconregr_WSOS_PolyJuMP(model, X, y, deg, shape_data)
+            build_shapeconregr_WSOS_PolyJuMP(model, X, y, deg, shape_data)
         else
             model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, use_dense = dense))
-            (coeffs, polys) = build_shapeconregr_WSOS(model, X, y, deg, shape_data)
-            p = JuMP.dot(coeffs, polys)
+            build_shapeconregr_WSOS(model, X, y, deg, shape_data)
         end
     else
         model = SumOfSquares.SOSModel(JuMP.with_optimizer(HYP.Optimizer, verbose = true, use_dense = dense))
-        p = build_shapeconregr_PSD(model, X, y, deg, shape_data)
+        build_shapeconregr_PSD(model, X, y, deg, shape_data)
     end
 
     JuMP.optimize!(model)
@@ -265,7 +264,7 @@ function run_JuMP_shapeconregr(use_wsos::Bool; dense::Bool = true, use_PolyJuMP:
     @test du_status == MOI.FEASIBLE_POINT
     @test primal_obj ≈ dual_obj atol = 1e-4 rtol = 1e-4
 
-    return (primal_obj, p)
+    return
 end
 
 run_JuMP_shapeconregr_PSD() = run_JuMP_shapeconregr(false)
