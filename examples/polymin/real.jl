@@ -123,6 +123,5 @@ function run_polymin()
     solver = SO.HSDSolver(model, verbose = true)
     SO.solve(solver)
     @test SO.get_status(solver) == :Optimal
-
     return
 end

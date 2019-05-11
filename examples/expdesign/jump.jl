@@ -37,7 +37,7 @@ function build_JuMP_expdesign(
     Q = V * diagm(np) * V' # information matrix
     JuMP.@constraint(model, vcat(hypo, 1.0, [Q[i, j] for i in 1:q for j in 1:i]) in MOI.LogDetConeTriangle(q)) # hypograph of logdet of information matrix
 
-    return (model, np)
+    return model
 end
 
 function JuMP_expdesign1(; use_dense::Bool = false)
@@ -74,7 +74,7 @@ function run_JuMP_expdesign(; rseed::Int = 1)
     Random.seed!(rseed)
     (q, p, n, nmax) = (5, 15, 25, 5) # small
     V = randn(q, p)
-    (model, np) = build_JuMP_expdesign(q, p, V, n, nmax, use_dense = use_dense)
+    model = build_JuMP_expdesign(q, p, V, n, nmax, use_dense = use_dense)
     JuMP.optimize!(model)
 
     term_status = JuMP.termination_status(model)
@@ -82,7 +82,7 @@ function run_JuMP_expdesign(; rseed::Int = 1)
     dual_obj = JuMP.objective_bound(model)
     pr_status = JuMP.primal_status(model)
     du_status = JuMP.dual_status(model)
-    npval = JuMP.value.(np)
+    npval = JuMP.value.(model[:np])
 
     @test term_status == MOI.OPTIMAL
     @test pr_status == MOI.FEASIBLE_POINT
