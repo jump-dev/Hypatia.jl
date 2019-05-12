@@ -21,15 +21,15 @@ using Test
 include("data.jl")
 
 function build_polymin(
-    polyname::Symbol,
+    n::Int,
+    fn::Polynomial{true,Int64},
+    dom::MU.Domain,
     deg::Int;
     primal_wsos::Bool = true,
     )
-    # get data for polynomial and domain, only works for boxes
-    (x, fn, dom, true_obj) = getpolydata(polyname)
+    # only works for boxes
     lbs = dom.l
     ubs = dom.u
-    n = length(x)
     d = div(deg + 1, 2)
 
     # TODO choose which cone definition to use and cleanup below
@@ -68,56 +68,54 @@ function build_polymin(
     # cones = [CO.WSOSPolyInterp_2(U, P0, Ls, gs, !primal_wsos)]
     cone_idxs = [1:U]
 
-    return (model = (c, A, b, G, h, cones, cone_idxs), true_obj = true_obj)
+    return (c, A, b, G, h, cones, cone_idxs)
 end
 
-polymin1() = build_polymin(:butcher, 2)
-polymin2() = build_polymin(:caprasse, 4)
-polymin3() = build_polymin(:goldsteinprice, 6)
-polymin4() = build_polymin(:heart, 2)
-polymin5() = build_polymin(:lotkavolterra, 3)
-polymin6() = build_polymin(:magnetism7, 2)
-polymin7() = build_polymin(:motzkin, 7)
-polymin8() = build_polymin(:reactiondiffusion, 4)
-polymin9() = build_polymin(:robinson, 8)
-polymin10() = build_polymin(:rosenbrock, 5)
-polymin11() = build_polymin(:schwefel, 4)
+function polymin(polyname::Symbol, deg::Int; primal_wsos::Bool = true)
+    (x, fn, dom, true_obj) = getpolydata(polyname)
+    model = build_polymin(length(x), fn, dom, deg, primal_wsos = primal_wsos)
+    if primal_wsos
+        true_obj *= -1
+    end
+    return (model = model, true_obj = true_obj)
+end
 
-function test_polymin(
-    instance::Function,
-    system_solver::Type{<:SO.CombinedHSDSystemSolver},
-    linear_model::Type{<:MO.LinearModel},
-    verbose::Bool;
-    atol::Float64 = 1e-4,
-    rtol::Float64 = 1e-4,
-    )
+polymin1() = polymin(:butcher, 2)
+polymin2() = polymin(:caprasse, 4)
+polymin3() = polymin(:goldsteinprice, 6)
+polymin4() = polymin(:heart, 2)
+polymin5() = polymin(:lotkavolterra, 3)
+polymin6() = polymin(:magnetism7, 2)
+polymin7() = polymin(:motzkin, 7)
+polymin8() = polymin(:reactiondiffusion, 4)
+polymin9() = polymin(:robinson, 8)
+polymin10() = polymin(:rosenbrock, 5)
+polymin11() = polymin(:schwefel, 4)
+polymin12() = polymin(:reactiondiffusion, 4, primal_wsos = false)
+
+function test_polymin(instance::Function)
     ((c, A, b, G, h, cones, cone_idxs), true_obj) = instance()
-    model = linear_model(c, A, b, G, h, cones, cone_idxs)
-    stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model))
-    solver = SO.HSDSolver(model, verbose = verbose, stepper = stepper)
+    model = MO.PreprocessedLinearModel(c, A, b, G, h, cones, cone_idxs)
+    solver = SO.HSDSolver(model, verbose = true)
     SO.solve(solver)
-    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
-    SO.test_certificates(solver, model, atol = atol, rtol = rtol)
+    r = SO.test_certificates(solver, model, atol = 1e-4, rtol = 1e-4)
     @test r.status == :Optimal
     @test r.primal_obj ≈ true_obj atol = 1e-4 rtol = 1e-4
-end
 
-function test_polymin(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
-    polymin_instances = [
-        polymin1,
-        polymin2,
-        polymin3,
-        polymin4,
-        polymin5,
-        polymin6,
-        polymin7,
-        polymin8,
-        polymin9,
-        polymin10,
-        polymin11,
-    ]
-    for inst in polymin_instances
-        test_polymin(inst, system_solver, linear_model, verbose)
-    end
     return
 end
+
+test_polymins() = test_polymin.([
+    polymin1,
+    polymin2,
+    polymin3,
+    polymin4,
+    polymin5,
+    polymin6,
+    polymin7,
+    polymin8,
+    polymin9,
+    polymin10,
+    polymin11,
+    polymin12,
+    ])
