@@ -81,6 +81,11 @@ mutable struct RawLinearModel <: LinearModel
 end
 
 mutable struct PreprocessedLinearModel <: LinearModel
+    c_raw::Vector{Float64}
+    A_raw::AbstractMatrix{Float64}
+    b_raw::Vector{Float64}
+    G_raw::AbstractMatrix{Float64}
+
     n::Int
     p::Int
     q::Int
@@ -93,8 +98,6 @@ mutable struct PreprocessedLinearModel <: LinearModel
     cone_idxs::Vector{UnitRange{Int}}
     nu::Float64
 
-    n_raw::Int
-    p_raw::Int
     x_keep_idxs::AbstractVector{Int}
     y_keep_idxs::AbstractVector{Int}
     Ap_R::AbstractMatrix{Float64}
@@ -107,11 +110,13 @@ mutable struct PreprocessedLinearModel <: LinearModel
     # NOTE (pivoted) QR factorizations are usually rank-revealing but may be unreliable, see http://www.math.sjsu.edu/~foster/rankrevealingcode.html
     function PreprocessedLinearModel(c::Vector{Float64}, A::AbstractMatrix{Float64}, b::Vector{Float64}, G::AbstractMatrix{Float64}, h::Vector{Float64}, cones::Vector{<:Cones.Cone}, cone_idxs::Vector{UnitRange{Int}}; tol_QR::Float64 = 1e-13)
         model = new()
+        model.c_raw = c
+        model.A_raw = A
+        model.b_raw = b
+        model.G_raw = G
         n = length(c)
         p = length(b)
         q = length(h)
-        model.n_raw = n
-        model.p_raw = p
         model.q = q
         model.h = h
         model.cones = cones
@@ -255,3 +260,6 @@ function set_initial_cone_point(point, cones)
     end
     return point
 end
+
+get_original_data(model::RawLinearModel) = (model.c, model.A, model.b, model.G, model.h, model.cones, model.cone_idxs)
+get_original_data(model::PreprocessedLinearModel) = (model.c_raw, model.A_raw, model.b_raw, model.G_raw, model.h, model.cones, model.cone_idxs)

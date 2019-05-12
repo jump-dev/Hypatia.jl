@@ -2,6 +2,7 @@
 Copyright 2018, Chris Coey and contributors
 =#
 
+# solve model, check conic certificates are valid and return certificate data
 function solve_and_check(
     c::Vector{Float64},
     A::AbstractMatrix{Float64},
@@ -19,44 +20,8 @@ function solve_and_check(
     model = linear_model(c, A, b, G, h, cones, cone_idxs)
     stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model))
     solver = SO.HSDSolver(model, verbose = verbose, stepper = stepper)
-
     SO.solve(solver)
-
-    x = SO.get_x(solver, model)
-    y = SO.get_y(solver, model)
-    s = SO.get_s(solver, model)
-    z = SO.get_z(solver, model)
-
-    primal_obj = SO.get_primal_obj(solver)
-    dual_obj = SO.get_dual_obj(solver)
-    status = SO.get_status(solver)
-    solve_time = SO.get_solve_time(solver)
-
-    # check conic certificates are valid
-    if status == :Optimal
-        @test primal_obj ≈ dual_obj atol = atol rtol = rtol
-        @test A * x ≈ b atol = atol rtol = rtol
-        @test G * x + s ≈ h atol = atol rtol = rtol
-        @test G' * z + A' * y ≈ -c atol = atol rtol = rtol
-        @test dot(s, z) ≈ 0.0 atol = atol rtol = rtol
-        @test dot(c, x) ≈ primal_obj atol = 1e-8 rtol = 1e-8
-        @test dot(b, y) + dot(h, z) ≈ -dual_obj atol = 1e-8 rtol = 1e-8
-    elseif status == :PrimalInfeasible
-        @test isnan(primal_obj)
-        @test dual_obj > 0
-        @test dot(b, y) + dot(h, z) ≈ -dual_obj atol = 1e-8 rtol = 1e-8
-        @test G' * z ≈ -A' * y atol = atol rtol = rtol
-    elseif status == :DualInfeasible
-        @test isnan(dual_obj)
-        @test primal_obj < 0
-        @test dot(c, x) ≈ primal_obj atol = 1e-8 rtol = 1e-8
-        @test G * x ≈ -s atol = atol rtol = rtol
-        @test A * x ≈ zeros(length(y)) atol = atol rtol = rtol
-    elseif status == :IllPosed
-        # TODO primal vs dual ill-posed statuses and conditions
-    end
-
-    return (x=x, y=y, s=s, z=z, primal_obj=primal_obj, dual_obj=dual_obj, status=status, solve_time=solve_time)
+    return SO.test_certificates(solver, model, atol = atol, rtol = rtol)
 end
 
 function dimension1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
