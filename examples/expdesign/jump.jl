@@ -18,21 +18,20 @@ using LinearAlgebra
 import Random
 using Test
 
-function build_JuMP_expdesign(
+function build_expdesign_JuMP(
+    model::JuMP.Model,
+    np::Vector{JuMP.VariableRef},
     q::Int,
     p::Int,
     V::Matrix{Float64},
     n::Int,
-    nmax::Int;
-    use_dense::Bool = true,
+    nmax::Int,
     )
     @assert (p > q) && (n > q) && (nmax <= n)
     @assert size(V) == (q, p)
 
-    model = JuMP.Model(JuMP.with_optimizer(Hypatia.Optimizer, verbose = true, use_dense = use_dense))
     JuMP.@variable(model, hypo) # hypograph of logdet variable
     JuMP.@objective(model, Max, hypo)
-    JuMP.@variable(model, 0 <= np[1:p] <= nmax) # number of each experiment
     JuMP.@constraint(model, sum(np) == n) # n experiments total
     Q = V * diagm(np) * V' # information matrix
     JuMP.@constraint(model, vcat(hypo, 1.0, [Q[i, j] for i in 1:q for j in 1:i]) in MOI.LogDetConeTriangle(q)) # hypograph of logdet of information matrix
@@ -40,41 +39,24 @@ function build_JuMP_expdesign(
     return model
 end
 
-function JuMP_expdesign1(; use_dense::Bool = false)
-    (q, p, n, nmax) = (25, 75, 125, 5) # large
-    V = randn(q, p)
-    return build_JuMP_expdesign(q, p, V, n, nmax, use_dense = use_dense)
-end
-
-function JuMP_expdesign2(; use_dense::Bool = false)
-    (q, p, n, nmax) = (10, 30, 50, 5) # medium
-    V = randn(q, p)
-    return build_JuMP_expdesign(q, p, V, n, nmax, use_dense = use_dense)
-end
-
-function JuMP_expdesign3(; use_dense::Bool = false)
-    (q, p, n, nmax) = (5, 15, 25, 5) # small
-    V = randn(q, p)
-    return build_JuMP_expdesign(q, p, V, n, nmax, use_dense = use_dense)
-end
-
-function JuMP_expdesign4(; use_dense::Bool = false)
-    (q, p, n, nmax) = (4, 8, 12, 3) # tiny
-    V = randn(q, p)
-    return build_JuMP_expdesign(q, p, V, n, nmax, use_dense = use_dense)
-end
-
-function JuMP_expdesign5(; use_dense::Bool = false)
-    (q, p, n, nmax) = (3, 5, 7, 2) # miniscule
-    V = randn(q, p)
-    return build_JuMP_expdesign(q, p, V, n, nmax, use_dense = use_dense)
-end
-
-function run_JuMP_expdesign(; rseed::Int = 1)
+function expdesign_JuMP(q::Int, p::Int, n::Int, nmax::Int; use_dense::Bool = false, rseed::Int = 1)
     Random.seed!(rseed)
-    (q, p, n, nmax) = (5, 15, 25, 5) # small
+    model = JuMP.Model(JuMP.with_optimizer(Hypatia.Optimizer, verbose = true, use_dense = use_dense))
+    JuMP.@variable(model, 0 <= np[1:p] <= nmax) # number of each experiment
     V = randn(q, p)
-    model = build_JuMP_expdesign(q, p, V, n, nmax, use_dense = use_dense)
+    build_expdesign_JuMP(model, np, q, p, V, n, nmax)
+    return (model = model, n = n, nmax = nmax, V = V, np = np)
+end
+
+expdesign1_JuMP(; use_dense::Bool = false) = expdesign_JuMP(25, 75, 125, 5, use_dense = use_dense) # large
+expdesign2_JuMP(; use_dense::Bool = false) = expdesign_JuMP(10, 30, 50, 5, use_dense = use_dense) # medium
+expdesign3_JuMP(; use_dense::Bool = false) = expdesign_JuMP(5, 15, 25, 5, use_dense = use_dense) # small
+expdesign4_JuMP(; use_dense::Bool = false) = expdesign_JuMP(4, 8, 12, 3, use_dense = use_dense) # tiny
+expdesign5_JuMP(; use_dense::Bool = false) = expdesign_JuMP(3, 5, 7, 2, use_dense = use_dense) # miniscule
+
+
+function test_expdesign_JuMP(instance::Function)
+    (model, n, nmax, V, np) = instance()
     JuMP.optimize!(model)
 
     term_status = JuMP.termination_status(model)
@@ -82,7 +64,7 @@ function run_JuMP_expdesign(; rseed::Int = 1)
     dual_obj = JuMP.objective_bound(model)
     pr_status = JuMP.primal_status(model)
     du_status = JuMP.dual_status(model)
-    npval = JuMP.value.(model[:np])
+    npval = JuMP.value.(np)
 
     @test term_status == MOI.OPTIMAL
     @test pr_status == MOI.FEASIBLE_POINT
@@ -94,3 +76,13 @@ function run_JuMP_expdesign(; rseed::Int = 1)
 
     return
 end
+
+test_expdesign_JuMP_many() = test_expdesign_JuMP.([
+    # expdesign1_JuMP,
+    # expdesign2_JuMP,
+    expdesign3_JuMP,
+    expdesign4_JuMP,
+    expdesign5_JuMP,
+])
+
+test_expdesign_JuMP_small() = test_expdesign_JuMP.([expdesign3_JuMP])

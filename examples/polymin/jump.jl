@@ -115,7 +115,7 @@ function test_polymin_JuMP(instance::Function)
     return
 end
 
-test_polymin_JuMP_all() = test_polymin_JuMP.([
+test_polymin_JuMP_many() = test_polymin_JuMP.([
     polymin1_JuMP,
     polymin2_JuMP,
     polymin3_JuMP,
