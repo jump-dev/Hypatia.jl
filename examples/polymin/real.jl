@@ -20,14 +20,14 @@ using Test
 
 include("data.jl")
 
-function build_polymin(
-    n::Int,
-    fn::Polynomial{true,Int64},
-    dom::MU.Domain,
+function polymin(
+    polyname::Symbol,
     deg::Int;
     primal_wsos::Bool = true,
     )
+    (x, fn, dom, true_obj) = getpolydata(polyname)
     # only works for boxes
+    n = length(x)
     lbs = dom.l
     ubs = dom.u
     d = div(deg + 1, 2)
@@ -46,6 +46,7 @@ function build_polymin(
         b = Float64[]
         G = ones(U, 1)
         h = [fn(pts[j, :]...) for j in 1:U]
+        true_obj *= -1
     else
         c = [fn(pts[j, :]...) for j in 1:U] # evaluate polynomial at transformed points
         A = ones(1, U) # TODO eliminate constraint and first variable
@@ -68,16 +69,7 @@ function build_polymin(
     # cones = [CO.WSOSPolyInterp_2(U, P0, Ls, gs, !primal_wsos)]
     cone_idxs = [1:U]
 
-    return (c, A, b, G, h, cones, cone_idxs)
-end
-
-function polymin(polyname::Symbol, deg::Int; primal_wsos::Bool = true)
-    (x, fn, dom, true_obj) = getpolydata(polyname)
-    model = build_polymin(length(x), fn, dom, deg, primal_wsos = primal_wsos)
-    if primal_wsos
-        true_obj *= -1
-    end
-    return (model = model, true_obj = true_obj)
+    return (model = (c, A, b, G, h, cones, cone_idxs), true_obj = true_obj)
 end
 
 polymin1() = polymin(:butcher, 2)

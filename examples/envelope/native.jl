@@ -19,7 +19,7 @@ using DelimitedFiles
 import Random
 using Test
 
-function build_envelope(
+function envelope(
     npoly::Int,
     deg::Int,
     n::Int,
@@ -65,16 +65,16 @@ function build_envelope(
     cones = [CO.WSOSPolyInterp(U, [P0, PWts...], !primal_wsos) for k in 1:npoly]
     cone_idxs = [(1 + (k - 1) * U):(k * U) for k in 1:npoly]
 
-    return (c, A, b, G, h, cones, cone_idxs)
+    return (model = (c, A, b, G, h, cones, cone_idxs),)
 end
 
-envelope1(; primal_wsos::Bool = true, use_dense::Bool = true) = (model = build_envelope(2, 5, 1, 5, use_data = true, primal_wsos = primal_wsos, use_dense = use_dense), ) # uses fixed data in folder
-envelope2(; primal_wsos::Bool = true, use_dense::Bool = true) = (model = build_envelope(2, 5, 2, 6, primal_wsos = primal_wsos, use_dense = use_dense), )
-envelope3(; primal_wsos::Bool = true, use_dense::Bool = true) = (model = build_envelope(3, 5, 3, 5, primal_wsos = primal_wsos, use_dense = use_dense), )
-envelope4(; primal_wsos::Bool = true, use_dense::Bool = true) = (model = build_envelope(2, 30, 1, 30, primal_wsos = primal_wsos, use_dense = use_dense), )
+envelope1(; primal_wsos::Bool = true, use_dense::Bool = true) = envelope(2, 5, 1, 5, use_data = true, primal_wsos = primal_wsos, use_dense = use_dense) # uses fixed data in folder
+envelope2(; primal_wsos::Bool = true, use_dense::Bool = true) = envelope(2, 5, 2, 6, primal_wsos = primal_wsos, use_dense = use_dense)
+envelope3(; primal_wsos::Bool = true, use_dense::Bool = true) = envelope(3, 5, 3, 5, primal_wsos = primal_wsos, use_dense = use_dense)
+envelope4(; primal_wsos::Bool = true, use_dense::Bool = true) = envelope(2, 30, 1, 30, primal_wsos = primal_wsos, use_dense = use_dense)
 
 function test_envelope(instance::Function)
-    ((c, A, b, G, h, cones, cone_idxs), ) = instance()
+    ((c, A, b, G, h, cones, cone_idxs),) = instance()
     model = MO.PreprocessedLinearModel(c, A, b, G, h, cones, cone_idxs)
     solver = SO.HSDSolver(model, verbose = true)
     SO.solve(solver)
@@ -84,4 +84,9 @@ function test_envelope(instance::Function)
     return
 end
 
-test_envelopes() = test_envelope.([envelope1, envelope2, envelope3, envelope4])
+test_envelopes() = test_envelope.([
+    envelope1,
+    envelope2,
+    envelope3,
+    envelope4,
+    ])

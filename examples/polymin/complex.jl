@@ -16,18 +16,11 @@ using Test
 
 include("data.jl")
 
-
 mon_pow(z, ex) = prod(z[i]^ex[i] for i in eachindex(ex))
 
-function build_complexpolymin(
-    n::Int,
-    d::Int,
-    f::Function,
-    gs::Vector,
-    gdegs::Vector,
-    primal_wsos::Bool;
-    sample_factor::Int = 100,
-    )
+function complexpolymin(polyname::Symbol, d::Int; primal_wsos = true, sample_factor::Int = 100)
+    (n, deg, f, gs, gdegs, true_obj) = complexpolys[polyname]
+    @assert d >= deg
     # generate interpolation
     L = binomial(n + d, n)
     U = L^2
@@ -71,6 +64,7 @@ function build_complexpolymin(
         b = Float64[]
         G = ones(U, 1)
         h = f.(points)
+        true_obj *= -1
     else
         c = f.(points)
         A = ones(1, U) # TODO can eliminate equality and a variable
@@ -81,15 +75,7 @@ function build_complexpolymin(
     cones = [CO.WSOSPolyInterp_2(U, P_data, g_data, !primal_wsos)]
     cone_idxs = [1:U]
 
-    return (c, A, b, G, h, cones, cone_idxs)
-end
-
-function complexpolymin(polyname::Symbol, d::Int; primal_wsos = true)
-    (n, deg, f, gs, gdegs, true_obj) = complexpolys[polyname]
-    if primal_wsos
-        true_obj *= -1
-    end
-    return (model = build_complexpolymin(n, d, f, gs, gdegs, primal_wsos), true_obj = true_obj)
+    return (model = (c, A, b, G, h, cones, cone_idxs), true_obj = true_obj)
 end
 
 complexpolymin1() = complexpolymin(:abs1d, 1)
