@@ -6,23 +6,19 @@ example taken from
 Aylward, E.M., Parrilo, P.A. and Slotine, J.J.E
 =#
 
-import Hypatia
-const HYP = Hypatia
-const CO = HYP.Cones
-const SO = HYP.Solvers
-const MO = HYP.Models
-const MU = HYP.ModelUtilities
-
-import JuMP
-import SumOfSquares
-import MathOptInterface
-const MOI = MathOptInterface
-import PolyJuMP
-const PJ = PolyJuMP
-import DynamicPolynomials
-const DP = DynamicPolynomials
 using LinearAlgebra
 using Test
+import MathOptInterface
+const MOI = MathOptInterface
+import JuMP
+import DynamicPolynomials
+const DP = DynamicPolynomials
+import PolyJuMP
+const PJ = PolyJuMP
+import SumOfSquares
+import Hypatia
+const HYP = Hypatia
+const MU = HYP.ModelUtilities
 
 const rt2 = sqrt(2)
 
