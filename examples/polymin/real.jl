@@ -20,7 +20,6 @@ using Test
 
 include("data.jl")
 
-
 function build_polymin(
     polyname::Symbol,
     deg::Int;
@@ -83,7 +82,6 @@ polymin8() = build_polymin(:reactiondiffusion, 4)
 polymin9() = build_polymin(:robinson, 8)
 polymin10() = build_polymin(:rosenbrock, 5)
 polymin11() = build_polymin(:schwefel, 4)
-
 
 function test_polymin(
     instance::Function,

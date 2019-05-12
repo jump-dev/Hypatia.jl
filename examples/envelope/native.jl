@@ -68,24 +68,20 @@ function build_envelope(
     return (c, A, b, G, h, cones, cone_idxs)
 end
 
-function envelope1(; primal_wsos::Bool = true, use_dense::Bool = true)
-    # uses fixed data in folder
-    return build_envelope(2, 5, 1, 5, use_data = true, primal_wsos = primal_wsos, use_dense = use_dense)
-end
+# uses fixed data in folder
+envelope1(; primal_wsos::Bool = true, use_dense::Bool = true) = build_envelope(2, 5, 1, 5, use_data = true, primal_wsos = primal_wsos, use_dense = use_dense)
+envelope2(; primal_wsos::Bool = true, use_dense::Bool = true) = build_envelope(2, 5, 2, 6, primal_wsos = primal_wsos, use_dense = use_dense)
+envelope3(; primal_wsos::Bool = true, use_dense::Bool = true) = build_envelope(3, 5, 3, 5, primal_wsos = primal_wsos, use_dense = use_dense)
+envelope4(; primal_wsos::Bool = true, use_dense::Bool = true) = build_envelope(2, 30, 1, 30, primal_wsos = primal_wsos, use_dense = use_dense)
 
-function envelope2(; primal_wsos::Bool = true, use_dense::Bool = true)
-    return build_envelope(2, 5, 2, 6, primal_wsos = primal_wsos, use_dense = use_dense)
-end
-
-function envelope3(; primal_wsos::Bool = true, use_dense::Bool = true)
-    return build_envelope(3, 5, 3, 5, primal_wsos = primal_wsos, use_dense = use_dense)
-end
-
-function envelope4(; primal_wsos::Bool = true, use_dense::Bool = true)
-    return build_envelope(2, 30, 1, 30, primal_wsos = primal_wsos, use_dense = use_dense)
-end
-
-function test_envelope(instance::Function, system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+function test_envelope(
+    instance::Function,
+    system_solver::Type{<:SO.CombinedHSDSystemSolver},
+    linear_model::Type{<:MO.LinearModel},
+    verbose::Bool;
+    atol::Float64 = 1e-4,
+    rtol::Float64 = 1e-4,
+    )
     (c, A, b, G, h, cones, cone_idxs) = instance()
     model = linear_model(c, A, b, G, h, cones, cone_idxs)
     stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model))
@@ -96,8 +92,9 @@ function test_envelope(instance::Function, system_solver::Type{<:SO.CombinedHSDS
     @test r.status == :Optimal
 end
 
-
-run_envelope_primal_dense() = run_envelope(true, true)
-run_envelope_dual_dense() = run_envelope(false, true)
-run_envelope_primal_sparse() = run_envelope(true, false)
-run_envelope_dual_sparse() = run_envelope(false, false)
+function test_envelope(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+    for inst in [envelope1, envelope2, envelope3, envelope4]
+        test_envelope(inst, system_solver, linear_model, verbose)
+    end
+    return
+end
