@@ -35,6 +35,9 @@ using Test
 
 const rt2 = sqrt(2)
 
+include("shapeconregrdata.jl")
+
+
 # a description of the shape of the regressor
 mutable struct ShapeData
     mono_dom::MU.Domain
@@ -224,32 +227,41 @@ function build_shapeconregr_WSOS(
     return model
 end
 
-function run_JuMP_shapeconregr(use_wsos::Bool; use_dense::Bool = true, use_PolyJuMP::Bool = false)
-    (n, deg, num_points, signal_ratio, f) =
-        # (2, 3, 100, 0.0, x -> exp(norm(x))) # no noise, monotonic function
-        (2, 3, 100, 0.0, x -> sum(x.^3)) # no noise, monotonic function
-        # (2, 3, 100, 0.0, x -> sum(x.^4)) # no noise, non-monotonic function
-        # (2, 3, 100, 50.0, x -> sum(x.^3)) # some noise, monotonic function
-        # (2, 3, 100, 50.0, x -> sum(x.^4)) # some noise, non-monotonic function
-        # (2, 8, 100, 0.0, x -> exp(norm(x))) # low n high deg, numerically harder
-        # (5, 5, 100, 0.0, x -> exp(norm(x))) # moderate size, no noise, monotonic # out of memory with psd
-        # (2, 4, 100, 0.0, x -> -sum(x.^4))
-        # (2, 4, 100, 0.0, x -> sum(x)^2)
-
-    shape_data = ShapeData(n)
+function shapeconregrj(inst::Int; use_dense::Bool = true, use_PolyJuMP::Bool = false, use_wsos::Bool = true)
+    (n, deg, num_points, signal_ratio, f, shapedata, use_lsq_obj, true_obj) = getshapeconregrdata(inst)
     (X, y) = generate_regr_data(f, -1.0, 1.0, n, num_points, signal_ratio = signal_ratio)
     model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, use_dense = use_dense))
-
     if use_wsos
         if use_PolyJuMP
-            build_shapeconregr_WSOS_PolyJuMP(model, X, y, deg, shape_data)
+            model = build_shapeconregr_WSOS_PolyJuMP(model, X, y, deg, shapedata, use_lsq_obj = use_lsq_obj)
         else
-            build_shapeconregr_WSOS(model, X, y, deg, shape_data)
+            model = build_shapeconregr_WSOS(model, X, y, deg, shapedata, use_lsq_obj = use_lsq_obj)
         end
     else
         PJ.setpolymodule!(model, SumOfSquares)
-        build_shapeconregr_PSD(model, X, y, deg, shape_data)
+        model = build_shapeconregr_PSD(model, X, y, deg, shapedata, use_lsq_obj = use_lsq_obj)
     end
+    return (model, true_obj)
+end
+
+shapeconregr1j(; use_dense::Bool = true) = shapeconregrj(1, use_dense = use_dense)
+shapeconregr2j(; use_dense::Bool = true) = shapeconregrj(2, use_dense = use_dense)
+shapeconregr3j(; use_dense::Bool = true) = shapeconregrj(3, use_dense = use_dense)
+shapeconregr4j(; use_dense::Bool = true) = shapeconregrj(4, use_dense = use_dense)
+shapeconregr5j(; use_dense::Bool = true) = shapeconregrj(5, use_dense = use_dense)
+shapeconregr6j(; use_dense::Bool = true) = shapeconregrj(6, use_dense = use_dense)
+shapeconregr7j(; use_dense::Bool = true) = shapeconregrj(7, use_dense = use_dense)
+shapeconregr8j(; use_dense::Bool = true) = shapeconregrj(8, use_dense = use_dense)
+shapeconregr9j(; use_dense::Bool = true) = shapeconregrj(9, use_dense = use_dense)
+shapeconregr10j(; use_dense::Bool = true) = shapeconregrj(10, use_dense = use_dense)
+shapeconregr11j(; use_dense::Bool = true) = shapeconregrj(11, use_dense = use_dense)
+shapeconregr12j(; use_dense::Bool = true) = shapeconregrj(12, use_dense = use_dense, use_wsos = false)
+shapeconregr13j(; use_dense::Bool = true) = shapeconregrj(13, use_dense = use_dense)
+shapeconregr14j(; use_dense::Bool = true) = shapeconregrj(13, use_dense = use_dense, use_wsos = false)
+shapeconregr15j(; use_dense::Bool = true) = shapeconregrj(15, use_dense = use_dense, use_PolyJuMP = true)
+
+function test_shapeconregrj(instance)
+    (model, true_obj) = instance()
 
     JuMP.optimize!(model)
     term_status = JuMP.termination_status(model)
@@ -262,10 +274,32 @@ function run_JuMP_shapeconregr(use_wsos::Bool; use_dense::Bool = true, use_PolyJ
     @test pr_status == MOI.FEASIBLE_POINT
     @test du_status == MOI.FEASIBLE_POINT
     @test primal_obj ≈ dual_obj atol = 1e-4 rtol = 1e-4
+    @test primal_obj ≈ true_obj atol = 1e-4 rtol = 1e-4
 
     return
 end
 
-run_JuMP_shapeconregr_PSD() = run_JuMP_shapeconregr(false)
-run_JuMP_shapeconregr_WSOS() = run_JuMP_shapeconregr(true)
-run_JuMP_shapeconregr_WSOS_PolyJuMP() = run_JuMP_shapeconregr(true, use_PolyJuMP = true) 
+test_shapeconregrj_many() = test_polyminj.([
+    shapeconregr1j,
+    shapeconregr2j,
+    shapeconregr3j,
+    shapeconregr4j,
+    shapeconregr5j,
+    shapeconregr6j,
+    shapeconregr7j,
+    shapeconregr8j,
+    shapeconregr9j,
+    shapeconregr10j,
+    shapeconregr11j,
+    shapeconregr12j,
+    shapeconregr13j,
+    # shapeconregr14j,
+    shapeconregr15j,
+])
+
+test_shapeconregrj_small() = test_polyminj.([
+    shapeconregr1j,
+    shapeconregr2j,
+    shapeconregr12j,
+    shapeconregr15j,
+])
