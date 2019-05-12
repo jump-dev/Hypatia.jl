@@ -1,7 +1,7 @@
 #=
 Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 
-example taken from
+contraction analysis example adapted from
 "Stability and robustness analysis of nonlinear systems via contraction metrics and SOS programming"
 Aylward, E.M., Parrilo, P.A. and Slotine, J.J.E
 =#
@@ -64,7 +64,7 @@ function contraction_JuMP(
         JuMP.@constraint(model, -R - Matrix(delta * I, n, n) in JuMP.PSDCone())
     end
 
-    return model
+    return (model = model,)
 end
 
 contraction1_JuMP() = contraction_JuMP(0.77, 4, 1e-3, use_wsos = true)
@@ -72,11 +72,11 @@ contraction2_JuMP() = contraction_JuMP(0.77, 4, 1e-3, use_wsos = false)
 contraction3_JuMP() = contraction_JuMP(0.85, 4, 1e-3, use_wsos = true)
 contraction4_JuMP() = contraction_JuMP(0.85, 4, 1e-3, use_wsos = false)
 
-function test_contraction_JuMP(instance; options)
+function test_contraction_JuMP(instance::Tuple{Function, Bool}; options)
     (builder, is_feas) = instance
-    model = builder()
-    JuMP.optimize!(model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
-    @test JuMP.termination_status(model) == (is_feas ? MOI.OPTIMAL : MOI.INFEASIBLE)
+    data = builder()
+    JuMP.optimize!(data.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
+    @test JuMP.termination_status(data.model) == (is_feas ? MOI.OPTIMAL : MOI.INFEASIBLE)
     return
 end
 
