@@ -52,19 +52,23 @@ function build_linearopt(
     return (c, A, b, G, h, cones, cone_idxs)
 end
 
-linearopt1(; use_dense::Bool = true) = build_linearopt(500, 1000, use_data = true, tosparse = !use_dense)
-linearopt2(; use_dense::Bool = true) = build_linearopt(500, 1000, tosparse = !use_dense)
-linearopt3(; use_dense::Bool = true) = build_linearopt(15, 20, tosparse = !use_dense)
+linearopt1(; use_dense::Bool = true) = (model = build_linearopt(500, 1000, use_data = true, tosparse = !use_dense), true_obj = 2055.807)
+linearopt2(; use_dense::Bool = true) = (model = build_linearopt(500, 1000, tosparse = !use_dense), true_obj = NaN)
+linearopt3(; use_dense::Bool = true) = (model = build_linearopt(15, 20, tosparse = !use_dense), true_obj = NaN)
+linearopt4(; use_dense::Bool = true) = (model = build_linearopt(25, 50, dense = true, tosparse = !use_dense), true_obj = NaN)
 
-function run_linearopt()
-    # optionally use fixed data in folder
-    # select the random matrix size, dense/sparse, sparsity fraction
-    (c, A, b, G, h, cones, cone_idxs) = linearopt3()
-
+function test_linearopt(instance::Function)
+    ((c, A, b, G, h, cones, cone_idxs), true_obj) = instance()
     model = MO.PreprocessedLinearModel(c, A, b, G, h, cones, cone_idxs)
     solver = SO.HSDSolver(model, verbose = true)
     SO.solve(solver)
-    @test SO.get_status(solver) == :Optimal
+    r = SO.test_certificates(solver, model, atol = 1e-3, rtol = 1e-3)
+    @test r.status == :Optimal
+    if !isnan(true_obj)
+        @test r.primal_obj ≈ true_obj atol = 1e-4 rtol = 1e-4
+    end
 
     return
 end
+
+test_linearopts() = test_linearopt.([linearopt1, linearopt2, linearopt3, linearopt4])

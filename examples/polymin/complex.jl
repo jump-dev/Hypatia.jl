@@ -85,8 +85,11 @@ function build_complexpolymin(
 end
 
 function complexpolymin(polyname::Symbol, d::Int; primal_wsos = true)
-    (n, deg, f, gs, gdegs, truemin) = complexpolys[polyname]
-    return build_complexpolymin(n, d, f, gs, gdegs, primal_wsos)
+    (n, deg, f, gs, gdegs, true_obj) = complexpolys[polyname]
+    if primal_wsos
+        true_obj *= -1
+    end
+    return (model = build_complexpolymin(n, d, f, gs, gdegs, primal_wsos), true_obj = true_obj)
 end
 
 complexpolymin1() = complexpolymin(:abs1d, 1)
@@ -104,25 +107,31 @@ complexpolymin12() = complexpolymin(:absbox2d, 2, primal_wsos = false)
 complexpolymin13() = complexpolymin(:negabsbox2d, 1, primal_wsos = false)
 complexpolymin14() = complexpolymin(:denseunit1d, 2, primal_wsos = false)
 
-
-
-function run_complexpolymin(polyname::Symbol, d::Int; primal_wsos::Bool = false)
-    # get data for polynomial and domain
-    (n, deg, f, gs, gdegs, truemin) = complexpolys[polyname]
-    @assert d >= deg
-    @assert all(d .>= gdegs)
-
-    (c, A, b, G, h, cones, cone_idxs) = build_complexpolymin(n, d, f, gs, gdegs, primal_wsos)
-
+function test_complexpolymin(instance::Function)
+    ((c, A, b, G, h, cones, cone_idxs), true_obj) = instance()
     model = MO.PreprocessedLinearModel(c, A, b, G, h, cones, cone_idxs)
-    solver = SO.HSDSolver(model, verbose = true, tol_feas = 1e-6, tol_rel_opt = 1e-7, tol_abs_opt = 1e-7)
+    solver = SO.HSDSolver(model, verbose = true)
     SO.solve(solver)
-
-    @test SO.get_status(solver) == :Optimal
-    @test SO.get_primal_obj(solver) ≈ (primal_wsos ? -truemin : truemin) atol = 1e-4 rtol = 1e-4
+    r = SO.test_certificates(solver, model, atol = 1e-4, rtol = 1e-4)
+    @test r.status == :Optimal
+    @test r.primal_obj ≈ true_obj atol = 1e-4 rtol = 1e-4
 
     return
 end
 
-run_complexpolymin_primal() = run_complexpolymin(:denseunit1d, 2, primal_wsos = true)
-run_complexpolymin_dual() = run_complexpolymin(:denseunit1d, 2, primal_wsos = false)
+test_complexpolymins() = test_complexpolymin.([
+    complexpolymin1,
+    complexpolymin2,
+    complexpolymin3,
+    complexpolymin4,
+    complexpolymin5,
+    complexpolymin6,
+    complexpolymin7,
+    complexpolymin8,
+    complexpolymin9,
+    complexpolymin10,
+    complexpolymin11,
+    complexpolymin12,
+    complexpolymin13,
+    complexpolymin14,
+    ])

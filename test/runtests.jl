@@ -24,7 +24,6 @@ include(joinpath(examples_dir, "envelope/native.jl"))
 include(joinpath(examples_dir, "linearopt/native.jl"))
 include(joinpath(examples_dir, "polymin/real.jl"))
 include(joinpath(examples_dir, "polymin/complex.jl"))
-include(joinpath(examples_dir, "polymin/instances.jl"))
 
 include(joinpath(@__DIR__, "native.jl"))
 
@@ -138,53 +137,15 @@ include(joinpath(examples_dir, "contractionanalysis/jump.jl"))
 #     t(s, m, verbose)
 # end
 
-# @info("starting default native examples tests")
-# testfuns = [
-#     run_envelope_primal_dense,
-#     run_envelope_dual_dense,
-#     run_envelope_primal_sparse,
-#     run_envelope_dual_sparse,
-#     run_linearopt,
-#     run_complexpolymin_primal,
-#     run_complexpolymin_dual,
-#     ]
-# @testset "default examples: $t" for t in testfuns
-#     t()
-# end
-
-@info("starting additional native examples tests")
-verbose = true
-system_solvers = [
-    # SO.NaiveCombinedHSDSystemSolver,
-    SO.QRCholCombinedHSDSystemSolver,
-    ]
-linear_models = [
-    # MO.RawLinearModel,
-    MO.PreprocessedLinearModel,
-    ]
+@info("starting default native examples tests")
 testfuns = [
-#     # TODO test primal and dual formulations of envelope
-#     envelope1,
-#     envelope2,
-#     envelope3,
-#     envelope4,
-    test_envelope,
-#     linearopt1,
-#     linearopt2,
-    test_polymin,
-#     test_complexpolymin1,
-#     test_complexpolymin2,
-#     test_complexpolymin3,
-#     test_complexpolymin4,
-#     test_complexpolymin5,
-#     test_complexpolymin6,
-#     test_complexpolymin7,
+    test_envelopes,
+    test_linearopts,
+    test_polymins,
+    test_complexpolymins,
     ]
-@testset "native examples: $t, $s, $m" for t in testfuns, s in system_solvers, m in linear_models
-    if s == SO.QRCholCombinedHSDSystemSolver && m == MO.RawLinearModel
-        continue # QRChol linear system solver needs preprocessed model
-    end
-    t(s, m, verbose)
+@testset "default examples: $t" for t in testfuns
+    t()
 end
 
 # @info("starting MathOptInterface tests")

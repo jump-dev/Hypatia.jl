@@ -792,29 +792,29 @@ end
 #     @test r.status == :Optimal
 # end
 
-function linearopt1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
-    # dense methods
-    (c, A, b, G, h, cones, cone_idxs) = build_linearopt(25, 50, dense = true, tosparse = false)
-    rd = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
-    @test rd.status == :Optimal
-
-    # sparse methods
-    (c, A, b, G, h, cones, cone_idxs) = build_linearopt(25, 50, dense = true, tosparse = true)
-    rs = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
-    @test rs.status == :Optimal
-
-    @test rs.primal_obj ≈ rd.primal_obj atol = 1e-4 rtol = 1e-4
-end
-
-function linearopt2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
-    (c, A, b, G, h, cones, cone_idxs) = build_linearopt(500, 1000, use_data = true, dense = true)
-    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose, atol = 1e-3, rtol = 1e-3)
-    @test r.status == :Optimal
-    @test r.primal_obj ≈ 2055.807 atol = 1e-4 rtol = 1e-4
-end
+# function linearopt1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+#     # dense methods
+#     (c, A, b, G, h, cones, cone_idxs) = build_linearopt(25, 50, dense = true, tosparse = false)
+#     rd = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+#     @test rd.status == :Optimal
+#
+#     # sparse methods
+#     (c, A, b, G, h, cones, cone_idxs) = build_linearopt(25, 50, dense = true, tosparse = true)
+#     rs = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+#     @test rs.status == :Optimal
+#
+#     @test rs.primal_obj ≈ rd.primal_obj atol = 1e-4 rtol = 1e-4
+# end
+#
+# function linearopt2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+#     (c, A, b, G, h, cones, cone_idxs) = build_linearopt(500, 1000, use_data = true, dense = true)
+#     r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose, atol = 1e-3, rtol = 1e-3)
+#     @test r.status == :Optimal
+#     @test r.primal_obj ≈ 2055.807 atol = 1e-4 rtol = 1e-4
+# end
 
 # for polymin tests, most optimal values are taken from https://people.sc.fsu.edu/~jburkardt/py_src/polynomials/polynomials.html
-
+#
 # function test_polymin1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
 #     (c, A, b, G, h, cones, cone_idxs) = polymin1()
 #     r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
@@ -891,75 +891,75 @@ end
 #     @test r.status == :Optimal
 #     @test abs(r.primal_obj) ≈ 0 atol = 1e-3 rtol = 1e-3
 # end
-
-# complex polymin test optimal values were found analytically in most cases
-
-function test_complexpolymin1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
-    truemin = 1
-    for primal_wsos in [false, true]
-        (c, A, b, G, h, cones, cone_idxs) = complexpolymin1(primal_wsos = primal_wsos)
-        r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
-        @test r.status == :Optimal
-        @test r.primal_obj ≈ (primal_wsos ? -truemin : truemin) atol = 1e-4 rtol = 1e-4
-    end
-end
-
-function test_complexpolymin2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
-    truemin = 1
-    for primal_wsos in [false, true]
-        (c, A, b, G, h, cones, cone_idxs) = complexpolymin2(primal_wsos = primal_wsos)
-        r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
-        @test r.status == :Optimal
-        @test r.primal_obj ≈ (primal_wsos ? -truemin : truemin) atol = 1e-4 rtol = 1e-4
-    end
-end
-
-function test_complexpolymin3(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
-    truemin = -1
-    for primal_wsos in [false, true]
-        (c, A, b, G, h, cones, cone_idxs) = complexpolymin3(primal_wsos = primal_wsos)
-        r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
-        @test r.status == :Optimal
-        @test r.primal_obj ≈ (primal_wsos ? -truemin : truemin) atol = 1e-4 rtol = 1e-4
-    end
-end
-
-function test_complexpolymin4(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
-    truemin = 1
-    for primal_wsos in [false, true]
-        (c, A, b, G, h, cones, cone_idxs) = complexpolymin4(primal_wsos = primal_wsos)
-        r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
-        @test r.status == :Optimal
-        @test r.primal_obj ≈ (primal_wsos ? -truemin : truemin) atol = 1e-4 rtol = 1e-4
-    end
-end
-
-function test_complexpolymin5(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
-    truemin = 1
-    for primal_wsos in [false, true]
-        (c, A, b, G, h, cones, cone_idxs) = complexpolymin5(primal_wsos = primal_wsos)
-        r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
-        @test r.status == :Optimal
-        @test r.primal_obj ≈ (primal_wsos ? -truemin : truemin) atol = 1e-4 rtol = 1e-4
-    end
-end
-
-function test_complexpolymin6(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
-    truemin = -2
-    for primal_wsos in [false, true]
-        (c, A, b, G, h, cones, cone_idxs) = complexpolymin6(primal_wsos = primal_wsos)
-        r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
-        @test r.status == :Optimal
-        @test r.primal_obj ≈ (primal_wsos ? -truemin : truemin) atol = 1e-4 rtol = 1e-4
-    end
-end
-
-function test_complexpolymin7(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
-    truemin = 0
-    for primal_wsos in [false, true]
-        (c, A, b, G, h, cones, cone_idxs) = complexpolymin7(primal_wsos = primal_wsos)
-        r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
-        @test r.status == :Optimal
-        @test r.primal_obj ≈ (primal_wsos ? -truemin : truemin) atol = 1e-4 rtol = 1e-4
-    end
-end
+#
+# # complex polymin test optimal values were found analytically in most cases
+#
+# function test_complexpolymin1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+#     truemin = 1
+#     for primal_wsos in [false, true]
+#         (c, A, b, G, h, cones, cone_idxs) = complexpolymin1(primal_wsos = primal_wsos)
+#         r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+#         @test r.status == :Optimal
+#         @test r.primal_obj ≈ (primal_wsos ? -truemin : truemin) atol = 1e-4 rtol = 1e-4
+#     end
+# end
+#
+# function test_complexpolymin2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+#     truemin = 1
+#     for primal_wsos in [false, true]
+#         (c, A, b, G, h, cones, cone_idxs) = complexpolymin2(primal_wsos = primal_wsos)
+#         r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+#         @test r.status == :Optimal
+#         @test r.primal_obj ≈ (primal_wsos ? -truemin : truemin) atol = 1e-4 rtol = 1e-4
+#     end
+# end
+#
+# function test_complexpolymin3(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+#     truemin = -1
+#     for primal_wsos in [false, true]
+#         (c, A, b, G, h, cones, cone_idxs) = complexpolymin3(primal_wsos = primal_wsos)
+#         r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+#         @test r.status == :Optimal
+#         @test r.primal_obj ≈ (primal_wsos ? -truemin : truemin) atol = 1e-4 rtol = 1e-4
+#     end
+# end
+#
+# function test_complexpolymin4(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+#     truemin = 1
+#     for primal_wsos in [false, true]
+#         (c, A, b, G, h, cones, cone_idxs) = complexpolymin4(primal_wsos = primal_wsos)
+#         r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+#         @test r.status == :Optimal
+#         @test r.primal_obj ≈ (primal_wsos ? -truemin : truemin) atol = 1e-4 rtol = 1e-4
+#     end
+# end
+#
+# function test_complexpolymin5(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+#     truemin = 1
+#     for primal_wsos in [false, true]
+#         (c, A, b, G, h, cones, cone_idxs) = complexpolymin5(primal_wsos = primal_wsos)
+#         r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+#         @test r.status == :Optimal
+#         @test r.primal_obj ≈ (primal_wsos ? -truemin : truemin) atol = 1e-4 rtol = 1e-4
+#     end
+# end
+#
+# function test_complexpolymin6(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+#     truemin = -2
+#     for primal_wsos in [false, true]
+#         (c, A, b, G, h, cones, cone_idxs) = complexpolymin6(primal_wsos = primal_wsos)
+#         r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+#         @test r.status == :Optimal
+#         @test r.primal_obj ≈ (primal_wsos ? -truemin : truemin) atol = 1e-4 rtol = 1e-4
+#     end
+# end
+#
+# function test_complexpolymin7(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+#     truemin = 0
+#     for primal_wsos in [false, true]
+#         (c, A, b, G, h, cones, cone_idxs) = complexpolymin7(primal_wsos = primal_wsos)
+#         r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+#         @test r.status == :Optimal
+#         @test r.primal_obj ≈ (primal_wsos ? -truemin : truemin) atol = 1e-4 rtol = 1e-4
+#     end
+# end
