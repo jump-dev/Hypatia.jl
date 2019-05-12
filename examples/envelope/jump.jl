@@ -16,14 +16,14 @@ using LinearAlgebra
 import Random
 using Test
 
-function build_JuMP_envelope(
+function build_envelope_JuMP(
+    model::JuMP.Model,
     npoly::Int,
     deg::Int,
     d::Int,
     domain::MU.Domain;
     sample::Bool = true,
     rseed::Int = 1,
-    use_dense::Bool = true,
     )
     Random.seed!(rseed)
 
@@ -36,8 +36,6 @@ function build_JuMP_envelope(
     LDegs = binomial(n + deg, n)
     polys = P0[:, 1:LDegs] * rand(-9:9, LDegs, npoly)
 
-    # build JuMP model
-    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, use_dense = use_dense))
     JuMP.@variable(model, fpv[j in 1:U]) # values at Fekete points
     JuMP.@objective(model, Max, dot(fpv, w)) # integral over domain (via quadrature)
     JuMP.@constraint(model, [i in 1:npoly], polys[:, i] .- fpv in HYP.WSOSPolyInterpCone(U, [P0, PWts...]))
@@ -45,20 +43,18 @@ function build_JuMP_envelope(
     return model
 end
 
-function JuMP_envelope1(; sample::Bool = true, use_dense::Bool = true)
-    return build_JuMP_envelope(2, 3, 4, MU.Box(-ones(2), ones(2)), use_dense = use_dense)
+function envelope_JuMP(npoly::Int, deg::Int, d::Int, domain::MU.Domain; sample::Bool = true, use_dense::Bool = true)
+    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, use_dense = use_dense))
+    return build_envelope_JuMP(model, npoly, deg, d, domain, sample = sample)
 end
 
-function JuMP_envelope2(; sample::Bool = true, use_dense::Bool = true)
-    return build_JuMP_envelope(2, 3, 4, MU.Ball(zeros(2), sqrt(2)), use_dense = use_dense)
-end
+envelope1_JuMP(; use_dense::Bool = true) = envelope_JuMP(2, 3, 4, MU.Box(-ones(2), ones(2)), use_dense = use_dense)
+envelope2_JuMP(; use_dense::Bool = true) = envelope_JuMP(2, 3, 4, MU.Ball(zeros(2), sqrt(2)), use_dense = use_dense) # needs fix to work https://github.com/chriscoey/Hypatia.jl/issues/173
+envelope3_JuMP(; use_dense::Bool = true) = envelope_JuMP(2, 3, 4, MU.Box(-ones(2), ones(2)), sample = false, use_dense = use_dense)
 
-function run_JuMP_envelope(; sample::Bool = true, box::Bool = true)
-    if box
-        model = JuMP_envelope1(sample = sample)
-    else
-        model = JuMP_envelope2(sample = sample)
-    end
+
+function test_envelope_JuMP(instance::Function)
+    model = instance()
     JuMP.optimize!(model)
 
     term_status = JuMP.termination_status(model)
@@ -75,6 +71,8 @@ function run_JuMP_envelope(; sample::Bool = true, box::Bool = true)
     return
 end
 
-run_JuMP_envelope_sampleinterp_box() = run_JuMP_envelope(sample = true, box = true)
-run_JuMP_envelope_sampleinterp_ball() = run_JuMP_envelope(sample = true, box = false)
-run_JuMP_envelope_boxinterp() = run_JuMP_envelope(sample = false, box = true)
+test_envelope_JuMP_many() = test_envelope_JuMP.([
+    envelope1_JuMP,
+    envelope2_JuMP,
+    envelope3_JuMP,
+])

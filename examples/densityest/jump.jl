@@ -27,18 +27,18 @@ import Random
 import Distributions
 using Test
 
-function build_JuMP_densityest(
-    model,
+function build_densityest_JuMP(
+    model::JuMP.Model,
     X::Matrix{Float64},
     deg::Int,
-    dom::MU.Domain;
+    domain::MU.Domain;
     sample_factor::Int = 100,
     use_monomials::Bool = true,
     )
 
     (nobs, dim) = size(X)
     d = div(deg + 1, 2)
-    (U, pts, P0, PWts, w) = MU.interpolate(dom, d, sample = true, calc_w = true, sample_factor = sample_factor)
+    (U, pts, P0, PWts, w) = MU.interpolate(domain, d, sample = true, calc_w = true, sample_factor = sample_factor)
 
     JuMP.@variable(model, z[1:nobs])
     JuMP.@objective(model, Max, sum(z))
@@ -69,34 +69,35 @@ function build_JuMP_densityest(
     return
 end
 
-function JuMP_densityest1(; use_monomials::Bool = false, use_dense::Bool = true)
-    nobs = 200
-    n = 1
-    deg = 4
+function densityest_JuMP(nobs::Int, n::Int, deg::Int; rseed::Int = 1, use_monomials::Bool = false, use_dense::Bool = true)
+    Random.seed!(rseed)
     X = rand(Distributions.Uniform(-1, 1), nobs, n)
-    dom = MU.Box(-ones(n), ones(n))
+    domain = MU.Box(-ones(n), ones(n))
     model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, use_dense = use_dense))
-    build_JuMP_densityest(model, X, deg, dom, use_monomials = use_monomials)
+    build_densityest_JuMP(model, X, deg, domain, use_monomials = use_monomials)
     return model
 end
 
-function run_JuMP_densityest(; rseed::Int = 1)
-    Random.seed!(rseed)
-    for use_monomials in [true, false]
-        model = JuMP_densityest1(use_monomials = use_monomials)
-        JuMP.optimize!(model)
+densityest1_JuMP(; use_dense::Bool = true) = densityest_JuMP(200, 1, 4, use_monomials = false, use_dense = use_dense)
+densityest2_JuMP(; use_dense::Bool = true) = densityest_JuMP(200, 1, 4, use_monomials = true, use_dense = use_dense)
 
-        term_status = JuMP.termination_status(model)
-        primal_obj = JuMP.objective_value(model)
-        dual_obj = JuMP.objective_bound(model)
-        pr_status = JuMP.primal_status(model)
-        du_status = JuMP.dual_status(model)
 
-        @test term_status == MOI.OPTIMAL
-        @test pr_status == MOI.FEASIBLE_POINT
-        @test du_status == MOI.FEASIBLE_POINT
-        @test primal_obj ≈ dual_obj atol = 1e-4 rtol = 1e-4
-    end
+function test_densityest_JuMP(instance::Function)
+    model = instance()
+    JuMP.optimize!(model)
+
+    term_status = JuMP.termination_status(model)
+    primal_obj = JuMP.objective_value(model)
+    dual_obj = JuMP.objective_bound(model)
+    pr_status = JuMP.primal_status(model)
+    du_status = JuMP.dual_status(model)
+
+    @test term_status == MOI.OPTIMAL
+    @test pr_status == MOI.FEASIBLE_POINT
+    @test du_status == MOI.FEASIBLE_POINT
+    @test primal_obj ≈ dual_obj atol = 1e-4 rtol = 1e-4
 
     return
 end
+
+test_densityest_JuMP_many() = test_densityest_JuMP.([densityest1_JuMP, densityest2_JuMP])

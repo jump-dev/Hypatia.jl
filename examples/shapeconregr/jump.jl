@@ -228,7 +228,7 @@ function build_shapeconregr_WSOS(
 end
 
 function shapeconregr_JuMP(inst::Int; use_dense::Bool = true, use_PolyJuMP::Bool = false, use_wsos::Bool = true)
-    (n, deg, num_points, signal_ratio, f, shapedata, use_lsq_ob_j, true_obj) = getshapeconregrdata(inst)
+    (n, deg, num_points, signal_ratio, f, shapedata, use_lsq_obj, true_obj) = getshapeconregrdata(inst)
     (X, y) = generate_regr_data(f, -1.0, 1.0, n, num_points, signal_ratio = signal_ratio)
     model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, use_dense = use_dense))
     if use_wsos
@@ -279,7 +279,7 @@ function test_shapeconregr_JuMP(instance::Function)
     return
 end
 
-test_shapeconregr_JuMP_all() = test_shapeconregr_JuMP.([
+test_shapeconregr_JuMP_many() = test_shapeconregr_JuMP.([
     shapeconregr1_JuMP,
     shapeconregr2_JuMP,
     shapeconregr3_JuMP,

@@ -117,4 +117,4 @@ function test_lotkavolterra_JuMP(instance::Function)
     return
 end
 
-test_lotkavolterra_JuMP_all() = test_lotkavolterra_JuMP.([lotkavolterra1_JuMP])
+test_lotkavolterra_JuMP_many() = test_lotkavolterra_JuMP.([lotkavolterra1_JuMP])

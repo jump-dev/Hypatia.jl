@@ -212,12 +212,7 @@ include(joinpath(examples_dir, "contractionanalysis/jump.jl"))
 
 # @info("starting default JuMP examples tests")
 # testfuns = [
-#     run_JuMP_envelope_boxinterp,
-#     run_JuMP_envelope_sampleinterp_box,
-#     run_JuMP_envelope_sampleinterp_ball,
-#     run_JuMP_expdesign,
 #     # run_JuMP_polymin_PSD, # too slow TODO check: final objective doesn't match
-#     run_JuMP_densityest,
 #     run_JuMP_sosmatrix_rand,
 #     run_JuMP_sosmatrix_a,
 #     run_JuMP_sosmatrix_poly_a,
@@ -233,10 +228,6 @@ include(joinpath(examples_dir, "contractionanalysis/jump.jl"))
 #     run_JuMP_sosmat2_matrix_dual,
 #     run_JuMP_sosmat3_primal, # numerically unstable
 #     run_JuMP_sosmat3_dual, # numerically unstable
-#    # run_JuMP_univariate_roa_WSOS,
-#    # run_JuMP_univariate_roa_PSD,
-#    # run_JuMP_contraction_PSD,
-#    # run_JuMP_contraction_WSOS,
 #     ]
 # @testset "default examples: $t" for t in testfuns
 #     t()
@@ -244,10 +235,14 @@ include(joinpath(examples_dir, "contractionanalysis/jump.jl"))
 
 @info("starting additional JuMP examples tests")
 testfuns = [
-    # test_lotkavolterra_JuMP_all,
-    # test_polymin_JuMP_all,
-    test_univariate_roa_JuMP_all,
-    # test_shapeconregr_JuMP_all,
+    test_contraction_JuMP_many,
+    test_densityest_JuMP_many,
+    test_envelope_JuMP_many,
+    test_expdesign_JuMP_many,
+    # test_lotkavolterra_JuMP_many,
+    # test_polymin_JuMP_many,
+    test_univariate_roa_JuMP_many,
+    # test_shapeconregr_JuMP_many,
     ]
 @testset "JuMP examples: $t" for t in testfuns
     t()

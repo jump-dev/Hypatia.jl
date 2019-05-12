@@ -123,4 +123,4 @@ function test_univariate_roa_JuMP(instance::Function)
     return
 end
 
-test_univariate_roa_JuMP_all() = test_univariate_roa_JuMP.([univariate_roa1_JuMP, univariate_roa2_JuMP])
+test_univariate_roa_JuMP_many() = test_univariate_roa_JuMP.([univariate_roa1_JuMP, univariate_roa2_JuMP])
