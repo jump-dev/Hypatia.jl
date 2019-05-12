@@ -145,7 +145,6 @@ include(joinpath(examples_dir, "contractionanalysis/jump.jl"))
 #     run_envelope_primal_sparse,
 #     run_envelope_dual_sparse,
 #     run_linearopt,
-#     run_polymin,
 #     run_complexpolymin_primal,
 #     run_complexpolymin_dual,
 #     ]
@@ -153,35 +152,26 @@ include(joinpath(examples_dir, "contractionanalysis/jump.jl"))
 #     t()
 # end
 
-# @info("starting additional native examples tests")
-# verbose = true
-# system_solvers = [
-#     # SO.NaiveCombinedHSDSystemSolver,
-#     SO.QRCholCombinedHSDSystemSolver,
-#     ]
-# linear_models = [
-#     # MO.RawLinearModel,
-#     MO.PreprocessedLinearModel,
-#     ]
-# testfuns = [
+@info("starting additional native examples tests")
+verbose = true
+system_solvers = [
+    # SO.NaiveCombinedHSDSystemSolver,
+    SO.QRCholCombinedHSDSystemSolver,
+    ]
+linear_models = [
+    # MO.RawLinearModel,
+    MO.PreprocessedLinearModel,
+    ]
+testfuns = [
 #     # TODO test primal and dual formulations of envelope
 #     envelope1,
 #     envelope2,
 #     envelope3,
 #     envelope4,
+    test_envelope,
 #     linearopt1,
 #     linearopt2,
-#     polymin1,
-#     polymin2,
-#     polymin3,
-#     polymin4,
-#     polymin5,
-#     polymin6,
-#     polymin7,
-#     polymin8,
-#     polymin9,
-#     polymin10,
-#     polymin11,
+    test_polymin,
 #     test_complexpolymin1,
 #     test_complexpolymin2,
 #     test_complexpolymin3,
@@ -189,13 +179,13 @@ include(joinpath(examples_dir, "contractionanalysis/jump.jl"))
 #     test_complexpolymin5,
 #     test_complexpolymin6,
 #     test_complexpolymin7,
-#     ]
-# @testset "native examples: $t, $s, $m" for t in testfuns, s in system_solvers, m in linear_models
-#     if s == SO.QRCholCombinedHSDSystemSolver && m == MO.RawLinearModel
-#         continue # QRChol linear system solver needs preprocessed model
-#     end
-#     t(s, m, verbose)
-# end
+    ]
+@testset "native examples: $t, $s, $m" for t in testfuns, s in system_solvers, m in linear_models
+    if s == SO.QRCholCombinedHSDSystemSolver && m == MO.RawLinearModel
+        continue # QRChol linear system solver needs preprocessed model
+    end
+    t(s, m, verbose)
+end
 
 # @info("starting MathOptInterface tests")
 # verbose = false

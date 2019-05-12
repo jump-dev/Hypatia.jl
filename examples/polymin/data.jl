@@ -142,3 +142,50 @@ function getpolydata(polyname::Symbol)
 
     return (x, f, dom, true_obj)
 end
+
+# TODO make similar to real case when https://github.com/JuliaAlgebra/MultivariatePolynomials.jl/issues/11 is addressed
+# list of predefined polynomials and domains
+complexpolys = Dict{Symbol, NamedTuple}(
+    :abs1d => (n = 1, deg = 1,
+        f = (z -> 1 + sum(abs2, z)),
+        gs = [],
+        gdegs = [],
+        truemin = 1,
+        ),
+    :absunit1d => (n = 1, deg = 1,
+        f = (z -> 1 + sum(abs2, z)),
+        gs = [z -> 1 - sum(abs2, z)],
+        gdegs = [1],
+        truemin = 1,
+        ),
+    :negabsunit1d => (n = 1, deg = 1,
+        f = (z -> -sum(abs2, z)),
+        gs = [z -> 1 - sum(abs2, z)],
+        gdegs = [1],
+        truemin = -1,
+        ),
+    :absball2d => (n = 2, deg = 1,
+        f = (z -> 1 + sum(abs2, z)),
+        gs = [z -> 1 - sum(abs2, z)],
+        gdegs = [1],
+        truemin = 1,
+        ),
+    :absbox2d => (n = 2, deg = 1,
+        f = (z -> 1 + sum(abs2, z)),
+        gs = [z -> 1 - abs2(z[1]), z -> 1 - abs2(z[2])],
+        gdegs = [1, 1],
+        truemin = 1,
+        ),
+    :negabsbox2d => (n = 2, deg = 1,
+        f = (z -> -sum(abs2, z)),
+        gs = [z -> 1 - abs2(z[1]), z -> 1 - abs2(z[2])],
+        gdegs = [1, 1],
+        truemin = -2,
+        ),
+    :denseunit1d => (n = 1, deg = 2,
+        f = (z -> 1 + 2real(z[1]) + abs(z[1])^2 + 2real(z[1]^2) + 2real(z[1]^2 * conj(z[1])) + abs(z[1])^4),
+        gs = [z -> 1 - abs2(z[1])],
+        gdegs = [1],
+        truemin = 0,
+    )
+)
