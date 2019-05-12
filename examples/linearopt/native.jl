@@ -16,7 +16,7 @@ using DelimitedFiles
 import Random
 using Test
 
-function build_linearopt(
+function linearopt(
     m::Int,
     n::Int;
     use_data::Bool = false,
@@ -34,11 +34,13 @@ function build_linearopt(
         A = readdlm(joinpath(datapath, "A$(m)x$(n).txt"), ',', Float64)
         b = vec(readdlm(joinpath(datapath, "b$m.txt"), ',', Float64))
         c = vec(readdlm(joinpath(datapath, "c$n.txt"), ',', Float64))
+        true_obj = 2055.807
     else
         # generate random data
         A = dense ? rand(-9.0:9.0, m, n) : 10.0 .* sprandn(m, n, nzfrac)
         b = A * ones(n)
         c = rand(0.0:9.0, n)
+        true_obj = NaN
     end
     if tosparse && !issparse(A)
         A = sparse(A)
@@ -49,13 +51,13 @@ function build_linearopt(
     cones = [CO.Nonnegative(n)]
     cone_idxs = [1:n]
 
-    return (c, A, b, G, h, cones, cone_idxs)
+    return (model = (c, A, b, G, h, cones, cone_idxs), true_obj = true_obj)
 end
 
-linearopt1(; use_dense::Bool = true) = (model = build_linearopt(500, 1000, use_data = true, tosparse = !use_dense), true_obj = 2055.807)
-linearopt2(; use_dense::Bool = true) = (model = build_linearopt(500, 1000, tosparse = !use_dense), true_obj = NaN)
-linearopt3(; use_dense::Bool = true) = (model = build_linearopt(15, 20, tosparse = !use_dense), true_obj = NaN)
-linearopt4(; use_dense::Bool = true) = (model = build_linearopt(25, 50, dense = true, tosparse = !use_dense), true_obj = NaN)
+linearopt1(; use_dense::Bool = true) = linearopt(500, 1000, use_data = true, tosparse = !use_dense)
+linearopt2(; use_dense::Bool = true) = linearopt(500, 1000, tosparse = !use_dense)
+linearopt3(; use_dense::Bool = true) = linearopt(15, 20, tosparse = !use_dense)
+linearopt4(; use_dense::Bool = true) = linearopt(25, 50, dense = true, tosparse = !use_dense)
 
 function test_linearopt(instance::Function)
     ((c, A, b, G, h, cones, cone_idxs), true_obj) = instance()
@@ -71,4 +73,9 @@ function test_linearopt(instance::Function)
     return
 end
 
-test_linearopts() = test_linearopt.([linearopt1, linearopt2, linearopt3, linearopt4])
+test_linearopts() = test_linearopt.([
+    linearopt1,
+    linearopt2,
+    linearopt3,
+    linearopt4
+    ])
