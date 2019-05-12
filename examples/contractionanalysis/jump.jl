@@ -29,9 +29,8 @@ const rt2 = sqrt(2)
 function contraction_JuMP(
     beta::Float64,
     deg_M::Int,
-    delta::Float64 = 1e-3;
+    delta::Float64;
     use_wsos::Bool = true,
-    use_dense::Bool = true,
     )
     n = 2
     dom = MU.FreeDomain(n)
@@ -48,7 +47,7 @@ function contraction_JuMP(
     dx2dt = 3 * x[1] - x[2]
     dynamics = [dx1dt; dx2dt]
 
-    model = JuMP.Model(JuMP.with_optimizer(Hypatia.Optimizer, verbose = true, tol_feas = 1e-4, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6, use_dense = use_dense))
+    model = JuMP.Model()
     JuMP.@variable(model, polys[1:3], PJ.Poly(polyjump_basis))
 
     M = [polys[1] polys[2]; polys[2] polys[3]]
@@ -72,16 +71,22 @@ function contraction_JuMP(
     return model
 end
 
-contraction1_JuMP(; use_dense::Bool = true) = contraction_JuMP(0.77, 4, 1e-3, use_wsos = true, use_dense = use_dense)
-contraction2_JuMP(; use_dense::Bool = true) = contraction_JuMP(0.77, 4, 1e-3, use_wsos = false, use_dense = use_dense)
+contraction1_JuMP() = contraction_JuMP(0.77, 4, 1e-3, use_wsos = true)
+contraction2_JuMP() = contraction_JuMP(0.77, 4, 1e-3, use_wsos = false)
+contraction3_JuMP() = contraction_JuMP(0.85, 4, 1e-3, use_wsos = true)
+contraction4_JuMP() = contraction_JuMP(0.85, 4, 1e-3, use_wsos = false)
 
-function test_contraction_JuMP(instance::Function)
-    model = instance()
-    JuMP.optimize!(model)
-    @test JuMP.termination_status(model) == MOI.OPTIMAL
-    @test JuMP.primal_status(model) == MOI.FEASIBLE_POINT
-    @test JuMP.dual_status(model) == MOI.FEASIBLE_POINT
+function test_contraction_JuMP(instance; options)
+    (builder, is_feas) = instance
+    model = builder()
+    JuMP.optimize!(model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
+    @test JuMP.termination_status(model) == (is_feas ? MOI.OPTIMAL : MOI.INFEASIBLE)
     return
 end
 
-test_contraction_JuMP_many() = test_contraction_JuMP.([contraction1_JuMP, contraction2_JuMP])
+test_contraction_JuMP(; options...) = test_contraction_JuMP.([
+    (contraction1_JuMP, true),
+    (contraction2_JuMP, true),
+    (contraction3_JuMP, false),
+    (contraction4_JuMP, false),
+    ], options = options)
