@@ -815,82 +815,82 @@ end
 
 # for polymin tests, most optimal values are taken from https://people.sc.fsu.edu/~jburkardt/py_src/polynomials/polynomials.html
 
-function test_polymin1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
-    (c, A, b, G, h, cones, cone_idxs) = polymin1()
-    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
-    @test r.status == :Optimal
-    @test abs(r.primal_obj) ≈ 1.4393333333 atol = 1e-4 rtol = 1e-4
-end
-
-function test_polymin2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
-    (c, A, b, G, h, cones, cone_idxs) = polymin2()
-    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
-    @test r.status == :Optimal
-    @test abs(r.primal_obj) ≈ 3.1800966258 atol = 1e-4 rtol = 1e-4
-end
-
-function test_polymin3(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
-    (c, A, b, G, h, cones, cone_idxs) = polymin3()
-    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose, atol = 1e-2, rtol = 1e-2)
-    @test r.status == :Optimal
-    @test abs(r.primal_obj) ≈ 3 atol = 1e-4 rtol = 1e-4
-end
-
-function test_polymin4(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
-    (c, A, b, G, h, cones, cone_idxs) = polymin4()
-    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
-    @test r.status == :Optimal
-    @test abs(r.primal_obj) ≈ 1.36775 atol = 1e-4 rtol = 1e-4
-end
-
-function test_polymin5(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
-    (c, A, b, G, h, cones, cone_idxs) = polymin5()
-    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
-    @test r.status == :Optimal
-    @test abs(r.primal_obj) ≈ 20.8 atol = 1e-4 rtol = 1e-4
-end
-
-function test_polymin6(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
-    (c, A, b, G, h, cones, cone_idxs) = polymin6()
-    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
-    @test r.status == :Optimal
-    @test abs(r.primal_obj) ≈ 0.25 atol = 1e-4 rtol = 1e-4
-end
-
-function test_polymin7(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
-    (c, A, b, G, h, cones, cone_idxs) = polymin7()
-    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
-    @test r.status == :Optimal
-    @test abs(r.primal_obj) ≈ 0 atol = 1e-4 rtol = 1e-4
-end
-
-function test_polymin8(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
-    (c, A, b, G, h, cones, cone_idxs) = polymin8()
-    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
-    @test r.status == :Optimal
-    @test abs(r.primal_obj) ≈ 36.71269068 atol = 1e-4 rtol = 1e-4
-end
-
-function test_polymin9(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
-    (c, A, b, G, h, cones, cone_idxs) = polymin9()
-    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
-    @test r.status == :Optimal
-    @test abs(r.primal_obj) ≈ 0.814814 atol = 1e-4 rtol = 1e-4
-end
-
-function test_polymin10(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
-    (c, A, b, G, h, cones, cone_idxs) = polymin10()
-    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose, atol = 1e-2, rtol = 1e-2)
-    @test r.status == :Optimal
-    @test abs(r.primal_obj) ≈ 0 atol = 1e-3 rtol = 1e-3
-end
-
-function test_polymin11(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
-    (c, A, b, G, h, cones, cone_idxs) = polymin11()
-    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose, atol = 1e-3, rtol = 1e-3)
-    @test r.status == :Optimal
-    @test abs(r.primal_obj) ≈ 0 atol = 1e-3 rtol = 1e-3
-end
+# function test_polymin1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+#     (c, A, b, G, h, cones, cone_idxs) = polymin1()
+#     r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+#     @test r.status == :Optimal
+#     @test abs(r.primal_obj) ≈ 1.4393333333 atol = 1e-4 rtol = 1e-4
+# end
+#
+# function test_polymin2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+#     (c, A, b, G, h, cones, cone_idxs) = polymin2()
+#     r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+#     @test r.status == :Optimal
+#     @test abs(r.primal_obj) ≈ 3.1800966258 atol = 1e-4 rtol = 1e-4
+# end
+#
+# function test_polymin3(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+#     (c, A, b, G, h, cones, cone_idxs) = polymin3()
+#     r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose, atol = 1e-2, rtol = 1e-2)
+#     @test r.status == :Optimal
+#     @test abs(r.primal_obj) ≈ 3 atol = 1e-4 rtol = 1e-4
+# end
+#
+# function test_polymin4(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+#     (c, A, b, G, h, cones, cone_idxs) = polymin4()
+#     r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+#     @test r.status == :Optimal
+#     @test abs(r.primal_obj) ≈ 1.36775 atol = 1e-4 rtol = 1e-4
+# end
+#
+# function test_polymin5(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+#     (c, A, b, G, h, cones, cone_idxs) = polymin5()
+#     r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+#     @test r.status == :Optimal
+#     @test abs(r.primal_obj) ≈ 20.8 atol = 1e-4 rtol = 1e-4
+# end
+#
+# function test_polymin6(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+#     (c, A, b, G, h, cones, cone_idxs) = polymin6()
+#     r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+#     @test r.status == :Optimal
+#     @test abs(r.primal_obj) ≈ 0.25 atol = 1e-4 rtol = 1e-4
+# end
+#
+# function test_polymin7(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+#     (c, A, b, G, h, cones, cone_idxs) = polymin7()
+#     r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+#     @test r.status == :Optimal
+#     @test abs(r.primal_obj) ≈ 0 atol = 1e-4 rtol = 1e-4
+# end
+#
+# function test_polymin8(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+#     (c, A, b, G, h, cones, cone_idxs) = polymin8()
+#     r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+#     @test r.status == :Optimal
+#     @test abs(r.primal_obj) ≈ 36.71269068 atol = 1e-4 rtol = 1e-4
+# end
+#
+# function test_polymin9(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+#     (c, A, b, G, h, cones, cone_idxs) = polymin9()
+#     r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+#     @test r.status == :Optimal
+#     @test abs(r.primal_obj) ≈ 0.814814 atol = 1e-4 rtol = 1e-4
+# end
+#
+# function test_polymin10(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+#     (c, A, b, G, h, cones, cone_idxs) = polymin10()
+#     r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose, atol = 1e-2, rtol = 1e-2)
+#     @test r.status == :Optimal
+#     @test abs(r.primal_obj) ≈ 0 atol = 1e-3 rtol = 1e-3
+# end
+#
+# function test_polymin11(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+#     (c, A, b, G, h, cones, cone_idxs) = polymin11()
+#     r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose, atol = 1e-3, rtol = 1e-3)
+#     @test r.status == :Optimal
+#     @test abs(r.primal_obj) ≈ 0 atol = 1e-3 rtol = 1e-3
+# end
 
 # complex polymin test optimal values were found analytically in most cases
 
