@@ -85,16 +85,17 @@ function envelope4(; primal_wsos::Bool = true, use_dense::Bool = true)
     return build_envelope(2, 30, 1, 30, primal_wsos = primal_wsos, use_dense = use_dense)
 end
 
-function run_envelope(primal_wsos::Bool, use_dense::Bool)
-    (c, A, b, G, h, cones, cone_idxs) = envelope3(primal_wsos = primal_wsos, use_dense = use_dense)
-
-    model = MO.PreprocessedLinearModel(c, A, b, G, h, cones, cone_idxs)
-    solver = SO.HSDSolver(model, verbose = true)
+function test_envelope(instance::Function, system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+    (c, A, b, G, h, cones, cone_idxs) = instance()
+    model = linear_model(c, A, b, G, h, cones, cone_idxs)
+    stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model))
+    solver = SO.HSDSolver(model, verbose = verbose, stepper = stepper)
     SO.solve(solver)
-    @test SO.get_status(solver) == :Optimal
-
-    return
+    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+    SO.test_certificates(solver, model, atol = atol, rtol = rtol)
+    @test r.status == :Optimal
 end
+
 
 run_envelope_primal_dense() = run_envelope(true, true)
 run_envelope_dual_dense() = run_envelope(false, true)
