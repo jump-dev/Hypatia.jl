@@ -20,7 +20,7 @@ import SemialgebraicSets
 import Random
 using Test
 
-include("polymindata.jl")
+include("data.jl")
 
 function build_polymin_JuMP_PSD(
     model::JuMP.Model,
