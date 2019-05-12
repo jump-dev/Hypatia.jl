@@ -33,7 +33,7 @@ function build_dynamics(x)
     return [dx1dt; dx2dt]
 end
 
-function build_contraction_common(model::JuMP.Model, beta::Float64, deg_M::Int, delta::Float64 = 1e-3; use_dense::Bool = true)
+function build_contraction_JuMP(model::JuMP.Model, beta::Float64, deg_M::Int, delta::Float64 = 1e-3; use_wsos::Bool = true)
     n = 2
     dom = MU.FreeDomain(n)
 
@@ -52,38 +52,28 @@ function build_contraction_common(model::JuMP.Model, beta::Float64, deg_M::Int, 
     dMdt = [JuMP.dot(DP.differentiate(M[i, j], x), dynamics) for i in 1:n, j in 1:n]
     Mdfdx = [sum(M[i, k] * dfdx[k, j] for k in 1:n) for i in 1:n, j in 1:n]
     R = Mdfdx + Mdfdx' + dMdt + beta * M
-    deg_R = maximum(DP.maxdegree.(R))
-    d_R = div(deg_R + 1, 2)
-    (U_R, pts_R, P0_R, _, _) = MU.interpolate(dom, d_R, sample = true)
 
-    return (model, M, R, pts_M, pts_R, U_M, U_R, P0_M, P0_R)
-end
+    if use_wsos
+        deg_R = maximum(DP.maxdegree.(R))
+        d_R = div(deg_R + 1, 2)
+        (U_R, pts_R, P0_R, _, _) = MU.interpolate(dom, d_R, sample = true)
+        JuMP.@constraint(model, [M[i, j](pts_M[u, :]) * (i == j ? 1.0 : rt2) - (i == j ? delta : 0.0) for i in 1:n for j in 1:i for u in 1:U_M] in HYP.WSOSPolyInterpMatCone(n, U_M, [P0_M]))
+        JuMP.@constraint(model, [-1 * R[i, j](pts_R[u, :]) * (i == j ? 1.0 : rt2) - (i == j ? delta : 0.0) for i in 1:n for j in 1:i for u in 1:U_R] in HYP.WSOSPolyInterpMatCone(n, U_R, [P0_R]))
+    else
+        PJ.setpolymodule!(model, SumOfSquares)
+        JuMP.@constraint(model, M - delta * Matrix{Float64}(I, n, n) in JuMP.PSDCone())
+        JuMP.@constraint(model, -R - delta * Matrix{Float64}(I, n, n) in JuMP.PSDCone())
+    end
 
-function build_contraction_JuMP_WSOS(model::JuMP.Model, beta::Float64, deg_M::Int; delta::Float64 = 1e-3)
-    n = 2
-    (model, M, R, pts_M, pts_R, U_M, U_R, P0_M, P0_R) = build_contraction_common(model, beta, deg_M, delta)
-    JuMP.@constraint(model, [M[i, j](pts_M[u, :]) * (i == j ? 1.0 : rt2) - (i == j ? delta : 0.0) for i in 1:n for j in 1:i for u in 1:U_M] in HYP.WSOSPolyInterpMatCone(n, U_M, [P0_M]))
-    JuMP.@constraint(model, [-1 * R[i, j](pts_R[u, :]) * (i == j ? 1.0 : rt2) - (i == j ? delta : 0.0) for i in 1:n for j in 1:i for u in 1:U_R] in HYP.WSOSPolyInterpMatCone(n, U_R, [P0_R]))
-    return model
-end
-
-function build_contraction_JuMP_PSD(model::JuMP.Model, beta::Float64, deg_M::Int; delta::Float64 = 1e-3)
-    n = 2
-    (model, M, R, _, _, _, _, _, _) = build_contraction_common(model, beta, deg_M, delta)
-    PJ.setpolymodule!(model, SumOfSquares)
-    JuMP.@constraint(model, M - delta * Matrix{Float64}(I, n, n) in JuMP.PSDCone())
-    JuMP.@constraint(model, -R - delta * Matrix{Float64}(I, n, n) in JuMP.PSDCone())
     return model
 end
 
 function contraction_JuMP(beta::Float64, deg_M::Int; use_wsos::Bool = true, use_dense::Bool = true)
     model = JuMP.Model(JuMP.with_optimizer(Hypatia.Optimizer, verbose = true, tol_feas = 1e-4, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6, use_dense = use_dense))
-    if use_wsos
-        build_contraction_JuMP_WSOS(model, beta, deg_M)
-    else
+    if !use_wsos
         PJ.setpolymodule!(model, SumOfSquares)
-        build_contraction_JuMP_PSD(model, beta, deg_M)
     end
+    return build_contraction_JuMP(model, beta, deg_M, use_wsos = use_wsos)
 end
 contraction1_JuMP(; use_dense::Bool = true) = contraction_JuMP(0.77, 4, use_wsos = true, use_dense = use_dense)
 contraction2_JuMP(; use_dense::Bool = true) = contraction_JuMP(0.77, 4, use_wsos = false, use_dense = use_dense)
