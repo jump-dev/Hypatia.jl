@@ -41,7 +41,7 @@ include(joinpath(examples_dir, "wsosmatrix/sosmat1.jl"))
 include(joinpath(examples_dir, "wsosmatrix/sosmat2.jl"))
 include(joinpath(examples_dir, "wsosmatrix/sosmat3.jl"))
 include(joinpath(examples_dir, "regionofattraction/univariate.jl"))
-include(joinpath(examples_dir, "contractionanalysis/jump.jl"))
+include(joinpath(examples_dir, "contraction/jump.jl"))
 
 
 @testset "Hypatia tests" begin
@@ -184,19 +184,16 @@ end
 #     t()
 # end
 
-# @info("starting additional JuMP examples tests")
-# testfuns = [
-#     test_contraction_JuMP_many,
-#     test_densityest_JuMP_many,
-#     test_envelope_JuMP_many,
-#     test_expdesign_JuMP_many,
-#     # test_lotkavolterra_JuMP_many,
-#     # test_polymin_JuMP_many,
-#     test_univariate_roa_JuMP_many,
-#     # test_shapeconregr_JuMP_many,
-#     ]
-# @testset "JuMP examples: $t" for t in testfuns
-#     t()
-# end
+@info("starting additional JuMP examples tests")
+@testset "JuMP examples" begin
+    test_contraction_JuMP(verbose = true, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4, tol_feas = 1e-4)
+    test_polymin_JuMP(verbose = true, tol_rel_opt = 1e-8, tol_abs_opt = 1e-8, tol_feas = 1e-8)
+    # test_densityest_JuMP()
+    # test_envelope_JuMP()
+    # test_expdesign_JuMP()
+    # test_lotkavolterra_JuMP()
+    # test_univariate_roa_JuMP()
+    # test_shapeconregr_JuMP()
+end
 
 end
