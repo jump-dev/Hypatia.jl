@@ -78,16 +78,16 @@ end
         lagrange_polys = MU.recover_lagrange_polys(pts, 2d)
 
         # generate vector of random polys using the Lagrange basis
-        random_coeffs = Random.rand(npolys, U)
-        subpolys = [LinearAlgebra.dot(random_coeffs[i, :], lagrange_polys) for i in 1:npolys]
-        random_vec = [random_coeffs[i, u] for i in 1:npolys for u in 1:U]
+        random_coefs = Random.rand(npolys, U)
+        subpolys = [LinearAlgebra.dot(random_coefs[i, :], lagrange_polys) for i in 1:npolys]
+        random_vec = [random_coefs[i, u] for i in 1:npolys for u in 1:U]
 
         model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, max_iters = 100))
-        JuMP.@variable(model, coeffs[1:U])
-        JuMP.@constraint(model, [coeffs; random_vec...] in HYP.WSOSPolyInterpSOCCone(npolys + 1, U, [P0]))
-        # JuMP.@objective(model, Min, dot(quad_weights, coeffs))
+        JuMP.@variable(model, coefs[1:U])
+        JuMP.@constraint(model, [coefs; random_vec...] in HYP.WSOSPolyInterpSOCCone(npolys + 1, U, [P0]))
+        # JuMP.@objective(model, Min, dot(quad_weights, coefs))
         JuMP.optimize!(model)
-        upper_bound = LinearAlgebra.dot(JuMP.value.(coeffs), lagrange_polys)
+        upper_bound = LinearAlgebra.dot(JuMP.value.(coefs), lagrange_polys)
         @test JuMP.termination_status(model) == MOI.OPTIMAL
         @test JuMP.primal_status(model) == MOI.FEASIBLE_POINT
 

@@ -227,7 +227,7 @@ function build_shapeconregr_WSOS(
     return model
 end
 
-function shapeconregrj(inst::Int; use_dense::Bool = true, use_PolyJuMP::Bool = false, use_wsos::Bool = true)
+function shapeconregr_JuMP(inst::Int; use_dense::Bool = true, use_PolyJuMP::Bool = false, use_wsos::Bool = true)
     (n, deg, num_points, signal_ratio, f, shapedata, use_lsq_obj, true_obj) = getshapeconregrdata(inst)
     (X, y) = generate_regr_data(f, -1.0, 1.0, n, num_points, signal_ratio = signal_ratio)
     model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, use_dense = use_dense))
@@ -244,23 +244,23 @@ function shapeconregrj(inst::Int; use_dense::Bool = true, use_PolyJuMP::Bool = f
     return (model, true_obj)
 end
 
-shapeconregr1j(; use_dense::Bool = true) = shapeconregrj(1, use_dense = use_dense)
-shapeconregr2j(; use_dense::Bool = true) = shapeconregrj(2, use_dense = use_dense)
-shapeconregr3j(; use_dense::Bool = true) = shapeconregrj(3, use_dense = use_dense)
-shapeconregr4j(; use_dense::Bool = true) = shapeconregrj(4, use_dense = use_dense)
-shapeconregr5j(; use_dense::Bool = true) = shapeconregrj(5, use_dense = use_dense)
-shapeconregr6j(; use_dense::Bool = true) = shapeconregrj(6, use_dense = use_dense)
-shapeconregr7j(; use_dense::Bool = true) = shapeconregrj(7, use_dense = use_dense)
-shapeconregr8j(; use_dense::Bool = true) = shapeconregrj(8, use_dense = use_dense)
-shapeconregr9j(; use_dense::Bool = true) = shapeconregrj(9, use_dense = use_dense)
-shapeconregr10j(; use_dense::Bool = true) = shapeconregrj(10, use_dense = use_dense)
-shapeconregr11j(; use_dense::Bool = true) = shapeconregrj(11, use_dense = use_dense)
-shapeconregr12j(; use_dense::Bool = true) = shapeconregrj(12, use_dense = use_dense, use_wsos = false)
-shapeconregr13j(; use_dense::Bool = true) = shapeconregrj(13, use_dense = use_dense)
-shapeconregr14j(; use_dense::Bool = true) = shapeconregrj(13, use_dense = use_dense, use_wsos = false)
-shapeconregr15j(; use_dense::Bool = true) = shapeconregrj(15, use_dense = use_dense, use_PolyJuMP = true)
+shapeconregr1_JuMP(; use_dense::Bool = true) = shapeconregr_JuMP(1, use_dense = use_dense)
+shapeconregr2_JuMP(; use_dense::Bool = true) = shapeconregr_JuMP(2, use_dense = use_dense)
+shapeconregr3_JuMP(; use_dense::Bool = true) = shapeconregr_JuMP(3, use_dense = use_dense)
+shapeconregr4_JuMP(; use_dense::Bool = true) = shapeconregr_JuMP(4, use_dense = use_dense)
+shapeconregr5_JuMP(; use_dense::Bool = true) = shapeconregr_JuMP(5, use_dense = use_dense)
+shapeconregr6_JuMP(; use_dense::Bool = true) = shapeconregr_JuMP(6, use_dense = use_dense)
+shapeconregr7_JuMP(; use_dense::Bool = true) = shapeconregr_JuMP(7, use_dense = use_dense)
+shapeconregr8_JuMP(; use_dense::Bool = true) = shapeconregr_JuMP(8, use_dense = use_dense)
+shapeconregr9_JuMP(; use_dense::Bool = true) = shapeconregr_JuMP(9, use_dense = use_dense)
+shapeconregr10_JuMP(; use_dense::Bool = true) = shapeconregr_JuMP(10, use_dense = use_dense)
+shapeconregr11_JuMP(; use_dense::Bool = true) = shapeconregr_JuMP(11, use_dense = use_dense)
+shapeconregr12_JuMP(; use_dense::Bool = true) = shapeconregr_JuMP(12, use_dense = use_dense, use_wsos = false)
+shapeconregr13_JuMP(; use_dense::Bool = true) = shapeconregr_JuMP(13, use_dense = use_dense)
+shapeconregr14_JuMP(; use_dense::Bool = true) = shapeconregr_JuMP(13, use_dense = use_dense, use_wsos = false)
+shapeconregr15_JuMP(; use_dense::Bool = true) = shapeconregr_JuMP(15, use_dense = use_dense, use_PolyJuMP = true)
 
-function test_shapeconregrj(instance)
+function test_shapeconregr_JuMP(instance)
     (model, true_obj) = instance()
 
     JuMP.optimize!(model)
@@ -279,7 +279,7 @@ function test_shapeconregrj(instance)
     return
 end
 
-test_shapeconregrj_many() = test_polyminj.([
+test_shapeconregr_JuMP_many() = test_shapeconregr_JuMP.([
     shapeconregr1j,
     shapeconregr2j,
     shapeconregr3j,
@@ -295,11 +295,11 @@ test_shapeconregrj_many() = test_polyminj.([
     shapeconregr13j,
     # shapeconregr14j,
     shapeconregr15j,
-])
+    ])
 
-test_shapeconregrj_small() = test_polyminj.([
+test_shapeconregr_JuMP_small() = test_shapeconregr_JuMP.([
     shapeconregr1j,
     shapeconregr2j,
     shapeconregr12j,
     shapeconregr15j,
-])
+    ])
