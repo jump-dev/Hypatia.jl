@@ -250,8 +250,8 @@ include(joinpath(@__DIR__, "JuMP.jl"))
 
 @info("starting additional JuMP examples tests")
 testfuns = [
-    test_polyminj_many,
-    test_shapeconregrj_many,
+    test_polymin_JuMP_many,
+    test_shapeconregr_JuMP_many,
     ]
 @testset "JuMP examples: $t" for t in testfuns
     t()
