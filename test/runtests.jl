@@ -32,6 +32,7 @@ include(joinpath(@__DIR__, "MathOptInterface.jl"))
 
 include(joinpath(examples_dir, "envelope/jump.jl"))
 include(joinpath(examples_dir, "expdesign/jump.jl"))
+include(joinpath(examples_dir, "lotkavolterra/jump.jl"))
 include(joinpath(examples_dir, "polymin/jump.jl"))
 include(joinpath(examples_dir, "shapeconregr/jump.jl"))
 include(joinpath(examples_dir, "densityest/jump.jl"))
@@ -42,8 +43,6 @@ include(joinpath(examples_dir, "wsosmatrix/sosmat2.jl"))
 include(joinpath(examples_dir, "wsosmatrix/sosmat3.jl"))
 include(joinpath(examples_dir, "regionofattraction/univariate.jl"))
 include(joinpath(examples_dir, "contractionanalysis/jump.jl"))
-
-include(joinpath(@__DIR__, "JuMP.jl"))
 
 
 @testset "Hypatia tests" begin
@@ -218,11 +217,6 @@ include(joinpath(@__DIR__, "JuMP.jl"))
 #     run_JuMP_envelope_sampleinterp_ball,
 #     run_JuMP_expdesign,
 #     # run_JuMP_polymin_PSD, # too slow TODO check: final objective doesn't match
-#     run_JuMP_polymin_WSOS_primal,
-#     run_JuMP_polymin_WSOS_dual,
-#     run_JuMP_shapeconregr_PSD,
-#     run_JuMP_shapeconregr_WSOS,
-#     run_JuMP_shapeconregr_WSOS_PolyJuMP,
 #     run_JuMP_densityest,
 #     run_JuMP_sosmatrix_rand,
 #     run_JuMP_sosmatrix_a,
@@ -250,8 +244,10 @@ include(joinpath(@__DIR__, "JuMP.jl"))
 
 @info("starting additional JuMP examples tests")
 testfuns = [
-    test_polymin_JuMP_many,
-    test_shapeconregr_JuMP_many,
+    # test_lotkavolterra_JuMP_all,
+    # test_polymin_JuMP_all,
+    test_univariate_roa_JuMP_all,
+    # test_shapeconregr_JuMP_all,
     ]
 @testset "JuMP examples: $t" for t in testfuns
     t()

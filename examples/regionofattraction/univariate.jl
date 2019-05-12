@@ -24,7 +24,7 @@ const DP = DynamicPolynomials
 using LinearAlgebra
 using Test
 
-function build_JuMP_univariate_roa_WSOS(deg::Int; use_dense::Bool = true)
+function build_univariate_roa_JuMP_WSOS(model::JuMP.Model, deg::Int)
     T = 100.0
 
     DP.@polyvar x
@@ -41,7 +41,6 @@ function build_JuMP_univariate_roa_WSOS(deg::Int; use_dense::Bool = true)
     wsos_cone2 = HYP.WSOSPolyInterpCone(U2, [P02, PWts2...])
     wsos_cone3 = HYP.WSOSPolyInterpCone(U3, [P03, PWts3...])
 
-    model = JuMP.Model(JuMP.with_optimizer(Hypatia.Optimizer, verbose = true, use_dense = use_dense))
     JuMP.@variables(model, begin
         v, PolyJuMP.Poly(DP.monomials([x; t], 0:deg))
         w, PolyJuMP.Poly(DP.monomials(x, 0:deg))
@@ -63,7 +62,7 @@ function build_JuMP_univariate_roa_WSOS(deg::Int; use_dense::Bool = true)
     return model
 end
 
-function build_JuMP_univariate_roa_PSD(deg::Int; use_dense::Bool = true)
+function build_univariate_roa_JuMP_PSD(model::JuMP.Model, deg::Int)
     T = 100.0
 
     DP.@polyvar x
@@ -73,7 +72,7 @@ function build_JuMP_univariate_roa_PSD(deg::Int; use_dense::Bool = true)
     int_box_mon(mon) = prod(1 / (p + 1) - (-1)^(p + 1) / (p + 1) for p in DP.exponents(mon))
     int_box(pol) = sum(DP.coefficient(t) * int_box_mon(t) for t in DP.terms(pol))
 
-    model = SumOfSquares.SOSModel(JuMP.with_optimizer(Hypatia.Optimizer, verbose = true, use_dense = use_dense))
+    PolyJuMP.setpolymodule!(model, SumOfSquares)
     JuMP.@variables(model, begin
         v, PolyJuMP.Poly(DP.monomials([x; t], 0:deg))
         w, PolyJuMP.Poly(DP.monomials(x, 0:deg))
@@ -93,15 +92,21 @@ function build_JuMP_univariate_roa_PSD(deg::Int; use_dense::Bool = true)
     return model
 end
 
-univariate_roa1(; use_dense::Bool = true) = build_JuMP_univariate_roa_WSOS(4, use_dense = use_dense)
-univariate_roa2(; use_dense::Bool = true) = build_JuMP_univariate_roa_PSD(4, use_dense = use_dense)
-
-function run_JuMP_univariate_roa(; use_WSOS::Bool = true)
+function univariate_roa_JuMP(deg::Int; use_WSOS::Bool = true, use_dense::Bool = true)
+    model = JuMP.Model(JuMP.with_optimizer(Hypatia.Optimizer, tol_feas = 1e-5, verbose = true, use_dense = use_dense))
     if use_WSOS
-        model = univariate_roa1()
+        build_univariate_roa_JuMP_WSOS(model, deg)
     else
-        model = univariate_roa2()
+        build_univariate_roa_JuMP_PSD(model, deg)
     end
+    return model
+end
+
+univariate_roa1_JuMP(; use_dense::Bool = true) = univariate_roa_JuMP(4, use_WSOS = true, use_dense = use_dense)
+univariate_roa2_JuMP(; use_dense::Bool = true) = univariate_roa_JuMP(4, use_WSOS = false, use_dense = use_dense)
+
+function test_univariate_roa_JuMP(instance::Function)
+    model = instance()
     JuMP.optimize!(model)
 
     term_status = JuMP.termination_status(model)
@@ -118,5 +123,4 @@ function run_JuMP_univariate_roa(; use_WSOS::Bool = true)
     return
 end
 
-run_JuMP_univariate_roa_WSOS() = run_JuMP_univariate_roa(use_WSOS = true)
-run_JuMP_univariate_roa_PSD() = run_JuMP_univariate_roa(use_WSOS = false)
+test_univariate_roa_JuMP_all() = test_univariate_roa_JuMP.([univariate_roa1_JuMP, univariate_roa2_JuMP])
