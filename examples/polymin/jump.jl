@@ -22,13 +22,14 @@ using Test
 
 include("polymindata.jl")
 
-function build_JuMP_polymin_PSD(
+function build_polymin_JuMP_PSD(
+    model::JuMP.Model,
     x,
     f,
     dom::MU.Domain;
     d::Int = div(max_degree(f) + 1, 2),
     )
-    model = SumOfSquares.SOSModel(JuMP.with_optimizer(HYP.Optimizer, verbose = true, tol_feas = 1e-7, tol_rel_opt = 1e-7, tol_abs_opt = 1e-7))
+    PolyJuMP.setpolymodule!(model, SumOfSquares)
     JuMP.@variable(model, a)
     JuMP.@objective(model, Max, a)
     bss = MU.get_domain_inequalities(dom, x)
@@ -37,7 +38,8 @@ function build_JuMP_polymin_PSD(
     return model
 end
 
-function build_JuMP_polymin_WSOS(
+function build_polymin_JuMP_WSOS(
+    model::JuMP.Model,
     x,
     f,
     dom::MU.Domain;
@@ -51,8 +53,6 @@ function build_JuMP_polymin_WSOS(
     (U, pts, P0, PWts, _) = MU.interpolate(dom, d, sample = sample, sample_factor = 100)
     cone = HYP.WSOSPolyInterpCone(U, [P0, PWts...], !primal_wsos)
 
-    # build JuMP model
-    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, tol_feas = 1e-8, tol_rel_opt = 1e-7, tol_abs_opt = 1e-8))
     coefs = [f(x => pts[j, :]) for j in 1:U]
     if primal_wsos
         JuMP.@variable(model, a)
@@ -70,32 +70,33 @@ end
 
 function polymin_JuMP(polyname::Symbol, d::Int; use_wsos::Bool = true, primal_wsos::Bool = false)
     (x, f, dom, true_obj) = getpolydata(polyname)
+    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, tol_feas = 1e-8, tol_rel_opt = 1e-7, tol_abs_opt = 1e-8))
     if use_wsos
-        model = build_JuMP_polymin_WSOS(x, f, dom, d = d, primal_wsos = primal_wsos)
+        model = build_polymin_JuMP_WSOS(model, x, f, dom, d = d, primal_wsos = primal_wsos)
     else
-        model = build_JuMP_polymin_PSD(x, f, dom, d = d)
+        model = build_polymin_JuMP_PSD(model, x, f, dom, d = d)
     end
     return (model = model, true_obj = true_obj)
 end
 
-polymin1j() = polymin_JuMP(:heart, 2)
-polymin2j() = polymin_JuMP(:schwefel, 2)
-polymin3j() = polymin_JuMP(:magnetism7_ball, 2)
-polymin4j() = polymin_JuMP(:motzkin_ellipsoid, 4)
-polymin5j() = polymin_JuMP(:caprasse, 4)
-polymin6j() = polymin_JuMP(:goldsteinprice, 7)
-polymin7j() = polymin_JuMP(:lotkavolterra, 3)
-polymin8j() = polymin_JuMP(:robinson, 8)
-polymin9j() = polymin_JuMP(:reactiondiffusion_ball, 3)
-polymin10j() = polymin_JuMP(:rosenbrock, 5)
-polymin11j() = polymin_JuMP(:butcher, 2)
-polymin12j() = polymin_JuMP(:butcher_ball, 2)
-polymin13j() = polymin_JuMP(:butcher_ellipsoid, 2)
-polymin14j() = polymin_JuMP(:motzkin, 3, use_wsos = false)
-polymin15j() = polymin_JuMP(:motzkin, 3, primal_wsos = true)
+polymin1_JuMP() = polymin_JuMP(:heart, 2)
+polymin2_JuMP() = polymin_JuMP(:schwefel, 2)
+polymin3_JuMP() = polymin_JuMP(:magnetism7_ball, 2)
+polymin4_JuMP() = polymin_JuMP(:motzkin_ellipsoid, 4)
+polymin5_JuMP() = polymin_JuMP(:caprasse, 4)
+polymin6_JuMP() = polymin_JuMP(:goldsteinprice, 7)
+polymin7_JuMP() = polymin_JuMP(:lotkavolterra, 3)
+polymin8_JuMP() = polymin_JuMP(:robinson, 8)
+polymin9_JuMP() = polymin_JuMP(:reactiondiffusion_ball, 3)
+polymin10_JuMP() = polymin_JuMP(:rosenbrock, 5)
+polymin11_JuMP() = polymin_JuMP(:butcher, 2)
+polymin12_JuMP() = polymin_JuMP(:butcher_ball, 2)
+polymin13_JuMP() = polymin_JuMP(:butcher_ellipsoid, 2)
+polymin14_JuMP() = polymin_JuMP(:motzkin, 3, use_wsos = false)
+polymin15_JuMP() = polymin_JuMP(:motzkin, 3, primal_wsos = true)
 # TODO add more from dictionary and more with different options combinations
 
-function test_polymin_JuMP(instance)
+function test_polymin_JuMP(instance::Function)
     (model, true_obj) = instance()
 
     JuMP.optimize!(model)
@@ -114,28 +115,28 @@ function test_polymin_JuMP(instance)
     return
 end
 
-test_polymin_JuMP_many() = test_polymin_JuMP.([
-    polymin1j,
-    polymin2j,
-    polymin3j,
-    polymin4j,
-    polymin5j,
-    polymin6j,
-    polymin7j,
-    polymin8j,
-    polymin9j,
-    polymin10j,
-    polymin11j,
-    polymin12j,
-    polymin13j,
-    polymin14j,
-    polymin15j,
+test_polymin_JuMP_all() = test_polymin_JuMP.([
+    polymin1_JuMP,
+    polymin2_JuMP,
+    polymin3_JuMP,
+    polymin4_JuMP,
+    polymin5_JuMP,
+    polymin6_JuMP,
+    polymin7_JuMP,
+    polymin8_JuMP,
+    polymin9_JuMP,
+    polymin10_JuMP,
+    polymin11_JuMP,
+    polymin12_JuMP,
+    polymin13_JuMP,
+    polymin14_JuMP,
+    polymin15_JuMP,
     ])
 
 test_polymin_JuMP_small() = test_polymin_JuMP.([
-    polymin2j,
-    polymin3j,
-    polymin6j,
-    polymin14j,
-    polymin15j,
+    polymin2_JuMP,
+    polymin3_JuMP,
+    polymin6_JuMP,
+    polymin14_JuMP,
+    polymin15_JuMP,
     ])
