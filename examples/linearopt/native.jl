@@ -20,55 +20,38 @@ function linearopt(
     m::Int,
     n::Int;
     use_data::Bool = false,
-    dense::Bool = false,
+    use_dense::Bool = true,
     nzfrac::Float64 = inv(sqrt(n)),
-    tosparse::Bool = false,
     rseed::Int = 1,
     )
     Random.seed!(rseed)
 
-    # set up problem data
-    if use_data
-        # use provided data in data folder
-        datapath = joinpath(@__DIR__, "data")
-        A = readdlm(joinpath(datapath, "A$(m)x$(n).txt"), ',', Float64)
-        b = vec(readdlm(joinpath(datapath, "b$m.txt"), ',', Float64))
-        c = vec(readdlm(joinpath(datapath, "c$n.txt"), ',', Float64))
-        true_obj = 2055.807
-    else
-        # generate random data
-        A = dense ? rand(-9.0:9.0, m, n) : 10.0 .* sprandn(m, n, nzfrac)
-        b = A * ones(n)
-        c = rand(0.0:9.0, n)
-        true_obj = NaN
-    end
-    if tosparse && !issparse(A)
-        A = sparse(A)
-    end
+    # generate random data
+    A = use_dense ? rand(-9.0:9.0, m, n) : 10.0 .* sprandn(m, n, nzfrac)
+    b = A * ones(n)
+    c = rand(0.0:9.0, n)
+
     G = Diagonal(-1.0I, n) # TODO uniformscaling
     h = zeros(n)
 
     cones = [CO.Nonnegative(n)]
     cone_idxs = [1:n]
 
-    return (model = (c, A, b, G, h, cones, cone_idxs), true_obj = true_obj)
+    return (model = (c, A, b, G, h, cones, cone_idxs),)
 end
 
-linearopt1(; use_dense::Bool = true) = linearopt(500, 1000, use_data = true, tosparse = !use_dense)
-linearopt2(; use_dense::Bool = true) = linearopt(500, 1000, tosparse = !use_dense)
-linearopt3(; use_dense::Bool = true) = linearopt(15, 20, tosparse = !use_dense)
-linearopt4(; use_dense::Bool = true) = linearopt(25, 50, dense = true, tosparse = !use_dense)
+linearopt1() = linearopt(500, 1000, use_dense = true)
+linearopt2() = linearopt(15, 20, use_dense = true)
+linearopt3() = linearopt(500, 1000, use_dense = false)
+linearopt4() = linearopt(15, 20, use_dense = false)
 
 function test_linearopt(instance::Function)
-    ((c, A, b, G, h, cones, cone_idxs), true_obj) = instance()
+    ((c, A, b, G, h, cones, cone_idxs),) = instance()
     model = MO.PreprocessedLinearModel(c, A, b, G, h, cones, cone_idxs)
     solver = SO.HSDSolver(model, verbose = true)
     SO.solve(solver)
     r = SO.test_certificates(solver, model, atol = 1e-3, rtol = 1e-3)
     @test r.status == :Optimal
-    if !isnan(true_obj)
-        @test r.primal_obj ≈ true_obj atol = 1e-4 rtol = 1e-4
-    end
 
     return
 end
@@ -77,5 +60,5 @@ test_linearopts() = test_linearopt.([
     linearopt1,
     linearopt2,
     linearopt3,
-    linearopt4
+    linearopt4,
     ])
