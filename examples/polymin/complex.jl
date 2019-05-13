@@ -18,7 +18,7 @@ include("data.jl")
 
 mon_pow(z, ex) = prod(z[i]^ex[i] for i in eachindex(ex))
 
-function complexpolymin(polyname::Symbol, d::Int; primal_wsos = true, sample_factor::Int = 100)
+function polymincomplex(polyname::Symbol, d::Int; primal_wsos = true, sample_factor::Int = 100)
     (n, deg, f, gs, gdegs, true_obj) = complexpolys[polyname]
     # generate interpolation
     L = binomial(n + d, n)
@@ -77,22 +77,22 @@ function complexpolymin(polyname::Symbol, d::Int; primal_wsos = true, sample_fac
     return (model = (c, A, b, G, h, cones, cone_idxs), true_obj = true_obj)
 end
 
-complexpolymin1() = complexpolymin(:abs1d, 1)
-complexpolymin2() = complexpolymin(:absunit1d, 1)
-complexpolymin3() = complexpolymin(:negabsunit1d, 2)
-complexpolymin4() = complexpolymin(:absball2d, 1)
-complexpolymin5() = complexpolymin(:absbox2d, 2)
-complexpolymin6() = complexpolymin(:negabsbox2d, 1)
-complexpolymin7() = complexpolymin(:denseunit1d, 2)
-complexpolymin8() = complexpolymin(:abs1d, 1, primal_wsos = false)
-complexpolymin9() = complexpolymin(:absunit1d, 1, primal_wsos = false)
-complexpolymin10() = complexpolymin(:negabsunit1d, 2, primal_wsos = false)
-complexpolymin11() = complexpolymin(:absball2d, 1, primal_wsos = false)
-complexpolymin12() = complexpolymin(:absbox2d, 2, primal_wsos = false)
-complexpolymin13() = complexpolymin(:negabsbox2d, 1, primal_wsos = false)
-complexpolymin14() = complexpolymin(:denseunit1d, 2, primal_wsos = false)
+polymincomplex1() = polymincomplex(:abs1d, 1)
+polymincomplex2() = polymincomplex(:absunit1d, 1)
+polymincomplex3() = polymincomplex(:negabsunit1d, 2)
+polymincomplex4() = polymincomplex(:absball2d, 1)
+polymincomplex5() = polymincomplex(:absbox2d, 2)
+polymincomplex6() = polymincomplex(:negabsbox2d, 1)
+polymincomplex7() = polymincomplex(:denseunit1d, 2)
+polymincomplex8() = polymincomplex(:abs1d, 1, primal_wsos = false)
+polymincomplex9() = polymincomplex(:absunit1d, 1, primal_wsos = false)
+polymincomplex10() = polymincomplex(:negabsunit1d, 2, primal_wsos = false)
+polymincomplex11() = polymincomplex(:absball2d, 1, primal_wsos = false)
+polymincomplex12() = polymincomplex(:absbox2d, 2, primal_wsos = false)
+polymincomplex13() = polymincomplex(:negabsbox2d, 1, primal_wsos = false)
+polymincomplex14() = polymincomplex(:denseunit1d, 2, primal_wsos = false)
 
-function test_complexpolymin(builder::Function)
+function test_polymincomplex(builder::Function)
     ((c, A, b, G, h, cones, cone_idxs), true_obj) = builder()
     model = MO.PreprocessedLinearModel(c, A, b, G, h, cones, cone_idxs)
     solver = SO.HSDSolver(model, verbose = true)
@@ -104,19 +104,19 @@ function test_complexpolymin(builder::Function)
     return
 end
 
-test_complexpolymins() = test_complexpolymin.([
-    complexpolymin1,
-    complexpolymin2,
-    complexpolymin3,
-    complexpolymin4,
-    complexpolymin5,
-    complexpolymin6,
-    complexpolymin7,
-    complexpolymin8,
-    complexpolymin9,
-    complexpolymin10,
-    complexpolymin11,
-    complexpolymin12,
-    complexpolymin13,
-    complexpolymin14,
+test_polymincomplexs() = test_polymincomplex.([
+    polymincomplex1,
+    polymincomplex2,
+    polymincomplex3,
+    polymincomplex4,
+    polymincomplex5,
+    polymincomplex6,
+    polymincomplex7,
+    polymincomplex8,
+    polymincomplex9,
+    polymincomplex10,
+    polymincomplex11,
+    polymincomplex12,
+    polymincomplex13,
+    polymincomplex14,
     ])

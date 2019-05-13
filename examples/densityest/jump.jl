@@ -35,7 +35,6 @@ function densityest_JuMP(
     sample_factor::Int = 100,
     use_monomials::Bool = false,
     )
-
     Random.seed!(rseed)
     X = rand(Distributions.Uniform(-1, 1), nobs, n)
     (nobs, dim) = size(X)
@@ -79,18 +78,7 @@ densityest2_JuMP() = densityest_JuMP(200, 1, 4, use_monomials = true)
 function test_densityest_JuMP(builder::Function; options)
     data = builder()
     JuMP.optimize!(data.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
-
-    term_status = JuMP.termination_status(data.model)
-    primal_obj = JuMP.objective_value(data.model)
-    dual_obj = JuMP.objective_bound(data.model)
-    pr_status = JuMP.primal_status(data.model)
-    du_status = JuMP.dual_status(data.model)
-
-    @test term_status == MOI.OPTIMAL
-    @test pr_status == MOI.FEASIBLE_POINT
-    @test du_status == MOI.FEASIBLE_POINT
-    @test primal_obj ≈ dual_obj atol = 1e-4 rtol = 1e-4
-
+    @test JuMP.termination_status(data.model) == MOI.OPTIMAL
     return
 end
 
