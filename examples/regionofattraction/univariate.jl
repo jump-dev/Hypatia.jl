@@ -68,46 +68,6 @@ function roauniv_JuMP(deg::Int; use_WSOS::Bool = true)
     return (model = model,)
 end
 
-# function roauniv_JuMP_PSD(model::JuMP.Model, deg::Int)
-    # T = 100.0
-    #
-    # DP.@polyvar x
-    # DP.@polyvar t
-    # f = x * (x - 0.5) * (x + 0.5) * T
-
-    # int_box_mon(mon) = prod(1 / (p + 1) - (-1)^(p + 1) / (p + 1) for p in DP.exponents(mon))
-    # int_box(pol) = sum(DP.coefficient(t) * int_box_mon(t) for t in DP.terms(pol))
-    #
-    # PolyJuMP.setpolymodule!(model, SumOfSquares)
-    # JuMP.@variables(model, begin
-    #     v, PolyJuMP.Poly(DP.monomials([x; t], 0:deg))
-    #     w, PolyJuMP.Poly(DP.monomials(x, 0:deg))
-    # end)
-
-    # JuMP.@objective(model, Min, int_box(w))
-
-    # dvdt = DP.differentiate(v, t) + DP.differentiate(v, x) * f
-    # diffwv = w - DP.subs(v, t => 0.0) - 1.0
-    # vT = DP.subs(v, t => 1.0)
-
-    # JuMP.@constraint(model, -dvdt >= 0, domain = (SAS.@set -1 <= x  && x <= 1 && 0 <= t && t <= 1))
-    # JuMP.@constraint(model, diffwv >= 0, domain = (SAS.@set -1 <= x && x <= 1))
-    # JuMP.@constraint(model, vT >= 0, domain = (SAS.@set -0.01 <= x && x <= 0.01))
-    # JuMP.@constraint(model, w >= 0, domain = (SAS.@set -1 <= x && x <= 1))
-
-    # return model
-# end
-
-# function roauniv_JuMP(deg::Int; use_WSOS::Bool = true)
-#     model = JuMP.Model()
-#     if use_WSOS
-#         build_roauniv_JuMP_WSOS(model, deg)
-#     else
-#         build_roauniv_JuMP_PSD(model, deg)
-#     end
-#     return model
-# end
-
 roauniv1_JuMP() = roauniv_JuMP(4, use_WSOS = true)
 roauniv2_JuMP() = roauniv_JuMP(4, use_WSOS = false)
 
