@@ -78,4 +78,7 @@ function test_regionofattr_JuMP(builder::Function; options)
     return
 end
 
-test_regionofattr_JuMP(; options...) = test_regionofattr_JuMP.([regionofattr1_JuMP, regionofattr2_JuMP], options = options)
+test_regionofattr_JuMP(; options...) = test_regionofattr_JuMP.([
+    regionofattr1_JuMP,
+    regionofattr2_JuMP,
+    ], options = options)

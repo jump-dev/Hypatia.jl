@@ -63,4 +63,4 @@ test_expdesign_JuMP(; options...) = test_expdesign_JuMP.([
     expdesign5_JuMP,
     ], options = options)
 
-test_expdesign_JuMP_small(; options...) = test_expdesign_JuMP.([expdesign3_JuMP], options = options)
+test_expdesign_JuMP_quick(; options...) = test_expdesign_JuMP.([expdesign3_JuMP], options = options)
