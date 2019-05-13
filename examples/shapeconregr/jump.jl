@@ -12,31 +12,23 @@ where
 see e.g. Chapter 8 of thesis by G. Hall (2018)
 =#
 
-import Hypatia
-const HYP = Hypatia
-const CO = HYP.Cones
-const SO = HYP.Solvers
-const MO = HYP.Models
-const MU = HYP.ModelUtilities
-
-import MathOptInterface
-const MOI = MathOptInterface
-import JuMP
-import MultivariatePolynomials
+import Random
+import Distributions
+import LinearAlgebra: norm
+using Test
 import DynamicPolynomials
 const DP = DynamicPolynomials
 import SumOfSquares
 import PolyJuMP
 const PJ = PolyJuMP
-import Random
-import Distributions
-import LinearAlgebra: norm
-using Test
+import MathOptInterface
+const MOI = MathOptInterface
+import JuMP
+import Hypatia
+const HYP = Hypatia
+const MU = HYP.ModelUtilities
 
 const rt2 = sqrt(2)
-
-include("shapeconregrdata.jl")
-
 
 # a description of the shape of the regressor
 mutable struct ShapeData
@@ -47,202 +39,182 @@ mutable struct ShapeData
 end
 ShapeData(n::Int) = ShapeData(MU.Box(-ones(n), ones(n)), MU.Box(-ones(n), ones(n)), ones(Int, n), 1)
 
-# problem data
-function generate_regr_data(
-    func::Function,
-    xmin::Float64,
-    xmax::Float64,
-    n::Int,
-    num_points::Int;
+function shapeconregr_JuMP(
+    inst::Int;
+    use_wsos::Bool = true,
+    sample::Bool = true,
     signal_ratio::Float64 = 1.0,
+    xmin::Float64 = -1.0,
+    xmax::Float64 = 1.0,
     rseed::Int = 1,
     )
     Random.seed!(rseed)
-    @assert 0.0 <= signal_ratio < Inf
+
+    # TODO all this data should be in the shapeconregr_JuMP arguments
+    (n, deg, num_points, signal_ratio, f, shape_data, use_lsq_obj, true_obj) = getshapeconregrdata(inst)
 
     X = rand(Distributions.Uniform(xmin, xmax), num_points, n)
-    y = [func(X[p, :]) for p in 1:num_points]
+    y = [f(X[p, :]) for p in 1:num_points]
     if !iszero(signal_ratio)
         noise = rand(Distributions.Normal(), num_points)
         noise .*= norm(y) / sqrt(signal_ratio) / norm(noise)
         y .+= noise
     end
 
-    return (X, y)
-end
-
-function add_loss_and_polys(
-    model::JuMP.Model,
-    X::Matrix{Float64},
-    y::Vector{Float64},
-    deg::Int,
-    use_lsq_obj::Bool,
-    )
-    (num_points, n) = size(X)
-    DP.@polyvar x[1:n]
-
-    JuMP.@variable(model, p, PJ.Poly(DP.monomials(x, 0:deg)))
-    if use_lsq_obj
-        JuMP.@variable(model, z)
-        JuMP.@objective(model, Min, z / num_points)
-        JuMP.@constraint(model, vcat([z], [y[i] - p(X[i, :]) for i in 1:num_points]) in MOI.SecondOrderCone(1 + num_points))
-     else
-        JuMP.@variable(model, z[1:num_points])
-        JuMP.@objective(model, Min, sum(z) / num_points)
-        JuMP.@constraints(model, begin
-            [i in 1:num_points], z[i] >= y[i] - p(X[i, :])
-            [i in 1:num_points], z[i] >= -y[i] + p(X[i, :])
-        end)
-    end
-
-    return (x, p)
-end
-
-function build_shapeconregr_PSD(
-    model,
-    X::Matrix{Float64},
-    y::Vector{Float64},
-    regressor_deg::Int,
-    shape_data::ShapeData;
-    use_lsq_obj::Bool = true,
-    )
-    n = size(X, 2)
-    d = div(regressor_deg + 1, 2)
-
-    (x, p) = add_loss_and_polys(model, X, y, regressor_deg, use_lsq_obj)
-
-    monotonic_set = MU.get_domain_inequalities(shape_data.mono_dom, x)
-    convex_set = MU.get_domain_inequalities(shape_data.conv_dom, x)
-
-    # monotonicity
-    for j in 1:n
-        if !iszero(shape_data.mono_profile[j])
-            gradient = DP.differentiate(p, x[j])
-            JuMP.@constraint(model, shape_data.mono_profile[j] * gradient >= 0, domain = monotonic_set)
-        end
-    end
-
-    # convexity
-    if !iszero(shape_data.conv_profile)
-        hessian = DP.differentiate(p, x, 2)
-        JuMP.@constraint(model, shape_data.conv_profile * hessian in JuMP.PSDCone(), domain = convex_set)
-    end
-
-    return model
-end
-
-function build_shapeconregr_WSOS_PolyJuMP(
-    model,
-    X::Matrix{Float64},
-    y::Vector{Float64},
-    r::Int,
-    shape_data::ShapeData;
-    use_lsq_obj::Bool = true,
-    sample::Bool = true,
-    rseed::Int = 1,
-    )
-    Random.seed!(rseed)
-    d = div(r + 1, 2)
-    n = size(X, 2)
-
-    (mono_U, mono_pts, mono_P0, mono_PWts, _) = MU.interpolate(shape_data.mono_dom, d, sample = sample, sample_factor = 50)
-    (conv_U, conv_pts, conv_P0, conv_PWts, _) = MU.interpolate(shape_data.conv_dom, d - 1, sample = sample, sample_factor = 50)
-    mono_wsos_cone = HYP.WSOSPolyInterpCone(mono_U, [mono_P0, mono_PWts...])
-    conv_wsos_cone = HYP.WSOSPolyInterpMatCone(n, conv_U, [conv_P0, conv_PWts...])
-
-    (x, p) = add_loss_and_polys(model, X, y, r, use_lsq_obj)
-
-    # monotonicity
-    for j in 1:n
-        if !iszero(shape_data.mono_profile[j])
-            gradient = DynamicPolynomials.differentiate(p, x[j])
-            JuMP.@constraint(model, [shape_data.mono_profile[j] * gradient(mono_pts[u, :]) for u in 1:mono_U] in mono_wsos_cone)
-        end
-    end
-
-    # convexity
-    if !iszero(shape_data.conv_profile)
-        hessian = DynamicPolynomials.differentiate(p, x, 2)
-        JuMP.@constraint(model, [shape_data.conv_profile * hessian[i, j](conv_pts[u, :]) * (i == j ? 1.0 : rt2) for i in 1:n for j in 1:i for u in 1:conv_U] in conv_wsos_cone)
-    end
-
-    return model
-end
-
-function build_shapeconregr_WSOS(
-    model,
-    X::Matrix{Float64},
-    y::Vector{Float64},
-    regressor_deg::Int,
-    shape_data::ShapeData;
-    use_lsq_obj::Bool = true,
-    sample::Bool = true,
-    rseed::Int = 1,
-    )
-    Random.seed!(rseed)
-
-    gradient_d = div(regressor_deg, 2)
-    hessian_d = div(regressor_deg - 1, 2)
-    (num_points, n) = size(X)
-
-    (regressor_points, _) = MU.get_interp_pts(MU.FreeDomain(n), regressor_deg, sample_factor = 50)
-    regressor_U = size(regressor_points, 1)
-
-    (mono_U, mono_points, mono_P0, mono_PWts, _) = MU.interpolate(shape_data.mono_dom, gradient_d, sample = sample, sample_factor = 50)
-    (conv_U, conv_points, conv_P0, conv_PWts, _) = MU.interpolate(shape_data.conv_dom, hessian_d, sample = sample, sample_factor = 50)
-    mono_wsos_cone = HYP.WSOSPolyInterpCone(mono_U, [mono_P0, mono_PWts...])
-    conv_wsos_cone = HYP.WSOSPolyInterpMatCone(n, conv_U, [conv_P0, conv_PWts...])
-
-    lagrange_polys = MU.recover_lagrange_polys(regressor_points, regressor_deg)
-
-    JuMP.@variable(model, regressor, variable_type = PJ.Poly(PJ.FixedPolynomialBasis(lagrange_polys)))
-    if use_lsq_obj
-        JuMP.@variable(model, z)
-        JuMP.@objective(model, Min, z / num_points)
-        JuMP.@constraint(model, vcat([z], [y[i] - regressor(X[i, :]) for i in 1:num_points]) in MOI.SecondOrderCone(1 + num_points))
-     else
-        JuMP.@variable(model, z[1:num_points])
-        JuMP.@objective(model, Min, sum(z) / num_points)
-        JuMP.@constraints(model, begin
-            [i in 1:num_points], z[i] >= y[i] - regressor(X[i, :])
-            [i in 1:num_points], z[i] >= -y[i] + regressor(X[i, :])
-        end)
-    end
-
-    # monotonicity
-    for j in 1:n
-        if !iszero(shape_data.mono_profile[j])
-            gradient = DP.differentiate(regressor, DP.variables(regressor)[j])
-            JuMP.@constraint(model, [shape_data.mono_profile[j] * gradient(mono_points[u, :]) for u in 1:mono_U] in mono_wsos_cone)
-        end
-    end
-
-    # convexity
-    if !iszero(shape_data.conv_profile)
-        hessian = DP.differentiate(regressor, DP.variables(regressor), 2)
-        JuMP.@constraint(model, [shape_data.conv_profile * hessian[i, j](conv_points[u, :]) * (i == j ? 1.0 : rt2)
-            for i in 1:n for j in 1:i for u in 1:conv_U] in conv_wsos_cone)
-    end
-
-    return model
-end
-
-function shapeconregr_JuMP(inst::Int; use_PolyJuMP::Bool = false, use_wsos::Bool = true)
-    (n, deg, num_points, signal_ratio, f, shapedata, use_lsq_obj, true_obj) = getshapeconregrdata(inst)
-    (X, y) = generate_regr_data(f, -1.0, 1.0, n, num_points, signal_ratio = signal_ratio)
     model = JuMP.Model()
+
     if use_wsos
-        if use_PolyJuMP
-            model = build_shapeconregr_WSOS_PolyJuMP(model, X, y, deg, shapedata, use_lsq_obj = use_lsq_obj)
-        else
-            model = build_shapeconregr_WSOS(model, X, y, deg, shapedata, use_lsq_obj = use_lsq_obj)
+        (regressor_points, _) = MU.get_interp_pts(MU.FreeDomain(n), deg, sample_factor = 50)
+        lagrange_polys = MU.recover_lagrange_polys(regressor_points, deg)
+
+        JuMP.@variable(model, regressor, variable_type = PJ.Poly(PJ.FixedPolynomialBasis(lagrange_polys)))
+
+        if use_lsq_obj
+            JuMP.@variable(model, z)
+            JuMP.@objective(model, Min, z / num_points)
+            JuMP.@constraint(model, vcat([z], [y[i] - regressor(X[i, :]) for i in 1:num_points]) in MOI.SecondOrderCone(1 + num_points))
+         else
+            JuMP.@variable(model, z[1:num_points])
+            JuMP.@objective(model, Min, sum(z) / num_points)
+            JuMP.@constraints(model, begin
+                [i in 1:num_points], z[i] >= y[i] - regressor(X[i, :])
+                [i in 1:num_points], z[i] >= -y[i] + regressor(X[i, :])
+            end)
+        end
+
+        # monotonicity
+        if !all(iszero, shape_data.mono_profile)
+            gradient_d = div(deg, 2)
+            (mono_U, mono_points, mono_P0, mono_PWts, _) = MU.interpolate(shape_data.mono_dom, gradient_d, sample = sample, sample_factor = 50)
+            mono_wsos_cone = HYP.WSOSPolyInterpCone(mono_U, [mono_P0, mono_PWts...])
+            for j in 1:n
+                if !iszero(shape_data.mono_profile[j])
+                    gradient = DP.differentiate(regressor, DP.variables(regressor)[j])
+                    JuMP.@constraint(model, [shape_data.mono_profile[j] * gradient(mono_points[u, :]) for u in 1:mono_U] in mono_wsos_cone)
+                end
+            end
+        end
+
+        # convexity
+        if !iszero(shape_data.conv_profile)
+            hessian_d = div(deg - 1, 2)
+            (conv_U, conv_points, conv_P0, conv_PWts, _) = MU.interpolate(shape_data.conv_dom, hessian_d, sample = sample, sample_factor = 50)
+            conv_wsos_cone = HYP.WSOSPolyInterpMatCone(n, conv_U, [conv_P0, conv_PWts...])
+            hessian = DP.differentiate(regressor, DP.variables(regressor), 2)
+            JuMP.@constraint(model, [shape_data.conv_profile * hessian[i, j](conv_points[u, :]) * (i == j ? 1.0 : rt2)
+                for i in 1:n for j in 1:i for u in 1:conv_U] in conv_wsos_cone)
         end
     else
         PJ.setpolymodule!(model, SumOfSquares)
-        model = build_shapeconregr_PSD(model, X, y, deg, shapedata, use_lsq_obj = use_lsq_obj)
+        d = div(deg + 1, 2)
+
+        DP.@polyvar x[1:n]
+
+        JuMP.@variable(model, p, PJ.Poly(DP.monomials(x, 0:deg)))
+        if use_lsq_obj
+            JuMP.@variable(model, z)
+            JuMP.@objective(model, Min, z / num_points)
+            JuMP.@constraint(model, vcat([z], [y[i] - p(X[i, :]) for i in 1:num_points]) in MOI.SecondOrderCone(1 + num_points))
+         else
+            JuMP.@variable(model, z[1:num_points])
+            JuMP.@objective(model, Min, sum(z) / num_points)
+            JuMP.@constraints(model, begin
+                [i in 1:num_points], z[i] >= y[i] - p(X[i, :])
+                [i in 1:num_points], z[i] >= -y[i] + p(X[i, :])
+            end)
+        end
+
+        # monotonicity
+        monotonic_set = MU.get_domain_inequalities(shape_data.mono_dom, x)
+        for j in 1:n
+            if !iszero(shape_data.mono_profile[j])
+                gradient = DP.differentiate(p, x[j])
+                JuMP.@constraint(model, shape_data.mono_profile[j] * gradient >= 0, domain = monotonic_set)
+            end
+        end
+
+        # convexity
+        if !iszero(shape_data.conv_profile)
+            convex_set = MU.get_domain_inequalities(shape_data.conv_dom, x)
+            hessian = DP.differentiate(p, x, 2)
+            JuMP.@constraint(model, shape_data.conv_profile * hessian in JuMP.PSDCone(), domain = convex_set)
+        end
     end
+
     return (model, true_obj)
 end
+
+
+# TODO remove duplicated variables and make into one-liner functions
+function getshapeconregrdata(inst::Int)
+    if inst == 1
+        (n, deg, num_points, signal_ratio, f, use_lsq_obj) = (2, 3, 100, 0.0, x -> exp(norm(x)), false)
+        shape_data = ShapeData(n)
+        true_obj = 4.4065e-1
+    elseif inst == 2
+        (n, deg, num_points, signal_ratio, f, use_lsq_obj) = (2, 3, 100, 0.0, x -> sum(x.^3), false)
+        shape_data = ShapeData(n)
+        true_obj = 1.3971e-1
+    elseif inst == 3
+        (n, deg, num_points, signal_ratio, f, use_lsq_obj) = (2, 3, 100, 0.0, x -> sum(x.^4), false)
+        shape_data = ShapeData(n)
+        true_obj = 2.4577e-1
+    elseif inst == 4
+        (n, deg, num_points, signal_ratio, f, use_lsq_obj) = (2, 3, 100, 50.0, x -> sum(x.^3), false)
+        shape_data = ShapeData(n)
+        true_obj = 1.5449e-1
+    elseif inst == 5
+        (n, deg, num_points, signal_ratio, f, use_lsq_obj) = (2, 3, 100, 50.0, x -> sum(x.^4), false)
+        shape_data = ShapeData(n)
+        true_obj = 2.5200e-1
+    elseif inst == 6
+        (n, deg, num_points, signal_ratio, f, use_lsq_obj) = (2, 3, 100, 0.0, x -> exp(norm(x)), true)
+        shape_data = ShapeData(n)
+        true_obj = 5.4584e-2
+    elseif inst == 7
+        (n, deg, num_points, signal_ratio, f, use_lsq_obj) = (2, 3, 100, 50.0, x -> sum(x.^4), true)
+        shape_data = ShapeData(n)
+        true_obj = 3.3249e-2
+    elseif inst == 8
+        (n, deg, num_points, signal_ratio, f, use_lsq_obj) = (2, 4, 100, 0.0, x -> -inv(1 + exp(-10.0 * norm(x))), true)
+        shape_data = ShapeData(MU.Box(zeros(n), ones(n)), MU.Box(zeros(n), ones(n)), ones(n), 1)
+        true_obj = 3.7723e-03
+    elseif inst == 9
+        (n, deg, num_points, signal_ratio, f, use_lsq_obj) = (2, 4, 100, 10.0, x -> -inv(1 + exp(-10.0 * norm(x))), true)
+        shape_data = ShapeData(MU.Box(zeros(n), ones(n)), MU.Box(zeros(n), ones(n)), ones(n), 1)
+        true_obj = 3.0995e-02 # not verified with SDP
+    elseif inst == 10
+        (n, deg, num_points, signal_ratio, f, use_lsq_obj) = (2, 4, 100, 0.0, x -> exp(norm(x)), true)
+        shape_data = ShapeData(n)
+        true_obj = 5.0209e-02 # not verified with SDP
+    elseif inst == 11
+        (n, deg, num_points, signal_ratio, f, use_lsq_obj) = (2, 5, 100, 10.0, x -> exp(norm(x)), true)
+        shape_data = ShapeData(MU.Box(0.5 * ones(n), 2 * ones(n)), MU.Box(0.5 * ones(n), 2 * ones(n)), ones(n), 1)
+        true_obj = 0.22206 # not verified with SDP
+    elseif inst == 12
+        (n, deg, num_points, signal_ratio, f, use_lsq_obj) = (2, 6, 100, 1.0, x -> exp(norm(x)), true)
+        shape_data = ShapeData(MU.Box(0.5 * ones(n), 2 * ones(n)), MU.Box(0.5 * ones(n), 2 * ones(n)), ones(n), 1)
+        true_obj = 0.22206
+    elseif inst == 13
+        (n, deg, num_points, signal_ratio, f, use_lsq_obj) = (2, 6, 100, 1.0, x -> exp(norm(x)), false)
+        shape_data = ShapeData(n)
+        true_obj = 1.7751 # not verified with SDP
+    elseif inst == 14
+        # either out of memory error when converting sparse to dense in MOI conversion, or during preprocessing
+        (n, deg, num_points, signal_ratio, f, use_lsq_obj) = (5, 5, 1000, 0.0, x -> exp(norm(x)), true)
+        shape_data = ShapeData(n)
+        true_obj = NaN # unknown
+    elseif inst == 15
+        (n, deg, num_points, signal_ratio, f, use_lsq_obj) = (2, 3, 100, 0.0, x -> exp(norm(x)), false)
+        shape_data = ShapeData(n)
+        true_obj = 4.4065e-1
+    else
+        error("instance $inst not recognized")
+    end
+    return (n, deg, num_points, signal_ratio, f, shape_data, use_lsq_obj, true_obj)
+end
+
+
 
 shapeconregr1_JuMP() = shapeconregr_JuMP(1)
 shapeconregr2_JuMP() = shapeconregr_JuMP(2)
@@ -263,19 +235,8 @@ shapeconregr15_JuMP() = shapeconregr_JuMP(15, use_PolyJuMP = true)
 function test_shapeconregr_JuMP(instance::Function; options)
     (model, true_obj) = instance()
     JuMP.optimize!(model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
-
-    term_status = JuMP.termination_status(model)
-    primal_obj = JuMP.objective_value(model)
-    dual_obj = JuMP.objective_bound(model)
-    pr_status = JuMP.primal_status(model)
-    du_status = JuMP.dual_status(model)
-
-    @test term_status == MOI.OPTIMAL
-    @test pr_status == MOI.FEASIBLE_POINT
-    @test du_status == MOI.FEASIBLE_POINT
-    @test primal_obj ≈ dual_obj atol = 1e-4 rtol = 1e-4
-    @test primal_obj ≈ true_obj atol = 1e-4 rtol = 1e-4
-
+    @test JuMP.termination_status(model) == MOI.OPTIMAL
+    @test JuMP.objective_value(model) ≈ true_obj atol = 1e-4 rtol = 1e-4
     return
 end
 
