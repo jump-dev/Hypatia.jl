@@ -24,7 +24,7 @@ const DP = DynamicPolynomials
 using LinearAlgebra
 using Test
 
-function roauniv_JuMP(deg::Int; use_WSOS::Bool = true)
+function regionofattr_JuMP(deg::Int; use_WSOS::Bool = true)
     T = 100.0
     DP.@polyvar x
     DP.@polyvar t
@@ -68,14 +68,14 @@ function roauniv_JuMP(deg::Int; use_WSOS::Bool = true)
     return (model = model,)
 end
 
-roauniv1_JuMP() = roauniv_JuMP(4, use_WSOS = true)
-roauniv2_JuMP() = roauniv_JuMP(4, use_WSOS = false)
+regionofattr1_JuMP() = regionofattr_JuMP(4, use_WSOS = true)
+regionofattr2_JuMP() = regionofattr_JuMP(4, use_WSOS = false)
 
-function test_roauniv_JuMP(builder::Function; options)
+function test_regionofattr_JuMP(builder::Function; options)
     data = builder()
     JuMP.optimize!(data.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
     @test JuMP.termination_status(data.model) == MOI.OPTIMAL
     return
 end
 
-test_roauniv_JuMP(; options...) = test_roauniv_JuMP.([roauniv1_JuMP, roauniv2_JuMP], options = options)
+test_regionofattr_JuMP(; options...) = test_regionofattr_JuMP.([regionofattr1_JuMP, regionofattr2_JuMP], options = options)

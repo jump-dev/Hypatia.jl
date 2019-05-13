@@ -84,7 +84,7 @@ function test_envelope(builder::Function)
     return
 end
 
-test_envelopes() = test_envelope.([
+test_envelope() = test_envelope.([
     envelope1,
     envelope2,
     envelope3,

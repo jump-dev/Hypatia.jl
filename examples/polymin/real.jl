@@ -93,7 +93,7 @@ function test_polymin(builder::Function)
     return
 end
 
-test_polymins() = test_polymin.([
+test_polymin() = test_polymin.([
     polymin1,
     polymin2,
     polymin3,

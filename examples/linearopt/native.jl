@@ -52,7 +52,7 @@ function test_linearopt(instance::Function)
     return
 end
 
-test_linearopts() = test_linearopt.([
+test_linearopt() = test_linearopt.([
     linearopt1,
     linearopt2,
     linearopt3,

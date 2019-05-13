@@ -104,7 +104,7 @@ function test_polymincomplex(builder::Function)
     return
 end
 
-test_polymincomplexs() = test_polymincomplex.([
+test_polymincomplex() = test_polymincomplex.([
     polymincomplex1,
     polymincomplex2,
     polymincomplex3,
