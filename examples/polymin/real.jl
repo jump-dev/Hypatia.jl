@@ -6,6 +6,8 @@ modified from https://github.com/dpapp-github/alfonso/blob/master/polyOpt.m
 formulates and solves the (dual of the) polynomial optimization problem for a given polynomial, described in the paper:
 D. Papp and S. Yildiz. Sum-of-squares optimization without semidefinite programming
 available at https://arxiv.org/abs/1712.01792
+
+TODO perhaps merge with polymin/complex.jl
 =#
 
 import Hypatia
