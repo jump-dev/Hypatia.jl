@@ -24,7 +24,7 @@ const DP = DynamicPolynomials
 using LinearAlgebra
 using Test
 
-function build_univariate_roa_JuMP_WSOS(model::JuMP.Model, deg::Int)
+function build_roauniv_JuMP_WSOS(model::JuMP.Model, deg::Int)
     T = 100.0
 
     DP.@polyvar x
@@ -62,7 +62,7 @@ function build_univariate_roa_JuMP_WSOS(model::JuMP.Model, deg::Int)
     return model
 end
 
-function build_univariate_roa_JuMP_PSD(model::JuMP.Model, deg::Int)
+function build_roauniv_JuMP_PSD(model::JuMP.Model, deg::Int)
     T = 100.0
 
     DP.@polyvar x
@@ -92,22 +92,22 @@ function build_univariate_roa_JuMP_PSD(model::JuMP.Model, deg::Int)
     return model
 end
 
-function univariate_roa_JuMP(deg::Int; use_WSOS::Bool = true, use_dense::Bool = true)
-    model = JuMP.Model(JuMP.with_optimizer(Hypatia.Optimizer, tol_feas = 1e-5, verbose = true, use_dense = use_dense))
+function roauniv_JuMP(deg::Int; use_WSOS::Bool = true)
+    model = JuMP.Model()
     if use_WSOS
-        build_univariate_roa_JuMP_WSOS(model, deg)
+        build_roauniv_JuMP_WSOS(model, deg)
     else
-        build_univariate_roa_JuMP_PSD(model, deg)
+        build_roauniv_JuMP_PSD(model, deg)
     end
     return model
 end
 
-univariate_roa1_JuMP(; use_dense::Bool = true) = univariate_roa_JuMP(4, use_WSOS = true, use_dense = use_dense)
-univariate_roa2_JuMP(; use_dense::Bool = true) = univariate_roa_JuMP(4, use_WSOS = false, use_dense = use_dense)
+roauniv1_JuMP() = roauniv_JuMP(4, use_WSOS = true)
+roauniv2_JuMP() = roauniv_JuMP(4, use_WSOS = false)
 
-function test_univariate_roa_JuMP(instance::Function)
+function test_roauniv_JuMP(instance::Function; options)
     model = instance()
-    JuMP.optimize!(model)
+    JuMP.optimize!(model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
 
     term_status = JuMP.termination_status(model)
     primal_obj = JuMP.objective_value(model)
@@ -123,4 +123,4 @@ function test_univariate_roa_JuMP(instance::Function)
     return
 end
 
-test_univariate_roa_JuMP_many() = test_univariate_roa_JuMP.([univariate_roa1_JuMP, univariate_roa2_JuMP])
+test_roauniv_JuMP(; options...) = test_roauniv_JuMP.([roauniv1_JuMP, roauniv2_JuMP], options = options)

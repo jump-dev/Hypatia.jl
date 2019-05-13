@@ -43,19 +43,18 @@ function build_envelope_JuMP(
     return model
 end
 
-function envelope_JuMP(npoly::Int, deg::Int, d::Int, domain::MU.Domain; sample::Bool = true, use_dense::Bool = true)
-    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, use_dense = use_dense))
+function envelope_JuMP(npoly::Int, deg::Int, d::Int, domain::MU.Domain; sample::Bool = true)
+    model = JuMP.Model()
     return build_envelope_JuMP(model, npoly, deg, d, domain, sample = sample)
 end
 
-envelope1_JuMP(; use_dense::Bool = true) = envelope_JuMP(2, 3, 4, MU.Box(-ones(2), ones(2)), use_dense = use_dense)
-envelope2_JuMP(; use_dense::Bool = true) = envelope_JuMP(2, 3, 4, MU.Ball(zeros(2), sqrt(2)), use_dense = use_dense) # needs fix to work https://github.com/chriscoey/Hypatia.jl/issues/173
-envelope3_JuMP(; use_dense::Bool = true) = envelope_JuMP(2, 3, 4, MU.Box(-ones(2), ones(2)), sample = false, use_dense = use_dense)
+envelope1_JuMP() = envelope_JuMP(2, 3, 4, MU.Box(-ones(2), ones(2)))
+envelope2_JuMP() = envelope_JuMP(2, 3, 4, MU.Ball(zeros(2), sqrt(2))) # needs fix to work https://github.com/chriscoey/Hypatia.jl/issues/173
+envelope3_JuMP() = envelope_JuMP(2, 3, 4, MU.Box(-ones(2), ones(2)), sample = false)
 
-
-function test_envelope_JuMP(instance::Function)
+function test_envelope_JuMP(instance::Function; options)
     model = instance()
-    JuMP.optimize!(model)
+    JuMP.optimize!(model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
 
     term_status = JuMP.termination_status(model)
     primal_obj = JuMP.objective_value(model)
@@ -71,8 +70,8 @@ function test_envelope_JuMP(instance::Function)
     return
 end
 
-test_envelope_JuMP_many() = test_envelope_JuMP.([
+test_envelope_JuMP(; options...) = test_envelope_JuMP.([
     envelope1_JuMP,
     envelope2_JuMP,
     envelope3_JuMP,
-])
+    ], options = options)

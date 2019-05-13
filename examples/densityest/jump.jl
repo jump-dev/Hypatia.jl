@@ -69,22 +69,22 @@ function build_densityest_JuMP(
     return
 end
 
-function densityest_JuMP(nobs::Int, n::Int, deg::Int; rseed::Int = 1, use_monomials::Bool = false, use_dense::Bool = true)
+function densityest_JuMP(nobs::Int, n::Int, deg::Int; rseed::Int = 1, use_monomials::Bool = false)
     Random.seed!(rseed)
     X = rand(Distributions.Uniform(-1, 1), nobs, n)
     domain = MU.Box(-ones(n), ones(n))
-    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, use_dense = use_dense))
+    model = JuMP.Model()
     build_densityest_JuMP(model, X, deg, domain, use_monomials = use_monomials)
     return model
 end
 
-densityest1_JuMP(; use_dense::Bool = true) = densityest_JuMP(200, 1, 4, use_monomials = false, use_dense = use_dense)
-densityest2_JuMP(; use_dense::Bool = true) = densityest_JuMP(200, 1, 4, use_monomials = true, use_dense = use_dense)
+densityest1_JuMP() = densityest_JuMP(200, 1, 4, use_monomials = false)
+densityest2_JuMP() = densityest_JuMP(200, 1, 4, use_monomials = true)
 
 
-function test_densityest_JuMP(instance::Function)
+function test_densityest_JuMP(instance::Function; options)
     model = instance()
-    JuMP.optimize!(model)
+    JuMP.optimize!(model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
 
     term_status = JuMP.termination_status(model)
     primal_obj = JuMP.objective_value(model)
@@ -100,4 +100,7 @@ function test_densityest_JuMP(instance::Function)
     return
 end
 
-test_densityest_JuMP_many() = test_densityest_JuMP.([densityest1_JuMP, densityest2_JuMP])
+test_densityest_JuMP(; options...) = test_densityest_JuMP.([
+    densityest1_JuMP,
+    densityest2_JuMP,
+    ], options = options)

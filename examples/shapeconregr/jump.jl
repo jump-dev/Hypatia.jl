@@ -227,10 +227,10 @@ function build_shapeconregr_WSOS(
     return model
 end
 
-function shapeconregr_JuMP(inst::Int; use_dense::Bool = true, use_PolyJuMP::Bool = false, use_wsos::Bool = true)
+function shapeconregr_JuMP(inst::Int; use_PolyJuMP::Bool = false, use_wsos::Bool = true)
     (n, deg, num_points, signal_ratio, f, shapedata, use_lsq_obj, true_obj) = getshapeconregrdata(inst)
     (X, y) = generate_regr_data(f, -1.0, 1.0, n, num_points, signal_ratio = signal_ratio)
-    model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, use_dense = use_dense))
+    model = JuMP.Model()
     if use_wsos
         if use_PolyJuMP
             model = build_shapeconregr_WSOS_PolyJuMP(model, X, y, deg, shapedata, use_lsq_obj = use_lsq_obj)
@@ -244,26 +244,26 @@ function shapeconregr_JuMP(inst::Int; use_dense::Bool = true, use_PolyJuMP::Bool
     return (model, true_obj)
 end
 
-shapeconregr1_JuMP(; use_dense::Bool = true) = shapeconregr_JuMP(1, use_dense = use_dense)
-shapeconregr2_JuMP(; use_dense::Bool = true) = shapeconregr_JuMP(2, use_dense = use_dense)
-shapeconregr3_JuMP(; use_dense::Bool = true) = shapeconregr_JuMP(3, use_dense = use_dense)
-shapeconregr4_JuMP(; use_dense::Bool = true) = shapeconregr_JuMP(4, use_dense = use_dense)
-shapeconregr5_JuMP(; use_dense::Bool = true) = shapeconregr_JuMP(5, use_dense = use_dense)
-shapeconregr6_JuMP(; use_dense::Bool = true) = shapeconregr_JuMP(6, use_dense = use_dense)
-shapeconregr7_JuMP(; use_dense::Bool = true) = shapeconregr_JuMP(7, use_dense = use_dense)
-shapeconregr8_JuMP(; use_dense::Bool = true) = shapeconregr_JuMP(8, use_dense = use_dense)
-shapeconregr9_JuMP(; use_dense::Bool = true) = shapeconregr_JuMP(9, use_dense = use_dense)
-shapeconregr10_JuMP(; use_dense::Bool = true) = shapeconregr_JuMP(10, use_dense = use_dense)
-shapeconregr11_JuMP(; use_dense::Bool = true) = shapeconregr_JuMP(11, use_dense = use_dense)
-shapeconregr12_JuMP(; use_dense::Bool = true) = shapeconregr_JuMP(12, use_dense = use_dense, use_wsos = false)
-shapeconregr13_JuMP(; use_dense::Bool = true) = shapeconregr_JuMP(13, use_dense = use_dense)
-shapeconregr14_JuMP(; use_dense::Bool = true) = shapeconregr_JuMP(13, use_dense = use_dense, use_wsos = false)
-shapeconregr15_JuMP(; use_dense::Bool = true) = shapeconregr_JuMP(15, use_dense = use_dense, use_PolyJuMP = true)
+shapeconregr1_JuMP() = shapeconregr_JuMP(1)
+shapeconregr2_JuMP() = shapeconregr_JuMP(2)
+shapeconregr3_JuMP() = shapeconregr_JuMP(3)
+shapeconregr4_JuMP() = shapeconregr_JuMP(4)
+shapeconregr5_JuMP() = shapeconregr_JuMP(5)
+shapeconregr6_JuMP() = shapeconregr_JuMP(6)
+shapeconregr7_JuMP() = shapeconregr_JuMP(7)
+shapeconregr8_JuMP() = shapeconregr_JuMP(8)
+shapeconregr9_JuMP() = shapeconregr_JuMP(9)
+shapeconregr10_JuMP() = shapeconregr_JuMP(10)
+shapeconregr11_JuMP() = shapeconregr_JuMP(11)
+shapeconregr12_JuMP() = shapeconregr_JuMP(12, use_wsos = false)
+shapeconregr13_JuMP() = shapeconregr_JuMP(13)
+shapeconregr14_JuMP() = shapeconregr_JuMP(13, use_wsos = false)
+shapeconregr15_JuMP() = shapeconregr_JuMP(15, use_PolyJuMP = true)
 
-function test_shapeconregr_JuMP(instance::Function)
+function test_shapeconregr_JuMP(instance::Function; options)
     (model, true_obj) = instance()
+    JuMP.optimize!(model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
 
-    JuMP.optimize!(model)
     term_status = JuMP.termination_status(model)
     primal_obj = JuMP.objective_value(model)
     dual_obj = JuMP.objective_bound(model)
@@ -279,7 +279,7 @@ function test_shapeconregr_JuMP(instance::Function)
     return
 end
 
-test_shapeconregr_JuMP_many() = test_shapeconregr_JuMP.([
+test_shapeconregr_JuMP(; options...) = test_shapeconregr_JuMP.([
     shapeconregr1_JuMP,
     shapeconregr2_JuMP,
     shapeconregr3_JuMP,
@@ -295,11 +295,11 @@ test_shapeconregr_JuMP_many() = test_shapeconregr_JuMP.([
     shapeconregr13_JuMP,
     # shapeconregr14_JuMP,
     shapeconregr15_JuMP,
-    ])
+    ], options = options)
 
-test_shapeconregr_JuMP_small() = test_shapeconregr_JuMP.([
+test_shapeconregr_JuMP_small(; options...) = test_shapeconregr_JuMP.([
     shapeconregr1_JuMP,
     shapeconregr2_JuMP,
     shapeconregr12_JuMP,
     shapeconregr15_JuMP,
-    ])
+    ], options = options)

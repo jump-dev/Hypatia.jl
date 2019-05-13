@@ -20,14 +20,10 @@ using Test
 
 include("data.jl")
 
-function polymin(
-    polyname::Symbol,
-    deg::Int;
-    primal_wsos::Bool = true,
-    )
+function polymin(polyname::Symbol, deg::Int; primal_wsos::Bool = true)
     (x, fn, dom, true_obj) = getpolydata(polyname)
-    # only works for boxes
     n = length(x)
+    # only works for boxes
     lbs = dom.l
     ubs = dom.u
     d = div(deg + 1, 2)
