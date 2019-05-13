@@ -25,18 +25,14 @@ function linearopt(
     rseed::Int = 1,
     )
     Random.seed!(rseed)
-
     # generate random data
     A = use_dense ? rand(-9.0:9.0, m, n) : 10.0 .* sprandn(m, n, nzfrac)
     b = A * ones(n)
     c = rand(0.0:9.0, n)
-
     G = Diagonal(-1.0I, n) # TODO uniformscaling
     h = zeros(n)
-
     cones = [CO.Nonnegative(n)]
     cone_idxs = [1:n]
-
     return (model = (c, A, b, G, h, cones, cone_idxs),)
 end
 

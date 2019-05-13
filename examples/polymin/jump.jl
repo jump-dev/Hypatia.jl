@@ -77,8 +77,8 @@ polymin14_JuMP() = polymin_JuMP(:motzkin, 3, use_wsos = false)
 polymin15_JuMP() = polymin_JuMP(:motzkin, 3, primal_wsos = true)
 # TODO add more from dictionary and more with different options combinations
 
-function test_polymin_JuMP(instance::Function; options)
-    data = instance()
+function test_polymin_JuMP(builder::Function; options)
+    data = builder()
     JuMP.optimize!(data.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
     @test JuMP.objective_value(data.model) ≈ data.true_obj atol = 1e-4 rtol = 1e-4
     return

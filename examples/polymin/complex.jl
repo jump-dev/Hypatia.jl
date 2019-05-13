@@ -20,7 +20,6 @@ mon_pow(z, ex) = prod(z[i]^ex[i] for i in eachindex(ex))
 
 function complexpolymin(polyname::Symbol, d::Int; primal_wsos = true, sample_factor::Int = 100)
     (n, deg, f, gs, gdegs, true_obj) = complexpolys[polyname]
-    @assert d >= deg
     # generate interpolation
     L = binomial(n + d, n)
     U = L^2
@@ -93,8 +92,8 @@ complexpolymin12() = complexpolymin(:absbox2d, 2, primal_wsos = false)
 complexpolymin13() = complexpolymin(:negabsbox2d, 1, primal_wsos = false)
 complexpolymin14() = complexpolymin(:denseunit1d, 2, primal_wsos = false)
 
-function test_complexpolymin(instance::Function)
-    ((c, A, b, G, h, cones, cone_idxs), true_obj) = instance()
+function test_complexpolymin(builder::Function)
+    ((c, A, b, G, h, cones, cone_idxs), true_obj) = builder()
     model = MO.PreprocessedLinearModel(c, A, b, G, h, cones, cone_idxs)
     solver = SO.HSDSolver(model, verbose = true)
     SO.solve(solver)
