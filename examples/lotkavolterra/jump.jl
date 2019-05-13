@@ -37,7 +37,7 @@ end
 
 integrate_ball(p, n) = sum(DynamicPolynomials.coefficient(t) * integrate_ball_monomial(t, n) for t in DynamicPolynomials.terms(p))
 
-function build_lotkavolterra_JuMP_PSD(model)
+function lotkavolterra_JuMP()
     # parameters
     d = 4 # degree
     n = 4 # number of species
@@ -61,6 +61,7 @@ function build_lotkavolterra_JuMP_PSD(model)
     X = SemialgebraicSets.@set x_h' * x_h <= 1.0 # non-extinction domain
     delta_X = SemialgebraicSets.@set x_h' * x_h == 1.0
 
+    model = SumOfSquares.SOSModel()
     JuMP.@variable(model, rho, PolyJuMP.Poly(x_mon))
     JuMP.@variable(model, rho_T, PolyJuMP.Poly(x_mon))
     JuMP.@variable(model, sigma[1:m], PolyJuMP.Poly(x_mon))
@@ -78,26 +79,20 @@ function build_lotkavolterra_JuMP_PSD(model)
     JuMP.@constraint(model, rho_T >= 0, domain = X)
     JuMP.@constraint(model, [i in 1:m], sigma[i] >= 0, domain = X)
 
-    return (sigma, rho)
-end
-
-function lotkavolterra_JuMP()
-    model = SumOfSquares.SOSModel()
-    build_lotkavolterra_JuMP_PSD(model)
-    return model
+    return (model = model,)
 end
 
 lotkavolterra1_JuMP() = lotkavolterra_JuMP()
 
-function test_lotkavolterra_JuMP(instance::Function; options)
-    model = instance()
-    JuMP.optimize!(model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
+function test_lotkavolterra_JuMP(builder::Function; options)
+    data = builder()
+    JuMP.optimize!(data.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
 
-    term_status = JuMP.termination_status(model)
-    primal_obj = JuMP.objective_value(model)
-    dual_obj = JuMP.objective_bound(model)
-    pr_status = JuMP.primal_status(model)
-    du_status = JuMP.dual_status(model)
+    term_status = JuMP.termination_status(data.model)
+    primal_obj = JuMP.objective_value(data.model)
+    dual_obj = JuMP.objective_bound(data.model)
+    pr_status = JuMP.primal_status(data.model)
+    du_status = JuMP.dual_status(data.model)
 
     @test term_status == MOI.OPTIMAL
     @test pr_status == MOI.FEASIBLE_POINT

@@ -73,8 +73,8 @@ envelope2(; primal_wsos::Bool = true, use_dense::Bool = true) = envelope(2, 5, 2
 envelope3(; primal_wsos::Bool = true, use_dense::Bool = true) = envelope(3, 5, 3, 5, primal_wsos = primal_wsos, use_dense = use_dense)
 envelope4(; primal_wsos::Bool = true, use_dense::Bool = true) = envelope(2, 30, 1, 30, primal_wsos = primal_wsos, use_dense = use_dense)
 
-function test_envelope(instance::Function)
-    ((c, A, b, G, h, cones, cone_idxs),) = instance()
+function test_envelope(builder::Function)
+    ((c, A, b, G, h, cones, cone_idxs),) = builder()
     model = MO.PreprocessedLinearModel(c, A, b, G, h, cones, cone_idxs)
     solver = SO.HSDSolver(model, verbose = true)
     SO.solve(solver)

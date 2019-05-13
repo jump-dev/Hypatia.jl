@@ -27,19 +27,23 @@ import Random
 import Distributions
 using Test
 
-function build_densityest_JuMP(
-    model::JuMP.Model,
-    X::Matrix{Float64},
-    deg::Int,
-    domain::MU.Domain;
+function densityest_JuMP(
+    nobs::Int,
+    n::Int,
+    deg::Int;
+    rseed::Int = 1,
     sample_factor::Int = 100,
-    use_monomials::Bool = true,
+    use_monomials::Bool = false,
     )
 
+    Random.seed!(rseed)
+    X = rand(Distributions.Uniform(-1, 1), nobs, n)
     (nobs, dim) = size(X)
+    domain = MU.Box(-ones(n), ones(n))
     d = div(deg + 1, 2)
-    (U, pts, P0, PWts, w) = MU.interpolate(domain, d, sample = true, calc_w = true, sample_factor = sample_factor)
 
+    model = JuMP.Model()
+    (U, pts, P0, PWts, w) = MU.interpolate(domain, d, sample = true, calc_w = true, sample_factor = sample_factor)
     JuMP.@variable(model, z[1:nobs])
     JuMP.@objective(model, Max, sum(z))
 
@@ -66,31 +70,21 @@ function build_densityest_JuMP(
             [i in 1:nobs], vcat(z[i], 1.0, dot(f, basis_evals[i, :])) in MOI.ExponentialCone() # hypograph of log
         end)
     end
-    return
-end
-
-function densityest_JuMP(nobs::Int, n::Int, deg::Int; rseed::Int = 1, use_monomials::Bool = false)
-    Random.seed!(rseed)
-    X = rand(Distributions.Uniform(-1, 1), nobs, n)
-    domain = MU.Box(-ones(n), ones(n))
-    model = JuMP.Model()
-    build_densityest_JuMP(model, X, deg, domain, use_monomials = use_monomials)
-    return model
+    return (model = model,)
 end
 
 densityest1_JuMP() = densityest_JuMP(200, 1, 4, use_monomials = false)
 densityest2_JuMP() = densityest_JuMP(200, 1, 4, use_monomials = true)
 
+function test_densityest_JuMP(builder::Function; options)
+    data = builder()
+    JuMP.optimize!(data.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
 
-function test_densityest_JuMP(instance::Function; options)
-    model = instance()
-    JuMP.optimize!(model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
-
-    term_status = JuMP.termination_status(model)
-    primal_obj = JuMP.objective_value(model)
-    dual_obj = JuMP.objective_bound(model)
-    pr_status = JuMP.primal_status(model)
-    du_status = JuMP.dual_status(model)
+    term_status = JuMP.termination_status(data.model)
+    primal_obj = JuMP.objective_value(data.model)
+    dual_obj = JuMP.objective_bound(data.model)
+    pr_status = JuMP.primal_status(data.model)
+    du_status = JuMP.dual_status(data.model)
 
     @test term_status == MOI.OPTIMAL
     @test pr_status == MOI.FEASIBLE_POINT

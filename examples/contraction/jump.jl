@@ -19,6 +19,7 @@ import SumOfSquares
 import Hypatia
 const HYP = Hypatia
 const MU = HYP.ModelUtilities
+import Random
 
 const rt2 = sqrt(2)
 
@@ -27,7 +28,9 @@ function contraction_JuMP(
     deg_M::Int,
     delta::Float64;
     use_wsos::Bool = true,
+    rseed::Int = 1,
     )
+    Random.seed!(rseed)
     n = 2
     dom = MU.FreeDomain(n)
 

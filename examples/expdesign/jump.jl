@@ -18,33 +18,23 @@ using LinearAlgebra
 import Random
 using Test
 
-function build_expdesign_JuMP(
-    model::JuMP.Model,
-    np::Vector{JuMP.VariableRef},
+function expdesign_JuMP(
     q::Int,
     p::Int,
-    V::Matrix{Float64},
     n::Int,
-    nmax::Int,
+    nmax::Int;
+    rseed::Int = 1,
     )
+    Random.seed!(rseed)
     @assert (p > q) && (n > q) && (nmax <= n)
-    @assert size(V) == (q, p)
-
+    V = randn(q, p)
+    model = JuMP.Model()
+    JuMP.@variable(model, 0 <= np[1:p] <= nmax) # number of each experiment
     JuMP.@variable(model, hypo) # hypograph of logdet variable
     JuMP.@objective(model, Max, hypo)
     JuMP.@constraint(model, sum(np) == n) # n experiments total
     Q = V * diagm(np) * V' # information matrix
     JuMP.@constraint(model, vcat(hypo, 1.0, [Q[i, j] for i in 1:q for j in 1:i]) in MOI.LogDetConeTriangle(q)) # hypograph of logdet of information matrix
-
-    return model
-end
-
-function expdesign_JuMP(q::Int, p::Int, n::Int, nmax::Int; rseed::Int = 1)
-    Random.seed!(rseed)
-    model = JuMP.Model()
-    JuMP.@variable(model, 0 <= np[1:p] <= nmax) # number of each experiment
-    V = randn(q, p)
-    build_expdesign_JuMP(model, np, q, p, V, n, nmax)
     return (model = model, n = n, nmax = nmax, V = V, np = np)
 end
 
@@ -54,25 +44,24 @@ expdesign3_JuMP() = expdesign_JuMP(5, 15, 25, 5) # small
 expdesign4_JuMP() = expdesign_JuMP(4, 8, 12, 3) # tiny
 expdesign5_JuMP() = expdesign_JuMP(3, 5, 7, 2) # miniscule
 
+function test_expdesign_JuMP(builder::Function; options)
+    data = builder()
+    JuMP.optimize!(data.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
 
-function test_expdesign_JuMP(instance::Function; options)
-    (model, n, nmax, V, np) = instance()
-    JuMP.optimize!(model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
-
-    term_status = JuMP.termination_status(model)
-    primal_obj = JuMP.objective_value(model)
-    dual_obj = JuMP.objective_bound(model)
-    pr_status = JuMP.primal_status(model)
-    du_status = JuMP.dual_status(model)
-    npval = JuMP.value.(np)
+    term_status = JuMP.termination_status(data.model)
+    primal_obj = JuMP.objective_value(data.model)
+    dual_obj = JuMP.objective_bound(data.model)
+    pr_status = JuMP.primal_status(data.model)
+    du_status = JuMP.dual_status(data.model)
+    npval = JuMP.value.(data.np)
 
     @test term_status == MOI.OPTIMAL
     @test pr_status == MOI.FEASIBLE_POINT
     @test du_status == MOI.FEASIBLE_POINT
     @test primal_obj ≈ dual_obj atol = 1e-4 rtol = 1e-4
-    @test primal_obj ≈ logdet(V * Diagonal(npval) * V') atol = 1e-4 rtol = 1e-4
-    @test sum(npval) ≈ n atol = 1e-4 rtol = 1e-4
-    @test all(-1e-4 .<= npval .<= nmax + 1e-4)
+    @test primal_obj ≈ logdet(data.V * Diagonal(npval) * data.V') atol = 1e-4 rtol = 1e-4
+    @test sum(npval) ≈ data.n atol = 1e-4 rtol = 1e-4
+    @test all(-1e-4 .<= npval .<= data.nmax + 1e-4)
 
     return
 end

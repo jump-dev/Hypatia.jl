@@ -137,13 +137,13 @@ include(joinpath(examples_dir, "contraction/jump.jl"))
 #     t(s, m, verbose)
 # end
 
-@info("starting default native examples tests")
-testfuns = [
-    test_envelopes,
-    test_linearopts,
-    test_polymins,
-    test_complexpolymins,
-    ]
+# @info("starting default native examples tests")
+# testfuns = [
+#     test_envelopes,
+#     test_linearopts,
+#     test_polymins,
+#     test_complexpolymins,
+#     ]
 # @testset "default examples: $t" for t in testfuns
 #     t()
 # end
@@ -183,17 +183,17 @@ testfuns = [
 # @testset "default examples: $t" for t in testfuns
 #     t()
 # end
-
+#
 @info("starting additional JuMP examples tests")
 @testset "JuMP examples" begin
     test_contraction_JuMP(verbose = true, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4, tol_feas = 1e-4)
-    test_polymin_JuMP(verbose = true, tol_rel_opt = 1e-8, tol_abs_opt = 1e-8, tol_feas = 1e-8)
     test_densityest_JuMP(verbose = true)
     test_envelope_JuMP(verbose = true)
     test_expdesign_JuMP(verbose = true)
     # test_lotkavolterra_JuMP(verbose = true, max_iters = 1000, time_limit = 3.6e4, tol_rel_opt = 1e-5, tol_abs_opt = 1e-6, tol_feas = 1e-6)
+    test_polymin_JuMP(verbose = true, tol_rel_opt = 1e-8, tol_abs_opt = 1e-8, tol_feas = 1e-8)
     test_roauniv_JuMP(verbose = true, tol_feas = 1e-5)
-    # test_shapeconregr_JuMP(verbose = true)
+    # # test_shapeconregr_JuMP(verbose = true)
 end
 
 end
