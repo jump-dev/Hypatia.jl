@@ -47,22 +47,11 @@ expdesign5_JuMP() = expdesign_JuMP(3, 5, 7, 2) # miniscule
 function test_expdesign_JuMP(builder::Function; options)
     data = builder()
     JuMP.optimize!(data.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
-
-    term_status = JuMP.termination_status(data.model)
-    primal_obj = JuMP.objective_value(data.model)
-    dual_obj = JuMP.objective_bound(data.model)
-    pr_status = JuMP.primal_status(data.model)
-    du_status = JuMP.dual_status(data.model)
+    @test JuMP.termination_status(data.model) == MOI.OPTIMAL
     npval = JuMP.value.(data.np)
-
-    @test term_status == MOI.OPTIMAL
-    @test pr_status == MOI.FEASIBLE_POINT
-    @test du_status == MOI.FEASIBLE_POINT
-    @test primal_obj ≈ dual_obj atol = 1e-4 rtol = 1e-4
-    @test primal_obj ≈ logdet(data.V * Diagonal(npval) * data.V') atol = 1e-4 rtol = 1e-4
+    @test JuMP.objective_value(data.model) ≈ logdet(data.V * Diagonal(npval) * data.V') atol = 1e-4 rtol = 1e-4
     @test sum(npval) ≈ data.n atol = 1e-4 rtol = 1e-4
     @test all(-1e-4 .<= npval .<= data.nmax + 1e-4)
-
     return
 end
 

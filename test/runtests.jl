@@ -40,7 +40,7 @@ include(joinpath(examples_dir, "wsosmatrix/muconvexity.jl"))
 include(joinpath(examples_dir, "wsosmatrix/sosmat1.jl"))
 include(joinpath(examples_dir, "wsosmatrix/sosmat2.jl"))
 include(joinpath(examples_dir, "wsosmatrix/sosmat3.jl"))
-include(joinpath(examples_dir, "regionofattraction/univariate.jl"))
+include(joinpath(examples_dir, "roauniv/jump.jl"))
 include(joinpath(examples_dir, "contraction/jump.jl"))
 
 
@@ -142,7 +142,7 @@ include(joinpath(examples_dir, "contraction/jump.jl"))
 #     test_envelopes,
 #     test_linearopts,
 #     test_polymins,
-#     test_complexpolymins,
+#     test_polymincomplexs,
 #     ]
 # @testset "default examples: $t" for t in testfuns
 #     t()
@@ -186,12 +186,12 @@ include(joinpath(examples_dir, "contraction/jump.jl"))
 #
 @info("starting additional JuMP examples tests")
 @testset "JuMP examples" begin
-    test_contraction_JuMP(verbose = true, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4, tol_feas = 1e-4)
+    # test_contraction_JuMP(verbose = true, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4, tol_feas = 1e-4)
     test_densityest_JuMP(verbose = true)
     test_envelope_JuMP(verbose = true)
     test_expdesign_JuMP(verbose = true)
     # test_lotkavolterra_JuMP(verbose = true, max_iters = 1000, time_limit = 3.6e4, tol_rel_opt = 1e-5, tol_abs_opt = 1e-6, tol_feas = 1e-6)
-    test_polymin_JuMP(verbose = true, tol_rel_opt = 1e-8, tol_abs_opt = 1e-8, tol_feas = 1e-8)
+    # test_polymin_JuMP(verbose = true, tol_rel_opt = 1e-8, tol_abs_opt = 1e-8, tol_feas = 1e-8)
     test_roauniv_JuMP(verbose = true, tol_feas = 1e-5)
     # # test_shapeconregr_JuMP(verbose = true)
 end

@@ -46,18 +46,7 @@ envelope3_JuMP() = envelope_JuMP(2, 3, 4, MU.Box(-ones(2), ones(2)), sample = fa
 function test_envelope_JuMP(builder::Function; options)
     data = builder()
     JuMP.optimize!(data.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
-
-    term_status = JuMP.termination_status(data.model)
-    primal_obj = JuMP.objective_value(data.model)
-    dual_obj = JuMP.objective_bound(data.model)
-    pr_status = JuMP.primal_status(data.model)
-    du_status = JuMP.dual_status(data.model)
-
-    @test term_status == MOI.OPTIMAL
-    @test pr_status == MOI.FEASIBLE_POINT
-    @test du_status == MOI.FEASIBLE_POINT
-    @test primal_obj ≈ dual_obj atol = 1e-4 rtol = 1e-4
-
+    @test JuMP.termination_status(data.model) == MOI.OPTIMAL
     return
 end
 
