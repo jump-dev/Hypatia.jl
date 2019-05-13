@@ -144,9 +144,9 @@ testfuns = [
     test_polymins,
     test_complexpolymins,
     ]
-@testset "default examples: $t" for t in testfuns
-    t()
-end
+# @testset "default examples: $t" for t in testfuns
+#     t()
+# end
 
 # @info("starting MathOptInterface tests")
 # verbose = false
@@ -188,12 +188,12 @@ end
 @testset "JuMP examples" begin
     test_contraction_JuMP(verbose = true, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4, tol_feas = 1e-4)
     test_polymin_JuMP(verbose = true, tol_rel_opt = 1e-8, tol_abs_opt = 1e-8, tol_feas = 1e-8)
-    # test_densityest_JuMP()
-    # test_envelope_JuMP()
-    # test_expdesign_JuMP()
-    # test_lotkavolterra_JuMP()
-    # test_univariate_roa_JuMP()
-    # test_shapeconregr_JuMP()
+    test_densityest_JuMP(verbose = true)
+    test_envelope_JuMP(verbose = true)
+    test_expdesign_JuMP(verbose = true)
+    # test_lotkavolterra_JuMP(verbose = true, max_iters = 1000, time_limit = 3.6e4, tol_rel_opt = 1e-5, tol_abs_opt = 1e-6, tol_feas = 1e-6)
+    test_roauniv_JuMP(verbose = true, tol_feas = 1e-5)
+    # test_shapeconregr_JuMP(verbose = true)
 end
 
 end

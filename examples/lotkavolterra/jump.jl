@@ -81,27 +81,17 @@ function build_lotkavolterra_JuMP_PSD(model)
     return (sigma, rho)
 end
 
-function lotkavolterra_JuMP(; use_dense::Bool = true)
-    model = SumOfSquares.SOSModel(JuMP.with_optimizer(HYP.Optimizer,
-        use_dense = use_dense,
-        verbose = true,
-        system_solver = SO.QRCholCombinedHSDSystemSolver,
-        linear_model = MO.PreprocessedLinearModel,
-        max_iters = 1000,
-        time_limit = 3.6e4,
-        tol_rel_opt = 1e-5,
-        tol_abs_opt = 1e-6,
-        tol_feas = 1e-6,
-        ))
+function lotkavolterra_JuMP()
+    model = SumOfSquares.SOSModel()
     build_lotkavolterra_JuMP_PSD(model)
     return model
 end
 
-lotkavolterra1_JuMP(; use_dense::Bool = true) = lotkavolterra_JuMP(use_dense = use_dense)
+lotkavolterra1_JuMP() = lotkavolterra_JuMP()
 
-function test_lotkavolterra_JuMP(instance::Function)
+function test_lotkavolterra_JuMP(instance::Function; options)
     model = instance()
-    JuMP.optimize!(model)
+    JuMP.optimize!(model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
 
     term_status = JuMP.termination_status(model)
     primal_obj = JuMP.objective_value(model)
@@ -117,4 +107,4 @@ function test_lotkavolterra_JuMP(instance::Function)
     return
 end
 
-test_lotkavolterra_JuMP_many() = test_lotkavolterra_JuMP.([lotkavolterra1_JuMP])
+test_lotkavolterra_JuMP(; options...) = test_lotkavolterra_JuMP.([lotkavolterra1_JuMP], options = options)

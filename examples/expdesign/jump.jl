@@ -39,25 +39,25 @@ function build_expdesign_JuMP(
     return model
 end
 
-function expdesign_JuMP(q::Int, p::Int, n::Int, nmax::Int; use_dense::Bool = false, rseed::Int = 1)
+function expdesign_JuMP(q::Int, p::Int, n::Int, nmax::Int; rseed::Int = 1)
     Random.seed!(rseed)
-    model = JuMP.Model(JuMP.with_optimizer(Hypatia.Optimizer, verbose = true, use_dense = use_dense))
+    model = JuMP.Model()
     JuMP.@variable(model, 0 <= np[1:p] <= nmax) # number of each experiment
     V = randn(q, p)
     build_expdesign_JuMP(model, np, q, p, V, n, nmax)
     return (model = model, n = n, nmax = nmax, V = V, np = np)
 end
 
-expdesign1_JuMP(; use_dense::Bool = false) = expdesign_JuMP(25, 75, 125, 5, use_dense = use_dense) # large
-expdesign2_JuMP(; use_dense::Bool = false) = expdesign_JuMP(10, 30, 50, 5, use_dense = use_dense) # medium
-expdesign3_JuMP(; use_dense::Bool = false) = expdesign_JuMP(5, 15, 25, 5, use_dense = use_dense) # small
-expdesign4_JuMP(; use_dense::Bool = false) = expdesign_JuMP(4, 8, 12, 3, use_dense = use_dense) # tiny
-expdesign5_JuMP(; use_dense::Bool = false) = expdesign_JuMP(3, 5, 7, 2, use_dense = use_dense) # miniscule
+expdesign1_JuMP() = expdesign_JuMP(25, 75, 125, 5) # large
+expdesign2_JuMP() = expdesign_JuMP(10, 30, 50, 5) # medium
+expdesign3_JuMP() = expdesign_JuMP(5, 15, 25, 5) # small
+expdesign4_JuMP() = expdesign_JuMP(4, 8, 12, 3) # tiny
+expdesign5_JuMP() = expdesign_JuMP(3, 5, 7, 2) # miniscule
 
 
-function test_expdesign_JuMP(instance::Function)
+function test_expdesign_JuMP(instance::Function; options)
     (model, n, nmax, V, np) = instance()
-    JuMP.optimize!(model)
+    JuMP.optimize!(model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
 
     term_status = JuMP.termination_status(model)
     primal_obj = JuMP.objective_value(model)
@@ -77,12 +77,12 @@ function test_expdesign_JuMP(instance::Function)
     return
 end
 
-test_expdesign_JuMP_many() = test_expdesign_JuMP.([
+test_expdesign_JuMP(; options...) = test_expdesign_JuMP.([
     # expdesign1_JuMP,
     # expdesign2_JuMP,
     expdesign3_JuMP,
     expdesign4_JuMP,
     expdesign5_JuMP,
-])
+    ], options = options)
 
-test_expdesign_JuMP_small() = test_expdesign_JuMP.([expdesign3_JuMP])
+test_expdesign_JuMP_small(; options...) = test_expdesign_JuMP.([expdesign3_JuMP], options = options)
