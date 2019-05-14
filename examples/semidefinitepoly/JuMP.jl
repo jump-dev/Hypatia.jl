@@ -36,10 +36,10 @@ const rt2 = sqrt(2)
 
 function semidefinitepolyJuMP(x::Vector{DP.PolyVar{true}}, H::Matrix; use_wsos::Bool = true, use_dual::Bool = false)
     model = JuMP.Model()
-    n = DynamicPolynomials.nvariables(x)
+    n = DP.nvariables(x)
     if use_wsos
         matdim = size(H, 1)
-        halfdeg = div(maximum(DynamicPolynomials.maxdegree.(H)) + 1, 2)
+        halfdeg = div(maximum(DP.maxdegree.(H)) + 1, 2)
         dom = MU.FreeDomain(n)
         (U, pts, P0, _, _) = MU.interpolate(dom, halfdeg, sample_factor = 20, sample = true)
         mat_wsos_cone = HYP.WSOSPolyInterpMatCone(matdim, U, [P0], use_dual)
@@ -62,24 +62,24 @@ function semidefinitepolyJuMP(x::Vector{DP.PolyVar{true}}, H::Matrix; use_wsos::
 end
 
 function semidefinitepolyJuMP(x::Vector{DP.PolyVar{true}}, poly::DP.Polynomial; use_wsos::Bool = true, use_dual::Bool = false)
-    return semidefinitepolyJuMP(x, DynamicPolynomials.differentiate(poly, x, 2), use_wsos = use_wsos, use_dual = use_dual)
+    return semidefinitepolyJuMP(x, DP.differentiate(poly, x, 2), use_wsos = use_wsos, use_dual = use_dual)
 end
 
 function semidefinitepolyJuMP1()
-    DynamicPolynomials.@polyvar x[1:1]
+    DP.@polyvar x[1:1]
     M = [(x[1] + 2x[1]^3) 1; (-x[1]^2 + 2) (3x[1]^2 - x[1] + 1)]
     MM = M' * M
     return semidefinitepolyJuMP(x, MM, use_wsos = true)
 end
 
 function semidefinitepolyJuMP2()
-    DynamicPolynomials.@polyvar x[1:1]
+    DP.@polyvar x[1:1]
     poly = x[1]^4 + 2x[1]^2
     return semidefinitepolyJuMP(x, poly, use_wsos = true)
 end
 
 function semidefinitepolyJuMP3()
-    DynamicPolynomials.@polyvar x[1:2]
+    DP.@polyvar x[1:2]
     poly = (x[1] + x[2])^4 + (x[1] + x[2])^2
     return semidefinitepolyJuMP(x, poly, use_wsos = true)
 end
@@ -89,8 +89,8 @@ function semidefinitepolyJuMP4()
     n = 3
     m = 3
     d = 1
-    DynamicPolynomials.@polyvar x[1:n]
-    Z = DynamicPolynomials.monomials(x, 0:d)
+    DP.@polyvar x[1:n]
+    Z = DP.monomials(x, 0:d)
     M = [sum(rand() * Z[l] for l in 1:length(Z)) for i in 1:m, j in 1:m]
     MM = M' * M
     MM = 0.5 * (MM + MM')
@@ -99,40 +99,36 @@ end
 
 # SOSTOOLS examples
 function semidefinitepolyJuMP5()
-    DynamicPolynomials.@polyvar x
+    DP.@polyvar x
     P = [(x^2 - 2x + 2) x; x x^2]
     return semidefinitepolyJuMP([x], P, use_wsos = true)
 end
 
 function semidefinitepolyJuMP6()
-    DynamicPolynomials.@polyvar x y z
+    DP.@polyvar x y z
     P = [
-        (x^2 + 2y^2) (-x * y) (-x * z);
-        (-x * y) (y^2 + 2z^2) (-y * z);
-        (-x * z) (-y * z) (z^2 + 2x^2);
+        (x^2 + 2y^2) (-x * y) (-x * z)
+        (-x * y) (y^2 + 2z^2) (-y * z)
+        (-x * z) (-y * z) (z^2 + 2x^2)
         ] .* (x * y * z)^0
     return semidefinitepolyJuMP([x; y; z], P, use_wsos = true)
 end
 
 function semidefinitepolyJuMP7()
-    DynamicPolynomials.@polyvar x1 x2 x3
+    DP.@polyvar x1 x2 x3
     P = [
-        (x1^4 + x1^2 * x2^2 + x1^2 * x3^2) (x1 * x2 * x3^2 - x1^3 * x2 - x1 * x2 * (x2^2 + 2 * x3^2));
-        (x1 * x2 * x3^2 - x1^3 * x2 - x1 * x2 * (x2^2 + 2 * x3^2)) (x1^2 * x2^2 + x2^2 * x3^2 + (x2^2 + 2 * x3^2)^2);
+        (x1^4 + x1^2 * x2^2 + x1^2 * x3^2) (x1 * x2 * x3^2 - x1^3 * x2 - x1 * x2 * (x2^2 + 2 * x3^2))
+        (x1 * x2 * x3^2 - x1^3 * x2 - x1 * x2 * (x2^2 + 2 * x3^2)) (x1^2 * x2^2 + x2^2 * x3^2 + (x2^2 + 2 * x3^2)^2)
         ]
     return semidefinitepolyJuMP([x1; x2; x3], P, use_wsos = true)
 end
 
 function test_semidefinitepolyJuMP(instance::Tuple{Function,Bool}; options, rseed::Int = 1)
     Random.seed!(1)
-    (instance, is_SOS) = instance
-    (model,) = instance()
-    JuMP.optimize!(model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
-    if is_SOS
-        @test JuMP.termination_status(model) == MOI.OPTIMAL
-    else
-        @test JuMP.termination_status(model) == MOI.INFEASIBLE
-    end
+    (instance, is_feas) = instance
+    d = instance()
+    JuMP.optimize!(d.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
+    @test JuMP.termination_status(d.model) == (is_feas ? MOI.OPTIMAL : MOI.INFEASIBLE)
 end
 
 test_semidefinitepolyJuMP(; options...) = test_semidefinitepolyJuMP.([
