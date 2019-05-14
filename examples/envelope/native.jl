@@ -23,7 +23,6 @@ function envelope(
     n::Int,
     env_halfdeg::Int;
     primal_wsos::Bool = true,
-    use_dense::Bool = false,
     )
     # generate interpolation
     @assert rand_halfdeg <= env_halfdeg
@@ -34,18 +33,17 @@ function envelope(
     L = binomial(n + rand_halfdeg, n)
     c_or_h = vec(P0[:, 1:L] * rand(-9:9, L, npoly))
 
-    subI = use_dense ? Array(1.0I, U, U) : sparse(1.0I, U, U)
     if primal_wsos
-        # use formulation with WSOS cone in primal
+        # WSOS cone in primal
         c = -w
         A = zeros(0, U)
         b = Float64[]
-        G = repeat(subI, outer = (npoly, 1))
+        G = repeat(sparse(1.0I, U, U), outer = (npoly, 1))
         h = c_or_h
     else
-        # use formulation with WSOS cone in dual
+        # WSOS cone in dual
         c = c_or_h
-        A = repeat(subI, outer = (1, npoly))
+        A = repeat(sparse(1.0I, U, U), outer = (1, npoly))
         b = w
         G = Diagonal(-1.0I, npoly * U) # TODO uniformscaling
         h = zeros(npoly * U)
@@ -57,9 +55,9 @@ function envelope(
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs)
 end
 
-envelope1(; primal_wsos::Bool = true, use_dense::Bool = true) = envelope(2, 5, 2, 6, primal_wsos = primal_wsos, use_dense = use_dense)
-envelope2(; primal_wsos::Bool = true, use_dense::Bool = true) = envelope(3, 5, 3, 5, primal_wsos = primal_wsos, use_dense = use_dense)
-envelope3(; primal_wsos::Bool = true, use_dense::Bool = true) = envelope(2, 30, 1, 30, primal_wsos = primal_wsos, use_dense = use_dense)
+envelope1(; primal_wsos::Bool = true) = envelope(2, 5, 2, 6, primal_wsos = primal_wsos)
+envelope2(; primal_wsos::Bool = true) = envelope(3, 5, 3, 5, primal_wsos = primal_wsos)
+envelope3(; primal_wsos::Bool = true) = envelope(2, 30, 1, 30, primal_wsos = primal_wsos)
 
 function test_envelope(instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
