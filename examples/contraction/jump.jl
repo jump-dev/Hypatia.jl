@@ -76,8 +76,8 @@ contraction3_JuMP() = contraction_JuMP(0.85, 4, 1e-3, use_wsos = true)
 contraction4_JuMP() = contraction_JuMP(0.85, 4, 1e-3, use_wsos = false)
 
 function test_contraction_JuMP(instance::Tuple{Function, Bool}; options)
-    (builder, is_feas) = instance
-    data = builder()
+    (instance, is_feas) = instance
+    data = instance()
     JuMP.optimize!(data.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
     @test JuMP.termination_status(data.model) == (is_feas ? MOI.OPTIMAL : MOI.INFEASIBLE)
     return

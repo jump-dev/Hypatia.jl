@@ -183,8 +183,8 @@ shapeconregr14_JuMP() = shapeconregr_JuMP(5, 5, 1000, x -> exp(norm(x)), use_wso
 shapeconregr15_JuMP() = shapeconregr_JuMP(2, 3, 100, x -> exp(norm(x)), use_lsq_obj = false, use_wsos = false)
 
 function test_shapeconregr_JuMP(instance::Tuple{Function,Number}; options)
-    (builder, true_obj) = instance
-    data = builder()
+    (instance, true_obj) = instance
+    data = instance()
     JuMP.optimize!(data.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
     @test JuMP.termination_status(data.model) == MOI.OPTIMAL
     @test JuMP.objective_value(data.model) ≈ true_obj atol = 1e-4 rtol = 1e-4
