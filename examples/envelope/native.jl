@@ -31,8 +31,8 @@ function envelope(
     (U, pts, P0, PWts, w) = MU.interpolate(domain, env_halfdeg, sample = false, calc_w = true)
 
     # generate random data
-    LDegs = binomial(n + rand_halfdeg, n)
-    c_or_h = vec(P0[:, 1:LDegs] * rand(-9:9, LDegs, npoly))
+    L = binomial(n + rand_halfdeg, n)
+    c_or_h = vec(P0[:, 1:L] * rand(-9:9, L, npoly))
 
     subI = use_dense ? Array(1.0I, U, U) : sparse(1.0I, U, U)
     if primal_wsos
