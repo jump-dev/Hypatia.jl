@@ -55,6 +55,7 @@ function densityestJuMP(
         for i in 1:nobs, j in 1:U
             basis_evals[i, j] = lagrange_polys[j](X[i, :])
         end
+
         JuMP.@variable(model, f[1:U])
         JuMP.@constraints(model, begin
             dot(w, f) == 1.0 # integrate to 1

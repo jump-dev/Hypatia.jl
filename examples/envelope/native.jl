@@ -54,26 +54,26 @@ function envelope(
     cones = [CO.WSOSPolyInterp(U, [P0, PWts...], !primal_wsos) for k in 1:npoly]
     cone_idxs = [(1 + (k - 1) * U):(k * U) for k in 1:npoly]
 
-    return (model = (c, A, b, G, h, cones, cone_idxs),)
+    return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs)
 end
 
 envelope1(; primal_wsos::Bool = true, use_dense::Bool = true) = envelope(2, 5, 2, 6, primal_wsos = primal_wsos, use_dense = use_dense)
 envelope2(; primal_wsos::Bool = true, use_dense::Bool = true) = envelope(3, 5, 3, 5, primal_wsos = primal_wsos, use_dense = use_dense)
 envelope3(; primal_wsos::Bool = true, use_dense::Bool = true) = envelope(2, 30, 1, 30, primal_wsos = primal_wsos, use_dense = use_dense)
 
-function test_envelope(instance::Function; rseed::Int = 1)
+function test_envelope(instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
-    ((c, A, b, G, h, cones, cone_idxs),) = instance()
-    model = MO.PreprocessedLinearModel(c, A, b, G, h, cones, cone_idxs)
-    solver = SO.HSDSolver(model, verbose = true)
+    d = instance()
+    model = MO.PreprocessedLinearModel(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
+    solver = SO.HSDSolver(model; options...)
     SO.solve(solver)
     r = SO.test_certificates(solver, model, atol = 1e-4, rtol = 1e-4)
     @test r.status == :Optimal
     return
 end
 
-test_envelope() = test_envelope.([
+test_envelope(; options...) = test_envelope.([
     envelope1,
     envelope2,
     envelope3,
-    ])
+    ], options = options)
