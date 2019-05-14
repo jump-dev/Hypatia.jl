@@ -37,7 +37,8 @@ function cancer_data()
     return (X, n)
 end
 
-function run_hard_densityest()
+function run_hard_densityest(; rseed::Int = 1)
+    Random.seed!(rseed)
     degrees = 4:2:6
 
     datasets = [
