@@ -8,16 +8,14 @@ D. Papp and S. Yildiz. Sum-of-squares optimization without semidefinite programm
 available at https://arxiv.org/abs/1712.01792
 =#
 
+using LinearAlgebra
+using SparseArrays
+import Random
+using Test
 import Hypatia
 const HYP = Hypatia
 const CO = HYP.Cones
 const MU = HYP.ModelUtilities
-
-using LinearAlgebra
-using SparseArrays
-using DelimitedFiles
-import Random
-using Test
 
 function envelope(
     npoly::Int,
@@ -25,25 +23,16 @@ function envelope(
     n::Int,
     d::Int;
     primal_wsos::Bool = true,
-    use_data::Bool = false,
     use_dense::Bool = false,
-    rseed::Int = 1,
     )
-    Random.seed!(rseed)
-
     # generate interpolation
     @assert deg <= d
     domain = MU.Box(-ones(n), ones(n))
     (U, pts, P0, PWts, w) = MU.interpolate(domain, d, sample = false, calc_w = true)
 
-    if use_data
-        # use provided data in data folder
-        c_or_h = vec(readdlm(joinpath(@__DIR__, "data/c$(npoly * U).txt"), ',', Float64))
-    else
-        # generate random data
-        LDegs = binomial(n + deg, n)
-        c_or_h = vec(P0[:, 1:LDegs] * rand(-9:9, LDegs, npoly))
-    end
+    # generate random data
+    LDegs = binomial(n + deg, n)
+    c_or_h = vec(P0[:, 1:LDegs] * rand(-9:9, LDegs, npoly))
 
     subI = use_dense ? Array(1.0I, U, U) : sparse(1.0I, U, U)
     if primal_wsos
@@ -68,19 +57,18 @@ function envelope(
     return (model = (c, A, b, G, h, cones, cone_idxs),)
 end
 
-envelope1(; primal_wsos::Bool = true, use_dense::Bool = true) = envelope(2, 5, 1, 5, use_data = true, primal_wsos = primal_wsos, use_dense = use_dense) # uses fixed data in folder
-envelope2(; primal_wsos::Bool = true, use_dense::Bool = true) = envelope(2, 5, 2, 6, primal_wsos = primal_wsos, use_dense = use_dense)
-envelope3(; primal_wsos::Bool = true, use_dense::Bool = true) = envelope(3, 5, 3, 5, primal_wsos = primal_wsos, use_dense = use_dense)
-envelope4(; primal_wsos::Bool = true, use_dense::Bool = true) = envelope(2, 30, 1, 30, primal_wsos = primal_wsos, use_dense = use_dense)
+envelope1(; primal_wsos::Bool = true, use_dense::Bool = true) = envelope(2, 5, 2, 6, primal_wsos = primal_wsos, use_dense = use_dense)
+envelope2(; primal_wsos::Bool = true, use_dense::Bool = true) = envelope(3, 5, 3, 5, primal_wsos = primal_wsos, use_dense = use_dense)
+envelope3(; primal_wsos::Bool = true, use_dense::Bool = true) = envelope(2, 30, 1, 30, primal_wsos = primal_wsos, use_dense = use_dense)
 
-function test_envelope(instance::Function)
+function test_envelope(instance::Function; rseed::Int = 1)
+    Random.seed!(rseed)
     ((c, A, b, G, h, cones, cone_idxs),) = instance()
     model = MO.PreprocessedLinearModel(c, A, b, G, h, cones, cone_idxs)
     solver = SO.HSDSolver(model, verbose = true)
     SO.solve(solver)
     r = SO.test_certificates(solver, model, atol = 1e-4, rtol = 1e-4)
     @test r.status == :Optimal
-
     return
 end
 
@@ -88,5 +76,4 @@ test_envelope() = test_envelope.([
     envelope1,
     envelope2,
     envelope3,
-    envelope4,
     ])
