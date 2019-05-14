@@ -75,8 +75,8 @@ end
 densityest1_JuMP() = densityest_JuMP(200, 1, 4, use_monomials = false)
 densityest2_JuMP() = densityest_JuMP(200, 1, 4, use_monomials = true)
 
-function test_densityest_JuMP(builder::Function; options)
-    data = builder()
+function test_densityest_JuMP(instance::Function; options)
+    data = instance()
     JuMP.optimize!(data.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
     @test JuMP.termination_status(data.model) == MOI.OPTIMAL
     return

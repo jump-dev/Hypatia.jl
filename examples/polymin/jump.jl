@@ -5,19 +5,17 @@ see description in examples/polymin/native.jl
 =#
 
 import Random
+using LinearAlgebra
 using Test
 import MathOptInterface
 const MOI = MathOptInterface
 import JuMP
-import DynamicPolynomials
-import SemialgebraicSets
-import PolyJuMP
 import SumOfSquares
 import Hypatia
 const HYP = Hypatia
 const MU = HYP.ModelUtilities
 
-include("data.jl")
+include(joinpath(@__DIR__, "data.jl"))
 
 function polymin_JuMP(
     polyname::Symbol,
@@ -29,30 +27,27 @@ function polymin_JuMP(
     )
     (x, f, dom, true_obj) = getpolydata(polyname)
 
-    model = JuMP.Model()
-
     if use_wsos
         Random.seed!(rseed)
         (U, pts, P0, PWts, _) = MU.interpolate(dom, d, sample = sample, sample_factor = 100)
-
         cone = HYP.WSOSPolyInterpCone(U, [P0, PWts...], !primal_wsos)
-        coefs = [f(x => pts[j, :]) for j in 1:U]
+        interp_vals = [f(x => pts[j, :]) for j in 1:U]
 
+        model = JuMP.Model()
         if primal_wsos
             JuMP.@variable(model, a)
             JuMP.@objective(model, Max, a)
-            JuMP.@constraint(model, coefs .- a in cone)
+            JuMP.@constraint(model, interp_vals .- a in cone)
         else
             JuMP.@variable(model, μ[1:U])
-            JuMP.@objective(model, Min, sum(μ[j] * coefs[j] for j in 1:U))
+            JuMP.@objective(model, Min, dot(μ, interp_vals))
             JuMP.@constraint(model, sum(μ) == 1.0) # TODO can remove this constraint and a variable
             JuMP.@constraint(model, μ in cone)
         end
     else
-        PolyJuMP.setpolymodule!(model, SumOfSquares)
+        model = SumOfSquares.SOSModel()
         JuMP.@variable(model, a)
         JuMP.@objective(model, Max, a)
-
         bss = MU.get_domain_inequalities(dom, x)
         JuMP.@constraint(model, f >= a, domain = bss, maxdegree = 2d)
     end
@@ -77,10 +72,10 @@ polymin14_JuMP() = polymin_JuMP(:motzkin, 3, use_wsos = false)
 polymin15_JuMP() = polymin_JuMP(:motzkin, 3, primal_wsos = true)
 # TODO add more from dictionary and more with different options combinations
 
-function test_polymin_JuMP(builder::Function; options)
-    data = builder()
-    JuMP.optimize!(data.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
-    @test JuMP.objective_value(data.model) ≈ data.true_obj atol = 1e-4 rtol = 1e-4
+function test_polymin_JuMP(instance::Function; options)
+    d = instance()
+    JuMP.optimize!(d.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
+    @test JuMP.objective_value(d.model) ≈ d.true_obj atol = 1e-4 rtol = 1e-4
     return
 end
 

@@ -22,8 +22,7 @@ examples_dir = joinpath(@__DIR__, "../examples")
 
 include(joinpath(examples_dir, "envelope/native.jl"))
 include(joinpath(examples_dir, "linearopt/native.jl"))
-include(joinpath(examples_dir, "polymin/real.jl"))
-include(joinpath(examples_dir, "polymin/complex.jl"))
+include(joinpath(examples_dir, "polymin/native.jl"))
 
 include(joinpath(@__DIR__, "native.jl"))
 
@@ -142,7 +141,6 @@ include(joinpath(examples_dir, "contraction/jump.jl"))
     test_envelope()
     test_linearopt()
     test_polymin()
-    test_polymincomplex()
 end
 
 # @info("starting MathOptInterface tests")

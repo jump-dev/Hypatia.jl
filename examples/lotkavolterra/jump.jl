@@ -84,8 +84,8 @@ end
 
 lotkavolterra1_JuMP() = lotkavolterra_JuMP()
 
-function test_lotkavolterra_JuMP(builder::Function; options)
-    data = builder()
+function test_lotkavolterra_JuMP(instance::Function; options)
+    data = instance()
     JuMP.optimize!(data.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
     @test JuMP.termination_status(data.model) == MOI.OPTIMAL
     return
