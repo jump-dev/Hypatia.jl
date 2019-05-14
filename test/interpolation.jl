@@ -6,13 +6,13 @@ import DynamicPolynomials
 function fekete_sample()
     Random.seed!(1)
     n = 3
-    d = 2
+    halfdeg = 2
     box = MU.Box(-ones(n), ones(n))
     free = MU.FreeDomain(n)
 
     for sample in (true, false)
-        (box_U, box_pts, box_P0, box_PWts, _) = MU.interpolate(box, d, sample = sample, sample_factor = 20)
-        (free_U, free_pts, free_P0, free_PWts, _) = MU.interpolate(free, d, sample = sample, sample_factor = 20)
+        (box_U, box_pts, box_P0, box_PWts, _) = MU.interpolate(box, halfdeg, sample = sample, sample_factor = 20)
+        (free_U, free_pts, free_P0, free_PWts, _) = MU.interpolate(free, halfdeg, sample = sample, sample_factor = 20)
         @test isempty(free_PWts)
         @test box_U == free_U
         @test size(box_pts) == size(free_pts)
@@ -54,11 +54,11 @@ function test_recover_lagrange_polys()
     end
 
     for n in 1:3, sample in [true, false]
-        d = 2
-        (U, pts, P0, PWts, w) = MU.interpolate(MU.FreeDomain(n), d, sample = sample, calc_w = true)
+        halfdeg = 2
+        (U, pts, P0, PWts, w) = MU.interpolate(MU.FreeDomain(n), halfdeg, sample = sample, calc_w = true)
         DynamicPolynomials.@polyvar x[1:n]
-        monos = DynamicPolynomials.monomials(x, 0:(2 * d))
-        lagrange_polys = MU.recover_lagrange_polys(pts, 2 * d)
+        monos = DynamicPolynomials.monomials(x, 0:(2 * halfdeg))
+        lagrange_polys = MU.recover_lagrange_polys(pts, 2 * halfdeg)
 
         @test sum(lagrange_polys) ≈ 1.0
         @test sum(w[i] * lagrange_polys[j](pts[i, :]) for j in 1:U, i in 1:U) ≈ sum(w)
@@ -68,8 +68,8 @@ end
 
 function test_recover_cheb_polys()
     DynamicPolynomials.@polyvar x[1:2]
-    d = 2
-    monos = DynamicPolynomials.monomials(x, 0:d)
-    cheb_polys = MU.get_chebyshev_polys(x, d)
+    halfdeg = 2
+    monos = DynamicPolynomials.monomials(x, 0:halfdeg)
+    cheb_polys = MU.get_chebyshev_polys(x, halfdeg)
     @test cheb_polys == [1; x[1]; x[2]; 2x[1]^2 - 1; x[1] * x[2]; 2x[2]^2 - 1]
 end

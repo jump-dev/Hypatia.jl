@@ -131,8 +131,8 @@ function test_semidefinite_barrier()
 end
 
 function test_wsospolyinterp_2_barrier()
-    for n in 1:3, d in 1:3
-        (U, _, P0, _, _) = MU.interpolate(MU.FreeDomain(n), d, sample = false)
+    for n in 1:3, halfdeg in 1:3
+        (U, _, P0, _, _) = MU.interpolate(MU.FreeDomain(n), halfdeg, sample = false)
         Ps = [P0]
         gs = [ones(U)]
         cone = CO.WSOSPolyInterp_2(U, Ps, gs, true)
@@ -142,8 +142,8 @@ function test_wsospolyinterp_2_barrier()
 end
 
 function test_wsospolyinterp_barrier()
-    for n in 1:3, d in 1:3
-        (U, _, P0, _, _) = MU.interpolate(MU.FreeDomain(n), d, sample = false)
+    for n in 1:3, halfdeg in 1:3
+        (U, _, P0, _, _) = MU.interpolate(MU.FreeDomain(n), halfdeg, sample = false)
         cone = CO.WSOSPolyInterp(U, [P0], true)
         pass_through_cone(cone, 1)
     end
@@ -151,8 +151,8 @@ function test_wsospolyinterp_barrier()
 end
 
 function test_wsospolyinterpmat_barrier()
-    for n in 1:3, d in 1:3, R in 1:3
-        (U, _, P0, _, _) = MU.interpolate(MU.FreeDomain(n), d, sample = false)
+    for n in 1:3, halfdeg in 1:3, R in 1:3
+        (U, _, P0, _, _) = MU.interpolate(MU.FreeDomain(n), halfdeg, sample = false)
         cone = CO.WSOSPolyInterpMat(R, U, [P0], true)
         pass_through_cone(cone, 1)
     end
@@ -160,8 +160,8 @@ function test_wsospolyinterpmat_barrier()
 end
 
 function test_wsospolyinterpsoc_barrier()
-    for n in 1:2, d in 1:2, R in 3:3
-        (U, _, P0, _, _) = MU.interpolate(MU.FreeDomain(n), d, sample = false)
+    for n in 1:2, halfdeg in 1:2, R in 3:3
+        (U, _, P0, _, _) = MU.interpolate(MU.FreeDomain(n), halfdeg, sample = false)
         cone = CO.WSOSPolyInterpSOC(R, U, [P0], true)
         pass_through_cone(cone, 10)
     end
