@@ -29,7 +29,7 @@ function muconvexityJuMP(
     n = MU.get_dimension(dom)
     DP.@polyvar x[1:n]
     poly = polyfun(x)
-    
+
     model = JuMP.Model()
     JuMP.@variable(model, mu)
     JuMP.@objective(model, Max, mu)
@@ -69,9 +69,9 @@ muconvexityJuMP8() = muconvexityJuMP(x -> sum(x.^4) - sum(x.^2), MU.Ball([5.0, 5
 function test_muconvexityJuMP(instance::Tuple{Function,Number}; options, rseed::Int = 1)
     Random.seed!(rseed)
     (instance, true_mu) = instance
-    data = instance()
-    JuMP.optimize!(data.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
-    @test JuMP.value(data.mu) ≈ true_mu atol = 1e-4 rtol = 1e-4
+    d = instance()
+    JuMP.optimize!(d.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
+    @test JuMP.value(d.mu) ≈ true_mu atol = 1e-4 rtol = 1e-4
 end
 
 test_muconvexityJuMP(; options...) = test_muconvexityJuMP.([
