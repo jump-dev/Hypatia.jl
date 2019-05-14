@@ -11,21 +11,21 @@ include(joinpath(@__DIR__(), "JuMP.jl"))
 # Example 1 from https://arxiv.org/pdf/1509.08165v1.pdf
 function normfunction_data(; n::Int = 5, num_points::Int = 100)
     f = x -> sum(abs2, x)
-    (X, y) = generate_regr_data(f, -1.0, 1.0, n, num_points, signal_ratio = 9.0)
+    (X, y) = generate_regr_data(n, num_points, f, xmin = -1.0, xmax = 1.0,  signal_ratio = 9.0)
     return (X, y, n)
 end
 
 # Example 5 from https://arxiv.org/pdf/1509.08165v1.pdf
 function customfunction_data(; n::Int = 5, num_points::Int = 100)
     f = x -> (5x[1] + 0.5x[2] + x[3])^2 + sqrt(x[4]^2 + x[5]^2)
-    (X, y) = generate_regr_data(f, -1.0, 1.0, n, num_points, signal_ratio = 9.0)
+    (X, y) = generate_regr_data(n, num_points, f, xmin = -1.0, xmax = 1.0,  signal_ratio = 9.0)
     return (X, y, n)
 end
 
 # Example 3 from https://arxiv.org/pdf/1509.08165v1.pdf
 function production_data()
-    df = CSV.read(joinpath(@__DIR__, "data", "naics5811.csv"))
-    deleterows!(df, 157) # outlier
+    df = readtable(joinpath(@__DIR__, "data", "naics5811.csv"))
+    deleterows!(df, 157:157) # outlier
     # number of non production employees
     df[:prode] .= df[:emp] - df[:prode]
     # group by industry codes
@@ -56,7 +56,17 @@ function run_hard_shapeconregr()
         ]
 
     for d in degrees, s in datasets
-        model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer,
+
+        println()
+        @show d
+        @show s
+        println()
+
+        (X, y, n) = s()
+
+        (model,) = shapeconregrJuMP(X, y, n, d, mono_dom = MU.FreeDomain(n), mono_profile = zeros(Int, n), conv_profile = 1)
+
+        (val, runtime, bytes, gctime, memallocs) = @timed JuMP.optimize!(model, JuMP.with_optimizer(HYP.Optimizer,
             use_dense = true,
             verbose = true,
             system_solver = SO.QRCholCombinedHSDSystemSolver,
@@ -67,17 +77,6 @@ function run_hard_shapeconregr()
             tol_abs_opt = 1e-6,
             tol_feas = 1e-6,
             ))
-
-        println()
-        @show d
-        @show s
-        println()
-
-        (X, y, n) = s()
-        shape_data = ShapeData(MU.FreeDomain(n), MU.FreeDomain(n), zeros(n), 1)
-        build_shapeconregr_WSOS(model, X, y, d, shape_data)
-
-        (val, runtime, bytes, gctime, memallocs) = @timed JuMP.optimize!(model)
 
         println()
         @show runtime
