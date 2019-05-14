@@ -55,16 +55,16 @@ function run_hard_shapeconregr()
         normfunction_data,
         ]
 
-    for d in degrees, s in datasets
+    for deg in degrees, s in datasets
 
         println()
-        @show d
+        @show deg
         @show s
         println()
 
         (X, y, n) = s()
 
-        (model,) = shapeconregrJuMP(X, y, n, d, mono_dom = MU.FreeDomain(n), mono_profile = zeros(Int, n), conv_profile = 1)
+        (model,) = shapeconregrJuMP(X, y, n, deg, mono_dom = MU.FreeDomain(n), mono_profile = zeros(Int, n), conv_profile = 1)
 
         (val, runtime, bytes, gctime, memallocs) = @timed JuMP.optimize!(model, JuMP.with_optimizer(HYP.Optimizer,
             use_dense = true,
