@@ -27,8 +27,8 @@ function envelopeJuMP(
 
     # generate random polynomials
     n = MU.get_dimension(domain)
-    LDegs = binomial(n + rand_halfdeg, n)
-    polys = P0[:, 1:LDegs] * rand(-9:9, LDegs, npoly)
+    L = binomial(n + rand_halfdeg, n)
+    polys = P0[:, 1:L] * rand(-9:9, L, npoly)
 
     model = JuMP.Model()
     JuMP.@variable(model, fpv[j in 1:U]) # values at Fekete points

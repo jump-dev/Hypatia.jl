@@ -37,7 +37,7 @@ integrate_ball(p, n) = sum(DP.coefficient(t) * integrate_ball_monomial(t, n) for
 
 function lotkavolterraJuMP()
     # parameters
-    d = 4 # degree
+    deg = 4 # degree
     n = 4 # number of species
     m = 2 * n # number of control inputs (u)
     Q = 0.475
@@ -47,7 +47,7 @@ function lotkavolterraJuMP()
     r = [1.0, 0.6, 0.4, 0.2] # growth rate of species
 
     DP.@polyvar x_h[1:n]
-    x_mon = DP.monomials(x_h, 0:d)
+    x_mon = DP.monomials(x_h, 0:deg)
     x_o = x_h * Q .+ q
     A = [1.0 0.3 0.4 0.2; -0.2 1.0 0.4 -0.1; -0.1 -0.2 1.0 0.3; -0.1 -0.2 -0.3 1.0]
     M = (sum(abs, l_u) + sum(l_u)) / 2.0 + l_x
