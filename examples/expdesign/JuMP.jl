@@ -36,7 +36,7 @@ function expdesignJuMP(
     Q = V * diagm(np) * V' # information matrix
     JuMP.@constraint(model, vcat(hypo, 1.0, [Q[i, j] for i in 1:q for j in 1:i]) in MOI.LogDetConeTriangle(q)) # hypograph of logdet of information matrix
 
-    return (model = model, n = n, nmax = nmax, V = V, np = np)
+    return (model = model,)
 end
 
 expdesignJuMP1() = expdesignJuMP(25, 75, 125, 5) # large
@@ -47,13 +47,9 @@ expdesignJuMP5() = expdesignJuMP(3, 5, 7, 2) # miniscule
 
 function test_expdesignJuMP(instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
-    data = instance()
-    JuMP.optimize!(data.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
-    @test JuMP.termination_status(data.model) == MOI.OPTIMAL
-    npval = JuMP.value.(data.np)
-    @test JuMP.objective_value(data.model) ≈ logdet(Symmetric(data.V * Diagonal(npval) * data.V')) atol = 1e-4 rtol = 1e-4
-    @test sum(npval) ≈ data.n atol = 1e-4 rtol = 1e-4
-    @test all(-1e-4 .<= npval .<= data.nmax + 1e-4)
+    d = instance()
+    JuMP.optimize!(d.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
+    @test JuMP.termination_status(d.model) == MOI.OPTIMAL
     return
 end
 

@@ -75,9 +75,9 @@ regionofattrJuMP2() = regionofattrJuMP(4, use_WSOS = false)
 
 function test_regionofattrJuMP(instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
-    data = instance()
-    JuMP.optimize!(data.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
-    @test JuMP.termination_status(data.model) == MOI.OPTIMAL
+    d = instance()
+    JuMP.optimize!(d.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
+    @test JuMP.termination_status(d.model) == MOI.OPTIMAL
     return
 end
 
