@@ -18,12 +18,12 @@ const MU = HYP.ModelUtilities
 function linearopt(
     m::Int,
     n::Int;
-    use_data::Bool = false,
-    use_dense::Bool = true,
-    nzfrac::Float64 = inv(sqrt(n)),
+    nzfrac::Float64 = 1.0,
     )
     # generate random data
-    A = use_dense ? rand(-9.0:9.0, m, n) : 10.0 .* sprandn(m, n, nzfrac)
+    @assert 0 < nzfrac <= 1.0
+    # A matrix is sparse iff nzfrac ∈ [0, 1)
+    A = (nzfrac == 1.0) ? rand(-9.0:9.0, m, n) : 10.0 .* sprandn(m, n, nzfrac)
     b = A * ones(n)
     c = rand(0.0:9.0, n)
     G = Diagonal(-1.0I, n) # TODO uniformscaling
@@ -33,10 +33,10 @@ function linearopt(
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs)
 end
 
-linearopt1() = linearopt(500, 1000, use_dense = true)
-linearopt2() = linearopt(15, 20, use_dense = true)
-linearopt3() = linearopt(500, 1000, use_dense = false)
-linearopt4() = linearopt(15, 20, use_dense = false)
+linearopt1() = linearopt(500, 1000)
+linearopt2() = linearopt(15, 20)
+linearopt3() = linearopt(500, 1000, nzfrac = 1/30)
+linearopt4() = linearopt(15, 20, nzfrac = 1/4)
 
 function test_linearopt(instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)

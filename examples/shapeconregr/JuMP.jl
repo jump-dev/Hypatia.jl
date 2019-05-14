@@ -16,6 +16,8 @@ import LinearAlgebra: norm
 import Random
 import Distributions
 using Test
+import DataFrames
+import CSV
 import DynamicPolynomials
 const DP = DynamicPolynomials
 import SumOfSquares
@@ -29,38 +31,6 @@ const HYP = Hypatia
 const MU = HYP.ModelUtilities
 
 const rt2 = sqrt(2)
-
-function generate_regr_data(
-    n::Int,
-    num_points::Int,
-    f::Function,
-    signal_ratio::Float64,
-    xmin::Float64,
-    xmax::Float64,
-    )
-    X = rand(Distributions.Uniform(xmin, xmax), num_points, n)
-    y = [f(X[p, :]) for p in 1:num_points]
-    if !iszero(signal_ratio)
-        noise = rand(Distributions.Normal(), num_points)
-        noise .*= norm(y) / sqrt(signal_ratio) / norm(noise)
-        y .+= noise
-    end
-    return (X, y)
-end
-
-function shapeconregrJuMP(
-    n::Int,
-    deg::Int,
-    num_points::Int,
-    f::Function;
-    signal_ratio::Float64 = 0.0,
-    xmin::Float64 = -1.0,
-    xmax::Float64 = 1.0,
-    model_kwargs...
-    )
-    (X, y) = generate_regr_data(n, num_points, f, signal_ratio, xmin, xmax)
-    return shapeconregrJuMP(X, y, n, deg; model_kwargs...)
-end
 
 function shapeconregrJuMP(
     X::AbstractMatrix{Float64},
@@ -158,6 +128,78 @@ function shapeconregrJuMP(
     return (model = model,)
 end
 
+function shapeconregrJuMP(
+    n::Int,
+    deg::Int,
+    num_points::Int,
+    f::Function;
+    signal_ratio::Float64 = 0.0,
+    xmin::Float64 = -1.0,
+    xmax::Float64 = 1.0,
+    model_kwargs...
+    )
+    X = rand(Distributions.Uniform(xmin, xmax), num_points, n)
+    y = [f(X[p, :]) for p in 1:num_points]
+
+    if !iszero(signal_ratio)
+        noise = rand(Distributions.Normal(), num_points)
+        noise .*= norm(y) / sqrt(signal_ratio) / norm(noise)
+        y .+= noise
+    end
+
+    return shapeconregrJuMP(X, y, n, deg; model_kwargs...)
+end
+
+
+
+
+# see https://arxiv.org/pdf/1509.08165v1.pdf (example 1)
+function normfunction_data(; n::Int = 5, num_points::Int = 100)
+    f = x -> sum(abs2, x)
+    (X, y) = generate_regr_data(n, num_points, f, 9.0, -1.0, 1.0)
+    return (X, y, n)
+end
+
+# see https://arxiv.org/pdf/1509.08165v1.pdf (example 5)
+function customfunction_data(; n::Int = 5, num_points::Int = 100)
+    f = x -> (5x[1] + 0.5x[2] + x[3])^2 + sqrt(x[4]^2 + x[5]^2)
+    (X, y) = generate_regr_data(n, num_points, f, 9.0, -1.0, 1.0)
+    return (X, y, n)
+end
+
+# see https://arxiv.org/pdf/1509.08165v1.pdf (example 3)
+# data obtained from http://www.nber.org/data/nbprod2005.html
+function production_data()
+    df = CSV.read(joinpath(@__DIR__, "data", "naics5811.csv"), copycols = true)
+    deleterows!(df, 157) # outlier
+    # number of non production employees
+    df[:prode] .= df[:emp] - df[:prode]
+    # group by industry codes
+    dfagg = aggregate(dropmissing(df), :naics, sum)
+    # four covariates: non production employees, production worker hours, production workers, total capital stock
+    n = 4
+    X = convert(Matrix, dfagg[[:prode_sum, :prodh_sum, :prodw_sum, :cap_sum]])
+    # value of shipment
+    y = convert(Array, dfagg[:vship_sum])
+    # use the log transform of covariates
+    Xlog = log.(X)
+    # mean center
+    Xlog .-= sum(Xlog, dims = 1) / size(Xlog, 1)
+    y .-= sum(y) / length(y)
+    # normalize to unit norm
+    Xlog ./= sqrt.(sum(abs2, Xlog, dims = 1))
+    y /= sqrt(sum(abs2, y))
+    return (Xlog, y, n)
+end
+
+        (X, y, n) = s()
+
+        (model,) = shapeconregrJuMP(X, y, n, deg, mono_dom = MU.FreeDomain(n), mono_profile = zeros(Int, n), conv_profile = 1)
+
+
+
+
+
 shapeconregrJuMP1() = shapeconregrJuMP(2, 3, 100, x -> exp(norm(x)), use_lsq_obj = false)
 shapeconregrJuMP2() = shapeconregrJuMP(2, 3, 100, x -> sum(x.^3), use_lsq_obj = false)
 shapeconregrJuMP3() = shapeconregrJuMP(2, 3, 100, x -> sum(x.^4), use_lsq_obj = false)
@@ -184,6 +226,7 @@ function test_shapeconregrJuMP(instance::Tuple{Function, Number}; options, rseed
     return
 end
 
+# TODO remove the unknown objective values (try to instead compare objvals from pairs of formulations)
 test_shapeconregrJuMP(; options...) = test_shapeconregrJuMP.([
     (shapeconregrJuMP1, 4.4065e-1),
     (shapeconregrJuMP2, 1.3971e-1),
