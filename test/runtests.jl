@@ -35,6 +35,7 @@ include(joinpath(examples_dir, "shapeconregr/JuMP.jl"))
 include(joinpath(examples_dir, "densityest/JuMP.jl"))
 include(joinpath(examples_dir, "regionofattr/JuMP.jl"))
 include(joinpath(examples_dir, "contraction/JuMP.jl"))
+# TODO some below were renamed or deleted
 # include(joinpath(examples_dir, "wsosmatrix/sosmatrix.jl"))
 # include(joinpath(examples_dir, "wsosmatrix/muconvexity.jl"))
 # include(joinpath(examples_dir, "wsosmatrix/sosmat1.jl"))

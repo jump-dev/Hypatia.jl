@@ -3,26 +3,25 @@ Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 
 test whether a given matrix has a SOS decomposition,
 and use this procedure to check whether a polynomial is globally convex
+
+TODO probably merge with muconvexity, and pull muconvexity out into its own example
 =#
 
-import Hypatia
-const HYP = Hypatia
-const CO = HYP.Cones
-const MU = HYP.ModelUtilities
-
+using Test
+import Random
 import MathOptInterface
 const MOI = MathOptInterface
 import JuMP
-import MultivariatePolynomials
 import DynamicPolynomials
 import SumOfSquares
 import PolyJuMP
-using Test
-import Random
+import Hypatia
+const HYP = Hypatia
+const MU = HYP.ModelUtilities
 
 const rt2 = sqrt(2)
 
-function sosmatrix_JuMP(x::Vector{PolyVar{true}}, H::Array{Polynomial{true,Int64},2}; use_wsos::Bool = true)
+function convexityJuMP(x::Vector{PolyVar{true}}, H::Array{Polynomial{true,Int64},2}; use_wsos::Bool = true)
     model = JuMP.model()
     if use_wsos
         n = DynamicPolynomials.nvariables(x)
@@ -38,31 +37,31 @@ function sosmatrix_JuMP(x::Vector{PolyVar{true}}, H::Array{Polynomial{true,Int64
     return (model = model,)
 end
 
-function sosmatrix_JuMP(x::Vector{PolyVar{true}}, poly::Polynomial{true,Int64}; use_wsos::Bool = true)
-    return sosmatrix_JuMP(x, DynamicPolynomials.differentiate(poly, x, 2), use_wsos = use_wsos)
+function convexityJuMP(x::Vector{PolyVar{true}}, poly::Polynomial{true,Int64}; use_wsos::Bool = true)
+    return convexityJuMP(x, DynamicPolynomials.differentiate(poly, x, 2), use_wsos = use_wsos)
 end
 
 
-function sosmatrix_JuMP1()
+function convexityJuMP1()
     DynamicPolynomials.@polyvar x[1:1]
     M = [(x[1] + 2x[1]^3) 1; (-x[1]^2 + 2) (3x[1]^2 - x[1] + 1)]
     MM = M' * M
-    return sosmatrix_JuMP(x, MM, use_wsos = true)
+    return convexityJuMP(x, MM, use_wsos = true)
 end
 
-function sosmatrix_JuMP2()
+function convexityJuMP2()
     DynamicPolynomials.@polyvar x[1:1]
     poly = x[1]^4 + 2x[1]^2
-    return sosmatrix_JuMP(x, poly, use_wsos = true)
+    return convexityJuMP(x, poly, use_wsos = true)
 end
 
-function sosmatrix_JuMP3()
+function convexityJuMP3()
     DynamicPolynomials.@polyvar x[1:2]
     poly = (x[1] + x[2])^4 + (x[1] + x[2])^2
-    return sosmatrix_JuMP(x, poly, use_wsos = true)
+    return convexityJuMP(x, poly, use_wsos = true)
 end
 
-function test_sosmatrix_JuMP(instance::Tuple{Function,Bool}, options)
+function test_convexityJuMP(instance::Tuple{Function,Bool}, options)
     (instance, is_SOS) = instance()
     JuMP.optimize!(data.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
     if is_SOS
@@ -72,10 +71,10 @@ function test_sosmatrix_JuMP(instance::Tuple{Function,Bool}, options)
     end
 end
 
-test_sosmatrix_JuMP(; options...) = test_sosmatrix_JuMP.([
-    sosmatrix_JuMP1,
-    sosmatrix_JuMP2,
-    sosmatrix_JuMP3,
+test_convexityJuMP(; options...) = test_convexityJuMP.([
+    convexityJuMP1,
+    convexityJuMP2,
+    convexityJuMP3,
     ], options = options)
 
 function run_JuMP_sosmatrix(
