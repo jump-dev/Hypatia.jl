@@ -33,13 +33,11 @@ const rt2 = sqrt(2)
 function generate_regr_data(
     n::Int,
     num_points::Int,
-    f::Function;
-    signal_ratio::Float64 = 0.0,
-    xmin::Float64 = -1.0,
-    xmax::Float64 = 1.0,
-    rseed::Int = 1,
+    f::Function,
+    signal_ratio::Float64,
+    xmin::Float64,
+    xmax::Float64,
     )
-    Random.seed!(rseed)
     X = rand(Distributions.Uniform(xmin, xmax), num_points, n)
     y = [f(X[p, :]) for p in 1:num_points]
     if !iszero(signal_ratio)
@@ -58,10 +56,9 @@ function shapeconregrJuMP(
     signal_ratio::Float64 = 0.0,
     xmin::Float64 = -1.0,
     xmax::Float64 = 1.0,
-    rseed::Int = 1,
     modeloptions...
     )
-    (X, y) = generate_regr_data(n, num_points, f, signal_ratio = signal_ratio, xmin = xmin, xmax = xmax, rseed = rseed)
+    (X, y) = generate_regr_data(n, num_points, f, signal_ratio, xmin, xmax)
     return shapeconregrJuMP(X, y, n, deg; modeloptions...)
 end
 
@@ -77,18 +74,15 @@ function shapeconregrJuMP(
     conv_profile::Int = 1,
     use_wsos::Bool = true,
     sample::Bool = true,
-    rseed::Int = 1,
     )
-    Random.seed!(rseed)
-    num_points = size(X, 1)
     @assert n == MU.get_dimension(mono_dom) == MU.get_dimension(conv_dom) == size(X, 2)
-
-    model = JuMP.Model()
+    num_points = size(X, 1)
 
     if use_wsos
         (regressor_points, _) = MU.get_interp_pts(MU.FreeDomain(n), deg, sample_factor = 50)
         lagrange_polys = MU.recover_lagrange_polys(regressor_points, deg)
 
+        model = JuMP.Model()
         JuMP.@variable(model, regressor, variable_type = PJ.Poly(PJ.FixedPolynomialBasis(lagrange_polys)))
 
         if use_lsq_obj
@@ -127,12 +121,11 @@ function shapeconregrJuMP(
                 for i in 1:n for j in 1:i for u in 1:conv_U] in conv_wsos_cone)
         end
     else
-        PJ.setpolymodule!(model, SumOfSquares)
-        d = div(deg + 1, 2)
-
         DP.@polyvar x[1:n]
 
+        model = SumOfSquares.SOSModel()
         JuMP.@variable(model, p, PJ.Poly(DP.monomials(x, 0:deg)))
+
         if use_lsq_obj
             JuMP.@variable(model, z)
             JuMP.@objective(model, Min, z / num_points)
@@ -182,7 +175,8 @@ shapeconregrJuMP13() = shapeconregrJuMP(2, 6, 100, x -> exp(norm(x)), signal_rat
 shapeconregrJuMP14() = shapeconregrJuMP(5, 5, 1000, x -> exp(norm(x)), use_wsos = false)
 shapeconregrJuMP15() = shapeconregrJuMP(2, 3, 100, x -> exp(norm(x)), use_lsq_obj = false, use_wsos = false)
 
-function test_shapeconregrJuMP(instance::Tuple{Function,Number}; options)
+function test_shapeconregrJuMP(instance::Tuple{Function, Number}; options, rseed::Int = 1)
+    Random.seed!(rseed)
     (instance, true_obj) = instance
     data = instance()
     JuMP.optimize!(data.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
