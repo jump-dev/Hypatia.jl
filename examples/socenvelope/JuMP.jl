@@ -1,10 +1,9 @@
 #=
 Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
-find a polynomial f such that f >= \sum_i g_i^2 where g_i are arbitrary polynomials, and the volumne under f is minimized
+find a polynomial f such that f² >= Σᵢ gᵢ² where gᵢ are arbitrary polynomials, and the volume under f is minimized
 
-# TODO add scalar formulation (model utilities code for sparse basis not in master)
-
+TODO add scalar formulation (model utilities code for sparse basis not in master)
 =#
 
 using LinearAlgebra
@@ -18,9 +17,7 @@ const HYP = Hypatia
 const MU = HYP.ModelUtilities
 
 function socenvelopeJuMP(n::Int, deg::Int, npolys::Int)
-    vec_length = npolys + 1
     dom = MU.FreeDomain(n)
-    DP.@polyvar x[1:n]
     halfdeg = div(deg + 1, 2)
     (U, pts, P0, _, w) = MU.interpolate(dom, halfdeg, sample = false, calc_w = true)
     lagrange_polys = MU.recover_lagrange_polys(pts, 2 * halfdeg)
@@ -34,7 +31,7 @@ function socenvelopeJuMP(n::Int, deg::Int, npolys::Int)
 
     fpoly = dot(f, lagrange_polys)
     rand_polys = [dot(polys[:, i], lagrange_polys) for i in 1:npolys]
-    cone = HYP.WSOSPolyInterpSOCCone(vec_length, U, [P0])
+    cone = HYP.WSOSPolyInterpSOCCone(npolys + 1, U, [P0])
     JuMP.@constraint(model, vcat(f, [polys[:, i] for i in 1:npolys]...) in cone)
 
     return (model = model,)

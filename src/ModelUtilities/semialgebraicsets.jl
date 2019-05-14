@@ -24,3 +24,5 @@ function get_domain_inequalities(dom::Box, x::DP.PolyVar{true})
     @assert get_dimension(dom) == 1
     return get_domain_inequalities(dom, [x])
 end
+
+get_domain_inequalities(dom::FreeDomain, x) = nothing
