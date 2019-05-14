@@ -25,16 +25,16 @@ const rt2 = sqrt(2)
 
 function contractionJuMP(
     beta::Float64,
-    deg_M::Int,
+    M_deg::Int,
     delta::Float64;
     use_wsos::Bool = true,
     )
     n = 2
     dom = MU.FreeDomain(n)
 
-    d_M = div(deg_M + 1, 2)
-    (U_M, pts_M, P0_M, _, _) = MU.interpolate(dom, d_M, sample = false)
-    lagrange_polys = MU.recover_lagrange_polys(pts_M, 2d_M)
+    M_halfdeg = div(M_deg + 1, 2)
+    (U_M, pts_M, P0_M, _, _) = MU.interpolate(dom, M_halfdeg, sample = false)
+    lagrange_polys = MU.recover_lagrange_polys(pts_M, 2 * M_halfdeg)
 
     polyjump_basis = PJ.FixedPolynomialBasis(lagrange_polys)
     x = DP.variables(lagrange_polys[1])

@@ -100,8 +100,8 @@ function shapeconregrJuMP(
 
         # monotonicity
         if !all(iszero, mono_profile)
-            gradient_d = div(deg, 2)
-            (mono_U, mono_points, mono_P0, mono_PWts, _) = MU.interpolate(mono_dom, gradient_d, sample = sample, sample_factor = 50)
+            gradient_halfdeg = div(deg, 2)
+            (mono_U, mono_points, mono_P0, mono_PWts, _) = MU.interpolate(mono_dom, gradient_halfdeg, sample = sample, sample_factor = 50)
             mono_wsos_cone = HYP.WSOSPolyInterpCone(mono_U, [mono_P0, mono_PWts...])
             for j in 1:n
                 if !iszero(mono_profile[j])
@@ -113,8 +113,8 @@ function shapeconregrJuMP(
 
         # convexity
         if !iszero(conv_profile)
-            hessian_d = div(deg - 1, 2)
-            (conv_U, conv_points, conv_P0, conv_PWts, _) = MU.interpolate(conv_dom, hessian_d, sample = sample, sample_factor = 50)
+            hessian_halfdeg = div(deg - 1, 2)
+            (conv_U, conv_points, conv_P0, conv_PWts, _) = MU.interpolate(conv_dom, hessian_halfdeg, sample = sample, sample_factor = 50)
             conv_wsos_cone = HYP.WSOSPolyInterpMatCone(n, conv_U, [conv_P0, conv_PWts...])
             hessian = DP.differentiate(regressor, DP.variables(regressor), 2)
             JuMP.@constraint(model, [conv_profile * hessian[i, j](conv_points[u, :]) * (i == j ? 1.0 : rt2) for i in 1:n for j in 1:i for u in 1:conv_U] in conv_wsos_cone)
@@ -143,7 +143,7 @@ function shapeconregrJuMP(
         for j in 1:n
             if !iszero(mono_profile[j])
                 gradient = DP.differentiate(p, x[j])
-                JuMP.@constraint(model, mono_profile[j] * gradient >= 0, domain = monotonic_set)
+                JuMP.@constraint(model, mono_profile[j] * gradient >= 0, domain = monotonic_set, maxdegree = 2 * div(deg, 2))
             end
         end
 
@@ -151,7 +151,7 @@ function shapeconregrJuMP(
         if !iszero(conv_profile)
             convex_set = MU.get_domain_inequalities(conv_dom, x)
             hessian = DP.differentiate(p, x, 2)
-            JuMP.@constraint(model, conv_profile * hessian in JuMP.PSDCone(), domain = convex_set)
+            JuMP.@constraint(model, conv_profile * hessian in JuMP.PSDCone(), domain = convex_set, maxdegree = 2 * div(deg - 1, 2))
         end
     end
 

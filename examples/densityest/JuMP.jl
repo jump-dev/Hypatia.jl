@@ -32,8 +32,8 @@ function densityestJuMP(
     X = rand(Distributions.Uniform(-1, 1), nobs, n)
     (nobs, dim) = size(X)
     domain = MU.Box(-ones(n), ones(n))
-    d = div(deg + 1, 2)
-    (U, pts, P0, PWts, w) = MU.interpolate(domain, d, sample = true, calc_w = true, sample_factor = sample_factor)
+    halfdeg = div(deg + 1, 2)
+    (U, pts, P0, PWts, w) = MU.interpolate(domain, halfdeg, sample = true, calc_w = true, sample_factor = sample_factor)
 
     model = JuMP.Model()
     JuMP.@variable(model, z[1:nobs])
@@ -42,7 +42,7 @@ function densityestJuMP(
     if use_monomials
         lagrange_polys = []
         DynamicPolynomials.@polyvar x[1:dim]
-        PX = DynamicPolynomials.monomials(x, 0:2d)
+        PX = DynamicPolynomials.monomials(x, 0:(2 * halfdeg))
 
         JuMP.@variable(model, f, PolyJuMP.Poly(PX))
         JuMP.@constraints(model, begin
@@ -51,7 +51,7 @@ function densityestJuMP(
             [i in 1:nobs], vcat(z[i], 1.0, f(X[i, :])) in MOI.ExponentialCone() # hypograph of log
         end)
     else
-        lagrange_polys = MU.recover_lagrange_polys(pts, 2d)
+        lagrange_polys = MU.recover_lagrange_polys(pts, 2 * halfdeg)
         basis_evals = Matrix{Float64}(undef, nobs, U)
         for i in 1:nobs, j in 1:U
             basis_evals[i, j] = lagrange_polys[j](X[i, :])
