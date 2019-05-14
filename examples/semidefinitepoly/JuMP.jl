@@ -66,26 +66,28 @@ function semidefinitepolyJuMP(x::Vector{DP.PolyVar{true}}, poly::DP.Polynomial; 
 end
 
 function semidefinitepolyJuMP1()
-    DynamicPolynomials.@polyvar x[1:1]
-    M = [(x[1] + 2x[1]^3) 1; (-x[1]^2 + 2) (3x[1]^2 - x[1] + 1)]
+    DynamicPolynomials.@polyvar x
+    M = [
+        (x + 2x^3)  1;
+        (-x^2 + 2)  (3x^2 - x + 1);
+        ]
     MM = M' * M
     return semidefinitepolyJuMP(x, MM, use_wsos = true)
 end
 
 function semidefinitepolyJuMP2()
-    DynamicPolynomials.@polyvar x[1:1]
-    poly = x[1]^4 + 2x[1]^2
+    DynamicPolynomials.@polyvar x
+    poly = x^4 + 2x^2
     return semidefinitepolyJuMP(x, poly, use_wsos = true)
 end
 
 function semidefinitepolyJuMP3()
-    DynamicPolynomials.@polyvar x[1:2]
-    poly = (x[1] + x[2])^4 + (x[1] + x[2])^2
-    return semidefinitepolyJuMP(x, poly, use_wsos = true)
+    DynamicPolynomials.@polyvar x y
+    poly = (x + y)^4 + (x + y)^2
+    return semidefinitepolyJuMP([x, y], poly, use_wsos = true)
 end
 
 function semidefinitepolyJuMP4()
-    Random.seed!(1234)
     n = 3
     m = 3
     d = 1
@@ -100,27 +102,30 @@ end
 # SOSTOOLS examples
 function semidefinitepolyJuMP5()
     DynamicPolynomials.@polyvar x
-    P = [(x^2 - 2x + 2) x; x x^2]
+    P = [
+        (x^2 - 2x + 2)  x;
+        x               x^2;
+        ]
     return semidefinitepolyJuMP([x], P, use_wsos = true)
 end
 
 function semidefinitepolyJuMP6()
     DynamicPolynomials.@polyvar x y z
     P = [
-        (x^2 + 2y^2) (-x * y) (-x * z);
-        (-x * y) (y^2 + 2z^2) (-y * z);
-        (-x * z) (-y * z) (z^2 + 2x^2);
-        ] .* (x * y * z)^0
-    return semidefinitepolyJuMP([x; y; z], P, use_wsos = true)
+        (x^2 + 2y^2)    (-x * y)        (-x * z);
+        (-x * y)        (y^2 + 2z^2)    (-y * z);
+        (-x * z)        (-y * z)        (z^2 + 2x^2);
+        ] .* (x * y * z)^0 # TODO the (x * y * z)^0 can be removed when https://github.com/JuliaOpt/SumOfSquares.jl/issues/106 is fixed
+    return semidefinitepolyJuMP([x, y, z], P, use_wsos = true)
 end
 
 function semidefinitepolyJuMP7()
-    DynamicPolynomials.@polyvar x1 x2 x3
+    DynamicPolynomials.@polyvar x y z
     P = [
-        (x1^4 + x1^2 * x2^2 + x1^2 * x3^2) (x1 * x2 * x3^2 - x1^3 * x2 - x1 * x2 * (x2^2 + 2 * x3^2));
-        (x1 * x2 * x3^2 - x1^3 * x2 - x1 * x2 * (x2^2 + 2 * x3^2)) (x1^2 * x2^2 + x2^2 * x3^2 + (x2^2 + 2 * x3^2)^2);
+        (x^4 + x^2 * y^2 + x^2 * z^2)                       (x * y * z^2 - x^3 * y - x * y * (y^2 + 2 * z^2));
+        (x * y * z^2 - x^3 * y - x * y * (y^2 + 2 * z^2))   (x^2 * y^2 + y^2 * z^2 + (y^2 + 2 * z^2)^2);
         ]
-    return semidefinitepolyJuMP([x1; x2; x3], P, use_wsos = true)
+    return semidefinitepolyJuMP([x, y, z], P, use_wsos = true)
 end
 
 function test_semidefinitepolyJuMP(instance::Tuple{Function,Bool}; options, rseed::Int = 1)
