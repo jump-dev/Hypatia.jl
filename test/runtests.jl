@@ -30,13 +30,15 @@ include(joinpath(@__DIR__, "MathOptInterface.jl"))
 include(joinpath(examples_dir, "envelope/JuMP.jl"))
 include(joinpath(examples_dir, "expdesign/JuMP.jl"))
 include(joinpath(examples_dir, "lotkavolterra/JuMP.jl"))
+include(joinpath(examples_dir, "muconvexity/JuMP.jl"))
 include(joinpath(examples_dir, "polymin/JuMP.jl"))
 include(joinpath(examples_dir, "shapeconregr/JuMP.jl"))
 include(joinpath(examples_dir, "densityest/JuMP.jl"))
 include(joinpath(examples_dir, "regionofattr/JuMP.jl"))
 include(joinpath(examples_dir, "contraction/JuMP.jl"))
+include(joinpath(examples_dir, "secondorderpoly/JuMP.jl"))
 include(joinpath(examples_dir, "semidefinitepoly/JuMP.jl"))
-include(joinpath(examples_dir, "muconvexity/JuMP.jl"))
+include(joinpath(examples_dir, "socenvelope/JuMP.jl"))
 
 @testset "Hypatia tests" begin
 
@@ -183,7 +185,9 @@ end
     test_polyminJuMP(verbose = verbose, tol_rel_opt = 1e-8, tol_abs_opt = 1e-8, tol_feas = 1e-8)
     test_regionofattrJuMP(verbose = verbose, tol_feas = 1e-5)
     test_shapeconregrJuMP(verbose = verbose, tol_rel_opt = 1e-7, tol_abs_opt = 1e-6, tol_feas = 1e-5)
-    test_convexityJuMP(verbose = true)
+    test_semidefinitepolyJuMP(verbose = verbose)
+    test_secondorderpolyJuMP(verbose = verbose)
+    test_socenvelopeJuMP(verbose = verbose)
 end
 
 end
