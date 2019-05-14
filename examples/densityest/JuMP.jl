@@ -22,6 +22,12 @@ import Hypatia
 const HYP = Hypatia
 const MU = HYP.ModelUtilities
 
+
+function generate_densityest_data(nobs::Int, n::Int)
+    X = rand(Distributions.Uniform(-1, 1), nobs, n)
+    return X
+end
+
 function densityestJuMP(
     nobs::Int,
     n::Int,
@@ -29,9 +35,18 @@ function densityestJuMP(
     sample_factor::Int = 100,
     use_monomials::Bool = false,
     )
-    X = rand(Distributions.Uniform(-1, 1), nobs, n)
+    X = generate_densityest_data(nobs, n)
+    return densityestJuMP(X, deg, sample_factor = sample_factor, use_monomials = use_monomials)
+end
+
+function densityestJuMP(
+    X::AbstractMatrix{Float64},
+    deg::Int;
+    sample_factor::Int = 100,
+    use_monomials::Bool = false,
+    )
     (nobs, dim) = size(X)
-    domain = MU.Box(-ones(n), ones(n))
+    domain = MU.Box(-ones(dim), ones(dim))
     halfdeg = div(deg + 1, 2)
     (U, pts, P0, PWts, w) = MU.interpolate(domain, halfdeg, sample = true, calc_w = true, sample_factor = sample_factor)
 

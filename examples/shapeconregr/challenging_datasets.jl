@@ -11,21 +11,21 @@ include(joinpath(@__DIR__(), "JuMP.jl"))
 # Example 1 from https://arxiv.org/pdf/1509.08165v1.pdf
 function normfunction_data(; n::Int = 5, num_points::Int = 100)
     f = x -> sum(abs2, x)
-    (X, y) = generate_regr_data(n, num_points, f, xmin = -1.0, xmax = 1.0,  signal_ratio = 9.0)
+    (X, y) = generate_regr_data(n, num_points, f, 9.0, -1.0, 1.0)
     return (X, y, n)
 end
 
 # Example 5 from https://arxiv.org/pdf/1509.08165v1.pdf
 function customfunction_data(; n::Int = 5, num_points::Int = 100)
     f = x -> (5x[1] + 0.5x[2] + x[3])^2 + sqrt(x[4]^2 + x[5]^2)
-    (X, y) = generate_regr_data(n, num_points, f, xmin = -1.0, xmax = 1.0,  signal_ratio = 9.0)
+    (X, y) = generate_regr_data(n, num_points, f, 9.0, -1.0, 1.0)
     return (X, y, n)
 end
 
 # Example 3 from https://arxiv.org/pdf/1509.08165v1.pdf
 function production_data()
-    df = readtable(joinpath(@__DIR__, "data", "naics5811.csv"))
-    deleterows!(df, 157:157) # outlier
+    df = CSV.read(joinpath(@__DIR__, "data", "naics5811.csv"), copycols = true)
+    deleterows!(df, 157) # outlier
     # number of non production employees
     df[:prode] .= df[:emp] - df[:prode]
     # group by industry codes

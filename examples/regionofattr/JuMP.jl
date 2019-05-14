@@ -37,12 +37,13 @@ function regionofattrJuMP(deg::Int; use_WSOS::Bool = true)
     vT = DP.subs(v, t => 1.0)
 
     if use_WSOS
+        halfdeg = div(deg + 1, 2)
         dom1 = MU.Box([-1.0], [1.0]) # just state
         dom2 = MU.Box([-1.0, 0.0], [1.0, 1.0]) # state and time
         dom3 = MU.Box([-0.01], [0.01]) # state at the end
-        (U1, pts1, P01, PWts1, quad_weights) = MU.interpolate(dom1, div(deg + 1, 2), sample = false, calc_w = true)
-        (U2, pts2, P02, PWts2, _) = MU.interpolate(dom2, div(deg + 1, 2), sample = false)
-        (U3, pts3, P03, PWts3, _) = MU.interpolate(dom3, div(deg + 1, 2) - 1, sample = false)
+        (U1, pts1, P01, PWts1, quad_weights) = MU.interpolate(dom1, halfdeg, sample = false, calc_w = true)
+        (U2, pts2, P02, PWts2, _) = MU.interpolate(dom2, halfdeg, sample = false)
+        (U3, pts3, P03, PWts3, _) = MU.interpolate(dom3, halfdeg - 1, sample = false)
         wsos_cone1 = HYP.WSOSPolyInterpCone(U1, [P01, PWts1...])
         wsos_cone2 = HYP.WSOSPolyInterpCone(U2, [P02, PWts2...])
         wsos_cone3 = HYP.WSOSPolyInterpCone(U3, [P03, PWts3...])
