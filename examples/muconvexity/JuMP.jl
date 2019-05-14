@@ -1,5 +1,5 @@
 #=
-Copyright 2018, Chris Coey, Lea Kapelevich and contributors
+Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
 find parameter of convexity mu for a given polynomial p(x)
 ie the largest mu such that p(x) - mu/2*||x||^2 is convex everywhere on given domain
@@ -29,7 +29,7 @@ function muconvexityJuMP(
     n = MU.get_dimension(dom)
     DP.@polyvar x[1:n]
     poly = polyfun(x)
-    
+
     model = JuMP.Model()
     JuMP.@variable(model, mu)
     JuMP.@objective(model, Max, mu)
@@ -65,6 +65,15 @@ muconvexityJuMP5() = muconvexityJuMP(x -> (x[1] + 1)^2 * (x[1] - 1)^2, MU.FreeDo
 muconvexityJuMP6() = muconvexityJuMP(x -> sum(x.^4) - sum(x.^2), MU.FreeDomain(3), use_wsos = false)
 muconvexityJuMP7() = muconvexityJuMP(x -> (x[1] + 1)^2 * (x[1] - 1)^2, MU.Box([-1.0], [1.0]), use_wsos = false)
 muconvexityJuMP8() = muconvexityJuMP(x -> sum(x.^4) - sum(x.^2), MU.Ball([5.0, 5.0], 1.0), use_wsos = false) # TODO giving incorrect solution
+# function muconvexityJuMP9()
+#     Random.seed!(1234)
+#     n = 2
+#     d = 4
+#     DP.@polyvar x[1:n]
+#     poly = sum(rand() * z for z in DP.monomials(x, 0:d))
+#     dom = MU.FreeDomain(n)
+#     return muconvexityJuMP(x, x -> poly(x), dom, use_wsos = true)
+# end
 
 function test_muconvexityJuMP(instance::Tuple{Function,Number}; options, rseed::Int = 1)
     Random.seed!(rseed)
