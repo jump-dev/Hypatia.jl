@@ -35,17 +35,17 @@ const rt2 = sqrt(2)
 function shapeconregrJuMP(
     X::AbstractMatrix{Float64},
     y::AbstractVector{Float64},
-    n::Int,
     deg::Int;
+    n::Int = size(X, 2),
     use_lsq_obj::Bool = true,
+    use_wsos::Bool = true,
+    sample::Bool = true,
     mono_dom::MU.Domain = MU.Box(-ones(n), ones(n)),
     conv_dom::MU.Domain = mono_dom,
     mono_profile::Vector{Int} = ones(Int, n),
     conv_profile::Int = 1,
-    use_wsos::Bool = true,
-    sample::Bool = true,
     )
-    @assert n == MU.get_dimension(mono_dom) == MU.get_dimension(conv_dom) == size(X, 2)
+    @assert n == size(X, 2)
     num_points = size(X, 1)
 
     if use_wsos
@@ -147,60 +147,33 @@ function shapeconregrJuMP(
         y .+= noise
     end
 
-    return shapeconregrJuMP(X, y, n, deg; model_kwargs...)
-end
-
-
-
-
-# see https://arxiv.org/pdf/1509.08165v1.pdf (example 1)
-function normfunction_data(; n::Int = 5, num_points::Int = 100)
-    f = x -> sum(abs2, x)
-    (X, y) = generate_regr_data(n, num_points, f, 9.0, -1.0, 1.0)
-    return (X, y, n)
-end
-
-# see https://arxiv.org/pdf/1509.08165v1.pdf (example 5)
-function customfunction_data(; n::Int = 5, num_points::Int = 100)
-    f = x -> (5x[1] + 0.5x[2] + x[3])^2 + sqrt(x[4]^2 + x[5]^2)
-    (X, y) = generate_regr_data(n, num_points, f, 9.0, -1.0, 1.0)
-    return (X, y, n)
+    return shapeconregrJuMP(X, y, deg; model_kwargs...)
 end
 
 # see https://arxiv.org/pdf/1509.08165v1.pdf (example 3)
 # data obtained from http://www.nber.org/data/nbprod2005.html
 function production_data()
     df = CSV.read(joinpath(@__DIR__, "data", "naics5811.csv"), copycols = true)
-    deleterows!(df, 157) # outlier
+    DataFrames.deleterows!(df, 157) # outlier
     # number of non production employees
     df[:prode] .= df[:emp] - df[:prode]
     # group by industry codes
-    dfagg = aggregate(dropmissing(df), :naics, sum)
+    df_aggr = DataFrames.aggregate(DataFrames.dropmissing(df), :naics, sum)
     # four covariates: non production employees, production worker hours, production workers, total capital stock
-    n = 4
-    X = convert(Matrix, dfagg[[:prode_sum, :prodh_sum, :prodw_sum, :cap_sum]])
-    # value of shipment
-    y = convert(Array, dfagg[:vship_sum])
     # use the log transform of covariates
-    Xlog = log.(X)
+    X = log.(convert(Matrix{Float64}, df_aggr[[:prode_sum, :prodh_sum, :prodw_sum, :cap_sum]])) # n = 4
+    # value of shipment
+    y = convert(Vector{Float64}, df_aggr[:vship_sum])
     # mean center
-    Xlog .-= sum(Xlog, dims = 1) / size(Xlog, 1)
+    X .-= sum(X, dims = 1) ./ size(X, 1)
     y .-= sum(y) / length(y)
     # normalize to unit norm
-    Xlog ./= sqrt.(sum(abs2, Xlog, dims = 1))
-    y /= sqrt(sum(abs2, y))
-    return (Xlog, y, n)
+    X ./= norm.(eachcol(X))'
+    y /= norm(y)
+    return (X, y)
 end
 
-        (X, y, n) = s()
-
-        (model,) = shapeconregrJuMP(X, y, n, deg, mono_dom = MU.FreeDomain(n), mono_profile = zeros(Int, n), conv_profile = 1)
-
-
-
-
-
-shapeconregrJuMP1() = shapeconregrJuMP(2, 3, 100, x -> exp(norm(x)), use_lsq_obj = false)
+shapeconregrJuMP1() = shapeconregrJuMP(production_data()..., 4, mono_dom = MU.FreeDomain(4), mono_profile = zeros(Int, 4))
 shapeconregrJuMP2() = shapeconregrJuMP(2, 3, 100, x -> sum(x.^3), use_lsq_obj = false)
 shapeconregrJuMP3() = shapeconregrJuMP(2, 3, 100, x -> sum(x.^4), use_lsq_obj = false)
 shapeconregrJuMP4() = shapeconregrJuMP(2, 3, 100, x -> sum(x.^3), signal_ratio = 50.0, use_lsq_obj = false)
@@ -213,41 +186,47 @@ shapeconregrJuMP10() = shapeconregrJuMP(2, 4, 100, x -> exp(norm(x)))
 shapeconregrJuMP11() = shapeconregrJuMP(2, 5, 100, x -> exp(norm(x)), signal_ratio = 10.0, mono_dom = MU.Box(0.5 * ones(2), 2 * ones(2)))
 shapeconregrJuMP12() = shapeconregrJuMP(2, 6, 100, x -> exp(norm(x)), signal_ratio = 1.0, mono_dom = MU.Box(0.5 * ones(2), 2 * ones(2)), use_wsos = false)
 shapeconregrJuMP13() = shapeconregrJuMP(2, 6, 100, x -> exp(norm(x)), signal_ratio = 1.0, use_lsq_obj = false)
-shapeconregrJuMP14() = shapeconregrJuMP(5, 5, 1000, x -> exp(norm(x)), use_wsos = false)
+shapeconregrJuMP14() = shapeconregrJuMP(5, 5, 50, x -> exp(norm(x)), use_wsos = false)
 shapeconregrJuMP15() = shapeconregrJuMP(2, 3, 100, x -> exp(norm(x)), use_lsq_obj = false, use_wsos = false)
+shapeconregrJuMP16() = shapeconregrJuMP(5, 4, 100, x -> sum(x.^2), signal_ratio = 9.0) # see https://arxiv.org/pdf/1509.08165v1.pdf (example 1)
+shapeconregrJuMP17() = shapeconregrJuMP(5, 4, 100, x -> (5x[1] + 0.5x[2] + x[3])^2 + sqrt(x[4]^2 + x[5]^2), signal_ratio = 9.0) # see https://arxiv.org/pdf/1509.08165v1.pdf (example 5)
 
 function test_shapeconregrJuMP(instance::Tuple{Function, Number}; options, rseed::Int = 1)
     Random.seed!(rseed)
     (instance, true_obj) = instance
-    data = instance()
-    JuMP.optimize!(data.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
-    @test JuMP.termination_status(data.model) == MOI.OPTIMAL
-    @test JuMP.objective_value(data.model) ≈ true_obj atol = 1e-4 rtol = 1e-4
+    d = instance()
+    JuMP.optimize!(d.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
+    @test JuMP.termination_status(d.model) == MOI.OPTIMAL
+    if !isnan(true_obj)
+        @test JuMP.objective_value(d.model) ≈ true_obj atol = 1e-4 rtol = 1e-4
+    end
     return
 end
 
-# TODO remove the unknown objective values (try to instead compare objvals from pairs of formulations)
 test_shapeconregrJuMP(; options...) = test_shapeconregrJuMP.([
-    (shapeconregrJuMP1, 4.4065e-1),
-    (shapeconregrJuMP2, 1.3971e-1),
-    (shapeconregrJuMP3, 2.4577e-1),
-    (shapeconregrJuMP4, 1.5449e-1),
-    (shapeconregrJuMP5, 2.5200e-1),
-    (shapeconregrJuMP6, 5.4584e-2),
-    (shapeconregrJuMP7, 3.3249e-2),
-    (shapeconregrJuMP8, 3.7723e-03),
-    (shapeconregrJuMP9, 3.0995e-02),
-    (shapeconregrJuMP10, 5.0209e-02),
-    (shapeconregrJuMP11, 0.22206),
-    (shapeconregrJuMP12, 0.22206),
-    (shapeconregrJuMP13, 1.7751), # not verified with SDP
-    # (shapeconregrJuMP14, NaN),
-    (shapeconregrJuMP15, 4.4065e-1),
+    (shapeconregrJuMP1, NaN),
+    (shapeconregrJuMP2, NaN),
+    (shapeconregrJuMP3, NaN),
+    (shapeconregrJuMP4, NaN),
+    (shapeconregrJuMP5, NaN),
+    (shapeconregrJuMP6, NaN),
+    (shapeconregrJuMP7, NaN),
+    (shapeconregrJuMP8, NaN),
+    (shapeconregrJuMP9, NaN),
+    (shapeconregrJuMP10, NaN),
+    (shapeconregrJuMP11, NaN),
+    (shapeconregrJuMP12, NaN),
+    (shapeconregrJuMP13, NaN),
+    (shapeconregrJuMP14, NaN),
+    (shapeconregrJuMP15, NaN),
+    (shapeconregrJuMP16, NaN),
+    (shapeconregrJuMP17, NaN),
     ], options = options)
 
 test_shapeconregrJuMP_quick(; options...) = test_shapeconregrJuMP.([
-    (shapeconregrJuMP1, 4.4065e-1),
-    (shapeconregrJuMP2, 1.3971e-1),
-    (shapeconregrJuMP12, 0.22206),
-    (shapeconregrJuMP15, 4.4065e-1),
+    (shapeconregrJuMP1, NaN),
+    (shapeconregrJuMP2, NaN),
+    (shapeconregrJuMP12, NaN),
+    (shapeconregrJuMP15, NaN),
+    (shapeconregrJuMP17, NaN),
     ], options = options)
