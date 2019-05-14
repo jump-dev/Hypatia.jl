@@ -22,6 +22,62 @@ import Random
 
 const rt2 = sqrt(2)
 
+function sosmatrix_JuMP(x::Vector{PolyVar{true}}, H::Array{Polynomial{true,Int64},2}; use_wsos::Bool = true)
+    model = JuMP.model()
+    if use_wsos
+        n = DynamicPolynomials.nvariables(x)
+        d = div(maximum(DynamicPolynomials.maxdegree.(H)) + 1, 2)
+        dom = MU.FreeDomain(n)
+        (U, pts, P0, _, _) = MU.interpolate(dom, d, sample_factor = 20, sample = true)
+        mat_wsos_cone = HYP.WSOSPolyInterpMatCone(n, U, [P0])
+        JuMP.@constraint(model, [H[i, j](pts[u, :]) * (i == j ? 1.0 : rt2) for i in 1:n for j in 1:i for u in 1:U] in mat_wsos_cone)
+    else
+        PolyJuMP.setpolymodule!(model, SumOfSquares)
+        JuMP.@constraint(model, H in JuMP.PSDCone())
+    end
+    return (model = model,)
+end
+
+function sosmatrix_JuMP(x::Vector{PolyVar{true}}, poly::Polynomial{true,Int64}; use_wsos::Bool = true)
+    return sosmatrix_JuMP(x, DynamicPolynomials.differentiate(poly, x, 2), use_wsos = use_wsos)
+end
+
+
+function sosmatrix_JuMP1()
+    DynamicPolynomials.@polyvar x[1:1]
+    M = [(x[1] + 2x[1]^3) 1; (-x[1]^2 + 2) (3x[1]^2 - x[1] + 1)]
+    MM = M' * M
+    return sosmatrix_JuMP(x, MM, use_wsos = true)
+end
+
+function sosmatrix_JuMP2()
+    DynamicPolynomials.@polyvar x[1:1]
+    poly = x[1]^4 + 2x[1]^2
+    return sosmatrix_JuMP(x, poly, use_wsos = true)
+end
+
+function sosmatrix_JuMP3()
+    DynamicPolynomials.@polyvar x[1:2]
+    poly = (x[1] + x[2])^4 + (x[1] + x[2])^2
+    return sosmatrix_JuMP(x, poly, use_wsos = true)
+end
+
+function test_sosmatrix_JuMP(instance::Tuple{Function,Bool}, options)
+    (instance, is_SOS) = instance()
+    JuMP.optimize!(data.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
+    if is_SOS
+        @test JuMP.termination_status(data.model) == MOI.OPTIMAL
+    else
+        @test JuMP.termination_status(data.model) == MOI.INFEASIBLE
+    end
+end
+
+test_sosmatrix_JuMP(; options...) = test_sosmatrix_JuMP.([
+    sosmatrix_JuMP1,
+    sosmatrix_JuMP2,
+    sosmatrix_JuMP3,
+    ], options = options)
+
 function run_JuMP_sosmatrix(
     x::Vector,
     H::Matrix,
