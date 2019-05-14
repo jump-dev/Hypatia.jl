@@ -182,7 +182,7 @@ verbose = true
     # test_polyminJuMP(verbose = verbose, tol_rel_opt = 1e-8, tol_abs_opt = 1e-8, tol_feas = 1e-8)
     # test_regionofattrJuMP(verbose = verbose, tol_feas = 1e-5)
     # test_shapeconregrJuMP(verbose = verbose, tol_rel_opt = 1e-7, tol_abs_opt = 1e-6, tol_feas = 1e-5)
-    test_convexityJuMP(verbose = true)
+    test_convexityJuMP(verbose = verbose)
 end
 
 end
