@@ -19,19 +19,19 @@ const MU = HYP.ModelUtilities
 
 function envelope(
     npoly::Int,
-    deg::Int,
+    rand_halfdeg::Int,
     n::Int,
-    d::Int;
+    env_halfdeg::Int;
     primal_wsos::Bool = true,
     use_dense::Bool = false,
     )
     # generate interpolation
-    @assert deg <= d
+    @assert rand_halfdeg <= env_halfdeg
     domain = MU.Box(-ones(n), ones(n))
-    (U, pts, P0, PWts, w) = MU.interpolate(domain, d, sample = false, calc_w = true)
+    (U, pts, P0, PWts, w) = MU.interpolate(domain, env_halfdeg, sample = false, calc_w = true)
 
     # generate random data
-    LDegs = binomial(n + deg, n)
+    LDegs = binomial(n + rand_halfdeg, n)
     c_or_h = vec(P0[:, 1:LDegs] * rand(-9:9, LDegs, npoly))
 
     subI = use_dense ? Array(1.0I, U, U) : sparse(1.0I, U, U)

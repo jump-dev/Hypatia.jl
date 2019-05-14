@@ -16,18 +16,18 @@ const MU = HYP.ModelUtilities
 
 function envelopeJuMP(
     npoly::Int,
-    deg::Int,
-    d::Int,
+    rand_halfdeg::Int,
+    env_halfdeg::Int,
     domain::MU.Domain;
     sample::Bool = true,
     )
     # generate interpolation
-    @assert deg <= d
-    (U, pts, P0, PWts, w) = MU.interpolate(domain, d, sample = sample, calc_w = true)
+    @assert rand_halfdeg <= env_halfdeg
+    (U, pts, P0, PWts, w) = MU.interpolate(domain, env_halfdeg, sample = sample, calc_w = true)
 
     # generate random polynomials
     n = MU.get_dimension(domain)
-    LDegs = binomial(n + deg, n)
+    LDegs = binomial(n + rand_halfdeg, n)
     polys = P0[:, 1:LDegs] * rand(-9:9, LDegs, npoly)
 
     model = JuMP.Model()

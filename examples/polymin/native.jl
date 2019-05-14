@@ -20,12 +20,12 @@ include(joinpath(@__DIR__, "data.jl"))
 
 function polyminreal(
     polyname::Symbol,
-    d::Int;
+    halfdeg::Int;
     primal_wsos::Bool = true,
     )
     (x, fn, dom, true_obj) = getpolydata(polyname)
     @assert dom isa MU.Box # only works for box domains
-    (U, pts, P0, PWts, _) = MU.interpolate(dom, d, sample = (length(x) >= 5))
+    (U, pts, P0, PWts, _) = MU.interpolate(dom, halfdeg, sample = (length(x) >= 5))
 
     # set up problem data
     interp_vals = [fn(pts[j, :]...) for j in 1:U]
@@ -65,14 +65,14 @@ polyminreal12() = polyminreal(:reactiondiffusion, 4, primal_wsos = false)
 
 function polymincomplex(
     polyname::Symbol,
-    d::Int;
+    halfdeg::Int;
     primal_wsos = true,
     sample_factor::Int = 100,
     )
     (n, deg, f, gs, gdegs, true_obj) = complexpolys[polyname]
 
     # generate interpolation
-    L = binomial(n + d, n)
+    L = binomial(n + halfdeg, n)
     U = L^2
     L_basis = [a for t in 0:d for a in Combinatorics.multiexponents(n, t)]
     mon_pow(z, ex) = prod(z[i]^ex[i] for i in eachindex(ex))
@@ -104,7 +104,7 @@ function polymincomplex(
     P_data = [V[:, 1:L]]
     for i in eachindex(gs)
         push!(g_data, gs[i].(points))
-        push!(P_data, V[:, 1:binomial(n + d - gdegs[i], n)])
+        push!(P_data, V[:, 1:binomial(n + halfdeg - gdegs[i], n)])
     end
 
     # setup problem data
