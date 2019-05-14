@@ -44,8 +44,8 @@ expdesign3_JuMP() = expdesign_JuMP(5, 15, 25, 5) # small
 expdesign4_JuMP() = expdesign_JuMP(4, 8, 12, 3) # tiny
 expdesign5_JuMP() = expdesign_JuMP(3, 5, 7, 2) # miniscule
 
-function test_expdesign_JuMP(builder::Function; options)
-    data = builder()
+function test_expdesign_JuMP(instance::Function; options)
+    data = instance()
     JuMP.optimize!(data.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
     @test JuMP.termination_status(data.model) == MOI.OPTIMAL
     npval = JuMP.value.(data.np)
