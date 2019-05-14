@@ -12,9 +12,9 @@ where
 see e.g. Chapter 8 of thesis by G. Hall (2018)
 =#
 
+import LinearAlgebra: norm
 import Random
 import Distributions
-import LinearAlgebra: norm
 using Test
 import DynamicPolynomials
 const DP = DynamicPolynomials

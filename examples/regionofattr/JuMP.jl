@@ -7,6 +7,7 @@ example taken from "Convex computation of the region of attraction of polynomial
 
 using LinearAlgebra
 using Test
+import Random
 import MathOptInterface
 const MOI = MathOptInterface
 import JuMP
@@ -25,7 +26,7 @@ function regionofattrJuMP(deg::Int; use_WSOS::Bool = true)
     DP.@polyvar x
     DP.@polyvar t
     f = x * (x - 0.5) * (x + 0.5) * T
-    
+
     model = JuMP.Model()
     JuMP.@variables(model, begin
         v, PolyJuMP.Poly(DP.monomials([x; t], 0:deg))
