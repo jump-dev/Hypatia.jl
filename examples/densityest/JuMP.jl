@@ -33,9 +33,9 @@ function densityestJuMP(
     (nobs, dim) = size(X)
     domain = MU.Box(-ones(n), ones(n))
     d = div(deg + 1, 2)
+    (U, pts, P0, PWts, w) = MU.interpolate(domain, d, sample = true, calc_w = true, sample_factor = sample_factor)
 
     model = JuMP.Model()
-    (U, pts, P0, PWts, w) = MU.interpolate(domain, d, sample = true, calc_w = true, sample_factor = sample_factor)
     JuMP.@variable(model, z[1:nobs])
     JuMP.@objective(model, Max, sum(z))
 
@@ -43,6 +43,7 @@ function densityestJuMP(
         lagrange_polys = []
         DynamicPolynomials.@polyvar x[1:dim]
         PX = DynamicPolynomials.monomials(x, 0:2d)
+
         JuMP.@variable(model, f, PolyJuMP.Poly(PX))
         JuMP.@constraints(model, begin
             sum(w[i] * f(pts[i, :]) for i in 1:U) == 1.0 # integrate to 1
@@ -55,6 +56,7 @@ function densityestJuMP(
         for i in 1:nobs, j in 1:U
             basis_evals[i, j] = lagrange_polys[j](X[i, :])
         end
+
         JuMP.@variable(model, f[1:U])
         JuMP.@constraints(model, begin
             dot(w, f) == 1.0 # integrate to 1
@@ -62,7 +64,7 @@ function densityestJuMP(
             [i in 1:nobs], vcat(z[i], 1.0, dot(f, basis_evals[i, :])) in MOI.ExponentialCone() # hypograph of log
         end)
     end
-    
+
     return (model = model,)
 end
 

@@ -1,7 +1,7 @@
 #=
 Copyright 2018, Chris Coey and contributors
 
-see description in examples/envelopeJuMP/native.jl
+see description in examples/envelope/native.jl
 =#
 
 using LinearAlgebra
@@ -39,7 +39,7 @@ function envelopeJuMP(
 end
 
 envelopeJuMP1() = envelopeJuMP(2, 3, 4, MU.Box(-ones(2), ones(2)))
-envelopeJuMP2() = envelopeJuMP(2, 3, 4, MU.Ball(zeros(2), sqrt(2))) # TODO needs https://github.com/chriscoey/Hypatia.jl/issues/173
+# envelopeJuMP2() = envelopeJuMP(2, 3, 4, MU.Ball(zeros(2), sqrt(2))) # TODO needs https://github.com/chriscoey/Hypatia.jl/issues/173
 envelopeJuMP3() = envelopeJuMP(2, 3, 4, MU.Box(-ones(2), ones(2)), sample = false)
 
 function test_envelopeJuMP(instance::Function; options, rseed::Int = 1)
@@ -52,6 +52,6 @@ end
 
 test_envelopeJuMP(; options...) = test_envelopeJuMP.([
     envelopeJuMP1,
-    envelopeJuMP2,
+    # envelopeJuMP2,
     envelopeJuMP3,
     ], options = options)
