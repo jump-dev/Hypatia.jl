@@ -34,7 +34,7 @@ include(joinpath(examples_dir, "lotkavolterra/jump.jl"))
 include(joinpath(examples_dir, "polymin/jump.jl"))
 include(joinpath(examples_dir, "shapeconregr/jump.jl"))
 include(joinpath(examples_dir, "densityest/jump.jl"))
-include(joinpath(examples_dir, "wsosmatrix/sosmatrix.jl"))
+# include(joinpath(examples_dir, "wsosmatrix/sosmatrix.jl"))
 include(joinpath(examples_dir, "wsosmatrix/muconvexity.jl"))
 include(joinpath(examples_dir, "wsosmatrix/sosmat1.jl"))
 include(joinpath(examples_dir, "wsosmatrix/sosmat2.jl"))
@@ -164,10 +164,6 @@ end
 #     run_JuMP_sosmatrix_poly_a,
 #     run_JuMP_sosmatrix_poly_b,
 #     run_JuMP_muconvexity_rand,
-#     run_JuMP_muconvexity_a,
-#     run_JuMP_muconvexity_b,
-#     run_JuMP_muconvexity_c,
-#     run_JuMP_muconvexity_d,
 #     run_JuMP_sosmat1,
 #     run_JuMP_sosmat2_scalar,
 #     run_JuMP_sosmat2_matrix,
@@ -180,15 +176,18 @@ end
 # end
 
 @info("starting additional JuMP examples tests")
+@testset "all" begin
 @testset "JuMP examples" begin
-    # test_contraction_JuMP(verbose = true, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4, tol_feas = 1e-4)
-    test_densityest_JuMP(verbose = true)
-    test_envelope_JuMP(verbose = true)
-    test_expdesign_JuMP(verbose = true)
-    # test_lotkavolterra_JuMP(verbose = true, max_iters = 1000, time_limit = 3.6e4, tol_rel_opt = 1e-5, tol_abs_opt = 1e-6, tol_feas = 1e-6)
-    # test_polymin_JuMP(verbose = true, tol_rel_opt = 1e-8, tol_abs_opt = 1e-8, tol_feas = 1e-8)
-    test_regionofattr_JuMP(verbose = true, tol_feas = 1e-5)
-    # # test_shapeconregr_JuMP(verbose = true)
+    # # test_contraction_JuMP(verbose = true, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4, tol_feas = 1e-4)
+    # test_densityest_JuMP(verbose = true)
+    # test_envelope_JuMP(verbose = true)
+    # test_expdesign_JuMP(verbose = true)
+    # # test_lotkavolterra_JuMP(verbose = true, max_iters = 1000, time_limit = 3.6e4, tol_rel_opt = 1e-5, tol_abs_opt = 1e-6, tol_feas = 1e-6)
+    # # test_polymin_JuMP(verbose = true, tol_rel_opt = 1e-8, tol_abs_opt = 1e-8, tol_feas = 1e-8)
+    # test_regionofattr_JuMP(verbose = true, tol_feas = 1e-5)
+    test_shapeconregr_JuMP(verbose = true, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6, tol_feas = 1e-5) # different examples work under different tolerances
+    # test_muconvexity_JuMP(verbose = true)
+end
 end
 
 end
