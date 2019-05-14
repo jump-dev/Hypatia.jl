@@ -21,7 +21,7 @@ function solve_and_check(
     stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model))
     solver = SO.HSDSolver(model, verbose = verbose, stepper = stepper)
     SO.solve(solver)
-    return SO.test_certificates(solver, model, atol = atol, rtol = rtol)
+    return SO.get_certificates(solver, model, test = true, atol = atol, rtol = rtol)
 end
 
 function dimension1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)

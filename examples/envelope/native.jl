@@ -65,7 +65,7 @@ function test_envelope(instance::Function; options, rseed::Int = 1)
     model = MO.PreprocessedLinearModel(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
     solver = SO.HSDSolver(model; options...)
     SO.solve(solver)
-    r = SO.test_certificates(solver, model, atol = 1e-4, rtol = 1e-4)
+    r = SO.get_certificates(solver, model, test = true, atol = 1e-4, rtol = 1e-4)
     @test r.status == :Optimal
     return
 end
