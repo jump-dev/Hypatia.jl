@@ -7,6 +7,7 @@ D. Papp and S. Yildiz. Sum-of-squares optimization without semidefinite programm
 polymincomplex: minimizes a real-valued complex polynomial over a domain defined by real-valued complex polynomials
 =#
 
+import Random
 using LinearAlgebra
 import Combinatorics
 using Test
@@ -69,12 +70,12 @@ function polymincomplex(
     primal_wsos = true,
     sample_factor::Int = 100,
     )
-    (n, deg, f, gs, gdegs, true_obj) = complexpolys[polyname]
+    (n, deg, f, gs, g_halfdegs, true_obj) = complexpolys[polyname]
 
     # generate interpolation
     L = binomial(n + halfdeg, n)
     U = L^2
-    L_basis = [a for t in 0:d for a in Combinatorics.multiexponents(n, t)]
+    L_basis = [a for t in 0:halfdeg for a in Combinatorics.multiexponents(n, t)]
     mon_pow(z, ex) = prod(z[i]^ex[i] for i in eachindex(ex))
     V_basis = [z -> mon_pow(z, L_basis[k]) * mon_pow(conj(z), L_basis[l]) for l in eachindex(L_basis) for k in eachindex(L_basis)]
     @assert length(V_basis) == U
@@ -104,7 +105,7 @@ function polymincomplex(
     P_data = [V[:, 1:L]]
     for i in eachindex(gs)
         push!(g_data, gs[i].(points))
-        push!(P_data, V[:, 1:binomial(n + halfdeg - gdegs[i], n)])
+        push!(P_data, V[:, 1:binomial(n + halfdeg - g_halfdegs[i], n)])
     end
 
     # setup problem data

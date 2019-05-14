@@ -8,6 +8,7 @@ Aylward, E.M., Parrilo, P.A. and Slotine, J.J.E
 
 using LinearAlgebra
 using Test
+import Random
 import MathOptInterface
 const MOI = MathOptInterface
 import JuMP
@@ -19,7 +20,6 @@ import SumOfSquares
 import Hypatia
 const HYP = Hypatia
 const MU = HYP.ModelUtilities
-import Random
 
 const rt2 = sqrt(2)
 
