@@ -19,7 +19,7 @@ include(joinpath(@__DIR__, "data.jl"))
 
 function polyminJuMP(
     polyname::Symbol,
-    d::Int;
+    halfdeg::Int;
     use_wsos::Bool = true,
     primal_wsos::Bool = false,
     sample::Bool = true,
@@ -29,7 +29,7 @@ function polyminJuMP(
 
     if use_wsos
         Random.seed!(rseed)
-        (U, pts, P0, PWts, _) = MU.interpolate(dom, d, sample = sample, sample_factor = 100)
+        (U, pts, P0, PWts, _) = MU.interpolate(dom, halfdeg, sample = sample, sample_factor = 100)
         cone = HYP.WSOSPolyInterpCone(U, [P0, PWts...], !primal_wsos)
         interp_vals = [f(x => pts[j, :]) for j in 1:U]
 
@@ -49,7 +49,7 @@ function polyminJuMP(
         JuMP.@variable(model, a)
         JuMP.@objective(model, Max, a)
         bss = MU.get_domain_inequalities(dom, x)
-        JuMP.@constraint(model, f >= a, domain = bss, maxdegree = 2d)
+        JuMP.@constraint(model, f >= a, domain = bss, maxdegree = 2 * halfdeg)
     end
 
     return (model = model, true_obj = true_obj)

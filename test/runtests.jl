@@ -184,7 +184,7 @@ end
     test_lotkavolterraJuMP(verbose = true, tol_rel_opt = 1e-5, tol_abs_opt = 1e-6, tol_feas = 1e-6)
     test_polyminJuMP(verbose = true, tol_rel_opt = 1e-8, tol_abs_opt = 1e-8, tol_feas = 1e-8)
     test_regionofattrJuMP(verbose = true, tol_feas = 1e-5)
-    test_shapeconregrJuMP(verbose = true)
+    test_shapeconregrJuMP(verbose = true, tol_rel_opt = 1e-7, tol_abs_opt = 1e-6, tol_feas = 1e-5)
 end
 
 end
