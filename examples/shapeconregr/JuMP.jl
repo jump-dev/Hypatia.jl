@@ -50,7 +50,7 @@ function generate_regr_data(
     return (X, y)
 end
 
-function shapeconregr_JuMP(
+function shapeconregrJuMP(
     n::Int,
     deg::Int,
     num_points::Int,
@@ -62,10 +62,10 @@ function shapeconregr_JuMP(
     modeloptions...
     )
     (X, y) = generate_regr_data(n, num_points, f, signal_ratio = signal_ratio, xmin = xmin, xmax = xmax, rseed = rseed)
-    return shapeconregr_JuMP(X, y, n, deg; modeloptions...)
+    return shapeconregrJuMP(X, y, n, deg; modeloptions...)
 end
 
-function shapeconregr_JuMP(
+function shapeconregrJuMP(
     X::AbstractMatrix{Float64},
     y::AbstractVector{Float64},
     n::Int,
@@ -166,23 +166,23 @@ function shapeconregr_JuMP(
     return (model = model,)
 end
 
-shapeconregr1_JuMP() = shapeconregr_JuMP(2, 3, 100, x -> exp(norm(x)), use_lsq_obj = false)
-shapeconregr2_JuMP() = shapeconregr_JuMP(2, 3, 100, x -> sum(x.^3), use_lsq_obj = false)
-shapeconregr3_JuMP() = shapeconregr_JuMP(2, 3, 100, x -> sum(x.^4), use_lsq_obj = false)
-shapeconregr4_JuMP() = shapeconregr_JuMP(2, 3, 100, x -> sum(x.^3), signal_ratio = 50.0, use_lsq_obj = false)
-shapeconregr5_JuMP() = shapeconregr_JuMP(2, 3, 100, x -> sum(x.^4), signal_ratio = 50.0, use_lsq_obj = false)
-shapeconregr6_JuMP() = shapeconregr_JuMP(2, 3, 100, x -> exp(norm(x)))
-shapeconregr7_JuMP() = shapeconregr_JuMP(2, 3, 100, x -> sum(x.^4), signal_ratio = 50.0)
-shapeconregr8_JuMP() = shapeconregr_JuMP(2, 4, 100, x -> -inv(1 + exp(-10.0 * norm(x))), mono_dom = MU.Box(zeros(2), ones(2)))
-shapeconregr9_JuMP() = shapeconregr_JuMP(2, 4, 100, x -> -inv(1 + exp(-10.0 * norm(x))), signal_ratio = 10.0, mono_dom = MU.Box(zeros(2), ones(2)))
-shapeconregr10_JuMP() = shapeconregr_JuMP(2, 4, 100, x -> exp(norm(x)))
-shapeconregr11_JuMP() = shapeconregr_JuMP(2, 5, 100, x -> exp(norm(x)), signal_ratio = 10.0, mono_dom = MU.Box(0.5 * ones(2), 2 * ones(2)))
-shapeconregr12_JuMP() = shapeconregr_JuMP(2, 6, 100, x -> exp(norm(x)), signal_ratio = 1.0, mono_dom = MU.Box(0.5 * ones(2), 2 * ones(2)), use_wsos = false)
-shapeconregr13_JuMP() = shapeconregr_JuMP(2, 6, 100, x -> exp(norm(x)), signal_ratio = 1.0, use_lsq_obj = false)
-shapeconregr14_JuMP() = shapeconregr_JuMP(5, 5, 1000, x -> exp(norm(x)), use_wsos = false)
-shapeconregr15_JuMP() = shapeconregr_JuMP(2, 3, 100, x -> exp(norm(x)), use_lsq_obj = false, use_wsos = false)
+shapeconregrJuMP1() = shapeconregrJuMP(2, 3, 100, x -> exp(norm(x)), use_lsq_obj = false)
+shapeconregrJuMP2() = shapeconregrJuMP(2, 3, 100, x -> sum(x.^3), use_lsq_obj = false)
+shapeconregrJuMP3() = shapeconregrJuMP(2, 3, 100, x -> sum(x.^4), use_lsq_obj = false)
+shapeconregrJuMP4() = shapeconregrJuMP(2, 3, 100, x -> sum(x.^3), signal_ratio = 50.0, use_lsq_obj = false)
+shapeconregrJuMP5() = shapeconregrJuMP(2, 3, 100, x -> sum(x.^4), signal_ratio = 50.0, use_lsq_obj = false)
+shapeconregrJuMP6() = shapeconregrJuMP(2, 3, 100, x -> exp(norm(x)))
+shapeconregrJuMP7() = shapeconregrJuMP(2, 3, 100, x -> sum(x.^4), signal_ratio = 50.0)
+shapeconregrJuMP8() = shapeconregrJuMP(2, 4, 100, x -> -inv(1 + exp(-10.0 * norm(x))), mono_dom = MU.Box(zeros(2), ones(2)))
+shapeconregrJuMP9() = shapeconregrJuMP(2, 4, 100, x -> -inv(1 + exp(-10.0 * norm(x))), signal_ratio = 10.0, mono_dom = MU.Box(zeros(2), ones(2)))
+shapeconregrJuMP10() = shapeconregrJuMP(2, 4, 100, x -> exp(norm(x)))
+shapeconregrJuMP11() = shapeconregrJuMP(2, 5, 100, x -> exp(norm(x)), signal_ratio = 10.0, mono_dom = MU.Box(0.5 * ones(2), 2 * ones(2)))
+shapeconregrJuMP12() = shapeconregrJuMP(2, 6, 100, x -> exp(norm(x)), signal_ratio = 1.0, mono_dom = MU.Box(0.5 * ones(2), 2 * ones(2)), use_wsos = false)
+shapeconregrJuMP13() = shapeconregrJuMP(2, 6, 100, x -> exp(norm(x)), signal_ratio = 1.0, use_lsq_obj = false)
+shapeconregrJuMP14() = shapeconregrJuMP(5, 5, 1000, x -> exp(norm(x)), use_wsos = false)
+shapeconregrJuMP15() = shapeconregrJuMP(2, 3, 100, x -> exp(norm(x)), use_lsq_obj = false, use_wsos = false)
 
-function test_shapeconregr_JuMP(instance::Tuple{Function,Number}; options)
+function test_shapeconregrJuMP(instance::Tuple{Function,Number}; options)
     (instance, true_obj) = instance
     data = instance()
     JuMP.optimize!(data.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
@@ -191,27 +191,27 @@ function test_shapeconregr_JuMP(instance::Tuple{Function,Number}; options)
     return
 end
 
-test_shapeconregr_JuMP(; options...) = test_shapeconregr_JuMP.([
-    (shapeconregr1_JuMP, 4.4065e-1),
-    (shapeconregr2_JuMP, 1.3971e-1),
-    (shapeconregr3_JuMP, 2.4577e-1),
-    (shapeconregr4_JuMP, 1.5449e-1),
-    (shapeconregr5_JuMP, 2.5200e-1),
-    (shapeconregr6_JuMP, 5.4584e-2),
-    (shapeconregr7_JuMP, 3.3249e-2),
-    (shapeconregr8_JuMP, 3.7723e-03),
-    (shapeconregr9_JuMP, 3.0995e-02),
-    (shapeconregr10_JuMP, 5.0209e-02),
-    (shapeconregr11_JuMP, 0.22206),
-    (shapeconregr12_JuMP, 0.22206),
-    (shapeconregr13_JuMP, 1.7751), # not verified with SDP
-    # (shapeconregr14_JuMP, NaN),
-    (shapeconregr15_JuMP, 4.4065e-1),
+test_shapeconregrJuMP(; options...) = test_shapeconregrJuMP.([
+    (shapeconregrJuMP1, 4.4065e-1),
+    (shapeconregrJuMP2, 1.3971e-1),
+    (shapeconregrJuMP3, 2.4577e-1),
+    (shapeconregrJuMP4, 1.5449e-1),
+    (shapeconregrJuMP5, 2.5200e-1),
+    (shapeconregrJuMP6, 5.4584e-2),
+    (shapeconregrJuMP7, 3.3249e-2),
+    (shapeconregrJuMP8, 3.7723e-03),
+    (shapeconregrJuMP9, 3.0995e-02),
+    (shapeconregrJuMP10, 5.0209e-02),
+    (shapeconregrJuMP11, 0.22206),
+    (shapeconregrJuMP12, 0.22206),
+    (shapeconregrJuMP13, 1.7751), # not verified with SDP
+    # (shapeconregrJuMP14, NaN),
+    (shapeconregrJuMP15, 4.4065e-1),
     ], options = options)
 
-test_shapeconregr_JuMP_small(; options...) = test_shapeconregr_JuMP.([
-    (shapeconregr1_JuMP, 4.4065e-1),
-    (shapeconregr2_JuMP, 1.3971e-1),
-    (shapeconregr12_JuMP, 0.22206),
-    (shapeconregr15_JuMP, 4.4065e-1),
+test_shapeconregrJuMP_quick(; options...) = test_shapeconregrJuMP.([
+    (shapeconregrJuMP1, 4.4065e-1),
+    (shapeconregrJuMP2, 1.3971e-1),
+    (shapeconregrJuMP12, 0.22206),
+    (shapeconregrJuMP15, 4.4065e-1),
     ], options = options)

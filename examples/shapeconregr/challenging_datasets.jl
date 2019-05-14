@@ -6,7 +6,7 @@ Data obtained from http://www.nber.org/data/nbprod2005.html
 
 using DataFrames
 using CSV
-include(joinpath(@__DIR__(), "jump.jl"))
+include(joinpath(@__DIR__(), "JuMP.jl"))
 
 # Example 1 from https://arxiv.org/pdf/1509.08165v1.pdf
 function normfunction_data(; n::Int = 5, num_points::Int = 100)

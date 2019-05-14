@@ -18,7 +18,7 @@ using LinearAlgebra
 import Random
 using Test
 
-function expdesign_JuMP(
+function expdesignJuMP(
     q::Int,
     p::Int,
     n::Int,
@@ -38,13 +38,13 @@ function expdesign_JuMP(
     return (model = model, n = n, nmax = nmax, V = V, np = np)
 end
 
-expdesign1_JuMP() = expdesign_JuMP(25, 75, 125, 5) # large
-expdesign2_JuMP() = expdesign_JuMP(10, 30, 50, 5) # medium
-expdesign3_JuMP() = expdesign_JuMP(5, 15, 25, 5) # small
-expdesign4_JuMP() = expdesign_JuMP(4, 8, 12, 3) # tiny
-expdesign5_JuMP() = expdesign_JuMP(3, 5, 7, 2) # miniscule
+expdesignJuMP1() = expdesignJuMP(25, 75, 125, 5) # large
+expdesignJuMP2() = expdesignJuMP(10, 30, 50, 5) # medium
+expdesignJuMP3() = expdesignJuMP(5, 15, 25, 5) # small
+expdesignJuMP4() = expdesignJuMP(4, 8, 12, 3) # tiny
+expdesignJuMP5() = expdesignJuMP(3, 5, 7, 2) # miniscule
 
-function test_expdesign_JuMP(instance::Function; options)
+function test_expdesignJuMP(instance::Function; options)
     data = instance()
     JuMP.optimize!(data.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
     @test JuMP.termination_status(data.model) == MOI.OPTIMAL
@@ -55,12 +55,12 @@ function test_expdesign_JuMP(instance::Function; options)
     return
 end
 
-test_expdesign_JuMP(; options...) = test_expdesign_JuMP.([
-    # expdesign1_JuMP,
-    # expdesign2_JuMP,
-    expdesign3_JuMP,
-    expdesign4_JuMP,
-    expdesign5_JuMP,
+test_expdesignJuMP(; options...) = test_expdesignJuMP.([
+    # expdesignJuMP1,
+    # expdesignJuMP2,
+    expdesignJuMP3,
+    expdesignJuMP4,
+    expdesignJuMP5,
     ], options = options)
 
-test_expdesign_JuMP_quick(; options...) = test_expdesign_JuMP.([expdesign3_JuMP], options = options)
+test_expdesignJuMP_quick(; options...) = test_expdesignJuMP.([expdesignJuMP3], options = options)

@@ -14,7 +14,6 @@ using LinearAlgebra
 using SparseArrays
 using Test
 
-
 include(joinpath(@__DIR__, "interpolation.jl"))
 include(joinpath(@__DIR__, "barriers.jl"))
 
@@ -28,6 +27,7 @@ include(joinpath(@__DIR__, "native.jl"))
 
 include(joinpath(@__DIR__, "MathOptInterface.jl"))
 
+<<<<<<< HEAD
 include(joinpath(examples_dir, "envelope/jump.jl"))
 include(joinpath(examples_dir, "expdesign/jump.jl"))
 include(joinpath(examples_dir, "lotkavolterra/jump.jl"))
@@ -35,13 +35,21 @@ include(joinpath(examples_dir, "polymin/jump.jl"))
 include(joinpath(examples_dir, "shapeconregr/jump.jl"))
 include(joinpath(examples_dir, "densityest/jump.jl"))
 # include(joinpath(examples_dir, "wsosmatrix/sosmatrix.jl"))
+=======
+include(joinpath(examples_dir, "envelope/JuMP.jl"))
+include(joinpath(examples_dir, "expdesign/JuMP.jl"))
+include(joinpath(examples_dir, "lotkavolterra/JuMP.jl"))
+include(joinpath(examples_dir, "polymin/JuMP.jl"))
+include(joinpath(examples_dir, "shapeconregr/JuMP.jl"))
+include(joinpath(examples_dir, "densityest/JuMP.jl"))
+include(joinpath(examples_dir, "wsosmatrix/sosmatrix.jl"))
+>>>>>>> upstream/examples_consistency
 include(joinpath(examples_dir, "wsosmatrix/muconvexity.jl"))
 include(joinpath(examples_dir, "wsosmatrix/sosmat1.jl"))
 include(joinpath(examples_dir, "wsosmatrix/sosmat2.jl"))
 include(joinpath(examples_dir, "wsosmatrix/sosmat3.jl"))
-include(joinpath(examples_dir, "regionofattr/jump.jl"))
-include(joinpath(examples_dir, "contraction/jump.jl"))
-
+include(joinpath(examples_dir, "regionofattr/JuMP.jl"))
+include(joinpath(examples_dir, "contraction/JuMP.jl"))
 
 @testset "Hypatia tests" begin
 
@@ -136,12 +144,6 @@ include(joinpath(examples_dir, "contraction/jump.jl"))
 #     t(s, m, verbose)
 # end
 
-@info("starting default native examples tests")
-@testset "JuMP examples" begin
-    test_envelope()
-    test_linearopt()
-    test_polymin()
-end
 
 # @info("starting MathOptInterface tests")
 # verbose = false
@@ -175,19 +177,23 @@ end
 #     t()
 # end
 
-@info("starting additional JuMP examples tests")
-@testset "all" begin
-@testset "JuMP examples" begin
-    # # test_contraction_JuMP(verbose = true, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4, tol_feas = 1e-4)
-    # test_densityest_JuMP(verbose = true)
-    # test_envelope_JuMP(verbose = true)
-    # test_expdesign_JuMP(verbose = true)
-    # # test_lotkavolterra_JuMP(verbose = true, max_iters = 1000, time_limit = 3.6e4, tol_rel_opt = 1e-5, tol_abs_opt = 1e-6, tol_feas = 1e-6)
-    # # test_polymin_JuMP(verbose = true, tol_rel_opt = 1e-8, tol_abs_opt = 1e-8, tol_feas = 1e-8)
-    # test_regionofattr_JuMP(verbose = true, tol_feas = 1e-5)
-    test_shapeconregr_JuMP(verbose = true, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6, tol_feas = 1e-5) # different examples work under different tolerances
-    # test_muconvexity_JuMP(verbose = true)
+@info("starting native examples tests")
+@testset "native examples" begin
+    test_envelope()
+    test_linearopt()
+    test_polymin()
 end
+
+@info("starting JuMP examples tests")
+@testset "JuMP examples" begin
+    test_contractionJuMP(verbose = true, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4, tol_feas = 1e-4)
+    test_densityestJuMP(verbose = true)
+    test_envelopeJuMP(verbose = true)
+    test_expdesignJuMP(verbose = true)
+    test_lotkavolterraJuMP(verbose = true, tol_rel_opt = 1e-5, tol_abs_opt = 1e-6, tol_feas = 1e-6)
+    test_polyminJuMP(verbose = true, tol_rel_opt = 1e-8, tol_abs_opt = 1e-8, tol_feas = 1e-8)
+    test_regionofattrJuMP(verbose = true, tol_feas = 1e-5)
+    test_shapeconregrJuMP(verbose = true)
 end
 
 end

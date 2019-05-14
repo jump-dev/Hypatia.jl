@@ -27,7 +27,7 @@ import Random
 import Distributions
 using Test
 
-function densityest_JuMP(
+function densityestJuMP(
     nobs::Int,
     n::Int,
     deg::Int;
@@ -72,17 +72,17 @@ function densityest_JuMP(
     return (model = model,)
 end
 
-densityest1_JuMP() = densityest_JuMP(200, 1, 4, use_monomials = false)
-densityest2_JuMP() = densityest_JuMP(200, 1, 4, use_monomials = true)
+densityestJuMP1() = densityestJuMP(200, 1, 4, use_monomials = false)
+densityestJuMP2() = densityestJuMP(200, 1, 4, use_monomials = true)
 
-function test_densityest_JuMP(instance::Function; options)
+function test_densityestJuMP(instance::Function; options)
     data = instance()
     JuMP.optimize!(data.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
     @test JuMP.termination_status(data.model) == MOI.OPTIMAL
     return
 end
 
-test_densityest_JuMP(; options...) = test_densityest_JuMP.([
-    densityest1_JuMP,
-    densityest2_JuMP,
+test_densityestJuMP(; options...) = test_densityestJuMP.([
+    densityestJuMP1,
+    densityestJuMP2,
     ], options = options)

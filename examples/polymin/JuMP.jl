@@ -1,5 +1,5 @@
 #=
-Copyright 2018, Chris Coey and contributors
+Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 
 see description in examples/polymin/native.jl
 =#
@@ -17,7 +17,7 @@ const MU = HYP.ModelUtilities
 
 include(joinpath(@__DIR__, "data.jl"))
 
-function polymin_JuMP(
+function polyminJuMP(
     polyname::Symbol,
     d::Int;
     use_wsos::Bool = true,
@@ -55,52 +55,52 @@ function polymin_JuMP(
     return (model = model, true_obj = true_obj)
 end
 
-polymin1_JuMP() = polymin_JuMP(:heart, 2)
-polymin2_JuMP() = polymin_JuMP(:schwefel, 2)
-polymin3_JuMP() = polymin_JuMP(:magnetism7_ball, 2)
-polymin4_JuMP() = polymin_JuMP(:motzkin_ellipsoid, 4)
-polymin5_JuMP() = polymin_JuMP(:caprasse, 4)
-polymin6_JuMP() = polymin_JuMP(:goldsteinprice, 7)
-polymin7_JuMP() = polymin_JuMP(:lotkavolterra, 3)
-polymin8_JuMP() = polymin_JuMP(:robinson, 8)
-polymin9_JuMP() = polymin_JuMP(:reactiondiffusion_ball, 3)
-polymin10_JuMP() = polymin_JuMP(:rosenbrock, 5)
-polymin11_JuMP() = polymin_JuMP(:butcher, 2)
-polymin12_JuMP() = polymin_JuMP(:butcher_ball, 2)
-polymin13_JuMP() = polymin_JuMP(:butcher_ellipsoid, 2)
-polymin14_JuMP() = polymin_JuMP(:motzkin, 3, use_wsos = false)
-polymin15_JuMP() = polymin_JuMP(:motzkin, 3, primal_wsos = true)
+polyminJuMP1() = polyminJuMP(:heart, 2)
+polyminJuMP2() = polyminJuMP(:schwefel, 2)
+polyminJuMP3() = polyminJuMP(:magnetism7_ball, 2)
+polyminJuMP4() = polyminJuMP(:motzkin_ellipsoid, 4)
+polyminJuMP5() = polyminJuMP(:caprasse, 4)
+polyminJuMP6() = polyminJuMP(:goldsteinprice, 7)
+polyminJuMP7() = polyminJuMP(:lotkavolterra, 3)
+polyminJuMP8() = polyminJuMP(:robinson, 8)
+polyminJuMP9() = polyminJuMP(:reactiondiffusion_ball, 3)
+polyminJuMP10() = polyminJuMP(:rosenbrock, 5)
+polyminJuMP11() = polyminJuMP(:butcher, 2)
+polyminJuMP12() = polyminJuMP(:butcher_ball, 2)
+polyminJuMP13() = polyminJuMP(:butcher_ellipsoid, 2)
+polyminJuMP14() = polyminJuMP(:motzkin, 3, use_wsos = false)
+polyminJuMP15() = polyminJuMP(:motzkin, 3, primal_wsos = true)
 # TODO add more from dictionary and more with different options combinations
 
-function test_polymin_JuMP(instance::Function; options)
+function test_polyminJuMP(instance::Function; options)
     d = instance()
     JuMP.optimize!(d.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
     @test JuMP.objective_value(d.model) ≈ d.true_obj atol = 1e-4 rtol = 1e-4
     return
 end
 
-test_polymin_JuMP(; options...) = test_polymin_JuMP.([
-    polymin1_JuMP,
-    polymin2_JuMP,
-    polymin3_JuMP,
-    polymin4_JuMP,
-    polymin5_JuMP,
-    polymin6_JuMP,
-    polymin7_JuMP,
-    polymin8_JuMP,
-    polymin9_JuMP,
-    polymin10_JuMP,
-    polymin11_JuMP,
-    polymin12_JuMP,
-    polymin13_JuMP,
-    polymin14_JuMP,
-    polymin15_JuMP,
+test_polyminJuMP(; options...) = test_polyminJuMP.([
+    polyminJuMP1,
+    polyminJuMP2,
+    polyminJuMP3,
+    polyminJuMP4,
+    polyminJuMP5,
+    polyminJuMP6,
+    polyminJuMP7,
+    polyminJuMP8,
+    polyminJuMP9,
+    polyminJuMP10,
+    polyminJuMP11,
+    polyminJuMP12,
+    polyminJuMP13,
+    polyminJuMP14,
+    polyminJuMP15,
     ], options = options)
 
-test_polymin_JuMP_quick(; options...) = test_polymin_JuMP.([
-    polymin2_JuMP,
-    polymin3_JuMP,
-    polymin6_JuMP,
-    polymin14_JuMP,
-    polymin15_JuMP,
+test_polyminJuMP_quick(; options...) = test_polyminJuMP.([
+    polyminJuMP2,
+    polyminJuMP3,
+    polyminJuMP6,
+    polyminJuMP14,
+    polyminJuMP15,
     ], options = options)
