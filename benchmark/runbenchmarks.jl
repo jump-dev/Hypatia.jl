@@ -55,7 +55,7 @@ end
 # Hypatia options
 verbose = true
 time_limit = 1e2
-dense = false
+use_dense = false
 
 MOI.Utilities.@model(HypatiaModelData,
     (MOI.Integer,), # integer constraints will be ignored by Hypatia
@@ -74,7 +74,7 @@ MOI.Utilities.@model(HypatiaModelData,
 optimizer = MOI.Utilities.CachingOptimizer(HypatiaModelData{Float64}(), Hypatia.Optimizer(
     verbose = verbose,
     time_limit = time_limit,
-    dense = dense,
+    use_dense = use_dense,
     tol_rel_opt = 1e-6,
     tol_abs_opt = 1e-7,
     tol_feas = 1e-7,
