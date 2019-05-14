@@ -35,8 +35,8 @@ end
 
 linearopt1() = linearopt(500, 1000)
 linearopt2() = linearopt(15, 20)
-linearopt3() = linearopt(500, 1000, nzfrac = 1/30)
-linearopt4() = linearopt(15, 20, nzfrac = 1/4)
+linearopt3() = linearopt(500, 1000, nzfrac = 1 / 30)
+linearopt4() = linearopt(15, 20, nzfrac = 1 / 4)
 
 function test_linearopt(instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
