@@ -178,6 +178,7 @@ end
     test_envelopeJuMP(verbose = verbose)
     test_expdesignJuMP(verbose = verbose)
     test_lotkavolterraJuMP(verbose = verbose, tol_rel_opt = 1e-5, tol_abs_opt = 1e-6, tol_feas = 1e-6)
+    test_muconvexityJuMP(verbose = verbose)
     test_polyminJuMP(verbose = verbose, tol_rel_opt = 1e-8, tol_abs_opt = 1e-8, tol_feas = 1e-8)
     test_regionofattrJuMP(verbose = verbose, tol_feas = 1e-5)
     test_shapeconregrJuMP(verbose = verbose, tol_rel_opt = 1e-7, tol_abs_opt = 1e-6, tol_feas = 1e-5)
