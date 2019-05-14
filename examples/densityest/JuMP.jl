@@ -9,33 +9,26 @@ find a density function f maximizing the log likelihood of the observations
     f ≥ 0
 ==#
 
-import Hypatia
-const HYP = Hypatia
-const CO = HYP.Cones
-const SO = HYP.Solvers
-const MO = HYP.Models
-const MU = HYP.ModelUtilities
-
-import JuMP
-import MathOptInterface
-const MOI = MathOptInterface
-import PolyJuMP
-import MultivariatePolynomials
-import DynamicPolynomials
 using LinearAlgebra
 import Random
 import Distributions
 using Test
+import MathOptInterface
+const MOI = MathOptInterface
+import JuMP
+import DynamicPolynomials
+import PolyJuMP
+import Hypatia
+const HYP = Hypatia
+const MU = HYP.ModelUtilities
 
 function densityestJuMP(
     nobs::Int,
     n::Int,
     deg::Int;
-    rseed::Int = 1,
     sample_factor::Int = 100,
     use_monomials::Bool = false,
     )
-    Random.seed!(rseed)
     X = rand(Distributions.Uniform(-1, 1), nobs, n)
     (nobs, dim) = size(X)
     domain = MU.Box(-ones(n), ones(n))
@@ -49,7 +42,7 @@ function densityestJuMP(
     if use_monomials
         lagrange_polys = []
         DynamicPolynomials.@polyvar x[1:dim]
-        PX = DynamicPolynomials.monomials(x, 0:(2 * d))
+        PX = DynamicPolynomials.monomials(x, 0:2d)
         JuMP.@variable(model, f, PolyJuMP.Poly(PX))
         JuMP.@constraints(model, begin
             sum(w[i] * f(pts[i, :]) for i in 1:U) == 1.0 # integrate to 1
@@ -57,7 +50,7 @@ function densityestJuMP(
             [i in 1:nobs], vcat(z[i], 1.0, f(X[i, :])) in MOI.ExponentialCone() # hypograph of log
         end)
     else
-        lagrange_polys = MU.recover_lagrange_polys(pts, 2 * d)
+        lagrange_polys = MU.recover_lagrange_polys(pts, 2d)
         basis_evals = Matrix{Float64}(undef, nobs, U)
         for i in 1:nobs, j in 1:U
             basis_evals[i, j] = lagrange_polys[j](X[i, :])
@@ -69,13 +62,15 @@ function densityestJuMP(
             [i in 1:nobs], vcat(z[i], 1.0, dot(f, basis_evals[i, :])) in MOI.ExponentialCone() # hypograph of log
         end)
     end
+    
     return (model = model,)
 end
 
 densityestJuMP1() = densityestJuMP(200, 1, 4, use_monomials = false)
 densityestJuMP2() = densityestJuMP(200, 1, 4, use_monomials = true)
 
-function test_densityestJuMP(instance::Function; options)
+function test_densityestJuMP(instance::Function; options, rseed::Int = 1)
+    Random.seed!(rseed)
     data = instance()
     JuMP.optimize!(data.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
     @test JuMP.termination_status(data.model) == MOI.OPTIMAL

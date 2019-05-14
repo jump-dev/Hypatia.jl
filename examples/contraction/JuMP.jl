@@ -1,8 +1,8 @@
 #=
 Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 
-contractionJuMP analysis example adapted from
-"Stability and robustness analysis of nonlinear systems via contractionJuMP metrics and SOS programming"
+contraction analysis example adapted from
+"Stability and robustness analysis of nonlinear systems via contraction metrics and SOS programming"
 Aylward, E.M., Parrilo, P.A. and Slotine, J.J.E
 =#
 
@@ -28,9 +28,7 @@ function contractionJuMP(
     deg_M::Int,
     delta::Float64;
     use_wsos::Bool = true,
-    rseed::Int = 1,
     )
-    Random.seed!(rseed)
     n = 2
     dom = MU.FreeDomain(n)
 
@@ -75,11 +73,12 @@ contractionJuMP2() = contractionJuMP(0.77, 4, 1e-3, use_wsos = false)
 contractionJuMP3() = contractionJuMP(0.85, 4, 1e-3, use_wsos = true)
 contractionJuMP4() = contractionJuMP(0.85, 4, 1e-3, use_wsos = false)
 
-function test_contractionJuMP(instance::Tuple{Function, Bool}; options)
+function test_contractionJuMP(instance::Tuple{Function, Bool}; options, rseed::Int = 1)
+    Random.seed!(rseed)
     (instance, is_feas) = instance
-    data = instance()
-    JuMP.optimize!(data.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
-    @test JuMP.termination_status(data.model) == (is_feas ? MOI.OPTIMAL : MOI.INFEASIBLE)
+    d = instance()
+    JuMP.optimize!(d.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
+    @test JuMP.termination_status(d.model) == (is_feas ? MOI.OPTIMAL : MOI.INFEASIBLE)
     return
 end
 
