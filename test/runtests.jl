@@ -27,29 +27,19 @@ include(joinpath(@__DIR__, "native.jl"))
 
 include(joinpath(@__DIR__, "MathOptInterface.jl"))
 
-<<<<<<< HEAD
-include(joinpath(examples_dir, "envelope/jump.jl"))
-include(joinpath(examples_dir, "expdesign/jump.jl"))
-include(joinpath(examples_dir, "lotkavolterra/jump.jl"))
-include(joinpath(examples_dir, "polymin/jump.jl"))
-include(joinpath(examples_dir, "shapeconregr/jump.jl"))
-include(joinpath(examples_dir, "densityest/jump.jl"))
-# include(joinpath(examples_dir, "wsosmatrix/sosmatrix.jl"))
-=======
 include(joinpath(examples_dir, "envelope/JuMP.jl"))
 include(joinpath(examples_dir, "expdesign/JuMP.jl"))
 include(joinpath(examples_dir, "lotkavolterra/JuMP.jl"))
 include(joinpath(examples_dir, "polymin/JuMP.jl"))
 include(joinpath(examples_dir, "shapeconregr/JuMP.jl"))
 include(joinpath(examples_dir, "densityest/JuMP.jl"))
-include(joinpath(examples_dir, "wsosmatrix/sosmatrix.jl"))
->>>>>>> upstream/examples_consistency
-include(joinpath(examples_dir, "wsosmatrix/muconvexity.jl"))
-include(joinpath(examples_dir, "wsosmatrix/sosmat1.jl"))
-include(joinpath(examples_dir, "wsosmatrix/sosmat2.jl"))
-include(joinpath(examples_dir, "wsosmatrix/sosmat3.jl"))
 include(joinpath(examples_dir, "regionofattr/JuMP.jl"))
 include(joinpath(examples_dir, "contraction/JuMP.jl"))
+# include(joinpath(examples_dir, "wsosmatrix/sosmatrix.jl"))
+# include(joinpath(examples_dir, "wsosmatrix/muconvexity.jl"))
+# include(joinpath(examples_dir, "wsosmatrix/sosmat1.jl"))
+# include(joinpath(examples_dir, "wsosmatrix/sosmat2.jl"))
+# include(joinpath(examples_dir, "wsosmatrix/sosmat3.jl"))
 
 @testset "Hypatia tests" begin
 

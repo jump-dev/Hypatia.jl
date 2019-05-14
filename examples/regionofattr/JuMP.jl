@@ -5,30 +5,27 @@ univariate cubic dynamical system
 example taken from "Convex computation of the region of attraction of polynomial control systems" by D. Henrion and M. Korda
 =#
 
-import Hypatia
-const HYP = Hypatia
-const CO = HYP.Cones
-const SO = HYP.Solvers
-const MO = HYP.Models
-const MU = HYP.ModelUtilities
-
-import JuMP
-import SumOfSquares
-import SemialgebraicSets
-const SAS = SemialgebraicSets
-import MathOptInterface
-const MOI = MathOptInterface
-import PolyJuMP
-import DynamicPolynomials
-const DP = DynamicPolynomials
 using LinearAlgebra
 using Test
+import MathOptInterface
+const MOI = MathOptInterface
+import JuMP
+import DynamicPolynomials
+const DP = DynamicPolynomials
+import SemialgebraicSets
+const SAS = SemialgebraicSets
+import SumOfSquares
+import PolyJuMP
+import Hypatia
+const HYP = Hypatia
+const MU = HYP.ModelUtilities
 
 function regionofattrJuMP(deg::Int; use_WSOS::Bool = true)
     T = 100.0
     DP.@polyvar x
     DP.@polyvar t
     f = x * (x - 0.5) * (x + 0.5) * T
+    
     model = JuMP.Model()
     JuMP.@variables(model, begin
         v, PolyJuMP.Poly(DP.monomials([x; t], 0:deg))
@@ -48,6 +45,7 @@ function regionofattrJuMP(deg::Int; use_WSOS::Bool = true)
         wsos_cone1 = HYP.WSOSPolyInterpCone(U1, [P01, PWts1...])
         wsos_cone2 = HYP.WSOSPolyInterpCone(U2, [P02, PWts2...])
         wsos_cone3 = HYP.WSOSPolyInterpCone(U3, [P03, PWts3...])
+
         JuMP.@objective(model, Min, sum(quad_weights[u] * w(pts1[u, :]) for u in 1:U1))
         JuMP.@constraints(model, begin
             [-dvdt(pts2[u, :]) for u in 1:U2] in wsos_cone2
@@ -58,6 +56,7 @@ function regionofattrJuMP(deg::Int; use_WSOS::Bool = true)
     else
         int_box_mon(mon) = prod(1 / (p + 1) - (-1)^(p + 1) / (p + 1) for p in DP.exponents(mon))
         int_box(pol) = sum(DP.coefficient(t) * int_box_mon(t) for t in DP.terms(pol))
+
         PolyJuMP.setpolymodule!(model, SumOfSquares)
         JuMP.@objective(model, Min, int_box(w))
         JuMP.@constraint(model, -dvdt >= 0, domain = (SAS.@set -1 <= x  && x <= 1 && 0 <= t && t <= 1))
@@ -65,13 +64,15 @@ function regionofattrJuMP(deg::Int; use_WSOS::Bool = true)
         JuMP.@constraint(model, vT >= 0, domain = (SAS.@set -0.01 <= x && x <= 0.01))
         JuMP.@constraint(model, w >= 0, domain = (SAS.@set -1 <= x && x <= 1))
     end
+
     return (model = model,)
 end
 
 regionofattrJuMP1() = regionofattrJuMP(4, use_WSOS = true)
 regionofattrJuMP2() = regionofattrJuMP(4, use_WSOS = false)
 
-function test_regionofattrJuMP(instance::Function; options)
+function test_regionofattrJuMP(instance::Function; options, rseed::Int = 1)
+    Random.seed!(rseed)
     data = instance()
     JuMP.optimize!(data.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
     @test JuMP.termination_status(data.model) == MOI.OPTIMAL
