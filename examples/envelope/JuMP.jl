@@ -1,7 +1,7 @@
 #=
 Copyright 2018, Chris Coey and contributors
 
-see description in examples/envelope/native.jl
+see description in examples/envelopeJuMP/native.jl
 =#
 
 import Hypatia
@@ -16,7 +16,7 @@ using LinearAlgebra
 import Random
 using Test
 
-function envelope_JuMP(
+function envelopeJuMP(
     npoly::Int,
     deg::Int,
     d::Int,
@@ -39,19 +39,19 @@ function envelope_JuMP(
     return (model = model,)
 end
 
-envelope1_JuMP() = envelope_JuMP(2, 3, 4, MU.Box(-ones(2), ones(2)))
-envelope2_JuMP() = envelope_JuMP(2, 3, 4, MU.Ball(zeros(2), sqrt(2))) # needs fix to work https://github.com/chriscoey/Hypatia.jl/issues/173
-envelope3_JuMP() = envelope_JuMP(2, 3, 4, MU.Box(-ones(2), ones(2)), sample = false)
+envelopeJuMP1() = envelopeJuMP(2, 3, 4, MU.Box(-ones(2), ones(2)))
+envelopeJuMP2() = envelopeJuMP(2, 3, 4, MU.Ball(zeros(2), sqrt(2))) # needs fix to work https://github.com/chriscoey/Hypatia.jl/issues/173
+envelopeJuMP3() = envelopeJuMP(2, 3, 4, MU.Box(-ones(2), ones(2)), sample = false)
 
-function test_envelope_JuMP(instance::Function; options)
+function test_envelopeJuMP(instance::Function; options)
     data = instance()
     JuMP.optimize!(data.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
     @test JuMP.termination_status(data.model) == MOI.OPTIMAL
     return
 end
 
-test_envelope_JuMP(; options...) = test_envelope_JuMP.([
-    envelope1_JuMP,
-    envelope2_JuMP,
-    envelope3_JuMP,
+test_envelopeJuMP(; options...) = test_envelopeJuMP.([
+    envelopeJuMP1,
+    envelopeJuMP2,
+    envelopeJuMP3,
     ], options = options)

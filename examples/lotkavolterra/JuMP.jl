@@ -37,7 +37,7 @@ end
 
 integrate_ball(p, n) = sum(DynamicPolynomials.coefficient(t) * integrate_ball_monomial(t, n) for t in DynamicPolynomials.terms(p))
 
-function lotkavolterra_JuMP()
+function lotkavolterraJuMP()
     # parameters
     d = 4 # degree
     n = 4 # number of species
@@ -82,13 +82,13 @@ function lotkavolterra_JuMP()
     return (model = model,)
 end
 
-lotkavolterra1_JuMP() = lotkavolterra_JuMP()
+lotkavolterraJuMP1() = lotkavolterraJuMP()
 
-function test_lotkavolterra_JuMP(instance::Function; options)
+function test_lotkavolterraJuMP(instance::Function; options)
     data = instance()
     JuMP.optimize!(data.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
     @test JuMP.termination_status(data.model) == MOI.OPTIMAL
     return
 end
 
-test_lotkavolterra_JuMP(; options...) = test_lotkavolterra_JuMP.([lotkavolterra1_JuMP], options = options)
+test_lotkavolterraJuMP(; options...) = test_lotkavolterraJuMP.([lotkavolterraJuMP1], options = options)
