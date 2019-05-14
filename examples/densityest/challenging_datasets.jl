@@ -4,7 +4,7 @@ Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 
 using DataFrames
 using CSV
-include(joinpath(@__DIR__(), "jump.jl"))
+include(joinpath(@__DIR__(), "JuMP.jl"))
 
 function scale_X!(X)
     X .-= 0.5 * (minimum(X, dims=1) + maximum(X, dims=1))
