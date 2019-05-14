@@ -66,7 +66,7 @@ function semidefinitepolyJuMP(x::Vector{DP.PolyVar{true}}, poly::DP.Polynomial; 
 end
 
 function semidefinitepolyJuMP1()
-    DynamicPolynomials.@polyvar x
+    DP.@polyvar x
     M = [
         (x + 2x^3)  1;
         (-x^2 + 2)  (3x^2 - x + 1);
@@ -76,13 +76,13 @@ function semidefinitepolyJuMP1()
 end
 
 function semidefinitepolyJuMP2()
-    DynamicPolynomials.@polyvar x
+    DP.@polyvar x
     poly = x^4 + 2x^2
     return semidefinitepolyJuMP(x, poly, use_wsos = true)
 end
 
 function semidefinitepolyJuMP3()
-    DynamicPolynomials.@polyvar x y
+    DP.@polyvar x y
     poly = (x + y)^4 + (x + y)^2
     return semidefinitepolyJuMP([x, y], poly, use_wsos = true)
 end
@@ -101,7 +101,7 @@ end
 
 # SOSTOOLS examples
 function semidefinitepolyJuMP5()
-    DynamicPolynomials.@polyvar x
+    DP.@polyvar x
     P = [
         (x^2 - 2x + 2)  x;
         x               x^2;
@@ -120,7 +120,7 @@ function semidefinitepolyJuMP6()
 end
 
 function semidefinitepolyJuMP7()
-    DynamicPolynomials.@polyvar x y z
+    DP.@polyvar x y z
     P = [
         (x^4 + x^2 * y^2 + x^2 * z^2)                       (x * y * z^2 - x^3 * y - x * y * (y^2 + 2 * z^2));
         (x * y * z^2 - x^3 * y - x * y * (y^2 + 2 * z^2))   (x^2 * y^2 + y^2 * z^2 + (y^2 + 2 * z^2)^2);
