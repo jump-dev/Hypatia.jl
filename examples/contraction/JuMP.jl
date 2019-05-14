@@ -1,8 +1,8 @@
 #=
 Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 
-contraction analysis example adapted from
-"Stability and robustness analysis of nonlinear systems via contraction metrics and SOS programming"
+contractionJuMP analysis example adapted from
+"Stability and robustness analysis of nonlinear systems via contractionJuMP metrics and SOS programming"
 Aylward, E.M., Parrilo, P.A. and Slotine, J.J.E
 =#
 
@@ -23,7 +23,7 @@ import Random
 
 const rt2 = sqrt(2)
 
-function contraction_JuMP(
+function contractionJuMP(
     beta::Float64,
     deg_M::Int,
     delta::Float64;
@@ -70,12 +70,12 @@ function contraction_JuMP(
     return (model = model,)
 end
 
-contraction1_JuMP() = contraction_JuMP(0.77, 4, 1e-3, use_wsos = true)
-contraction2_JuMP() = contraction_JuMP(0.77, 4, 1e-3, use_wsos = false)
-contraction3_JuMP() = contraction_JuMP(0.85, 4, 1e-3, use_wsos = true)
-contraction4_JuMP() = contraction_JuMP(0.85, 4, 1e-3, use_wsos = false)
+contractionJuMP1() = contractionJuMP(0.77, 4, 1e-3, use_wsos = true)
+contractionJuMP2() = contractionJuMP(0.77, 4, 1e-3, use_wsos = false)
+contractionJuMP3() = contractionJuMP(0.85, 4, 1e-3, use_wsos = true)
+contractionJuMP4() = contractionJuMP(0.85, 4, 1e-3, use_wsos = false)
 
-function test_contraction_JuMP(instance::Tuple{Function, Bool}; options)
+function test_contractionJuMP(instance::Tuple{Function, Bool}; options)
     (instance, is_feas) = instance
     data = instance()
     JuMP.optimize!(data.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
@@ -83,9 +83,9 @@ function test_contraction_JuMP(instance::Tuple{Function, Bool}; options)
     return
 end
 
-test_contraction_JuMP(; options...) = test_contraction_JuMP.([
-    (contraction1_JuMP, true),
-    (contraction2_JuMP, true),
-    (contraction3_JuMP, false),
-    (contraction4_JuMP, false),
+test_contractionJuMP(; options...) = test_contractionJuMP.([
+    (contractionJuMP1, true),
+    (contractionJuMP2, true),
+    (contractionJuMP3, false),
+    (contractionJuMP4, false),
     ], options = options)
