@@ -46,7 +46,8 @@ function production_data()
     return (Xlog, y, n)
 end
 
-function run_hard_shapeconregr()
+function run_hard_shapeconregr(; rseed::Int = 1)
+    Random.seed!(rseed)
     degrees = 4:2:4
 
     datasets = [
