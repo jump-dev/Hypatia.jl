@@ -35,12 +35,7 @@ include(joinpath(examples_dir, "shapeconregr/JuMP.jl"))
 include(joinpath(examples_dir, "densityest/JuMP.jl"))
 include(joinpath(examples_dir, "regionofattr/JuMP.jl"))
 include(joinpath(examples_dir, "contraction/JuMP.jl"))
-# TODO some below were renamed or deleted
-# include(joinpath(examples_dir, "wsosmatrix/sosmatrix.jl"))
-# include(joinpath(examples_dir, "wsosmatrix/muconvexity.jl"))
-# include(joinpath(examples_dir, "wsosmatrix/sosmat1.jl"))
-# include(joinpath(examples_dir, "wsosmatrix/sosmat2.jl"))
-# include(joinpath(examples_dir, "wsosmatrix/sosmat3.jl"))
+include(joinpath(examples_dir, "semidefinitepoly/JuMP.jl"))
 
 @testset "Hypatia tests" begin
 
@@ -168,25 +163,26 @@ include(joinpath(examples_dir, "contraction/JuMP.jl"))
 #     t()
 # end
 
-verbose = false
+verbose = true
 
-@info("starting native examples tests")
-@testset "native examples" begin
-    test_envelope(verbose = verbose)
-    test_linearopt(verbose = verbose)
-    test_polymin(verbose = verbose)
-end
+# @info("starting native examples tests")
+# @testset "native examples" begin
+#     test_envelope(verbose = verbose)
+#     test_linearopt(verbose = verbose)
+#     test_polymin(verbose = verbose)
+# end
 
 @info("starting JuMP examples tests")
 @testset "JuMP examples" begin
-    test_contractionJuMP(verbose = verbose, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4, tol_feas = 1e-4)
-    test_densityestJuMP(verbose = verbose)
-    test_envelopeJuMP(verbose = verbose)
-    test_expdesignJuMP(verbose = verbose)
-    test_lotkavolterraJuMP(verbose = verbose, tol_rel_opt = 1e-5, tol_abs_opt = 1e-6, tol_feas = 1e-6)
-    test_polyminJuMP(verbose = verbose, tol_rel_opt = 1e-8, tol_abs_opt = 1e-8, tol_feas = 1e-8)
-    test_regionofattrJuMP(verbose = verbose, tol_feas = 1e-5)
-    test_shapeconregrJuMP(verbose = verbose, tol_rel_opt = 1e-7, tol_abs_opt = 1e-6, tol_feas = 1e-5)
+    # test_contractionJuMP(verbose = verbose, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4, tol_feas = 1e-4)
+    # test_densityestJuMP(verbose = verbose)
+    # test_envelopeJuMP(verbose = verbose)
+    # test_expdesignJuMP(verbose = verbose)
+    # test_lotkavolterraJuMP(verbose = verbose, tol_rel_opt = 1e-5, tol_abs_opt = 1e-6, tol_feas = 1e-6)
+    # test_polyminJuMP(verbose = verbose, tol_rel_opt = 1e-8, tol_abs_opt = 1e-8, tol_feas = 1e-8)
+    # test_regionofattrJuMP(verbose = verbose, tol_feas = 1e-5)
+    # test_shapeconregrJuMP(verbose = verbose, tol_rel_opt = 1e-7, tol_abs_opt = 1e-6, tol_feas = 1e-5)
+    test_convexityJuMP(verbose = true)
 end
 
 end
