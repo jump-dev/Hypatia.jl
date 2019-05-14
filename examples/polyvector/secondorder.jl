@@ -1,22 +1,20 @@
 #=
 Copyright 2018, Chris Coey, Lea Kapelevich and contributors
+
+TODO description
 =#
 
-import Hypatia
-const HYP = Hypatia
-const CO = HYP.Cones
-const MU = HYP.ModelUtilities
-
-import MathOptInterface
-const MOI = MathOptInterface
-import JuMP
-# import PolyJuMP
-import DynamicPolynomials
-const DP = DynamicPolynomials
-# import SumOfSquares
 import LinearAlgebra
 import Random
 using Test
+import MathOptInterface
+const MOI = MathOptInterface
+import JuMP
+import DynamicPolynomials
+const DP = DynamicPolynomials
+import Hypatia
+const HYP = Hypatia
+const MU = HYP.ModelUtilities
 
 const rt2 = sqrt(2)
 
@@ -25,8 +23,10 @@ function JuMP_polysoc_monomial(P, n)
     d = div(maximum(DP.maxdegree.(P)) + 1, 2)
     (U, pts, P0, _, _) = MU.interpolate(dom, d, sample = false)
     cone = HYP.WSOSPolyInterpSOCCone(length(P), U, [P0])
+
     model = JuMP.Model(JuMP.with_optimizer(HYP.Optimizer, verbose = true, max_iters = 200))
     JuMP.@constraint(model, [P[i](pts[u, :]) for i in 1:length(P) for u in 1:U] in cone)
+
     return model
 end
 
@@ -44,7 +44,6 @@ function simple_feasibility()
     end
 end
 
-
 function simple_infeasibility()
     DP.@polyvar x
     for socpoly in [
@@ -61,7 +60,6 @@ function simple_infeasibility()
         @test JuMP.primal_status(model) == MOI.INFEASIBLE_POINT
     end
 end
-
 
 @testset "everything" begin
     simple_feasibility()
