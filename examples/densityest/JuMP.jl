@@ -33,16 +33,17 @@ function densityestJuMP(
     (nobs, dim) = size(X)
     domain = MU.Box(-ones(n), ones(n))
     halfdeg = div(deg + 1, 2)
+    (U, pts, P0, PWts, w) = MU.interpolate(domain, halfdeg, sample = true, calc_w = true, sample_factor = sample_factor)
 
     model = JuMP.Model()
-    (U, pts, P0, PWts, w) = MU.interpolate(domain, halfdeg, sample = true, calc_w = true, sample_factor = sample_factor)
     JuMP.@variable(model, z[1:nobs])
     JuMP.@objective(model, Max, sum(z))
 
     if use_monomials
         lagrange_polys = []
         DynamicPolynomials.@polyvar x[1:dim]
-        PX = DynamicPolynomials.monomials(x, 0:2 * halfdeg)
+        PX = DynamicPolynomials.monomials(x, 0:(2 * halfdeg))
+
         JuMP.@variable(model, f, PolyJuMP.Poly(PX))
         JuMP.@constraints(model, begin
             sum(w[i] * f(pts[i, :]) for i in 1:U) == 1.0 # integrate to 1
