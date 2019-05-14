@@ -27,6 +27,15 @@ include(joinpath(@__DIR__, "native.jl"))
 
 include(joinpath(@__DIR__, "MathOptInterface.jl"))
 
+<<<<<<< HEAD
+include(joinpath(examples_dir, "envelope/jump.jl"))
+include(joinpath(examples_dir, "expdesign/jump.jl"))
+include(joinpath(examples_dir, "lotkavolterra/jump.jl"))
+include(joinpath(examples_dir, "polymin/jump.jl"))
+include(joinpath(examples_dir, "shapeconregr/jump.jl"))
+include(joinpath(examples_dir, "densityest/jump.jl"))
+# include(joinpath(examples_dir, "wsosmatrix/sosmatrix.jl"))
+=======
 include(joinpath(examples_dir, "envelope/JuMP.jl"))
 include(joinpath(examples_dir, "expdesign/JuMP.jl"))
 include(joinpath(examples_dir, "lotkavolterra/JuMP.jl"))
@@ -34,6 +43,7 @@ include(joinpath(examples_dir, "polymin/JuMP.jl"))
 include(joinpath(examples_dir, "shapeconregr/JuMP.jl"))
 include(joinpath(examples_dir, "densityest/JuMP.jl"))
 include(joinpath(examples_dir, "wsosmatrix/sosmatrix.jl"))
+>>>>>>> upstream/examples_consistency
 include(joinpath(examples_dir, "wsosmatrix/muconvexity.jl"))
 include(joinpath(examples_dir, "wsosmatrix/sosmat1.jl"))
 include(joinpath(examples_dir, "wsosmatrix/sosmat2.jl"))
@@ -156,10 +166,6 @@ include(joinpath(examples_dir, "contraction/JuMP.jl"))
 #     run_JuMP_sosmatrix_poly_a,
 #     run_JuMP_sosmatrix_poly_b,
 #     run_JuMP_muconvexity_rand,
-#     run_JuMP_muconvexity_a,
-#     run_JuMP_muconvexity_b,
-#     run_JuMP_muconvexity_c,
-#     run_JuMP_muconvexity_d,
 #     run_JuMP_sosmat1,
 #     run_JuMP_sosmat2_scalar,
 #     run_JuMP_sosmat2_matrix,
