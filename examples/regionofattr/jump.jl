@@ -71,8 +71,8 @@ end
 regionofattr1_JuMP() = regionofattr_JuMP(4, use_WSOS = true)
 regionofattr2_JuMP() = regionofattr_JuMP(4, use_WSOS = false)
 
-function test_regionofattr_JuMP(builder::Function; options)
-    data = builder()
+function test_regionofattr_JuMP(instance::Function; options)
+    data = instance()
     JuMP.optimize!(data.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
     @test JuMP.termination_status(data.model) == MOI.OPTIMAL
     return

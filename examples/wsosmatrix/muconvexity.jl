@@ -72,8 +72,8 @@ muconvexity7_JuMP() = muconvexity_JuMP(x -> (x[1] + 1)^2 * (x[1] - 1)^2, MU.Box(
 muconvexity8_JuMP() = muconvexity_JuMP(x -> sum(x.^4) - sum(x.^2), MU.Ball([5.0, 5.0], 1.0), use_wsos = false) # TODO giving incorrect solution
 
 function test_muconvexity_JuMP(instance::Tuple{Function,Number}; options)
-    (builder, true_mu) = instance
-    data = builder()
+    (instance, true_mu) = instance
+    data = instance()
     JuMP.optimize!(data.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
     @test JuMP.value(data.mu) ≈ true_mu atol = 1e-4 rtol = 1e-4
 end

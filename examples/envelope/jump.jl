@@ -43,8 +43,8 @@ envelope1_JuMP() = envelope_JuMP(2, 3, 4, MU.Box(-ones(2), ones(2)))
 envelope2_JuMP() = envelope_JuMP(2, 3, 4, MU.Ball(zeros(2), sqrt(2))) # needs fix to work https://github.com/chriscoey/Hypatia.jl/issues/173
 envelope3_JuMP() = envelope_JuMP(2, 3, 4, MU.Box(-ones(2), ones(2)), sample = false)
 
-function test_envelope_JuMP(builder::Function; options)
-    data = builder()
+function test_envelope_JuMP(instance::Function; options)
+    data = instance()
     JuMP.optimize!(data.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
     @test JuMP.termination_status(data.model) == MOI.OPTIMAL
     return
