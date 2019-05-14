@@ -30,35 +30,16 @@ const MU = HYP.ModelUtilities
 
 const rt2 = sqrt(2)
 
-# a description of the shape of the regressor
-# mutable struct ShapeData
-#     mono_dom::MU.Domain
-#     conv_dom::MU.Domain
-#     mono_profile::Vector{Int}
-#     conv_profile::Int
-# end
-# ShapeData(n::Int) = ShapeData(MU.Box(-ones(n), ones(n)), MU.Box(-ones(n), ones(n)), ones(Int, n), 1)
-
-function shapeconregr_JuMP(
+function generate_regr_data(
     n::Int,
-    deg::Int,
     num_points::Int,
-    signal_ratio::Float64,
-    f::Function,
-    use_lsq_obj::Bool;
-    mono_dom::MU.Domain = MU.Box(-ones(n), ones(n)),
-    conv_dom::MU.Domain = mono_dom,
-    mono_profile::Vector{Int} = ones(Int, n),
-    conv_profile::Int = 1,
-    use_wsos::Bool = true,
-    sample::Bool = true,
+    f::Function;
+    signal_ratio::Float64 = 0.0,
     xmin::Float64 = -1.0,
     xmax::Float64 = 1.0,
     rseed::Int = 1,
     )
     Random.seed!(rseed)
-    @assert n == MU.get_dimension(mono_dom) == MU.get_dimension(conv_dom)
-
     X = rand(Distributions.Uniform(xmin, xmax), num_points, n)
     y = [f(X[p, :]) for p in 1:num_points]
     if !iszero(signal_ratio)
@@ -66,6 +47,41 @@ function shapeconregr_JuMP(
         noise .*= norm(y) / sqrt(signal_ratio) / norm(noise)
         y .+= noise
     end
+    return (X, y)
+end
+
+function shapeconregr_JuMP(
+    n::Int,
+    deg::Int,
+    num_points::Int,
+    f::Function;
+    signal_ratio::Float64 = 0.0,
+    xmin::Float64 = -1.0,
+    xmax::Float64 = 1.0,
+    rseed::Int = 1,
+    modeloptions...
+    )
+    (X, y) = generate_regr_data(n, num_points, f, signal_ratio = signal_ratio, xmin = xmin, xmax = xmax, rseed = rseed)
+    return shapeconregr_JuMP(X, y, n, deg; modeloptions...)
+end
+
+function shapeconregr_JuMP(
+    X::AbstractMatrix{Float64},
+    y::AbstractVector{Float64},
+    n::Int,
+    deg::Int;
+    use_lsq_obj::Bool = true,
+    mono_dom::MU.Domain = MU.Box(-ones(n), ones(n)),
+    conv_dom::MU.Domain = mono_dom,
+    mono_profile::Vector{Int} = ones(Int, n),
+    conv_profile::Int = 1,
+    use_wsos::Bool = true,
+    sample::Bool = true,
+    rseed::Int = 1,
+    )
+    Random.seed!(rseed)
+    num_points = size(X, 1)
+    @assert n == MU.get_dimension(mono_dom) == MU.get_dimension(conv_dom) == size(X, 2)
 
     model = JuMP.Model()
 
@@ -150,21 +166,21 @@ function shapeconregr_JuMP(
     return (model = model,)
 end
 
-shapeconregr1_JuMP() = shapeconregr_JuMP(2, 3, 100, 0.0, x -> exp(norm(x)), false)
-shapeconregr2_JuMP() = shapeconregr_JuMP(2, 3, 100, 0.0, x -> sum(x.^3), false)
-shapeconregr3_JuMP() = shapeconregr_JuMP(2, 3, 100, 0.0, x -> sum(x.^4), false)
-shapeconregr4_JuMP() = shapeconregr_JuMP(2, 3, 100, 50.0, x -> sum(x.^3), false)
-shapeconregr5_JuMP() = shapeconregr_JuMP(2, 3, 100, 50.0, x -> sum(x.^4), false)
-shapeconregr6_JuMP() = shapeconregr_JuMP(2, 3, 100, 0.0, x -> exp(norm(x)), true)
-shapeconregr7_JuMP() = shapeconregr_JuMP(2, 3, 100, 50.0, x -> sum(x.^4), true)
-shapeconregr8_JuMP() = shapeconregr_JuMP(2, 4, 100, 0.0, x -> -inv(1 + exp(-10.0 * norm(x))), true, mono_dom = MU.Box(zeros(2), ones(2)))
-shapeconregr9_JuMP() = shapeconregr_JuMP(2, 4, 100, 10.0, x -> -inv(1 + exp(-10.0 * norm(x))), true, mono_dom = MU.Box(zeros(2), ones(2)))
-shapeconregr10_JuMP() = shapeconregr_JuMP(2, 4, 100, 0.0, x -> exp(norm(x)), true)
-shapeconregr11_JuMP() = shapeconregr_JuMP(2, 5, 100, 10.0, x -> exp(norm(x)), true, mono_dom = MU.Box(0.5 * ones(2), 2 * ones(2)))
-shapeconregr12_JuMP() = shapeconregr_JuMP(2, 6, 100, 1.0, x -> exp(norm(x)), true, mono_dom = MU.Box(0.5 * ones(2), 2 * ones(2)), use_wsos = false)
-shapeconregr13_JuMP() = shapeconregr_JuMP(2, 6, 100, 1.0, x -> exp(norm(x)), false)
-shapeconregr14_JuMP() = shapeconregr_JuMP(5, 5, 1000, 0.0, x -> exp(norm(x)), true, use_wsos = false)
-shapeconregr15_JuMP() = shapeconregr_JuMP(2, 3, 100, 0.0, x -> exp(norm(x)), false, use_wsos = false)
+shapeconregr1_JuMP() = shapeconregr_JuMP(2, 3, 100, x -> exp(norm(x)), use_lsq_obj = false)
+shapeconregr2_JuMP() = shapeconregr_JuMP(2, 3, 100, x -> sum(x.^3), use_lsq_obj = false)
+shapeconregr3_JuMP() = shapeconregr_JuMP(2, 3, 100, x -> sum(x.^4), use_lsq_obj = false)
+shapeconregr4_JuMP() = shapeconregr_JuMP(2, 3, 100, x -> sum(x.^3), signal_ratio = 50.0, use_lsq_obj = false)
+shapeconregr5_JuMP() = shapeconregr_JuMP(2, 3, 100, x -> sum(x.^4), signal_ratio = 50.0, use_lsq_obj = false)
+shapeconregr6_JuMP() = shapeconregr_JuMP(2, 3, 100, x -> exp(norm(x)))
+shapeconregr7_JuMP() = shapeconregr_JuMP(2, 3, 100, x -> sum(x.^4), signal_ratio = 50.0)
+shapeconregr8_JuMP() = shapeconregr_JuMP(2, 4, 100, x -> -inv(1 + exp(-10.0 * norm(x))), mono_dom = MU.Box(zeros(2), ones(2)))
+shapeconregr9_JuMP() = shapeconregr_JuMP(2, 4, 100, x -> -inv(1 + exp(-10.0 * norm(x))), signal_ratio = 10.0, mono_dom = MU.Box(zeros(2), ones(2)))
+shapeconregr10_JuMP() = shapeconregr_JuMP(2, 4, 100, x -> exp(norm(x)))
+shapeconregr11_JuMP() = shapeconregr_JuMP(2, 5, 100, x -> exp(norm(x)), signal_ratio = 10.0, mono_dom = MU.Box(0.5 * ones(2), 2 * ones(2)))
+shapeconregr12_JuMP() = shapeconregr_JuMP(2, 6, 100, x -> exp(norm(x)), signal_ratio = 1.0, mono_dom = MU.Box(0.5 * ones(2), 2 * ones(2)), use_wsos = false)
+shapeconregr13_JuMP() = shapeconregr_JuMP(2, 6, 100, x -> exp(norm(x)), signal_ratio = 1.0, use_lsq_obj = false)
+shapeconregr14_JuMP() = shapeconregr_JuMP(5, 5, 1000, x -> exp(norm(x)), use_wsos = false)
+shapeconregr15_JuMP() = shapeconregr_JuMP(2, 3, 100, x -> exp(norm(x)), use_lsq_obj = false, use_wsos = false)
 
 function test_shapeconregr_JuMP(instance::Tuple{Function,Number}; options)
     (builder, true_obj) = instance
