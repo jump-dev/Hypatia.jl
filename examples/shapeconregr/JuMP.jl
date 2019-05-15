@@ -190,6 +190,7 @@ shapeconregrJuMP14() = shapeconregrJuMP(5, 5, 50, x -> exp(norm(x)), use_wsos = 
 shapeconregrJuMP15() = shapeconregrJuMP(2, 3, 100, x -> exp(norm(x)), use_lsq_obj = false, use_wsos = false)
 shapeconregrJuMP16() = shapeconregrJuMP(5, 4, 100, x -> sum(x.^2), signal_ratio = 9.0) # see https://arxiv.org/pdf/1509.08165v1.pdf (example 1)
 shapeconregrJuMP17() = shapeconregrJuMP(5, 4, 100, x -> (5x[1] + 0.5x[2] + x[3])^2 + sqrt(x[4]^2 + x[5]^2), signal_ratio = 9.0) # see https://arxiv.org/pdf/1509.08165v1.pdf (example 5)
+shapeconregrJuMP18() = shapeconregrJuMP(2, 4, 100, x -> sum((x .+ 1).^4), signal_ratio = 0.0)
 
 function test_shapeconregrJuMP(instance::Tuple{Function, Number}; options, rseed::Int = 1)
     Random.seed!(rseed)
@@ -221,6 +222,7 @@ test_shapeconregrJuMP(; options...) = test_shapeconregrJuMP.([
     (shapeconregrJuMP15, NaN),
     (shapeconregrJuMP16, NaN),
     (shapeconregrJuMP17, NaN),
+    (shapeconregrJuMP18, 0),
     ], options = options)
 
 test_shapeconregrJuMP_quick(; options...) = test_shapeconregrJuMP.([
@@ -229,4 +231,5 @@ test_shapeconregrJuMP_quick(; options...) = test_shapeconregrJuMP.([
     (shapeconregrJuMP12, NaN),
     (shapeconregrJuMP15, NaN),
     (shapeconregrJuMP17, NaN),
+    (shapeconregrJuMP18, 0),
     ], options = options)
