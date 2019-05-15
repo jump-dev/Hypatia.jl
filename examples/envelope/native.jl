@@ -75,7 +75,7 @@ function test_envelope(instance::Function; options, rseed::Int = 1)
     return
 end
 
-test_envelope(; options...) = test_envelope.([
+test_envelope_all(; options...) = test_envelope.([
     envelope1,
     envelope2,
     envelope3,
@@ -84,9 +84,7 @@ test_envelope(; options...) = test_envelope.([
     envelope6,
     ], options = options)
 
-test_envelope_quick(; options...) = test_envelope.([
+test_envelope(; options...) = test_envelope.([
     envelope1,
-    envelope2,
-    envelope4,
     envelope5,
     ], options = options)

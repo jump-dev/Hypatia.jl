@@ -53,14 +53,14 @@ function test_expdesignJuMP(instance::Function; options, rseed::Int = 1)
     return
 end
 
-test_expdesignJuMP(; options...) = test_expdesignJuMP.([
-    # expdesignJuMP1,
-    # expdesignJuMP2,
+test_expdesignJuMP_all(; options...) = test_expdesignJuMP.([
+    expdesignJuMP1,
+    expdesignJuMP2,
     expdesignJuMP3,
     expdesignJuMP4,
     expdesignJuMP5,
     ], options = options)
 
-test_expdesignJuMP_quick(; options...) = test_expdesignJuMP.([
+test_expdesignJuMP(; options...) = test_expdesignJuMP.([
     expdesignJuMP3,
     ], options = options)

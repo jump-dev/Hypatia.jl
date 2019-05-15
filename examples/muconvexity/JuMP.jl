@@ -41,7 +41,6 @@ function muconvexityJuMP(
         d = div(maximum(DP.maxdegree.(H)) + 1, 2)
         (U, pts, P0, PWts, _) = MU.interpolate(dom, d, sample = true, sample_factor = 100)
         mat_wsos_cone = HYP.WSOSPolyInterpMatCone(n, U, [P0, PWts...])
-
         JuMP.@constraint(model, [H[i, j](x => pts[u, :]) * (i == j ? 1.0 : rt2) for i in 1:n for j in 1:i for u in 1:U] in mat_wsos_cone)
     else
         PolyJuMP.setpolymodule!(model, SumOfSquares)
@@ -54,11 +53,11 @@ end
 muconvexityJuMP1() = muconvexityJuMP(x -> (x[1] + 1)^2 * (x[1] - 1)^2, MU.FreeDomain(1), use_wsos = true)
 muconvexityJuMP2() = muconvexityJuMP(x -> sum(x.^4) - sum(x.^2), MU.FreeDomain(3), use_wsos = true)
 muconvexityJuMP3() = muconvexityJuMP(x -> (x[1] + 1)^2 * (x[1] - 1)^2, MU.Box([-1.0], [1.0]), use_wsos = true)
-muconvexityJuMP4() = muconvexityJuMP(x -> sum(x.^4) - sum(x.^2), MU.Ball([5.0, 5.0], 1.0), use_wsos = true) # TODO giving incorrect solution
+muconvexityJuMP4() = muconvexityJuMP(x -> sum(x.^4) - sum(x.^2), MU.Ball(ones(2), 5.0), use_wsos = true)
 muconvexityJuMP5() = muconvexityJuMP(x -> (x[1] + 1)^2 * (x[1] - 1)^2, MU.FreeDomain(1), use_wsos = false)
 muconvexityJuMP6() = muconvexityJuMP(x -> sum(x.^4) - sum(x.^2), MU.FreeDomain(3), use_wsos = false)
 muconvexityJuMP7() = muconvexityJuMP(x -> (x[1] + 1)^2 * (x[1] - 1)^2, MU.Box([-1.0], [1.0]), use_wsos = false)
-muconvexityJuMP8() = muconvexityJuMP(x -> sum(x.^4) - sum(x.^2), MU.Ball([5.0, 5.0], 1.0), use_wsos = false) # TODO giving incorrect solution
+muconvexityJuMP8() = muconvexityJuMP(x -> sum(x.^4) - sum(x.^2), MU.Ball(ones(2), 5.0), use_wsos = false)
 
 function test_muconvexityJuMP(instance::Tuple{Function,Number}; options, rseed::Int = 1)
     Random.seed!(rseed)
@@ -68,13 +67,22 @@ function test_muconvexityJuMP(instance::Tuple{Function,Number}; options, rseed::
     @test JuMP.value(d.mu) ≈ true_mu atol = 1e-4 rtol = 1e-4
 end
 
-test_muconvexityJuMP(; options...) = test_muconvexityJuMP.([
+test_muconvexityJuMP_all(; options...) = test_muconvexityJuMP.([
     (muconvexityJuMP1, -4),
     (muconvexityJuMP2, -2),
     (muconvexityJuMP3, -4),
     (muconvexityJuMP4, -2),
     (muconvexityJuMP5, -4),
     (muconvexityJuMP6, -2),
+    (muconvexityJuMP7, -4),
+    (muconvexityJuMP8, -2),
+    ], options = options)
+
+test_muconvexityJuMP(; options...) = test_muconvexityJuMP.([
+    (muconvexityJuMP1, -4),
+    (muconvexityJuMP3, -4),
+    (muconvexityJuMP4, -2),
+    (muconvexityJuMP5, -4),
     (muconvexityJuMP7, -4),
     (muconvexityJuMP8, -2),
     ], options = options)

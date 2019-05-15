@@ -89,6 +89,8 @@ function test_lotkavolterraJuMP(instance::Function; options)
     return
 end
 
-test_lotkavolterraJuMP(; options...) = test_lotkavolterraJuMP.([
+test_lotkavolterraJuMP_all(; options...) = test_lotkavolterraJuMP.([
     lotkavolterraJuMP1,
     ], options = options)
+
+test_lotkavolterraJuMP(; options...) = test_lotkavolterraJuMP(options = options)

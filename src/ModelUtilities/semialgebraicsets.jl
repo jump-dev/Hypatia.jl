@@ -25,4 +25,4 @@ function get_domain_inequalities(dom::Box, x::DP.PolyVar{true})
     return get_domain_inequalities(dom, [x])
 end
 
-get_domain_inequalities(dom::FreeDomain, x) = nothing
+get_domain_inequalities(dom::FreeDomain, x) = SAS.BasicSemialgebraicSet{Float64, DynamicPolynomials.Polynomial{true, Float64}}()

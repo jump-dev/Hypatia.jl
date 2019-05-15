@@ -112,7 +112,7 @@ function test_densityestJuMP(instance::Function; options, rseed::Int = 1)
     return
 end
 
-test_densityestJuMP(; options...) = test_densityestJuMP.([
+test_densityestJuMP_all(; options...) = test_densityestJuMP.([
     densityestJuMP1,
     densityestJuMP2,
     densityestJuMP3,
@@ -121,15 +121,9 @@ test_densityestJuMP(; options...) = test_densityestJuMP.([
     densityestJuMP6,
     ], options = options)
 
-test_densityestJuMP_various(; options...) = test_densityestJuMP.([
+test_densityestJuMP(; options...) = test_densityestJuMP.([
     densityestJuMP1,
     densityestJuMP3,
-    densityestJuMP5,
-    densityestJuMP6,
-    ], options = options)
-
-test_densityestJuMP_quick(; options...) = test_densityestJuMP.([
-    densityestJuMP1,
     densityestJuMP5,
     densityestJuMP6,
     ], options = options)
