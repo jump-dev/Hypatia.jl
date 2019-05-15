@@ -85,7 +85,7 @@ function test_polyminJuMP(instance::Function; options)
     return
 end
 
-test_polyminJuMP(; options...) = test_polyminJuMP.([
+test_polyminJuMP_all(; options...) = test_polyminJuMP.([
     polyminJuMP1,
     polyminJuMP2,
     polyminJuMP3,
@@ -110,11 +110,10 @@ test_polyminJuMP(; options...) = test_polyminJuMP.([
     polyminJuMP22,
     ], options = options)
 
-test_polyminJuMP_quick(; options...) = test_polyminJuMP.([
+test_polyminJuMP(; options...) = test_polyminJuMP.([
     polyminJuMP2,
     polyminJuMP3,
-    polyminJuMP6,
+    polyminJuMP12,
     polyminJuMP14,
-    polyminJuMP15,
     polyminJuMP20,
     ], options = options)
