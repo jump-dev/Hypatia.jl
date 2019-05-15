@@ -82,9 +82,11 @@ function test_contractionJuMP(instance::Tuple{Function, Bool}; options, rseed::I
     return
 end
 
-test_contractionJuMP(; options...) = test_contractionJuMP.([
+test_contractionJuMP_all(; options...) = test_contractionJuMP.([
     (contractionJuMP1, true),
     (contractionJuMP2, true),
     (contractionJuMP3, false),
     (contractionJuMP4, false),
     ], options = options)
+
+test_contractionJuMP(; options...) = test_contractionJuMP_all(options = options)

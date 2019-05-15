@@ -50,8 +50,10 @@ function test_envelopeJuMP(instance::Function; options, rseed::Int = 1)
     return
 end
 
-test_envelopeJuMP(; options...) = test_envelopeJuMP.([
+test_envelopeJuMP_all(; options...) = test_envelopeJuMP.([
     envelopeJuMP1,
     # envelopeJuMP2,
     envelopeJuMP3,
     ], options = options)
+
+test_envelopeJuMP(; options...) = test_envelopeJuMP_all(options = options)

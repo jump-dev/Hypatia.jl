@@ -51,11 +51,13 @@ function test_linearopt(instance::Function; options, rseed::Int = 1)
     return
 end
 
-test_linearopt(; options...) = test_linearopt.([
+test_linearopt_all(; options...) = test_linearopt.([
     linearopt1,
     linearopt2,
     linearopt3,
     linearopt4,
     ], options = options)
 
-test_linearopt_quick(; options...) = test_linearopt(options = options)
+test_linearopt(; options...) = test_linearopt.([
+    linearopt4,
+    ], options = options)
