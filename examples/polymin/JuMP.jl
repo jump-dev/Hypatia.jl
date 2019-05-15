@@ -63,11 +63,11 @@ polyminJuMP5() = polyminJuMP(:caprasse, 4)
 polyminJuMP6() = polyminJuMP(:goldsteinprice, 7)
 polyminJuMP7() = polyminJuMP(:lotkavolterra, 3)
 polyminJuMP8() = polyminJuMP(:robinson, 8)
-polyminJuMP9() = polyminJuMP(:reactiondiffusion_ball, 3)
+polyminJuMP9() = polyminJuMP(:robinson_ball, 8)
 polyminJuMP10() = polyminJuMP(:rosenbrock, 5)
 polyminJuMP11() = polyminJuMP(:butcher, 2)
-polyminJuMP12() = polyminJuMP(:butcher_ball, 2)
-polyminJuMP13() = polyminJuMP(:butcher_ellipsoid, 2)
+polyminJuMP12() = polyminJuMP(:goldsteinprice_ellipsoid, 7)
+polyminJuMP13() = polyminJuMP(:goldsteinprice_ball, 7)
 polyminJuMP14() = polyminJuMP(:motzkin, 3, primal_wsos = false)
 polyminJuMP15() = polyminJuMP(:motzkin, 3)
 polyminJuMP16() = polyminJuMP(:reactiondiffusion, 4, primal_wsos = false)
@@ -85,7 +85,7 @@ function test_polyminJuMP(instance::Function; options)
     return
 end
 
-test_polyminJuMP(; options...) = test_polyminJuMP.([
+test_polyminJuMP_all(; options...) = test_polyminJuMP.([
     polyminJuMP1,
     polyminJuMP2,
     polyminJuMP3,
@@ -110,11 +110,10 @@ test_polyminJuMP(; options...) = test_polyminJuMP.([
     polyminJuMP22,
     ], options = options)
 
-test_polyminJuMP_quick(; options...) = test_polyminJuMP.([
+test_polyminJuMP(; options...) = test_polyminJuMP.([
     polyminJuMP2,
     polyminJuMP3,
-    polyminJuMP6,
+    polyminJuMP12,
     polyminJuMP14,
-    polyminJuMP15,
     polyminJuMP20,
     ], options = options)
