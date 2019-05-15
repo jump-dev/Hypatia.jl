@@ -59,16 +59,15 @@ polyminreal5() = polyminreal(:caprasse, 4)
 polyminreal6() = polyminreal(:goldsteinprice, 7)
 polyminreal7() = polyminreal(:lotkavolterra, 3)
 polyminreal8() = polyminreal(:robinson, 8)
-polyminreal9() = polyminreal(:reactiondiffusion_ball, 3)
+polyminJuMP9() = polyminJuMP(:robinson_ball, 8)
 polyminreal10() = polyminreal(:rosenbrock, 5)
 polyminreal11() = polyminreal(:butcher, 2)
-polyminreal12() = polyminreal(:butcher_ball, 2)
-polyminreal13() = polyminreal(:butcher_ellipsoid, 2)
+polyminJuMP12() = polyminJuMP(:goldsteinprice_ellipsoid, 7)
+polyminJuMP13() = polyminJuMP(:goldsteinprice_ball, 7)
 polyminreal14() = polyminreal(:motzkin, 3, primal_wsos = false)
 polyminreal15() = polyminreal(:motzkin, 3)
 polyminreal16() = polyminreal(:reactiondiffusion, 4, primal_wsos = false)
 polyminreal17() = polyminreal(:lotkavolterra, 3, primal_wsos = false)
-
 
 function polymincomplex(
     polyname::Symbol,
