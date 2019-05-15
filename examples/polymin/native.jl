@@ -161,7 +161,7 @@ function test_polymin(instance::Function; options, rseed::Int = 1)
     return
 end
 
-test_polymin(; options...) = test_polymin.([
+test_polymin_all(; options...) = test_polymin.([
     polyminreal1,
     polyminreal2,
     polyminreal3,
@@ -195,12 +195,11 @@ test_polymin(; options...) = test_polymin.([
     polymincomplex14,
     ], options = options)
 
-test_polymin_quick(; options...) = test_polyminJuMP.([
+test_polymin(; options...) = test_polyminJuMP.([
     polyminJuMP2,
     polyminJuMP3,
-    polyminJuMP6,
+    polyminJuMP12,
     polyminJuMP14,
-    polyminJuMP15,
     polymincomplex1,
     polymincomplex3,
     polymincomplex8,

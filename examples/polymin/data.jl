@@ -83,11 +83,6 @@ function getpolydata(polyname::Symbol)
         f = -x[1]+2x[2]-x[3]-0.835634534x[2]*(1+x[2])
         dom = MU.Box(-5 * ones(3), 5 * ones(3))
         true_obj = -36.71269068
-    elseif polyname == :reactiondiffusion_ball
-        DP.@polyvar x[1:3]
-        f = -x[1]+2x[2]-x[3]-0.835634534x[2]*(1+x[2])
-        dom = MU.Ball(zeros(3), 5*sqrt(3))
-        true_obj = -73.31
     elseif polyname == :robinson
         DP.@polyvar x[1:2]
         f = 1+x[1]^6+x[2]^6-x[1]^4*x[2]^2+x[1]^4-x[1]^2*x[2]^4+x[2]^4-x[1]^2+x[2]^2+3x[1]^2*x[2]^2
@@ -97,7 +92,7 @@ function getpolydata(polyname::Symbol)
         DP.@polyvar x[1:2]
         f = 1+x[1]^6+x[2]^6-x[1]^4*x[2]^2+x[1]^4-x[1]^2*x[2]^4+x[2]^4-x[1]^2+x[2]^2+3x[1]^2*x[2]^2
         dom = MU.Ball(zeros(2), sqrt(2))
-        true_obj = 0.814814 # small neighborhood
+        true_obj = 0.814814 # small neighborhood around box
     elseif polyname == :rosenbrock
         DP.@polyvar x[1:2]
         f = (1-x[1])^2+100*(x[1]^2-x[2])^2
