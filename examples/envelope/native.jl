@@ -16,6 +16,8 @@ import Hypatia
 const HYP = Hypatia
 const CO = HYP.Cones
 const MU = HYP.ModelUtilities
+const MO = HYP.Models
+const SO = HYP.Solvers
 
 function envelope(
     npoly::Int,
