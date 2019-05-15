@@ -1,6 +1,8 @@
 #=
 Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 =#
+
+import Random
 import DynamicPolynomials
 
 function fekete_sample()
@@ -22,6 +24,7 @@ function fekete_sample()
 end
 
 function test_recover_lagrange_polys()
+    Random.seed!(1)
     n = 1
     deg = 1
     pts = reshape(Float64[0, 1], 2, 1)

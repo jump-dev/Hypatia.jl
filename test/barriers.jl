@@ -2,38 +2,12 @@
 Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 =#
 
-Random.seed!(1234)
+import Random
 
 function load_feasible_point(cone::CO.Cone)
     point = zeros(CO.dimension(cone))
     CO.set_initial_point(point, cone)
     CO.load_point(cone, point)
-    return
-end
-
-function load_feasible_point(cone::CO.WSOSPolyInterpSOC)
-    lambda(point) = Symmetric(cone.ipwt[1]' * Diagonal(point) * cone.ipwt[1])
-    schur_lambda(lambdas) = Symmetric(lambdas[1] - sum(lambdas[i] * (lambdas[1] \ lambdas[i]) for i in 2:cone.R))
-    point = zeros(CO.dimension(cone))
-    cone.point = point
-    for r in 1:cone.R
-        subpoint = view(point, ((r - 1) * cone.U + 1):(r * cone.U))
-        subpoint .= randn(cone.U)
-    end
-    # randomly add some near-zeros
-    nz = rand(1:cone.U)
-    near_zeros = rand(1:cone.U, nz)
-    point[near_zeros] .= 1e-5
-    # make point feasible
-    subpoint = view(cone.point, 1:cone.U)
-    while !isposdef(lambda(subpoint))
-        subpoint .+= rand(cone.U)
-    end
-    all_lambdas = [Symmetric(lambda(point[((r - 1) * cone.U + 1):(r * cone.U)])) for r in 1:cone.R]
-    while !isposdef(schur_lambda(all_lambdas))
-        subpoint .+= rand(cone.U)
-        all_lambdas[1] = lambda(subpoint)
-    end
     return
 end
 
@@ -99,6 +73,7 @@ function test_epipersumexp_barrier()
 end
 
 function test_hypogeomean_barrier()
+    Random.seed!(1)
     for dim in [3, 5, 7]
         alpha = rand(dim - 1)
         alpha ./= sum(alpha)
@@ -131,6 +106,7 @@ function test_semidefinite_barrier()
 end
 
 function test_wsospolyinterp_2_barrier()
+    Random.seed!(1)
     for n in 1:3, halfdeg in 1:3
         (U, _, P0, _, _) = MU.interpolate(MU.FreeDomain(n), halfdeg, sample = false)
         Ps = [P0]
@@ -142,6 +118,7 @@ function test_wsospolyinterp_2_barrier()
 end
 
 function test_wsospolyinterp_barrier()
+    Random.seed!(1)
     for n in 1:3, halfdeg in 1:3
         (U, _, P0, _, _) = MU.interpolate(MU.FreeDomain(n), halfdeg, sample = false)
         cone = CO.WSOSPolyInterp(U, [P0], true)
@@ -151,6 +128,7 @@ function test_wsospolyinterp_barrier()
 end
 
 function test_wsospolyinterpmat_barrier()
+    Random.seed!(1)
     for n in 1:3, halfdeg in 1:3, R in 1:3
         (U, _, P0, _, _) = MU.interpolate(MU.FreeDomain(n), halfdeg, sample = false)
         cone = CO.WSOSPolyInterpMat(R, U, [P0], true)
@@ -160,10 +138,11 @@ function test_wsospolyinterpmat_barrier()
 end
 
 function test_wsospolyinterpsoc_barrier()
+    Random.seed!(1)
     for n in 1:2, halfdeg in 1:2, R in 3:3
         (U, _, P0, _, _) = MU.interpolate(MU.FreeDomain(n), halfdeg, sample = false)
         cone = CO.WSOSPolyInterpSOC(R, U, [P0], true)
-        pass_through_cone(cone, 10)
+        pass_through_cone(cone, 1)
     end
     return
 end
