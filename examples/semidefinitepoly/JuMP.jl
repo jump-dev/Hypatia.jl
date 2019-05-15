@@ -72,13 +72,13 @@ function semidefinitepolyJuMP1()
         (-x^2 + 2)  (3x^2 - x + 1);
         ]
     MM = M' * M
-    return semidefinitepolyJuMP(x, MM, use_wsos = true)
+    return semidefinitepolyJuMP([x], MM, use_wsos = true)
 end
 
 function semidefinitepolyJuMP2()
     DP.@polyvar x
     poly = x^4 + 2x^2
-    return semidefinitepolyJuMP(x, poly, use_wsos = true)
+    return semidefinitepolyJuMP([x], poly, use_wsos = true)
 end
 
 function semidefinitepolyJuMP3()
