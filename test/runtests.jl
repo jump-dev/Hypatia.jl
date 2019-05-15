@@ -141,36 +141,37 @@ include(joinpath(examples_dir, "semidefinitepoly/JuMP.jl"))
 #     test_moi(d, s, m, verbose)
 # end
 
-# @info("starting native examples tests")
-# native_options = (
-#     verbose = true,
-#     max_iters = 150,
-#     )
-# @testset "native examples" begin
-#     test_envelope(; native_options...)
-#     test_linearopt(; native_options...)
-#     test_polymin(; native_options...)
-# end
+@info("starting native examples tests")
+native_options = (
+    verbose = true,
+    max_iters = 150,
+    )
+@testset "native examples" begin
+    test_envelope(; native_options...) # done
+    test_linearopt(; native_options...) # done
+    test_polymin(; native_options...) # needs following up on failures
+end
 
 @info("starting JuMP examples tests")
 JuMP_options = (
     verbose = true,
     test_certificates = true,
-    max_iters = 150,
+    max_iters = 400,
     )
 @testset "JuMP examples" begin
-    # test_contractionJuMP(; JuMP_options..., tol_rel_opt = 1e-4, tol_abs_opt = 1e-4, tol_feas = 1e-4)
-    # test_densityestJuMP(; JuMP_options...)
-    # test_envelopeJuMP(; JuMP_options...)
-    # test_expdesignJuMP(; JuMP_options...)
-    # test_lotkavolterraJuMP(; JuMP_options..., tol_rel_opt = 1e-5, tol_abs_opt = 1e-6, tol_feas = 1e-6)
-    test_muconvexityJuMP(; JuMP_options...)
-    # test_polyminJuMP(; JuMP_options..., tol_rel_opt = 1e-8, tol_abs_opt = 1e-8, tol_feas = 1e-8)
-    test_polynormJuMP(; JuMP_options...)
-    # test_regionofattrJuMP(; JuMP_options..., tol_feas = 1e-5)
-    test_secondorderpolyJuMP(; JuMP_options...)
-    test_semidefinitepolyJuMP(; JuMP_options...)
-    # test_shapeconregrJuMP(; JuMP_options..., tol_rel_opt = 1e-7, tol_abs_opt = 1e-6, tol_feas = 1e-5)
+    test_contractionJuMP(; JuMP_options..., tol_rel_opt = 1e-4, tol_abs_opt = 1e-4, tol_feas = 1e-4) # follow up failures
+    test_densityestJuMP(; JuMP_options..., tol_rel_opt = 1e-6, tol_abs_opt = 1e-5, tol_feas = 1e-7) # follow up failures
+    test_envelopeJuMP(; JuMP_options...) # done
+    test_expdesignJuMP(; JuMP_options...) # done
+    test_lotkavolterraJuMP(; JuMP_options..., tol_rel_opt = 1e-5, tol_abs_opt = 1e-6, tol_feas = 1e-6) # done
+    test_muconvexityJuMP(; JuMP_options...) # done
+    test_polyminJuMP(; JuMP_options..., tol_rel_opt = 1e-10, tol_abs_opt = 1e-9, tol_feas = 1e-9) # follow up failures
+    test_polynormJuMP(; JuMP_options...) # done
+    test_regionofattrJuMP(; JuMP_options..., tol_abs_opt = 1e-8, tol_rel_opt = 1e-8, tol_feas = 1e-6)
+    test_secondorderpolyJuMP(; JuMP_options...) # fix isnan
+    test_semidefinitepolyJuMP(; JuMP_options..., tol_abs_opt = 1e-6, tol_rel_opt = 1e-6, tol_feas = 1e-7) # fix isnan
+    test_shapeconregrJuMP(; JuMP_options..., tol_rel_opt = 1e-7, tol_abs_opt = 1e-7, tol_feas = 1e-7)
+
 end
 
 end

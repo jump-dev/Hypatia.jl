@@ -59,16 +59,15 @@ polyminreal5() = polyminreal(:caprasse, 4)
 polyminreal6() = polyminreal(:goldsteinprice, 7)
 polyminreal7() = polyminreal(:lotkavolterra, 3)
 polyminreal8() = polyminreal(:robinson, 8)
-polyminreal9() = polyminreal(:reactiondiffusion_ball, 3)
+polyminreal9() = polyminreal(:robinson_ball, 8)
 polyminreal10() = polyminreal(:rosenbrock, 5)
 polyminreal11() = polyminreal(:butcher, 2)
-polyminreal12() = polyminreal(:butcher_ball, 2)
-polyminreal13() = polyminreal(:butcher_ellipsoid, 2)
+polyminreal12() = polyminreal(:goldsteinprice_ellipsoid, 7)
+polyminreal13() = polyminreal(:goldsteinprice_ball, 7)
 polyminreal14() = polyminreal(:motzkin, 3, primal_wsos = false)
 polyminreal15() = polyminreal(:motzkin, 3)
 polyminreal16() = polyminreal(:reactiondiffusion, 4, primal_wsos = false)
 polyminreal17() = polyminreal(:lotkavolterra, 3, primal_wsos = false)
-
 
 function polymincomplex(
     polyname::Symbol,
@@ -162,7 +161,7 @@ function test_polymin(instance::Function; options, rseed::Int = 1)
     return
 end
 
-test_polymin(; options...) = test_polymin.([
+test_polymin_all(; options...) = test_polymin.([
     polyminreal1,
     polyminreal2,
     polyminreal3,
@@ -196,12 +195,11 @@ test_polymin(; options...) = test_polymin.([
     polymincomplex14,
     ], options = options)
 
-test_polymin_quick(; options...) = test_polyminJuMP.([
-    polyminJuMP2,
-    polyminJuMP3,
-    polyminJuMP6,
-    polyminJuMP14,
-    polyminJuMP15,
+test_polymin(; options...) = test_polymin.([
+    polyminreal2,
+    polyminreal3,
+    polyminreal12,
+    polyminreal14,
     polymincomplex1,
     polymincomplex3,
     polymincomplex8,
