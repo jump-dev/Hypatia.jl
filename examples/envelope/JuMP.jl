@@ -39,7 +39,7 @@ function envelopeJuMP(
 end
 
 envelopeJuMP1() = envelopeJuMP(2, 3, 4, MU.Box(-ones(2), ones(2)))
-# envelopeJuMP2() = envelopeJuMP(2, 3, 4, MU.Ball(zeros(2), sqrt(2))) # FIXME needs https://github.com/chriscoey/Hypatia.jl/issues/173
+# envelopeJuMP2() = envelopeJuMP(2, 3, 4, MU.Ball(zeros(2), sqrt(2))) # TODO needs https://github.com/chriscoey/Hypatia.jl/issues/173
 envelopeJuMP3() = envelopeJuMP(2, 3, 4, MU.Box(-ones(2), ones(2)), sample = false)
 
 function test_envelopeJuMP(instance::Function; options, rseed::Int = 1)
