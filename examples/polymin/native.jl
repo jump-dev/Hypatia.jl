@@ -200,8 +200,6 @@ test_polymin(; options...) = test_polymin.([
     polyminreal3,
     polyminreal12,
     polyminreal14,
-    polymincomplex1,
-    polymincomplex3,
-    polymincomplex8,
-    polymincomplex10,
+    polymincomplex7,
+    polymincomplex14,
     ], options = options)

@@ -55,5 +55,4 @@ test_polynormJuMP_all(; options...) = test_polynormJuMP.([
 
 test_polynormJuMP(; options...) = test_polynormJuMP.([
     polynormJuMP1,
-    polynormJuMP2,
     ], options = options)
