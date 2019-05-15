@@ -68,9 +68,15 @@ polyminJuMP10() = polyminJuMP(:rosenbrock, 5)
 polyminJuMP11() = polyminJuMP(:butcher, 2)
 polyminJuMP12() = polyminJuMP(:butcher_ball, 2)
 polyminJuMP13() = polyminJuMP(:butcher_ellipsoid, 2)
-polyminJuMP14() = polyminJuMP(:motzkin, 3, use_wsos = false)
-polyminJuMP15() = polyminJuMP(:motzkin, 3, primal_wsos = true)
-# TODO add more from dictionary and more with different options combinations
+polyminJuMP14() = polyminJuMP(:motzkin, 3, primal_wsos = false)
+polyminJuMP15() = polyminJuMP(:motzkin, 3)
+polyminJuMP16() = polyminJuMP(:reactiondiffusion, 4, primal_wsos = false)
+polyminJuMP17() = polyminJuMP(:lotkavolterra, 3, primal_wsos = false)
+polyminJuMP18() = polyminJuMP(:heart, 2, use_wsos = false)
+polyminJuMP19() = polyminJuMP(:schwefel, 2, use_wsos = false)
+polyminJuMP20() = polyminJuMP(:magnetism7_ball, 2, use_wsos = false)
+polyminJuMP21() = polyminJuMP(:motzkin_ellipsoid, 4, use_wsos = false)
+polyminJuMP22() = polyminJuMP(:caprasse, 4, use_wsos = false)
 
 function test_polyminJuMP(instance::Function; options)
     d = instance()
@@ -95,6 +101,13 @@ test_polyminJuMP(; options...) = test_polyminJuMP.([
     polyminJuMP13,
     polyminJuMP14,
     polyminJuMP15,
+    polyminJuMP16,
+    polyminJuMP17,
+    polyminJuMP18,
+    polyminJuMP19,
+    polyminJuMP20,
+    polyminJuMP21,
+    polyminJuMP22,
     ], options = options)
 
 test_polyminJuMP_quick(; options...) = test_polyminJuMP.([
@@ -103,4 +116,5 @@ test_polyminJuMP_quick(; options...) = test_polyminJuMP.([
     polyminJuMP6,
     polyminJuMP14,
     polyminJuMP15,
+    polyminJuMP20,
     ], options = options)

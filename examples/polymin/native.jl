@@ -25,8 +25,8 @@ function polyminreal(
     primal_wsos::Bool = true,
     )
     (x, fn, dom, true_obj) = getpolydata(polyname)
-    @assert dom isa MU.Box # only works for box domains
-    (U, pts, P0, PWts, _) = MU.interpolate(dom, halfdeg, sample = (length(x) >= 5))
+    sample = (length(x) >= 5) || !isa(dom, MU.Box)
+    (U, pts, P0, PWts, _) = MU.interpolate(dom, halfdeg, sample = sample)
 
     # set up problem data
     interp_vals = [fn(pts[j, :]...) for j in 1:U]
@@ -50,19 +50,25 @@ function polyminreal(
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs, true_obj = true_obj)
 end
 
-polyminreal1() = polyminreal(:butcher, 2)
-polyminreal2() = polyminreal(:caprasse, 4)
-polyminreal3() = polyminreal(:goldsteinprice, 6)
-polyminreal4() = polyminreal(:heart, 2)
-polyminreal5() = polyminreal(:lotkavolterra, 3)
-polyminreal6() = polyminreal(:magnetism7, 2)
-polyminreal7() = polyminreal(:motzkin, 7)
-polyminreal8() = polyminreal(:reactiondiffusion, 4)
-polyminreal9() = polyminreal(:robinson, 8)
+
+polyminreal1() = polyminreal(:heart, 2)
+polyminreal2() = polyminreal(:schwefel, 2)
+polyminreal3() = polyminreal(:magnetism7_ball, 2)
+polyminreal4() = polyminreal(:motzkin_ellipsoid, 4)
+polyminreal5() = polyminreal(:caprasse, 4)
+polyminreal6() = polyminreal(:goldsteinprice, 7)
+polyminreal7() = polyminreal(:lotkavolterra, 3)
+polyminreal8() = polyminreal(:robinson, 8)
+polyminreal9() = polyminreal(:reactiondiffusion_ball, 3)
 polyminreal10() = polyminreal(:rosenbrock, 5)
-polyminreal11() = polyminreal(:schwefel, 4)
-polyminreal12() = polyminreal(:reactiondiffusion, 4, primal_wsos = false)
-# TODO add more with primal_wsos = false
+polyminreal11() = polyminreal(:butcher, 2)
+polyminreal12() = polyminreal(:butcher_ball, 2)
+polyminreal13() = polyminreal(:butcher_ellipsoid, 2)
+polyminreal14() = polyminreal(:motzkin, 3, primal_wsos = false)
+polyminreal15() = polyminreal(:motzkin, 3)
+polyminreal16() = polyminreal(:reactiondiffusion, 4, primal_wsos = false)
+polyminreal17() = polyminreal(:lotkavolterra, 3, primal_wsos = false)
+
 
 function polymincomplex(
     polyname::Symbol,
@@ -169,6 +175,11 @@ test_polymin(; options...) = test_polymin.([
     polyminreal10,
     polyminreal11,
     polyminreal12,
+    polyminreal13,
+    polyminreal14,
+    polyminreal15,
+    polyminreal16,
+    polyminreal17,
     polymincomplex1,
     polymincomplex2,
     polymincomplex3,
@@ -183,4 +194,16 @@ test_polymin(; options...) = test_polymin.([
     polymincomplex12,
     polymincomplex13,
     polymincomplex14,
+    ], options = options)
+
+test_polymin_quick(; options...) = test_polyminJuMP.([
+    polyminJuMP2,
+    polyminJuMP3,
+    polyminJuMP6,
+    polyminJuMP14,
+    polyminJuMP15,
+    polymincomplex1,
+    polymincomplex3,
+    polymincomplex8,
+    polymincomplex10,
     ], options = options)

@@ -7,6 +7,7 @@ solves a simple linear optimization problem (LP) min c'x s.t. Ax = b, x >= 0
 =#
 
 using SparseArrays
+using LinearAlgebra
 import Random
 using Test
 import Hypatia
@@ -15,7 +16,6 @@ const CO = HYP.Cones
 const MO = HYP.Models
 const SO = HYP.Solvers
 const MU = HYP.ModelUtilities
-using LinearAlgebra
 
 function linearopt(
     m::Int,
@@ -57,3 +57,5 @@ test_linearopt(; options...) = test_linearopt.([
     linearopt3,
     linearopt4,
     ], options = options)
+
+test_linearopt_quick(; options...) = test_linearopt(options = options)

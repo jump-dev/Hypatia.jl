@@ -114,9 +114,22 @@ end
 
 test_densityestJuMP(; options...) = test_densityestJuMP.([
     densityestJuMP1,
-    # densityestJuMP2,
+    densityestJuMP2,
     densityestJuMP3,
-    # densityestJuMP4,
+    densityestJuMP4,
+    densityestJuMP5,
+    densityestJuMP6,
+    ], options = options)
+
+test_densityestJuMP_various(; options...) = test_densityestJuMP.([
+    densityestJuMP1,
+    densityestJuMP3,
+    densityestJuMP5,
+    densityestJuMP6,
+    ], options = options)
+
+test_densityestJuMP_quick(; options...) = test_densityestJuMP.([
+    densityestJuMP1,
     densityestJuMP5,
     densityestJuMP6,
     ], options = options)
