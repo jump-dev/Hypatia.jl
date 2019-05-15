@@ -76,24 +76,24 @@ function get_certificates(
     if test
         (c, A, b, G, h, cones, cone_idxs) = Models.get_original_data(model)
         if status == :Optimal
-            @test primal_obj ≈ dual_obj atol = atol rtol = rtol
-            @test A * x ≈ b atol = atol rtol = rtol
-            @test G * x + s ≈ h atol = atol rtol = rtol
-            @test G' * z + A' * y ≈ -c atol = atol rtol = rtol
-            @test dot(s, z) ≈ 0.0 atol = atol rtol = rtol
-            @test dot(c, x) ≈ primal_obj atol = 1e-8 rtol = 1e-8
-            @test dot(b, y) + dot(h, z) ≈ -dual_obj atol = 1e-8 rtol = 1e-8
+            @test primal_obj ≈ dual_obj atol=atol rtol=rtol
+            @test A * x ≈ b atol=atol rtol=rtol
+            @test G * x + s ≈ h atol=atol rtol=rtol
+            @test G' * z + A' * y ≈ -c atol=atol rtol=rtol
+            @test dot(s, z) ≈ 0.0 atol=atol rtol=rtol
+            @test dot(c, x) ≈ primal_obj atol=1e-8 rtol=1e-8
+            @test dot(b, y) + dot(h, z) ≈ -dual_obj atol=1e-8 rtol=1e-8
         elseif status == :PrimalInfeasible
-            @test isnan(primal_obj)
+            # @test isnan(primal_obj)
             @test dual_obj > 0
-            @test dot(b, y) + dot(h, z) ≈ -dual_obj atol = 1e-8 rtol = 1e-8
-            @test G' * z ≈ -A' * y atol = atol rtol = rtol
+            @test dot(b, y) + dot(h, z) ≈ -dual_obj atol=1e-8 rtol=1e-8
+            @test G' * z ≈ -A' * y atol=atol rtol=rtol
         elseif status == :DualInfeasible
-            @test isnan(dual_obj)
+            # @test isnan(dual_obj)
             @test primal_obj < 0
-            @test dot(c, x) ≈ primal_obj atol = 1e-8 rtol = 1e-8
-            @test G * x ≈ -s atol = atol rtol = rtol
-            @test A * x ≈ zeros(length(y)) atol = atol rtol = rtol
+            @test dot(c, x) ≈ primal_obj atol=1e-8 rtol=1e-8
+            @test G * x ≈ -s atol=atol rtol=rtol
+            @test A * x ≈ zeros(length(y)) atol=atol rtol=rtol
         elseif status == :IllPosed
             # TODO primal vs dual ill-posed statuses and conditions
         end
