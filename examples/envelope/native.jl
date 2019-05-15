@@ -57,9 +57,12 @@ function envelope(
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs)
 end
 
-envelope1(; primal_wsos::Bool = true) = envelope(2, 5, 2, 6, primal_wsos = primal_wsos)
-envelope2(; primal_wsos::Bool = true) = envelope(3, 5, 3, 5, primal_wsos = primal_wsos)
-envelope3(; primal_wsos::Bool = true) = envelope(2, 30, 1, 30, primal_wsos = primal_wsos)
+envelope1() = envelope(2, 5, 2, 6)
+envelope2() = envelope(3, 5, 3, 5)
+envelope3() = envelope(2, 30, 1, 30)
+envelope4() = envelope(2, 5, 2, 6, primal_wsos = false)
+envelope5() = envelope(3, 5, 3, 5, primal_wsos = false)
+envelope6() = envelope(2, 30, 1, 30, primal_wsos = false)
 
 function test_envelope(instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
@@ -76,4 +79,14 @@ test_envelope(; options...) = test_envelope.([
     envelope1,
     envelope2,
     envelope3,
+    envelope4,
+    envelope5,
+    envelope6,
+    ], options = options)
+
+test_envelope_quick(; options...) = test_envelope.([
+    envelope1,
+    envelope2,
+    envelope4,
+    envelope5,
     ], options = options)
