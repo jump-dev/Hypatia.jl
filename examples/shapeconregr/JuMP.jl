@@ -206,7 +206,7 @@ function test_shapeconregrJuMP(instance::Tuple{Function, Number}; options, rseed
     return
 end
 
-test_shapeconregrJuMP(; options...) = test_shapeconregrJuMP.([
+test_shapeconregrJuMP_all(; options...) = test_shapeconregrJuMP.([
     (shapeconregrJuMP1, NaN),
     (shapeconregrJuMP2, NaN),
     (shapeconregrJuMP3, NaN),
@@ -220,8 +220,8 @@ test_shapeconregrJuMP(; options...) = test_shapeconregrJuMP.([
     (shapeconregrJuMP11, NaN),
     (shapeconregrJuMP12, NaN),
     (shapeconregrJuMP13, NaN),
-    (shapeconregrJuMP14, NaN),
-    (shapeconregrJuMP15, NaN),
+    # (shapeconregrJuMP14, NaN), # very large sdp
+    # (shapeconregrJuMP15, NaN), # very large sdp
     (shapeconregrJuMP16, NaN),
     (shapeconregrJuMP17, NaN),
     (shapeconregrJuMP18, 0.0),
@@ -229,11 +229,14 @@ test_shapeconregrJuMP(; options...) = test_shapeconregrJuMP.([
     (shapeconregrJuMP20, 0.0),
     ], options = options)
 
-test_shapeconregrJuMP_quick(; options...) = test_shapeconregrJuMP.([
+test_shapeconregrJuMP(; options...) = test_shapeconregrJuMP.([
     (shapeconregrJuMP1, NaN),
     (shapeconregrJuMP2, NaN),
+    (shapeconregrJuMP4, NaN),
+    (shapeconregrJuMP6, NaN),
     (shapeconregrJuMP12, NaN),
     (shapeconregrJuMP15, NaN),
+    (shapeconregrJuMP16, NaN),
     (shapeconregrJuMP17, NaN),
     (shapeconregrJuMP18, 0),
     ], options = options)

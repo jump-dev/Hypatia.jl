@@ -89,4 +89,9 @@ test_contractionJuMP_all(; options...) = test_contractionJuMP.([
     (contractionJuMP4, false),
     ], options = options)
 
-test_contractionJuMP(; options...) = test_contractionJuMP_all(options = options)
+test_contractionJuMP(; options...) = test_contractionJuMP.([
+    (contractionJuMP1, true),
+    (contractionJuMP2, true),
+    (contractionJuMP3, false),
+    (contractionJuMP4, false),
+    ], options = options)

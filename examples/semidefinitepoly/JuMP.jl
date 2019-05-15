@@ -136,12 +136,20 @@ function test_semidefinitepolyJuMP(instance::Tuple{Function,Bool}; options, rsee
     @test JuMP.termination_status(d.model) == (is_feas ? MOI.OPTIMAL : MOI.INFEASIBLE)
 end
 
-test_semidefinitepolyJuMP(; options...) = test_semidefinitepolyJuMP.([
+test_semidefinitepolyJuMP_all(; options...) = test_semidefinitepolyJuMP.([
     (semidefinitepolyJuMP1, true),
     (semidefinitepolyJuMP2, true),
-    # (semidefinitepolyJuMP3, true), # failing
-    # (semidefinitepolyJuMP4, true), # failing
+    (semidefinitepolyJuMP3, true), # failing with bk not chol
+    (semidefinitepolyJuMP4, true), # failing with bk not chol
     (semidefinitepolyJuMP5, true),
     (semidefinitepolyJuMP6, false),
-    # (semidefinitepolyJuMP7, true), # failing
+    (semidefinitepolyJuMP7, true), # failing with bk not chol
+    ], options = options)
+
+test_semidefinitepolyJuMP(; options...) = test_semidefinitepolyJuMP.([
+    (semidefinitepolyJuMP1, true),
+    (semidefinitepolyJuMP3, true),
+    (semidefinitepolyJuMP5, true),
+    (semidefinitepolyJuMP6, false),
+    (semidefinitepolyJuMP7, true),
     ], options = options)

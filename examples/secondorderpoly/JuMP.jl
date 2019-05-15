@@ -44,7 +44,7 @@ function test_secondorderpolyJuMP(instance; options)
     @test JuMP.termination_status(d.model) == (isfeas ? MOI.OPTIMAL : MOI.INFEASIBLE)
 end
 
-test_secondorderpolyJuMP(; options...) = test_secondorderpolyJuMP.([
+test_secondorderpolyJuMP_all(; options...) = test_secondorderpolyJuMP.([
     (secondorderpolyJuMP1, true),
     (secondorderpolyJuMP2, true),
     (secondorderpolyJuMP3, true),
@@ -54,4 +54,9 @@ test_secondorderpolyJuMP(; options...) = test_secondorderpolyJuMP.([
     (secondorderpolyJuMP7, false),
     (secondorderpolyJuMP8, false),
     (secondorderpolyJuMP9, false),
+    ], options = options)
+
+test_secondorderpolyJuMP(; options...) = test_secondorderpolyJuMP.([
+    (secondorderpolyJuMP1, true),
+    (secondorderpolyJuMP6, false),
     ], options = options)
