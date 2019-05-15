@@ -63,6 +63,7 @@ function test_moi(
         MOIU.UniversalFallback(HypatiaModelData{Float64}()),
         HYP.Optimizer(
             use_dense = use_dense,
+            test_certificates = true,
             verbose = verbose,
             system_solver = system_solver,
             linear_model = linear_model,
