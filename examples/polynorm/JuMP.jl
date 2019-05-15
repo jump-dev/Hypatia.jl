@@ -48,6 +48,11 @@ function test_polynormJuMP(instance::Function; options, rseed::Int = 1)
     return
 end
 
+test_polynormJuMP_all(; options...) = test_polynormJuMP.([
+    polynormJuMP1,
+    polynormJuMP2,
+    ], options = options)
+
 test_polynormJuMP(; options...) = test_polynormJuMP.([
     polynormJuMP1,
     polynormJuMP2,

@@ -81,6 +81,11 @@ function test_regionofattrJuMP(instance::Function; options, rseed::Int = 1)
     return
 end
 
+test_regionofattrJuMP_all(; options...) = test_regionofattrJuMP.([
+    regionofattrJuMP1,
+    regionofattrJuMP2,
+    ], options = options)
+
 test_regionofattrJuMP(; options...) = test_regionofattrJuMP.([
     regionofattrJuMP1,
     regionofattrJuMP2,

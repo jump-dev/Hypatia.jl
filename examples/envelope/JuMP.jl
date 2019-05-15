@@ -56,4 +56,8 @@ test_envelopeJuMP_all(; options...) = test_envelopeJuMP.([
     envelopeJuMP3,
     ], options = options)
 
-test_envelopeJuMP(; options...) = test_envelopeJuMP_all(options = options)
+test_envelopeJuMP(; options...) = test_envelopeJuMP.([
+    envelopeJuMP1,
+    # envelopeJuMP2,
+    envelopeJuMP3,
+    ], options = options)
