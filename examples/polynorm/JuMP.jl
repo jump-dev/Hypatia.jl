@@ -3,7 +3,7 @@ Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
 find a polynomial f such that f² >= Σᵢ gᵢ² where gᵢ are arbitrary polynomials, and the volume under f is minimized
 
-TODO add scalar formulation (model utilities code for sparse basis not in master)
+TODO add scalar SOS formulation
 =#
 
 using LinearAlgebra

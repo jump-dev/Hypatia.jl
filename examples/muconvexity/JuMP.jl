@@ -59,7 +59,7 @@ muconvexityJuMP6() = muconvexityJuMP(x -> sum(x.^4) - sum(x.^2), MU.FreeDomain(3
 muconvexityJuMP7() = muconvexityJuMP(x -> (x[1] + 1)^2 * (x[1] - 1)^2, MU.Box([-1.0], [1.0]), use_wsos = false)
 muconvexityJuMP8() = muconvexityJuMP(x -> sum(x.^4) - sum(x.^2), MU.Ball(ones(2), 5.0), use_wsos = false)
 
-function test_muconvexityJuMP(instance::Tuple{Function,Number}; options, rseed::Int = 1)
+function test_muconvexityJuMP(instance::Tuple{Function, Float64}; options, rseed::Int = 1)
     Random.seed!(rseed)
     (instance, true_mu) = instance
     d = instance()
@@ -68,21 +68,21 @@ function test_muconvexityJuMP(instance::Tuple{Function,Number}; options, rseed::
 end
 
 test_muconvexityJuMP_all(; options...) = test_muconvexityJuMP.([
-    (muconvexityJuMP1, -4),
-    (muconvexityJuMP2, -2),
-    (muconvexityJuMP3, -4),
-    (muconvexityJuMP4, -2),
-    (muconvexityJuMP5, -4),
-    (muconvexityJuMP6, -2),
-    (muconvexityJuMP7, -4),
-    (muconvexityJuMP8, -2),
+    (muconvexityJuMP1, -4.0),
+    (muconvexityJuMP2, -2.0),
+    (muconvexityJuMP3, -4.0),
+    (muconvexityJuMP4, -2.0),
+    (muconvexityJuMP5, -4.0),
+    (muconvexityJuMP6, -2.0),
+    (muconvexityJuMP7, -4.0),
+    (muconvexityJuMP8, -2.0),
     ], options = options)
 
 test_muconvexityJuMP(; options...) = test_muconvexityJuMP.([
-    (muconvexityJuMP1, -4),
-    (muconvexityJuMP3, -4),
-    (muconvexityJuMP4, -2),
-    (muconvexityJuMP5, -4),
-    (muconvexityJuMP7, -4),
-    (muconvexityJuMP8, -2),
+    (muconvexityJuMP1, -4.0),
+    (muconvexityJuMP3, -4.0),
+    (muconvexityJuMP4, -2.0),
+    (muconvexityJuMP5, -4.0),
+    (muconvexityJuMP7, -4.0),
+    (muconvexityJuMP8, -2.0),
     ], options = options)

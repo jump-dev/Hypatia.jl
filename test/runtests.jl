@@ -37,7 +37,7 @@ include(joinpath(examples_dir, "semidefinitepoly/JuMP.jl"))
 
 @testset "Hypatia tests" begin
 
-@info("starting interpolation tests")
+# @info("starting interpolation tests")
 # @testset "interpolation tests" begin
 #     fekete_sample()
 #     test_recover_lagrange_polys()
@@ -141,16 +141,16 @@ include(joinpath(examples_dir, "semidefinitepoly/JuMP.jl"))
 #     test_moi(d, s, m, verbose)
 # end
 
-@info("starting native examples tests")
-native_options = (
-    verbose = true,
-    max_iters = 150,
-    )
-@testset "native examples" begin
-    test_envelope(; native_options...)
-    test_linearopt(; native_options...)
-    test_polymin(; native_options...)
-end
+# @info("starting native examples tests")
+# native_options = (
+#     verbose = true,
+#     max_iters = 150,
+#     )
+# @testset "native examples" begin
+#     test_envelope(; native_options...)
+#     test_linearopt(; native_options...)
+#     test_polymin(; native_options...)
+# end
 
 @info("starting JuMP examples tests")
 JuMP_options = (
@@ -159,19 +159,18 @@ JuMP_options = (
     max_iters = 150,
     )
 @testset "JuMP examples" begin
-    test_contractionJuMP(; JuMP_options..., tol_rel_opt = 1e-4, tol_abs_opt = 1e-4, tol_feas = 1e-4)
-    test_densityestJuMP(; JuMP_options...)
-    test_envelopeJuMP(; JuMP_options...)
-    test_expdesignJuMP(; JuMP_options...)
-    test_lotkavolterraJuMP(; JuMP_options..., tol_rel_opt = 1e-5, tol_abs_opt = 1e-6, tol_feas = 1e-6)
+    # test_contractionJuMP(; JuMP_options..., tol_rel_opt = 1e-4, tol_abs_opt = 1e-4, tol_feas = 1e-4)
+    # test_densityestJuMP(; JuMP_options...)
+    # test_envelopeJuMP(; JuMP_options...)
+    # test_expdesignJuMP(; JuMP_options...)
+    # test_lotkavolterraJuMP(; JuMP_options..., tol_rel_opt = 1e-5, tol_abs_opt = 1e-6, tol_feas = 1e-6)
     test_muconvexityJuMP(; JuMP_options...)
-    test_polyminJuMP(; JuMP_options..., tol_rel_opt = 1e-8, tol_abs_opt = 1e-8, tol_feas = 1e-8)
+    # test_polyminJuMP(; JuMP_options..., tol_rel_opt = 1e-8, tol_abs_opt = 1e-8, tol_feas = 1e-8)
     test_polynormJuMP(; JuMP_options...)
-    test_regionofattrJuMP(; JuMP_options..., tol_feas = 1e-5)
+    # test_regionofattrJuMP(; JuMP_options..., tol_feas = 1e-5)
     test_secondorderpolyJuMP(; JuMP_options...)
     test_semidefinitepolyJuMP(; JuMP_options...)
-    test_shapeconregrJuMP(; JuMP_options..., tol_rel_opt = 1e-7, tol_abs_opt = 1e-6, tol_feas = 1e-5)
-
+    # test_shapeconregrJuMP(; JuMP_options..., tol_rel_opt = 1e-7, tol_abs_opt = 1e-6, tol_feas = 1e-5)
 end
 
 end

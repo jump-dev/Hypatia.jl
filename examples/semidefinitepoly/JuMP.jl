@@ -3,20 +3,6 @@ Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 
 test whether a given matrix has a SOS decomposition,
 and use this procedure to check whether a polynomial is globally convex
-
-semidefinitepolyJuMP5: example modified from https://github.com/JuliaOpt/SumOfSquares.jl/blob/master/test/simplematrixsos.jl
-Example 3.77 and 3.79 of Blekherman, G., Parrilo, P. A., & Thomas, R. R. (Eds.),
-Semidefinite optimization and convex algebraic geometry SIAM 2013
-
-semidefinitepolyJuMP6: example modified from https://github.com/JuliaOpt/SumOfSquares.jl/blob/master/test/choi.jl
-verifies that a given polynomial matrix is not a Sum-of-Squares matrix
-see Choi, M. D., "Positive semidefinite biquadratic forms",
-Linear Algebra and its Applications, 1975, 12(2), 95-100
-
-semidefinitepolyJuMP7: example modified from https://github.com/JuliaOpt/SumOfSquares.jl/blob/master/test/sosdemo9.jl
-Section 3.9 of SOSTOOLS User's Manual, see https://www.cds.caltech.edu/sostools/
-
-# TODO PSD and dual form for each of the problems below
 =#
 
 using Test
@@ -36,13 +22,15 @@ const rt2 = sqrt(2)
 
 function semidefinitepolyJuMP(x::Vector{DP.PolyVar{true}}, H::Matrix; use_wsos::Bool = true, use_dual::Bool = false)
     model = JuMP.Model()
-    n = DP.nvariables(x)
+
     if use_wsos
         matdim = size(H, 1)
         halfdeg = div(maximum(DP.maxdegree.(H)) + 1, 2)
+        n = DP.nvariables(x)
         dom = MU.FreeDomain(n)
         (U, pts, P0, _, _) = MU.interpolate(dom, halfdeg, sample_factor = 20, sample = true)
         mat_wsos_cone = HYP.WSOSPolyInterpMatCone(matdim, U, [P0], use_dual)
+
         if use_dual
             JuMP.@variable(model, z[i in 1:n, 1:i, 1:U])
             JuMP.@constraint(model, [z[i, j, u] * (i == j ? 1.0 : rt2) for i in 1:matdim for j in 1:i for u in 1:U] in mat_wsos_cone)
@@ -58,12 +46,12 @@ function semidefinitepolyJuMP(x::Vector{DP.PolyVar{true}}, H::Matrix; use_wsos::
             JuMP.@constraint(model, H in JuMP.PSDCone())
         end
     end
+
     return (model = model,)
 end
 
-function semidefinitepolyJuMP(x::Vector{DP.PolyVar{true}}, poly::DP.Polynomial; use_wsos::Bool = true, use_dual::Bool = false)
-    return semidefinitepolyJuMP(x, DP.differentiate(poly, x, 2), use_wsos = use_wsos, use_dual = use_dual)
-end
+semidefinitepolyJuMP(x::Vector{DP.PolyVar{true}}, poly::DP.Polynomial; use_wsos::Bool = true, use_dual::Bool = false) =
+    semidefinitepolyJuMP(x, DP.differentiate(poly, x, 2), use_wsos = use_wsos, use_dual = use_dual)
 
 function semidefinitepolyJuMP1()
     DP.@polyvar x
@@ -99,7 +87,9 @@ function semidefinitepolyJuMP4()
     return semidefinitepolyJuMP(x, MM, use_wsos = true)
 end
 
-# SOSTOOLS examples
+# example modified from https://github.com/JuliaOpt/SumOfSquares.jl/blob/master/test/simplematrixsos.jl
+# Example 3.77 and 3.79 of Blekherman, G., Parrilo, P. A., & Thomas, R. R. (Eds.),
+# Semidefinite optimization and convex algebraic geometry SIAM 2013
 function semidefinitepolyJuMP5()
     DP.@polyvar x
     P = [
@@ -109,6 +99,10 @@ function semidefinitepolyJuMP5()
     return semidefinitepolyJuMP([x], P, use_wsos = true)
 end
 
+# example modified from https://github.com/JuliaOpt/SumOfSquares.jl/blob/master/test/choi.jl
+# verifies that a given polynomial matrix is not a Sum-of-Squares matrix
+# see Choi, M. D., "Positive semidefinite biquadratic forms",
+# Linear Algebra and its Applications, 1975, 12(2), 95-100
 function semidefinitepolyJuMP6()
     DP.@polyvar x y z
     P = [
@@ -119,6 +113,8 @@ function semidefinitepolyJuMP6()
     return semidefinitepolyJuMP([x, y, z], P, use_wsos = true)
 end
 
+# example modified from https://github.com/JuliaOpt/SumOfSquares.jl/blob/master/test/sosdemo9.jl
+# Section 3.9 of SOSTOOLS User's Manual, see https://www.cds.caltech.edu/sostools/
 function semidefinitepolyJuMP7()
     DP.@polyvar x y z
     P = [
@@ -139,11 +135,11 @@ end
 test_semidefinitepolyJuMP_all(; options...) = test_semidefinitepolyJuMP.([
     (semidefinitepolyJuMP1, true),
     (semidefinitepolyJuMP2, true),
-    (semidefinitepolyJuMP3, true), # failing with bk not chol
-    (semidefinitepolyJuMP4, true), # failing with bk not chol
+    (semidefinitepolyJuMP3, true),
+    (semidefinitepolyJuMP4, true),
     (semidefinitepolyJuMP5, true),
     (semidefinitepolyJuMP6, false),
-    (semidefinitepolyJuMP7, true), # failing with bk not chol
+    (semidefinitepolyJuMP7, true),
     ], options = options)
 
 test_semidefinitepolyJuMP(; options...) = test_semidefinitepolyJuMP.([
