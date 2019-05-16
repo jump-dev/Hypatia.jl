@@ -11,6 +11,7 @@ include("Models/Models.jl")
 include("Solvers/Solvers.jl")
 
 # MathOptInterface
+using Test
 using LinearAlgebra
 using SparseArrays
 import MathOptInterface

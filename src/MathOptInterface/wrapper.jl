@@ -6,6 +6,7 @@ MathOptInterface wrapper of Hypatia solver
 
 mutable struct Optimizer <: MOI.AbstractOptimizer
     use_dense::Bool
+    test_certificates::Bool
     verbose::Bool
     system_solver::Type{<:Solvers.CombinedHSDSystemSolver}
     linear_model::Type{<:Models.LinearModel}
@@ -44,12 +45,21 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     primal_obj::Float64
     dual_obj::Float64
 
-    load_only::Bool
-
-    function Optimizer(use_dense::Bool, verbose::Bool, system_solver::Type{<:Solvers.CombinedHSDSystemSolver},
-            linear_model::Type{<:Models.LinearModel}, max_iters::Int, time_limit::Float64, tol_rel_opt::Float64, tol_abs_opt::Float64, tol_feas::Float64, load_only::Bool)
+    function Optimizer(
+        use_dense::Bool,
+        test_certificates::Bool,
+        verbose::Bool, system_solver::Type{<:Solvers.CombinedHSDSystemSolver},
+        linear_model::Type{<:Models.LinearModel},
+        max_iters::Int,
+        time_limit::Float64,
+        tol_rel_opt::Float64,
+        tol_abs_opt::Float64,
+        tol_feas::Float64,
+        load_only::Bool,
+        )
         opt = new()
         opt.use_dense = use_dense
+        opt.test_certificates = test_certificates
         opt.verbose = verbose
         opt.system_solver = system_solver
         opt.linear_model = linear_model
@@ -66,6 +76,7 @@ end
 
 Optimizer(;
     use_dense::Bool = true,
+    test_certificates::Bool = false,
     verbose::Bool = false,
     system_solver::Type{<:Solvers.CombinedHSDSystemSolver} = Solvers.QRCholCombinedHSDSystemSolver,
     linear_model::Type{<:Models.LinearModel} = Models.PreprocessedLinearModel,
@@ -75,8 +86,7 @@ Optimizer(;
     tol_abs_opt::Float64 = 1e-7,
     tol_feas::Float64 = 1e-7,
     load_only::Bool = false,
-    ) =
-    Optimizer(use_dense, verbose, system_solver, linear_model, max_iters, time_limit, tol_rel_opt, tol_abs_opt, tol_feas, load_only)
+    ) = Optimizer(use_dense, test_certificates, verbose, system_solver, linear_model, max_iters, time_limit, tol_rel_opt, tol_abs_opt, tol_feas, , load_only)
 
 MOI.get(::Optimizer, ::MOI.SolverName) = "Hypatia"
 
@@ -512,20 +522,19 @@ function MOI.optimize!(opt::Optimizer)
         tol_rel_opt = opt.tol_rel_opt, tol_abs_opt = opt.tol_abs_opt, tol_feas = opt.tol_feas,
         )
     Solvers.solve(solver)
+    r = Solvers.get_certificates(solver, model, test = opt.test_certificates)
 
-    opt.status = Solvers.get_status(solver)
     opt.solve_time = Solvers.get_solve_time(solver)
-    opt.primal_obj = Solvers.get_primal_obj(solver)
-    opt.dual_obj = Solvers.get_dual_obj(solver)
+    opt.status = r.status
+    opt.primal_obj = r.primal_obj
+    opt.dual_obj = r.dual_obj
 
     # get solution and transform for MOI
-    opt.x = Solvers.get_x(solver, model)
+    opt.x = r.x
     opt.constr_prim_eq += opt.b - opt.A * opt.x
-    opt.y = Solvers.get_y(solver, model)
-
-    opt.s = Solvers.get_s(solver, model)
-    opt.z = Solvers.get_z(solver, model)
-
+    opt.y = r.y
+    opt.s = r.s
+    opt.z = r.z
     # TODO refac out primitive cone untransformations
     for k in eachindex(opt.cones)
         if opt.cones[k] isa Cones.PosSemidef
@@ -540,7 +549,6 @@ function MOI.optimize!(opt::Optimizer)
             opt.z[idxs] .*= scale_vec
         end
     end
-
     opt.s[opt.interval_idxs] ./= opt.interval_scales
     opt.constr_prim_cone += opt.s
     opt.z[opt.interval_idxs] .*= opt.interval_scales
