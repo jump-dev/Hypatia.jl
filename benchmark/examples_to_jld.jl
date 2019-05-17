@@ -1,16 +1,9 @@
 #=
-Copyright 2018, Chris Coey, Lea Kapelevich and contributors
+Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 =#
 
 import JLD
-import JuMP
-import Hypatia
-const HYP = Hypatia
-const CO = HYP.Cones
 import Random
-import Distributions
-import JuMP
-import SumOfSquares
 
 examples_dir = joinpath(@__DIR__, "../examples")
 
@@ -28,7 +21,7 @@ outputpath = joinpath(@__DIR__, "instancefiles", "jld")
 Random.seed!(1234)
 
 function example_to_JLD(modelname::String, isnative::Bool)
-    d = eval(Meta.parse(modelname))
+    d = eval(Meta.parse(modelname))()
     if isnative
         (c, A, b, G, h, cones, cone_idxs) = (d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
     else
