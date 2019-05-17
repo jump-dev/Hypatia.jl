@@ -105,18 +105,7 @@ function test_semidefinite_barrier()
     return
 end
 
-function test_wsospolyinterp_2_barrier()
-    Random.seed!(1)
-    for n in 1:3, halfdeg in 1:3
-        (U, _, P0, _, _) = MU.interpolate(MU.FreeDomain(n), halfdeg, sample = false)
-        Ps = [P0]
-        gs = [ones(U)]
-        cone = CO.WSOSPolyInterp_2(U, Ps, gs, true)
-        pass_through_cone(cone, 1)
-    end
-    return
-end
-
+# TODO also test complex
 function test_wsospolyinterp_barrier()
     Random.seed!(1)
     for n in 1:3, halfdeg in 1:3
