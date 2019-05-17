@@ -56,7 +56,6 @@ barrier_testfuns = [
     test_hypoperlog_barrier,
     test_hypoperlogdet_barrier,
     test_semidefinite_barrier,
-    test_wsospolyinterp_2_barrier,
     test_wsospolyinterp_barrier,
     test_wsospolyinterpmat_barrier,
     test_wsospolyinterpsoc_barrier,
