@@ -11,7 +11,9 @@ row-wise lower triangle (svec space) of positive semidefinite matrix cone
 barrier from "Self-Scaled Barriers and Interior-Point Methods for Convex Programming" by Nesterov & Todd
 -logdet(W)
 
-TODO eliminate allocations for inverse-finding
+TODO
+- eliminate allocations for inverse-finding
+- eliminate redundant svec_to_smat calls
 =#
 
 RealOrComplexF64 = Union{Float64, ComplexF64}
