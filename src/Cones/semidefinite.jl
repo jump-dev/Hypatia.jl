@@ -54,8 +54,8 @@ function setup_data(cone::PosSemidef{T}) where T
     dim = cone.dim
     cone.mat = Matrix{T}(undef, cone.side, cone.side)
     cone.g = Vector{Float64}(undef, dim)
-    cone.H = zeros(dim, dim)
-    cone.Hi = copy(cone.H)
+    cone.H = Matrix{Float64}(undef, dim, dim)
+    cone.Hi = similar(cone.H)
     return
 end
 
@@ -105,13 +105,13 @@ function check_in_cone(cone::PosSemidef{T}) where T
                         Hi[k2, k] = abs2(mat[i2, i])
                         k2 += 1
                     else
-                        c = rt2 * inv_mat[i2, i] * inv_mat[j, j2]
-                        ci = rt2 * mat[i2, i] * mat[j, j2]
+                        c = rt2 * conj(inv_mat[i2, i]) * inv_mat[j2, j]
+                        ci = rt2 * conj(mat[i2, i]) * mat[j2, j]
                         H[k2, k] = real(c)
                         Hi[k2, k] = real(ci)
                         k2 += 1
-                        H[k2, k] = -imag(c)
-                        Hi[k2, k] = -imag(ci)
+                        H[k2, k] = imag(c)
+                        Hi[k2, k] = imag(ci)
                         k2 += 1
                     end
                     if k2 > k
@@ -122,27 +122,27 @@ function check_in_cone(cone::PosSemidef{T}) where T
             else
                 for i2 in 1:cone.side, j2 in 1:i2
                     if i2 == j2 # TODO try to merge with other XOR condition above
-                        c = rt2 * inv_mat[i2, i] * inv_mat[j, j2]
-                        ci = rt2 * mat[i2, i] * mat[j, j2]
+                        c = rt2 * inv_mat[i2, i] * conj(inv_mat[j2, j])
+                        ci = rt2 * mat[i2, i] * (j2 >= j ? mat[j2, j] : conj(mat[j2, j]))
                         H[k2, k] = real(c)
                         Hi[k2, k] = real(ci)
                         H[k2, k + 1] = imag(c)
                         Hi[k2, k + 1] = imag(ci)
                         k2 += 1
                     else
-                        c = inv_mat[i2, i] * inv_mat[j, j2] + inv_mat[j2, i] * inv_mat[j, i2]
-                        ci = mat[i2, i] * mat[j, j2] + mat[j2, i] * mat[j, i2]
+                        c = inv_mat[i2, i] * conj(inv_mat[j2, j]) + inv_mat[j2, i] * conj(inv_mat[i2, j])
+                        ci = mat[i2, i] * (j2 >= j ? mat[j2, j] : conj(mat[j2, j])) + mat[j2, i] * (i2 >= j ? mat[i2, j] : conj(mat[i2, j]))
+                        c2 = conj(inv_mat[i2, i]) * inv_mat[j2, j] - conj(inv_mat[j2, i]) * inv_mat[i2, j]
+                        c2i = conj(mat[i2, i]) * (j2 < j ? mat[j2, j] : conj(mat[j2, j])) - conj(mat[j2, i]) * (i2 < j ? mat[i2, j] : conj(mat[i2, j]))
                         H[k2, k] = real(c)
                         Hi[k2, k] = real(ci)
                         H[k2, k + 1] = imag(c)
                         Hi[k2, k + 1] = imag(ci)
                         k2 += 1
-                        c = inv_mat[i2, i] * inv_mat[j, j2] - inv_mat[j2, i] * inv_mat[j, i2]
-                        ci = mat[i2, i] * mat[j, j2] - mat[j2, i] * mat[j, i2]
-                        H[k2, k] = -imag(c)
-                        Hi[k2, k] = -imag(ci)
-                        H[k2, k + 1] = real(c)
-                        Hi[k2, k + 1] = real(ci)
+                        H[k2, k] = imag(c2)
+                        Hi[k2, k] = imag(c2i)
+                        H[k2, k + 1] = real(c2)
+                        Hi[k2, k + 1] = real(c2i)
                         k2 += 1
                     end
                     if k2 > k
