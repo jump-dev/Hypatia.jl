@@ -17,10 +17,13 @@ mutable struct CombinedHSDStepper <: HSDStepper
     cones_outside_nbhd::Vector{Bool}
     cones_loaded::Vector{Bool}
 
+    infty_nbhd::Bool
+
     function CombinedHSDStepper(
         model::Models.LinearModel;
         system_solver::CombinedHSDSystemSolver = (model isa Models.PreprocessedLinearModel ? QRCholCombinedHSDSystemSolver(model) : NaiveCombinedHSDSystemSolver(model)),
         max_nbhd::Float64 = 0.75,
+        infty_nbhd::Bool = true,
         )
         stepper = new()
 
@@ -40,6 +43,8 @@ mutable struct CombinedHSDStepper <: HSDStepper
         stepper.nbhd_temp = [Vector{Float64}(undef, length(model.cone_idxs[k])) for k in eachindex(model.cones)]
         stepper.cones_outside_nbhd = trues(length(model.cones))
         stepper.cones_loaded = trues(length(model.cones))
+
+        stepper.infty_nbhd = infty_nbhd
 
         return stepper
     end
@@ -188,7 +193,7 @@ function find_max_alpha_in_nbhd(z_dir::AbstractVector{Float64}, s_dir::AbstractV
                 if stepper.cones_outside_nbhd[k]
                     cone_k = cones[k]
                     Cones.load_point(cone_k, stepper.primal_views[k])
-                    if Cones.check_in_cone(cone_k)
+                    if Cones.check_in_cone(cone_k, invert_hess = false)
                         stepper.cones_outside_nbhd[k] = false
                         stepper.cones_loaded[k] = true
                     else
@@ -208,42 +213,55 @@ function find_max_alpha_in_nbhd(z_dir::AbstractVector{Float64}, s_dir::AbstractV
                         cone_k = cones[k]
                         if !stepper.cones_loaded[k]
                             Cones.load_point(cone_k, stepper.primal_views[k])
-                            if !Cones.check_in_cone(cone_k)
+                            if !Cones.check_in_cone(cone_k, invert_hess = !stepper.infty_nbhd)
                                 in_nbhds = false
                                 break
                             end
                         end
 
                         # modifies dual_views
-                        stepper.dual_views[k] .+= mu_temp .* Cones.grad(cone_k)
-                        Cones.inv_hess_prod!(stepper.nbhd_temp[k], stepper.dual_views[k], cone_k)
-                        # mul!(stepper.nbhd_temp[k], Cones.inv_hess(cone_k), stepper.dual_views[k])
-                        nbhd_sqr_k = dot(stepper.dual_views[k], stepper.nbhd_temp[k])
+                       stepper.dual_views[k] .+= mu_temp .* Cones.grad(cone_k)
 
-                        if nbhd_sqr_k <= -1e-5
-                            println("numerical issue for cone: nbhd_sqr_k is $nbhd_sqr_k")
-                            in_nbhds = false
-                            break
-                        elseif nbhd_sqr_k > 0.0
-                            full_nbhd_sqr += nbhd_sqr_k
-                            if full_nbhd_sqr > abs2(mu_temp * nbhd)
-                                in_nbhds = false
-                                break
-                            end
-                        end
-                    end
-                    if in_nbhds
-                        break
-                    end
-                end
-            end
-        end
+                       if stepper.infty_nbhd
+                           gradnorm = norm(Cones.grad(cone_k), Inf)
+                           nbhd_sqr_k = abs2(norm(stepper.dual_views[k], Inf) ./ gradnorm)
+                           full_nbhd_sqr = max(nbhd_sqr_k, full_nbhd_sqr)
+                       else
+                           Cones.inv_hess_prod!(stepper.nbhd_temp[k], stepper.dual_views[k], cone_k)
+                           nbhd_sqr_k = dot(stepper.dual_views[k], stepper.nbhd_temp[k])
+                           if nbhd_sqr_k <= -1e-5
+                               println("numerical issue for cone: nbhd_sqr_k is $nbhd_sqr_k")
+                               in_nbhds = false
+                               break
+                           elseif nbhd_sqr_k > 0.0
+                               full_nbhd_sqr += nbhd_sqr_k
+                           end
+                       end
 
-        if alpha < 1e-3
-            # alpha is very small so just let it be zero
-            alpha = 0.0
-            break
-        end
+                       if full_nbhd_sqr > abs2(mu_temp * nbhd)
+                           in_nbhds = false
+                           break
+                       end
+
+                   end
+                   if in_nbhds
+                       # update inverse hessian if it hasn't been updated
+                       if stepper.infty_nbhd
+                           for cone_k in cones
+                               Cones.check_in_cone(cone_k, invert_hess = true)
+                           end
+                       end
+                       break
+                   end
+               end
+           end
+       end
+
+       if alpha < 1e-3
+           # alpha is very small so just let it be zero
+           alpha = 0.0
+           break
+       end
 
         # iterate is outside the neighborhood: decrease alpha
         alpha *= 0.8 # TODO option for parameter
