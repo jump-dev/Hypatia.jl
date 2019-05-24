@@ -5,6 +5,10 @@ polyminreal: formulates and solves the real polynomial optimization problem for 
 D. Papp and S. Yildiz. Sum-of-squares optimization without semidefinite programming.
 
 polymincomplex: minimizes a real-valued complex polynomial over a domain defined by real-valued complex polynomials
+
+TODO
+- generalize ModelUtilities interpolation code for complex polynomials space
+- merge real and complex polyvars data when complex is supported in DynamicPolynomials: https://github.com/JuliaAlgebra/MultivariatePolynomials.jl/issues/11
 =#
 
 import Random
@@ -50,7 +54,6 @@ function polyminreal(
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs, true_obj = true_obj)
 end
 
-
 polyminreal1() = polyminreal(:heart, 2)
 polyminreal2() = polyminreal(:schwefel, 2)
 polyminreal3() = polyminreal(:magnetism7_ball, 2)
@@ -74,10 +77,12 @@ function polymincomplex(
     halfdeg::Int;
     primal_wsos = true,
     sample_factor::Int = 100,
+    use_QR::Bool = false,
     )
     (n, deg, f, gs, g_halfdegs, true_obj) = complexpolys[polyname]
 
     # generate interpolation
+    # TODO use more numerically-stable basis for columns
     L = binomial(n + halfdeg, n)
     U = L^2
     L_basis = [a for t in 0:halfdeg for a in Combinatorics.multiexponents(n, t)]
@@ -85,32 +90,41 @@ function polymincomplex(
     V_basis = [z -> mon_pow(z, L_basis[k]) * mon_pow(conj(z), L_basis[l]) for l in eachindex(L_basis) for k in eachindex(L_basis)]
     @assert length(V_basis) == U
 
-    # sample from cartesian product of n complex unit balls
-    # TODO expo vs unif give different distributions it seems
-    # TODO look up theory of ideal interpolation points analogous to Fekete points in real case
-    num_samp = sample_factor * U
-    X = randn(num_samp, 2n)
-    # Y = randexp(num_samp)
-    # all_points_real = [X[p, :] ./ sqrt(Y[p] + sum(abs2, X)) for p in 1:num_samp]
-    Y = rand(num_samp).^inv(2n)
-    all_points_real = [Y[p] * X[p, :] ./ norm(X[p, :]) for p in 1:num_samp]
-    all_points = [[p[i] + im * p[i+1] for i in 1:2:2n] for p in all_points_real]
+    # sample from domain (inefficient for general domains, only samples from unit box and checks feasibility)
+    num_samples = sample_factor * U
+    samples = Vector{Vector{ComplexF64}}(undef, num_samples)
+    k = 0
+    randbox() = 2 * rand() - 1
+    while k < num_samples
+        z = [Complex(randbox(), randbox()) for i in 1:n]
+        if all(g -> g(z) > 0.0, gs)
+            k += 1
+            samples[k] = z
+        end
+    end
 
     # select subset of points to maximize |det(V)| in heuristic QR-based procedure (analogous to real case)
-    V = [b(z) for z in all_points, b in V_basis]
+    V = [b(z) for z in samples, b in V_basis]
     @test rank(V) == U
     VF = qr(Matrix(transpose(V)), Val(true))
     keep = VF.p[1:U]
-    points = all_points[keep]
+    points = samples[keep]
     V = V[keep, :]
     @test rank(V) == U
 
     # setup P matrices
-    g_data = [ones(U)]
-    P_data = [V[:, 1:L]]
+    P0 = V[:, 1:L]
+    if use_QR
+        P0 = Matrix(qr(P0).Q)
+    end
+    P_data = [P0]
     for i in eachindex(gs)
-        push!(g_data, gs[i].(points))
-        push!(P_data, V[:, 1:binomial(n + halfdeg - g_halfdegs[i], n)])
+        gi = gs[i].(points)
+        Pi = Diagonal(sqrt.(gi)) * P0[:, 1:binomial(n + halfdeg - g_halfdegs[i], n)]
+        if use_QR
+            Pi = Matrix(qr(Pi).Q)
+        end
+        push!(P_data, Pi)
     end
 
     # setup problem data
@@ -128,7 +142,7 @@ function polymincomplex(
         G = Diagonal(-1.0I, U)
         h = zeros(U)
     end
-    cones = [CO.WSOSPolyInterp_2(U, P_data, g_data, !primal_wsos)] # TODO use old WSOS cone definition
+    cones = [CO.WSOSPolyInterp(U, P_data, !primal_wsos)]
     cone_idxs = [1:U]
 
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs, true_obj = true_obj)

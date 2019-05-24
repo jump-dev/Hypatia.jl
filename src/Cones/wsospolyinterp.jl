@@ -2,18 +2,22 @@
 Copyright 2018, Chris Coey and contributors
 Copyright 2018, David Papp, Sercan Yildiz
 
-interpolation-based weighted-sum-of-squares (multivariate) polynomial cone parametrized by interpolation points ipwt
+interpolation-based weighted-sum-of-squares (multivariate) polynomial cone parametrized by interpolation points Ps
 
 definition and dual barrier from "Sum-of-squares optimization without semidefinite programming" by D. Papp and S. Yildiz, available at https://arxiv.org/abs/1712.01792
 
-TODO can perform loop for calculating g and H in parallel
-TODO scale the interior direction
+TODO
+- can perform loop for calculating g and H in parallel
+- scale the interior direction
+- check if gradient and hessian are correct for complex case
 =#
 
-mutable struct WSOSPolyInterp <: Cone
+RealOrComplexF64 = Union{Float64, ComplexF64}
+
+mutable struct WSOSPolyInterp{T <: RealOrComplexF64} <: Cone
     use_dual::Bool
     dim::Int
-    ipwt::Vector{Matrix{Float64}}
+    Ps::Vector{Matrix{T}}
 
     point::AbstractVector{Float64}
     g::Vector{Float64}
@@ -21,80 +25,91 @@ mutable struct WSOSPolyInterp <: Cone
     H2::Matrix{Float64}
     Hi::Matrix{Float64}
     F # TODO prealloc
-    tmp1::Vector{Matrix{Float64}}
-    tmp2::Vector{Matrix{Float64}}
-    tmp3::Matrix{Float64}
+    tmpLL::Vector{Matrix{T}}
+    tmpUL::Vector{Matrix{T}}
+    tmpLU::Vector{Matrix{T}}
+    tmpUU::Matrix{T}
+    ΛFs::Vector{CholeskyPivoted{T, Matrix{T}}}
 
-    function WSOSPolyInterp(dim::Int, ipwt::Vector{Matrix{Float64}}, is_dual::Bool)
-        for ipwtj in ipwt
-            @assert size(ipwtj, 1) == dim
+    function WSOSPolyInterp(dim::Int, Ps::Vector{Matrix{T}}, is_dual::Bool) where {T <: RealOrComplexF64}
+        for k in eachindex(Ps)
+            @assert size(Ps[k], 1) == dim
         end
-        cone = new()
+        cone = new{T}()
         cone.use_dual = !is_dual # using dual barrier
         cone.dim = dim
-        cone.ipwt = ipwt
+        cone.Ps = Ps
         return cone
     end
 end
 
-WSOSPolyInterp(dim::Int, ipwt::Vector{Matrix{Float64}}) = WSOSPolyInterp(dim, ipwt, false)
+WSOSPolyInterp(dim::Int, Ps::Vector{Matrix{T}}) where {T <: RealOrComplexF64} = WSOSPolyInterp{T}(dim, Ps, false)
 
-function setup_data(cone::WSOSPolyInterp)
+function setup_data(cone::WSOSPolyInterp{T}) where T
     dim = cone.dim
-    ipwt = cone.ipwt
-    cone.g = similar(ipwt[1], dim)
-    cone.H = similar(ipwt[1], dim, dim)
+    cone.g = Vector{Float64}(undef, dim)
+    cone.H = similar(cone.g, dim, dim)
     cone.H2 = similar(cone.H)
     cone.Hi = similar(cone.H)
-    cone.tmp1 = [similar(ipwt[1], size(ipwtj, 2), size(ipwtj, 2)) for ipwtj in ipwt]
-    cone.tmp2 = [similar(ipwt[1], size(ipwtj, 2), dim) for ipwtj in ipwt]
-    cone.tmp3 = similar(ipwt[1], dim, dim)
+    Ps = cone.Ps
+    cone.tmpLL = [Matrix{T}(undef, size(Pk, 2), size(Pk, 2)) for Pk in Ps]
+    cone.tmpUL = [Matrix{T}(undef, dim, size(Pk, 2)) for Pk in Ps]
+    cone.tmpLU = [Matrix{T}(undef, size(Pk, 2), dim) for Pk in Ps]
+    cone.tmpUU = Matrix{T}(undef, dim, dim)
+    cone.ΛFs = Vector{CholeskyPivoted{T, Matrix{T}}}(undef, length(Ps))
     return
 end
 
-get_nu(cone::WSOSPolyInterp) = sum(size(ipwtj, 2) for ipwtj in cone.ipwt)
+get_nu(cone::WSOSPolyInterp) = sum(size(Pk, 2) for Pk in cone.Ps)
 
 set_initial_point(arr::AbstractVector{Float64}, cone::WSOSPolyInterp) = (@. arr = 1.0; arr)
 
+_AtA!(U::Matrix{T}, A::Matrix{T}) where {T <: Real} = BLAS.syrk!('U', 'T', one(T), A, zero(T), U)
+_AtA!(U::Matrix{Complex{T}}, A::Matrix{Complex{T}}) where {T <: Real} = BLAS.herk!('U', 'C', one(T), A, zero(T), U)
+
 function check_in_cone(cone::WSOSPolyInterp)
-    ΛFs = Vector{CholeskyPivoted{Float64, Matrix{Float64}}}(undef, length(cone.ipwt))
+    Ps = cone.Ps
+    LLs = cone.tmpLL
+    ULs = cone.tmpUL
+    LUs = cone.tmpLU
+    UU = cone.tmpUU
+    ΛFs = cone.ΛFs
+    D = Diagonal(cone.point)
 
-    for j in eachindex(cone.ipwt) # TODO can be done in parallel
-        ipwtj = cone.ipwt[j]
-        tmp1j = cone.tmp1[j]
-        tmp2j = cone.tmp2[j]
-
-        # tmp1j = ipwtj'*Diagonal(point)*ipwtj
-        # mul!(tmp2j, ipwtj', Diagonal(cone.point)) # TODO dispatches to an extremely inefficient method, but should be fixed on master now - check timings for both
-        @. tmp2j = ipwtj' * cone.point'
-        mul!(tmp1j, tmp2j, ipwtj)
+    for k in eachindex(Ps) # TODO can be done in parallel
+        # Λ = Pk' * Diagonal(point) * Pk
+        # TODO LDLT calculation could be faster
+        # TODO mul!(A, B', Diagonal(x)) calls extremely inefficient method but don't need ULk
+        Pk = Ps[k]
+        ULk = ULs[k]
+        LLk = LLs[k]
+        mul!(ULk, D, Pk)
+        mul!(LLk, Pk', ULk)
 
         # pivoted cholesky and triangular solve method
-        ΛFj = cholesky!(Symmetric(tmp1j, :L), Val(true), check = false)
-        if !isposdef(ΛFj)
+        ΛFk = cholesky!(Hermitian(LLk, :L), Val(true), check = false)
+        if !isposdef(ΛFk)
             return false
         end
-        ΛFs[j] = ΛFj
+        ΛFs[k] = ΛFk
     end
 
-    @. cone.g = 0.0
-    @. cone.H = 0.0
-    tmp3 = cone.tmp3
+    g = cone.g
+    H = cone.H
+    @. g = 0.0
+    @. H = 0.0
 
-    for j in eachindex(cone.ipwt) # TODO can be done in parallel, but need multiple tmp3s
-        ipwtj = cone.ipwt[j]
-        tmp2j = cone.tmp2[j]
-        ΛFj = ΛFs[j]
+    for k in eachindex(Ps) # TODO can be done in parallel, but need multiple tmp3s
+        LUk = LUs[k]
+        ΛFk = ΛFs[k]
+        LUk .= view(Ps[k]', ΛFk.p, :)
+        ldiv!(ΛFk.L, LUk) # TODO check calls best triangular solve
+        _AtA!(UU, LUk)
 
-        tmp2j .= view(ipwtj', ΛFj.p, :)
-        ldiv!(ΛFj.L, tmp2j) # TODO make sure calls best triangular solve
-        # mul!(tmp3, tmp2j', tmp2j)
-        BLAS.syrk!('U', 'T', 1.0, tmp2j, 0.0, tmp3)
-
-        @inbounds for j in eachindex(cone.g)
-            cone.g[j] -= tmp3[j, j]
+        @inbounds for j in eachindex(g)
+            g[j] -= real(UU[j, j])
             @inbounds for i in 1:j
-                cone.H[i, j] += abs2(tmp3[i, j])
+                H[i, j] += abs2(UU[i, j])
             end
         end
     end
