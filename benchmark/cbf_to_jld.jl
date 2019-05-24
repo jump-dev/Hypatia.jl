@@ -44,13 +44,13 @@ for instname in instances
     model = MathOptFormat.read_from_file(fullpathin)
     MOI.empty!(optimizer)
     MOI.copy_to(optimizer, model)
-    nativedata = optimizer.optimizer
+    d = optimizer.optimizer
     # just load, don't optimize
-    nativedata.use_dense = false
-    nativedata.load_only = true
+    d.use_dense = false
+    d.load_only = true
     MOI.optimize!(optimizer)
-    (c, A, b, G, h, cones, cone_idxs) = (nativedata.c, nativedata.A, nativedata.b, nativedata.G, nativedata.h, nativedata.cones, nativedata.cone_idxs)
-    fullpathout = joinpath(outputpath, chop(instname, tail = 4) * ".jld")
+    (c, A, b, G, h, cones, cone_idxs) = (d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
+    fullpathout = joinpath(outputpath, instname, tail * ".jld")
     JLD.save(fullpathout, "c", c, "A", A, "b", b, "G", G, "h", h, "cones", cones, "cone_idxs", cone_idxs)
 end
 
