@@ -2,15 +2,25 @@
 Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 =#
 
+# julia benchmark/cbf_to_jld.jl cbf_easy C:/Users/lkape/Documents/cblib/all/cblib.zib.de/download/all benchmark/instancefiles
+Pkg.activate(".")
+
 import JLD
 import MathOptFormat
 import MathOptInterface
 const MOI = MathOptInterface
 import Hypatia
 
-instsetfile = "benchmark/instancesets/cbf/easy.txt"
-inputpath = joinpath(@__DIR__, "instancefiles", "cbf")
-outputpath = joinpath(@__DIR__, "instancefiles", "jld")
+instanceset = ARGS[1]
+instsetfile = joinpath(@__DIR__, "instancesets", instanceset * ".txt")
+
+inputpath = ARGS[2]
+
+outputpath = ARGS[3]
+if !isdir(outputpath)
+    error("output path is not a valid directory: $outputpath")
+end
+
 instances = SubString[]
 for l in readlines(instsetfile)
     str = split(strip(l))
@@ -40,7 +50,7 @@ optimizer = MOI.Utilities.CachingOptimizer(HypatiaModelData{Float64}(), Hypatia.
 
 for instname in instances
     println("opening $instname")
-    fullpathin = joinpath(inputpath, instname)
+    fullpathin = joinpath(inputpath, instname * ".cbf.gz")
     model = MathOptFormat.read_from_file(fullpathin)
     MOI.empty!(optimizer)
     MOI.copy_to(optimizer, model)
@@ -50,7 +60,7 @@ for instname in instances
     d.load_only = true
     MOI.optimize!(optimizer)
     (c, A, b, G, h, cones, cone_idxs) = (d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
-    fullpathout = joinpath(outputpath, instname, tail * ".jld")
+    fullpathout = joinpath(outputpath, instname * ".jld")
     JLD.save(fullpathout, "c", c, "A", A, "b", b, "G", G, "h", h, "cones", cones, "cone_idxs", cone_idxs)
 end
 

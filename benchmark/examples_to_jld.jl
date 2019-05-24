@@ -9,8 +9,8 @@ import Hypatia
 import Random
 
 # instanceset = ARGS[1]
-instanceset = "JuMP_easy.txt"
-instsetfile = joinpath(@__DIR__, "instancesets", instanceset)
+instanceset = "JuMP_easy"
+instsetfile = joinpath(@__DIR__, "instancesets", instanceset * ".txt")
 isnative = false # TODO infer
 outputpath = joinpath(@__DIR__, "instancefiles")
 if !isdir(outputpath)

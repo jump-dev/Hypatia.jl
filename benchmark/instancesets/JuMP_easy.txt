@@ -2,3 +2,10 @@
 
 contractionJuMP1
 densityestJuMP5
+envelopeJuMP1
+expdesignJuMP3
+polyminJuMP2
+polyminJuMP3
+regionofattrJuMP1
+regionofattrJuMP2
+shapeconregrJuMP1
