@@ -4,12 +4,17 @@ Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 TODO readme for benchmarks and describe ARGS for running on command line
 =#
 
+# julia benchmark/runbenchmarks.jl JuMP_easy benchmark/instancefiles tmp
+
+Pkg.activate(".")
 import Hypatia
-import MathOptFormat
-import MathOptInterface
-const MOI = MathOptInterface
-import GZip
+const CO = Hypatia.Cones
+const MO = Hypatia.Models
+const SO = Hypatia.Solvers
+import JLD
 import Dates
+import SparseArrays
+import LinearAlgebra
 
 # parse command line arguments
 println()
@@ -18,7 +23,7 @@ if length(ARGS) != 3
 end
 
 instanceset = ARGS[1]
-instsetfile = joinpath(@__DIR__, "instancesets", instanceset)
+instsetfile = joinpath(@__DIR__, "instancesets", instanceset * ".txt")
 if !isfile(instsetfile)
     error("instance set file not found: $instsetfile")
 end
@@ -41,7 +46,7 @@ for l in readlines(instsetfile)
 end
 println("instance set $instanceset contains $(length(instances)) instances")
 for instname in instances
-    instfile = joinpath(inputpath, instname)
+    instfile = joinpath(inputpath, instname * ".jld")
     if !isfile(instfile)
         error("instance file not found: $instfile")
     end
@@ -55,30 +60,6 @@ end
 # Hypatia options
 verbose = true
 time_limit = 1e2
-use_dense = false
-
-MOI.Utilities.@model(HypatiaModelData,
-    (MOI.Integer,), # integer constraints will be ignored by Hypatia
-    (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan, MOI.Interval),
-    (MOI.Reals, MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives,
-        MOI.SecondOrderCone, MOI.RotatedSecondOrderCone,
-        MOI.PositiveSemidefiniteConeTriangle,
-        MOI.ExponentialCone),
-    (MOI.PowerCone,),
-    (MOI.SingleVariable,),
-    (MOI.ScalarAffineFunction,),
-    (MOI.VectorOfVariables,),
-    (MOI.VectorAffineFunction,),
-    )
-
-optimizer = MOI.Utilities.CachingOptimizer(HypatiaModelData{Float64}(), Hypatia.Optimizer(
-    verbose = verbose,
-    time_limit = time_limit,
-    use_dense = use_dense,
-    tol_rel_opt = 1e-6,
-    tol_abs_opt = 1e-7,
-    tol_feas = 1e-7,
-    ))
 
 println("\nstarting benchmark run in 5 seconds\n")
 sleep(5.0)
@@ -110,20 +91,24 @@ for instname in instances
 
         println("\nreading instance and constructing model...")
         readtime = @elapsed begin
-            model = MathOptFormat.read_into_model(joinpath(inputpath, instname))
-            MOI.empty!(optimizer)
-            MOI.copy_to(optimizer, model)
+            md = JLD.load(joinpath(inputpath, instname * ".jld"))
+            (c, A, b, G, h, cones, cone_idxs) = (md["c"], md["A"], md["b"], md["G"], md["h"], md["cones"], md["cone_idxs"])
+            for c in cones
+                CO.setup_data(c)
+            end
+            plmodel = MO.PreprocessedLinearModel(c, A, b, G, h, cones, cone_idxs)
+            solver = SO.HSDSolver(plmodel, verbose = verbose, time_limit = time_limit)
         end
         println("took $readtime seconds")
 
         println("\nsolving model...")
         try
-            (val, runtime, bytes, gctime, memallocs) = @timed MOI.optimize!(optimizer)
+            (val, runtime, bytes, gctime, memallocs) = @timed SO.solve(solver)
             println("\nHypatia finished")
-            status = MOI.get(optimizer, MOI.TerminationStatus())
-            niters = -1 # TODO niters = MOI.get(optimizer, MOI.BarrierIterations())
-            primal_obj = MOI.get(optimizer, MOI.ObjectiveValue())
-            dual_obj = MOI.get(optimizer, MOI.ObjectiveBound())
+            status = solver.status
+            niters = solver.num_iters
+            primal_obj = solver.primal_obj
+            dual_obj = solver.dual_obj
         catch solveerror
             println("\nHypatia errored: ", solveerror)
         end
@@ -132,8 +117,8 @@ for instname in instances
         dump(memallocs)
         println()
 
-        redirect_stdout(OUT)
-        redirect_stderr(ERR)
+        # redirect_stdout(OUT)
+        # redirect_stderr(ERR)
     end
 
     if !isnothing(solveerror)

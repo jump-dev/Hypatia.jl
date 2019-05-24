@@ -199,3 +199,23 @@ JuMP_options = (
 end
 
 end
+
+@info("starting benchmark script tests")
+@testset "benchmark scripts" begin
+    benchmark_dir = joinpath(@__DIR__, "../benchmark")
+    benchmark_file = joinpath(benchmark_dir, "runbenchmarks.jl")
+    temp_dir = "temp_$(round(Int,time()))"
+    mkdir(temp_dir)
+    run(`julia $benchmark_file test benchmark/instancefiles $temp_dir`)
+    @test isfile(joinpath(temp_dir, "RESULTS_test.csv"))
+    for l in readlines(joinpath(benchmark_dir, "instancesets", "test.txt"))
+        str = split(strip(l))
+        if !isempty(str)
+            str1 = first(str)
+            if !startswith(str1, '#')
+                @test isfile(joinpath(temp_dir, str1 * ".txt"))
+            end
+        end
+    end
+    rm(temp_dir, recursive = true)
+end

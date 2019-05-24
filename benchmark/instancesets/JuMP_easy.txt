@@ -1,0 +1,4 @@
+# examples saved in Hypatia native format
+
+contractionJuMP1
+densityestJuMP5

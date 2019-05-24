@@ -1,0 +1,11 @@
+# examples saved in Hypatia native format, one from each type of problem
+
+envelope1
+envelope5
+linearopt4
+polyminreal2
+polyminreal3
+polyminreal12
+polyminreal14
+polymincomplex7
+polymincomplex14
