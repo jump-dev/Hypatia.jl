@@ -6,6 +6,15 @@ import JLD
 import Random
 import JuMP
 import Hypatia
+import Random
+
+# instanceset = ARGS[1]
+instanceset = "JuMP_easy.txt"
+instsetfile = joinpath(@__DIR__, "instancesets", "jld", instanceset)
+isnative = false # TODO infer
+outputpath = joinpath(@__DIR__, "instancefiles", "jld")
+
+Random.seed!(1234) # would make more sense for random seed to be in all the model functions, not outside
 
 examples_dir = joinpath(@__DIR__, "../examples")
 for e in readdir(examples_dir)
@@ -20,11 +29,7 @@ for e in readdir(examples_dir)
     end
 end
 
-outputpath = joinpath(@__DIR__, "instancefiles", "jld")
-
-Random.seed!(1234)
-
-function example_to_JLD(modelname::String, isnative::Bool)
+function example_to_JLD(modelname::AbstractString, isnative::Bool)
     d = eval(Meta.parse(modelname))()
     if isnative
         (c, A, b, G, h, cones, cone_idxs) = (d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
@@ -39,9 +44,13 @@ function example_to_JLD(modelname::String, isnative::Bool)
     return
 end
 
-for (modelname, isnative) in [
-    ("densityestJuMP5", false),
-    ("envelope1", true),
-    ]
-    example_to_JLD(modelname, isnative)
+for l in readlines(instsetfile)
+    str = split(strip(l))
+    if !isempty(str)
+        str1 = first(str)
+        if !startswith(str1, '#')
+            println("\nconverting $(str1)\n")
+            example_to_JLD(str1, isnative)
+        end
+    end
 end

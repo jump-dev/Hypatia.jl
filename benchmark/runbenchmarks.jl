@@ -4,7 +4,7 @@ Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 TODO readme for benchmarks and describe ARGS for running on command line
 =#
 
-# julia benchmark/runbenchmarks.jl native_all.txt benchmark/instancefiles/jld tmp
+# julia benchmark/runbenchmarks.jl JuMP_easy.txt benchmark/instancefiles/jld tmp
 
 Pkg.activate(".")
 import Hypatia
@@ -23,7 +23,7 @@ if length(ARGS) != 3
 end
 
 instanceset = ARGS[1]
-# instanceset = "native_all.txt"
+# instanceset = "native_easy.txt"
 instsetfile = joinpath(@__DIR__, "instancesets", "jld", instanceset)
 if !isfile(instsetfile)
     error("instance set file not found: $instsetfile")
@@ -48,7 +48,7 @@ for l in readlines(instsetfile)
 end
 println("instance set $instanceset contains $(length(instances)) instances")
 for instname in instances
-    instfile = joinpath(inputpath, instname)
+    instfile = joinpath(inputpath, instname * ".jld")
     if !isfile(instfile)
         error("instance file not found: $instfile")
     end
@@ -83,7 +83,7 @@ for instname in instances
     (status, primal_obj, dual_obj, niters, runtime, gctime, bytes) = (:UnSolved, NaN, NaN, -1, NaN, NaN, -1)
     memallocs = nothing
 
-    instfile = joinpath(outputpath, chop(instname, tail = 4) * ".txt")
+    instfile = joinpath(outputpath, instname * ".txt")
     open(instfile, "w") do fdinst
         redirect_stdout(fdinst)
         redirect_stderr(fdinst)
@@ -94,7 +94,7 @@ for instname in instances
 
         println("\nreading instance and constructing model...")
         readtime = @elapsed begin
-            md = JLD.load(joinpath(inputpath, instname))
+            md = JLD.load(joinpath(inputpath, instname * ".jld"))
             (c, A, b, G, h, cones, cone_idxs) = (md["c"], md["A"], md["b"], md["G"], md["h"], md["cones"], md["cone_idxs"])
             for c in cones
                 CO.setup_data(c)

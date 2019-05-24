@@ -1,11 +1,11 @@
 # examples saved in Hypatia native format, one from each type of problem
 
-densityest.jld
-envelope3.jld
-linearopt.jld
-polyminreal7.jld
-polymincomplex4.jld
-expdesign_medium.jld
-shapeconregr0.jld
-roa.jld
-# lotkavolterra.jld big
+envelope1
+envelope5
+linearopt4
+polyminreal2
+polyminreal3
+polyminreal12
+polyminreal14
+polymincomplex7
+polymincomplex14

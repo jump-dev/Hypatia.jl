@@ -1,9 +1,9 @@
 # a selection of CBF instances that solve reliably and quickly
 
-expdesign_D_8_4.jld # psd, exp
-port_12_9_3_a_1.jld # psd, soc, exp
-tls4.jld # soc
-ck_n25_m10_o1_1.jld # rsoc
-rsyn0805h.jld # exp
-2x3_3bars.jld # psd
-HMCR-n20-m400.jld # power
+expdesign_D_8_4 # psd, exp
+port_12_9_3_a_1 # psd, soc, exp
+tls4 # soc
+ck_n25_m10_o1_1 # rsoc
+rsyn0805h # exp
+2x3_3bars # psd
+HMCR-n20-m400 # power
