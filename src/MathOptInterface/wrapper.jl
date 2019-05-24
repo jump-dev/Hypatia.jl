@@ -45,6 +45,8 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     primal_obj::Float64
     dual_obj::Float64
 
+    load_only::Bool
+
     function Optimizer(
         use_dense::Bool,
         test_certificates::Bool,
@@ -69,7 +71,7 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
         opt.tol_abs_opt = tol_abs_opt
         opt.tol_feas = tol_feas
         opt.status = :NotLoaded
-        opt.load_only = false
+        opt.load_only = load_only
         return opt
     end
 end
@@ -86,7 +88,7 @@ Optimizer(;
     tol_abs_opt::Float64 = 1e-7,
     tol_feas::Float64 = 1e-7,
     load_only::Bool = false,
-    ) = Optimizer(use_dense, test_certificates, verbose, system_solver, linear_model, max_iters, time_limit, tol_rel_opt, tol_abs_opt, tol_feas, , load_only)
+    ) = Optimizer(use_dense, test_certificates, verbose, system_solver, linear_model, max_iters, time_limit, tol_rel_opt, tol_abs_opt, tol_feas, load_only)
 
 MOI.get(::Optimizer, ::MOI.SolverName) = "Hypatia"
 
