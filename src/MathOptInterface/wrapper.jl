@@ -47,18 +47,7 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
 
     load_only::Bool
 
-    function Optimizer(
-        use_dense::Bool,
-        test_certificates::Bool,
-        verbose::Bool, system_solver::Type{<:Solvers.CombinedHSDSystemSolver},
-        linear_model::Type{<:Models.LinearModel},
-        max_iters::Int,
-        time_limit::Float64,
-        tol_rel_opt::Float64,
-        tol_abs_opt::Float64,
-        tol_feas::Float64,
-        load_only::Bool,
-        )
+    function Optimizer(use_dense::Bool, test_certificates::Bool, verbose::Bool, system_solver::Type{<:Solvers.CombinedHSDSystemSolver}, linear_model::Type{<:Models.LinearModel}, max_iters::Int, time_limit::Float64, tol_rel_opt::Float64, tol_abs_opt::Float64, tol_feas::Float64, load_only::Bool)
         opt = new()
         opt.use_dense = use_dense
         opt.test_certificates = test_certificates
