@@ -51,7 +51,7 @@ function step(solver::HSDSolver, stepper::CombinedHSDStepper)
 
     # calculate affine/prediction and correction directions
     # @timeit "directions" begin
-    (x_pred, x_corr, y_pred, y_corr, z_pred, z_corr, s_pred, s_corr, tau_pred, tau_corr, kap_pred, kap_corr) = get_combined_directions(solver, stepper.system_solver)
+    @timeit Hypatia.to "comb directions" (x_pred, x_corr, y_pred, y_corr, z_pred, z_corr, s_pred, s_corr, tau_pred, tau_corr, kap_pred, kap_corr) = get_combined_directions(solver, stepper.system_solver)
 
     # st = SymIndefCombinedHSDSystemSolver(model)
     # (_x_pred, _x_corr, _y_pred, _y_corr, _z_pred, _z_corr, _s_pred, _s_corr, _tau_pred, _tau_corr, _kap_pred, _kap_corr) = get_combined_directions(solver, st)

@@ -10,9 +10,11 @@ using Printf
 using LinearAlgebra
 using SparseArrays
 using Test
+using TimerOutputs
 
-import Hypatia.Cones
-import Hypatia.Models
+import Hypatia
+const Cones = Hypatia.Cones
+const Models = Hypatia.Models
 
 abstract type Solver end
 

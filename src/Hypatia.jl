@@ -3,6 +3,8 @@ Copyright 2018, Chris Coey and contributors
 =#
 
 module Hypatia
+import TimerOutputs
+const to = TimerOutputs.TimerOutput()
 
 # submodules
 include("ModelUtilities/ModelUtilities.jl")
