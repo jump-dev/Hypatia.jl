@@ -10,7 +10,7 @@ using Printf
 using LinearAlgebra
 using SparseArrays
 using Test
-using TimerOutputs
+import TimerOutputs
 
 import Hypatia
 const Cones = Hypatia.Cones
