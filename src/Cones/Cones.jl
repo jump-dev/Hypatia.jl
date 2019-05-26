@@ -9,10 +9,9 @@ module Cones
 using LinearAlgebra
 using ForwardDiff
 using DiffResults
+# using TimerOutputs
 
 abstract type Cone end
-
-using TimerOutputs
 
 include("orthant.jl")
 include("epinorminf.jl")

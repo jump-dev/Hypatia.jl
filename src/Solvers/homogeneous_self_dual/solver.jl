@@ -50,6 +50,7 @@ mutable struct HSDSolver <: Solver
     status::Symbol
     num_iters::Int
     solve_time::Float64
+    timer::TimerOutput
 
     function HSDSolver(
         model::Models.LinearModel,
@@ -107,8 +108,7 @@ mutable struct HSDSolver <: Solver
         solver.status = :SolveNotCalled
         solver.num_iters = 0
         solver.solve_time = NaN
-        solver.primal_obj = NaN
-        solver.dual_obj = NaN
+        solver.timer = TimerOutput()
 
         return solver
     end
@@ -117,8 +117,6 @@ end
 get_tau(solver::HSDSolver) = solver.tau
 get_kappa(solver::HSDSolver) = solver.kap
 get_mu(solver::HSDSolver) = solver.mu
-
-# using TimerOutputs
 
 # TODO maybe use iteration interface rather than while loop
 function solve(solver::HSDSolver)
@@ -130,22 +128,14 @@ function solve(solver::HSDSolver)
         error("initial mu is $(solver.mu) (should be 1.0)")
     end
 
-    # reset_timer!()
-
     while true
-        # @timeit "res" begin
-        calc_residual(solver)
-        # end
+        @timeit solver.timer "calc_res" calc_residual(solver)
 
-        # @timeit "conv" begin
-        calc_convergence_params(solver)
-        # end
+        @timeit solver.timer "calc_conv" calc_convergence_params(solver)
 
-        solver.verbose && print_iteration_stats(solver, solver.stepper)
+        @timeit solver.timer "print_iter" solver.verbose && print_iteration_stats(solver, solver.stepper)
 
-        # @timeit "check" begin
-        check_convergence(solver) && break
-        # end
+        @timeit solver.timer "check_conv" check_convergence(solver) && break
 
         if solver.num_iters == solver.max_iters
             solver.verbose && println("iteration limit reached; terminating")
@@ -159,15 +149,10 @@ function solve(solver::HSDSolver)
             break
         end
 
-        # TODO may use different function, or function could change during some iteration eg if numerical difficulties
-        # @timeit "step" begin
-        step(solver, solver.stepper)
-        # end
+        @timeit solver.timer "step" step(solver, solver.stepper)
 
         solver.num_iters += 1
     end
-
-    # print_timer()
 
     # calculate result and iteration statistics and finish
     point = solver.point

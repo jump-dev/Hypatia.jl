@@ -10,6 +10,7 @@ using Printf
 using LinearAlgebra
 using SparseArrays
 using Test
+using TimerOutputs
 
 import Hypatia.Cones
 import Hypatia.Models
@@ -28,6 +29,8 @@ include("homogeneous_self_dual/combined_step/qrchol.jl")
 # include("homogeneous_self_dual/combined_step/cholchol.jl")
 
 # TODO sequential quadratic algorithm for linear, quadratic, and smooth convex models
+
+get_timer(solver::Solver) = solver.timer
 
 get_status(solver::Solver) = solver.status
 get_solve_time(solver::Solver) = solver.solve_time
