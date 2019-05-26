@@ -79,7 +79,7 @@ function polymincomplex(
     sample_factor::Int = 100,
     use_QR::Bool = false,
     )
-    (n, deg, f, gs, g_halfdegs, true_obj) = complexpolys[polyname]
+    (n, f, gs, g_halfdegs, true_obj) = complexpolys[polyname]
 
     # generate interpolation
     # TODO use more numerically-stable basis for columns
