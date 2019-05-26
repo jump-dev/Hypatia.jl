@@ -48,7 +48,8 @@ mutable struct HSDSolver <: Solver
     y_feas::Float64
     z_feas::Float64
 
-    slow_prev::Bool
+    prev_is_slow::Bool
+    prev2_is_slow::Bool
     prev_gap::Float64
     prev_rel_gap::Float64
     prev_x_feas::Float64
@@ -114,7 +115,8 @@ mutable struct HSDSolver <: Solver
         solver.y_feas = NaN
         solver.z_feas = NaN
 
-        solver.slow_prev = false
+        solver.prev_is_slow = false
+        solver.prev2_is_slow = false
         solver.prev_gap = NaN
         solver.prev_rel_gap = NaN
         solver.prev_x_feas = NaN
@@ -254,15 +256,17 @@ function check_convergence(solver::HSDSolver)
         max_improve = max(max_improve, (prev - curr) / (abs(prev) + 1e-8))
     end
     if max_improve < solver.tol_slow
-        if solver.slow_prev
+        if solver.prev_is_slow && solver.prev2_is_slow
             solver.verbose && println("slow progress in consecutive iterations; terminating")
             solver.status = :SlowProgress
             return true
         else
-            solver.slow_prev = true
+            solver.prev2_is_slow = solver.prev_is_slow
+            solver.prev_is_slow = true
         end
     else
-        solver.slow_prev = false
+        solver.prev2_is_slow = solver.prev_is_slow
+        solver.prev_is_slow = false
     end
 
     return false
