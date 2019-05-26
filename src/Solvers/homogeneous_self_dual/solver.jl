@@ -15,6 +15,7 @@ mutable struct HSDSolver <: Solver
     tol_rel_opt::Float64
     tol_abs_opt::Float64
     tol_feas::Float64
+    tol_slow::Float64
     max_iters::Int
     time_limit::Float64
 
@@ -47,19 +48,26 @@ mutable struct HSDSolver <: Solver
     y_feas::Float64
     z_feas::Float64
 
+    slow_prev::Bool
+    prev_gap::Float64
+    prev_rel_gap::Float64
+    prev_x_feas::Float64
+    prev_y_feas::Float64
+    prev_z_feas::Float64
+
     status::Symbol
     num_iters::Int
     solve_time::Float64
     timer::TimerOutput
 
     function HSDSolver(
-        model::Models.LinearModel,
-        ;
+        model::Models.LinearModel;
         stepper::HSDStepper = CombinedHSDStepper(model),
         verbose::Bool = true,
-        tol_rel_opt = 1e-6,
-        tol_abs_opt = 1e-7,
-        tol_feas = 1e-7,
+        tol_rel_opt::Float64 = 1e-6,
+        tol_abs_opt::Float64 = 1e-7,
+        tol_feas::Float64 = 1e-7,
+        tol_slow::Float64 = 5e-3,
         max_iters::Int = 500,
         time_limit::Float64 = 3e2,
         )
@@ -73,6 +81,7 @@ mutable struct HSDSolver <: Solver
         solver.tol_rel_opt = tol_rel_opt
         solver.tol_abs_opt = tol_abs_opt
         solver.tol_feas = tol_feas
+        solver.tol_slow = tol_slow
         solver.max_iters = max_iters
         solver.time_limit = time_limit
 
@@ -104,6 +113,13 @@ mutable struct HSDSolver <: Solver
         solver.x_feas = NaN
         solver.y_feas = NaN
         solver.z_feas = NaN
+
+        solver.slow_prev = false
+        solver.prev_gap = NaN
+        solver.prev_rel_gap = NaN
+        solver.prev_x_feas = NaN
+        solver.prev_y_feas = NaN
+        solver.prev_z_feas = NaN
 
         solver.status = :SolveNotCalled
         solver.num_iters = 0
@@ -172,6 +188,12 @@ function calc_convergence_params(solver::HSDSolver)
     model = solver.model
     point = solver.point
 
+    solver.prev_gap = solver.gap
+    solver.prev_rel_gap = solver.rel_gap
+    solver.prev_x_feas = solver.x_feas
+    solver.prev_y_feas = solver.y_feas
+    solver.prev_z_feas = solver.z_feas
+
     solver.primal_obj_t = dot(model.c, point.x)
     solver.dual_obj_t = -dot(model.b, point.y) - dot(model.h, point.z)
     solver.primal_obj = solver.primal_obj_t / solver.tau
@@ -221,6 +243,26 @@ function check_convergence(solver::HSDSolver)
         solver.verbose && println("ill-posedness detected; terminating")
         solver.status = :IllPosed
         return true
+    end
+
+    max_improve = 0.0
+    for (curr, prev) in ((solver.gap, solver.prev_gap), (solver.rel_gap, solver.prev_rel_gap),
+        (solver.x_feas, solver.prev_x_feas), (solver.y_feas, solver.prev_y_feas), (solver.z_feas, solver.prev_z_feas))
+        if isnan(prev) || isnan(curr)
+            continue
+        end
+        max_improve = max(max_improve, (prev - curr) / (abs(prev) + 1e-8))
+    end
+    if max_improve < solver.tol_slow
+        if solver.slow_prev
+            solver.verbose && println("slow progress in consecutive iterations; terminating")
+            solver.status = :SlowProgress
+            return true
+        else
+            solver.slow_prev = true
+        end
+    else
+        solver.slow_prev = false
     end
 
     return false

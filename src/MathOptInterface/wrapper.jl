@@ -558,9 +558,7 @@ function MOI.get(opt::Optimizer, ::MOI.TerminationStatus)
         return MOI.INFEASIBLE
     elseif opt.status == :DualInfeasible
         return MOI.DUAL_INFEASIBLE
-    elseif opt.status == :IllPosed
-        error("MOI did not have a TerminationStatusCode for ill-posed")
-    elseif opt.status in (:PredictorFail, :CorrectorFail)
+    elseif opt.status == :SlowProgress
         return MOI.SLOW_PROGRESS
     elseif opt.status == :IterationLimit
         return MOI.ITERATION_LIMIT
@@ -570,33 +568,6 @@ function MOI.get(opt::Optimizer, ::MOI.TerminationStatus)
         @warn("Hypatia status $(opt.status) not handled")
         return MOI.OTHER_ERROR
     end
-end
-
-function MOI.get(opt::Optimizer, ::MOI.ObjectiveValue)
-    if opt.obj_sense == MOI.MIN_SENSE
-        return opt.primal_obj + opt.obj_const
-    elseif opt.obj_sense == MOI.MAX_SENSE
-        return -opt.primal_obj + opt.obj_const
-    else
-        error("no objective sense is set")
-    end
-end
-
-function MOI.get(opt::Optimizer, ::MOI.ObjectiveBound)
-    if opt.obj_sense == MOI.MIN_SENSE
-        return opt.dual_obj + opt.obj_const
-    elseif opt.obj_sense == MOI.MAX_SENSE
-        return -opt.dual_obj + opt.obj_const
-    else
-        error("no objective sense is set")
-    end
-end
-
-function MOI.get(opt::Optimizer, ::MOI.ResultCount)
-    if opt.status in (:Optimal, :PrimalInfeasible, :DualInfeasible, :IllPosed)
-        return 1
-    end
-    return 0
 end
 
 function MOI.get(opt::Optimizer, ::MOI.PrimalStatus)
@@ -626,6 +597,28 @@ function MOI.get(opt::Optimizer, ::MOI.DualStatus)
         return MOI.UNKNOWN_RESULT_STATUS
     end
 end
+
+function MOI.get(opt::Optimizer, ::MOI.ObjectiveValue)
+    if opt.obj_sense == MOI.MIN_SENSE
+        return opt.primal_obj + opt.obj_const
+    elseif opt.obj_sense == MOI.MAX_SENSE
+        return -opt.primal_obj + opt.obj_const
+    else
+        error("no objective sense is set")
+    end
+end
+
+function MOI.get(opt::Optimizer, ::MOI.ObjectiveBound)
+    if opt.obj_sense == MOI.MIN_SENSE
+        return opt.dual_obj + opt.obj_const
+    elseif opt.obj_sense == MOI.MAX_SENSE
+        return -opt.dual_obj + opt.obj_const
+    else
+        error("no objective sense is set")
+    end
+end
+
+MOI.get(opt::Optimizer, ::MOI.ResultCount) = 1
 
 MOI.get(opt::Optimizer, ::MOI.VariablePrimal, vi::MOI.VariableIndex) = opt.x[vi.value]
 MOI.get(opt::Optimizer, a::MOI.VariablePrimal, vi::Vector{MOI.VariableIndex}) = MOI.get.(opt, a, vi)
