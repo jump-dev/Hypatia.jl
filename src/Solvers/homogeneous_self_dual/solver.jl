@@ -216,23 +216,25 @@ function calc_convergence_params(solver::HSDSolver)
     return
 end
 
+# check convergence criteria
+# TODO nearly primal or dual infeasible or nearly optimal cases?
 function check_convergence(solver::HSDSolver)
-    # check convergence criteria
-    # TODO nearly primal or dual infeasible or nearly optimal cases?
     if max(solver.x_feas, solver.y_feas, solver.z_feas) <= solver.tol_feas &&
         (solver.gap <= solver.tol_abs_opt || (!isnan(solver.rel_gap) && solver.rel_gap <= solver.tol_rel_opt))
         solver.verbose && println("optimal solution found; terminating")
-        solver.status = :Optimal
+        solver.status = :Optimal # TODO consider renaming to ComplementarySolution
         return true
     end
+
     if solver.dual_obj_t > 0.0
         infres_pr = solver.x_norm_res_t * solver.x_conv_tol / solver.dual_obj_t
         if infres_pr <= solver.tol_feas
             solver.verbose && println("primal infeasibility detected; terminating")
-            solver.status = :PrimalInfeasible
+            solver.status = :PrimalInfeasible # TODO consider renaming
             return true
         end
     end
+
     if solver.primal_obj_t < 0.0
         infres_du = -max(solver.y_norm_res_t * solver.y_conv_tol, solver.z_norm_res_t * solver.z_conv_tol) / solver.primal_obj_t
         if infres_du <= solver.tol_feas
@@ -241,9 +243,19 @@ function check_convergence(solver::HSDSolver)
             return true
         end
     end
+
     if solver.mu <= solver.tol_feas * 1e-2 && solver.tau <= solver.tol_feas * 1e-2 * min(1.0, solver.kap)
-        solver.verbose && println("ill-posedness detected; terminating")
-        solver.status = :IllPosed
+
+        if ... # primal facial reduction certificate
+            solver.status = :PrimalIllPosed
+            solver.verbose && println("primal ill-posedness detected; terminating")
+        elseif ... # dual facial reduction certificate
+            solver.status = :DualIllPosed
+            solver.verbose && println("dual ill-posedness detected; terminating")
+        else ... # primal and dual facial reduction certificates
+            solver.status = :PrimalDualIllPosed
+            solver.verbose && println("primal and dual ill-posedness detected; terminating")
+        end
         return true
     end
 
