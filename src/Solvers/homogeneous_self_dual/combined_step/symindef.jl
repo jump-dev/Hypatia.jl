@@ -1,5 +1,9 @@
-
 #=
+Copyright 2018, Chris Coey and contributors
+
+symmetric-indefinite linear system solver
+does not require inverse hessian products
+
 A'*y + G'*z + c*tau = xrhs
 -A*x + b*tau = yrhs
 (pr bar) -mu*H_k*G_k*x + z_k + mu*H_k*h_k*tau = mu*H_k*zrhs_k + srhs_k
@@ -9,16 +13,17 @@ A'*y + G'*z + c*tau = xrhs
 eliminate tau (see CVXOPT paper)
 
 symmetrize the LHS matrix by multiplying some equations by -1 and by premultiplying the z variable by (mu*H_k)^-1 for k using primal barrier
+
+TODO reduce allocations
 =#
 
-
-# TODO eliminate allocations
-
-
 mutable struct SymIndefCombinedHSDSystemSolver <: CombinedHSDSystemSolver
-    lhs::Matrix{Float64}
-    # lhs_H_k
+    use_sparse::Bool
+
+    lhs_copy
+    lhs
     rhs::Matrix{Float64}
+
     x1
     x2
     x3
@@ -38,13 +43,30 @@ mutable struct SymIndefCombinedHSDSystemSolver <: CombinedHSDSystemSolver
     s2_k
     s3_k
 
-    function SymIndefCombinedHSDSystemSolver(model::Models.LinearModel)
+    function SymIndefCombinedHSDSystemSolver(model::Models.LinearModel; use_sparse::Bool = false)
         (n, p, q) = (model.n, model.p, model.q)
         npq = n + p + q
         system_solver = new()
+        system_solver.use_sparse = use_sparse
 
-        # TODO allow sparse lhs?
-        system_solver.lhs = Matrix{Float64}(undef, npq, npq)
+        # x y z
+        # lower symmetric
+        if use_sparse
+            system_solver.lhs_copy = Float64[
+                spzeros(n,n)  spzeros(n,p)  spzeros(n,q);
+                model.A       spzeros(p,p)  spzeros(p,q);
+                model.G       spzeros(q,p)  sparse(-1.0I,q,q);
+            ]
+            @assert issparse(system_solver.lhs_copy)
+        else
+            system_solver.lhs_copy = Float64[
+                zeros(n,n)  zeros(n,p)  zeros(n,q);
+                model.A     zeros(p,p)  zeros(p,q);
+                model.G     zeros(q,p)  Matrix(-1.0I,q,q);
+            ]
+        end
+
+        system_solver.lhs = similar(system_solver.lhs_copy)
         # function view_k(k::Int)
         #     rows = (n + p) .+ model.cone_idxs[k]
         #     cols = Cones.use_dual(model.cones[k]) ? rows : (q + 1) .+ rows
@@ -52,7 +74,7 @@ mutable struct SymIndefCombinedHSDSystemSolver <: CombinedHSDSystemSolver
         # end
         # system_solver.lhs_H_k = [view_k(k) for k in eachindex(model.cones)]
 
-        rhs = similar(system_solver.lhs, npq, 3)
+        rhs = Matrix{Float64}(undef, npq, 3)
         system_solver.rhs = rhs
         rows = 1:n
         system_solver.x1 = view(rhs, rows, 1)
@@ -73,9 +95,9 @@ mutable struct SymIndefCombinedHSDSystemSolver <: CombinedHSDSystemSolver
         system_solver.s1 = similar(rhs, q)
         system_solver.s2 = similar(rhs, q)
         system_solver.s3 = similar(rhs, q)
-        system_solver.s1_k = [view(system_solver.s1, model.cone_idxs[k]) for k in eachindex(model.cones)]
-        system_solver.s2_k = [view(system_solver.s2, model.cone_idxs[k]) for k in eachindex(model.cones)]
-        system_solver.s3_k = [view(system_solver.s3, model.cone_idxs[k]) for k in eachindex(model.cones)]
+        # system_solver.s1_k = [view(system_solver.s1, model.cone_idxs[k]) for k in eachindex(model.cones)]
+        # system_solver.s2_k = [view(system_solver.s2, model.cone_idxs[k]) for k in eachindex(model.cones)]
+        # system_solver.s3_k = [view(system_solver.s3, model.cone_idxs[k]) for k in eachindex(model.cones)]
 
         return system_solver
     end
@@ -106,9 +128,6 @@ function get_combined_directions(solver::HSDSolver, system_solver::SymIndefCombi
     s1 = system_solver.s1
     s2 = system_solver.s2
     s3 = system_solver.s3
-    # s1_k = system_solver.s1_k
-    # s2_k = system_solver.s2_k
-    # s3_k = system_solver.s3_k
 
     @. x1 = -model.c
     x2 .= solver.x_residual
@@ -118,16 +137,10 @@ function get_combined_directions(solver::HSDSolver, system_solver::SymIndefCombi
     y3 .= 0.0
     z1 .= model.h
     @. z2 .= -solver.z_residual
-    # z3 .= 0.0
+    z3 .= 0.0
 
-    # x y z
-    # lower symmetric
-    lhs .= [
-        zeros(n,n)  zeros(n,p)  zeros(n,q);
-        model.A     zeros(p,p)  zeros(p,q);
-        model.G     zeros(q,p)  Matrix(-1.0I,q,q);
-    ]
-
+    # update lhs matrix
+    copyto!(lhs, system_solver.lhs_copy)
     for k in eachindex(cones)
         cone_k = cones[k]
         idxs = model.cone_idxs[k]
@@ -154,12 +167,21 @@ function get_combined_directions(solver::HSDSolver, system_solver::SymIndefCombi
     end
 
     # solve system
-    ldiv!(bunchkaufman!(Symmetric(lhs, :L)), rhs)
+    if system_solver.use_sparse
+        F = ldlt(Symmetric(lhs, :L), check = false)
+        if !issuccess(F)
+            F = ldlt(Symmetric(lhs, :L), shift = 1e-6, check = true)
+        end
+        rhs .= F \ rhs
+    else
+        F = bunchkaufman!(Symmetric(lhs, :L), true, check = true)
+        ldiv!(F, rhs)
+    end
 
     for k in eachindex(cones)
-        H = Cones.hess(cones[k])
         if !Cones.use_dual(cones[k])
             # z_k is premultiplied by (mu * H_k)^-1
+            H = Cones.hess(cones[k])
             z1_k[k] .= mu * H * z1_k[k]
             z2_k[k] .= mu * H * z2_k[k]
             z3_k[k] .= mu * H * z3_k[k]
