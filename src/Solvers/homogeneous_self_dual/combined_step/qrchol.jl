@@ -1,6 +1,11 @@
+#=
+Copyright 2018, Chris Coey and contributors
+
+QR + Cholesky linear system solver
+=#
 
 mutable struct QRCholCombinedHSDSystemSolver <: CombinedHSDSystemSolver
-    # Ap_RiQ1t
+    use_sparse::Bool
 
     xi::Matrix{Float64}
     yi::Matrix{Float64}
@@ -49,11 +54,10 @@ mutable struct QRCholCombinedHSDSystemSolver <: CombinedHSDSystemSolver
     HGxi_k
     Gxi_k
 
-    function QRCholCombinedHSDSystemSolver(model::Models.PreprocessedLinearModel)
+    function QRCholCombinedHSDSystemSolver(model::Models.PreprocessedLinearModel; use_sparse::Bool = false)
         (n, p, q) = (model.n, model.p, model.q)
         system_solver = new()
-
-        # system_solver.Ap_RiQ1t = model.Ap_R \ (model.Ap_Q1')
+        system_solver.use_sparse = use_sparse
 
         xi = Matrix{Float64}(undef, n, 3)
         yi = Matrix{Float64}(undef, p, 3)
@@ -93,8 +97,16 @@ mutable struct QRCholCombinedHSDSystemSolver <: CombinedHSDSystemSolver
         system_solver.GHGQ1x = Matrix{Float64}(undef, n, 3)
         system_solver.Q2div = Matrix{Float64}(undef, nmp, 3)
         system_solver.GQ2 = model.G * model.Ap_Q2
-        system_solver.HGQ2 = Matrix{Float64}(undef, q, nmp)
-        system_solver.Q2GHGQ2 = Matrix{Float64}(undef, nmp, nmp)
+        if use_sparse
+            if system_solver.GQ2 isa Matrix{Float64}
+                error("to use sparse factorization for direction finding, cannot use dense A or G matrices")
+            end
+            system_solver.HGQ2 = spzeros(Float64, q, nmp)
+            system_solver.Q2GHGQ2 = spzeros(Float64, nmp, nmp)
+        else
+            system_solver.HGQ2 = Matrix{Float64}(undef, q, nmp)
+            system_solver.Q2GHGQ2 = Matrix{Float64}(undef, nmp, nmp)
+        end
         system_solver.Q2x = similar(system_solver.Q1x)
         system_solver.Gxi = similar(system_solver.GQ1x)
         system_solver.HGxi = similar(system_solver.Gxi)
@@ -191,6 +203,7 @@ function get_combined_directions(solver::HSDSolver, system_solver::QRCholCombine
         end
     end
 
+    # TODO maybe replace with Diagonal(blocks) matrix product
     function block_hessian_product!(prod_k, arr_k)
         for k in eachindex(cones)
             cone_k = cones[k]
@@ -223,20 +236,30 @@ function get_combined_directions(solver::HSDSolver, system_solver::QRCholCombine
         block_hessian_product!(HGQ2_k, GQ2_k)
         mul!(Q2GHGQ2, GQ2', HGQ2)
 
-        # F = bunchkaufman!(Symmetric(Q2GHGQ2), true, check = false) # TODO prealloc with old sysvx code
-        # if !issuccess(F)
-        F = cholesky!(Symmetric(Q2GHGQ2), Val(true), check = false) # TODO prealloc cholesky auxiliary vectors using posvx
-        if !isposdef(F)
-            println("linear system matrix factorization failed")
-            mul!(Q2GHGQ2, GQ2', HGQ2)
-            # Q2GHGQ2 += 1e-4I
-            F = bunchkaufman!(Symmetric(Q2GHGQ2), true, check = false)
+        if system_solver.use_sparse
+            F = ldlt(Symmetric(Q2GHGQ2), check = false)
             if !issuccess(F)
-                error("could not fix failure of positive definiteness (mu is $mu); terminating")
+                println("sparse linear system matrix factorization failed")
+                mul!(Q2GHGQ2, GQ2', HGQ2)
+                F = ldlt(Symmetric(Q2GHGQ2), shift = 1e-4, check = false)
+                if !issuccess(F)
+                    error("could not fix failure of positive definiteness (mu is $mu); terminating")
+                end
             end
+            Q2div .= F \ Q2div # TODO eliminate allocs (see https://github.com/JuliaLang/julia/issues/30084)
+        else
+            F = cholesky!(Symmetric(Q2GHGQ2), Val(true), check = false) # TODO prealloc cholesky auxiliary vectors using posvx
+            if !isposdef(F)
+                println("dense linear system matrix factorization failed")
+                mul!(Q2GHGQ2, GQ2', HGQ2)
+                Q2GHGQ2 += 1e-4I
+                F = bunchkaufman!(Symmetric(Q2GHGQ2), true, check = false) # TODO prealloc with old sysvx code
+                if !issuccess(F)
+                    error("could not fix failure of positive definiteness (mu is $mu); terminating")
+                end
+            end
+            ldiv!(F, Q2div)
         end
-
-        ldiv!(F, Q2div)
     end
 
     mul!(Q2x, model.Ap_Q2, Q2div)
