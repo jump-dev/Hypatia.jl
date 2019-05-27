@@ -1,9 +1,12 @@
 
 mutable struct NaiveCombinedHSDSystemSolver <: CombinedHSDSystemSolver
-    lhs_copy::Matrix{Float64}
-    lhs::Matrix{Float64}
+    use_sparse::Bool
+
+    lhs_copy
+    lhs
     lhs_H_k
     rhs::Matrix{Float64}
+
     x1
     x2
     y1
@@ -16,20 +19,33 @@ mutable struct NaiveCombinedHSDSystemSolver <: CombinedHSDSystemSolver
     s2
     kap_row::Int
 
-    function NaiveCombinedHSDSystemSolver(model::Models.LinearModel)
+    function NaiveCombinedHSDSystemSolver(model::Models.LinearModel; use_sparse::Bool = false)
         (n, p, q) = (model.n, model.p, model.q)
         system_solver = new()
+        system_solver.use_sparse = use_sparse
 
-        # TODO eliminate s and allow sparse lhs?
         # x y z kap s tau
-        system_solver.lhs_copy = [
-            zeros(n,n)  model.A'    model.G'          zeros(n)  zeros(n,q)         model.c;
-            -model.A    zeros(p,p)  zeros(p,q)        zeros(p)  zeros(p,q)         model.b;
-            zeros(q,n)  zeros(q,p)  Matrix(1.0I,q,q)  zeros(q)  Matrix(1.0I,q,q)   zeros(q);
-            zeros(1,n)  zeros(1,p)  zeros(1,q)        1.0       zeros(1,q)         1.0;
-            -model.G    zeros(q,p)  zeros(q,q)        zeros(q)  Matrix(-1.0I,q,q)  model.h;
-            -model.c'   -model.b'   -model.h'         -1.0      zeros(1,q)         0.0;
-        ]
+        if use_sparse
+            system_solver.lhs_copy = Float64[
+            spzeros(n,n)  model.A'      model.G'          spzeros(n)  spzeros(n,q)       model.c;
+            -model.A      spzeros(p,p)  spzeros(p,q)      spzeros(p)  spzeros(p,q)       model.b;
+            spzeros(q,n)  spzeros(q,p)  sparse(1.0I,q,q)  spzeros(q)  sparse(1.0I,q,q)   spzeros(q);
+            spzeros(1,n)  spzeros(1,p)  spzeros(1,q)      1.0         spzeros(1,q)       1.0;
+            -model.G      spzeros(q,p)  spzeros(q,q)      spzeros(q)  sparse(-1.0I,q,q)  model.h;
+            -model.c'     -model.b'     -model.h'         -1.0        spzeros(1,q)       0.0;
+            ]
+            @assert issparse(system_solver.lhs_copy)
+        else
+            system_solver.lhs_copy = [
+                zeros(n,n)  model.A'    model.G'          zeros(n)  zeros(n,q)         model.c;
+                -model.A    zeros(p,p)  zeros(p,q)        zeros(p)  zeros(p,q)         model.b;
+                zeros(q,n)  zeros(q,p)  Matrix(1.0I,q,q)  zeros(q)  Matrix(1.0I,q,q)   zeros(q);
+                zeros(1,n)  zeros(1,p)  zeros(1,q)        1.0       zeros(1,q)         1.0;
+                -model.G    zeros(q,p)  zeros(q,q)        zeros(q)  Matrix(-1.0I,q,q)  model.h;
+                -model.c'   -model.b'   -model.h'         -1.0      zeros(1,q)         0.0;
+            ]
+        end
+
         system_solver.lhs = similar(system_solver.lhs_copy)
         function view_k(k::Int)
             rows = (n + p) .+ model.cone_idxs[k]
@@ -97,7 +113,11 @@ function get_combined_directions(solver::HSDSolver, system_solver::NaiveCombined
     rhs[end, 2] = 0.0
 
     # solve system
-    ldiv!(lu!(lhs), rhs)
+    if system_solver.use_sparse
+        rhs .= lu(lhs) \ rhs
+    else
+        ldiv!(lu!(lhs), rhs)
+    end
 
     return (system_solver.x1, system_solver.x2, system_solver.y1, system_solver.y2, system_solver.z1, system_solver.z2, system_solver.s1, system_solver.s2, rhs[end, 1], rhs[end, 2], rhs[kap_row, 1], rhs[kap_row, 2])
 end

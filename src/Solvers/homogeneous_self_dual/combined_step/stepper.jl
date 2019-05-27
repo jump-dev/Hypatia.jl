@@ -71,7 +71,7 @@ function step(solver::HSDSolver, stepper::CombinedHSDStepper)
 
     if iszero(alpha)
         # could not step far in combined direction, so perform a pure correction step
-        println("performing correction step")
+        solver.verbose && println("performing correction step")
         z_comb = z_corr
         s_comb = s_corr
         tau_comb = tau_corr
