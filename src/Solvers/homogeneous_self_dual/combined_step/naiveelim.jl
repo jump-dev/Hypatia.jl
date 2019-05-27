@@ -1,5 +1,8 @@
-
 #=
+Copyright 2018, Chris Coey and contributors
+
+naive elimination-based linear system solver
+
 A'*y + G'*z + c*tau = xrhs
 -A*x + b*tau = yrhs
 -G*x - s + h*tau = zrhs
@@ -27,16 +30,17 @@ so
 kap + mu/(taubar^2)*tau = taurhs --> kap = taurhs - mu/(taubar^2)*tau
 -->
 -c'x - b'y - h'z + mu/(taubar^2)*tau = taurhs + kaprhs
+
+TODO reduce allocations
 =#
 
-
-# TODO eliminate allocations
-
-
 mutable struct NaiveElimCombinedHSDSystemSolver <: CombinedHSDSystemSolver
-    lhs::Matrix{Float64}
-    # lhs_H_k
+    use_sparse::Bool
+
+    lhs_copy
+    lhs
     rhs::Matrix{Float64}
+
     x1
     x2
     y1
@@ -50,13 +54,30 @@ mutable struct NaiveElimCombinedHSDSystemSolver <: CombinedHSDSystemSolver
     s1_k
     s2_k
 
-    function NaiveElimCombinedHSDSystemSolver(model::Models.LinearModel)
+    function NaiveElimCombinedHSDSystemSolver(model::Models.LinearModel; use_sparse::Bool = false)
         (n, p, q) = (model.n, model.p, model.q)
         npq1 = n + p + q + 1
         system_solver = new()
+        system_solver.use_sparse = use_sparse
 
-        # TODO allow sparse lhs?
-        system_solver.lhs = Matrix{Float64}(undef, npq1, npq1)
+        if use_sparse
+            system_solver.lhs_copy = Float64[
+                spzeros(n,n)  model.A'      model.G'          model.c;
+                -model.A      spzeros(p,p)  spzeros(p,q)      model.b;
+                -model.G      spzeros(q,p)  sparse(1.0I,q,q)  model.h;
+                -model.c'     -model.b'     -model.h'         1.0;
+            ]
+            @assert issparse(system_solver.lhs_copy)
+        else
+            system_solver.lhs_copy = Float64[
+                zeros(n,n)  model.A'    model.G'          model.c;
+                -model.A    zeros(p,p)  zeros(p,q)        model.b;
+                -model.G    zeros(q,p)  Matrix(1.0I,q,q)  model.h;
+                -model.c'   -model.b'   -model.h'         1.0;
+            ]
+        end
+
+        system_solver.lhs = similar(system_solver.lhs_copy)
         # function view_k(k::Int)
         #     rows = (n + p) .+ model.cone_idxs[k]
         #     cols = Cones.use_dual(model.cones[k]) ? rows : (q + 1) .+ rows
@@ -64,7 +85,7 @@ mutable struct NaiveElimCombinedHSDSystemSolver <: CombinedHSDSystemSolver
         # end
         # system_solver.lhs_H_k = [view_k(k) for k in eachindex(model.cones)]
 
-        rhs = similar(system_solver.lhs, npq1, 2)
+        rhs = Matrix{Float64}(undef, npq1, 2)
         system_solver.rhs = rhs
         rows = 1:n
         system_solver.x1 = view(rhs, rows, 1)
@@ -109,6 +130,7 @@ function get_combined_directions(solver::HSDSolver, system_solver::NaiveElimComb
     s1_k = system_solver.s1_k
     s2_k = system_solver.s2_k
 
+    # update rhs matrix
     x1 .= solver.x_residual
     x2 .= 0.0
     y1 .= solver.y_residual
@@ -124,15 +146,10 @@ function get_combined_directions(solver::HSDSolver, system_solver::NaiveElimComb
     tau_rhs = [-kap, -kap + mu / tau]
     kap_rhs = [kap + solver.primal_obj_t - solver.dual_obj_t, 0.0]
 
-    mtt = mu/tau/tau
-
-    # x y z tau
-    lhs .= [
-        zeros(n,n)  model.A'    model.G'          model.c;
-        -model.A    zeros(p,p)  zeros(p,q)        model.b;
-        -model.G    zeros(q,p)  Matrix(1.0I,q,q)  model.h;
-        -model.c'   -model.b'   -model.h'         mtt;
-    ]
+    # update lhs matrix
+    copyto!(lhs, system_solver.lhs_copy)
+    mtt = mu / tau / tau
+    lhs[end, end] = mtt
 
     for k in eachindex(cones)
         cone_k = cones[k]
@@ -156,13 +173,18 @@ function get_combined_directions(solver::HSDSolver, system_solver::NaiveElimComb
     rhs[end, :] .= kap_rhs + tau_rhs
 
     # solve system
-    ldiv!(lu!(lhs), rhs)
+    if system_solver.use_sparse
+        rhs .= lu(lhs) \ rhs
+    else
+        ldiv!(lu!(lhs), rhs)
+    end
 
     # lift to get s and kap
     tau1 = rhs[end, 1]
     tau2 = rhs[end, 2]
 
     # s = -G*x + h*tau - zrhs
+    # TODO remove allocs
     s1 .= -model.G * x1 + model.h * tau1 - solver.z_residual
     s2 .= -model.G * x2 + model.h * tau2
 
