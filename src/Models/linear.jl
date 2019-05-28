@@ -30,23 +30,23 @@ The primal-dual optimality conditions are:
 
 # TODO check model data consistency
 
-mutable struct RawLinearModel <: LinearModel
+mutable struct RawLinearModel{T <: HypReal} <: LinearModel{T}
     n::Int
     p::Int
     q::Int
-    c::Vector{Float64}
-    A::AbstractMatrix{Float64}
-    b::Vector{Float64}
-    G::AbstractMatrix{Float64}
-    h::Vector{Float64}
+    c::Vector{T}
+    A::AbstractMatrix{T}
+    b::Vector{T}
+    G::AbstractMatrix{T}
+    h::Vector{T}
     cones::Vector{Cones.Cone}
-    cone_idxs::Vector{UnitRange{Int}}
-    nu::Float64
+    cone_idxs::Vector{UnitRange{Int}} # TODO allow generic Integer type for UnitRange parameter
+    nu::T
 
-    initial_point::Point
+    initial_point::Point{T}
 
-    function RawLinearModel(c::Vector{Float64}, A::AbstractMatrix{Float64}, b::Vector{Float64}, G::AbstractMatrix{Float64}, h::Vector{Float64}, cones::Vector{<:Cones.Cone}, cone_idxs::Vector{UnitRange{Int}})
-        model = new()
+    function RawLinearModel(c::Vector{T}, A::AbstractMatrix{T}, b::Vector{T}, G::AbstractMatrix{T}, h::Vector{T}, cones::Vector{<:Cones.Cone}, cone_idxs::Vector{UnitRange{Int}}) where {T <: HypReal}
+        model = new{T}()
 
         model.n = length(c)
         model.p = length(b)
@@ -58,10 +58,10 @@ mutable struct RawLinearModel <: LinearModel
         model.h = h
         model.cones = cones
         model.cone_idxs = cone_idxs
-        model.nu = isempty(cones) ? 0.0 : sum(Cones.get_nu, cones)
+        model.nu = isempty(cones) ? zero(T) : sum(Cones.get_nu, cones)
 
         # get initial point
-        point = Point(Float64[], Float64[], similar(h), similar(h), cones, cone_idxs)
+        point = Point(T[], T[], similar(h), similar(h), cones, cone_idxs)
         set_initial_cone_point(point, model.cones)
 
         # solve for y as least squares solution to A'y = -c - G'z
@@ -80,7 +80,7 @@ mutable struct RawLinearModel <: LinearModel
     end
 end
 
-mutable struct PreprocessedLinearModel <: LinearModel
+mutable struct PreprocessedLinearModel{T <: HypReal} <: LinearModel{T}
     c_raw::Vector{Float64}
     A_raw::AbstractMatrix{Float64}
     b_raw::Vector{Float64}
@@ -108,8 +108,8 @@ mutable struct PreprocessedLinearModel <: LinearModel
 
     # TODO could optionally rescale rows of [A, b] and [G, h] and [A', G', c] and variables
     # NOTE (pivoted) QR factorizations are usually rank-revealing but may be unreliable, see http://www.math.sjsu.edu/~foster/rankrevealingcode.html
-    function PreprocessedLinearModel(c::Vector{Float64}, A::AbstractMatrix{Float64}, b::Vector{Float64}, G::AbstractMatrix{Float64}, h::Vector{Float64}, cones::Vector{<:Cones.Cone}, cone_idxs::Vector{UnitRange{Int}}; tol_QR::Float64 = 1e-13)
-        model = new()
+    function PreprocessedLinearModel(c::Vector{T}, A::AbstractMatrix{T}, b::Vector{T}, G::AbstractMatrix{T}, h::Vector{Float64}, cones::Vector{<:Cones.Cone}, cone_idxs::Vector{UnitRange{Int}}; tol_QR::Float64 = 1e-13) where {T <: HypReal}
+        model = new{T}()
         model.c_raw = c
         model.A_raw = A
         model.b_raw = b

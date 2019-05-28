@@ -6,20 +6,20 @@ import Random
 
 # solve model, check conic certificates are valid and return certificate data
 function solve_and_check(
-    c::Vector{Float64},
-    A::AbstractMatrix{Float64},
-    b::Vector{Float64},
-    G::AbstractMatrix{Float64},
-    h::Vector{Float64},
+    c::Vector{T},
+    A::AbstractMatrix{T},
+    b::Vector{T},
+    G::AbstractMatrix{T},
+    h::Vector{T},
     cones::Vector{<:CO.Cone},
     cone_idxs::Vector{UnitRange{Int}},
     system_solver::Type{<:SO.CombinedHSDSystemSolver},
     linear_model::Type{<:MO.LinearModel},
     verbose::Bool;
-    atol::Float64 = 1e-4,
-    rtol::Float64 = 1e-4,
+    atol = max(1e-5, sqrt(sqrt(eps(T)))),
+    rtol = atol,
     use_sparse::Bool = false,
-    )
+    ) where {T <: HypReal}
     model = linear_model(c, A, b, G, h, cones, cone_idxs)
     stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model, use_sparse = use_sparse))
     solver = SO.HSDSolver(model, verbose = verbose, stepper = stepper)
@@ -27,7 +27,7 @@ function solve_and_check(
     return SO.get_certificates(solver, model, test = true, atol = atol, rtol = rtol)
 end
 
-function dimension1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+function dimension1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
     c = Float64[-1, 0]
     A = Matrix{Float64}(undef, 0, 2)
     b = Float64[]
@@ -51,7 +51,7 @@ function dimension1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_mo
     end
 end
 
-function consistent1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+function consistent1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
     Random.seed!(1)
     (n, p, q) = (30, 15, 30)
     A = rand(-9.0:9.0, p, n)
@@ -74,7 +74,7 @@ function consistent1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_m
     @test r.status == :Optimal
 end
 
-function inconsistent1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+function inconsistent1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
     Random.seed!(1)
     (n, p, q) = (30, 15, 30)
     A = rand(-9.0:9.0, p, n)
@@ -90,7 +90,7 @@ function inconsistent1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear
     @test_throws ErrorException("some primal equality constraints are inconsistent") linear_model(c, A, b, G, h, [CO.Nonnegative(q)], [1:q])
 end
 
-function inconsistent2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+function inconsistent2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
     Random.seed!(1)
     (n, p, q) = (30, 15, 30)
     A = rand(-9.0:9.0, p, n)
@@ -107,23 +107,23 @@ function inconsistent2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear
     @test_throws ErrorException("some dual equality constraints are inconsistent") linear_model(c, A, b, G, h, [CO.Nonnegative(q)], [1:q])
 end
 
-function orthant1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+function orthant1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
     Random.seed!(1)
     (n, p, q) = (6, 3, 6)
-    c = rand(0.0:9.0, n)
-    A = rand(-9.0:9.0, p, n)
-    b = A * ones(n)
-    h = zeros(q)
+    c = rand(T(0):T(9), n)
+    A = rand(T(-9):T(9), p, n)
+    b = A * ones(T, n)
+    h = zeros(T, q)
     cone_idxs = [1:q]
 
     # nonnegative cone
-    G = SparseMatrixCSC(-1.0I, q, n)
+    G = SparseMatrixCSC(-one(T) * I, q, n)
     cones = [CO.Nonnegative(q)]
     rnn = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
     @test rnn.status == :Optimal
 
     # nonpositive cone
-    G = SparseMatrixCSC(1.0I, q, n)
+    G = SparseMatrixCSC(one(T) * I, q, n)
     cones = [CO.Nonpositive(q)]
     rnp = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
     @test rnp.status == :Optimal
@@ -131,14 +131,14 @@ function orthant1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_mode
     @test rnp.primal_obj ≈ rnn.primal_obj atol=1e-4 rtol=1e-4
 end
 
-function orthant2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+function orthant2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
     Random.seed!(1)
     (n, p, q) = (5, 2, 10)
-    c = rand(0.0:9.0, n)
-    A = rand(-9.0:9.0, p, n)
-    b = A * ones(n)
-    G = rand(q, n) - Matrix(2.0I, q, n)
-    h = G * ones(n)
+    c = rand(T(0):T(9), n)
+    A = rand(T(-9):T(9), p, n)
+    b = A * ones(T, n)
+    G = rand(T, q, n) - Matrix(T(2) * I, q, n)
+    h = G * ones(T, n)
     cone_idxs = [1:q]
 
     # use dual barrier
@@ -154,7 +154,7 @@ function orthant2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_mode
     @test r1.primal_obj ≈ r2.primal_obj atol=1e-4 rtol=1e-4
 end
 
-function orthant3(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+function orthant3(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
     Random.seed!(1)
     (n, p, q) = (15, 6, 15)
     c = rand(0.0:9.0, n)
@@ -177,7 +177,7 @@ function orthant3(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_mode
     @test r1.primal_obj ≈ r2.primal_obj atol=1e-4 rtol=1e-4
 end
 
-function orthant4(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+function orthant4(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
     Random.seed!(1)
     (n, p, q) = (5, 2, 10)
     c = rand(0.0:9.0, n)
@@ -201,7 +201,7 @@ function orthant4(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_mode
     @test r1.primal_obj ≈ r2.primal_obj atol=1e-4 rtol=1e-4
 end
 
-function epinorminf1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+function epinorminf1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
     c = Float64[0, -1, -1]
     A = Float64[1 0 0; 0 1 0]
     b = Float64[1, inv(sqrt(2))]
@@ -217,7 +217,7 @@ function epinorminf1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_m
     @test r.y ≈ [1, 1] atol=1e-4 rtol=1e-4
 end
 
-function epinorminf2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+function epinorminf2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
     Random.seed!(1)
     c = Float64[1, 0, 0, 0, 0, 0]
     A = rand(-9.0:9.0, 3, 6)
@@ -232,7 +232,7 @@ function epinorminf2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_m
     @test r.primal_obj ≈ 1 atol=1e-4 rtol=1e-4
 end
 
-function epinorminf3(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+function epinorminf3(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
     c = Float64[1, 0, 0, 0, 0, 0]
     A = zeros(0, 6)
     b = zeros(0)
@@ -247,7 +247,7 @@ function epinorminf3(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_m
     @test r.x ≈ zeros(6) atol=1e-4 rtol=1e-4
 end
 
-function epinorminf4(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+function epinorminf4(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
     c = Float64[0, 1, -1]
     A = Float64[1 0 0; 0 1 0]
     b = Float64[1, -0.4]
@@ -263,7 +263,7 @@ function epinorminf4(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_m
     @test r.y ≈ [1, 0] atol=1e-4 rtol=1e-4
 end
 
-function epinorminf5(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+function epinorminf5(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
     Random.seed!(1)
     c = Float64[1, 0, 0, 0, 0, 0]
     A = rand(-9.0:9.0, 3, 6)
@@ -278,7 +278,7 @@ function epinorminf5(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_m
     @test r.primal_obj ≈ 1 atol=1e-4 rtol=1e-4
 end
 
-function epinorminf6(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+function epinorminf6(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
     l = 3
     L = 2l + 1
     c = collect(Float64, -l:l)
@@ -298,7 +298,7 @@ function epinorminf6(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_m
     @test sum(abs, r.x) ≈ 1 atol=1e-4 rtol=1e-4
 end
 
-function epinormeucl1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+function epinormeucl1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
     c = Float64[0, -1, -1]
     A = Float64[1 0 0; 0 1 0]
     b = Float64[1, inv(sqrt(2))]
@@ -317,7 +317,7 @@ function epinormeucl1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_
     end
 end
 
-function epinormeucl2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+function epinormeucl2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
     c = Float64[0, -1, -1]
     A = Float64[1 0 0]
     b = Float64[0]
@@ -335,7 +335,7 @@ function epinormeucl2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_
     end
 end
 
-function epipersquare1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+function epipersquare1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
     c = Float64[0, 0, -1, -1]
     A = Float64[1 0 0 0; 0 1 0 0]
     b = Float64[1/2, 1]
@@ -353,7 +353,7 @@ function epipersquare1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear
     end
 end
 
-function epipersquare2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+function epipersquare2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
     c = Float64[0, 0, -1]
     A = Float64[1 0 0; 0 1 0]
     b = Float64[1/2, 1] / sqrt(2)
@@ -371,7 +371,7 @@ function epipersquare2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear
     end
 end
 
-function epipersquare3(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+function epipersquare3(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
     c = Float64[0, 1, -1, -1]
     A = Float64[1 0 0 0]
     b = Float64[0]
@@ -389,7 +389,7 @@ function epipersquare3(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear
     end
 end
 
-function semidefinite1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+function semidefinite1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
     c = Float64[0, -1, 0]
     A = Float64[1 0 0; 0 0 1]
     b = Float64[1/2, 1]
@@ -407,7 +407,7 @@ function semidefinite1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear
     end
 end
 
-function semidefinite2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+function semidefinite2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
     c = Float64[0, -1, 0]
     A = Float64[1 0 1]
     b = Float64[0]
@@ -425,7 +425,7 @@ function semidefinite2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear
     end
 end
 
-function semidefinite3(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+function semidefinite3(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
     c = Float64[1, 0, 1, 0, 0, 1]
     A = Float64[1 2 3 4 5 6; 1 1 1 1 1 1]
     b = Float64[10, 3]
@@ -443,7 +443,7 @@ function semidefinite3(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear
     end
 end
 
-function semidefinitecomplex1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+function semidefinitecomplex1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
     c = Float64[1, 0, 0, 1]
     A = Float64[0 0 1 0]
     b = Float64[1]
@@ -458,7 +458,7 @@ function semidefinitecomplex1(system_solver::Type{<:SO.CombinedHSDSystemSolver},
     @test r.x ≈ [1, 0, 1, 1] atol=1e-4 rtol=1e-4
 end
 
-function hypoperlog1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+function hypoperlog1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
     c = Float64[1, 1, 1]
     A = Float64[0 1 0; 1 0 0]
     b = Float64[2, 1]
@@ -476,7 +476,7 @@ function hypoperlog1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_m
     @test r.z ≈ c + A' * r.y atol=1e-4 rtol=1e-4
 end
 
-function hypoperlog2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+function hypoperlog2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
     c = Float64[-1, 0, 0]
     A = Float64[0 1 0]
     b = Float64[0]
@@ -490,7 +490,7 @@ function hypoperlog2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_m
     @test r.primal_obj ≈ 0 atol=1e-4 rtol=1e-4
 end
 
-function hypoperlog3(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+function hypoperlog3(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
     c = Float64[1, 1, 1]
     A = Matrix{Float64}(undef, 0, 3)
     b = Vector{Float64}(undef, 0)
@@ -506,7 +506,7 @@ function hypoperlog3(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_m
     @test isempty(r.y)
 end
 
-function hypoperlog4(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+function hypoperlog4(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
     c = Float64[0, 0, 1]
     A = Float64[0 1 0; 1 0 0]
     b = Float64[1, -1]
@@ -521,7 +521,7 @@ function hypoperlog4(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_m
     @test r.x ≈ [-1, 1, exp(-2)] atol=1e-4 rtol=1e-4
 end
 
-function epiperpower1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+function epiperpower1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
     c = Float64[1, 0, -1, 0, 0, -1]
     A = Float64[1 1 0 1/2 0 0; 0 0 0 0 1 0]
     b = Float64[2, 1]
@@ -536,7 +536,7 @@ function epiperpower1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_
     @test r.x[[1, 2, 4]] ≈ [0.0639314, 0.783361, 2.30542] atol=1e-4 rtol=1e-4
 end
 
-function epiperpower2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+function epiperpower2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
     c = Float64[0, 0, -1]
     A = Float64[1 0 0; 0 1 0]
     b = Float64[1/2, 1]
@@ -554,7 +554,7 @@ function epiperpower2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_
     end
 end
 
-function epiperpower3(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+function epiperpower3(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
     c = Float64[0, 0, 1]
     A = Float64[1 0 0; 0 1 0]
     b = Float64[0, 1]
@@ -572,7 +572,7 @@ function epiperpower3(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_
     end
 end
 
-function hypogeomean1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+function hypogeomean1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
     c = Float64[1, 0, 0, -1, -1, 0]
     A = Float64[1 1 1/2 0 0 0; 0 0 0 0 0 1]
     b = Float64[2, 1]
@@ -587,7 +587,7 @@ function hypogeomean1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_
     @test r.x[1:3] ≈ [0.0639314, 0.783361, 2.30542] atol=1e-4 rtol=1e-4
 end
 
-function hypogeomean2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+function hypogeomean2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
     c = Float64[-1, 0, 0]
     A = Float64[0 0 1; 0 1 0]
     b = Float64[1/2, 1]
@@ -605,7 +605,7 @@ function hypogeomean2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_
     end
 end
 
-function hypogeomean3(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+function hypogeomean3(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
     l = 4
     c = vcat(0.0, ones(l))
     A = Float64[1.0 zeros(1, l)]
@@ -624,7 +624,7 @@ function hypogeomean3(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_
     end
 end
 
-function hypogeomean4(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+function hypogeomean4(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
     l = 4
     c = ones(l)
     A = zeros(0, l)
@@ -643,7 +643,7 @@ function hypogeomean4(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_
     end
 end
 
-function epinormspectral1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+function epinormspectral1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
     Random.seed!(1)
     (Xn, Xm) = (3, 4)
     Xnm = Xn * Xm
@@ -669,7 +669,7 @@ function epinormspectral1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, lin
     end
 end
 
-function hypoperlogdet1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+function hypoperlogdet1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
     Random.seed!(1)
     side = 4
     dim = 2 + div(side * (side + 1), 2)
@@ -692,7 +692,7 @@ function hypoperlogdet1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linea
     @test r.z[1] * (logdet(CO.svec_to_smat!(zeros(side, side), -r.z[3:end]) / r.z[1]) + side) ≈ r.z[2] atol=1e-4 rtol=1e-4
 end
 
-function hypoperlogdet2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+function hypoperlogdet2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
     Random.seed!(1)
     side = 3
     dim = 2 + div(side * (side + 1), 2)
@@ -715,7 +715,7 @@ function hypoperlogdet2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linea
     @test r.z[2] * logdet(CO.svec_to_smat!(zeros(side, side), r.z[3:end]) / r.z[2]) ≈ r.z[1] atol=1e-4 rtol=1e-4
 end
 
-function hypoperlogdet3(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+function hypoperlogdet3(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
     Random.seed!(1)
     side = 3
     dim = 2 + div(side * (side + 1), 2)
@@ -736,7 +736,7 @@ function hypoperlogdet3(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linea
     @test r.x ≈ [0, 0] atol=1e-4 rtol=1e-4
 end
 
-function epipersumexp1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+function epipersumexp1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
     l = 5
     c = vcat(0.0, -ones(l))
     A = Float64[1 zeros(1, l)]
@@ -753,7 +753,7 @@ function epipersumexp1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear
     @test r.s[1] ≈ 1 atol=1e-4 rtol=1e-4
 end
 
-function epipersumexp2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, verbose::Bool)
+function epipersumexp2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
     l = 5
     c = vcat(0.0, -ones(l))
     A = Float64[1 zeros(1, l)]

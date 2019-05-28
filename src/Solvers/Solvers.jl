@@ -14,19 +14,20 @@ using TimerOutputs
 
 import Hypatia.Cones
 import Hypatia.Models
+import Hypatia.HypReal
 
-abstract type Solver end
+abstract type Solver{T <: HypReal} end
 
 # homogeneous self-dual embedding algorithm
-abstract type HSDStepper end
-abstract type CombinedHSDSystemSolver end
+abstract type HSDStepper{T <: HypReal} end
+abstract type CombinedHSDSystemSolver{T <: HypReal} end
 include("homogeneous_self_dual/solver.jl")
 include("homogeneous_self_dual/combined_step/stepper.jl")
 include("homogeneous_self_dual/combined_step/naive.jl")
-include("homogeneous_self_dual/combined_step/naiveelim.jl")
-include("homogeneous_self_dual/combined_step/symindef.jl")
-include("homogeneous_self_dual/combined_step/qrchol.jl")
-# include("homogeneous_self_dual/combined_step/cholchol.jl")
+# include("homogeneous_self_dual/combined_step/naiveelim.jl")
+# include("homogeneous_self_dual/combined_step/symindef.jl")
+# include("homogeneous_self_dual/combined_step/qrchol.jl")
+# # include("homogeneous_self_dual/combined_step/cholchol.jl")
 
 # TODO sequential quadratic algorithm for linear, quadratic, and smooth convex models
 
@@ -45,29 +46,30 @@ get_z(solver::Solver) = copy(solver.point.z)
 get_z(solver::Solver, model::Models.Model) = get_z(solver)
 
 get_x(solver::Solver) = copy(solver.point.x)
-function get_x(solver::Solver, model::Models.PreprocessedLinearModel)
-    x = zeros(length(model.c_raw))
+function get_x(solver::Solver{T}, model::Models.PreprocessedLinearModel{T}) where T
+    x = zeros(T, length(model.c_raw))
     x[model.x_keep_idxs] = solver.point.x # unpreprocess solver's solution
     return x
 end
 get_x(solver::Solver, model::Models.Model) = get_x(solver)
 
 get_y(solver::Solver) = copy(solver.point.y)
-function get_y(solver::Solver, model::Models.PreprocessedLinearModel)
-    y = zeros(length(model.b_raw))
+function get_y(solver::Solver{T}, model::Models.PreprocessedLinearModel{T}) where T
+    y = zeros(T, length(model.b_raw))
     y[model.y_keep_idxs] = solver.point.y # unpreprocess solver's solution
     return y
 end
 get_y(solver::Solver, model::Models.Model) = get_y(solver)
 
 # check conic certificates are valid
+# TODO pick default tols based on T
 function get_certificates(
-    solver::Solver,
-    model::Models.LinearModel;
+    solver::Solver{T},
+    model::Models.LinearModel{T};
     test::Bool = true,
-    atol::Float64 = 1e-4,
-    rtol::Float64 = 1e-4,
-    )
+    atol = max(1e-5, sqrt(sqrt(eps(T)))),
+    rtol = atol,
+    ) where T
     status = get_status(solver)
     primal_obj = get_primal_obj(solver)
     dual_obj = get_dual_obj(solver)
@@ -83,20 +85,20 @@ function get_certificates(
             @test A * x ≈ b atol=atol rtol=rtol
             @test G * x + s ≈ h atol=atol rtol=rtol
             @test G' * z + A' * y ≈ -c atol=atol rtol=rtol
-            @test dot(s, z) ≈ 0.0 atol=atol rtol=rtol
-            @test dot(c, x) ≈ primal_obj atol=1e-8 rtol=1e-8
-            @test dot(b, y) + dot(h, z) ≈ -dual_obj atol=1e-8 rtol=1e-8
+            @test dot(s, z) ≈ zero(T) atol=atol rtol=rtol
+            @test dot(c, x) ≈ primal_obj atol=atol^2 rtol=rtol^2
+            @test dot(b, y) + dot(h, z) ≈ -dual_obj atol=atol^2 rtol=rtol^2
         elseif status == :PrimalInfeasible
             # @test isnan(primal_obj)
-            @test dual_obj > 0
-            @test dot(b, y) + dot(h, z) ≈ -dual_obj atol=1e-8 rtol=1e-8
+            @test dual_obj > zero(T)
+            @test dot(b, y) + dot(h, z) ≈ -dual_obj atol=atol^2 rtol=rtol^2
             @test G' * z ≈ -A' * y atol=atol rtol=rtol
         elseif status == :DualInfeasible
             # @test isnan(dual_obj)
-            @test primal_obj < 0
-            @test dot(c, x) ≈ primal_obj atol=1e-8 rtol=1e-8
+            @test primal_obj < zero(T)
+            @test dot(c, x) ≈ primal_obj atol=atol^2 rtol=rtol^2
             @test G * x ≈ -s atol=atol rtol=rtol
-            @test A * x ≈ zeros(length(y)) atol=atol rtol=rtol
+            @test A * x ≈ zeros(T, length(y)) atol=atol rtol=rtol
         elseif status == :IllPosed
             # TODO primal vs dual ill-posed statuses and conditions
         end

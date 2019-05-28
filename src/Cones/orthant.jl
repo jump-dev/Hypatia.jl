@@ -14,7 +14,7 @@ mutable struct Nonnegative <: Cone
     use_dual::Bool
     dim::Int
 
-    point::AbstractVector{Float64}
+    point::AbstractVector{<:HypReal}
 
     function Nonnegative(dim::Int, is_dual::Bool)
         cone = new()
@@ -31,7 +31,7 @@ mutable struct Nonpositive <: Cone
     use_dual::Bool
     dim::Int
 
-    point::AbstractVector{Float64}
+    point::AbstractVector{<:HypReal}
 
     function Nonpositive(dim::Int, is_dual::Bool)
         cone = new()
@@ -50,8 +50,8 @@ setup_data(cone::OrthantCone) = nothing
 
 get_nu(cone::OrthantCone) = cone.dim
 
-set_initial_point(arr::AbstractVector{Float64}, cone::Nonnegative) = (@. arr = 1.0; arr)
-set_initial_point(arr::AbstractVector{Float64}, cone::Nonpositive) = (@. arr = -1.0; arr)
+set_initial_point(arr::AbstractVector{<:HypReal}, cone::Nonnegative) = (@. arr = 1.0; arr)
+set_initial_point(arr::AbstractVector{<:HypReal}, cone::Nonpositive) = (@. arr = -1.0; arr)
 
 check_in_cone(cone::Nonnegative) = all(u -> (u > 0.0), cone.point)
 check_in_cone(cone::Nonpositive) = all(u -> (u < 0.0), cone.point)
@@ -60,5 +60,5 @@ grad(cone::OrthantCone) = -inv.(cone.point)
 hess(cone::OrthantCone) = Diagonal(abs2.(inv.(cone.point)))
 inv_hess(cone::OrthantCone) = Diagonal(abs2.(cone.point))
 
-hess_prod!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::OrthantCone) = (@. prod = arr / cone.point / cone.point; prod)
-inv_hess_prod!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::OrthantCone) = (@. prod = arr * cone.point * cone.point; prod)
+hess_prod!(prod::AbstractArray{<:HypReal}, arr::AbstractArray{<:HypReal}, cone::OrthantCone) = (@. prod = arr / cone.point / cone.point; prod)
+inv_hess_prod!(prod::AbstractArray{<:HypReal}, arr::AbstractArray{<:HypReal}, cone::OrthantCone) = (@. prod = arr * cone.point * cone.point; prod)

@@ -4,8 +4,10 @@ Copyright 2018, Chris Coey and contributors
 
 module Hypatia
 
+const HypReal = Union{AbstractFloat, Rational}
+
 # submodules
-include("ModelUtilities/ModelUtilities.jl")
+# include("ModelUtilities/ModelUtilities.jl")
 include("Cones/Cones.jl")
 include("Models/Models.jl")
 include("Solvers/Solvers.jl")

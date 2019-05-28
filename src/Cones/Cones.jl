@@ -11,6 +11,8 @@ using ForwardDiff
 using DiffResults
 # using TimerOutputs
 
+import Hypatia.HypReal
+
 abstract type Cone end
 
 include("orthant.jl")
@@ -29,7 +31,7 @@ include("wsospolyinterpmat.jl")
 include("wsospolyinterpsoc.jl")
 
 use_dual(cone::Cone) = cone.use_dual
-load_point(cone::Cone, point::AbstractVector{Float64}) = (cone.point = point)
+load_point(cone::Cone, point::AbstractVector{<:HypReal}) = (cone.point = point)
 dimension(cone::Cone) = cone.dim
 
 function factorize_hess(cone::Cone)
@@ -48,17 +50,17 @@ inv_hess(cone::Cone) = inv(cone.F)
 hess_fact(cone::Cone) = cone.F
 # hessL(cone::Cone) = cone.F.L
 # inv_hessL(cone::Cone) = inv(cone.F.L)
-hess_prod!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::Cone) = mul!(prod, Symmetric(cone.H, :U), arr)
-inv_hess_prod!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::Cone) = ldiv!(prod, cone.F, arr)
-# hessL_prod!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::Cone) = mul!(prod, cone.F.L, arr)
-# inv_hessL_prod!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::Cone) = ldiv!(prod, cone.F.L, arr)
+hess_prod!(prod::AbstractArray{<:HypReal}, arr::AbstractArray{<:HypReal}, cone::Cone) = mul!(prod, Symmetric(cone.H, :U), arr)
+inv_hess_prod!(prod::AbstractArray{<:HypReal}, arr::AbstractArray{<:HypReal}, cone::Cone) = ldiv!(prod, cone.F, arr)
+# hessL_prod!(prod::AbstractArray{<:HypReal}, arr::AbstractArray{<:HypReal}, cone::Cone) = mul!(prod, cone.F.L, arr)
+# inv_hessL_prod!(prod::AbstractArray{<:HypReal}, arr::AbstractArray{<:HypReal}, cone::Cone) = ldiv!(prod, cone.F.L, arr)
 
 # utilities for converting between smat and svec forms (lower triangle) for symmetric matrices
 # TODO only need to do lower triangle if use symmetric matrix types
 const rt2 = sqrt(2)
 const rt2i = inv(rt2)
 
-function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{T}) where {T <: Real}
+function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{T}) where {T <: HypReal}
     k = 1
     m = size(mat, 1)
     for i in 1:m, j in 1:i
@@ -72,7 +74,7 @@ function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{T}) where {T 
     return vec
 end
 
-function svec_to_smat!(mat::AbstractMatrix{T}, vec::AbstractVector{T}) where {T <: Real}
+function svec_to_smat!(mat::AbstractMatrix{T}, vec::AbstractVector{T}) where {T <: HypReal}
     k = 1
     m = size(mat, 1)
     for i in 1:m, j in 1:i
@@ -86,7 +88,7 @@ function svec_to_smat!(mat::AbstractMatrix{T}, vec::AbstractVector{T}) where {T 
     return mat
 end
 
-function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}) where {T <: Real}
+function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}) where {T <: HypReal}
     k = 1
     m = size(mat, 1)
     for i in 1:m, j in 1:i
@@ -104,7 +106,7 @@ function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}) 
     return vec
 end
 
-function svec_to_smat!(mat::AbstractMatrix{Complex{T}}, vec::AbstractVector{T}) where {T <: Real}
+function svec_to_smat!(mat::AbstractMatrix{Complex{T}}, vec::AbstractVector{T}) where {T <: HypReal}
     k = 1
     m = size(mat, 1)
     for i in 1:m, j in 1:i
