@@ -17,7 +17,7 @@ mutable struct CombinedHSDStepper{T <: HypReal} <: HSDStepper{T}
     cones_outside_nbhd::Vector{Bool}
     cones_loaded::Vector{Bool}
 
-    function CombinedHSDStepper(
+    function CombinedHSDStepper{T}(
         model::Models.LinearModel{T};
         system_solver::CombinedHSDSystemSolver{T} = (model isa Models.PreprocessedLinearModel{T} ? QRCholCombinedHSDSystemSolver(model) : NaiveCombinedHSDSystemSolver(model)),
         max_nbhd::T = T(0.75),

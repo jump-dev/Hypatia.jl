@@ -23,7 +23,14 @@ mutable struct Point{T <: HypReal}
     dual_views::Vector{SubArray{T, 1, Vector{T}, Tuple{UnitRange{Int}}, true}}
     primal_views::Vector{SubArray{T, 1, Vector{T}, Tuple{UnitRange{Int}}, true}}
 
-    function Point(x::Vector{T}, y::Vector{T}, z::Vector{T}, s::Vector{T}, cones::Vector{<:Cones.Cone}, cone_idxs::Vector{UnitRange{Int}}) where {T <: HypReal}
+    function Point(
+        x::Vector{T},
+        y::Vector{T},
+        z::Vector{T},
+        s::Vector{T},
+        cones::Vector{<:Cones.Cone},
+        cone_idxs::Vector{UnitRange{Int}},
+        ) where {T <: HypReal}
         point = new{T}()
 
         point.x = x

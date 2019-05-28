@@ -6,52 +6,57 @@ import Random
 
 # solve model, check conic certificates are valid and return certificate data
 function solve_and_check(
-    c::Vector{T},
-    A::AbstractMatrix{T},
-    b::Vector{T},
-    G::AbstractMatrix{T},
-    h::Vector{T},
+    c::Vector,
+    A::AbstractMatrix,
+    b::Vector,
+    G::AbstractMatrix,
+    h::Vector,
     cones::Vector{<:CO.Cone},
     cone_idxs::Vector{UnitRange{Int}},
-    system_solver::Type{<:SO.CombinedHSDSystemSolver},
-    linear_model::Type{<:MO.LinearModel},
+    linear_model::Type{<:MO.LinearModel{T}},
+    system_solver::Type{<:SO.CombinedHSDSystemSolver{T}},
     verbose::Bool;
-    atol = max(1e-5, sqrt(sqrt(eps(T)))),
-    rtol = atol,
+    atol::Real = max(1e-5, sqrt(sqrt(eps(T)))),
+    rtol::Real = atol,
     use_sparse::Bool = false,
     ) where {T <: HypReal}
     model = linear_model(c, A, b, G, h, cones, cone_idxs)
-    stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model, use_sparse = use_sparse))
-    solver = SO.HSDSolver(model, verbose = verbose, stepper = stepper)
+    stepper = SO.CombinedHSDStepper{T}(model, system_solver = system_solver(model, use_sparse = use_sparse))
+    solver = SO.HSDSolver{T}(model, verbose = verbose, stepper = stepper)
     SO.solve(solver)
     return SO.get_certificates(solver, model, test = true, atol = atol, rtol = rtol)
 end
 
-function dimension1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
-    c = Float64[-1, 0]
-    A = Matrix{Float64}(undef, 0, 2)
-    b = Float64[]
-    G = Float64[1 0]
-    h = Float64[1]
+function dimension1(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
+
+    c = T[-1, 0]
+    A = zeros(T, 0, 2)
+    b = T[]
+    G = T[1 0]
+    h = T[1]
     cones = [CO.Nonnegative(1, false)]
     cone_idxs = [1:1]
 
     for use_sparse in (false, true)
         if use_sparse
+            if T != Float64
+                continue # TODO currently cannot do preprocessing with sparse A or G if not using Float64
+            end
             A = sparse(A)
             G = sparse(G)
         end
-        r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose, use_sparse = use_sparse)
+        r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose, use_sparse = use_sparse)
         @test r.status == :Optimal
-        @test r.primal_obj ≈ -1 atol=1e-4 rtol=1e-4
-        @test r.x ≈ [1, 0] atol=1e-4 rtol=1e-4
+        @test r.primal_obj ≈ T(-1) atol=tol rtol=tol
+        @test r.x ≈ T[1, 0] atol=tol rtol=tol
         @test isempty(r.y)
 
-        @test_throws ErrorException("some dual equality constraints are inconsistent") linear_model(Float64[-1, -1], A, b, G, h, cones, cone_idxs)
+        @test_throws ErrorException linear_model(T[-1, -1], A, b, G, h, cones, cone_idxs)
     end
 end
 
-function consistent1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
+function consistent1(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
     Random.seed!(1)
     (n, p, q) = (30, 15, 30)
     A = rand(-9.0:9.0, p, n)
@@ -70,11 +75,11 @@ function consistent1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_m
     cones = [CO.Nonpositive(q)]
     cone_idxs = [1:q]
 
-    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
     @test r.status == :Optimal
 end
 
-function inconsistent1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
+function inconsistent1(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
     Random.seed!(1)
     (n, p, q) = (30, 15, 30)
     A = rand(-9.0:9.0, p, n)
@@ -87,10 +92,10 @@ function inconsistent1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear
     b[11:15] = 2 * (rnd1 * b[1:5] - rnd2 * b[6:10])
     h = zeros(q)
 
-    @test_throws ErrorException("some primal equality constraints are inconsistent") linear_model(c, A, b, G, h, [CO.Nonnegative(q)], [1:q])
+    @test_throws ErrorException linear_model(c, A, b, G, h, [CO.Nonnegative(q)], [1:q])
 end
 
-function inconsistent2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
+function inconsistent2(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
     Random.seed!(1)
     (n, p, q) = (30, 15, 30)
     A = rand(-9.0:9.0, p, n)
@@ -104,10 +109,11 @@ function inconsistent2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear
     c[11:15] = 2 * (rnd1 * c[1:5] - rnd2 * c[6:10])
     h = zeros(q)
 
-    @test_throws ErrorException("some dual equality constraints are inconsistent") linear_model(c, A, b, G, h, [CO.Nonnegative(q)], [1:q])
+    @test_throws ErrorException linear_model(c, A, b, G, h, [CO.Nonnegative(q)], [1:q])
 end
 
-function orthant1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
+function orthant1(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
     Random.seed!(1)
     (n, p, q) = (6, 3, 6)
     c = rand(T(0):T(9), n)
@@ -119,19 +125,20 @@ function orthant1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_mode
     # nonnegative cone
     G = SparseMatrixCSC(-one(T) * I, q, n)
     cones = [CO.Nonnegative(q)]
-    rnn = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+    rnn = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
     @test rnn.status == :Optimal
 
     # nonpositive cone
     G = SparseMatrixCSC(one(T) * I, q, n)
     cones = [CO.Nonpositive(q)]
-    rnp = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+    rnp = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
     @test rnp.status == :Optimal
 
-    @test rnp.primal_obj ≈ rnn.primal_obj atol=1e-4 rtol=1e-4
+    @test rnp.primal_obj ≈ rnn.primal_obj atol=tol rtol=tol
 end
 
-function orthant2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
+function orthant2(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
     Random.seed!(1)
     (n, p, q) = (5, 2, 10)
     c = rand(T(0):T(9), n)
@@ -143,18 +150,19 @@ function orthant2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_mode
 
     # use dual barrier
     cones = [CO.Nonnegative(q, true)]
-    r1 = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+    r1 = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
     @test r1.status == :Optimal
 
     # use primal barrier
     cones = [CO.Nonnegative(q, false)]
-    r2 = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+    r2 = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
     @test r2.status == :Optimal
 
-    @test r1.primal_obj ≈ r2.primal_obj atol=1e-4 rtol=1e-4
+    @test r1.primal_obj ≈ r2.primal_obj atol=tol rtol=tol
 end
 
-function orthant3(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
+function orthant3(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
     Random.seed!(1)
     (n, p, q) = (15, 6, 15)
     c = rand(0.0:9.0, n)
@@ -166,18 +174,19 @@ function orthant3(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_mode
 
     # use dual barrier
     cones = [CO.Nonpositive(q, true)]
-    r1 = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+    r1 = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
     @test r1.status == :Optimal
 
     # use primal barrier
     cones = [CO.Nonpositive(q, false)]
-    r2 = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+    r2 = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
     @test r2.status == :Optimal
 
-    @test r1.primal_obj ≈ r2.primal_obj atol=1e-4 rtol=1e-4
+    @test r1.primal_obj ≈ r2.primal_obj atol=tol rtol=tol
 end
 
-function orthant4(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
+function orthant4(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
     Random.seed!(1)
     (n, p, q) = (5, 2, 10)
     c = rand(0.0:9.0, n)
@@ -189,19 +198,20 @@ function orthant4(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_mode
     # mixture of nonnegative and nonpositive cones
     cones = [CO.Nonnegative(4, false), CO.Nonnegative(6, true)]
     cone_idxs = [1:4, 5:10]
-    r1 = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+    r1 = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
     @test r1.status == :Optimal
 
     # only nonnegative cone
     cones = [CO.Nonnegative(10, false)]
     cone_idxs = [1:10]
-    r2 = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+    r2 = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
     @test r2.status == :Optimal
 
-    @test r1.primal_obj ≈ r2.primal_obj atol=1e-4 rtol=1e-4
+    @test r1.primal_obj ≈ r2.primal_obj atol=tol rtol=tol
 end
 
-function epinorminf1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
+function epinorminf1(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
     c = Float64[0, -1, -1]
     A = Float64[1 0 0; 0 1 0]
     b = Float64[1, inv(sqrt(2))]
@@ -210,14 +220,15 @@ function epinorminf1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_m
     cones = [CO.EpiNormInf(3)]
     cone_idxs = [1:3]
 
-    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
     @test r.status == :Optimal
-    @test r.primal_obj ≈ -1 - inv(sqrt(2)) atol=1e-4 rtol=1e-4
-    @test r.x ≈ [1, inv(sqrt(2)), 1] atol=1e-4 rtol=1e-4
-    @test r.y ≈ [1, 1] atol=1e-4 rtol=1e-4
+    @test r.primal_obj ≈ -1 - inv(sqrt(2)) atol=tol rtol=tol
+    @test r.x ≈ [1, inv(sqrt(2)), 1] atol=tol rtol=tol
+    @test r.y ≈ [1, 1] atol=tol rtol=tol
 end
 
-function epinorminf2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
+function epinorminf2(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
     Random.seed!(1)
     c = Float64[1, 0, 0, 0, 0, 0]
     A = rand(-9.0:9.0, 3, 6)
@@ -227,12 +238,13 @@ function epinorminf2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_m
     cones = [CO.EpiNormInf(6)]
     cone_idxs = [1:6]
 
-    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
     @test r.status == :Optimal
-    @test r.primal_obj ≈ 1 atol=1e-4 rtol=1e-4
+    @test r.primal_obj ≈ 1 atol=tol rtol=tol
 end
 
-function epinorminf3(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
+function epinorminf3(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
     c = Float64[1, 0, 0, 0, 0, 0]
     A = zeros(0, 6)
     b = zeros(0)
@@ -241,13 +253,14 @@ function epinorminf3(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_m
     cones = [CO.EpiNormInf(6)]
     cone_idxs = [1:6]
 
-    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
     @test r.status == :Optimal
-    @test r.primal_obj ≈ 0 atol=1e-4 rtol=1e-4
-    @test r.x ≈ zeros(6) atol=1e-4 rtol=1e-4
+    @test r.primal_obj ≈ 0 atol=tol rtol=tol
+    @test r.x ≈ zeros(6) atol=tol rtol=tol
 end
 
-function epinorminf4(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
+function epinorminf4(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
     c = Float64[0, 1, -1]
     A = Float64[1 0 0; 0 1 0]
     b = Float64[1, -0.4]
@@ -256,14 +269,15 @@ function epinorminf4(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_m
     cones = [CO.EpiNormInf(3, true)]
     cone_idxs = [1:3]
 
-    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
     @test r.status == :Optimal
-    @test r.primal_obj ≈ -1 atol=1e-4 rtol=1e-4
-    @test r.x ≈ [1, -0.4, 0.6] atol=1e-4 rtol=1e-4
-    @test r.y ≈ [1, 0] atol=1e-4 rtol=1e-4
+    @test r.primal_obj ≈ -1 atol=tol rtol=tol
+    @test r.x ≈ [1, -0.4, 0.6] atol=tol rtol=tol
+    @test r.y ≈ [1, 0] atol=tol rtol=tol
 end
 
-function epinorminf5(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
+function epinorminf5(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
     Random.seed!(1)
     c = Float64[1, 0, 0, 0, 0, 0]
     A = rand(-9.0:9.0, 3, 6)
@@ -273,12 +287,13 @@ function epinorminf5(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_m
     cones = [CO.EpiNormInf(6, true)]
     cone_idxs = [1:6]
 
-    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
     @test r.status == :Optimal
-    @test r.primal_obj ≈ 1 atol=1e-4 rtol=1e-4
+    @test r.primal_obj ≈ 1 atol=tol rtol=tol
 end
 
-function epinorminf6(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
+function epinorminf6(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
     l = 3
     L = 2l + 1
     c = collect(Float64, -l:l)
@@ -290,15 +305,16 @@ function epinorminf6(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_m
     cones = [CO.EpiNormInf(L + 1, true), CO.EpiNormInf(L + 1, false)]
     cone_idxs = [1:(L + 1), (L + 2):(2L + 2)]
 
-    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
     @test r.status == :Optimal
-    @test r.primal_obj ≈ -l + 1 atol=1e-4 rtol=1e-4
-    @test r.x[2] ≈ 0.5 atol=1e-4 rtol=1e-4
-    @test r.x[end - 1] ≈ -0.5 atol=1e-4 rtol=1e-4
-    @test sum(abs, r.x) ≈ 1 atol=1e-4 rtol=1e-4
+    @test r.primal_obj ≈ -l + 1 atol=tol rtol=tol
+    @test r.x[2] ≈ 0.5 atol=tol rtol=tol
+    @test r.x[end - 1] ≈ -0.5 atol=tol rtol=tol
+    @test sum(abs, r.x) ≈ 1 atol=tol rtol=tol
 end
 
-function epinormeucl1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
+function epinormeucl1(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
     c = Float64[0, -1, -1]
     A = Float64[1 0 0; 0 1 0]
     b = Float64[1, inv(sqrt(2))]
@@ -309,15 +325,16 @@ function epinormeucl1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_
     for is_dual in (true, false)
         cones = [CO.EpiNormEucl(3, is_dual)]
 
-        r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+        r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
         @test r.status == :Optimal
-        @test r.primal_obj ≈ -sqrt(2) atol=1e-4 rtol=1e-4
-        @test r.x ≈ [1, inv(sqrt(2)), inv(sqrt(2))] atol=1e-4 rtol=1e-4
-        @test r.y ≈ [sqrt(2), 0] atol=1e-4 rtol=1e-4
+        @test r.primal_obj ≈ -sqrt(2) atol=tol rtol=tol
+        @test r.x ≈ [1, inv(sqrt(2)), inv(sqrt(2))] atol=tol rtol=tol
+        @test r.y ≈ [sqrt(2), 0] atol=tol rtol=tol
     end
 end
 
-function epinormeucl2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
+function epinormeucl2(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
     c = Float64[0, -1, -1]
     A = Float64[1 0 0]
     b = Float64[0]
@@ -328,14 +345,15 @@ function epinormeucl2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_
     for is_dual in (true, false)
         cones = [CO.EpiNormEucl(3, is_dual)]
 
-        r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+        r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
         @test r.status == :Optimal
-        @test r.primal_obj ≈ 0 atol=1e-4 rtol=1e-4
-        @test r.x ≈ zeros(3) atol=1e-4 rtol=1e-4
+        @test r.primal_obj ≈ 0 atol=tol rtol=tol
+        @test r.x ≈ zeros(3) atol=tol rtol=tol
     end
 end
 
-function epipersquare1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
+function epipersquare1(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
     c = Float64[0, 0, -1, -1]
     A = Float64[1 0 0 0; 0 1 0 0]
     b = Float64[1/2, 1]
@@ -346,14 +364,15 @@ function epipersquare1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear
     for is_dual in (true, false)
         cones = [CO.EpiPerSquare(4, is_dual)]
 
-        r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+        r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
         @test r.status == :Optimal
-        @test r.primal_obj ≈ -sqrt(2) atol=1e-4 rtol=1e-4
-        @test r.x[3:4] ≈ [1, 1] / sqrt(2) atol=1e-4 rtol=1e-4
+        @test r.primal_obj ≈ -sqrt(2) atol=tol rtol=tol
+        @test r.x[3:4] ≈ [1, 1] / sqrt(2) atol=tol rtol=tol
     end
 end
 
-function epipersquare2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
+function epipersquare2(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
     c = Float64[0, 0, -1]
     A = Float64[1 0 0; 0 1 0]
     b = Float64[1/2, 1] / sqrt(2)
@@ -364,14 +383,15 @@ function epipersquare2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear
     for is_dual in (true, false)
         cones = [CO.EpiPerSquare(3, is_dual)]
 
-        r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+        r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
         @test r.status == :Optimal
-        @test r.primal_obj ≈ -inv(sqrt(2)) atol=1e-4 rtol=1e-4
-        @test r.x[2] ≈ inv(sqrt(2)) atol=1e-4 rtol=1e-4
+        @test r.primal_obj ≈ -inv(sqrt(2)) atol=tol rtol=tol
+        @test r.x[2] ≈ inv(sqrt(2)) atol=tol rtol=tol
     end
 end
 
-function epipersquare3(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
+function epipersquare3(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
     c = Float64[0, 1, -1, -1]
     A = Float64[1 0 0 0]
     b = Float64[0]
@@ -382,14 +402,15 @@ function epipersquare3(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear
     for is_dual in (true, false)
         cones = [CO.EpiPerSquare(4, is_dual)]
 
-        r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+        r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
         @test r.status == :Optimal
-        @test r.primal_obj ≈ 0 atol=1e-4 rtol=1e-4
-        @test r.x ≈ zeros(4) atol=1e-4 rtol=1e-4
+        @test r.primal_obj ≈ 0 atol=tol rtol=tol
+        @test r.x ≈ zeros(4) atol=tol rtol=tol
     end
 end
 
-function semidefinite1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
+function semidefinite1(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
     c = Float64[0, -1, 0]
     A = Float64[1 0 0; 0 0 1]
     b = Float64[1/2, 1]
@@ -400,14 +421,15 @@ function semidefinite1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear
     for is_dual in (true, false)
         cones = [CO.PosSemidef(3, is_dual)]
 
-        r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+        r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
         @test r.status == :Optimal
-        @test r.primal_obj ≈ -1 atol=1e-4 rtol=1e-4
-        @test r.x[2] ≈ 1 atol=1e-4 rtol=1e-4
+        @test r.primal_obj ≈ -1 atol=tol rtol=tol
+        @test r.x[2] ≈ 1 atol=tol rtol=tol
     end
 end
 
-function semidefinite2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
+function semidefinite2(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
     c = Float64[0, -1, 0]
     A = Float64[1 0 1]
     b = Float64[0]
@@ -418,14 +440,15 @@ function semidefinite2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear
     for is_dual in (true, false)
         cones = [CO.PosSemidef(3, is_dual)]
 
-        r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+        r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
         @test r.status == :Optimal
-        @test r.primal_obj ≈ 0 atol=1e-4 rtol=1e-4
-        @test r.x ≈ zeros(3) atol=1e-4 rtol=1e-4
+        @test r.primal_obj ≈ 0 atol=tol rtol=tol
+        @test r.x ≈ zeros(3) atol=tol rtol=tol
     end
 end
 
-function semidefinite3(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
+function semidefinite3(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
     c = Float64[1, 0, 1, 0, 0, 1]
     A = Float64[1 2 3 4 5 6; 1 1 1 1 1 1]
     b = Float64[10, 3]
@@ -436,14 +459,15 @@ function semidefinite3(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear
     for is_dual in (true, false)
         cones = [CO.PosSemidef(6, is_dual)]
 
-        r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+        r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
         @test r.status == :Optimal
-        @test r.primal_obj ≈ 1.249632 atol=1e-4 rtol=1e-4
-        @test r.x ≈ [0.491545, 0.647333, 0.426249, 0.571161, 0.531874, 0.331838] atol=1e-4 rtol=1e-4
+        @test r.primal_obj ≈ 1.249632 atol=tol rtol=tol
+        @test r.x ≈ [0.491545, 0.647333, 0.426249, 0.571161, 0.531874, 0.331838] atol=tol rtol=tol
     end
 end
 
-function semidefinitecomplex1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
+function semidefinitecomplex1(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
     c = Float64[1, 0, 0, 1]
     A = Float64[0 0 1 0]
     b = Float64[1]
@@ -452,13 +476,14 @@ function semidefinitecomplex1(system_solver::Type{<:SO.CombinedHSDSystemSolver},
     cone_idxs = [1:4]
     cones = [CO.PosSemidef{ComplexF64}(4)]
 
-    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
     @test r.status == :Optimal
-    @test r.primal_obj ≈ 2 atol=1e-4 rtol=1e-4
-    @test r.x ≈ [1, 0, 1, 1] atol=1e-4 rtol=1e-4
+    @test r.primal_obj ≈ 2 atol=tol rtol=tol
+    @test r.x ≈ [1, 0, 1, 1] atol=tol rtol=tol
 end
 
-function hypoperlog1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
+function hypoperlog1(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
     c = Float64[1, 1, 1]
     A = Float64[0 1 0; 1 0 0]
     b = Float64[2, 1]
@@ -467,16 +492,17 @@ function hypoperlog1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_m
     cones = [CO.HypoPerLog()]
     cone_idxs = [1:3]
 
-    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
     @test r.status == :Optimal
     ehalf = exp(1 / 2)
-    @test r.primal_obj ≈ 2 * ehalf + 3 atol=1e-4 rtol=1e-4
-    @test r.x ≈ [1, 2, 2 * ehalf] atol=1e-4 rtol=1e-4
-    @test r.y ≈ -[1 + ehalf / 2, 1 + ehalf] atol=1e-4 rtol=1e-4
-    @test r.z ≈ c + A' * r.y atol=1e-4 rtol=1e-4
+    @test r.primal_obj ≈ 2 * ehalf + 3 atol=tol rtol=tol
+    @test r.x ≈ [1, 2, 2 * ehalf] atol=tol rtol=tol
+    @test r.y ≈ -[1 + ehalf / 2, 1 + ehalf] atol=tol rtol=tol
+    @test r.z ≈ c + A' * r.y atol=tol rtol=tol
 end
 
-function hypoperlog2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
+function hypoperlog2(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
     c = Float64[-1, 0, 0]
     A = Float64[0 1 0]
     b = Float64[0]
@@ -485,12 +511,13 @@ function hypoperlog2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_m
     cones = [CO.HypoPerLog()]
     cone_idxs = [1:3]
 
-    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
     @test r.status == :Optimal
-    @test r.primal_obj ≈ 0 atol=1e-4 rtol=1e-4
+    @test r.primal_obj ≈ 0 atol=tol rtol=tol
 end
 
-function hypoperlog3(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
+function hypoperlog3(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
     c = Float64[1, 1, 1]
     A = Matrix{Float64}(undef, 0, 3)
     b = Vector{Float64}(undef, 0)
@@ -499,14 +526,15 @@ function hypoperlog3(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_m
     cones = [CO.HypoPerLog(), CO.Nonnegative(1)]
     cone_idxs = [1:3, 4:4]
 
-    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
     @test r.status == :Optimal
-    @test r.primal_obj ≈ 0 atol=1e-4 rtol=1e-4
-    @test r.x ≈ [0, 0, 0] atol=1e-4 rtol=1e-4
+    @test r.primal_obj ≈ 0 atol=tol rtol=tol
+    @test r.x ≈ [0, 0, 0] atol=tol rtol=tol
     @test isempty(r.y)
 end
 
-function hypoperlog4(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
+function hypoperlog4(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
     c = Float64[0, 0, 1]
     A = Float64[0 1 0; 1 0 0]
     b = Float64[1, -1]
@@ -515,13 +543,14 @@ function hypoperlog4(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_m
     cones = [CO.HypoPerLog(true)]
     cone_idxs = [1:3]
 
-    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
     @test r.status == :Optimal
-    @test r.primal_obj ≈ exp(-2) atol=1e-4 rtol=1e-4
-    @test r.x ≈ [-1, 1, exp(-2)] atol=1e-4 rtol=1e-4
+    @test r.primal_obj ≈ exp(-2) atol=tol rtol=tol
+    @test r.x ≈ [-1, 1, exp(-2)] atol=tol rtol=tol
 end
 
-function epiperpower1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
+function epiperpower1(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
     c = Float64[1, 0, -1, 0, 0, -1]
     A = Float64[1 1 0 1/2 0 0; 0 0 0 0 1 0]
     b = Float64[2, 1]
@@ -530,13 +559,14 @@ function epiperpower1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_
     cones = [CO.EpiPerPower(5.0, false), CO.EpiPerPower(2.5, false)]
     cone_idxs = [1:3, 4:6]
 
-    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
     @test r.status == :Optimal
-    @test r.primal_obj ≈ -1.80734 atol=1e-4 rtol=1e-4
-    @test r.x[[1, 2, 4]] ≈ [0.0639314, 0.783361, 2.30542] atol=1e-4 rtol=1e-4
+    @test r.primal_obj ≈ -1.80734 atol=tol rtol=tol
+    @test r.x[[1, 2, 4]] ≈ [0.0639314, 0.783361, 2.30542] atol=tol rtol=tol
 end
 
-function epiperpower2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
+function epiperpower2(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
     c = Float64[0, 0, -1]
     A = Float64[1 0 0; 0 1 0]
     b = Float64[1/2, 1]
@@ -547,14 +577,15 @@ function epiperpower2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_
     for is_dual in (true, false)
         cones = [CO.EpiPerPower(2.0, is_dual)]
 
-        r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+        r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
         @test r.status == :Optimal
-        @test r.primal_obj ≈ (is_dual ? -sqrt(2) : -inv(sqrt(2))) atol=1e-4 rtol=1e-4
-        @test r.x[1:2] ≈ [1/2, 1] atol=1e-4 rtol=1e-4
+        @test r.primal_obj ≈ (is_dual ? -sqrt(2) : -inv(sqrt(2))) atol=tol rtol=tol
+        @test r.x[1:2] ≈ [1/2, 1] atol=tol rtol=tol
     end
 end
 
-function epiperpower3(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
+function epiperpower3(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
     c = Float64[0, 0, 1]
     A = Float64[1 0 0; 0 1 0]
     b = Float64[0, 1]
@@ -565,14 +596,15 @@ function epiperpower3(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_
     for is_dual in (true, false), alpha in [1.5; 2.0] # TODO objective gap is large when alpha is different e.g. 2.5, investigate why
         cones = [CO.EpiPerPower(alpha, is_dual)]
 
-        r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose, atol=1e-3, rtol=1e-3)
+        r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose, atol=1e-3, rtol=1e-3)
         @test r.status == :Optimal
-        @test r.primal_obj ≈ 0 atol=1e-3 rtol=1e-3
-        @test r.x[1:2] ≈ [0, 1] atol=1e-4 rtol=1e-4
+        @test r.primal_obj ≈ 0 atol=10tol rtol=10tol
+        @test r.x[1:2] ≈ [0, 1] atol=tol rtol=tol
     end
 end
 
-function hypogeomean1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
+function hypogeomean1(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
     c = Float64[1, 0, 0, -1, -1, 0]
     A = Float64[1 1 1/2 0 0 0; 0 0 0 0 0 1]
     b = Float64[2, 1]
@@ -581,13 +613,14 @@ function hypogeomean1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_
     cones = [CO.HypoGeomean([0.2, 0.8], false), CO.HypoGeomean([0.4, 0.6], false)]
     cone_idxs = [1:3, 4:6]
 
-    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
     @test r.status == :Optimal
-    @test r.primal_obj ≈ -1.80734 atol=1e-4 rtol=1e-4
-    @test r.x[1:3] ≈ [0.0639314, 0.783361, 2.30542] atol=1e-4 rtol=1e-4
+    @test r.primal_obj ≈ -1.80734 atol=tol rtol=tol
+    @test r.x[1:3] ≈ [0.0639314, 0.783361, 2.30542] atol=tol rtol=tol
 end
 
-function hypogeomean2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
+function hypogeomean2(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
     c = Float64[-1, 0, 0]
     A = Float64[0 0 1; 0 1 0]
     b = Float64[1/2, 1]
@@ -598,14 +631,15 @@ function hypogeomean2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_
     for is_dual in (true, false)
         cones = [CO.HypoGeomean([0.5, 0.5], is_dual)]
 
-        r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+        r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
         @test r.status == :Optimal
-        @test r.primal_obj ≈ (is_dual ? 0 : -inv(sqrt(2))) atol=1e-4 rtol=1e-4
-        @test r.x[2:3] ≈ [1, 0.5] atol=1e-4 rtol=1e-4
+        @test r.primal_obj ≈ (is_dual ? 0 : -inv(sqrt(2))) atol=tol rtol=tol
+        @test r.x[2:3] ≈ [1, 0.5] atol=tol rtol=tol
     end
 end
 
-function hypogeomean3(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
+function hypogeomean3(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
     l = 4
     c = vcat(0.0, ones(l))
     A = Float64[1.0 zeros(1, l)]
@@ -617,14 +651,15 @@ function hypogeomean3(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_
         b = is_dual ? [-1.0] : [1.0]
         cones = [CO.HypoGeomean(fill(inv(l), l), is_dual)]
 
-        r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+        r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
         @test r.status == :Optimal
-        @test r.primal_obj ≈ (is_dual ? 1.0 : l) atol=1e-4 rtol=1e-4
-        @test r.x[2:end] ≈ (is_dual ? inv(l) : 1.0) * ones(l) atol=1e-4 rtol=1e-4
+        @test r.primal_obj ≈ (is_dual ? 1.0 : l) atol=tol rtol=tol
+        @test r.x[2:end] ≈ (is_dual ? inv(l) : 1.0) * ones(l) atol=tol rtol=tol
     end
 end
 
-function hypogeomean4(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
+function hypogeomean4(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
     l = 4
     c = ones(l)
     A = zeros(0, l)
@@ -636,14 +671,15 @@ function hypogeomean4(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_
     for is_dual in (true, false)
         cones = [CO.HypoGeomean(fill(inv(l), l), is_dual)]
 
-        r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+        r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
         @test r.status == :Optimal
-        @test r.primal_obj ≈ 0 atol=1e-4 rtol=1e-4
-        @test r.x ≈ zeros(l) atol=1e-4 rtol=1e-4
+        @test r.primal_obj ≈ 0 atol=tol rtol=tol
+        @test r.x ≈ zeros(l) atol=tol rtol=tol
     end
 end
 
-function epinormspectral1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
+function epinormspectral1(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
     Random.seed!(1)
     (Xn, Xm) = (3, 4)
     Xnm = Xn * Xm
@@ -657,19 +693,20 @@ function epinormspectral1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, lin
     for is_dual in (true, false)
         cones = [CO.EpiNormSpectral(Xn, Xm, is_dual)]
 
-        r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+        r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
         @test r.status == :Optimal
         if is_dual
-            @test sum(svdvals!(reshape(r.s[2:end], Xn, Xm))) ≈ r.s[1] atol=1e-4 rtol=1e-4
-            @test svdvals!(reshape(r.z[2:end], Xn, Xm))[1] ≈ r.z[1] atol=1e-4 rtol=1e-4
+            @test sum(svdvals!(reshape(r.s[2:end], Xn, Xm))) ≈ r.s[1] atol=tol rtol=tol
+            @test svdvals!(reshape(r.z[2:end], Xn, Xm))[1] ≈ r.z[1] atol=tol rtol=tol
         else
-            @test svdvals!(reshape(r.s[2:end], Xn, Xm))[1] ≈ r.s[1] atol=1e-4 rtol=1e-4
-            @test sum(svdvals!(reshape(r.z[2:end], Xn, Xm))) ≈ r.z[1] atol=1e-4 rtol=1e-4
+            @test svdvals!(reshape(r.s[2:end], Xn, Xm))[1] ≈ r.s[1] atol=tol rtol=tol
+            @test sum(svdvals!(reshape(r.z[2:end], Xn, Xm))) ≈ r.z[1] atol=tol rtol=tol
         end
     end
 end
 
-function hypoperlogdet1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
+function hypoperlogdet1(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
     Random.seed!(1)
     side = 4
     dim = 2 + div(side * (side + 1), 2)
@@ -684,15 +721,16 @@ function hypoperlogdet1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linea
     cones = [CO.HypoPerLogdet(dim)]
     cone_idxs = [1:dim]
 
-    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
     @test r.status == :Optimal
-    @test r.x[1] ≈ -r.primal_obj atol=1e-4 rtol=1e-4
-    @test r.x[2] ≈ 1 atol=1e-4 rtol=1e-4
-    @test r.s[2] * logdet(CO.svec_to_smat!(zeros(side, side), r.s[3:end]) / r.s[2]) ≈ r.s[1] atol=1e-4 rtol=1e-4
-    @test r.z[1] * (logdet(CO.svec_to_smat!(zeros(side, side), -r.z[3:end]) / r.z[1]) + side) ≈ r.z[2] atol=1e-4 rtol=1e-4
+    @test r.x[1] ≈ -r.primal_obj atol=tol rtol=tol
+    @test r.x[2] ≈ 1 atol=tol rtol=tol
+    @test r.s[2] * logdet(CO.svec_to_smat!(zeros(side, side), r.s[3:end]) / r.s[2]) ≈ r.s[1] atol=tol rtol=tol
+    @test r.z[1] * (logdet(CO.svec_to_smat!(zeros(side, side), -r.z[3:end]) / r.z[1]) + side) ≈ r.z[2] atol=tol rtol=tol
 end
 
-function hypoperlogdet2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
+function hypoperlogdet2(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
     Random.seed!(1)
     side = 3
     dim = 2 + div(side * (side + 1), 2)
@@ -707,15 +745,16 @@ function hypoperlogdet2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linea
     cones = [CO.HypoPerLogdet(dim, true)]
     cone_idxs = [1:dim]
 
-    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
     @test r.status == :Optimal
-    @test r.x[2] ≈ r.primal_obj atol=1e-4 rtol=1e-4
-    @test r.x[1] ≈ -1 atol=1e-4 rtol=1e-4
-    @test r.s[1] * (logdet(CO.svec_to_smat!(zeros(side, side), -r.s[3:end]) / r.s[1]) + side) ≈ r.s[2] atol=1e-4 rtol=1e-4
-    @test r.z[2] * logdet(CO.svec_to_smat!(zeros(side, side), r.z[3:end]) / r.z[2]) ≈ r.z[1] atol=1e-4 rtol=1e-4
+    @test r.x[2] ≈ r.primal_obj atol=tol rtol=tol
+    @test r.x[1] ≈ -1 atol=tol rtol=tol
+    @test r.s[1] * (logdet(CO.svec_to_smat!(zeros(side, side), -r.s[3:end]) / r.s[1]) + side) ≈ r.s[2] atol=tol rtol=tol
+    @test r.z[2] * logdet(CO.svec_to_smat!(zeros(side, side), r.z[3:end]) / r.z[2]) ≈ r.z[1] atol=tol rtol=tol
 end
 
-function hypoperlogdet3(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
+function hypoperlogdet3(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
     Random.seed!(1)
     side = 3
     dim = 2 + div(side * (side + 1), 2)
@@ -730,13 +769,14 @@ function hypoperlogdet3(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linea
     cones = [CO.HypoPerLogdet(dim)]
     cone_idxs = [1:dim]
 
-    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
     @test r.status == :Optimal
-    @test r.x[1] ≈ -r.primal_obj atol=1e-4 rtol=1e-4
-    @test r.x ≈ [0, 0] atol=1e-4 rtol=1e-4
+    @test r.x[1] ≈ -r.primal_obj atol=tol rtol=tol
+    @test r.x ≈ [0, 0] atol=tol rtol=tol
 end
 
-function epipersumexp1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
+function epipersumexp1(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
     l = 5
     c = vcat(0.0, -ones(l))
     A = Float64[1 zeros(1, l)]
@@ -746,14 +786,15 @@ function epipersumexp1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear
     cones = [CO.EpiPerSumExp(l + 2)]
     cone_idxs = [1:(l + 2)]
 
-    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
     @test r.status == :Optimal
-    @test r.x[1] ≈ 1 atol=1e-4 rtol=1e-4
-    @test r.s[2] ≈ 0 atol=1e-4 rtol=1e-4
-    @test r.s[1] ≈ 1 atol=1e-4 rtol=1e-4
+    @test r.x[1] ≈ 1 atol=tol rtol=tol
+    @test r.s[2] ≈ 0 atol=tol rtol=tol
+    @test r.s[1] ≈ 1 atol=tol rtol=tol
 end
 
-function epipersumexp2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_model::Type{<:MO.LinearModel}, T::Type{<:HypReal}, verbose::Bool)
+function epipersumexp2(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
     l = 5
     c = vcat(0.0, -ones(l))
     A = Float64[1 zeros(1, l)]
@@ -763,9 +804,9 @@ function epipersumexp2(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear
     cones = [CO.EpiPerSumExp(l + 2)]
     cone_idxs = [1:(l + 2)]
 
-    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
     @test r.status == :Optimal
-    @test r.x[1] ≈ 1 atol=1e-4 rtol=1e-4
-    @test r.s[2] ≈ 1 atol=1e-4 rtol=1e-4
-    @test r.s[2] * sum(exp, r.s[3:end] / r.s[2]) ≈ r.s[1] atol=1e-4 rtol=1e-4
+    @test r.x[1] ≈ 1 atol=tol rtol=tol
+    @test r.s[2] ≈ 1 atol=tol rtol=tol
+    @test r.s[2] * sum(exp, r.s[3:end] / r.s[2]) ≈ r.s[1] atol=tol rtol=tol
 end
