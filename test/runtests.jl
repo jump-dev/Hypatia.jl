@@ -68,8 +68,8 @@ include(joinpath(@__DIR__, "native.jl"))
 @info("starting native interface tests")
 verbose = true
 real_types = [
-    Float32,
     Float64,
+    Float32,
     BigFloat,
     ]
 system_solvers = [
@@ -84,18 +84,18 @@ testfuns_singular = [
     inconsistent1,
     inconsistent2,
     ]
-# @testset "preprocessing tests: $t, $s, $T" for t in testfuns_singular, s in system_solvers, T in real_types
-#     t(s, T, MO.PreprocessedLinearModel, verbose)
-# end
+@testset "preprocessing tests: $t, $s, $T" for t in testfuns_singular, s in system_solvers, T in real_types
+    t(s{T}, MO.PreprocessedLinearModel{T}, verbose)
+end
 linear_models = [
-    # MO.PreprocessedLinearModel,
+    MO.PreprocessedLinearModel,
     MO.RawLinearModel,
     ]
 testfuns_nonsingular = [
-    # orthant1,
+    orthant1,
     orthant2,
-    # orthant3,
-    # orthant4,
+    orthant3,
+    orthant4,
     # epinorminf1,
     # epinorminf2,
     # epinorminf3,
@@ -133,7 +133,7 @@ testfuns_nonsingular = [
     # if s == SO.QRCholCombinedHSDSystemSolver && m == MO.RawLinearModel
     #     continue # QRChol linear system solver needs preprocessed model
     # end
-    t(s, m, T, verbose)
+    t(s{T}, m{T}, verbose)
 end
 
 # @info("starting MathOptInterface tests")

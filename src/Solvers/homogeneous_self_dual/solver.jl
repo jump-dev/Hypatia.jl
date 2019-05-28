@@ -63,13 +63,13 @@ mutable struct HSDSolver{T <: HypReal} <: Solver{T}
     solve_time::Float64
     timer::TimerOutput
 
-    function HSDSolver(
+    function HSDSolver{T}(
         model::Models.LinearModel{T};
         stepper::HSDStepper{T} = CombinedHSDStepper(model),
         verbose::Bool = true,
-        tol_rel_opt = max(1e-10, sqrt(eps(T))),
-        tol_abs_opt = 1e1 * tol_rel_opt,
-        tol_feas = tol_abs_opt,
+        tol_rel_opt = max(1e-12, 1e-2 * cbrt(eps(T))),
+        tol_abs_opt = tol_rel_opt,
+        tol_feas = tol_rel_opt,
         tol_slow = 5e-3,
         max_iters::Int = 250,
         time_limit = 3e2,
@@ -255,7 +255,7 @@ function check_convergence(solver::HSDSolver{T}) where T
         if isnan(prev) || isnan(curr)
             continue
         end
-        max_improve = max(max_improve, (prev - curr) / (abs(prev) + T(1e-6)))
+        max_improve = max(max_improve, (prev - curr) / (abs(prev) + eps(T)))
     end
     if max_improve < solver.tol_slow
         if solver.prev_is_slow && solver.prev2_is_slow

@@ -46,20 +46,20 @@ get_z(solver::Solver) = copy(solver.point.z)
 get_z(solver::Solver, model::Models.Model) = get_z(solver)
 
 get_x(solver::Solver) = copy(solver.point.x)
-function get_x(solver::Solver{T}, model::Models.PreprocessedLinearModel{T}) where T
+function get_x(solver::Solver{T}, model::Models.PreprocessedLinearModel{T}) where {T <: HypReal}
     x = zeros(T, length(model.c_raw))
     x[model.x_keep_idxs] = solver.point.x # unpreprocess solver's solution
     return x
 end
-get_x(solver::Solver, model::Models.Model) = get_x(solver)
+get_x(solver::Solver{T}, model::Models.Model{T}) where {T <: HypReal} = get_x(solver)
 
 get_y(solver::Solver) = copy(solver.point.y)
-function get_y(solver::Solver{T}, model::Models.PreprocessedLinearModel{T}) where T
+function get_y(solver::Solver{T}, model::Models.PreprocessedLinearModel{T}) where {T <: HypReal}
     y = zeros(T, length(model.b_raw))
     y[model.y_keep_idxs] = solver.point.y # unpreprocess solver's solution
     return y
 end
-get_y(solver::Solver, model::Models.Model) = get_y(solver)
+get_y(solver::Solver{T}, model::Models.Model{T}) where {T <: HypReal} = get_y(solver)
 
 # check conic certificates are valid
 # TODO pick default tols based on T
@@ -69,7 +69,7 @@ function get_certificates(
     test::Bool = true,
     atol = max(1e-5, sqrt(sqrt(eps(T)))),
     rtol = atol,
-    ) where T
+    ) where {T <: HypReal}
     status = get_status(solver)
     primal_obj = get_primal_obj(solver)
     dual_obj = get_dual_obj(solver)

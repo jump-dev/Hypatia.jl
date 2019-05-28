@@ -19,7 +19,7 @@ mutable struct NaiveCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSo
     s2
     kap_row::Int
 
-    function NaiveCombinedHSDSystemSolver(model::Models.LinearModel{T}; use_sparse::Bool = false) where {T <: HypReal}
+    function NaiveCombinedHSDSystemSolver{T}(model::Models.LinearModel{T}; use_sparse::Bool = false) where {T <: HypReal}
         (n, p, q) = (model.n, model.p, model.q)
         system_solver = new{T}()
         system_solver.use_sparse = use_sparse
