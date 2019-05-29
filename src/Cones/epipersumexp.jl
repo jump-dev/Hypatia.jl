@@ -16,35 +16,35 @@ mutable struct EpiPerSumExp{T <: HypReal} <: Cone{T}
     use_dual::Bool
     dim::Int
 
-    point::AbstractVector{Float64}
-    g::Vector{Float64}
-    H::Matrix{Float64}
-    H2::Matrix{Float64}
+    point::AbstractVector{T}
+    g::Vector{T}
+    H::Matrix{T}
+    H2::Matrix{T}
     F
     barfun::Function
     diffres
 
-    function EpiPerSumExp(dim::Int, is_dual::Bool)
-        cone = new()
+    function EpiPerSumExp{T}(dim::Int, is_dual::Bool) where {T <: HypReal}
+        cone = new{T}()
         cone.use_dual = is_dual
         cone.dim = dim
         return cone
     end
 end
 
-EpiPerSumExp(dim::Int) = EpiPerSumExp(dim, false)
+EpiPerSumExp{T}(dim::Int) where {T <: HypReal} = EpiPerSumExp{T}(dim, false)
 
-function setup_data(cone::EpiPerSumExp)
+function setup_data(cone::EpiPerSumExp{T}) where {T <: HypReal}
     dim = cone.dim
-    cone.g = Vector{Float64}(undef, dim)
-    cone.H = Matrix{Float64}(undef, dim, dim)
-    cone.H2 = similar(cone.H)
+    cone.g = zeros(T, dim)
+    cone.H = zeros(T, dim, dim)
+    cone.H2 = copy(cone.H)
     function barfun(point)
         u = point[1]
         v = point[2]
         w = view(point, 3:dim)
         # return -log(u - v*sum(wi -> exp(wi/v), w)) - log(u) - log(v)
-        return -log(log(u) - log(v) - log(sum(wi -> exp(wi / v), w))) - log(u) - 2.0 * log(v) # TODO use the numerically safer way to evaluate LSE function
+        return -log(log(u) - log(v) - log(sum(wi -> exp(wi / v), w))) - log(u) - 2 * log(v) # TODO use the numerically safer way to evaluate LSE function
     end
     cone.barfun = barfun
     cone.diffres = DiffResults.HessianResult(cone.g)
@@ -53,13 +53,13 @@ end
 
 get_nu(cone::EpiPerSumExp) = 3 # TODO does this increase with dim > 3?
 
-set_initial_point(arr::AbstractVector{Float64}, cone::EpiPerSumExp) = (@. arr = -log(cone.dim - 2); arr[1] = 2.0; arr[2] = 1.0; arr)
+set_initial_point(arr::AbstractVector{T}, cone::EpiPerSumExp{T}) where {T <: HypReal} = (@. arr = -log(T(cone.dim - 2)); arr[1] = T(2); arr[2] = one(T); arr)
 
-function check_in_cone(cone::EpiPerSumExp)
+function check_in_cone(cone::EpiPerSumExp{T}) where {T <: HypReal}
     u = cone.point[1]
     v = cone.point[2]
     w = view(cone.point, 3:cone.dim)
-    if u <= 0.0 || v <= 0.0 || u <= v * sum(wi -> exp(wi / v), w) # TODO use the numerically safer way to evaluate LSE function
+    if u <= zero(T) || v <= zero(T) || u <= v * sum(wi -> exp(wi / v), w) # TODO use the numerically safer way to evaluate LSE function
         return false
     end
 
