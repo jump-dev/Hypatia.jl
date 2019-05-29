@@ -414,12 +414,12 @@ function semidefinite1(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, lin
     c = T[0, -1, 0]
     A = T[1 0 0; 0 0 1]
     b = T[1/2, 1]
-    G = SparseMatrixCSC(-1.0I, 3, 3)
-    h = zeros(3)
+    G = Matrix{T}(-I, 3, 3)
+    h = zeros(T, 3)
     cone_idxs = [1:3]
 
     for is_dual in (true, false)
-        cones = [CO.PosSemidef(3, is_dual)]
+        cones = [CO.PosSemidef{T, T}(3, is_dual)]
 
         r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
         @test r.status == :Optimal
@@ -433,12 +433,12 @@ function semidefinite2(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, lin
     c = T[0, -1, 0]
     A = T[1 0 1]
     b = T[0]
-    G = SparseMatrixCSC(-1.0I, 3, 3)
-    h = zeros(3)
+    G = Diagonal(-one(T) * I, 3)
+    h = zeros(T, 3)
     cone_idxs = [1:3]
 
     for is_dual in (true, false)
-        cones = [CO.PosSemidef(3, is_dual)]
+        cones = [CO.PosSemidef{T, T}(3, is_dual)]
 
         r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
         @test r.status == :Optimal
@@ -449,15 +449,15 @@ end
 
 function semidefinite3(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
     tol = max(1e-5, sqrt(sqrt(eps(T))))
-    c = T[1, 0, 1, 0, 0, 1]
-    A = T[1 2 3 4 5 6; 1 1 1 1 1 1]
-    b = T[10, 3]
+    c = [1, 0, 1, 0, 0, 1]
+    A = [1 2 3 4 5 6; 1 1 1 1 1 1]
+    b = [10, 3]
     G = SparseMatrixCSC(-1.0I, 6, 6)
     h = zeros(6)
     cone_idxs = [1:6]
 
     for is_dual in (true, false)
-        cones = [CO.PosSemidef(6, is_dual)]
+        cones = [CO.PosSemidef{T, T}(6, is_dual)]
 
         r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
         @test r.status == :Optimal
@@ -471,10 +471,10 @@ function semidefinitecomplex1(system_solver::Type{<:SO.CombinedHSDSystemSolver{T
     c = T[1, 0, 0, 1]
     A = T[0 0 1 0]
     b = T[1]
-    G = Diagonal([-1, -sqrt(2), -sqrt(2), -1])
-    h = zeros(4)
+    G = diagm(T[-1, -sqrt(2), -sqrt(2), -1])
+    h = zeros(T, 4)
     cone_idxs = [1:4]
-    cones = [CO.PosSemidef{ComplexF64}(4)]
+    cones = [CO.PosSemidef{T, Complex{T}}(4)]
 
     r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
     @test r.status == :Optimal
@@ -487,9 +487,9 @@ function hypoperlog1(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linea
     c = T[1, 1, 1]
     A = T[0 1 0; 1 0 0]
     b = T[2, 1]
-    G = SparseMatrixCSC(-1.0I, 3, 3)
-    h = zeros(3)
-    cones = [CO.HypoPerLog()]
+    G = Matrix{T}(-I, 3, 3)
+    h = zeros(T, 3)
+    cones = [CO.HypoPerLog{T}()]
     cone_idxs = [1:3]
 
     r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
@@ -503,12 +503,12 @@ end
 
 function hypoperlog2(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
     tol = max(1e-5, sqrt(sqrt(eps(T))))
-    c = T[-1, 0, 0]
-    A = T[0 1 0]
-    b = T[0]
-    G = SparseMatrixCSC(-1.0I, 3, 3)
+    c = [-1, 0, 0]
+    A = [0 1 0]
+    b = [0]
+    G = Diagonal(-I, 3)
     h = zeros(3)
-    cones = [CO.HypoPerLog()]
+    cones = [CO.HypoPerLog{T}()]
     cone_idxs = [1:3]
 
     r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
@@ -518,12 +518,12 @@ end
 
 function hypoperlog3(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
     tol = max(1e-5, sqrt(sqrt(eps(T))))
-    c = T[1, 1, 1]
-    A = zeros(T, 0, 3)
-    b = zeros(T, 0)
+    c = [1, 1, 1]
+    A = zeros(0, 3)
+    b = zeros(0)
     G = sparse([1, 2, 3, 4], [1, 2, 3, 1], -ones(4))
     h = zeros(4)
-    cones = [CO.HypoPerLog(), CO.Nonnegative{T}(1)]
+    cones = [CO.HypoPerLog{T}(), CO.Nonnegative{T}(1)]
     cone_idxs = [1:3, 4:4]
 
     r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
@@ -540,7 +540,7 @@ function hypoperlog4(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linea
     b = T[1, -1]
     G = SparseMatrixCSC(-1.0I, 3, 3)
     h = zeros(3)
-    cones = [CO.HypoPerLog(true)]
+    cones = [CO.HypoPerLog{T}(true)]
     cone_idxs = [1:3]
 
     r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
@@ -554,9 +554,9 @@ function epiperpower1(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, line
     c = T[1, 0, -1, 0, 0, -1]
     A = T[1 1 0 1/2 0 0; 0 0 0 0 1 0]
     b = T[2, 1]
-    G = SparseMatrixCSC(-1.0I, 6, 6)
-    h = zeros(6)
-    cones = [CO.EpiPerPower(5.0, false), CO.EpiPerPower(2.5, false)]
+    G = Matrix{T}(-I, 6, 6)
+    h = zeros(T, 6)
+    cones = [CO.EpiPerPower{T}(5.0, false), CO.EpiPerPower{T}(2.5, false)]
     cone_idxs = [1:3, 4:6]
 
     r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
@@ -567,15 +567,15 @@ end
 
 function epiperpower2(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
     tol = max(1e-5, sqrt(sqrt(eps(T))))
-    c = T[0, 0, -1]
-    A = T[1 0 0; 0 1 0]
-    b = T[1/2, 1]
-    G = SparseMatrixCSC(-1.0I, 3, 3)
+    c = [0, 0, -1]
+    A = [1 0 0; 0 1 0]
+    b = [1/2, 1]
+    G = Diagonal(-I, 3)
     h = zeros(3)
     cone_idxs = [1:3]
 
     for is_dual in (true, false)
-        cones = [CO.EpiPerPower(2.0, is_dual)]
+        cones = [CO.EpiPerPower{T}(2.0, is_dual)]
 
         r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
         @test r.status == :Optimal
@@ -589,12 +589,12 @@ function epiperpower3(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, line
     c = T[0, 0, 1]
     A = T[1 0 0; 0 1 0]
     b = T[0, 1]
-    G = SparseMatrixCSC(-1.0I, 3, 3)
-    h = zeros(3)
+    G = SparseMatrixCSC(-one(T) * I, 3, 3)
+    h = zeros(T, 3)
     cone_idxs = [1:3]
 
     for is_dual in (true, false), alpha in [1.5; 2.0] # TODO objective gap is large when alpha is different e.g. 2.5, investigate why
-        cones = [CO.EpiPerPower(alpha, is_dual)]
+        cones = [CO.EpiPerPower{T}(alpha, is_dual)]
 
         r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose, atol=1e-3, rtol=1e-3)
         @test r.status == :Optimal
@@ -608,9 +608,9 @@ function hypogeomean1(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, line
     c = T[1, 0, 0, -1, -1, 0]
     A = T[1 1 1/2 0 0 0; 0 0 0 0 0 1]
     b = T[2, 1]
-    G = SparseMatrixCSC(-1.0I, 6, 6)[[4, 1, 2, 5, 3, 6], :]
-    h = zeros(6)
-    cones = [CO.HypoGeomean([0.2, 0.8], false), CO.HypoGeomean([0.4, 0.6], false)]
+    G = Matrix{T}(-1.0I, 6, 6)[[4, 1, 2, 5, 3, 6], :]
+    h = zeros(T, 6)
+    cones = [CO.HypoGeomean{T}([0.2, 0.8], false), CO.HypoGeomean{T}([0.4, 0.6], false)]
     cone_idxs = [1:3, 4:6]
 
     r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
@@ -621,15 +621,15 @@ end
 
 function hypogeomean2(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
     tol = max(1e-5, sqrt(sqrt(eps(T))))
-    c = T[-1, 0, 0]
-    A = T[0 0 1; 0 1 0]
-    b = T[1/2, 1]
-    G = SparseMatrixCSC(-1.0I, 3, 3)
+    c = [-1, 0, 0]
+    A = [0 0 1; 0 1 0]
+    b = [1/2, 1]
+    G = Matrix(-I, 3, 3)
     h = zeros(3)
     cone_idxs = [1:3]
 
     for is_dual in (true, false)
-        cones = [CO.HypoGeomean([0.5, 0.5], is_dual)]
+        cones = [CO.HypoGeomean{T}([0.5, 0.5], is_dual)]
 
         r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
         @test r.status == :Optimal
@@ -649,7 +649,7 @@ function hypogeomean3(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, line
 
     for is_dual in (true, false)
         b = is_dual ? [-1.0] : [1.0]
-        cones = [CO.HypoGeomean(fill(inv(l), l), is_dual)]
+        cones = [CO.HypoGeomean{T}(fill(inv(l), l), is_dual)]
 
         r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
         @test r.status == :Optimal
@@ -664,12 +664,12 @@ function hypogeomean4(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, line
     c = ones(l)
     A = zeros(0, l)
     b = zeros(0)
-    G = T[zeros(1, l); Matrix(-1.0I, l, l)]
+    G = [zeros(1, l); Matrix(-1.0I, l, l)]
     h = zeros(l + 1)
     cone_idxs = [1:(l + 1)]
 
     for is_dual in (true, false)
-        cones = [CO.HypoGeomean(fill(inv(l), l), is_dual)]
+        cones = [CO.HypoGeomean{T}(fill(inv(l), l), is_dual)]
 
         r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
         @test r.status == :Optimal
@@ -684,14 +684,14 @@ function epinormspectral1(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, 
     (Xn, Xm) = (3, 4)
     Xnm = Xn * Xm
     c = vcat(1.0, zeros(Xnm))
-    A = [spzeros(Xnm, 1) sparse(1.0I, Xnm, Xnm)]
+    A = [zeros(Xnm, 1) Matrix(1.0I, Xnm, Xnm)]
     b = rand(Xnm)
-    G = sparse(-1.0I, Xnm + 1, Xnm + 1)
+    G = Matrix(-1.0I, Xnm + 1, Xnm + 1)
     h = vcat(0.0, rand(Xnm))
     cone_idxs = [1:(Xnm + 1)]
 
     for is_dual in (true, false)
-        cones = [CO.EpiNormSpectral(Xn, Xm, is_dual)]
+        cones = [CO.EpiNormSpectral{T}(Xn, Xm, is_dual)]
 
         r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
         @test r.status == :Optimal

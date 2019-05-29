@@ -14,17 +14,17 @@ TODO although this barrier has a lower parameter, maybe the more standard barrie
 
 mutable struct EpiPerPower{T <: HypReal} <: Cone{T}
     use_dual::Bool
-    alpha::Float64
+    alpha::Real
 
-    point::AbstractVector{Float64}
-    g::Vector{Float64}
-    H::Matrix{Float64}
-    H2::Matrix{Float64}
+    point::AbstractVector{T}
+    g::Vector{T}
+    H::Matrix{T}
+    H2::Matrix{T}
     F
     barfun::Function
     diffres
 
-    function EpiPerPower(alpha::Float64, is_dual::Bool)
+    function EpiPerPower{T}(alpha::Real, is_dual::Bool) where {T <: HypReal}
         @assert alpha > 1.0
         cone = new()
         cone.use_dual = is_dual
@@ -33,12 +33,12 @@ mutable struct EpiPerPower{T <: HypReal} <: Cone{T}
     end
 end
 
-EpiPerPower(alpha::Float64) = EpiPerPower(alpha, false)
+EpiPerPower{T}(alpha::Real) where {T <: HypReal} = EpiPerPower{T}(alpha, false)
 
-function setup_data(cone::EpiPerPower)
-    cone.g = Vector{Float64}(undef, 3)
-    cone.H = Matrix{Float64}(undef, 3, 3)
-    cone.H2 = similar(cone.H)
+function setup_data(cone::EpiPerPower{T}) where {T <: HypReal}
+    cone.g = zeros(T, 3)
+    cone.H = zeros(T, 3, 3)
+    cone.H2 = copy(cone.H)
 
     alpha = cone.alpha
     ialpha2 = 2.0 * inv(alpha)
@@ -53,13 +53,13 @@ end
 
 dimension(cone::EpiPerPower) = 3
 
-get_nu(cone::EpiPerPower) = 3 - 2 * min(inv(cone.alpha), 1.0 - inv(cone.alpha))
+get_nu(cone::EpiPerPower) = 3 - 2 * min(inv(cone.alpha), 1 - inv(cone.alpha))
 
-set_initial_point(arr::AbstractVector{Float64}, cone::EpiPerPower) = (arr[1] = 1.0; arr[2] = 1.0; arr[3] = 0.0; arr)
+set_initial_point(arr::AbstractVector{T}, cone::EpiPerPower{T}) where {T <: HypReal} = (arr[1] = one(T); arr[2] = one(T); arr[3] = zero(T); arr)
 
-function check_in_cone(cone::EpiPerPower)
+function check_in_cone(cone::EpiPerPower{T}) where {T <: HypReal}
     (u, v, w) = cone.point
-    if u <= 0.0 || v <= 0.0 || u <= v * (abs(w / v))^cone.alpha
+    if u <= zero(T) || v <= zero(T) || u <= v * (abs(w / v))^cone.alpha
         return false
     end
 

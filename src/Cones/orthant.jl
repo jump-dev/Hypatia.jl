@@ -53,6 +53,7 @@ get_nu(cone::OrthantCone) = cone.dim
 set_initial_point(arr::AbstractVector{T}, cone::Nonnegative{T}) where {T <: HypReal} = (@. arr = one(T); arr)
 set_initial_point(arr::AbstractVector{T}, cone::Nonpositive{T}) where {T <: HypReal} = (@. arr = -one(T); arr)
 
+# TODO can change the u > 0.0 check to signbit function
 check_in_cone(cone::Nonnegative{T}) where {T <: HypReal} = all(u -> (u > zero(T)), cone.point)
 check_in_cone(cone::Nonpositive{T}) where {T <: HypReal} = all(u -> (u < zero(T)), cone.point)
 
