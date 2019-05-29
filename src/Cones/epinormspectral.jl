@@ -13,7 +13,7 @@ barrier from "Interior-Point Polynomial Algorithms in Convex Programming" by Nes
 # TODO eliminate allocations for incone check
 =#
 
-mutable struct EpiNormSpectral <: Cone
+mutable struct EpiNormSpectral{T <: HypReal} <: Cone{T}
     use_dual::Bool
     dim::Int
     n::Int

@@ -11,7 +11,7 @@ dual barrier (modified by reflecting around u = 0 and using dual cone definition
 TODO try to make barrier evaluation more efficient
 =#
 
-mutable struct HypoGeomean <: Cone
+mutable struct HypoGeomean{T <: HypReal} <: Cone{T}
     use_dual::Bool
     dim::Int
     alpha::Vector{Float64}

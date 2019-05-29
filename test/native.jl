@@ -35,7 +35,7 @@ function dimension1(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear
     b = T[]
     G = T[1 0]
     h = T[1]
-    cones = [CO.Nonnegative(1, false)]
+    cones = [CO.Nonnegative{T}(1, false)]
     cone_idxs = [1:1]
 
     for use_sparse in (false, true)
@@ -72,7 +72,7 @@ function consistent1(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linea
     G[:, 11:15] = rnd1 * G[:, 1:5] - rnd2 * G[:, 6:10]
     c[11:15] = rnd1 * c[1:5] - rnd2 * c[6:10]
     h = zeros(q)
-    cones = [CO.Nonpositive(q)]
+    cones = [CO.Nonpositive{T}(q)]
     cone_idxs = [1:q]
 
     r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
@@ -92,7 +92,7 @@ function inconsistent1(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, lin
     b[11:15] = 2 * (rnd1 * b[1:5] - rnd2 * b[6:10])
     h = zeros(q)
 
-    @test_throws ErrorException linear_model(c, A, b, G, h, [CO.Nonnegative(q)], [1:q])
+    @test_throws ErrorException linear_model(c, A, b, G, h, [CO.Nonnegative{T}(q)], [1:q])
 end
 
 function inconsistent2(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
@@ -109,7 +109,7 @@ function inconsistent2(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, lin
     c[11:15] = 2 * (rnd1 * c[1:5] - rnd2 * c[6:10])
     h = zeros(q)
 
-    @test_throws ErrorException linear_model(c, A, b, G, h, [CO.Nonnegative(q)], [1:q])
+    @test_throws ErrorException linear_model(c, A, b, G, h, [CO.Nonnegative{T}(q)], [1:q])
 end
 
 function orthant1(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
@@ -124,13 +124,13 @@ function orthant1(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_m
 
     # nonnegative cone
     G = SparseMatrixCSC(-one(T) * I, q, n)
-    cones = [CO.Nonnegative(q)]
+    cones = [CO.Nonnegative{T}(q)]
     rnn = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
     @test rnn.status == :Optimal
 
     # nonpositive cone
     G = SparseMatrixCSC(one(T) * I, q, n)
-    cones = [CO.Nonpositive(q)]
+    cones = [CO.Nonpositive{T}(q)]
     rnp = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
     @test rnp.status == :Optimal
 
@@ -149,12 +149,12 @@ function orthant2(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_m
     cone_idxs = [1:q]
 
     # use dual barrier
-    cones = [CO.Nonnegative(q, true)]
+    cones = [CO.Nonnegative{T}(q, true)]
     r1 = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
     @test r1.status == :Optimal
 
     # use primal barrier
-    cones = [CO.Nonnegative(q, false)]
+    cones = [CO.Nonnegative{T}(q, false)]
     r2 = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
     @test r2.status == :Optimal
 
@@ -173,12 +173,12 @@ function orthant3(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_m
     cone_idxs = [1:q]
 
     # use dual barrier
-    cones = [CO.Nonpositive(q, true)]
+    cones = [CO.Nonpositive{T}(q, true)]
     r1 = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
     @test r1.status == :Optimal
 
     # use primal barrier
-    cones = [CO.Nonpositive(q, false)]
+    cones = [CO.Nonpositive{T}(q, false)]
     r2 = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
     @test r2.status == :Optimal
 
@@ -196,13 +196,13 @@ function orthant4(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_m
     h = G * ones(n)
 
     # mixture of nonnegative and nonpositive cones
-    cones = [CO.Nonnegative(4, false), CO.Nonnegative(6, true)]
+    cones = [CO.Nonnegative{T}(4, false), CO.Nonnegative{T}(6, true)]
     cone_idxs = [1:4, 5:10]
     r1 = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
     @test r1.status == :Optimal
 
     # only nonnegative cone
-    cones = [CO.Nonnegative(10, false)]
+    cones = [CO.Nonnegative{T}(10, false)]
     cone_idxs = [1:10]
     r2 = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
     @test r2.status == :Optimal
@@ -212,12 +212,12 @@ end
 
 function epinorminf1(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
     tol = max(1e-5, sqrt(sqrt(eps(T))))
-    c = Float64[0, -1, -1]
-    A = Float64[1 0 0; 0 1 0]
-    b = Float64[1, inv(sqrt(2))]
-    G = SparseMatrixCSC(-1.0I, 3, 3)
-    h = zeros(3)
-    cones = [CO.EpiNormInf(3)]
+    c = T[0, -1, -1]
+    A = T[1 0 0; 0 1 0]
+    b = T[1, inv(sqrt(2))]
+    G = SparseMatrixCSC(-one(T) * I, 3, 3)
+    h = zeros(T, 3)
+    cones = [CO.EpiNormInf{T}(3)]
     cone_idxs = [1:3]
 
     r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
@@ -230,12 +230,12 @@ end
 function epinorminf2(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
     tol = max(1e-5, sqrt(sqrt(eps(T))))
     Random.seed!(1)
-    c = Float64[1, 0, 0, 0, 0, 0]
+    c = T[1, 0, 0, 0, 0, 0]
     A = rand(-9.0:9.0, 3, 6)
     b = A * ones(6)
     G = rand(6, 6)
     h = G * ones(6)
-    cones = [CO.EpiNormInf(6)]
+    cones = [CO.EpiNormInf{T}(6)]
     cone_idxs = [1:6]
 
     r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
@@ -245,12 +245,12 @@ end
 
 function epinorminf3(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
     tol = max(1e-5, sqrt(sqrt(eps(T))))
-    c = Float64[1, 0, 0, 0, 0, 0]
+    c = T[1, 0, 0, 0, 0, 0]
     A = zeros(0, 6)
     b = zeros(0)
-    G = SparseMatrixCSC(-1.0I, 6, 6)
+    G = Diagonal(-I, 6)
     h = zeros(6)
-    cones = [CO.EpiNormInf(6)]
+    cones = [CO.EpiNormInf{T}(6)]
     cone_idxs = [1:6]
 
     r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
@@ -261,12 +261,12 @@ end
 
 function epinorminf4(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
     tol = max(1e-5, sqrt(sqrt(eps(T))))
-    c = Float64[0, 1, -1]
-    A = Float64[1 0 0; 0 1 0]
-    b = Float64[1, -0.4]
-    G = SparseMatrixCSC(-1.0I, 3, 3)
+    c = T[0, 1, -1]
+    A = T[1 0 0; 0 1 0]
+    b = T[1, -0.4]
+    G = Diagonal(-I, 3)
     h = zeros(3)
-    cones = [CO.EpiNormInf(3, true)]
+    cones = [CO.EpiNormInf{T}(3, true)]
     cone_idxs = [1:3]
 
     r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
@@ -279,12 +279,12 @@ end
 function epinorminf5(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
     tol = max(1e-5, sqrt(sqrt(eps(T))))
     Random.seed!(1)
-    c = Float64[1, 0, 0, 0, 0, 0]
+    c = T[1, 0, 0, 0, 0, 0]
     A = rand(-9.0:9.0, 3, 6)
     b = A * ones(6)
     G = rand(6, 6)
     h = G * ones(6)
-    cones = [CO.EpiNormInf(6, true)]
+    cones = [CO.EpiNormInf{T}(6, true)]
     cone_idxs = [1:6]
 
     r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
@@ -296,13 +296,13 @@ function epinorminf6(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linea
     tol = max(1e-5, sqrt(sqrt(eps(T))))
     l = 3
     L = 2l + 1
-    c = collect(Float64, -l:l)
+    c = collect(T, -l:l)
     A = spzeros(2, L)
     A[1, 1] = A[1, L] = A[2, 1] = 1.0; A[2, L] = -1.0
-    b = Float64[0, 0]
+    b = T[0, 0]
     G = [spzeros(1, L); sparse(1.0I, L, L); spzeros(1, L); sparse(2.0I, L, L)]
     h = zeros(2L + 2); h[1] = 1.0; h[L + 2] = 1.0
-    cones = [CO.EpiNormInf(L + 1, true), CO.EpiNormInf(L + 1, false)]
+    cones = [CO.EpiNormInf{T}(L + 1, true), CO.EpiNormInf{T}(L + 1, false)]
     cone_idxs = [1:(L + 1), (L + 2):(2L + 2)]
 
     r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
@@ -315,15 +315,15 @@ end
 
 function epinormeucl1(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
     tol = max(1e-5, sqrt(sqrt(eps(T))))
-    c = Float64[0, -1, -1]
-    A = Float64[1 0 0; 0 1 0]
-    b = Float64[1, inv(sqrt(2))]
-    G = SparseMatrixCSC(-1.0I, 3, 3)
-    h = zeros(3)
+    c = T[0, -1, -1]
+    A = T[1 0 0; 0 1 0]
+    b = T[1, inv(sqrt(2))]
+    G = Matrix{T}(-I, 3, 3)
+    h = zeros(T, 3)
     cone_idxs = [1:3]
 
     for is_dual in (true, false)
-        cones = [CO.EpiNormEucl(3, is_dual)]
+        cones = [CO.EpiNormEucl{T}(3, is_dual)]
 
         r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
         @test r.status == :Optimal
@@ -335,15 +335,15 @@ end
 
 function epinormeucl2(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
     tol = max(1e-5, sqrt(sqrt(eps(T))))
-    c = Float64[0, -1, -1]
-    A = Float64[1 0 0]
-    b = Float64[0]
-    G = SparseMatrixCSC(-1.0I, 3, 3)
+    c = T[0, -1, -1]
+    A = T[1 0 0]
+    b = T[0]
+    G = Diagonal(-one(T) * I, 3)
     h = zeros(3)
     cone_idxs = [1:3]
 
     for is_dual in (true, false)
-        cones = [CO.EpiNormEucl(3, is_dual)]
+        cones = [CO.EpiNormEucl{T}(3, is_dual)]
 
         r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
         @test r.status == :Optimal
@@ -354,9 +354,9 @@ end
 
 function epipersquare1(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
     tol = max(1e-5, sqrt(sqrt(eps(T))))
-    c = Float64[0, 0, -1, -1]
-    A = Float64[1 0 0 0; 0 1 0 0]
-    b = Float64[1/2, 1]
+    c = T[0, 0, -1, -1]
+    A = T[1 0 0 0; 0 1 0 0]
+    b = T[1/2, 1]
     G = SparseMatrixCSC(-1.0I, 4, 4)
     h = zeros(4)
     cone_idxs = [1:4]
@@ -373,9 +373,9 @@ end
 
 function epipersquare2(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
     tol = max(1e-5, sqrt(sqrt(eps(T))))
-    c = Float64[0, 0, -1]
-    A = Float64[1 0 0; 0 1 0]
-    b = Float64[1/2, 1] / sqrt(2)
+    c = T[0, 0, -1]
+    A = T[1 0 0; 0 1 0]
+    b = T[1/2, 1] / sqrt(2)
     G = SparseMatrixCSC(-1.0I, 3, 3)
     h = zeros(3)
     cone_idxs = [1:3]
@@ -392,9 +392,9 @@ end
 
 function epipersquare3(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
     tol = max(1e-5, sqrt(sqrt(eps(T))))
-    c = Float64[0, 1, -1, -1]
-    A = Float64[1 0 0 0]
-    b = Float64[0]
+    c = T[0, 1, -1, -1]
+    A = T[1 0 0 0]
+    b = T[0]
     G = SparseMatrixCSC(-1.0I, 4, 4)
     h = zeros(4)
     cone_idxs = [1:4]
@@ -411,9 +411,9 @@ end
 
 function semidefinite1(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
     tol = max(1e-5, sqrt(sqrt(eps(T))))
-    c = Float64[0, -1, 0]
-    A = Float64[1 0 0; 0 0 1]
-    b = Float64[1/2, 1]
+    c = T[0, -1, 0]
+    A = T[1 0 0; 0 0 1]
+    b = T[1/2, 1]
     G = SparseMatrixCSC(-1.0I, 3, 3)
     h = zeros(3)
     cone_idxs = [1:3]
@@ -430,9 +430,9 @@ end
 
 function semidefinite2(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
     tol = max(1e-5, sqrt(sqrt(eps(T))))
-    c = Float64[0, -1, 0]
-    A = Float64[1 0 1]
-    b = Float64[0]
+    c = T[0, -1, 0]
+    A = T[1 0 1]
+    b = T[0]
     G = SparseMatrixCSC(-1.0I, 3, 3)
     h = zeros(3)
     cone_idxs = [1:3]
@@ -449,9 +449,9 @@ end
 
 function semidefinite3(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
     tol = max(1e-5, sqrt(sqrt(eps(T))))
-    c = Float64[1, 0, 1, 0, 0, 1]
-    A = Float64[1 2 3 4 5 6; 1 1 1 1 1 1]
-    b = Float64[10, 3]
+    c = T[1, 0, 1, 0, 0, 1]
+    A = T[1 2 3 4 5 6; 1 1 1 1 1 1]
+    b = T[10, 3]
     G = SparseMatrixCSC(-1.0I, 6, 6)
     h = zeros(6)
     cone_idxs = [1:6]
@@ -468,9 +468,9 @@ end
 
 function semidefinitecomplex1(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
     tol = max(1e-5, sqrt(sqrt(eps(T))))
-    c = Float64[1, 0, 0, 1]
-    A = Float64[0 0 1 0]
-    b = Float64[1]
+    c = T[1, 0, 0, 1]
+    A = T[0 0 1 0]
+    b = T[1]
     G = Diagonal([-1, -sqrt(2), -sqrt(2), -1])
     h = zeros(4)
     cone_idxs = [1:4]
@@ -484,9 +484,9 @@ end
 
 function hypoperlog1(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
     tol = max(1e-5, sqrt(sqrt(eps(T))))
-    c = Float64[1, 1, 1]
-    A = Float64[0 1 0; 1 0 0]
-    b = Float64[2, 1]
+    c = T[1, 1, 1]
+    A = T[0 1 0; 1 0 0]
+    b = T[2, 1]
     G = SparseMatrixCSC(-1.0I, 3, 3)
     h = zeros(3)
     cones = [CO.HypoPerLog()]
@@ -503,9 +503,9 @@ end
 
 function hypoperlog2(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
     tol = max(1e-5, sqrt(sqrt(eps(T))))
-    c = Float64[-1, 0, 0]
-    A = Float64[0 1 0]
-    b = Float64[0]
+    c = T[-1, 0, 0]
+    A = T[0 1 0]
+    b = T[0]
     G = SparseMatrixCSC(-1.0I, 3, 3)
     h = zeros(3)
     cones = [CO.HypoPerLog()]
@@ -518,12 +518,12 @@ end
 
 function hypoperlog3(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
     tol = max(1e-5, sqrt(sqrt(eps(T))))
-    c = Float64[1, 1, 1]
-    A = Matrix{Float64}(undef, 0, 3)
-    b = Vector{Float64}(undef, 0)
+    c = T[1, 1, 1]
+    A = zeros(T, 0, 3)
+    b = zeros(T, 0)
     G = sparse([1, 2, 3, 4], [1, 2, 3, 1], -ones(4))
     h = zeros(4)
-    cones = [CO.HypoPerLog(), CO.Nonnegative(1)]
+    cones = [CO.HypoPerLog(), CO.Nonnegative{T}(1)]
     cone_idxs = [1:3, 4:4]
 
     r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
@@ -535,9 +535,9 @@ end
 
 function hypoperlog4(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
     tol = max(1e-5, sqrt(sqrt(eps(T))))
-    c = Float64[0, 0, 1]
-    A = Float64[0 1 0; 1 0 0]
-    b = Float64[1, -1]
+    c = T[0, 0, 1]
+    A = T[0 1 0; 1 0 0]
+    b = T[1, -1]
     G = SparseMatrixCSC(-1.0I, 3, 3)
     h = zeros(3)
     cones = [CO.HypoPerLog(true)]
@@ -551,9 +551,9 @@ end
 
 function epiperpower1(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
     tol = max(1e-5, sqrt(sqrt(eps(T))))
-    c = Float64[1, 0, -1, 0, 0, -1]
-    A = Float64[1 1 0 1/2 0 0; 0 0 0 0 1 0]
-    b = Float64[2, 1]
+    c = T[1, 0, -1, 0, 0, -1]
+    A = T[1 1 0 1/2 0 0; 0 0 0 0 1 0]
+    b = T[2, 1]
     G = SparseMatrixCSC(-1.0I, 6, 6)
     h = zeros(6)
     cones = [CO.EpiPerPower(5.0, false), CO.EpiPerPower(2.5, false)]
@@ -567,9 +567,9 @@ end
 
 function epiperpower2(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
     tol = max(1e-5, sqrt(sqrt(eps(T))))
-    c = Float64[0, 0, -1]
-    A = Float64[1 0 0; 0 1 0]
-    b = Float64[1/2, 1]
+    c = T[0, 0, -1]
+    A = T[1 0 0; 0 1 0]
+    b = T[1/2, 1]
     G = SparseMatrixCSC(-1.0I, 3, 3)
     h = zeros(3)
     cone_idxs = [1:3]
@@ -586,9 +586,9 @@ end
 
 function epiperpower3(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
     tol = max(1e-5, sqrt(sqrt(eps(T))))
-    c = Float64[0, 0, 1]
-    A = Float64[1 0 0; 0 1 0]
-    b = Float64[0, 1]
+    c = T[0, 0, 1]
+    A = T[1 0 0; 0 1 0]
+    b = T[0, 1]
     G = SparseMatrixCSC(-1.0I, 3, 3)
     h = zeros(3)
     cone_idxs = [1:3]
@@ -605,9 +605,9 @@ end
 
 function hypogeomean1(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
     tol = max(1e-5, sqrt(sqrt(eps(T))))
-    c = Float64[1, 0, 0, -1, -1, 0]
-    A = Float64[1 1 1/2 0 0 0; 0 0 0 0 0 1]
-    b = Float64[2, 1]
+    c = T[1, 0, 0, -1, -1, 0]
+    A = T[1 1 1/2 0 0 0; 0 0 0 0 0 1]
+    b = T[2, 1]
     G = SparseMatrixCSC(-1.0I, 6, 6)[[4, 1, 2, 5, 3, 6], :]
     h = zeros(6)
     cones = [CO.HypoGeomean([0.2, 0.8], false), CO.HypoGeomean([0.4, 0.6], false)]
@@ -621,9 +621,9 @@ end
 
 function hypogeomean2(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
     tol = max(1e-5, sqrt(sqrt(eps(T))))
-    c = Float64[-1, 0, 0]
-    A = Float64[0 0 1; 0 1 0]
-    b = Float64[1/2, 1]
+    c = T[-1, 0, 0]
+    A = T[0 0 1; 0 1 0]
+    b = T[1/2, 1]
     G = SparseMatrixCSC(-1.0I, 3, 3)
     h = zeros(3)
     cone_idxs = [1:3]
@@ -642,7 +642,7 @@ function hypogeomean3(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, line
     tol = max(1e-5, sqrt(sqrt(eps(T))))
     l = 4
     c = vcat(0.0, ones(l))
-    A = Float64[1.0 zeros(1, l)]
+    A = T[1.0 zeros(1, l)]
     G = SparseMatrixCSC(-1.0I, l + 1, l + 1)
     h = zeros(l + 1)
     cone_idxs = [1:(l + 1)]
@@ -664,7 +664,7 @@ function hypogeomean4(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, line
     c = ones(l)
     A = zeros(0, l)
     b = zeros(0)
-    G = Float64[zeros(1, l); Matrix(-1.0I, l, l)]
+    G = T[zeros(1, l); Matrix(-1.0I, l, l)]
     h = zeros(l + 1)
     cone_idxs = [1:(l + 1)]
 
@@ -710,9 +710,9 @@ function hypoperlogdet1(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, li
     Random.seed!(1)
     side = 4
     dim = 2 + div(side * (side + 1), 2)
-    c = Float64[-1, 0]
-    A = Float64[0 1]
-    b = Float64[1]
+    c = T[-1, 0]
+    A = T[0 1]
+    b = T[1]
     G = SparseMatrixCSC(-1.0I, dim, 2)
     mat_half = randn(side, side)
     mat = mat_half * mat_half'
@@ -734,9 +734,9 @@ function hypoperlogdet2(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, li
     Random.seed!(1)
     side = 3
     dim = 2 + div(side * (side + 1), 2)
-    c = Float64[0, 1]
-    A = Float64[1 0]
-    b = Float64[-1]
+    c = T[0, 1]
+    A = T[1 0]
+    b = T[-1]
     G = SparseMatrixCSC(-1.0I, dim, 2)
     mat_half = rand(side, side)
     mat = mat_half * mat_half'
@@ -758,9 +758,9 @@ function hypoperlogdet3(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, li
     Random.seed!(1)
     side = 3
     dim = 2 + div(side * (side + 1), 2)
-    c = Float64[-1, 0]
-    A = Float64[0 1]
-    b = Float64[0]
+    c = T[-1, 0]
+    A = T[0 1]
+    b = T[0]
     G = SparseMatrixCSC(-1.0I, dim, 2)
     mat_half = rand(side, side)
     mat = mat_half * mat_half'
@@ -779,9 +779,9 @@ function epipersumexp1(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, lin
     tol = max(1e-5, sqrt(sqrt(eps(T))))
     l = 5
     c = vcat(0.0, -ones(l))
-    A = Float64[1 zeros(1, l)]
-    b = Float64[1]
-    G = Float64[-1 spzeros(1, l); spzeros(1, l + 1); spzeros(l, 1) sparse(-1.0I, l, l)]
+    A = T[1 zeros(1, l)]
+    b = T[1]
+    G = T[-1 spzeros(1, l); spzeros(1, l + 1); spzeros(l, 1) sparse(-1.0I, l, l)]
     h = zeros(l + 2)
     cones = [CO.EpiPerSumExp(l + 2)]
     cone_idxs = [1:(l + 2)]
@@ -797,9 +797,9 @@ function epipersumexp2(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, lin
     tol = max(1e-5, sqrt(sqrt(eps(T))))
     l = 5
     c = vcat(0.0, -ones(l))
-    A = Float64[1 zeros(1, l)]
-    b = Float64[1]
-    G = Float64[-1.0 spzeros(1, l); spzeros(1, l + 1); spzeros(l, 1) sparse(-1.0I, l, l)]
+    A = T[1 zeros(1, l)]
+    b = T[1]
+    G = T[-1.0 spzeros(1, l); spzeros(1, l + 1); spzeros(l, 1) sparse(-1.0I, l, l)]
     h = zeros(l + 2); h[2] = 1.0
     cones = [CO.EpiPerSumExp(l + 2)]
     cone_idxs = [1:(l + 2)]

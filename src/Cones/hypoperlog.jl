@@ -14,7 +14,7 @@ TODO could write the inverse hessian analytically rather than factorizing
 TODO choose a better interior direction
 =#
 
-mutable struct HypoPerLog <: Cone
+mutable struct HypoPerLog{T <: HypReal} <: Cone{T}
     use_dual::Bool
 
     point::AbstractVector{Float64}
