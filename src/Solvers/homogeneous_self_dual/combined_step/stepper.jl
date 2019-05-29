@@ -71,7 +71,7 @@ function step(solver::HSDSolver, stepper::CombinedHSDStepper)
 
     if iszero(alpha)
         # could not step far in combined direction, so perform a pure correction step
-        println("performing correction step")
+        solver.verbose && println("performing correction step")
         z_comb = z_corr
         s_comb = s_corr
         tau_comb = tau_corr
@@ -214,7 +214,7 @@ function find_max_alpha_in_nbhd(z_dir::AbstractVector{Float64}, s_dir::AbstractV
             end
         end
 
-        if alpha < 1e-3
+        if alpha < 1e-2 # TODO option for parameter
             # alpha is very small so just let it be zero
             alpha = 0.0
             break

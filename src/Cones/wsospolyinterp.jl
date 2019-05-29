@@ -103,13 +103,13 @@ function check_in_cone(cone::WSOSPolyInterp)
         LUk = LUs[k]
         ΛFk = ΛFs[k]
         LUk .= view(Ps[k]', ΛFk.p, :)
-        ldiv!(ΛFk.L, LUk) # TODO check calls best triangular solve
+        ldiv!(LowerTriangular(ΛFk.L), LUk)
         _AtA!(UU, LUk)
 
-        @inbounds for j in eachindex(g)
-            g[j] -= real(UU[j, j])
-            @inbounds for i in 1:j
-                H[i, j] += abs2(UU[i, j])
+        for j in eachindex(g)
+            @inbounds g[j] -= real(UU[j, j])
+            for i in 1:j
+                @inbounds H[i, j] += abs2(UU[i, j])
             end
         end
     end

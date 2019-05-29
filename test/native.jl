@@ -18,9 +18,10 @@ function solve_and_check(
     verbose::Bool;
     atol::Float64 = 1e-4,
     rtol::Float64 = 1e-4,
+    use_sparse::Bool = false,
     )
     model = linear_model(c, A, b, G, h, cones, cone_idxs)
-    stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model))
+    stepper = SO.CombinedHSDStepper(model, system_solver = system_solver(model, use_sparse = use_sparse))
     solver = SO.HSDSolver(model, verbose = verbose, stepper = stepper)
     SO.solve(solver)
     return SO.get_certificates(solver, model, test = true, atol = atol, rtol = rtol)
@@ -40,7 +41,7 @@ function dimension1(system_solver::Type{<:SO.CombinedHSDSystemSolver}, linear_mo
             A = sparse(A)
             G = sparse(G)
         end
-        r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose)
+        r = solve_and_check(c, A, b, G, h, cones, cone_idxs, system_solver, linear_model, verbose, use_sparse = use_sparse)
         @test r.status == :Optimal
         @test r.primal_obj ≈ -1 atol=1e-4 rtol=1e-4
         @test r.x ≈ [1, 0] atol=1e-4 rtol=1e-4

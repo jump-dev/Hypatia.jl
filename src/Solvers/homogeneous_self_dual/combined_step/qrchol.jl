@@ -1,6 +1,11 @@
+#=
+Copyright 2018, Chris Coey and contributors
+
+QR + Cholesky linear system solver
+=#
 
 mutable struct QRCholCombinedHSDSystemSolver <: CombinedHSDSystemSolver
-    # Ap_RiQ1t
+    use_sparse::Bool
 
     xi::Matrix{Float64}
     yi::Matrix{Float64}
@@ -49,11 +54,10 @@ mutable struct QRCholCombinedHSDSystemSolver <: CombinedHSDSystemSolver
     HGxi_k
     Gxi_k
 
-    function QRCholCombinedHSDSystemSolver(model::Models.PreprocessedLinearModel)
+    function QRCholCombinedHSDSystemSolver(model::Models.PreprocessedLinearModel; use_sparse::Bool = false)
         (n, p, q) = (model.n, model.p, model.q)
         system_solver = new()
-
-        # system_solver.Ap_RiQ1t = model.Ap_R \ (model.Ap_Q1')
+        system_solver.use_sparse = use_sparse
 
         xi = Matrix{Float64}(undef, n, 3)
         yi = Matrix{Float64}(undef, p, 3)
@@ -93,8 +97,16 @@ mutable struct QRCholCombinedHSDSystemSolver <: CombinedHSDSystemSolver
         system_solver.GHGQ1x = Matrix{Float64}(undef, n, 3)
         system_solver.Q2div = Matrix{Float64}(undef, nmp, 3)
         system_solver.GQ2 = model.G * model.Ap_Q2
-        system_solver.HGQ2 = Matrix{Float64}(undef, q, nmp)
-        system_solver.Q2GHGQ2 = Matrix{Float64}(undef, nmp, nmp)
+        if use_sparse
+            if system_solver.GQ2 isa Matrix{Float64}
+                error("to use sparse factorization for direction finding, cannot use dense A or G matrices")
+            end
+            system_solver.HGQ2 = spzeros(Float64, q, nmp)
+            system_solver.Q2GHGQ2 = spzeros(Float64, nmp, nmp)
+        else
+            system_solver.HGQ2 = Matrix{Float64}(undef, q, nmp)
+            system_solver.Q2GHGQ2 = Matrix{Float64}(undef, nmp, nmp)
+        end
         system_solver.Q2x = similar(system_solver.Q1x)
         system_solver.Gxi = similar(system_solver.GQ1x)
         system_solver.HGxi = similar(system_solver.Gxi)
@@ -163,16 +175,13 @@ function get_combined_directions(solver::HSDSolver, system_solver::QRCholCombine
     HGxi_k = system_solver.HGxi_k
     Gxi_k = system_solver.Gxi_k
 
-    # @timeit "setup xy" begin
     @. x1 = -model.c
     @. x2 = solver.x_residual
     @. x3 = 0.0
     @. y1 = model.b
     @. y2 = -solver.y_residual
     @. y3 = 0.0
-    # end
 
-    # @timeit "setup z" begin
     @. z1_temp = model.h
     @. z2_temp = -solver.z_residual
     for k in eachindex(cones)
@@ -183,39 +192,31 @@ function get_combined_directions(solver::HSDSolver, system_solver::QRCholCombine
             @. z1_temp_k[k] /= mu
             @. z2_temp_k[k] = (duals_k + z2_temp_k[k]) / mu
             @. z3_temp_k[k] = duals_k / mu + grad_k
-            # ldiv!(z_k[k], Cones.hess_fact(cone_k), z_temp_k[k])
-            # mul!(z_k[k], Cones.inv_hess(cone_k), z_temp_k[k])
             Cones.inv_hess_prod!(z_k[k], z_temp_k[k], cone_k)
         else
             @. z1_temp_k[k] *= mu
             @. z2_temp_k[k] *= mu
-            # mul!(z1_k[k], Cones.hess(cone_k), z1_temp_k[k])
-            # mul!(z2_k[k], Cones.hess(cone_k), z2_temp_k[k])
             Cones.hess_prod!(z1_k[k], z1_temp_k[k], cone_k)
             Cones.hess_prod!(z2_k[k], z2_temp_k[k], cone_k)
             @. z2_k[k] += duals_k
             @. z3_k[k] = duals_k + grad_k * mu
         end
     end
-    # end
 
+    # TODO maybe replace with Diagonal(blocks) matrix product
     function block_hessian_product!(prod_k, arr_k)
         for k in eachindex(cones)
             cone_k = cones[k]
             if Cones.use_dual(cone_k)
-                # ldiv!(prod_k[k], Cones.hess_fact(cone_k), arr_k[k])
-                # mul!(prod_k[k], Cones.inv_hess(cone_k), arr_k[k])
                 Cones.inv_hess_prod!(prod_k[k], arr_k[k], cone_k)
                 prod_k[k] ./= mu
             else
-                # mul!(prod_k[k], Cones.hess(cone_k), arr_k[k])
                 Cones.hess_prod!(prod_k[k], arr_k[k], cone_k)
                 prod_k[k] .*= mu
             end
         end
     end
 
-    # @timeit "pre fact" begin
     # bxGHbz = bx + G'*Hbz
     mul!(bxGHbz, model.G', zi)
     @. bxGHbz += xi
@@ -230,38 +231,37 @@ function get_combined_directions(solver::HSDSolver, system_solver::QRCholCombine
     mul!(GHGQ1x, model.G', HGQ1x)
     @. GHGQ1x = bxGHbz - GHGQ1x
     mul!(Q2div, model.Ap_Q2', GHGQ1x)
-    # end
 
     if !iszero(size(Q2div, 1))
-        # @timeit "mat" begin
         block_hessian_product!(HGQ2_k, GQ2_k)
         mul!(Q2GHGQ2, GQ2', HGQ2)
-        # end
 
-        # TODO prealloc cholesky auxiliary vectors using posvx
-        # TODO use old sysvx code
-        F = bunchkaufman!(Symmetric(Q2GHGQ2), true, check = false)
-        if !issuccess(F)
-        # @timeit "chol" begin
-        # F = cholesky!(Symmetric(Q2GHGQ2), Val(true), check = false)
-        # end
-        # if !isposdef(F)
-            # @timeit "recover" begin
-            println("linear system matrix factorization failed")
-            mul!(Q2GHGQ2, GQ2', HGQ2)
-            Q2GHGQ2 += 1e-4I
-            F = bunchkaufman!(Symmetric(Q2GHGQ2), true, check = false)
+        if system_solver.use_sparse
+            F = ldlt(Symmetric(Q2GHGQ2), check = false)
             if !issuccess(F)
-                error("could not fix failure of positive definiteness (mu is $mu); terminating")
+                println("sparse linear system matrix factorization failed")
+                mul!(Q2GHGQ2, GQ2', HGQ2)
+                F = ldlt(Symmetric(Q2GHGQ2), shift = 1e-4, check = false)
+                if !issuccess(F)
+                    error("could not fix failure of positive definiteness (mu is $mu); terminating")
+                end
             end
-            # end
+            Q2div .= F \ Q2div # TODO eliminate allocs (see https://github.com/JuliaLang/julia/issues/30084)
+        else
+            F = cholesky!(Symmetric(Q2GHGQ2), Val(true), check = false) # TODO prealloc cholesky auxiliary vectors using posvx
+            if !isposdef(F)
+                println("dense linear system matrix factorization failed")
+                mul!(Q2GHGQ2, GQ2', HGQ2)
+                Q2GHGQ2 += 1e-4I
+                F = bunchkaufman!(Symmetric(Q2GHGQ2), true, check = false) # TODO prealloc with old sysvx code
+                if !issuccess(F)
+                    error("could not fix failure of positive definiteness (mu is $mu); terminating")
+                end
+            end
+            ldiv!(F, Q2div)
         end
-        # @timeit "ldiv" begin
-        ldiv!(F, Q2div)
-        # end
     end
 
-    # @timeit "post fact" begin
     mul!(Q2x, model.Ap_Q2, Q2div)
 
     # xi = Q1x + Q2x
@@ -272,16 +272,13 @@ function get_combined_directions(solver::HSDSolver, system_solver::QRCholCombine
     block_hessian_product!(HGxi_k, Gxi_k)
     mul!(GHGxi, model.G', HGxi)
     @. bxGHbz -= GHGxi
-    # mul!(yi, system_solver.Ap_RiQ1t, bxGHbz)
     mul!(yi, model.Ap_Q1', bxGHbz)
     ldiv!(model.Ap_R, yi)
 
     # zi = HG*xi - Hbz
     @. zi = HGxi - zi
-    # end
 
     # lift to HSDE space
-    # @timeit "lift" begin
     tau_denom = mu / solver.tau / solver.tau - dot(model.c, x1) - dot(model.b, y1) - dot(model.h, z1)
 
     function lift!(x, y, z, s, tau_rhs, kap_rhs)
@@ -298,7 +295,6 @@ function get_combined_directions(solver::HSDSolver, system_solver::QRCholCombine
     (tau_pred, kap_pred) = lift!(x2, y2, z2, z2_temp, solver.kap + solver.primal_obj_t - solver.dual_obj_t, -solver.kap)
     @. z2_temp -= solver.z_residual
     (tau_corr, kap_corr) = lift!(x3, y3, z3, z3_temp, 0.0, -solver.kap + mu / solver.tau)
-    # end
 
     return (x2, x3, y2, y3, z2, z3, z2_temp, z3_temp, tau_pred, tau_corr, kap_pred, kap_corr)
 end

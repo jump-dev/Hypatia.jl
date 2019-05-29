@@ -65,10 +65,12 @@ barrier_testfuns = [
 end
 
 @info("starting native interface tests")
-verbose = true
+verbose = false
 system_solvers = [
-    SO.NaiveCombinedHSDSystemSolver,
     SO.QRCholCombinedHSDSystemSolver,
+    SO.SymIndefCombinedHSDSystemSolver,
+    SO.NaiveElimCombinedHSDSystemSolver,
+    SO.NaiveCombinedHSDSystemSolver,
     ]
 testfuns_singular = [
     dimension1,
@@ -80,8 +82,8 @@ testfuns_singular = [
     t(s, MO.PreprocessedLinearModel, verbose)
 end
 linear_models = [
-    MO.RawLinearModel,
     MO.PreprocessedLinearModel,
+    MO.RawLinearModel,
     ]
 testfuns_nonsingular = [
     orthant1,
