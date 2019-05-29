@@ -357,12 +357,12 @@ function epipersquare1(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, lin
     c = T[0, 0, -1, -1]
     A = T[1 0 0 0; 0 1 0 0]
     b = T[1/2, 1]
-    G = SparseMatrixCSC(-1.0I, 4, 4)
-    h = zeros(4)
+    G = Matrix{T}(-I, 4, 4)
+    h = zeros(T, 4)
     cone_idxs = [1:4]
 
     for is_dual in (true, false)
-        cones = [CO.EpiPerSquare(4, is_dual)]
+        cones = [CO.EpiPerSquare{T}(4, is_dual)]
 
         r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
         @test r.status == :Optimal
@@ -376,12 +376,12 @@ function epipersquare2(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, lin
     c = T[0, 0, -1]
     A = T[1 0 0; 0 1 0]
     b = T[1/2, 1] / sqrt(2)
-    G = SparseMatrixCSC(-1.0I, 3, 3)
+    G = Matrix{T}(-I, 3, 3)
     h = zeros(3)
     cone_idxs = [1:3]
 
     for is_dual in (true, false)
-        cones = [CO.EpiPerSquare(3, is_dual)]
+        cones = [CO.EpiPerSquare{T}(3, is_dual)]
 
         r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
         @test r.status == :Optimal
@@ -392,15 +392,15 @@ end
 
 function epipersquare3(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
     tol = max(1e-5, sqrt(sqrt(eps(T))))
-    c = T[0, 1, -1, -1]
-    A = T[1 0 0 0]
-    b = T[0]
+    c = [0, 1, -1, -1]
+    A = [1 0 0 0]
+    b = [0]
     G = SparseMatrixCSC(-1.0I, 4, 4)
     h = zeros(4)
     cone_idxs = [1:4]
 
     for is_dual in (true, false)
-        cones = [CO.EpiPerSquare(4, is_dual)]
+        cones = [CO.EpiPerSquare{T}(4, is_dual)]
 
         r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
         @test r.status == :Optimal
