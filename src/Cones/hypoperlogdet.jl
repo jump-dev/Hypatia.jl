@@ -9,7 +9,7 @@ barrier (guessed, based on analogy to hypoperlog barrier)
 -log(v*logdet(W/v) - u) - logdet(W) - log(v)
 =#
 
-mutable struct HypoPerLogdet <: Cone
+mutable struct HypoPerLogdet{T <: HypReal} <: Cone{T}
     use_dual::Bool
     dim::Int
     side::Int

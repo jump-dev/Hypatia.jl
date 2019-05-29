@@ -12,7 +12,7 @@ TODO use the numerically safer way to evaluate LSE function
 TODO compare alternative barrier -log(u - v*sum(wi -> exp(wi/v), w)) - log(u) - log(v)
 =#
 
-mutable struct EpiPerSumExp <: Cone
+mutable struct EpiPerSumExp{T <: HypReal} <: Cone{T}
     use_dual::Bool
     dim::Int
 

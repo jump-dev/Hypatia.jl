@@ -66,7 +66,7 @@ include(joinpath(@__DIR__, "native.jl"))
 # end
 
 @info("starting native interface tests")
-verbose = true
+verbose = false
 real_types = [
     Float64,
     Float32,
@@ -84,26 +84,26 @@ testfuns_singular = [
     inconsistent1,
     inconsistent2,
     ]
-@testset "preprocessing tests: $t, $s, $T" for t in testfuns_singular, s in system_solvers, T in real_types
-    t(s{T}, MO.PreprocessedLinearModel{T}, verbose)
-end
+# @testset "preprocessing tests: $t, $s, $T" for t in testfuns_singular, s in system_solvers, T in real_types
+#     t(s{T}, MO.PreprocessedLinearModel{T}, verbose)
+# end
 linear_models = [
     MO.PreprocessedLinearModel,
     MO.RawLinearModel,
     ]
 testfuns_nonsingular = [
-    orthant1,
-    orthant2,
-    orthant3,
-    orthant4,
+    # orthant1,
+    # orthant2,
+    # orthant3,
+    # orthant4,
     # epinorminf1,
     # epinorminf2,
     # epinorminf3,
     # epinorminf4,
     # epinorminf5,
     # epinorminf6,
-    # epinormeucl1,
-    # epinormeucl2,
+    epinormeucl1,
+    epinormeucl2,
     # epipersquare1,
     # epipersquare2,
     # epipersquare3,

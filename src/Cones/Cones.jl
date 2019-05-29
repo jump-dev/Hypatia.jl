@@ -7,53 +7,55 @@ functions and caches for cones
 module Cones
 
 using LinearAlgebra
+import LinearAlgebra.BlasReal
 using ForwardDiff
 using DiffResults
-# using TimerOutputs
 
 import Hypatia.HypReal
 
-abstract type Cone end
+const HypRealOrComplex{T <: HypReal} = Union{T, Complex{T}}
+
+abstract type Cone{T <: HypReal} end
 
 include("orthant.jl")
 include("epinorminf.jl")
 include("epinormeucl.jl")
-include("epipersquare.jl")
-include("hypoperlog.jl")
-include("epiperpower.jl")
-include("epipersumexp.jl")
-include("hypogeomean.jl")
-include("epinormspectral.jl")
-include("semidefinite.jl")
-include("hypoperlogdet.jl")
-include("wsospolyinterp.jl")
-include("wsospolyinterpmat.jl")
-include("wsospolyinterpsoc.jl")
+# include("epipersquare.jl")
+# include("hypoperlog.jl")
+# include("epiperpower.jl")
+# include("epipersumexp.jl")
+# include("hypogeomean.jl")
+# include("epinormspectral.jl")
+# include("semidefinite.jl")
+# include("hypoperlogdet.jl")
+# include("wsospolyinterp.jl")
+# include("wsospolyinterpmat.jl")
+# include("wsospolyinterpsoc.jl")
 
 use_dual(cone::Cone) = cone.use_dual
-load_point(cone::Cone, point::AbstractVector{<:HypReal}) = (cone.point = point)
+load_point(cone::Cone{T}, point::AbstractVector{T}) where {T <: HypReal} = (cone.point = point)
 dimension(cone::Cone) = cone.dim
 
-function factorize_hess(cone::Cone)
+function factorize_hess(cone::Cone{T}) where {T <: BlasReal}
     @. cone.H2 = cone.H
-
     # cone.F = bunchkaufman!(Symmetric(cone.H2, :U), true, check = false)
     # return issuccess(cone.F)
-
     cone.F = cholesky!(Symmetric(cone.H2, :U), Val(true), check = false)
+    return isposdef(cone.F)
+end
+
+function factorize_hess(cone::Cone{T}) where {T <: HypReal}
+    @. cone.H2 = cone.H
+    cone.F = cholesky!(Symmetric(cone.H2, :U), check = false) # TODO generic pivoted cholesky not implemented yet in Julia
     return isposdef(cone.F)
 end
 
 grad(cone::Cone) = cone.g
 hess(cone::Cone) = Symmetric(cone.H, :U)
-inv_hess(cone::Cone) = inv(cone.F)
+inv_hess(cone::Cone) = Symmetric(inv(cone.F), :U)
 hess_fact(cone::Cone) = cone.F
-# hessL(cone::Cone) = cone.F.L
-# inv_hessL(cone::Cone) = inv(cone.F.L)
-hess_prod!(prod::AbstractArray{<:HypReal}, arr::AbstractArray{<:HypReal}, cone::Cone) = mul!(prod, Symmetric(cone.H, :U), arr)
-inv_hess_prod!(prod::AbstractArray{<:HypReal}, arr::AbstractArray{<:HypReal}, cone::Cone) = ldiv!(prod, cone.F, arr)
-# hessL_prod!(prod::AbstractArray{<:HypReal}, arr::AbstractArray{<:HypReal}, cone::Cone) = mul!(prod, cone.F.L, arr)
-# inv_hessL_prod!(prod::AbstractArray{<:HypReal}, arr::AbstractArray{<:HypReal}, cone::Cone) = ldiv!(prod, cone.F.L, arr)
+hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::Cone) where {T <: HypReal} = mul!(prod, Symmetric(cone.H, :U), arr)
+inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::Cone) where {T <: HypReal} = ldiv!(prod, cone.F, arr)
 
 # utilities for converting between smat and svec forms (lower triangle) for symmetric matrices
 # TODO only need to do lower triangle if use symmetric matrix types

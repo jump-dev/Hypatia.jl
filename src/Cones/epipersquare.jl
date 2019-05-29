@@ -9,7 +9,7 @@ barrier from "Self-Scaled Barriers and Interior-Point Methods for Convex Program
 -log(2*u*v - norm_2(w)^2)
 =#
 
-mutable struct EpiPerSquare <: Cone
+mutable struct EpiPerSquare{T <: HypReal} <: Cone{T}
     use_dual::Bool
     dim::Int
     
@@ -77,9 +77,9 @@ function check_in_cone(cone::EpiPerSquare)
 end
 
 # calcg!(g::AbstractVector{Float64}, cone::EpiPerSquare) = (@. g = cone.point/cone.dist; tmp = g[1]; g[1] = -g[2]; g[2] = -tmp; g)
-# calcHiarr!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::EpiPerSquare) = mul!(prod, cone.Hi, arr)
-# calcHarr!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::EpiPerSquare) = mul!(prod, cone.H, arr)
+# calcHiarr!(prod::AbstractVecOrMat{Float64}, arr::AbstractVecOrMat{Float64}, cone::EpiPerSquare) = mul!(prod, cone.Hi, arr)
+# calcHarr!(prod::AbstractVecOrMat{Float64}, arr::AbstractVecOrMat{Float64}, cone::EpiPerSquare) = mul!(prod, cone.H, arr)
 
 inv_hess(cone::EpiPerSquare) = Symmetric(cone.Hi, :U)
 
-inv_hess_prod!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::EpiPerSquare) = mul!(prod, Symmetric(cone.Hi, :U), arr)
+inv_hess_prod!(prod::AbstractVecOrMat{Float64}, arr::AbstractVecOrMat{Float64}, cone::EpiPerSquare) = mul!(prod, Symmetric(cone.Hi, :U), arr)

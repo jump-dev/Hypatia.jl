@@ -12,7 +12,7 @@ TODO get gradient and hessian analytically (may be nicer if redefine as u >= v/a
 TODO although this barrier has a lower parameter, maybe the more standard barrier is more numerically robust
 =#
 
-mutable struct EpiPerPower <: Cone
+mutable struct EpiPerPower{T <: HypReal} <: Cone{T}
     use_dual::Bool
     alpha::Float64
 

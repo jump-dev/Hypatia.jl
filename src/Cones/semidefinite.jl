@@ -18,7 +18,7 @@ TODO
 
 RealOrComplexF64 = Union{Float64, ComplexF64}
 
-mutable struct PosSemidef{T <: RealOrComplexF64} <: Cone
+mutable struct PosSemidef{T <: HypRealOrComplex{T2}} <: Cone{T2}
     use_dual::Bool
     dim::Int
     side::Int
@@ -29,7 +29,7 @@ mutable struct PosSemidef{T <: RealOrComplexF64} <: Cone
     Hi::Matrix{Float64}
     mat::Matrix{T}
 
-    function PosSemidef{T}(dim::Int, is_dual::Bool) where {T <: RealOrComplexF64}
+    function PosSemidef{T}(dim::Int, is_dual::Bool) where {T <: HypRealOrComplex}
         cone = new{T}()
         cone.use_dual = is_dual
         cone.dim = dim # real vector dimension
@@ -181,4 +181,4 @@ end
 
 inv_hess(cone::PosSemidef) = Symmetric(cone.Hi, :U)
 
-inv_hess_prod!(prod::AbstractArray{Float64}, arr::AbstractArray{Float64}, cone::PosSemidef) = mul!(prod, Symmetric(cone.Hi, :U), arr)
+inv_hess_prod!(prod::AbstractVecOrMat{Float64}, arr::AbstractVecOrMat{Float64}, cone::PosSemidef) = mul!(prod, Symmetric(cone.Hi, :U), arr)

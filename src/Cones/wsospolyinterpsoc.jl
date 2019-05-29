@@ -6,7 +6,7 @@ interpolation-based weighted-sum-of-squares (multivariate) polynomial second ord
 definition and dual barrier extended from "Sum-of-squares optimization without semidefinite programming" by D. Papp and S. Yildiz, available at https://arxiv.org/abs/1712.01792
 =#
 
-mutable struct WSOSPolyInterpSOC <: Cone
+mutable struct WSOSPolyInterpSOC{T <: HypReal} <: Cone{T}
     use_dual::Bool
     dim::Int
     R::Int
