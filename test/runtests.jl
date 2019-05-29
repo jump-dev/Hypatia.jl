@@ -93,7 +93,7 @@ testfuns_nonsingular = [
     # epinorminf1,
     # epinorminf2,
     # epinorminf3,
-    epinorminf4,
+    # epinorminf4,
     # epinorminf5,
     epinorminf6,
     epinormeucl1,
