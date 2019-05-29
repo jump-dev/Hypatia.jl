@@ -12,7 +12,7 @@ TODO
 - check if gradient and hessian are correct for complex case
 =#
 
-mutable struct WSOSPolyInterp{T <: RealOrComplexF64}{T <: HypReal} <: Cone{T}
+mutable struct WSOSPolyInterp{T <: HypReal, R <: HypRealOrComplex{T}} <: Cone{T}
     use_dual::Bool
     dim::Int
     Ps::Vector{Matrix{T}}

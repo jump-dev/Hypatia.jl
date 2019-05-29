@@ -11,7 +11,6 @@ using LinearAlgebra
 using SparseArrays
 using Test
 using TimerOutputs
-
 import Hypatia.Cones
 import Hypatia.Models
 import Hypatia.HypReal

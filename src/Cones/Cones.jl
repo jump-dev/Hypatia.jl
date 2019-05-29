@@ -10,10 +10,8 @@ using LinearAlgebra
 import LinearAlgebra.BlasReal
 using ForwardDiff
 using DiffResults
-
 import Hypatia.HypReal
-
-const HypRealOrComplex{T <: HypReal} = Union{T, Complex{T}}
+import Hypatia.HypRealOrComplex
 
 abstract type Cone{T <: HypReal} end
 
