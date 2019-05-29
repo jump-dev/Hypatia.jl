@@ -66,7 +66,7 @@ include(joinpath(@__DIR__, "native.jl"))
 # end
 
 @info("starting native interface tests")
-verbose = false
+verbose = true
 real_types = [
     Float64,
     Float32,
@@ -104,9 +104,9 @@ testfuns_nonsingular = [
     # epinorminf6,
     # epinormeucl1,
     # epinormeucl2,
-    epipersquare1,
-    epipersquare2,
-    epipersquare3,
+    # epipersquare1,
+    # epipersquare2,
+    # epipersquare3,
     # semidefinite1,
     # semidefinite2,
     # semidefinite3,
@@ -122,7 +122,7 @@ testfuns_nonsingular = [
     # hypogeomean2,
     # hypogeomean3,
     # hypogeomean4,
-    # epinormspectral1,
+    epinormspectral1,
     # hypoperlogdet1,
     # hypoperlogdet2,
     # hypoperlogdet3,

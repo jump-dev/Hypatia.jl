@@ -14,23 +14,23 @@ TODO try to make barrier evaluation more efficient
 mutable struct HypoGeomean{T <: HypReal} <: Cone{T}
     use_dual::Bool
     dim::Int
-    alpha::Vector{Float64}
+    alpha::Vector{<:Real}
 
-    ialpha::Vector{Float64}
-    point::AbstractVector{Float64}
-    g::Vector{Float64}
-    H::Matrix{Float64}
-    H2::Matrix{Float64}
+    ialpha::Vector{<:Real}
+    point::AbstractVector{T}
+    g::Vector{T}
+    H::Matrix{T}
+    H2::Matrix{T}
     F
     barfun::Function
     diffres
 
-    function HypoGeomean(alpha::Vector{Float64}, is_dual::Bool)
+    function HypoGeomean{T}(alpha::Vector{<:Real}, is_dual::Bool) where {T <: HypReal}
         dim = length(alpha) + 1
         @assert dim >= 3
         @assert all(ai >= 0.0 for ai in alpha)
-        @assert sum(alpha) == 1.0
-        cone = new()
+        @assert sum(alpha) == 1.0 # TODO this check may be too strict
+        cone = new{T}()
         cone.use_dual = !is_dual # using dual barrier
         cone.dim = dim
         cone.alpha = alpha
@@ -38,16 +38,16 @@ mutable struct HypoGeomean{T <: HypReal} <: Cone{T}
     end
 end
 
-HypoGeomean(alpha::Vector{Float64}) = HypoGeomean(alpha, false)
+HypoGeomean{T}(alpha::Vector{<:Real}) where {T <: HypReal} = HypoGeomean{T}(alpha, false)
 
-function setup_data(cone::HypoGeomean)
+function setup_data(cone::HypoGeomean{T}) where {T <: HypReal}
     dim = cone.dim
     alpha = cone.alpha
     ialpha = inv.(alpha)
     cone.ialpha = ialpha
-    cone.g = Vector{Float64}(undef, dim)
-    cone.H = Matrix{Float64}(undef, dim, dim)
-    cone.H2 = similar(cone.H)
+    cone.g = zeros(T, dim)
+    cone.H = zeros(T, dim, dim)
+    cone.H2 = copy(cone.H)
     function barfun(point)
         u = point[1]
         w = view(point, 2:dim)
@@ -60,12 +60,12 @@ end
 
 get_nu(cone::HypoGeomean) = cone.dim
 
-set_initial_point(arr::AbstractVector{Float64}, cone::HypoGeomean) = (@. arr = 1.0; arr[1] = -prod(cone.ialpha[i]^cone.alpha[i] for i in eachindex(cone.alpha)) / cone.dim; arr)
+set_initial_point(arr::AbstractVector{T}, cone::HypoGeomean{T}) where {T <: HypReal} = (@. arr = one(T); arr[1] = -prod(cone.ialpha[i]^cone.alpha[i] for i in eachindex(cone.alpha)) / cone.dim; arr)
 
-function check_in_cone(cone::HypoGeomean)
+function check_in_cone(cone::HypoGeomean{T}) where {T <: HypReal}
     u = cone.point[1]
     w = view(cone.point, 2:cone.dim)
-    if u >= 0.0 || any(wi <= 0.0 for wi in w)
+    if u >= zero(T) || any(wi <= zero(T) for wi in w)
         return false
     end
     if sum(cone.alpha[i] * log(w[i] * cone.ialpha[i]) for i in eachindex(cone.alpha)) <= log(-u)

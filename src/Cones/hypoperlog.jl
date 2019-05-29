@@ -17,24 +17,24 @@ TODO choose a better interior direction
 mutable struct HypoPerLog{T <: HypReal} <: Cone{T}
     use_dual::Bool
 
-    point::AbstractVector{Float64}
-    g::Vector{Float64}
-    H::Matrix{Float64}
-    H2::Matrix{Float64}
+    point::AbstractVector{T}
+    g::Vector{T}
+    H::Matrix{T}
+    H2::Matrix{T}
     F
 
-    function HypoPerLog(is_dual::Bool)
-        cone = new()
+    function HypoPerLog{T}(is_dual::Bool) where {T <: HypReal}
+        cone = new{T}()
         cone.use_dual = is_dual
         return cone
     end
 end
 
-HypoPerLog() = HypoPerLog(false)
+HypoPerLog{T}() where {T <: HypReal} = HypoPerLog{T}(false)
 
-function setup_data(cone::HypoPerLog)
-    cone.g = Vector{Float64}(undef, 3)
-    cone.H = Matrix{Float64}(undef, 3, 3)
+function setup_data(cone::HypoPerLog{T}) where {T <: HypReal}
+    cone.g = Vector{T}(undef, 3)
+    cone.H = Matrix{T}(undef, 3, 3)
     cone.H2 = similar(cone.H)
     return
 end
@@ -43,17 +43,17 @@ dimension(cone::HypoPerLog) = 3
 
 get_nu(cone::HypoPerLog) = 3
 
-set_initial_point(arr::AbstractVector{Float64}, cone::HypoPerLog) = (arr[1] = -1.0; arr[2] = 1.0; arr[3] = 1.0; arr)
+set_initial_point(arr::AbstractVector{T}, cone::HypoPerLog{T}) where {T <: HypReal} = (arr[1] = -one(T); arr[2] = one(T); arr[3] = one(T); arr)
 
-function check_in_cone(cone::HypoPerLog)
+function check_in_cone(cone::HypoPerLog{T}) where {T <: HypReal}
     (u, v, w) = cone.point
-    if (v <= 0.0) || (w <= 0.0)
+    if (v <= zero(T)) || (w <= zero(T))
         return false
     end
     lwv = log(w / v)
     vlwv = v * lwv
     vlwvu = vlwv - u
-    if vlwvu <= 0.0
+    if vlwvu <= zero(T)
         return false
     end
 
@@ -61,18 +61,18 @@ function check_in_cone(cone::HypoPerLog)
     ivlwvu = inv(vlwvu)
     g = cone.g
     g[1] = ivlwvu
-    g[2] = ivlwvu * (v - u - 2.0 * vlwvu) / v
-    g[3] = -(1.0 + v * ivlwvu) / w
+    g[2] = ivlwvu * (v - u - vlwvu - vlwvu) / v
+    g[3] = -(one(T) + v * ivlwvu) / w
 
     # Hessian
     vw = v / w
     ivlwvu2 = abs2(ivlwvu)
     H = cone.H
     H[1, 1] = ivlwvu2
-    H[1, 2] = H[2, 1] = -(lwv - 1.0) * ivlwvu2
+    H[1, 2] = H[2, 1] = -(lwv - one(T)) * ivlwvu2
     H[1, 3] = H[3, 1] = -vw * ivlwvu2
-    H[2, 2] = abs2(lwv - 1.0) * ivlwvu2 + ivlwvu / v + inv(abs2(v))
-    H[2, 3] = H[3, 2] = vw * (lwv - 1.0) * ivlwvu2 - ivlwvu / w
+    H[2, 2] = abs2(lwv - one(T)) * ivlwvu2 + ivlwvu / v + inv(abs2(v))
+    H[2, 3] = H[3, 2] = vw * (lwv - one(T)) * ivlwvu2 - ivlwvu / w
     H[3, 3] = abs2(vw) * ivlwvu2 + vw / w * ivlwvu + inv(abs2(w))
 
     return factorize_hess(cone)
