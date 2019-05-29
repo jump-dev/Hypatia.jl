@@ -171,8 +171,8 @@ JuMP_options = (
     @testset "densityest" begin test_densityestJuMP(; JuMP_options...,
         tol_rel_opt = 1e-5, tol_abs_opt = 1e-5, tol_feas = 1e-6,
         ) end
-    @testset "envelope" begin test_envelopeJuMP(; JuMP_options...,
-        ) end
+    # @testset "envelope" begin test_envelopeJuMP(; JuMP_options...,
+    #     ) end
     @testset "expdesign" begin test_expdesignJuMP(; JuMP_options...,
         ) end
     @testset "lotkavolterra" begin test_lotkavolterraJuMP(; JuMP_options...,
@@ -180,14 +180,14 @@ JuMP_options = (
         ) end
     @testset "muconvexity" begin test_muconvexityJuMP(; JuMP_options...,
         ) end
-    @testset "polymin" begin test_polyminJuMP(; JuMP_options...,
-        tol_rel_opt = 1e-9, tol_abs_opt = 1e-8, tol_feas = 1e-9,
-        ) end
+    # @testset "polymin" begin test_polyminJuMP(; JuMP_options...,
+    #     tol_rel_opt = 1e-9, tol_abs_opt = 1e-8, tol_feas = 1e-9,
+    #     ) end
     @testset "polynorm" begin test_polynormJuMP(; JuMP_options...,
         ) end
-    @testset "regionofattr" begin test_regionofattrJuMP(; JuMP_options...,
-        tol_abs_opt = 1e-6, tol_rel_opt = 1e-6, tol_feas = 1e-6,
-        ) end
+    # @testset "regionofattr" begin test_regionofattrJuMP(; JuMP_options...,
+    #     tol_abs_opt = 1e-6, tol_rel_opt = 1e-6, tol_feas = 1e-6,
+    #     ) end
     @testset "secondorderpoly" begin test_secondorderpolyJuMP(; JuMP_options...,
         ) end
     @testset "semidefinitepoly" begin test_semidefinitepolyJuMP(; JuMP_options...,

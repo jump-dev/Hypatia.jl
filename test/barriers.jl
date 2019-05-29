@@ -68,7 +68,7 @@ end
 
 function test_hypogeomean_barrier()
     Random.seed!(1)
-    for dim in [3, 5, 7]
+    for dim in [3, 5]
         alpha = rand(dim - 1)
         alpha ./= sum(alpha)
         cone = CO.HypoGeomean(alpha)
