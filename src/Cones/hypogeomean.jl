@@ -29,7 +29,8 @@ mutable struct HypoGeomean{T <: HypReal} <: Cone{T}
         dim = length(alpha) + 1
         @assert dim >= 3
         @assert all(ai >= 0.0 for ai in alpha)
-        @assert sum(alpha) == 1.0 # TODO this check may be too strict
+        tol = 1e3 * eps(T)
+        @assert sum(alpha) ≈ 1 atol=tol rtol=tol
         cone = new{T}()
         cone.use_dual = !is_dual # using dual barrier
         cone.dim = dim
