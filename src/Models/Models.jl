@@ -8,7 +8,6 @@ module Models
 
 using LinearAlgebra
 using SparseArrays
-
 import Hypatia.Cones
 import Hypatia.HypReal
 

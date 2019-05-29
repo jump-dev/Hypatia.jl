@@ -5,6 +5,10 @@ Copyright 2018, Chris Coey and contributors
 module Hypatia
 
 const HypReal = Union{AbstractFloat, Rational}
+const HypRealOrComplex{T <: HypReal} = Union{T, Complex{T}}
+
+const rt2 = sqrt(2)
+const rt2i = inv(rt2)
 
 # submodules
 # include("ModelUtilities/ModelUtilities.jl")
