@@ -130,18 +130,18 @@ testfuns_nonsingular = [
     t(s, m, verbose)
 end
 
-@info("starting MathOptInterface tests")
-verbose = false
-system_solvers = [
-    SO.NaiveCombinedHSDSystemSolver,
-    SO.QRCholCombinedHSDSystemSolver,
-    ]
-linear_models = [
-    MO.PreprocessedLinearModel, # MOI tests require preprocessing
-    ]
-@testset "MOI tests: $(d ? "dense" : "sparse"), $s, $m" for d in (false, true), s in system_solvers, m in linear_models
-    test_moi(d, s, m, verbose)
-end
+# @info("starting MathOptInterface tests")
+# verbose = false
+# system_solvers = [
+#     SO.NaiveCombinedHSDSystemSolver,
+#     SO.QRCholCombinedHSDSystemSolver,
+#     ]
+# linear_models = [
+#     MO.PreprocessedLinearModel, # MOI tests require preprocessing
+#     ]
+# @testset "MOI tests: $(d ? "dense" : "sparse"), $s, $m" for d in (false, true), s in system_solvers, m in linear_models
+#     test_moi(d, s, m, verbose)
+# end
 
 @info("starting native examples tests")
 native_options = (
@@ -154,9 +154,9 @@ native_options = (
         ) end
     @testset "linearopt" begin test_linearopt(; native_options...,
         ) end
-    @testset "polymin" begin test_polymin(; native_options...,
-        tol_rel_opt = 1e-9, tol_abs_opt = 1e-8, tol_feas = 1e-9,
-        ) end
+    # @testset "polymin" begin test_polymin(; native_options...,
+    #     tol_rel_opt = 1e-9, tol_abs_opt = 1e-8, tol_feas = 1e-9,
+    #     ) end
 end
 
 @info("starting JuMP examples tests")
@@ -167,12 +167,12 @@ JuMP_options = (
     time_limit = 6e2, # 1 minute
     )
 @testset "JuMP examples" begin
-    @testset "contraction" begin test_contractionJuMP(; JuMP_options...,
-        tol_rel_opt = 1e-4, tol_abs_opt = 1e-4, tol_feas = 1e-4,
-        ) end
-    @testset "densityest" begin test_densityestJuMP(; JuMP_options...,
-        tol_rel_opt = 1e-5, tol_abs_opt = 1e-5, tol_feas = 1e-6,
-        ) end
+    # @testset "contraction" begin test_contractionJuMP(; JuMP_options...,
+    #     tol_rel_opt = 1e-4, tol_abs_opt = 1e-4, tol_feas = 1e-4,
+    #     ) end
+    # @testset "densityest" begin test_densityestJuMP(; JuMP_options...,
+    #     tol_rel_opt = 1e-5, tol_abs_opt = 1e-5, tol_feas = 1e-6,
+    #     ) end
     # @testset "envelope" begin test_envelopeJuMP(; JuMP_options...,
     #     ) end
     @testset "expdesign" begin test_expdesignJuMP(; JuMP_options...,
@@ -192,12 +192,12 @@ JuMP_options = (
     #     ) end
     @testset "secondorderpoly" begin test_secondorderpolyJuMP(; JuMP_options...,
         ) end
-    @testset "semidefinitepoly" begin test_semidefinitepolyJuMP(; JuMP_options...,
-        tol_abs_opt = 1e-7, tol_rel_opt = 1e-7, tol_feas = 1e-7,
-        ) end
-    @testset "shapeconregr" begin test_shapeconregrJuMP(; JuMP_options...,
-        tol_rel_opt = 1e-6, tol_abs_opt = 1e-6, tol_feas = 1e-6,
-        ) end
+    # @testset "semidefinitepoly" begin test_semidefinitepolyJuMP(; JuMP_options...,
+    #     tol_abs_opt = 1e-7, tol_rel_opt = 1e-7, tol_feas = 1e-7,
+    #     ) end
+    # @testset "shapeconregr" begin test_shapeconregrJuMP(; JuMP_options...,
+    #     tol_rel_opt = 1e-6, tol_abs_opt = 1e-6, tol_feas = 1e-6,
+    #     ) end
 end
 
 end
