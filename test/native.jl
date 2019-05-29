@@ -713,20 +713,20 @@ function hypoperlogdet1(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, li
     c = T[-1, 0]
     A = T[0 1]
     b = T[1]
-    G = SparseMatrixCSC(-1.0I, dim, 2)
-    mat_half = randn(side, side)
+    G = Matrix{T}(-I, dim, 2)
+    mat_half = rand(T, side, side)
     mat = mat_half * mat_half'
-    h = zeros(dim)
+    h = zeros(T, dim)
     CO.smat_to_svec!(view(h, 3:dim), mat)
-    cones = [CO.HypoPerLogdet(dim)]
+    cones = [CO.HypoPerLogdet{T}(dim)]
     cone_idxs = [1:dim]
 
     r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
     @test r.status == :Optimal
     @test r.x[1] ≈ -r.primal_obj atol=tol rtol=tol
     @test r.x[2] ≈ 1 atol=tol rtol=tol
-    @test r.s[2] * logdet(CO.svec_to_smat!(zeros(side, side), r.s[3:end]) / r.s[2]) ≈ r.s[1] atol=tol rtol=tol
-    @test r.z[1] * (logdet(CO.svec_to_smat!(zeros(side, side), -r.z[3:end]) / r.z[1]) + side) ≈ r.z[2] atol=tol rtol=tol
+    @test r.s[2] * logdet(CO.svec_to_smat!(zeros(T, side, side), r.s[3:end]) / r.s[2]) ≈ r.s[1] atol=tol rtol=tol
+    @test r.z[1] * (logdet(CO.svec_to_smat!(zeros(T, side, side), -r.z[3:end]) / r.z[1]) + T(side)) ≈ r.z[2] atol=tol rtol=tol
 end
 
 function hypoperlogdet2(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
@@ -737,20 +737,20 @@ function hypoperlogdet2(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, li
     c = T[0, 1]
     A = T[1 0]
     b = T[-1]
-    G = SparseMatrixCSC(-1.0I, dim, 2)
-    mat_half = rand(side, side)
+    G = Matrix{T}(-I, dim, 2)
+    mat_half = rand(T, side, side)
     mat = mat_half * mat_half'
-    h = zeros(dim)
+    h = zeros(T, dim)
     CO.smat_to_svec!(view(h, 3:dim), mat)
-    cones = [CO.HypoPerLogdet(dim, true)]
+    cones = [CO.HypoPerLogdet{T}(dim, true)]
     cone_idxs = [1:dim]
 
     r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
     @test r.status == :Optimal
     @test r.x[2] ≈ r.primal_obj atol=tol rtol=tol
     @test r.x[1] ≈ -1 atol=tol rtol=tol
-    @test r.s[1] * (logdet(CO.svec_to_smat!(zeros(side, side), -r.s[3:end]) / r.s[1]) + side) ≈ r.s[2] atol=tol rtol=tol
-    @test r.z[2] * logdet(CO.svec_to_smat!(zeros(side, side), r.z[3:end]) / r.z[2]) ≈ r.z[1] atol=tol rtol=tol
+    @test r.s[1] * (logdet(CO.svec_to_smat!(zeros(T, side, side), -r.s[3:end]) / r.s[1]) + T(side)) ≈ r.s[2] atol=tol rtol=tol
+    @test r.z[2] * logdet(CO.svec_to_smat!(zeros(T, side, side), r.z[3:end]) / r.z[2]) ≈ r.z[1] atol=tol rtol=tol
 end
 
 function hypoperlogdet3(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
@@ -758,15 +758,15 @@ function hypoperlogdet3(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, li
     Random.seed!(1)
     side = 3
     dim = 2 + div(side * (side + 1), 2)
-    c = T[-1, 0]
-    A = T[0 1]
-    b = T[0]
+    c = [-1, 0]
+    A = [0 1]
+    b = [0]
     G = SparseMatrixCSC(-1.0I, dim, 2)
     mat_half = rand(side, side)
     mat = mat_half * mat_half'
     h = zeros(dim)
     CO.smat_to_svec!(view(h, 3:dim), mat)
-    cones = [CO.HypoPerLogdet(dim)]
+    cones = [CO.HypoPerLogdet{T}(dim)]
     cone_idxs = [1:dim]
 
     r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
@@ -779,11 +779,11 @@ function epipersumexp1(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, lin
     tol = max(1e-5, sqrt(sqrt(eps(T))))
     l = 5
     c = vcat(0.0, -ones(l))
-    A = T[1 zeros(1, l)]
-    b = T[1]
-    G = T[-1 spzeros(1, l); spzeros(1, l + 1); spzeros(l, 1) sparse(-1.0I, l, l)]
+    A = [1 zeros(1, l)]
+    b = [1]
+    G = [-1 zeros(1, l); zeros(1, l + 1); zeros(l, 1) sparse(-1.0I, l, l)]
     h = zeros(l + 2)
-    cones = [CO.EpiPerSumExp(l + 2)]
+    cones = [CO.EpiPerSumExp{T}(l + 2)]
     cone_idxs = [1:(l + 2)]
 
     r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
@@ -797,11 +797,11 @@ function epipersumexp2(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, lin
     tol = max(1e-5, sqrt(sqrt(eps(T))))
     l = 5
     c = vcat(0.0, -ones(l))
-    A = T[1 zeros(1, l)]
-    b = T[1]
-    G = T[-1.0 spzeros(1, l); spzeros(1, l + 1); spzeros(l, 1) sparse(-1.0I, l, l)]
+    A = [1 zeros(1, l)]
+    b = [1]
+    G = [-1.0 spzeros(1, l); spzeros(1, l + 1); spzeros(l, 1) sparse(-1.0I, l, l)]
     h = zeros(l + 2); h[2] = 1.0
-    cones = [CO.EpiPerSumExp(l + 2)]
+    cones = [CO.EpiPerSumExp{T}(l + 2)]
     cone_idxs = [1:(l + 2)]
 
     r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)

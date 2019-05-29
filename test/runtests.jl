@@ -122,12 +122,12 @@ testfuns_nonsingular = [
     # hypogeomean2,
     # hypogeomean3,
     # hypogeomean4,
-    epinormspectral1,
+    # epinormspectral1,
     # hypoperlogdet1,
     # hypoperlogdet2,
     # hypoperlogdet3,
-    # epipersumexp1,
-    # epipersumexp2,
+    epipersumexp1,
+    epipersumexp2,
     ]
 @testset "native tests: $t, $s, $m, $T" for t in testfuns_nonsingular, s in system_solvers, m in linear_models, T in real_types
     # if s == SO.QRCholCombinedHSDSystemSolver && m == MO.RawLinearModel

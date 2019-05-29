@@ -14,15 +14,15 @@ mutable struct HypoPerLogdet{T <: HypReal} <: Cone{T}
     dim::Int
     side::Int
 
-    point::AbstractVector{Float64}
-    mat::Matrix{Float64}
-    g::Vector{Float64}
-    H::Matrix{Float64}
-    H2::Matrix{Float64}
+    point::AbstractVector{T}
+    mat::Matrix{T}
+    g::Vector{T}
+    H::Matrix{T}
+    H2::Matrix{T}
     F
 
-    function HypoPerLogdet(dim::Int, is_dual::Bool)
-        cone = new()
+    function HypoPerLogdet{T}(dim::Int, is_dual::Bool) where {T <: HypReal}
+        cone = new{T}()
         cone.use_dual = is_dual
         cone.dim = dim
         cone.side = round(Int, sqrt(0.25 + 2 * (dim - 2)) - 0.5)
@@ -30,60 +30,61 @@ mutable struct HypoPerLogdet{T <: HypReal} <: Cone{T}
     end
 end
 
-HypoPerLogdet(dim::Int) = HypoPerLogdet(dim, false)
+HypoPerLogdet{T}(dim::Int) where {T <: HypReal} = HypoPerLogdet{T}(dim, false)
 
-function setup_data(cone::HypoPerLogdet)
+function setup_data(cone::HypoPerLogdet{T}) where {T <: HypReal}
     dim = cone.dim
     side = round(Int, sqrt(0.25 + 2 * (dim - 2)) - 0.5)
     side = cone.side
-    cone.mat = Matrix{Float64}(undef, side, side)
-    cone.g = Vector{Float64}(undef, dim)
-    cone.H = Matrix{Float64}(undef, dim, dim)
+    cone.mat = Matrix{T}(undef, side, side)
+    cone.g = Vector{T}(undef, dim)
+    cone.H = Matrix{T}(undef, dim, dim)
     cone.H2 = similar(cone.H)
     return
 end
 
 get_nu(cone::HypoPerLogdet) = cone.side + 2
 
-function set_initial_point(arr::AbstractVector{Float64}, cone::HypoPerLogdet)
-    arr[1] = -1.0
-    arr[2] = 1.0
-    smat_to_svec!(view(arr, 3:cone.dim), Matrix(1.0I, cone.side, cone.side))
+function set_initial_point(arr::AbstractVector{T}, cone::HypoPerLogdet{T}) where {T <: HypReal}
+    arr[1] = -one(T)
+    arr[2] = one(T)
+    smat_to_svec!(view(arr, 3:cone.dim), Matrix(one(T) * I, cone.side, cone.side)) # TODO remove allocs
     return arr
 end
 
-function check_in_cone(cone::HypoPerLogdet)
+# TODO remove allocs
+function check_in_cone(cone::HypoPerLogdet{T}) where {T <: HypReal}
     u = cone.point[1]
     v = cone.point[2]
-    if v <= 0.0
+    if v <= zero(T)
         return false
     end
     W = cone.mat
     svec_to_smat!(W, view(cone.point, 3:cone.dim))
-    F = cholesky(Symmetric(W), Val(true), check = false)
+    F = cholesky(Symmetric(W), Val(true), check = false) # TODO doesn't work for generic reals
     if !isposdef(F) || u >= v * (logdet(F) - cone.side * log(v))
         return false
     end
 
     L = logdet(W / v)
     z = v * L - u
-    Wi = inv(W)
+    Wi = Symmetric(inv(W))
     n = cone.side
     dim = cone.dim
     vzi = v / z
 
-    cone.g[1] = 1 / z
-    cone.g[2] = (n - L) / z - 1 / v
-    gwmat = -Wi * (1 + vzi)
+    cone.g[1] = inv(z)
+    cone.g[2] = (T(n) - L) / z - inv(v)
+    gwmat = -Wi * (one(T) + vzi)
     smat_to_svec!(view(cone.g, 3:dim), gwmat)
 
-    cone.H[1, 1] = 1 / z / z
-    cone.H[1, 2] = (n - L) / z / z
+    cone.H[1, 1] = inv(z) / z
+    cone.H[1, 2] = (T(n) - L) / z / z
     Huwmat = -vzi * Wi / z
     smat_to_svec!(view(cone.H, 1, 3:dim), Huwmat)
 
-    cone.H[2, 2] = (-n + L)^2 / z / z + n / (v * z) + 1 / v / v
-    Hvwmat = ((-n + L) * vzi - 1) * Wi / z
+    cone.H[2, 2] = abs2(T(-n) + L) / z / z + T(n) / (v * z) + inv(v) / v
+    Hvwmat = ((T(-n) + L) * vzi - one(T)) * Wi / z
     smat_to_svec!(view(cone.H, 2, 3:dim), Hvwmat)
 
     k = 3
@@ -91,11 +92,11 @@ function check_in_cone(cone::HypoPerLogdet)
         k2 = 3
         for i2 in 1:n, j2 in 1:i2
             if (i == j) && (i2 == j2)
-                cone.H[k2, k] = abs2(Wi[i2, i]) * (vzi + 1) + Wi[i, i] * Wi[i2, i2] * vzi^2
+                cone.H[k2, k] = abs2(Wi[i2, i]) * (vzi + one(T)) + Wi[i, i] * Wi[i2, i2] * abs2(vzi)
             elseif (i != j) && (i2 != j2)
-                cone.H[k2, k] = (Wi[i2, i] * Wi[j, j2] + Wi[j2, i] * Wi[j, i2]) * (vzi + 1) + 2 * Wi[i, j] * Wi[i2, j2] * vzi^2
+                cone.H[k2, k] = (Wi[i2, i] * Wi[j, j2] + Wi[j2, i] * Wi[j, i2]) * (vzi + one(T)) + 2 * Wi[i, j] * Wi[i2, j2] * abs2(vzi)
             else
-                cone.H[k2, k] = rt2 * (Wi[i2, i] * Wi[j, j2] * (vzi + 1) + Wi[i, j] * Wi[i2, j2] * vzi^2)
+                cone.H[k2, k] = rt2 * (Wi[i2, i] * Wi[j, j2] * (vzi + one(T)) + Wi[i, j] * Wi[i2, j2] * abs2(vzi))
             end
             if k2 == k
                 break
@@ -104,8 +105,6 @@ function check_in_cone(cone::HypoPerLogdet)
         end
         k += 1
     end
-
-    # @assert isapprox(Symmetric(cone.H, :U) * cone.point, -cone.g, atol = 1e-6, rtol = 1e-6)
 
     return factorize_hess(cone)
 end
