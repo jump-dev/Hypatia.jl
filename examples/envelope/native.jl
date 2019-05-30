@@ -15,9 +15,9 @@ using Test
 import Hypatia
 const HYP = Hypatia
 const CO = HYP.Cones
-const MU = HYP.ModelUtilities
 const MO = HYP.Models
 const SO = HYP.Solvers
+const MU = HYP.ModelUtilities
 
 function envelope(
     npoly::Int,
@@ -51,7 +51,7 @@ function envelope(
         h = zeros(npoly * U)
     end
 
-    cones = [CO.WSOSPolyInterp(U, [P0, PWts...], !primal_wsos) for k in 1:npoly]
+    cones = [CO.WSOSPolyInterp{Float64, Float64}(U, [P0, PWts...], !primal_wsos) for k in 1:npoly]
     cone_idxs = [(1 + (k - 1) * U):(k * U) for k in 1:npoly]
 
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs)
@@ -67,8 +67,8 @@ envelope6() = envelope(2, 30, 1, 30, primal_wsos = false)
 function test_envelope(instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
     d = instance()
-    model = MO.PreprocessedLinearModel(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
-    solver = SO.HSDSolver(model; options...)
+    model = MO.PreprocessedLinearModel{Float64}(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
+    solver = SO.HSDSolver{Float64}(model; options...)
     SO.solve(solver)
     r = SO.get_certificates(solver, model, test = true, atol = 1e-4, rtol = 1e-4)
     @test r.status == :Optimal

@@ -19,12 +19,12 @@ const SO = HYP.Solvers
 
 examples_dir = joinpath(@__DIR__, "../examples")
 # include(joinpath(examples_dir, "envelope/native.jl"))
-include(joinpath(examples_dir, "linearopt/native.jl"))
-# include(joinpath(examples_dir, "polymin/native.jl"))
+# include(joinpath(examples_dir, "linearopt/native.jl"))
+include(joinpath(examples_dir, "polymin/native.jl"))
 # include(joinpath(examples_dir, "contraction/JuMP.jl"))
 # include(joinpath(examples_dir, "densityest/JuMP.jl"))
 # include(joinpath(examples_dir, "envelope/JuMP.jl"))
-include(joinpath(examples_dir, "expdesign/JuMP.jl"))
+# include(joinpath(examples_dir, "expdesign/JuMP.jl"))
 # include(joinpath(examples_dir, "lotkavolterra/JuMP.jl"))
 # include(joinpath(examples_dir, "muconvexity/JuMP.jl"))
 # include(joinpath(examples_dir, "polymin/JuMP.jl"))
@@ -150,21 +150,21 @@ include(joinpath(examples_dir, "expdesign/JuMP.jl"))
 #     test_moi(d, s{Float64}, m{Float64}, verbose)
 # end
 #
-@info("starting native examples tests")
-native_options = (
-    verbose = true,
-    max_iters = 150,
-    time_limit = 6e2, # 1 minute
-    )
-@testset "native examples" begin
-    # @testset "envelope" begin test_envelope(; native_options...,
-    #     ) end
-    @testset "linearopt" begin test_linearopt(; native_options...,
-        ) end
-    # @testset "polymin" begin test_polymin(; native_options...,
-    #     tol_rel_opt = 1e-9, tol_abs_opt = 1e-8, tol_feas = 1e-9,
-    #     ) end
-end
+# @info("starting native examples tests")
+# native_options = (
+#     verbose = true,
+#     max_iters = 150,
+#     time_limit = 6e2, # 1 minute
+#     )
+# @testset "native examples" begin
+#     @testset "envelope" begin test_envelope(; native_options...,
+#         ) end
+#     @testset "linearopt" begin test_linearopt(; native_options...,
+#         ) end
+#     @testset "polymin" begin test_polymin(; native_options...,
+#         tol_rel_opt = 1e-9, tol_abs_opt = 1e-8, tol_feas = 1e-9,
+#         ) end
+# end
 
 @info("starting JuMP examples tests")
 JuMP_options = (
@@ -182,8 +182,8 @@ JuMP_options = (
     #     ) end
     # @testset "envelope" begin test_envelopeJuMP(; JuMP_options...,
     #     ) end
-    @testset "expdesign" begin test_expdesignJuMP(; JuMP_options...,
-        ) end
+    # @testset "expdesign" begin test_expdesignJuMP(; JuMP_options...,
+    #     ) end
     # @testset "lotkavolterra" begin test_lotkavolterraJuMP(; JuMP_options...,
     #     tol_rel_opt = 1e-5, tol_abs_opt = 1e-6, tol_feas = 1e-6,
     #     ) end

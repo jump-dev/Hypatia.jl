@@ -11,7 +11,7 @@ const rt2 = sqrt(2)
 const rt2i = inv(rt2)
 
 # submodules
-# include("ModelUtilities/ModelUtilities.jl")
+include("ModelUtilities/ModelUtilities.jl")
 include("Cones/Cones.jl")
 include("Models/Models.jl")
 include("Solvers/Solvers.jl")

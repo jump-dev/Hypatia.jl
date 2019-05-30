@@ -20,6 +20,7 @@ const HYP = Hypatia
 const CO = HYP.Cones
 const MO = HYP.Models
 const SO = HYP.Solvers
+const MU = HYP.ModelUtilities
 
 include(joinpath(@__DIR__, "data.jl"))
 
@@ -48,7 +49,7 @@ function polyminreal(
         G = Diagonal(-1.0I, U) # TODO use UniformScaling
         h = zeros(U)
     end
-    cones = [CO.WSOSPolyInterp(U, [P0, PWts...], !primal_wsos)]
+    cones = [CO.WSOSPolyInterp{Float64, Float64}(U, [P0, PWts...], !primal_wsos)]
     cone_idxs = [1:U]
 
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs, true_obj = true_obj)
@@ -75,7 +76,7 @@ polyminreal17() = polyminreal(:lotkavolterra, 3, primal_wsos = false)
 function polymincomplex(
     polyname::Symbol,
     halfdeg::Int;
-    primal_wsos = true,
+    primal_wsos::Bool = true,
     sample_factor::Int = 100,
     use_QR::Bool = false,
     )
@@ -142,7 +143,7 @@ function polymincomplex(
         G = Diagonal(-1.0I, U)
         h = zeros(U)
     end
-    cones = [CO.WSOSPolyInterp(U, P_data, !primal_wsos)]
+    cones = [CO.WSOSPolyInterp{Float64, ComplexF64}(U, P_data, !primal_wsos)]
     cone_idxs = [1:U]
 
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs, true_obj = true_obj)
@@ -166,8 +167,8 @@ polymincomplex14() = polymincomplex(:denseunit1d, 2, primal_wsos = false)
 function test_polymin(instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
     d = instance()
-    model = MO.PreprocessedLinearModel(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
-    solver = SO.HSDSolver(model; options...)
+    model = MO.PreprocessedLinearModel{Float64}(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
+    solver = SO.HSDSolver{Float64}(model; options...)
     SO.solve(solver)
     r = SO.get_certificates(solver, model, test = true, atol = 1e-4, rtol = 1e-4)
     @test r.status == :Optimal
