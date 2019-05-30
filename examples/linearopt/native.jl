@@ -15,7 +15,6 @@ const HYP = Hypatia
 const CO = HYP.Cones
 const MO = HYP.Models
 const SO = HYP.Solvers
-const MU = HYP.ModelUtilities
 
 function linearopt(
     m::Int,
@@ -30,7 +29,7 @@ function linearopt(
     c = rand(0.0:9.0, n)
     G = Diagonal(-1.0I, n) # TODO uniformscaling
     h = zeros(n)
-    cones = [CO.Nonnegative(n)]
+    cones = [CO.Nonnegative{Float64}(n)]
     cone_idxs = [1:n]
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs)
 end
@@ -43,8 +42,8 @@ linearopt4() = linearopt(15, 20, nzfrac = 1 / 4)
 function test_linearopt(instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
     d = instance()
-    model = MO.PreprocessedLinearModel(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
-    solver = SO.HSDSolver(model; options...)
+    model = MO.PreprocessedLinearModel{Float64}(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
+    solver = SO.HSDSolver{Float64}(model; options...)
     SO.solve(solver)
     r = SO.get_certificates(solver, model, test = true, atol = 1e-3, rtol = 1e-3)
     @test r.status == :Optimal

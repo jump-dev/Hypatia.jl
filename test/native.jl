@@ -3,6 +3,8 @@ Copyright 2018, Chris Coey and contributors
 =#
 
 import Random
+using LinearAlgebra
+using SparseArrays
 
 # solve model, check conic certificates are valid and return certificate data
 function solve_and_check(
