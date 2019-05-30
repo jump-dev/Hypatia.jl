@@ -10,7 +10,7 @@ const HYP = Hypatia
 const CO = HYP.Cones
 const MO = HYP.Models
 const SO = HYP.Solvers
-# const MU = HYP.ModelUtilities
+const MU = HYP.ModelUtilities
 
 # include(joinpath(@__DIR__, "interpolation.jl"))
 # include(joinpath(@__DIR__, "barriers.jl"))
@@ -20,14 +20,14 @@ const SO = HYP.Solvers
 examples_dir = joinpath(@__DIR__, "../examples")
 # include(joinpath(examples_dir, "envelope/native.jl"))
 # include(joinpath(examples_dir, "linearopt/native.jl"))
-include(joinpath(examples_dir, "polymin/native.jl"))
+# include(joinpath(examples_dir, "polymin/native.jl"))
 # include(joinpath(examples_dir, "contraction/JuMP.jl"))
 # include(joinpath(examples_dir, "densityest/JuMP.jl"))
-# include(joinpath(examples_dir, "envelope/JuMP.jl"))
-# include(joinpath(examples_dir, "expdesign/JuMP.jl"))
+include(joinpath(examples_dir, "envelope/JuMP.jl"))
+include(joinpath(examples_dir, "expdesign/JuMP.jl"))
 # include(joinpath(examples_dir, "lotkavolterra/JuMP.jl"))
-# include(joinpath(examples_dir, "muconvexity/JuMP.jl"))
-# include(joinpath(examples_dir, "polymin/JuMP.jl"))
+include(joinpath(examples_dir, "muconvexity/JuMP.jl"))
+include(joinpath(examples_dir, "polymin/JuMP.jl"))
 # include(joinpath(examples_dir, "polynorm/JuMP.jl"))
 # include(joinpath(examples_dir, "regionofattr/JuMP.jl"))
 # include(joinpath(examples_dir, "secondorderpoly/JuMP.jl"))
@@ -180,18 +180,18 @@ JuMP_options = (
     # @testset "densityest" begin test_densityestJuMP(; JuMP_options...,
     #     tol_rel_opt = 1e-5, tol_abs_opt = 1e-5, tol_feas = 1e-6,
     #     ) end
-    # @testset "envelope" begin test_envelopeJuMP(; JuMP_options...,
-    #     ) end
+    @testset "envelope" begin test_envelopeJuMP(; JuMP_options...,
+        ) end
     # @testset "expdesign" begin test_expdesignJuMP(; JuMP_options...,
     #     ) end
     # @testset "lotkavolterra" begin test_lotkavolterraJuMP(; JuMP_options...,
     #     tol_rel_opt = 1e-5, tol_abs_opt = 1e-6, tol_feas = 1e-6,
     #     ) end
-    # @testset "muconvexity" begin test_muconvexityJuMP(; JuMP_options...,
-    #     ) end
-    # @testset "polymin" begin test_polyminJuMP(; JuMP_options...,
-    #     tol_rel_opt = 1e-9, tol_abs_opt = 1e-8, tol_feas = 1e-9,
-    #     ) end
+    @testset "muconvexity" begin test_muconvexityJuMP(; JuMP_options...,
+        ) end
+    @testset "polymin" begin test_polyminJuMP(; JuMP_options...,
+        tol_rel_opt = 1e-9, tol_abs_opt = 1e-8, tol_feas = 1e-9,
+        ) end
     # @testset "polynorm" begin test_polynormJuMP(; JuMP_options...,
     #     ) end
     # @testset "regionofattr" begin test_regionofattrJuMP(; JuMP_options...,
