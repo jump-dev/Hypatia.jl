@@ -7,8 +7,6 @@ see description in examples/polymin/native.jl
 import Random
 using LinearAlgebra
 using Test
-import MathOptInterface
-const MOI = MathOptInterface
 import JuMP
 import SumOfSquares
 import Hypatia
@@ -30,7 +28,7 @@ function polyminJuMP(
     if use_wsos
         Random.seed!(rseed)
         (U, pts, P0, PWts, _) = MU.interpolate(dom, halfdeg, sample = sample, sample_factor = 100)
-        cone = HYP.WSOSPolyInterpCone(U, [P0, PWts...], !primal_wsos)
+        cone = HYP.WSOSPolyInterpCone{Float64, Float64}(U, [P0, PWts...], !primal_wsos)
         interp_vals = [f(x => pts[j, :]) for j in 1:U]
 
         model = JuMP.Model()

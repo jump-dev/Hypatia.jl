@@ -12,6 +12,8 @@ using ForwardDiff
 using DiffResults
 import Hypatia.HypReal
 import Hypatia.HypRealOrComplex
+import Hypatia.rt2
+import Hypatia.rt2i
 
 abstract type Cone{T <: HypReal} end
 
@@ -26,7 +28,7 @@ include("hypogeomean.jl")
 include("epinormspectral.jl")
 include("hypoperlogdet.jl")
 include("epipersumexp.jl")
-# include("wsospolyinterp.jl")
+include("wsospolyinterp.jl")
 # include("wsospolyinterpmat.jl")
 # include("wsospolyinterpsoc.jl")
 
@@ -57,8 +59,6 @@ inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::Cone) 
 
 # utilities for converting between smat and svec forms (lower triangle) for symmetric matrices
 # TODO only need to do lower triangle if use symmetric matrix types
-const rt2 = sqrt(2)
-const rt2i = inv(rt2)
 
 function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{T}) where {T <: HypReal}
     k = 1
