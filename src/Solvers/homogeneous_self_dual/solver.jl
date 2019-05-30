@@ -65,7 +65,7 @@ mutable struct HSDSolver{T <: HypReal} <: Solver{T}
 
     function HSDSolver{T}(
         model::Models.LinearModel{T};
-        stepper::HSDStepper{T} = CombinedHSDStepper(model),
+        stepper::HSDStepper{T} = CombinedHSDStepper{T}(model),
         verbose::Bool = true,
         tol_rel_opt = max(1e-12, 1e-2 * cbrt(eps(T))),
         tol_abs_opt = tol_rel_opt,
@@ -139,7 +139,7 @@ get_kappa(solver::HSDSolver) = solver.kap
 get_mu(solver::HSDSolver) = solver.mu
 
 # TODO maybe use iteration interface rather than while loop
-function solve(solver::HSDSolver{T}) where T
+function solve(solver::HSDSolver{T}) where {T <: HypReal}
     solver.status = :SolveCalled
     start_time = time()
 
@@ -188,7 +188,7 @@ function solve(solver::HSDSolver{T}) where T
     return
 end
 
-function calc_convergence_params(solver::HSDSolver{T}) where T
+function calc_convergence_params(solver::HSDSolver{T}) where {T <: HypReal}
     model = solver.model
     point = solver.point
 
@@ -218,7 +218,7 @@ function calc_convergence_params(solver::HSDSolver{T}) where T
     return
 end
 
-function check_convergence(solver::HSDSolver{T}) where T
+function check_convergence(solver::HSDSolver{T}) where {T <: HypReal}
     # check convergence criteria
     # TODO nearly primal or dual infeasible or nearly optimal cases?
     if max(solver.x_feas, solver.y_feas, solver.z_feas) <= solver.tol_feas &&
@@ -274,7 +274,7 @@ function check_convergence(solver::HSDSolver{T}) where T
     return false
 end
 
-function calc_residual(solver::HSDSolver{T}) where T
+function calc_residual(solver::HSDSolver{T}) where {T <: HypReal}
     model = solver.model
     point = solver.point
 
@@ -304,7 +304,7 @@ function calc_residual(solver::HSDSolver{T}) where T
     return
 end
 
-function calc_mu(solver::HSDSolver{T}) where T
+function calc_mu(solver::HSDSolver{T}) where {T <: HypReal}
     solver.mu = (dot(solver.point.z, solver.point.s) + solver.tau * solver.kap) /
         (one(T) + solver.model.nu)
     return solver.mu

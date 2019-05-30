@@ -19,7 +19,7 @@ mutable struct CombinedHSDStepper{T <: HypReal} <: HSDStepper{T}
 
     function CombinedHSDStepper{T}(
         model::Models.LinearModel{T};
-        system_solver::CombinedHSDSystemSolver{T} = (model isa Models.PreprocessedLinearModel{T} ? QRCholCombinedHSDSystemSolver(model) : NaiveCombinedHSDSystemSolver(model)),
+        system_solver::CombinedHSDSystemSolver{T} = (model isa Models.PreprocessedLinearModel{T} ? QRCholCombinedHSDSystemSolver{T}(model) : NaiveCombinedHSDSystemSolver{T}(model)),
         max_nbhd::T = T(0.75),
         ) where {T <: HypReal}
         stepper = new{T}()
@@ -45,7 +45,7 @@ mutable struct CombinedHSDStepper{T <: HypReal} <: HSDStepper{T}
     end
 end
 
-function step(solver::HSDSolver{T}, stepper::CombinedHSDStepper{T}) where T
+function step(solver::HSDSolver{T}, stepper::CombinedHSDStepper{T}) where {T <: HypReal}
     model = solver.model
     point = solver.point
 
@@ -100,8 +100,8 @@ function step(solver::HSDSolver{T}, stepper::CombinedHSDStepper{T}) where T
     return point
 end
 
-function print_iteration_stats(solver::HSDSolver, stepper::CombinedHSDStepper)
-    if solver.num_iters == 0
+function print_iteration_stats(solver::HSDSolver{T}, stepper::CombinedHSDStepper{T}) where {T <: HypReal}
+    if iszero(solver.num_iters)
         @printf("\n%5s %12s %12s %9s %9s %9s %9s %9s %9s %9s %9s %9s %9s\n",
             "iter", "p_obj", "d_obj", "abs_gap", "rel_gap",
             "x_feas", "y_feas", "z_feas", "tau", "kap", "mu",
@@ -130,9 +130,9 @@ function find_max_alpha_in_nbhd(
     kap_dir::T,
     nbhd::T,
     prev_alpha::T,
-    stepper::CombinedHSDStepper,
-    solver::HSDSolver,
-    ) where T
+    stepper::CombinedHSDStepper{T},
+    solver::HSDSolver{T},
+    ) where {T <: HypReal}
     point = solver.point
     model = solver.model
     cones = model.cones

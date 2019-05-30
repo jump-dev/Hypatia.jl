@@ -2,9 +2,6 @@
 Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 =#
 
-import Random
-using LinearAlgebra
-using SparseArrays
 using Test
 import Hypatia
 import Hypatia.HypReal
@@ -15,19 +12,19 @@ const MO = HYP.Models
 const SO = HYP.Solvers
 # const MU = HYP.ModelUtilities
 
-include(joinpath(@__DIR__, "interpolation.jl"))
-include(joinpath(@__DIR__, "barriers.jl"))
-include(joinpath(@__DIR__, "native.jl"))
-include(joinpath(@__DIR__, "MathOptInterface.jl"))
+# include(joinpath(@__DIR__, "interpolation.jl"))
+# include(joinpath(@__DIR__, "barriers.jl"))
+# include(joinpath(@__DIR__, "native.jl"))
+# include(joinpath(@__DIR__, "MathOptInterface.jl"))
 
-# examples_dir = joinpath(@__DIR__, "../examples")
+examples_dir = joinpath(@__DIR__, "../examples")
 # include(joinpath(examples_dir, "envelope/native.jl"))
-# include(joinpath(examples_dir, "linearopt/native.jl"))
+include(joinpath(examples_dir, "linearopt/native.jl"))
 # include(joinpath(examples_dir, "polymin/native.jl"))
 # include(joinpath(examples_dir, "contraction/JuMP.jl"))
 # include(joinpath(examples_dir, "densityest/JuMP.jl"))
 # include(joinpath(examples_dir, "envelope/JuMP.jl"))
-# include(joinpath(examples_dir, "expdesign/JuMP.jl"))
+include(joinpath(examples_dir, "expdesign/JuMP.jl"))
 # include(joinpath(examples_dir, "lotkavolterra/JuMP.jl"))
 # include(joinpath(examples_dir, "muconvexity/JuMP.jl"))
 # include(joinpath(examples_dir, "polymin/JuMP.jl"))
@@ -37,20 +34,22 @@ include(joinpath(@__DIR__, "MathOptInterface.jl"))
 # include(joinpath(examples_dir, "shapeconregr/JuMP.jl"))
 # include(joinpath(examples_dir, "semidefinitepoly/JuMP.jl"))
 
+
+# @info("starting Hypatia tests")
 @testset "Hypatia tests" begin
 
-@info("starting interpolation tests")
+# @info("starting interpolation tests")
 # @testset "interpolation tests" begin
 #     fekete_sample()
 #     test_recover_lagrange_polys()
 #     test_recover_cheb_polys()
 # end
 
-real_types = [
-    Float64,
-    Float32,
-    BigFloat,
-    ]
+# real_types = [
+#     Float64,
+#     Float32,
+#     BigFloat,
+#     ]
 
 # @info("starting barrier tests")
 # barrier_testfuns = [
@@ -138,74 +137,74 @@ real_types = [
 #     t(s{T}, m{T}, verbose)
 # end
 
-@info("starting MathOptInterface tests")
-verbose = false
-system_solvers = [
-    SO.NaiveCombinedHSDSystemSolver,
-    SO.QRCholCombinedHSDSystemSolver,
-    ]
-linear_models = [
-    MO.PreprocessedLinearModel, # MOI tests require preprocessing
-    ]
-@testset "MOI tests: $(d ? "dense" : "sparse"), $s, $m" for d in (false, true), s in system_solvers, m in linear_models
-    test_moi(d, s{Float64}, m{Float64}, verbose)
+# @info("starting MathOptInterface tests")
+# verbose = false
+# system_solvers = [
+#     SO.NaiveCombinedHSDSystemSolver,
+#     SO.QRCholCombinedHSDSystemSolver,
+#     ]
+# linear_models = [
+#     MO.PreprocessedLinearModel, # MOI tests require preprocessing
+#     ]
+# @testset "MOI tests: $(d ? "dense" : "sparse"), $s, $m" for d in (false, true), s in system_solvers, m in linear_models
+#     test_moi(d, s{Float64}, m{Float64}, verbose)
+# end
+#
+@info("starting native examples tests")
+native_options = (
+    verbose = true,
+    max_iters = 150,
+    time_limit = 6e2, # 1 minute
+    )
+@testset "native examples" begin
+    # @testset "envelope" begin test_envelope(; native_options...,
+    #     ) end
+    @testset "linearopt" begin test_linearopt(; native_options...,
+        ) end
+    # @testset "polymin" begin test_polymin(; native_options...,
+    #     tol_rel_opt = 1e-9, tol_abs_opt = 1e-8, tol_feas = 1e-9,
+    #     ) end
 end
-#
-# @info("starting native examples tests")
-# native_options = (
-#     verbose = true,
-#     max_iters = 150,
-#     time_limit = 6e2, # 1 minute
-#     )
-# @testset "native examples" begin
-#     @testset "envelope" begin test_envelope(; native_options...,
-#         ) end
-#     @testset "linearopt" begin test_linearopt(; native_options...,
-#         ) end
-#     @testset "polymin" begin test_polymin(; native_options...,
-#         tol_rel_opt = 1e-9, tol_abs_opt = 1e-8, tol_feas = 1e-9,
-#         ) end
-# end
-#
-# @info("starting JuMP examples tests")
-# JuMP_options = (
-#     verbose = true,
-#     test_certificates = true,
-#     max_iters = 250,
-#     time_limit = 6e2, # 1 minute
-#     )
-# @testset "JuMP examples" begin
-#     @testset "contraction" begin test_contractionJuMP(; JuMP_options...,
-#         tol_rel_opt = 1e-4, tol_abs_opt = 1e-4, tol_feas = 1e-4,
-#         ) end
-#     @testset "densityest" begin test_densityestJuMP(; JuMP_options...,
-#         tol_rel_opt = 1e-5, tol_abs_opt = 1e-5, tol_feas = 1e-6,
-#         ) end
-#     @testset "envelope" begin test_envelopeJuMP(; JuMP_options...,
-#         ) end
-#     @testset "expdesign" begin test_expdesignJuMP(; JuMP_options...,
-#         ) end
-#     @testset "lotkavolterra" begin test_lotkavolterraJuMP(; JuMP_options...,
-#         tol_rel_opt = 1e-5, tol_abs_opt = 1e-6, tol_feas = 1e-6,
-#         ) end
-#     @testset "muconvexity" begin test_muconvexityJuMP(; JuMP_options...,
-#         ) end
-#     @testset "polymin" begin test_polyminJuMP(; JuMP_options...,
-#         tol_rel_opt = 1e-9, tol_abs_opt = 1e-8, tol_feas = 1e-9,
-#         ) end
-#     @testset "polynorm" begin test_polynormJuMP(; JuMP_options...,
-#         ) end
-#     @testset "regionofattr" begin test_regionofattrJuMP(; JuMP_options...,
-#         tol_abs_opt = 1e-6, tol_rel_opt = 1e-6, tol_feas = 1e-6,
-#         ) end
-#     @testset "secondorderpoly" begin test_secondorderpolyJuMP(; JuMP_options...,
-#         ) end
-#     @testset "semidefinitepoly" begin test_semidefinitepolyJuMP(; JuMP_options...,
-#         tol_abs_opt = 1e-7, tol_rel_opt = 1e-7, tol_feas = 1e-7,
-#         ) end
-#     @testset "shapeconregr" begin test_shapeconregrJuMP(; JuMP_options...,
-#         tol_rel_opt = 1e-6, tol_abs_opt = 1e-6, tol_feas = 1e-6,
-#         ) end
-# end
+
+@info("starting JuMP examples tests")
+JuMP_options = (
+    verbose = true,
+    test_certificates = true,
+    max_iters = 250,
+    time_limit = 6e2, # 1 minute
+    )
+@testset "JuMP examples" begin
+    # @testset "contraction" begin test_contractionJuMP(; JuMP_options...,
+    #     tol_rel_opt = 1e-4, tol_abs_opt = 1e-4, tol_feas = 1e-4,
+    #     ) end
+    # @testset "densityest" begin test_densityestJuMP(; JuMP_options...,
+    #     tol_rel_opt = 1e-5, tol_abs_opt = 1e-5, tol_feas = 1e-6,
+    #     ) end
+    # @testset "envelope" begin test_envelopeJuMP(; JuMP_options...,
+    #     ) end
+    @testset "expdesign" begin test_expdesignJuMP(; JuMP_options...,
+        ) end
+    # @testset "lotkavolterra" begin test_lotkavolterraJuMP(; JuMP_options...,
+    #     tol_rel_opt = 1e-5, tol_abs_opt = 1e-6, tol_feas = 1e-6,
+    #     ) end
+    # @testset "muconvexity" begin test_muconvexityJuMP(; JuMP_options...,
+    #     ) end
+    # @testset "polymin" begin test_polyminJuMP(; JuMP_options...,
+    #     tol_rel_opt = 1e-9, tol_abs_opt = 1e-8, tol_feas = 1e-9,
+    #     ) end
+    # @testset "polynorm" begin test_polynormJuMP(; JuMP_options...,
+    #     ) end
+    # @testset "regionofattr" begin test_regionofattrJuMP(; JuMP_options...,
+    #     tol_abs_opt = 1e-6, tol_rel_opt = 1e-6, tol_feas = 1e-6,
+    #     ) end
+    # @testset "secondorderpoly" begin test_secondorderpolyJuMP(; JuMP_options...,
+    #     ) end
+    # @testset "semidefinitepoly" begin test_semidefinitepolyJuMP(; JuMP_options...,
+    #     tol_abs_opt = 1e-7, tol_rel_opt = 1e-7, tol_feas = 1e-7,
+    #     ) end
+    # @testset "shapeconregr" begin test_shapeconregrJuMP(; JuMP_options...,
+    #     tol_rel_opt = 1e-6, tol_abs_opt = 1e-6, tol_feas = 1e-6,
+    #     ) end
+end
 
 end
