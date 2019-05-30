@@ -14,16 +14,16 @@ struct WSOSPolyInterpCone{T <: HypReal, R <: HypRealOrComplex{T}} <: MOI.Abstrac
 end
 WSOSPolyInterpCone{T, R}(dimension::Int, Ps::Vector{Matrix{R}}) where {R <: HypRealOrComplex{T}} where {T <: HypReal} = WSOSPolyInterpCone{T, R}(dimension, Ps, false)
 
-# export WSOSPolyInterpMatCone
-#
-# struct WSOSPolyInterpMatCone <: MOI.AbstractVectorSet
-#     R::Int
-#     U::Int
-#     ipwt::Vector{Matrix{Float64}}
-#     is_dual::Bool
-# end
-# WSOSPolyInterpMatCone(R::Int, U::Int, ipwt::Vector{Matrix{Float64}}) = WSOSPolyInterpMatCone(R, U, ipwt, false)
-#
+export WSOSPolyInterpMatCone
+
+struct WSOSPolyInterpMatCone{T <: HypReal} <: MOI.AbstractVectorSet
+    R::Int
+    U::Int
+    ipwt::Vector{Matrix{Float64}}
+    is_dual::Bool
+end
+WSOSPolyInterpMatCone{T}(R::Int, U::Int, ipwt::Vector{Matrix{Float64}}) where {T <: HypReal} = WSOSPolyInterpMatCone{T}(R, U, ipwt, false)
+
 # export WSOSPolyInterpSOCCone # TODO rename, terrible name
 #
 # struct WSOSPolyInterpSOCCone <: MOI.AbstractVectorSet
@@ -43,7 +43,7 @@ MOIOtherCones = (
     MOI.PositiveSemidefiniteConeTriangle,
     MOI.LogDetConeTriangle,
     WSOSPolyInterpCone{<:HypReal, <:HypRealOrComplex},
-    # WSOSPolyInterpMatCone,
+    WSOSPolyInterpMatCone{<:HypReal},
     # WSOSPolyInterpSOCCone,
 )
 
@@ -54,7 +54,7 @@ cone_from_moi(s::MOI.ExponentialCone) = Cones.HypoPerLog{Float64}()
 cone_from_moi(s::MOI.GeometricMeanCone) = (l = MOI.dimension(s) - 1; Cones.HypoGeomean{Float64}(fill(inv(l), l)))
 cone_from_moi(s::MOI.PowerCone{Float64}) = Cones.EpiPerPower{Float64}(inv(s.exponent))
 cone_from_moi(s::WSOSPolyInterpCone{T, R}) where {R <: HypRealOrComplex{T}} where {T <: HypReal} = Cones.WSOSPolyInterp{T, R}(s.dimension, s.Ps, s.is_dual)
-# cone_from_moi(s::WSOSPolyInterpMatCone) = Cones.WSOSPolyInterpMat(s.R, s.U, s.ipwt, s.is_dual)
+cone_from_moi(s::WSOSPolyInterpMatCone{T}) where {T <: HypReal} = Cones.WSOSPolyInterpMat{T}(s.R, s.U, s.ipwt, s.is_dual)
 # cone_from_moi(s::WSOSPolyInterpSOCCone) = Cones.WSOSPolyInterpSOC(s.R, s.U, s.ipwt, s.is_dual)
 cone_from_moi(s::MOI.AbstractVectorSet) = error("MOI set $s is not recognized")
 

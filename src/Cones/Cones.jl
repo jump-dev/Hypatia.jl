@@ -29,7 +29,7 @@ include("epinormspectral.jl")
 include("hypoperlogdet.jl")
 include("epipersumexp.jl")
 include("wsospolyinterp.jl")
-# include("wsospolyinterpmat.jl")
+include("wsospolyinterpmat.jl")
 # include("wsospolyinterpsoc.jl")
 
 use_dual(cone::Cone) = cone.use_dual

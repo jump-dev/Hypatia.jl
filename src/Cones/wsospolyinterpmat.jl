@@ -11,28 +11,28 @@ mutable struct WSOSPolyInterpMat{T <: HypReal} <: Cone{T}
     dim::Int
     R::Int
     U::Int
-    ipwt::Vector{Matrix{Float64}}
+    ipwt::Vector{Matrix{T}}
 
-    point::AbstractVector{Float64}
-    g::Vector{Float64}
-    H::Matrix{Float64}
-    H2::Matrix{Float64}
-    Hi::Matrix{Float64}
+    point::AbstractVector{T}
+    g::Vector{T}
+    H::Matrix{T}
+    H2::Matrix{T}
+    Hi::Matrix{T}
     F
-    mat::Vector{Matrix{Float64}}
-    matfact::Vector{CholeskyPivoted{Float64, Matrix{Float64}}}
-    tmp1::Vector{Matrix{Float64}}
-    tmp2::Matrix{Float64}
-    tmp3::Matrix{Float64}
-    blockmats::Vector{Vector{Vector{Matrix{Float64}}}}
-    blockfacts::Vector{Vector{CholeskyPivoted{Float64, Matrix{Float64}}}}
-    PlambdaP::Matrix{Float64}
+    mat::Vector{Matrix{T}}
+    matfact::Vector{CholeskyPivoted{T, Matrix{T}}}
+    tmp1::Vector{Matrix{T}}
+    tmp2::Matrix{T}
+    tmp3::Matrix{T}
+    blockmats::Vector{Vector{Vector{Matrix{T}}}}
+    blockfacts::Vector{Vector{CholeskyPivoted{T, Matrix{T}}}}
+    PlambdaP::Matrix{T}
 
-    function WSOSPolyInterpMat(R::Int, U::Int, ipwt::Vector{Matrix{Float64}}, is_dual::Bool)
+    function WSOSPolyInterpMat{T}(R::Int, U::Int, ipwt::Vector{Matrix{T}}, is_dual::Bool) where {T <: HypReal}
         for ipwtj in ipwt
             @assert size(ipwtj, 1) == U
         end
-        cone = new()
+        cone = new{T}()
         cone.use_dual = !is_dual # using dual barrier
         dim = U * div(R * (R + 1), 2)
         cone.dim = dim
@@ -43,42 +43,42 @@ mutable struct WSOSPolyInterpMat{T <: HypReal} <: Cone{T}
     end
 end
 
-WSOSPolyInterpMat(R::Int, U::Int, ipwt::Vector{Matrix{Float64}}) = WSOSPolyInterpMat(R, U, ipwt, false)
+WSOSPolyInterpMat{T}(R::Int, U::Int, ipwt::Vector{Matrix{T}}) where {T <: HypReal} = WSOSPolyInterpMat{T}(R, U, ipwt, false)
 
-function setup_data(cone::WSOSPolyInterpMat)
+function setup_data(cone::WSOSPolyInterpMat{T}) where {T <: HypReal}
     dim = cone.dim
     U = cone.U
     R = cone.R
     ipwt = cone.ipwt
-    cone.g = similar(ipwt[1], dim)
-    cone.H = similar(ipwt[1], dim, dim)
+    cone.g = Vector{T}(undef, dim)
+    cone.H = Matrix{T}(undef, dim, dim)
     cone.H2 = similar(cone.H)
     cone.Hi = similar(cone.H)
-    cone.mat = [similar(ipwt[1], size(ipwtj, 2) * R, size(ipwtj, 2) * R) for ipwtj in ipwt]
-    cone.matfact = Vector{CholeskyPivoted{Float64, Matrix{Float64}}}(undef, length(ipwt))
-    cone.tmp1 = [similar(ipwt[1], size(ipwtj, 2), U) for ipwtj in ipwt]
-    cone.tmp2 = similar(ipwt[1], U, U)
+    cone.mat = [similar(cone.H, size(ipwtj, 2) * R, size(ipwtj, 2) * R) for ipwtj in ipwt]
+    cone.matfact = Vector{CholeskyPivoted{T, Matrix{T}}}(undef, length(ipwt))
+    cone.tmp1 = [similar(cone.H, size(ipwtj, 2), U) for ipwtj in ipwt]
+    cone.tmp2 = similar(cone.H, U, U)
     cone.tmp3 = similar(cone.tmp2)
-    cone.blockmats = [Vector{Vector{Matrix{Float64}}}(undef, R) for ipwtj in ipwt]
+    cone.blockmats = [Vector{Vector{Matrix{T}}}(undef, R) for ipwtj in ipwt]
     for i in eachindex(ipwt), j in 1:R # TODO actually store 1 fewer (no diagonal) and also make this less confusing
-        cone.blockmats[i][j] = Vector{Matrix{Float64}}(undef, j)
+        cone.blockmats[i][j] = Vector{Matrix{T}}(undef, j)
         for k in 1:j # TODO actually need to only go up to j-1
             L = size(ipwt[i], 2)
-            cone.blockmats[i][j][k] = Matrix{Float64}(undef, L, L)
+            cone.blockmats[i][j][k] = Matrix{T}(undef, L, L)
         end
     end
-    cone.blockfacts = [Vector{CholeskyPivoted{Float64, Matrix{Float64}}}(undef, R) for _ in eachindex(ipwt)]
-    cone.PlambdaP = Matrix{Float64}(undef, R * U,  R * U)
+    cone.blockfacts = [Vector{CholeskyPivoted{T, Matrix{T}}}(undef, R) for _ in eachindex(ipwt)]
+    cone.PlambdaP = Matrix{T}(undef, R * U,  R * U)
     return
 end
 
 get_nu(cone::WSOSPolyInterpMat) = cone.R * sum(size(ipwtj, 2) for ipwtj in cone.ipwt)
 
-function set_initial_point(arr::AbstractVector{Float64}, cone::WSOSPolyInterpMat)
+function set_initial_point(arr::AbstractVector{T}, cone::WSOSPolyInterpMat{T}) where {T <: HypReal}
     # sum of diagonal matrices with interpolant polynomial repeating on the diagonal
     idx = 1
     for i in 1:cone.R, j in 1:i
-        arr[idx:(idx + cone.U - 1)] .= (i == j) ? 1.0 : 0.0
+        arr[idx:(idx + cone.U - 1)] .= (i == j) ? one(T) : zero(T)
         idx += cone.U
     end
     return arr
@@ -86,13 +86,14 @@ end
 
 _blockrange(inner::Int, outer::Int) = (outer * (inner - 1) + 1):(outer * inner)
 
+# NOTE this is experimental code
 function check_in_cone(cone::WSOSPolyInterpMat)
     # check_in_cone_nowinv(cone)
     check_in_cone_master(cone)
 end
 
 # TODO all views can be allocated just once in the cone definition (delete _blockrange too)
-function check_in_cone_nowinv(cone::WSOSPolyInterpMat)
+function check_in_cone_nowinv(cone::WSOSPolyInterpMat{T}) where {T <: HypReal}
     # @timeit "build mat" begin
     for j in eachindex(cone.ipwt)
         ipwtj = cone.ipwt[j]
@@ -122,8 +123,8 @@ function check_in_cone_nowinv(cone::WSOSPolyInterpMat)
     # end
 
     # @timeit "grad hess" begin
-    cone.g .= 0.0
-    cone.H .= 0.0
+    cone.g .= zero(T)
+    cone.H .= zero(T)
     for j in eachindex(cone.ipwt)
         ipwtj = cone.ipwt[j]
         L = size(ipwtj, 2)
@@ -137,7 +138,7 @@ function check_in_cone_nowinv(cone::WSOSPolyInterpMat)
         uo = 0
         for p in 1:cone.R, q in 1:p
             uo += 1
-            fact = (p == q) ? 1.0 : rt2
+            fact = (p == q) ? one(T) : rt2
             rinds = _blockrange(p, cone.U)
             cinds = _blockrange(q, cone.U)
             idxs = _blockrange(uo, cone.U)
@@ -155,7 +156,7 @@ function check_in_cone_nowinv(cone::WSOSPolyInterpMat)
                 cinds2 = _blockrange(q2, cone.U)
                 idxs2 = _blockrange(uo2, cone.U)
 
-                fact = xor(p == q, p2 == q2) ? rt2i : 1.0
+                fact = xor(p == q, p2 == q2) ? rt2i : one(T)
                 @. cone.H[idxs, idxs2] += PlambdaP[rinds, rinds2] * PlambdaP[cinds, cinds2] * fact
 
                 if (p != q) || (p2 != q2)
@@ -170,16 +171,16 @@ function check_in_cone_nowinv(cone::WSOSPolyInterpMat)
 end
 
 # res stored lower triangle
-function blockcholesky!(cone::WSOSPolyInterpMat, L::Int, j::Int)
+function blockcholesky!(cone::WSOSPolyInterpMat{T}, L::Int, j::Int) where {T <: HypReal}
     R = cone.R
     res = cone.blockmats[j]
     tmp = zeros(L, L)
     facts = cone.blockfacts[j]
     for r in 1:R
-        tmp .= 0.0
+        tmp .= zero(T)
         # blocks on the diagonal come from cholesky decomposition after back-substitution, result stored in cone.blockfacts
         for k in 1:(r - 1)
-            BLAS.syrk!('U', 'N', 1.0, res[r][k], 1.0, tmp)
+            BLAS.syrk!('U', 'N', one(T), res[r][k], one(T), tmp)
         end
         diag_block = cone.mat[j][_blockrange(r, L), _blockrange(r, L)] - tmp
         F = cholesky!(Symmetric(diag_block, :U), Val(true), check = false)
@@ -192,7 +193,7 @@ function blockcholesky!(cone::WSOSPolyInterpMat, L::Int, j::Int)
         for s in (r + 1):R
             for k in 1:(r - 1)
                 # tmp += res[r][k] * res[s][k]'
-                BLAS.gemm!('N', 'T', 1.0, res[r][k], res[s][k], 1.0, tmp)
+                BLAS.gemm!('N', 'T', one(T), res[r][k], res[s][k], one(T), tmp)
             end
             rhs = cone.mat[j][_blockrange(s, L), _blockrange(r, L)] - tmp
             res[s][r] = (facts[r].L \ view(rhs, facts[r].p, :))'
@@ -201,7 +202,7 @@ function blockcholesky!(cone::WSOSPolyInterpMat, L::Int, j::Int)
     return true
 end
 
-function _block_trisolve(cone::WSOSPolyInterpMat, blocknum::Int, L::Int, j::Int)
+function _block_trisolve(cone::WSOSPolyInterpMat{T}, blocknum::Int, L::Int, j::Int) where {T <: HypReal}
     Lmat = cone.blockmats[j]
     R = cone.R
     U = cone.U
@@ -210,11 +211,11 @@ function _block_trisolve(cone::WSOSPolyInterpMat, blocknum::Int, L::Int, j::Int)
     tmp = zeros(L, U)
     resvec[_blockrange(blocknum, L), :] = Fvec[blocknum].L \ view(cone.ipwt[j]', Fvec[blocknum].p, :)
     for r in (blocknum + 1):R
-        tmp .= 0.0
+        tmp .= zero(T)
         for s in blocknum:(r - 1)
             # tmp -= Lmat[r][s] * resvec[_blockrange(s, L), :]
             resblock = resvec[_blockrange(s, L), :]
-            BLAS.gemm!('N', 'N', -1.0, Lmat[r][s], resblock, 1.0, tmp)
+            BLAS.gemm!('N', 'N', -one(T), Lmat[r][s], resblock, one(T), tmp)
         end
         resvec[_blockrange(r, L), :] = Fvec[r].L \ view(tmp, Fvec[r].p, :)
     end
@@ -222,7 +223,7 @@ function _block_trisolve(cone::WSOSPolyInterpMat, blocknum::Int, L::Int, j::Int)
 end
 
 # one block-column at a time on the RHS
-function _block_trisolve(cone::WSOSPolyInterpMat, L::Int, j::Int)
+function _block_trisolve(cone::WSOSPolyInterpMat{T}, L::Int, j::Int) where {T <: HypReal}
     R = cone.R
     U = cone.U
     resmat = zeros(R * L, R * U)
@@ -233,7 +234,7 @@ function _block_trisolve(cone::WSOSPolyInterpMat, L::Int, j::Int)
 end
 
 # multiply lower triangular block matrix transposed by itself
-function _mulblocks!(cone::WSOSPolyInterpMat, mat::Matrix{Float64}, L::Int)
+function _mulblocks!(cone::WSOSPolyInterpMat{T}, mat::Matrix{T}, L::Int) where {T <: HypReal}
     # cone.PlambdaP = mat' * mat
     R = cone.R
     U = cone.U
@@ -241,7 +242,7 @@ function _mulblocks!(cone::WSOSPolyInterpMat, mat::Matrix{Float64}, L::Int)
         rinds = _blockrange(i, U)
         for j in i:R
             cinds = _blockrange(j, U)
-            tmp .= 0.0
+            tmp .= zero(T)
             # since mat is block lower triangular rows only from max(i,j) start making a nonzero contribution to the product
             mulrange = ((j - 1) * L + 1):(L * R)
             mul!(view(cone.PlambdaP, rinds, cinds), mat[mulrange, _blockrange(i, U)]',  mat[mulrange, _blockrange(j, U)])
@@ -250,7 +251,7 @@ function _mulblocks!(cone::WSOSPolyInterpMat, mat::Matrix{Float64}, L::Int)
     return nothing
 end
 
-function check_in_cone_master(cone::WSOSPolyInterpMat)
+function check_in_cone_master(cone::WSOSPolyInterpMat{T}) where {T <: HypReal}
     # @timeit "build mat" begin
     for j in eachindex(cone.ipwt)
         ipwtj = cone.ipwt[j]
@@ -281,8 +282,8 @@ function check_in_cone_master(cone::WSOSPolyInterpMat)
     # end
 
     # @timeit "grad hess" begin
-    cone.g .= 0.0
-    cone.H .= 0.0
+    cone.g .= zero(T)
+    cone.H .= zero(T)
     for j in eachindex(cone.ipwt)
         # @timeit "W_inv" begin
         W_inv_j = inv(cone.matfact[j])
@@ -297,7 +298,7 @@ function check_in_cone_master(cone::WSOSPolyInterpMat)
         uo = 0
         for p in 1:cone.R, q in 1:p
             uo += 1
-            fact = (p == q) ? 1.0 : rt2
+            fact = (p == q) ? one(T) : rt2
             rinds = _blockrange(p, L)
             cinds = _blockrange(q, L)
             idxs = _blockrange(uo, cone.U)
@@ -321,7 +322,7 @@ function check_in_cone_master(cone::WSOSPolyInterpMat)
                 mul!(tmp2, ipwtj, tmp1j)
                 mul!(tmp1j, view(W_inv_j, cinds, cinds2), ipwtj')
                 mul!(tmp3, ipwtj, tmp1j)
-                fact = xor(p == q, p2 == q2) ? rt2i : 1.0
+                fact = xor(p == q, p2 == q2) ? rt2i : one(T)
                 @. cone.H[idxs, idxs2] += tmp2 * tmp3 * fact
 
                 if (p != q) || (p2 != q2)
