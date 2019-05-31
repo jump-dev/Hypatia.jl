@@ -69,8 +69,8 @@ Optimizer(;
     use_dense::Bool = true,
     test_certificates::Bool = false,
     verbose::Bool = false,
-    system_solver::Type{<:Solvers.CombinedHSDSystemSolver} = Solvers.QRCholCombinedHSDSystemSolver,
-    linear_model::Type{<:Models.LinearModel} = Models.PreprocessedLinearModel,
+    system_solver::Type{<:Solvers.CombinedHSDSystemSolver} = Solvers.QRCholCombinedHSDSystemSolver{Float64},
+    linear_model::Type{<:Models.LinearModel} = Models.PreprocessedLinearModel{Float64},
     max_iters::Int = 500,
     time_limit::Float64 = 3.6e3, # TODO should be Inf
     tol_rel_opt::Float64 = 1e-6,
@@ -302,7 +302,7 @@ function MOI.copy_to(
 
     if q > nonneg_start
         # exists at least one nonnegative constraint
-        push!(cones, Cones.Nonnegative(q - nonneg_start))
+        push!(cones, Cones.Nonnegative{Float64}(q - nonneg_start))
         push!(cone_idxs, (nonneg_start + 1):q)
     end
 
@@ -370,7 +370,7 @@ function MOI.copy_to(
 
     if q > nonpos_start
         # exists at least one nonpositive constraint
-        push!(cones, Cones.Nonpositive(q - nonpos_start))
+        push!(cones, Cones.Nonpositive{Float64}(q - nonpos_start))
         push!(cone_idxs, (nonpos_start + 1):q)
     end
 
@@ -445,7 +445,7 @@ function MOI.copy_to(
     opt.interval_scales = interval_scales
     if q > interval_start
         # exists at least one interval-type constraint
-        push!(cones, Cones.EpiNormInf(q - interval_start))
+        push!(cones, Cones.EpiNormInf{Float64}(q - interval_start))
         push!(cone_idxs, (interval_start + 1):q)
     end
 
@@ -506,8 +506,8 @@ function MOI.optimize!(opt::Optimizer)
         return
     end
     model = opt.linear_model(copy(opt.c), copy(opt.A), copy(opt.b), copy(opt.G), copy(opt.h), opt.cones, opt.cone_idxs)
-    stepper = Solvers.CombinedHSDStepper(model, system_solver = opt.system_solver(model))
-    solver = Solvers.HSDSolver(
+    stepper = Solvers.CombinedHSDStepper{Float64}(model, system_solver = opt.system_solver(model))
+    solver = Solvers.HSDSolver{Float64}(
         model, stepper = stepper,
         verbose = opt.verbose, max_iters = opt.max_iters, time_limit = opt.time_limit,
         tol_rel_opt = opt.tol_rel_opt, tol_abs_opt = opt.tol_abs_opt, tol_feas = opt.tol_feas,

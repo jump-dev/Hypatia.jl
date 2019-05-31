@@ -10,53 +10,53 @@ barrier from "Barrier Functions in Interior Point Methods" by Osman Guler
 TODO for efficiency, don't construct full H matrix (arrow fill)
 =#
 
-mutable struct EpiNormInf <: Cone
+mutable struct EpiNormInf{T <: HypReal} <: Cone{T}
     use_dual::Bool
     dim::Int
-    
-    point::AbstractVector{Float64}
-    g::Vector{Float64}
-    H::Matrix{Float64}
-    H2::Matrix{Float64}
+
+    point::AbstractVector{T}
+    g::Vector{T}
+    H::Matrix{T}
+    H2::Matrix{T}
     F
 
-    function EpiNormInf(dim::Int, is_dual::Bool)
-        cone = new()
+    function EpiNormInf{T}(dim::Int, is_dual::Bool) where {T <: HypReal}
+        cone = new{T}()
         cone.use_dual = is_dual
         cone.dim = dim
         return cone
     end
 end
 
-EpiNormInf(dim::Int) = EpiNormInf(dim, false)
+EpiNormInf{T}(dim::Int) where {T <: HypReal} = EpiNormInf{T}(dim, false)
 
-function setup_data(cone::EpiNormInf)
+function setup_data(cone::EpiNormInf{T}) where {T <: HypReal}
     dim = cone.dim
-    cone.g = Vector{Float64}(undef, dim)
-    cone.H = Matrix{Float64}(undef, dim, dim)
-    cone.H2 = similar(cone.H)
+    cone.g = zeros(T, dim)
+    cone.H = zeros(T, dim, dim)
+    cone.H2 = copy(cone.H)
     return
 end
 
 get_nu(cone::EpiNormInf) = cone.dim
 
-set_initial_point(arr::AbstractVector{Float64}, cone::EpiNormInf) = (@. arr = 0.0; arr[1] = 1.0; arr)
+set_initial_point(arr::AbstractVector{T}, cone::EpiNormInf{T}) where {T <: HypReal} = (@. arr = zero(T); arr[1] = one(T); arr)
 
-function check_in_cone(cone::EpiNormInf)
+function check_in_cone(cone::EpiNormInf{T}) where {T <: HypReal}
     u = cone.point[1]
     w = view(cone.point, 2:cone.dim)
     if u <= maximum(abs, w)
         return false
     end
 
-    # TODO don't explicitly construct full matrix
+    # TODO don't explicitly construct full matrix (arrow)
     g = cone.g
     H = cone.H
     usqr = abs2(u)
-    g1 = 0.0
-    h1 = 0.0
+    g1 = zero(T)
+    h1 = zero(T)
     for j in eachindex(w)
-        iuwj = 2.0 / (usqr - abs2(w[j]))
+        iuwj = T(2) / (usqr - abs2(w[j]))
         g1 += iuwj
         wiuwj = w[j] * iuwj
         h1 += abs2(iuwj)

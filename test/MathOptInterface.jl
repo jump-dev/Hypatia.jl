@@ -4,9 +4,9 @@ Copyright 2018, Chris Coey and contributors
 
 import MathOptInterface
 const MOI = MathOptInterface
-MOIT = MOI.Test
-MOIB = MOI.Bridges
-MOIU = MOI.Utilities
+const MOIT = MOI.Test
+const MOIB = MOI.Bridges
+const MOIU = MOI.Utilities
 
 MOIU.@model(HypatiaModelData,
     (),
