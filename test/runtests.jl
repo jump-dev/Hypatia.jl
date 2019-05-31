@@ -2,11 +2,10 @@
 Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 =#
 
-import Random
-using LinearAlgebra
-using SparseArrays
 using Test
 import Hypatia
+import Hypatia.HypReal
+import Hypatia.HypRealOrComplex
 const HYP = Hypatia
 const CO = HYP.Cones
 const MO = HYP.Models
@@ -35,6 +34,13 @@ include(joinpath(examples_dir, "secondorderpoly/JuMP.jl"))
 include(joinpath(examples_dir, "shapeconregr/JuMP.jl"))
 include(joinpath(examples_dir, "semidefinitepoly/JuMP.jl"))
 
+real_types = [
+    Float64,
+    Float32,
+    BigFloat,
+    ]
+
+@info("starting Hypatia tests")
 @testset "Hypatia tests" begin
 
 @info("starting interpolation tests")
@@ -49,8 +55,9 @@ barrier_testfuns = [
     test_epinormeucl_barrier,
     test_epinorinf_barrier,
     test_epinormspectral_barrier,
-    test_epiperpower_barrier,
     test_epipersquare_barrier,
+    # TODO next 3 fail with BigFloat, see https://github.com/JuliaDiff/DiffResults.jl/pull/9#issuecomment-497853361
+    test_epiperpower_barrier,
     test_epipersumexp_barrier,
     test_hypogeomean_barrier,
     test_hypoperlog_barrier,
@@ -58,10 +65,10 @@ barrier_testfuns = [
     test_semidefinite_barrier,
     test_wsospolyinterp_barrier,
     test_wsospolyinterpmat_barrier,
-    test_wsospolyinterpsoc_barrier,
+    test_wsospolyinterpsoc_barrier, # NOTE not updated for generic reals (too much work)
     ]
-@testset "barrier functions tests: $t" for t in barrier_testfuns
-    t()
+@testset "barrier functions tests: $t, $T" for t in barrier_testfuns, T in real_types
+    t(T)
 end
 
 @info("starting native interface tests")
@@ -78,8 +85,8 @@ testfuns_singular = [
     inconsistent1,
     inconsistent2,
     ]
-@testset "preprocessing tests: $t, $s" for t in testfuns_singular, s in system_solvers
-    t(s, MO.PreprocessedLinearModel, verbose)
+@testset "preprocessing tests: $t, $s, $T" for t in testfuns_singular, s in system_solvers, T in real_types
+    t(s{T}, MO.PreprocessedLinearModel{T}, verbose)
 end
 linear_models = [
     MO.PreprocessedLinearModel,
@@ -123,11 +130,11 @@ testfuns_nonsingular = [
     epipersumexp1,
     epipersumexp2,
     ]
-@testset "native tests: $t, $s, $m" for t in testfuns_nonsingular, s in system_solvers, m in linear_models
+@testset "native tests: $t, $s, $m, $T" for t in testfuns_nonsingular, s in system_solvers, m in linear_models, T in real_types
     if s == SO.QRCholCombinedHSDSystemSolver && m == MO.RawLinearModel
         continue # QRChol linear system solver needs preprocessed model
     end
-    t(s, m, verbose)
+    t(s{T}, m{T}, verbose)
 end
 
 @info("starting MathOptInterface tests")
@@ -140,7 +147,7 @@ linear_models = [
     MO.PreprocessedLinearModel, # MOI tests require preprocessing
     ]
 @testset "MOI tests: $(d ? "dense" : "sparse"), $s, $m" for d in (false, true), s in system_solvers, m in linear_models
-    test_moi(d, s, m, verbose)
+    test_moi(d, s{Float64}, m{Float64}, verbose)
 end
 
 @info("starting native examples tests")
@@ -161,7 +168,7 @@ end
 
 @info("starting JuMP examples tests")
 JuMP_options = (
-    verbose = true,
+    verbose = false,
     test_certificates = true,
     max_iters = 250,
     time_limit = 6e2, # 1 minute

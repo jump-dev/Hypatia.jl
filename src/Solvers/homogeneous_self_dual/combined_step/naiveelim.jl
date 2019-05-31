@@ -34,12 +34,12 @@ kap + mu/(taubar^2)*tau = taurhs --> kap = taurhs - mu/(taubar^2)*tau
 TODO reduce allocations
 =#
 
-mutable struct NaiveElimCombinedHSDSystemSolver <: CombinedHSDSystemSolver
+mutable struct NaiveElimCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSolver{T}
     use_sparse::Bool
 
     lhs_copy
     lhs
-    rhs::Matrix{Float64}
+    rhs::Matrix{T}
 
     x1
     x2
@@ -49,31 +49,31 @@ mutable struct NaiveElimCombinedHSDSystemSolver <: CombinedHSDSystemSolver
     z2
     z1_k
     z2_k
-    s1::Vector{Float64}
-    s2::Vector{Float64}
+    s1::Vector{T}
+    s2::Vector{T}
     s1_k
     s2_k
 
-    function NaiveElimCombinedHSDSystemSolver(model::Models.LinearModel; use_sparse::Bool = false)
+    function NaiveElimCombinedHSDSystemSolver{T}(model::Models.LinearModel{T}; use_sparse::Bool = false) where {T <: HypReal}
         (n, p, q) = (model.n, model.p, model.q)
         npq1 = n + p + q + 1
-        system_solver = new()
+        system_solver = new{T}()
         system_solver.use_sparse = use_sparse
 
         if use_sparse
-            system_solver.lhs_copy = Float64[
-                spzeros(n,n)  model.A'      model.G'          model.c;
-                -model.A      spzeros(p,p)  spzeros(p,q)      model.b;
-                -model.G      spzeros(q,p)  sparse(1.0I,q,q)  model.h;
-                -model.c'     -model.b'     -model.h'         1.0;
+            system_solver.lhs_copy = T[
+                spzeros(T,n,n)  model.A'        model.G'              model.c;
+                -model.A        spzeros(T,p,p)  spzeros(T,p,q)        model.b;
+                -model.G        spzeros(T,q,p)  sparse(one(T)*I,q,q)  model.h;
+                -model.c'       -model.b'       -model.h'             one(T);
             ]
             @assert issparse(system_solver.lhs_copy)
         else
-            system_solver.lhs_copy = Float64[
-                zeros(n,n)  model.A'    model.G'          model.c;
-                -model.A    zeros(p,p)  zeros(p,q)        model.b;
-                -model.G    zeros(q,p)  Matrix(1.0I,q,q)  model.h;
-                -model.c'   -model.b'   -model.h'         1.0;
+            system_solver.lhs_copy = T[
+                zeros(T,n,n)  model.A'      model.G'              model.c;
+                -model.A      zeros(T,p,p)  zeros(T,p,q)          model.b;
+                -model.G      zeros(T,q,p)  Matrix(one(T)*I,q,q)  model.h;
+                -model.c'     -model.b'     -model.h'             one(T);
             ]
         end
 
@@ -85,7 +85,7 @@ mutable struct NaiveElimCombinedHSDSystemSolver <: CombinedHSDSystemSolver
         # end
         # system_solver.lhs_H_k = [view_k(k) for k in eachindex(model.cones)]
 
-        rhs = Matrix{Float64}(undef, npq1, 2)
+        rhs = Matrix{T}(undef, npq1, 2)
         system_solver.rhs = rhs
         rows = 1:n
         system_solver.x1 = view(rhs, rows, 1)
@@ -108,7 +108,7 @@ mutable struct NaiveElimCombinedHSDSystemSolver <: CombinedHSDSystemSolver
     end
 end
 
-function get_combined_directions(solver::HSDSolver, system_solver::NaiveElimCombinedHSDSystemSolver)
+function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveElimCombinedHSDSystemSolver{T}) where {T <: HypReal}
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
     cones = model.cones
@@ -132,11 +132,11 @@ function get_combined_directions(solver::HSDSolver, system_solver::NaiveElimComb
 
     # update rhs matrix
     x1 .= solver.x_residual
-    x2 .= 0.0
+    x2 .= zero(T)
     y1 .= solver.y_residual
-    y2 .= 0.0
+    y2 .= zero(T)
     z1 .= solver.z_residual
-    z2 .= 0.0
+    z2 .= zero(T)
     for k in eachindex(cones)
         duals_k = solver.point.dual_views[k]
         g = Cones.grad(cones[k])
@@ -144,7 +144,7 @@ function get_combined_directions(solver::HSDSolver, system_solver::NaiveElimComb
         @. s2_k[k] = -duals_k - mu * g
     end
     tau_rhs = [-kap, -kap + mu / tau]
-    kap_rhs = [kap + solver.primal_obj_t - solver.dual_obj_t, 0.0]
+    kap_rhs = [kap + solver.primal_obj_t - solver.dual_obj_t, zero(T)]
 
     # update lhs matrix
     copyto!(lhs, system_solver.lhs_copy)

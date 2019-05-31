@@ -8,22 +8,29 @@ module Models
 
 using LinearAlgebra
 using SparseArrays
-
 import Hypatia.Cones
+import Hypatia.HypReal
 
-mutable struct Point
-    x::Vector{Float64}
-    y::Vector{Float64}
-    z::Vector{Float64}
-    s::Vector{Float64}
+mutable struct Point{T <: HypReal}
+    x::Vector{T}
+    y::Vector{T}
+    z::Vector{T}
+    s::Vector{T}
 
-    z_views::Vector{SubArray{Float64,1,Vector{Float64},Tuple{UnitRange{Int}},true}}
-    s_views::Vector{SubArray{Float64,1,Vector{Float64},Tuple{UnitRange{Int}},true}}
-    dual_views::Vector{SubArray{Float64,1,Vector{Float64},Tuple{UnitRange{Int}},true}}
-    primal_views::Vector{SubArray{Float64,1,Vector{Float64},Tuple{UnitRange{Int}},true}}
+    z_views::Vector{SubArray{T, 1, Vector{T}, Tuple{UnitRange{Int}}, true}}
+    s_views::Vector{SubArray{T, 1, Vector{T}, Tuple{UnitRange{Int}}, true}}
+    dual_views::Vector{SubArray{T, 1, Vector{T}, Tuple{UnitRange{Int}}, true}}
+    primal_views::Vector{SubArray{T, 1, Vector{T}, Tuple{UnitRange{Int}}, true}}
 
-    function Point(x, y, z, s, cones, cone_idxs)
-        point = new()
+    function Point(
+        x::Vector{T},
+        y::Vector{T},
+        z::Vector{T},
+        s::Vector{T},
+        cones::Vector{<:Cones.Cone},
+        cone_idxs::Vector{UnitRange{Int}},
+        ) where {T <: HypReal}
+        point = new{T}()
 
         point.x = x
         point.y = y
@@ -39,9 +46,9 @@ mutable struct Point
     end
 end
 
-abstract type Model end
+abstract type Model{T <: HypReal} end
 
-abstract type LinearModel <: Model end
+abstract type LinearModel{T <: HypReal} <: Model{T} end
 include("linear.jl")
 
 # TODO other model types eg quadratic obj, convex differentiable obj

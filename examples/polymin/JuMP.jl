@@ -7,8 +7,6 @@ see description in examples/polymin/native.jl
 import Random
 using LinearAlgebra
 using Test
-import MathOptInterface
-const MOI = MathOptInterface
 import JuMP
 import SumOfSquares
 import Hypatia

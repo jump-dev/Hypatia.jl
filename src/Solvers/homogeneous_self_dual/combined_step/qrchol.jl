@@ -4,12 +4,12 @@ Copyright 2018, Chris Coey and contributors
 QR + Cholesky linear system solver
 =#
 
-mutable struct QRCholCombinedHSDSystemSolver <: CombinedHSDSystemSolver
+mutable struct QRCholCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSolver{T}
     use_sparse::Bool
 
-    xi::Matrix{Float64}
-    yi::Matrix{Float64}
-    zi::Matrix{Float64}
+    xi::Matrix{T}
+    yi::Matrix{T}
+    zi::Matrix{T}
 
     x1
     y1
@@ -54,14 +54,14 @@ mutable struct QRCholCombinedHSDSystemSolver <: CombinedHSDSystemSolver
     HGxi_k
     Gxi_k
 
-    function QRCholCombinedHSDSystemSolver(model::Models.PreprocessedLinearModel; use_sparse::Bool = false)
+    function QRCholCombinedHSDSystemSolver{T}(model::Models.PreprocessedLinearModel{T}; use_sparse::Bool = false) where {T <: HypReal}
         (n, p, q) = (model.n, model.p, model.q)
-        system_solver = new()
+        system_solver = new{T}()
         system_solver.use_sparse = use_sparse
 
-        xi = Matrix{Float64}(undef, n, 3)
-        yi = Matrix{Float64}(undef, p, 3)
-        zi = Matrix{Float64}(undef, q, 3)
+        xi = Matrix{T}(undef, n, 3)
+        yi = Matrix{T}(undef, p, 3)
+        zi = Matrix{T}(undef, q, 3)
         system_solver.xi = xi
         system_solver.yi = yi
         system_solver.zi = zi
@@ -90,22 +90,22 @@ mutable struct QRCholCombinedHSDSystemSolver <: CombinedHSDSystemSolver
         system_solver.z3_temp_k = [view(zi_temp, idxs, 3) for idxs in model.cone_idxs]
 
         nmp = n - p
-        system_solver.bxGHbz = Matrix{Float64}(undef, n, 3)
+        system_solver.bxGHbz = Matrix{T}(undef, n, 3)
         system_solver.Q1x = similar(system_solver.bxGHbz)
-        system_solver.GQ1x = Matrix{Float64}(undef, q, 3)
+        system_solver.GQ1x = Matrix{T}(undef, q, 3)
         system_solver.HGQ1x = similar(system_solver.GQ1x)
-        system_solver.GHGQ1x = Matrix{Float64}(undef, n, 3)
-        system_solver.Q2div = Matrix{Float64}(undef, nmp, 3)
+        system_solver.GHGQ1x = Matrix{T}(undef, n, 3)
+        system_solver.Q2div = Matrix{T}(undef, nmp, 3)
         system_solver.GQ2 = model.G * model.Ap_Q2
         if use_sparse
-            if system_solver.GQ2 isa Matrix{Float64}
+            if system_solver.GQ2 isa Matrix{T}
                 error("to use sparse factorization for direction finding, cannot use dense A or G matrices")
             end
-            system_solver.HGQ2 = spzeros(Float64, q, nmp)
-            system_solver.Q2GHGQ2 = spzeros(Float64, nmp, nmp)
+            system_solver.HGQ2 = spzeros(T, q, nmp)
+            system_solver.Q2GHGQ2 = spzeros(T, nmp, nmp)
         else
-            system_solver.HGQ2 = Matrix{Float64}(undef, q, nmp)
-            system_solver.Q2GHGQ2 = Matrix{Float64}(undef, nmp, nmp)
+            system_solver.HGQ2 = Matrix{T}(undef, q, nmp)
+            system_solver.Q2GHGQ2 = Matrix{T}(undef, nmp, nmp)
         end
         system_solver.Q2x = similar(system_solver.Q1x)
         system_solver.Gxi = similar(system_solver.GQ1x)
@@ -123,7 +123,7 @@ mutable struct QRCholCombinedHSDSystemSolver <: CombinedHSDSystemSolver
     end
 end
 
-function get_combined_directions(solver::HSDSolver, system_solver::QRCholCombinedHSDSystemSolver)
+function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholCombinedHSDSystemSolver{T}) where {T <: HypReal}
     model = solver.model
     cones = model.cones
     cone_idxs = model.cone_idxs
@@ -177,10 +177,10 @@ function get_combined_directions(solver::HSDSolver, system_solver::QRCholCombine
 
     @. x1 = -model.c
     @. x2 = solver.x_residual
-    @. x3 = 0.0
+    @. x3 = zero(T)
     @. y1 = model.b
     @. y2 = -solver.y_residual
-    @. y3 = 0.0
+    @. y3 = zero(T)
 
     @. z1_temp = model.h
     @. z2_temp = -solver.z_residual
@@ -237,25 +237,32 @@ function get_combined_directions(solver::HSDSolver, system_solver::QRCholCombine
         mul!(Q2GHGQ2, GQ2', HGQ2)
 
         if system_solver.use_sparse
-            F = ldlt(Symmetric(Q2GHGQ2), check = false)
+            F = ldlt(Symmetric(Q2GHGQ2), check = false) # TODO not implemented for generic reals
             if !issuccess(F)
                 println("sparse linear system matrix factorization failed")
                 mul!(Q2GHGQ2, GQ2', HGQ2)
-                F = ldlt(Symmetric(Q2GHGQ2), shift = 1e-4, check = false)
+                F = ldlt(Symmetric(Q2GHGQ2), shift = T(1e-4), check = false)
                 if !issuccess(F)
                     error("could not fix failure of positive definiteness (mu is $mu); terminating")
                 end
             end
             Q2div .= F \ Q2div # TODO eliminate allocs (see https://github.com/JuliaLang/julia/issues/30084)
         else
-            F = cholesky!(Symmetric(Q2GHGQ2), Val(true), check = false) # TODO prealloc cholesky auxiliary vectors using posvx
+            F = hyp_chol!(Symmetric(Q2GHGQ2)) # TODO prealloc blasreal cholesky auxiliary vectors using posvx
             if !isposdef(F)
                 println("dense linear system matrix factorization failed")
                 mul!(Q2GHGQ2, GQ2', HGQ2)
-                Q2GHGQ2 += 1e-4I
-                F = bunchkaufman!(Symmetric(Q2GHGQ2), true, check = false) # TODO prealloc with old sysvx code
-                if !issuccess(F)
-                    error("could not fix failure of positive definiteness (mu is $mu); terminating")
+                Q2GHGQ2 += T(1e-4) * I
+                if T <: BlasReal
+                    F = bunchkaufman!(Symmetric(Q2GHGQ2), true, check = false) # TODO prealloc with old sysvx code; not implemented for generic reals
+                    if !issuccess(F)
+                        error("could not fix failure of positive definiteness (mu is $mu); terminating")
+                    end
+                else
+                    F = hyp_chol!(Symmetric(Q2GHGQ2)) # TODO prealloc blasreal cholesky auxiliary vectors using posvx
+                    if !isposdef(F)
+                        error("could not fix failure of positive definiteness (mu is $mu); terminating")
+                    end
                 end
             end
             ldiv!(F, Q2div)
@@ -294,7 +301,7 @@ function get_combined_directions(solver::HSDSolver, system_solver::QRCholCombine
 
     (tau_pred, kap_pred) = lift!(x2, y2, z2, z2_temp, solver.kap + solver.primal_obj_t - solver.dual_obj_t, -solver.kap)
     @. z2_temp -= solver.z_residual
-    (tau_corr, kap_corr) = lift!(x3, y3, z3, z3_temp, 0.0, -solver.kap + mu / solver.tau)
+    (tau_corr, kap_corr) = lift!(x3, y3, z3, z3_temp, zero(T), -solver.kap + mu / solver.tau)
 
     return (x2, x3, y2, y3, z2, z3, z2_temp, z3_temp, tau_pred, tau_corr, kap_pred, kap_corr)
 end

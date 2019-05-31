@@ -17,12 +17,12 @@ symmetrize the LHS matrix by multiplying some equations by -1 and by premultiply
 TODO reduce allocations
 =#
 
-mutable struct SymIndefCombinedHSDSystemSolver <: CombinedHSDSystemSolver
+mutable struct SymIndefCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSolver{T}
     use_sparse::Bool
 
     lhs_copy
     lhs
-    rhs::Matrix{Float64}
+    rhs::Matrix{T}
 
     x1
     x2
@@ -36,33 +36,33 @@ mutable struct SymIndefCombinedHSDSystemSolver <: CombinedHSDSystemSolver
     z1_k
     z2_k
     z3_k
-    s1::Vector{Float64}
-    s2::Vector{Float64}
-    s3::Vector{Float64}
+    s1::Vector{T}
+    s2::Vector{T}
+    s3::Vector{T}
     s1_k
     s2_k
     s3_k
 
-    function SymIndefCombinedHSDSystemSolver(model::Models.LinearModel; use_sparse::Bool = false)
+    function SymIndefCombinedHSDSystemSolver{T}(model::Models.LinearModel{T}; use_sparse::Bool = false) where {T <: HypReal}
         (n, p, q) = (model.n, model.p, model.q)
         npq = n + p + q
-        system_solver = new()
+        system_solver = new{T}()
         system_solver.use_sparse = use_sparse
 
         # x y z
         # lower symmetric
         if use_sparse
-            system_solver.lhs_copy = Float64[
-                spzeros(n,n)  spzeros(n,p)  spzeros(n,q);
-                model.A       spzeros(p,p)  spzeros(p,q);
-                model.G       spzeros(q,p)  sparse(-1.0I,q,q);
+            system_solver.lhs_copy = T[
+                spzeros(T,n,n)  spzeros(T,n,p)  spzeros(T,n,q);
+                model.A         spzeros(T,p,p)  spzeros(T,p,q);
+                model.G         spzeros(T,q,p)  sparse(-one(T)*I,q,q);
             ]
             @assert issparse(system_solver.lhs_copy)
         else
-            system_solver.lhs_copy = Float64[
-                zeros(n,n)  zeros(n,p)  zeros(n,q);
-                model.A     zeros(p,p)  zeros(p,q);
-                model.G     zeros(q,p)  Matrix(-1.0I,q,q);
+            system_solver.lhs_copy = T[
+                zeros(T,n,n)  zeros(T,n,p)  zeros(T,n,q);
+                model.A       zeros(T,p,p)  zeros(T,p,q);
+                model.G       zeros(T,q,p)  Matrix(-one(T)I,q,q);
             ]
         end
 
@@ -74,7 +74,7 @@ mutable struct SymIndefCombinedHSDSystemSolver <: CombinedHSDSystemSolver
         # end
         # system_solver.lhs_H_k = [view_k(k) for k in eachindex(model.cones)]
 
-        rhs = Matrix{Float64}(undef, npq, 3)
+        rhs = Matrix{T}(undef, npq, 3)
         system_solver.rhs = rhs
         rows = 1:n
         system_solver.x1 = view(rhs, rows, 1)
@@ -95,15 +95,12 @@ mutable struct SymIndefCombinedHSDSystemSolver <: CombinedHSDSystemSolver
         system_solver.s1 = similar(rhs, q)
         system_solver.s2 = similar(rhs, q)
         system_solver.s3 = similar(rhs, q)
-        # system_solver.s1_k = [view(system_solver.s1, model.cone_idxs[k]) for k in eachindex(model.cones)]
-        # system_solver.s2_k = [view(system_solver.s2, model.cone_idxs[k]) for k in eachindex(model.cones)]
-        # system_solver.s3_k = [view(system_solver.s3, model.cone_idxs[k]) for k in eachindex(model.cones)]
 
         return system_solver
     end
 end
 
-function get_combined_directions(solver::HSDSolver, system_solver::SymIndefCombinedHSDSystemSolver)
+function get_combined_directions(solver::HSDSolver{T}, system_solver::SymIndefCombinedHSDSystemSolver{T}) where {T <: HypReal}
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
     cones = model.cones
@@ -131,13 +128,13 @@ function get_combined_directions(solver::HSDSolver, system_solver::SymIndefCombi
 
     @. x1 = -model.c
     x2 .= solver.x_residual
-    x3 .= 0.0
+    x3 .= zero(T)
     y1 .= model.b
     @. y2 = -solver.y_residual
-    y3 .= 0.0
+    y3 .= zero(T)
     z1 .= model.h
     @. z2 .= -solver.z_residual
-    z3 .= 0.0
+    z3 .= zero(T)
 
     # update lhs matrix
     copyto!(lhs, system_solver.lhs_copy)
@@ -174,8 +171,12 @@ function get_combined_directions(solver::HSDSolver, system_solver::SymIndefCombi
         end
         rhs .= F \ rhs
     else
-        F = bunchkaufman!(Symmetric(lhs, :L), true, check = true)
-        ldiv!(F, rhs)
+        if T <: BlasReal
+            F = bunchkaufman!(Symmetric(lhs, :L), true, check = true) # TODO doesn't work for generic reals (need LDLT)
+            ldiv!(F, rhs)
+        else
+            rhs .= Symmetric(lhs, :L) \ rhs # TODO replace with a generic julia symmetric indefinite decomposition if available, see https://github.com/JuliaLang/julia/issues/10953
+        end
     end
 
     for k in eachindex(cones)
@@ -204,7 +205,7 @@ function get_combined_directions(solver::HSDSolver, system_solver::SymIndefCombi
 
     (tau_pred, kap_pred) = lift!(x2, y2, z2, s2, kap + solver.primal_obj_t - solver.dual_obj_t, -kap)
     @. s2 -= solver.z_residual
-    (tau_corr, kap_corr) = lift!(x3, y3, z3, s3, 0.0, -kap + mu / tau)
+    (tau_corr, kap_corr) = lift!(x3, y3, z3, s3, zero(T), -kap + mu / tau)
 
     return (x2, x3, y2, y3, z2, z3, s2, s3, tau_pred, tau_corr, kap_pred, kap_corr)
 end

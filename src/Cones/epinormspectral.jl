@@ -9,27 +9,26 @@ W is vectorized column-by-column (i.e. vec(W) in Julia)
 barrier from "Interior-Point Polynomial Algorithms in Convex Programming" by Nesterov & Nemirovskii 1994
 -logdet(u*I_n - W*W'/u) - log(u)
 
-# TODO don't use ForwardDiff: use identity for inverse of matrix plus I and properties of SVD unitary matrices
-# TODO eliminate allocations for incone check
+TODO eliminate allocations
 =#
 
-mutable struct EpiNormSpectral <: Cone
+mutable struct EpiNormSpectral{T <: HypReal} <: Cone{T}
     use_dual::Bool
     dim::Int
     n::Int
     m::Int
-    
-    point::AbstractVector{Float64}
-    W::Matrix{Float64}
-    g::Vector{Float64}
-    H::Matrix{Float64}
-    H2::Matrix{Float64}
+
+    point::AbstractVector{T}
+    W::Matrix{T}
+    g::Vector{T}
+    H::Matrix{T}
+    H2::Matrix{T}
     F
 
-    function EpiNormSpectral(n::Int, m::Int, is_dual::Bool)
+    function EpiNormSpectral{T}(n::Int, m::Int, is_dual::Bool) where {T <: HypReal}
         @assert n <= m
         dim = n * m + 1
-        cone = new()
+        cone = new{T}()
         cone.use_dual = is_dual
         cone.dim = dim
         cone.n = n
@@ -38,46 +37,48 @@ mutable struct EpiNormSpectral <: Cone
     end
 end
 
-EpiNormSpectral(n::Int, m::Int) = EpiNormSpectral(n, m, false)
+EpiNormSpectral{T}(n::Int, m::Int) where {T <: HypReal} = EpiNormSpectral{T}(n, m, false)
 
-function setup_data(cone::EpiNormSpectral)
+function setup_data(cone::EpiNormSpectral{T}) where {T <: HypReal}
     dim = cone.dim
-    cone.W = Matrix{Float64}(undef, cone.n, cone.m)
-    cone.g = Vector{Float64}(undef, dim)
-    cone.H = Matrix{Float64}(undef, dim, dim)
+    cone.W = Matrix{T}(undef, cone.n, cone.m)
+    cone.g = Vector{T}(undef, dim)
+    cone.H = zeros(T, dim, dim)
     cone.H2 = similar(cone.H)
     return
 end
 
 get_nu(cone::EpiNormSpectral) = cone.n + 1
 
-set_initial_point(arr::AbstractVector{Float64}, cone::EpiNormSpectral) = (@. arr = 0.0; arr[1] = 1.0; arr)
+set_initial_point(arr::AbstractVector{T}, cone::EpiNormSpectral{T}) where {T <: HypReal} = (@. arr = zero(T); arr[1] = one(T); arr)
 
-function check_in_cone(cone::EpiNormSpectral)
+function check_in_cone(cone::EpiNormSpectral{T}) where {T <: HypReal}
     u = cone.point[1]
-    if u <= 0.0
+    if u <= zero(T)
         return false
     end
     W = cone.W
     W[:] = view(cone.point, 2:cone.dim)
     n = cone.n
     m = cone.m
-    X = Symmetric(W * W')
+
+    X = Symmetric(W * W') # TODO use syrk
     Z = Symmetric(u * I - X / u)
-    F = cholesky(Z, Val(true), check = false) # TODO in place
+    F = hyp_chol!(Z)
     if !isposdef(F)
         return false
     end
+
     # TODO figure out structured form of inverse? could simplify algebra
     Zi = Symmetric(inv(F))
-    Eu = Symmetric(I + X / u^2)
-    cone.H .= 0.0
+    Eu = Symmetric(I + X / u / u)
+    cone.H .= zero(T)
 
-    cone.g[1] = -dot(Zi, Eu) - 1 / u
+    cone.g[1] = -dot(Zi, Eu) - inv(u)
     cone.g[2:end] = vec(2 * Zi * W / u)
 
     ZiEuZi = Symmetric(Zi * Eu * Zi)
-    cone.H[1, 1] = dot(ZiEuZi, Eu) + (2 * dot(Zi, X) / u + 1) / u / u
+    cone.H[1, 1] = dot(ZiEuZi, Eu) + (2 * dot(Zi, X) / u + one(T)) / u / u
     cone.H[1, 2:end] = vec(-2 * (ZiEuZi + Zi / u) *  W / u)
 
     tmpvec = zeros(n)
@@ -93,7 +94,7 @@ function check_in_cone(cone::EpiNormSpectral)
         end
 
         # Zi * dZdWij * Zi
-        term1 = Symmetric(tmpmat + tmpmat')
+        term1 = Symmetric(tmpmat + tmpmat') # TODO use syrk
 
         # TODO matrixify
         q = p
@@ -108,8 +109,6 @@ function check_in_cone(cone::EpiNormSpectral)
         end
         p += 1
     end
-
-    # @assert isapprox(Symmetric(cone.H, :U) * cone.point, -cone.g, atol = 1e-6, rtol = 1e-6)
 
     return factorize_hess(cone)
 end
