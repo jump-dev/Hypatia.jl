@@ -27,7 +27,7 @@ mutable struct WSOSPolyInterp{T <: HypReal, R <: HypRealOrComplex{T}} <: Cone{T}
     tmpUL::Vector{Matrix{R}}
     tmpLU::Vector{Matrix{R}}
     tmpUU::Matrix{R}
-    ΛFs::Vector{CholeskyPivoted{R, Matrix{R}}}
+    ΛFs::Vector
 
     function WSOSPolyInterp{T, R}(dim::Int, Ps::Vector{Matrix{R}}, is_dual::Bool) where {R <: HypRealOrComplex{T}} where {T <: HypReal}
         for k in eachindex(Ps)
@@ -54,17 +54,13 @@ function setup_data(cone::WSOSPolyInterp{T, R}) where {R <: HypRealOrComplex{T}}
     cone.tmpUL = [Matrix{R}(undef, dim, size(Pk, 2)) for Pk in Ps]
     cone.tmpLU = [Matrix{R}(undef, size(Pk, 2), dim) for Pk in Ps]
     cone.tmpUU = Matrix{R}(undef, dim, dim)
-    cone.ΛFs = Vector{CholeskyPivoted{R, Matrix{R}}}(undef, length(Ps))
+    cone.ΛFs = Vector{Any}(undef, length(Ps))
     return
 end
 
 get_nu(cone::WSOSPolyInterp) = sum(size(Pk, 2) for Pk in cone.Ps)
 
 set_initial_point(arr::AbstractVector{T}, cone::WSOSPolyInterp{T, R}) where {R <: HypRealOrComplex{T}} where {T <: HypReal} = (@. arr = one(T); arr)
-
-# TODO need a generic method for non-BlasFloat
-_AtA!(U::Matrix{T}, A::Matrix{T}) where {T <: LinearAlgebra.BlasFloat} = BLAS.syrk!('U', 'T', one(T), A, zero(T), U)
-_AtA!(U::Matrix{Complex{T}}, A::Matrix{Complex{T}}) where {T <: LinearAlgebra.BlasFloat} = BLAS.herk!('U', 'C', one(T), A, zero(T), U)
 
 function check_in_cone(cone::WSOSPolyInterp{T, R}) where {R <: HypRealOrComplex{T}} where {T <: HypReal}
     Ps = cone.Ps
@@ -86,7 +82,7 @@ function check_in_cone(cone::WSOSPolyInterp{T, R}) where {R <: HypRealOrComplex{
         mul!(LLk, Pk', ULk)
 
         # pivoted cholesky and triangular solve method
-        ΛFk = cholesky!(Hermitian(LLk, :L), Val(true), check = false) # TODO doesn't work for generic reals
+        ΛFk = hyp_chol!(Hermitian(LLk, :L))
         if !isposdef(ΛFk)
             return false
         end
@@ -99,11 +95,9 @@ function check_in_cone(cone::WSOSPolyInterp{T, R}) where {R <: HypRealOrComplex{
     @. H = zero(T)
 
     for k in eachindex(Ps) # TODO can be done in parallel, but need multiple tmp3s
-        LUk = LUs[k]
-        ΛFk = ΛFs[k]
-        LUk .= view(Ps[k]', ΛFk.p, :)
-        ldiv!(LowerTriangular(ΛFk.L), LUk)
-        _AtA!(UU, LUk)
+        # TODO may be faster (but less numerically stable) with explicit inverse here
+        LUk = hyp_ldiv_chol_L!(LUs[k], ΛFs[k], Ps[k]')
+        hyp_AtA!(UU, LUk)
 
         for j in eachindex(g)
             @inbounds g[j] -= real(UU[j, j])
