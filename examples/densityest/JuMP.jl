@@ -53,7 +53,7 @@ function densityestJuMP(
         JuMP.@variable(model, f, PolyJuMP.Poly(PX))
         JuMP.@constraints(model, begin
             sum(w[i] * f(pts[i, :]) for i in 1:U) == 1.0 # integrate to 1
-            [f(pts[i, :]) for i in 1:U] in HYP.WSOSPolyInterpCone{Float64, Float64}(U, [P0, PWts...]) # density nonnegative
+            [f(pts[i, :]) for i in 1:U] in HYP.WSOSPolyInterpCone(U, [P0, PWts...]) # density nonnegative
             [i in 1:nobs], vcat(z[i], 1.0, f(X[i, :])) in MOI.ExponentialCone() # hypograph of log
         end)
     else
@@ -66,7 +66,7 @@ function densityestJuMP(
         JuMP.@variable(model, f[1:U])
         JuMP.@constraints(model, begin
             dot(w, f) == 1.0 # integrate to 1
-            f in HYP.WSOSPolyInterpCone{Float64, Float64}(U, [P0, PWts...]) # density nonnegative
+            f in HYP.WSOSPolyInterpCone(U, [P0, PWts...]) # density nonnegative
             [i in 1:nobs], vcat(z[i], 1.0, dot(f, basis_evals[i, :])) in MOI.ExponentialCone() # hypograph of log
         end)
     end

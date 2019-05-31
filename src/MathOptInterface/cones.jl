@@ -7,32 +7,32 @@ and functions for converting between Hypatia and MOI cone definitions
 
 export WSOSPolyInterpCone
 
-struct WSOSPolyInterpCone{T <: HypReal, R <: HypRealOrComplex{T}} <: MOI.AbstractVectorSet
+struct WSOSPolyInterpCone <: MOI.AbstractVectorSet # real case only
     dimension::Int
-    Ps::Vector{Matrix{R}}
+    Ps::Vector{Matrix{Float64}}
     is_dual::Bool
 end
-WSOSPolyInterpCone{T, R}(dimension::Int, Ps::Vector{Matrix{R}}) where {R <: HypRealOrComplex{T}} where {T <: HypReal} = WSOSPolyInterpCone{T, R}(dimension, Ps, false)
+WSOSPolyInterpCone(dimension::Int, Ps::Vector{Matrix{Float64}}) = WSOSPolyInterpCone(dimension, Ps, false)
 
-export WSOSPolyInterpMatCone
+export WSOSPolyInterpMatCone # TODO rename
 
-struct WSOSPolyInterpMatCone{T <: HypReal} <: MOI.AbstractVectorSet
+struct WSOSPolyInterpMatCone <: MOI.AbstractVectorSet
     R::Int
     U::Int
     ipwt::Vector{Matrix{Float64}}
     is_dual::Bool
 end
-WSOSPolyInterpMatCone{T}(R::Int, U::Int, ipwt::Vector{Matrix{Float64}}) where {T <: HypReal} = WSOSPolyInterpMatCone{T}(R, U, ipwt, false)
+WSOSPolyInterpMatCone(R::Int, U::Int, ipwt::Vector{Matrix{Float64}}) = WSOSPolyInterpMatCone(R, U, ipwt, false)
 
-# export WSOSPolyInterpSOCCone # TODO rename, terrible name
-#
-# struct WSOSPolyInterpSOCCone <: MOI.AbstractVectorSet
-#     R::Int
-#     U::Int
-#     ipwt::Vector{Matrix{Float64}}
-#     is_dual::Bool
-# end
-# WSOSPolyInterpSOCCone(R::Int, U::Int, ipwt::Vector{Matrix{Float64}}) = WSOSPolyInterpSOCCone(R, U, ipwt, false)
+export WSOSPolyInterpSOCCone # TODO rename
+
+struct WSOSPolyInterpSOCCone <: MOI.AbstractVectorSet
+    R::Int
+    U::Int
+    ipwt::Vector{Matrix{Float64}}
+    is_dual::Bool
+end
+WSOSPolyInterpSOCCone(R::Int, U::Int, ipwt::Vector{Matrix{Float64}}) = WSOSPolyInterpSOCCone(R, U, ipwt, false)
 
 MOIOtherCones = (
     MOI.SecondOrderCone,
@@ -42,9 +42,9 @@ MOIOtherCones = (
     MOI.GeometricMeanCone,
     MOI.PositiveSemidefiniteConeTriangle,
     MOI.LogDetConeTriangle,
-    WSOSPolyInterpCone{<:HypReal, <:HypRealOrComplex},
-    WSOSPolyInterpMatCone{<:HypReal},
-    # WSOSPolyInterpSOCCone,
+    WSOSPolyInterpCone,
+    WSOSPolyInterpMatCone,
+    WSOSPolyInterpSOCCone,
 )
 
 # MOI cones for which no transformation is needed
@@ -53,9 +53,9 @@ cone_from_moi(s::MOI.RotatedSecondOrderCone) = Cones.EpiPerSquare{Float64}(MOI.d
 cone_from_moi(s::MOI.ExponentialCone) = Cones.HypoPerLog{Float64}()
 cone_from_moi(s::MOI.GeometricMeanCone) = (l = MOI.dimension(s) - 1; Cones.HypoGeomean{Float64}(fill(inv(l), l)))
 cone_from_moi(s::MOI.PowerCone{Float64}) = Cones.EpiPerPower{Float64}(inv(s.exponent))
-cone_from_moi(s::WSOSPolyInterpCone{T, R}) where {R <: HypRealOrComplex{T}} where {T <: HypReal} = Cones.WSOSPolyInterp{T, R}(s.dimension, s.Ps, s.is_dual)
-cone_from_moi(s::WSOSPolyInterpMatCone{T}) where {T <: HypReal} = Cones.WSOSPolyInterpMat{T}(s.R, s.U, s.ipwt, s.is_dual)
-# cone_from_moi(s::WSOSPolyInterpSOCCone) = Cones.WSOSPolyInterpSOC(s.R, s.U, s.ipwt, s.is_dual)
+cone_from_moi(s::WSOSPolyInterpCone) = Cones.WSOSPolyInterp{Float64, Float64}(s.dimension, s.Ps, s.is_dual)
+cone_from_moi(s::WSOSPolyInterpMatCone) = Cones.WSOSPolyInterpMat{Float64}(s.R, s.U, s.ipwt, s.is_dual)
+cone_from_moi(s::WSOSPolyInterpSOCCone) = Cones.WSOSPolyInterpSOC{Float64}(s.R, s.U, s.ipwt, s.is_dual)
 cone_from_moi(s::MOI.AbstractVectorSet) = error("MOI set $s is not recognized")
 
 function build_var_cone(fi::MOI.VectorOfVariables, si::MOI.AbstractVectorSet, dim::Int, q::Int)
