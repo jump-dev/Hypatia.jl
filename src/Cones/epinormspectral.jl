@@ -43,7 +43,7 @@ function setup_data(cone::EpiNormSpectral{T}) where {T <: HypReal}
     dim = cone.dim
     cone.W = Matrix{T}(undef, cone.n, cone.m)
     cone.g = Vector{T}(undef, dim)
-    cone.H = Matrix{T}(undef, dim, dim)
+    cone.H = zeros(T, dim, dim)
     cone.H2 = similar(cone.H)
     return
 end

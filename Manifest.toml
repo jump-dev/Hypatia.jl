@@ -145,6 +145,12 @@ git-tree-sha1 = "429b70c7a08ec34a20e0864366c20dfb8966e5e5"
 uuid = "92c85e6c-cbff-5e0c-80f7-495c94daaecd"
 version = "0.5.1"
 
+[[GenericLinearAlgebra]]
+deps = ["LinearAlgebra", "Printf", "Random", "Test"]
+git-tree-sha1 = "ca235f9c4652b31525232a36d7832f5ee681d76a"
+uuid = "14197337-ba66-59df-a3e3-ca00e7dcff7a"
+version = "0.1.0"
+
 [[InteractiveUtils]]
 deps = ["Markdown"]
 uuid = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
