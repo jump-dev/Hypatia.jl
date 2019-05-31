@@ -64,13 +64,16 @@ function check_in_cone(cone::HypoPerLogdet{T}) where {T <: HypReal}
     W = cone.mat
     svec_to_smat!(W, view(cone.point, 3:cone.dim))
     F = hyp_chol!(Symmetric(W))
-    if !isposdef(F) || u >= v * (logdet(F) - cone.side * log(v))
+    ldW = logdet(F)
+    if !isposdef(F) || u >= v * (ldW - cone.side * log(v))
         return false
     end
 
-    L = logdet(W / v)
+    # L = logdet(W / v)
+    L = ldW - cone.side * log(v)
     z = v * L - u
-    Wi = Symmetric(inv(W))
+
+    Wi = Symmetric(inv(F))
     n = cone.side
     dim = cone.dim
     vzi = v / z

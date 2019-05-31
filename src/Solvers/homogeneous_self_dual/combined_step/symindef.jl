@@ -171,8 +171,12 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::SymIndefCo
         end
         rhs .= F \ rhs
     else
-        F = bunchkaufman!(Symmetric(lhs, :L), true, check = true) # TODO doesn't work for generic reals (need LDLT)
-        ldiv!(F, rhs)
+        if T <: BlasReal
+            F = bunchkaufman!(Symmetric(lhs, :L), true, check = true) # TODO doesn't work for generic reals (need LDLT)
+            ldiv!(F, rhs)
+        else
+            rhs .= Symmetric(lhs, :L) \ rhs # TODO replace with a generic julia symmetric indefinite decomposition if available, see https://github.com/JuliaLang/julia/issues/10953
+        end
     end
 
     for k in eachindex(cones)

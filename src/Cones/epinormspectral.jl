@@ -62,7 +62,7 @@ function check_in_cone(cone::EpiNormSpectral{T}) where {T <: HypReal}
     n = cone.n
     m = cone.m
 
-    X = Symmetric(W * W') # TODO use hyp_AtA! when prealloc'd
+    X = Symmetric(W * W') # TODO use syrk
     Z = Symmetric(u * I - X / u)
     F = hyp_chol!(Z)
     if !isposdef(F)
@@ -94,7 +94,7 @@ function check_in_cone(cone::EpiNormSpectral{T}) where {T <: HypReal}
         end
 
         # Zi * dZdWij * Zi
-        term1 = Symmetric(tmpmat + tmpmat')
+        term1 = Symmetric(tmpmat + tmpmat') # TODO use syrk
 
         # TODO matrixify
         q = p

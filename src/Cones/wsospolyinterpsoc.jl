@@ -22,14 +22,14 @@ mutable struct WSOSPolyInterpSOC{T <: HypReal} <: Cone{T}
     Hi::Matrix{T}
     F
     mat::Vector{Matrix{T}}
-    matfact::Vector{CholeskyPivoted{T, Matrix{T}}}
+    matfact::Vector
     tmp1::Vector{Matrix{T}}
     tmp2::Vector{Matrix{T}}
     tmp3::Matrix{T}
     tmp4::Vector{Matrix{T}}
     li_lambda::Vector{Vector{Matrix{T}}}
     PlambdaiP::Vector{Vector{Vector{Matrix{T}}}}
-    lambdafact::Vector{CholeskyPivoted{T, Matrix{T}}}
+    lambdafact::Vector
 
     function WSOSPolyInterpSOC{T}(R::Int, U::Int, ipwt::Vector{Matrix{T}}, is_dual::Bool) where {T <: HypReal}
         for ipwtj in ipwt
@@ -60,7 +60,7 @@ function setup_data(cone::WSOSPolyInterpSOC{T}) where {T <: HypReal}
     cone.H2 = similar(cone.H)
     cone.Hi = similar(cone.H)
     cone.mat = [similar(cone.g, size(ipwtj, 2), size(ipwtj, 2)) for ipwtj in ipwt]
-    cone.matfact = Vector{CholeskyPivoted{T, Matrix{T}}}(undef, length(ipwt))
+    cone.matfact = Vector{Any}(undef, length(ipwt))
     cone.tmp1 = [similar(cone.g, size(ipwtj, 2), U) for ipwtj in ipwt]
     cone.tmp2 = [similar(cone.g, size(ipwtj, 2), U) for ipwtj in ipwt]
     cone.tmp3 = similar(cone.g, U, U)
@@ -76,7 +76,7 @@ function setup_data(cone::WSOSPolyInterpSOC{T}) where {T <: HypReal}
             cone.PlambdaiP[j][r1][r2] = similar(cone.g, U, U)
         end
     end
-    cone.lambdafact = Vector{CholeskyPivoted{T, Matrix{T}}}(undef, length(ipwt))
+    cone.lambdafact = Vector{Any}(undef, length(ipwt))
     return
 end
 
@@ -90,7 +90,6 @@ end
 
 # TODO cleanup experimental code
 function check_in_cone(cone::WSOSPolyInterpSOC{T}) where {T <: HypReal}
-    # @timeit "build mat" begin
     for j in eachindex(cone.ipwt)
         ipwtj = cone.ipwt[j]
         li_lambda = cone.li_lambda[j]
@@ -107,8 +106,7 @@ function check_in_cone(cone::WSOSPolyInterpSOC{T}) where {T <: HypReal}
         @. tmp1 = ipwtj' * point_pq'
         mul!(tmp4, tmp1, ipwtj)
         mat .= tmp4
-        lambdafact[j] = cholesky!(Symmetric(tmp4, :L), Val(true), check = false)
-
+        lambdafact[j] = hyp_chol!(Symmetric(tmp4, :L))
         if !isposdef(lambdafact[j])
             return false
         end
@@ -127,14 +125,12 @@ function check_in_cone(cone::WSOSPolyInterpSOC{T}) where {T <: HypReal}
             uo += cone.U
         end
 
-        matfact[j] = cholesky!(Symmetric(mat, :U), Val(true), check = false)
+        matfact[j] = hyp_chol!(Symmetric(mat, :U))
         if !isposdef(matfact[j])
             return false
         end
     end
-    # end
 
-    # @timeit "grad hess" begin
     cone.g .= zero(T)
     cone.H .= zero(T)
     for j in eachindex(cone.ipwt)
@@ -218,7 +214,6 @@ function check_in_cone(cone::WSOSPolyInterpSOC{T}) where {T <: HypReal}
             end
         end
     end # j
-    # end
 
     return factorize_hess(cone)
 end

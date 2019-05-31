@@ -19,6 +19,7 @@ include("Models/Models.jl")
 include("Solvers/Solvers.jl")
 
 # MathOptInterface
+using SparseArrays
 import MathOptInterface
 const MOI = MathOptInterface
 
