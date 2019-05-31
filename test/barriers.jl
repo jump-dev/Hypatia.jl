@@ -107,6 +107,7 @@ function test_wsospolyinterp_barrier(T::Type{<:HypReal})
     Random.seed!(1)
     for n in 1:3, halfdeg in 1:3
         (U, _, P0, _, _) = MU.interpolate(MU.FreeDomain(n), halfdeg, sample = false)
+        P0 = convert(Matrix{T}, P0)
         cone = CO.WSOSPolyInterp{T, T}(U, [P0], true)
         pass_through_cone(cone)
     end
@@ -118,6 +119,7 @@ function test_wsospolyinterpmat_barrier(T::Type{<:HypReal})
     Random.seed!(1)
     for n in 1:3, halfdeg in 1:3, R in 1:3
         (U, _, P0, _, _) = MU.interpolate(MU.FreeDomain(n), halfdeg, sample = false)
+        P0 = convert(Matrix{T}, P0)
         cone = CO.WSOSPolyInterpMat{T}(R, U, [P0], true)
         pass_through_cone(cone)
     end
@@ -128,6 +130,7 @@ function test_wsospolyinterpsoc_barrier(T::Type{<:HypReal})
     Random.seed!(1)
     for n in 1:2, halfdeg in 1:2, R in 3:3
         (U, _, P0, _, _) = MU.interpolate(MU.FreeDomain(n), halfdeg, sample = false)
+        P0 = convert(Matrix{T}, P0)
         cone = CO.WSOSPolyInterpSOC{T}(R, U, [P0], true)
         pass_through_cone(cone)
     end
