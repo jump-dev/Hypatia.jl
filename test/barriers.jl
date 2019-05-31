@@ -2,6 +2,7 @@
 Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 =#
 
+using LinearAlgebra
 import Random
 
 function pass_through_cone(cone::CO.Cone{T}; num_checks::Int = 2) where {T <: HypReal}

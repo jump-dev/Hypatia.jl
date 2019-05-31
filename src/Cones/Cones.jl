@@ -12,6 +12,9 @@ using ForwardDiff
 using DiffResults
 import Hypatia.HypReal
 import Hypatia.HypRealOrComplex
+import Hypatia.hyp_AtA!
+import Hypatia.hyp_chol!
+import Hypatia.hyp_ldiv_chol_L!
 import Hypatia.rt2
 import Hypatia.rt2i
 
