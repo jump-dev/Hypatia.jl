@@ -39,17 +39,9 @@ use_dual(cone::Cone) = cone.use_dual
 load_point(cone::Cone{T}, point::AbstractVector{T}) where {T <: HypReal} = (cone.point = point)
 dimension(cone::Cone) = cone.dim
 
-function factorize_hess(cone::Cone{T}) where {T <: BlasFloat}
-    @. cone.H2 = cone.H
-    # cone.F = bunchkaufman!(Symmetric(cone.H2, :U), true, check = false)
-    # return issuccess(cone.F)
-    cone.F = cholesky!(Symmetric(cone.H2, :U), Val(true), check = false)
-    return isposdef(cone.F)
-end
-
-function factorize_hess(cone::Cone{T}) where {T <: HypReal}
-    @. cone.H2 = cone.H
-    cone.F = cholesky!(Symmetric(cone.H2, :U), check = false) # TODO generic pivoted cholesky not implemented yet in Julia
+function factorize_hess(cone::Cone)
+    copyto!(cone.H2, cone.H)
+    cone.F = hyp_chol!(Symmetric(cone.H2, :U))
     return isposdef(cone.F)
 end
 

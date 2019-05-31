@@ -7,6 +7,8 @@ Copyright 2018, Chris Coey and contributors
 
 barrier (guessed, based on analogy to hypoperlog barrier)
 -log(v*logdet(W/v) - u) - logdet(W) - log(v)
+
+TODO remove allocations
 =#
 
 mutable struct HypoPerLogdet{T <: HypReal} <: Cone{T}
@@ -61,7 +63,7 @@ function check_in_cone(cone::HypoPerLogdet{T}) where {T <: HypReal}
     end
     W = cone.mat
     svec_to_smat!(W, view(cone.point, 3:cone.dim))
-    F = cholesky(Symmetric(W), Val(true), check = false) # TODO doesn't work for generic reals
+    F = hyp_chol!(Symmetric(W))
     if !isposdef(F) || u >= v * (logdet(F) - cone.side * log(v))
         return false
     end

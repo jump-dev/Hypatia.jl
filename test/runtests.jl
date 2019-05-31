@@ -12,9 +12,9 @@ const MO = HYP.Models
 const SO = HYP.Solvers
 const MU = HYP.ModelUtilities
 
-# include(joinpath(@__DIR__, "interpolation.jl"))
+include(joinpath(@__DIR__, "interpolation.jl"))
 include(joinpath(@__DIR__, "barriers.jl"))
-# include(joinpath(@__DIR__, "native.jl"))
+include(joinpath(@__DIR__, "native.jl"))
 # include(joinpath(@__DIR__, "MathOptInterface.jl"))
 
 # examples_dir = joinpath(@__DIR__, "../examples")
@@ -35,8 +35,8 @@ include(joinpath(@__DIR__, "barriers.jl"))
 # include(joinpath(examples_dir, "semidefinitepoly/JuMP.jl"))
 
 real_types = [
-    Float64,
-    Float32,
+    # Float64,
+    # Float32,
     BigFloat,
     ]
 
@@ -50,34 +50,35 @@ real_types = [
 #     test_recover_cheb_polys()
 # end
 #
-@info("starting barrier tests")
-barrier_testfuns = [
-    # test_epinormeucl_barrier,
-    # test_epinorinf_barrier,
-    # test_epinormspectral_barrier,
-    # test_epiperpower_barrier,
-    # test_epipersquare_barrier,
-    # test_epipersumexp_barrier,
-    # test_hypogeomean_barrier,
-    # test_hypoperlog_barrier,
-    # test_hypoperlogdet_barrier,
-    # test_semidefinite_barrier,
-    test_wsospolyinterp_barrier,
-    # test_wsospolyinterpmat_barrier,
-    # test_wsospolyinterpsoc_barrier,
-    ]
-@testset "barrier functions tests: $t, $T" for t in barrier_testfuns, T in real_types
-    t(T)
-end
-
-# @info("starting native interface tests")
-# verbose = false
-# system_solvers = [
-#     # SO.QRCholCombinedHSDSystemSolver,
-#     # SO.SymIndefCombinedHSDSystemSolver,
-#     SO.NaiveElimCombinedHSDSystemSolver,
-#     # SO.NaiveCombinedHSDSystemSolver,
+# @info("starting barrier tests")
+# barrier_testfuns = [
+#     test_epinormeucl_barrier,
+#     test_epinorinf_barrier,
+#     test_epinormspectral_barrier,
+#     test_epipersquare_barrier,
+#     # TODO next 3 fail with BigFloat, see https://github.com/JuliaDiff/DiffResults.jl/pull/9#issuecomment-497853361
+#     test_epiperpower_barrier,
+#     test_epipersumexp_barrier,
+#     test_hypogeomean_barrier,
+#     test_hypoperlog_barrier,
+#     test_hypoperlogdet_barrier,
+#     test_semidefinite_barrier,
+#     test_wsospolyinterp_barrier,
+#     test_wsospolyinterpmat_barrier,
+#     test_wsospolyinterpsoc_barrier,
 #     ]
+# @testset "barrier functions tests: $t, $T" for t in barrier_testfuns, T in real_types
+#     t(T)
+# end
+
+@info("starting native interface tests")
+verbose = false
+system_solvers = [
+    SO.QRCholCombinedHSDSystemSolver,
+    # SO.SymIndefCombinedHSDSystemSolver,
+    # SO.NaiveElimCombinedHSDSystemSolver,
+    # SO.NaiveCombinedHSDSystemSolver,
+    ]
 # testfuns_singular = [
 #     dimension1,
 #     consistent1,
@@ -87,54 +88,54 @@ end
 # @testset "preprocessing tests: $t, $s, $T" for t in testfuns_singular, s in system_solvers, T in real_types
 #     t(s{T}, MO.PreprocessedLinearModel{T}, verbose)
 # end
-# linear_models = [
-#     MO.PreprocessedLinearModel,
-#     MO.RawLinearModel,
-#     ]
-# testfuns_nonsingular = [
-#     orthant1,
-#     orthant2,
-#     orthant3,
-#     orthant4,
-#     epinorminf1,
-#     epinorminf2,
-#     epinorminf3,
-#     epinorminf4,
-#     epinorminf5,
-#     epinorminf6,
-#     epinormeucl1,
-#     epinormeucl2,
-#     epipersquare1,
-#     epipersquare2,
-#     epipersquare3,
-#     semidefinite1,
-#     semidefinite2,
-#     semidefinite3,
-#     semidefinitecomplex1,
-#     hypoperlog1,
-#     hypoperlog2,
-#     hypoperlog3,
-#     hypoperlog4,
-#     epiperpower1,
-#     epiperpower2,
-#     epiperpower3,
-#     hypogeomean1,
-#     hypogeomean2,
-#     hypogeomean3,
-#     hypogeomean4,
-#     epinormspectral1,
-#     hypoperlogdet1,
-#     hypoperlogdet2,
-#     hypoperlogdet3,
-#     epipersumexp1,
-#     epipersumexp2,
-#     ]
-# @testset "native tests: $t, $s, $m, $T" for t in testfuns_nonsingular, s in system_solvers, m in linear_models, T in real_types
-#     if s == SO.QRCholCombinedHSDSystemSolver && m == MO.RawLinearModel
-#         continue # QRChol linear system solver needs preprocessed model
-#     end
-#     t(s{T}, m{T}, verbose)
-# end
+linear_models = [
+    MO.PreprocessedLinearModel,
+    # MO.RawLinearModel,
+    ]
+testfuns_nonsingular = [
+    # orthant1,
+    # orthant2,
+    # orthant3,
+    # orthant4,
+    # epinorminf1,
+    # epinorminf2,
+    # epinorminf3,
+    # epinorminf4,
+    # epinorminf5,
+    epinorminf6,
+    # epinormeucl1,
+    # epinormeucl2,
+    # epipersquare1,
+    # epipersquare2,
+    # epipersquare3,
+    semidefinite1,
+    # semidefinite2,
+    semidefinite3,
+    # semidefinitecomplex1,
+    # hypoperlog1,
+    # hypoperlog2,
+    # hypoperlog3,
+    # hypoperlog4,
+    # epiperpower1,
+    # epiperpower2,
+    # epiperpower3,
+    # hypogeomean1,
+    # hypogeomean2,
+    # hypogeomean3,
+    # hypogeomean4,
+    epinormspectral1,
+    hypoperlogdet1,
+    hypoperlogdet2,
+    hypoperlogdet3,
+    # epipersumexp1,
+    # epipersumexp2,
+    ]
+@testset "native tests: $t, $s, $m, $T" for t in testfuns_nonsingular, s in system_solvers, m in linear_models, T in real_types
+    if s == SO.QRCholCombinedHSDSystemSolver && m == MO.RawLinearModel
+        continue # QRChol linear system solver needs preprocessed model
+    end
+    t(s{T}, m{T}, verbose)
+end
 
 # @info("starting MathOptInterface tests")
 # verbose = false

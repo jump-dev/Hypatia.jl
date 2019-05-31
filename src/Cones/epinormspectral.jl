@@ -9,7 +9,7 @@ W is vectorized column-by-column (i.e. vec(W) in Julia)
 barrier from "Interior-Point Polynomial Algorithms in Convex Programming" by Nesterov & Nemirovskii 1994
 -logdet(u*I_n - W*W'/u) - log(u)
 
-# TODO eliminate allocations for incone check
+TODO eliminate allocations
 =#
 
 mutable struct EpiNormSpectral{T <: HypReal} <: Cone{T}
@@ -61,12 +61,14 @@ function check_in_cone(cone::EpiNormSpectral{T}) where {T <: HypReal}
     W[:] = view(cone.point, 2:cone.dim)
     n = cone.n
     m = cone.m
-    X = Symmetric(W * W') # TODO syrk
+
+    X = Symmetric(W * W') # TODO use hyp_AtA! when prealloc'd
     Z = Symmetric(u * I - X / u)
-    F = cholesky(Z, Val(true), check = false) # TODO in place; doesn't work for generic reals
+    F = hyp_chol!(Z)
     if !isposdef(F)
         return false
     end
+
     # TODO figure out structured form of inverse? could simplify algebra
     Zi = Symmetric(inv(F))
     Eu = Symmetric(I + X / u / u)
