@@ -237,7 +237,7 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
         mul!(Q2GHGQ2, GQ2', HGQ2)
 
         if system_solver.use_sparse
-            F = ldlt(Symmetric(Q2GHGQ2), check = false)
+            F = ldlt(Symmetric(Q2GHGQ2), check = false) # TODO not implemented for generic reals
             if !issuccess(F)
                 println("sparse linear system matrix factorization failed")
                 mul!(Q2GHGQ2, GQ2', HGQ2)
@@ -248,14 +248,21 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
             end
             Q2div .= F \ Q2div # TODO eliminate allocs (see https://github.com/JuliaLang/julia/issues/30084)
         else
-            F = cholesky!(Symmetric(Q2GHGQ2), Val(true), check = false) # TODO prealloc cholesky auxiliary vectors using posvx; not implemented for generic reals
+            F = hyp_chol!(Symmetric(Q2GHGQ2)) # TODO prealloc blasreal cholesky auxiliary vectors using posvx
             if !isposdef(F)
                 println("dense linear system matrix factorization failed")
                 mul!(Q2GHGQ2, GQ2', HGQ2)
                 Q2GHGQ2 += T(1e-4) * I
-                F = bunchkaufman!(Symmetric(Q2GHGQ2), true, check = false) # TODO prealloc with old sysvx code
-                if !issuccess(F)
-                    error("could not fix failure of positive definiteness (mu is $mu); terminating")
+                if T <: BlasReal
+                    F = bunchkaufman!(Symmetric(Q2GHGQ2), true, check = false) # TODO prealloc with old sysvx code; not implemented for generic reals
+                    if !issuccess(F)
+                        error("could not fix failure of positive definiteness (mu is $mu); terminating")
+                    end
+                else
+                    F = hyp_chol!(Symmetric(Q2GHGQ2)) # TODO prealloc blasreal cholesky auxiliary vectors using posvx
+                    if !isposdef(F)
+                        error("could not fix failure of positive definiteness (mu is $mu); terminating")
+                    end
                 end
             end
             ldiv!(F, Q2div)

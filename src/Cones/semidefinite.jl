@@ -74,7 +74,7 @@ end
 function check_in_cone(cone::PosSemidef{T, R}) where {R <: HypRealOrComplex{T}} where {T <: HypReal}
     mat = cone.mat
     svec_to_smat!(mat, cone.point)
-    F = cholesky!(Hermitian(mat), Val(true), check = false) # TODO doesn't work for generic T non-BLAS type
+    F = hyp_chol!(Hermitian(mat))
     if !isposdef(F)
         return false
     end

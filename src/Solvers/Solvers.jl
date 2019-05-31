@@ -8,12 +8,16 @@ module Solvers
 
 using Printf
 using LinearAlgebra
+import LinearAlgebra.BlasReal
 using SparseArrays
 using Test
 using TimerOutputs
 import Hypatia.Cones
 import Hypatia.Models
 import Hypatia.HypReal
+import Hypatia.hyp_AtA!
+import Hypatia.hyp_chol!
+import Hypatia.hyp_ldiv_chol_L!
 
 abstract type Solver{T <: HypReal} end
 
