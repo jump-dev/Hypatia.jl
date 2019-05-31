@@ -48,8 +48,8 @@ PosSemidef{T, R}(dim::Int) where {R <: HypRealOrComplex{T}} where {T <: HypReal}
 function setup_data(cone::PosSemidef{T, R}) where {R <: HypRealOrComplex{T}} where {T <: HypReal}
     dim = cone.dim
     cone.g = Vector{T}(undef, dim)
-    cone.H = Matrix{T}(undef, dim, dim)
-    cone.Hi = similar(cone.H)
+    cone.H = zeros(T, dim, dim)
+    cone.Hi = zeros(T, dim, dim)
     cone.mat = Matrix{R}(undef, cone.side, cone.side)
     return
 end

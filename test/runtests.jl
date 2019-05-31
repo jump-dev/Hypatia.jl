@@ -72,11 +72,11 @@ real_types = [
 # end
 
 @info("starting native interface tests")
-verbose = false
+verbose = true
 system_solvers = [
     SO.QRCholCombinedHSDSystemSolver,
     # SO.SymIndefCombinedHSDSystemSolver,
-    # SO.NaiveElimCombinedHSDSystemSolver,
+    SO.NaiveElimCombinedHSDSystemSolver,
     # SO.NaiveCombinedHSDSystemSolver,
     ]
 # testfuns_singular = [
@@ -90,7 +90,7 @@ system_solvers = [
 # end
 linear_models = [
     MO.PreprocessedLinearModel,
-    # MO.RawLinearModel,
+    MO.RawLinearModel,
     ]
 testfuns_nonsingular = [
     # orthant1,
@@ -102,15 +102,15 @@ testfuns_nonsingular = [
     # epinorminf3,
     # epinorminf4,
     # epinorminf5,
-    epinorminf6,
+    # epinorminf6,
     # epinormeucl1,
     # epinormeucl2,
     # epipersquare1,
     # epipersquare2,
     # epipersquare3,
-    semidefinite1,
+    # semidefinite1,
     # semidefinite2,
-    semidefinite3,
+    # semidefinite3,
     # semidefinitecomplex1,
     # hypoperlog1,
     # hypoperlog2,

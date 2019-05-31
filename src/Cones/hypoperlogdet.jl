@@ -40,7 +40,7 @@ function setup_data(cone::HypoPerLogdet{T}) where {T <: HypReal}
     side = cone.side
     cone.mat = Matrix{T}(undef, side, side)
     cone.g = Vector{T}(undef, dim)
-    cone.H = Matrix{T}(undef, dim, dim)
+    cone.H = zeros(T, dim, dim)
     cone.H2 = similar(cone.H)
     return
 end

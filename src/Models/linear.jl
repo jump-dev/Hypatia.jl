@@ -97,17 +97,16 @@ mutable struct RawLinearModel{T <: HypReal} <: LinearModel{T}
 
         # solve for y as least squares solution to A'y = -c - G'z
         if !iszero(model.p)
-            Ap = A'
-            if issparse(Ap) && !(T <: sparse_QR_reals)
+            if issparse(A) && !(T <: sparse_QR_reals)
                 # TODO alternative fallback is to convert sparse{T} to sparse{Float64} and do the sparse LU
                 if use_dense_fallback
                     @warn("using dense factorization of A' in initial point finding because sparse factorization for number type $T is not supported by SparseArrays")
-                    F = qr!(Matrix(Ap))
+                    F = qr!(Matrix(A'))
                 else
                     error("sparse factorization for number type $T is not supported by SparseArrays, so Hypatia cannot find an initial point")
                 end
             else
-                F = qr(Ap)
+                F = qr(A')
             end
             point.y = F \ (-c - G' * point.z)
         end
@@ -229,13 +228,13 @@ mutable struct PreprocessedLinearModel{T <: HypReal} <: LinearModel{T}
                 point.x = AG_fact \ vcat(b, h - point.s)
             else
                 # TODO optimize all below
-                if issparse(AG)
+                if AG_fact isa QRPivoted{T, Matrix{T}}
+                    x_keep_idxs = AG_fact.p[1:AG_rank]
+                    AG_Q1 = AG_fact.Q * Matrix{T}(I, p + q, AG_rank)
+                else
                     x_keep_idxs = AG_fact.pcol[1:AG_rank]
                     AG_Q1 = Matrix{T}(undef, p + q, AG_rank)
                     AG_Q1[AG_fact.prow, :] = AG_fact.Q * Matrix{T}(I, p + q, AG_rank)
-                else
-                    x_keep_idxs = AG_fact.p[1:AG_rank]
-                    AG_Q1 = AG_fact.Q * Matrix{T}(I, p + q, AG_rank)
                 end
                 AG_R = UpperTriangular(AG_R[1:AG_rank, 1:AG_rank])
 
@@ -258,16 +257,15 @@ mutable struct PreprocessedLinearModel{T <: HypReal} <: LinearModel{T}
 
         # solve for y as least squares solution to A'y = -c - G'z
         if !iszero(p)
-            Ap = A'
-            if issparse(Ap) && !(T <: sparse_QR_reals)
+            if issparse(A) && !(T <: sparse_QR_reals)
                 if use_dense_fallback
                     @warn("using dense factorization of A' in preprocessing and initial point finding because sparse factorization for number type $T is not supported by SparseArrays")
-                    Ap_fact = qr!(Matrix(Ap), Val(true))
+                    Ap_fact = qr!(Matrix(A'), Val(true))
                 else
                     error("sparse factorization for number type $T is not supported by SparseArrays, so Hypatia cannot preprocess and find an initial point")
                 end
             else
-                Ap_fact = issparse(A) ? qr(sparse(Ap), tol = tol_QR) : qr(Ap, Val(true))
+                Ap_fact = issparse(A) ? qr(sparse(A'), tol = tol_QR) : qr(A', Val(true))
             end
             Ap_R = Ap_fact.R
 
@@ -280,13 +278,13 @@ mutable struct PreprocessedLinearModel{T <: HypReal} <: LinearModel{T}
             end
 
             # TODO optimize all below
-            if issparse(A)
+            if Ap_fact isa QRPivoted{T, Matrix{T}}
+                y_keep_idxs = Ap_fact.p[1:Ap_rank]
+                A_Q = Ap_fact.Q * Matrix{T}(I, n, n)
+            else
                 y_keep_idxs = Ap_fact.pcol[1:Ap_rank]
                 A_Q = Matrix{T}(undef, n, n)
                 A_Q[Ap_fact.prow, :] = Ap_fact.Q * Matrix{T}(I, n, n)
-            else
-                y_keep_idxs = Ap_fact.p[1:Ap_rank]
-                A_Q = Ap_fact.Q * Matrix{T}(I, n, n)
             end
             Ap_Q1 = A_Q[:, 1:Ap_rank]
             Ap_Q2 = A_Q[:, (Ap_rank + 1):n]
