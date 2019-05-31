@@ -62,9 +62,9 @@ get_nu(cone::WSOSPolyInterp) = sum(size(Pk, 2) for Pk in cone.Ps)
 
 set_initial_point(arr::AbstractVector{T}, cone::WSOSPolyInterp{T, R}) where {R <: HypRealOrComplex{T}} where {T <: HypReal} = (@. arr = one(T); arr)
 
-# TODO need a generic method for non-BlasReal
-_AtA!(U::Matrix{T}, A::Matrix{T}) where {T <: LinearAlgebra.BlasReal} = BLAS.syrk!('U', 'T', one(T), A, zero(T), U)
-_AtA!(U::Matrix{Complex{T}}, A::Matrix{Complex{T}}) where {T <: LinearAlgebra.BlasReal} = BLAS.herk!('U', 'C', one(T), A, zero(T), U)
+# TODO need a generic method for non-BlasFloat
+_AtA!(U::Matrix{T}, A::Matrix{T}) where {T <: LinearAlgebra.BlasFloat} = BLAS.syrk!('U', 'T', one(T), A, zero(T), U)
+_AtA!(U::Matrix{Complex{T}}, A::Matrix{Complex{T}}) where {T <: LinearAlgebra.BlasFloat} = BLAS.herk!('U', 'C', one(T), A, zero(T), U)
 
 function check_in_cone(cone::WSOSPolyInterp{T, R}) where {R <: HypRealOrComplex{T}} where {T <: HypReal}
     Ps = cone.Ps
