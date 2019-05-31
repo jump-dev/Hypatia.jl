@@ -106,7 +106,7 @@ mutable struct RawLinearModel{T <: HypReal} <: LinearModel{T}
                     error("sparse factorization for number type $T is not supported by SparseArrays, so Hypatia cannot find an initial point")
                 end
             else
-                F = qr(A')
+                F = issparse(A) ? qr(sparse(A')) : qr!(Matrix(A'))
             end
             point.y = F \ (-c - G' * point.z)
         end
