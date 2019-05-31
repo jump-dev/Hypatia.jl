@@ -7,7 +7,7 @@ functions and caches for cones
 module Cones
 
 using LinearAlgebra
-import LinearAlgebra.BlasReal
+import LinearAlgebra.BlasFloat
 using ForwardDiff
 using DiffResults
 import Hypatia.HypReal
@@ -36,7 +36,7 @@ use_dual(cone::Cone) = cone.use_dual
 load_point(cone::Cone{T}, point::AbstractVector{T}) where {T <: HypReal} = (cone.point = point)
 dimension(cone::Cone) = cone.dim
 
-function factorize_hess(cone::Cone{T}) where {T <: BlasReal}
+function factorize_hess(cone::Cone{T}) where {T <: BlasFloat}
     @. cone.H2 = cone.H
     # cone.F = bunchkaufman!(Symmetric(cone.H2, :U), true, check = false)
     # return issuccess(cone.F)

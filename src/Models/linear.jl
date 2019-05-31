@@ -44,6 +44,8 @@ function set_initial_cone_point(point, cones)
     return point
 end
 
+const sparse_QR_reals = Float64
+
 mutable struct RawLinearModel{T <: HypReal} <: LinearModel{T}
     n::Int
     p::Int
@@ -66,11 +68,9 @@ mutable struct RawLinearModel{T <: HypReal} <: LinearModel{T}
         G::AbstractMatrix,
         h::Vector,
         cones::Vector{<:Cones.Cone},
-        cone_idxs::Vector{UnitRange{Int}},
+        cone_idxs::Vector{UnitRange{Int}};
+        use_dense_fallback::Bool = true,
         ) where {T <: HypReal}
-        if (issparse(A) || issparse(G)) && T != Float64
-            error("can only use Float64 types with sparse A or G (generic QR not implemented)")
-        end
         c = convert(Vector{T}, c)
         A = convert(AbstractMatrix{T}, A)
         b = convert(Vector{T}, b)
@@ -97,16 +97,35 @@ mutable struct RawLinearModel{T <: HypReal} <: LinearModel{T}
 
         # solve for y as least squares solution to A'y = -c - G'z
         if !iszero(model.p)
-            point.y = (issparse(A) ? sparse(A') : A') \ (-c - G' * point.z)
+            Ap = A'
+            if issparse(Ap) && !(T <: sparse_QR_reals)
+                # TODO alternative fallback is to convert sparse{T} to sparse{Float64} and do the sparse LU
+                if use_dense_fallback
+                    @warn("using dense factorization of A' in initial point finding because sparse factorization for number type $T is not supported by SparseArrays")
+                    F = qr!(Matrix(Ap))
+                else
+                    error("sparse factorization for number type $T is not supported by SparseArrays, so Hypatia cannot find an initial point")
+                end
+            else
+                F = qr(Ap)
+            end
+            point.y = F \ (-c - G' * point.z)
         end
 
         # solve for x as least squares solution to Ax = b, Gx = h - s
         if !iszero(model.n)
             AG = vcat(A, G)
-            if issparse(AG) && T != Float64
-                error("can only use Float64 types with sparse [A; G] (generic QR not implemented)")
+            if issparse(AG) && !(T <: sparse_QR_reals)
+                # TODO alternative fallback is to convert sparse{T} to sparse{Float64} and do the sparse LU
+                if use_dense_fallback
+                    @warn("using dense factorization of [A; G] in initial point finding because sparse factorization for number type $T is not supported by SparseArrays")
+                    AG = Matrix(AG)
+                else
+                    error("sparse factorization for number type $T is not supported by SparseArrays, so Hypatia cannot find an initial point")
+                end
             end
-            point.x = AG \ vcat(b, h - point.s)
+            F = issparse(AG) ? qr(AG) : qr!(AG)
+            point.x = F \ vcat(b, h - point.s)
         end
 
         model.initial_point = point
@@ -154,10 +173,8 @@ mutable struct PreprocessedLinearModel{T <: HypReal} <: LinearModel{T}
         cones::Vector{<:Cones.Cone},
         cone_idxs::Vector{UnitRange{Int}};
         tol_QR::Real = max(1e-14, 1e3 * eps(T)),
+        use_dense_fallback::Bool = true,
         ) where {T <: HypReal}
-        if (issparse(A) || issparse(G)) && T != Float64
-            error("can only use Float64 types with sparse A or G (generic QR not implemented)")
-        end
         c = convert(Vector{T}, c)
         A = convert(AbstractMatrix{T}, A)
         b = convert(Vector{T}, b)
@@ -187,14 +204,15 @@ mutable struct PreprocessedLinearModel{T <: HypReal} <: LinearModel{T}
         if !iszero(n)
             # get pivoted QR # TODO when Julia has a unified QR interface, replace this
             AG = vcat(A, G)
-            if issparse(AG)
-                if T != Float64
-                    error("can only use Float64 types with sparse [A; G] (generic QR not implemented)")
+            if issparse(AG) && !(T <: sparse_QR_reals)
+                if use_dense_fallback
+                    @warn("using dense factorization of [A; G] in preprocessing and initial point finding because sparse factorization for number type $T is not supported by SparseArrays")
+                    AG = Matrix(AG)
+                else
+                    error("sparse factorization for number type $T is not supported by SparseArrays, so Hypatia cannot preprocess and find an initial point")
                 end
-                AG_fact = qr(AG, tol = tol_QR)
-            else
-                AG_fact = qr(AG, Val(true))
             end
+            AG_fact = issparse(AG) ? qr(AG, tol = tol_QR) : qr(AG, Val(true))
             AG_R = AG_fact.R
 
             # TODO could replace this with rank(Ap_fact) when available for both dense and sparse
@@ -240,11 +258,16 @@ mutable struct PreprocessedLinearModel{T <: HypReal} <: LinearModel{T}
 
         # solve for y as least squares solution to A'y = -c - G'z
         if !iszero(p)
-            # get pivoted QR # TODO when Julia has a unified QR interface, replace this
-            if issparse(A)
-                Ap_fact = qr(sparse(A'), tol = tol_QR)
+            Ap = A'
+            if issparse(Ap) && !(T <: sparse_QR_reals)
+                if use_dense_fallback
+                    @warn("using dense factorization of A' in preprocessing and initial point finding because sparse factorization for number type $T is not supported by SparseArrays")
+                    Ap_fact = qr!(Matrix(Ap), Val(true))
+                else
+                    error("sparse factorization for number type $T is not supported by SparseArrays, so Hypatia cannot preprocess and find an initial point")
+                end
             else
-                Ap_fact = qr(A', Val(true))
+                Ap_fact = issparse(A) ? qr(sparse(Ap), tol = tol_QR) : qr(Ap, Val(true))
             end
             Ap_R = Ap_fact.R
 
