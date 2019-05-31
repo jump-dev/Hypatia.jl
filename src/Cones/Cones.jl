@@ -30,7 +30,7 @@ include("hypoperlogdet.jl")
 include("epipersumexp.jl")
 include("wsospolyinterp.jl")
 include("wsospolyinterpmat.jl")
-# include("wsospolyinterpsoc.jl")
+include("wsospolyinterpsoc.jl")
 
 use_dual(cone::Cone) = cone.use_dual
 load_point(cone::Cone{T}, point::AbstractVector{T}) where {T <: HypReal} = (cone.point = point)

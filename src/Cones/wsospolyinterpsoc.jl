@@ -11,31 +11,31 @@ mutable struct WSOSPolyInterpSOC{T <: HypReal} <: Cone{T}
     dim::Int
     R::Int
     U::Int
-    ipwt::Vector{Matrix{Float64}}
+    ipwt::Vector{Matrix{T}}
 
-    point::AbstractVector{Float64}
-    g::Vector{Float64}
-    H::Matrix{Float64}
-    gtry::Vector{Float64}
-    Htry::Matrix{Float64}
-    H2::Matrix{Float64}
-    Hi::Matrix{Float64}
+    point::AbstractVector{T}
+    g::Vector{T}
+    H::Matrix{T}
+    gtry::Vector{T}
+    Htry::Matrix{T}
+    H2::Matrix{T}
+    Hi::Matrix{T}
     F
-    mat::Vector{Matrix{Float64}}
-    matfact::Vector{CholeskyPivoted{Float64, Matrix{Float64}}}
-    tmp1::Vector{Matrix{Float64}}
-    tmp2::Vector{Matrix{Float64}}
-    tmp3::Matrix{Float64}
-    tmp4::Vector{Matrix{Float64}}
-    li_lambda::Vector{Vector{Matrix{Float64}}}
-    PlambdaiP::Vector{Vector{Vector{Matrix{Float64}}}}
-    lambdafact::Vector{CholeskyPivoted{Float64, Matrix{Float64}}}
+    mat::Vector{Matrix{T}}
+    matfact::Vector{CholeskyPivoted{T, Matrix{T}}}
+    tmp1::Vector{Matrix{T}}
+    tmp2::Vector{Matrix{T}}
+    tmp3::Matrix{T}
+    tmp4::Vector{Matrix{T}}
+    li_lambda::Vector{Vector{Matrix{T}}}
+    PlambdaiP::Vector{Vector{Vector{Matrix{T}}}}
+    lambdafact::Vector{CholeskyPivoted{T, Matrix{T}}}
 
-    function WSOSPolyInterpSOC(R::Int, U::Int, ipwt::Vector{Matrix{Float64}}, is_dual::Bool)
+    function WSOSPolyInterpSOC{T}(R::Int, U::Int, ipwt::Vector{Matrix{T}}, is_dual::Bool) where {T <: HypReal}
         for ipwtj in ipwt
             @assert size(ipwtj, 1) == U
         end
-        cone = new()
+        cone = new{T}()
         cone.use_dual = !is_dual # using dual barrier
         dim = U * R
         cone.dim = dim
@@ -46,49 +46,50 @@ mutable struct WSOSPolyInterpSOC{T <: HypReal} <: Cone{T}
     end
 end
 
-WSOSPolyInterpSOC(R::Int, U::Int, ipwt::Vector{Matrix{Float64}}) = WSOSPolyInterpSOC(R, U, ipwt, false)
+WSOSPolyInterpSOC{T}(R::Int, U::Int, ipwt::Vector{Matrix{T}}) where {T <: HypReal} = WSOSPolyInterpSOC{T}(R, U, ipwt, false)
 
-function setup_data(cone::WSOSPolyInterpSOC)
+function setup_data(cone::WSOSPolyInterpSOC{T}) where {T <: HypReal}
     dim = cone.dim
     U = cone.U
     R = cone.R
     ipwt = cone.ipwt
-    cone.g = similar(ipwt[1], dim)
-    cone.H = similar(ipwt[1], dim, dim)
-    cone.gtry = similar(ipwt[1], dim)
-    cone.Htry = similar(ipwt[1], dim, dim)
+    cone.g = Vector{T}(undef, dim)
+    cone.H = Matrix{T}(undef, dim, dim)
+    cone.gtry = similar(cone.g, dim)
+    cone.Htry = similar(cone.g, dim, dim)
     cone.H2 = similar(cone.H)
     cone.Hi = similar(cone.H)
-    cone.mat = [similar(ipwt[1], size(ipwtj, 2), size(ipwtj, 2)) for ipwtj in ipwt]
-    cone.matfact = Vector{CholeskyPivoted{Float64, Matrix{Float64}}}(undef, length(ipwt))
-    cone.tmp1 = [similar(ipwt[1], size(ipwtj, 2), U) for ipwtj in ipwt]
-    cone.tmp2 = [similar(ipwt[1], size(ipwtj, 2), U) for ipwtj in ipwt]
-    cone.tmp3 = similar(ipwt[1], U, U)
-    cone.tmp4 = [similar(ipwt[1], size(ipwtj, 2), size(ipwtj, 2)) for ipwtj in ipwt]
-    cone.li_lambda = [Vector{Matrix{Float64}}(undef, R - 1) for ipwtj in ipwt]
+    cone.mat = [similar(cone.g, size(ipwtj, 2), size(ipwtj, 2)) for ipwtj in ipwt]
+    cone.matfact = Vector{CholeskyPivoted{T, Matrix{T}}}(undef, length(ipwt))
+    cone.tmp1 = [similar(cone.g, size(ipwtj, 2), U) for ipwtj in ipwt]
+    cone.tmp2 = [similar(cone.g, size(ipwtj, 2), U) for ipwtj in ipwt]
+    cone.tmp3 = similar(cone.g, U, U)
+    cone.tmp4 = [similar(cone.g, size(ipwtj, 2), size(ipwtj, 2)) for ipwtj in ipwt]
+    cone.li_lambda = [Vector{Matrix{T}}(undef, R - 1) for ipwtj in ipwt]
     for j in eachindex(ipwt), r in 1:(R - 1)
-        cone.li_lambda[j][r] = similar(ipwt[1], size(ipwt[j], 2), size(ipwt[j], 2))
+        cone.li_lambda[j][r] = similar(cone.g, size(ipwt[j], 2), size(ipwt[j], 2))
     end
-    cone.PlambdaiP = [Vector{Vector{Matrix{Float64}}}(undef, R) for ipwtj in ipwt]
+    cone.PlambdaiP = [Vector{Vector{Matrix{T}}}(undef, R) for ipwtj in ipwt]
     for j in eachindex(ipwt), r1 in 1:R
-        cone.PlambdaiP[j][r1] = Vector{Matrix{Float64}}(undef, r1)
+        cone.PlambdaiP[j][r1] = Vector{Matrix{T}}(undef, r1)
         for r2 in 1:r1
-            cone.PlambdaiP[j][r1][r2] = similar(ipwt[1], U, U)
+            cone.PlambdaiP[j][r1][r2] = similar(cone.g, U, U)
         end
     end
-    cone.lambdafact = Vector{CholeskyPivoted{Float64, Matrix{Float64}}}(undef, length(ipwt))
+    cone.lambdafact = Vector{CholeskyPivoted{T, Matrix{T}}}(undef, length(ipwt))
     return
 end
 
 get_nu(cone::WSOSPolyInterpSOC) = sum(size(ipwtj, 2) for ipwtj in cone.ipwt)
 
-function set_initial_point(arr::AbstractVector{Float64}, cone::WSOSPolyInterpSOC)
-    arr .= 0.0
-    arr[1:cone.U] .= 1.0
+function set_initial_point(arr::AbstractVector{T}, cone::WSOSPolyInterpSOC{T}) where {T <: HypReal}
+    arr .= zero(T)
+    arr[1:cone.U] .= one(T)
     return arr
 end
 
-function check_in_cone(cone::WSOSPolyInterpSOC)
+# TODO cleanup experimental code
+function check_in_cone(cone::WSOSPolyInterpSOC{T}) where {T <: HypReal}
     # @timeit "build mat" begin
     for j in eachindex(cone.ipwt)
         ipwtj = cone.ipwt[j]
@@ -134,8 +135,8 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
     # end
 
     # @timeit "grad hess" begin
-    cone.g .= 0.0
-    cone.H .= 0.0
+    cone.g .= zero(T)
+    cone.H .= zero(T)
     for j in eachindex(cone.ipwt)
         ipwtj = cone.ipwt[j]
         tmp1 = cone.tmp1[j]
@@ -167,14 +168,14 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
             mul!(tmp2, li_lambda[r - 1]', ipwtj')
             tmp2 .= view(tmp2, matfact[j].p, :)
             ldiv!(matfact[j].L, tmp2)
-            BLAS.syrk!('U', 'T', 1.0, tmp2, 0.0, PlambdaiP[r][r])
+            BLAS.syrk!('U', 'T', one(T), tmp2, zero(T), PlambdaiP[r][r])
             PlambdaiP[r][r] .+= Symmetric(ipwtj * tmp1, :U)
         end
 
         # part of gradient/hessian when p=1
         tmp2 .= view(ipwtj', cone.lambdafact[j].p, :)
         ldiv!(cone.lambdafact[j].L, tmp2)
-        BLAS.syrk!('U', 'T', 1.0, tmp2, 0.0, tmp3)
+        BLAS.syrk!('U', 'T', one(T), tmp2, zero(T), tmp3)
 
         for i in 1:cone.U
             cone.g[i] += tmp3[i, i] * (cone.R - 1)
@@ -217,12 +218,6 @@ function check_in_cone(cone::WSOSPolyInterpSOC)
             end
         end
     end # j
-    # end
-
-    # if !isapprox(Symmetric(cone.H, :U) * cone.point, -cone.g)
-    #     @show Symmetric(cone.H, :U) * cone.point, -cone.g
-    #     @show cone.point
-    #     error()
     # end
 
     return factorize_hess(cone)
