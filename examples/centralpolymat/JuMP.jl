@@ -15,11 +15,11 @@ import Random
 using LinearAlgebra
 using Test
 
-function centralpolymatJuMP(n::Int, d::Int)
+function centralpolymatJuMP(n::Int, halfdeg::Int)
     DP.@polyvar x[1:n]
-    halfdeg_monos = DP.monomials(x, 0:d)
-    L = binomial(n + d, n)
-    U = binomial(n + 2d, n)
+    halfdeg_monos = DP.monomials(x, 0:halfdeg)
+    L = binomial(n + halfdeg, n)
+    U = binomial(n + 2 * halfdeg, n)
     coeffs = randn(L, L)
     mat = coeffs * coeffs'
     poly = halfdeg_monos' * mat * halfdeg_monos
@@ -38,7 +38,6 @@ end
 
 centralpolymatJuMP1() = centralpolymatJuMP(2, 3)
 centralpolymatJuMP2() = centralpolymatJuMP(3, 2)
-
 
 function test_centralpolymatJuMP(instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
