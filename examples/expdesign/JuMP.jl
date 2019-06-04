@@ -34,16 +34,20 @@ function expdesignJuMP(
     JuMP.@constraint(model, sum(np) == n) # n experiments total
     v1 = [Q[i, j] for i in 1:q for j in 1:i] # vectorized Q
 
-    if use_logdet == 1
+    if use_logdet
         JuMP.@variable(model, hypo) # hypograph of logdet variable
         JuMP.@objective(model, Max, hypo)
         JuMP.@constraint(model, vcat(hypo, 1.0, v1) in MOI.LogDetConeTriangle(q)) # hypograph of logdet of information matrix
     else
-        JuMP.@variable(model, hypo[1:q])
-        JuMP.@variable(model, lowertri[i in 1:q, j in 1:i])
+        JuMP.@variables(model, begin
+            hypo[1:q]
+            lowertri[i in 1:q, j in 1:i]
+        end)
         v2 = vcat([vcat(zeros(i - 1), [lowertri[j, i] for j in i:q], zeros(i - 1), lowertri[i, i]) for i in 1:q]...)
-        JuMP.@constraint(model, vcat(v1, v2) in MOI.PositiveSemidefiniteConeTriangle(2q))
-        JuMP.@constraint(model, [i in 1:q], [hypo[i], 1.0, lowertri[i, i]] in MOI.ExponentialCone())
+        JuMP.@constraints(model, begin
+            vcat(v1, v2) in MOI.PositiveSemidefiniteConeTriangle(2q)
+            [i in 1:q], [hypo[i], 1.0, lowertri[i, i]] in MOI.ExponentialCone()
+        end)
         JuMP.@objective(model, Max, sum(hypo))
     end
     return (model = model,)
