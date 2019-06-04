@@ -18,6 +18,7 @@ include(joinpath(@__DIR__, "native.jl"))
 include(joinpath(@__DIR__, "MathOptInterface.jl"))
 
 examples_dir = joinpath(@__DIR__, "../examples")
+include(joinpath(examples_dir, "centralpolymat/JuMP.jl"))
 include(joinpath(examples_dir, "envelope/native.jl"))
 include(joinpath(examples_dir, "linearopt/native.jl"))
 include(joinpath(examples_dir, "polymin/native.jl"))
@@ -174,6 +175,9 @@ JuMP_options = (
     time_limit = 6e2, # 1 minute
     )
 @testset "JuMP examples" begin
+    @testset "centralpolymat" begin test_centralpolymatJuMP(; JuMP_options...,
+        tol_rel_opt = 1e-6, tol_abs_opt = 1e-6, tol_feas = 1e-7,
+        ) end
     @testset "contraction" begin test_contractionJuMP(; JuMP_options...,
         tol_rel_opt = 1e-4, tol_abs_opt = 1e-4, tol_feas = 1e-4,
         ) end
