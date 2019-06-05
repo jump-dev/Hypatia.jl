@@ -2,6 +2,8 @@
 Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
 compute a gram matrix of a polynomial, minimizing the logarithm of its determinant
+https://perso.uclouvain.be/paul.vandooren/publications/GeninNV99b.pdf
+
 =#
 
 import DynamicPolynomials

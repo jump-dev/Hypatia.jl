@@ -23,9 +23,11 @@ function expdesignJuMP(
     p::Int,
     n::Int,
     nmax::Int;
-    use_logdet::Bool = true,
+    use_psd::Bool = false,
+    criterion = "d",
     )
     @assert (p > q) && (n > q) && (nmax <= n)
+    @assert criterion in ["d", "e"]
     V = randn(q, p)
 
     model = JuMP.Model()
@@ -34,20 +36,25 @@ function expdesignJuMP(
     JuMP.@constraint(model, sum(np) == n) # n experiments total
     v1 = [Q[i, j] for i in 1:q for j in 1:i] # vectorized Q
 
-    if use_logdet
+    if !use_psd
         JuMP.@variable(model, hypo) # hypograph of logdet variable
         JuMP.@objective(model, Max, hypo)
-        JuMP.@constraint(model, vcat(hypo, 1.0, v1) in MOI.LogDetConeTriangle(q)) # hypograph of logdet of information matrix
+        if criterion == "d"
+            JuMP.@constraint(model, vcat(hypo, 1.0, v1) in MOI.LogDetConeTriangle(q)) # hypograph of logdet of information matrix
+        else
+            error("root det cone not implemented yet")
+        end
     else
-        JuMP.@variables(model, begin
-            hypo[1:q]
-            lowertri[i in 1:q, j in 1:i]
-        end)
+        JuMP.@variable(model, lowertri[i in 1:q, j in 1:i])
         v2 = vcat([vcat(zeros(i - 1), [lowertri[j, i] for j in i:q], zeros(i - 1), lowertri[i, i]) for i in 1:q]...)
-        JuMP.@constraints(model, begin
-            vcat(v1, v2) in MOI.PositiveSemidefiniteConeTriangle(2q)
-            [i in 1:q], [hypo[i], 1.0, lowertri[i, i]] in MOI.ExponentialCone()
-        end)
+        JuMP.@constraint(model, vcat(v1, v2) in MOI.PositiveSemidefiniteConeTriangle(2q))
+        if criterion == "d"
+            JuMP.@variable(model, hypo[1:q])
+            JuMP.@constraint(model, [i in 1:q], [hypo[i], 1.0, lowertri[i, i]] in MOI.ExponentialCone())
+        else
+            JuMP.@variable(model, hypo)
+            JuMP.@constraint(model, vcat(hypo, [lowertri[i, i] for i in 1:q]) in MOI.GeometricMeanCone(q + 1))
+        end
         JuMP.@objective(model, Max, sum(hypo))
     end
     return (model = model,)
@@ -58,11 +65,16 @@ expdesignJuMP2() = expdesignJuMP(10, 30, 50, 5) # medium
 expdesignJuMP3() = expdesignJuMP(5, 15, 25, 5) # small
 expdesignJuMP4() = expdesignJuMP(4, 8, 12, 3) # tiny
 expdesignJuMP5() = expdesignJuMP(3, 5, 7, 2) # miniscule
-expdesignJuMP6() = expdesignJuMP(25, 75, 125, 5, use_logdet = false) # large
-expdesignJuMP7() = expdesignJuMP(10, 30, 50, 5, use_logdet = false) # medium
-expdesignJuMP8() = expdesignJuMP(5, 15, 25, 5, use_logdet = false) # small
-expdesignJuMP9() = expdesignJuMP(4, 8, 12, 3, use_logdet = false) # tiny
-expdesignJuMP10() = expdesignJuMP(3, 5, 7, 2, use_logdet = false) # miniscule
+expdesignJuMP6() = expdesignJuMP(25, 75, 125, 5, use_psd = true) # large
+expdesignJuMP7() = expdesignJuMP(10, 30, 50, 5, use_psd = true) # medium
+expdesignJuMP8() = expdesignJuMP(5, 15, 25, 5, use_psd = true) # small
+expdesignJuMP9() = expdesignJuMP(4, 8, 12, 3, use_psd = true) # tiny
+expdesignJuMP10() = expdesignJuMP(3, 5, 7, 2, use_psd = true) # miniscule
+expdesignJuMP11() = expdesignJuMP(25, 75, 125, 5, use_psd = true, criterion = "e") # large
+expdesignJuMP12() = expdesignJuMP(10, 30, 50, 5, use_psd = true, criterion = "e") # medium
+expdesignJuMP13() = expdesignJuMP(5, 15, 25, 5, use_psd = true, criterion = "e") # small
+expdesignJuMP14() = expdesignJuMP(4, 8, 12, 3, use_psd = true, criterion = "e") # tiny
+expdesignJuMP15() = expdesignJuMP(3, 5, 7, 2, use_psd = true, criterion = "e") # miniscule
 
 function test_expdesignJuMP(instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
@@ -83,9 +95,15 @@ test_expdesignJuMP_all(; options...) = test_expdesignJuMP.([
     expdesignJuMP9,
     expdesignJuMP9,
     expdesignJuMP10,
+    expdesignJuMP11,
+    expdesignJuMP12,
+    expdesignJuMP13,
+    expdesignJuMP14,
+    expdesignJuMP15,
     ], options = options)
 
 test_expdesignJuMP(; options...) = test_expdesignJuMP.([
     expdesignJuMP3,
     expdesignJuMP8,
+    expdesignJuMP13,
     ], options = options)
