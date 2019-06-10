@@ -202,7 +202,7 @@ function calc_convergence_params(solver::HSDSolver{T}) where {T <: HypReal}
     solver.dual_obj_t = -dot(model.b, point.y) - dot(model.h, point.z)
     solver.primal_obj = solver.primal_obj_t / solver.tau
     solver.dual_obj = solver.dual_obj_t / solver.tau
-    solver.gap = dot(point.z, point.s) # TODO maybe should adapt original Alfonso condition instead of using this CVXOPT condition
+    solver.gap = dot(point.z, point.s)
     if solver.primal_obj < zero(T)
         solver.rel_gap = solver.gap / -solver.primal_obj
     elseif solver.dual_obj > zero(T)
