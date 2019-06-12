@@ -97,6 +97,9 @@ mutable struct RawLinearModel{T <: HypReal} <: LinearModel{T}
 
         find_initial_point(model, use_dense_fallback)
 
+        @show model.initial_point.x
+        @show model.initial_point.y
+
         return model
     end
 end
@@ -181,7 +184,7 @@ mutable struct PreprocessedLinearModel{T <: HypReal} <: LinearModel{T}
         h::Vector,
         cones::Vector{<:Cones.Cone},
         cone_idxs::Vector{UnitRange{Int}};
-        tol_QR::Real = max(1e-14, 1e3 * eps(T)),
+        tol_QR::Real = 1e3 * eps(T),
         use_dense_fallback::Bool = true,
         ) where {T <: HypReal}
         c = convert(Vector{T}, c)
@@ -203,6 +206,9 @@ mutable struct PreprocessedLinearModel{T <: HypReal} <: LinearModel{T}
         model.nu = isempty(cones) ? zero(T) : sum(Cones.get_nu, cones)
 
         preprocess_find_initial_point(model, tol_QR, use_dense_fallback)
+
+        @show model.initial_point.x
+        @show model.initial_point.y
 
         return model
     end
