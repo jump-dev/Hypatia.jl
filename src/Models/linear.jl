@@ -266,12 +266,12 @@ function preprocess_find_initial_point(model::PreprocessedLinearModel{T}, tol_QR
             end
             println("removed $(n - AG_rank) out of $n dual equality constraints")
 
+            point.x = (AG_fact \ vcat(b, model.h - point.s))[x_keep_idxs]
+
             c = c_sub
             A = A[:, x_keep_idxs]
             G = G[:, x_keep_idxs]
             n = AG_rank
-
-            point.x = (AG_fact \ vcat(b, model.h - point.s))[x_keep_idxs]
         end
     else
         x_keep_idxs = Int[]
@@ -319,13 +319,21 @@ function preprocess_find_initial_point(model::PreprocessedLinearModel{T}, tol_QR
             println("removed $(p - Ap_rank) out of $p primal equality constraints")
         end
 
-        A = A[y_keep_idxs, :]
+        point.y = (Ap_fact \ (-c - G' * point.z))[y_keep_idxs]
+
+        if !(Ap_fact isa QRPivoted{T, Matrix{T}})
+            row_piv = Ap_fact.prow
+            A = A[y_keep_idxs, row_piv]
+            c = c[row_piv]
+            G = G[:, row_piv]
+            x_keep_idxs = x_keep_idxs[row_piv]
+        else
+            A = A[y_keep_idxs, :]
+        end
         b = b_sub
         p = Ap_rank
         model.Ap_R = Ap_R
         model.Ap_Q = Ap_Q
-
-        point.y = (Ap_fact \ (-c - G' * point.z))[y_keep_idxs]
     else
         y_keep_idxs = Int[]
         model.Ap_R = UpperTriangular(zeros(T, 0, 0))
