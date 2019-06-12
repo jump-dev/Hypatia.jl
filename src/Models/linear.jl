@@ -33,7 +33,7 @@ TODO
 =#
 
 function initialize_cone_point(cones::Vector{<:Cones.Cone{T}}, cone_idxs::Vector{UnitRange{Int}}) where {T <: HypReal}
-    q = sum(Cones.dimension, cones)
+    q = isempty(cones) ? 0 : sum(Cones.dimension, cones)
     point = Point(T[], T[], Vector{T}(undef, q), Vector{T}(undef, q), cones, cone_idxs)
     for k in eachindex(cones)
         cone_k = cones[k]
@@ -71,7 +71,7 @@ mutable struct RawLinearModel{T <: HypReal} <: LinearModel{T}
         b::Vector,
         G::AbstractMatrix,
         h::Vector,
-        cones::Vector{<:Cones.Cone{T}},
+        cones::Vector{<:Cones.Cone},
         cone_idxs::Vector{UnitRange{Int}};
         use_dense_fallback::Bool = true,
         ) where {T <: HypReal}
@@ -168,7 +168,6 @@ mutable struct PreprocessedLinearModel{T <: HypReal} <: LinearModel{T}
 
     x_keep_idxs::AbstractVector{Int}
     y_keep_idxs::AbstractVector{Int}
-
     Ap_R::UpperTriangular{T, <:AbstractMatrix{T}}
     Ap_Q::Union{UniformScaling, AbstractMatrix{T}}
 
@@ -180,7 +179,7 @@ mutable struct PreprocessedLinearModel{T <: HypReal} <: LinearModel{T}
         b::Vector,
         G::AbstractMatrix,
         h::Vector,
-        cones::Vector{<:Cones.Cone{T}},
+        cones::Vector{<:Cones.Cone},
         cone_idxs::Vector{UnitRange{Int}};
         tol_QR::Real = max(1e-14, 1e3 * eps(T)),
         use_dense_fallback::Bool = true,
@@ -236,9 +235,9 @@ function preprocess_find_initial_point(model::PreprocessedLinearModel{T}, tol_QR
             end
         end
         AG_fact = issparse(AG) ? qr(AG, tol = tol_QR) : qr(AG, Val(true))
-        AG_R = AG_fact.R
 
         # TODO could replace this with rank(Ap_fact) when available for both dense and sparse
+        AG_R = AG_fact.R
         AG_rank = 0
         for i in 1:size(AG_R, 1) # TODO could replace this with rank(AG_fact) when available for both dense and sparse
             if abs(AG_R[i, i]) > tol_QR
@@ -246,38 +245,33 @@ function preprocess_find_initial_point(model::PreprocessedLinearModel{T}, tol_QR
             end
         end
 
-
-
         if AG_rank == n
             # no dual equalities to remove
             x_keep_idxs = 1:n
             point.x = AG_fact \ vcat(b, model.h - point.s)
         else
-            # TODO remove need for forming Q1 and Q2 explicitly
-
-            # TODO optimize all below
-            if AG_fact isa QRPivoted{T, Matrix{T}}
-                x_keep_idxs = AG_fact.p[1:AG_rank]
-                AG_Q1 = AG_fact.Q * Matrix{T}(I, p + q, AG_rank)
-            else
-                x_keep_idxs = AG_fact.pcol[1:AG_rank]
-                AG_Q1 = Matrix{T}(undef, p + q, AG_rank)
-                AG_Q1[AG_fact.prow, :] = AG_fact.Q * Matrix{T}(I, p + q, AG_rank)
-            end
+            col_piv = (AG_fact isa QRPivoted{T, Matrix{T}}) ? AG_fact.p : AG_fact.pcol
+            x_keep_idxs = col_piv[1:AG_rank]
             AG_R = UpperTriangular(AG_R[1:AG_rank, 1:AG_rank])
 
+            # TODO optimize all below
             c_sub = c[x_keep_idxs]
-            yz_sub = AG_Q1 * (AG_R' \ c_sub)
+            yz_sub = AG_fact.Q * (Matrix{T}(I, p + q, AG_rank) * (AG_R' \ c_sub))
+            if !(AG_fact isa QRPivoted{T, Matrix{T}})
+                yz_sub = yz_sub[AG_fact.rpivinv]
+            end
             residual = norm(AG' * yz_sub - c, Inf)
             if residual > tol_QR
                 error("some dual equality constraints are inconsistent (residual $residual, tolerance $tol_QR)")
             end
             println("removed $(n - AG_rank) out of $n dual equality constraints")
+
             c = c_sub
             A = A[:, x_keep_idxs]
             G = G[:, x_keep_idxs]
             n = AG_rank
-            point.x = AG_R \ (AG_Q1' * vcat(b, model.h - point.s))
+
+            point.x = (AG_fact \ vcat(b, model.h - point.s))[x_keep_idxs]
         end
     else
         x_keep_idxs = Int[]
@@ -295,9 +289,9 @@ function preprocess_find_initial_point(model::PreprocessedLinearModel{T}, tol_QR
         else
             Ap_fact = issparse(A) ? qr(sparse(A'), tol = tol_QR) : qr(A', Val(true))
         end
-        Ap_R = Ap_fact.R
 
         # TODO could replace this with rank(Ap_fact) when available for both dense and sparse
+        Ap_R = Ap_fact.R
         Ap_rank = 0
         for i in 1:size(Ap_R, 1)
             if abs(Ap_R[i, i]) > tol_QR
@@ -305,39 +299,33 @@ function preprocess_find_initial_point(model::PreprocessedLinearModel{T}, tol_QR
             end
         end
 
-
-
-        # TODO remove need for forming Q1 and Q2 explicitly
+        Ap_R = UpperTriangular(Ap_R[1:Ap_rank, 1:Ap_rank])
+        col_piv = (Ap_fact isa QRPivoted{T, Matrix{T}}) ? Ap_fact.p : Ap_fact.pcol
+        y_keep_idxs = col_piv[1:Ap_rank]
+        Ap_Q = Ap_fact.Q
 
         # TODO optimize all below
-        if Ap_fact isa QRPivoted{T, Matrix{T}}
-            y_keep_idxs = Ap_fact.p[1:Ap_rank]
-            Ap_Q = Ap_fact.Q * Matrix{T}(I, n, n)
-        else
-            y_keep_idxs = Ap_fact.pcol[1:Ap_rank]
-            Ap_Q = Matrix{T}(undef, n, n)
-            Ap_Q[Ap_fact.prow, :] = Ap_fact.Q * Matrix{T}(I, n, n)
-        end
-        Ap_Q1 = Ap_Q[:, 1:Ap_rank]
-        Ap_Q2 = Ap_Q[:, (Ap_rank + 1):n]
-        Ap_R = UpperTriangular(Ap_R[1:Ap_rank, 1:Ap_rank])
-
         b_sub = b[y_keep_idxs]
         if Ap_rank < p
             # some dependent primal equalities, so check if they are consistent
-            x_sub = Ap_Q1 * (Ap_R' \ b_sub)
+            x_sub = Ap_Q * (Matrix{T}(I, n, Ap_rank) * (Ap_R' \ b_sub))
+            if !(Ap_fact isa QRPivoted{T, Matrix{T}})
+                x_sub = x_sub[Ap_fact.rpivinv]
+            end
             residual = norm(A * x_sub - b, Inf)
             if residual > tol_QR
                 error("some primal equality constraints are inconsistent (residual $residual, tolerance $tol_QR)")
             end
             println("removed $(p - Ap_rank) out of $p primal equality constraints")
         end
+
         A = A[y_keep_idxs, :]
         b = b_sub
         p = Ap_rank
-        point.y = Ap_R \ (Ap_Q1' * (-c - G' * point.z)) # TODO remove allocs
         model.Ap_R = Ap_R
         model.Ap_Q = Ap_Q
+
+        point.y = (Ap_fact \ (-c - G' * point.z))[y_keep_idxs]
     else
         y_keep_idxs = Int[]
         model.Ap_R = UpperTriangular(zeros(T, 0, 0))
