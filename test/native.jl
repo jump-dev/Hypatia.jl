@@ -78,6 +78,19 @@ function consistent1(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linea
     cones = [CO.Nonpositive{T}(q)]
     cone_idxs = [1:q]
 
+    AG = vcat(A, G)
+
+    @show AG
+    @show vcat(b, h)
+    
+    F = qr!(AG)
+    @show F \ vcat(b, h)
+
+    AG = vcat(A, G)
+    AG = convert(Matrix{T}, AG)
+    F = qr!(AG)
+    @show F \ convert(Vector{T}, vcat(b, h))
+
     r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
     @test r.status == :Optimal
 end
