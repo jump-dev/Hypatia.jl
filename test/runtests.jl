@@ -37,8 +37,8 @@ include(joinpath(examples_dir, "semidefinitepoly/JuMP.jl"))
 
 real_types = [
     Float64,
-    Float32,
-    BigFloat,
+    # Float32,
+    # BigFloat,
     ]
 
 @info("starting Hypatia tests")
@@ -73,12 +73,12 @@ real_types = [
 # end
 
 @info("starting native interface tests")
-verbose = false
+verbose = true
 system_solvers = [
     SO.QRCholCombinedHSDSystemSolver,
-    SO.SymIndefCombinedHSDSystemSolver,
-    SO.NaiveElimCombinedHSDSystemSolver,
-    SO.NaiveCombinedHSDSystemSolver,
+    # SO.SymIndefCombinedHSDSystemSolver,
+    # SO.NaiveElimCombinedHSDSystemSolver,
+    # SO.NaiveCombinedHSDSystemSolver,
     ]
 testfuns_singular = [
     dimension1,
@@ -91,7 +91,7 @@ testfuns_singular = [
 end
 linear_models = [
     MO.PreprocessedLinearModel,
-    MO.RawLinearModel,
+    # MO.RawLinearModel,
     ]
 testfuns_nonsingular = [
     orthant1,

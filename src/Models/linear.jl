@@ -168,9 +168,9 @@ mutable struct PreprocessedLinearModel{T <: HypReal} <: LinearModel{T}
 
     x_keep_idxs::AbstractVector{Int}
     y_keep_idxs::AbstractVector{Int}
-    Ap_R::AbstractMatrix{T}
-    Ap_Q1::AbstractMatrix{T}
-    Ap_Q2
+
+    Ap_R::UpperTriangular{T, <:AbstractMatrix{T}}
+    Ap_Q::Union{UniformScaling, AbstractMatrix{T}}
 
     initial_point::Point
 
@@ -246,11 +246,15 @@ function preprocess_find_initial_point(model::PreprocessedLinearModel{T}, tol_QR
             end
         end
 
+
+
         if AG_rank == n
             # no dual equalities to remove
             x_keep_idxs = 1:n
             point.x = AG_fact \ vcat(b, model.h - point.s)
         else
+            # TODO remove need for forming Q1 and Q2 explicitly
+
             # TODO optimize all below
             if AG_fact isa QRPivoted{T, Matrix{T}}
                 x_keep_idxs = AG_fact.p[1:AG_rank]
@@ -301,17 +305,21 @@ function preprocess_find_initial_point(model::PreprocessedLinearModel{T}, tol_QR
             end
         end
 
+
+
+        # TODO remove need for forming Q1 and Q2 explicitly
+
         # TODO optimize all below
         if Ap_fact isa QRPivoted{T, Matrix{T}}
             y_keep_idxs = Ap_fact.p[1:Ap_rank]
-            A_Q = Ap_fact.Q * Matrix{T}(I, n, n)
+            Ap_Q = Ap_fact.Q * Matrix{T}(I, n, n)
         else
             y_keep_idxs = Ap_fact.pcol[1:Ap_rank]
-            A_Q = Matrix{T}(undef, n, n)
-            A_Q[Ap_fact.prow, :] = Ap_fact.Q * Matrix{T}(I, n, n)
+            Ap_Q = Matrix{T}(undef, n, n)
+            Ap_Q[Ap_fact.prow, :] = Ap_fact.Q * Matrix{T}(I, n, n)
         end
-        Ap_Q1 = A_Q[:, 1:Ap_rank]
-        Ap_Q2 = A_Q[:, (Ap_rank + 1):n]
+        Ap_Q1 = Ap_Q[:, 1:Ap_rank]
+        Ap_Q2 = Ap_Q[:, (Ap_rank + 1):n]
         Ap_R = UpperTriangular(Ap_R[1:Ap_rank, 1:Ap_rank])
 
         b_sub = b[y_keep_idxs]
@@ -329,13 +337,11 @@ function preprocess_find_initial_point(model::PreprocessedLinearModel{T}, tol_QR
         p = Ap_rank
         point.y = Ap_R \ (Ap_Q1' * (-c - G' * point.z)) # TODO remove allocs
         model.Ap_R = Ap_R
-        model.Ap_Q1 = Ap_Q1
-        model.Ap_Q2 = Ap_Q2
+        model.Ap_Q = Ap_Q
     else
         y_keep_idxs = Int[]
         model.Ap_R = UpperTriangular(zeros(T, 0, 0))
-        model.Ap_Q1 = zeros(T, n, 0)
-        model.Ap_Q2 = I
+        model.Ap_Q = I
     end
 
     model.c = c
