@@ -39,7 +39,10 @@ mutable struct QRCholCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemS
     HGQ1x
     GHGQ1x
     Q2div
+
+    GQ1
     GQ2
+
     HGQ2
     Q2GHGQ2
     Q2x
@@ -90,16 +93,20 @@ mutable struct QRCholCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemS
         system_solver.z3_temp_k = [view(zi_temp, idxs, 3) for idxs in model.cone_idxs]
 
         nmp = n - p
+
         system_solver.bxGHbz = Matrix{T}(undef, n, 3)
         system_solver.Q1x = similar(system_solver.bxGHbz)
         system_solver.GQ1x = Matrix{T}(undef, q, 3)
         system_solver.HGQ1x = similar(system_solver.GQ1x)
         system_solver.GHGQ1x = Matrix{T}(undef, n, 3)
         system_solver.Q2div = Matrix{T}(undef, nmp, 3)
-        system_solver.GQ2 = model.G * model.Ap_Q2
+
+        GQ = model.G * model.Ap_Q # TODO check efficiency
+        system_solver.GQ1 = GQ[:, 1:p]
+        system_solver.GQ2 = GQ[:, (p + 1):end]
         if use_sparse
-            if system_solver.GQ2 isa Matrix{T}
-                error("to use sparse factorization for direction finding, cannot use dense A or G matrices")
+            if !issparse(GQ)
+                error("to use sparse factorization for direction finding, cannot use dense A or G matrices (GQ is of type $(typeof(GQ)))")
             end
             system_solver.HGQ2 = spzeros(T, q, nmp)
             system_solver.Q2GHGQ2 = spzeros(T, nmp, nmp)
@@ -107,6 +114,7 @@ mutable struct QRCholCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemS
             system_solver.HGQ2 = Matrix{T}(undef, q, nmp)
             system_solver.Q2GHGQ2 = Matrix{T}(undef, nmp, nmp)
         end
+
         system_solver.Q2x = similar(system_solver.Q1x)
         system_solver.Gxi = similar(system_solver.GQ1x)
         system_solver.HGxi = similar(system_solver.Gxi)
@@ -129,6 +137,7 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
     cone_idxs = model.cone_idxs
     mu = solver.mu
 
+    # TODO delete what isn't used
     xi = system_solver.xi
     yi = system_solver.yi
     zi = system_solver.zi
@@ -160,9 +169,12 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
     HGQ1x = system_solver.HGQ1x
     GHGQ1x = system_solver.GHGQ1x
     Q2div = system_solver.Q2div
+
+    GQ1 = system_solver.GQ1
     GQ2 = system_solver.GQ2
     HGQ2 = system_solver.HGQ2
     Q2GHGQ2 = system_solver.Q2GHGQ2
+
     Q2x = system_solver.Q2x
     Gxi = system_solver.Gxi
     HGxi = system_solver.HGxi
@@ -217,20 +229,29 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
         end
     end
 
+    # TODO cleanup all below
+
+    # Q1x = Q1*R'\by
+    # ldiv!(model.Ap_R', yi)
+    # mul!(Q1x, model.Ap_Q1, yi)
+    ldiv!(model.Ap_R', yi)
+
     # bxGHbz = bx + G'*Hbz
     mul!(bxGHbz, model.G', zi)
     @. bxGHbz += xi
 
-    # Q1x = Q1*Ri'*by
-    ldiv!(model.Ap_R', yi)
-    mul!(Q1x, model.Ap_Q1, yi)
+    # Q2x = Q2*(K22_F\(Q2'*(bxGHbz - GHG*Q1x)))
+    # mul!(GQ1x, model.G, Q1x)
+    # block_hessian_product!(HGQ1x_k, GQ1x_k)
+    # mul!(GHGQ1x, model.G', HGQ1x)
+    # @. GHGQ1x = bxGHbz - GHGQ1x
+    # mul!(Q2div, model.Ap_Q2', GHGQ1x)
 
     # Q2x = Q2*(K22_F\(Q2'*(bxGHbz - GHG*Q1x)))
-    mul!(GQ1x, model.G, Q1x)
+    mul!(GQ1x, GQ1, yi)
     block_hessian_product!(HGQ1x_k, GQ1x_k)
-    mul!(GHGQ1x, model.G', HGQ1x)
-    @. GHGQ1x = bxGHbz - GHGQ1x
-    mul!(Q2div, model.Ap_Q2', GHGQ1x)
+    QpbxGHbz = model.Ap_Q' * bxGHbz # TODO allocs
+    Q2div = QpbxGHbz[(model.p + 1):end, :] - GQ2' * HGQ1x # TODO allocs
 
     if !iszero(size(Q2div, 1))
         block_hessian_product!(HGQ2_k, GQ2_k)
@@ -269,17 +290,26 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
         end
     end
 
-    mul!(Q2x, model.Ap_Q2, Q2div)
+    # mul!(Q2x, model.Ap_Q2, Q2div)
 
     # xi = Q1x + Q2x
-    @. xi = Q1x + Q2x
+    # @. xi = Q1x + Q2x
+
+    # xi = Q1x + Q2x
+    xi .= model.Ap_Q * vcat(yi, Q2div) # TODO allocs
+
+    # yi = Ri*Q1'*(bxGHbz - GHG*xi)
+    # mul!(Gxi, model.G, xi)
+    # block_hessian_product!(HGxi_k, Gxi_k)
+    # mul!(GHGxi, model.G', HGxi)
+    # @. bxGHbz -= GHGxi
+    # mul!(yi, model.Ap_Q1', bxGHbz)
+    # ldiv!(model.Ap_R, yi)
 
     # yi = Ri*Q1'*(bxGHbz - GHG*xi)
     mul!(Gxi, model.G, xi)
     block_hessian_product!(HGxi_k, Gxi_k)
-    mul!(GHGxi, model.G', HGxi)
-    @. bxGHbz -= GHGxi
-    mul!(yi, model.Ap_Q1', bxGHbz)
+    yi .= QpbxGHbz[1:model.p, :] - GQ1' * HGxi # TODO allocs
     ldiv!(model.Ap_R, yi)
 
     # zi = HG*xi - Hbz
