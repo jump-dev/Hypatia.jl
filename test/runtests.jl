@@ -72,85 +72,85 @@ real_types = [
 #     t(T)
 # end
 
-@info("starting native interface tests")
-verbose = true
+# @info("starting native interface tests")
+# verbose = true
+# system_solvers = [
+#     SO.QRCholCombinedHSDSystemSolver,
+#     # SO.SymIndefCombinedHSDSystemSolver,
+#     # SO.NaiveElimCombinedHSDSystemSolver,
+#     # SO.NaiveCombinedHSDSystemSolver,
+#     ]
+# testfuns_singular = [
+#     dimension1,
+#     consistent1,
+#     inconsistent1,
+#     inconsistent2,
+#     ]
+# @testset "preprocessing tests: $t, $s, $T" for t in testfuns_singular, s in system_solvers, T in real_types
+#     t(s{T}, MO.PreprocessedLinearModel{T}, verbose)
+# end
+# linear_models = [
+#     MO.PreprocessedLinearModel,
+#     # MO.RawLinearModel,
+#     ]
+# testfuns_nonsingular = [
+#     orthant1,
+#     orthant2,
+#     orthant3,
+#     orthant4,
+#     epinorminf1,
+#     epinorminf2,
+#     epinorminf3,
+#     epinorminf4,
+#     epinorminf5,
+#     epinorminf6,
+#     epinormeucl1,
+#     epinormeucl2,
+#     epipersquare1,
+#     epipersquare2,
+#     epipersquare3,
+#     semidefinite1,
+#     semidefinite2,
+#     semidefinite3,
+#     semidefinitecomplex1,
+#     hypoperlog1,
+#     hypoperlog2,
+#     hypoperlog3,
+#     hypoperlog4,
+#     epiperpower1,
+#     epiperpower2,
+#     epiperpower3,
+#     hypogeomean1,
+#     hypogeomean2,
+#     hypogeomean3,
+#     hypogeomean4,
+#     epinormspectral1,
+#     hypoperlogdet1,
+#     hypoperlogdet2,
+#     hypoperlogdet3,
+#     epipersumexp1,
+#     epipersumexp2,
+#     ]
+# @testset "native tests: $t, $s, $m, $T" for t in testfuns_nonsingular, s in system_solvers, m in linear_models, T in real_types
+#     if s == SO.QRCholCombinedHSDSystemSolver && m == MO.RawLinearModel
+#         continue # QRChol linear system solver needs preprocessed model
+#     end
+#     t(s{T}, m{T}, verbose)
+# end
+
+@info("starting MathOptInterface tests")
+verbose = false
 system_solvers = [
-    SO.QRCholCombinedHSDSystemSolver,
-    # SO.SymIndefCombinedHSDSystemSolver,
-    # SO.NaiveElimCombinedHSDSystemSolver,
     # SO.NaiveCombinedHSDSystemSolver,
+    SO.QRCholCombinedHSDSystemSolver,
     ]
-testfuns_singular = [
-    dimension1,
-    consistent1,
-    inconsistent1,
-    inconsistent2,
-    ]
-@testset "preprocessing tests: $t, $s, $T" for t in testfuns_singular, s in system_solvers, T in real_types
-    t(s{T}, MO.PreprocessedLinearModel{T}, verbose)
-end
 linear_models = [
-    MO.PreprocessedLinearModel,
-    # MO.RawLinearModel,
+    MO.PreprocessedLinearModel, # MOI tests require preprocessing
     ]
-testfuns_nonsingular = [
-    orthant1,
-    orthant2,
-    orthant3,
-    orthant4,
-    epinorminf1,
-    epinorminf2,
-    epinorminf3,
-    epinorminf4,
-    epinorminf5,
-    epinorminf6,
-    epinormeucl1,
-    epinormeucl2,
-    epipersquare1,
-    epipersquare2,
-    epipersquare3,
-    semidefinite1,
-    semidefinite2,
-    semidefinite3,
-    semidefinitecomplex1,
-    hypoperlog1,
-    hypoperlog2,
-    hypoperlog3,
-    hypoperlog4,
-    epiperpower1,
-    epiperpower2,
-    epiperpower3,
-    hypogeomean1,
-    hypogeomean2,
-    hypogeomean3,
-    hypogeomean4,
-    epinormspectral1,
-    hypoperlogdet1,
-    hypoperlogdet2,
-    hypoperlogdet3,
-    epipersumexp1,
-    epipersumexp2,
-    ]
-@testset "native tests: $t, $s, $m, $T" for t in testfuns_nonsingular, s in system_solvers, m in linear_models, T in real_types
-    if s == SO.QRCholCombinedHSDSystemSolver && m == MO.RawLinearModel
-        continue # QRChol linear system solver needs preprocessed model
-    end
-    t(s{T}, m{T}, verbose)
+@testset "MOI tests: $(d ? "dense" : "sparse"), $s, $m" for d in (false, true), s in system_solvers, m in linear_models
+    test_moi(d, s{Float64}, m{Float64}, verbose)
 end
 
-# @info("starting MathOptInterface tests")
-# verbose = false
-# system_solvers = [
-#     SO.NaiveCombinedHSDSystemSolver,
-#     SO.QRCholCombinedHSDSystemSolver,
-#     ]
-# linear_models = [
-#     MO.PreprocessedLinearModel, # MOI tests require preprocessing
-#     ]
-# @testset "MOI tests: $(d ? "dense" : "sparse"), $s, $m" for d in (false, true), s in system_solvers, m in linear_models
-#     test_moi(d, s{Float64}, m{Float64}, verbose)
-# end
-#
 # @info("starting native examples tests")
 # native_options = (
 #     verbose = true,
