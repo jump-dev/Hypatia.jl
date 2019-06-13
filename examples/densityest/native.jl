@@ -88,7 +88,7 @@ function densityest(
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs)
 end
 
-densityest(nobs::Int, n::Int, deg::Int) = densityest(randn(nobs, n), deg)
+densityest(nobs::Int, n::Int, deg::Int; options...) = densityest(randn(nobs, n), deg; options...)
 
 # iris dataset
 function iris_data()
@@ -111,10 +111,10 @@ function cancer_data()
     return X
 end
 
-densityest1() = densityest(iris_data(), 4)
-densityest2() = densityest(iris_data(), 6)
-densityest3() = densityest(cancer_data(), 4)
-densityest4() = densityest(cancer_data(), 6)
+densityest1() = densityest(iris_data(), 4, use_sumlog = true)
+densityest2() = densityest(iris_data(), 4)
+densityest3() = densityest(cancer_data(), 4, use_sumlog = true)
+densityest4() = densityest(cancer_data(), 4)
 densityest5() = densityest(200, 1, 4, use_sumlog = true)
 densityest6() = densityest(200, 1, 4, use_sumlog = false)
 
