@@ -26,7 +26,7 @@ function densityest(
     X::AbstractMatrix{Float64},
     deg::Int;
     sample_factor::Int = 100,
-    use_sumlog::Bool = true,
+    use_sumlog::Bool = false,
     )
     (nobs, dim) = size(X)
 
@@ -62,7 +62,6 @@ function densityest(
         end
         G = vcat(G1, G2)
         cone_idxs = [1:U, (U + 1):(U + 2 + nobs)]
-        @show cone_idxs, size(G1), size(G2), size(h), size(c), size(A), size(b)
         cones = [CO.WSOSPolyInterp{Float64, Float64}(U, [P0, PWts...]), CO.HypoPerSumLog{Float64}(nobs + 2)]
     else
         c = vcat(-ones(nobs), zeros(U))
@@ -114,7 +113,10 @@ end
 
 densityest1() = densityest(iris_data(), 4)
 densityest2() = densityest(iris_data(), 6)
-densityest3() = densityest(200, 1, 4)
+densityest3() = densityest(cancer_data(), 4)
+densityest4() = densityest(cancer_data(), 6)
+densityest5() = densityest(200, 1, 4, use_sumlog = true)
+densityest6() = densityest(200, 1, 4, use_sumlog = false)
 
 function test_densityest(instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
@@ -131,9 +133,14 @@ test_densityest_all(; options...) = test_densityest.([
     densityest1,
     densityest2,
     densityest3,
+    densityest4,
+    densityest5,
+    densityest6,
     ], options = options)
 
 test_densityest(; options...) = test_densityest.([
-    # densityest1,
+    densityest1,
     densityest3,
+    densityest5,
+    densityest6,
     ], options = options)
