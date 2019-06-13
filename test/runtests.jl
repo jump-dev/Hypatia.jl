@@ -36,7 +36,7 @@ include(joinpath(examples_dir, "shapeconregr/JuMP.jl"))
 include(joinpath(examples_dir, "semidefinitepoly/JuMP.jl"))
 
 real_types = [
-    # Float64,
+    Float64,
     # Float32,
     BigFloat,
     ]
@@ -72,24 +72,23 @@ real_types = [
 #     t(T)
 # end
 
-@info("starting native interface tests")
-verbose = true
-system_solvers = [
-    # SO.QRCholCombinedHSDSystemSolver,
-    # SO.SymIndefCombinedHSDSystemSolver,
-    SO.NaiveElimCombinedHSDSystemSolver,
-    # SO.NaiveCombinedHSDSystemSolver,
-    ]
-testfuns_singular = [
-    # dimension1,
-    consistent1,
-    # inconsistent1,
-    # inconsistent2,
-    ]
-@testset "preprocessing tests: $t, $s, $T" for t in testfuns_singular, s in system_solvers, T in real_types
-    t(s{T}, MO.RawLinearModel{T}, verbose)
-    # t(s{T}, MO.PreprocessedLinearModel{T}, verbose)
-end
+# @info("starting native interface tests")
+# verbose = true
+# system_solvers = [
+#     SO.QRCholCombinedHSDSystemSolver,
+#     # SO.SymIndefCombinedHSDSystemSolver,
+#     SO.NaiveElimCombinedHSDSystemSolver,
+#     # SO.NaiveCombinedHSDSystemSolver,
+#     ]
+# testfuns_singular = [
+#     dimension1,
+#     consistent1,
+#     inconsistent1,
+#     inconsistent2,
+#     ]
+# @testset "preprocessing tests: $t, $s, $T" for t in testfuns_singular, s in system_solvers, T in real_types
+#     t(s{T}, MO.PreprocessedLinearModel{T}, verbose)
+# end
 # linear_models = [
 #     MO.PreprocessedLinearModel,
 #     MO.RawLinearModel,
@@ -139,24 +138,24 @@ end
 #     t(s{T}, m{T}, verbose)
 # end
 
-# @info("starting MathOptInterface tests")
-# verbose = false
-# dense_options = [
-#     true,
-#     false,
-#     ]
-# system_solvers = [
-#     # SO.NaiveCombinedHSDSystemSolver,
-#     SO.NaiveElimCombinedHSDSystemSolver,
-#     SO.QRCholCombinedHSDSystemSolver,
-#     ]
-# linear_models = [
-#     MO.PreprocessedLinearModel, # some MOI tests require preprocessing to pass
-#     # MO.RawLinearModel,
-#     ]
-# @testset "MOI tests: $(d ? "dense" : "sparse"), $s, $m" for d in dense_options, s in system_solvers, m in linear_models
-#     test_moi(d, s{Float64}, m{Float64}, verbose)
-# end
+@info("starting MathOptInterface tests")
+verbose = false
+dense_options = [
+    true,
+    false,
+    ]
+system_solvers = [
+    # SO.NaiveCombinedHSDSystemSolver,
+    SO.NaiveElimCombinedHSDSystemSolver,
+    SO.QRCholCombinedHSDSystemSolver,
+    ]
+linear_models = [
+    MO.PreprocessedLinearModel, # some MOI tests require preprocessing to pass
+    # MO.RawLinearModel,
+    ]
+@testset "MOI tests: $(d ? "dense" : "sparse"), $s, $m" for d in dense_options, s in system_solvers, m in linear_models
+    test_moi(d, s{Float64}, m{Float64}, verbose)
+end
 
 # @info("starting native examples tests")
 # native_options = (
