@@ -4,6 +4,8 @@ Copyright 2018, Chris Coey and contributors
 QR + Cholesky linear system solver
 =#
 
+using SuiteSparse
+
 mutable struct QRCholCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSolver{T}
     use_sparse::Bool
 
@@ -14,6 +16,8 @@ mutable struct QRCholCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemS
     x1
     y1
     z1
+    xi1
+    xi2
     x2
     y2
     z2
@@ -33,19 +37,18 @@ mutable struct QRCholCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemS
     z2_temp_k
     z3_temp_k
 
-    bxGHbz
-    Q1x
+    GQ1
+    GQ2
+    QpbxGHbz
+    Q1pbxGHbz
+    Q2pbxGHbz
     GQ1x
     HGQ1x
-    GHGQ1x
     Q2div
-    GQ2
     HGQ2
     Q2GHGQ2
-    Q2x
     Gxi
     HGxi
-    GHGxi
 
     HGQ1x_k
     GQ1x_k
@@ -66,6 +69,8 @@ mutable struct QRCholCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemS
         system_solver.yi = yi
         system_solver.zi = zi
 
+        system_solver.xi1 = view(xi, 1:p, :)
+        system_solver.xi2 = view(xi, (p + 1):n, :)
         system_solver.x1 = view(xi, :, 1)
         system_solver.y1 = view(yi, :, 1)
         system_solver.z1 = view(zi, :, 1)
@@ -90,16 +95,20 @@ mutable struct QRCholCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemS
         system_solver.z3_temp_k = [view(zi_temp, idxs, 3) for idxs in model.cone_idxs]
 
         nmp = n - p
-        system_solver.bxGHbz = Matrix{T}(undef, n, 3)
-        system_solver.Q1x = similar(system_solver.bxGHbz)
-        system_solver.GQ1x = Matrix{T}(undef, q, 3)
-        system_solver.HGQ1x = similar(system_solver.GQ1x)
-        system_solver.GHGQ1x = Matrix{T}(undef, n, 3)
-        system_solver.Q2div = Matrix{T}(undef, nmp, 3)
-        system_solver.GQ2 = model.G * model.Ap_Q2
+
+        if !isa(model.G, Matrix{T}) && isa(model.Ap_Q, SuiteSparse.SPQR.QRSparseQ)
+            # TODO very inefficient method used for sparse G * QRSparseQ : see https://github.com/JuliaLang/julia/issues/31124#issuecomment-501540818
+            # TODO remove workaround and warning
+            @warn("in QRChol, converting G to dense before multiplying by sparse Householder Q due to very inefficient dispatch")
+            GQ = Matrix(model.G) * model.Ap_Q
+        else
+            GQ = model.G * model.Ap_Q
+        end
+        system_solver.GQ1 = GQ[:, 1:p]
+        system_solver.GQ2 = GQ[:, (p + 1):end]
         if use_sparse
-            if system_solver.GQ2 isa Matrix{T}
-                error("to use sparse factorization for direction finding, cannot use dense A or G matrices")
+            if !issparse(GQ)
+                error("to use sparse factorization for direction finding, cannot use dense A or G matrices (GQ is of type $(typeof(GQ)))")
             end
             system_solver.HGQ2 = spzeros(T, q, nmp)
             system_solver.Q2GHGQ2 = spzeros(T, nmp, nmp)
@@ -107,10 +116,14 @@ mutable struct QRCholCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemS
             system_solver.HGQ2 = Matrix{T}(undef, q, nmp)
             system_solver.Q2GHGQ2 = Matrix{T}(undef, nmp, nmp)
         end
-        system_solver.Q2x = similar(system_solver.Q1x)
+        system_solver.QpbxGHbz = Matrix{T}(undef, n, 3)
+        system_solver.Q1pbxGHbz = view(system_solver.QpbxGHbz, 1:p, :)
+        system_solver.Q2pbxGHbz = view(system_solver.QpbxGHbz, (p + 1):n, :)
+        system_solver.GQ1x = Matrix{T}(undef, q, 3)
+        system_solver.HGQ1x = similar(system_solver.GQ1x)
+        system_solver.Q2div = Matrix{T}(undef, nmp, 3)
         system_solver.Gxi = similar(system_solver.GQ1x)
         system_solver.HGxi = similar(system_solver.Gxi)
-        system_solver.GHGxi = similar(system_solver.GHGQ1x)
 
         system_solver.HGQ1x_k = [view(system_solver.HGQ1x, idxs, :) for idxs in model.cone_idxs]
         system_solver.GQ1x_k = [view(system_solver.GQ1x, idxs, :) for idxs in model.cone_idxs]
@@ -132,6 +145,8 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
     xi = system_solver.xi
     yi = system_solver.yi
     zi = system_solver.zi
+    xi1 = system_solver.xi1
+    xi2 = system_solver.xi2
     x1 = system_solver.x1
     y1 = system_solver.y1
     z1 = system_solver.z1
@@ -154,19 +169,18 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
     z2_temp_k = system_solver.z2_temp_k
     z3_temp_k = system_solver.z3_temp_k
 
-    bxGHbz = system_solver.bxGHbz
-    Q1x = system_solver.Q1x
+    GQ1 = system_solver.GQ1
+    GQ2 = system_solver.GQ2
+    QpbxGHbz = system_solver.QpbxGHbz
+    Q1pbxGHbz = system_solver.Q1pbxGHbz
+    Q2pbxGHbz = system_solver.Q2pbxGHbz
     GQ1x = system_solver.GQ1x
     HGQ1x = system_solver.HGQ1x
-    GHGQ1x = system_solver.GHGQ1x
     Q2div = system_solver.Q2div
-    GQ2 = system_solver.GQ2
     HGQ2 = system_solver.HGQ2
     Q2GHGQ2 = system_solver.Q2GHGQ2
-    Q2x = system_solver.Q2x
     Gxi = system_solver.Gxi
     HGxi = system_solver.HGxi
-    GHGxi = system_solver.GHGxi
 
     HGQ1x_k = system_solver.HGQ1x_k
     GQ1x_k = system_solver.GQ1x_k
@@ -217,22 +231,18 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
         end
     end
 
-    # bxGHbz = bx + G'*Hbz
-    mul!(bxGHbz, model.G', zi)
-    @. bxGHbz += xi
-
-    # Q1x = Q1*Ri'*by
     ldiv!(model.Ap_R', yi)
-    mul!(Q1x, model.Ap_Q1, yi)
 
-    # Q2x = Q2*(K22_F\(Q2'*(bxGHbz - GHG*Q1x)))
-    mul!(GQ1x, model.G, Q1x)
-    block_hessian_product!(HGQ1x_k, GQ1x_k)
-    mul!(GHGQ1x, model.G', HGQ1x)
-    @. GHGQ1x = bxGHbz - GHGQ1x
-    mul!(Q2div, model.Ap_Q2', GHGQ1x)
+    mul!(QpbxGHbz, model.G', zi)
+    @. QpbxGHbz += xi
+    lmul!(model.Ap_Q', QpbxGHbz)
 
     if !iszero(size(Q2div, 1))
+        mul!(GQ1x, GQ1, yi)
+        block_hessian_product!(HGQ1x_k, GQ1x_k)
+        mul!(Q2div, GQ2', HGQ1x)
+        @. Q2div = Q2pbxGHbz - Q2div
+
         block_hessian_product!(HGQ2_k, GQ2_k)
         mul!(Q2GHGQ2, GQ2', HGQ2)
 
@@ -269,21 +279,20 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
         end
     end
 
-    mul!(Q2x, model.Ap_Q2, Q2div)
+    @. xi1 = yi
+    @. xi2 = Q2div
+    lmul!(model.Ap_Q, xi)
 
-    # xi = Q1x + Q2x
-    @. xi = Q1x + Q2x
-
-    # yi = Ri*Q1'*(bxGHbz - GHG*xi)
     mul!(Gxi, model.G, xi)
     block_hessian_product!(HGxi_k, Gxi_k)
-    mul!(GHGxi, model.G', HGxi)
-    @. bxGHbz -= GHGxi
-    mul!(yi, model.Ap_Q1', bxGHbz)
-    ldiv!(model.Ap_R, yi)
 
-    # zi = HG*xi - Hbz
     @. zi = HGxi - zi
+
+    if !iszero(length(yi))
+        mul!(yi, GQ1', HGxi)
+        @. yi = Q1pbxGHbz - yi
+        ldiv!(model.Ap_R, yi)
+    end
 
     # lift to HSDE space
     tau_denom = mu / solver.tau / solver.tau - dot(model.c, x1) - dot(model.b, y1) - dot(model.h, z1)
