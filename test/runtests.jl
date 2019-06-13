@@ -117,6 +117,7 @@ testfuns_nonsingular = [
     hypoperlog2,
     hypoperlog3,
     hypoperlog4,
+    hypopersumlog1,
     epiperpower1,
     epiperpower2,
     epiperpower3,
