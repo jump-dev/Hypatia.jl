@@ -48,6 +48,19 @@ function initialize_cone_point(cones::Vector{<:Cones.Cone{T}}, cone_idxs::Vector
     return point
 end
 
+# NOTE (pivoted) QR factorizations are usually rank-revealing but may be unreliable, see http://www.math.sjsu.edu/~foster/rankrevealingcode.html
+# TODO could replace this with rank(Ap_fact) when available for both dense and sparse
+function get_rank_est(qr_fact, tol_qr::Real)
+    R = qr_fact.R
+    rank_est = 0
+    for i in 1:size(R, 1) # TODO could replace this with rank(AG_fact) when available for both dense and sparse
+        if abs(R[i, i]) > tol_qr
+            rank_est += 1
+        end
+    end
+    return rank_est
+end
+
 const sparse_QR_reals = Float64
 
 mutable struct RawLinearModel{T <: HypReal} <: LinearModel{T}
@@ -73,6 +86,7 @@ mutable struct RawLinearModel{T <: HypReal} <: LinearModel{T}
         h::Vector,
         cones::Vector{<:Cones.Cone},
         cone_idxs::Vector{UnitRange{Int}};
+        tol_qr::Real = 1e2 * eps(T),
         use_dense_fallback::Bool = true,
         ) where {T <: HypReal}
         c = convert(Vector{T}, c)
@@ -95,17 +109,14 @@ mutable struct RawLinearModel{T <: HypReal} <: LinearModel{T}
         model.cone_idxs = cone_idxs
         model.nu = isempty(cones) ? zero(T) : sum(Cones.get_nu, cones)
 
-        find_initial_point(model, use_dense_fallback)
-
-        @show model.initial_point.x
-        @show model.initial_point.y
+        find_initial_point(model, tol_qr, use_dense_fallback)
 
         return model
     end
 end
 
 # get initial point for RawLinearModel
-function find_initial_point(model::RawLinearModel{T}, use_dense_fallback::Bool) where {T <: HypReal}
+function find_initial_point(model::RawLinearModel{T}, tol_qr::Real, use_dense_fallback::Bool) where {T <: HypReal}
     A = model.A
     G = model.G
 
@@ -118,14 +129,20 @@ function find_initial_point(model::RawLinearModel{T}, use_dense_fallback::Bool) 
             # TODO alternative fallback is to convert sparse{T} to sparse{Float64} and do the sparse LU
             if use_dense_fallback
                 @warn("using dense factorization of A' in initial point finding because sparse factorization for number type $T is not supported by SparseArrays")
-                F = qr!(Matrix(A'))
+                Ap_fact = qr!(Matrix(A'))
             else
                 error("sparse factorization for number type $T is not supported by SparseArrays, so Hypatia cannot find an initial point")
             end
         else
-            F = issparse(A) ? qr(sparse(A')) : qr!(Matrix(A'))
+            Ap_fact = issparse(A) ? qr(sparse(A')) : qr!(Matrix(A'))
         end
-        point.y = F \ (-model.c - G' * point.z)
+
+        Ap_rank = get_rank_est(Ap_fact, tol_qr)
+        if Ap_rank < model.p
+            @warn("some primal equalities appear to be dependent; try using PreprocessedLinearModel")
+        end
+
+        point.y = Ap_fact \ (-model.c - G' * point.z)
     end
 
     # solve for x as least squares solution to Ax = b, Gx = h - s
@@ -140,8 +157,14 @@ function find_initial_point(model::RawLinearModel{T}, use_dense_fallback::Bool) 
                 error("sparse factorization for number type $T is not supported by SparseArrays, so Hypatia cannot find an initial point")
             end
         end
-        F = issparse(AG) ? qr(AG) : qr!(AG)
-        point.x = F \ vcat(model.b, model.h - point.s)
+        AG_fact = issparse(AG) ? qr(AG) : qr!(AG)
+
+        AG_rank = get_rank_est(AG_fact, tol_qr)
+        if AG_rank < model.n
+            @warn("some dual equalities appear to be dependent; try using PreprocessedLinearModel")
+        end
+
+        point.x = AG_fact \ vcat(model.b, model.h - point.s)
     end
 
     model.initial_point = point
@@ -184,7 +207,7 @@ mutable struct PreprocessedLinearModel{T <: HypReal} <: LinearModel{T}
         h::Vector,
         cones::Vector{<:Cones.Cone},
         cone_idxs::Vector{UnitRange{Int}};
-        tol_QR::Real = 1e3 * eps(T),
+        tol_qr::Real = 1e2 * eps(T),
         use_dense_fallback::Bool = true,
         ) where {T <: HypReal}
         c = convert(Vector{T}, c)
@@ -205,18 +228,14 @@ mutable struct PreprocessedLinearModel{T <: HypReal} <: LinearModel{T}
         model.cone_idxs = cone_idxs
         model.nu = isempty(cones) ? zero(T) : sum(Cones.get_nu, cones)
 
-        preprocess_find_initial_point(model, tol_QR, use_dense_fallback)
-
-        @show model.initial_point.x
-        @show model.initial_point.y
+        preprocess_find_initial_point(model, tol_qr, use_dense_fallback)
 
         return model
     end
 end
 
 # preprocess and get initial point for PreprocessedLinearModel
-# NOTE (pivoted) QR factorizations are usually rank-revealing but may be unreliable, see http://www.math.sjsu.edu/~foster/rankrevealingcode.html
-function preprocess_find_initial_point(model::PreprocessedLinearModel{T}, tol_QR::Real, use_dense_fallback::Bool) where {T <: HypReal}
+function preprocess_find_initial_point(model::PreprocessedLinearModel{T}, tol_qr::Real, use_dense_fallback::Bool) where {T <: HypReal}
     c = model.c_raw
     A = model.A_raw
     b = model.b_raw
@@ -240,17 +259,9 @@ function preprocess_find_initial_point(model::PreprocessedLinearModel{T}, tol_QR
                 error("sparse factorization for number type $T is not supported by SparseArrays, so Hypatia cannot preprocess and find an initial point")
             end
         end
-        AG_fact = issparse(AG) ? qr(AG, tol = tol_QR) : qr(AG, Val(true))
+        AG_fact = issparse(AG) ? qr(AG, tol = tol_qr) : qr(AG, Val(true))
 
-        # TODO could replace this with rank(Ap_fact) when available for both dense and sparse
-        AG_R = AG_fact.R
-        AG_rank = 0
-        for i in 1:size(AG_R, 1) # TODO could replace this with rank(AG_fact) when available for both dense and sparse
-            if abs(AG_R[i, i]) > tol_QR
-                AG_rank += 1
-            end
-        end
-
+        AG_rank = get_rank_est(AG_fact, tol_qr)
         if AG_rank == n
             # no dual equalities to remove
             x_keep_idxs = 1:n
@@ -258,7 +269,7 @@ function preprocess_find_initial_point(model::PreprocessedLinearModel{T}, tol_QR
         else
             col_piv = (AG_fact isa QRPivoted{T, Matrix{T}}) ? AG_fact.p : AG_fact.pcol
             x_keep_idxs = col_piv[1:AG_rank]
-            AG_R = UpperTriangular(AG_R[1:AG_rank, 1:AG_rank])
+            AG_R = UpperTriangular(AG_fact.R[1:AG_rank, 1:AG_rank])
 
             # TODO optimize all below
             c_sub = c[x_keep_idxs]
@@ -267,12 +278,12 @@ function preprocess_find_initial_point(model::PreprocessedLinearModel{T}, tol_QR
                 yz_sub = yz_sub[AG_fact.rpivinv]
             end
             residual = norm(AG' * yz_sub - c, Inf)
-            if residual > tol_QR
-                error("some dual equality constraints are inconsistent (residual $residual, tolerance $tol_QR)")
+            if residual > tol_qr
+                error("some dual equality constraints are inconsistent (residual $residual, tolerance $tol_qr)")
             end
             println("removed $(n - AG_rank) out of $n dual equality constraints")
 
-            point.x = (AG_fact \ vcat(b, model.h - point.s))[x_keep_idxs]
+            point.x = AG_R \ (Matrix{T}(I, AG_rank, p + q) * (AG_fact.Q' * vcat(b, model.h - point.s)))
 
             c = c_sub
             A = A[:, x_keep_idxs]
@@ -293,19 +304,12 @@ function preprocess_find_initial_point(model::PreprocessedLinearModel{T}, tol_QR
                 error("sparse factorization for number type $T is not supported by SparseArrays, so Hypatia cannot preprocess and find an initial point")
             end
         else
-            Ap_fact = issparse(A) ? qr(sparse(A'), tol = tol_QR) : qr(A', Val(true))
+            Ap_fact = issparse(A) ? qr(sparse(A'), tol = tol_qr) : qr(A', Val(true))
         end
 
-        # TODO could replace this with rank(Ap_fact) when available for both dense and sparse
-        Ap_R = Ap_fact.R
-        Ap_rank = 0
-        for i in 1:size(Ap_R, 1)
-            if abs(Ap_R[i, i]) > tol_QR
-                Ap_rank += 1
-            end
-        end
+        Ap_rank = get_rank_est(Ap_fact, tol_qr)
 
-        Ap_R = UpperTriangular(Ap_R[1:Ap_rank, 1:Ap_rank])
+        Ap_R = UpperTriangular(Ap_fact.R[1:Ap_rank, 1:Ap_rank])
         col_piv = (Ap_fact isa QRPivoted{T, Matrix{T}}) ? Ap_fact.p : Ap_fact.pcol
         y_keep_idxs = col_piv[1:Ap_rank]
         Ap_Q = Ap_fact.Q
@@ -319,13 +323,13 @@ function preprocess_find_initial_point(model::PreprocessedLinearModel{T}, tol_QR
                 x_sub = x_sub[Ap_fact.rpivinv]
             end
             residual = norm(A * x_sub - b, Inf)
-            if residual > tol_QR
-                error("some primal equality constraints are inconsistent (residual $residual, tolerance $tol_QR)")
+            if residual > tol_qr
+                error("some primal equality constraints are inconsistent (residual $residual, tolerance $tol_qr)")
             end
             println("removed $(p - Ap_rank) out of $p primal equality constraints")
         end
 
-        point.y = (Ap_fact \ (-c - G' * point.z))[y_keep_idxs]
+        point.y = Ap_R \ (Matrix{T}(I, Ap_rank, n) * (Ap_fact.Q' *  (-c - G' * point.z)))
 
         if !(Ap_fact isa QRPivoted{T, Matrix{T}})
             row_piv = Ap_fact.prow
