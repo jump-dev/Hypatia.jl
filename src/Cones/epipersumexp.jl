@@ -51,7 +51,7 @@ function setup_data(cone::EpiPerSumExp{T}) where {T <: HypReal}
     return
 end
 
-get_nu(cone::EpiPerSumExp) = 3 # TODO does this increase with dim > 3?
+get_nu(cone::EpiPerSumExp) = 3
 
 set_initial_point(arr::AbstractVector{T}, cone::EpiPerSumExp{T}) where {T <: HypReal} = (@. arr = -log(T(cone.dim - 2)); arr[1] = T(2); arr[2] = one(T); arr)
 
