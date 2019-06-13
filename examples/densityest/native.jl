@@ -1,5 +1,5 @@
 #=
-Copyright 2018, Chris Coey, Lea Kapelevich and contributors
+Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
 given a sequence of observations X_1,...,X_n with each Xᵢ in Rᵈ,
 find a density function f maximizing the log likelihood of the observations
@@ -26,6 +26,7 @@ function densityest(
     X::AbstractMatrix{Float64},
     deg::Int;
     sample_factor::Int = 100,
+    use_sumlog::Bool = false,
     )
     (nobs, dim) = size(X)
 
@@ -44,28 +45,45 @@ function densityest(
         basis_evals[i, j] = lagrange_polys[j](X[i, :])
     end
 
-    c = vcat(-ones(nobs), zeros(1 + U))
-    dimx = nobs + 1 + U
-    A = zeros(nobs + 2, dimx)
-    A[nobs + 1, nobs + 1] = 1.0
-    A[end, (nobs + 2):end] = w
-    b = zeros(nobs + 2)
-    b[(nobs + 1):end] .= 1.0
-    G1 = zeros(U, dimx)
-    G1[:, (nobs + 2):end] = -Matrix{Float64}(I, U, U)
-    G2 = zeros(3 * nobs, dimx)
-    @show U, nobs, size(G1), size(G2)
-    offset = 1
-    for i in 1:nobs
-        G2[offset, i] = -1.0
-        G2[offset + 1, nobs + 1] = -1.0
-        G2[offset + 2, (nobs + 2):(nobs + 1 + U)] = -basis_evals[i, :]
-        offset += 3
+    if use_sumlog
+        c = vcat([-1.0], zeros(1 + U))
+        dimx = 2 + U
+        A = zeros(2, dimx)
+        A[1, 2] = 1.0
+        A[2, 3:end] = w
+        b = [1.0; 1.0]
+        G1 = zeros(U, dimx)
+        G1[:, 3:end] = -Matrix{Float64}(I, U, U)
+        G2 = zeros(3, dimx)
+        G2[1, 1] = -1.0
+        G2[2, 2] = -1.0
+        G2[3, 3:end] = -sum(basis_evals, dims = 1)
+        G = vcat(G1, G2)
+        h = zeros(U + 3)
+        cone_idxs = [1:U, (U + 1):(U + 3)]
+        # cones = [CO.WSOSPolyInterp{Float64, Float64}(U, [P0, PWts...]), CO....{Float64}()] TODO
+    else
+        c = vcat(-ones(nobs), zeros(1 + U))
+        dimx = nobs + 1 + U
+        A = zeros(2, dimx)
+        A[1, nobs + 1] = 1.0
+        A[2, (nobs + 2):end] = w
+        b = [1.0; 1.0]
+        G1 = zeros(U, dimx)
+        G1[:, (nobs + 2):end] = -Matrix{Float64}(I, U, U)
+        G2 = zeros(3 * nobs, dimx)
+        offset = 1
+        for i in 1:nobs
+            G2[offset, i] = -1.0
+            G2[offset + 1, nobs + 1] = -1.0
+            G2[offset + 2, (nobs + 2):(nobs + 1 + U)] = -basis_evals[i, :]
+            offset += 3
+        end
+        G = vcat(G1, G2)
+        h = zeros(U + 3 * nobs)
+        cone_idxs = vcat([1:U], [(3 * (i - 1) + U + 1):(3 * i + U) for i in 1:nobs])
+        cones = vcat(CO.WSOSPolyInterp{Float64, Float64}(U, [P0, PWts...]), [CO.HypoPerLog{Float64}() for _ in 1:nobs])
     end
-    G = vcat(G1, G2)
-    h = zeros(U + 3 * nobs)
-    cone_idxs = vcat([1:U], [(3 * (i - 1) + U + 1):(3 * i + U) for i in 1:nobs])
-    cones = vcat(CO.WSOSPolyInterp{Float64, Float64}(U, [P0, PWts...]), [CO.HypoPerLog{Float64}() for _ in 1:nobs])
 
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs)
 end
