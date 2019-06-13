@@ -1,16 +1,15 @@
 #=
-Copyright 2019, Chris Coey and contributors
+Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
 (closure of) hypograph of perspective of sum of logarithms
 (u in R, v in R_+, w in R_+^n) : u <= v*sum(log.(w/v))
-= v*(sum(log.(w)) - n*log(v))
 
-barrier (guessed)
+barrier (guessed, reduces to 3-dim exp cone self-concordant barrier)
 -log(v*sum(log.(w/v)) - u) - sum(log.(w)) - log(v)
-=-log(v*(sum(log.(w)) - n*log(v)) - u) - log(prod(w)) - log(v)
 
-TODO remove 3D cone and update examples
-
+TODO
+- rename to and replace 3D cone (hypoperlog)
+- remove ForwardDiff
 =#
 
 mutable struct HypoPerSumLog{T <: HypReal} <: Cone{T}
@@ -44,7 +43,7 @@ function setup_data(cone::HypoPerSumLog{T}) where {T <: HypReal}
         u = point[1]
         v = point[2]
         w = view(point, 3:dim)
-        return -log(v * (sum(wi -> log(wi / v), w)) - u) - sum(wi -> log(wi), w) - log(v)
+        return -log(v * sum(wi -> log(wi / v), w) - u) - sum(wi -> log(wi), w) - log(v)
     end
     cone.barfun = barfun
     cone.diffres = DiffResults.HessianResult(cone.g)
@@ -54,9 +53,9 @@ end
 get_nu(cone::HypoPerSumLog) = cone.dim
 
 function set_initial_point(arr::AbstractVector{T}, cone::HypoPerSumLog{T}) where {T <: HypReal}
-    @. arr = exp(inv(T(cone.dim - 2)))
-    arr[1] = T(-1)
+    arr[1] = -one(T)
     arr[2] = one(T)
+    @. arr[3:end] = exp(inv(T(cone.dim - 2)))
     return arr
 end
 
@@ -64,7 +63,7 @@ function check_in_cone(cone::HypoPerSumLog{T}) where {T <: HypReal}
     u = cone.point[1]
     v = cone.point[2]
     w = view(cone.point, 3:cone.dim)
-    if any(wi -> wi <= zero(T), w) || v <= zero(T) || u >= v * (sum(wi -> log(wi / v), w))
+    if any(wi -> wi <= zero(T), w) || v <= zero(T) || u >= v * sum(wi -> log(wi / v), w)
         return false
     end
 

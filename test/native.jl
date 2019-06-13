@@ -557,26 +557,24 @@ function hypopersumlog1(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, li
     c = T[-1, 0, 0]
     A = T[0 1 1]
     b = T[1]
-    G = sparse([1, 3, 4], [1, 2, 3], -ones(3))
-    h = zeros(T, 4)
-    h[2] = 1
+    G = sparse([1, 3, 4], [1, 2, 3], -ones(T, 3))
+    h = T[0, 1, 0, 0]
     cones = [CO.HypoPerSumLog{T}(4)]
     cone_idxs = [1:4]
 
     r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
     @test r.status == :Optimal
-    log_quarter = log(0.25)
-    @test r.primal_obj ≈ -log_quarter atol=tol rtol=tol
-    @test r.x ≈ [log_quarter, 0.5, 0.5] atol=tol rtol=tol
-    @test r.y ≈ [2.0] atol=tol rtol=tol
+    @test r.primal_obj ≈ -log(0.25) atol=tol rtol=tol
+    @test r.x ≈ [log(0.25), 0.5, 0.5] atol=tol rtol=tol
+    @test r.y ≈ [2] atol=tol rtol=tol
 end
 
 function hypopersumlog2(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
     tol = max(1e-5, sqrt(sqrt(eps(T))))
     c = T[-1, 0, 0]
-    A = zeros(0, 3)
-    b = zeros(0)
-    G = sparse([1, 3, 4], [1, 2, 3], -ones(3))
+    A = zeros(T, 0, 3)
+    b = zeros(T, 0)
+    G = sparse([1, 3, 4], [1, 2, 3], -ones(T, 3))
     h = zeros(T, 4)
     cones = [CO.HypoPerSumLog{T}(4)]
     cone_idxs = [1:4]

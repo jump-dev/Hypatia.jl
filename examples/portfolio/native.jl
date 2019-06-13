@@ -1,6 +1,10 @@
 #=
 Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
+TODO
+- add description
+- add more risk constraints covering more cones
+- enable random generation
 =#
 
 using LinearAlgebra
@@ -58,7 +62,6 @@ function test_portfolio(instance::Function; options, rseed::Int = 1)
     return
 end
 
-# example from DMD homework
 portfolio1() = portfolio(
     3,
     returns = -[0.0254,	0.0190,	0.0045],
