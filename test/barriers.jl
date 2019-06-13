@@ -4,6 +4,10 @@ Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 
 using LinearAlgebra
 import Random
+import Hypatia
+import Hypatia.HypReal
+const CO = Hypatia.Cones
+using Test
 
 function pass_through_cone(cone::CO.Cone{T}; num_checks::Int = 2) where {T <: HypReal}
     CO.setup_data(cone)
@@ -87,6 +91,14 @@ end
 function test_hypoperlogdet_barrier(T::Type{<:HypReal})
     for dim in [3, 5, 8]
         cone = CO.HypoPerLogdet{T}(dim)
+        pass_through_cone(cone)
+    end
+    return
+end
+
+function test_hypopersumlog_barrier(T::Type{<:HypReal})
+    for dim in [3, 5, 8]
+        cone = CO.HypoPerSumLog{T}(dim)
         pass_through_cone(cone)
     end
     return

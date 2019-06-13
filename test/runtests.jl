@@ -24,12 +24,14 @@ include(joinpath(examples_dir, "linearopt/native.jl"))
 include(joinpath(examples_dir, "polymin/native.jl"))
 include(joinpath(examples_dir, "contraction/JuMP.jl"))
 include(joinpath(examples_dir, "densityest/JuMP.jl"))
+include(joinpath(examples_dir, "densityest/native.jl"))
 include(joinpath(examples_dir, "envelope/JuMP.jl"))
 include(joinpath(examples_dir, "expdesign/JuMP.jl"))
 include(joinpath(examples_dir, "lotkavolterra/JuMP.jl"))
 include(joinpath(examples_dir, "muconvexity/JuMP.jl"))
 include(joinpath(examples_dir, "polymin/JuMP.jl"))
 include(joinpath(examples_dir, "polynorm/JuMP.jl"))
+include(joinpath(examples_dir, "portfolio/native.jl"))
 include(joinpath(examples_dir, "regionofattr/JuMP.jl"))
 include(joinpath(examples_dir, "secondorderpoly/JuMP.jl"))
 include(joinpath(examples_dir, "shapeconregr/JuMP.jl"))
@@ -62,6 +64,7 @@ barrier_testfuns = [
     test_epipersumexp_barrier,
     test_hypogeomean_barrier,
     test_hypoperlog_barrier,
+    test_hypopersumlog_barrier,
     test_hypoperlogdet_barrier,
     test_semidefinite_barrier,
     test_wsospolyinterp_barrier,
@@ -117,6 +120,8 @@ testfuns_nonsingular = [
     hypoperlog2,
     hypoperlog3,
     hypoperlog4,
+    hypopersumlog1,
+    hypopersumlog2,
     epiperpower1,
     epiperpower2,
     epiperpower3,
@@ -162,12 +167,16 @@ native_options = (
     time_limit = 6e2, # 1 minute
     )
 @testset "native examples" begin
+    @testset "densityest" begin test_densityest(; native_options...,
+        ) end
     @testset "envelope" begin test_envelope(; native_options...,
         ) end
     @testset "linearopt" begin test_linearopt(; native_options...,
         ) end
     @testset "polymin" begin test_polymin(; native_options...,
         tol_rel_opt = 1e-9, tol_abs_opt = 1e-8, tol_feas = 1e-9,
+        ) end
+    @testset "portfolio" begin test_portfolio(; native_options...,
         ) end
 end
 

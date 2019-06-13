@@ -1,19 +1,12 @@
 #=
 Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 
-given a sequence of observations X_1,...,X_n with each Xᵢ in Rᵈ,
-find a density function f maximizing the log likelihood of the observations
-    min -∑ᵢ zᵢ
-    -zᵢ + log(f(Xᵢ)) ≥ 0 ∀ i = 1,...,n
-    ∫f = 1
-    f ≥ 0
+see description in native.jl
 ==#
 
 using LinearAlgebra
 import Random
 using Test
-import DataFrames
-import CSV
 import MathOptInterface
 const MOI = MathOptInterface
 import JuMP
@@ -22,6 +15,8 @@ import PolyJuMP
 import Hypatia
 const HYP = Hypatia
 const MU = HYP.ModelUtilities
+
+include(joinpath(@__DIR__, "data.jl"))
 
 function densityestJuMP(
     X::AbstractMatrix{Float64},
@@ -75,27 +70,6 @@ function densityestJuMP(
 end
 
 densityestJuMP(nobs::Int, n::Int, deg::Int, use_monomials::Bool) = densityestJuMP(randn(nobs, n), deg, use_monomials = use_monomials)
-
-# iris dataset
-function iris_data()
-    df = CSV.read(joinpath(@__DIR__, "data", "iris.csv"))
-    # only use setosa species
-    dfsub = df[df.species .== "setosa", [:sepal_length, :sepal_width, :petal_length, :petal_width]] # n = 4
-    X = convert(Matrix{Float64}, dfsub)
-    return X
-end
-
-# lung cancer dataset from https://github.com/therneau/survival (cancer.rda)
-# description at https://github.com/therneau/survival/blob/master/man/lung.Rd
-function cancer_data()
-    df = CSV.read(joinpath(@__DIR__, "data", "cancer.csv"), missingstring = "NA", copycols = true)
-    DataFrames.dropmissing!(df, disallowmissing = true)
-    # only use males with status 2
-    dfsub = df[df.status .== 2, :]
-    dfsub = dfsub[dfsub.sex .== 1, [:time, :age, :ph_ecog, :ph_karno, :pat_karno, :meal_cal, :wt_loss]] # n = 7
-    X = convert(Matrix{Float64}, dfsub)
-    return X
-end
 
 densityestJuMP1() = densityestJuMP(iris_data(), 4)
 densityestJuMP2() = densityestJuMP(iris_data(), 6)
