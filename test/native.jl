@@ -552,6 +552,26 @@ function hypoperlog4(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linea
     @test r.x ≈ [-1, 1, exp(-2)] atol=tol rtol=tol
 end
 
+function hypopersumlog1(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
+    c = T[-1, 0, 0]
+    A = T[0 1 1]
+    b = T[1]
+    G = sparse([1, 3, 4], [1, 2, 3], -ones(3))
+    h = zeros(T, 4)
+    h[2] = 1
+    cones = [CO.HypoPerSumLog{T}(4)]
+    cone_idxs = [1:4]
+
+    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
+    @test r.status == :Optimal
+    log_quarter = log(0.25)
+    @test r.primal_obj ≈ -log_quarter atol=tol rtol=tol
+    @test r.x ≈ [-log_quarter, 0.5, 0.5] atol=tol rtol=tol
+    @test r.y ≈ [2.0] atol=tol rtol=tol
+    @test r.z ≈ c + A' * r.y atol=tol rtol=tol
+end
+
 function epiperpower1(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
     tol = max(1e-5, sqrt(sqrt(eps(T))))
     c = T[1, 0, -1, 0, 0, -1]

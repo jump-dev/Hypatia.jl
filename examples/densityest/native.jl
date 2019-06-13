@@ -56,7 +56,7 @@ function densityest(
         G1[:, 2:end] = -Matrix{Float64}(I, U, U)
         G2 = zeros(2 + nobs, dimx)
         G2[1, 1] = -1.0
-        h[2] = 1.0
+        h[U + 2] = 1.0
         for i in 1:nobs
             G2[i + 2, 2:end] = -basis_evals[i, :]
         end
@@ -83,7 +83,6 @@ function densityest(
         end
         G = vcat(G1, G2)
         cone_idxs = vcat([1:U], [(3 * (i - 1) + U + 1):(3 * i + U) for i in 1:nobs])
-        # @show dimx, size(A)
         cones = vcat(CO.WSOSPolyInterp{Float64, Float64}(U, [P0, PWts...]), [CO.HypoPerLog{Float64}() for _ in 1:nobs])
     end
 
