@@ -12,8 +12,6 @@ find a density function f maximizing the log likelihood of the observations
 using LinearAlgebra
 import Random
 using Test
-import DataFrames
-import CSV
 import DynamicPolynomials
 import Hypatia
 const HYP = Hypatia
@@ -22,11 +20,13 @@ const MU = HYP.ModelUtilities
 const CO = HYP.Cones
 const SO = HYP.Solvers
 
+include(joinpath(@__DIR__, "data.jl"))
+
 function densityest(
     X::AbstractMatrix{Float64},
     deg::Int;
-    sample_factor::Int = 100,
     use_sumlog::Bool = false,
+    sample_factor::Int = 100,
     )
     (nobs, dim) = size(X)
 
@@ -90,31 +90,10 @@ end
 
 densityest(nobs::Int, n::Int, deg::Int; options...) = densityest(randn(nobs, n), deg; options...)
 
-# iris dataset
-function iris_data()
-    df = CSV.read(joinpath(@__DIR__, "data", "iris.csv"))
-    # only use setosa species
-    dfsub = df[df.species .== "setosa", [:sepal_length, :sepal_width, :petal_length, :petal_width]] # n = 4
-    X = convert(Matrix{Float64}, dfsub)
-    return X
-end
-
-# lung cancer dataset from https://github.com/therneau/survival (cancer.rda)
-# description at https://github.com/therneau/survival/blob/master/man/lung.Rd
-function cancer_data()
-    df = CSV.read(joinpath(@__DIR__, "data", "cancer.csv"), missingstring = "NA", copycols = true)
-    DataFrames.dropmissing!(df, disallowmissing = true)
-    # only use males with status 2
-    dfsub = df[df.status .== 2, :]
-    dfsub = dfsub[dfsub.sex .== 1, [:time, :age, :ph_ecog, :ph_karno, :pat_karno, :meal_cal, :wt_loss]] # n = 7
-    X = convert(Matrix{Float64}, dfsub)
-    return X
-end
-
 densityest1() = densityest(iris_data(), 4, use_sumlog = true)
-densityest2() = densityest(iris_data(), 4)
+densityest2() = densityest(iris_data(), 4, use_sumlog = false)
 densityest3() = densityest(cancer_data(), 4, use_sumlog = true)
-densityest4() = densityest(cancer_data(), 4)
+densityest4() = densityest(cancer_data(), 4, use_sumlog = false)
 densityest5() = densityest(200, 1, 4, use_sumlog = true)
 densityest6() = densityest(200, 1, 4, use_sumlog = false)
 
