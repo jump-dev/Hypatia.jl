@@ -101,7 +101,8 @@ mutable struct QRCholCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemS
         system_solver.GHGQ1x = Matrix{T}(undef, n, 3)
         system_solver.Q2div = Matrix{T}(undef, nmp, 3)
 
-        GQ = model.G * model.Ap_Q # TODO check efficiency
+        # TODO very inefficient method used for sparse G * Q : see https://github.com/JuliaLang/julia/issues/31124#issuecomment-501540818
+        GQ = model.G * model.Ap_Q
         system_solver.GQ1 = GQ[:, 1:p]
         system_solver.GQ2 = GQ[:, (p + 1):end]
         if use_sparse
