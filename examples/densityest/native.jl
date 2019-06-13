@@ -26,7 +26,7 @@ function densityest(
     X::AbstractMatrix{Float64},
     deg::Int;
     sample_factor::Int = 100,
-    use_sumlog::Bool = false,
+    use_sumlog::Bool = true,
     )
     (nobs, dim) = size(X)
 
@@ -46,42 +46,44 @@ function densityest(
     end
 
     if use_sumlog
-        c = vcat([-1.0], zeros(1 + U))
-        dimx = 2 + U
-        A = zeros(2, dimx)
-        A[1, 2] = 1.0
-        A[2, 3:end] = w
-        b = [1.0; 1.0]
+        c = vcat([-1.0], zeros(U))
+        dimx = 1 + U
+        A = zeros(1, dimx)
+        A[1, 2:end] = w
+        b = [1.0]
+        h = zeros(U + 2 + nobs)
         G1 = zeros(U, dimx)
-        G1[:, 3:end] = -Matrix{Float64}(I, U, U)
-        G2 = zeros(3, dimx)
+        G1[:, 2:end] = -Matrix{Float64}(I, U, U)
+        G2 = zeros(2 + nobs, dimx)
         G2[1, 1] = -1.0
-        G2[2, 2] = -1.0
-        G2[3, 3:end] = -sum(basis_evals, dims = 1)
+        h[2] = 1.0
+        for i in 1:nobs
+            G2[i + 2, 2:end] = -basis_evals[i, :]
+        end
         G = vcat(G1, G2)
-        h = zeros(U + 3)
-        cone_idxs = [1:U, (U + 1):(U + 3)]
-        # cones = [CO.WSOSPolyInterp{Float64, Float64}(U, [P0, PWts...]), CO....{Float64}()] TODO
+        cone_idxs = [1:U, (U + 1):(U + 2 + nobs)]
+        @show cone_idxs, size(G1), size(G2), size(h), size(c), size(A), size(b)
+        cones = [CO.WSOSPolyInterp{Float64, Float64}(U, [P0, PWts...]), CO.HypoPerSumLog{Float64}(nobs + 2)]
     else
-        c = vcat(-ones(nobs), zeros(1 + U))
-        dimx = nobs + 1 + U
-        A = zeros(2, dimx)
-        A[1, nobs + 1] = 1.0
-        A[2, (nobs + 2):end] = w
-        b = [1.0; 1.0]
+        c = vcat(-ones(nobs), zeros(U))
+        dimx = nobs + U
+        A = zeros(1, dimx)
+        A[1, (nobs + 1):end] = w
+        b = [1.0]
+        h = zeros(U + 3 * nobs)
         G1 = zeros(U, dimx)
-        G1[:, (nobs + 2):end] = -Matrix{Float64}(I, U, U)
+        G1[:, (nobs + 1):end] = -Matrix{Float64}(I, U, U)
         G2 = zeros(3 * nobs, dimx)
         offset = 1
         for i in 1:nobs
             G2[offset, i] = -1.0
-            G2[offset + 1, nobs + 1] = -1.0
-            G2[offset + 2, (nobs + 2):(nobs + 1 + U)] = -basis_evals[i, :]
+            h[U + offset + 1] = 1.0
+            G2[offset + 2, (nobs + 1):end] = -basis_evals[i, :]
             offset += 3
         end
         G = vcat(G1, G2)
-        h = zeros(U + 3 * nobs)
         cone_idxs = vcat([1:U], [(3 * (i - 1) + U + 1):(3 * i + U) for i in 1:nobs])
+        # @show dimx, size(A)
         cones = vcat(CO.WSOSPolyInterp{Float64, Float64}(U, [P0, PWts...]), [CO.HypoPerLog{Float64}() for _ in 1:nobs])
     end
 
@@ -133,6 +135,6 @@ test_densityest_all(; options...) = test_densityest.([
     ], options = options)
 
 test_densityest(; options...) = test_densityest.([
-    densityest1,
+    # densityest1,
     densityest3,
     ], options = options)
