@@ -9,6 +9,8 @@ barrier (guessed)
 -log(v*sum(log.(w/v)) - u) - sum(log.(w)) - log(v)
 =-log(v*(sum(log.(w)) - n*log(v)) - u) - log(prod(w)) - log(v)
 
+TODO remove 3D cone and update examples
+
 =#
 
 mutable struct HypoPerSumLog{T <: HypReal} <: Cone{T}
@@ -42,7 +44,7 @@ function setup_data(cone::HypoPerSumLog{T}) where {T <: HypReal}
         u = point[1]
         v = point[2]
         w = view(point, 3:dim)
-        return -log(v * (sum(wi -> log(wi), w) - (dim - 2) * log(v)) - u) - sum(wi -> log(wi), w) - log(v)
+        return -log(v * (sum(wi -> log(wi / v), w)) - u) - sum(wi -> log(wi), w) - log(v)
     end
     cone.barfun = barfun
     cone.diffres = DiffResults.HessianResult(cone.g)
@@ -62,7 +64,7 @@ function check_in_cone(cone::HypoPerSumLog{T}) where {T <: HypReal}
     u = cone.point[1]
     v = cone.point[2]
     w = view(cone.point, 3:cone.dim)
-    if any(wi -> wi <= zero(T), w) || v <= zero(T) || u >= v * (sum(wi -> log(wi), w) - (cone.dim - 2) * log(v))
+    if any(wi -> wi <= zero(T), w) || v <= zero(T) || u >= v * (sum(wi -> log(wi / v), w))
         return false
     end
 
