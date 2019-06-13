@@ -140,14 +140,18 @@ end
 
 @info("starting MathOptInterface tests")
 verbose = false
+dense_options = [
+    true,
+    false,
+    ]
 system_solvers = [
-    SO.NaiveCombinedHSDSystemSolver,
+    SO.NaiveElimCombinedHSDSystemSolver,
     SO.QRCholCombinedHSDSystemSolver,
     ]
 linear_models = [
-    MO.PreprocessedLinearModel, # MOI tests require preprocessing
+    MO.PreprocessedLinearModel, # some MOI tests require preprocessing to pass
     ]
-@testset "MOI tests: $(d ? "dense" : "sparse"), $s, $m" for d in (false, true), s in system_solvers, m in linear_models
+@testset "MOI tests: $(d ? "dense" : "sparse"), $s, $m" for d in dense_options, s in system_solvers, m in linear_models
     test_moi(d, s{Float64}, m{Float64}, verbose)
 end
 

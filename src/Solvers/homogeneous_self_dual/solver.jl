@@ -188,6 +188,42 @@ function solve(solver::HSDSolver{T}) where {T <: HypReal}
     return
 end
 
+function calc_mu(solver::HSDSolver{T}) where {T <: HypReal}
+    solver.mu = (dot(solver.point.z, solver.point.s) + solver.tau * solver.kap) /
+        (one(T) + solver.model.nu)
+    return solver.mu
+end
+
+function calc_residual(solver::HSDSolver{T}) where {T <: HypReal}
+    model = solver.model
+    point = solver.point
+
+    # x_residual = -A'*y - G'*z - c*tau
+    x_residual = solver.x_residual
+    mul!(x_residual, model.G', point.z)
+    x_residual .= -model.A' * point.y - x_residual # TODO remove allocs
+    solver.x_norm_res_t = norm(x_residual)
+    @. x_residual -= model.c * solver.tau
+    solver.x_norm_res = norm(x_residual) / solver.tau
+
+    # y_residual = A*x - b*tau
+    y_residual = solver.y_residual
+    mul!(y_residual, model.A, point.x)
+    solver.y_norm_res_t = norm(y_residual)
+    @. y_residual -= model.b * solver.tau
+    solver.y_norm_res = norm(y_residual) / solver.tau
+
+    # z_residual = s + G*x - h*tau
+    z_residual = solver.z_residual
+    mul!(z_residual, model.G, point.x)
+    @. z_residual += point.s
+    solver.z_norm_res_t = norm(z_residual)
+    @. z_residual -= model.h * solver.tau
+    solver.z_norm_res = norm(z_residual) / solver.tau
+
+    return
+end
+
 function calc_convergence_params(solver::HSDSolver{T}) where {T <: HypReal}
     model = solver.model
     point = solver.point
@@ -202,7 +238,7 @@ function calc_convergence_params(solver::HSDSolver{T}) where {T <: HypReal}
     solver.dual_obj_t = -dot(model.b, point.y) - dot(model.h, point.z)
     solver.primal_obj = solver.primal_obj_t / solver.tau
     solver.dual_obj = solver.dual_obj_t / solver.tau
-    solver.gap = dot(point.z, point.s) # TODO maybe should adapt original Alfonso condition instead of using this CVXOPT condition
+    solver.gap = dot(point.z, point.s)
     if solver.primal_obj < zero(T)
         solver.rel_gap = solver.gap / -solver.primal_obj
     elseif solver.dual_obj > zero(T)
@@ -272,40 +308,4 @@ function check_convergence(solver::HSDSolver{T}) where {T <: HypReal}
     end
 
     return false
-end
-
-function calc_residual(solver::HSDSolver{T}) where {T <: HypReal}
-    model = solver.model
-    point = solver.point
-
-    # x_residual = -A'*y - G'*z - c*tau
-    x_residual = solver.x_residual
-    mul!(x_residual, model.G', point.z)
-    x_residual .= -model.A' * point.y - x_residual # TODO remove allocs
-    solver.x_norm_res_t = norm(x_residual)
-    @. x_residual -= model.c * solver.tau
-    solver.x_norm_res = norm(x_residual) / solver.tau
-
-    # y_residual = A*x - b*tau
-    y_residual = solver.y_residual
-    mul!(y_residual, model.A, point.x)
-    solver.y_norm_res_t = norm(y_residual)
-    @. y_residual -= model.b * solver.tau
-    solver.y_norm_res = norm(y_residual) / solver.tau
-
-    # z_residual = s + G*x - h*tau
-    z_residual = solver.z_residual
-    mul!(z_residual, model.G, point.x)
-    @. z_residual += point.s
-    solver.z_norm_res_t = norm(z_residual)
-    @. z_residual -= model.h * solver.tau
-    solver.z_norm_res = norm(z_residual) / solver.tau
-
-    return
-end
-
-function calc_mu(solver::HSDSolver{T}) where {T <: HypReal}
-    solver.mu = (dot(solver.point.z, solver.point.s) + solver.tau * solver.kap) /
-        (one(T) + solver.model.nu)
-    return solver.mu
 end
