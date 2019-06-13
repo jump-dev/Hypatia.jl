@@ -62,19 +62,19 @@ end
 function consistent1(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
     Random.seed!(1)
     (n, p, q) = (30, 15, 30)
-    A = rand(-9.0:9.0, p, n)
-    G = Matrix(1.0I, q, n)
-    c = rand(0.0:9.0, n)
-    rnd1 = rand()
-    rnd2 = rand()
+    c = rand(T(0):T(9), n)
+    A = rand(T(-9):T(9), p, n)
+    G = Matrix{T}(I, q, n)
+    rnd1 = rand(T)
+    rnd2 = rand(T)
     A[11:15, :] = rnd1 * A[1:5, :] - rnd2 * A[6:10, :]
-    b = A * ones(n)
-    rnd1 = rand()
-    rnd2 = rand()
+    b = A * ones(T, n)
+    rnd1 = rand(T)
+    rnd2 = rand(T)
     A[:, 11:15] = rnd1 * A[:, 1:5] - rnd2 * A[:, 6:10]
     G[:, 11:15] = rnd1 * G[:, 1:5] - rnd2 * G[:, 6:10]
     c[11:15] = rnd1 * c[1:5] - rnd2 * c[6:10]
-    h = zeros(q)
+    h = zeros(T, q)
     cones = [CO.Nonpositive{T}(q)]
     cone_idxs = [1:q]
 
@@ -85,15 +85,15 @@ end
 function inconsistent1(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
     Random.seed!(1)
     (n, p, q) = (30, 15, 30)
-    A = rand(-9.0:9.0, p, n)
-    G = Matrix(-1.0I, q, n)
-    c = rand(0.0:9.0, n)
-    b = rand(p)
-    rnd1 = rand()
-    rnd2 = rand()
+    c = rand(T(0):T(9), n)
+    A = rand(T(-9):T(9), p, n)
+    G = Matrix{T}(-I, q, n)
+    b = rand(T, p)
+    rnd1 = rand(T)
+    rnd2 = rand(T)
     A[11:15, :] = rnd1 * A[1:5, :] - rnd2 * A[6:10, :]
-    b[11:15] = 2 * (rnd1 * b[1:5] - rnd2 * b[6:10])
-    h = zeros(q)
+    b[11:15] = T(2) * (rnd1 * b[1:5] - rnd2 * b[6:10])
+    h = zeros(T, q)
 
     @test_throws ErrorException linear_model(c, A, b, G, h, [CO.Nonnegative{T}(q)], [1:q])
 end
@@ -101,16 +101,16 @@ end
 function inconsistent2(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
     Random.seed!(1)
     (n, p, q) = (30, 15, 30)
-    A = rand(-9.0:9.0, p, n)
-    G = Matrix(-1.0I, q, n)
-    c = rand(0.0:9.0, n)
-    b = rand(p)
-    rnd1 = rand()
-    rnd2 = rand()
+    c = rand(T(0):T(9), n)
+    A = rand(T(-9):T(9), p, n)
+    G = Matrix{T}(-I, q, n)
+    b = rand(T, p)
+    rnd1 = rand(T)
+    rnd2 = rand(T)
     A[:,11:15] = rnd1 * A[:,1:5] - rnd2 * A[:,6:10]
     G[:,11:15] = rnd1 * G[:,1:5] - rnd2 * G[:,6:10]
-    c[11:15] = 2 * (rnd1 * c[1:5] - rnd2 * c[6:10])
-    h = zeros(q)
+    c[11:15] = T(2) * (rnd1 * c[1:5] - rnd2 * c[6:10])
+    h = zeros(T, q)
 
     @test_throws ErrorException linear_model(c, A, b, G, h, [CO.Nonnegative{T}(q)], [1:q])
 end

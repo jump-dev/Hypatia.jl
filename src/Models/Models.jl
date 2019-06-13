@@ -27,7 +27,7 @@ mutable struct Point{T <: HypReal}
         y::Vector{T},
         z::Vector{T},
         s::Vector{T},
-        cones::Vector{<:Cones.Cone},
+        cones::Vector{<:Cones.Cone{T}},
         cone_idxs::Vector{UnitRange{Int}},
         ) where {T <: HypReal}
         point = new{T}()
