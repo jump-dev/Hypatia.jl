@@ -5,8 +5,8 @@ Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 using LinearAlgebra
 import Random
 import Hypatia
+import Hypatia.HypReal
 const CO = Hypatia.Cones
-const HypReal = Hypatia.HypReal
 using Test
 
 function pass_through_cone(cone::CO.Cone{T}; num_checks::Int = 2) where {T <: HypReal}
