@@ -59,7 +59,6 @@ function matrix_completion(
     h = zeros(m * n + 2 + num_unknown)
     # first component of the vector in the in geomean cone, elements multiply to one
     h[m * n + 2] = 1
-    @show m * n, num_known, num_unknown
 
     for (k, (i, j)) in enumerate(zip(known_rows, known_cols))
         known_idx = cart_to_single(i, j)
@@ -80,12 +79,9 @@ function matrix_completion(
     @assert unknown_idx - 1 == num_unknown
 
     G = vcat(G1, G2, G3)
-    @show A, G, h
 
     cone_idxs = [1:(m * n + 1), (m * n + 2):(m * n + 2 + num_unknown)]
     cones = [CO.EpiNormSpectral{Float64}(n, m), CO.HypoGeomean{Float64}(ones(num_unknown) / num_unknown)]
-
-    # @show cone_idxs, size(A), size(G)
 
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs)
 end
