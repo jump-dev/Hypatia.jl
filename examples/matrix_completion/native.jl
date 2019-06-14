@@ -42,6 +42,10 @@ function matrix_completion(
     end
     known_pairs = [(known_rows[i], known_cols[i]) for i in 1:num_known]
     cart_to_single(i, j) = (j - 1) * m + i
+    # change everything to a threelinerish?
+    # known_idxs = cart_to_single.(zip(known_rows, known_cols))
+    # unknown_idxs = setdiff(1:n, known_idxs)
+    # G[unknown_idxs, :] .= -1
 
     num_unknown = m * n - num_known
     dimx = 1 + num_unknown
@@ -78,6 +82,8 @@ function matrix_completion(
     cones = CO.Cone[CO.EpiNormSpectral{Float64}(n, m)]
     cone_idxs = [1:(m * n + 1)]
 
+    spectral_dim = m * n + 1
+
     if !use_3dim
         # hypogeomean for values to be filled
         G2 = zeros(num_unknown + 1, num_unknown + 1)
@@ -103,37 +109,40 @@ function matrix_completion(
     end
 
     if use_3dim
-        dimx += num_unknown - 2
-        # number of 3-dimensional power cones needed is num_unknown - 1
-        G3 = zeros(3 * (num_unknown - 1), dimx)
+        # number of 3-dimensional power cones needed is num_unknown - 1, number of new variables is num_unknown - 2
+        # first num_unknown columns overlap with G1, column for the epigraph variable of the spectral cone added later
+        G2 = zeros(3 * (num_unknown - 1), 2 * num_unknown - 2)
         # first cone is a special case since two of the original variables participate in it
         # TODO offset columns by 1 due to spectral variable
-        G3[3, 1] = -1
-        G3[2, 2] = -1
-        G3[1, num_unknown + 1] = -1
+        G2[3, 1] = -1
+        G2[2, 2] = -1
+        G2[1, num_unknown + 1] = -1
         push!(cones, CO.HypoGeomean{Float64}([0.5, 0.5]))
-        push!(cone_idxs, spectral_dim + 1:3)
+        push!(cone_idxs, (spectral_dim + 1):(spectral_dim + 3))
         offset = 4
         # loop over new vars
         for i in 1:(num_unknown - 3)
-            G3[offset, num_unknown + i + 1] = -1
-            G3[offset + 1, num_unknown + i] = -1
-            G3[offset + 2, i + 2] = -1
+            G2[offset, num_unknown + i + 1] = -1
+            G2[offset + 1, num_unknown + i] = -1
+            G2[offset + 2, i + 2] = -1
             push!(cones, CO.HypoGeomean{Float64}([(i + 1) / (i + 2), 1 / (i + 2)]))
-            push!(cone_idxs, spectral_dim + (3 * i + 1):(3 * (i + 1)))
+            push!(cone_idxs, (spectral_dim + 3 * i + 1):(spectral_dim + 3 * (i + 1)))
             offset += 3
         end
         # last row also special becuase hypograph variable is fixed
-        G3[offset + 2, num_unknown] = -1
-        G3[offset + 1, 2 * num_unknown - 2] = -1
-        @show G3
+        G2[offset + 2, num_unknown] = -1
+        G2[offset + 1, 2 * num_unknown - 2] = -1
         push!(cones, CO.HypoGeomean{Float64}([(num_unknown - 1) / num_unknown, 1 / num_unknown]))
-        push!(cone_idxs, spectral_dim + (num_unknown - 5):(num_unknown - 3))
+        push!(cone_idxs, (spectral_dim + 3 * num_unknown - 5):(spectral_dim + 3 * num_unknown - 3))
         h = vcat(h1, zeros(3 * (num_unknown - 2)), [1, 0, 0])
-        @show h
 
-        G3 = [zeros(3 * (num_unknown - 1)) G3]
-        G = vcat([G1 zeros(1, num_unknown - 1)], [G2, zeros(num_unknown - 1)], G3)
+        # G1 needs to be post-padded with columns for 3dim cone vars
+        G1 = [G1 zeros(m * n + 1, num_unknown - 2)]
+        # G2 needs to be pre-padded with the epigraph variable for the spectral norm cone
+        G2 = [zeros(3 * (num_unknown - 1)) G2]
+        G = vcat(G1, G2)
+        c = vcat(c, zeros(num_unknown - 2))
+        A = zeros(0, size(G, 2))
 
     end
 
