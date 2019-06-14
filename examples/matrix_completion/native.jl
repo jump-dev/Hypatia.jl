@@ -27,6 +27,7 @@ function matrix_completion(
     known_vals::Vector{Float64} = Float64[],
     use_3dim::Bool = false,
     )
+    @assert m >= n
 
     if num_known < 0
         num_known = round(Int, m * n * 0.1)
@@ -40,30 +41,29 @@ function matrix_completion(
     if isempty(known_vals)
         known_vals = randn(num_known)
     end
-    known_pairs = [(known_rows[i], known_cols[i]) for i in 1:num_known]
     cart_to_single(i, j) = (j - 1) * m + i
     # change everything to a threelinerish?
     # known_idxs = cart_to_single.(zip(known_rows, known_cols))
     # unknown_idxs = setdiff(1:n, known_idxs)
     # G[unknown_idxs, :] .= -1
 
-    num_unknown = m * n - num_known
-    dimx = 1 + num_unknown
-    c = zeros(dimx)
-    c[1] = 1
-    A = zeros(0, dimx)
-    b = Float64[]
-
-    # epinormspectral cone- get vec(X) in G and h
-    G1 = zeros(m * n, num_unknown)
     h1 = zeros(m * n)
 
-    is_known = fill(false, n * m)
+    is_known = fill(false, m * n)
     for (k, (i, j)) in enumerate(zip(known_rows, known_cols))
         known_idx = cart_to_single(i, j)
         h1[known_idx] = known_vals[k]
         is_known[known_idx] = true
     end
+
+    num_known = sum(is_known) # TODO handle repetitions better
+    num_unknown = m * n - num_known
+    c = zeros(1 + num_unknown)
+    c[1] = 1
+    b = Float64[]
+
+    # epinormspectral cone- get vec(X) in G and h
+    G1 = zeros(m * n, num_unknown)
 
     total_idx = 1
     unknown_idx = 1
@@ -104,16 +104,16 @@ function matrix_completion(
 
         G = vcat(G1, G2)
 
+        A = zeros(0, 1 + num_unknown)
+
         push!(cone_idxs, (m * n + 2):(m * n + 2 + num_unknown))
         push!(cones, CO.HypoGeomean{Float64}(ones(num_unknown) / num_unknown))
-    end
 
-    if use_3dim
+    else
         # number of 3-dimensional power cones needed is num_unknown - 1, number of new variables is num_unknown - 2
         # first num_unknown columns overlap with G1, column for the epigraph variable of the spectral cone added later
         G2 = zeros(3 * (num_unknown - 1), 2 * num_unknown - 2)
         # first cone is a special case since two of the original variables participate in it
-        # TODO offset columns by 1 due to spectral variable
         G2[3, 1] = -1
         G2[2, 2] = -1
         G2[1, num_unknown + 1] = -1
@@ -146,25 +146,32 @@ function matrix_completion(
 
     end
 
-    @show A, G, h cone_idxs, cones
-
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs)
 end
 
-matrix_completion1() = matrix_completion(
+matrix_completion_ex(use_3dim::Bool) = matrix_completion(
     3,
     3,
     num_known = 5,
     known_rows = [1, 3, 2, 3, 1],
     known_cols = [1, 1, 2, 2, 3],
     known_vals = [1.0, 3.2, 0.8, 5.9, 1.9],
+    use_3dim = use_3dim,
 )
+matrix_completion1() = matrix_completion_ex(false)
+matrix_completion2() = matrix_completion_ex(true)
+matrix_completion3() = matrix_completion(6, 5, use_3dim = false)
+matrix_completion4() = matrix_completion(6, 5, use_3dim = true)
 
 # [
 # 1.        0.6911765108350109 1.9
 # 1.031601017350596 0.8        2.3506257965881243
 # 3.2        5.9        0.5966455412012085
 # ]
+
+# [1.         4.63616907 1.9
+# 0.49991744 0.8        0.37774148
+# 3.2        5.9        1.14221476]
 
 function test_matrix_completion(instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
@@ -180,8 +187,14 @@ end
 
 test_matrix_completion_all(; options...) = test_matrix_completion.([
     matrix_completion1,
+    matrix_completion2,
+    matrix_completion3,
+    matrix_completion4,
     ], options = options)
 
 test_matrix_completion(; options...) = test_matrix_completion.([
     matrix_completion1,
+    matrix_completion2,
+    matrix_completion3,
+    matrix_completion4,
     ], options = options)
