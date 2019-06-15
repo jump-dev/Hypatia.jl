@@ -53,16 +53,16 @@ function expdesignJuMP(
     return (model = model,)
 end
 
-expdesignJuMP1() = expdesignJuMP(25, 75, 125, 5) # large
-expdesignJuMP2() = expdesignJuMP(10, 30, 50, 5) # medium
-expdesignJuMP3() = expdesignJuMP(5, 15, 25, 5) # small
-expdesignJuMP4() = expdesignJuMP(4, 8, 12, 3) # tiny
-expdesignJuMP5() = expdesignJuMP(3, 5, 7, 2) # miniscule
-expdesignJuMP6() = expdesignJuMP(25, 75, 125, 5, use_logdet = false) # large
-expdesignJuMP7() = expdesignJuMP(10, 30, 50, 5, use_logdet = false) # medium
-expdesignJuMP8() = expdesignJuMP(5, 15, 25, 5, use_logdet = false) # small
-expdesignJuMP9() = expdesignJuMP(4, 8, 12, 3, use_logdet = false) # tiny
-expdesignJuMP10() = expdesignJuMP(3, 5, 7, 2, use_logdet = false) # miniscule
+expdesignJuMP1() = expdesignJuMP(25, 75, 125, 5)
+expdesignJuMP2() = expdesignJuMP(10, 30, 50, 5)
+expdesignJuMP3() = expdesignJuMP(5, 15, 25, 5)
+expdesignJuMP4() = expdesignJuMP(4, 8, 12, 3)
+expdesignJuMP5() = expdesignJuMP(3, 5, 7, 2)
+expdesignJuMP6() = expdesignJuMP(25, 75, 125, 5, use_logdet = false)
+expdesignJuMP7() = expdesignJuMP(10, 30, 50, 5, use_logdet = false)
+expdesignJuMP8() = expdesignJuMP(5, 15, 25, 5, use_logdet = false)
+expdesignJuMP9() = expdesignJuMP(4, 8, 12, 3, use_logdet = false)
+expdesignJuMP10() = expdesignJuMP(3, 5, 7, 2, use_logdet = false)
 
 function test_expdesignJuMP(instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)

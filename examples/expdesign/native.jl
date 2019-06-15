@@ -23,28 +23,35 @@ function expdesign(
     p::Int,
     n::Int,
     nmax::Int;
-    use_logdet::Bool = true,
+    use_logdet::Bool = false,
     )
 
     @assert (p > q) && (n > q) && (nmax <= n)
     V = randn(q, p)
 
     # hypograph variable and number of trials of each experiment
-    A = [0 ones(p)...]
+    A = ones(1, p)
     b = Float64[n]
-    c = [-1, zeros(p)...]
 
     # nonnegativity
-    G_nonneg = [zeros(p) -Matrix{Float64}(I, p, p)]
+    G_nonneg = -Matrix{Float64}(I, p, p)
     h_nonneg = zeros(p)
     # do <= nmax experiments
-    G_nmax = [zeros(p) Matrix{Float64}(I, p, p)]
+    G_nmax = Matrix{Float64}(I, p, p)
     h_nmax = fill(nmax, p)
 
     cones = CO.Cone[CO.Nonnegative{Float64}(p), CO.Nonnegative{Float64}(p)]
     cone_idxs = [1:p, (p + 1):(2 * p)]
 
     if use_logdet
+
+        # pad with hypograph variable
+        A = [0 A]
+        G_nonneg = [zeros(p) G_nonneg]
+        G_nmax = [zeros(p) G_nmax]
+        # maximize the hypograph variable of the logdet cone
+        c = [-1, zeros(p)...]
+
         # dimension of vectorized matrix V*diag(np)*V'
         dimvec = Int(q * (q + 1) / 2)
         G_logdet = zeros(dimvec, p)
@@ -59,19 +66,84 @@ function expdesign(
         G_logdet = [-1 zeros(1, p); zeros(1, p + 1); zeros(dimvec) G_logdet]
         push!(cones, CO.HypoPerLogdet{Float64}(dimvec + 2))
         push!(cone_idxs, (2 * p + 1):(2 * p + dimvec + 2))
+
+        G = vcat(G_nonneg, G_nmax, G_logdet)
+        h = vcat(h_nonneg, h_nmax, h_logdet)
     else
-        # something
+
+        # requires an upper triangular matrix of additional variables, ordered as vec(triangle)
+        num_trivars = Int(q * (q + 1) / 2)
+        # pad with triangle matrix variables and q hypopoerlog cone hypograph variables
+        A = [A zeros(1, num_trivars) zeros(1, q)]
+        G_nonneg = [G_nonneg zeros(p, num_trivars) zeros(p, q)]
+        G_nmax = [G_nmax zeros(p, num_trivars) zeros(p, q)]
+        # maximize the sum of hypograph variables of all hypoperlog cones
+        c = vcat(zeros(p), zeros(num_trivars), -ones(q))
+
+        # number of experiments, upper triangular matrix, hypograph variables
+        dimx = p + num_trivars + q
+
+        # vectorized dimension of psd matrix
+        dimvec = q * (2 * q + 1)
+        G_psd = zeros(dimvec, dimx)
+
+        # V*diag(np)*V
+        l = 1
+        for i in 1:q, j in 1:i
+            for k in 1:p
+                G_psd[l, k] = -V[i, k] * V[j, k] * (i == j ? 1 : rt2)
+            end
+            l += 1
+        end
+        # [triangle' diag(triangle)]
+        tri_idx = 1
+        for i in 1:q
+            # triangle'
+            # skip zero-valued elements
+            l += i - 1
+            for j in i:q
+                G_psd[l, p + tri_idx] = -rt2
+                l += 1
+                tri_idx += 1
+            end
+            # diag(triangle)
+            # skip zero-valued elements
+            l += i - 1
+            G_psd[l, p + sum(1:i)] = -1
+            l += 1
+        end
+
+
+        h_psd = zeros(dimvec)
+        push!(cone_idxs, (2 * p + 1):(2 * p + dimvec))
+        push!(cones, CO.PosSemidef{Float64, Float64}(dimvec))
+
+        G_log = zeros(3 * q, dimx)
+        h_log = zeros(3 * q)
+        offset = 1
+        for i in 1:q
+            # hypograph variable
+            G_log[offset, p + num_trivars + i] = -1
+            # perspective variable
+            h_log[offset + 1] = 1
+            # diagonal element in the triangular matrix
+            G_log[offset + 2, p + sum(1:i)] = -1
+            cone_offset = 2 * p + dimvec + offset
+            push!(cone_idxs, cone_offset:(cone_offset + 2))
+            push!(cones, CO.HypoPerLog{Float64}())
+            offset += 3
+        end
+
+        G = vcat(G_nonneg, G_nmax, G_psd, G_log)
+        h = vcat(h_nonneg, h_nmax, h_psd, h_log)
+
     end
-
-    G = vcat(G_nonneg, G_nmax, G_logdet)
-    h = vcat(h_nonneg, h_nmax, h_logdet)
-
-    @show size(G), size(A), cone_idxs, size(h), size(c)
 
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs)
 end
 
 function test_expdesign(instance::Function; options, rseed::Int = 1)
+    @show options
     Random.seed!(rseed)
     d = instance()
     model = MO.PreprocessedLinearModel{Float64}(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
@@ -82,16 +154,16 @@ function test_expdesign(instance::Function; options, rseed::Int = 1)
     return
 end
 
-expdesign1() = expdesign(25, 75, 125, 5) # large
-expdesign2() = expdesign(10, 30, 50, 5) # medium
-expdesign3() = expdesign(5, 15, 25, 5) # small
-expdesign4() = expdesign(4, 8, 12, 3) # tiny
-expdesign5() = expdesign(3, 5, 7, 2) # miniscule
-expdesign6() = expdesign(25, 75, 125, 5, use_logdet = false) # large
-expdesign7() = expdesign(10, 30, 50, 5, use_logdet = false) # medium
-expdesign8() = expdesign(5, 15, 25, 5, use_logdet = false) # small
-expdesign9() = expdesign(4, 8, 12, 3, use_logdet = false) # tiny
-expdesign10() = expdesign(3, 5, 7, 2, use_logdet = false) # miniscule
+expdesign1() = expdesign(25, 75, 125, 5)
+expdesign2() = expdesign(10, 30, 50, 5)
+expdesign3() = expdesign(5, 15, 25, 5)
+expdesign4() = expdesign(4, 8, 12, 3)
+expdesign5() = expdesign(3, 5, 7, 2)
+expdesign6() = expdesign(25, 75, 125, 5, use_logdet = false)
+expdesign7() = expdesign(10, 30, 50, 5, use_logdet = false)
+expdesign8() = expdesign(5, 15, 25, 5, use_logdet = false)
+expdesign9() = expdesign(4, 8, 12, 3, use_logdet = false)
+expdesign10() = expdesign(3, 5, 7, 2, use_logdet = false)
 
 test_expdesign_all(; options...) = test_expdesign.([
     expdesign1,
@@ -99,14 +171,16 @@ test_expdesign_all(; options...) = test_expdesign.([
     expdesign3,
     expdesign4,
     expdesign5,
-    # expdesign6,
-    # expdesign7,
-    # expdesign9,
-    # expdesign9,
-    # expdesign10,
+    expdesign6,
+    expdesign7,
+    expdesign9,
+    expdesign9,
+    expdesign10,
     ], options = options)
 
 test_expdesign(; options...) = test_expdesign.([
+    expdesign5,
+    expdesign10,
     expdesign3,
-    # expdesign8,
+    expdesign8,
     ], options = options)
