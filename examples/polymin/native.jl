@@ -77,7 +77,9 @@ function polyminreal(
                 Gk = Matrix{Float64}(undef, dk, U)
                 l = 1
                 for i in 1:Lk, j in 1:i
-                    Gk[l, :] = -[Pk[u, i] * Pk[u, j] for u in 1:U] * (i == j ? 1 : rt2)
+                    for u in 1:U
+                        Gk[l, u] = -Pk[u, i] * Pk[u, j] * (i == j ? 1 : rt2)
+                    end
                     l += 1
                 end
                 G = vcat(G, Gk)
