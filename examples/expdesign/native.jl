@@ -57,7 +57,9 @@ function expdesign(
         G_logdet = zeros(dimvec, p)
         l = 1
         for i in 1:q, j in 1:i
-            G_logdet[l, :] = -[V[i, k] * V[j, k] for k in 1:p] * (i == j ? 1 : rt2)
+            for k in 1:p
+                G_logdet[l, k] = -V[i, k] * V[j, k] * (i == j ? 1 : rt2)
+            end
             l += 1
         end
         @assert l - 1 == dimvec
@@ -87,6 +89,9 @@ function expdesign(
         dimvec = q * (2 * q + 1)
         G_psd = zeros(dimvec, dimx)
 
+        # variables in upper triangular matrix numbered row-wise
+        diag_idx(i::Int) = (i == 1 ? 1 : 1 + sum(q - j for j in 0:(i - 2)))
+
         # V*diag(np)*V
         l = 1
         for i in 1:q, j in 1:i
@@ -109,10 +114,9 @@ function expdesign(
             # diag(triangle)
             # skip zero-valued elements
             l += i - 1
-            G_psd[l, p + sum(1:i)] = -1
+            G_psd[l, p + diag_idx(i)] = -1
             l += 1
         end
-
 
         h_psd = zeros(dimvec)
         push!(cone_idxs, (2 * p + 1):(2 * p + dimvec))
@@ -127,7 +131,7 @@ function expdesign(
             # perspective variable
             h_log[offset + 1] = 1
             # diagonal element in the triangular matrix
-            G_log[offset + 2, p + sum(1:i)] = -1
+            G_log[offset + 2, p + diag_idx(i)] = -1
             cone_offset = 2 * p + dimvec + offset
             push!(cone_idxs, cone_offset:(cone_offset + 2))
             push!(cones, CO.HypoPerLog{Float64}())
@@ -143,7 +147,6 @@ function expdesign(
 end
 
 function test_expdesign(instance::Function; options, rseed::Int = 1)
-    @show options
     Random.seed!(rseed)
     d = instance()
     model = MO.PreprocessedLinearModel{Float64}(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
@@ -154,11 +157,11 @@ function test_expdesign(instance::Function; options, rseed::Int = 1)
     return
 end
 
-expdesign1() = expdesign(25, 75, 125, 5)
-expdesign2() = expdesign(10, 30, 50, 5)
-expdesign3() = expdesign(5, 15, 25, 5)
-expdesign4() = expdesign(4, 8, 12, 3)
-expdesign5() = expdesign(3, 5, 7, 2)
+expdesign1() = expdesign(25, 75, 125, 5, use_logdet = true)
+expdesign2() = expdesign(10, 30, 50, 5, use_logdet = true)
+expdesign3() = expdesign(5, 15, 25, 5, use_logdet = true)
+expdesign4() = expdesign(4, 8, 12, 3, use_logdet = true)
+expdesign5() = expdesign(3, 5, 7, 2, use_logdet = true)
 expdesign6() = expdesign(25, 75, 125, 5, use_logdet = false)
 expdesign7() = expdesign(10, 30, 50, 5, use_logdet = false)
 expdesign8() = expdesign(5, 15, 25, 5, use_logdet = false)
@@ -183,4 +186,6 @@ test_expdesign(; options...) = test_expdesign.([
     expdesign10,
     expdesign3,
     expdesign8,
+    expdesign1,
+    expdesign6,
     ], options = options)
