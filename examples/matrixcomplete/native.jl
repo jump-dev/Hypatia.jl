@@ -80,7 +80,7 @@ function matrixcomplete(
 
     # add first row and column for epigraph variable
     G1 = [-1 zeros(1, num_unknown); zeros(m * n) G1]
-    h1 = [0, h1...]
+    h1 = vcat(0, h1)
 
     cones = CO.Cone[CO.EpiNormSpectral{Float64}(n, m)]
     cone_idxs = [1:(m * n + 1)]
@@ -100,7 +100,7 @@ function matrixcomplete(
             total_idx += 1
         end
         # first component of the vector in the in geomean cone, elements multiply to one
-        h2 = [1, zeros(num_unknown)...]
+        h2 = vcat(1, zeros(num_unknown))
         h = vcat(h1, h2)
         @assert total_idx - 1 == m * n
         @assert unknown_idx - 1 == num_unknown
@@ -164,16 +164,6 @@ matrixcomplete1() = matrixcomplete_ex(false)
 matrixcomplete2() = matrixcomplete_ex(true)
 matrixcomplete3() = matrixcomplete(6, 5, use_3dim = false)
 matrixcomplete4() = matrixcomplete(6, 5, use_3dim = true)
-
-# [
-# 1.        0.6911765108350109 1.9
-# 1.031601017350596 0.8        2.3506257965881243
-# 3.2        5.9        0.5966455412012085
-# ]
-
-# [1.         4.63616907 1.9
-# 0.49991744 0.8        0.37774148
-# 3.2        5.9        1.14221476]
 
 function test_matrixcomplete(instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
