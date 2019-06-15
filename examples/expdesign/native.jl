@@ -49,7 +49,7 @@ function expdesign(
         G_nonneg = [zeros(p) G_nonneg]
         G_nmax = [zeros(p) G_nmax]
         # maximize the hypograph variable of the logdet cone
-        c = [-1, zeros(p)...]
+        c = vcat(-1, zeros(p))
 
         # dimension of vectorized matrix V*diag(np)*V'
         dimvec = Int(q * (q + 1) / 2)

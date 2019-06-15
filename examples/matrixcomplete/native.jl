@@ -42,21 +42,25 @@ function matrixcomplete(
         known_vals = randn(num_known)
     end
     mat_to_vec_idx(i, j) = (j - 1) * m + i
-    # change everything to a threelinerish?
-    # known_idxs = mat_to_vec_idx.(zip(known_rows, known_cols))
-    # unknown_idxs = setdiff(1:n, known_idxs)
-    # G[unknown_idxs, :] .= -1
 
-    h1 = zeros(m * n)
+    # a little more confusing
+    # known_idxs = mat_to_vec_idx.(known_rows, known_cols)
+    # p = sortperm(known_idxs)
+    # unknown_idxs = setdiff(1:(m * n), known_idxs)
+    # is_known = fill(false, m * n)
+    # is_known[known_idxs] .= true
+    # G1[unique(unknown_idxs[p]), 1:num_unknown] .= -1
+    # h1[known_idxs[p]] .= known_vals[p] # if an index is repeated, last value will be chosen
 
     is_known = fill(false, m * n)
+    h1 = zeros(m * n)
     for (k, (i, j)) in enumerate(zip(known_rows, known_cols))
         known_idx = mat_to_vec_idx(i, j)
         h1[known_idx] = known_vals[k]
         is_known[known_idx] = true
     end
 
-    num_known = sum(is_known) # TODO handle repetitions better
+    num_known = sum(is_known) # if randomly generated, some indices may repeat
     num_unknown = m * n - num_known
     c = zeros(1 + num_unknown)
     c[1] = 1
@@ -64,7 +68,6 @@ function matrixcomplete(
 
     # epinormspectral cone- get vec(X) in G and h
     G1 = zeros(m * n, num_unknown)
-
     total_idx = 1
     unknown_idx = 1
     for j in 1:n, i in 1:m
