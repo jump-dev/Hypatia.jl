@@ -25,7 +25,7 @@ function portfolio(
     returns::Vector{Float64} = Float64[],
     sigma_half::AbstractMatrix{Float64} = Matrix{Float64}(undef, 0, 0),
     gamma::Float64 = -1.0,
-    risk_measure::String = "entropic",
+    risk_measure::Symbol = :entropic,
     )
 
     if isempty(returns)
@@ -46,18 +46,18 @@ function portfolio(
     cone_idxs = [1:num_stocks]
     cones = CO.Cone[CO.Nonnegative{Float64}(num_stocks)]
 
-    if risk_measure == "quadratic"
+    if risk_measure == :quadratic
         G2 = vcat(zeros(1, num_stocks), -sigma_half)
         h2 = [gamma; zeros(num_stocks)]
         cone_idxs = vcat(cone_idxs, [(num_stocks + 1):(2 * num_stocks + 1)])
         cones = vcat(cones, [CO.EpiNormEucl{Float64}(num_stocks + 1)])
         G = vcat(G1, G2)
         h = vcat(h1, h2)
-    elseif risk_measure == "entropic"
+    elseif risk_measure == :entropic
         # sigma_half = abs.(sigma_half) TODO will this always be feasible?
-        c = [c; zeros(2 * num_stocks)]
+        c = vcat(c, zeros(2 * num_stocks))
         A = [A zeros(1, 2 * num_stocks); zeros(1, num_stocks) ones(1, 2 * num_stocks)]
-        b = [b; gamma^2]
+        b = vcat(b, gamma^2)
         G2pos = zeros(3 * num_stocks, 3 * num_stocks)
         G2neg = zeros(3 * num_stocks, 3 * num_stocks)
         h2 = zeros(3 * num_stocks)
@@ -72,24 +72,11 @@ function portfolio(
             G2neg[offset + 1, 1:num_stocks] = sigma_half[i, :]
             offset += 3
         end
-
         G = [G1 zeros(num_stocks, 2 * num_stocks); G2pos; G2neg]
-        h = [h1; h2; h2]
+        h = vcat(h1, h2, h2)
 
         cone_idxs = vcat(cone_idxs, [(3 * (i - 1) + num_stocks + 1):(3 * i + num_stocks) for i in 1:(2 * num_stocks)])
         cones = vcat(cones, [CO.HypoPerLog{Float64}() for _ in 1:(2 * num_stocks)])
-
-        # TODO remove
-        # A = [A [0; 1]]
-        # G = [G zeros(size(G, 1)); zeros(1, size(G, 2)) -1]
-        # h = [h; 0]
-        # c = [c; 0]
-        # push!(cone_idxs, (7 * num_stocks + 1):(7 * num_stocks + 1))
-        # push!(cones, CO.Nonnegative{Float64}(1))
-        # @show size(A), size(G), cone_idxs
-
-        @show A, G, h, cone_idxs
-
     else
         error("unknown risk measure: $risk_measure")
     end
@@ -108,7 +95,7 @@ function test_portfolio(instance::Function; options, rseed::Int = 1)
     return
 end
 
-portfolio1() = portfolio(
+portfolio_ex(risk_measure::Symbol) = portfolio(
     3,
     returns = -[0.0254,	0.0190,	0.0045],
     sigma_half = cholesky([
@@ -117,12 +104,18 @@ portfolio1() = portfolio(
         0.0001	0.0002	0.0019
         ]).U,
     gamma = 0.033,
+    risk_measure = risk_measure,
     )
+
+portfolio1() = portfolio_ex(:quadratic)
+portfolio2() = portfolio_ex(:entropic)
 
 test_portfolio_all(; options...) = test_portfolio.([
     portfolio1,
+    portfolio2,
     ], options = options)
 
 test_portfolio(; options...) = test_portfolio.([
     portfolio1,
+    portfolio2,
     ], options = options)

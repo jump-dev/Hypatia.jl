@@ -25,7 +25,6 @@ function expdesign(
     nmax::Int;
     use_logdet::Bool = false,
     )
-
     @assert (p > q) && (n > q) && (nmax <= n)
     V = randn(q, p)
 
@@ -140,7 +139,6 @@ function expdesign(
 
         G = vcat(G_nonneg, G_nmax, G_psd, G_log)
         h = vcat(h_nonneg, h_nmax, h_psd, h_log)
-
     end
 
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs)
