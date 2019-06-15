@@ -23,7 +23,7 @@ function expdesign(
     p::Int,
     n::Int,
     nmax::Int;
-    use_logdet::Bool = false,
+    use_logdet::Bool = true,
     )
     @assert (p > q) && (n > q) && (nmax <= n)
     V = randn(q, p)
@@ -72,7 +72,7 @@ function expdesign(
         h = vcat(h_nonneg, h_nmax, h_logdet)
     else
 
-        # requires an upper triangular matrix of additional variables, ordered as vec(triangle)
+        # requires an upper triangular matrix of additional variables, ordered row wise
         num_trivars = Int(q * (q + 1) / 2)
         # pad with triangle matrix variables and q hypopoerlog cone hypograph variables
         A = [A zeros(1, num_trivars) zeros(1, q)]
