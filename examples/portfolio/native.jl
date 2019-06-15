@@ -74,7 +74,6 @@ function portfolio(
         end
         G = [G1 zeros(num_stocks, 2 * num_stocks); G2pos; G2neg]
         h = vcat(h1, h2, h2)
-
         cone_idxs = vcat(cone_idxs, [(3 * (i - 1) + num_stocks + 1):(3 * i + num_stocks) for i in 1:(2 * num_stocks)])
         cones = vcat(cones, [CO.HypoPerLog{Float64}() for _ in 1:(2 * num_stocks)])
     else
