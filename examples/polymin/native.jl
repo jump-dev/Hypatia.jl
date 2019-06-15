@@ -22,20 +22,37 @@ const MO = HYP.Models
 const SO = HYP.Solvers
 const MU = HYP.ModelUtilities
 
+const rt2 = sqrt(2)
+
 include(joinpath(@__DIR__, "data.jl"))
 
 function polyminreal(
     polyname::Symbol,
     halfdeg::Int;
-    primal_wsos::Bool = true,
+    use_primal::Bool = true,
+    use_wsos::Bool = true,
     )
+
+    if use_primal && !use_wsos
+        error("primal psd formulation is not implemented yet")
+    end
+
     (x, fn, dom, true_obj) = getpolydata(polyname)
     sample = (length(x) >= 5) || !isa(dom, MU.Box)
     (U, pts, P0, PWts, _) = MU.interpolate(dom, halfdeg, sample = sample)
 
+    if use_wsos
+        cones = [CO.WSOSPolyInterp{Float64, Float64}(U, [P0, PWts...], !use_primal)]
+        cone_idxs = [1:U]
+    else
+        # will be set up iteratively
+        cones = CO.Cone[]
+        cone_idxs = UnitRange{Int}[]
+    end
+
     # set up problem data
     interp_vals = [fn(pts[j, :]...) for j in 1:U]
-    if primal_wsos
+    if use_primal
         c = [-1.0]
         A = zeros(0, 1)
         b = Float64[]
@@ -46,11 +63,29 @@ function polyminreal(
         c = interp_vals
         A = ones(1, U) # TODO eliminate constraint and first variable
         b = [1.0]
-        G = Diagonal(-1.0I, U) # TODO use UniformScaling
-        h = zeros(U)
+        if use_wsos
+            G = Diagonal(-1.0I, U) # TODO use UniformScaling
+            h = zeros(U)
+        else
+            G = zeros(0, U)
+            rowidx = 1
+            for Pk in [P0, PWts...]
+                Lk = size(Pk, 2)
+                dk = Int(Lk * (Lk + 1) / 2)
+                push!(cone_idxs, rowidx:(rowidx + dk - 1))
+                push!(cones, CO.PosSemidef{Float64, Float64}(dk))
+                Gk = Matrix{Float64}(undef, dk, U)
+                l = 1
+                for i in 1:Lk, j in 1:i
+                    Gk[l, :] = -[Pk[u, i] * Pk[u, j] for u in 1:U] * (i == j ? 1 : rt2)
+                    l += 1
+                end
+                G = vcat(G, Gk)
+                rowidx += dk
+            end
+            h = zeros(size(G, 1))
+        end
     end
-    cones = [CO.WSOSPolyInterp{Float64, Float64}(U, [P0, PWts...], !primal_wsos)]
-    cone_idxs = [1:U]
 
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs, true_obj = true_obj)
 end
@@ -68,18 +103,28 @@ polyminreal10() = polyminreal(:rosenbrock, 5)
 polyminreal11() = polyminreal(:butcher, 2)
 polyminreal12() = polyminreal(:goldsteinprice_ellipsoid, 7)
 polyminreal13() = polyminreal(:goldsteinprice_ball, 7)
-polyminreal14() = polyminreal(:motzkin, 3, primal_wsos = false)
+polyminreal14() = polyminreal(:motzkin, 3, use_primal = false)
 polyminreal15() = polyminreal(:motzkin, 3)
-polyminreal16() = polyminreal(:reactiondiffusion, 4, primal_wsos = false)
-polyminreal17() = polyminreal(:lotkavolterra, 3, primal_wsos = false)
+polyminreal16() = polyminreal(:reactiondiffusion, 4, use_primal = false)
+polyminreal17() = polyminreal(:lotkavolterra, 3, use_primal = false)
+polyminreal18() = polyminreal(:motzkin, 3, use_primal = false, use_wsos = false)
+polyminreal19() = polyminreal(:motzkin, 3, use_wsos = false)
+polyminreal20() = polyminreal(:reactiondiffusion, 4, use_primal = false, use_wsos = false)
+polyminreal21() = polyminreal(:lotkavolterra, 3, use_primal = false, use_wsos = false)
 
 function polymincomplex(
     polyname::Symbol,
     halfdeg::Int;
-    primal_wsos::Bool = true,
+    use_primal::Bool = true,
+    use_wsos::Bool = true,
     sample_factor::Int = 100,
     use_QR::Bool = false,
     )
+
+    if !use_wsos
+        error("psd formulation is not implemented yet")
+    end
+
     (n, f, gs, g_halfdegs, true_obj) = complexpolys[polyname]
 
     # generate interpolation
@@ -129,7 +174,7 @@ function polymincomplex(
     end
 
     # setup problem data
-    if primal_wsos
+    if use_primal
         c = [-1.0]
         A = zeros(0, 1)
         b = Float64[]
@@ -143,7 +188,7 @@ function polymincomplex(
         G = Diagonal(-1.0I, U)
         h = zeros(U)
     end
-    cones = [CO.WSOSPolyInterp{Float64, ComplexF64}(U, P_data, !primal_wsos)]
+    cones = [CO.WSOSPolyInterp{Float64, ComplexF64}(U, P_data, !use_primal)]
     cone_idxs = [1:U]
 
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs, true_obj = true_obj)
@@ -156,13 +201,13 @@ polymincomplex4() = polymincomplex(:absball2d, 1)
 polymincomplex5() = polymincomplex(:absbox2d, 2)
 polymincomplex6() = polymincomplex(:negabsbox2d, 1)
 polymincomplex7() = polymincomplex(:denseunit1d, 2)
-polymincomplex8() = polymincomplex(:abs1d, 1, primal_wsos = false)
-polymincomplex9() = polymincomplex(:absunit1d, 1, primal_wsos = false)
-polymincomplex10() = polymincomplex(:negabsunit1d, 2, primal_wsos = false)
-polymincomplex11() = polymincomplex(:absball2d, 1, primal_wsos = false)
-polymincomplex12() = polymincomplex(:absbox2d, 2, primal_wsos = false)
-polymincomplex13() = polymincomplex(:negabsbox2d, 1, primal_wsos = false)
-polymincomplex14() = polymincomplex(:denseunit1d, 2, primal_wsos = false)
+polymincomplex8() = polymincomplex(:abs1d, 1, use_primal = false)
+polymincomplex9() = polymincomplex(:absunit1d, 1, use_primal = false)
+polymincomplex10() = polymincomplex(:negabsunit1d, 2, use_primal = false)
+polymincomplex11() = polymincomplex(:absball2d, 1, use_primal = false)
+polymincomplex12() = polymincomplex(:absbox2d, 2, use_primal = false)
+polymincomplex13() = polymincomplex(:negabsbox2d, 1, use_primal = false)
+polymincomplex14() = polymincomplex(:denseunit1d, 2, use_primal = false)
 
 function test_polymin(instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
@@ -194,6 +239,10 @@ test_polymin_all(; options...) = test_polymin.([
     polyminreal15,
     polyminreal16,
     polyminreal17,
+    polyminreal18,
+    polyminreal19,
+    polyminreal20,
+    polyminreal21,
     polymincomplex1,
     polymincomplex2,
     polymincomplex3,
@@ -215,6 +264,7 @@ test_polymin(; options...) = test_polymin.([
     polyminreal3,
     polyminreal12,
     polyminreal14,
+    polyminreal18,
     polymincomplex7,
     polymincomplex14,
     ], options = options)
