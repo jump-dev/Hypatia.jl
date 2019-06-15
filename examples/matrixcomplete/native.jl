@@ -106,9 +106,7 @@ function matrixcomplete(
         @assert unknown_idx - 1 == num_unknown
 
         G = vcat(G1, G2)
-
         A = zeros(0, 1 + num_unknown)
-
         push!(cone_idxs, (m * n + 2):(m * n + 2 + num_unknown))
         push!(cones, CO.HypoGeomean{Float64}(ones(num_unknown) / num_unknown))
 
