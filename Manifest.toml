@@ -248,19 +248,19 @@ version = "0.9.7"
 
 [[Parsers]]
 deps = ["Dates", "Test"]
-git-tree-sha1 = "eaed2db080700f1013f0fc05667ecb2a082265a1"
+git-tree-sha1 = "db2b35dedab3c0e46dc15996d170af07a5ab91c9"
 uuid = "69de0a69-1ddd-5017-9359-2bf0b02dc9f0"
-version = "0.3.5"
+version = "0.3.6"
 
 [[Pkg]]
 deps = ["Dates", "LibGit2", "Markdown", "Printf", "REPL", "Random", "SHA", "UUIDs"]
 uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 
 [[PolyJuMP]]
-deps = ["JuMP", "LinearAlgebra", "MathOptInterface", "MultivariateMoments", "MultivariatePolynomials", "SemialgebraicSets", "Test"]
-git-tree-sha1 = "436f2f071e4aa9e085081f4eac0badb8d05b76a0"
+deps = ["JuMP", "LinearAlgebra", "MathOptInterface", "MultivariateMoments", "MultivariatePolynomials", "SemialgebraicSets"]
+git-tree-sha1 = "c08ac83375a7c8bc26680da4f88cd55a220efb0f"
 uuid = "ddf597a6-d67e-5340-b84c-e37d84115374"
-version = "0.3.0"
+version = "0.3.1"
 
 [[Polynomials]]
 deps = ["LinearAlgebra", "SparseArrays", "Test"]

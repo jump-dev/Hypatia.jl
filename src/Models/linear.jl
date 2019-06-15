@@ -271,9 +271,8 @@ function preprocess_find_initial_point(model::PreprocessedLinearModel{T}, tol_qr
             x_keep_idxs = col_piv[1:AG_rank]
             AG_R = UpperTriangular(AG_fact.R[1:AG_rank, 1:AG_rank])
 
-            # TODO optimize all below
             c_sub = c[x_keep_idxs]
-            yz_sub = AG_fact.Q * (Matrix{T}(I, p + q, AG_rank) * (AG_R' \ c_sub))
+            yz_sub = AG_fact.Q * vcat(AG_R' \ c_sub, zeros(p + q - AG_rank))
             if !(AG_fact isa QRPivoted{T, Matrix{T}})
                 yz_sub = yz_sub[AG_fact.rpivinv]
             end
@@ -283,7 +282,7 @@ function preprocess_find_initial_point(model::PreprocessedLinearModel{T}, tol_qr
             end
             println("removed $(n - AG_rank) out of $n dual equality constraints")
 
-            point.x = AG_R \ (Matrix{T}(I, AG_rank, p + q) * (AG_fact.Q' * vcat(b, model.h - point.s)))
+            point.x = AG_R \ (AG_fact.Q' * vcat(b, model.h - point.s))[1:AG_rank]
 
             c = c_sub
             A = A[:, x_keep_idxs]
@@ -308,17 +307,15 @@ function preprocess_find_initial_point(model::PreprocessedLinearModel{T}, tol_qr
         end
 
         Ap_rank = get_rank_est(Ap_fact, tol_qr)
-
         Ap_R = UpperTriangular(Ap_fact.R[1:Ap_rank, 1:Ap_rank])
         col_piv = (Ap_fact isa QRPivoted{T, Matrix{T}}) ? Ap_fact.p : Ap_fact.pcol
         y_keep_idxs = col_piv[1:Ap_rank]
         Ap_Q = Ap_fact.Q
 
-        # TODO optimize all below
         b_sub = b[y_keep_idxs]
         if Ap_rank < p
             # some dependent primal equalities, so check if they are consistent
-            x_sub = Ap_Q * (Matrix{T}(I, n, Ap_rank) * (Ap_R' \ b_sub))
+            x_sub = Ap_Q * vcat(Ap_R' \ b_sub, zeros(n - Ap_rank))
             if !(Ap_fact isa QRPivoted{T, Matrix{T}})
                 x_sub = x_sub[Ap_fact.rpivinv]
             end
@@ -329,7 +326,7 @@ function preprocess_find_initial_point(model::PreprocessedLinearModel{T}, tol_qr
             println("removed $(p - Ap_rank) out of $p primal equality constraints")
         end
 
-        point.y = Ap_R \ (Matrix{T}(I, Ap_rank, n) * (Ap_fact.Q' *  (-c - G' * point.z)))
+        point.y = Ap_R \ (Ap_fact.Q' *  (-c - G' * point.z))[1:Ap_rank]
 
         if !(Ap_fact isa QRPivoted{T, Matrix{T}})
             row_piv = Ap_fact.prow
