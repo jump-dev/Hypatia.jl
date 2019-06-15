@@ -1,7 +1,7 @@
 #=
 Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
-see https://www.cvxpy.org/examples/dgp/pf_matrix_completion.html
+see https://www.cvxpy.org/examples/dgp/pf_matrixcomplete.html
 modified to use spectral norm
 
 =#
@@ -18,7 +18,7 @@ const MU = HYP.ModelUtilities
 const CO = HYP.Cones
 const SO = HYP.Solvers
 
-function matrix_completion(
+function matrixcomplete(
     m::Int,
     n::Int;
     num_known::Int = -1,
@@ -41,9 +41,9 @@ function matrix_completion(
     if isempty(known_vals)
         known_vals = randn(num_known)
     end
-    cart_to_single(i, j) = (j - 1) * m + i
+    mat_to_vec_idx(i, j) = (j - 1) * m + i
     # change everything to a threelinerish?
-    # known_idxs = cart_to_single.(zip(known_rows, known_cols))
+    # known_idxs = mat_to_vec_idx.(zip(known_rows, known_cols))
     # unknown_idxs = setdiff(1:n, known_idxs)
     # G[unknown_idxs, :] .= -1
 
@@ -51,7 +51,7 @@ function matrix_completion(
 
     is_known = fill(false, m * n)
     for (k, (i, j)) in enumerate(zip(known_rows, known_cols))
-        known_idx = cart_to_single(i, j)
+        known_idx = mat_to_vec_idx(i, j)
         h1[known_idx] = known_vals[k]
         is_known[known_idx] = true
     end
@@ -68,7 +68,7 @@ function matrix_completion(
     total_idx = 1
     unknown_idx = 1
     for j in 1:n, i in 1:m
-        if !is_known[cart_to_single(i, j)]
+        if !is_known[mat_to_vec_idx(i, j)]
             G1[total_idx, unknown_idx] = -1
             unknown_idx += 1
         end
@@ -90,7 +90,7 @@ function matrix_completion(
         total_idx = 1
         unknown_idx = 1
         for j in 1:n, i in 1:m
-            if !is_known[cart_to_single(i, j)]
+            if !is_known[mat_to_vec_idx(i, j)]
                 G2[unknown_idx + 1, unknown_idx + 1] = -1
                 unknown_idx += 1
             end
@@ -143,13 +143,12 @@ function matrix_completion(
         G = vcat(G1, G2)
         c = vcat(c, zeros(num_unknown - 2))
         A = zeros(0, size(G, 2))
-
     end
 
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs)
 end
 
-matrix_completion_ex(use_3dim::Bool) = matrix_completion(
+matrixcomplete_ex(use_3dim::Bool) = matrixcomplete(
     3,
     3,
     num_known = 5,
@@ -157,11 +156,11 @@ matrix_completion_ex(use_3dim::Bool) = matrix_completion(
     known_cols = [1, 1, 2, 2, 3],
     known_vals = [1.0, 3.2, 0.8, 5.9, 1.9],
     use_3dim = use_3dim,
-)
-matrix_completion1() = matrix_completion_ex(false)
-matrix_completion2() = matrix_completion_ex(true)
-matrix_completion3() = matrix_completion(6, 5, use_3dim = false)
-matrix_completion4() = matrix_completion(6, 5, use_3dim = true)
+    )
+matrixcomplete1() = matrixcomplete_ex(false)
+matrixcomplete2() = matrixcomplete_ex(true)
+matrixcomplete3() = matrixcomplete(6, 5, use_3dim = false)
+matrixcomplete4() = matrixcomplete(6, 5, use_3dim = true)
 
 # [
 # 1.        0.6911765108350109 1.9
@@ -173,7 +172,7 @@ matrix_completion4() = matrix_completion(6, 5, use_3dim = true)
 # 0.49991744 0.8        0.37774148
 # 3.2        5.9        1.14221476]
 
-function test_matrix_completion(instance::Function; options, rseed::Int = 1)
+function test_matrixcomplete(instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
     d = instance()
     model = MO.PreprocessedLinearModel{Float64}(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
@@ -185,16 +184,16 @@ function test_matrix_completion(instance::Function; options, rseed::Int = 1)
     return
 end
 
-test_matrix_completion_all(; options...) = test_matrix_completion.([
-    matrix_completion1,
-    matrix_completion2,
-    matrix_completion3,
-    matrix_completion4,
+test_matrixcomplete_all(; options...) = test_matrixcomplete.([
+    matrixcomplete1,
+    matrixcomplete2,
+    matrixcomplete3,
+    matrixcomplete4,
     ], options = options)
 
-test_matrix_completion(; options...) = test_matrix_completion.([
-    matrix_completion1,
-    matrix_completion2,
-    matrix_completion3,
-    matrix_completion4,
+test_matrixcomplete(; options...) = test_matrixcomplete.([
+    matrixcomplete1,
+    matrixcomplete2,
+    matrixcomplete3,
+    matrixcomplete4,
     ], options = options)

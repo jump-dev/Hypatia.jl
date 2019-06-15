@@ -32,7 +32,6 @@ function polyminreal(
     use_primal::Bool = true,
     use_wsos::Bool = true,
     )
-
     if use_primal && !use_wsos
         error("primal psd formulation is not implemented yet")
     end
@@ -122,7 +121,6 @@ function polymincomplex(
     sample_factor::Int = 100,
     use_QR::Bool = false,
     )
-
     if !use_wsos
         error("psd formulation is not implemented yet")
     end
