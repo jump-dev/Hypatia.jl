@@ -1,9 +1,8 @@
 #=
 Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
-see https://www.cvxpy.org/examples/dgp/pf_matrixcomplete.html
+see https://www.cvxpy.org/examples/dgp/pf_matrix_completion.html
 modified to use spectral norm
-
 =#
 
 using LinearAlgebra
@@ -18,7 +17,7 @@ const MU = HYP.ModelUtilities
 const CO = HYP.Cones
 const SO = HYP.Solvers
 
-function matrixcomplete(
+function matrixcompletion(
     m::Int,
     n::Int;
     num_known::Int = -1,
@@ -42,15 +41,6 @@ function matrixcomplete(
         known_vals = randn(num_known)
     end
     mat_to_vec_idx(i, j) = (j - 1) * m + i
-
-    # a little more confusing
-    # known_idxs = mat_to_vec_idx.(known_rows, known_cols)
-    # p = sortperm(known_idxs)
-    # unknown_idxs = setdiff(1:(m * n), known_idxs)
-    # is_known = fill(false, m * n)
-    # is_known[known_idxs] .= true
-    # G1[unique(unknown_idxs[p]), 1:num_unknown] .= -1
-    # h1[known_idxs[p]] .= known_vals[p] # if an index is repeated, last value will be chosen
 
     is_known = fill(false, m * n)
     h1 = zeros(m * n)
@@ -109,7 +99,6 @@ function matrixcomplete(
         A = zeros(0, 1 + num_unknown)
         push!(cone_idxs, (m * n + 2):(m * n + 2 + num_unknown))
         push!(cones, CO.HypoGeomean{Float64}(ones(num_unknown) / num_unknown))
-
     else
         # number of 3-dimensional power cones needed is num_unknown - 1, number of new variables is num_unknown - 2
         # first num_unknown columns overlap with G1, column for the epigraph variable of the spectral cone added later
@@ -130,6 +119,7 @@ function matrixcomplete(
             push!(cone_idxs, (spectral_dim + 3 * i + 1):(spectral_dim + 3 * (i + 1)))
             offset += 3
         end
+
         # last row also special becuase hypograph variable is fixed
         G2[offset + 2, num_unknown] = -1
         G2[offset + 1, 2 * num_unknown - 2] = -1
@@ -149,7 +139,7 @@ function matrixcomplete(
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs)
 end
 
-matrixcomplete_ex(use_3dim::Bool) = matrixcomplete(
+matrixcompletion_ex(use_3dim::Bool) = matrixcompletion(
     3,
     3,
     num_known = 5,
@@ -158,33 +148,36 @@ matrixcomplete_ex(use_3dim::Bool) = matrixcomplete(
     known_vals = [1.0, 3.2, 0.8, 5.9, 1.9],
     use_3dim = use_3dim,
     )
-matrixcomplete1() = matrixcomplete_ex(false)
-matrixcomplete2() = matrixcomplete_ex(true)
-matrixcomplete3() = matrixcomplete(6, 5, use_3dim = false)
-matrixcomplete4() = matrixcomplete(6, 5, use_3dim = true)
+matrixcompletion1() = matrixcompletion_ex(false)
+matrixcompletion2() = matrixcompletion_ex(true)
+matrixcompletion3() = matrixcompletion(6, 5, use_3dim = false)
+matrixcompletion4() = matrixcompletion(6, 5, use_3dim = true)
+matrixcompletion5() = matrixcompletion(8, 6, use_3dim = false)
+matrixcompletion6() = matrixcompletion(8, 6, use_3dim = true)
 
-function test_matrixcomplete(instance::Function; options, rseed::Int = 1)
+function test_matrixcompletion(instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
     d = instance()
     model = MO.PreprocessedLinearModel{Float64}(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
     solver = SO.HSDSolver{Float64}(model; options...)
     SO.solve(solver)
     r = SO.get_certificates(solver, model, test = true, atol = 1e-4, rtol = 1e-4)
-    @show r.x
     @test r.status == :Optimal
     return
 end
 
-test_matrixcomplete_all(; options...) = test_matrixcomplete.([
-    matrixcomplete1,
-    matrixcomplete2,
-    matrixcomplete3,
-    matrixcomplete4,
+test_matrixcompletion_all(; options...) = test_matrixcompletion.([
+    matrixcompletion1,
+    matrixcompletion2,
+    matrixcompletion3,
+    matrixcompletion4,
+    matrixcompletion5,
+    matrixcompletion6,
     ], options = options)
 
-test_matrixcomplete(; options...) = test_matrixcomplete.([
-    matrixcomplete1,
-    matrixcomplete2,
-    matrixcomplete3,
-    matrixcomplete4,
+test_matrixcompletion(; options...) = test_matrixcompletion.([
+    matrixcompletion1,
+    matrixcompletion2,
+    matrixcompletion3,
+    matrixcompletion4,
     ], options = options)

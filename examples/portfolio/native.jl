@@ -27,7 +27,6 @@ function portfolio(
     gamma::Float64 = -1.0,
     risk_measure::Symbol = :entropic,
     )
-
     if isempty(returns)
         returns = randn(num_stocks)
     end

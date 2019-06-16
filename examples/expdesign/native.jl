@@ -2,7 +2,6 @@
 Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
 see description in examples/expdesign/JuMP.jl
-
 =#
 
 using LinearAlgebra
@@ -43,7 +42,6 @@ function expdesign(
     cone_idxs = [1:p, (p + 1):(2 * p)]
 
     if use_logdet
-
         # pad with hypograph variable
         A = [0 A]
         G_nonneg = [zeros(p) G_nonneg]
@@ -71,7 +69,6 @@ function expdesign(
         G = vcat(G_nonneg, G_nmax, G_logdet)
         h = vcat(h_nonneg, h_nmax, h_logdet)
     else
-
         # requires an upper triangular matrix of additional variables, ordered row wise
         num_trivars = Int(q * (q + 1) / 2)
         # pad with triangle matrix variables and q hypopoerlog cone hypograph variables
