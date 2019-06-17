@@ -35,11 +35,14 @@ TODO reduce allocations
 =#
 
 mutable struct NaiveElimCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSolver{T}
+    use_iterative::Bool
     use_sparse::Bool
 
     lhs_copy
     lhs
     rhs::Matrix{T}
+    prevsol1::Vector{T}
+    prevsol2::Vector{T}
 
     x1
     x2
@@ -54,11 +57,21 @@ mutable struct NaiveElimCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSyst
     s1_k
     s2_k
 
-    function NaiveElimCombinedHSDSystemSolver{T}(model::Models.LinearModel{T}; use_sparse::Bool = false) where {T <: HypReal}
+    function NaiveElimCombinedHSDSystemSolver{T}(
+        model::Models.LinearModel{T};
+        use_iterative::Bool = true,
+        use_sparse::Bool = false,
+        ) where {T <: HypReal}
         (n, p, q) = (model.n, model.p, model.q)
         npq1 = n + p + q + 1
         system_solver = new{T}()
+        system_solver.use_iterative = use_iterative
         system_solver.use_sparse = use_sparse
+
+        if use_iterative
+            system_solver.prevsol1 = zeros(T, npq1)
+            system_solver.prevsol2 = zeros(T, npq1)
+        end
 
         if use_sparse
             system_solver.lhs_copy = T[
@@ -173,10 +186,25 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveElimC
     rhs[end, :] .= kap_rhs + tau_rhs
 
     # solve system
-    if system_solver.use_sparse
-        rhs .= lu(lhs) \ rhs
+    if system_solver.use_iterative
+        # TODO optimize for this case, including applying the blocks of the LHS
+        # TODO need preconditioner
+        # TODO pick which square non-symm method to use
+        # TODO prealloc whatever is needed inside the solver
+        # TODO possibly fix IterativeSolvers so that methods can take matrix RHS, however the two columns may take different number of iters needed to converge
+        # TODO use previous solution as initial guess for new solution to speed up the method
+        rhs1 = view(rhs, :, 1)
+        rhs2 = view(rhs, :, 2)
+        IterativeSolvers.gmres!(system_solver.prevsol1, lhs, rhs1)
+        IterativeSolvers.gmres!(system_solver.prevsol2, lhs, rhs2)
+        copyto!(rhs1, system_solver.prevsol1)
+        copyto!(rhs2, system_solver.prevsol2)
     else
-        ldiv!(lu!(lhs), rhs)
+        if system_solver.use_sparse
+            rhs .= lu(lhs) \ rhs
+        else
+            ldiv!(lu!(lhs), rhs)
+        end
     end
 
     # lift to get s and kap

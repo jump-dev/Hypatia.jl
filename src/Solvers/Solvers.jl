@@ -10,6 +10,7 @@ using Printf
 using LinearAlgebra
 import LinearAlgebra.BlasReal
 using SparseArrays
+import IterativeSolvers
 using Test
 using TimerOutputs
 import Hypatia.Cones
