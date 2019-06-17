@@ -64,10 +64,13 @@ expdesignJuMP8() = expdesignJuMP(5, 15, 25, 5, use_logdet = false)
 expdesignJuMP9() = expdesignJuMP(4, 8, 12, 3, use_logdet = false)
 expdesignJuMP10() = expdesignJuMP(3, 5, 7, 2, use_logdet = false)
 
+expdesignJuMP11() = expdesignJuMP(50, 100, 125, 5, use_logdet = true)
+expdesignJuMP12() = expdesignJuMP(50, 100, 125, 5, use_logdet = false)
+
 function test_expdesignJuMP(instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
     d = instance()
-    JuMP.optimize!(d.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
+    @time JuMP.optimize!(d.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
     @test JuMP.termination_status(d.model) == MOI.OPTIMAL
     return
 end
@@ -86,6 +89,8 @@ test_expdesignJuMP_all(; options...) = test_expdesignJuMP.([
     ], options = options)
 
 test_expdesignJuMP(; options...) = test_expdesignJuMP.([
-    expdesignJuMP3,
-    expdesignJuMP8,
+    expdesignJuMP1,
+    expdesignJuMP6,
+    # expdesignJuMP3,
+    # expdesignJuMP8,
     ], options = options)

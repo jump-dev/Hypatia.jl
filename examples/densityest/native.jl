@@ -27,6 +27,7 @@ function densityest(
     deg::Int;
     use_sumlog::Bool = false,
     sample_factor::Int = 100,
+    T::DataType = Float64,
     )
     (nobs, dim) = size(X)
 
@@ -44,35 +45,34 @@ function densityest(
     for i in 1:nobs, j in 1:U
         basis_evals[i, j] = lagrange_polys[j](X[i, :])
     end
+    b = T[1]
 
     if use_sumlog
-        c = vcat([-1.0], zeros(U))
+        c = vcat(-1, zeros(T, U))
         dimx = 1 + U
-        A = zeros(1, dimx)
+        A = zeros(T, 1, dimx)
         A[1, 2:end] = w
-        b = [1.0]
-        h = zeros(U + 2 + nobs)
-        G1 = zeros(U, dimx)
+        h = zeros(T, U + 2 + nobs)
+        G1 = zeros(T, U, dimx)
         G1[:, 2:end] = -Matrix{Float64}(I, U, U)
-        G2 = zeros(2 + nobs, dimx)
-        G2[1, 1] = -1.0
-        h[U + 2] = 1.0
+        G2 = zeros(T, 2 + nobs, dimx)
+        G2[1, 1] = -1
+        h[U + 2] = 1
         for i in 1:nobs
             G2[i + 2, 2:end] = -basis_evals[i, :]
         end
         G = vcat(G1, G2)
         cone_idxs = [1:U, (U + 1):(U + 2 + nobs)]
-        cones = [CO.WSOSPolyInterp{Float64, Float64}(U, [P0, PWts...]), CO.HypoPerSumLog{Float64}(nobs + 2)]
+        cones = [CO.WSOSPolyInterp{T, T}(U, [P0, PWts...]), CO.HypoPerSumLog{T}(nobs + 2)]
     else
-        c = vcat(-ones(nobs), zeros(U))
+        c = vcat(-ones(T, nobs), zeros(T, U))
         dimx = nobs + U
-        A = zeros(1, dimx)
+        A = zeros(T, 1, dimx)
         A[1, (nobs + 1):end] = w
-        b = [1.0]
-        h = zeros(U + 3 * nobs)
-        G1 = zeros(U, dimx)
+        h = zeros(T, U + 3 * nobs)
+        G1 = zeros(T, U, dimx)
         G1[:, (nobs + 1):end] = -Matrix{Float64}(I, U, U)
-        G2 = zeros(3 * nobs, dimx)
+        G2 = zeros(T, 3 * nobs, dimx)
         offset = 1
         for i in 1:nobs
             G2[offset, i] = -1.0
@@ -82,7 +82,7 @@ function densityest(
         end
         G = vcat(G1, G2)
         cone_idxs = vcat([1:U], [(3 * (i - 1) + U + 1):(3 * i + U) for i in 1:nobs])
-        cones = vcat(CO.WSOSPolyInterp{Float64, Float64}(U, [P0, PWts...]), [CO.HypoPerLog{Float64}() for _ in 1:nobs])
+        cones = vcat(CO.WSOSPolyInterp{T, T}(U, [P0, PWts...]), [CO.HypoPerLog{T}() for _ in 1:nobs])
     end
 
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs)
@@ -125,3 +125,7 @@ test_densityest(; options...) = test_densityest.([
     densityest5,
     densityest6,
     ], options = options)
+
+@testset "" begin
+    test_densityest(verbose = true)
+end
