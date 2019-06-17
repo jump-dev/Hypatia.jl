@@ -55,7 +55,7 @@ get_nu(cone::HypoPerSumLog) = cone.dim
 function set_initial_point(arr::AbstractVector{T}, cone::HypoPerSumLog{T}) where {T <: HypReal}
     arr[1] = -one(T)
     arr[2] = one(T)
-    @. arr[3:end] = exp(inv(T(cone.dim - 2)))
+    @. arr[3:end] = one(T)
     return arr
 end
 
