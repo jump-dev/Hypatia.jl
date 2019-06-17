@@ -8,6 +8,7 @@ module Models
 
 using LinearAlgebra
 using SparseArrays
+import IterativeSolvers
 import Hypatia.Cones
 import Hypatia.HypReal
 

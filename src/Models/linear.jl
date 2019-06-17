@@ -78,6 +78,7 @@ mutable struct RawLinearModel{T <: HypReal} <: LinearModel{T}
 
     initial_point::Point{T}
 
+    # TODO loosen restriction to AbstractMatrix
     function RawLinearModel{T}(
         c::Vector,
         A::AbstractMatrix,
@@ -86,6 +87,7 @@ mutable struct RawLinearModel{T <: HypReal} <: LinearModel{T}
         h::Vector,
         cones::Vector{<:Cones.Cone},
         cone_idxs::Vector{UnitRange{Int}};
+        use_iterative::Bool = true, # TODO choose default
         tol_qr::Real = 1e2 * eps(T),
         use_dense_fallback::Bool = true,
         ) where {T <: HypReal}
@@ -109,62 +111,89 @@ mutable struct RawLinearModel{T <: HypReal} <: LinearModel{T}
         model.cone_idxs = cone_idxs
         model.nu = isempty(cones) ? zero(T) : sum(Cones.get_nu, cones)
 
-        find_initial_point(model, tol_qr, use_dense_fallback)
+        find_initial_point(model, use_iterative, tol_qr, use_dense_fallback)
 
         return model
     end
 end
 
 # get initial point for RawLinearModel
-function find_initial_point(model::RawLinearModel{T}, tol_qr::Real, use_dense_fallback::Bool) where {T <: HypReal}
+# TODO can run the x and y finding in parallel since they do not depend on eachother
+function find_initial_point(model::RawLinearModel{T}, use_iterative::Bool, tol_qr::Real, use_dense_fallback::Bool) where {T <: HypReal}
     A = model.A
     G = model.G
 
     point = initialize_cone_point(model.cones, model.cone_idxs)
     @assert model.q == length(point.z)
 
-    # solve for y as least squares solution to A'y = -c - G'z
-    if !iszero(model.p)
-        if issparse(A) && !(T <: sparse_QR_reals)
-            # TODO alternative fallback is to convert sparse{T} to sparse{Float64} and do the sparse LU
-            if use_dense_fallback
-                @warn("using dense factorization of A' in initial point finding because sparse factorization for number type $T is not supported by SparseArrays")
-                Ap_fact = qr!(Matrix(A'))
-            else
-                error("sparse factorization for number type $T is not supported by SparseArrays, so Hypatia cannot find an initial point")
-            end
-        else
-            Ap_fact = issparse(A) ? qr(sparse(A')) : qr!(Matrix(A'))
-        end
-
-        Ap_rank = get_rank_est(Ap_fact, tol_qr)
-        if Ap_rank < model.p
-            @warn("some primal equalities appear to be dependent; try using PreprocessedLinearModel")
-        end
-
-        point.y = Ap_fact \ (-model.c - G' * point.z)
-    end
+    # TODO optionally use row and col scaling on AG and apply to c, b, h
+    # TODO precondition iterative methods
+    # TODO pick default tol for iter methods
 
     # solve for x as least squares solution to Ax = b, Gx = h - s
     if !iszero(model.n)
         AG = vcat(A, G)
-        if issparse(AG) && !(T <: sparse_QR_reals)
-            # TODO alternative fallback is to convert sparse{T} to sparse{Float64} and do the sparse LU
-            if use_dense_fallback
-                @warn("using dense factorization of [A; G] in initial point finding because sparse factorization for number type $T is not supported by SparseArrays")
-                AG = Matrix(AG)
-            else
-                error("sparse factorization for number type $T is not supported by SparseArrays, so Hypatia cannot find an initial point")
+        rhs = vcat(model.b, model.h - point.s)
+
+        if use_iterative
+            # use iterative solvers method TODO pick lsqr or lsmr
+            point.x = zeros(T, model.n)
+            # IterativeSolvers.lsmr!(point.x, AG, rhs)
+            IterativeSolvers.lsqr!(point.x, AG, rhs)
+            # @show any(isnan, point.x)
+            # @show norm(point.x - (AG \ rhs))
+        else
+            if issparse(AG) && !(T <: sparse_QR_reals)
+                # TODO alternative fallback is to convert sparse{T} to sparse{Float64} and do the sparse LU
+                if use_dense_fallback
+                    @warn("using dense factorization of [A; G] in initial point finding because sparse factorization for number type $T is not supported by SparseArrays")
+                    AG = Matrix(AG)
+                else
+                    error("sparse factorization for number type $T is not supported by SparseArrays, so Hypatia cannot find an initial point")
+                end
             end
-        end
-        AG_fact = issparse(AG) ? qr(AG) : qr!(AG)
+            AG_fact = issparse(AG) ? qr(AG) : qr!(AG)
 
-        AG_rank = get_rank_est(AG_fact, tol_qr)
-        if AG_rank < model.n
-            @warn("some dual equalities appear to be dependent; try using PreprocessedLinearModel")
-        end
+            AG_rank = get_rank_est(AG_fact, tol_qr)
+            if AG_rank < model.n
+                @warn("some dual equalities appear to be dependent; try using PreprocessedLinearModel")
+            end
 
-        point.x = AG_fact \ vcat(model.b, model.h - point.s)
+            point.x = AG_fact \ rhs
+        end
+    end
+
+    # solve for y as least squares solution to A'y = -c - G'z
+    if !iszero(model.p)
+        rhs = -model.c - G' * point.z
+
+        if use_iterative
+            # use iterative solvers method TODO pick lsqr or lsmr
+            point.y = zeros(T, model.p)
+            # IterativeSolvers.lsmr!(point.y, A', rhs)
+            IterativeSolvers.lsqr!(point.y, A', rhs)
+            # @show any(isnan, point.y)
+            # @show norm(point.y - (A' \ rhs))
+        else
+            if issparse(A) && !(T <: sparse_QR_reals)
+                # TODO alternative fallback is to convert sparse{T} to sparse{Float64} and do the sparse LU
+                if use_dense_fallback
+                    @warn("using dense factorization of A' in initial point finding because sparse factorization for number type $T is not supported by SparseArrays")
+                    Ap_fact = qr!(Matrix(A'))
+                else
+                    error("sparse factorization for number type $T is not supported by SparseArrays, so Hypatia cannot find an initial point")
+                end
+            else
+                Ap_fact = issparse(A) ? qr(sparse(A')) : qr!(Matrix(A'))
+            end
+
+            Ap_rank = get_rank_est(Ap_fact, tol_qr)
+            if Ap_rank < model.p
+                @warn("some primal equalities appear to be dependent; try using PreprocessedLinearModel")
+            end
+
+            point.y = Ap_fact \ rhs
+        end
     end
 
     model.initial_point = point
