@@ -89,8 +89,6 @@ test_expdesignJuMP_all(; options...) = test_expdesignJuMP.([
     ], options = options)
 
 test_expdesignJuMP(; options...) = test_expdesignJuMP.([
-    expdesignJuMP1,
-    expdesignJuMP6,
-    # expdesignJuMP3,
-    # expdesignJuMP8,
+    expdesignJuMP3,
+    expdesignJuMP8,
     ], options = options)
