@@ -70,8 +70,7 @@ function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{T}) where {T 
     return vec
 end
 
-# function svec_to_smat!(mat::AbstractMatrix{T}, vec::AbstractVector{T}) where {T <: HypReal}
-function svec_to_smat!(mat, vec)
+function svec_to_smat!(mat::AbstractMatrix{T}, vec::AbstractVector{T}) where {T <: HypReal}
     k = 1
     m = size(mat, 1)
     for i in 1:m, j in 1:i
