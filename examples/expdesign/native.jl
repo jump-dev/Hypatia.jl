@@ -148,8 +148,7 @@ function test_expdesign(instance::Function; T::THR = Float64, rseed::Int = 1, op
     d = instance(T = T)
     model = MO.PreprocessedLinearModel{T}(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
     solver = SO.HSDSolver{T}(model; options...)
-    @time SO.solve(solver)
-    @show solver.num_iters
+    SO.solve(solver)
     r = SO.get_certificates(solver, model, test = false, atol = 1e-4, rtol = 1e-4)
     @test r.status == :Optimal
     return
