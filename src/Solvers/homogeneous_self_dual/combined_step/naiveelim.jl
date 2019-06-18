@@ -187,17 +187,18 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveElimC
 
     # solve system
     if system_solver.use_iterative
-        # TODO optimize for this case, including applying the blocks of the LHS
         # TODO need preconditioner
+        # TODO optimize for this case, including applying the blocks of the LHS
         # TODO pick which square non-symm method to use
         # TODO prealloc whatever is needed inside the solver
         # TODO possibly fix IterativeSolvers so that methods can take matrix RHS, however the two columns may take different number of iters needed to converge
-        # TODO use previous solution as initial guess for new solution to speed up the method
+
         rhs1 = view(rhs, :, 1)
-        rhs2 = view(rhs, :, 2)
         IterativeSolvers.gmres!(system_solver.prevsol1, lhs, rhs1)
-        IterativeSolvers.gmres!(system_solver.prevsol2, lhs, rhs2)
         copyto!(rhs1, system_solver.prevsol1)
+
+        rhs2 = view(rhs, :, 2)
+        IterativeSolvers.gmres!(system_solver.prevsol2, lhs, rhs2)
         copyto!(rhs2, system_solver.prevsol2)
     else
         if system_solver.use_sparse
