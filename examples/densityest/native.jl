@@ -20,6 +20,8 @@ const MU = HYP.ModelUtilities
 const CO = HYP.Cones
 const SO = HYP.Solvers
 
+THR = Type{<: HYP.HypReal}
+
 include(joinpath(@__DIR__, "data.jl"))
 
 function densityest(
@@ -27,7 +29,7 @@ function densityest(
     deg::Int;
     use_sumlog::Bool = false,
     sample_factor::Int = 100,
-    T::DataType = Float64,
+    T::THR = Float64,
     )
     (nobs, dim) = size(X)
 
@@ -90,42 +92,38 @@ end
 
 densityest(nobs::Int, n::Int, deg::Int; options...) = densityest(randn(nobs, n), deg; options...)
 
-densityest1() = densityest(iris_data(), 4, use_sumlog = true)
-densityest2() = densityest(iris_data(), 4, use_sumlog = false)
-densityest3() = densityest(cancer_data(), 4, use_sumlog = true)
-densityest4() = densityest(cancer_data(), 4, use_sumlog = false)
-densityest5() = densityest(200, 1, 4, use_sumlog = true)
-densityest6() = densityest(200, 1, 4, use_sumlog = false)
+densityest1(; T::THR = Float64) = densityest(iris_data(), 4, use_sumlog = true, T = T)
+densityest2(; T::THR = Float64) = densityest(iris_data(), 4, use_sumlog = false, T = T)
+densityest3(; T::THR = Float64) = densityest(cancer_data(), 4, use_sumlog = true, T = T)
+densityest4(; T::THR = Float64) = densityest(cancer_data(), 4, use_sumlog = false, T = T)
+densityest5(; T::THR = Float64) = densityest(200, 1, 4, use_sumlog = true, T = T)
+densityest6(; T::THR = Float64) = densityest(200, 1, 4, use_sumlog = false, T = T)
 
-function test_densityest(instance::Function; options, rseed::Int = 1)
+function test_densityest(instance::Function; T::THR = Float64, rseed::Int = 1, options)
     Random.seed!(rseed)
-    d = instance()
-    model = MO.PreprocessedLinearModel{Float64}(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
-    solver = SO.HSDSolver{Float64}(model; options...)
+    d = instance(T = T)
+    model = MO.PreprocessedLinearModel{T}(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
+    solver = SO.HSDSolver{T}(model; options...)
     SO.solve(solver)
     r = SO.get_certificates(solver, model, test = true, atol = 1e-4, rtol = 1e-4)
     @test r.status == :Optimal
     return
 end
 
-test_densityest_all(; options...) = test_densityest.([
+test_densityest_all(; T::THR = Float64, options...) = test_densityest.([
     densityest1,
     densityest2,
     densityest3,
     densityest4,
     densityest5,
     densityest6,
-    ], options = options)
+    ], T = T, options = options)
 
-test_densityest(; options...) = test_densityest.([
+test_densityest(; T::THR = Float64, options...) = test_densityest.([
     densityest1,
     densityest2,
     densityest3,
     densityest4,
     densityest5,
     densityest6,
-    ], options = options)
-
-@testset "" begin
-    test_densityest(verbose = true)
-end
+    ], T = T, options = options)

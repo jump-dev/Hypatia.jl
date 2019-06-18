@@ -17,6 +17,8 @@ const MU = HYP.ModelUtilities
 const CO = HYP.Cones
 const SO = HYP.Solvers
 
+THR = Type{<: HYP.HypReal}
+
 function matrixcompletion(
     m::Int,
     n::Int;
@@ -25,7 +27,7 @@ function matrixcompletion(
     known_cols::Vector{Int} = Int[],
     known_vals::Vector{Float64} = Float64[],
     use_3dim::Bool = false,
-    T::DataType = Float64,
+    T::THR = Float64,
     )
     @assert m >= n
 
@@ -148,17 +150,16 @@ matrixcompletion_ex(use_3dim::Bool) = matrixcompletion(
     known_vals = [1.0, 3.2, 0.8, 5.9, 1.9],
     use_3dim = use_3dim,
     )
-matrixcompletion1() = matrixcompletion_ex(false)
-matrixcompletion2() = matrixcompletion_ex(true)
-matrixcompletion3() = matrixcompletion(6, 5, use_3dim = false)
-matrixcompletion4() = matrixcompletion(6, 5, use_3dim = true)
-matrixcompletion5() = matrixcompletion(8, 6, use_3dim = false)
-matrixcompletion6() = matrixcompletion(8, 6, use_3dim = true)
+matrixcompletion1(; T::THR = Float64) = matrixcompletion_ex(false)
+matrixcompletion2(; T::THR = Float64) = matrixcompletion_ex(true)
+matrixcompletion3(; T::THR = Float64) = matrixcompletion(6, 5, use_3dim = false)
+matrixcompletion4(; T::THR = Float64) = matrixcompletion(6, 5, use_3dim = true)
+matrixcompletion5(; T::THR = Float64) = matrixcompletion(8, 6, use_3dim = false)
+matrixcompletion6(; T::THR = Float64) = matrixcompletion(8, 6, use_3dim = true)
 
-function test_matrixcompletion(instance::Function; options, rseed::Int = 1)
+function test_matrixcompletion(instance::Function; T::THR = Float64, rseed::Int = 1, options)
     Random.seed!(rseed)
-    d = instance()
-    T = Float64
+    d = instance(T = T)
     model = MO.PreprocessedLinearModel{T}(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
     solver = SO.HSDSolver{T}(model; options...)
     SO.solve(solver)
@@ -167,77 +168,18 @@ function test_matrixcompletion(instance::Function; options, rseed::Int = 1)
     return
 end
 
-test_matrixcompletion_all(; options...) = test_matrixcompletion.([
+test_matrixcompletion_all(; T::THR = Float64, options...) = test_matrixcompletion.([
     matrixcompletion1,
     matrixcompletion2,
     matrixcompletion3,
     matrixcompletion4,
     matrixcompletion5,
     matrixcompletion6,
-    ], options = options)
+    ], T = T, options = options)
 
-test_matrixcompletion(; options...) = test_matrixcompletion.([
+test_matrixcompletion(; T::THR = Float64, options...) = test_matrixcompletion.([
     matrixcompletion1,
     matrixcompletion2,
     matrixcompletion3,
     matrixcompletion4,
-    ], options = options)
-
-# @testset "" begin
-#     test_matrixcompletion(verbose = true)
-# end
-
-
-# matrixcompletion(
-#     m::Int,
-#     n::Int;
-#     num_known::Int = -1,
-#     known_rows::Vector{Int} = Int[],
-#     known_cols::Vector{Int} = Int[],
-#     known_vals::Vector{Float64} = Float64[],
-#     use_3dim::Bool = false,
-#     real_type::DataType = Float64,
-#     )
-#
-#
-
-
-n_range = [10]
-tf = [true, false]
-seeds = [2]
-real_types = [Float32, Float64]
-
-# compile run
-# for T in real_types, use_3dim in tf
-#     d = matrixcompletion(5, 5, use_3dim = use_3dim, T = T)
-#     model = MO.PreprocessedLinearModel{T}(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
-#     solver = SO.HSDSolver{T}(model, tol_abs_opt = 1e-5, tol_rel_opt = 1e-5)
-#     t = @timed SO.solve(solver)
-#     r = SO.get_certificates(solver, model, test = false, atol = 1e-4, rtol = 1e-4)
-# end
-
-io = open("matrixcopletion.csv", "w")
-println(io, "use3dim,real,seed,m,n,unknown,dimx,dimy,dimz,time,bytes,numiters,status,pobj,dobj,xfeas,yfeas,zfeas")
-for n in n_range, T in real_types, seed in seeds
-    m = n + 10
-    num_known = round(Int, 0.1 * m * n)
-    Random.seed!(seed)
-    for use_3dim in tf
-        d = matrixcompletion(m, n, num_known = num_known, use_3dim = use_3dim, T = T)
-        model = MO.PreprocessedLinearModel{T}(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
-        solver = SO.HSDSolver{T}(model, tol_abs_opt = 1e-5, tol_rel_opt = 1e-5)
-        t = @timed SO.solve(solver)
-        r = SO.get_certificates(solver, model, test = false, atol = 1e-4, rtol = 1e-4)
-        dimx = size(d.G, 2)
-        dimy = size(d.A, 1)
-        dimz = size(d.G, 1)
-        println(io, "$use_3dim,$T,$seed,$m,$n,$num_known,$dimx,$dimy,$dimz,$(t[2]),$(t[3])," *
-            "$(solver.num_iters),$(r.status),$(r.primal_obj),$(r.dual_obj),$(solver.x_feas)," *
-            "$(solver.y_feas),$(solver.z_feas)"
-            )
-    end
-end
-close(io)
-
-
-;
+    ], T = T, options = options)

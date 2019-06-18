@@ -171,7 +171,11 @@ native_options = (
         ) end
     @testset "envelope" begin test_envelope(; native_options...,
         ) end
+    @testset "expdesign" begin test_expdesign(; native_options...,
+        ) end
     @testset "linearopt" begin test_linearopt(; native_options...,
+        ) end
+    @testset "matrixcompletion" begin test_matrixcompletion(; native_options...,
         ) end
     @testset "polymin" begin test_polymin(; native_options...,
         tol_rel_opt = 1e-9, tol_abs_opt = 1e-8, tol_feas = 1e-9,

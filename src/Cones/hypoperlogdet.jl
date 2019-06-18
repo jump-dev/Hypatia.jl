@@ -31,7 +31,7 @@ mutable struct HypoPerLogdet{T <: HypReal} <: Cone{T}
         cone.use_dual = is_dual
         cone.dim = dim
         cone.side = round(Int, sqrt(0.25 + 2 * (dim - 2)) - 0.5)
-        k = 3/2 * (cone.side + 1)
+        k = 4 * (cone.side + 1)
         n = cone.side + 1
         cone.k = k
         cone.gamma = (k^(3 / 2) / (k - n)^(3 / 2) + (1 + k / (k - n))^(3 / 2) / sqrt(k))^2
