@@ -8,7 +8,6 @@ using LinearAlgebra
 import Random
 using Test
 import Hypatia
-import Hypatia
 const HYP = Hypatia
 const MO = HYP.Models
 const MU = HYP.ModelUtilities
@@ -17,13 +16,15 @@ const SO = HYP.Solvers
 
 const rt2 = sqrt(2)
 
+THR = Type{<: HYP.HypReal}
+
 function expdesign(
     q::Int,
     p::Int,
     n::Int,
     nmax::Int;
     use_logdet::Bool = true,
-    T::DataType = Float64,
+    T::THR = Float64,
     )
     @assert (p > q) && (n > q) && (nmax <= n)
     V = randn(q, p)
@@ -142,10 +143,9 @@ function expdesign(
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs)
 end
 
-function test_expdesign(instance::Function; options, rseed::Int = 1)
+function test_expdesign(instance::Function; T::THR = Float64, rseed::Int = 1, options)
     Random.seed!(rseed)
-    T = Float64
-    d = instance()
+    d = instance(T = T)
     model = MO.PreprocessedLinearModel{T}(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
     solver = SO.HSDSolver{T}(model; options...)
     @time SO.solve(solver)
@@ -155,21 +155,18 @@ function test_expdesign(instance::Function; options, rseed::Int = 1)
     return
 end
 
-expdesign1() = expdesign(25, 75, 125, 5, use_logdet = true)
-expdesign2() = expdesign(10, 30, 50, 5, use_logdet = true)
-expdesign3() = expdesign(5, 15, 25, 5, use_logdet = true)
-expdesign4() = expdesign(4, 8, 12, 3, use_logdet = true)
-expdesign5() = expdesign(3, 5, 7, 2, use_logdet = true)
-expdesign6() = expdesign(25, 75, 125, 5, use_logdet = false)
-expdesign7() = expdesign(10, 30, 50, 5, use_logdet = false)
-expdesign8() = expdesign(5, 15, 25, 5, use_logdet = false)
-expdesign9() = expdesign(4, 8, 12, 3, use_logdet = false)
-expdesign10() = expdesign(3, 5, 7, 2, use_logdet = false)
+expdesign1(; T::THR = Float64) = expdesign(25, 75, 125, 5, use_logdet = true, T = T)
+expdesign2(; T::THR = Float64) = expdesign(10, 30, 50, 5, use_logdet = true, T = T)
+expdesign3(; T::THR = Float64) = expdesign(5, 15, 25, 5, use_logdet = true, T = T)
+expdesign4(; T::THR = Float64) = expdesign(4, 8, 12, 3, use_logdet = true, T = T)
+expdesign5(; T::THR = Float64) = expdesign(3, 5, 7, 2, use_logdet = true, T = T)
+expdesign6(; T::THR = Float64) = expdesign(25, 75, 125, 5, use_logdet = false, T = T)
+expdesign7(; T::THR = Float64) = expdesign(10, 30, 50, 5, use_logdet = false, T = T)
+expdesign8(; T::THR = Float64) = expdesign(5, 15, 25, 5, use_logdet = false, T = T)
+expdesign9(; T::THR = Float64) = expdesign(4, 8, 12, 3, use_logdet = false, T = T)
+expdesign10(; T::THR = Float64) = expdesign(3, 5, 7, 2, use_logdet = false, T = T)
 
-expdesign11() = expdesign(50, 100, 125, 5, use_logdet = true)
-expdesign12() = expdesign(50, 100, 125, 5, use_logdet = false)
-
-test_expdesign_all(; real_type::DataType = Float64, options...) = test_expdesign.([
+test_expdesign_all(; T::THR = Float64, options...) = test_expdesign.([
     expdesign1,
     expdesign2,
     expdesign3,
@@ -180,57 +177,15 @@ test_expdesign_all(; real_type::DataType = Float64, options...) = test_expdesign
     expdesign9,
     expdesign9,
     expdesign10,
-    ], real_type = real_type, options = options)
+    ], T = T, options = options)
 
-test_expdesign(; options...) = test_expdesign.([
+test_expdesign(; T::THR = Float64, options...) = test_expdesign.([
+    expdesign2,
     expdesign3,
-    # expdesign6,
-    # expdesign3,
-    # expdesign8,
-    # expdesign4,
-    # expdesign9,
-    # expdesign5,
-    # expdesign10,
-    ], options = options)
-
-@testset "" begin
-    test_expdesign(verbose = true, tol_abs_opt = 1e-5, tol_rel_opt = 1e-5)
-end
-
-
-
-
-# n_range = [4, 8, 12]
-# p_range = [4, 8, 16]
-
-# q_range = [4, 6, 8]
-# nmax = 5
-# tf = [true]
-# seeds = 1:2
-# real_types = [Float64]
-#
-# io = open("expdesign.csv", "w")
-# println(io, "uselogdet,real,seed,q,p,n,dimx,dimy,dimz,time,bytes,numiters,status,pobj,dobj,xfeas,yfeas,zfeas")
-# for q in q_range, T in real_types, seed in seeds
-#     p = 2 * q
-#     n = 2 * q
-#     Random.seed!(seed)
-#     for use_logdet in tf
-#         d = expdesign(q, p, n, nmax, use_logdet = use_logdet, T = T)
-#         model = MO.PreprocessedLinearModel{T}(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
-#         solver = SO.HSDSolver{T}(model, tol_abs_opt = 1e-5, tol_rel_opt = 1e-5)
-#         t = @timed SO.solve(solver)
-#         r = SO.get_certificates(solver, model, test = false, atol = 1e-4, rtol = 1e-4)
-#         dimx = size(d.G, 2)
-#         dimy = size(d.A, 1)
-#         dimz = size(d.G, 1)
-#         println(io, "$use_logdet,$T,$seed,$q,$p,$n,$dimx,$dimy,$dimz,$(t[2]),$(t[3])," *
-#             "$(solver.num_iters),$(r.status),$(r.primal_obj),$(r.dual_obj),$(solver.x_feas)," *
-#             "$(solver.y_feas),$(solver.z_feas)"
-#             )
-#     end
-# end
-# close(io)
-#
-#
-# ;
+    expdesign4,
+    expdesign5,
+    expdesign6,
+    expdesign7,
+    expdesign9,
+    expdesign9,
+    ], T = T, options = options)
