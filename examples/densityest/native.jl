@@ -119,7 +119,9 @@ test_densityest_all(; options...) = test_densityest.([
 
 test_densityest(; options...) = test_densityest.([
     densityest1,
+    densityest2,
     densityest3,
+    densityest4,
     densityest5,
     densityest6,
     ], options = options)
