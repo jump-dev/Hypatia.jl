@@ -180,12 +180,6 @@ test_expdesign_all(; T::THR = Float64, options...) = test_expdesign.([
     ], T = T, options = options)
 
 test_expdesign(; T::THR = Float64, options...) = test_expdesign.([
-    expdesign2,
     expdesign3,
-    expdesign4,
-    expdesign5,
-    expdesign6,
-    expdesign7,
-    expdesign9,
-    expdesign9,
+    expdesign8,
     ], T = T, options = options)
