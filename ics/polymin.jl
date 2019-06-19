@@ -91,13 +91,14 @@ end
 
 n_range = [2, 3, 4]
 halfdeg_range = [3, 4, 5]
+T = Float64
 
-io = open("polymin.csv", "w")
+io = open("polyminreal.csv", "w")
 println(io, "usewsos,seed,n,halfdeg,dimx,dimy,dimz,time,bytes,numiters,status,pobj,dobj,xfeas,yfeas,zfeas")
 for n in n_range, halfdeg in halfdeg_range, use_wsos in tf, seed in seeds
 
     Random.seed!(seed)
-    d = polymin(n, halfdeg, use_wsos = use_wsos)
+    d = polyminreal(n, halfdeg, use_wsos = use_wsos)
     model = MO.PreprocessedLinearModel{T}(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
     solver = SO.HSDSolver{T}(model, tol_abs_opt = 1e-5, tol_rel_opt = 1e-5, time_limit = 600)
     t = @timed SO.solve(solver)

@@ -26,9 +26,10 @@ function portfolio(
     sigma_half::AbstractMatrix{Float64} = Matrix{Float64}(undef, 0, 0),
     gamma::Float64 = -1.0,
     risk_measure::Symbol = :entropic,
+    use_l1::Bool = true,
     )
     if isempty(returns)
-        returns = randn(num_stocks)
+        returns = rand(num_stocks)
     end
     if isempty(sigma_half)
         sigma_half = randn(num_stocks, num_stocks)
@@ -45,13 +46,33 @@ function portfolio(
     cone_idxs = [1:num_stocks]
     cones = CO.Cone[CO.Nonnegative{Float64}(num_stocks)]
 
-    if risk_measure == :quadratic
+    if risk_measure == :quadratic || (risk_measure == :l1 && use_l1)
         G2 = vcat(zeros(1, num_stocks), -sigma_half)
         h2 = [gamma; zeros(num_stocks)]
         cone_idxs = vcat(cone_idxs, [(num_stocks + 1):(2 * num_stocks + 1)])
-        cones = vcat(cones, [CO.EpiNormEucl{Float64}(num_stocks + 1)])
         G = vcat(G1, G2)
         h = vcat(h1, h2)
+        if risk_measure == :quadratic
+            cones = vcat(cones, CO.EpiNormEucl{Float64}(num_stocks + 1))
+        else
+            cones = vcat(cones, CO.EpiNormInf{Float64}(num_stocks + 1, true))
+        end
+
+    elseif risk_measure == :l1 && !use_l1
+        c = vcat(c, zeros(2 * num_stocks))
+        id = Matrix{Float64}(I, num_stocks, num_stocks)
+        A_slacks = [sigma_half -id; -sigma_half, -id]
+        A_l1 = [zeros(1, num_stocks) ones(1, 2 * num_stocks)]
+        A = [A zeros(1, 2 * num_stocks); A_slacks; A_l1]
+        b = vcat(b, zeros(2 * num_stocks), gamma)
+        G = [
+            G1 zeros(num_stocks, 2 * num_stocks);
+            zeros(2 * num_stocks, num_stocks) Matrix{Float64}(I, 2 * num_stocks, 2 * num_stocks)
+            ]
+        h = vcat(h, zeros(2 * num_stocks))
+        cones = vcat(cones, CO.Nonnegative{Float64}(2 * num_stocks))
+        cone_idxs = vcat(cone_idxs, (num_stocks + 1):(3 * num_stocks))
+
     elseif risk_measure == :entropic
         # sigma_half = abs.(sigma_half) TODO will this always be feasible?
         c = vcat(c, zeros(2 * num_stocks))
