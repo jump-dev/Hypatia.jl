@@ -31,14 +31,24 @@ function polyminreal(
     halfdeg::Int;
     use_primal::Bool = true,
     use_wsos::Bool = true,
+    n::Int = -1,
     )
     if use_primal && !use_wsos
         error("primal psd formulation is not implemented yet")
     end
 
-    (x, fn, dom, true_obj) = getpolydata(polyname)
-    sample = (length(x) >= 5) || !isa(dom, MU.Box)
-    (U, pts, P0, PWts, _) = MU.interpolate(dom, halfdeg, sample = sample)
+    if polyname == :random
+        true_obj = NaN
+        dom = MU.Box(-ones(n), ones(n))
+        (U, pts, P0, PWts, _) = MU.interpolate(dom, halfdeg, sample = false)
+        interp_vals = randn(U)
+    else
+        (x, fn, dom, true_obj) = getpolydata(polyname)
+        sample = (length(x) >= 5) || !isa(dom, MU.Box)
+        (U, pts, P0, PWts, _) = MU.interpolate(dom, halfdeg, sample = sample)
+        # set up problem data
+        interp_vals = [fn(pts[j, :]...) for j in 1:U]
+    end
 
     if use_wsos
         cones = [CO.WSOSPolyInterp{Float64, Float64}(U, [P0, PWts...], !use_primal)]
@@ -49,8 +59,6 @@ function polyminreal(
         cone_idxs = UnitRange{Int}[]
     end
 
-    # set up problem data
-    interp_vals = [fn(pts[j, :]...) for j in 1:U]
     if use_primal
         c = [-1.0]
         A = zeros(0, 1)
@@ -90,6 +98,43 @@ function polyminreal(
 
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs, true_obj = true_obj)
 end
+
+function polyminreal(n::Int, deg::Int) =
+    polyname::Symbol,
+    halfdeg::Int;
+    use_primal::Bool = true,
+    use_wsos::Bool = true,
+    )
+
+io = open("polymin.csv", "w")
+println(io, "usesumlog,real,alpha,seed,n,deg,dimx,dimy,dimz,time,bytes,numiters,status,pobj,dobj,xfeas,yfeas,zfeas")
+for n in n_range, deg in d_range, T in real_types, seed in seeds
+    for use_sumlog in tf
+        if use_sumlog
+            a_range = alpha_range
+        else
+            a_range = [-1]
+        end
+        for alpha in a_range
+            Random.seed!(seed)
+            d = polymin(200, n, deg, use_sumlog = use_sumlog, T = T, alpha = alpha)
+            model = MO.PreprocessedLinearModel{T}(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
+            solver = SO.HSDSolver{T}(model, tol_abs_opt = 1e-5, tol_rel_opt = 1e-5, time_limit = 600)
+            t = @timed SO.solve(solver)
+            r = SO.get_certificates(solver, model, test = false, atol = 1e-4, rtol = 1e-4)
+            dimx = size(d.G, 2)
+            dimy = size(d.A, 1)
+            dimz = size(d.G, 1)
+            println(io, "$use_sumlog,$T,$alpha,$seed,$n,$deg,$dimx,$dimy,$dimz,$(t[2]),$(t[3])," *
+                "$(solver.num_iters),$(r.status),$(r.primal_obj),$(r.dual_obj),$(solver.x_feas)," *
+                "$(solver.y_feas),$(solver.z_feas)"
+                )
+        end
+    end
+end
+close(io)
+
+
 
 polyminreal1() = polyminreal(:heart, 2)
 polyminreal2() = polyminreal(:schwefel, 2)

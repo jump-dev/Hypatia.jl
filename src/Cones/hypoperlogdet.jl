@@ -26,12 +26,19 @@ mutable struct HypoPerLogdet{T <: HypReal} <: Cone{T}
     H2::Matrix{T}
     F
 
-    function HypoPerLogdet{T}(dim::Int, is_dual::Bool) where {T <: HypReal}
+    function HypoPerLogdet{T}(dim::Int, is_dual::Bool; alpha = -1) where {T <: HypReal}
         cone = new{T}()
         cone.use_dual = is_dual
         cone.dim = dim
         cone.side = round(Int, sqrt(0.25 + 2 * (dim - 2)) - 0.5)
-        k = 4 * (cone.side + 1)
+        if alpha == -1
+            alpha = 4 + 3 / sqrt(cone.side + 1)
+        elseif alpha == -2
+            cone.k = cone.side + 2
+            cone.gamma = 1.0
+            return cone
+        end
+        k = alpha * (cone.side + 1)
         n = cone.side + 1
         cone.k = k
         cone.gamma = (k^(3 / 2) / (k - n)^(3 / 2) + (1 + k / (k - n))^(3 / 2) / sqrt(k))^2
@@ -39,7 +46,7 @@ mutable struct HypoPerLogdet{T <: HypReal} <: Cone{T}
     end
 end
 
-HypoPerLogdet{T}(dim::Int) where {T <: HypReal} = HypoPerLogdet{T}(dim, false)
+HypoPerLogdet{T}(dim::Int; alpha = -1) where {T <: HypReal} = HypoPerLogdet{T}(dim, false, alpha = alpha)
 
 function setup_data(cone::HypoPerLogdet{T}) where {T <: HypReal}
     dim = cone.dim

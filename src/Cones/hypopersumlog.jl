@@ -15,6 +15,8 @@ TODO
 mutable struct HypoPerSumLog{T <: HypReal} <: Cone{T}
     use_dual::Bool
     dim::Int
+    k::Float64
+    gamma::Float64
 
     point::AbstractVector{T}
     g::Vector{T}
@@ -24,15 +26,26 @@ mutable struct HypoPerSumLog{T <: HypReal} <: Cone{T}
     barfun::Function
     diffres
 
-    function HypoPerSumLog{T}(dim::Int, is_dual::Bool) where {T <: HypReal}
+    function HypoPerSumLog{T}(dim::Int, is_dual::Bool; alpha = -1) where {T <: HypReal}
         cone = new{T}()
         cone.use_dual = is_dual
         cone.dim = dim
+        if alpha == -1
+            alpha = 4 + 3 / sqrt(cone.dim - 1)
+        elseif alpha == -2
+            cone.k = cone.dim
+            cone.gamma = 1.0
+            return cone
+        end
+        n = cone.dim - 1
+        k = alpha * n
+        cone.k = cone.dim + 2 # k
+        cone.gamma = (k^(3 / 2) / (k - n)^(3 / 2) + (1 + k / (k - n))^(3 / 2) / sqrt(k))^2
         return cone
     end
 end
 
-HypoPerSumLog{T}(dim::Int) where {T <: HypReal} = HypoPerSumLog{T}(dim, false)
+HypoPerSumLog{T}(dim::Int; alpha = alpha) where {T <: HypReal} = HypoPerSumLog{T}(dim, false, alpha = alpha)
 
 function setup_data(cone::HypoPerSumLog{T}) where {T <: HypReal}
     dim = cone.dim
@@ -43,14 +56,14 @@ function setup_data(cone::HypoPerSumLog{T}) where {T <: HypReal}
         u = point[1]
         v = point[2]
         w = view(point, 3:dim)
-        return -log(v * sum(wi -> log(wi / v), w) - u) - sum(wi -> log(wi), w) - log(v)
+        return cone.gamma * (-log(v * sum(wi -> log(wi / v), w) - u) - sum(wi -> log(wi), w) - log(v) * (cone.k - cone.dim + 1))
     end
     cone.barfun = barfun
     cone.diffres = DiffResults.HessianResult(cone.g)
     return
 end
 
-get_nu(cone::HypoPerSumLog) = cone.dim
+get_nu(cone::HypoPerSumLog) = cone.k * cone.gamma
 
 function set_initial_point(arr::AbstractVector{T}, cone::HypoPerSumLog{T}) where {T <: HypReal}
     arr[1] = -one(T)
