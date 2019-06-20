@@ -31,7 +31,7 @@ const rt2 = sqrt(2)
 #     JuMP.@objective(model, Max, sum(X[i, j] * A[i, j] * (i == j ? 1 : 2) for i in 1:n for j in 1:i))
 #     return (model = model,)
 # end
-function sparsepca(n::Int, k::Int; T = Float64, mat = zeros(T, 0, 0))
+function sparsepca(n::Int, k::Int; T = Float64, mat = zeros(T, 0, 0), use_l1ball::Bool = true)
     dimx = div(n * (n + 1), 2)
     if isempty(mat)
         mat = randn(n, n)
@@ -42,28 +42,52 @@ function sparsepca(n::Int, k::Int; T = Float64, mat = zeros(T, 0, 0))
     c = [mat[i, j] for i in 1:n for j in 1:i]
     b = T[1]
     A = zeros(T, 1, dimx)
-    # l1 cone
-    G1 = -Matrix{T}(I, dimx, dimx) * 2
     # PSD cone
-    G2 = -Matrix{T}(I, dimx, dimx) * rt2
+    Gpsd = -Matrix{T}(I, dimx, dimx) * rt2
     for i in 1:n
         s = sum(1:i)
         A[s] = 1
-        G1[s, s] = -1
-        G2[s, s] = -1
+        Gpsd[s, s] = -1
     end
-    G = vcat(zeros(T, 1, dimx), G1, G2)
-    h = vcat(k, zeros(2 * dimx))
-    cones = [CO.EpiNormInf{T}(1 + dimx, true), CO.PosSemidef{T, T}(dimx)]
-    cone_idxs = [1:(dimx + 1), (dimx + 2):(2 * dimx + 1)]
-    @show (A), (G), cone_idxs, size(h), size(c)
+    hpsd = zeros(dimx)
+    cones = CO.Cone[CO.PosSemidef{T, T}(dimx)]
+    cone_idxs = [1:dimx]
+
+    if use_l1ball
+        # l1 cone
+        Gl1 = -Matrix{T}(I, dimx, dimx) * 2
+        for i in 1:n
+            s = sum(1:i)
+            Gl1[s, s] = -1
+        end
+        G = vcat(Gpsd, zeros(T, 1, dimx), Gl1)
+        h = vcat(hpsd, k, zeros(T, dimx))
+        push!(cones, CO.EpiNormInf{T}(1 + dimx, true))
+        push!(cone_idxs, (dimx + 1):(2 * dimx + 1))
+    else
+        c = vcat(c, zeros(2 * dimx))
+        id = Matrix{T}(I, dimx, dimx)
+        A_slacks = [-id -id id]
+        A_l1 = [zeros(1, dimx) ones(1, 2 * dimx)]
+        A = vcat([A zeros(T, 1, 2 * dimx)], A_slacks, A_l1)
+        b = vcat(b, zeros(T, dimx), k)
+        G = [
+            Gpsd zeros(T, dimx, 2 * dimx)
+            zeros(2 * dimx, dimx) -Matrix{T}(I, 2 * dimx, 2 * dimx)
+            ]
+        h = vcat(hpsd, zeros(2 * dimx))
+        push!(cones, CO.Nonnegative{T}(2 * dimx))
+        push!(cone_idxs, (dimx + 1):(3 * dimx))
+    end
+
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs)
 end
 
-sparsepca1(; T::THR = Float) = sparsepca(3, 3, T = T)
+sparsepca1(; T = Float) = sparsepca(3, 3, T = T)
+sparsepca2(; T = Float) = sparsepca(3, 3, T = T, use_l1ball = false)
 # sparsepca2(; T::THR = Float) = sparsepca(3, 3, T = T, mat = Matrix{Float64}(I, 3, 3))
 
-function test_sparsepca(instance::Function; T::THR = Float64, rseed::Int = 1, options)
+function test_sparsepca(instance::Function; T = Float64, rseed::Int = 1, options)
     Random.seed!(rseed)
     d = instance(T = T)
     model = MO.PreprocessedLinearModel{T}(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
@@ -77,8 +101,10 @@ end
 
 test_sparsepca_all(; options...) = test_sparsepca.([
     sparsepca1,
+    sparsepca2,
     ], options = options)
 
-test_sparsepca1(; options...) = test_sparsepca.([
+test_sparsepca(; options...) = test_sparsepca.([
     sparsepca1,
+    sparsepca2,
     ], options = options)

@@ -25,6 +25,7 @@ function expdesign(
     nmax::Int;
     use_logdet::Bool = true,
     T::THR = Float64,
+    use_sumlog::Bool = true,
     alpha = 4,
     )
     @assert (p > q) && (n > q) && (nmax <= n)
@@ -74,15 +75,22 @@ function expdesign(
     else
         # requires an upper triangular matrix of additional variables, ordered row wise
         num_trivars = div(q * (q + 1), 2)
+        if use_sumlog
+            dimx = p + num_trivars + 1
+            padx = num_trivars + 1
+            num_hypo = 1
+        else
+            # number of experiments, upper triangular matrix, hypograph variables
+            dimx = p + num_trivars + q
+            padx = num_trivars + q
+            num_hypo = q
+        end
         # pad with triangle matrix variables and q hypopoerlog cone hypograph variables
-        A = [A zeros(T, 1, num_trivars) zeros(T, 1, q)]
-        G_nonneg = [G_nonneg zeros(T, p, num_trivars) zeros(T, p, q)]
-        G_nmax = [G_nmax zeros(T, p, num_trivars) zeros(T, p, q)]
+        A = [A zeros(T, 1, padx)]
+        G_nonneg = [G_nonneg zeros(T, p, padx)]
+        G_nmax = [G_nmax zeros(T, p, padx)]
         # maximize the sum of hypograph variables of all hypoperlog cones
-        c = vcat(zeros(T, p), zeros(T, num_trivars), -ones(T, q))
-
-        # number of experiments, upper triangular matrix, hypograph variables
-        dimx = p + num_trivars + q
+        c = vcat(zeros(T, p), zeros(T, num_trivars), -ones(T, num_hypo))
 
         # vectorized dimension of psd matrix
         dimvec = q * (2 * q + 1)
@@ -121,24 +129,43 @@ function expdesign(
         push!(cone_idxs, (2 * p + 1):(2 * p + dimvec))
         push!(cones, CO.PosSemidef{T, T}(dimvec))
 
-        G_log = zeros(T, 3 * q, dimx)
-        h_log = zeros(T, 3 * q)
-        offset = 1
-        for i in 1:q
-            # hypograph variable
-            G_log[offset, p + num_trivars + i] = -1
-            # perspective variable
-            h_log[offset + 1] = 1
-            # diagonal element in the triangular matrix
-            G_log[offset + 2, p + diag_idx(i)] = -1
-            cone_offset = 2 * p + dimvec + offset
-            push!(cone_idxs, cone_offset:(cone_offset + 2))
-            push!(cones, CO.HypoPerLog{T}())
-            offset += 3
+        if use_sumlog
+            G_logvars = zeros(T, q, num_trivars)
+            for i in 1:q
+                G_logvars[i, diag_idx(i)] = -1
+            end
+            G_log = [
+                # hypograph row
+                zeros(T, 1, p + num_trivars) -1
+                # perspective row
+                zeros(T, 1, dimx)
+                # log row
+                zeros(T, q, p) G_logvars zeros(T, q)
+                ]
+            h_log = vcat(0, 1, zeros(T, q))
+            push!(cone_idxs, (2 * p + dimvec + 1):(2 * p + dimvec + 2 + q))
+            push!(cones, CO.HypoPerSumLog{T}(q + 2))
+        else
+            G_log = zeros(T, 3 * q, dimx)
+            h_log = zeros(T, 3 * q)
+            offset = 1
+            for i in 1:q
+                # hypograph variable
+                G_log[offset, p + num_trivars + i] = -1
+                # perspective variable
+                h_log[offset + 1] = 1
+                # diagonal element in the triangular matrix
+                G_log[offset + 2, p + diag_idx(i)] = -1
+                cone_offset = 2 * p + dimvec + offset
+                push!(cone_idxs, cone_offset:(cone_offset + 2))
+                push!(cones, CO.HypoPerLog{T}())
+                offset += 3
+            end
         end
 
         G = vcat(G_nonneg, G_nmax, G_psd, G_log)
         h = vcat(h_nonneg, h_nmax, h_psd, h_log)
+
     end
 
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs)
@@ -183,11 +210,11 @@ test_expdesign_all(; T::THR = Float64, options...) = test_expdesign.([
     ], T = T, options = options)
 
 test_expdesign(; T::THR = Float64, options...) = test_expdesign.([
-    expdesign1,
+    # expdesign1,
     expdesign6,
-    # expdesign4,
+    # expdesign2,
     # expdesign5,
-    # expdesign6,
+    # expdesign10,
     # expdesign7,
     # expdesign9,
     # expdesign9,
@@ -203,42 +230,42 @@ test_expdesign(; T::THR = Float64, options...) = test_expdesign.([
 # n_range = [4, 8, 12]
 # p_range = [4, 8, 16]
 
-q_range = [4; 6; 8]
-nmax = 5
-tf = [true, false]
-seeds = 1:2
-real_types = [Float64, Float32, BigFloat]
-alpha_range = [2, 4, -1, -2]
-
-io = open("expdesign.csv", "w")
-println(io, "uselogdet,real,alpha,seed,q,p,n,dimx,dimy,dimz,time,bytes,numiters,status,pobj,dobj,xfeas,yfeas,zfeas")
-for q in q_range, T in real_types, seed in seeds
-    p = 2 * q
-    n = 2 * q
-    for use_logdet in tf
-        if use_logdet
-            a_range = alpha_range
-        else
-            a_range = [-1]
-        end
-        for alpha in a_range
-            Random.seed!(seed)
-            d = expdesign(q, p, n, nmax, use_logdet = use_logdet, T = T, alpha = alpha)
-            model = MO.PreprocessedLinearModel{T}(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
-            solver = SO.HSDSolver{T}(model, tol_abs_opt = 1e-5, tol_rel_opt = 1e-5, time_limit = 600)
-            t = @timed SO.solve(solver)
-            r = SO.get_certificates(solver, model, test = false, atol = 1e-4, rtol = 1e-4)
-            dimx = size(d.G, 2)
-            dimy = size(d.A, 1)
-            dimz = size(d.G, 1)
-            println(io, "$use_logdet,$T,$alpha,$seed,$q,$p,$n,$dimx,$dimy,$dimz,$(t[2]),$(t[3])," *
-                "$(solver.num_iters),$(r.status),$(r.primal_obj),$(r.dual_obj),$(solver.x_feas)," *
-                "$(solver.y_feas),$(solver.z_feas)"
-                )
-        end
-    end
-end
-close(io)
+# q_range = [4; 6; 8]
+# nmax = 5
+# tf = [true, false]
+# seeds = 1:2
+# real_types = [Float64, Float32, BigFloat]
+# alpha_range = [2, 4, -1, -2]
+#
+# io = open("expdesign.csv", "w")
+# println(io, "uselogdet,real,alpha,seed,q,p,n,dimx,dimy,dimz,time,bytes,numiters,status,pobj,dobj,xfeas,yfeas,zfeas")
+# for q in q_range, T in real_types, seed in seeds
+#     p = 2 * q
+#     n = 2 * q
+#     for use_logdet in tf
+#         if use_logdet
+#             a_range = alpha_range
+#         else
+#             a_range = [-1]
+#         end
+#         for alpha in a_range
+#             Random.seed!(seed)
+#             d = expdesign(q, p, n, nmax, use_logdet = use_logdet, T = T, alpha = alpha)
+#             model = MO.PreprocessedLinearModel{T}(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
+#             solver = SO.HSDSolver{T}(model, tol_abs_opt = 1e-5, tol_rel_opt = 1e-5, time_limit = 600)
+#             t = @timed SO.solve(solver)
+#             r = SO.get_certificates(solver, model, test = false, atol = 1e-4, rtol = 1e-4)
+#             dimx = size(d.G, 2)
+#             dimy = size(d.A, 1)
+#             dimz = size(d.G, 1)
+#             println(io, "$use_logdet,$T,$alpha,$seed,$q,$p,$n,$dimx,$dimy,$dimz,$(t[2]),$(t[3])," *
+#                 "$(solver.num_iters),$(r.status),$(r.primal_obj),$(r.dual_obj),$(solver.x_feas)," *
+#                 "$(solver.y_feas),$(solver.z_feas)"
+#                 )
+#         end
+#     end
+# end
+# close(io)
 
 
 ;

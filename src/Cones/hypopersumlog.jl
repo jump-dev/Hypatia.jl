@@ -45,7 +45,7 @@ mutable struct HypoPerSumLog{T <: HypReal} <: Cone{T}
     end
 end
 
-HypoPerSumLog{T}(dim::Int; alpha = alpha) where {T <: HypReal} = HypoPerSumLog{T}(dim, false, alpha = alpha)
+HypoPerSumLog{T}(dim::Int; alpha = -1) where {T <: HypReal} = HypoPerSumLog{T}(dim, false, alpha = alpha)
 
 function setup_data(cone::HypoPerSumLog{T}) where {T <: HypReal}
     dim = cone.dim
