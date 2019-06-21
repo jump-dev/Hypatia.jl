@@ -9,6 +9,7 @@ barrier (guessed, reduces to 3-dim exp cone self-concordant barrier)
 
 TODO
 - rename to and replace 3D cone (hypoperlog)
+- remove vw and other numerical optimization
 =#
 
 mutable struct HypoPerSumLog{T <: HypReal} <: Cone{T}
@@ -49,8 +50,7 @@ get_nu(cone::HypoPerSumLog) = cone.dim
 
 function set_initial_point(arr::AbstractVector{T}, cone::HypoPerSumLog{T}) where {T <: HypReal}
     arr[1] = -one(T)
-    arr[2] = one(T)
-    @. arr[3:end] = one(T)
+    @. arr[2:end] = one(T)
     return arr
 end
 
@@ -63,20 +63,19 @@ function check_in_cone(cone::HypoPerSumLog{T}) where {T <: HypReal}
     end
 
     lwv = sum(wi -> log(wi / v), w)
-    vlwv = v * lwv
-    vlwvu = vlwv - u
+    vlwvu = v * lwv - u
     lwvn = lwv - T(cone.dim - 2)
+    ivlwvu = inv(vlwvu)
+    vw = v ./ w # TODO remove allocations
+    ivlwvu2 = abs2(ivlwvu)
 
     # gradient
-    ivlwvu = inv(vlwvu)
     g = cone.g
     g[1] = ivlwvu
     g[2] = -lwvn * ivlwvu - inv(v)
     @. g[3:end] = -(one(T) + v * ivlwvu) / w
 
     # Hessian
-    vw = v ./ w # TODO remove allocations
-    ivlwvu2 = abs2(ivlwvu)
     H = cone.H
     H[1, 1] = ivlwvu2
     H[1, 2] = -lwvn * ivlwvu2
