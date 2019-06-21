@@ -26,7 +26,7 @@ mutable struct HypoPerSumLog{T <: HypReal} <: Cone{T}
     barfun::Function
     diffres
 
-    function HypoPerSumLog{T}(dim::Int, is_dual::Bool; alpha = -1) where {T <: HypReal}
+    function HypoPerSumLog{T}(dim::Int, is_dual::Bool; alpha = -2) where {T <: HypReal}
         cone = new{T}()
         cone.use_dual = is_dual
         cone.dim = dim
@@ -45,7 +45,7 @@ mutable struct HypoPerSumLog{T <: HypReal} <: Cone{T}
     end
 end
 
-HypoPerSumLog{T}(dim::Int; alpha = -1) where {T <: HypReal} = HypoPerSumLog{T}(dim, false, alpha = alpha)
+HypoPerSumLog{T}(dim::Int; alpha = -2) where {T <: HypReal} = HypoPerSumLog{T}(dim, false, alpha = alpha)
 
 function setup_data(cone::HypoPerSumLog{T}) where {T <: HypReal}
     dim = cone.dim
@@ -72,6 +72,21 @@ function set_initial_point(arr::AbstractVector{T}, cone::HypoPerSumLog{T}) where
     return arr
 end
 
+# function check_in_cone(cone::HypoPerSumLog{T}) where {T <: HypReal}
+#     u = cone.point[1]
+#     v = cone.point[2]
+#     w = view(cone.point, 3:cone.dim)
+#     if any(wi -> wi <= zero(T), w) || v <= zero(T) || u >= v * sum(wi -> log(wi / v), w)
+#         return false
+#     end
+#
+#     cone.diffres = ForwardDiff.hessian!(cone.diffres, cone.barfun, cone.point)
+#     cone.g .= DiffResults.gradient(cone.diffres)
+#     cone.H .= DiffResults.hessian(cone.diffres)
+#
+#     return factorize_hess(cone)
+# end
+
 function check_in_cone(cone::HypoPerSumLog{T}) where {T <: HypReal}
     u = cone.point[1]
     v = cone.point[2]
@@ -80,9 +95,36 @@ function check_in_cone(cone::HypoPerSumLog{T}) where {T <: HypReal}
         return false
     end
 
-    cone.diffres = ForwardDiff.hessian!(cone.diffres, cone.barfun, cone.point)
-    cone.g .= DiffResults.gradient(cone.diffres)
-    cone.H .= DiffResults.hessian(cone.diffres)
+    lwv = sum(wi -> log(wi / v), w)
+    vlwv = v * lwv
+    vlwvu = vlwv - u
+
+    n = cone.dim - 2
+
+    # gradient
+    ivlwvu = inv(vlwvu)
+    g = cone.g
+    g[1] = ivlwvu
+    g[2] = (cone.dim - 2 - lwv) * ivlwvu - 1 / v * (cone.k - cone.dim + 1)
+    g[3:end] = -(one(T) + v * ivlwvu) ./ w
+    cone.g .*= cone.gamma
+
+    # Hessian
+    vw = v ./ w
+    ivlwvu2 = abs2(ivlwvu)
+    H = cone.H
+    H[1, 1] = ivlwvu2
+    H[1, 2] = H[2, 1] = -(lwv - one(T) * n) * ivlwvu2
+    H[1, 3:end] = H[3:end, 1] = -vw * ivlwvu2
+    H[2, 2] = abs2(lwv - one(T) * n) * ivlwvu2 + ivlwvu * one(T) * n / v + inv(abs2(v)) * (cone.k - cone.dim + 1)
+    H[2, 3:end] = H[3:end, 2] = vw * (lwv - one(T) * n) * ivlwvu2 - ivlwvu ./ w
+    for i in 1:(cone.dim - 2)
+        for j in 1:(i - 1)
+            H[(2 + i), (2 + j)] = H[(2 + j), (2 + i)] = ivlwvu2 * vw[i] * vw[j]
+        end
+        H[(2 + i), (2 + i)] = abs2(vw[i]) * ivlwvu2 + vw[i] / w[i] * ivlwvu + inv(abs2(w[i]))
+    end
+    cone.H .*= cone.gamma
 
     return factorize_hess(cone)
 end
