@@ -101,6 +101,7 @@ function matrixcompletion(
         A = zeros(T, 0, 1 + num_unknown)
         push!(cone_idxs, (m * n + 2):(m * n + 2 + num_unknown))
         push!(cones, CO.HypoGeomean{T}(ones(num_unknown) / num_unknown))
+        @show num_unknown + 1
     else
         # number of 3-dimensional power cones needed is num_unknown - 1, number of new variables is num_unknown - 2
         # first num_unknown columns overlap with G1, column for the epigraph variable of the spectral cone added later
@@ -156,6 +157,8 @@ matrixcompletion3(; T::THR = Float64) = matrixcompletion(6, 5, use_3dim = false)
 matrixcompletion4(; T::THR = Float64) = matrixcompletion(6, 5, use_3dim = true)
 matrixcompletion5(; T::THR = Float64) = matrixcompletion(8, 6, use_3dim = false)
 matrixcompletion6(; T::THR = Float64) = matrixcompletion(8, 6, use_3dim = true)
+matrixcompletion7(; T::THR = Float64) = matrixcompletion(12, 8, use_3dim = false)
+matrixcompletion8(; T::THR = Float64) = matrixcompletion(12, 8, use_3dim = true)
 
 function test_matrixcompletion(instance::Function; T::THR = Float64, rseed::Int = 1, options)
     Random.seed!(rseed)
@@ -165,6 +168,7 @@ function test_matrixcompletion(instance::Function; T::THR = Float64, rseed::Int 
     SO.solve(solver)
     r = SO.get_certificates(solver, model, test = true, atol = 1e-4, rtol = 1e-4)
     @test r.status == :Optimal
+    @show r.x
     return
 end
 
@@ -179,9 +183,12 @@ test_matrixcompletion_all(; T::THR = Float64, options...) = test_matrixcompletio
 
 test_matrixcompletion(; T::THR = Float64, options...) = test_matrixcompletion.([
     matrixcompletion1,
-    matrixcompletion2,
+    # matrixcompletion2,
     matrixcompletion3,
-    matrixcompletion4,
+    # matrixcompletion4,
+    matrixcompletion5,
+    # matrixcompletion6,
+    matrixcompletion7,
     ], T = T, options = options)
 
 @testset "" begin
@@ -207,16 +214,16 @@ end
 # tf = [true, false]
 # seeds = [2]
 # real_types = [Float32, Float64]
-#
-# # compile run
-# # for T in real_types, use_3dim in tf
-# #     d = matrixcompletion(5, 5, use_3dim = use_3dim, T = T)
-# #     model = MO.PreprocessedLinearModel{T}(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
-# #     solver = SO.HSDSolver{T}(model, tol_abs_opt = 1e-5, tol_rel_opt = 1e-5)
-# #     t = @timed SO.solve(solver)
-# #     r = SO.get_certificates(solver, model, test = false, atol = 1e-4, rtol = 1e-4)
-# # end
-#
+
+# compile run
+# for T in real_types, use_3dim in tf
+#     d = matrixcompletion(5, 5, use_3dim = use_3dim, T = T)
+#     model = MO.PreprocessedLinearModel{T}(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
+#     solver = SO.HSDSolver{T}(model, tol_abs_opt = 1e-5, tol_rel_opt = 1e-5)
+#     t = @timed SO.solve(solver)
+#     r = SO.get_certificates(solver, model, test = false, atol = 1e-4, rtol = 1e-4)
+# end
+
 # io = open("matrixcopletion.csv", "w")
 # println(io, "use3dim,real,seed,m,n,unknown,dimx,dimy,dimz,time,bytes,numiters,status,pobj,dobj,xfeas,yfeas,zfeas")
 # for n in n_range, T in real_types, seed in seeds

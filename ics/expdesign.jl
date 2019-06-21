@@ -144,7 +144,7 @@ function expdesign(
                 ]
             h_log = vcat(0, 1, zeros(T, q))
             push!(cone_idxs, (2 * p + dimvec + 1):(2 * p + dimvec + 2 + q))
-            push!(cones, CO.HypoPerSumLog{T}(q + 2))
+            push!(cones, CO.HypoPerSumLog{T}(q + 2, alpha = alpha))
         else
             G_log = zeros(T, 3 * q, dimx)
             h_log = zeros(T, 3 * q)
@@ -230,42 +230,42 @@ test_expdesign(; T::THR = Float64, options...) = test_expdesign.([
 # n_range = [4, 8, 12]
 # p_range = [4, 8, 16]
 
-# q_range = [4; 6; 8]
-# nmax = 5
-# tf = [true, false]
-# seeds = 1:2
-# real_types = [Float64, Float32, BigFloat]
-# alpha_range = [2, 4, -1, -2]
-#
-# io = open("expdesign.csv", "w")
-# println(io, "uselogdet,real,alpha,seed,q,p,n,dimx,dimy,dimz,time,bytes,numiters,status,pobj,dobj,xfeas,yfeas,zfeas")
-# for q in q_range, T in real_types, seed in seeds
-#     p = 2 * q
-#     n = 2 * q
-#     for use_logdet in tf
-#         if use_logdet
-#             a_range = alpha_range
-#         else
-#             a_range = [-1]
-#         end
-#         for alpha in a_range
-#             Random.seed!(seed)
-#             d = expdesign(q, p, n, nmax, use_logdet = use_logdet, T = T, alpha = alpha)
-#             model = MO.PreprocessedLinearModel{T}(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
-#             solver = SO.HSDSolver{T}(model, tol_abs_opt = 1e-5, tol_rel_opt = 1e-5, time_limit = 600)
-#             t = @timed SO.solve(solver)
-#             r = SO.get_certificates(solver, model, test = false, atol = 1e-4, rtol = 1e-4)
-#             dimx = size(d.G, 2)
-#             dimy = size(d.A, 1)
-#             dimz = size(d.G, 1)
-#             println(io, "$use_logdet,$T,$alpha,$seed,$q,$p,$n,$dimx,$dimy,$dimz,$(t[2]),$(t[3])," *
-#                 "$(solver.num_iters),$(r.status),$(r.primal_obj),$(r.dual_obj),$(solver.x_feas)," *
-#                 "$(solver.y_feas),$(solver.z_feas)"
-#                 )
-#         end
-#     end
-# end
-# close(io)
+q_range = [6, 8, 10]
+nmax = 5
+tf = [true, false]
+seeds = 1:2
+real_types = [Float64, Float32] #, BigFloat]
+alpha_range = [4]
+
+io = open("expdesign.csv", "w")
+println(io, "uselogdet,use_sumlog,real,alpha,seed,q,p,n,dimx,dimy,dimz,time,bytes,numiters,status,pobj,dobj,xfeas,yfeas,zfeas")
+for q in q_range, T in real_types, seed in seeds, use_logdet in [false], use_sumlog in tf
+    p = 2 * q
+    n = 2 * q
+
+    if use_logdet || use_sumlog
+        a_range = alpha_range
+    else
+        a_range = [-1]
+    end
+    for alpha in a_range
+        Random.seed!(seed)
+        d = expdesign(q, p, n, nmax, use_logdet = use_logdet, use_sumlog = use_sumlog, T = T, alpha = alpha)
+        model = MO.PreprocessedLinearModel{T}(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
+        solver = SO.HSDSolver{T}(model, tol_abs_opt = 1e-5, tol_rel_opt = 1e-5, time_limit = 600)
+        t = @timed SO.solve(solver)
+        r = SO.get_certificates(solver, model, test = false, atol = 1e-4, rtol = 1e-4)
+        dimx = size(d.G, 2)
+        dimy = size(d.A, 1)
+        dimz = size(d.G, 1)
+        println(io, "$use_logdet,$use_sumlog,$T,$alpha,$seed,$q,$p,$n,$dimx,$dimy,$dimz,$(t[2]),$(t[3])," *
+            "$(solver.num_iters),$(r.status),$(r.primal_obj),$(r.dual_obj),$(solver.x_feas)," *
+            "$(solver.y_feas),$(solver.z_feas)"
+            )
+    end
+
+end
+close(io)
 
 
 ;
