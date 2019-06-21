@@ -9,7 +9,6 @@ barrier (guessed, reduces to 3-dim exp cone self-concordant barrier)
 
 TODO
 - rename to and replace 3D cone (hypoperlog)
-- remove ForwardDiff
 =#
 
 mutable struct HypoPerSumLog{T <: HypReal} <: Cone{T}
@@ -21,8 +20,6 @@ mutable struct HypoPerSumLog{T <: HypReal} <: Cone{T}
     H::Matrix{T}
     H2::Matrix{T}
     F
-    barfun::Function
-    diffres
 
     function HypoPerSumLog{T}(dim::Int, is_dual::Bool) where {T <: HypReal}
         cone = new{T}()
@@ -45,8 +42,6 @@ function setup_data(cone::HypoPerSumLog{T}) where {T <: HypReal}
         w = view(point, 3:dim)
         return -log(v * sum(wi -> log(wi / v), w) - u) - sum(wi -> log(wi), w) - log(v)
     end
-    cone.barfun = barfun
-    cone.diffres = DiffResults.HessianResult(cone.g)
     return
 end
 
@@ -67,9 +62,33 @@ function check_in_cone(cone::HypoPerSumLog{T}) where {T <: HypReal}
         return false
     end
 
-    cone.diffres = ForwardDiff.hessian!(cone.diffres, cone.barfun, cone.point)
-    cone.g .= DiffResults.gradient(cone.diffres)
-    cone.H .= DiffResults.hessian(cone.diffres)
+    lwv = sum(wi -> log(wi / v), w)
+    vlwv = v * lwv
+    vlwvu = vlwv - u
+    n = cone.dim - 2
+
+    # gradient
+    ivlwvu = inv(vlwvu)
+    g = cone.g
+    g[1] = ivlwvu
+    g[2] = (cone.dim - 2 - lwv) * ivlwvu - 1 / v
+    g[3:end] = -(one(T) + v * ivlwvu) ./ w
+
+    # Hessian
+    vw = v ./ w # TODO remove allocations
+    ivlwvu2 = abs2(ivlwvu)
+    H = cone.H
+    H[1, 1] = ivlwvu2
+    H[1, 2] = -(lwv - T(n)) * ivlwvu2
+    H[1, 3:end] = -vw * ivlwvu2
+    H[2, 2] = abs2(lwv - T(n)) * ivlwvu2 + ivlwvu * T(n) / v + inv(abs2(v))
+    H[2, 3:end] = vw * (lwv - T(n)) * ivlwvu2 - ivlwvu ./ w
+    for j in 1:(cone.dim - 2)
+        for i in 1:(j - 1)
+            H[(2 + i), (2 + j)] = ivlwvu2 * vw[i] * vw[j]
+        end
+        H[(2 + j), (2 + j)] = abs2(vw[j]) * ivlwvu2 + vw[j] / w[j] * ivlwvu + inv(abs2(w[j]))
+    end
 
     return factorize_hess(cone)
 end
