@@ -234,8 +234,18 @@ q_range = [6, 8, 10]
 nmax = 5
 tf = [true, false]
 seeds = 1:2
-real_types = [Float64, Float32] #, BigFloat]
+real_types = [Float64, Float32, BigFloat]
 alpha_range = [4]
+
+# compile run
+(p, q, n) = (3, 2, nmax)
+for T in real_types, use_logdet in [false], use_sumlog in tf
+    d = expdesign(q, p, n, nmax, use_logdet = use_logdet, use_sumlog = use_sumlog, T = T)
+    model = MO.PreprocessedLinearModel{T}(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
+    solver = SO.HSDSolver{T}(model, tol_abs_opt = 1e-5, tol_rel_opt = 1e-5)
+    t = @timed SO.solve(solver)
+    r = SO.get_certificates(solver, model, test = false, atol = 1e-4, rtol = 1e-4)
+end
 
 io = open("expdesign.csv", "w")
 println(io, "uselogdet,use_sumlog,real,alpha,seed,q,p,n,dimx,dimy,dimz,time,bytes,numiters,status,pobj,dobj,xfeas,yfeas,zfeas")
