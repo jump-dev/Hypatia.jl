@@ -72,7 +72,7 @@ function check_in_cone(cone::HypoPerSumLog{T}) where {T <: HypReal}
     g = cone.g
     g[1] = ivlwvu
     g[2] = -lwvn * ivlwvu - inv(v)
-    @. g[3:end] = -(one(T) + v * ivlwvu) ./ w
+    @. g[3:end] = -(one(T) + v * ivlwvu) / w
 
     # Hessian
     vw = v ./ w # TODO remove allocations
@@ -82,7 +82,7 @@ function check_in_cone(cone::HypoPerSumLog{T}) where {T <: HypReal}
     H[1, 2] = -lwvn * ivlwvu2
     @. H[1, 3:end] = -vw * ivlwvu2
     H[2, 2] = abs2(lwvn) * ivlwvu2 + ivlwvu * T(cone.dim - 2) / v + inv(abs2(v))
-    @. H[2, 3:end] = vw * lwvn * ivlwvu2 - ivlwvu ./ w
+    @. H[2, 3:end] = vw * lwvn * ivlwvu2 - ivlwvu / w
     for j in 1:(cone.dim - 2)
         for i in 1:(j - 1)
             H[2 + i, 2 + j] = ivlwvu2 * vw[i] * vw[j]
