@@ -65,29 +65,29 @@ function check_in_cone(cone::HypoPerSumLog{T}) where {T <: HypReal}
     lwv = sum(wi -> log(wi / v), w)
     vlwv = v * lwv
     vlwvu = vlwv - u
-    n = cone.dim - 2
+    lwvn = lwv - T(cone.dim - 2)
 
     # gradient
     ivlwvu = inv(vlwvu)
     g = cone.g
     g[1] = ivlwvu
-    g[2] = (cone.dim - 2 - lwv) * ivlwvu - 1 / v
-    g[3:end] = -(one(T) + v * ivlwvu) ./ w
+    g[2] = -lwvn * ivlwvu - inv(v)
+    @. g[3:end] = -(one(T) + v * ivlwvu) ./ w
 
     # Hessian
     vw = v ./ w # TODO remove allocations
     ivlwvu2 = abs2(ivlwvu)
     H = cone.H
     H[1, 1] = ivlwvu2
-    H[1, 2] = -(lwv - T(n)) * ivlwvu2
-    H[1, 3:end] = -vw * ivlwvu2
-    H[2, 2] = abs2(lwv - T(n)) * ivlwvu2 + ivlwvu * T(n) / v + inv(abs2(v))
-    H[2, 3:end] = vw * (lwv - T(n)) * ivlwvu2 - ivlwvu ./ w
+    H[1, 2] = -lwvn * ivlwvu2
+    @. H[1, 3:end] = -vw * ivlwvu2
+    H[2, 2] = abs2(lwvn) * ivlwvu2 + ivlwvu * T(cone.dim - 2) / v + inv(abs2(v))
+    @. H[2, 3:end] = vw * lwvn * ivlwvu2 - ivlwvu ./ w
     for j in 1:(cone.dim - 2)
         for i in 1:(j - 1)
-            H[(2 + i), (2 + j)] = ivlwvu2 * vw[i] * vw[j]
+            H[2 + i, 2 + j] = ivlwvu2 * vw[i] * vw[j]
         end
-        H[(2 + j), (2 + j)] = abs2(vw[j]) * ivlwvu2 + vw[j] / w[j] * ivlwvu + inv(abs2(w[j]))
+        H[2 + j, 2 + j] = abs2(vw[j]) * ivlwvu2 + vw[j] / w[j] * ivlwvu + inv(abs2(w[j]))
     end
 
     return factorize_hess(cone)
