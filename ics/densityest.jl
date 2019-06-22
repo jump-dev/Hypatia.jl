@@ -67,19 +67,20 @@ function densityest(
         c_poly = zeros(T, U)
         A_poly = zeros(T, 0, U)
         b_poly = T[]
-        c_poly = T[]
         push!(cones, CO.WSOSPolyInterp{T, T}(U, [P0c, PWtsc...]))
         push!(cone_idxs, 1:U)
         cone_offset += U
+        A_lin = zeros(T, 1, U)
+        num_psd_vars = 0
     else
         # will set up for U coefficient variables plus PSD variables
         # there are n new PSD variables, we will store them scaled, lower triangle, row-wise
         n = length(PWts) + 1
-        psd_vars = 0
-        a_poly = Vector{Matrix{T}}(n)
-        L = size(P0, 2)
+        num_psd_vars = 0
+        a_poly = Matrix{T}[]
+        L = size(P0c, 2)
         dim = div(L * (L + 1), 2)
-        num_poly_vars += dim
+        num_psd_vars += dim
         # first part of A
         push!(a_poly, zeros(T, U, dim))
         idx = 1
@@ -88,14 +89,14 @@ function densityest(
             a_poly[1][:, idx] = P0c[:, k] .* P0c[:, l] * (k == l ? 1 : rt2)
             idx += 1
         end
-        push!(cones, CO.PosSemidef{T}(dim))
+        push!(cones, CO.PosSemidef{T, T}(dim))
         push!(cone_idxs, 1:dim)
         cone_offset += dim
 
         for i in 1:(n - 1)
             L = size(PWts[i], 2)
             dim = div(L * (L + 1), 2)
-            num_poly_vars += dim
+            num_psd_vars += dim
             push!(a_poly, zeros(T, U, dim))
             idx = 1
             for k in 1:L, l in 1:k
@@ -103,54 +104,51 @@ function densityest(
                 a_poly[i + 1][:, idx] = PWtsc[i][:, k] .* PWtsc[i][:, l] * (k == l ? 1 : rt2)
                 idx += 1
             end
-            push!(cone_idxs, cone_offset:(cone_offset + dim))
-            push!(cones, CO.PosSemidef{T}(dim))
+            push!(cone_idxs, cone_offset:(cone_offset + dim - 1))
+            push!(cones, CO.PosSemidef{T, T}(dim))
             cone_offset += dim
         end
+        A_lin = zeros(T, 1, U + num_psd_vars)
         A_poly = hcat(a_poly...)
         A_poly = [-Matrix{T}(I, U, U) A_poly]
-        c_poly = zeros(T, num_poly_vars)
         b_poly = zeros(T, U)
-        G_poly = [zeros(T, num_poly_vars, U) -Matrix{T}(I, num_poly_vars, num_poly_vars)]
-        h_poly = zeros(num_poly_vars)
+        G_poly = [zeros(T, num_psd_vars, U) -Matrix{T}(I, num_psd_vars, num_psd_vars)]
+        h_poly = zeros(num_psd_vars)
     end
+    A_lin[1:U] = w
 
     if use_sumlog
         # pre-pad with one hypograph variable
-        c_log = vcat(-1, zeros(T, U))
-        dimx = 1 + U
-        G_poly = [zeros(T, U, 1) G_poly]
+        c_log = T[-1]
+        G_poly = [zeros(T, cone_offset - 1, 1) G_poly]
         A = [
             zeros(T, size(A_poly, 1)) A_poly
-            0 w'
+            0 A_lin
             ]
-        A = zeros(T, 1, dimx)
-        A[1, 2:end] = w
         h_log = zeros(T, nobs + 2)
         h_log[2] = 1
-        G_log = zeros(T, 2 + nobs, dimx)
+        G_log = zeros(T, 2 + nobs, 1 + U + num_psd_vars)
         G_log[1, 1] = -1
         for i in 1:nobs
-            G_log[i + 2, 2:end] = -basis_evals[i, :]
+            G_log[i + 2, 2:(1 + U)] = -basis_evals[i, :]
         end
         push!(cone_idxs, cone_offset:(cone_offset + 1 + nobs))
         push!(cones, CO.HypoPerSumLog{T}(nobs + 2, alpha = alpha))
     else
         # pre-pad with `nobs` hypograph variables
-        c_log = vcat(-ones(T, nobs), zeros(T, U))
-        dimx = nobs + U
-        G_poly = [zeros(T, U, nobs) G_poly]
+        c_log = -ones(T, nobs)
+        G_poly = [zeros(T, cone_offset - 1, nobs) G_poly]
         A = [
             zeros(T, size(A_poly, 1), nobs) A_poly
-            zeros(T, 1, nobs) w'
+            zeros(T, 1, nobs) A_lin
             ]
         h_log = zeros(T, 3 * nobs)
 
-        G_log = zeros(T, 3 * nobs, dimx)
+        G_log = zeros(T, 3 * nobs, nobs + U + num_psd_vars)
         offset = 1
         for i in 1:nobs
             G_log[offset, i] = -1.0
-            G_log[offset + 2, (nobs + 1):end] = -basis_evals[i, :]
+            G_log[offset + 2, (nobs + 1):(nobs + U)] = -basis_evals[i, :]
             h_log[offset + 1] = 1.0
             offset += 3
             push!(cones, CO.HypoPerSumLog{T}(3, alpha = -2))
@@ -160,8 +158,10 @@ function densityest(
     end
     G = vcat(G_poly, G_log)
     h = vcat(h_poly, h_log)
-    c = vcat(c_log, c_poly)
+    c = vcat(c_log, zeros(T, U), zeros(T, num_psd_vars))
     b = vcat(b_poly, 1)
+
+    @show size(G), size(A), size(h), cone_idxs, size(c), size(b)
 
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs)
 end
@@ -174,6 +174,8 @@ densityest(nobs::Int, n::Int, deg::Int; alpha = -1, options...) = densityest(ran
 # densityest4(; T::THR = Float64) = densityest(cancer_data(), 4, use_sumlog = false, T = T)
 densityest5(; T::THR = Float64) = densityest(200, 1, 4, use_sumlog = true, T = T)
 densityest6(; T::THR = Float64) = densityest(200, 1, 4, use_sumlog = false, T = T)
+densityest7(; T::THR = Float64) = densityest(200, 1, 4, use_sumlog = true, use_wsos = false, T = T)
+densityest8(; T::THR = Float64) = densityest(200, 1, 4, use_sumlog = false, use_wsos = false, T = T)
 
 function test_densityest(instance::Function; T::THR = Float64, rseed::Int = 1, options)
     Random.seed!(rseed)
@@ -196,8 +198,10 @@ test_densityest_all(; T::THR = Float64, options...) = test_densityest.([
     ], T = T, options = options)
 
 test_densityest(; T::THR = Float64, options...) = test_densityest.([
-    densityest5,
-    densityest6,
+    # densityest5,
+    # densityest6,
+    densityest7,
+    densityest8,
     ], T = T, options = options)
 
 
