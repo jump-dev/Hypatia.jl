@@ -27,6 +27,7 @@ function matrixcompletion(
     known_cols::Vector{Int} = Int[],
     known_vals::Vector{Float64} = Float64[],
     use_3dim::Bool = false,
+    use_epinorm::Bool = true,
     T::THR = Float64,
     )
     @assert m >= n
@@ -43,13 +44,22 @@ function matrixcompletion(
     if isempty(known_vals)
         known_vals = randn(num_known)
     end
-    mat_to_vec_idx(i, j) = (j - 1) * m + i
+
+    function mat_to_vec_idx(i::Int, j::Int)
+        if use_epinorm
+            return (j - 1) * m + i
+        else
+            return (i - 1) * n + j
+        end
+    end
 
     is_known = fill(false, m * n)
-    h1 = zeros(T, m * n)
+    # h for the rows that X (the matrix and not epigraph variable) participates in
+    h_norm_x = zeros(T, m * n)
     for (k, (i, j)) in enumerate(zip(known_rows, known_cols))
         known_idx = mat_to_vec_idx(i, j)
-        h1[known_idx] = known_vals[k]
+        # if not using the epinorminf cone, indices relate to X'
+        h_norm_x[known_idx] = known_vals[k]
         is_known[known_idx] = true
     end
 
@@ -59,85 +69,120 @@ function matrixcompletion(
     b = T[]
 
     # epinormspectral cone- get vec(X) in G and h
-    G1 = zeros(T, m * n, num_unknown)
-    total_idx = 1
-    unknown_idx = 1
-    for j in 1:n, i in 1:m
-        if !is_known[mat_to_vec_idx(i, j)]
-            G1[total_idx, unknown_idx] = -1
-            unknown_idx += 1
+    if use_epinorm
+    G_norm = zeros(T, m * n, num_unknown)
+        total_idx = 1
+        unknown_idx = 1
+        for j in 1:n, i in 1:m
+            if !is_known[total_idx]
+                G_norm[total_idx, unknown_idx] = -1
+                unknown_idx += 1
+            end
+            total_idx += 1
         end
-        total_idx += 1
+
+        # add first row and column for epigraph variable
+        G_norm = [-one(T) zeros(T, 1, num_unknown); zeros(T, m * n) G_norm]
+        h_norm_x = vcat(0, h_norm_x)
+        h_norm = h_norm_x
+
+        cones = CO.Cone[CO.EpiNormSpectral{T}(n, m)]
+        cone_idxs = UnitRange{Int}[1:(m * n + 1)]
+        cone_offset = m * n + 1
+    else
+        num_rows = div(m * (m + 1), 2) + m * n + div(n * (n + 1), 2)
+        G_norm = zeros(T, num_rows, num_unknown + 1)
+        h_norm = zeros(T, num_rows)
+        # first block epigraph variable * I
+        for i in 1:m
+            G_norm[sum(1:i), 1] = -1
+        end
+        # index to count rows in the bottom half of the large to-be-PSD matrix
+        idx = 1
+        unknown_idx = 1
+        # fill bottom `n` rows
+        for i in 1:n
+            # X'
+            for j in 1:m
+                # we are dealing with X'_{ij} = X_{ji}, but that is taken care of in is_known
+                var_idx = mat_to_vec_idx(i, j)
+                if !is_known[var_idx]
+                    G_norm[m + idx, unknown_idx] = 1 # or -1 ?
+                    unknown_idx += 1
+                else
+                    h_norm[m + idx] = h_norm_x[var_idx]
+                end
+                idx += 1
+            end
+            # second block epigraph variable * I
+            # skip `i` rows which will be filled with zeros
+            idx += i
+            G_norm[m + idx, 1] = -1
+        end
+
+        cones = CO.Cone[CO.PosSemidef{T, T}(num_rows)]
+        cone_idxs = UnitRange{Int}[1:num_rows]
+        cone_offset = num_rows
     end
-
-    # add first row and column for epigraph variable
-    G1 = [-one(T) zeros(T, 1, num_unknown); zeros(T, m * n) G1]
-    h1 = vcat(0, h1)
-
-    cones = CO.Cone[CO.EpiNormSpectral{T}(n, m)]
-    cone_idxs = [1:(m * n + 1)]
-
-    spectral_dim = m * n + 1
 
     if !use_3dim
         # hypogeomean for values to be filled
-        G2 = zeros(T, num_unknown + 1, num_unknown + 1)
+        G_geo = zeros(T, num_unknown + 1, num_unknown + 1)
         total_idx = 1
         unknown_idx = 1
         for j in 1:n, i in 1:m
             if !is_known[mat_to_vec_idx(i, j)]
-                G2[unknown_idx + 1, unknown_idx + 1] = -1
+                G_geo[unknown_idx + 1, unknown_idx + 1] = -1
                 unknown_idx += 1
             end
             total_idx += 1
         end
         # first component of the vector in the in geomean cone, elements multiply to one
         h2 = vcat(1, zeros(T, num_unknown))
-        h = vcat(h1, h2)
+        h = vcat(h_norm, h2)
         @assert total_idx - 1 == m * n
         @assert unknown_idx - 1 == num_unknown
 
-        G = vcat(G1, G2)
         A = zeros(T, 0, 1 + num_unknown)
         push!(cone_idxs, (m * n + 2):(m * n + 2 + num_unknown))
         push!(cones, CO.HypoGeomean{T}(ones(num_unknown) / num_unknown))
-        @show num_unknown + 1
     else
         # number of 3-dimensional power cones needed is num_unknown - 1, number of new variables is num_unknown - 2
-        # first num_unknown columns overlap with G1, column for the epigraph variable of the spectral cone added later
-        G2 = zeros(T, 3 * (num_unknown - 1), 2 * num_unknown - 2)
+        # first num_unknown columns overlap with G_norm, column for the epigraph variable of the spectral cone added later
+        G_geo = zeros(T, 3 * (num_unknown - 1), 2 * num_unknown - 2)
         # first cone is a special case since two of the original variables participate in it
-        G2[3, 1] = -1
-        G2[2, 2] = -1
-        G2[1, num_unknown + 1] = -1
+        G_geo[3, 1] = -1
+        G_geo[2, 2] = -1
+        G_geo[1, num_unknown + 1] = -1
         push!(cones, CO.HypoGeomean{T}([0.5, 0.5]))
-        push!(cone_idxs, (spectral_dim + 1):(spectral_dim + 3))
+        push!(cone_idxs, (cone_offset + 1):(cone_offset + 3))
         offset = 4
         # loop over new vars
         for i in 1:(num_unknown - 3)
-            G2[offset, num_unknown + i + 1] = -1
-            G2[offset + 1, num_unknown + i] = -1
-            G2[offset + 2, i + 2] = -1
+            G_geo[offset, num_unknown + i + 1] = -1
+            G_geo[offset + 1, num_unknown + i] = -1
+            G_geo[offset + 2, i + 2] = -1
             push!(cones, CO.HypoGeomean{T}([(i + 1) / (i + 2), 1 / (i + 2)]))
-            push!(cone_idxs, (spectral_dim + 3 * i + 1):(spectral_dim + 3 * (i + 1)))
+            push!(cone_idxs, (cone_offset + 3 * i + 1):(cone_offset + 3 * (i + 1)))
             offset += 3
         end
 
         # last row also special becuase hypograph variable is fixed
-        G2[offset + 2, num_unknown] = -1
-        G2[offset + 1, 2 * num_unknown - 2] = -1
+        G_geo[offset + 2, num_unknown] = -1
+        G_geo[offset + 1, 2 * num_unknown - 2] = -1
         push!(cones, CO.HypoGeomean{T}([(num_unknown - 1) / num_unknown, 1 / num_unknown]))
-        push!(cone_idxs, (spectral_dim + 3 * num_unknown - 5):(spectral_dim + 3 * num_unknown - 3))
-        h = vcat(h1, zeros(T, 3 * (num_unknown - 2)), [1, 0, 0])
+        push!(cone_idxs, (cone_offset + 3 * num_unknown - 5):(cone_offset + 3 * num_unknown - 3))
+        h = vcat(h_norm, zeros(T, 3 * (num_unknown - 2)), [1, 0, 0])
 
-        # G1 needs to be post-padded with columns for 3dim cone vars
-        G1 = [G1 zeros(T, m * n + 1, num_unknown - 2)]
-        # G2 needs to be pre-padded with the epigraph variable for the spectral norm cone
-        G2 = [zeros(T, 3 * (num_unknown - 1)) G2]
-        G = vcat(G1, G2)
+        # G_norm needs to be post-padded with columns for 3dim cone vars
+        G_norm = [G_norm zeros(T, m * n + 1, num_unknown - 2)]
+        # G_geo needs to be pre-padded with the epigraph variable for the spectral norm cone
+        G_geo = [zeros(T, 3 * (num_unknown - 1)) G_geo]
         c = vcat(c, zeros(T, num_unknown - 2))
         A = zeros(T, 0, size(G, 2))
     end
+    G = vcat(G_norm, G_geo)
+    @show size(G), size(A), cone_idxs
 
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs)
 end
@@ -155,10 +200,13 @@ matrixcompletion1(; T::THR = Float64) = matrixcompletion_ex(false)
 matrixcompletion2(; T::THR = Float64) = matrixcompletion_ex(true)
 matrixcompletion3(; T::THR = Float64) = matrixcompletion(6, 5, use_3dim = false)
 matrixcompletion4(; T::THR = Float64) = matrixcompletion(6, 5, use_3dim = true)
-matrixcompletion5(; T::THR = Float64) = matrixcompletion(8, 6, use_3dim = false)
-matrixcompletion6(; T::THR = Float64) = matrixcompletion(8, 6, use_3dim = true)
-matrixcompletion7(; T::THR = Float64) = matrixcompletion(12, 8, use_3dim = false)
-matrixcompletion8(; T::THR = Float64) = matrixcompletion(12, 8, use_3dim = true)
+matrixcompletion5(; T::THR = Float64) = matrixcompletion(6, 5, use_epinorm = false)
+matrixcompletion6(; T::THR = Float64) = matrixcompletion(8, 6, use_3dim = false)
+matrixcompletion7(; T::THR = Float64) = matrixcompletion(8, 6, use_3dim = true)
+matrixcompletion8(; T::THR = Float64) = matrixcompletion(8, 6, use_epinorm = false)
+matrixcompletion9(; T::THR = Float64) = matrixcompletion(12, 8, use_3dim = false)
+matrixcompletion10(; T::THR = Float64) = matrixcompletion(12, 8, use_3dim = true)
+matrixcompletion11(; T::THR = Float64) = matrixcompletion(12, 8, use_epinorm = true)
 
 function test_matrixcompletion(instance::Function; T::THR = Float64, rseed::Int = 1, options)
     Random.seed!(rseed)
@@ -182,13 +230,12 @@ test_matrixcompletion_all(; T::THR = Float64, options...) = test_matrixcompletio
     ], T = T, options = options)
 
 test_matrixcompletion(; T::THR = Float64, options...) = test_matrixcompletion.([
-    matrixcompletion1,
-    # matrixcompletion2,
     matrixcompletion3,
-    # matrixcompletion4,
-    matrixcompletion5,
-    # matrixcompletion6,
-    matrixcompletion7,
+    # matrixcompletion5,
+    matrixcompletion6,
+    # matrixcompletion8,
+    matrixcompletion9,
+    # matrixcompletion11,
     ], T = T, options = options)
 
 @testset "" begin
