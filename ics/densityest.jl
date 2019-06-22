@@ -28,6 +28,7 @@ function densityest(
     X::AbstractMatrix{Float64},
     deg::Int;
     use_sumlog::Bool = false,
+    use_wsos::Bool = true,
     sample_factor::Int = 100,
     T::THR = Float64,
     alpha = -1,
@@ -49,7 +50,6 @@ function densityest(
     for i in 1:nobs, j in 1:U
         basis_evals[i, j] = lagrange_polys[j](X[i, :])
     end
-    b = T[1]
 
     P0c = convert.(T, P0)
     PWtsc = Matrix{T}[]
@@ -57,43 +57,111 @@ function densityest(
         push!(PWtsc, convert.(T, pwt))
     end
 
+    cones = CO.Cone[]
+    cone_idxs = UnitRange{Int}[]
+    cone_offset = 1
+    if use_wsos
+        # will set up for U variables
+        G_poly = -Matrix{T}(I, U, U)
+        h_poly = zeros(T, U)
+        c_poly = zeros(T, U)
+        A_poly = zeros(T, 0, U)
+        b_poly = T[]
+        c_poly = T[]
+        push!(cones, CO.WSOSPolyInterp{T, T}(U, [P0c, PWtsc...]))
+        push!(cone_idxs, 1:U)
+        cone_offset += U
+    else
+        # will set up for U coefficient variables plus PSD variables
+        # there are n new PSD variables, we will store them scaled, lower triangle, row-wise
+        n = length(PWts) + 1
+        psd_vars = 0
+        a_poly = Vector{Matrix{T}}(n)
+        L = size(P0, 2)
+        dim = div(L * (L + 1), 2)
+        num_poly_vars += dim
+        # first part of A
+        push!(a_poly, zeros(T, U, dim))
+        idx = 1
+        for k in 1:L, l in 1:k
+            # off diagonals are doubled, but already scaled by rt2
+            a_poly[1][:, idx] = P0c[:, k] .* P0c[:, l] * (k == l ? 1 : rt2)
+            idx += 1
+        end
+        push!(cones, CO.PosSemidef{T}(dim))
+        push!(cone_idxs, 1:dim)
+        cone_offset += dim
+
+        for i in 1:(n - 1)
+            L = size(PWts[i], 2)
+            dim = div(L * (L + 1), 2)
+            num_poly_vars += dim
+            push!(a_poly, zeros(T, U, dim))
+            idx = 1
+            for k in 1:L, l in 1:k
+                # off diagonals are doubled, but already scaled by rt2
+                a_poly[i + 1][:, idx] = PWtsc[i][:, k] .* PWtsc[i][:, l] * (k == l ? 1 : rt2)
+                idx += 1
+            end
+            push!(cone_idxs, cone_offset:(cone_offset + dim))
+            push!(cones, CO.PosSemidef{T}(dim))
+            cone_offset += dim
+        end
+        A_poly = hcat(a_poly...)
+        A_poly = [-Matrix{T}(I, U, U) A_poly]
+        c_poly = zeros(T, num_poly_vars)
+        b_poly = zeros(T, U)
+        G_poly = [zeros(T, num_poly_vars, U) -Matrix{T}(I, num_poly_vars, num_poly_vars)]
+        h_poly = zeros(num_poly_vars)
+    end
+
     if use_sumlog
-        c = vcat(-1, zeros(T, U))
+        # pre-pad with one hypograph variable
+        c_log = vcat(-1, zeros(T, U))
         dimx = 1 + U
+        G_poly = [zeros(T, U, 1) G_poly]
+        A = [
+            zeros(T, size(A_poly, 1)) A_poly
+            0 w'
+            ]
         A = zeros(T, 1, dimx)
         A[1, 2:end] = w
-        h = zeros(T, U + 2 + nobs)
-        G1 = zeros(T, U, dimx)
-        G1[:, 2:end] = -Matrix{Float64}(I, U, U)
-        G2 = zeros(T, 2 + nobs, dimx)
-        G2[1, 1] = -1
-        h[U + 2] = 1
+        h_log = zeros(T, nobs + 2)
+        h_log[2] = 1
+        G_log = zeros(T, 2 + nobs, dimx)
+        G_log[1, 1] = -1
         for i in 1:nobs
-            G2[i + 2, 2:end] = -basis_evals[i, :]
+            G_log[i + 2, 2:end] = -basis_evals[i, :]
         end
-        G = vcat(G1, G2)
-        cone_idxs = [1:U, (U + 1):(U + 2 + nobs)]
-        cones = [CO.WSOSPolyInterp{T, T}(U, [P0c, PWtsc...]), CO.HypoPerSumLog{T}(nobs + 2, alpha = alpha)]
+        push!(cone_idxs, cone_offset:(cone_offset + 1 + nobs))
+        push!(cones, CO.HypoPerSumLog{T}(nobs + 2, alpha = alpha))
     else
-        c = vcat(-ones(T, nobs), zeros(T, U))
+        # pre-pad with `nobs` hypograph variables
+        c_log = vcat(-ones(T, nobs), zeros(T, U))
         dimx = nobs + U
-        A = zeros(T, 1, dimx)
-        A[1, (nobs + 1):end] = w
-        h = zeros(T, U + 3 * nobs)
-        G1 = zeros(T, U, dimx)
-        G1[:, (nobs + 1):end] = -Matrix{Float64}(I, U, U)
-        G2 = zeros(T, 3 * nobs, dimx)
+        G_poly = [zeros(T, U, nobs) G_poly]
+        A = [
+            zeros(T, size(A_poly, 1), nobs) A_poly
+            zeros(T, 1, nobs) w'
+            ]
+        h_log = zeros(T, 3 * nobs)
+
+        G_log = zeros(T, 3 * nobs, dimx)
         offset = 1
         for i in 1:nobs
-            G2[offset, i] = -1.0
-            h[U + offset + 1] = 1.0
-            G2[offset + 2, (nobs + 1):end] = -basis_evals[i, :]
+            G_log[offset, i] = -1.0
+            G_log[offset + 2, (nobs + 1):end] = -basis_evals[i, :]
+            h_log[offset + 1] = 1.0
             offset += 3
+            push!(cones, CO.HypoPerSumLog{T}(3, alpha = -2))
+            push!(cone_idxs, cone_offset:(cone_offset + 2))
+            cone_offset += 3
         end
-        G = vcat(G1, G2)
-        cone_idxs = vcat([1:U], [(3 * (i - 1) + U + 1):(3 * i + U) for i in 1:nobs])
-        cones = vcat(CO.WSOSPolyInterp{T, T}(U, [P0c, PWtsc...]), [CO.HypoPerSumLog{T}(3, alpha = -2) for _ in 1:nobs])
     end
+    G = vcat(G_poly, G_log)
+    h = vcat(h_poly, h_log)
+    c = vcat(c_log, c_poly)
+    b = vcat(b_poly, 1)
 
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs)
 end
