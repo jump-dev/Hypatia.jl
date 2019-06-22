@@ -30,7 +30,7 @@ function matrixcompletion(
     use_epinorm::Bool = true,
     T::THR = Float64,
     )
-    @assert m >= n
+    @assert m <= n
 
     if num_known < 0
         num_known = round(Int, m * n * 0.1)
@@ -45,12 +45,14 @@ function matrixcompletion(
         known_vals = randn(num_known)
     end
 
+    @show num_known
+
     function mat_to_vec_idx(i::Int, j::Int)
-        if use_epinorm
+        # if use_epinorm
             return (j - 1) * m + i
-        else
-            return (i - 1) * n + j
-        end
+        # else
+        #     return (i - 1) * n + j
+        # end
     end
 
     is_known = fill(false, m * n)
@@ -70,7 +72,7 @@ function matrixcompletion(
 
     # epinormspectral cone- get vec(X) in G and h
     if use_epinorm
-    G_norm = zeros(T, m * n, num_unknown)
+        G_norm = zeros(T, m * n, num_unknown)
         total_idx = 1
         unknown_idx = 1
         for j in 1:n, i in 1:m
@@ -86,10 +88,22 @@ function matrixcompletion(
         h_norm_x = vcat(0, h_norm_x)
         h_norm = h_norm_x
 
-        cones = CO.Cone[CO.EpiNormSpectral{T}(n, m)]
+        cones = CO.Cone[CO.EpiNormSpectral{T}(m, n)]
         cone_idxs = UnitRange{Int}[1:(m * n + 1)]
         cone_offset = m * n + 1
     else
+        # TODO think of a better way to do this
+        unknown_ref = Dict()
+        total_idx = 1
+        unknown_idx = 1
+        for j in 1:n, i in 1:m
+            if !is_known[total_idx]
+                unknown_ref[total_idx] = unknown_idx
+                unknown_idx += 1
+            end
+            total_idx += 1
+        end
+
         num_rows = div(m * (m + 1), 2) + m * n + div(n * (n + 1), 2)
         G_norm = zeros(T, num_rows, num_unknown + 1)
         h_norm = zeros(T, num_rows)
@@ -97,28 +111,33 @@ function matrixcompletion(
         for i in 1:m
             G_norm[sum(1:i), 1] = -1
         end
+        offset = div(m * (m + 1), 2)
         # index to count rows in the bottom half of the large to-be-PSD matrix
         idx = 1
+        # index only in X
+        var_idx = 1
+        # index of unknown vars (the x variables in the standard from), can increment it because we are moving row wise in X'
         unknown_idx = 1
         # fill bottom `n` rows
         for i in 1:n
             # X'
             for j in 1:m
-                # we are dealing with X'_{ij} = X_{ji}, but that is taken care of in is_known
-                var_idx = mat_to_vec_idx(i, j)
                 if !is_known[var_idx]
-                    G_norm[m + idx, unknown_idx] = 1 # or -1 ?
+                    G_norm[offset + idx, 1 + unknown_idx] = -rt2
                     unknown_idx += 1
                 else
-                    h_norm[m + idx] = h_norm_x[var_idx]
+                    h_norm[offset + idx] = h_norm_x[var_idx] * rt2
                 end
                 idx += 1
+                var_idx += 1
             end
             # second block epigraph variable * I
             # skip `i` rows which will be filled with zeros
             idx += i
-            G_norm[m + idx, 1] = -1
+            G_norm[offset + idx - 1, 1] = -1
         end
+        # @show m, n
+        # @show G_norm, h_norm
 
         cones = CO.Cone[CO.PosSemidef{T, T}(num_rows)]
         cone_idxs = UnitRange{Int}[1:num_rows]
@@ -144,7 +163,7 @@ function matrixcompletion(
         @assert unknown_idx - 1 == num_unknown
 
         A = zeros(T, 0, 1 + num_unknown)
-        push!(cone_idxs, (m * n + 2):(m * n + 2 + num_unknown))
+        push!(cone_idxs, (cone_offset + 1):(cone_offset + num_unknown + 1))
         push!(cones, CO.HypoGeomean{T}(ones(num_unknown) / num_unknown))
     else
         # number of 3-dimensional power cones needed is num_unknown - 1, number of new variables is num_unknown - 2
@@ -182,7 +201,7 @@ function matrixcompletion(
         A = zeros(T, 0, size(G, 2))
     end
     G = vcat(G_norm, G_geo)
-    @show size(G), size(A), cone_idxs
+    # @show size(G), cone_idxs
 
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs)
 end
@@ -195,18 +214,21 @@ matrixcompletion_ex(use_3dim::Bool) = matrixcompletion(
     known_cols = [1, 1, 2, 2, 3],
     known_vals = [1.0, 3.2, 0.8, 5.9, 1.9],
     use_3dim = use_3dim,
+    use_epinorm = false,
     )
 matrixcompletion1(; T::THR = Float64) = matrixcompletion_ex(false)
 matrixcompletion2(; T::THR = Float64) = matrixcompletion_ex(true)
-matrixcompletion3(; T::THR = Float64) = matrixcompletion(6, 5, use_3dim = false)
-matrixcompletion4(; T::THR = Float64) = matrixcompletion(6, 5, use_3dim = true)
-matrixcompletion5(; T::THR = Float64) = matrixcompletion(6, 5, use_epinorm = false)
-matrixcompletion6(; T::THR = Float64) = matrixcompletion(8, 6, use_3dim = false)
-matrixcompletion7(; T::THR = Float64) = matrixcompletion(8, 6, use_3dim = true)
-matrixcompletion8(; T::THR = Float64) = matrixcompletion(8, 6, use_epinorm = false)
-matrixcompletion9(; T::THR = Float64) = matrixcompletion(12, 8, use_3dim = false)
-matrixcompletion10(; T::THR = Float64) = matrixcompletion(12, 8, use_3dim = true)
-matrixcompletion11(; T::THR = Float64) = matrixcompletion(12, 8, use_epinorm = true)
+matrixcompletion3(; T::THR = Float64) = matrixcompletion(5, 6, use_3dim = false)
+matrixcompletion4(; T::THR = Float64) = matrixcompletion(5, 6, use_3dim = true)
+matrixcompletion5(; T::THR = Float64) = matrixcompletion(5, 6, use_epinorm = false)
+matrixcompletion6(; T::THR = Float64) = matrixcompletion(6, 8, use_3dim = false)
+matrixcompletion7(; T::THR = Float64) = matrixcompletion(6, 8, use_3dim = true)
+matrixcompletion8(; T::THR = Float64) = matrixcompletion(6, 8, use_epinorm = false)
+matrixcompletion9(; T::THR = Float64) = matrixcompletion(8, 12, use_3dim = false)
+matrixcompletion10(; T::THR = Float64) = matrixcompletion(8, 12, use_3dim = true)
+matrixcompletion11(; T::THR = Float64) = matrixcompletion(8, 12, use_epinorm = false)
+
+matrixcompletion12(; T::THR = Float64) = matrixcompletion(2, 3, use_epinorm = false)
 
 function test_matrixcompletion(instance::Function; T::THR = Float64, rseed::Int = 1, options)
     Random.seed!(rseed)
@@ -230,12 +252,14 @@ test_matrixcompletion_all(; T::THR = Float64, options...) = test_matrixcompletio
     ], T = T, options = options)
 
 test_matrixcompletion(; T::THR = Float64, options...) = test_matrixcompletion.([
+    # matrixcompletion1,
     matrixcompletion3,
-    # matrixcompletion5,
+    matrixcompletion5,
     matrixcompletion6,
-    # matrixcompletion8,
+    matrixcompletion8,
     matrixcompletion9,
-    # matrixcompletion11,
+    matrixcompletion11,
+    # matrixcompletion12,
     ], T = T, options = options)
 
 @testset "" begin
