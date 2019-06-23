@@ -35,7 +35,7 @@ function setup_data(cone::EpiNormEucl{T}) where {T <: HypReal}
     return
 end
 
-get_nu(cone::EpiNormEucl) = 1
+get_nu(cone::EpiNormEucl) = 2
 
 set_initial_point(arr::AbstractVector{T}, cone::EpiNormEucl{T}) where {T <: HypReal} = (@. arr = zero(T); arr[1] = one(T); arr)
 
@@ -50,7 +50,7 @@ function check_in_cone(cone::EpiNormEucl{T}) where {T <: HypReal}
         return false
     end
 
-    @. cone.g = cone.point / dist
+    @. cone.g = 2 * cone.point / dist
     cone.g[1] = -cone.g[1]
 
     Hi = cone.Hi
@@ -60,13 +60,14 @@ function check_in_cone(cone::EpiNormEucl{T}) where {T <: HypReal}
     for j in 2:cone.dim
         Hi[j, j] += dist
     end
+    @. Hi / 2
 
     H = cone.H
     @. H = Hi
     for j in 2:cone.dim
         H[1, j] = H[j, 1] = -H[j, 1] # TODO only need upper tri
     end
-    @. H *= abs2(inv(dist))
+    @. H *= abs2(inv(dist)) * 2
 
     return true
 end
