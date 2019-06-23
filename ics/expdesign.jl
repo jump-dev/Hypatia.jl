@@ -23,9 +23,10 @@ function expdesign(
     p::Int,
     n::Int,
     nmax::Int;
-    use_logdet::Bool = true,
     T::THR = Float64,
+    use_logdet::Bool = true,
     use_sumlog::Bool = true,
+    # use_linf::Bool = true,
     alpha = 4,
     )
     @assert (p > q) && (n > q) && (nmax <= n)
@@ -39,7 +40,9 @@ function expdesign(
     G_nonneg = -Matrix{T}(I, p, p)
     h_nonneg = zeros(T, p)
     # do <= nmax experiments
-    G_nmax = Matrix{T}(I, p, p)
+    if use_linf
+
+    G_nmax = Matrix{T}(I, p, p) * (use_linf? 1 : -1)
     h_nmax = fill(T(nmax), p)
 
     cones = CO.Cone[CO.Nonnegative{T}(p), CO.Nonnegative{T}(p)]
@@ -230,11 +233,11 @@ test_expdesign(; T::THR = Float64, options...) = test_expdesign.([
 # n_range = [4, 8, 12]
 # p_range = [4, 8, 16]
 
-q_range = [6, 8, 10]
+q_range = [4]
 nmax = 5
 tf = [true, false]
 seeds = 1:2
-real_types = [Float64, Float32, BigFloat]
+real_types = [BigFloat]
 alpha_range = [4]
 
 # compile run
