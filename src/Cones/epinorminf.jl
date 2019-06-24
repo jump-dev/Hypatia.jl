@@ -88,12 +88,6 @@ function check_in_cone(cone::EpiNormInf{T}) where {T <: HypReal}
     H[1, 1] = -t1 * invu + usqr * h1 - g1
     Harw.point = -t1 * invu + usqr * h1 - g1
 
-    # diag_inv =
-    # diag_inv_edge = Harw[2][2:end] ./ Harw[1]
-    # schur = H[1, 1] - dot(Harw[2][2:end], diag_inv_edge)
-    # Hi[2:end, 2:end] = diag_inv_edge * diag_inv_edge' / schur
-    # Hi[1, 1]
-
     return factorize_hess(cone)
 end
 
@@ -101,12 +95,7 @@ function hess(cone::EpiNormInf{T}) where {T <: HypReal}
     ret = zeros(T, cone.dim, cone.dim)
     ret[1, 1] = cone.Harw.point
     view(ret, 1, 2:cone.dim) .= cone.Harw.edge
-    view(ret, cone.diagidxs) .= cone.Harw.diag # @. view(a, diagind(a))
-
-    tol = max(1e-6, sqrt(eps(T)))
-    # @assert Symmetric(cone.H) * cone.point ≈ -cone.g atol=tol rtol=tol
-    # @assert Symmetric(ret, :U) * cone.point ≈ -cone.g atol=tol rtol=tol erroring, # but at the same rate as just cone.H
-
+    view(ret, cone.diagidxs) .= cone.Harw.diag
     return Symmetric(ret, :U)
 end
 
@@ -115,12 +104,12 @@ function inv_hess(cone::EpiNormInf{T}) where {T <: HypReal}
     H = cone.Harw
     view(ret, cone.diagidxs) .= inv.(H.diag)
     diag_inv_edge = H.edge ./ H.diag
+    ret[2:end, 2:end] = diag_inv_edge * diag_inv_edge' #/ schur
+    ret[1, 2:end] = -diag_inv_edge #/ schur
+    ret[1, 1] = 1
     schur = H.point - dot(H.edge, diag_inv_edge)
-    ret[2:end, 2:end] = diag_inv_edge * diag_inv_edge' / schur
-    ret[1, 2:end] = -diag_inv_edge / schur
-    ret[1, 1] = inv(schur)
+    ret ./= schur
     ret[cone.diagidxs] += inv.(H.diag)
-
     return Symmetric(ret)
 end
 
@@ -134,10 +123,10 @@ end
 function inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiNormInf{T}) where {T <: HypReal}
     H = cone.Harw
     diag_inv_edge = H.edge ./ H.diag
-    schur = H.point - dot(H.edge, diag_inv_edge)
     x_arr = diag_inv_edge' * arr[2:end, :] - arr[1, :]' # row vector in math
     prod[2:cone.dim, :] = diag_inv_edge * x_arr
     prod[1, :] = -x_arr
+    schur = H.point - dot(H.edge, diag_inv_edge)
     prod ./= schur
     prod[2:end, :] .+= arr[2:end, :] ./ H.diag
 
