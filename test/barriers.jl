@@ -23,6 +23,22 @@ function test_barrier_oracles(cone::CO.Cone{T}) where {T <: HypReal}
     @test CO.hess(cone) * point ≈ -CO.grad(cone) atol=tol rtol=tol
     @test CO.hess(cone) * CO.inv_hess(cone) ≈ I atol=tol rtol=tol
 
+    # product with matrices
+    for d in [0, 2, 4], _ in 1:5
+        prod = zeros(T, cone.dim, cone.dim + d)
+        arr = convert(AbstractMatrix{T}, randn(cone.dim, cone.dim + d))
+        @test CO.hess_prod!(prod, arr, cone) ≈ CO.hess(cone) * arr atol=tol rtol=tol
+        @test CO.inv_hess_prod!(prod, arr, cone) ≈ CO.inv_hess(cone) * arr atol=tol rtol=tol
+    end
+
+    # product with vectors
+    prod = zeros(T, cone.dim)
+    for _ in 1:5
+        arr = convert(AbstractVector{T}, randn(cone.dim))
+        @test CO.hess_prod!(prod, arr, cone) ≈ CO.hess(cone) * arr atol=tol rtol=tol
+        @test CO.inv_hess_prod!(prod, arr, cone) ≈ CO.inv_hess(cone) * arr atol=tol rtol=tol
+    end
+
     return
 end
 
@@ -34,7 +50,7 @@ function test_epinormeucl_barrier(T::Type{<:HypReal})
     return
 end
 
-function test_epinorinf_barrier(T::Type{<:HypReal})
+function test_epinorminf_barrier(T::Type{<:HypReal})
     for dim in [3, 5, 8]
         cone = CO.EpiNormInf{T}(dim)
         test_barrier_oracles(cone)
