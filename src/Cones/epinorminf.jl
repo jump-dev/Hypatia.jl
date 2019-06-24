@@ -97,22 +97,30 @@ function check_in_cone(cone::EpiNormInf{T}) where {T <: HypReal}
     return factorize_hess(cone)
 end
 
-function hess(cone::EpiNormInf)
-    ret = zeros(cone.dim, cone.dim)
+function hess(cone::EpiNormInf{T}) where {T <: HypReal}
+    ret = zeros(T, cone.dim, cone.dim)
     ret[1, 1] = cone.Harw.point
     view(ret, 1, 2:cone.dim) .= cone.Harw.edge
     view(ret, cone.diagidxs) .= cone.Harw.diag # @. view(a, diagind(a))
-    return Symmetric(ret)
+
+    tol = max(1e-6, sqrt(eps(T)))
+    # @assert Symmetric(cone.H) * cone.point ≈ -cone.g atol=tol rtol=tol
+    # @assert Symmetric(ret, :U) * cone.point ≈ -cone.g atol=tol rtol=tol erroring, # but at the same rate as just cone.H
+
+    return Symmetric(ret, :U)
 end
 
-function inv_hess(cone::EpiNormInf)
-    ret = zeros(cone.dim, cone.dim)
-    view(ret, cone.diagidxs) .= inv.(cone.Harw.diag)
-    diag_inv_edge = H.diag ./ H.edge
-    schur = H.point - dot(H.diag, diag_inv_edge)
+function inv_hess(cone::EpiNormInf{T}) where {T <: HypReal}
+    ret = zeros(T, cone.dim, cone.dim)
+    H = cone.Harw
+    view(ret, cone.diagidxs) .= inv.(H.diag)
+    diag_inv_edge = H.edge ./ H.diag
+    schur = H.point - dot(H.edge, diag_inv_edge)
     ret[2:end, 2:end] = diag_inv_edge * diag_inv_edge' / schur
     ret[1, 2:end] = -diag_inv_edge / schur
-    @assert Symmetric(ret) * cone.H ≈ I atol=1e-5 rtol=1e-5
+    ret[1, 1] = inv(schur)
+    ret[cone.diagidxs] += inv.(H.diag)
+
     return Symmetric(ret)
 end
 
@@ -123,17 +131,15 @@ function hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::E
     return prod
 end
 
-# function inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiNormInf{T}) where {T <: HypReal}
-#     H = cone.Harw
-#     diag_inv_edge = H.diag ./ H.edge
-#     schur = H.point - dot(H.diag, diag_inv_edge)
-#     x_arr = diag_inv_edge' * arr[2:end, :] - arr[1, :]
-#     prod[2:cone.dim, :] = diag_inv_edge * x_arr
-#     prod[1, :] = -x_arr
-#     prod ./= schur
-#     prod[2:end, :] .+= arr[2:end, :] ./ H.diag
-#
-#     # prod = diag_inv_edge * x_arr / schur
-#     # prod[2:end, 2:end] += inv.(H.diag)
-#     return prod
-# end
+function inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiNormInf{T}) where {T <: HypReal}
+    H = cone.Harw
+    diag_inv_edge = H.edge ./ H.diag
+    schur = H.point - dot(H.edge, diag_inv_edge)
+    x_arr = diag_inv_edge' * arr[2:end, :] - arr[1, :]' # row vector in math
+    prod[2:cone.dim, :] = diag_inv_edge * x_arr
+    prod[1, :] = -x_arr
+    prod ./= schur
+    prod[2:end, :] .+= arr[2:end, :] ./ H.diag
+
+    return prod
+end
