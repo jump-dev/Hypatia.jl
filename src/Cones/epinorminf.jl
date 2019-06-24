@@ -7,8 +7,13 @@ epigraph of L-infinity norm
 barrier from "Barrier Functions in Interior Point Methods" by Osman Guler
 -sum_i(log(u^2 - w_i^2)) + (n-1)*log(u)
 
-TODO for efficiency, don't construct full H matrix (arrow fill)
 =#
+
+mutable struct Aredge{T <: HypReal}
+    point::T
+    edge::Vector{T}
+    diag::Vector{T}
+end
 
 mutable struct EpiNormInf{T <: HypReal} <: Cone{T}
     use_dual::Bool
@@ -18,6 +23,9 @@ mutable struct EpiNormInf{T <: HypReal} <: Cone{T}
     g::Vector{T}
     H::Matrix{T}
     H2::Matrix{T}
+    Harw::Aredge
+    diagidxs::Vector{Int}
+    Hi::Matrix{T}
     F
 
     function EpiNormInf{T}(dim::Int, is_dual::Bool) where {T <: HypReal}
@@ -35,6 +43,9 @@ function setup_data(cone::EpiNormInf{T}) where {T <: HypReal}
     cone.g = zeros(T, dim)
     cone.H = zeros(T, dim, dim)
     cone.H2 = copy(cone.H)
+
+    cone.Harw = Aredge(zero(T), zeros(T, dim - 1), zeros(T, dim - 1))
+    cone.diagidxs = diagind(zeros(dim, dim))[2:end] # TODO calculate
     return
 end
 
@@ -49,7 +60,9 @@ function check_in_cone(cone::EpiNormInf{T}) where {T <: HypReal}
         return false
     end
 
-    # TODO don't explicitly construct full matrix (arrow)
+    Harw = cone.Harw
+
+    # TODO don't explicitly construct full matrix (aredge)
     g = cone.g
     H = cone.H
     usqr = abs2(u)
@@ -64,11 +77,63 @@ function check_in_cone(cone::EpiNormInf{T}) where {T <: HypReal}
         g[jp1] = wiuwj
         H[jp1, jp1] = iuwj + abs2(wiuwj)
         H[1, jp1] = H[jp1, 1] = -iuwj * wiuwj * u
+
+        Harw.diag[j] = iuwj + abs2(wiuwj) # diagonal
+        Harw.edge[j] = -iuwj * wiuwj * u  # edge
     end
     invu = inv(u)
     t1 = (cone.dim - 2) * invu
     g[1] = t1 - u * g1
+
     H[1, 1] = -t1 * invu + usqr * h1 - g1
+    Harw.point = -t1 * invu + usqr * h1 - g1
+
+    # diag_inv =
+    # diag_inv_edge = Harw[2][2:end] ./ Harw[1]
+    # schur = H[1, 1] - dot(Harw[2][2:end], diag_inv_edge)
+    # Hi[2:end, 2:end] = diag_inv_edge * diag_inv_edge' / schur
+    # Hi[1, 1]
 
     return factorize_hess(cone)
 end
+
+function hess(cone::EpiNormInf)
+    ret = zeros(cone.dim, cone.dim)
+    ret[1, 1] = cone.Harw.point
+    view(ret, 1, 2:cone.dim) .= cone.Harw.edge
+    view(ret, cone.diagidxs) .= cone.Harw.diag # @. view(a, diagind(a))
+    return Symmetric(ret)
+end
+
+function inv_hess(cone::EpiNormInf)
+    ret = zeros(cone.dim, cone.dim)
+    view(ret, cone.diagidxs) .= inv.(cone.Harw.diag)
+    diag_inv_edge = H.diag ./ H.edge
+    schur = H.point - dot(H.diag, diag_inv_edge)
+    ret[2:end, 2:end] = diag_inv_edge * diag_inv_edge' / schur
+    ret[1, 2:end] = -diag_inv_edge / schur
+    @assert Symmetric(ret) * cone.H ≈ I atol=1e-5 rtol=1e-5
+    return Symmetric(ret)
+end
+
+function hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiNormInf{T}) where {T <: HypReal}
+    H = cone.Harw
+    prod[1, :] = H.point * arr[1, :]' + H.edge' * arr[2:end, :]
+    prod[2:end, :] = arr[2:end, :] .* H.diag + H.edge * arr[1, :]'
+    return prod
+end
+
+# function inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiNormInf{T}) where {T <: HypReal}
+#     H = cone.Harw
+#     diag_inv_edge = H.diag ./ H.edge
+#     schur = H.point - dot(H.diag, diag_inv_edge)
+#     x_arr = diag_inv_edge' * arr[2:end, :] - arr[1, :]
+#     prod[2:cone.dim, :] = diag_inv_edge * x_arr
+#     prod[1, :] = -x_arr
+#     prod ./= schur
+#     prod[2:end, :] .+= arr[2:end, :] ./ H.diag
+#
+#     # prod = diag_inv_edge * x_arr / schur
+#     # prod[2:end, 2:end] += inv.(H.diag)
+#     return prod
+# end
