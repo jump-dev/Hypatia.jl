@@ -1,11 +1,11 @@
 #=
-Copyright 2018, Chris Coey and contributors
+Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 
 epigraph of Euclidean (2-)norm (AKA second-order cone)
 (u in R, w in R^n) : u >= norm_2(w)
 
 barrier from "Self-Scaled Barriers and Interior-Point Methods for Convex Programming" by Nesterov & Todd
--log(u^2 - norm(w)^2)
+-log(u^2 - norm_2(w)^2)
 =#
 
 mutable struct EpiNormEucl{T <: HypReal} <: Cone{T}
@@ -35,38 +35,30 @@ function setup_data(cone::EpiNormEucl{T}) where {T <: HypReal}
     return
 end
 
-get_nu(cone::EpiNormEucl) = 1
+get_nu(cone::EpiNormEucl) = 2
 
 set_initial_point(arr::AbstractVector{T}, cone::EpiNormEucl{T}) where {T <: HypReal} = (@. arr = zero(T); arr[1] = one(T); arr)
 
 function check_in_cone(cone::EpiNormEucl{T}) where {T <: HypReal}
-    u = cone.point[1]
-    w = view(cone.point, 2:cone.dim)
-    if u <= zero(T)
+    if cone.point[1] <= zero(T)
         return false
     end
-    dist = abs2(u) - sum(abs2, w)
+    dist = (abs2(cone.point[1]) - sum(abs2, view(cone.point, 2:cone.dim))) / 2
     if dist <= zero(T)
         return false
     end
 
     @. cone.g = cone.point / dist
-    cone.g[1] = -cone.g[1]
+    cone.g[1] *= -1
 
-    Hi = cone.Hi
-    mul!(Hi, cone.point, cone.point') # TODO use syrk
-    @. Hi += Hi
-    Hi[1, 1] -= dist
-    for j in 2:cone.dim
-        Hi[j, j] += dist
-    end
+    # TODO only work with upper triangle
+    mul!(cone.H, cone.g, cone.g')
+    cone.H += inv(dist) * I
+    cone.H[1, 1] -= 2 / dist
 
-    H = cone.H
-    @. H = Hi
-    for j in 2:cone.dim
-        H[1, j] = H[j, 1] = -H[j, 1] # TODO only need upper tri
-    end
-    @. H *= abs2(inv(dist))
+    mul!(cone.Hi, cone.point, cone.point')
+    cone.Hi += dist * I
+    cone.Hi[1, 1] -= 2 * dist
 
     return true
 end
