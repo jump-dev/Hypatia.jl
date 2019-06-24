@@ -9,7 +9,7 @@ barrier from "Barrier Functions in Interior Point Methods" by Osman Guler
 
 =#
 
-mutable struct Aredge{T <: HypReal}
+mutable struct Arrow{T <: HypReal}
     point::T
     edge::Vector{T}
     diag::Vector{T}
@@ -23,7 +23,7 @@ mutable struct EpiNormInf{T <: HypReal} <: Cone{T}
     g::Vector{T}
     H::Matrix{T}
     H2::Matrix{T}
-    Harw::Aredge
+    Harw::Arrow
     diagidxs::Vector{Int}
     Hi::Matrix{T}
     F
@@ -44,7 +44,7 @@ function setup_data(cone::EpiNormInf{T}) where {T <: HypReal}
     cone.H = zeros(T, dim, dim)
     cone.H2 = copy(cone.H)
 
-    cone.Harw = Aredge(zero(T), zeros(T, dim - 1), zeros(T, dim - 1))
+    cone.Harw = Arrow(zero(T), zeros(T, dim - 1), zeros(T, dim - 1))
     cone.diagidxs = diagind(zeros(dim, dim))[2:end] # TODO calculate
     return
 end
@@ -62,7 +62,7 @@ function check_in_cone(cone::EpiNormInf{T}) where {T <: HypReal}
 
     Harw = cone.Harw
 
-    # TODO don't explicitly construct full matrix (aredge)
+    # TODO don't explicitly construct full matrix (Arrow)
     g = cone.g
     H = cone.H
     usqr = abs2(u)
