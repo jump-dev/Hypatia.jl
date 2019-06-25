@@ -23,6 +23,7 @@ include(joinpath(examples_dir, "densityest/native.jl"))
 include(joinpath(examples_dir, "envelope/native.jl"))
 include(joinpath(examples_dir, "expdesign/native.jl"))
 include(joinpath(examples_dir, "linearopt/native.jl"))
+include(joinpath(examples_dir, "matrixcompletion/native.jl"))
 include(joinpath(examples_dir, "polymin/native.jl"))
 include(joinpath(examples_dir, "sparsepca/native.jl"))
 include(joinpath(examples_dir, "contraction/JuMP.jl"))
@@ -187,6 +188,8 @@ native_options = (
 end
 @testset "native examples: $T" for T in real_types
     @testset "expdesign" begin test_expdesign(T; native_options...,
+        ) end
+    @testset "matrixcompletion" begin test_matrixcompletion(T; native_options...,
         ) end
     @testset "sparsepca" begin test_sparsepca(T; native_options...,
         ) end
