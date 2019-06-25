@@ -64,9 +64,6 @@ expdesignJuMP8() = expdesignJuMP(5, 15, 25, 5, use_logdet = false)
 expdesignJuMP9() = expdesignJuMP(4, 8, 12, 3, use_logdet = false)
 expdesignJuMP10() = expdesignJuMP(3, 5, 7, 2, use_logdet = false)
 
-expdesignJuMP11() = expdesignJuMP(50, 100, 125, 5, use_logdet = true)
-expdesignJuMP12() = expdesignJuMP(50, 100, 125, 5, use_logdet = false)
-
 function test_expdesignJuMP(instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
     d = instance()
