@@ -47,7 +47,7 @@ function setup_data(cone::EpiNormInf{T}) where {T <: HypReal}
 
     cone.Harw = Arrow(zero(T), zeros(T, dim - 1), zeros(T, dim - 1))
     cone.diagidxs = diagind(zeros(dim, dim))[2:end] # TODO calculate
-    diagiedge = zeros(T, dim - 1)
+    cone.diagiedge = zeros(T, dim - 1)
     return
 end
 
@@ -64,7 +64,6 @@ function check_in_cone(cone::EpiNormInf{T}) where {T <: HypReal}
 
     Harw = cone.Harw
 
-    # TODO don't explicitly construct full matrix (Arrow)
     g = cone.g
     H = cone.H
     usqr = abs2(u)

@@ -56,7 +56,7 @@ real_types = [
 @info("starting barrier tests")
 barrier_testfuns = [
     test_epinormeucl_barrier,
-    test_epinorinf_barrier,
+    test_epinorminf_barrier,
     test_epinormspectral_barrier,
     test_epipersquare_barrier,
     # TODO next 3 fail with BigFloat, see https://github.com/JuliaDiff/DiffResults.jl/pull/9#issuecomment-497853361
