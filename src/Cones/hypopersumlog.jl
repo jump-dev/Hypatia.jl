@@ -9,7 +9,7 @@ barrier (guessed, reduces to 3-dim exp cone self-concordant barrier)
 
 TODO
 - rename to and replace 3D cone (hypoperlog)
-- remove ForwardDiff
+- remove vw and other numerical optimization
 =#
 
 mutable struct HypoPerSumLog{T <: HypReal} <: Cone{T}
@@ -23,8 +23,6 @@ mutable struct HypoPerSumLog{T <: HypReal} <: Cone{T}
     H::Matrix{T}
     H2::Matrix{T}
     F
-    barfun::Function
-    diffres
 
     function HypoPerSumLog{T}(dim::Int, is_dual::Bool; alpha = -2) where {T <: HypReal}
         cone = new{T}()
@@ -58,8 +56,6 @@ function setup_data(cone::HypoPerSumLog{T}) where {T <: HypReal}
         w = view(point, 3:dim)
         return cone.gamma * (-log(v * sum(wi -> log(wi / v), w) - u) - sum(wi -> log(wi), w) - log(v) * (cone.k - cone.dim + 1))
     end
-    cone.barfun = barfun
-    cone.diffres = DiffResults.HessianResult(cone.g)
     return
 end
 
@@ -67,8 +63,7 @@ get_nu(cone::HypoPerSumLog) = cone.k * cone.gamma
 
 function set_initial_point(arr::AbstractVector{T}, cone::HypoPerSumLog{T}) where {T <: HypReal}
     arr[1] = -one(T)
-    arr[2] = one(T)
-    @. arr[3:end] = one(T)
+    @. arr[2:end] = one(T)
     return arr
 end
 
