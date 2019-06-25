@@ -12,8 +12,8 @@ find a density function f maximizing the log likelihood of the observations
 using LinearAlgebra
 import Random
 using Test
-import DynamicPolynomials
 import Hypatia
+import Hypatia.HypReal
 const HYP = Hypatia
 const MO = HYP.Models
 const MU = HYP.ModelUtilities
@@ -23,12 +23,16 @@ const SO = HYP.Solvers
 include(joinpath(@__DIR__, "data.jl"))
 
 function densityest(
-    X::AbstractMatrix{Float64},
+    T::Type{<:HypReal},
+    X::Matrix{Float64},
     deg::Int;
     use_sumlog::Bool = false,
+    use_wsos::Bool = true,
     sample_factor::Int = 100,
     )
     (nobs, dim) = size(X)
+    rt2 = sqrt(T(2))
+    X = convert(Matrix{T}, X)
 
     domain = MU.Box(-ones(dim), ones(dim))
     # rescale X to be in unit box
@@ -44,84 +48,156 @@ function densityest(
     for i in 1:nobs, j in 1:U
         basis_evals[i, j] = lagrange_polys[j](X[i, :])
     end
+    # TODO remove below conversions when ModelUtilities can use T <: Real
+    P0 = T.(P0)
+    PWts = convert.(Matrix{T}, PWts)
+
+    cones = CO.Cone[]
+    cone_idxs = UnitRange{Int}[]
+    cone_offset = 1
+    if use_wsos
+        # will set up for U variables
+        G_poly = Matrix{T}(-I, U, U)
+        h_poly = zeros(T, U)
+        c_poly = zeros(T, U)
+        A_poly = zeros(T, 0, U)
+        b_poly = T[]
+        push!(cones, CO.WSOSPolyInterp{T, T}(U, [P0, PWts...]))
+        push!(cone_idxs, 1:U)
+        cone_offset += U
+        A_lin = zeros(T, 1, U)
+        num_psd_vars = 0
+    else
+        # will set up for U coefficient variables plus PSD variables
+        # there are n new PSD variables, we will store them scaled, lower triangle, row-wise
+        n = length(PWts) + 1
+        num_psd_vars = 0
+        a_poly = Matrix{T}[]
+        L = size(P0, 2)
+        dim = div(L * (L + 1), 2)
+        num_psd_vars += dim
+        # first part of A
+        push!(a_poly, zeros(T, U, dim))
+        idx = 1
+        for k in 1:L, l in 1:k
+            # off diagonals are doubled, but already scaled by rt2
+            a_poly[1][:, idx] = P0[:, k] .* P0[:, l] * (k == l ? 1 : rt2)
+            idx += 1
+        end
+        push!(cones, CO.PosSemidef{T, T}(dim))
+        push!(cone_idxs, 1:dim)
+        cone_offset += dim
+
+        for i in 1:(n - 1)
+            L = size(PWts[i], 2)
+            dim = div(L * (L + 1), 2)
+            num_psd_vars += dim
+            push!(a_poly, zeros(T, U, dim))
+            idx = 1
+            for k in 1:L, l in 1:k
+                # off diagonals are doubled, but already scaled by rt2
+                a_poly[i + 1][:, idx] = PWts[i][:, k] .* PWts[i][:, l] * (k == l ? 1 : rt2)
+                idx += 1
+            end
+            push!(cone_idxs, cone_offset:(cone_offset + dim - 1))
+            push!(cones, CO.PosSemidef{T, T}(dim))
+            cone_offset += dim
+        end
+        A_lin = zeros(T, 1, U + num_psd_vars)
+        A_poly = hcat(a_poly...)
+        A_poly = hcat(Matrix{T}(-I, U, U), A_poly)
+        b_poly = zeros(T, U)
+        G_poly = hcat(zeros(T, num_psd_vars, U), Matrix{T}(-I, num_psd_vars, num_psd_vars))
+        h_poly = zeros(T, num_psd_vars)
+    end
+    A_lin[1:U] = w
 
     if use_sumlog
-        c = vcat([-1.0], zeros(U))
-        dimx = 1 + U
-        A = zeros(1, dimx)
-        A[1, 2:end] = w
-        b = [1.0]
-        h = zeros(U + 2 + nobs)
-        G1 = zeros(U, dimx)
-        G1[:, 2:end] = -Matrix{Float64}(I, U, U)
-        G2 = zeros(2 + nobs, dimx)
-        G2[1, 1] = -1.0
-        h[U + 2] = 1.0
+        # pre-pad with one hypograph variable
+        c_log = T[-1]
+        G_poly = hcat(zeros(T, cone_offset - 1, 1), G_poly)
+        A = [
+            zeros(T, size(A_poly, 1))    A_poly;
+            zero(T)    A_lin;
+            ]
+        h_log = zeros(T, nobs + 2)
+        h_log[2] = 1
+        G_log = zeros(T, 2 + nobs, 1 + U + num_psd_vars)
+        G_log[1, 1] = -1
         for i in 1:nobs
-            G2[i + 2, 2:end] = -basis_evals[i, :]
+            G_log[i + 2, 2:(1 + U)] = -basis_evals[i, :]
         end
-        G = vcat(G1, G2)
-        cone_idxs = [1:U, (U + 1):(U + 2 + nobs)]
-        cones = [CO.WSOSPolyInterp{Float64, Float64}(U, [P0, PWts...]), CO.HypoPerSumLog{Float64}(nobs + 2)]
+        push!(cone_idxs, cone_offset:(cone_offset + 1 + nobs))
+        push!(cones, CO.HypoPerSumLog{T}(nobs + 2))
     else
-        c = vcat(-ones(nobs), zeros(U))
-        dimx = nobs + U
-        A = zeros(1, dimx)
-        A[1, (nobs + 1):end] = w
-        b = [1.0]
-        h = zeros(U + 3 * nobs)
-        G1 = zeros(U, dimx)
-        G1[:, (nobs + 1):end] = -Matrix{Float64}(I, U, U)
-        G2 = zeros(3 * nobs, dimx)
+        # pre-pad with `nobs` hypograph variables
+        c_log = -ones(nobs)
+        G_poly = hcat(zeros(T, cone_offset - 1, nobs), G_poly)
+        A = [
+            zeros(T, size(A_poly, 1), nobs)    A_poly;
+            zeros(T, 1, nobs)    A_lin;
+            ]
+        h_log = zeros(T, 3 * nobs)
+
+        G_log = zeros(T, 3 * nobs, nobs + U + num_psd_vars)
         offset = 1
         for i in 1:nobs
-            G2[offset, i] = -1.0
-            h[U + offset + 1] = 1.0
-            G2[offset + 2, (nobs + 1):end] = -basis_evals[i, :]
+            G_log[offset, i] = -1.0
+            G_log[offset + 2, (nobs + 1):(nobs + U)] = -basis_evals[i, :]
+            h_log[offset + 1] = 1.0
             offset += 3
+            push!(cones, CO.HypoPerSumLog{T}(3))
+            push!(cone_idxs, cone_offset:(cone_offset + 2))
+            cone_offset += 3
         end
-        G = vcat(G1, G2)
-        cone_idxs = vcat([1:U], [(3 * (i - 1) + U + 1):(3 * i + U) for i in 1:nobs])
-        cones = vcat(CO.WSOSPolyInterp{Float64, Float64}(U, [P0, PWts...]), [CO.HypoPerLog{Float64}() for _ in 1:nobs])
     end
+    G = vcat(G_poly, G_log)
+    h = vcat(h_poly, h_log)
+    c = vcat(c_log, zeros(T, U), zeros(T, num_psd_vars))
+    b = vcat(b_poly, one(T))
 
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs)
 end
 
-densityest(nobs::Int, n::Int, deg::Int; options...) = densityest(randn(nobs, n), deg; options...)
+densityest(T::Type{<:HypReal}, nobs::Int, n::Int, deg::Int; options...) = densityest(T, randn(nobs, n), deg; options...)
 
-densityest1() = densityest(iris_data(), 4, use_sumlog = true)
-densityest2() = densityest(iris_data(), 4, use_sumlog = false)
-densityest3() = densityest(cancer_data(), 4, use_sumlog = true)
-densityest4() = densityest(cancer_data(), 4, use_sumlog = false)
-densityest5() = densityest(200, 1, 4, use_sumlog = true)
-densityest6() = densityest(200, 1, 4, use_sumlog = false)
+densityest1(T::Type{<:HypReal}) = densityest(T, iris_data(), 4, use_sumlog = true)
+densityest2(T::Type{<:HypReal}) = densityest(T, iris_data(), 4, use_sumlog = false)
+densityest3(T::Type{<:HypReal}) = densityest(T, cancer_data(), 4, use_sumlog = true)
+densityest4(T::Type{<:HypReal}) = densityest(T, cancer_data(), 4, use_sumlog = false)
+densityest5(T::Type{<:HypReal}) = densityest(T, 50, 1, 4, use_sumlog = true)
+densityest6(T::Type{<:HypReal}) = densityest(T, 50, 1, 4, use_sumlog = false)
+densityest7(T::Type{<:HypReal}) = densityest(T, 50, 1, 4, use_sumlog = true, use_wsos = false)
+densityest8(T::Type{<:HypReal}) = densityest(T, 50, 1, 4, use_sumlog = false, use_wsos = false)
 
-function test_densityest(instance::Function; options, rseed::Int = 1)
+function test_densityest(T::Type{<:HypReal}, instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
-    d = instance()
-    model = MO.PreprocessedLinearModel{Float64}(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
-    solver = SO.HSDSolver{Float64}(model; options...)
+    d = instance(T)
+    model = MO.PreprocessedLinearModel{T}(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
+    solver = SO.HSDSolver{T}(model; options...)
     SO.solve(solver)
-    r = SO.get_certificates(solver, model, test = true, atol = 1e-4, rtol = 1e-4)
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
+    r = SO.get_certificates(solver, model, test = true, atol = tol, rtol = tol)
     @test r.status == :Optimal
     return
 end
 
-test_densityest_all(; options...) = test_densityest.([
+test_densityest_all(T::Type{<:HypReal}; options...) = test_densityest.(T, [
     densityest1,
     densityest2,
     densityest3,
     densityest4,
     densityest5,
     densityest6,
+    densityest7,
+    densityest8,
     ], options = options)
 
-test_densityest(; options...) = test_densityest.([
+test_densityest(T::Type{<:HypReal}; options...) = test_densityest.(T, [
     densityest1,
-    densityest2,
     densityest3,
-    densityest4,
     densityest5,
     densityest6,
+    densityest7,
+    densityest8,
     ], options = options)
