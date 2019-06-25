@@ -37,12 +37,11 @@ function sparsepca(
     )
     x = zeros(T, p)
     signal = Distributions.sample(1:p, k, replace = false)
-    x[signal] = randn(T, k)
+    x[signal] = rand(T, k)
     sigma = x * x'
     sigma ./= tr(sigma)
 
     rt2 = sqrt(T(2))
-
     dimx = div(n * (n + 1), 2)
     # x will be the svec (lower triangle, row-wise) of the matrix solution we seek
     c = [-sigma[i, j] * (i == j ? 1 : rt2) for i in 1:n for j in 1:i]
@@ -78,9 +77,6 @@ function sparsepca(
             -id    -id    id;
             zeros(T, 1, dimx)    l1'    l1';
             ]
-        # A_slacks = hcat(-id, -id, id)
-        # A_l1 = [zeros(T, 1, dimx) [i == j ? one(T) : rt2]] # double off-diagonals, which are already scaled by rt2
-        # A = vcat([A zeros(T, 1, 2 * dimx)], A_slacks, A_l1)
         b = vcat(b, zeros(T, dimx), k)
         G = [
             Gpsd    zeros(T, dimx, 2 * dimx);
@@ -94,8 +90,8 @@ function sparsepca(
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs)
 end
 
-sparsepca1(T::Type{<:HypReal}) = sparsepca(T, 3, 3, 3)
-sparsepca2(T::Type{<:HypReal}) = sparsepca(T, 3, 3, 3, use_l1ball = false)
+sparsepca1(T::Type{<:HypReal}) = sparsepca(T, 5, 4, 3)
+sparsepca2(T::Type{<:HypReal}) = sparsepca(T, 5, 4, 3, use_l1ball = false)
 sparsepca3(T::Type{<:HypReal}) = sparsepca(T, 10, 10, 3)
 sparsepca4(T::Type{<:HypReal}) = sparsepca(T, 10, 10, 3, use_l1ball = false)
 
@@ -105,8 +101,10 @@ function test_sparsepca(T::Type{<:HypReal}, instance::Function; options, rseed::
     model = MO.PreprocessedLinearModel{T}(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
     solver = SO.HSDSolver{T}(model; options...)
     SO.solve(solver)
-    r = SO.get_certificates(solver, model, test = true, atol = 1e-4, rtol = 1e-4)
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
+    r = SO.get_certificates(solver, model, test = true, atol = tol, rtol = tol)
     @test r.status == :Optimal
+    @test r.primal_obj ≈ -1 atol = tol rtol = tol
     return
 end
 
@@ -119,5 +117,5 @@ test_sparsepca_all(T::Type{<:HypReal}; options...) = test_sparsepca.(T, [
 
 test_sparsepca(T::Type{<:HypReal}; options...) = test_sparsepca.(T, [
     sparsepca1,
-    sparsepca4,
+    sparsepca2,
     ], options = options)
