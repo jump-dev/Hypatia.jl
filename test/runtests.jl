@@ -174,8 +174,6 @@ native_options = (
     time_limit = 6e2, # 1 minute
     )
 @testset "native examples" begin
-    @testset "densityest" begin test_densityest(; native_options...,
-        ) end
     @testset "envelope" begin test_envelope(; native_options...,
         ) end
     @testset "linearopt" begin test_linearopt(; native_options...,
@@ -187,6 +185,8 @@ native_options = (
         ) end
 end
 @testset "native examples: $T" for T in real_types
+    @testset "densityest" begin test_densityest(T; native_options...,
+        ) end
     @testset "expdesign" begin test_expdesign(T; native_options...,
         ) end
     @testset "matrixcompletion" begin test_matrixcompletion(T; native_options...,
