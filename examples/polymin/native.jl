@@ -31,14 +31,27 @@ function polyminreal(
     halfdeg::Int;
     use_primal::Bool = true,
     use_wsos::Bool = true,
+    n::Int = -1,
     )
     if use_primal && !use_wsos
         error("primal psd formulation is not implemented yet")
     end
 
-    (x, fn, dom, true_obj) = getpolydata(polyname)
-    sample = (length(x) >= 5) || !isa(dom, MU.Box)
-    (U, pts, P0, PWts, _) = MU.interpolate(dom, halfdeg, sample = sample)
+    if polyname == :random
+        if n < 0
+            error("`n` should be specified as a keyword argument if randomly generating a polynomial")
+        end
+        true_obj = NaN
+        dom = MU.Box(-ones(n), ones(n))
+        (U, pts, P0, PWts, _) = MU.interpolate(dom, halfdeg, sample = true)
+        interp_vals = randn(U) .+ 40
+    else
+        (x, fn, dom, true_obj) = getpolydata(polyname)
+        sample = (length(x) >= 5) || !isa(dom, MU.Box)
+        (U, pts, P0, PWts, _) = MU.interpolate(dom, halfdeg, sample = sample)
+        # set up problem data
+        interp_vals = [fn(pts[j, :]...) for j in 1:U]
+    end
 
     if use_wsos
         cones = [CO.WSOSPolyInterp{Float64, Float64}(U, [P0, PWts...], !use_primal)]
@@ -49,8 +62,6 @@ function polyminreal(
         cone_idxs = UnitRange{Int}[]
     end
 
-    # set up problem data
-    interp_vals = [fn(pts[j, :]...) for j in 1:U]
     if use_primal
         c = [-1.0]
         A = zeros(0, 1)
@@ -112,6 +123,8 @@ polyminreal18() = polyminreal(:motzkin, 3, use_primal = false, use_wsos = false)
 polyminreal19() = polyminreal(:motzkin, 3, use_wsos = false)
 polyminreal20() = polyminreal(:reactiondiffusion, 4, use_primal = false, use_wsos = false)
 polyminreal21() = polyminreal(:lotkavolterra, 3, use_primal = false, use_wsos = false)
+polyminreal22() = polyminreal(:random, 3, use_primal = false, use_wsos = false, n = 3)
+polyminreal23() = polyminreal(:random, 3, use_primal = false, use_wsos = true, n = 3)
 
 function polymincomplex(
     polyname::Symbol,
@@ -217,7 +230,9 @@ function test_polymin(instance::Function; options, rseed::Int = 1)
     SO.solve(solver)
     r = SO.get_certificates(solver, model, test = true, atol = 1e-4, rtol = 1e-4)
     @test r.status == :Optimal
-    @test r.primal_obj ≈ d.true_obj atol = 1e-4 rtol = 1e-4
+    if !isnan(d.true_obj)
+        @test r.primal_obj ≈ d.true_obj atol = 1e-4 rtol = 1e-4
+    end
     return
 end
 
@@ -243,6 +258,8 @@ test_polymin_all(; options...) = test_polymin.([
     polyminreal19,
     polyminreal20,
     polyminreal21,
+    polyminreal22,
+    polyminreal23,
     polymincomplex1,
     polymincomplex2,
     polymincomplex3,
@@ -265,6 +282,8 @@ test_polymin(; options...) = test_polymin.([
     polyminreal12,
     polyminreal14,
     polyminreal18,
+    polyminreal22,
+    polyminreal23,
     polymincomplex7,
     polymincomplex14,
-    ], options = options)
+], options = options)
