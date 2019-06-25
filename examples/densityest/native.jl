@@ -43,19 +43,14 @@ function densityest(
 
     halfdeg = div(deg + 1, 2)
     (U, pts, P0, PWts, w) = MU.interpolate(domain, halfdeg, sample = true, calc_w = true, sample_factor = sample_factor)
-
     lagrange_polys = MU.recover_lagrange_polys(pts, 2 * halfdeg)
     basis_evals = Matrix{Float64}(undef, nobs, U)
     for i in 1:nobs, j in 1:U
         basis_evals[i, j] = lagrange_polys[j](X[i, :])
     end
-
-    # TODO remove these when converting is figured out
-    P0c = convert.(T, P0)
-    PWtsc = Matrix{T}[]
-    for pwt in PWts
-        push!(PWtsc, convert.(T, pwt))
-    end
+    # TODO remove below conversions when ModelUtilities can use T <: Real
+    P0 = T.(P0)
+    PWts = convert.(Matrix{T}, PWts)
 
     cones = CO.Cone[]
     cone_idxs = UnitRange{Int}[]
@@ -66,8 +61,8 @@ function densityest(
         h_poly = zeros(T, U)
         c_poly = zeros(T, U)
         A_poly = zeros(T, 0, U)
-        b_poly = Float64[]
-        push!(cones, CO.WSOSPolyInterp{T, T}(U, [P0c, PWtsc...]))
+        b_poly = T[]
+        push!(cones, CO.WSOSPolyInterp{T, T}(U, [P0, PWts...]))
         push!(cone_idxs, 1:U)
         cone_offset += U
         A_lin = zeros(T, 1, U)
@@ -78,7 +73,7 @@ function densityest(
         n = length(PWts) + 1
         num_psd_vars = 0
         a_poly = Matrix{T}[]
-        L = size(P0c, 2)
+        L = size(P0, 2)
         dim = div(L * (L + 1), 2)
         num_psd_vars += dim
         # first part of A
@@ -86,7 +81,7 @@ function densityest(
         idx = 1
         for k in 1:L, l in 1:k
             # off diagonals are doubled, but already scaled by rt2
-            a_poly[1][:, idx] = P0c[:, k] .* P0c[:, l] * (k == l ? 1 : rt2)
+            a_poly[1][:, idx] = P0[:, k] .* P0[:, l] * (k == l ? 1 : rt2)
             idx += 1
         end
         push!(cones, CO.PosSemidef{T, T}(dim))
@@ -101,7 +96,7 @@ function densityest(
             idx = 1
             for k in 1:L, l in 1:k
                 # off diagonals are doubled, but already scaled by rt2
-                a_poly[i + 1][:, idx] = PWtsc[i][:, k] .* PWtsc[i][:, l] * (k == l ? 1 : rt2)
+                a_poly[i + 1][:, idx] = PWts[i][:, k] .* PWts[i][:, l] * (k == l ? 1 : rt2)
                 idx += 1
             end
             push!(cone_idxs, cone_offset:(cone_offset + dim - 1))
@@ -110,9 +105,9 @@ function densityest(
         end
         A_lin = zeros(T, 1, U + num_psd_vars)
         A_poly = hcat(a_poly...)
-        A_poly = [Matrix{T}(-I, U, U) A_poly]
+        A_poly = hcat(Matrix{T}(-I, U, U), A_poly)
         b_poly = zeros(T, U)
-        G_poly = [zeros(T, num_psd_vars, U) Matrix{T}(-I, num_psd_vars, num_psd_vars)]
+        G_poly = hcat(zeros(T, num_psd_vars, U), Matrix{T}(-I, num_psd_vars, num_psd_vars))
         h_poly = zeros(T, num_psd_vars)
     end
     A_lin[1:U] = w
@@ -120,10 +115,10 @@ function densityest(
     if use_sumlog
         # pre-pad with one hypograph variable
         c_log = T[-1]
-        G_poly = [zeros(T, cone_offset - 1, 1) G_poly]
+        G_poly = hcat(zeros(T, cone_offset - 1, 1), G_poly)
         A = [
-            zeros(T, size(A_poly, 1)) A_poly
-            0 A_lin
+            zeros(T, size(A_poly, 1))    A_poly;
+            zero(T)    A_lin;
             ]
         h_log = zeros(T, nobs + 2)
         h_log[2] = 1
@@ -137,7 +132,7 @@ function densityest(
     else
         # pre-pad with `nobs` hypograph variables
         c_log = -ones(nobs)
-        G_poly = [zeros(T, cone_offset - 1, nobs) G_poly]
+        G_poly = hcat(zeros(T, cone_offset - 1, nobs), G_poly)
         A = [
             zeros(T, size(A_poly, 1), nobs)    A_poly;
             zeros(T, 1, nobs)    A_lin;
@@ -164,7 +159,7 @@ function densityest(
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs)
 end
 
-densityest(T::Type{<:HypReal}, nobs::Int, n::Int, deg::Int; options...) = densityest(T, rand(T, nobs, n), deg; options...)
+densityest(T::Type{<:HypReal}, nobs::Int, n::Int, deg::Int; options...) = densityest(T, randn(nobs, n), deg; options...)
 
 densityest1(T::Type{<:HypReal}) = densityest(T, iris_data(), 4, use_sumlog = true)
 densityest2(T::Type{<:HypReal}) = densityest(T, iris_data(), 4, use_sumlog = false)
@@ -198,7 +193,7 @@ test_densityest_all(T::Type{<:HypReal}; options...) = test_densityest.(T, [
     densityest8,
     ], options = options)
 
-    test_densityest(T::Type{<:HypReal}; options...) = test_densityest.(T, [
+test_densityest(T::Type{<:HypReal}; options...) = test_densityest.(T, [
     densityest1,
     densityest3,
     densityest5,
