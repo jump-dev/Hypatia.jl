@@ -19,7 +19,7 @@ const MU = HYP.ModelUtilities
 include(joinpath(@__DIR__, "data.jl"))
 
 function densityestJuMP(
-    X::AbstractMatrix{Float64},
+    X::Matrix{Float64},
     deg::Int;
     sample_factor::Int = 100,
     use_monomials::Bool = false,
