@@ -24,17 +24,28 @@ using Test
 import Hypatia
 const HYP = Hypatia
 const MO = HYP.Models
-const MU = HYP.ModelUtilities
 const CO = HYP.Cones
 const SO = HYP.Solvers
+import Hypatia.HypReal
 
-const rt2 = sqrt(2)
+function sparsepca(
+    T::Type{<:HypReal},
+    n::Int,
+    p::Int,
+    k::Int;
+    use_l1ball::Bool = true,
+    )
+    x = zeros(T, p)
+    signal = Distributions.sample(1:p, k, replace = false)
+    x[signal] = randn(T, k)
+    sigma = x * x'
+    sigma ./= tr(sigma)
 
-function sparsepca(mat::Matrix, k::Int; T = Float64, use_l1ball::Bool = true, spike = [])
-    n = size(mat, 1)
+    rt2 = sqrt(T(2))
+
     dimx = div(n * (n + 1), 2)
     # x will be the svec (lower triangle, row-wise) of the matrix solution we seek
-    c = -[mat[i, j] * (i == j ? 1 : rt2) for i in 1:n for j in 1:i]
+    c = [-sigma[i, j] * (i == j ? 1 : rt2) for i in 1:n for j in 1:i]
     b = T[1]
     A = zeros(T, 1, dimx)
     # PSD cone, x is already vectorized and scaled
@@ -43,13 +54,13 @@ function sparsepca(mat::Matrix, k::Int; T = Float64, use_l1ball::Bool = true, sp
         s = sum(1:i)
         A[s] = 1
     end
-    hpsd = zeros(dimx)
+    hpsd = zeros(T, dimx)
     cones = CO.Cone[CO.PosSemidef{T, T}(dimx)]
     cone_idxs = [1:dimx]
 
     if use_l1ball
         # l1 cone
-        Gl1 = -Matrix{T}(I, dimx, dimx) * rt2 # need to double off-diagonals, which are already scaled by rt2
+        Gl1 = Matrix{T}(-rt2 * I, dimx, dimx) # double off-diagonals, which are already scaled by rt2
         for i in 1:n
             s = sum(1:i)
             Gl1[s, s] = -1
@@ -59,41 +70,38 @@ function sparsepca(mat::Matrix, k::Int; T = Float64, use_l1ball::Bool = true, sp
         push!(cones, CO.EpiNormInf{T}(1 + dimx, true))
         push!(cone_idxs, (dimx + 1):(2 * dimx + 1))
     else
-        c = vcat(c, zeros(2 * dimx))
+        c = vcat(c, zeros(T, 2 * dimx))
         id = Matrix{T}(I, dimx, dimx)
-        A_slacks = [-id -id id]
-        A_l1 = [zeros(1, dimx) [i == j ? 1 : rt2]] # need to double off-diagonals, which are already scaled by rt2
-        A = vcat([A zeros(T, 1, 2 * dimx)], A_slacks, A_l1)
+        l1 = [(i == j ? one(T) : rt2) for i in 1:n for j in 1:i]
+        A = T[
+            A    zeros(T, 1, 2 * dimx);
+            -id    -id    id;
+            zeros(T, 1, dimx)    l1'    l1';
+            ]
+        # A_slacks = hcat(-id, -id, id)
+        # A_l1 = [zeros(T, 1, dimx) [i == j ? one(T) : rt2]] # double off-diagonals, which are already scaled by rt2
+        # A = vcat([A zeros(T, 1, 2 * dimx)], A_slacks, A_l1)
         b = vcat(b, zeros(T, dimx), k)
         G = [
-            Gpsd zeros(T, dimx, 2 * dimx)
-            zeros(2 * dimx, dimx) -Matrix{T}(I, 2 * dimx, 2 * dimx)
+            Gpsd    zeros(T, dimx, 2 * dimx);
+            zeros(T, 2 * dimx, dimx)    Matrix{T}(-I, 2 * dimx, 2 * dimx);
             ]
-        h = vcat(hpsd, zeros(2 * dimx))
+        h = vcat(hpsd, zeros(T, 2 * dimx))
         push!(cones, CO.Nonnegative{T}(2 * dimx))
         push!(cone_idxs, (dimx + 1):(3 * dimx))
     end
 
-    return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs, mat = mat, spike = spike)
+    return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs)
 end
 
-function sparsepca(n::Int, p::Int, k::Int; snr = 100, T = Float64, use_l1ball::Bool = true)
-    x = zeros(p)
-    signal = Distributions.sample(1:p, k, replace = false)
-    x[signal] = randn(k)
-    sigma = x * x'
-    sigma ./= tr(sigma)
-    return sparsepca(sigma, k, T = Float64, use_l1ball = true, spike = x)
-end
+sparsepca1(T::Type{<:HypReal}) = sparsepca(T, 3, 3, 3)
+sparsepca2(T::Type{<:HypReal}) = sparsepca(T, 3, 3, 3, use_l1ball = false)
+sparsepca3(T::Type{<:HypReal}) = sparsepca(T, 10, 10, 3)
+sparsepca4(T::Type{<:HypReal}) = sparsepca(T, 10, 10, 3, use_l1ball = false)
 
-sparsepca1(; T = Float) = sparsepca(3, 3, 3, T = T)
-sparsepca2(; T = Float) = sparsepca(3, 3, 3, T = T, use_l1ball = false)
-sparsepca3(; T = Float) = sparsepca(10, 10, 3, T = T)
-sparsepca4(; T = Float) = sparsepca(10, 10, 3, T = T, use_l1ball = false)
-
-function test_sparsepca(instance::Function; T = Float64, rseed::Int = 1, options)
+function test_sparsepca(T::Type{<:HypReal}, instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
-    d = instance(T = T)
+    d = instance(T)
     model = MO.PreprocessedLinearModel{T}(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
     solver = SO.HSDSolver{T}(model; options...)
     SO.solve(solver)
@@ -102,14 +110,14 @@ function test_sparsepca(instance::Function; T = Float64, rseed::Int = 1, options
     return
 end
 
-test_sparsepca_all(; options...) = test_sparsepca.([
+test_sparsepca_all(T::Type{<:HypReal}; options...) = test_sparsepca.(T, [
     sparsepca1,
     sparsepca2,
     sparsepca3,
     sparsepca4,
     ], options = options)
 
-test_sparsepca(; options...) = test_sparsepca.([
+test_sparsepca(T::Type{<:HypReal}; options...) = test_sparsepca.(T, [
     sparsepca1,
-    sparsepca2,
+    sparsepca4,
     ], options = options)
