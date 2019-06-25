@@ -184,7 +184,7 @@ function test_densityest(instance::Function; T::THR = Float64, rseed::Int = 1, o
     model = MO.PreprocessedLinearModel{T}(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
     solver = SO.HSDSolver{T}(model; options...)
     SO.solve(solver)
-    r = SO.get_certificates(solver, model, test = false, atol = 1e-4, rtol = 1e-4)
+    r = SO.get_certificates(solver, model, test = true, atol = 1e-4, rtol = 1e-4)
     @test r.status == :Optimal
     return
 end
@@ -207,4 +207,4 @@ test_densityest(; T::THR = Float64, options...) = test_densityest.([
     densityest6,
     densityest7,
     densityest8,
-], T = T, options = options)
+    ], T = T, options = options)
