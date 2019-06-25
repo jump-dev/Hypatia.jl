@@ -26,7 +26,6 @@ function expdesign(
     T::THR = Float64,
     use_logdet::Bool = true,
     use_sumlog::Bool = true,
-    alpha = 4,
     )
     @assert (p > q) && (n > q) && (nmax <= n)
     V = randn(q, p)
@@ -67,7 +66,7 @@ function expdesign(
         # pad with hypograph variable and perspective variable
         h_logdet = [0, 1, zeros(size(G_logdet, 1))...]
         G_logdet = [-1 zeros(1, p); zeros(1, p + 1); zeros(dimvec) G_logdet]
-        push!(cones, CO.HypoPerLogdet{T}(dimvec + 2, alpha = alpha))
+        push!(cones, CO.HypoPerLogdet{T}(dimvec + 2))
         push!(cone_idxs, (2 * p + 1):(2 * p + dimvec + 2))
 
         G = vcat(G_nonneg, G_nmax, G_logdet)
@@ -144,7 +143,7 @@ function expdesign(
                 ]
             h_log = vcat(0, 1, zeros(q))
             push!(cone_idxs, (2 * p + dimvec + 1):(2 * p + dimvec + 2 + q))
-            push!(cones, CO.HypoPerSumLog{T}(q + 2, alpha = alpha))
+            push!(cones, CO.HypoPerSumLog{T}(q + 2))
         else
             G_log = zeros(3 * q, dimx)
             h_log = zeros(3 * q)
@@ -175,7 +174,7 @@ function test_expdesign(instance::Function; T::THR = Float64, rseed::Int = 1, op
     model = MO.PreprocessedLinearModel{T}(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
     solver = SO.HSDSolver{T}(model; options...)
     SO.solve(solver)
-    r = SO.get_certificates(solver, model, test = false, atol = 1e-4, rtol = 1e-4)
+    r = SO.get_certificates(solver, model, test = true, atol = 1e-4, rtol = 1e-4)
     @test r.status == :Optimal
     return
 end
