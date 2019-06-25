@@ -36,6 +36,7 @@ function densityest(
     )
     (nobs, dim) = size(X)
 
+    X = convert(AbstractMatrix{T}, X)
     domain = MU.Box(-ones(dim), ones(dim))
     # rescale X to be in unit box
     minX = minimum(X, dims = 1)
@@ -65,9 +66,9 @@ function densityest(
     if use_wsos
         # will set up for U variables
         G_poly = -Matrix{T}(I, U, U)
-        h_poly = zeros(U)
-        c_poly = zeros(U)
-        A_poly = zeros(0, U)
+        h_poly = zeros(T, U)
+        c_poly = zeros(T, U)
+        A_poly = zeros(T, 0, U)
         b_poly = Float64[]
         push!(cones, CO.WSOSPolyInterp{T, T}(U, [P0c, PWtsc...]))
         push!(cone_idxs, 1:U)
@@ -99,7 +100,7 @@ function densityest(
             L = size(PWts[i], 2)
             dim = div(L * (L + 1), 2)
             num_psd_vars += dim
-            push!(a_poly, zeros(U, dim))
+            push!(a_poly, zeros(T, U, dim))
             idx = 1
             for k in 1:L, l in 1:k
                 # off diagonals are doubled, but already scaled by rt2
@@ -110,26 +111,26 @@ function densityest(
             push!(cones, CO.PosSemidef{T, T}(dim))
             cone_offset += dim
         end
-        A_lin = zeros(1, U + num_psd_vars)
+        A_lin = zeros(T, 1, U + num_psd_vars)
         A_poly = hcat(a_poly...)
-        A_poly = [-Matrix{Float64}(I, U, U) A_poly]
-        b_poly = zeros(U)
-        G_poly = [zeros(num_psd_vars, U) -Matrix{Float64}(I, num_psd_vars, num_psd_vars)]
-        h_poly = zeros(num_psd_vars)
+        A_poly = [-Matrix{T}(I, U, U) A_poly]
+        b_poly = zeros(T, U)
+        G_poly = [zeros(T, num_psd_vars, U) -Matrix{T}(I, num_psd_vars, num_psd_vars)]
+        h_poly = zeros(T, num_psd_vars)
     end
     A_lin[1:U] = w
 
     if use_sumlog
         # pre-pad with one hypograph variable
-        c_log = Float64[-1]
-        G_poly = [zeros(cone_offset - 1, 1) G_poly]
+        c_log = T[-1]
+        G_poly = [zeros(T, cone_offset - 1, 1) G_poly]
         A = [
-            zeros(size(A_poly, 1)) A_poly
+            zeros(T, size(A_poly, 1)) A_poly
             0 A_lin
             ]
-        h_log = zeros(nobs + 2)
+        h_log = zeros(T, nobs + 2)
         h_log[2] = 1
-        G_log = zeros(2 + nobs, 1 + U + num_psd_vars)
+        G_log = zeros(T, 2 + nobs, 1 + U + num_psd_vars)
         G_log[1, 1] = -1
         for i in 1:nobs
             G_log[i + 2, 2:(1 + U)] = -basis_evals[i, :]
@@ -139,14 +140,14 @@ function densityest(
     else
         # pre-pad with `nobs` hypograph variables
         c_log = -ones(nobs)
-        G_poly = [zeros(cone_offset - 1, nobs) G_poly]
+        G_poly = [zeros(T, cone_offset - 1, nobs) G_poly]
         A = [
-            zeros(size(A_poly, 1), nobs) A_poly
-            zeros(1, nobs) A_lin
+            zeros(T, size(A_poly, 1), nobs) A_poly
+            zeros(T, 1, nobs) A_lin
             ]
-        h_log = zeros(3 * nobs)
+        h_log = zeros(T, 3 * nobs)
 
-        G_log = zeros(3 * nobs, nobs + U + num_psd_vars)
+        G_log = zeros(T, 3 * nobs, nobs + U + num_psd_vars)
         offset = 1
         for i in 1:nobs
             G_log[offset, i] = -1.0
@@ -160,7 +161,7 @@ function densityest(
     end
     G = vcat(G_poly, G_log)
     h = vcat(h_poly, h_log)
-    c = vcat(c_log, zeros(U), zeros(num_psd_vars))
+    c = vcat(c_log, zeros(T, U), zeros(T, num_psd_vars))
     b = vcat(b_poly, 1)
 
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs)
