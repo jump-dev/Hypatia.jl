@@ -193,4 +193,4 @@ test_portfolio(; options...) = test_portfolio.([
     portfolio2,
     portfolio7,
     portfolio8,
-], options = options)
+    ], options = options)
