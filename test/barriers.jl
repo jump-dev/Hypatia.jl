@@ -11,7 +11,8 @@ using Test
 
 function test_barrier_oracles(cone::CO.Cone{T}) where {T <: HypReal}
     CO.setup_data(cone)
-    point = Vector{T}(undef, CO.dimension(cone))
+    dim = CO.dimension(cone)
+    point = Vector{T}(undef, dim)
     CO.set_initial_point(point, cone)
     CO.load_point(cone, point)
 
@@ -22,29 +23,21 @@ function test_barrier_oracles(cone::CO.Cone{T}) where {T <: HypReal}
     @test -dot(point, CO.grad(cone)) ≈ CO.get_nu(cone) atol=tol rtol=tol
     @test CO.hess(cone) * point ≈ -CO.grad(cone) atol=tol rtol=tol
     @test CO.hess(cone) * CO.inv_hess(cone) ≈ I atol=tol rtol=tol
-
-    # product with matrices
-    for d in [0, 2, 4], _ in 1:5
-        prod = zeros(T, cone.dim, cone.dim + d)
-        arr = convert(AbstractMatrix{T}, randn(cone.dim, cone.dim + d))
-        @test CO.hess_prod!(prod, arr, cone) ≈ CO.hess(cone) * arr atol=tol rtol=tol
-        @test CO.inv_hess_prod!(prod, arr, cone) ≈ CO.inv_hess(cone) * arr atol=tol rtol=tol
-    end
-
-    # product with vectors
-    prod = zeros(T, cone.dim)
-    for _ in 1:5
-        arr = convert(AbstractVector{T}, randn(cone.dim))
-        @test CO.hess_prod!(prod, arr, cone) ≈ CO.hess(cone) * arr atol=tol rtol=tol
-        @test CO.inv_hess_prod!(prod, arr, cone) ≈ CO.inv_hess(cone) * arr atol=tol rtol=tol
-    end
+    prod = similar(point)
+    @test CO.hess_prod!(prod, point, cone) ≈ -CO.grad(cone) atol=tol rtol=tol
+    @test CO.inv_hess_prod!(prod, CO.grad(cone), cone) ≈ -point atol=tol rtol=tol
+    prod = similar(point, dim, dim)
+    @test CO.hess_prod!(prod, CO.inv_hess(cone), cone) ≈ I atol=tol rtol=tol
+    @test CO.inv_hess_prod!(prod, CO.hess(cone), cone) ≈ I atol=tol rtol=tol
 
     return
 end
 
-function test_epinormeucl_barrier(T::Type{<:HypReal})
-    for dim in [2, 3, 5]
-        cone = CO.EpiNormEucl{T}(dim)
+function test_orthant_barrier(T::Type{<:HypReal})
+    for dim in [1, 3, 5]
+        cone = CO.Nonnegative{T}(dim)
+        test_barrier_oracles(cone)
+        cone = CO.Nonpositive{T}(dim)
         test_barrier_oracles(cone)
     end
     return
@@ -58,17 +51,9 @@ function test_epinorminf_barrier(T::Type{<:HypReal})
     return
 end
 
-function test_epinormspectral_barrier(T::Type{<:HypReal})
-    for (n, m) in [(1, 3), (2, 4)]
-        cone = CO.EpiNormSpectral{T}(n, m)
-        test_barrier_oracles(cone)
-    end
-    return
-end
-
-function test_epiperpower_barrier(T::Type{<:HypReal})
-    for alpha in [1.5, 2.5]
-        cone = CO.EpiPerPower{T}(alpha)
+function test_epinormeucl_barrier(T::Type{<:HypReal})
+    for dim in [2, 3, 5]
+        cone = CO.EpiNormEucl{T}(dim)
         test_barrier_oracles(cone)
     end
     return
@@ -77,6 +62,14 @@ end
 function test_epipersquare_barrier(T::Type{<:HypReal})
     for dim in [3, 5, 8]
         cone = CO.EpiPerSquare{T}(dim)
+        test_barrier_oracles(cone)
+    end
+    return
+end
+
+function test_epiperpower_barrier(T::Type{<:HypReal})
+    for alpha in [1.5, 2.5]
+        cone = CO.EpiPerPower{T}(alpha)
         test_barrier_oracles(cone)
     end
     return
@@ -107,17 +100,17 @@ function test_hypoperlog_barrier(T::Type{<:HypReal})
     return
 end
 
-function test_hypoperlogdet_barrier(T::Type{<:HypReal})
+function test_hypopersumlog_barrier(T::Type{<:HypReal})
     for dim in [3, 5, 8]
-        cone = CO.HypoPerLogdet{T}(dim)
+        cone = CO.HypoPerSumLog{T}(dim)
         test_barrier_oracles(cone)
     end
     return
 end
 
-function test_hypopersumlog_barrier(T::Type{<:HypReal})
-    for dim in [3, 5, 8]
-        cone = CO.HypoPerSumLog{T}(dim)
+function test_epinormspectral_barrier(T::Type{<:HypReal})
+    for (n, m) in [(1, 3), (2, 4)]
+        cone = CO.EpiNormSpectral{T}(n, m)
         test_barrier_oracles(cone)
     end
     return
@@ -130,6 +123,14 @@ function test_semidefinite_barrier(T::Type{<:HypReal})
     end
     for dim in [1, 4, 9]
         cone = CO.PosSemidef{T, Complex{T}}(dim) # complex
+        test_barrier_oracles(cone)
+    end
+    return
+end
+
+function test_hypoperlogdet_barrier(T::Type{<:HypReal})
+    for dim in [3, 5, 8]
+        cone = CO.HypoPerLogdet{T}(dim)
         test_barrier_oracles(cone)
     end
     return
