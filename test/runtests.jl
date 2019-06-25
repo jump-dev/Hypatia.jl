@@ -21,6 +21,7 @@ examples_dir = joinpath(@__DIR__, "../examples")
 include(joinpath(examples_dir, "centralpolymat/JuMP.jl"))
 include(joinpath(examples_dir, "envelope/native.jl"))
 include(joinpath(examples_dir, "linearopt/native.jl"))
+include(joinpath(examples_dir, "matrixcompletion/native.jl"))
 include(joinpath(examples_dir, "polymin/native.jl"))
 include(joinpath(examples_dir, "contraction/JuMP.jl"))
 include(joinpath(examples_dir, "densityest/JuMP.jl"))
@@ -172,6 +173,8 @@ native_options = (
     @testset "envelope" begin test_envelope(; native_options...,
         ) end
     @testset "linearopt" begin test_linearopt(; native_options...,
+        ) end
+    @testset "matrixcompletion" begin test_matrixcompletion(; native_options...,
         ) end
     @testset "polymin" begin test_polymin(; native_options...,
         tol_rel_opt = 1e-9, tol_abs_opt = 1e-8, tol_feas = 1e-9,
