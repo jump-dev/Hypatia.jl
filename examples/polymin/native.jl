@@ -16,45 +16,48 @@ using LinearAlgebra
 import Combinatorics
 using Test
 import Hypatia
+import Hypatia.HypReal
 const HYP = Hypatia
 const CO = HYP.Cones
 const MO = HYP.Models
 const SO = HYP.Solvers
 const MU = HYP.ModelUtilities
 
-const rt2 = sqrt(2)
-
 include(joinpath(@__DIR__, "data.jl"))
 
 function polyminreal(
+    T::Type{<:HypReal},
     polyname::Symbol,
     halfdeg::Int;
     use_primal::Bool = true,
     use_wsos::Bool = true,
-    n::Int = -1,
+    n::Int = 0,
     )
     if use_primal && !use_wsos
         error("primal psd formulation is not implemented yet")
     end
 
     if polyname == :random
-        if n < 0
-            error("`n` should be specified as a keyword argument if randomly generating a polynomial")
+        if n <= 0
+            error("`n` should be specified as a positive keyword argument if randomly generating a polynomial")
         end
         true_obj = NaN
         dom = MU.Box(-ones(n), ones(n))
         (U, pts, P0, PWts, _) = MU.interpolate(dom, halfdeg, sample = true)
-        interp_vals = randn(U) .+ 40
+        interp_vals = T.(randn(U))
     else
         (x, fn, dom, true_obj) = getpolydata(polyname)
         sample = (length(x) >= 5) || !isa(dom, MU.Box)
         (U, pts, P0, PWts, _) = MU.interpolate(dom, halfdeg, sample = sample)
         # set up problem data
-        interp_vals = [fn(pts[j, :]...) for j in 1:U]
+        interp_vals = T[fn(pts[j, :]...) for j in 1:U]
     end
+    # TODO remove below conversions when ModelUtilities can use T <: Real
+    P0 = T.(P0)
+    PWts = convert.(Matrix{T}, PWts)
 
     if use_wsos
-        cones = [CO.WSOSPolyInterp{Float64, Float64}(U, [P0, PWts...], !use_primal)]
+        cones = [CO.WSOSPolyInterp{T, T}(U, [P0, PWts...], !use_primal)]
         cone_idxs = [1:U]
     else
         # will be set up iteratively
@@ -63,70 +66,71 @@ function polyminreal(
     end
 
     if use_primal
-        c = [-1.0]
-        A = zeros(0, 1)
-        b = Float64[]
-        G = ones(U, 1)
+        c = T[-1]
+        A = zeros(T, 0, 1)
+        b = T[]
+        G = ones(T, U, 1)
         h = interp_vals
-        true_obj *= -1
+        true_obj = -true_obj
     else
         c = interp_vals
-        A = ones(1, U) # TODO eliminate constraint and first variable
-        b = [1.0]
+        A = ones(T, 1, U) # TODO eliminate constraint and first variable
+        b = T[1]
         if use_wsos
-            G = Diagonal(-1.0I, U) # TODO use UniformScaling
-            h = zeros(U)
+            G = Diagonal(-one(T) * I, U) # TODO use UniformScaling
+            h = zeros(T, U)
         else
-            G = zeros(0, U)
+            G = zeros(T, 0, U)
             rowidx = 1
+            rt2 = sqrt(T(2))
             for Pk in [P0, PWts...]
                 Lk = size(Pk, 2)
-                dk = Int(Lk * (Lk + 1) / 2)
+                dk = div(Lk * (Lk + 1), 2)
                 push!(cone_idxs, rowidx:(rowidx + dk - 1))
-                push!(cones, CO.PosSemidef{Float64, Float64}(dk))
-                Gk = Matrix{Float64}(undef, dk, U)
+                push!(cones, CO.PosSemidef{T, T}(dk))
+                Gk = Matrix{T}(undef, dk, U)
                 l = 1
                 for i in 1:Lk, j in 1:i
-                    for u in 1:U
-                        Gk[l, u] = -Pk[u, i] * Pk[u, j] * (i == j ? 1 : rt2)
-                    end
+                    scal = i == j ? 1 : rt2
+                    @. Gk[l, :] = -Pk[:, i] * Pk[:, j]
                     l += 1
                 end
                 G = vcat(G, Gk)
                 rowidx += dk
             end
-            h = zeros(size(G, 1))
+            h = zeros(T, size(G, 1))
         end
     end
 
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs, true_obj = true_obj)
 end
 
-polyminreal1() = polyminreal(:heart, 2)
-polyminreal2() = polyminreal(:schwefel, 2)
-polyminreal3() = polyminreal(:magnetism7_ball, 2)
-polyminreal4() = polyminreal(:motzkin_ellipsoid, 4)
-polyminreal5() = polyminreal(:caprasse, 4)
-polyminreal6() = polyminreal(:goldsteinprice, 7)
-polyminreal7() = polyminreal(:lotkavolterra, 3)
-polyminreal8() = polyminreal(:robinson, 8)
-polyminreal9() = polyminreal(:robinson_ball, 8)
-polyminreal10() = polyminreal(:rosenbrock, 5)
-polyminreal11() = polyminreal(:butcher, 2)
-polyminreal12() = polyminreal(:goldsteinprice_ellipsoid, 7)
-polyminreal13() = polyminreal(:goldsteinprice_ball, 7)
-polyminreal14() = polyminreal(:motzkin, 3, use_primal = false)
-polyminreal15() = polyminreal(:motzkin, 3)
-polyminreal16() = polyminreal(:reactiondiffusion, 4, use_primal = false)
-polyminreal17() = polyminreal(:lotkavolterra, 3, use_primal = false)
-polyminreal18() = polyminreal(:motzkin, 3, use_primal = false, use_wsos = false)
-polyminreal19() = polyminreal(:motzkin, 3, use_wsos = false)
-polyminreal20() = polyminreal(:reactiondiffusion, 4, use_primal = false, use_wsos = false)
-polyminreal21() = polyminreal(:lotkavolterra, 3, use_primal = false, use_wsos = false)
-polyminreal22() = polyminreal(:random, 3, use_primal = false, use_wsos = false, n = 3)
-polyminreal23() = polyminreal(:random, 3, use_primal = false, use_wsos = true, n = 3)
+polyminreal1(T::Type{<:HypReal}) = polyminreal(T, :heart, 2)
+polyminreal2(T::Type{<:HypReal}) = polyminreal(T, :schwefel, 2)
+polyminreal3(T::Type{<:HypReal}) = polyminreal(T, :magnetism7_ball, 2)
+polyminreal4(T::Type{<:HypReal}) = polyminreal(T, :motzkin_ellipsoid, 4)
+polyminreal5(T::Type{<:HypReal}) = polyminreal(T, :caprasse, 4)
+polyminreal6(T::Type{<:HypReal}) = polyminreal(T, :goldsteinprice, 7)
+polyminreal7(T::Type{<:HypReal}) = polyminreal(T, :lotkavolterra, 3)
+polyminreal8(T::Type{<:HypReal}) = polyminreal(T, :robinson, 8)
+polyminreal9(T::Type{<:HypReal}) = polyminreal(T, :robinson_ball, 8)
+polyminreal10(T::Type{<:HypReal}) = polyminreal(T, :rosenbrock, 5)
+polyminreal11(T::Type{<:HypReal}) = polyminreal(T, :butcher, 2)
+polyminreal12(T::Type{<:HypReal}) = polyminreal(T, :goldsteinprice_ellipsoid, 7)
+polyminreal13(T::Type{<:HypReal}) = polyminreal(T, :goldsteinprice_ball, 7)
+polyminreal14(T::Type{<:HypReal}) = polyminreal(T, :motzkin, 3, use_primal = false)
+polyminreal15(T::Type{<:HypReal}) = polyminreal(T, :motzkin, 3)
+polyminreal16(T::Type{<:HypReal}) = polyminreal(T, :reactiondiffusion, 4, use_primal = false)
+polyminreal17(T::Type{<:HypReal}) = polyminreal(T, :lotkavolterra, 3, use_primal = false)
+polyminreal18(T::Type{<:HypReal}) = polyminreal(T, :motzkin, 3, use_primal = false, use_wsos = false)
+polyminreal19(T::Type{<:HypReal}) = polyminreal(T, :motzkin, 3, use_wsos = false)
+polyminreal20(T::Type{<:HypReal}) = polyminreal(T, :reactiondiffusion, 4, use_primal = false, use_wsos = false)
+polyminreal21(T::Type{<:HypReal}) = polyminreal(T, :lotkavolterra, 3, use_primal = false, use_wsos = false)
+polyminreal22(T::Type{<:HypReal}) = polyminreal(T, :random, 2, use_primal = false, use_wsos = false, n = 1)
+polyminreal23(T::Type{<:HypReal}) = polyminreal(T, :random, 2, use_primal = false, use_wsos = true, n = 2)
 
 function polymincomplex(
+    T::Type{<:HypReal},
     polyname::Symbol,
     halfdeg::Int;
     use_primal::Bool = true,
@@ -135,7 +139,7 @@ function polymincomplex(
     use_QR::Bool = false,
     )
     if !use_wsos
-        error("psd formulation is not implemented yet")
+        error("PSD formulation is not implemented yet")
     end
 
     (n, f, gs, g_halfdegs, true_obj) = complexpolys[polyname]
@@ -151,12 +155,12 @@ function polymincomplex(
 
     # sample from domain (inefficient for general domains, only samples from unit box and checks feasibility)
     num_samples = sample_factor * U
-    samples = Vector{Vector{ComplexF64}}(undef, num_samples)
+    samples = Vector{Vector{Complex{T}}}(undef, num_samples)
     k = 0
-    randbox() = 2 * rand() - 1
+    randbox() = 2 * rand(T) - 1
     while k < num_samples
         z = [Complex(randbox(), randbox()) for i in 1:n]
-        if all(g -> g(z) > 0.0, gs)
+        if all(g -> g(z) > zero(T), gs)
             k += 1
             samples[k] = z
         end
@@ -164,12 +168,10 @@ function polymincomplex(
 
     # select subset of points to maximize |det(V)| in heuristic QR-based procedure (analogous to real case)
     V = [b(z) for z in samples, b in V_basis]
-    @test rank(V) == U
     VF = qr(Matrix(transpose(V)), Val(true))
     keep = VF.p[1:U]
     points = samples[keep]
     V = V[keep, :]
-    @test rank(V) == U
 
     # setup P matrices
     P0 = V[:, 1:L]
@@ -188,55 +190,56 @@ function polymincomplex(
 
     # setup problem data
     if use_primal
-        c = [-1.0]
-        A = zeros(0, 1)
-        b = Float64[]
-        G = ones(U, 1)
+        c = T[-1]
+        A = zeros(T, 0, 1)
+        b = T[]
+        G = ones(T, U, 1)
         h = f.(points)
-        true_obj *= -1
+        true_obj = -true_obj
     else
         c = f.(points)
-        A = ones(1, U) # TODO can eliminate equality and a variable
-        b = [1.0]
-        G = Diagonal(-1.0I, U)
-        h = zeros(U)
+        A = ones(T, 1, U) # TODO can eliminate equality and a variable
+        b = T[1]
+        G = Diagonal(-one(T) * I, U)
+        h = zeros(T, U)
     end
-    cones = [CO.WSOSPolyInterp{Float64, ComplexF64}(U, P_data, !use_primal)]
+    cones = [CO.WSOSPolyInterp{T, Complex{T}}(U, P_data, !use_primal)]
     cone_idxs = [1:U]
 
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs, true_obj = true_obj)
 end
 
-polymincomplex1() = polymincomplex(:abs1d, 1)
-polymincomplex2() = polymincomplex(:absunit1d, 1)
-polymincomplex3() = polymincomplex(:negabsunit1d, 2)
-polymincomplex4() = polymincomplex(:absball2d, 1)
-polymincomplex5() = polymincomplex(:absbox2d, 2)
-polymincomplex6() = polymincomplex(:negabsbox2d, 1)
-polymincomplex7() = polymincomplex(:denseunit1d, 2)
-polymincomplex8() = polymincomplex(:abs1d, 1, use_primal = false)
-polymincomplex9() = polymincomplex(:absunit1d, 1, use_primal = false)
-polymincomplex10() = polymincomplex(:negabsunit1d, 2, use_primal = false)
-polymincomplex11() = polymincomplex(:absball2d, 1, use_primal = false)
-polymincomplex12() = polymincomplex(:absbox2d, 2, use_primal = false)
-polymincomplex13() = polymincomplex(:negabsbox2d, 1, use_primal = false)
-polymincomplex14() = polymincomplex(:denseunit1d, 2, use_primal = false)
+polymincomplex1(T::Type{<:HypReal}) = polymincomplex(T, :abs1d, 1)
+polymincomplex2(T::Type{<:HypReal}) = polymincomplex(T, :absunit1d, 1)
+polymincomplex3(T::Type{<:HypReal}) = polymincomplex(T, :negabsunit1d, 2)
+polymincomplex4(T::Type{<:HypReal}) = polymincomplex(T, :absball2d, 1)
+polymincomplex5(T::Type{<:HypReal}) = polymincomplex(T, :absbox2d, 2)
+polymincomplex6(T::Type{<:HypReal}) = polymincomplex(T, :negabsbox2d, 1)
+polymincomplex7(T::Type{<:HypReal}) = polymincomplex(T, :denseunit1d, 2)
+polymincomplex8(T::Type{<:HypReal}) = polymincomplex(T, :abs1d, 1, use_primal = false)
+polymincomplex9(T::Type{<:HypReal}) = polymincomplex(T, :absunit1d, 1, use_primal = false)
+polymincomplex10(T::Type{<:HypReal}) = polymincomplex(T, :negabsunit1d, 2, use_primal = false)
+polymincomplex11(T::Type{<:HypReal}) = polymincomplex(T, :absball2d, 1, use_primal = false)
+polymincomplex12(T::Type{<:HypReal}) = polymincomplex(T, :absbox2d, 2, use_primal = false)
+polymincomplex13(T::Type{<:HypReal}) = polymincomplex(T, :negabsbox2d, 1, use_primal = false)
+polymincomplex14(T::Type{<:HypReal}) = polymincomplex(T, :denseunit1d, 2, use_primal = false)
 
-function test_polymin(instance::Function; options, rseed::Int = 1)
+function test_polymin(T::Type{<:HypReal}, instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
-    d = instance()
-    model = MO.PreprocessedLinearModel{Float64}(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
-    solver = SO.HSDSolver{Float64}(model; options...)
+    d = instance(T)
+    model = MO.PreprocessedLinearModel{T}(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
+    solver = SO.HSDSolver{T}(model; options...)
     SO.solve(solver)
-    r = SO.get_certificates(solver, model, test = true, atol = 1e-4, rtol = 1e-4)
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
+    r = SO.get_certificates(solver, model, test = true, atol = tol, rtol = tol)
     @test r.status == :Optimal
     if !isnan(d.true_obj)
-        @test r.primal_obj ≈ d.true_obj atol = 1e-4 rtol = 1e-4
+        @test r.primal_obj ≈ d.true_obj atol = tol rtol = tol
     end
     return
 end
 
-test_polymin_all(; options...) = test_polymin.([
+test_polymin_all(T::Type{<:HypReal}; options...) = test_polymin.(T, [
     polyminreal1,
     polyminreal2,
     polyminreal3,
@@ -276,7 +279,7 @@ test_polymin_all(; options...) = test_polymin.([
     polymincomplex14,
     ], options = options)
 
-test_polymin(; options...) = test_polymin.([
+test_polymin(T::Type{<:HypReal}; options...) = test_polymin.(T, [
     polyminreal2,
     polyminreal3,
     polyminreal12,

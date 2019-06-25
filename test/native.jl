@@ -5,7 +5,7 @@ Copyright 2018, Chris Coey and contributors
 import Random
 using LinearAlgebra
 using SparseArrays
-using GenericLinearAlgebra
+import GenericLinearAlgebra.svdvals!
 
 # solve model, check conic certificates are valid and return certificate data
 function solve_and_check(
