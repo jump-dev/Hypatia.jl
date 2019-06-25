@@ -1,13 +1,20 @@
-#=
-Copyright 2019, Chris Coey, Lea Kapelevich and contributors
+# compare formulations
 
-=#
+import Hypatia
+examples_dir = joinpath(dirname(dirname(pathof(Hypatia))), "examples")
+
+include(joinpath(examples_dir, "densityest/native.jl"))
+include(joinpath(examples_dir, "expdesign/native.jl"))
+include(joinpath(examples_dir, "matrixcompletion/native.jl"))
+include(joinpath(examples_dir, "polymin/native.jl"))
+include(joinpath(examples_dir, "sparsepca/native.jl"))
+include(joinpath(examples_dir, "portfolio/native.jl"))
 
 real_types = [Float64, Float32, BigFloat]
 tf = [true, false]
 seeds = 1:2
 
-function solve_formulation(d)
+function solve_formulation(d, T::Type{<:HypReal})
     model = MO.PreprocessedLinearModel{T}(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
     solver = SO.HSDSolver{T}(model, tol_abs_opt = 1e-5, tol_rel_opt = 1e-5, time_limit = 600)
     t = @timed SO.solve(solver)
@@ -22,22 +29,21 @@ end
 
 # compile run
 for T in real_types, use_wsos in tf
-    d = densityest(T, 10, 4, 2, use_wsos = use_wsos)
+    d = densityest(T, 10, 2, 2, use_wsos = use_wsos)
 end
 # run
 n_range = [1, 2]
-deg_range = [4, 6]
+deg_range = [4]
 io = open("densityest.csv", "w")
 println(io, "usewsos,real,seed,n,deg,dimx,dimy,dimz,time,bytes,numiters,status,pobj,dobj,xfeas,yfeas,zfeas")
-for use_wsos in tf n in n_range, deg in d_range, T in real_types, seed in seeds
+for use_wsos in tf, n in n_range, deg in deg_range, T in real_types, seed in seeds
     Random.seed!(seed)
     d = densityest(T, 200, n, deg, use_wsos = use_wsos)
-    (solver, r, dimx, dimy, dimz, t) = solve_formulation(d)
+    (solver, r, dimx, dimy, dimz, t) = solve_formulation(d, T)
     println(io, "$use_wsos,$T,$seed,$n,$deg,$dimx,$dimy,$dimz,$(t[2]),$(t[3])," *
         "$(solver.num_iters),$(r.status),$(r.primal_obj),$(r.dual_obj),$(solver.x_feas)," *
         "$(solver.y_feas),$(solver.z_feas)"
         )
-    end
 end
 close(io)
 
@@ -46,7 +52,7 @@ close(io)
 # # compile run
 # for use_ball in tf
 #     d = portfolio(4, risk_measures = [:l1, :linf], use_l1ball = use_ball, use_linfball = use_ball)
-#     (solver, r, dimx, dimy, dimz, t) = solve_formulation(d)
+#     (solver, r, dimx, dimy, dimz, t) = solve_formulation(d, T)
 # end
 # # run
 # n_range = [100, 200, 400, 600]
@@ -55,7 +61,7 @@ close(io)
 # for n in n_range, seed in seeds, use_ball in tf
 #     Random.seed!(seed)
 #     d = portfolio(T, n, risk_measures = [:l1, :linf], use_l1ball = use_ball, use_linfball = use_ball)
-#     (solver, r, dimx, dimy, dimz, t) = solve_formulation(d)
+#     (solver, r, dimx, dimy, dimz, t) = solve_formulation(d, T)
 #     println(io, "$use_ball,$seed,$n,$dimx,$dimy,$dimz,$(t[2]),$(t[3])," *
 #         "$(solver.num_iters),$(r.status),$(r.primal_obj),$(r.dual_obj),$(solver.x_feas)," *
 #         "$(solver.y_feas),$(solver.z_feas)"
@@ -64,23 +70,23 @@ close(io)
 # close(io)
 
 # expdesign
-
+q_range = [10, 20, 30]
 # compile run
 nmax = 5
 (p, q, n) = (3, 2, nmax)
-for T in real_types, use_logdet in tf, use_sumlog in tf
+for T in real_types, use_logdet in tf, use_sumlog in [false]
     d = expdesign(T, q, p, n, nmax, use_logdet = use_logdet, use_sumlog = use_sumlog)
-    (solver, r, dimx, dimy, dimz, t) = solve_formulation(d)
+    (solver, r, dimx, dimy, dimz, t) = solve_formulation(d, T)
 end
 # run
 io = open("expdesign.csv", "w")
 println(io, "uselogdet,use_sumlog,real,seed,q,p,n,dimx,dimy,dimz,time,bytes,numiters,status,pobj,dobj,xfeas,yfeas,zfeas")
-for q in q_range, T in real_types, seed in seeds, use_logdet in [false], use_sumlog in tf
+for q in q_range, T in real_types, seed in seeds, use_logdet in tf, use_sumlog in [false]
     p = 2 * q
     n = 2 * q
     Random.seed!(seed)
     d = expdesign(T, q, p, n, nmax, use_logdet = use_logdet, use_sumlog = use_sumlog)
-    (solver, r, dimx, dimy, dimz, t) = solve_formulation(d)
+    (solver, r, dimx, dimy, dimz, t) = solve_formulation(d, T)
     println(io, "$use_logdet,$use_sumlog,$T,$seed,$q,$p,$n,$dimx,$dimy,$dimz,$(t[2]),$(t[3])," *
         "$(solver.num_iters),$(r.status),$(r.primal_obj),$(r.dual_obj),$(solver.x_feas)," *
         "$(solver.y_feas),$(solver.z_feas)"
@@ -94,7 +100,7 @@ n_range = [10]
 # compile run
 for T in real_types, use_geomean in tf
     d = matrixcompletion(5, 5, use_geomean = use_geomean, T = T)
-    (solver, r, dimx, dimy, dimz, t) = solve_formulation(d)
+    (solver, r, dimx, dimy, dimz, t) = solve_formulation(d, T)
 end
 # run
 io = open("matrixcopletion.csv", "w")
@@ -104,7 +110,7 @@ for n in n_range, T in real_types, seed in seeds, use_geomean in tf
     num_known = round(Int, 0.1 * m * n)
     Random.seed!(seed)
     d = matrixcompletion(T, m, n, num_known = num_known, use_geomean = use_geomean)
-    (solver, r, dimx, dimy, dimz, t) = solve_formulation(d)
+    (solver, r, dimx, dimy, dimz, t) = solve_formulation(d, T)
     println(io, "$use_geomean,$T,$seed,$m,$n,$num_known,$dimx,$dimy,$dimz,$(t[2]),$(t[3])," *
         "$(solver.num_iters),$(r.status),$(r.primal_obj),$(r.dual_obj),$(solver.x_feas)," *
         "$(solver.y_feas),$(solver.z_feas)"
@@ -118,7 +124,7 @@ k_range = [5, 10, 20]
 # compile run
 for T in real_types, use_l1ball in tf
     d = sparsepca(T, 3, 3, 3, use_l1ball = use_l1ball)
-    (solver, r, dimx, dimy, dimz, t) = solve_formulation(d)
+    (solver, r, dimx, dimy, dimz, t) = solve_formulation(d, T)
 end
 # run
 io = open("sparsepca.csv", "w")
@@ -126,7 +132,7 @@ println(io, "usel1ball,real,seed,p,k,dimx,dimy,dimz,time,bytes,numiters,status,p
 for p in p_range, k in k_range, T in real_types, seed in seeds, use_l1ball in tf
     Random.seed!(seed)
     d = sparsepca(T, p, p, k, use_l1ball = use_l1ball)
-    (solver, r, dimx, dimy, dimz, t) = solve_formulation(d)
+    (solver, r, dimx, dimy, dimz, t) = solve_formulation(d, T)
     println(io, "$use_l1ball,$T,$seed,$p,$k,$dimx,$dimy,$dimz,$(t[2]),$(t[3])," *
         "$(solver.num_iters),$(r.status),$(r.primal_obj),$(r.dual_obj),$(solver.x_feas)," *
         "$(solver.y_feas),$(solver.z_feas)"
@@ -140,7 +146,7 @@ halfdeg_range = [3, 4, 5]
 # compile run
 for use_wsos in tf
     d = polyminreal(:random, 2, use_wsos = use_wsos, n = 2)
-    (solver, r, dimx, dimy, dimz, t) = solve_formulation(d)
+    (solver, r, dimx, dimy, dimz, t) = solve_formulation(d, T)
 end
 # compile
 io = open("polyminreal.csv", "w")
@@ -148,7 +154,7 @@ println(io, "usewsos,seed,n,halfdeg,dimx,dimy,dimz,time,bytes,numiters,status,po
 for n in n_range, halfdeg in halfdeg_range, use_wsos in tf, seed in seeds
     Random.seed!(seed)
     d = polyminreal(:random, halfdeg, use_wsos = use_wsos, n = n)
-    (solver, r, dimx, dimy, dimz, t) = solve_formulation(d)
+    (solver, r, dimx, dimy, dimz, t) = solve_formulation(d, T)
     println(io, "$use_wsos,$seed,$n,$halfdeg,$dimx,$dimy,$dimz,$(t[2]),$(t[3])," *
         "$(solver.num_iters),$(r.status),$(r.primal_obj),$(r.dual_obj),$(solver.x_feas)," *
         "$(solver.y_feas),$(solver.z_feas)"
