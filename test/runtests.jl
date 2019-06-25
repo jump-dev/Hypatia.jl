@@ -180,8 +180,6 @@ native_options = (
     @testset "polymin" begin test_polymin(; native_options...,
         tol_rel_opt = 1e-9, tol_abs_opt = 1e-8, tol_feas = 1e-9,
         ) end
-    @testset "portfolio" begin test_portfolio(; native_options...,
-        ) end
 end
 @testset "native examples: $T" for T in real_types
     @testset "densityest" begin test_densityest(T; native_options...,
@@ -191,6 +189,8 @@ end
     @testset "matrixcompletion" begin test_matrixcompletion(T; native_options...,
         ) end
     @testset "sparsepca" begin test_sparsepca(T; native_options...,
+        ) end
+    @testset "portfolio" begin test_portfolio(T; native_options...,
         ) end
 end
 

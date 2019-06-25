@@ -7,49 +7,39 @@ maximize expected returns subject to risk constraints
 using LinearAlgebra
 import Random
 using Test
-import DataFrames
-import CSV
-import DynamicPolynomials
 import Hypatia
+import Hypatia.HypReal
 const HYP = Hypatia
 const MO = HYP.Models
-const MU = HYP.ModelUtilities
 const CO = HYP.Cones
 const SO = HYP.Solvers
 
 function portfolio(
-    num_stocks::Int;
-    returns::Vector{Float64} = Float64[],
-    sigma_half::AbstractMatrix{Float64} = Matrix{Float64}(undef, 0, 0),
-    gamma::Float64 = -1.0,
-    risk_measures::Vector{Symbol} = [:entropic],
+    T::Type{<:HypReal},
+    num_stocks::Int,
+    risk_measures::Vector{Symbol};
     use_l1ball::Bool = true,
     use_linfball::Bool = true,
     )
     if :entropic in risk_measures && length(risk_measures) > 1
-        error("we currently assume entropic ball doesn't intersect with another ball")
+        error("if using entropic ball, cannot specify other risk measures")
     end
-    if isempty(returns)
-        returns = rand(num_stocks)
-    end
-    if isempty(sigma_half)
-        sigma_half = randn(num_stocks, num_stocks)
-    end
-    if gamma < 0
-        x = randn(num_stocks)
-        x ./= norm(x)
-        gamma = sum(abs, sigma_half * x) / sqrt(num_stocks)
-    end
+
+    returns = rand(num_stocks)
+    sigma_half = randn(num_stocks, num_stocks)
+    x = randn(num_stocks)
+    x ./= norm(x)
+    gamma = sum(abs, sigma_half * x) / sqrt(num_stocks)
 
     c = returns
     # investments add to one
     A = ones(1, num_stocks)
     b = [1.0]
     # nonnegativity
-    G = -Matrix{Float64}(I, num_stocks, num_stocks)
+    G = -Matrix{T}(I, num_stocks, num_stocks)
     h = zeros(num_stocks)
     cone_idxs = UnitRange{Int}[1:num_stocks]
-    cones = CO.Cone[CO.Nonnegative{Float64}(num_stocks)]
+    cones = CO.Cone[CO.Nonnegative{T}(num_stocks)]
     cone_offset = num_stocks
 
     function add_single_ball(cone, gamma)
@@ -63,19 +53,19 @@ function portfolio(
     end
 
     if :quadratic in risk_measures
-        add_single_ball(CO.EpiNormEucl{Float64}(num_stocks + 1), gamma)
+        add_single_ball(CO.EpiNormEucl{T}(num_stocks + 1), gamma)
     end
     if :l1 in risk_measures && use_l1ball
-        add_single_ball(CO.EpiNormInf{Float64}(num_stocks + 1, true), gamma * sqrt(num_stocks))
+        add_single_ball(CO.EpiNormInf{T}(num_stocks + 1, true), gamma * sqrt(num_stocks))
     end
     if :linf in risk_measures && use_linfball
-        add_single_ball(CO.EpiNormInf{Float64}(num_stocks + 1), gamma)
+        add_single_ball(CO.EpiNormInf{T}(num_stocks + 1), gamma)
     end
 
     if :l1 in risk_measures && !use_l1ball
         c = vcat(c, zeros(2 * num_stocks))
-        id = Matrix{Float64}(I, num_stocks, num_stocks)
-        id2 = Matrix{Float64}(I, 2 * num_stocks, 2 * num_stocks)
+        id = Matrix{T}(I, num_stocks, num_stocks)
+        id2 = Matrix{T}(I, 2 * num_stocks, 2 * num_stocks)
         A_slacks = [sigma_half -id id]
         A_l1 = [zeros(1, num_stocks) ones(1, 2 * num_stocks)]
         A = [
@@ -89,14 +79,14 @@ function portfolio(
             zeros(2 * num_stocks, num_stocks) -id2
             ]
         h = vcat(h, zeros(2 * num_stocks))
-        push!(cones, CO.Nonnegative{Float64}(2 * num_stocks))
+        push!(cones, CO.Nonnegative{T}(2 * num_stocks))
         push!(cone_idxs, (cone_offset + 1):(cone_offset + 2 * num_stocks))
         cone_offset += 2 * num_stocks
     end
 
     if :linf in risk_measures && !use_linfball
         c = vcat(c, zeros(2 * num_stocks))
-        id = Matrix{Float64}(I, num_stocks, num_stocks)
+        id = Matrix{T}(I, num_stocks, num_stocks)
         fill_cols = size(A, 2) - num_stocks
         fill_rows = size(A, 1)
         A = [
@@ -107,10 +97,10 @@ function portfolio(
         b = vcat(b, gamma * ones(2 * num_stocks))
         G = [
             G zeros(size(G, 1), 2 * num_stocks)
-            zeros(2 * num_stocks, size(G, 2)) -Matrix{Float64}(I, 2 * num_stocks, 2 * num_stocks)
+            zeros(2 * num_stocks, size(G, 2)) -Matrix{T}(I, 2 * num_stocks, 2 * num_stocks)
             ]
         h = vcat(h, zeros(2 * num_stocks))
-        push!(cones, CO.Nonnegative{Float64}(2 * num_stocks))
+        push!(cones, CO.Nonnegative{T}(2 * num_stocks))
         push!(cone_idxs, (cone_offset + 1):(cone_offset + 2 * num_stocks))
         cone_offset += 2 * num_stocks
     end
@@ -137,60 +127,44 @@ function portfolio(
         G = [G zeros(size(G, 1), 2 * num_stocks); G2pos; G2neg]
         h = vcat(h, h2, h2)
         cone_idxs = vcat(cone_idxs, [(3 * (i - 1) + cone_offset + 1):(3 * i + cone_offset) for i in 1:(2 * num_stocks)])
-        cones = vcat(cones, [CO.HypoPerLog{Float64}() for _ in 1:(2 * num_stocks)])
+        cones = vcat(cones, [CO.HypoPerLog{T}() for _ in 1:(2 * num_stocks)])
         cone_offset += 6 * num_stocks
     end
 
-    return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs, sigma_half = sigma_half, gamma = gamma)
+    return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs)
 end
 
-function test_portfolio(instance::Function; options, rseed::Int = 1)
+portfolio1(T::Type{<:HypReal}) = portfolio(T, 4, [:l1], use_l1ball = true)
+portfolio2(T::Type{<:HypReal}) = portfolio(T, 4, [:l1], use_l1ball = false)
+portfolio3(T::Type{<:HypReal}) = portfolio(T, 4, [:linf], use_linfball = true)
+portfolio4(T::Type{<:HypReal}) = portfolio(T, 4, [:linf], use_linfball = false)
+portfolio5(T::Type{<:HypReal}) = portfolio(T, 4, [:linf, :l1], use_linfball = true, use_l1ball = true)
+portfolio6(T::Type{<:HypReal}) = portfolio(T, 4, [:linf, :l1], use_linfball = false, use_l1ball = false)
+
+function test_portfolio(T::Type{<:HypReal}, instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
-    d = instance()
-    model = MO.PreprocessedLinearModel{Float64}(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
-    solver = SO.HSDSolver{Float64}(model; options...)
+    d = instance(T)
+    model = MO.PreprocessedLinearModel{T}(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
+    solver = SO.HSDSolver{T}(model; options...)
     SO.solve(solver)
-    r = SO.get_certificates(solver, model, test = true, atol = 1e-4, rtol = 1e-4)
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
+    r = SO.get_certificates(solver, model, test = true, atol = tol, rtol = tol)
     @test r.status == :Optimal
     return
 end
 
-portfolio_ex(risk_measures::Vector{Symbol}; kwargs...) = portfolio(
-    3,
-    returns = -[0.0254,	0.0190,	0.0045],
-    sigma_half = cholesky([
-        0.0056	0.0012	0.0001
-        0.0012	0.0020	0.0002
-        0.0001	0.0002	0.0019
-        ]).U,
-    gamma = 0.033,
-    risk_measures = risk_measures;
-    kwargs...,
-    )
-
-portfolio1() = portfolio_ex([:quadratic])
-portfolio2() = portfolio_ex([:entropic])
-portfolio3() = portfolio(4, risk_measures = [:l1], use_l1ball = true)
-portfolio4() = portfolio(4, risk_measures = [:l1], use_l1ball = false)
-portfolio5() = portfolio(4, risk_measures = [:linf], use_linfball = true)
-portfolio6() = portfolio(4, risk_measures = [:linf], use_linfball = false)
-portfolio7() = portfolio(4, risk_measures = [:linf, :l1], use_linfball = true, use_l1ball = true)
-portfolio8() = portfolio(4, risk_measures = [:linf, :l1], use_linfball = false, use_l1ball = false)
-
-test_portfolio_all(; options...) = test_portfolio.([
+test_portfolio_all(T::Type{<:HypReal}; options...) = test_portfolio.(T, [
     portfolio1,
     portfolio2,
     portfolio3,
     portfolio4,
     portfolio5,
     portfolio6,
-    portfolio7,
-    portfolio8,
     ], options = options)
 
-test_portfolio(; options...) = test_portfolio.([
+test_portfolio(T::Type{<:HypReal}; options...) = test_portfolio.(T, [
     portfolio1,
-    portfolio2,
-    portfolio7,
-    portfolio8,
+    portfolio3,
+    portfolio5,
+    portfolio6,
     ], options = options)
