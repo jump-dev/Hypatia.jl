@@ -8,53 +8,50 @@ using LinearAlgebra
 import Random
 using Test
 import Hypatia
+import Hypatia.HypReal
 const HYP = Hypatia
 const MO = HYP.Models
-const MU = HYP.ModelUtilities
 const CO = HYP.Cones
 const SO = HYP.Solvers
 
-const rt2 = sqrt(2)
-
-THR = Type{<: HYP.HypReal}
-
 function expdesign(
+    T::Type{<:HypReal},
     q::Int,
     p::Int,
     n::Int,
     nmax::Int;
-    T::THR = Float64,
     use_logdet::Bool = true,
     use_sumlog::Bool = true,
     )
     @assert (p > q) && (n > q) && (nmax <= n)
-    V = randn(q, p)
+    rt2 = sqrt(T(2))
+    V = T(4) * rand(T, q, p) .- T(2)
 
     # hypograph variable and number of trials of each experiment
-    A = ones(1, p)
-    b = Float64[n]
+    A = ones(T, 1, p)
+    b = T[n]
 
     # nonnegativity
-    G_nonneg = -Matrix{Float64}(I, p, p)
-    h_nonneg = zeros(p)
+    G_nonneg = Matrix{T}(-I, p, p)
+    h_nonneg = zeros(T, p)
     # do <= nmax experiments
-    G_nmax = -Matrix{Float64}(I, p, p)
-    h_nmax = fill(nmax, p)
+    G_nmax = Matrix{T}(-I, p, p)
+    h_nmax = fill(T(nmax), p)
 
     cones = CO.Cone[CO.Nonnegative{T}(p), CO.Nonnegative{T}(p)]
     cone_idxs = [1:p, (p + 1):(2 * p)]
 
     if use_logdet
         # pad with hypograph variable
-        A = [0 A]
-        G_nonneg = [zeros(p) G_nonneg]
-        G_nmax = [zeros(p) G_nmax]
+        A = hcat(zero(T), A)
+        G_nonneg = hcat(zeros(T, p), G_nonneg)
+        G_nmax = hcat(zeros(T, p), G_nmax)
         # maximize the hypograph variable of the logdet cone
-        c = vcat(-1, zeros(p))
+        c = vcat(-one(T), zeros(T, p))
 
         # dimension of vectorized matrix V*diag(np)*V'
         dimvec = div(q * (q + 1), 2)
-        G_logdet = zeros(dimvec, p)
+        G_logdet = zeros(T, dimvec, p)
         l = 1
         for i in 1:q, j in 1:i
             for k in 1:p
@@ -64,8 +61,12 @@ function expdesign(
         end
         @assert l - 1 == dimvec
         # pad with hypograph variable and perspective variable
-        h_logdet = [0, 1, zeros(size(G_logdet, 1))...]
-        G_logdet = [-1 zeros(1, p); zeros(1, p + 1); zeros(dimvec) G_logdet]
+        h_logdet = vcat(zero(T), one(T), zeros(T, dimvec))
+        G_logdet = [
+            -one(T)    zeros(T, 1, p);
+            zeros(T, 1, p + 1);
+            zeros(T, dimvec)    G_logdet;
+            ]
         push!(cones, CO.HypoPerLogdet{T}(dimvec + 2))
         push!(cone_idxs, (2 * p + 1):(2 * p + dimvec + 2))
 
@@ -85,15 +86,15 @@ function expdesign(
             num_hypo = q
         end
         # pad with triangle matrix variables and q hypopoerlog cone hypograph variables
-        A = [A zeros(1, padx)]
-        G_nonneg = [G_nonneg zeros(p, padx)]
-        G_nmax = [G_nmax zeros(p, padx)]
+        A = [A zeros(T, 1, padx)]
+        G_nonneg = hcat(G_nonneg, zeros(T, p, padx))
+        G_nmax = hcat(G_nmax, zeros(T, p, padx))
         # maximize the sum of hypograph variables of all hypoperlog cones
-        c = vcat(zeros(p), zeros(num_trivars), -ones(num_hypo))
+        c = vcat(zeros(T, p + num_trivars), -ones(T, num_hypo))
 
         # vectorized dimension of psd matrix
         dimvec = q * (2 * q + 1)
-        G_psd = zeros(dimvec, dimx)
+        G_psd = zeros(T, dimvec, dimx)
 
         # variables in upper triangular matrix numbered row-wise
         diag_idx(i::Int) = (i == 1 ? 1 : 1 + sum(q - j for j in 0:(i - 2)))
@@ -124,29 +125,29 @@ function expdesign(
             l += 1
         end
 
-        h_psd = zeros(dimvec)
+        h_psd = zeros(T, dimvec)
         push!(cone_idxs, (2 * p + 1):(2 * p + dimvec))
         push!(cones, CO.PosSemidef{T, T}(dimvec))
 
         if use_sumlog
-            G_logvars = zeros(q, num_trivars)
+            G_logvars = zeros(T, q, num_trivars)
             for i in 1:q
                 G_logvars[i, diag_idx(i)] = -1
             end
             G_log = [
                 # hypograph row
-                zeros(1, p + num_trivars) -1
+                zeros(T, 1, p + num_trivars)    -one(T)
                 # perspective row
-                zeros(1, dimx)
+                zeros(T, 1, dimx)
                 # log row
-                zeros(q, p) G_logvars zeros(q)
+                zeros(T, q, p)    G_logvars    zeros(T, q)
                 ]
-            h_log = vcat(0, 1, zeros(q))
+            h_log = vcat(zero(T), one(T), zeros(q))
             push!(cone_idxs, (2 * p + dimvec + 1):(2 * p + dimvec + 2 + q))
             push!(cones, CO.HypoPerSumLog{T}(q + 2))
         else
-            G_log = zeros(3 * q, dimx)
-            h_log = zeros(3 * q)
+            G_log = zeros(T, 3 * q, dimx)
+            h_log = zeros(T, 3 * q)
             offset = 1
             for i in 1:q
                 # hypograph variable
@@ -168,29 +169,30 @@ function expdesign(
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs)
 end
 
-function test_expdesign(instance::Function; T::THR = Float64, rseed::Int = 1, options)
+function test_expdesign(T::Type{<:HypReal}, instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
-    d = instance(T = T)
+    d = instance(T)
     model = MO.PreprocessedLinearModel{T}(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
     solver = SO.HSDSolver{T}(model; options...)
     SO.solve(solver)
-    r = SO.get_certificates(solver, model, test = true, atol = 1e-4, rtol = 1e-4)
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
+    r = SO.get_certificates(solver, model, test = true, atol = tol, rtol = tol)
     @test r.status == :Optimal
     return
 end
 
-expdesign1(; T::THR = Float64) = expdesign(25, 75, 125, 5, use_logdet = true, T = T)
-expdesign2(; T::THR = Float64) = expdesign(10, 30, 50, 5, use_logdet = true, T = T)
-expdesign3(; T::THR = Float64) = expdesign(5, 15, 25, 5, use_logdet = true, T = T)
-expdesign4(; T::THR = Float64) = expdesign(4, 8, 12, 3, use_logdet = true, T = T)
-expdesign5(; T::THR = Float64) = expdesign(3, 5, 7, 2, use_logdet = true, T = T)
-expdesign6(; T::THR = Float64) = expdesign(25, 75, 125, 5, use_logdet = false, T = T)
-expdesign7(; T::THR = Float64) = expdesign(10, 30, 50, 5, use_logdet = false, T = T)
-expdesign8(; T::THR = Float64) = expdesign(5, 15, 25, 5, use_logdet = false, T = T)
-expdesign9(; T::THR = Float64) = expdesign(4, 8, 12, 3, use_logdet = false, T = T)
-expdesign10(; T::THR = Float64) = expdesign(3, 5, 7, 2, use_logdet = false, T = T)
+expdesign1(T::Type{<:HypReal}) = expdesign(T, 25, 75, 125, 5, use_logdet = true)
+expdesign2(T::Type{<:HypReal}) = expdesign(T, 10, 30, 50, 5, use_logdet = true)
+expdesign3(T::Type{<:HypReal}) = expdesign(T, 5, 15, 25, 5, use_logdet = true)
+expdesign4(T::Type{<:HypReal}) = expdesign(T, 4, 8, 12, 3, use_logdet = true)
+expdesign5(T::Type{<:HypReal}) = expdesign(T, 3, 5, 7, 2, use_logdet = true)
+expdesign6(T::Type{<:HypReal}) = expdesign(T, 25, 75, 125, 5, use_logdet = false)
+expdesign7(T::Type{<:HypReal}) = expdesign(T, 10, 30, 50, 5, use_logdet = false)
+expdesign8(T::Type{<:HypReal}) = expdesign(T, 5, 15, 25, 5, use_logdet = false)
+expdesign9(T::Type{<:HypReal}) = expdesign(T, 4, 8, 12, 3, use_logdet = false)
+expdesign10(T::Type{<:HypReal}) = expdesign(T, 3, 5, 7, 2, use_logdet = false)
 
-test_expdesign_all(; T::THR = Float64, options...) = test_expdesign.([
+test_expdesign_all(T::Type{<:HypReal}; options...) = test_expdesign.(T, [
     expdesign1,
     expdesign2,
     expdesign3,
@@ -198,12 +200,12 @@ test_expdesign_all(; T::THR = Float64, options...) = test_expdesign.([
     expdesign5,
     expdesign6,
     expdesign7,
-    expdesign9,
+    expdesign8,
     expdesign9,
     expdesign10,
-    ], T = T, options = options)
+    ], options = options)
 
-test_expdesign(; T::THR = Float64, options...) = test_expdesign.([
-    expdesign3,
-    expdesign8,
-    ], T = T, options = options)
+test_expdesign(T::Type{<:HypReal}; options...) = test_expdesign.(T, [
+    expdesign5,
+    expdesign10,
+    ], options = options)
