@@ -4,17 +4,6 @@ Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 see "A Direct Formulation for Sparse PCA Using Semidefinite Programming" by
 Alexandre d’Aspremont, Laurent El Ghaoui, Michael I. Jordan, Gert R. G. Lanckriet
 
-TODO add examples with stochastic data e.g.
-
-signal = randn(0, snr)
-# sample components that will carry the signal
-spike = sample(1:p, k)
-sigma = zeros(p, p)
-for i in 1:n
-    x = randn(p)
-    x[spike] .+= signal
-    sigma += x * x' / n
-end
 ==#
 
 using LinearAlgebra
