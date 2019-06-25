@@ -12,31 +12,28 @@ find a density function f maximizing the log likelihood of the observations
 using LinearAlgebra
 import Random
 using Test
-import DynamicPolynomials
 import Hypatia
+import Hypatia.HypReal
 const HYP = Hypatia
 const MO = HYP.Models
 const MU = HYP.ModelUtilities
 const CO = HYP.Cones
 const SO = HYP.Solvers
 
-THR = Type{<: HYP.HypReal}
-
-const rt2 = sqrt(2)
-
 include(joinpath(@__DIR__, "data.jl"))
 
 function densityest(
-    X::AbstractMatrix{Float64},
+    T::Type{<:HypReal},
+    X::Matrix{Float64},
     deg::Int;
     use_sumlog::Bool = false,
     use_wsos::Bool = true,
     sample_factor::Int = 100,
-    T::THR = Float64,
     )
     (nobs, dim) = size(X)
+    rt2 = sqrt(T(2))
+    X = convert(Matrix{T}, X)
 
-    X = convert(AbstractMatrix{T}, X)
     domain = MU.Box(-ones(dim), ones(dim))
     # rescale X to be in unit box
     minX = minimum(X, dims = 1)
@@ -65,7 +62,7 @@ function densityest(
     cone_offset = 1
     if use_wsos
         # will set up for U variables
-        G_poly = -Matrix{T}(I, U, U)
+        G_poly = Matrix{T}(-I, U, U)
         h_poly = zeros(T, U)
         c_poly = zeros(T, U)
         A_poly = zeros(T, 0, U)
@@ -113,9 +110,9 @@ function densityest(
         end
         A_lin = zeros(T, 1, U + num_psd_vars)
         A_poly = hcat(a_poly...)
-        A_poly = [-Matrix{T}(I, U, U) A_poly]
+        A_poly = [Matrix{T}(-I, U, U) A_poly]
         b_poly = zeros(T, U)
-        G_poly = [zeros(T, num_psd_vars, U) -Matrix{T}(I, num_psd_vars, num_psd_vars)]
+        G_poly = [zeros(T, num_psd_vars, U) Matrix{T}(-I, num_psd_vars, num_psd_vars)]
         h_poly = zeros(T, num_psd_vars)
     end
     A_lin[1:U] = w
@@ -142,8 +139,8 @@ function densityest(
         c_log = -ones(nobs)
         G_poly = [zeros(T, cone_offset - 1, nobs) G_poly]
         A = [
-            zeros(T, size(A_poly, 1), nobs) A_poly
-            zeros(T, 1, nobs) A_lin
+            zeros(T, size(A_poly, 1), nobs)    A_poly;
+            zeros(T, 1, nobs)    A_lin;
             ]
         h_log = zeros(T, 3 * nobs)
 
@@ -162,34 +159,35 @@ function densityest(
     G = vcat(G_poly, G_log)
     h = vcat(h_poly, h_log)
     c = vcat(c_log, zeros(T, U), zeros(T, num_psd_vars))
-    b = vcat(b_poly, 1)
+    b = vcat(b_poly, one(T))
 
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs)
 end
 
-densityest(nobs::Int, n::Int, deg::Int; options...) = densityest(randn(nobs, n), deg; options...)
+densityest(T::Type{<:HypReal}, nobs::Int, n::Int, deg::Int; options...) = densityest(T, rand(T, nobs, n), deg; options...)
 
-densityest1(; T::THR = Float64) = densityest(iris_data(), 4, use_sumlog = true, T = T)
-densityest2(; T::THR = Float64) = densityest(iris_data(), 4, use_sumlog = false, T = T)
-densityest3(; T::THR = Float64) = densityest(cancer_data(), 4, use_sumlog = true, T = T)
-densityest4(; T::THR = Float64) = densityest(cancer_data(), 4, use_sumlog = false, T = T)
-densityest5(; T::THR = Float64) = densityest(200, 1, 4, use_sumlog = true, T = T)
-densityest6(; T::THR = Float64) = densityest(200, 1, 4, use_sumlog = false, T = T)
-densityest7(; T::THR = Float64) = densityest(200, 1, 4, use_sumlog = true, use_wsos = false, T = T)
-densityest8(; T::THR = Float64) = densityest(200, 1, 4, use_sumlog = false, use_wsos = false, T = T)
+densityest1(T::Type{<:HypReal}) = densityest(T, iris_data(), 4, use_sumlog = true)
+densityest2(T::Type{<:HypReal}) = densityest(T, iris_data(), 4, use_sumlog = false)
+densityest3(T::Type{<:HypReal}) = densityest(T, cancer_data(), 4, use_sumlog = true)
+densityest4(T::Type{<:HypReal}) = densityest(T, cancer_data(), 4, use_sumlog = false)
+densityest5(T::Type{<:HypReal}) = densityest(T, 50, 1, 4, use_sumlog = true)
+densityest6(T::Type{<:HypReal}) = densityest(T, 50, 1, 4, use_sumlog = false)
+densityest7(T::Type{<:HypReal}) = densityest(T, 50, 1, 4, use_sumlog = true, use_wsos = false)
+densityest8(T::Type{<:HypReal}) = densityest(T, 50, 1, 4, use_sumlog = false, use_wsos = false)
 
-function test_densityest(instance::Function; T::THR = Float64, rseed::Int = 1, options)
+function test_densityest(T::Type{<:HypReal}, instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
-    d = instance(T = T)
+    d = instance(T)
     model = MO.PreprocessedLinearModel{T}(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
     solver = SO.HSDSolver{T}(model; options...)
     SO.solve(solver)
-    r = SO.get_certificates(solver, model, test = true, atol = 1e-4, rtol = 1e-4)
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
+    r = SO.get_certificates(solver, model, test = true, atol = tol, rtol = tol)
     @test r.status == :Optimal
     return
 end
 
-test_densityest_all(; T::THR = Float64, options...) = test_densityest.([
+test_densityest_all(T::Type{<:HypReal}; options...) = test_densityest.(T, [
     densityest1,
     densityest2,
     densityest3,
@@ -198,13 +196,13 @@ test_densityest_all(; T::THR = Float64, options...) = test_densityest.([
     densityest6,
     densityest7,
     densityest8,
-    ], T = T, options = options)
+    ], options = options)
 
-test_densityest(; T::THR = Float64, options...) = test_densityest.([
+    test_densityest(T::Type{<:HypReal}; options...) = test_densityest.(T, [
     densityest1,
     densityest3,
     densityest5,
     densityest6,
     densityest7,
     densityest8,
-    ], T = T, options = options)
+    ], options = options)
