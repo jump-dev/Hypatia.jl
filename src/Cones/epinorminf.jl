@@ -26,6 +26,7 @@ mutable struct EpiNormInf{T <: HypReal} <: Cone{T}
     Harw::Arrow
     diagidxs::Vector{Int}
     Hi::Matrix{T}
+    diagiedge::Vector{T}
     F
 
     function EpiNormInf{T}(dim::Int, is_dual::Bool) where {T <: HypReal}
@@ -46,6 +47,7 @@ function setup_data(cone::EpiNormInf{T}) where {T <: HypReal}
 
     cone.Harw = Arrow(zero(T), zeros(T, dim - 1), zeros(T, dim - 1))
     cone.diagidxs = diagind(zeros(dim, dim))[2:end] # TODO calculate
+    diagiedge = zeros(T, dim - 1)
     return
 end
 
@@ -100,14 +102,16 @@ function hess(cone::EpiNormInf{T}) where {T <: HypReal}
 end
 
 function inv_hess(cone::EpiNormInf{T}) where {T <: HypReal}
+    # the inverse is Diag(0, inv(diag)) + xx'/schur where x = (-1, edge ./ diag)
     ret = zeros(T, cone.dim, cone.dim)
     H = cone.Harw
     view(ret, cone.diagidxs) .= inv.(H.diag)
-    diag_inv_edge = H.edge ./ H.diag
-    ret[2:end, 2:end] = diag_inv_edge * diag_inv_edge' #/ schur
-    ret[1, 2:end] = -diag_inv_edge #/ schur
+    diagiedge = cone.diagiedge
+    diagiedge = H.edge ./ H.diag
+    ret[2:end, 2:end] = diagiedge * diagiedge'
+    ret[1, 2:end] = -diagiedge
     ret[1, 1] = 1
-    schur = H.point - dot(H.edge, diag_inv_edge)
+    schur = H.point - dot(H.edge, diagiedge)
     ret ./= schur
     ret[cone.diagidxs] += inv.(H.diag)
     return Symmetric(ret)
@@ -122,13 +126,18 @@ end
 
 function inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiNormInf{T}) where {T <: HypReal}
     H = cone.Harw
-    diag_inv_edge = H.edge ./ H.diag
-    x_arr = diag_inv_edge' * arr[2:end, :] - arr[1, :]' # row vector in math
-    prod[2:cone.dim, :] = diag_inv_edge * x_arr
+    # edge ./ diag
+    diagiedge = cone.diagiedge
+    diagiedge = H.edge ./ H.diag
+    # x' * arr
+    x_arr = diagiedge' * arr[2:end, :] - arr[1, :]' # row vector in math
+    # x * (x' * arr)
+    prod[2:cone.dim, :] = diagiedge * x_arr
     prod[1, :] = -x_arr
-    schur = H.point - dot(H.edge, diag_inv_edge)
+    # x * (x' * arr) / schur
+    schur = H.point - dot(H.edge, diagiedge)
     prod ./= schur
+    # add Diag(0, inv(diag)) * arr
     prod[2:end, :] .+= arr[2:end, :] ./ H.diag
-
     return prod
 end
