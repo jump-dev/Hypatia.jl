@@ -20,6 +20,7 @@ include(joinpath(@__DIR__, "MathOptInterface.jl"))
 examples_dir = joinpath(@__DIR__, "../examples")
 include(joinpath(examples_dir, "centralpolymat/JuMP.jl"))
 include(joinpath(examples_dir, "envelope/native.jl"))
+include(joinpath(examples_dir, "expdesign/native.jl"))
 include(joinpath(examples_dir, "linearopt/native.jl"))
 include(joinpath(examples_dir, "polymin/native.jl"))
 include(joinpath(examples_dir, "contraction/JuMP.jl"))
@@ -170,6 +171,8 @@ native_options = (
     @testset "densityest" begin test_densityest(; native_options...,
         ) end
     @testset "envelope" begin test_envelope(; native_options...,
+        ) end
+    @testset "expdesign" begin test_expdesign(; native_options...,
         ) end
     @testset "linearopt" begin test_linearopt(; native_options...,
         ) end

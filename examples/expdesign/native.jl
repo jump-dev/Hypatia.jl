@@ -8,7 +8,6 @@ using LinearAlgebra
 import Random
 using Test
 import Hypatia
-import Hypatia
 const HYP = Hypatia
 const MO = HYP.Models
 const MU = HYP.ModelUtilities
@@ -17,12 +16,17 @@ const SO = HYP.Solvers
 
 const rt2 = sqrt(2)
 
+THR = Type{<: HYP.HypReal}
+
 function expdesign(
     q::Int,
     p::Int,
     n::Int,
     nmax::Int;
+    T::THR = Float64,
     use_logdet::Bool = true,
+    use_sumlog::Bool = true,
+    alpha = 4,
     )
     @assert (p > q) && (n > q) && (nmax <= n)
     V = randn(q, p)
@@ -35,10 +39,10 @@ function expdesign(
     G_nonneg = -Matrix{Float64}(I, p, p)
     h_nonneg = zeros(p)
     # do <= nmax experiments
-    G_nmax = Matrix{Float64}(I, p, p)
+    G_nmax = -Matrix{Float64}(I, p, p)
     h_nmax = fill(nmax, p)
 
-    cones = CO.Cone[CO.Nonnegative{Float64}(p), CO.Nonnegative{Float64}(p)]
+    cones = CO.Cone[CO.Nonnegative{T}(p), CO.Nonnegative{T}(p)]
     cone_idxs = [1:p, (p + 1):(2 * p)]
 
     if use_logdet
@@ -50,7 +54,7 @@ function expdesign(
         c = vcat(-1, zeros(p))
 
         # dimension of vectorized matrix V*diag(np)*V'
-        dimvec = Int(q * (q + 1) / 2)
+        dimvec = div(q * (q + 1), 2)
         G_logdet = zeros(dimvec, p)
         l = 1
         for i in 1:q, j in 1:i
@@ -63,23 +67,30 @@ function expdesign(
         # pad with hypograph variable and perspective variable
         h_logdet = [0, 1, zeros(size(G_logdet, 1))...]
         G_logdet = [-1 zeros(1, p); zeros(1, p + 1); zeros(dimvec) G_logdet]
-        push!(cones, CO.HypoPerLogdet{Float64}(dimvec + 2))
+        push!(cones, CO.HypoPerLogdet{T}(dimvec + 2, alpha = alpha))
         push!(cone_idxs, (2 * p + 1):(2 * p + dimvec + 2))
 
         G = vcat(G_nonneg, G_nmax, G_logdet)
         h = vcat(h_nonneg, h_nmax, h_logdet)
     else
         # requires an upper triangular matrix of additional variables, ordered row wise
-        num_trivars = Int(q * (q + 1) / 2)
+        num_trivars = div(q * (q + 1), 2)
+        if use_sumlog
+            dimx = p + num_trivars + 1
+            padx = num_trivars + 1
+            num_hypo = 1
+        else
+            # number of experiments, upper triangular matrix, hypograph variables
+            dimx = p + num_trivars + q
+            padx = num_trivars + q
+            num_hypo = q
+        end
         # pad with triangle matrix variables and q hypopoerlog cone hypograph variables
-        A = [A zeros(1, num_trivars) zeros(1, q)]
-        G_nonneg = [G_nonneg zeros(p, num_trivars) zeros(p, q)]
-        G_nmax = [G_nmax zeros(p, num_trivars) zeros(p, q)]
+        A = [A zeros(1, padx)]
+        G_nonneg = [G_nonneg zeros(p, padx)]
+        G_nmax = [G_nmax zeros(p, padx)]
         # maximize the sum of hypograph variables of all hypoperlog cones
-        c = vcat(zeros(p), zeros(num_trivars), -ones(q))
-
-        # number of experiments, upper triangular matrix, hypograph variables
-        dimx = p + num_trivars + q
+        c = vcat(zeros(p), zeros(num_trivars), -ones(num_hypo))
 
         # vectorized dimension of psd matrix
         dimvec = q * (2 * q + 1)
@@ -116,24 +127,41 @@ function expdesign(
 
         h_psd = zeros(dimvec)
         push!(cone_idxs, (2 * p + 1):(2 * p + dimvec))
-        push!(cones, CO.PosSemidef{Float64, Float64}(dimvec))
+        push!(cones, CO.PosSemidef{T, T}(dimvec))
 
-        G_log = zeros(3 * q, dimx)
-        h_log = zeros(3 * q)
-        offset = 1
-        for i in 1:q
-            # hypograph variable
-            G_log[offset, p + num_trivars + i] = -1
-            # perspective variable
-            h_log[offset + 1] = 1
-            # diagonal element in the triangular matrix
-            G_log[offset + 2, p + diag_idx(i)] = -1
-            cone_offset = 2 * p + dimvec + offset
-            push!(cone_idxs, cone_offset:(cone_offset + 2))
-            push!(cones, CO.HypoPerLog{Float64}())
-            offset += 3
+        if use_sumlog
+            G_logvars = zeros(q, num_trivars)
+            for i in 1:q
+                G_logvars[i, diag_idx(i)] = -1
+            end
+            G_log = [
+                # hypograph row
+                zeros(1, p + num_trivars) -1
+                # perspective row
+                zeros(1, dimx)
+                # log row
+                zeros(q, p) G_logvars zeros(q)
+                ]
+            h_log = vcat(0, 1, zeros(q))
+            push!(cone_idxs, (2 * p + dimvec + 1):(2 * p + dimvec + 2 + q))
+            push!(cones, CO.HypoPerSumLog{T}(q + 2, alpha = alpha))
+        else
+            G_log = zeros(3 * q, dimx)
+            h_log = zeros(3 * q)
+            offset = 1
+            for i in 1:q
+                # hypograph variable
+                G_log[offset, p + num_trivars + i] = -1
+                # perspective variable
+                h_log[offset + 1] = 1
+                # diagonal element in the triangular matrix
+                G_log[offset + 2, p + diag_idx(i)] = -1
+                cone_offset = 2 * p + dimvec + offset
+                push!(cone_idxs, cone_offset:(cone_offset + 2))
+                push!(cones, CO.HypoPerLog{T}())
+                offset += 3
+            end
         end
-
         G = vcat(G_nonneg, G_nmax, G_psd, G_log)
         h = vcat(h_nonneg, h_nmax, h_psd, h_log)
     end
@@ -141,29 +169,29 @@ function expdesign(
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs)
 end
 
-function test_expdesign(instance::Function; options, rseed::Int = 1)
+function test_expdesign(instance::Function; T::THR = Float64, rseed::Int = 1, options)
     Random.seed!(rseed)
-    d = instance()
-    model = MO.PreprocessedLinearModel{Float64}(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
-    solver = SO.HSDSolver{Float64}(model; options...)
+    d = instance(T = T)
+    model = MO.PreprocessedLinearModel{T}(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
+    solver = SO.HSDSolver{T}(model; options...)
     SO.solve(solver)
-    r = SO.get_certificates(solver, model, test = true, atol = 1e-4, rtol = 1e-4)
+    r = SO.get_certificates(solver, model, test = false, atol = 1e-4, rtol = 1e-4)
     @test r.status == :Optimal
     return
 end
 
-expdesign1() = expdesign(25, 75, 125, 5, use_logdet = true)
-expdesign2() = expdesign(10, 30, 50, 5, use_logdet = true)
-expdesign3() = expdesign(5, 15, 25, 5, use_logdet = true)
-expdesign4() = expdesign(4, 8, 12, 3, use_logdet = true)
-expdesign5() = expdesign(3, 5, 7, 2, use_logdet = true)
-expdesign6() = expdesign(25, 75, 125, 5, use_logdet = false)
-expdesign7() = expdesign(10, 30, 50, 5, use_logdet = false)
-expdesign8() = expdesign(5, 15, 25, 5, use_logdet = false)
-expdesign9() = expdesign(4, 8, 12, 3, use_logdet = false)
-expdesign10() = expdesign(3, 5, 7, 2, use_logdet = false)
+expdesign1(; T::THR = Float64) = expdesign(25, 75, 125, 5, use_logdet = true, T = T)
+expdesign2(; T::THR = Float64) = expdesign(10, 30, 50, 5, use_logdet = true, T = T)
+expdesign3(; T::THR = Float64) = expdesign(5, 15, 25, 5, use_logdet = true, T = T)
+expdesign4(; T::THR = Float64) = expdesign(4, 8, 12, 3, use_logdet = true, T = T)
+expdesign5(; T::THR = Float64) = expdesign(3, 5, 7, 2, use_logdet = true, T = T)
+expdesign6(; T::THR = Float64) = expdesign(25, 75, 125, 5, use_logdet = false, T = T)
+expdesign7(; T::THR = Float64) = expdesign(10, 30, 50, 5, use_logdet = false, T = T)
+expdesign8(; T::THR = Float64) = expdesign(5, 15, 25, 5, use_logdet = false, T = T)
+expdesign9(; T::THR = Float64) = expdesign(4, 8, 12, 3, use_logdet = false, T = T)
+expdesign10(; T::THR = Float64) = expdesign(3, 5, 7, 2, use_logdet = false, T = T)
 
-test_expdesign_all(; options...) = test_expdesign.([
+test_expdesign_all(; T::THR = Float64, options...) = test_expdesign.([
     expdesign1,
     expdesign2,
     expdesign3,
@@ -174,13 +202,9 @@ test_expdesign_all(; options...) = test_expdesign.([
     expdesign9,
     expdesign9,
     expdesign10,
-    ], options = options)
+    ], T = T, options = options)
 
-test_expdesign(; options...) = test_expdesign.([
-    expdesign5,
-    expdesign10,
+test_expdesign(; T::THR = Float64, options...) = test_expdesign.([
     expdesign3,
     expdesign8,
-    expdesign1,
-    expdesign6,
-    ], options = options)
+    ], T = T, options = options)
