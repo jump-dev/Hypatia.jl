@@ -5,7 +5,7 @@ see "A Direct Formulation for Sparse PCA Using Semidefinite Programming" by
 Alexandre d’Aspremont, Laurent El Ghaoui, Michael I. Jordan, Gert R. G. Lanckriet
 
 TODO add examples with stochastic data e.g.
-@assert 0 < k <= p
+
 signal = randn(0, snr)
 # sample components that will carry the signal
 spike = sample(1:p, k)
@@ -33,12 +33,28 @@ function sparsepca(
     p::Int,
     k::Int;
     use_l1ball::Bool = true,
+    snr::Float64 = -1.0
     )
+    @assert 0 < k <= p
     x = zeros(T, p)
+    # sample components that will carry the signal
     signal = Distributions.sample(1:p, k, replace = false)
-    x[signal] = rand(T, k)
-    sigma = x * x'
-    sigma ./= tr(sigma)
+    if snr < 0
+        # noiseless model
+        x[signal] = rand(T, k)
+        sigma = x * x'
+        sigma ./= tr(sigma)
+    else
+        # simulate some observations with noise
+        sigma = zeros(T, p, p)
+        for _ in 1:100
+            # base noise
+            x = convert(Vector{T}, randn(p))
+            # add signal to some components
+            x[signal] .+= convert(T, rand(Distributions.Normal(0, snr)))
+            sigma += x * x' / 100
+        end
+    end
 
     rt2 = sqrt(T(2))
     dimx = div(p * (p + 1), 2)
@@ -86,13 +102,15 @@ function sparsepca(
         push!(cone_idxs, (dimx + 1):(3 * dimx))
     end
 
-    return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs)
+    return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs, sigma = sigma)
 end
 
 sparsepca1(T::Type{<:HypReal}) = sparsepca(T, 5, 3)
 sparsepca2(T::Type{<:HypReal}) = sparsepca(T, 5, 3, use_l1ball = false)
 sparsepca3(T::Type{<:HypReal}) = sparsepca(T, 10, 3)
 sparsepca4(T::Type{<:HypReal}) = sparsepca(T, 10, 3, use_l1ball = false)
+sparsepca5(T::Type{<:HypReal}) = sparsepca(T, 10, 3, snr = 10.0)
+sparsepca6(T::Type{<:HypReal}) = sparsepca(T, 10, 3, snr = 10.0, use_l1ball = false)
 
 function test_sparsepca(T::Type{<:HypReal}, instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
@@ -103,7 +121,9 @@ function test_sparsepca(T::Type{<:HypReal}, instance::Function; options, rseed::
     tol = max(1e-5, sqrt(sqrt(eps(T))))
     r = SO.get_certificates(solver, model, test = true, atol = tol, rtol = tol)
     @test r.status == :Optimal
-    @test r.primal_obj ≈ -1 atol = tol rtol = tol
+    if tr(d.sigma) ≈ -1
+        @test r.primal_obj ≈ -1 atol = tol rtol = tol
+    end
     return
 end
 
@@ -112,6 +132,8 @@ test_sparsepca_all(T::Type{<:HypReal}; options...) = test_sparsepca.(T, [
     sparsepca2,
     sparsepca3,
     sparsepca4,
+    sparsepca5,
+    sparsepca6,
     ], options = options)
 
 test_sparsepca(T::Type{<:HypReal}; options...) = test_sparsepca.(T, [
