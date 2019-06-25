@@ -97,7 +97,7 @@ function test_sparsepca(instance::Function; T = Float64, rseed::Int = 1, options
     model = MO.PreprocessedLinearModel{T}(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
     solver = SO.HSDSolver{T}(model; options...)
     SO.solve(solver)
-    r = SO.get_certificates(solver, model, test = false, atol = 1e-4, rtol = 1e-4)
+    r = SO.get_certificates(solver, model, test = true, atol = 1e-4, rtol = 1e-4)
     @test r.status == :Optimal
     return
 end
