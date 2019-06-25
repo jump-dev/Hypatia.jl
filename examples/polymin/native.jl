@@ -286,4 +286,4 @@ test_polymin(; options...) = test_polymin.([
     polyminreal23,
     polymincomplex7,
     polymincomplex14,
-], options = options)
+    ], options = options)
