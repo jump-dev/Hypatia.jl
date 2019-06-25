@@ -46,7 +46,7 @@ function setup_data(cone::EpiNormInf{T}) where {T <: HypReal}
     cone.H2 = copy(cone.H)
 
     cone.Harw = Arrow(zero(T), zeros(T, dim - 1), zeros(T, dim - 1))
-    cone.diagidxs = diagind(zeros(dim, dim))[2:end] # TODO calculate
+    cone.diagidxs = [(i - 1) * dim + i for i in 2:dim]
     cone.diagiedge = zeros(T, dim - 1)
     return
 end
@@ -127,7 +127,7 @@ function inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, con
     H = cone.Harw
     # edge ./ diag
     diagiedge = cone.diagiedge
-    diagiedge = H.edge ./ H.diag
+    @. diagiedge = H.edge / H.diag
     # x' * arr
     x_arr = diagiedge' * arr[2:end, :] - arr[1, :]' # row vector in math
     # x * (x' * arr)
