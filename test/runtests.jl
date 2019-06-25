@@ -19,9 +19,11 @@ include(joinpath(@__DIR__, "MathOptInterface.jl"))
 
 examples_dir = joinpath(@__DIR__, "../examples")
 include(joinpath(examples_dir, "centralpolymat/JuMP.jl"))
+include(joinpath(examples_dir, "densityest/native.jl"))
 include(joinpath(examples_dir, "envelope/native.jl"))
 include(joinpath(examples_dir, "linearopt/native.jl"))
 include(joinpath(examples_dir, "polymin/native.jl"))
+include(joinpath(examples_dir, "sparsepca/native.jl"))
 include(joinpath(examples_dir, "contraction/JuMP.jl"))
 include(joinpath(examples_dir, "densityest/JuMP.jl"))
 include(joinpath(examples_dir, "densityest/native.jl"))
@@ -180,6 +182,10 @@ native_options = (
         tol_rel_opt = 1e-9, tol_abs_opt = 1e-8, tol_feas = 1e-9,
         ) end
     @testset "portfolio" begin test_portfolio(; native_options...,
+        ) end
+end
+@testset "native examples: $T" for T in real_types
+    @testset "sparsepca" begin test_sparsepca(T; native_options...,
         ) end
 end
 
