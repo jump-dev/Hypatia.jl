@@ -182,6 +182,8 @@ native_options = (
         ) end
     @testset "portfolio" begin test_portfolio(; native_options...,
         ) end
+    @testset "sparsepca" begin test_sparsepca(; native_options...,
+        ) end
 end
 
 @info("starting JuMP examples tests")
