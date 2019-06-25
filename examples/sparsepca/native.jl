@@ -3,7 +3,6 @@ Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
 see "A Direct Formulation for Sparse PCA Using Semidefinite Programming" by
 Alexandre d’Aspremont, Laurent El Ghaoui, Michael I. Jordan, Gert R. G. Lanckriet
-
 ==#
 
 using LinearAlgebra
@@ -11,48 +10,46 @@ import Distributions
 import Random
 using Test
 import Hypatia
+import Hypatia.HypReal
 const HYP = Hypatia
 const MO = HYP.Models
 const CO = HYP.Cones
 const SO = HYP.Solvers
-import Hypatia.HypReal
 
 function sparsepca(
     T::Type{<:HypReal},
     p::Int,
     k::Int;
     use_l1ball::Bool = true,
-    snr::Float64 = -1.0
+    noise_ratio::Float64 = 0.0,
     )
     @assert 0 < k <= p
-    x = zeros(T, p)
-    # sample components that will carry the signal
-    signal = Distributions.sample(1:p, k, replace = false)
-    if snr < 0
+
+    signal_idxs = Distributions.sample(1:p, k, replace = false) # sample components that will carry the signal
+    if noise_ratio <= 0.0
         # noiseless model
-        x[signal] = rand(T, k)
+        x = zeros(T, p)
+        x[signal_idxs] = rand(T, k)
         sigma = x * x'
         sigma ./= tr(sigma)
     else
         # simulate some observations with noise
-        sigma = zeros(T, p, p)
-        for _ in 1:100
-            # base noise
-            x = convert(Vector{T}, randn(p))
-            # add signal to some components
-            x[signal] .+= convert(T, rand(Distributions.Normal(0, snr)))
-            sigma += x * x' / 100
-        end
+        x = randn(p, 100)
+        sigma = x * x'
+        y = rand(Distributions.Normal(0, noise_ratio), k)
+        sigma[signal_idxs, signal_idxs] .+= y * y'
+        sigma ./= 100
+        sigma = T.(sigma)
     end
 
     rt2 = sqrt(T(2))
     dimx = div(p * (p + 1), 2)
     # x will be the svec (lower triangle, row-wise) of the matrix solution we seek
-    c = [-sigma[i, j] * (i == j ? 1 : rt2) for i in 1:p for j in 1:i]
+    c = T[-sigma[i, j] * (i == j ? 1 : rt2) for i in 1:p for j in 1:i]
     b = T[1]
     A = zeros(T, 1, dimx)
     # PSD cone, x is already vectorized and scaled
-    Gpsd = -Matrix{T}(I, dimx, dimx)
+    Gpsd = Matrix{T}(-I, dimx, dimx)
     for i in 1:p
         s = sum(1:i)
         A[s] = 1
@@ -69,7 +66,7 @@ function sparsepca(
             Gl1[s, s] = -1
         end
         G = vcat(Gpsd, zeros(T, 1, dimx), Gl1)
-        h = vcat(hpsd, k, zeros(T, dimx))
+        h = vcat(hpsd, T(k), zeros(T, dimx))
         push!(cones, CO.EpiNormInf{T}(1 + dimx, true))
         push!(cone_idxs, (dimx + 1):(2 * dimx + 1))
     else
@@ -98,8 +95,8 @@ sparsepca1(T::Type{<:HypReal}) = sparsepca(T, 5, 3)
 sparsepca2(T::Type{<:HypReal}) = sparsepca(T, 5, 3, use_l1ball = false)
 sparsepca3(T::Type{<:HypReal}) = sparsepca(T, 10, 3)
 sparsepca4(T::Type{<:HypReal}) = sparsepca(T, 10, 3, use_l1ball = false)
-sparsepca5(T::Type{<:HypReal}) = sparsepca(T, 10, 3, snr = 10.0)
-sparsepca6(T::Type{<:HypReal}) = sparsepca(T, 10, 3, snr = 10.0, use_l1ball = false)
+sparsepca5(T::Type{<:HypReal}) = sparsepca(T, 10, 3, noise_ratio = 10.0)
+sparsepca6(T::Type{<:HypReal}) = sparsepca(T, 10, 3, noise_ratio = 10.0, use_l1ball = false)
 
 function test_sparsepca(T::Type{<:HypReal}, instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
