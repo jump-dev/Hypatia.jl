@@ -29,9 +29,9 @@ version = "0.5.4"
 
 [[CSV]]
 deps = ["CategoricalArrays", "DataFrames", "Dates", "Mmap", "Parsers", "PooledArrays", "Profile", "Tables", "Unicode", "WeakRefStrings"]
-git-tree-sha1 = "239240112fc5f18fb934942a5b6f207a8f9e45d2"
+git-tree-sha1 = "078801ccf5a644df31cef99c9add46107b94aba5"
 uuid = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
-version = "0.5.5"
+version = "0.5.6"
 
 [[Calculus]]
 deps = ["Compat"]
@@ -223,10 +223,10 @@ uuid = "f4abf1af-0426-5881-a0da-e2f168889b5e"
 version = "0.2.1"
 
 [[MultivariatePolynomials]]
-deps = ["LinearAlgebra", "Test"]
-git-tree-sha1 = "b14b7fb661be7724efdbaf2e469cc1b24a805785"
+deps = ["LinearAlgebra"]
+git-tree-sha1 = "71d65128858b8daea23cb04b7aa1c547453cf91e"
 uuid = "102ac46a-7ee4-5c85-9060-abc95bfdeaa3"
-version = "0.2.8"
+version = "0.2.9"
 
 [[NaNMath]]
 deps = ["Compat"]
@@ -257,10 +257,10 @@ deps = ["Dates", "LibGit2", "Markdown", "Printf", "REPL", "Random", "SHA", "UUID
 uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 
 [[PolyJuMP]]
-deps = ["JuMP", "LinearAlgebra", "MathOptInterface", "MultivariateMoments", "MultivariatePolynomials", "SemialgebraicSets", "Test"]
-git-tree-sha1 = "436f2f071e4aa9e085081f4eac0badb8d05b76a0"
+deps = ["JuMP", "LinearAlgebra", "MathOptInterface", "MultivariateMoments", "MultivariatePolynomials", "SemialgebraicSets"]
+git-tree-sha1 = "c08ac83375a7c8bc26680da4f88cd55a220efb0f"
 uuid = "ddf597a6-d67e-5340-b84c-e37d84115374"
-version = "0.3.0"
+version = "0.3.1"
 
 [[Polynomials]]
 deps = ["LinearAlgebra", "SparseArrays", "Test"]
@@ -387,9 +387,9 @@ uuid = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
 
 [[SumOfSquares]]
 deps = ["JuMP", "LinearAlgebra", "MathOptInterface", "MultivariateMoments", "MultivariatePolynomials", "Pkg", "PolyJuMP", "Reexport", "SemialgebraicSets", "SparseArrays"]
-git-tree-sha1 = "153b6aa62a5712644ae0786417fc249ea5794580"
+git-tree-sha1 = "e81450255e4fabe1c0923f5696a24df3438a0923"
 uuid = "4b9e565b-77fc-50a5-a571-1244f986bda1"
-version = "0.3.2"
+version = "0.3.3"
 
 [[TableTraits]]
 deps = ["IteratorInterfaceExtensions"]
@@ -399,9 +399,9 @@ version = "1.0.0"
 
 [[Tables]]
 deps = ["IteratorInterfaceExtensions", "LinearAlgebra", "Requires", "TableTraits", "Test"]
-git-tree-sha1 = "351a4b894122e1553c6ed05fda54086ab036adef"
+git-tree-sha1 = "c328ce4519e2c1ec7368e6ce98a5f916ecf230a8"
 uuid = "bd369af6-aec1-5ad0-b16a-f7cc5008161c"
-version = "0.2.5"
+version = "0.2.6"
 
 [[Test]]
 deps = ["Distributed", "InteractiveUtils", "Logging", "Random"]

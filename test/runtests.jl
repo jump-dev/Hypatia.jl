@@ -19,10 +19,13 @@ include(joinpath(@__DIR__, "MathOptInterface.jl"))
 
 examples_dir = joinpath(@__DIR__, "../examples")
 include(joinpath(examples_dir, "centralpolymat/JuMP.jl"))
+include(joinpath(examples_dir, "densityest/native.jl"))
 include(joinpath(examples_dir, "envelope/native.jl"))
+include(joinpath(examples_dir, "expdesign/native.jl"))
 include(joinpath(examples_dir, "linearopt/native.jl"))
 include(joinpath(examples_dir, "matrixcompletion/native.jl"))
 include(joinpath(examples_dir, "polymin/native.jl"))
+include(joinpath(examples_dir, "sparsepca/native.jl"))
 include(joinpath(examples_dir, "contraction/JuMP.jl"))
 include(joinpath(examples_dir, "densityest/JuMP.jl"))
 include(joinpath(examples_dir, "densityest/native.jl"))
@@ -56,28 +59,32 @@ end
 
 @info("starting barrier tests")
 barrier_testfuns = [
+    test_orthant_barrier,
+    test_epinorminf_barrier,
     test_epinormeucl_barrier,
-    test_epinorinf_barrier,
-    test_epinormspectral_barrier,
     test_epipersquare_barrier,
-    # TODO next 3 fail with BigFloat, see https://github.com/JuliaDiff/DiffResults.jl/pull/9#issuecomment-497853361
+    # TODO next 3 fail with BigFloat: can only use BLAS floats with ForwardDiff barriers, see https://github.com/JuliaDiff/DiffResults.jl/pull/9#issuecomment-497853361
     test_epiperpower_barrier,
     test_epipersumexp_barrier,
     test_hypogeomean_barrier,
     test_hypoperlog_barrier,
     test_hypopersumlog_barrier,
-    test_hypoperlogdet_barrier,
+    test_epinormspectral_barrier,
     test_semidefinite_barrier,
+    test_hypoperlogdet_barrier,
     test_wsospolyinterp_barrier,
     test_wsospolyinterpmat_barrier,
     test_wsospolyinterpsoc_barrier, # NOTE not updated for generic reals (too much work)
     ]
 @testset "barrier functions tests: $t, $T" for t in barrier_testfuns, T in real_types
+    if T == BigFloat && t in (test_epiperpower_barrier, test_epipersumexp_barrier, test_hypogeomean_barrier, test_wsospolyinterpmat_barrier, test_wsospolyinterpsoc_barrier)
+        continue
+    end
     t(T)
 end
 
 @info("starting native interface tests")
-verbose = false
+verbose = true
 system_solvers = [
     SO.QRCholCombinedHSDSystemSolver,
     SO.SymIndefCombinedHSDSystemSolver,
@@ -107,7 +114,6 @@ testfuns_nonsingular = [
     epinorminf3,
     epinorminf4,
     epinorminf5,
-    epinorminf6,
     epinormeucl1,
     epinormeucl2,
     epipersquare1,
@@ -174,12 +180,18 @@ native_options = (
         ) end
     @testset "linearopt" begin test_linearopt(; native_options...,
         ) end
-    @testset "matrixcompletion" begin test_matrixcompletion(; native_options...,
-        ) end
     @testset "polymin" begin test_polymin(; native_options...,
         tol_rel_opt = 1e-9, tol_abs_opt = 1e-8, tol_feas = 1e-9,
         ) end
     @testset "portfolio" begin test_portfolio(; native_options...,
+        ) end
+end
+@testset "native examples: $T" for T in real_types
+    @testset "expdesign" begin test_expdesign(T; native_options...,
+        ) end
+    @testset "matrixcompletion" begin test_matrixcompletion(T; native_options...,
+        ) end
+    @testset "sparsepca" begin test_sparsepca(T; native_options...,
         ) end
 end
 
