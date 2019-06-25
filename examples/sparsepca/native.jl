@@ -30,7 +30,6 @@ import Hypatia.HypReal
 
 function sparsepca(
     T::Type{<:HypReal},
-    n::Int,
     p::Int,
     k::Int;
     use_l1ball::Bool = true,
@@ -42,14 +41,14 @@ function sparsepca(
     sigma ./= tr(sigma)
 
     rt2 = sqrt(T(2))
-    dimx = div(n * (n + 1), 2)
+    dimx = div(p * (p + 1), 2)
     # x will be the svec (lower triangle, row-wise) of the matrix solution we seek
-    c = [-sigma[i, j] * (i == j ? 1 : rt2) for i in 1:n for j in 1:i]
+    c = [-sigma[i, j] * (i == j ? 1 : rt2) for i in 1:p for j in 1:i]
     b = T[1]
     A = zeros(T, 1, dimx)
     # PSD cone, x is already vectorized and scaled
     Gpsd = -Matrix{T}(I, dimx, dimx)
-    for i in 1:n
+    for i in 1:p
         s = sum(1:i)
         A[s] = 1
     end
@@ -60,7 +59,7 @@ function sparsepca(
     if use_l1ball
         # l1 cone
         Gl1 = Matrix{T}(-rt2 * I, dimx, dimx) # double off-diagonals, which are already scaled by rt2
-        for i in 1:n
+        for i in 1:p
             s = sum(1:i)
             Gl1[s, s] = -1
         end
@@ -71,7 +70,7 @@ function sparsepca(
     else
         c = vcat(c, zeros(T, 2 * dimx))
         id = Matrix{T}(I, dimx, dimx)
-        l1 = [(i == j ? one(T) : rt2) for i in 1:n for j in 1:i]
+        l1 = [(i == j ? one(T) : rt2) for i in 1:p for j in 1:i]
         A = T[
             A    zeros(T, 1, 2 * dimx);
             -id    -id    id;
@@ -90,10 +89,10 @@ function sparsepca(
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs)
 end
 
-sparsepca1(T::Type{<:HypReal}) = sparsepca(T, 5, 4, 3)
-sparsepca2(T::Type{<:HypReal}) = sparsepca(T, 5, 4, 3, use_l1ball = false)
-sparsepca3(T::Type{<:HypReal}) = sparsepca(T, 10, 10, 3)
-sparsepca4(T::Type{<:HypReal}) = sparsepca(T, 10, 10, 3, use_l1ball = false)
+sparsepca1(T::Type{<:HypReal}) = sparsepca(T, 5, 3)
+sparsepca2(T::Type{<:HypReal}) = sparsepca(T, 5, 3, use_l1ball = false)
+sparsepca3(T::Type{<:HypReal}) = sparsepca(T, 10, 3)
+sparsepca4(T::Type{<:HypReal}) = sparsepca(T, 10, 3, use_l1ball = false)
 
 function test_sparsepca(T::Type{<:HypReal}, instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
