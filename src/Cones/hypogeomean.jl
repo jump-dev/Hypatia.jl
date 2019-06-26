@@ -71,7 +71,7 @@ function check_in_cone(cone::HypoGeomean{T}) where {T <: HypReal}
     prodwaau = prodwaa + u
 
     cone.g[1] = -inv(prodwaau) - inv(u)
-    cone.H[1, 1] = inv(abs2(prodwaau)) + inv(u) / u
+    cone.H[1, 1] = inv(prodwaau) / prodwaau + inv(u) / u
     # column loop
     for i in eachindex(alpha)
         prod_excli = prodwaa * alpha[i] / w[i]
