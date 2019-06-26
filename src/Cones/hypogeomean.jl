@@ -83,7 +83,7 @@ function check_in_cone(cone::HypoGeomean{T}) where {T <: HypReal}
             prod_exclj = prodwaa * alpha[j] / w[j]
             cone.H[j + 1, i + 1] = fact * alpha[j] / w[j] * (prodwaa / prodwaau - 1)
         end
-        cone.H[i + 1, i + 1] = fact * (prodwaa / prodwaau * alpha[i] - alpha[i] + 1) + (1 - alpha[i]) / w[i] / w[i]
+        cone.H[i + 1, i + 1] = fact / w[i] * (prodwaa / prodwaau * alpha[i] - alpha[i] + 1) + (1 - alpha[i]) / w[i] / w[i]
     end
 
     return factorize_hess(cone)
