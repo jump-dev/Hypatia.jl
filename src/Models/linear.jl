@@ -80,22 +80,22 @@ mutable struct RawLinearModel{T <: HypReal} <: LinearModel{T}
 
     # TODO loosen restriction to AbstractMatrix
     function RawLinearModel{T}(
-        c::Vector,
-        A::AbstractMatrix,
-        b::Vector,
-        G::AbstractMatrix,
-        h::Vector,
-        cones::Vector{<:Cones.Cone},
+        c::Vector{T},
+        A::AbstractMatrix{T},
+        b::Vector{T},
+        G::AbstractMatrix{T},
+        h::Vector{T},
+        cones::Vector{Cones.Cone{T}},
         cone_idxs::Vector{UnitRange{Int}};
         use_iterative::Bool = true, # TODO choose default
         tol_qr::Real = 1e2 * eps(T),
         use_dense_fallback::Bool = true,
         ) where {T <: HypReal}
-        c = convert(Vector{T}, c)
-        A = convert(AbstractMatrix{T}, A)
-        b = convert(Vector{T}, b)
-        G = convert(AbstractMatrix{T}, G)
-        h = convert(Vector{T}, h)
+        # c = convert(Vector{T}, c)
+        # A = convert(AbstractMatrix{T}, A)
+        # b = convert(Vector{T}, b)
+        # G = convert(AbstractMatrix{T}, G)
+        # h = convert(Vector{T}, h)
 
         model = new{T}()
 
@@ -229,21 +229,21 @@ mutable struct PreprocessedLinearModel{T <: HypReal} <: LinearModel{T}
     initial_point::Point
 
     function PreprocessedLinearModel{T}(
-        c::Vector,
-        A::AbstractMatrix,
-        b::Vector,
-        G::AbstractMatrix,
-        h::Vector,
-        cones::Vector{<:Cones.Cone},
+        c::Vector{T},
+        A::AbstractMatrix{T},
+        b::Vector{T},
+        G::AbstractMatrix{T},
+        h::Vector{T},
+        cones::Vector{Cones.Cone{T}},
         cone_idxs::Vector{UnitRange{Int}};
         tol_qr::Real = 1e2 * eps(T),
         use_dense_fallback::Bool = true,
         ) where {T <: HypReal}
-        c = convert(Vector{T}, c)
-        A = convert(AbstractMatrix{T}, A)
-        b = convert(Vector{T}, b)
-        G = convert(AbstractMatrix{T}, G)
-        h = convert(Vector{T}, h)
+        # c = convert(Vector{T}, c)
+        # A = convert(AbstractMatrix{T}, A)
+        # b = convert(Vector{T}, b)
+        # G = convert(AbstractMatrix{T}, G)
+        # h = convert(Vector{T}, h)
 
         model = new{T}()
 
