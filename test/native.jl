@@ -5,7 +5,7 @@ Copyright 2018, Chris Coey and contributors
 import Random
 using LinearAlgebra
 using SparseArrays
-using GenericLinearAlgebra
+import GenericLinearAlgebra.svdvals!
 
 # solve model, check conic certificates are valid and return certificate data
 function solve_and_check(
@@ -215,9 +215,10 @@ end
 
 function epinorminf1(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
     tol = max(1e-5, sqrt(sqrt(eps(T))))
+    Tirt2 = inv(sqrt(T(2)))
     c = T[0, -1, -1]
     A = T[1 0 0; 0 1 0]
-    b = T[1, inv(sqrt(2))]
+    b = [one(T), Tirt2]
     G = SparseMatrixCSC(-one(T) * I, 3, 3)
     h = zeros(T, 3)
     cones = [CO.EpiNormInf{T}(3)]
@@ -225,34 +226,39 @@ function epinorminf1(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linea
 
     r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
     @test r.status == :Optimal
-    @test r.primal_obj ≈ -1 - inv(sqrt(2)) atol=tol rtol=tol
-    @test r.x ≈ [1, inv(sqrt(2)), 1] atol=tol rtol=tol
+    @test r.primal_obj ≈ -1 - Tirt2 atol=tol rtol=tol
+    @test r.x ≈ [one(T), Tirt2, one(T)] atol=tol rtol=tol
     @test r.y ≈ [1, 1] atol=tol rtol=tol
 end
 
 function epinorminf2(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
-    tol = max(1e-5, sqrt(sqrt(eps(T))))
-    Random.seed!(1)
-    c = T[1, 0, 0, 0, 0, 0]
-    A = rand(-9.0:9.0, 3, 6)
-    b = A * ones(6)
-    G = rand(6, 6)
-    h = G * ones(6)
-    cones = [CO.EpiNormInf{T}(6)]
-    cone_idxs = [1:6]
+    tol = max(1e-5, 10 * sqrt(sqrt(eps(T))))
+    l = 3
+    L = 2l + 1
+    c = collect(T, -l:l)
+    A = spzeros(T, 2, L)
+    A[1, 1] = A[1, L] = A[2, 1] = 1; A[2, L] = -1
+    b = T[0, 0]
+    G = [spzeros(T, 1, L); sparse(one(T) * I, L, L); spzeros(T, 1, L); sparse(T(2) * I, L, L)]
+    h = zeros(T, 2L + 2); h[1] = 1; h[L + 2] = 1
+    cones = [CO.EpiNormInf{T}(L + 1, true), CO.EpiNormInf{T}(L + 1, false)]
+    cone_idxs = [1:(L + 1), (L + 2):(2L + 2)]
 
     r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
     @test r.status == :Optimal
-    @test r.primal_obj ≈ 1 atol=tol rtol=tol
+    @test r.primal_obj ≈ -l + 1 atol=tol rtol=tol
+    @test r.x[2] ≈ T(0.5) atol=tol rtol=tol
+    @test r.x[end - 1] ≈ T(-0.5) atol=tol rtol=tol
+    @test sum(abs, r.x) ≈ 1 atol=tol rtol=tol
 end
 
 function epinorminf3(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
     tol = max(1e-5, sqrt(sqrt(eps(T))))
     c = T[1, 0, 0, 0, 0, 0]
-    A = zeros(0, 6)
-    b = zeros(0)
-    G = Diagonal(-I, 6)
-    h = zeros(6)
+    A = zeros(T, 0, 6)
+    b = zeros(T, 0)
+    G = Diagonal(-one(T) * I, 6)
+    h = zeros(T, 6)
     cones = [CO.EpiNormInf{T}(6)]
     cone_idxs = [1:6]
 
@@ -267,53 +273,32 @@ function epinorminf4(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linea
     c = T[0, 1, -1]
     A = T[1 0 0; 0 1 0]
     b = T[1, -0.4]
-    G = Diagonal(-I, 3)
-    h = zeros(3)
+    G = Diagonal(-one(T) * I, 3)
+    h = zeros(T, 3)
     cones = [CO.EpiNormInf{T}(3, true)]
     cone_idxs = [1:3]
 
     r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
     @test r.status == :Optimal
     @test r.primal_obj ≈ -1 atol=tol rtol=tol
-    @test r.x ≈ [1, -0.4, 0.6] atol=tol rtol=tol
-    @test r.y ≈ [1, 0] atol=tol rtol=tol
+    @test r.x ≈ T[1, -0.4, 0.6] atol=tol rtol=tol
+    @test r.y ≈ T[1, 0] atol=tol rtol=tol
 end
 
 function epinorminf5(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
     tol = max(1e-5, sqrt(sqrt(eps(T))))
     Random.seed!(1)
     c = T[1, 0, 0, 0, 0, 0]
-    A = rand(-9.0:9.0, 3, 6)
-    b = A * ones(6)
-    G = rand(6, 6)
-    h = G * ones(6)
+    A = rand(T(-9):T(9), 3, 6)
+    b = A * ones(T, 6)
+    G = rand(T, 6, 6)
+    h = G * ones(T, 6)
     cones = [CO.EpiNormInf{T}(6, true)]
     cone_idxs = [1:6]
 
     r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
     @test r.status == :Optimal
     @test r.primal_obj ≈ 1 atol=tol rtol=tol
-end
-
-function epinorminf6(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
-    tol = max(1e-5, sqrt(sqrt(eps(T))))
-    l = 3
-    L = 2l + 1
-    c = collect(T, -l:l)
-    A = spzeros(2, L)
-    A[1, 1] = A[1, L] = A[2, 1] = 1.0; A[2, L] = -1.0
-    b = T[0, 0]
-    G = [spzeros(1, L); sparse(1.0I, L, L); spzeros(1, L); sparse(2.0I, L, L)]
-    h = zeros(2L + 2); h[1] = 1.0; h[L + 2] = 1.0
-    cones = [CO.EpiNormInf{T}(L + 1, true), CO.EpiNormInf{T}(L + 1, false)]
-    cone_idxs = [1:(L + 1), (L + 2):(2L + 2)]
-
-    r = solve_and_check(c, A, b, G, h, cones, cone_idxs, linear_model, system_solver, verbose)
-    @test r.status == :Optimal
-    @test r.primal_obj ≈ -l + 1 atol=tol rtol=tol
-    @test r.x[2] ≈ 0.5 atol=tol rtol=tol
-    @test r.x[end - 1] ≈ -0.5 atol=tol rtol=tol
-    @test sum(abs, r.x) ≈ 1 atol=tol rtol=tol
 end
 
 function epinormeucl1(system_solver::Type{<:SO.CombinedHSDSystemSolver{T}}, linear_model::Type{<:MO.LinearModel{T}}, verbose::Bool) where {T <: HypReal}
