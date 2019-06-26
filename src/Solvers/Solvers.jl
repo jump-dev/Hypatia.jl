@@ -113,4 +113,30 @@ function get_certificates(
     return (x = x, y = y, s = s, z = z, primal_obj = primal_obj, dual_obj = dual_obj, status = status)
 end
 
+# build linear model, solve, check conic certificates, and return certificate data
+function solve_and_check(
+    c::Vector,
+    A::AbstractMatrix,
+    b::Vector,
+    G::AbstractMatrix,
+    h::Vector,
+    cones::Vector{<:Cones.Cone},
+    cone_idxs::Vector{UnitRange{Int}};
+    test::Bool = true,
+    linear_model::Type{<:Models.LinearModel{T}} = Models.PreprocessedLinearModel{T},
+    linear_model_options,
+    system_solver::Type{<:Solvers.CombinedHSDSystemSolver{T}} = Solvers.QRCholCombinedHSDSystemSolver{T},
+    system_solver_options,
+    stepper_options,
+    solver_options,
+    atol::Real = max(1e-5, sqrt(sqrt(eps(T)))),
+    rtol::Real = atol,
+    ) where {T <: HypReal}
+    model = linear_model(c, A, b, G, h, cones, cone_idxs; linear_model_options...)
+    stepper = SO.CombinedHSDStepper{T}(model, system_solver = system_solver(model; system_solver_options...); stepper_options...)
+    solver = SO.HSDSolver{T}(model, stepper = stepper; solver_options...)
+    SO.solve(solver)
+    return SO.get_certificates(solver, model, test = test, atol = atol, rtol = rtol)
+end
+
 end
