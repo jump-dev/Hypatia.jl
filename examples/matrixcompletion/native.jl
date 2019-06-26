@@ -68,7 +68,7 @@ function matrixcompletion(
         h_norm_x = vcat(zero(T), h_norm_x)
         h_norm = h_norm_x
 
-        cones = CO.Cone[CO.EpiNormSpectral{T}(m, n)]
+        cones = CO.Cone{T}[CO.EpiNormSpectral{T}(m, n)]
         cone_idxs = UnitRange{Int}[1:(m * n + 1)]
         cone_offset = m * n + 1
     else
@@ -104,7 +104,7 @@ function matrixcompletion(
             idx += i
             G_norm[offset + idx - 1, 1] = -1
         end
-        cones = CO.Cone[CO.PosSemidef{T, T}(num_rows)]
+        cones = CO.Cone{T}[CO.PosSemidef{T, T}(num_rows)]
         cone_idxs = UnitRange{Int}[1:num_rows]
         cone_offset = num_rows
     end

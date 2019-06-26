@@ -55,7 +55,7 @@ function sparsepca(
         A[s] = 1
     end
     hpsd = zeros(T, dimx)
-    cones = CO.Cone[CO.PosSemidef{T, T}(dimx)]
+    cones = CO.Cone{T}[CO.PosSemidef{T, T}(dimx)]
     cone_idxs = [1:dimx]
 
     if use_l1ball

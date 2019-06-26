@@ -57,11 +57,11 @@ function polyminreal(
     PWts = convert.(Matrix{T}, PWts)
 
     if use_wsos
-        cones = [CO.WSOSPolyInterp{T, T}(U, [P0, PWts...], !use_primal)]
+        cones = CO.Cone{T}[CO.WSOSPolyInterp{T, T}(U, [P0, PWts...], !use_primal)]
         cone_idxs = [1:U]
     else
         # will be set up iteratively
-        cones = CO.Cone[]
+        cones = CO.Cone{T}[]
         cone_idxs = UnitRange{Int}[]
     end
 
@@ -203,7 +203,7 @@ function polymincomplex(
         G = Diagonal(-one(T) * I, U)
         h = zeros(T, U)
     end
-    cones = [CO.WSOSPolyInterp{T, Complex{T}}(U, P_data, !use_primal)]
+    cones = CO.Cone{T}[CO.WSOSPolyInterp{T, Complex{T}}(U, P_data, !use_primal)]
     cone_idxs = [1:U]
 
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs, true_obj = true_obj)
