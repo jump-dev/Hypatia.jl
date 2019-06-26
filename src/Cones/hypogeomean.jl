@@ -52,7 +52,11 @@ end
 
 get_nu(cone::HypoGeomean) = cone.dim
 
-set_initial_point(arr::AbstractVector{T}, cone::HypoGeomean{T}) where {T <: HypReal} = (@. arr = one(T); arr[1] = -prod(cone.ialpha[i]^cone.alpha[i] for i in eachindex(cone.alpha)) / cone.dim; arr)
+function set_initial_point(arr::AbstractVector{T}, cone::HypoGeomean{T}) where {T <: HypReal}
+    @. arr = one(T)
+    arr[1] = -prod(cone.ialpha[i]^cone.alpha[i] for i in eachindex(cone.alpha)) / cone.dim
+    return arr
+end
 
 function check_in_cone(cone::HypoGeomean{T}) where {T <: HypReal}
     u = cone.point[1]
