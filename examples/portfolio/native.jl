@@ -39,7 +39,7 @@ function portfolio(
     G = Matrix{T}(-I, num_stocks, num_stocks)
     h = zeros(T, num_stocks)
     cone_idxs = UnitRange{Int}[1:num_stocks]
-    cones = CO.Cone[CO.Nonnegative{T}(num_stocks)]
+    cones = CO.Cone{T}[CO.Nonnegative{T}(num_stocks)]
     cone_offset = num_stocks
 
     function add_single_ball(cone, gamma_new)

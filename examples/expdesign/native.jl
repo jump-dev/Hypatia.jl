@@ -38,7 +38,7 @@ function expdesign(
     G_nmax = Matrix{T}(-I, p, p)
     h_nmax = fill(T(nmax), p)
 
-    cones = CO.Cone[CO.Nonnegative{T}(p), CO.Nonnegative{T}(p)]
+    cones = CO.Cone{T}[CO.Nonnegative{T}(p), CO.Nonnegative{T}(p)]
     cone_idxs = [1:p, (p + 1):(2 * p)]
 
     if use_logdet
@@ -126,8 +126,8 @@ function expdesign(
         end
 
         h_psd = zeros(T, dimvec)
-        push!(cone_idxs, (2 * p + 1):(2 * p + dimvec))
         push!(cones, CO.PosSemidef{T, T}(dimvec))
+        push!(cone_idxs, (2 * p + 1):(2 * p + dimvec))
 
         if use_sumlog
             G_logvars = zeros(T, q, num_trivars)
@@ -142,9 +142,9 @@ function expdesign(
                 # log row
                 zeros(T, q, p)    G_logvars    zeros(T, q)
                 ]
-            h_log = vcat(zero(T), one(T), zeros(q))
-            push!(cone_idxs, (2 * p + dimvec + 1):(2 * p + dimvec + 2 + q))
+            h_log = vcat(zero(T), one(T), zeros(T, q))
             push!(cones, CO.HypoPerSumLog{T}(q + 2))
+            push!(cone_idxs, (2 * p + dimvec + 1):(2 * p + dimvec + 2 + q))
         else
             G_log = zeros(T, 3 * q, dimx)
             h_log = zeros(T, 3 * q)
@@ -157,8 +157,8 @@ function expdesign(
                 # diagonal element in the triangular matrix
                 G_log[offset + 2, p + diag_idx(i)] = -1
                 cone_offset = 2 * p + dimvec + offset
-                push!(cone_idxs, cone_offset:(cone_offset + 2))
                 push!(cones, CO.HypoPerLog{T}())
+                push!(cone_idxs, cone_offset:(cone_offset + 2))
                 offset += 3
             end
         end
