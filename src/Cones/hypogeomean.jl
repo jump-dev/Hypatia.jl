@@ -22,8 +22,6 @@ mutable struct HypoGeomean{T <: HypReal} <: Cone{T}
     H::Matrix{T}
     H2::Matrix{T}
     F
-    barfun::Function
-    diffres
 
     function HypoGeomean{T}(alpha::Vector{<:Real}, is_dual::Bool) where {T <: HypReal}
         dim = length(alpha) + 1
@@ -49,13 +47,6 @@ function setup_data(cone::HypoGeomean{T}) where {T <: HypReal}
     cone.g = zeros(T, dim)
     cone.H = zeros(T, dim, dim)
     cone.H2 = copy(cone.H)
-    function barfun(point)
-        u = point[1]
-        w = view(point, 2:dim)
-        return -log(prod((w[i] * ialpha[i])^alpha[i] for i in eachindex(alpha)) + u) - sum((1.0 - alpha[i]) * log(w[i] * ialpha[i]) for i in eachindex(alpha)) - log(-u)
-    end
-    cone.barfun = barfun
-    cone.diffres = DiffResults.HessianResult(cone.g)
     return
 end
 
@@ -73,10 +64,27 @@ function check_in_cone(cone::HypoGeomean{T}) where {T <: HypReal}
         return false
     end
 
-    # TODO check allocations, check with Jarrett if this is most efficient way to use DiffResults
-    cone.diffres = ForwardDiff.hessian!(cone.diffres, cone.barfun, cone.point)
-    cone.g .= DiffResults.gradient(cone.diffres)
-    cone.H .= DiffResults.hessian(cone.diffres)
+    ialpha = cone.ialpha
+    alpha = cone.alpha
+
+    prodwaa = prod((w[i] * ialpha[i])^alpha[i] for i in eachindex(alpha))
+    prodwaau = prodwaa + u
+
+    cone.g[1] = -inv(prodwaau) - inv(u)
+    cone.H[1, 1] = inv(abs2(prodwaau)) + inv(u) / u
+    # column loop
+    for i in eachindex(alpha)
+        prod_excli = prodwaa * alpha[i] / w[i]
+        cone.g[i + 1] = -prod_excli / prodwaau - (1 - alpha[i]) / w[i]
+        cone.H[1, i + 1] = prod_excli / prodwaau / prodwaau
+        fact = prodwaa / prodwaau * alpha[i] / w[i]
+        # row loop
+        for j in 1:(i - 1)
+            prod_exclj = prodwaa * alpha[j] / w[j]
+            cone.H[j + 1, i + 1] = fact * alpha[j] / w[j] * (prodwaa / prodwaau - 1)
+        end
+        cone.H[i + 1, i + 1] = fact * (prodwaa / prodwaau * alpha[i] - alpha[i] + 1) + (1 - alpha[i]) / w[i] / w[i]
+    end
 
     return factorize_hess(cone)
 end
