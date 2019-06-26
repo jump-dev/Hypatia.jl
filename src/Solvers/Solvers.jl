@@ -114,29 +114,29 @@ function get_certificates(
 end
 
 # build linear model, solve, check conic certificates, and return certificate data
-function solve_and_check(
-    c::Vector,
-    A::AbstractMatrix,
-    b::Vector,
-    G::AbstractMatrix,
-    h::Vector,
-    cones::Vector{<:Cones.Cone},
+function build_solve_check(
+    c::Vector{T},
+    A::AbstractMatrix{T},
+    b::Vector{T},
+    G::AbstractMatrix{T},
+    h::Vector{T},
+    cones::Vector{Cones.Cone{T}},
     cone_idxs::Vector{UnitRange{Int}};
     test::Bool = true,
-    linear_model::Type{<:Models.LinearModel{T}} = Models.PreprocessedLinearModel{T},
-    linear_model_options,
-    system_solver::Type{<:Solvers.CombinedHSDSystemSolver{T}} = Solvers.QRCholCombinedHSDSystemSolver{T},
-    system_solver_options,
-    stepper_options,
-    solver_options,
+    linear_model::Type{<:Models.LinearModel} = MO.PreprocessedLinearModel,
+    system_solver::Type{<:CombinedHSDSystemSolver} = SO.QRCholCombinedHSDSystemSolver,
+    linear_model_options::NamedTuple = NamedTuple(),
+    system_solver_options::NamedTuple = NamedTuple(),
+    stepper_options::NamedTuple = NamedTuple(),
+    solver_options::NamedTuple = NamedTuple(),
     atol::Real = max(1e-5, sqrt(sqrt(eps(T)))),
     rtol::Real = atol,
     ) where {T <: HypReal}
-    model = linear_model(c, A, b, G, h, cones, cone_idxs; linear_model_options...)
-    stepper = SO.CombinedHSDStepper{T}(model, system_solver = system_solver(model; system_solver_options...); stepper_options...)
-    solver = SO.HSDSolver{T}(model, stepper = stepper; solver_options...)
-    SO.solve(solver)
-    return SO.get_certificates(solver, model, test = test, atol = atol, rtol = rtol)
+    model = linear_model{T}(c, A, b, G, h, cones, cone_idxs; linear_model_options...)
+    stepper = CombinedHSDStepper{T}(model, system_solver = system_solver{T}(model; system_solver_options...); stepper_options...)
+    solver = HSDSolver{T}(model, stepper = stepper; solver_options...)
+    solve(solver)
+    return get_certificates(solver, model, test = test, atol = atol, rtol = rtol)
 end
 
 end

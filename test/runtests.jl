@@ -43,7 +43,7 @@ include(joinpath(@__DIR__, "MathOptInterface.jl"))
 real_types = [
     Float64,
     Float32,
-    BigFloat,
+    # BigFloat,
     ]
 
 @info("starting Hypatia tests")
@@ -98,62 +98,72 @@ testfuns_preproc = [
     ]
 @testset "preprocessing tests: $t, $s, $T" for t in testfuns_preproc, s in system_solvers, T in real_types
     test_options = (
-        linear_model = MO.PreprocessedLinearModel{T},
-        linear_model_options = (use_iterative = false,),
-        system_solver = s{T},
+        linear_model = MO.PreprocessedLinearModel,
+        system_solver = s,
         solver_options = (verbose = true,),
         )
-    t(test_options)
+    t(T, test_options)
 end
-# linear_models = [
-#     # MO.PreprocessedLinearModel,
-#     MO.RawLinearModel,
-#     ]
-# testfuns_raw = [
-#     orthant1,
-#     orthant2,
-#     orthant3,
-#     orthant4,
-#     epinorminf1,
-#     epinorminf2,
-#     epinorminf3,
-#     epinorminf4,
-#     epinorminf5,
-#     epinormeucl1,
-#     epinormeucl2,
-#     epipersquare1,
-#     epipersquare2,
-#     epipersquare3,
-#     hypoperlog1,
-#     hypoperlog2,
-#     hypoperlog3,
-#     hypoperlog4,
-#     hypopersumlog1,
-#     hypopersumlog2,
-#     # epiperpower1,
-#     # epiperpower2,
-#     # epiperpower3,
-#     # epipersumexp1,
-#     # epipersumexp2,
-#     # hypogeomean1,
-#     # hypogeomean2,
-#     # hypogeomean3,
-#     # hypogeomean4,
-#     epinormspectral1,
-#     semidefinite1,
-#     semidefinite2,
-#     semidefinite3,
-#     semidefinitecomplex1,
-#     hypoperlogdet1,
-#     hypoperlogdet2,
-#     hypoperlogdet3,
-#     ]
-# @testset "native tests: $t, $s, $m, $T" for t in testfuns_raw, s in system_solvers, m in linear_models, T in real_types
-#     if s == SO.QRCholCombinedHSDSystemSolver && m == MO.RawLinearModel
-#         continue # QRChol linear system solver needs preprocessed model
-#     end
-#     t(s{T}, m{T}, verbose)
-# end
+linear_models = [
+    # MO.PreprocessedLinearModel,
+    MO.RawLinearModel,
+    ]
+testfuns_raw = [
+    orthant1,
+    orthant2,
+    orthant3,
+    orthant4,
+    epinorminf1,
+    epinorminf2,
+    epinorminf3,
+    epinorminf4,
+    epinorminf5,
+    epinormeucl1,
+    epinormeucl2,
+    epipersquare1,
+    epipersquare2,
+    epipersquare3,
+    hypoperlog1,
+    hypoperlog2,
+    hypoperlog3,
+    hypoperlog4,
+    hypopersumlog1,
+    hypopersumlog2,
+    epiperpower1,
+    epiperpower2,
+    epiperpower3,
+    epipersumexp1,
+    epipersumexp2,
+    hypogeomean1,
+    hypogeomean2,
+    hypogeomean3,
+    hypogeomean4,
+    epinormspectral1,
+    semidefinite1,
+    semidefinite2,
+    semidefinite3,
+    semidefinitecomplex1,
+    hypoperlogdet1,
+    hypoperlogdet2,
+    hypoperlogdet3,
+    ]
+@testset "native tests: $t, $s, $m, $T" for t in testfuns_raw, s in system_solvers, m in linear_models, T in real_types
+    if T == BigFloat && t in (epiperpower1, epiperpower2, epiperpower3, epipersumexp1, epipersumexp2)
+        continue
+    end
+    if s == SO.QRCholCombinedHSDSystemSolver && m == MO.RawLinearModel
+        continue # QRChol linear system solver needs preprocessed model
+    end
+    test_options = (
+        linear_model = m,
+        linear_model_options = (m == MO.RawLinearModel ? (use_iterative = true,) : NamedTuple()),
+        system_solver = s,
+        system_solver_options = (m == MO.RawLinearModel ? (use_iterative = true,) : NamedTuple()),
+        # stepper_options = NamedTuple(),
+        solver_options = (verbose = true,),
+        )
+    t(T, test_options)
+end
 
 # @info("starting MathOptInterface tests")
 # verbose = false
