@@ -19,6 +19,7 @@ import Hypatia.HypReal
 import Hypatia.hyp_AtA!
 import Hypatia.hyp_chol!
 import Hypatia.hyp_ldiv_chol_L!
+import Hypatia.HypBlockMatrix
 
 abstract type Solver{T <: HypReal} end
 

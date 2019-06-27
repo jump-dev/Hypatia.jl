@@ -59,7 +59,7 @@ mutable struct NaiveElimCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSyst
 
     function NaiveElimCombinedHSDSystemSolver{T}(
         model::Models.LinearModel{T};
-        use_iterative::Bool = true,
+        use_iterative::Bool = false,
         use_sparse::Bool = false,
         ) where {T <: HypReal}
         (n, p, q) = (model.n, model.p, model.q)
@@ -68,15 +68,56 @@ mutable struct NaiveElimCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSyst
         system_solver.use_iterative = use_iterative
         system_solver.use_sparse = use_sparse
 
+        rhs = Matrix{T}(undef, npq1, 2)
+        system_solver.rhs = rhs
+        rows = 1:n
+        system_solver.x1 = view(rhs, rows, 1)
+        system_solver.x2 = view(rhs, rows, 2)
+        rows = (n + 1):(n + p)
+        system_solver.y1 = view(rhs, rows, 1)
+        system_solver.y2 = view(rhs, rows, 2)
+        rows = (n + p + 1):(n + p + q)
+        system_solver.z1 = view(rhs, rows, 1)
+        system_solver.z2 = view(rhs, rows, 2)
+        z_start = n + p
+        system_solver.z1_k = [view(rhs, z_start .+ model.cone_idxs[k], 1) for k in eachindex(model.cones)]
+        system_solver.z2_k = [view(rhs, z_start .+ model.cone_idxs[k], 2) for k in eachindex(model.cones)]
+        system_solver.s1 = similar(rhs, q)
+        system_solver.s2 = similar(rhs, q)
+        system_solver.s1_k = [view(system_solver.s1, model.cone_idxs[k]) for k in eachindex(model.cones)]
+        system_solver.s2_k = [view(system_solver.s2, model.cone_idxs[k]) for k in eachindex(model.cones)]
+
         if use_iterative
             system_solver.prevsol1 = zeros(T, npq1)
             system_solver.prevsol2 = zeros(T, npq1)
 
             # block matrix for efficient multiplication
+            cone_rows = UnitRange{Int}[]
+            cone_cols = UnitRange{Int}[]
+            for k in eachindex(model.cones)
+                cone_k = model.cones[k]
+                idxs = model.cone_idxs[k]
+                rows = (n + p) .+ idxs
+                if Cones.use_dual(cone_k)
+                    push!(cone_rows, rows)
+                    push!(cone_cols, rows)
+                else
+                    push!(cone_rows, rows)
+                    push!(cone_cols, 1:n)
+                    push!(cone_rows, rows)
+                    push!(cone_cols, npq1:npq1)
+                end
+            end
+
+            rc1 = 1:n
+            rc2 = (n + 1):(n + p)
+            rc3 = (n + p + 1):(n + p + q)
+            rc4 = (n + p + q + 1):(n + p + q + 1)
             system_solver.lhs = HypBlockMatrix{T}(
-                [A', G', model.c, -A, model.b, -model.G, ..., model.h, -model.c', -model.b', -model.h', [1]],
-                [1:n, 1:n, 1:n, (n + 1):(n + p), (n + 1):(n + p), (n + p + 1):(n + p + q), ..., (n + p + 1):(n + p + q), (n + p + q + 1):(n + p + q + 1)],
-                [1:p, (p + 1):(p + q), (p + q + 1):(p + q + 1), 1:n, (p + q + 1):(p + q + 1), 1:n, ..., (p + q + 1):(p + q + 1), 1:n, (n + 1):(n + p), (n + p + 1):(n + p + q), (n + p + q + 1):(n + p + q + 1))
+                [fill(I, length(cone_rows))...,
+                model.A', model.G', model.c, -model.A, model.b, -model.G, model.h, -model.c', -model.b', -model.h', [one(T)]],
+                [cone_rows..., rc1, rc1, rc1, rc2, rc2, rc3, rc3, rc4, rc4, rc4, rc4],
+                [cone_cols..., rc2, rc3, rc4, rc1, rc4, rc1, rc4, rc1, rc2, rc3, rc4],
                 )
         else
             if use_sparse
@@ -97,25 +138,6 @@ mutable struct NaiveElimCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSyst
             end
             system_solver.lhs = similar(system_solver.lhs_copy)
         end
-
-        rhs = Matrix{T}(undef, npq1, 2)
-        system_solver.rhs = rhs
-        rows = 1:n
-        system_solver.x1 = view(rhs, rows, 1)
-        system_solver.x2 = view(rhs, rows, 2)
-        rows = (n + 1):(n + p)
-        system_solver.y1 = view(rhs, rows, 1)
-        system_solver.y2 = view(rhs, rows, 2)
-        rows = (n + p + 1):(n + p + q)
-        system_solver.z1 = view(rhs, rows, 1)
-        system_solver.z2 = view(rhs, rows, 2)
-        z_start = n + p
-        system_solver.z1_k = [view(rhs, z_start .+ model.cone_idxs[k], 1) for k in eachindex(model.cones)]
-        system_solver.z2_k = [view(rhs, z_start .+ model.cone_idxs[k], 2) for k in eachindex(model.cones)]
-        system_solver.s1 = similar(rhs, q)
-        system_solver.s2 = similar(rhs, q)
-        system_solver.s1_k = [view(system_solver.s1, model.cone_idxs[k]) for k in eachindex(model.cones)]
-        system_solver.s2_k = [view(system_solver.s2, model.cone_idxs[k]) for k in eachindex(model.cones)]
 
         return system_solver
     end
@@ -157,6 +179,9 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveElimC
         @. s1_k[k] = -duals_k
         @. s2_k[k] = -duals_k - mu * g
         if !Cones.use_dual(cone_k)
+
+
+            # TODO use hess prod instead
             H = Cones.hess(cone_k)
             # -mu*H_k*G_k*x + z_k + mu*H_k*h_k*tau = mu*H_k*zrhs_k + srhs_k
             z1_k[k] .= mu * H * z1_k[k]
@@ -176,6 +201,26 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveElimC
     # solve system
     if system_solver.use_iterative
         lhs.blocks[end][1] = mtt
+        b_idx = 1
+        for k in eachindex(cones)
+            cone_k = cones[k]
+            idxs = model.cone_idxs[k]
+
+
+            # TODO use hess prod instead
+            H = Cones.hess(cone_k)
+
+            if Cones.use_dual(cone_k)
+                lhs.blocks[b_idx] = mu * H
+                b_idx += 1
+            else
+                lhs.blocks[b_idx] = -mu * H * model.G[idxs, :]
+                b_idx += 1
+                lhs.blocks[b_idx] = mu * H * model.h[idxs]
+                b_idx += 1
+            end
+        end
+
 
         # TODO need preconditioner
         # TODO optimize for this case, including applying the blocks of the LHS
@@ -198,6 +243,9 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveElimC
             cone_k = cones[k]
             idxs = model.cone_idxs[k]
             rows = (n + p) .+ idxs
+
+
+            # TODO use hess prod instead
             H = Cones.hess(cone_k)
             if Cones.use_dual(cone_k)
                 # -G_k*x + mu*H_k*z_k + h_k*tau = zrhs_k + srhs_k
@@ -228,7 +276,7 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveElimC
 
     # kap = taurhs - mu/(taubar^2)*tau
     kap1 = tau_rhs1 - mtt * tau1
-    kap2 = tau_rhs1 - mtt * tau2
+    kap2 = tau_rhs2 - mtt * tau2
 
     return (x1, x2, y1, y2, z1, z2, s1, s2, tau1, tau2, kap1, kap2)
 end
