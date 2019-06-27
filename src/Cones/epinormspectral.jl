@@ -86,12 +86,8 @@ function check_in_cone(cone::EpiNormSpectral{T}) where {T <: HypReal}
 
     p = 2
     for j in 1:m, i in 1:n
-        for d in 1:n
-            tmpvec[d] = sum(W[c, j] / u * Zi[c, d] for c in 1:n)
-            for c in 1:n
-                tmpmat[c, d] = Zi[c, i] * tmpvec[d]
-            end
-        end
+        tmpvec = W[:, j]' * Zi / u
+        tmpmat = Zi[:, i] * tmpvec
 
         # Zi * dZdWij * Zi
         term1 = Symmetric(tmpmat + tmpmat') # TODO use syrk
