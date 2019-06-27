@@ -17,32 +17,32 @@ include(joinpath(@__DIR__, "barriers.jl"))
 include(joinpath(@__DIR__, "native.jl"))
 include(joinpath(@__DIR__, "MathOptInterface.jl"))
 
-examples_dir = joinpath(@__DIR__, "../examples")
-include(joinpath(examples_dir, "centralpolymat/JuMP.jl"))
-include(joinpath(examples_dir, "contraction/JuMP.jl"))
-include(joinpath(examples_dir, "densityest/JuMP.jl"))
-include(joinpath(examples_dir, "densityest/native.jl"))
-include(joinpath(examples_dir, "envelope/JuMP.jl"))
-include(joinpath(examples_dir, "envelope/native.jl"))
-include(joinpath(examples_dir, "expdesign/JuMP.jl"))
-include(joinpath(examples_dir, "expdesign/native.jl"))
-include(joinpath(examples_dir, "linearopt/native.jl"))
-include(joinpath(examples_dir, "lotkavolterra/JuMP.jl"))
-include(joinpath(examples_dir, "matrixcompletion/native.jl"))
-include(joinpath(examples_dir, "muconvexity/JuMP.jl"))
-include(joinpath(examples_dir, "polymin/JuMP.jl"))
-include(joinpath(examples_dir, "polymin/native.jl"))
-include(joinpath(examples_dir, "polynorm/JuMP.jl"))
-include(joinpath(examples_dir, "portfolio/native.jl"))
-include(joinpath(examples_dir, "regionofattr/JuMP.jl"))
-include(joinpath(examples_dir, "secondorderpoly/JuMP.jl"))
-include(joinpath(examples_dir, "semidefinitepoly/JuMP.jl"))
-include(joinpath(examples_dir, "shapeconregr/JuMP.jl"))
-include(joinpath(examples_dir, "sparsepca/native.jl"))
+# examples_dir = joinpath(@__DIR__, "../examples")
+# include(joinpath(examples_dir, "centralpolymat/JuMP.jl"))
+# include(joinpath(examples_dir, "contraction/JuMP.jl"))
+# include(joinpath(examples_dir, "densityest/JuMP.jl"))
+# include(joinpath(examples_dir, "densityest/native.jl"))
+# include(joinpath(examples_dir, "envelope/JuMP.jl"))
+# include(joinpath(examples_dir, "envelope/native.jl"))
+# include(joinpath(examples_dir, "expdesign/JuMP.jl"))
+# include(joinpath(examples_dir, "expdesign/native.jl"))
+# include(joinpath(examples_dir, "linearopt/native.jl"))
+# include(joinpath(examples_dir, "lotkavolterra/JuMP.jl"))
+# include(joinpath(examples_dir, "matrixcompletion/native.jl"))
+# include(joinpath(examples_dir, "muconvexity/JuMP.jl"))
+# include(joinpath(examples_dir, "polymin/JuMP.jl"))
+# include(joinpath(examples_dir, "polymin/native.jl"))
+# include(joinpath(examples_dir, "polynorm/JuMP.jl"))
+# include(joinpath(examples_dir, "portfolio/native.jl"))
+# include(joinpath(examples_dir, "regionofattr/JuMP.jl"))
+# include(joinpath(examples_dir, "secondorderpoly/JuMP.jl"))
+# include(joinpath(examples_dir, "semidefinitepoly/JuMP.jl"))
+# include(joinpath(examples_dir, "shapeconregr/JuMP.jl"))
+# include(joinpath(examples_dir, "sparsepca/native.jl"))
 
 real_types = [
-    # Float64,
-    # Float32,
+    Float64,
+    Float32,
     BigFloat,
     ]
 
@@ -83,87 +83,87 @@ real_types = [
 #     t(T)
 # end
 
-# @info("starting native interface tests")
-# system_solvers = [
-#     # SO.QRCholCombinedHSDSystemSolver,
-#     # SO.SymIndefCombinedHSDSystemSolver,
-#     SO.NaiveElimCombinedHSDSystemSolver,
-#     # SO.NaiveCombinedHSDSystemSolver,
-#     ]
-# testfuns_preproc = [
-#     dimension1,
-#     consistent1,
-#     inconsistent1,
-#     inconsistent2,
-#     ]
-# @testset "preprocessing tests: $t, $s, $T" for t in testfuns_preproc, s in system_solvers, T in real_types
-#     test_options = (
-#         linear_model = MO.PreprocessedLinearModel,
-#         system_solver = s,
-#         solver_options = (verbose = true,),
-#         )
-#     t(T, test_options)
-# end
-# linear_models = [
-#     # MO.PreprocessedLinearModel,
-#     MO.RawLinearModel,
-#     ]
-# testfuns_raw = [
-#     orthant1,
-#     orthant2,
-#     orthant3,
-#     orthant4,
-#     epinorminf1,
-#     epinorminf2,
-#     epinorminf3,
-#     epinorminf4,
-#     epinorminf5,
-#     epinormeucl1,
-#     epinormeucl2,
-#     epipersquare1,
-#     epipersquare2,
-#     epipersquare3,
-#     hypoperlog1,
-#     hypoperlog2,
-#     hypoperlog3,
-#     hypoperlog4,
-#     hypopersumlog1,
-#     hypopersumlog2,
-#     epiperpower1,
-#     epiperpower2,
-#     epiperpower3,
-#     epipersumexp1,
-#     epipersumexp2,
-#     hypogeomean1,
-#     hypogeomean2,
-#     hypogeomean3,
-#     hypogeomean4,
-#     epinormspectral1,
-#     semidefinite1,
-#     semidefinite2,
-#     semidefinite3,
-#     semidefinitecomplex1,
-#     hypoperlogdet1,
-#     hypoperlogdet2,
-#     hypoperlogdet3,
-#     ]
-# @testset "native tests: $t, $s, $m, $T" for t in testfuns_raw, s in system_solvers, m in linear_models, T in real_types
-#     if T == BigFloat && t in (epiperpower1, epiperpower2, epiperpower3, epipersumexp1, epipersumexp2)
-#         continue
-#     end
-#     if s == SO.QRCholCombinedHSDSystemSolver && m == MO.RawLinearModel
-#         continue # QRChol linear system solver needs preprocessed model
-#     end
-#     test_options = (
-#         linear_model = m,
-#         linear_model_options = (m == MO.RawLinearModel ? (use_iterative = true,) : NamedTuple()),
-#         system_solver = s,
-#         system_solver_options = (m == MO.RawLinearModel ? (use_iterative = true,) : NamedTuple()),
-#         # stepper_options = NamedTuple(),
-#         solver_options = (verbose = true,),
-#         )
-#     t(T, test_options)
-# end
+@info("starting native interface tests")
+system_solvers = [
+    # SO.QRCholCombinedHSDSystemSolver,
+    # SO.SymIndefCombinedHSDSystemSolver,
+    SO.NaiveElimCombinedHSDSystemSolver,
+    # SO.NaiveCombinedHSDSystemSolver,
+    ]
+testfuns_preproc = [
+    dimension1,
+    consistent1,
+    inconsistent1,
+    inconsistent2,
+    ]
+@testset "preprocessing tests: $t, $s, $T" for t in testfuns_preproc, s in system_solvers, T in real_types
+    test_options = (
+        linear_model = MO.PreprocessedLinearModel,
+        system_solver = s,
+        solver_options = (verbose = true,),
+        )
+    t(T, test_options)
+end
+linear_models = [
+    # MO.PreprocessedLinearModel,
+    MO.RawLinearModel,
+    ]
+testfuns_raw = [
+    orthant1,
+    orthant2,
+    orthant3,
+    orthant4,
+    epinorminf1,
+    epinorminf2,
+    epinorminf3,
+    epinorminf4,
+    epinorminf5,
+    epinormeucl1,
+    epinormeucl2,
+    epipersquare1,
+    epipersquare2,
+    epipersquare3,
+    hypoperlog1,
+    hypoperlog2,
+    hypoperlog3,
+    hypoperlog4,
+    hypopersumlog1,
+    hypopersumlog2,
+    epiperpower1,
+    epiperpower2,
+    epipersumexp1,
+    epipersumexp2,
+    hypogeomean1,
+    hypogeomean2,
+    hypogeomean3,
+    epinormspectral1,
+    semidefinite1,
+    semidefinite2,
+    semidefinitecomplex1,
+    hypoperlogdet1,
+    hypoperlogdet2,
+    hypoperlogdet3,
+    ]
+@testset "native tests: $t, $s, $m, $T" for t in testfuns_raw, s in system_solvers, m in linear_models, T in real_types
+    if T == BigFloat && t in (epiperpower1, epiperpower2, epipersumexp1, epipersumexp2)
+        continue # ForwardDiff does not work with BigFloat
+    end
+    if T == BigFloat && m == MO.RawLinearModel
+        continue # IterativeSolvers does not work with BigFloat
+    end
+    if s == SO.QRCholCombinedHSDSystemSolver && m == MO.RawLinearModel
+        continue # QRChol linear system solver needs preprocessed model
+    end
+    test_options = (
+        linear_model = m,
+        linear_model_options = (m == MO.RawLinearModel ? (use_iterative = true,) : NamedTuple()),
+        system_solver = s,
+        system_solver_options = (m == MO.RawLinearModel ? (use_iterative = true,) : NamedTuple()),
+        # stepper_options = NamedTuple(),
+        solver_options = (verbose = true,),
+        )
+    t(T, test_options)
+end
 
 # @info("starting MathOptInterface tests")
 # verbose = false
@@ -182,33 +182,33 @@ real_types = [
 #     test_moi(d, s{Float64}, m{Float64}, verbose)
 # end
 #
-@info("starting native examples tests")
-native_options = (
-    verbose = true,
-    max_iters = 150,
-    time_limit = 6e2, # 1 minute
-    )
-# @testset "native examples" begin # TODO generalize these for T in real_types
-#     @testset "envelope" begin test_envelope(; native_options...,
+# @info("starting native examples tests")
+# native_options = (
+#     verbose = true,
+#     max_iters = 150,
+#     time_limit = 6e2, # 1 minute
+#     )
+# # @testset "native examples" begin # TODO generalize these for T in real_types
+# #     @testset "envelope" begin test_envelope(; native_options...,
+# #         ) end
+# #     @testset "linearopt" begin test_linearopt(; native_options...,
+# #         ) end
+# # end
+# @testset "native examples: $T" for T in real_types
+#     @testset "densityest" begin test_densityest(T; native_options...,
 #         ) end
-#     @testset "linearopt" begin test_linearopt(; native_options...,
+#     @testset "expdesign" begin test_expdesign(T; native_options...,
+#         ) end
+#     @testset "matrixcompletion" begin test_matrixcompletion(T; native_options...,
+#         ) end
+#     @testset "sparsepca" begin test_sparsepca(T; native_options...,
+#         ) end
+#     @testset "polymin" begin test_polymin(T; native_options...,
+#         tol_rel_opt = 1e-9, tol_abs_opt = 1e-8, tol_feas = 1e-9,
+#         ) end
+#     @testset "portfolio" begin test_portfolio(T; native_options...,
 #         ) end
 # end
-@testset "native examples: $T" for T in real_types
-    @testset "densityest" begin test_densityest(T; native_options...,
-        ) end
-    @testset "expdesign" begin test_expdesign(T; native_options...,
-        ) end
-    @testset "matrixcompletion" begin test_matrixcompletion(T; native_options...,
-        ) end
-    @testset "sparsepca" begin test_sparsepca(T; native_options...,
-        ) end
-    @testset "polymin" begin test_polymin(T; native_options...,
-        tol_rel_opt = 1e-9, tol_abs_opt = 1e-8, tol_feas = 1e-9,
-        ) end
-    @testset "portfolio" begin test_portfolio(T; native_options...,
-        ) end
-end
 #
 # @info("starting JuMP examples tests")
 # JuMP_options = (
