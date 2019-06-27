@@ -81,32 +81,25 @@ function check_in_cone(cone::EpiNormSpectral{T}) where {T <: HypReal}
     cone.H[1, 1] = dot(ZiEuZi, Eu) + (2 * dot(Zi, X) / u + one(T)) / u / u
     cone.H[1, 2:end] = vec(-2 * (ZiEuZi + Zi / u) *  W / u)
 
-    tmpvec = zeros(n)
-    tmpmat = zeros(n, n)
-
     p = 2
     for j in 1:m, i in 1:n
-        for d in 1:n
-            tmpvec[d] = sum(W[c, j] / u * Zi[c, d] for c in 1:n)
-            for c in 1:n
-                tmpmat[c, d] = Zi[c, i] * tmpvec[d]
-            end
-        end
+        tmpmat = Zi[:, i] * W[:, j]' * Zi / u
 
         # Zi * dZdWij * Zi
         term1 = Symmetric(tmpmat + tmpmat') # TODO use syrk
 
-        # TODO matrixify
         q = p
-        # l = j
-        for k in i:n
-            cone.H[p, q] += 2 * (sum(term1[ni, k] * W[ni, j] for ni in 1:n) + Zi[i, k]) / u
-            q += 1
+        cone.H[p, q:(q + n - i)] = Zi[i, i:n]
+        for ni in 1:n
+            cone.H[p, q:(q + n - i)] += term1[ni, i:n] * W[ni, j]
         end
-        for l in (j + 1):m, k in 1:n
-            cone.H[p, q] += 2 * sum(term1[ni, k] * W[ni, l] for ni in 1:n) / u
-            q += 1
-        end
+        cone.H[p, q:(q + n - i)] *= 2 / u
+        q += (n - i + 1)
+
+        mat = 2 * term1 * W[:, (j + 1):m] / u
+        nterms = n * (m - j)
+        cone.H[p, q:(q + nterms - 1)] += vec(mat)
+        q += nterms
         p += 1
     end
 
