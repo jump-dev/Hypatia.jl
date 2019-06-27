@@ -18,6 +18,7 @@ using Test
 import Hypatia
 import Hypatia.HypReal
 const CO = Hypatia.Cones
+const MU = Hypatia.ModelUtilities
 
 include(joinpath(@__DIR__, "data.jl"))
 
