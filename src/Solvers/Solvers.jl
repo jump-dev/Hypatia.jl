@@ -123,8 +123,8 @@ function build_solve_check(
     cones::Vector{Cones.Cone{T}},
     cone_idxs::Vector{UnitRange{Int}};
     test::Bool = true,
-    linear_model::Type{<:Models.LinearModel} = MO.PreprocessedLinearModel,
-    system_solver::Type{<:CombinedHSDSystemSolver} = SO.QRCholCombinedHSDSystemSolver,
+    linear_model::Type{<:Models.LinearModel} = Models.PreprocessedLinearModel,
+    system_solver::Type{<:CombinedHSDSystemSolver} = Solvers.QRCholCombinedHSDSystemSolver,
     linear_model_options::NamedTuple = NamedTuple(),
     system_solver_options::NamedTuple = NamedTuple(),
     stepper_options::NamedTuple = NamedTuple(),
