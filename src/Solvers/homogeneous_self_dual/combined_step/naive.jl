@@ -24,7 +24,7 @@ mutable struct NaiveCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSo
 
     function NaiveCombinedHSDSystemSolver{T}(
         model::Models.LinearModel{T};
-        use_iterative::Bool = true,
+        use_iterative::Bool = false,
         use_sparse::Bool = false,
         ) where {T <: HypReal}
         (n, p, q) = (model.n, model.p, model.q)

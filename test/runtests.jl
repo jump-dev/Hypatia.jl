@@ -86,12 +86,12 @@ include(joinpath(@__DIR__, "native.jl"))
 real_types = [
     Float64,
     Float32,
-    # BigFloat,
+    BigFloat,
     ]
 system_solvers = [
-    # SO.QRCholCombinedHSDSystemSolver,
-    # SO.SymIndefCombinedHSDSystemSolver,
-    # SO.NaiveElimCombinedHSDSystemSolver,
+    SO.QRCholCombinedHSDSystemSolver,
+    SO.SymIndefCombinedHSDSystemSolver,
+    SO.NaiveElimCombinedHSDSystemSolver,
     SO.NaiveCombinedHSDSystemSolver,
     ]
 testfuns_preproc = [
@@ -100,17 +100,16 @@ testfuns_preproc = [
     inconsistent1,
     inconsistent2,
     ]
-# @testset "preprocessing tests: $t, $s, $T" for t in testfuns_preproc, s in system_solvers, T in real_types
-#     test_options = (
-#         linear_model = MO.PreprocessedLinearModel,
-#         system_solver = s,
-#         system_solver_options = (use_iterative = false,),
-#         solver_options = (verbose = true,),
-#         )
-#     t(T, test_options)
-# end
+@testset "preprocessing tests: $t, $s, $T" for t in testfuns_preproc, s in system_solvers, T in real_types
+    test_options = (
+        linear_model = MO.PreprocessedLinearModel,
+        system_solver = s,
+        solver_options = (verbose = true,),
+        )
+    t(T, test_options)
+end
 linear_models = [
-    # MO.PreprocessedLinearModel,
+    MO.PreprocessedLinearModel,
     MO.RawLinearModel,
     ]
 testfuns_raw = [
@@ -162,13 +161,24 @@ testfuns_raw = [
     test_options = (
         linear_model = m,
         system_solver = s,
-        linear_model_options = (m == MO.RawLinearModel ? (use_iterative = true,) : NamedTuple()),
-        system_solver_options = (m == MO.RawLinearModel ? (use_iterative = true,) : NamedTuple()),
-        # stepper_options = NamedTuple(),
+        linear_model_options = NamedTuple(),
+        system_solver_options = NamedTuple(),
+        stepper_options = NamedTuple(),
+        solver_options = (verbose = false,),
+        )
+    t(T, test_options)
+end
+@testset "native tests (iterative linear system solves): $t" for t in testfuns_raw
+    test_options = (
+        linear_model = MO.RawLinearModel,
+        system_solver = SO.NaiveCombinedHSDSystemSolver,
+        linear_model_options = (use_iterative = true,),
+        system_solver_options = (use_iterative = true,),
         solver_options = (verbose = true,),
         )
     t(T, test_options)
 end
+
 
 # @info("starting native examples tests")
 # real_types = [

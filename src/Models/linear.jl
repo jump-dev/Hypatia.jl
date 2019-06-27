@@ -87,7 +87,7 @@ mutable struct RawLinearModel{T <: HypReal} <: LinearModel{T}
         h::Vector{T},
         cones::Vector{Cones.Cone{T}},
         cone_idxs::Vector{UnitRange{Int}};
-        use_iterative::Bool = true, # TODO choose default
+        use_iterative::Bool = false,
         tol_qr::Real = 1e2 * eps(T),
         use_dense_fallback::Bool = true,
         ) where {T <: HypReal}
