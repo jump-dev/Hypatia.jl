@@ -171,18 +171,6 @@ testfuns_raw = [
 end
 
 @info("starting native examples tests")
-@testset "native examples" begin
-    # TODO rewrite like test/native.jl functions, to take T and all options and use build_solve_check
-    native_options = (
-        verbose = true,
-        max_iters = 150,
-        time_limit = 6e2, # 1 minute
-        )
-
-    @testset "envelope" begin test_envelope(; native_options...) end
-
-    @testset "linearopt" begin test_linearopt(; native_options...) end
-end
 real_types = [
     Float64,
     Float32,
