@@ -11,10 +11,7 @@ import Random
 using Test
 import Hypatia
 import Hypatia.HypReal
-const HYP = Hypatia
-const MO = HYP.Models
-const CO = HYP.Cones
-const SO = HYP.Solvers
+const CO = Hypatia.Cones
 
 function sparsepca(
     T::Type{<:HypReal},
@@ -32,6 +29,7 @@ function sparsepca(
         x[signal_idxs] = rand(T, k)
         sigma = x * x'
         sigma ./= tr(sigma)
+        true_obj = -1
     else
         # simulate some observations with noise
         x = randn(p, 100)
@@ -40,6 +38,7 @@ function sparsepca(
         sigma[signal_idxs, signal_idxs] .+= y * y'
         sigma ./= 100
         sigma = T.(sigma)
+        true_obj = NaN
     end
 
     rt2 = sqrt(T(2))
@@ -88,7 +87,7 @@ function sparsepca(
         push!(cone_idxs, (dimx + 1):(3 * dimx))
     end
 
-    return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs, sigma = sigma)
+    return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs, true_obj = true_obj)
 end
 
 sparsepca1(T::Type{<:HypReal}) = sparsepca(T, 5, 3)
@@ -98,31 +97,27 @@ sparsepca4(T::Type{<:HypReal}) = sparsepca(T, 10, 3, use_l1ball = false)
 sparsepca5(T::Type{<:HypReal}) = sparsepca(T, 10, 3, noise_ratio = 10.0)
 sparsepca6(T::Type{<:HypReal}) = sparsepca(T, 10, 3, noise_ratio = 10.0, use_l1ball = false)
 
-function test_sparsepca(T::Type{<:HypReal}, instance::Function; options, rseed::Int = 1)
-    Random.seed!(rseed)
-    d = instance(T)
-    model = MO.PreprocessedLinearModel{T}(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
-    solver = SO.HSDSolver{T}(model; options...)
-    SO.solve(solver)
-    tol = max(1e-5, sqrt(sqrt(eps(T))))
-    r = SO.get_certificates(solver, model, test = true, atol = tol, rtol = tol)
-    @test r.status == :Optimal
-    if tr(d.sigma) ≈ -1
-        @test r.primal_obj ≈ -1 atol = tol rtol = tol
-    end
-    return
-end
-
-test_sparsepca_all(T::Type{<:HypReal}; options...) = test_sparsepca.(T, [
+instances_sparsepca_all = [
     sparsepca1,
     sparsepca2,
     sparsepca3,
     sparsepca4,
     sparsepca5,
     sparsepca6,
-    ], options = options)
-
-test_sparsepca(T::Type{<:HypReal}; options...) = test_sparsepca.(T, [
+    ]
+instances_sparsepca_few = [
     sparsepca1,
     sparsepca2,
-    ], options = options)
+    ]
+
+function test_sparsepca(instance::Function; T::Type{<:HypReal} = Float64, test_options::NamedTuple = NamedTuple(), rseed::Int = 1)
+    Random.seed!(rseed)
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
+    d = instance(T)
+    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs; test_options..., atol = tol, rtol = tol)
+    @test r.status == :Optimal
+    if !isnan(d.true_obj)
+        @test r.primal_obj ≈ d.true_obj atol = tol rtol = tol
+    end
+    return
+end
