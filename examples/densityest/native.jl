@@ -14,11 +14,7 @@ import Random
 using Test
 import Hypatia
 import Hypatia.HypReal
-const HYP = Hypatia
-const MO = HYP.Models
-const MU = HYP.ModelUtilities
-const CO = HYP.Cones
-const SO = HYP.Solvers
+const CO = Hypatia.Cones
 
 include(joinpath(@__DIR__, "data.jl"))
 
@@ -170,19 +166,7 @@ densityest6(T::Type{<:HypReal}) = densityest(T, 50, 1, 4, use_sumlog = false)
 densityest7(T::Type{<:HypReal}) = densityest(T, 50, 1, 4, use_sumlog = true, use_wsos = false)
 densityest8(T::Type{<:HypReal}) = densityest(T, 50, 1, 4, use_sumlog = false, use_wsos = false)
 
-function test_densityest(T::Type{<:HypReal}, instance::Function; options, rseed::Int = 1)
-    Random.seed!(rseed)
-    d = instance(T)
-    model = MO.PreprocessedLinearModel{T}(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
-    solver = SO.HSDSolver{T}(model; options...)
-    SO.solve(solver)
-    tol = max(1e-5, sqrt(sqrt(eps(T))))
-    r = SO.get_certificates(solver, model, test = true, atol = tol, rtol = tol)
-    @test r.status == :Optimal
-    return
-end
-
-test_densityest_all(T::Type{<:HypReal}; options...) = test_densityest.(T, [
+instances_densityest_all = [
     densityest1,
     densityest2,
     densityest3,
@@ -191,13 +175,21 @@ test_densityest_all(T::Type{<:HypReal}; options...) = test_densityest.(T, [
     densityest6,
     densityest7,
     densityest8,
-    ], options = options)
-
-test_densityest(T::Type{<:HypReal}; options...) = test_densityest.(T, [
+    ]
+instances_densityest_few = [
     densityest1,
     densityest3,
     densityest5,
     densityest6,
     densityest7,
     densityest8,
-    ], options = options)
+    ]
+
+function test_densityest(instance::Function; T::Type{<:HypReal} = Float64, test_options::NamedTuple = NamedTuple(), rseed::Int = 1)
+    Random.seed!(rseed)
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
+    d = instance(T)
+    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs; test_options..., atol = tol, rtol = tol)
+    @test r.status == :Optimal
+    return
+end
