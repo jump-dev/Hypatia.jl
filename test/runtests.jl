@@ -51,6 +51,11 @@ include(joinpath(examples_dir, "sparsepca/native.jl"))
 end
 
 @info("starting barrier tests")
+real_types = [
+    Float64,
+    Float32,
+    BigFloat,
+    ]
 barrier_testfuns = [
     test_orthant_barrier,
     test_epinorminf_barrier,
@@ -165,6 +170,47 @@ testfuns_raw = [
     t(T, test_options)
 end
 
+@info("starting native examples tests")
+@testset "native examples" begin
+    # TODO rewrite like test/native.jl functions, to take T and all options and use build_solve_check
+    native_options = (
+        verbose = true,
+        max_iters = 150,
+        time_limit = 6e2, # 1 minute
+        )
+
+    @testset "envelope" begin test_envelope(; native_options...) end
+
+    @testset "linearopt" begin test_linearopt(; native_options...) end
+end
+real_types = [
+    Float64,
+    Float32,
+    # BigFloat,
+    ]
+@testset "native examples: $T" for T in real_types
+    # TODO test some other options maybe
+    test_options = (
+        solver_options = (verbose = true,),
+        )
+
+    @testset "densityest" begin test_densityest.(instances_densityest_few, T = T, test_options = test_options) end
+
+    @testset "envelope" begin test_envelope.(instances_envelope_few, T = T, test_options = test_options) end
+
+    @testset "expdesign" begin test_expdesign.(instances_expdesign_few, T = T, test_options = test_options) end
+
+    @testset "linearopt" begin test_linearopt.(instances_linearopt_few, T = T, test_options = test_options) end
+
+    @testset "matrixcompletion" begin test_matrixcompletion.(instances_matrixcompletion_few, T = T, test_options = test_options) end
+
+    @testset "sparsepca" begin test_sparsepca.(instances_sparsepca_few, T = T, test_options = test_options) end
+
+    @testset "polymin" begin test_polymin.(instances_polymin_few, T = T, test_options = test_options) end
+
+    @testset "portfolio" begin test_portfolio.(instances_portfolio_few, T = T, test_options = test_options) end
+end
+
 @info("starting MathOptInterface tests")
 verbose = false
 dense_options = [
@@ -180,43 +226,6 @@ linear_models = [
     ]
 @testset "MOI tests: $(d ? "dense" : "sparse"), $s, $m" for d in dense_options, s in system_solvers, m in linear_models
     test_moi(d, s{Float64}, m{Float64}, verbose)
-end
-
-@info("starting native examples tests")
-real_types = [
-    Float64,
-    Float32,
-    # BigFloat,
-    ]
-@testset "native examples" begin
-    # TODO rewrite like test/native.jl functions, to take T and all options and use build_solve_check
-    native_options = (
-        verbose = true,
-        max_iters = 150,
-        time_limit = 6e2, # 1 minute
-        )
-
-    @testset "envelope" begin test_envelope(; native_options...) end
-
-    @testset "linearopt" begin test_linearopt(; native_options...) end
-end
-@testset "native examples: $T" for T in real_types
-    # TODO test some other options maybe
-    test_options = (
-        solver_options = (verbose = true,),
-        )
-
-    @testset "densityest" begin test_densityest.(instances_densityest_few, T = T, test_options = test_options) end
-
-    @testset "expdesign" begin test_expdesign.(instances_expdesign_few, T = T, test_options = test_options) end
-
-    @testset "matrixcompletion" begin test_matrixcompletion.(instances_matrixcompletion_few, T = T, test_options = test_options) end
-
-    @testset "sparsepca" begin test_sparsepca.(instances_sparsepca_few, T = T, test_options = test_options) end
-
-    @testset "polymin" begin test_polymin.(instances_polymin_few, T = T, test_options = test_options) end
-
-    @testset "portfolio" begin test_portfolio.(instances_portfolio_few, T = T, test_options = test_options) end
 end
 
 @info("starting JuMP examples tests")
