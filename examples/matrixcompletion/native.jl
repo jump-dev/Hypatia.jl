@@ -156,7 +156,7 @@ function matrixcompletion(
         h = vcat(h_norm, zeros(T, 3 * (num_unknown - 2)), T[1, 0, 0])
 
         # G_norm needs to be post-padded with columns for 3dim cone vars
-        G_norm = hcat(G_norm, zeros(T, m * n + 1, num_unknown - 2))
+        G_norm = hcat(G_norm, zeros(size(G_norm, 1), num_unknown - 2))
         # G_geo needs to be pre-padded with the epigraph variable for the spectral norm cone
         G_geo = hcat(zeros(T, 3 * (num_unknown - 1)), G_geo)
         c = vcat(c, zeros(T, num_unknown - 2))
@@ -170,12 +170,15 @@ end
 matrixcompletion1(T::Type{<:HypReal}) = matrixcompletion(T, 5, 6)
 matrixcompletion2(T::Type{<:HypReal}) = matrixcompletion(T, 5, 6, use_geomean = false)
 matrixcompletion3(T::Type{<:HypReal}) = matrixcompletion(T, 5, 6, use_epinorm = false)
-matrixcompletion4(T::Type{<:HypReal}) = matrixcompletion(T, 6, 8)
-matrixcompletion5(T::Type{<:HypReal}) = matrixcompletion(T, 6, 8, use_geomean = false)
-matrixcompletion6(T::Type{<:HypReal}) = matrixcompletion(T, 6, 8, use_epinorm = false)
-matrixcompletion7(T::Type{<:HypReal}) = matrixcompletion(T, 8, 8)
-matrixcompletion8(T::Type{<:HypReal}) = matrixcompletion(T, 8, 8, use_geomean = false)
-matrixcompletion9(T::Type{<:HypReal}) = matrixcompletion(T, 8, 8, use_epinorm = false)
+matrixcompletion4(T::Type{<:HypReal}) = matrixcompletion(T, 5, 6, use_geomean = false, use_epinorm = false)
+matrixcompletion5(T::Type{<:HypReal}) = matrixcompletion(T, 6, 8)
+matrixcompletion6(T::Type{<:HypReal}) = matrixcompletion(T, 6, 8, use_geomean = false)
+matrixcompletion7(T::Type{<:HypReal}) = matrixcompletion(T, 6, 8, use_epinorm = false)
+matrixcompletion8(T::Type{<:HypReal}) = matrixcompletion(T, 6, 8, use_geomean = false, use_epinorm = false)
+matrixcompletion9(T::Type{<:HypReal}) = matrixcompletion(T, 8, 8)
+matrixcompletion10(T::Type{<:HypReal}) = matrixcompletion(T, 8, 8, use_geomean = false)
+matrixcompletion11(T::Type{<:HypReal}) = matrixcompletion(T, 8, 8, use_epinorm = false)
+matrixcompletion12(T::Type{<:HypReal}) = matrixcompletion(T, 8, 8, use_geomean = false, use_epinorm = false)
 
 instances_matrixcompletion_all = [
     matrixcompletion1,
@@ -187,11 +190,15 @@ instances_matrixcompletion_all = [
     matrixcompletion7,
     matrixcompletion8,
     matrixcompletion9,
+    matrixcompletion10,
+    matrixcompletion11,
+    matrixcompletion12,
     ]
 instances_matrixcompletion_few = [
     matrixcompletion1,
     matrixcompletion2,
     matrixcompletion3,
+    matrixcompletion4,
     ]
 
 function test_matrixcompletion(instance::Function; T::Type{<:HypReal} = Float64, test_options::NamedTuple = NamedTuple(), rseed::Int = 1)
