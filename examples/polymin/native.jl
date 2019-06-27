@@ -17,11 +17,7 @@ import Combinatorics
 using Test
 import Hypatia
 import Hypatia.HypReal
-const HYP = Hypatia
-const CO = HYP.Cones
-const MO = HYP.Models
-const SO = HYP.Solvers
-const MU = HYP.ModelUtilities
+const CO = Hypatia.Cones
 
 include(joinpath(@__DIR__, "data.jl"))
 
@@ -224,22 +220,7 @@ polymincomplex12(T::Type{<:HypReal}) = polymincomplex(T, :absbox2d, 2, use_prima
 polymincomplex13(T::Type{<:HypReal}) = polymincomplex(T, :negabsbox2d, 1, use_primal = false)
 polymincomplex14(T::Type{<:HypReal}) = polymincomplex(T, :denseunit1d, 2, use_primal = false)
 
-function test_polymin(T::Type{<:HypReal}, instance::Function; options, rseed::Int = 1)
-    Random.seed!(rseed)
-    d = instance(T)
-    model = MO.PreprocessedLinearModel{T}(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
-    solver = SO.HSDSolver{T}(model; options...)
-    SO.solve(solver)
-    tol = max(1e-5, sqrt(sqrt(eps(T))))
-    r = SO.get_certificates(solver, model, test = true, atol = tol, rtol = tol)
-    @test r.status == :Optimal
-    if !isnan(d.true_obj)
-        @test r.primal_obj ≈ d.true_obj atol = tol rtol = tol
-    end
-    return
-end
-
-test_polymin_all(T::Type{<:HypReal}; options...) = test_polymin.(T, [
+instances_polymin_all = [
     polyminreal1,
     polyminreal2,
     polyminreal3,
@@ -277,9 +258,8 @@ test_polymin_all(T::Type{<:HypReal}; options...) = test_polymin.(T, [
     polymincomplex12,
     polymincomplex13,
     polymincomplex14,
-    ], options = options)
-
-test_polymin(T::Type{<:HypReal}; options...) = test_polymin.(T, [
+    ]
+instances_polymin_few = [
     polyminreal2,
     polyminreal3,
     polyminreal12,
@@ -289,4 +269,16 @@ test_polymin(T::Type{<:HypReal}; options...) = test_polymin.(T, [
     polyminreal23,
     polymincomplex7,
     polymincomplex14,
-    ], options = options)
+    ]
+
+function test_polymin(instance::Function; T::Type{<:HypReal} = Float64, test_options::NamedTuple = NamedTuple(), rseed::Int = 1)
+    Random.seed!(rseed)
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
+    d = instance(T)
+    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs; test_options..., atol = tol, rtol = tol)
+    @test r.status == :Optimal
+    if !isnan(d.true_obj)
+        @test r.primal_obj ≈ d.true_obj atol = tol rtol = tol
+    end
+    return
+end

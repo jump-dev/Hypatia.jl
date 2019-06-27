@@ -9,10 +9,7 @@ import Random
 using Test
 import Hypatia
 import Hypatia.HypReal
-const HYP = Hypatia
-const MO = HYP.Models
-const CO = HYP.Cones
-const SO = HYP.Solvers
+const CO = Hypatia.Cones
 
 function portfolio(
     T::Type{<:HypReal},
@@ -150,30 +147,26 @@ portfolio4(T::Type{<:HypReal}) = portfolio(T, 6, [:linf], use_linfball = false)
 portfolio5(T::Type{<:HypReal}) = portfolio(T, 4, [:linf, :l1], use_linfball = true, use_l1ball = true)
 portfolio6(T::Type{<:HypReal}) = portfolio(T, 6, [:linf, :l1], use_linfball = false, use_l1ball = false)
 
-function test_portfolio(T::Type{<:HypReal}, instance::Function; options, rseed::Int = 1)
-    Random.seed!(rseed)
-    d = instance(T)
-    model = MO.PreprocessedLinearModel{T}(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
-    solver = SO.HSDSolver{T}(model; options...)
-    SO.solve(solver)
-    tol = max(1e-5, sqrt(sqrt(eps(T))))
-    r = SO.get_certificates(solver, model, test = true, atol = tol, rtol = tol)
-    @test r.status == :Optimal
-    return
-end
-
-test_portfolio_all(T::Type{<:HypReal}; options...) = test_portfolio.(T, [
+instances_portfolio_all = [
     portfolio1,
     portfolio2,
     portfolio3,
     portfolio4,
     portfolio5,
     portfolio6,
-    ], options = options)
-
-test_portfolio(T::Type{<:HypReal}; options...) = test_portfolio.(T, [
+    ]
+instances_portfolio_few = [
     portfolio1,
     portfolio3,
     portfolio5,
     portfolio6,
-    ], options = options)
+    ]
+
+function test_portfolio(instance::Function; T::Type{<:HypReal} = Float64, test_options::NamedTuple = NamedTuple(), rseed::Int = 1)
+    Random.seed!(rseed)
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
+    d = instance(T)
+    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs; test_options..., atol = tol, rtol = tol)
+    @test r.status == :Optimal
+    return
+end
