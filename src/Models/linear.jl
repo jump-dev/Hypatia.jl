@@ -91,12 +91,6 @@ mutable struct RawLinearModel{T <: HypReal} <: LinearModel{T}
         tol_qr::Real = 1e2 * eps(T),
         use_dense_fallback::Bool = true,
         ) where {T <: HypReal}
-        # c = convert(Vector{T}, c)
-        # A = convert(AbstractMatrix{T}, A)
-        # b = convert(Vector{T}, b)
-        # G = convert(AbstractMatrix{T}, G)
-        # h = convert(Vector{T}, h)
-
         model = new{T}()
 
         model.n = length(c)
@@ -122,27 +116,27 @@ end
 function find_initial_point(model::RawLinearModel{T}, use_iterative::Bool, tol_qr::Real, use_dense_fallback::Bool) where {T <: HypReal}
     A = model.A
     G = model.G
+    n = model.n
+    p = model.p
+    q = model.q
 
     point = initialize_cone_point(model.cones, model.cone_idxs)
-    @assert model.q == length(point.z)
+    @assert q == length(point.z)
 
     # TODO optionally use row and col scaling on AG and apply to c, b, h
     # TODO precondition iterative methods
     # TODO pick default tol for iter methods
 
     # solve for x as least squares solution to Ax = b, Gx = h - s
-    if !iszero(model.n)
-        AG = vcat(A, G)
+    if !iszero(n)
         rhs = vcat(model.b, model.h - point.s)
-
         if use_iterative
             # use iterative solvers method TODO pick lsqr or lsmr
-            point.x = zeros(T, model.n)
-            # IterativeSolvers.lsmr!(point.x, AG, rhs)
+            AG = HypBlockMatrix{T}([A, G], [1:p, (p + 1):(p + q)], [1:n, 1:n])
+            point.x = zeros(T, n)
             IterativeSolvers.lsqr!(point.x, AG, rhs)
-            # @show any(isnan, point.x)
-            # @show norm(point.x - (AG \ rhs))
         else
+            AG = vcat(A, G)
             if issparse(AG) && !(T <: sparse_QR_reals)
                 # TODO alternative fallback is to convert sparse{T} to sparse{Float64} and do the sparse LU
                 if use_dense_fallback
@@ -155,7 +149,7 @@ function find_initial_point(model::RawLinearModel{T}, use_iterative::Bool, tol_q
             AG_fact = issparse(AG) ? qr(AG) : qr!(AG)
 
             AG_rank = get_rank_est(AG_fact, tol_qr)
-            if AG_rank < model.n
+            if AG_rank < n
                 @warn("some dual equalities appear to be dependent; try using PreprocessedLinearModel")
             end
 
@@ -164,16 +158,12 @@ function find_initial_point(model::RawLinearModel{T}, use_iterative::Bool, tol_q
     end
 
     # solve for y as least squares solution to A'y = -c - G'z
-    if !iszero(model.p)
+    if !iszero(p)
         rhs = -model.c - G' * point.z
-
         if use_iterative
             # use iterative solvers method TODO pick lsqr or lsmr
-            point.y = zeros(T, model.p)
-            # IterativeSolvers.lsmr!(point.y, A', rhs)
+            point.y = zeros(T, p)
             IterativeSolvers.lsqr!(point.y, A', rhs)
-            # @show any(isnan, point.y)
-            # @show norm(point.y - (A' \ rhs))
         else
             if issparse(A) && !(T <: sparse_QR_reals)
                 # TODO alternative fallback is to convert sparse{T} to sparse{Float64} and do the sparse LU
@@ -188,7 +178,7 @@ function find_initial_point(model::RawLinearModel{T}, use_iterative::Bool, tol_q
             end
 
             Ap_rank = get_rank_est(Ap_fact, tol_qr)
-            if Ap_rank < model.p
+            if Ap_rank < p
                 @warn("some primal equalities appear to be dependent; try using PreprocessedLinearModel")
             end
 
@@ -239,12 +229,6 @@ mutable struct PreprocessedLinearModel{T <: HypReal} <: LinearModel{T}
         tol_qr::Real = 1e2 * eps(T),
         use_dense_fallback::Bool = true,
         ) where {T <: HypReal}
-        # c = convert(Vector{T}, c)
-        # A = convert(AbstractMatrix{T}, A)
-        # b = convert(Vector{T}, b)
-        # G = convert(AbstractMatrix{T}, G)
-        # h = convert(Vector{T}, h)
-
         model = new{T}()
 
         model.c_raw = c
@@ -384,7 +368,7 @@ function preprocess_find_initial_point(model::PreprocessedLinearModel{T}, tol_qr
     model.b = b
     model.G = G
     model.n = n
-    model.p = p
+    p = p
     model.x_keep_idxs = x_keep_idxs
     model.y_keep_idxs = y_keep_idxs
 
