@@ -53,7 +53,6 @@ get_nu(cone::EpiNormSpectral) = cone.n + 1
 set_initial_point(arr::AbstractVector{T}, cone::EpiNormSpectral{T}) where {T <: HypReal} = (@. arr = zero(T); arr[1] = one(T); arr)
 
 function check_in_cone(cone::EpiNormSpectral{T}) where {T <: HypReal}
-    TimerOutputs.@timeit to "epibar" begin
     u = cone.point[1]
     if u <= zero(T)
         return false
@@ -86,7 +85,7 @@ function check_in_cone(cone::EpiNormSpectral{T}) where {T <: HypReal}
     tmpmat = zeros(n, n)
 
     p = 2
-    TimerOutputs.@timeit to "barloop" for j in 1:m, i in 1:n
+    for j in 1:m, i in 1:n
         for d in 1:n
             tmpvec[d] = sum(W[c, j] / u * Zi[c, d] for c in 1:n)
             for c in 1:n
@@ -95,16 +94,9 @@ function check_in_cone(cone::EpiNormSpectral{T}) where {T <: HypReal}
         end
 
         # Zi * dZdWij * Zi
-        TimerOutputs.@timeit to "syrk" term1 = Symmetric(tmpmat + tmpmat') # TODO use syrk
+        term1 = Symmetric(tmpmat + tmpmat') # TODO use syrk
 
-        TimerOutputs.@timeit to "matrixify" begin
         q = p
-        # l = j
-        # @inbounds for k in i:n
-        #     TimerOutputs.@timeit to "sum1" cone.H[p, q] += 2 * (sum(term1[ni, k] * W[ni, j] for ni in 1:n) + Zi[i, k]) / u
-        #     q += 1
-        # end
-
         cone.H[p, q:(q + n - i)] = Zi[i, i:n]
         for ni in 1:n
             cone.H[p, q:(q + n - i)] += term1[ni, i:n] * W[ni, j]
@@ -112,27 +104,12 @@ function check_in_cone(cone::EpiNormSpectral{T}) where {T <: HypReal}
         cone.H[p, q:(q + n - i)] *= 2 / u
         q += (n - i + 1)
 
-        # gives exactly same # iters as loop code
-        # arr = 2 * (sum(term1[ni, i:n]' * W[ni, j] for ni in 1:n) .+ Zi[i, i:n]') / u
-        # cone.H[p, q:(q + n - i)] += arr[:]
-        # q += (n - i + 1)
-
-        # @inbounds for l in (j + 1):m, k in 1:n
-        #     TimerOutputs.@timeit to "sum2" cone.H[p, q] += 2 * sum(term1[ni, k] * W[ni, l] for ni in 1:n) / u
-        #     q += 1
-        # end
-
-        # gives exactly same # iters as loop code
         mat = 2 * term1 * W[:, (j + 1):m] / u
         nterms = n * (m - j)
-        cone.H[p, q:(q + nterms - 1)] += mat[:]
+        cone.H[p, q:(q + nterms - 1)] += vec(mat)
         q += nterms
-
         p += 1
-
-        end #mat
     end
-    end # timeit
 
     return factorize_hess(cone)
 end
