@@ -13,13 +13,11 @@ using SparseArrays
 import Random
 using Test
 import Hypatia
-const HYP = Hypatia
-const CO = HYP.Cones
-const MO = HYP.Models
-const SO = HYP.Solvers
-const MU = HYP.ModelUtilities
+const CO = Hypatia.Cones
+const MU = Hypatia.ModelUtilities
 
 function envelope(
+    T::Type{<:HypReal},
     npoly::Int,
     rand_halfdeg::Int,
     n::Int,
@@ -30,61 +28,62 @@ function envelope(
     @assert rand_halfdeg <= env_halfdeg
     domain = MU.Box(-ones(n), ones(n))
     (U, pts, P0, PWts, w) = MU.interpolate(domain, env_halfdeg, sample = false, calc_w = true)
+    # TODO remove below conversions when ModelUtilities can use T <: Real
+    w = T.(w)
+    P0 = T.(P0)
+    PWts = convert.(Matrix{T}, PWts)
 
     # generate random data
     L = binomial(n + rand_halfdeg, n)
-    c_or_h = vec(P0[:, 1:L] * rand(-9:9, L, npoly))
+    c_or_h = vec(P0[:, 1:L] * rand(T(-9):T(9), L, npoly))
 
     if primal_wsos
         # WSOS cone in primal
         c = -w
-        A = zeros(0, U)
-        b = Float64[]
-        G = repeat(sparse(1.0I, U, U), outer = (npoly, 1))
+        A = zeros(T, 0, U)
+        b = T[]
+        G = repeat(sparse(one(T) * I, U, U), outer = (npoly, 1))
         h = c_or_h
     else
         # WSOS cone in dual
         c = c_or_h
-        A = repeat(sparse(1.0I, U, U), outer = (1, npoly))
+        A = repeat(sparse(one(T) * I, U, U), outer = (1, npoly))
         b = w
-        G = Diagonal(-1.0I, npoly * U) # TODO uniformscaling
-        h = zeros(npoly * U)
+        G = Diagonal(-one(T) * I, npoly * U) # TODO uniformscaling
+        h = zeros(T, npoly * U)
     end
 
-    cones = [CO.WSOSPolyInterp{Float64, Float64}(U, [P0, PWts...], !primal_wsos) for k in 1:npoly]
+    cones = CO.Cone{T}[CO.WSOSPolyInterp{T, T}(U, [P0, PWts...], !primal_wsos) for k in 1:npoly]
     cone_idxs = [(1 + (k - 1) * U):(k * U) for k in 1:npoly]
 
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs)
 end
 
-envelope1() = envelope(2, 5, 2, 6)
-envelope2() = envelope(3, 5, 3, 5)
-envelope3() = envelope(2, 30, 1, 30)
-envelope4() = envelope(2, 5, 2, 6, primal_wsos = false)
-envelope5() = envelope(3, 5, 3, 5, primal_wsos = false)
-envelope6() = envelope(2, 30, 1, 30, primal_wsos = false)
+envelope1(T::Type{<:HypReal}) = envelope(T, 2, 5, 2, 6)
+envelope2(T::Type{<:HypReal}) = envelope(T, 3, 3, 3, 3)
+envelope3(T::Type{<:HypReal}) = envelope(T, 2, 30, 1, 30)
+envelope4(T::Type{<:HypReal}) = envelope(T, 2, 5, 2, 6, primal_wsos = false)
+envelope5(T::Type{<:HypReal}) = envelope(T, 3, 3, 3, 3, primal_wsos = false)
+envelope6(T::Type{<:HypReal}) = envelope(T, 2, 30, 1, 30, primal_wsos = false)
 
-function test_envelope(instance::Function; options, rseed::Int = 1)
-    Random.seed!(rseed)
-    d = instance()
-    model = MO.PreprocessedLinearModel{Float64}(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
-    solver = SO.HSDSolver{Float64}(model; options...)
-    SO.solve(solver)
-    r = SO.get_certificates(solver, model, test = true, atol = 1e-4, rtol = 1e-4)
-    @test r.status == :Optimal
-    return
-end
-
-test_envelope_all(; options...) = test_envelope.([
+instances_envelope_all = [
     envelope1,
     envelope2,
     envelope3,
     envelope4,
     envelope5,
     envelope6,
-    ], options = options)
-
-test_envelope(; options...) = test_envelope.([
+    ]
+instances_envelope_few = [
     envelope1,
     envelope5,
-    ], options = options)
+    ]
+
+function test_envelope(instance::Function; T::Type{<:HypReal} = Float64, test_options::NamedTuple = NamedTuple(), rseed::Int = 1)
+    Random.seed!(rseed)
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
+    d = instance(T)
+    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs; test_options..., atol = tol, rtol = tol)
+    @test r.status == :Optimal
+    return
+end

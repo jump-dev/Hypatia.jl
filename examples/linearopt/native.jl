@@ -11,52 +11,51 @@ using LinearAlgebra
 import Random
 using Test
 import Hypatia
-const HYP = Hypatia
-const CO = HYP.Cones
-const MO = HYP.Models
-const SO = HYP.Solvers
+const CO = Hypatia.Cones
 
 function linearopt(
+    T::Type{<:HypReal},
     m::Int,
     n::Int;
     nzfrac::Float64 = 1.0,
     )
     # generate random data
-    @assert 0 < nzfrac <= 1.0
+    @assert 0 < nzfrac <= 1
+
     # A matrix is sparse iff nzfrac ∈ [0, 1)
-    A = (nzfrac == 1.0) ? rand(-9.0:9.0, m, n) : 10.0 .* sprandn(m, n, nzfrac)
-    b = A * ones(n)
-    c = rand(0.0:9.0, n)
-    G = Diagonal(-1.0I, n) # TODO uniformscaling
-    h = zeros(n)
-    cones = [CO.Nonnegative{Float64}(n)]
+    A = (nzfrac >= 1.0) ? rand(T, m, n) : sprand(T, m, n, nzfrac)
+    A .*= 10
+    b = vec(sum(A, dims = 2))
+    c = rand(T, n)
+    G = Diagonal(-one(T) * I, n) # TODO uniformscaling
+    h = zeros(T, n)
+    cones = CO.Cone{T}[CO.Nonnegative{T}(n)]
     cone_idxs = [1:n]
+
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs)
 end
 
-linearopt1() = linearopt(500, 1000)
-linearopt2() = linearopt(15, 20)
-linearopt3() = linearopt(500, 1000, nzfrac = 1 / 30)
-linearopt4() = linearopt(15, 20, nzfrac = 1 / 4)
+linearopt1(T::Type{<:HypReal}) = linearopt(T, 500, 1000)
+linearopt2(T::Type{<:HypReal}) = linearopt(T, 15, 20)
+linearopt3(T::Type{<:HypReal}) = linearopt(T, 500, 1000, nzfrac = 0.05)
+linearopt4(T::Type{<:HypReal}) = linearopt(T, 15, 20, nzfrac = 0.25)
 
-function test_linearopt(instance::Function; options, rseed::Int = 1)
-    Random.seed!(rseed)
-    d = instance()
-    model = MO.PreprocessedLinearModel{Float64}(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
-    solver = SO.HSDSolver{Float64}(model; options...)
-    SO.solve(solver)
-    r = SO.get_certificates(solver, model, test = true, atol = 1e-3, rtol = 1e-3)
-    @test r.status == :Optimal
-    return
-end
-
-test_linearopt_all(; options...) = test_linearopt.([
+instances_linearopt_all = [
     linearopt1,
     linearopt2,
     linearopt3,
     linearopt4,
-    ], options = options)
-
-test_linearopt(; options...) = test_linearopt.([
+    ]
+instances_linearopt_few = [
+    linearopt2,
     linearopt4,
-    ], options = options)
+    ]
+
+function test_linearopt(instance::Function; T::Type{<:HypReal} = Float64, test_options::NamedTuple = NamedTuple(), rseed::Int = 1)
+    Random.seed!(rseed)
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
+    d = instance(T)
+    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs; test_options..., atol = tol, rtol = tol)
+    @test r.status == :Optimal
+    return
+end

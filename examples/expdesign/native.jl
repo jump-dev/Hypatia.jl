@@ -9,10 +9,7 @@ import Random
 using Test
 import Hypatia
 import Hypatia.HypReal
-const HYP = Hypatia
-const MO = HYP.Models
-const CO = HYP.Cones
-const SO = HYP.Solvers
+const CO = Hypatia.Cones
 
 function expdesign(
     T::Type{<:HypReal},
@@ -38,7 +35,7 @@ function expdesign(
     G_nmax = Matrix{T}(-I, p, p)
     h_nmax = fill(T(nmax), p)
 
-    cones = CO.Cone[CO.Nonnegative{T}(p), CO.Nonnegative{T}(p)]
+    cones = CO.Cone{T}[CO.Nonnegative{T}(p), CO.Nonnegative{T}(p)]
     cone_idxs = [1:p, (p + 1):(2 * p)]
 
     if use_logdet
@@ -126,8 +123,8 @@ function expdesign(
         end
 
         h_psd = zeros(T, dimvec)
-        push!(cone_idxs, (2 * p + 1):(2 * p + dimvec))
         push!(cones, CO.PosSemidef{T, T}(dimvec))
+        push!(cone_idxs, (2 * p + 1):(2 * p + dimvec))
 
         if use_sumlog
             G_logvars = zeros(T, q, num_trivars)
@@ -142,9 +139,9 @@ function expdesign(
                 # log row
                 zeros(T, q, p)    G_logvars    zeros(T, q)
                 ]
-            h_log = vcat(zero(T), one(T), zeros(q))
-            push!(cone_idxs, (2 * p + dimvec + 1):(2 * p + dimvec + 2 + q))
+            h_log = vcat(zero(T), one(T), zeros(T, q))
             push!(cones, CO.HypoPerSumLog{T}(q + 2))
+            push!(cone_idxs, (2 * p + dimvec + 1):(2 * p + dimvec + 2 + q))
         else
             G_log = zeros(T, 3 * q, dimx)
             h_log = zeros(T, 3 * q)
@@ -157,8 +154,8 @@ function expdesign(
                 # diagonal element in the triangular matrix
                 G_log[offset + 2, p + diag_idx(i)] = -1
                 cone_offset = 2 * p + dimvec + offset
-                push!(cone_idxs, cone_offset:(cone_offset + 2))
                 push!(cones, CO.HypoPerLog{T}())
+                push!(cone_idxs, cone_offset:(cone_offset + 2))
                 offset += 3
             end
         end
@@ -167,18 +164,6 @@ function expdesign(
     end
 
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs)
-end
-
-function test_expdesign(T::Type{<:HypReal}, instance::Function; options, rseed::Int = 1)
-    Random.seed!(rseed)
-    d = instance(T)
-    model = MO.PreprocessedLinearModel{T}(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
-    solver = SO.HSDSolver{T}(model; options...)
-    SO.solve(solver)
-    tol = max(1e-5, sqrt(sqrt(eps(T))))
-    r = SO.get_certificates(solver, model, test = true, atol = tol, rtol = tol)
-    @test r.status == :Optimal
-    return
 end
 
 expdesign1(T::Type{<:HypReal}) = expdesign(T, 25, 75, 125, 5, use_logdet = true)
@@ -192,7 +177,7 @@ expdesign8(T::Type{<:HypReal}) = expdesign(T, 5, 15, 25, 5, use_logdet = false)
 expdesign9(T::Type{<:HypReal}) = expdesign(T, 4, 8, 12, 3, use_logdet = false)
 expdesign10(T::Type{<:HypReal}) = expdesign(T, 3, 5, 7, 2, use_logdet = false)
 
-test_expdesign_all(T::Type{<:HypReal}; options...) = test_expdesign.(T, [
+instances_expdesign_all = [
     expdesign1,
     expdesign2,
     expdesign3,
@@ -203,9 +188,17 @@ test_expdesign_all(T::Type{<:HypReal}; options...) = test_expdesign.(T, [
     expdesign8,
     expdesign9,
     expdesign10,
-    ], options = options)
-
-test_expdesign(T::Type{<:HypReal}; options...) = test_expdesign.(T, [
+    ]
+instances_expdesign_few = [
     expdesign5,
     expdesign10,
-    ], options = options)
+    ]
+
+function test_expdesign(instance::Function; T::Type{<:HypReal} = Float64, test_options::NamedTuple = NamedTuple(), rseed::Int = 1)
+    Random.seed!(rseed)
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
+    d = instance(T)
+    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs; test_options..., atol = tol, rtol = tol)
+    @test r.status == :Optimal
+    return
+end

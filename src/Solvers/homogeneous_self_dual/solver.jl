@@ -5,7 +5,6 @@ interior point type and functions for algorithms based on homogeneous self dual 
 
 TODO
 make internal statuses types
-set default tolerances based on real type
 =#
 
 mutable struct HSDSolver{T <: HypReal} <: Solver{T}
@@ -144,7 +143,7 @@ function solve(solver::HSDSolver{T}) where {T <: HypReal}
     start_time = time()
 
     calc_mu(solver)
-    if isnan(solver.mu) || abs(one(T) - solver.mu) > T(1e-6)
+    if isnan(solver.mu) || abs(one(T) - solver.mu) > sqrt(eps(T))
         error("initial mu is $(solver.mu) (should be 1.0)")
     end
 

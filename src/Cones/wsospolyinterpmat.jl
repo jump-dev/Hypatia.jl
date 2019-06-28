@@ -74,6 +74,9 @@ end
 _blockrange(inner::Int, outer::Int) = (outer * (inner - 1) + 1):(outer * inner)
 
 function check_in_cone(cone::WSOSPolyInterpMat{T}) where {T <: HypReal}
+    rt2 = sqrt(T(2))
+    rt2i = inv(rt2)
+
     for j in eachindex(cone.ipwt)
         ipwtj = cone.ipwt[j]
         tmp1j = cone.tmp1[j]
