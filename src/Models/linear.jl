@@ -68,9 +68,9 @@ mutable struct RawLinearModel{T <: HypReal} <: LinearModel{T}
     p::Int
     q::Int
     c::Vector{T}
-    A::AbstractMatrix{T}
+    A::HypLinMap{T}
     b::Vector{T}
-    G::AbstractMatrix{T}
+    G::HypLinMap{T}
     h::Vector{T}
     cones::Vector{Cones.Cone{T}}
     cone_idxs::Vector{UnitRange{Int}} # TODO allow generic Integer type for UnitRange parameter
@@ -78,12 +78,11 @@ mutable struct RawLinearModel{T <: HypReal} <: LinearModel{T}
 
     initial_point::Point{T}
 
-    # TODO loosen restriction to AbstractMatrix
     function RawLinearModel{T}(
         c::Vector{T},
-        A::AbstractMatrix{T},
+        A::HypLinMap{T},
         b::Vector{T},
-        G::AbstractMatrix{T},
+        G::HypLinMap{T},
         h::Vector{T},
         cones::Vector{Cones.Cone{T}},
         cone_idxs::Vector{UnitRange{Int}};
@@ -193,19 +192,20 @@ end
 
 get_original_data(model::RawLinearModel) = (model.c, model.A, model.b, model.G, model.h, model.cones, model.cone_idxs)
 
+# TODO specialize method when A = I
 mutable struct PreprocessedLinearModel{T <: HypReal} <: LinearModel{T}
     c_raw::Vector{T}
-    A_raw::AbstractMatrix{T}
+    A_raw::HypLinMap{T}
     b_raw::Vector{T}
-    G_raw::AbstractMatrix{T}
+    G_raw::HypLinMap{T}
 
     n::Int
     p::Int
     q::Int
     c::Vector{T}
-    A::AbstractMatrix{T}
+    A::HypLinMap{T}
     b::Vector{T}
-    G::AbstractMatrix{T}
+    G::HypLinMap{T}
     h::Vector{T}
     cones::Vector{Cones.Cone{T}}
     cone_idxs::Vector{UnitRange{Int}}
@@ -220,9 +220,9 @@ mutable struct PreprocessedLinearModel{T <: HypReal} <: LinearModel{T}
 
     function PreprocessedLinearModel{T}(
         c::Vector{T},
-        A::AbstractMatrix{T},
+        A::HypLinMap{T},
         b::Vector{T},
-        G::AbstractMatrix{T},
+        G::HypLinMap{T},
         h::Vector{T},
         cones::Vector{Cones.Cone{T}},
         cone_idxs::Vector{UnitRange{Int}};
@@ -368,7 +368,7 @@ function preprocess_find_initial_point(model::PreprocessedLinearModel{T}, tol_qr
     model.b = b
     model.G = G
     model.n = n
-    p = p
+    model.p = p
     model.x_keep_idxs = x_keep_idxs
     model.y_keep_idxs = y_keep_idxs
 

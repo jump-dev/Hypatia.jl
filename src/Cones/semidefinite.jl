@@ -81,12 +81,13 @@ function check_in_cone(cone::PosSemidef{T, R}) where {R <: HypRealOrComplex{T}} 
 
     inv_mat = Hermitian(inv(F)) # TODO eliminate allocs
     smat_to_svec!(cone.g, transpose(inv_mat)) # TODO avoid doing this twice
-    cone.g .*= -1.0
+    cone.g .*= -1
 
     # set upper triangles of hessian and inverse hessian
     svec_to_smat!(mat, cone.point)
     H = cone.H
     Hi = cone.Hi
+    rt2 = sqrt(T(2))
 
     # TODO refactor
     if R <: Complex

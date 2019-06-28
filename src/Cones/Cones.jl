@@ -15,8 +15,6 @@ import Hypatia.HypRealOrComplex
 import Hypatia.hyp_AtA!
 import Hypatia.hyp_chol!
 import Hypatia.hyp_ldiv_chol_L!
-import Hypatia.rt2
-import Hypatia.rt2i
 
 abstract type Cone{T <: HypReal} end
 
@@ -59,6 +57,7 @@ inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::Cone) 
 function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{T}) where {T <: HypReal}
     k = 1
     m = size(mat, 1)
+    rt2 = sqrt(T(2))
     for i in 1:m, j in 1:i
         if i == j
             vec[k] = mat[i, j]
@@ -73,6 +72,7 @@ end
 function svec_to_smat!(mat::AbstractMatrix{T}, vec::AbstractVector{T}) where {T <: HypReal}
     k = 1
     m = size(mat, 1)
+    rt2i = inv(sqrt(T(2)))
     for i in 1:m, j in 1:i
         if i == j
             mat[i, j] = vec[k]
@@ -87,6 +87,7 @@ end
 function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}) where {T <: HypReal}
     k = 1
     m = size(mat, 1)
+    rt2 = sqrt(T(2))
     for i in 1:m, j in 1:i
         if i == j
             vec[k] = mat[i, j]
@@ -105,6 +106,7 @@ end
 function svec_to_smat!(mat::AbstractMatrix{Complex{T}}, vec::AbstractVector{T}) where {T <: HypReal}
     k = 1
     m = size(mat, 1)
+    rt2i = inv(sqrt(T(2)))
     for i in 1:m, j in 1:i
         if i == j
             mat[i, j] = vec[k]

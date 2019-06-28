@@ -16,6 +16,7 @@ using TimerOutputs
 import Hypatia.Cones
 import Hypatia.Models
 import Hypatia.HypReal
+import Hypatia.HypLinMap
 import Hypatia.hyp_AtA!
 import Hypatia.hyp_chol!
 import Hypatia.hyp_ldiv_chol_L!
@@ -117,9 +118,9 @@ end
 # build linear model, solve, check conic certificates, and return certificate data
 function build_solve_check(
     c::Vector{T},
-    A::AbstractMatrix{T},
+    A::HypLinMap{T},
     b::Vector{T},
-    G::AbstractMatrix{T},
+    G::HypLinMap{T},
     h::Vector{T},
     cones::Vector{Cones.Cone{T}},
     cone_idxs::Vector{UnitRange{Int}};
