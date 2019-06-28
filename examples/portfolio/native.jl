@@ -82,21 +82,12 @@ function portfolio(
     end
 
     if :linf in risk_measures && !use_linfball
-        c = vcat(c, zeros(T, 2 * num_stocks))
-        id = Matrix{T}(I, num_stocks, num_stocks)
-        fill_cols = size(A, 2) - num_stocks
-        fill_rows = size(A, 1)
-        A = [
-            A    zeros(T, fill_rows, 2 * num_stocks);
-            sigma_half    zeros(T, num_stocks, fill_cols)    id    zeros(T, num_stocks, num_stocks);
-            -sigma_half    zeros(T, num_stocks, fill_cols)    zeros(T, num_stocks, num_stocks)    id;
-            ]
-        b = vcat(b, gamma * ones(T, 2 * num_stocks))
         G = [
-            G    zeros(T, size(G, 1), 2 * num_stocks);
-            zeros(T, 2 * num_stocks, size(G, 2))    Matrix{T}(-I, 2 * num_stocks, 2 * num_stocks);
+            G;
+            sigma_half    zeros(T, num_stocks, size(G, 2) - num_stocks);
+            -sigma_half    zeros(T, num_stocks, size(G, 2) - num_stocks);
             ]
-        h = vcat(h, zeros(T, 2 * num_stocks))
+        h = vcat(h, gamma * ones(T, 2 * num_stocks))
         push!(cones, CO.Nonnegative{T}(2 * num_stocks))
         push!(cone_idxs, (cone_offset + 1):(cone_offset + 2 * num_stocks))
         cone_offset += 2 * num_stocks
