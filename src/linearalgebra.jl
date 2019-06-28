@@ -2,7 +2,6 @@
 Copyright 2019, Chris Coey and contributors
 =#
 
-using LinearAlgebra
 import LinearAlgebra.BlasReal
 import LinearAlgebra.BlasFloat
 import LinearAlgebra.HermOrSym

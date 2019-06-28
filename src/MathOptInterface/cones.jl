@@ -77,8 +77,10 @@ end
 # MOI cones requiring transformations (eg rescaling, changing order)
 # TODO later remove if MOI gets scaled triangle sets
 
-svec_scale(dim) = [(i == j ? 1.0 : rt2) for i in 1:round(Int, sqrt(0.25 + 2.0 * dim) - 0.5) for j in 1:i]
-svec_unscale(dim) = [(i == j ? 1.0 : rt2i) for i in 1:round(Int, sqrt(0.25 + 2.0 * dim) - 0.5) for j in 1:i]
+const rt2 = sqrt(2)
+const rt2i = inv(rt2)
+svec_scale(dim) = [(i == j ? 1.0 : rt2) for i in 1:round(Int, sqrt(0.25 + 2 * dim) - 0.5) for j in 1:i]
+svec_unscale(dim) = [(i == j ? 1.0 : rt2i) for i in 1:round(Int, sqrt(0.25 + 2 * dim) - 0.5) for j in 1:i]
 
 # PSD cone: convert from smat to svec form (scale off-diagonals)
 function build_var_cone(fi::MOI.VectorOfVariables, si::MOI.PositiveSemidefiniteConeTriangle, dim::Int, q::Int)

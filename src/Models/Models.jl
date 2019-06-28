@@ -11,6 +11,7 @@ using SparseArrays
 import IterativeSolvers
 import Hypatia.Cones
 import Hypatia.HypReal
+import Hypatia.HypLinMap
 import Hypatia.HypBlockMatrix
 
 mutable struct Point{T <: HypReal}

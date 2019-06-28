@@ -92,6 +92,8 @@ function check_in_cone(cone::HypoPerLogdet{T}) where {T <: HypReal}
     Hvwmat = ((T(-n) + L) * vzi - one(T)) * Wi / z
     smat_to_svec!(view(cone.H, 2, 3:dim), Hvwmat)
 
+    rt2 = sqrt(T(2))
+    
     k = 3
     for i in 1:n, j in 1:i
         k2 = 3

@@ -33,8 +33,8 @@ const MU = HYP.ModelUtilities
 const rt2 = sqrt(2)
 
 function shapeconregrJuMP(
-    X::AbstractMatrix{Float64},
-    y::AbstractVector{Float64},
+    X::Matrix{Float64},
+    y::Vector{Float64},
     deg::Int;
     n::Int = size(X, 2),
     use_lsq_obj::Bool = true,
