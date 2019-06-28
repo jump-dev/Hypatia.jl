@@ -68,9 +68,9 @@ mutable struct RawLinearModel{T <: HypReal} <: LinearModel{T}
     p::Int
     q::Int
     c::Vector{T}
-    A::AbstractMatrix{T}
+    A::HypLinMap{T}
     b::Vector{T}
-    G::AbstractMatrix{T}
+    G::HypLinMap{T}
     h::Vector{T}
     cones::Vector{Cones.Cone{T}}
     cone_idxs::Vector{UnitRange{Int}} # TODO allow generic Integer type for UnitRange parameter
@@ -79,22 +79,17 @@ mutable struct RawLinearModel{T <: HypReal} <: LinearModel{T}
     initial_point::Point{T}
 
     function RawLinearModel{T}(
-        c::Vector,
-        A::AbstractMatrix,
-        b::Vector,
-        G::AbstractMatrix,
-        h::Vector,
-        cones::Vector{<:Cones.Cone},
+        c::Vector{T},
+        A::HypLinMap{T},
+        b::Vector{T},
+        G::HypLinMap{T},
+        h::Vector{T},
+        cones::Vector{Cones.Cone{T}},
         cone_idxs::Vector{UnitRange{Int}};
+        use_iterative::Bool = false,
         tol_qr::Real = 1e2 * eps(T),
         use_dense_fallback::Bool = true,
         ) where {T <: HypReal}
-        c = convert(Vector{T}, c)
-        A = convert(AbstractMatrix{T}, A)
-        b = convert(Vector{T}, b)
-        G = convert(AbstractMatrix{T}, G)
-        h = convert(Vector{T}, h)
-
         model = new{T}()
 
         model.n = length(c)
@@ -109,62 +104,85 @@ mutable struct RawLinearModel{T <: HypReal} <: LinearModel{T}
         model.cone_idxs = cone_idxs
         model.nu = isempty(cones) ? zero(T) : sum(Cones.get_nu, cones)
 
-        find_initial_point(model, tol_qr, use_dense_fallback)
+        find_initial_point(model, use_iterative, tol_qr, use_dense_fallback)
 
         return model
     end
 end
 
 # get initial point for RawLinearModel
-function find_initial_point(model::RawLinearModel{T}, tol_qr::Real, use_dense_fallback::Bool) where {T <: HypReal}
+# TODO can run the x and y finding in parallel since they do not depend on eachother
+function find_initial_point(model::RawLinearModel{T}, use_iterative::Bool, tol_qr::Real, use_dense_fallback::Bool) where {T <: HypReal}
     A = model.A
     G = model.G
+    n = model.n
+    p = model.p
+    q = model.q
 
     point = initialize_cone_point(model.cones, model.cone_idxs)
-    @assert model.q == length(point.z)
+    @assert q == length(point.z)
 
-    # solve for y as least squares solution to A'y = -c - G'z
-    if !iszero(model.p)
-        if issparse(A) && !(T <: sparse_QR_reals)
-            # TODO alternative fallback is to convert sparse{T} to sparse{Float64} and do the sparse LU
-            if use_dense_fallback
-                @warn("using dense factorization of A' in initial point finding because sparse factorization for number type $T is not supported by SparseArrays")
-                Ap_fact = qr!(Matrix(A'))
-            else
-                error("sparse factorization for number type $T is not supported by SparseArrays, so Hypatia cannot find an initial point")
-            end
-        else
-            Ap_fact = issparse(A) ? qr(sparse(A')) : qr!(Matrix(A'))
-        end
-
-        Ap_rank = get_rank_est(Ap_fact, tol_qr)
-        if Ap_rank < model.p
-            @warn("some primal equalities appear to be dependent; try using PreprocessedLinearModel")
-        end
-
-        point.y = Ap_fact \ (-model.c - G' * point.z)
-    end
+    # TODO optionally use row and col scaling on AG and apply to c, b, h
+    # TODO precondition iterative methods
+    # TODO pick default tol for iter methods
 
     # solve for x as least squares solution to Ax = b, Gx = h - s
-    if !iszero(model.n)
-        AG = vcat(A, G)
-        if issparse(AG) && !(T <: sparse_QR_reals)
-            # TODO alternative fallback is to convert sparse{T} to sparse{Float64} and do the sparse LU
-            if use_dense_fallback
-                @warn("using dense factorization of [A; G] in initial point finding because sparse factorization for number type $T is not supported by SparseArrays")
-                AG = Matrix(AG)
-            else
-                error("sparse factorization for number type $T is not supported by SparseArrays, so Hypatia cannot find an initial point")
+    if !iszero(n)
+        rhs = vcat(model.b, model.h - point.s)
+        if use_iterative
+            # use iterative solvers method TODO pick lsqr or lsmr
+            AG = HypBlockMatrix{T}([A, G], [1:p, (p + 1):(p + q)], [1:n, 1:n])
+            point.x = zeros(T, n)
+            IterativeSolvers.lsqr!(point.x, AG, rhs)
+        else
+            AG = vcat(A, G)
+            if issparse(AG) && !(T <: sparse_QR_reals)
+                # TODO alternative fallback is to convert sparse{T} to sparse{Float64} and do the sparse LU
+                if use_dense_fallback
+                    @warn("using dense factorization of [A; G] in initial point finding because sparse factorization for number type $T is not supported by SparseArrays")
+                    AG = Matrix(AG)
+                else
+                    error("sparse factorization for number type $T is not supported by SparseArrays, so Hypatia cannot find an initial point")
+                end
             end
-        end
-        AG_fact = issparse(AG) ? qr(AG) : qr!(AG)
+            AG_fact = issparse(AG) ? qr(AG) : qr!(AG)
 
-        AG_rank = get_rank_est(AG_fact, tol_qr)
-        if AG_rank < model.n
-            @warn("some dual equalities appear to be dependent; try using PreprocessedLinearModel")
-        end
+            AG_rank = get_rank_est(AG_fact, tol_qr)
+            if AG_rank < n
+                @warn("some dual equalities appear to be dependent; try using PreprocessedLinearModel")
+            end
 
-        point.x = AG_fact \ vcat(model.b, model.h - point.s)
+            point.x = AG_fact \ rhs
+        end
+    end
+
+    # solve for y as least squares solution to A'y = -c - G'z
+    if !iszero(p)
+        rhs = -model.c - G' * point.z
+        if use_iterative
+            # use iterative solvers method TODO pick lsqr or lsmr
+            point.y = zeros(T, p)
+            IterativeSolvers.lsqr!(point.y, A', rhs)
+        else
+            if issparse(A) && !(T <: sparse_QR_reals)
+                # TODO alternative fallback is to convert sparse{T} to sparse{Float64} and do the sparse LU
+                if use_dense_fallback
+                    @warn("using dense factorization of A' in initial point finding because sparse factorization for number type $T is not supported by SparseArrays")
+                    Ap_fact = qr!(Matrix(A'))
+                else
+                    error("sparse factorization for number type $T is not supported by SparseArrays, so Hypatia cannot find an initial point")
+                end
+            else
+                Ap_fact = issparse(A) ? qr(sparse(A')) : qr!(Matrix(A'))
+            end
+
+            Ap_rank = get_rank_est(Ap_fact, tol_qr)
+            if Ap_rank < p
+                @warn("some primal equalities appear to be dependent; try using PreprocessedLinearModel")
+            end
+
+            point.y = Ap_fact \ rhs
+        end
     end
 
     model.initial_point = point
@@ -174,19 +192,20 @@ end
 
 get_original_data(model::RawLinearModel) = (model.c, model.A, model.b, model.G, model.h, model.cones, model.cone_idxs)
 
+# TODO specialize method when A = I
 mutable struct PreprocessedLinearModel{T <: HypReal} <: LinearModel{T}
     c_raw::Vector{T}
-    A_raw::AbstractMatrix{T}
+    A_raw::HypLinMap{T}
     b_raw::Vector{T}
-    G_raw::AbstractMatrix{T}
+    G_raw::HypLinMap{T}
 
     n::Int
     p::Int
     q::Int
     c::Vector{T}
-    A::AbstractMatrix{T}
+    A::HypLinMap{T}
     b::Vector{T}
-    G::AbstractMatrix{T}
+    G::HypLinMap{T}
     h::Vector{T}
     cones::Vector{Cones.Cone{T}}
     cone_idxs::Vector{UnitRange{Int}}
@@ -200,22 +219,16 @@ mutable struct PreprocessedLinearModel{T <: HypReal} <: LinearModel{T}
     initial_point::Point
 
     function PreprocessedLinearModel{T}(
-        c::Vector,
-        A::AbstractMatrix,
-        b::Vector,
-        G::AbstractMatrix,
-        h::Vector,
-        cones::Vector{<:Cones.Cone},
+        c::Vector{T},
+        A::HypLinMap{T},
+        b::Vector{T},
+        G::HypLinMap{T},
+        h::Vector{T},
+        cones::Vector{Cones.Cone{T}},
         cone_idxs::Vector{UnitRange{Int}};
         tol_qr::Real = 1e2 * eps(T),
         use_dense_fallback::Bool = true,
         ) where {T <: HypReal}
-        c = convert(Vector{T}, c)
-        A = convert(AbstractMatrix{T}, A)
-        b = convert(Vector{T}, b)
-        G = convert(AbstractMatrix{T}, G)
-        h = convert(Vector{T}, h)
-
         model = new{T}()
 
         model.c_raw = c

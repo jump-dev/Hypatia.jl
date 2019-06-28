@@ -119,9 +119,9 @@ version = "0.20.0"
 
 [[DynamicPolynomials]]
 deps = ["LinearAlgebra", "MultivariatePolynomials", "Pkg", "Reexport", "Test"]
-git-tree-sha1 = "7d3baae847b3ea1aa8c4bef261683bf2c111ee5c"
+git-tree-sha1 = "71149b015940b6d710a0f5e9e0599ae9ffe97177"
 uuid = "7c1d4256-1411-5781-91ec-d7bc3513ac07"
-version = "0.2.1"
+version = "0.3.0"
 
 [[FFTW]]
 deps = ["AbstractFFTs", "BinaryProvider", "Compat", "Conda", "Libdl", "LinearAlgebra", "Reexport", "Test"]
@@ -187,12 +187,6 @@ uuid = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
 [[LinearAlgebra]]
 deps = ["Libdl"]
 uuid = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
-
-[[LinearMaps]]
-deps = ["LinearAlgebra", "SparseArrays"]
-git-tree-sha1 = "1f078906c5e44c2a2796ee62abb316d358afaa4c"
-uuid = "7a12625a-238d-50fd-b39a-03d52299707e"
-version = "2.4.0"
 
 [[Logging]]
 uuid = "56ddb016-857b-54e1-b83d-db4d58db5568"

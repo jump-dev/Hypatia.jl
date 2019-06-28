@@ -10,10 +10,7 @@ import Random
 using Test
 import Hypatia
 import Hypatia.HypReal
-const HYP = Hypatia
-const MO = HYP.Models
-const CO = HYP.Cones
-const SO = HYP.Solvers
+const CO = Hypatia.Cones
 
 function matrixcompletion(
     T::Type{<:HypReal},
@@ -68,7 +65,7 @@ function matrixcompletion(
         h_norm_x = vcat(zero(T), h_norm_x)
         h_norm = h_norm_x
 
-        cones = CO.Cone[CO.EpiNormSpectral{T}(m, n)]
+        cones = CO.Cone{T}[CO.EpiNormSpectral{T}(m, n)]
         cone_idxs = UnitRange{Int}[1:(m * n + 1)]
         cone_offset = m * n + 1
     else
@@ -104,7 +101,7 @@ function matrixcompletion(
             idx += i
             G_norm[offset + idx - 1, 1] = -1
         end
-        cones = CO.Cone[CO.PosSemidef{T, T}(num_rows)]
+        cones = CO.Cone{T}[CO.PosSemidef{T, T}(num_rows)]
         cone_idxs = UnitRange{Int}[1:num_rows]
         cone_offset = num_rows
     end
@@ -183,19 +180,7 @@ matrixcompletion10(T::Type{<:HypReal}) = matrixcompletion(T, 8, 8, use_geomean =
 matrixcompletion11(T::Type{<:HypReal}) = matrixcompletion(T, 8, 8, use_epinorm = false)
 matrixcompletion12(T::Type{<:HypReal}) = matrixcompletion(T, 8, 8, use_geomean = false, use_epinorm = false)
 
-function test_matrixcompletion(T::Type{<:HypReal}, instance::Function; options, rseed::Int = 1)
-    Random.seed!(rseed)
-    d = instance(T)
-    model = MO.PreprocessedLinearModel{T}(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
-    solver = SO.HSDSolver{T}(model; options...)
-    SO.solve(solver)
-    tol = max(1e-5, sqrt(sqrt(eps(T))))
-    r = SO.get_certificates(solver, model, test = true, atol = tol, rtol = tol)
-    @test r.status == :Optimal
-    return
-end
-
-test_matrixcompletion_all(T::Type{<:HypReal}; options...) = test_matrixcompletion.(T, [
+instances_matrixcompletion_all = [
     matrixcompletion1,
     matrixcompletion2,
     matrixcompletion3,
@@ -208,11 +193,19 @@ test_matrixcompletion_all(T::Type{<:HypReal}; options...) = test_matrixcompletio
     matrixcompletion10,
     matrixcompletion11,
     matrixcompletion12,
-    ], options = options)
-
-test_matrixcompletion(T::Type{<:HypReal}; options...) = test_matrixcompletion.(T, [
+    ]
+instances_matrixcompletion_few = [
     matrixcompletion1,
     matrixcompletion2,
     matrixcompletion3,
     matrixcompletion4,
-    ], options = options)
+    ]
+
+function test_matrixcompletion(instance::Function; T::Type{<:HypReal} = Float64, test_options::NamedTuple = NamedTuple(), rseed::Int = 1)
+    Random.seed!(rseed)
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
+    d = instance(T)
+    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs; test_options..., atol = tol, rtol = tol)
+    @test r.status == :Optimal
+    return
+end

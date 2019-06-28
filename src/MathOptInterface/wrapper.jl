@@ -16,13 +16,13 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     max_iters::Int
     time_limit::Float64
 
-    c
-    A
-    b
-    G
-    h
-    cones
-    cone_idxs
+    c::Vector{Float64}
+    A::HypLinMap{Float64}
+    b::Vector{Float64}
+    G::HypLinMap{Float64}
+    h::Vector{Float64}
+    cones::Vector{Cones.Cone{Float64}}
+    cone_idxs::Vector{UnitRange{Int}}
 
     solver::Solvers.HSDSolver
 
@@ -235,7 +235,7 @@ function MOI.copy_to(
     (Ih, Vh) = (Int[], Float64[])
     (Icpc, Vcpc) = (Int[], Float64[]) # constraint set constants for opt.constr_prim_eq
     constr_offset_cone = Vector{Int}()
-    cones = Cones.Cone[]
+    cones = Cones.Cone{Float64}[]
     cone_idxs = UnitRange{Int}[]
 
     # build up one nonnegative cone

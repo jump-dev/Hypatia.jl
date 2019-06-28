@@ -201,10 +201,9 @@ function find_max_alpha_in_nbhd(
                         # modifies dual_views
                         stepper.dual_views[k] .+= mu_temp .* Cones.grad(cone_k)
                         Cones.inv_hess_prod!(stepper.nbhd_temp[k], stepper.dual_views[k], cone_k)
-                        # mul!(stepper.nbhd_temp[k], Cones.inv_hess(cone_k), stepper.dual_views[k])
                         nbhd_sqr_k = dot(stepper.dual_views[k], stepper.nbhd_temp[k])
 
-                        if nbhd_sqr_k <= T(-1e-5)
+                        if nbhd_sqr_k <= -cbrt(eps(T))
                             println("numerical issue for cone: nbhd_sqr_k is $nbhd_sqr_k")
                             in_nbhds = false
                             break

@@ -10,14 +10,17 @@ using Printf
 using LinearAlgebra
 import LinearAlgebra.BlasReal
 using SparseArrays
+import IterativeSolvers
 using Test
 using TimerOutputs
 import Hypatia.Cones
 import Hypatia.Models
 import Hypatia.HypReal
+import Hypatia.HypLinMap
 import Hypatia.hyp_AtA!
 import Hypatia.hyp_chol!
 import Hypatia.hyp_ldiv_chol_L!
+import Hypatia.HypBlockMatrix
 
 abstract type Solver{T <: HypReal} end
 
@@ -110,6 +113,32 @@ function get_certificates(
     end
 
     return (x = x, y = y, s = s, z = z, primal_obj = primal_obj, dual_obj = dual_obj, status = status)
+end
+
+# build linear model, solve, check conic certificates, and return certificate data
+function build_solve_check(
+    c::Vector{T},
+    A::HypLinMap{T},
+    b::Vector{T},
+    G::HypLinMap{T},
+    h::Vector{T},
+    cones::Vector{Cones.Cone{T}},
+    cone_idxs::Vector{UnitRange{Int}};
+    test::Bool = true,
+    linear_model::Type{<:Models.LinearModel} = Models.PreprocessedLinearModel,
+    system_solver::Type{<:CombinedHSDSystemSolver} = Solvers.QRCholCombinedHSDSystemSolver,
+    linear_model_options::NamedTuple = NamedTuple(),
+    system_solver_options::NamedTuple = NamedTuple(),
+    stepper_options::NamedTuple = NamedTuple(),
+    solver_options::NamedTuple = NamedTuple(),
+    atol::Real = max(1e-5, sqrt(sqrt(eps(T)))),
+    rtol::Real = atol,
+    ) where {T <: HypReal}
+    model = linear_model{T}(c, A, b, G, h, cones, cone_idxs; linear_model_options...)
+    stepper = CombinedHSDStepper{T}(model, system_solver = system_solver{T}(model; system_solver_options...); stepper_options...)
+    solver = HSDSolver{T}(model, stepper = stepper; solver_options...)
+    solve(solver)
+    return get_certificates(solver, model, test = test, atol = atol, rtol = rtol)
 end
 
 end

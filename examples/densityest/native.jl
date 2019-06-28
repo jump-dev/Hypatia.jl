@@ -14,11 +14,8 @@ import Random
 using Test
 import Hypatia
 import Hypatia.HypReal
-const HYP = Hypatia
-const MO = HYP.Models
-const MU = HYP.ModelUtilities
-const CO = HYP.Cones
-const SO = HYP.Solvers
+const CO = Hypatia.Cones
+const MU = Hypatia.ModelUtilities
 
 include(joinpath(@__DIR__, "data.jl"))
 
@@ -52,7 +49,7 @@ function densityest(
     P0 = T.(P0)
     PWts = convert.(Matrix{T}, PWts)
 
-    cones = CO.Cone[]
+    cones = CO.Cone{T}[]
     cone_idxs = UnitRange{Int}[]
     cone_offset = 1
     if use_wsos
@@ -99,8 +96,8 @@ function densityest(
                 a_poly[i + 1][:, idx] = PWts[i][:, k] .* PWts[i][:, l] * (k == l ? 1 : rt2)
                 idx += 1
             end
-            push!(cone_idxs, cone_offset:(cone_offset + dim - 1))
             push!(cones, CO.PosSemidef{T, T}(dim))
+            push!(cone_idxs, cone_offset:(cone_offset + dim - 1))
             cone_offset += dim
         end
         A_lin = zeros(T, 1, U + num_psd_vars)
@@ -127,11 +124,11 @@ function densityest(
         for i in 1:nobs
             G_log[i + 2, 2:(1 + U)] = -basis_evals[i, :]
         end
-        push!(cone_idxs, cone_offset:(cone_offset + 1 + nobs))
         push!(cones, CO.HypoPerSumLog{T}(nobs + 2))
+        push!(cone_idxs, cone_offset:(cone_offset + 1 + nobs))
     else
         # pre-pad with `nobs` hypograph variables
-        c_log = -ones(nobs)
+        c_log = -ones(T, nobs)
         G_poly = hcat(zeros(T, cone_offset - 1, nobs), G_poly)
         A = [
             zeros(T, size(A_poly, 1), nobs)    A_poly;
@@ -153,7 +150,7 @@ function densityest(
     end
     G = vcat(G_poly, G_log)
     h = vcat(h_poly, h_log)
-    c = vcat(c_log, zeros(T, U), zeros(T, num_psd_vars))
+    c = vcat(c_log, zeros(T, U + num_psd_vars))
     b = vcat(b_poly, one(T))
 
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs)
@@ -170,19 +167,7 @@ densityest6(T::Type{<:HypReal}) = densityest(T, 50, 1, 4, use_sumlog = false)
 densityest7(T::Type{<:HypReal}) = densityest(T, 50, 1, 4, use_sumlog = true, use_wsos = false)
 densityest8(T::Type{<:HypReal}) = densityest(T, 50, 1, 4, use_sumlog = false, use_wsos = false)
 
-function test_densityest(T::Type{<:HypReal}, instance::Function; options, rseed::Int = 1)
-    Random.seed!(rseed)
-    d = instance(T)
-    model = MO.PreprocessedLinearModel{T}(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs)
-    solver = SO.HSDSolver{T}(model; options...)
-    SO.solve(solver)
-    tol = max(1e-5, sqrt(sqrt(eps(T))))
-    r = SO.get_certificates(solver, model, test = true, atol = tol, rtol = tol)
-    @test r.status == :Optimal
-    return
-end
-
-test_densityest_all(T::Type{<:HypReal}; options...) = test_densityest.(T, [
+instances_densityest_all = [
     densityest1,
     densityest2,
     densityest3,
@@ -191,13 +176,21 @@ test_densityest_all(T::Type{<:HypReal}; options...) = test_densityest.(T, [
     densityest6,
     densityest7,
     densityest8,
-    ], options = options)
-
-test_densityest(T::Type{<:HypReal}; options...) = test_densityest.(T, [
+    ]
+instances_densityest_few = [
     densityest1,
     densityest3,
     densityest5,
     densityest6,
     densityest7,
     densityest8,
-    ], options = options)
+    ]
+
+function test_densityest(instance::Function; T::Type{<:HypReal} = Float64, test_options::NamedTuple = NamedTuple(), rseed::Int = 1)
+    Random.seed!(rseed)
+    tol = max(1e-5, sqrt(sqrt(eps(T))))
+    d = instance(T)
+    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs; test_options..., atol = tol, rtol = tol)
+    @test r.status == :Optimal
+    return
+end
