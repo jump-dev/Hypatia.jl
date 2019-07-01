@@ -89,7 +89,7 @@ function polyminreal(
                 l = 1
                 for i in 1:Lk, j in 1:i
                     scal = i == j ? 1 : rt2
-                    @. Gk[l, :] = -Pk[:, i] * Pk[:, j]
+                    @. Gk[l, :] = -Pk[:, i] * Pk[:, j] * scal
                     l += 1
                 end
                 G = vcat(G, Gk)
@@ -123,8 +123,8 @@ polyminreal18(T::Type{<:HypReal}) = polyminreal(T, :motzkin, 3, use_primal = fal
 polyminreal19(T::Type{<:HypReal}) = polyminreal(T, :motzkin, 3, use_wsos = false)
 polyminreal20(T::Type{<:HypReal}) = polyminreal(T, :reactiondiffusion, 4, use_primal = false, use_wsos = false)
 polyminreal21(T::Type{<:HypReal}) = polyminreal(T, :lotkavolterra, 3, use_primal = false, use_wsos = false)
-polyminreal22(T::Type{<:HypReal}) = polyminreal(T, :random, 2, use_primal = false, use_wsos = false, n = 1)
-polyminreal23(T::Type{<:HypReal}) = polyminreal(T, :random, 2, use_primal = false, use_wsos = true, n = 2)
+polyminreal22(T::Type{<:HypReal}) = polyminreal(T, :random, 2, use_primal = false, use_wsos = false, n = 5)
+polyminreal23(T::Type{<:HypReal}) = polyminreal(T, :random, 2, use_primal = false, use_wsos = true, n = 5)
 
 function polymincomplex(
     T::Type{<:HypReal},
