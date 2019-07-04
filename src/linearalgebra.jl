@@ -11,6 +11,7 @@ import Base.adjoint
 import Base.eltype
 import Base.size
 import Base.*
+import Base.-
 
 
 hyp_AtA!(U::Matrix{T}, A::Matrix{T}) where {T <: BlasReal} = BLAS.syrk!('U', 'T', one(T), A, zero(T), U)
@@ -34,18 +35,19 @@ function hyp_ldiv_chol_L!(B::Matrix, F::Cholesky, A::AbstractMatrix)
 end
 
 
-struct HypBlockMatrix{T <: HypReal}
+mutable struct HypBlockMatrix{T <: HypReal} # TODO undo
     nrows::Int
     ncols::Int
     blocks::Vector
     rows::Vector{UnitRange{Int}}
     cols::Vector{UnitRange{Int}}
-    function HypBlockMatrix{T}(blocks::Vector, rows::Vector{UnitRange{Int}}, cols::Vector{UnitRange{Int}}) where {T <: HypReal}
-        @assert length(blocks) == length(rows) == length(cols)
-        nrows = maximum(last, rows)
-        ncols = maximum(last, cols)
-        return new{T}(nrows, ncols, blocks, rows, cols)
-    end
+end
+
+function HypBlockMatrix{T}(blocks::Vector, rows::Vector{UnitRange{Int}}, cols::Vector{UnitRange{Int}}) where {T <: HypReal}
+    @assert length(blocks) == length(rows) == length(cols)
+    nrows = maximum(last, rows)
+    ncols = maximum(last, cols)
+    return HypBlockMatrix{T}(nrows, ncols, blocks, rows, cols)
 end
 
 eltype(A::HypBlockMatrix{T}) where {T <: HypReal} = T
@@ -53,7 +55,14 @@ eltype(A::HypBlockMatrix{T}) where {T <: HypReal} = T
 size(A::HypBlockMatrix) = (A.nrows, A.ncols)
 size(A::HypBlockMatrix, d) = (d == 1 ? A.nrows : A.ncols)
 
-adjoint(A::HypBlockMatrix{T}) where {T <: HypReal} = HypBlockMatrix{T}(adjoint.(A.blocks), A.cols, A.rows)
+adjoint(A::HypBlockMatrix{T}) where {T <: HypReal} = HypBlockMatrix{T}(A.ncols, A.nrows, adjoint.(A.blocks), A.cols, A.rows)
+
+# no method matching *(::Array{Float64,1}, ::SubArray{Float64,1,Array{Float64,1},Tuple{UnitRange{Int64}},true})
+
+# A = Hypatia.HypBlockMatrix{Float64}(1, 5, [ones(Float64, 1, 3)], [1:1], [1:3])
+# y = zeros(1)
+# x = randn(5)
+# mul!(y, A, x)
 
 function mul!(y::AbstractVector{T}, A::HypBlockMatrix{T}, x::AbstractVector{T}) where {T <: HypReal}
     @assert size(x, 1) == A.ncols
@@ -110,4 +119,6 @@ end
 #     return y
 # end
 
-*(A::HypBlockMatrix{T}, x::Vector{T}) where {T <: HypReal} = mul!(similar(x, size(A, 1)), A, x)
+*(A::HypBlockMatrix{T}, x::AbstractVector{T}) where {T <: HypReal} = mul!(similar(x, size(A, 1)), A, x)
+
+-(A::HypBlockMatrix{T}) where {T <: HypReal} = HypBlockMatrix{T}(A.nrows, A.ncols, -A.blocks, A.rows, A.cols)
