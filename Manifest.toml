@@ -117,6 +117,12 @@ git-tree-sha1 = "4ae0ff1a3a556383f7b1b004f5fb964b26ac96c9"
 uuid = "31c24e10-a181-5473-b8eb-7969acd0382f"
 version = "0.20.0"
 
+[[DoubleFloats]]
+deps = ["GenericSVD", "GenericSchur", "LinearAlgebra", "Polynomials", "Quadmath", "Random", "SpecialFunctions"]
+git-tree-sha1 = "c4acb1336dd43d5c62bd28c3caabb03f4d5d4d37"
+uuid = "497a8b3b-efae-58df-a0af-a86822472b78"
+version = "0.9.1"
+
 [[DynamicPolynomials]]
 deps = ["LinearAlgebra", "MultivariatePolynomials", "Pkg", "Reexport", "Test"]
 git-tree-sha1 = "71149b015940b6d710a0f5e9e0599ae9ffe97177"
@@ -151,9 +157,27 @@ git-tree-sha1 = "ca235f9c4652b31525232a36d7832f5ee681d76a"
 uuid = "14197337-ba66-59df-a3e3-ca00e7dcff7a"
 version = "0.1.0"
 
+[[GenericSVD]]
+deps = ["LinearAlgebra", "Random", "Test"]
+git-tree-sha1 = "8aa93c3f3d81562a8962047eafcc5712af0a0f59"
+uuid = "01680d73-4ee2-5a08-a1aa-533608c188bb"
+version = "0.2.1"
+
+[[GenericSchur]]
+deps = ["LinearAlgebra", "Printf"]
+git-tree-sha1 = "25992e6d023b72860348553f976599184c85d914"
+uuid = "c145ed77-6b09-5dd9-b285-bf645a82121e"
+version = "0.2.3"
+
 [[InteractiveUtils]]
 deps = ["Markdown"]
 uuid = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
+
+[[IterativeRefinement]]
+deps = ["DoubleFloats", "LinearAlgebra", "Random", "Test"]
+git-tree-sha1 = "0db009fc565788a3f12e4e54255ea5167a4bc08b"
+uuid = "bcb6b82e-7479-5933-8c8e-2e0b909ee6a3"
+version = "0.1.0"
 
 [[IterativeSolvers]]
 deps = ["LinearAlgebra", "Printf", "Random", "RecipesBase", "SparseArrays", "Test"]
@@ -280,6 +304,12 @@ deps = ["DataStructures", "LinearAlgebra"]
 git-tree-sha1 = "389fd27b958a33df5234772cc464b663b208273d"
 uuid = "1fd47b50-473d-5c70-9696-f719f8f3bcdc"
 version = "2.0.4"
+
+[[Quadmath]]
+deps = ["Random", "Requires"]
+git-tree-sha1 = "0d177ab3217bd6347d01bdf56e5da0571222d7f3"
+uuid = "be4d8f0f-7fa4-5f49-b795-2f01399ab2dd"
+version = "0.5.0"
 
 [[REPL]]
 deps = ["InteractiveUtils", "Markdown", "Sockets"]

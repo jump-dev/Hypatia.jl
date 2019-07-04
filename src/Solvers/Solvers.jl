@@ -11,6 +11,7 @@ using LinearAlgebra
 import LinearAlgebra.BlasReal
 using SparseArrays
 import IterativeSolvers
+import IterativeRefinement
 using Test
 using TimerOutputs
 import Hypatia.Cones

@@ -8,6 +8,7 @@ using SuiteSparse
 
 mutable struct QRCholCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSolver{T}
     use_sparse::Bool
+    use_refine::Bool
 
     xi::Matrix{T}
     yi::Matrix{T}
@@ -57,10 +58,11 @@ mutable struct QRCholCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemS
     HGxi_k
     Gxi_k
 
-    function QRCholCombinedHSDSystemSolver{T}(model::Models.PreprocessedLinearModel{T}; use_sparse::Bool = false) where {T <: HypReal}
+    function QRCholCombinedHSDSystemSolver{T}(model::Models.PreprocessedLinearModel{T}; use_sparse::Bool = false, use_refine::Bool = true) where {T <: HypReal}
         (n, p, q) = (model.n, model.p, model.q)
         system_solver = new{T}()
         system_solver.use_sparse = use_sparse
+        system_solver.use_refine = use_refine
 
         xi = Matrix{T}(undef, n, 3)
         yi = Matrix{T}(undef, p, 3)
@@ -257,6 +259,30 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
                 end
             end
             Q2div .= F \ Q2div # TODO eliminate allocs (see https://github.com/JuliaLang/julia/issues/30084)
+        elseif system_solver.use_refine
+            # @assert issymmetric(Q2GHGQ2)
+
+
+            (Rv, Cv) = IterativeRefinement.equilibrators(Q2GHGQ2)
+            R = Diagonal(Rv)
+            As = R * Symmetric(Q2GHGQ2) * Diagonal(Cv)
+            F = hyp_chol!(Symmetric(Q2GHGQ2))
+            a = opnorm(As, Inf)
+            κnorm = IterativeRefinement.condInfest(As, F, a)
+
+            lmul!(R, Q2div)
+            (sol1, bn, bc) = IterativeRefinement.rfldiv(As, view(Q2div, :, 1); F = F, κ = κnorm, equilibrate = false)
+            (sol2, bn, bc) = IterativeRefinement.rfldiv(As, view(Q2div, :, 2); F = F, κ = κnorm, equilibrate = false)
+            (sol3, bn, bc) = IterativeRefinement.rfldiv(As, view(Q2div, :, 3); F = F, κ = κnorm, equilibrate = false)
+            Q2div[:, 1] .= sol1
+            Q2div[:, 2] .= sol2
+            Q2div[:, 3] .= sol3
+            lmul!(Diagonal(Cv), Q2div)
+
+
+            # (sol, bn, bc) = IterativeRefinement.rfldiv(Symmetric(Q2GHGQ2), Q2div, f = cholesky!)
+
+
         else
             F = hyp_chol!(Symmetric(Q2GHGQ2)) # TODO prealloc blasreal cholesky auxiliary vectors using posvx
             if !isposdef(F)
