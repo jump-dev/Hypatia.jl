@@ -10,6 +10,8 @@ using Test
 import Hypatia
 import Hypatia.HypReal
 const CO = Hypatia.Cones
+const MO = Hypatia.Models
+const SO = Hypatia.Solvers
 
 function expdesign(
     T::Type{<:HypReal},
@@ -19,6 +21,7 @@ function expdesign(
     nmax::Int;
     use_logdet::Bool = true,
     use_sumlog::Bool = true,
+    use_linops::Bool = true,
     )
     @assert (p > q) && (n > q) && (nmax <= n)
     rt2 = sqrt(T(2))
@@ -28,21 +31,18 @@ function expdesign(
     A = ones(T, 1, p)
     b = T[n]
 
-    # nonnegativity
-    G_nonneg = Matrix{T}(-I, p, p)
+    # nonnegativity, do <= nmax experiments
+    if !use_linops
+        G_nonneg = Matrix{T}(-I, p, p)
+        G_nmax = Matrix{T}(-I, p, p)
+    end
     h_nonneg = zeros(T, p)
-    # do <= nmax experiments
-    G_nmax = Matrix{T}(-I, p, p)
     h_nmax = fill(T(nmax), p)
 
     cones = CO.Cone{T}[CO.Nonnegative{T}(p), CO.Nonnegative{T}(p)]
     cone_idxs = [1:p, (p + 1):(2 * p)]
 
     if use_logdet
-        # pad with hypograph variable
-        A = hcat(zero(T), A)
-        G_nonneg = hcat(zeros(T, p), G_nonneg)
-        G_nmax = hcat(zeros(T, p), G_nmax)
         # maximize the hypograph variable of the logdet cone
         c = vcat(-one(T), zeros(T, p))
 
@@ -59,15 +59,30 @@ function expdesign(
         @assert l - 1 == dimvec
         # pad with hypograph variable and perspective variable
         h_logdet = vcat(zero(T), one(T), zeros(T, dimvec))
-        G_logdet = [
-            -one(T)    zeros(T, 1, p);
-            zeros(T, 1, p + 1);
-            zeros(T, dimvec)    G_logdet;
-            ]
         push!(cones, CO.HypoPerLogdet{T}(dimvec + 2))
         push!(cone_idxs, (2 * p + 1):(2 * p + dimvec + 2))
 
-        G = vcat(G_nonneg, G_nmax, G_logdet)
+        if use_linops
+            A = SO.HypBlockMatrix{T}([A], [1:1], [2:(p + 1)])
+            G = SO.HypBlockMatrix{T}(
+                [-I, -I, -ones(T, 1, 1), G_logdet],
+                [1:p, (p + 1):(2 * p), (2 * p + 1):(2 * p + 1), (2 * p + 3):(2 * p + 2 + dimvec)],
+                [2:(p + 1), 2:(p + 1), 1:1, 2:(p + 1)]
+                )
+        else
+            # pad with hypograph variable
+            A = hcat(zero(T), A)
+            G_nonneg = hcat(zeros(T, p), G_nonneg)
+            G_nmax = hcat(zeros(T, p), G_nmax)
+            # also perspective variable
+            G_logdet = [
+                -one(T)    zeros(T, 1, p);
+                zeros(T, 1, p + 1);
+                zeros(T, dimvec)    G_logdet;
+                ]
+            # all conic constraints
+            G = vcat(G_nonneg, G_nmax, G_logdet)
+        end
         h = vcat(h_nonneg, h_nmax, h_logdet)
     else
         # requires an upper triangular matrix of additional variables, ordered row wise
@@ -82,10 +97,6 @@ function expdesign(
             padx = num_trivars + q
             num_hypo = q
         end
-        # pad with triangle matrix variables and q hypopoerlog cone hypograph variables
-        A = [A zeros(T, 1, padx)]
-        G_nonneg = hcat(G_nonneg, zeros(T, p, padx))
-        G_nmax = hcat(G_nmax, zeros(T, p, padx))
         # maximize the sum of hypograph variables of all hypoperlog cones
         c = vcat(zeros(T, p + num_trivars), -ones(T, num_hypo))
 
@@ -159,7 +170,21 @@ function expdesign(
                 offset += 3
             end
         end
-        G = vcat(G_nonneg, G_nmax, G_psd, G_log)
+        if use_linops
+            A = SO.HypBlockMatrix{T}(1, p + padx, [A], UnitRange{Int}[1:1], UnitRange{Int}[1:p])
+            G = SO.HypBlockMatrix{T}(
+                [-I, -I, G_psd, G_log],
+                [1:p, (p + 1):(2 * p), (2 * p + 1):(2 * p + dimvec), (2 * p + dimvec + 1):(2 * p + dimvec + size(G_log, 1))],
+                [1:p, 1:p, 1:dimx, 1:dimx]
+                )
+        else
+            # pad with triangle matrix variables and q hypopoerlog cone hypograph variables
+            A = [A zeros(T, 1, padx)]
+            G_nonneg = hcat(G_nonneg, zeros(T, p, padx))
+            G_nmax = hcat(G_nmax, zeros(T, p, padx))
+            # all conic constraints
+            G = vcat(G_nonneg, G_nmax, G_psd, G_log)
+        end
         h = vcat(h_nonneg, h_nmax, h_psd, h_log)
     end
 
@@ -169,7 +194,15 @@ end
 expdesign1(T::Type{<:HypReal}) = expdesign(T, 25, 75, 125, 5, use_logdet = true)
 expdesign2(T::Type{<:HypReal}) = expdesign(T, 10, 30, 50, 5, use_logdet = true)
 expdesign3(T::Type{<:HypReal}) = expdesign(T, 5, 15, 25, 5, use_logdet = true)
-expdesign4(T::Type{<:HypReal}) = expdesign(T, 4, 8, 12, 3, use_logdet = true)
+
+# 4, 8, 12, 3
+expdesign4a(T::Type{<:HypReal}) = expdesign(T,4, 8, 12, 3, use_logdet = true, use_linops = true)
+expdesign4b(T::Type{<:HypReal}) = expdesign(T, 4, 8, 12, 3, use_logdet = true, use_linops = false)
+expdesign4c(T::Type{<:HypReal}) = expdesign(T, 4, 8, 12, 3, use_logdet = false, use_sumlog = false, use_linops = true)
+expdesign4d(T::Type{<:HypReal}) = expdesign(T, 4, 8, 12, 3, use_logdet = false, use_sumlog = false, use_linops = false)
+expdesign4e(T::Type{<:HypReal}) = expdesign(T, 4, 8, 12, 3, use_logdet = false, use_sumlog = true, use_linops = true)
+expdesign4f(T::Type{<:HypReal}) = expdesign(T, 4, 8, 12, 3, use_logdet = false, use_sumlog = true, use_linops = false)
+
 expdesign5(T::Type{<:HypReal}) = expdesign(T, 3, 5, 7, 2, use_logdet = true)
 expdesign6(T::Type{<:HypReal}) = expdesign(T, 25, 75, 125, 5, use_logdet = false)
 expdesign7(T::Type{<:HypReal}) = expdesign(T, 10, 30, 50, 5, use_logdet = false)
@@ -181,7 +214,7 @@ instances_expdesign_all = [
     expdesign1,
     expdesign2,
     expdesign3,
-    expdesign4,
+    # expdesign4,
     expdesign5,
     expdesign6,
     expdesign7,
@@ -202,3 +235,23 @@ function test_expdesign(instance::Function; T::Type{<:HypReal} = Float64, test_o
     @test r.status == :Optimal
     return
 end
+
+for fun in [
+    # expdesign4a,
+    # expdesign4b,
+    # expdesign4c,
+    # expdesign4d,
+    expdesign4e,
+    expdesign4f,
+    ]
+    test_expdesign(fun, T = Float64, test_options = (
+        linear_model = MO.RawLinearModel,
+        system_solver = SO.NaiveCombinedHSDSystemSolver,
+        linear_model_options = (use_iterative = true,),
+        system_solver_options = (use_iterative = true,),
+        solver_options = (verbose = true, tol_abs_opt = 1e-5, tol_rel_opt = 1e-5, tol_feas = 1e-5)
+        )
+        )
+end
+
+;

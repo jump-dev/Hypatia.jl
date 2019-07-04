@@ -8,9 +8,9 @@ using LinearAlgebra
 
 const HypReal = Union{AbstractFloat, Rational}
 const HypRealOrComplex{T <: HypReal} = Union{T, Complex{T}}
-const HypLinMap{T <: HypReal} = Union{UniformScaling, AbstractMatrix{T}}
 
 include("linearalgebra.jl")
+const HypLinMap{T <: HypReal} = Union{UniformScaling, AbstractMatrix{T}, HypBlockMatrix{T}}
 
 # submodules
 include("ModelUtilities/ModelUtilities.jl")
