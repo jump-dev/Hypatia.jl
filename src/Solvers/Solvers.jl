@@ -9,7 +9,9 @@ module Solvers
 using Printf
 using LinearAlgebra
 import LinearAlgebra.BlasReal
+import LinearAlgebra.BlasInt
 using SparseArrays
+import SuiteSparse
 import IterativeSolvers
 using Test
 using TimerOutputs
@@ -21,6 +23,8 @@ import Hypatia.hyp_AtA!
 import Hypatia.hyp_chol!
 import Hypatia.hyp_ldiv_chol_L!
 import Hypatia.HypBlockMatrix
+import Hypatia.hyp_posvx!
+import Hypatia.hyp_sysvx!
 
 abstract type Solver{T <: HypReal} end
 

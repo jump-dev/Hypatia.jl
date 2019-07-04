@@ -4,8 +4,6 @@ Copyright 2018, Chris Coey and contributors
 QR + Cholesky linear system solver
 =#
 
-using SuiteSparse
-
 mutable struct QRCholCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSolver{T}
     use_sparse::Bool
 
@@ -56,6 +54,14 @@ mutable struct QRCholCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemS
     GQ2_k
     HGxi_k
     Gxi_k
+
+    lsferr
+    lsberr
+    lswork
+    lsiwork
+    lsAF
+    lsS
+    ipiv
 
     function QRCholCombinedHSDSystemSolver{T}(model::Models.PreprocessedLinearModel{T}; use_sparse::Bool = false) where {T <: HypReal}
         (n, p, q) = (model.n, model.p, model.q)
@@ -131,6 +137,21 @@ mutable struct QRCholCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemS
         system_solver.GQ2_k = [view(system_solver.GQ2, idxs, :) for idxs in model.cone_idxs]
         system_solver.HGxi_k = [view(system_solver.HGxi, idxs, :) for idxs in model.cone_idxs]
         system_solver.Gxi_k = [view(system_solver.Gxi, idxs, :) for idxs in model.cone_idxs]
+
+
+        system_solver.lsferr = Vector{Float64}(undef, 2)
+        system_solver.lsberr = Vector{Float64}(undef, 2)
+        system_solver.lsAF = Matrix{Float64}(undef, nmp, nmp)
+        system_solver.lsiwork = Vector{BlasInt}(undef, nmp)
+
+        # posvx
+        system_solver.lswork = Vector{Float64}(undef, 3*nmp)
+        system_solver.lsS = Vector{Float64}(undef, nmp)
+
+        # sysvx
+        system_solver.lswork = Vector{Float64}(undef, 5*nmp)
+        system_solver.ipiv = Vector{BlasInt}(undef, nmp)
+
 
         return system_solver
     end
@@ -258,6 +279,21 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
             end
             Q2div .= F \ Q2div # TODO eliminate allocs (see https://github.com/JuliaLang/julia/issues/30084)
         else
+            # Q2divcopy = copy(Q2div) # TODO prealloc
+            # success = hyp_posvx!(Q2div, Q2GHGQ2, Q2divcopy, system_solver.lsferr, system_solver.lsberr, system_solver.lswork, system_solver.lsiwork, system_solver.lsAF, system_solver.lsS)
+            # if !success
+            #     println("dense linear system matrix factorization failed")
+            #     mul!(Q2GHGQ2, GQ2', HGQ2)
+            #     # Q2GHGQ2 += T(1e-4) * I
+            #
+            #     success = hyp_sysvx!(Q2div, Q2GHGQ2, Q2divcopy, system_solver.lsferr, system_solver.lsberr, system_solver.lswork, system_solver.lsiwork, system_solver.lsAF, system_solver.ipiv)
+            #     if !success
+            #         error("could not fix linear system solve failure; terminating")
+            #     end
+            # end
+
+
+
             F = hyp_chol!(Symmetric(Q2GHGQ2)) # TODO prealloc blasreal cholesky auxiliary vectors using posvx
             if !isposdef(F)
                 println("dense linear system matrix factorization failed")
@@ -276,6 +312,7 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
                 end
             end
             ldiv!(F, Q2div)
+
         end
     end
 
