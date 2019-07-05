@@ -11,6 +11,7 @@ import Base.adjoint
 import Base.eltype
 import Base.size
 import Base.*
+import Base.-
 
 
 hyp_AtA!(U::Matrix{T}, A::Matrix{T}) where {T <: BlasReal} = BLAS.syrk!('U', 'T', one(T), A, zero(T), U)
@@ -40,12 +41,13 @@ struct HypBlockMatrix{T <: HypReal}
     blocks::Vector
     rows::Vector{UnitRange{Int}}
     cols::Vector{UnitRange{Int}}
-    function HypBlockMatrix{T}(blocks::Vector, rows::Vector{UnitRange{Int}}, cols::Vector{UnitRange{Int}}) where {T <: HypReal}
-        @assert length(blocks) == length(rows) == length(cols)
-        nrows = maximum(last, rows)
-        ncols = maximum(last, cols)
-        return new{T}(nrows, ncols, blocks, rows, cols)
-    end
+end
+
+function HypBlockMatrix{T}(blocks::Vector, rows::Vector{UnitRange{Int}}, cols::Vector{UnitRange{Int}}) where {T <: HypReal}
+    @assert length(blocks) == length(rows) == length(cols)
+    nrows = maximum(last, rows)
+    ncols = maximum(last, cols)
+    return HypBlockMatrix{T}(nrows, ncols, blocks, rows, cols)
 end
 
 eltype(A::HypBlockMatrix{T}) where {T <: HypReal} = T
@@ -53,7 +55,7 @@ eltype(A::HypBlockMatrix{T}) where {T <: HypReal} = T
 size(A::HypBlockMatrix) = (A.nrows, A.ncols)
 size(A::HypBlockMatrix, d) = (d == 1 ? A.nrows : A.ncols)
 
-adjoint(A::HypBlockMatrix{T}) where {T <: HypReal} = HypBlockMatrix{T}(adjoint.(A.blocks), A.cols, A.rows)
+adjoint(A::HypBlockMatrix{T}) where {T <: HypReal} = HypBlockMatrix{T}(A.ncols, A.nrows, adjoint.(A.blocks), A.cols, A.rows)
 
 function mul!(y::AbstractVector{T}, A::HypBlockMatrix{T}, x::AbstractVector{T}) where {T <: HypReal}
     @assert size(x, 1) == A.ncols
@@ -110,4 +112,6 @@ end
 #     return y
 # end
 
-*(A::HypBlockMatrix{T}, x::Vector{T}) where {T <: HypReal} = mul!(similar(x, size(A, 1)), A, x)
+*(A::HypBlockMatrix{T}, x::AbstractVector{T}) where {T <: HypReal} = mul!(similar(x, size(A, 1)), A, x)
+
+-(A::HypBlockMatrix{T}) where {T <: HypReal} = HypBlockMatrix{T}(A.nrows, A.ncols, -A.blocks, A.rows, A.cols)
