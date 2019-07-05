@@ -2,9 +2,6 @@
 Copyright 2018, Chris Coey and contributors
 
 interior point type and functions for algorithms based on homogeneous self dual embedding
-
-TODO
-make internal statuses types
 =#
 
 mutable struct HSDSolver{T <: HypReal} <: Solver{T}
