@@ -10,7 +10,7 @@ using Test
 import Hypatia
 import Hypatia.HypReal
 const CO = Hypatia.Cones
-const SO = Hypatia.Solvers
+const HYP = Hypatia
 
 function expdesign(
     T::Type{<:HypReal},
@@ -20,7 +20,7 @@ function expdesign(
     nmax::Int;
     use_logdet::Bool = true,
     use_sumlog::Bool = true,
-    use_linops::Bool = true,
+    use_linops::Bool = false,
     )
     @assert (p > q) && (n > q) && (nmax <= n)
     rt2 = sqrt(T(2))
@@ -56,8 +56,8 @@ function expdesign(
         push!(cone_idxs, (2 * p + 1):(2 * p + dimvec + 2))
 
         if use_linops
-            A = SO.HypBlockMatrix{T}([A], [1:1], [2:(p + 1)])
-            G = SO.HypBlockMatrix{T}(
+            A = HYP.HypBlockMatrix{T}([A], [1:1], [2:(p + 1)])
+            G = HYP.HypBlockMatrix{T}(
                 [-I, -I, -ones(T, 1, 1), G_logdet],
                 [1:p, (p + 1):(2 * p), (2 * p + 1):(2 * p + 1), (2 * p + 3):(2 * p + 2 + dimvec)],
                 [2:(p + 1), 2:(p + 1), 1:1, 2:(p + 1)]
@@ -164,8 +164,8 @@ function expdesign(
             end
         end
         if use_linops
-            A = SO.HypBlockMatrix{T}(1, p + padx, [A], UnitRange{Int}[1:1], UnitRange{Int}[1:p])
-            G = SO.HypBlockMatrix{T}(
+            A = HYP.HypBlockMatrix{T}(1, p + padx, [A], [1:1], [1:p])
+            G = HYP.HypBlockMatrix{T}(
                 [-I, -I, G_psd, G_log],
                 [1:p, (p + 1):(2 * p), (2 * p + 1):(2 * p + dimvec), (2 * p + dimvec + 1):(2 * p + dimvec + size(G_log, 1))],
                 [1:p, 1:p, 1:dimx, 1:dimx]
@@ -187,7 +187,7 @@ end
 expdesign1(T::Type{<:HypReal}) = expdesign(T, 25, 75, 125, 5, use_logdet = true)
 expdesign2(T::Type{<:HypReal}) = expdesign(T, 10, 30, 50, 5, use_logdet = true)
 expdesign3(T::Type{<:HypReal}) = expdesign(T, 5, 15, 25, 5, use_logdet = true)
-expdesign4(T::Type{<:HypReal}) = expdesign(T,4, 8, 12, 3, use_logdet = true)
+expdesign4(T::Type{<:HypReal}) = expdesign(T, 4, 8, 12, 3, use_logdet = true)
 expdesign5(T::Type{<:HypReal}) = expdesign(T, 3, 5, 7, 2, use_logdet = true)
 expdesign6(T::Type{<:HypReal}) = expdesign(T, 25, 75, 125, 5, use_logdet = false)
 expdesign7(T::Type{<:HypReal}) = expdesign(T, 10, 30, 50, 5, use_logdet = false)
