@@ -194,27 +194,23 @@ end
 expdesign1(T::Type{<:HypReal}) = expdesign(T, 25, 75, 125, 5, use_logdet = true)
 expdesign2(T::Type{<:HypReal}) = expdesign(T, 10, 30, 50, 5, use_logdet = true)
 expdesign3(T::Type{<:HypReal}) = expdesign(T, 5, 15, 25, 5, use_logdet = true)
-
-# 4, 8, 12, 3
-expdesign4a(T::Type{<:HypReal}) = expdesign(T,4, 8, 12, 3, use_logdet = true, use_linops = true)
-expdesign4b(T::Type{<:HypReal}) = expdesign(T, 4, 8, 12, 3, use_logdet = true, use_linops = false)
-expdesign4c(T::Type{<:HypReal}) = expdesign(T, 4, 8, 12, 3, use_logdet = false, use_sumlog = false, use_linops = true)
-expdesign4d(T::Type{<:HypReal}) = expdesign(T, 4, 8, 12, 3, use_logdet = false, use_sumlog = false, use_linops = false)
-expdesign4e(T::Type{<:HypReal}) = expdesign(T, 4, 8, 12, 3, use_logdet = false, use_sumlog = true, use_linops = true)
-expdesign4f(T::Type{<:HypReal}) = expdesign(T, 4, 8, 12, 3, use_logdet = false, use_sumlog = true, use_linops = false)
-
+expdesign4(T::Type{<:HypReal}) = expdesign(T,4, 8, 12, 3, use_logdet = true)
 expdesign5(T::Type{<:HypReal}) = expdesign(T, 3, 5, 7, 2, use_logdet = true)
 expdesign6(T::Type{<:HypReal}) = expdesign(T, 25, 75, 125, 5, use_logdet = false)
 expdesign7(T::Type{<:HypReal}) = expdesign(T, 10, 30, 50, 5, use_logdet = false)
 expdesign8(T::Type{<:HypReal}) = expdesign(T, 5, 15, 25, 5, use_logdet = false)
 expdesign9(T::Type{<:HypReal}) = expdesign(T, 4, 8, 12, 3, use_logdet = false)
 expdesign10(T::Type{<:HypReal}) = expdesign(T, 3, 5, 7, 2, use_logdet = false)
+expdesign11(T::Type{<:HypReal}) = expdesign(T, 4, 8, 12, 3, use_logdet = true, use_linops = true)
+expdesign12(T::Type{<:HypReal}) = expdesign(T, 4, 8, 12, 3, use_logdet = false, use_sumlog = false, use_linops = true)
+expdesign13(T::Type{<:HypReal}) = expdesign(T, 4, 8, 12, 3, use_logdet = false, use_sumlog = false, use_linops = false)
+expdesign14(T::Type{<:HypReal}) = expdesign(T, 4, 8, 12, 3, use_logdet = false, use_sumlog = true, use_linops = true)
 
 instances_expdesign_all = [
     expdesign1,
     expdesign2,
     expdesign3,
-    # expdesign4,
+    expdesign4,
     expdesign5,
     expdesign6,
     expdesign7,
@@ -225,6 +221,7 @@ instances_expdesign_all = [
 instances_expdesign_few = [
     expdesign5,
     expdesign10,
+    expdesign11,
     ]
 
 function test_expdesign(instance::Function; T::Type{<:HypReal} = Float64, test_options::NamedTuple = NamedTuple(), rseed::Int = 1)
@@ -235,23 +232,3 @@ function test_expdesign(instance::Function; T::Type{<:HypReal} = Float64, test_o
     @test r.status == :Optimal
     return
 end
-
-for fun in [
-    # expdesign4a,
-    # expdesign4b,
-    # expdesign4c,
-    # expdesign4d,
-    expdesign4e,
-    expdesign4f,
-    ]
-    test_expdesign(fun, T = Float64, test_options = (
-        linear_model = MO.RawLinearModel,
-        system_solver = SO.NaiveCombinedHSDSystemSolver,
-        linear_model_options = (use_iterative = true,),
-        system_solver_options = (use_iterative = true,),
-        solver_options = (verbose = true, tol_abs_opt = 1e-5, tol_rel_opt = 1e-5, tol_feas = 1e-5)
-        )
-        )
-end
-
-;
