@@ -10,7 +10,6 @@ using Test
 import Hypatia
 import Hypatia.HypReal
 const CO = Hypatia.Cones
-const MO = Hypatia.Models
 const SO = Hypatia.Solvers
 
 function expdesign(
@@ -30,12 +29,6 @@ function expdesign(
     # hypograph variable and number of trials of each experiment
     A = ones(T, 1, p)
     b = T[n]
-
-    # nonnegativity, do <= nmax experiments
-    if !use_linops
-        G_nonneg = Matrix{T}(-I, p, p)
-        G_nmax = Matrix{T}(-I, p, p)
-    end
     h_nonneg = zeros(T, p)
     h_nmax = fill(T(nmax), p)
 
@@ -72,8 +65,8 @@ function expdesign(
         else
             # pad with hypograph variable
             A = hcat(zero(T), A)
-            G_nonneg = hcat(zeros(T, p), G_nonneg)
-            G_nmax = hcat(zeros(T, p), G_nmax)
+            G_nonneg = hcat(zeros(T, p), Matrix{T}(-I, p, p))
+            G_nmax = hcat(zeros(T, p), Matrix{T}(-I, p, p))
             # also perspective variable
             G_logdet = [
                 -one(T)    zeros(T, 1, p);
@@ -180,8 +173,8 @@ function expdesign(
         else
             # pad with triangle matrix variables and q hypopoerlog cone hypograph variables
             A = [A zeros(T, 1, padx)]
-            G_nonneg = hcat(G_nonneg, zeros(T, p, padx))
-            G_nmax = hcat(G_nmax, zeros(T, p, padx))
+            G_nonneg = hcat(Matrix{T}(-I, p, p), zeros(T, p, padx))
+            G_nmax = hcat(Matrix{T}(-I, p, p), zeros(T, p, padx))
             # all conic constraints
             G = vcat(G_nonneg, G_nmax, G_psd, G_log)
         end
