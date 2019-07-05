@@ -57,13 +57,6 @@ size(A::HypBlockMatrix, d) = (d == 1 ? A.nrows : A.ncols)
 
 adjoint(A::HypBlockMatrix{T}) where {T <: HypReal} = HypBlockMatrix{T}(A.ncols, A.nrows, adjoint.(A.blocks), A.cols, A.rows)
 
-# no method matching *(::Array{Float64,1}, ::SubArray{Float64,1,Array{Float64,1},Tuple{UnitRange{Int64}},true})
-
-# A = Hypatia.HypBlockMatrix{Float64}(1, 5, [ones(Float64, 1, 3)], [1:1], [1:3])
-# y = zeros(1)
-# x = randn(5)
-# mul!(y, A, x)
-
 function mul!(y::AbstractVector{T}, A::HypBlockMatrix{T}, x::AbstractVector{T}) where {T <: HypReal}
     @assert size(x, 1) == A.ncols
     @assert size(y, 1) == A.nrows
