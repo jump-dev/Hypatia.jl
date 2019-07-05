@@ -10,6 +10,7 @@ const HypReal = Union{AbstractFloat, Rational}
 const HypRealOrComplex{T <: HypReal} = Union{T, Complex{T}}
 
 include("linearalgebra.jl")
+
 const HypLinMap{T <: HypReal} = Union{UniformScaling, AbstractMatrix{T}, HypBlockMatrix{T}}
 
 # submodules
