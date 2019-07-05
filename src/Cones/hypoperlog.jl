@@ -43,13 +43,7 @@ dimension(cone::HypoPerLog) = 3
 
 get_nu(cone::HypoPerLog) = 3
 
-function set_initial_point(arr::AbstractVector{T}, cone::HypoPerLog{T}) where {T <: HypReal}
-    # arr .= [T(-0.827838), T(0.805102), T(1.290928)] * 100
-    arr .= T[-1, 1, 1]
-    return arr
-end
-
- # = (arr[1] = -one(T); arr[2] = one(T); arr[3] = one(T); arr)
+set_initial_point(arr::AbstractVector{T}, cone::HypoPerLog{T}) where {T <: HypReal} = (arr[1] = -one(T); arr[2] = one(T); arr[3] = one(T); arr)
 
 function check_in_cone(cone::HypoPerLog{T}) where {T <: HypReal}
     (u, v, w) = cone.point
