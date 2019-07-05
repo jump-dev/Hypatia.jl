@@ -172,7 +172,7 @@ function find_max_alpha_in_nbhd(
                 if stepper.cones_outside_nbhd[k]
                     cone_k = cones[k]
                     Cones.load_point(cone_k, stepper.primal_views[k])
-                    if Cones.check_in_cone(cone_k)
+                    @timeit solver.timer "incone1" if Cones.check_in_cone(cone_k)
                         stepper.cones_outside_nbhd[k] = false
                         stepper.cones_loaded[k] = true
                     else
@@ -192,7 +192,7 @@ function find_max_alpha_in_nbhd(
                         cone_k = cones[k]
                         if !stepper.cones_loaded[k]
                             Cones.load_point(cone_k, stepper.primal_views[k])
-                            if !Cones.check_in_cone(cone_k)
+                            @timeit solver.timer "incone2" if !Cones.check_in_cone(cone_k)
                                 in_nbhds = false
                                 break
                             end
@@ -200,7 +200,7 @@ function find_max_alpha_in_nbhd(
 
                         # modifies dual_views
                         stepper.dual_views[k] .+= mu_temp .* Cones.grad(cone_k)
-                        Cones.inv_hess_prod!(stepper.nbhd_temp[k], stepper.dual_views[k], cone_k)
+                        @timeit solver.timer "inv_hess_prod!" Cones.inv_hess_prod!(stepper.nbhd_temp[k], stepper.dual_views[k], cone_k)
                         nbhd_sqr_k = dot(stepper.dual_views[k], stepper.nbhd_temp[k])
 
                         if nbhd_sqr_k <= -cbrt(eps(T))
