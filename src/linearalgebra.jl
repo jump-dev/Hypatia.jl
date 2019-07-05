@@ -35,7 +35,7 @@ function hyp_ldiv_chol_L!(B::Matrix, F::Cholesky, A::AbstractMatrix)
 end
 
 
-mutable struct HypBlockMatrix{T <: HypReal} # TODO undo
+struct HypBlockMatrix{T <: HypReal}
     nrows::Int
     ncols::Int
     blocks::Vector
