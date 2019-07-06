@@ -1,15 +1,8 @@
 #=
 Copyright 2018, Chris Coey and contributors
 
-naive elimination-based linear system solver
-
-A'*y + G'*z + c*tau = xrhs
--A*x + b*tau = yrhs
--G*x - s + h*tau = zrhs
--c'*x - b'*y - h'*z - kap = kaprhs
-(pr bar) z_k + mu*H_k*s_k = srhs_k
-(du bar) mu*H_k*z_k + s_k = srhs_k
-kap + mu/(taubar^2)*tau = taurhs
+naive+elimination linear system solver
+solves linear system in naive.jl via the following procedure
 
 eliminate s
 -G*x - s + h*tau = zrhs
@@ -35,14 +28,11 @@ TODO reduce allocations
 =#
 
 mutable struct NaiveElimCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSolver{T}
-    use_iterative::Bool
     use_sparse::Bool
 
     lhs_copy
     lhs
     rhs::Matrix{T}
-    prevsol1::Vector{T}
-    prevsol2::Vector{T}
 
     x1
     x2
@@ -57,16 +47,30 @@ mutable struct NaiveElimCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSyst
     s1_k
     s2_k
 
-    function NaiveElimCombinedHSDSystemSolver{T}(
-        model::Models.LinearModel{T};
-        use_iterative::Bool = false,
-        use_sparse::Bool = false,
-        ) where {T <: HypReal}
+    function NaiveElimCombinedHSDSystemSolver{T}(model::Models.LinearModel{T}; use_sparse::Bool = false) where {T <: HypReal}
         (n, p, q) = (model.n, model.p, model.q)
         npq1 = n + p + q + 1
         system_solver = new{T}()
-        system_solver.use_iterative = use_iterative
         system_solver.use_sparse = use_sparse
+
+        if use_sparse
+            system_solver.lhs_copy = T[
+                spzeros(T,n,n)  model.A'        model.G'              model.c;
+                -model.A        spzeros(T,p,p)  spzeros(T,p,q)        model.b;
+                -model.G        spzeros(T,q,p)  sparse(one(T)*I,q,q)  model.h;
+                -model.c'       -model.b'       -model.h'             one(T);
+            ]
+            @assert issparse(system_solver.lhs_copy)
+        else
+            system_solver.lhs_copy = T[
+                zeros(T,n,n)  model.A'      model.G'              model.c;
+                -model.A      zeros(T,p,p)  zeros(T,p,q)          model.b;
+                -model.G      zeros(T,q,p)  Matrix(one(T)*I,q,q)  model.h;
+                -model.c'     -model.b'     -model.h'             one(T);
+            ]
+        end
+
+        system_solver.lhs = similar(system_solver.lhs_copy)
 
         rhs = Matrix{T}(undef, npq1, 2)
         system_solver.rhs = rhs
@@ -86,58 +90,6 @@ mutable struct NaiveElimCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSyst
         system_solver.s2 = similar(rhs, q)
         system_solver.s1_k = [view(system_solver.s1, model.cone_idxs[k]) for k in eachindex(model.cones)]
         system_solver.s2_k = [view(system_solver.s2, model.cone_idxs[k]) for k in eachindex(model.cones)]
-
-        if use_iterative
-            system_solver.prevsol1 = zeros(T, npq1)
-            system_solver.prevsol2 = zeros(T, npq1)
-
-            # block matrix for efficient multiplication
-            cone_rows = UnitRange{Int}[]
-            cone_cols = UnitRange{Int}[]
-            for k in eachindex(model.cones)
-                cone_k = model.cones[k]
-                idxs = model.cone_idxs[k]
-                rows = (n + p) .+ idxs
-                if Cones.use_dual(cone_k)
-                    push!(cone_rows, rows)
-                    push!(cone_cols, rows)
-                else
-                    push!(cone_rows, rows)
-                    push!(cone_cols, 1:n)
-                    push!(cone_rows, rows)
-                    push!(cone_cols, npq1:npq1)
-                end
-            end
-
-            rc1 = 1:n
-            rc2 = (n + 1):(n + p)
-            rc3 = (n + p + 1):(n + p + q)
-            rc4 = (n + p + q + 1):(n + p + q + 1)
-            system_solver.lhs = HypBlockMatrix{T}(
-                [fill(I, length(cone_rows))...,
-                model.A', model.G', model.c, -model.A, model.b, -model.G, model.h, -model.c', -model.b', -model.h', [one(T)]],
-                [cone_rows..., rc1, rc1, rc1, rc2, rc2, rc3, rc3, rc4, rc4, rc4, rc4],
-                [cone_cols..., rc2, rc3, rc4, rc1, rc4, rc1, rc4, rc1, rc2, rc3, rc4],
-                )
-        else
-            if use_sparse
-                system_solver.lhs_copy = T[
-                    spzeros(T,n,n)  model.A'        model.G'              model.c;
-                    -model.A        spzeros(T,p,p)  spzeros(T,p,q)        model.b;
-                    -model.G        spzeros(T,q,p)  sparse(one(T)*I,q,q)  model.h;
-                    -model.c'       -model.b'       -model.h'             one(T);
-                    ]
-                @assert issparse(system_solver.lhs_copy)
-            else
-                system_solver.lhs_copy = T[
-                    zeros(T,n,n)  model.A'      model.G'              model.c;
-                    -model.A      zeros(T,p,p)  zeros(T,p,q)          model.b;
-                    -model.G      zeros(T,q,p)  Matrix(one(T)*I,q,q)  model.h;
-                    -model.c'     -model.b'     -model.h'             one(T);
-                    ]
-            end
-            system_solver.lhs = similar(system_solver.lhs_copy)
-        end
 
         return system_solver
     end
@@ -173,95 +125,45 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveElimC
     z1 .= solver.z_residual
     z2 .= zero(T)
     for k in eachindex(cones)
-        cone_k = cones[k]
         duals_k = solver.point.dual_views[k]
-        g = Cones.grad(cone_k)
+        g = Cones.grad(cones[k])
         @. s1_k[k] = -duals_k
         @. s2_k[k] = -duals_k - mu * g
-        if !Cones.use_dual(cone_k)
+    end
+    tau_rhs = [-kap, -kap + mu / tau]
+    kap_rhs = [kap + solver.primal_obj_t - solver.dual_obj_t, zero(T)]
 
+    # update lhs matrix
+    copyto!(lhs, system_solver.lhs_copy)
+    mtt = mu / tau / tau
+    lhs[end, end] = mtt
 
-            # TODO use hess prod instead
-            H = Cones.hess(cone_k)
+    for k in eachindex(cones)
+        cone_k = cones[k]
+        idxs = model.cone_idxs[k]
+        rows = (n + p) .+ idxs
+        H = Cones.hess(cones[k])
+        if Cones.use_dual(cone_k)
+            # -G_k*x + mu*H_k*z_k + h_k*tau = zrhs_k + srhs_k
+            lhs[rows, rows] .= mu * H
+        else
             # -mu*H_k*G_k*x + z_k + mu*H_k*h_k*tau = mu*H_k*zrhs_k + srhs_k
+            lhs[rows, 1:n] .= -mu * H * model.G[idxs, :]
+            lhs[rows, end] .= mu * H * model.h[idxs]
             z1_k[k] .= mu * H * z1_k[k]
             z2_k[k] .= mu * H * z2_k[k]
         end
     end
     z1 .+= s1
     z2 .+= s2
-    kap_rhs1 = kap + solver.primal_obj_t - solver.dual_obj_t
-    tau_rhs1 = -kap
-    tau_rhs2 = -kap + mu / tau
-    mtt = mu / tau / tau
     # -c'x - b'y - h'z + mu/(taubar^2)*tau = taurhs + kaprhs
-    rhs[end, 1] = kap_rhs1 + tau_rhs1
-    rhs[end, 2] = tau_rhs2
+    rhs[end, :] .= kap_rhs + tau_rhs
 
     # solve system
-    if system_solver.use_iterative
-        lhs.blocks[end][1] = mtt
-        b_idx = 1
-        for k in eachindex(cones)
-            cone_k = cones[k]
-            idxs = model.cone_idxs[k]
-
-
-            # TODO use hess prod instead
-            H = Cones.hess(cone_k)
-
-            if Cones.use_dual(cone_k)
-                lhs.blocks[b_idx] = mu * H
-                b_idx += 1
-            else
-                lhs.blocks[b_idx] = -mu * H * model.G[idxs, :]
-                b_idx += 1
-                lhs.blocks[b_idx] = mu * H * model.h[idxs]
-                b_idx += 1
-            end
-        end
-
-
-        # TODO need preconditioner
-        # TODO optimize for this case, including applying the blocks of the LHS
-        # TODO pick which square non-symm method to use
-        # TODO prealloc whatever is needed inside the solver
-        # TODO possibly fix IterativeSolvers so that methods can take matrix RHS, however the two columns may take different number of iters needed to converge
-
-        rhs1 = view(rhs, :, 1)
-        IterativeSolvers.gmres!(system_solver.prevsol1, lhs, rhs1)
-        copyto!(rhs1, system_solver.prevsol1)
-
-        rhs2 = view(rhs, :, 2)
-        IterativeSolvers.gmres!(system_solver.prevsol2, lhs, rhs2)
-        copyto!(rhs2, system_solver.prevsol2)
+    if system_solver.use_sparse
+        rhs .= lu(lhs) \ rhs
     else
-        # update lhs matrix
-        copyto!(lhs, system_solver.lhs_copy)
-        lhs[end, end] = mtt
-        for k in eachindex(cones)
-            cone_k = cones[k]
-            idxs = model.cone_idxs[k]
-            rows = (n + p) .+ idxs
-
-
-            # TODO use hess prod instead
-            H = Cones.hess(cone_k)
-            if Cones.use_dual(cone_k)
-                # -G_k*x + mu*H_k*z_k + h_k*tau = zrhs_k + srhs_k
-                lhs[rows, rows] .= mu * H
-            else
-                # -mu*H_k*G_k*x + z_k + mu*H_k*h_k*tau = mu*H_k*zrhs_k + srhs_k
-                lhs[rows, 1:n] .= -mu * H * model.G[idxs, :]
-                lhs[rows, end] .= mu * H * model.h[idxs]
-            end
-        end
-
-        if system_solver.use_sparse
-            rhs .= lu(lhs) \ rhs
-        else
-            ldiv!(lu!(lhs), rhs)
-        end
+        ldiv!(lu!(lhs), rhs)
     end
 
     # lift to get s and kap
@@ -269,14 +171,13 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveElimC
     tau2 = rhs[end, 2]
 
     # s = -G*x + h*tau - zrhs
-    mul!(s1, model.G, x1)
-    @. s1 = -s1 + model.h * tau1 - solver.z_residual
-    mul!(s2, model.G, x2)
-    @. s2 = -s2 + model.h * tau2
+    # TODO remove allocs
+    s1 .= -model.G * x1 + model.h * tau1 - solver.z_residual
+    s2 .= -model.G * x2 + model.h * tau2
 
     # kap = taurhs - mu/(taubar^2)*tau
-    kap1 = tau_rhs1 - mtt * tau1
-    kap2 = tau_rhs2 - mtt * tau2
+    kap1 = tau_rhs[1] - mtt * tau1
+    kap2 = tau_rhs[2] - mtt * tau2
 
     return (x1, x2, y1, y2, z1, z2, s1, s2, tau1, tau2, kap1, kap2)
 end

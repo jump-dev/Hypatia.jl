@@ -503,7 +503,7 @@ end
 
 function hypopersumlog1(T, test_options)
     tol = max(1e-5, sqrt(sqrt(eps(T))))
-    Tlogq = -log(T(0.25))
+    Tlogq = log(T(0.25))
     c = T[-1, 0, 0]
     A = T[0 1 1]
     b = T[1]
@@ -564,7 +564,7 @@ function epiperpower2(T, test_options)
     h = zeros(T, 3)
     cone_idxs = [1:3]
 
-    for is_dual in (true, false), alpha in [1.5, 2.0]
+    for is_dual in (true, false), alpha in [1.5, 2.5]
         cones = CO.Cone{T}[CO.EpiPerPower{T}(alpha, is_dual)]
 
         r = build_solve_check(c, A, b, G, h, cones, cone_idxs; test_options...)
