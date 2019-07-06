@@ -10,13 +10,13 @@ A'*y + G'*z + c*tau = xrhs
 (du bar) -G_k*x + mu*H_k*z_k + h_k*tau = zrhs_k + srhs_k
 -c'x - b'y - h'z + mu/(taubar^2)*tau = taurhs + kaprhs
 
-eliminate tau via a procedure similar to that described by S7.4 of
-http://www.seas.ucla.edu/~vandenbe/publications/coneprog.pdf
-and symmetrize the LHS matrix by multiplying some equations by -1
-
 optionally avoid use of inverse Hessians, by replacing the (pr bar) constraints with
 (pr bar) -mu*H_k*G_k*x + z_k + mu*H_k*h_k*tau = mu*H_k*zrhs_k + srhs_k
 i.e. premultiplying by mu*H_k
+
+eliminate tau via a procedure similar to that described by S7.4 of
+http://www.seas.ucla.edu/~vandenbe/publications/coneprog.pdf
+and symmetrize the LHS matrix by multiplying some equations by -1
 
 TODO reduce allocations
 =#
@@ -48,7 +48,7 @@ mutable struct SymIndefCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSyste
     s2_k
     s3_k
 
-    function SymIndefCombinedHSDSystemSolver{T}(model::Models.LinearModel{T}; use_sparse::Bool = false, use_hess_inv::Bool = true) where {T <: HypReal}
+    function SymIndefCombinedHSDSystemSolver{T}(model::Models.LinearModel{T}; use_sparse::Bool = false, use_hess_inv::Bool = false) where {T <: HypReal}
         (n, p, q) = (model.n, model.p, model.q)
         npq = n + p + q
         system_solver = new{T}()
@@ -144,23 +144,30 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::SymIndefCo
         idxs = model.cone_idxs[k]
         rows = (n + p) .+ idxs
         duals_k = solver.point.dual_views[k]
-        H = Cones.hess(cone_k)
         g = Cones.grad(cone_k)
         if Cones.use_dual(cone_k)
             # G_k*x - mu*H_k*z_k = zrhs_k + srhs_k
+            H = Cones.hess(cone_k)
             lhs[rows, rows] .= -mu * H
             @. z2_k[k] += duals_k
             @. z3_k[k] = duals_k + mu * g
         else
-            # mu*H_k*G_k*x - z_k = mu*H_k*zrhs_k + srhs_k
-            lhs[rows, 1:n] .= mu * H * model.G[idxs, :]
-            z1_k[k] .= mu * H * z1_k[k]
-            z2_k[k] .= mu * H * z2_k[k]
-            @. z2_k[k] += duals_k
-            @. z3_k[k] = duals_k + mu * g
-
-            # symmetrize: z_k is premultiplied by (mu * H_k)^-1
-            lhs[rows, rows] .= -mu * H
+            if use_hess_inv
+                # G_k*x - (mu*H_k)^-1*z_k = zrhs_k + (mu*H_k)^-1*srhs_k
+                muHinv = Cones.inv_hess(cone_k) / mu
+                lhs[rows, rows] .= -muHinv
+                z2_k[k] .+= muHinv * duals_k
+                z3_k[k] .= muHinv * (duals_k + mu * g)
+            else
+                # mu*H_k*G_k*x - z_k = mu*H_k*zrhs_k + srhs_k
+                H = Cones.hess(cone_k)
+                lhs[rows, 1:n] .= mu * H * model.G[idxs, :]
+                lhs[rows, rows] .= -mu * H
+                z1_k[k] .= mu * H * z1_k[k]
+                z2_k[k] .= mu * H * z2_k[k]
+                @. z2_k[k] += duals_k
+                @. z3_k[k] = duals_k + mu * g
+            end
         end
     end
 
@@ -194,6 +201,7 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::SymIndefCo
     end
 
     # lift to HSDE space
+    # if not using inverse hessians, use modified h
     tau_denom = mu / tau / tau - dot(model.c, x1) - dot(model.b, y1) - dot(model.h, z1)
 
     function lift!(x, y, z, s, tau_rhs, kap_rhs)
