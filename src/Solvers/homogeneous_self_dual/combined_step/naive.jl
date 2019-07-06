@@ -1,3 +1,18 @@
+#=
+Copyright 2018, Chris Coey and contributors
+
+naive linear system solver
+
+A'*y + G'*z + c*tau = xrhs
+-A*x + b*tau = yrhs
+-G*x - s + h*tau = zrhs
+-c'*x - b'*y - h'*z - kap = kaprhs
+(pr bar) z_k + mu*H_k*s_k = srhs_k
+(du bar) mu*H_k*z_k + s_k = srhs_k
+kap + mu/(taubar^2)*tau = taurhs
+
+TODO reduce allocations
+=#
 
 mutable struct NaiveCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSolver{T}
     use_iterative::Bool
