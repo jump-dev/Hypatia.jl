@@ -11,9 +11,16 @@ barrier from "Barrier Functions in Interior Point Methods" by Osman Guler
 mutable struct EpiNormInf{T <: HypReal} <: Cone{T}
     use_dual::Bool
     dim::Int
-
     point::AbstractVector{T}
-    g::Vector{T}
+
+    is_feas::Bool
+    grad_updated::Bool
+    hess_updated::Bool
+    inv_hess_updated::Bool
+    grad::Vector{T}
+    hess::Symmetric{T, Matrix{T}}
+    inv_hess::Symmetric{T, Matrix{T}}
+
     diag11::T
     diag2n::Vector{T}
     edge2n::Vector{T}
@@ -30,9 +37,12 @@ end
 
 EpiNormInf{T}(dim::Int) where {T <: HypReal} = EpiNormInf{T}(dim, false)
 
+# TODO maybe only allocate the fields we use
 function setup_data(cone::EpiNormInf{T}) where {T <: HypReal}
     dim = cone.dim
-    cone.g = zeros(T, dim)
+    cone.grad = zeros(T, dim)
+    cone.hess = Symmetric(zeros(T, dim, dim), :U)
+    cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.diag2n = zeros(T, dim - 1)
     cone.edge2n = zeros(T, dim - 1)
     cone.div2n = zeros(T, dim - 1)
@@ -41,74 +51,99 @@ end
 
 get_nu(cone::EpiNormInf) = cone.dim
 
-set_initial_point(arr::AbstractVector{T}, cone::EpiNormInf{T}) where {T <: HypReal} = (@. arr = zero(T); arr[1] = one(T); arr)
+function set_initial_point(arr::AbstractVector, cone::EpiNormInf)
+    arr .= 0
+    arr[1] = 1
+    return arr
+end
 
-function check_in_cone(cone::EpiNormInf{T}) where {T <: HypReal}
+reset_data(cone::EpiNormInf) = (cone.is_feas = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
+
+function check_feas(cone::EpiNormInf)
+    @assert !cone.is_feas
+    if cone.point[1] > 0
+        cone.is_feas = (cone.point[1] > maximum(abs, view(cone.point, 2:cone.dim)))
+    end
+    return cone.is_feas
+end
+
+function grad(cone::EpiNormInf)
+    @assert cone.is_feas
     u = cone.point[1]
     w = view(cone.point, 2:cone.dim)
-    if u <= maximum(abs, w)
-        return false
-    end
-
-    g = cone.g
     usqr = abs2(u)
-    g1 = zero(T)
-    h1 = zero(T)
-    for j in eachindex(w)
-        iuwj = T(2) / (usqr - abs2(w[j]))
-        g1 += iuwj
-        wiuwj = w[j] * iuwj
-        h1 += abs2(iuwj)
-        g[j + 1] = wiuwj
-
-        cone.diag2n[j] = iuwj + abs2(wiuwj) # diagonal
-        cone.edge2n[j] = -iuwj * wiuwj * u  # edge
-        cone.div2n[j] = -cone.edge2n[j] / cone.diag2n[j] # -edge / diag
+    g1 = zero(u)
+    for (j, wj) in enumerate(w)
+        g1 += 2 / (u - abs2(wj) / u)
+        cone.grad[j + 1] = 2 / (usqr / wj - wj)
     end
-    t1 = T(cone.dim - 2) / u
-    g[1] = t1 - u * g1
-
-    cone.diag11 = -t1 / u + usqr * h1 - g1
-    cone.schur = cone.diag11 + dot(cone.edge2n, cone.div2n)
-
-    return true
+    cone.grad[1] = (cone.dim - 2) / u - g1
+    cone.grad_updated = true
+    return cone.grad
 end
 
-function hess(cone::EpiNormInf{T}) where {T <: HypReal}
-    H = zeros(T, cone.dim, cone.dim)
-    H[1, 1] = cone.diag11
-    @inbounds for j in 2:cone.dim
-        H[j, j] = cone.diag2n[j - 1]
-        H[1, j] = cone.edge2n[j - 1]
+
+
+# u = cone.point[1]
+# w = view(cone.point, 2:cone.dim)
+#
+# usqr = abs2(u)
+# g1 = zero(T)
+# h1 = zero(T)
+# for j in eachindex(w)
+#     iuwj = 2 / (usqr - abs2(w[j]))
+#     g1 += iuwj
+#     wiuwj = w[j] * iuwj
+#     h1 += abs2(iuwj)
+#     cone.grad[j + 1] = wiuwj
+#
+#     cone.diag2n[j] = iuwj + abs2(wiuwj) # diagonal
+#     cone.edge2n[j] = -iuwj * wiuwj * u # edge
+#     cone.div2n[j] = -cone.edge2n[j] / cone.diag2n[j] # -edge / diag
+# end
+# t1 = (cone.dim - 2) / u
+# cone.grad[1] = t1 - u * g1
+#
+# cone.diag11 = -t1 / u + usqr * h1 - g1
+# cone.schur = cone.diag11 + dot(cone.edge2n, cone.div2n)
+
+
+
+# symmetric arrow matrix
+function setup_hess(cone::EpiNormInf)
+    cone.hess[1, 1] = cone.diag11
+    for j in 2:cone.dim
+        cone.hess[j, j] = cone.diag2n[j - 1]
+        cone.hess[1, j] = cone.edge2n[j - 1]
     end
-    return Symmetric(H, :U)
+    return cone.hess
 end
 
-function inv_hess(cone::EpiNormInf{T}) where {T <: HypReal}
-    # Hessian inverse is Diag(0, inv(diag)) + xx'/schur where x = (-1, edge ./ diag)
+# Diag(0, inv(diag)) + xx' / schur, where x = (-1, edge ./ diag)
+function setup_inv_hess(cone::EpiNormInf)
     Hi = zeros(T, cone.dim, cone.dim)
     Hi[1, 1] = 1
     @. Hi[1, 2:end] = cone.div2n
-    @inbounds for j in 2:cone.dim, i in 2:j
+    for j in 2:cone.dim, i in 2:j
         Hi[i, j] = Hi[1, j] * Hi[1, i]
     end
     Hi ./= cone.schur
-    @inbounds for j in 2:cone.dim
+    for j in 2:cone.dim
         Hi[j, j] += inv(cone.diag2n[j - 1])
     end
     return Symmetric(Hi, :U)
 end
 
-function hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiNormInf{T}) where {T <: HypReal}
-    @inbounds for j in 1:size(prod, 2)
+function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
+    for j in 1:size(prod, 2)
         @views prod[1, j] = cone.diag11 * arr[1, j] + dot(cone.edge2n, arr[2:end, j])
         @views @. prod[2:end, j] = cone.edge2n * arr[1, j] + cone.diag2n * arr[2:end, j]
     end
     return prod
 end
 
-function inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiNormInf{T}) where {T <: HypReal}
-    @inbounds for j in 1:size(prod, 2)
+function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
+    for j in 1:size(prod, 2)
         @views prod[1, j] = arr[1, j] + dot(cone.div2n, arr[2:end, j])
         @views @. prod[2:end, j] = cone.div2n * prod[1, j]
     end
