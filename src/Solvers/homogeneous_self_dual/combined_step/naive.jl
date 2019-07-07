@@ -195,8 +195,8 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveCombi
         # error()
         # xe = lhs \ rhs[:, 1]
         # (system_solver.prevsol1, stats) = Krylov.dqgmres(lhs, rhs1)
-        # (_, log) = IterativeSolvers.gmres!(system_solver.prevsol1, lhs, rhs1, restart = size(lhs, 2), log = true)
-        (_, log) = IterativeSolvers.bicgstabl!(system_solver.prevsol1, lhs, rhs1, log = true)
+        (_, log) = IterativeSolvers.gmres!(system_solver.prevsol1, lhs, rhs1, restart = size(lhs, 2), log = true)
+        # (_, log) = IterativeSolvers.bicgstabl!(system_solver.prevsol1, lhs, rhs1, log = true)
         copyto!(rhs1, system_solver.prevsol1)
         # if norm(system_solver.prevsol1 - xe) > 50
         #     CSV.write("lhs.csv",  DataFrames.DataFrame(lhs), writeheader=false)

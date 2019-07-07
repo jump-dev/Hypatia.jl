@@ -182,16 +182,23 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::SymIndefCo
             prevsol = view(system_solver.prevsol, :, i)
             # # dqgmres
             (x, stats) = Krylov.minres(Symmetric(lhs, :L), rhs2)
+            @show stats
             # if norm(rhs2 - Symmetric(lhs, :L) * x) > 0.01
             #     CSV.write("lhs.csv",  DataFrames.DataFrame(lhs), writeheader=false)
             #     CSV.write("rhs.csv",  DataFrames.DataFrame(rhs), writeheader=false)
             #     error()
             # end
-            # rhs2 .= x
-            (x, log) = IterativeSolvers.minres!(prevsol, Symmetric(lhs, :L), rhs2, log = true, maxiter = 1 * size(lhs, 2), tol = 1e-12)
-            # CSV.write("lhs.csv",  DataFrames.DataFrame(lhs), writeheader=false)
-            # CSV.write("rhs.csv",  DataFrames.DataFrame(rhs), writeheader=false)
-            rhs2 .= prevsol
+            rhs2 .= x
+
+            # (x, log) = IterativeSolvers.gmres!(prevsol, Symmetric(lhs, :L), rhs2, log = true, maxiter = 1 * size(lhs, 2), tol = 1e-12, restart = size(lhs, 2))
+            # if !(log.isconverged)
+            #     @show size(solver.model.A)
+            #     @show size(solver.model.G)
+            #     CSV.write("lhs.csv",  DataFrames.DataFrame(lhs), writeheader=false)
+            #     CSV.write("rhs.csv",  DataFrames.DataFrame(rhs), writeheader=false)
+            #     error()
+            # end
+            # rhs2 .= prevsol
             # @show stats
         end
         # rhs .= Symmetric(lhs, :L) \ rhs

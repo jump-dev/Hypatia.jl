@@ -283,3 +283,21 @@ function test_polymin(instance::Function; T::Type{<:HypReal} = Float64, test_opt
     end
     return
 end
+
+# const MO = HYP.Models
+# const SO = HYP.Solvers
+# for fun in [
+#     polyminreal2,
+#     polyminreal3,
+#     polyminreal12,
+#     ]
+#     test_expdesign(fun, T = Float64, test_options = (
+#         linear_model = MO.RawLinearModel,
+#         system_solver = SO.SymIndefCombinedHSDSystemSolver,
+#         linear_model_options = (use_iterative = false,),
+#         system_solver_options = (use_iterative = false, use_hess_inv = true),
+#         solver_options = (verbose = true, tol_abs_opt = 1e-5, tol_rel_opt = 1e-5, tol_feas = 1e-5),
+#         test = false,
+#         )
+#         )
+# end

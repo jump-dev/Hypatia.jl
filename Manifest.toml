@@ -219,12 +219,10 @@ uuid = "c8e1da08-722c-5040-9ed9-7db0dc04731e"
 version = "1.2.0"
 
 [[IterativeSolvers]]
-deps = ["LinearAlgebra", "Printf", "Random", "RecipesBase", "SparseArrays"]
-git-tree-sha1 = "b17ce238c4b445f9e758438f37058deca94c502a"
-repo-rev = "master"
-repo-url = "https://github.com/JuliaMath/IterativeSolvers.jl.git"
+deps = ["LinearAlgebra", "Printf", "Random", "RecipesBase", "SparseArrays", "Test"]
+git-tree-sha1 = "5687f68018b4f14c0da54d402bb23eecaec17f37"
 uuid = "42fd0dbc-a981-5370-80f2-aaf504508153"
-version = "0.8.0"
+version = "0.8.1"
 
 [[IteratorInterfaceExtensions]]
 git-tree-sha1 = "a3f24677c21f5bbe9d2a714f95dcd58337fb2856"

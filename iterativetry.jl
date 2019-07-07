@@ -1,41 +1,61 @@
 using IterativeSolvers, CSV, Preconditioners, SparseArrays
 using AlgebraicMultigrid
 using Krylov
+using LinearOperators
 
-A = CSV.read("lhs.csv", header = false)
-A = convert(Matrix, A)
+LHS = CSV.read("lhs.csv", header = false)
+LHS = convert(Matrix, LHS)
 b = CSV.read("rhs.csv", header = false)
 b = convert(Matrix, b)
 b = b[:, 1]
+x = zeros(size(b))
+@show cond(Symmetric(LHS, :L))
 
-A = sparse(A)
-ml = ruge_stuben(Symmetric(A, :L))
-p = aspreconditioner(ml)
-# (xi, log) = minres!(b, Symmetric(A, :L), b, log = true, verbose = true, Pl = p)
-(xi, stats) = Krylov.minres(Symmetric(A, :L), b)
+# size(solver.model.A) = (1, 9)
+# size(solver.model.G) = (28, 9)
+n = 9; p = 1; q = 28
+ill_cond_block = LHS[(n + 1):end, (n + 1):end]
+AG = LHS[(n + 1):end, 1:n]
+W = I * 10
+preconditioner = [
+    W   zeros(n, p + q);
+    zeros(p + q, n)   ill_cond_block + AG * (W \ AG');
+    ]
+@show cond(preconditioner \ Symmetric(LHS, :L))
 
-A = sparse(A)
-ml = ruge_stuben(A)
+LHS = sparse(LHS)
+ml = ruge_stuben(Symmetric(LHS, :L))
 p = aspreconditioner(ml)
-(xi, log) = gmres(A, b, log = true, restart = size(A, 2), verbose = true, Pl = p)
-xe = A \ b
+(xi, log) = minres!(x, Symmetric(LHS, :L), b, log = true, verbose = true)
+# (xi, stats) = Krylov.minres(Symmetric(LHS, :L), b, M = LinearOperator(preconditioner))
+
+precLHS = sparse(preconditioner \ Symmetric(LHS, :L))
+pecb = preconditioner \ b
+x = zeros(size(b))
+minres!(x, precLHS, pecb, log = true, verbose = true)
+
+LHS = sparse(LHS)
+ml = ruge_stuben(LHS)
+p = aspreconditioner(ml)
+(xi, log) = gmres(LHS, b, log = true, restart = size(LHS, 2), verbose = true, Pl = p)
+xe = LHS \ b
 xi ./ xe
-# (xi, log) = gmres!(xe, A, b, log = true)
+# (xi, log) = gmres!(xe, LHS, b, log = true)
 
 
 using IterativeSolvers, AlgebraicMultigrid, Random
 Random.seed!(1)
-A = sprandn(50, 50, 0.1)
+LHS = sprandn(50, 50, 0.1)
 x = randn(50)
-b = A * x
-ml = ruge_stuben(A)
+b = LHS * x
+ml = ruge_stuben(LHS)
 p = aspreconditioner(ml)
-(y, log) = gmres(A, b, log = true, restart = size(A, 2), verbose = true, Pl = p, tol = 1e-9)
+(y, log) = gmres(LHS, b, log = true, restart = size(LHS, 2), verbose = true, Pl = p, tol = 1e-9)
 # julia> log
 # Converged after 13 iterations.
 # julia> log[:resnorm][end]
 # 0.5156281490822161
-(y, log) = gmres(A, b, log = true, restart = size(A, 2), verbose = true, tol = 1e-9)
+(y, log) = gmres(LHS, b, log = true, restart = size(LHS, 2), verbose = true, tol = 1e-9)
 # julia> log
 # Converged after 50 iterations.
 # julia> log[:resnorm][end]
@@ -44,8 +64,8 @@ p = aspreconditioner(ml)
 
 
 
-norm(b - A * y)
+norm(b - LHS * y)
 
 
-xe = A \ b
+xe = LHS \ b
 xi ./ xe

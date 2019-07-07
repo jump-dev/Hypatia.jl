@@ -121,3 +121,19 @@ function test_sparsepca(instance::Function; T::Type{<:HypReal} = Float64, test_o
     end
     return
 end
+
+const MO = HYP.Models
+const SO = HYP.Solvers
+for fun in [
+    sparsepca1,
+    sparsepca2,
+    ]
+    test_expdesign(fun, T = Float64, test_options = (
+        linear_model = MO.RawLinearModel,
+        system_solver = SO.SymIndefCombinedHSDSystemSolver,
+        linear_model_options = (use_iterative = true,),
+        system_solver_options = (use_iterative = true,),
+        solver_options = (verbose = true, tol_abs_opt = 1e-5, tol_rel_opt = 1e-5, tol_feas = 1e-5)
+        )
+        )
+end
