@@ -38,6 +38,42 @@ use_dual(cone::Cone) = cone.use_dual
 load_point(cone::Cone{T}, point::AbstractVector{T}) where {T <: HypReal} = (cone.point = point)
 dimension(cone::Cone) = cone.dim
 
+
+
+mutable struct ProductCone{T <: HypReal} end
+    cones::Vector{Cone{T}}
+    num_cones::Int
+    dim::Int
+    bar_par::T
+
+    feas_list::Vector{Bool}
+    grad_list::Vector{Vector{T}}
+    hess_list::Vector
+    inv_hess_list::Vector
+
+    function ProductCone{T}(cones::Vector{Cone{T}}) where {T <: HypReal}
+        prodcone = new{T}()
+        prodcone.cones = cones
+        prodcone.num_cones = length(cones)
+        prodcone.dim = sum(...)
+        prodcone.bar_par = sum(...)
+        # TODO allocate these extra algorithmic fields only at start of algorithm?
+        prodcone.feas_list = falses(prodcone.num_cones)
+        prodcone.grad_list = Vector{Vector{T}}(undef, prodcone.num_cones)
+        prodcone.hess_list = Vector{Any}(undef, prodcone.num_cones)
+        prodcone.inv_hess_list = Vector{Any}(undef, prodcone.num_cones)
+        return prodcone
+    end
+end
+
+
+# function grad(cone::Cone)
+
+
+
+
+
+
 function factorize_hess(cone::Cone)
     copyto!(cone.H2, cone.H)
     cone.F = hyp_chol!(Symmetric(cone.H2, :U))

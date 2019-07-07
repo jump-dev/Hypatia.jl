@@ -9,17 +9,14 @@ definition and dual barrier from "Sum-of-squares optimization without semidefini
 TODO
 - can perform loop for calculating g and H in parallel
 - scale the interior direction
-- check if gradient and hessian are correct for complex case
 =#
 
 mutable struct WSOSPolyInterp{T <: HypReal, R <: HypRealOrComplex{T}} <: Cone{T}
     use_dual::Bool
     dim::Int
     Ps::Vector{Matrix{R}}
-
     point::AbstractVector{T}
-    g::Vector{T}
-    H::Matrix{T}
+
     H2::Matrix{T}
     Hi::Matrix{T}
     F # TODO prealloc
@@ -28,6 +25,9 @@ mutable struct WSOSPolyInterp{T <: HypReal, R <: HypRealOrComplex{T}} <: Cone{T}
     tmpLU::Vector{Matrix{R}}
     tmpUU::Matrix{R}
     ΛFs::Vector
+
+    grad::Vector{T}
+    hess::Symmetric{T, Matrix{T}}
 
     function WSOSPolyInterp{T, R}(dim::Int, Ps::Vector{Matrix{R}}, is_dual::Bool) where {R <: HypRealOrComplex{T}} where {T <: HypReal}
         for k in eachindex(Ps)
@@ -45,8 +45,10 @@ WSOSPolyInterp{T, R}(dim::Int, Ps::Vector{Matrix{R}}) where {R <: HypRealOrCompl
 
 function setup_data(cone::WSOSPolyInterp{T, R}) where {R <: HypRealOrComplex{T}} where {T <: HypReal}
     dim = cone.dim
-    cone.g = Vector{T}(undef, dim)
-    cone.H = similar(cone.g, dim, dim)
+    cone.grad = zeros(T, dim)
+    cone.hess = Symmetric(zeros(T, dim, dim), :U)
+    cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
+
     cone.H2 = similar(cone.H)
     cone.Hi = similar(cone.H)
     Ps = cone.Ps
@@ -60,9 +62,14 @@ end
 
 get_nu(cone::WSOSPolyInterp) = sum(size(Pk, 2) for Pk in cone.Ps)
 
-set_initial_point(arr::AbstractVector{T}, cone::WSOSPolyInterp{T, R}) where {R <: HypRealOrComplex{T}} where {T <: HypReal} = (@. arr = one(T); arr)
+function set_initial_point(arr::AbstractVector, cone::WSOSPolyInterp)
+    arr = 1
+    return arr
+end
 
-function check_in_cone(cone::WSOSPolyInterp{T, R}) where {R <: HypRealOrComplex{T}} where {T <: HypReal}
+# TODO order the k indices so that fastest and most recently infeasible k are first
+# TODO can be done in parallel
+function check_in_cone(cone::WSOSPolyInterp)
     Ps = cone.Ps
     LLs = cone.tmpLL
     ULs = cone.tmpUL
@@ -71,7 +78,7 @@ function check_in_cone(cone::WSOSPolyInterp{T, R}) where {R <: HypRealOrComplex{
     ΛFs = cone.ΛFs
     D = Diagonal(cone.point)
 
-    for k in eachindex(Ps) # TODO can be done in parallel
+    for k in eachindex(Ps)
         # Λ = Pk' * Diagonal(point) * Pk
         # TODO LDLT calculation could be faster
         # TODO mul!(A, B', Diagonal(x)) calls extremely inefficient method but don't need ULk
@@ -88,24 +95,33 @@ function check_in_cone(cone::WSOSPolyInterp{T, R}) where {R <: HypRealOrComplex{
         end
         ΛFs[k] = ΛFk
     end
+end
 
-    g = cone.g
-    H = cone.H
-    @. g = zero(T)
-    @. H = zero(T)
-
-    for k in eachindex(Ps) # TODO can be done in parallel, but need multiple tmp3s
-        # TODO may be faster (but less numerically stable) with explicit inverse here
+# TODO maybe add kwargs to all these functions - for whether to compute the hyp_AtA in grad or in hess (only diag needed for grad)
+# TODO can be done in parallel
+# TODO may be faster (but less numerically stable) with explicit inverse here
+function grad(cone::WSOSPolyInterp)
+    cone.grad .= 0
+    for k in eachindex(Ps)
         LUk = hyp_ldiv_chol_L!(LUs[k], ΛFs[k], Ps[k]')
         hyp_AtA!(UU, LUk)
-
-        for j in eachindex(g)
-            @inbounds g[j] -= real(UU[j, j])
-            for i in 1:j
-                @inbounds H[i, j] += abs2(UU[i, j])
-            end
+        for j in eachindex(cone.grad)
+            @inbounds cone.grad[j] -= real(UU[j, j])
         end
     end
-
-    return factorize_hess(cone)
+    return cone.grad
 end
+
+function hess(cone::WSOSPolyInterp)
+    for k in eachindex(Ps)
+        UU = Symmetric(cone.tmpUU[k], :U)
+        # TODO compare below options
+        cone.hess += abs2.(UU)
+        # for j in eachindex(g), i in 1:j
+        #     @inbounds cone.hess[i, j] += abs2(UU[i, j])
+        # end
+    end
+    return cone.hess
+end
+
+# TODO? inv_hess and hess_prod! and inv_hess_prod!
