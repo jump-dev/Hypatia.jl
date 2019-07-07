@@ -24,10 +24,12 @@ TODO reduce allocations
 mutable struct SymIndefCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSolver{T}
     use_sparse::Bool
     use_hess_inv::Bool
+    use_iterative::Bool
 
     lhs_copy
     lhs
     rhs::Matrix{T}
+    prevsol::Matrix{T}
 
     x1
     x2
@@ -48,12 +50,13 @@ mutable struct SymIndefCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSyste
     s2_k
     s3_k
 
-    function SymIndefCombinedHSDSystemSolver{T}(model::Models.LinearModel{T}; use_sparse::Bool = false, use_hess_inv::Bool = false) where {T <: HypReal}
+    function SymIndefCombinedHSDSystemSolver{T}(model::Models.LinearModel{T}; use_sparse::Bool = false, use_hess_inv::Bool = false, use_iterative::Bool = false) where {T <: HypReal}
         (n, p, q) = (model.n, model.p, model.q)
         npq = n + p + q
         system_solver = new{T}()
         system_solver.use_sparse = use_sparse
         system_solver.use_hess_inv = use_hess_inv
+        system_solver.use_iterative = use_iterative
 
         # x y z
         # symmetric, lower triangle filled only
@@ -76,6 +79,7 @@ mutable struct SymIndefCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSyste
 
         rhs = Matrix{T}(undef, npq, 3)
         system_solver.rhs = rhs
+        system_solver.prevsol = Matrix{T}(undef, npq, 3)
         rows = 1:n
         system_solver.x1 = view(rhs, rows, 1)
         system_solver.x2 = view(rhs, rows, 2)
@@ -172,18 +176,39 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::SymIndefCo
     end
 
     # solve system
-    if system_solver.use_sparse
-        F = ldlt(Symmetric(lhs, :L), check = false)
-        if !issuccess(F)
-            F = ldlt(Symmetric(lhs, :L), shift = 1e-6, check = true)
+    if system_solver.use_iterative
+        for i in 1:3
+            rhs2 = view(rhs, :, i)
+            prevsol = view(system_solver.prevsol, :, i)
+            # # dqgmres
+            (x, stats) = Krylov.minres(Symmetric(lhs, :L), rhs2)
+            # if norm(rhs2 - Symmetric(lhs, :L) * x) > 0.01
+            #     CSV.write("lhs.csv",  DataFrames.DataFrame(lhs), writeheader=false)
+            #     CSV.write("rhs.csv",  DataFrames.DataFrame(rhs), writeheader=false)
+            #     error()
+            # end
+            # rhs2 .= x
+            (x, log) = IterativeSolvers.minres!(prevsol, Symmetric(lhs, :L), rhs2, log = true, maxiter = 1 * size(lhs, 2), tol = 1e-12)
+            # CSV.write("lhs.csv",  DataFrames.DataFrame(lhs), writeheader=false)
+            # CSV.write("rhs.csv",  DataFrames.DataFrame(rhs), writeheader=false)
+            rhs2 .= prevsol
+            # @show stats
         end
-        rhs .= F \ rhs
+        # rhs .= Symmetric(lhs, :L) \ rhs
     else
-        if T <: BlasReal
-            F = bunchkaufman!(Symmetric(lhs, :L), true, check = true) # TODO doesn't work for generic reals (need LDLT)
-            ldiv!(F, rhs)
+        if system_solver.use_sparse
+            F = ldlt(Symmetric(lhs, :L), check = false)
+            if !issuccess(F)
+                F = ldlt(Symmetric(lhs, :L), shift = 1e-6, check = true)
+            end
+            rhs .= F \ rhs
         else
-            rhs .= Symmetric(lhs, :L) \ rhs # TODO replace with a generic julia symmetric indefinite decomposition if available, see https://github.com/JuliaLang/julia/issues/10953
+            if T <: BlasReal
+                F = bunchkaufman!(Symmetric(lhs, :L), true, check = true) # TODO doesn't work for generic reals (need LDLT)
+                ldiv!(F, rhs)
+            else
+                rhs .= Symmetric(lhs, :L) \ rhs # TODO replace with a generic julia symmetric indefinite decomposition if available, see https://github.com/JuliaLang/julia/issues/10953
+            end
         end
     end
 

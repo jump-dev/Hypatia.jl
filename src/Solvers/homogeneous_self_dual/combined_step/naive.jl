@@ -17,6 +17,7 @@ TODO reduce allocations
 mutable struct NaiveCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSolver{T}
     use_iterative::Bool
     use_sparse::Bool
+    use_linops::Bool
 
     lhs_copy
     lhs
@@ -41,12 +42,14 @@ mutable struct NaiveCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSo
         model::Models.LinearModel{T};
         use_iterative::Bool = false,
         use_sparse::Bool = false,
+        use_linops::Bool = false,
         ) where {T <: HypReal}
         (n, p, q) = (model.n, model.p, model.q)
         dim = n + p + 2q + 2
         system_solver = new{T}()
         system_solver.use_iterative = use_iterative
         system_solver.use_sparse = use_sparse
+        system_solver.use_linops = use_linops
 
         system_solver.rhs = zeros(T, dim, 2)
         rows = 1:n
@@ -66,10 +69,12 @@ mutable struct NaiveCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSo
         system_solver.s2 = view(system_solver.rhs, rows, 2)
         system_solver.kap_row = n + p + q + 1
 
-        # x y z kap s tau
         if use_iterative
             system_solver.prevsol1 = zeros(T, dim)
             system_solver.prevsol2 = zeros(T, dim)
+        end
+        # x y z kap s tau
+        if use_linops
 
             # block matrix for efficient multiplication
             rc1 = 1:n
@@ -160,28 +165,48 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveCombi
 
     # solve system
     if system_solver.use_iterative
-        lhs.blocks[end][1] = mu / tau / tau
-        b_idx = 1
-        for k in eachindex(cones)
-            cone_k = cones[k]
-            # TODO use hess prod instead
+        if system_solver.use_linops
+            lhs.blocks[end][1] = mu / tau / tau
+            b_idx = 1
+            for k in eachindex(cones)
+                cone_k = cones[k]
+                # TODO use hess prod instead
 
-            lhs.blocks[b_idx + (Cones.use_dual(cone_k) ? 0 : 1)] = mu * Cones.hess(cone_k)
-            b_idx += 2
+                lhs.blocks[b_idx + (Cones.use_dual(cone_k) ? 0 : 1)] = mu * Cones.hess(cone_k)
+                b_idx += 2
+            end
+            # TODO need preconditioner
+            # TODO optimize for this case, including applying the blocks of the LHS
+            # TODO pick which square non-symm method to use
+            # TODO prealloc whatever is needed inside the solver
+            # TODO possibly fix IterativeSolvers so that methods can take matrix RHS, however the two columns may take different number of iters needed to converge
+        else
+            copyto!(lhs, system_solver.lhs_copy)
+            lhs[kap_row, end] = mu / tau / tau
+            for k in eachindex(cones)
+                H = Cones.hess(cones[k])
+                @. system_solver.lhs_H_k[k] = mu * H
+            end
         end
 
-        # TODO need preconditioner
-        # TODO optimize for this case, including applying the blocks of the LHS
-        # TODO pick which square non-symm method to use
-        # TODO prealloc whatever is needed inside the solver
-        # TODO possibly fix IterativeSolvers so that methods can take matrix RHS, however the two columns may take different number of iters needed to converge
-
         rhs1 = view(rhs, :, 1)
-        IterativeSolvers.gmres!(system_solver.prevsol1, lhs, rhs1)
+        # CSV.write("lhs.csv",  DataFrames.DataFrame(lhs), writeheader=false)
+        # CSV.write("rhs.csv",  DataFrames.DataFrame(rhs), writeheader=false)
+        # error()
+        # xe = lhs \ rhs[:, 1]
+        # (system_solver.prevsol1, stats) = Krylov.dqgmres(lhs, rhs1)
+        # (_, log) = IterativeSolvers.gmres!(system_solver.prevsol1, lhs, rhs1, restart = size(lhs, 2), log = true)
+        (_, log) = IterativeSolvers.bicgstabl!(system_solver.prevsol1, lhs, rhs1, log = true)
         copyto!(rhs1, system_solver.prevsol1)
+        # if norm(system_solver.prevsol1 - xe) > 50
+        #     CSV.write("lhs.csv",  DataFrames.DataFrame(lhs), writeheader=false)
+        #     CSV.write("rhs.csv",  DataFrames.DataFrame(rhs), writeheader=false)
+        #     error()
+        # end
+        # @show system_solver.prevsol1 ./ xe
 
         rhs2 = view(rhs, :, 2)
-        IterativeSolvers.gmres!(system_solver.prevsol2, lhs, rhs2)
+        IterativeSolvers.gmres!(system_solver.prevsol2, lhs, rhs2, restart = size(lhs, 2))
         copyto!(rhs2, system_solver.prevsol2)
     else
         # update lhs matrix

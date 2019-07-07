@@ -161,3 +161,12 @@ function test_portfolio(instance::Function; T::Type{<:HypReal} = Float64, test_o
     @test r.status == :Optimal
     return
 end
+
+test_expdesign(portfolio6, T = Float64, test_options = (
+    linear_model = MO.RawLinearModel,
+    system_solver = SO.NaiveCombinedHSDSystemSolver,
+    linear_model_options = (use_iterative = false,),
+    system_solver_options = (use_iterative = false,),
+    solver_options = (verbose = true, tol_abs_opt = 1e-5, tol_rel_opt = 1e-5, tol_feas = 1e-5)
+    )
+    )
