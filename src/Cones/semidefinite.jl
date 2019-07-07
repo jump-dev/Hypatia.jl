@@ -72,25 +72,26 @@ function set_initial_point(arr::AbstractVector{T}, cone::PosSemidef{T, R}) where
 end
 
 function check_in_cone(cone::PosSemidef{T, R}) where {R <: HypRealOrComplex{T}} where {T <: HypReal}
+    Hypatia.TimerOutputs.@timeit Hypatia.to "all" begin
     mat = cone.mat
-    svec_to_smat!(mat, cone.point)
-    F = hyp_chol!(Hermitian(mat))
+    Hypatia.TimerOutputs.@timeit Hypatia.to "smat_pt" svec_to_smat!(mat, cone.point)
+    Hypatia.TimerOutputs.@timeit Hypatia.to "chol" F = hyp_chol!(Hermitian(mat))
     if !isposdef(F)
         return false
     end
 
-    inv_mat = Hermitian(inv(F)) # TODO eliminate allocs
-    smat_to_svec!(cone.g, transpose(inv_mat)) # TODO avoid doing this twice
+    Hypatia.TimerOutputs.@timeit Hypatia.to "inversion" inv_mat = Hermitian(inv(F)) # TODO eliminate allocs
+    Hypatia.TimerOutputs.@timeit Hypatia.to "smat_to_svec" smat_to_svec!(cone.g, transpose(inv_mat)) # TODO avoid doing this twice
     cone.g .*= -1
 
     # set upper triangles of hessian and inverse hessian
-    svec_to_smat!(mat, cone.point)
+    Hypatia.TimerOutputs.@timeit Hypatia.to "svec_to_smat" svec_to_smat!(mat, cone.point)
     H = cone.H
     Hi = cone.Hi
     rt2 = sqrt(T(2))
 
     # TODO refactor
-    if R <: Complex
+    Hypatia.TimerOutputs.@timeit Hypatia.to "if" if R <: Complex
         k = 1
         for i in 1:cone.side, j in 1:i
             k2 = 1
@@ -149,30 +150,33 @@ function check_in_cone(cone::PosSemidef{T, R}) where {R <: HypRealOrComplex{T}} 
             end
         end
     else
+        Hypatia.TimerOutputs.@timeit Hypatia.to "semidefbar" begin
         k = 1
-        for i in 1:cone.side, j in 1:i
+        Hypatia.TimerOutputs.@timeit Hypatia.to "for1" for i in 1:cone.side, j in 1:i
             k2 = 1
-            for i2 in 1:cone.side, j2 in 1:i2
-                if (i == j) && (i2 == j2)
-                    H[k2, k] = abs2(inv_mat[i2, i])
-                    Hi[k2, k] = abs2(mat[i2, i])
+            Hypatia.TimerOutputs.@timeit Hypatia.to "for2" for i2 in 1:cone.side, j2 in 1:i2
+                Hypatia.TimerOutputs.@timeit Hypatia.to "ifa" if (i == j) && (i2 == j2)
+                    Hypatia.TimerOutputs.@timeit Hypatia.to "abs21" H[k2, k] = abs2(inv_mat[i2, i])
+                    Hypatia.TimerOutputs.@timeit Hypatia.to "abs22" Hi[k2, k] = abs2(mat[i2, i])
                 elseif (i != j) && (i2 != j2)
-                    H[k2, k] = inv_mat[i2, i] * inv_mat[j, j2] + inv_mat[j2, i] * inv_mat[j, i2]
-                    Hi[k2, k] = mat[i2, i] * mat[j, j2] + mat[j2, i] * mat[j, i2]
+                    Hypatia.TimerOutputs.@timeit Hypatia.to "1" H[k2, k] = inv_mat[i2, i] * inv_mat[j, j2] + inv_mat[j2, i] * inv_mat[j, i2]
+                    Hypatia.TimerOutputs.@timeit Hypatia.to "2" Hi[k2, k] = mat[i2, i] * mat[j, j2] + mat[j2, i] * mat[j, i2]
                 else
-                    H[k2, k] = rt2 * inv_mat[i2, i] * inv_mat[j, j2]
-                    Hi[k2, k] = rt2 * mat[i2, i] * mat[j, j2]
+                    Hypatia.TimerOutputs.@timeit Hypatia.to "3" H[k2, k] = rt2 * inv_mat[i2, i] * inv_mat[j, j2]
+                    Hypatia.TimerOutputs.@timeit Hypatia.to "4" Hi[k2, k] = rt2 * mat[i2, i] * mat[j, j2]
                 end
-                if k2 == k
+                Hypatia.TimerOutputs.@timeit Hypatia.to "if2" if k2 == k
                     break
                 end
                 k2 += 1
             end
             k += 1
         end
+        end # time
     end
 
     return true
+    end # time
 end
 
 inv_hess(cone::PosSemidef) = Symmetric(cone.Hi, :U)

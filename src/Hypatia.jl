@@ -5,6 +5,8 @@ Copyright 2018, Chris Coey and contributors
 module Hypatia
 
 using LinearAlgebra
+using TimerOutputs
+const to = TimerOutput()
 
 const HypReal = Union{AbstractFloat, Rational}
 const HypRealOrComplex{T <: HypReal} = Union{T, Complex{T}}

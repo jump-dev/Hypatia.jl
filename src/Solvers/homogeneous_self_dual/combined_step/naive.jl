@@ -35,7 +35,7 @@ mutable struct NaiveCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSo
 
         system_solver.rhs = zeros(T, dim, 2)
         rows = 1:n
-        system_solver.x1 = view(system_solver.rhs, rows, 1)
+        system_solver.x1 = view(system_solver.rhs, rows, 1)mu * Cones.hess(cone_k)
         system_solver.x2 = view(system_solver.rhs, rows, 2)
         rows = (n + 1):(n + p)
         system_solver.y1 = view(system_solver.rhs, rows, 1)
@@ -49,7 +49,7 @@ mutable struct NaiveCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSo
         rows = (n + p + q + 2):(n + p + 2q + 1)
         system_solver.s1 = view(system_solver.rhs, rows, 1)
         system_solver.s2 = view(system_solver.rhs, rows, 2)
-        system_solver.kap_row = n + p + q + 1
+        system_solver.kap_row = n + p + q + 1mu * Cones.hess(cone_k)
 
         # x y z kap s tau
         if use_iterative

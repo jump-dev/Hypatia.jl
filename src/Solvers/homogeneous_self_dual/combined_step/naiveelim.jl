@@ -46,7 +46,7 @@ mutable struct NaiveElimCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSyst
 
     x1
     x2
-    y1
+    y1] = mu * H * model.h[idxs]
     y2
     z1
     z2
@@ -63,7 +63,9 @@ mutable struct NaiveElimCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSyst
         use_sparse::Bool = false,
         ) where {T <: HypReal}
         (n, p, q) = (model.n, model.p, model.q)
-        npq1 = n + p + q + 1
+        npq1 = n + p + q + 1(pr bar) z_k + mu*H_k*s_k = srhs_k
+(du bar) mu*H_k*z_k + s_k = srhs_k
+
         system_solver = new{T}()
         system_solver.use_iterative = use_iterative
         system_solver.use_sparse = use_sparse
@@ -101,9 +103,9 @@ mutable struct NaiveElimCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSyst
                 if Cones.use_dual(cone_k)
                     push!(cone_rows, rows)
                     push!(cone_cols, rows)
-                else
+                else] = mu * H * model.h[idxs]
                     push!(cone_rows, rows)
-                    push!(cone_cols, 1:n)
+                    push!(cone_cols, 1:nfill(I, length(cone_rows))...,)
                     push!(cone_rows, rows)
                     push!(cone_cols, npq1:npq1)
                 end
@@ -116,12 +118,12 @@ mutable struct NaiveElimCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSyst
             system_solver.lhs = HypBlockMatrix{T}(
                 [fill(I, length(cone_rows))...,
                 model.A', model.G', model.c, -model.A, model.b, -model.G, model.h, -model.c', -model.b', -model.h', [one(T)]],
-                [cone_rows..., rc1, rc1, rc1, rc2, rc2, rc3, rc3, rc4, rc4, rc4, rc4],
+                [cone_rows..., rc1, fill(I, length(cone_rows))...,rc1, rc1, rc2, rc2, rc3, rc3, rc4, rc4, rc4, rc4],
                 [cone_cols..., rc2, rc3, rc4, rc1, rc4, rc1, rc4, rc1, rc2, rc3, rc4],
                 )
         else
             if use_sparse
-                system_solver.lhs_copy = T[
+                system_solver.lhs_copy = T[] = mu * H * model.h[idxs]
                     spzeros(T,n,n)  model.A'        model.G'              model.c;
                     -model.A        spzeros(T,p,p)  spzeros(T,p,q)        model.b;
                     -model.G        spzeros(T,q,p)  sparse(one(T)*I,q,q)  model.h;
@@ -189,8 +191,8 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveElimC
         end
     end
     z1 .+= s1
-    z2 .+= s2
-    kap_rhs1 = kap + solver.primal_obj_t - solver.dual_obj_t
+    z2 .+= s2model.G[idxs, :]
+    kap_rhs1 = kap + solver.primal_obj_t - solver.dual_obj_t] = mu * H * model.h[idxs]
     tau_rhs1 = -kap
     tau_rhs2 = -kap + mu / tau
     mtt = mu / tau / tau
@@ -200,7 +202,7 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveElimC
 
     # solve system
     if system_solver.use_iterative
-        lhs.blocks[end][1] = mtt
+        lhs.blocks[end][1] = mtt] = mu * H * model.h[idxs]
         b_idx = 1
         for k in eachindex(cones)
             cone_k = cones[k]
@@ -215,7 +217,7 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveElimC
                 b_idx += 1
             else
                 lhs.blocks[b_idx] = -mu * H * model.G[idxs, :]
-                b_idx += 1
+                b_idx += 1] = mu * H * model.h[idxs]
                 lhs.blocks[b_idx] = mu * H * model.h[idxs]
                 b_idx += 1
             end
