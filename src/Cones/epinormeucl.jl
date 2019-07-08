@@ -54,8 +54,10 @@ reset_data(cone::EpiNormEucl) = (cone.is_feas = cone.grad_updated = cone.hess_up
 
 function update_feas(cone::EpiNormEucl)
     @assert !cone.is_feas
-    if cone.point[1] > 0
-        cone.dist = abs2(cone.point[1]) - sum(abs2, view(cone.point, 2:cone.dim))
+    u = cone.point[1]
+    if u > 0
+        w = view(cone.point, 3:cone.dim)
+        cone.dist = abs2(u) - sum(abs2, w)
         cone.is_feas = (cone.dist > 0)
     end
     return cone.is_feas
@@ -73,7 +75,7 @@ end
 function update_hess(cone::EpiNormEucl)
     @assert cone.grad_updated
     mul!(cone.hess, cone.grad, cone.grad')
-    cone.hess += (2 * inv(cone.dist)) * I
+    cone.hess += (2 / cone.dist) * I
     cone.hess[1, 1] -= inv(cone.dist)
     cone.hess_updated = true
     return cone.hess
@@ -89,4 +91,26 @@ function update_inv_hess(cone::EpiNormEucl)
     return cone.inv_hess
 end
 
-# TODO? hess_prod! and inv_hess_prod!
+function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormEucl)
+    @assert cone.grad_updated
+    idist = 2 / cone.dist
+    for j in 1:size(prod, 2)
+        aj = view(arr, :, j)
+        ga = dot(cone.grad, aj)
+        @views @. prod[:, j] = ga * cone.grad + idist * aj
+        prod[1, j] -= arr[1, j] / cone.dist
+    end
+    return prod
+end
+
+function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormEucl)
+    @assert cone.is_feas
+    hdist = cone.dist / 2
+    for j in 1:size(prod, 2)
+        aj = view(arr, :, j)
+        pa = dot(cone.point, aj)
+        @views @. prod[:, j] = pa * cone.point + hdist * aj
+        prod[1, j] -= arr[1, j] * cone.dist
+    end
+    return prod
+end
