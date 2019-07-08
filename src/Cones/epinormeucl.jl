@@ -54,8 +54,10 @@ reset_data(cone::EpiNormEucl) = (cone.is_feas = cone.grad_updated = cone.hess_up
 
 function check_feas(cone::EpiNormEucl)
     @assert !cone.is_feas
-    if cone.point[1] > 0
-        cone.dist = abs2(cone.point[1]) - sum(abs2, view(cone.point, 2:cone.dim))
+    u = cone.point[1]
+    if u > 0
+        w = view(cone.point, 3:cone.dim)
+        cone.dist = abs2(u) - sum(abs2, w)
         cone.is_feas = (cone.dist > 0)
     end
     return cone.is_feas
