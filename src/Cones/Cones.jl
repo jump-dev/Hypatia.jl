@@ -22,15 +22,15 @@ include("orthant.jl")
 include("epinorminf.jl")
 include("epinormeucl.jl")
 include("epipersquare.jl")
-# include("semidefinite.jl")
-# include("hypoperlog.jl")
 # include("epiperpower.jl")
+# include("hypoperlog.jl")
 # include("hypogeomean.jl")
 # include("epinormspectral.jl")
-# include("hypoperlogdet.jl")
 # include("hypopersumlog.jl")
 # include("epipersumexp.jl")
-# include("wsospolyinterp.jl")
+include("semidefinite.jl")
+# include("hypoperlogdet.jl")
+include("wsospolyinterp.jl")
 # include("wsospolyinterpmat.jl")
 # include("wsospolyinterpsoc.jl")
 
@@ -87,8 +87,16 @@ grad(cone::Cone) = cone.g
 hess(cone::Cone) = Symmetric(cone.H, :U)
 inv_hess(cone::Cone) = Symmetric(inv(cone.F), :U)
 hess_fact(cone::Cone) = cone.F
-hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone) = mul!(prod, Symmetric(cone.H, :U), arr)
-inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone) = ldiv!(prod, cone.F, arr)
+
+function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
+    @assert cone.hess_updated
+    return mul!(prod, cone.hess, arr)
+end
+
+function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
+    @assert cone.inv_hess_updated
+    return ldiv!(prod, cone.F, arr)
+end
 
 # utilities for converting between smat and svec forms (lower triangle) for symmetric matrices
 # TODO only need to do lower triangle if use symmetric matrix types

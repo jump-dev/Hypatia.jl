@@ -2,12 +2,13 @@
 Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 =#
 
+using Test
 using LinearAlgebra
 import Random
 import Hypatia
 import Hypatia.HypReal
 const CO = Hypatia.Cones
-using Test
+const MU = Hypatia.ModelUtilities
 
 function test_barrier_oracles(cone::CO.Cone{T}) where {T <: HypReal}
     CO.setup_data(cone)
@@ -78,14 +79,14 @@ function test_epipersquare_barrier(T::Type{<:HypReal})
     return
 end
 
-# function test_epiperpower_barrier(T::Type{<:HypReal})
-#     for alpha in [1.5, 2.5]
-#         cone = CO.EpiPerPower{T}(alpha)
-#         test_barrier_oracles(cone)
-#     end
-#     return
-# end
-#
+function test_epiperpower_barrier(T::Type{<:HypReal})
+    for alpha in [1.5, 2.5]
+        cone = CO.EpiPerPower{T}(alpha)
+        test_barrier_oracles(cone)
+    end
+    return
+end
+
 # function test_epipersumexp_barrier(T::Type{<:HypReal})
 #     for dim in [3, 5, 8]
 #         cone = CO.EpiPerSumExp{T}(dim)
@@ -127,18 +128,18 @@ end
 #     return
 # end
 #
-# function test_semidefinite_barrier(T::Type{<:HypReal})
-#     for dim in [1, 3, 6]
-#         cone = CO.PosSemidef{T, T}(dim) # real
-#         test_barrier_oracles(cone)
-#     end
-#     for dim in [1, 4, 9]
-#         cone = CO.PosSemidef{T, Complex{T}}(dim) # complex
-#         test_barrier_oracles(cone)
-#     end
-#     return
-# end
-#
+function test_semidefinite_barrier(T::Type{<:HypReal})
+    for dim in [1, 3, 6]
+        cone = CO.PosSemidef{T, T}(dim) # real
+        test_barrier_oracles(cone)
+    end
+    for dim in [1, 4, 9]
+        cone = CO.PosSemidef{T, Complex{T}}(dim) # complex
+        test_barrier_oracles(cone)
+    end
+    return
+end
+
 # function test_hypoperlogdet_barrier(T::Type{<:HypReal})
 #     for dim in [3, 5, 8]
 #         cone = CO.HypoPerLogdet{T}(dim)
@@ -147,18 +148,18 @@ end
 #     return
 # end
 #
-# function test_wsospolyinterp_barrier(T::Type{<:HypReal})
-#     Random.seed!(1)
-#     for n in 1:3, halfdeg in 1:3
-#         (U, _, P0, _, _) = MU.interpolate(MU.FreeDomain(n), halfdeg, sample = false)
-#         P0 = convert(Matrix{T}, P0)
-#         cone = CO.WSOSPolyInterp{T, T}(U, [P0], true)
-#         test_barrier_oracles(cone)
-#     end
-#     # TODO also test complex case CO.WSOSPolyInterp{T, Complex{T}} - need complex MU interp functions first
-#     return
-# end
-#
+function test_wsospolyinterp_barrier(T::Type{<:HypReal})
+    Random.seed!(1)
+    for n in 1:3, halfdeg in 1:3
+        (U, _, P0, _, _) = MU.interpolate(MU.FreeDomain(n), halfdeg, sample = false)
+        P0 = convert(Matrix{T}, P0)
+        cone = CO.WSOSPolyInterp{T, T}(U, [P0], true)
+        test_barrier_oracles(cone)
+    end
+    # TODO also test complex case CO.WSOSPolyInterp{T, Complex{T}} - need complex MU interp functions first
+    return
+end
+
 # function test_wsospolyinterpmat_barrier(T::Type{<:HypReal})
 #     Random.seed!(1)
 #     for n in 1:3, halfdeg in 1:3, R in 1:3
