@@ -21,7 +21,7 @@ abstract type Cone{T <: HypReal} end
 include("orthant.jl")
 include("epinorminf.jl")
 include("epinormeucl.jl")
-# include("epipersquare.jl")
+include("epipersquare.jl")
 # include("semidefinite.jl")
 # include("hypoperlog.jl")
 # include("epiperpower.jl")

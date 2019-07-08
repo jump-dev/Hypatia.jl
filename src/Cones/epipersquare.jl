@@ -22,6 +22,8 @@ mutable struct EpiPerSquare{T <: HypReal} <: Cone{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
 
+    dist::T
+
     function EpiPerSquare{T}(dim::Int, is_dual::Bool) where {T <: HypReal}
         cone = new{T}()
         cone.use_dual = is_dual
@@ -65,9 +67,9 @@ end
 function update_grad(cone::EpiPerSquare)
     @assert cone.is_feas
     @. cone.grad = cone.point / cone.dist
-    g2 = cone.g[2]
-    cone.g[2] = -cone.g[1]
-    cone.g[1] = -g2
+    g2 = cone.grad[2]
+    cone.grad[2] = -cone.grad[1]
+    cone.grad[1] = -g2
     cone.grad_updated = true
     return cone.grad
 end
@@ -75,29 +77,56 @@ end
 # TODO only work with upper triangle
 function update_hess(cone::EpiPerSquare)
     @assert cone.grad_updated
-    mul!(cone.hess, cone.grad, cone.grad')
+    mul!(cone.hess.data, cone.point, cone.point')
     invdist = inv(cone.dist)
     for j in 3:cone.dim
-        cone.hess[j, j] += invdist
-        cone.hess[1, j] *= -1
-        cone.hess[2, j] *= -1
+        cone.hess.data[j, j] += invdist
+        cone.hess.data[1, j] *= -1
+        cone.hess.data[2, j] *= -1
     end
-    cone.hess[1, 2] -= invdist
+    cone.hess.data[1, 2] -= invdist
     cone.hess_updated = true
     return cone.hess
 end
 
 # TODO only work with upper triangle
-function setup_inv_hess(cone::EpiPerSquare)
-    @assert cone.grad_updated
-    mul!(cone.inv_hess, cone.point, cone.point')
+function update_inv_hess(cone::EpiPerSquare)
+    @assert cone.is_feas
+    mul!(cone.inv_hess.data, cone.point, cone.point')
     for j in 3:cone.dim
-        cone.hess[j, j] += cone.dist
+        cone.inv_hess.data[j, j] += cone.dist
     end
-    cone.hess[1, 2] -= cone.dist
+    cone.inv_hess.data[1, 2] -= cone.dist
     cone.inv_hess_updated = true
     return cone.inv_hess
 end
+
+function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerSquare)
+    @assert cone.is_feas
+    for j in 1:size(prod, 2)
+        pa = dot(cone.point, view(arr, :, j)) / cone.dist
+        @. prod[:, j] = pa * cone.point
+        @views @. prod[3:end, j] += arr[3:end, j]
+        prod[1, j] -= arr[2, j]
+        prod[2, j] -= arr[1, j]
+    end
+    prod ./= cone.dist
+    return prod
+end
+
+function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerSquare)
+    @assert cone.is_feas
+    for j in 1:size(prod, 2)
+        pa = dot(cone.point, view(arr, :, j))
+        @. prod[:, j] = pa * cone.point
+        @views @. prod[3:end, j] += cone.dist * arr[3:end, j]
+        prod[1, j] -= cone.dist * arr[2, j]
+        prod[2, j] -= cone.dist * arr[1, j]
+    end
+    return prod
+end
+
+
 
 # TODO? hess_prod! and inv_hess_prod!
 

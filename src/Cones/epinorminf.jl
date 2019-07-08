@@ -133,7 +133,7 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Epi
     @assert cone.grad_updated
     for j in 1:size(prod, 2)
         @views prod[1, j] = arr[1, j] + dot(cone.div2n, arr[2:end, j])
-        @views @. prod[2:end, j] = cone.div2n * prod[1, j]
+        @. prod[2:end, j] = cone.div2n * prod[1, j]
     end
     prod ./= cone.schur
     @. @views prod[2:end, :] += arr[2:end, :] / cone.diag2n
