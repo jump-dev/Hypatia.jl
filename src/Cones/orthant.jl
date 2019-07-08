@@ -76,37 +76,40 @@ set_initial_point(arr::AbstractVector, cone::Nonpositive) = (arr .= -1)
 
 reset_data(cone::OrthantCone) = (cone.is_feas = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
 
-function check_feas(cone::Nonnegative)
+function update_feas(cone::Nonnegative)
     @assert !cone.is_feas
     cone.is_feas = all(u -> (u > 0), cone.point)
     return cone.is_feas
 end
-function check_feas(cone::Nonpositive)
+function update_feas(cone::Nonpositive)
     @assert !cone.is_feas
     cone.is_feas = all(u -> (u < 0), cone.point)
     return cone.is_feas
 end
 
-function grad(cone::OrthantCone)
+function update_grad(cone::OrthantCone)
     @assert cone.is_feas
     @. cone.grad = -inv(cone.point)
     cone.grad_updated = true
     return cone.grad
 end
 
-function hess(cone::OrthantCone)
+function update_hess(cone::OrthantCone)
     @assert cone.grad_updated
     @. cone.hess.diag = abs2(cone.grad)
     cone.hess_updated = true
     return cone.hess
 end
 
-function inv_hess(cone::OrthantCone)
+function update_inv_hess(cone::OrthantCone)
     @assert cone.is_feas
     @. cone.inv_hess.diag = abs2(cone.point)
     cone.inv_hess_updated = true
     return cone.inv_hess
 end
+
+update_hess_prod() = nothing
+update_inv_hess_prod() = nothing
 
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::OrthantCone)
     @assert cone.is_feas

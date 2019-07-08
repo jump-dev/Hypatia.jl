@@ -59,7 +59,7 @@ end
 
 reset_data(cone::EpiNormInf) = (cone.is_feas = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
 
-function check_feas(cone::EpiNormInf)
+function update_feas(cone::EpiNormInf)
     @assert !cone.is_feas
     if cone.point[1] > 0
         cone.is_feas = (cone.point[1] > maximum(abs, view(cone.point, 2:cone.dim)))
@@ -67,17 +67,28 @@ function check_feas(cone::EpiNormInf)
     return cone.is_feas
 end
 
-function grad(cone::EpiNormInf)
+function update_grad(cone::EpiNormInf{T}) where {T <: HypReal}
     @assert cone.is_feas
     u = cone.point[1]
     w = view(cone.point, 2:cone.dim)
-    usqr = abs2(u)
     g1 = zero(u)
+    h1 = zero(u)
+    usqr = abs2(u)
     for (j, wj) in enumerate(w)
-        g1 += 2 / (u - abs2(wj) / u)
-        cone.grad[j + 1] = 2 / (usqr / wj - wj)
+        iuw2u = 2 / (u - abs2(wj) / u)
+        g1 += iuw2u
+        h1 += abs2(iuw2u)
+        iu2ww = 2 / (usqr / wj - wj)
+        cone.grad[j + 1] = iu2ww
+        iu2w2 = 2 / (usqr - abs2(wj))
+        cone.diag2n[j] = iu2w2 + abs2(iu2ww)
+        cone.edge2n[j] = -iu2w2 * iuw2u
+        cone.div2n[j] = iuw2u / (1 + abs2(iu2ww) / iu2w2)
     end
-    cone.grad[1] = (cone.dim - 2) / u - g1
+    t1 = (cone.dim - 2) / u
+    cone.grad[1] = t1 - g1
+    cone.diag11 = -(t1 + g1) / u + h1
+    cone.schur = cone.diag11 + sum(cone.edge2n, cone.div2n)
     cone.grad_updated = true
     return cone.grad
 end
@@ -93,8 +104,8 @@ end
 # for j in eachindex(w)
 #     iuwj = 2 / (usqr - abs2(w[j]))
 #     g1 += iuwj
-#     wiuwj = w[j] * iuwj
 #     h1 += abs2(iuwj)
+#     wiuwj = w[j] * iuwj
 #     cone.grad[j + 1] = wiuwj
 #
 #     cone.diag2n[j] = iuwj + abs2(wiuwj) # diagonal
@@ -109,8 +120,33 @@ end
 
 
 
+# function update_hess_helpers(cone::EpiNormInf)
+#     @assert cone.grad_updated
+#     u = cone.point[1]
+#     w = view(cone.point, 2:cone.dim)
+#     wg = view(cone.grad, 2:cone.dim)
+#     @. cone.diag2n = abs2(wg) + wg / w
+#     @. cone.edge2n = -abs2(wg) / w * u
+#
+#     cone.diag11 = (2 - cone.dim) / u / u +
+#
+#     u = cone.point[1]
+#     w = view(cone.point, 2:cone.dim)
+#     usqr = abs2(u)
+#     g1 = zero(u)
+#     for (j, wj) in enumerate(w)
+#         g1 += 2 / (u - abs2(wj) / u)
+#         cone.grad[j + 1] = 2 / (usqr / wj - wj)
+#     end
+#
+#
+#     cone.hess_helpers_updated = true
+#     return
+# end
+
 # symmetric arrow matrix
-function setup_hess(cone::EpiNormInf)
+function update_hess(cone::EpiNormInf)
+    @assert cone.grad_updated
     cone.hess[1, 1] = cone.diag11
     for j in 2:cone.dim
         cone.hess[j, j] = cone.diag2n[j - 1]
@@ -120,21 +156,22 @@ function setup_hess(cone::EpiNormInf)
 end
 
 # Diag(0, inv(diag)) + xx' / schur, where x = (-1, edge ./ diag)
-function setup_inv_hess(cone::EpiNormInf)
-    Hi = zeros(T, cone.dim, cone.dim)
-    Hi[1, 1] = 1
-    @. Hi[1, 2:end] = cone.div2n
+function update_inv_hess(cone::EpiNormInf)
+    @assert cone.grad_updated
+    cone.inv_hess[1, 1] = 1
+    @. cone.inv_hess[1, 2:end] = cone.div2n
     for j in 2:cone.dim, i in 2:j
-        Hi[i, j] = Hi[1, j] * Hi[1, i]
+        cone.inv_hess[i, j] = cone.inv_hess[1, j] * cone.inv_hess[1, i]
     end
-    Hi ./= cone.schur
+    cone.inv_hess ./= cone.schur
     for j in 2:cone.dim
-        Hi[j, j] += inv(cone.diag2n[j - 1])
+        cone.inv_hess[j, j] += inv(cone.diag2n[j - 1])
     end
-    return Symmetric(Hi, :U)
+    return cone.inv_hess
 end
 
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
+    @assert cone.grad_updated
     for j in 1:size(prod, 2)
         @views prod[1, j] = cone.diag11 * arr[1, j] + dot(cone.edge2n, arr[2:end, j])
         @views @. prod[2:end, j] = cone.edge2n * arr[1, j] + cone.diag2n * arr[2:end, j]
@@ -143,6 +180,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNorm
 end
 
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
+    @assert cone.grad_updated
     for j in 1:size(prod, 2)
         @views prod[1, j] = arr[1, j] + dot(cone.div2n, arr[2:end, j])
         @views @. prod[2:end, j] = cone.div2n * prod[1, j]

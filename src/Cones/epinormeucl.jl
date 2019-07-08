@@ -52,7 +52,7 @@ end
 
 reset_data(cone::EpiNormEucl) = (cone.is_feas = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
 
-function check_feas(cone::EpiNormEucl)
+function update_feas(cone::EpiNormEucl)
     @assert !cone.is_feas
     if cone.point[1] > 0
         cone.dist = abs2(cone.point[1]) - sum(abs2, view(cone.point, 2:cone.dim))
@@ -61,7 +61,7 @@ function check_feas(cone::EpiNormEucl)
     return cone.is_feas
 end
 
-function grad(cone::EpiNormEucl)
+function update_grad(cone::EpiNormEucl)
     @assert cone.is_feas
     @. cone.grad = cone.point / cone.dist * 2
     cone.grad[1] *= -1
@@ -70,7 +70,7 @@ function grad(cone::EpiNormEucl)
 end
 
 # TODO only work with upper triangle
-function setup_hess(cone::EpiNormEucl)
+function update_hess(cone::EpiNormEucl)
     @assert cone.grad_updated
     mul!(cone.hess, cone.grad, cone.grad')
     cone.hess += (2 * inv(cone.dist)) * I
@@ -80,7 +80,7 @@ function setup_hess(cone::EpiNormEucl)
 end
 
 # TODO only work with upper triangle
-function setup_inv_hess(cone::EpiNormEucl)
+function update_inv_hess(cone::EpiNormEucl)
     @assert cone.is_feas
     mul!(cone.inv_hess, cone.point, cone.point')
     cone.inv_hess += (cone.dist / 2) * I
