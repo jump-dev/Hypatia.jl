@@ -64,8 +64,8 @@ const OrthantCone{T <: HypReal} = Union{Nonnegative{T}, Nonpositive{T}}
 function setup_data(cone::OrthantCone{T}) where {T <: HypReal}
     dim = cone.dim
     cone.grad = zeros(T, dim)
-    cone.hess = Diagonal(zeros(T, dim), :U)
-    cone.inv_hess = Diagonal(zeros(T, dim), :U)
+    cone.hess = Diagonal(zeros(T, dim))
+    cone.inv_hess = Diagonal(zeros(T, dim))
     return
 end
 
@@ -107,9 +107,6 @@ function update_inv_hess(cone::OrthantCone)
     cone.inv_hess_updated = true
     return cone.inv_hess
 end
-
-update_hess_prod() = nothing
-update_inv_hess_prod() = nothing
 
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::OrthantCone)
     @assert cone.is_feas

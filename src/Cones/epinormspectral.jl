@@ -87,6 +87,7 @@ function update_grad(cone::EpiNormSpectral)
 end
 
 # TODO maybe this could be simpler/faster if use mul!(cone.hess, cone.grad, cone.grad') and build from there
+# TODO remove allocations
 function update_hess(cone::EpiNormSpectral)
     @assert cone.grad_updated
     cone.hess .= 0
