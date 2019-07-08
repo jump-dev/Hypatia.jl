@@ -21,6 +21,7 @@ mutable struct WSOSPolyInterp{T <: HypReal, R <: HypRealOrComplex{T}} <: Cone{T}
     grad_updated::Bool
     hess_updated::Bool
     inv_hess_updated::Bool
+    inv_hess_prod_updated::Bool
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
@@ -51,7 +52,7 @@ function setup_data(cone::WSOSPolyInterp{T, R}) where {R <: HypRealOrComplex{T}}
     dim = cone.dim
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
+    # cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
 
     Ps = cone.Ps
     cone.tmpLL = [Matrix{R}(undef, size(Pk, 2), size(Pk, 2)) for Pk in Ps]
@@ -66,7 +67,7 @@ get_nu(cone::WSOSPolyInterp) = sum(size(Pk, 2) for Pk in cone.Ps)
 
 set_initial_point(arr::AbstractVector, cone::WSOSPolyInterp) = (arr .= 1)
 
-reset_data(cone::WSOSPolyInterp) = (cone.is_feas = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
+reset_data(cone::WSOSPolyInterp) = (cone.is_feas = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.inv_hess_prod_updated = false)
 
 # TODO order the k indices so that fastest and most recently infeasible k are first
 # TODO can be done in parallel
@@ -101,7 +102,7 @@ function update_grad(cone::WSOSPolyInterp)
     cone.grad .= 0
     for k in eachindex(cone.Ps)
         LUk = hyp_ldiv_chol_L!(cone.tmpLU[k], cone.ΛFs[k], cone.Ps[k]')
-        for j in eachindex(cone.grad)
+        for j in 1:cone.dim
             cone.grad[j] -= sum(abs2, view(LUk, :, j))
         end
         # hyp_AtA!(UU, LUk)
@@ -117,14 +118,40 @@ function update_hess(cone::WSOSPolyInterp)
     @assert cone.grad_updated
     cone.hess .= 0
     for k in eachindex(cone.Ps)
-        UUk = hyp_AtA!(cone.tmpUU[k], cone.tmpLU[k])
-        cone.hess += abs2.(UUk)
-        # for j in eachindex(g), i in 1:j
-        #     cone.hess[i, j] += abs2(UU[i, j])
-        # end
+        UUk = hyp_AtA!(cone.tmpUU, cone.tmpLU[k])
+        # cone.hess.data += abs2.(UUk)
+        for j in 1:cone.dim, i in 1:j
+            cone.hess.data[i, j] += abs2(UUk[i, j])
+        end
     end
     cone.hess_updated = true
     return cone.hess
 end
 
-# TODO? inv_hess and hess_prod! and inv_hess_prod!
+function update_inv_hess_prod(cone::WSOSPolyInterp)
+    @assert cone.hess_updated
+    copyto!(cone.tmpUU, cone.hess)
+    cone.F = hyp_chol!(Symmetric(cone.tmpUU, :U))
+    cone.inv_hess_prod_updated = true
+    return
+end
+
+function update_inv_hess(cone::WSOSPolyInterp)
+    if !cone.inv_hess_prod_updated
+        update_inv_hess_prod(cone)
+    end
+    cone.inv_hess = Symmetric(inv(cone.F), :U)
+    cone.inv_hess_updated = true
+    return cone.inv_hess
+end
+
+# TODO maybe write using linear operator form rather than needing explicit hess
+function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::WSOSPolyInterp)
+    @assert cone.hess_updated
+    return mul!(prod, cone.hess, arr)
+end
+
+function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::WSOSPolyInterp)
+    @assert cone.inv_hess_prod_updated
+    return ldiv!(prod, cone.F, arr)
+end
