@@ -177,12 +177,29 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::SymIndefCo
 
     # solve system
     if system_solver.use_iterative
+
+        ill_cond_block = lhs[(n + 1):end, (n + 1):end]
+        AG = lhs[(n + 1):end, 1:n]
+        W = I
+        preconditioner = [
+        W   zeros(n, p + q);
+        zeros(p + q, n)   ill_cond_block + AG * (W \ AG');
+        ]
+        # @show cond(preconditioner \ Symmetric(LHS, :L))
+        # preconditioner = I
+        # d = diag(lhs)
+        # preconditioner = Diagonal(map(di -> (iszero(di) ? 1.0 : di), d))
+        # lhsp = preconditioner \ Symmetric(lhs, :L)
+
         for i in 1:3
+
             rhs2 = view(rhs, :, i)
+            rhsp = preconditioner \ rhs2
+
             prevsol = view(system_solver.prevsol, :, i)
-            # # dqgmres
-            (x, stats) = Krylov.minres(Symmetric(lhs, :L), rhs2)
-            @show stats
+            # # dqgmre
+            (x, stats) = Krylov.minres(Symmetric(lhs, :L), rhs2, atol=Inf, rtol=1e-8) #, M = LinearOperators.LinearOperator(preconditioner))
+            @show stats.solved
             # if norm(rhs2 - Symmetric(lhs, :L) * x) > 0.01
             #     CSV.write("lhs.csv",  DataFrames.DataFrame(lhs), writeheader=false)
             #     CSV.write("rhs.csv",  DataFrames.DataFrame(rhs), writeheader=false)
@@ -190,18 +207,19 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::SymIndefCo
             # end
             rhs2 .= x
 
-            # (x, log) = IterativeSolvers.gmres!(prevsol, Symmetric(lhs, :L), rhs2, log = true, maxiter = 1 * size(lhs, 2), tol = 1e-12, restart = size(lhs, 2))
+
+            # (x, log) = IterativeSolvers.gmres!(prevsol, lhsp, rhsp, log = true, maxiter = 1 * size(lhs, 2), tol = 1e-9, restart = div(size(lhs, 2), 1))
             # if !(log.isconverged)
             #     @show size(solver.model.A)
             #     @show size(solver.model.G)
             #     CSV.write("lhs.csv",  DataFrames.DataFrame(lhs), writeheader=false)
             #     CSV.write("rhs.csv",  DataFrames.DataFrame(rhs), writeheader=false)
-            #     error()
+            #     # error()
             # end
             # rhs2 .= prevsol
-            # @show stats
+
         end
-        # rhs .= Symmetric(lhs, :L) \ rhs
+
     else
         if system_solver.use_sparse
             F = ldlt(Symmetric(lhs, :L), check = false)
@@ -210,12 +228,15 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::SymIndefCo
             end
             rhs .= F \ rhs
         else
+            CSV.write("lhs/lhs_$(round(Int, time() * 1000)).csv",  DataFrames.DataFrame(lhs), writeheader=false)
+            # CSV.write("matrices/rhs_$(round(Int, time() * 1000)).csv",  DataFrames.DataFrame(rhs), writeheader=false)
             if T <: BlasReal
                 F = bunchkaufman!(Symmetric(lhs, :L), true, check = true) # TODO doesn't work for generic reals (need LDLT)
                 ldiv!(F, rhs)
             else
                 rhs .= Symmetric(lhs, :L) \ rhs # TODO replace with a generic julia symmetric indefinite decomposition if available, see https://github.com/JuliaLang/julia/issues/10953
             end
+            @show size(rhs), size(lhs)
         end
     end
 

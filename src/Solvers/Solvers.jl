@@ -13,6 +13,7 @@ using SparseArrays
 import SuiteSparse
 import IterativeSolvers
 import Krylov
+import LinearOperators
 using Test
 using TimerOutputs
 import Hypatia.Cones

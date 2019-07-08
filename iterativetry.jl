@@ -99,7 +99,7 @@ function equilibrators(A::AbstractMatrix{T}) where {T}
 end
 
 # no warm starts
-(n, p, q) = (22, 1, 64)
+(n, p, q) = (9, 1, 28) # (22, 1, 64)
 tol = 1e-8
 open("itertry.csv", "w") do iterf
     println(iterf, "cond,minres,,gmres,,gmresrestart,,minreskry,,greskry,,diprecon,,newpreconrestart,")
