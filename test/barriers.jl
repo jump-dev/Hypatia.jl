@@ -70,14 +70,14 @@ function test_epinormeucl_barrier(T::Type{<:HypReal})
     return
 end
 
-# function test_epipersquare_barrier(T::Type{<:HypReal})
-#     for dim in [3, 5, 8]
-#         cone = CO.EpiPerSquare{T}(dim)
-#         test_barrier_oracles(cone)
-#     end
-#     return
-# end
-#
+function test_epipersquare_barrier(T::Type{<:HypReal})
+    for dim in [3, 5, 8]
+        cone = CO.EpiPerSquare{T}(dim)
+        test_barrier_oracles(cone)
+    end
+    return
+end
+
 # function test_epiperpower_barrier(T::Type{<:HypReal})
 #     for alpha in [1.5, 2.5]
 #         cone = CO.EpiPerPower{T}(alpha)
