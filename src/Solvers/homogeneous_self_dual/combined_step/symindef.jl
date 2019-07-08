@@ -68,7 +68,7 @@ mutable struct SymIndefCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSyste
             system_solver.lhs_copy = T[
                 zeros(T,n,n)  zeros(T,n,p)  zeros(T,n,q);
                 model.A       zeros(T,p,p)  zeros(T,p,q);
-                model.G       zeros(T,q,p)  Matrix(-one(T)I,q,q);
+                model.G       zeros(T,q,p)  Matrix(-one(T)*I,q,q);
             ]
         end
 
