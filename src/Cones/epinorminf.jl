@@ -67,6 +67,7 @@ function update_feas(cone::EpiNormInf)
     return cone.is_feas
 end
 
+# TODO maybe move the diag2n, edge2n, div2n to update hess/inv_hess functions
 function update_grad(cone::EpiNormInf{T}) where {T <: HypReal}
     @assert cone.is_feas
     u = cone.point[1]
@@ -78,19 +79,65 @@ function update_grad(cone::EpiNormInf{T}) where {T <: HypReal}
         iuw2u = 2 / (u - abs2(wj) / u)
         g1 += iuw2u
         h1 += abs2(iuw2u)
-        iu2ww = 2 / (usqr / wj - wj)
-        cone.grad[j + 1] = iu2ww
         iu2w2 = 2 / (usqr - abs2(wj))
+        iu2ww = wj * iu2w2
+        cone.grad[j + 1] = iu2ww
         cone.diag2n[j] = iu2w2 + abs2(iu2ww)
-        cone.edge2n[j] = -iu2w2 * iuw2u
-        cone.div2n[j] = iuw2u / (1 + abs2(iu2ww) / iu2w2)
+        cone.edge2n[j] = -iuw2u * iu2ww
+        cone.div2n[j] = -cone.edge2n[j] / cone.diag2n[j]
     end
     t1 = (cone.dim - 2) / u
     cone.grad[1] = t1 - g1
     cone.diag11 = -(t1 + g1) / u + h1
-    cone.schur = cone.diag11 + sum(cone.edge2n, cone.div2n)
+    cone.schur = cone.diag11 + dot(cone.edge2n, cone.div2n)
     cone.grad_updated = true
     return cone.grad
+end
+
+# symmetric arrow matrix
+function update_hess(cone::EpiNormInf)
+    @assert cone.grad_updated
+    cone.hess.data[1, 1] = cone.diag11
+    for j in 2:cone.dim
+        cone.hess.data[1, j] = cone.edge2n[j - 1]
+        cone.hess.data[j, j] = cone.diag2n[j - 1]
+    end
+    return cone.hess
+end
+
+# Diag(0, inv(diag)) + xx' / schur, where x = (-1, edge ./ diag)
+function update_inv_hess(cone::EpiNormInf)
+    @assert cone.grad_updated
+    cone.inv_hess.data[1, 1] = 1
+    @. cone.inv_hess.data[1, 2:end] = cone.div2n
+    for j in 2:cone.dim, i in 2:j
+        cone.inv_hess.data[i, j] = cone.inv_hess.data[1, j] * cone.inv_hess.data[1, i]
+    end
+    cone.inv_hess.data ./= cone.schur
+    for j in 2:cone.dim
+        cone.inv_hess.data[j, j] += inv(cone.diag2n[j - 1])
+    end
+    return cone.inv_hess
+end
+
+function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
+    @assert cone.grad_updated
+    for j in 1:size(prod, 2)
+        @views prod[1, j] = cone.diag11 * arr[1, j] + dot(cone.edge2n, arr[2:end, j])
+        @views @. prod[2:end, j] = cone.edge2n * arr[1, j] + cone.diag2n * arr[2:end, j]
+    end
+    return prod
+end
+
+function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
+    @assert cone.grad_updated
+    for j in 1:size(prod, 2)
+        @views prod[1, j] = arr[1, j] + dot(cone.div2n, arr[2:end, j])
+        @views @. prod[2:end, j] = cone.div2n * prod[1, j]
+    end
+    prod ./= cone.schur
+    @. @views prod[2:end, :] += arr[2:end, :] / cone.diag2n
+    return prod
 end
 
 
@@ -143,49 +190,3 @@ end
 #     cone.hess_helpers_updated = true
 #     return
 # end
-
-# symmetric arrow matrix
-function update_hess(cone::EpiNormInf)
-    @assert cone.grad_updated
-    cone.hess[1, 1] = cone.diag11
-    for j in 2:cone.dim
-        cone.hess[j, j] = cone.diag2n[j - 1]
-        cone.hess[1, j] = cone.edge2n[j - 1]
-    end
-    return cone.hess
-end
-
-# Diag(0, inv(diag)) + xx' / schur, where x = (-1, edge ./ diag)
-function update_inv_hess(cone::EpiNormInf)
-    @assert cone.grad_updated
-    cone.inv_hess[1, 1] = 1
-    @. cone.inv_hess[1, 2:end] = cone.div2n
-    for j in 2:cone.dim, i in 2:j
-        cone.inv_hess[i, j] = cone.inv_hess[1, j] * cone.inv_hess[1, i]
-    end
-    cone.inv_hess ./= cone.schur
-    for j in 2:cone.dim
-        cone.inv_hess[j, j] += inv(cone.diag2n[j - 1])
-    end
-    return cone.inv_hess
-end
-
-function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
-    @assert cone.grad_updated
-    for j in 1:size(prod, 2)
-        @views prod[1, j] = cone.diag11 * arr[1, j] + dot(cone.edge2n, arr[2:end, j])
-        @views @. prod[2:end, j] = cone.edge2n * arr[1, j] + cone.diag2n * arr[2:end, j]
-    end
-    return prod
-end
-
-function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
-    @assert cone.grad_updated
-    for j in 1:size(prod, 2)
-        @views prod[1, j] = arr[1, j] + dot(cone.div2n, arr[2:end, j])
-        @views @. prod[2:end, j] = cone.div2n * prod[1, j]
-    end
-    prod ./= cone.schur
-    @. @views prod[2:end, :] += arr[2:end, :] / cone.diag2n
-    return prod
-end

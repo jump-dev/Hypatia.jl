@@ -21,50 +21,53 @@ abstract type Cone{T <: HypReal} end
 include("orthant.jl")
 include("epinorminf.jl")
 include("epinormeucl.jl")
-include("epipersquare.jl")
-include("semidefinite.jl")
-include("hypoperlog.jl")
-include("epiperpower.jl")
-include("hypogeomean.jl")
-include("epinormspectral.jl")
-include("hypoperlogdet.jl")
-include("hypopersumlog.jl")
-include("epipersumexp.jl")
-include("wsospolyinterp.jl")
-include("wsospolyinterpmat.jl")
-include("wsospolyinterpsoc.jl")
+# include("epipersquare.jl")
+# include("semidefinite.jl")
+# include("hypoperlog.jl")
+# include("epiperpower.jl")
+# include("hypogeomean.jl")
+# include("epinormspectral.jl")
+# include("hypoperlogdet.jl")
+# include("hypopersumlog.jl")
+# include("epipersumexp.jl")
+# include("wsospolyinterp.jl")
+# include("wsospolyinterpmat.jl")
+# include("wsospolyinterpsoc.jl")
 
 use_dual(cone::Cone) = cone.use_dual
-load_point(cone::Cone{T}, point::AbstractVector{T}) where {T <: HypReal} = (cone.point = point)
+load_point(cone::Cone, point::AbstractVector) = (cone.point = point)
 dimension(cone::Cone) = cone.dim
 
+update_hess_prod(cone::Cone) = nothing
+update_inv_hess_prod(cone::Cone) = nothing
 
 
-mutable struct ProductCone{T <: HypReal} end
-    cones::Vector{Cone{T}}
-    num_cones::Int
-    dim::Int
-    bar_par::T
 
-    feas_list::Vector{Bool}
-    grad_list::Vector{Vector{T}}
-    hess_list::Vector
-    inv_hess_list::Vector
-
-    function ProductCone{T}(cones::Vector{Cone{T}}) where {T <: HypReal}
-        prodcone = new{T}()
-        prodcone.cones = cones
-        prodcone.num_cones = length(cones)
-        prodcone.dim = sum(...)
-        prodcone.bar_par = sum(...)
-        # TODO allocate these extra algorithmic fields only at start of algorithm?
-        prodcone.feas_list = falses(prodcone.num_cones)
-        prodcone.grad_list = Vector{Vector{T}}(undef, prodcone.num_cones)
-        prodcone.hess_list = Vector{Any}(undef, prodcone.num_cones)
-        prodcone.inv_hess_list = Vector{Any}(undef, prodcone.num_cones)
-        return prodcone
-    end
-end
+# mutable struct ProductCone{T <: HypReal} end
+#     cones::Vector{Cone{T}}
+#     num_cones::Int
+#     dim::Int
+#     bar_par::T
+#
+#     feas_list::Vector{Bool}
+#     grad_list::Vector{Vector{T}}
+#     hess_list::Vector
+#     inv_hess_list::Vector
+#
+#     function ProductCone{T}(cones::Vector{Cone{T}}) where {T <: HypReal}
+#         prodcone = new{T}()
+#         prodcone.cones = cones
+#         prodcone.num_cones = length(cones)
+#         prodcone.dim = sum(...)
+#         prodcone.bar_par = sum(...)
+#         # TODO allocate these extra algorithmic fields only at start of algorithm?
+#         prodcone.feas_list = falses(prodcone.num_cones)
+#         prodcone.grad_list = Vector{Vector{T}}(undef, prodcone.num_cones)
+#         prodcone.hess_list = Vector{Any}(undef, prodcone.num_cones)
+#         prodcone.inv_hess_list = Vector{Any}(undef, prodcone.num_cones)
+#         return prodcone
+#     end
+# end
 
 
 # function grad(cone::Cone)
@@ -84,8 +87,8 @@ grad(cone::Cone) = cone.g
 hess(cone::Cone) = Symmetric(cone.H, :U)
 inv_hess(cone::Cone) = Symmetric(inv(cone.F), :U)
 hess_fact(cone::Cone) = cone.F
-hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::Cone) where {T <: HypReal} = mul!(prod, Symmetric(cone.H, :U), arr)
-inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::Cone) where {T <: HypReal} = ldiv!(prod, cone.F, arr)
+hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone) = mul!(prod, Symmetric(cone.H, :U), arr)
+inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone) = ldiv!(prod, cone.F, arr)
 
 # utilities for converting between smat and svec forms (lower triangle) for symmetric matrices
 # TODO only need to do lower triangle if use symmetric matrix types
