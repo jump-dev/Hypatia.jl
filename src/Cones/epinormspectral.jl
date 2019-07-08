@@ -1,5 +1,5 @@
 #=
-Copyright 2018, Chris Coey and contributors
+Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 
 epigraph of matrix spectral norm (operator norm associated with standard Euclidean norm; i.e. maximum singular value)
 (u in R, W in R^{n,m}) : u >= opnorm(W)
@@ -17,12 +17,17 @@ mutable struct EpiNormSpectral{T <: HypReal} <: Cone{T}
     dim::Int
     n::Int
     m::Int
-
     point::AbstractVector{T}
+
+    is_feas::Bool
+    grad_updated::Bool
+    hess_updated::Bool
+    inv_hess_updated::Bool
+    grad::Vector{T}
+    hess::Symmetric{T, Matrix{T}}
+    inv_hess::Symmetric{T, Matrix{T}}
+
     W::Matrix{T}
-    g::Vector{T}
-    H::Matrix{T}
-    H2::Matrix{T}
     F
 
     function EpiNormSpectral{T}(n::Int, m::Int, is_dual::Bool) where {T <: HypReal}
@@ -41,41 +46,50 @@ EpiNormSpectral{T}(n::Int, m::Int) where {T <: HypReal} = EpiNormSpectral{T}(n, 
 
 function setup_data(cone::EpiNormSpectral{T}) where {T <: HypReal}
     dim = cone.dim
+    cone.grad = zeros(T, dim)
+    cone.hess = Symmetric(zeros(T, dim, dim), :U)
+    cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.W = Matrix{T}(undef, cone.n, cone.m)
-    cone.g = Vector{T}(undef, dim)
-    cone.H = zeros(T, dim, dim)
-    cone.H2 = similar(cone.H)
     return
 end
 
 get_nu(cone::EpiNormSpectral) = cone.n + 1
 
-set_initial_point(arr::AbstractVector{T}, cone::EpiNormSpectral{T}) where {T <: HypReal} = (@. arr = zero(T); arr[1] = one(T); arr)
+function set_initial_point(arr::AbstractVector, cone::EpiNormSpectral)
+    arr .= 0
+    arr[1] = 1
+    return arr
+end
 
-function check_in_cone(cone::EpiNormSpectral{T}) where {T <: HypReal}
+reset_data(cone::EpiNormSpectral) = (cone.is_feas = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
+
+function update_feas(cone::EpiNormSpectral)
+    @assert !cone.is_feas
     u = cone.point[1]
-    if u <= zero(T)
-        return false
+    if u > 0
+        cone.W .= view(cone.point, 2:cone.dim)
+        X = Symmetric(cone.W * cone.W') # TODO use syrk
+        Z = Symmetric(u * I - X / u)
+        fact_Z = hyp_chol!(Z)
+        cone.is_feas = isposdef(fact_Z)
     end
-    W = cone.W
-    W[:] = view(cone.point, 2:cone.dim)
-    n = cone.n
-    m = cone.m
+    return cone.is_feas
+end
 
-    X = Symmetric(W * W') # TODO use syrk
-    Z = Symmetric(u * I - X / u)
-    F = hyp_chol!(Z)
-    if !isposdef(F)
-        return false
-    end
-
-    # TODO figure out structured form of inverse? could simplify algebra
-    Zi = Symmetric(inv(F))
+function update_grad(cone::EpiNormSpectral)
+    @assert cone.is_feas
+    Zi = Symmetric(inv(cone.fact_Z))
     Eu = Symmetric(I + X / u / u)
-    cone.H .= zero(T)
-
     cone.g[1] = -dot(Zi, Eu) - inv(u)
-    cone.g[2:end] = vec(2 * Zi * W / u)
+    cone.g[2:end] .= vec(2 * Zi * W / u)
+    cone.grad_updated = true
+    return cone.grad
+end
+
+# TODO maybe this could be simpler/faster if use mul!(cone.hess, cone.grad, cone.grad') and build from there
+function update_hess(cone::EpiNormSpectral)
+    @assert cone.grad_updated
+    cone.hess .= 0
 
     ZiEuZi = Symmetric(Zi * Eu * Zi)
     cone.H[1, 1] = dot(ZiEuZi, Eu) + (2 * dot(Zi, X) / u + one(T)) / u / u
@@ -103,5 +117,55 @@ function check_in_cone(cone::EpiNormSpectral{T}) where {T <: HypReal}
         p += 1
     end
 
-    return factorize_hess(cone)
+    cone.hess_updated = true
+    return cone.hess
 end
+
+# TODO? hess_prod! and inv_hess_prod!
+
+
+# W = cone.W
+# W[:] = view(cone.point, 2:cone.dim)
+# n = cone.n
+# m = cone.m
+#
+# X = Symmetric(W * W') # TODO use syrk
+# Z = Symmetric(u * I - X / u)
+# F = hyp_chol!(Z)
+# if !isposdef(F)
+#     return false
+# end
+#
+# # TODO figure out structured form of inverse? could simplify algebra
+# Zi = Symmetric(inv(F))
+# Eu = Symmetric(I + X / u / u)
+# cone.H .= zero(T)
+#
+# cone.g[1] = -dot(Zi, Eu) - inv(u)
+# cone.g[2:end] = vec(2 * Zi * W / u)
+#
+# ZiEuZi = Symmetric(Zi * Eu * Zi)
+# cone.H[1, 1] = dot(ZiEuZi, Eu) + (2 * dot(Zi, X) / u + one(T)) / u / u
+# cone.H[1, 2:end] = vec(-2 * (ZiEuZi + Zi / u) *  W / u)
+#
+# p = 2
+# for j in 1:m, i in 1:n
+#     tmpmat = Zi[:, i] * W[:, j]' * Zi / u
+#
+#     # Zi * dZdWij * Zi
+#     term1 = Symmetric(tmpmat + tmpmat') # TODO use syrk
+#
+#     q = p
+#     cone.H[p, q:(q + n - i)] = Zi[i, i:n]
+#     for ni in 1:n
+#         cone.H[p, q:(q + n - i)] += term1[ni, i:n] * W[ni, j]
+#     end
+#     cone.H[p, q:(q + n - i)] *= 2 / u
+#     q += (n - i + 1)
+#
+#     mat = 2 * term1 * W[:, (j + 1):m] / u
+#     nterms = n * (m - j)
+#     cone.H[p, q:(q + nterms - 1)] += vec(mat)
+#     q += nterms
+#     p += 1
+# end
