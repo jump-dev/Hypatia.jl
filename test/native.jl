@@ -444,7 +444,7 @@ function hypoperlog1(T, test_options)
     b = T[2, 1]
     G = Matrix{T}(-I, 3, 3)
     h = zeros(T, 3)
-    cones = CO.Cone{T}[CO.HypoPerLog{T}()]
+    cones = CO.Cone{T}[CO.HypoPerLog{T}(3)]
     cone_idxs = [1:3]
 
     r = build_solve_check(c, A, b, G, h, cones, cone_idxs; test_options...)
@@ -462,7 +462,7 @@ function hypoperlog2(T, test_options)
     b = T[0]
     G = Diagonal(-one(T) * I, 3)
     h = zeros(T, 3)
-    cones = CO.Cone{T}[CO.HypoPerLog{T}()]
+    cones = CO.Cone{T}[CO.HypoPerLog{T}(3)]
     cone_idxs = [1:3]
 
     r = build_solve_check(c, A, b, G, h, cones, cone_idxs; test_options...)
@@ -477,7 +477,7 @@ function hypoperlog3(T, test_options)
     b = zeros(T, 0)
     G = sparse([1, 2, 3, 4], [1, 2, 3, 1], -ones(T, 4))
     h = zeros(T, 4)
-    cones = CO.Cone{T}[CO.HypoPerLog{T}(), CO.Nonnegative{T}(1)]
+    cones = CO.Cone{T}[CO.HypoPerLog{T}(3), CO.Nonnegative{T}(1)]
     cone_idxs = [1:3, 4:4]
 
     r = build_solve_check(c, A, b, G, h, cones, cone_idxs; test_options...)
@@ -495,7 +495,7 @@ function hypoperlog4(T, test_options)
     b = T[1, -1]
     G = SparseMatrixCSC(-one(T) * I, 3, 3)
     h = zeros(T, 3)
-    cones = CO.Cone{T}[CO.HypoPerLog{T}(true)]
+    cones = CO.Cone{T}[CO.HypoPerLog{T}(3, true)]
     cone_idxs = [1:3]
 
     r = build_solve_check(c, A, b, G, h, cones, cone_idxs; test_options...)
@@ -504,7 +504,7 @@ function hypoperlog4(T, test_options)
     @test r.x ≈ [-1, 1, Texp2] atol=tol rtol=tol
 end
 
-function hypopersumlog1(T, test_options)
+function hypoperlog5(T, test_options)
     tol = max(1e-5, sqrt(sqrt(eps(T))))
     Tlogq = log(T(0.25))
     c = T[-1, 0, 0]
@@ -512,7 +512,7 @@ function hypopersumlog1(T, test_options)
     b = T[1]
     G = sparse([1, 3, 4], [1, 2, 3], -ones(T, 3))
     h = T[0, 1, 0, 0]
-    cones = CO.Cone{T}[CO.HypoPerSumLog{T}(4)]
+    cones = CO.Cone{T}[CO.HypoPerLog{T}(4)]
     cone_idxs = [1:4]
 
     r = build_solve_check(c, A, b, G, h, cones, cone_idxs; test_options...)
@@ -522,14 +522,14 @@ function hypopersumlog1(T, test_options)
     @test r.y ≈ [2] atol=tol rtol=tol
 end
 
-function hypopersumlog2(T, test_options)
+function hypoperlog6(T, test_options)
     tol = max(1e-5, sqrt(sqrt(eps(T))))
     c = T[-1, 0, 0]
     A = zeros(T, 0, 3)
     b = zeros(T, 0)
     G = sparse([1, 3, 4], [1, 2, 3], -ones(T, 3))
     h = zeros(T, 4)
-    cones = CO.Cone{T}[CO.HypoPerSumLog{T}(4)]
+    cones = CO.Cone{T}[CO.HypoPerLog{T}(4)]
     cone_idxs = [1:4]
 
     r = build_solve_check(c, A, b, G, h, cones, cone_idxs; test_options...)

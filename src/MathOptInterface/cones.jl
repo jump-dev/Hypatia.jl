@@ -50,7 +50,7 @@ MOIOtherCones = (
 # MOI cones for which no transformation is needed
 cone_from_moi(s::MOI.SecondOrderCone) = Cones.EpiNormEucl{Float64}(MOI.dimension(s))
 cone_from_moi(s::MOI.RotatedSecondOrderCone) = Cones.EpiPerSquare{Float64}(MOI.dimension(s))
-cone_from_moi(s::MOI.ExponentialCone) = Cones.HypoPerLog{Float64}()
+cone_from_moi(s::MOI.ExponentialCone) = Cones.HypoPerLog{Float64}(3)
 cone_from_moi(s::MOI.GeometricMeanCone) = (l = MOI.dimension(s) - 1; Cones.HypoGeomean{Float64}(fill(inv(l), l)))
 cone_from_moi(s::MOI.PowerCone{Float64}) = Cones.EpiPerPower{Float64}(inv(s.exponent))
 cone_from_moi(s::WSOSPolyInterpCone) = Cones.WSOSPolyInterp{Float64, Float64}(s.dimension, s.Ps, s.is_dual)

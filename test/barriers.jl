@@ -30,7 +30,7 @@ function test_barrier_oracles(cone::CO.Cone{T}; noise = 0.0) where {T <: HypReal
     CO.update_hess_prod(cone)
     CO.update_inv_hess_prod(cone)
 
-    tol = max(1e-12, sqrt(eps(T)))
+    tol = max(1e-20, sqrt(eps(T)))
 
     @test dot(point, grad) ≈ -nu atol=tol rtol=tol
     @test hess * point ≈ -grad atol=tol rtol=tol
@@ -95,14 +95,14 @@ function test_epiperpower_barrier(T::Type{<:HypReal})
     return
 end
 
-# function test_epipersumexp_barrier(T::Type{<:HypReal})
-#     for dim in [3, 5, 8]
-#         cone = CO.EpiPerSumExp{T}(dim)
-#         test_barrier_oracles(cone)
-#     end
-#     return
-# end
-#
+function test_epipersumexp_barrier(T::Type{<:HypReal})
+    for dim in [3, 5, 8]
+        cone = CO.EpiPerSumExp{T}(dim)
+        test_barrier_oracles(cone)
+    end
+    return
+end
+
 # function test_hypogeomean_barrier(T::Type{<:HypReal})
 #     Random.seed!(1)
 #     for dim in [3, 5, 8]
@@ -114,20 +114,14 @@ end
 #     return
 # end
 #
-# function test_hypoperlog_barrier(T::Type{<:HypReal})
-#     cone = CO.HypoPerLog{T}()
-#     test_barrier_oracles(cone)
-#     return
-# end
-#
-# function test_hypopersumlog_barrier(T::Type{<:HypReal})
-#     for dim in [3, 5, 8]
-#         cone = CO.HypoPerSumLog{T}(dim)
-#         test_barrier_oracles(cone)
-#     end
-#     return
-# end
-#
+function test_hypoperlog_barrier(T::Type{<:HypReal})
+    for dim in [3, 5, 8]
+        cone = CO.HypoPerLog{T}(dim)
+        test_barrier_oracles(cone)
+    end
+    return
+end
+
 # function test_epinormspectral_barrier(T::Type{<:HypReal})
 #     for (n, m) in [(1, 3), (2, 4)]
 #         cone = CO.EpiNormSpectral{T}(n, m)

@@ -40,6 +40,7 @@ end
 HypoPerLogdet{T}(dim::Int) where {T <: HypReal} = HypoPerLogdet{T}(dim, false)
 
 function setup_data(cone::HypoPerLogdet{T}) where {T <: HypReal}
+    reset_data(cone)
     dim = cone.dim
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
@@ -66,7 +67,7 @@ reset_data(cone::HypoPerLogdet) = (cone.is_feas = cone.grad_updated = cone.hess_
 
 # TODO remove allocs
 function update_feas(cone::HypoPerLogdet)
-    @assert !cone.is_feas
+    @assert !cone.feas_updated
     u = cone.point[1]
     v = cone.point[2]
     if v > 0
