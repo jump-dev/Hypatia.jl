@@ -40,6 +40,7 @@ end
 HypoGeomean{T}(alpha::Vector{<:Real}) where {T <: HypReal} = HypoGeomean{T}(alpha, false)
 
 function setup_data(cone::HypoGeomean{T}) where {T <: HypReal}
+    reset_data(cone)
     dim = cone.dim
     alpha = cone.alpha
     ialpha = inv.(alpha)
@@ -59,6 +60,7 @@ function set_initial_point(arr::AbstractVector{T}, cone::HypoGeomean{T}) where {
 end
 
 function check_in_cone(cone::HypoGeomean{T}) where {T <: HypReal}
+    @assert !cone.feas_updated
     u = cone.point[1]
     w = view(cone.point, 2:cone.dim)
     if u >= zero(T) || any(wi <= zero(T) for wi in w)

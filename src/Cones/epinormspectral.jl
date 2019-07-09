@@ -45,6 +45,7 @@ end
 EpiNormSpectral{T}(n::Int, m::Int) where {T <: HypReal} = EpiNormSpectral{T}(n, m, false)
 
 function setup_data(cone::EpiNormSpectral{T}) where {T <: HypReal}
+    reset_data(cone)
     dim = cone.dim
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
@@ -64,7 +65,7 @@ end
 reset_data(cone::EpiNormSpectral) = (cone.is_feas = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
 
 function update_feas(cone::EpiNormSpectral)
-    @assert !cone.is_feas
+    @assert !cone.feas_updated
     u = cone.point[1]
     if u > 0
         cone.W .= view(cone.point, 2:cone.dim)

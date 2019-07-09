@@ -32,7 +32,7 @@ mutable struct WSOSPolyInterp{T <: HypReal, R <: HypRealOrComplex{T}} <: Cone{T}
     tmpLU::Vector{Matrix{R}}
     tmpUU::Matrix{R}
     ΛFs::Vector
-    F # TODO prealloc
+    hess_fact # TODO prealloc
 
     function WSOSPolyInterp{T, R}(dim::Int, Ps::Vector{Matrix{R}}, is_dual::Bool) where {R <: HypRealOrComplex{T}} where {T <: HypReal}
         for k in eachindex(Ps)
@@ -56,7 +56,6 @@ function setup_data(cone::WSOSPolyInterp{T, R}) where {R <: HypRealOrComplex{T}}
     dim = cone.dim
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
-    # cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     Ps = cone.Ps
     cone.tmpLL = [Matrix{R}(undef, size(Pk, 2), size(Pk, 2)) for Pk in Ps]
     cone.tmpUL = [Matrix{R}(undef, dim, size(Pk, 2)) for Pk in Ps]
@@ -133,7 +132,7 @@ end
 function update_inv_hess_prod(cone::WSOSPolyInterp)
     @assert cone.hess_updated
     copyto!(cone.tmpUU, cone.hess)
-    cone.F = hyp_chol!(Symmetric(cone.tmpUU, :U))
+    cone.hess_fact = hyp_chol!(Symmetric(cone.tmpUU, :U))
     cone.inv_hess_prod_updated = true
     return
 end
@@ -142,7 +141,7 @@ function update_inv_hess(cone::WSOSPolyInterp)
     if !cone.inv_hess_prod_updated
         update_inv_hess_prod(cone)
     end
-    cone.inv_hess = Symmetric(inv(cone.F), :U)
+    cone.inv_hess = Symmetric(inv(cone.hess_fact), :U)
     cone.inv_hess_updated = true
     return cone.inv_hess
 end
@@ -155,5 +154,5 @@ end
 
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::WSOSPolyInterp)
     @assert cone.inv_hess_prod_updated
-    return ldiv!(prod, cone.F, arr)
+    return ldiv!(prod, cone.hess_fact, arr)
 end
