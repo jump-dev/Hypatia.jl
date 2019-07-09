@@ -2,11 +2,15 @@
 Copyright 2018, Chris Coey and contributors
 =#
 
+using Test
 import MathOptInterface
 const MOI = MathOptInterface
 const MOIT = MOI.Test
 const MOIB = MOI.Bridges
 const MOIU = MOI.Utilities
+import Hypatia
+const MO = Hypatia.Models
+const SO = Hypatia.Solvers
 
 MOIU.@model(HypatiaModelData,
     (),
@@ -61,7 +65,7 @@ function test_moi(
     )
     optimizer = MOIU.CachingOptimizer(
         MOIU.UniversalFallback(HypatiaModelData{Float64}()),
-        HYP.Optimizer(
+        Hypatia.Optimizer(
             use_dense = use_dense,
             test_certificates = true,
             verbose = verbose,

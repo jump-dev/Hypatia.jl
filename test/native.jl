@@ -2,12 +2,15 @@
 Copyright 2018, Chris Coey and contributors
 =#
 
+using Test
 import Random
 using LinearAlgebra
 using SparseArrays
 import GenericLinearAlgebra.svdvals!
+import Hypatia
 import Hypatia.HypReal
 import Hypatia.Solvers.build_solve_check
+const CO = Hypatia.Cones
 
 function dimension1(T, test_options)
     tol = max(1e-5, sqrt(sqrt(eps(T))))

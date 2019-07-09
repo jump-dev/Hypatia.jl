@@ -15,10 +15,11 @@ mutable struct Nonnegative{T <: HypReal} <: Cone{T}
     dim::Int
     point::AbstractVector{T}
 
-    is_feas::Bool
+    feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
     inv_hess_updated::Bool
+    is_feas::Bool
     grad::Vector{T}
     hess::Diagonal{T, Vector{T}}
     inv_hess::Diagonal{T, Vector{T}}
@@ -39,10 +40,11 @@ mutable struct Nonpositive{T <: HypReal} <: Cone{T}
     dim::Int
     point::AbstractVector{T}
 
-    is_feas::Bool
+    feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
     inv_hess_updated::Bool
+    is_feas::Bool
     grad::Vector{T}
     hess::Diagonal{T, Vector{T}}
     inv_hess::Diagonal{T, Vector{T}}
@@ -60,8 +62,11 @@ Nonpositive{T}(dim::Int) where {T <: HypReal} = Nonpositive{T}(dim, false)
 
 const OrthantCone{T <: HypReal} = Union{Nonnegative{T}, Nonpositive{T}}
 
+reset_data(cone::OrthantCone) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
+
 # TODO maybe only allocate the fields we use
 function setup_data(cone::OrthantCone{T}) where {T <: HypReal}
+    reset_data(cone)
     dim = cone.dim
     cone.grad = zeros(T, dim)
     cone.hess = Diagonal(zeros(T, dim))
@@ -74,16 +79,16 @@ get_nu(cone::OrthantCone) = cone.dim
 set_initial_point(arr::AbstractVector, cone::Nonnegative) = (arr .= 1)
 set_initial_point(arr::AbstractVector, cone::Nonpositive) = (arr .= -1)
 
-reset_data(cone::OrthantCone) = (cone.is_feas = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
-
 function update_feas(cone::Nonnegative)
-    @assert !cone.is_feas
+    @assert !cone.feas_updated
     cone.is_feas = all(u -> (u > 0), cone.point)
+    cone.feas_updated = true
     return cone.is_feas
 end
 function update_feas(cone::Nonpositive)
-    @assert !cone.is_feas
+    @assert !cone.feas_updated
     cone.is_feas = all(u -> (u < 0), cone.point)
+    cone.feas_updated = true
     return cone.is_feas
 end
 
