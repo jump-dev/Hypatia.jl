@@ -23,18 +23,21 @@ mutable struct PosSemidef{T <: HypReal, R <: HypRealOrComplex{T}} <: Cone{T}
     point::AbstractVector{T}
     is_complex::Bool
 
-    is_feas::Bool
+    feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
     inv_hess_updated::Bool
+    is_feas::Bool
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
 
     mat::Matrix{R}
+    mat2::Matrix{R}
     inv_mat::Matrix{R}
     fact_mat
     rt2::T
+    rt2i::T
 
     function PosSemidef{T, R}(dim::Int, is_dual::Bool) where {R <: HypRealOrComplex{T}} where {T <: HypReal}
         cone = new{T, R}()
@@ -56,13 +59,18 @@ end
 
 PosSemidef{T, R}(dim::Int) where {R <: HypRealOrComplex{T}} where {T <: HypReal} = PosSemidef{T, R}(dim, false)
 
+reset_data(cone::PosSemidef) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
+
 function setup_data(cone::PosSemidef{T, R}) where {R <: HypRealOrComplex{T}} where {T <: HypReal}
+    reset_data(cone)
     dim = cone.dim
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.mat = Matrix{R}(undef, cone.side, cone.side)
+    cone.mat2 = Matrix{R}(undef, cone.side, cone.side)
     cone.rt2 = sqrt(T(2))
+    cone.rt2i = inv(cone.rt2)
     return
 end
 
@@ -83,21 +91,21 @@ function set_initial_point(arr::AbstractVector, cone::PosSemidef)
     return arr
 end
 
-reset_data(cone::PosSemidef) = (cone.is_feas = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
-
 # TODO only work with upper triangle
 function update_feas(cone::PosSemidef)
-    @assert !cone.is_feas
-    svec_to_smat!(cone.mat, cone.point)
-    cone.fact_mat = hyp_chol!(Hermitian(cone.mat))
+    @assert !cone.feas_updated
+    svec_to_smat!(cone.mat, cone.point, cone.rt2i)
+    copyto!(cone.mat2, cone.mat)
+    cone.fact_mat = hyp_chol!(Hermitian(cone.mat2))
     cone.is_feas = isposdef(cone.fact_mat)
+    cone.feas_updated = true
     return cone.is_feas
 end
 
 function update_grad(cone::PosSemidef)
     @assert cone.is_feas
-    cone.inv_mat = Hermitian(inv(cone.fact_mat)) # TODO eliminate allocs
-    smat_to_svec!(cone.grad, transpose(cone.inv_mat)) # TODO avoid doing this twice
+    cone.inv_mat = inv(cone.fact_mat) # TODO eliminate allocs
+    smat_to_svec!(cone.grad, transpose(cone.inv_mat), cone.rt2)
     cone.grad .*= -1
     cone.grad_updated = true
     return cone.grad
@@ -261,12 +269,16 @@ end
 
 # TODO maybe write using linear operator form rather than needing explicit hess
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidef)
-    @assert cone.hess_updated
+    if !cone.hess_updated
+        update_hess(cone)
+    end
     return mul!(prod, cone.hess, arr)
 end
 
 # TODO maybe write using linear operator form rather than needing explicit inv_hess
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidef)
-    @assert cone.inv_hess_updated
+    if !cone.inv_hess_updated
+        update_inv_hess(cone)
+    end
     return mul!(prod, cone.inv_hess, arr)
 end

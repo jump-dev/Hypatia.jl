@@ -13,10 +13,11 @@ mutable struct EpiNormEucl{T <: HypReal} <: Cone{T}
     dim::Int
     point::AbstractVector{T}
 
-    is_feas::Bool
+    feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
     inv_hess_updated::Bool
+    is_feas::Bool
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
@@ -33,8 +34,11 @@ end
 
 EpiNormEucl{T}(dim::Int) where {T <: HypReal} = EpiNormEucl{T}(dim, false)
 
+reset_data(cone::EpiNormEucl) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
+
 # TODO maybe only allocate the fields we use
 function setup_data(cone::EpiNormEucl{T}) where {T <: HypReal}
+    reset_data(cone)
     dim = cone.dim
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
@@ -50,16 +54,17 @@ function set_initial_point(arr::AbstractVector, cone::EpiNormEucl)
     return arr
 end
 
-reset_data(cone::EpiNormEucl) = (cone.is_feas = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
-
 function update_feas(cone::EpiNormEucl)
-    @assert !cone.is_feas
+    @assert !cone.feas_updated
     u = cone.point[1]
     if u > 0
         w = view(cone.point, 2:cone.dim)
         cone.dist = (abs2(u) - sum(abs2, w)) / 2
         cone.is_feas = (cone.dist > 0)
+    else
+        cone.is_feas = false
     end
+    cone.feas_updated = true
     return cone.is_feas
 end
 

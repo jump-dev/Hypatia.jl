@@ -13,10 +13,11 @@ mutable struct EpiNormInf{T <: HypReal} <: Cone{T}
     dim::Int
     point::AbstractVector{T}
 
-    is_feas::Bool
+    feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
     inv_hess_updated::Bool
+    is_feas::Bool
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
@@ -37,8 +38,11 @@ end
 
 EpiNormInf{T}(dim::Int) where {T <: HypReal} = EpiNormInf{T}(dim, false)
 
+reset_data(cone::EpiNormInf) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
+
 # TODO maybe only allocate the fields we use
 function setup_data(cone::EpiNormInf{T}) where {T <: HypReal}
+    reset_data(cone)
     dim = cone.dim
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
@@ -57,13 +61,10 @@ function set_initial_point(arr::AbstractVector, cone::EpiNormInf)
     return arr
 end
 
-reset_data(cone::EpiNormInf) = (cone.is_feas = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
-
 function update_feas(cone::EpiNormInf)
-    @assert !cone.is_feas
-    if cone.point[1] > 0
-        cone.is_feas = (cone.point[1] > maximum(abs, view(cone.point, 2:cone.dim)))
-    end
+    @assert !cone.feas_updated
+    cone.is_feas = cone.point[1] > 0 && cone.point[1] > maximum(abs, view(cone.point, 2:cone.dim))
+    cone.feas_updated = true
     return cone.is_feas
 end
 

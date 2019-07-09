@@ -14,10 +14,11 @@ mutable struct EpiPerSquare{T <: HypReal} <: Cone{T}
     dim::Int
     point::AbstractVector{T}
 
-    is_feas::Bool
+    feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
     inv_hess_updated::Bool
+    is_feas::Bool
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
@@ -34,7 +35,10 @@ end
 
 EpiPerSquare{T}(dim::Int) where {T <: HypReal} = EpiPerSquare{T}(dim, false)
 
+reset_data(cone::EpiPerSquare) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
+
 function setup_data(cone::EpiPerSquare{T}) where {T <: HypReal}
+    reset_data(cone)
     dim = cone.dim
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
@@ -50,17 +54,18 @@ function set_initial_point(arr::AbstractVector, cone::EpiPerSquare)
     return arr
 end
 
-reset_data(cone::EpiPerSquare) = (cone.is_feas = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
-
 function update_feas(cone::EpiPerSquare)
-    @assert !cone.is_feas
+    @assert !cone.feas_updated
     u = cone.point[1]
     v = cone.point[2]
     if u > 0 && v > 0
         w = view(cone.point, 3:cone.dim)
         cone.dist = u * v - sum(abs2, w) / 2
         cone.is_feas = (cone.dist > 0)
+    else
+        cone.is_feas = false
     end
+    cone.feas_updated = true
     return cone.is_feas
 end
 
@@ -77,12 +82,10 @@ end
 # TODO only work with upper triangle
 function update_hess(cone::EpiPerSquare)
     @assert cone.grad_updated
-    mul!(cone.hess.data, cone.point, cone.point')
+    mul!(cone.hess.data, cone.grad, cone.grad')
     invdist = inv(cone.dist)
     for j in 3:cone.dim
         cone.hess.data[j, j] += invdist
-        cone.hess.data[1, j] *= -1
-        cone.hess.data[2, j] *= -1
     end
     cone.hess.data[1, 2] -= invdist
     cone.hess_updated = true
@@ -102,15 +105,14 @@ function update_inv_hess(cone::EpiPerSquare)
 end
 
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerSquare)
-    @assert cone.is_feas
+    @assert cone.grad_updated
     for j in 1:size(prod, 2)
-        pa = dot(cone.point, view(arr, :, j)) / cone.dist
-        @. prod[:, j] = pa * cone.point
-        @views @. prod[3:end, j] += arr[3:end, j]
-        prod[1, j] -= arr[2, j]
-        prod[2, j] -= arr[1, j]
+        ga = dot(cone.grad, view(arr, :, j))
+        @. prod[:, j] = ga * cone.grad
+        @views @. prod[3:end, j] += arr[3:end, j] / cone.dist
+        prod[1, j] -= arr[2, j] / cone.dist
+        prod[2, j] -= arr[1, j] / cone.dist
     end
-    prod ./= cone.dist
     return prod
 end
 

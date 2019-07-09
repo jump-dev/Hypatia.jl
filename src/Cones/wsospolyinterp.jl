@@ -17,11 +17,12 @@ mutable struct WSOSPolyInterp{T <: HypReal, R <: HypRealOrComplex{T}} <: Cone{T}
     Ps::Vector{Matrix{R}}
     point::AbstractVector{T}
 
-    is_feas::Bool
+    feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
     inv_hess_updated::Bool
     inv_hess_prod_updated::Bool
+    is_feas::Bool
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
@@ -47,13 +48,15 @@ end
 
 WSOSPolyInterp{T, R}(dim::Int, Ps::Vector{Matrix{R}}) where {R <: HypRealOrComplex{T}} where {T <: HypReal} = WSOSPolyInterp{T, R}(dim, Ps, false)
 
+reset_data(cone::WSOSPolyInterp) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.inv_hess_prod_updated = false)
+
 # TODO maybe only allocate the fields we use
 function setup_data(cone::WSOSPolyInterp{T, R}) where {R <: HypRealOrComplex{T}} where {T <: HypReal}
+    reset_data(cone)
     dim = cone.dim
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     # cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
-
     Ps = cone.Ps
     cone.tmpLL = [Matrix{R}(undef, size(Pk, 2), size(Pk, 2)) for Pk in Ps]
     cone.tmpUL = [Matrix{R}(undef, dim, size(Pk, 2)) for Pk in Ps]
@@ -67,13 +70,12 @@ get_nu(cone::WSOSPolyInterp) = sum(size(Pk, 2) for Pk in cone.Ps)
 
 set_initial_point(arr::AbstractVector, cone::WSOSPolyInterp) = (arr .= 1)
 
-reset_data(cone::WSOSPolyInterp) = (cone.is_feas = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.inv_hess_prod_updated = false)
-
 # TODO order the k indices so that fastest and most recently infeasible k are first
 # TODO can be done in parallel
 function update_feas(cone::WSOSPolyInterp)
-    @assert !cone.is_feas
+    @assert !cone.feas_updated
     D = Diagonal(cone.point)
+    cone.is_feas = true
     for k in eachindex(cone.Ps)
         # Λ = Pk' * Diagonal(point) * Pk
         # TODO mul!(A, B', Diagonal(x)) calls extremely inefficient method but doesn't need ULk
@@ -90,7 +92,7 @@ function update_feas(cone::WSOSPolyInterp)
         end
         cone.ΛFs[k] = ΛFk
     end
-    cone.is_feas = true
+    cone.feas_updated = true
     return cone.is_feas
 end
 
