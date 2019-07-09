@@ -733,7 +733,7 @@ function hypoperlogdet3(T, test_options)
     @test norm(r.x) ≈ 0 atol=tol rtol=tol
 end
 
-function epipersumexp1(T, test_options)
+function epiperexp1(T, test_options)
     tol = max(1e-5, sqrt(sqrt(eps(T))))
     l = 5
     c = vcat(zero(T), -ones(T, l))
@@ -741,7 +741,7 @@ function epipersumexp1(T, test_options)
     b = T[1]
     G = [-one(T) zeros(T, 1, l); zeros(T, 1, l + 1); zeros(T, l, 1) sparse(-one(T) * I, l, l)]
     h = zeros(T, l + 2)
-    cones = CO.Cone{T}[CO.EpiPerSumExp{T}(l + 2)]
+    cones = CO.Cone{T}[CO.EpiPerExp{T}(l + 2)]
     cone_idxs = [1:(l + 2)]
 
     r = build_solve_check(c, A, b, G, h, cones, cone_idxs; test_options...)
@@ -751,7 +751,7 @@ function epipersumexp1(T, test_options)
     @test r.s[1] ≈ 1 atol=tol rtol=tol
 end
 
-function epipersumexp2(T, test_options)
+function epiperexp2(T, test_options)
     tol = max(1e-5, sqrt(sqrt(eps(T))))
     l = 5
     c = vcat(zero(T), -ones(T, l))
@@ -759,7 +759,7 @@ function epipersumexp2(T, test_options)
     b = T[1]
     G = [-one(T) spzeros(T, 1, l); spzeros(T, 1, l + 1); spzeros(T, l, 1) sparse(-one(T) * I, l, l)]
     h = zeros(T, l + 2); h[2] = 1
-    cones = CO.Cone{T}[CO.EpiPerSumExp{T}(l + 2)]
+    cones = CO.Cone{T}[CO.EpiPerExp{T}(l + 2)]
     cone_idxs = [1:(l + 2)]
 
     r = build_solve_check(c, A, b, G, h, cones, cone_idxs; test_options...)

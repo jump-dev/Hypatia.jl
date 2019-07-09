@@ -49,7 +49,7 @@ include(joinpath(@__DIR__, "barriers.jl"))
 real_types = [
     Float64,
     Float32,
-    BigFloat, # NOTE can only use BLAS floats with ForwardDiff barriers, see https://github.com/JuliaDiff/DiffResults.jl/pull/9#issuecomment-497853361
+    # BigFloat, # NOTE can only use BLAS floats with ForwardDiff barriers, see https://github.com/JuliaDiff/DiffResults.jl/pull/9#issuecomment-497853361
     ]
 barrier_testfuns = [
     # test_orthant_barrier,
@@ -57,9 +57,9 @@ barrier_testfuns = [
     # test_epinormeucl_barrier,
     # test_epipersquare_barrier,
     # test_epiperpower_barrier, # fails with BigFloat
-    # test_epipersumexp_barrier,
-    test_hypoperlog_barrier,
-    # # test_hypogeomean_barrier,
+    # test_hypoperlog_barrier,
+    # test_epiperexp_barrier, # fails with BigFloat
+    test_hypogeomean_barrier,
     # # test_epinormspectral_barrier,
     # test_semidefinite_barrier,
     # # test_hypoperlogdet_barrier,
@@ -69,7 +69,7 @@ barrier_testfuns = [
     # # test_wsospolyinterpsoc_barrier, # NOTE not updated for generic reals (too much work)
     ]
 @testset "barrier functions tests: $t, $T" for t in barrier_testfuns, T in real_types
-    # if T == BigFloat && t in (test_epiperpower_barrier, test_epipersumexp_barrier, test_wsospolyinterpmat_barrier, test_wsospolyinterpsoc_barrier)
+    # if T == BigFloat && t in (test_epiperpower_barrier, test_epiperexp_barrier, test_wsospolyinterpmat_barrier, test_wsospolyinterpsoc_barrier)
     #     continue
     # end
     t(T)
@@ -128,8 +128,8 @@ end
 #     # hypoperlog6,
 #     # epiperpower1,
 #     # epiperpower2,
-#     # epipersumexp1,
-#     # epipersumexp2,
+#     # epiperexp1,
+#     # epiperexp2,
 #     # hypogeomean1,
 #     # hypogeomean2,
 #     # hypogeomean3,
@@ -142,7 +142,7 @@ end
 #     # hypoperlogdet3,
 #     ]
 # @testset "native tests: $t, $s, $m, $T" for t in testfuns_raw, s in system_solvers, m in linear_models, T in real_types
-#     if T == BigFloat && t in (epiperpower1, epiperpower2, epipersumexp1, epipersumexp2)
+#     if T == BigFloat && t in (epiperpower1, epiperpower2, epiperexp1, epiperexp2)
 #         continue # ForwardDiff does not work with BigFloat
 #     end
 #     if T == BigFloat && m == MO.RawLinearModel
