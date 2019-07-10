@@ -49,8 +49,6 @@ end
 
 HypoGeomean{T}(alpha::Vector{T}) where {T <: HypReal} = HypoGeomean{T}(alpha, false)
 
-reset_data(cone::HypoGeomean) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.inv_hess_prod_updated = false)
-
 function setup_data(cone::HypoGeomean{T}) where {T <: HypReal}
     reset_data(cone)
     dim = cone.dim
@@ -102,43 +100,15 @@ function update_hess(cone::HypoGeomean)
     w = view(cone.point, 2:cone.dim)
     wiaau = cone.wiaa + u
     cone.hess.data[1, 1] = inv(wiaau) / wiaau + inv(u) / u
-    for i in eachindex(w)
-        i1 = i + 1
-        wiwaw = -cone.wiw * cone.alpha[i] / w[i]
-        cone.hess.data[1, i1] = -wiwaw / wiaau
-        for j in 1:(i - 1)
-            cone.hess.data[j + 1, i1] = wiwaw * cone.a1ww[j]
+    for j in eachindex(w)
+        j1 = j + 1
+        wiwaw = -cone.wiw * cone.alpha[j] / w[j]
+        cone.hess.data[1, j1] = -wiwaw / wiaau
+        for i in 1:(j - 1)
+            cone.hess.data[i + 1, j1] = wiwaw * cone.a1ww[i]
         end
-        cone.hess.data[i1, i1] = wiwaw * cone.grad[i1] + (1 - cone.alpha[i]) / w[i] / w[i]
+        cone.hess.data[j1, j1] = wiwaw * cone.grad[j1] + (1 - cone.alpha[j]) / w[j] / w[j]
     end
     cone.hess_updated = true
     return cone.hess
-end
-
-function update_inv_hess_prod(cone::HypoGeomean)
-    @assert cone.hess_updated
-    copyto!(cone.tmp_hess, cone.hess)
-    cone.hess_fact = hyp_chol!(cone.tmp_hess)
-    cone.inv_hess_prod_updated = true
-    return
-end
-
-function update_inv_hess(cone::HypoGeomean)
-    if !cone.inv_hess_prod_updated
-        update_inv_hess_prod(cone)
-    end
-    cone.inv_hess = Symmetric(inv(cone.hess_fact), :U)
-    cone.inv_hess_updated = true
-    return cone.inv_hess
-end
-
-# TODO maybe write using linear operator form rather than needing explicit hess
-function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoGeomean)
-    @assert cone.hess_updated
-    return mul!(prod, cone.hess, arr)
-end
-
-function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoGeomean)
-    @assert cone.inv_hess_prod_updated
-    return ldiv!(prod, cone.hess_fact, arr)
 end

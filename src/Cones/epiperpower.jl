@@ -14,7 +14,7 @@ TODO although this barrier has a lower parameter, maybe the more standard barrie
 
 mutable struct EpiPerPower{T <: HypReal} <: Cone{T}
     use_dual::Bool
-    alpha::Real
+    alpha::T
     point::AbstractVector{T}
 
     feas_updated::Bool
@@ -32,7 +32,7 @@ mutable struct EpiPerPower{T <: HypReal} <: Cone{T}
     tmp_hess::Symmetric{T, Matrix{T}}
     hess_fact # TODO prealloc
 
-    function EpiPerPower{T}(alpha::Real, is_dual::Bool) where {T <: HypReal}
+    function EpiPerPower{T}(alpha::T, is_dual::Bool) where {T <: HypReal}
         @assert alpha > 1.0
         cone = new()
         cone.use_dual = is_dual
@@ -41,9 +41,7 @@ mutable struct EpiPerPower{T <: HypReal} <: Cone{T}
     end
 end
 
-EpiPerPower{T}(alpha::Real) where {T <: HypReal} = EpiPerPower{T}(alpha, false)
-
-reset_data(cone::EpiPerPower) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.inv_hess_prod_updated = false)
+EpiPerPower{T}(alpha::T) where {T <: HypReal} = EpiPerPower{T}(alpha, false)
 
 function setup_data(cone::EpiPerPower{T}) where {T <: HypReal}
     reset_data(cone)
@@ -52,9 +50,9 @@ function setup_data(cone::EpiPerPower{T}) where {T <: HypReal}
     cone.tmp_hess = Symmetric(zeros(T, 3, 3), :U)
     ialpha2 = 2 / cone.alpha
     if cone.alpha >= 2
-        cone.barfun = point -> -log(point[1] * point[2]^(2 - ialpha2) - abs2(point[3]) * point[1]^(1 - ialpha2))
+        cone.barfun = point -> -log(point[1] * point[2] ^ (2 - ialpha2) - abs2(point[3]) * point[1] ^ (1 - ialpha2))
     else
-        cone.barfun = point -> -log(point[1]^ialpha2 * point[2] - abs2(point[3]) * point[2]^(ialpha2 - 1))
+        cone.barfun = point -> -log(point[1] ^ ialpha2 * point[2] - abs2(point[3]) * point[2] ^ (ialpha2 - 1))
     end
     cone.diffres = DiffResults.HessianResult(cone.grad)
     return
@@ -74,51 +72,7 @@ end
 function update_feas(cone::EpiPerPower)
     @assert !cone.feas_updated
     (u, v, w) = cone.point
-    cone.is_feas = u > 0 && v > 0 && u > v * (abs(w / v))^cone.alpha
+    cone.is_feas = (u > 0 && v > 0 && log(abs(w)) < log(u) / cone.alpha + log(v) * cone.alpha / (cone.alpha - 1))
     cone.feas_updated = true
     return cone.is_feas
-end
-
-# TODO check if this is most efficient way to use DiffResults
-function update_grad(cone::EpiPerPower)
-    @assert cone.is_feas
-    cone.diffres = ForwardDiff.hessian!(cone.diffres, cone.barfun, cone.point)
-    cone.grad .= DiffResults.gradient(cone.diffres)
-    cone.grad_updated = true
-    return cone.grad
-end
-
-function update_hess(cone::EpiPerPower)
-    @assert cone.grad_updated
-    cone.hess.data .= DiffResults.hessian(cone.diffres)
-    cone.hess_updated = true
-    return cone.hess
-end
-
-function update_inv_hess_prod(cone::EpiPerPower)
-    @assert cone.hess_updated
-    copyto!(cone.tmp_hess, cone.hess)
-    cone.hess_fact = hyp_chol!(cone.tmp_hess)
-    cone.inv_hess_prod_updated = true
-    return
-end
-
-function update_inv_hess(cone::EpiPerPower)
-    if !cone.inv_hess_prod_updated
-        update_inv_hess_prod(cone)
-    end
-    cone.inv_hess = Symmetric(inv(cone.hess_fact), :U)
-    cone.inv_hess_updated = true
-    return cone.inv_hess
-end
-
-# TODO maybe write using linear operator form rather than needing explicit hess
-function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerPower)
-    @assert cone.hess_updated
-    return mul!(prod, cone.hess, arr)
-end
-
-function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerPower)
-    @assert cone.inv_hess_prod_updated
-    return ldiv!(prod, cone.hess_fact, arr)
 end

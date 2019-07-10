@@ -9,7 +9,7 @@ const SO = Hypatia.Solvers
 
 # include(joinpath(@__DIR__, "interpolation.jl"))
 include(joinpath(@__DIR__, "barriers.jl"))
-# include(joinpath(@__DIR__, "native.jl"))
+include(joinpath(@__DIR__, "native.jl"))
 # include(joinpath(@__DIR__, "MathOptInterface.jl"))
 #
 # examples_dir = joinpath(@__DIR__, "../examples")
@@ -45,54 +45,54 @@ include(joinpath(@__DIR__, "barriers.jl"))
 #     test_recover_cheb_polys()
 # end
 
-@info("starting barrier tests")
-real_types = [
-    Float64,
-    Float32,
-    BigFloat, # NOTE can only use BLAS floats with ForwardDiff barriers, see https://github.com/JuliaDiff/DiffResults.jl/pull/9#issuecomment-497853361
-    ]
-barrier_testfuns = [
-    # test_orthant_barrier,
-    # test_epinorminf_barrier,
-    # test_epinormeucl_barrier,
-    # test_epipersquare_barrier,
-    # test_epiperpower_barrier, # fails with BigFloat
-    # test_hypoperlog_barrier,
-    # test_epiperexp_barrier, # fails with BigFloat
-    test_hypogeomean_barrier,
-    # # test_epinormspectral_barrier,
-    # test_semidefinite_barrier,
-    # # test_hypoperlogdet_barrier,
-    # test_wsospolyinterp_barrier,
-    # # TODO next 2 fail with BigFloat
-    # # test_wsospolyinterpmat_barrier,
-    # # test_wsospolyinterpsoc_barrier, # NOTE not updated for generic reals (too much work)
-    ]
-@testset "barrier functions tests: $t, $T" for t in barrier_testfuns, T in real_types
-    # if T == BigFloat && t in (test_epiperpower_barrier, test_epiperexp_barrier, test_wsospolyinterpmat_barrier, test_wsospolyinterpsoc_barrier)
-    #     continue
-    # end
-    t(T)
-end
-#
-# @info("starting native interface tests")
+# @info("starting barrier tests")
 # real_types = [
 #     Float64,
 #     Float32,
-#     BigFloat,
+#     BigFloat, # NOTE can only use BLAS floats with ForwardDiff barriers, see https://github.com/JuliaDiff/DiffResults.jl/pull/9#issuecomment-497853361
 #     ]
-# system_solvers = [
-#     SO.QRCholCombinedHSDSystemSolver,
-#     SO.SymIndefCombinedHSDSystemSolver,
-#     SO.NaiveElimCombinedHSDSystemSolver,
-#     SO.NaiveCombinedHSDSystemSolver,
+# barrier_testfuns = [
+#     # test_orthant_barrier,
+#     # test_epinorminf_barrier,
+#     # test_epinormeucl_barrier,
+#     # test_epipersquare_barrier,
+#     # test_epiperpower_barrier, # fails with BigFloat
+#     test_hypoperlog_barrier,
+#     # test_epiperexp_barrier, # fails with BigFloat
+#     test_hypogeomean_barrier,
+#     # # test_epinormspectral_barrier,
+#     # test_semidefinite_barrier,
+#     # # test_hypoperlogdet_barrier,
+#     # test_wsospolyinterp_barrier,
+#     # # TODO next 2 fail with BigFloat
+#     # # test_wsospolyinterpmat_barrier,
+#     # # test_wsospolyinterpsoc_barrier, # NOTE not updated for generic reals (too much work)
 #     ]
-# testfuns_preproc = [
-#     dimension1,
-#     consistent1,
-#     inconsistent1,
-#     inconsistent2,
-#     ]
+# @testset "barrier functions tests: $t, $T" for t in barrier_testfuns, T in real_types
+#     # if T == BigFloat && t in (test_epiperpower_barrier, test_epiperexp_barrier, test_wsospolyinterpmat_barrier, test_wsospolyinterpsoc_barrier)
+#     #     continue
+#     # end
+#     t(T)
+# end
+
+@info("starting native interface tests")
+real_types = [
+    Float64,
+    Float32,
+    BigFloat,
+    ]
+system_solvers = [
+    SO.QRCholCombinedHSDSystemSolver,
+    # SO.SymIndefCombinedHSDSystemSolver,
+    SO.NaiveElimCombinedHSDSystemSolver,
+    # SO.NaiveCombinedHSDSystemSolver,
+    ]
+testfuns_preproc = [
+    dimension1,
+    consistent1,
+    inconsistent1,
+    inconsistent2,
+    ]
 # @testset "preprocessing tests: $t, $s, $T" for t in testfuns_preproc, s in system_solvers, T in real_types
 #     test_options = (
 #         linear_model = MO.PreprocessedLinearModel,
@@ -101,66 +101,66 @@ end
 #         )
 #     t(T, test_options)
 # end
-# linear_models = [
-#     MO.PreprocessedLinearModel,
-#     MO.RawLinearModel,
-#     ]
-# testfuns_raw = [
-#     orthant1,
-#     orthant2,
-#     orthant3,
-#     orthant4,
-#     epinorminf1,
-#     epinorminf2,
-#     epinorminf3,
-#     epinorminf4,
-#     epinorminf5,
-#     epinormeucl1,
-#     epinormeucl2,
-#     epipersquare1,
-#     epipersquare2,
-#     epipersquare3,
-#     # hypoperlog1,
-#     # hypoperlog2,
-#     # hypoperlog3,
-#     # hypoperlog4,
-#     # hypoperlog5,
-#     # hypoperlog6,
-#     # epiperpower1,
-#     # epiperpower2,
-#     # epiperexp1,
-#     # epiperexp2,
-#     # hypogeomean1,
-#     # hypogeomean2,
-#     # hypogeomean3,
-#     # epinormspectral1,
-#     semidefinite1,
-#     semidefinite2,
-#     semidefinitecomplex1,
-#     # hypoperlogdet1,
-#     # hypoperlogdet2,
-#     # hypoperlogdet3,
-#     ]
-# @testset "native tests: $t, $s, $m, $T" for t in testfuns_raw, s in system_solvers, m in linear_models, T in real_types
-#     if T == BigFloat && t in (epiperpower1, epiperpower2, epiperexp1, epiperexp2)
-#         continue # ForwardDiff does not work with BigFloat
-#     end
-#     if T == BigFloat && m == MO.RawLinearModel
-#         continue # IterativeSolvers does not work with BigFloat
-#     end
-#     if s == SO.QRCholCombinedHSDSystemSolver && m == MO.RawLinearModel
-#         continue # QRChol linear system solver needs preprocessed model
-#     end
-#     test_options = (
-#         linear_model = m,
-#         system_solver = s,
-#         linear_model_options = NamedTuple(),
-#         system_solver_options = NamedTuple(),
-#         stepper_options = NamedTuple(),
-#         solver_options = (verbose = false,),
-#         )
-#     t(T, test_options)
-# end
+linear_models = [
+    MO.PreprocessedLinearModel,
+    # MO.RawLinearModel,
+    ]
+testfuns_raw = [
+    # orthant1,
+    # orthant2,
+    # orthant3,
+    # orthant4,
+    # epinorminf1,
+    # epinorminf2,
+    # epinorminf3,
+    # epinorminf4,
+    # epinorminf5,
+    # epinormeucl1,
+    # epinormeucl2,
+    # epipersquare1,
+    # epipersquare2,
+    # epipersquare3,
+    hypoperlog1,
+    hypoperlog2,
+    # hypoperlog3,
+    # hypoperlog4,
+    # hypoperlog5,
+    # hypoperlog6,
+    epiperpower1,
+    epiperpower2,
+    # epiperexp1,
+    # epiperexp2,
+    # hypogeomean1,
+    # hypogeomean2,
+    # hypogeomean3,
+    # epinormspectral1,
+    # semidefinite1,
+    # semidefinite2,
+    # semidefinitecomplex1,
+    # hypoperlogdet1,
+    # hypoperlogdet2,
+    # hypoperlogdet3,
+    ]
+@testset "native tests: $t, $s, $m, $T" for t in testfuns_raw, s in system_solvers, m in linear_models, T in real_types
+    if T == BigFloat && t in (epiperpower1, epiperpower2, epiperexp1, epiperexp2)
+        continue # ForwardDiff does not work with BigFloat
+    end
+    if T == BigFloat && m == MO.RawLinearModel
+        continue # IterativeSolvers does not work with BigFloat
+    end
+    if s == SO.QRCholCombinedHSDSystemSolver && m == MO.RawLinearModel
+        continue # QRChol linear system solver needs preprocessed model
+    end
+    test_options = (
+        linear_model = m,
+        system_solver = s,
+        linear_model_options = NamedTuple(),
+        system_solver_options = NamedTuple(),
+        stepper_options = NamedTuple(),
+        solver_options = (verbose = false,),
+        )
+    t(T, test_options)
+end
 # @testset "native tests (iterative linear system solves): $t, $T" for t in testfuns_raw, T in real_types
 #     if T == BigFloat
 #         continue # IterativeSolvers does not work with BigFloat

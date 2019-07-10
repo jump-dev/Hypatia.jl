@@ -549,7 +549,7 @@ function epiperpower1(T, test_options)
     cone_idxs = [1:3]
 
     for is_dual in (true, false)
-        cones = CO.Cone{T}[CO.EpiPerPower{T}(2.0, is_dual)]
+        cones = CO.Cone{T}[CO.EpiPerPower{T}(T(2), is_dual)]
 
         r = build_solve_check(c, A, b, G, h, cones, cone_idxs; test_options...)
         @test r.status == :Optimal
@@ -567,7 +567,7 @@ function epiperpower2(T, test_options)
     h = zeros(T, 3)
     cone_idxs = [1:3]
 
-    for is_dual in (true, false), alpha in [1.5, 2.5]
+    for is_dual in (true, false), alpha in T[1.5, 2.5]
         cones = CO.Cone{T}[CO.EpiPerPower{T}(alpha, is_dual)]
 
         r = build_solve_check(c, A, b, G, h, cones, cone_idxs; test_options...)
@@ -587,7 +587,7 @@ function hypogeomean1(T, test_options)
     cone_idxs = [1:3]
 
     for is_dual in (true, false)
-        cones = CO.Cone{T}[CO.HypoGeomean{T}([0.5, 0.5], is_dual)]
+        cones = CO.Cone{T}[CO.HypoGeomean{T}(ones(T, 2) / 2, is_dual)]
 
         r = build_solve_check(c, A, b, G, h, cones, cone_idxs; test_options...)
         @test r.status == :Optimal
@@ -607,7 +607,7 @@ function hypogeomean2(T, test_options)
 
     for is_dual in (true, false)
         b = is_dual ? [-one(T)] : [one(T)]
-        cones = CO.Cone{T}[CO.HypoGeomean{T}(fill(inv(l), l), is_dual)]
+        cones = CO.Cone{T}[CO.HypoGeomean{T}(fill(inv(T(l)), l), is_dual)]
 
         r = build_solve_check(c, A, b, G, h, cones, cone_idxs; test_options...)
         @test r.status == :Optimal
@@ -627,7 +627,7 @@ function hypogeomean3(T, test_options)
     cone_idxs = [1:(l + 1)]
 
     for is_dual in (true, false)
-        cones = CO.Cone{T}[CO.HypoGeomean{T}(fill(inv(l), l), is_dual)]
+        cones = CO.Cone{T}[CO.HypoGeomean{T}(fill(inv(T(l)), l), is_dual)]
 
         r = build_solve_check(c, A, b, G, h, cones, cone_idxs; test_options...)
         @test r.status == :Optimal

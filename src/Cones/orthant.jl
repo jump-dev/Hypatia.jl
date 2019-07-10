@@ -113,6 +113,9 @@ function update_inv_hess(cone::OrthantCone)
     return cone.inv_hess
 end
 
+update_hess_prod(cone::OrthantCone) = nothing
+update_inv_hess_prod(cone::OrthantCone) = nothing
+
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::OrthantCone)
     @assert cone.is_feas
     @. prod = arr / cone.point / cone.point
