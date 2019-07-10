@@ -70,7 +70,10 @@ function update_inv_hess_prod(cone::Cone)
     end
     copyto!(cone.tmp_hess, cone.hess)
     cone.hess_fact = hyp_chol!(cone.tmp_hess)
-    @assert isposdef(cone.hess_fact)
+    if !isposdef(cone.hess_fact) # TODO maybe better to not step to this point if the hessian factorization fails
+        copyto!(cone.tmp_hess, cone.hess)
+        cone.hess_fact = lu!(cone.tmp_hess)
+    end
     cone.inv_hess_prod_updated = true
     return
 end

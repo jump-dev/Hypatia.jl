@@ -172,19 +172,24 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::SymIndefCo
     end
 
     # solve system
+    lhs_symm = Symmetric(lhs)
     if system_solver.use_sparse
-        F = ldlt(Symmetric(lhs, :L), check = false)
+        F = ldlt(lhs_symm, check = false)
         if !issuccess(F)
-            F = ldlt(Symmetric(lhs, :L), shift = 1e-6, check = true)
+            F = ldlt(lhs_symm, shift = 1e-6, check = true)
         end
         rhs .= F \ rhs
     else
-        if T <: BlasReal
-            F = bunchkaufman!(Symmetric(lhs, :L), true, check = true) # TODO doesn't work for generic reals (need LDLT)
-            ldiv!(F, rhs)
-        else
-            rhs .= Symmetric(lhs, :L) \ rhs # TODO replace with a generic julia symmetric indefinite decomposition if available, see https://github.com/JuliaLang/julia/issues/10953
-        end
+        # TODO decide which factorization to use
+        # if T <: BlasReal
+        #     F = bunchkaufman!(lhs_symm, true, check = true) # TODO doesn't work for generic reals - try LU, or need LDLT implementation
+        #     ldiv!(F, rhs)
+        # else
+        #     F = lu!(lhs_symm) # TODO replace with a generic julia symmetric indefinite decomposition if available, see https://github.com/JuliaLang/julia/issues/10953
+        #     ldiv!(F, rhs)
+        # end
+        F = lu!(lhs_symm)
+        ldiv!(F, rhs)
     end
 
     if !use_hess_inv
