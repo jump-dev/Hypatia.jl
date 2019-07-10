@@ -114,7 +114,7 @@ end
 function test_hypogeomean_barrier(T::Type{<:HypReal})
     Random.seed!(1)
     for dim in [3, 5, 8]
-        alpha = rand(T, dim - 1)
+        alpha = rand(T, dim - 1) .+ 1
         alpha ./= sum(alpha)
         cone = CO.HypoGeomean{T}(alpha)
         test_barrier_oracles(cone)
