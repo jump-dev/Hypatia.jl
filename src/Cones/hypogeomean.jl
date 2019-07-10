@@ -36,7 +36,7 @@ mutable struct HypoGeomean{T <: HypReal} <: Cone{T}
     function HypoGeomean{T}(alpha::Vector{T}, is_dual::Bool) where {T <: HypReal}
         dim = length(alpha) + 1
         @assert dim >= 3
-        @assert all(ai >= 0 for ai in alpha)
+        @assert all(ai > 0 for ai in alpha)
         tol = 1e3 * eps(T)
         @assert sum(alpha) ≈ 1 atol=tol rtol=tol
         cone = new{T}()
