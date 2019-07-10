@@ -37,6 +37,12 @@ mutable struct EpiPerPower{T <: HypReal} <: Cone{T}
         cone = new()
         cone.use_dual = is_dual
         cone.alpha = alpha
+        ialpha2 = 2 / alpha
+        if cone.alpha >= 2
+            cone.barfun = (s -> -log(s[1] * s[2] ^ (2 - ialpha2) - abs2(s[3]) * s[1] ^ (1 - ialpha2)))
+        else
+            cone.barfun = (s -> -log(s[1] ^ ialpha2 * s[2] - abs2(s[3]) * s[2] ^ (ialpha2 - 1)))
+        end
         return cone
     end
 end
@@ -48,12 +54,6 @@ function setup_data(cone::EpiPerPower{T}) where {T <: HypReal}
     cone.grad = zeros(T, 3)
     cone.hess = Symmetric(zeros(T, 3, 3), :U)
     cone.tmp_hess = Symmetric(zeros(T, 3, 3), :U)
-    ialpha2 = 2 / cone.alpha
-    if cone.alpha >= 2
-        cone.barfun = point -> -log(point[1] * point[2] ^ (2 - ialpha2) - abs2(point[3]) * point[1] ^ (1 - ialpha2))
-    else
-        cone.barfun = point -> -log(point[1] ^ ialpha2 * point[2] - abs2(point[3]) * point[2] ^ (ialpha2 - 1))
-    end
     cone.diffres = DiffResults.HessianResult(cone.grad)
     return
 end

@@ -92,15 +92,16 @@ function update_hess(cone::HypoPerLog)
     u = cone.point[1]
     v = cone.point[2]
     w = view(cone.point, 3:cone.dim)
-    @. cone.vwivlwvu = v / w / cone.vlwvu
+    d = cone.dim - 2
+    @. cone.vwivlwvu = v / cone.vlwvu / w
     cone.hess.data[1, 1] = abs2(cone.grad[1])
-    lvwnivlwvu = (cone.lwv - (cone.dim - 2)) / cone.vlwvu
+    lvwnivlwvu = (cone.lwv - d) / cone.vlwvu
     cone.hess.data[1, 2] = -lvwnivlwvu / cone.vlwvu
     @. cone.hess.data[1, 3:end] = -cone.vwivlwvu / cone.vlwvu
-    cone.hess.data[2, 2] = abs2(lvwnivlwvu) + ((cone.dim - 2) / cone.vlwvu + inv(v)) / v
-    hden = (-v * cone.hess.data[1, 2] - 1) / cone.vlwvu
+    cone.hess.data[2, 2] = abs2(lvwnivlwvu) + (d / cone.vlwvu + inv(v)) / v
+    hden = (v * lvwnivlwvu - 1) / cone.vlwvu
     @. cone.hess.data[2, 3:end] = hden / w
-    for j in 1:(cone.dim - 2)
+    for j in 1:d
         j2 = 2 + j
         for i in 1:j
             cone.hess.data[2 + i, j2] = cone.vwivlwvu[i] * cone.vwivlwvu[j]
