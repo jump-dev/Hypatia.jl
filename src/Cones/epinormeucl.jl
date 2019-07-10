@@ -96,6 +96,9 @@ function update_inv_hess(cone::EpiNormEucl)
     return cone.inv_hess
 end
 
+update_hess_prod(cone::EpiNormEucl) = nothing
+update_inv_hess_prod(cone::EpiNormEucl) = nothing
+
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormEucl)
     @assert cone.grad_updated
     disth = cone.dist / 2

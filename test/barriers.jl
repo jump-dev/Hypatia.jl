@@ -87,7 +87,7 @@ function test_epipersquare_barrier(T::Type{<:HypReal})
 end
 
 function test_epiperpower_barrier(T::Type{<:HypReal})
-    for alpha in [1.5, 2.5]
+    for alpha in T[1.5, 2.5]
         cone = CO.EpiPerPower{T}(alpha)
         test_barrier_oracles(cone)
         test_barrier_oracles(cone, noise = 0.1)

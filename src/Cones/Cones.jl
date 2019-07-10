@@ -37,13 +37,66 @@ use_dual(cone::Cone) = cone.use_dual
 load_point(cone::Cone, point::AbstractVector) = (reset_data(cone); cone.point = point)
 dimension(cone::Cone) = cone.dim
 
-update_hess_prod(cone::Cone) = nothing
-update_inv_hess_prod(cone::Cone) = nothing
-
 is_feas(cone::Cone) = (cone.feas_updated ? cone.is_feas : update_feas(cone))
 grad(cone::Cone) = (cone.grad_updated ? cone.grad : update_grad(cone))
 hess(cone::Cone) = (cone.hess_updated ? cone.hess : update_hess(cone))
 inv_hess(cone::Cone) = (cone.inv_hess_updated ? cone.inv_hess : update_inv_hess(cone))
+
+# fallbacks
+
+reset_data(cone::Cone) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.inv_hess_prod_updated = false)
+
+# TODO check if this is most efficient way to use DiffResults
+function update_grad(cone::Cone)
+    @assert cone.is_feas
+    cone.diffres = ForwardDiff.hessian!(cone.diffres, cone.barfun, cone.point)
+    cone.grad .= DiffResults.gradient(cone.diffres)
+    cone.grad_updated = true
+    return cone.grad
+end
+
+function update_hess(cone::Cone)
+    @assert cone.grad_updated
+    cone.hess.data .= DiffResults.hessian(cone.diffres)
+    cone.hess_updated = true
+    return cone.hess
+end
+
+update_hess_prod(cone::Cone) = nothing
+
+function update_inv_hess_prod(cone::Cone)
+    if !cone.hess_updated
+        update_hess(cone)
+    end
+    copyto!(cone.tmp_hess, cone.hess)
+    cone.hess_fact = hyp_chol!(cone.tmp_hess)
+    cone.inv_hess_prod_updated = true
+    return
+end
+
+function update_inv_hess(cone::Cone)
+    if !cone.inv_hess_prod_updated
+        update_inv_hess_prod(cone)
+    end
+    cone.inv_hess = Symmetric(inv(cone.hess_fact), :U)
+    cone.inv_hess_updated = true
+    return cone.inv_hess
+end
+
+# TODO maybe write using linear operator form rather than needing explicit hess
+function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
+    if !cone.hess_updated
+        update_hess(cone)
+    end
+    return mul!(prod, cone.hess, arr)
+end
+
+function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
+    if !cone.inv_hess_prod_updated
+        update_inv_hess_prod(cone)
+    end
+    return ldiv!(prod, cone.hess_fact, arr)
+end
 
 # utilities for converting between smat and svec forms (lower triangle) for symmetric matrices
 # TODO only need to do upper/lower triangle if use symmetric matrix types

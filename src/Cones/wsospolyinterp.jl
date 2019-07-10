@@ -32,6 +32,7 @@ mutable struct WSOSPolyInterp{T <: HypReal, R <: HypRealOrComplex{T}} <: Cone{T}
     tmpLU::Vector{Matrix{R}}
     tmpUU::Matrix{R}
     ΛFs::Vector
+    tmp_hess::Symmetric{T, Matrix{T}}
     hess_fact # TODO prealloc
 
     function WSOSPolyInterp{T, R}(dim::Int, Ps::Vector{Matrix{R}}, is_dual::Bool) where {R <: HypRealOrComplex{T}} where {T <: HypReal}
@@ -48,8 +49,6 @@ end
 
 WSOSPolyInterp{T, R}(dim::Int, Ps::Vector{Matrix{R}}) where {R <: HypRealOrComplex{T}} where {T <: HypReal} = WSOSPolyInterp{T, R}(dim, Ps, false)
 
-reset_data(cone::WSOSPolyInterp) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.inv_hess_prod_updated = false)
-
 # TODO maybe only allocate the fields we use
 function setup_data(cone::WSOSPolyInterp{T, R}) where {R <: HypRealOrComplex{T}} where {T <: HypReal}
     reset_data(cone)
@@ -62,6 +61,7 @@ function setup_data(cone::WSOSPolyInterp{T, R}) where {R <: HypRealOrComplex{T}}
     cone.tmpLU = [Matrix{R}(undef, size(Pk, 2), dim) for Pk in Ps]
     cone.tmpUU = Matrix{R}(undef, dim, dim)
     cone.ΛFs = Vector{Any}(undef, length(Ps))
+    cone.tmp_hess = Symmetric(zeros(T, dim, dim), :U)
     return
 end
 
@@ -127,32 +127,4 @@ function update_hess(cone::WSOSPolyInterp)
     end
     cone.hess_updated = true
     return cone.hess
-end
-
-function update_inv_hess_prod(cone::WSOSPolyInterp)
-    @assert cone.hess_updated
-    copyto!(cone.tmpUU, cone.hess)
-    cone.hess_fact = hyp_chol!(Symmetric(cone.tmpUU, :U))
-    cone.inv_hess_prod_updated = true
-    return
-end
-
-function update_inv_hess(cone::WSOSPolyInterp)
-    if !cone.inv_hess_prod_updated
-        update_inv_hess_prod(cone)
-    end
-    cone.inv_hess = Symmetric(inv(cone.hess_fact), :U)
-    cone.inv_hess_updated = true
-    return cone.inv_hess
-end
-
-# TODO maybe write using linear operator form rather than needing explicit hess
-function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::WSOSPolyInterp)
-    @assert cone.hess_updated
-    return mul!(prod, cone.hess, arr)
-end
-
-function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::WSOSPolyInterp)
-    @assert cone.inv_hess_prod_updated
-    return ldiv!(prod, cone.hess_fact, arr)
 end

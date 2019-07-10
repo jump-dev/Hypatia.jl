@@ -267,6 +267,9 @@ function update_inv_hess(cone::PosSemidef{<:HypReal, <:Complex{<:HypReal}})
     return cone.inv_hess
 end
 
+update_hess_prod(cone::PosSemidef) = nothing
+update_inv_hess_prod(cone::PosSemidef) = nothing
+
 # TODO maybe write using linear operator form rather than needing explicit hess
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidef)
     if !cone.hess_updated

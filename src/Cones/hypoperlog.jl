@@ -39,8 +39,6 @@ end
 
 HypoPerLog{T}(dim::Int) where {T <: HypReal} = HypoPerLog{T}(dim, false)
 
-reset_data(cone::HypoPerLog) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.inv_hess_prod_updated = false)
-
 # TODO maybe only allocate the fields we use
 function setup_data(cone::HypoPerLog{T}) where {T <: HypReal}
     reset_data(cone)
@@ -111,32 +109,4 @@ function update_hess(cone::HypoPerLog)
     end
     cone.hess_updated = true
     return cone.hess
-end
-
-function update_inv_hess_prod(cone::HypoPerLog)
-    @assert cone.hess_updated
-    copyto!(cone.tmp_hess, cone.hess)
-    cone.hess_fact = hyp_chol!(cone.tmp_hess)
-    cone.inv_hess_prod_updated = true
-    return
-end
-
-function update_inv_hess(cone::HypoPerLog)
-    if !cone.inv_hess_prod_updated
-        update_inv_hess_prod(cone)
-    end
-    cone.inv_hess = Symmetric(inv(cone.hess_fact), :U)
-    cone.inv_hess_updated = true
-    return cone.inv_hess
-end
-
-# TODO maybe write using linear operator form rather than needing explicit hess
-function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPerLog)
-    @assert cone.hess_updated
-    return mul!(prod, cone.hess, arr)
-end
-
-function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPerLog)
-    @assert cone.inv_hess_prod_updated
-    return ldiv!(prod, cone.hess_fact, arr)
 end

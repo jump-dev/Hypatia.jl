@@ -121,6 +121,9 @@ function update_inv_hess(cone::EpiNormInf)
     return cone.inv_hess
 end
 
+update_hess_prod(cone::EpiNormInf) = nothing
+update_inv_hess_prod(cone::EpiNormInf) = nothing
+
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
     @assert cone.grad_updated
     for j in 1:size(prod, 2)
