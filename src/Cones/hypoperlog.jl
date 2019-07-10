@@ -64,7 +64,7 @@ function update_feas(cone::HypoPerLog)
     v = cone.point[2]
     w = view(cone.point, 3:cone.dim)
     if v > 0 && all(wi -> wi > 0, w)
-        cone.lwv = sum(wi -> log(wi / v), w)
+        cone.lwv = sum(log(wi / v) for wi in w)
         cone.vlwvu = v * cone.lwv - u
         cone.is_feas = (cone.vlwvu > 0)
     else

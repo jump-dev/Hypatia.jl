@@ -30,7 +30,7 @@ function test_barrier_oracles(cone::CO.Cone{T}; noise = 0.0) where {T <: HypReal
     CO.update_hess_prod(cone)
     CO.update_inv_hess_prod(cone)
 
-    tol = max(1e-20, sqrt(eps(T)))
+    tol = 1e4 * eps(T)
 
     @test dot(point, grad) ≈ -nu atol=tol rtol=tol
     @test hess * point ≈ -grad atol=tol rtol=tol

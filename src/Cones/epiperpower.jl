@@ -33,7 +33,7 @@ mutable struct EpiPerPower{T <: HypReal} <: Cone{T}
     hess_fact # TODO prealloc
 
     function EpiPerPower{T}(alpha::T, is_dual::Bool) where {T <: HypReal}
-        @assert alpha > 1.0
+        @assert alpha > 1
         cone = new()
         cone.use_dual = is_dual
         cone.alpha = alpha
@@ -72,7 +72,7 @@ end
 function update_feas(cone::EpiPerPower)
     @assert !cone.feas_updated
     (u, v, w) = cone.point
-    cone.is_feas = (u > 0 && v > 0 && log(abs(w)) < log(u) / cone.alpha + log(v) * cone.alpha / (cone.alpha - 1))
+    cone.is_feas = (u > 0 && v > 0 && log(abs(w)) < log(u) / cone.alpha + log(v) * (cone.alpha - 1) / cone.alpha)
     cone.feas_updated = true
     return cone.is_feas
 end

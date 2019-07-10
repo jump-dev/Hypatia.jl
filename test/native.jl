@@ -544,7 +544,7 @@ function epiperpower1(T, test_options)
     c = T[0, 0, -1]
     A = T[1 0 0; 0 1 0]
     b = T[0.5, 1]
-    G = Diagonal(-one(T) * I, 3)
+    G = Diagonal(-T(10) * I, 3)
     h = zeros(T, 3)
     cone_idxs = [1:3]
 
@@ -563,7 +563,7 @@ function epiperpower2(T, test_options)
     c = T[0, 0, 1]
     A = T[1 0 0; 0 1 0]
     b = T[0, 1]
-    G = SparseMatrixCSC(-one(T) * I, 3, 3)
+    G = SparseMatrixCSC(-T(100) * I, 3, 3)
     h = zeros(T, 3)
     cone_idxs = [1:3]
 
