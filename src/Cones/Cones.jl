@@ -70,6 +70,7 @@ function update_inv_hess_prod(cone::Cone)
     end
     copyto!(cone.tmp_hess, cone.hess)
     cone.hess_fact = hyp_chol!(cone.tmp_hess)
+    @assert isposdef(cone.hess_fact)
     cone.inv_hess_prod_updated = true
     return
 end
@@ -101,7 +102,7 @@ end
 # utilities for converting between smat and svec forms (lower triangle) for symmetric matrices
 # TODO only need to do upper/lower triangle if use symmetric matrix types
 
-function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{T}, rt2::T) where {T <: HypReal}
+function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{T}, rt2::T) where {T}
     k = 1
     m = size(mat, 1)
     for i in 1:m, j in 1:i
@@ -115,7 +116,7 @@ function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{T}, rt2::T) w
     return vec
 end
 
-function svec_to_smat!(mat::AbstractMatrix{T}, vec::AbstractVector{T}, rt2i::T) where {T <: HypReal}
+function svec_to_smat!(mat::AbstractMatrix{T}, vec::AbstractVector{T}, rt2i::T) where {T}
     k = 1
     m = size(mat, 1)
     for i in 1:m, j in 1:i
@@ -129,7 +130,7 @@ function svec_to_smat!(mat::AbstractMatrix{T}, vec::AbstractVector{T}, rt2i::T) 
     return mat
 end
 
-function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}, rt2::T) where {T <: HypReal}
+function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}, rt2::T) where {T}
     k = 1
     m = size(mat, 1)
     for i in 1:m, j in 1:i
@@ -147,7 +148,7 @@ function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}, 
     return vec
 end
 
-function svec_to_smat!(mat::AbstractMatrix{Complex{T}}, vec::AbstractVector{T}, rt2i::T) where {T <: HypReal}
+function svec_to_smat!(mat::AbstractMatrix{Complex{T}}, vec::AbstractVector{T}, rt2i::T) where {T}
     k = 1
     m = size(mat, 1)
     for i in 1:m, j in 1:i

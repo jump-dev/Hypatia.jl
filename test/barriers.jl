@@ -5,12 +5,13 @@ Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 using Test
 import Random
 using LinearAlgebra
+import ForwardDiff
 import Hypatia
 import Hypatia.HypReal
 const CO = Hypatia.Cones
 const MU = Hypatia.ModelUtilities
 
-function test_barrier_oracles(cone::CO.Cone{T}; noise = 0.0) where {T <: HypReal}
+function test_barrier_oracles(cone::CO.Cone{T}, barrier::Function; noise = 0.0) where {T <: HypReal}
     CO.setup_data(cone)
     dim = CO.dimension(cone)
     point = Vector{T}(undef, dim)
@@ -44,44 +45,76 @@ function test_barrier_oracles(cone::CO.Cone{T}; noise = 0.0) where {T <: HypReal
     @test CO.hess_prod!(prod, inv_hess, cone) ≈ I atol=tol rtol=tol
     @test CO.inv_hess_prod!(prod, hess, cone) ≈ I atol=tol rtol=tol
 
+    id = Matrix{T}(I, dim, dim)
+    @test CO.hess_prod!(prod, id, cone) ≈ hess atol=tol rtol=tol
+    @test CO.inv_hess_prod!(prod, id, cone) ≈ inv_hess atol=tol rtol=tol
+
+    if T in (Float32, Float64) # NOTE can only use BLAS floats with ForwardDiff barriers, see https://github.com/JuliaDiff/DiffResults.jl/pull/9#issuecomment-497853361
+        FD_grad = ForwardDiff.gradient(barrier, point)
+        @test FD_grad ≈ grad atol=tol rtol=tol
+        FD_hess = ForwardDiff.hessian(barrier, point)
+        @test FD_hess ≈ hess atol=tol rtol=tol
+    end
+
     return
 end
 
 function test_orthant_barrier(T::Type{<:HypReal})
+    barrier = s -> -sum(log, s)
     for dim in [1, 3, 5]
         cone = CO.Nonnegative{T}(dim)
-        test_barrier_oracles(cone)
-        test_barrier_oracles(cone, noise = 0.1)
+        test_barrier_oracles(cone, barrier)
+        test_barrier_oracles(cone, barrier, noise = 0.1)
+    end
+
+    barrier = s -> -sum(log, -s)
+    for dim in [1, 3, 5]
         cone = CO.Nonpositive{T}(dim)
-        test_barrier_oracles(cone)
-        test_barrier_oracles(cone, noise = 0.1)
+        test_barrier_oracles(cone, barrier)
+        test_barrier_oracles(cone, barrier, noise = 0.1)
     end
     return
 end
 
 function test_epinorminf_barrier(T::Type{<:HypReal})
+    function barrier(s)
+        u = s[1]
+        w = s[2:end]
+        return -sum(log, u .- abs2.(w) ./ u) - log(u)
+    end
     for dim in [3, 5, 8]
         cone = CO.EpiNormInf{T}(dim)
-        test_barrier_oracles(cone)
-        test_barrier_oracles(cone, noise = 0.1)
+        test_barrier_oracles(cone, barrier)
+        test_barrier_oracles(cone, barrier, noise = 0.1)
     end
     return
 end
 
 function test_epinormeucl_barrier(T::Type{<:HypReal})
+    function barrier(s)
+        u = s[1]
+        w = s[2:end]
+        return -log(abs2(u) - sum(abs2, w))
+    end
     for dim in [2, 3, 5]
         cone = CO.EpiNormEucl{T}(dim)
-        test_barrier_oracles(cone)
-        test_barrier_oracles(cone, noise = 0.1)
+        test_barrier_oracles(cone, barrier)
+        test_barrier_oracles(cone, barrier, noise = 0.1)
     end
     return
 end
 
 function test_epipersquare_barrier(T::Type{<:HypReal})
+    function barrier(s)
+        u = s[1]
+        v = s[2]
+        w = s[3:end]
+        return -log(2 * u * v - sum(abs2, w))
+    end
     for dim in [3, 5, 8]
         cone = CO.EpiPerSquare{T}(dim)
-        test_barrier_oracles(cone)
-        test_barrier_oracles(cone, noise = 0.1)
+        test_barrier_oracles(cone, barrier)
+        test_barrier_oracles(cone, barrier, noise = 0.1)
     end
     return
 end
@@ -89,16 +122,23 @@ end
 function test_epiperpower_barrier(T::Type{<:HypReal})
     for alpha in T[1.5, 2.5]
         cone = CO.EpiPerPower{T}(alpha)
-        test_barrier_oracles(cone)
-        test_barrier_oracles(cone, noise = 0.1)
+        test_barrier_oracles(cone, cone.barfun)
+        test_barrier_oracles(cone, cone.barfun, noise = 0.1)
     end
     return
 end
 
 function test_hypoperlog_barrier(T::Type{<:HypReal})
+    function barrier(s)
+        u = s[1]
+        v = s[2]
+        w = s[3:end]
+        return -log(v * sum(log, w ./ v) - u) - sum(log, w) - log(v)
+    end
     for dim in [3, 5, 8]
         cone = CO.HypoPerLog{T}(dim)
-        test_barrier_oracles(cone)
+        test_barrier_oracles(cone, barrier)
+        test_barrier_oracles(cone, barrier, noise = 0.1)
     end
     return
 end
@@ -106,7 +146,8 @@ end
 function test_epiperexp_barrier(T::Type{<:HypReal})
     for dim in [3, 5, 8]
         cone = CO.EpiPerExp{T}(dim)
-        test_barrier_oracles(cone)
+        test_barrier_oracles(cone, cone.barfun)
+        test_barrier_oracles(cone, cone.barfun, noise = 0.1)
     end
     return
 end
@@ -116,8 +157,14 @@ function test_hypogeomean_barrier(T::Type{<:HypReal})
     for dim in [3, 5, 8]
         alpha = rand(T, dim - 1) .+ 1
         alpha ./= sum(alpha)
+        function barrier(s)
+            u = s[1]
+            w = s[2:end]
+            return -log(prod((w ./ alpha) .^ alpha) + u) - sum((1 .- alpha) .* log.(w ./ alpha)) - log(-u)
+        end
         cone = CO.HypoGeomean{T}(alpha)
-        test_barrier_oracles(cone)
+        test_barrier_oracles(cone, barrier)
+        test_barrier_oracles(cone, barrier, noise = 0.1)
     end
     return
 end
@@ -131,15 +178,30 @@ end
 # end
 #
 function test_semidefinite_barrier(T::Type{<:HypReal})
-    for dim in [1, 3, 6]
-        cone = CO.PosSemidef{T, T}(dim) # real
-        test_barrier_oracles(cone)
-        test_barrier_oracles(cone, noise = 0.1)
-    end
-    for dim in [1, 4, 9]
-        cone = CO.PosSemidef{T, Complex{T}}(dim) # complex
-        test_barrier_oracles(cone)
-        test_barrier_oracles(cone, noise = 0.1)
+    for side in [1, 2, 3]
+        # real PSD cone
+        dim = div(side * (side + 1), 2)
+        cone = CO.PosSemidef{T, T}(dim)
+        function R_barrier(s)
+            S = similar(s, side, side)
+            rt2i = convert(eltype(s), inv(sqrt(T(2))))
+            CO.svec_to_smat!(S, s, rt2i)
+            return -logdet(cholesky!(Symmetric(S)))
+        end
+        test_barrier_oracles(cone, R_barrier)
+        test_barrier_oracles(cone, R_barrier, noise = 0.1)
+
+        # complex PSD cone
+        dim = side^2
+        cone = CO.PosSemidef{T, Complex{T}}(dim)
+        function C_barrier(s)
+            S = zeros(Complex{eltype(s)}, side, side)
+            rt2i = convert(eltype(s), inv(sqrt(T(2))))
+            CO.svec_to_smat!(S, s, rt2i)
+            return -logdet(cholesky!(Hermitian(S)))
+        end
+        test_barrier_oracles(cone, C_barrier)
+        test_barrier_oracles(cone, C_barrier, noise = 0.1)
     end
     return
 end
@@ -157,9 +219,13 @@ function test_wsospolyinterp_barrier(T::Type{<:HypReal})
     for n in 1:3, halfdeg in 1:3
         (U, _, P0, _, _) = MU.interpolate(MU.FreeDomain(n), halfdeg, sample = false)
         P0 = convert(Matrix{T}, P0)
-        cone = CO.WSOSPolyInterp{T, T}(U, [P0], true)
-        test_barrier_oracles(cone)
-        test_barrier_oracles(cone, noise = 0.1)
+        cone = CO.WSOSPolyInterp{T, T}(U, [P0], true) # TODO test with more Pi
+        function barrier(s)
+            Lambda = Symmetric(P0' * Diagonal(s) * P0)
+            return -logdet(cholesky!(Lambda))
+        end
+        test_barrier_oracles(cone, barrier)
+        test_barrier_oracles(cone, barrier, noise = 0.1)
     end
     # TODO also test complex case CO.WSOSPolyInterp{T, Complex{T}} - need complex MU interp functions first
     return

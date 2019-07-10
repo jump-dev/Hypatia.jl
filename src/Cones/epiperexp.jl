@@ -36,6 +36,14 @@ mutable struct EpiPerExp{T <: HypReal} <: Cone{T}
         cone = new{T}()
         cone.use_dual = is_dual
         cone.dim = dim
+        function barfun(point)
+            u = point[1]
+            v = point[2]
+            w = view(point, 3:dim)
+            # return -log(u - v*sum(wi -> exp(wi/v), w)) - log(u) - log(v)
+            return -log(log(u) - log(v) - log(sum(wi -> exp(wi / v), w))) - log(u) - 2 * log(v) # TODO use the numerically safer way to evaluate LSE function
+        end
+        cone.barfun = barfun
         return cone
     end
 end
@@ -48,14 +56,6 @@ function setup_data(cone::EpiPerExp{T}) where {T <: HypReal}
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.tmp_hess = Symmetric(zeros(T, dim, dim), :U)
-    function barfun(point)
-        u = point[1]
-        v = point[2]
-        w = view(point, 3:dim)
-        # return -log(u - v*sum(wi -> exp(wi/v), w)) - log(u) - log(v)
-        return -log(log(u) - log(v) - log(sum(wi -> exp(wi / v), w))) - log(u) - 2 * log(v) # TODO use the numerically safer way to evaluate LSE function
-    end
-    cone.barfun = barfun
     cone.diffres = DiffResults.HessianResult(cone.grad)
     return
 end

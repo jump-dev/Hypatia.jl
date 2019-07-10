@@ -29,9 +29,9 @@ version = "0.5.6"
 
 [[CSV]]
 deps = ["CategoricalArrays", "DataFrames", "Dates", "Mmap", "Parsers", "PooledArrays", "Profile", "Tables", "Unicode", "WeakRefStrings"]
-git-tree-sha1 = "f4a8ed808b7ee18638c5f8b278071ce0245e5e85"
+git-tree-sha1 = "2ea7620282c60902d7f0085d190abe9cf9928981"
 uuid = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
-version = "0.5.7"
+version = "0.5.8"
 
 [[Calculus]]
 deps = ["Compat"]
