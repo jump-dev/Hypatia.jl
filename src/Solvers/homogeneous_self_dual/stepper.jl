@@ -1,3 +1,8 @@
+#=
+Copyright 2018, Chris Coey and contributors
+
+interior point stepper and line search functions for algorithms based on homogeneous self dual embedding
+=#
 
 mutable struct CombinedHSDStepper{T <: HypReal} <: HSDStepper{T}
     system_solver::CombinedHSDSystemSolver{T}
