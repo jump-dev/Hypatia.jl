@@ -17,16 +17,29 @@ mutable struct HypoPerLogdet{T <: HypReal} <: Cone{T}
     side::Int
     point::AbstractVector{T}
 
-    is_feas::Bool
+    feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
     inv_hess_updated::Bool
+    inv_hess_prod_updated::Bool
+    is_feas::Bool
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
 
+    rt2::T
+    rt2i::T
     mat::Matrix{T}
-    F
+    fact_mat
+    ldWv
+    z
+    Wi
+    nLz
+    ldWvuv
+    vzip1
+    Wivzi
+    tmp_hess::Symmetric{T, Matrix{T}}
+    hess_fact # TODO prealloc
 
     function HypoPerLogdet{T}(dim::Int, is_dual::Bool) where {T <: HypReal}
         cone = new{T}()
@@ -44,26 +57,27 @@ function setup_data(cone::HypoPerLogdet{T}) where {T <: HypReal}
     dim = cone.dim
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.side = round(Int, sqrt(0.25 + 2 * (dim - 2)) - 0.5)
+    cone.tmp_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.mat = Matrix{T}(undef, cone.side, cone.side)
+    cone.Wivzi = similar(cone.mat)
+    cone.rt2 = sqrt(T(2))
+    cone.rt2i = inv(cone.rt2)
     return
 end
 
 get_nu(cone::HypoPerLogdet) = cone.side + 2
 
 function set_initial_point(arr::AbstractVector, cone::HypoPerLogdet)
+    arr .= 0
     arr[1] = -1
     arr[2] = 1
     k = 3
-    for i in 1:cone.side, j in 1:i
-        arr[k] = (i == j) ? 1 : 0
-        k += 1
+    for i in 1:cone.side
+        arr[k] = 1
+        k += i + 1
     end
     return arr
 end
-
-reset_data(cone::HypoPerLogdet) = (cone.is_feas = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
 
 # TODO remove allocs
 function update_feas(cone::HypoPerLogdet)
@@ -71,37 +85,35 @@ function update_feas(cone::HypoPerLogdet)
     u = cone.point[1]
     v = cone.point[2]
     if v > 0
-        svec_to_smat!(cone.mat, view(cone.point, 3:cone.dim))
-        fact_mat = hyp_chol!(Symmetric(cone.mat))
-        if !isposdef(fact_mat)
-            return false
+        svec_to_smat!(cone.mat, view(cone.point, 3:cone.dim), cone.rt2i)
+        cone.fact_mat = hyp_chol!(Symmetric(cone.mat))
+        if isposdef(cone.fact_mat)
+            cone.ldWv = logdet(cone.fact_mat) - cone.side * log(v)
+            cone.z = v * cone.ldWv - u
+            cone.is_feas = cone.z > 0
+        else
+            cone.is_feas = false
         end
-        ldW = logdet(fact_mat)
-        if u >= v * (ldW - cone.side * log(v))
-            return false
-        end
-        cone.is_feas = true
+    else
+        cone.is_feas = false
     end
+    cone.feas_updated = true
     return cone.is_feas
 end
 
 function update_grad(cone::HypoPerLogdet)
     @assert cone.is_feas
-
-    L = ldW - cone.side * log(v)
-    z = v * L - u
-
-    Wi = Symmetric(inv(F))
-    n = cone.side
-    dim = cone.dim
-    vzi = v / z
-
-    cone.g[1] = inv(z)
-    cone.g[2] = (T(n) - L) / z - inv(v)
-    gwmat = -Wi * (one(T) + vzi)
-    smat_to_svec!(view(cone.g, 3:dim), gwmat)
-
-
+    u = cone.point[1]
+    v = cone.point[2]
+    cone.Wi = Symmetric(inv(cone.fact_mat))
+    cone.nLz = (cone.side - cone.ldWv) / cone.z
+    cone.ldWvuv = cone.ldWv - u / v
+    cone.vzip1 = 1 + inv(cone.ldWvuv)
+    cone.grad[1] = inv(cone.z)
+    cone.grad[2] = cone.nLz - inv(v)
+    gend = view(cone.grad, 3:cone.dim)
+    smat_to_svec!(gend, cone.Wi, cone.rt2)
+    gend .*= -cone.vzip1
     cone.grad_updated = true
     return cone.grad
 end
@@ -109,84 +121,39 @@ end
 # TODO only work with upper triangle
 function update_hess(cone::HypoPerLogdet)
     @assert cone.grad_updated
-
-    cone.H[1, 1] = inv(z) / z
-    cone.H[1, 2] = (T(n) - L) / z / z
-    Huwmat = -vzi * Wi / z
-    smat_to_svec!(view(cone.H, 1, 3:dim), Huwmat)
-
-    cone.H[2, 2] = abs2(T(-n) + L) / z / z + T(n) / (v * z) + inv(v) / v
-    Hvwmat = ((T(-n) + L) * vzi - one(T)) * Wi / z
-    smat_to_svec!(view(cone.H, 2, 3:dim), Hvwmat)
-
-    rt2 = sqrt(T(2))
-
-    k = 3
-    for i in 1:n, j in 1:i
+    u = cone.point[1]
+    v = cone.point[2]
+    z = cone.z
+    Wi = cone.Wi
+    Wivzi = cone.Wivzi
+    @. Wivzi = Wi / cone.ldWvuv # prealloc
+    cone.hess.data[1, 1] = inv(z) / z
+    cone.hess.data[1, 2] = cone.nLz / z
+    h1end = view(cone.hess.data, 1, 3:cone.dim)
+    smat_to_svec!(h1end, Wivzi, cone.rt2)
+    h1end ./= -z
+    cone.hess.data[2, 2] = abs2(cone.nLz) + (cone.side / z + inv(v)) / v
+    h2end = view(cone.hess.data, 2, 3:cone.dim)
+    smat_to_svec!(h2end, Wi, cone.rt2)
+    h2end .*= ((cone.ldWv - cone.side) / cone.ldWvuv - 1) / z
+    k1 = 3
+    for i in 1:cone.side, j in 1:i
         k2 = 3
-        for i2 in 1:n, j2 in 1:i2
+        for i2 in 1:cone.side, j2 in 1:i2
             if (i == j) && (i2 == j2)
-                cone.H[k2, k] = abs2(Wi[i2, i]) * (vzi + one(T)) + Wi[i, i] * Wi[i2, i2] * abs2(vzi)
+                cone.hess.data[k2, k1] = abs2(Wi[i2, i]) * cone.vzip1 + Wivzi[i, i] * Wivzi[i2, i2]
             elseif (i != j) && (i2 != j2)
-                cone.H[k2, k] = (Wi[i2, i] * Wi[j, j2] + Wi[j2, i] * Wi[j, i2]) * (vzi + one(T)) + 2 * Wi[i, j] * Wi[i2, j2] * abs2(vzi)
+                cone.hess.data[k2, k1] = (Wi[i2, i] * Wi[j, j2] + Wi[j2, i] * Wi[j, i2]) * cone.vzip1 + 2 * Wivzi[i, j] * Wivzi[i2, j2]
             else
-                cone.H[k2, k] = rt2 * (Wi[i2, i] * Wi[j, j2] * (vzi + one(T)) + Wi[i, j] * Wi[i2, j2] * abs2(vzi))
+                cone.hess.data[k2, k1] = cone.rt2 * (Wi[i2, i] * Wi[j, j2] * cone.vzip1 + Wivzi[i, j] * Wivzi[i2, j2])
             end
-            if k2 == k
+            if k2 == k1
                 break
             end
             k2 += 1
         end
-        k += 1
+        k1 += 1
     end
-
-
     cone.hess_updated = true
     return cone.hess
 end
-
-
-#
-# # L = logdet(W / v)
-# L = ldW - cone.side * log(v)
-# z = v * L - u
-#
-# Wi = Symmetric(inv(F))
-# n = cone.side
-# dim = cone.dim
-# vzi = v / z
-#
-# cone.g[1] = inv(z)
-# cone.g[2] = (T(n) - L) / z - inv(v)
-# gwmat = -Wi * (one(T) + vzi)
-# smat_to_svec!(view(cone.g, 3:dim), gwmat)
-#
-# cone.H[1, 1] = inv(z) / z
-# cone.H[1, 2] = (T(n) - L) / z / z
-# Huwmat = -vzi * Wi / z
-# smat_to_svec!(view(cone.H, 1, 3:dim), Huwmat)
-#
-# cone.H[2, 2] = abs2(T(-n) + L) / z / z + T(n) / (v * z) + inv(v) / v
-# Hvwmat = ((T(-n) + L) * vzi - one(T)) * Wi / z
-# smat_to_svec!(view(cone.H, 2, 3:dim), Hvwmat)
-#
-# rt2 = sqrt(T(2))
-#
-# k = 3
-# for i in 1:n, j in 1:i
-#     k2 = 3
-#     for i2 in 1:n, j2 in 1:i2
-#         if (i == j) && (i2 == j2)
-#             cone.H[k2, k] = abs2(Wi[i2, i]) * (vzi + one(T)) + Wi[i, i] * Wi[i2, i2] * abs2(vzi)
-#         elseif (i != j) && (i2 != j2)
-#             cone.H[k2, k] = (Wi[i2, i] * Wi[j, j2] + Wi[j2, i] * Wi[j, i2]) * (vzi + one(T)) + 2 * Wi[i, j] * Wi[i2, j2] * abs2(vzi)
-#         else
-#             cone.H[k2, k] = rt2 * (Wi[i2, i] * Wi[j, j2] * (vzi + one(T)) + Wi[i, j] * Wi[i2, j2] * abs2(vzi))
-#         end
-#         if k2 == k
-#             break
-#         end
-#         k2 += 1
-#     end
-#     k += 1
-# end
