@@ -126,7 +126,7 @@ function matrixcompletion(
 
         A = zeros(T, 0, 1 + num_unknown)
         push!(cone_idxs, (cone_offset + 1):(cone_offset + num_unknown + 1))
-        push!(cones, CO.HypoGeomean{T}(ones(num_unknown) / num_unknown))
+        push!(cones, CO.HypoGeomean{T}(fill(inv(T(num_unknown)), num_unknown)))
     else
         # number of 3-dimensional power cones needed is num_unknown - 1, number of new variables is num_unknown - 2
         # first num_unknown columns overlap with G_norm, column for the epigraph variable of the spectral cone added later
@@ -135,7 +135,7 @@ function matrixcompletion(
         G_geo[3, 1] = -1
         G_geo[2, 2] = -1
         G_geo[1, num_unknown + 1] = -1
-        push!(cones, CO.HypoGeomean{T}([0.5, 0.5]))
+        push!(cones, CO.HypoGeomean{T}(fill(inv(T(2)), 2)))
         push!(cone_idxs, (cone_offset + 1):(cone_offset + 3))
         offset = 4
         # loop over new vars
@@ -143,7 +143,7 @@ function matrixcompletion(
             G_geo[offset, num_unknown + i + 1] = -1
             G_geo[offset + 1, num_unknown + i] = -1
             G_geo[offset + 2, i + 2] = -1
-            push!(cones, CO.HypoGeomean{T}([(i + 1) / (i + 2), 1 / (i + 2)]))
+            push!(cones, CO.HypoGeomean{T}([T(i + 1) / T(i + 2), inv(T(i + 2))]))
             push!(cone_idxs, (cone_offset + 3 * i + 1):(cone_offset + 3 * (i + 1)))
             offset += 3
         end
@@ -151,12 +151,12 @@ function matrixcompletion(
         # last row also special becuase hypograph variable is fixed
         G_geo[offset + 2, num_unknown] = -1
         G_geo[offset + 1, 2 * num_unknown - 2] = -1
-        push!(cones, CO.HypoGeomean{T}([(num_unknown - 1) / num_unknown, 1 / num_unknown]))
+        push!(cones, CO.HypoGeomean{T}([T(num_unknown - 1) / T(num_unknown), inv(T(num_unknown))]))
         push!(cone_idxs, (cone_offset + 3 * num_unknown - 5):(cone_offset + 3 * num_unknown - 3))
         h = vcat(h_norm, zeros(T, 3 * (num_unknown - 2)), T[1, 0, 0])
 
         # G_norm needs to be post-padded with columns for 3dim cone vars
-        G_norm = hcat(G_norm, zeros(size(G_norm, 1), num_unknown - 2))
+        G_norm = hcat(G_norm, zeros(T, size(G_norm, 1), num_unknown - 2))
         # G_geo needs to be pre-padded with the epigraph variable for the spectral norm cone
         G_geo = hcat(zeros(T, 3 * (num_unknown - 1)), G_geo)
         c = vcat(c, zeros(T, num_unknown - 2))

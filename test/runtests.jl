@@ -106,6 +106,10 @@ linear_models = [
     MO.PreprocessedLinearModel,
     MO.RawLinearModel,
     ]
+use_infty_nbhd = [
+    true,
+    false,
+    ]
 testfuns_raw = [
     orthant1,
     orthant2,
@@ -142,7 +146,7 @@ testfuns_raw = [
     hypoperlogdet2,
     hypoperlogdet3,
     ]
-@testset "native tests: $t, $s, $m, $T" for t in testfuns_raw, s in system_solvers, m in linear_models, T in real_types
+@testset "native tests: $t, $s, $m, $n, $T" for t in testfuns_raw, s in system_solvers, m in linear_models, n in use_infty_nbhd, T in real_types
     if T == BigFloat && t in (epiperpower1, epiperpower2, epiperexp1, epiperexp2)
         continue # ForwardDiff does not work with BigFloat
     end
@@ -157,8 +161,8 @@ testfuns_raw = [
         system_solver = s,
         linear_model_options = NamedTuple(),
         system_solver_options = NamedTuple(),
-        stepper_options = NamedTuple(),
-        solver_options = (verbose = false,),
+        stepper_options = (use_infty_nbhd = n,),
+        solver_options = (verbose = true,),
         )
     t(T, test_options)
 end
@@ -185,7 +189,7 @@ real_types = [
 @testset "native examples: $T" for T in real_types
     # TODO test some other options maybe
     test_options = (
-        solver_options = (verbose = true,),
+        solver_options = (verbose = false,),
         )
 
     @testset "densityest" begin test_densityest.(instances_densityest_few, T = T, test_options = test_options) end
