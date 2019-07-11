@@ -165,15 +165,20 @@ function find_max_alpha_in_nbhd(
     while num_pred_iters < 100
         num_pred_iters += 1
 
+        @timeit solver.timer "ls_update" begin
         @. z_temp = point.z + alpha * z_dir
         @. s_temp = point.s + alpha * s_dir
         tau_temp = solver.tau + alpha * tau_dir
         kap_temp = solver.kap + alpha * kap_dir
         taukap_temp = tau_temp * kap_temp
         mu_temp = (dot(s_temp, z_temp) + taukap_temp) / (one(T) + model.nu)
+        end
 
-        if mu_temp > zero(T) && in_nbhd(mu_temp, taukap_temp, nbhd, model.cones, stepper)
-            break
+        if mu_temp > zero(T)
+            @timeit solver.timer "nbhd_check" in_nbhd = check_nbhd(mu_temp, taukap_temp, nbhd, model.cones, stepper)
+            if in_nbhd
+                break
+            end
         end
 
         if alpha < T(1e-2) # TODO option for parameter
@@ -189,7 +194,7 @@ function find_max_alpha_in_nbhd(
     return (alpha, num_pred_iters)
 end
 
-function in_nbhd(
+function check_nbhd(
     mu_temp::T,
     taukap_temp::T,
     nbhd::T,
