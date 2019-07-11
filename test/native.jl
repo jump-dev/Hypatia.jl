@@ -666,6 +666,8 @@ end
 function hypoperlogdet1(T, test_options)
     tol = max(1e-5, sqrt(sqrt(eps(T))))
     Random.seed!(1)
+    Trt2 = sqrt(T(2))
+    Tirt2 = inv(Trt2)
     side = 4
     dim = 2 + div(side * (side + 1), 2)
     c = T[-1, 0]
@@ -675,7 +677,7 @@ function hypoperlogdet1(T, test_options)
     mat_half = rand(T, side, side)
     mat = mat_half * mat_half'
     h = zeros(T, dim)
-    CO.smat_to_svec!(view(h, 3:dim), mat)
+    CO.smat_to_svec!(view(h, 3:dim), mat, Trt2)
     cones = CO.Cone{T}[CO.HypoPerLogdet{T}(dim)]
     cone_idxs = [1:dim]
 
@@ -683,13 +685,15 @@ function hypoperlogdet1(T, test_options)
     @test r.status == :Optimal
     @test r.x[1] ≈ -r.primal_obj atol=tol rtol=tol
     @test r.x[2] ≈ 1 atol=tol rtol=tol
-    @test r.s[2] * logdet(CO.svec_to_smat!(zeros(T, side, side), r.s[3:end]) / r.s[2]) ≈ r.s[1] atol=tol rtol=tol
-    @test r.z[1] * (logdet(CO.svec_to_smat!(zeros(T, side, side), -r.z[3:end]) / r.z[1]) + T(side)) ≈ r.z[2] atol=tol rtol=tol
+    @test r.s[2] * logdet(CO.svec_to_smat!(zeros(T, side, side), r.s[3:end], Tirt2) / r.s[2]) ≈ r.s[1] atol=tol rtol=tol
+    @test r.z[1] * (logdet(CO.svec_to_smat!(zeros(T, side, side), -r.z[3:end], Tirt2) / r.z[1]) + T(side)) ≈ r.z[2] atol=tol rtol=tol
 end
 
 function hypoperlogdet2(T, test_options)
     tol = max(1e-5, sqrt(sqrt(eps(T))))
     Random.seed!(1)
+    Trt2 = sqrt(T(2))
+    Tirt2 = inv(Trt2)
     side = 3
     dim = 2 + div(side * (side + 1), 2)
     c = T[0, 1]
@@ -699,7 +703,7 @@ function hypoperlogdet2(T, test_options)
     mat_half = rand(T, side, side)
     mat = mat_half * mat_half'
     h = zeros(T, dim)
-    CO.smat_to_svec!(view(h, 3:dim), mat)
+    CO.smat_to_svec!(view(h, 3:dim), mat, Trt2)
     cones = CO.Cone{T}[CO.HypoPerLogdet{T}(dim, true)]
     cone_idxs = [1:dim]
 
@@ -707,13 +711,14 @@ function hypoperlogdet2(T, test_options)
     @test r.status == :Optimal
     @test r.x[2] ≈ r.primal_obj atol=tol rtol=tol
     @test r.x[1] ≈ -1 atol=tol rtol=tol
-    @test r.s[1] * (logdet(CO.svec_to_smat!(zeros(T, side, side), -r.s[3:end]) / r.s[1]) + T(side)) ≈ r.s[2] atol=tol rtol=tol
-    @test r.z[2] * logdet(CO.svec_to_smat!(zeros(T, side, side), r.z[3:end]) / r.z[2]) ≈ r.z[1] atol=tol rtol=tol
+    @test r.s[1] * (logdet(CO.svec_to_smat!(zeros(T, side, side), -r.s[3:end], Tirt2) / r.s[1]) + T(side)) ≈ r.s[2] atol=tol rtol=tol
+    @test r.z[2] * logdet(CO.svec_to_smat!(zeros(T, side, side), r.z[3:end], Tirt2) / r.z[2]) ≈ r.z[1] atol=tol rtol=tol
 end
 
 function hypoperlogdet3(T, test_options)
     tol = max(1e-5, sqrt(sqrt(eps(T))))
     Random.seed!(1)
+    Trt2 = sqrt(T(2))
     side = 3
     dim = 2 + div(side * (side + 1), 2)
     c = T[-1, 0]
@@ -723,7 +728,7 @@ function hypoperlogdet3(T, test_options)
     mat_half = rand(T, side, side)
     mat = mat_half * mat_half'
     h = zeros(T, dim)
-    CO.smat_to_svec!(view(h, 3:dim), mat)
+    CO.smat_to_svec!(view(h, 3:dim), mat, Trt2)
     cones = CO.Cone{T}[CO.HypoPerLogdet{T}(dim)]
     cone_idxs = [1:dim]
 

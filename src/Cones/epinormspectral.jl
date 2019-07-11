@@ -19,16 +19,23 @@ mutable struct EpiNormSpectral{T <: HypReal} <: Cone{T}
     m::Int
     point::AbstractVector{T}
 
-    is_feas::Bool
+    feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
     inv_hess_updated::Bool
+    inv_hess_prod_updated::Bool
+    is_feas::Bool
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
 
-    W::Matrix{T}
-    F
+    W
+    X
+    fact_Z
+    Zi
+    Eu
+    tmp_hess::Symmetric{T, Matrix{T}}
+    hess_fact # TODO prealloc
 
     function EpiNormSpectral{T}(n::Int, m::Int, is_dual::Bool) where {T <: HypReal}
         @assert n <= m
@@ -49,7 +56,7 @@ function setup_data(cone::EpiNormSpectral{T}) where {T <: HypReal}
     dim = cone.dim
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
+    cone.tmp_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.W = Matrix{T}(undef, cone.n, cone.m)
     return
 end
@@ -62,112 +69,64 @@ function set_initial_point(arr::AbstractVector, cone::EpiNormSpectral)
     return arr
 end
 
-reset_data(cone::EpiNormSpectral) = (cone.is_feas = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
-
 function update_feas(cone::EpiNormSpectral)
     @assert !cone.feas_updated
     u = cone.point[1]
     if u > 0
-        cone.W .= view(cone.point, 2:cone.dim)
-        X = Symmetric(cone.W * cone.W') # TODO use syrk
-        Z = Symmetric(u * I - X / u)
-        fact_Z = hyp_chol!(Z)
-        cone.is_feas = isposdef(fact_Z)
+        cone.W[:] .= view(cone.point, 2:cone.dim)
+        cone.X = Symmetric(cone.W * cone.W') # TODO use syrk
+        Z = Symmetric(u * I - cone.X / u)
+        cone.fact_Z = hyp_chol!(Z)
+        cone.is_feas = isposdef(cone.fact_Z)
+    else
+        cone.is_feas = false
     end
+    cone.feas_updated = true
     return cone.is_feas
 end
 
 function update_grad(cone::EpiNormSpectral)
     @assert cone.is_feas
-    Zi = Symmetric(inv(cone.fact_Z))
-    Eu = Symmetric(I + X / u / u)
-    cone.g[1] = -dot(Zi, Eu) - inv(u)
-    cone.g[2:end] .= vec(2 * Zi * W / u)
+    u = cone.point[1]
+    cone.Zi = Symmetric(inv(cone.fact_Z))
+    cone.Eu = Symmetric(I + cone.X / u / u)
+    cone.grad[1] = -dot(cone.Zi, cone.Eu) - inv(u)
+    cone.grad[2:end] .= vec(2 * cone.Zi * cone.W / u)
     cone.grad_updated = true
     return cone.grad
 end
 
 # TODO maybe this could be simpler/faster if use mul!(cone.hess, cone.grad, cone.grad') and build from there
-# TODO remove allocations
 function update_hess(cone::EpiNormSpectral)
     @assert cone.grad_updated
+    n = cone.n
+    m = cone.m
+    u = cone.point[1]
+    W = cone.W
+    X = cone.X
+    Zi = cone.Zi
+    Eu = cone.Eu
     cone.hess .= 0
-
     ZiEuZi = Symmetric(Zi * Eu * Zi)
-    cone.H[1, 1] = dot(ZiEuZi, Eu) + (2 * dot(Zi, X) / u + one(T)) / u / u
-    cone.H[1, 2:end] = vec(-2 * (ZiEuZi + Zi / u) *  W / u)
-
+    cone.hess.data[1, 1] = dot(ZiEuZi, Eu) + (2 * dot(Zi, X) / u + 1) / u / u
+    cone.hess.data[1, 2:end] = vec(-2 * (ZiEuZi + Zi / u) * W / u)
     p = 2
     for j in 1:m, i in 1:n
-        tmpmat = Zi[:, i] * W[:, j]' * Zi / u
-
-        # Zi * dZdWij * Zi
-        term1 = Symmetric(tmpmat + tmpmat') # TODO use syrk
-
+        @views tmpmat = Zi[:, i] * W[:, j]' * Zi / u
+        term1 = Symmetric(tmpmat + tmpmat') # Zi * dZdWij * Zi
         q = p
-        cone.H[p, q:(q + n - i)] = Zi[i, i:n]
-        for ni in 1:n
-            cone.H[p, q:(q + n - i)] += term1[ni, i:n] * W[ni, j]
+        viewij = view(cone.hess.data, p, q:(q + n - i))
+        @views viewij .= Zi[i, i:n]
+        @views @. for ni in 1:n
+            viewij += W[ni, j] * term1[ni, i:n]
         end
-        cone.H[p, q:(q + n - i)] *= 2 / u
+        viewij .*= 2 / u
         q += (n - i + 1)
-
-        mat = 2 * term1 * W[:, (j + 1):m] / u
-        nterms = n * (m - j)
-        cone.H[p, q:(q + nterms - 1)] += vec(mat)
-        q += nterms
+        ntermsij = n * (m - j)
+        @views cone.hess.data[p, q:(q + ntermsij - 1)] .+= vec(2 * term1 * W[:, (j + 1):m] / u)
+        q += ntermsij
         p += 1
     end
-
     cone.hess_updated = true
     return cone.hess
 end
-
-# TODO? hess_prod! and inv_hess_prod!
-
-
-# W = cone.W
-# W[:] = view(cone.point, 2:cone.dim)
-# n = cone.n
-# m = cone.m
-#
-# X = Symmetric(W * W') # TODO use syrk
-# Z = Symmetric(u * I - X / u)
-# F = hyp_chol!(Z)
-# if !isposdef(F)
-#     return false
-# end
-#
-# # TODO figure out structured form of inverse? could simplify algebra
-# Zi = Symmetric(inv(F))
-# Eu = Symmetric(I + X / u / u)
-# cone.H .= zero(T)
-#
-# cone.g[1] = -dot(Zi, Eu) - inv(u)
-# cone.g[2:end] = vec(2 * Zi * W / u)
-#
-# ZiEuZi = Symmetric(Zi * Eu * Zi)
-# cone.H[1, 1] = dot(ZiEuZi, Eu) + (2 * dot(Zi, X) / u + one(T)) / u / u
-# cone.H[1, 2:end] = vec(-2 * (ZiEuZi + Zi / u) *  W / u)
-#
-# p = 2
-# for j in 1:m, i in 1:n
-#     tmpmat = Zi[:, i] * W[:, j]' * Zi / u
-#
-#     # Zi * dZdWij * Zi
-#     term1 = Symmetric(tmpmat + tmpmat') # TODO use syrk
-#
-#     q = p
-#     cone.H[p, q:(q + n - i)] = Zi[i, i:n]
-#     for ni in 1:n
-#         cone.H[p, q:(q + n - i)] += term1[ni, i:n] * W[ni, j]
-#     end
-#     cone.H[p, q:(q + n - i)] *= 2 / u
-#     q += (n - i + 1)
-#
-#     mat = 2 * term1 * W[:, (j + 1):m] / u
-#     nterms = n * (m - j)
-#     cone.H[p, q:(q + nterms - 1)] += vec(mat)
-#     q += nterms
-#     p += 1
-# end

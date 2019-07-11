@@ -21,40 +21,37 @@ function test_barrier_oracles(cone::CO.Cone{T}, barrier::Function; noise = 0.0) 
     end
     CO.load_point(cone, point)
 
-    @test cone.point == point
-    @test CO.is_feas(cone)
-
-    nu = CO.get_nu(cone)
-    grad = CO.grad(cone)
-    hess = CO.hess(cone)
-    inv_hess = CO.inv_hess(cone)
-    CO.update_hess_prod(cone)
-    CO.update_inv_hess_prod(cone)
-
     tol = 1e4 * eps(T)
 
+    @test cone.point == point
+    @test CO.is_feas(cone)
+    nu = CO.get_nu(cone)
+    grad = CO.grad(cone)
     @test dot(point, grad) ≈ -nu atol=tol rtol=tol
+    hess = CO.hess(cone)
     @test hess * point ≈ -grad atol=tol rtol=tol
-    @test hess * inv_hess ≈ I atol=tol rtol=tol
-
-    prod = similar(point)
-    @test CO.hess_prod!(prod, point, cone) ≈ -grad atol=tol rtol=tol
-    @test CO.inv_hess_prod!(prod, grad, cone) ≈ -point atol=tol rtol=tol
-
-    prod = similar(point, dim, dim)
-    @test CO.hess_prod!(prod, inv_hess, cone) ≈ I atol=tol rtol=tol
-    @test CO.inv_hess_prod!(prod, hess, cone) ≈ I atol=tol rtol=tol
-
-    id = Matrix{T}(I, dim, dim)
-    @test CO.hess_prod!(prod, id, cone) ≈ hess atol=tol rtol=tol
-    @test CO.inv_hess_prod!(prod, id, cone) ≈ inv_hess atol=tol rtol=tol
 
     if T in (Float32, Float64) # NOTE can only use BLAS floats with ForwardDiff barriers, see https://github.com/JuliaDiff/DiffResults.jl/pull/9#issuecomment-497853361
         FD_grad = ForwardDiff.gradient(barrier, point)
-        @test FD_grad ≈ grad atol=tol rtol=tol
         FD_hess = ForwardDiff.hessian(barrier, point)
+        @test FD_grad ≈ grad atol=tol rtol=tol
         @test FD_hess ≈ hess atol=tol rtol=tol
     end
+
+    inv_hess = CO.inv_hess(cone)
+    @test hess * inv_hess ≈ I atol=tol rtol=tol
+
+    CO.update_hess_prod(cone)
+    CO.update_inv_hess_prod(cone)
+    prod = similar(point)
+    @test CO.hess_prod!(prod, point, cone) ≈ -grad atol=tol rtol=tol
+    @test CO.inv_hess_prod!(prod, grad, cone) ≈ -point atol=tol rtol=tol
+    prod = similar(point, dim, dim)
+    @test CO.hess_prod!(prod, inv_hess, cone) ≈ I atol=tol rtol=tol
+    @test CO.inv_hess_prod!(prod, hess, cone) ≈ I atol=tol rtol=tol
+    id = Matrix{T}(I, dim, dim)
+    @test CO.hess_prod!(prod, id, cone) ≈ hess atol=tol rtol=tol
+    @test CO.inv_hess_prod!(prod, id, cone) ≈ inv_hess atol=tol rtol=tol
 
     return
 end
@@ -157,26 +154,32 @@ function test_hypogeomean_barrier(T::Type{<:HypReal})
     for dim in [3, 5, 8]
         alpha = rand(T, dim - 1) .+ 1
         alpha ./= sum(alpha)
+        cone = CO.HypoGeomean{T}(alpha)
         function barrier(s)
             u = s[1]
             w = s[2:end]
             return -log(prod((w ./ alpha) .^ alpha) + u) - sum((1 .- alpha) .* log.(w ./ alpha)) - log(-u)
         end
-        cone = CO.HypoGeomean{T}(alpha)
         test_barrier_oracles(cone, barrier)
         test_barrier_oracles(cone, barrier, noise = 0.1)
     end
     return
 end
 
-# function test_epinormspectral_barrier(T::Type{<:HypReal})
-#     for (n, m) in [(1, 3), (2, 4)]
-#         cone = CO.EpiNormSpectral{T}(n, m)
-#         test_barrier_oracles(cone)
-#     end
-#     return
-# end
-#
+function test_epinormspectral_barrier(T::Type{<:HypReal})
+    for (n, m) in [(1, 2), (2, 2), (2, 3)]
+        cone = CO.EpiNormSpectral{T}(n, m)
+        function barrier(s)
+            u = s[1]
+            W = reshape(s[2:end], n, m)
+            return -logdet(cholesky!(Symmetric(u * I - W * W' / u))) - log(u)
+        end
+        test_barrier_oracles(cone, barrier)
+        test_barrier_oracles(cone, barrier, noise = 0.1)
+    end
+    return
+end
+
 function test_semidefinite_barrier(T::Type{<:HypReal})
     for side in [1, 2, 3]
         # real PSD cone
@@ -206,14 +209,24 @@ function test_semidefinite_barrier(T::Type{<:HypReal})
     return
 end
 
-# function test_hypoperlogdet_barrier(T::Type{<:HypReal})
-#     for dim in [3, 5, 8]
-#         cone = CO.HypoPerLogdet{T}(dim)
-#         test_barrier_oracles(cone)
-#     end
-#     return
-# end
-#
+function test_hypoperlogdet_barrier(T::Type{<:HypReal})
+    for side in [1, 2, 3]
+        dim = 2 + div(side * (side + 1), 2)
+        cone = CO.HypoPerLogdet{T}(dim)
+        function barrier(s)
+            u = s[1]
+            v = s[2]
+            W = similar(s, side, side)
+            rt2i = convert(eltype(s), inv(sqrt(T(2))))
+            CO.svec_to_smat!(W, s[3:end], rt2i)
+            return -log(v * logdet(cholesky!(Symmetric(W / v))) - u) - logdet(cholesky!(Symmetric(W))) - log(v)
+        end
+        test_barrier_oracles(cone, barrier)
+        test_barrier_oracles(cone, barrier, noise = 0.1)
+    end
+    return
+end
+
 function test_wsospolyinterp_barrier(T::Type{<:HypReal})
     Random.seed!(1)
     for n in 1:3, halfdeg in 1:3

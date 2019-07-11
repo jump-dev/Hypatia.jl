@@ -32,12 +32,12 @@ mutable struct PosSemidef{T <: HypReal, R <: HypRealOrComplex{T}} <: Cone{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
 
+    rt2::T
+    rt2i::T
     mat::Matrix{R}
     mat2::Matrix{R}
     inv_mat::Matrix{R}
     fact_mat
-    rt2::T
-    rt2i::T
 
     function PosSemidef{T, R}(dim::Int, is_dual::Bool) where {R <: HypRealOrComplex{T}} where {T <: HypReal}
         cone = new{T, R}()
@@ -77,16 +77,12 @@ end
 get_nu(cone::PosSemidef) = cone.side
 
 function set_initial_point(arr::AbstractVector, cone::PosSemidef)
-    incr_off = cone.is_complex ? 2 : 1
+    incr = cone.is_complex ? 2 : 1
     arr .= 0
     k = 1
-    for i in 1:cone.side, j in 1:i
-        if i == j # on diagonal
-            arr[k] = 1
-            k += 1
-        else # off diagonal
-            k += incr_off
-        end
+    for i in 1:cone.side
+        arr[k] = 1
+        k += incr * i + 1
     end
     return arr
 end
