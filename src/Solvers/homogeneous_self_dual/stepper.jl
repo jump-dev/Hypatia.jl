@@ -1,3 +1,8 @@
+#=
+Copyright 2018, Chris Coey and contributors
+
+interior point stepper and line search functions for algorithms based on homogeneous self dual embedding
+=#
 
 mutable struct CombinedHSDStepper{T <: HypReal} <: HSDStepper{T}
     system_solver::CombinedHSDSystemSolver{T}
@@ -172,7 +177,7 @@ function find_max_alpha_in_nbhd(
                 if stepper.cones_outside_nbhd[k]
                     cone_k = cones[k]
                     Cones.load_point(cone_k, stepper.primal_views[k])
-                    if Cones.check_in_cone(cone_k)
+                    if Cones.is_feas(cone_k)
                         stepper.cones_outside_nbhd[k] = false
                         stepper.cones_loaded[k] = true
                     else
@@ -192,7 +197,7 @@ function find_max_alpha_in_nbhd(
                         cone_k = cones[k]
                         if !stepper.cones_loaded[k]
                             Cones.load_point(cone_k, stepper.primal_views[k])
-                            if !Cones.check_in_cone(cone_k)
+                            if !Cones.is_feas(cone_k)
                                 in_nbhds = false
                                 break
                             end
