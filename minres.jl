@@ -142,18 +142,21 @@ function iterate(m::MINRESIterable, iteration::Int=start(m))
     #
     # end
 
-    # if iteration > 5
-    #     for i in 1:(iteration - 3)
-    #         tmp = view(m.V, :, i)
-    #         proj = dot(tmp, m.v_next)
-    #         axpy!(-proj, tmp, m.v_next)
-    #     end
-    # end
+    if iteration > 5
+        # if norm(m.v_next) < 0.1 * norm(m.A) # https://www.cs.cornell.edu/~bindel/class/cs6210-f16/lec/2016-11-16.pdf
+            for i in 1:(iteration - 3)
+                tmp = view(m.V, :, i)
+                proj = dot(tmp, m.v_next)
+                # @show proj
+                axpy!(-proj, tmp, m.v_next)
+            end
+        # end
+    end
     # @show iteration
-
 
     # Normalize
     m.H[4] = norm(m.v_next)
+    # @show m.H[4]
     rmul!(m.v_next, inv(m.H[4]))
 
     # modification
@@ -275,8 +278,8 @@ minres(A, b; kwargs...) = minres!(zerox(A, b), A, b; initially_zero = true, kwar
 
 using SparseArrays, Random
 Random.seed!(1)
-n = 50
-A = randn(n, n)
+n = 5000
+A = sprandn(n, n, 0.1)
 A = A + A'
 x = randn(n)
 b = A * x
