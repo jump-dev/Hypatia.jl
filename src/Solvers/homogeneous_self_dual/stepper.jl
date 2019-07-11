@@ -26,8 +26,8 @@ mutable struct CombinedHSDStepper{T <: HypReal} <: HSDStepper{T}
     function CombinedHSDStepper{T}(
         model::Models.LinearModel{T};
         system_solver::CombinedHSDSystemSolver{T} = (model isa Models.PreprocessedLinearModel{T} ? QRCholCombinedHSDSystemSolver{T}(model) : NaiveCombinedHSDSystemSolver{T}(model)),
-        max_nbhd::T = T(0.75),
         use_infty_nbhd::Bool = true,
+        max_nbhd::T = T(0.7), # TODO tune: maybe (use_infty_nbhd ? T(0.5) : T(0.75))
         ) where {T <: HypReal}
         stepper = new{T}()
 
@@ -63,7 +63,7 @@ function step(solver::HSDSolver{T}, stepper::CombinedHSDStepper{T}) where {T <: 
     @timeit solver.timer "directions" (x_pred, x_corr, y_pred, y_corr, z_pred, z_corr, s_pred, s_corr, tau_pred, tau_corr, kap_pred, kap_corr) = get_combined_directions(solver, stepper.system_solver)
 
     # calculate correction factor gamma by finding distance affine_alpha for stepping in affine direction
-    @timeit solver.timer "aff_alpha" (affine_alpha, affine_alpha_iters) = find_max_alpha_in_nbhd(z_pred, s_pred, tau_pred, kap_pred, T(0.9999), stepper.prev_affine_alpha, stepper, solver)
+    @timeit solver.timer "aff_alpha" (affine_alpha, affine_alpha_iters) = find_max_alpha_in_nbhd(z_pred, s_pred, tau_pred, kap_pred, T(0.99), stepper.prev_affine_alpha, stepper, solver)
     gamma = (one(T) - affine_alpha)^3 # TODO allow different function (heuristic)
     stepper.prev_affine_alpha = affine_alpha
     stepper.prev_affine_alpha_iters = affine_alpha_iters
@@ -86,7 +86,7 @@ function step(solver::HSDSolver{T}, stepper::CombinedHSDStepper{T}) where {T <: 
         s_comb = s_corr
         tau_comb = tau_corr
         kap_comb = kap_corr
-        @timeit solver.timer "corr_alpha" (alpha, corr_alpha_iters) = find_max_alpha_in_nbhd(z_comb, s_comb, tau_comb, kap_comb, stepper.max_nbhd, T(0.9999), stepper, solver)
+        @timeit solver.timer "corr_alpha" (alpha, corr_alpha_iters) = find_max_alpha_in_nbhd(z_comb, s_comb, tau_comb, kap_comb, stepper.max_nbhd, T(0.99), stepper, solver)
         alpha_iters += corr_alpha_iters
 
         @. point.x += alpha * x_corr
@@ -148,7 +148,7 @@ function find_max_alpha_in_nbhd(
     s_temp = stepper.s_temp
 
     # alpha = 0.9999 # TODO make this an option
-    alpha = min(prev_alpha * T(1.4), T(0.9999))
+    alpha = min(prev_alpha * T(1.4), T(0.99))
 
     if kap_dir < zero(T)
         alpha = min(alpha, -solver.kap / kap_dir)
