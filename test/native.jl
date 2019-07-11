@@ -2,12 +2,15 @@
 Copyright 2018, Chris Coey and contributors
 =#
 
+using Test
 import Random
 using LinearAlgebra
 using SparseArrays
 import GenericLinearAlgebra.svdvals!
+import Hypatia
 import Hypatia.HypReal
 import Hypatia.Solvers.build_solve_check
+const CO = Hypatia.Cones
 
 function dimension1(T, test_options)
     tol = max(1e-5, sqrt(sqrt(eps(T))))
@@ -441,7 +444,7 @@ function hypoperlog1(T, test_options)
     b = T[2, 1]
     G = Matrix{T}(-I, 3, 3)
     h = zeros(T, 3)
-    cones = CO.Cone{T}[CO.HypoPerLog{T}()]
+    cones = CO.Cone{T}[CO.HypoPerLog{T}(3)]
     cone_idxs = [1:3]
 
     r = build_solve_check(c, A, b, G, h, cones, cone_idxs; test_options...)
@@ -459,7 +462,7 @@ function hypoperlog2(T, test_options)
     b = T[0]
     G = Diagonal(-one(T) * I, 3)
     h = zeros(T, 3)
-    cones = CO.Cone{T}[CO.HypoPerLog{T}()]
+    cones = CO.Cone{T}[CO.HypoPerLog{T}(3)]
     cone_idxs = [1:3]
 
     r = build_solve_check(c, A, b, G, h, cones, cone_idxs; test_options...)
@@ -474,7 +477,7 @@ function hypoperlog3(T, test_options)
     b = zeros(T, 0)
     G = sparse([1, 2, 3, 4], [1, 2, 3, 1], -ones(T, 4))
     h = zeros(T, 4)
-    cones = CO.Cone{T}[CO.HypoPerLog{T}(), CO.Nonnegative{T}(1)]
+    cones = CO.Cone{T}[CO.HypoPerLog{T}(3), CO.Nonnegative{T}(1)]
     cone_idxs = [1:3, 4:4]
 
     r = build_solve_check(c, A, b, G, h, cones, cone_idxs; test_options...)
@@ -492,7 +495,7 @@ function hypoperlog4(T, test_options)
     b = T[1, -1]
     G = SparseMatrixCSC(-one(T) * I, 3, 3)
     h = zeros(T, 3)
-    cones = CO.Cone{T}[CO.HypoPerLog{T}(true)]
+    cones = CO.Cone{T}[CO.HypoPerLog{T}(3, true)]
     cone_idxs = [1:3]
 
     r = build_solve_check(c, A, b, G, h, cones, cone_idxs; test_options...)
@@ -501,7 +504,7 @@ function hypoperlog4(T, test_options)
     @test r.x ≈ [-1, 1, Texp2] atol=tol rtol=tol
 end
 
-function hypopersumlog1(T, test_options)
+function hypoperlog5(T, test_options)
     tol = max(1e-5, sqrt(sqrt(eps(T))))
     Tlogq = log(T(0.25))
     c = T[-1, 0, 0]
@@ -509,7 +512,7 @@ function hypopersumlog1(T, test_options)
     b = T[1]
     G = sparse([1, 3, 4], [1, 2, 3], -ones(T, 3))
     h = T[0, 1, 0, 0]
-    cones = CO.Cone{T}[CO.HypoPerSumLog{T}(4)]
+    cones = CO.Cone{T}[CO.HypoPerLog{T}(4)]
     cone_idxs = [1:4]
 
     r = build_solve_check(c, A, b, G, h, cones, cone_idxs; test_options...)
@@ -519,14 +522,14 @@ function hypopersumlog1(T, test_options)
     @test r.y ≈ [2] atol=tol rtol=tol
 end
 
-function hypopersumlog2(T, test_options)
+function hypoperlog6(T, test_options)
     tol = max(1e-5, sqrt(sqrt(eps(T))))
     c = T[-1, 0, 0]
     A = zeros(T, 0, 3)
     b = zeros(T, 0)
     G = sparse([1, 3, 4], [1, 2, 3], -ones(T, 3))
     h = zeros(T, 4)
-    cones = CO.Cone{T}[CO.HypoPerSumLog{T}(4)]
+    cones = CO.Cone{T}[CO.HypoPerLog{T}(4)]
     cone_idxs = [1:4]
 
     r = build_solve_check(c, A, b, G, h, cones, cone_idxs; test_options...)
@@ -541,12 +544,12 @@ function epiperpower1(T, test_options)
     c = T[0, 0, -1]
     A = T[1 0 0; 0 1 0]
     b = T[0.5, 1]
-    G = Diagonal(-one(T) * I, 3)
+    G = Diagonal(-T(10) * I, 3)
     h = zeros(T, 3)
     cone_idxs = [1:3]
 
     for is_dual in (true, false)
-        cones = CO.Cone{T}[CO.EpiPerPower{T}(2.0, is_dual)]
+        cones = CO.Cone{T}[CO.EpiPerPower{T}(T(2), is_dual)]
 
         r = build_solve_check(c, A, b, G, h, cones, cone_idxs; test_options...)
         @test r.status == :Optimal
@@ -560,11 +563,11 @@ function epiperpower2(T, test_options)
     c = T[0, 0, 1]
     A = T[1 0 0; 0 1 0]
     b = T[0, 1]
-    G = SparseMatrixCSC(-one(T) * I, 3, 3)
+    G = SparseMatrixCSC(-T(100) * I, 3, 3)
     h = zeros(T, 3)
     cone_idxs = [1:3]
 
-    for is_dual in (true, false), alpha in [1.5, 2.5]
+    for is_dual in (true, false), alpha in T[1.5, 2.5]
         cones = CO.Cone{T}[CO.EpiPerPower{T}(alpha, is_dual)]
 
         r = build_solve_check(c, A, b, G, h, cones, cone_idxs; test_options...)
@@ -584,7 +587,7 @@ function hypogeomean1(T, test_options)
     cone_idxs = [1:3]
 
     for is_dual in (true, false)
-        cones = CO.Cone{T}[CO.HypoGeomean{T}([0.5, 0.5], is_dual)]
+        cones = CO.Cone{T}[CO.HypoGeomean{T}(ones(T, 2) / 2, is_dual)]
 
         r = build_solve_check(c, A, b, G, h, cones, cone_idxs; test_options...)
         @test r.status == :Optimal
@@ -604,7 +607,7 @@ function hypogeomean2(T, test_options)
 
     for is_dual in (true, false)
         b = is_dual ? [-one(T)] : [one(T)]
-        cones = CO.Cone{T}[CO.HypoGeomean{T}(fill(inv(l), l), is_dual)]
+        cones = CO.Cone{T}[CO.HypoGeomean{T}(fill(inv(T(l)), l), is_dual)]
 
         r = build_solve_check(c, A, b, G, h, cones, cone_idxs; test_options...)
         @test r.status == :Optimal
@@ -624,7 +627,7 @@ function hypogeomean3(T, test_options)
     cone_idxs = [1:(l + 1)]
 
     for is_dual in (true, false)
-        cones = CO.Cone{T}[CO.HypoGeomean{T}(fill(inv(l), l), is_dual)]
+        cones = CO.Cone{T}[CO.HypoGeomean{T}(fill(inv(T(l)), l), is_dual)]
 
         r = build_solve_check(c, A, b, G, h, cones, cone_idxs; test_options...)
         @test r.status == :Optimal
@@ -663,6 +666,8 @@ end
 function hypoperlogdet1(T, test_options)
     tol = max(1e-5, sqrt(sqrt(eps(T))))
     Random.seed!(1)
+    Trt2 = sqrt(T(2))
+    Tirt2 = inv(Trt2)
     side = 4
     dim = 2 + div(side * (side + 1), 2)
     c = T[-1, 0]
@@ -672,7 +677,7 @@ function hypoperlogdet1(T, test_options)
     mat_half = rand(T, side, side)
     mat = mat_half * mat_half'
     h = zeros(T, dim)
-    CO.smat_to_svec!(view(h, 3:dim), mat)
+    CO.smat_to_svec!(view(h, 3:dim), mat, Trt2)
     cones = CO.Cone{T}[CO.HypoPerLogdet{T}(dim)]
     cone_idxs = [1:dim]
 
@@ -680,13 +685,15 @@ function hypoperlogdet1(T, test_options)
     @test r.status == :Optimal
     @test r.x[1] ≈ -r.primal_obj atol=tol rtol=tol
     @test r.x[2] ≈ 1 atol=tol rtol=tol
-    @test r.s[2] * logdet(CO.svec_to_smat!(zeros(T, side, side), r.s[3:end]) / r.s[2]) ≈ r.s[1] atol=tol rtol=tol
-    @test r.z[1] * (logdet(CO.svec_to_smat!(zeros(T, side, side), -r.z[3:end]) / r.z[1]) + T(side)) ≈ r.z[2] atol=tol rtol=tol
+    @test r.s[2] * logdet(CO.svec_to_smat!(zeros(T, side, side), r.s[3:end], Tirt2) / r.s[2]) ≈ r.s[1] atol=tol rtol=tol
+    @test r.z[1] * (logdet(CO.svec_to_smat!(zeros(T, side, side), -r.z[3:end], Tirt2) / r.z[1]) + T(side)) ≈ r.z[2] atol=tol rtol=tol
 end
 
 function hypoperlogdet2(T, test_options)
     tol = max(1e-5, sqrt(sqrt(eps(T))))
     Random.seed!(1)
+    Trt2 = sqrt(T(2))
+    Tirt2 = inv(Trt2)
     side = 3
     dim = 2 + div(side * (side + 1), 2)
     c = T[0, 1]
@@ -696,7 +703,7 @@ function hypoperlogdet2(T, test_options)
     mat_half = rand(T, side, side)
     mat = mat_half * mat_half'
     h = zeros(T, dim)
-    CO.smat_to_svec!(view(h, 3:dim), mat)
+    CO.smat_to_svec!(view(h, 3:dim), mat, Trt2)
     cones = CO.Cone{T}[CO.HypoPerLogdet{T}(dim, true)]
     cone_idxs = [1:dim]
 
@@ -704,13 +711,14 @@ function hypoperlogdet2(T, test_options)
     @test r.status == :Optimal
     @test r.x[2] ≈ r.primal_obj atol=tol rtol=tol
     @test r.x[1] ≈ -1 atol=tol rtol=tol
-    @test r.s[1] * (logdet(CO.svec_to_smat!(zeros(T, side, side), -r.s[3:end]) / r.s[1]) + T(side)) ≈ r.s[2] atol=tol rtol=tol
-    @test r.z[2] * logdet(CO.svec_to_smat!(zeros(T, side, side), r.z[3:end]) / r.z[2]) ≈ r.z[1] atol=tol rtol=tol
+    @test r.s[1] * (logdet(CO.svec_to_smat!(zeros(T, side, side), -r.s[3:end], Tirt2) / r.s[1]) + T(side)) ≈ r.s[2] atol=tol rtol=tol
+    @test r.z[2] * logdet(CO.svec_to_smat!(zeros(T, side, side), r.z[3:end], Tirt2) / r.z[2]) ≈ r.z[1] atol=tol rtol=tol
 end
 
 function hypoperlogdet3(T, test_options)
     tol = max(1e-5, sqrt(sqrt(eps(T))))
     Random.seed!(1)
+    Trt2 = sqrt(T(2))
     side = 3
     dim = 2 + div(side * (side + 1), 2)
     c = T[-1, 0]
@@ -720,7 +728,7 @@ function hypoperlogdet3(T, test_options)
     mat_half = rand(T, side, side)
     mat = mat_half * mat_half'
     h = zeros(T, dim)
-    CO.smat_to_svec!(view(h, 3:dim), mat)
+    CO.smat_to_svec!(view(h, 3:dim), mat, Trt2)
     cones = CO.Cone{T}[CO.HypoPerLogdet{T}(dim)]
     cone_idxs = [1:dim]
 
@@ -730,7 +738,7 @@ function hypoperlogdet3(T, test_options)
     @test norm(r.x) ≈ 0 atol=tol rtol=tol
 end
 
-function epipersumexp1(T, test_options)
+function epiperexp1(T, test_options)
     tol = max(1e-5, sqrt(sqrt(eps(T))))
     l = 5
     c = vcat(zero(T), -ones(T, l))
@@ -738,7 +746,7 @@ function epipersumexp1(T, test_options)
     b = T[1]
     G = [-one(T) zeros(T, 1, l); zeros(T, 1, l + 1); zeros(T, l, 1) sparse(-one(T) * I, l, l)]
     h = zeros(T, l + 2)
-    cones = CO.Cone{T}[CO.EpiPerSumExp{T}(l + 2)]
+    cones = CO.Cone{T}[CO.EpiPerExp{T}(l + 2)]
     cone_idxs = [1:(l + 2)]
 
     r = build_solve_check(c, A, b, G, h, cones, cone_idxs; test_options...)
@@ -748,7 +756,7 @@ function epipersumexp1(T, test_options)
     @test r.s[1] ≈ 1 atol=tol rtol=tol
 end
 
-function epipersumexp2(T, test_options)
+function epiperexp2(T, test_options)
     tol = max(1e-5, sqrt(sqrt(eps(T))))
     l = 5
     c = vcat(zero(T), -ones(T, l))
@@ -756,7 +764,7 @@ function epipersumexp2(T, test_options)
     b = T[1]
     G = [-one(T) spzeros(T, 1, l); spzeros(T, 1, l + 1); spzeros(T, l, 1) sparse(-one(T) * I, l, l)]
     h = zeros(T, l + 2); h[2] = 1
-    cones = CO.Cone{T}[CO.EpiPerSumExp{T}(l + 2)]
+    cones = CO.Cone{T}[CO.EpiPerExp{T}(l + 2)]
     cone_idxs = [1:(l + 2)]
 
     r = build_solve_check(c, A, b, G, h, cones, cone_idxs; test_options...)

@@ -12,11 +12,18 @@ barrier from "Self-Scaled Barriers and Interior-Point Methods for Convex Program
 mutable struct EpiPerSquare{T <: HypReal} <: Cone{T}
     use_dual::Bool
     dim::Int
-
     point::AbstractVector{T}
-    g::Vector{T}
-    H::Matrix{T}
-    Hi::Matrix{T}
+
+    feas_updated::Bool
+    grad_updated::Bool
+    hess_updated::Bool
+    inv_hess_updated::Bool
+    is_feas::Bool
+    grad::Vector{T}
+    hess::Symmetric{T, Matrix{T}}
+    inv_hess::Symmetric{T, Matrix{T}}
+
+    dist::T
 
     function EpiPerSquare{T}(dim::Int, is_dual::Bool) where {T <: HypReal}
         cone = new{T}()
@@ -28,60 +35,98 @@ end
 
 EpiPerSquare{T}(dim::Int) where {T <: HypReal} = EpiPerSquare{T}(dim, false)
 
+reset_data(cone::EpiPerSquare) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
+
 function setup_data(cone::EpiPerSquare{T}) where {T <: HypReal}
+    reset_data(cone)
     dim = cone.dim
-    cone.g = zeros(T, dim)
-    cone.H = zeros(T, dim, dim)
-    cone.Hi = copy(cone.H)
+    cone.grad = zeros(T, dim)
+    cone.hess = Symmetric(zeros(T, dim, dim), :U)
+    cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     return
 end
 
 get_nu(cone::EpiPerSquare) = 2
 
-set_initial_point(arr::AbstractVector{T}, cone::EpiPerSquare{T}) where {T <: HypReal} = (@. arr = zero(T); arr[1] = one(T); arr[2] = one(T); arr)
-
-function check_in_cone(cone::EpiPerSquare{T}) where {T <: HypReal}
-    u = cone.point[1]
-    v = cone.point[2]
-    w = view(cone.point, 3:cone.dim)
-    if u <= zero(T) || v <= zero(T)
-        return false
-    end
-    nrm2 = T(0.5) * sum(abs2, w)
-    dist = u * v - nrm2
-    if dist <= zero(T)
-        return false
-    end
-
-    @. cone.g = cone.point / dist
-    tmp = -cone.g[2]
-    cone.g[2] = -cone.g[1]
-    cone.g[1] = tmp
-
-    Hi = cone.Hi
-    mul!(Hi, cone.point, cone.point') # TODO syrk
-    Hi[2, 1] = Hi[1, 2] = nrm2 # TODO only need upper tri
-    for j in 3:cone.dim
-        Hi[j, j] += dist
-    end
-
-    H = cone.H
-    @. H = Hi
-    for j in 3:cone.dim
-        H[1, j] = H[j, 1] = -Hi[2, j]
-        H[2, j] = H[j, 2] = -Hi[1, j]
-    end
-    H[1, 1] = Hi[2, 2]
-    H[2, 2] = Hi[1, 1]
-    @. H = H / dist / dist
-
-    return true
+function set_initial_point(arr::AbstractVector, cone::EpiPerSquare)
+    arr .= 0
+    arr[1:2] .= 1
+    return arr
 end
 
-# calcg!(g::AbstractVector{T}, cone::EpiPerSquare) = (@. g = cone.point/cone.dist; tmp = g[1]; g[1] = -g[2]; g[2] = -tmp; g)
-# calcHiarr!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiPerSquare) = mul!(prod, cone.Hi, arr)
-# calcHarr!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiPerSquare) = mul!(prod, cone.H, arr)
+function update_feas(cone::EpiPerSquare)
+    @assert !cone.feas_updated
+    u = cone.point[1]
+    v = cone.point[2]
+    if u > 0 && v > 0
+        w = view(cone.point, 3:cone.dim)
+        cone.dist = u * v - sum(abs2, w) / 2
+        cone.is_feas = (cone.dist > 0)
+    else
+        cone.is_feas = false
+    end
+    cone.feas_updated = true
+    return cone.is_feas
+end
 
-inv_hess(cone::EpiPerSquare) = Symmetric(cone.Hi, :U)
+function update_grad(cone::EpiPerSquare)
+    @assert cone.is_feas
+    @. cone.grad = cone.point / cone.dist
+    g2 = cone.grad[2]
+    cone.grad[2] = -cone.grad[1]
+    cone.grad[1] = -g2
+    cone.grad_updated = true
+    return cone.grad
+end
 
-inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiPerSquare{T}) where {T <: HypReal} = mul!(prod, Symmetric(cone.Hi, :U), arr)
+# TODO only work with upper triangle
+function update_hess(cone::EpiPerSquare)
+    @assert cone.grad_updated
+    mul!(cone.hess.data, cone.grad, cone.grad')
+    invdist = inv(cone.dist)
+    for j in 3:cone.dim
+        cone.hess.data[j, j] += invdist
+    end
+    cone.hess.data[1, 2] -= invdist
+    cone.hess_updated = true
+    return cone.hess
+end
+
+# TODO only work with upper triangle
+function update_inv_hess(cone::EpiPerSquare)
+    @assert cone.is_feas
+    mul!(cone.inv_hess.data, cone.point, cone.point')
+    for j in 3:cone.dim
+        cone.inv_hess.data[j, j] += cone.dist
+    end
+    cone.inv_hess.data[1, 2] -= cone.dist
+    cone.inv_hess_updated = true
+    return cone.inv_hess
+end
+
+update_hess_prod(cone::EpiPerSquare) = nothing
+update_inv_hess_prod(cone::EpiPerSquare) = nothing
+
+function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerSquare)
+    @assert cone.grad_updated
+    for j in 1:size(prod, 2)
+        ga = dot(cone.grad, view(arr, :, j))
+        @. prod[:, j] = ga * cone.grad
+        @views @. prod[3:end, j] += arr[3:end, j] / cone.dist
+        prod[1, j] -= arr[2, j] / cone.dist
+        prod[2, j] -= arr[1, j] / cone.dist
+    end
+    return prod
+end
+
+function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerSquare)
+    @assert cone.is_feas
+    for j in 1:size(prod, 2)
+        pa = dot(cone.point, view(arr, :, j))
+        @. prod[:, j] = pa * cone.point
+        @views @. prod[3:end, j] += cone.dist * arr[3:end, j]
+        prod[1, j] -= cone.dist * arr[2, j]
+        prod[2, j] -= cone.dist * arr[1, j]
+    end
+    return prod
+end
