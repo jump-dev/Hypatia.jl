@@ -2,6 +2,8 @@ using IterativeSolvers, CSV, Preconditioners, SparseArrays
 using AlgebraicMultigrid
 using Krylov
 using LinearOperators
+using DelimitedFiles
+using LinearAlgebra
 
 #=
 
@@ -99,54 +101,121 @@ function equilibrators(A::AbstractMatrix{T}) where {T}
 end
 
 # no warm starts
-(n, p, q) = (9, 1, 28) # (22, 1, 64)
+(n, p, q) = (270, 1, 960)
 tol = 1e-8
+restart_freq = div(n + p + q, 4)
+maxiter = restart_freq * 5
 open("itertry.csv", "w") do iterf
-    println(iterf, "cond,minres,,gmres,,gmresrestart,,minreskry,,greskry,,diprecon,,newpreconrestart,")
+    println(iterf, "cond,direct,,minres,,,," *
+        "gmres,,,,gmresrestart,,,," *
+        "minresprecon,,,," *
+        # "minreskry,,,,greskry,,,," *
+        # "diprecongmres,,,,gemresmanual,,,,minresmanual,,,,newprecongmres,,,"
+        "")
     rhs = vec(readdlm("rhs.csv"))
+    idx = 0
     for f in readdir("lhs")
+        idx += 1
+        println(idx)
+
         lhs = convert(Matrix, CSV.read(joinpath("lhs", f), header = false))
         L = Symmetric(lhs, :L)
         print(iterf, 0, ",")
 
-        (xi, log) = minres!(zeros(length(rhs)), L, rhs, log = true, tol = tol)
-        print(iterf, log.isconverged, ",")
-        print(iterf, norm(rhs - L * xi), ",")
+        # direct
+        xi = zeros(length(rhs))
+        t = @timed begin
+            F = bunchkaufman(Symmetric(lhs, :L), true, check = true)
+            ldiv!(xi, F, rhs)
+        end
+        print(iterf, "$(t[2]),$(t[3]),")
 
-        (xi, log) = gmres!(zeros(length(rhs)), L, rhs, log = true, tol = tol, restart = size(lhs, 2))
-        print(iterf, log.isconverged, ",")
-        print(iterf, norm(rhs - L * xi), ",")
+        # minres
+        xi = zeros(length(rhs))
+        t = @timed minres!(xi, L, rhs, tol = tol)
+        isconverged = (norm(rhs - L * xi) < 1e-5)
+        print(iterf, "$isconverged,$(t[2]),$(t[3]),$(norm(rhs - L * xi)),")
 
-        (xi, log) = gmres!(zeros(length(rhs)), L, rhs, log = true, tol = tol, restart = div(size(lhs, 2), 2))
-        print(iterf, log.isconverged, ",")
-        print(iterf, norm(rhs - L * xi), ",")
+        # unrestarted gmres
+        xi = zeros(length(rhs))
+        t = @timed gmres!(xi, L, rhs, tol = tol, restart = size(L, 2))
+        isconverged = (norm(rhs - L * xi) < 1e-5)
+        print(iterf, "$isconverged,$(t[2]),$(t[3]),$(norm(rhs - L * xi)),")
 
-        (xi, log) = Krylov.minres(L, rhs, atol = tol, rtol = tol)
-        print(iterf, log.solved, ",")
-        print(iterf, norm(rhs - L * xi), ",")
+        # restarted gmres
+        xi = zeros(length(rhs))
+        t = @timed gmres!(xi, L, rhs, tol = tol, restart = restart_freq, maxiter = maxiter)
+        isconverged = (norm(rhs - L * xi) < 1e-5)
+        print(iterf, "$isconverged,$(t[2]),$(t[3]),$(norm(rhs - L * xi)),")
 
-        (xi, log) = Krylov.dqgmres(L, rhs, atol = tol, rtol = tol)
-        print(iterf, log.solved, ",")
-        print(iterf, norm(rhs - L * xi), ",")
 
-        (R, C) =  equilibrators(L)
-        lprecond = cholesky(Array(Diagonal(map(ri -> isfinite(ri) ? inv(ri) : 1.0, R)))) # ugh preconditioners so messy
-        rprecond = cholesky(Array(Diagonal(map(ci -> isfinite(ci) ? inv(ci) : 1.0, C))))
-        (xi, log) = gmres!(zeros(length(rhs)), L, rhs, log = true, tol = tol, restart = size(lhs, 2), Pl = lprecond, Pr = rprecond)
-        print(iterf, log.isconverged, ",")
-        print(iterf, norm(rhs - L * xi), ",")
+        # t = @timed (xi, _) = Krylov.minres(L, rhs, atol = tol, rtol = tol)
+        # isconverged = (norm(rhs - L * xi) < 1e-5)
+        # print(iterf, "$isconverged,$(t[2]),$(t[3]),$(norm(rhs - L * xi)),")
+        #
+        # t = @timed (xi, _) = Krylov.dqgmres(L, rhs, atol = tol, rtol = tol)
+        # isconverged = (norm(rhs - L * xi) < 1e-5)
+        # print(iterf, "$isconverged,$(t[2]),$(t[3]),$(norm(rhs - L * xi)),")
 
-        ill_cond_block = lhs[(n + 1):end, (n + 1):end]
-        AG = lhs[(n + 1):end, 1:n]
-        W = I
-        preconditioner = [
-            W   zeros(n, p + q);
-            zeros(p + q, n)   ill_cond_block + AG * (W \ AG');
-            ]
-        # lhsp = preconditioner \ Symmetric(lhs, :L)
-        # rhsp = preconditioner \ rhs
-        (xi, log) = gmres!(zeros(length(rhs)), L, rhs, log = true, tol = tol, restart = div(size(L, 2), 2), Pl = lu(preconditioner))
-        print(iterf, log.isconverged, ",")
-        print(iterf, norm(rhs - L * xi), "\n")
+        # (R, C) =  equilibrators(L)
+        # lprecond = cholesky(Array(Diagonal(map(ri -> isfinite(ri) ? inv(ri) : 1.0, R)))) # ugh preconditioners so messy
+        # rprecond = cholesky(Array(Diagonal(map(ci -> isfinite(ci) ? inv(ci) : 1.0, C))))
+        # xi = zeros(length(rhs))
+        # t = @timed gmres!(xi, L, rhs, tol = tol, restart = restart_freq, Pl = lprecond, Pr = rprecond, maxiter = maxiter)
+        # isconverged = (norm(rhs - L * xi) < 1e-5)
+        # print(iterf, "$isconverged,$(t[2]),$(t[3]),$(norm(rhs - L * xi)),")
+        #
+        tcond = @timed begin
+            ill_cond_block = lhs[(n + 1):end, (n + 1):end]
+            AG = lhs[(n + 1):end, 1:n]
+            W = I
+            preconditioner = [
+                W   zeros(n, p + q);
+                zeros(p + q, n)   ill_cond_block + AG * (W \ AG');
+                ]
+            Lp = preconditioner \ L
+            rhsp = preconditioner \ rhs
+        end
+        @show (tcond[2], tcond[3])
+
+        # preconditioned minres
+        xi = zeros(length(rhs))
+        t = @timed minres!(xi, Lp, rhsp, tol = tol, maxiter = maxiter)
+        isconverged = (norm(rhs - L * xi) < 1e-5)
+        print(iterf, "$isconverged,$(t[2]),$(t[3]),$(norm(rhs - L * xi)),")
+
+
+        # xi = zeros(length(rhs))
+        # t = @timed gmres!(xi, Lp, rhsp, tol = tol, restart = restart_freq, maxiter = maxiter)
+        # isconverged = (norm(rhs - L * xi) < 1e-5)
+        # print(iterf, "$isconverged,$(t[2]),$(t[3]),$(norm(rhs - L * xi)),")
+        #
+        # xi = zeros(length(rhs))
+        # t = @timed minres!(xi, Lp, rhsp, tol = tol)
+        # isconverged = (norm(rhs - L * xi) < 1e-5)
+        # print(iterf, "$isconverged,$(t[2]),$(t[3]),$(norm(rhs - L * xi)),")
+        #
+        # xi = zeros(length(rhs))
+        # t = @timed gmres!(xi, L, rhs, tol = tol, restart = restart_freq, Pl = lu(preconditioner), maxiter = maxiter)
+        # isconverged = (norm(rhs - L * xi) < 1e-5)
+        # print(iterf, "$isconverged,$(t[2]),$(t[3]),$(norm(rhs - L * xi))\n")
+
+        print(iterf, "\n")
     end
 end
+
+# using BenchmarkTools, IterativeSolvers
+# n = 100
+# A = randn(n, n)
+# A = A + A'
+# x = randn(n)
+# b = A * x
+# sol = zeros(n)
+#
+# t1 = @timed ldiv!(sol, lu(A), b)
+#
+# sol = zeros(n)
+# t2 = @timed minres!(sol, A, b)
+#
+# sol = zeros(n)
+# t3 = @timed gmres!(sol, A, b)

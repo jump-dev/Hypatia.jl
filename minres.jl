@@ -22,6 +22,9 @@ mutable struct MINRESIterable{matT, solT, vecT <: DenseVector, smallVecT <: Dens
     v_next::vecT
 
     V
+    alphas::vecT
+    betas::vecT
+    Wortho
 
     # W = R * inv(V) is computed using 3-term recurrence
     w_prev::vecT
@@ -60,7 +63,11 @@ function minres_iterable!(x, A, b;
     copyto!(v_curr, b)
     v_next = similar(x)
 
-    V = zeros(size(A))
+    V = zeros(T, size(A))
+    alphas = zeros(T, size(A, 2))
+    betas = zeros(T, size(A, 2))
+    Wortho = zeros(T, size(A))
+    Wortho[1, 1] = 1
 
     w_prev = similar(x)
     w_curr = similar(x)
@@ -93,7 +100,8 @@ function minres_iterable!(x, A, b;
 
     MINRESIterable(
         A, skew_hermitian, x,
-        v_prev, v_curr, v_next, V,
+        v_prev, v_curr, v_next,
+        V, alphas, betas, Wortho,
         w_prev, w_curr, w_next,
         H, rhs,
         c_prev, s_prev, c_curr, s_curr,
@@ -113,7 +121,7 @@ function iterate(m::MINRESIterable, iteration::Int=start(m))
     # v_next = A * v_curr - H[2] * v_prev
     mul!(m.v_next, m.A, m.v_curr)
 
-    if iteration > 3
+    if iteration > 1
         m.V[:, iteration - 1] .= m.v_curr
     end
 
@@ -124,22 +132,23 @@ function iterate(m::MINRESIterable, iteration::Int=start(m))
     m.H[3] = m.skew_hermitian ? proj : real(proj)
     axpy!(-proj, m.v_curr, m.v_next)
 
+    m.alphas[iteration] = proj
+    m.betas[iteration] = norm(m.v_next)
 
-    # if iteration > 3
-    #     proj =
-    #     axpy!(-proj, m.v_curr, m.v_next)
-    # end
-
-    # modified, order shouldn't matter, right?
-    # if iteration > 5
-    #     # v_prev_prev = m.V[:, iteration - 3]
-    #     # proj = dot(v_prev_prev, m.v_next)
-    #     # axpy!(-proj, v_prev_prev, m.v_next)
-    #
-    #     h = m.V[:, 2:iteration - 3]' * m.v_next
-    #     @show norm(h)
-    #     m.v_next .-= V[:, 2:iteration - 3] * h
-    #
+    # pert = eps() * norm(A)
+    # if iteration < m.maxiter
+    #     m.Wortho[iteration + 1, iteration + 1] = 1
+    #     # Wortho[iteration + 1, iteration] is zero
+    #     if iteration > 3
+    #         for k in 1:(iteration - 1) # e.g. in iteration 2, fill out row 3, only column 1 needs to be computed
+    #             w = m.betas[k] * m.Wortho[iteration, k + 1] + (m.alphas[k] - m.alphas[iteration]) * m.Wortho[iteration, k] - m.betas[iteration - 1] * m.Wortho[iteration - 1, k]
+    #             (k > 1) && (w += m.betas[k - 1] * m.Wortho[iteration, k - 1])
+    #             m.Wortho[iteration + 1, k] = (w + 2 * sign(w) * pert) / m.betas[iteration]
+    #             if abs2(m.Wortho[iteration + 1, k]) > eps()
+    #                 @show m.Wortho[iteration + 1, k]
+    #             end
+    #         end
+    #     end
     # end
 
     if iteration > 5
@@ -148,7 +157,7 @@ function iterate(m::MINRESIterable, iteration::Int=start(m))
                 tmp = view(m.V, :, i)
                 proj = dot(tmp, m.v_next)
                 # @show proj
-                axpy!(-proj, tmp, m.v_next)
+                axpy!(-proj, view(m.V, :, i), m.v_next)
             end
         # end
     end
