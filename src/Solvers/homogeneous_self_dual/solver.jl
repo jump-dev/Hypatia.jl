@@ -143,6 +143,7 @@ function solve(solver::HSDSolver{T}) where {T <: HypReal}
     if isnan(solver.mu) || abs(one(T) - solver.mu) > sqrt(eps(T))
         error("initial mu is $(solver.mu) (should be 1.0)")
     end
+    Cones.load_point.(solver.model.cones, solver.point.primal_views)
 
     while true
         @timeit solver.timer "calc_res" calc_residual(solver)
