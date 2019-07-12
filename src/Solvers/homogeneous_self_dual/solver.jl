@@ -141,7 +141,7 @@ function solve(solver::HSDSolver{T}) where {T <: HypReal}
 
     calc_mu(solver)
     if isnan(solver.mu) || abs(one(T) - solver.mu) > sqrt(eps(T))
-        error("initial mu is $(solver.mu) (should be 1.0)")
+        error("initial mu is $(solver.mu) (should be 1)")
     end
     Cones.load_point.(solver.model.cones, solver.point.primal_views)
 
@@ -181,6 +181,8 @@ function solve(solver::HSDSolver{T}) where {T <: HypReal}
     solver.solve_time = time() - start_time
 
     solver.verbose && println("\nstatus is $(solver.status) after $(solver.num_iters) iterations and $(trunc(solver.solve_time, digits=3)) seconds\n")
+
+    println(solver.timer)
 
     return
 end
