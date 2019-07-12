@@ -62,6 +62,8 @@ function step(solver::HSDSolver{T}, stepper::CombinedHSDStepper{T}) where {T <: 
     # calculate affine/prediction and correction directions
     @timeit solver.timer "directions" (x_pred, x_corr, y_pred, y_corr, z_pred, z_corr, s_pred, s_corr, tau_pred, tau_corr, kap_pred, kap_corr) = get_combined_directions(solver, stepper.system_solver)
 
+    Cones.load_point.(solver.model.cones, stepper.primal_views)
+
     # calculate correction factor gamma by finding distance affine_alpha for stepping in affine direction
     @timeit solver.timer "aff_alpha" (affine_alpha, affine_alpha_iters) = find_max_alpha_in_nbhd(z_pred, s_pred, tau_pred, kap_pred, T(0.99), stepper.prev_affine_alpha, stepper, solver)
     gamma = (one(T) - affine_alpha)^3 # TODO allow different function (heuristic)
@@ -105,6 +107,7 @@ function step(solver::HSDSolver{T}, stepper::CombinedHSDStepper{T}) where {T <: 
     solver.kap += alpha * kap_comb
     calc_mu(solver)
 
+    Cones.load_point.(solver.model.cones, solver.point.primal_views)
     @assert solver.tau > zero(T) && solver.kap > zero(T) && solver.mu > zero(T)
 
     return point
@@ -208,10 +211,10 @@ function check_nbhd(
     end
 
     # accept primal iterate if it is inside the cone and neighborhood
-    # first check incone for whichever cones were not incone last linesearch iteration
+    # first check inside cone for whichever cones were violated last line search iteration
     for (k, cone_k) in enumerate(cones)
         if stepper.cones_outside_nbhd[k]
-            Cones.load_point(cone_k, stepper.primal_views[k])
+            Cones.reset_data(cone_k)
             if Cones.is_feas(cone_k)
                 stepper.cones_outside_nbhd[k] = false
                 stepper.cones_loaded[k] = true
@@ -225,7 +228,7 @@ function check_nbhd(
 
     for (k, cone_k) in enumerate(cones)
         if !stepper.cones_loaded[k]
-            Cones.load_point(cone_k, stepper.primal_views[k])
+            Cones.reset_data(cone_k)
             if !Cones.is_feas(cone_k)
                 return false
             end
