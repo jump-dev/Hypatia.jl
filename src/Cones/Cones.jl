@@ -34,7 +34,7 @@ include("wsospolyinterp.jl")
 # include("wsospolyinterpsoc.jl")
 
 use_dual(cone::Cone) = cone.use_dual
-load_point(cone::Cone, point::AbstractVector) = (reset_data(cone); cone.point = point)
+load_point(cone::Cone, point::AbstractVector) = (cone.point = point)
 dimension(cone::Cone) = cone.dim
 
 is_feas(cone::Cone) = (cone.feas_updated ? cone.is_feas : update_feas(cone))
