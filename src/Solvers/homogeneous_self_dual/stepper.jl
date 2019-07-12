@@ -20,7 +20,7 @@ mutable struct CombinedHSDStepper{T <: HypReal} <: HSDStepper{T}
     primal_views
     dual_views
     nbhd_temp
-    cones_outside_nbhd::Vector{Bool}
+    cones_infeas::Vector{Bool}
     cones_loaded::Vector{Bool}
 
     function CombinedHSDStepper{T}(
@@ -35,10 +35,10 @@ mutable struct CombinedHSDStepper{T <: HypReal} <: HSDStepper{T}
         stepper.max_nbhd = max_nbhd
         stepper.use_infty_nbhd = use_infty_nbhd
 
-        stepper.prev_affine_alpha = T(0.9999)
+        stepper.prev_affine_alpha = T(0.99)
         stepper.prev_affine_alpha_iters = 0
-        stepper.prev_gamma = T(0.9999)
-        stepper.prev_alpha = T(0.9999)
+        stepper.prev_gamma = T(0.99)
+        stepper.prev_alpha = T(0.99)
         stepper.prev_alpha_iters = 0
 
         stepper.z_temp = similar(model.h)
@@ -48,7 +48,7 @@ mutable struct CombinedHSDStepper{T <: HypReal} <: HSDStepper{T}
         if !use_infty_nbhd
             stepper.nbhd_temp = [Vector{T}(undef, length(model.cone_idxs[k])) for k in eachindex(model.cones)]
         end
-        stepper.cones_outside_nbhd = trues(length(model.cones))
+        stepper.cones_infeas = trues(length(model.cones))
         stepper.cones_loaded = trues(length(model.cones))
 
         return stepper
@@ -65,7 +65,7 @@ function step(solver::HSDSolver{T}, stepper::CombinedHSDStepper{T}) where {T <: 
     Cones.load_point.(solver.model.cones, stepper.primal_views)
 
     # calculate correction factor gamma by finding distance affine_alpha for stepping in affine direction
-    @timeit solver.timer "aff_alpha" (affine_alpha, affine_alpha_iters) = find_max_alpha_in_nbhd(z_pred, s_pred, tau_pred, kap_pred, T(0.99), stepper.prev_affine_alpha, stepper, solver)
+    @timeit solver.timer "aff_alpha" (affine_alpha, affine_alpha_iters) = find_max_alpha_in_nbhd(z_pred, s_pred, tau_pred, kap_pred, T(0.99), stepper.prev_affine_alpha, T(1e-2), stepper, solver)
     gamma = (one(T) - affine_alpha)^3 # TODO allow different function (heuristic)
     stepper.prev_affine_alpha = affine_alpha
     stepper.prev_affine_alpha_iters = affine_alpha_iters
@@ -79,7 +79,7 @@ function step(solver::HSDSolver{T}, stepper::CombinedHSDStepper{T}) where {T <: 
     @. s_comb = pred_factor * s_pred + gamma * s_corr
     tau_comb = pred_factor * tau_pred + gamma * tau_corr
     kap_comb = pred_factor * kap_pred + gamma * kap_corr
-    @timeit solver.timer "comb_alpha" (alpha, alpha_iters) = find_max_alpha_in_nbhd(z_comb, s_comb, tau_comb, kap_comb, stepper.max_nbhd, stepper.prev_alpha, stepper, solver)
+    @timeit solver.timer "comb_alpha" (alpha, alpha_iters) = find_max_alpha_in_nbhd(z_comb, s_comb, tau_comb, kap_comb, stepper.max_nbhd, stepper.prev_alpha, T(1e-3), stepper, solver)
 
     if iszero(alpha)
         # could not step far in combined direction, so perform a pure correction step
@@ -88,9 +88,12 @@ function step(solver::HSDSolver{T}, stepper::CombinedHSDStepper{T}) where {T <: 
         s_comb = s_corr
         tau_comb = tau_corr
         kap_comb = kap_corr
-        @timeit solver.timer "corr_alpha" (alpha, corr_alpha_iters) = find_max_alpha_in_nbhd(z_comb, s_comb, tau_comb, kap_comb, stepper.max_nbhd, T(0.99), stepper, solver)
+        @timeit solver.timer "corr_alpha" (alpha, corr_alpha_iters) = find_max_alpha_in_nbhd(z_comb, s_comb, tau_comb, kap_comb, stepper.max_nbhd, T(0.99), T(1e-5), stepper, solver)
         alpha_iters += corr_alpha_iters
 
+        if iszero(alpha)
+            error("could not step in correction direction; terminating")
+        end
         @. point.x += alpha * x_corr
         @. point.y += alpha * y_corr
     else
@@ -142,6 +145,7 @@ function find_max_alpha_in_nbhd(
     kap_dir::T,
     nbhd::T,
     prev_alpha::T,
+    min_alpha::T,
     stepper::CombinedHSDStepper{T},
     solver::HSDSolver{T},
     ) where {T <: HypReal}
@@ -150,9 +154,7 @@ function find_max_alpha_in_nbhd(
     z_temp = stepper.z_temp
     s_temp = stepper.s_temp
 
-    # alpha = 0.9999 # TODO make this an option
     alpha = min(prev_alpha * T(1.4), T(0.99))
-
     if kap_dir < zero(T)
         alpha = min(alpha, -solver.kap / kap_dir)
     end
@@ -161,11 +163,10 @@ function find_max_alpha_in_nbhd(
     end
     # TODO what about mu? quadratic equation. need dot(s_temp, z_temp) + tau_temp * kap_temp > 0
 
-    stepper.cones_outside_nbhd .= true
-
+    stepper.cones_infeas .= true
     tau_temp = kap_temp = taukap_temp = mu_temp = zero(T)
     num_pred_iters = 0
-    while num_pred_iters < 100
+    while true
         num_pred_iters += 1
 
         @timeit solver.timer "ls_update" begin
@@ -184,7 +185,7 @@ function find_max_alpha_in_nbhd(
             end
         end
 
-        if alpha < T(1e-2) # TODO option for parameter
+        if alpha < min_alpha
             # alpha is very small so just let it be zero
             alpha = zero(T)
             break
@@ -213,10 +214,10 @@ function check_nbhd(
     # accept primal iterate if it is inside the cone and neighborhood
     # first check inside cone for whichever cones were violated last line search iteration
     for (k, cone_k) in enumerate(cones)
-        if stepper.cones_outside_nbhd[k]
+        if stepper.cones_infeas[k]
             Cones.reset_data(cone_k)
             if Cones.is_feas(cone_k)
-                stepper.cones_outside_nbhd[k] = false
+                stepper.cones_infeas[k] = false
                 stepper.cones_loaded[k] = true
             else
                 return false
