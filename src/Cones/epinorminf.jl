@@ -63,7 +63,9 @@ end
 
 function update_feas(cone::EpiNormInf)
     @assert !cone.feas_updated
-    cone.is_feas = cone.point[1] > 0 && cone.point[1] > maximum(abs, view(cone.point, 2:cone.dim))
+    u = cone.point[1]
+    w = view(cone.point, 2:cone.dim)
+    cone.is_feas = (u > 0 && u > norm(w, Inf))
     cone.feas_updated = true
     return cone.is_feas
 end
@@ -103,6 +105,7 @@ function update_hess(cone::EpiNormInf)
         cone.hess.data[1, j] = cone.edge2n[j - 1]
         cone.hess.data[j, j] = cone.diag2n[j - 1]
     end
+    cone.hess_updated = true
     return cone.hess
 end
 
@@ -118,6 +121,7 @@ function update_inv_hess(cone::EpiNormInf)
     for j in 2:cone.dim
         cone.inv_hess.data[j, j] += inv(cone.diag2n[j - 1])
     end
+    cone.inv_hess_updated = true
     return cone.inv_hess
 end
 

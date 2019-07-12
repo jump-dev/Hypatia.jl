@@ -9,18 +9,16 @@ mutable struct CombinedHSDStepper{T <: HypReal} <: HSDStepper{T}
     max_nbhd::T
     use_infty_nbhd::Bool
 
-    prev_affine_alpha::T
-    prev_affine_alpha_iters::Int
+    prev_aff_alpha::T
     prev_gamma::T
     prev_alpha::T
-    prev_alpha_iters::Int
 
     z_temp::Vector{T}
     s_temp::Vector{T}
     primal_views
     dual_views
     nbhd_temp
-    cones_outside_nbhd::Vector{Bool}
+    cones_infeas::Vector{Bool}
     cones_loaded::Vector{Bool}
 
     function CombinedHSDStepper{T}(
@@ -35,11 +33,9 @@ mutable struct CombinedHSDStepper{T <: HypReal} <: HSDStepper{T}
         stepper.max_nbhd = max_nbhd
         stepper.use_infty_nbhd = use_infty_nbhd
 
-        stepper.prev_affine_alpha = T(0.9999)
-        stepper.prev_affine_alpha_iters = 0
-        stepper.prev_gamma = T(0.9999)
-        stepper.prev_alpha = T(0.9999)
-        stepper.prev_alpha_iters = 0
+        stepper.prev_aff_alpha = one(T)
+        stepper.prev_gamma = one(T)
+        stepper.prev_alpha = one(T)
 
         stepper.z_temp = similar(model.h)
         stepper.s_temp = similar(model.h)
@@ -48,7 +44,7 @@ mutable struct CombinedHSDStepper{T <: HypReal} <: HSDStepper{T}
         if !use_infty_nbhd
             stepper.nbhd_temp = [Vector{T}(undef, length(model.cone_idxs[k])) for k in eachindex(model.cones)]
         end
-        stepper.cones_outside_nbhd = trues(length(model.cones))
+        stepper.cones_infeas = trues(length(model.cones))
         stepper.cones_loaded = trues(length(model.cones))
 
         return stepper
@@ -62,11 +58,14 @@ function step(solver::HSDSolver{T}, stepper::CombinedHSDStepper{T}) where {T <: 
     # calculate affine/prediction and correction directions
     @timeit solver.timer "directions" (x_pred, x_corr, y_pred, y_corr, z_pred, z_corr, s_pred, s_corr, tau_pred, tau_corr, kap_pred, kap_corr) = get_combined_directions(solver, stepper.system_solver)
 
-    # calculate correction factor gamma by finding distance affine_alpha for stepping in affine direction
-    @timeit solver.timer "aff_alpha" (affine_alpha, affine_alpha_iters) = find_max_alpha_in_nbhd(z_pred, s_pred, tau_pred, kap_pred, T(0.99), stepper.prev_affine_alpha, stepper, solver)
-    gamma = (one(T) - affine_alpha)^3 # TODO allow different function (heuristic)
-    stepper.prev_affine_alpha = affine_alpha
-    stepper.prev_affine_alpha_iters = affine_alpha_iters
+    Cones.load_point.(solver.model.cones, stepper.primal_views)
+
+    # calculate correction factor gamma by finding distance aff_alpha for stepping in affine direction
+    # TODO try setting nbhd to T(Inf) and avoiding the neighborhood checks - requires tuning
+    @timeit solver.timer "aff_alpha" aff_alpha = find_max_alpha_in_nbhd(z_pred, s_pred, tau_pred, kap_pred, stepper, solver, nbhd = one(T), prev_alpha = max(stepper.prev_aff_alpha, T(2e-2)), min_alpha = T(2e-2))
+    stepper.prev_aff_alpha = aff_alpha
+
+    gamma = abs2(one(T) - aff_alpha) # TODO allow different function (heuristic)
     stepper.prev_gamma = gamma
 
     # find distance alpha for stepping in combined direction
@@ -77,7 +76,7 @@ function step(solver::HSDSolver{T}, stepper::CombinedHSDStepper{T}) where {T <: 
     @. s_comb = pred_factor * s_pred + gamma * s_corr
     tau_comb = pred_factor * tau_pred + gamma * tau_corr
     kap_comb = pred_factor * kap_pred + gamma * kap_corr
-    @timeit solver.timer "comb_alpha" (alpha, alpha_iters) = find_max_alpha_in_nbhd(z_comb, s_comb, tau_comb, kap_comb, stepper.max_nbhd, stepper.prev_alpha, stepper, solver)
+    @timeit solver.timer "comb_alpha" alpha = find_max_alpha_in_nbhd(z_comb, s_comb, tau_comb, kap_comb, stepper, solver, nbhd = stepper.max_nbhd, prev_alpha = stepper.prev_alpha, min_alpha = T(1e-2))
 
     if iszero(alpha)
         # could not step far in combined direction, so perform a pure correction step
@@ -86,9 +85,11 @@ function step(solver::HSDSolver{T}, stepper::CombinedHSDStepper{T}) where {T <: 
         s_comb = s_corr
         tau_comb = tau_corr
         kap_comb = kap_corr
-        @timeit solver.timer "corr_alpha" (alpha, corr_alpha_iters) = find_max_alpha_in_nbhd(z_comb, s_comb, tau_comb, kap_comb, stepper.max_nbhd, T(0.99), stepper, solver)
-        alpha_iters += corr_alpha_iters
+        @timeit solver.timer "corr_alpha" alpha = find_max_alpha_in_nbhd(z_comb, s_comb, tau_comb, kap_comb, stepper, solver, nbhd = stepper.max_nbhd, prev_alpha = one(T), min_alpha = T(1e-4))
 
+        if iszero(alpha)
+            error("could not step in correction direction; terminating")
+        end
         @. point.x += alpha * x_corr
         @. point.y += alpha * y_corr
     else
@@ -96,7 +97,6 @@ function step(solver::HSDSolver{T}, stepper::CombinedHSDStepper{T}) where {T <: 
         @. point.y += alpha * (pred_factor * y_pred + gamma * y_corr)
     end
     stepper.prev_alpha = alpha
-    stepper.prev_alpha_iters = alpha_iters
 
     # step distance alpha in combined direction
     @. point.z += alpha * z_comb
@@ -105,6 +105,7 @@ function step(solver::HSDSolver{T}, stepper::CombinedHSDStepper{T}) where {T <: 
     solver.kap += alpha * kap_comb
     calc_mu(solver)
 
+    Cones.load_point.(solver.model.cones, solver.point.primal_views)
     @assert solver.tau > zero(T) && solver.kap > zero(T) && solver.mu > zero(T)
 
     return point
@@ -137,34 +138,29 @@ function find_max_alpha_in_nbhd(
     s_dir::AbstractVector{T},
     tau_dir::T,
     kap_dir::T,
+    stepper::CombinedHSDStepper{T},
+    solver::HSDSolver{T};
     nbhd::T,
     prev_alpha::T,
-    stepper::CombinedHSDStepper{T},
-    solver::HSDSolver{T},
+    min_alpha::T,
     ) where {T <: HypReal}
     point = solver.point
     model = solver.model
     z_temp = stepper.z_temp
     s_temp = stepper.s_temp
 
-    # alpha = 0.9999 # TODO make this an option
-    alpha = min(prev_alpha * T(1.4), T(0.99))
-
+    alpha = min(prev_alpha * T(1.4), one(T)) # TODO option for parameter
     if kap_dir < zero(T)
         alpha = min(alpha, -solver.kap / kap_dir)
     end
     if tau_dir < zero(T)
         alpha = min(alpha, -solver.tau / tau_dir)
     end
-    # TODO what about mu? quadratic equation. need dot(s_temp, z_temp) + tau_temp * kap_temp > 0
+    alpha *= T(0.9999)
 
-    stepper.cones_outside_nbhd .= true
-
+    stepper.cones_infeas .= true
     tau_temp = kap_temp = taukap_temp = mu_temp = zero(T)
-    num_pred_iters = 0
-    while num_pred_iters < 100
-        num_pred_iters += 1
-
+    while true
         @timeit solver.timer "ls_update" begin
         @. z_temp = point.z + alpha * z_dir
         @. s_temp = point.s + alpha * s_dir
@@ -181,7 +177,7 @@ function find_max_alpha_in_nbhd(
             end
         end
 
-        if alpha < T(1e-2) # TODO option for parameter
+        if alpha < min_alpha
             # alpha is very small so just let it be zero
             alpha = zero(T)
             break
@@ -191,7 +187,7 @@ function find_max_alpha_in_nbhd(
         alpha *= T(0.8) # TODO option for parameter
     end
 
-    return (alpha, num_pred_iters)
+    return alpha
 end
 
 function check_nbhd(
@@ -201,19 +197,21 @@ function check_nbhd(
     cones::Vector{<:Cones.Cone{T}},
     stepper::CombinedHSDStepper{T},
     ) where {T <: HypReal}
-    rhs_nbhd = abs2(mu_temp * nbhd)
-    lhs_nbhd = abs2(taukap_temp - mu_temp)
-    if lhs_nbhd >= rhs_nbhd
-        return false
+    if isfinite(nbhd)
+        rhs_nbhd = abs2(mu_temp * nbhd)
+        lhs_nbhd = abs2(taukap_temp - mu_temp)
+        if lhs_nbhd >= rhs_nbhd
+            return false
+        end
     end
 
     # accept primal iterate if it is inside the cone and neighborhood
-    # first check incone for whichever cones were not incone last linesearch iteration
+    # first check inside cone for whichever cones were violated last line search iteration
     for (k, cone_k) in enumerate(cones)
-        if stepper.cones_outside_nbhd[k]
-            Cones.load_point(cone_k, stepper.primal_views[k])
+        if stepper.cones_infeas[k]
+            Cones.reset_data(cone_k)
             if Cones.is_feas(cone_k)
-                stepper.cones_outside_nbhd[k] = false
+                stepper.cones_infeas[k] = false
                 stepper.cones_loaded[k] = true
             else
                 return false
@@ -223,36 +221,39 @@ function check_nbhd(
         end
     end
 
-    for (k, cone_k) in enumerate(cones)
-        if !stepper.cones_loaded[k]
-            Cones.load_point(cone_k, stepper.primal_views[k])
-            if !Cones.is_feas(cone_k)
+    if isfinite(nbhd)
+        for (k, cone_k) in enumerate(cones)
+            if !stepper.cones_loaded[k]
+                Cones.reset_data(cone_k)
+                if !Cones.is_feas(cone_k)
+                    return false
+                end
+            end
+
+            # modifies dual_views
+            duals_k = stepper.dual_views[k]
+            g_k = Cones.grad(cone_k)
+            @. duals_k += mu_temp * g_k
+
+            if stepper.use_infty_nbhd
+                k_nbhd = abs2(norm(duals_k, Inf) / norm(g_k, Inf))
+                # k_nbhd = abs2(maximum(abs(dj) / abs(gj) for (dj, gj) in zip(duals_k, g_k))) # TODO try this neighborhood
+                lhs_nbhd = max(lhs_nbhd, k_nbhd)
+            else
+                nbhd_temp_k = stepper.nbhd_temp[k]
+                Cones.inv_hess_prod!(nbhd_temp_k, duals_k, cone_k)
+                k_nbhd = dot(duals_k, nbhd_temp_k)
+                if k_nbhd <= -cbrt(eps(T))
+                    println("numerical issue for cone: k_nbhd is $k_nbhd")
+                    return false
+                elseif k_nbhd > zero(T)
+                    lhs_nbhd += k_nbhd
+                end
+            end
+
+            if lhs_nbhd > rhs_nbhd
                 return false
             end
-        end
-
-        # modifies dual_views
-        duals_k = stepper.dual_views[k]
-        g_k = Cones.grad(cone_k)
-        @. duals_k += mu_temp * g_k
-
-        if stepper.use_infty_nbhd
-            k_nbhd = abs2(norm(duals_k, Inf) / norm(g_k, Inf))
-            lhs_nbhd = max(lhs_nbhd, k_nbhd)
-        else
-            nbhd_temp_k = stepper.nbhd_temp[k]
-            Cones.inv_hess_prod!(nbhd_temp_k, duals_k, cone_k)
-            k_nbhd = dot(duals_k, nbhd_temp_k)
-            if k_nbhd <= -cbrt(eps(T))
-                println("numerical issue for cone: k_nbhd is $k_nbhd")
-                return false
-            elseif k_nbhd > zero(T)
-                lhs_nbhd += k_nbhd
-            end
-        end
-
-        if lhs_nbhd > rhs_nbhd
-            return false
         end
     end
 

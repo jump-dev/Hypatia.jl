@@ -90,7 +90,7 @@ function update_feas(cone::HypoPerLogdet)
         if isposdef(cone.fact_mat)
             cone.ldWv = logdet(cone.fact_mat) - cone.side * log(v)
             cone.z = v * cone.ldWv - u
-            cone.is_feas = cone.z > 0
+            cone.is_feas = (cone.z > 0)
         else
             cone.is_feas = false
         end

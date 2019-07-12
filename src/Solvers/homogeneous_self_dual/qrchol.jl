@@ -262,9 +262,10 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
             if !isposdef(F)
                 println("dense linear system matrix factorization failed")
                 mul!(Q2GHGQ2, GQ2', HGQ2)
-                Q2GHGQ2 += T(1e-4) * I
+                Q2GHGQ2 += T(1e-8) * I
                 if T <: BlasReal
                     F = bunchkaufman!(Symmetric(Q2GHGQ2), true, check = false) # TODO prealloc with old sysvx code; not implemented for generic reals
+                    # F = lu!(Symmetric(Q2GHGQ2), check = false) # TODO prealloc with old sysvx code; not implemented for generic reals
                     if !issuccess(F)
                         error("could not fix failure of positive definiteness (mu is $mu); terminating")
                     end
