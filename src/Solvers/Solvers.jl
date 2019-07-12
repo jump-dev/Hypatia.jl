@@ -33,14 +33,11 @@ abstract type Solver{T <: HypReal} end
 abstract type HSDStepper{T <: HypReal} end
 abstract type CombinedHSDSystemSolver{T <: HypReal} end
 include("homogeneous_self_dual/solver.jl")
-include("homogeneous_self_dual/combined_step/stepper.jl")
-include("homogeneous_self_dual/combined_step/naive.jl")
-include("homogeneous_self_dual/combined_step/naiveelim.jl")
-include("homogeneous_self_dual/combined_step/symindef.jl")
-include("homogeneous_self_dual/combined_step/qrchol.jl")
-# include("homogeneous_self_dual/combined_step/cholchol.jl")
-
-# TODO sequential quadratic algorithm for linear, quadratic, and smooth convex models
+include("homogeneous_self_dual/stepper.jl")
+include("homogeneous_self_dual/naive.jl")
+include("homogeneous_self_dual/naiveelim.jl")
+include("homogeneous_self_dual/symindef.jl")
+include("homogeneous_self_dual/qrchol.jl")
 
 get_timer(solver::Solver) = solver.timer
 
@@ -73,7 +70,6 @@ end
 get_y(solver::Solver{T}, model::Models.Model{T}) where {T <: HypReal} = get_y(solver)
 
 # check conic certificates are valid
-# TODO pick default tols based on T
 function get_certificates(
     solver::Solver{T},
     model::Models.LinearModel{T};

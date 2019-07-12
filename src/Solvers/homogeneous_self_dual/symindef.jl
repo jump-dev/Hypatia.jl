@@ -71,7 +71,7 @@ mutable struct SymIndefCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSyste
             system_solver.lhs_copy = T[
                 zeros(T,n,n)  zeros(T,n,p)  zeros(T,n,q);
                 model.A       zeros(T,p,p)  zeros(T,p,q);
-                model.G       zeros(T,q,p)  Matrix(-one(T)I,q,q);
+                model.G       zeros(T,q,p)  Matrix(-one(T)*I,q,q);
             ]
         end
 
@@ -238,6 +238,8 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::SymIndefCo
             end
             @show size(rhs), size(lhs)
         end
+        # F = lu!(lhs_symm)
+        # ldiv!(F, rhs)
     end
 
     if !use_hess_inv

@@ -144,7 +144,7 @@ function expdesign(
                 zeros(T, q, p)    G_logvars    zeros(T, q)
                 ]
             h_log = vcat(zero(T), one(T), zeros(T, q))
-            push!(cones, CO.HypoPerSumLog{T}(q + 2))
+            push!(cones, CO.HypoPerLog{T}(q + 2))
             push!(cone_idxs, (2 * p + dimvec + 1):(2 * p + dimvec + 2 + q))
         else
             G_log = zeros(T, 3 * q, dimx)
@@ -158,7 +158,7 @@ function expdesign(
                 # diagonal element in the triangular matrix
                 G_log[offset + 2, p + diag_idx(i)] = -1
                 cone_offset = 2 * p + dimvec + offset
-                push!(cones, CO.HypoPerLog{T}())
+                push!(cones, CO.HypoPerLog{T}(3))
                 push!(cone_idxs, cone_offset:(cone_offset + 2))
                 offset += 3
             end

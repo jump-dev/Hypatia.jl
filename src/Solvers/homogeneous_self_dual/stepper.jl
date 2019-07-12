@@ -1,7 +1,13 @@
+#=
+Copyright 2018, Chris Coey and contributors
+
+interior point stepper and line search functions for algorithms based on homogeneous self dual embedding
+=#
 
 mutable struct CombinedHSDStepper{T <: HypReal} <: HSDStepper{T}
     system_solver::CombinedHSDSystemSolver{T}
     max_nbhd::T
+    use_infty_nbhd::Bool
 
     prev_affine_alpha::T
     prev_affine_alpha_iters::Int
@@ -20,12 +26,14 @@ mutable struct CombinedHSDStepper{T <: HypReal} <: HSDStepper{T}
     function CombinedHSDStepper{T}(
         model::Models.LinearModel{T};
         system_solver::CombinedHSDSystemSolver{T} = (model isa Models.PreprocessedLinearModel{T} ? QRCholCombinedHSDSystemSolver{T}(model) : NaiveCombinedHSDSystemSolver{T}(model)),
-        max_nbhd::T = T(0.75),
+        use_infty_nbhd::Bool = true,
+        max_nbhd::T = T(0.7), # TODO tune: maybe (use_infty_nbhd ? T(0.5) : T(0.75))
         ) where {T <: HypReal}
         stepper = new{T}()
 
         stepper.system_solver = system_solver
         stepper.max_nbhd = max_nbhd
+        stepper.use_infty_nbhd = use_infty_nbhd
 
         stepper.prev_affine_alpha = T(0.9999)
         stepper.prev_affine_alpha_iters = 0
@@ -37,7 +45,9 @@ mutable struct CombinedHSDStepper{T <: HypReal} <: HSDStepper{T}
         stepper.s_temp = similar(model.h)
         stepper.primal_views = [view(Cones.use_dual(model.cones[k]) ? stepper.z_temp : stepper.s_temp, model.cone_idxs[k]) for k in eachindex(model.cones)]
         stepper.dual_views = [view(Cones.use_dual(model.cones[k]) ? stepper.s_temp : stepper.z_temp, model.cone_idxs[k]) for k in eachindex(model.cones)]
-        stepper.nbhd_temp = [Vector{T}(undef, length(model.cone_idxs[k])) for k in eachindex(model.cones)]
+        if !use_infty_nbhd
+            stepper.nbhd_temp = [Vector{T}(undef, length(model.cone_idxs[k])) for k in eachindex(model.cones)]
+        end
         stepper.cones_outside_nbhd = trues(length(model.cones))
         stepper.cones_loaded = trues(length(model.cones))
 
@@ -53,7 +63,7 @@ function step(solver::HSDSolver{T}, stepper::CombinedHSDStepper{T}) where {T <: 
     @timeit solver.timer "directions" (x_pred, x_corr, y_pred, y_corr, z_pred, z_corr, s_pred, s_corr, tau_pred, tau_corr, kap_pred, kap_corr) = get_combined_directions(solver, stepper.system_solver)
 
     # calculate correction factor gamma by finding distance affine_alpha for stepping in affine direction
-    @timeit solver.timer "aff_alpha" (affine_alpha, affine_alpha_iters) = find_max_alpha_in_nbhd(z_pred, s_pred, tau_pred, kap_pred, T(0.9999), stepper.prev_affine_alpha, stepper, solver)
+    @timeit solver.timer "aff_alpha" (affine_alpha, affine_alpha_iters) = find_max_alpha_in_nbhd(z_pred, s_pred, tau_pred, kap_pred, T(0.99), stepper.prev_affine_alpha, stepper, solver)
     gamma = (one(T) - affine_alpha)^3 # TODO allow different function (heuristic)
     stepper.prev_affine_alpha = affine_alpha
     stepper.prev_affine_alpha_iters = affine_alpha_iters
@@ -76,7 +86,7 @@ function step(solver::HSDSolver{T}, stepper::CombinedHSDStepper{T}) where {T <: 
         s_comb = s_corr
         tau_comb = tau_corr
         kap_comb = kap_corr
-        @timeit solver.timer "corr_alpha" (alpha, corr_alpha_iters) = find_max_alpha_in_nbhd(z_comb, s_comb, tau_comb, kap_comb, stepper.max_nbhd, T(0.9999), stepper, solver)
+        @timeit solver.timer "corr_alpha" (alpha, corr_alpha_iters) = find_max_alpha_in_nbhd(z_comb, s_comb, tau_comb, kap_comb, stepper.max_nbhd, T(0.99), stepper, solver)
         alpha_iters += corr_alpha_iters
 
         @. point.x += alpha * x_corr
@@ -122,7 +132,6 @@ function print_iteration_stats(solver::HSDSolver{T}, stepper::CombinedHSDStepper
 end
 
 # backtracking line search to find large distance to step in direction while remaining inside cones and inside a given neighborhood
-# TODO try infinite norm neighborhood, which is cheaper to check, or enforce that for each cone we are within a smaller neighborhood separately
 function find_max_alpha_in_nbhd(
     z_dir::AbstractVector{T},
     s_dir::AbstractVector{T},
@@ -135,12 +144,11 @@ function find_max_alpha_in_nbhd(
     ) where {T <: HypReal}
     point = solver.point
     model = solver.model
-    cones = model.cones
     z_temp = stepper.z_temp
     s_temp = stepper.s_temp
 
     # alpha = 0.9999 # TODO make this an option
-    alpha = min(prev_alpha * T(1.4), T(0.9999))
+    alpha = min(prev_alpha * T(1.4), T(0.99))
 
     if kap_dir < zero(T)
         alpha = min(alpha, -solver.kap / kap_dir)
@@ -157,68 +165,19 @@ function find_max_alpha_in_nbhd(
     while num_pred_iters < 100
         num_pred_iters += 1
 
+        @timeit solver.timer "ls_update" begin
         @. z_temp = point.z + alpha * z_dir
         @. s_temp = point.s + alpha * s_dir
         tau_temp = solver.tau + alpha * tau_dir
         kap_temp = solver.kap + alpha * kap_dir
         taukap_temp = tau_temp * kap_temp
         mu_temp = (dot(s_temp, z_temp) + taukap_temp) / (one(T) + model.nu)
+        end
 
         if mu_temp > zero(T)
-            # accept primal iterate if it is inside the cone and neighborhood
-            # first check incone for whichever cones were not incone last linesearch iteration
-            in_cones = true
-            for k in eachindex(cones)
-                if stepper.cones_outside_nbhd[k]
-                    cone_k = cones[k]
-                    Cones.load_point(cone_k, stepper.primal_views[k])
-                    if Cones.check_in_cone(cone_k)
-                        stepper.cones_outside_nbhd[k] = false
-                        stepper.cones_loaded[k] = true
-                    else
-                        in_cones = false
-                        break
-                    end
-                else
-                    stepper.cones_loaded[k] = false
-                end
-            end
-
-            if in_cones
-                full_nbhd_sqr = abs2(taukap_temp - mu_temp)
-                if full_nbhd_sqr < abs2(mu_temp * nbhd)
-                    in_nbhds = true
-                    for k in eachindex(cones)
-                        cone_k = cones[k]
-                        if !stepper.cones_loaded[k]
-                            Cones.load_point(cone_k, stepper.primal_views[k])
-                            if !Cones.check_in_cone(cone_k)
-                                in_nbhds = false
-                                break
-                            end
-                        end
-
-                        # modifies dual_views
-                        stepper.dual_views[k] .+= mu_temp .* Cones.grad(cone_k)
-                        Cones.inv_hess_prod!(stepper.nbhd_temp[k], stepper.dual_views[k], cone_k)
-                        nbhd_sqr_k = dot(stepper.dual_views[k], stepper.nbhd_temp[k])
-
-                        if nbhd_sqr_k <= -cbrt(eps(T))
-                            println("numerical issue for cone: nbhd_sqr_k is $nbhd_sqr_k")
-                            in_nbhds = false
-                            break
-                        elseif nbhd_sqr_k > zero(T)
-                            full_nbhd_sqr += nbhd_sqr_k
-                            if full_nbhd_sqr > abs2(mu_temp * nbhd)
-                                in_nbhds = false
-                                break
-                            end
-                        end
-                    end
-                    if in_nbhds
-                        break
-                    end
-                end
+            @timeit solver.timer "nbhd_check" in_nbhd = check_nbhd(mu_temp, taukap_temp, nbhd, model.cones, stepper)
+            if in_nbhd
+                break
             end
         end
 
@@ -233,4 +192,69 @@ function find_max_alpha_in_nbhd(
     end
 
     return (alpha, num_pred_iters)
+end
+
+function check_nbhd(
+    mu_temp::T,
+    taukap_temp::T,
+    nbhd::T,
+    cones::Vector{<:Cones.Cone{T}},
+    stepper::CombinedHSDStepper{T},
+    ) where {T <: HypReal}
+    rhs_nbhd = abs2(mu_temp * nbhd)
+    lhs_nbhd = abs2(taukap_temp - mu_temp)
+    if lhs_nbhd >= rhs_nbhd
+        return false
+    end
+
+    # accept primal iterate if it is inside the cone and neighborhood
+    # first check incone for whichever cones were not incone last linesearch iteration
+    for (k, cone_k) in enumerate(cones)
+        if stepper.cones_outside_nbhd[k]
+            Cones.load_point(cone_k, stepper.primal_views[k])
+            if Cones.is_feas(cone_k)
+                stepper.cones_outside_nbhd[k] = false
+                stepper.cones_loaded[k] = true
+            else
+                return false
+            end
+        else
+            stepper.cones_loaded[k] = false
+        end
+    end
+
+    for (k, cone_k) in enumerate(cones)
+        if !stepper.cones_loaded[k]
+            Cones.load_point(cone_k, stepper.primal_views[k])
+            if !Cones.is_feas(cone_k)
+                return false
+            end
+        end
+
+        # modifies dual_views
+        duals_k = stepper.dual_views[k]
+        g_k = Cones.grad(cone_k)
+        @. duals_k += mu_temp * g_k
+
+        if stepper.use_infty_nbhd
+            k_nbhd = abs2(norm(duals_k, Inf) / norm(g_k, Inf))
+            lhs_nbhd = max(lhs_nbhd, k_nbhd)
+        else
+            nbhd_temp_k = stepper.nbhd_temp[k]
+            Cones.inv_hess_prod!(nbhd_temp_k, duals_k, cone_k)
+            k_nbhd = dot(duals_k, nbhd_temp_k)
+            if k_nbhd <= -cbrt(eps(T))
+                println("numerical issue for cone: k_nbhd is $k_nbhd")
+                return false
+            elseif k_nbhd > zero(T)
+                lhs_nbhd += k_nbhd
+            end
+        end
+
+        if lhs_nbhd > rhs_nbhd
+            return false
+        end
+    end
+
+    return true
 end

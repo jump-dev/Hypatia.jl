@@ -123,7 +123,7 @@ function portfolio(
         h = vcat(h, h2, h2)
         for i in 1:(2 * num_stocks)
             push!(cone_idxs, (3 * (i - 1) + cone_offset + 1):(3 * i + cone_offset))
-            push!(cones, CO.HypoPerLog{T}())
+            push!(cones, CO.HypoPerLog{T}(3))
         end
         cone_offset += 6 * num_stocks
     end
