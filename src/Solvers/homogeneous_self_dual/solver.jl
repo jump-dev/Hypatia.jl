@@ -182,6 +182,11 @@ function solve(solver::HSDSolver{T}) where {T <: HypReal}
 
     solver.verbose && println("\nstatus is $(solver.status) after $(solver.num_iters) iterations and $(trunc(solver.solve_time, digits=3)) seconds\n")
 
+    if solver.verbose
+        println(T)
+        println(solver.timer)
+    end
+
     return
 end
 
