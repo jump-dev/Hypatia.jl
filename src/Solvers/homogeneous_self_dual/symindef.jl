@@ -79,7 +79,7 @@ mutable struct SymIndefCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSyste
 
         rhs = Matrix{T}(undef, npq, 3)
         system_solver.rhs = rhs
-        system_solver.prevsol = Matrix{T}(undef, npq, 3)
+        system_solver.prevsol = zeros(T, npq, 3)
         rows = 1:n
         system_solver.x1 = view(rhs, rows, 1)
         system_solver.x2 = view(rhs, rows, 2)
@@ -194,29 +194,24 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::SymIndefCo
         for i in 1:3
 
             rhs2 = view(rhs, :, i)
-            rhsp = preconditioner \ rhs2
+            # rhsp = preconditioner \ rhs2
 
             prevsol = view(system_solver.prevsol, :, i)
-            # # dqgmre
-            (x, stats) = Krylov.minres(Symmetric(lhs, :L), rhs2, atol=Inf, rtol=1e-8) #, M = LinearOperators.LinearOperator(preconditioner))
-            @show stats.solved
-            # if norm(rhs2 - Symmetric(lhs, :L) * x) > 0.01
-            #     CSV.write("lhs.csv",  DataFrames.DataFrame(lhs), writeheader=false)
-            #     CSV.write("rhs.csv",  DataFrames.DataFrame(rhs), writeheader=false)
-            #     error()
-            # end
-            rhs2 .= x
 
+            x0 = deepcopy(system_solver.prevsol)
+            # @show norm(rhs2 - Symmetric(lhs, :L) * prevsol) < 1e-5
 
-            # (x, log) = IterativeSolvers.gmres!(prevsol, lhsp, rhsp, log = true, maxiter = 1 * size(lhs, 2), tol = 1e-9, restart = div(size(lhs, 2), 1))
-            # if !(log.isconverged)
-            #     @show size(solver.model.A)
-            #     @show size(solver.model.G)
-            #     CSV.write("lhs.csv",  DataFrames.DataFrame(lhs), writeheader=false)
-            #     CSV.write("rhs.csv",  DataFrames.DataFrame(rhs), writeheader=false)
-            #     # error()
-            # end
-            # rhs2 .= prevsol
+            (prevsol, log) = IterativeSolvers.minres!(prevsol, Symmetric(lhs, :L), rhs2, maxiter = 1 * size(lhs, 2), reorth = true, log = true) # goes badly
+            # (x, log) = IterativeSolvers.gmres!(prevsol, Symmetric(lhs, :L), rhs2, maxiter = 1 * size(lhs, 2), restart = size(lhs, 2), log = true)
+
+            # prevsol = Symmetric(lhs, :L) \ rhs2
+            if !(log.isconverged)
+                CSV.write("lhs.csv",  DataFrames.DataFrame(lhs), writeheader=false)
+                CSV.write("rhs.csv",  DataFrames.DataFrame(rhs), writeheader=false)
+                CSV.write("prevsol.csv",  DataFrames.DataFrame(x0), writeheader=false)
+                # error()
+            end
+            rhs2 .= prevsol
 
         end
 
@@ -236,7 +231,7 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::SymIndefCo
             else
                 rhs .= Symmetric(lhs, :L) \ rhs # TODO replace with a generic julia symmetric indefinite decomposition if available, see https://github.com/JuliaLang/julia/issues/10953
             end
-            @show size(rhs), size(lhs)
+            # @show size(rhs), size(lhs)
         end
         # F = lu!(lhs_symm)
         # ldiv!(F, rhs)

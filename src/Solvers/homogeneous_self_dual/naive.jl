@@ -103,6 +103,7 @@ mutable struct NaiveCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSo
         else
             if use_sparse
                 system_solver.lhs_copy = T[
+                    # x             # y             # z                   # k           # s                    # tau
                     spzeros(T,n,n)  model.A'        model.G'              spzeros(T,n)  spzeros(T,n,q)         model.c;
                     -model.A        spzeros(T,p,p)  spzeros(T,p,q)        spzeros(T,p)  spzeros(T,p,q)         model.b;
                     spzeros(T,q,n)  spzeros(T,q,p)  sparse(one(T)*I,q,q)  spzeros(T,q)  sparse(one(T)*I,q,q)   spzeros(T,q);
@@ -195,7 +196,8 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveCombi
         # error()
         # xe = lhs \ rhs[:, 1]
         # (system_solver.prevsol1, stats) = Krylov.dqgmres(lhs, rhs1)
-        (_, log) = IterativeSolvers.gmres!(system_solver.prevsol1, lhs, rhs1, restart = size(lhs, 2), log = true)
+
+        (_, log) = IterativeSolvers.gmres!(system_solver.prevsol1, lhs, rhs1, log = true, restart = size(lhs, 2))
         # (_, log) = IterativeSolvers.bicgstabl!(system_solver.prevsol1, lhs, rhs1, log = true)
         copyto!(rhs1, system_solver.prevsol1)
         # if norm(system_solver.prevsol1 - xe) > 50

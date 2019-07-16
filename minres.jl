@@ -285,11 +285,11 @@ Same as [`minres!`](@ref), but allocates a solution vector `x` initialized with 
 minres(A, b; kwargs...) = minres!(zerox(A, b), A, b; initially_zero = true, kwargs...)
 
 
-using SparseArrays, Random
-Random.seed!(1)
-n = 5000
-A = sprandn(n, n, 0.1)
-A = A + A'
-x = randn(n)
-b = A * x
-(sol, V) = minres(A, b)
+# using SparseArrays, Random
+# Random.seed!(1)
+# n = 50
+# A = sprandn(n, n, 0.1)
+# A = A + A'
+# x = randn(n)
+# b = A * x
+# (sol) = minres(A, b)

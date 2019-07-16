@@ -4,17 +4,40 @@ using Krylov
 using LinearOperators
 using DelimitedFiles
 using LinearAlgebra
+import Krylov
 
-#=
 
 LHS = CSV.read("lhs.csv", header = false)
 LHS = convert(Matrix, LHS)
 b = CSV.read("rhs.csv", header = false)
 b = convert(Matrix, b)
-b = b[:, 1]
-x = zeros(size(b))
-@show cond(Symmetric(LHS, :L))
+i = 1
+b = b[:, i]
+prevsol = CSV.read("prevsol.csv", header = false)
+prevsol = convert(Matrix, prevsol)
+prevsol = prevsol[:, i]
+A = Symmetric(LHS, :L)
+(x, hist) = minres(A, b, log = true, reorth = true)
+norm(b - A * x)
 
+# maxels = maximum(A, dims = 2)
+# maxels = map(x -> iszero(x) ? 1.0 : x, maxels)
+# p = Diagonal(maxels[:])
+# maxels = maximum(A, dims = 1)
+# maxels = map(x -> iszero(x) ? 1.0 : x, maxels)
+# c = Diagonal(maxels[:])
+# n = 4; pq = 11;
+# ill_cond_block = Symmetric(A[(n + 1):end, (n + 1):end])
+# AG = A[(n + 1):end, 1:n]
+# W = I
+# preconditioner = Symmetric([
+#     W   zeros(n, pq);
+#     zeros(pq, n)   ill_cond_block + AG * AG';
+#     ])
+# y = Krylov.minres(A, b, verbose = true)
+
+
+#=
 # size(solver.model.A) = (1, 9)
 # size(solver.model.G) = (28, 9)
 n = 19; p = 1; q = 58
