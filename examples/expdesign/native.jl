@@ -10,6 +10,7 @@ using Test
 import Hypatia
 import Hypatia.HypReal
 const CO = Hypatia.Cones
+const HYP = Hypatia
 
 function expdesign(
     T::Type{<:HypReal},
@@ -19,6 +20,7 @@ function expdesign(
     nmax::Int;
     use_logdet::Bool = true,
     use_sumlog::Bool = true,
+    use_linops::Bool = false,
     )
     @assert (p > q) && (n > q) && (nmax <= n)
     rt2 = sqrt(T(2))
@@ -27,22 +29,13 @@ function expdesign(
     # hypograph variable and number of trials of each experiment
     A = ones(T, 1, p)
     b = T[n]
-
-    # nonnegativity
-    G_nonneg = Matrix{T}(-I, p, p)
     h_nonneg = zeros(T, p)
-    # do <= nmax experiments
-    G_nmax = Matrix{T}(-I, p, p)
     h_nmax = fill(T(nmax), p)
 
     cones = CO.Cone{T}[CO.Nonnegative{T}(p), CO.Nonnegative{T}(p)]
     cone_idxs = [1:p, (p + 1):(2 * p)]
 
     if use_logdet
-        # pad with hypograph variable
-        A = hcat(zero(T), A)
-        G_nonneg = hcat(zeros(T, p), G_nonneg)
-        G_nmax = hcat(zeros(T, p), G_nmax)
         # maximize the hypograph variable of the logdet cone
         c = vcat(-one(T), zeros(T, p))
 
@@ -59,15 +52,30 @@ function expdesign(
         @assert l - 1 == dimvec
         # pad with hypograph variable and perspective variable
         h_logdet = vcat(zero(T), one(T), zeros(T, dimvec))
-        G_logdet = [
-            -one(T)    zeros(T, 1, p);
-            zeros(T, 1, p + 1);
-            zeros(T, dimvec)    G_logdet;
-            ]
         push!(cones, CO.HypoPerLogdet{T}(dimvec + 2))
         push!(cone_idxs, (2 * p + 1):(2 * p + dimvec + 2))
 
-        G = vcat(G_nonneg, G_nmax, G_logdet)
+        if use_linops
+            A = HYP.HypBlockMatrix{T}([A], [1:1], [2:(p + 1)])
+            G = HYP.HypBlockMatrix{T}(
+                [-I, -I, -ones(T, 1, 1), G_logdet],
+                [1:p, (p + 1):(2 * p), (2 * p + 1):(2 * p + 1), (2 * p + 3):(2 * p + 2 + dimvec)],
+                [2:(p + 1), 2:(p + 1), 1:1, 2:(p + 1)]
+                )
+        else
+            # pad with hypograph variable
+            A = hcat(zero(T), A)
+            G_nonneg = hcat(zeros(T, p), Matrix{T}(-I, p, p))
+            G_nmax = hcat(zeros(T, p), Matrix{T}(-I, p, p))
+            # also perspective variable
+            G_logdet = [
+                -one(T)    zeros(T, 1, p);
+                zeros(T, 1, p + 1);
+                zeros(T, dimvec)    G_logdet;
+                ]
+            # all conic constraints
+            G = vcat(G_nonneg, G_nmax, G_logdet)
+        end
         h = vcat(h_nonneg, h_nmax, h_logdet)
     else
         # requires an upper triangular matrix of additional variables, ordered row wise
@@ -82,10 +90,6 @@ function expdesign(
             padx = num_trivars + q
             num_hypo = q
         end
-        # pad with triangle matrix variables and q hypopoerlog cone hypograph variables
-        A = [A zeros(T, 1, padx)]
-        G_nonneg = hcat(G_nonneg, zeros(T, p, padx))
-        G_nmax = hcat(G_nmax, zeros(T, p, padx))
         # maximize the sum of hypograph variables of all hypoperlog cones
         c = vcat(zeros(T, p + num_trivars), -ones(T, num_hypo))
 
@@ -140,7 +144,7 @@ function expdesign(
                 zeros(T, q, p)    G_logvars    zeros(T, q)
                 ]
             h_log = vcat(zero(T), one(T), zeros(T, q))
-            push!(cones, CO.HypoPerSumLog{T}(q + 2))
+            push!(cones, CO.HypoPerLog{T}(q + 2))
             push!(cone_idxs, (2 * p + dimvec + 1):(2 * p + dimvec + 2 + q))
         else
             G_log = zeros(T, 3 * q, dimx)
@@ -154,12 +158,26 @@ function expdesign(
                 # diagonal element in the triangular matrix
                 G_log[offset + 2, p + diag_idx(i)] = -1
                 cone_offset = 2 * p + dimvec + offset
-                push!(cones, CO.HypoPerLog{T}())
+                push!(cones, CO.HypoPerLog{T}(3))
                 push!(cone_idxs, cone_offset:(cone_offset + 2))
                 offset += 3
             end
         end
-        G = vcat(G_nonneg, G_nmax, G_psd, G_log)
+        if use_linops
+            A = HYP.HypBlockMatrix{T}(1, p + padx, [A], [1:1], [1:p])
+            G = HYP.HypBlockMatrix{T}(
+                [-I, -I, G_psd, G_log],
+                [1:p, (p + 1):(2 * p), (2 * p + 1):(2 * p + dimvec), (2 * p + dimvec + 1):(2 * p + dimvec + size(G_log, 1))],
+                [1:p, 1:p, 1:dimx, 1:dimx]
+                )
+        else
+            # pad with triangle matrix variables and q hypopoerlog cone hypograph variables
+            A = [A zeros(T, 1, padx)]
+            G_nonneg = hcat(Matrix{T}(-I, p, p), zeros(T, p, padx))
+            G_nmax = hcat(Matrix{T}(-I, p, p), zeros(T, p, padx))
+            # all conic constraints
+            G = vcat(G_nonneg, G_nmax, G_psd, G_log)
+        end
         h = vcat(h_nonneg, h_nmax, h_psd, h_log)
     end
 
@@ -176,6 +194,10 @@ expdesign7(T::Type{<:HypReal}) = expdesign(T, 10, 30, 50, 5, use_logdet = false)
 expdesign8(T::Type{<:HypReal}) = expdesign(T, 5, 15, 25, 5, use_logdet = false)
 expdesign9(T::Type{<:HypReal}) = expdesign(T, 4, 8, 12, 3, use_logdet = false)
 expdesign10(T::Type{<:HypReal}) = expdesign(T, 3, 5, 7, 2, use_logdet = false)
+expdesign11(T::Type{<:HypReal}) = expdesign(T, 4, 8, 12, 3, use_logdet = true, use_linops = true)
+expdesign12(T::Type{<:HypReal}) = expdesign(T, 4, 8, 12, 3, use_logdet = false, use_sumlog = false, use_linops = true)
+expdesign13(T::Type{<:HypReal}) = expdesign(T, 4, 8, 12, 3, use_logdet = false, use_sumlog = false, use_linops = false)
+expdesign14(T::Type{<:HypReal}) = expdesign(T, 4, 8, 12, 3, use_logdet = false, use_sumlog = true, use_linops = true)
 
 instances_expdesign_all = [
     expdesign1,
@@ -192,6 +214,7 @@ instances_expdesign_all = [
 instances_expdesign_few = [
     expdesign5,
     expdesign10,
+    expdesign11,
     ]
 
 function test_expdesign(instance::Function; T::Type{<:HypReal} = Float64, test_options::NamedTuple = NamedTuple(), rseed::Int = 1)

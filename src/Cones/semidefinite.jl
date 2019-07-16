@@ -20,12 +20,24 @@ mutable struct PosSemidef{T <: HypReal, R <: HypRealOrComplex{T}} <: Cone{T}
     use_dual::Bool
     dim::Int
     side::Int
-
     point::AbstractVector{T}
-    g::Vector{T}
-    H::Matrix{T}
-    Hi::Matrix{T}
+    is_complex::Bool
+
+    feas_updated::Bool
+    grad_updated::Bool
+    hess_updated::Bool
+    inv_hess_updated::Bool
+    is_feas::Bool
+    grad::Vector{T}
+    hess::Symmetric{T, Matrix{T}}
+    inv_hess::Symmetric{T, Matrix{T}}
+
+    rt2::T
+    rt2i::T
     mat::Matrix{R}
+    mat2::Matrix{R}
+    inv_mat::Matrix{R}
+    fact_mat
 
     function PosSemidef{T, R}(dim::Int, is_dual::Bool) where {R <: HypRealOrComplex{T}} where {T <: HypReal}
         cone = new{T, R}()
@@ -34,9 +46,11 @@ mutable struct PosSemidef{T <: HypReal, R <: HypRealOrComplex{T}} <: Cone{T}
         if R <: Complex
             side = isqrt(dim) # real lower triangle and imaginary under diagonal
             @assert side^2 == dim
+            cone.is_complex = true
         else
-            side = round(Int, sqrt(0.25 + 2.0 * dim) - 0.5) # real lower triangle
+            side = round(Int, sqrt(0.25 + 2 * dim) - 0.5) # real lower triangle
             @assert side * (side + 1) == 2 * dim
+            cone.is_complex = false
         end
         cone.side = side
         return cone
@@ -45,136 +59,225 @@ end
 
 PosSemidef{T, R}(dim::Int) where {R <: HypRealOrComplex{T}} where {T <: HypReal} = PosSemidef{T, R}(dim, false)
 
+reset_data(cone::PosSemidef) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
+
 function setup_data(cone::PosSemidef{T, R}) where {R <: HypRealOrComplex{T}} where {T <: HypReal}
+    reset_data(cone)
     dim = cone.dim
-    cone.g = Vector{T}(undef, dim)
-    cone.H = zeros(T, dim, dim)
-    cone.Hi = zeros(T, dim, dim)
+    cone.grad = zeros(T, dim)
+    cone.hess = Symmetric(zeros(T, dim, dim), :U)
+    cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.mat = Matrix{R}(undef, cone.side, cone.side)
+    cone.mat2 = Matrix{R}(undef, cone.side, cone.side)
+    cone.rt2 = sqrt(T(2))
+    cone.rt2i = inv(cone.rt2)
     return
 end
 
 get_nu(cone::PosSemidef) = cone.side
 
-function set_initial_point(arr::AbstractVector{T}, cone::PosSemidef{T, R}) where {R <: HypRealOrComplex{T}} where {T <: HypReal}
-    incr_off = (R <: Complex) ? 2 : 1
-    arr .= 0.0
+function set_initial_point(arr::AbstractVector, cone::PosSemidef)
+    incr = cone.is_complex ? 2 : 1
+    arr .= 0
     k = 1
-    for i in 1:cone.side, j in 1:i
-        if i == j # on diagonal
-            arr[k] = 1.0
-            k += 1
-        else # off diagonal
-            k += incr_off
-        end
+    for i in 1:cone.side
+        arr[k] = 1
+        k += incr * i + 1
     end
     return arr
 end
 
-function check_in_cone(cone::PosSemidef{T, R}) where {R <: HypRealOrComplex{T}} where {T <: HypReal}
-    mat = cone.mat
-    svec_to_smat!(mat, cone.point)
-    F = hyp_chol!(Hermitian(mat))
-    if !isposdef(F)
-        return false
-    end
-
-    inv_mat = Hermitian(inv(F)) # TODO eliminate allocs
-    smat_to_svec!(cone.g, transpose(inv_mat)) # TODO avoid doing this twice
-    cone.g .*= -1
-
-    # set upper triangles of hessian and inverse hessian
-    svec_to_smat!(mat, cone.point)
-    H = cone.H
-    Hi = cone.Hi
-    rt2 = sqrt(T(2))
-
-    # TODO refactor
-    if R <: Complex
-        k = 1
-        for i in 1:cone.side, j in 1:i
-            k2 = 1
-            if i == j
-                for i2 in 1:cone.side, j2 in 1:i2
-                    if i2 == j2
-                        H[k2, k] = abs2(inv_mat[i2, i])
-                        Hi[k2, k] = abs2(mat[i2, i])
-                        k2 += 1
-                    else
-                        c = rt2 * conj(inv_mat[i2, i]) * inv_mat[j2, j]
-                        ci = rt2 * conj(mat[i2, i]) * mat[j2, j]
-                        H[k2, k] = real(c)
-                        Hi[k2, k] = real(ci)
-                        k2 += 1
-                        H[k2, k] = imag(c)
-                        Hi[k2, k] = imag(ci)
-                        k2 += 1
-                    end
-                    if k2 > k
-                        break
-                    end
-                end
-                k += 1
-            else
-                for i2 in 1:cone.side, j2 in 1:i2
-                    if i2 == j2 # TODO try to merge with other XOR condition above
-                        c = rt2 * inv_mat[i2, i] * conj(inv_mat[j2, j])
-                        ci = rt2 * mat[i2, i] * (j2 >= j ? mat[j2, j] : conj(mat[j2, j]))
-                        H[k2, k] = real(c)
-                        Hi[k2, k] = real(ci)
-                        H[k2, k + 1] = imag(c)
-                        Hi[k2, k + 1] = imag(ci)
-                        k2 += 1
-                    else
-                        c = inv_mat[i2, i] * conj(inv_mat[j2, j]) + inv_mat[j2, i] * conj(inv_mat[i2, j])
-                        ci = mat[i2, i] * (j2 >= j ? mat[j2, j] : conj(mat[j2, j])) + mat[j2, i] * (i2 >= j ? mat[i2, j] : conj(mat[i2, j]))
-                        c2 = conj(inv_mat[i2, i]) * inv_mat[j2, j] - conj(inv_mat[j2, i]) * inv_mat[i2, j]
-                        c2i = conj(mat[i2, i]) * (j2 < j ? mat[j2, j] : conj(mat[j2, j])) - conj(mat[j2, i]) * (i2 < j ? mat[i2, j] : conj(mat[i2, j]))
-                        H[k2, k] = real(c)
-                        Hi[k2, k] = real(ci)
-                        H[k2, k + 1] = imag(c)
-                        Hi[k2, k + 1] = imag(ci)
-                        k2 += 1
-                        H[k2, k] = imag(c2)
-                        Hi[k2, k] = imag(c2i)
-                        H[k2, k + 1] = real(c2)
-                        Hi[k2, k + 1] = real(c2i)
-                        k2 += 1
-                    end
-                    if k2 > k
-                        break
-                    end
-                end
-                k += 2
-            end
-        end
-    else
-        k = 1
-        for i in 1:cone.side, j in 1:i
-            k2 = 1
-            for i2 in 1:cone.side, j2 in 1:i2
-                if (i == j) && (i2 == j2)
-                    H[k2, k] = abs2(inv_mat[i2, i])
-                    Hi[k2, k] = abs2(mat[i2, i])
-                elseif (i != j) && (i2 != j2)
-                    H[k2, k] = inv_mat[i2, i] * inv_mat[j, j2] + inv_mat[j2, i] * inv_mat[j, i2]
-                    Hi[k2, k] = mat[i2, i] * mat[j, j2] + mat[j2, i] * mat[j, i2]
-                else
-                    H[k2, k] = rt2 * inv_mat[i2, i] * inv_mat[j, j2]
-                    Hi[k2, k] = rt2 * mat[i2, i] * mat[j, j2]
-                end
-                if k2 == k
-                    break
-                end
-                k2 += 1
-            end
-            k += 1
-        end
-    end
-
-    return true
+# TODO only work with upper triangle
+function update_feas(cone::PosSemidef)
+    @assert !cone.feas_updated
+    svec_to_smat!(cone.mat, cone.point, cone.rt2i)
+    copyto!(cone.mat2, cone.mat)
+    cone.fact_mat = hyp_chol!(Hermitian(cone.mat2))
+    cone.is_feas = isposdef(cone.fact_mat)
+    cone.feas_updated = true
+    return cone.is_feas
 end
 
-inv_hess(cone::PosSemidef) = Symmetric(cone.Hi, :U)
+function update_grad(cone::PosSemidef)
+    @assert cone.is_feas
+    cone.inv_mat = inv(cone.fact_mat) # TODO eliminate allocs
+    smat_to_svec!(cone.grad, transpose(cone.inv_mat), cone.rt2)
+    cone.grad .*= -1
+    cone.grad_updated = true
+    return cone.grad
+end
 
-inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::PosSemidef{T, R}) where {R <: HypRealOrComplex{T}} where {T <: HypReal} = mul!(prod, Symmetric(cone.Hi, :U), arr)
+# TODO parallelize
+function _build_hess_real(H::Matrix, mat::Matrix{<:HypReal}, rt2::HypReal)
+    side = size(mat, 1)
+    k = 1
+    for i in 1:side, j in 1:i
+        k2 = 1
+        for i2 in 1:side, j2 in 1:i2
+            if (i == j) && (i2 == j2)
+                H[k2, k] = abs2(mat[i2, i])
+            elseif (i != j) && (i2 != j2)
+                H[k2, k] = mat[i2, i] * mat[j, j2] + mat[j2, i] * mat[j, i2]
+            else
+                H[k2, k] = rt2 * mat[i2, i] * mat[j, j2]
+            end
+            if k2 == k
+                break
+            end
+            k2 += 1
+        end
+        k += 1
+    end
+    return H
+end
+
+function _build_hess_complex(H::Matrix, mat::Matrix{<:Complex}, rt2::HypReal)
+    side = size(mat, 1)
+    k = 1
+    for i in 1:side, j in 1:i
+        k2 = 1
+        if i == j
+            for i2 in 1:side, j2 in 1:i2
+                if i2 == j2
+                    H[k2, k] = abs2(mat[i2, i])
+                    k2 += 1
+                else
+                    c = rt2 * conj(mat[i2, i]) * mat[j2, j]
+                    H[k2, k] = real(c)
+                    k2 += 1
+                    H[k2, k] = imag(c)
+                    k2 += 1
+                end
+                if k2 > k
+                    break
+                end
+            end
+            k += 1
+        else
+            for i2 in 1:side, j2 in 1:i2
+                if i2 == j2
+                    c = rt2 * mat[i2, i] * conj(mat[j2, j])
+                    H[k2, k] = real(c)
+                    H[k2, k + 1] = imag(c)
+                    k2 += 1
+                else
+                    b1 = mat[i2, i] * conj(mat[j2, j])
+                    b2 = mat[j2, i] * conj(mat[i2, j])
+                    c1 = b1 + b2
+                    H[k2, k] = real(c1)
+                    H[k2, k + 1] = imag(c1)
+                    k2 += 1
+                    c2 = b1 - b2
+                    H[k2, k] = -imag(c2)
+                    H[k2, k + 1] = real(c2)
+                    k2 += 1
+                end
+                if k2 > k
+                    break
+                end
+            end
+            k += 2
+        end
+    end
+    return H
+end
+
+function _build_inv_hess_complex(H::Matrix, mat::Matrix{<:Complex}, rt2::HypReal)
+    side = size(mat, 1)
+    k = 1
+    for i in 1:side, j in 1:i
+        k2 = 1
+        if i == j
+            for i2 in 1:side, j2 in 1:i2
+                if i2 == j2
+                    H[k2, k] = abs2(mat[i2, i])
+                    k2 += 1
+                else
+                    c = rt2 * conj(mat[i2, i]) * mat[j2, j]
+                    H[k2, k] = real(c)
+                    k2 += 1
+                    H[k2, k] = imag(c)
+                    k2 += 1
+                end
+                if k2 > k
+                    break
+                end
+            end
+            k += 1
+        else
+            for i2 in 1:side, j2 in 1:i2
+                if i2 == j2
+                    c = rt2 * mat[i2, i] * (j2 >= j ? mat[j2, j] : conj(mat[j2, j]))
+                    H[k2, k] = real(c)
+                    H[k2, k + 1] = imag(c)
+                    k2 += 1
+                else
+                    b1 = mat[i2, i] * (j2 >= j ? mat[j2, j] : conj(mat[j2, j]))
+                    b2 = mat[j2, i] * (i2 >= j ? mat[i2, j] : conj(mat[i2, j]))
+                    c1 = b1 + b2
+                    # c1 = mat[i2, i] * (j2 >= j ? mat[j2, j] : conj(mat[j2, j])) + mat[j2, i] * (i2 >= j ? mat[i2, j] : conj(mat[i2, j]))
+                    H[k2, k] = real(c1)
+                    H[k2, k + 1] = imag(c1)
+                    k2 += 1
+                    c2 = b1 - b2
+                    # c2 = conj(mat[i2, i]) * (j2 >= j ? conj(mat[j2, j]) : mat[j2, j])) - conj(mat[j2, i]) * (i2 >= j ? conj(mat[i2, j]) : mat[i2, j])
+                    H[k2, k] = -imag(c2)
+                    H[k2, k + 1] = real(c2)
+                    k2 += 1
+                end
+                if k2 > k
+                    break
+                end
+            end
+            k += 2
+        end
+    end
+    return H
+end
+
+function update_hess(cone::PosSemidef{<:HypReal, <:HypReal})
+    @assert cone.grad_updated
+    _build_hess_real(cone.hess.data, cone.inv_mat, cone.rt2)
+    cone.hess_updated = true
+    return cone.hess
+end
+
+function update_hess(cone::PosSemidef{<:HypReal, <:Complex{<:HypReal}})
+    @assert cone.grad_updated
+    _build_hess_complex(cone.hess.data, cone.inv_mat, cone.rt2)
+    cone.hess_updated = true
+    return cone.hess
+end
+
+function update_inv_hess(cone::PosSemidef{<:HypReal, <:HypReal})
+    @assert cone.is_feas
+    _build_hess_real(cone.inv_hess.data, cone.mat, cone.rt2)
+    cone.inv_hess_updated = true
+    return cone.inv_hess
+end
+
+function update_inv_hess(cone::PosSemidef{<:HypReal, <:Complex{<:HypReal}})
+    @assert cone.is_feas
+    _build_inv_hess_complex(cone.inv_hess.data, cone.mat, cone.rt2)
+    cone.inv_hess_updated = true
+    return cone.inv_hess
+end
+
+update_hess_prod(cone::PosSemidef) = nothing
+update_inv_hess_prod(cone::PosSemidef) = nothing
+
+# TODO maybe write using linear operator form rather than needing explicit hess
+function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidef)
+    if !cone.hess_updated
+        update_hess(cone)
+    end
+    return mul!(prod, cone.hess, arr)
+end
+
+# TODO maybe write using linear operator form rather than needing explicit inv_hess
+function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidef)
+    if !cone.inv_hess_updated
+        update_inv_hess(cone)
+    end
+    return mul!(prod, cone.inv_hess, arr)
+end

@@ -124,7 +124,7 @@ function densityest(
         for i in 1:nobs
             G_log[i + 2, 2:(1 + U)] = -basis_evals[i, :]
         end
-        push!(cones, CO.HypoPerSumLog{T}(nobs + 2))
+        push!(cones, CO.HypoPerLog{T}(nobs + 2))
         push!(cone_idxs, cone_offset:(cone_offset + 1 + nobs))
     else
         # pre-pad with `nobs` hypograph variables
@@ -143,7 +143,7 @@ function densityest(
             G_log[offset + 2, (nobs + 1):(nobs + U)] = -basis_evals[i, :]
             h_log[offset + 1] = 1.0
             offset += 3
-            push!(cones, CO.HypoPerSumLog{T}(3))
+            push!(cones, CO.HypoPerLog{T}(3))
             push!(cone_idxs, cone_offset:(cone_offset + 2))
             cone_offset += 3
         end
