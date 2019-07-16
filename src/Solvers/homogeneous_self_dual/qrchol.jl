@@ -1,10 +1,10 @@
 #=
 Copyright 2018, Chris Coey and contributors
 
-QR + Cholesky linear system solver
+QR+Cholesky linear system solver
+solves linear system in naive.jl via a procedure similar to that described by S10.3 of
+http://www.seas.ucla.edu/~vandenbe/publications/coneprog.pdf
 =#
-
-using SuiteSparse
 
 mutable struct QRCholCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSolver{T}
     use_sparse::Bool
@@ -262,9 +262,10 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
             if !isposdef(F)
                 println("dense linear system matrix factorization failed")
                 mul!(Q2GHGQ2, GQ2', HGQ2)
-                Q2GHGQ2 += T(1e-4) * I
+                Q2GHGQ2 += T(1e-8) * I
                 if T <: BlasReal
                     F = bunchkaufman!(Symmetric(Q2GHGQ2), true, check = false) # TODO prealloc with old sysvx code; not implemented for generic reals
+                    # F = lu!(Symmetric(Q2GHGQ2), check = false) # TODO prealloc with old sysvx code; not implemented for generic reals
                     if !issuccess(F)
                         error("could not fix failure of positive definiteness (mu is $mu); terminating")
                     end
@@ -314,26 +315,3 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
 
     return (x2, x3, y2, y3, z2, z3, z2_temp, z3_temp, tau_pred, tau_corr, kap_pred, kap_corr)
 end
-
-
-
-# TODO singular recovery using A'*A
-
-# Q2GHGQ2_fact = cholesky!(Q2GHGQ2, Val(true), check = false)
-# singular = !isposdef(Q2GHGQ2_fact)
-#
-# if singular
-#     println("singular Q2GHGQ2")
-#
-#     Q2GHGQ2 = Symmetric(model.Ap_Q2' * (GHG + model.A' * model.A + 1e-4I) * model.Ap_Q2)
-#     # @show eigvals(Q2GHGQ2)
-#     Q2GHGQ2_fact = cholesky!(Q2GHGQ2, Val(true), check = false)
-#     if !isposdef(Q2GHGQ2_fact)
-#         error("could not fix singular Q2GHGQ2")
-#     end
-# end
-#
-# xGHz = xi + model.G' * zi
-# if singular
-#     xGHz += model.A' * yi # TODO should this be minus
-# end

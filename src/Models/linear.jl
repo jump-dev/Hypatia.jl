@@ -41,7 +41,7 @@ function initialize_cone_point(cones::Vector{<:Cones.Cone{T}}, cone_idxs::Vector
         primal_k = point.primal_views[k]
         Cones.set_initial_point(primal_k, cone_k)
         Cones.load_point(cone_k, primal_k)
-        @assert Cones.check_in_cone(cone_k)
+        @assert Cones.is_feas(cone_k)
         g = Cones.grad(cone_k)
         @. point.dual_views[k] = -g
     end

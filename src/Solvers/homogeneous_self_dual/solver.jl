@@ -2,9 +2,6 @@
 Copyright 2018, Chris Coey and contributors
 
 interior point type and functions for algorithms based on homogeneous self dual embedding
-
-TODO
-make internal statuses types
 =#
 
 mutable struct HSDSolver{T <: HypReal} <: Solver{T}
@@ -144,8 +141,9 @@ function solve(solver::HSDSolver{T}) where {T <: HypReal}
 
     calc_mu(solver)
     if isnan(solver.mu) || abs(one(T) - solver.mu) > sqrt(eps(T))
-        error("initial mu is $(solver.mu) (should be 1.0)")
+        error("initial mu is $(solver.mu) (should be 1)")
     end
+    Cones.load_point.(solver.model.cones, solver.point.primal_views)
 
     while true
         @timeit solver.timer "calc_res" calc_residual(solver)

@@ -11,11 +11,18 @@ barrier from "Self-Scaled Barriers and Interior-Point Methods for Convex Program
 mutable struct EpiNormEucl{T <: HypReal} <: Cone{T}
     use_dual::Bool
     dim::Int
-
     point::AbstractVector{T}
-    g::Vector{T}
-    H::Matrix{T}
-    Hi::Matrix{T}
+
+    feas_updated::Bool
+    grad_updated::Bool
+    hess_updated::Bool
+    inv_hess_updated::Bool
+    is_feas::Bool
+    grad::Vector{T}
+    hess::Symmetric{T, Matrix{T}}
+    inv_hess::Symmetric{T, Matrix{T}}
+
+    dist::T
 
     function EpiNormEucl{T}(dim::Int, is_dual::Bool) where {T <: HypReal}
         cone = new{T}()
@@ -27,42 +34,91 @@ end
 
 EpiNormEucl{T}(dim::Int) where {T <: HypReal} = EpiNormEucl{T}(dim, false)
 
+reset_data(cone::EpiNormEucl) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
+
+# TODO maybe only allocate the fields we use
 function setup_data(cone::EpiNormEucl{T}) where {T <: HypReal}
+    reset_data(cone)
     dim = cone.dim
-    cone.g = Vector{T}(undef, dim)
-    cone.H = Matrix{T}(undef, dim, dim)
-    cone.Hi = similar(cone.H)
+    cone.grad = zeros(T, dim)
+    cone.hess = Symmetric(zeros(T, dim, dim), :U)
+    cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     return
 end
 
 get_nu(cone::EpiNormEucl) = 2
 
-set_initial_point(arr::AbstractVector{T}, cone::EpiNormEucl{T}) where {T <: HypReal} = (@. arr = zero(T); arr[1] = one(T); arr)
-
-function check_in_cone(cone::EpiNormEucl{T}) where {T <: HypReal}
-    if cone.point[1] <= zero(T)
-        return false
-    end
-    dist = (abs2(cone.point[1]) - sum(abs2, view(cone.point, 2:cone.dim))) / 2
-    if dist <= zero(T)
-        return false
-    end
-
-    @. cone.g = cone.point / dist
-    cone.g[1] *= -1
-
-    # TODO only work with upper triangle
-    mul!(cone.H, cone.g, cone.g')
-    cone.H += inv(dist) * I
-    cone.H[1, 1] -= 2 / dist
-
-    mul!(cone.Hi, cone.point, cone.point')
-    cone.Hi += dist * I
-    cone.Hi[1, 1] -= 2 * dist
-
-    return true
+function set_initial_point(arr::AbstractVector, cone::EpiNormEucl)
+    arr .= 0
+    arr[1] = 1
+    return arr
 end
 
-inv_hess(cone::EpiNormEucl) = Symmetric(cone.Hi, :U)
+function update_feas(cone::EpiNormEucl)
+    @assert !cone.feas_updated
+    u = cone.point[1]
+    if u > 0
+        w = view(cone.point, 2:cone.dim)
+        cone.dist = (abs2(u) - sum(abs2, w)) / 2
+        cone.is_feas = (cone.dist > 0)
+    else
+        cone.is_feas = false
+    end
+    cone.feas_updated = true
+    return cone.is_feas
+end
 
-inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiNormEucl{T}) where {T <: HypReal} = mul!(prod, Symmetric(cone.Hi, :U), arr)
+function update_grad(cone::EpiNormEucl)
+    @assert cone.is_feas
+    @. cone.grad = cone.point / cone.dist
+    cone.grad[1] *= -1
+    cone.grad_updated = true
+    return cone.grad
+end
+
+# TODO only work with upper triangle
+function update_hess(cone::EpiNormEucl)
+    @assert cone.grad_updated
+    mul!(cone.hess.data, cone.grad, cone.grad')
+    cone.hess += inv(cone.dist) * I
+    cone.hess[1, 1] -= 2 / cone.dist
+    cone.hess_updated = true
+    return cone.hess
+end
+
+# TODO only work with upper triangle
+function update_inv_hess(cone::EpiNormEucl)
+    @assert cone.is_feas
+    mul!(cone.inv_hess.data, cone.point, cone.point')
+    cone.inv_hess += cone.dist * I
+    cone.inv_hess[1, 1] -= 2 * cone.dist
+    cone.inv_hess_updated = true
+    return cone.inv_hess
+end
+
+update_hess_prod(cone::EpiNormEucl) = nothing
+update_inv_hess_prod(cone::EpiNormEucl) = nothing
+
+function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormEucl)
+    @assert cone.grad_updated
+    disth = cone.dist / 2
+    for j in 1:size(prod, 2)
+        @views aj = arr[:, j]
+        ga = dot(cone.grad, aj)
+        @. prod[:, j] = ga * cone.grad + aj / cone.dist
+        prod[1, j] -= arr[1, j] / disth
+    end
+    return prod
+end
+
+function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormEucl)
+    @assert cone.is_feas
+    dist2 = cone.dist * 2
+    for j in 1:size(prod, 2)
+        @views aj = arr[:, j]
+        pa = dot(cone.point, aj)
+        @. prod[:, j] = pa * cone.point + cone.dist * aj
+        prod[1, j] -= arr[1, j] * dist2
+    end
+    return prod
+end

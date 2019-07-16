@@ -14,19 +14,29 @@ TODO try to make barrier evaluation more efficient
 mutable struct HypoGeomean{T <: HypReal} <: Cone{T}
     use_dual::Bool
     dim::Int
-    alpha::Vector{<:Real}
-
-    ialpha::Vector{<:Real}
+    alpha::Vector{T}
     point::AbstractVector{T}
-    g::Vector{T}
-    H::Matrix{T}
-    H2::Matrix{T}
-    F
 
-    function HypoGeomean{T}(alpha::Vector{<:Real}, is_dual::Bool) where {T <: HypReal}
+    feas_updated::Bool
+    grad_updated::Bool
+    hess_updated::Bool
+    inv_hess_updated::Bool
+    inv_hess_prod_updated::Bool
+    is_feas::Bool
+    grad::Vector{T}
+    hess::Symmetric{T, Matrix{T}}
+    inv_hess::Symmetric{T, Matrix{T}}
+
+    wiaa::T
+    wiw::T
+    a1ww::Vector{T}
+    tmp_hess::Symmetric{T, Matrix{T}}
+    hess_fact # TODO prealloc
+
+    function HypoGeomean{T}(alpha::Vector{T}, is_dual::Bool) where {T <: HypReal}
         dim = length(alpha) + 1
         @assert dim >= 3
-        @assert all(ai >= 0.0 for ai in alpha)
+        @assert all(ai > 0 for ai in alpha)
         tol = 1e3 * eps(T)
         @assert sum(alpha) ≈ 1 atol=tol rtol=tol
         cone = new{T}()
@@ -37,58 +47,68 @@ mutable struct HypoGeomean{T <: HypReal} <: Cone{T}
     end
 end
 
-HypoGeomean{T}(alpha::Vector{<:Real}) where {T <: HypReal} = HypoGeomean{T}(alpha, false)
+HypoGeomean{T}(alpha::Vector{T}) where {T <: HypReal} = HypoGeomean{T}(alpha, false)
 
 function setup_data(cone::HypoGeomean{T}) where {T <: HypReal}
+    reset_data(cone)
     dim = cone.dim
-    alpha = cone.alpha
-    ialpha = inv.(alpha)
-    cone.ialpha = ialpha
-    cone.g = zeros(T, dim)
-    cone.H = zeros(T, dim, dim)
-    cone.H2 = copy(cone.H)
+    cone.grad = zeros(T, dim)
+    cone.hess = Symmetric(zeros(T, dim, dim), :U)
+    cone.tmp_hess = Symmetric(zeros(T, dim, dim), :U)
+    cone.a1ww = zeros(T, dim - 1)
     return
 end
 
 get_nu(cone::HypoGeomean) = cone.dim
 
-function set_initial_point(arr::AbstractVector{T}, cone::HypoGeomean{T}) where {T <: HypReal}
-    @. arr = one(T)
-    arr[1] = -prod(cone.ialpha[i]^cone.alpha[i] for i in eachindex(cone.alpha)) / cone.dim
+function set_initial_point(arr::AbstractVector, cone::HypoGeomean)
+    arr .= 1
+    arr[1] = -prod(cone.alpha[i] ^ (-cone.alpha[i]) for i in eachindex(cone.alpha)) / cone.dim
     return arr
 end
 
-function check_in_cone(cone::HypoGeomean{T}) where {T <: HypReal}
+function update_feas(cone::HypoGeomean)
+    @assert !cone.feas_updated
     u = cone.point[1]
     w = view(cone.point, 2:cone.dim)
-    if u >= zero(T) || any(wi <= zero(T) for wi in w)
-        return false
+    if u < 0 && all(wi -> wi > 0, w)
+        cone.wiaa = exp(sum(cone.alpha[i] * log(w[i] / cone.alpha[i]) for i in eachindex(cone.alpha)))
+        cone.is_feas = (cone.wiaa > -u)
+    else
+        cone.is_feas = false
     end
-    if sum(cone.alpha[i] * log(w[i] * cone.ialpha[i]) for i in eachindex(cone.alpha)) <= log(-u)
-        return false
-    end
+    cone.feas_updated = true
+    return cone.is_feas
+end
 
-    ialpha = cone.ialpha
-    alpha = cone.alpha
+function update_grad(cone::HypoGeomean)
+    @assert cone.is_feas
+    u = cone.point[1]
+    w = view(cone.point, 2:cone.dim)
+    wiaau = cone.wiaa + u
+    cone.wiw = cone.wiaa / wiaau
+    @. cone.a1ww = cone.alpha * (1 - cone.wiw) / w
+    cone.grad[1] = -inv(cone.wiaa + u) - inv(u)
+    @. cone.grad[2:end] = cone.a1ww - inv(w)
+    cone.grad_updated = true
+    return cone.grad
+end
 
-    prodwaa = prod((w[i] * ialpha[i])^alpha[i] for i in eachindex(alpha))
-    prodwaau = prodwaa + u
-
-    cone.g[1] = -inv(prodwaau) - inv(u)
-    cone.H[1, 1] = inv(prodwaau) / prodwaau + inv(u) / u
-    # column loop
-    for i in eachindex(alpha)
-        prod_excli = prodwaa * alpha[i] / w[i]
-        cone.g[i + 1] = -prod_excli / prodwaau - (1 - alpha[i]) / w[i]
-        cone.H[1, i + 1] = prod_excli / prodwaau / prodwaau
-        fact = prodwaa / prodwaau * alpha[i] / w[i]
-        # row loop
-        for j in 1:(i - 1)
-            prod_exclj = prodwaa * alpha[j] / w[j]
-            cone.H[j + 1, i + 1] = fact * alpha[j] / w[j] * (prodwaa / prodwaau - 1)
+function update_hess(cone::HypoGeomean)
+    @assert cone.grad_updated
+    u = cone.point[1]
+    w = view(cone.point, 2:cone.dim)
+    wiaau = cone.wiaa + u
+    cone.hess.data[1, 1] = inv(wiaau) / wiaau + inv(u) / u
+    for j in eachindex(w)
+        j1 = j + 1
+        wiwaw = -cone.wiw * cone.alpha[j] / w[j]
+        cone.hess.data[1, j1] = -wiwaw / wiaau
+        for i in 1:(j - 1)
+            cone.hess.data[i + 1, j1] = wiwaw * cone.a1ww[i]
         end
-        cone.H[i + 1, i + 1] = fact / w[i] * (prodwaa / prodwaau * alpha[i] - alpha[i] + 1) + (1 - alpha[i]) / w[i] / w[i]
+        cone.hess.data[j1, j1] = wiwaw * cone.grad[j1] + (1 - cone.alpha[j]) / w[j] / w[j]
     end
-
-    return factorize_hess(cone)
+    cone.hess_updated = true
+    return cone.hess
 end
