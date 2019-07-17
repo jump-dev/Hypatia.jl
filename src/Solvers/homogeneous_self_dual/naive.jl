@@ -90,6 +90,8 @@ mutable struct NaiveCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSo
             end
 
             system_solver.lhs = HypBlockMatrix{T}(
+                dim,
+                dim,
                 [fill(I, length(cone_rows))...,
                 model.A', model.G', reshape(model.c, :, 1), -model.A, reshape(model.b, :, 1), ones(T, 1, 1), -model.G, -I, reshape(model.h, :, 1), -model.c', -model.b', -model.h', -ones(T, 1, 1), ones(T, 1, 1)],
                 [cone_rows..., rc1, rc1, rc1, rc2, rc2, rc4, rc5, rc5, rc5, rc6, rc6, rc6, rc6, rc4],

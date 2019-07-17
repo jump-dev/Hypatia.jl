@@ -131,7 +131,7 @@ function find_initial_point(model::RawLinearModel{T}, use_iterative::Bool, tol_q
         rhs = vcat(model.b, model.h - point.s)
         if use_iterative
             # use iterative solvers method TODO pick lsqr or lsmr
-            AG = HypBlockMatrix{T}([A, G], [1:p, (p + 1):(p + q)], [1:n, 1:n])
+            AG = HypBlockMatrix{T}(p + q, n, [A, G], [1:p, (p + 1):(p + q)], [1:n, 1:n])
             point.x = zeros(T, n)
             IterativeSolvers.lsqr!(point.x, AG, rhs)
         else
