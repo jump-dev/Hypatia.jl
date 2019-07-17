@@ -196,7 +196,7 @@ real_types = [
 
     # @testset "envelope" begin test_envelope.(instances_envelope_few, T = T, test_options = test_options) end
 
-    @testset "expdesign" begin test_expdesign.(instances_expdesign_few, T = T, test_options = test_options) end
+    # @testset "expdesign" begin test_expdesign.(instances_expdesign_few, T = T, test_options = test_options) end
 
     # @testset "linearopt" begin test_linearopt.(instances_linearopt_few, T = T, test_options = test_options) end
     #
@@ -215,10 +215,13 @@ end
         system_solver = SO.NaiveCombinedHSDSystemSolver,
         linear_model_options = (use_iterative = true,),
         system_solver_options = (use_iterative = true,),
-        solver_options = (verbose = true,),
+        solver_options = (verbose = true, tol_feas = 1e-5, tol_abs_opt = 1e-5, tol_rel_opt = 1e-5),
+
         )
 
     @testset "expdesign" begin test_expdesign.(instances_expdesign_linops, T = T, test_options = test_options) end
+
+    @testset "polymin" begin test_polymin.(instances_polymin_linops, T = T, test_options = test_options) end
 
     @testset "portfolio" begin test_portfolio.(instances_portfolio_linops, T = T, test_options = test_options) end
 
