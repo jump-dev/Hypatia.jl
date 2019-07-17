@@ -10,7 +10,6 @@ using Test
 import Hypatia
 import Hypatia.HypReal
 const CO = Hypatia.Cones
-const HYP = Hypatia
 
 function portfolio(
     T::Type{<:HypReal},
@@ -193,8 +192,8 @@ function portfolio(
     end
 
     if use_linops
-        A = HYP.HypBlockMatrix{T}(last_idx(A_rows), last_idx(A_cols), A_blocks, A_rows, A_cols)
-        G = HYP.HypBlockMatrix{T}(last_idx(G_rows), last_idx(G_cols), G_blocks, G_rows, G_cols)
+        A = Hypatia.HypBlockMatrix{T}(last_idx(A_rows), last_idx(A_cols), A_blocks, A_rows, A_cols)
+        G = Hypatia.HypBlockMatrix{T}(last_idx(G_rows), last_idx(G_cols), G_blocks, G_rows, G_cols)
     end
 
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs)
@@ -244,18 +243,3 @@ function test_portfolio(instance::Function; T::Type{<:HypReal} = Float64, test_o
     @test r.status == :Optimal
     return
 end
-
-# MO = HYP.Models
-# SO = HYP.Solvers
-# for t in instances_portfolio_linops
-#     test_portfolio(t, T = Float64, test_options = (
-#         linear_model = MO.RawLinearModel,
-#         system_solver = SO.NaiveCombinedHSDSystemSolver,
-#         linear_model_options = (use_iterative = true,),
-#         system_solver_options = (use_iterative = true,),
-#         solver_options = (verbose = true,),
-#         ))
-# end
-#
-#
-# ;
