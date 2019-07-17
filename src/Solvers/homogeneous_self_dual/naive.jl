@@ -17,6 +17,7 @@ TODO reduce allocations
 mutable struct NaiveCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSolver{T}
     use_iterative::Bool
     use_sparse::Bool
+    use_restarts::Bool
 
     lhs_copy
     lhs
@@ -41,6 +42,7 @@ mutable struct NaiveCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSo
         model::Models.LinearModel{T};
         use_iterative::Bool = false,
         use_sparse::Bool = false,
+        use_restarts::Bool = false,
         ) where {T <: HypReal}
         (n, p, q) = (model.n, model.p, model.q)
         dim = n + p + 2q + 2
@@ -97,6 +99,8 @@ mutable struct NaiveCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSo
                 [cone_rows..., rc1, rc1, rc1, rc2, rc2, rc4, rc5, rc5, rc5, rc6, rc6, rc6, rc6, rc4],
                 [cone_cols..., rc2, rc3, rc6, rc1, rc6, rc4, rc1, rc5, rc6, rc1, rc2, rc3, rc4, rc6],
                 )
+
+            system_solver.use_restarts = use_restarts
         else
             if use_sparse
                 system_solver.lhs_copy = T[
@@ -178,12 +182,19 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveCombi
         # TODO prealloc whatever is needed inside the solver
         # TODO possibly fix IterativeSolvers so that methods can take matrix RHS, however the two columns may take different number of iters needed to converge
 
+        # if using restarted gmres, use default from IterativeSolvers
+        if system_solver.use_restarts
+            restart = min(20, size(lhs, 2))
+        else
+            restart = size(lhs, 2)
+        end
+
         rhs1 = view(rhs, :, 1)
-        IterativeSolvers.gmres!(system_solver.prevsol1, lhs, rhs1)
+        IterativeSolvers.gmres!(system_solver.prevsol1, lhs, rhs1, restart = restart)
         copyto!(rhs1, system_solver.prevsol1)
 
         rhs2 = view(rhs, :, 2)
-        IterativeSolvers.gmres!(system_solver.prevsol2, lhs, rhs2)
+        IterativeSolvers.gmres!(system_solver.prevsol2, lhs, rhs2, restart = restart)
         copyto!(rhs2, system_solver.prevsol2)
     else
         # update lhs matrix
