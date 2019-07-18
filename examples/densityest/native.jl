@@ -20,71 +20,6 @@ const MU = Hypatia.ModelUtilities
 
 include(joinpath(@__DIR__, "data.jl"))
 
-function get_AG_linops(T, use_wsos, use_sumlog, A_psd, w, G_log, U, nobs)
-    num_hypo_vars = (use_sumlog ? 1 : nobs)
-    (log_rows, log_cols) = size(G_log)
-    @assert log_cols == num_hypo_vars + U
-    if use_wsos
-        A = HypBlockMatrix{T}(
-            1,
-            num_hypo_vars + U,
-            [T.(w')],
-            [1:1],
-            [(num_hypo_vars + 1):(num_hypo_vars + U)]
-        )
-        G = HypBlockMatrix{T}(
-            U + log_rows,
-            num_hypo_vars + U,
-            [-I, G_log],
-            [1:U, (U + 1):(U + log_rows)],
-            [(num_hypo_vars + 1):(num_hypo_vars + U), 1:(num_hypo_vars + U)],
-        )
-    else
-        num_psd_vars = size(A_psd, 2)
-        A = HypBlockMatrix{T}(
-            U + 1,
-            num_hypo_vars + U + num_psd_vars,
-            [-I, A_psd, T.(w')],
-            [1:U, 1:U, (U + 1):(U + 1)],
-            [(num_hypo_vars + 1):(num_hypo_vars + U), (num_hypo_vars + U + 1):(num_hypo_vars + U + num_psd_vars), (num_hypo_vars + 1):(num_hypo_vars + U)],
-        )
-        G = HypBlockMatrix{T}(
-            num_psd_vars + log_rows,
-            num_hypo_vars + U + num_psd_vars,
-            [-I, G_log],
-            [1:num_psd_vars, (num_psd_vars + 1):(num_psd_vars + log_rows)],
-            [(num_hypo_vars + U + 1):(num_hypo_vars + U + num_psd_vars), 1:(num_hypo_vars + U)],
-        )
-    end
-    return (A, G)
-end
-
-function get_AG_matrices(T, use_wsos, use_sumlog, A_psd, w, G_log, U, nobs)
-    num_hypo_vars = (use_sumlog ? 1 : nobs)
-    (log_rows, log_cols) = size(G_log)
-    @assert log_cols == num_hypo_vars + U
-    if use_wsos
-        A = [
-            zeros(T, 1, num_hypo_vars)    T.(w');
-            ]
-        G = [
-            zeros(T, U, num_hypo_vars)    Matrix{T}(-I, U, U);
-            G_log;
-            ]
-    else
-        num_psd_vars = size(A_psd, 2)
-        A = [
-            zeros(T, U, num_hypo_vars)    Matrix{T}(-I, U, U)    A_psd;
-            zeros(T, 1, num_hypo_vars)    T.(w')    zeros(T, 1, num_psd_vars);
-            ]
-        G = [
-            zeros(T, num_psd_vars, num_hypo_vars + U)   Matrix{T}(-I, num_psd_vars, num_psd_vars);
-            G_log   zeros(T, log_rows, num_psd_vars);
-            ]
-    end
-    return (A, G)
-end
-
 function densityest(
     T::Type{<:HypReal},
     X::Matrix{Float64},
@@ -122,7 +57,6 @@ function densityest(
 
     if use_wsos
         # U variables
-        A_psd = T[]
         h_poly = zeros(T, U)
         b_poly = T[]
         push!(cones, CO.WSOSPolyInterp{T, T}(U, [P0, PWts...]))
@@ -133,16 +67,16 @@ function densityest(
         # U polynomial coefficient variables plus PSD variables
         # there are n new PSD variables, we will store them scaled, lower triangle, row-wise
         n = length(PWts) + 1
-        a_psd = Matrix{T}[]
+        psd_var_list = Matrix{T}[]
         L = size(P0, 2)
         dim = div(L * (L + 1), 2)
         num_psd_vars = dim
         # first part of A
-        push!(a_psd, zeros(T, U, dim))
+        push!(psd_var_list, zeros(T, U, dim))
         idx = 1
         for k in 1:L, l in 1:k
             # off diagonals are doubled, but already scaled by rt2
-            a_psd[1][:, idx] = P0[:, k] .* P0[:, l] * (k == l ? 1 : rt2)
+            psd_var_list[1][:, idx] = P0[:, k] .* P0[:, l] * (k == l ? 1 : rt2)
             idx += 1
         end
         push!(cones, CO.PosSemidef{T, T}(dim))
@@ -153,25 +87,23 @@ function densityest(
             L = size(PWts[i], 2)
             dim = div(L * (L + 1), 2)
             num_psd_vars += dim
-            push!(a_psd, zeros(T, U, dim))
+            push!(psd_var_list, zeros(T, U, dim))
             idx = 1
             for k in 1:L, l in 1:k
                 # off diagonals are doubled, but already scaled by rt2
-                a_psd[i + 1][:, idx] = PWts[i][:, k] .* PWts[i][:, l] * (k == l ? 1 : rt2)
+                psd_var_list[i + 1][:, idx] = PWts[i][:, k] .* PWts[i][:, l] * (k == l ? 1 : rt2)
                 idx += 1
             end
             push!(cones, CO.PosSemidef{T, T}(dim))
             push!(cone_idxs, cone_offset:(cone_offset + dim - 1))
             cone_offset += dim
         end
-        A_psd = hcat(a_psd...)
+        A_psd = hcat(psd_var_list...)
         b_poly = zeros(T, U)
         h_poly = zeros(T, num_psd_vars)
     end
 
     if use_sumlog
-        # pre-pad with one hypograph variable
-        c_log = T[-1]
         h_log = zeros(T, nobs + 2)
         h_log[2] = 1
         G_log = zeros(T, 2 + nobs, 1 + U)
@@ -181,9 +113,8 @@ function densityest(
         end
         push!(cones, CO.HypoPerLog{T}(nobs + 2))
         push!(cone_idxs, cone_offset:(cone_offset + 1 + nobs))
+        num_hypo_vars = 1
     else
-        # pre-pad with `nobs` hypograph variables
-        c_log = -ones(T, nobs)
         h_log = zeros(T, 3 * nobs)
         G_log = zeros(T, 3 * nobs, nobs + U)
         offset = 1
@@ -196,15 +127,64 @@ function densityest(
             push!(cone_idxs, cone_offset:(cone_offset + 2))
             cone_offset += 3
         end
+        num_hypo_vars = nobs
     end
 
+    (log_rows, log_cols) = size(G_log)
     if use_linops
-        (A, G) = get_AG_linops(T, use_wsos, use_sumlog, A_psd, w, G_log, U, nobs)
+        if use_wsos
+            A = HypBlockMatrix{T}(
+                1,
+                num_hypo_vars + U,
+                [T.(w')],
+                [1:1],
+                [(num_hypo_vars + 1):(num_hypo_vars + U)]
+            )
+            G = HypBlockMatrix{T}(
+                U + log_rows,
+                num_hypo_vars + U,
+                [-I, G_log],
+                [1:U, (U + 1):(U + log_rows)],
+                [(num_hypo_vars + 1):(num_hypo_vars + U), 1:(num_hypo_vars + U)],
+            )
+        else
+            A = HypBlockMatrix{T}(
+                U + 1,
+                num_hypo_vars + U + num_psd_vars,
+                [-I, A_psd, T.(w')],
+                [1:U, 1:U, (U + 1):(U + 1)],
+                [(num_hypo_vars + 1):(num_hypo_vars + U), (num_hypo_vars + U + 1):(num_hypo_vars + U + num_psd_vars), (num_hypo_vars + 1):(num_hypo_vars + U)],
+            )
+            G = HypBlockMatrix{T}(
+                num_psd_vars + log_rows,
+                num_hypo_vars + U + num_psd_vars,
+                [-I, G_log],
+                [1:num_psd_vars, (num_psd_vars + 1):(num_psd_vars + log_rows)],
+                [(num_hypo_vars + U + 1):(num_hypo_vars + U + num_psd_vars), 1:(num_hypo_vars + U)],
+            )
+        end
     else
-        (A, G) = get_AG_matrices(T, use_wsos, use_sumlog, A_psd, w, G_log, U, nobs)
+        if use_wsos
+            A = [
+                zeros(T, 1, num_hypo_vars)    T.(w');
+                ]
+            G = [
+                zeros(T, U, num_hypo_vars)    Matrix{T}(-I, U, U);
+                G_log;
+                ]
+        else
+            A = [
+                zeros(T, U, num_hypo_vars)    Matrix{T}(-I, U, U)    A_psd;
+                zeros(T, 1, num_hypo_vars)    T.(w')    zeros(T, 1, num_psd_vars);
+                ]
+            G = [
+                zeros(T, num_psd_vars, num_hypo_vars + U)   Matrix{T}(-I, num_psd_vars, num_psd_vars);
+                G_log   zeros(T, log_rows, num_psd_vars);
+                ]
+        end
     end
     h = vcat(h_poly, h_log)
-    c = vcat(c_log, zeros(T, U + num_psd_vars))
+    c = vcat(-ones(T, num_hypo_vars), zeros(T, U + num_psd_vars))
     b = vcat(b_poly, one(T))
 
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs)
