@@ -55,7 +55,6 @@ function portfolio(
             push!(G_blocks, -sigma_half)
             push!(G_rows, (cone_offset + 2):(cone_offset + num_stocks + 1))
             push!(G_cols, 1:num_stocks)
-
         else
             G = vcat(G, zeros(T, 1, num_stocks), -sigma_half)
         end
@@ -85,9 +84,9 @@ function portfolio(
             push!(A_blocks, ones(T, 1, 2 * num_stocks))
 
             A_offset = last_idx(A_rows)
-            push!(A_rows, (A_offset + 1):(A_offset + num_stocks))
-            push!(A_rows, (A_offset + 1):(A_offset + num_stocks))
-            push!(A_rows, (A_offset + 1):(A_offset + num_stocks))
+            for _ in 1:3
+                push!(A_rows, (A_offset + 1):(A_offset + num_stocks))
+            end
             push!(A_rows, (last_idx(A_rows) + 1):(last_idx(A_rows) + 1))
 
             push!(A_cols, 1:num_stocks)
@@ -101,12 +100,10 @@ function portfolio(
         else
             id = Matrix{T}(I, num_stocks, num_stocks)
             id2 = Matrix{T}(I, 2 * num_stocks, 2 * num_stocks)
-            A_slacks = hcat(sigma_half, -id, id)
-            A_l1 = hcat(zeros(T, 1, num_stocks), ones(T, 1, 2 * num_stocks))
             A = [
                 A    zeros(T, 1, 2 * num_stocks);
-                A_slacks;
-                A_l1;
+                sigma_half    -id    id;
+                zeros(T, 1, num_stocks)    ones(T, 1, 2 * num_stocks);
                 ]
             G = [
                 G    zeros(T, size(G, 1), 2 * num_stocks);
