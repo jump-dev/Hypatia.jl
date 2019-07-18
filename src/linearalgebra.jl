@@ -44,7 +44,7 @@ struct HypBlockMatrix{T <: HypReal}
 
     function HypBlockMatrix{T}(nrows::Int, ncols::Int, blocks::Vector, rows::Vector{UnitRange{Int}}, cols::Vector{UnitRange{Int}}) where {T <: HypReal}
         @assert length(blocks) == length(rows) == length(cols)
-        return new(nrows, ncols, blocks, rows, cols)
+        return new{T}(nrows, ncols, blocks, rows, cols)
     end
 end
 

@@ -17,9 +17,9 @@ import Combinatorics
 using Test
 import Hypatia
 import Hypatia.HypReal
+import Hypatia.HypBlockMatrix
 const CO = Hypatia.Cones
 const MU = Hypatia.ModelUtilities
-const HYP = Hypatia
 
 include(joinpath(@__DIR__, "data.jl"))
 
@@ -67,9 +67,8 @@ function polyminreal(
     if use_primal
         c = T[-1]
         if use_linops
-            A = HYP.HypBlockMatrix{T}(0, 1, Any[[]], UnitRange{Int}[0:-1], [1:1])
-            # A = HYP.HypBlockMatrix{T}(0, 0, Any[], UnitRange{Int}[], UnitRange{Int}[])
-            G = HYP.HypBlockMatrix{T}(U, 1, [ones(T, U, 1)], [1:U], [1:1])
+            A = HypBlockMatrix{T}(0, 1, Any[[]], [0:-1], [1:1])
+            G = HypBlockMatrix{T}(U, 1, [ones(T, U, 1)], [1:U], [1:1])
         else
             A = zeros(T, 0, 1)
             G = ones(T, U, 1)
@@ -80,14 +79,14 @@ function polyminreal(
     else
         c = interp_vals
         if use_linops
-            A = HYP.HypBlockMatrix{T}(1, U, [ones(T, 1, U)], [1:1], [1:U])
+            A = HypBlockMatrix{T}(1, U, [ones(T, 1, U)], [1:1], [1:U])
         else
             A = ones(T, 1, U) # TODO eliminate constraint and first variable
         end
         b = T[1]
         if use_wsos
             if use_linops
-                G = HYP.HypBlockMatrix{T}(U, U, [-I], [1:U], [1:U])
+                G = HypBlockMatrix{T}(U, U, [-I], [1:U], [1:U])
             else
                 G = Diagonal(-one(T) * I, U)
             end
@@ -113,7 +112,7 @@ function polyminreal(
             end
             if use_linops
                 (nrows, ncols) = size(G_full)
-                G = HYP.HypBlockMatrix{T}(nrows, ncols, [G_full], [1:nrows], [1:ncols])
+                G = HypBlockMatrix{T}(nrows, ncols, [G_full], [1:nrows], [1:ncols])
             else
                 G = G_full
             end
@@ -145,7 +144,6 @@ polyminreal18(T::Type{<:HypReal}) = polyminreal(T, :motzkin, 3, use_primal = fal
 polyminreal19(T::Type{<:HypReal}) = polyminreal(T, :motzkin, 3, use_wsos = false)
 polyminreal20(T::Type{<:HypReal}) = polyminreal(T, :reactiondiffusion, 4, use_primal = false, use_wsos = false)
 polyminreal21(T::Type{<:HypReal}) = polyminreal(T, :lotkavolterra, 3, use_primal = false, use_wsos = false)
-
 polyminreal22(T::Type{<:HypReal}) = polyminreal(T, :random, 2, use_primal = true, use_wsos = true, n = 5, use_linops = true)
 polyminreal23(T::Type{<:HypReal}) = polyminreal(T, :random, 2, use_primal = true, use_wsos = true, n = 5, use_linops = false)
 polyminreal24(T::Type{<:HypReal}) = polyminreal(T, :random, 2, use_primal = false, use_wsos = true, n = 5, use_linops = true)
