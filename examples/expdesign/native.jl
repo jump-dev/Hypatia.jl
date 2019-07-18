@@ -9,6 +9,7 @@ import Random
 using Test
 import Hypatia
 import Hypatia.HypReal
+import Hypatia.HypBlockMatrix
 const CO = Hypatia.Cones
 const HYP = Hypatia
 
@@ -56,8 +57,8 @@ function expdesign(
         push!(cone_idxs, (2 * p + 1):(2 * p + dimvec + 2))
 
         if use_linops
-            A = HYP.HypBlockMatrix{T}(1, p + 1, [A], [1:1], [2:(p + 1)])
-            G = HYP.HypBlockMatrix{T}(
+            A = HypBlockMatrix{T}(1, p + 1, [A], [1:1], [2:(p + 1)])
+            G = HypBlockMatrix{T}(
                 2 * p + 2 + dimvec,
                 p + 1,
                 [-I, -I, -ones(T, 1, 1), G_logdet],
@@ -166,8 +167,8 @@ function expdesign(
             end
         end
         if use_linops
-            A = HYP.HypBlockMatrix{T}(1, p + padx, [A], [1:1], [1:p])
-            G = HYP.HypBlockMatrix{T}(
+            A = HypBlockMatrix{T}(1, p + padx, [A], [1:1], [1:p])
+            G = HypBlockMatrix{T}(
                 2 * p + dimvec + size(G_log, 1),
                 dimx,
                 [-I, -I, G_psd, G_log],
