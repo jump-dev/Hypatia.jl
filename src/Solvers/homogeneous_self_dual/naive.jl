@@ -49,6 +49,7 @@ mutable struct NaiveCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSo
         system_solver = new{T}()
         system_solver.use_iterative = use_iterative
         system_solver.use_sparse = use_sparse
+        system_solver.use_restarts = use_restarts
 
         system_solver.rhs = zeros(T, dim, 2)
         rows = 1:n
