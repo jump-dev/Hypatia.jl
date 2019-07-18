@@ -151,15 +151,6 @@ polyminreal25(T::Type{<:HypReal}) = polyminreal(T, :random, 2, use_primal = fals
 polyminreal26(T::Type{<:HypReal}) = polyminreal(T, :random, 2, use_primal = false, use_wsos = true, n = 5, use_linops = true)
 polyminreal27(T::Type{<:HypReal}) = polyminreal(T, :random, 2, use_primal = false, use_wsos = false, n = 5, use_linops = false)
 
-instances_polymin_linops = [
-    polyminreal22,
-    polyminreal23,
-    polyminreal24,
-    polyminreal25,
-    polyminreal26,
-    polyminreal27,
-]
-
 function polymincomplex(
     T::Type{<:HypReal},
     polyname::Symbol,
@@ -277,8 +268,9 @@ instances_polymin_all = [
     polyminreal19,
     polyminreal20,
     polyminreal21,
-    polyminreal22,
     polyminreal23,
+    polyminreal25,
+    polyminreal27,
     polymincomplex1,
     polymincomplex2,
     polymincomplex3,
@@ -294,13 +286,17 @@ instances_polymin_all = [
     polymincomplex13,
     polymincomplex14,
     ]
+instances_polymin_linops = [
+    polyminreal22,
+    polyminreal24,
+    polyminreal26,
+    ]
 instances_polymin_few = [
     polyminreal2,
     polyminreal3,
     polyminreal12,
     polyminreal14,
     polyminreal18,
-    polyminreal22,
     polyminreal23,
     polymincomplex7,
     polymincomplex14,
