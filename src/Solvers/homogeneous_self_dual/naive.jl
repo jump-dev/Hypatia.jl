@@ -17,7 +17,7 @@ TODO reduce allocations
 mutable struct NaiveCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSolver{T}
     use_iterative::Bool
     use_sparse::Bool
-    use_restarts::Bool
+    use_iterative_restarts::Bool
 
     lhs_copy
     lhs
@@ -42,14 +42,14 @@ mutable struct NaiveCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSo
         model::Models.LinearModel{T};
         use_iterative::Bool = false,
         use_sparse::Bool = false,
-        use_restarts::Bool = false,
+        use_iterative_restarts::Bool = false,
         ) where {T <: HypReal}
         (n, p, q) = (model.n, model.p, model.q)
         dim = n + p + 2q + 2
         system_solver = new{T}()
         system_solver.use_iterative = use_iterative
         system_solver.use_sparse = use_sparse
-        system_solver.use_restarts = use_restarts
+        system_solver.use_iterative_restarts = use_iterative_restarts
 
         system_solver.rhs = zeros(T, dim, 2)
         rows = 1:n
@@ -101,7 +101,6 @@ mutable struct NaiveCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSo
                 [cone_cols..., rc2, rc3, rc6, rc1, rc6, rc4, rc1, rc5, rc6, rc1, rc2, rc3, rc4, rc6],
                 )
 
-            system_solver.use_restarts = use_restarts
         else
             if use_sparse
                 system_solver.lhs_copy = T[
@@ -184,11 +183,7 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveCombi
         # TODO possibly fix IterativeSolvers so that methods can take matrix RHS, however the two columns may take different number of iters needed to converge
 
         # if using restarted gmres, use default from IterativeSolvers
-        if system_solver.use_restarts
-            restart = min(20, size(lhs, 2))
-        else
-            restart = size(lhs, 2)
-        end
+        restart = (system_solver.use_iterative_restarts ? min(20, size(lhs, 2)) : size(lhs, 2))
 
         rhs1 = view(rhs, :, 1)
         IterativeSolvers.gmres!(system_solver.prevsol1, lhs, rhs1, restart = restart)
