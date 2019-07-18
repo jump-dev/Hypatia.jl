@@ -20,70 +20,6 @@ const MU = Hypatia.ModelUtilities
 
 include(joinpath(@__DIR__, "data.jl"))
 
-function get_AG_operators(T, use_wsos, use_sumlog, A_psd, w, G_log, U, nobs)
-    num_psd_vars = size(A_psd, 2)
-    num_hypo_vars = (use_sumlog ? 1 : nobs)
-    (log_rows, log_cols) = size(G_log)
-    @assert log_cols == num_hypo_vars + U
-    if use_wsos
-        A = HypBlockMatrix{T}(
-            1,
-            num_hypo_vars + U,
-            [T.(w')],
-            [1:1],
-            [(num_hypo_vars + 1):(num_hypo_vars + U)]
-        )
-        G = HypBlockMatrix{T}(
-            log_rows,
-            num_hypo_vars + U,
-            [I, G_log],
-            [1:U, 1:log_rows],
-            [1:U, 1:(num_hypo_vars + U)],
-        )
-    else
-        A = HypBlockMatrix{T}(
-            U + 1,
-            num_hypo_vars + U + num_psd_vars,
-            [I, A_psd, T.(w')],
-            [1:U, 1:U, (U + 1):(U + 1)],
-            [(num_hypo_vars + 1):(num_hypo_vars + U), (num_hypo_vars + U + 1):(num_hypo_vars + U + num_psd_vars), (num_hypo_vars + 1):(num_hypo_vars + U)],
-        )
-        G = HypBlockMatrix{T}(
-            log_rows,
-            num_hypo_vars + U + num_psd_vars,
-            [I, G_log],
-            [1:num_psd_vars, 1:log_rows],
-            [1:num_psd_vars, 1:(num_hypo_vars + U)],
-        )
-    end
-end
-
-function get_AG_matrices(T, use_wsos, use_sumlog, A_psd, w, G_log, U)
-    num_hypo_vars = (use_sumlog ? 1 : nobs)
-    (log_rows, log_cols) = size(G_log)
-    @assert log_cols == num_hypo_vars + U
-    if use_wsos
-        A = [
-            zeros(T, 1, num_hypo_vars)    T.(w');
-            ]
-        G = [
-            zeros(T, U, num_hypo_vars)    Matrix{T}(-I, U, U);
-            G_log;
-            ]
-    else
-        num_psd_vars = size(A_psd, 2)
-        A = [
-            zeros(T, size(A_poly, 1), num_hypo_vars)    -Matrix{T}(-I, U, U)    A_psd;
-            zeros(T, 1, num_hypo_vars)    T.(w')    zeros(T, 1, num_psd_vars);
-            ]
-        G = [
-            zeros(T, num_psd_vars, num_hypo_vars + U)   Matrix{T}(-I, num_psd_vars, num_psd_vars);
-            G_log   zeros(T, log_rows, num_psd_vars);
-            ]
-    end
-    return (A, G)
-end
-
 function densityest(
     T::Type{<:HypReal},
     X::Matrix{Float64},
@@ -269,9 +205,6 @@ densityest10(T::Type{<:HypReal}) = densityest(T, 10, 1, 2, use_sumlog = true, us
 densityest11(T::Type{<:HypReal}) = densityest(T, 10, 1, 2, use_sumlog = false, use_wsos = true, use_linops = true)
 densityest12(T::Type{<:HypReal}) = densityest(T, 10, 1, 2, use_sumlog = false, use_wsos = false, use_linops = true)
 
-densityest9(T::Type{<:HypReal}) = densityest(T, 50, 1, 4, use_sumlog = true, use_wsos = false, use_linops = false)
-densityest10(T::Type{<:HypReal}) = densityest(T, 50, 1, 4, use_sumlog = false, use_wsos = false, use_linops = true)
-
 instances_densityest_all = [
     densityest1,
     densityest2,
@@ -282,6 +215,12 @@ instances_densityest_all = [
     densityest7,
     densityest8,
     ]
+instances_densityest_linops = [
+    densityest9,
+    densityest10,
+    densityest11,
+    densityest12,
+    ]
 instances_densityest_few = [
     densityest1,
     densityest2,
@@ -291,13 +230,6 @@ instances_densityest_few = [
     densityest6,
     densityest7,
     densityest8,
-    ]
-
-instances_densityest_linops = [
-    densityest9,
-    densityest10,
-    densityest11,
-    densityest12,
     ]
 
 function test_densityest(instance::Function; T::Type{<:HypReal} = Float64, test_options::NamedTuple = NamedTuple(), rseed::Int = 1)
