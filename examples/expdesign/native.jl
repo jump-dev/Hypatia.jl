@@ -9,6 +9,7 @@ import Random
 using Test
 import Hypatia
 import Hypatia.HypReal
+import Hypatia.HypBlockMatrix
 const CO = Hypatia.Cones
 const HYP = Hypatia
 
@@ -56,8 +57,10 @@ function expdesign(
         push!(cone_idxs, (2 * p + 1):(2 * p + dimvec + 2))
 
         if use_linops
-            A = HYP.HypBlockMatrix{T}([A], [1:1], [2:(p + 1)])
-            G = HYP.HypBlockMatrix{T}(
+            A = HypBlockMatrix{T}(1, p + 1, [A], [1:1], [2:(p + 1)])
+            G = HypBlockMatrix{T}(
+                2 * p + 2 + dimvec,
+                p + 1,
                 [-I, -I, -ones(T, 1, 1), G_logdet],
                 [1:p, (p + 1):(2 * p), (2 * p + 1):(2 * p + 1), (2 * p + 3):(2 * p + 2 + dimvec)],
                 [2:(p + 1), 2:(p + 1), 1:1, 2:(p + 1)]
@@ -164,8 +167,10 @@ function expdesign(
             end
         end
         if use_linops
-            A = HYP.HypBlockMatrix{T}(1, p + padx, [A], [1:1], [1:p])
-            G = HYP.HypBlockMatrix{T}(
+            A = HypBlockMatrix{T}(1, p + padx, [A], [1:1], [1:p])
+            G = HypBlockMatrix{T}(
+                2 * p + dimvec + size(G_log, 1),
+                dimx,
                 [-I, -I, G_psd, G_log],
                 [1:p, (p + 1):(2 * p), (2 * p + 1):(2 * p + dimvec), (2 * p + dimvec + 1):(2 * p + dimvec + size(G_log, 1))],
                 [1:p, 1:p, 1:dimx, 1:dimx]
@@ -210,11 +215,16 @@ instances_expdesign_all = [
     expdesign8,
     expdesign9,
     expdesign10,
+    expdesign13,
     ]
+instances_expdesign_linops = [
+    expdesign11,
+    expdesign12,
+    expdesign14,
+]
 instances_expdesign_few = [
     expdesign5,
     expdesign10,
-    expdesign11,
     ]
 
 function test_expdesign(instance::Function; T::Type{<:HypReal} = Float64, test_options::NamedTuple = NamedTuple(), rseed::Int = 1)

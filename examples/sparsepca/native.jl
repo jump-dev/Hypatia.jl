@@ -11,6 +11,7 @@ import Random
 using Test
 import Hypatia
 import Hypatia.HypReal
+import Hypatia.HypBlockMatrix
 const CO = Hypatia.Cones
 
 function sparsepca(
@@ -19,6 +20,7 @@ function sparsepca(
     k::Int;
     use_l1ball::Bool = true,
     noise_ratio::Float64 = 0.0,
+    use_linops::Bool = false,
     )
     @assert 0 < k <= p
 
@@ -47,8 +49,6 @@ function sparsepca(
     c = T[-sigma[i, j] * (i == j ? 1 : rt2) for i in 1:p for j in 1:i]
     b = T[1]
     A = zeros(T, 1, dimx)
-    # PSD cone, x is already vectorized and scaled
-    Gpsd = Matrix{T}(-I, dimx, dimx)
     for i in 1:p
         s = sum(1:i)
         A[s] = 1
@@ -59,29 +59,70 @@ function sparsepca(
 
     if use_l1ball
         # l1 cone
-        Gl1 = Matrix{T}(-rt2 * I, dimx, dimx) # double off-diagonals, which are already scaled by rt2
-        for i in 1:p
-            s = sum(1:i)
-            Gl1[s, s] = -1
+        # double off-diagonals, which are already scaled by rt2
+        if use_linops
+            Gl1 = Diagonal(-rt2 * ones(T, dimx))
+            for i in 1:p
+                s = sum(1:i)
+                Gl1.diag[s] = -1
+            end
+        else
+            Gl1 = Matrix{T}(-rt2 * I, dimx, dimx)
+            for i in 1:p
+                s = sum(1:i)
+                Gl1[s, s] = -1
+            end
         end
-        G = vcat(Gpsd, zeros(T, 1, dimx), Gl1)
+        if use_linops
+            G = HypBlockMatrix{T}(
+                2 * dimx + 1,
+                dimx,
+                [-I, Gl1],
+                [1:dimx, (dimx + 2):(2 * dimx + 1)],
+                [1:dimx, 1:dimx]
+                )
+            A = HypBlockMatrix{T}(1, dimx, [A], [1:1], [1:dimx])
+        else
+            G = [
+                Matrix{T}(-I, dimx, dimx); # psd cone
+                zeros(T, 1, dimx);
+                Gl1;
+                ]
+        end
         h = vcat(hpsd, T(k), zeros(T, dimx))
         push!(cones, CO.EpiNormInf{T}(1 + dimx, true))
         push!(cone_idxs, (dimx + 1):(2 * dimx + 1))
     else
         c = vcat(c, zeros(T, 2 * dimx))
+        b = vcat(b, zeros(T, dimx), k)
         id = Matrix{T}(I, dimx, dimx)
         l1 = [(i == j ? one(T) : rt2) for i in 1:p for j in 1:i]
-        A = T[
-            A    zeros(T, 1, 2 * dimx);
-            -id    -id    id;
-            zeros(T, 1, dimx)    l1'    l1';
-            ]
-        b = vcat(b, zeros(T, dimx), k)
-        G = [
-            Gpsd    zeros(T, dimx, 2 * dimx);
-            zeros(T, 2 * dimx, dimx)    Matrix{T}(-I, 2 * dimx, 2 * dimx);
-            ]
+        if use_linops
+            A = HypBlockMatrix{T}(
+                dimx + 2,
+                3 * dimx,
+                [A, -I, -I, I, reshape(l1, 1, dimx), reshape(l1, 1, dimx)],
+                [1:1, 2:(dimx + 1), 2:(dimx + 1), 2:(dimx + 1), (dimx + 2):(dimx + 2), (dimx + 2):(dimx + 2)],
+                [1:dimx, 1:dimx, (dimx + 1):(2 * dimx), (2 * dimx + 1):(3 * dimx), (dimx + 1):(2 * dimx), (2 * dimx + 1):(3 * dimx)]
+                )
+            G = HypBlockMatrix{T}(
+                3 * dimx,
+                3 * dimx,
+                [-I, -I],
+                [1:dimx, (dimx + 1):(3 * dimx)],
+                [1:dimx, (dimx + 1):(3 * dimx)]
+                )
+        else
+            A = T[
+                A    zeros(T, 1, 2 * dimx);
+                -id    -id    id;
+                zeros(T, 1, dimx)    l1'    l1';
+                ]
+            G = [
+                Matrix{T}(-I, dimx, dimx)    zeros(T, dimx, 2 * dimx);
+                zeros(T, 2 * dimx, dimx)    Matrix{T}(-I, 2 * dimx, 2 * dimx);
+                ]
+        end
         h = vcat(hpsd, zeros(T, 2 * dimx))
         push!(cones, CO.Nonnegative{T}(2 * dimx))
         push!(cone_idxs, (dimx + 1):(3 * dimx))
@@ -94,8 +135,10 @@ sparsepca1(T::Type{<:HypReal}) = sparsepca(T, 5, 3)
 sparsepca2(T::Type{<:HypReal}) = sparsepca(T, 5, 3, use_l1ball = false)
 sparsepca3(T::Type{<:HypReal}) = sparsepca(T, 10, 3)
 sparsepca4(T::Type{<:HypReal}) = sparsepca(T, 10, 3, use_l1ball = false)
-sparsepca5(T::Type{<:HypReal}) = sparsepca(T, 10, 3, noise_ratio = 10.0)
-sparsepca6(T::Type{<:HypReal}) = sparsepca(T, 10, 3, noise_ratio = 10.0, use_l1ball = false)
+sparsepca5(T::Type{<:HypReal}) = sparsepca(T, 10, 3, noise_ratio = 10.0, use_linops = false)
+sparsepca6(T::Type{<:HypReal}) = sparsepca(T, 10, 3, noise_ratio = 10.0, use_linops = true)
+sparsepca7(T::Type{<:HypReal}) = sparsepca(T, 10, 3, noise_ratio = 10.0, use_l1ball = false, use_linops = false)
+sparsepca8(T::Type{<:HypReal}) = sparsepca(T, 10, 3, noise_ratio = 10.0, use_l1ball = false, use_linops = true)
 
 instances_sparsepca_all = [
     sparsepca1,
@@ -103,7 +146,13 @@ instances_sparsepca_all = [
     sparsepca3,
     sparsepca4,
     sparsepca5,
+    sparsepca7,
+    ]
+instances_sparsepca_linops = [
+    sparsepca5,
     sparsepca6,
+    sparsepca7,
+    sparsepca8,
     ]
 instances_sparsepca_few = [
     sparsepca1,

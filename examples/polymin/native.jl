@@ -17,6 +17,7 @@ import Combinatorics
 using Test
 import Hypatia
 import Hypatia.HypReal
+import Hypatia.HypBlockMatrix
 const CO = Hypatia.Cones
 const MU = Hypatia.ModelUtilities
 
@@ -29,6 +30,7 @@ function polyminreal(
     use_primal::Bool = true,
     use_wsos::Bool = true,
     n::Int = 0,
+    use_linops::Bool = false,
     )
     if use_primal && !use_wsos
         error("primal psd formulation is not implemented yet")
@@ -64,20 +66,33 @@ function polyminreal(
 
     if use_primal
         c = T[-1]
-        A = zeros(T, 0, 1)
+        if use_linops
+            A = HypBlockMatrix{T}(0, 1, Any[[]], [0:-1], [1:1])
+            G = HypBlockMatrix{T}(U, 1, [ones(T, U, 1)], [1:U], [1:1])
+        else
+            A = zeros(T, 0, 1)
+            G = ones(T, U, 1)
+        end
         b = T[]
-        G = ones(T, U, 1)
         h = interp_vals
         true_obj = -true_obj
     else
         c = interp_vals
-        A = ones(T, 1, U) # TODO eliminate constraint and first variable
+        if use_linops
+            A = HypBlockMatrix{T}(1, U, [ones(T, 1, U)], [1:1], [1:U])
+        else
+            A = ones(T, 1, U) # TODO eliminate constraint and first variable
+        end
         b = T[1]
         if use_wsos
-            G = Diagonal(-one(T) * I, U) # TODO use UniformScaling
+            if use_linops
+                G = HypBlockMatrix{T}(U, U, [-I], [1:U], [1:U])
+            else
+                G = Diagonal(-one(T) * I, U)
+            end
             h = zeros(T, U)
         else
-            G = zeros(T, 0, U)
+            G_full = zeros(T, 0, U)
             rowidx = 1
             rt2 = sqrt(T(2))
             for Pk in [P0, PWts...]
@@ -92,8 +107,14 @@ function polyminreal(
                     @. Gk[l, :] = -Pk[:, i] * Pk[:, j] * scal
                     l += 1
                 end
-                G = vcat(G, Gk)
+                G_full = vcat(G_full, Gk)
                 rowidx += dk
+            end
+            if use_linops
+                (nrows, ncols) = size(G_full)
+                G = HypBlockMatrix{T}(nrows, ncols, [G_full], [1:nrows], [1:ncols])
+            else
+                G = G_full
             end
             h = zeros(T, size(G, 1))
         end
@@ -123,8 +144,21 @@ polyminreal18(T::Type{<:HypReal}) = polyminreal(T, :motzkin, 3, use_primal = fal
 polyminreal19(T::Type{<:HypReal}) = polyminreal(T, :motzkin, 3, use_wsos = false)
 polyminreal20(T::Type{<:HypReal}) = polyminreal(T, :reactiondiffusion, 4, use_primal = false, use_wsos = false)
 polyminreal21(T::Type{<:HypReal}) = polyminreal(T, :lotkavolterra, 3, use_primal = false, use_wsos = false)
-polyminreal22(T::Type{<:HypReal}) = polyminreal(T, :random, 2, use_primal = false, use_wsos = false, n = 5)
-polyminreal23(T::Type{<:HypReal}) = polyminreal(T, :random, 2, use_primal = false, use_wsos = true, n = 5)
+polyminreal22(T::Type{<:HypReal}) = polyminreal(T, :random, 2, use_primal = true, use_wsos = true, n = 5, use_linops = true)
+polyminreal23(T::Type{<:HypReal}) = polyminreal(T, :random, 2, use_primal = true, use_wsos = true, n = 5, use_linops = false)
+polyminreal24(T::Type{<:HypReal}) = polyminreal(T, :random, 2, use_primal = false, use_wsos = true, n = 5, use_linops = true)
+polyminreal25(T::Type{<:HypReal}) = polyminreal(T, :random, 2, use_primal = false, use_wsos = false, n = 5, use_linops = false)
+polyminreal26(T::Type{<:HypReal}) = polyminreal(T, :random, 2, use_primal = false, use_wsos = true, n = 5, use_linops = true)
+polyminreal27(T::Type{<:HypReal}) = polyminreal(T, :random, 2, use_primal = false, use_wsos = false, n = 5, use_linops = false)
+
+instances_polymin_linops = [
+    polyminreal22,
+    polyminreal23,
+    polyminreal24,
+    polyminreal25,
+    polyminreal26,
+    polyminreal27,
+]
 
 function polymincomplex(
     T::Type{<:HypReal},

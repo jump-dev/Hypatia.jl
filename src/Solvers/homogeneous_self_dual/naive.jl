@@ -18,6 +18,7 @@ mutable struct NaiveCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSo
     use_iterative::Bool
     use_sparse::Bool
     use_linops::Bool
+    use_restarts::Bool
 
     lhs_copy
     lhs
@@ -43,6 +44,7 @@ mutable struct NaiveCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSo
         use_iterative::Bool = false,
         use_sparse::Bool = false,
         use_linops::Bool = false,
+        use_restarts::Bool = false,
         ) where {T <: HypReal}
         (n, p, q) = (model.n, model.p, model.q)
         dim = n + p + 2q + 2
@@ -50,6 +52,7 @@ mutable struct NaiveCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSo
         system_solver.use_iterative = use_iterative
         system_solver.use_sparse = use_sparse
         system_solver.use_linops = use_linops
+        system_solver.use_restarts = use_restarts
 
         system_solver.rhs = zeros(T, dim, 2)
         rows = 1:n
@@ -95,11 +98,15 @@ mutable struct NaiveCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSo
             end
 
             system_solver.lhs = HypBlockMatrix{T}(
+                dim,
+                dim,
                 [fill(I, length(cone_rows))...,
                 model.A', model.G', reshape(model.c, :, 1), -model.A, reshape(model.b, :, 1), ones(T, 1, 1), -model.G, -I, reshape(model.h, :, 1), -model.c', -model.b', -model.h', -ones(T, 1, 1), ones(T, 1, 1)],
                 [cone_rows..., rc1, rc1, rc1, rc2, rc2, rc4, rc5, rc5, rc5, rc6, rc6, rc6, rc6, rc4],
                 [cone_cols..., rc2, rc3, rc6, rc1, rc6, rc4, rc1, rc5, rc6, rc1, rc2, rc3, rc4, rc6],
                 )
+
+            system_solver.use_restarts = use_restarts
         else
             if use_sparse
                 system_solver.lhs_copy = T[
@@ -199,6 +206,7 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveCombi
 
         (_, log) = IterativeSolvers.gmres!(system_solver.prevsol1, lhs, rhs1, log = true, restart = size(lhs, 2))
         # (_, log) = IterativeSolvers.bicgstabl!(system_solver.prevsol1, lhs, rhs1, log = true)
+
         copyto!(rhs1, system_solver.prevsol1)
         # if norm(system_solver.prevsol1 - xe) > 50
         #     CSV.write("lhs.csv",  DataFrames.DataFrame(lhs), writeheader=false)
@@ -208,7 +216,7 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveCombi
         # @show system_solver.prevsol1 ./ xe
 
         rhs2 = view(rhs, :, 2)
-        IterativeSolvers.gmres!(system_solver.prevsol2, lhs, rhs2, restart = size(lhs, 2))
+        IterativeSolvers.gmres!(system_solver.prevsol2, lhs, rhs2, restart = restart)
         copyto!(rhs2, system_solver.prevsol2)
     else
         # update lhs matrix
