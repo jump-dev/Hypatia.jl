@@ -21,6 +21,9 @@ and symmetrize the LHS matrix by multiplying some equations by -1
 TODO reduce allocations
 =#
 
+using LinearAlgebra.LAPACK: BlasInt, chklapackerror, @blasfunc, liblapack
+using LinearAlgebra.LAPACK: checksquare
+
 mutable struct SymIndefCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSolver{T}
     use_sparse::Bool
     use_hess_inv::Bool
@@ -104,6 +107,71 @@ mutable struct SymIndefCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSyste
     end
 end
 
+for (syequb_, elty, relty) in
+    ((:dsyequb_, :Float64, :Float64),
+     # (:syequb_, :ComplexF64, :Float64),
+     # (:syequb_, :ComplexF32, :Float32),
+     # (:syequb_, :Float32, :Float32),
+     )
+    @eval begin
+        function syequb(A::AbstractMatrix{$elty})
+            m,n = size(A)
+            lda = max(1, stride(A,2))
+            S = Vector{$relty}(undef, n)
+            info = Ref{BlasInt}()
+            scond = Ref{$relty}()
+            amax = Ref{$relty}()
+            work = Vector{$relty}(undef, 3 * n)
+            ccall((@blasfunc($syequb_), liblapack), Cvoid,
+                  (Ref{UInt8}, Ref{BlasInt}, Ptr{$elty}, Ref{BlasInt},
+                   Ptr{$relty},
+                   Ptr{$relty}, Ptr{$relty}, Ptr{$relty},
+                   Ptr{BlasInt}),
+                  'L', n, A, lda, S, scond, amax, work, info)
+            chklapackerror(info[])
+            S, scond, amax
+        end
+    end
+end
+
+function equilibrators(A::AbstractMatrix{T}) where {T}
+    abs1(x::Real) = abs(x)
+    abs1(x::Complex) = abs(real(x)) + abs(imag(x))
+    B = abs1.(A)
+    m,n = size(B)
+    R = zeros(T,m)
+    C = zeros(T,n)
+    @inbounds for j=1:n
+        R .= max.(R,view(B,:,j))
+    end
+    @inbounds for i=1:m
+        if R[i] > 0
+            R[i] = T(2)^floor(Int,log2(R[i]))
+        end
+    end
+    # R .= 1 ./ R
+    @inbounds for i=1:m
+        C .= max.(C,view(B,i,:) / R[i])
+    end
+    @inbounds for j=1:n
+        if C[j] > 0
+            C[j] = T(2)^floor(Int,log2(C[j]))
+        end
+    end
+    # C .= 1 ./ C
+    R,C
+end
+
+function maxels(A)
+    maxels = maximum(A, dims = 2)
+    maxels = map(x -> iszero(x) ? 1.0 : x, maxels)
+    pl = Diagonal(maxels[:])
+    maxels = maximum(A, dims = 1)
+    maxels = map(x -> iszero(x) ? 1.0 : x, maxels)
+    pr = Diagonal(maxels[:])
+    return (pl, pr)
+end
+
 function get_combined_directions(solver::HSDSolver{T}, system_solver::SymIndefCombinedHSDSystemSolver{T}) where {T <: HypReal}
     use_hess_inv = system_solver.use_hess_inv
     model = solver.model
@@ -181,15 +249,22 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::SymIndefCo
         ill_cond_block = lhs[(n + 1):end, (n + 1):end]
         AG = lhs[(n + 1):end, 1:n]
         W = I
+        # preconditioner = [
+        # W   zeros(n, p + q);
+        # zeros(p + q, n)   ill_cond_block + AG * (W \ AG');
+        # ]
         preconditioner = [
-        W   zeros(n, p + q);
-        zeros(p + q, n)   ill_cond_block + AG * (W \ AG');
+        I   zeros(n + p, q)
+        zeros(q, n + p)    lhs[(n + p + 1):end, (n + p + 1):end]
         ]
         # @show cond(preconditioner \ Symmetric(LHS, :L))
         # preconditioner = I
         # d = diag(lhs)
         # preconditioner = Diagonal(map(di -> (iszero(di) ? 1.0 : di), d))
         # lhsp = preconditioner \ Symmetric(lhs, :L)
+
+        # (R, C) = equilibrators(Symmetric(lhs, :L))
+        # (pl, pr) = maxels(Symmetric(lhs, :L))
 
         for i in 1:3
 
@@ -201,16 +276,25 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::SymIndefCo
             x0 = deepcopy(system_solver.prevsol)
             # @show norm(rhs2 - Symmetric(lhs, :L) * prevsol) < 1e-5
 
-            (prevsol, log) = IterativeSolvers.minres!(prevsol, Symmetric(lhs, :L), rhs2, maxiter = 1 * size(lhs, 2), reorth = true, log = true) # goes badly
-            # (x, log) = IterativeSolvers.gmres!(prevsol, Symmetric(lhs, :L), rhs2, maxiter = 1 * size(lhs, 2), restart = size(lhs, 2), log = true)
-
+            # (prevsol, log) = IterativeSolvers.minres!(prevsol, Symmetric(lhs, :L), rhs2, maxiter = 1 * size(lhs, 2), reorth = true, log = true, tol = 1e-8) # goes badly
+            # prevsol .= C * prevsol
+            # @show size(lhs, 2), log.iters
+            # @show log.isconverged
+            # @show cond(Symmetric(lhs, :L))
+            # @show cond(Diagonal(R) \ Symmetric(lhs, :L) / Diagonal(C))
+            S, scond, amax = syequb(lhs)
+            S = Diagonal(S)
+            @show cond(Symmetric(lhs, :L))
+            @show cond(S * Symmetric(lhs, :L) * S)
+            (x) = IterativeSolvers.gmres!(prevsol, Symmetric(S * Symmetric(lhs, :L) * S), S * rhs2, maxiter = 1 * size(lhs, 2), restart = div(size(lhs, 2), 1), log = false)
+            prevsol .= S * prevsol
             # prevsol = Symmetric(lhs, :L) \ rhs2
-            if !(log.isconverged)
-                CSV.write("lhs.csv",  DataFrames.DataFrame(lhs), writeheader=false)
-                CSV.write("rhs.csv",  DataFrames.DataFrame(rhs), writeheader=false)
-                CSV.write("prevsol.csv",  DataFrames.DataFrame(x0), writeheader=false)
-                # error()
-            end
+            # if !(log.isconverged)
+            #     CSV.write("lhs.csv",  DataFrames.DataFrame(lhs), writeheader=false)
+            #     CSV.write("rhs.csv",  DataFrames.DataFrame(rhs), writeheader=false)
+            #     CSV.write("prevsol.csv",  DataFrames.DataFrame(x0), writeheader=false)
+            #     # error()
+            # end
             rhs2 .= prevsol
 
         end

@@ -36,6 +36,48 @@ norm(b - A * x)
 #     ])
 # y = Krylov.minres(A, b, verbose = true)
 
+function diamondboyd(A)
+    n = size(A, 1)
+    u = zeros(n)
+    ubar = zeros(n)
+    gamma = 0.1
+    for iter in 1:1000
+        D = Diagonal(exp.(u))
+        s = (rand(n) .- 0.5) .* 2
+        u = (u - 2 * (abs2.(D * A * D * s) - ones(n) + gamma .* u)) ./ (gamma * (iter + 1))
+        ubar = 2 * u ./ (iter + 2) + iter * ubar / (iter + 2)
+    end
+    return Diagonal(exp.(ubar))
+end
+
+function equilibrators(A::AbstractMatrix{T}) where {T}
+    abs1(x::Real) = abs(x)
+    abs1(x::Complex) = abs(real(x)) + abs(imag(x))
+    B = abs1.(A)
+    m,n = size(B)
+    R = zeros(T,m)
+    C = zeros(T,n)
+    @inbounds for j=1:n
+        R .= max.(R,view(B,:,j))
+    end
+    @inbounds for i=1:m
+        if R[i] > 0
+            R[i] = T(2)^floor(Int,log2(R[i]))
+        end
+    end
+    R .= 1 ./ R
+    @inbounds for i=1:m
+        C .= max.(C,R[i] * view(B,i,:))
+    end
+    @inbounds for j=1:n
+        if C[j] > 0
+            C[j] = T(2)^floor(Int,log2(C[j]))
+        end
+    end
+    C .= 1 ./ C
+    R,C
+end
+
 
 #=
 # size(solver.model.A) = (1, 9)

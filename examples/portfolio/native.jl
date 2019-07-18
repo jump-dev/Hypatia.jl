@@ -209,6 +209,8 @@ portfolio10(T::Type{<:HypReal}) = portfolio(T, 3, [:linf, :l1], use_l1ball = fal
 portfolio11(T::Type{<:HypReal}) = portfolio(T, 4, [:entropic], use_l1ball = false, use_linops = false)
 portfolio12(T::Type{<:HypReal}) = portfolio(T, 4, [:entropic], use_l1ball = false, use_linops = true)
 
+portfolio13(T::Type{<:HypReal}) = portfolio(T, 400, [:linf, :l1], use_linfball = true, use_l1ball = true)
+
 instances_portfolio_all = [
     portfolio1,
     portfolio2,
@@ -241,11 +243,13 @@ function test_portfolio(instance::Function; T::Type{<:HypReal} = Float64, test_o
     return
 end
 
-test_expdesign(portfolio6, T = Float64, test_options = (
+MO = Hypatia.Models
+SO = Hypatia.Solvers
+test_portfolio(portfolio13, T = Float64, test_options = (
     linear_model = MO.RawLinearModel,
-    system_solver = SO.NaiveCombinedHSDSystemSolver,
-    linear_model_options = (use_iterative = false,),
-    system_solver_options = (use_iterative = false,),
+    system_solver = SO.SymIndefCombinedHSDSystemSolver,
+    linear_model_options = (use_iterative = true,),
+    system_solver_options = (use_iterative = true,),
     solver_options = (verbose = true, tol_abs_opt = 1e-5, tol_rel_opt = 1e-5, tol_feas = 1e-5)
     )
     )

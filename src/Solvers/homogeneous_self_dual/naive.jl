@@ -204,7 +204,11 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveCombi
         # xe = lhs \ rhs[:, 1]
         # (system_solver.prevsol1, stats) = Krylov.dqgmres(lhs, rhs1)
 
-        (_, log) = IterativeSolvers.gmres!(system_solver.prevsol1, lhs, rhs1, log = true, restart = size(lhs, 2))
+        io = open("port.csv", "a")
+        (x, log) = IterativeSolvers.gmres!(system_solver.prevsol1, lhs, rhs1, log = true, restart = 20)
+        @show log.isconverged
+        @show log.iters
+        # print(io, "$(size(lhs, 2)), $(log.iters), $(norm(rhs1 - lhs * x))")
         # (_, log) = IterativeSolvers.bicgstabl!(system_solver.prevsol1, lhs, rhs1, log = true)
 
         copyto!(rhs1, system_solver.prevsol1)
@@ -216,7 +220,12 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveCombi
         # @show system_solver.prevsol1 ./ xe
 
         rhs2 = view(rhs, :, 2)
-        IterativeSolvers.gmres!(system_solver.prevsol2, lhs, rhs2, restart = restart)
+        (x, log) = IterativeSolvers.gmres!(system_solver.prevsol2, lhs, rhs2, restart = 20, log = true)
+        @show log.isconverged
+        @show log.iters
+        # print(io, "$(log.iters), $(norm(rhs2 - lhs * x))")
+        print("\n")
+        close(io)
         copyto!(rhs2, system_solver.prevsol2)
     else
         # update lhs matrix
