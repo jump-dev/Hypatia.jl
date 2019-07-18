@@ -84,9 +84,7 @@ function portfolio(
             push!(A_blocks, ones(T, 1, 2 * num_stocks))
 
             A_offset = last_idx(A_rows)
-            for _ in 1:3
-                push!(A_rows, (A_offset + 1):(A_offset + num_stocks))
-            end
+            append!(A_rows, fill((A_offset + 1):(A_offset + num_stocks), 3))
             push!(A_rows, (last_idx(A_rows) + 1):(last_idx(A_rows) + 1))
 
             push!(A_cols, 1:num_stocks)
@@ -126,10 +124,11 @@ function portfolio(
             push!(G_cols, 1:num_stocks)
             push!(G_cols, 1:num_stocks)
         else
+            padding = zeros(T, num_stocks, size(G, 2) - num_stocks)
             G = [
                 G;
-                sigma_half    zeros(T, num_stocks, size(G, 2) - num_stocks);
-                -sigma_half    zeros(T, num_stocks, size(G, 2) - num_stocks);
+                sigma_half    padding;
+                -sigma_half    padding;
                 ]
         end
         h = vcat(h, gamma * ones(T, 2 * num_stocks))
@@ -142,13 +141,9 @@ function portfolio(
         # sigma_half = abs.(sigma_half) TODO will this always be feasible?
         c = vcat(c, zeros(T, 2 * num_stocks))
         b = vcat(b, gamma^2)
-        if use_linops
-            col_offset = last_idx(G_cols)
-        else
-            col_offset = size(G, 2)
-        end
+        col_offset = (use_linops ? last_idx(G_cols) : size(G, 2))
         G2pos = zeros(T, 3 * num_stocks, 2 * num_stocks + col_offset)
-        G2neg = zeros(T, 3 * num_stocks, 2 * num_stocks + col_offset)
+        G2neg = copy(G2pos)
         h2 = zeros(T, 3 * num_stocks)
 
         row_offset = 1
@@ -161,11 +156,11 @@ function portfolio(
             G2neg[row_offset + 1, 1:num_stocks] = sigma_half[i, :]
             row_offset += 3
         end
+
         if use_linops
             push!(A_blocks, ones(T, 1, 2 * num_stocks))
             push!(A_rows, (last_idx(A_rows) + 1):(last_idx(A_rows) + 1))
             push!(A_cols, (last_idx(A_cols) + 1):(last_idx(A_cols) + 2 * num_stocks))
-
             push!(G_blocks, vcat(G2pos, G2neg))
             push!(G_rows, (cone_offset + 1):(cone_offset + 6 * num_stocks))
             push!(G_cols, 1:(2 * num_stocks + col_offset))
@@ -220,16 +215,16 @@ instances_portfolio_all = [
     portfolio9,
     portfolio11,
     ]
-instances_portfolio_linops = [
-    portfolio8,
-    portfolio10,
-    portfolio12,
-    ]
 instances_portfolio_few = [
     portfolio1,
     portfolio3,
     portfolio5,
     portfolio6,
+    ]
+instances_portfolio_linops = [
+    portfolio8,
+    portfolio10,
+    portfolio12,
     ]
 
 function test_portfolio(instance::Function; T::Type{<:HypReal} = Float64, test_options::NamedTuple = NamedTuple(), rseed::Int = 1)
