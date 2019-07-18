@@ -14,10 +14,76 @@ import Random
 using Test
 import Hypatia
 import Hypatia.HypReal
+import Hypatia.HypBlockMatrix
 const CO = Hypatia.Cones
 const MU = Hypatia.ModelUtilities
 
 include(joinpath(@__DIR__, "data.jl"))
+
+function get_AG_linops(T, use_wsos, use_sumlog, A_psd, w, G_log, U, nobs)
+    num_hypo_vars = (use_sumlog ? 1 : nobs)
+    (log_rows, log_cols) = size(G_log)
+    @assert log_cols == num_hypo_vars + U
+    if use_wsos
+        A = HypBlockMatrix{T}(
+            1,
+            num_hypo_vars + U,
+            [T.(w')],
+            [1:1],
+            [(num_hypo_vars + 1):(num_hypo_vars + U)]
+        )
+        G = HypBlockMatrix{T}(
+            U + log_rows,
+            num_hypo_vars + U,
+            [-I, G_log],
+            [1:U, (U + 1):(U + log_rows)],
+            [(num_hypo_vars + 1):(num_hypo_vars + U), 1:(num_hypo_vars + U)],
+        )
+    else
+        num_psd_vars = size(A_psd, 2)
+        A = HypBlockMatrix{T}(
+            U + 1,
+            num_hypo_vars + U + num_psd_vars,
+            [-I, A_psd, T.(w')],
+            [1:U, 1:U, (U + 1):(U + 1)],
+            [(num_hypo_vars + 1):(num_hypo_vars + U), (num_hypo_vars + U + 1):(num_hypo_vars + U + num_psd_vars), (num_hypo_vars + 1):(num_hypo_vars + U)],
+        )
+        G = HypBlockMatrix{T}(
+            num_psd_vars + log_rows,
+            num_hypo_vars + U + num_psd_vars,
+            [-I, G_log],
+            [1:num_psd_vars, (num_psd_vars + 1):(num_psd_vars + log_rows)],
+            [(num_hypo_vars + U + 1):(num_hypo_vars + U + num_psd_vars), 1:(num_hypo_vars + U)],
+        )
+    end
+    return (A, G)
+end
+
+function get_AG_matrices(T, use_wsos, use_sumlog, A_psd, w, G_log, U, nobs)
+    num_hypo_vars = (use_sumlog ? 1 : nobs)
+    (log_rows, log_cols) = size(G_log)
+    @assert log_cols == num_hypo_vars + U
+    if use_wsos
+        A = [
+            zeros(T, 1, num_hypo_vars)    T.(w');
+            ]
+        G = [
+            zeros(T, U, num_hypo_vars)    Matrix{T}(-I, U, U);
+            G_log;
+            ]
+    else
+        num_psd_vars = size(A_psd, 2)
+        A = [
+            zeros(T, U, num_hypo_vars)    Matrix{T}(-I, U, U)    A_psd;
+            zeros(T, 1, num_hypo_vars)    T.(w')    zeros(T, 1, num_psd_vars);
+            ]
+        G = [
+            zeros(T, num_psd_vars, num_hypo_vars + U)   Matrix{T}(-I, num_psd_vars, num_psd_vars);
+            G_log   zeros(T, log_rows, num_psd_vars);
+            ]
+    end
+    return (A, G)
+end
 
 function densityest(
     T::Type{<:HypReal},
@@ -26,6 +92,7 @@ function densityest(
     use_sumlog::Bool = false,
     use_wsos::Bool = true,
     sample_factor::Int = 100,
+    use_linops::Bool = false,
     )
     (nobs, dim) = size(X)
     rt2 = sqrt(T(2))
@@ -52,33 +119,30 @@ function densityest(
     cones = CO.Cone{T}[]
     cone_idxs = UnitRange{Int}[]
     cone_offset = 1
+
     if use_wsos
-        # will set up for U variables
-        G_poly = Matrix{T}(-I, U, U)
+        # U variables
+        A_psd = T[]
         h_poly = zeros(T, U)
-        c_poly = zeros(T, U)
-        A_poly = zeros(T, 0, U)
         b_poly = T[]
         push!(cones, CO.WSOSPolyInterp{T, T}(U, [P0, PWts...]))
         push!(cone_idxs, 1:U)
         cone_offset += U
-        A_lin = zeros(T, 1, U)
         num_psd_vars = 0
     else
-        # will set up for U coefficient variables plus PSD variables
+        # U polynomial coefficient variables plus PSD variables
         # there are n new PSD variables, we will store them scaled, lower triangle, row-wise
         n = length(PWts) + 1
-        num_psd_vars = 0
-        a_poly = Matrix{T}[]
+        a_psd = Matrix{T}[]
         L = size(P0, 2)
         dim = div(L * (L + 1), 2)
-        num_psd_vars += dim
+        num_psd_vars = dim
         # first part of A
-        push!(a_poly, zeros(T, U, dim))
+        push!(a_psd, zeros(T, U, dim))
         idx = 1
         for k in 1:L, l in 1:k
             # off diagonals are doubled, but already scaled by rt2
-            a_poly[1][:, idx] = P0[:, k] .* P0[:, l] * (k == l ? 1 : rt2)
+            a_psd[1][:, idx] = P0[:, k] .* P0[:, l] * (k == l ? 1 : rt2)
             idx += 1
         end
         push!(cones, CO.PosSemidef{T, T}(dim))
@@ -89,37 +153,28 @@ function densityest(
             L = size(PWts[i], 2)
             dim = div(L * (L + 1), 2)
             num_psd_vars += dim
-            push!(a_poly, zeros(T, U, dim))
+            push!(a_psd, zeros(T, U, dim))
             idx = 1
             for k in 1:L, l in 1:k
                 # off diagonals are doubled, but already scaled by rt2
-                a_poly[i + 1][:, idx] = PWts[i][:, k] .* PWts[i][:, l] * (k == l ? 1 : rt2)
+                a_psd[i + 1][:, idx] = PWts[i][:, k] .* PWts[i][:, l] * (k == l ? 1 : rt2)
                 idx += 1
             end
             push!(cones, CO.PosSemidef{T, T}(dim))
             push!(cone_idxs, cone_offset:(cone_offset + dim - 1))
             cone_offset += dim
         end
-        A_lin = zeros(T, 1, U + num_psd_vars)
-        A_poly = hcat(a_poly...)
-        A_poly = hcat(Matrix{T}(-I, U, U), A_poly)
+        A_psd = hcat(a_psd...)
         b_poly = zeros(T, U)
-        G_poly = hcat(zeros(T, num_psd_vars, U), Matrix{T}(-I, num_psd_vars, num_psd_vars))
         h_poly = zeros(T, num_psd_vars)
     end
-    A_lin[1:U] = w
 
     if use_sumlog
         # pre-pad with one hypograph variable
         c_log = T[-1]
-        G_poly = hcat(zeros(T, cone_offset - 1, 1), G_poly)
-        A = [
-            zeros(T, size(A_poly, 1))    A_poly;
-            zero(T)    A_lin;
-            ]
         h_log = zeros(T, nobs + 2)
         h_log[2] = 1
-        G_log = zeros(T, 2 + nobs, 1 + U + num_psd_vars)
+        G_log = zeros(T, 2 + nobs, 1 + U)
         G_log[1, 1] = -1
         for i in 1:nobs
             G_log[i + 2, 2:(1 + U)] = -basis_evals[i, :]
@@ -129,14 +184,8 @@ function densityest(
     else
         # pre-pad with `nobs` hypograph variables
         c_log = -ones(T, nobs)
-        G_poly = hcat(zeros(T, cone_offset - 1, nobs), G_poly)
-        A = [
-            zeros(T, size(A_poly, 1), nobs)    A_poly;
-            zeros(T, 1, nobs)    A_lin;
-            ]
         h_log = zeros(T, 3 * nobs)
-
-        G_log = zeros(T, 3 * nobs, nobs + U + num_psd_vars)
+        G_log = zeros(T, 3 * nobs, nobs + U)
         offset = 1
         for i in 1:nobs
             G_log[offset, i] = -1.0
@@ -148,7 +197,12 @@ function densityest(
             cone_offset += 3
         end
     end
-    G = vcat(G_poly, G_log)
+
+    if use_linops
+        (A, G) = get_AG_linops(T, use_wsos, use_sumlog, A_psd, w, G_log, U, nobs)
+    else
+        (A, G) = get_AG_matrices(T, use_wsos, use_sumlog, A_psd, w, G_log, U, nobs)
+    end
     h = vcat(h_poly, h_log)
     c = vcat(c_log, zeros(T, U + num_psd_vars))
     b = vcat(b_poly, one(T))
@@ -166,6 +220,10 @@ densityest5(T::Type{<:HypReal}) = densityest(T, 50, 1, 4, use_sumlog = true)
 densityest6(T::Type{<:HypReal}) = densityest(T, 50, 1, 4, use_sumlog = false)
 densityest7(T::Type{<:HypReal}) = densityest(T, 50, 1, 4, use_sumlog = true, use_wsos = false)
 densityest8(T::Type{<:HypReal}) = densityest(T, 50, 1, 4, use_sumlog = false, use_wsos = false)
+densityest9(T::Type{<:HypReal}) = densityest(T, 10, 1, 2, use_sumlog = true, use_wsos = true, use_linops = true)
+densityest10(T::Type{<:HypReal}) = densityest(T, 10, 1, 2, use_sumlog = true, use_wsos = false, use_linops = true)
+densityest11(T::Type{<:HypReal}) = densityest(T, 10, 1, 2, use_sumlog = false, use_wsos = true, use_linops = true)
+densityest12(T::Type{<:HypReal}) = densityest(T, 10, 1, 2, use_sumlog = false, use_wsos = false, use_linops = true)
 
 instances_densityest_all = [
     densityest1,
@@ -179,11 +237,20 @@ instances_densityest_all = [
     ]
 instances_densityest_few = [
     densityest1,
+    densityest2,
     densityest3,
+    densityest4,
     densityest5,
     densityest6,
     densityest7,
     densityest8,
+    ]
+
+instances_densityest_linops = [
+    densityest9,
+    densityest10,
+    densityest11,
+    densityest12,
     ]
 
 function test_densityest(instance::Function; T::Type{<:HypReal} = Float64, test_options::NamedTuple = NamedTuple(), rseed::Int = 1)
