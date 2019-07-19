@@ -41,13 +41,11 @@ struct HypBlockMatrix{T <: HypReal}
     blocks::Vector
     rows::Vector{UnitRange{Int}}
     cols::Vector{UnitRange{Int}}
-end
 
-function HypBlockMatrix{T}(blocks::Vector, rows::Vector{UnitRange{Int}}, cols::Vector{UnitRange{Int}}) where {T <: HypReal}
-    @assert length(blocks) == length(rows) == length(cols)
-    nrows = maximum(last, rows)
-    ncols = maximum(last, cols)
-    return HypBlockMatrix{T}(nrows, ncols, blocks, rows, cols)
+    function HypBlockMatrix{T}(nrows::Int, ncols::Int, blocks::Vector, rows::Vector{UnitRange{Int}}, cols::Vector{UnitRange{Int}}) where {T <: HypReal}
+        @assert length(blocks) == length(rows) == length(cols)
+        return new{T}(nrows, ncols, blocks, rows, cols)
+    end
 end
 
 eltype(A::HypBlockMatrix{T}) where {T <: HypReal} = T
