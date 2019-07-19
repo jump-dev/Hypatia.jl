@@ -121,7 +121,7 @@ for (syequb_, elty, relty) in
             info = Ref{BlasInt}()
             scond = Ref{$relty}()
             amax = Ref{$relty}()
-            work = Vector{$relty}(undef, 3 * n)
+            work = Vector{$relty}(undef, 2 * n)
             ccall((@blasfunc($syequb_), liblapack), Cvoid,
                   (Ref{UInt8}, Ref{BlasInt}, Ptr{$elty}, Ref{BlasInt},
                    Ptr{$relty},
@@ -282,12 +282,19 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::SymIndefCo
             # @show log.isconverged
             # @show cond(Symmetric(lhs, :L))
             # @show cond(Diagonal(R) \ Symmetric(lhs, :L) / Diagonal(C))
+
             S, scond, amax = syequb(lhs)
             S = Diagonal(S)
-            @show cond(Symmetric(lhs, :L))
-            @show cond(S * Symmetric(lhs, :L) * S)
-            (x) = IterativeSolvers.gmres!(prevsol, Symmetric(S * Symmetric(lhs, :L) * S), S * rhs2, maxiter = 1 * size(lhs, 2), restart = div(size(lhs, 2), 1), log = false)
+
+            # @show eigen(Symmetric(lhs, :L)).values
+            # @show eigen(S * Symmetric(lhs, :L) * S).values
+            # (x, log) = IterativeSolvers.gmres!(prevsol, Symmetric(S * Symmetric(lhs, :L) * S), S * rhs2, maxiter = 1 * size(lhs, 2), restart = 20, log = true, tol = 1e-12)
+            (x, log) = IterativeSolvers.minres!(prevsol, Symmetric(S * Symmetric(lhs, :L) * S), S * rhs2, maxiter = 1 * size(lhs, 2), log = true, tol = 1e-12, reorth = true)
             prevsol .= S * prevsol
+
+            # (x, log) = IterativeSolvers.gmres!(prevsol, Symmetric(lhs, :L), rhs2, maxiter = 1 * size(lhs, 2), restart = div(size(lhs, 2), 1), log = true)
+
+            # @show log.iters
             # prevsol = Symmetric(lhs, :L) \ rhs2
             # if !(log.isconverged)
             #     CSV.write("lhs.csv",  DataFrames.DataFrame(lhs), writeheader=false)
@@ -307,7 +314,7 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::SymIndefCo
             end
             rhs .= F \ rhs
         else
-            CSV.write("lhs/lhs_$(round(Int, time() * 1000)).csv",  DataFrames.DataFrame(lhs), writeheader=false)
+            # CSV.write("lhs/lhs_$(round(Int, time() * 1000)).csv",  DataFrames.DataFrame(lhs), writeheader=false)
             # CSV.write("matrices/rhs_$(round(Int, time() * 1000)).csv",  DataFrames.DataFrame(rhs), writeheader=false)
             if T <: BlasReal
                 F = bunchkaufman!(Symmetric(lhs, :L), true, check = true) # TODO doesn't work for generic reals (need LDLT)

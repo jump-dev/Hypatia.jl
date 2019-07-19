@@ -180,6 +180,8 @@ matrixcompletion10(T::Type{<:HypReal}) = matrixcompletion(T, 8, 8, use_geomean =
 matrixcompletion11(T::Type{<:HypReal}) = matrixcompletion(T, 8, 8, use_epinorm = false)
 matrixcompletion12(T::Type{<:HypReal}) = matrixcompletion(T, 8, 8, use_geomean = false, use_epinorm = false)
 
+matrixcompletion13(T::Type{<:HypReal}) = matrixcompletion(T, 6, 60)
+
 instances_matrixcompletion_all = [
     matrixcompletion1,
     matrixcompletion2,
@@ -196,16 +198,17 @@ instances_matrixcompletion_all = [
     ]
 instances_matrixcompletion_few = [
     matrixcompletion1,
-    matrixcompletion2,
-    matrixcompletion3,
-    matrixcompletion4,
+    matrixcompletion5,
+    matrixcompletion9,
+    # matrixcompletion13,
     ]
 
 function test_matrixcompletion(instance::Function; T::Type{<:HypReal} = Float64, test_options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)
     tol = max(1e-5, sqrt(sqrt(eps(T))))
     d = instance(T)
-    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs; test_options..., atol = tol, rtol = tol)
+    t = @timed r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs; test_options..., atol = tol, rtol = tol, test = false)
+    @show t[2]
     @test r.status == :Optimal
     return
 end

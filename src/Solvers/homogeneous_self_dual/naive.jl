@@ -18,7 +18,11 @@ mutable struct NaiveCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSo
     use_iterative::Bool
     use_sparse::Bool
     use_linops::Bool
+<<<<<<< Updated upstream
     use_restarts::Bool
+=======
+    use_iterative_restarts::Bool
+>>>>>>> Stashed changes
 
     lhs_copy
     lhs
@@ -44,8 +48,7 @@ mutable struct NaiveCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSo
         use_iterative::Bool = false,
         use_sparse::Bool = false,
         use_linops::Bool = false,
-        use_restarts::Bool = false,
-
+        use_iterative_restarts::Bool = false,
         ) where {T <: HypReal}
         (n, p, q) = (model.n, model.p, model.q)
         dim = n + p + 2q + 2
@@ -53,7 +56,8 @@ mutable struct NaiveCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSo
         system_solver.use_iterative = use_iterative
         system_solver.use_sparse = use_sparse
         system_solver.use_linops = use_linops
-        system_solver.use_restarts = use_restarts
+        system_solver.use_iterative_restarts = use_iterative_restarts
+
 
         system_solver.rhs = zeros(T, dim, 2)
         rows = 1:n
