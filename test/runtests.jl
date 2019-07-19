@@ -214,7 +214,7 @@ end
         linear_model = MO.RawLinearModel,
         system_solver = SO.NaiveCombinedHSDSystemSolver,
         linear_model_options = (use_iterative = true,),
-        system_solver_options = (use_iterative = true, use_iterative_restarts = false,),
+        system_solver_options = (use_iterative = true,),
         solver_options = (verbose = false, tol_feas = 1e-5, tol_abs_opt = 1e-5, tol_rel_opt = 1e-5),
         )
 

@@ -17,7 +17,6 @@ TODO reduce allocations
 mutable struct NaiveCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSolver{T}
     use_iterative::Bool
     use_sparse::Bool
-    use_iterative_restarts::Bool
 
     lhs_copy
     lhs
@@ -42,14 +41,12 @@ mutable struct NaiveCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSo
         model::Models.LinearModel{T};
         use_iterative::Bool = false,
         use_sparse::Bool = false,
-        use_iterative_restarts::Bool = false,
         ) where {T <: HypReal}
         (n, p, q) = (model.n, model.p, model.q)
         dim = n + p + 2q + 2
         system_solver = new{T}()
         system_solver.use_iterative = use_iterative
         system_solver.use_sparse = use_sparse
-        system_solver.use_iterative_restarts = use_iterative_restarts
 
         system_solver.rhs = zeros(T, dim, 2)
         rows = 1:n
@@ -182,15 +179,13 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveCombi
         # TODO prealloc whatever is needed inside the solver
         # TODO possibly fix IterativeSolvers so that methods can take matrix RHS, however the two columns may take different number of iters needed to converge
 
-        # if using restarted gmres, use default from IterativeSolvers
-        restart = (system_solver.use_iterative_restarts ? min(20, size(lhs, 2)) : size(lhs, 2))
-
+        dim = size(lhs, 2)
         rhs1 = view(rhs, :, 1)
-        IterativeSolvers.gmres!(system_solver.prevsol1, lhs, rhs1, restart = restart)
+        IterativeSolvers.gmres!(system_solver.prevsol1, lhs, rhs1, restart = dim)
         copyto!(rhs1, system_solver.prevsol1)
 
         rhs2 = view(rhs, :, 2)
-        IterativeSolvers.gmres!(system_solver.prevsol2, lhs, rhs2, restart = restart)
+        IterativeSolvers.gmres!(system_solver.prevsol2, lhs, rhs2, restart = dim)
         copyto!(rhs2, system_solver.prevsol2)
     else
         # update lhs matrix
