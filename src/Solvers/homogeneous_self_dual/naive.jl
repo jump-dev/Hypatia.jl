@@ -17,12 +17,8 @@ TODO reduce allocations
 mutable struct NaiveCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSolver{T}
     use_iterative::Bool
     use_sparse::Bool
-<<<<<<< HEAD
     use_linops::Bool
     use_restarts::Bool
-=======
-    use_iterative_restarts::Bool
->>>>>>> upstream/portlinops
 
     lhs_copy
     lhs
@@ -47,24 +43,17 @@ mutable struct NaiveCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSo
         model::Models.LinearModel{T};
         use_iterative::Bool = false,
         use_sparse::Bool = false,
-<<<<<<< HEAD
         use_linops::Bool = false,
         use_restarts::Bool = false,
-=======
-        use_iterative_restarts::Bool = false,
->>>>>>> upstream/portlinops
+
         ) where {T <: HypReal}
         (n, p, q) = (model.n, model.p, model.q)
         dim = n + p + 2q + 2
         system_solver = new{T}()
         system_solver.use_iterative = use_iterative
         system_solver.use_sparse = use_sparse
-<<<<<<< HEAD
         system_solver.use_linops = use_linops
         system_solver.use_restarts = use_restarts
-=======
-        system_solver.use_iterative_restarts = use_iterative_restarts
->>>>>>> upstream/portlinops
 
         system_solver.rhs = zeros(T, dim, 2)
         rows = 1:n
