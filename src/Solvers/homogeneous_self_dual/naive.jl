@@ -180,6 +180,7 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveCombi
         # TODO possibly fix IterativeSolvers so that methods can take matrix RHS, however the two columns may take different number of iters needed to converge
 
         dim = size(lhs, 2)
+        
         rhs1 = view(rhs, :, 1)
         IterativeSolvers.gmres!(system_solver.prevsol1, lhs, rhs1, restart = dim)
         copyto!(rhs1, system_solver.prevsol1)
