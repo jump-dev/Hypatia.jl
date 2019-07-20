@@ -189,6 +189,8 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
     HGxi_k = system_solver.HGxi_k
     Gxi_k = system_solver.Gxi_k
 
+    @timeit solver.timer "setup" begin
+
     @. x1 = -model.c
     @. x2 = solver.x_residual
     @. x3 = zero(T)
@@ -201,7 +203,7 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
     for k in eachindex(cones)
         cone_k = cones[k]
         duals_k = solver.point.dual_views[k]
-        grad_k = Cones.grad(cone_k)
+        @timeit solver.timer "grad1" grad_k = Cones.grad(cone_k)
         if Cones.use_dual(cone_k)
             @. z1_temp_k[k] /= mu
             @. z2_temp_k[k] = (duals_k + z2_temp_k[k]) / mu
@@ -210,11 +212,13 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
         else
             @. z1_temp_k[k] *= mu
             @. z2_temp_k[k] *= mu
-            Cones.hess_prod!(z1_k[k], z1_temp_k[k], cone_k)
-            Cones.hess_prod!(z2_k[k], z2_temp_k[k], cone_k)
+            @timeit solver.timer "hess1" Cones.hess_prod!(z1_k[k], z1_temp_k[k], cone_k)
+            @timeit solver.timer "hess2" Cones.hess_prod!(z2_k[k], z2_temp_k[k], cone_k)
             @. z2_k[k] += duals_k
             @. z3_k[k] = duals_k + grad_k * mu
         end
+    end
+
     end
 
     # TODO maybe replace with Diagonal(blocks) matrix product
@@ -222,29 +226,52 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
         for k in eachindex(cones)
             cone_k = cones[k]
             if Cones.use_dual(cone_k)
+                @timeit solver.timer "inv_hess_prod" begin
                 Cones.inv_hess_prod!(prod_k[k], arr_k[k], cone_k)
                 prod_k[k] ./= mu
+                end
             else
-                Cones.hess_prod!(prod_k[k], arr_k[k], cone_k)
-                prod_k[k] .*= mu
+                @timeit solver.timer "hess_prod" begin
+                @timeit solver.timer "hess_prod1" Cones.hess_prod!(prod_k[k], arr_k[k], cone_k)
+                @timeit solver.timer "hess_prod2" prod_k[k] .*= mu
+                end
             end
         end
     end
 
-    ldiv!(model.Ap_R', yi)
+    @timeit solver.timer "ldiv_yi" ldiv!(model.Ap_R', yi)
 
+    @timeit solver.timer "QpbxGHbz" begin
     mul!(QpbxGHbz, model.G', zi)
     @. QpbxGHbz += xi
     lmul!(model.Ap_Q', QpbxGHbz)
+    end
 
     if !iszero(size(Q2div, 1))
+        @timeit solver.timer "Q2div" begin
         mul!(GQ1x, GQ1, yi)
         block_hessian_product!(HGQ1x_k, GQ1x_k)
         mul!(Q2div, GQ2', HGQ1x)
         @. Q2div = Q2pbxGHbz - Q2div
+        end
 
-        block_hessian_product!(HGQ2_k, GQ2_k)
-        mul!(Q2GHGQ2, GQ2', HGQ2)
+        @timeit solver.timer "Q2GHGQ2" begin
+        if iszero(model.p)
+            @timeit solver.timer "special" begin
+            H = Cones.hess(first(cones)).data
+            @. Q2GHGQ2 = mu * (H[1, 1] + H[2:end, 2:end] - H[1:1, 2:end] - H[1:1, 2:end]')
+            # for j in 2:size(H, 2), i in 2:j
+            #     @inbounds Q2GHGQ2[i-1, j-1] = mu * (H[1, 1] - H[i, 1] - H[1, j] + H[i, j])
+            # end
+
+            # @. Q2GHGQ2 = H[1, 1] - H[2:end, 1:1] - H[1:1, 2:end] + H[2:end, 2:end]
+            # Q2GHGQ2 .*= mu
+            end
+        else
+            @timeit solver.timer "Hprod" block_hessian_product!(HGQ2_k, GQ2_k)
+            @timeit solver.timer "GQ2prod" mul!(Q2GHGQ2, GQ2', HGQ2)
+        end
+        end
 
         if system_solver.use_sparse
             F = ldlt(Symmetric(Q2GHGQ2), check = false) # TODO not implemented for generic reals
@@ -258,7 +285,7 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
             end
             Q2div .= F \ Q2div # TODO eliminate allocs (see https://github.com/JuliaLang/julia/issues/30084)
         else
-            F = hyp_chol!(Symmetric(Q2GHGQ2)) # TODO prealloc blasreal cholesky auxiliary vectors using posvx
+            @timeit solver.timer "chol" F = hyp_chol!(Symmetric(Q2GHGQ2)) # TODO prealloc blasreal cholesky auxiliary vectors using posvx
             if !isposdef(F)
                 println("dense linear system matrix factorization failed")
                 mul!(Q2GHGQ2, GQ2', HGQ2)
@@ -276,24 +303,32 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
                     end
                 end
             end
-            ldiv!(F, Q2div)
+            @timeit solver.timer "ldiv_Q2div" ldiv!(F, Q2div)
         end
     end
 
+    @timeit solver.timer "xi" begin
     @. xi1 = yi
     @. xi2 = Q2div
     lmul!(model.Ap_Q, xi)
+    end
 
+    @timeit solver.timer "HGxi" begin
     mul!(Gxi, model.G, xi)
     block_hessian_product!(HGxi_k, Gxi_k)
+    end
 
     @. zi = HGxi - zi
 
     if !iszero(length(yi))
+        @timeit solver.timer "yi" begin
         mul!(yi, GQ1', HGxi)
         @. yi = Q1pbxGHbz - yi
         ldiv!(model.Ap_R, yi)
+        end
     end
+
+    @timeit solver.timer "lift" begin
 
     # lift to HSDE space
     tau_denom = mu / solver.tau / solver.tau - dot(model.c, x1) - dot(model.b, y1) - dot(model.h, z1)
@@ -312,6 +347,8 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
     (tau_pred, kap_pred) = lift!(x2, y2, z2, z2_temp, solver.kap + solver.primal_obj_t - solver.dual_obj_t, -solver.kap)
     @. z2_temp -= solver.z_residual
     (tau_corr, kap_corr) = lift!(x3, y3, z3, z3_temp, zero(T), -solver.kap + mu / solver.tau)
+
+    end
 
     return (x2, x3, y2, y3, z2, z3, z2_temp, z3_temp, tau_pred, tau_corr, kap_pred, kap_corr)
 end

@@ -103,7 +103,7 @@ function update_grad(cone::WSOSPolyInterp)
     cone.grad .= 0
     for k in eachindex(cone.Ps)
         LUk = hyp_ldiv_chol_L!(cone.tmpLU[k], cone.ΛFs[k], cone.Ps[k]')
-        for j in 1:cone.dim
+        @inbounds for j in 1:cone.dim
             cone.grad[j] -= sum(abs2, view(LUk, :, j))
         end
         # hyp_AtA!(UU, LUk)
@@ -121,7 +121,7 @@ function update_hess(cone::WSOSPolyInterp)
     for k in eachindex(cone.Ps)
         UUk = hyp_AtA!(cone.tmpUU, cone.tmpLU[k])
         # cone.hess.data += abs2.(UUk)
-        for j in 1:cone.dim, i in 1:j
+        @inbounds for j in 1:cone.dim, i in 1:j
             cone.hess.data[i, j] += abs2(UUk[i, j])
         end
     end
