@@ -197,8 +197,8 @@ instances_matrixcompletion_all = [
     matrixcompletion12,
     ]
 instances_matrixcompletion_few = [
-    matrixcompletion1,
-    matrixcompletion5,
+    # matrixcompletion1,
+    # matrixcompletion5,
     matrixcompletion9,
     # matrixcompletion13,
     ]

@@ -295,22 +295,23 @@ instances_polymin_few = [
     polyminreal2,
     polyminreal3,
     polyminreal12,
-    polyminreal14,
-    polyminreal18,
-    polyminreal23,
-    polymincomplex7,
-    polymincomplex14,
+    # polyminreal14,
+    # polyminreal18,
+    # polyminreal23,
+    # polymincomplex7,
+    # polymincomplex14,
     ]
 
 function test_polymin(instance::Function; T::Type{<:HypReal} = Float64, test_options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)
     tol = max(1e-5, sqrt(sqrt(eps(T))))
     d = instance(T)
-    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs; test_options..., atol = tol, rtol = tol)
+    t = @timed r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs; test_options..., atol = tol, rtol = tol, test = false)
     @test r.status == :Optimal
     if !isnan(d.true_obj)
         @test r.primal_obj ≈ d.true_obj atol = tol rtol = tol
     end
+    @show t[2]
     return
 end
 

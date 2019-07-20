@@ -219,11 +219,11 @@ instances_portfolio_all = [
     portfolio11,
     ]
 instances_portfolio_few = [
-    portfolio1,
-    portfolio3,
-    portfolio5,
-    portfolio6,
-    # portfolio13,
+    # portfolio1,
+    # portfolio3,
+    # portfolio5,
+    # portfolio6,
+    portfolio13,
     ]
 instances_portfolio_linops = [
     portfolio8,

@@ -4,20 +4,24 @@ using Krylov
 using LinearOperators
 using DelimitedFiles
 using LinearAlgebra
-import Krylov
 
 
-LHS = CSV.read("lhs.csv", header = false)
+LHS = CSV.read("lhs.csv", header = false);
 LHS = convert(Matrix, LHS)
-b = CSV.read("rhs.csv", header = false)
-b = convert(Matrix, b)
 i = 1
+b = CSV.read("rhs.csv", header = false);
+b = convert(Matrix, b)
 b = b[:, i]
-prevsol = CSV.read("prevsol.csv", header = false)
+prevsol = CSV.read("prevsol.csv", header = false);
 prevsol = convert(Matrix, prevsol)
 prevsol = prevsol[:, i]
 A = Symmetric(LHS, :L)
-(x, hist) = minres(A, b, log = true, reorth = true)
+
+# A = BigFloat.(A)
+# b = BigFloat.(b)
+# prevsol = BigFloat.(prevsol)
+
+(x, hist) = gmres!(prevsol, A, b, log = true, tol = 1e-12)
 norm(b - A * x)
 
 # maxels = maximum(A, dims = 2)

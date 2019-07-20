@@ -138,7 +138,9 @@ function build_solve_check(
     model = linear_model{T}(c, A, b, G, h, cones, cone_idxs; linear_model_options...)
     stepper = CombinedHSDStepper{T}(model, system_solver = system_solver{T}(model; system_solver_options...); stepper_options...)
     solver = HSDSolver{T}(model, stepper = stepper; solver_options...)
+    reset_timer!(solver.timer)
     solve(solver)
+    print_timer(solver.timer)
     return get_certificates(solver, model, test = test, atol = atol, rtol = rtol)
 end
 

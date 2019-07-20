@@ -18,11 +18,7 @@ mutable struct NaiveCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSo
     use_iterative::Bool
     use_sparse::Bool
     use_linops::Bool
-<<<<<<< Updated upstream
-    use_restarts::Bool
-=======
     use_iterative_restarts::Bool
->>>>>>> Stashed changes
 
     lhs_copy
     lhs

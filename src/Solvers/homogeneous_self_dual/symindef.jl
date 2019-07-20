@@ -265,6 +265,7 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::SymIndefCo
 
         # (R, C) = equilibrators(Symmetric(lhs, :L))
         # (pl, pr) = maxels(Symmetric(lhs, :L))
+        # io = open("p1.csv", "a")
 
         for i in 1:3
 
@@ -283,16 +284,26 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::SymIndefCo
             # @show cond(Symmetric(lhs, :L))
             # @show cond(Diagonal(R) \ Symmetric(lhs, :L) / Diagonal(C))
 
-            S, scond, amax = syequb(lhs)
+            @timeit solver.timer "precond" S, scond, amax = syequb(lhs)
             S = Diagonal(S)
+            # S = I
 
+            # @show Symmetric(lhs, :L)
+            # @show S * Symmetric(lhs, :L) * S
             # @show eigen(Symmetric(lhs, :L)).values
             # @show eigen(S * Symmetric(lhs, :L) * S).values
-            # (x, log) = IterativeSolvers.gmres!(prevsol, Symmetric(S * Symmetric(lhs, :L) * S), S * rhs2, maxiter = 1 * size(lhs, 2), restart = 20, log = true, tol = 1e-12)
-            (x, log) = IterativeSolvers.minres!(prevsol, Symmetric(S * Symmetric(lhs, :L) * S), S * rhs2, maxiter = 1 * size(lhs, 2), log = true, tol = 1e-12, reorth = true)
+            # (x, log) = IterativeSolvers.gmres!(prevsol, Symmetric(S * Symmetric(lhs, :L) * S), S * rhs2, maxiter = 1 * size(lhs, 2), restart = size(lhs, 2), log = true, tol = 1e-12)
+            prevsol .= S \ prevsol
+            @timeit solver.timer "minres" (x, log) = IterativeSolvers.minres!(prevsol, Symmetric(S * Symmetric(lhs, :L) * S), S * rhs2, maxiter = 1 * size(lhs, 2), log = true, tol = 1e-12, reorth = false)
             prevsol .= S * prevsol
 
-            # (x, log) = IterativeSolvers.gmres!(prevsol, Symmetric(lhs, :L), rhs2, maxiter = 1 * size(lhs, 2), restart = div(size(lhs, 2), 1), log = true)
+            # print(io, "$(dot(x0[:, i], prevsol) / norm(x0[:, i]) / norm(prevsol)),")
+            # print(io, "$(norm(x0[:, i]) / norm(prevsol)), $(norm(x0[:, i]) - norm(prevsol)),")
+            # print(io, "$(norm(Symmetric(lhs, :L) \ rhs2 - x0[:, i])),$(norm(rhs2 - Symmetric(lhs, :L) * x0[:, i])), ,")
+
+            # @timeit solver.timer "itersolve" (x, log) = IterativeSolvers.gmres!(prevsol, Symmetric(lhs, :L), rhs2, maxiter = 1 * size(lhs, 2), restart = div(size(lhs, 2), 1), log = true)
+
+            # @show log.iters, size(lhs, 2)
 
             # @show log.iters
             # prevsol = Symmetric(lhs, :L) \ rhs2
@@ -300,11 +311,13 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::SymIndefCo
             #     CSV.write("lhs.csv",  DataFrames.DataFrame(lhs), writeheader=false)
             #     CSV.write("rhs.csv",  DataFrames.DataFrame(rhs), writeheader=false)
             #     CSV.write("prevsol.csv",  DataFrames.DataFrame(x0), writeheader=false)
-            #     # error()
+            #     error()
             # end
             rhs2 .= prevsol
 
         end
+        # print(io, "\n")
+        # close(io)
 
     else
         if system_solver.use_sparse

@@ -34,6 +34,8 @@ mutable struct NaiveElimCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSyst
     lhs
     rhs::Matrix{T}
 
+    prevsol::Matrix{T}
+
     x1
     x2
     y1
@@ -74,6 +76,7 @@ mutable struct NaiveElimCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSyst
 
         rhs = Matrix{T}(undef, npq1, 2)
         system_solver.rhs = rhs
+        system_solver.prevsol = zeros(T, npq1, 2)
         rows = 1:n
         system_solver.x1 = view(rhs, rows, 1)
         system_solver.x2 = view(rhs, rows, 2)
@@ -159,12 +162,17 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveElimC
     # -c'x - b'y - h'z + mu/(taubar^2)*tau = taurhs + kaprhs
     rhs[end, :] .= kap_rhs + tau_rhs
 
+    # for i in 1:2
+    #     @show norm(lu(lhs) \ rhs[:, i] - system_solver.prevsol[:, i]), norm(rhs[:, i] - lhs * system_solver.prevsol[:, i])
+    # end
+
     # solve system
     if system_solver.use_sparse
         rhs .= lu(lhs) \ rhs
     else
         ldiv!(lu!(lhs), rhs)
     end
+    system_solver.prevsol .= rhs
 
     # lift to get s and kap
     tau1 = rhs[end, 1]

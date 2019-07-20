@@ -26,7 +26,7 @@ include(joinpath(examples_dir, "expdesign/JuMP.jl"))
 include(joinpath(examples_dir, "matrixcompletion/native.jl"))
 # include(joinpath(examples_dir, "muconvexity/JuMP.jl"))
 # include(joinpath(examples_dir, "polymin/JuMP.jl"))
-# include(joinpath(examples_dir, "polymin/native.jl"))
+include(joinpath(examples_dir, "polymin/native.jl"))
 # include(joinpath(examples_dir, "polynorm/JuMP.jl"))
 include(joinpath(examples_dir, "portfolio/native.jl"))
 # include(joinpath(examples_dir, "regionofattr/JuMP.jl"))
@@ -207,13 +207,13 @@ real_types = [
 
     # @testset "linearopt" begin test_linearopt.(instances_linearopt_few, T = T, test_options = test_options) end
 
-    # @testset "matrixcompletion" begin test_matrixcompletion.(instances_matrixcompletion_few, T = T, test_options = test_options) end
+    @testset "matrixcompletion" begin test_matrixcompletion.(instances_matrixcompletion_few, T = T, test_options = test_options) end
 
     # @testset "sparsepca" begin test_sparsepca.(instances_sparsepca_few, T = T, test_options = test_options) end
 
     # @testset "polymin" begin test_polymin.(instances_polymin_few, T = T, test_options = test_options) end
 
-    @testset "portfolio" begin test_portfolio.(instances_portfolio_few, T = T, test_options = test_options) end
+    # @testset "portfolio" begin test_portfolio.(instances_portfolio_few, T = T, test_options = test_options) end
 end
 #
 # @info("starting MathOptInterface tests")
