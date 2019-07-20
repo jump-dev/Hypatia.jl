@@ -29,6 +29,7 @@ TODO reduce allocations
 
 mutable struct NaiveElimCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSolver{T}
     use_sparse::Bool
+    use_iterative::Bool
 
     lhs_copy
     lhs
@@ -49,11 +50,12 @@ mutable struct NaiveElimCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSyst
     s1_k
     s2_k
 
-    function NaiveElimCombinedHSDSystemSolver{T}(model::Models.LinearModel{T}; use_sparse::Bool = false) where {T <: HypReal}
+    function NaiveElimCombinedHSDSystemSolver{T}(model::Models.LinearModel{T}; use_sparse::Bool = false, use_iterative::Bool = false) where {T <: HypReal}
         (n, p, q) = (model.n, model.p, model.q)
         npq1 = n + p + q + 1
         system_solver = new{T}()
         system_solver.use_sparse = use_sparse
+        system_solver.use_iterative = use_iterative
 
         if use_sparse
             system_solver.lhs_copy = T[
@@ -166,11 +168,18 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveElimC
     #     @show norm(lu(lhs) \ rhs[:, i] - system_solver.prevsol[:, i]), norm(rhs[:, i] - lhs * system_solver.prevsol[:, i])
     # end
 
-    # solve system
-    if system_solver.use_sparse
-        rhs .= lu(lhs) \ rhs
+    if system_solver.use_iterative
+        for i in 1:2
+            (x, log) = IterativeSolvers.gmres!(system_solver.prevsol[:, i], lhs, rhs[:, i], log = true, rtol = 1e-8, atol = 1e-8, restart = size(lhs, 2))
+            @show log.iters
+        end
     else
-        ldiv!(lu!(lhs), rhs)
+        # solve system
+        if system_solver.use_sparse
+            rhs .= lu(lhs) \ rhs
+        else
+            ldiv!(lu!(lhs), rhs)
+        end
     end
     system_solver.prevsol .= rhs
 

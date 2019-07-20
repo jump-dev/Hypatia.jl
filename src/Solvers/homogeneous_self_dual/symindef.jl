@@ -294,7 +294,7 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::SymIndefCo
             # @show eigen(S * Symmetric(lhs, :L) * S).values
             # (x, log) = IterativeSolvers.gmres!(prevsol, Symmetric(S * Symmetric(lhs, :L) * S), S * rhs2, maxiter = 1 * size(lhs, 2), restart = size(lhs, 2), log = true, tol = 1e-12)
             prevsol .= S \ prevsol
-            @timeit solver.timer "minres" (x, log) = IterativeSolvers.minres!(prevsol, Symmetric(S * Symmetric(lhs, :L) * S), S * rhs2, maxiter = 1 * size(lhs, 2), log = true, tol = 1e-12, reorth = false)
+            @timeit solver.timer "minres" (x, log) = IterativeSolvers.minres!(prevsol, Symmetric(S * Symmetric(lhs, :L) * S), S * rhs2, maxiter = size(lhs, 2), log = true, rtol = 1e-8, reorth = false)
             prevsol .= S * prevsol
 
             # print(io, "$(dot(x0[:, i], prevsol) / norm(x0[:, i]) / norm(prevsol)),")
@@ -305,7 +305,7 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::SymIndefCo
 
             # @show log.iters, size(lhs, 2)
 
-            # @show log.iters
+            @show log.iters
             # prevsol = Symmetric(lhs, :L) \ rhs2
             # if !(log.isconverged)
             #     CSV.write("lhs.csv",  DataFrames.DataFrame(lhs), writeheader=false)
