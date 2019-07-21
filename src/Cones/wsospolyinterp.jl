@@ -120,7 +120,6 @@ function update_hess(cone::WSOSPolyInterp)
     cone.hess .= 0
     for k in eachindex(cone.Ps)
         UUk = hyp_AtA!(cone.tmpUU, cone.tmpLU[k])
-        # cone.hess.data += abs2.(UUk)
         @inbounds for j in 1:cone.dim, i in 1:j
             cone.hess.data[i, j] += abs2(UUk[i, j])
         end
