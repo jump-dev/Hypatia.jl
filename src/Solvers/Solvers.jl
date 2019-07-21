@@ -27,6 +27,66 @@ import Hypatia.HypBlockMatrix
 
 import CSV, DataFrames
 
+using LinearAlgebra.LAPACK: BlasInt, chklapackerror, @blasfunc, liblapack
+using LinearAlgebra.LAPACK: checksquare
+
+for (syequb_, elty, relty) in
+    ((:dsyequb_, :Float64, :Float64),
+     # (:syequb_, :ComplexF64, :Float64),
+     # (:syequb_, :ComplexF32, :Float32),
+     # (:syequb_, :Float32, :Float32),
+     )
+    @eval begin
+        function syequb(A::AbstractMatrix{$elty})
+            m,n = size(A)
+            lda = max(1, stride(A,2))
+            S = Vector{$relty}(undef, n)
+            info = Ref{BlasInt}()
+            scond = Ref{$relty}()
+            amax = Ref{$relty}()
+            work = Vector{$relty}(undef, 3 * n)
+            ccall((@blasfunc($syequb_), liblapack), Cvoid,
+                  (Ref{UInt8}, Ref{BlasInt}, Ptr{$elty}, Ref{BlasInt},
+                   Ptr{$relty},
+                   Ptr{$relty}, Ptr{$relty}, Ptr{$relty},
+                   Ptr{BlasInt}),
+                  'L', n, A, lda, S, scond, amax, work, info)
+            chklapackerror(info[])
+            S, scond, amax
+        end
+    end
+end
+
+using LinearAlgebra.LAPACK: BlasInt, chklapackerror, @blasfunc, liblapack
+using LinearAlgebra.LAPACK: checksquare
+for (geequb, elty, relty) in
+    ((:dgeequb_, :Float64, :Float64),
+     (:zgeequb_, :ComplexF64, :Float64),
+     (:cgeequb_, :ComplexF32, :Float32),
+     (:sgeequb_, :Float32, :Float32))
+    @eval begin
+
+        function geequb(A::AbstractMatrix{$elty})
+            m,n = size(A)
+            lda = max(1, stride(A,2))
+            C = Vector{$relty}(undef, n)
+            R = Vector{$relty}(undef, m)
+            info = Ref{BlasInt}()
+            rowcond = Ref{$relty}()
+            colcond = Ref{$relty}()
+            amax = Ref{$relty}()
+            ccall((@blasfunc($geequb), liblapack), Cvoid,
+                  (Ref{BlasInt}, Ref{BlasInt}, Ptr{$elty}, Ref{BlasInt},
+                   Ptr{$relty}, Ptr{$relty},
+                   Ptr{$relty}, Ptr{$relty}, Ptr{$relty},
+                   Ptr{BlasInt}),
+                  m, n, A, lda, R, C, rowcond, colcond, amax, info)
+            chklapackerror(info[])
+            R, C, rowcond, colcond, amax
+        end
+    end
+end
+
 abstract type Solver{T <: HypReal} end
 
 # homogeneous self-dual embedding algorithm

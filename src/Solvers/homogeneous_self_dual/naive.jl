@@ -152,6 +152,10 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveCombi
     mu = solver.mu
     tau = solver.tau
     kap = solver.kap
+    # prevsol1 = system_solver.prevsol1
+    # prevsol2 = system_solver.prevsol2
+
+    stepper = solver.stepper
 
     # update rhs matrix
     system_solver.x1 .= solver.x_residual
@@ -204,30 +208,39 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveCombi
         # xe = lhs \ rhs[:, 1]
         # (system_solver.prevsol1, stats) = Krylov.dqgmres(lhs, rhs1)
 
-        io = open("port.csv", "a")
-        (x, log) = IterativeSolvers.gmres!(system_solver.prevsol1, lhs, rhs1, log = true, restart = 20)
-        @show log.isconverged
-        @show log.iters
-        # print(io, "$(size(lhs, 2)), $(log.iters), $(norm(rhs1 - lhs * x))")
-        # (_, log) = IterativeSolvers.bicgstabl!(system_solver.prevsol1, lhs, rhs1, log = true)
+        # (R, C, scond, amax) = geequb(lhs)
+        # (R, C) = (Diagonal(R), Diagonal(C))
+        R, C = I, I
 
-        copyto!(rhs1, system_solver.prevsol1)
-        # if norm(system_solver.prevsol1 - xe) > 50
+        system_solver.prevsol1 .= C \ prevsol1
+        (x, log) = IterativeSolvers.gmres!(prevsol1, R * lhs * C, R * rhs1, log = true, restart = size(lhs, 2), atol = 1e-6, rtol = 1e-6)
+        prevsol1 .= C * prevsol1
+
+        # (_, log) = IterativeSolvers.bicgstabl!(prevsol1, lhs, rhs1, log = true)
+
+        copyto!(rhs1, prevsol1)
+        # if norm(prevsol1 - xe) > 50
         #     CSV.write("lhs.csv",  DataFrames.DataFrame(lhs), writeheader=false)
         #     CSV.write("rhs.csv",  DataFrames.DataFrame(rhs), writeheader=false)
         #     error()
         # end
-        # @show system_solver.prevsol1 ./ xe
+        # @show prevsol1 ./ xe
 
         rhs2 = view(rhs, :, 2)
-        (x, log) = IterativeSolvers.gmres!(system_solver.prevsol2, lhs, rhs2, restart = 20, log = true)
-        @show log.isconverged
-        @show log.iters
-        # print(io, "$(log.iters), $(norm(rhs2 - lhs * x))")
-        print("\n")
-        close(io)
-        copyto!(rhs2, system_solver.prevsol2)
+        xexact2 = lhs \ rhs2
+        (x, log) = IterativeSolvers.gmres!(prevsol2, lhs, rhs2, restart = size(lhs, 2), log = true, atol = 1e-6, rtol = 1e-6)
+        copyto!(rhs2, prevsol2)
     else
+
+        # io = open("naiveportfolio.csv", "a")
+        # xexact1 = lhs \ rhs1
+        # print(io, "$(norm(rhs1 - lhs * system_solver.prevsol1)),$(norm(system_solver.prevsol1 - xexact1)),$(dot(xexact1, prevsol1) / norm(prevsol1) / norm(xexact1)),")
+        # print(io, "$(log.iters), ,")
+        # print(io, "$(norm(rhs2 .- lhs * prevsol2)), $(norm(prevsol2 .- xexact2)),$(dot(xexact2, prevsol2) / norm(prevsol2) / norm(xexact2)),")
+        # print(io, "$(log.iters)")
+        # print(io, "\n")
+
+
         # update lhs matrix
         copyto!(lhs, system_solver.lhs_copy)
         lhs[kap_row, end] = mu / tau / tau
@@ -241,6 +254,7 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveCombi
         else
             ldiv!(lu!(lhs), rhs)
         end
+
     end
 
     return (system_solver.x1, system_solver.x2, system_solver.y1, system_solver.y2, system_solver.z1, system_solver.z2, system_solver.s1, system_solver.s2, rhs[end, 1], rhs[end, 2], rhs[kap_row, 1], rhs[kap_row, 2])

@@ -21,6 +21,19 @@ mutable struct CombinedHSDStepper{T <: HypReal} <: HSDStepper{T}
     cones_infeas::Vector{Bool}
     cones_loaded::Vector{Bool}
 
+    x_pred_prev
+    x_corr_prev
+    y_pred_prev
+    y_corr_prev
+    z_pred_prev
+    z_corr_prev
+    s_pred_prev
+    s_corr_prev
+    tau_pred_prev
+    tau_corr_prev
+    kap_pred_prev
+    kap_corr_prev
+
     function CombinedHSDStepper{T}(
         model::Models.LinearModel{T};
         system_solver::CombinedHSDSystemSolver{T} = (model isa Models.PreprocessedLinearModel{T} ? QRCholCombinedHSDSystemSolver{T}(model) : NaiveCombinedHSDSystemSolver{T}(model)),
@@ -47,6 +60,19 @@ mutable struct CombinedHSDStepper{T <: HypReal} <: HSDStepper{T}
         stepper.cones_infeas = trues(length(model.cones))
         stepper.cones_loaded = trues(length(model.cones))
 
+        stepper.x_pred_prev = zeros(T, length(system_solver.x1))
+        stepper.x_corr_prev = zeros(T, length(system_solver.x1))
+        stepper.y_pred_prev = zeros(T, length(system_solver.y1))
+        stepper.y_corr_prev = zeros(T, length(system_solver.y1))
+        stepper.z_pred_prev = zeros(T, length(system_solver.z1))
+        stepper.z_corr_prev = zeros(T, length(system_solver.z1))
+        stepper.s_pred_prev = zeros(T, length(system_solver.s1))
+        stepper.s_corr_prev = zeros(T, length(system_solver.s1))
+        stepper.tau_pred_prev = zero(T)
+        stepper.tau_corr_prev = zero(T)
+        stepper.kap_pred_prev = zero(T)
+        stepper.kap_corr_prev = zero(T)
+
         return stepper
     end
 end
@@ -57,6 +83,43 @@ function step(solver::HSDSolver{T}, stepper::CombinedHSDStepper{T}) where {T <: 
 
     # calculate affine/prediction and correction directions
     @timeit solver.timer "directions" (x_pred, x_corr, y_pred, y_corr, z_pred, z_corr, s_pred, s_corr, tau_pred, tau_corr, kap_pred, kap_corr) = get_combined_directions(solver, stepper.system_solver)
+
+    # io = open("matrix7.csv", "a")
+    # # println(io, "xpred,xcorr,ypred,ycorr,zpred,zcorr,spred,scorr,taupred,taucorr,xpred,xcorr,ypred,ycorr,zpred,zcorr,spred,scorr,taupred,taucorr")
+    # println(io,
+    # "$(dot(stepper.x_pred_prev, x_pred) / norm(stepper.x_pred_prev) / norm(x_pred)),$(dot(stepper.x_corr_prev, x_corr) / norm(stepper.x_corr_prev) / norm(x_corr))," *
+    # "$(dot(stepper.y_pred_prev, y_pred) / norm(stepper.y_pred_prev) / norm(y_pred)),$(dot(stepper.y_corr_prev, y_corr) / norm(stepper.y_corr_prev) / norm(y_corr))," *
+    # "$(dot(stepper.z_pred_prev, z_pred) / norm(stepper.z_pred_prev) / norm(z_pred)),$(dot(stepper.z_corr_prev, z_corr) / norm(stepper.z_corr_prev) / norm(z_corr))," *
+    # "$(dot(stepper.s_pred_prev, s_pred) / norm(stepper.s_pred_prev) / norm(s_pred)),$(dot(stepper.s_corr_prev, s_corr) / norm(stepper.s_corr_prev) / norm(s_corr))," *
+    # "$(stepper.tau_pred_prev / tau_pred), $(stepper.tau_corr_prev / tau_corr)," *
+    # "$(stepper.kap_pred_prev / kap_pred), $(stepper.kap_corr_prev / kap_corr)"
+    # )
+    # close(io)
+    #
+    # io = open("norms.csv", "a")
+    # # println(io, "xpred,xcorr,ypred,ycorr,zpred,zcorr,spred,scorr,taupred,taucorr,xpred,xcorr,ypred,ycorr,zpred,zcorr,spred,scorr,taupred,taucorr")
+    # println(io,
+    # "$(norm(x_pred)),$(norm(x_corr))," *
+    # "$(norm(y_pred)),$(norm(y_corr))," *
+    # "$(norm(z_pred)),$(norm(z_corr))," *
+    # "$(norm(s_pred)),$(norm(s_corr))," *
+    # "$(norm(tau_pred)),$(norm(tau_corr))," *
+    # "$(norm(kap_pred)),$(norm(kap_corr))"
+    # )
+    # close(io)
+    #
+    # stepper.x_pred_prev .= x_pred
+    # stepper.x_corr_prev .= x_corr
+    # stepper.y_pred_prev .= y_pred
+    # stepper.y_corr_prev .= y_corr
+    # stepper.z_pred_prev .= z_pred
+    # stepper.z_corr_prev .= z_corr
+    # stepper.s_pred_prev .= s_pred
+    # stepper.s_corr_prev .= s_corr
+    # stepper.tau_pred_prev = tau_pred
+    # stepper.tau_corr_prev = tau_corr
+    # stepper.kap_pred_prev = kap_pred
+    # stepper.kap_corr_prev = kap_corr
 
     Cones.load_point.(solver.model.cones, stepper.primal_views)
 
