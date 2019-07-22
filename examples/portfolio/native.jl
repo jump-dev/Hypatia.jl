@@ -82,7 +82,6 @@ function portfolio(
             push!(A_blocks, sigma_half)
             push!(A_blocks, -I)
             push!(A_blocks, I)
-            push!(A_blocks, ones(T, 1, 2 * num_stocks))
 
             A_offset = last_idx(A_rows)
             append!(A_rows, fill((A_offset + 1):(A_offset + num_stocks), 3))
@@ -94,26 +93,30 @@ function portfolio(
             push!(A_cols, (num_stocks + 1):(3 * num_stocks))
 
             push!(G_blocks, -I)
+            push!(G_blocks, ones(T, 1, 2 * num_stocks))
             push!(G_rows, (last_idx(G_rows) + 1):(last_idx(G_rows) + 2 * num_stocks))
-            push!(G_cols, (last_idx(G_cols) + 1):(last_idx(G_cols) + 2 * num_stocks))
+            push!(G_rows, (last_idx(G_rows) + 1):(last_idx(G_rows) + 1))
+            # must have `num_stocks` primal variables, append columns
+            push!(G_cols, (num_stocks + 1):(3 * num_stocks))
+            push!(G_cols, (num_stocks + 1):(3 * num_stocks))
         else
             id = Matrix{T}(I, num_stocks, num_stocks)
             id2 = Matrix{T}(I, 2 * num_stocks, 2 * num_stocks)
             A = [
                 A    zeros(T, 1, 2 * num_stocks);
                 sigma_half    -id    id;
-                zeros(T, 1, num_stocks)    ones(T, 1, 2 * num_stocks);
                 ]
             G = [
                 G    zeros(T, size(G, 1), 2 * num_stocks);
                 zeros(T, 2 * num_stocks, num_stocks)    -id2;
+                zeros(T, 1, num_stocks)    ones(T, 1, 2 * num_stocks);
                 ]
         end
-        b = vcat(b, zeros(T, num_stocks), gamma * sqrt(T(num_stocks)))
-        h = vcat(h, zeros(T, 2 * num_stocks))
-        push!(cones, CO.Nonnegative{T}(2 * num_stocks))
-        push!(cone_idxs, (cone_offset + 1):(cone_offset + 2 * num_stocks))
-        cone_offset += 2 * num_stocks
+        b = vcat(b, zeros(T, num_stocks))
+        h = vcat(h, zeros(T, 2 * num_stocks), gamma * sqrt(T(num_stocks)))
+        push!(cones, CO.Nonnegative{T}(2 * num_stocks + 1))
+        push!(cone_idxs, (cone_offset + 1):(cone_offset + 2 * num_stocks + 1))
+        cone_offset += 2 * num_stocks + 1
     end
 
     if :linf in risk_measures && !use_linfball
