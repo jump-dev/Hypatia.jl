@@ -12,8 +12,8 @@ b = CSV.read("rhs.csv", header = false);
 b = convert(Matrix, b)
 b = b[:, i]
 prevsol = CSV.read("prevsol.csv", header = false);
-prevsol = convert(Matrix, prevsol)
-prevsol = prevsol[:, i]
+prevsol = convert(Matrix, prevsol);
+prevsol = prevsol[:, i];
 A = Symmetric(LHS, :L)
 
 # A = BigFloat.(A)
@@ -21,8 +21,8 @@ A = Symmetric(LHS, :L)
 # prevsol = BigFloat.(prevsol)
 
 IterativeSolvers.TimerOutputs.reset_timer!()
-(x, hist) = IterativeSolvers.minres!(prevsol, A, b, log = true, rtol = 1e-8, atol = 1e-8, verbose = true)
-IterativeSolvers.TimerOutputs.print_timer!()
+(x, hist) = IterativeSolvers.minres!(prevsol, A, b, log = true, rtol = 1e-8, atol = 1e-8, verbose = false)
+IterativeSolvers.TimerOutputs.print_timer()
 norm(b - A * x)
 
 # maxels = maximum(A, dims = 2)
