@@ -93,39 +93,39 @@ function sparsepca(
         push!(cones, CO.EpiNormInf{T}(1 + dimx, true))
         push!(cone_idxs, (dimx + 1):(2 * dimx + 1))
     else
-        c = vcat(c, zeros(T, 2 * dimx))
-        b = vcat(b, zeros(T, dimx), k)
         id = Matrix{T}(I, dimx, dimx)
         l1 = [(i == j ? one(T) : rt2) for i in 1:p for j in 1:i]
         if use_linops
             A = HypBlockMatrix{T}(
-                dimx + 2,
+                dimx + 1,
                 3 * dimx,
-                [A, -I, -I, I, reshape(l1, 1, dimx), reshape(l1, 1, dimx)],
-                [1:1, 2:(dimx + 1), 2:(dimx + 1), 2:(dimx + 1), (dimx + 2):(dimx + 2), (dimx + 2):(dimx + 2)],
-                [1:dimx, 1:dimx, (dimx + 1):(2 * dimx), (2 * dimx + 1):(3 * dimx), (dimx + 1):(2 * dimx), (2 * dimx + 1):(3 * dimx)]
+                [A, -I, -I, I],
+                [1:1, 2:(dimx + 1), 2:(dimx + 1), 2:(dimx + 1)],
+                [1:dimx, 1:dimx, (dimx + 1):(2 * dimx), (2 * dimx + 1):(3 * dimx)]
                 )
             G = HypBlockMatrix{T}(
+                3 * dimx + 1,
                 3 * dimx,
-                3 * dimx,
-                [-I, -I],
-                [1:dimx, (dimx + 1):(3 * dimx)],
-                [1:dimx, (dimx + 1):(3 * dimx)]
+                [-I, -I, repeat(l1', 1, 2)],
+                [1:dimx, (dimx + 1):(3 * dimx), (3 * dimx + 1):(3 * dimx + 1)],
+                [1:dimx, (dimx + 1):(3 * dimx), (dimx + 1):(3 * dimx)]
                 )
         else
             A = T[
                 A    zeros(T, 1, 2 * dimx);
                 -id    -id    id;
-                zeros(T, 1, dimx)    l1'    l1';
                 ]
             G = [
                 Matrix{T}(-I, dimx, dimx)    zeros(T, dimx, 2 * dimx);
                 zeros(T, 2 * dimx, dimx)    Matrix{T}(-I, 2 * dimx, 2 * dimx);
+                zeros(T, 1, dimx)    repeat(l1', 1, 2);
                 ]
         end
-        h = vcat(hpsd, zeros(T, 2 * dimx))
-        push!(cones, CO.Nonnegative{T}(2 * dimx))
-        push!(cone_idxs, (dimx + 1):(3 * dimx))
+        c = vcat(c, zeros(T, 2 * dimx))
+        b = vcat(b, zeros(T, dimx))
+        h = vcat(hpsd, zeros(T, 2 * dimx), k)
+        push!(cones, CO.Nonnegative{T}(2 * dimx + 1))
+        push!(cone_idxs, (dimx + 1):(3 * dimx + 1))
     end
 
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs, true_obj = true_obj)
