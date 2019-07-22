@@ -132,28 +132,28 @@ function matrixcompletion(
         # first num_unknown columns overlap with G_norm, column for the epigraph variable of the spectral cone added later
         G_geo = zeros(T, 3 * (num_unknown - 1), 2 * num_unknown - 2)
         # first cone is a special case since two of the original variables participate in it
-        G_geo[3, 1] = -1
+        G_geo[1, 1] = -1
         G_geo[2, 2] = -1
-        G_geo[1, num_unknown + 1] = -1
-        push!(cones, CO.HypoGeomean{T}(fill(inv(T(2)), 2)))
+        G_geo[3, num_unknown + 1] = -1
+        push!(cones, CO.EpiPerPower{T}(T(2)))
         push!(cone_idxs, (cone_offset + 1):(cone_offset + 3))
         offset = 4
         # loop over new vars
         for i in 1:(num_unknown - 3)
-            G_geo[offset, num_unknown + i + 1] = -1
+            G_geo[offset + 2, num_unknown + i + 1] = -1
             G_geo[offset + 1, num_unknown + i] = -1
-            G_geo[offset + 2, i + 2] = -1
-            push!(cones, CO.HypoGeomean{T}([T(i + 1) / T(i + 2), inv(T(i + 2))]))
+            G_geo[offset, i + 2] = -1
+            push!(cones, CO.EpiPerPower{T}(T(i + 2)))
             push!(cone_idxs, (cone_offset + 3 * i + 1):(cone_offset + 3 * (i + 1)))
             offset += 3
         end
 
         # last row also special becuase hypograph variable is fixed
-        G_geo[offset + 2, num_unknown] = -1
+        G_geo[offset, num_unknown] = -1
         G_geo[offset + 1, 2 * num_unknown - 2] = -1
-        push!(cones, CO.HypoGeomean{T}([T(num_unknown - 1) / T(num_unknown), inv(T(num_unknown))]))
+        push!(cones, CO.EpiPerPower{T}(T(num_unknown)))
         push!(cone_idxs, (cone_offset + 3 * num_unknown - 5):(cone_offset + 3 * num_unknown - 3))
-        h = vcat(h_norm, zeros(T, 3 * (num_unknown - 2)), T[1, 0, 0])
+        h = vcat(h_norm, zeros(T, 3 * (num_unknown - 2)), T[0, 0, 1])
 
         # G_norm needs to be post-padded with columns for 3dim cone vars
         G_norm = hcat(G_norm, zeros(T, size(G_norm, 1), num_unknown - 2))
