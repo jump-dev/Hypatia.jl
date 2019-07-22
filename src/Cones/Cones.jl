@@ -33,7 +33,7 @@ include("epinormspectral.jl")
 include("possemideftri.jl")
 include("hypoperlogdettri.jl")
 include("wsospolyinterp.jl")
-# include("wsospolyinterpmat.jl")
+include("wsospolyinterpmat.jl")
 # include("wsospolyinterpsoc.jl")
 
 use_dual(cone::Cone) = cone.use_dual
