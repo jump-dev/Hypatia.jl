@@ -173,6 +173,8 @@ function production_data()
     return (X, y)
 end
 
+# TODO for odd degrees WSOS/PSD formulations don't match, modeling issue
+
 shapeconregrJuMP1() = shapeconregrJuMP(production_data()..., 4, mono_dom = MU.FreeDomain(4), mono_profile = zeros(Int, 4))
 shapeconregrJuMP2() = shapeconregrJuMP(2, 3, 100, x -> sum(x.^3), use_lsq_obj = false)
 shapeconregrJuMP3() = shapeconregrJuMP(2, 3, 100, x -> sum(x.^4), use_lsq_obj = false)

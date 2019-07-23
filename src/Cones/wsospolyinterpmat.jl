@@ -11,9 +11,7 @@ mutable struct WSOSPolyInterpMat{T <: Real} <: Cone{T}
     dim::Int
     R::Int
     U::Int
-    ipwt::Vector{Matrix{T}}
-    point::Vector{T}
-
+    Ps::Vector{Matrix{T}}
     point::AbstractVector{T}
 
     feas_updated::Bool
@@ -22,21 +20,24 @@ mutable struct WSOSPolyInterpMat{T <: Real} <: Cone{T}
     inv_hess_updated::Bool
     inv_hess_prod_updated::Bool
     is_feas::Bool
-
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
-    tmp_hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
-    hess_fact
-    mat::Vector{Matrix{T}}
-    matfact::Vector
-    tmp1::Vector{Matrix{T}}
-    tmp2::Matrix{T}
-    tmp3::Matrix{T}
 
-    function WSOSPolyInterpMat{T}(R::Int, U::Int, ipwt::Vector{Matrix{T}}, is_dual::Bool) where {T <: Real}
-        for ipwtj in ipwt
-            @assert size(ipwtj, 1) == U
+    rt2::T
+    rt2i::T
+    slice::Vector{T}
+    LL::Vector{Symmetric{T, Matrix{T}}}
+    ΛFs::Vector
+    LUs::Vector{Matrix{T}}
+    UU1::Matrix{T}
+    UU2::Matrix{T}
+    tmp_hess::Symmetric{T, Matrix{T}}
+    hess_fact
+
+    function WSOSPolyInterpMat{T}(R::Int, U::Int, Ps::Vector{Matrix{T}}, is_dual::Bool) where {T <: HypReal}
+        for Pj in Ps
+            @assert size(Pj, 1) == U
         end
         cone = new{T}()
         cone.use_dual = !is_dual # using dual barrier
@@ -44,37 +45,39 @@ mutable struct WSOSPolyInterpMat{T <: Real} <: Cone{T}
         cone.dim = dim
         cone.R = R
         cone.U = U
-        cone.ipwt = ipwt
+        cone.Ps = Ps
         return cone
     end
 end
 
-WSOSPolyInterpMat{T}(R::Int, U::Int, ipwt::Vector{Matrix{T}}) where {T <: Real} = WSOSPolyInterpMat{T}(R, U, ipwt, false)
+WSOSPolyInterpMat{T}(R::Int, U::Int, Ps::Vector{Matrix{T}}) where {T <: HypReal} = WSOSPolyInterpMat{T}(R, U, Ps, false)
 
 function setup_data(cone::WSOSPolyInterpMat{T}) where {T <: HypReal}
     reset_data(cone)
     dim = cone.dim
     U = cone.U
     R = cone.R
-    ipwt = cone.ipwt
+    Ps = cone.Ps
     cone.grad = Vector{T}(undef, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.tmp_hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.mat = [similar(cone.hess, size(ipwtj, 2) * R, size(ipwtj, 2) * R) for ipwtj in ipwt]
-    cone.matfact = Vector{Any}(undef, length(ipwt))
-    cone.tmp1 = [similar(cone.hess, size(ipwtj, 2), U) for ipwtj in ipwt]
-    cone.tmp2 = similar(cone.hess, U, U)
-    cone.tmp3 = similar(cone.tmp2)
+    cone.rt2 = sqrt(T(2))
+    cone.rt2i = inv(cone.rt2)
+    cone.slice = Vector{T}(undef, U)
+    cone.LL = [Symmetric(zeros(T, size(Pj, 2) * R, size(Pj, 2) * R), :L) for Pj in Ps]
+    cone.ΛFs = Vector{Any}(undef, length(Ps))
+    cone.LUs = [Matrix{T}(undef, size(Pj, 2), U) for Pj in Ps]
+    cone.UU1 = Matrix{T}(undef, U, U)
+    cone.UU2 = similar(cone.UU1)
     return
 end
 
-get_nu(cone::WSOSPolyInterpMat) = cone.R * sum(size(ipwtj, 2) for ipwtj in cone.ipwt)
+get_nu(cone::WSOSPolyInterpMat) = cone.R * sum(size(Pj, 2) for Pj in cone.Ps)
 
-function set_initial_point(arr::AbstractVector{T}, cone::WSOSPolyInterpMat{T}) where {T <: Real}
-    # sum of diagonal matrices with interpolant polynomial repeating on the diagonal
+function set_initial_point(arr::AbstractVector, cone::WSOSPolyInterpMat)
     idx = 1
     for i in 1:cone.R, j in 1:i
-        arr[idx:(idx + cone.U - 1)] .= (i == j) ? one(T) : zero(T)
+        arr[idx:(idx + cone.U - 1)] .= (i == j) ? 1 : 0
         idx += cone.U
     end
     return arr
@@ -84,31 +87,27 @@ _blockrange(inner::Int, outer::Int) = (outer * (inner - 1) + 1):(outer * inner)
 
 function update_feas(cone::WSOSPolyInterpMat)
     @assert !cone.feas_updated
-    rt2i = inv(sqrt(2))
     cone.is_feas = true
-    for j in eachindex(cone.ipwt)
-        ipwtj = cone.ipwt[j]
-        tmp1j = cone.tmp1[j]
-        L = size(ipwtj, 2)
-        mat = cone.mat[j]
-        uo = 1
-        for p in 1:cone.R, q in 1:p
-            point_pq = cone.point[uo:(uo + cone.U - 1)] # TODO prealloc
-            if p != q
-                @. point_pq *= rt2i
+    for j in eachindex(cone.Ps)
+        Pj = cone.Ps[j]
+        LU = cone.LUs[j]
+        L = size(Pj, 2)
+        Λ = cone.LL[j]
+        uo = rowo = 1
+        for p in 1:cone.R
+            colo = 1
+            for q in 1:p
+                fact = (p == q ? 1 : cone.rt2i)
+                cone.slice .= view(cone.point, uo:(uo + cone.U - 1)) * fact
+                mul!(LU, Pj', Diagonal(cone.slice))
+                mul!(view(Λ.data, rowo:(rowo + L - 1), colo:(colo + L - 1)), LU, Pj)
+                uo += cone.U
+                colo += L
             end
-
-            @. tmp1j = ipwtj' * point_pq'
-
-            rinds = _blockrange(p, L)
-            cinds = _blockrange(q, L)
-            mul!(view(mat, rinds, cinds), tmp1j, ipwtj)
-
-            uo += cone.U
+            rowo += L
         end
-
-        cone.matfact[j] = cholesky!(Symmetric(mat, :L), check = false)
-        if !isposdef(cone.matfact[j])
+        cone.ΛFs[j] = hyp_chol!(Λ)
+        if !isposdef(cone.ΛFs[j])
             cone.is_feas = false
             break
         end
@@ -118,29 +117,24 @@ function update_feas(cone::WSOSPolyInterpMat)
 end
 
 function update_grad(cone::WSOSPolyInterpMat)
-    @assert cone.is_feas
-    rt2 = sqrt(2)
+    @assert is_feas(cone)
     cone.grad .= 0
-    for j in eachindex(cone.ipwt)
-        W_inv_j = inv(cone.matfact[j])
-
-        ipwtj = cone.ipwt[j]
-        tmp1j = cone.tmp1[j]
-        tmp2 = cone.tmp2
-        tmp3 = cone.tmp3
-
-        L = size(ipwtj, 2)
-        uo = 0
-        for p in 1:cone.R, q in 1:p
-            uo += 1
-            fact = (p == q) ? 1 : rt2
-            rinds = _blockrange(p, L)
-            cinds = _blockrange(q, L)
-            idxs = _blockrange(uo, cone.U)
-
-            for i in 1:cone.U
-                cone.grad[idxs[i]] -= ipwtj[i, :]' * view(W_inv_j, rinds, cinds) * ipwtj[i, :] * fact
+    for j in eachindex(cone.Ps)
+        W_inv_j = inv(cone.ΛFs[j]) # TODO store
+        Pj = cone.Ps[j]
+        L = size(Pj, 2)
+        idx = rowo = 1
+        for p in 1:cone.R
+            colo = 1
+            for q in 1:p
+                fact = (p == q) ? 1 : cone.rt2
+                for i in 1:cone.U
+                    cone.grad[idx] -= Pj[i, :]' * view(W_inv_j, rowo:(rowo + L - 1), colo:(colo + L - 1)) * Pj[i, :] * fact
+                    idx += 1
+                end
+                colo += L
             end
+            rowo += L
         end
     end
     cone.grad_updated = true
@@ -148,22 +142,19 @@ function update_grad(cone::WSOSPolyInterpMat)
 end
 
 function update_hess(cone::WSOSPolyInterpMat)
-    rt2 = sqrt(2)
-    rt2i = inv(rt2)
+    @assert is_feas(cone)
     cone.hess .= 0
-    for j in eachindex(cone.ipwt)
-        W_inv_j = inv(cone.matfact[j]) # TODO store
-
-        ipwtj = cone.ipwt[j]
-        tmp1j = cone.tmp1[j]
-        tmp2 = cone.tmp2
-        tmp3 = cone.tmp3
-
-        L = size(ipwtj, 2)
+    UU1 = cone.UU1
+    UU2 = cone.UU2
+    for j in eachindex(cone.Ps)
+        W_inv_j = inv(cone.ΛFs[j]) # TODO store
+        Pj = cone.Ps[j]
+        LU = cone.LUs[j]
+        L = size(Pj, 2)
         uo = 0
         for p in 1:cone.R, q in 1:p
             uo += 1
-            fact = (p == q) ? 1 : rt2
+            fact = (p == q) ? 1 : cone.rt2
             rinds = _blockrange(p, L)
             cinds = _blockrange(q, L)
             idxs = _blockrange(uo, cone.U)
@@ -179,19 +170,19 @@ function update_hess(cone::WSOSPolyInterpMat)
                 cinds2 = _blockrange(q2, L)
                 idxs2 = _blockrange(uo2, cone.U)
 
-                mul!(tmp1j, view(W_inv_j, rinds, rinds2), ipwtj')
-                mul!(tmp2, ipwtj, tmp1j)
-                mul!(tmp1j, view(W_inv_j, cinds, cinds2), ipwtj')
-                mul!(tmp3, ipwtj, tmp1j)
-                fact = xor(p == q, p2 == q2) ? rt2i : 1
-                @. cone.hess.data[idxs, idxs2] += tmp2 * tmp3 * fact
+                mul!(LU, view(W_inv_j, rinds, rinds2), Pj')
+                mul!(UU1, Pj, LU)
+                mul!(LU, view(W_inv_j, cinds, cinds2), Pj')
+                mul!(UU2, Pj, LU)
+                fact = xor(p == q, p2 == q2) ? cone.rt2i : 1
+                @. cone.hess.data[idxs, idxs2] += UU1 * UU2 * fact
 
                 if (p != q) || (p2 != q2)
-                    mul!(tmp1j, view(W_inv_j, rinds, cinds2), ipwtj')
-                    mul!(tmp2, ipwtj, tmp1j)
-                    mul!(tmp1j, view(W_inv_j, cinds, rinds2), ipwtj')
-                    mul!(tmp3, ipwtj, tmp1j)
-                    @. cone.hess.data[idxs, idxs2] += tmp2 * tmp3 * fact
+                    mul!(LU, view(W_inv_j, rinds, cinds2), Pj')
+                    mul!(UU1, Pj, LU)
+                    mul!(LU, view(W_inv_j, cinds, rinds2), Pj')
+                    mul!(UU2, Pj, LU)
+                    @. cone.hess.data[idxs, idxs2] += UU1 * UU2 * fact
                 end
             end
         end
@@ -199,89 +190,3 @@ function update_hess(cone::WSOSPolyInterpMat)
     cone.hess_updated = true
     return cone.hess
 end
-
-# function check_in_cone(cone::WSOSPolyInterpMat{T}) where {T <: HypReal}
-#     rt2 = sqrt(T(2))
-#     rt2i = inv(rt2)
-#
-#     for j in eachindex(cone.ipwt)
-#         ipwtj = cone.ipwt[j]
-#         tmp1j = cone.tmp1[j]
-#         L = size(ipwtj, 2)
-#         mat = cone.mat[j]
-#
-#         uo = 1
-#         for p in 1:cone.R, q in 1:p
-#             point_pq = cone.point[uo:(uo + cone.U - 1)] # TODO prealloc
-#             if p != q
-#                 @. point_pq *= rt2i
-#             end
-#             @. tmp1j = ipwtj' * point_pq'
-#
-#             rinds = _blockrange(p, L)
-#             cinds = _blockrange(q, L)
-#             mul!(view(mat, rinds, cinds), tmp1j, ipwtj)
-#
-#             uo += cone.U
-#         end
-#
-#         cone.matfact[j] = hyp_chol!(Symmetric(mat, :L))
-#         if !isposdef(cone.matfact[j])
-#             return false
-#         end
-#     end
-#
-#     cone.grad .= zero(T)
-#     cone.hess .= zero(T)
-#     for j in eachindex(cone.ipwt)
-#         W_inv_j = inv(cone.matfact[j])
-#
-#         ipwtj = cone.ipwt[j]
-#         tmp1j = cone.tmp1[j]
-#         tmp2 = cone.tmp2
-#         tmp3 = cone.tmp3
-#
-#         L = size(ipwtj, 2)
-#         uo = 0
-#         for p in 1:cone.R, q in 1:p
-#             uo += 1
-#             fact = (p == q) ? one(T) : rt2
-#             rinds = _blockrange(p, L)
-#             cinds = _blockrange(q, L)
-#             idxs = _blockrange(uo, cone.U)
-#
-#             for i in 1:cone.U
-#                 cone.grad[idxs[i]] -= ipwtj[i, :]' * view(W_inv_j, rinds, cinds) * ipwtj[i, :] * fact
-#             end
-#
-#             uo2 = 0
-#             for p2 in 1:cone.R, q2 in 1:p2
-#                 uo2 += 1
-#                 if uo2 < uo
-#                     continue
-#                 end
-#
-#                 rinds2 = _blockrange(p2, L)
-#                 cinds2 = _blockrange(q2, L)
-#                 idxs2 = _blockrange(uo2, cone.U)
-#
-#                 mul!(tmp1j, view(W_inv_j, rinds, rinds2), ipwtj')
-#                 mul!(tmp2, ipwtj, tmp1j)
-#                 mul!(tmp1j, view(W_inv_j, cinds, cinds2), ipwtj')
-#                 mul!(tmp3, ipwtj, tmp1j)
-#                 fact = xor(p == q, p2 == q2) ? rt2i : one(T)
-#                 @. cone.hess[idxs, idxs2] += tmp2 * tmp3 * fact
-#
-#                 if (p != q) || (p2 != q2)
-#                     mul!(tmp1j, view(W_inv_j, rinds, cinds2), ipwtj')
-#                     mul!(tmp2, ipwtj, tmp1j)
-#                     mul!(tmp1j, view(W_inv_j, cinds, rinds2), ipwtj')
-#                     mul!(tmp3, ipwtj, tmp1j)
-#                     @. cone.hess[idxs, idxs2] += tmp2 * tmp3 * fact
-#                 end
-#             end
-#         end
-#     end
-#
-#     return factorize_hess(cone)
-# end
