@@ -36,6 +36,7 @@ mutable struct PosSemidef{T <: HypReal, R <: HypRealOrComplex{T}} <: Cone{T}
     rt2i::T
     mat::Matrix{R}
     mat2::Matrix{R}
+    mat3::Matrix{R}
     inv_mat::Matrix{R}
     fact_mat
 
@@ -69,6 +70,7 @@ function setup_data(cone::PosSemidef{T, R}) where {R <: HypRealOrComplex{T}} whe
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.mat = Matrix{R}(undef, cone.side, cone.side)
     cone.mat2 = Matrix{R}(undef, cone.side, cone.side)
+    cone.mat3 = similar(cone.mat2)
     cone.rt2 = sqrt(T(2))
     cone.rt2i = inv(cone.rt2)
     return
@@ -266,20 +268,33 @@ end
 update_hess_prod(cone::PosSemidef{<:HypReal}) = nothing
 update_inv_hess_prod(cone::PosSemidef) = nothing
 
+# TODO complex case as an operator
 function hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::PosSemidef{T, T}) where {T <: HypReal}
     @assert cone.grad_updated
-    for i in 1:size(arr, 2)
+    @inbounds for i in 1:size(arr, 2)
         svec_to_smat!(cone.mat2, view(arr, :, i), cone.rt2i)
-        V = Symmetric(cone.inv_mat, :L) * Symmetric(cone.mat2, :L) * Symmetric(cone.inv_mat, :L)
-        smat_to_svec!(view(prod, :, i), V, cone.rt2)
+        mul!(cone.mat3, Symmetric(cone.mat2, :L), Symmetric(cone.inv_mat, :L))
+        mul!(cone.mat2, Symmetric(cone.inv_mat, :L), cone.mat3)
+        smat_to_svec!(view(prod, :, i), cone.mat2, cone.rt2)
     end
     return prod
 end
 
-# TODO maybe write using linear operator form rather than needing explicit inv_hess
+# TODO complex case as an operator
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidef)
     if !cone.inv_hess_updated
         update_inv_hess(cone)
     end
     return mul!(prod, cone.inv_hess, arr)
+end
+
+function inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::PosSemidef{T, T}) where {T <: HypReal}
+    @assert is_feas(cone)
+    @inbounds for i in 1:size(arr, 2)
+        svec_to_smat!(cone.mat2, view(arr, :, i), cone.rt2i)
+        mul!(cone.mat3, Symmetric(cone.mat2, :L), Symmetric(cone.mat, :L))
+        mul!(cone.mat2, Symmetric(cone.mat, :L), cone.mat3)
+        smat_to_svec!(view(prod, :, i), cone.mat2, cone.rt2)
+    end
+    return prod
 end
