@@ -69,8 +69,8 @@ function setup_data(cone::PosSemidef{T, R}) where {R <: HypRealOrComplex{T}} whe
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.mat = Matrix{R}(undef, cone.side, cone.side)
-    cone.mat2 = Matrix{R}(undef, cone.side, cone.side)
-    cone.mat3 = similar(cone.mat2)
+    cone.mat2 = similar(cone.mat)
+    cone.mat3 = similar(cone.mat)
     cone.rt2 = sqrt(T(2))
     cone.rt2i = inv(cone.rt2)
     return
@@ -265,11 +265,10 @@ function update_inv_hess(cone::PosSemidef{<:HypReal, <:Complex{<:HypReal}})
     return cone.inv_hess
 end
 
-update_hess_prod(cone::PosSemidef{<:HypReal}) = nothing
 update_inv_hess_prod(cone::PosSemidef) = nothing
 
 # TODO complex case as an operator
-function hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::PosSemidef{T, T}) where {T <: HypReal}
+function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidef{<: HypReal, <: HypReal})
     @assert cone.grad_updated
     @inbounds for i in 1:size(arr, 2)
         svec_to_smat!(cone.mat2, view(arr, :, i), cone.rt2i)
@@ -288,7 +287,7 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Pos
     return mul!(prod, cone.inv_hess, arr)
 end
 
-function inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::PosSemidef{T, T}) where {T <: HypReal}
+function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidef{T, T}) where {T <: HypReal}
     @assert is_feas(cone)
     @inbounds for i in 1:size(arr, 2)
         svec_to_smat!(cone.mat2, view(arr, :, i), cone.rt2i)
