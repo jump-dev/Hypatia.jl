@@ -37,7 +37,7 @@ mutable struct HypoPerLogdet{T <: HypReal} <: Cone{T}
     nLz
     ldWvuv
     vzip1
-    Wivzi
+    Wivzi::Symmetric{T, Matrix{T}}
     tmp_hess::Symmetric{T, Matrix{T}}
     hess_fact # TODO prealloc
 
@@ -59,7 +59,7 @@ function setup_data(cone::HypoPerLogdet{T}) where {T <: HypReal}
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.tmp_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.mat = Matrix{T}(undef, cone.side, cone.side)
-    cone.Wivzi = similar(cone.mat)
+    cone.Wivzi = Symmetric(zeros(T, cone.side, cone.side), :U)
     cone.rt2 = sqrt(T(2))
     cone.rt2i = inv(cone.rt2)
     return
@@ -127,7 +127,8 @@ function update_hess(cone::HypoPerLogdet)
     z = cone.z
     Wi = cone.Wi
     Wivzi = cone.Wivzi
-    Wivzi .= Symmetric(Wi / cone.ldWvuv, :U) # TODO
+    Wivzi .= Symmetric(Wi / cone.ldWvuv, :U)  # TODO not sure of best way to broadcast over while keeping type symmetric
+    # @show typeof(cone.Wivzi)
     cone.hess.data[1, 1] = inv(z) / z
     cone.hess.data[1, 2] = cone.nLz / z
     @timeit "h1end" h1end = view(cone.hess.data, 1, 3:cone.dim)
@@ -169,26 +170,30 @@ end
 #     return mul!(prod, cone.hess, arr)
 # end
 
-function hess_prod!(prod::AbstractVector, arr::AbstractVector, cone::HypoPerLogdet)
+function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPerLogdet)
     @assert is_feas(cone)
     if !cone.hess_updated
         update_hess(cone)
     end
     @assert cone.grad_updated
 
+
     for i in 1:size(arr, 2)
-        prod[1:2, i] = cone.hess[1:2, :] * arr
-        prod[3:end, i] = cone.hess[3:end, 1:2] * arr[1:2]
+        prod[1:2, i] = cone.hess[1:2, :] * arr[:, i]
+        prod[3:end, i] = cone.hess[3:end, 1:2] * arr[1:2, i]
         Wi = cone.Wi
 
-        svec_to_smat!(cone.mat, arr[3:end], cone.rt2i)
+        svec_to_smat!(cone.mat, arr[3:end, i], cone.rt2i)
 
-        prod_block = cone.mat * Symmetric(arr_block, :L) * cone.mat
+        prod_block = Wi * Symmetric(cone.mat, :L) * Wi
         prod_block .*= cone.vzip1
-        prod_block += cone.Wivzi .* dot(Symmetric(arr_block, :L), cone.Wivzi)
+        prod_block += cone.Wivzi .* dot(Symmetric(cone.mat, :L), cone.Wivzi)
 
-        smat_to_svec!(view(prod, 3:cone.dim, i), prod_block, cone.rt2)
+        tmp = zeros(cone.dim - 2)
+        smat_to_svec!(tmp, prod_block, cone.rt2)
+        prod[3:end, i] .+= tmp
     end
+
 
     return prod
 end
