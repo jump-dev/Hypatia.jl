@@ -187,24 +187,18 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPer
         @timeit "update" update_hess_prod(cone)
     end
     Wi = cone.Wi
-    @timeit "prod1" prod[1:2, :] = cone.hess[1:2, :] * arr
-    # @timeit "prod2"  prod[3:end, :] .= cone.hess[3:end, 1:2] * arr[1:2, :]
+    @timeit "prod1" mul!(view(prod, 1:2, :), view(cone.hess, 1:2, :), arr)
     @timeit "prod2" mul!(view(prod, 3:cone.dim, :), view(cone.hess, 3:cone.dim, 1:2), view(arr, 1:2, :))
 
-    for i in 1:size(arr, 2)
-        svec_to_smat!(cone.mat, view(arr, 3:cone.dim, i), cone.rt2i)
-        # @timeit "mul1" mul!(cone.mat2, Symmetric(cone.mat, :L), Wi)
-        # @timeit "mul2" mul!(cone.mat3, Wi, cone.mat2)
-        # BLAS.symm!('L', 'L', 1.0, cone.mat, Wi.data, 0.0, cone.mat2)
-        # BLAS.symm!('L', 'L', 1.0, Wi.data, cone.mat2, 0.0, cone.mat3)
-        # faster than the two mul!s (dispatches to symmetric method), and a little faster than two symms TODO so figure out how to optimize
-        # TODO type mat3 as symmetric?
-        @timeit "quadprod" cone.mat3 = Wi * Symmetric(cone.mat, :L) * Wi
-        cone.mat3 .*= cone.vzip1
-        dot_prod = dot(Symmetric(cone.mat, :L), cone.Wivzi)
+    @inbounds for i in 1:size(arr, 2)
+        @timeit "v2m" svec_to_smat!(cone.mat, view(arr, 3:cone.dim, i), cone.rt2i)
+        @timeit "qp1" BLAS.symm!('L', 'L', 1.0, cone.mat, Wi.data, 0.0, cone.mat2)
+        @timeit "qp2" BLAS.symm!('L', 'L', 1.0, Wi.data, cone.mat2, 0.0, cone.mat3)
+        @timeit "scalarmul" @. cone.mat3 *= cone.vzip1
+        @timeit "dotprod" dot_prod = dot(Symmetric(cone.mat, :L), cone.Wivzi)
         @timeit "term2" @. cone.mat3 += cone.Wivzi * dot_prod
-        smat_to_svec!(cone.vecn, cone.mat3, cone.rt2)
-        prod[3:end, i] .+= cone.vecn
+        @timeit "m2v" smat_to_svec!(cone.vecn, cone.mat3, cone.rt2)
+        @timeit "plus" view(prod, 3:cone.dim, i) .+= cone.vecn
     end
 
     end
