@@ -120,32 +120,33 @@ end
 
 # TODO only work with upper triangle
 function update_hess(cone::HypoPerLogdet)
+    @timeit "everything" begin
     @assert cone.grad_updated
     u = cone.point[1]
     v = cone.point[2]
     z = cone.z
     Wi = cone.Wi
     Wivzi = cone.Wivzi
-    @. Wivzi = Wi / cone.ldWvuv # prealloc
+    Wivzi .= Symmetric(Wi / cone.ldWvuv, :U) # TODO
     cone.hess.data[1, 1] = inv(z) / z
     cone.hess.data[1, 2] = cone.nLz / z
-    h1end = view(cone.hess.data, 1, 3:cone.dim)
-    smat_to_svec!(h1end, Wivzi, cone.rt2)
+    @timeit "h1end" h1end = view(cone.hess.data, 1, 3:cone.dim)
+    @timeit "smat_to_svec" smat_to_svec!(h1end, Wivzi, cone.rt2)
     h1end ./= -z
     cone.hess.data[2, 2] = abs2(cone.nLz) + (cone.side / z + inv(v)) / v
-    h2end = view(cone.hess.data, 2, 3:cone.dim)
-    smat_to_svec!(h2end, Wi, cone.rt2)
-    h2end .*= ((cone.ldWv - cone.side) / cone.ldWvuv - 1) / z
+    @timeit "h2end" h2end = view(cone.hess.data, 2, 3:cone.dim)
+    @timeit "smat_to_svec" smat_to_svec!(h2end, Wi, cone.rt2)
+    @timeit "h2end" h2end .*= ((cone.ldWv - cone.side) / cone.ldWvuv - 1) / z
     k1 = 3
-    for i in 1:cone.side, j in 1:i
+    @timeit "big loop" for i in 1:cone.side, j in 1:i
         k2 = 3
         for i2 in 1:cone.side, j2 in 1:i2
             if (i == j) && (i2 == j2)
-                cone.hess.data[k2, k1] = abs2(Wi[i2, i]) * cone.vzip1 + Wivzi[i, i] * Wivzi[i2, i2]
+                @timeit "line1" cone.hess.data[k2, k1] = abs2(Wi[i2, i]) * cone.vzip1 + Wivzi[i, i] * Wivzi[i2, i2]
             elseif (i != j) && (i2 != j2)
-                cone.hess.data[k2, k1] = (Wi[i2, i] * Wi[j, j2] + Wi[j2, i] * Wi[j, i2]) * cone.vzip1 + 2 * Wivzi[i, j] * Wivzi[i2, j2]
+                @timeit "line2" cone.hess.data[k2, k1] = (Wi[i2, i] * Wi[j, j2] + Wi[j2, i] * Wi[j, i2]) * cone.vzip1 + 2 * Wivzi[i, j] * Wivzi[i2, j2]
             else
-                cone.hess.data[k2, k1] = cone.rt2 * (Wi[i2, i] * Wi[j, j2] * cone.vzip1 + Wivzi[i, j] * Wivzi[i2, j2])
+                @timeit "line3" cone.hess.data[k2, k1] = cone.rt2 * (Wi[i2, i] * Wi[j, j2] * cone.vzip1 + Wivzi[i, j] * Wivzi[i2, j2])
             end
             if k2 == k1
                 break
@@ -154,6 +155,40 @@ function update_hess(cone::HypoPerLogdet)
         end
         k1 += 1
     end
+    end
     cone.hess_updated = true
     return cone.hess
+end
+
+# update_hess_prod(cone::EpiNormInf) = nothing
+
+# function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPerLogdet)
+#     if !cone.hess_updated
+#         update_hess(cone)
+#     end
+#     return mul!(prod, cone.hess, arr)
+# end
+
+function hess_prod!(prod::AbstractVector, arr::AbstractVector, cone::HypoPerLogdet)
+    @assert is_feas(cone)
+    if !cone.hess_updated
+        update_hess(cone)
+    end
+    @assert cone.grad_updated
+
+    for i in 1:size(arr, 2)
+        prod[1:2, i] = cone.hess[1:2, :] * arr
+        prod[3:end, i] = cone.hess[3:end, 1:2] * arr[1:2]
+        Wi = cone.Wi
+
+        svec_to_smat!(cone.mat, arr[3:end], cone.rt2i)
+
+        prod_block = cone.mat * Symmetric(arr_block, :L) * cone.mat
+        prod_block .*= cone.vzip1
+        prod_block += cone.Wivzi .* dot(Symmetric(arr_block, :L), cone.Wivzi)
+
+        smat_to_svec!(view(prod, 3:cone.dim, i), prod_block, cone.rt2)
+    end
+
+    return prod
 end
