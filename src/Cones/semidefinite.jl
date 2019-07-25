@@ -263,15 +263,17 @@ function update_inv_hess(cone::PosSemidef{<:HypReal, <:Complex{<:HypReal}})
     return cone.inv_hess
 end
 
-update_hess_prod(cone::PosSemidef) = nothing
+update_hess_prod(cone::PosSemidef{<:HypReal}) = nothing
 update_inv_hess_prod(cone::PosSemidef) = nothing
 
-# TODO maybe write using linear operator form rather than needing explicit hess
-function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidef)
-    if !cone.hess_updated
-        update_hess(cone)
+function hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::PosSemidef{T, T}) where {T <: HypReal}
+    @assert cone.grad_updated
+    for i in 1:size(arr, 2)
+        svec_to_smat!(cone.mat2, view(arr, :, i), cone.rt2i)
+        V = Symmetric(cone.inv_mat, :L) * Symmetric(cone.mat2, :L) * Symmetric(cone.inv_mat, :L)
+        smat_to_svec!(view(prod, :, i), V, cone.rt2)
     end
-    return mul!(prod, cone.hess, arr)
+    return prod
 end
 
 # TODO maybe write using linear operator form rather than needing explicit inv_hess
