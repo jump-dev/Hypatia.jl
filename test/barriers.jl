@@ -39,14 +39,16 @@ function test_barrier_oracles(cone::CO.Cone{T}, barrier::Function; noise = 0.0) 
     end
 
     inv_hess = CO.inv_hess(cone)
-    @test hess * inv_hess ≈ I atol=tol rtol=tol
 
     CO.update_hess_prod(cone)
     CO.update_inv_hess_prod(cone)
     prod = similar(point)
+    @show -CO.hess_prod!(prod, point, cone) ./ grad
     @test CO.hess_prod!(prod, point, cone) ≈ -grad atol=tol rtol=tol
     @test CO.inv_hess_prod!(prod, grad, cone) ≈ -point atol=tol rtol=tol
     prod = similar(point, dim, dim)
+    @show (hess * inv_hess )
+    @test hess * inv_hess ≈ I atol=tol rtol=tol
     @test CO.hess_prod!(prod, inv_hess, cone) ≈ I atol=tol rtol=tol
     @test CO.inv_hess_prod!(prod, hess, cone) ≈ I atol=tol rtol=tol
     id = Matrix{T}(I, dim, dim)
@@ -182,17 +184,18 @@ end
 
 function test_semidefinite_barrier(T::Type{<:HypReal})
     for side in [1, 2, 3]
-        # real PSD cone
-        dim = div(side * (side + 1), 2)
-        cone = CO.PosSemidef{T, T}(dim)
-        function R_barrier(s)
-            S = similar(s, side, side)
-            rt2i = convert(eltype(s), inv(sqrt(T(2))))
-            CO.svec_to_smat!(S, s, rt2i)
-            return -logdet(cholesky!(Symmetric(S)))
-        end
-        test_barrier_oracles(cone, R_barrier)
-        test_barrier_oracles(cone, R_barrier, noise = 0.1)
+        # # real PSD cone
+        # dim = div(side * (side + 1), 2)
+        # cone = CO.PosSemidef{T, T}(dim)
+        # function R_barrier(s)
+        #     S = similar(s, side, side)
+        #     rt2i = convert(eltype(s), inv(sqrt(T(2))))
+        #     CO.svec_to_smat!(S, s, rt2i)
+        #     return -logdet(cholesky!(Symmetric(S)))
+        # end
+        # @show "real"
+        # test_barrier_oracles(cone, R_barrier)
+        # test_barrier_oracles(cone, R_barrier, noise = 0.1)
 
         # complex PSD cone
         dim = side^2
@@ -203,8 +206,28 @@ function test_semidefinite_barrier(T::Type{<:HypReal})
             CO.svec_to_smat!(S, s, rt2i)
             return -logdet(cholesky!(Hermitian(S)))
         end
+        @show "complex"
         test_barrier_oracles(cone, C_barrier)
         test_barrier_oracles(cone, C_barrier, noise = 0.1)
+    end
+    return
+end
+
+function test_semidefiniteunsc_barrier(T::Type{<:HypReal})
+    for side in [1, 2, 3]
+        # real PSD cone
+        dim = div(side * (side + 1), 2)
+        cone = CO.PosSemidefUnsc{T, T}(dim)
+        function R_barrier(s)
+            S = similar(s, side, side)
+            CO.svec_to_smat!(S, s, one(eltype(s)))
+            return -logdet(cholesky!(Symmetric(S)))
+        end
+        test_barrier_oracles(cone, R_barrier)
+        test_barrier_oracles(cone, R_barrier, noise = 0.1)
+
+        # TODO complex
+
     end
     return
 end
@@ -226,6 +249,24 @@ function test_hypoperlogdet_barrier(T::Type{<:HypReal})
     end
     return
 end
+
+function test_hypoperlogdetunscaled_barrier(T::Type{<:HypReal})
+    for side in [1, 2, 3, 4]
+        dim = 2 + div(side * (side + 1), 2)
+        cone = CO.HypoPerLogdetUnsc{T}(dim)
+        function barrier(s)
+            u = s[1]
+            v = s[2]
+            W = similar(s, side, side)
+            CO.svec_to_smat!(W, s[3:end], one(eltype(s)))
+            return -log(v * logdet(cholesky!(Symmetric(W / v))) - u) - logdet(cholesky!(Symmetric(W))) - log(v)
+        end
+        test_barrier_oracles(cone, barrier)
+        test_barrier_oracles(cone, barrier, noise = 0.1)
+    end
+    return
+end
+
 
 function test_wsospolyinterp_barrier(T::Type{<:HypReal})
     Random.seed!(1)

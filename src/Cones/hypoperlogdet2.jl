@@ -69,8 +69,8 @@ function setup_data(cone::HypoPerLogdetUnsc{T}) where {T <: HypReal}
     cone.mat3 = similar(cone.mat)
     cone.vecn = Vector{T}(undef, cone.dim - 2)
     cone.Wivzi = Symmetric(zeros(T, cone.side, cone.side), :U)
-    cone.rt2 = one(T)
-    cone.rt2i = one(T)
+    cone.rt2 = T(2)
+    cone.rt2i = one(T) # TODO remove, not used
     return
 end
 
@@ -123,11 +123,6 @@ function update_grad(cone::HypoPerLogdetUnsc)
     gend = view(cone.grad, 3:cone.dim)
     smat_to_svec!(gend, cone.Wi, cone.rt2)
     gend .*= -cone.vzip1
-    for i in 1:cone.side
-        s1 = sum(1:(i - 1))
-        s2 = sum(1:i)
-        gend[(s1 + 1):(s2 - 1)] *= 2
-    end
     cone.grad_updated = true
     return cone.grad
 end
@@ -182,13 +177,6 @@ function update_hess_prod(cone::HypoPerLogdetUnsc)
     h2end = view(cone.hess.data, 2, 3:cone.dim)
     smat_to_svec!(h2end, Wi, cone.rt2)
     h2end .*= ((cone.ldWv - cone.side) / cone.ldWvuv - 1) / z
-    for i in 1:cone.side
-        s1 = sum(1:(i - 1))
-        s2 = sum(1:i)
-        h1end[(s1 + 1):(s2 - 1)] *= 2
-        h2end[(s1 + 1):(s2 - 1)] *= 2
-    end
-
     cone.hess_prod_updated = true
 end
 
