@@ -29,7 +29,7 @@ mutable struct HypoPerLogdet{T <: HypReal} <: Cone{T}
     inv_hess::Symmetric{T, Matrix{T}}
 
     rt2::T
-    rt2i::T
+    rt2i::T # TODO remove, unused
     mat::Matrix{T}
     mat2::Matrix{T}
     mat3::Matrix{T}
@@ -70,7 +70,7 @@ function setup_data(cone::HypoPerLogdet{T}) where {T <: HypReal}
     cone.vecn = Vector{T}(undef, cone.dim - 2)
     cone.Wivzi = Symmetric(zeros(T, cone.side, cone.side), :U)
     cone.rt2 = sqrt(T(2))
-    cone.rt2i = inv(cone.rt2)
+    cone.rt2i = inv(cone.rt2) # TODO remove, unused
     return
 end
 

@@ -271,28 +271,48 @@ update_inv_hess_prod(cone::PosSemidef) = nothing
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidef{<: HypReal, <: HypReal})
     @assert cone.grad_updated
     @inbounds for i in 1:size(arr, 2)
-        svec_to_smat!(cone.mat2, view(arr, :, i), cone.rt2i)
-        mul!(cone.mat3, Symmetric(cone.mat2, :L), Symmetric(cone.inv_mat, :L))
-        mul!(cone.mat2, Symmetric(cone.inv_mat, :L), cone.mat3)
+        svec_to_smat!((cone.mat2), view(arr, :, i), cone.rt2i)
+        # TODO make muls use Symmetric methods
+        mul!(cone.mat3, Symmetric(cone.mat2, :L), cone.inv_mat)
+        mul!(cone.mat2, cone.inv_mat, cone.mat3)
         smat_to_svec!(view(prod, :, i), cone.mat2, cone.rt2)
     end
     return prod
 end
 
-# TODO complex case as an operator
-function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidef)
-    if !cone.inv_hess_updated
-        update_inv_hess(cone)
+# function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidef)
+#     @assert cone.grad_updated
+#     @inbounds for i in 1:size(arr, 2)
+#         svec_to_smat!((cone.mat2), view(arr, :, i), cone.rt2i)
+#         # TODO make muls use Hermitian methods
+#         mul!(cone.mat3, Hermitian(cone.mat2, :L), transpose(cone.inv_mat))
+#         mul!(cone.mat2, (cone.inv_mat), cone.mat3)
+#         smat_to_svec!(view(prod, :, i), cone.mat2, cone.rt2)
+#     end
+#     return prod
+# end
+
+# FIXME
+function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidef)
+    @assert cone.grad_updated
+    @inbounds for i in 1:size(arr, 2)
+        svec_to_smat!((cone.mat2), view(arr, :, i), cone.rt2i)
+        # TODO make muls use Hermitian methods
+        mul!(cone.mat3, Hermitian(cone.mat2, :L), transpose(cone.inv_mat))
+        mul!(cone.mat2, (cone.inv_mat), cone.mat3)
+        smat_to_svec!(view(prod, :, i), cone.mat2, cone.rt2)
     end
-    return mul!(prod, cone.inv_hess, arr)
+    return prod
 end
 
-function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidef{T, T}) where {T <: HypReal}
+# FIXME for complex
+function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidef)
     @assert is_feas(cone)
     @inbounds for i in 1:size(arr, 2)
         svec_to_smat!(cone.mat2, view(arr, :, i), cone.rt2i)
-        mul!(cone.mat3, Symmetric(cone.mat2, :L), Symmetric(cone.mat, :L))
-        mul!(cone.mat2, Symmetric(cone.mat, :L), cone.mat3)
+        # TODO make muls use Symmetric/Hermitian methods
+        mul!(cone.mat3, Symmetric(cone.mat2, :L), transpose(cone.mat))
+        mul!(cone.mat2, cone.mat, cone.mat3)
         smat_to_svec!(view(prod, :, i), cone.mat2, cone.rt2)
     end
     return prod
