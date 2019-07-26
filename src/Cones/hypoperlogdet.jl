@@ -192,11 +192,10 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPer
 
     @inbounds for i in 1:size(arr, 2)
         @timeit "v2m" svec_to_smat!(cone.mat, view(arr, 3:cone.dim, i), cone.rt2i)
-        @timeit "qp1" BLAS.symm!('L', 'L', 1.0, cone.mat, Wi.data, 0.0, cone.mat2)
+        @timeit "qp1" BLAS.symm!('L', 'L', cone.vzip1, cone.mat, Wi.data, 0.0, cone.mat2)
         @timeit "qp2" BLAS.symm!('L', 'L', 1.0, Wi.data, cone.mat2, 0.0, cone.mat3)
-        @timeit "scalarmul" @. cone.mat3 *= cone.vzip1
         @timeit "dotprod" dot_prod = dot(Symmetric(cone.mat, :L), cone.Wivzi)
-        @timeit "term2" @. cone.mat3 += cone.Wivzi * dot_prod
+        @timeit "axpy" @. cone.mat3 += cone.Wivzi * dot_prod
         @timeit "m2v" smat_to_svec!(cone.vecn, cone.mat3, cone.rt2)
         @timeit "plus" view(prod, 3:cone.dim, i) .+= cone.vecn
     end
