@@ -683,7 +683,7 @@ function hypoperlogdet1(T, test_options)
     @test r.status == :Optimal
     @test r.x[1] ≈ -r.primal_obj atol=tol rtol=tol
     @test r.x[2] ≈ 1 atol=tol rtol=tol
-    @test r.s[2] * logdet(CO.vec_to_mat!(zeros(T, side, side), r.s[3:end]) / r.s[2]) ≈ r.s[1] atol=tol rtol=tol
+    @test r.s[2] * logdet(CO.vec_to_mat_L!(zeros(T, side, side), r.s[3:end]) / r.s[2]) ≈ r.s[1] atol=tol rtol=tol
 end
 
 function hypoperlogdet2(T, test_options)
@@ -706,7 +706,7 @@ function hypoperlogdet2(T, test_options)
     @test r.status == :Optimal
     @test r.x[2] ≈ r.primal_obj atol=tol rtol=tol
     @test r.x[1] ≈ -1 atol=tol rtol=tol
-    @test r.z[2] * logdet(CO.vec_to_mat!(zeros(T, side, side), r.z[3:end]) / r.z[2]) ≈ r.z[1] atol=tol rtol=tol
+    @test r.z[2] * logdet(CO.vec_to_mat_L!(zeros(T, side, side), r.z[3:end]) / r.z[2]) ≈ r.z[1] atol=tol rtol=tol
 end
 
 function hypoperlogdet3(T, test_options)
@@ -730,83 +730,6 @@ function hypoperlogdet3(T, test_options)
     @test r.x[1] ≈ -r.primal_obj atol=tol rtol=tol
     @test norm(r.x) ≈ 0 atol=tol rtol=tol
 end
-
-# function hypoperlogdet1(T, test_options)
-#     tol = max(1e-5, sqrt(sqrt(eps(T))))
-#     Random.seed!(1)
-#     rt2 = sqrt(T(2))
-#     rt2i = inv(rt2)
-#     side = 4
-#     dim = 2 + div(side * (side + 1), 2)
-#     c = T[-1, 0]
-#     A = T[0 1]
-#     b = T[1]
-#     G = Matrix{T}(-I, dim, 2)
-#     mat_half = rand(T, side, side)
-#     mat = mat_half * mat_half'
-#     h = zeros(T, dim)
-#     CO.smat_to_svec!(view(h, 3:dim), mat, rt2)
-#     cones = CO.Cone{T}[CO.HypoPerLogdet{T}(dim)]
-#     cone_idxs = [1:dim]
-#
-#     r = build_solve_check(c, A, b, G, h, cones, cone_idxs; test_options...)
-#     @test r.status == :Optimal
-#     @test r.x[1] ≈ -r.primal_obj atol=tol rtol=tol
-#     @test r.x[2] ≈ 1 atol=tol rtol=tol
-#     @test r.s[2] * logdet(CO.svec_to_smat!(zeros(T, side, side), r.s[3:end], rt2i) / r.s[2]) ≈ r.s[1] atol=tol rtol=tol
-#     @test r.z[1] * (logdet(CO.svec_to_smat!(zeros(T, side, side), -r.z[3:end], rt2i) / r.z[1]) + T(side)) ≈ r.z[2] atol=tol rtol=tol
-# end
-#
-# function hypoperlogdet2(T, test_options)
-#     tol = max(1e-5, sqrt(sqrt(eps(T))))
-#     Random.seed!(1)
-#     rt2 = sqrt(T(2))
-#     rt2i = inv(rt2)
-#     side = 3
-#     dim = 2 + div(side * (side + 1), 2)
-#     c = T[0, 1]
-#     A = T[1 0]
-#     b = T[-1]
-#     G = Matrix{T}(-I, dim, 2)
-#     mat_half = rand(T, side, side)
-#     mat = mat_half * mat_half'
-#     h = zeros(T, dim)
-#     CO.smat_to_svec!(view(h, 3:dim), mat, rt2)
-#     cones = CO.Cone{T}[CO.HypoPerLogdet{T}(dim, true)]
-#     cone_idxs = [1:dim]
-#
-#     r = build_solve_check(c, A, b, G, h, cones, cone_idxs; test_options...)
-#     @test r.status == :Optimal
-#     @test r.x[2] ≈ r.primal_obj atol=tol rtol=tol
-#     @test r.x[1] ≈ -1 atol=tol rtol=tol
-#     @test r.s[1] * (logdet(CO.svec_to_smat!(zeros(T, side, side), -r.s[3:end], rt2i) / r.s[1]) + T(side)) ≈ r.s[2] atol=tol rtol=tol
-#     @test r.z[2] * logdet(CO.svec_to_smat!(zeros(T, side, side), r.z[3:end], rt2i) / r.z[2]) ≈ r.z[1] atol=tol rtol=tol
-# end
-#
-# function hypoperlogdet3(T, test_options)
-#     tol = max(1e-5, sqrt(sqrt(eps(T))))
-#     Random.seed!(1)
-#     rt2 = sqrt(T(2))
-#     rt2i = inv(rt2)
-#     side = 3
-#     dim = 2 + div(side * (side + 1), 2)
-#     c = T[-1, 0]
-#     A = T[0 1]
-#     b = T[0]
-#     G = SparseMatrixCSC(-one(T) * I, dim, 2)
-#     mat_half = rand(T, side, side)
-#     mat = mat_half * mat_half'
-#     h = zeros(T, dim)
-#     CO.smat_to_svec!(view(h, 3:dim), mat, rt2)
-#     cones = CO.Cone{T}[CO.HypoPerLogdet{T}(dim)]
-#     cone_idxs = [1:dim]
-#
-#     r = build_solve_check(c, A, b, G, h, cones, cone_idxs; test_options...)
-#     @test r.status == :Optimal
-#     @test r.x[1] ≈ -r.primal_obj atol=tol rtol=tol
-#     @test norm(r.x) ≈ 0 atol=tol rtol=tol
-# end
-
 
 function epiperexp1(T, test_options)
     tol = max(1e-5, sqrt(sqrt(eps(T))))

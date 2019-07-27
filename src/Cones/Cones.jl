@@ -16,6 +16,7 @@ import Hypatia.hyp_AtA!
 import Hypatia.hyp_chol!
 import Hypatia.hyp_ldiv_chol_L!
 import Hypatia.hyp_symm!
+import Hypatia.hyp_dot
 
 using TimerOutputs
 
@@ -170,7 +171,7 @@ function svec_to_smat!(mat::AbstractMatrix{Complex{T}}, vec::AbstractVector{T}, 
     return mat
 end
 
-function mat_to_vec!(vec::AbstractVector{T}, mat::AbstractMatrix{T}) where {T}
+function mat_L_to_vec!(vec::AbstractVector{T}, mat::AbstractMatrix{T}) where {T}
     k = 1
     m = size(mat, 1)
     for i in 1:m, j in 1:i
@@ -180,7 +181,7 @@ function mat_to_vec!(vec::AbstractVector{T}, mat::AbstractMatrix{T}) where {T}
     return vec
 end
 
-function vec_to_mat!(mat::AbstractMatrix{T}, vec::AbstractVector{T}) where {T}
+function vec_to_mat_L!(mat::AbstractMatrix{T}, vec::AbstractVector{T}) where {T}
     k = 1
     m = size(mat, 1)
     for i in 1:m, j in 1:i

@@ -43,11 +43,9 @@ function test_barrier_oracles(cone::CO.Cone{T}, barrier::Function; noise = 0.0) 
     CO.update_hess_prod(cone)
     CO.update_inv_hess_prod(cone)
     prod = similar(point)
-    @show -CO.hess_prod!(prod, point, cone) ./ grad
     @test CO.hess_prod!(prod, point, cone) ≈ -grad atol=tol rtol=tol
     @test CO.inv_hess_prod!(prod, grad, cone) ≈ -point atol=tol rtol=tol
     prod = similar(point, dim, dim)
-    @show (hess * inv_hess )
     @test hess * inv_hess ≈ I atol=tol rtol=tol
     @test CO.hess_prod!(prod, inv_hess, cone) ≈ I atol=tol rtol=tol
     @test CO.inv_hess_prod!(prod, hess, cone) ≈ I atol=tol rtol=tol
@@ -240,8 +238,7 @@ function test_hypoperlogdet_barrier(T::Type{<:HypReal})
             u = s[1]
             v = s[2]
             W = similar(s, side, side)
-            rt2i = convert(eltype(s), inv(sqrt(T(2))))
-            CO.svec_to_smat!(W, s[3:end], rt2i)
+            CO.vec_to_mat_L!(W, s[3:end])
             return -log(v * logdet(cholesky!(Symmetric(W / v))) - u) - logdet(cholesky!(Symmetric(W))) - log(v)
         end
         test_barrier_oracles(cone, barrier)
@@ -249,24 +246,6 @@ function test_hypoperlogdet_barrier(T::Type{<:HypReal})
     end
     return
 end
-
-function test_hypoperlogdetunscaled_barrier(T::Type{<:HypReal})
-    for side in [1, 2, 3, 4]
-        dim = 2 + div(side * (side + 1), 2)
-        cone = CO.HypoPerLogdetUnsc{T}(dim)
-        function barrier(s)
-            u = s[1]
-            v = s[2]
-            W = similar(s, side, side)
-            CO.svec_to_smat!(W, s[3:end], one(eltype(s)))
-            return -log(v * logdet(cholesky!(Symmetric(W / v))) - u) - logdet(cholesky!(Symmetric(W))) - log(v)
-        end
-        test_barrier_oracles(cone, barrier)
-        test_barrier_oracles(cone, barrier, noise = 0.1)
-    end
-    return
-end
-
 
 function test_wsospolyinterp_barrier(T::Type{<:HypReal})
     Random.seed!(1)
