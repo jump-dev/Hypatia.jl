@@ -184,9 +184,9 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPer
         @timeit "update" update_hess_prod(cone)
     end
     Wi = cone.Wi
-    @timeit "prod1" mul!(view(prod, 1:2, :), view(cone.hess, 1:2, :), arr)
+    @timeit "prod1" @views mul!(prod[1:2, :], cone.hess[1:2, :], arr)
     # could get rid of cone.vecn used later if we wrap a gemm
-    @timeit "prod2" mul!(view(prod, 3:cone.dim, :), view(cone.hess, 3:cone.dim, 1:2), view(arr, 1:2, :))
+    @timeit "prod2" @views mul!(prod[3:cone.dim, :], cone.hess[3:cone.dim, 1:2], arr[1:2, :])
 
     @inbounds for i in 1:size(arr, 2)
         @timeit "v2m" vec_to_mat_L!(cone.mat, view(arr, 3:cone.dim, i))
