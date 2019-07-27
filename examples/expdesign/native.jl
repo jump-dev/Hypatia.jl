@@ -46,7 +46,7 @@ function expdesign(
         l = 1
         for i in 1:q, j in 1:i
             for k in 1:p
-                G_logdet[l, k] = -V[i, k] * V[j, k] * (i == j ? 1 : rt2)
+                G_logdet[l, k] = -V[i, k] * V[j, k]
             end
             l += 1
         end
