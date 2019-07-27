@@ -137,6 +137,114 @@ function _build_hess_real2(H::Matrix, mat::Matrix, scaling::T, is_inv::Bool) whe
     return H
 end
 
+function _build_hess_complex2(H::Matrix{T}, mat::Matrix{Complex{T}}) where {T <: HypReal}
+    side = size(mat, 1)
+    k = 1
+    for i in 1:side, j in 1:i
+        k2 = 1
+        if i == j
+            for i2 in 1:side, j2 in 1:i2
+                if i2 == j2
+                    H[k2, k] = abs2(mat[i2, i])
+                    k2 += 1
+                else
+                    c = T(2) * conj(mat[i2, i]) * mat[j2, j]
+                    @show i, j, i2, j2, c
+                    H[k2, k] = real(c)
+                    k2 += 1
+                    H[k2, k] = imag(c)
+                    k2 += 1
+                end
+                if k2 > k
+                    break
+                end
+            end
+            k += 1
+        else
+            for i2 in 1:side, j2 in 1:i2
+                if i2 == j2
+                    c = T(2) * mat[i2, i] * conj(mat[j2, j])
+                    @show i, j, i2, j2, c
+                    H[k2, k] = real(c)
+                    H[k2, k + 1] = imag(c)
+                    k2 += 1
+                else
+                    b1 = mat[i2, i] * conj(mat[j2, j])
+                    b2 = mat[j2, i] * conj(mat[i2, j])
+                    c1 = T(2) * (b1 + b2)
+                    @show i, j, i2, j2, c1, "three"
+                    H[k2, k] = real(c1)
+                    H[k2, k + 1] = imag(c1)
+                    k2 += 1
+                    c2 = T(2) * (b1 - b2)
+                    @show i, j, i2, j2, c2, "four"
+                    H[k2, k] = -imag(c2) * T(2)
+                    H[k2, k + 1] = real(c2)
+                    k2 += 1
+                end
+                if k2 > k
+                    break
+                end
+            end
+            k += 2
+        end
+    end
+    return H
+end
+
+function _build_inv_hess_complex2(H::Matrix{T}, mat::Matrix{Complex{T}}) where {T <: HypReal}
+    side = size(mat, 1)
+    k = 1
+    for i in 1:side, j in 1:i
+        k2 = 1
+        if i == j
+            for i2 in 1:side, j2 in 1:i2
+                if i2 == j2
+                    H[k2, k] = abs2(mat[i2, i])
+                    k2 += 1
+                else
+                    c = conj(mat[i2, i]) * mat[j2, j]
+                    H[k2, k] = real(c)
+                    k2 += 1
+                    H[k2, k] = imag(c)
+                    k2 += 1
+                end
+                if k2 > k
+                    break
+                end
+            end
+            k += 1
+        else
+            for i2 in 1:side, j2 in 1:i2
+                if i2 == j2
+                    c = mat[i2, i] * (j2 >= j ? mat[j2, j] : conj(mat[j2, j]))
+                    H[k2, k] = real(c)
+                    H[k2, k + 1] = imag(c)
+                    k2 += 1
+                else
+                    b1 = mat[i2, i] * (j2 >= j ? mat[j2, j] : conj(mat[j2, j]))
+                    b2 = mat[j2, i] * (i2 >= j ? mat[i2, j] : conj(mat[i2, j]))
+                    c1 = T(0.5) * (b1 + b2)
+                    # c1 = mat[i2, i] * (j2 >= j ? mat[j2, j] : conj(mat[j2, j])) + mat[j2, i] * (i2 >= j ? mat[i2, j] : conj(mat[i2, j]))
+                    H[k2, k] = real(c1)
+                    H[k2, k + 1] = imag(c1)
+                    k2 += 1
+                    c2 = T(0.5) * (b1 - b2)
+                    # c2 = conj(mat[i2, i]) * (j2 >= j ? conj(mat[j2, j]) : mat[j2, j])) - conj(mat[j2, i]) * (i2 >= j ? conj(mat[i2, j]) : mat[i2, j])
+                    H[k2, k] = -imag(c2)
+                    H[k2, k + 1] = real(c2)
+                    k2 += 1
+                end
+                if k2 > k
+                    break
+                end
+            end
+            k += 2
+        end
+    end
+    return H
+end
+
 function update_hess(cone::PosSemidefUnsc{T, T}) where {T <:HypReal}
     @assert cone.grad_updated
     _build_hess_real2(cone.hess.data, cone.inv_mat, cone.two, false)
@@ -144,9 +252,24 @@ function update_hess(cone::PosSemidefUnsc{T, T}) where {T <:HypReal}
     return cone.hess
 end
 
+function update_hess(cone::PosSemidefUnsc)
+    @show cone.dim
+    @assert cone.grad_updated
+    _build_hess_complex2(cone.hess.data, cone.inv_mat)
+    cone.hess_updated = true
+    return cone.hess
+end
+
 function update_inv_hess(cone::PosSemidefUnsc{T, T}) where {T <:HypReal}
     @assert cone.is_feas
     _build_hess_real2(cone.inv_hess.data, cone.mat, inv(cone.two), true)
+    cone.inv_hess_updated = true
+    return cone.inv_hess
+end
+
+function update_inv_hess(cone::PosSemidefUnsc)
+    @assert cone.is_feas
+    _build_inv_hess_complex2(cone.inv_hess.data, cone.mat)
     cone.inv_hess_updated = true
     return cone.inv_hess
 end
