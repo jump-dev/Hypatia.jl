@@ -1,10 +1,13 @@
 #=
 Copyright 2018, Chris Coey and contributors
-(closure of) hypograph of perspective of (natural) log of determinant of a (row-wise lower triangle i.e. svec space) symmetric positive define matrix
-(smat space) (u in R, v in R_+, w in S_+) : u <= v*logdet(W/v)
+
+(closure of) hypograph of perspective of (natural) log of determinant of a (row-wise lower triangle) symmetric positive define matrix
+(mat space) (u in R, v in R_+, w in S_+) : u <= v*logdet(W/v)
 (see equivalent MathOptInterface LogDetConeConeTriangle definition)
+
 barrier (guessed, based on analogy to hypoperlog barrier)
 -log(v*logdet(W/v) - u) - logdet(W) - log(v)
+
 TODO remove allocations
 =#
 
@@ -25,8 +28,7 @@ mutable struct HypoPerLogdet{T <: HypReal} <: Cone{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
 
-    rt2::T
-    rt2i::T
+    scaling::T
     mat::Matrix{T}
     mat2::Matrix{T}
     mat3::Matrix{T}
@@ -66,8 +68,7 @@ function setup_data(cone::HypoPerLogdet{T}) where {T <: HypReal}
     cone.mat3 = similar(cone.mat)
     cone.vecn = Vector{T}(undef, cone.dim - 2)
     cone.Wivzi = Symmetric(zeros(T, cone.side, cone.side), :U)
-    cone.rt2 = T(2)
-    cone.rt2i = one(T) # TODO remove, not used
+    cone.scaling = T(2)
     return
 end
 
@@ -91,7 +92,7 @@ function update_feas(cone::HypoPerLogdet)
     u = cone.point[1]
     v = cone.point[2]
     if v > 0
-        svec_to_smat!(cone.mat, view(cone.point, 3:cone.dim), cone.rt2i)
+        vec_to_mat_L!(cone.mat, view(cone.point, 3:cone.dim))
         cone.fact_mat = hyp_chol!(Symmetric(cone.mat))
         if isposdef(cone.fact_mat)
             cone.ldWv = logdet(cone.fact_mat) - cone.side * log(v)
@@ -118,7 +119,7 @@ function update_grad(cone::HypoPerLogdet)
     cone.grad[1] = inv(cone.z)
     cone.grad[2] = cone.nLz - inv(v)
     gend = view(cone.grad, 3:cone.dim)
-    smat_to_svec!(gend, cone.Wi, cone.rt2)
+    smat_to_svec!(gend, cone.Wi, cone.scaling)
     gend .*= -cone.vzip1
     cone.grad_updated = true
     return cone.grad
@@ -168,11 +169,11 @@ function update_hess_prod(cone::HypoPerLogdet)
     cone.hess.data[1, 1] = inv(z) / z
     cone.hess.data[1, 2] = cone.nLz / z
     h1end = view(cone.hess.data, 1, 3:cone.dim)
-    smat_to_svec!(h1end, Wivzi, cone.rt2)
+    smat_to_svec!(h1end, Wivzi, cone.scaling)
     h1end ./= -z
     cone.hess.data[2, 2] = abs2(cone.nLz) + (cone.side / z + inv(v)) / v
     h2end = view(cone.hess.data, 2, 3:cone.dim)
-    smat_to_svec!(h2end, Wi, cone.rt2)
+    smat_to_svec!(h2end, Wi, cone.scaling)
     h2end .*= ((cone.ldWv - cone.side) / cone.ldWvuv - 1) / z
     cone.hess_prod_updated = true
 end
@@ -184,15 +185,16 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPer
     end
     Wi = cone.Wi
     @timeit "prod1" mul!(view(prod, 1:2, :), view(cone.hess, 1:2, :), arr)
+    # could get rid of cone.vecn used later if we wrap a gemm
     @timeit "prod2" mul!(view(prod, 3:cone.dim, :), view(cone.hess, 3:cone.dim, 1:2), view(arr, 1:2, :))
 
     @inbounds for i in 1:size(arr, 2)
-        @timeit "v2m" svec_to_smat!(cone.mat, view(arr, 3:cone.dim, i), cone.rt2i)
+        @timeit "v2m" vec_to_mat_L!(cone.mat, view(arr, 3:cone.dim, i))
         @timeit "qp1" hyp_symm!(cone.vzip1, cone.mat, Wi.data, cone.mat2)
         @timeit "qp2" hyp_symm!(one(T), Wi.data, cone.mat2, cone.mat3)
-        @timeit "dotprod" dot_prod = dot(Symmetric(cone.mat, :L), cone.Wivzi)
+        @timeit "dotprod" dot_prod = hyp_dot(Symmetric(cone.mat, :L), cone.Wivzi)
         @timeit "axpy" @. cone.mat3 += cone.Wivzi * dot_prod
-        @timeit "m2v" smat_to_svec!(cone.vecn, cone.mat3, cone.rt2)
+        @timeit "m2v" smat_to_svec!(cone.vecn, cone.mat3, cone.scaling)
         @timeit "plus" view(prod, 3:cone.dim, i) .+= cone.vecn
     end
 
