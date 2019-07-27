@@ -15,6 +15,7 @@ import Hypatia.HypRealOrComplex
 import Hypatia.hyp_AtA!
 import Hypatia.hyp_chol!
 import Hypatia.hyp_ldiv_chol_L!
+import Hypatia.hyp_symm!
 
 using TimerOutputs
 
@@ -32,7 +33,6 @@ include("epinormspectral.jl")
 include("semidefinite.jl")
 include("semidefinite2.jl")
 include("hypoperlogdet.jl")
-include("hypoperlogdet2.jl")
 include("wsospolyinterp.jl")
 # include("wsospolyinterpmat.jl")
 # include("wsospolyinterpsoc.jl")
@@ -166,6 +166,26 @@ function svec_to_smat!(mat::AbstractMatrix{Complex{T}}, vec::AbstractVector{T}, 
             mat[i, j] = mat[j, i] = rt2i * Complex(vec[k], vec[k + 1])
             k += 2
         end
+    end
+    return mat
+end
+
+function mat_to_vec!(vec::AbstractVector{T}, mat::AbstractMatrix{T}) where {T}
+    k = 1
+    m = size(mat, 1)
+    for i in 1:m, j in 1:i
+        vec[k] = mat[i, j]
+        k += 1
+    end
+    return vec
+end
+
+function vec_to_mat!(mat::AbstractMatrix{T}, vec::AbstractVector{T}) where {T}
+    k = 1
+    m = size(mat, 1)
+    for i in 1:m, j in 1:i
+        mat[i, j] = mat[j, i] = vec[k]
+        k += 1
     end
     return mat
 end

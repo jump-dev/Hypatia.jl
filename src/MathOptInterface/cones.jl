@@ -100,20 +100,19 @@ function build_constr_cone(fi::MOI.VectorAffineFunction{Float64}, si::MOI.Positi
     return (IGi, VGi, Ihi, Vhi, conei)
 end
 
-# logdet cone: convert from smat to svec form (scale off-diagonals)
+# logdet cone: convert from mat to vec form (scale off-diagonals)
 function build_var_cone(fi::MOI.VectorOfVariables, si::MOI.LogDetConeTriangle, dim::Int, q::Int)
     IGi = (q + 1):(q + dim)
-    VGi = vcat(-1.0, -1.0, -svec_scale(dim - 2))
+    VGi = -ones(dim)
     conei = Cones.HypoPerLogdet{Float64}(dim)
     return (IGi, VGi, conei)
 end
 
 function build_constr_cone(fi::MOI.VectorAffineFunction{Float64}, si::MOI.LogDetConeTriangle, dim::Int, q::Int)
-    scalevec = vcat(1.0, 1.0, svec_scale(dim - 2))
     IGi = [q + vt.output_index for vt in fi.terms]
-    VGi = [-vt.scalar_term.coefficient * scalevec[vt.output_index] for vt in fi.terms]
+    VGi = [-vt.scalar_term.coefficient for vt in fi.terms]
     Ihi = (q + 1):(q + dim)
-    Vhi = scalevec .* fi.constants
+    Vhi = fi.constants
     conei = Cones.HypoPerLogdet{Float64}(dim)
     return (IGi, VGi, Ihi, Vhi, conei)
 end

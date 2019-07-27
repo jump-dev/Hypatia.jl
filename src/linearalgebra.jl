@@ -22,6 +22,8 @@ hyp_AtA!(U::Matrix{T}, A::Matrix{T}) where {T <: HypRealOrComplex{<:HypReal}} = 
 hyp_chol!(A::HermOrSym{T, Matrix{T}}) where {T <: BlasFloat} = cholesky!(A, Val(true), check = false)
 hyp_chol!(A::HermOrSym{T, Matrix{T}}) where {T <: HypRealOrComplex{<:HypReal}} = cholesky!(A, check = false)
 
+hyp_symm!(alpha::T, A::Matrix{T}, B::Matrix{T}, C::Matrix{T}) where {T <: BlasFloat} = BLAS.symm!('L', 'L', alpha, A, B, zero(T), C)
+hyp_symm!(alpha::T, A::Matrix{T}, B::Matrix{T}, C::Matrix{T}) where {T <: HypRealOrComplex{<:HypReal}} = mul!(C, alpha .* A, B)
 
 function hyp_ldiv_chol_L!(B::Matrix, F::CholeskyPivoted, A::AbstractMatrix)
     copyto!(B, view(A, F.p, :))
