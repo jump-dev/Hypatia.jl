@@ -80,7 +80,7 @@ test_expdesignJuMP_all(; options...) = test_expdesignJuMP.([
     expdesignJuMP5,
     expdesignJuMP6,
     expdesignJuMP7,
-    expdesignJuMP9,
+    expdesignJuMP8,
     expdesignJuMP9,
     expdesignJuMP10,
     ], options = options)
