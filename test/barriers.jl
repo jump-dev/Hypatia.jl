@@ -182,50 +182,27 @@ end
 
 function test_semidefinite_barrier(T::Type{<:HypReal})
     for side in [1, 2, 3]
-        # # real PSD cone
-        # dim = div(side * (side + 1), 2)
-        # cone = CO.PosSemidef{T, T}(dim)
-        # function R_barrier(s)
-        #     S = similar(s, side, side)
-        #     rt2i = convert(eltype(s), inv(sqrt(T(2))))
-        #     CO.svec_to_smat!(S, s, rt2i)
-        #     return -logdet(cholesky!(Symmetric(S)))
-        # end
-        # @show "real"
-        # test_barrier_oracles(cone, R_barrier)
-        # test_barrier_oracles(cone, R_barrier, noise = 0.1)
+        # real PSD cone
+        dim = div(side * (side + 1), 2)
+        cone = CO.PosSemidef{T, T}(dim)
+        function R_barrier(s)
+            S = similar(s, side, side)
+            CO.vec_to_mat_L!(S, s)
+            return -logdet(cholesky!(Symmetric(S)))
+        end
+        test_barrier_oracles(cone, R_barrier)
+        test_barrier_oracles(cone, R_barrier, noise = 0.1)
 
         # complex PSD cone
         dim = side^2
         cone = CO.PosSemidef{T, Complex{T}}(dim)
         function C_barrier(s)
             S = zeros(Complex{eltype(s)}, side, side)
-            rt2i = convert(eltype(s), inv(sqrt(T(2))))
-            CO.svec_to_smat!(S, s, rt2i)
+            CO.vec_to_mat_L!(S, s)
             return -logdet(cholesky!(Hermitian(S)))
         end
-        @show "complex"
         test_barrier_oracles(cone, C_barrier)
         test_barrier_oracles(cone, C_barrier, noise = 0.1)
-    end
-    return
-end
-
-function test_semidefiniteunsc_barrier(T::Type{<:HypReal})
-    for side in [1, 2, 3]
-        # real PSD cone
-        dim = div(side * (side + 1), 2)
-        cone = CO.PosSemidefUnsc{T, T}(dim)
-        function R_barrier(s)
-            S = similar(s, side, side)
-            CO.svec_to_smat!(S, s, one(eltype(s)))
-            return -logdet(cholesky!(Symmetric(S)))
-        end
-        test_barrier_oracles(cone, R_barrier)
-        test_barrier_oracles(cone, R_barrier, noise = 0.1)
-
-        # TODO complex
-
     end
     return
 end

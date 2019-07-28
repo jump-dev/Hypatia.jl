@@ -16,7 +16,7 @@ import Hypatia.hyp_AtA!
 import Hypatia.hyp_chol!
 import Hypatia.hyp_ldiv_chol_L!
 import Hypatia.hyp_symm!
-import Hypatia.hyp_dot
+import Hypatia.hyp_symm_dot
 
 using TimerOutputs
 
@@ -32,7 +32,6 @@ include("epiperexp.jl")
 include("hypogeomean.jl")
 include("epinormspectral.jl")
 include("semidefinite.jl")
-include("semidefinite2.jl")
 include("hypoperlogdet.jl")
 include("wsospolyinterp.jl")
 # include("wsospolyinterpmat.jl")
@@ -110,35 +109,35 @@ end
 # utilities for converting between smat and svec forms (lower triangle) for symmetric matrices
 # TODO only need to do upper/lower triangle if use symmetric matrix types
 
-function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{T}, rt2::T) where {T}
+function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{T}) where {T}
     k = 1
     m = size(mat, 1)
     for i in 1:m, j in 1:i
         if i == j
             vec[k] = mat[i, j]
         else
-            vec[k] = rt2 * mat[i, j]
+            vec[k] = 2 * mat[i, j]
         end
         k += 1
     end
     return vec
 end
 
-function svec_to_smat!(mat::AbstractMatrix{T}, vec::AbstractVector{T}, rt2i::T) where {T}
+function svec_to_smat!(mat::AbstractMatrix{T}, vec::AbstractVector{T}) where {T}
     k = 1
     m = size(mat, 1)
     for i in 1:m, j in 1:i
         if i == j
             mat[i, j] = vec[k]
         else
-            mat[i, j] = mat[j, i] = rt2i * vec[k]
+            mat[i, j] = mat[j, i] = vec[k] / 2
         end
         k += 1
     end
     return mat
 end
 
-function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}, rt2::T) where {T}
+function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}) where {T}
     k = 1
     m = size(mat, 1)
     for i in 1:m, j in 1:i
@@ -146,7 +145,7 @@ function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}, 
             vec[k] = real(mat[i, j])
             k += 1
         else
-            ck = rt2 * mat[i, j]
+            ck = 2 * mat[i, j]
             vec[k] = real(ck)
             k += 1
             vec[k] = imag(ck)
@@ -156,7 +155,7 @@ function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}, 
     return vec
 end
 
-function svec_to_smat!(mat::AbstractMatrix{Complex{T}}, vec::AbstractVector{T}, rt2i::T) where {T}
+function svec_to_smat!(mat::AbstractMatrix{Complex{T}}, vec::AbstractVector{T}) where {T}
     k = 1
     m = size(mat, 1)
     for i in 1:m, j in 1:i
@@ -164,7 +163,7 @@ function svec_to_smat!(mat::AbstractMatrix{Complex{T}}, vec::AbstractVector{T}, 
             mat[i, j] = vec[k]
             k += 1
         else
-            mat[i, j] = mat[j, i] = rt2i * Complex(vec[k], vec[k + 1])
+            mat[i, j] = mat[j, i] = Complex(vec[k], vec[k + 1]) / 2
             k += 2
         end
     end
@@ -187,6 +186,39 @@ function vec_to_mat_L!(mat::AbstractMatrix{T}, vec::AbstractVector{T}) where {T}
     for i in 1:m, j in 1:i
         mat[i, j] = mat[j, i] = vec[k]
         k += 1
+    end
+    return mat
+end
+
+function mat_L_to_vec!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}) where {T}
+    k = 1
+    m = size(mat, 1)
+    for i in 1:m, j in 1:i
+        if i == j
+            vec[k] = real(mat[i, j])
+            k += 1
+        else
+            ck = mat[i, j]
+            vec[k] = real(ck)
+            k += 1
+            vec[k] = imag(ck)
+            k += 1
+        end
+    end
+    return vec
+end
+
+function vec_to_mat_L!(mat::AbstractMatrix{Complex{T}}, vec::AbstractVector{T}) where {T}
+    k = 1
+    m = size(mat, 1)
+    for i in 1:m, j in 1:i
+        if i == j
+            mat[i, j] = vec[k]
+            k += 1
+        else
+            mat[i, j] = mat[j, i] = Complex(vec[k], vec[k + 1])
+            k += 2
+        end
     end
     return mat
 end

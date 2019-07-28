@@ -383,6 +383,7 @@ end
 
 function semidefinite1(T, test_options)
     tol = max(1e-5, sqrt(sqrt(eps(T))))
+    Trt2i = inv(sqrt(T(2)))
     c = T[0, -1, 0]
     A = T[1 0 0; 0 0 1]
     b = T[0.5, 1]
@@ -390,14 +391,12 @@ function semidefinite1(T, test_options)
     h = zeros(T, 3)
     cone_idxs = [1:3]
 
-    for is_dual in (true, false)
-        cones = CO.Cone{T}[CO.PosSemidef{T, T}(3, is_dual)]
+    cones = CO.Cone{T}[CO.PosSemidef{T, T}(3)]
 
-        r = build_solve_check(c, A, b, G, h, cones, cone_idxs; test_options...)
-        @test r.status == :Optimal
-        @test r.primal_obj ≈ -1 atol=tol rtol=tol
-        @test r.x[2] ≈ 1 atol=tol rtol=tol
-    end
+    r = build_solve_check(c, A, b, G, h, cones, cone_idxs; test_options...)
+    @test r.status == :Optimal
+    @test r.primal_obj ≈ -Trt2i atol=tol rtol=tol
+    @test r.x[2] ≈ Trt2i atol=tol rtol=tol
 end
 
 function semidefinite2(T, test_options)
@@ -409,23 +408,20 @@ function semidefinite2(T, test_options)
     h = zeros(T, 3)
     cone_idxs = [1:3]
 
-    for is_dual in (true, false)
-        cones = CO.Cone{T}[CO.PosSemidef{T, T}(3, is_dual)]
+    cones = CO.Cone{T}[CO.PosSemidef{T, T}(3)]
 
-        r = build_solve_check(c, A, b, G, h, cones, cone_idxs; test_options...)
-        @test r.status == :Optimal
-        @test r.primal_obj ≈ 0 atol=tol rtol=tol
-        @test norm(r.x) ≈ 0 atol=tol rtol=tol
-    end
+    r = build_solve_check(c, A, b, G, h, cones, cone_idxs; test_options...)
+    @test r.status == :Optimal
+    @test r.primal_obj ≈ 0 atol=tol rtol=tol
+    @test norm(r.x) ≈ 0 atol=tol rtol=tol
 end
 
 function semidefinitecomplex1(T, test_options)
     tol = max(1e-5, sqrt(sqrt(eps(T))))
-    Trt2 = sqrt(T(2))
     c = T[1, 0, 0, 1]
     A = T[0 0 1 0]
     b = T[1]
-    G = diagm(T[-1, -Trt2, -Trt2, -1])
+    G = Diagonal(-one(T) * I, 4)
     h = zeros(T, 4)
     cone_idxs = [1:4]
     cones = CO.Cone{T}[CO.PosSemidef{T, Complex{T}}(4)]
@@ -675,7 +671,7 @@ function hypoperlogdet1(T, test_options)
     mat_half = rand(T, side, side)
     mat = mat_half * mat_half'
     h = zeros(T, dim)
-    CO.mat_to_vec!(view(h, 3:dim), mat)
+    CO.mat_L_to_vec!(view(h, 3:dim), mat)
     cones = CO.Cone{T}[CO.HypoPerLogdet{T}(dim)]
     cone_idxs = [1:dim]
 
@@ -698,7 +694,7 @@ function hypoperlogdet2(T, test_options)
     mat_half = rand(T, side, side)
     mat = mat_half * mat_half'
     h = zeros(T, dim)
-    CO.mat_to_vec!(view(h, 3:dim), mat)
+    CO.mat_L_to_vec!(view(h, 3:dim), mat)
     cones = CO.Cone{T}[CO.HypoPerLogdet{T}(dim, true)]
     cone_idxs = [1:dim]
 
@@ -721,7 +717,7 @@ function hypoperlogdet3(T, test_options)
     mat_half = rand(T, side, side)
     mat = mat_half * mat_half'
     h = zeros(T, dim)
-    CO.mat_to_vec!(view(h, 3:dim), mat)
+    CO.mat_L_to_vec!(view(h, 3:dim), mat)
     cones = CO.Cone{T}[CO.HypoPerLogdet{T}(dim)]
     cone_idxs = [1:dim]
 

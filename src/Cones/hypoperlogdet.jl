@@ -28,7 +28,6 @@ mutable struct HypoPerLogdet{T <: HypReal} <: Cone{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
 
-    scaling::T
     mat::Matrix{T}
     mat2::Matrix{T}
     mat3::Matrix{T}
@@ -68,7 +67,6 @@ function setup_data(cone::HypoPerLogdet{T}) where {T <: HypReal}
     cone.mat3 = similar(cone.mat)
     cone.vecn = Vector{T}(undef, cone.dim - 2)
     cone.Wivzi = Symmetric(zeros(T, cone.side, cone.side), :U)
-    cone.scaling = T(2)
     return
 end
 
@@ -119,7 +117,7 @@ function update_grad(cone::HypoPerLogdet)
     cone.grad[1] = inv(cone.z)
     cone.grad[2] = cone.nLz - inv(v)
     gend = view(cone.grad, 3:cone.dim)
-    smat_to_svec!(gend, cone.Wi, cone.scaling)
+    smat_to_svec!(gend, cone.Wi)
     gend .*= -cone.vzip1
     cone.grad_updated = true
     return cone.grad
@@ -169,11 +167,11 @@ function update_hess_prod(cone::HypoPerLogdet)
     cone.hess.data[1, 1] = inv(z) / z
     cone.hess.data[1, 2] = cone.nLz / z
     h1end = view(cone.hess.data, 1, 3:cone.dim)
-    smat_to_svec!(h1end, Wivzi, cone.scaling)
+    smat_to_svec!(h1end, Wivzi)
     h1end ./= -z
     cone.hess.data[2, 2] = abs2(cone.nLz) + (cone.side / z + inv(v)) / v
     h2end = view(cone.hess.data, 2, 3:cone.dim)
-    smat_to_svec!(h2end, Wi, cone.scaling)
+    smat_to_svec!(h2end, Wi)
     h2end .*= ((cone.ldWv - cone.side) / cone.ldWvuv - 1) / z
     cone.hess_prod_updated = true
 end
@@ -192,9 +190,9 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPer
         @timeit "v2m" vec_to_mat_L!(cone.mat, view(arr, 3:cone.dim, i))
         @timeit "qp1" hyp_symm!(cone.vzip1, cone.mat, Wi.data, cone.mat2)
         @timeit "qp2" hyp_symm!(one(T), Wi.data, cone.mat2, cone.mat3)
-        @timeit "dotprod" dot_prod = hyp_dot(Symmetric(cone.mat, :L), cone.Wivzi)
+        @timeit "dotprod" dot_prod = hyp_symm_dot(Symmetric(cone.mat, :L), cone.Wivzi)
         @timeit "axpy" @. cone.mat3 += cone.Wivzi * dot_prod
-        @timeit "m2v" smat_to_svec!(cone.vecn, cone.mat3, cone.scaling)
+        @timeit "m2v" smat_to_svec!(cone.vecn, cone.mat3)
         @timeit "plus" view(prod, 3:cone.dim, i) .+= cone.vecn
     end
 
