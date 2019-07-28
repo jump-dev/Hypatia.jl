@@ -30,7 +30,6 @@ function densityest(
     use_linops::Bool = false,
     )
     (nobs, dim) = size(X)
-    rt2 = sqrt(T(2))
     X = convert(Matrix{T}, X)
 
     domain = MU.Box(-ones(dim), ones(dim))
@@ -75,8 +74,8 @@ function densityest(
         push!(psd_var_list, zeros(T, U, dim))
         idx = 1
         for k in 1:L, l in 1:k
-            # off diagonals are doubled, but already scaled by rt2
-            psd_var_list[1][:, idx] = P0[:, k] .* P0[:, l] * (k == l ? 1 : rt2)
+            # off diagonals are doubled
+            psd_var_list[1][:, idx] = P0[:, k] .* P0[:, l] * (k == l ? 1 : 2)
             idx += 1
         end
         push!(cones, CO.PosSemidef{T, T}(dim))
@@ -90,8 +89,8 @@ function densityest(
             push!(psd_var_list, zeros(T, U, dim))
             idx = 1
             for k in 1:L, l in 1:k
-                # off diagonals are doubled, but already scaled by rt2
-                psd_var_list[i + 1][:, idx] = PWts[i][:, k] .* PWts[i][:, l] * (k == l ? 1 : rt2)
+                # off diagonals are doubled
+                psd_var_list[i + 1][:, idx] = PWts[i][:, k] .* PWts[i][:, l] * (k == l ? 1 : 2)
                 idx += 1
             end
             push!(cones, CO.PosSemidef{T, T}(dim))

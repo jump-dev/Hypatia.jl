@@ -20,7 +20,6 @@ function matrixcompletion(
     use_epinorm::Bool = true,
     )
     @assert m <= n
-    rt2 = sqrt(T(2))
 
     num_known = round(Int, m * n * 0.1)
     known_rows = rand(1:m, num_known)
@@ -88,10 +87,10 @@ function matrixcompletion(
             # X'
             for j in 1:m
                 if !is_known[var_idx]
-                    G_norm[offset + idx, 1 + unknown_idx] = -rt2
+                    G_norm[offset + idx, 1 + unknown_idx] = -1
                     unknown_idx += 1
                 else
-                    h_norm[offset + idx] = h_norm_x[var_idx] * rt2
+                    h_norm[offset + idx] = h_norm_x[var_idx]
                 end
                 idx += 1
                 var_idx += 1
@@ -209,3 +208,5 @@ function test_matrixcompletion(instance::Function; T::Type{<:HypReal} = Float64,
     @test r.status == :Optimal
     return
 end
+
+test_matrixcompletion.(instances_matrixcompletion_all, test_options = (solver_options = (verbose = true,),))

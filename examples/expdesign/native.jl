@@ -24,7 +24,6 @@ function expdesign(
     use_linops::Bool = false,
     )
     @assert (p > q) && (n > q) && (nmax <= n)
-    rt2 = sqrt(T(2))
     V = T(4) * rand(T, q, p) .- T(2)
 
     # hypograph variable and number of trials of each experiment
@@ -107,7 +106,7 @@ function expdesign(
         l = 1
         for i in 1:q, j in 1:i
             for k in 1:p
-                G_psd[l, k] = -V[i, k] * V[j, k] * (i == j ? 1 : rt2)
+                G_psd[l, k] = -V[i, k] * V[j, k]
             end
             l += 1
         end
@@ -118,7 +117,7 @@ function expdesign(
             # skip zero-valued elements
             l += i - 1
             for j in i:q
-                G_psd[l, p + tri_idx] = -rt2
+                G_psd[l, p + tri_idx] = -1
                 l += 1
                 tri_idx += 1
             end

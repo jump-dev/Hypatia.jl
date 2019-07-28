@@ -94,7 +94,6 @@ function polyminreal(
         else
             G_full = zeros(T, 0, U)
             rowidx = 1
-            rt2 = sqrt(T(2))
             for Pk in [P0, PWts...]
                 Lk = size(Pk, 2)
                 dk = div(Lk * (Lk + 1), 2)
@@ -103,8 +102,7 @@ function polyminreal(
                 Gk = Matrix{T}(undef, dk, U)
                 l = 1
                 for i in 1:Lk, j in 1:i
-                    scal = i == j ? 1 : rt2
-                    @. Gk[l, :] = -Pk[:, i] * Pk[:, j] * scal
+                    @. Gk[l, :] = -Pk[:, i] * Pk[:, j]
                     l += 1
                 end
                 G_full = vcat(G_full, Gk)
@@ -141,7 +139,7 @@ polyminreal15(T::Type{<:HypReal}) = polyminreal(T, :motzkin, 3)
 polyminreal16(T::Type{<:HypReal}) = polyminreal(T, :reactiondiffusion, 4, use_primal = false)
 polyminreal17(T::Type{<:HypReal}) = polyminreal(T, :lotkavolterra, 3, use_primal = false)
 polyminreal18(T::Type{<:HypReal}) = polyminreal(T, :motzkin, 3, use_primal = false, use_wsos = false)
-polyminreal19(T::Type{<:HypReal}) = polyminreal(T, :motzkin, 3, use_wsos = false)
+polyminreal19(T::Type{<:HypReal}) = polyminreal(T, :motzkin, 3, use_primal = false, use_wsos = false)
 polyminreal20(T::Type{<:HypReal}) = polyminreal(T, :reactiondiffusion, 4, use_primal = false, use_wsos = false)
 polyminreal21(T::Type{<:HypReal}) = polyminreal(T, :lotkavolterra, 3, use_primal = false, use_wsos = false)
 polyminreal22(T::Type{<:HypReal}) = polyminreal(T, :random, 2, use_primal = true, use_wsos = true, n = 5, use_linops = true)
