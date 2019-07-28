@@ -25,7 +25,7 @@ hyp_chol!(A::HermOrSym{T, Matrix{T}}) where {T <: HypRealOrComplex{<:HypReal}} =
 hyp_symm!(alpha::T, A::Matrix{T}, B::Matrix{T}, C::Matrix{T}) where {T <: BlasFloat} = BLAS.symm!('L', 'L', alpha, A, B, zero(T), C)
 hyp_symm!(alpha::T, A::Matrix{T}, B::Matrix{T}, C::Matrix{T}) where {T <: HypRealOrComplex{<:HypReal}} = mul!(C, alpha .* A, B)
 
-function hyp_dot(A::Symmetric{T, Matrix{T}}, B::Symmetric{T, Matrix{T}}) where {T}
+function hyp_symm_dot(A::Symmetric{T, Matrix{T}}, B::Symmetric{T, Matrix{T}}) where {T}
     ret = zero(T)
     m = size(A, 2)
     @inbounds for j in 1:m
