@@ -66,7 +66,7 @@ function setup_data(cone::HypoPerLogdet{T}) where {T <: HypReal}
     cone.mat2 = similar(cone.mat)
     cone.mat3 = similar(cone.mat)
     cone.vecn = Vector{T}(undef, cone.dim - 2)
-    cone.Wivzi = Symmetric(zeros(T, cone.side, cone.side), :U)
+    cone.Wivzi = Symmetric(zeros(T, cone.side, cone.side), :L)
     return
 end
 
@@ -91,7 +91,7 @@ function update_feas(cone::HypoPerLogdet)
     v = cone.point[2]
     if v > 0
         vec_to_mat_L!(cone.mat, view(cone.point, 3:cone.dim))
-        cone.fact_mat = hyp_chol!(Symmetric(cone.mat))
+        cone.fact_mat = hyp_chol!(Symmetric(cone.mat, :L))
         if isposdef(cone.fact_mat)
             cone.ldWv = logdet(cone.fact_mat) - cone.side * log(v)
             cone.z = v * cone.ldWv - u
@@ -110,7 +110,7 @@ function update_grad(cone::HypoPerLogdet)
     @assert cone.is_feas
     u = cone.point[1]
     v = cone.point[2]
-    cone.Wi = Symmetric(inv(cone.fact_mat))
+    cone.Wi = Symmetric(inv(cone.fact_mat), :L)
     cone.nLz = (cone.side - cone.ldWv) / cone.z
     cone.ldWvuv = cone.ldWv - u / v
     cone.vzip1 = 1 + inv(cone.ldWvuv)
@@ -162,7 +162,7 @@ function update_hess_prod(cone::HypoPerLogdet)
     z = cone.z
     Wi = cone.Wi
     Wivzi = cone.Wivzi
-    Wivzi .= Symmetric(Wi / cone.ldWvuv, :U)  # TODO not sure best way to broadcast over while keeping type symmetric
+    Wivzi .= Symmetric(Wi / cone.ldWvuv, :L)  # TODO not sure best way to broadcast over while keeping type symmetric
 
     cone.hess.data[1, 1] = inv(z) / z
     cone.hess.data[1, 2] = cone.nLz / z

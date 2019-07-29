@@ -8,6 +8,7 @@ module Cones
 
 using LinearAlgebra
 import LinearAlgebra.BlasFloat
+import LinearAlgebra.HermOrSym
 using ForwardDiff
 using DiffResults
 import Hypatia.HypReal
@@ -130,7 +131,7 @@ function svec_to_smat!(mat::AbstractMatrix{T}, vec::AbstractVector{T}) where {T}
         if i == j
             mat[i, j] = vec[k]
         else
-            mat[i, j] = mat[j, i] = vec[k] / 2
+            mat[i, j] = vec[k] / 2
         end
         k += 1
     end
@@ -163,7 +164,8 @@ function svec_to_smat!(mat::AbstractMatrix{Complex{T}}, vec::AbstractVector{T}) 
             mat[i, j] = vec[k]
             k += 1
         else
-            mat[i, j] = mat[j, i] = Complex(vec[k], vec[k + 1]) / 2
+            mat[i, j] = Complex(vec[k], vec[k + 1]) / 2
+            # mat[j, i] = Complex(vec[k], -vec[k + 1]) / 2
             k += 2
         end
     end
@@ -184,7 +186,7 @@ function vec_to_mat_L!(mat::AbstractMatrix{T}, vec::AbstractVector{T}) where {T}
     k = 1
     m = size(mat, 1)
     for i in 1:m, j in 1:i
-        mat[i, j] = mat[j, i] = vec[k]
+        mat[i, j] = vec[k]
         k += 1
     end
     return mat
@@ -216,7 +218,8 @@ function vec_to_mat_L!(mat::AbstractMatrix{Complex{T}}, vec::AbstractVector{T}) 
             mat[i, j] = vec[k]
             k += 1
         else
-            mat[i, j] = mat[j, i] = Complex(vec[k], vec[k + 1])
+            mat[i, j] = Complex(vec[k], vec[k + 1])
+            # mat[j, i] = Complex(vec[k], -vec[k + 1])
             k += 2
         end
     end

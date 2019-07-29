@@ -208,5 +208,3 @@ function test_matrixcompletion(instance::Function; T::Type{<:HypReal} = Float64,
     @test r.status == :Optimal
     return
 end
-
-test_matrixcompletion.(instances_matrixcompletion_all, test_options = (solver_options = (verbose = true,),))
