@@ -23,7 +23,7 @@ hyp_chol!(A::HermOrSym{T, Matrix{T}}) where {T <: BlasFloat} = cholesky!(A, Val(
 hyp_chol!(A::HermOrSym{T, Matrix{T}}) where {T <: HypRealOrComplex{<:HypReal}} = cholesky!(A, check = false)
 
 hyp_symm!(alpha::T, A::Matrix{T}, B::Matrix{T}, C::Matrix{T}) where {T <: BlasFloat} = BLAS.symm!('L', 'L', alpha, A, B, zero(T), C)
-hyp_symm!(alpha::T, A::Matrix{T}, B::Matrix{T}, C::Matrix{T}) where {T <: HypRealOrComplex{<:HypReal}} = mul!(C, alpha .* A, B)
+hyp_symm!(alpha::T, A::Matrix{T}, B::Matrix{T}, C::Matrix{T}) where {T <: HypRealOrComplex{<:HypReal}} = mul!(C, alpha .* Symmetric(A, :L), B)
 
 function hyp_symm_dot(A::Symmetric{T, Matrix{T}}, B::Symmetric{T, Matrix{T}}) where {T}
     ret = zero(T)
