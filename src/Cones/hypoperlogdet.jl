@@ -39,7 +39,7 @@ mutable struct HypoPerLogdet{T <: HypReal} <: Cone{T}
     nLz
     ldWvuv
     vzip1
-    Wivzi::Symmetric{T, Matrix{T}}
+    Wivzi::Matrix{T}
     tmp_hess::Symmetric{T, Matrix{T}}
     hess_fact # TODO prealloc
 
@@ -66,7 +66,7 @@ function setup_data(cone::HypoPerLogdet{T}) where {T <: HypReal}
     cone.mat2 = similar(cone.mat)
     cone.mat3 = similar(cone.mat)
     cone.vecn = Vector{T}(undef, cone.dim - 2)
-    cone.Wivzi = Symmetric(zeros(T, cone.side, cone.side), :L)
+    cone.Wivzi = similar(cone.mat)
     return
 end
 
@@ -90,7 +90,7 @@ function update_feas(cone::HypoPerLogdet)
     u = cone.point[1]
     v = cone.point[2]
     if v > 0
-        vec_to_mat_L!(cone.mat, view(cone.point, 3:cone.dim))
+        vec_to_mat!(cone.mat, view(cone.point, 3:cone.dim))
         cone.fact_mat = hyp_chol!(Symmetric(cone.mat, :L))
         if isposdef(cone.fact_mat)
             cone.ldWv = logdet(cone.fact_mat) - cone.side * log(v)
@@ -110,7 +110,7 @@ function update_grad(cone::HypoPerLogdet)
     @assert cone.is_feas
     u = cone.point[1]
     v = cone.point[2]
-    cone.Wi = Symmetric(inv(cone.fact_mat), :L)
+    cone.Wi = inv(cone.fact_mat)
     cone.nLz = (cone.side - cone.ldWv) / cone.z
     cone.ldWvuv = cone.ldWv - u / v
     cone.vzip1 = 1 + inv(cone.ldWvuv)
@@ -162,7 +162,7 @@ function update_hess_prod(cone::HypoPerLogdet)
     z = cone.z
     Wi = cone.Wi
     Wivzi = cone.Wivzi
-    Wivzi .= Symmetric(Wi / cone.ldWvuv, :L)  # TODO not sure best way to broadcast over while keeping type symmetric
+    @. Wivzi = Wi / cone.ldWvuv
 
     cone.hess.data[1, 1] = inv(z) / z
     cone.hess.data[1, 2] = cone.nLz / z
@@ -177,25 +177,23 @@ function update_hess_prod(cone::HypoPerLogdet)
 end
 
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPerLogdet{T}) where {T <: HypReal}
-    @timeit "everything" begin
     if !cone.hess_prod_updated
-        @timeit "update" update_hess_prod(cone)
+        update_hess_prod(cone)
     end
     Wi = cone.Wi
-    @timeit "prod1" @views mul!(prod[1:2, :], cone.hess[1:2, :], arr)
+    @views mul!(prod[1:2, :], cone.hess[1:2, :], arr)
     # could get rid of cone.vecn used later if we wrap a gemm
-    @timeit "prod2" @views mul!(prod[3:cone.dim, :], cone.hess[3:cone.dim, 1:2], arr[1:2, :])
+    @views mul!(prod[3:cone.dim, :], cone.hess[3:cone.dim, 1:2], arr[1:2, :])
 
     @inbounds for i in 1:size(arr, 2)
-        @timeit "v2m" vec_to_mat_L!(cone.mat, view(arr, 3:cone.dim, i))
-        @timeit "qp1" hyp_symm!(cone.vzip1, cone.mat, Wi.data, cone.mat2)
-        @timeit "qp2" hyp_symm!(one(T), Wi.data, cone.mat2, cone.mat3)
-        @timeit "dotprod" dot_prod = hyp_symm_dot(Symmetric(cone.mat, :L), cone.Wivzi)
-        @timeit "axpy" @. cone.mat3 += cone.Wivzi * dot_prod
-        @timeit "m2v" smat_to_svec!(cone.vecn, cone.mat3)
-        @timeit "plus" view(prod, 3:cone.dim, i) .+= cone.vecn
-    end
-
+        vec_to_mat!(cone.mat, view(arr, 3:cone.dim, i))
+        mul!(cone.mat2, cone.mat, cone.Wi)
+        mul!(cone.mat3, cone.Wi, cone.mat2)
+        @. cone.mat3 *=  cone.vzip1
+        dot_prod = dot(cone.mat, cone.Wivzi)
+        @. cone.mat3 += cone.Wivzi * dot_prod
+        smat_to_svec!(cone.vecn, cone.mat3)
+        view(prod, 3:cone.dim, i) .+= cone.vecn
     end
 
     return prod

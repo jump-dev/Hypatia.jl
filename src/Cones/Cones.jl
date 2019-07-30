@@ -16,10 +16,6 @@ import Hypatia.HypRealOrComplex
 import Hypatia.hyp_AtA!
 import Hypatia.hyp_chol!
 import Hypatia.hyp_ldiv_chol_L!
-import Hypatia.hyp_symm!
-import Hypatia.hyp_symm_dot
-
-using TimerOutputs
 
 abstract type Cone{T <: HypReal} end
 
@@ -108,7 +104,6 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Con
 end
 
 # utilities for converting between smat and svec forms (lower triangle) for symmetric matrices
-# TODO only need to do upper/lower triangle if use symmetric matrix types
 
 function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{T}) where {T}
     k = 1
@@ -131,7 +126,7 @@ function svec_to_smat!(mat::AbstractMatrix{T}, vec::AbstractVector{T}) where {T}
         if i == j
             mat[i, j] = vec[k]
         else
-            mat[i, j] = vec[k] / 2
+            mat[i, j] = mat[j, i] = vec[k] / 2
         end
         k += 1
     end
@@ -165,7 +160,7 @@ function svec_to_smat!(mat::AbstractMatrix{Complex{T}}, vec::AbstractVector{T}) 
             k += 1
         else
             mat[i, j] = Complex(vec[k], vec[k + 1]) / 2
-            # mat[j, i] = Complex(vec[k], -vec[k + 1]) / 2
+            mat[j, i] = Complex(vec[k], -vec[k + 1]) / 2
             k += 2
         end
     end
@@ -182,11 +177,11 @@ function mat_L_to_vec!(vec::AbstractVector{T}, mat::AbstractMatrix{T}) where {T}
     return vec
 end
 
-function vec_to_mat_L!(mat::AbstractMatrix{T}, vec::AbstractVector{T}) where {T}
+function vec_to_mat!(mat::AbstractMatrix{T}, vec::AbstractVector{T}) where {T}
     k = 1
     m = size(mat, 1)
     for i in 1:m, j in 1:i
-        mat[i, j] = vec[k]
+        mat[i, j] = mat[j, i] = vec[k]
         k += 1
     end
     return mat
@@ -210,7 +205,7 @@ function mat_L_to_vec!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}) 
     return vec
 end
 
-function vec_to_mat_L!(mat::AbstractMatrix{Complex{T}}, vec::AbstractVector{T}) where {T}
+function vec_to_mat!(mat::AbstractMatrix{Complex{T}}, vec::AbstractVector{T}) where {T}
     k = 1
     m = size(mat, 1)
     for i in 1:m, j in 1:i
@@ -219,7 +214,7 @@ function vec_to_mat_L!(mat::AbstractMatrix{Complex{T}}, vec::AbstractVector{T}) 
             k += 1
         else
             mat[i, j] = Complex(vec[k], vec[k + 1])
-            # mat[j, i] = Complex(vec[k], -vec[k + 1])
+            mat[j, i] = Complex(vec[k], -vec[k + 1])
             k += 2
         end
     end

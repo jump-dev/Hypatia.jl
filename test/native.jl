@@ -679,7 +679,7 @@ function hypoperlogdet1(T, test_options)
     @test r.status == :Optimal
     @test r.x[1] ≈ -r.primal_obj atol=tol rtol=tol
     @test r.x[2] ≈ 1 atol=tol rtol=tol
-    @test r.s[2] * logdet(CO.vec_to_mat_L!(zeros(T, side, side), r.s[3:end]) / r.s[2]) ≈ r.s[1] atol=tol rtol=tol
+    @test r.s[2] * logdet(CO.vec_to_mat!(zeros(T, side, side), r.s[3:end]) / r.s[2]) ≈ r.s[1] atol=tol rtol=tol
 end
 
 function hypoperlogdet2(T, test_options)
@@ -702,7 +702,7 @@ function hypoperlogdet2(T, test_options)
     @test r.status == :Optimal
     @test r.x[2] ≈ r.primal_obj atol=tol rtol=tol
     @test r.x[1] ≈ -1 atol=tol rtol=tol
-    @test r.z[2] * logdet(CO.vec_to_mat_L!(zeros(T, side, side), r.z[3:end]) / r.z[2]) ≈ r.z[1] atol=tol rtol=tol
+    @test r.z[2] * logdet(CO.vec_to_mat!(zeros(T, side, side), r.z[3:end]) / r.z[2]) ≈ r.z[1] atol=tol rtol=tol
 end
 
 function hypoperlogdet3(T, test_options)
