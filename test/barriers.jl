@@ -39,6 +39,7 @@ function test_barrier_oracles(cone::CO.Cone{T}, barrier::Function; noise = 0.0) 
     end
 
     inv_hess = CO.inv_hess(cone)
+    # @show inv_hess ./ inv(hess)
     @test hess * inv_hess ≈ I atol=tol rtol=tol
 
     CO.update_hess_prod(cone)
@@ -183,22 +184,24 @@ end
 function test_semidefinite_barrier(T::Type{<:HypReal})
     for side in [1, 2, 3]
         # real PSD cone
+        @show "real"
         dim = div(side * (side + 1), 2)
         cone = CO.PosSemidef{T, T}(dim)
         function R_barrier(s)
             S = similar(s, side, side)
-            CO.vec_to_mat!(S, s)
+            CO.vec_to_mat_U!(S, s)
             return -logdet(cholesky!(Symmetric(S, :U)))
         end
         test_barrier_oracles(cone, R_barrier)
         test_barrier_oracles(cone, R_barrier, noise = 0.1)
 
         # complex PSD cone
+        @show "complex"
         dim = side^2
         cone = CO.PosSemidef{T, Complex{T}}(dim)
         function C_barrier(s)
             S = zeros(Complex{eltype(s)}, side, side)
-            CO.vec_to_mat!(S, s)
+            CO.vec_to_mat_U!(S, s)
             return -logdet(cholesky!(Hermitian(S, :U)))
         end
         test_barrier_oracles(cone, C_barrier)
@@ -215,7 +218,7 @@ function test_hypoperlogdet_barrier(T::Type{<:HypReal})
             u = s[1]
             v = s[2]
             W = similar(s, side, side)
-            CO.vec_to_mat!(W, s[3:end])
+            CO.vec_to_mat_U!(W, s[3:end])
             return -log(v * logdet(cholesky!(Symmetric(W / v, :U))) - u) - logdet(cholesky!(Symmetric(W, :U))) - log(v)
         end
         test_barrier_oracles(cone, barrier)

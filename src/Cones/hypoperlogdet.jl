@@ -91,7 +91,7 @@ function update_feas(cone::HypoPerLogdet)
     u = cone.point[1]
     v = cone.point[2]
     if v > 0
-        vec_to_mat!(cone.mat, view(cone.point, 3:cone.dim))
+        vec_to_mat_U!(cone.mat, view(cone.point, 3:cone.dim))
         cone.fact_mat = hyp_chol!(Symmetric(cone.mat, :U))
         if isposdef(cone.fact_mat)
             cone.ldWv = logdet(cone.fact_mat) - cone.side * log(v)
@@ -118,7 +118,7 @@ function update_grad(cone::HypoPerLogdet)
     cone.grad[1] = inv(cone.z)
     cone.grad[2] = cone.nLz - inv(v)
     gend = view(cone.grad, 3:cone.dim)
-    smat_U_to_svec!(gend, cone.Wi)
+    mat_U_to_vec_scaled!(gend, cone.Wi)
     gend .*= -cone.vzip1
     cone.grad_updated = true
     return cone.grad
@@ -168,13 +168,14 @@ function update_hess_prod(cone::HypoPerLogdet)
     cone.hess.data[1, 1] = inv(z) / z
     cone.hess.data[1, 2] = cone.nLz / z
     h1end = view(cone.hess.data, 1, 3:cone.dim)
-    smat_U_to_svec!(h1end, Wivzi)
+    mat_U_to_vec_scaled!(h1end, Wivzi)
     h1end ./= -z
     cone.hess.data[2, 2] = abs2(cone.nLz) + (cone.side / z + inv(v)) / v
     h2end = view(cone.hess.data, 2, 3:cone.dim)
-    smat_U_to_svec!(h2end, Wi)
+    mat_U_to_vec_scaled!(h2end, Wi)
     h2end .*= ((cone.ldWv - cone.side) / cone.ldWvuv - 1) / z
     cone.hess_prod_updated = true
+    return nothing
 end
 
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPerLogdet{T}) where {T <: HypReal}
@@ -186,13 +187,13 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPer
     @views mul!(prod[3:cone.dim, :], cone.hess[3:cone.dim, 1:2], arr[1:2, :])
 
     @inbounds for i in 1:size(arr, 2)
-        vec_to_mat!(cone.mat, view(arr, 3:cone.dim, i))
-        mul!(cone.mat2, cone.mat, cone.Wi)
-        mul!(cone.mat3, cone.Wi, cone.mat2)
+        vec_to_mat_U!(cone.mat, view(arr, 3:cone.dim, i))
+        mul!(cone.mat2, Symmetric(cone.mat, :U), cone.Wi)
+        mul!(cone.mat3, Symmetric(cone.Wi, :U), cone.mat2)
         @. cone.mat3 *=  cone.vzip1
-        dot_prod = dot(cone.mat, cone.Wivzi)
+        dot_prod = dot(Symmetric(cone.mat, :U), Symmetric(cone.Wivzi, :U)) # slow until dot product is merged in Julia
         @. cone.mat3 += cone.Wivzi * dot_prod
-        smat_U_to_svec!(cone.vecn, cone.mat3)
+        mat_U_to_vec_scaled!(cone.vecn, cone.mat3)
         view(prod, 3:cone.dim, i) .+= cone.vecn
     end
 
