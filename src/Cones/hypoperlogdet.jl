@@ -91,7 +91,7 @@ function update_feas(cone::HypoPerLogdet)
     v = cone.point[2]
     if v > 0
         vec_to_mat!(cone.mat, view(cone.point, 3:cone.dim))
-        cone.fact_mat = hyp_chol!(Symmetric(cone.mat, :L))
+        cone.fact_mat = hyp_chol!(Symmetric(cone.mat, :U))
         if isposdef(cone.fact_mat)
             cone.ldWv = logdet(cone.fact_mat) - cone.side * log(v)
             cone.z = v * cone.ldWv - u
@@ -117,7 +117,7 @@ function update_grad(cone::HypoPerLogdet)
     cone.grad[1] = inv(cone.z)
     cone.grad[2] = cone.nLz - inv(v)
     gend = view(cone.grad, 3:cone.dim)
-    smat_L_to_svec!(gend, cone.Wi)
+    smat_U_to_svec!(gend, cone.Wi)
     gend .*= -cone.vzip1
     cone.grad_updated = true
     return cone.grad
@@ -167,11 +167,11 @@ function update_hess_prod(cone::HypoPerLogdet)
     cone.hess.data[1, 1] = inv(z) / z
     cone.hess.data[1, 2] = cone.nLz / z
     h1end = view(cone.hess.data, 1, 3:cone.dim)
-    smat_L_to_svec!(h1end, Wivzi)
+    smat_U_to_svec!(h1end, Wivzi)
     h1end ./= -z
     cone.hess.data[2, 2] = abs2(cone.nLz) + (cone.side / z + inv(v)) / v
     h2end = view(cone.hess.data, 2, 3:cone.dim)
-    smat_L_to_svec!(h2end, Wi)
+    smat_U_to_svec!(h2end, Wi)
     h2end .*= ((cone.ldWv - cone.side) / cone.ldWvuv - 1) / z
     cone.hess_prod_updated = true
 end
@@ -192,7 +192,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPer
         @. cone.mat3 *=  cone.vzip1
         dot_prod = dot(cone.mat, cone.Wivzi)
         @. cone.mat3 += cone.Wivzi * dot_prod
-        smat_L_to_svec!(cone.vecn, cone.mat3)
+        smat_U_to_svec!(cone.vecn, cone.mat3)
         view(prod, 3:cone.dim, i) .+= cone.vecn
     end
 

@@ -671,7 +671,7 @@ function hypoperlogdet1(T, test_options)
     mat_half = rand(T, side, side)
     mat = mat_half * mat_half'
     h = zeros(T, dim)
-    CO.mat_L_to_vec!(view(h, 3:dim), mat)
+    CO.mat_U_to_vec!(view(h, 3:dim), mat)
     cones = CO.Cone{T}[CO.HypoPerLogdet{T}(dim)]
     cone_idxs = [1:dim]
 
@@ -694,7 +694,7 @@ function hypoperlogdet2(T, test_options)
     mat_half = rand(T, side, side)
     mat = mat_half * mat_half'
     h = zeros(T, dim)
-    CO.mat_L_to_vec!(view(h, 3:dim), mat)
+    CO.mat_U_to_vec!(view(h, 3:dim), mat)
     cones = CO.Cone{T}[CO.HypoPerLogdet{T}(dim, true)]
     cone_idxs = [1:dim]
 
@@ -717,7 +717,7 @@ function hypoperlogdet3(T, test_options)
     mat_half = rand(T, side, side)
     mat = mat_half * mat_half'
     h = zeros(T, dim)
-    CO.mat_L_to_vec!(view(h, 3:dim), mat)
+    CO.mat_U_to_vec!(view(h, 3:dim), mat)
     cones = CO.Cone{T}[CO.HypoPerLogdet{T}(dim)]
     cone_idxs = [1:dim]
 

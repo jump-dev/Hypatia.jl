@@ -104,10 +104,10 @@ end
 
 # utilities for converting between smat and svec forms (lower triangle) for symmetric matrices
 
-function smat_L_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{T}) where {T}
+function smat_U_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{T}) where {T}
     k = 1
     m = size(mat, 1)
-    for i in 1:m, j in 1:i
+    for j in 1:m, i in 1:j
         if i == j
             vec[k] = mat[i, j]
         else
@@ -121,7 +121,7 @@ end
 function svec_to_smat!(mat::AbstractMatrix{T}, vec::AbstractVector{T}) where {T}
     k = 1
     m = size(mat, 1)
-    for i in 1:m, j in 1:i
+    for j in 1:m, i in 1:j
         if i == j
             mat[i, j] = vec[k]
         else
@@ -132,10 +132,10 @@ function svec_to_smat!(mat::AbstractMatrix{T}, vec::AbstractVector{T}) where {T}
     return mat
 end
 
-function smat_L_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}) where {T}
+function smat_U_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}) where {T}
     k = 1
     m = size(mat, 1)
-    for i in 1:m, j in 1:i
+    for j in 1:m, i in 1:j
         if i == j
             vec[k] = real(mat[i, j])
             k += 1
@@ -143,7 +143,7 @@ function smat_L_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}
             ck = 2 * mat[i, j]
             vec[k] = real(ck)
             k += 1
-            vec[k] = imag(ck)
+            vec[k] = -imag(ck)
             k += 1
         end
     end
@@ -153,23 +153,23 @@ end
 function svec_to_smat!(mat::AbstractMatrix{Complex{T}}, vec::AbstractVector{T}) where {T}
     k = 1
     m = size(mat, 1)
-    for i in 1:m, j in 1:i
+    for j in 1:m, i in 1:j
         if i == j
             mat[i, j] = vec[k]
             k += 1
         else
-            mat[i, j] = Complex(vec[k], vec[k + 1]) / 2
-            mat[j, i] = Complex(vec[k], -vec[k + 1]) / 2
+            mat[i, j] = Complex(vec[k], -vec[k + 1]) / 2
+            mat[j, i] = Complex(vec[k], vec[k + 1]) / 2
             k += 2
         end
     end
     return mat
 end
 
-function mat_L_to_vec!(vec::AbstractVector{T}, mat::AbstractMatrix{T}) where {T}
+function mat_U_to_vec!(vec::AbstractVector{T}, mat::AbstractMatrix{T}) where {T}
     k = 1
     m = size(mat, 1)
-    for i in 1:m, j in 1:i
+    for j in 1:m, i in 1:j
         vec[k] = mat[i, j]
         k += 1
     end
@@ -179,17 +179,17 @@ end
 function vec_to_mat!(mat::AbstractMatrix{T}, vec::AbstractVector{T}) where {T}
     k = 1
     m = size(mat, 1)
-    for i in 1:m, j in 1:i
+    for j in 1:m, i in 1:j
         mat[i, j] = mat[j, i] = vec[k]
         k += 1
     end
     return mat
 end
 
-function mat_L_to_vec!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}) where {T}
+function mat_U_to_vec!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}) where {T}
     k = 1
     m = size(mat, 1)
-    for i in 1:m, j in 1:i
+    for j in 1:m, i in 1:j
         if i == j
             vec[k] = real(mat[i, j])
             k += 1
@@ -197,7 +197,7 @@ function mat_L_to_vec!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}) 
             ck = mat[i, j]
             vec[k] = real(ck)
             k += 1
-            vec[k] = imag(ck)
+            vec[k] = -imag(ck)
             k += 1
         end
     end
@@ -207,13 +207,13 @@ end
 function vec_to_mat!(mat::AbstractMatrix{Complex{T}}, vec::AbstractVector{T}) where {T}
     k = 1
     m = size(mat, 1)
-    for i in 1:m, j in 1:i
+    for j in 1:m, i in 1:j
         if i == j
             mat[i, j] = vec[k]
             k += 1
         else
-            mat[i, j] = Complex(vec[k], vec[k + 1])
-            mat[j, i] = Complex(vec[k], -vec[k + 1])
+            mat[i, j] = Complex(vec[k], -vec[k + 1])
+            mat[j, i] = Complex(vec[k], vec[k + 1])
             k += 2
         end
     end

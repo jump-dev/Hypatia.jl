@@ -91,7 +91,7 @@ function update_feas(cone::PosSemidef)
     @assert !cone.feas_updated
     vec_to_mat!(cone.mat, cone.point)
     copyto!(cone.mat2, cone.mat)
-    cone.fact_mat = hyp_chol!(Hermitian(cone.mat2, :L))
+    cone.fact_mat = hyp_chol!(Hermitian(cone.mat2, :U))
     cone.is_feas = isposdef(cone.fact_mat)
     cone.feas_updated = true
     return cone.is_feas
@@ -100,7 +100,7 @@ end
 function update_grad(cone::PosSemidef)
     @assert cone.is_feas
     cone.inv_mat = inv(cone.fact_mat) # TODO eliminate allocs
-    smat_L_to_svec!(cone.grad, cone.inv_mat)
+    smat_U_to_svec!(cone.grad, cone.inv_mat)
     cone.grad .*= -1
     cone.grad_updated = true
     return cone.grad
@@ -284,7 +284,7 @@ end
 #         vec_to_mat!(cone.mat2, view(arr, :, i))
 #         mul!(cone.mat3, cone.mat2, cone.inv_mat)
 #         mul!(cone.mat2, cone.inv_mat, cone.mat3)
-#         smat_L_to_svec!(view(prod, :, i), cone.mat2)
+#         smat_U_to_svec!(view(prod, :, i), cone.mat2)
 #     end
 #     return prod
 # end
