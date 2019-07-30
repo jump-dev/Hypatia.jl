@@ -66,7 +66,7 @@ function sparsepca(
                 Gl1.diag[s] = -1
             end
         else
-            Gl1 = Matrix{T}(UniformScaling(-T(2)), dimx, dimx)
+            Gl1 = Matrix{T}(-2I, dimx, dimx)
             for i in 1:p
                 s = sum(1:i)
                 Gl1[s, s] = -1
