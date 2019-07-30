@@ -103,12 +103,12 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Con
     return ldiv!(prod, cone.hess_fact, arr)
 end
 
-# utilities for converting between smat and svec forms (lower triangle) for symmetric matrices
+# utilities for converting between symmetric/Hermitian matrix and vector triangle forms
 
 function mat_U_to_vec_scaled!(vec::AbstractVector{T}, mat::AbstractMatrix{T}) where {T}
     k = 1
     m = size(mat, 1)
-    for j in 1:m, i in 1:j
+    @inbounds for j in 1:m, i in 1:j
         if i == j
             vec[k] = mat[i, j]
         else
@@ -122,7 +122,7 @@ end
 function vec_to_mat_U_scaled!(mat::AbstractMatrix{T}, vec::AbstractVector{T}) where {T}
     k = 1
     m = size(mat, 1)
-    for j in 1:m, i in 1:j
+    @inbounds for j in 1:m, i in 1:j
         if i == j
             mat[i, j] = vec[k]
         else
@@ -136,7 +136,7 @@ end
 function mat_U_to_vec_scaled!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}) where {T}
     k = 1
     m = size(mat, 1)
-    for j in 1:m, i in 1:j
+    @inbounds for j in 1:m, i in 1:j
         if i == j
             vec[k] = real(mat[i, j])
             k += 1
@@ -154,7 +154,7 @@ end
 function vec_to_mat_U_scaled!(mat::AbstractMatrix{Complex{T}}, vec::AbstractVector{T}) where {T}
     k = 1
     m = size(mat, 1)
-    for j in 1:m, i in 1:j
+    @inbounds for j in 1:m, i in 1:j
         if i == j
             mat[i, j] = vec[k]
             k += 1
@@ -169,7 +169,7 @@ end
 function mat_U_to_vec!(vec::AbstractVector{T}, mat::AbstractMatrix{T}) where {T}
     k = 1
     m = size(mat, 1)
-    for j in 1:m, i in 1:j
+    @inbounds for j in 1:m, i in 1:j
         vec[k] = mat[i, j]
         k += 1
     end
@@ -179,7 +179,7 @@ end
 function vec_to_mat_U!(mat::AbstractMatrix{T}, vec::AbstractVector{T}) where {T}
     k = 1
     m = size(mat, 1)
-    for j in 1:m, i in 1:j
+    @inbounds for j in 1:m, i in 1:j
         mat[i, j] = vec[k]
         k += 1
     end
@@ -189,7 +189,7 @@ end
 function mat_U_to_vec!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}) where {T}
     k = 1
     m = size(mat, 1)
-    for j in 1:m, i in 1:j
+    @inbounds for j in 1:m, i in 1:j
         if i == j
             vec[k] = real(mat[i, j])
             k += 1
@@ -207,7 +207,7 @@ end
 function vec_to_mat_U!(mat::AbstractMatrix{Complex{T}}, vec::AbstractVector{T}) where {T}
     k = 1
     m = size(mat, 1)
-    for j in 1:m, i in 1:j
+    @inbounds for j in 1:m, i in 1:j
         if i == j
             mat[i, j] = vec[k]
             k += 1

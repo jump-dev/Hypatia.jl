@@ -184,7 +184,7 @@ function test_semidefinite_barrier(T::Type{<:HypReal})
     for side in [1, 2, 3]
         # real PSD cone
         dim = div(side * (side + 1), 2)
-        cone = CO.PosSemidef{T, T}(dim)
+        cone = CO.PosSemidefTri{T, T}(dim)
         function R_barrier(s)
             S = similar(s, side, side)
             CO.vec_to_mat_U!(S, s)
@@ -195,7 +195,7 @@ function test_semidefinite_barrier(T::Type{<:HypReal})
 
         # complex PSD cone
         dim = side^2
-        cone = CO.PosSemidef{T, Complex{T}}(dim)
+        cone = CO.PosSemidefTri{T, Complex{T}}(dim)
         function C_barrier(s)
             S = zeros(Complex{eltype(s)}, side, side)
             CO.vec_to_mat_U!(S, s)
@@ -210,7 +210,7 @@ end
 function test_hypoperlogdet_barrier(T::Type{<:HypReal})
     for side in [1, 2, 3]
         dim = 2 + div(side * (side + 1), 2)
-        cone = CO.HypoPerLogdet{T}(dim)
+        cone = CO.HypoPerLogdetTri{T}(dim)
         function barrier(s)
             u = s[1]
             v = s[2]

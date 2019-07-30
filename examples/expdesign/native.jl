@@ -52,7 +52,7 @@ function expdesign(
         @assert l - 1 == dimvec
         # pad with hypograph variable and perspective variable
         h_logdet = vcat(zero(T), one(T), zeros(T, dimvec))
-        push!(cones, CO.HypoPerLogdet{T}(dimvec + 2))
+        push!(cones, CO.HypoPerLogdetTri{T}(dimvec + 2))
         push!(cone_idxs, (2 * p + 1):(2 * p + dimvec + 2))
 
         if use_linops
@@ -129,7 +129,7 @@ function expdesign(
         end
 
         h_psd = zeros(T, dimvec)
-        push!(cones, CO.PosSemidef{T, T}(dimvec))
+        push!(cones, CO.PosSemidefTri{T, T}(dimvec))
         push!(cone_idxs, (2 * p + 1):(2 * p + dimvec))
 
         if use_sumlog

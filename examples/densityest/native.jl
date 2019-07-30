@@ -78,7 +78,7 @@ function densityest(
             psd_var_list[1][:, idx] = P0[:, k] .* P0[:, l] * (k == l ? 1 : 2)
             idx += 1
         end
-        push!(cones, CO.PosSemidef{T, T}(dim))
+        push!(cones, CO.PosSemidefTri{T, T}(dim))
         push!(cone_idxs, 1:dim)
         cone_offset += dim
 
@@ -93,7 +93,7 @@ function densityest(
                 psd_var_list[i + 1][:, idx] = PWts[i][:, k] .* PWts[i][:, l] * (k == l ? 1 : 2)
                 idx += 1
             end
-            push!(cones, CO.PosSemidef{T, T}(dim))
+            push!(cones, CO.PosSemidefTri{T, T}(dim))
             push!(cone_idxs, cone_offset:(cone_offset + dim - 1))
             cone_offset += dim
         end

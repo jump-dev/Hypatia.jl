@@ -391,7 +391,7 @@ function semidefinite1(T, test_options)
     h = zeros(T, 3)
     cone_idxs = [1:3]
 
-    cones = CO.Cone{T}[CO.PosSemidef{T, T}(3)]
+    cones = CO.Cone{T}[CO.PosSemidefTri{T, T}(3)]
 
     r = build_solve_check(c, A, b, G, h, cones, cone_idxs; test_options...)
     @test r.status == :Optimal
@@ -408,7 +408,7 @@ function semidefinite2(T, test_options)
     h = zeros(T, 3)
     cone_idxs = [1:3]
 
-    cones = CO.Cone{T}[CO.PosSemidef{T, T}(3)]
+    cones = CO.Cone{T}[CO.PosSemidefTri{T, T}(3)]
 
     r = build_solve_check(c, A, b, G, h, cones, cone_idxs; test_options...)
     @test r.status == :Optimal
@@ -424,7 +424,7 @@ function semidefinitecomplex1(T, test_options)
     G = Diagonal(-one(T) * I, 4)
     h = zeros(T, 4)
     cone_idxs = [1:4]
-    cones = CO.Cone{T}[CO.PosSemidef{T, Complex{T}}(4)]
+    cones = CO.Cone{T}[CO.PosSemidefTri{T, Complex{T}}(4)]
 
     r = build_solve_check(c, A, b, G, h, cones, cone_idxs; test_options...)
     @test r.status == :Optimal
@@ -672,7 +672,7 @@ function hypoperlogdet1(T, test_options)
     mat = mat_half * mat_half'
     h = zeros(T, dim)
     CO.mat_U_to_vec!(view(h, 3:dim), mat)
-    cones = CO.Cone{T}[CO.HypoPerLogdet{T}(dim)]
+    cones = CO.Cone{T}[CO.HypoPerLogdetTri{T}(dim)]
     cone_idxs = [1:dim]
 
     r = build_solve_check(c, A, b, G, h, cones, cone_idxs; test_options...)
@@ -695,7 +695,7 @@ function hypoperlogdet2(T, test_options)
     mat = mat_half * mat_half'
     h = zeros(T, dim)
     CO.mat_U_to_vec!(view(h, 3:dim), mat)
-    cones = CO.Cone{T}[CO.HypoPerLogdet{T}(dim, true)]
+    cones = CO.Cone{T}[CO.HypoPerLogdetTri{T}(dim, true)]
     cone_idxs = [1:dim]
 
     r = build_solve_check(c, A, b, G, h, cones, cone_idxs; test_options...)
@@ -718,7 +718,7 @@ function hypoperlogdet3(T, test_options)
     mat = mat_half * mat_half'
     h = zeros(T, dim)
     CO.mat_U_to_vec!(view(h, 3:dim), mat)
-    cones = CO.Cone{T}[CO.HypoPerLogdet{T}(dim)]
+    cones = CO.Cone{T}[CO.HypoPerLogdetTri{T}(dim)]
     cone_idxs = [1:dim]
 
     r = build_solve_check(c, A, b, G, h, cones, cone_idxs; test_options...)

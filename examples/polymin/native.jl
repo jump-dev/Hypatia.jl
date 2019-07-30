@@ -98,7 +98,7 @@ function polyminreal(
                 Lk = size(Pk, 2)
                 dk = div(Lk * (Lk + 1), 2)
                 push!(cone_idxs, rowidx:(rowidx + dk - 1))
-                push!(cones, CO.PosSemidef{T, T}(dk))
+                push!(cones, CO.PosSemidefTri{T, T}(dk))
                 Gk = Matrix{T}(undef, dk, U)
                 l = 1
                 for i in 1:Lk, j in 1:i

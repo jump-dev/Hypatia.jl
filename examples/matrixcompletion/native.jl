@@ -100,7 +100,7 @@ function matrixcompletion(
             idx += i
             G_norm[offset + idx - 1, 1] = -1
         end
-        cones = CO.Cone{T}[CO.PosSemidef{T, T}(num_rows)]
+        cones = CO.Cone{T}[CO.PosSemidefTri{T, T}(num_rows)]
         cone_idxs = UnitRange{Int}[1:num_rows]
         cone_offset = num_rows
     end

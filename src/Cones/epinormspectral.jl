@@ -107,15 +107,18 @@ function update_hess(cone::EpiNormSpectral)
     Zi = cone.Zi
     Eu = cone.Eu
     cone.hess .= 0
+    H = cone.hess.data
+
     ZiEuZi = Symmetric(Zi * Eu * Zi)
-    cone.hess.data[1, 1] = dot(ZiEuZi, Eu) + (2 * dot(Zi, X) / u + 1) / u / u
-    cone.hess.data[1, 2:end] = vec(-2 * (ZiEuZi + Zi / u) * W / u)
+    H[1, 1] = dot(ZiEuZi, Eu) + (2 * dot(Zi, X) / u + 1) / u / u
+    H[1, 2:end] = vec(-2 * (ZiEuZi + Zi / u) * W / u)
+
     p = 2
-    for j in 1:m, i in 1:n
+    @inbounds for j in 1:m, i in 1:n
         @views tmpmat = Zi[:, i] * W[:, j]' * Zi / u
         term1 = Symmetric(tmpmat + tmpmat') # Zi * dZdWij * Zi
         q = p
-        viewij = view(cone.hess.data, p, q:(q + n - i))
+        viewij = view(H, p, q:(q + n - i))
         @views viewij .= Zi[i, i:n]
         @views @. for ni in 1:n
             viewij += W[ni, j] * term1[ni, i:n]
@@ -123,10 +126,11 @@ function update_hess(cone::EpiNormSpectral)
         viewij .*= 2 / u
         q += (n - i + 1)
         ntermsij = n * (m - j)
-        @views cone.hess.data[p, q:(q + ntermsij - 1)] .+= vec(2 * term1 * W[:, (j + 1):m] / u)
+        @views H[p, q:(q + ntermsij - 1)] .+= vec(2 * term1 * W[:, (j + 1):m] / u)
         q += ntermsij
         p += 1
     end
+
     cone.hess_updated = true
     return cone.hess
 end
