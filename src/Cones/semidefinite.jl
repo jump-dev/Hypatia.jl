@@ -23,7 +23,6 @@ mutable struct PosSemidef{T <: HypReal, R <: HypRealOrComplex{T}} <: Cone{T}
     side::Int
     point::AbstractVector{T}
     is_complex::Bool
-    use_hess_prod_ops
 
     feas_updated::Bool
     grad_updated::Bool
@@ -40,11 +39,10 @@ mutable struct PosSemidef{T <: HypReal, R <: HypRealOrComplex{T}} <: Cone{T}
     inv_mat::Matrix{R}
     fact_mat
 
-    function PosSemidef{T, R}(dim::Int, is_dual::Bool, use_hess_prod_ops::Bool) where {R <: HypRealOrComplex{T}} where {T <: HypReal}
+    function PosSemidef{T, R}(dim::Int, is_dual::Bool) where {R <: HypRealOrComplex{T}} where {T <: HypReal}
         cone = new{T, R}()
         cone.use_dual = is_dual
         cone.dim = dim # real vector dimension
-        cone.use_hess_prod_ops = use_hess_prod_ops
         if R <: Complex
             side = isqrt(dim) # real lower triangle and imaginary under diagonal
             @assert side^2 == dim
@@ -59,7 +57,7 @@ mutable struct PosSemidef{T <: HypReal, R <: HypRealOrComplex{T}} <: Cone{T}
     end
 end
 
-PosSemidef{T, R}(dim::Int; use_hess_prod_ops::Bool = true) where {R <: HypRealOrComplex{T}} where {T <: HypReal} = PosSemidef{T, R}(dim, false, use_hess_prod_ops)
+PosSemidef{T, R}(dim::Int) where {R <: HypRealOrComplex{T}} where {T <: HypReal} = PosSemidef{T, R}(dim, false)
 
 reset_data(cone::PosSemidef) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
 
@@ -102,7 +100,7 @@ end
 function update_grad(cone::PosSemidef)
     @assert cone.is_feas
     cone.inv_mat = inv(cone.fact_mat) # TODO eliminate allocs
-    smat_to_svec!(cone.grad, cone.inv_mat)
+    smat_L_to_svec!(cone.grad, cone.inv_mat)
     cone.grad .*= -1
     cone.grad_updated = true
     return cone.grad
@@ -286,7 +284,7 @@ end
 #         vec_to_mat!(cone.mat2, view(arr, :, i))
 #         mul!(cone.mat3, cone.mat2, cone.inv_mat)
 #         mul!(cone.mat2, cone.inv_mat, cone.mat3)
-#         smat_to_svec!(view(prod, :, i), cone.mat2)
+#         smat_L_to_svec!(view(prod, :, i), cone.mat2)
 #     end
 #     return prod
 # end

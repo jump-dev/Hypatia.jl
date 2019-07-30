@@ -8,7 +8,6 @@ module Cones
 
 using LinearAlgebra
 import LinearAlgebra.BlasFloat
-import LinearAlgebra.HermOrSym
 using ForwardDiff
 using DiffResults
 import Hypatia.HypReal
@@ -105,7 +104,7 @@ end
 
 # utilities for converting between smat and svec forms (lower triangle) for symmetric matrices
 
-function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{T}) where {T}
+function smat_L_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{T}) where {T}
     k = 1
     m = size(mat, 1)
     for i in 1:m, j in 1:i
@@ -133,7 +132,7 @@ function svec_to_smat!(mat::AbstractMatrix{T}, vec::AbstractVector{T}) where {T}
     return mat
 end
 
-function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}) where {T}
+function smat_L_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}) where {T}
     k = 1
     m = size(mat, 1)
     for i in 1:m, j in 1:i
