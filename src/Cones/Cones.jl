@@ -8,6 +8,7 @@ module Cones
 
 using LinearAlgebra
 import LinearAlgebra.BlasFloat
+import LinearAlgebra.copytri!
 using ForwardDiff
 using DiffResults
 import Hypatia.HypReal
@@ -104,7 +105,7 @@ end
 
 # utilities for converting between smat and svec forms (lower triangle) for symmetric matrices
 
-function smat_U_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{T}) where {T}
+function mat_U_to_vec_scaled!(vec::AbstractVector{T}, mat::AbstractMatrix{T}) where {T}
     k = 1
     m = size(mat, 1)
     for j in 1:m, i in 1:j
@@ -118,21 +119,21 @@ function smat_U_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{T}) where {
     return vec
 end
 
-function svec_to_smat!(mat::AbstractMatrix{T}, vec::AbstractVector{T}) where {T}
+function vec_to_mat_U_scaled!(mat::AbstractMatrix{T}, vec::AbstractVector{T}) where {T}
     k = 1
     m = size(mat, 1)
     for j in 1:m, i in 1:j
         if i == j
             mat[i, j] = vec[k]
         else
-            mat[i, j] = mat[j, i] = vec[k] / 2
+            mat[i, j] = vec[k] / 2
         end
         k += 1
     end
     return mat
 end
 
-function smat_U_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}) where {T}
+function mat_U_to_vec_scaled!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}) where {T}
     k = 1
     m = size(mat, 1)
     for j in 1:m, i in 1:j
@@ -150,7 +151,7 @@ function smat_U_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}
     return vec
 end
 
-function svec_to_smat!(mat::AbstractMatrix{Complex{T}}, vec::AbstractVector{T}) where {T}
+function vec_to_mat_U_scaled!(mat::AbstractMatrix{Complex{T}}, vec::AbstractVector{T}) where {T}
     k = 1
     m = size(mat, 1)
     for j in 1:m, i in 1:j
@@ -159,7 +160,6 @@ function svec_to_smat!(mat::AbstractMatrix{Complex{T}}, vec::AbstractVector{T}) 
             k += 1
         else
             mat[i, j] = Complex(vec[k], -vec[k + 1]) / 2
-            mat[j, i] = Complex(vec[k], vec[k + 1]) / 2
             k += 2
         end
     end
@@ -176,11 +176,11 @@ function mat_U_to_vec!(vec::AbstractVector{T}, mat::AbstractMatrix{T}) where {T}
     return vec
 end
 
-function vec_to_mat!(mat::AbstractMatrix{T}, vec::AbstractVector{T}) where {T}
+function vec_to_mat_U!(mat::AbstractMatrix{T}, vec::AbstractVector{T}) where {T}
     k = 1
     m = size(mat, 1)
     for j in 1:m, i in 1:j
-        mat[i, j] = mat[j, i] = vec[k]
+        mat[i, j] = vec[k]
         k += 1
     end
     return mat
@@ -204,7 +204,7 @@ function mat_U_to_vec!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}) 
     return vec
 end
 
-function vec_to_mat!(mat::AbstractMatrix{Complex{T}}, vec::AbstractVector{T}) where {T}
+function vec_to_mat_U!(mat::AbstractMatrix{Complex{T}}, vec::AbstractVector{T}) where {T}
     k = 1
     m = size(mat, 1)
     for j in 1:m, i in 1:j
@@ -213,7 +213,6 @@ function vec_to_mat!(mat::AbstractMatrix{Complex{T}}, vec::AbstractVector{T}) wh
             k += 1
         else
             mat[i, j] = Complex(vec[k], -vec[k + 1])
-            mat[j, i] = Complex(vec[k], vec[k + 1])
             k += 2
         end
     end

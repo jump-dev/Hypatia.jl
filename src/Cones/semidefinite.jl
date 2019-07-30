@@ -88,7 +88,7 @@ end
 # TODO only work with upper triangle
 function update_feas(cone::PosSemidef)
     @assert !cone.feas_updated
-    vec_to_mat!(cone.mat, cone.point)
+    vec_to_mat_U!(cone.mat, cone.point)
     copyto!(cone.mat2, cone.mat)
     cone.fact_mat = hyp_chol!(Hermitian(cone.mat2, :U))
     cone.is_feas = isposdef(cone.fact_mat)
@@ -99,16 +99,17 @@ end
 function update_grad(cone::PosSemidef)
     @assert cone.is_feas
     cone.inv_mat = inv(cone.fact_mat) # TODO eliminate allocs
-    smat_U_to_svec!(cone.grad, cone.inv_mat)
+    mat_U_to_vec_scaled!(cone.grad, cone.inv_mat)
     cone.grad .*= -1
     cone.grad_updated = true
     return cone.grad
 end
 
 # TODO parallelize
-function _build_hess_real(H::Matrix{T}, mat::Matrix{T}, is_inv::Bool, scaling::T) where {T}
+function _build_hess_real(H::Matrix{T}, mat::Matrix{T}, is_inv::Bool) where {T <: HypReal}
     side = size(mat, 1)
-    scaling_new = (is_inv ? one(T) : scaling)
+    scale1 = (is_inv ? inv(T(2)) : T(2))
+    scale2 = (is_inv ? one(T) : scale1)
     k = 1
     for i in 1:side, j in 1:i
         k2 = 1
@@ -116,9 +117,9 @@ function _build_hess_real(H::Matrix{T}, mat::Matrix{T}, is_inv::Bool, scaling::T
             if (i == j) && (i2 == j2)
                 H[k2, k] = abs2(mat[i2, i])
             elseif (i != j) && (i2 != j2)
-                H[k2, k] = scaling * (mat[i2, i] * mat[j, j2] + mat[j2, i] * mat[j, i2])
+                H[k2, k] = scale1 * (mat[i2, i] * mat[j, j2] + mat[j2, i] * mat[j, i2])
             else
-                H[k2, k] = scaling_new * mat[i2, i] * mat[j, j2]
+                H[k2, k] = scale2 * mat[i2, i] * mat[j, j2]
             end
             if k2 == k
                 break
@@ -130,9 +131,10 @@ function _build_hess_real(H::Matrix{T}, mat::Matrix{T}, is_inv::Bool, scaling::T
     return H
 end
 
-function _build_hess_complex(H::Matrix{T}, mat::Matrix{Complex{T}}, is_inv::Bool, scaling::T) where {T <: HypReal}
+function _build_hess_complex(H::Matrix{T}, mat::Matrix{Complex{T}}, is_inv::Bool) where {T <: HypReal}
     side = size(mat, 1)
-    scaling_new = (is_inv ? one(T) : scaling)
+    scale1 = (is_inv ? inv(T(2)) : T(2))
+    scale2 = (is_inv ? one(T) : scale1)
     k = 1
     for i in 1:side, j in 1:i
         k2 = 1
@@ -142,7 +144,7 @@ function _build_hess_complex(H::Matrix{T}, mat::Matrix{Complex{T}}, is_inv::Bool
                     H[k2, k] = abs2(mat[i2, i])
                     k2 += 1
                 else
-                    c = scaling_new * mat[i, i2] * mat[j2, j]
+                    c = scale2 * mat[i, i2] * mat[j2, j]
                     H[k2, k] = real(c)
                     k2 += 1
                     H[k2, k] = -imag(c)
@@ -156,18 +158,18 @@ function _build_hess_complex(H::Matrix{T}, mat::Matrix{Complex{T}}, is_inv::Bool
         else
             for i2 in 1:side, j2 in 1:i2
                 if i2 == j2
-                    c = scaling_new * mat[i2, i] * mat[j, j2]
+                    c = scale2 * mat[i2, i] * mat[j, j2]
                     H[k2, k] = real(c)
                     H[k2, k + 1] = -imag(c)
                     k2 += 1
                 else
                     b1 = mat[i2, i] * mat[j, j2]
                     b2 = mat[j2, i] * mat[j, i2]
-                    c1 = scaling * (b1 + b2)
+                    c1 = scale1 * (b1 + b2)
                     H[k2, k] = real(c1)
                     H[k2, k + 1] = -imag(c1)
                     k2 += 1
-                    c2 = scaling * (b1 - b2)
+                    c2 = scale1 * (b1 - b2)
                     H[k2, k] = imag(c2)
                     H[k2, k + 1] = real(c2)
                     k2 += 1
@@ -182,53 +184,59 @@ function _build_hess_complex(H::Matrix{T}, mat::Matrix{Complex{T}}, is_inv::Bool
     return H
 end
 
-function update_hess(cone::PosSemidef{T, T}) where {T <: HypReal}
+function update_hess(cone::PosSemidef{<:HypReal, <:HypReal})
     @assert cone.grad_updated
-    _build_hess_real(cone.hess.data, cone.inv_mat, false, T(2))
+    _build_hess_real(cone.hess.data, cone.inv_mat, false)
     cone.hess_updated = true
     return cone.hess
 end
 
-function update_hess(cone::PosSemidef{T, Complex{T}}) where {T <: HypReal}
+function update_hess(cone::PosSemidef{<:HypReal, <:Complex{<:HypReal}})
     @assert cone.grad_updated
-    _build_hess_complex(cone.hess.data, cone.inv_mat, false, T(2))
+    _build_hess_complex(cone.hess.data, cone.inv_mat, false)
     cone.hess_updated = true
     return cone.hess
 end
 
-function update_inv_hess(cone::PosSemidef{T, T}) where {T <: HypReal}
-    @assert cone.is_feas
-    _build_hess_real(cone.inv_hess.data, cone.mat, true, inv(T(2)))
+function update_inv_hess(cone::PosSemidef{<:HypReal, <:HypReal})
+    @assert is_feas(cone)
+    update_inv_hess_prod(cone) # need cone.mat to be symmetric
+    _build_hess_real(cone.inv_hess.data, cone.mat, true)
     cone.inv_hess_updated = true
     return cone.inv_hess
 end
 
-function update_inv_hess(cone::PosSemidef{T, Complex{T}}) where {T <: HypReal}
-    @assert cone.is_feas
-    _build_hess_complex(cone.inv_hess.data, cone.mat, true, inv(T(2)))
+function update_inv_hess(cone::PosSemidef{<:HypReal, <:Complex{<:HypReal}})
+    @assert is_feas(cone)
+    update_inv_hess_prod(cone) # need cone.mat to be symmetric
+    _build_hess_complex(cone.inv_hess.data, cone.mat, true)
     cone.inv_hess_updated = true
     return cone.inv_hess
 end
 
-update_inv_hess_prod(cone::PosSemidef) = nothing
+function update_inv_hess_prod(cone::PosSemidef)
+    copytri!(cone.mat, 'U', cone.is_complex)
+    return nothing
+end
 
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidef)
     @assert cone.grad_updated
     @inbounds for i in 1:size(arr, 2)
-        vec_to_mat!(cone.mat2, view(arr, :, i))
-        mul!(cone.mat3, cone.mat2, cone.inv_mat)
-        mul!(cone.mat2, cone.inv_mat, cone.mat3)
-        smat_U_to_svec!(view(prod, :, i), cone.mat2)
+        vec_to_mat_U!(cone.mat2, view(arr, :, i))
+        mul!(cone.mat3, Hermitian(cone.mat2, :U), cone.inv_mat)
+        mul!(cone.mat2, Hermitian(cone.inv_mat, :U), cone.mat3)
+        mat_U_to_vec_scaled!(view(prod, :, i), cone.mat2)
     end
     return prod
 end
 
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidef)
     @assert is_feas(cone)
+    update_inv_hess_prod(cone)
     @inbounds for i in 1:size(arr, 2)
-        svec_to_smat!(cone.mat2, view(arr, :, i))
-        mul!(cone.mat3, cone.mat2, cone.mat)
-        mul!(cone.mat2, cone.mat, cone.mat3)
+        vec_to_mat_U_scaled!(cone.mat2, view(arr, :, i))
+        mul!(cone.mat3, Hermitian(cone.mat2, :U), cone.mat)
+        mul!(cone.mat2, Hermitian(cone.mat, :U), cone.mat3)
         mat_U_to_vec!(view(prod, :, i), cone.mat2)
     end
     return prod
