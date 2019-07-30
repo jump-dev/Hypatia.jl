@@ -34,12 +34,12 @@ mutable struct HypoPerLogdet{T <: HypReal} <: Cone{T}
     mat3::Matrix{T}
     vecn::Vector{T}
     fact_mat
-    ldWv
-    z
-    Wi
-    nLz
-    ldWvuv
-    vzip1
+    ldWv::T
+    z::T
+    Wi::Matrix{T}
+    nLz::T
+    ldWvuv::T
+    vzip1::T
     Wivzi::Matrix{T}
     tmp_hess::Symmetric{T, Matrix{T}}
     hess_fact # TODO prealloc
