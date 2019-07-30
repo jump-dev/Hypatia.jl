@@ -162,7 +162,7 @@ testfuns_raw = [
         linear_model_options = NamedTuple(),
         system_solver_options = NamedTuple(),
         stepper_options = (use_infty_nbhd = n,),
-        solver_options = (verbose = true,),
+        solver_options = (verbose = false,),
         )
     t(T, test_options)
 end
@@ -186,7 +186,7 @@ real_types = [
     Float32,
     # BigFloat,
     ]
-    
+
 @testset "native examples: $T" for T in real_types
     # TODO test some other options maybe
     test_options = (
@@ -228,7 +228,6 @@ end
     @testset "polymin" begin test_polymin.(instances_polymin_linops, T = T, test_options = test_options) end
 
     @testset "portfolio" begin test_portfolio.(instances_portfolio_linops, T = T, test_options = test_options) end
-
 end
 
 @info("starting MathOptInterface tests")

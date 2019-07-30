@@ -82,12 +82,13 @@ end
 # TODO only work with upper triangle
 function update_hess(cone::EpiPerSquare)
     @assert cone.grad_updated
-    mul!(cone.hess.data, cone.grad, cone.grad')
+    H = cone.hess.data
+    mul!(H, cone.grad, cone.grad')
     invdist = inv(cone.dist)
-    for j in 3:cone.dim
-        cone.hess.data[j, j] += invdist
+    @inbounds for j in 3:cone.dim
+        H[j, j] += invdist
     end
-    cone.hess.data[1, 2] -= invdist
+    H[1, 2] -= invdist
     cone.hess_updated = true
     return cone.hess
 end
@@ -96,7 +97,7 @@ end
 function update_inv_hess(cone::EpiPerSquare)
     @assert cone.is_feas
     mul!(cone.inv_hess.data, cone.point, cone.point')
-    for j in 3:cone.dim
+    @inbounds for j in 3:cone.dim
         cone.inv_hess.data[j, j] += cone.dist
     end
     cone.inv_hess.data[1, 2] -= cone.dist
@@ -109,7 +110,7 @@ update_inv_hess_prod(cone::EpiPerSquare) = nothing
 
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerSquare)
     @assert cone.grad_updated
-    for j in 1:size(prod, 2)
+    @inbounds for j in 1:size(prod, 2)
         ga = dot(cone.grad, view(arr, :, j))
         @. prod[:, j] = ga * cone.grad
         @views @. prod[3:end, j] += arr[3:end, j] / cone.dist
@@ -121,7 +122,7 @@ end
 
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerSquare)
     @assert cone.is_feas
-    for j in 1:size(prod, 2)
+    @inbounds for j in 1:size(prod, 2)
         pa = dot(cone.point, view(arr, :, j))
         @. prod[:, j] = pa * cone.point
         @views @. prod[3:end, j] += cone.dist * arr[3:end, j]

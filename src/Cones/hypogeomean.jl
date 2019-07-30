@@ -98,17 +98,20 @@ function update_hess(cone::HypoGeomean)
     @assert cone.grad_updated
     u = cone.point[1]
     w = view(cone.point, 2:cone.dim)
+    H = cone.hess.data
+
     wiaau = cone.wiaa + u
-    cone.hess.data[1, 1] = inv(wiaau) / wiaau + inv(u) / u
-    for j in eachindex(w)
+    H[1, 1] = inv(wiaau) / wiaau + inv(u) / u
+    @inbounds for j in eachindex(w)
         j1 = j + 1
         wiwaw = -cone.wiw * cone.alpha[j] / w[j]
-        cone.hess.data[1, j1] = -wiwaw / wiaau
-        for i in 1:(j - 1)
-            cone.hess.data[i + 1, j1] = wiwaw * cone.a1ww[i]
+        H[1, j1] = -wiwaw / wiaau
+        @inbounds for i in 1:(j - 1)
+            H[i + 1, j1] = wiwaw * cone.a1ww[i]
         end
-        cone.hess.data[j1, j1] = wiwaw * cone.grad[j1] + (1 - cone.alpha[j]) / w[j] / w[j]
+        H[j1, j1] = wiwaw * cone.grad[j1] + (1 - cone.alpha[j]) / w[j] / w[j]
     end
+
     cone.hess_updated = true
     return cone.hess
 end
