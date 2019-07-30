@@ -265,37 +265,23 @@ end
 update_inv_hess_prod(cone::PosSemidef) = nothing
 
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidef)
-    if !cone.hess_updated
-        update_hess(cone)
+    @assert cone.grad_updated
+    @inbounds for i in 1:size(arr, 2)
+        vec_to_mat!(cone.mat2, view(arr, :, i))
+        mul!(cone.mat3, cone.mat2, cone.inv_mat)
+        mul!(cone.mat2, cone.inv_mat, cone.mat3)
+        smat_U_to_svec!(view(prod, :, i), cone.mat2)
     end
-    return mul!(prod, cone.hess, arr)
+    return prod
 end
 
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidef)
-    if !cone.inv_hess_updated
-        update_inv_hess(cone)
+    @assert is_feas(cone)
+    @inbounds for i in 1:size(arr, 2)
+        svec_to_smat!(cone.mat2, view(arr, :, i))
+        mul!(cone.mat3, cone.mat2, cone.mat)
+        mul!(cone.mat2, cone.mat, cone.mat3)
+        mat_L_to_vec!(view(prod, :, i), cone.mat2)
     end
-    return mul!(prod, cone.inv_hess, arr)
+    return prod
 end
-
-# function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidef)
-#     @assert cone.grad_updated
-#     @inbounds for i in 1:size(arr, 2)
-#         vec_to_mat!(cone.mat2, view(arr, :, i))
-#         mul!(cone.mat3, cone.mat2, cone.inv_mat)
-#         mul!(cone.mat2, cone.inv_mat, cone.mat3)
-#         smat_U_to_svec!(view(prod, :, i), cone.mat2)
-#     end
-#     return prod
-# end
-#
-# function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidef)
-#     @assert is_feas(cone)
-#     @inbounds for i in 1:size(arr, 2)
-#         svec_to_smat!(cone.mat2, view(arr, :, i))
-#         mul!(cone.mat3, cone.mat2, cone.mat)
-#         mul!(cone.mat2, cone.mat, cone.mat3)
-#         mat_L_to_vec!(view(prod, :, i), cone.mat2)
-#     end
-#     return prod
-# end
