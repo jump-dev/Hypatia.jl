@@ -39,7 +39,6 @@ function test_barrier_oracles(cone::CO.Cone{T}, barrier::Function; noise = 0.0) 
     end
 
     inv_hess = CO.inv_hess(cone)
-    # @show inv_hess ./ inv(hess)
     @test hess * inv_hess ≈ I atol=tol rtol=tol
 
     CO.update_hess_prod(cone)
@@ -184,7 +183,6 @@ end
 function test_semidefinite_barrier(T::Type{<:HypReal})
     for side in [1, 2, 3]
         # real PSD cone
-        @show "real"
         dim = div(side * (side + 1), 2)
         cone = CO.PosSemidef{T, T}(dim)
         function R_barrier(s)
@@ -196,7 +194,6 @@ function test_semidefinite_barrier(T::Type{<:HypReal})
         test_barrier_oracles(cone, R_barrier, noise = 0.1)
 
         # complex PSD cone
-        @show "complex"
         dim = side^2
         cone = CO.PosSemidef{T, Complex{T}}(dim)
         function C_barrier(s)
