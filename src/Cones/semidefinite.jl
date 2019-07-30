@@ -13,7 +13,6 @@ barrier from "Self-Scaled Barriers and Interior-Point Methods for Convex Program
 
 TODO
 - eliminate allocations for inverse-finding
-
 - not make multiplication operators the default
 =#
 
@@ -107,20 +106,19 @@ function update_grad(cone::PosSemidef)
 end
 
 # TODO parallelize
-function _build_hess_real(H::Symmetric{T, Matrix{T}}, mat::Matrix{T}, is_inv::Bool) where {T}
+function _build_hess_real(H::Matrix{T}, mat::Matrix{T}, is_inv::Bool, scaling::T) where {T}
     side = size(mat, 1)
+    scaling_new = (is_inv ? one(T) : scaling)
     k = 1
     for i in 1:side, j in 1:i
         k2 = 1
         for i2 in 1:side, j2 in 1:i2
             if (i == j) && (i2 == j2)
-                H.data[k2, k] = abs2(mat[i2, i])
+                H[k2, k] = abs2(mat[i2, i])
             elseif (i != j) && (i2 != j2)
-                fact = (is_inv ? inv(2) : 2)
-                H.data[k2, k] = fact * (mat[i2, i] * mat[j, j2] + mat[j2, i] * mat[j, i2])
+                H[k2, k] = scaling * (mat[i2, i] * mat[j, j2] + mat[j2, i] * mat[j, i2])
             else
-                fact = (is_inv ? 1 : 2)
-                H.data[k2, k] = fact * mat[i2, i] * mat[j, j2]
+                H[k2, k] = scaling_new * mat[i2, i] * mat[j, j2]
             end
             if k2 == k
                 break
@@ -132,21 +130,22 @@ function _build_hess_real(H::Symmetric{T, Matrix{T}}, mat::Matrix{T}, is_inv::Bo
     return H
 end
 
-function _build_hess_complex(H::Symmetric{T, Matrix{T}}, mat::Matrix{Complex{T}}) where {T <: HypReal}
+function _build_hess_complex(H::Matrix{T}, mat::Matrix{Complex{T}}, is_inv::Bool, scaling::T) where {T <: HypReal}
     side = size(mat, 1)
+    scaling_new = (is_inv ? one(T) : scaling)
     k = 1
     for i in 1:side, j in 1:i
         k2 = 1
         if i == j
             for i2 in 1:side, j2 in 1:i2
                 if i2 == j2
-                    H.data[k2, k] = abs2(mat[i2, i])
+                    H[k2, k] = abs2(mat[i2, i])
                     k2 += 1
                 else
-                    c = T(2) * mat[i, i2] * mat[j2, j]
-                    H.data[k2, k] = real(c)
+                    c = scaling_new * mat[i, i2] * mat[j2, j]
+                    H[k2, k] = real(c)
                     k2 += 1
-                    H.data[k2, k] = -imag(c)
+                    H[k2, k] = -imag(c)
                     k2 += 1
                 end
                 if k2 > k
@@ -157,71 +156,20 @@ function _build_hess_complex(H::Symmetric{T, Matrix{T}}, mat::Matrix{Complex{T}}
         else
             for i2 in 1:side, j2 in 1:i2
                 if i2 == j2
-                    c = T(2) * mat[i2, i] * mat[j, j2]
-                    H.data[k2, k] = real(c)
-                    H.data[k2, k + 1] = -imag(c)
+                    c = scaling_new * mat[i2, i] * mat[j, j2]
+                    H[k2, k] = real(c)
+                    H[k2, k + 1] = -imag(c)
                     k2 += 1
                 else
                     b1 = mat[i2, i] * mat[j, j2]
                     b2 = mat[j2, i] * mat[j, i2]
-                    c1 = T(2) * (b1 + b2)
-                    H.data[k2, k] = real(c1)
-                    H.data[k2, k + 1] = -imag(c1)
+                    c1 = scaling * (b1 + b2)
+                    H[k2, k] = real(c1)
+                    H[k2, k + 1] = -imag(c1)
                     k2 += 1
-                    c2 = T(2) * (b1 - b2)
-                    H.data[k2, k] = imag(c2)
-                    H.data[k2, k + 1] = real(c2)
-                    k2 += 1
-                end
-                if k2 > k
-                    break
-                end
-            end
-            k += 2
-        end
-    end
-    return H
-end
-
-function _build_inv_hess_complex(H::Symmetric{T, Matrix{T}}, mat::Matrix{Complex{T}}) where {T <: HypReal}
-    side = size(mat, 1)
-    k = 1
-    for i in 1:side, j in 1:i
-        k2 = 1
-        if i == j
-            for i2 in 1:side, j2 in 1:i2
-                if i2 == j2
-                    H.data[k2, k] = abs2(mat[i2, i])
-                    k2 += 1
-                else
-                    c = mat[i, i2] * mat[j2, j]
-                    H.data[k2, k] = real(c)
-                    k2 += 1
-                    H.data[k2, k] = -imag(c)
-                    k2 += 1
-                end
-                if k2 > k
-                    break
-                end
-            end
-            k += 1
-        else
-            for i2 in 1:side, j2 in 1:i2
-                if i2 == j2
-                    c = mat[i2, i] * mat[j, j2]
-                    H.data[k2, k] = real(c)
-                    H.data[k2, k + 1] = -imag(c)
-                    k2 += 1
-                else
-                    b1 = mat[i2, i] * mat[j, j2]
-                    b2 = mat[j2, i] * mat[j, i2]
-                    c1 = T(0.5) * (b1 + b2)
-                    H.data[k2, k] = real(c1)
-                    H.data[k2, k + 1] = -imag(c1)
-                    k2 += 1
-                    c2 = T(0.5) * (b1 - b2)
-                    H.data[k2, k] = imag(c2)
-                    H.data[k2, k + 1] = real(c2)
+                    c2 = scaling * (b1 - b2)
+                    H[k2, k] = imag(c2)
+                    H[k2, k + 1] = real(c2)
                     k2 += 1
                 end
                 if k2 > k
@@ -236,28 +184,28 @@ end
 
 function update_hess(cone::PosSemidef{T, T}) where {T <: HypReal}
     @assert cone.grad_updated
-    _build_hess_real(cone.hess, cone.inv_mat, false)
+    _build_hess_real(cone.hess.data, cone.inv_mat, false, T(2))
     cone.hess_updated = true
     return cone.hess
 end
 
-function update_hess(cone::PosSemidef)
+function update_hess(cone::PosSemidef{T, Complex{T}}) where {T <: HypReal}
     @assert cone.grad_updated
-    _build_hess_complex(cone.hess, cone.inv_mat)
+    _build_hess_complex(cone.hess.data, cone.inv_mat, false, T(2))
     cone.hess_updated = true
     return cone.hess
 end
 
 function update_inv_hess(cone::PosSemidef{T, T}) where {T <: HypReal}
     @assert cone.is_feas
-    _build_hess_real(cone.inv_hess, cone.mat, true)
+    _build_hess_real(cone.inv_hess.data, cone.mat, true, inv(T(2)))
     cone.inv_hess_updated = true
     return cone.inv_hess
 end
 
-function update_inv_hess(cone::PosSemidef)
+function update_inv_hess(cone::PosSemidef{T, Complex{T}}) where {T <: HypReal}
     @assert cone.is_feas
-    _build_inv_hess_complex(cone.inv_hess, cone.mat)
+    _build_hess_complex(cone.inv_hess.data, cone.mat, true, inv(T(2)))
     cone.inv_hess_updated = true
     return cone.inv_hess
 end
@@ -281,7 +229,7 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Pos
         svec_to_smat!(cone.mat2, view(arr, :, i))
         mul!(cone.mat3, cone.mat2, cone.mat)
         mul!(cone.mat2, cone.mat, cone.mat3)
-        mat_L_to_vec!(view(prod, :, i), cone.mat2)
+        mat_U_to_vec!(view(prod, :, i), cone.mat2)
     end
     return prod
 end

@@ -9,6 +9,7 @@ barrier (guessed, based on analogy to hypoperlog barrier)
 -log(v*logdet(W/v) - u) - logdet(W) - log(v)
 
 TODO remove allocations
+TODO get rid of cone.vecn used by wrapping muls in the Hessian with BLAS functions
 =#
 
 mutable struct HypoPerLogdet{T <: HypReal} <: Cone{T}
@@ -182,7 +183,6 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPer
     end
     Wi = cone.Wi
     @views mul!(prod[1:2, :], cone.hess[1:2, :], arr)
-    # could get rid of cone.vecn used later if we wrap a gemm
     @views mul!(prod[3:cone.dim, :], cone.hess[3:cone.dim, 1:2], arr[1:2, :])
 
     @inbounds for i in 1:size(arr, 2)
