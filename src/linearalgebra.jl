@@ -32,7 +32,6 @@ function hyp_ldiv_chol_L!(B::Matrix, F::Cholesky, A::AbstractMatrix)
     return B
 end
 
-
 struct HypBlockMatrix{T <: HypReal}
     nrows::Int
     ncols::Int
