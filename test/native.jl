@@ -381,7 +381,7 @@ function epipersquare3(T, test_options)
     end
 end
 
-function semidefinite1(T, test_options)
+function possemideftri1(T, test_options)
     tol = max(1e-5, sqrt(sqrt(eps(T))))
     Trt2 = sqrt(T(2))
     Trt2i = inv(Trt2)
@@ -407,7 +407,7 @@ function semidefinite1(T, test_options)
     end
 end
 
-function semidefinite2(T, test_options)
+function possemideftri2(T, test_options)
     tol = max(1e-5, sqrt(sqrt(eps(T))))
     c = T[0, -1, 0]
     A = T[1 0 1]
@@ -426,7 +426,7 @@ function semidefinite2(T, test_options)
     end
 end
 
-function semidefinitecomplex1(T, test_options)
+function possemideftricomplex1(T, test_options)
     tol = max(1e-5, sqrt(sqrt(eps(T))))
     Trt2 = sqrt(T(2))
     c = T[1, 0, 0, 1]
@@ -670,7 +670,7 @@ function epinormspectral1(T, test_options)
     end
 end
 
-function hypoperlogdet1(T, test_options)
+function hypoperlogdettri1(T, test_options)
     tol = max(1e-5, sqrt(sqrt(eps(T))))
     Random.seed!(1)
     side = 4
@@ -698,7 +698,7 @@ function hypoperlogdet1(T, test_options)
     @test r.z[1] * (logdet(Symmetric(sol_mat, :U) / r.z[1]) + T(side)) ≈ r.z[2] atol=tol rtol=tol
 end
 
-function hypoperlogdet2(T, test_options)
+function hypoperlogdettri2(T, test_options)
     tol = max(1e-5, sqrt(sqrt(eps(T))))
     Random.seed!(1)
     side = 3
@@ -726,7 +726,7 @@ function hypoperlogdet2(T, test_options)
     @test r.z[2] * logdet(Symmetric(sol_mat, :U) / r.z[2]) ≈ r.z[1] atol=tol rtol=tol
 end
 
-function hypoperlogdet3(T, test_options)
+function hypoperlogdettri3(T, test_options)
     tol = max(1e-5, sqrt(sqrt(eps(T))))
     Random.seed!(1)
     side = 3

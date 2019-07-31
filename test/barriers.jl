@@ -180,7 +180,7 @@ function test_epinormspectral_barrier(T::Type{<:HypReal})
     return
 end
 
-function test_semidefinite_barrier(T::Type{<:HypReal})
+function test_possemideftri_barrier(T::Type{<:HypReal})
     for side in [1, 2, 3]
         # real PSD cone
         dim = div(side * (side + 1), 2)
@@ -207,7 +207,7 @@ function test_semidefinite_barrier(T::Type{<:HypReal})
     return
 end
 
-function test_hypoperlogdet_barrier(T::Type{<:HypReal})
+function test_hypoperlogdettri_barrier(T::Type{<:HypReal})
     for side in [1, 2, 3]
         dim = 2 + div(side * (side + 1), 2)
         cone = CO.HypoPerLogdetTri{T}(dim)
