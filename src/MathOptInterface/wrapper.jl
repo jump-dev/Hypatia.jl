@@ -528,9 +528,9 @@ function MOI.optimize!(opt::Optimizer)
     opt.z = r.z
     opt.s[opt.interval_idxs] ./= opt.interval_scales
     for (k, cone_k) in enumerate(opt.cones)
-        if cone_k isa Cones.PosSemidef || cone_k isa Cones.HypoPerLogdet # rescale duals for symmetric triangle cones
+        if cone_k isa Cones.PosSemidefTri || cone_k isa Cones.HypoPerLogdetTri # rescale duals for symmetric triangle cones
             unscale_vec = (Cones.use_dual(cone_k) ? opt.s : opt.z)
-            idxs = (cone_k isa Cones.PosSemidef ? opt.cone_idxs[k] : opt.cone_idxs[k][3:end])
+            idxs = (cone_k isa Cones.PosSemidefTri ? opt.cone_idxs[k] : opt.cone_idxs[k][3:end])
             offset = 1
             for i in 1:round(Int, sqrt(0.25 + 2 * length(idxs)) - 0.5)
                 for j in 1:(i - 1)
