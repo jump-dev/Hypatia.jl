@@ -10,6 +10,7 @@ barrier from "Interior-Point Polynomial Algorithms in Convex Programming" by Nes
 -logdet(u*I_n - W*W'/u) - log(u)
 
 TODO eliminate allocations
+TODO type auxiliary fields
 =#
 
 mutable struct EpiNormSpectral{T <: HypReal} <: Cone{T}
