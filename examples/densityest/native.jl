@@ -239,3 +239,8 @@ function test_densityest(instance::Function; T::Type{<:HypReal} = Float64, test_
     @test r.status == :Optimal
     return
 end
+
+test_densityest.(
+    instances_densityest_few,
+    T = Float64,
+    test_options = (solver_options = (verbose = true,),))

@@ -258,8 +258,14 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
             end
             Q2div .= F \ Q2div # TODO eliminate allocs (see https://github.com/JuliaLang/julia/issues/30084)
         else
-            F = hyp_chol!(Symmetric(Q2GHGQ2)) # TODO prealloc blasreal cholesky auxiliary vectors using posvx
+            Q2GHGQ2_copy = copy(Q2GHGQ2)
+            # F = hyp_chol!(Symmetric(Q2GHGQ2)) # TODO prealloc blasreal cholesky auxiliary vectors using posvx
+            F = hyp_chol!(Symmetric(BigFloat.(Q2GHGQ2)))
+            # F = hyp_chol!(Symmetric(Float64.(Q2GHGQ2)))
+            # @show typeof(F)
+            # F = bunchkaufman!(Symmetric(Q2GHGQ2), true, check = false)
             if !isposdef(F)
+            # if !issuccess(F)
                 println("dense linear system matrix factorization failed")
                 mul!(Q2GHGQ2, GQ2', HGQ2)
                 Q2GHGQ2 += T(1e-8) * I
@@ -276,7 +282,42 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
                     end
                 end
             end
-            ldiv!(F, Q2div)
+            Q2div_copy = copy(Q2div)
+            Q2div_copy2 = copy(Q2div_copy)
+            Q2div_copy = F \ Q2div_copy2
+            # Q2div_copy = Float64.(F.U) \ (Float64.(F.L) \ Float64.(Q2div_copy2))
+            Q2div .= Float64.(Q2div_copy)
+            # @show typeof(Q2div)
+            # @show typeof(F)
+            # ldiv!(F, Q2div)
+
+            # Q2div, bnorm, bcomp = IterativeRefinement.rfldiv(Q2GHGQ2, Q2div_copy)
+            # sol = F \ Q2div
+            # println(norm(Q2div_copy - Symmetric(Q2GHGQ2_copy) * Q2div))
+
+            # iter = 0
+            # res = Q2div_copy - Symmetric(Q2GHGQ2_copy) * Q2div
+            # err = similar(Q2div)
+            # while norm(res) > 1e-8 && iter <= 20
+            #     res = BigFloat.(Q2div_copy) - Symmetric(BigFloat.(Q2GHGQ2_copy)) * BigFloat.(Q2div)
+            #     F2 = cholesky(Symmetric(Q2GHGQ2_copy))
+            #     err .= res
+            #     ldiv!(F2, err)
+            #     # err = Symmetric(BigFloat.(Q2GHGQ2_copy)) \ BigFloat.(res)
+            #     Q2div .+= err
+            #     iter += 1
+            #     @show iter, norm(res)
+            # end
+
+            # X = similar(Q2div_copy)
+            # Q2GHGQ2_copy2 = copy(Q2GHGQ2_copy)
+            # Q2div_copy2 = copy(Q2div_copy)
+            # hyp_posvxx!(X, Q2GHGQ2_copy, Q2div_copy)
+            # @show norm(Q2div_copy2 - Q2GHGQ2_copy2 * X)
+
+
+            # sol .= Q2div
+            # @show typeof(Q2div)
         end
     end
 
@@ -299,6 +340,12 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
     tau_denom = mu / solver.tau / solver.tau - dot(model.c, x1) - dot(model.b, y1) - dot(model.h, z1)
 
     function lift!(x, y, z, s, tau_rhs, kap_rhs)
+        # x = Float64.(x)
+        # y = Float64.(y)
+        # z = Float64.(z)
+        # s = Float64.(s)
+        # tau_rhs = Float64(tau_rhs)
+        # kap_rhs = Float64(kap_rhs)
         tau_sol = (tau_rhs + kap_rhs + dot(model.c, x) + dot(model.b, y) + dot(model.h, z)) / tau_denom
         @. x += tau_sol * x1
         @. y += tau_sol * y1
@@ -312,6 +359,9 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
     (tau_pred, kap_pred) = lift!(x2, y2, z2, z2_temp, solver.kap + solver.primal_obj_t - solver.dual_obj_t, -solver.kap)
     @. z2_temp -= solver.z_residual
     (tau_corr, kap_corr) = lift!(x3, y3, z3, z3_temp, zero(T), -solver.kap + mu / solver.tau)
+
+    x2 = Float64.(x2)
+    x3 = Float64.(x3)
 
     return (x2, x3, y2, y3, z2, z3, z2_temp, z3_temp, tau_pred, tau_corr, kap_pred, kap_corr)
 end

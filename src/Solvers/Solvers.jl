@@ -12,6 +12,7 @@ import LinearAlgebra.BlasReal
 using SparseArrays
 import SuiteSparse
 import IterativeSolvers
+import IterativeRefinement
 using Test
 using TimerOutputs
 import Hypatia.Cones
@@ -22,6 +23,9 @@ import Hypatia.hyp_AtA!
 import Hypatia.hyp_chol!
 import Hypatia.hyp_ldiv_chol_L!
 import Hypatia.HypBlockMatrix
+import Hypatia.hyp_sysvx!
+import Hypatia.hyp_posvx!
+import Hypatia.hyp_posvxx!
 
 abstract type Solver{T <: HypReal} end
 

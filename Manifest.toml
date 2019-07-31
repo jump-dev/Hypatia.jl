@@ -171,6 +171,14 @@ git-tree-sha1 = "15732c475062348b0165684ffe28e85ea8396afc"
 uuid = "41ab1584-1d38-5bbf-9106-f11c6c58b48f"
 version = "1.0.0"
 
+[[IterativeRefinement]]
+deps = ["LinearAlgebra"]
+git-tree-sha1 = "c56da0148b1a78bef63abdb5adaeae341a77a066"
+repo-rev = "master"
+repo-url = "https://github.com/RalphAS/IterativeRefinement.jl.git"
+uuid = "bcb6b82e-7479-5933-8c8e-2e0b909ee6a3"
+version = "0.2.0-DEV"
+
 [[IterativeSolvers]]
 deps = ["LinearAlgebra", "Printf", "Random", "RecipesBase", "SparseArrays", "Test"]
 git-tree-sha1 = "5687f68018b4f14c0da54d402bb23eecaec17f37"
