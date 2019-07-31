@@ -75,7 +75,7 @@ function update_feas(cone::WSOSPolyInterp)
     @assert !cone.feas_updated
     D = Diagonal(cone.point)
     cone.is_feas = true
-    for k in eachindex(cone.Ps)
+    @inbounds for k in eachindex(cone.Ps)
         # Λ = Pk' * Diagonal(point) * Pk
         # TODO mul!(A, B', Diagonal(x)) calls extremely inefficient method but doesn't need ULk
         Pk = cone.Ps[k]
@@ -101,9 +101,9 @@ end
 function update_grad(cone::WSOSPolyInterp)
     @assert cone.is_feas
     cone.grad .= 0
-    for k in eachindex(cone.Ps)
+    @inbounds for k in eachindex(cone.Ps)
         LUk = hyp_ldiv_chol_L!(cone.tmpLU[k], cone.ΛFs[k], cone.Ps[k]')
-        for j in 1:cone.dim
+        @inbounds for j in 1:cone.dim
             cone.grad[j] -= sum(abs2, view(LUk, :, j))
         end
         # hyp_AtA!(UU, LUk)
@@ -118,10 +118,10 @@ end
 function update_hess(cone::WSOSPolyInterp)
     @assert cone.grad_updated
     cone.hess .= 0
-    for k in eachindex(cone.Ps)
+    @inbounds for k in eachindex(cone.Ps)
         UUk = hyp_AtA!(cone.tmpUU, cone.tmpLU[k])
         # cone.hess.data += abs2.(UUk)
-        for j in 1:cone.dim, i in 1:j
+        @inbounds for j in 1:cone.dim, i in 1:j
             cone.hess.data[i, j] += abs2(UUk[i, j])
         end
     end

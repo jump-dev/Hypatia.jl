@@ -78,7 +78,7 @@ function update_grad(cone::EpiNormInf{T}) where {T <: HypReal}
     g1 = zero(u)
     h1 = zero(u)
     usqr = abs2(u)
-    for (j, wj) in enumerate(w)
+    @inbounds for (j, wj) in enumerate(w)
         iuw2u = 2 / (u - abs2(wj) / u)
         g1 += iuw2u
         h1 += abs2(iuw2u)
@@ -100,10 +100,11 @@ end
 # symmetric arrow matrix
 function update_hess(cone::EpiNormInf)
     @assert cone.grad_updated
-    cone.hess.data[1, 1] = cone.diag11
-    for j in 2:cone.dim
-        cone.hess.data[1, j] = cone.edge2n[j - 1]
-        cone.hess.data[j, j] = cone.diag2n[j - 1]
+    H = cone.hess.data
+    H[1, 1] = cone.diag11
+    @inbounds for j in 2:cone.dim
+        H[1, j] = cone.edge2n[j - 1]
+        H[j, j] = cone.diag2n[j - 1]
     end
     cone.hess_updated = true
     return cone.hess
@@ -114,11 +115,11 @@ function update_inv_hess(cone::EpiNormInf)
     @assert cone.grad_updated
     cone.inv_hess.data[1, 1] = 1
     @. cone.inv_hess.data[1, 2:end] = cone.div2n
-    for j in 2:cone.dim, i in 2:j
+    @inbounds for j in 2:cone.dim, i in 2:j
         cone.inv_hess.data[i, j] = cone.inv_hess.data[1, j] * cone.inv_hess.data[1, i]
     end
     cone.inv_hess.data ./= cone.schur
-    for j in 2:cone.dim
+    @inbounds for j in 2:cone.dim
         cone.inv_hess.data[j, j] += inv(cone.diag2n[j - 1])
     end
     cone.inv_hess_updated = true
@@ -130,7 +131,7 @@ update_inv_hess_prod(cone::EpiNormInf) = nothing
 
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
     @assert cone.grad_updated
-    for j in 1:size(prod, 2)
+    @inbounds for j in 1:size(prod, 2)
         @views prod[1, j] = cone.diag11 * arr[1, j] + dot(cone.edge2n, arr[2:end, j])
         @views @. prod[2:end, j] = cone.edge2n * arr[1, j] + cone.diag2n * arr[2:end, j]
     end
@@ -139,7 +140,7 @@ end
 
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
     @assert cone.grad_updated
-    for j in 1:size(prod, 2)
+    @inbounds for j in 1:size(prod, 2)
         @views prod[1, j] = arr[1, j] + dot(cone.div2n, arr[2:end, j])
         @. prod[2:end, j] = cone.div2n * prod[1, j]
     end
