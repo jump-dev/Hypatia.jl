@@ -284,9 +284,9 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::SymIndefCo
             # @show cond(Symmetric(lhs, :L))
             # @show cond(Diagonal(R) \ Symmetric(lhs, :L) / Diagonal(C))
 
-            @timeit solver.timer "precond" S, scond, amax = syequb(lhs)
-            S = Diagonal(S)
-            # S = I
+            # @timeit solver.timer "precond" S, scond, amax = syequb(lhs)
+            # S = Diagonal(S)
+            S = I
 
             # @show Symmetric(lhs, :L)
             # @show S * Symmetric(lhs, :L) * S
@@ -294,7 +294,7 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::SymIndefCo
             # @show eigen(S * Symmetric(lhs, :L) * S).values
             # (x, log) = IterativeSolvers.gmres!(prevsol, Symmetric(S * Symmetric(lhs, :L) * S), S * rhs2, maxiter = 1 * size(lhs, 2), restart = size(lhs, 2), log = true, tol = 1e-12)
             prevsol .= S \ prevsol
-            @timeit solver.timer "minres" (x, log) = IterativeSolvers.minres!(prevsol, Symmetric(S * Symmetric(lhs, :L) * S), S * rhs2, maxiter = size(lhs, 2), log = true, rtol = 1e-8, reorth = false)
+            @timeit solver.timer "minres" (x, log) = IterativeSolvers.minres!(prevsol, Symmetric(S * Symmetric(lhs, :L) * S), S * rhs2, maxiter = size(lhs, 2), log = true, atol = 1e-8, rtol = 1e-8, reorth = false)
             prevsol .= S * prevsol
 
             # print(io, "$(dot(x0[:, i], prevsol) / norm(x0[:, i]) / norm(prevsol)),")
@@ -307,7 +307,7 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::SymIndefCo
 
             @show log.iters
             # prevsol = Symmetric(lhs, :L) \ rhs2
-            # if !(log.isconverged)
+            # if norm(rhs2 - Symmetric(lhs, :L) * x0[:, i]) < 0.1 && log.iters > 200
             #     CSV.write("lhs.csv",  DataFrames.DataFrame(lhs), writeheader=false)
             #     CSV.write("rhs.csv",  DataFrames.DataFrame(rhs), writeheader=false)
             #     CSV.write("prevsol.csv",  DataFrames.DataFrame(x0), writeheader=false)

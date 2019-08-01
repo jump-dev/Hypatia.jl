@@ -10,7 +10,6 @@ using Test
 import Hypatia
 import Hypatia.HypReal
 const CO = Hypatia.Cones
-using DelimitedFiles
 
 function portfolio(
     T::Type{<:HypReal},
@@ -208,8 +207,6 @@ portfolio10(T::Type{<:HypReal}) = portfolio(T, 3, [:linf, :l1], use_l1ball = fal
 portfolio11(T::Type{<:HypReal}) = portfolio(T, 4, [:entropic], use_l1ball = false, use_linops = false)
 portfolio12(T::Type{<:HypReal}) = portfolio(T, 4, [:entropic], use_l1ball = false, use_linops = true)
 
-portfolio13(T::Type{<:HypReal}) = portfolio(T, 400, [:linf, :l1], use_linfball = true, use_l1ball = true)
-
 instances_portfolio_all = [
     portfolio1,
     portfolio2,
@@ -222,11 +219,10 @@ instances_portfolio_all = [
     portfolio11,
     ]
 instances_portfolio_few = [
-    # portfolio1,
-    # portfolio3,
-    # portfolio5,
-    # portfolio6,
-    portfolio13,
+    portfolio1,
+    portfolio3,
+    portfolio5,
+    portfolio6,
     ]
 instances_portfolio_linops = [
     portfolio8,
@@ -238,22 +234,7 @@ function test_portfolio(instance::Function; T::Type{<:HypReal} = Float64, test_o
     Random.seed!(rseed)
     tol = max(1e-5, sqrt(sqrt(eps(T))))
     d = instance(T)
-    t = @timed r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs; test_options..., atol = tol, rtol = tol)
-    @show t[2]
-    # writedlm("rhs.csv", vcat(-d.c, d.b, d.h))
+    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs; test_options..., atol = tol, rtol = tol)
     @test r.status == :Optimal
     return
 end
-
-# MO = Hypatia.Models
-# SO = Hypatia.Solvers
-# test_portfolio(portfolio13, T = Float64, test_options = (
-#     # linear_model = MO.RawLinearModel,
-#     # system_solver = SO.SymIndefCombinedHSDSystemSolver,
-#     # linear_model_options = (use_iterative = true,),
-#     # system_solver_options = (use_iterative = true,),
-#     linear_model = MO.PreprocessedLinearModel,
-#     system_solver = SO.QRCholCombinedHSDSystemSolver,
-#     solver_options = (verbose = true, tol_abs_opt = 1e-5, tol_rel_opt = 1e-5, tol_feas = 1e-5)
-#     )
-#     )
