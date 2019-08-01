@@ -243,4 +243,4 @@ end
 test_densityest.(
     densityest2,
     T = Float64,
-    test_options = (solver_options = (verbose = true,),))
+    test_options = (solver_options = (verbose = true,), stepper_options = (max_nbhd = 0.3,)))

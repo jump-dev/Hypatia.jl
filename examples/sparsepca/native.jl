@@ -171,6 +171,6 @@ function test_sparsepca(instance::Function; T::Type{<:HypReal} = Float64, test_o
 end
 
 test_sparsepca.(
-    instances_sparsepca_all,
+    sparsepca2,
     T = Float64,
-    test_options = (solver_options = (verbose = true,),))
+    test_options = (solver_options = (verbose = true,), stepper_options = (max_nbhd = 0.7,)))

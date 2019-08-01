@@ -5,6 +5,8 @@ QR+Cholesky linear system solver
 solves linear system in naive.jl via a procedure similar to that described by S10.3 of
 http://www.seas.ucla.edu/~vandenbe/publications/coneprog.pdf
 =#
+using DataFrames
+using CSV
 
 mutable struct QRCholCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSolver{T}
     use_sparse::Bool
@@ -241,11 +243,13 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
         mul!(GQ1x, GQ1, yi)
         block_hessian_product!(HGQ1x_k, GQ1x_k)
         mul!((Q2div), (GQ2'), (HGQ1x))
-        @show typeof(Q2div)
+        # @show typeof(Q2div)
         @. Q2div = (Q2pbxGHbz) - Q2div
 
         block_hessian_product!(HGQ2_k, GQ2_k)
-        mul!((Q2GHGQ2), (GQ2'), (HGQ2))
+        Q2GHGQ2 = (Q2GHGQ2)
+        mul!(Q2GHGQ2, (GQ2'), (HGQ2))
+        # @show typeof(Q2GHGQ2)
 
         if system_solver.use_sparse
             F = ldlt(Symmetric(Q2GHGQ2), check = false) # TODO not implemented for generic reals
@@ -260,10 +264,10 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
             Q2div .= F \ Q2div # TODO eliminate allocs (see https://github.com/JuliaLang/julia/issues/30084)
         else
             Q2GHGQ2_copy = copy(Q2GHGQ2)
-            # F = hyp_chol!(Symmetric(Q2GHGQ2)) # TODO prealloc blasreal cholesky auxiliary vectors using posvx
-            F = hyp_chol!(Symmetric(BigFloat.(Q2GHGQ2)))
+            F = hyp_chol!(Symmetric(Q2GHGQ2)) # TODO prealloc blasreal cholesky auxiliary vectors using posvx
+            # Q2GHGQ2_bf = BigFloat.(Q2GHGQ2)
+            # F = hyp_chol!(Symmetric(Q2GHGQ2_bf))
             # F = hyp_chol!(Symmetric(Float64.(Q2GHGQ2)))
-            # @show typeof(F)
             # F = bunchkaufman!(Symmetric(Q2GHGQ2), true, check = false)
             while !isposdef(F)
             # if !issuccess(F)
@@ -271,6 +275,10 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
                 setprecision(2p)
                 F = hyp_chol!(Symmetric(BigFloat.(Q2GHGQ2)))
                 println("presision is at $p bits")
+                if p > 5096
+                    setprecision(BigFloat, 128)
+                    error()
+                end
                 # println("dense linear system matrix factorization failed")
                 # mul!(Q2GHGQ2, GQ2', HGQ2)
                 # Q2GHGQ2 += T(1e-8) * I
@@ -287,16 +295,18 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
                 #     end
                 # end
             end
+            Q2div_bf = BigFloat.(Q2div)
             Q2div_copy = copy(Q2div) #
             Q2div_copy2 = copy(Q2div_copy) #
-            Q2div_copy = F \ Q2div_copy2 #
+            # Q2div_copy = F \ Q2div_copy2 #
             # Q2div_copy = Float64.(F.U) \ (Float64.(F.L) \ Float64.(Q2div_copy2))
-            # @show typeof(Q2div_copy)
-            Q2div .= (Q2div_copy) #
             # @show typeof(Q2div)
             # @show typeof(F)
-            # ldiv!(F, Q2div)
-            # @show typeof(Q2div)
+            Q2div[:, 1] ./= 1e6
+            ldiv!(F, Q2div)
+            Q2div[:, 1] .*= 1e6
+            # @show typeof(Q2div_bf)
+            # Q2div .= Float64.(Q2div_bf) #
 
             # Q2div, bnorm, bcomp = IterativeRefinement.rfldiv(Q2GHGQ2, Q2div_copy)
             # sol = F \ Q2div
@@ -305,6 +315,10 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
             # iter = 0
             res = Q2div_copy2 - Symmetric(Q2GHGQ2_copy) * Q2div
             @show norm(res)
+            if norm(res) > 1e-7
+                CSV.write("lhs.csv",  DataFrames.DataFrame(Q2GHGQ2_copy), writeheader=false)
+                CSV.write("rhs.csv",  DataFrames.DataFrame(Q2div_copy2), writeheader=false)
+            end
             # err = similar(Q2div)
             # while norm(res) > 1e-8 && iter <= 20
             #     res = BigFloat.(Q2div_copy) - Symmetric(BigFloat.(Q2GHGQ2_copy)) * BigFloat.(Q2div)
