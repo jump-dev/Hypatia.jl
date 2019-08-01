@@ -200,7 +200,6 @@ function hyp_posvx!(
     #         resize!(work, lwork)
     #     end
     # end
-    @show rcond
 
     # @show S, equed
 
@@ -211,7 +210,7 @@ function hyp_posvx!(
         println("failure to solve linear system (sysvx status $(info[]))")
         return false
     end
-    return true
+    return (true, S)
 end
 
 function hyp_posvxx!(

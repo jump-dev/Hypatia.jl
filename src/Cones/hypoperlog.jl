@@ -20,13 +20,13 @@ mutable struct HypoPerLog{T <: HypReal} <: Cone{T}
     inv_hess_prod_updated::Bool
     is_feas::Bool
     grad::Vector{T}
-    hess::Symmetric{T, Matrix{T}}
-    inv_hess::Symmetric{T, Matrix{T}}
+    hess::Symmetric
+    inv_hess::Symmetric
 
     lwv::T
     vlwvu::T
     vwivlwvu::Vector{T}
-    tmp_hess::Symmetric{T, Matrix{T}}
+    tmp_hess::Symmetric
     hess_fact # TODO prealloc
 
     function HypoPerLog{T}(dim::Int, is_dual::Bool) where {T <: HypReal}
@@ -44,7 +44,7 @@ function setup_data(cone::HypoPerLog{T}) where {T <: HypReal}
     reset_data(cone)
     dim = cone.dim
     cone.grad = zeros(T, dim)
-    cone.hess = Symmetric(zeros(T, dim, dim), :U)
+    cone.hess = Symmetric(zeros(BigFloat, dim, dim), :U)
     cone.tmp_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.vwivlwvu = zeros(T, dim - 2)
     return
@@ -95,8 +95,15 @@ function update_hess(cone::HypoPerLog)
     d = cone.dim - 2
     H = cone.hess.data
 
+    u = BigFloat(u)
+    v = BigFloat(v)
+    w .= BigFloat.(copy(w))
+    grad = BigFloat.(cone.grad)
+    cone.vlwvu = BigFloat(cone.vlwvu)
+    cone.lwv = BigFloat(cone.lwv)
+
     @. cone.vwivlwvu = v / cone.vlwvu / w
-    H[1, 1] = abs2(cone.grad[1])
+    H[1, 1] = abs2(grad[1])
     lvwnivlwvu = (cone.lwv - d) / cone.vlwvu
     H[1, 2] = -lvwnivlwvu / cone.vlwvu
     @. H[1, 3:end] = -cone.vwivlwvu / cone.vlwvu
@@ -108,9 +115,9 @@ function update_hess(cone::HypoPerLog)
         @inbounds for i in 1:j
             H[2 + i, j2] = cone.vwivlwvu[i] * cone.vwivlwvu[j]
         end
-        H[j2, j2] -= cone.grad[j2] / w[j]
+        H[j2, j2] -= grad[j2] / w[j]
     end
-    
+
     cone.hess_updated = true
     return cone.hess
 end

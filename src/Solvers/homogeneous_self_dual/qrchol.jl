@@ -240,11 +240,12 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
     if !iszero(size(Q2div, 1))
         mul!(GQ1x, GQ1, yi)
         block_hessian_product!(HGQ1x_k, GQ1x_k)
-        mul!(Q2div, GQ2', HGQ1x)
-        @. Q2div = Q2pbxGHbz - Q2div
+        mul!((Q2div), (GQ2'), (HGQ1x))
+        @show typeof(Q2div)
+        @. Q2div = (Q2pbxGHbz) - Q2div
 
         block_hessian_product!(HGQ2_k, GQ2_k)
-        mul!(Q2GHGQ2, GQ2', HGQ2)
+        mul!((Q2GHGQ2), (GQ2'), (HGQ2))
 
         if system_solver.use_sparse
             F = ldlt(Symmetric(Q2GHGQ2), check = false) # TODO not implemented for generic reals
@@ -259,38 +260,42 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
             Q2div .= F \ Q2div # TODO eliminate allocs (see https://github.com/JuliaLang/julia/issues/30084)
         else
             Q2GHGQ2_copy = copy(Q2GHGQ2)
-            F = hyp_chol!(Symmetric(Q2GHGQ2)) # TODO prealloc blasreal cholesky auxiliary vectors using posvx
-            # F = hyp_chol!(Symmetric(BigFloat.(Q2GHGQ2)))
+            # F = hyp_chol!(Symmetric(Q2GHGQ2)) # TODO prealloc blasreal cholesky auxiliary vectors using posvx
+            F = hyp_chol!(Symmetric(BigFloat.(Q2GHGQ2)))
             # F = hyp_chol!(Symmetric(Float64.(Q2GHGQ2)))
             # @show typeof(F)
             # F = bunchkaufman!(Symmetric(Q2GHGQ2), true, check = false)
-            if !isposdef(F)
+            while !isposdef(F)
             # if !issuccess(F)
-                println("dense linear system matrix factorization failed")
-                mul!(Q2GHGQ2, GQ2', HGQ2)
-                Q2GHGQ2 += T(1e-8) * I
-                if T <: BlasReal
-                    F = bunchkaufman!(Symmetric(Q2GHGQ2), true, check = false) # TODO prealloc with old sysvx code; not implemented for generic reals
-                    # F = lu!(Symmetric(Q2GHGQ2), check = false) # TODO prealloc with old sysvx code; not implemented for generic reals
-                    if !issuccess(F)
-                        error("could not fix failure of positive definiteness (mu is $mu); terminating")
-                    end
-                else
-                    F = hyp_chol!(Symmetric(Q2GHGQ2)) # TODO prealloc blasreal cholesky auxiliary vectors using posvx
-                    if !isposdef(F)
-                        error("could not fix failure of positive definiteness (mu is $mu); terminating")
-                    end
-                end
+                p = precision(BigFloat)
+                setprecision(2p)
+                F = hyp_chol!(Symmetric(BigFloat.(Q2GHGQ2)))
+                println("presision is at $p bits")
+                # println("dense linear system matrix factorization failed")
+                # mul!(Q2GHGQ2, GQ2', HGQ2)
+                # Q2GHGQ2 += T(1e-8) * I
+                # if T <: BlasReal
+                #     F = bunchkaufman!(Symmetric(Q2GHGQ2), true, check = false) # TODO prealloc with old sysvx code; not implemented for generic reals
+                #     # F = lu!(Symmetric(Q2GHGQ2), check = false) # TODO prealloc with old sysvx code; not implemented for generic reals
+                #     if !issuccess(F)
+                #         error("could not fix failure of positive definiteness (mu is $mu); terminating")
+                #     end
+                # else
+                #     F = hyp_chol!(Symmetric(Q2GHGQ2)) # TODO prealloc blasreal cholesky auxiliary vectors using posvx
+                #     if !isposdef(F)
+                #         error("could not fix failure of positive definiteness (mu is $mu); terminating")
+                #     end
+                # end
             end
             Q2div_copy = copy(Q2div) #
-            # Q2div_copy2 = copy(Q2div_copy) #
-            # Q2div_copy = F \ Q2div_copy2 #
+            Q2div_copy2 = copy(Q2div_copy) #
+            Q2div_copy = F \ Q2div_copy2 #
             # Q2div_copy = Float64.(F.U) \ (Float64.(F.L) \ Float64.(Q2div_copy2))
             # @show typeof(Q2div_copy)
-            # Q2div .= (Q2div_copy) #
+            Q2div .= (Q2div_copy) #
             # @show typeof(Q2div)
             # @show typeof(F)
-            ldiv!(F, Q2div)
+            # ldiv!(F, Q2div)
             # @show typeof(Q2div)
 
             # Q2div, bnorm, bcomp = IterativeRefinement.rfldiv(Q2GHGQ2, Q2div_copy)
@@ -298,8 +303,8 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
             # println(norm(Q2div_copy - Symmetric(Q2GHGQ2_copy) * Q2div))
 
             # iter = 0
-            # res = Q2div_copy2 - Symmetric(Q2GHGQ2_copy) * Q2div
-            # @show norm(res)
+            res = Q2div_copy2 - Symmetric(Q2GHGQ2_copy) * Q2div
+            @show norm(res)
             # err = similar(Q2div)
             # while norm(res) > 1e-8 && iter <= 20
             #     res = BigFloat.(Q2div_copy) - Symmetric(BigFloat.(Q2GHGQ2_copy)) * BigFloat.(Q2div)
@@ -312,11 +317,12 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
             #     @show iter, norm(res)
             # end
 
-            X = similar(Q2div_copy)
-            Q2GHGQ2_copy2 = copy(Q2GHGQ2_copy)
-            Q2div_copy2 = copy(Q2div_copy)
-            hyp_sysvx!(X, Q2GHGQ2_copy, Q2div_copy)
-            @show norm(Q2div_copy2 - Q2GHGQ2_copy2 * X)
+            # X = similar(Q2div_copy)
+            # Q2GHGQ2_copy2 = copy(Q2GHGQ2_copy)
+            # # Q2div_copy2 = copy(Q2div_copy)
+            # (_, S) = hyp_svx!(X, Q2GHGQ2_copy, Q2div_copy)
+            # @show "1", norm(Q2div_copy2 - Q2GHGQ2_copy2 * X)
+            # Q2div .= X
 
 
             # sol .= Q2div
