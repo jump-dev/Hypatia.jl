@@ -1,6 +1,5 @@
 using IterativeSolvers, CSV, Preconditioners, SparseArrays
 using AlgebraicMultigrid
-using Krylov
 using LinearOperators
 using DelimitedFiles
 using LinearAlgebra
@@ -8,20 +7,22 @@ using LinearAlgebra
 
 LHS = CSV.read("lhs.csv", header = false);
 LHS = convert(Matrix, LHS)
-i = 1
+i = 3
 b = CSV.read("rhs.csv", header = false);
 b = convert(Matrix, b)
 b = b[:, i]
 prevsol = CSV.read("prevsol.csv", header = false);
-prevsol = convert(Matrix, prevsol)
-prevsol = prevsol[:, i]
+prevsol = convert(Matrix, prevsol);
+prevsol = prevsol[:, i];
 A = Symmetric(LHS, :L)
 
 # A = BigFloat.(A)
 # b = BigFloat.(b)
 # prevsol = BigFloat.(prevsol)
 
-(x, hist) = gmres!(prevsol, A, b, log = true, tol = 1e-12)
+IterativeSolvers.TimerOutputs.reset_timer!()
+(x, hist) = IterativeSolvers.minres!(prevsol, A, b, log = true, rtol = 1e-8, atol = 1e-8, verbose = false)
+IterativeSolvers.TimerOutputs.print_timer()
 norm(b - A * x)
 
 # maxels = maximum(A, dims = 2)

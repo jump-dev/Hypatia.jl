@@ -169,10 +169,16 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveElimC
     # end
 
     if system_solver.use_iterative
+        (R, C, scond, amax) = geequb(lhs)
+        (R, C) = (Diagonal(R), Diagonal(C))
+        # R, C = I, I
+        system_solver.prevsol .= C \ system_solver.prevsol
         for i in 1:2
-            (x, log) = IterativeSolvers.gmres!(system_solver.prevsol[:, i], lhs, rhs[:, i], log = true, rtol = 1e-8, atol = 1e-8, restart = size(lhs, 2))
+            (x, log) = IterativeSolvers.gmres!(system_solver.prevsol[:, i], R * lhs * C, R * rhs[:, i], log = true, rtol = 1e-8, atol = 1e-8, restart = size(lhs, 2))
+            system_solver.prevsol[:, i] .= C * system_solver.prevsol[:, i]
             @show log.iters
         end
+        system_solver.rhs .= system_solver.prevsol
     else
         # solve system
         if system_solver.use_sparse
@@ -181,7 +187,6 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveElimC
             ldiv!(lu!(lhs), rhs)
         end
     end
-    system_solver.prevsol .= rhs
 
     # lift to get s and kap
     tau1 = rhs[end, 1]
