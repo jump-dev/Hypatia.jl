@@ -205,10 +205,10 @@ densityest11(T::Type{<:HypReal}) = densityest(T, 10, 1, 2, use_sumlog = false, u
 densityest12(T::Type{<:HypReal}) = densityest(T, 10, 1, 2, use_sumlog = false, use_wsos = false, use_linops = true)
 
 instances_densityest_all = [
-    densityest1,
-    densityest2,
-    densityest3,
-    densityest4,
+    # densityest1,
+    # densityest2,
+    # densityest3,
+    # densityest4,
     densityest5,
     densityest6,
     densityest7,
@@ -241,6 +241,6 @@ function test_densityest(instance::Function; T::Type{<:HypReal} = Float64, test_
 end
 
 test_densityest.(
-    instances_densityest_few,
+    densityest2,
     T = Float64,
     test_options = (solver_options = (verbose = true,),))

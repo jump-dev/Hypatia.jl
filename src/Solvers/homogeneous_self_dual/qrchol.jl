@@ -259,8 +259,8 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
             Q2div .= F \ Q2div # TODO eliminate allocs (see https://github.com/JuliaLang/julia/issues/30084)
         else
             Q2GHGQ2_copy = copy(Q2GHGQ2)
-            # F = hyp_chol!(Symmetric(Q2GHGQ2)) # TODO prealloc blasreal cholesky auxiliary vectors using posvx
-            F = hyp_chol!(Symmetric(BigFloat.(Q2GHGQ2)))
+            F = hyp_chol!(Symmetric(Q2GHGQ2)) # TODO prealloc blasreal cholesky auxiliary vectors using posvx
+            # F = hyp_chol!(Symmetric(BigFloat.(Q2GHGQ2)))
             # F = hyp_chol!(Symmetric(Float64.(Q2GHGQ2)))
             # @show typeof(F)
             # F = bunchkaufman!(Symmetric(Q2GHGQ2), true, check = false)
@@ -282,21 +282,24 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
                     end
                 end
             end
-            Q2div_copy = copy(Q2div)
-            Q2div_copy2 = copy(Q2div_copy)
-            Q2div_copy = F \ Q2div_copy2
+            Q2div_copy = copy(Q2div) #
+            # Q2div_copy2 = copy(Q2div_copy) #
+            # Q2div_copy = F \ Q2div_copy2 #
             # Q2div_copy = Float64.(F.U) \ (Float64.(F.L) \ Float64.(Q2div_copy2))
-            Q2div .= Float64.(Q2div_copy)
+            # @show typeof(Q2div_copy)
+            # Q2div .= (Q2div_copy) #
             # @show typeof(Q2div)
             # @show typeof(F)
-            # ldiv!(F, Q2div)
+            ldiv!(F, Q2div)
+            # @show typeof(Q2div)
 
             # Q2div, bnorm, bcomp = IterativeRefinement.rfldiv(Q2GHGQ2, Q2div_copy)
             # sol = F \ Q2div
             # println(norm(Q2div_copy - Symmetric(Q2GHGQ2_copy) * Q2div))
 
             # iter = 0
-            # res = Q2div_copy - Symmetric(Q2GHGQ2_copy) * Q2div
+            # res = Q2div_copy2 - Symmetric(Q2GHGQ2_copy) * Q2div
+            # @show norm(res)
             # err = similar(Q2div)
             # while norm(res) > 1e-8 && iter <= 20
             #     res = BigFloat.(Q2div_copy) - Symmetric(BigFloat.(Q2GHGQ2_copy)) * BigFloat.(Q2div)
@@ -309,11 +312,11 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
             #     @show iter, norm(res)
             # end
 
-            # X = similar(Q2div_copy)
-            # Q2GHGQ2_copy2 = copy(Q2GHGQ2_copy)
-            # Q2div_copy2 = copy(Q2div_copy)
-            # hyp_posvxx!(X, Q2GHGQ2_copy, Q2div_copy)
-            # @show norm(Q2div_copy2 - Q2GHGQ2_copy2 * X)
+            X = similar(Q2div_copy)
+            Q2GHGQ2_copy2 = copy(Q2GHGQ2_copy)
+            Q2div_copy2 = copy(Q2div_copy)
+            hyp_sysvx!(X, Q2GHGQ2_copy, Q2div_copy)
+            @show norm(Q2div_copy2 - Q2GHGQ2_copy2 * X)
 
 
             # sol .= Q2div
@@ -333,7 +336,9 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
     if !iszero(length(yi))
         mul!(yi, GQ1', HGxi)
         @. yi = Q1pbxGHbz - yi
+        yi_copy = copy(yi)
         ldiv!(model.Ap_R, yi)
+        # @show norm(yi_copy - model.Ap_R * yi)
     end
 
     # lift to HSDE space

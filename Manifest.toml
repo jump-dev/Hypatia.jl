@@ -127,6 +127,12 @@ git-tree-sha1 = "2f25cc24d4370d9395344a0b8cf7e8d98407c650"
 uuid = "31c24e10-a181-5473-b8eb-7969acd0382f"
 version = "0.21.0"
 
+[[DoubleFloats]]
+deps = ["GenericSVD", "GenericSchur", "LinearAlgebra", "Polynomials", "Quadmath", "Random", "Requires"]
+git-tree-sha1 = "4e3112739c4eb107b6c7a018483a3d84332b4de0"
+uuid = "497a8b3b-efae-58df-a0af-a86822472b78"
+version = "0.9.4"
+
 [[DynamicPolynomials]]
 deps = ["LinearAlgebra", "MultivariatePolynomials", "Pkg", "Reexport", "Test"]
 git-tree-sha1 = "73bb16dca284abf4aeb5e6055d1be00a9ccf1d20"
@@ -161,6 +167,18 @@ git-tree-sha1 = "ca235f9c4652b31525232a36d7832f5ee681d76a"
 uuid = "14197337-ba66-59df-a3e3-ca00e7dcff7a"
 version = "0.1.0"
 
+[[GenericSVD]]
+deps = ["LinearAlgebra", "Random", "Test"]
+git-tree-sha1 = "8aa93c3f3d81562a8962047eafcc5712af0a0f59"
+uuid = "01680d73-4ee2-5a08-a1aa-533608c188bb"
+version = "0.2.1"
+
+[[GenericSchur]]
+deps = ["LinearAlgebra", "Printf"]
+git-tree-sha1 = "25992e6d023b72860348553f976599184c85d914"
+uuid = "c145ed77-6b09-5dd9-b285-bf645a82121e"
+version = "0.2.3"
+
 [[InteractiveUtils]]
 deps = ["Markdown"]
 uuid = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
@@ -172,12 +190,10 @@ uuid = "41ab1584-1d38-5bbf-9106-f11c6c58b48f"
 version = "1.0.0"
 
 [[IterativeRefinement]]
-deps = ["LinearAlgebra"]
-git-tree-sha1 = "c56da0148b1a78bef63abdb5adaeae341a77a066"
-repo-rev = "master"
-repo-url = "https://github.com/RalphAS/IterativeRefinement.jl.git"
+deps = ["DoubleFloats", "LinearAlgebra", "Random", "Test"]
+git-tree-sha1 = "0db009fc565788a3f12e4e54255ea5167a4bc08b"
 uuid = "bcb6b82e-7479-5933-8c8e-2e0b909ee6a3"
-version = "0.2.0-DEV"
+version = "0.1.0"
 
 [[IterativeSolvers]]
 deps = ["LinearAlgebra", "Printf", "Random", "RecipesBase", "SparseArrays", "Test"]
@@ -305,6 +321,12 @@ git-tree-sha1 = "3ce467a8e76c6030d4c3786e7d3a73442017cdc0"
 uuid = "1fd47b50-473d-5c70-9696-f719f8f3bcdc"
 version = "2.0.3"
 
+[[Quadmath]]
+deps = ["Random", "Requires"]
+git-tree-sha1 = "0d177ab3217bd6347d01bdf56e5da0571222d7f3"
+uuid = "be4d8f0f-7fa4-5f49-b795-2f01399ab2dd"
+version = "0.5.0"
+
 [[REPL]]
 deps = ["InteractiveUtils", "Markdown", "Sockets"]
 uuid = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
@@ -323,6 +345,12 @@ deps = ["Pkg"]
 git-tree-sha1 = "7b1d07f411bc8ddb7977ec7f377b97b158514fe0"
 uuid = "189a3867-3050-52da-a836-e630ba90ab69"
 version = "0.2.0"
+
+[[Requires]]
+deps = ["Test"]
+git-tree-sha1 = "f6fbf4ba64d295e146e49e021207993b6b48c7d1"
+uuid = "ae029012-a4dd-5104-9daa-d747884805df"
+version = "0.5.2"
 
 [[Rmath]]
 deps = ["BinaryProvider", "Libdl", "Random", "Statistics", "Test"]

@@ -283,6 +283,36 @@ function hyp_posvxx!(
     return true
 end
 
+function equilibrators(A::AbstractMatrix{T}) where {T}
+    m,n = size(A)
+    R = zeros(T,m)
+    C = zeros(T,n)
+    @inbounds for j=1:n
+        for i=1:m
+            R[i] = max(R[i],abs(A[i,j]))
+        end
+    end
+    @inbounds for i=1:m
+        if R[i] > 0
+            R[i] = T(2)^floor(Int,log2(R[i]))
+        end
+    end
+    R .= 1 ./ R
+    @inbounds for i=1:m
+        for j=1:n
+            C[j] = max(C[j],R[i] * abs(A[i,j]))
+        end
+    end
+    @inbounds for j=1:n
+        if C[j] > 0
+            C[j] = T(2)^floor(Int,log2(C[j]))
+        end
+    end
+    C .= 1 ./ C
+    R,C
+end
+
+
 hyp_AtA!(U::Matrix{T}, A::Matrix{T}) where {T <: BlasReal} = BLAS.syrk!('U', 'T', one(T), A, zero(T), U)
 hyp_AtA!(U::Matrix{Complex{T}}, A::Matrix{Complex{T}}) where {T <: BlasReal} = BLAS.herk!('U', 'C', one(T), A, zero(T), U)
 hyp_AtA!(U::Matrix{T}, A::Matrix{T}) where {T <: HypRealOrComplex{<:HypReal}} = mul!(U, A', A)
