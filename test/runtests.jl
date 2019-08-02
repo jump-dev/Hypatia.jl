@@ -61,8 +61,8 @@ barrier_testfuns = [
     test_epiperexp_barrier, # fails with BigFloat
     test_hypogeomean_barrier,
     test_epinormspectral_barrier,
-    test_semidefinite_barrier,
-    test_hypoperlogdet_barrier,
+    test_possemideftri_barrier,
+    test_hypoperlogdettri_barrier,
     test_wsospolyinterp_barrier,
     # TODO next 2 fail with BigFloat
     # NOTE not updated for generic reals or for new cone oracles interface
@@ -139,12 +139,12 @@ testfuns_raw = [
     hypogeomean2,
     hypogeomean3,
     epinormspectral1,
-    semidefinite1,
-    semidefinite2,
-    semidefinitecomplex1,
-    hypoperlogdet1,
-    hypoperlogdet2,
-    hypoperlogdet3,
+    possemideftri1,
+    possemideftri2,
+    possemideftricomplex1,
+    hypoperlogdettri1,
+    hypoperlogdettri2,
+    hypoperlogdettri3,
     ]
 @testset "native tests: $t, $s, $m, $n, $T" for t in testfuns_raw, s in system_solvers, m in linear_models, n in use_infty_nbhd, T in real_types
     if T == BigFloat && t in (epiperpower1, epiperpower2, epiperexp1, epiperexp2)
