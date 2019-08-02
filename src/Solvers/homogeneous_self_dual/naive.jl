@@ -17,6 +17,7 @@ TODO reduce allocations
 mutable struct NaiveCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSolver{T}
     use_iterative::Bool
     use_sparse::Bool
+    use_kaptau_ntscal::Bool
 
     lhs_copy
     lhs
@@ -41,12 +42,14 @@ mutable struct NaiveCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSo
         model::Models.LinearModel{T};
         use_iterative::Bool = false,
         use_sparse::Bool = false,
+        use_kaptau_ntscal::Bool = false,
         ) where {T <: HypReal}
         (n, p, q) = (model.n, model.p, model.q)
         dim = n + p + 2q + 2
         system_solver = new{T}()
         system_solver.use_iterative = use_iterative
         system_solver.use_sparse = use_sparse
+        system_solver.use_kaptau_ntscal = use_kaptau_ntscal
 
         system_solver.rhs = zeros(T, dim, 2)
         rows = 1:n
@@ -93,11 +96,10 @@ mutable struct NaiveCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSo
                 dim,
                 dim,
                 [fill(I, length(cone_rows))...,
-                model.A', model.G', reshape(model.c, :, 1), -model.A, reshape(model.b, :, 1), ones(T, 1, 1), -model.G, -I, reshape(model.h, :, 1), -model.c', -model.b', -model.h', -ones(T, 1, 1), ones(T, 1, 1)],
-                [cone_rows..., rc1, rc1, rc1, rc2, rc2, rc4, rc5, rc5, rc5, rc6, rc6, rc6, rc6, rc4],
-                [cone_cols..., rc2, rc3, rc6, rc1, rc6, rc4, rc1, rc5, rc6, rc1, rc2, rc3, rc4, rc6],
+                model.A', model.G', reshape(model.c, :, 1), -model.A, reshape(model.b, :, 1), -model.G, -I, reshape(model.h, :, 1), -model.c', -model.b', -model.h', -ones(T, 1, 1), ones(T, 1, 1), ones(T, 1, 1)],
+                [cone_rows..., rc1, rc1, rc1, rc2, rc2, rc5, rc5, rc5, rc6, rc6, rc6, rc6, rc4, rc4],
+                [cone_cols..., rc2, rc3, rc6, rc1, rc6, rc1, rc5, rc6, rc1, rc2, rc3, rc4, rc4, rc6],
                 )
-
         else
             if use_sparse
                 system_solver.lhs_copy = T[
@@ -156,19 +158,28 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveCombi
     end
     system_solver.s1 .= solver.z_residual
     system_solver.s2 .= zero(T)
-    rhs[kap_row, 1] = -kap
-    rhs[kap_row, 2] = -kap + mu / tau
+    if system_solver.use_kaptau_ntscal
+        rhs[kap_row, 1] = -kap * tau
+        rhs[kap_row, 2] = -kap * tau + mu
+    else
+        rhs[kap_row, 1] = -kap
+        rhs[kap_row, 2] = -kap + mu / tau
+    end
     rhs[end, 1] = kap + solver.primal_obj_t - solver.dual_obj_t
     rhs[end, 2] = zero(T)
 
     # solve system
     if system_solver.use_iterative
-        lhs.blocks[end][1] = mu / tau / tau
+        if system_solver.use_kaptau_ntscal
+            lhs.blocks[end - 1][1] = tau
+            lhs.blocks[end][1] = kap
+        else
+            lhs.blocks[end][1] = mu / tau / tau
+        end
         b_idx = 1
         for k in eachindex(cones)
             cone_k = cones[k]
             # TODO use hess prod instead
-
             lhs.blocks[b_idx + (Cones.use_dual(cone_k) ? 0 : 1)] = mu * Cones.hess(cone_k)
             b_idx += 2
         end
@@ -180,7 +191,7 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveCombi
         # TODO possibly fix IterativeSolvers so that methods can take matrix RHS, however the two columns may take different number of iters needed to converge
 
         dim = size(lhs, 2)
-        
+
         rhs1 = view(rhs, :, 1)
         IterativeSolvers.gmres!(system_solver.prevsol1, lhs, rhs1, restart = dim)
         copyto!(rhs1, system_solver.prevsol1)
@@ -191,7 +202,12 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveCombi
     else
         # update lhs matrix
         copyto!(lhs, system_solver.lhs_copy)
-        lhs[kap_row, end] = mu / tau / tau
+        if system_solver.use_kaptau_ntscal
+            lhs[kap_row, kap_row] = tau
+            lhs[kap_row, end] = kap
+        else
+            lhs[kap_row, end] = mu / tau / tau
+        end
         for k in eachindex(cones)
             H = Cones.hess(cones[k])
             @. system_solver.lhs_H_k[k] = mu * H
