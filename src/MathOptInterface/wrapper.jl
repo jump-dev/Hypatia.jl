@@ -80,6 +80,7 @@ Optimizer(;
     ) = Optimizer(use_dense, test_certificates, verbose, system_solver, linear_model, max_iters, time_limit, tol_rel_opt, tol_abs_opt, tol_feas, load_only)
 
 MOI.get(::Optimizer, ::MOI.SolverName) = "Hypatia"
+MOI.get(opt::Optimizer, ::MOI.RawSolver) = opt.solver
 
 MOI.is_empty(opt::Optimizer) = (opt.status == :NotLoaded)
 MOI.empty!(opt::Optimizer) = (opt.status = :NotLoaded) # TODO empty the data and results? keep options?
@@ -90,21 +91,18 @@ MOI.supports(::Optimizer, ::Union{
     MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}},
     ) = true
 
-# TODO don't restrict to Float64 type
-SupportedFuns = Union{
-    MOI.SingleVariable, MOI.ScalarAffineFunction{Float64},
-    MOI.VectorOfVariables, MOI.VectorAffineFunction{Float64},
-    }
+MOI.supports_constraint(::Optimizer,
+    ::Type{<:Union{MOI.SingleVariable, MOI.ScalarAffineFunction{Float64}}},
+    ::Type{<:Union{MOI.EqualTo{Float64}, MOI.GreaterThan{Float64}, MOI.LessThan{Float64}, MOI.Interval{Float64}}}
+    ) = true
+MOI.supports_constraint(::Optimizer,
+    ::Type{<:Union{MOI.VectorOfVariables, MOI.VectorAffineFunction{Float64}}},
+    ::Type{<:Union{MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives, MOIOtherCones...}}
+    ) = true
 
-SupportedSets = Union{
-    MOI.EqualTo{Float64}, MOI.Zeros,
-    MOI.GreaterThan{Float64}, MOI.Nonnegatives,
-    MOI.LessThan{Float64}, MOI.Nonpositives,
-    MOI.Interval{Float64},
-    MOIOtherCones...
-    }
-
-MOI.supports_constraint(::Optimizer, ::Type{<:SupportedFuns}, ::Type{<:SupportedSets}) = true
+MOI.supports(::Optimizer, ::MOI.Silent) = true
+MOI.set(opt::Optimizer, ::MOI.Silent, value::Bool) = (opt.verbose = value)
+MOI.get(opt::Optimizer, ::MOI.Silent) = opt.verbose
 
 # build representation as min c'x s.t. A*x = b, h - G*x in K
 function MOI.copy_to(
@@ -164,6 +162,7 @@ function MOI.copy_to(
         push!(constr_offset_eq, p)
         p += 1
         push!(IA, p)
+        # push!(JA, idx_map[ci.value].value)
         push!(JA, idx_map[get_con_fun(ci).variable].value)
         push!(VA, -1.0)
         push!(Ib, p)
@@ -547,7 +546,15 @@ function MOI.optimize!(opt::Optimizer)
     return
 end
 
-# function MOI.free!(opt::Optimizer) # TODO ?
+# MOI.supports(::Optimizer, ::MOI.SolveTime) = true
+function MOI.get(opt::Optimizer, ::MOI.SolveTime)
+    if opt.status in (:NotLoaded, :Loaded)
+        error("solve has not been called")
+    end
+    return opt.solve_time
+end
+
+MOI.get(opt::Optimizer, ::MOI.RawStatusString) = string(opt.status)
 
 function MOI.get(opt::Optimizer, ::MOI.TerminationStatus)
     if opt.status in (:NotLoaded, :Loaded)
@@ -608,7 +615,7 @@ function MOI.get(opt::Optimizer, ::MOI.ObjectiveValue)
     end
 end
 
-function MOI.get(opt::Optimizer, ::MOI.ObjectiveBound)
+function MOI.get(opt::Optimizer, ::Union{MOI.DualObjectiveValue, MOI.ObjectiveBound})
     if opt.obj_sense == MOI.MIN_SENSE
         return opt.dual_obj + opt.obj_const
     elseif opt.obj_sense == MOI.MAX_SENSE
