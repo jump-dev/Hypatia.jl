@@ -21,11 +21,14 @@ mutable struct CombinedHSDStepper{T <: HypReal} <: HSDStepper{T}
     cones_infeas::Vector{Bool}
     cones_loaded::Vector{Bool}
 
+    check_solver
+
     function CombinedHSDStepper{T}(
         model::Models.LinearModel{T};
         system_solver::CombinedHSDSystemSolver{T} = (model isa Models.PreprocessedLinearModel{T} ? QRCholCombinedHSDSystemSolver{T}(model) : NaiveCombinedHSDSystemSolver{T}(model)),
         use_infty_nbhd::Bool = true,
         max_nbhd::T = T(0.7), # TODO tune: maybe (use_infty_nbhd ? T(0.5) : T(0.75))
+        check_solver = NaiveCombinedHSDSystemSolver(model),
         ) where {T <: HypReal}
         stepper = new{T}()
 
@@ -47,6 +50,8 @@ mutable struct CombinedHSDStepper{T <: HypReal} <: HSDStepper{T}
         stepper.cones_infeas = trues(length(model.cones))
         stepper.cones_loaded = trues(length(model.cones))
 
+        stepper.check_solver = check_solver
+
         return stepper
     end
 end
@@ -57,6 +62,9 @@ function step(solver::HSDSolver{T}, stepper::CombinedHSDStepper{T}) where {T <: 
 
     # calculate affine/prediction and correction directions
     @timeit solver.timer "directions" (x_pred, x_corr, y_pred, y_corr, z_pred, z_corr, s_pred, s_corr, tau_pred, tau_corr, kap_pred, kap_corr) = get_combined_directions(solver, stepper.system_solver)
+    # (pred_res, corr_res) = get_combined_directions(solver, stepper.check_solver, (vcat(x_pred, y_pred, z_pred, kap_pred, s_pred, tau_pred), vcat(x_corr, y_corr, z_corr, kap_corr, s_corr, tau_corr)))
+    (pred_res, corr_res) = calc_residuals_curr(solver, x_pred, x_corr, y_pred, y_corr, z_pred, z_corr, s_pred, s_corr, tau_pred, tau_corr, kap_pred, kap_corr)
+    @show norm(pred_res), norm(corr_res)
 
     Cones.load_point.(solver.model.cones, stepper.primal_views)
 

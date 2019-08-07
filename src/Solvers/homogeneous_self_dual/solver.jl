@@ -191,6 +191,59 @@ function calc_mu(solver::HSDSolver{T}) where {T <: HypReal}
     return solver.mu
 end
 
+# A'*y + G'*z + c*tau = xrhs = (solver.x_residual, 0)
+# -A*x + b*tau = yrhs = (solver.y_residual, 0)
+# -G*x - s + h*tau = zrhs = (-duals_k, -duals_k - mu * g)
+# -c'*x - b'*y - h'*z - kap = kaprhs = (-kap, -kap + mu / tau)
+# (pr bar) z_k + mu*H_k*s_k = srhs_k = (z_residual, 0)
+# (du bar) mu*H_k*z_k + s_k = srhs_k
+# kap + mu/(taubar^2)*tau = taurhs = (kap + solver.primal_obj_t - solver.dual_obj_t, 0)
+
+function calc_residuals_curr(solver::HSDSolver{T}, x_pred, x_corr, y_pred, y_corr, z_pred, z_corr, s_pred, s_corr, tau_pred, tau_corr, kap_pred, kap_corr) where {T <: HypReal}
+    model = solver.model
+    point = solver.point
+
+    x_res_pred = solver.x_residual - model.A' * y_pred - model.G' * z_pred - model.c * tau_pred
+    x_res_corr = - model.A' * y_corr - model.G' * z_corr - model.c * tau_corr
+
+    y_res_pred = solver.y_residual + model.A * x_pred - model.b * tau_pred
+    y_res_corr =  model.A * x_corr - model.b * tau_corr
+
+    z_rhs_pred = []
+    z_rhs_corr = []
+    for k in eachindex(model.cones)
+        duals_k = solver.point.dual_views[k]
+        g = Cones.grad(model.cones[k])
+        push!(z_rhs_pred, -duals_k...)
+        push!(z_rhs_corr, (-duals_k - solver.mu * g)...)
+    end
+    z_res_pred = z_rhs_pred + model.G * x_pred + s_pred - model.h * tau_pred
+    z_res_corr = z_rhs_corr + model.G * x_corr + s_corr - model.h * tau_corr
+
+    kap_res_pred = -solver.kap + model.c' * x_pred + model.b' * y_pred + model.h' * z_pred + kap_pred
+    kap_res_corr = -solver.kap + solver.mu / solver.tau + model.c' * x_corr + model.b' * y_corr + model.h' * z_corr + kap_corr
+
+    s_res_pred = zeros(model.q)
+    s_res_corr = zeros(model.q)
+    for k in eachindex(model.cones)
+        cone_k = model.cones[k]
+        idxs = model.cone_idxs[k]
+        if Cones.use_dual(cone_k)
+            s_res_pred[idxs] = solver.z_residual[idxs] - solver.mu * Cones.hess(cone_k) * z_pred[idxs] - s_pred[idxs]
+            s_res_corr[idxs] = -solver.mu * Cones.hess(cone_k) * z_corr[idxs] - s_corr[idxs]
+        else
+            # @show size(solver.z_residual), size(model.G)
+            s_res_pred[idxs] = solver.z_residual[idxs] - z_pred[idxs] - solver.mu * Cones.hess(cone_k) * s_pred[idxs]
+            s_res_corr[idxs] = -z_corr[idxs] - solver.mu * Cones.hess(cone_k) * s_corr[idxs]
+        end
+    end
+
+    tau_res_pred = solver.kap + solver.primal_obj_t - solver.dual_obj_t - kap_pred - solver.mu / solver.tau / solver.tau * tau_pred
+    tau_res_corr = - kap_corr - solver.mu / solver.tau / solver.tau * tau_corr
+
+    return (x_res_pred, x_res_corr, y_res_pred, y_res_corr, z_res_corr, z_res_corr, s_res_pred, s_res_corr, kap_res_pred, kap_res_corr, tau_res_pred, tau_res_corr)
+end
+
 function calc_residual(solver::HSDSolver{T}) where {T <: HypReal}
     model = solver.model
     point = solver.point
