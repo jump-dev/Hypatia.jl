@@ -35,6 +35,8 @@ end
 WSOSPolyInterpSOCCone(R::Int, U::Int, ipwt::Vector{Matrix{Float64}}) = WSOSPolyInterpSOCCone(R, U, ipwt, false)
 
 MOIOtherCones = (
+    MOI.NormInfinityCone,
+    MOI.NormOneCone,
     MOI.SecondOrderCone,
     MOI.RotatedSecondOrderCone,
     MOI.ExponentialCone,
@@ -45,9 +47,11 @@ MOIOtherCones = (
     WSOSPolyInterpCone,
     WSOSPolyInterpMatCone,
     WSOSPolyInterpSOCCone,
-)
+    )
 
 # MOI cones for which no transformation is needed
+cone_from_moi(s::MOI.NormInfinityCone) = Cones.EpiNormInf{Float64}(MOI.dimension(s))
+cone_from_moi(s::MOI.NormOneCone) = Cones.EpiNormInf{Float64}(MOI.dimension(s), true)
 cone_from_moi(s::MOI.SecondOrderCone) = Cones.EpiNormEucl{Float64}(MOI.dimension(s))
 cone_from_moi(s::MOI.RotatedSecondOrderCone) = Cones.EpiPerSquare{Float64}(MOI.dimension(s))
 cone_from_moi(s::MOI.ExponentialCone) = Cones.HypoPerLog{Float64}(3)

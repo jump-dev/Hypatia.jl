@@ -12,20 +12,6 @@ import Hypatia
 const MO = Hypatia.Models
 const SO = Hypatia.Solvers
 
-MOIU.@model(HypatiaModelData,
-    (),
-    (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan, MOI.Interval),
-    (MOI.Reals, MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives,
-        MOI.SecondOrderCone, MOI.RotatedSecondOrderCone,
-        MOI.PositiveSemidefiniteConeTriangle,
-        MOI.ExponentialCone, MOI.GeometricMeanCone, MOI.LogDetConeTriangle),
-    (MOI.PowerCone,),
-    (MOI.SingleVariable,),
-    (MOI.ScalarAffineFunction,),
-    (MOI.VectorOfVariables,),
-    (MOI.VectorAffineFunction,),
-    )
-
 config = MOIT.TestConfig(
     atol = 1e-4,
     rtol = 1e-4,
@@ -41,10 +27,16 @@ unit_exclude = [
     "solve_qp_edge_cases",
     "solve_integer_edge_cases",
     "solve_objbound_edge_cases",
+    "solve_zero_one_with_bounds_1",
+    "solve_zero_one_with_bounds_2",
+    "solve_zero_one_with_bounds_3",
+    "solve_unbounded_model", # dual equalities are inconsistent, so detect dual infeasibility but currently no certificate or status
     ]
 
 conic_exclude = String[
     # "lin",
+    # "norminf",
+    # "normone",
     # "soc",
     # "rsoc",
     # "exp",
@@ -52,7 +44,7 @@ conic_exclude = String[
     # "sdp",
     # "logdet",
     # "rootdet",
-    # TODO MOI bridges don't support square logdet or rootdet
+    # TODO currently some issue with square det transformation?
     "logdets",
     "rootdets",
     ]
@@ -64,7 +56,7 @@ function test_moi(
     verbose::Bool,
     )
     optimizer = MOIU.CachingOptimizer(
-        MOIU.UniversalFallback(HypatiaModelData{Float64}()),
+        MOIU.UniversalFallback(MOIU.Model{Float64}()),
         Hypatia.Optimizer(
             use_dense = use_dense,
             test_certificates = true,
@@ -85,7 +77,7 @@ function test_moi(
         MOIT.contlineartest(optimizer, config)
     end
     @testset "conic tests" begin
-        MOIT.contconictest(MOIB.SquarePSD{Float64}(MOIB.RootDet{Float64}(optimizer)), config, conic_exclude)
+        MOIT.contconictest(MOIB.Constraint.Square{Float64}(MOIB.Constraint.RootDet{Float64}(optimizer)), config, conic_exclude)
     end
 
     return
