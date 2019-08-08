@@ -170,6 +170,7 @@ function test_sparsepca(instance::Function; T::Type{<:HypReal} = Float64, test_o
     return
 end
 
+SO = Hypatia.Solvers
 test_sparsepca.(
     sparsepca2,
     T = Float64,

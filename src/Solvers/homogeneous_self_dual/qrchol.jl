@@ -295,16 +295,14 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
                 #     end
                 # end
             end
-            Q2div_bf = BigFloat.(Q2div)
+            # Q2div_bf = BigFloat.(Q2div)
             Q2div_copy = copy(Q2div) #
             Q2div_copy2 = copy(Q2div_copy) #
             # Q2div_copy = F \ Q2div_copy2 #
             # Q2div_copy = Float64.(F.U) \ (Float64.(F.L) \ Float64.(Q2div_copy2))
             # @show typeof(Q2div)
             # @show typeof(F)
-            Q2div[:, 1] ./= 1e6
             ldiv!(F, Q2div)
-            Q2div[:, 1] .*= 1e6
             # @show typeof(Q2div_bf)
             # Q2div .= Float64.(Q2div_bf) #
 
@@ -315,6 +313,11 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
             # iter = 0
             res = Q2div_copy2 - Symmetric(Q2GHGQ2_copy) * Q2div
             @show norm(res)
+            # open("qrcholres.csv", "a") do io
+            #     pred_res_norm = norm(res[:, 1])
+            #     corr_res_norm = norm(res[:, 2])
+            #     println(io, "$(pred_res_norm),$(corr_res_norm)")
+            # end
             if norm(res) > 1e-7
                 CSV.write("lhs.csv",  DataFrames.DataFrame(Q2GHGQ2_copy), writeheader=false)
                 CSV.write("rhs.csv",  DataFrames.DataFrame(Q2div_copy2), writeheader=false)

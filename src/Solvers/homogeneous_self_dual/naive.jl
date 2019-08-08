@@ -133,7 +133,7 @@ mutable struct NaiveCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSo
     end
 end
 
-function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveCombinedHSDSystemSolver{T}) where {T <: HypReal}
+function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveCombinedHSDSystemSolver{T}; no_solve = false) where {T <: HypReal}
     model = solver.model
     cones = model.cones
     lhs = system_solver.lhs
@@ -180,7 +180,7 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveCombi
         # TODO possibly fix IterativeSolvers so that methods can take matrix RHS, however the two columns may take different number of iters needed to converge
 
         dim = size(lhs, 2)
-        
+
         rhs1 = view(rhs, :, 1)
         IterativeSolvers.gmres!(system_solver.prevsol1, lhs, rhs1, restart = dim)
         copyto!(rhs1, system_solver.prevsol1)
@@ -197,10 +197,18 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveCombi
             @. system_solver.lhs_H_k[k] = mu * H
         end
 
+        if no_solve
+            return (copy(lhs), copy(rhs))
+        end
+
         if system_solver.use_sparse
             rhs .= lu(lhs) \ rhs
         else
+            lhs_copy = copy(lhs)
+            rhs_copy = copy(rhs)
             ldiv!(lu!(lhs), rhs)
+            res = rhs_copy[:, 1] - lhs_copy * vcat(system_solver.x1, system_solver.y1, system_solver.z1, rhs[kap_row, 1], system_solver.s1, rhs[end, 1])
+            @show norm(res)
         end
     end
 

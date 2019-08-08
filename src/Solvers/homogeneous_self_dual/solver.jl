@@ -232,16 +232,20 @@ function calc_residuals_curr(solver::HSDSolver{T}, x_pred, x_corr, y_pred, y_cor
             s_res_pred[idxs] = solver.z_residual[idxs] - solver.mu * Cones.hess(cone_k) * z_pred[idxs] - s_pred[idxs]
             s_res_corr[idxs] = -solver.mu * Cones.hess(cone_k) * z_corr[idxs] - s_corr[idxs]
         else
-            # @show size(solver.z_residual), size(model.G)
             s_res_pred[idxs] = solver.z_residual[idxs] - z_pred[idxs] - solver.mu * Cones.hess(cone_k) * s_pred[idxs]
             s_res_corr[idxs] = -z_corr[idxs] - solver.mu * Cones.hess(cone_k) * s_corr[idxs]
         end
     end
 
     tau_res_pred = solver.kap + solver.primal_obj_t - solver.dual_obj_t - kap_pred - solver.mu / solver.tau / solver.tau * tau_pred
-    tau_res_corr = - kap_corr - solver.mu / solver.tau / solver.tau * tau_corr
+    tau_res_corr = -kap_corr - solver.mu / solver.tau / solver.tau * tau_corr
 
-    return (x_res_pred, x_res_corr, y_res_pred, y_res_corr, z_res_corr, z_res_corr, s_res_pred, s_res_corr, kap_res_pred, kap_res_corr, tau_res_pred, tau_res_corr)
+    pred_res = vcat(x_res_pred, y_res_pred, z_res_pred, s_res_pred, kap_res_pred, tau_res_pred)
+    corr_res = vcat(x_res_corr, y_res_corr, z_res_corr, s_res_corr, kap_res_corr, tau_res_corr)
+
+    # @show norm(x_res_pred), norm(y_res_pred), norm(z_res_pred), norm(s_res_pred), norm(kap_res_pred), norm(tau_res_pred)
+
+    return (pred_res, corr_res)
 end
 
 function calc_residual(solver::HSDSolver{T}) where {T <: HypReal}

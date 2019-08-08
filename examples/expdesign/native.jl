@@ -234,3 +234,9 @@ function test_expdesign(instance::Function; T::Type{<:HypReal} = Float64, test_o
     @test r.status == :Optimal
     return
 end
+
+SO = Hypatia.Solvers
+expdesign15(T::Type{<:HypReal}) = expdesign(Float64, 15, 30, 30, 5, use_logdet = true, use_sumlog = false, use_linops = false)
+test_expdesign(expdesign15, test_options = (solver_options = (verbose = true,), system_solver = SO.NaiveCombinedHSDSystemSolver))
+
+;

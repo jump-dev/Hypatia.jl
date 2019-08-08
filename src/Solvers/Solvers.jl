@@ -136,7 +136,9 @@ function build_solve_check(
     rtol::Real = atol,
     ) where {T <: HypReal}
     model = linear_model{T}(c, A, b, G, h, cones, cone_idxs; linear_model_options...)
-    stepper = CombinedHSDStepper{T}(model, system_solver = system_solver{T}(model; system_solver_options...); stepper_options...)
+    check_model = Models.PreprocessedLinearModel{T}(c, A, b, G, h, cones, cone_idxs; linear_model_options...)
+    check_solver = Solvers.NaiveCombinedHSDSystemSolver{T}(check_model; system_solver_options...)
+    stepper = CombinedHSDStepper{T}(model, system_solver = system_solver{T}(model; system_solver_options...); check_solver = check_solver, stepper_options...)
     solver = HSDSolver{T}(model, stepper = stepper; solver_options...)
     solve(solver)
     return get_certificates(solver, model, test = test, atol = atol, rtol = rtol)
