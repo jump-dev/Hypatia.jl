@@ -37,6 +37,7 @@ mutable struct PosSemidefTri{T <: HypReal, R <: HypRealOrComplex{T}} <: Cone{T}
     mat3::Matrix{R}
     inv_mat::Matrix{R}
     fact_mat
+    point_sqrt
 
     function PosSemidefTri{T, R}(dim::Int, is_dual::Bool) where {R <: HypRealOrComplex{T}} where {T <: HypReal}
         cone = new{T, R}()
@@ -91,6 +92,7 @@ function update_feas(cone::PosSemidefTri)
     copyto!(cone.mat2, cone.mat)
     cone.fact_mat = hyp_chol!(Hermitian(cone.mat2, :U)) # TODO eliminate allocs
     cone.is_feas = isposdef(cone.fact_mat)
+    cone.point_sqrt = copy(cone.fact_mat.U)
     cone.feas_updated = true
     return cone.is_feas
 end
@@ -226,6 +228,25 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Pos
         mul!(cone.mat3, Hermitian(cone.mat2, :U), cone.mat)
         mul!(cone.mat2, Hermitian(cone.mat, :U), cone.mat3)
         mat_U_to_vec!(view(prod, :, i), cone.mat2)
+    end
+    return prod
+end
+
+function hess_sqrt(cone::PosSemidefTri)
+    @assert cone.is_feas
+    H = cone.hess
+    return cholesky(H).L
+end
+
+# this is not correct, and if it was, factors not rational
+function hess_fact_prod!(prod, arr, cone::PosSemidefTri{T, R}) where {R <: HypRealOrComplex{T}} where {T <: HypReal}
+    @assert cone.is_feas
+    Li = inv(cone.point_sqrt)
+    @inbounds for i in 1:size(arr, 2)
+        vec_to_mat_U!(cone.mat2, view(arr, :, i))
+        mul!(cone.mat3, Hermitian(cone.mat2, :U), Li)
+        mul!(cone.mat2, Li, cone.mat3)
+        mat_U_to_vec_scaled!(view(prod, :, i), cone.mat2, sqrt(T(2)))
     end
     return prod
 end

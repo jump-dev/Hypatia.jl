@@ -53,6 +53,19 @@ function test_barrier_oracles(cone::CO.Cone{T}, barrier::Function; noise = 0.0) 
     @test CO.hess_prod!(prod, id, cone) ≈ hess atol=tol rtol=tol
     @test CO.inv_hess_prod!(prod, id, cone) ≈ inv_hess atol=tol rtol=tol
 
+    hess_fact = CO.hess_sqrt(cone)
+    @test hess_fact * transpose(hess_fact) ≈ hess atol=tol rtol=tol
+    dividend = zeros(T, dim, dim)
+    CO.hess_fact_div!(dividend, hess, cone)
+    @test dividend ≈ transpose(hess_fact) atol=tol rtol=tol
+    CO.hess_fact_div!(dividend, hess_fact, cone)
+    @test dividend ≈ I atol=tol rtol=tol
+    # hess_fact_prod!(prod, transpose(hess_fact), cone)
+    # @test prod ≈ hess atol=tol rtol=tol
+    # id = Matrix{T}(I, dim, dim)
+    # CO.hess_fact_prod!(prod, id, cone)
+    # @test prod ≈ hess_fact atol=tol rtol=tol
+
     return
 end
 
@@ -183,6 +196,7 @@ end
 function test_possemideftri_barrier(T::Type{<:HypReal})
     for side in [1, 2, 3]
         # real PSD cone
+        @show "real"
         dim = div(side * (side + 1), 2)
         cone = CO.PosSemidefTri{T, T}(dim)
         function R_barrier(s)
@@ -194,6 +208,7 @@ function test_possemideftri_barrier(T::Type{<:HypReal})
         test_barrier_oracles(cone, R_barrier, noise = 0.1)
 
         # complex PSD cone
+        @show "complex"
         dim = side^2
         cone = CO.PosSemidefTri{T, Complex{T}}(dim)
         function C_barrier(s)

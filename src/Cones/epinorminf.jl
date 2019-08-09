@@ -148,3 +148,73 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Epi
     @. @views prod[2:end, :] += arr[2:end, :] / cone.diag2n
     return prod
 end
+
+function _swap_first_last!(mat::AbstractVecOrMat)
+    @. mat[1, :] += mat[end, :]
+    @. mat[end, :] = mat[1, :] - mat[end, :]
+    @. mat[1, :] = mat[1, :] - mat[end, :]
+    return mat
+end
+
+function hess_sqrt(cone::EpiNormInf{T}) where {T}
+    @assert cone.grad_updated
+    d = sqrt.(vcat(cone.diag2n[end], cone.diag2n[1:(end - 1)]))
+    e = vcat(cone.edge2n[end], cone.edge2n[1:(end - 1)]) ./ d
+    point = sqrt(cone.diag11 - dot(e, e))
+    Lbar = zeros(T, cone.dim, cone.dim)
+    Lbar[end, 1:(end - 1)] = e
+    for i in 1:(cone.dim - 1)
+        Lbar[i, i] = d[i]
+    end
+    Lbar[end, end] = point
+    _swap_first_last!(Lbar)
+
+    return Lbar
+end
+
+function hess_fact_prod!(prod, arr, cone::EpiNormInf)
+    @assert cone.is_feas
+
+    return prod
+end
+
+# implicitly swaps first and last rows in arr and divides by half arrow
+function hess_fact_div!(dividend, arr, cone::EpiNormInf)
+    @assert cone.grad_updated
+    (m, n) = size(arr)
+    @assert size(dividend) == (m, n)
+    diag_sqrt = sqrt.(cone.diag2n)
+    edge_sqrt = cone.edge2n ./ diag_sqrt
+    for i in 1:n
+        dividend[1, i] = arr[end, i] / diag_sqrt[end]
+        for j in 2:(m - 1)
+            dividend[j, i] = arr[j, i] / diag_sqrt[j - 1]
+        end
+        dividend[m, i] = arr[1, i] - dividend[1, i] * edge_sqrt[end]
+        for j in 2:(m - 1)
+            dividend[m, i] -= dividend[j, i] * edge_sqrt[j - 1]
+        end
+        dividend[m, i] /= sqrt(cone.diag11 - dot(edge_sqrt, edge_sqrt))
+    end
+    return dividend
+end
+
+# function hess_fact_div!(dividend, arr, cone::EpiNormInf)
+#     @assert cone.grad_updated
+#     (m, n) = size(arr)
+#     @assert size(dividend) == (m, n)
+#     diag_sqrt = sqrt.(cone.diag2n)
+#     edge_sqrt = cone.edge2n ./ diag_sqrt
+#     for i in 1:n
+#         dividend[1, i] = arr[end, i] / diag_sqrt[end]
+#         for j in 2:(m - 1)
+#             dividend[j, i] = arr[j, i] / diag_sqrt[j]
+#         end
+#         dividend[m, i] = arr[1, i] - dividend[1, i] * edge_sqrt[end]
+#         for j in 2:(m - 1)
+#             dividend[m, i] -= dividend[j, i] * edge_sqrt[j]
+#         end
+#         dividend[m, i] /= sqrt(cone.diag11 - dot(edge_sqrt, edge_sqrt))
+#     end
+#     return dividend
+# end
