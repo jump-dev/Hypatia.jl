@@ -55,11 +55,16 @@ function test_barrier_oracles(cone::CO.Cone{T}, barrier::Function; noise = 0.0) 
 
     hess_fact = CO.hess_sqrt(cone)
     @test hess_fact * transpose(hess_fact) ≈ hess atol=tol rtol=tol
-    dividend = zeros(T, dim, dim)
-    CO.hess_fact_div!(dividend, hess, cone)
-    @test dividend ≈ transpose(hess_fact) atol=tol rtol=tol
-    CO.hess_fact_div!(dividend, hess_fact, cone)
-    @test dividend ≈ I atol=tol rtol=tol
+    prod_or_div = zeros(T, dim, dim)
+    CO.hess_sqrt_div!(prod_or_div, hess, cone)
+    @test prod_or_div ≈ transpose(hess_fact) atol=tol rtol=tol
+    CO.hess_sqrt_div!(prod_or_div, hess_fact, cone)
+    @test prod_or_div ≈ I atol=tol rtol=tol
+    CO.hess_sqrt_mul!(prod_or_div, transpose(hess_fact), cone)
+    @test prod_or_div ≈ hess atol=tol rtol=tol
+    CO.hess_sqrt_mul!(prod_or_div, id, cone)
+    @test prod_or_div ≈ hess_fact atol=tol rtol=tol
+
     # hess_fact_prod!(prod, transpose(hess_fact), cone)
     # @test prod ≈ hess atol=tol rtol=tol
     # id = Matrix{T}(I, dim, dim)
