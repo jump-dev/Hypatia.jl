@@ -546,7 +546,11 @@ function MOI.optimize!(opt::Optimizer)
     return
 end
 
-# MOI.supports(::Optimizer, ::MOI.SolveTime) = true
+MOI.supports(::Optimizer, ::MOI.TimeLimitSec) = true
+MOI.set(opt::Optimizer, ::MOI.TimeLimitSec, value::Real) = (opt.time_limit = value)
+MOI.set(opt::Optimizer, ::MOI.TimeLimitSec, ::Nothing) = (opt.time_limit = Inf)
+MOI.get(opt::Optimizer, ::MOI.TimeLimitSec) = (isfinite(opt.time_limit) ? opt.time_limit : nothing)
+
 function MOI.get(opt::Optimizer, ::MOI.SolveTime)
     if opt.status in (:NotLoaded, :Loaded)
         error("solve has not been called")
