@@ -149,14 +149,14 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Epi
     return prod
 end
 
-function _swap_first_last!(mat::AbstractVecOrMat)
+function _swap_first_last_rows!(mat::AbstractVecOrMat)
     @. mat[1, :] += mat[end, :]
     @. mat[end, :] = mat[1, :] - mat[end, :]
     @. mat[1, :] = mat[1, :] - mat[end, :]
     return mat
 end
 
-function hess_sqrt(cone::EpiNormInf{T}) where {T}
+function hess_L_fact(cone::EpiNormInf{T}) where {T}
     @assert cone.grad_updated
     # implicitly swaps rows and columns in Hessian
     d = sqrt.(vcat(cone.diag2n[end], cone.diag2n[1:(end - 1)]))
@@ -170,13 +170,14 @@ function hess_sqrt(cone::EpiNormInf{T}) where {T}
     end
     Lbar[end, end] = point
     # swap rows, as Lbar*Lbar' = PHP'
-    _swap_first_last!(Lbar)
+    _swap_first_last_rows!(Lbar)
 
     return Lbar
 end
 
-# implicitly swaps first and last rows in arr and divides by half arrow
-function hess_sqrt_div!(dividend, arr, cone::EpiNormInf)
+hess_U_fact(cone::EpiNormInf) = hess_L_fact(cone)'
+
+function hess_L_div!(dividend, arr, cone::EpiNormInf)
     @assert cone.grad_updated
     (m, n) = size(arr)
     @assert size(dividend) == (m, n)
@@ -196,18 +197,21 @@ function hess_sqrt_div!(dividend, arr, cone::EpiNormInf)
     return dividend
 end
 
-function hess_sqrt_mul!(prod, arr, cone::EpiNormInf)
+# U_factor * arr = U_bar * (P' * arr) where (P' * arr) swaps first and last rows of arr
+# functin implicitly forms the diagonal, edge, and point of U_bar, swaps rows in arr, and multiplies  U_bar by permuted arr
+function hess_U_prod!(prod, arr, cone::EpiNormInf)
+    mul!(prod, hess_U_fact(cone), arr)
     @assert cone.grad_updated
     (m, n) = size(arr)
     @assert size(prod) == (m, n)
-    diag_sqrt = sqrt.(vcat(cone.diag2n[end], cone.diag2n[1:(end - 1)]))
-    edge_sqrt = vcat(cone.edge2n[end], cone.edge2n[1:(end - 1)]) ./ diag_sqrt
+    diag_sqrt = sqrt.(cone.diag2n)
+    edge_sqrt = cone.edge2n ./ diag_sqrt
     for i in 1:n
-        for j in 1:(m - 1)
-            prod[j, i] = diag_sqrt[j] * arr[j, i]
+        prod[1, i] = diag_sqrt[end] * arr[m, i] + edge_sqrt[end] * arr[1, i]
+        for j in 2:(m - 1)
+            prod[j, i] = diag_sqrt[j - 1] * arr[j, i] + edge_sqrt[j - 1] * arr[1, i]
         end
-        prod[m, i] = dot(edge_sqrt, arr[1:(end - 1), i]) + sqrt(cone.diag11 - dot(edge_sqrt, edge_sqrt)) * arr[end, i]
+        prod[m, i] = sqrt(cone.diag11 - dot(edge_sqrt, edge_sqrt)) * arr[1, i]
     end
-    _swap_first_last!(prod)
     return prod
 end
