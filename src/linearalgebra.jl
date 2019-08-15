@@ -53,6 +53,7 @@ size(A::HypBlockMatrix, d) = (d == 1 ? A.nrows : A.ncols)
 adjoint(A::HypBlockMatrix{T}) where {T <: HypReal} = HypBlockMatrix{T}(A.ncols, A.nrows, adjoint.(A.blocks), A.cols, A.rows)
 
 # TODO try to speed up by using better logic for alpha and beta (see Julia's 5-arg mul! code)
+# TODO check that this eliminates allocs when using IterativeSolvers methods, and that it is as fast as possible
 function mul!(y::AbstractVector{T}, A::HypBlockMatrix{T}, x::AbstractVector{T}, alpha::Number, beta::Number) where {T <: HypReal}
     @assert size(x, 1) == A.ncols
     @assert size(y, 1) == A.nrows
