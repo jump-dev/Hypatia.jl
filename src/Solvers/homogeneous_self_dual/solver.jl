@@ -198,10 +198,11 @@ function calc_residual(solver::HSDSolver{T}) where {T <: HypReal}
     # x_residual = -A'*y - G'*z - c*tau
     x_residual = solver.x_residual
     mul!(x_residual, model.G', point.z)
-    x_residual .= -model.A' * point.y - x_residual # TODO remove allocs
+    mul!(x_residual, model.A', point.y, true, true)
     solver.x_norm_res_t = norm(x_residual)
-    @. x_residual -= model.c * solver.tau
+    @. x_residual += model.c * solver.tau
     solver.x_norm_res = norm(x_residual) / solver.tau
+    @. x_residual *= -1
 
     # y_residual = A*x - b*tau
     y_residual = solver.y_residual
