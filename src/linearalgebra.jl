@@ -52,60 +52,24 @@ size(A::HypBlockMatrix, d) = (d == 1 ? A.nrows : A.ncols)
 
 adjoint(A::HypBlockMatrix{T}) where {T <: HypReal} = HypBlockMatrix{T}(A.ncols, A.nrows, adjoint.(A.blocks), A.cols, A.rows)
 
-function mul!(y::AbstractVector{T}, A::HypBlockMatrix{T}, x::AbstractVector{T}) where {T <: HypReal}
+# TODO try to speed up by using better logic for alpha and beta (see Julia's 5-arg mul! code)
+# TODO check that this eliminates allocs when using IterativeSolvers methods, and that it is as fast as possible
+function mul!(y::AbstractVector{T}, A::HypBlockMatrix{T}, x::AbstractVector{T}, alpha::Number, beta::Number) where {T <: HypReal}
     @assert size(x, 1) == A.ncols
     @assert size(y, 1) == A.nrows
     @assert size(x, 2) == size(y, 2)
 
-    y .= zero(T)
-
+    @. y *= beta
     for (b, r, c) in zip(A.blocks, A.rows, A.cols)
         if isempty(r) || isempty(c)
             continue
         end
-        # println()
-        # if b isa UniformScaling
-        #     println("I")
-        # else
-        #     println(size(b))
-        # end
-        # println(r, " , ", c)
         xk = view(x, c)
         yk = view(y, r)
-        yk .+= b * xk # TODO need inplace mul+add
-        # mul!(yk, b, xk, α = one(T), β = one(T))
+        mul!(yk, b, xk, alpha, true)
     end
-
     return y
 end
-
-# function mul!(y::AbstractVector{T}, A::Adjoint{T, HypBlockMatrix{T}}, x::AbstractVector{T}) where {T <: HypReal}
-#     @assert size(x, 1) == A.ncols
-#     @assert size(y, 1) == A.nrows
-#     @assert size(x, 2) == size(y, 2)
-#
-#     y .= zero(T)
-#
-#     for (b, r, c) in zip(A.blocks, A.rows, A.cols)
-#         if isempty(r) || isempty(c)
-#             continue
-#         end
-#         # println()
-#         # if b isa UniformScaling
-#         #     println("I")
-#         # else
-#         #     println(size(b))
-#         # end
-#         # println(r, " , ", c)
-#         xk = view(x, r)
-#         yk = view(y, c)
-#         yk .+= b' * xk # TODO need inplace mul+add
-#         # mul!(yk, b', xk)
-#         # mul!(yk, b', xk, α = one(T), β = one(T))
-#     end
-#
-#     return y
-# end
 
 *(A::HypBlockMatrix{T}, x::AbstractVector{T}) where {T <: HypReal} = mul!(similar(x, size(A, 1)), A, x)
 
