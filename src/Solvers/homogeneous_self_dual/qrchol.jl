@@ -303,8 +303,8 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
         @. x += tau_sol * x1
         @. y += tau_sol * y1
         @. z += tau_sol * z1
-        mul!(s, model.G, x)
-        @. s = -s + tau_sol * model.h
+        copyto!(s, model.h)
+        mul!(s, model.G, x, -1, tau_sol)
         kap_sol = -dot(model.c, x) - dot(model.b, y) - dot(model.h, z) - tau_rhs
         return (tau_sol, kap_sol)
     end
