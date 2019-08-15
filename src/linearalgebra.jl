@@ -56,57 +56,20 @@ function mul!(y::AbstractVector{T}, A::HypBlockMatrix{T}, x::AbstractVector{T}) 
     @assert size(x, 1) == A.ncols
     @assert size(y, 1) == A.nrows
     @assert size(x, 2) == size(y, 2)
-
     y .= zero(T)
-
     for (b, r, c) in zip(A.blocks, A.rows, A.cols)
         if isempty(r) || isempty(c)
             continue
         end
-        # println()
-        # if b isa UniformScaling
-        #     println("I")
-        # else
-        #     println(size(b))
-        # end
-        # println(r, " , ", c)
         xk = view(x, c)
         yk = view(y, r)
-        yk .+= b * xk # TODO need inplace mul+add
-        # mul!(yk, b, xk, α = one(T), β = one(T))
+        # yk .+= b * xk # TODO check 5-arg mul is correct
+        mul!(yk, b, xk, true, true)
     end
-
     return y
 end
 
-# function mul!(y::AbstractVector{T}, A::Adjoint{T, HypBlockMatrix{T}}, x::AbstractVector{T}) where {T <: HypReal}
-#     @assert size(x, 1) == A.ncols
-#     @assert size(y, 1) == A.nrows
-#     @assert size(x, 2) == size(y, 2)
-#
-#     y .= zero(T)
-#
-#     for (b, r, c) in zip(A.blocks, A.rows, A.cols)
-#         if isempty(r) || isempty(c)
-#             continue
-#         end
-#         # println()
-#         # if b isa UniformScaling
-#         #     println("I")
-#         # else
-#         #     println(size(b))
-#         # end
-#         # println(r, " , ", c)
-#         xk = view(x, r)
-#         yk = view(y, c)
-#         yk .+= b' * xk # TODO need inplace mul+add
-#         # mul!(yk, b', xk)
-#         # mul!(yk, b', xk, α = one(T), β = one(T))
-#     end
-#
-#     return y
-# end
-
+# TODO add in-place 5-arg mul
 *(A::HypBlockMatrix{T}, x::AbstractVector{T}) where {T <: HypReal} = mul!(similar(x, size(A, 1)), A, x)
 
 -(A::HypBlockMatrix{T}) where {T <: HypReal} = HypBlockMatrix{T}(A.nrows, A.ncols, -A.blocks, A.rows, A.cols)
