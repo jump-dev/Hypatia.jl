@@ -184,11 +184,9 @@ end
 real_types = [
     Float64,
     Float32,
-    # BigFloat,
     ]
 
 @testset "native examples: $T" for T in real_types
-    # TODO test some other options maybe
     test_options = (
         solver_options = (verbose = false,),
         )
