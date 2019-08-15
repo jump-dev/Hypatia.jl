@@ -52,24 +52,24 @@ size(A::HypBlockMatrix, d) = (d == 1 ? A.nrows : A.ncols)
 
 adjoint(A::HypBlockMatrix{T}) where {T <: HypReal} = HypBlockMatrix{T}(A.ncols, A.nrows, adjoint.(A.blocks), A.cols, A.rows)
 
-function mul!(y::AbstractVector{T}, A::HypBlockMatrix{T}, x::AbstractVector{T}) where {T <: HypReal}
+# TODO try to speed up by using better logic for alpha and beta (see Julia's 5-arg mul! code)
+function mul!(y::AbstractVector{T}, A::HypBlockMatrix{T}, x::AbstractVector{T}, alpha::Number, beta::Number) where {T <: HypReal}
     @assert size(x, 1) == A.ncols
     @assert size(y, 1) == A.nrows
     @assert size(x, 2) == size(y, 2)
-    y .= zero(T)
+
+    @. y *= beta
     for (b, r, c) in zip(A.blocks, A.rows, A.cols)
         if isempty(r) || isempty(c)
             continue
         end
         xk = view(x, c)
         yk = view(y, r)
-        # yk .+= b * xk # TODO check 5-arg mul is correct
-        mul!(yk, b, xk, true, true)
+        mul!(yk, b, xk, alpha, true)
     end
     return y
 end
 
-# TODO add in-place 5-arg mul
 *(A::HypBlockMatrix{T}, x::AbstractVector{T}) where {T <: HypReal} = mul!(similar(x, size(A, 1)), A, x)
 
 -(A::HypBlockMatrix{T}) where {T <: HypReal} = HypBlockMatrix{T}(A.nrows, A.ncols, -A.blocks, A.rows, A.cols)
