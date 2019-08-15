@@ -41,10 +41,9 @@ mutable struct QRCholCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemS
     GQ2
     QpbxGHbz
     Q1pbxGHbz
-    Q2pbxGHbz
+    Q2div
     GQ1x
     HGQ1x
-    Q2div
     HGQ2
     Q2GHGQ2
     Gxi
@@ -118,10 +117,9 @@ mutable struct QRCholCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemS
         end
         system_solver.QpbxGHbz = Matrix{T}(undef, n, 3)
         system_solver.Q1pbxGHbz = view(system_solver.QpbxGHbz, 1:p, :)
-        system_solver.Q2pbxGHbz = view(system_solver.QpbxGHbz, (p + 1):n, :)
+        system_solver.Q2div = view(system_solver.QpbxGHbz, (p + 1):n, :)
         system_solver.GQ1x = Matrix{T}(undef, q, 3)
         system_solver.HGQ1x = similar(system_solver.GQ1x)
-        system_solver.Q2div = Matrix{T}(undef, nmp, 3)
         system_solver.Gxi = similar(system_solver.GQ1x)
         system_solver.HGxi = similar(system_solver.Gxi)
 
@@ -173,10 +171,9 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
     GQ2 = system_solver.GQ2
     QpbxGHbz = system_solver.QpbxGHbz
     Q1pbxGHbz = system_solver.Q1pbxGHbz
-    Q2pbxGHbz = system_solver.Q2pbxGHbz
+    Q2div = system_solver.Q2div
     GQ1x = system_solver.GQ1x
     HGQ1x = system_solver.HGQ1x
-    Q2div = system_solver.Q2div
     HGQ2 = system_solver.HGQ2
     Q2GHGQ2 = system_solver.Q2GHGQ2
     Gxi = system_solver.Gxi
@@ -233,15 +230,14 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
 
     ldiv!(model.Ap_R', yi)
 
-    mul!(QpbxGHbz, model.G', zi)
-    @. QpbxGHbz += xi
+    copyto!(QpbxGHbz, xi)
+    mul!(QpbxGHbz, model.G', zi, true, true)
     lmul!(model.Ap_Q', QpbxGHbz)
 
     if !iszero(size(Q2div, 1))
         mul!(GQ1x, GQ1, yi)
         block_hessian_product!(HGQ1x_k, GQ1x_k)
-        mul!(Q2div, GQ2', HGQ1x)
-        @. Q2div = Q2pbxGHbz - Q2div
+        mul!(Q2div, GQ2', HGQ1x, -1, true)
 
         block_hessian_product!(HGQ2_k, GQ2_k)
         mul!(Q2GHGQ2, GQ2', HGQ2)
@@ -280,8 +276,8 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
         end
     end
 
-    @. xi1 = yi
-    @. xi2 = Q2div
+    copyto!(xi1, yi)
+    copyto!(xi2, Q2div)
     lmul!(model.Ap_Q, xi)
 
     mul!(Gxi, model.G, xi)
@@ -290,8 +286,8 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
     @. zi = HGxi - zi
 
     if !iszero(length(yi))
-        mul!(yi, GQ1', HGxi)
-        @. yi = Q1pbxGHbz - yi
+        copyto!(yi, Q1pbxGHbz)
+        mul!(yi, GQ1', HGxi, -1, true)
         ldiv!(model.Ap_R, yi)
     end
 
