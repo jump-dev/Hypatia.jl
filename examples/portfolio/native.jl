@@ -46,7 +46,6 @@ function portfolio(
     end
     b = T[1]
     h = zeros(T, num_stocks)
-    cone_idxs = UnitRange{Int}[1:num_stocks]
     cones = CO.Cone{T}[CO.Nonnegative{T}(num_stocks)]
     cone_offset = num_stocks
 
@@ -61,7 +60,6 @@ function portfolio(
         h_risk = vcat(gamma_new, zeros(T, num_stocks))
         h = vcat(h, h_risk)
         push!(cones, cone)
-        push!(cone_idxs, (cone_offset + 1):(cone_offset + num_stocks + 1))
         cone_offset += num_stocks + 1
     end
 
@@ -112,7 +110,6 @@ function portfolio(
         b = vcat(b, zeros(T, num_stocks))
         h = vcat(h, zeros(T, 2 * num_stocks), gamma * sqrt(T(num_stocks)))
         push!(cones, CO.Nonnegative{T}(2 * num_stocks + 1))
-        push!(cone_idxs, (cone_offset + 1):(cone_offset + 2 * num_stocks + 1))
         cone_offset += 2 * num_stocks + 1
     end
 
@@ -134,7 +131,6 @@ function portfolio(
         end
         h = vcat(h, gamma * ones(T, 2 * num_stocks))
         push!(cones, CO.Nonnegative{T}(2 * num_stocks))
-        push!(cone_idxs, (cone_offset + 1):(cone_offset + 2 * num_stocks))
         cone_offset += 2 * num_stocks
     end
 
@@ -178,7 +174,6 @@ function portfolio(
         end
         h = vcat(h, h2, h2)
         for i in 1:(2 * num_stocks)
-            push!(cone_idxs, (3 * (i - 1) + cone_offset + 1):(3 * i + cone_offset))
             push!(cones, CO.HypoPerLog{T}(3))
         end
         cone_offset += 6 * num_stocks
@@ -189,7 +184,7 @@ function portfolio(
         G = Hypatia.HypBlockMatrix{T}(last_idx(G_rows), last_idx(G_cols), G_blocks, G_rows, G_cols)
     end
 
-    return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs)
+    return (c = c, A = A, b = b, G = G, h = h, cones = cones)
 end
 
 portfolio1(T::Type{<:HypReal}) = portfolio(T, 4, [:l1], use_l1ball = true)
@@ -232,7 +227,7 @@ function test_portfolio(instance::Function; T::Type{<:HypReal} = Float64, test_o
     Random.seed!(rseed)
     tol = max(1e-5, sqrt(sqrt(eps(T))))
     d = instance(T)
-    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs; test_options..., atol = tol, rtol = tol)
+    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; test_options..., atol = tol, rtol = tol)
     @test r.status == :Optimal
     return
 end

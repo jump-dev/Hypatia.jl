@@ -57,11 +57,9 @@ function polyminreal(
 
     if use_wsos
         cones = CO.Cone{T}[CO.WSOSPolyInterp{T, T}(U, [P0, PWts...], !use_primal)]
-        cone_idxs = [1:U]
     else
         # will be set up iteratively
         cones = CO.Cone{T}[]
-        cone_idxs = UnitRange{Int}[]
     end
 
     if use_primal
@@ -93,11 +91,9 @@ function polyminreal(
             h = zeros(T, U)
         else
             G_full = zeros(T, 0, U)
-            rowidx = 1
             for Pk in [P0, PWts...]
                 Lk = size(Pk, 2)
                 dk = div(Lk * (Lk + 1), 2)
-                push!(cone_idxs, rowidx:(rowidx + dk - 1))
                 push!(cones, CO.PosSemidefTri{T, T}(dk))
                 Gk = Matrix{T}(undef, dk, U)
                 l = 1
@@ -106,7 +102,6 @@ function polyminreal(
                     l += 1
                 end
                 G_full = vcat(G_full, Gk)
-                rowidx += dk
             end
             if use_linops
                 (nrows, ncols) = size(G_full)
@@ -118,7 +113,7 @@ function polyminreal(
         end
     end
 
-    return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs, true_obj = true_obj)
+    return (c = c, A = A, b = b, G = G, h = h, cones = cones, true_obj = true_obj)
 end
 
 polyminreal1(T::Type{<:HypReal}) = polyminreal(T, :heart, 2)
@@ -224,9 +219,8 @@ function polymincomplex(
         h = zeros(T, U)
     end
     cones = CO.Cone{T}[CO.WSOSPolyInterp{T, Complex{T}}(U, P_data, !use_primal)]
-    cone_idxs = [1:U]
 
-    return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs, true_obj = true_obj)
+    return (c = c, A = A, b = b, G = G, h = h, cones = cones, true_obj = true_obj)
 end
 
 polymincomplex1(T::Type{<:HypReal}) = polymincomplex(T, :abs1d, 1)
@@ -304,7 +298,7 @@ function test_polymin(instance::Function; T::Type{<:HypReal} = Float64, test_opt
     Random.seed!(rseed)
     tol = max(1e-5, sqrt(sqrt(eps(T))))
     d = instance(T)
-    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs; test_options..., atol = tol, rtol = tol)
+    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; test_options..., atol = tol, rtol = tol)
     @test r.status == :Optimal
     if !isnan(d.true_obj)
         @test r.primal_obj ≈ d.true_obj atol = tol rtol = tol

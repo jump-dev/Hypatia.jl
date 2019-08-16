@@ -51,7 +51,6 @@ function densityest(
     PWts = convert.(Matrix{T}, PWts)
 
     cones = CO.Cone{T}[]
-    cone_idxs = UnitRange{Int}[]
     cone_offset = 1
 
     if use_wsos
@@ -59,7 +58,6 @@ function densityest(
         h_poly = zeros(T, U)
         b_poly = T[]
         push!(cones, CO.WSOSPolyInterp{T, T}(U, [P0, PWts...]))
-        push!(cone_idxs, 1:U)
         cone_offset += U
         num_psd_vars = 0
     else
@@ -79,7 +77,6 @@ function densityest(
             idx += 1
         end
         push!(cones, CO.PosSemidefTri{T, T}(dim))
-        push!(cone_idxs, 1:dim)
         cone_offset += dim
 
         for i in 1:(n - 1)
@@ -94,7 +91,6 @@ function densityest(
                 idx += 1
             end
             push!(cones, CO.PosSemidefTri{T, T}(dim))
-            push!(cone_idxs, cone_offset:(cone_offset + dim - 1))
             cone_offset += dim
         end
         A_psd = hcat(psd_var_list...)
@@ -111,7 +107,6 @@ function densityest(
             G_log[i + 2, 2:(1 + U)] = -basis_evals[i, :]
         end
         push!(cones, CO.HypoPerLog{T}(nobs + 2))
-        push!(cone_idxs, cone_offset:(cone_offset + 1 + nobs))
         num_hypo_vars = 1
     else
         h_log = zeros(T, 3 * nobs)
@@ -123,7 +118,6 @@ function densityest(
             h_log[offset + 1] = 1.0
             offset += 3
             push!(cones, CO.HypoPerLog{T}(3))
-            push!(cone_idxs, cone_offset:(cone_offset + 2))
             cone_offset += 3
         end
         num_hypo_vars = nobs
@@ -186,7 +180,7 @@ function densityest(
     c = vcat(-ones(T, num_hypo_vars), zeros(T, U + num_psd_vars))
     b = vcat(b_poly, one(T))
 
-    return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs)
+    return (c = c, A = A, b = b, G = G, h = h, cones = cones)
 end
 
 densityest(T::Type{<:HypReal}, nobs::Int, n::Int, deg::Int; options...) = densityest(T, randn(nobs, n), deg; options...)
@@ -235,7 +229,7 @@ function test_densityest(instance::Function; T::Type{<:HypReal} = Float64, test_
     Random.seed!(rseed)
     tol = max(1e-5, sqrt(sqrt(eps(T))))
     d = instance(T)
-    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs; test_options..., atol = tol, rtol = tol)
+    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; test_options..., atol = tol, rtol = tol)
     @test r.status == :Optimal
     return
 end
