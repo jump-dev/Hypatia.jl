@@ -8,6 +8,7 @@ module Cones
 
 using LinearAlgebra
 import LinearAlgebra.BlasFloat
+import LinearAlgebra.copytri!
 using ForwardDiff
 using DiffResults
 import Hypatia.HypReal
@@ -27,8 +28,8 @@ include("hypoperlog.jl")
 include("epiperexp.jl")
 include("hypogeomean.jl")
 include("epinormspectral.jl")
-include("semidefinite.jl")
-include("hypoperlogdet.jl")
+include("possemideftri.jl")
+include("hypoperlogdettri.jl")
 include("wsospolyinterp.jl")
 # include("wsospolyinterpmat.jl")
 # include("wsospolyinterpsoc.jl")
@@ -102,64 +103,116 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Con
     return ldiv!(prod, cone.hess_fact, arr)
 end
 
-# utilities for converting between smat and svec forms (lower triangle) for symmetric matrices
-# TODO only need to do upper/lower triangle if use symmetric matrix types
+# utilities for converting between symmetric/Hermitian matrix and vector triangle forms
 
-function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{T}, rt2::T) where {T}
+function mat_U_to_vec_scaled!(vec::AbstractVector{T}, mat::AbstractMatrix{T}) where {T}
     k = 1
     m = size(mat, 1)
-    for i in 1:m, j in 1:i
+    @inbounds for j in 1:m, i in 1:j
         if i == j
             vec[k] = mat[i, j]
         else
-            vec[k] = rt2 * mat[i, j]
+            vec[k] = 2 * mat[i, j]
         end
         k += 1
     end
     return vec
 end
 
-function svec_to_smat!(mat::AbstractMatrix{T}, vec::AbstractVector{T}, rt2i::T) where {T}
+function vec_to_mat_U_scaled!(mat::AbstractMatrix{T}, vec::AbstractVector{T}) where {T}
     k = 1
     m = size(mat, 1)
-    for i in 1:m, j in 1:i
+    @inbounds for j in 1:m, i in 1:j
         if i == j
             mat[i, j] = vec[k]
         else
-            mat[i, j] = mat[j, i] = rt2i * vec[k]
+            mat[i, j] = vec[k] / 2
         end
         k += 1
     end
     return mat
 end
 
-function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}, rt2::T) where {T}
+function mat_U_to_vec_scaled!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}) where {T}
     k = 1
     m = size(mat, 1)
-    for i in 1:m, j in 1:i
+    @inbounds for j in 1:m, i in 1:j
         if i == j
             vec[k] = real(mat[i, j])
             k += 1
         else
-            ck = rt2 * mat[i, j]
+            ck = 2 * mat[i, j]
             vec[k] = real(ck)
             k += 1
-            vec[k] = imag(ck)
+            vec[k] = -imag(ck)
             k += 1
         end
     end
     return vec
 end
 
-function svec_to_smat!(mat::AbstractMatrix{Complex{T}}, vec::AbstractVector{T}, rt2i::T) where {T}
+function vec_to_mat_U_scaled!(mat::AbstractMatrix{Complex{T}}, vec::AbstractVector{T}) where {T}
     k = 1
     m = size(mat, 1)
-    for i in 1:m, j in 1:i
+    @inbounds for j in 1:m, i in 1:j
         if i == j
             mat[i, j] = vec[k]
             k += 1
         else
-            mat[i, j] = mat[j, i] = rt2i * Complex(vec[k], vec[k + 1])
+            mat[i, j] = Complex(vec[k], -vec[k + 1]) / 2
+            k += 2
+        end
+    end
+    return mat
+end
+
+function mat_U_to_vec!(vec::AbstractVector{T}, mat::AbstractMatrix{T}) where {T}
+    k = 1
+    m = size(mat, 1)
+    @inbounds for j in 1:m, i in 1:j
+        vec[k] = mat[i, j]
+        k += 1
+    end
+    return vec
+end
+
+function vec_to_mat_U!(mat::AbstractMatrix{T}, vec::AbstractVector{T}) where {T}
+    k = 1
+    m = size(mat, 1)
+    @inbounds for j in 1:m, i in 1:j
+        mat[i, j] = vec[k]
+        k += 1
+    end
+    return mat
+end
+
+function mat_U_to_vec!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}) where {T}
+    k = 1
+    m = size(mat, 1)
+    @inbounds for j in 1:m, i in 1:j
+        if i == j
+            vec[k] = real(mat[i, j])
+            k += 1
+        else
+            ck = mat[i, j]
+            vec[k] = real(ck)
+            k += 1
+            vec[k] = -imag(ck)
+            k += 1
+        end
+    end
+    return vec
+end
+
+function vec_to_mat_U!(mat::AbstractMatrix{Complex{T}}, vec::AbstractVector{T}) where {T}
+    k = 1
+    m = size(mat, 1)
+    @inbounds for j in 1:m, i in 1:j
+        if i == j
+            mat[i, j] = vec[k]
+            k += 1
+        else
+            mat[i, j] = Complex(vec[k], -vec[k + 1])
             k += 2
         end
     end

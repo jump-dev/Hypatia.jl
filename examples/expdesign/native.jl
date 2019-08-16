@@ -24,7 +24,6 @@ function expdesign(
     use_linops::Bool = false,
     )
     @assert (p > q) && (n > q) && (nmax <= n)
-    rt2 = sqrt(T(2))
     V = T(4) * rand(T, q, p) .- T(2)
 
     # hypograph variable and number of trials of each experiment
@@ -46,14 +45,14 @@ function expdesign(
         l = 1
         for i in 1:q, j in 1:i
             for k in 1:p
-                G_logdet[l, k] = -V[i, k] * V[j, k] * (i == j ? 1 : rt2)
+                G_logdet[l, k] = -V[i, k] * V[j, k]
             end
             l += 1
         end
         @assert l - 1 == dimvec
         # pad with hypograph variable and perspective variable
         h_logdet = vcat(zero(T), one(T), zeros(T, dimvec))
-        push!(cones, CO.HypoPerLogdet{T}(dimvec + 2))
+        push!(cones, CO.HypoPerLogdetTri{T}(dimvec + 2))
         push!(cone_idxs, (2 * p + 1):(2 * p + dimvec + 2))
 
         if use_linops
@@ -107,7 +106,7 @@ function expdesign(
         l = 1
         for i in 1:q, j in 1:i
             for k in 1:p
-                G_psd[l, k] = -V[i, k] * V[j, k] * (i == j ? 1 : rt2)
+                G_psd[l, k] = -V[i, k] * V[j, k]
             end
             l += 1
         end
@@ -118,7 +117,7 @@ function expdesign(
             # skip zero-valued elements
             l += i - 1
             for j in i:q
-                G_psd[l, p + tri_idx] = -rt2
+                G_psd[l, p + tri_idx] = -1
                 l += 1
                 tri_idx += 1
             end
@@ -130,7 +129,7 @@ function expdesign(
         end
 
         h_psd = zeros(T, dimvec)
-        push!(cones, CO.PosSemidef{T, T}(dimvec))
+        push!(cones, CO.PosSemidefTri{T, T}(dimvec))
         push!(cone_idxs, (2 * p + 1):(2 * p + dimvec))
 
         if use_sumlog

@@ -526,21 +526,21 @@ function MOI.optimize!(opt::Optimizer)
     opt.y = r.y
     opt.s = r.s
     opt.z = r.z
-    # TODO refac out primitive cone untransformations
-    for k in eachindex(opt.cones)
-        if opt.cones[k] isa Cones.PosSemidef
-            idxs = opt.cone_idxs[k]
-            scale_vec = svec_unscale(length(idxs))
-            opt.s[idxs] .*= scale_vec
-            opt.z[idxs] .*= scale_vec
-        elseif opt.cones[k] isa Cones.HypoPerLogdet
-            idxs = opt.cone_idxs[k][3:end]
-            scale_vec = svec_unscale(length(idxs))
-            opt.s[idxs] .*= scale_vec
-            opt.z[idxs] .*= scale_vec
+    opt.s[opt.interval_idxs] ./= opt.interval_scales
+    for (k, cone_k) in enumerate(opt.cones)
+        if cone_k isa Cones.PosSemidefTri || cone_k isa Cones.HypoPerLogdetTri # rescale duals for symmetric triangle cones
+            unscale_vec = (Cones.use_dual(cone_k) ? opt.s : opt.z)
+            idxs = (cone_k isa Cones.PosSemidefTri ? opt.cone_idxs[k] : opt.cone_idxs[k][3:end])
+            offset = 1
+            for i in 1:round(Int, sqrt(0.25 + 2 * length(idxs)) - 0.5)
+                for j in 1:(i - 1)
+                    unscale_vec[idxs[offset]] /= 2.0
+                    offset += 1
+                end
+                offset += 1
+            end
         end
     end
-    opt.s[opt.interval_idxs] ./= opt.interval_scales
     opt.constr_prim_cone += opt.s
     opt.z[opt.interval_idxs] .*= opt.interval_scales
 

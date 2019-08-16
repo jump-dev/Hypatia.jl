@@ -43,10 +43,9 @@ function sparsepca(
         true_obj = NaN
     end
 
-    rt2 = sqrt(T(2))
     dimx = div(p * (p + 1), 2)
-    # x will be the svec (lower triangle, row-wise) of the matrix solution we seek
-    c = T[-sigma[i, j] * (i == j ? 1 : rt2) for i in 1:p for j in 1:i]
+    # x will be the vec (lower triangle, row-wise) of the matrix solution we seek
+    c = T[-sigma[i, j] * (i == j ? 1 : 2) for i in 1:p for j in 1:i]
     b = T[1]
     A = zeros(T, 1, dimx)
     for i in 1:p
@@ -54,20 +53,20 @@ function sparsepca(
         A[s] = 1
     end
     hpsd = zeros(T, dimx)
-    cones = CO.Cone{T}[CO.PosSemidef{T, T}(dimx)]
+    cones = CO.Cone{T}[CO.PosSemidefTri{T, T}(dimx)]
     cone_idxs = [1:dimx]
 
     if use_l1ball
         # l1 cone
-        # double off-diagonals, which are already scaled by rt2
+        # double off-diagonals
         if use_linops
-            Gl1 = Diagonal(-rt2 * ones(T, dimx))
+            Gl1 = Diagonal(fill(-T(2), dimx))
             for i in 1:p
                 s = sum(1:i)
                 Gl1.diag[s] = -1
             end
         else
-            Gl1 = Matrix{T}(-rt2 * I, dimx, dimx)
+            Gl1 = Matrix{T}(-2I, dimx, dimx)
             for i in 1:p
                 s = sum(1:i)
                 Gl1[s, s] = -1
@@ -94,7 +93,7 @@ function sparsepca(
         push!(cone_idxs, (dimx + 1):(2 * dimx + 1))
     else
         id = Matrix{T}(I, dimx, dimx)
-        l1 = [(i == j ? one(T) : rt2) for i in 1:p for j in 1:i]
+        l1 = [(i == j ? one(T) : T(2)) for i in 1:p for j in 1:i]
         if use_linops
             A = HypBlockMatrix{T}(
                 dimx + 1,

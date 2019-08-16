@@ -180,28 +180,26 @@ function test_epinormspectral_barrier(T::Type{<:HypReal})
     return
 end
 
-function test_semidefinite_barrier(T::Type{<:HypReal})
+function test_possemideftri_barrier(T::Type{<:HypReal})
     for side in [1, 2, 3]
         # real PSD cone
         dim = div(side * (side + 1), 2)
-        cone = CO.PosSemidef{T, T}(dim)
+        cone = CO.PosSemidefTri{T, T}(dim)
         function R_barrier(s)
             S = similar(s, side, side)
-            rt2i = convert(eltype(s), inv(sqrt(T(2))))
-            CO.svec_to_smat!(S, s, rt2i)
-            return -logdet(cholesky!(Symmetric(S)))
+            CO.vec_to_mat_U!(S, s)
+            return -logdet(cholesky!(Symmetric(S, :U)))
         end
         test_barrier_oracles(cone, R_barrier)
         test_barrier_oracles(cone, R_barrier, noise = 0.1)
 
         # complex PSD cone
         dim = side^2
-        cone = CO.PosSemidef{T, Complex{T}}(dim)
+        cone = CO.PosSemidefTri{T, Complex{T}}(dim)
         function C_barrier(s)
             S = zeros(Complex{eltype(s)}, side, side)
-            rt2i = convert(eltype(s), inv(sqrt(T(2))))
-            CO.svec_to_smat!(S, s, rt2i)
-            return -logdet(cholesky!(Hermitian(S)))
+            CO.vec_to_mat_U!(S, s)
+            return -logdet(cholesky!(Hermitian(S, :U)))
         end
         test_barrier_oracles(cone, C_barrier)
         test_barrier_oracles(cone, C_barrier, noise = 0.1)
@@ -209,17 +207,16 @@ function test_semidefinite_barrier(T::Type{<:HypReal})
     return
 end
 
-function test_hypoperlogdet_barrier(T::Type{<:HypReal})
+function test_hypoperlogdettri_barrier(T::Type{<:HypReal})
     for side in [1, 2, 3]
         dim = 2 + div(side * (side + 1), 2)
-        cone = CO.HypoPerLogdet{T}(dim)
+        cone = CO.HypoPerLogdetTri{T}(dim)
         function barrier(s)
             u = s[1]
             v = s[2]
             W = similar(s, side, side)
-            rt2i = convert(eltype(s), inv(sqrt(T(2))))
-            CO.svec_to_smat!(W, s[3:end], rt2i)
-            return -log(v * logdet(cholesky!(Symmetric(W / v))) - u) - logdet(cholesky!(Symmetric(W))) - log(v)
+            CO.vec_to_mat_U!(W, s[3:end])
+            return -log(v * logdet(cholesky!(Symmetric(W / v, :U))) - u) - logdet(cholesky!(Symmetric(W, :U))) - log(v)
         end
         test_barrier_oracles(cone, barrier)
         test_barrier_oracles(cone, barrier, noise = 0.1)
