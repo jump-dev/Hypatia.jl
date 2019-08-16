@@ -65,8 +65,6 @@ function matrixcompletion(
         h_norm = h_norm_x
 
         cones = CO.Cone{T}[CO.EpiNormSpectral{T}(m, n)]
-        cone_idxs = UnitRange{Int}[1:(m * n + 1)]
-        cone_offset = m * n + 1
     else
         num_rows = div(m * (m + 1), 2) + m * n + div(n * (n + 1), 2)
         G_norm = zeros(T, num_rows, num_unknown + 1)
@@ -101,8 +99,6 @@ function matrixcompletion(
             G_norm[offset + idx - 1, 1] = -1
         end
         cones = CO.Cone{T}[CO.PosSemidefTri{T, T}(num_rows)]
-        cone_idxs = UnitRange{Int}[1:num_rows]
-        cone_offset = num_rows
     end
 
     if use_geomean
@@ -124,7 +120,6 @@ function matrixcompletion(
         @assert unknown_idx - 1 == num_unknown
 
         A = zeros(T, 0, 1 + num_unknown)
-        push!(cone_idxs, (cone_offset + 1):(cone_offset + num_unknown + 1))
         push!(cones, CO.HypoGeomean{T}(fill(inv(T(num_unknown)), num_unknown)))
     else
         # number of 3-dimensional power cones needed is num_unknown - 1, number of new variables is num_unknown - 2
@@ -135,7 +130,6 @@ function matrixcompletion(
         G_geo[2, 2] = -1
         G_geo[3, num_unknown + 1] = -1
         push!(cones, CO.EpiPerPower{T}(T(2)))
-        push!(cone_idxs, (cone_offset + 1):(cone_offset + 3))
         offset = 4
         # loop over new vars
         for i in 1:(num_unknown - 3)
@@ -143,7 +137,6 @@ function matrixcompletion(
             G_geo[offset + 1, num_unknown + i] = -1
             G_geo[offset, i + 2] = -1
             push!(cones, CO.EpiPerPower{T}(T(i + 2)))
-            push!(cone_idxs, (cone_offset + 3 * i + 1):(cone_offset + 3 * (i + 1)))
             offset += 3
         end
 
@@ -151,7 +144,6 @@ function matrixcompletion(
         G_geo[offset, num_unknown] = -1
         G_geo[offset + 1, 2 * num_unknown - 2] = -1
         push!(cones, CO.EpiPerPower{T}(T(num_unknown)))
-        push!(cone_idxs, (cone_offset + 3 * num_unknown - 5):(cone_offset + 3 * num_unknown - 3))
         h = vcat(h_norm, zeros(T, 3 * (num_unknown - 2)), T[0, 0, 1])
 
         # G_norm needs to be post-padded with columns for 3dim cone vars
@@ -163,7 +155,7 @@ function matrixcompletion(
     end
     G = vcat(G_norm, G_geo)
 
-    return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs)
+    return (c = c, A = A, b = b, G = G, h = h, cones = cones)
 end
 
 matrixcompletion1(T::Type{<:HypReal}) = matrixcompletion(T, 5, 6)
@@ -204,7 +196,7 @@ function test_matrixcompletion(instance::Function; T::Type{<:HypReal} = Float64,
     Random.seed!(rseed)
     tol = max(1e-5, sqrt(sqrt(eps(T))))
     d = instance(T)
-    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs; test_options..., atol = tol, rtol = tol)
+    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; test_options..., atol = tol, rtol = tol)
     @test r.status == :Optimal
     return
 end

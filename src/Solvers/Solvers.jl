@@ -82,7 +82,7 @@ function get_certificates(
     z = get_z(solver, model)
 
     if test
-        (c, A, b, G, h, cones, cone_idxs) = Models.get_original_data(model)
+        (c, A, b, G, h, cones) = Models.get_original_data(model)
         if status == :Optimal
             @test primal_obj ≈ dual_obj atol=atol rtol=rtol
             @test A * x ≈ b atol=atol rtol=rtol
@@ -119,8 +119,7 @@ function build_solve_check(
     b::Vector{T},
     G::HypLinMap{T},
     h::Vector{T},
-    cones::Vector{Cones.Cone{T}},
-    cone_idxs::Vector{UnitRange{Int}};
+    cones::Vector{Cones.Cone{T}};
     test::Bool = true,
     linear_model::Type{<:Models.LinearModel} = Models.PreprocessedLinearModel,
     system_solver::Type{<:CombinedHSDSystemSolver} = Solvers.QRCholCombinedHSDSystemSolver,
@@ -131,7 +130,7 @@ function build_solve_check(
     atol::Real = max(1e-5, sqrt(sqrt(eps(T)))),
     rtol::Real = atol,
     ) where {T <: HypReal}
-    model = linear_model{T}(c, A, b, G, h, cones, cone_idxs; linear_model_options...)
+    model = linear_model{T}(c, A, b, G, h, cones; linear_model_options...)
     stepper = CombinedHSDStepper{T}(model, system_solver = system_solver{T}(model; system_solver_options...); stepper_options...)
     solver = HSDSolver{T}(model, stepper = stepper; solver_options...)
     solve(solver)

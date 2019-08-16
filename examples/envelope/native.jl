@@ -54,9 +54,8 @@ function envelope(
     end
 
     cones = CO.Cone{T}[CO.WSOSPolyInterp{T, T}(U, [P0, PWts...], !primal_wsos) for k in 1:npoly]
-    cone_idxs = [(1 + (k - 1) * U):(k * U) for k in 1:npoly]
 
-    return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs)
+    return (c = c, A = A, b = b, G = G, h = h, cones = cones)
 end
 
 envelope1(T::Type{<:HypReal}) = envelope(T, 2, 5, 2, 6)
@@ -83,7 +82,7 @@ function test_envelope(instance::Function; T::Type{<:HypReal} = Float64, test_op
     Random.seed!(rseed)
     tol = max(1e-5, sqrt(sqrt(eps(T))))
     d = instance(T)
-    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs; test_options..., atol = tol, rtol = tol)
+    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; test_options..., atol = tol, rtol = tol)
     @test r.status == :Optimal
     return
 end

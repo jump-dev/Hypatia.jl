@@ -25,7 +25,6 @@ mutable struct Optimizer{T <: Real} <: MOI.AbstractOptimizer
     G::HypLinMap{T}
     h::Vector{T}
     cones::Vector{Cones.Cone{T}}
-    cone_idxs::Vector{UnitRange{Int}}
 
     solver::Solvers.HSDSolver
 
@@ -236,7 +235,6 @@ function MOI.copy_to(
     (Icpc, Vcpc) = (Int[], T[]) # constraint set constants for opt.constr_prim_eq
     constr_offset_cone = Vector{Int}()
     cones = Cones.Cone{T}[]
-    cone_idxs = UnitRange{Int}[]
 
     # build up one nonnegative cone
     nonneg_start = q
@@ -303,7 +301,6 @@ function MOI.copy_to(
     if q > nonneg_start
         # exists at least one nonnegative constraint
         push!(cones, Cones.Nonnegative{T}(q - nonneg_start))
-        push!(cone_idxs, (nonneg_start + 1):q)
     end
 
     # build up one nonpositive cone
@@ -371,7 +368,6 @@ function MOI.copy_to(
     if q > nonpos_start
         # exists at least one nonpositive constraint
         push!(cones, Cones.Nonpositive{T}(q - nonpos_start))
-        push!(cone_idxs, (nonpos_start + 1):q)
     end
 
     # build up one L_infinity norm cone from two-sided interval constraints
@@ -446,7 +442,6 @@ function MOI.copy_to(
     if q > interval_start
         # exists at least one interval-type constraint
         push!(cones, Cones.EpiNormInf{T}(q - interval_start))
-        push!(cone_idxs, (interval_start + 1):q)
     end
 
     # add non-LP conic constraints
@@ -476,7 +471,6 @@ function MOI.copy_to(
             append!(IG, IGi)
             append!(VG, VGi)
             push!(cones, conei)
-            push!(cone_idxs, (q + 1):(q + dim))
             q += dim
         end
     end
@@ -496,7 +490,6 @@ function MOI.copy_to(
     opt.G = model_G
     opt.h = model_h
     opt.cones = cones
-    opt.cone_idxs = cone_idxs
 
     opt.constr_offset_cone = constr_offset_cone
     opt.constr_prim_cone = Vector(sparsevec(Icpc, Vcpc, q))
@@ -510,7 +503,7 @@ function MOI.optimize!(opt::Optimizer{T}) where {T <: Real}
     if opt.load_only
         return
     end
-    model = opt.linear_model(copy(opt.c), copy(opt.A), copy(opt.b), copy(opt.G), copy(opt.h), opt.cones, opt.cone_idxs)
+    model = opt.linear_model(copy(opt.c), copy(opt.A), copy(opt.b), copy(opt.G), copy(opt.h), opt.cones)
     stepper = Solvers.CombinedHSDStepper{T}(model, system_solver = opt.system_solver(model))
     solver = Solvers.HSDSolver{T}(
         model, stepper = stepper,
@@ -534,8 +527,9 @@ function MOI.optimize!(opt::Optimizer{T}) where {T <: Real}
     opt.s[opt.interval_idxs] ./= opt.interval_scales
     for (k, cone_k) in enumerate(opt.cones)
         if cone_k isa Cones.PosSemidefTri || cone_k isa Cones.HypoPerLogdetTri # rescale duals for symmetric triangle cones
+            cone_idxs_k = Models.get_cone_idxs(model)[k]
             unscale_vec = (Cones.use_dual(cone_k) ? opt.s : opt.z)
-            idxs = (cone_k isa Cones.PosSemidefTri ? opt.cone_idxs[k] : opt.cone_idxs[k][3:end])
+            idxs = (cone_k isa Cones.PosSemidefTri ? cone_idxs_k : cone_idxs_k[3:end])
             offset = 1
             for i in 1:round(Int, sqrt(0.25 + 2 * length(idxs)) - 0.5)
                 for j in 1:(i - 1)

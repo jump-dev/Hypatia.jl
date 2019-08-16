@@ -54,7 +54,6 @@ function sparsepca(
     end
     hpsd = zeros(T, dimx)
     cones = CO.Cone{T}[CO.PosSemidefTri{T, T}(dimx)]
-    cone_idxs = [1:dimx]
 
     if use_l1ball
         # l1 cone
@@ -90,7 +89,6 @@ function sparsepca(
         end
         h = vcat(hpsd, T(k), zeros(T, dimx))
         push!(cones, CO.EpiNormInf{T}(1 + dimx, true))
-        push!(cone_idxs, (dimx + 1):(2 * dimx + 1))
     else
         id = Matrix{T}(I, dimx, dimx)
         l1 = [(i == j ? one(T) : T(2)) for i in 1:p for j in 1:i]
@@ -124,10 +122,9 @@ function sparsepca(
         b = vcat(b, zeros(T, dimx))
         h = vcat(hpsd, zeros(T, 2 * dimx), k)
         push!(cones, CO.Nonnegative{T}(2 * dimx + 1))
-        push!(cone_idxs, (dimx + 1):(3 * dimx + 1))
     end
 
-    return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs, true_obj = true_obj)
+    return (c = c, A = A, b = b, G = G, h = h, cones = cones, true_obj = true_obj)
 end
 
 sparsepca1(T::Type{<:HypReal}) = sparsepca(T, 5, 3)
@@ -162,7 +159,7 @@ function test_sparsepca(instance::Function; T::Type{<:HypReal} = Float64, test_o
     Random.seed!(rseed)
     tol = max(1e-5, sqrt(sqrt(eps(T))))
     d = instance(T)
-    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs; test_options..., atol = tol, rtol = tol)
+    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; test_options..., atol = tol, rtol = tol)
     @test r.status == :Optimal
     if !isnan(d.true_obj)
         @test r.primal_obj ≈ d.true_obj atol = tol rtol = tol
