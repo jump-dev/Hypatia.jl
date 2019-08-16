@@ -56,4 +56,6 @@ include("linear.jl")
 
 # TODO other model types eg quadratic obj, convex differentiable obj
 
+get_cone_idxs(model::Model) = model.cone_idxs
+
 end
