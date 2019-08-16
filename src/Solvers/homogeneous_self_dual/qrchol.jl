@@ -233,6 +233,27 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
         end
     end
 
+    function block_hessian_product_bf!(prod_k, arr_k)
+        for k in eachindex(cones)
+            bf_arr = copy(arr_k[k])
+            bf_arr .= BigFloat.(bf_arr)
+            bf_prod = Matrix{BigFloat}(undef, size(prod_k[k]))
+
+            cone_k = cones[k]
+            if Cones.use_dual(cone_k)
+                bf_prod .= BigFloat.(cone_k.hess) \ bf_arr
+                bf_prod ./= mu
+                @show typeof(bf_prod)
+                prod_k[k] .= Float64.(bf_prod)
+            else
+                bf_prod .= BigFloat.(cone_k.hess) * bf_arr
+                bf_prod .*= mu
+                @show typeof(bf_prod)
+                prod_k[k] .= Float64.(bf_prod)
+            end
+        end
+    end
+
     ldiv!(model.Ap_R', yi)
 
     mul!(QpbxGHbz, model.G', zi)
@@ -246,10 +267,25 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
         # @show typeof(Q2div)
         @. Q2div = (Q2pbxGHbz) - Q2div
 
-        block_hessian_product!(HGQ2_k, GQ2_k)
-        Q2GHGQ2 = (Q2GHGQ2)
-        mul!(Q2GHGQ2, (GQ2'), (HGQ2))
-        # @show typeof(Q2GHGQ2)
+        use_hess_sqrt = false
+        if use_hess_sqrt
+            for k in eachindex(cones)
+                cone_k = cones[k]
+                if Cones.use_dual(cone_k)
+                    Cones.hess_L_div!(HGQ2_k[k], GQ2_k[k], cone_k)
+                    HGQ2_k[k] ./= sqrt(mu)
+                else
+                    Cones.hess_U_prod!(HGQ2_k[k], GQ2_k[k], cone_k)
+                    HGQ2_k[k] .*= sqrt(mu)
+                end
+            end
+            hyp_AtA!(Q2GHGQ2, HGQ2)
+            Q2GHGQ2 = Symmetric(Q2GHGQ2)
+        else
+            block_hessian_product!(HGQ2_k, GQ2_k)
+            mul!(Q2GHGQ2, GQ2', HGQ2)
+            @show typeof(Q2GHGQ2)
+        end
 
         if system_solver.use_sparse
             F = ldlt(Symmetric(Q2GHGQ2), check = false) # TODO not implemented for generic reals
