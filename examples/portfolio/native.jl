@@ -84,12 +84,10 @@ function portfolio(
 
             A_offset = last_idx(A_rows)
             append!(A_rows, fill((A_offset + 1):(A_offset + num_stocks), 3))
-            push!(A_rows, (last_idx(A_rows) + 1):(last_idx(A_rows) + 1))
 
             push!(A_cols, 1:num_stocks)
             push!(A_cols, (num_stocks + 1):(2 * num_stocks))
             push!(A_cols, (2 * num_stocks + 1):(3 * num_stocks))
-            push!(A_cols, (num_stocks + 1):(3 * num_stocks))
 
             push!(G_blocks, -I)
             push!(G_blocks, ones(T, 1, 2 * num_stocks))
