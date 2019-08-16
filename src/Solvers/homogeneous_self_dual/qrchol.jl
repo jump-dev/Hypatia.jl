@@ -205,7 +205,7 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
             @. z1_temp_k[k] /= mu
             @. z2_temp_k[k] = (duals_k + z2_temp_k[k]) / mu
             @. z3_temp_k[k] = duals_k / mu + grad_k
-            Cones.inv_hess_prod!(z_k[k], z_temp_k[k], cone_k)
+            @timeit solver.timer "invhess" Cones.inv_hess_prod!(z_k[k], z_temp_k[k], cone_k)
         else
             @. z1_temp_k[k] *= mu
             @. z2_temp_k[k] *= mu
