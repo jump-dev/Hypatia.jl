@@ -10,12 +10,12 @@ mutable struct HSDSolver{T <: HypReal} <: Solver{T}
     stepper::HSDStepper{T}
 
     verbose::Bool
+    max_iters::Int
+    time_limit::Float64
     tol_rel_opt::T
     tol_abs_opt::T
     tol_feas::T
     tol_slow::T
-    max_iters::Int
-    time_limit::Float64
 
     x_conv_tol::T
     y_conv_tol::T
@@ -62,13 +62,13 @@ mutable struct HSDSolver{T <: HypReal} <: Solver{T}
     function HSDSolver{T}(
         model::Models.LinearModel{T};
         stepper::HSDStepper{T} = CombinedHSDStepper{T}(model),
-        verbose::Bool = true,
-        tol_rel_opt = max(1e-12, 1e-2 * cbrt(eps(T))),
-        tol_abs_opt = tol_rel_opt,
-        tol_feas = tol_rel_opt,
-        tol_slow = 5e-3,
-        max_iters::Int = 250,
-        time_limit = 3e2,
+        verbose::Bool = false,
+        max_iters::Int = 500,
+        time_limit::Real = 3.6e3,
+        tol_rel_opt::Real = max(T(1e-12), T(1e-2) * cbrt(eps(T))),
+        tol_abs_opt::Real = tol_rel_opt,
+        tol_feas::Real = tol_rel_opt,
+        tol_slow::Real = T(5e-3),
         ) where {T <: HypReal}
         solver = new{T}()
 
@@ -77,12 +77,12 @@ mutable struct HSDSolver{T <: HypReal} <: Solver{T}
         solver.stepper = stepper
 
         solver.verbose = verbose
-        solver.tol_rel_opt = T(tol_rel_opt)
-        solver.tol_abs_opt = T(tol_abs_opt)
-        solver.tol_feas = T(tol_feas)
-        solver.tol_slow = T(tol_slow)
         solver.max_iters = max_iters
         solver.time_limit = time_limit
+        solver.tol_rel_opt = tol_rel_opt
+        solver.tol_abs_opt = tol_abs_opt
+        solver.tol_feas = tol_feas
+        solver.tol_slow = tol_slow
 
         solver.x_conv_tol = inv(max(one(T), norm(model.c)))
         solver.y_conv_tol = inv(max(one(T), norm(model.b)))
@@ -91,27 +91,27 @@ mutable struct HSDSolver{T <: HypReal} <: Solver{T}
         solver.point = model.initial_point
         solver.tau = one(T)
         solver.kap = one(T)
-        solver.mu = T(NaN)
+        solver.mu = NaN
 
         solver.x_residual = similar(model.c)
         solver.y_residual = similar(model.b)
         solver.z_residual = similar(model.h)
-        solver.x_norm_res_t = T(NaN)
-        solver.y_norm_res_t = T(NaN)
-        solver.z_norm_res_t = T(NaN)
-        solver.x_norm_res = T(NaN)
-        solver.y_norm_res = T(NaN)
-        solver.z_norm_res = T(NaN)
+        solver.x_norm_res_t = NaN
+        solver.y_norm_res_t = NaN
+        solver.z_norm_res_t = NaN
+        solver.x_norm_res = NaN
+        solver.y_norm_res = NaN
+        solver.z_norm_res = NaN
 
-        solver.primal_obj_t = T(NaN)
-        solver.dual_obj_t = T(NaN)
-        solver.primal_obj = T(NaN)
-        solver.dual_obj = T(NaN)
-        solver.gap = T(NaN)
-        solver.rel_gap = T(NaN)
-        solver.x_feas = T(NaN)
-        solver.y_feas = T(NaN)
-        solver.z_feas = T(NaN)
+        solver.primal_obj_t = NaN
+        solver.dual_obj_t = NaN
+        solver.primal_obj = NaN
+        solver.dual_obj = NaN
+        solver.gap = NaN
+        solver.rel_gap = NaN
+        solver.x_feas = NaN
+        solver.y_feas = NaN
+        solver.z_feas = NaN
 
         solver.prev_is_slow = false
         solver.prev2_is_slow = false
@@ -242,7 +242,7 @@ function calc_convergence_params(solver::HSDSolver{T}) where {T <: HypReal}
     elseif solver.dual_obj > zero(T)
         solver.rel_gap = solver.gap / solver.dual_obj
     else
-        solver.rel_gap = T(NaN)
+        solver.rel_gap = NaN
     end
 
     solver.x_feas = solver.x_norm_res * solver.x_conv_tol
