@@ -7,75 +7,74 @@ and functions for converting between Hypatia and MOI cone definitions
 
 export WSOSPolyInterpCone
 
-struct WSOSPolyInterpCone <: MOI.AbstractVectorSet # real case only
+struct WSOSPolyInterpCone{T <: Real} <: MOI.AbstractVectorSet # real case only
     dimension::Int
-    Ps::Vector{Matrix{Float64}}
+    Ps::Vector{Matrix{T}}
     is_dual::Bool
 end
-WSOSPolyInterpCone(dimension::Int, Ps::Vector{Matrix{Float64}}) = WSOSPolyInterpCone(dimension, Ps, false)
+WSOSPolyInterpCone(dimension::Int, Ps::Vector{Matrix{T}}) where {T <: Real} = WSOSPolyInterpCone{T}(dimension, Ps, false)
 
 export WSOSPolyInterpMatCone # TODO rename
 
-struct WSOSPolyInterpMatCone <: MOI.AbstractVectorSet
+struct WSOSPolyInterpMatCone{T <: Real} <: MOI.AbstractVectorSet
     R::Int
     U::Int
-    ipwt::Vector{Matrix{Float64}}
+    ipwt::Vector{Matrix{T}}
     is_dual::Bool
 end
-WSOSPolyInterpMatCone(R::Int, U::Int, ipwt::Vector{Matrix{Float64}}) = WSOSPolyInterpMatCone(R, U, ipwt, false)
+WSOSPolyInterpMatCone(R::Int, U::Int, ipwt::Vector{Matrix{T}}) where {T <: Real} = WSOSPolyInterpMatCone{T}(R, U, ipwt, false)
 
 export WSOSPolyInterpSOCCone # TODO rename
 
-struct WSOSPolyInterpSOCCone <: MOI.AbstractVectorSet
+struct WSOSPolyInterpSOCCone{T <: Real} <: MOI.AbstractVectorSet
     R::Int
     U::Int
-    ipwt::Vector{Matrix{Float64}}
+    ipwt::Vector{Matrix{T}}
     is_dual::Bool
 end
-WSOSPolyInterpSOCCone(R::Int, U::Int, ipwt::Vector{Matrix{Float64}}) = WSOSPolyInterpSOCCone(R, U, ipwt, false)
+WSOSPolyInterpSOCCone(R::Int, U::Int, ipwt::Vector{Matrix{T}}) where {T <: Real} = WSOSPolyInterpSOCCone{T}(R, U, ipwt, false)
 
-MOIOtherCones = (
+const MOIOtherConesList(::Type{T}) where {T <: Real} = (
     MOI.NormInfinityCone,
     MOI.NormOneCone,
     MOI.SecondOrderCone,
     MOI.RotatedSecondOrderCone,
     MOI.ExponentialCone,
-    MOI.PowerCone{Float64},
+    MOI.PowerCone{T},
     MOI.GeometricMeanCone,
     MOI.PositiveSemidefiniteConeTriangle,
     MOI.LogDetConeTriangle,
-    WSOSPolyInterpCone,
-    WSOSPolyInterpMatCone,
-    WSOSPolyInterpSOCCone,
+    WSOSPolyInterpCone{T},
+    # WSOSPolyInterpMatCone{T},
+    # WSOSPolyInterpSOCCone{T},
     )
 
+const MOIOtherCones{T <: Real} = Union{
+    MOI.NormInfinityCone,
+    MOI.NormOneCone,
+    MOI.SecondOrderCone,
+    MOI.RotatedSecondOrderCone,
+    MOI.ExponentialCone,
+    MOI.PowerCone{T},
+    MOI.GeometricMeanCone,
+    MOI.PositiveSemidefiniteConeTriangle,
+    MOI.LogDetConeTriangle,
+    WSOSPolyInterpCone{T},
+    # WSOSPolyInterpMatCone{T},
+    # WSOSPolyInterpSOCCone{T},
+    }
+
 # MOI cones for which no transformation is needed
-cone_from_moi(s::MOI.NormInfinityCone) = Cones.EpiNormInf{Float64}(MOI.dimension(s))
-cone_from_moi(s::MOI.NormOneCone) = Cones.EpiNormInf{Float64}(MOI.dimension(s), true)
-cone_from_moi(s::MOI.SecondOrderCone) = Cones.EpiNormEucl{Float64}(MOI.dimension(s))
-cone_from_moi(s::MOI.RotatedSecondOrderCone) = Cones.EpiPerSquare{Float64}(MOI.dimension(s))
-cone_from_moi(s::MOI.ExponentialCone) = Cones.HypoPerLog{Float64}(3)
-cone_from_moi(s::MOI.GeometricMeanCone) = (l = MOI.dimension(s) - 1; Cones.HypoGeomean{Float64}(fill(inv(l), l)))
-cone_from_moi(s::MOI.PowerCone{Float64}) = Cones.EpiPerPower{Float64}(inv(s.exponent))
-cone_from_moi(s::MOI.PositiveSemidefiniteConeTriangle) = Cones.PosSemidefTri{Float64, Float64}(MOI.dimension(s))
-cone_from_moi(s::MOI.LogDetConeTriangle) = Cones.HypoPerLogdetTri{Float64}(MOI.dimension(s))
-cone_from_moi(s::WSOSPolyInterpCone) = Cones.WSOSPolyInterp{Float64, Float64}(s.dimension, s.Ps, s.is_dual)
-cone_from_moi(s::WSOSPolyInterpMatCone) = Cones.WSOSPolyInterpMat{Float64}(s.R, s.U, s.ipwt, s.is_dual)
-cone_from_moi(s::WSOSPolyInterpSOCCone) = Cones.WSOSPolyInterpSOC{Float64}(s.R, s.U, s.ipwt, s.is_dual)
-cone_from_moi(s::MOI.AbstractVectorSet) = error("MOI set $s is not recognized")
-
-function build_var_cone(fi::MOI.VectorOfVariables, si::MOI.AbstractVectorSet, dim::Int, q::Int)
-    IGi = (q + 1):(q + dim)
-    VGi = -ones(dim)
-    conei = cone_from_moi(si)
-    return (IGi, VGi, conei)
-end
-
-function build_constr_cone(fi::MOI.VectorAffineFunction{Float64}, si::MOI.AbstractVectorSet, dim::Int, q::Int)
-    IGi = [q + vt.output_index for vt in fi.terms]
-    VGi = [-vt.scalar_term.coefficient for vt in fi.terms]
-    Ihi = (q + 1):(q + dim)
-    Vhi = fi.constants
-    conei = cone_from_moi(si)
-    return (IGi, VGi, Ihi, Vhi, conei)
-end
+cone_from_moi(::Type{T}, s::MOI.NormInfinityCone) where {T <: Real} = Cones.EpiNormInf{T}(MOI.dimension(s))
+cone_from_moi(::Type{T}, s::MOI.NormOneCone) where {T <: Real} = Cones.EpiNormInf{T}(MOI.dimension(s), true)
+cone_from_moi(::Type{T}, s::MOI.SecondOrderCone) where {T <: Real} = Cones.EpiNormEucl{T}(MOI.dimension(s))
+cone_from_moi(::Type{T}, s::MOI.RotatedSecondOrderCone) where {T <: Real} = Cones.EpiPerSquare{T}(MOI.dimension(s))
+cone_from_moi(::Type{T}, s::MOI.ExponentialCone) where {T <: Real} = Cones.HypoPerLog{T}(3)
+cone_from_moi(::Type{T}, s::MOI.GeometricMeanCone) where {T <: Real} = (l = MOI.dimension(s) - 1; Cones.HypoGeomean{T}(fill(inv(l), l)))
+cone_from_moi(::Type{T}, s::MOI.PowerCone{T}) where {T <: Real} = Cones.EpiPerPower{T}(inv(s.exponent))
+cone_from_moi(::Type{T}, s::MOI.PositiveSemidefiniteConeTriangle) where {T <: Real} = Cones.PosSemidefTri{T, T}(MOI.dimension(s))
+cone_from_moi(::Type{T}, s::MOI.LogDetConeTriangle) where {T <: Real} = Cones.HypoPerLogdetTri{T}(MOI.dimension(s))
+cone_from_moi(::Type{T}, s::WSOSPolyInterpCone{T}) where {T <: Real} = Cones.WSOSPolyInterp{T, T}(s.dimension, s.Ps, s.is_dual)
+# cone_from_moi(::Type{T}, s::WSOSPolyInterpMatCone{T}) where {T <: Real} = Cones.WSOSPolyInterpMat{T}(s.R, s.U, s.ipwt, s.is_dual)
+# cone_from_moi(::Type{T}, s::WSOSPolyInterpSOCCone{T}) where {T <: Real} = Cones.WSOSPolyInterpSOC{T}(s.R, s.U, s.ipwt, s.is_dual)
+cone_from_moi(::Type{T}, s::MOI.AbstractVectorSet) where {T <: Real} = error("MOI set $s is not recognized")

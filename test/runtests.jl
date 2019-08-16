@@ -230,6 +230,10 @@ end
 
 @info("starting MathOptInterface tests")
 verbose = false
+real_types = [
+    Float64,
+    # BigFloat, # TODO test this when MOI allows
+    ]
 dense_options = [
     true,
     false,
@@ -238,8 +242,8 @@ system_solvers = [
     SO.NaiveElimCombinedHSDSystemSolver,
     SO.QRCholCombinedHSDSystemSolver,
     ]
-@testset "MOI tests: $(d ? "dense" : "sparse"), $s" for d in dense_options, s in system_solvers
-    test_moi(d, s{Float64}, MO.PreprocessedLinearModel{Float64}, verbose)
+@testset "MOI tests: $(d ? "dense" : "sparse"), $s, $T" for d in dense_options, s in system_solvers, T in real_types
+    test_moi(d, s{T}, MO.PreprocessedLinearModel{T}, verbose)
 end
 
 @info("starting JuMP examples tests")

@@ -51,22 +51,24 @@ conic_exclude = String[
 
 function test_moi(
     use_dense::Bool,
-    system_solver::Type{<:SO.CombinedHSDSystemSolver},
-    linear_model::Type{<:MO.LinearModel},
+    system_solver::Type{<:SO.CombinedHSDSystemSolver{T}},
+    linear_model::Type{<:MO.LinearModel{T}},
     verbose::Bool,
-    )
+    ) where {T <: Real}
     optimizer = MOIU.CachingOptimizer(
-        MOIU.UniversalFallback(MOIU.Model{Float64}()),
-        Hypatia.Optimizer(
+        MOIU.UniversalFallback(MOIU.Model{T}()),
+        Hypatia.Optimizer{T}(
             use_dense = use_dense,
             test_certificates = true,
             verbose = verbose,
             system_solver = system_solver,
             linear_model = linear_model,
+            max_iters = 200,
             time_limit = 2e1,
             tol_rel_opt = 2e-8,
             tol_abs_opt = 2e-8,
             tol_feas = 1e-8,
+            tol_slow = 1e-6,
             )
         )
 
@@ -77,7 +79,7 @@ function test_moi(
         MOIT.contlineartest(optimizer, config)
     end
     @testset "conic tests" begin
-        MOIT.contconictest(MOIB.Constraint.Square{Float64}(MOIB.Constraint.RootDet{Float64}(optimizer)), config, conic_exclude)
+        MOIT.contconictest(MOIB.Constraint.Square{T}(MOIB.Constraint.RootDet{T}(optimizer)), config, conic_exclude)
     end
 
     return
