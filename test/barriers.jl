@@ -7,11 +7,10 @@ import Random
 using LinearAlgebra
 import ForwardDiff
 import Hypatia
-import Hypatia.HypReal
 const CO = Hypatia.Cones
 const MU = Hypatia.ModelUtilities
 
-function test_barrier_oracles(cone::CO.Cone{T}, barrier::Function; noise = 0.0) where {T <: HypReal}
+function test_barrier_oracles(cone::CO.Cone{T}, barrier::Function; noise = 0.0) where {T <: Real}
     CO.setup_data(cone)
     dim = CO.dimension(cone)
     point = Vector{T}(undef, dim)
@@ -56,7 +55,7 @@ function test_barrier_oracles(cone::CO.Cone{T}, barrier::Function; noise = 0.0) 
     return
 end
 
-function test_orthant_barrier(T::Type{<:HypReal})
+function test_orthant_barrier(T::Type{<:Real})
     barrier = s -> -sum(log, s)
     for dim in [1, 3, 5]
         cone = CO.Nonnegative{T}(dim)
@@ -73,7 +72,7 @@ function test_orthant_barrier(T::Type{<:HypReal})
     return
 end
 
-function test_epinorminf_barrier(T::Type{<:HypReal})
+function test_epinorminf_barrier(T::Type{<:Real})
     function barrier(s)
         u = s[1]
         w = s[2:end]
@@ -87,7 +86,7 @@ function test_epinorminf_barrier(T::Type{<:HypReal})
     return
 end
 
-function test_epinormeucl_barrier(T::Type{<:HypReal})
+function test_epinormeucl_barrier(T::Type{<:Real})
     function barrier(s)
         u = s[1]
         w = s[2:end]
@@ -101,7 +100,7 @@ function test_epinormeucl_barrier(T::Type{<:HypReal})
     return
 end
 
-function test_epipersquare_barrier(T::Type{<:HypReal})
+function test_epipersquare_barrier(T::Type{<:Real})
     function barrier(s)
         u = s[1]
         v = s[2]
@@ -116,7 +115,7 @@ function test_epipersquare_barrier(T::Type{<:HypReal})
     return
 end
 
-function test_epiperpower_barrier(T::Type{<:HypReal})
+function test_epiperpower_barrier(T::Type{<:Real})
     for alpha in T[1.5, 2.5]
         cone = CO.EpiPerPower{T}(alpha)
         test_barrier_oracles(cone, cone.barfun)
@@ -125,7 +124,7 @@ function test_epiperpower_barrier(T::Type{<:HypReal})
     return
 end
 
-function test_hypoperlog_barrier(T::Type{<:HypReal})
+function test_hypoperlog_barrier(T::Type{<:Real})
     function barrier(s)
         u = s[1]
         v = s[2]
@@ -140,7 +139,7 @@ function test_hypoperlog_barrier(T::Type{<:HypReal})
     return
 end
 
-function test_epiperexp_barrier(T::Type{<:HypReal})
+function test_epiperexp_barrier(T::Type{<:Real})
     for dim in [3, 5, 8]
         cone = CO.EpiPerExp{T}(dim)
         test_barrier_oracles(cone, cone.barfun)
@@ -149,7 +148,7 @@ function test_epiperexp_barrier(T::Type{<:HypReal})
     return
 end
 
-function test_hypogeomean_barrier(T::Type{<:HypReal})
+function test_hypogeomean_barrier(T::Type{<:Real})
     Random.seed!(1)
     for dim in [3, 5, 8]
         alpha = rand(T, dim - 1) .+ 1
@@ -166,7 +165,7 @@ function test_hypogeomean_barrier(T::Type{<:HypReal})
     return
 end
 
-function test_epinormspectral_barrier(T::Type{<:HypReal})
+function test_epinormspectral_barrier(T::Type{<:Real})
     for (n, m) in [(1, 2), (2, 2), (2, 3)]
         cone = CO.EpiNormSpectral{T}(n, m)
         function barrier(s)
@@ -180,7 +179,7 @@ function test_epinormspectral_barrier(T::Type{<:HypReal})
     return
 end
 
-function test_possemideftri_barrier(T::Type{<:HypReal})
+function test_possemideftri_barrier(T::Type{<:Real})
     for side in [1, 2, 3]
         # real PSD cone
         dim = div(side * (side + 1), 2)
@@ -207,7 +206,7 @@ function test_possemideftri_barrier(T::Type{<:HypReal})
     return
 end
 
-function test_hypoperlogdettri_barrier(T::Type{<:HypReal})
+function test_hypoperlogdettri_barrier(T::Type{<:Real})
     for side in [1, 2, 3]
         dim = 2 + div(side * (side + 1), 2)
         cone = CO.HypoPerLogdetTri{T}(dim)
@@ -224,7 +223,7 @@ function test_hypoperlogdettri_barrier(T::Type{<:HypReal})
     return
 end
 
-function test_wsospolyinterp_barrier(T::Type{<:HypReal})
+function test_wsospolyinterp_barrier(T::Type{<:Real})
     Random.seed!(1)
     for n in 1:3, halfdeg in 1:3
         (U, _, P0, _, _) = MU.interpolate(MU.FreeDomain(n), halfdeg, sample = false)
@@ -241,7 +240,7 @@ function test_wsospolyinterp_barrier(T::Type{<:HypReal})
     return
 end
 
-# function test_wsospolyinterpmat_barrier(T::Type{<:HypReal})
+# function test_wsospolyinterpmat_barrier(T::Type{<:Real})
 #     Random.seed!(1)
 #     for n in 1:3, halfdeg in 1:3, R in 1:3
 #         (U, _, P0, _, _) = MU.interpolate(MU.FreeDomain(n), halfdeg, sample = false)
@@ -252,7 +251,7 @@ end
 #     return
 # end
 #
-# function test_wsospolyinterpsoc_barrier(T::Type{<:HypReal})
+# function test_wsospolyinterpsoc_barrier(T::Type{<:Real})
 #     Random.seed!(1)
 #     for n in 1:2, halfdeg in 1:2, R in 3:3
 #         (U, _, P0, _, _) = MU.interpolate(MU.FreeDomain(n), halfdeg, sample = false)

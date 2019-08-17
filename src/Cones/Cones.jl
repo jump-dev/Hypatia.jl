@@ -11,13 +11,12 @@ import LinearAlgebra.BlasFloat
 import LinearAlgebra.copytri!
 using ForwardDiff
 using DiffResults
-import Hypatia.HypReal
-import Hypatia.HypRealOrComplex
+import Hypatia.RealOrComplex
 import Hypatia.hyp_AtA!
 import Hypatia.hyp_chol!
 import Hypatia.hyp_ldiv_chol_L!
 
-abstract type Cone{T <: HypReal} end
+abstract type Cone{T <: Real} end
 
 include("orthant.jl")
 include("epinorminf.jl")

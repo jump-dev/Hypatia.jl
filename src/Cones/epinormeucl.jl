@@ -8,7 +8,7 @@ barrier from "Self-Scaled Barriers and Interior-Point Methods for Convex Program
 -log(u^2 - norm_2(w)^2)
 =#
 
-mutable struct EpiNormEucl{T <: HypReal} <: Cone{T}
+mutable struct EpiNormEucl{T <: Real} <: Cone{T}
     use_dual::Bool
     dim::Int
     point::AbstractVector{T}
@@ -24,7 +24,7 @@ mutable struct EpiNormEucl{T <: HypReal} <: Cone{T}
 
     dist::T
 
-    function EpiNormEucl{T}(dim::Int, is_dual::Bool) where {T <: HypReal}
+    function EpiNormEucl{T}(dim::Int, is_dual::Bool) where {T <: Real}
         cone = new{T}()
         cone.use_dual = is_dual
         cone.dim = dim
@@ -32,12 +32,12 @@ mutable struct EpiNormEucl{T <: HypReal} <: Cone{T}
     end
 end
 
-EpiNormEucl{T}(dim::Int) where {T <: HypReal} = EpiNormEucl{T}(dim, false)
+EpiNormEucl{T}(dim::Int) where {T <: Real} = EpiNormEucl{T}(dim, false)
 
 reset_data(cone::EpiNormEucl) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
 
 # TODO maybe only allocate the fields we use
-function setup_data(cone::EpiNormEucl{T}) where {T <: HypReal}
+function setup_data(cone::EpiNormEucl{T}) where {T <: Real}
     reset_data(cone)
     dim = cone.dim
     cone.grad = zeros(T, dim)

@@ -14,7 +14,7 @@ import Hypatia
 const CO = Hypatia.Cones
 
 function linearopt(
-    T::Type{<:HypReal},
+    T::Type{<:Real},
     m::Int,
     n::Int;
     nzfrac::Float64 = 1.0,
@@ -34,10 +34,10 @@ function linearopt(
     return (c = c, A = A, b = b, G = G, h = h, cones = cones)
 end
 
-linearopt1(T::Type{<:HypReal}) = linearopt(T, 500, 1000)
-linearopt2(T::Type{<:HypReal}) = linearopt(T, 15, 20)
-linearopt3(T::Type{<:HypReal}) = linearopt(T, 500, 1000, nzfrac = 0.05)
-linearopt4(T::Type{<:HypReal}) = linearopt(T, 15, 20, nzfrac = 0.25)
+linearopt1(T::Type{<:Real}) = linearopt(T, 500, 1000)
+linearopt2(T::Type{<:Real}) = linearopt(T, 15, 20)
+linearopt3(T::Type{<:Real}) = linearopt(T, 500, 1000, nzfrac = 0.05)
+linearopt4(T::Type{<:Real}) = linearopt(T, 15, 20, nzfrac = 0.25)
 
 instances_linearopt_all = [
     linearopt1,
@@ -50,7 +50,7 @@ instances_linearopt_few = [
     linearopt4,
     ]
 
-function test_linearopt(instance::Function; T::Type{<:HypReal} = Float64, test_options::NamedTuple = NamedTuple(), rseed::Int = 1)
+function test_linearopt(instance::Function; T::Type{<:Real} = Float64, test_options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)
     tol = max(1e-5, sqrt(sqrt(eps(T))))
     d = instance(T)

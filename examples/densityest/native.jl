@@ -13,15 +13,14 @@ using LinearAlgebra
 import Random
 using Test
 import Hypatia
-import Hypatia.HypReal
-import Hypatia.HypBlockMatrix
+import Hypatia.BlockMatrix
 const CO = Hypatia.Cones
 const MU = Hypatia.ModelUtilities
 
 include(joinpath(@__DIR__, "data.jl"))
 
 function densityest(
-    T::Type{<:HypReal},
+    T::Type{<:Real},
     X::Matrix{Float64},
     deg::Int;
     use_sumlog::Bool = false,
@@ -126,14 +125,14 @@ function densityest(
     (log_rows, log_cols) = size(G_log)
     if use_linops
         if use_wsos
-            A = HypBlockMatrix{T}(
+            A = BlockMatrix{T}(
                 1,
                 num_hypo_vars + U,
                 [T.(w')],
                 [1:1],
                 [(num_hypo_vars + 1):(num_hypo_vars + U)]
             )
-            G = HypBlockMatrix{T}(
+            G = BlockMatrix{T}(
                 U + log_rows,
                 num_hypo_vars + U,
                 [-I, G_log],
@@ -141,14 +140,14 @@ function densityest(
                 [(num_hypo_vars + 1):(num_hypo_vars + U), 1:(num_hypo_vars + U)],
             )
         else
-            A = HypBlockMatrix{T}(
+            A = BlockMatrix{T}(
                 U + 1,
                 num_hypo_vars + U + num_psd_vars,
                 [-I, A_psd, T.(w')],
                 [1:U, 1:U, (U + 1):(U + 1)],
                 [(num_hypo_vars + 1):(num_hypo_vars + U), (num_hypo_vars + U + 1):(num_hypo_vars + U + num_psd_vars), (num_hypo_vars + 1):(num_hypo_vars + U)],
             )
-            G = HypBlockMatrix{T}(
+            G = BlockMatrix{T}(
                 num_psd_vars + log_rows,
                 num_hypo_vars + U + num_psd_vars,
                 [-I, G_log],
@@ -183,20 +182,20 @@ function densityest(
     return (c = c, A = A, b = b, G = G, h = h, cones = cones)
 end
 
-densityest(T::Type{<:HypReal}, nobs::Int, n::Int, deg::Int; options...) = densityest(T, randn(nobs, n), deg; options...)
+densityest(T::Type{<:Real}, nobs::Int, n::Int, deg::Int; options...) = densityest(T, randn(nobs, n), deg; options...)
 
-densityest1(T::Type{<:HypReal}) = densityest(T, iris_data(), 4, use_sumlog = true)
-densityest2(T::Type{<:HypReal}) = densityest(T, iris_data(), 4, use_sumlog = false)
-densityest3(T::Type{<:HypReal}) = densityest(T, cancer_data(), 4, use_sumlog = true)
-densityest4(T::Type{<:HypReal}) = densityest(T, cancer_data(), 4, use_sumlog = false)
-densityest5(T::Type{<:HypReal}) = densityest(T, 50, 1, 4, use_sumlog = true)
-densityest6(T::Type{<:HypReal}) = densityest(T, 50, 1, 4, use_sumlog = false)
-densityest7(T::Type{<:HypReal}) = densityest(T, 50, 1, 4, use_sumlog = true, use_wsos = false)
-densityest8(T::Type{<:HypReal}) = densityest(T, 50, 1, 4, use_sumlog = false, use_wsos = false)
-densityest9(T::Type{<:HypReal}) = densityest(T, 10, 1, 2, use_sumlog = true, use_wsos = true, use_linops = true)
-densityest10(T::Type{<:HypReal}) = densityest(T, 10, 1, 2, use_sumlog = true, use_wsos = false, use_linops = true)
-densityest11(T::Type{<:HypReal}) = densityest(T, 10, 1, 2, use_sumlog = false, use_wsos = true, use_linops = true)
-densityest12(T::Type{<:HypReal}) = densityest(T, 10, 1, 2, use_sumlog = false, use_wsos = false, use_linops = true)
+densityest1(T::Type{<:Real}) = densityest(T, iris_data(), 4, use_sumlog = true)
+densityest2(T::Type{<:Real}) = densityest(T, iris_data(), 4, use_sumlog = false)
+densityest3(T::Type{<:Real}) = densityest(T, cancer_data(), 4, use_sumlog = true)
+densityest4(T::Type{<:Real}) = densityest(T, cancer_data(), 4, use_sumlog = false)
+densityest5(T::Type{<:Real}) = densityest(T, 50, 1, 4, use_sumlog = true)
+densityest6(T::Type{<:Real}) = densityest(T, 50, 1, 4, use_sumlog = false)
+densityest7(T::Type{<:Real}) = densityest(T, 50, 1, 4, use_sumlog = true, use_wsos = false)
+densityest8(T::Type{<:Real}) = densityest(T, 50, 1, 4, use_sumlog = false, use_wsos = false)
+densityest9(T::Type{<:Real}) = densityest(T, 10, 1, 2, use_sumlog = true, use_wsos = true, use_linops = true)
+densityest10(T::Type{<:Real}) = densityest(T, 10, 1, 2, use_sumlog = true, use_wsos = false, use_linops = true)
+densityest11(T::Type{<:Real}) = densityest(T, 10, 1, 2, use_sumlog = false, use_wsos = true, use_linops = true)
+densityest12(T::Type{<:Real}) = densityest(T, 10, 1, 2, use_sumlog = false, use_wsos = false, use_linops = true)
 
 instances_densityest_all = [
     densityest1,
@@ -225,7 +224,7 @@ instances_densityest_few = [
     densityest8,
     ]
 
-function test_densityest(instance::Function; T::Type{<:HypReal} = Float64, test_options::NamedTuple = NamedTuple(), rseed::Int = 1)
+function test_densityest(instance::Function; T::Type{<:Real} = Float64, test_options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)
     tol = max(1e-5, sqrt(sqrt(eps(T))))
     d = instance(T)
