@@ -10,11 +10,9 @@ using LinearAlgebra
 using SparseArrays
 import IterativeSolvers
 import Hypatia.Cones
-import Hypatia.HypReal
-import Hypatia.HypLinMap
-import Hypatia.HypBlockMatrix
+import Hypatia.BlockMatrix
 
-mutable struct Point{T <: HypReal}
+mutable struct Point{T <: Real}
     x::Vector{T}
     y::Vector{T}
     z::Vector{T}
@@ -32,7 +30,7 @@ mutable struct Point{T <: HypReal}
         s::Vector{T},
         cones::Vector{<:Cones.Cone{T}},
         cone_idxs::Vector{UnitRange{Int}},
-        ) where {T <: HypReal}
+        ) where {T <: Real}
         point = new{T}()
 
         point.x = x
@@ -49,9 +47,9 @@ mutable struct Point{T <: HypReal}
     end
 end
 
-abstract type Model{T <: HypReal} end
+abstract type Model{T <: Real} end
 
-abstract type LinearModel{T <: HypReal} <: Model{T} end
+abstract type LinearModel{T <: Real} <: Model{T} end
 include("linear.jl")
 
 # TODO other model types eg quadratic obj, convex differentiable obj

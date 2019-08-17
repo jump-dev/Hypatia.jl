@@ -11,7 +11,7 @@ dual barrier (modified by reflecting around u = 0 and using dual cone definition
 TODO try to make barrier evaluation more efficient
 =#
 
-mutable struct HypoGeomean{T <: HypReal} <: Cone{T}
+mutable struct HypoGeomean{T <: Real} <: Cone{T}
     use_dual::Bool
     dim::Int
     alpha::Vector{T}
@@ -33,7 +33,7 @@ mutable struct HypoGeomean{T <: HypReal} <: Cone{T}
     tmp_hess::Symmetric{T, Matrix{T}}
     hess_fact # TODO prealloc
 
-    function HypoGeomean{T}(alpha::Vector{T}, is_dual::Bool) where {T <: HypReal}
+    function HypoGeomean{T}(alpha::Vector{T}, is_dual::Bool) where {T <: Real}
         dim = length(alpha) + 1
         @assert dim >= 3
         @assert all(ai > 0 for ai in alpha)
@@ -47,9 +47,9 @@ mutable struct HypoGeomean{T <: HypReal} <: Cone{T}
     end
 end
 
-HypoGeomean{T}(alpha::Vector{T}) where {T <: HypReal} = HypoGeomean{T}(alpha, false)
+HypoGeomean{T}(alpha::Vector{T}) where {T <: Real} = HypoGeomean{T}(alpha, false)
 
-function setup_data(cone::HypoGeomean{T}) where {T <: HypReal}
+function setup_data(cone::HypoGeomean{T}) where {T <: Real}
     reset_data(cone)
     dim = cone.dim
     cone.grad = zeros(T, dim)
