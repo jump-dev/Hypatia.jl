@@ -9,11 +9,10 @@ using LinearAlgebra
 import Random
 using Test
 import Hypatia
-import Hypatia.HypReal
 const CO = Hypatia.Cones
 
 function matrixcompletion(
-    T::Type{<:HypReal},
+    T::Type{<:Real},
     m::Int,
     n::Int;
     use_geomean::Bool = true,
@@ -158,18 +157,18 @@ function matrixcompletion(
     return (c = c, A = A, b = b, G = G, h = h, cones = cones)
 end
 
-matrixcompletion1(T::Type{<:HypReal}) = matrixcompletion(T, 5, 6)
-matrixcompletion2(T::Type{<:HypReal}) = matrixcompletion(T, 5, 6, use_geomean = false)
-matrixcompletion3(T::Type{<:HypReal}) = matrixcompletion(T, 5, 6, use_epinorm = false)
-matrixcompletion4(T::Type{<:HypReal}) = matrixcompletion(T, 5, 6, use_geomean = false, use_epinorm = false)
-matrixcompletion5(T::Type{<:HypReal}) = matrixcompletion(T, 6, 8)
-matrixcompletion6(T::Type{<:HypReal}) = matrixcompletion(T, 6, 8, use_geomean = false)
-matrixcompletion7(T::Type{<:HypReal}) = matrixcompletion(T, 6, 8, use_epinorm = false)
-matrixcompletion8(T::Type{<:HypReal}) = matrixcompletion(T, 6, 8, use_geomean = false, use_epinorm = false)
-matrixcompletion9(T::Type{<:HypReal}) = matrixcompletion(T, 8, 8)
-matrixcompletion10(T::Type{<:HypReal}) = matrixcompletion(T, 8, 8, use_geomean = false)
-matrixcompletion11(T::Type{<:HypReal}) = matrixcompletion(T, 8, 8, use_epinorm = false)
-matrixcompletion12(T::Type{<:HypReal}) = matrixcompletion(T, 8, 8, use_geomean = false, use_epinorm = false)
+matrixcompletion1(T::Type{<:Real}) = matrixcompletion(T, 5, 6)
+matrixcompletion2(T::Type{<:Real}) = matrixcompletion(T, 5, 6, use_geomean = false)
+matrixcompletion3(T::Type{<:Real}) = matrixcompletion(T, 5, 6, use_epinorm = false)
+matrixcompletion4(T::Type{<:Real}) = matrixcompletion(T, 5, 6, use_geomean = false, use_epinorm = false)
+matrixcompletion5(T::Type{<:Real}) = matrixcompletion(T, 6, 8)
+matrixcompletion6(T::Type{<:Real}) = matrixcompletion(T, 6, 8, use_geomean = false)
+matrixcompletion7(T::Type{<:Real}) = matrixcompletion(T, 6, 8, use_epinorm = false)
+matrixcompletion8(T::Type{<:Real}) = matrixcompletion(T, 6, 8, use_geomean = false, use_epinorm = false)
+matrixcompletion9(T::Type{<:Real}) = matrixcompletion(T, 8, 8)
+matrixcompletion10(T::Type{<:Real}) = matrixcompletion(T, 8, 8, use_geomean = false)
+matrixcompletion11(T::Type{<:Real}) = matrixcompletion(T, 8, 8, use_epinorm = false)
+matrixcompletion12(T::Type{<:Real}) = matrixcompletion(T, 8, 8, use_geomean = false, use_epinorm = false)
 
 instances_matrixcompletion_all = [
     matrixcompletion1,
@@ -192,7 +191,7 @@ instances_matrixcompletion_few = [
     matrixcompletion4,
     ]
 
-function test_matrixcompletion(instance::Function; T::Type{<:HypReal} = Float64, test_options::NamedTuple = NamedTuple(), rseed::Int = 1)
+function test_matrixcompletion(instance::Function; T::Type{<:Real} = Float64, test_options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)
     tol = max(1e-5, sqrt(sqrt(eps(T))))
     d = instance(T)

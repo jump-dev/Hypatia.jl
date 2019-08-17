@@ -6,7 +6,7 @@ solves linear system in naive.jl via a procedure similar to that described by S1
 http://www.seas.ucla.edu/~vandenbe/publications/coneprog.pdf
 =#
 
-mutable struct QRCholCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSolver{T}
+mutable struct QRCholCombinedHSDSystemSolver{T <: Real} <: CombinedHSDSystemSolver{T}
     use_sparse::Bool
 
     xi::Matrix{T}
@@ -56,7 +56,7 @@ mutable struct QRCholCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemS
     HGxi_k
     Gxi_k
 
-    function QRCholCombinedHSDSystemSolver{T}(model::Models.PreprocessedLinearModel{T}; use_sparse::Bool = false) where {T <: HypReal}
+    function QRCholCombinedHSDSystemSolver{T}(model::Models.PreprocessedLinearModel{T}; use_sparse::Bool = false) where {T <: Real}
         (n, p, q) = (model.n, model.p, model.q)
         system_solver = new{T}()
         system_solver.use_sparse = use_sparse
@@ -134,7 +134,7 @@ mutable struct QRCholCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemS
     end
 end
 
-function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholCombinedHSDSystemSolver{T}) where {T <: HypReal}
+function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholCombinedHSDSystemSolver{T}) where {T <: Real}
     model = solver.model
     cones = model.cones
     cone_idxs = model.cone_idxs

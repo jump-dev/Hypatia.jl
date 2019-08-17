@@ -6,9 +6,7 @@ using Test
 import Random
 using LinearAlgebra
 using SparseArrays
-import GenericLinearAlgebra.svdvals!
 import Hypatia
-import Hypatia.HypReal
 import Hypatia.Solvers.build_solve_check
 const CO = Hypatia.Cones
 

@@ -4,7 +4,7 @@ Copyright 2018, Chris Coey and contributors
 interior point type and functions for algorithms based on homogeneous self dual embedding
 =#
 
-mutable struct HSDSolver{T <: HypReal} <: Solver{T}
+mutable struct HSDSolver{T <: Real} <: Solver{T}
     model::Models.LinearModel{T}
 
     stepper::HSDStepper{T}
@@ -69,7 +69,7 @@ mutable struct HSDSolver{T <: HypReal} <: Solver{T}
         tol_abs_opt::Real = tol_rel_opt,
         tol_feas::Real = tol_rel_opt,
         tol_slow::Real = T(5e-3),
-        ) where {T <: HypReal}
+        ) where {T <: Real}
         solver = new{T}()
 
         solver.model = model
@@ -135,7 +135,7 @@ get_kappa(solver::HSDSolver) = solver.kap
 get_mu(solver::HSDSolver) = solver.mu
 
 # TODO maybe use iteration interface rather than while loop
-function solve(solver::HSDSolver{T}) where {T <: HypReal}
+function solve(solver::HSDSolver{T}) where {T <: Real}
     solver.status = :SolveCalled
     start_time = time()
 
@@ -177,6 +177,7 @@ function solve(solver::HSDSolver{T}) where {T <: HypReal}
     point.y ./= solver.tau
     point.z ./= solver.tau
     point.s ./= solver.tau
+    Cones.load_point.(solver.model.cones, solver.point.primal_views)
 
     solver.solve_time = time() - start_time
 
@@ -185,13 +186,13 @@ function solve(solver::HSDSolver{T}) where {T <: HypReal}
     return
 end
 
-function calc_mu(solver::HSDSolver{T}) where {T <: HypReal}
+function calc_mu(solver::HSDSolver{T}) where {T <: Real}
     solver.mu = (dot(solver.point.z, solver.point.s) + solver.tau * solver.kap) /
         (one(T) + solver.model.nu)
     return solver.mu
 end
 
-function calc_residual(solver::HSDSolver{T}) where {T <: HypReal}
+function calc_residual(solver::HSDSolver{T}) where {T <: Real}
     model = solver.model
     point = solver.point
 
@@ -222,7 +223,7 @@ function calc_residual(solver::HSDSolver{T}) where {T <: HypReal}
     return
 end
 
-function calc_convergence_params(solver::HSDSolver{T}) where {T <: HypReal}
+function calc_convergence_params(solver::HSDSolver{T}) where {T <: Real}
     model = solver.model
     point = solver.point
 
@@ -252,7 +253,7 @@ function calc_convergence_params(solver::HSDSolver{T}) where {T <: HypReal}
     return
 end
 
-function check_convergence(solver::HSDSolver{T}) where {T <: HypReal}
+function check_convergence(solver::HSDSolver{T}) where {T <: Real}
     # check convergence criteria
     # TODO nearly primal or dual infeasible or nearly optimal cases?
     if max(solver.x_feas, solver.y_feas, solver.z_feas) <= solver.tol_feas &&
