@@ -9,7 +9,7 @@ barrier from "Self-Scaled Barriers and Interior-Point Methods for Convex Program
 -log(2*u*v - norm_2(w)^2)
 =#
 
-mutable struct EpiPerSquare{T <: HypReal} <: Cone{T}
+mutable struct EpiPerSquare{T <: Real} <: Cone{T}
     use_dual::Bool
     dim::Int
     point::AbstractVector{T}
@@ -25,7 +25,7 @@ mutable struct EpiPerSquare{T <: HypReal} <: Cone{T}
 
     dist::T
 
-    function EpiPerSquare{T}(dim::Int, is_dual::Bool) where {T <: HypReal}
+    function EpiPerSquare{T}(dim::Int, is_dual::Bool) where {T <: Real}
         cone = new{T}()
         cone.use_dual = is_dual
         cone.dim = dim
@@ -33,11 +33,11 @@ mutable struct EpiPerSquare{T <: HypReal} <: Cone{T}
     end
 end
 
-EpiPerSquare{T}(dim::Int) where {T <: HypReal} = EpiPerSquare{T}(dim, false)
+EpiPerSquare{T}(dim::Int) where {T <: Real} = EpiPerSquare{T}(dim, false)
 
 reset_data(cone::EpiPerSquare) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
 
-function setup_data(cone::EpiPerSquare{T}) where {T <: HypReal}
+function setup_data(cone::EpiPerSquare{T}) where {T <: Real}
     reset_data(cone)
     dim = cone.dim
     cone.grad = zeros(T, dim)

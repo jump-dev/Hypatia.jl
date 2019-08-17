@@ -14,7 +14,7 @@ kap + mu/(taubar^2)*tau = taurhs
 TODO reduce allocations
 =#
 
-mutable struct NaiveCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSolver{T}
+mutable struct NaiveCombinedHSDSystemSolver{T <: Real} <: CombinedHSDSystemSolver{T}
     use_iterative::Bool
     use_sparse::Bool
 
@@ -41,7 +41,7 @@ mutable struct NaiveCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSo
         model::Models.LinearModel{T};
         use_iterative::Bool = false,
         use_sparse::Bool = false,
-        ) where {T <: HypReal}
+        ) where {T <: Real}
         (n, p, q) = (model.n, model.p, model.q)
         dim = n + p + 2q + 2
         system_solver = new{T}()
@@ -89,7 +89,7 @@ mutable struct NaiveCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSo
                 push!(cone_cols, (q + 1) .+ rows)
             end
 
-            system_solver.lhs = HypBlockMatrix{T}(
+            system_solver.lhs = BlockMatrix{T}(
                 dim,
                 dim,
                 [fill(I, length(cone_rows))...,
@@ -133,7 +133,7 @@ mutable struct NaiveCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSo
     end
 end
 
-function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveCombinedHSDSystemSolver{T}) where {T <: HypReal}
+function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveCombinedHSDSystemSolver{T}) where {T <: Real}
     model = solver.model
     cones = model.cones
     lhs = system_solver.lhs

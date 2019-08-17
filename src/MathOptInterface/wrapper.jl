@@ -20,9 +20,9 @@ mutable struct Optimizer{T <: Real} <: MOI.AbstractOptimizer
     tol_slow::T
 
     c::Vector{T}
-    A::HypLinMap{T}
+    A
     b::Vector{T}
-    G::HypLinMap{T}
+    G
     h::Vector{T}
     cones::Vector{Cones.Cone{T}}
 

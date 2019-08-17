@@ -8,7 +8,7 @@ barrier from "Barrier Functions in Interior Point Methods" by Osman Guler
 -sum_i(log(u - w_i^2/u)) - log(u)
 =#
 
-mutable struct EpiNormInf{T <: HypReal} <: Cone{T}
+mutable struct EpiNormInf{T <: Real} <: Cone{T}
     use_dual::Bool
     dim::Int
     point::AbstractVector{T}
@@ -28,7 +28,7 @@ mutable struct EpiNormInf{T <: HypReal} <: Cone{T}
     div2n::Vector{T}
     schur::T
 
-    function EpiNormInf{T}(dim::Int, is_dual::Bool) where {T <: HypReal}
+    function EpiNormInf{T}(dim::Int, is_dual::Bool) where {T <: Real}
         cone = new{T}()
         cone.use_dual = is_dual
         cone.dim = dim
@@ -36,12 +36,12 @@ mutable struct EpiNormInf{T <: HypReal} <: Cone{T}
     end
 end
 
-EpiNormInf{T}(dim::Int) where {T <: HypReal} = EpiNormInf{T}(dim, false)
+EpiNormInf{T}(dim::Int) where {T <: Real} = EpiNormInf{T}(dim, false)
 
 reset_data(cone::EpiNormInf) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
 
 # TODO maybe only allocate the fields we use
-function setup_data(cone::EpiNormInf{T}) where {T <: HypReal}
+function setup_data(cone::EpiNormInf{T}) where {T <: Real}
     reset_data(cone)
     dim = cone.dim
     cone.grad = zeros(T, dim)
@@ -71,7 +71,7 @@ function update_feas(cone::EpiNormInf)
 end
 
 # TODO maybe move the diag2n, edge2n, div2n to update hess/inv_hess functions
-function update_grad(cone::EpiNormInf{T}) where {T <: HypReal}
+function update_grad(cone::EpiNormInf{T}) where {T <: Real}
     @assert cone.is_feas
     u = cone.point[1]
     w = view(cone.point, 2:cone.dim)

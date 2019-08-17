@@ -21,7 +21,7 @@ and symmetrize the LHS matrix by multiplying some equations by -1
 TODO reduce allocations
 =#
 
-mutable struct SymIndefCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSolver{T}
+mutable struct SymIndefCombinedHSDSystemSolver{T <: Real} <: CombinedHSDSystemSolver{T}
     use_sparse::Bool
     use_hess_inv::Bool
 
@@ -48,7 +48,7 @@ mutable struct SymIndefCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSyste
     s2_k
     s3_k
 
-    function SymIndefCombinedHSDSystemSolver{T}(model::Models.LinearModel{T}; use_sparse::Bool = false, use_hess_inv::Bool = false) where {T <: HypReal}
+    function SymIndefCombinedHSDSystemSolver{T}(model::Models.LinearModel{T}; use_sparse::Bool = false, use_hess_inv::Bool = false) where {T <: Real}
         (n, p, q) = (model.n, model.p, model.q)
         npq = n + p + q
         system_solver = new{T}()
@@ -100,7 +100,7 @@ mutable struct SymIndefCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSyste
     end
 end
 
-function get_combined_directions(solver::HSDSolver{T}, system_solver::SymIndefCombinedHSDSystemSolver{T}) where {T <: HypReal}
+function get_combined_directions(solver::HSDSolver{T}, system_solver::SymIndefCombinedHSDSystemSolver{T}) where {T <: Real}
     use_hess_inv = system_solver.use_hess_inv
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)

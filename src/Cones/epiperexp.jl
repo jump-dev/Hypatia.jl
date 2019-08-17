@@ -12,7 +12,7 @@ TODO use the numerically safer way to evaluate LSE function
 TODO compare alternative barrier -log(u - v*sum(wi -> exp(wi/v), w)) - log(u) - log(v)
 =#
 
-mutable struct EpiPerExp{T <: HypReal} <: Cone{T}
+mutable struct EpiPerExp{T <: Real} <: Cone{T}
     use_dual::Bool
     dim::Int
     point::AbstractVector{T}
@@ -32,7 +32,7 @@ mutable struct EpiPerExp{T <: HypReal} <: Cone{T}
     tmp_hess::Symmetric{T, Matrix{T}}
     hess_fact # TODO prealloc
 
-    function EpiPerExp{T}(dim::Int, is_dual::Bool) where {T <: HypReal}
+    function EpiPerExp{T}(dim::Int, is_dual::Bool) where {T <: Real}
         cone = new{T}()
         cone.use_dual = is_dual
         cone.dim = dim
@@ -48,9 +48,9 @@ mutable struct EpiPerExp{T <: HypReal} <: Cone{T}
     end
 end
 
-EpiPerExp{T}(dim::Int) where {T <: HypReal} = EpiPerExp{T}(dim, false)
+EpiPerExp{T}(dim::Int) where {T <: Real} = EpiPerExp{T}(dim, false)
 
-function setup_data(cone::EpiPerExp{T}) where {T <: HypReal}
+function setup_data(cone::EpiPerExp{T}) where {T <: Real}
     reset_data(cone)
     dim = cone.dim
     cone.grad = zeros(T, dim)
@@ -62,7 +62,7 @@ end
 
 get_nu(cone::EpiPerExp) = 3
 
-function set_initial_point(arr::AbstractVector{T}, cone::EpiPerExp{T}) where {T <: HypReal}
+function set_initial_point(arr::AbstractVector{T}, cone::EpiPerExp{T}) where {T <: Real}
     @. arr = -log(T(cone.dim - 2))
     arr[1] = 2
     arr[2] = 1
