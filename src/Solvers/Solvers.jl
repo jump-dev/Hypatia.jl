@@ -16,18 +16,16 @@ using Test
 using TimerOutputs
 import Hypatia.Cones
 import Hypatia.Models
-import Hypatia.HypReal
-import Hypatia.HypLinMap
 import Hypatia.hyp_AtA!
 import Hypatia.hyp_chol!
 import Hypatia.hyp_ldiv_chol_L!
-import Hypatia.HypBlockMatrix
+import Hypatia.BlockMatrix
 
-abstract type Solver{T <: HypReal} end
+abstract type Solver{T <: Real} end
 
 # homogeneous self-dual embedding algorithm
-abstract type HSDStepper{T <: HypReal} end
-abstract type CombinedHSDSystemSolver{T <: HypReal} end
+abstract type HSDStepper{T <: Real} end
+abstract type CombinedHSDSystemSolver{T <: Real} end
 include("homogeneous_self_dual/solver.jl")
 include("homogeneous_self_dual/stepper.jl")
 include("homogeneous_self_dual/naive.jl")
@@ -50,20 +48,20 @@ get_z(solver::Solver) = copy(solver.point.z)
 get_z(solver::Solver, model::Models.Model) = get_z(solver)
 
 get_x(solver::Solver) = copy(solver.point.x)
-function get_x(solver::Solver{T}, model::Models.PreprocessedLinearModel{T}) where {T <: HypReal}
+function get_x(solver::Solver{T}, model::Models.PreprocessedLinearModel{T}) where {T <: Real}
     x = zeros(T, length(model.c_raw))
     x[model.x_keep_idxs] = solver.point.x # unpreprocess solver's solution
     return x
 end
-get_x(solver::Solver{T}, model::Models.Model{T}) where {T <: HypReal} = get_x(solver)
+get_x(solver::Solver{T}, model::Models.Model{T}) where {T <: Real} = get_x(solver)
 
 get_y(solver::Solver) = copy(solver.point.y)
-function get_y(solver::Solver{T}, model::Models.PreprocessedLinearModel{T}) where {T <: HypReal}
+function get_y(solver::Solver{T}, model::Models.PreprocessedLinearModel{T}) where {T <: Real}
     y = zeros(T, length(model.b_raw))
     y[model.y_keep_idxs] = solver.point.y # unpreprocess solver's solution
     return y
 end
-get_y(solver::Solver{T}, model::Models.Model{T}) where {T <: HypReal} = get_y(solver)
+get_y(solver::Solver{T}, model::Models.Model{T}) where {T <: Real} = get_y(solver)
 
 # check conic certificates are valid
 function get_certificates(
@@ -72,7 +70,7 @@ function get_certificates(
     test::Bool = true,
     atol = max(1e-5, sqrt(sqrt(eps(T)))),
     rtol = atol,
-    ) where {T <: HypReal}
+    ) where {T <: Real}
     status = get_status(solver)
     primal_obj = get_primal_obj(solver)
     dual_obj = get_dual_obj(solver)
@@ -82,7 +80,7 @@ function get_certificates(
     z = get_z(solver, model)
 
     if test
-        (c, A, b, G, h, cones, cone_idxs) = Models.get_original_data(model)
+        (c, A, b, G, h, cones) = Models.get_original_data(model)
         if status == :Optimal
             @test primal_obj ≈ dual_obj atol=atol rtol=rtol
             @test A * x ≈ b atol=atol rtol=rtol
@@ -115,12 +113,11 @@ end
 # build linear model, solve, check conic certificates, and return certificate data
 function build_solve_check(
     c::Vector{T},
-    A::HypLinMap{T},
+    A,
     b::Vector{T},
-    G::HypLinMap{T},
+    G,
     h::Vector{T},
-    cones::Vector{Cones.Cone{T}},
-    cone_idxs::Vector{UnitRange{Int}};
+    cones::Vector{Cones.Cone{T}};
     test::Bool = true,
     linear_model::Type{<:Models.LinearModel} = Models.PreprocessedLinearModel,
     system_solver::Type{<:CombinedHSDSystemSolver} = Solvers.QRCholCombinedHSDSystemSolver,
@@ -130,8 +127,8 @@ function build_solve_check(
     solver_options::NamedTuple = NamedTuple(),
     atol::Real = max(1e-5, sqrt(sqrt(eps(T)))),
     rtol::Real = atol,
-    ) where {T <: HypReal}
-    model = linear_model{T}(c, A, b, G, h, cones, cone_idxs; linear_model_options...)
+    ) where {T <: Real}
+    model = linear_model{T}(c, A, b, G, h, cones; linear_model_options...)
     stepper = CombinedHSDStepper{T}(model, system_solver = system_solver{T}(model; system_solver_options...); stepper_options...)
     solver = HSDSolver{T}(model, stepper = stepper; solver_options...)
     solve(solver)

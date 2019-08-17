@@ -28,11 +28,10 @@ The primal-dual optimality conditions are:
 ```
 
 TODO
-- check model data consistency
 - could optionally rescale rows of [A, b] and [G, h] and [A', G', c] and variables, for better numerics
 =#
 
-function initialize_cone_point(cones::Vector{<:Cones.Cone{T}}, cone_idxs::Vector{UnitRange{Int}}) where {T <: HypReal}
+function initialize_cone_point(cones::Vector{<:Cones.Cone{T}}, cone_idxs::Vector{UnitRange{Int}}) where {T <: Real}
     q = isempty(cones) ? 0 : sum(Cones.dimension, cones)
     point = Point(T[], T[], Vector{T}(undef, q), Vector{T}(undef, q), cones, cone_idxs)
     for k in eachindex(cones)
@@ -61,16 +60,28 @@ function get_rank_est(qr_fact, tol_qr::Real)
     return rank_est
 end
 
+function build_cone_idxs(q::Int, cones::Vector{Cones.Cone{T}}) where {T <: Real}
+    cone_idxs = Vector{UnitRange{Int}}(undef, length(cones))
+    prev_idx = 0
+    for (k, cone) in enumerate(cones)
+        dim = Cones.dimension(cone)
+        cone_idxs[k] = (prev_idx + 1):(prev_idx + dim)
+        prev_idx += dim
+    end
+    @assert q == prev_idx
+    return cone_idxs
+end
+
 const sparse_QR_reals = Float64
 
-mutable struct RawLinearModel{T <: HypReal} <: LinearModel{T}
+mutable struct RawLinearModel{T <: Real} <: LinearModel{T}
     n::Int
     p::Int
     q::Int
     c::Vector{T}
-    A::HypLinMap{T}
+    A
     b::Vector{T}
-    G::HypLinMap{T}
+    G
     h::Vector{T}
     cones::Vector{Cones.Cone{T}}
     cone_idxs::Vector{UnitRange{Int}} # TODO allow generic Integer type for UnitRange parameter
@@ -80,16 +91,15 @@ mutable struct RawLinearModel{T <: HypReal} <: LinearModel{T}
 
     function RawLinearModel{T}(
         c::Vector{T},
-        A::HypLinMap{T},
+        A,
         b::Vector{T},
-        G::HypLinMap{T},
+        G,
         h::Vector{T},
-        cones::Vector{Cones.Cone{T}},
-        cone_idxs::Vector{UnitRange{Int}};
+        cones::Vector{Cones.Cone{T}};
         use_iterative::Bool = false,
         tol_qr::Real = 1e2 * eps(T),
         use_dense_fallback::Bool = true,
-        ) where {T <: HypReal}
+        ) where {T <: Real}
         model = new{T}()
 
         model.n = length(c)
@@ -101,7 +111,7 @@ mutable struct RawLinearModel{T <: HypReal} <: LinearModel{T}
         model.G = G
         model.h = h
         model.cones = cones
-        model.cone_idxs = cone_idxs
+        model.cone_idxs = build_cone_idxs(model.q, model.cones)
         model.nu = isempty(cones) ? zero(T) : sum(Cones.get_nu, cones)
 
         find_initial_point(model, use_iterative, tol_qr, use_dense_fallback)
@@ -112,7 +122,7 @@ end
 
 # get initial point for RawLinearModel
 # TODO can run the x and y finding in parallel since they do not depend on eachother
-function find_initial_point(model::RawLinearModel{T}, use_iterative::Bool, tol_qr::Real, use_dense_fallback::Bool) where {T <: HypReal}
+function find_initial_point(model::RawLinearModel{T}, use_iterative::Bool, tol_qr::Real, use_dense_fallback::Bool) where {T <: Real}
     A = model.A
     G = model.G
     n = model.n
@@ -131,7 +141,7 @@ function find_initial_point(model::RawLinearModel{T}, use_iterative::Bool, tol_q
         rhs = vcat(model.b, model.h - point.s)
         if use_iterative
             # use iterative solvers method TODO pick lsqr or lsmr
-            AG = HypBlockMatrix{T}(p + q, n, [A, G], [1:p, (p + 1):(p + q)], [1:n, 1:n])
+            AG = BlockMatrix{T}(p + q, n, [A, G], [1:p, (p + 1):(p + q)], [1:n, 1:n])
             point.x = zeros(T, n)
             IterativeSolvers.lsqr!(point.x, AG, rhs)
         else
@@ -193,19 +203,19 @@ end
 get_original_data(model::RawLinearModel) = (model.c, model.A, model.b, model.G, model.h, model.cones, model.cone_idxs)
 
 # TODO specialize method when A = I
-mutable struct PreprocessedLinearModel{T <: HypReal} <: LinearModel{T}
+mutable struct PreprocessedLinearModel{T <: Real} <: LinearModel{T}
     c_raw::Vector{T}
-    A_raw::HypLinMap{T}
+    A_raw
     b_raw::Vector{T}
-    G_raw::HypLinMap{T}
+    G_raw
 
     n::Int
     p::Int
     q::Int
     c::Vector{T}
-    A::HypLinMap{T}
+    A
     b::Vector{T}
-    G::HypLinMap{T}
+    G
     h::Vector{T}
     cones::Vector{Cones.Cone{T}}
     cone_idxs::Vector{UnitRange{Int}}
@@ -220,15 +230,14 @@ mutable struct PreprocessedLinearModel{T <: HypReal} <: LinearModel{T}
 
     function PreprocessedLinearModel{T}(
         c::Vector{T},
-        A::HypLinMap{T},
+        A,
         b::Vector{T},
-        G::HypLinMap{T},
+        G,
         h::Vector{T},
-        cones::Vector{Cones.Cone{T}},
-        cone_idxs::Vector{UnitRange{Int}};
+        cones::Vector{Cones.Cone{T}};
         tol_qr::Real = 1e2 * eps(T),
         use_dense_fallback::Bool = true,
-        ) where {T <: HypReal}
+        ) where {T <: Real}
         model = new{T}()
 
         model.c_raw = c
@@ -238,7 +247,7 @@ mutable struct PreprocessedLinearModel{T <: HypReal} <: LinearModel{T}
         model.q = length(h)
         model.h = h
         model.cones = cones
-        model.cone_idxs = cone_idxs
+        model.cone_idxs = build_cone_idxs(model.q, model.cones)
         model.nu = isempty(cones) ? zero(T) : sum(Cones.get_nu, cones)
 
         preprocess_find_initial_point(model, tol_qr, use_dense_fallback)
@@ -248,7 +257,7 @@ mutable struct PreprocessedLinearModel{T <: HypReal} <: LinearModel{T}
 end
 
 # preprocess and get initial point for PreprocessedLinearModel
-function preprocess_find_initial_point(model::PreprocessedLinearModel{T}, tol_qr::Real, use_dense_fallback::Bool) where {T <: HypReal}
+function preprocess_find_initial_point(model::PreprocessedLinearModel{T}, tol_qr::Real, use_dense_fallback::Bool) where {T <: Real}
     c = model.c_raw
     A = model.A_raw
     b = model.b_raw
@@ -377,4 +386,4 @@ function preprocess_find_initial_point(model::PreprocessedLinearModel{T}, tol_qr
     return
 end
 
-get_original_data(model::PreprocessedLinearModel) = (model.c_raw, model.A_raw, model.b_raw, model.G_raw, model.h, model.cones, model.cone_idxs)
+get_original_data(model::PreprocessedLinearModel) = (model.c_raw, model.A_raw, model.b_raw, model.G_raw, model.h, model.cones)
