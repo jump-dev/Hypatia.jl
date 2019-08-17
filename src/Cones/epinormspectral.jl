@@ -31,14 +31,14 @@ mutable struct EpiNormSpectral{T <: Real} <: Cone{T}
     inv_hess::Symmetric{T, Matrix{T}}
 
     W::Matrix{T}
-    X::Matrix{T}
+    WWt::Matrix{T}
     Z::Matrix{T}
     fact_Z
     Zi::Symmetric{T, Matrix{T}}
     Eu::Symmetric{T, Matrix{T}}
     ZiEuZi::Matrix{T}
-    tmp_nn::Matrix{T}
-    tmp_nm::Matrix{T}
+    tmpnn::Matrix{T}
+    tmpnm::Matrix{T}
 
     tmp_hess::Symmetric{T, Matrix{T}}
     hess_fact # TODO prealloc
@@ -64,13 +64,13 @@ function setup_data(cone::EpiNormSpectral{T}) where {T <: Real}
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.tmp_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.W = Matrix{T}(undef, cone.n, cone.m)
-    cone.X = Matrix{T}(undef, cone.n, cone.n)
+    cone.WWt = Matrix{T}(undef, cone.n, cone.n)
     cone.Z = Matrix{T}(undef, cone.n, cone.n)
     cone.Zi = Symmetric(zeros(T, cone.n, cone.n))
     cone.Eu = Symmetric(zeros(T, cone.n, cone.n))
     cone.ZiEuZi = Matrix{T}(undef, cone.n, cone.n)
-    cone.tmp_nn = Matrix{T}(undef, cone.n, cone.n)
-    cone.tmp_nm = Matrix{T}(undef, cone.n, cone.m)
+    cone.tmpnn = Matrix{T}(undef, cone.n, cone.n)
+    cone.tmpnm = Matrix{T}(undef, cone.n, cone.m)
     return
 end
 
@@ -87,8 +87,8 @@ function update_feas(cone::EpiNormSpectral)
     u = cone.point[1]
     if u > 0
         cone.W[:] .= view(cone.point, 2:cone.dim)
-        hyp_AAt!(cone.X, cone.W)
-        cone.Z = u * I - cone.X / u
+        hyp_AAt!(cone.WWt, cone.W)
+        cone.Z = u * I - cone.WWt / u
         cone.fact_Z = hyp_chol!(Symmetric(cone.Z, :U))
         cone.is_feas = isposdef(cone.fact_Z)
     else
@@ -102,10 +102,10 @@ function update_grad(cone::EpiNormSpectral{T}) where {T <: Real}
     @assert cone.is_feas
     u = cone.point[1]
     cone.Zi = Symmetric(inv(cone.fact_Z))
-    cone.Eu = Symmetric(I + Symmetric(cone.X, :U) / u / u)
+    cone.Eu = I + Symmetric(cone.WWt, :U) / u / u
     cone.grad[1] = -dot(cone.Zi, cone.Eu) - inv(u)
-    mul!(cone.tmp_nm, cone.Zi, cone.W, T(2) / u, zero(T))
-    cone.grad[2:end] .= vec(cone.tmp_nm)
+    mul!(cone.tmpnm, cone.Zi, cone.W, T(2) / u, zero(T))
+    cone.grad[2:end] .= vec(cone.tmpnm)
     cone.grad_updated = true
     return cone.grad
 end
@@ -117,49 +117,46 @@ function update_hess(cone::EpiNormSpectral{T}) where {T <: Real}
     m = cone.m
     u = cone.point[1]
     W = cone.W
-    X = cone.X
+    WWt = cone.WWt
     Z = cone.Z
     Zi = cone.Zi
     Eu = cone.Eu
     ZiEuZi = cone.ZiEuZi
-    tmp_nn = cone.tmp_nn
-    tmp_nm = cone.tmp_nm
+    tmpnn = cone.tmpnn
+    tmpnm = cone.tmpnm
     cone.hess .= 0
     H = cone.hess.data
 
-    mul!(tmp_nn, Eu, Zi) # dispatches on slow method unless one of the matrices is not symmetric
-    mul!(ZiEuZi, Zi, tmp_nn)
-    H[1, 1] = dot(Symmetric(ZiEuZi, :U), Eu) + (2 * dot(Zi, Symmetric(X, :U)) / u + 1) / u / u
-    @. tmp_nn = -2 * (Zi / u + ZiEuZi) / u
-    mul!(tmp_nm, tmp_nn, W)
-    @views copyto!(H[1, 2:end], tmp_nm)
+    # no BLAS method for product of two symmetric matrices, faster if one is not symmetric
+    mul!(tmpnn, Eu, Zi.data)
+    mul!(ZiEuZi, Zi, tmpnn)
+    H[1, 1] = dot(Symmetric(ZiEuZi, :U), Eu) + (2 * dot(Zi, Symmetric(WWt, :U)) / u + 1) / u / u
+    @. tmpnn = -2 * (Zi / u + ZiEuZi) / u
+    mul!(tmpnm, tmpnn, W)
+    @views copyto!(H[1, 2:end], tmpnm)
 
     p = 2
     # calculate d^2F / dW_ij dW_kl, p and q are linear indices for (i, j) and (k, l)
     @inbounds for j in 1:m, i in 1:n
-        @views mul!(tmp_nn, Zi[:, i], W[:, j]')
-        mul!(Z, tmp_nn, Zi)
+        @views mul!(tmpnn, Zi[:, i], W[:, j]')
+        mul!(Z, tmpnn, Zi)
          # evaluates to Zi * dZdW_ij * Zi
-        tmp_nn = (Z + Z') / u
+        tmpnn = (Z + Z') / u
         # add to terms where k = i, and l = j:n, inner product of Zi with d^2Z / dW_ij dW_kl nonzero only when j=l
         q = p
         viewij = view(H, p, q:(q + n - i))
         # inner product of Zi with d^2Z / dW_ij dW_kl, unscaled by 2 / u
         @views viewij .= Zi[i, i:n]
         @views @. for ni in 1:n
-            viewij += W[ni, j] * tmp_nn[ni, i:n]
+            viewij += W[ni, j] * tmpnn[ni, i:n]
         end
         # add to terms where k > i, l = 1:n
         q += (n - i + 1)
         ntermsij = n * (m - j)
         if j <= m - 1
-            # viewH = reshape(view(H, q, q + ntermsij - 1), n, m - j)
-            # viewH .+= Symmetric(tmp_nn, :U) * W[:, (j + 1):m]
-            # mul!(viewH, Symmetric(tmp_nn, :U), W[:, (j + 1):m], one(T), one(T))
             # the size of the result changes each iteration
-            tmp_view = view(tmp_nm, :, 1:(m - j))
-            @views mul!(tmp_view, Symmetric(tmp_nn, :U), W[:, (j + 1):m])
-            @views H[p, q:(q + ntermsij - 1)] .+= vec(tmp_view)
+            viewH = reshape(view(H, p, q:(q + ntermsij - 1)), n, m - j)
+            mul!(viewH, Symmetric(tmpnn, :U), W[:, (j + 1):m], one(T), one(T))
         end
         # scale all terms we just modified, i.e. k >= i
         @views H[p, (q - n + i - 1):(q + ntermsij - 1)] .*= 2 / u
