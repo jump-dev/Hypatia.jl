@@ -98,7 +98,7 @@ function update_feas(cone::EpiNormSpectral)
     return cone.is_feas
 end
 
-function update_grad(cone::EpiNormSpectral{T}) where {T <: HypReal}
+function update_grad(cone::EpiNormSpectral{T}) where {T <: Real}
     @assert cone.is_feas
     u = cone.point[1]
     cone.Zi = Symmetric(inv(cone.fact_Z))
@@ -111,7 +111,7 @@ function update_grad(cone::EpiNormSpectral{T}) where {T <: HypReal}
 end
 
 # TODO maybe this could be simpler/faster if use mul!(cone.hess, cone.grad, cone.grad') and build from there
-function update_hess(cone::EpiNormSpectral{T}) where {T <: HypReal}
+function update_hess(cone::EpiNormSpectral{T}) where {T <: Real}
     @assert cone.grad_updated
     n = cone.n
     m = cone.m

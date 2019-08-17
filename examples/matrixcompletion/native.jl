@@ -199,3 +199,10 @@ function test_matrixcompletion(instance::Function; T::Type{<:Real} = Float64, te
     @test r.status == :Optimal
     return
 end
+
+matrixcompletion13(T::Type{<:HypReal}) = matrixcompletion(T, 8, 80, use_geomean = true, use_epinorm = false)
+
+# test_matrixcompletion.(
+#     matrixcompletion13,
+#     test_options = (solver_options = (verbose = true,),)
+#     )

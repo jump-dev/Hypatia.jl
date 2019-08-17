@@ -16,6 +16,14 @@ hyp_AtA!(U::Matrix{T}, A::Matrix{T}) where {T <: BlasReal} = BLAS.syrk!('U', 'T'
 hyp_AtA!(U::Matrix{Complex{T}}, A::Matrix{Complex{T}}) where {T <: BlasReal} = BLAS.herk!('U', 'C', one(T), A, zero(T), U)
 hyp_AtA!(U::Matrix{T}, A::Matrix{T}) where {T <: RealOrComplex{<:Real}} = mul!(U, A', A)
 
+hyp_AAt!(U::Matrix{T}, A::Matrix{T}) where {T <: BlasReal} = BLAS.syrk!('U', 'N', one(T), A, zero(T), U)
+hyp_AAt!(U::Matrix{Complex{T}}, A::Matrix{Complex{T}}) where {T <: BlasReal} = BLAS.herk!('U', 'N', one(T), A, zero(T), U)
+hyp_AAt!(U::Matrix{T}, A::Matrix{T}) where {T <: HypRealOrComplex{<:HypReal}} = mul!(U, A, A')
+
+# hyp_syrk!(trans::Char, A::Matrix{T}, U::Matrix{T}) where {T <: BlasReal} = BLAS.syrk!('U', trans, one(T), A, zero(T), U)
+# hyp_syrk!(trans::Char, A::Matrix{Complex{T}}, U::Matrix{Complex{T}}) where {T <: BlasReal} = BLAS.herk!('U', trans, one(T), A, zero(T), U)
+# hyp_syrk!(trans::Char, A::Matrix{T}, U::Matrix{T}) where {T <: HypRealOrComplex{<:HypReal}} = t == 'T' && mul!(U, A', A) || mul!(U, A, A')
+
 hyp_chol!(A::HermOrSym{T, Matrix{T}}) where {T <: BlasFloat} = cholesky!(A, Val(true), check = false)
 hyp_chol!(A::HermOrSym{T, Matrix{T}}) where {T <: RealOrComplex{<:Real}} = cholesky!(A, check = false)
 
