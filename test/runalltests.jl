@@ -7,7 +7,7 @@ using Test
 @info("starting Hypatia all tests")
 
 @testset "Hypatia all tests" begin
-    # include(joinpath(@__DIR__, "runinterptests.jl"))
+    include(joinpath(@__DIR__, "runinterptests.jl"))
     include(joinpath(@__DIR__, "runbarriertests.jl"))
     include(joinpath(@__DIR__, "runnativetests.jl"))
     include(joinpath(@__DIR__, "runmoitests.jl"))
