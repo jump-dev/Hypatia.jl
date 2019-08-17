@@ -111,7 +111,7 @@ function update_grad(cone::EpiNormSpectral{T}) where {T <: Real}
 end
 
 # TODO maybe this could be simpler/faster if use mul!(cone.hess, cone.grad, cone.grad') and build from there
-function update_hess(cone::EpiNormSpectral{T}) where {T <: Real}
+function update_hess(cone::EpiNormSpectral)
     @assert cone.grad_updated
     n = cone.n
     m = cone.m
@@ -156,7 +156,7 @@ function update_hess(cone::EpiNormSpectral{T}) where {T <: Real}
         if j <= m - 1
             # the size of the result changes each iteration
             viewH = reshape(view(H, p, q:(q + ntermsij - 1)), n, m - j)
-            mul!(viewH, Symmetric(tmpnn, :U), W[:, (j + 1):m], one(T), one(T))
+            mul!(viewH, Symmetric(tmpnn, :U), W[:, (j + 1):m], true, true)
         end
         # scale all terms we just modified, i.e. k >= i
         @views H[p, (q - n + i - 1):(q + ntermsij - 1)] .*= 2 / u
