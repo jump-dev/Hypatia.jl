@@ -8,7 +8,7 @@ using LinearAlgebra
 import ForwardDiff
 import Hypatia
 const CO = Hypatia.Cones
-const MU = Hypatia.ModelUtilities
+# const MU = Hypatia.ModelUtilities
 
 function test_barrier_oracles(cone::CO.Cone{T}, barrier::Function; noise = 0.0) where {T <: Real}
     CO.setup_data(cone)
@@ -223,22 +223,22 @@ function test_hypoperlogdettri_barrier(T::Type{<:Real})
     return
 end
 
-function test_wsospolyinterp_barrier(T::Type{<:Real})
-    Random.seed!(1)
-    for n in 1:3, halfdeg in 1:3
-        (U, _, P0, _, _) = MU.interpolate(MU.FreeDomain(n), halfdeg, sample = false)
-        P0 = convert(Matrix{T}, P0)
-        cone = CO.WSOSPolyInterp{T, T}(U, [P0], true) # TODO test with more Pi
-        function barrier(s)
-            Lambda = Symmetric(P0' * Diagonal(s) * P0)
-            return -logdet(cholesky!(Lambda))
-        end
-        test_barrier_oracles(cone, barrier)
-        test_barrier_oracles(cone, barrier, noise = 0.1)
-    end
-    # TODO also test complex case CO.WSOSPolyInterp{T, Complex{T}} - need complex MU interp functions first
-    return
-end
+# function test_wsospolyinterp_barrier(T::Type{<:Real})
+#     Random.seed!(1)
+#     for n in 1:3, halfdeg in 1:3
+#         (U, _, P0, _, _) = MU.interpolate(MU.FreeDomain(n), halfdeg, sample = false)
+#         P0 = convert(Matrix{T}, P0)
+#         cone = CO.WSOSPolyInterp{T, T}(U, [P0], true) # TODO test with more Pi
+#         function barrier(s)
+#             Lambda = Symmetric(P0' * Diagonal(s) * P0)
+#             return -logdet(cholesky!(Lambda))
+#         end
+#         test_barrier_oracles(cone, barrier)
+#         test_barrier_oracles(cone, barrier, noise = 0.1)
+#     end
+#     # TODO also test complex case CO.WSOSPolyInterp{T, Complex{T}} - need complex MU interp functions first
+#     return
+# end
 
 # function test_wsospolyinterpmat_barrier(T::Type{<:Real})
 #     Random.seed!(1)
