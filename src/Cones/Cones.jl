@@ -11,14 +11,13 @@ import LinearAlgebra.BlasFloat
 import LinearAlgebra.copytri!
 using ForwardDiff
 using DiffResults
-import Hypatia.HypReal
-import Hypatia.HypRealOrComplex
+import Hypatia.RealOrComplex
 import Hypatia.hyp_AtA!
 import Hypatia.hyp_aat!
 import Hypatia.hyp_chol!
 import Hypatia.hyp_ldiv_chol_L!
 
-abstract type Cone{T <: HypReal} end
+abstract type Cone{T <: Real} end
 
 include("orthant.jl")
 include("epinorminf.jl")
@@ -36,7 +35,8 @@ include("wsospolyinterp.jl")
 # include("wsospolyinterpsoc.jl")
 
 use_dual(cone::Cone) = cone.use_dual
-load_point(cone::Cone, point::AbstractVector) = (cone.point = point)
+load_point(cone::Cone, point::AbstractVector{T}, scal::T) where {T} = (@. cone.point = point / scal)
+load_point(cone::Cone, point::AbstractVector) = copyto!(cone.point, point)
 dimension(cone::Cone) = cone.dim
 
 is_feas(cone::Cone) = (cone.feas_updated ? cone.is_feas : update_feas(cone))

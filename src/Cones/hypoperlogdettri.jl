@@ -12,11 +12,11 @@ TODO remove allocations
 TODO remove cone.vecn
 =#
 
-mutable struct HypoPerLogdetTri{T <: HypReal} <: Cone{T}
+mutable struct HypoPerLogdetTri{T <: Real} <: Cone{T}
     use_dual::Bool
     dim::Int
     side::Int
-    point::AbstractVector{T}
+    point::Vector{T}
 
     feas_updated::Bool
     grad_updated::Bool
@@ -44,7 +44,7 @@ mutable struct HypoPerLogdetTri{T <: HypReal} <: Cone{T}
     tmp_hess::Symmetric{T, Matrix{T}}
     hess_fact # TODO prealloc
 
-    function HypoPerLogdetTri{T}(dim::Int, is_dual::Bool) where {T <: HypReal}
+    function HypoPerLogdetTri{T}(dim::Int, is_dual::Bool) where {T <: Real}
         cone = new{T}()
         cone.use_dual = is_dual
         cone.dim = dim
@@ -53,13 +53,14 @@ mutable struct HypoPerLogdetTri{T <: HypReal} <: Cone{T}
     end
 end
 
-HypoPerLogdetTri{T}(dim::Int) where {T <: HypReal} = HypoPerLogdetTri{T}(dim, false)
+HypoPerLogdetTri{T}(dim::Int) where {T <: Real} = HypoPerLogdetTri{T}(dim, false)
 
 reset_data(cone::HypoPerLogdetTri) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_prod_updated = cone.inv_hess_prod_updated = false)
 
-function setup_data(cone::HypoPerLogdetTri{T}) where {T <: HypReal}
+function setup_data(cone::HypoPerLogdetTri{T}) where {T <: Real}
     reset_data(cone)
     dim = cone.dim
+    cone.point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.tmp_hess = Symmetric(zeros(T, dim, dim), :U)
@@ -184,7 +185,7 @@ function update_hess_prod(cone::HypoPerLogdetTri)
     return nothing
 end
 
-function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPerLogdetTri{T}) where {T <: HypReal}
+function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPerLogdetTri{T}) where {T <: Real}
     if !cone.hess_prod_updated
         update_hess_prod(cone)
     end

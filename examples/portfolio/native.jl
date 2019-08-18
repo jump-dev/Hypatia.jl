@@ -8,11 +8,10 @@ using LinearAlgebra
 import Random
 using Test
 import Hypatia
-import Hypatia.HypReal
 const CO = Hypatia.Cones
 
 function portfolio(
-    T::Type{<:HypReal},
+    T::Type{<:Real},
     num_stocks::Int,
     risk_measures::Vector{Symbol};
     use_l1ball::Bool = true,
@@ -46,7 +45,6 @@ function portfolio(
     end
     b = T[1]
     h = zeros(T, num_stocks)
-    cone_idxs = UnitRange{Int}[1:num_stocks]
     cones = CO.Cone{T}[CO.Nonnegative{T}(num_stocks)]
     cone_offset = num_stocks
 
@@ -61,7 +59,6 @@ function portfolio(
         h_risk = vcat(gamma_new, zeros(T, num_stocks))
         h = vcat(h, h_risk)
         push!(cones, cone)
-        push!(cone_idxs, (cone_offset + 1):(cone_offset + num_stocks + 1))
         cone_offset += num_stocks + 1
     end
 
@@ -112,7 +109,6 @@ function portfolio(
         b = vcat(b, zeros(T, num_stocks))
         h = vcat(h, zeros(T, 2 * num_stocks), gamma * sqrt(T(num_stocks)))
         push!(cones, CO.Nonnegative{T}(2 * num_stocks + 1))
-        push!(cone_idxs, (cone_offset + 1):(cone_offset + 2 * num_stocks + 1))
         cone_offset += 2 * num_stocks + 1
     end
 
@@ -134,7 +130,6 @@ function portfolio(
         end
         h = vcat(h, gamma * ones(T, 2 * num_stocks))
         push!(cones, CO.Nonnegative{T}(2 * num_stocks))
-        push!(cone_idxs, (cone_offset + 1):(cone_offset + 2 * num_stocks))
         cone_offset += 2 * num_stocks
     end
 
@@ -178,32 +173,31 @@ function portfolio(
         end
         h = vcat(h, h2, h2)
         for i in 1:(2 * num_stocks)
-            push!(cone_idxs, (3 * (i - 1) + cone_offset + 1):(3 * i + cone_offset))
             push!(cones, CO.HypoPerLog{T}(3))
         end
         cone_offset += 6 * num_stocks
     end
 
     if use_linops
-        A = Hypatia.HypBlockMatrix{T}(last_idx(A_rows), last_idx(A_cols), A_blocks, A_rows, A_cols)
-        G = Hypatia.HypBlockMatrix{T}(last_idx(G_rows), last_idx(G_cols), G_blocks, G_rows, G_cols)
+        A = Hypatia.BlockMatrix{T}(last_idx(A_rows), last_idx(A_cols), A_blocks, A_rows, A_cols)
+        G = Hypatia.BlockMatrix{T}(last_idx(G_rows), last_idx(G_cols), G_blocks, G_rows, G_cols)
     end
 
-    return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs)
+    return (c = c, A = A, b = b, G = G, h = h, cones = cones)
 end
 
-portfolio1(T::Type{<:HypReal}) = portfolio(T, 4, [:l1], use_l1ball = true)
-portfolio2(T::Type{<:HypReal}) = portfolio(T, 6, [:l1], use_l1ball = false)
-portfolio3(T::Type{<:HypReal}) = portfolio(T, 4, [:linf], use_linfball = true)
-portfolio4(T::Type{<:HypReal}) = portfolio(T, 6, [:linf], use_linfball = false)
-portfolio5(T::Type{<:HypReal}) = portfolio(T, 4, [:linf, :l1], use_linfball = true, use_l1ball = true)
-portfolio6(T::Type{<:HypReal}) = portfolio(T, 6, [:linf, :l1], use_linfball = false, use_l1ball = false)
-portfolio7(T::Type{<:HypReal}) = portfolio(T, 4, [:linf, :l1], use_l1ball = true, use_linops = false)
-portfolio8(T::Type{<:HypReal}) = portfolio(T, 4, [:linf, :l1], use_l1ball = true, use_linops = true)
-portfolio9(T::Type{<:HypReal}) = portfolio(T, 3, [:linf, :l1], use_l1ball = false, use_linops = false)
-portfolio10(T::Type{<:HypReal}) = portfolio(T, 3, [:linf, :l1], use_l1ball = false, use_linops = true)
-portfolio11(T::Type{<:HypReal}) = portfolio(T, 4, [:entropic], use_l1ball = false, use_linops = false)
-portfolio12(T::Type{<:HypReal}) = portfolio(T, 4, [:entropic], use_l1ball = false, use_linops = true)
+portfolio1(T::Type{<:Real}) = portfolio(T, 4, [:l1], use_l1ball = true)
+portfolio2(T::Type{<:Real}) = portfolio(T, 6, [:l1], use_l1ball = false)
+portfolio3(T::Type{<:Real}) = portfolio(T, 4, [:linf], use_linfball = true)
+portfolio4(T::Type{<:Real}) = portfolio(T, 6, [:linf], use_linfball = false)
+portfolio5(T::Type{<:Real}) = portfolio(T, 4, [:linf, :l1], use_linfball = true, use_l1ball = true)
+portfolio6(T::Type{<:Real}) = portfolio(T, 6, [:linf, :l1], use_linfball = false, use_l1ball = false)
+portfolio7(T::Type{<:Real}) = portfolio(T, 4, [:linf, :l1], use_l1ball = true, use_linops = false)
+portfolio8(T::Type{<:Real}) = portfolio(T, 4, [:linf, :l1], use_l1ball = true, use_linops = true)
+portfolio9(T::Type{<:Real}) = portfolio(T, 3, [:linf, :l1], use_l1ball = false, use_linops = false)
+portfolio10(T::Type{<:Real}) = portfolio(T, 3, [:linf, :l1], use_l1ball = false, use_linops = true)
+portfolio11(T::Type{<:Real}) = portfolio(T, 4, [:entropic], use_l1ball = false, use_linops = false)
+portfolio12(T::Type{<:Real}) = portfolio(T, 4, [:entropic], use_l1ball = false, use_linops = true)
 
 instances_portfolio_all = [
     portfolio1,
@@ -228,11 +222,11 @@ instances_portfolio_linops = [
     portfolio12,
     ]
 
-function test_portfolio(instance::Function; T::Type{<:HypReal} = Float64, test_options::NamedTuple = NamedTuple(), rseed::Int = 1)
+function test_portfolio(instance::Function; T::Type{<:Real} = Float64, test_options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)
     tol = max(1e-5, sqrt(sqrt(eps(T))))
     d = instance(T)
-    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs; test_options..., atol = tol, rtol = tol)
+    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; test_options..., atol = tol, rtol = tol)
     @test r.status == :Optimal
     return
 end

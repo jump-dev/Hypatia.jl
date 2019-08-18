@@ -8,10 +8,10 @@ barrier (guessed, reduces to 3-dim exp cone self-concordant barrier)
 -log(v*sum(log.(w/v)) - u) - sum(log.(w)) - log(v)
 =#
 
-mutable struct HypoPerLog{T <: HypReal} <: Cone{T}
+mutable struct HypoPerLog{T <: Real} <: Cone{T}
     use_dual::Bool
     dim::Int
-    point::AbstractVector{T}
+    point::Vector{T}
 
     feas_updated::Bool
     grad_updated::Bool
@@ -29,7 +29,7 @@ mutable struct HypoPerLog{T <: HypReal} <: Cone{T}
     tmp_hess::Symmetric
     hess_fact # TODO prealloc
 
-    function HypoPerLog{T}(dim::Int, is_dual::Bool) where {T <: HypReal}
+    function HypoPerLog{T}(dim::Int, is_dual::Bool) where {T <: Real}
         cone = new{T}()
         cone.use_dual = is_dual
         cone.dim = dim
@@ -37,12 +37,13 @@ mutable struct HypoPerLog{T <: HypReal} <: Cone{T}
     end
 end
 
-HypoPerLog{T}(dim::Int) where {T <: HypReal} = HypoPerLog{T}(dim, false)
+HypoPerLog{T}(dim::Int) where {T <: Real} = HypoPerLog{T}(dim, false)
 
 # TODO maybe only allocate the fields we use
-function setup_data(cone::HypoPerLog{T}) where {T <: HypReal}
+function setup_data(cone::HypoPerLog{T}) where {T <: Real}
     reset_data(cone)
     dim = cone.dim
+    cone.point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(BigFloat, dim, dim), :U)
     cone.tmp_hess = Symmetric(zeros(T, dim, dim), :U)
