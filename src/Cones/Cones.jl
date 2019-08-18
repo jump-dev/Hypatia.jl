@@ -13,6 +13,7 @@ using ForwardDiff
 using DiffResults
 import Hypatia.RealOrComplex
 import Hypatia.hyp_AtA!
+import Hypatia.hyp_AAt!
 import Hypatia.hyp_chol!
 import Hypatia.hyp_ldiv_chol_L!
 
