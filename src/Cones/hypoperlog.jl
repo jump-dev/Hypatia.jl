@@ -11,7 +11,7 @@ barrier (guessed, reduces to 3-dim exp cone self-concordant barrier)
 mutable struct HypoPerLog{T <: Real} <: Cone{T}
     use_dual::Bool
     dim::Int
-    point::AbstractVector{T}
+    point::Vector{T}
 
     feas_updated::Bool
     grad_updated::Bool
@@ -43,6 +43,7 @@ HypoPerLog{T}(dim::Int) where {T <: Real} = HypoPerLog{T}(dim, false)
 function setup_data(cone::HypoPerLog{T}) where {T <: Real}
     reset_data(cone)
     dim = cone.dim
+    cone.point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.tmp_hess = Symmetric(zeros(T, dim, dim), :U)
@@ -110,7 +111,7 @@ function update_hess(cone::HypoPerLog)
         end
         H[j2, j2] -= cone.grad[j2] / w[j]
     end
-    
+
     cone.hess_updated = true
     return cone.hess
 end
