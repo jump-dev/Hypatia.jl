@@ -193,6 +193,7 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
     @. y2 = -solver.y_residual
     @. y3 = zero(T)
 
+    sqrtmu = sqrt(mu)
     @. z1_temp = model.h
     @. z2_temp = -solver.z_residual
     for k in eachindex(cones)
@@ -200,30 +201,24 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
         duals_k = solver.point.dual_views[k]
         grad_k = Cones.grad(cone_k)
         if Cones.use_dual(cone_k)
-            @. z1_temp_k[k] /= mu
-            @. z2_temp_k[k] = (duals_k + z2_temp_k[k]) / mu
-            @. z3_temp_k[k] = duals_k / mu + grad_k
+            @. z2_temp_k[k] = duals_k + z2_temp_k[k]
+            @. z3_temp_k[k] = duals_k + grad_k * sqrtmu
             Cones.inv_hess_prod!(z_k[k], z_temp_k[k], cone_k)
         else
-            @. z1_temp_k[k] *= mu
-            @. z2_temp_k[k] *= mu
             Cones.hess_prod!(z1_k[k], z1_temp_k[k], cone_k)
             Cones.hess_prod!(z2_k[k], z2_temp_k[k], cone_k)
             @. z2_k[k] += duals_k
-            @. z3_k[k] = duals_k + grad_k * mu
+            @. z3_k[k] = duals_k + grad_k * sqrtmu
         end
     end
 
-    # TODO maybe replace with Diagonal(blocks) matrix product
     function block_hessian_product!(prod_k, arr_k)
         for k in eachindex(cones)
             cone_k = cones[k]
             if Cones.use_dual(cone_k)
                 Cones.inv_hess_prod!(prod_k[k], arr_k[k], cone_k)
-                prod_k[k] ./= mu
             else
                 Cones.hess_prod!(prod_k[k], arr_k[k], cone_k)
-                prod_k[k] .*= mu
             end
         end
     end

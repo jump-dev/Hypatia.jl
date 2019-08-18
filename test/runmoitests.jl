@@ -19,8 +19,10 @@ dense_options = [
     ]
 
 system_solvers = [
-    SO.NaiveElimCombinedHSDSystemSolver,
     SO.QRCholCombinedHSDSystemSolver,
+    # SO.SymIndefCombinedHSDSystemSolver,
+    # SO.NaiveElimCombinedHSDSystemSolver,
+    # SO.NaiveCombinedHSDSystemSolver,
     ]
 
 @testset "MOI tests: $(d ? "dense" : "sparse"), $s, $T" for d in dense_options, s in system_solvers, T in real_types

@@ -138,35 +138,36 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::SymIndefCo
     z3 .= zero(T)
 
     # update lhs matrix
+    sqrtmu = sqrt(mu)
     copyto!(lhs, system_solver.lhs_copy)
     for k in eachindex(cones)
         cone_k = cones[k]
         idxs = model.cone_idxs[k]
         rows = (n + p) .+ idxs
         duals_k = solver.point.dual_views[k]
-        g = Cones.grad(cone_k)
+        grad_k = Cones.grad(cone_k)
         if Cones.use_dual(cone_k)
             # G_k*x - mu*H_k*z_k = zrhs_k + srhs_k
             H = Cones.hess(cone_k)
-            lhs[rows, rows] .= -mu * H
+            lhs[rows, rows] .= -H
             @. z2_k[k] += duals_k
-            @. z3_k[k] = duals_k + mu * g
+            @. z3_k[k] = duals_k + grad_k * sqrtmu
         else
             if use_hess_inv
                 # G_k*x - (mu*H_k)^-1*z_k = zrhs_k + (mu*H_k)^-1*srhs_k
-                muHinv = Cones.inv_hess(cone_k) / mu
+                muHinv = Cones.inv_hess(cone_k)
                 lhs[rows, rows] .= -muHinv
                 z2_k[k] .+= muHinv * duals_k
-                z3_k[k] .= muHinv * (duals_k + mu * g)
+                z3_k[k] .= muHinv * (duals_k + grad_k * sqrtmu)
             else
                 # mu*H_k*G_k*x - z_k = mu*H_k*zrhs_k + srhs_k
                 H = Cones.hess(cone_k)
-                lhs[rows, 1:n] .= mu * H * model.G[idxs, :]
-                lhs[rows, rows] .= -mu * H
-                z1_k[k] .= mu * H * z1_k[k]
-                z2_k[k] .= mu * H * z2_k[k]
+                lhs[rows, 1:n] .= H * model.G[idxs, :]
+                lhs[rows, rows] .= -H
+                z1_k[k] .= H * z1_k[k]
+                z2_k[k] .= H * z2_k[k]
                 @. z2_k[k] += duals_k
-                @. z3_k[k] = duals_k + mu * g
+                @. z3_k[k] = duals_k + grad_k * sqrtmu
             end
         end
     end
@@ -198,9 +199,9 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::SymIndefCo
                 # z_k is premultiplied by (mu * H_k)^-1
                 H = Cones.hess(cones[k])
                 # TODO combine into one
-                z1_k[k] .= mu * H * z1_k[k]
-                z2_k[k] .= mu * H * z2_k[k]
-                z3_k[k] .= mu * H * z3_k[k]
+                z1_k[k] .= H * z1_k[k]
+                z2_k[k] .= H * z2_k[k]
+                z3_k[k] .= H * z3_k[k]
             end
         end
     end

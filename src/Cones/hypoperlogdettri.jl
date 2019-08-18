@@ -16,7 +16,7 @@ mutable struct HypoPerLogdetTri{T <: Real} <: Cone{T}
     use_dual::Bool
     dim::Int
     side::Int
-    point::AbstractVector{T}
+    point::Vector{T}
 
     feas_updated::Bool
     grad_updated::Bool
@@ -60,6 +60,7 @@ reset_data(cone::HypoPerLogdetTri) = (cone.feas_updated = cone.grad_updated = co
 function setup_data(cone::HypoPerLogdetTri{T}) where {T <: Real}
     reset_data(cone)
     dim = cone.dim
+    cone.point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.tmp_hess = Symmetric(zeros(T, dim, dim), :U)
