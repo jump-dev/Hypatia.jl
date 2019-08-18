@@ -53,24 +53,23 @@ function test_barrier_oracles(cone::CO.Cone{T}, barrier::Function; noise = 0.0) 
     @test CO.hess_prod!(prod, id, cone) ≈ hess atol=tol rtol=tol
     @test CO.inv_hess_prod!(prod, id, cone) ≈ inv_hess atol=tol rtol=tol
 
-    hess_fact = CO.hess_sqrt(cone)
-    @test hess_fact * transpose(hess_fact) ≈ hess atol=tol rtol=tol
+    hess_U = CO.hess_U_fact(cone)
+    hess_L = CO.hess_L_fact(cone)
+    @test hess_L * hess_U ≈ hess atol=tol rtol=tol
+    @test hess_L ≈ hess_U' atol=tol rtol=tol
     prod_or_div = zeros(T, dim, dim)
-    CO.hess_sqrt_div!(prod_or_div, hess, cone)
-    @test prod_or_div ≈ transpose(hess_fact) atol=tol rtol=tol
-    CO.hess_sqrt_div!(prod_or_div, hess_fact, cone)
-    @test prod_or_div ≈ I atol=tol rtol=tol
-    CO.hess_sqrt_mul!(prod_or_div, transpose(hess_fact), cone)
-    @test prod_or_div ≈ hess atol=tol rtol=tol
-    CO.hess_sqrt_mul!(prod_or_div, id, cone)
-    @test prod_or_div ≈ hess_fact atol=tol rtol=tol
-
-    # hess_fact_prod!(prod, transpose(hess_fact), cone)
-    # @test prod ≈ hess atol=tol rtol=tol
-    # id = Matrix{T}(I, dim, dim)
-    # CO.hess_fact_prod!(prod, id, cone)
-    # @test prod ≈ hess_fact atol=tol rtol=tol
-
+    CO.hess_U_prod!(prod_or_div, id, cone)
+    @show prod_or_div
+    @test prod_or_div ≈ hess_U atol=tol rtol=tol
+    arr = T.(randn(dim, dim))
+    CO.hess_U_prod!(prod_or_div, arr, cone)
+    @test prod_or_div ≈ (hess_U * arr) atol=tol rtol=tol
+    CO.hess_L_div!(prod_or_div, hess, cone)
+    @test prod_or_div ≈ hess_U atol=tol rtol=tol
+    CO.hess_L_div!(prod_or_div, id, cone)
+    @test prod_or_div ≈ inv(hess_L) atol=tol rtol=tol
+    CO.hess_L_div!(prod_or_div, arr, cone)
+    @test prod_or_div ≈ hess_L \ arr atol=tol rtol=tol
     return
 end
 
@@ -213,16 +212,16 @@ function test_possemideftri_barrier(T::Type{<:HypReal})
         test_barrier_oracles(cone, R_barrier, noise = 0.1)
 
         # complex PSD cone
-        @show "complex"
-        dim = side^2
-        cone = CO.PosSemidefTri{T, Complex{T}}(dim)
-        function C_barrier(s)
-            S = zeros(Complex{eltype(s)}, side, side)
-            CO.vec_to_mat_U!(S, s)
-            return -logdet(cholesky!(Hermitian(S, :U)))
-        end
-        test_barrier_oracles(cone, C_barrier)
-        test_barrier_oracles(cone, C_barrier, noise = 0.1)
+        # @show "complex"
+        # dim = side^2
+        # cone = CO.PosSemidefTri{T, Complex{T}}(dim)
+        # function C_barrier(s)
+        #     S = zeros(Complex{eltype(s)}, side, side)
+        #     CO.vec_to_mat_U!(S, s)
+        #     return -logdet(cholesky!(Hermitian(S, :U)))
+        # end
+        # test_barrier_oracles(cone, C_barrier)
+        # test_barrier_oracles(cone, C_barrier, noise = 0.1)
     end
     return
 end

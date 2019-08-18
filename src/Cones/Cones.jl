@@ -14,6 +14,7 @@ using DiffResults
 import Hypatia.HypReal
 import Hypatia.HypRealOrComplex
 import Hypatia.hyp_AtA!
+import Hypatia.hyp_aat!
 import Hypatia.hyp_chol!
 import Hypatia.hyp_ldiv_chol_L!
 
@@ -47,9 +48,13 @@ inv_hess(cone::Cone) = (cone.inv_hess_updated ? cone.inv_hess : update_inv_hess(
 
 reset_data(cone::Cone) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.inv_hess_prod_updated = false)
 
-hess_sqrt(cone::Cone) = hyp_chol!(copy(cone.hess)).L
-hess_sqrt_div!(dividend, arr, cone::Cone) = ldiv!(dividend, hess_sqrt(cone), arr)
-hess_sqrt_mul!(prod, arr, cone::Cone) = mul!(prod, hess_sqrt(cone), arr)
+# TODO very dumb atm
+# hess_U_fact(cone::Cone) = sqrt(cone.hess)
+# hess_L_fact(cone::Cone) = sqrt(cone.hess)
+hess_U_fact(cone::Cone) = cholesky(cone.hess, Val(false)).U
+hess_L_fact(cone::Cone) = cholesky(cone.hess, Val(false)).L
+hess_U_prod!(prod, arr, cone::Cone) = mul!(prod, hess_U_fact(cone), arr)
+hess_L_div!(dividend, arr, cone::Cone) = (dividend .= hess_L_fact(cone) \ arr; dividend)
 
 # TODO check if this is most efficient way to use DiffResults
 function update_grad(cone::Cone)

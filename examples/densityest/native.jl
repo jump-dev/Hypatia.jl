@@ -240,7 +240,8 @@ function test_densityest(instance::Function; T::Type{<:HypReal} = Float64, test_
     return
 end
 
+SO = Hypatia.Solvers
 test_densityest.(
     densityest2,
     T = Float64,
-    test_options = (solver_options = (verbose = true,), stepper_options = (max_nbhd = 0.3,)))
+    test_options = (system_solver = SO.QRCholCombinedHSDSystemSolver, solver_options = (verbose = true,), stepper_options = (max_nbhd = 0.3,)))

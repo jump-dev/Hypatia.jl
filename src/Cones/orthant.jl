@@ -127,3 +127,8 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Ort
     @. prod = arr * cone.point * cone.point
     return prod
 end
+
+hess_U_fact(cone::OrthantCone) = (@assert cone.grad_updated; Diagonal(-cone.grad))
+hess_L_fact(cone::OrthantCone) = hess_U_fact(cone)
+hess_U_prod!(prod, arr, cone::OrthantCone) = (@. prod = arr / cone.point; prod)
+hess_L_div!(dividend, arr, cone::OrthantCone) = (@. dividend = arr * cone.point; dividend)

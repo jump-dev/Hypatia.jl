@@ -37,7 +37,7 @@ mutable struct PosSemidefTri{T <: HypReal, R <: HypRealOrComplex{T}} <: Cone{T}
     mat3::Matrix{R}
     inv_mat::Matrix{R}
     fact_mat
-    point_sqrt
+    point_sqrt # remove
 
     function PosSemidefTri{T, R}(dim::Int, is_dual::Bool) where {R <: HypRealOrComplex{T}} where {T <: HypReal}
         cone = new{T, R}()
@@ -92,7 +92,6 @@ function update_feas(cone::PosSemidefTri)
     copyto!(cone.mat2, cone.mat)
     cone.fact_mat = hyp_chol!(Hermitian(cone.mat2, :U)) # TODO eliminate allocs
     cone.is_feas = isposdef(cone.fact_mat)
-    cone.point_sqrt = copy(cone.fact_mat.U)
     cone.feas_updated = true
     return cone.is_feas
 end
@@ -219,6 +218,12 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemi
     return prod
 end
 
+# function hess_sqrt(cone::PosSemidefTri{T}) where {T}
+#     @assert cone.is_feas
+#     copyto!(cone.mat2, cone.mat)
+#
+# end
+
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidefTri)
     if !cone.inv_hess_prod_updated
         update_inv_hess_prod(cone)
@@ -232,21 +237,121 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Pos
     return prod
 end
 
-function hess_sqrt(cone::PosSemidefTri)
-    @assert cone.is_feas
-    H = cone.hess
-    return cholesky(H).L
+# function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidefTri{T, R}) where {R <: HypRealOrComplex{T}} where {T <: HypReal}
+#     if !cone.inv_hess_prod_updated
+#         update_inv_hess_prod(cone)
+#     end
+#     U = sqrt(cone.mat)
+#     @inbounds for i in 1:size(arr, 2)
+#         vec_to_mat_U_scaled!(cone.mat2, view(arr, :, i), inv(T(2)))
+#         # vec_to_mat_U_scaled!(cone.mat2, view(arr, :, i), inv(sqrt(T(2))))
+#         cone.mat2 .= U * Hermitian(cone.mat2, :U) * U
+#         # mat_U_to_vec!(view(arr, :, i), cone.mat2)
+#         # vec_to_mat_U_scaled!(cone.mat2, view(arr, :, i), inv(sqrt(T(2))))
+#         cone.mat2 .= U * Hermitian(cone.mat2, :U) * U
+#         mat_U_to_vec!(view(prod, :, i), cone.mat2)
+#     end
+#     return prod
+# end
+
+function scale_off_diags!(mat, fact)
+    (m, n) = size(mat)
+    for j in 1:n, i in 1:m
+        if i != j
+            mat[i, j] *= fact
+        end
+    end
+    return mat
 end
 
-# this is not correct, and if it was, factors not rational
-function hess_fact_prod!(prod, arr, cone::PosSemidefTri{T, R}) where {R <: HypRealOrComplex{T}} where {T <: HypReal}
+function hess_U_prod!(prod, arr, cone::PosSemidefTri{T, R}) where {R <: HypRealOrComplex{T}} where {T <: HypReal}
     @assert cone.is_feas
-    Li = inv(cone.point_sqrt)
+    copyto!(cone.mat2, cone.mat)
+    # Li = inv(cholesky(Hermitian(cone.mat2, :U), Val(false)).L)
+    Li = inv(sqrt(Hermitian(cone.mat2, :U)))
+    scale_off_diags!(Li.data, inv(sqrt(T(2))))
     @inbounds for i in 1:size(arr, 2)
         vec_to_mat_U!(cone.mat2, view(arr, :, i))
+        # vec_to_mat_U_scaled!(cone.mat2, view(arr, :, i), sqrt(inv(T(2))))
         mul!(cone.mat3, Hermitian(cone.mat2, :U), Li)
-        mul!(cone.mat2, Li, cone.mat3)
-        mat_U_to_vec_scaled!(view(prod, :, i), cone.mat2, sqrt(T(2)))
+        mul!(cone.mat2, Li', cone.mat3)
+        # mat_U_to_vec_scaled!(view(prod, :, i), cone.mat2, sqrt(T(2)))
+        mat_U_to_vec_scaled!(view(prod, :, i), cone.mat2)
     end
     return prod
+end
+
+function hess_L_div!(dividend, arr, cone::PosSemidefTri{T, R}) where {R <: HypRealOrComplex{T}} where {T <: HypReal}
+    @assert cone.is_feas
+    copyto!(cone.mat2, cone.mat)
+    # U = cholesky(Hermitian(cone.mat2, :U), Val(false)).U
+    U = sqrt(Hermitian(cone.mat2, :U))
+    @inbounds for i in 1:size(arr, 2)
+        vec_to_mat_U_scaled!(cone.mat2, view(arr, :, i), inv(sqrt(T(2))))
+        mul!(cone.mat3, Hermitian(cone.mat2, :U), U)
+        mul!(cone.mat2, U', cone.mat3)
+        mat_U_to_vec!(view(dividend, :, i), cone.mat2)
+    end
+    return dividend
+end
+
+function mat_U_to_vec_scaled!(vec::AbstractVector{T}, mat::AbstractMatrix{T}, scal) where {T}
+    k = 1
+    m = size(mat, 1)
+    @inbounds for j in 1:m, i in 1:j
+        if i == j
+            vec[k] = mat[i, j]
+        else
+            vec[k] = scal * mat[i, j]
+        end
+        k += 1
+    end
+    return vec
+end
+
+function mat_U_to_vec_scaled!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}, scal) where {T}
+    k = 1
+    m = size(mat, 1)
+    @inbounds for j in 1:m, i in 1:j
+        if i == j
+            vec[k] = real(mat[i, j])
+            k += 1
+        else
+            ck = scal * mat[i, j]
+            vec[k] = real(ck)
+            k += 1
+            vec[k] = -imag(ck)
+            k += 1
+        end
+    end
+    return vec
+end
+
+function vec_to_mat_U_scaled!(mat::AbstractMatrix{T}, vec::AbstractVector{T}, scal) where {T}
+    k = 1
+    m = size(mat, 1)
+    @inbounds for j in 1:m, i in 1:j
+        if i == j
+            mat[i, j] = vec[k]
+        else
+            mat[i, j] = vec[k] * scal
+        end
+        k += 1
+    end
+    return mat
+end
+
+function vec_to_mat_U_scaled!(mat::AbstractMatrix{Complex{T}}, vec::AbstractVector{T}) where {T}
+    k = 1
+    m = size(mat, 1)
+    @inbounds for j in 1:m, i in 1:j
+        if i == j
+            mat[i, j] = vec[k]
+            k += 1
+        else
+            mat[i, j] = Complex(vec[k], -vec[k + 1]) * scal
+            k += 2
+        end
+    end
+    return mat
 end

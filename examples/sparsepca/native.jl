@@ -174,4 +174,4 @@ SO = Hypatia.Solvers
 test_sparsepca.(
     sparsepca2,
     T = Float64,
-    test_options = (solver_options = (verbose = true,), stepper_options = (max_nbhd = 0.7,)))
+    test_options = (system_solver = SO.QRCholCombinedHSDSystemSolver, solver_options = (verbose = true,), stepper_options = (max_nbhd = 0.7,)))
