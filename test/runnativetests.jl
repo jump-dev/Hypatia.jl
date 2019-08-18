@@ -11,14 +11,14 @@ const SO = Hypatia.Solvers
 
 real_types = [
     Float64,
-    Float32,
-    BigFloat,
+    # Float32,
+    # BigFloat,
     ]
 
 system_solvers = [
-    SO.QRCholCombinedHSDSystemSolver,
-    SO.SymIndefCombinedHSDSystemSolver,
-    SO.NaiveElimCombinedHSDSystemSolver,
+    # SO.QRCholCombinedHSDSystemSolver,
+    # SO.SymIndefCombinedHSDSystemSolver,
+    # SO.NaiveElimCombinedHSDSystemSolver,
     SO.NaiveCombinedHSDSystemSolver,
     ]
 
