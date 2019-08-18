@@ -124,11 +124,12 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveElimC
     y2 .= zero(T)
     z1 .= solver.z_residual
     z2 .= zero(T)
+    sqrtmu = sqrt(mu)
     for k in eachindex(cones)
         duals_k = solver.point.dual_views[k]
-        g = Cones.grad(cones[k])
+        grad_k = Cones.grad(cones[k])
         @. s1_k[k] = -duals_k
-        @. s2_k[k] = -duals_k - mu * g
+        @. s2_k[k] = -duals_k - grad_k * sqrtmu
     end
     tau_rhs = [-kap, -kap + mu / tau]
     kap_rhs = [kap + solver.primal_obj_t - solver.dual_obj_t, zero(T)]
@@ -142,16 +143,16 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveElimC
         cone_k = cones[k]
         idxs = model.cone_idxs[k]
         rows = (n + p) .+ idxs
-        H = Cones.hess(cones[k])
+        H = Cones.hess(cone_k)
         if Cones.use_dual(cone_k)
             # -G_k*x + mu*H_k*z_k + h_k*tau = zrhs_k + srhs_k
-            lhs[rows, rows] .= mu * H
+            lhs[rows, rows] .= H
         else
             # -mu*H_k*G_k*x + z_k + mu*H_k*h_k*tau = mu*H_k*zrhs_k + srhs_k
-            lhs[rows, 1:n] .= -mu * H * model.G[idxs, :]
-            lhs[rows, end] .= mu * H * model.h[idxs]
-            z1_k[k] .= mu * H * z1_k[k]
-            z2_k[k] .= mu * H * z2_k[k]
+            lhs[rows, 1:n] .= -H * model.G[idxs, :]
+            lhs[rows, end] .= H * model.h[idxs]
+            z1_k[k] .= H * z1_k[k]
+            z2_k[k] .= H * z2_k[k]
         end
     end
     z1 .+= s1

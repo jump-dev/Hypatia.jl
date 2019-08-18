@@ -11,7 +11,7 @@ barrier from "Barrier Functions in Interior Point Methods" by Osman Guler
 mutable struct EpiNormInf{T <: Real} <: Cone{T}
     use_dual::Bool
     dim::Int
-    point::AbstractVector{T}
+    point::Vector{T}
 
     feas_updated::Bool
     grad_updated::Bool
@@ -44,6 +44,7 @@ reset_data(cone::EpiNormInf) = (cone.feas_updated = cone.grad_updated = cone.hes
 function setup_data(cone::EpiNormInf{T}) where {T <: Real}
     reset_data(cone)
     dim = cone.dim
+    cone.point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
