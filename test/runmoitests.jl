@@ -15,7 +15,7 @@ real_types = [
 
 dense_options = [
     true,
-    false,
+    # false,
     ]
 
 system_solvers = [
