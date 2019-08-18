@@ -10,17 +10,17 @@ import Hypatia
 const CO = Hypatia.Cones
 # const MU = Hypatia.ModelUtilities
 
-function test_barrier_oracles(cone::CO.Cone{T}, barrier::Function; noise = 0.0) where {T <: Real}
+function test_barrier_oracles(cone::CO.Cone{T}, barrier::Function; noise = 0) where {T <: Real}
     CO.setup_data(cone)
     dim = CO.dimension(cone)
     point = Vector{T}(undef, dim)
     CO.set_initial_point(point, cone)
     if !iszero(noise)
-        point += T(noise) * (rand(T, dim) .- T(0.5))
+        point += T(noise) * (rand(T, dim) .- inv(T(2)))
     end
     CO.load_point(cone, point)
 
-    tol = 1e4 * eps(T)
+    tol = 10000 * eps(T)
 
     @test cone.point == point
     @test CO.is_feas(cone)
@@ -31,10 +31,8 @@ function test_barrier_oracles(cone::CO.Cone{T}, barrier::Function; noise = 0.0) 
     @test hess * point ≈ -grad atol=tol rtol=tol
 
     if T in (Float32, Float64) # NOTE can only use BLAS floats with ForwardDiff barriers, see https://github.com/JuliaDiff/DiffResults.jl/pull/9#issuecomment-497853361
-        FD_grad = ForwardDiff.gradient(barrier, point)
-        FD_hess = ForwardDiff.hessian(barrier, point)
-        @test FD_grad ≈ grad atol=tol rtol=tol
-        @test FD_hess ≈ hess atol=tol rtol=tol
+        @test ForwardDiff.gradient(barrier, point) ≈ grad atol=tol rtol=tol
+        @test ForwardDiff.hessian(barrier, point) ≈ hess atol=tol rtol=tol
     end
 
     inv_hess = CO.inv_hess(cone)

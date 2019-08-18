@@ -508,7 +508,7 @@ function MOI.optimize!(opt::Optimizer{T}) where {T <: Real}
     solver = Solvers.HSDSolver{T}(
         model, stepper = stepper,
         verbose = opt.verbose, max_iters = opt.max_iters, time_limit = opt.time_limit,
-        tol_rel_opt = opt.tol_rel_opt, tol_abs_opt = opt.tol_abs_opt, tol_feas = opt.tol_feas,
+        tol_rel_opt = opt.tol_rel_opt, tol_abs_opt = opt.tol_abs_opt, tol_feas = opt.tol_feas, tol_slow = opt.tol_slow,
         )
     Solvers.solve(solver)
     r = Solvers.get_certificates(solver, model, test = opt.test_certificates)

@@ -68,7 +68,7 @@ function test_moi(
             tol_rel_opt = 2e-8,
             tol_abs_opt = 2e-8,
             tol_feas = 1e-8,
-            tol_slow = 1e-6,
+            tol_slow = 1e-7,
             )
         )
 
