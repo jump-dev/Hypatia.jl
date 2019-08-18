@@ -139,7 +139,7 @@ function update_hess(cone::EpiNormSpectral)
     # calculate d^2F / dW_ij dW_kl, p and q are linear indices for (i, j) and (k, l)
     @inbounds for j in 1:m
         @views mul!(tmpn, Zi, W[:, j])
-        @. tmpnn /= u
+        @. tmpn /= u
         for i in 1:n
             # tmpnn evaluates to Zi * dZdW_ij * Zi
             @views mul!(tmpnn, Zi[:, i], tmpn')
