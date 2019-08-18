@@ -12,8 +12,8 @@ mutable struct WSOSPolyInterpMat{T <: Real} <: Cone{T}
     R::Int
     U::Int
     ipwt::Vector{Matrix{T}}
+    point::Vector{T}
 
-    point::AbstractVector{T}
     g::Vector{T}
     H::Matrix{T}
     H2::Matrix{T}
@@ -47,6 +47,7 @@ function setup_data(cone::WSOSPolyInterpMat{T}) where {T <: Real}
     U = cone.U
     R = cone.R
     ipwt = cone.ipwt
+    cone.point = zeros(T, dim)
     cone.g = Vector{T}(undef, dim)
     cone.H = zeros(T, dim, dim)
     cone.H2 = similar(cone.H)

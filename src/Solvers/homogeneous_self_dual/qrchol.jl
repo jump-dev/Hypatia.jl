@@ -194,7 +194,6 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
     @. y3 = zero(T)
 
     sqrtmu = sqrt(mu)
-
     @. z1_temp = model.h
     @. z2_temp = -solver.z_residual
     for k in eachindex(cones)
@@ -202,13 +201,10 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
         duals_k = solver.point.dual_views[k]
         grad_k = Cones.grad(cone_k)
         if Cones.use_dual(cone_k)
-            @. z1_temp_k[k] /= mu
-            @. z2_temp_k[k] = (duals_k + z2_temp_k[k]) / mu
-            @. z3_temp_k[k] = duals_k / mu + grad_k / sqrtmu
+            @. z2_temp_k[k] = duals_k + z2_temp_k[k]
+            @. z3_temp_k[k] = duals_k + grad_k * sqrtmu
             Cones.inv_hess_prod!(z_k[k], z_temp_k[k], cone_k)
         else
-            @. z1_temp_k[k] *= mu
-            @. z2_temp_k[k] *= mu
             Cones.hess_prod!(z1_k[k], z1_temp_k[k], cone_k)
             Cones.hess_prod!(z2_k[k], z2_temp_k[k], cone_k)
             @. z2_k[k] += duals_k
@@ -221,10 +217,8 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
             cone_k = cones[k]
             if Cones.use_dual(cone_k)
                 Cones.inv_hess_prod!(prod_k[k], arr_k[k], cone_k)
-                # prod_k[k] ./= mu
             else
                 Cones.hess_prod!(prod_k[k], arr_k[k], cone_k)
-                # prod_k[k] .*= mu
             end
         end
     end
@@ -312,182 +306,3 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
 
     return (x2, x3, y2, y3, z2, z3, z2_temp, z3_temp, tau_pred, tau_corr, kap_pred, kap_corr)
 end
-
-
-
-# function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholCombinedHSDSystemSolver{T}) where {T <: Real}
-#     model = solver.model
-#     cones = model.cones
-#     cone_idxs = model.cone_idxs
-#     mu = solver.mu
-#
-#     xi = system_solver.xi
-#     yi = system_solver.yi
-#     zi = system_solver.zi
-#     xi1 = system_solver.xi1
-#     xi2 = system_solver.xi2
-#     x1 = system_solver.x1
-#     y1 = system_solver.y1
-#     z1 = system_solver.z1
-#     x2 = system_solver.x2
-#     y2 = system_solver.y2
-#     z2 = system_solver.z2
-#     x3 = system_solver.x3
-#     y3 = system_solver.y3
-#     z3 = system_solver.z3
-#     z_k = system_solver.z_k
-#     z1_k = system_solver.z1_k
-#     z2_k = system_solver.z2_k
-#     z3_k = system_solver.z3_k
-#     zi_temp = system_solver.zi_temp
-#     z1_temp = system_solver.z1_temp
-#     z2_temp = system_solver.z2_temp
-#     z3_temp = system_solver.z3_temp
-#     z_temp_k = system_solver.z_temp_k
-#     z1_temp_k = system_solver.z1_temp_k
-#     z2_temp_k = system_solver.z2_temp_k
-#     z3_temp_k = system_solver.z3_temp_k
-#
-#     GQ1 = system_solver.GQ1
-#     GQ2 = system_solver.GQ2
-#     QpbxGHbz = system_solver.QpbxGHbz
-#     Q1pbxGHbz = system_solver.Q1pbxGHbz
-#     Q2div = system_solver.Q2div
-#     GQ1x = system_solver.GQ1x
-#     HGQ1x = system_solver.HGQ1x
-#     HGQ2 = system_solver.HGQ2
-#     Q2GHGQ2 = system_solver.Q2GHGQ2
-#     Gxi = system_solver.Gxi
-#     HGxi = system_solver.HGxi
-#
-#     HGQ1x_k = system_solver.HGQ1x_k
-#     GQ1x_k = system_solver.GQ1x_k
-#     HGQ2_k = system_solver.HGQ2_k
-#     GQ2_k = system_solver.GQ2_k
-#     HGxi_k = system_solver.HGxi_k
-#     Gxi_k = system_solver.Gxi_k
-#
-#     @. x1 = -model.c
-#     @. x2 = solver.x_residual
-#     @. x3 = zero(T)
-#     @. y1 = model.b
-#     @. y2 = -solver.y_residual
-#     @. y3 = zero(T)
-#
-#     @. z1_temp = model.h
-#     @. z2_temp = -solver.z_residual
-#     for k in eachindex(cones)
-#         cone_k = cones[k]
-#         duals_k = solver.point.dual_views[k]
-#         grad_k = Cones.grad(cone_k)
-#         if Cones.use_dual(cone_k)
-#             @. z1_temp_k[k] /= mu
-#             @. z2_temp_k[k] = (duals_k + z2_temp_k[k]) / mu
-#             @. z3_temp_k[k] = duals_k / mu + grad_k
-#             Cones.inv_hess_prod!(z_k[k], z_temp_k[k], cone_k)
-#         else
-#             @. z1_temp_k[k] *= mu
-#             @. z2_temp_k[k] *= mu
-#             Cones.hess_prod!(z1_k[k], z1_temp_k[k], cone_k)
-#             Cones.hess_prod!(z2_k[k], z2_temp_k[k], cone_k)
-#             @. z2_k[k] += duals_k
-#             @. z3_k[k] = duals_k + grad_k * mu
-#         end
-#     end
-#
-#     function block_hessian_product!(prod_k, arr_k)
-#         for k in eachindex(cones)
-#             cone_k = cones[k]
-#             if Cones.use_dual(cone_k)
-#                 Cones.inv_hess_prod!(prod_k[k], arr_k[k], cone_k)
-#                 prod_k[k] ./= mu
-#             else
-#                 Cones.hess_prod!(prod_k[k], arr_k[k], cone_k)
-#                 prod_k[k] .*= mu
-#             end
-#         end
-#     end
-#
-#     ldiv!(model.Ap_R', yi)
-#
-#     copyto!(QpbxGHbz, xi)
-#     mul!(QpbxGHbz, model.G', zi, true, true)
-#     lmul!(model.Ap_Q', QpbxGHbz)
-#
-#     if !iszero(size(Q2div, 1))
-#         mul!(GQ1x, GQ1, yi)
-#         block_hessian_product!(HGQ1x_k, GQ1x_k)
-#         mul!(Q2div, GQ2', HGQ1x, -1, true)
-#
-#         block_hessian_product!(HGQ2_k, GQ2_k)
-#         mul!(Q2GHGQ2, GQ2', HGQ2)
-#
-#         if system_solver.use_sparse
-#             F = ldlt(Symmetric(Q2GHGQ2), check = false) # TODO not implemented for generic reals
-#             if !issuccess(F)
-#                 println("sparse linear system matrix factorization failed")
-#                 mul!(Q2GHGQ2, GQ2', HGQ2)
-#                 F = ldlt(Symmetric(Q2GHGQ2), shift = T(1e-4), check = false)
-#                 if !issuccess(F)
-#                     error("could not fix failure of positive definiteness (mu is $mu); terminating")
-#                 end
-#             end
-#             Q2div .= F \ Q2div # TODO eliminate allocs (see https://github.com/JuliaLang/julia/issues/30084)
-#         else
-#             F = hyp_chol!(Symmetric(Q2GHGQ2)) # TODO prealloc blasreal cholesky auxiliary vectors using posvx
-#             if !isposdef(F)
-#                 println("dense linear system matrix factorization failed")
-#                 mul!(Q2GHGQ2, GQ2', HGQ2)
-#                 Q2GHGQ2 += T(1e-8) * I
-#                 if T <: BlasReal
-#                     F = bunchkaufman!(Symmetric(Q2GHGQ2), true, check = false) # TODO prealloc with old sysvx code; not implemented for generic reals
-#                     # F = lu!(Symmetric(Q2GHGQ2), check = false) # TODO prealloc with old sysvx code; not implemented for generic reals
-#                     if !issuccess(F)
-#                         error("could not fix failure of positive definiteness (mu is $mu); terminating")
-#                     end
-#                 else
-#                     F = hyp_chol!(Symmetric(Q2GHGQ2)) # TODO prealloc blasreal cholesky auxiliary vectors using posvx
-#                     if !isposdef(F)
-#                         error("could not fix failure of positive definiteness (mu is $mu); terminating")
-#                     end
-#                 end
-#             end
-#             ldiv!(F, Q2div)
-#         end
-#     end
-#
-#     copyto!(xi1, yi)
-#     copyto!(xi2, Q2div)
-#     lmul!(model.Ap_Q, xi)
-#
-#     mul!(Gxi, model.G, xi)
-#     block_hessian_product!(HGxi_k, Gxi_k)
-#
-#     @. zi = HGxi - zi
-#
-#     if !iszero(length(yi))
-#         copyto!(yi, Q1pbxGHbz)
-#         mul!(yi, GQ1', HGxi, -1, true)
-#         ldiv!(model.Ap_R, yi)
-#     end
-#
-#     # lift to HSDE space
-#     tau_denom = mu / solver.tau / solver.tau - dot(model.c, x1) - dot(model.b, y1) - dot(model.h, z1)
-#
-#     function lift!(x, y, z, s, tau_rhs, kap_rhs)
-#         tau_sol = (tau_rhs + kap_rhs + dot(model.c, x) + dot(model.b, y) + dot(model.h, z)) / tau_denom
-#         @. x += tau_sol * x1
-#         @. y += tau_sol * y1
-#         @. z += tau_sol * z1
-#         copyto!(s, model.h)
-#         mul!(s, model.G, x, -1, tau_sol)
-#         kap_sol = -dot(model.c, x) - dot(model.b, y) - dot(model.h, z) - tau_rhs
-#         return (tau_sol, kap_sol)
-#     end
-#
-#     (tau_pred, kap_pred) = lift!(x2, y2, z2, z2_temp, solver.kap + solver.primal_obj_t - solver.dual_obj_t, -solver.kap)
-#     @. z2_temp -= solver.z_residual
-#     (tau_corr, kap_corr) = lift!(x3, y3, z3, z3_temp, zero(T), -solver.kap + mu / solver.tau)
-#
-#     return (x2, x3, y2, y3, z2, z3, z2_temp, z3_temp, tau_pred, tau_corr, kap_pred, kap_corr)
-# end

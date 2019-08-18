@@ -15,7 +15,7 @@ mutable struct HypoGeomean{T <: Real} <: Cone{T}
     use_dual::Bool
     dim::Int
     alpha::Vector{T}
-    point::AbstractVector{T}
+    point::Vector{T}
 
     feas_updated::Bool
     grad_updated::Bool
@@ -52,6 +52,7 @@ HypoGeomean{T}(alpha::Vector{T}) where {T <: Real} = HypoGeomean{T}(alpha, false
 function setup_data(cone::HypoGeomean{T}) where {T <: Real}
     reset_data(cone)
     dim = cone.dim
+    cone.point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.tmp_hess = Symmetric(zeros(T, dim, dim), :U)

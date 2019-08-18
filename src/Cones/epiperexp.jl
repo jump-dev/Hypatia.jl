@@ -15,7 +15,7 @@ TODO compare alternative barrier -log(u - v*sum(wi -> exp(wi/v), w)) - log(u) - 
 mutable struct EpiPerExp{T <: Real} <: Cone{T}
     use_dual::Bool
     dim::Int
-    point::AbstractVector{T}
+    point::Vector{T}
 
     feas_updated::Bool
     grad_updated::Bool
@@ -53,6 +53,7 @@ EpiPerExp{T}(dim::Int) where {T <: Real} = EpiPerExp{T}(dim, false)
 function setup_data(cone::EpiPerExp{T}) where {T <: Real}
     reset_data(cone)
     dim = cone.dim
+    cone.point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.tmp_hess = Symmetric(zeros(T, dim, dim), :U)

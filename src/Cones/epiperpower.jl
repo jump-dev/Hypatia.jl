@@ -15,7 +15,7 @@ TODO although this barrier has a lower parameter, maybe the more standard barrie
 mutable struct EpiPerPower{T <: Real} <: Cone{T}
     use_dual::Bool
     alpha::T
-    point::AbstractVector{T}
+    point::Vector{T}
 
     feas_updated::Bool
     grad_updated::Bool
@@ -51,6 +51,7 @@ EpiPerPower{T}(alpha::T) where {T <: Real} = EpiPerPower{T}(alpha, false)
 
 function setup_data(cone::EpiPerPower{T}) where {T <: Real}
     reset_data(cone)
+    cone.point = zeros(T, 3)
     cone.grad = zeros(T, 3)
     cone.hess = Symmetric(zeros(T, 3, 3), :U)
     cone.tmp_hess = Symmetric(zeros(T, 3, 3), :U)
