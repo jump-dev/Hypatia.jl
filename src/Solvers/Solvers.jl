@@ -87,18 +87,16 @@ function get_certificates(
             @test G * x + s ≈ h atol=atol rtol=rtol
             @test G' * z + A' * y ≈ -c atol=atol rtol=rtol
             @test dot(s, z) ≈ zero(T) atol=atol rtol=rtol
-            @test dot(c, x) ≈ primal_obj atol=atol^2 rtol=rtol^2
-            @test dot(b, y) + dot(h, z) ≈ -dual_obj atol=atol^2 rtol=rtol^2
+            @test dot(c, x) + model.obj_offset ≈ primal_obj atol=atol^2 rtol=rtol^2
+            @test -dot(b, y) - dot(h, z) + model.obj_offset ≈ dual_obj atol=atol^2 rtol=rtol^2
         elseif status == :PrimalInfeasible
-            # @test isnan(primal_obj)
-            @test dual_obj > zero(T)
-            @test dot(b, y) + dot(h, z) ≈ -dual_obj atol=atol^2 rtol=rtol^2
+            @test dual_obj > model.obj_offset
+            @test -dot(b, y) - dot(h, z) + model.obj_offset ≈ dual_obj atol=atol^2 rtol=rtol^2
             # TODO conv check causes us to stop before this is satisfied to sufficient tolerance - maybe add option to keep going
             # @test G' * z ≈ -A' * y atol=atol rtol=rtol
         elseif status == :DualInfeasible
-            # @test isnan(dual_obj)
-            @test primal_obj < zero(T)
-            @test dot(c, x) ≈ primal_obj atol=atol^2 rtol=rtol^2
+            @test primal_obj < model.obj_offset
+            @test dot(c, x) + model.obj_offset ≈ primal_obj atol=atol^2 rtol=rtol^2
             # TODO conv check causes us to stop before this is satisfied to sufficient tolerance - maybe add option to keep going
             # @test G * x ≈ -s atol=atol rtol=rtol
             # @test A * x ≈ zeros(T, length(y)) atol=atol rtol=rtol
@@ -118,6 +116,7 @@ function build_solve_check(
     G,
     h::Vector{T},
     cones::Vector{Cones.Cone{T}};
+    obj_offset::T = zero(T),
     test::Bool = true,
     linear_model::Type{<:Models.LinearModel} = Models.PreprocessedLinearModel,
     system_solver::Type{<:CombinedHSDSystemSolver} = Solvers.QRCholCombinedHSDSystemSolver,
@@ -128,7 +127,7 @@ function build_solve_check(
     atol::Real = max(1e-5, sqrt(sqrt(eps(T)))),
     rtol::Real = atol,
     ) where {T <: Real}
-    model = linear_model{T}(c, A, b, G, h, cones; linear_model_options...)
+    model = linear_model{T}(c, A, b, G, h, cones; obj_offset = obj_offset, linear_model_options...)
     stepper = CombinedHSDStepper{T}(model, system_solver = system_solver{T}(model; system_solver_options...); stepper_options...)
     solver = HSDSolver{T}(model, stepper = stepper; solver_options...)
     solve(solver)

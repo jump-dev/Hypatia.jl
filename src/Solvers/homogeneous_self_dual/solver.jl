@@ -235,8 +235,8 @@ function calc_convergence_params(solver::HSDSolver{T}) where {T <: Real}
 
     solver.primal_obj_t = dot(model.c, point.x)
     solver.dual_obj_t = -dot(model.b, point.y) - dot(model.h, point.z)
-    solver.primal_obj = solver.primal_obj_t / solver.tau
-    solver.dual_obj = solver.dual_obj_t / solver.tau
+    solver.primal_obj = solver.primal_obj_t / solver.tau + model.obj_offset
+    solver.dual_obj = solver.dual_obj_t / solver.tau + model.obj_offset
     solver.gap = dot(point.z, point.s)
     if solver.primal_obj < zero(T)
         solver.rel_gap = solver.gap / -solver.primal_obj
