@@ -8,13 +8,12 @@ using LinearAlgebra
 import Random
 using Test
 import Hypatia
-import Hypatia.HypReal
-import Hypatia.HypBlockMatrix
+import Hypatia.BlockMatrix
 const CO = Hypatia.Cones
 const HYP = Hypatia
 
 function expdesign(
-    T::Type{<:HypReal},
+    T::Type{<:Real},
     q::Int,
     p::Int,
     n::Int,
@@ -33,7 +32,6 @@ function expdesign(
     h_nmax = fill(T(nmax), p)
 
     cones = CO.Cone{T}[CO.Nonnegative{T}(p), CO.Nonnegative{T}(p)]
-    cone_idxs = [1:p, (p + 1):(2 * p)]
 
     if use_logdet
         # maximize the hypograph variable of the logdet cone
@@ -53,11 +51,10 @@ function expdesign(
         # pad with hypograph variable and perspective variable
         h_logdet = vcat(zero(T), one(T), zeros(T, dimvec))
         push!(cones, CO.HypoPerLogdetTri{T}(dimvec + 2))
-        push!(cone_idxs, (2 * p + 1):(2 * p + dimvec + 2))
 
         if use_linops
-            A = HypBlockMatrix{T}(1, p + 1, [A], [1:1], [2:(p + 1)])
-            G = HypBlockMatrix{T}(
+            A = BlockMatrix{T}(1, p + 1, [A], [1:1], [2:(p + 1)])
+            G = BlockMatrix{T}(
                 2 * p + 2 + dimvec,
                 p + 1,
                 [-I, -I, -ones(T, 1, 1), G_logdet],
@@ -130,7 +127,6 @@ function expdesign(
 
         h_psd = zeros(T, dimvec)
         push!(cones, CO.PosSemidefTri{T, T}(dimvec))
-        push!(cone_idxs, (2 * p + 1):(2 * p + dimvec))
 
         if use_sumlog
             G_logvars = zeros(T, q, num_trivars)
@@ -147,7 +143,6 @@ function expdesign(
                 ]
             h_log = vcat(zero(T), one(T), zeros(T, q))
             push!(cones, CO.HypoPerLog{T}(q + 2))
-            push!(cone_idxs, (2 * p + dimvec + 1):(2 * p + dimvec + 2 + q))
         else
             G_log = zeros(T, 3 * q, dimx)
             h_log = zeros(T, 3 * q)
@@ -159,15 +154,13 @@ function expdesign(
                 h_log[offset + 1] = 1
                 # diagonal element in the triangular matrix
                 G_log[offset + 2, p + diag_idx(i)] = -1
-                cone_offset = 2 * p + dimvec + offset
                 push!(cones, CO.HypoPerLog{T}(3))
-                push!(cone_idxs, cone_offset:(cone_offset + 2))
                 offset += 3
             end
         end
         if use_linops
-            A = HypBlockMatrix{T}(1, p + padx, [A], [1:1], [1:p])
-            G = HypBlockMatrix{T}(
+            A = BlockMatrix{T}(1, p + padx, [A], [1:1], [1:p])
+            G = BlockMatrix{T}(
                 2 * p + dimvec + size(G_log, 1),
                 dimx,
                 [-I, -I, G_psd, G_log],
@@ -185,23 +178,23 @@ function expdesign(
         h = vcat(h_nonneg, h_nmax, h_psd, h_log)
     end
 
-    return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs)
+    return (c = c, A = A, b = b, G = G, h = h, cones = cones)
 end
 
-expdesign1(T::Type{<:HypReal}) = expdesign(T, 25, 75, 125, 5, use_logdet = true)
-expdesign2(T::Type{<:HypReal}) = expdesign(T, 10, 30, 50, 5, use_logdet = true)
-expdesign3(T::Type{<:HypReal}) = expdesign(T, 5, 15, 25, 5, use_logdet = true)
-expdesign4(T::Type{<:HypReal}) = expdesign(T, 4, 8, 12, 3, use_logdet = true)
-expdesign5(T::Type{<:HypReal}) = expdesign(T, 3, 5, 7, 2, use_logdet = true)
-expdesign6(T::Type{<:HypReal}) = expdesign(T, 25, 75, 125, 5, use_logdet = false)
-expdesign7(T::Type{<:HypReal}) = expdesign(T, 10, 30, 50, 5, use_logdet = false)
-expdesign8(T::Type{<:HypReal}) = expdesign(T, 5, 15, 25, 5, use_logdet = false)
-expdesign9(T::Type{<:HypReal}) = expdesign(T, 4, 8, 12, 3, use_logdet = false)
-expdesign10(T::Type{<:HypReal}) = expdesign(T, 3, 5, 7, 2, use_logdet = false)
-expdesign11(T::Type{<:HypReal}) = expdesign(T, 4, 8, 12, 3, use_logdet = true, use_linops = true)
-expdesign12(T::Type{<:HypReal}) = expdesign(T, 4, 8, 12, 3, use_logdet = false, use_sumlog = false, use_linops = true)
-expdesign13(T::Type{<:HypReal}) = expdesign(T, 4, 8, 12, 3, use_logdet = false, use_sumlog = false, use_linops = false)
-expdesign14(T::Type{<:HypReal}) = expdesign(T, 4, 8, 12, 3, use_logdet = false, use_sumlog = true, use_linops = true)
+expdesign1(T::Type{<:Real}) = expdesign(T, 25, 75, 125, 5, use_logdet = true)
+expdesign2(T::Type{<:Real}) = expdesign(T, 10, 30, 50, 5, use_logdet = true)
+expdesign3(T::Type{<:Real}) = expdesign(T, 5, 15, 25, 5, use_logdet = true)
+expdesign4(T::Type{<:Real}) = expdesign(T, 4, 8, 12, 3, use_logdet = true)
+expdesign5(T::Type{<:Real}) = expdesign(T, 3, 5, 7, 2, use_logdet = true)
+expdesign6(T::Type{<:Real}) = expdesign(T, 25, 75, 125, 5, use_logdet = false)
+expdesign7(T::Type{<:Real}) = expdesign(T, 10, 30, 50, 5, use_logdet = false)
+expdesign8(T::Type{<:Real}) = expdesign(T, 5, 15, 25, 5, use_logdet = false)
+expdesign9(T::Type{<:Real}) = expdesign(T, 4, 8, 12, 3, use_logdet = false)
+expdesign10(T::Type{<:Real}) = expdesign(T, 3, 5, 7, 2, use_logdet = false)
+expdesign11(T::Type{<:Real}) = expdesign(T, 4, 8, 12, 3, use_logdet = true, use_linops = true)
+expdesign12(T::Type{<:Real}) = expdesign(T, 4, 8, 12, 3, use_logdet = false, use_sumlog = false, use_linops = true)
+expdesign13(T::Type{<:Real}) = expdesign(T, 4, 8, 12, 3, use_logdet = false, use_sumlog = false, use_linops = false)
+expdesign14(T::Type{<:Real}) = expdesign(T, 4, 8, 12, 3, use_logdet = false, use_sumlog = true, use_linops = true)
 
 instances_expdesign_all = [
     expdesign1,
@@ -226,11 +219,11 @@ instances_expdesign_few = [
     expdesign10,
     ]
 
-function test_expdesign(instance::Function; T::Type{<:HypReal} = Float64, test_options::NamedTuple = NamedTuple(), rseed::Int = 1)
+function test_expdesign(instance::Function; T::Type{<:Real} = Float64, test_options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)
     tol = max(1e-5, sqrt(sqrt(eps(T))))
     d = instance(T)
-    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs; test_options..., atol = tol, rtol = tol)
+    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; test_options..., atol = tol, rtol = tol)
     @test r.status == :Optimal
     return
 end

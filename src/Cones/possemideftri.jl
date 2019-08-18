@@ -15,12 +15,12 @@ TODO
 - eliminate allocations for inverse-finding
 =#
 
-mutable struct PosSemidefTri{T <: HypReal, R <: HypRealOrComplex{T}} <: Cone{T}
+mutable struct PosSemidefTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     use_dual::Bool
     dim::Int
     side::Int
-    point::AbstractVector{T}
     is_complex::Bool
+    point::Vector{T}
 
     feas_updated::Bool
     grad_updated::Bool
@@ -39,7 +39,7 @@ mutable struct PosSemidefTri{T <: HypReal, R <: HypRealOrComplex{T}} <: Cone{T}
     fact_mat
     point_sqrt
 
-    function PosSemidefTri{T, R}(dim::Int, is_dual::Bool) where {R <: HypRealOrComplex{T}} where {T <: HypReal}
+    function PosSemidefTri{T, R}(dim::Int, is_dual::Bool) where {R <: RealOrComplex{T}} where {T <: Real}
         cone = new{T, R}()
         cone.use_dual = is_dual
         cone.dim = dim # real vector dimension
@@ -57,13 +57,14 @@ mutable struct PosSemidefTri{T <: HypReal, R <: HypRealOrComplex{T}} <: Cone{T}
     end
 end
 
-PosSemidefTri{T, R}(dim::Int) where {R <: HypRealOrComplex{T}} where {T <: HypReal} = PosSemidefTri{T, R}(dim, false)
+PosSemidefTri{T, R}(dim::Int) where {R <: RealOrComplex{T}} where {T <: Real} = PosSemidefTri{T, R}(dim, false)
 
 reset_data(cone::PosSemidefTri) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.inv_hess_prod_updated = false)
 
-function setup_data(cone::PosSemidefTri{T, R}) where {R <: HypRealOrComplex{T}} where {T <: HypReal}
+function setup_data(cone::PosSemidefTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     reset_data(cone)
     dim = cone.dim
+    cone.point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
@@ -107,7 +108,7 @@ function update_grad(cone::PosSemidefTri)
 end
 
 # TODO parallelize
-function _build_hess(H::Matrix{T}, mat::Matrix{T}, is_inv::Bool) where {T <: HypReal}
+function _build_hess(H::Matrix{T}, mat::Matrix{T}, is_inv::Bool) where {T <: Real}
     side = size(mat, 1)
     scale1 = (is_inv ? inv(T(2)) : T(2))
     scale2 = (is_inv ? one(T) : scale1)
@@ -132,7 +133,7 @@ function _build_hess(H::Matrix{T}, mat::Matrix{T}, is_inv::Bool) where {T <: Hyp
     return H
 end
 
-function _build_hess(H::Matrix{T}, mat::Matrix{Complex{T}}, is_inv::Bool) where {T <: HypReal}
+function _build_hess(H::Matrix{T}, mat::Matrix{Complex{T}}, is_inv::Bool) where {T <: Real}
     side = size(mat, 1)
     scale1 = (is_inv ? inv(T(2)) : T(2))
     scale2 = (is_inv ? one(T) : scale1)

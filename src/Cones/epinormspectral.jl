@@ -13,12 +13,12 @@ TODO eliminate allocations
 TODO type auxiliary fields
 =#
 
-mutable struct EpiNormSpectral{T <: HypReal} <: Cone{T}
+mutable struct EpiNormSpectral{T <: Real} <: Cone{T}
     use_dual::Bool
     dim::Int
     n::Int
     m::Int
-    point::AbstractVector{T}
+    point::Vector{T}
 
     feas_updated::Bool
     grad_updated::Bool
@@ -38,7 +38,7 @@ mutable struct EpiNormSpectral{T <: HypReal} <: Cone{T}
     tmp_hess::Symmetric{T, Matrix{T}}
     hess_fact # TODO prealloc
 
-    function EpiNormSpectral{T}(n::Int, m::Int, is_dual::Bool) where {T <: HypReal}
+    function EpiNormSpectral{T}(n::Int, m::Int, is_dual::Bool) where {T <: Real}
         @assert n <= m
         dim = n * m + 1
         cone = new{T}()
@@ -50,11 +50,12 @@ mutable struct EpiNormSpectral{T <: HypReal} <: Cone{T}
     end
 end
 
-EpiNormSpectral{T}(n::Int, m::Int) where {T <: HypReal} = EpiNormSpectral{T}(n, m, false)
+EpiNormSpectral{T}(n::Int, m::Int) where {T <: Real} = EpiNormSpectral{T}(n, m, false)
 
-function setup_data(cone::EpiNormSpectral{T}) where {T <: HypReal}
+function setup_data(cone::EpiNormSpectral{T}) where {T <: Real}
     reset_data(cone)
     dim = cone.dim
+    cone.point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.tmp_hess = Symmetric(zeros(T, dim, dim), :U)

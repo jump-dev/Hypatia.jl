@@ -17,7 +17,7 @@ const CO = Hypatia.Cones
 const MU = Hypatia.ModelUtilities
 
 function envelope(
-    T::Type{<:HypReal},
+    T::Type{<:Real},
     npoly::Int,
     rand_halfdeg::Int,
     n::Int,
@@ -54,17 +54,16 @@ function envelope(
     end
 
     cones = CO.Cone{T}[CO.WSOSPolyInterp{T, T}(U, [P0, PWts...], !primal_wsos) for k in 1:npoly]
-    cone_idxs = [(1 + (k - 1) * U):(k * U) for k in 1:npoly]
 
-    return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs)
+    return (c = c, A = A, b = b, G = G, h = h, cones = cones)
 end
 
-envelope1(T::Type{<:HypReal}) = envelope(T, 2, 5, 2, 6)
-envelope2(T::Type{<:HypReal}) = envelope(T, 3, 3, 3, 3)
-envelope3(T::Type{<:HypReal}) = envelope(T, 2, 30, 1, 30)
-envelope4(T::Type{<:HypReal}) = envelope(T, 2, 5, 2, 6, primal_wsos = false)
-envelope5(T::Type{<:HypReal}) = envelope(T, 3, 3, 3, 3, primal_wsos = false)
-envelope6(T::Type{<:HypReal}) = envelope(T, 2, 30, 1, 30, primal_wsos = false)
+envelope1(T::Type{<:Real}) = envelope(T, 2, 5, 2, 6)
+envelope2(T::Type{<:Real}) = envelope(T, 3, 3, 3, 3)
+envelope3(T::Type{<:Real}) = envelope(T, 2, 30, 1, 30)
+envelope4(T::Type{<:Real}) = envelope(T, 2, 5, 2, 6, primal_wsos = false)
+envelope5(T::Type{<:Real}) = envelope(T, 3, 3, 3, 3, primal_wsos = false)
+envelope6(T::Type{<:Real}) = envelope(T, 2, 30, 1, 30, primal_wsos = false)
 
 instances_envelope_all = [
     envelope1,
@@ -79,11 +78,11 @@ instances_envelope_few = [
     envelope5,
     ]
 
-function test_envelope(instance::Function; T::Type{<:HypReal} = Float64, test_options::NamedTuple = NamedTuple(), rseed::Int = 1)
+function test_envelope(instance::Function; T::Type{<:Real} = Float64, test_options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)
     tol = max(1e-5, sqrt(sqrt(eps(T))))
     d = instance(T)
-    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs; test_options..., atol = tol, rtol = tol)
+    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; test_options..., atol = tol, rtol = tol)
     @test r.status == :Optimal
     return
 end

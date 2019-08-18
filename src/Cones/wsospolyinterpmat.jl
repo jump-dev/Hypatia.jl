@@ -6,14 +6,14 @@ interpolation-based weighted-sum-of-squares (multivariate) polynomial matrix con
 definition and dual barrier extended from "Sum-of-squares optimization without semidefinite programming" by D. Papp and S. Yildiz, available at https://arxiv.org/abs/1712.01792
 =#
 
-mutable struct WSOSPolyInterpMat{T <: HypReal} <: Cone{T}
+mutable struct WSOSPolyInterpMat{T <: Real} <: Cone{T}
     use_dual::Bool
     dim::Int
     R::Int
     U::Int
     ipwt::Vector{Matrix{T}}
+    point::Vector{T}
 
-    point::AbstractVector{T}
     g::Vector{T}
     H::Matrix{T}
     H2::Matrix{T}
@@ -25,7 +25,7 @@ mutable struct WSOSPolyInterpMat{T <: HypReal} <: Cone{T}
     tmp2::Matrix{T}
     tmp3::Matrix{T}
 
-    function WSOSPolyInterpMat{T}(R::Int, U::Int, ipwt::Vector{Matrix{T}}, is_dual::Bool) where {T <: HypReal}
+    function WSOSPolyInterpMat{T}(R::Int, U::Int, ipwt::Vector{Matrix{T}}, is_dual::Bool) where {T <: Real}
         for ipwtj in ipwt
             @assert size(ipwtj, 1) == U
         end
@@ -40,13 +40,14 @@ mutable struct WSOSPolyInterpMat{T <: HypReal} <: Cone{T}
     end
 end
 
-WSOSPolyInterpMat{T}(R::Int, U::Int, ipwt::Vector{Matrix{T}}) where {T <: HypReal} = WSOSPolyInterpMat{T}(R, U, ipwt, false)
+WSOSPolyInterpMat{T}(R::Int, U::Int, ipwt::Vector{Matrix{T}}) where {T <: Real} = WSOSPolyInterpMat{T}(R, U, ipwt, false)
 
-function setup_data(cone::WSOSPolyInterpMat{T}) where {T <: HypReal}
+function setup_data(cone::WSOSPolyInterpMat{T}) where {T <: Real}
     dim = cone.dim
     U = cone.U
     R = cone.R
     ipwt = cone.ipwt
+    cone.point = zeros(T, dim)
     cone.g = Vector{T}(undef, dim)
     cone.H = zeros(T, dim, dim)
     cone.H2 = similar(cone.H)
@@ -61,7 +62,7 @@ end
 
 get_nu(cone::WSOSPolyInterpMat) = cone.R * sum(size(ipwtj, 2) for ipwtj in cone.ipwt)
 
-function set_initial_point(arr::AbstractVector{T}, cone::WSOSPolyInterpMat{T}) where {T <: HypReal}
+function set_initial_point(arr::AbstractVector{T}, cone::WSOSPolyInterpMat{T}) where {T <: Real}
     # sum of diagonal matrices with interpolant polynomial repeating on the diagonal
     idx = 1
     for i in 1:cone.R, j in 1:i
@@ -73,7 +74,7 @@ end
 
 _blockrange(inner::Int, outer::Int) = (outer * (inner - 1) + 1):(outer * inner)
 
-function check_in_cone(cone::WSOSPolyInterpMat{T}) where {T <: HypReal}
+function check_in_cone(cone::WSOSPolyInterpMat{T}) where {T <: Real}
     rt2 = sqrt(T(2))
     rt2i = inv(rt2)
 

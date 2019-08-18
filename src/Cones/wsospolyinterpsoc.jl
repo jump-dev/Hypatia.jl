@@ -6,14 +6,14 @@ interpolation-based weighted-sum-of-squares (multivariate) polynomial second ord
 definition and dual barrier extended from "Sum-of-squares optimization without semidefinite programming" by D. Papp and S. Yildiz, available at https://arxiv.org/abs/1712.01792
 =#
 
-mutable struct WSOSPolyInterpSOC{T <: HypReal} <: Cone{T}
+mutable struct WSOSPolyInterpSOC{T <: Real} <: Cone{T}
     use_dual::Bool
     dim::Int
     R::Int
     U::Int
     ipwt::Vector{Matrix{T}}
+    point::Vector{T}
 
-    point::AbstractVector{T}
     g::Vector{T}
     H::Matrix{T}
     gtry::Vector{T}
@@ -31,7 +31,7 @@ mutable struct WSOSPolyInterpSOC{T <: HypReal} <: Cone{T}
     PlambdaiP::Vector{Vector{Vector{Matrix{T}}}}
     lambdafact::Vector
 
-    function WSOSPolyInterpSOC{T}(R::Int, U::Int, ipwt::Vector{Matrix{T}}, is_dual::Bool) where {T <: HypReal}
+    function WSOSPolyInterpSOC{T}(R::Int, U::Int, ipwt::Vector{Matrix{T}}, is_dual::Bool) where {T <: Real}
         for ipwtj in ipwt
             @assert size(ipwtj, 1) == U
         end
@@ -46,13 +46,14 @@ mutable struct WSOSPolyInterpSOC{T <: HypReal} <: Cone{T}
     end
 end
 
-WSOSPolyInterpSOC{T}(R::Int, U::Int, ipwt::Vector{Matrix{T}}) where {T <: HypReal} = WSOSPolyInterpSOC{T}(R, U, ipwt, false)
+WSOSPolyInterpSOC{T}(R::Int, U::Int, ipwt::Vector{Matrix{T}}) where {T <: Real} = WSOSPolyInterpSOC{T}(R, U, ipwt, false)
 
-function setup_data(cone::WSOSPolyInterpSOC{T}) where {T <: HypReal}
+function setup_data(cone::WSOSPolyInterpSOC{T}) where {T <: Real}
     dim = cone.dim
     U = cone.U
     R = cone.R
     ipwt = cone.ipwt
+    cone.point = zeros(T, dim)
     cone.g = Vector{T}(undef, dim)
     cone.H = Matrix{T}(undef, dim, dim)
     cone.gtry = similar(cone.g, dim)
@@ -82,14 +83,14 @@ end
 
 get_nu(cone::WSOSPolyInterpSOC) = sum(size(ipwtj, 2) for ipwtj in cone.ipwt)
 
-function set_initial_point(arr::AbstractVector{T}, cone::WSOSPolyInterpSOC{T}) where {T <: HypReal}
+function set_initial_point(arr::AbstractVector{T}, cone::WSOSPolyInterpSOC{T}) where {T <: Real}
     arr .= zero(T)
     arr[1:cone.U] .= one(T)
     return arr
 end
 
 # TODO cleanup experimental code
-function check_in_cone(cone::WSOSPolyInterpSOC{T}) where {T <: HypReal}
+function check_in_cone(cone::WSOSPolyInterpSOC{T}) where {T <: Real}
     for j in eachindex(cone.ipwt)
         ipwtj = cone.ipwt[j]
         li_lambda = cone.li_lambda[j]
