@@ -200,7 +200,7 @@ end
 # (du bar) mu*H_k*z_k + s_k = srhs_k
 # kap + mu/(taubar^2)*tau = taurhs = (kap + solver.primal_obj_t - solver.dual_obj_t, 0)
 
-function calc_residuals_curr(solver::HSDSolver{T}, x_pred, x_corr, y_pred, y_corr, z_pred, z_corr, s_pred, s_corr, tau_pred, tau_corr, kap_pred, kap_corr) where {T <: HypReal}
+function calc_residuals_curr(solver::HSDSolver{T}, x_pred, x_corr, y_pred, y_corr, z_pred, z_corr, s_pred, s_corr, tau_pred, tau_corr, kap_pred, kap_corr) where {T <: Real}
     model = solver.model
     point = solver.point
 

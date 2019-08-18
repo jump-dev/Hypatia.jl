@@ -240,7 +240,7 @@ function hess_sqrt(cone::PosSemidefTri)
 end
 
 # this is not correct, and if it was, factors not rational
-function hess_fact_prod!(prod, arr, cone::PosSemidefTri{T, R}) where {R <: HypRealOrComplex{T}} where {T <: HypReal}
+function hess_fact_prod!(prod, arr, cone::PosSemidefTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     @assert cone.is_feas
     Li = inv(cone.point_sqrt)
     @inbounds for i in 1:size(arr, 2)
