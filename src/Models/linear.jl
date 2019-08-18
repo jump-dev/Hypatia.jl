@@ -16,6 +16,7 @@ dual (over z,y):
                 z in K*  (s)
 ```
 where K is a convex cone defined as a Cartesian product of recognized primitive cones, and K* is its dual cone.
+An objective offset can be provided as the keyword arg `obj_offset` (default 0).
 
 The primal-dual optimality conditions are:
 ```
@@ -78,13 +79,14 @@ mutable struct RawLinearModel{T <: Real} <: LinearModel{T}
     n::Int
     p::Int
     q::Int
+    obj_offset::T
     c::Vector{T}
     A
     b::Vector{T}
     G
     h::Vector{T}
     cones::Vector{Cones.Cone{T}}
-    cone_idxs::Vector{UnitRange{Int}} # TODO allow generic Integer type for UnitRange parameter
+    cone_idxs::Vector{UnitRange{Int}}
     nu::T
 
     initial_point::Point{T}
@@ -96,6 +98,7 @@ mutable struct RawLinearModel{T <: Real} <: LinearModel{T}
         G,
         h::Vector{T},
         cones::Vector{Cones.Cone{T}};
+        obj_offset::T = zero(T),
         use_iterative::Bool = false,
         tol_qr::Real = 1e2 * eps(T),
         use_dense_fallback::Bool = true,
@@ -105,6 +108,7 @@ mutable struct RawLinearModel{T <: Real} <: LinearModel{T}
         model.n = length(c)
         model.p = length(b)
         model.q = length(h)
+        model.obj_offset = obj_offset
         model.c = c
         model.A = A
         model.b = b
@@ -212,6 +216,7 @@ mutable struct PreprocessedLinearModel{T <: Real} <: LinearModel{T}
     n::Int
     p::Int
     q::Int
+    obj_offset::T
     c::Vector{T}
     A
     b::Vector{T}
@@ -235,11 +240,13 @@ mutable struct PreprocessedLinearModel{T <: Real} <: LinearModel{T}
         G,
         h::Vector{T},
         cones::Vector{Cones.Cone{T}};
+        obj_offset::T = zero(T),
         tol_qr::Real = 1e2 * eps(T),
         use_dense_fallback::Bool = true,
         ) where {T <: Real}
         model = new{T}()
 
+        model.obj_offset = obj_offset
         model.c_raw = c
         model.A_raw = A
         model.b_raw = b

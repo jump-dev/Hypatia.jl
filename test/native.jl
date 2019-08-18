@@ -104,13 +104,13 @@ function orthant1(T, test_options)
     # nonnegative cone
     G = SparseMatrixCSC(-one(T) * I, q, n)
     cones = CO.Cone{T}[CO.Nonnegative{T}(q)]
-    rnn = build_solve_check(c, A, b, G, h, cones; test_options...)
+    rnn = build_solve_check(c, A, b, G, h, cones; obj_offset = one(T), test_options...)
     @test rnn.status == :Optimal
 
     # nonpositive cone
     G = SparseMatrixCSC(one(T) * I, q, n)
     cones = CO.Cone{T}[CO.Nonpositive{T}(q)]
-    rnp = build_solve_check(c, A, b, G, h, cones; test_options...)
+    rnp = build_solve_check(c, A, b, G, h, cones; obj_offset = one(T), test_options...)
     @test rnp.status == :Optimal
 
     @test rnp.primal_obj ≈ rnn.primal_obj atol=tol rtol=tol
@@ -214,9 +214,9 @@ function epinorminf2(T, test_options)
     h = zeros(T, 2L + 2); h[1] = 1; h[L + 2] = 1
     cones = CO.Cone{T}[CO.EpiNormInf{T}(L + 1, true), CO.EpiNormInf{T}(L + 1, false)]
 
-    r = build_solve_check(c, A, b, G, h, cones; test_options...)
+    r = build_solve_check(c, A, b, G, h, cones; obj_offset = one(T), test_options...)
     @test r.status == :Optimal
-    @test r.primal_obj ≈ -l + 1 atol=tol rtol=tol
+    @test r.primal_obj ≈ -l + 2 atol=tol rtol=tol
     @test r.x[2] ≈ 0.5 atol=tol rtol=tol
     @test r.x[end - 1] ≈ -0.5 atol=tol rtol=tol
     @test sum(abs, r.x) ≈ 1 atol=tol rtol=tol
@@ -337,9 +337,9 @@ function epipersquare2(T, test_options)
     for is_dual in (true, false)
         cones = CO.Cone{T}[CO.EpiPerSquare{T}(3, is_dual)]
 
-        r = build_solve_check(c, A, b, G, h, cones; test_options...)
+        r = build_solve_check(c, A, b, G, h, cones; obj_offset = -one(T), test_options...)
         @test r.status == :Optimal
-        @test r.primal_obj ≈ -Tirt2 atol=tol rtol=tol
+        @test r.primal_obj ≈ -Tirt2 - 1 atol=tol rtol=tol
         @test r.x[2] ≈ Tirt2 atol=tol rtol=tol
     end
 end
@@ -355,7 +355,7 @@ function epipersquare3(T, test_options)
     for is_dual in (true, false)
         cones = CO.Cone{T}[CO.EpiPerSquare{T}(4, is_dual)]
 
-        r = build_solve_check(c, A, b, G, h, cones; test_options...)
+        r = build_solve_check(c, A, b, G, h, cones; obj_offset = zero(T), test_options...)
         @test r.status == :Optimal
         @test r.primal_obj ≈ 0 atol=tol rtol=tol
         @test norm(r.x) ≈ 0 atol=tol rtol=tol
