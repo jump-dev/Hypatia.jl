@@ -100,6 +100,23 @@ function update_feas(cone::EpiNormSpectral)
     return cone.is_feas
 end
 
+# function update_grad(cone::EpiNormSpectral)
+#     @timeit "gradient" begin
+#         @assert cone.is_feas
+#         u = cone.point[1]
+#         cone.Zi = Symmetric(inv(cone.fact_Z))
+#         cone.Eu = I + Symmetric(cone.WWt, :U) / u / u
+#         cone.grad[1] = -dot(cone.Zi, cone.Eu) - inv(u)
+#         mul!(cone.tmpnm, cone.Zi, cone.W)
+#         @. cone.tmpnm /= u / 2
+#         @inbounds for i in 1:(cone.n * cone.m)
+#             cone.grad[i + 1] = cone.tmpnm[i]
+#         end
+#         cone.grad_updated = true
+#     end
+#     return cone.grad
+# end
+
 function update_grad(cone::EpiNormSpectral)
     @assert cone.is_feas
     u = cone.point[1]
@@ -108,7 +125,9 @@ function update_grad(cone::EpiNormSpectral)
     cone.grad[1] = -dot(cone.Zi, cone.Eu) - inv(u)
     mul!(cone.tmpnm, cone.Zi, cone.W)
     @. cone.tmpnm /= u / 2
-    cone.grad[2:end] .= vec(cone.tmpnm)
+    @inbounds for i in 1:(cone.n * cone.m)
+        cone.grad[i + 1] = cone.tmpnm[i]
+    end
     cone.grad_updated = true
     return cone.grad
 end
@@ -219,7 +238,7 @@ function update_hess(cone::EpiNormSpectral)
             q += (n - i + 1)
             if j <= m - 1
                 @views mul!(tmpnm[1:n, 1:(m - j)], Symmetric(tmpnn, :U),  W[:, (j + 1):m])
-                for l in 1:(m - j), k in 1:n
+                @inbounds for l in 1:(m - j), k in 1:n
                     H[p, q] += tmpnm[k, l]
                     q += 1
                 end
