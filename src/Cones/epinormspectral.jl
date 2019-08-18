@@ -132,11 +132,9 @@ function update_hess(cone::EpiNormSpectral)
     # no BLAS method for product of two symmetric matrices, faster if one is not symmetric
     mul!(tmpnn, Eu, Zi.data)
     mul!(ZiEuZi, Zi, tmpnn)
-    H[1, 1] = dot(Symmetric(ZiEuZi, :U), Eu) + (2 * dot(Zi, Symmetric(WWt, :U)) / u + 1) / u / u
     @. tmpnn = -(Zi / u + ZiEuZi)
     mul!(tmpnm, tmpnn, W)
     @views copyto!(H[1, 2:end], tmpnm)
-
     p = 2
     # calculate d^2F / dW_ij dW_kl, p and q are linear indices for (i, j) and (k, l)
     @inbounds for j in 1:m
@@ -165,8 +163,10 @@ function update_hess(cone::EpiNormSpectral)
             p += 1
         end
     end
-    # scale everything except H[1, 1]
-    @views @. H[1:end, 2:end] /= u / 2
+    # scale everything
+    @. H /= u / 2
+    H[1, 1] = dot(Symmetric(ZiEuZi, :U), Eu) + (2 * dot(Zi, Symmetric(WWt, :U)) / u + 1) / u / u
+
     cone.hess_updated = true
     return cone.hess
 end
