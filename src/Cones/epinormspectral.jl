@@ -102,12 +102,13 @@ function update_grad(cone::EpiNormSpectral)
     u = cone.point[1]
     cone.Zi = Symmetric(inv(cone.fact_Z))
     @. cone.Eu.data = cone.WWt / u / u
-    for i in 1:cone.n
+    @inbounds for i in 1:cone.n
         cone.Eu[i, i] += 1
     end
     cone.grad[1] = -dot(cone.Zi, cone.Eu) - inv(u)
     mul!(cone.tmpnm, cone.Zi, cone.W)
-    @. cone.tmpnm /= u / 2
+    @. cone.tmpnm /= u
+    @. cone.tmpnm *= 2
     @inbounds for i in 1:(cone.n * cone.m)
         cone.grad[i + 1] = cone.tmpnm[i]
     end
@@ -167,7 +168,8 @@ function update_hess(cone::EpiNormSpectral)
         end
     end
     # scale everything
-    @. H /= u / 2
+    @. H /= u
+    @. H *= 2
     H[1, 1] = dot(Symmetric(ZiEuZi, :U), Eu) + (2 * dot(Zi, Symmetric(WWt, :U)) / u + 1) / u / u
     cone.hess_updated = true
     return cone.hess
