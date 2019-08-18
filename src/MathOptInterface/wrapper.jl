@@ -19,6 +19,7 @@ mutable struct Optimizer{T <: Real} <: MOI.AbstractOptimizer
     tol_feas::T
     tol_slow::T
 
+    obj_offset::T
     c::Vector{T}
     A
     b::Vector{T}
@@ -29,7 +30,6 @@ mutable struct Optimizer{T <: Real} <: MOI.AbstractOptimizer
     solver::Solvers.HSDSolver
 
     obj_sense::MOI.OptimizationSense
-    obj_const::T
     num_eq_constrs::Int
     constr_offset_eq::Vector{Int}
     constr_prim_eq::Vector{T}
@@ -138,10 +138,13 @@ function MOI.copy_to(
         push!(Jc, idx_map[t.variable_index].value)
         push!(Vc, t.coefficient)
     end
+    opt.obj_offset = obj.constant
     if MOI.get(src, MOI.ObjectiveSense()) == MOI.MAX_SENSE
         Vc .*= -1
+        opt.obj_offset = -obj.constant
+    else
+        opt.obj_offset = obj.constant
     end
-    opt.obj_const = obj.constant
     opt.obj_sense = MOI.get(src, MOI.ObjectiveSense())
     model_c = Vector(sparsevec(Jc, Vc, n))
 
@@ -503,7 +506,7 @@ function MOI.optimize!(opt::Optimizer{T}) where {T <: Real}
     if opt.load_only
         return
     end
-    model = opt.linear_model(copy(opt.c), copy(opt.A), copy(opt.b), copy(opt.G), copy(opt.h), opt.cones)
+    model = opt.linear_model(copy(opt.c), copy(opt.A), copy(opt.b), copy(opt.G), copy(opt.h), opt.cones, obj_offset = opt.obj_offset)
     stepper = Solvers.CombinedHSDStepper{T}(model, system_solver = opt.system_solver(model))
     solver = Solvers.HSDSolver{T}(
         model, stepper = stepper,
@@ -611,9 +614,9 @@ end
 
 function MOI.get(opt::Optimizer, ::MOI.ObjectiveValue)
     if opt.obj_sense == MOI.MIN_SENSE
-        return opt.primal_obj + opt.obj_const
+        return opt.primal_obj
     elseif opt.obj_sense == MOI.MAX_SENSE
-        return -opt.primal_obj + opt.obj_const
+        return -opt.primal_obj
     else
         error("no objective sense is set")
     end
@@ -621,9 +624,9 @@ end
 
 function MOI.get(opt::Optimizer, ::Union{MOI.DualObjectiveValue, MOI.ObjectiveBound})
     if opt.obj_sense == MOI.MIN_SENSE
-        return opt.dual_obj + opt.obj_const
+        return opt.dual_obj
     elseif opt.obj_sense == MOI.MAX_SENSE
-        return -opt.dual_obj + opt.obj_const
+        return -opt.dual_obj
     else
         error("no objective sense is set")
     end
