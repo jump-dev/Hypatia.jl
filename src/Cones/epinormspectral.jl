@@ -39,6 +39,7 @@ mutable struct EpiNormSpectral{T <: Real} <: Cone{T}
     ZiEuZi::Matrix{T}
     tmpnn::Matrix{T}
     tmpnm::Matrix{T}
+    tmpn::Vector{T}
 
     tmp_hess::Symmetric{T, Matrix{T}}
     hess_fact # TODO prealloc
@@ -71,6 +72,7 @@ function setup_data(cone::EpiNormSpectral{T}) where {T <: Real}
     cone.ZiEuZi = Matrix{T}(undef, cone.n, cone.n)
     cone.tmpnn = Matrix{T}(undef, cone.n, cone.n)
     cone.tmpnm = Matrix{T}(undef, cone.n, cone.m)
+    cone.tmpn = Vector{T}(undef, cone.n)
     return
 end
 
@@ -98,13 +100,13 @@ function update_feas(cone::EpiNormSpectral)
     return cone.is_feas
 end
 
-function update_grad(cone::EpiNormSpectral{T}) where {T <: Real}
+function update_grad(cone::EpiNormSpectral)
     @assert cone.is_feas
     u = cone.point[1]
     cone.Zi = Symmetric(inv(cone.fact_Z))
     cone.Eu = I + Symmetric(cone.WWt, :U) / u / u
     cone.grad[1] = -dot(cone.Zi, cone.Eu) - inv(u)
-    mul!(cone.tmpnm, cone.Zi, cone.W, T(2) / u, zero(T))
+    mul!(cone.tmpnm, cone.Zi, cone.W, 2 / u, false)
     cone.grad[2:end] .= vec(cone.tmpnm)
     cone.grad_updated = true
     return cone.grad
@@ -118,12 +120,12 @@ function update_hess(cone::EpiNormSpectral)
     u = cone.point[1]
     W = cone.W
     WWt = cone.WWt
-    Z = cone.Z
     Zi = cone.Zi
     Eu = cone.Eu
     ZiEuZi = cone.ZiEuZi
     tmpnn = cone.tmpnn
     tmpnm = cone.tmpnm
+    tmpn = cone.tmpn
     cone.hess .= 0
     H = cone.hess.data
 
@@ -131,38 +133,40 @@ function update_hess(cone::EpiNormSpectral)
     mul!(tmpnn, Eu, Zi.data)
     mul!(ZiEuZi, Zi, tmpnn)
     H[1, 1] = dot(Symmetric(ZiEuZi, :U), Eu) + (2 * dot(Zi, Symmetric(WWt, :U)) / u + 1) / u / u
-    @. tmpnn = -2 * (Zi / u + ZiEuZi) / u
+    @. tmpnn = -(Zi / u + ZiEuZi)
     mul!(tmpnm, tmpnn, W)
     @views copyto!(H[1, 2:end], tmpnm)
 
     p = 2
     # calculate d^2F / dW_ij dW_kl, p and q are linear indices for (i, j) and (k, l)
-    @inbounds for j in 1:m, i in 1:n
-        @views mul!(tmpnn, Zi[:, i], W[:, j]')
-        mul!(Z, tmpnn, Zi)
-         # evaluates to Zi * dZdW_ij * Zi
-        tmpnn = (Z + Z') / u
-        # add to terms where k = i, and l = j:n, inner product of Zi with d^2Z / dW_ij dW_kl nonzero only when j=l
-        q = p
-        viewij = view(H, p, q:(q + n - i))
-        # inner product of Zi with d^2Z / dW_ij dW_kl, unscaled by 2 / u
-        @views viewij .= Zi[i, i:n]
-        @views @. for ni in 1:n
-            viewij += W[ni, j] * tmpnn[ni, i:n]
+    @inbounds for j in 1:m
+        @views mul!(tmpn, Zi, W[:, j])
+        @. tmpnn /= u
+        for i in 1:n
+            # tmpnn evaluates to Zi * dZdW_ij * Zi
+            @views mul!(tmpnn, Zi[:, i], tmpn')
+            @. tmpnn += tmpnn'
+            # add to terms where k = i, and l = j:n, inner product of Zi with d^2Z / dW_ij dW_kl nonzero only when j=l
+            q = p
+            viewij = view(H, p, q:(q + n - i))
+            # add inner product of Zi with d^2Z / dW_ij dW_kl, unscaled by 2 / u as well as shared term
+            @views viewij .= Zi[i, i:n]
+            for ni in 1:n
+                axpy!(W[ni, j], tmpnn[ni, i:n], viewij)
+            end
+            # add to terms where k > i, l = 1:n
+            q += (n - i + 1)
+            ntermsij = n * (m - j)
+            if j <= m - 1
+                @views mul!(tmpnm[1:n, 1:(m - j)], Symmetric(tmpnn, :U),  W[:, (j + 1):m])
+                @views H[p, q:(q + ntermsij - 1)] .+= vec(tmpnm[1:n, 1:(m - j)])
+            end
+            q += ntermsij
+            p += 1
         end
-        # add to terms where k > i, l = 1:n
-        q += (n - i + 1)
-        ntermsij = n * (m - j)
-        if j <= m - 1
-            # the size of the result changes each iteration
-            viewH = reshape(view(H, p, q:(q + ntermsij - 1)), n, m - j)
-            mul!(viewH, Symmetric(tmpnn, :U), W[:, (j + 1):m], true, true)
-        end
-        # scale all terms we just modified, i.e. k >= i
-        @views H[p, (q - n + i - 1):(q + ntermsij - 1)] .*= 2 / u
-        q += ntermsij
-        p += 1
     end
+    # scale everything except H[1, 1]
+    @views @. H[1:end, 2:end] /= u / 2
     cone.hess_updated = true
     return cone.hess
 end
