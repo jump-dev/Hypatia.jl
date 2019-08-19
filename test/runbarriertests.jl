@@ -9,7 +9,7 @@ include(joinpath(@__DIR__, "barrier.jl"))
 real_types = [
     Float64,
     Float32,
-    # BigFloat, # NOTE can only use BLAS floats with ForwardDiff barriers, see https://github.com/JuliaDiff/DiffResults.jl/pull/9#issuecomment-497853361
+    BigFloat, # NOTE can only use BLAS floats with ForwardDiff barriers, see https://github.com/JuliaDiff/DiffResults.jl/pull/9#issuecomment-497853361
     ]
 
 barrier_testfuns = [
