@@ -8,6 +8,7 @@ const RealOrComplex{T <: Real} = Union{T, Complex{T}}
 
 using LinearAlgebra
 
+include("blockmatrix.jl")
 include("linearalgebra.jl")
 
 # submodules

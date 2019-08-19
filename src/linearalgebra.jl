@@ -5,12 +5,6 @@ Copyright 2019, Chris Coey and contributors
 import LinearAlgebra.BlasReal
 import LinearAlgebra.BlasFloat
 import LinearAlgebra.HermOrSym
-import LinearAlgebra.mul!
-import Base.adjoint
-import Base.eltype
-import Base.size
-import Base.*
-import Base.-
 
 hyp_AtA!(U::Matrix{T}, A::Matrix{T}) where {T <: BlasReal} = BLAS.syrk!('U', 'T', one(T), A, zero(T), U)
 hyp_AtA!(U::Matrix{Complex{T}}, A::Matrix{Complex{T}}) where {T <: BlasReal} = BLAS.herk!('U', 'C', one(T), A, zero(T), U)
@@ -18,6 +12,86 @@ hyp_AtA!(U::Matrix{T}, A::Matrix{T}) where {T <: RealOrComplex{<:Real}} = mul!(U
 
 hyp_AAt!(U::Matrix{T}, A::Matrix{T}) where {T <: BlasReal} = BLAS.syrk!('U', 'N', one(T), A, zero(T), U)
 hyp_AAt!(U::Matrix{T}, A::Matrix{T}) where {T <: RealOrComplex{<:Real}} = mul!(U, A, A')
+
+
+import LinearAlgebra.BlasInt
+import LinearAlgebra.BLAS.@blasfunc
+import LinearAlgebra.LAPACK.liblapack
+
+# cache for LAPACK cholesky
+struct HypCholCache{R <: BlasReal, T <: RealOrComplex{R}}
+    uplo
+    n
+    lda
+    piv
+    rank
+    work
+    info
+    tol
+
+    function HypCholCache(use_upper::Bool, A::Matrix{T}; tol = zero(R)) where {T <: RealOrComplex{R}} where {R <: BlasReal}
+        LinearAlgebra.chkstride1(A)
+        uplo = (use_upper ? 'U' : 'L')
+        n = LinearAlgebra.checksquare(A)
+        lda = max(1, stride(A, 2))
+        piv = similar(A, BlasInt, n)
+        rank = Vector{BlasInt}(undef, 1)
+        work = Vector{R}(undef, 2 * n)
+        info = Ref{BlasInt}()
+        return new{R, T}(uplo, n, lda, piv, rank, work, info, tol)
+    end
+end
+
+for (potri, pstrf, elty, rtyp) in (
+    (:dpotri_, :dpstrf_, :Float64, :Float64),
+    (:spotri_, :spstrf_, :Float32, :Float32),
+    (:zpotri_, :zpstrf_, :ComplexF64, :Float64),
+    (:cpotri_, :cpstrf_, :ComplexF32, :Float32),
+    )
+
+    # TODO implement inverse for pivoted
+
+    @eval begin
+        function hyp_chol!(c::HypCholCache{$rtyp, $elty}, A::Matrix{$elty})
+            ccall((@blasfunc($pstrf), liblapack), Cvoid, (
+                Ref{UInt8}, Ref{BlasInt}, Ptr{$elty}, Ref{BlasInt}, Ptr{BlasInt},
+                Ptr{BlasInt}, Ref{$rtyp}, Ptr{$rtyp}, Ptr{BlasInt}
+                ), c.uplo, c.n, A, c.lda, c.piv, c.rank, c.tol, c.work, c.info)
+
+            if c.info[] < 0
+                throw(ArgumentError("invalid argument #$(-c.info[]) to LAPACK call"))
+            end
+
+            C = CholeskyPivoted{$elty, Matrix{$elty}}(A, c.uplo, c.piv, c.rank[1], c.tol, c.info[])
+
+            return C
+        end
+    end
+end
+
+
+# function pstrf!(uplo::AbstractChar, A::AbstractMatrix{$elty}, tol::Real)
+#     chkstride1(A)
+#     n = checksquare(A)
+#     chkuplo(uplo)
+#     piv  = similar(A, BlasInt, n)
+#     rank = Vector{BlasInt}(undef, 1)
+#     work = Vector{$rtyp}(undef, 2n)
+#     info = Ref{BlasInt}()
+#     ccall((@blasfunc($pstrf), liblapack), Cvoid, (
+#         Ref{UInt8}, Ref{BlasInt}, Ptr{$elty}, Ref{BlasInt}, Ptr{BlasInt},
+#         Ptr{BlasInt}, Ref{$rtyp}, Ptr{$rtyp}, Ptr{BlasInt}
+#         ),
+#         uplo, n, A, max(1,stride(A,2)), piv, rank, tol, work, info)
+#     if info[] < 0
+#       throw(ArgumentError("invalid argument #$(-ret) to LAPACK call"))
+#     end
+#
+#     A, piv, rank[1], info[] #Stored in CholeskyPivoted
+# end
+
+
+
 
 hyp_chol!(A::HermOrSym{T, Matrix{T}}) where {T <: BlasFloat} = cholesky!(A, Val(true), check = false)
 hyp_chol!(A::HermOrSym{T, Matrix{T}}) where {T <: RealOrComplex{<:Real}} = cholesky!(A, check = false)
@@ -32,46 +106,3 @@ function hyp_ldiv_chol_L!(B::Matrix, F::Cholesky, A::AbstractMatrix)
     ldiv!(LowerTriangular(F.L), B)
     return B
 end
-
-struct BlockMatrix{T <: Real}
-    nrows::Int
-    ncols::Int
-    blocks::Vector
-    rows::Vector{UnitRange{Int}}
-    cols::Vector{UnitRange{Int}}
-
-    function BlockMatrix{T}(nrows::Int, ncols::Int, blocks::Vector, rows::Vector{UnitRange{Int}}, cols::Vector{UnitRange{Int}}) where {T <: Real}
-        @assert length(blocks) == length(rows) == length(cols)
-        return new{T}(nrows, ncols, blocks, rows, cols)
-    end
-end
-
-eltype(A::BlockMatrix{T}) where {T <: Real} = T
-
-size(A::BlockMatrix) = (A.nrows, A.ncols)
-size(A::BlockMatrix, d) = (d == 1 ? A.nrows : A.ncols)
-
-adjoint(A::BlockMatrix{T}) where {T <: Real} = BlockMatrix{T}(A.ncols, A.nrows, adjoint.(A.blocks), A.cols, A.rows)
-
-# TODO try to speed up by using better logic for alpha and beta (see Julia's 5-arg mul! code)
-# TODO check that this eliminates allocs when using IterativeSolvers methods, and that it is as fast as possible
-function mul!(y::AbstractVector{T}, A::BlockMatrix{T}, x::AbstractVector{T}, alpha::Number, beta::Number) where {T <: Real}
-    @assert size(x, 1) == A.ncols
-    @assert size(y, 1) == A.nrows
-    @assert size(x, 2) == size(y, 2)
-
-    @. y *= beta
-    for (b, r, c) in zip(A.blocks, A.rows, A.cols)
-        if isempty(r) || isempty(c)
-            continue
-        end
-        xk = view(x, c)
-        yk = view(y, r)
-        mul!(yk, b, xk, alpha, true)
-    end
-    return y
-end
-
-*(A::BlockMatrix{T}, x::AbstractVector{T}) where {T <: Real} = mul!(similar(x, size(A, 1)), A, x)
-
--(A::BlockMatrix{T}) where {T <: Real} = BlockMatrix{T}(A.nrows, A.ncols, -A.blocks, A.rows, A.cols)
