@@ -89,7 +89,7 @@ function update_grad(cone::HypoGeomean)
     wiaau = cone.wiaa + u
     cone.wiw = cone.wiaa / wiaau
     @. cone.a1ww = cone.alpha * (1 - cone.wiw) / w
-    cone.grad[1] = -inv(cone.wiaa + u) - inv(u)
+    cone.grad[1] = -inv(wiaau) - inv(u)
     @. cone.grad[2:end] = cone.a1ww - inv(w)
     cone.grad_updated = true
     return cone.grad
