@@ -37,6 +37,7 @@ mutable struct PosSemidefTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     mat3::Matrix{R}
     inv_mat::Matrix{R}
     fact_mat
+    chol_cache
 
     function PosSemidefTri{T, R}(dim::Int, is_dual::Bool) where {R <: RealOrComplex{T}} where {T <: Real}
         cone = new{T, R}()
@@ -70,6 +71,7 @@ function setup_data(cone::PosSemidefTri{T, R}) where {R <: RealOrComplex{T}} whe
     cone.mat = zeros(R, cone.side, cone.side)
     cone.mat2 = similar(cone.mat)
     cone.mat3 = similar(cone.mat)
+    cone.chol_cache = HypCholCache(true, cone.mat2)
     return
 end
 
@@ -90,7 +92,7 @@ function update_feas(cone::PosSemidefTri)
     @assert !cone.feas_updated
     vec_to_mat_U!(cone.mat, cone.point)
     copyto!(cone.mat2, cone.mat)
-    cone.fact_mat = hyp_chol!(Hermitian(cone.mat2, :U)) # TODO eliminate allocs
+    cone.fact_mat = hyp_chol!(cone.chol_cache, cone.mat2)
     cone.is_feas = isposdef(cone.fact_mat)
     cone.feas_updated = true
     return cone.is_feas
