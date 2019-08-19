@@ -107,20 +107,68 @@ function update_hess(cone::GeneralizedPower)
     wi2au = cone.wi2a - abs2(u)
     wi2a_wi2au = wi2a / wi2au
 
+    alphawi = 2 * alpha ./ w
+
     # reuse from gradient
     term1 = cone.wi2a ./ w .* alpha * 2 / wi2au
 
     H[1, 1] = 2 / wi2au + 4 * u^2 / wi2au^2
+
     for j in eachindex(w)
         j1 = j + 1
         H[1, j1] = -4 * cone.alpha[j] * u * wi2a_wi2au / wi2au / w[j]
         for i in 1:(j - 1)
-            H[i + 1, j1] = 4 * alpha[i] * alpha[j] * wi2a_wi2au * (wi2a_wi2au - 1) / w[i] / w[j]
+            H[i + 1, j1] = alphawi[i] * alphawi[j] * wi2a_wi2au * (wi2a_wi2au - 1)
         end
-        # H[j1, j1] = wiwaw * cone.grad[j1] + (1 - cone.alpha[j]) / w[j] / w[j]
-        H[j1, j1] = term1[j]^2 - 2 * alpha[j] * (2 * alpha[j] - 1) * wi2a_wi2au / w[j]^2 + (1 - alpha[j]) / w[j]^2
+        H[j1, j1] = alphawi[j]^2 * wi2a_wi2au * (wi2a_wi2au - 1) + 2 * alpha[j] / w[j]^2 * wi2a_wi2au  + (1 - alpha[j]) / w[j]^2
     end
+
+
+    # for j in eachindex(w)
+    #     j1 = j + 1
+    #     H[1, j1] = -4 * cone.alpha[j] * u * wi2a_wi2au / wi2au / w[j]
+    #     for i in 1:(j - 1)
+    #         H[i + 1, j1] = 4 * alpha[i] * alpha[j] * wi2a_wi2au * (wi2a_wi2au - 1) / w[i] / w[j]
+    #     end
+    #     # H[j1, j1] = wiwaw * cone.grad[j1] + (1 - cone.alpha[j]) / w[j] / w[j]
+    #     H[j1, j1] = term1[j]^2 - 2 * alpha[j] * (2 * alpha[j] - 1) * wi2a_wi2au / w[j]^2 + (1 - alpha[j]) / w[j]^2
+    # end
 
     cone.hess_updated = true
     return cone.hess
 end
+
+# matrixified
+# function update_hess(cone::GeneralizedPower)
+#     @assert cone.grad_updated
+#     u = cone.point[1]
+#     w = view(cone.point, 2:cone.dim)
+#     H = cone.hess.data
+#     alpha = cone.alpha
+#
+#
+#     wi2a = cone.wi2a
+#     wi2au = cone.wi2a - abs2(u)
+#     wi2a_wi2au = wi2a / wi2au
+#
+#     # reuse from gradient
+#     term1 = cone.wi2a ./ w .* alpha * 2 / wi2au
+#
+#     H[1, 1] = 2 / wi2au + 4 * u^2 / wi2au^2
+#     for j in eachindex(w)
+#         j1 = j + 1
+#         H[1, j1] = -4 * cone.alpha[j] * u * wi2a_wi2au / wi2au / w[j]
+#     end
+#
+#     Hblock = view(H, 2:cone.dim, 2:cone.dim)
+#     tmpvec = 2 * alpha ./ w
+#     mul!(Hblock, tmpvec, tmpvec')
+#     Hblock .*= wi2a_wi2au^2
+#     Hblock .-= tmpvec * tmpvec' * wi2a_wi2au
+#     for i in 1:(cone.dim - 1)
+#         Hblock[i, i] += 2 * alpha[i] / w[i]^2 * wi2a_wi2au + (1 - alpha[i]) / w[i]^2
+#     end
+#
+#     cone.hess_updated = true
+#     return cone.hess
+# end
