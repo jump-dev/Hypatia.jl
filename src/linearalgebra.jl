@@ -19,7 +19,7 @@ import LinearAlgebra.BLAS.@blasfunc
 import LinearAlgebra.LAPACK.liblapack
 
 # cache for LAPACK cholesky
-struct HypCholCache{R <: BlasReal, T <: RealOrComplex{R}}
+mutable struct HypCholCache{R <: Real, T <: RealOrComplex{R}}
     uplo
     n
     lda
@@ -28,19 +28,29 @@ struct HypCholCache{R <: BlasReal, T <: RealOrComplex{R}}
     work
     info
     tol
-
-    function HypCholCache(use_upper::Bool, A::Matrix{T}; tol = zero(R)) where {T <: RealOrComplex{R}} where {R <: BlasReal}
-        LinearAlgebra.chkstride1(A)
-        uplo = (use_upper ? 'U' : 'L')
-        n = LinearAlgebra.checksquare(A)
-        lda = max(1, stride(A, 2))
-        piv = similar(A, BlasInt, n)
-        rank = Vector{BlasInt}(undef, 1)
-        work = Vector{R}(undef, 2 * n)
-        info = Ref{BlasInt}()
-        return new{R, T}(uplo, n, lda, piv, rank, work, info, tol)
-    end
+    HypCholCache{R, T}() where {T <: RealOrComplex{R}} where {R <: Real} = new{R, T}()
 end
+
+function HypCholCache(use_upper::Bool, A::Matrix{T}; tol = zero(R)) where {T <: RealOrComplex{R}} where {R <: BlasReal}
+    LinearAlgebra.chkstride1(A)
+    c = HypCholCache{R, T}()
+    c.uplo = (use_upper ? 'U' : 'L')
+    c.n = LinearAlgebra.checksquare(A)
+    c.lda = max(1, stride(A, 2))
+    c.piv = similar(A, BlasInt, c.n)
+    c.rank = Vector{BlasInt}(undef, 1)
+    c.work = Vector{R}(undef, 2 * c.n)
+    c.info = Ref{BlasInt}()
+    c.tol = tol
+    return c
+end
+
+function HypCholCache(use_upper::Bool, A::Matrix{T}; tol = zero(R)) where {T <: RealOrComplex{R}} where {R <: Real}
+    c = HypCholCache{R, T}()
+    c.uplo = (use_upper ? :U : :L)
+    return c
+end
+
 
 for (potri, pstrf, elty, rtyp) in (
     (:dpotri_, :dpstrf_, :Float64, :Float64),
@@ -69,30 +79,9 @@ for (potri, pstrf, elty, rtyp) in (
     end
 end
 
+hyp_chol!(c::HypCholCache{R, T}, A::Matrix{T}) where {T <: RealOrComplex{R}} where {R <: Real} = cholesky!(Hermitian(A, c.uplo), check = false)
 
-# function pstrf!(uplo::AbstractChar, A::AbstractMatrix{$elty}, tol::Real)
-#     chkstride1(A)
-#     n = checksquare(A)
-#     chkuplo(uplo)
-#     piv  = similar(A, BlasInt, n)
-#     rank = Vector{BlasInt}(undef, 1)
-#     work = Vector{$rtyp}(undef, 2n)
-#     info = Ref{BlasInt}()
-#     ccall((@blasfunc($pstrf), liblapack), Cvoid, (
-#         Ref{UInt8}, Ref{BlasInt}, Ptr{$elty}, Ref{BlasInt}, Ptr{BlasInt},
-#         Ptr{BlasInt}, Ref{$rtyp}, Ptr{$rtyp}, Ptr{BlasInt}
-#         ),
-#         uplo, n, A, max(1,stride(A,2)), piv, rank, tol, work, info)
-#     if info[] < 0
-#       throw(ArgumentError("invalid argument #$(-ret) to LAPACK call"))
-#     end
-#
-#     A, piv, rank[1], info[] #Stored in CholeskyPivoted
-# end
-
-
-
-
+# TODO delete later
 hyp_chol!(A::HermOrSym{T, Matrix{T}}) where {T <: BlasFloat} = cholesky!(A, Val(true), check = false)
 hyp_chol!(A::HermOrSym{T, Matrix{T}}) where {T <: RealOrComplex{<:Real}} = cholesky!(A, check = false)
 
