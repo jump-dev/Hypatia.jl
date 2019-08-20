@@ -56,6 +56,9 @@ mutable struct QRCholCombinedHSDSystemSolver{T <: Real} <: CombinedHSDSystemSolv
     HGxi_k
     Gxi_k
 
+    solvesol
+    solvecache
+
     function QRCholCombinedHSDSystemSolver{T}(model::Models.PreprocessedLinearModel{T}; use_sparse::Bool = false) where {T <: Real}
         (n, p, q) = (model.n, model.p, model.q)
         system_solver = new{T}()
@@ -129,6 +132,11 @@ mutable struct QRCholCombinedHSDSystemSolver{T <: Real} <: CombinedHSDSystemSolv
         system_solver.GQ2_k = [view(system_solver.GQ2, idxs, :) for idxs in model.cone_idxs]
         system_solver.HGxi_k = [view(system_solver.HGxi, idxs, :) for idxs in model.cone_idxs]
         system_solver.Gxi_k = [view(system_solver.Gxi, idxs, :) for idxs in model.cone_idxs]
+
+        if !use_sparse
+            system_solver.solvesol = Matrix{T}(undef, nmp, 3)
+            system_solver.solvecache = HypBKSolveCache(true, system_solver.solvesol, system_solver.Q2GHGQ2, system_solver.Q2div)
+        end
 
         return system_solver
     end
@@ -229,6 +237,8 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
     mul!(QpbxGHbz, model.G', zi, true, true)
     lmul!(model.Ap_Q', QpbxGHbz)
 
+    copyto!(xi1, yi)
+
     if !iszero(size(Q2div, 1))
         mul!(GQ1x, GQ1, yi)
         block_hessian_product!(HGQ1x_k, GQ1x_k)
@@ -247,40 +257,20 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
                     error("could not fix failure of positive definiteness (mu is $mu); terminating")
                 end
             end
-            Q2div .= F \ Q2div # TODO eliminate allocs (see https://github.com/JuliaLang/julia/issues/30084)
+            xi2 .= F \ Q2div # TODO eliminate allocs (see https://github.com/JuliaLang/julia/issues/30084)
         else
-            # F = hyp_chol!(Symmetric(Q2GHGQ2)) # TODO prealloc blasreal cholesky auxiliary vectors using posvx
-            # if !isposdef(F)
-            #     println("dense linear system matrix factorization failed")
-            #     mul!(Q2GHGQ2, GQ2', HGQ2)
-            #     Q2GHGQ2 += T(1e-8) * I
-            #     if T <: BlasReal
-            #         F = bunchkaufman!(Symmetric(Q2GHGQ2), true, check = false) # TODO prealloc with old sysvx code; not implemented for generic reals
-            #         # F = lu!(Symmetric(Q2GHGQ2), check = false) # TODO prealloc with old sysvx code; not implemented for generic reals
-            #         if !issuccess(F)
-            #             error("could not fix failure of positive definiteness (mu is $mu); terminating")
-            #         end
-            #     else
-            #         F = hyp_chol!(Symmetric(Q2GHGQ2)) # TODO prealloc blasreal cholesky auxiliary vectors using posvx
-            #         if !isposdef(F)
-            #             error("could not fix failure of positive definiteness (mu is $mu); terminating")
-            #         end
-            #     end
-            # end
-            # ldiv!(F, Q2div)
-
-            # # prealloc
-            # c = HypCholSolveCache(true, copy(Q2div), copy(Q2GHGQ2), copy(Q2div))
-            # Q2div .= hyp_chol_solve!(c, copy(Q2div), copy(Q2GHGQ2), copy(Q2div))
-            c = HypBKSolveCache(true, copy(Q2div), copy(Q2GHGQ2), copy(Q2div))
-            Q2div .= hyp_bk_solve!(c, copy(Q2div), copy(Q2GHGQ2), copy(Q2div))
-
-
+            if !hyp_bk_solve!(system_solver.solvecache, system_solver.solvesol, Q2GHGQ2, Q2div)
+                println("dense linear system matrix factorization failed")
+                mul!(Q2GHGQ2, GQ2', HGQ2)
+                Q2GHGQ2 += sqrt(eps(T)) * I
+                if !hyp_bk_solve!(system_solver.solvecache, system_solver.solvesol, Q2GHGQ2, Q2div)
+                    error("could not fix failure of positive definiteness (mu is $mu); terminating")
+                end
+            end
+            copyto!(xi2, system_solver.solvesol)
         end
     end
 
-    copyto!(xi1, yi)
-    copyto!(xi2, Q2div)
     lmul!(model.Ap_Q, xi)
 
     mul!(Gxi, model.G, xi)

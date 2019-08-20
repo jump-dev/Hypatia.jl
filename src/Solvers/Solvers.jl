@@ -128,7 +128,7 @@ function build_solve_check(
     system_solver_options::NamedTuple = NamedTuple(),
     stepper_options::NamedTuple = NamedTuple(),
     solver_options::NamedTuple = NamedTuple(),
-    atol::Real = max(1e-5, sqrt(sqrt(eps(T)))),
+    atol::Real = sqrt(sqrt(eps(T))),
     rtol::Real = atol,
     ) where {T <: Real}
     model = linear_model{T}(c, A, b, G, h, cones; obj_offset = obj_offset, linear_model_options...)

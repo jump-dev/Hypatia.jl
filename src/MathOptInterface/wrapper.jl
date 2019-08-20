@@ -54,12 +54,12 @@ mutable struct Optimizer{T <: Real} <: MOI.AbstractOptimizer
         verbose::Bool = false,
         system_solver::Type{<:Solvers.CombinedHSDSystemSolver{T}} = Solvers.QRCholCombinedHSDSystemSolver{T},
         linear_model::Type{<:Models.LinearModel{T}} = Models.PreprocessedLinearModel{T},
-        max_iters::Int = 500,
-        time_limit::Real = 3.6e3,
-        tol_rel_opt::Real = max(T(1e-12), T(1e-2) * cbrt(eps(T))),
+        max_iters::Int = 1000,
+        time_limit::Real = Inf,
+        tol_rel_opt::Real = sqrt(eps(T)),
         tol_abs_opt::Real = tol_rel_opt,
         tol_feas::Real = tol_rel_opt,
-        tol_slow::Real = T(5e-3),
+        tol_slow::Real = T(1e-3),
         ) where {T <: Real}
         opt = new{T}()
 
