@@ -17,6 +17,8 @@ import Hypatia.hyp_AAt!
 import Hypatia.hyp_chol!
 import Hypatia.hyp_ldiv_chol_L!
 
+using TimerOutputs
+
 abstract type Cone{T <: Real} end
 
 include("orthant.jl")
@@ -24,7 +26,7 @@ include("epinorminf.jl")
 include("epinormeucl.jl")
 include("epipersquare.jl")
 include("epiperpower.jl")
-include("generalizedpower.jl")
+include("power.jl")
 include("hypoperlog.jl")
 include("epiperexp.jl")
 include("hypogeomean.jl")
