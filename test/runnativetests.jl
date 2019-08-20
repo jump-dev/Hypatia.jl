@@ -11,8 +11,8 @@ const SO = Hypatia.Solvers
 
 real_types = [
     Float64,
-    # Float32,
-    # BigFloat,
+    Float32,
+    BigFloat,
     ]
 
 system_solvers = [
@@ -45,7 +45,7 @@ linear_models = [
 
 use_infty_nbhd = [
     true,
-    # false,
+    false,
     ]
 
 testfuns_raw = [

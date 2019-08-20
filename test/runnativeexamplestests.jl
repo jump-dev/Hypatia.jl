@@ -10,7 +10,7 @@ const SO = Hypatia.Solvers
 examples_dir = joinpath(@__DIR__, "../examples")
 
 # include(joinpath(examples_dir, "densityest/native.jl"))
-# include(joinpath(examples_dir, "envelope/native.jl"))
+include(joinpath(examples_dir, "envelope/native.jl"))
 include(joinpath(examples_dir, "expdesign/native.jl"))
 include(joinpath(examples_dir, "linearopt/native.jl"))
 include(joinpath(examples_dir, "matrixcompletion/native.jl"))
@@ -22,7 +22,7 @@ include(joinpath(examples_dir, "sparsepca/native.jl"))
 
 real_types = [
     Float64,
-    # Float32,
+    Float32,
     ]
 
 @testset "native examples: $T" for T in real_types
@@ -31,8 +31,8 @@ real_types = [
         )
 
     # @testset "densityest" begin test_densityest.(instances_densityest_few, T = T, test_options = test_options) end
-    #
-    # @testset "envelope" begin test_envelope.(instances_envelope_few, T = T, test_options = test_options) end
+
+    @testset "envelope" begin test_envelope.(instances_envelope_few, T = T, test_options = test_options) end
 
     @testset "expdesign" begin test_expdesign.(instances_expdesign_few, T = T, test_options = test_options) end
 

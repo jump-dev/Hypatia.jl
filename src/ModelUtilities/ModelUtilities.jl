@@ -12,12 +12,12 @@ using LinearAlgebra
 import FFTW
 import Combinatorics
 import GSL: sf_gamma_inc_Q
-import DynamicPolynomials
-const DP = DynamicPolynomials
+# import DynamicPolynomials
+# const DP = DynamicPolynomials
 include("interpolate.jl")
 
-import SemialgebraicSets
-const SAS = SemialgebraicSets
-include("semialgebraicsets.jl")
+# import SemialgebraicSets
+# const SAS = SemialgebraicSets
+# include("semialgebraicsets.jl")
 
 end

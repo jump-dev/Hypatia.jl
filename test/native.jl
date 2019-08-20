@@ -11,7 +11,7 @@ import Hypatia.Solvers.build_solve_check
 const CO = Hypatia.Cones
 
 function dimension1(T, test_options)
-    tol = max(1e-5, sqrt(sqrt(eps(T))))
+    tol = sqrt(sqrt(eps(T)))
     c = T[-1, 0]
     A = zeros(T, 0, 2)
     b = T[]
@@ -21,9 +21,6 @@ function dimension1(T, test_options)
 
     for use_sparse in (false, true)
         if use_sparse
-            if T != Float64
-                continue # TODO currently cannot do preprocessing with sparse A or G if not using Float64
-            end
             A = sparse(A)
             G = sparse(G)
         end
@@ -93,7 +90,7 @@ function inconsistent2(T, test_options)
 end
 
 function orthant1(T, test_options)
-    tol = max(1e-5, sqrt(sqrt(eps(T))))
+    tol = sqrt(sqrt(eps(T)))
     Random.seed!(1)
     (n, p, q) = (6, 3, 6)
     c = rand(T(0):T(9), n)
@@ -117,7 +114,7 @@ function orthant1(T, test_options)
 end
 
 function orthant2(T, test_options)
-    tol = max(1e-5, sqrt(sqrt(eps(T))))
+    tol = sqrt(sqrt(eps(T)))
     Random.seed!(1)
     (n, p, q) = (5, 2, 10)
     c = rand(T(0):T(9), n)
@@ -140,7 +137,7 @@ function orthant2(T, test_options)
 end
 
 function orthant3(T, test_options)
-    tol = max(1e-5, sqrt(sqrt(eps(T))))
+    tol = sqrt(sqrt(eps(T)))
     Random.seed!(1)
     (n, p, q) = (15, 6, 15)
     c = rand(T(0):T(9), n)
@@ -163,7 +160,7 @@ function orthant3(T, test_options)
 end
 
 function orthant4(T, test_options)
-    tol = max(1e-5, sqrt(sqrt(eps(T))))
+    tol = sqrt(sqrt(eps(T)))
     Random.seed!(1)
     (n, p, q) = (5, 2, 10)
     c = rand(T(0):T(9), n)
@@ -186,7 +183,7 @@ function orthant4(T, test_options)
 end
 
 function epinorminf1(T, test_options)
-    tol = max(1e-5, sqrt(sqrt(eps(T))))
+    tol = sqrt(sqrt(eps(T)))
     Tirt2 = inv(sqrt(T(2)))
     c = T[0, -1, -1]
     A = T[1 0 0; 0 1 0]
@@ -203,7 +200,7 @@ function epinorminf1(T, test_options)
 end
 
 function epinorminf2(T, test_options)
-    tol = max(1e-5, 10 * sqrt(sqrt(eps(T))))
+    tol = 10 * sqrt(sqrt(eps(T)))
     l = 3
     L = 2l + 1
     c = collect(T, -l:l)
@@ -223,7 +220,7 @@ function epinorminf2(T, test_options)
 end
 
 function epinorminf3(T, test_options)
-    tol = max(1e-5, sqrt(sqrt(eps(T))))
+    tol = sqrt(sqrt(eps(T)))
     c = T[1, 0, 0, 0, 0, 0]
     A = zeros(T, 0, 6)
     b = zeros(T, 0)
@@ -238,7 +235,7 @@ function epinorminf3(T, test_options)
 end
 
 function epinorminf4(T, test_options)
-    tol = max(1e-5, sqrt(sqrt(eps(T))))
+    tol = sqrt(sqrt(eps(T)))
     c = T[0, 1, -1]
     A = T[1 0 0; 0 1 0]
     b = T[1, -0.4]
@@ -254,7 +251,7 @@ function epinorminf4(T, test_options)
 end
 
 function epinorminf5(T, test_options)
-    tol = max(1e-5, sqrt(sqrt(eps(T))))
+    tol = sqrt(sqrt(eps(T)))
     Random.seed!(1)
     c = T[1, 0, 0, 0, 0, 0]
     A = rand(T(-9):T(9), 3, 6)
@@ -269,7 +266,7 @@ function epinorminf5(T, test_options)
 end
 
 function epinormeucl1(T, test_options)
-    tol = max(1e-5, sqrt(sqrt(eps(T))))
+    tol = sqrt(sqrt(eps(T)))
     Trt2 = sqrt(T(2))
     Tirt2 = inv(Trt2)
     c = T[0, -1, -1]
@@ -290,7 +287,7 @@ function epinormeucl1(T, test_options)
 end
 
 function epinormeucl2(T, test_options)
-    tol = max(1e-5, sqrt(sqrt(eps(T))))
+    tol = sqrt(sqrt(eps(T)))
     c = T[0, -1, -1]
     A = T[1 0 0]
     b = T[0]
@@ -308,7 +305,7 @@ function epinormeucl2(T, test_options)
 end
 
 function epipersquare1(T, test_options)
-    tol = max(1e-5, sqrt(sqrt(eps(T))))
+    tol = sqrt(sqrt(eps(T)))
     c = T[0, 0, -1, -1]
     A = T[1 0 0 0; 0 1 0 0]
     b = T[0.5, 1]
@@ -326,7 +323,7 @@ function epipersquare1(T, test_options)
 end
 
 function epipersquare2(T, test_options)
-    tol = max(1e-5, sqrt(sqrt(eps(T))))
+    tol = sqrt(sqrt(eps(T)))
     Tirt2 = inv(sqrt(T(2)))
     c = T[0, 0, -1]
     A = T[1 0 0; 0 1 0]
@@ -345,7 +342,7 @@ function epipersquare2(T, test_options)
 end
 
 function epipersquare3(T, test_options)
-    tol = max(1e-5, sqrt(sqrt(eps(T))))
+    tol = sqrt(sqrt(eps(T)))
     c = T[0, 1, -1, -1]
     A = T[1 0 0 0]
     b = T[0]
@@ -363,7 +360,7 @@ function epipersquare3(T, test_options)
 end
 
 function possemideftri1(T, test_options)
-    tol = max(1e-5, sqrt(sqrt(eps(T))))
+    tol = sqrt(sqrt(eps(T)))
     Trt2 = sqrt(T(2))
     Trt2i = inv(Trt2)
     c = T[0, -1, 0]
@@ -388,7 +385,7 @@ function possemideftri1(T, test_options)
 end
 
 function possemideftri2(T, test_options)
-    tol = max(1e-5, sqrt(sqrt(eps(T))))
+    tol = sqrt(sqrt(eps(T)))
     c = T[0, -1, 0]
     A = T[1 0 1]
     b = T[0]
@@ -406,7 +403,7 @@ function possemideftri2(T, test_options)
 end
 
 function possemideftricomplex1(T, test_options)
-    tol = max(1e-5, sqrt(sqrt(eps(T))))
+    tol = sqrt(sqrt(eps(T)))
     Trt2 = sqrt(T(2))
     c = T[1, 0, 0, 1]
     A = T[0 0 1 0]
@@ -422,7 +419,7 @@ function possemideftricomplex1(T, test_options)
 end
 
 function hypoperlog1(T, test_options)
-    tol = max(1e-5, sqrt(sqrt(eps(T))))
+    tol = sqrt(sqrt(eps(T)))
     Texph = exp(T(0.5))
     c = T[1, 1, 1]
     A = T[0 1 0; 1 0 0]
@@ -440,7 +437,7 @@ function hypoperlog1(T, test_options)
 end
 
 function hypoperlog2(T, test_options)
-    tol = max(1e-5, sqrt(sqrt(eps(T))))
+    tol = sqrt(sqrt(eps(T)))
     c = T[-1, 0, 0]
     A = T[0 1 0]
     b = T[0]
@@ -454,7 +451,7 @@ function hypoperlog2(T, test_options)
 end
 
 function hypoperlog3(T, test_options)
-    tol = max(1e-5, sqrt(sqrt(eps(T))))
+    tol = sqrt(sqrt(eps(T)))
     c = T[1, 1, 1]
     A = zeros(T, 0, 3)
     b = zeros(T, 0)
@@ -470,7 +467,7 @@ function hypoperlog3(T, test_options)
 end
 
 function hypoperlog4(T, test_options)
-    tol = max(1e-5, sqrt(sqrt(eps(T))))
+    tol = sqrt(sqrt(eps(T)))
     Texp2 = exp(T(-2))
     c = T[0, 0, 1]
     A = T[0 1 0; 1 0 0]
@@ -486,7 +483,7 @@ function hypoperlog4(T, test_options)
 end
 
 function hypoperlog5(T, test_options)
-    tol = max(1e-5, sqrt(sqrt(eps(T))))
+    tol = sqrt(sqrt(eps(T)))
     Tlogq = log(T(0.25))
     c = T[-1, 0, 0]
     A = T[0 1 1]
@@ -503,7 +500,7 @@ function hypoperlog5(T, test_options)
 end
 
 function hypoperlog6(T, test_options)
-    tol = max(1e-5, sqrt(sqrt(eps(T))))
+    tol = sqrt(sqrt(eps(T)))
     c = T[-1, 0, 0]
     A = zeros(T, 0, 3)
     b = zeros(T, 0)
@@ -519,7 +516,7 @@ function hypoperlog6(T, test_options)
 end
 
 function epiperpower1(T, test_options)
-    tol = max(1e-5, sqrt(sqrt(eps(T))))
+    tol = sqrt(sqrt(eps(T)))
     c = T[0, 0, -1]
     A = T[1 0 0; 0 1 0]
     b = T[0.5, 1]
@@ -537,7 +534,7 @@ function epiperpower1(T, test_options)
 end
 
 function epiperpower2(T, test_options)
-    tol = max(1e-5, sqrt(sqrt(eps(T))))
+    tol = 10 * sqrt(sqrt(eps(T)))
     c = T[0, 0, 1]
     A = T[1 0 0; 0 1 0]
     b = T[0, 1]
@@ -555,7 +552,7 @@ function epiperpower2(T, test_options)
 end
 
 function hypogeomean1(T, test_options)
-    tol = max(1e-5, sqrt(sqrt(eps(T))))
+    tol = sqrt(sqrt(eps(T)))
     c = T[-1, 0, 0]
     A = T[0 0 1; 0 1 0]
     b = T[0.5, 1]
@@ -573,7 +570,7 @@ function hypogeomean1(T, test_options)
 end
 
 function hypogeomean2(T, test_options)
-    tol = max(1e-5, sqrt(sqrt(eps(T))))
+    tol = sqrt(sqrt(eps(T)))
     l = 4
     c = vcat(zero(T), ones(T, l))
     A = T[one(T) zeros(T, 1, l)]
@@ -592,7 +589,7 @@ function hypogeomean2(T, test_options)
 end
 
 function hypogeomean3(T, test_options)
-    tol = max(1e-5, sqrt(sqrt(eps(T))))
+    tol = sqrt(sqrt(eps(T)))
     l = 4
     c = ones(T, l)
     A = zeros(T, 0, l)
@@ -611,7 +608,7 @@ function hypogeomean3(T, test_options)
 end
 
 function epinormspectral1(T, test_options)
-    tol = max(1e-5, sqrt(sqrt(eps(T))))
+    tol = sqrt(sqrt(eps(T)))
     Random.seed!(1)
     (Xn, Xm) = (3, 4)
     Xnm = Xn * Xm
@@ -637,7 +634,7 @@ function epinormspectral1(T, test_options)
 end
 
 function hypoperlogdettri1(T, test_options)
-    tol = max(1e-5, sqrt(sqrt(eps(T))))
+    tol = sqrt(sqrt(eps(T)))
     Random.seed!(1)
     side = 4
     dim = 2 + div(side * (side + 1), 2)
@@ -664,7 +661,7 @@ function hypoperlogdettri1(T, test_options)
 end
 
 function hypoperlogdettri2(T, test_options)
-    tol = max(1e-5, sqrt(sqrt(eps(T))))
+    tol = sqrt(sqrt(eps(T)))
     Random.seed!(1)
     side = 3
     dim = 2 + div(side * (side + 1), 2)
@@ -691,7 +688,7 @@ function hypoperlogdettri2(T, test_options)
 end
 
 function hypoperlogdettri3(T, test_options)
-    tol = max(1e-5, sqrt(sqrt(eps(T))))
+    tol = sqrt(sqrt(eps(T)))
     Random.seed!(1)
     side = 3
     dim = 2 + div(side * (side + 1), 2)
@@ -712,7 +709,7 @@ function hypoperlogdettri3(T, test_options)
 end
 
 function epiperexp1(T, test_options)
-    tol = max(1e-5, sqrt(sqrt(eps(T))))
+    tol = sqrt(sqrt(eps(T)))
     l = 5
     c = vcat(zero(T), -ones(T, l))
     A = hcat(one(T), zeros(T, 1, l))
@@ -729,7 +726,7 @@ function epiperexp1(T, test_options)
 end
 
 function epiperexp2(T, test_options)
-    tol = max(1e-5, sqrt(sqrt(eps(T))))
+    tol = sqrt(sqrt(eps(T)))
     l = 5
     c = vcat(zero(T), -ones(T, l))
     A = hcat(one(T), zeros(T, 1, l))

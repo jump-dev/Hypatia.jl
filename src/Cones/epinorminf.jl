@@ -87,13 +87,16 @@ function update_grad(cone::EpiNormInf{T}) where {T <: Real}
         iu2ww = wj * iu2w2
         cone.grad[j + 1] = iu2ww
         cone.diag2n[j] = iu2w2 + abs2(iu2ww)
+        @assert cone.diag2n[j] > 0
         cone.edge2n[j] = -iuw2u * iu2ww
         cone.div2n[j] = -cone.edge2n[j] / cone.diag2n[j]
     end
     t1 = (cone.dim - 2) / u
     cone.grad[1] = t1 - g1
     cone.diag11 = -(t1 + g1) / u + h1
+    @assert cone.diag11 > 0
     cone.schur = cone.diag11 + dot(cone.edge2n, cone.div2n)
+    @assert cone.schur > 0
     cone.grad_updated = true
     return cone.grad
 end

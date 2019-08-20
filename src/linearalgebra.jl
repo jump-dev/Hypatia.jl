@@ -14,7 +14,6 @@ hyp_AAt!(U::Matrix{T}, A::Matrix{T}) where {T <: BlasReal} = BLAS.syrk!('U', 'N'
 hyp_AAt!(U::Matrix{T}, A::Matrix{T}) where {T <: RealOrComplex{<:Real}} = mul!(U, A, A')
 
 
-
 import LinearAlgebra.BlasInt
 import LinearAlgebra.BLAS.@blasfunc
 import LinearAlgebra.LAPACK.liblapack
@@ -91,8 +90,6 @@ function hyp_ldiv_chol_L!(B::Matrix, F::Cholesky, A::AbstractMatrix)
     return B
 end
 
-
-
 # cache for LAPACK cholesky with linear solve (like POSVX)
 mutable struct HypCholSolveCache{R <: Real}
     uplo
@@ -114,7 +111,8 @@ mutable struct HypCholSolveCache{R <: Real}
     HypCholSolveCache{R}() where {R <: Real} = new{R}()
 end
 
-function HypCholSolveCache(use_upper::Bool, X::AbstractMatrix{R}, A::AbstractMatrix{R}, B::AbstractMatrix{R}) where {R <: BlasReal}
+# NOTE X (solution) argument needs to be a Matrix type or else silent failures occur
+function HypCholSolveCache(use_upper::Bool, X::Matrix{R}, A::AbstractMatrix{R}, B::AbstractMatrix{R}) where {R <: BlasReal}
     LinearAlgebra.chkstride1(A)
     c = HypCholSolveCache{R}()
     c.uplo = (use_upper ? 'U' : 'L')
@@ -144,7 +142,7 @@ for (posvx, elty, rtyp) in (
     (:sposvx_, :Float32, :Float32),
     )
     @eval begin
-        function hyp_chol_solve!(c::HypCholSolveCache{$elty}, X::AbstractMatrix{$elty}, A::AbstractMatrix{$elty}, B::AbstractMatrix{$elty})
+        function hyp_chol_solve!(c::HypCholSolveCache{$elty}, X::Matrix{$elty}, A::AbstractMatrix{$elty}, B::AbstractMatrix{$elty})
             ccall((@blasfunc($posvx), liblapack), Cvoid, (
                 Ref{UInt8}, Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt},
                 Ptr{$elty}, Ref{BlasInt}, Ptr{$elty}, Ref{BlasInt},
@@ -158,35 +156,35 @@ for (posvx, elty, rtyp) in (
             if c.info[] < 0
                 throw(ArgumentError("invalid argument #$(-c.info[]) to LAPACK call"))
             elseif 0 < c.info[] <= c.n
-                println("factorization failed")
+                println("factorization failed: #$(c.info[])")
+                return false
             elseif c.info[] == c.n
-                println("RCOND is small")
+                println("RCOND is small: $(c.rcond[])")
             end
-
-            return X
+            return true
         end
     end
 end
 
-function HypCholSolveCache(use_upper::Bool, X::AbstractMatrix{R}, A::AbstractMatrix{R}, B::AbstractMatrix{R}) where {R <: Real}
+function HypCholSolveCache(use_upper::Bool, X::Matrix{R}, A::AbstractMatrix{R}, B::AbstractMatrix{R}) where {R <: Real}
     c = HypCholSolveCache{R}()
     c.uplo = (use_upper ? :U : :L)
     return c
 end
 
-function hyp_chol_solve!(c::HypCholSolveCache{R}, X::AbstractMatrix{R}, A::AbstractMatrix{R}, B::AbstractMatrix{R}) where {R <: Real}
+function hyp_chol_solve!(c::HypCholSolveCache{R}, X::Matrix{R}, A::AbstractMatrix{R}, B::AbstractMatrix{R}) where {R <: Real}
     F = cholesky!(Symmetric(A, c.uplo), check = false)
     if !isposdef(F)
-        error("Cholesky factorization failed")
+        return false
     end
     ldiv!(X, F, B)
-    return X
+    return true
 end
 
-
-
 # cache for LAPACK Bunch-Kaufman with linear solve (like SYSVX)
-mutable struct HypBKSolveCache{R <: BlasReal}
+# TODO try Aasen's version (http://www.netlib.org/lapack/lawnspdf/lawn294.pdf) and other
+mutable struct HypBKSolveCache{R <: Real}
+    tol_diag
     uplo
     n
     lda
@@ -202,12 +200,14 @@ mutable struct HypBKSolveCache{R <: BlasReal}
     AF
     ipiv
     info
-    HypBKSolveCache{R}() where {R <: BlasReal} = new{R}()
+    HypBKSolveCache{R}() where {R <: Real} = new{R}()
 end
 
-function HypBKSolveCache(use_upper::Bool, X::AbstractMatrix{R}, A::AbstractMatrix{R}, B::AbstractMatrix{R}) where {R <: BlasReal}
+# NOTE X (solution) argument needs to be a Matrix type or else silent failures occur
+function HypBKSolveCache(use_upper::Bool, X::Matrix{R}, A::AbstractMatrix{R}, B::AbstractMatrix{R}) where {R <: BlasReal}
     LinearAlgebra.chkstride1(A)
     c = HypBKSolveCache{R}()
+    c.tol_diag = sqrt(eps(R)) # TODO tune
     c.uplo = (use_upper ? 'U' : 'L')
     c.n = LinearAlgebra.checksquare(A)
     @assert c.n == size(X, 1) == size(B, 1)
@@ -234,34 +234,55 @@ for (sysvx, elty, rtyp) in (
     (:ssysvx_, :Float32, :Float32),
     )
     @eval begin
-        function hyp_bk_solve!(c::HypBKSolveCache{$elty}, X::AbstractMatrix{$elty}, A::AbstractMatrix{$elty}, B::AbstractMatrix{$elty})
-            # ccall((@blasfunc($posvx), liblapack), Cvoid, (
-            #     Ref{UInt8}, Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt},
-            #     Ptr{$elty}, Ref{BlasInt}, Ptr{$elty}, Ref{BlasInt},
-            #     Ref{UInt8}, Ptr{$elty},
-            #     Ptr{$elty}, Ref{BlasInt}, Ptr{$elty},
-            #     Ref{BlasInt}, Ptr{$elty}, Ptr{$elty}, Ptr{$elty},
-            #     Ptr{$elty}, Ptr{BlasInt}, Ptr{BlasInt},
-            #     ), 'E', c.uplo, c.n, c.nrhs, A, c.lda, c.AF, c.ldaf, 'Y', c.S, B,
-            #     c.ldb, X, c.n, c.rcond, c.ferr, c.berr, c.work, c.iwork, c.info)
-            ccall((@blasfunc(dsysvx_), Base.liblapack_name), Cvoid,
+        function hyp_bk_solve!(c::HypBKSolveCache{$elty}, X::Matrix{$elty}, A::AbstractMatrix{$elty}, B::AbstractMatrix{$elty})
+            # ensure diagonal terms in symmetric (and ideally PSD) matrix are not too small
+            @inbounds for j in 1:c.n
+                if A[j, j] < c.tol_diag
+                    A[j, j] = c.tol_diag
+                end
+            end
+
+            ccall((@blasfunc($sysvx), Base.liblapack_name), Cvoid,
                 (Ref{UInt8}, Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt},
-                Ptr{Float64}, Ref{BlasInt}, Ptr{Float64}, Ref{BlasInt},
-                Ptr{BlasInt}, Ptr{Float64}, Ref{BlasInt}, Ptr{Float64},
-                Ref{BlasInt}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64},
-                Ptr{Float64}, Ptr{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt}),
+                Ptr{$elty}, Ref{BlasInt}, Ptr{$elty}, Ref{BlasInt},
+                Ptr{BlasInt}, Ptr{$elty}, Ref{BlasInt}, Ptr{$elty},
+                Ref{BlasInt}, Ptr{$elty}, Ptr{$elty}, Ptr{$elty},
+                Ptr{$elty}, Ptr{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt}),
                 'N', c.uplo, c.n, c.nrhs, A, c.lda, c.AF, c.ldaf, c.ipiv, B,
                 c.ldb, X, c.n, c.rcond, c.ferr, c.berr, c.work, c.lwork, c.iwork, c.info)
 
             if c.info[] < 0
                 throw(ArgumentError("invalid argument #$(-c.info[]) to LAPACK call"))
             elseif 0 < c.info[] <= c.n
-                println("factorization failed")
+                println("factorization failed: #$(c.info[])")
+                return false
             elseif c.info[] == c.n
-                println("RCOND is small")
+                println("RCOND is small: $(c.rcond[])")
             end
-
-            return X
+            return true
         end
     end
+end
+
+function HypBKSolveCache(use_upper::Bool, X::Matrix{R}, A::AbstractMatrix{R}, B::AbstractMatrix{R}) where {R <: Real}
+    c = HypBKSolveCache{R}()
+    c.tol_diag = sqrt(eps(R)) # TODO tune
+    c.uplo = (use_upper ? :U : :L)
+    return c
+end
+
+# fall back to Cholesky solve for eltype not BlasReal
+function hyp_bk_solve!(c::HypBKSolveCache{R}, X::Matrix{R}, A::AbstractMatrix{R}, B::AbstractMatrix{R}) where {R <: Real}
+    # ensure diagonal terms in symmetric (and ideally PSD) matrix are not too small
+    @inbounds for j in 1:size(A, 1)
+        if A[j, j] < c.tol_diag
+            A[j, j] = c.tol_diag
+        end
+    end
+    F = cholesky!(Symmetric(A, c.uplo), check = false)
+    if !isposdef(F)
+        return false
+    end
+    ldiv!(X, F, B)
+    return true
 end
