@@ -17,8 +17,6 @@ import Hypatia.hyp_AAt!
 import Hypatia.hyp_chol!
 import Hypatia.hyp_ldiv_chol_L!
 
-using TimerOutputs
-
 abstract type Cone{T <: Real} end
 
 include("orthant.jl")

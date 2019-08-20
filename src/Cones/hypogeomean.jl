@@ -78,8 +78,9 @@ function update_feas(cone::HypoGeomean)
     w = view(cone.point, 2:cone.dim)
     @. cone.alphaiw = cone.alpha / w
     if u < 0 && all(wi -> wi > 0, w)
-        cone.wiaa = exp(-sum(cone.alpha[i] * log(cone.alphaiw[i]) for i in eachindex(cone.alpha)))
-        cone.is_feas = (cone.wiaa > -u)
+        cone.wiaa = -sum(cone.alpha[i] * log(cone.alphaiw[i]) for i in eachindex(cone.alpha))
+        cone.is_feas = (cone.wiaa > log(-u))
+        cone.wiaa = exp(cone.wiaa)
     else
         cone.is_feas = false
     end
