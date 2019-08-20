@@ -27,8 +27,10 @@ mutable struct Power{T <: Real} <: Cone{T}
     inv_hess::Symmetric{T, Matrix{T}}
 
     logprodw::T
-    wi2a::T
+    prodw::T
+    prodw_prodwu::T
     wiw::T
+    prodwu::T
     alphawi::Vector{T}
     tmp_hess::Symmetric{T, Matrix{T}}
     hess_fact # TODO prealloc
@@ -91,11 +93,13 @@ function update_grad(cone::Power)
     w = view(cone.point, (m + 1):cone.dim)
     @. cone.alphawi = 2 * cone.alpha / w
     # prod_i((w_i)^(2 * alpha_i))
-    cone.wi2a = exp(2 * cone.logprodw)
+    cone.prodw = exp(2 * cone.logprodw)
     # violation term
-    wi2au = cone.wi2a - sum(abs2, u)
-    @. cone.grad[1:m] = u * 2 / wi2au
-    @. cone.grad[(m + 1):end] = -cone.alphawi * cone.wi2a / wi2au - (1 - cone.alpha) / w
+    cone.prodwu = cone.prodw - sum(abs2, u)
+    # ratio of product and violation
+    cone.prodw_prodwu = cone.prodw / cone.prodwu
+    @. cone.grad[1:m] = u * 2 / cone.prodwu
+    @. cone.grad[(m + 1):end] = -cone.alphawi * cone.prodw_prodwu - (1 - cone.alpha) / w
     cone.grad_updated = true
     return cone.grad
 end
@@ -108,14 +112,13 @@ function update_hess(cone::Power)
     H = cone.hess.data
     alpha = cone.alpha
     alphawi = cone.alphawi
-    wi2a = cone.wi2a
-    wi2au = cone.wi2a - sum(abs2, u)
-    # ratio of product and violation
-    wi2a_wi2au = wi2a / wi2au
+    prodw = cone.prodw
+    prodwu = cone.prodwu
+    prodw_prodwu = cone.prodw_prodwu
 
     # double derivative wrt u
-    scal = 4 / wi2au / wi2au
-    offset = 2 / wi2au
+    offset = 2 / prodwu
+    scal = 2 * offset / prodwu
     @inbounds for j in 1:m
         @inbounds for i in 1:j
             H[i, j] = scal * u[i] * u[j]
@@ -127,20 +130,61 @@ function update_hess(cone::Power)
         jm = j + m
 
         # derivative wrt u and w
-        scal = -2 * alphawi[j] * wi2a_wi2au / wi2au
+        scal = -2 * alphawi[j] * prodw_prodwu / prodwu
         @inbounds for i in 1:m
             H[i, jm] = scal * u[i]
         end
 
         # double derivative wrt w
-        awj_ratio = alphawi[j] * wi2a_wi2au
-        awj_ratio_ratio = awj_ratio * (wi2a_wi2au - 1)
+        awj_ratio = alphawi[j] * prodw_prodwu
+        awj_ratio_ratio = awj_ratio * (prodw_prodwu - 1)
         @inbounds for i in 1:(j - 1)
             H[i + m, jm] = alphawi[i] * awj_ratio_ratio
+            # H[i + m, jm] = alphawi[i] * alphawi[j] * prodw_prodwu * (prodw_prodwu - 1)
         end
         H[jm, jm] = awj_ratio_ratio * alphawi[j] + (awj_ratio + (1 - alpha[j]) / w[j]) / w[j]
+        # H[jm, jm] = (1 - alpha[j]) / w[j]^2 + alphawi[j]^2 * prodw_prodwu * (prodw_prodwu - 1) + alphawi[j] / w[j] * prodw_prodwu
+        # H[jm, jm] += (1 - alpha[j]) / w[j]^2 + alphawi[j] / w[j] * prodw_prodwu
     end
 
     cone.hess_updated = true
     return cone.hess
+end
+
+function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Power)
+    @assert cone.grad_updated
+    m = cone.m
+    u = cone.point[1:m]
+    w = view(cone.point, (m + 1):cone.dim)
+    alpha = cone.alpha
+    prodwu = cone.prodwu
+    alphawi = cone.alphawi
+    prodw_prodwu = cone.prodw_prodwu
+
+    offset = 2 / prodwu
+    scal = 2 * offset / prodwu
+
+    # TODO wrap entire block in @views?
+
+    @inbounds for i in 1:size(arr, 2)
+        # H[1:m, 1:m] * arr[1:m]
+        @. prod[1:m, i] = u[1:m] * scal
+        prod[1:m, i] .*= dot(u[1:m], arr[1:m, i])
+        @. prod[1:m, i] += offset * arr[1:m, i]
+
+        # H[(m + 1):dim, 1:m] * arr[(m + 1):dim]
+        dotn = -2 * prodw_prodwu * dot(alphawi, arr[(m + 1):cone.dim, i]) / prodwu
+        @. prod[1:m, i] += u[1:m] * dotn
+
+        # H[(m + 1):dim, (m + 1):dim] * arr[(m + 1):dim]
+        @. prod[(m + 1):cone.dim, i] = alphawi * prodw_prodwu * (prodw_prodwu - 1)
+        prod[(m + 1):cone.dim, i] .*= dot(alphawi, arr[(m + 1):cone.dim, i])
+        @. prod[(m + 1):cone.dim, i] += (prodw_prodwu * alphawi / w + (1 - alpha) / w / w) * arr[(m + 1):cone.dim, i]
+
+        # H[1:m, (m + 1):dim] * arr[1:m]
+        dotm = -2 * prodw_prodwu / prodwu * dot(u[1:m], arr[1:m, i])
+        prod[(m + 1):cone.dim, i] .+= dotm * alphawi
+    end
+
+    return prod
 end
