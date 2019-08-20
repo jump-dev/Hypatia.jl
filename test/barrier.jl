@@ -155,9 +155,9 @@ function test_power_barrier(T::Type{<:Real})
         function barrier(s)
             u = s[1:m]
             w = s[(m + 1):end]
-            return -log(prod(w.^(2 .* alpha)) - sum(abs2, u)) - sum((1 .- alpha) .* log.(w))
+            return -log(prod(w[j] ^ (2 * alpha[j]) for j in eachindex(w)) - sum(abs2, u)) - sum((1 - alpha[j]) * log(w[j]) for j in eachindex(w))
         end
-        # test_barrier_oracles(cone, barrier)
+        test_barrier_oracles(cone, barrier)
         test_barrier_oracles(cone, barrier, noise = 0.1)
     end
     return

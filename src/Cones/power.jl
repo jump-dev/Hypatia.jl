@@ -64,8 +64,8 @@ end
 get_nu(cone::Power) = length(cone.alpha) + 1
 
 function set_initial_point(arr::AbstractVector, cone::Power)
-    arr .= 1
     arr[1:cone.m] .= 0
+    arr[(cone.m + 1):cone.dim] .= 1
     return arr
 end
 
@@ -126,7 +126,7 @@ function update_hess(cone::Power)
     @inbounds for j in eachindex(w)
         jm = j + m
         # derivative wrt u and w
-        scal = -4 * cone.alpha[j] * wi2a_wi2au / wi2au / w[j]
+        scal = -2 * alphawi[j] * wi2a_wi2au / wi2au
         @inbounds for i in 1:m
             H[i, jm] = scal * u[i]
         end
@@ -134,8 +134,7 @@ function update_hess(cone::Power)
         awj_ratio = alphawi[j] * wi2a_wi2au
         awj_ratio_ratio = awj_ratio * (wi2a_wi2au - 1)
         @inbounds for i in 1:(j - 1)
-            im = i + m
-            H[im, jm] = alphawi[i] * awj_ratio_ratio
+            H[i + m, jm] = alphawi[i] * awj_ratio_ratio
         end
         H[jm, jm] = awj_ratio_ratio * alphawi[j] + (awj_ratio + (1 - alpha[j]) / w[j]) / w[j]
     end
