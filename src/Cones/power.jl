@@ -32,6 +32,7 @@ mutable struct Power{T <: Real} <: Cone{T}
     alphawi::Vector{T}
     tmp_hess::Symmetric{T, Matrix{T}}
     hess_fact # TODO prealloc
+    cache_fact
 
     function Power{T}(alpha::Vector{T}, m::Int, is_dual::Bool) where {T <: Real}
         dim = length(alpha) + m
@@ -58,6 +59,7 @@ function setup_data(cone::Power{T}) where {T <: Real}
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.tmp_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.alphawi = zeros(T, dim - cone.m)
+    cone.cache_fact = nothing
     return
 end
 

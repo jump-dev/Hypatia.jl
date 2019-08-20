@@ -40,6 +40,7 @@ mutable struct EpiNormSpectral{T <: Real} <: Cone{T}
 
     tmp_hess::Symmetric{T, Matrix{T}}
     hess_fact # TODO prealloc
+    cache_fact
 
     function EpiNormSpectral{T}(n::Int, m::Int, is_dual::Bool) where {T <: Real}
         @assert n <= m
@@ -71,6 +72,7 @@ function setup_data(cone::EpiNormSpectral{T}) where {T <: Real}
     cone.tmpnn = Matrix{T}(undef, cone.n, cone.n)
     cone.tmpnm = Matrix{T}(undef, cone.n, cone.m)
     cone.tmpn = Vector{T}(undef, cone.n)
+    cone.cache_fact = nothing
     return
 end
 
