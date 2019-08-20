@@ -125,11 +125,13 @@ function update_hess(cone::Power)
 
     @inbounds for j in eachindex(w)
         jm = j + m
+
         # derivative wrt u and w
         scal = -2 * alphawi[j] * wi2a_wi2au / wi2au
         @inbounds for i in 1:m
             H[i, jm] = scal * u[i]
         end
+
         # double derivative wrt w
         awj_ratio = alphawi[j] * wi2a_wi2au
         awj_ratio_ratio = awj_ratio * (wi2a_wi2au - 1)
@@ -138,7 +140,7 @@ function update_hess(cone::Power)
         end
         H[jm, jm] = awj_ratio_ratio * alphawi[j] + (awj_ratio + (1 - alpha[j]) / w[j]) / w[j]
     end
-    
+
     cone.hess_updated = true
     return cone.hess
 end
