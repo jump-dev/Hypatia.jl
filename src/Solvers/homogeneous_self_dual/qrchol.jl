@@ -269,9 +269,13 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
             # end
             # ldiv!(F, Q2div)
 
-            # prealloc
-            c = HypCholSolveCache(true, copy(Q2div), copy(Q2GHGQ2), copy(Q2div))
-            Q2div .= hyp_chol_solve!(c, copy(Q2div), copy(Q2GHGQ2), copy(Q2div))
+            # # prealloc
+            # c = HypCholSolveCache(true, copy(Q2div), copy(Q2GHGQ2), copy(Q2div))
+            # Q2div .= hyp_chol_solve!(c, copy(Q2div), copy(Q2GHGQ2), copy(Q2div))
+            c = HypBKSolveCache(true, copy(Q2div), copy(Q2GHGQ2), copy(Q2div))
+            Q2div .= hyp_bk_solve!(c, copy(Q2div), copy(Q2GHGQ2), copy(Q2div))
+
+
         end
     end
 
