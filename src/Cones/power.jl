@@ -108,7 +108,6 @@ function update_hess(cone::Power)
     H = cone.hess.data
     alpha = cone.alpha
     alphawi = cone.alphawi
-
     wi2a = cone.wi2a
     wi2au = cone.wi2a - sum(abs2, u)
     # ratio of product and violation
@@ -123,6 +122,7 @@ function update_hess(cone::Power)
         end
         H[j, j] += offset
     end
+
     @inbounds for j in eachindex(w)
         jm = j + m
         # derivative wrt u and w
@@ -138,6 +138,7 @@ function update_hess(cone::Power)
         end
         H[jm, jm] = awj_ratio_ratio * alphawi[j] + (awj_ratio + (1 - alpha[j]) / w[j]) / w[j]
     end
+    
     cone.hess_updated = true
     return cone.hess
 end
