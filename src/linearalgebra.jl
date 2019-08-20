@@ -96,8 +96,6 @@ end
 # cache for LAPACK cholesky with linear solve (like POSVX)
 mutable struct HypCholSolveCache{R <: Real}
     uplo
-    fact
-    equed
     n
     lda
     ldaf
@@ -120,12 +118,10 @@ function HypCholSolveCache(use_upper::Bool, X::AbstractMatrix{R}, A::AbstractMat
     LinearAlgebra.chkstride1(A)
     c = HypCholSolveCache{R}()
     c.uplo = (use_upper ? 'U' : 'L')
-    c.fact = 'E'
-    c.equed = 'Y'
     c.n = LinearAlgebra.checksquare(A)
     @assert c.n == size(X, 1) == size(B, 1)
     @assert size(X, 2) == size(B, 2)
-    c.lda = max(1, stride(A, 2))
+    c.lda = stride(A, 2)
     c.ldaf = c.n
     c.nrhs = size(B, 2)
     c.ldb = stride(B, 2)
@@ -156,13 +152,8 @@ for (posvx, elty, rtyp) in (
                 Ptr{$elty}, Ref{BlasInt}, Ptr{$elty},
                 Ref{BlasInt}, Ptr{$elty}, Ptr{$elty}, Ptr{$elty},
                 Ptr{$elty}, Ptr{BlasInt}, Ptr{BlasInt},
-                ), c.fact, c.uplo, c.n, c.nrhs, A, c.lda, c.AF, c.ldaf, c.equed, c.S, B,
+                ), 'E', c.uplo, c.n, c.nrhs, A, c.lda, c.AF, c.ldaf, 'Y', c.S, B,
                 c.ldb, X, c.n, c.rcond, c.ferr, c.berr, c.work, c.iwork, c.info)
-
-                @show c.equed
-                @show c.fact
-                @show c.rcond[]
-                @show c.info[]
 
             if c.info[] < 0
                 throw(ArgumentError("invalid argument #$(-c.info[]) to LAPACK call"))

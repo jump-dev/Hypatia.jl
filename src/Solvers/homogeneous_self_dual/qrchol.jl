@@ -271,7 +271,7 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
 
             # prealloc
             c = HypCholSolveCache(true, copy(Q2div), copy(Q2GHGQ2), copy(Q2div))
-            hyp_chol_solve!(c, copy(Q2div), copy(Q2GHGQ2), copy(Q2div))
+            Q2div .= hyp_chol_solve!(c, copy(Q2div), copy(Q2GHGQ2), copy(Q2div))
         end
     end
 
