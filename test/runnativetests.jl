@@ -17,9 +17,9 @@ real_types = [
 
 system_solvers = [
     SO.QRCholCombinedHSDSystemSolver,
-    # SO.SymIndefCombinedHSDSystemSolver,
-    # SO.NaiveElimCombinedHSDSystemSolver,
-    # SO.NaiveCombinedHSDSystemSolver,
+    SO.SymIndefCombinedHSDSystemSolver,
+    SO.NaiveElimCombinedHSDSystemSolver,
+    SO.NaiveCombinedHSDSystemSolver,
     ]
 
 testfuns_preproc = [
@@ -40,7 +40,7 @@ end
 
 linear_models = [
     MO.PreprocessedLinearModel,
-    # MO.RawLinearModel,
+    MO.RawLinearModel,
     ]
 
 use_infty_nbhd = [
@@ -105,21 +105,21 @@ testfuns_raw = [
         linear_model_options = NamedTuple(),
         system_solver_options = NamedTuple(),
         stepper_options = (use_infty_nbhd = n,),
-        solver_options = (verbose = true,),
+        solver_options = (verbose = false,),
         )
     t(T, test_options)
 end
-#
-# @testset "native tests (iterative linear system solves): $t, $T" for t in testfuns_raw, T in real_types
-#     if T == BigFloat
-#         continue # IterativeSolvers does not work with BigFloat
-#     end
-#     test_options = (
-#         linear_model = MO.RawLinearModel,
-#         system_solver = SO.NaiveCombinedHSDSystemSolver,
-#         linear_model_options = (use_iterative = true,),
-#         system_solver_options = (use_iterative = true,),
-#         solver_options = (verbose = false,),
-#         )
-#     t(T, test_options)
-# end
+
+@testset "native tests (iterative linear system solves): $t, $T" for t in testfuns_raw, T in real_types
+    if T == BigFloat
+        continue # IterativeSolvers does not work with BigFloat
+    end
+    test_options = (
+        linear_model = MO.RawLinearModel,
+        system_solver = SO.NaiveCombinedHSDSystemSolver,
+        linear_model_options = (use_iterative = true,),
+        system_solver_options = (use_iterative = true,),
+        solver_options = (verbose = false,),
+        )
+    t(T, test_options)
+end
