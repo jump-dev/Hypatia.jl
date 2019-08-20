@@ -20,11 +20,12 @@ barrier_testfuns = [
     test_epiperpower_barrier, # fails with BigFloat
     test_hypoperlog_barrier,
     test_epiperexp_barrier, # fails with BigFloat
+    test_power_barrier,
     test_hypogeomean_barrier,
     test_epinormspectral_barrier,
     test_possemideftri_barrier,
     test_hypoperlogdettri_barrier,
-    # test_wsospolyinterp_barrier,
+    test_wsospolyinterp_barrier,
     # TODO next 2 fail with BigFloat
     # NOTE not updated for generic reals or for new cone oracles interface
     # test_wsospolyinterpmat_barrier,

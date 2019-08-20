@@ -19,6 +19,10 @@ import Hypatia.Models
 import Hypatia.hyp_AtA!
 import Hypatia.hyp_chol!
 import Hypatia.hyp_ldiv_chol_L!
+import Hypatia.HypCholSolveCache
+import Hypatia.hyp_chol_solve!
+import Hypatia.HypBKSolveCache
+import Hypatia.hyp_bk_solve!
 import Hypatia.BlockMatrix
 
 abstract type Solver{T <: Real} end
@@ -124,7 +128,7 @@ function build_solve_check(
     system_solver_options::NamedTuple = NamedTuple(),
     stepper_options::NamedTuple = NamedTuple(),
     solver_options::NamedTuple = NamedTuple(),
-    atol::Real = max(1e-5, sqrt(sqrt(eps(T)))),
+    atol::Real = sqrt(sqrt(eps(T))),
     rtol::Real = atol,
     ) where {T <: Real}
     model = linear_model{T}(c, A, b, G, h, cones; obj_offset = obj_offset, linear_model_options...)
