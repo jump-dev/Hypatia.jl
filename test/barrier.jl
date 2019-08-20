@@ -146,6 +146,23 @@ function test_epiperexp_barrier(T::Type{<:Real})
     return
 end
 
+function test_power_barrier(T::Type{<:Real})
+    Random.seed!(1)
+    for dim in [3, 5, 8], m in [1, 2, 3]
+        alpha = rand(T, dim - 1) .+ 1
+        alpha ./= sum(alpha)
+        cone = CO.Power{T}(alpha, m)
+        function barrier(s)
+            u = s[1:m]
+            w = s[(m + 1):end]
+            return -log(prod(w[j] ^ (2 * alpha[j]) for j in eachindex(w)) - sum(abs2, u)) - sum((1 - alpha[j]) * log(w[j]) for j in eachindex(w))
+        end
+        test_barrier_oracles(cone, barrier)
+        test_barrier_oracles(cone, barrier, noise = 0.1)
+    end
+    return
+end
+
 function test_hypogeomean_barrier(T::Type{<:Real})
     Random.seed!(1)
     for dim in [3, 5, 8]
