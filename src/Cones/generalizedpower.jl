@@ -56,11 +56,11 @@ function setup_data(cone::GeneralizedPower{T}) where {T <: Real}
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.tmp_hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.alphawi = zeros(T, dim - 1)
+    cone.alphawi = zeros(T, dim - cone.m)
     return
 end
 
-get_nu(cone::GeneralizedPower) = cone.dim
+get_nu(cone::GeneralizedPower) = length(cone.alpha) + 1
 
 function set_initial_point(arr::AbstractVector, cone::GeneralizedPower)
     arr .= 1
@@ -70,8 +70,9 @@ end
 
 function update_feas(cone::GeneralizedPower)
     @assert !cone.feas_updated
-    u = cone.point[1]
-    w = view(cone.point, 2:cone.dim)
+    m = cone.m
+    u = cone.point[1:m]
+    w = view(cone.point, (m + 1):cone.dim)
     if all(wi -> wi > 0, w)
         cone.is_feas = (sum(cone.alpha[i] * log(w[i]) for i in eachindex(cone.alpha)) > log(sum(abs2, u)))
     else
@@ -116,8 +117,11 @@ function update_hess(cone::GeneralizedPower)
     # double derivative wrt u
     scal = 4 / wi2au / wi2au
     offset = 2 / wi2au
-    for i in 1:m
-        H[i, i] = offset + scal * u[i]^2
+    for j in 1:m
+        for i in 1:j
+            H[i, j] = scal * u[i] * u[j]
+        end
+        H[j, j] += offset
     end
     for j in eachindex(w)
         jm = j + m
