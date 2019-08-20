@@ -30,7 +30,7 @@ mutable struct HypoGeomean{T <: Real} <: Cone{T}
     wiaa::T
     wiw::T
     alphaiw::Vector{T}
-    a1ww::Vector{T} # seems useless
+    a1ww::Vector{T}
     tmpnn::Matrix{T}
     tmp_hess::Symmetric{T, Matrix{T}}
     hess_fact # TODO prealloc
@@ -93,69 +93,71 @@ function update_grad(cone::HypoGeomean)
     w = view(cone.point, 2:cone.dim)
     wiaau = cone.wiaa + u
     cone.wiw = cone.wiaa / wiaau
-    @. cone.a1ww = cone.alpha * (1 - cone.wiw) / w
+    @. cone.a1ww = cone.alphaiw * (1 - cone.wiw)
     cone.grad[1] = -inv(wiaau) - inv(u)
     @. cone.grad[2:end] = cone.a1ww - inv(w)
     cone.grad_updated = true
     return cone.grad
 end
 
-# function update_hess(cone::HypoGeomean)
-#     @assert cone.grad_updated
-#     u = cone.point[1]
-#     w = view(cone.point, 2:cone.dim)
-#     H = cone.hess.data
-#
-#     wiaau = cone.wiaa + u
-#     H[1, 1] = inv(wiaau) / wiaau + inv(u) / u
-#     @inbounds for j in eachindex(w)
-#         j1 = j + 1
-#         wiwaw = -cone.wiw * cone.alpha[j] / w[j]
-#         H[1, j1] = -wiwaw / wiaau
-#         @inbounds for i in 1:(j - 1)
-#             H[i + 1, j1] = wiwaw * cone.a1ww[i]
-#         end
-#         H[j1, j1] = wiwaw * cone.grad[j1] + (1 - cone.alpha[j]) / w[j] / w[j]
-#     end
-#
-#     cone.hess_updated = true
-#     return cone.hess
-# end
-
 function update_hess(cone::HypoGeomean)
     @timeit "hess" begin
-
     @assert cone.grad_updated
     u = cone.point[1]
     w = view(cone.point, 2:cone.dim)
     H = cone.hess.data
-    alpha = cone.alpha
-    wiw = cone.wiw
-    tmpnn = cone.tmpnn
-    alphaiw = cone.alphaiw
-
 
     wiaau = cone.wiaa + u
     H[1, 1] = inv(wiaau) / wiaau + inv(u) / u
     @inbounds for j in eachindex(w)
         j1 = j + 1
-        wiwaw = -wiw * alphaiw[j]
+        wiwaw = -cone.wiw * cone.alpha[j] / w[j]
         H[1, j1] = -wiwaw / wiaau
+        @inbounds for i in 1:(j - 1)
+            H[i + 1, j1] = wiwaw * cone.a1ww[i]
+        end
+        H[j1, j1] = wiwaw * cone.grad[j1] + (1 - cone.alpha[j]) / w[j] / w[j]
     end
-
-    Hblock = view(H, 2:cone.dim, 2:cone.dim)
-
-    mul!(tmpnn, alphaiw, alphaiw')
-    @. tmpnn *= abs2(wiw)
-    tmpnn .-= alphaiw * alphaiw' * wiw
-    # mul!(tmpnn, alphaiw, alphaiw', wiw, -1)
-    for i in 1:(cone.dim - 1)
-        tmpnn[i, i] += alpha[i] / w[i]^2 * wiw + (1 - alpha[i]) / w[i]^2
-    end
-    Hblock .= tmpnn
 
     cone.hess_updated = true
-
     end
     return cone.hess
 end
+
+# function update_hess(cone::HypoGeomean)
+#     @timeit "hess" begin
+#
+#     @assert cone.grad_updated
+#     u = cone.point[1]
+#     w = view(cone.point, 2:cone.dim)
+#     H = cone.hess.data
+#     alpha = cone.alpha
+#     wiw = cone.wiw
+#     tmpnn = cone.tmpnn
+#     alphaiw = cone.alphaiw
+#
+#
+#     wiaau = cone.wiaa + u
+#     H[1, 1] = inv(wiaau) / wiaau + inv(u) / u
+#     @inbounds for j in eachindex(w)
+#         j1 = j + 1
+#         wiwaw = -wiw * alphaiw[j]
+#         H[1, j1] = -wiwaw / wiaau
+#     end
+#
+#     Hblock = view(H, 2:cone.dim, 2:cone.dim)
+#
+#     mul!(tmpnn, alphaiw, alphaiw')
+#     @. tmpnn *= abs2(wiw)
+#     tmpnn .-= alphaiw * alphaiw' * wiw
+#     # mul!(tmpnn, alphaiw, alphaiw', wiw, -1)
+#     for i in 1:(cone.dim - 1)
+#         tmpnn[i, i] += (1 + (wiw - 1) * alpha[i]) / w[i]^2
+#     end
+#     Hblock .= tmpnn
+#
+#     cone.hess_updated = true
+#
+#     end
+#     return cone.hess
+# end
