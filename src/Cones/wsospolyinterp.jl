@@ -34,6 +34,7 @@ mutable struct WSOSPolyInterp{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     ΛFs::Vector
     tmp_hess::Symmetric{T, Matrix{T}}
     hess_fact # TODO prealloc
+    cache_fact
 
     function WSOSPolyInterp{T, R}(dim::Int, Ps::Vector{Matrix{R}}, is_dual::Bool) where {R <: RealOrComplex{T}} where {T <: Real}
         for k in eachindex(Ps)
@@ -63,6 +64,7 @@ function setup_data(cone::WSOSPolyInterp{T, R}) where {R <: RealOrComplex{T}} wh
     cone.tmpUU = Matrix{R}(undef, dim, dim)
     cone.ΛFs = Vector{Any}(undef, length(Ps))
     cone.tmp_hess = Symmetric(zeros(T, dim, dim), :U)
+    cone.cache_fact = nothing
     return
 end
 

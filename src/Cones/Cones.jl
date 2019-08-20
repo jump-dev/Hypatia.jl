@@ -17,6 +17,8 @@ import Hypatia.hyp_AAt!
 import Hypatia.HypCholCache
 import Hypatia.hyp_chol!
 import Hypatia.hyp_ldiv_chol_L!
+import Hypatia.HypBKCache
+import Hypatia.hyp_bk!
 
 abstract type Cone{T <: Real} end
 
@@ -68,15 +70,28 @@ end
 
 update_hess_prod(cone::Cone) = nothing
 
-function update_inv_hess_prod(cone::Cone)
+function update_inv_hess_prod(cone::Cone{T}) where {T}
     if !cone.hess_updated
         update_hess(cone)
     end
     copyto!(cone.tmp_hess, cone.hess)
-    cone.hess_fact = hyp_chol!(cone.tmp_hess)
-    if !isposdef(cone.hess_fact) # TODO maybe better to not step to this point if the hessian factorization fails
+    if isnothing(cone.cache_fact)
+        cone.cache_fact = HypBKCache(cone.tmp_hess.uplo, cone.tmp_hess.data)
+    end
+    cone.hess_fact = hyp_bk!(cone.cache_fact, cone.tmp_hess.data)
+    if !issuccess(cone.hess_fact) # TODO maybe better to not step to this point if the hessian factorization fails
+        println("primitive cone hessian factorization failed")
         copyto!(cone.tmp_hess, cone.hess)
-        cone.hess_fact = lu!(cone.tmp_hess)
+        tol_diag = sqrt(eps(T))
+        @inbounds for j in 1:size(cone.tmp_hess.data, 1)
+            if cone.tmp_hess.data[j, j] < tol_diag
+                cone.tmp_hess.data[j, j] = tol_diag
+            end
+        end
+        cone.hess_fact = hyp_bk!(cone.cache_fact, cone.tmp_hess.data)
+        if !issuccess(cone.hess_fact)
+            error("cannot factorize primitive cone hessian")
+        end
     end
     cone.inv_hess_prod_updated = true
     return
@@ -103,7 +118,7 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Con
     if !cone.inv_hess_prod_updated
         update_inv_hess_prod(cone)
     end
-    return ldiv!(prod, cone.hess_fact, arr)
+    return ldiv!(prod, cone.hess_fact, arr) # TODO could use sysvx with already computed factorization here, for improved numerics
 end
 
 # utilities for converting between symmetric/Hermitian matrix and vector triangle forms

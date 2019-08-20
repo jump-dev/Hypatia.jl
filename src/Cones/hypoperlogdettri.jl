@@ -43,6 +43,7 @@ mutable struct HypoPerLogdetTri{T <: Real} <: Cone{T}
     Wivzi::Matrix{T}
     tmp_hess::Symmetric{T, Matrix{T}}
     hess_fact # TODO prealloc
+    cache_fact
 
     function HypoPerLogdetTri{T}(dim::Int, is_dual::Bool) where {T <: Real}
         cone = new{T}()
@@ -69,6 +70,7 @@ function setup_data(cone::HypoPerLogdetTri{T}) where {T <: Real}
     cone.mat3 = similar(cone.mat)
     cone.vecn = Vector{T}(undef, cone.dim - 2)
     cone.Wivzi = similar(cone.mat)
+    cone.cache_fact = nothing
     return
 end
 

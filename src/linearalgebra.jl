@@ -17,6 +17,16 @@ hyp_AAt!(U::Matrix{T}, A::Matrix{T}) where {T <: RealOrComplex{<:Real}} = mul!(U
 import LinearAlgebra.BlasInt
 import LinearAlgebra.BLAS.@blasfunc
 import LinearAlgebra.LAPACK.liblapack
+import LinearAlgebra.issuccess
+
+LinearAlgebra.issuccess(F::Union{Cholesky, CholeskyPivoted}) = isposdef(F)
+
+
+# TODO delete later
+hyp_chol!(A::HermOrSym{T, Matrix{T}}) where {T <: BlasFloat} = cholesky!(A, Val(true), check = false)
+hyp_chol!(A::HermOrSym{T, Matrix{T}}) where {T <: RealOrComplex{<:Real}} = cholesky!(A, check = false)
+
+
 
 # cache for LAPACK pivoted cholesky (like PSTRF)
 mutable struct HypCholCache{R <: Real, T <: RealOrComplex{R}}
@@ -75,10 +85,6 @@ end
 
 hyp_chol!(c::HypCholCache{R, T}, A::AbstractMatrix{T}) where {T <: RealOrComplex{R}} where {R <: Real} = cholesky!(Hermitian(A, c.uplo), check = false)
 
-# TODO delete later
-hyp_chol!(A::HermOrSym{T, Matrix{T}}) where {T <: BlasFloat} = cholesky!(A, Val(true), check = false)
-hyp_chol!(A::HermOrSym{T, Matrix{T}}) where {T <: RealOrComplex{<:Real}} = cholesky!(A, check = false)
-
 function hyp_ldiv_chol_L!(B::Matrix, F::CholeskyPivoted, A::AbstractMatrix)
     copyto!(B, view(A, F.p, :))
     ldiv!(LowerTriangular(F.L), B)
@@ -89,6 +95,68 @@ function hyp_ldiv_chol_L!(B::Matrix, F::Cholesky, A::AbstractMatrix)
     ldiv!(LowerTriangular(F.L), B)
     return B
 end
+
+# cache for LAPACK Bunch-Kaufman (like SYTRF_ROOK)
+mutable struct HypBKCache{R <: Real}
+    uplo
+    n
+    lda
+    ipiv
+    work
+    lwork
+    info
+    HypBKCache{R}() where {R <: Real} = new{R}()
+end
+
+function HypBKCache(uplo::Char, A::AbstractMatrix{R}) where {R <: BlasReal}
+    LinearAlgebra.chkstride1(A)
+    c = HypBKCache{R}()
+    c.uplo = uplo
+    c.n = LinearAlgebra.checksquare(A)
+    c.lda = max(1, stride(A, 2))
+    c.ipiv = similar(A, BlasInt, c.n)
+    c.work = Vector{R}(undef, 1)
+    c.lwork = BlasInt(-1)
+    c.info = Ref{BlasInt}()
+    c.lwork = hyp_bk!(c, A)
+    c.work = Vector{R}(undef, c.lwork)
+    return c
+end
+
+for (sytrf, elty, rtyp) in (
+    (:dsytrf_rook_, :Float64, :Float64),
+    (:ssytrf_rook_, :Float32, :Float32),
+    # (:zsytrf_rook_, :ComplexF64, :Float64),
+    # (:csytrf_rook_, :ComplexF32, :Float32),
+    )
+    @eval begin
+        function hyp_bk!(c::HypBKCache{$elty}, A::AbstractMatrix{$elty})
+            ccall((@blasfunc($sytrf), liblapack), Cvoid, (
+                Ref{UInt8}, Ref{BlasInt}, Ptr{$elty}, Ref{BlasInt},
+                Ptr{BlasInt}, Ptr{$elty}, Ref{BlasInt}, Ptr{BlasInt}
+                ), c.uplo, c.n, A, c.lda, c.ipiv, c.work, c.lwork, c.info)
+
+            if c.info[] < 0
+                throw(ArgumentError("invalid argument #$(-c.info[]) to LAPACK call"))
+            elseif c.lwork == -1
+                return BlasInt(real(c.work[1]))
+            elseif c.info[] == c.n
+                println("RCOND is small: $(c.rcond[])")
+            end
+
+            return BunchKaufman{$elty, typeof(A)}(A, c.ipiv, c.uplo, true, true, c.info[])
+        end
+    end
+end
+
+function HypBKCache(uplo::Char, A::AbstractMatrix{R}) where {R <: Real}
+    c = HypBKCache{R}()
+    c.uplo = uplo
+    return c
+end
+
+# fall back to Cholesky for eltype not BlasReal
+hyp_bk!(c::HypBKCache{R}, A::AbstractMatrix{R}) where {R <: Real} = cholesky!(Symmetric(A, Symbol(c.uplo)), check = false)
 
 # cache for LAPACK cholesky with linear solve (like POSVX)
 mutable struct HypCholSolveCache{R <: Real}

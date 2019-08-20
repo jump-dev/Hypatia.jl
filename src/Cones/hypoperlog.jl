@@ -28,6 +28,7 @@ mutable struct HypoPerLog{T <: Real} <: Cone{T}
     vwivlwvu::Vector{T}
     tmp_hess::Symmetric{T, Matrix{T}}
     hess_fact # TODO prealloc
+    cache_fact
 
     function HypoPerLog{T}(dim::Int, is_dual::Bool) where {T <: Real}
         cone = new{T}()
@@ -48,6 +49,7 @@ function setup_data(cone::HypoPerLog{T}) where {T <: Real}
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.tmp_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.vwivlwvu = zeros(T, dim - 2)
+    cone.cache_fact = nothing
     return
 end
 
