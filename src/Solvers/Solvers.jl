@@ -21,6 +21,8 @@ import Hypatia.hyp_chol!
 import Hypatia.hyp_ldiv_chol_L!
 import Hypatia.HypCholSolveCache
 import Hypatia.hyp_chol_solve!
+import Hypatia.HypBKSolveCache
+import Hypatia.hyp_bk_solve!
 import Hypatia.BlockMatrix
 
 abstract type Solver{T <: Real} end
