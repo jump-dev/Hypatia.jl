@@ -607,6 +607,83 @@ function hypogeomean3(T, test_options)
     end
 end
 
+function power1(T, test_options)
+    tol = sqrt(sqrt(eps(T)))
+    c = T[1, 0, 0]
+    A = T[0 0 1; 0 1 0]
+    b = T[0.5, 1]
+    G = Matrix{T}(-I, 3, 3)
+    h = zeros(T, 3)
+
+    for is_dual in (false, true)
+        cones = CO.Cone{T}[CO.Power{T}(ones(T, 2) / 2, 1, is_dual)]
+
+        r = build_solve_check(c, A, b, G, h, cones; test_options...)
+        @test r.status == :Optimal
+        @test r.primal_obj ≈ (is_dual ? -sqrt(T(2)) : -inv(sqrt(T(2)))) atol=tol rtol=tol
+        @test r.x[1] ≈ (is_dual ? -sqrt(T(2)) : -inv(sqrt(T(2))))
+        @test r.x[2:3] ≈ [1, 0.5] atol=tol rtol=tol
+    end
+end
+
+function power2(T, test_options)
+    tol = sqrt(sqrt(eps(T)))
+    c = T[-1, -1, 0, 0]
+    A = T[0 0 0 1; 0 0 1 0]
+    b = T[0.5, 1]
+    G = Matrix{T}(-I, 4, 4)
+    h = zeros(T, 4)
+
+    for is_dual in (true, false)
+        cones = CO.Cone{T}[CO.Power{T}(ones(T, 2) / 2, 2, is_dual)]
+
+        r = build_solve_check(c, A, b, G, h, cones; test_options...)
+        @test r.status == :Optimal
+        @test r.primal_obj ≈ (is_dual ? -T(2) : -1) atol=tol rtol=tol
+        @test norm(r.x[1:2]) ≈ (is_dual ? sqrt(T(2)) : inv(sqrt(T(2))))
+        @test r.x[1:2] ≈ (is_dual ? ones(T, 2) : fill(inv(T(2)), 2))
+        @test r.x[3:4] ≈ [1, 0.5] atol=tol rtol=tol
+    end
+end
+
+function power3(T, test_options)
+    tol = sqrt(sqrt(eps(T)))
+    l = 4
+    c = vcat(zeros(T, 2), ones(T, l))
+    A = T[one(T) zero(T) zeros(T, 1, l); zero(T) one(T) zeros(T, 1, l)]
+    G = SparseMatrixCSC(-one(T) * I, l + 2, l + 2)
+    h = zeros(T, l + 2)
+
+    for is_dual in (true, false)
+        b = [one(T), zero(T)]
+        cones = CO.Cone{T}[CO.Power{T}(fill(inv(T(l)), l), 2, is_dual)]
+
+        r = build_solve_check(c, A, b, G, h, cones; test_options...)
+        @test r.status == :Optimal
+        @test r.primal_obj ≈ (is_dual ? 1 : T(l)) atol=tol rtol=tol
+        @test r.x[3:end] ≈ (is_dual ? fill(inv(T(l)), l) : ones(l)) atol=tol rtol=tol
+    end
+end
+
+function power4(T, test_options)
+    tol = sqrt(sqrt(eps(T)))
+    l = 4
+    c = ones(T, l)
+    A = zeros(T, 0, l)
+    b = zeros(T, 0)
+    G = [zeros(T, 3, l); Matrix{T}(-I, l, l)]
+    h = zeros(T, l + 3)
+
+    for is_dual in (true, false)
+        cones = CO.Cone{T}[CO.Power{T}(fill(inv(T(l)), l), 3, is_dual)]
+
+        r = build_solve_check(c, A, b, G, h, cones; test_options...)
+        @test r.status == :Optimal
+        @test r.primal_obj ≈ 0 atol=tol rtol=tol
+        @test norm(r.x) ≈ 0 atol=tol rtol=tol
+    end
+end
+
 function epinormspectral1(T, test_options)
     tol = sqrt(sqrt(eps(T)))
     Random.seed!(1)
