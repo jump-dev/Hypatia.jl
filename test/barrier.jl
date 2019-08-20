@@ -30,7 +30,6 @@ function test_barrier_oracles(cone::CO.Cone{T}, barrier::Function; noise = 0) wh
     hess = CO.hess(cone)
     @test hess * point ≈ -grad atol=tol rtol=tol
 
-    @show ForwardDiff.hessian(barrier, point) ./ hess
     if T in (Float32, Float64) # NOTE can only use BLAS floats with ForwardDiff barriers, see https://github.com/JuliaDiff/DiffResults.jl/pull/9#issuecomment-497853361
         @test ForwardDiff.gradient(barrier, point) ≈ grad atol=tol rtol=tol
         @test ForwardDiff.hessian(barrier, point) ≈ hess atol=tol rtol=tol
@@ -147,18 +146,18 @@ function test_epiperexp_barrier(T::Type{<:Real})
     return
 end
 
-function test_generalizedpower_barrier(T::Type{<:Real})
+function test_power_barrier(T::Type{<:Real})
     Random.seed!(1)
     for dim in [3, 5, 8], m in [1, 2, 3]
         alpha = rand(T, dim - 1) .+ 1
         alpha ./= sum(alpha)
-        cone = CO.GeneralizedPower{T}(alpha, 1)
+        cone = CO.Power{T}(alpha, m)
         function barrier(s)
-            u = s[1]
-            w = s[2:end]
+            u = s[1:m]
+            w = s[(m + 1):end]
             return -log(prod(w.^(2 .* alpha)) - sum(abs2, u)) - sum((1 .- alpha) .* log.(w))
         end
-        test_barrier_oracles(cone, barrier)
+        # test_barrier_oracles(cone, barrier)
         test_barrier_oracles(cone, barrier, noise = 0.1)
     end
     return
