@@ -95,8 +95,7 @@ function update_grad(cone::Power)
     # violation term
     wi2au = cone.wi2a - sum(abs2, u)
     @. cone.grad[1:m] = u * 2 / wi2au
-    @. cone.grad[(m + 1):end] = -cone.alphawi * cone.wi2a / wi2au
-    @. cone.grad[(m + 1):end] -= (1 - cone.alpha) / w
+    @. cone.grad[(m + 1):end] = -cone.alphawi * cone.wi2a / wi2au - (1 - cone.alpha) / w
     cone.grad_updated = true
     return cone.grad
 end
