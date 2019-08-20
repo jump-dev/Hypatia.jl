@@ -29,7 +29,9 @@ mutable struct HypoGeomean{T <: Real} <: Cone{T}
 
     wiaa::T
     wiw::T
+    alphaiw::Vector{T}
     a1ww::Vector{T}
+    tmpnn::Matrix{T}
     tmp_hess::Symmetric{T, Matrix{T}}
     hess_fact # TODO prealloc
 
@@ -57,6 +59,8 @@ function setup_data(cone::HypoGeomean{T}) where {T <: Real}
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.tmp_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.a1ww = zeros(T, dim - 1)
+    cone.alphaiw = zeros(T, dim - 1)
+    cone.tmpnn = zeros(T, dim - 1, dim - 1)
     return
 end
 
@@ -72,9 +76,10 @@ function update_feas(cone::HypoGeomean)
     @assert !cone.feas_updated
     u = cone.point[1]
     w = view(cone.point, 2:cone.dim)
+    @. cone.alphaiw = cone.alpha / w
     if u < 0 && all(wi -> wi > 0, w)
-        cone.wiaa = exp(sum(cone.alpha[i] * log(w[i] / cone.alpha[i]) for i in eachindex(cone.alpha)))
-        cone.is_feas = (cone.wiaa > -u)
+        cone.wiaa = -sum(cone.alpha[i] * log(cone.alphaiw[i]) for i in eachindex(cone.alpha))
+        cone.is_feas = (cone.wiaa > log(-u))
     else
         cone.is_feas = false
     end
@@ -86,10 +91,11 @@ function update_grad(cone::HypoGeomean)
     @assert cone.is_feas
     u = cone.point[1]
     w = view(cone.point, 2:cone.dim)
+    cone.wiaa = exp(cone.wiaa)
     wiaau = cone.wiaa + u
     cone.wiw = cone.wiaa / wiaau
-    @. cone.a1ww = cone.alpha * (1 - cone.wiw) / w
-    cone.grad[1] = -inv(cone.wiaa + u) - inv(u)
+    @. cone.a1ww = cone.alphaiw * (1 - cone.wiw)
+    cone.grad[1] = -inv(wiaau) - inv(u)
     @. cone.grad[2:end] = cone.a1ww - inv(w)
     cone.grad_updated = true
     return cone.grad
