@@ -13,22 +13,22 @@ real_types = [
     ]
 
 barrier_testfuns = [
-    # test_orthant_barrier,
-    # test_epinorminf_barrier,
-    # test_epinormeucl_barrier,
-    # test_epipersquare_barrier,
-    # test_epiperpower_barrier, # fails with BigFloat
-    # test_hypoperlog_barrier,
-    # test_epiperexp_barrier, # fails with BigFloat
-    # test_hypogeomean_barrier,
-    # test_epinormspectral_barrier,
+    test_orthant_barrier,
+    test_epinorminf_barrier,
+    test_epinormeucl_barrier,
+    test_epipersquare_barrier,
+    test_epiperpower_barrier, # fails with BigFloat
+    test_hypoperlog_barrier,
+    test_epiperexp_barrier, # fails with BigFloat
+    test_hypogeomean_barrier,
+    test_epinormspectral_barrier,
     test_possemideftri_barrier,
-    # test_hypoperlogdettri_barrier,
-    # # test_wsospolyinterp_barrier,
-    # # TODO next 2 fail with BigFloat
-    # # NOTE not updated for generic reals or for new cone oracles interface
-    # # test_wsospolyinterpmat_barrier,
-    # # test_wsospolyinterpsoc_barrier,
+    test_hypoperlogdettri_barrier,
+    # test_wsospolyinterp_barrier,
+    # TODO next 2 fail with BigFloat
+    # NOTE not updated for generic reals or for new cone oracles interface
+    # test_wsospolyinterpmat_barrier,
+    # test_wsospolyinterpsoc_barrier,
     ]
 
 @testset "barrier functions tests: $t, $T" for t in barrier_testfuns, T in real_types
