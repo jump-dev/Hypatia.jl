@@ -31,7 +31,7 @@ mutable struct EpiPerPower{T <: Real} <: Cone{T}
     diffres
     tmp_hess::Symmetric{T, Matrix{T}}
     hess_fact # TODO prealloc
-    cache_fact
+    hess_fact_cache
 
     function EpiPerPower{T}(alpha::T, is_dual::Bool) where {T <: Real}
         @assert alpha > 1
@@ -57,7 +57,7 @@ function setup_data(cone::EpiPerPower{T}) where {T <: Real}
     cone.hess = Symmetric(zeros(T, 3, 3), :U)
     cone.tmp_hess = Symmetric(zeros(T, 3, 3), :U)
     cone.diffres = DiffResults.HessianResult(cone.grad)
-    cone.cache_fact = nothing
+    cone.hess_fact_cache = nothing
     return
 end
 
