@@ -58,10 +58,10 @@ function envelope(
     return (c = c, A = A, b = b, G = G, h = h, cones = cones)
 end
 
-envelope1(T::Type{<:Real}) = envelope(T, 2, 5, 2, 6)
+envelope1(T::Type{<:Real}) = envelope(T, 2, 3, 2, 4)
 envelope2(T::Type{<:Real}) = envelope(T, 3, 3, 3, 3)
 envelope3(T::Type{<:Real}) = envelope(T, 2, 30, 1, 30)
-envelope4(T::Type{<:Real}) = envelope(T, 2, 5, 2, 6, primal_wsos = false)
+envelope4(T::Type{<:Real}) = envelope(T, 2, 3, 2, 4, primal_wsos = false)
 envelope5(T::Type{<:Real}) = envelope(T, 3, 3, 3, 3, primal_wsos = false)
 envelope6(T::Type{<:Real}) = envelope(T, 2, 30, 1, 30, primal_wsos = false)
 
@@ -80,9 +80,8 @@ instances_envelope_few = [
 
 function test_envelope(instance::Function; T::Type{<:Real} = Float64, test_options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)
-    tol = max(1e-5, sqrt(sqrt(eps(T))))
     d = instance(T)
-    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; test_options..., atol = tol, rtol = tol)
+    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; test_options...)
     @test r.status == :Optimal
     return
 end

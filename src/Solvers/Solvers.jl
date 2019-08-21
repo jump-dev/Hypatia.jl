@@ -72,8 +72,8 @@ function get_certificates(
     solver::Solver{T},
     model::Models.LinearModel{T};
     test::Bool = true,
-    atol = max(1e-5, sqrt(sqrt(eps(T)))),
-    rtol = atol,
+    atol::Real = sqrt(sqrt(eps(T))),
+    rtol::Real = atol,
     ) where {T <: Real}
     status = get_status(solver)
     primal_obj = get_primal_obj(solver)
@@ -90,9 +90,9 @@ function get_certificates(
             @test A * x ≈ b atol=atol rtol=rtol
             @test G * x + s ≈ h atol=atol rtol=rtol
             @test G' * z + A' * y ≈ -c atol=atol rtol=rtol
-            @test dot(s, z) ≈ zero(T) atol=atol rtol=rtol
             @test dot(c, x) + model.obj_offset ≈ primal_obj atol=atol^2 rtol=rtol^2
             @test -dot(b, y) - dot(h, z) + model.obj_offset ≈ dual_obj atol=atol^2 rtol=rtol^2
+            @test dot(s, z) ≈ zero(T) atol=10atol rtol=10rtol
         elseif status == :PrimalInfeasible
             @test dual_obj > model.obj_offset
             @test -dot(b, y) - dot(h, z) + model.obj_offset ≈ dual_obj atol=atol^2 rtol=rtol^2
