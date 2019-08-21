@@ -240,7 +240,7 @@ end
 
 function test_wsospolyinterp_barrier(T::Type{<:Real})
     Random.seed!(1)
-    for n in 1:3, halfdeg in 1:3
+    for n in [1, 2, 3], halfdeg in [1, 2]
         (U, _, P0, _, _) = MU.interpolate(MU.FreeDomain(n), halfdeg, sample = false)
         P0 = convert(Matrix{T}, P0)
         cone = CO.WSOSPolyInterp{T, T}(U, [P0], true) # TODO test with more Pi

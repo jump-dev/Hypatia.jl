@@ -31,7 +31,7 @@ mutable struct EpiPerExp{T <: Real} <: Cone{T}
     diffres
     tmp_hess::Symmetric{T, Matrix{T}}
     hess_fact # TODO prealloc
-    cache_fact
+    hess_fact_cache
 
     function EpiPerExp{T}(dim::Int, is_dual::Bool) where {T <: Real}
         cone = new{T}()
@@ -59,7 +59,7 @@ function setup_data(cone::EpiPerExp{T}) where {T <: Real}
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.tmp_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.diffres = DiffResults.HessianResult(cone.grad)
-    cone.cache_fact = nothing
+    cone.hess_fact_cache = nothing
     return
 end
 

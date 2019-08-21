@@ -135,7 +135,7 @@ mutable struct QRCholCombinedHSDSystemSolver{T <: Real} <: CombinedHSDSystemSolv
 
         if !use_sparse
             system_solver.solvesol = Matrix{T}(undef, nmp, 3)
-            system_solver.solvecache = HypBKSolveCache(true, system_solver.solvesol, system_solver.Q2GHGQ2, system_solver.Q2div)
+            system_solver.solvecache = HypBKSolveCache('U', system_solver.solvesol, system_solver.Q2GHGQ2, system_solver.Q2div, tol_diag = sqrt(eps(T)))
         end
 
         return system_solver
@@ -252,7 +252,7 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
             if !issuccess(F)
                 println("sparse linear system matrix factorization failed")
                 mul!(Q2GHGQ2, GQ2', HGQ2)
-                F = ldlt(Symmetric(Q2GHGQ2), shift = T(1e-4), check = false)
+                F = ldlt(Symmetric(Q2GHGQ2), shift = cbrt(eps(T)), check = false)
                 if !issuccess(F)
                     error("could not fix failure of positive definiteness (mu is $mu); terminating")
                 end
@@ -262,7 +262,7 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
             if !hyp_bk_solve!(system_solver.solvecache, system_solver.solvesol, Q2GHGQ2, Q2div)
                 println("dense linear system matrix factorization failed")
                 mul!(Q2GHGQ2, GQ2', HGQ2)
-                Q2GHGQ2 += sqrt(eps(T)) * I
+                Q2GHGQ2 += cbrt(eps(T)) * I
                 if !hyp_bk_solve!(system_solver.solvecache, system_solver.solvesol, Q2GHGQ2, Q2div)
                     error("could not fix failure of positive definiteness (mu is $mu); terminating")
                 end

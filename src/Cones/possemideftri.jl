@@ -71,7 +71,7 @@ function setup_data(cone::PosSemidefTri{T, R}) where {R <: RealOrComplex{T}} whe
     cone.mat = zeros(R, cone.side, cone.side)
     cone.mat2 = similar(cone.mat)
     cone.mat3 = similar(cone.mat)
-    cone.chol_cache = HypCholCache(true, cone.mat2)
+    cone.chol_cache = HypCholCache('U', cone.mat2)
     return
 end
 
