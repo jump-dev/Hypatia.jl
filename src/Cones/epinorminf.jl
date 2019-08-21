@@ -80,7 +80,6 @@ function update_grad(cone::EpiNormInf{T}) where {T <: Real}
     usqr = abs2(u)
     cone.schur = zero(T)
     @inbounds for (j, wj) in enumerate(w)
-        # iuw2u = 2 / (u - abs2(wj) / u)
         iuw2u = 2 * u / (usqr - abs2(wj))
         g1 += iuw2u
         h1 += abs2(iuw2u)
