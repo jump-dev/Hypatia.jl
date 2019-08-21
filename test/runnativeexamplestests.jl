@@ -28,6 +28,7 @@ real_types = [
 @testset "native examples: $T" for T in real_types
     test_options = (
         solver_options = (verbose = true,),
+        atol = sqrt(sqrt(eps(T))),
         )
 
     # @testset "densityest" begin test_densityest.(instances_densityest_few, T = T, test_options = test_options) end
@@ -48,12 +49,14 @@ real_types = [
 end
 
 @testset "native examples (linear operators) : $T" for T in real_types
+    tol = sqrt(sqrt(eps(T)))
     test_options = (
         linear_model = MO.RawLinearModel,
         system_solver = SO.NaiveCombinedHSDSystemSolver,
         linear_model_options = (use_iterative = true,),
         system_solver_options = (use_iterative = true,),
-        solver_options = (verbose = false, tol_feas = 1e-5, tol_abs_opt = 1e-5, tol_rel_opt = 1e-5),
+        solver_options = (verbose = false, tol_feas = tol / 10, tol_abs_opt = tol / 10, tol_rel_opt = tol / 10),
+        atol = 10 * tol,
         )
 
     # @testset "densityest" begin test_densityest.(instances_densityest_linops, T = T, test_options = test_options) end

@@ -36,61 +36,58 @@ import LinearAlgebra.issuccess
 LinearAlgebra.issuccess(F::Union{Cholesky, CholeskyPivoted}) = isposdef(F)
 
 
-# TODO delete later
-hyp_chol!(A::HermOrSym{T, Matrix{T}}) where {T <: BlasFloat} = cholesky!(A, Val(true), check = false)
-hyp_chol!(A::HermOrSym{T, Matrix{T}}) where {T <: RealOrComplex{<:Real}} = cholesky!(A, check = false)
+
+# TODO inverse of chol pivoted
+# function inv(C::CholeskyPivoted)
+#     ipiv = invperm(C.piv)
+#     copytri!(LAPACK.potri!(C.uplo, copy(C.factors)), C.uplo, true)[ipiv, ipiv]
+# end
 
 
+# TODO equilibrate for cholesky and bk. just sqrt(diag)? better to use EQUB
 
-# cache for LAPACK pivoted cholesky (like PSTRF)
+
+# cache for LAPACK cholesky (like POTRF)
 mutable struct HypCholCache{R <: Real, T <: RealOrComplex{R}}
     tol_diag
     uplo
     n
     lda
-    piv
-    rank
-    work
     info
-    tol
     HypCholCache{R, T}() where {T <: RealOrComplex{R}} where {R <: Real} = new{R, T}()
 end
 
-function HypCholCache(uplo::Char, A::AbstractMatrix{T}; tol_diag = zero(R)) where {T <: RealOrComplex{R}} where {R <: BlasReal}
+function HypCholCache(uplo::Char, A::StridedMatrix{T}; tol_diag = zero(R)) where {T <: RealOrComplex{R}} where {R <: BlasReal}
     LinearAlgebra.chkstride1(A)
+    Base.require_one_based_indexing(A)
     c = HypCholCache{R, T}()
     c.tol_diag = tol_diag
     c.uplo = uplo
     c.n = LinearAlgebra.checksquare(A)
     c.lda = max(1, stride(A, 2))
-    c.piv = similar(A, BlasInt, c.n)
-    c.rank = Vector{BlasInt}(undef, 1)
-    c.work = Vector{R}(undef, 2 * c.n)
     c.info = Ref{BlasInt}()
-    c.tol = zero(R)
     return c
 end
 
-for (pstrf, elty, rtyp) in (
-    (:dpstrf_, :Float64, :Float64),
-    (:spstrf_, :Float32, :Float32),
-    (:zpstrf_, :ComplexF64, :Float64),
-    (:cpstrf_, :ComplexF32, :Float32),
+for (potrf, elty, rtyp) in (
+    (:dpotrf_, :Float64, :Float64),
+    (:spotrf_, :Float32, :Float32),
+    (:zpotrf_, :ComplexF64, :Float64),
+    (:cpotrf_, :ComplexF32, :Float32),
     )
     @eval begin
-        function hyp_chol!(c::HypCholCache{$rtyp, $elty}, A::AbstractMatrix{$elty})
+        function hyp_chol!(c::HypCholCache{$rtyp, $elty}, A::StridedMatrix{$elty})
             set_min_diag!(A, c.tol_diag)
 
-            ccall((@blasfunc($pstrf), liblapack), Cvoid, (
+            ccall((@blasfunc($potrf), liblapack), Cvoid, (
                 Ref{UInt8}, Ref{BlasInt}, Ptr{$elty}, Ref{BlasInt}, Ptr{BlasInt},
-                Ptr{BlasInt}, Ref{$rtyp}, Ptr{$rtyp}, Ptr{BlasInt}
-                ), c.uplo, c.n, A, c.lda, c.piv, c.rank, c.tol, c.work, c.info)
+                ), c.uplo, c.n, A, c.lda, c.info)
 
             if c.info[] < 0
                 throw(ArgumentError("invalid argument #$(-c.info[]) to LAPACK call"))
             end
 
-            return CholeskyPivoted{$elty, typeof(A)}(A, c.uplo, c.piv, c.rank[1], c.tol, c.info[])
+            return Cholesky{$elty, typeof(A)}(A, c.uplo, c.info[])
         end
     end
 end
@@ -107,11 +104,6 @@ function hyp_chol!(c::HypCholCache{R, T}, A::AbstractMatrix{T}) where {T <: Real
     return cholesky!(Hermitian(A, Symbol(c.uplo)), check = false)
 end
 
-function hyp_ldiv_chol_L!(B::Matrix, F::CholeskyPivoted, A::AbstractMatrix)
-    copyto!(B, view(A, F.p, :))
-    ldiv!(LowerTriangular(F.L), B)
-    return B
-end
 function hyp_ldiv_chol_L!(B::Matrix, F::Cholesky, A::AbstractMatrix)
     copyto!(B, A)
     ldiv!(LowerTriangular(F.L), B)

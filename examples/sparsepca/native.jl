@@ -154,14 +154,13 @@ instances_sparsepca_few = [
     sparsepca2,
     ]
 
-function test_sparsepca(instance::Function; T::Type{<:Real} = Float64, test_options::NamedTuple = NamedTuple(), rseed::Int = 1)
+function test_sparsepca(instance::Function; T::Type{<:Real} = Float64, test_options::NamedTuple = (atol = sqrt(sqrt(eps(T))),), rseed::Int = 1)
     Random.seed!(rseed)
-    tol = max(1e-5, sqrt(sqrt(eps(T))))
     d = instance(T)
-    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; test_options..., atol = tol, rtol = tol)
+    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; test_options...)
     @test r.status == :Optimal
     if !isnan(d.true_obj)
-        @test r.primal_obj ≈ d.true_obj atol = tol rtol = tol
+        @test r.primal_obj ≈ d.true_obj atol=test_options.atol rtol=test_options.atol
     end
     return
 end
