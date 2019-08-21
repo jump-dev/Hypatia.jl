@@ -29,18 +29,18 @@ testfuns_preproc = [
     inconsistent2,
     ]
 
-@testset "preprocessing tests: $t, $s, $T" for t in testfuns_preproc, s in system_solvers, T in real_types
-    test_options = (
-        linear_model = MO.PreprocessedLinearModel,
-        system_solver = s,
-        solver_options = (verbose = true,),
-        )
-    t(T, test_options)
-end
+# @testset "preprocessing tests: $t, $s, $T" for t in testfuns_preproc, s in system_solvers, T in real_types
+#     test_options = (
+#         linear_model = MO.PreprocessedLinearModel,
+#         system_solver = s,
+#         solver_options = (verbose = true,),
+#         )
+#     t(T, test_options)
+# end
 
 linear_models = [
     MO.PreprocessedLinearModel,
-    MO.RawLinearModel,
+    # MO.RawLinearModel,
     ]
 
 use_infty_nbhd = [
@@ -49,44 +49,44 @@ use_infty_nbhd = [
     ]
 
 testfuns_raw = [
-    orthant1,
-    orthant2,
-    orthant3,
-    orthant4,
+    # orthant1,
+    # orthant2,
+    # orthant3,
+    # orthant4,
     epinorminf1,
     epinorminf2,
     epinorminf3,
     epinorminf4,
     epinorminf5,
-    epinormeucl1,
-    epinormeucl2,
-    epipersquare1,
-    epipersquare2,
-    epipersquare3,
-    hypoperlog1,
-    hypoperlog2,
-    hypoperlog3,
-    hypoperlog4,
-    hypoperlog5,
-    hypoperlog6,
-    epiperpower1,
-    epiperpower2,
-    epiperexp1,
-    epiperexp2,
-    power1,
-    power2,
-    power3,
-    power4,
-    hypogeomean1,
-    hypogeomean2,
-    hypogeomean3,
-    epinormspectral1,
-    possemideftri1,
-    possemideftri2,
-    possemideftricomplex1,
-    hypoperlogdettri1,
-    hypoperlogdettri2,
-    hypoperlogdettri3,
+    # epinormeucl1,
+    # epinormeucl2,
+    # epipersquare1,
+    # epipersquare2,
+    # epipersquare3,
+    # hypoperlog1,
+    # hypoperlog2,
+    # hypoperlog3,
+    # hypoperlog4,
+    # hypoperlog5,
+    # hypoperlog6,
+    # epiperpower1,
+    # epiperpower2,
+    # epiperexp1,
+    # epiperexp2,
+    # power1,
+    # power2,
+    # power3,
+    # power4,
+    # hypogeomean1,
+    # hypogeomean2,
+    # hypogeomean3,
+    # epinormspectral1,
+    # possemideftri1,
+    # possemideftri2,
+    # possemideftricomplex1,
+    # hypoperlogdettri1,
+    # hypoperlogdettri2,
+    # hypoperlogdettri3,
     ]
 
 @testset "native tests: $t, $s, $m, $n, $T" for t in testfuns_raw, s in system_solvers, m in linear_models, n in use_infty_nbhd, T in real_types
@@ -105,7 +105,7 @@ testfuns_raw = [
         linear_model_options = NamedTuple(),
         system_solver_options = NamedTuple(),
         stepper_options = (use_infty_nbhd = n,),
-        solver_options = (verbose = false,),
+        solver_options = (verbose = true,),
         )
     t(T, test_options)
 end
