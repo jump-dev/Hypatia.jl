@@ -2,6 +2,20 @@
 Copyright 2019, Chris Coey and contributors
 =#
 
+# ensure diagonal terms in symm/herm (and ideally PSD) matrix are not too small
+function set_min_diag!(A::Matrix{<:RealOrComplex{T}}, tol::T) where {T <: Real}
+    if tol <= 0
+        return A
+    end
+    @inbounds for j in 1:size(A, 1)
+        if A[j, j] < tol
+            A[j, j] = tol
+        end
+    end
+    return A
+end
+
+
 import LinearAlgebra.BlasReal
 import LinearAlgebra.BlasFloat
 import LinearAlgebra.HermOrSym
@@ -30,6 +44,7 @@ hyp_chol!(A::HermOrSym{T, Matrix{T}}) where {T <: RealOrComplex{<:Real}} = chole
 
 # cache for LAPACK pivoted cholesky (like PSTRF)
 mutable struct HypCholCache{R <: Real, T <: RealOrComplex{R}}
+    tol_diag
     uplo
     n
     lda
@@ -41,17 +56,18 @@ mutable struct HypCholCache{R <: Real, T <: RealOrComplex{R}}
     HypCholCache{R, T}() where {T <: RealOrComplex{R}} where {R <: Real} = new{R, T}()
 end
 
-function HypCholCache(use_upper::Bool, A::AbstractMatrix{T}; tol = zero(R)) where {T <: RealOrComplex{R}} where {R <: BlasReal}
+function HypCholCache(uplo::Char, A::AbstractMatrix{T}; tol_diag = zero(R)) where {T <: RealOrComplex{R}} where {R <: BlasReal}
     LinearAlgebra.chkstride1(A)
     c = HypCholCache{R, T}()
-    c.uplo = (use_upper ? 'U' : 'L')
+    c.tol_diag = tol_diag
+    c.uplo = uplo
     c.n = LinearAlgebra.checksquare(A)
     c.lda = max(1, stride(A, 2))
     c.piv = similar(A, BlasInt, c.n)
     c.rank = Vector{BlasInt}(undef, 1)
     c.work = Vector{R}(undef, 2 * c.n)
     c.info = Ref{BlasInt}()
-    c.tol = tol
+    c.tol = zero(R)
     return c
 end
 
@@ -63,6 +79,8 @@ for (pstrf, elty, rtyp) in (
     )
     @eval begin
         function hyp_chol!(c::HypCholCache{$rtyp, $elty}, A::AbstractMatrix{$elty})
+            set_min_diag!(A, c.tol_diag)
+
             ccall((@blasfunc($pstrf), liblapack), Cvoid, (
                 Ref{UInt8}, Ref{BlasInt}, Ptr{$elty}, Ref{BlasInt}, Ptr{BlasInt},
                 Ptr{BlasInt}, Ref{$rtyp}, Ptr{$rtyp}, Ptr{BlasInt}
@@ -77,13 +95,17 @@ for (pstrf, elty, rtyp) in (
     end
 end
 
-function HypCholCache(use_upper::Bool, A::AbstractMatrix{T}; tol = zero(R)) where {T <: RealOrComplex{R}} where {R <: Real}
+function HypCholCache(uplo::Char, A::AbstractMatrix{T}; tol_diag = zero(R)) where {T <: RealOrComplex{R}} where {R <: Real}
     c = HypCholCache{R, T}()
-    c.uplo = (use_upper ? :U : :L)
+    c.tol_diag = tol_diag
+    c.uplo = uplo
     return c
 end
 
-hyp_chol!(c::HypCholCache{R, T}, A::AbstractMatrix{T}) where {T <: RealOrComplex{R}} where {R <: Real} = cholesky!(Hermitian(A, c.uplo), check = false)
+function hyp_chol!(c::HypCholCache{R, T}, A::AbstractMatrix{T}) where {T <: RealOrComplex{R}} where {R <: Real}
+    set_min_diag!(A, c.tol_diag)
+    return cholesky!(Hermitian(A, Symbol(c.uplo)), check = false)
+end
 
 function hyp_ldiv_chol_L!(B::Matrix, F::CholeskyPivoted, A::AbstractMatrix)
     copyto!(B, view(A, F.p, :))
@@ -98,6 +120,7 @@ end
 
 # cache for LAPACK Bunch-Kaufman (like SYTRF_ROOK)
 mutable struct HypBKCache{R <: Real}
+    tol_diag
     uplo
     n
     lda
@@ -108,9 +131,10 @@ mutable struct HypBKCache{R <: Real}
     HypBKCache{R}() where {R <: Real} = new{R}()
 end
 
-function HypBKCache(uplo::Char, A::AbstractMatrix{R}) where {R <: BlasReal}
+function HypBKCache(uplo::Char, A::AbstractMatrix{R}; tol_diag = zero(R)) where {R <: BlasReal}
     LinearAlgebra.chkstride1(A)
     c = HypBKCache{R}()
+    c.tol_diag = tol_diag
     c.uplo = uplo
     c.n = LinearAlgebra.checksquare(A)
     c.lda = max(1, stride(A, 2))
@@ -126,11 +150,11 @@ end
 for (sytrf, elty, rtyp) in (
     (:dsytrf_rook_, :Float64, :Float64),
     (:ssytrf_rook_, :Float32, :Float32),
-    # (:zsytrf_rook_, :ComplexF64, :Float64),
-    # (:csytrf_rook_, :ComplexF32, :Float32),
     )
     @eval begin
         function hyp_bk!(c::HypBKCache{$elty}, A::AbstractMatrix{$elty})
+            set_min_diag!(A, c.tol_diag)
+
             ccall((@blasfunc($sytrf), liblapack), Cvoid, (
                 Ref{UInt8}, Ref{BlasInt}, Ptr{$elty}, Ref{BlasInt},
                 Ptr{BlasInt}, Ptr{$elty}, Ref{BlasInt}, Ptr{BlasInt}
@@ -149,17 +173,22 @@ for (sytrf, elty, rtyp) in (
     end
 end
 
-function HypBKCache(uplo::Char, A::AbstractMatrix{R}) where {R <: Real}
+function HypBKCache(uplo::Char, A::AbstractMatrix{R}; tol_diag = zero(R)) where {R <: Real}
     c = HypBKCache{R}()
+    c.tol_diag = tol_diag
     c.uplo = uplo
     return c
 end
 
 # fall back to Cholesky for eltype not BlasReal
-hyp_bk!(c::HypBKCache{R}, A::AbstractMatrix{R}) where {R <: Real} = cholesky!(Symmetric(A, Symbol(c.uplo)), check = false)
+function hyp_bk!(c::HypBKCache{R}, A::AbstractMatrix{R}) where {R <: Real}
+    set_min_diag!(A, c.tol_diag)
+    return cholesky!(Symmetric(A, Symbol(c.uplo)), check = false)
+end
 
 # cache for LAPACK cholesky with linear solve (like POSVX)
 mutable struct HypCholSolveCache{R <: Real}
+    tol_diag
     uplo
     n
     lda
@@ -180,10 +209,11 @@ mutable struct HypCholSolveCache{R <: Real}
 end
 
 # NOTE X (solution) argument needs to be a Matrix type or else silent failures occur
-function HypCholSolveCache(use_upper::Bool, X::Matrix{R}, A::AbstractMatrix{R}, B::AbstractMatrix{R}) where {R <: BlasReal}
+function HypCholSolveCache(uplo::Char, X::Matrix{R}, A::AbstractMatrix{R}, B::AbstractMatrix{R}; tol_diag = zero(R)) where {R <: BlasReal}
     LinearAlgebra.chkstride1(A)
     c = HypCholSolveCache{R}()
-    c.uplo = (use_upper ? 'U' : 'L')
+    c.tol_diag = tol_diag
+    c.uplo = uplo
     c.n = LinearAlgebra.checksquare(A)
     @assert c.n == size(X, 1) == size(B, 1)
     @assert size(X, 2) == size(B, 2)
@@ -211,6 +241,8 @@ for (posvx, elty, rtyp) in (
     )
     @eval begin
         function hyp_chol_solve!(c::HypCholSolveCache{$elty}, X::Matrix{$elty}, A::AbstractMatrix{$elty}, B::AbstractMatrix{$elty})
+            set_min_diag!(A, c.tol_diag)
+
             ccall((@blasfunc($posvx), liblapack), Cvoid, (
                 Ref{UInt8}, Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt},
                 Ptr{$elty}, Ref{BlasInt}, Ptr{$elty}, Ref{BlasInt},
@@ -234,14 +266,16 @@ for (posvx, elty, rtyp) in (
     end
 end
 
-function HypCholSolveCache(use_upper::Bool, X::Matrix{R}, A::AbstractMatrix{R}, B::AbstractMatrix{R}) where {R <: Real}
+function HypCholSolveCache(uplo::Char, X::Matrix{R}, A::AbstractMatrix{R}, B::AbstractMatrix{R}; tol_diag = zero(R)) where {R <: Real}
     c = HypCholSolveCache{R}()
-    c.uplo = (use_upper ? :U : :L)
+    c.tol_diag = tol_diag
+    c.uplo = uplo
     return c
 end
 
 function hyp_chol_solve!(c::HypCholSolveCache{R}, X::Matrix{R}, A::AbstractMatrix{R}, B::AbstractMatrix{R}) where {R <: Real}
-    F = cholesky!(Symmetric(A, c.uplo), check = false)
+    set_min_diag!(A, c.tol_diag)
+    F = cholesky!(Symmetric(A, Symbol(c.uplo)), check = false)
     if !isposdef(F)
         return false
     end
@@ -272,11 +306,11 @@ mutable struct HypBKSolveCache{R <: Real}
 end
 
 # NOTE X (solution) argument needs to be a Matrix type or else silent failures occur
-function HypBKSolveCache(use_upper::Bool, X::Matrix{R}, A::AbstractMatrix{R}, B::AbstractMatrix{R}) where {R <: BlasReal}
+function HypBKSolveCache(uplo::Char, X::Matrix{R}, A::AbstractMatrix{R}, B::AbstractMatrix{R}; tol_diag = zero(R)) where {R <: BlasReal}
     LinearAlgebra.chkstride1(A)
     c = HypBKSolveCache{R}()
-    c.tol_diag = sqrt(eps(R)) # TODO tune
-    c.uplo = (use_upper ? 'U' : 'L')
+    c.tol_diag = tol_diag
+    c.uplo = uplo
     c.n = LinearAlgebra.checksquare(A)
     @assert c.n == size(X, 1) == size(B, 1)
     @assert size(X, 2) == size(B, 2)
@@ -303,12 +337,7 @@ for (sysvx, elty, rtyp) in (
     )
     @eval begin
         function hyp_bk_solve!(c::HypBKSolveCache{$elty}, X::Matrix{$elty}, A::AbstractMatrix{$elty}, B::AbstractMatrix{$elty})
-            # ensure diagonal terms in symmetric (and ideally PSD) matrix are not too small
-            @inbounds for j in 1:c.n
-                if A[j, j] < c.tol_diag
-                    A[j, j] = c.tol_diag
-                end
-            end
+            set_min_diag!(A, c.tol_diag)
 
             ccall((@blasfunc($sysvx), Base.liblapack_name), Cvoid,
                 (Ref{UInt8}, Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt},
@@ -332,22 +361,17 @@ for (sysvx, elty, rtyp) in (
     end
 end
 
-function HypBKSolveCache(use_upper::Bool, X::Matrix{R}, A::AbstractMatrix{R}, B::AbstractMatrix{R}) where {R <: Real}
+function HypBKSolveCache(uplo::Char, X::Matrix{R}, A::AbstractMatrix{R}, B::AbstractMatrix{R}; tol_diag = zero(R)) where {R <: Real}
     c = HypBKSolveCache{R}()
-    c.tol_diag = sqrt(eps(R)) # TODO tune
-    c.uplo = (use_upper ? :U : :L)
+    c.tol_diag = tol_diag
+    c.uplo = uplo
     return c
 end
 
 # fall back to Cholesky solve for eltype not BlasReal
 function hyp_bk_solve!(c::HypBKSolveCache{R}, X::Matrix{R}, A::AbstractMatrix{R}, B::AbstractMatrix{R}) where {R <: Real}
-    # ensure diagonal terms in symmetric (and ideally PSD) matrix are not too small
-    @inbounds for j in 1:size(A, 1)
-        if A[j, j] < c.tol_diag
-            A[j, j] = c.tol_diag
-        end
-    end
-    F = cholesky!(Symmetric(A, c.uplo), check = false)
+    set_min_diag!(A, c.tol_diag)
+    F = cholesky!(Symmetric(A, Symbol(c.uplo)), check = false)
     if !isposdef(F)
         return false
     end

@@ -34,6 +34,7 @@ mutable struct HypoPerLogdetTri{T <: Real} <: Cone{T}
     mat3::Matrix{T}
     vecn::Vector{T}
     fact_mat
+    chol_cache
     ldWv::T
     z::T
     Wi::Matrix{T}
@@ -43,7 +44,7 @@ mutable struct HypoPerLogdetTri{T <: Real} <: Cone{T}
     Wivzi::Matrix{T}
     tmp_hess::Symmetric{T, Matrix{T}}
     hess_fact # TODO prealloc
-    cache_fact
+    hess_fact_cache
 
     function HypoPerLogdetTri{T}(dim::Int, is_dual::Bool) where {T <: Real}
         cone = new{T}()
@@ -69,8 +70,9 @@ function setup_data(cone::HypoPerLogdetTri{T}) where {T <: Real}
     cone.mat2 = similar(cone.mat)
     cone.mat3 = similar(cone.mat)
     cone.vecn = Vector{T}(undef, cone.dim - 2)
+    cone.chol_cache = HypCholCache('U', cone.mat)
     cone.Wivzi = similar(cone.mat)
-    cone.cache_fact = nothing
+    cone.hess_fact_cache = nothing
     return
 end
 
@@ -92,10 +94,9 @@ function update_feas(cone::HypoPerLogdetTri)
     @assert !cone.feas_updated
     u = cone.point[1]
     v = cone.point[2]
-
     if v > 0
         vec_to_mat_U!(cone.mat, view(cone.point, 3:cone.dim))
-        cone.fact_mat = hyp_chol!(Symmetric(cone.mat, :U)) # TODO remove allocs
+        cone.fact_mat = hyp_chol!(cone.chol_cache, cone.mat)
         if isposdef(cone.fact_mat)
             cone.ldWv = logdet(cone.fact_mat) - cone.side * log(v)
             cone.z = v * cone.ldWv - u
@@ -106,7 +107,6 @@ function update_feas(cone::HypoPerLogdetTri)
     else
         cone.is_feas = false
     end
-
     cone.feas_updated = true
     return cone.is_feas
 end
@@ -115,7 +115,6 @@ function update_grad(cone::HypoPerLogdetTri)
     @assert cone.is_feas
     u = cone.point[1]
     v = cone.point[2]
-
     cone.Wi = inv(cone.fact_mat) # TODO remove allocs
     cone.nLz = (cone.side - cone.ldWv) / cone.z
     cone.ldWvuv = cone.ldWv - u / v
@@ -125,7 +124,6 @@ function update_grad(cone::HypoPerLogdetTri)
     gend = view(cone.grad, 3:cone.dim)
     mat_U_to_vec_scaled!(gend, cone.Wi)
     gend .*= -cone.vzip1
-
     cone.grad_updated = true
     return cone.grad
 end

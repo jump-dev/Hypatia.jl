@@ -31,6 +31,7 @@ mutable struct EpiNormSpectral{T <: Real} <: Cone{T}
     WWt::Matrix{T}
     Z::Matrix{T}
     fact_Z
+    chol_cache
     Zi::Symmetric{T, Matrix{T}}
     Eu::Symmetric{T, Matrix{T}}
     ZiEuZi::Matrix{T}
@@ -40,7 +41,7 @@ mutable struct EpiNormSpectral{T <: Real} <: Cone{T}
 
     tmp_hess::Symmetric{T, Matrix{T}}
     hess_fact # TODO prealloc
-    cache_fact
+    hess_fact_cache
 
     function EpiNormSpectral{T}(n::Int, m::Int, is_dual::Bool) where {T <: Real}
         @assert n <= m
@@ -66,13 +67,14 @@ function setup_data(cone::EpiNormSpectral{T}) where {T <: Real}
     cone.W = Matrix{T}(undef, cone.n, cone.m)
     cone.WWt = Matrix{T}(undef, cone.n, cone.n)
     cone.Z = Matrix{T}(undef, cone.n, cone.n)
+    cone.chol_cache = HypCholCache('U', cone.Z)
     cone.Zi = Symmetric(zeros(T, cone.n, cone.n))
     cone.Eu = Symmetric(zeros(T, cone.n, cone.n))
     cone.ZiEuZi = Matrix{T}(undef, cone.n, cone.n)
     cone.tmpnn = Matrix{T}(undef, cone.n, cone.n)
     cone.tmpnm = Matrix{T}(undef, cone.n, cone.m)
     cone.tmpn = Vector{T}(undef, cone.n)
-    cone.cache_fact = nothing
+    cone.hess_fact_cache = nothing
     return
 end
 
@@ -90,8 +92,8 @@ function update_feas(cone::EpiNormSpectral)
     if u > 0
         cone.W[:] .= view(cone.point, 2:cone.dim)
         hyp_AAt!(cone.WWt, cone.W)
-        cone.Z = u * I - cone.WWt / u
-        cone.fact_Z = hyp_chol!(Symmetric(cone.Z, :U))
+        cone.Z = u * I - cone.WWt / u # TODO remove allocs
+        cone.fact_Z = hyp_chol!(cone.chol_cache, cone.Z)
         cone.is_feas = isposdef(cone.fact_Z)
     else
         cone.is_feas = false
@@ -103,7 +105,7 @@ end
 function update_grad(cone::EpiNormSpectral)
     @assert cone.is_feas
     u = cone.point[1]
-    cone.Zi = Symmetric(inv(cone.fact_Z))
+    cone.Zi = Symmetric(inv(cone.fact_Z)) # TODO eliminate allocs
     @. cone.Eu.data = cone.WWt / u / u
     @inbounds for i in 1:cone.n
         cone.Eu[i, i] += 1
