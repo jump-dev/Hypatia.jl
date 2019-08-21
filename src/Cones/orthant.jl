@@ -25,6 +25,7 @@ mutable struct Nonnegative{T <: Real} <: Cone{T}
     inv_hess::Diagonal{T, Vector{T}}
 
     function Nonnegative{T}(dim::Int, is_dual::Bool) where {T <: Real}
+        @assert dim >= 1
         cone = new{T}()
         cone.use_dual = is_dual
         cone.dim = dim
@@ -50,6 +51,7 @@ mutable struct Nonpositive{T <: Real} <: Cone{T}
     inv_hess::Diagonal{T, Vector{T}}
 
     function Nonpositive{T}(dim::Int, is_dual::Bool) where {T <: Real}
+        @assert dim >= 1
         cone = new{T}()
         cone.use_dual = is_dual
         cone.dim = dim

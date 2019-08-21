@@ -40,6 +40,7 @@ mutable struct PosSemidefTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     chol_cache
 
     function PosSemidefTri{T, R}(dim::Int, is_dual::Bool) where {R <: RealOrComplex{T}} where {T <: Real}
+        @assert dim >= 1
         cone = new{T, R}()
         cone.use_dual = is_dual
         cone.dim = dim # real vector dimension

@@ -40,11 +40,11 @@ mutable struct EpiNormSpectral{T <: Real} <: Cone{T}
     tmpn::Vector{T}
 
     tmp_hess::Symmetric{T, Matrix{T}}
-    hess_fact # TODO prealloc
+    hess_fact
     hess_fact_cache
 
     function EpiNormSpectral{T}(n::Int, m::Int, is_dual::Bool) where {T <: Real}
-        @assert n <= m
+        @assert 1 <= n <= m
         dim = n * m + 1
         cone = new{T}()
         cone.use_dual = is_dual
@@ -92,7 +92,8 @@ function update_feas(cone::EpiNormSpectral)
     if u > 0
         cone.W[:] .= view(cone.point, 2:cone.dim)
         hyp_AAt!(cone.WWt, cone.W)
-        cone.Z = u * I - cone.WWt / u # TODO remove allocs
+        copyto!(cone.Z, u * I)
+        @. cone.Z -= cone.WWt / u
         cone.fact_Z = hyp_chol!(cone.chol_cache, cone.Z)
         cone.is_feas = isposdef(cone.fact_Z)
     else
@@ -139,10 +140,11 @@ function update_hess(cone::EpiNormSpectral)
     # no BLAS method for product of two symmetric matrices, faster if one is not symmetric
     mul!(tmpnn, Eu, Zi.data)
     mul!(ZiEuZi, Zi, tmpnn)
-    @. tmpnn = -(Zi / u + ZiEuZi)
+    @. tmpnn = -Zi / u - ZiEuZi
     mul!(tmpnm, tmpnn, W)
     @views copyto!(H[1, 2:end], tmpnm)
     p = 2
+
     # calculate d^2F / dW_ij dW_kl, p and q are linear indices for (i, j) and (k, l)
     @inbounds for j in 1:m
         @views mul!(tmpn, Zi, W[:, j])
@@ -171,9 +173,11 @@ function update_hess(cone::EpiNormSpectral)
             p += 1
         end
     end
+
     # scale everything
     @. H = H / u * 2
     H[1, 1] = dot(Symmetric(ZiEuZi, :U), Eu) + (2 * dot(Zi, Symmetric(WWt, :U)) / u + 1) / u / u
+
     cone.hess_updated = true
     return cone.hess
 end

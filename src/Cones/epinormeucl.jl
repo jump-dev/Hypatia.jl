@@ -25,6 +25,7 @@ mutable struct EpiNormEucl{T <: Real} <: Cone{T}
     dist::T
 
     function EpiNormEucl{T}(dim::Int, is_dual::Bool) where {T <: Real}
+        @assert dim >= 2
         cone = new{T}()
         cone.use_dual = is_dual
         cone.dim = dim

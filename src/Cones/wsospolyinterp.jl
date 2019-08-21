@@ -35,7 +35,7 @@ mutable struct WSOSPolyInterp{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     chol_caches::Vector
 
     tmp_hess::Symmetric{T, Matrix{T}}
-    hess_fact # TODO prealloc
+    hess_fact
     hess_fact_cache
 
     function WSOSPolyInterp{T, R}(dim::Int, Ps::Vector{Matrix{R}}, is_dual::Bool) where {R <: RealOrComplex{T}} where {T <: Real}
@@ -52,7 +52,6 @@ end
 
 WSOSPolyInterp{T, R}(dim::Int, Ps::Vector{Matrix{R}}) where {R <: RealOrComplex{T}} where {T <: Real} = WSOSPolyInterp{T, R}(dim, Ps, false)
 
-# TODO maybe only allocate the fields we use
 function setup_data(cone::WSOSPolyInterp{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     reset_data(cone)
     dim = cone.dim
@@ -111,10 +110,6 @@ function update_grad(cone::WSOSPolyInterp)
         @inbounds for j in 1:cone.dim
             cone.grad[j] -= sum(abs2, view(LUk, :, j))
         end
-        # hyp_AtA!(UU, LUk)
-        # for j in eachindex(cone.grad)
-        #     cone.grad[j] -= real(UU[j, j])
-        # end
     end
     cone.grad_updated = true
     return cone.grad
@@ -125,7 +120,6 @@ function update_hess(cone::WSOSPolyInterp)
     cone.hess .= 0
     @inbounds for k in eachindex(cone.Ps)
         UUk = hyp_AtA!(cone.tmpUU, cone.tmpLU[k])
-        # cone.hess.data += abs2.(UUk)
         @inbounds for j in 1:cone.dim, i in 1:j
             cone.hess.data[i, j] += abs2(UUk[i, j])
         end
