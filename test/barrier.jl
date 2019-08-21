@@ -55,14 +55,14 @@ end
 
 function test_orthant_barrier(T::Type{<:Real})
     barrier = s -> -sum(log, s)
-    for dim in [1, 3, 5]
+    for dim in [1, 3]
         cone = CO.Nonnegative{T}(dim)
         test_barrier_oracles(cone, barrier)
         test_barrier_oracles(cone, barrier, noise = 0.1)
     end
 
     barrier = s -> -sum(log, -s)
-    for dim in [1, 3, 5]
+    for dim in [1, 3]
         cone = CO.Nonpositive{T}(dim)
         test_barrier_oracles(cone, barrier)
         test_barrier_oracles(cone, barrier, noise = 0.1)
@@ -76,7 +76,7 @@ function test_epinorminf_barrier(T::Type{<:Real})
         w = s[2:end]
         return -sum(log, u .- abs2.(w) ./ u) - log(u)
     end
-    for dim in [3, 5, 8]
+    for dim in [2, 4]
         cone = CO.EpiNormInf{T}(dim)
         test_barrier_oracles(cone, barrier)
         test_barrier_oracles(cone, barrier, noise = 0.1)
@@ -90,7 +90,7 @@ function test_epinormeucl_barrier(T::Type{<:Real})
         w = s[2:end]
         return -log(abs2(u) - sum(abs2, w))
     end
-    for dim in [2, 3, 5]
+    for dim in [2, 4]
         cone = CO.EpiNormEucl{T}(dim)
         test_barrier_oracles(cone, barrier)
         test_barrier_oracles(cone, barrier, noise = 0.1)
@@ -105,7 +105,7 @@ function test_epipersquare_barrier(T::Type{<:Real})
         w = s[3:end]
         return -log(2 * u * v - sum(abs2, w))
     end
-    for dim in [3, 5, 8]
+    for dim in [3, 5]
         cone = CO.EpiPerSquare{T}(dim)
         test_barrier_oracles(cone, barrier)
         test_barrier_oracles(cone, barrier, noise = 0.1)
@@ -129,7 +129,7 @@ function test_hypoperlog_barrier(T::Type{<:Real})
         w = s[3:end]
         return -log(v * sum(log, w ./ v) - u) - sum(log, w) - log(v)
     end
-    for dim in [3, 5, 8]
+    for dim in [3, 5]
         cone = CO.HypoPerLog{T}(dim)
         test_barrier_oracles(cone, barrier)
         test_barrier_oracles(cone, barrier, noise = 0.1)
@@ -138,7 +138,7 @@ function test_hypoperlog_barrier(T::Type{<:Real})
 end
 
 function test_epiperexp_barrier(T::Type{<:Real})
-    for dim in [3, 5, 8]
+    for dim in [3, 5]
         cone = CO.EpiPerExp{T}(dim)
         test_barrier_oracles(cone, cone.barfun)
         test_barrier_oracles(cone, cone.barfun, noise = 0.1)
@@ -148,8 +148,8 @@ end
 
 function test_power_barrier(T::Type{<:Real})
     Random.seed!(1)
-    for dim in [3, 5, 8], m in [1, 2, 3]
-        alpha = rand(T, dim - 1) .+ 1
+    for dimalpha in [2, 4], m in [1, 3]
+        alpha = rand(T, dimalpha) .+ 1
         alpha ./= sum(alpha)
         cone = CO.Power{T}(alpha, m)
         function barrier(s)
@@ -165,7 +165,7 @@ end
 
 function test_hypogeomean_barrier(T::Type{<:Real})
     Random.seed!(1)
-    for dim in [3, 5, 8]
+    for dim in [2, 4]
         alpha = rand(T, dim - 1) .+ 1
         alpha ./= sum(alpha)
         cone = CO.HypoGeomean{T}(alpha)

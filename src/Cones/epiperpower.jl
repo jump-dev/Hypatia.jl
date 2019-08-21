@@ -30,7 +30,7 @@ mutable struct EpiPerPower{T <: Real} <: Cone{T}
     barfun::Function
     diffres
     tmp_hess::Symmetric{T, Matrix{T}}
-    hess_fact # TODO prealloc
+    hess_fact
     hess_fact_cache
 
     function EpiPerPower{T}(alpha::T, is_dual::Bool) where {T <: Real}

@@ -33,14 +33,15 @@ mutable struct Power{T <: Real} <: Cone{T}
     prodwu::T
     alphawi::Vector{T}
     tmp_hess::Symmetric{T, Matrix{T}}
-    hess_fact # TODO prealloc
+    hess_fact
     hess_fact_cache
 
     function Power{T}(alpha::Vector{T}, m::Int, is_dual::Bool) where {T <: Real}
+        @assert m >= 1
         dim = length(alpha) + m
         @assert dim >= 3
         @assert all(ai > 0 for ai in alpha)
-        tol = 1e3 * eps(T)
+        tol = 1000 * eps(T)
         @assert sum(alpha) ≈ 1 atol=tol rtol=tol
         cone = new{T}()
         cone.m = m
