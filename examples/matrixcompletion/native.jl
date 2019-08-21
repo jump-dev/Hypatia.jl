@@ -16,7 +16,7 @@ function matrixcompletion(
     m::Int,
     n::Int;
     use_power::Bool = true,
-    use_epinorm::Bool = true,
+    use_epinorminf::Bool = true,
     )
     @assert m <= n
 
@@ -43,7 +43,7 @@ function matrixcompletion(
     b = T[]
 
     # epinormspectral cone- get vec(X) in G and h
-    if use_epinorm
+    if use_epinorminf
         G_norm = zeros(T, m * n, num_unknown)
         total_idx = 1
         unknown_idx = 1
@@ -159,16 +159,16 @@ end
 
 matrixcompletion1(T::Type{<:Real}) = matrixcompletion(T, 5, 6)
 matrixcompletion2(T::Type{<:Real}) = matrixcompletion(T, 5, 6, use_power = false)
-matrixcompletion3(T::Type{<:Real}) = matrixcompletion(T, 5, 6, use_epinorm = false)
-matrixcompletion4(T::Type{<:Real}) = matrixcompletion(T, 5, 6, use_power = false, use_epinorm = false)
+matrixcompletion3(T::Type{<:Real}) = matrixcompletion(T, 5, 6, use_epinorminf = false)
+matrixcompletion4(T::Type{<:Real}) = matrixcompletion(T, 5, 6, use_power = false, use_epinorminf = false)
 matrixcompletion5(T::Type{<:Real}) = matrixcompletion(T, 6, 8)
 matrixcompletion6(T::Type{<:Real}) = matrixcompletion(T, 6, 8, use_power = false)
-matrixcompletion7(T::Type{<:Real}) = matrixcompletion(T, 6, 8, use_epinorm = false)
-matrixcompletion8(T::Type{<:Real}) = matrixcompletion(T, 6, 8, use_power = false, use_epinorm = false)
+matrixcompletion7(T::Type{<:Real}) = matrixcompletion(T, 6, 8, use_epinorminf = false)
+matrixcompletion8(T::Type{<:Real}) = matrixcompletion(T, 6, 8, use_power = false, use_epinorminf = false)
 matrixcompletion9(T::Type{<:Real}) = matrixcompletion(T, 8, 8)
 matrixcompletion10(T::Type{<:Real}) = matrixcompletion(T, 8, 8, use_power = false)
-matrixcompletion11(T::Type{<:Real}) = matrixcompletion(T, 8, 8, use_epinorm = false)
-matrixcompletion12(T::Type{<:Real}) = matrixcompletion(T, 8, 8, use_power = false, use_epinorm = false)
+matrixcompletion11(T::Type{<:Real}) = matrixcompletion(T, 8, 8, use_epinorminf = false)
+matrixcompletion12(T::Type{<:Real}) = matrixcompletion(T, 8, 8, use_power = false, use_epinorminf = false)
 
 instances_matrixcompletion_all = [
     matrixcompletion1,
