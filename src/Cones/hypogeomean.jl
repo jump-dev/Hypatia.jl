@@ -33,12 +33,12 @@ mutable struct HypoGeomean{T <: Real} <: Cone{T}
     a1ww::Vector{T}
     tmpnn::Matrix{T}
     tmp_hess::Symmetric{T, Matrix{T}}
-    hess_fact # TODO prealloc
+    hess_fact
     hess_fact_cache
 
     function HypoGeomean{T}(alpha::Vector{T}, is_dual::Bool) where {T <: Real}
         dim = length(alpha) + 1
-        @assert dim >= 3
+        @assert dim >= 2
         @assert all(ai > 0 for ai in alpha)
         tol = 1e3 * eps(T)
         @assert sum(alpha) ≈ 1 atol=tol rtol=tol

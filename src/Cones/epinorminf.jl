@@ -29,6 +29,7 @@ mutable struct EpiNormInf{T <: Real} <: Cone{T}
     schur::T
 
     function EpiNormInf{T}(dim::Int, is_dual::Bool) where {T <: Real}
+        @assert dim >= 2
         cone = new{T}()
         cone.use_dual = is_dual
         cone.dim = dim
