@@ -76,18 +76,13 @@ function update_inv_hess_prod(cone::Cone{T}) where {T}
     end
     copyto!(cone.tmp_hess, cone.hess)
     if isnothing(cone.cache_fact)
-        cone.cache_fact = HypBKCache(cone.tmp_hess.uplo, cone.tmp_hess.data)
+        cone.cache_fact = HypBKCache(cone.tmp_hess.uplo, cone.tmp_hess.data, tol_diag = sqrt(eps(T)))
     end
     cone.hess_fact = hyp_bk!(cone.cache_fact, cone.tmp_hess.data)
     if !issuccess(cone.hess_fact) # TODO maybe better to not step to this point if the hessian factorization fails
         println("primitive cone hessian factorization failed")
         copyto!(cone.tmp_hess, cone.hess)
-        tol_diag = sqrt(eps(T))
-        @inbounds for j in 1:size(cone.tmp_hess.data, 1)
-            if cone.tmp_hess.data[j, j] < tol_diag
-                cone.tmp_hess.data[j, j] = tol_diag
-            end
-        end
+        cone.tmp_hess += cbrt(eps(T)) * I
         cone.hess_fact = hyp_bk!(cone.cache_fact, cone.tmp_hess.data)
         if !issuccess(cone.hess_fact)
             error("cannot factorize primitive cone hessian")
