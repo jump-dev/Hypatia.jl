@@ -74,7 +74,7 @@ function test_epinorminf_barrier(T::Type{<:Real})
     function barrier(s)
         u = s[1]
         w = s[2:end]
-        return -sum(log, u .- abs2.(w) ./ u) - log(u)
+        return -sum(log(u - abs2(wj) / u) for wj in w) - log(u)
     end
     for dim in [2, 4]
         cone = CO.EpiNormInf{T}(dim)
@@ -127,7 +127,7 @@ function test_hypoperlog_barrier(T::Type{<:Real})
         u = s[1]
         v = s[2]
         w = s[3:end]
-        return -log(v * sum(log, w ./ v) - u) - sum(log, w) - log(v)
+        return -log(v * sum(log(wj / v) for wj in w) - u) - sum(log, w) - log(v)
     end
     for dim in [3, 5]
         cone = CO.HypoPerLog{T}(dim)
@@ -172,7 +172,7 @@ function test_hypogeomean_barrier(T::Type{<:Real})
         function barrier(s)
             u = s[1]
             w = s[2:end]
-            return -log(prod((w ./ alpha) .^ alpha) + u) - sum((1 .- alpha) .* log.(w ./ alpha)) - log(-u)
+            return -log(prod((w[j] / alpha[j]) ^ alpha[j] for j in eachindex(w)) + u) - sum((1 - alpha[j]) * log(w[j] / alpha[j]) for j in eachindex(w)) - log(-u)
         end
         test_barrier_oracles(cone, barrier)
         test_barrier_oracles(cone, barrier, noise = 0.1)
