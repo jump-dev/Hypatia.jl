@@ -34,7 +34,7 @@ mutable struct HypoGeomean{T <: Real} <: Cone{T}
     tmpnn::Matrix{T}
     tmp_hess::Symmetric{T, Matrix{T}}
     hess_fact # TODO prealloc
-    cache_fact
+    hess_fact_cache
 
     function HypoGeomean{T}(alpha::Vector{T}, is_dual::Bool) where {T <: Real}
         dim = length(alpha) + 1
@@ -62,7 +62,7 @@ function setup_data(cone::HypoGeomean{T}) where {T <: Real}
     cone.a1ww = zeros(T, dim - 1)
     cone.alphaiw = zeros(T, dim - 1)
     cone.tmpnn = zeros(T, dim - 1, dim - 1)
-    cone.cache_fact = nothing
+    cone.hess_fact_cache = nothing
     return
 end
 
