@@ -140,11 +140,8 @@ function update_hess(cone::Power)
         awj_ratio_ratio = awj_ratio * (prodw_prodwu - 1)
         @inbounds for i in 1:(j - 1)
             H[i + m, jm] = alphawi[i] * awj_ratio_ratio
-            # H[i + m, jm] = alphawi[i] * alphawi[j] * prodw_prodwu * (prodw_prodwu - 1)
         end
         H[jm, jm] = awj_ratio_ratio * alphawi[j] + (awj_ratio + (1 - alpha[j]) / w[j]) / w[j]
-        # H[jm, jm] = (1 - alpha[j]) / w[j]^2 + alphawi[j]^2 * prodw_prodwu * (prodw_prodwu - 1) + alphawi[j] / w[j] * prodw_prodwu
-        # H[jm, jm] += (1 - alpha[j]) / w[j]^2 + alphawi[j] / w[j] * prodw_prodwu
     end
 
     cone.hess_updated = true
@@ -160,13 +157,10 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Power)
     prodwu = cone.prodwu
     alphawi = cone.alphawi
     prodw_prodwu = cone.prodw_prodwu
-
     offset = 2 / prodwu
     scal = 2 * offset / prodwu
 
-    # TODO wrap entire block in @views?
-
-    @inbounds for i in 1:size(arr, 2)
+    @views @inbounds for i in 1:size(arr, 2)
         # H[1:m, 1:m] * arr[1:m]
         @. prod[1:m, i] = u[1:m] * scal
         prod[1:m, i] .*= dot(u[1:m], arr[1:m, i])
@@ -179,7 +173,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Power)
         # H[(m + 1):dim, (m + 1):dim] * arr[(m + 1):dim]
         @. prod[(m + 1):cone.dim, i] = alphawi * prodw_prodwu * (prodw_prodwu - 1)
         prod[(m + 1):cone.dim, i] .*= dot(alphawi, arr[(m + 1):cone.dim, i])
-        @. prod[(m + 1):cone.dim, i] += (prodw_prodwu * alphawi / w + (1 - alpha) / w / w) * arr[(m + 1):cone.dim, i]
+        @. prod[(m + 1):cone.dim, i] += (prodw_prodwu * alphawi + (1 - alpha) / w) * arr[(m + 1):cone.dim, i] / w
 
         # H[1:m, (m + 1):dim] * arr[1:m]
         dotm = -2 * prodw_prodwu / prodwu * dot(u[1:m], arr[1:m, i])

@@ -15,7 +15,7 @@ function matrixcompletion(
     T::Type{<:Real},
     m::Int,
     n::Int;
-    use_geomean::Bool = true,
+    use_power::Bool = true,
     use_epinorm::Bool = true,
     )
     @assert m <= n
@@ -100,7 +100,7 @@ function matrixcompletion(
         cones = CO.Cone{T}[CO.PosSemidefTri{T, T}(num_rows)]
     end
 
-    if use_geomean
+    if use_power
         # hypogeomean for values to be filled
         G_geo = zeros(T, num_unknown + 1, num_unknown + 1)
         total_idx = 1
@@ -112,14 +112,14 @@ function matrixcompletion(
             end
             total_idx += 1
         end
-        # first component of the vector in the in geomean cone, elements multiply to one
+        # first component of the vector in the in power cone, elements multiply to one
         h2 = vcat(one(T), zeros(T, num_unknown))
         h = vcat(h_norm, h2)
         @assert total_idx - 1 == m * n
         @assert unknown_idx - 1 == num_unknown
 
         A = zeros(T, 0, 1 + num_unknown)
-        push!(cones, CO.HypoGeomean{T}(fill(inv(T(num_unknown)), num_unknown)))
+        push!(cones, CO.Power{T}(fill(inv(T(num_unknown)), num_unknown), 1))
     else
         # number of 3-dimensional power cones needed is num_unknown - 1, number of new variables is num_unknown - 2
         # first num_unknown columns overlap with G_norm, column for the epigraph variable of the spectral cone added later
@@ -158,17 +158,17 @@ function matrixcompletion(
 end
 
 matrixcompletion1(T::Type{<:Real}) = matrixcompletion(T, 5, 6)
-matrixcompletion2(T::Type{<:Real}) = matrixcompletion(T, 5, 6, use_geomean = false)
+matrixcompletion2(T::Type{<:Real}) = matrixcompletion(T, 5, 6, use_power = false)
 matrixcompletion3(T::Type{<:Real}) = matrixcompletion(T, 5, 6, use_epinorm = false)
-matrixcompletion4(T::Type{<:Real}) = matrixcompletion(T, 5, 6, use_geomean = false, use_epinorm = false)
+matrixcompletion4(T::Type{<:Real}) = matrixcompletion(T, 5, 6, use_power = false, use_epinorm = false)
 matrixcompletion5(T::Type{<:Real}) = matrixcompletion(T, 6, 8)
-matrixcompletion6(T::Type{<:Real}) = matrixcompletion(T, 6, 8, use_geomean = false)
+matrixcompletion6(T::Type{<:Real}) = matrixcompletion(T, 6, 8, use_power = false)
 matrixcompletion7(T::Type{<:Real}) = matrixcompletion(T, 6, 8, use_epinorm = false)
-matrixcompletion8(T::Type{<:Real}) = matrixcompletion(T, 6, 8, use_geomean = false, use_epinorm = false)
+matrixcompletion8(T::Type{<:Real}) = matrixcompletion(T, 6, 8, use_power = false, use_epinorm = false)
 matrixcompletion9(T::Type{<:Real}) = matrixcompletion(T, 8, 8)
-matrixcompletion10(T::Type{<:Real}) = matrixcompletion(T, 8, 8, use_geomean = false)
+matrixcompletion10(T::Type{<:Real}) = matrixcompletion(T, 8, 8, use_power = false)
 matrixcompletion11(T::Type{<:Real}) = matrixcompletion(T, 8, 8, use_epinorm = false)
-matrixcompletion12(T::Type{<:Real}) = matrixcompletion(T, 8, 8, use_geomean = false, use_epinorm = false)
+matrixcompletion12(T::Type{<:Real}) = matrixcompletion(T, 8, 8, use_power = false, use_epinorm = false)
 
 instances_matrixcompletion_all = [
     matrixcompletion1,
