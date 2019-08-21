@@ -26,6 +26,7 @@ mutable struct EpiPerSquare{T <: Real} <: Cone{T}
     dist::T
 
     function EpiPerSquare{T}(dim::Int, is_dual::Bool) where {T <: Real}
+        @assert dim >= 3
         cone = new{T}()
         cone.use_dual = is_dual
         cone.dim = dim

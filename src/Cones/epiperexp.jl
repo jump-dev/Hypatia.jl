@@ -30,10 +30,11 @@ mutable struct EpiPerExp{T <: Real} <: Cone{T}
     barfun::Function
     diffres
     tmp_hess::Symmetric{T, Matrix{T}}
-    hess_fact # TODO prealloc
+    hess_fact
     hess_fact_cache
 
     function EpiPerExp{T}(dim::Int, is_dual::Bool) where {T <: Real}
+        @assert dim >= 3
         cone = new{T}()
         cone.use_dual = is_dual
         cone.dim = dim

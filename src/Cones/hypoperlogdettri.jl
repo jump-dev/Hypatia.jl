@@ -43,10 +43,11 @@ mutable struct HypoPerLogdetTri{T <: Real} <: Cone{T}
     vzip1::T
     Wivzi::Matrix{T}
     tmp_hess::Symmetric{T, Matrix{T}}
-    hess_fact # TODO prealloc
+    hess_fact
     hess_fact_cache
 
     function HypoPerLogdetTri{T}(dim::Int, is_dual::Bool) where {T <: Real}
+        @assert dim >= 3
         cone = new{T}()
         cone.use_dual = is_dual
         cone.dim = dim
