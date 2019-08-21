@@ -17,6 +17,8 @@ mutable struct EpiNormInf{T <: Real} <: Cone{T}
     grad_updated::Bool
     hess_updated::Bool
     inv_hess_updated::Bool
+    inv_hess_prod_updated::Bool
+    hess_prod_updated::Bool
     is_feas::Bool
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
@@ -38,7 +40,8 @@ end
 
 EpiNormInf{T}(dim::Int) where {T <: Real} = EpiNormInf{T}(dim, false)
 
-reset_data(cone::EpiNormInf) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
+reset_data(cone::EpiNormInf) = (cone.feas_updated = cone.grad_updated = cone.hess_updated =
+    cone.inv_hess_updated = cone.inv_hess_prod_updated = cone.hess_prod_updated = false)
 
 # TODO maybe only allocate the fields we use
 function setup_data(cone::EpiNormInf{T}) where {T <: Real}
@@ -71,32 +74,24 @@ function update_feas(cone::EpiNormInf)
     return cone.is_feas
 end
 
-# TODO maybe move the diag2n, edge2n, div2n to update hess/inv_hess functions
+# TODO maybe move the diag2n, edge2n to update hess/inv_hess functions
 function update_grad(cone::EpiNormInf{T}) where {T <: Real}
     @assert cone.is_feas
     u = cone.point[1]
     w = view(cone.point, 2:cone.dim)
     g1 = zero(u)
-    h1 = zero(u)
     usqr = abs2(u)
     @inbounds for (j, wj) in enumerate(w)
         iuw2u = 2 / (u - abs2(wj) / u)
         g1 += iuw2u
-        h1 += abs2(iuw2u)
         iu2w2 = 2 / (usqr - abs2(wj))
         iu2ww = wj * iu2w2
         cone.grad[j + 1] = iu2ww
         cone.diag2n[j] = iu2w2 + abs2(iu2ww)
         @assert cone.diag2n[j] > 0
-        cone.edge2n[j] = -iuw2u * iu2ww
-        cone.div2n[j] = -cone.edge2n[j] / cone.diag2n[j]
     end
-    t1 = (cone.dim - 2) / u
-    cone.grad[1] = t1 - g1
-    cone.diag11 = -(t1 + g1) / u + h1
-    @assert cone.diag11 > 0
-    cone.schur = cone.diag11 + dot(cone.edge2n, cone.div2n)
-    @assert cone.schur > 0
+    cone.grad[1] = (cone.dim - 2) / u - g1
+
     cone.grad_updated = true
     return cone.grad
 end
@@ -104,6 +99,9 @@ end
 # symmetric arrow matrix
 function update_hess(cone::EpiNormInf)
     @assert cone.grad_updated
+    if !cone.hess_prod_updated
+        update_hess_prod(cone)
+    end
     H = cone.hess.data
     H[1, 1] = cone.diag11
     @inbounds for j in 2:cone.dim
@@ -117,6 +115,9 @@ end
 # Diag(0, inv(diag)) + xx' / schur, where x = (-1, edge ./ diag)
 function update_inv_hess(cone::EpiNormInf)
     @assert cone.grad_updated
+    if !cone.inv_hess_prod_updated
+        update_inv_hess_prod(cone)
+    end
     cone.inv_hess.data[1, 1] = 1
     @. cone.inv_hess.data[1, 2:end] = cone.div2n
     @inbounds for j in 2:cone.dim, i in 2:j
@@ -130,11 +131,46 @@ function update_inv_hess(cone::EpiNormInf)
     return cone.inv_hess
 end
 
-update_hess_prod(cone::EpiNormInf) = nothing
-update_inv_hess_prod(cone::EpiNormInf) = nothing
+function update_hess_prod(cone::EpiNormInf{T}) where {T <: Real}
+    u = cone.point[1]
+    w = view(cone.point, 2:cone.dim)
+    usqr = abs2(u)
+    cone.diag11 = 2 * sum((abs2(u) + abs2(wj)) / (abs2(u) - abs2(wj))^2 for wj in w) - (cone.dim - 2) / u / u
+    # cone.diag11 = zero(T)
+    for j in eachindex(w)
+        iuw2u = 2 / (u - abs2(w[j]) / u)
+        iu2w2 = 2 / (usqr - abs2(w[j]))
+        iu2ww = w[j] * iu2w2
+        # cone.diag11 += (abs2(u) + abs2(w[j])) / (abs2(u) - abs2(w[j]))^2
+        cone.edge2n[j] = -iuw2u * iu2ww # -abs2(iu2w2) * u * w[j] #
+    end
+    # cone.diag11 *= 2
+    # cone.diag11 -= (cone.dim - 2) / u / u
+    @assert cone.diag11 > 0
+
+    cone.hess_prod_updated = true
+    return nothing
+end
+
+function update_inv_hess_prod(cone::EpiNormInf)
+    u = cone.point[1]
+    w = view(cone.point, 2:cone.dim)
+    cone.schur = 2 * sum(inv(u^2 + wj^2) for wj in w) - (cone.dim - 2) / u / u
+    @assert cone.schur > 0
+    # -edge / diag
+    for j in eachindex(w)
+        cone.div2n[j] = 2 * u * w[j] / (abs2(u) + abs2(w[j]))
+    end
+
+    cone.inv_hess_prod_updated = true
+    return nothing
+end
 
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
     @assert cone.grad_updated
+    if !cone.hess_prod_updated
+        update_hess_prod(cone)
+    end
     @inbounds for j in 1:size(prod, 2)
         @views prod[1, j] = cone.diag11 * arr[1, j] + dot(cone.edge2n, arr[2:end, j])
         @views @. prod[2:end, j] = cone.edge2n * arr[1, j] + cone.diag2n * arr[2:end, j]
@@ -144,6 +180,9 @@ end
 
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
     @assert cone.grad_updated
+    if !cone.inv_hess_prod_updated
+        update_inv_hess_prod(cone)
+    end
     @inbounds for j in 1:size(prod, 2)
         @views prod[1, j] = arr[1, j] + dot(cone.div2n, arr[2:end, j])
         @. prod[2:end, j] = cone.div2n * prod[1, j]
