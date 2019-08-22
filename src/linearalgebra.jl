@@ -36,15 +36,7 @@ import LinearAlgebra.issuccess
 LinearAlgebra.issuccess(F::Union{Cholesky, CholeskyPivoted}) = isposdef(F)
 
 
-
-# TODO inverse of chol pivoted
-# function inv(C::CholeskyPivoted)
-#     ipiv = invperm(C.piv)
-#     copytri!(LAPACK.potri!(C.uplo, copy(C.factors)), C.uplo, true)[ipiv, ipiv]
-# end
-
-
-# TODO equilibrate for cholesky and bk. just sqrt(diag)? better to use EQUB
+# TODO equilibrate for cholesky and bk - use DPOEQUB/DSYEQUB
 
 
 # cache for LAPACK cholesky (like POTRF)
@@ -69,11 +61,11 @@ function HypCholCache(uplo::Char, A::StridedMatrix{T}; tol_diag = zero(R)) where
     return c
 end
 
-for (potrf, elty, rtyp) in (
-    (:dpotrf_, :Float64, :Float64),
-    (:spotrf_, :Float32, :Float32),
-    (:zpotrf_, :ComplexF64, :Float64),
-    (:cpotrf_, :ComplexF32, :Float32),
+for (potrf, potri, elty, rtyp) in (
+    (:dpotrf_, :dpotri_, :Float64, :Float64),
+    (:spotrf_, :spotri_, :Float32, :Float32),
+    (:zpotrf_, :zpotri_, :ComplexF64, :Float64),
+    (:cpotrf_, :cpotri_, :ComplexF32, :Float32),
     )
     @eval begin
         function hyp_chol!(c::HypCholCache{$rtyp, $elty}, A::StridedMatrix{$elty})
@@ -90,6 +82,23 @@ for (potrf, elty, rtyp) in (
             return Cholesky{$elty, typeof(A)}(A, c.uplo, c.info[])
         end
     end
+
+    @eval begin
+        function hyp_chol_inv!(c::HypCholCache{$rtyp, $elty}, fact_A::Cholesky{$elty, <:StridedMatrix{$elty}})
+            ccall((@blasfunc($potri), liblapack), Cvoid, (
+                Ref{UInt8}, Ref{BlasInt}, Ptr{$elty}, Ref{BlasInt}, Ptr{BlasInt},
+                ), c.uplo, c.n, fact_A.factors, c.lda, c.info)
+
+            if c.info[] < 0
+                throw(ArgumentError("invalid argument #$(-c.info[]) to LAPACK call"))
+            elseif c.info[] > 0
+                error("failed to calculate matrix inverse from cholesky")
+            end
+
+            return fact_A.factors
+        end
+    end
+
 end
 
 function HypCholCache(uplo::Char, A::AbstractMatrix{T}; tol_diag = zero(R)) where {T <: RealOrComplex{R}} where {R <: Real}
@@ -104,10 +113,8 @@ function hyp_chol!(c::HypCholCache{R, T}, A::AbstractMatrix{T}) where {T <: Real
     return cholesky!(Hermitian(A, Symbol(c.uplo)), check = false)
 end
 
-function hyp_ldiv_chol_L!(B::Matrix, F::Cholesky, A::AbstractMatrix)
-    copyto!(B, A)
-    ldiv!(LowerTriangular(F.L), B)
-    return B
+function hyp_chol_inv!(c::HypCholCache{R, T}, fact_A::Cholesky{T, <:AbstractMatrix{T}}) where {T <: RealOrComplex{R}} where {R <: Real}
+    return inv(fact_A)
 end
 
 # cache for LAPACK Bunch-Kaufman (like SYTRF_ROOK)
