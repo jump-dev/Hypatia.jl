@@ -192,7 +192,8 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPer
         vec_to_mat_U!(cone.mat2, view(arr, 3:cone.dim, i))
         dot_prod = dot(Symmetric(cone.mat2, :U), Symmetric(cone.Wivzi, :U))
         mul!(cone.mat3, Symmetric(cone.mat2, :U), cone.Wi)
-        @. cone.mat2 = cone.Wivzi * dot_prod
+        copyto!(cone.mat2, cone.Wivzi)
+        @. cone.mat2 *= dot_prod
         mul!(cone.mat2, Symmetric(cone.Wi, :U), cone.mat3, cone.vzip1, true)
         mat_U_to_vec_scaled!(view(prod, 3:cone.dim, i), cone.mat2)
     end
