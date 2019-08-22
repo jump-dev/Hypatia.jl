@@ -80,20 +80,23 @@ function update_grad(cone::EpiNormInf{T}) where {T <: Real}
     usqr = abs2(u)
     cone.schur = zero(T)
     @inbounds for (j, wj) in enumerate(w)
-        iuw2u = 2 * u / (usqr - abs2(wj))
+        # NOTE these operations are somewhat redundant, but numerically tuned to work well
+        wjsqr = abs2(wj)
+        usqrmwsqr = usqr - wjsqr
+        @assert usqrmwsqr > 0
+        iuw2u = 2 * u / usqrmwsqr
         g1 += iuw2u
         h1 += abs2(iuw2u)
-        iu2w2 = 2 / (usqr - abs2(wj))
+        iu2w2 = 2 / usqrmwsqr
         iu2ww = wj * iu2w2
         cone.grad[j + 1] = iu2ww
+        # NOTE diag2n and edge2n operations can be moved to hessian update
         cone.diag2n[j] = iu2w2 + abs2(iu2ww)
-        @assert cone.diag2n[j] > 0
-        # more numerically stable than reusing iuw2u
-        cone.edge2n[j] = -2 / (u - abs2(w[j]) / u) * iu2ww
-
-        usqrwsqr = usqr + abs2(wj)
-        cone.div2n[j] = 2 * u * wj / usqrwsqr
-        cone.schur += inv(usqrwsqr)
+        cone.edge2n[j] = -2 / (u - wjsqr / u) * iu2ww
+        # NOTE div2n and schur operations can be moved to inv hessian update
+        usqrpwsqr = usqr + wjsqr
+        cone.div2n[j] = 2 * u * wj / usqrpwsqr
+        cone.schur += inv(usqrpwsqr)
     end
     t1 = (cone.dim - 2) / u
     cone.grad[1] = t1 - g1
