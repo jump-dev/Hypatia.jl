@@ -4,8 +4,6 @@ Copyright 2019, Chris Coey and contributors
 
 include(joinpath(@__DIR__, "barrier.jl"))
 
-@info("starting barrier tests")
-
 real_types = [
     Float64,
     Float32,
@@ -32,7 +30,8 @@ barrier_testfuns = [
     # test_wsospolyinterpsoc_barrier,
     ]
 
-@testset "barrier functions tests: $t, $T" for t in barrier_testfuns, T in real_types
+@info("starting barrier tests")
+@testset "barrier tests: $t, $T" for t in barrier_testfuns, T in real_types
     if T == BigFloat && t in (test_epiperpower_barrier, test_epiperexp_barrier) #, test_wsospolyinterpmat_barrier, test_wsospolyinterpsoc_barrier)
         continue
     end

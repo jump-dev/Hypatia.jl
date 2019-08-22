@@ -22,7 +22,6 @@ include(joinpath(examples_dir, "semidefinitepoly/JuMP.jl"))
 include(joinpath(examples_dir, "shapeconregr/JuMP.jl"))
 
 @info("starting JuMP examples tests")
-
 @testset "JuMP examples" begin
     # TODO rewrite like test/native.jl functions, to take T and all options and use build_solve_check
     JuMP_options = (
