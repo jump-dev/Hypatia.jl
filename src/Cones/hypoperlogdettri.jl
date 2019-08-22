@@ -29,8 +29,6 @@ mutable struct HypoPerLogdetTri{T <: Real} <: Cone{T}
     mat::Matrix{T}
     mat2::Matrix{T}
     mat3::Matrix{T}
-    mat4::Matrix{T}
-    vecn::Vector{T}
     fact_mat
     chol_cache
     ldWv::T
@@ -68,8 +66,6 @@ function setup_data(cone::HypoPerLogdetTri{T}) where {T <: Real}
     cone.mat = Matrix{T}(undef, cone.side, cone.side)
     cone.mat2 = similar(cone.mat)
     cone.mat3 = similar(cone.mat)
-    cone.mat4 = similar(cone.mat)
-    cone.vecn = Vector{T}(undef, cone.dim - 2)
     cone.chol_cache = HypCholCache('U', cone.mat)
     cone.Wivzi = similar(cone.mat)
     cone.hess_fact_cache = nothing
@@ -185,24 +181,23 @@ function update_hess_prod(cone::HypoPerLogdetTri)
     return nothing
 end
 
-function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPerLogdetTri{T}) where {T <: Real}
+function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPerLogdetTri)
     if !cone.hess_prod_updated
         update_hess_prod(cone)
     end
     Wi = cone.Wi
     @views mul!(prod[1:2, :], cone.hess[1:2, :], arr)
-    @views mul!(prod[3:cone.dim, :], cone.hess[3:cone.dim, 1:2], arr[1:2, :])
 
     @inbounds for i in 1:size(arr, 2)
-        vec_to_mat_U!(cone.mat4, view(arr, 3:cone.dim, i))
-        mul!(cone.mat2, Symmetric(cone.mat4, :U), cone.Wi)
-        mul!(cone.mat3, Symmetric(cone.Wi, :U), cone.mat2)
-        @. cone.mat3 *= cone.vzip1
-        dot_prod = dot(Symmetric(cone.mat4, :U), Symmetric(cone.Wivzi, :U)) # TODO replace with faster dot product https://github.com/JuliaLang/julia/issues/32730
-        @. cone.mat3 += cone.Wivzi * dot_prod
-        mat_U_to_vec_scaled!(cone.vecn, cone.mat3)
-        view(prod, 3:cone.dim, i) .+= cone.vecn
+        vec_to_mat_U!(cone.mat2, view(arr, 3:cone.dim, i))
+        dot_prod = dot(Symmetric(cone.mat2, :U), Symmetric(cone.Wivzi, :U))
+        mul!(cone.mat3, Symmetric(cone.mat2, :U), cone.Wi)
+        copyto!(cone.mat2, cone.Wivzi)
+        @. cone.mat2 *= dot_prod
+        mul!(cone.mat2, Symmetric(cone.Wi, :U), cone.mat3, cone.vzip1, true)
+        mat_U_to_vec_scaled!(view(prod, 3:cone.dim, i), cone.mat2)
     end
+    @views mul!(prod[3:cone.dim, :], cone.hess[3:cone.dim, 1:2], arr[1:2, :], true, true)
 
     return prod
 end
