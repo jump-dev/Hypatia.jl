@@ -133,7 +133,14 @@ end
 function test_epiperexp_barrier(T::Type{<:Real})
     for dim in [3, 5]
         cone = CO.EpiPerExp{T}(dim)
-        test_barrier_oracles(cone, cone.barfun, noise = 0.1)
+        function barrier(s)
+            u = s[1]
+            v = s[2]
+            w = s[3:end]
+            # return -log(u - v*sum(wi -> exp(wi/v), w)) - log(u) - log(v)
+            return -log(log(u) - log(v) - log(sum(wi -> exp(wi / v), w))) - log(u) - 2 * log(v)
+        end
+        test_barrier_oracles(cone, barrier, noise = 0.1)
     end
     return
 end
