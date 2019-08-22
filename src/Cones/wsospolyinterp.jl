@@ -7,7 +7,7 @@ interpolation-based weighted-sum-of-squares (multivariate) polynomial cone param
 definition and dual barrier from "Sum-of-squares optimization without semidefinite programming" by D. Papp and S. Yildiz, available at https://arxiv.org/abs/1712.01792
 
 TODO
-- can perform loop for calculating g and H in parallel
+- perform loop for calculating g and H in parallel
 - scale the interior direction
 =#
 
@@ -106,7 +106,9 @@ function update_grad(cone::WSOSPolyInterp)
     @assert cone.is_feas
     cone.grad .= 0
     @inbounds for k in eachindex(cone.Ps)
-        LUk = hyp_ldiv_chol_L!(cone.tmpLU[k], cone.ΛFs[k], cone.Ps[k]')
+        LUk = cone.tmpLU[k]
+        copyto!(LUk, cone.Ps[k]')
+        ldiv!(LowerTriangular(cone.ΛFs[k].L), LUk)
         @inbounds for j in 1:cone.dim
             cone.grad[j] -= sum(abs2, view(LUk, :, j))
         end

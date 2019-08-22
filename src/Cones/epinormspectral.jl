@@ -37,7 +37,7 @@ mutable struct EpiNormSpectral{T <: Real} <: Cone{T}
     ZiEuZi::Matrix{T}
     tmpnn::Matrix{T}
     tmpnm::Matrix{T}
-    tmpn::Vector{T}
+    tmpnm2::Matrix{T}
 
     tmp_hess::Symmetric{T, Matrix{T}}
     hess_fact
@@ -68,12 +68,11 @@ function setup_data(cone::EpiNormSpectral{T}) where {T <: Real}
     cone.WWt = Matrix{T}(undef, cone.n, cone.n)
     cone.Z = Matrix{T}(undef, cone.n, cone.n)
     cone.chol_cache = HypCholCache('U', cone.Z)
-    cone.Zi = Symmetric(zeros(T, cone.n, cone.n))
     cone.Eu = Symmetric(zeros(T, cone.n, cone.n))
     cone.ZiEuZi = Matrix{T}(undef, cone.n, cone.n)
     cone.tmpnn = Matrix{T}(undef, cone.n, cone.n)
     cone.tmpnm = Matrix{T}(undef, cone.n, cone.m)
-    cone.tmpn = Vector{T}(undef, cone.n)
+    cone.tmpnm2 = Matrix{T}(undef, cone.n, cone.m)
     cone.hess_fact_cache = nothing
     return
 end
@@ -106,16 +105,17 @@ end
 function update_grad(cone::EpiNormSpectral)
     @assert cone.is_feas
     u = cone.point[1]
-    cone.Zi = Symmetric(inv(cone.fact_Z)) # TODO eliminate allocs
+    # ldiv!(cone.tmpnm, cone.fact_Z, cone.W)
+    cone.Zi = Symmetric(hyp_chol_inv!(cone.chol_cache, cone.fact_Z), :U) # NOTE: destroys cone.fact_Z
+    mul!(cone.tmpnm, cone.Zi, cone.W) # TODO could use ldiv (as above) instead for potentially better numerics
     @. cone.Eu.data = cone.WWt / u / u
     @inbounds for i in 1:cone.n
         cone.Eu[i, i] += 1
     end
     cone.grad[1] = -dot(cone.Zi, cone.Eu) - inv(u)
-    mul!(cone.tmpnm, cone.Zi, cone.W)
-    @. cone.tmpnm = cone.tmpnm / u * 2
+    @. cone.tmpnm /= u
     @inbounds for i in 1:(cone.n * cone.m)
-        cone.grad[i + 1] = cone.tmpnm[i]
+        cone.grad[i + 1] = 2 * cone.tmpnm[i]
     end
     cone.grad_updated = true
     return cone.grad
@@ -133,46 +133,43 @@ function update_hess(cone::EpiNormSpectral)
     ZiEuZi = cone.ZiEuZi
     tmpnn = cone.tmpnn
     tmpnm = cone.tmpnm
-    tmpn = cone.tmpn
+    tmpnm2 = cone.tmpnm2
     cone.hess .= 0
     H = cone.hess.data
 
+    # calculate d^2F / dW_ij dW_kl, p and q are linear indices for (i, j) and (k, l)
+    p = 2
+    @inbounds for j in 1:m, i in 1:n
+        # tmpnn evaluates to Zi * dZdW_ij * Zi
+        @views mul!(tmpnn, Zi[:, i], tmpnm[:, j]')
+        @. tmpnn += tmpnn'
+        # add to terms where k = i, and l = j:n, inner product of Zi with d^2Z / dW_ij dW_kl nonzero only when j=l
+        q = p
+        viewij = view(H, p, q:(q + n - i))
+        # add inner product of Zi with d^2Z / dW_ij dW_kl, unscaled by 2 / u as well as shared term
+        @views viewij .= Zi[i, i:n]
+        @views @. for ni in 1:n
+            viewij += W[ni, j] * tmpnn[ni, i:n]
+        end
+        # add to terms where k > i, l = 1:n
+        q += (n - i + 1)
+        if j <= m - 1
+            @views mul!(tmpnm2[1:n, 1:(m - j)], Symmetric(tmpnn, :U),  W[:, (j + 1):m])
+            @inbounds for l in 1:(m - j), k in 1:n
+                H[p, q] += tmpnm2[k, l]
+                q += 1
+            end
+        end
+        p += 1
+    end
+
     # no BLAS method for product of two symmetric matrices, faster if one is not symmetric
+    copytri!(Zi.data, 'U')
     mul!(tmpnn, Eu, Zi.data)
     mul!(ZiEuZi, Zi, tmpnn)
-    @. tmpnn = -Zi / u - ZiEuZi
-    mul!(tmpnm, tmpnn, W)
+    mul!(tmpnm, ZiEuZi, W, true, true)
+    tmpnm .*= -1
     @views copyto!(H[1, 2:end], tmpnm)
-    p = 2
-
-    # calculate d^2F / dW_ij dW_kl, p and q are linear indices for (i, j) and (k, l)
-    @inbounds for j in 1:m
-        @views mul!(tmpn, Zi, W[:, j])
-        @. tmpn /= u
-        @inbounds for i in 1:n
-            # tmpnn evaluates to Zi * dZdW_ij * Zi
-            @views mul!(tmpnn, Zi[:, i], tmpn')
-            @. tmpnn += tmpnn'
-            # add to terms where k = i, and l = j:n, inner product of Zi with d^2Z / dW_ij dW_kl nonzero only when j=l
-            q = p
-            viewij = view(H, p, q:(q + n - i))
-            # add inner product of Zi with d^2Z / dW_ij dW_kl, unscaled by 2 / u as well as shared term
-            @views viewij .= Zi[i, i:n]
-            @views @. for ni in 1:n
-                viewij += W[ni, j] * tmpnn[ni, i:n]
-            end
-            # add to terms where k > i, l = 1:n
-            q += (n - i + 1)
-            if j <= m - 1
-                @views mul!(tmpnm[1:n, 1:(m - j)], Symmetric(tmpnn, :U),  W[:, (j + 1):m])
-                @inbounds for l in 1:(m - j), k in 1:n
-                    H[p, q] += tmpnm[k, l]
-                    q += 1
-                end
-            end
-            p += 1
-        end
-    end
 
     # scale everything
     @. H = H / u * 2
