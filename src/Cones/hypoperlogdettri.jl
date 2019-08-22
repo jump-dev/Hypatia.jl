@@ -195,7 +195,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPer
         mul!(cone.mat2, Symmetric(cone.mat4, :U), cone.Wi)
         mul!(cone.mat3, Symmetric(cone.Wi, :U), cone.mat2)
         @. cone.mat3 *= cone.vzip1
-        dot_prod = dot(Symmetric(cone.mat4, :U), Symmetric(cone.Wivzi, :U)) # TODO replace with faster dot product https://github.com/JuliaLang/julia/issues/32730
+        dot_prod = dot(Symmetric(cone.mat4, :U), Symmetric(cone.Wivzi, :U))
         @. cone.mat3 += cone.Wivzi * dot_prod
         mat_U_to_vec_scaled!(view(prod, 3:cone.dim, i), cone.mat3)
     end
