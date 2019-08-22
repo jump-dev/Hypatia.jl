@@ -72,7 +72,6 @@ function update_feas(cone::EpiNormInf)
     return cone.is_feas
 end
 
-# TODO maybe move the diag2n, edge2n, div2n to update hess/inv_hess functions
 function update_grad(cone::EpiNormInf{T}) where {T <: Real}
     @assert cone.is_feas
     u = cone.point[1]
@@ -80,23 +79,31 @@ function update_grad(cone::EpiNormInf{T}) where {T <: Real}
     g1 = zero(u)
     h1 = zero(u)
     usqr = abs2(u)
+    cone.schur = zero(T)
     @inbounds for (j, wj) in enumerate(w)
-        iuw2u = 2 / (u - abs2(wj) / u)
+        # NOTE these operations are somewhat redundant, but numerically tuned to work well
+        wjsqr = abs2(wj)
+        usqrmwsqr = usqr - wjsqr
+        @assert usqrmwsqr > 0
+        iuw2u = 2 * u / usqrmwsqr
         g1 += iuw2u
         h1 += abs2(iuw2u)
-        iu2w2 = 2 / (usqr - abs2(wj))
+        iu2w2 = 2 / usqrmwsqr
         iu2ww = wj * iu2w2
         cone.grad[j + 1] = iu2ww
+        # NOTE diag2n and edge2n operations can be moved to hessian update
         cone.diag2n[j] = iu2w2 + abs2(iu2ww)
-        @assert cone.diag2n[j] > 0
-        cone.edge2n[j] = -iuw2u * iu2ww
-        cone.div2n[j] = -cone.edge2n[j] / cone.diag2n[j]
+        cone.edge2n[j] = -2 / (u - wjsqr / u) * iu2ww
+        # NOTE div2n and schur operations can be moved to inv hessian update
+        usqrpwsqr = usqr + wjsqr
+        cone.div2n[j] = 2 * u * wj / usqrpwsqr
+        cone.schur += inv(usqrpwsqr)
     end
     t1 = (cone.dim - 2) / u
     cone.grad[1] = t1 - g1
     cone.diag11 = -(t1 + g1) / u + h1
     @assert cone.diag11 > 0
-    cone.schur = cone.diag11 + dot(cone.edge2n, cone.div2n)
+    cone.schur = 2 * cone.schur - t1 / u
     @assert cone.schur > 0
     cone.grad_updated = true
     return cone.grad
