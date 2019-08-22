@@ -7,9 +7,6 @@ Copyright 2018, Chris Coey and contributors
 
 barrier (guessed, based on analogy to hypoperlog barrier)
 -log(v*logdet(W/v) - u) - logdet(W) - log(v)
-
-TODO remove allocations
-TODO remove cone.vecn
 =#
 
 mutable struct HypoPerLogdetTri{T <: Real} <: Cone{T}
@@ -32,6 +29,7 @@ mutable struct HypoPerLogdetTri{T <: Real} <: Cone{T}
     mat::Matrix{T}
     mat2::Matrix{T}
     mat3::Matrix{T}
+    mat4::Matrix{T}
     vecn::Vector{T}
     fact_mat
     chol_cache
@@ -70,6 +68,7 @@ function setup_data(cone::HypoPerLogdetTri{T}) where {T <: Real}
     cone.mat = Matrix{T}(undef, cone.side, cone.side)
     cone.mat2 = similar(cone.mat)
     cone.mat3 = similar(cone.mat)
+    cone.mat4 = similar(cone.mat)
     cone.vecn = Vector{T}(undef, cone.dim - 2)
     cone.chol_cache = HypCholCache('U', cone.mat)
     cone.Wivzi = similar(cone.mat)
@@ -116,7 +115,8 @@ function update_grad(cone::HypoPerLogdetTri)
     @assert cone.is_feas
     u = cone.point[1]
     v = cone.point[2]
-    cone.Wi = inv(cone.fact_mat) # TODO remove allocs
+    cone.Wi = hyp_chol_inv!(cone.chol_cache, cone.fact_mat)
+    copytri!(cone.Wi, 'U')
     cone.nLz = (cone.side - cone.ldWv) / cone.z
     cone.ldWvuv = cone.ldWv - u / v
     cone.vzip1 = 1 + inv(cone.ldWvuv)
@@ -129,7 +129,6 @@ function update_grad(cone::HypoPerLogdetTri)
     return cone.grad
 end
 
-# TODO only work with upper triangle
 function update_hess(cone::HypoPerLogdetTri)
     if !cone.hess_prod_updated
         update_hess_prod(cone) # fill in first two rows of the Hessian and compute Wivzi
@@ -195,11 +194,11 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPer
     @views mul!(prod[3:cone.dim, :], cone.hess[3:cone.dim, 1:2], arr[1:2, :])
 
     @inbounds for i in 1:size(arr, 2)
-        vec_to_mat_U!(cone.mat, view(arr, 3:cone.dim, i))
-        mul!(cone.mat2, Symmetric(cone.mat, :U), cone.Wi)
+        vec_to_mat_U!(cone.mat4, view(arr, 3:cone.dim, i))
+        mul!(cone.mat2, Symmetric(cone.mat4, :U), cone.Wi)
         mul!(cone.mat3, Symmetric(cone.Wi, :U), cone.mat2)
         @. cone.mat3 *= cone.vzip1
-        dot_prod = dot(Symmetric(cone.mat, :U), Symmetric(cone.Wivzi, :U)) # TODO replace with faster dot product https://github.com/JuliaLang/julia/issues/32730
+        dot_prod = dot(Symmetric(cone.mat4, :U), Symmetric(cone.Wivzi, :U)) # TODO replace with faster dot product https://github.com/JuliaLang/julia/issues/32730
         @. cone.mat3 += cone.Wivzi * dot_prod
         mat_U_to_vec_scaled!(cone.vecn, cone.mat3)
         view(prod, 3:cone.dim, i) .+= cone.vecn

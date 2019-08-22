@@ -7,7 +7,7 @@ interpolation-based weighted-sum-of-squares (multivariate) polynomial cone param
 definition and dual barrier from "Sum-of-squares optimization without semidefinite programming" by D. Papp and S. Yildiz, available at https://arxiv.org/abs/1712.01792
 
 TODO
-- can perform loop for calculating g and H in parallel
+- perform loop for calculating g and H in parallel
 - scale the interior direction
 =#
 
