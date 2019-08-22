@@ -26,7 +26,6 @@ mutable struct PosSemidefTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     grad_updated::Bool
     hess_updated::Bool
     inv_hess_updated::Bool
-    inv_hess_prod_updated::Bool
     is_feas::Bool
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
@@ -35,6 +34,7 @@ mutable struct PosSemidefTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     mat::Matrix{R}
     mat2::Matrix{R}
     mat3::Matrix{R}
+    mat4::Matrix{R}
     inv_mat::Matrix{R}
     fact_mat
     chol_cache
@@ -60,7 +60,7 @@ end
 
 PosSemidefTri{T, R}(dim::Int) where {R <: RealOrComplex{T}} where {T <: Real} = PosSemidefTri{T, R}(dim, false)
 
-reset_data(cone::PosSemidefTri) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.inv_hess_prod_updated = false)
+reset_data(cone::PosSemidefTri) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
 
 function setup_data(cone::PosSemidefTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     reset_data(cone)
@@ -72,6 +72,7 @@ function setup_data(cone::PosSemidefTri{T, R}) where {R <: RealOrComplex{T}} whe
     cone.mat = zeros(R, cone.side, cone.side)
     cone.mat2 = similar(cone.mat)
     cone.mat3 = similar(cone.mat)
+    cone.mat4 = similar(cone.mat)
     cone.chol_cache = HypCholCache('U', cone.mat2)
     return
 end
@@ -101,9 +102,11 @@ end
 
 function update_grad(cone::PosSemidefTri)
     @assert cone.is_feas
-    cone.inv_mat = inv(cone.fact_mat) # TODO eliminate allocs
+    cone.inv_mat = hyp_chol_inv!(cone.chol_cache, cone.fact_mat)
+    copytri!(cone.inv_mat, 'U', cone.is_complex)
     mat_U_to_vec_scaled!(cone.grad, cone.inv_mat)
     cone.grad .*= -1
+    copytri!(cone.mat, 'U', cone.is_complex)
     cone.grad_updated = true
     return cone.grad
 end
@@ -195,41 +198,33 @@ function update_hess(cone::PosSemidefTri)
 end
 
 function update_inv_hess(cone::PosSemidefTri)
-    if !cone.inv_hess_prod_updated
-        update_inv_hess_prod(cone) # need cone.mat to be symmetric/Hermitian
-    end
+    @assert is_feas(cone)
     _build_hess(cone.inv_hess.data, cone.mat, true)
     cone.inv_hess_updated = true
     return cone.inv_hess
 end
 
-function update_inv_hess_prod(cone::PosSemidefTri)
-    @assert is_feas(cone)
-    copytri!(cone.mat, 'U', cone.is_complex)
-    cone.inv_hess_prod_updated = true
-    return nothing
-end
+update_hess_prod(cone::PosSemidefTri) = nothing
+update_inv_hess_prod(cone::PosSemidefTri) = nothing
 
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidefTri)
     @assert cone.grad_updated
     @inbounds for i in 1:size(arr, 2)
-        vec_to_mat_U!(cone.mat2, view(arr, :, i))
-        mul!(cone.mat3, Hermitian(cone.mat2, :U), cone.inv_mat)
-        mul!(cone.mat2, Hermitian(cone.inv_mat, :U), cone.mat3)
-        mat_U_to_vec_scaled!(view(prod, :, i), cone.mat2)
+        vec_to_mat_U!(cone.mat4, view(arr, :, i))
+        mul!(cone.mat3, Hermitian(cone.mat4, :U), cone.inv_mat)
+        mul!(cone.mat4, Hermitian(cone.inv_mat, :U), cone.mat3)
+        mat_U_to_vec_scaled!(view(prod, :, i), cone.mat4)
     end
     return prod
 end
 
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidefTri)
-    if !cone.inv_hess_prod_updated
-        update_inv_hess_prod(cone)
-    end
+    @assert is_feas(cone)
     @inbounds for i in 1:size(arr, 2)
-        vec_to_mat_U_scaled!(cone.mat2, view(arr, :, i))
-        mul!(cone.mat3, Hermitian(cone.mat2, :U), cone.mat)
-        mul!(cone.mat2, Hermitian(cone.mat, :U), cone.mat3)
-        mat_U_to_vec!(view(prod, :, i), cone.mat2)
+        vec_to_mat_U_scaled!(cone.mat4, view(arr, :, i))
+        mul!(cone.mat3, Hermitian(cone.mat4, :U), cone.mat)
+        mul!(cone.mat4, Hermitian(cone.mat, :U), cone.mat3)
+        mat_U_to_vec!(view(prod, :, i), cone.mat4)
     end
     return prod
 end
