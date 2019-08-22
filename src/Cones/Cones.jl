@@ -16,7 +16,7 @@ import Hypatia.hyp_AtA!
 import Hypatia.hyp_AAt!
 import Hypatia.HypCholCache
 import Hypatia.hyp_chol!
-import Hypatia.hyp_ldiv_chol_L!
+import Hypatia.hyp_chol_inv!
 import Hypatia.HypBKCache
 import Hypatia.hyp_bk!
 

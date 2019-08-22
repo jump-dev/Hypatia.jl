@@ -16,9 +16,6 @@ using Test
 using TimerOutputs
 import Hypatia.Cones
 import Hypatia.Models
-import Hypatia.hyp_AtA!
-import Hypatia.hyp_chol!
-import Hypatia.hyp_ldiv_chol_L!
 import Hypatia.HypCholSolveCache
 import Hypatia.hyp_chol_solve!
 import Hypatia.HypBKSolveCache

@@ -20,7 +20,7 @@ function test_barrier_oracles(cone::CO.Cone{T}, barrier::Function; noise = 0) wh
     end
     CO.load_point(cone, point)
 
-    tol = 10000 * eps(T)
+    tol = 100 * eps(T)
 
     @test cone.point == point
     @test CO.is_feas(cone)
@@ -57,14 +57,12 @@ function test_orthant_barrier(T::Type{<:Real})
     barrier = s -> -sum(log, s)
     for dim in [1, 3]
         cone = CO.Nonnegative{T}(dim)
-        test_barrier_oracles(cone, barrier)
         test_barrier_oracles(cone, barrier, noise = 0.1)
     end
 
     barrier = s -> -sum(log, -s)
     for dim in [1, 3]
         cone = CO.Nonpositive{T}(dim)
-        test_barrier_oracles(cone, barrier)
         test_barrier_oracles(cone, barrier, noise = 0.1)
     end
     return
@@ -78,7 +76,6 @@ function test_epinorminf_barrier(T::Type{<:Real})
     end
     for dim in [2, 4]
         cone = CO.EpiNormInf{T}(dim)
-        test_barrier_oracles(cone, barrier)
         test_barrier_oracles(cone, barrier, noise = 0.1)
     end
     return
@@ -92,7 +89,6 @@ function test_epinormeucl_barrier(T::Type{<:Real})
     end
     for dim in [2, 4]
         cone = CO.EpiNormEucl{T}(dim)
-        test_barrier_oracles(cone, barrier)
         test_barrier_oracles(cone, barrier, noise = 0.1)
     end
     return
@@ -107,7 +103,6 @@ function test_epipersquare_barrier(T::Type{<:Real})
     end
     for dim in [3, 5]
         cone = CO.EpiPerSquare{T}(dim)
-        test_barrier_oracles(cone, barrier)
         test_barrier_oracles(cone, barrier, noise = 0.1)
     end
     return
@@ -116,7 +111,6 @@ end
 function test_epiperpower_barrier(T::Type{<:Real})
     for alpha in T[1.5, 2.5]
         cone = CO.EpiPerPower{T}(alpha)
-        test_barrier_oracles(cone, cone.barfun)
         test_barrier_oracles(cone, cone.barfun, noise = 0.1)
     end
     return
@@ -131,7 +125,6 @@ function test_hypoperlog_barrier(T::Type{<:Real})
     end
     for dim in [3, 5]
         cone = CO.HypoPerLog{T}(dim)
-        test_barrier_oracles(cone, barrier)
         test_barrier_oracles(cone, barrier, noise = 0.1)
     end
     return
@@ -140,7 +133,6 @@ end
 function test_epiperexp_barrier(T::Type{<:Real})
     for dim in [3, 5]
         cone = CO.EpiPerExp{T}(dim)
-        test_barrier_oracles(cone, cone.barfun)
         test_barrier_oracles(cone, cone.barfun, noise = 0.1)
     end
     return
@@ -157,7 +149,6 @@ function test_power_barrier(T::Type{<:Real})
             w = s[(m + 1):end]
             return -log(prod(w[j] ^ (2 * alpha[j]) for j in eachindex(w)) - sum(abs2, u)) - sum((1 - alpha[j]) * log(w[j]) for j in eachindex(w))
         end
-        test_barrier_oracles(cone, barrier)
         test_barrier_oracles(cone, barrier, noise = 0.1)
     end
     return
@@ -174,7 +165,6 @@ function test_hypogeomean_barrier(T::Type{<:Real})
             w = s[2:end]
             return -log(prod((w[j] / alpha[j]) ^ alpha[j] for j in eachindex(w)) + u) - sum((1 - alpha[j]) * log(w[j] / alpha[j]) for j in eachindex(w)) - log(-u)
         end
-        test_barrier_oracles(cone, barrier)
         test_barrier_oracles(cone, barrier, noise = 0.1)
     end
     return
@@ -188,7 +178,6 @@ function test_epinormspectral_barrier(T::Type{<:Real})
             W = reshape(s[2:end], n, m)
             return -logdet(cholesky!(Symmetric(u * I - W * W' / u))) - log(u)
         end
-        test_barrier_oracles(cone, barrier)
         test_barrier_oracles(cone, barrier, noise = 0.1)
     end
     return
@@ -204,7 +193,6 @@ function test_possemideftri_barrier(T::Type{<:Real})
             CO.vec_to_mat_U!(S, s)
             return -logdet(cholesky!(Symmetric(S, :U)))
         end
-        test_barrier_oracles(cone, R_barrier)
         test_barrier_oracles(cone, R_barrier, noise = 0.1)
 
         # complex PSD cone
@@ -215,7 +203,6 @@ function test_possemideftri_barrier(T::Type{<:Real})
             CO.vec_to_mat_U!(S, s)
             return -logdet(cholesky!(Hermitian(S, :U)))
         end
-        test_barrier_oracles(cone, C_barrier)
         test_barrier_oracles(cone, C_barrier, noise = 0.1)
     end
     return
@@ -232,7 +219,6 @@ function test_hypoperlogdettri_barrier(T::Type{<:Real})
             CO.vec_to_mat_U!(W, s[3:end])
             return -log(v * logdet(cholesky!(Symmetric(W / v, :U))) - u) - logdet(cholesky!(Symmetric(W, :U))) - log(v)
         end
-        test_barrier_oracles(cone, barrier)
         test_barrier_oracles(cone, barrier, noise = 0.1)
     end
     return
@@ -248,7 +234,6 @@ function test_wsospolyinterp_barrier(T::Type{<:Real})
             Lambda = Symmetric(P0' * Diagonal(s) * P0)
             return -logdet(cholesky!(Lambda))
         end
-        test_barrier_oracles(cone, barrier)
         test_barrier_oracles(cone, barrier, noise = 0.1)
     end
     # TODO also test complex case CO.WSOSPolyInterp{T, Complex{T}} - need complex MU interp functions first
