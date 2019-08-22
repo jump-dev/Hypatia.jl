@@ -28,6 +28,10 @@ mutable struct EpiPerExp{T <: Real} <: Cone{T}
     inv_hess::Symmetric{T, Matrix{T}}
 
     barfun::Function
+    lse::T
+    uvlse::T
+    sumwexpv::T
+    dzdv::T
     diffres
     tmp_hess::Symmetric{T, Matrix{T}}
     hess_fact
@@ -59,6 +63,8 @@ function setup_data(cone::EpiPerExp{T}) where {T <: Real}
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.tmp_hess = Symmetric(zeros(T, dim, dim), :U)
+
+
     cone.diffres = DiffResults.HessianResult(cone.grad)
     cone.hess_fact_cache = nothing
     return
@@ -78,7 +84,98 @@ function update_feas(cone::EpiPerExp)
     u = cone.point[1]
     v = cone.point[2]
     w = view(cone.point, 3:cone.dim)
-    cone.is_feas = u > 0 && v > 0 && u > v * sum(wi -> exp(wi / v), w) # TODO use the numerically safer way to evaluate LSE function
+    cone.lse = log(sum(wi -> exp(wi / v), w))
+    cone.is_feas = u > 0 && v > 0 && log(u) > cone.lse
     cone.feas_updated = true
     return cone.is_feas
+end
+
+function update_grad(cone::EpiPerExp)
+    @assert cone.is_feas
+    u = cone.point[1]
+    v = cone.point[2]
+    w = view(cone.point, 3:cone.dim)
+    lse = cone.lse
+    sumexp = sum(wi -> exp(wi / v), w)
+    sumwexpv = sum(wi -> wi * exp(wi / v), w) / v
+    cone.sumwexpv = sumwexpv
+    uvlse = log(u) - log(v) - lse
+    cone.uvlse = uvlse
+    # derivative of uvlse wrt v
+    dzdv = -inv(v) + sumwexpv / sumexp / v
+    cone.dzdv = dzdv
+
+    cone.grad[1] = -(inv(uvlse) + 1) / u
+    cone.grad[2] = -dzdv / uvlse - 2 / v
+    # cone.grad[2] = ((1 - sumwexpv / sumexp) / uvlse - 2) / v
+    @. cone.grad[3:end] = exp(w / v) / v / sumexp / uvlse
+
+    # cone.diffres = ForwardDiff.hessian!(cone.diffres, cone.barfun, cone.point)
+
+    cone.grad_updated = true
+    return cone.grad
+end
+
+function update_hess(cone::EpiPerExp)
+    @assert cone.grad_updated
+    u = cone.point[1]
+    v = cone.point[2]
+    w = view(cone.point, 3:cone.dim)
+    lse = cone.lse
+    uvlse = cone.uvlse
+    sumwexpv = cone.sumwexpv
+    dzdv = cone.dzdv
+    sumexp = sum(wi -> exp(wi / v), w) # TODO cache
+
+    H = cone.hess.data
+    H[1, 1] = (1 / uvlse / uvlse + 1 / uvlse + 1) / u / u
+    H[1, 2] = dzdv / uvlse / uvlse / u
+
+    t1 = inv(uvlse)
+    t2 = inv(sumexp)
+    t3(i) = w[i] / v / v
+    t4(i) = exp(w[i] / v)
+    t3t4 = sum(t3(i) * t4(i) for i in eachindex(w))
+    dt1dv = -inv(abs2(uvlse)) * dzdv
+    dt2dv = inv(abs2(sumexp)) * sumwexpv / v
+    dt3dv(i) = -2 * w[i] / v / v / v
+    dt4dv(i) = -w[i] / v / v * exp(w[i] / v)
+    dt3t4dv = sum(t3(i) * dt4dv(i) + dt3dv(i) * t4(i) for i in eachindex(w))
+
+    H[2, 2] = -dzdv / uvlse / uvlse / v - 1 / uvlse / v / v
+    H[2, 2] += 2 / v / v
+    H[2, 2] -= dt1dv * t2 * t3t4
+    H[2, 2] -= t1 * (dt2dv * t3t4 + t2 * dt3t4dv)
+
+    for i in eachindex(w)
+        H[1, 2 + i] = -exp(w[i] / v) / v / sumexp / u / uvlse / uvlse
+    end
+
+    for i in eachindex(w)
+        dt1dw = -inv(abs2(uvlse)) * exp(w[i] / v) / v / sumexp
+        dt2dw = -inv(abs2(sumexp)) * exp(w[i] / v) / v
+        dt3t4dw = exp(w[i] / v) * (1 / v / v + w[i] / v^3)
+        # dt3t4dw = 1 / v^2 * exp(w[i] / v) +
+        H[2, 2 + i] = inv(abs2(uvlse)) * exp(w[i] / v) / v / sumexp / v # repetition
+        H[2, 2 + i] += dt1dw * t2 * t3t4
+        H[2, 2 + i] -= t1 * (dt2dw * t3t4 + dt3t4dw * t2)
+    end
+
+    # dsumexpdv = -sumwexpv / v
+    # for i in eachindex(w)
+    #     H[2, 2 + i] += -inv(abs2(uvlse)) * cone.dzdv * inv(sumexp) * exp(w[i] * v)
+    #     term2 = -inv(abs2(sumexp)) * dsumexpdv / v * exp(w[i] / v)
+    #     term2 += (-sumexp / v^2 + )
+    # end
+
+    for j in eachindex(w)
+        for i in 1:j
+            # H[2 + i, 2 + j] = -inv(abs2(uvlse)) * inv(abs2(sumexp)) * inv(abs2(v)) * exp(w[i] / v) * exp(w[j] / v)
+            H[2 + i, 2 + j] = inv(abs2(sumexp)) * inv(abs2(v)) * exp(w[i] / v) * exp(w[j] / v) * (inv(abs2(uvlse)) - inv(uvlse))
+        end
+        H[j + 2, j + 2] += inv(uvlse) * inv(sumexp) * inv(abs2(v)) * exp(w[j] / v)
+    end
+
+    cone.hess_updated = true
+    return cone.hess
 end
