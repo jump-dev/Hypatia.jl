@@ -29,7 +29,7 @@ mutable struct EpiPerExp{T <: Real} <: Cone{T}
 
     lse::T
     uvlse::T
-    sumwexpv::T
+    sumwexp::T
     sumexp::T
     dzdv::T
     dzdw::Vector{T}
@@ -94,17 +94,16 @@ function update_grad(cone::EpiPerExp)
     lse = cone.lse
     sumexp = sum(wi -> exp(wi / v), w)
     cone.sumexp = sumexp
-    sumwexpv = sum(wi -> wi * exp(wi / v), w) / v
-    cone.sumwexpv = sumwexpv
+    sumwexp = sum(wi -> wi * exp(wi / v), w)
+    cone.sumwexp = sumwexp
     uvlse = cone.uvlse
 
     # derivative of uvlse wrt v
-    dzdv = -inv(v) + sumwexpv / sumexp / v
+    dzdv = (sumwexp / v / sumexp - 1) / v
     cone.dzdv = dzdv
 
     cone.grad[1] = -(inv(uvlse) + 1) / u
     cone.grad[2] = -dzdv / uvlse - 2 / v
-    # cone.grad[2] = ((1 - sumwexpv / sumexp) / uvlse - 2) / v
     @. cone.dzdw = exp(w / v) / v / sumexp
     @. cone.grad[3:end] = cone.dzdw / uvlse
 
@@ -119,24 +118,26 @@ function update_hess(cone::EpiPerExp)
     w = view(cone.point, 3:cone.dim)
     lse = cone.lse
     uvlse = cone.uvlse
-    sumwexpv = cone.sumwexpv
+    sumwexp = cone.sumwexp
     dzdv = cone.dzdv
     dzdw = cone.dzdw
     sumexp = cone.sumexp
-    sumwexpvv = sumwexpv / v
+    sumwexpvv = sumwexp / v / v
     sumwsqrexpvv = sum(wi -> abs2(wi) * exp(wi / v), w) / v / v
+
+    sumwexp = sum(wi -> wi * exp(wi / v), w) # TODO cache
 
     H = cone.hess.data
     H[1, 1] = (inv(abs2(uvlse)) + inv(uvlse) + 1) / u / u
     H[1, 2] = dzdv / uvlse / uvlse / u
     @views @. H[1, 3:cone.dim] = -dzdw / u / uvlse / uvlse
 
-    # the derivative of sum(w / v ^ 2 .* exp.(w / v)) with respect to v
-    dsumwexpvvdv = -(sumwsqrexpvv + 2 * sumwexpv) / v / v
-    H[2, 2] = -dzdv / uvlse / uvlse / v - 1 / uvlse / v / v
+    # the derivative of sum(w / v ^ 2 .* exp.(w / v)) with respect to v, unscaled by inv(v ^ 2)
+    dsumwexpvvdv = -(sumwsqrexpvv + 2 * sumwexp / v)
+    H[2, 2] = -(dzdv / uvlse + 1 / v) / v
+    H[2, 2] += (sumwexp * (dzdv / uvlse - sumwexpvv / sumexp) - dsumwexpvvdv) / v / v / sumexp
+    H[2, 2] /= uvlse
     H[2, 2] += 2 / v / v
-    H[2, 2] += dzdv * sumwexpvv / uvlse / uvlse / sumexp
-    H[2, 2] -= (abs2(sumwexpv) / v / v / sumexp + dsumwexpvvdv) / uvlse / sumexp
 
     for i in eachindex(w)
         # derivative of inv(z) wrt w
