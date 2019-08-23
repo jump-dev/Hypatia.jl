@@ -9,8 +9,6 @@ module Cones
 using LinearAlgebra
 import LinearAlgebra.BlasFloat
 import LinearAlgebra.copytri!
-using ForwardDiff
-using DiffResults
 import Hypatia.RealOrComplex
 import Hypatia.hyp_AtA!
 import Hypatia.hyp_AAt!
