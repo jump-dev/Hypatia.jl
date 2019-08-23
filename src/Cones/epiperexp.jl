@@ -125,8 +125,6 @@ function update_hess(cone::EpiPerExp)
     sumwexpvv = sumwexp / v / v
     sumwsqrexpvv = sum(wi -> abs2(wi) * exp(wi / v), w) / v / v
 
-    sumwexp = sum(wi -> wi * exp(wi / v), w) # TODO cache
-
     H = cone.hess.data
     H[1, 1] = (inv(abs2(uvlse)) + inv(uvlse) + 1) / u / u
     H[1, 2] = dzdv / uvlse / uvlse / u
@@ -148,6 +146,7 @@ function update_hess(cone::EpiPerExp)
         # product rule for inv(z) * inv(sumexp) * sumwexpvv
         H[2, 2 + i] += dzidw * sumwexpvv / sumexp
         H[2, 2 + i] += (dzdw[i] * sumwexpvv - dsumwexpvvdw) / uvlse / sumexp
+        # equivalently H[2, 2 + i] += ((dzdw[i] * sumwexpvv * (1 - inv(uvlse)) - dsumwexpvvdw) / uvlse) / sumexp
     end
 
     for j in eachindex(w)
