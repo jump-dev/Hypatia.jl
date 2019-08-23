@@ -107,7 +107,7 @@ function matrixcompletion(
         unknown_idx = 1
         for j in 1:n, i in 1:m
             if !is_known[mat_to_vec_idx(i, j)]
-                G_geo[unknown_idx + 1, unknown_idx + 1] = -1
+                G_geo[unknown_idx, unknown_idx] = -1
                 unknown_idx += 1
             end
             total_idx += 1
