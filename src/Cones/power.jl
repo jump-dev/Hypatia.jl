@@ -163,30 +163,23 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Power)
     produw = cone.produw
     alphaui = cone.alphaui
     produ_produw = cone.produ_produw
-    scal1 = -2 * produ_produw / produw
-    scal2 = 2 / produw
     @. cone.tmpm = (produ_produw * alphaui + (1 - alpha) / u) / u
 
     @views @. prod[1:m, :] = alphaui * produ_produw * (produ_produw - 1)
-    @views @. prod[(m + 1):dim, :] = w * abs2(scal2)
+    @views @. prod[(m + 1):dim, :] = 2 * w / produw
 
     @views @inbounds for i in 1:size(arr, 2)
-        # H[1:m, 1:m] * arr[1:m]
         prod[1:m, i] .*= dot(alphaui, arr[1:m, i])
-        @. prod[1:m, i] += cone.tmpm * arr[1:m, i]
-
-        # H[1:m, (m + 1):dim] * arr[(m + 1):dim]
-        dotm = scal1 * dot(w, arr[(m + 1):dim, i])
+        dotm = -2 * produ_produw * dot(w, arr[(m + 1):dim, i]) / produw
         @. prod[1:m, i] += dotm * alphaui
-
-        # H[(m + 1):dim, (m + 1):dim] * arr[(m + 1):dim]
         prod[(m + 1):dim, i] .*= dot(w, arr[(m + 1):dim, i])
-        @. prod[(m + 1):dim, i] += scal2 * arr[(m + 1):dim, i]
-
-        # H[(m + 1):dim, 1:m] * arr[1:m]
-        dotn = scal1 * dot(alphaui, arr[1:m, i])
+        @. prod[(m + 1):dim, i] += arr[(m + 1):dim, i]
+        @. prod[(m + 1):dim, i] *= 2 / produw
+        dotn = -2 * produ_produw * dot(alphaui, arr[1:m, i]) / produw
         @. prod[(m + 1):dim, i] += w * dotn
     end
+
+    @views @. prod[1:m, :] += cone.tmpm * arr[1:m, :]
 
     return prod
 end
