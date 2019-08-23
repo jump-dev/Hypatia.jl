@@ -75,8 +75,13 @@ function update_feas(cone::EpiPerExp)
     u = cone.point[1]
     v = cone.point[2]
     w = view(cone.point, 3:cone.dim)
-    cone.lse = log(sum(wi -> exp(wi / v), w))
-    cone.is_feas = u > 0 && v > 0 && log(u) > cone.lse
+    if u > 0 && v > 0
+        cone.lse = log(sum(wi -> exp(wi / v), w))
+        cone.uvlse = log(u) - log(v) - cone.lse
+        cone.is_feas = cone.uvlse > 0
+    else
+        cone.is_feas = false
+    end
     cone.feas_updated = true
     return cone.is_feas
 end
@@ -91,8 +96,8 @@ function update_grad(cone::EpiPerExp)
     cone.sumexp = sumexp
     sumwexpv = sum(wi -> wi * exp(wi / v), w) / v
     cone.sumwexpv = sumwexpv
-    uvlse = log(u) - log(v) - lse
-    cone.uvlse = uvlse
+    uvlse = cone.uvlse
+
     # derivative of uvlse wrt v
     dzdv = -inv(v) + sumwexpv / sumexp / v
     cone.dzdv = dzdv
@@ -145,10 +150,11 @@ function update_hess(cone::EpiPerExp)
     end
 
     for j in eachindex(w)
+        j2 = j + 2
         for i in 1:j
-            H[2 + i, 2 + j] = dzdw[i] * dzdw[j] * (inv(abs2(uvlse)) - inv(uvlse))
+            H[2 + i, j2] = dzdw[i] * dzdw[j] * (inv(abs2(uvlse)) - inv(uvlse))
         end
-        H[j + 2, j + 2] += dzdw[j] / v / uvlse
+        H[j2, j2] += dzdw[j] / v / uvlse
     end
 
     cone.hess_updated = true
