@@ -75,7 +75,7 @@ function update_feas(cone::EpiPerExp)
     if u > 0 && v > 0
         @. cone.expwv = exp(w / v)
         cone.sumexp = sum(cone.expwv)
-        cone.lse = log(sum(cone.expwv))
+        cone.lse = log(cone.sumexp)
         cone.uvlse = log(u) - log(v) - cone.lse
         cone.is_feas = cone.uvlse > 0
     else
