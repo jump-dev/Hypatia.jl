@@ -5,7 +5,8 @@ Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 (u in R, v in R_+, w in R^n) : u >= v*sum(exp.(w/v))
 
 barrier (guessed)
--log(u - v*sum(wi -> exp(wi/v), w)) - log(u) - log(v)
+-log(v*log(u/v) - v*logsumexp(w/v)) - log(u) - log(v)
+in the three dimensional case this matches the barrier for hypoperlog (self-concordant)
 =#
 
 mutable struct EpiPerExp{T <: Real} <: Cone{T}
