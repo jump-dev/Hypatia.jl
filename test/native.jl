@@ -515,42 +515,6 @@ function hypoperlog6(T, test_options)
     @test isempty(r.y)
 end
 
-function epiperpower1(T, test_options)
-    tol = sqrt(sqrt(eps(T)))
-    c = T[0, 0, -1]
-    A = T[1 0 0; 0 1 0]
-    b = T[0.5, 1]
-    G = Diagonal(-T(10) * I, 3)
-    h = zeros(T, 3)
-
-    for is_dual in (true, false)
-        cones = CO.Cone{T}[CO.EpiPerPower{T}(T(2), is_dual)]
-
-        r = build_solve_check(c, A, b, G, h, cones; atol = tol, test_options...)
-        @test r.status == :Optimal
-        @test r.primal_obj ≈ (is_dual ? -sqrt(T(2)) : -inv(sqrt(T(2)))) atol=tol rtol=tol
-        @test r.x[1:2] ≈ [0.5, 1] atol=tol rtol=tol
-    end
-end
-
-function epiperpower2(T, test_options)
-    tol = 10 * sqrt(sqrt(eps(T)))
-    c = T[0, 0, 1]
-    A = T[1 0 0; 0 1 0]
-    b = T[0, 1]
-    G = SparseMatrixCSC(-T(100) * I, 3, 3)
-    h = zeros(T, 3)
-
-    for is_dual in (true, false), alpha in T[1.5, 2.5]
-        cones = CO.Cone{T}[CO.EpiPerPower{T}(alpha, is_dual)]
-
-        r = build_solve_check(c, A, b, G, h, cones; atol = tol, test_options...)
-        @test r.status == :Optimal
-        @test r.primal_obj ≈ 0 atol=tol rtol=tol
-        @test r.x[1:2] ≈ [0, 1] atol=tol rtol=tol
-    end
-end
-
 function hypogeomean1(T, test_options)
     tol = sqrt(sqrt(eps(T)))
     c = T[-1, 0, 0]

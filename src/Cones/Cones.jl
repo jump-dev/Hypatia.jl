@@ -49,22 +49,6 @@ inv_hess(cone::Cone) = (cone.inv_hess_updated ? cone.inv_hess : update_inv_hess(
 
 reset_data(cone::Cone) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.inv_hess_prod_updated = false)
 
-# TODO check if this is most efficient way to use DiffResults
-function update_grad(cone::Cone)
-    @assert cone.is_feas
-    cone.diffres = ForwardDiff.hessian!(cone.diffres, cone.barfun, cone.point)
-    cone.grad .= DiffResults.gradient(cone.diffres)
-    cone.grad_updated = true
-    return cone.grad
-end
-
-function update_hess(cone::Cone)
-    @assert cone.grad_updated
-    cone.hess.data .= DiffResults.hessian(cone.diffres)
-    cone.hess_updated = true
-    return cone.hess
-end
-
 update_hess_prod(cone::Cone) = nothing
 
 function update_inv_hess_prod(cone::Cone{T}) where {T}
