@@ -134,7 +134,7 @@ function test_epiperexp_barrier(T::Type{<:Real})
             u = s[1]
             v = s[2]
             w = s[3:end]
-            return -log(u - v*sum(wi -> exp(wi/v), w)) - log(u) - log(v)
+            return -log(v * log(u / v) - v * log(sum(wi -> exp(wi / v), w))) - log(u) - log(v)
         end
         test_barrier_oracles(cone, barrier)
     end

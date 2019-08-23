@@ -31,6 +31,7 @@ mutable struct Power{T <: Real} <: Cone{T}
     produ_produw::T
     produw::T
     alphaui::Vector{T}
+    tmpm::Vector{T}
     tmp_hess::Symmetric{T, Matrix{T}}
     hess_fact
     hess_fact_cache
@@ -61,6 +62,7 @@ function setup_data(cone::Power{T}) where {T <: Real}
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.tmp_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.alphaui = zeros(length(cone.alpha))
+    cone.tmpm = zeros(length(cone.alpha))
     cone.hess_fact_cache = nothing
     return
 end
@@ -131,13 +133,13 @@ function update_hess(cone::Power)
 
     offset = 2 / produw
     scal = 2 * offset / produw
+    @. cone.tmpm = -2 * alphaui * produ_produw / produw
     for j in 1:cone.n
         jm = j + m
 
         # derivative wrt u and w
         @inbounds for i in 1:m
-            scali = -2 * alphaui[i] * produ_produw / produw
-            H[i, jm] = scali * w[j]
+            H[i, jm] = cone.tmpm[i] * w[j]
         end
 
         # double derivative wrt w
@@ -161,26 +163,28 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Power)
     produw = cone.produw
     alphaui = cone.alphaui
     produ_produw = cone.produ_produw
-    offset = 2 / produw
-    scal = 2 * offset / produw
+    scal1 = -2 * produ_produw / produw
+    scal2 = 2 / produw
+    @. cone.tmpm = (produ_produw * alphaui + (1 - alpha) / u) / u
+
+    @views @. prod[1:m, :] = alphaui * produ_produw * (produ_produw - 1)
+    @views @. prod[(m + 1):dim, :] = w * abs2(scal2)
 
     @views @inbounds for i in 1:size(arr, 2)
         # H[1:m, 1:m] * arr[1:m]
-        @. prod[1:m, i] = alphaui * produ_produw * (produ_produw - 1)
         prod[1:m, i] .*= dot(alphaui, arr[1:m, i])
-        @. prod[1:m, i] += (produ_produw * alphaui + (1 - alpha) / u) * arr[1:m, i] / u
+        @. prod[1:m, i] += cone.tmpm * arr[1:m, i]
 
         # H[1:m, (m + 1):dim] * arr[(m + 1):dim]
-        dotm = -2 * produ_produw / produw * dot(w, arr[(m + 1):dim, i])
-        prod[1:m, i] .+= dotm * alphaui
+        dotm = scal1 * dot(w, arr[(m + 1):dim, i])
+        @. prod[1:m, i] += dotm * alphaui
 
         # H[(m + 1):dim, (m + 1):dim] * arr[(m + 1):dim]
-        @. prod[(m + 1):dim, i] = w * scal
         prod[(m + 1):dim, i] .*= dot(w, arr[(m + 1):dim, i])
-        @. prod[(m + 1):dim, i] += offset * arr[(m + 1):dim, i]
+        @. prod[(m + 1):dim, i] += scal2 * arr[(m + 1):dim, i]
 
         # H[(m + 1):dim, 1:m] * arr[1:m]
-        dotn = -2 * produ_produw * dot(alphaui, arr[1:m, i]) / produw
+        dotn = scal1 * dot(alphaui, arr[1:m, i])
         @. prod[(m + 1):dim, i] += w * dotn
     end
 
