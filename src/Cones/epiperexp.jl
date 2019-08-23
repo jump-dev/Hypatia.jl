@@ -29,6 +29,7 @@ mutable struct EpiPerExp{T <: Real} <: Cone{T}
     sumexp::T
     dzdv::T
     dzdw::Vector{T}
+    expwv::Vector{T}
     tmp_hess::Symmetric{T, Matrix{T}}
     hess_fact
     hess_fact_cache
@@ -50,6 +51,7 @@ function setup_data(cone::EpiPerExp{T}) where {T <: Real}
     cone.point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
+    cone.expwv = zeros(T, dim - 2)
     cone.dzdw = zeros(T, dim - 2)
     cone.tmp_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.hess_fact_cache = nothing
@@ -71,7 +73,9 @@ function update_feas(cone::EpiPerExp)
     v = cone.point[2]
     w = view(cone.point, 3:cone.dim)
     if u > 0 && v > 0
-        cone.lse = log(sum(wi -> exp(wi / v), w))
+        @. cone.expwv = exp(w / v)
+        cone.sumexp = sum(cone.expwv)
+        cone.lse = log(sum(cone.expwv))
         cone.uvlse = log(u) - log(v) - cone.lse
         cone.is_feas = cone.uvlse > 0
     else
@@ -87,15 +91,14 @@ function update_grad(cone::EpiPerExp)
     v = cone.point[2]
     w = view(cone.point, 3:cone.dim)
     lse = cone.lse
-    sumexp = sum(wi -> exp(wi / v), w)
-    cone.sumexp = sumexp
-    sumwexp = sum(wi -> wi * exp(wi / v), w)
+    sumexp = cone.sumexp
+    sumwexp = dot(w, cone.expwv)
     cone.sumwexp = sumwexp
     uvlse = cone.uvlse
     cone.dzdv = (sumwexp / v / sumexp - 1) / v # derivative of uvlse wrt v
     cone.grad[1] = -(inv(uvlse) + 1) / u
     cone.grad[2] = -cone.dzdv / uvlse - 2 / v
-    @. cone.dzdw = exp(w / v) / v / sumexp
+    @. cone.dzdw = cone.expwv / v / sumexp
     @. cone.grad[3:end] = cone.dzdw / uvlse
     cone.grad_updated = true
     return cone.grad
@@ -106,6 +109,7 @@ function update_hess(cone::EpiPerExp)
     u = cone.point[1]
     v = cone.point[2]
     w = view(cone.point, 3:cone.dim)
+    expwv = cone.expwv
     lse = cone.lse
     uvlse = cone.uvlse
     sumwexp = cone.sumwexp
@@ -120,7 +124,7 @@ function update_hess(cone::EpiPerExp)
 
     # the derivative of sum(w / v ^ 2 .* exp.(w / v)) with respect to v, unscaled by inv(v ^ 2)
     sumwexpvv = sumwexp / v / v
-    sumwsqrexpvv = sum(wi -> abs2(wi) * exp(wi / v), w) / v / v
+    sumwsqrexpvv = sum(abs2(w[j]) * expwv[j] for j in eachindex(w)) / v / v
     dsumwexpvvdv = -(sumwsqrexpvv + 2 * sumwexp / v)
     H[2, 2] = -(dzdv / uvlse + 1 / v) / v
     H[2, 2] += (sumwexp * (dzdv / uvlse - sumwexpvv / sumexp) - dsumwexpvvdv) / v / v / sumexp
@@ -130,7 +134,7 @@ function update_hess(cone::EpiPerExp)
     for i in eachindex(w)
         # derivative of inv(z) wrt w
         dzidw = -dzdw[i] / uvlse / uvlse
-        dsumwexpvvdw = exp(w[i] / v) * (1 + w[i] / v) / v / v
+        dsumwexpvvdw = expwv[i] * (1 + w[i] / v) / v / v
         # derivative of inv(z) * inv(v) wrt w
         H[2, 2 + i] = -dzidw / v
         # product rule for inv(z) * inv(sumexp) * sumwexpvv
