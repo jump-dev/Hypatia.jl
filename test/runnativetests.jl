@@ -7,8 +7,6 @@ include(joinpath(@__DIR__, "native.jl"))
 const MO = Hypatia.Models
 const SO = Hypatia.Solvers
 
-@info("starting native tests")
-
 real_types = [
     Float64,
     Float32,
@@ -29,6 +27,7 @@ testfuns_preproc = [
     inconsistent2,
     ]
 
+@info("starting preprocessing tests")
 @testset "preprocessing tests: $t, $s, $T" for t in testfuns_preproc, s in system_solvers, T in real_types
     test_options = (
         linear_model = MO.PreprocessedLinearModel,
@@ -87,6 +86,7 @@ testfuns_raw = [
     hypoperlogdettri3,
     ]
 
+@info("starting native tests")
 @testset "native tests: $t, $s, $m, $n, $T" for t in testfuns_raw, s in system_solvers, m in linear_models, n in use_infty_nbhd, T in real_types
     if T == BigFloat && t == epinormspectral1
         continue # cannot get svdvals with BigFloat
@@ -105,7 +105,8 @@ testfuns_raw = [
     t(T, test_options)
 end
 
-@testset "native tests (iterative linear system solves): $t, $T" for t in testfuns_raw, T in real_types
+@info("starting native tests (iterative linear system methods)")
+@testset "native tests (iterative linear system methods): $t, $T" for t in testfuns_raw, T in real_types
     if T == BigFloat
         continue # IterativeSolvers does not work with BigFloat
     end
