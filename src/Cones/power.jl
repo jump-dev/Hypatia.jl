@@ -1,19 +1,19 @@
 #=
 Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
-generalized power cone parametrized by alpha in R_+^n on unit simplex
-(u in R^m, w in R_+^n) : norm_2(u) <= prod_i(w_i^alpha_i)
-where sum_i(alpha_i) = 1, alpha_i >= 0
+generalized power cone parametrized by alpha in R_++^n in unit simplex interior
+(u in R_++^m, w in R^n) : prod_i(u_i^alpha_i) => norm_2(w)
+where sum_i(alpha_i) = 1, alpha_i > 0
 
 barrier from "On self-concordant barriers for generalized power cones" by Roy & Xiao 2018
--log(prod_i((w_i)^(2 * alpha_i)) - norm_2(u)^2) - sum_i((1 - alpha_i)*log(w_i))
+-log(prod_i((u_i)^(2 * alpha_i)) - norm_2(w)^2) - sum_i((1 - alpha_i)*log(u_i))
 =#
 
 mutable struct Power{T <: Real} <: Cone{T}
     use_dual::Bool
     dim::Int
     alpha::Vector{T}
-    m::Int
+    n::Int
     point::Vector{T}
 
     feas_updated::Bool
@@ -26,25 +26,25 @@ mutable struct Power{T <: Real} <: Cone{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
 
-    logprodw::T
-    prodw::T
-    prodw_prodwu::T
-    wiw::T
-    prodwu::T
-    alphawi::Vector{T}
+    logprodu::T
+    produ::T
+    produ_produw::T
+    produw::T
+    alphaui::Vector{T}
+    tmpm::Vector{T}
     tmp_hess::Symmetric{T, Matrix{T}}
     hess_fact
     hess_fact_cache
 
-    function Power{T}(alpha::Vector{T}, m::Int, is_dual::Bool) where {T <: Real}
-        @assert m >= 1
-        dim = length(alpha) + m
+    function Power{T}(alpha::Vector{T}, n::Int, is_dual::Bool) where {T <: Real}
+        @assert n >= 1
+        dim = length(alpha) + n
         @assert dim >= 3
         @assert all(ai > 0 for ai in alpha)
         tol = 1000 * eps(T)
         @assert sum(alpha) ≈ 1 atol=tol rtol=tol
         cone = new{T}()
-        cone.m = m
+        cone.n = n
         cone.use_dual = is_dual
         cone.dim = dim
         cone.alpha = alpha
@@ -52,7 +52,7 @@ mutable struct Power{T <: Real} <: Cone{T}
     end
 end
 
-Power{T}(alpha::Vector{T}, m::Int) where {T <: Real} = Power{T}(alpha, m, false)
+Power{T}(alpha::Vector{T}, n::Int) where {T <: Real} = Power{T}(alpha, n, false)
 
 function setup_data(cone::Power{T}) where {T <: Real}
     reset_data(cone)
@@ -61,7 +61,8 @@ function setup_data(cone::Power{T}) where {T <: Real}
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.tmp_hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.alphawi = zeros(T, dim - cone.m)
+    cone.alphaui = zeros(length(cone.alpha))
+    cone.tmpm = zeros(length(cone.alpha))
     cone.hess_fact_cache = nothing
     return
 end
@@ -69,19 +70,20 @@ end
 get_nu(cone::Power) = length(cone.alpha) + 1
 
 function set_initial_point(arr::AbstractVector, cone::Power)
-    arr[1:cone.m] .= 0
-    arr[(cone.m + 1):cone.dim] .= 1
+    m = length(cone.alpha)
+    arr[1:m] .= 1
+    arr[(m + 1):cone.dim] .= 0
     return arr
 end
 
 function update_feas(cone::Power)
     @assert !cone.feas_updated
-    m = cone.m
+    m = length(cone.alpha)
     u = cone.point[1:m]
     w = view(cone.point, (m + 1):cone.dim)
-    if all(wi -> wi > 0, w)
-        cone.logprodw = sum(cone.alpha[i] * log(w[i]) for i in eachindex(cone.alpha))
-        cone.is_feas = (cone.logprodw > log(norm(u)))
+    if all(ui -> ui > 0, u)
+        cone.logprodu = sum(cone.alpha[i] * log(u[i]) for i in eachindex(cone.alpha))
+        cone.is_feas = (cone.logprodu > log(norm(w)))
     else
         cone.is_feas = false
     end
@@ -91,60 +93,60 @@ end
 
 function update_grad(cone::Power)
     @assert cone.is_feas
-    m = cone.m
-    u = cone.point[1:cone.m]
+    m = length(cone.alpha)
+    u = cone.point[1:m]
     w = view(cone.point, (m + 1):cone.dim)
-    @. cone.alphawi = 2 * cone.alpha / w
-    # prod_i((w_i)^(2 * alpha_i))
-    cone.prodw = exp(2 * cone.logprodw)
+    @. cone.alphaui = 2 * cone.alpha / u
+    # prod_i((u_i)^(2 * alpha_i))
+    cone.produ = exp(2 * cone.logprodu)
     # violation term
-    cone.prodwu = cone.prodw - sum(abs2, u)
+    cone.produw = cone.produ - sum(abs2, w)
     # ratio of product and violation
-    cone.prodw_prodwu = cone.prodw / cone.prodwu
-    @. cone.grad[1:m] = u * 2 / cone.prodwu
-    @. cone.grad[(m + 1):end] = -cone.alphawi * cone.prodw_prodwu - (1 - cone.alpha) / w
+    cone.produ_produw = cone.produ / cone.produw
+    @. cone.grad[1:m] = -cone.alphaui * cone.produ_produw - (1 - cone.alpha) / u
+    @. cone.grad[(m + 1):end] = w * 2 / cone.produw
     cone.grad_updated = true
     return cone.grad
 end
 
 function update_hess(cone::Power)
     @assert cone.grad_updated
-    m = cone.m
+    m = length(cone.alpha)
     u = cone.point[1:m]
     w = view(cone.point, (m + 1):cone.dim)
     H = cone.hess.data
     alpha = cone.alpha
-    alphawi = cone.alphawi
-    prodw = cone.prodw
-    prodwu = cone.prodwu
-    prodw_prodwu = cone.prodw_prodwu
+    alphaui = cone.alphaui
+    produ = cone.produ
+    produw = cone.produw
+    produ_produw = cone.produ_produw
 
     # double derivative wrt u
-    offset = 2 / prodwu
-    scal = 2 * offset / prodwu
     @inbounds for j in 1:m
+        awj_ratio = alphaui[j] * produ_produw
+        awj_ratio_ratio = awj_ratio * (produ_produw - 1)
         @inbounds for i in 1:j
-            H[i, j] = scal * u[i] * u[j]
+            H[i, j] = alphaui[i] * awj_ratio_ratio
         end
-        H[j, j] += offset
+        H[j, j] = awj_ratio_ratio * alphaui[j] + (awj_ratio + (1 - alpha[j]) / u[j]) / u[j]
     end
 
-    @inbounds for j in eachindex(w)
+    offset = 2 / produw
+    scal = 2 * offset / produw
+    @. cone.tmpm = -2 * alphaui * produ_produw / produw
+    for j in 1:cone.n
         jm = j + m
 
         # derivative wrt u and w
-        scal = -2 * alphawi[j] * prodw_prodwu / prodwu
         @inbounds for i in 1:m
-            H[i, jm] = scal * u[i]
+            H[i, jm] = cone.tmpm[i] * w[j]
         end
 
         # double derivative wrt w
-        awj_ratio = alphawi[j] * prodw_prodwu
-        awj_ratio_ratio = awj_ratio * (prodw_prodwu - 1)
-        @inbounds for i in 1:(j - 1)
-            H[i + m, jm] = alphawi[i] * awj_ratio_ratio
+        @inbounds for i in 1:j
+            H[i + m, jm] = scal * w[i] * w[j]
         end
-        H[jm, jm] = awj_ratio_ratio * alphawi[j] + (awj_ratio + (1 - alpha[j]) / w[j]) / w[j]
+        H[jm, jm] += offset
     end
 
     cone.hess_updated = true
@@ -153,35 +155,31 @@ end
 
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Power)
     @assert cone.grad_updated
-    m = cone.m
+    m = length(cone.alpha)
+    dim = cone.dim
     u = cone.point[1:m]
-    w = view(cone.point, (m + 1):cone.dim)
+    w = view(cone.point, (m + 1):dim)
     alpha = cone.alpha
-    prodwu = cone.prodwu
-    alphawi = cone.alphawi
-    prodw_prodwu = cone.prodw_prodwu
-    offset = 2 / prodwu
-    scal = 2 * offset / prodwu
+    produw = cone.produw
+    tmpm = cone.tmpm
+    alphaui = cone.alphaui
+    produ_produw = cone.produ_produw
+    @. tmpm = 2 * produ_produw * alphaui / produw
 
+    @views @. prod[1:m, :] = alphaui * produ_produw * (produ_produw - 1)
+    @views @. prod[(m + 1):dim, :] = 2 / produw
     @views @inbounds for i in 1:size(arr, 2)
-        # H[1:m, 1:m] * arr[1:m]
-        @. prod[1:m, i] = u[1:m] * scal
-        prod[1:m, i] .*= dot(u[1:m], arr[1:m, i])
-        @. prod[1:m, i] += offset * arr[1:m, i]
-
-        # H[(m + 1):dim, 1:m] * arr[(m + 1):dim]
-        dotn = -2 * prodw_prodwu * dot(alphawi, arr[(m + 1):cone.dim, i]) / prodwu
-        @. prod[1:m, i] += u[1:m] * dotn
-
-        # H[(m + 1):dim, (m + 1):dim] * arr[(m + 1):dim]
-        @. prod[(m + 1):cone.dim, i] = alphawi * prodw_prodwu * (prodw_prodwu - 1)
-        prod[(m + 1):cone.dim, i] .*= dot(alphawi, arr[(m + 1):cone.dim, i])
-        @. prod[(m + 1):cone.dim, i] += (prodw_prodwu * alphawi + (1 - alpha) / w) * arr[(m + 1):cone.dim, i] / w
-
-        # H[1:m, (m + 1):dim] * arr[1:m]
-        dotm = -2 * prodw_prodwu / prodwu * dot(u[1:m], arr[1:m, i])
-        prod[(m + 1):cone.dim, i] .+= dotm * alphawi
+        dotm = dot(alphaui, arr[1:m, i])
+        dotn = dot(w, arr[(m + 1):dim, i])
+        prod[1:m, i] .*= dotm
+        prod[(m + 1):dim, i] .*= dotn
+        @. prod[1:m, i] -= tmpm * dotn
+        @. prod[(m + 1):dim, i] -= produ_produw * dotm
     end
+    @views @. prod[1:m, :] += arr[1:m, :] * (produ_produw * alphaui + (1 - alpha) / u) / u
+    @views @. prod[(m + 1):dim, :] *= w
+    @views @. prod[(m + 1):dim, :] += arr[(m + 1):dim, :]
+    @views @. prod[(m + 1):dim, :] *= 2 / produw
 
     return prod
 end

@@ -515,42 +515,6 @@ function hypoperlog6(T, test_options)
     @test isempty(r.y)
 end
 
-function epiperpower1(T, test_options)
-    tol = sqrt(sqrt(eps(T)))
-    c = T[0, 0, -1]
-    A = T[1 0 0; 0 1 0]
-    b = T[0.5, 1]
-    G = Diagonal(-T(10) * I, 3)
-    h = zeros(T, 3)
-
-    for is_dual in (true, false)
-        cones = CO.Cone{T}[CO.EpiPerPower{T}(T(2), is_dual)]
-
-        r = build_solve_check(c, A, b, G, h, cones; atol = tol, test_options...)
-        @test r.status == :Optimal
-        @test r.primal_obj ≈ (is_dual ? -sqrt(T(2)) : -inv(sqrt(T(2)))) atol=tol rtol=tol
-        @test r.x[1:2] ≈ [0.5, 1] atol=tol rtol=tol
-    end
-end
-
-function epiperpower2(T, test_options)
-    tol = 10 * sqrt(sqrt(eps(T)))
-    c = T[0, 0, 1]
-    A = T[1 0 0; 0 1 0]
-    b = T[0, 1]
-    G = SparseMatrixCSC(-T(100) * I, 3, 3)
-    h = zeros(T, 3)
-
-    for is_dual in (true, false), alpha in T[1.5, 2.5]
-        cones = CO.Cone{T}[CO.EpiPerPower{T}(alpha, is_dual)]
-
-        r = build_solve_check(c, A, b, G, h, cones; atol = tol, test_options...)
-        @test r.status == :Optimal
-        @test r.primal_obj ≈ 0 atol=tol rtol=tol
-        @test r.x[1:2] ≈ [0, 1] atol=tol rtol=tol
-    end
-end
-
 function hypogeomean1(T, test_options)
     tol = sqrt(sqrt(eps(T)))
     c = T[-1, 0, 0]
@@ -609,8 +573,8 @@ end
 
 function power1(T, test_options)
     tol = sqrt(sqrt(eps(T)))
-    c = T[1, 0, 0]
-    A = T[0 0 1; 0 1 0]
+    c = T[0, 0, 1]
+    A = T[1 0 0; 0 1 0]
     b = T[0.5, 1]
     G = Matrix{T}(-I, 3, 3)
     h = zeros(T, 3)
@@ -621,15 +585,15 @@ function power1(T, test_options)
         r = build_solve_check(c, A, b, G, h, cones; atol = tol, test_options...)
         @test r.status == :Optimal
         @test r.primal_obj ≈ (is_dual ? -sqrt(T(2)) : -inv(sqrt(T(2)))) atol=tol rtol=tol
-        @test r.x[1] ≈ (is_dual ? -sqrt(T(2)) : -inv(sqrt(T(2))))
-        @test r.x[2:3] ≈ [1, 0.5] atol=tol rtol=tol
+        @test r.x[3] ≈ (is_dual ? -sqrt(T(2)) : -inv(sqrt(T(2))))
+        @test r.x[1:2] ≈ [0.5, 1] atol=tol rtol=tol
     end
 end
 
 function power2(T, test_options)
     tol = sqrt(sqrt(eps(T)))
-    c = T[-1, -1, 0, 0]
-    A = T[0 0 0 1; 0 0 1 0]
+    c = T[0, 0, -1, -1]
+    A = T[0 1 0 0; 1 0 0 0]
     b = T[0.5, 1]
     G = Matrix{T}(-I, 4, 4)
     h = zeros(T, 4)
@@ -640,17 +604,17 @@ function power2(T, test_options)
         r = build_solve_check(c, A, b, G, h, cones; atol = tol, test_options...)
         @test r.status == :Optimal
         @test r.primal_obj ≈ (is_dual ? -T(2) : -1) atol=tol rtol=tol
-        @test norm(r.x[1:2]) ≈ (is_dual ? sqrt(T(2)) : inv(sqrt(T(2))))
-        @test r.x[1:2] ≈ (is_dual ? ones(T, 2) : fill(inv(T(2)), 2))
-        @test r.x[3:4] ≈ [1, 0.5] atol=tol rtol=tol
+        @test norm(r.x[3:4]) ≈ (is_dual ? sqrt(T(2)) : inv(sqrt(T(2))))
+        @test r.x[3:4] ≈ (is_dual ? ones(T, 2) : fill(inv(T(2)), 2))
+        @test r.x[1:2] ≈ [1, 0.5] atol=tol rtol=tol
     end
 end
 
 function power3(T, test_options)
     tol = sqrt(sqrt(eps(T)))
     l = 4
-    c = vcat(zeros(T, 2), ones(T, l))
-    A = T[one(T) zero(T) zeros(T, 1, l); zero(T) one(T) zeros(T, 1, l)]
+    c = vcat(ones(T, l), zeros(T, 2))
+    A = T[zeros(T, 1, l) one(T) zero(T); zeros(T, 1, l) zero(T) one(T)]
     G = SparseMatrixCSC(-one(T) * I, l + 2, l + 2)
     h = zeros(T, l + 2)
 
@@ -661,7 +625,7 @@ function power3(T, test_options)
         r = build_solve_check(c, A, b, G, h, cones; atol = tol, test_options...)
         @test r.status == :Optimal
         @test r.primal_obj ≈ (is_dual ? 1 : T(l)) atol=tol rtol=tol
-        @test r.x[3:end] ≈ (is_dual ? fill(inv(T(l)), l) : ones(l)) atol=tol rtol=tol
+        @test r.x[1:l] ≈ (is_dual ? fill(inv(T(l)), l) : ones(l)) atol=tol rtol=tol
     end
 end
 
