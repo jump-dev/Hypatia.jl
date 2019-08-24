@@ -143,19 +143,18 @@ update_inv_hess_prod(cone::EpiNormInf) = nothing
 
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
     @assert cone.grad_updated
-    @inbounds for j in 1:size(prod, 2)
-        @views prod[1, j] = cone.diag11 * arr[1, j] + dot(cone.edge2n, arr[2:end, j])
-        @views @. prod[2:end, j] = cone.edge2n * arr[1, j] + cone.diag2n * arr[2:end, j]
-    end
+    @views @. prod[1, :] = cone.diag11 * arr[1, :]
+    @views mul!(prod[1, :], arr[2:end, :]', cone.edge2n, true, true)
+    @views mul!(prod[2:end, :], cone.edge2n, arr[1, :]')
+    @views @. prod[2:end, :] += cone.diag2n * arr[2:end, :]
     return prod
 end
 
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
     @assert cone.grad_updated
-    @inbounds for j in 1:size(prod, 2)
-        @views prod[1, j] = arr[1, j] + dot(cone.div2n, arr[2:end, j])
-        @. prod[2:end, j] = cone.div2n * prod[1, j]
-    end
+    @views copyto!(prod[1, :], arr[1, :])
+    @views mul!(prod[1, :], arr[2:end, :]', cone.div2n, true, true)
+    @views @. prod[2:end, :] = cone.div2n * prod[1, :]'
     prod ./= cone.schur
     @. @views prod[2:end, :] += arr[2:end, :] / cone.diag2n
     return prod
