@@ -107,13 +107,13 @@ function matrixcompletion(
         unknown_idx = 1
         for j in 1:n, i in 1:m
             if !is_known[mat_to_vec_idx(i, j)]
-                G_geo[unknown_idx, unknown_idx] = -1
+                G_geo[unknown_idx, unknown_idx + 1] = -1
                 unknown_idx += 1
             end
             total_idx += 1
         end
         # first component of the vector in the in power cone, elements multiply to one
-        h2 = vcat(one(T), zeros(T, num_unknown))
+        h2 = vcat(zeros(T, num_unknown), one(T))
         h = vcat(h_norm, h2)
         @assert total_idx - 1 == m * n
         @assert unknown_idx - 1 == num_unknown
@@ -128,21 +128,21 @@ function matrixcompletion(
         G_geo[1, 1] = -1
         G_geo[2, 2] = -1
         G_geo[3, num_unknown + 1] = -1
-        push!(cones, CO.EpiPerPower{T}(T(2)))
+        push!(cones, CO.Power{T}(fill(inv(T(2)), 2), 1))
         offset = 4
         # loop over new vars
         for i in 1:(num_unknown - 3)
             G_geo[offset + 2, num_unknown + i + 1] = -1
             G_geo[offset + 1, num_unknown + i] = -1
             G_geo[offset, i + 2] = -1
-            push!(cones, CO.EpiPerPower{T}(T(i + 2)))
+            push!(cones, CO.Power{T}([inv(T(i + 2)), T(i + 1) / T(i + 2)], 1))
             offset += 3
         end
 
         # last row also special becuase hypograph variable is fixed
         G_geo[offset, num_unknown] = -1
         G_geo[offset + 1, 2 * num_unknown - 2] = -1
-        push!(cones, CO.EpiPerPower{T}(T(num_unknown)))
+        push!(cones, CO.Power{T}([inv(T(num_unknown)), T(num_unknown - 1) / T(num_unknown)], 1))
         h = vcat(h_norm, zeros(T, 3 * (num_unknown - 2)), T[0, 0, 1])
 
         # G_norm needs to be post-padded with columns for 3dim cone vars
