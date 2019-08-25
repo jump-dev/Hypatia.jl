@@ -179,7 +179,8 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Power)
     @views @. prod[1:m, :] += arr[1:m, :] * (produ_produw * alphaui + (1 - alpha) / u) / u
     @views @. prod[(m + 1):dim, :] *= w
     @views @. prod[(m + 1):dim, :] += arr[(m + 1):dim, :]
-    @views @. prod[(m + 1):dim, :] *= 2 / produw
+    @views @. prod[(m + 1):dim, :] *= 2
+    @views @. prod[(m + 1):dim, :] /= produw
 
     return prod
 end
