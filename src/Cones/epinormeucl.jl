@@ -110,7 +110,6 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNorm
         @. prod[:, j] = ga * cone.grad
     end
     @. prod += arr / cone.dist
-    # mul!(prod, cone.grad)
     prod[1, :] -= arr[1, :] / disth
     return prod
 end

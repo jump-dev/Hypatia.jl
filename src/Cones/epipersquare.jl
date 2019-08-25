@@ -116,9 +116,11 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerS
         ga = dot(cone.grad, view(arr, :, j))
         @. prod[:, j] = ga * cone.grad
     end
-    @views @. prod[3:end, :] += arr[3:end, :] / cone.dist
-    @views @. prod[1, :] -= arr[2, :] / cone.dist
-    @views @. prod[2, :] -= arr[1, :] / cone.dist
+    @. @views begin
+        prod[3:end, :] += arr[3:end, :] / cone.dist
+        prod[1, :] -= arr[2, :] / cone.dist
+        prod[2, :] -= arr[1, :] / cone.dist
+    end
     return prod
 end
 
