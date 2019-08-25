@@ -128,8 +128,10 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Epi
         pa = dot(cone.point, view(arr, :, j))
         @. prod[:, j] = pa * cone.point
     end
-    @views @. prod[3:end, :] += cone.dist * arr[3:end, :]
-    @views @. prod[1, :] -= cone.dist * arr[2, :]
-    @views @. prod[2, :] -= cone.dist * arr[1, :]
+    @. @views begin
+        prod[3:end, :] += cone.dist * arr[3:end, :]
+        prod[1, :] -= cone.dist * arr[2, :]
+        prod[2, :] -= cone.dist * arr[1, :]
+    end
     return prod
 end
