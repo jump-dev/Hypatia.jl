@@ -81,23 +81,20 @@ function update_grad(cone::EpiNormInf{T}) where {T <: Real}
     usqr = abs2(u)
     cone.schur = zero(T)
     @inbounds for (j, wj) in enumerate(w)
-        # NOTE these operations are somewhat redundant, but numerically tuned to work well
-        wjsqr = abs2(wj)
-        usqrmwsqr = usqr - wjsqr
-        @assert usqrmwsqr > 0
-        iuw2u = 2 * u / usqrmwsqr
-        g1 += iuw2u
-        h1 += abs2(iuw2u)
-        iu2w2 = 2 / usqrmwsqr
-        iu2ww = wj * iu2w2
-        cone.grad[j + 1] = iu2ww
+        umwj = (u - wj)
+        upwj = (u + wj)
+        udiv = 2 * u / umwj / upwj
+        wdiv = 2 * wj / umwj / upwj
+        g1 += udiv
+        h1 += abs2(udiv)
+        cone.grad[j + 1] = wdiv
         # NOTE diag2n and edge2n operations can be moved to hessian update
-        cone.diag2n[j] = iu2w2 + abs2(iu2ww)
-        cone.edge2n[j] = -2 / (u - wjsqr / u) * iu2ww
+        cone.diag2n[j] = 2 / umwj / upwj + abs2(wdiv)
+        cone.edge2n[j] = -udiv * wdiv
         # NOTE div2n and schur operations can be moved to inv hessian update
-        usqrpwsqr = usqr + wjsqr
-        cone.div2n[j] = 2 * u * wj / usqrpwsqr
-        cone.schur += inv(usqrpwsqr)
+        u2pwj2 = usqr + abs2(wj)
+        cone.div2n[j] = 2 * u / u2pwj2 * wj
+        cone.schur += inv(u2pwj2)
     end
     t1 = (cone.dim - 2) / u
     cone.grad[1] = t1 - g1
@@ -143,10 +140,12 @@ update_inv_hess_prod(cone::EpiNormInf) = nothing
 
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
     @assert cone.grad_updated
-    @. @views prod[1, :] = cone.diag11 * arr[1, :]
-    @views mul!(prod[1, :], arr[2:end, :]', cone.edge2n, true, true)
-    @views mul!(prod[2:end, :], cone.edge2n, arr[1, :]')
-    @. @views prod[2:end, :] += cone.diag2n * arr[2:end, :]
+    @views begin
+        copyto!(prod[1, :], arr[1, :])
+        mul!(prod[1, :], arr[2:end, :]', cone.edge2n, true, cone.diag11)
+        mul!(prod[2:end, :], cone.edge2n, arr[1, :]')
+        @. prod[2:end, :] += cone.diag2n * arr[2:end, :]
+    end
     return prod
 end
 
@@ -160,6 +159,5 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Epi
     @. @views prod[2:end, :] /= (abs2(u) + abs2(w))
     prod ./= cone.schur
     @. @views prod[2:end, :] += arr[2:end, :] / cone.diag2n
-
     return prod
 end

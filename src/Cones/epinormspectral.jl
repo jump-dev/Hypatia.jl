@@ -148,7 +148,7 @@ function update_hess(cone::EpiNormSpectral)
         viewij = view(H, p, q:(q + n - i))
         # add inner product of Zi with d^2Z / dW_ij dW_kl, unscaled by 2 / u as well as shared term
         @views viewij .= Zi[i, i:n]
-        @views @. for ni in 1:n
+        @. @views for ni in 1:n
             viewij += W[ni, j] * tmpnn[ni, i:n]
         end
         # add to terms where k > i, l = 1:n
