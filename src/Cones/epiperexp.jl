@@ -121,7 +121,7 @@ function update_hess(cone::EpiPerExp)
 
     H[1, 1] = ((inv(uvlse) + 1) / uvlse + 1) / u / u
     H[1, 2] = dzdv / uvlse / uvlse / u
-    @views @. H[1, 3:cone.dim] = -dzdw / u / uvlse / uvlse
+    @. @views H[1, 3:cone.dim] = -dzdw / u / uvlse / uvlse
 
     # the derivative of sum(w / v ^ 2 .* exp.(w / v)) with respect to v, unscaled by inv(v ^ 2)
     sumwexpvv = sumwexp / v / v

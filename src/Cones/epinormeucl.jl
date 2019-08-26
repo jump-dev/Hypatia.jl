@@ -103,25 +103,22 @@ update_inv_hess_prod(cone::EpiNormEucl) = nothing
 
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormEucl)
     @assert cone.grad_updated
-    disth = cone.dist / 2
     @inbounds for j in 1:size(prod, 2)
-        @views aj = arr[:, j]
-        ga = dot(cone.grad, aj)
+        @views ga = dot(cone.grad, arr[:, j])
         @. prod[:, j] = ga * cone.grad
     end
     @. prod += arr / cone.dist
-    prod[1, :] -= arr[1, :] / disth
+    @. @views prod[1, :] -= 2 * arr[1, :] / cone.dist
     return prod
 end
 
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormEucl)
     @assert cone.is_feas
-    @views @inbounds for j in 1:size(prod, 2)
-        aj = arr[:, j]
-        pa = dot(cone.point, aj)
+    @inbounds for j in 1:size(prod, 2)
+        @views pa = dot(cone.point, arr[:, j])
         @. prod[:, j] = pa * cone.point
     end
     @. prod += cone.dist * arr
-    @views @. prod[1, :] -= arr[1, :] * cone.dist * 2
+    @. @views prod[1, :] -= 2 * arr[1, :] * cone.dist
     return prod
 end
