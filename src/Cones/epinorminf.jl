@@ -24,6 +24,7 @@ mutable struct EpiNormInf{T <: Real} <: Cone{T}
 
     diag11::T
     diag2n::Vector{T}
+    invdiag2n::Vector{T}
     edge2n::Vector{T}
     div2n::Vector{T}
     schur::T
@@ -50,6 +51,7 @@ function setup_data(cone::EpiNormInf{T}) where {T <: Real}
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.diag2n = zeros(T, dim - 1)
+    cone.invdiag2n = zeros(T, dim - 1)
     cone.edge2n = zeros(T, dim - 1)
     cone.div2n = zeros(T, dim - 1)
     return
@@ -84,21 +86,20 @@ function update_grad(cone::EpiNormInf{T}) where {T <: Real}
         umwj = (u - wj)
         upwj = (u + wj)
         udiv = 2 * u / umwj / upwj
-        wdiv = 2 * wj / umwj / upwj
         g1 += udiv
         h1 += abs2(udiv)
+        wdiv = 2 * wj / umwj / upwj
         cone.grad[j + 1] = wdiv
-        # NOTE diag2n and edge2n operations can be moved to hessian update
-        cone.diag2n[j] = 2 / umwj / upwj + abs2(wdiv)
+        cone.diag2n[j] = 2 * (1 + wj * wdiv) / umwj / upwj
+        cone.invdiag2n[j] = umwj * upwj / (2 + 2 * wj * wdiv)
         cone.edge2n[j] = -udiv * wdiv
-        # NOTE div2n and schur operations can be moved to inv hessian update
         u2pwj2 = usqr + abs2(wj)
         cone.div2n[j] = 2 * u / u2pwj2 * wj
         cone.schur += inv(u2pwj2)
     end
     t1 = (cone.dim - 2) / u
     cone.grad[1] = t1 - g1
-    cone.diag11 = -(t1 + g1) / u + h1
+    cone.diag11 = h1 - (t1 + g1) / u
     @assert cone.diag11 > 0
     cone.schur = 2 * cone.schur - t1 / u
     @assert cone.schur > 0
@@ -129,7 +130,7 @@ function update_inv_hess(cone::EpiNormInf)
     end
     cone.inv_hess.data ./= cone.schur
     @inbounds for j in 2:cone.dim
-        cone.inv_hess.data[j, j] += inv(cone.diag2n[j - 1])
+        cone.inv_hess.data[j, j] += cone.invdiag2n[j - 1]
     end
     cone.inv_hess_updated = true
     return cone.inv_hess
@@ -151,13 +152,12 @@ end
 
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
     @assert cone.grad_updated
-    u = cone.point[1]
-    w = view(cone.point, 2:cone.dim)
-    @views copyto!(prod[1, :], arr[1, :])
-    @views mul!(prod[1, :], arr[2:end, :]', cone.div2n, true, true)
-    @. @views prod[2:end, :] = 2 * u * w * prod[1, :]'
-    @. @views prod[2:end, :] /= (abs2(u) + abs2(w))
-    prod ./= cone.schur
-    @. @views prod[2:end, :] += arr[2:end, :] / cone.diag2n
+    @views begin
+        copyto!(prod[1, :], arr[1, :])
+        mul!(prod[1, :], arr[2:end, :]', cone.div2n, true, true)
+        @. prod[2:end, :] = cone.div2n * prod[1, :]'
+        prod ./= cone.schur
+        @. prod[2:end, :] += arr[2:end, :] * cone.invdiag2n
+    end
     return prod
 end
