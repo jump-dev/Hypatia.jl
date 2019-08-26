@@ -24,6 +24,7 @@ mutable struct EpiNormInf{T <: Real} <: Cone{T}
 
     diag11::T
     diag2n::Vector{T}
+    invdiag2n::Vector{T}
     edge2n::Vector{T}
     div2n::Vector{T}
     schur::T
@@ -50,6 +51,7 @@ function setup_data(cone::EpiNormInf{T}) where {T <: Real}
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.diag2n = zeros(T, dim - 1)
+    cone.invdiag2n = zeros(T, dim - 1)
     cone.edge2n = zeros(T, dim - 1)
     cone.div2n = zeros(T, dim - 1)
     return
@@ -81,27 +83,23 @@ function update_grad(cone::EpiNormInf{T}) where {T <: Real}
     usqr = abs2(u)
     cone.schur = zero(T)
     @inbounds for (j, wj) in enumerate(w)
-        # NOTE these operations are somewhat redundant, but numerically tuned to work well
-        wjsqr = abs2(wj)
-        usqrmwsqr = usqr - wjsqr
-        @assert usqrmwsqr > 0
-        iuw2u = 2 * u / usqrmwsqr
-        g1 += iuw2u
-        h1 += abs2(iuw2u)
-        iu2w2 = 2 / usqrmwsqr
-        iu2ww = wj * iu2w2
-        cone.grad[j + 1] = iu2ww
-        # NOTE diag2n and edge2n operations can be moved to hessian update
-        cone.diag2n[j] = iu2w2 + abs2(iu2ww)
-        cone.edge2n[j] = -2 / (u - wjsqr / u) * iu2ww
-        # NOTE div2n and schur operations can be moved to inv hessian update
-        usqrpwsqr = usqr + wjsqr
-        cone.div2n[j] = 2 * u * wj / usqrpwsqr
-        cone.schur += inv(usqrpwsqr)
+        umwj = (u - wj)
+        upwj = (u + wj)
+        udiv = 2 * u / umwj / upwj
+        g1 += udiv
+        h1 += abs2(udiv)
+        wdiv = 2 * wj / umwj / upwj
+        cone.grad[j + 1] = wdiv
+        cone.diag2n[j] = 2 * (1 + wj * wdiv) / umwj / upwj
+        cone.invdiag2n[j] = umwj * upwj / (2 + 2 * wj * wdiv)
+        cone.edge2n[j] = -udiv * wdiv
+        u2pwj2 = usqr + abs2(wj)
+        cone.div2n[j] = 2 * u / u2pwj2 * wj
+        cone.schur += inv(u2pwj2)
     end
     t1 = (cone.dim - 2) / u
     cone.grad[1] = t1 - g1
-    cone.diag11 = -(t1 + g1) / u + h1
+    cone.diag11 = h1 - (t1 + g1) / u
     @assert cone.diag11 > 0
     cone.schur = 2 * cone.schur - t1 / u
     @assert cone.schur > 0
@@ -132,7 +130,7 @@ function update_inv_hess(cone::EpiNormInf)
     end
     cone.inv_hess.data ./= cone.schur
     @inbounds for j in 2:cone.dim
-        cone.inv_hess.data[j, j] += inv(cone.diag2n[j - 1])
+        cone.inv_hess.data[j, j] += cone.invdiag2n[j - 1]
     end
     cone.inv_hess_updated = true
     return cone.inv_hess
@@ -143,20 +141,23 @@ update_inv_hess_prod(cone::EpiNormInf) = nothing
 
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
     @assert cone.grad_updated
-    @inbounds for j in 1:size(prod, 2)
-        @views prod[1, j] = cone.diag11 * arr[1, j] + dot(cone.edge2n, arr[2:end, j])
-        @views @. prod[2:end, j] = cone.edge2n * arr[1, j] + cone.diag2n * arr[2:end, j]
+    @views begin
+        copyto!(prod[1, :], arr[1, :])
+        mul!(prod[1, :], arr[2:end, :]', cone.edge2n, true, cone.diag11)
+        mul!(prod[2:end, :], cone.edge2n, arr[1, :]')
+        @. prod[2:end, :] += cone.diag2n * arr[2:end, :]
     end
     return prod
 end
 
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
     @assert cone.grad_updated
-    @inbounds for j in 1:size(prod, 2)
-        @views prod[1, j] = arr[1, j] + dot(cone.div2n, arr[2:end, j])
-        @. prod[2:end, j] = cone.div2n * prod[1, j]
+    @views begin
+        copyto!(prod[1, :], arr[1, :])
+        mul!(prod[1, :], arr[2:end, :]', cone.div2n, true, true)
+        @. prod[2:end, :] = cone.div2n * prod[1, :]'
+        prod ./= cone.schur
+        @. prod[2:end, :] += arr[2:end, :] * cone.invdiag2n
     end
-    prod ./= cone.schur
-    @. @views prod[2:end, :] += arr[2:end, :] / cone.diag2n
     return prod
 end
