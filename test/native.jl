@@ -824,10 +824,10 @@ end
 
 function unbounded1(T, test_options)
     tol = sqrt(sqrt(eps(T)))
-    c = [one(T), one(T), zero(T)]
+    c = [-one(T), -one(T), zero(T)]
     A = zeros(T, 0, 3)
     b = T[]
-    G = SparseMatrixCSC(-one(T) * I, 6, 6)
+    G = repeat(SparseMatrixCSC(-one(T) * I, 3, 3), 2, 1)
     h = zeros(T, 6)
     cones = CO.Cone{T}[CO.EpiNormInf{T}(3), CO.EpiNormInf{T}(3, true)]
 
@@ -837,11 +837,12 @@ end
 
 function unbounded2(T, test_options)
     tol = sqrt(sqrt(eps(T)))
-    c = [-one(T), zero(T), zero(T), zero(T)]
-    A = T[0 1 0 0; 1 0 1 0]
-    b = T[1, 0]
-    G = SparseMatrixCSC(-one(T) * I, 4, 4)
-    h = zeros(T, 4)
+    c = [-one(T), zero(T), zero(T)]
+    A =T[1 1 0]
+    b = T[0]
+    # investigate failure
+    G = -T[1 0 0; 0 0 0; 0 1 0; 0 0 1]
+    h = T[0, 1, 0, 0]
     cones = CO.Cone{T}[CO.EpiPerExp{T}(4)]
 
     r = build_solve_check(c, A, b, G, h, cones; atol = tol, test_options...)
