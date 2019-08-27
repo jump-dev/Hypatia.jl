@@ -73,14 +73,15 @@ function update_feas(cone::EpiPerExp)
     u = cone.point[1]
     v = cone.point[2]
     w = view(cone.point, 3:cone.dim)
+    cone.is_feas = false
     if u > 0 && v > 0
         @. cone.expwv = exp(w / v)
-        cone.sumexp = sum(cone.expwv)
-        cone.lse = log(cone.sumexp)
-        cone.uvlse = log(u) - log(v) - cone.lse
-        cone.is_feas = cone.uvlse > 0
-    else
-        cone.is_feas = false
+        if all(ej -> isfinite(ej) && ej > 0, cone.expwv)
+            cone.sumexp = sum(cone.expwv)
+            cone.lse = log(cone.sumexp)
+            cone.uvlse = log(u) - log(v) - cone.lse
+            cone.is_feas = (isfinite(cone.uvlse) && cone.uvlse > 0)
+        end
     end
     cone.feas_updated = true
     return cone.is_feas
