@@ -115,9 +115,11 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerS
     @inbounds for j in 1:size(prod, 2)
         ga = dot(cone.grad, view(arr, :, j))
         @. prod[:, j] = ga * cone.grad
-        @views @. prod[3:end, j] += arr[3:end, j] / cone.dist
-        prod[1, j] -= arr[2, j] / cone.dist
-        prod[2, j] -= arr[1, j] / cone.dist
+    end
+    @. @views begin
+        prod[3:end, :] += arr[3:end, :] / cone.dist
+        prod[1, :] -= arr[2, :] / cone.dist
+        prod[2, :] -= arr[1, :] / cone.dist
     end
     return prod
 end
@@ -127,9 +129,11 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Epi
     @inbounds for j in 1:size(prod, 2)
         pa = dot(cone.point, view(arr, :, j))
         @. prod[:, j] = pa * cone.point
-        @views @. prod[3:end, j] += cone.dist * arr[3:end, j]
-        prod[1, j] -= cone.dist * arr[2, j]
-        prod[2, j] -= cone.dist * arr[1, j]
+    end
+    @. @views begin
+        prod[3:end, :] += cone.dist * arr[3:end, :]
+        prod[1, :] -= cone.dist * arr[2, :]
+        prod[2, :] -= cone.dist * arr[1, :]
     end
     return prod
 end

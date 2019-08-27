@@ -96,11 +96,8 @@ testfuns_raw = [
     ]
 
 @testset "native tests: $t, $s, $m, $n, $T" for t in testfuns_raw, s in system_solvers, m in linear_models, n in use_infty_nbhd, T in real_types
-    if T == BigFloat && t in (epiperpower1, epiperpower2, epiperexp1, epiperexp2, epinormspectral1)
-        continue # ForwardDiff does not work with BigFloat, cannot get svdvals with BigFloat
-    end
-    if T == BigFloat && m == MO.RawLinearModel
-        continue # IterativeSolvers does not work with BigFloat
+    if T == BigFloat && t == epinormspectral1
+        continue # Cannot get svdvals with BigFloat
     end
     if s == SO.QRCholCombinedHSDSystemSolver && m == MO.RawLinearModel
         continue # QRChol linear system solver needs preprocessed model
