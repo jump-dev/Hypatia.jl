@@ -782,3 +782,81 @@ function epiperexp2(T, test_options)
     @test r.s[2] ≈ 1 atol=tol rtol=tol
     @test r.s[2] * sum(exp, r.s[3:end] / r.s[2]) ≈ r.s[1] atol=tol rtol=tol
 end
+
+function primalinfeas1(T, test_options)
+    tol = sqrt(sqrt(eps(T)))
+    c = T[1, 0]
+    A = T[1 1]
+    b = [-T(2)]
+    G = SparseMatrixCSC(-one(T) * I, 2, 2)
+    h = zeros(T, 2)
+    cones = CO.Cone{T}[CO.Nonnegative{T}(2)]
+
+    r = build_solve_check(c, A, b, G, h, cones; atol = tol, test_options...)
+    @test r.status == :PrimalInfeasible
+end
+
+function primalinfeas2(T, test_options)
+    tol = sqrt(sqrt(eps(T)))
+    c = T[1, 1, 1]
+    A = zeros(T, 0, 3)
+    b = T[]
+    G = vcat(SparseMatrixCSC(-one(T) * I, 3, 3), Diagonal([one(T), one(T), -one(T)]))
+    h = vcat(zeros(T, 3), one(T), one(T), -T(2))
+    cones = CO.Cone{T}[CO.EpiNormEucl{T}(3), CO.Nonnegative{T}(3)]
+
+    r = build_solve_check(c, A, b, G, h, cones; atol = tol, test_options...)
+    @test r.status == :PrimalInfeasible
+end
+
+function primalinfeas3(T, test_options)
+    tol = sqrt(sqrt(eps(T)))
+    c = zeros(T, 3)
+    A = SparseMatrixCSC(-one(T) * I, 3, 3)
+    b = [one(T), one(T), T(3)]
+    G = SparseMatrixCSC(-one(T) * I, 3, 3)
+    h = zeros(T, 3)
+    cones = CO.Cone{T}[CO.HypoPerLog{T}(3)]
+
+    r = build_solve_check(c, A, b, G, h, cones; atol = tol, test_options...)
+    @test r.status == :PrimalInfeasible
+end
+
+function dualinfeas1(T, test_options)
+    tol = sqrt(sqrt(eps(T)))
+    c = T[-1, -1, 0]
+    A = zeros(T, 0, 3)
+    b = T[]
+    G = repeat(SparseMatrixCSC(-one(T) * I, 3, 3), 2, 1)
+    h = zeros(T, 6)
+    cones = CO.Cone{T}[CO.EpiNormInf{T}(3), CO.EpiNormInf{T}(3, true)]
+
+    r = build_solve_check(c, A, b, G, h, cones; atol = tol, test_options...)
+    @test r.status == :DualInfeasible
+end
+
+function dualinfeas2(T, test_options)
+    tol = sqrt(sqrt(eps(T)))
+    c = T[-1, 0]
+    A = zeros(T, 0, 2)
+    b = T[]
+    G = T[-1 0; 0 0; 0 -1]
+    h = T[0, 1, 0]
+    cones = CO.Cone{T}[CO.EpiPerSquare{T}(3)]
+
+    r = build_solve_check(c, A, b, G, h, cones; atol = tol, test_options...)
+    @test r.status == :DualInfeasible
+end
+
+function dualinfeas3(T, test_options)
+    tol = sqrt(sqrt(eps(T)))
+    c = T[0, 1, 1, 0]
+    A = zeros(T, 0, 4)
+    b = T[]
+    G = SparseMatrixCSC(-one(T) * I, 4, 4)
+    h = zeros(T, 4)
+    cones = CO.Cone{T}[CO.EpiPerSquare{T}(4)]
+
+    r = build_solve_check(c, A, b, G, h, cones; atol = tol, test_options...)
+    @test r.status == :DualInfeasible
+end

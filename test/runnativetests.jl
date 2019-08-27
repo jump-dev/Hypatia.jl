@@ -87,6 +87,12 @@ testfuns_raw = [
     hypoperlogdettri1,
     hypoperlogdettri2,
     hypoperlogdettri3,
+    primalinfeas1,
+    primalinfeas2,
+    primalinfeas3,
+    dualinfeas1,
+    dualinfeas2,
+    dualinfeas3,
     ]
 
 @testset "native tests: $t, $s, $m, $n, $T" for t in testfuns_raw, s in system_solvers, m in linear_models, n in use_infty_nbhd, T in real_types
@@ -102,7 +108,7 @@ testfuns_raw = [
         linear_model_options = NamedTuple(),
         system_solver_options = NamedTuple(),
         stepper_options = (use_infty_nbhd = n,),
-        solver_options = (verbose = false,),
+        solver_options = (verbose = true,),
         )
     t(T, test_options)
 end
