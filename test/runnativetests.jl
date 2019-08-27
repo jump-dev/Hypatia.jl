@@ -108,7 +108,7 @@ testfuns_raw = [
         linear_model_options = NamedTuple(),
         system_solver_options = NamedTuple(),
         stepper_options = (use_infty_nbhd = n,),
-        solver_options = (verbose = false,),
+        solver_options = (verbose = true,),
         )
     t(T, test_options)
 end

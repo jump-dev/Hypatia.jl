@@ -824,7 +824,7 @@ end
 
 function dualinfeas1(T, test_options)
     tol = sqrt(sqrt(eps(T)))
-    c = [-one(T), -one(T), zero(T)]
+    c = T[-1, -1, 0]
     A = zeros(T, 0, 3)
     b = T[]
     G = repeat(SparseMatrixCSC(-one(T) * I, 3, 3), 2, 1)
@@ -837,13 +837,12 @@ end
 
 function dualinfeas2(T, test_options)
     tol = sqrt(sqrt(eps(T)))
-    c = [-one(T), zero(T), zero(T)]
-    A =T[1 1 0]
-    b = T[0]
-    # investigate failure
-    G = -T[1 0 0; 0 0 0; 0 1 0; 0 0 1]
-    h = T[0, 1, 0, 0]
-    cones = CO.Cone{T}[CO.EpiPerExp{T}(4)]
+    c = T[-1, 0]
+    A = zeros(T, 0, 2)
+    b = T[]
+    G = T[-1 0; 0 0; 0 -1]
+    h = T[0, 1, 0]
+    cones = CO.Cone{T}[CO.EpiPerSquare{T}(3)]
 
     r = build_solve_check(c, A, b, G, h, cones; atol = tol, test_options...)
     @test r.status == :DualInfeasible
