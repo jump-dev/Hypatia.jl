@@ -783,7 +783,7 @@ function epiperexp2(T, test_options)
     @test r.s[2] * sum(exp, r.s[3:end] / r.s[2]) ≈ r.s[1] atol=tol rtol=tol
 end
 
-function infeasible1(T, test_options)
+function primalinfeas1(T, test_options)
     tol = sqrt(sqrt(eps(T)))
     c = T[1, 0]
     A = T[1 1]
@@ -796,7 +796,7 @@ function infeasible1(T, test_options)
     @test r.status == :PrimalInfeasible
 end
 
-function infeasible2(T, test_options)
+function primalinfeas2(T, test_options)
     tol = sqrt(sqrt(eps(T)))
     c = T[1, 1, 1]
     A = zeros(T, 0, 3)
@@ -809,7 +809,7 @@ function infeasible2(T, test_options)
     @test r.status == :PrimalInfeasible
 end
 
-function infeasible3(T, test_options)
+function primalinfeas3(T, test_options)
     tol = sqrt(sqrt(eps(T)))
     c = zeros(T, 3)
     A = SparseMatrixCSC(-one(T) * I, 3, 3)
@@ -822,7 +822,7 @@ function infeasible3(T, test_options)
     @test r.status == :PrimalInfeasible
 end
 
-function unbounded1(T, test_options)
+function dualinfeas1(T, test_options)
     tol = sqrt(sqrt(eps(T)))
     c = [-one(T), -one(T), zero(T)]
     A = zeros(T, 0, 3)
@@ -835,7 +835,7 @@ function unbounded1(T, test_options)
     @test r.status == :DualInfeasible
 end
 
-function unbounded2(T, test_options)
+function dualinfeas2(T, test_options)
     tol = sqrt(sqrt(eps(T)))
     c = [-one(T), zero(T), zero(T)]
     A =T[1 1 0]
@@ -849,7 +849,7 @@ function unbounded2(T, test_options)
     @test r.status == :DualInfeasible
 end
 
-function unbounded3(T, test_options)
+function dualinfeas3(T, test_options)
     tol = sqrt(sqrt(eps(T)))
     c = T[0, 1, 1, 0]
     A = zeros(T, 0, 4)
