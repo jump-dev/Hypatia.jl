@@ -84,6 +84,8 @@ point = lifting \ feasible_hess
 
 barfun(point) = -logdet(feas_check(point))
 
+point = ones(length(monos_sqr))
+
 
 # convex polys
 p1 = x[1] ^ 6 + x[2] ^ 4
@@ -100,8 +102,19 @@ point[7] = 1
 
 gradient = ForwardDiff.gradient(barfun, point)
 
-
-
-
+using SumOfSquares, Hypatia
+model = SOSModel(with_optimizer(Mosek.Optimizer))
+@variable(model, poly, Poly(monos_sqr))
+hess = differentiate(poly, x, 2)
+@constraint(model, poly in SOSConvexCone())
+@constraint(model, sum(coefficients(poly)) == 1)
+# optimize!(model)
+# println(coefficients(JuMP.value.(poly)))
+@variable(model, t)
+@objective(model, Max, t)
+@constraint(model, hess - t * I in SOSMatrixCone())
+optimize!(model)
+println(coefficients(JuMP.value.(poly)))
+point = coefficients(JuMP.value.(poly))
 
 ;
