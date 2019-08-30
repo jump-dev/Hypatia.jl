@@ -40,7 +40,7 @@ function monomial_lambda(point)
     return lambda
 end
 
-# for interest (and to use forwarddiff), get the overconstrained LHS we are implicitly using to lift
+# for interest (and to not use forwarddiff), get the overconstrained LHS we are implicitly using to lift
 lifting = zeros(length(monos_hess) * div(n * (n + 1), 2), length(monos_sqr))
 # the lifting is equal to the concatenation of its action on each basis vector
 for k in 1:length(monos_sqr)
