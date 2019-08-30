@@ -1,22 +1,15 @@
 #=
-Copyright 2018, Chris Coey and contributors
-Copyright 2018, David Papp, Sercan Yildiz
+Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
-interpolation-based weighted-sum-of-squares (multivariate) polynomial cone parametrized by interpolation points Ps
-
-definition and dual barrier from "Sum-of-squares optimization without semidefinite programming" by D. Papp and S. Yildiz, available at https://arxiv.org/abs/1712.01792
-
-TODO
-- perform loop for calculating g and H in parallel
-- scale the interior direction
 =#
 
 using DynamicPolynomials, ForwardDiff, DiffResults
 
-mutable struct WSOSPolyMonomial{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
+mutable struct WSOSPolyMonomial{T <: Real} <: Cone{T}
     use_dual::Bool
+    n::Int
+    deg::Int
     dim::Int
-    Ps::Vector{Matrix{R}}
     point::Vector{T}
 
     feas_updated::Bool
@@ -29,25 +22,28 @@ mutable struct WSOSPolyMonomial{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
 
-    polypairs
+    poly_pairs
     barfun
+    diffres
 
     tmp_hess::Symmetric{T, Matrix{T}}
     hess_fact
     hess_fact_cache
 
-    function WSOSPolyMonomial{T, R}(n::Int, deg::Int, is_dual::Bool) where {R <: RealOrComplex{T}} where {T <: Real}
-        cone = new{T, R}()
+    function WSOSPolyMonomial{T}(n::Int, deg::Int, is_dual::Bool) where {T <: Real}
+        cone = new{T}()
         cone.use_dual = !is_dual # using dual barrier
-        dim = binomial(n + deg, n)
+        cone.n = n
+        cone.deg = deg
+        dim = binomial(cone.n + deg, cone.n)
         cone.dim = dim
         return cone
     end
 end
 
-WSOSPolyMonomial{T, R}(n::Int, deg::Int) where {R <: RealOrComplex{T}} where {T <: Real} = WSOSPolyMonomial{T, R}(n::Int, deg::Int, false)
+WSOSPolyMonomial{T}(n::Int, deg::Int) where {T <: Real} = WSOSPolyMonomial{T}(n::Int, deg::Int, false)
 
-function setup_data(cone::WSOSPolyMonomial{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
+function setup_data(cone::WSOSPolyMonomial{T}) where {T <: Real}
     reset_data(cone)
     dim = cone.dim
     cone.point = zeros(T, dim)
@@ -56,43 +52,53 @@ function setup_data(cone::WSOSPolyMonomial{T, R}) where {R <: RealOrComplex{T}} 
     cone.tmp_hess = Symmetric(zeros(T, dim, dim), :U)
 
     # create a lookup table of coefficients we will use to build lambda later
-    @polyvar x[1:n]
+    @polyvar x[1:cone.n]
     monos_low = monomials(x, 0:div(cone.deg, 2))
+    monos_sqr = monomials(x, 0:cone.deg)
     L = length(monos_low)
-    polypairs = [Float64[] for i in 1:L, j in 1:L]
-    for i in 1:length(monos_low), j in 1:i, m in monos_hess
-        push!(poly_pairs[i, j], coefficient(poly, m).constant)
+    poly_pairs = [Float64[] for i in 1:L, j in 1:L]
+    for i in 1:length(monos_low), j in 1:i, m in monos_sqr
+        poly = monos_low[i] * monos_low[j]
+        push!(poly_pairs[i, j], coefficient(poly, m))
     end
-    cone.polypairs = polypairs
+    cone.poly_pairs = poly_pairs
 
     function barfun(point)
         lambda = zeros(eltype(point), L, L)
         for k in 1:L, l in 1:k
-            lambda[k, l] = dot(polypairs[k, l], point)
+            lambda[k, l] = dot(poly_pairs[k, l], point)
         end
         return -logdet(lambda)
     end
     cone.barfun = barfun
+    cone.diffres = DiffResults.HessianResult(cone.grad)
 
     cone.hess_fact_cache = nothing
     return
 end
 
-get_nu(cone::WSOSPolyMonomial) = binomial(n + div(deg, 2), n)
+get_nu(cone::WSOSPolyMonomial) = binomial(cone.n + div(cone.deg, 2), cone.n)
 
-set_initial_point(arr::AbstractVector, cone::WSOSPolyMonomial) = (arr .= 1)
+function set_initial_point(arr::AbstractVector, cone::WSOSPolyMonomial)
+    for i in eachindex(arr)
+        arr[i] = inv(i + 1)
+    end
+end
 
 function update_feas(cone::WSOSPolyMonomial)
     @assert !cone.feas_updated
     L = binomial(cone.n + div(cone.deg, 2), cone.n)
     lambda = zeros(eltype(cone.point), L, L)
     for k in 1:L, l in 1:k
-        lambda[k, l] = dot(cone.polypairs[k, l], cone.point)
+        lambda[k, l] = dot(cone.poly_pairs[k, l], cone.point)
     end
-    return isposdef(Symmetric(lambda, :L))
+    @show isposdef(Symmetric(lambda, :L))
+    cone.is_feas = isposdef(Symmetric(lambda, :L))
+    cone.feas_updated = true
+    return cone.is_feas
 end
 
-function update_grad(cone::Cone)
+function update_grad(cone::WSOSPolyMonomial)
     @assert cone.is_feas
     cone.diffres = ForwardDiff.hessian!(cone.diffres, cone.barfun, cone.point)
     cone.grad .= DiffResults.gradient(cone.diffres)
@@ -100,9 +106,16 @@ function update_grad(cone::Cone)
     return cone.grad
 end
 
-function update_hess(cone::Cone)
+function update_hess(cone::WSOSPolyMonomial)
     @assert cone.grad_updated
     cone.hess.data .= DiffResults.hessian(cone.diffres)
     cone.hess_updated = true
     return cone.hess
+end
+
+function inv_hess(cone::WSOSPolyMonomial)
+    @show cone.hess
+    cone.inv_hess = inv(cone.hess)
+    cone.inv_hess_updated = true
+    return cone.inv_hess
 end
