@@ -6,7 +6,7 @@ Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 using ForwardDiff, DynamicPolynomials, LinearAlgebra
 
 n = 1
-k = 6
+k = 4
 k_l = div(k - 2, 2)
 
 @polyvar x[1:n]
@@ -15,12 +15,14 @@ monos_hess = monomials(x, 0:(k - 2))
 monos_low = monomials(x, 0:k_l)
 
 # lookup table for when we come to calculate lambda, stores coefficients of p_i * p_j
+# and lambda_{ij}(x) = dot(coefficients(p_i * p_j), x) = dot(poly_pairs[i, j], x)
 poly_pairs = [Float64[] for i in 1:length(monos_low), j in 1:length(monos_low)]
 for i in 1:length(monos_low), j in 1:i, m in monos_hess
     poly = monos_low[i] * monos_low[j]
     push!(poly_pairs[i, j], coefficient(poly, m))
 end
 
+# same thing as what we do in the monomial SOS cone, in block form
 function monomial_lambda(point)
     L = binomial(n + k_l, n)
     @assert L == length(monos_low)
@@ -32,24 +34,14 @@ function monomial_lambda(point)
     for i in 1:n, j in 1:i
         point_coeffs = view(point, u:(u + U - 1))
         for k in 1:L, l in 1:k
-            fact = (i == j ? 1 : inv(sqrt(2)))
-            lambda[(i - 1) * L + k, (j - 1) * L + l] = lambda[(i - 1) * L + l, (j - 1) * L + k] = dot(poly_pairs[k, l], point_coeffs) * fact
+            lambda[(i - 1) * L + k, (j - 1) * L + l] = lambda[(i - 1) * L + l, (j - 1) * L + k] = dot(poly_pairs[k, l], point_coeffs)
         end
         u += U
     end
     return lambda
 end
 
-# for interest (and to use forwarddiff), get the overconstrained LHS we are implicitly using to lift
-lifting = zeros(length(monos_hess) * div(n * (n + 1), 2), length(monos_sqr))
-# the lifting is equal to the concatenation of its action on each basis vector
-for k in 1:length(monos_sqr)
-    basis_poly = monos_sqr[k]
-    hess = differentiate(basis_poly, x, 2)
-    lifting[:, k] = vcat([coefficient(hess[i, j], m) for i in 1:n for j in 1:i for m in monos_hess]...)
-end
-
-# using dynamic polynomials, check lambda logic is right
+# (old code) this is how we could get Lambda using Dynamic polynomials
 function get_lambda_dp(point)
     p = dot(point, monos_sqr)
     hess = differentiate(p, x, 2)
@@ -58,33 +50,72 @@ function get_lambda_dp(point)
     return lambda
 end
 
-# without using dynamic polynomials
+# but we don't want to use dynamic polynomials (to be able to use forwarddiff, and also get the lifting matrix explicitly for interest)
+# the lifting takes us from a polynomial up to degree k to a vcat-ed hessian with polys of maximum degree k - 2
+lifting = zeros(length(monos_hess) * div(n * (n + 1), 2), length(monos_sqr))
+# the lifting is equal to the concatenation of its action basis vectors
+for k in 1:length(monos_sqr)
+    basis_poly = monos_sqr[k]
+    hess = differentiate(basis_poly, x, 2)
+    lifting[:, k] = vcat([coefficient(hess[i, j], m) for i in 1:n for j in 1:i for m in monos_hess]...)
+end
+# get lambda without using dynamic polynomials
 function get_lambda(point)
     hess_fullspace = lifting * point
     lambda = monomial_lambda(hess_fullspace)
     return lambda
 end
+# check lifting matrix is correct
 point = randn(length(monos_sqr))
 @assert get_lambda(point) ≈ get_lambda_dp(point)
 
-# we can come up with an interior point for the univariate case
-feasible_hess = zeros(length(monos_hess) * div(n * (n + 1), 2))
-idx = 1
-for i in 1:n, j in 1:i, u in 1:length(monos_sqr)
-    if i == j
-        feasible_hess[idx] = inv(u + 1)
-    end
-    global idx += 1
+# barrier function
+function barfun(point)
+    lambda = get_lambda(point)
+    f = cholesky(Symmetric(lambda, :L), check = false)
+    @show eigmin(Symmetric(lambda, :L))
+    @assert isposdef(f)
+    return -logdet(f)
 end
-# luckily this is a Hessian!
-point = lifting \ feasible_hess
-@assert norm(feasible_hess - lifting * point) ≈ 0
-barfun(point) = -logdet(get_lambda(point))
-gradient = ForwardDiff.gradient(barfun, point)
-@show dot(-gradient, point)
+
+function feas_check(point)
+    lambda = get_lambda(point)
+    @show lambda
+    f = cholesky(Symmetric(lambda, :L), check = false)
+    @show eigmin(Symmetric(lambda, :L))
+    @show isposdef(f)
+    return isposdef(f)
+end
+
+# gradient = ForwardDiff.gradient(barfun, point)
+# @show dot(-gradient, point)
+# hessian = ForwardDiff.hessian(barfun, point)
+# @assert isposdef(Symmetric(hessian))
 
 
+for _ in 1:100
 
+    b = rand()
+    c = rand()
+    a = 36 * b ^ 2 / 96 / c * 1.2
+    @assert 36 * b ^ 2 - 96 * a * c < 0
+
+    u = rand()
+    v = rand()
+    w = v ^ 2 / u * 1.1
+    # w = 2 / 3 * v ^ 2 / u * 1.1
+
+    @assert dot([a, b, c], [u, v, w]) > 0
+
+    # point = [rand(), 0, rand()]
+    point = [w, v, u]
+    @show point
+    feas_check(point)
+
+    # @show (u * a + v * b + w * c < 0) && !feas_check(point)
+    # @assert ((u * a + v * b + w * c > 0) && feas_check(point)) || ((u * a + v * b + w * c < 0) && !feas_check(point))
+    println()
+end
 
 
 # using SumOfSquares, Hypatia
