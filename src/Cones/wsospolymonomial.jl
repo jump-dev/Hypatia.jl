@@ -68,7 +68,7 @@ function setup_data(cone::WSOSPolyMonomial{T}) where {T <: Real}
         for k in 1:L, l in 1:k
             lambda[k, l] = dot(poly_pairs[k, l], point)
         end
-        return -logdet(lambda)
+        return -logdet(Symmetric(lambda, :L))
     end
     cone.barfun = barfun
     cone.diffres = DiffResults.HessianResult(cone.grad)
@@ -80,9 +80,34 @@ end
 get_nu(cone::WSOSPolyMonomial) = binomial(cone.n + div(cone.deg, 2), cone.n)
 
 function set_initial_point(arr::AbstractVector, cone::WSOSPolyMonomial)
-    for i in eachindex(arr)
-        arr[i] = inv(i + 1)
+    @polyvar x[1:cone.n]
+    monos = monomials(x, 0:cone.deg)
+
+    pts = randn(cone.dim, cone.n)
+    V = zeros(cone.dim, cone.dim)
+    for i in 1:cone.dim, j in 1:cone.dim
+        V[i, j] = monos[i](pts[j, :])
     end
+    arr .= V * ones(cone.dim)
+    println(arr)
+
+    # for (i, m) in enumerate(monos)
+    #     if !all(iseven, exponents(m))
+    #         arr[i] = 0
+    #         continue
+    #     end
+    #     # arr[i] = inv(degree(m) + 1)
+    #     arr[i] = 1
+    #     # if degree(m) == 0
+    #     #     arr[i] = 1
+    #     # else
+    #     #     arr[i] = inv(prod((iszero(e) ? 1 : e) for e in exponents(m)) + 1)
+    #     # end
+    #     # @show arr[i], inv(degree(m) + 1)
+    # end
+    # for i in eachindex(arr)
+    #     arr[i] = inv(i + 1)
+    # end
 end
 
 function update_feas(cone::WSOSPolyMonomial)
@@ -92,7 +117,7 @@ function update_feas(cone::WSOSPolyMonomial)
     for k in 1:L, l in 1:k
         lambda[k, l] = dot(cone.poly_pairs[k, l], cone.point)
     end
-    @show isposdef(Symmetric(lambda, :L))
+    @show Symmetric(lambda, :L)
     cone.is_feas = isposdef(Symmetric(lambda, :L))
     cone.feas_updated = true
     return cone.is_feas
@@ -113,9 +138,8 @@ function update_hess(cone::WSOSPolyMonomial)
     return cone.hess
 end
 
-function inv_hess(cone::WSOSPolyMonomial)
-    @show cone.hess
-    cone.inv_hess = inv(cone.hess)
-    cone.inv_hess_updated = true
-    return cone.inv_hess
-end
+# function inv_hess(cone::WSOSPolyMonomial)
+#     cone.inv_hess = inv(cone.hess)
+#     cone.inv_hess_updated = true
+#     return cone.inv_hess
+# end
