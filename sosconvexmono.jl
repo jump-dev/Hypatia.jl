@@ -5,7 +5,7 @@ Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
 using ForwardDiff, DynamicPolynomials, LinearAlgebra
 
-n = 1
+n = 2
 k = 4
 k_l = div(k - 2, 2)
 
@@ -41,14 +41,14 @@ function monomial_lambda(point)
     return lambda
 end
 
-# (old code) this is how we could get Lambda using Dynamic polynomials
-function get_lambda_dp(point)
-    p = dot(point, monos_sqr)
-    hess = differentiate(p, x, 2)
-    hess_fullspace = vcat([coefficient(hess[i, j], m) for i in 1:n for j in 1:i for m in monos_hess]...)
-    lambda = monomial_lambda(hess_fullspace)
-    return lambda
-end
+# # (old code) this is how we could get Lambda using Dynamic polynomials
+# function get_lambda_dp(point)
+#     p = dot(point, monos_sqr)
+#     hess = differentiate(p, x, 2)
+#     hess_fullspace = vcat([coefficient(hess[i, j], m) for i in 1:n for j in 1:i for m in monos_hess]...)
+#     lambda = monomial_lambda(hess_fullspace)
+#     return lambda
+# end
 
 # but we don't want to use dynamic polynomials (to be able to use forwarddiff, and also get the lifting matrix explicitly for interest)
 # the lifting takes us from a polynomial up to degree k to a vcat-ed hessian with polys of maximum degree k - 2
@@ -61,13 +61,14 @@ for k in 1:length(monos_sqr)
 end
 # get lambda without using dynamic polynomials
 function get_lambda(point)
-    hess_fullspace = lifting * point
+    # hess_fullspace = lifting * point
+    hess_fullspace = integrate(lifting) * point
     lambda = monomial_lambda(hess_fullspace)
     return lambda
 end
 # check lifting matrix is correct
 point = randn(length(monos_sqr))
-@assert get_lambda(point) ≈ get_lambda_dp(point)
+# @assert get_lambda(point) ≈ get_lambda_dp(point)
 
 # barrier function
 function barfun(point)
@@ -87,35 +88,54 @@ function feas_check(point)
     return isposdef(f)
 end
 
+function integrate(lifting)
+    integrating = similar(lifting)
+    for i in 1:size(lifting, 1), j in 1:size(lifting, 2)
+        aij = lifting[i, j]
+        integrating[i, j] = iszero(aij) ? 0 : inv(aij)
+    end
+    scalevals = diag(lifting' * integrating)
+    integrating ./= scalevals'
+    @show lifting' * integrating
+    return integrating
+end
+
+
+for (i, m) in enumerate(monos_sqr)
+    point[i] = all(iseven, exponents(m)) ? 1 : 0
+end
+
+feas_check(point)
+
 # gradient = ForwardDiff.gradient(barfun, point)
 # @show dot(-gradient, point)
 # hessian = ForwardDiff.hessian(barfun, point)
 # @assert isposdef(Symmetric(hessian))
 
 
-for _ in 1:100
-
-    b = rand()
-    c = rand()
-    a = 36 * b ^ 2 / 96 / c * 1.2
-    @assert 36 * b ^ 2 - 96 * a * c < 0
-
-    u = rand()
-    v = rand()
-    w = v ^ 2 / u * 1.1
-    # w = 2 / 3 * v ^ 2 / u * 1.1
-
-    @assert dot([a, b, c], [u, v, w]) > 0
-
-    # point = [rand(), 0, rand()]
-    point = [w, v, u]
-    @show point
-    feas_check(point)
-
-    # @show (u * a + v * b + w * c < 0) && !feas_check(point)
-    # @assert ((u * a + v * b + w * c > 0) && feas_check(point)) || ((u * a + v * b + w * c < 0) && !feas_check(point))
-    println()
-end
+# for _ in 1:100
+#
+#     b = rand()
+#     c = rand()
+#     a = 36 * b ^ 2 / 96 / c * 1.2
+#     @assert 36 * b ^ 2 - 96 * a * c < 0
+#
+#     u = rand()
+#     v = rand()
+#     w = v ^ 2 / u * 1.1
+#     # w = 2 / 3 * v ^ 2 / u * 1.1
+#
+#     @assert dot([a, b, c], [u, v, w]) > 0
+#
+#     # point = [rand(), 0, rand()]
+#     point = [w, v, u]
+#     @show point
+#     feas_check(point)
+#
+#     # @show (u * a + v * b + w * c < 0) && !feas_check(point)
+#     # @assert ((u * a + v * b + w * c > 0) && feas_check(point)) || ((u * a + v * b + w * c < 0) && !feas_check(point))
+#     println()
+# end
 
 
 # using SumOfSquares, Hypatia
