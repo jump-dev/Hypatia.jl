@@ -59,6 +59,7 @@ for k in 1:length(monos_sqr)
     hess = differentiate(basis_poly, x, 2)
     lifting[:, k] = vcat([coefficient(hess[i, j], m) for i in 1:n for j in 1:i for m in monos_hess]...)
 end
+
 # get lambda without using dynamic polynomials
 function get_lambda(point)
     # hess_fullspace = lifting * point
@@ -74,7 +75,7 @@ point = randn(length(monos_sqr))
 function barfun(point)
     lambda = get_lambda(point)
     f = cholesky(Symmetric(lambda, :L), check = false)
-    @show eigmin(Symmetric(lambda, :L))
+    # @show eigmin(Symmetric(lambda, :L))
     @assert isposdef(f)
     return -logdet(f)
 end
@@ -83,7 +84,7 @@ function feas_check(point)
     lambda = get_lambda(point)
     @show lambda
     f = cholesky(Symmetric(lambda, :L), check = false)
-    @show eigmin(Symmetric(lambda, :L))
+    # @show eigmin(Symmetric(lambda, :L))
     @show isposdef(f)
     return isposdef(f)
 end
@@ -101,14 +102,20 @@ function integrate(lifting)
 end
 
 
-for (i, m) in enumerate(monos_sqr)
-    point[i] = all(iseven, exponents(m)) ? 1 : 0
-end
+# for (i, m) in enumerate(monos_sqr)
+#     point[i] = all(iseven, exponents(m)) ? 1 : 0
+# end
+#
+# feas_check(point)
 
-feas_check(point)
 
-# gradient = ForwardDiff.gradient(barfun, point)
-# @show dot(-gradient, point)
+gradient = ForwardDiff.gradient(barfun, point)
+@show dot(-gradient, point)
+point = zeros(length(monos_sqr))
+point[1] = 1
+point[3] = 1
+point[5] = 2
+barfun(point)
 # hessian = ForwardDiff.hessian(barfun, point)
 # @assert isposdef(Symmetric(hessian))
 

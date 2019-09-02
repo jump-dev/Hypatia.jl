@@ -3,9 +3,12 @@ Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
 =#
 
+using DynamicPolynomials, ForwardDiff, DiffResults
 
-mutable struct SOSConvexMono{T <: Real} <: Cone{T}
+mutable struct SOSConvexPolyMonomial{T <: Real} <: Cone{T}
     use_dual::Bool
+    n::Int
+    deg::Int
     dim::Int
     point::Vector{T}
 
@@ -13,83 +16,128 @@ mutable struct SOSConvexMono{T <: Real} <: Cone{T}
     grad_updated::Bool
     hess_updated::Bool
     inv_hess_updated::Bool
+    inv_hess_prod_updated::Bool
     is_feas::Bool
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
 
-    dist::T
+    poly_pairs
+    barfun
+    diffres
 
-    function SOSConvexMono{T}(dim::Int, is_dual::Bool) where {T <: Real}
-        @assert dim >= 2
+    tmp_hess::Symmetric{T, Matrix{T}}
+    hess_fact
+    hess_fact_cache
+
+    function SOSConvexPolyMonomial{T}(n::Int, deg::Int, is_dual::Bool) where {T <: Real}
         cone = new{T}()
-        cone.use_dual = is_dual
+        cone.use_dual = !is_dual # using dual barrier
+        cone.n = n
+        cone.deg = deg
+        dim = binomial(cone.n + deg, cone.n)
         cone.dim = dim
         return cone
     end
 end
 
-SOSConvexMono{T}(dim::Int) where {T <: Real} = SOSConvexMono{T}(dim, false)
+SOSConvexPolyMonomial{T}(n::Int, deg::Int) where {T <: Real} = SOSConvexPolyMonomial{T}(n::Int, deg::Int, false)
 
-reset_data(cone::SOSConvexMono) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
-
-# TODO maybe only allocate the fields we use
-function setup_data(cone::SOSConvexMono{T}) where {T <: Real}
+function setup_data(cone::SOSConvexPolyMonomial{T}) where {T <: Real}
     reset_data(cone)
     dim = cone.dim
     cone.point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
+    cone.tmp_hess = Symmetric(zeros(T, dim, dim), :U)
+
+    # create a lookup table of coefficients we will use to build lambda later
+    n = cone.n
+    @polyvar x[1:n]
+    monos_sqr = monomials(x, 2:cone.deg)
+    monos_hess = monomials(x, 0:cone.deg - 2)
+    monos_low = monomials(x, 0:div(cone.deg - 2, 2))
+    L = length(monos_low)
+    poly_pairs = [Float64[] for i in 1:L, j in 1:L]
+    for i in 1:length(monos_low), j in 1:i, m in monos_hess
+        poly = monos_low[i] * monos_low[j]
+        push!(poly_pairs[i, j], coefficient(poly, m))
+    end
+    cone.poly_pairs = poly_pairs
+
+    lifting = zeros(length(monos_hess) * div(n * (n + 1), 2), length(monos_sqr))
+    for k in 1:length(monos_sqr)
+        basis_poly = monos_sqr[k]
+        hess = differentiate(basis_poly, x, 2)
+        lifting[:, k] = vcat([coefficient(hess[i, j], m) for i in 1:n for j in 1:i for m in monos_hess]...)
+    end
+    integrating = similar(lifting)
+    for i in 1:size(lifting, 1), j in 1:size(lifting, 2)
+        aij = lifting[i, j]
+        integrating[i, j] = iszero(aij) ? 0 : inv(aij)
+    end
+    scalevals = diag(lifting' * integrating)
+    integrating ./= scalevals'
+
+    function barfun(point)
+        hess_fullspace = integrating * point
+        lambda = zeros(eltype(point), n * L, n * L)
+        u = 1
+        for i in 1:n, j in 1:i
+            point_coeffs = view(point, u:(u + U - 1))
+            for k in 1:L, l in 1:k
+                lambda[(i - 1) * L + k, (j - 1) * L + l] = lambda[(i - 1) * L + l, (j - 1) * L + k] = dot(poly_pairs[k, l], point_coeffs)
+            end
+            u += U
+        end
+        return -logdet(Symmetric(lambda, :L))
+    end
+    cone.barfun = barfun
+    cone.diffres = DiffResults.HessianResult(cone.grad)
+
+    cone.hess_fact_cache = nothing
     return
 end
 
-get_nu(cone::SOSConvexMono) = 2
+get_nu(cone::SOSConvexPolyMonomial) = binomial(cone.n + div(cone.deg, 2), cone.n)
 
-function set_initial_point(arr::AbstractVector, cone::SOSConvexMono)
+function set_initial_point(arr::AbstractVector, cone::SOSConvexPolyMonomial)
     arr .= 0
     arr[1] = 1
+    arr[3] = 1
+    arr[5] = 2
     return arr
 end
 
-function update_feas(cone::SOSConvexMono)
+function update_feas(cone::SOSConvexPolyMonomial)
     @assert !cone.feas_updated
-    u = cone.point[1]
-    if u > 0
-        w = view(cone.point, 2:cone.dim)
-        cone.dist = (abs2(u) - sum(abs2, w)) / 2
-        cone.is_feas = (cone.dist > 0)
-    else
-        cone.is_feas = false
+    L = binomial(cone.n + div(cone.deg, 2), cone.n)
+    lambda = zeros(eltype(cone.point), L, L)
+    for k in 1:L, l in 1:k
+        lambda[k, l] = dot(cone.poly_pairs[k, l], cone.point)
     end
+    cone.is_feas = isposdef(Symmetric(lambda, :L))
     cone.feas_updated = true
     return cone.is_feas
 end
 
-function update_grad(cone::SOSConvexMono)
+function update_grad(cone::SOSConvexPolyMonomial)
     @assert cone.is_feas
-    @. cone.grad = cone.point / cone.dist
-    cone.grad[1] *= -1
+    cone.diffres = ForwardDiff.hessian!(cone.diffres, cone.barfun, cone.point)
+    cone.grad .= DiffResults.gradient(cone.diffres)
     cone.grad_updated = true
     return cone.grad
 end
 
-# TODO only work with upper triangle
-function update_hess(cone::SOSConvexMono)
+function update_hess(cone::SOSConvexPolyMonomial)
     @assert cone.grad_updated
-    mul!(cone.hess.data, cone.grad, cone.grad')
-    cone.hess += inv(cone.dist) * I
-    cone.hess[1, 1] -= 2 / cone.dist
+    cone.hess.data .= DiffResults.hessian(cone.diffres)
     cone.hess_updated = true
     return cone.hess
 end
 
-# TODO only work with upper triangle
-function update_inv_hess(cone::SOSConvexMono)
-    @assert cone.is_feas
-    mul!(cone.inv_hess.data, cone.point, cone.point')
-    cone.inv_hess += cone.dist * I
-    cone.inv_hess[1, 1] -= 2 * cone.dist
-    cone.inv_hess_updated = true
-    return cone.inv_hess
-end
+# function inv_hess(cone::SOSConvexPolyMonomial)
+#     cone.inv_hess = inv(cone.hess)
+#     cone.inv_hess_updated = true
+#     return cone.inv_hess
+# end
