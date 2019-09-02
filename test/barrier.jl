@@ -243,6 +243,19 @@ function test_wsospolyinterp_barrier(T::Type{<:Real})
     return
 end
 
+function test_wsospolymonomial_barrier(T::Type{<:Real})
+    Random.seed!(1)
+    for n in [2], halfdeg in [3]
+        println()
+        @show n, halfdeg
+        cone = CO.WSOSPolyMonomial{T}(n, 2 * halfdeg)
+        CO.setup_data(cone)
+        barrier = cone.barfun
+        test_barrier_oracles(cone, barrier, tol = 10_000 * eps(T))
+    end
+    return
+end
+
 # function test_wsospolyinterpmat_barrier(T::Type{<:Real})
 #     Random.seed!(1)
 #     for n in 1:3, halfdeg in 1:3, R in 1:3
