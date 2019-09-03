@@ -13,7 +13,7 @@ real_types = [
 
 dense_options = [
     true,
-    false,
+    # false,
     ]
 
 system_solvers = [
@@ -25,5 +25,15 @@ system_solvers = [
 
 @info("starting MOI tests")
 @testset "MOI tests: $(d ? "dense" : "sparse"), $s, $T" for d in dense_options, s in system_solvers, T in real_types
-    test_moi(d, s{T}, MO.PreprocessedLinearModel{T}, verbose)
+    hypatia_options = (
+        # linear_model = m,
+        system_solver = s,
+        # linear_model_options = NamedTuple(),
+        # system_solver_options = NamedTuple(),
+        stepper_options = NamedTuple(),
+        solver_options = (verbose = false,),
+        )
+
+    # test_moi(d, s{T}, MO.PreprocessedLinearModel{T}, verbose)
+    test_moi(T, d, hypatia_options)
 end

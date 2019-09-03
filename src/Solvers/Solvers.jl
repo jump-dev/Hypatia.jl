@@ -64,14 +64,31 @@ function get_y(solver::Solver{T}, model::Models.PreprocessedLinearModel{T}) wher
 end
 get_y(solver::Solver{T}, model::Models.Model{T}) where {T <: Real} = get_y(solver)
 
-# check conic certificates are valid
-function get_certificates(
-    solver::Solver{T},
-    model::Models.LinearModel{T};
+# build linear model, solve, optionally test conic certificates, and return certificates and solver and model information
+function build_solve_check(
+    c::Vector{T},
+    A,
+    b::Vector{T},
+    G,
+    h::Vector{T},
+    cones::Vector{Cones.Cone{T}};
+    obj_offset::T = zero(T),
+    linear_model::Type{<:Models.LinearModel} = Models.PreprocessedLinearModel,
+    system_solver::Type{<:CombinedHSDSystemSolver} = Solvers.QRCholCombinedHSDSystemSolver,
+    linear_model_options::NamedTuple = NamedTuple(),
+    system_solver_options::NamedTuple = NamedTuple(),
+    stepper_options::NamedTuple = NamedTuple(),
+    solver_options::NamedTuple = NamedTuple(),
     test::Bool = true,
     atol::Real = sqrt(sqrt(eps(T))),
     rtol::Real = atol,
     ) where {T <: Real}
+    model = linear_model{T}(c, A, b, G, h, cones; obj_offset = obj_offset, linear_model_options...)
+    stepper = CombinedHSDStepper{T}(model, system_solver = system_solver{T}(model; system_solver_options...); stepper_options...)
+    solver = HSDSolver{T}(model, stepper = stepper; solver_options...)
+
+    solve(solver)
+
     status = get_status(solver)
     primal_obj = get_primal_obj(solver)
     dual_obj = get_dual_obj(solver)
@@ -106,33 +123,9 @@ function get_certificates(
         end
     end
 
-    return (x = x, y = y, s = s, z = z, primal_obj = primal_obj, dual_obj = dual_obj, status = status)
-end
+    solve_time = get_solve_time(solver)
 
-# build linear model, solve, check conic certificates, and return certificate data
-function build_solve_check(
-    c::Vector{T},
-    A,
-    b::Vector{T},
-    G,
-    h::Vector{T},
-    cones::Vector{Cones.Cone{T}};
-    obj_offset::T = zero(T),
-    test::Bool = true,
-    linear_model::Type{<:Models.LinearModel} = Models.PreprocessedLinearModel,
-    system_solver::Type{<:CombinedHSDSystemSolver} = Solvers.QRCholCombinedHSDSystemSolver,
-    linear_model_options::NamedTuple = NamedTuple(),
-    system_solver_options::NamedTuple = NamedTuple(),
-    stepper_options::NamedTuple = NamedTuple(),
-    solver_options::NamedTuple = NamedTuple(),
-    atol::Real = sqrt(sqrt(eps(T))),
-    rtol::Real = atol,
-    ) where {T <: Real}
-    model = linear_model{T}(c, A, b, G, h, cones; obj_offset = obj_offset, linear_model_options...)
-    stepper = CombinedHSDStepper{T}(model, system_solver = system_solver{T}(model; system_solver_options...); stepper_options...)
-    solver = HSDSolver{T}(model, stepper = stepper; solver_options...)
-    solve(solver)
-    return get_certificates(solver, model, test = test, atol = atol, rtol = rtol)
+    return (solver = solver, model = model, solve_time = solve_time, primal_obj = primal_obj, dual_obj = dual_obj, status = status, x = x, y = y, s = s, z = z)
 end
 
 end
