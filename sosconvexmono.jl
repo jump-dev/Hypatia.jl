@@ -97,7 +97,7 @@ function integrate(lifting)
     end
     scalevals = diag(lifting' * integrating)
     integrating ./= scalevals'
-    @show lifting' * integrating
+    # @show lifting' * integrating
     return integrating
 end
 
@@ -109,15 +109,50 @@ end
 # feas_check(point)
 
 
-gradient = ForwardDiff.gradient(barfun, point)
-@show dot(-gradient, point)
 point = zeros(length(monos_sqr))
 point[1] = 1
 point[3] = 1
-point[5] = 2
+point[5] = 2 # *
+point[10] = 1
+point[12] = 1
 barfun(point)
+@show get_lambda(point)
+gradient = ForwardDiff.gradient(barfun, point)
+@show dot(-gradient, point)
 # hessian = ForwardDiff.hessian(barfun, point)
 # @assert isposdef(Symmetric(hessian))
+
+using JuMP, Hypatia
+model = Model(with_optimizer(Hypatia.Optimizer{Float64}, verbose = true))
+@variables(model, begin
+    mu
+end)
+coeffs = Vector{GenericAffExpr{Float64,VariableRef}}(undef, length(monos_sqr))
+coeffs .= 0
+coeffs[1] = 1
+coeffs[5] = 1
+coeffs[10] = -1 - 0.5 * mu
+coeffs[12] = -1 - 0.5 * mu
+@constraint(model, coeffs in Hypatia.WSOSConvexPolyMonomialCone(2, 4))
+@objective(model, Max, mu)
+optimize!(model)
+@show JuMP.value(mu) # -2
+
+model = Model(with_optimizer(Hypatia.Optimizer{Float64}, verbose = true))
+@variables(model, begin
+    mu
+end)
+coeffs = Vector{GenericAffExpr{Float64,VariableRef}}(undef, length(monos_sqr))
+coeffs .= 0
+coeffs[1] = 1
+coeffs[5] = 1
+coeffs[10] = -2 - 0.5 * mu
+coeffs[12] = -2 - 0.5 * mu
+@constraint(model, coeffs in Hypatia.WSOSConvexPolyMonomialCone(2, 4))
+@objective(model, Max, mu)
+optimize!(model)
+@show JuMP.value(mu) # -4
+
 
 
 # for _ in 1:100
@@ -161,31 +196,5 @@ barfun(point)
 # point = coefficients(JuMP.value.(poly))
 
 
-# k = 6
-# n = 3
-# @polyvar x[1:n]
-# monos = monomials(x, 0:3)
-# m = SOSModel(with_optimizer(Mosek.Optimizer))
-# @variables(m, p, Poly(monomials(x, 2:k)))
-# @variable(m, G[1:length(monos), 1:length(monos)], Symmetric)
-# @variable(m, t)
-# @constraint(m, constr, p in SOSCone())
-# @constraint(m, p == monos' * G * monos)
-# @constraint(m, tr(G) == 1)
-# @constraint(m, vcat(t, 1, [G[i, j] for i in 1:length(monos) for j in 1:i]...) in MOI.LogDetConeTriangle(length(monos)))
-# @objective(m, Max, t)
-# optimize!(m)
-# @show value.(p)
-# @show termination_status(m)
-#
-# k = 6
-# n = 3
-# @polyvar x[1:n]
-# m = SOSModel(with_optimizer(Mosek.Optimizer))
-# @variable(m, p, Poly(monomials(x, 2:k)))
-# @constraint(m, constr, p in SOSCone())
-# optimize!(m)
-# @show value.(p)
-# @show termination_status(m)
 
 ;

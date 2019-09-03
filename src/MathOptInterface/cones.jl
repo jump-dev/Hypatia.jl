@@ -5,7 +5,15 @@ definitions of conic sets not already defined by MathOptInterface
 and functions for converting between Hypatia and MOI cone definitions
 =#
 
-export WSOSPolyInterpCone
+export WSOSPolyInterpCone, WSOSConvexPolyMonomialCone
+
+struct WSOSConvexPolyMonomialCone{T <: Real} <: MOI.AbstractVectorSet
+    n::Int
+    deg::Int
+    is_dual::Bool
+end
+# TODO generalize number
+WSOSConvexPolyMonomialCone(n::Int, deg::Int) = WSOSConvexPolyMonomialCone{Float64}(n::Int, deg::Int, false)
 
 struct WSOSPolyInterpCone{T <: Real} <: MOI.AbstractVectorSet # real case only
     dimension::Int
@@ -45,6 +53,7 @@ const MOIOtherConesList(::Type{T}) where {T <: Real} = (
     MOI.PositiveSemidefiniteConeTriangle,
     MOI.LogDetConeTriangle,
     WSOSPolyInterpCone{T},
+    WSOSConvexPolyMonomialCone{T},
     # WSOSPolyInterpMatCone{T},
     # WSOSPolyInterpSOCCone{T},
     )
@@ -60,6 +69,7 @@ const MOIOtherCones{T <: Real} = Union{
     MOI.PositiveSemidefiniteConeTriangle,
     MOI.LogDetConeTriangle,
     WSOSPolyInterpCone{T},
+    WSOSConvexPolyMonomialCone{T},
     # WSOSPolyInterpMatCone{T},
     # WSOSPolyInterpSOCCone{T},
     }
@@ -75,6 +85,7 @@ cone_from_moi(::Type{T}, s::MOI.PowerCone{T}) where {T <: Real} = Cones.Power{T}
 cone_from_moi(::Type{T}, s::MOI.PositiveSemidefiniteConeTriangle) where {T <: Real} = Cones.PosSemidefTri{T, T}(MOI.dimension(s))
 cone_from_moi(::Type{T}, s::MOI.LogDetConeTriangle) where {T <: Real} = Cones.HypoPerLogdetTri{T}(MOI.dimension(s))
 cone_from_moi(::Type{T}, s::WSOSPolyInterpCone{T}) where {T <: Real} = Cones.WSOSPolyInterp{T, T}(s.dimension, s.Ps, s.is_dual)
+cone_from_moi(::Type{T}, s::WSOSConvexPolyMonomialCone{T}) where {T <: Real} = Cones.WSOSConvexPolyMonomial{T}(s.n, s.deg, s.is_dual)
 # cone_from_moi(::Type{T}, s::WSOSPolyInterpMatCone{T}) where {T <: Real} = Cones.WSOSPolyInterpMat{T}(s.R, s.U, s.ipwt, s.is_dual)
 # cone_from_moi(::Type{T}, s::WSOSPolyInterpSOCCone{T}) where {T <: Real} = Cones.WSOSPolyInterpSOC{T}(s.R, s.U, s.ipwt, s.is_dual)
 cone_from_moi(::Type{T}, s::MOI.AbstractVectorSet) where {T <: Real} = error("MOI set $s is not recognized")

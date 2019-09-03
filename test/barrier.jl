@@ -13,8 +13,8 @@ const MU = Hypatia.ModelUtilities
 function test_barrier_oracles(
     cone::CO.Cone{T},
     barrier::Function;
-    noise::Real = 0.2,
-    scale::Real = 10000,
+    noise::Real = 0,
+    scale::Real = 1000,
     tol::Real = 100eps(T),
     ) where {T <: Real}
     CO.setup_data(cone)
@@ -26,6 +26,7 @@ function test_barrier_oracles(
         point /= scale
     end
     CO.load_point(cone, point)
+    @show point
 
     @test cone.point == point
     @test CO.is_feas(cone)
@@ -249,6 +250,19 @@ function test_wsospolymonomial_barrier(T::Type{<:Real})
         println()
         @show n, halfdeg
         cone = CO.WSOSPolyMonomial{T}(n, 2 * halfdeg)
+        CO.setup_data(cone)
+        barrier = cone.barfun
+        test_barrier_oracles(cone, barrier, tol = 10_000 * eps(T))
+    end
+    return
+end
+
+function test_wsosconvexpolymonomial_barrier(T::Type{<:Real})
+    Random.seed!(1)
+    for n in [2], deg in [4]
+        println()
+        @show n, deg
+        cone = CO.WSOSConvexPolyMonomial{T}(n, deg)
         CO.setup_data(cone)
         barrier = cone.barfun
         test_barrier_oracles(cone, barrier, tol = 10_000 * eps(T))
