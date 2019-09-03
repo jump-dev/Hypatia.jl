@@ -9,25 +9,23 @@ mutable struct Optimizer{T <: Real} <: MOI.AbstractOptimizer
     use_dense::Bool
     test_certificates::Bool
 
-    verbose::Bool
-    system_solver::Type{<:Solvers.CombinedHSDSystemSolver{T}}
-    linear_model::Type{<:Models.LinearModel{T}}
-    max_iters::Int
-    time_limit::Float64
-    tol_rel_opt::T
-    tol_abs_opt::T
-    tol_feas::T
-    tol_slow::T
+    # verbose::Bool
+    # system_solver::Type{<:Solvers.CombinedHSDSystemSolver{T}}
+    # linear_model::Type{<:Models.LinearModel{T}}
+    # max_iters::Int
+    # time_limit::Float64
+    # tol_rel_opt::T
+    # tol_abs_opt::T
+    # tol_feas::T
+    # tol_slow::T
 
-    obj_offset::T
     c::Vector{T}
     A
     b::Vector{T}
     G
     h::Vector{T}
     cones::Vector{Cones.Cone{T}}
-
-    solver::Solvers.HSDSolver
+    obj_offset::T
 
     obj_sense::MOI.OptimizationSense
     num_eq_constrs::Int
@@ -38,43 +36,46 @@ mutable struct Optimizer{T <: Real} <: MOI.AbstractOptimizer
     interval_idxs::UnitRange{Int}
     interval_scales::Vector{T}
 
+    hypatia_options::NamedTuple
+    solver::Solvers.HSDSolver{T}
+    status::Symbol
+
+    result::NamedTuple
     x::Vector{T}
     s::Vector{T}
     y::Vector{T}
     z::Vector{T}
-    status::Symbol
-    solve_time::Float64
-    primal_obj::T
-    dual_obj::T
 
     function Optimizer{T}(;
         load_only::Bool = false,
         use_dense::Bool = true,
         test_certificates::Bool = false,
-        verbose::Bool = false,
-        system_solver::Type{<:Solvers.CombinedHSDSystemSolver{T}} = Solvers.QRCholCombinedHSDSystemSolver{T},
-        linear_model::Type{<:Models.LinearModel{T}} = Models.PreprocessedLinearModel{T},
-        max_iters::Int = 1000,
-        time_limit::Real = Inf,
-        tol_rel_opt::Real = sqrt(eps(T)),
-        tol_abs_opt::Real = tol_rel_opt,
-        tol_feas::Real = tol_rel_opt,
-        tol_slow::Real = T(1e-3),
+        hypatia_options::NamedTuple = NamedTuple(),
+        # verbose::Bool = false,
+        # system_solver::Type{<:Solvers.CombinedHSDSystemSolver{T}} = Solvers.QRCholCombinedHSDSystemSolver{T},
+        # linear_model::Type{<:Models.LinearModel{T}} = Models.PreprocessedLinearModel{T},
+        # max_iters::Int = 1000,
+        # time_limit::Real = Inf,
+        # tol_rel_opt::Real = sqrt(eps(T)),
+        # tol_abs_opt::Real = tol_rel_opt,
+        # tol_feas::Real = tol_rel_opt,
+        # tol_slow::Real = T(1e-3),
         ) where {T <: Real}
         opt = new{T}()
 
         opt.load_only = load_only
         opt.use_dense = use_dense
         opt.test_certificates = test_certificates
-        opt.verbose = verbose
-        opt.system_solver = system_solver
-        opt.linear_model = linear_model
-        opt.max_iters = max_iters
-        opt.time_limit = time_limit
-        opt.tol_rel_opt = tol_rel_opt
-        opt.tol_abs_opt = tol_abs_opt
-        opt.tol_feas = tol_feas
-        opt.tol_slow = tol_slow
+        opt.hypatia_options = hypatia_options
+        # opt.verbose = verbose
+        # opt.system_solver = system_solver
+        # opt.linear_model = linear_model
+        # opt.max_iters = max_iters
+        # opt.time_limit = time_limit
+        # opt.tol_rel_opt = tol_rel_opt
+        # opt.tol_abs_opt = tol_abs_opt
+        # opt.tol_feas = tol_feas
+        # opt.tol_slow = tol_slow
 
         opt.status = :NotLoaded
 
@@ -102,10 +103,6 @@ MOI.supports_constraint(::Optimizer{T},
     ::Type{<:Union{MOI.VectorOfVariables, MOI.VectorAffineFunction{T}}},
     ::Type{<:Union{MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives, MOIOtherCones{T}}}
     ) where {T <: Real} = true
-
-MOI.supports(::Optimizer, ::MOI.Silent) = true
-MOI.set(opt::Optimizer, ::MOI.Silent, value::Bool) = (opt.verbose = value)
-MOI.get(opt::Optimizer, ::MOI.Silent) = opt.verbose
 
 # build representation as min c'x s.t. A*x = b, h - G*x in K
 function MOI.copy_to(
@@ -221,11 +218,7 @@ function MOI.copy_to(
     end
 
     push!(constr_offset_eq, p)
-    if opt.use_dense
-        model_A = Matrix(sparse(IA, JA, VA, p, n))
-    else
-        model_A = dropzeros!(sparse(IA, JA, VA, p, n))
-    end
+    model_A = dropzeros!(sparse(IA, JA, VA, p, n))
     model_b = Vector(sparsevec(Ib, Vb, p))
     opt.num_eq_constrs = i
     opt.constr_prim_eq = Vector(sparsevec(Icpe, Vcpe, p))
@@ -480,11 +473,7 @@ function MOI.copy_to(
 
     push!(constr_offset_cone, q)
 
-    if opt.use_dense
-        model_G = Matrix(sparse(IG, JG, VG, q, n))
-    else
-        model_G = dropzeros!(sparse(IG, JG, VG, q, n))
-    end
+    model_G = dropzeros!(sparse(IG, JG, VG, q, n))
     model_h = Vector(sparsevec(Ih, Vh, q))
 
     opt.c = model_c
@@ -504,24 +493,36 @@ end
 
 function MOI.optimize!(opt::Optimizer{T}) where {T <: Real}
     if opt.load_only
-        return
+        return nothing
     end
-    model = opt.linear_model(copy(opt.c), copy(opt.A), copy(opt.b), copy(opt.G), copy(opt.h), opt.cones, obj_offset = opt.obj_offset)
-    stepper = Solvers.CombinedHSDStepper{T}(model, system_solver = opt.system_solver(model))
-    solver = Solvers.HSDSolver{T}(
-        model, stepper = stepper,
-        verbose = opt.verbose, max_iters = opt.max_iters, time_limit = opt.time_limit,
-        tol_rel_opt = opt.tol_rel_opt, tol_abs_opt = opt.tol_abs_opt, tol_feas = opt.tol_feas, tol_slow = opt.tol_slow,
-        )
-    Solvers.solve(solver)
-    r = Solvers.get_certificates(solver, model, test = opt.test_certificates)
+    # model = opt.linear_model(copy(opt.c), copy(opt.A), copy(opt.b), copy(opt.G), copy(opt.h), opt.cones, obj_offset = opt.obj_offset)
+    # stepper = Solvers.CombinedHSDStepper{T}(model, system_solver = opt.system_solver(model))
+    # solver = Solvers.HSDSolver{T}(
+    #     model, stepper = stepper,
+    #     verbose = opt.verbose, max_iters = opt.max_iters, time_limit = opt.time_limit,
+    #     tol_rel_opt = opt.tol_rel_opt, tol_abs_opt = opt.tol_abs_opt, tol_feas = opt.tol_feas, tol_slow = opt.tol_slow,
+    #     )
+    # Solvers.solve(solver)
+    # r = Solvers.get_certificates(solver, model, test = opt.test_certificates)
 
-    opt.solve_time = Solvers.get_solve_time(solver)
+    if opt.use_dense
+        A = Matrix(opt.A)
+        G = Matrix(opt.G)
+    else
+        A = copy(opt.A)
+        G = copy(opt.G)
+    end
+
+    r = Solvers.build_solve_check(copy(opt.c), A, copy(opt.b), G, copy(opt.h), opt.cones,
+        test = opt.test_certificates; opt.hypatia_options...)
+    opt.result = r
+
     opt.status = r.status
-    opt.primal_obj = r.primal_obj
-    opt.dual_obj = r.dual_obj
+    # opt.result.primal_obj = r.primal_obj
+    # opt.result.dual_obj = r.dual_obj
+    # opt.solve_time = Solvers.get_solve_time(solver)
 
-    # get solution and transform for MOI
+    # transform solution for MOI
     opt.x = r.x
     opt.constr_prim_eq += opt.b - opt.A * opt.x
     opt.y = r.y
@@ -530,7 +531,7 @@ function MOI.optimize!(opt::Optimizer{T}) where {T <: Real}
     opt.s[opt.interval_idxs] ./= opt.interval_scales
     for (k, cone_k) in enumerate(opt.cones)
         if cone_k isa Cones.PosSemidefTri || cone_k isa Cones.HypoPerLogdetTri # rescale duals for symmetric triangle cones
-            cone_idxs_k = Models.get_cone_idxs(model)[k]
+            cone_idxs_k = Models.get_cone_idxs(r.model)[k]
             unscale_vec = (Cones.use_dual(cone_k) ? opt.s : opt.z)
             idxs = (cone_k isa Cones.PosSemidefTri ? cone_idxs_k : cone_idxs_k[3:end])
             offset = 1
@@ -546,37 +547,42 @@ function MOI.optimize!(opt::Optimizer{T}) where {T <: Real}
     opt.constr_prim_cone += opt.s
     opt.z[opt.interval_idxs] .*= opt.interval_scales
 
-    return
+    return nothing
 end
 
+MOI.supports(::Optimizer, ::MOI.Silent) = true
+MOI.set(opt::Optimizer, ::MOI.Silent, value::Bool) = (opt.hypatia_options.verbose = value)
+MOI.get(opt::Optimizer, ::MOI.Silent) = (isdefined(opt.hypatia_options.verbose) ? opt.hypatia_options.verbose : false)
+
 MOI.supports(::Optimizer, ::MOI.TimeLimitSec) = true
-MOI.set(opt::Optimizer, ::MOI.TimeLimitSec, value::Real) = (opt.time_limit = value)
-MOI.set(opt::Optimizer, ::MOI.TimeLimitSec, ::Nothing) = (opt.time_limit = Inf)
-MOI.get(opt::Optimizer, ::MOI.TimeLimitSec) = (isfinite(opt.time_limit) ? opt.time_limit : nothing)
+MOI.set(opt::Optimizer, ::MOI.TimeLimitSec, value::Real) = (opt.hypatia_options.time_limit = value)
+MOI.set(opt::Optimizer, ::MOI.TimeLimitSec, ::Nothing) = (opt.hypatia_options.time_limit = Inf)
+MOI.get(opt::Optimizer, ::MOI.TimeLimitSec) = (isdefined(opt.hypatia_options.verbose) ? (isfinite(opt.hypatia_options.time_limit) ? opt.hypatia_options.time_limit : nothing) : nothing)
 
 function MOI.get(opt::Optimizer, ::MOI.SolveTime)
     if opt.status in (:NotLoaded, :Loaded)
         error("solve has not been called")
     end
-    return opt.solve_time
+    return opt.result.solve_time
 end
 
-MOI.get(opt::Optimizer, ::MOI.RawStatusString) = string(opt.status)
+MOI.get(opt::Optimizer, ::MOI.RawStatusString) = string(opt.result.status)
 
 function MOI.get(opt::Optimizer, ::MOI.TerminationStatus)
-    if opt.status in (:NotLoaded, :Loaded)
+    status = opt.status
+    if status in (:NotLoaded, :Loaded)
         return MOI.OPTIMIZE_NOT_CALLED
-    elseif opt.status == :Optimal
+    elseif status == :Optimal
         return MOI.OPTIMAL
-    elseif opt.status == :PrimalInfeasible
+    elseif status == :PrimalInfeasible
         return MOI.INFEASIBLE
-    elseif opt.status == :DualInfeasible
+    elseif status == :DualInfeasible
         return MOI.DUAL_INFEASIBLE
-    elseif opt.status == :SlowProgress
+    elseif status == :SlowProgress
         return MOI.SLOW_PROGRESS
-    elseif opt.status == :IterationLimit
+    elseif status == :IterationLimit
         return MOI.ITERATION_LIMIT
-    elseif opt.status == :TimeLimit
+    elseif status == :TimeLimit
         return MOI.TIME_LIMIT
     else
         @warn("Hypatia status $(opt.status) not handled")
@@ -585,13 +591,14 @@ function MOI.get(opt::Optimizer, ::MOI.TerminationStatus)
 end
 
 function MOI.get(opt::Optimizer, ::MOI.PrimalStatus)
-    if opt.status == :Optimal
+    status = opt.status
+    if status == :Optimal
         return MOI.FEASIBLE_POINT
-    elseif opt.status == :PrimalInfeasible
+    elseif status == :PrimalInfeasible
         return MOI.INFEASIBLE_POINT
-    elseif opt.status == :DualInfeasible
+    elseif status == :DualInfeasible
         return MOI.INFEASIBILITY_CERTIFICATE
-    elseif opt.status == :IllPosed
+    elseif status == :IllPosed
         return MOI.OTHER_RESULT_STATUS
     else
         return MOI.UNKNOWN_RESULT_STATUS
@@ -599,13 +606,14 @@ function MOI.get(opt::Optimizer, ::MOI.PrimalStatus)
 end
 
 function MOI.get(opt::Optimizer, ::MOI.DualStatus)
-    if opt.status == :Optimal
+    status = opt.status
+    if status == :Optimal
         return MOI.FEASIBLE_POINT
-    elseif opt.status == :PrimalInfeasible
+    elseif status == :PrimalInfeasible
         return MOI.INFEASIBILITY_CERTIFICATE
-    elseif opt.status == :DualInfeasible
+    elseif status == :DualInfeasible
         return MOI.INFEASIBLE_POINT
-    elseif opt.status == :IllPosed
+    elseif status == :IllPosed
         return MOI.OTHER_RESULT_STATUS
     else
         return MOI.UNKNOWN_RESULT_STATUS
@@ -614,9 +622,9 @@ end
 
 function MOI.get(opt::Optimizer, ::MOI.ObjectiveValue)
     if opt.obj_sense == MOI.MIN_SENSE
-        return opt.primal_obj
+        return opt.result.primal_obj
     elseif opt.obj_sense == MOI.MAX_SENSE
-        return -opt.primal_obj
+        return -opt.result.primal_obj
     else
         error("no objective sense is set")
     end
@@ -624,9 +632,9 @@ end
 
 function MOI.get(opt::Optimizer, ::Union{MOI.DualObjectiveValue, MOI.ObjectiveBound})
     if opt.obj_sense == MOI.MIN_SENSE
-        return opt.dual_obj
+        return opt.result.dual_obj
     elseif opt.obj_sense == MOI.MAX_SENSE
-        return -opt.dual_obj
+        return -opt.result.dual_obj
     else
         error("no objective sense is set")
     end
