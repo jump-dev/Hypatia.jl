@@ -114,6 +114,9 @@ function MOI.copy_to(
     copy_names::Bool = false,
     warn_attributes::Bool = true,
     ) where {T <: Real}
+
+    @show "starting copyto"
+
     @assert !copy_names
     idx_map = Dict{MOI.Index, MOI.Index}()
 
@@ -499,6 +502,8 @@ function MOI.copy_to(
 
     opt.status = :Loaded
 
+    println("finished copyto")
+
     return idx_map
 end
 
@@ -506,13 +511,18 @@ function MOI.optimize!(opt::Optimizer{T}) where {T <: Real}
     if opt.load_only
         return
     end
+    @show "pre model"
+    @show opt.cones
     model = opt.linear_model(copy(opt.c), copy(opt.A), copy(opt.b), copy(opt.G), copy(opt.h), opt.cones, obj_offset = opt.obj_offset)
+    @show "post model"
     stepper = Solvers.CombinedHSDStepper{T}(model, system_solver = opt.system_solver(model))
+    @show "post stepper"
     solver = Solvers.HSDSolver{T}(
         model, stepper = stepper,
         verbose = opt.verbose, max_iters = opt.max_iters, time_limit = opt.time_limit,
         tol_rel_opt = opt.tol_rel_opt, tol_abs_opt = opt.tol_abs_opt, tol_feas = opt.tol_feas, tol_slow = opt.tol_slow,
         )
+    @show "post solver"
     Solvers.solve(solver)
     r = Solvers.get_certificates(solver, model, test = opt.test_certificates)
 

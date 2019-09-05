@@ -10,10 +10,11 @@ export WSOSPolyInterpCone, WSOSConvexPolyMonomialCone
 struct WSOSConvexPolyMonomialCone{T <: Real} <: MOI.AbstractVectorSet
     n::Int
     deg::Int
+    dimension::Int
     is_dual::Bool
 end
 # TODO generalize number
-WSOSConvexPolyMonomialCone(n::Int, deg::Int) = WSOSConvexPolyMonomialCone{Float64}(n::Int, deg::Int, false)
+WSOSConvexPolyMonomialCone(n::Int, deg::Int) = WSOSConvexPolyMonomialCone{Float64}(n, deg, binomial(n + deg, n) - binomial(n + 1, n), false)
 
 struct WSOSPolyInterpCone{T <: Real} <: MOI.AbstractVectorSet # real case only
     dimension::Int
