@@ -3,7 +3,7 @@ Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
 =#
 
-using ForwardDiff, DynamicPolynomials, LinearAlgebra
+using ForwardDiff, DynamicPolynomials, LinearAlgebra, JuMP, MosekTools, Hypatia
 
 n = 2
 k = 4
@@ -101,58 +101,160 @@ function integrate(lifting)
     return integrating
 end
 
-
-# for (i, m) in enumerate(monos_sqr)
-#     point[i] = all(iseven, exponents(m)) ? 1 : 0
-# end
+# point = zeros(length(monos_sqr))
+# point[1] = 12
+# point[3] = 12
+# point[5] = 1.01 # *
+# point[10] = 1
+# point[12] = 1
+# h = lifting' \ point
 #
-# feas_check(point)
-
-
-point = zeros(length(monos_sqr))
-point[1] = 1
-point[3] = 1
-point[5] = 2 # *
-point[10] = 1
-point[12] = 1
-barfun(point)
-@show get_lambda(point)
-gradient = ForwardDiff.gradient(barfun, point)
-@show dot(-gradient, point)
+# lambda = monomial_lambda(h)
+# barfun(point)
+# @show get_lambda(point)
+# gradient = ForwardDiff.gradient(barfun, point)
+# @show dot(-gradient, point)
 # hessian = ForwardDiff.hessian(barfun, point)
 # @assert isposdef(Symmetric(hessian))
 
-using JuMP, Hypatia
-model = Model(with_optimizer(Hypatia.Optimizer{Float64}, verbose = true))
-@variables(model, begin
-    mu
-end)
-coeffs = Vector{GenericAffExpr{Float64,VariableRef}}(undef, length(monos_sqr))
-coeffs .= 0
-coeffs[1] = 1
-coeffs[5] = 1
-coeffs[10] = -1 - 0.5 * mu
-coeffs[12] = -1 - 0.5 * mu
-@constraint(model, coeffs in Hypatia.WSOSConvexPolyMonomialCone(2, 4))
-@objective(model, Max, mu)
-optimize!(model)
-@show JuMP.value(mu) # -2
+function lambda_direct(point)
+    L = length(monos_low)
+    lambda = zeros(eltype(point), L * n, L * n)
+    for (u, msu) in enumerate(monos_sqr)
+        idxs = []
+        num_repeats = 0
+        for i in 1:n, j in 1:i
+            di = degree(msu, x[i])
+            dj = degree(msu, x[j])
+            if (i == j && di >= 2) || (i != j && di >= 1 && dj >= 1)
+                num_repeats += 1
+            else
+                continue
+            end
+            for k in 1:length(monos_low), l in 1:k
+                if msu != monos_low[k] * monos_low[l] * x[i] * x[j]
+                    continue
+                end
+                if i == j
+                    fact = inv(di * (di - 1))
+                else
+                    fact = inv(di * dj)
+                end
+                lambda[(i - 1) * L + k, (j - 1) * L + l] = lambda[(i - 1) * L + l, (j - 1) * L + k] = fact * point[u]
+                push!(idxs, (i, j, k, l))
+            end # inner
+        end # outer
+        println("$msu has $num_repeats repeats")
+        # if msu == x[1] ^ 2 * x[2] ^ 2
+        #     weights = [0.5, 0, 0.5]
+        # else
+            weights = fill(1 / num_repeats, num_repeats)
+        # end
+        for (w, (i, j, k, l)) in enumerate(idxs)
+            lambda[(i - 1) * L + k, (j - 1) * L + l] *= weights[w]
+            if k != l
+                lambda[(i - 1) * L + l, (j - 1) * L + k] *= weights[w]
+            end
+        end
+    end # monos sqr
+    return lambda
+end
 
-model = Model(with_optimizer(Hypatia.Optimizer{Float64}, verbose = true))
-@variables(model, begin
-    mu
-end)
-coeffs = Vector{GenericAffExpr{Float64,VariableRef}}(undef, length(monos_sqr))
-coeffs .= 0
-coeffs[1] = 1
-coeffs[5] = 1
-coeffs[10] = -2 - 0.5 * mu
-coeffs[12] = -2 - 0.5 * mu
-@constraint(model, coeffs in Hypatia.WSOSConvexPolyMonomialCone(2, 4))
-@objective(model, Max, mu)
-optimize!(model)
-@show JuMP.value(mu) # -4
 
+my_nullspace = zeros(18, 6)
+my_nullspace[5, 1] = 1
+my_nullspace[10, 1] = -1
+my_nullspace[2, 2] = 6
+my_nullspace[7, 2] = -3
+my_nullspace[16, 3] = 2
+my_nullspace[11, 3] = -2
+my_nullspace[14, 4] = 6
+my_nullspace[9, 4] = -3
+my_nullspace[3, 5] = 2
+my_nullspace[8, 5] = -1
+my_nullspace[8, 6] = 1
+my_nullspace[13, 6] = -2
+
+integrator2 = copy(integrate(lifting))
+for j in 1:size(integrator2, 2)
+    repteated = false
+    for i in 1:size(integrator2, 1)
+        if !iszero(integrator2[i, j]) && !repteated
+            repteated = true
+            @show i, j
+        elseif !iszero(integrator2[i, j]) && repteated
+            integrator2[i, j] = 0
+            @show "zeroing", i, j
+        end
+    end
+end
+
+integrator_manual = hcat(integrator2, my_nullspace)
+
+function find_initial_point()
+    model = Model(with_optimizer(Hypatia.Optimizer{Float64}, verbose = true, use_dense = false))
+    # model = Model(with_optimizer(Mosek.Optimizer, QUIET = false))
+    @variable(model, coeffs[1:length(monos_sqr)])
+    @variable(model, t)
+    hankel_old = lambda_direct(coeffs * 1)
+    hankel = monomial_lambda(lifting * inv(lifting' * lifting) * coeffs)
+    s = size(hankel, 1)
+
+    @constraint(model, [hankel[i, j] - (i == j ? 0 : 0) for i in 1:s for j in 1:i] in MOI.PositiveSemidefiniteConeTriangle(s))
+    # @constraint(model, [t, 1,  [hankel[i, j] for i in 1:s for j in 1:i]...] in MOI.LogDetConeTriangle(s))
+
+    # @SDconstraint(model, hankel ⪰ eps * I)
+    # @objective(model, Max, t)
+    optimize!(model)
+    H = value.(hankel)
+    H[abs.(H) .< 1e-9] .= 0
+    H = Symmetric(H, :L)
+    @show H
+    @show dot(value.(coeffs), monos_sqr)
+    @show isposdef(H)
+    @show logdet(H)
+
+end
+
+hess = differentiate(dot(coeffs, monos_sqr), x, 2)
+hankel_sym = Symmetric(hankel_old, :L)
+dp = 0
+for i in 1:n, j in 1:n, k in 1:length(monos_low), l in 1:length(monos_low)
+    global dp += coefficient(hess[i, j], monos_low[k] * monos_low[l]) * hankel_sym[(i - 1) * 3 + k, (j - 1) * 3 + l] # * monos_low[k] * monos_low[l]
+end
+
+# 1.2000000000000002
+# -6.523353691671332e-17
+# 2.3698645623511286e-17
+# 7.689634644949283
+# 9.732396729288051e-16
+# 7.689634644949283
+# 1.5425503798568115e-16
+# 1.2668625483510415e-15
+# 1.5309340259959062e-15
+# 8.00935267466167e-16
+# 1.2000000000000002
+# -2.2278572467804496e-16
+# 7.689634644949298
+# -5.319110456494835e-16
+# 1.2000000000000002
+# -0.0
+# 4.490755470545132e-16
+# -3.8339068559688606e-16
+# 4.118413075418305e-17
+# -6.70463770558626e-16
+# -9.284211040019328e-16
+# -0.0
+# 1.1554912489174514e-15
+# -6.709795971515719e-16
+# -0.0
+# 0.2
+# -0.0
+# -0.0
+# 0.2
+# -0.0
+# 0.2
+# arr = [1.2, 0.0, 0.0, 10.0, 0.0, 10.0, 0.0, 0.0, 0.0, 0.0, 1.2, 0.0, 10.0, 0.0, 1.2, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.2, 0.0, 0.0, 0.2, 0.0, 0.2]
 
 
 # for _ in 1:100
@@ -180,20 +282,6 @@ optimize!(model)
 # end
 
 
-# using SumOfSquares, Hypatia
-# model = SOSModel(with_optimizer(Mosek.Optimizer))
-# @variable(model, poly, Poly(monos_sqr))
-# hess = differentiate(poly, x, 2)
-# @constraint(model, poly in SOSConvexCone())
-# @constraint(model, sum(coefficients(poly)) == 1)
-# # optimize!(model)
-# # println(coefficients(JuMP.value.(poly)))
-# @variable(model, t)
-# @objective(model, Max, t)
-# @constraint(model, hess - t * I in SOSMatrixCone())
-# optimize!(model)
-# println(coefficients(JuMP.value.(poly)))
-# point = coefficients(JuMP.value.(poly))
 
 
 

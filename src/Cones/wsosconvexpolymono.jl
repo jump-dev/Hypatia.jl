@@ -37,6 +37,7 @@ mutable struct WSOSConvexPolyMonomial{T <: Real} <: Cone{T}
         cone.n = n
         cone.deg = deg
         dim = binomial(cone.n + deg, cone.n) - binomial(cone.n + 1, cone.n)
+        @show cone.dim
         cone.dim = dim
         return cone
     end
@@ -83,19 +84,69 @@ function setup_data(cone::WSOSConvexPolyMonomial{T}) where {T <: Real}
     integrating ./= scalevals'
 
     function get_lambda(point)
-        hess_fullspace = integrating * point
-        lambda = zeros(eltype(point), n * L, n * L)
-        U = length(monos_hess)
-        u = 1
-        for i in 1:n, j in 1:i
-            point_coeffs = view(hess_fullspace, u:(u + U - 1))
-            for k in 1:L, l in 1:k
-                lambda[(i - 1) * L + k, (j - 1) * L + l] = lambda[(i - 1) * L + l, (j - 1) * L + k] = dot(poly_pairs[k, l], point_coeffs)
+        L = length(monos_low)
+        lambda = zeros(eltype(point), L * n, L * n)
+        for (u, msu) in enumerate(monos_sqr)
+            idxs = []
+            num_repeats = 0
+            for i in 1:n, j in 1:i
+                di = degree(msu, x[i])
+                dj = degree(msu, x[j])
+                if (i == j && di >= 2) || (i != j && di >= 1 && dj >= 1)
+                    num_repeats += 1
+                else
+                    continue
+                end
+                for k in 1:length(monos_low), l in 1:k
+                    if msu != monos_low[k] * monos_low[l] * x[i] * x[j]
+                        continue
+                    end
+                    if i == j
+                        fact = inv(di * (di - 1))
+                    else
+                        fact = inv(di * dj)
+                    end
+                    lambda[(i - 1) * L + k, (j - 1) * L + l] = lambda[(i - 1) * L + l, (j - 1) * L + k] = fact * point[u]
+                    push!(idxs, (i, j, k, l))
+                end # inner
+            end # outer
+            # weights = rand(num_repeats)
+            # weights ./= sum(weights)
+            # @show (weights)
+            # @show msu, weights
+            # if msu == x[1] ^ 2 * x[2] ^ 2
+            #     weights = [0.5, 0, 0.5]
+            # elseif msu == x[1] ^ 3 * x[2]
+            #     weights = [0, 1]
+            # elseif msu == x[2] ^ 3 * x[1]
+            #     weights = [0, 1]
+            # else
+                weights = fill(1 / num_repeats, num_repeats)
+            # end
+            for (w, (i, j, k, l)) in enumerate(idxs)
+                lambda[(i - 1) * L + k, (j - 1) * L + l] *= weights[w]
+                if k != l
+                    lambda[(i - 1) * L + l, (j - 1) * L + k] *= weights[w]
+                end
             end
-            u += U
-        end
+        end # monos sqr
         return lambda
     end
+
+    # function get_lambda(point)
+    #     hess_fullspace = integrating * point
+    #     lambda = zeros(eltype(point), n * L, n * L)
+    #     U = length(monos_hess)
+    #     u = 1
+    #     for i in 1:n, j in 1:i
+    #         point_coeffs = view(hess_fullspace, u:(u + U - 1))
+    #         for k in 1:L, l in 1:k
+    #             lambda[(i - 1) * L + k, (j - 1) * L + l] = lambda[(i - 1) * L + l, (j - 1) * L + k] = dot(poly_pairs[k, l], point_coeffs)
+    #         end
+    #         u += U
+    #     end
+    #     return lambda
+    # end
     cone.get_lambda = get_lambda
 
     function barfun(point)
@@ -111,12 +162,59 @@ end
 get_nu(cone::WSOSConvexPolyMonomial) = binomial(cone.n + div(cone.deg - 2, 2), cone.n) * cone.n
 
 function set_initial_point(arr::AbstractVector, cone::WSOSConvexPolyMonomial)
+    @assert cone.deg == 4
     arr .= 0
-    arr[1] = 1
-    arr[3] = 1
-    arr[5] = 2 # *
-    arr[10] = 1
-    arr[12] = 1
+    if cone.n == 2
+        arr[1] = 1
+        arr[3] = 1
+        arr[5] = 1.01 # *
+        arr[10] = 1
+        arr[12] = 1
+    elseif cone.n == 3
+        # arr[1] = 1.2
+        # arr[4] = 10
+        # arr[6] = 10
+        # arr[11] = 1.2
+        # arr[13] = 10
+        # arr[15] = 1.2
+        # arr[26] = 0.2
+        # arr[29] = 0.2
+        # arr[31] = 0.2
+        # @show arr
+        arr .= [
+        13.96770224404994
+         0
+         0.0
+         4.933853779793987
+         0.0
+         4.933853779463825
+         0.0
+         0.0
+         0.0
+         0
+        13.967702240748276
+         0.0
+         4.933853779133654
+         0.0
+        13.967702244049939
+         0.0
+         0.0
+         0.0
+         0.0
+         0.0
+         0.0
+         0.0
+         0.0
+         0.0
+         0
+         2
+         0.0
+         0.0
+         2.0
+         0.0
+         2
+          ]
+    end
     return arr
 end
 
