@@ -78,7 +78,7 @@ function build_solve_check(
     atol::Real = sqrt(sqrt(eps(T))),
     rtol::Real = atol,
     ) where {T <: Real}
-    model = linear_model{T}(c, A, b, G, h, cones, obj_offset = obj_offset, linear_model_options...)
+    model = linear_model{T}(c, A, b, G, h, cones; obj_offset = obj_offset, linear_model_options...)
     load(solver, model)
     solve(solver)
 

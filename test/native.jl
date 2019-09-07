@@ -10,7 +10,7 @@ import Hypatia
 import Hypatia.Solvers.build_solve_check
 const CO = Hypatia.Cones
 
-function dimension1(T, test_options)
+function dimension1(T; test_options...)
     tol = sqrt(sqrt(eps(T)))
     c = T[-1, 0]
     A = zeros(T, 0, 2)
@@ -34,7 +34,7 @@ function dimension1(T, test_options)
     end
 end
 
-function consistent1(T, test_options)
+function consistent1(T; test_options...)
     Random.seed!(1)
     (n, p, q) = (30, 15, 30)
     c = rand(T(0):T(9), n)
@@ -56,7 +56,7 @@ function consistent1(T, test_options)
     @test r.status == :Optimal
 end
 
-function inconsistent1(T, test_options)
+function inconsistent1(T; test_options...)
     Random.seed!(1)
     (n, p, q) = (30, 15, 30)
     c = rand(T(0):T(9), n)
@@ -72,7 +72,7 @@ function inconsistent1(T, test_options)
     @test_throws ErrorException test_options.linear_model{T}(c, A, b, G, h, CO.Cone{T}[CO.Nonnegative{T}(q)])
 end
 
-function inconsistent2(T, test_options)
+function inconsistent2(T; test_options...)
     Random.seed!(1)
     (n, p, q) = (30, 15, 30)
     c = rand(T(0):T(9), n)
@@ -89,7 +89,7 @@ function inconsistent2(T, test_options)
     @test_throws ErrorException test_options.linear_model{T}(c, A, b, G, h, CO.Cone{T}[CO.Nonnegative{T}(q)])
 end
 
-function orthant1(T, test_options)
+function orthant1(T; test_options...)
     tol = sqrt(sqrt(eps(T)))
     Random.seed!(1)
     (n, p, q) = (6, 3, 6)
@@ -113,7 +113,7 @@ function orthant1(T, test_options)
     @test rnp.primal_obj ≈ rnn.primal_obj atol=tol rtol=tol
 end
 
-function orthant2(T, test_options)
+function orthant2(T; test_options...)
     tol = 2 * sqrt(sqrt(eps(T)))
     Random.seed!(1)
     (n, p, q) = (5, 2, 10)
@@ -136,7 +136,7 @@ function orthant2(T, test_options)
     @test r1.primal_obj ≈ r2.primal_obj atol=tol rtol=tol
 end
 
-function orthant3(T, test_options)
+function orthant3(T; test_options...)
     tol = 2 * sqrt(sqrt(eps(T)))
     Random.seed!(1)
     (n, p, q) = (15, 6, 15)
@@ -159,7 +159,7 @@ function orthant3(T, test_options)
     @test r1.primal_obj ≈ r2.primal_obj atol=tol rtol=tol
 end
 
-function orthant4(T, test_options)
+function orthant4(T; test_options...)
     tol = 4 * sqrt(sqrt(eps(T)))
     Random.seed!(1)
     (n, p, q) = (5, 2, 10)
@@ -182,7 +182,7 @@ function orthant4(T, test_options)
     @test r1.primal_obj ≈ r2.primal_obj atol=tol rtol=tol
 end
 
-function epinorminf1(T, test_options)
+function epinorminf1(T; test_options...)
     tol = sqrt(sqrt(eps(T)))
     Tirt2 = inv(sqrt(T(2)))
     c = T[0, -1, -1]
@@ -199,7 +199,7 @@ function epinorminf1(T, test_options)
     @test r.y ≈ [1, 1] atol=tol rtol=tol
 end
 
-function epinorminf2(T, test_options)
+function epinorminf2(T; test_options...)
     tol = 10 * sqrt(sqrt(eps(T)))
     l = 3
     L = 2l + 1
@@ -219,7 +219,7 @@ function epinorminf2(T, test_options)
     @test sum(abs, r.x) ≈ 1 atol=tol rtol=tol
 end
 
-function epinorminf3(T, test_options)
+function epinorminf3(T; test_options...)
     tol = sqrt(sqrt(eps(T)))
     c = T[1, 0, 0, 0, 0, 0]
     A = zeros(T, 0, 6)
@@ -234,7 +234,7 @@ function epinorminf3(T, test_options)
     @test norm(r.x) ≈ 0 atol=tol rtol=tol
 end
 
-function epinorminf4(T, test_options)
+function epinorminf4(T; test_options...)
     tol = sqrt(sqrt(eps(T)))
     c = T[0, 1, -1]
     A = T[1 0 0; 0 1 0]
@@ -250,7 +250,7 @@ function epinorminf4(T, test_options)
     @test r.y ≈ [1, 0] atol=tol rtol=tol
 end
 
-function epinorminf5(T, test_options)
+function epinorminf5(T; test_options...)
     tol = sqrt(sqrt(eps(T)))
     Random.seed!(1)
     c = T[1, 0, 0, 0, 0, 0]
@@ -265,7 +265,7 @@ function epinorminf5(T, test_options)
     @test r.primal_obj ≈ 1 atol=tol rtol=tol
 end
 
-function epinormeucl1(T, test_options)
+function epinormeucl1(T; test_options...)
     tol = sqrt(sqrt(eps(T)))
     Trt2 = sqrt(T(2))
     Tirt2 = inv(Trt2)
@@ -286,7 +286,7 @@ function epinormeucl1(T, test_options)
     end
 end
 
-function epinormeucl2(T, test_options)
+function epinormeucl2(T; test_options...)
     tol = sqrt(sqrt(eps(T)))
     c = T[0, -1, -1]
     A = T[1 0 0]
@@ -304,7 +304,7 @@ function epinormeucl2(T, test_options)
     end
 end
 
-function epipersquare1(T, test_options)
+function epipersquare1(T; test_options...)
     tol = sqrt(sqrt(eps(T)))
     c = T[0, 0, -1, -1]
     A = T[1 0 0 0; 0 1 0 0]
@@ -322,7 +322,7 @@ function epipersquare1(T, test_options)
     end
 end
 
-function epipersquare2(T, test_options)
+function epipersquare2(T; test_options...)
     tol = sqrt(sqrt(eps(T)))
     Tirt2 = inv(sqrt(T(2)))
     c = T[0, 0, -1]
@@ -341,7 +341,7 @@ function epipersquare2(T, test_options)
     end
 end
 
-function epipersquare3(T, test_options)
+function epipersquare3(T; test_options...)
     tol = sqrt(sqrt(eps(T)))
     c = T[0, 1, -1, -1]
     A = T[1 0 0 0]
@@ -359,7 +359,7 @@ function epipersquare3(T, test_options)
     end
 end
 
-function possemideftri1(T, test_options)
+function possemideftri1(T; test_options...)
     tol = sqrt(sqrt(eps(T)))
     Trt2 = sqrt(T(2))
     Trt2i = inv(Trt2)
@@ -384,7 +384,7 @@ function possemideftri1(T, test_options)
     end
 end
 
-function possemideftri2(T, test_options)
+function possemideftri2(T; test_options...)
     tol = sqrt(sqrt(eps(T)))
     c = T[0, -1, 0]
     A = T[1 0 1]
@@ -402,7 +402,7 @@ function possemideftri2(T, test_options)
     end
 end
 
-function possemideftricomplex1(T, test_options)
+function possemideftricomplex1(T; test_options...)
     tol = sqrt(sqrt(eps(T)))
     Trt2 = sqrt(T(2))
     c = T[1, 0, 0, 1]
@@ -418,7 +418,7 @@ function possemideftricomplex1(T, test_options)
     @test r.x ≈ [1, 0, 1, 1] atol=tol rtol=tol
 end
 
-function hypoperlog1(T, test_options)
+function hypoperlog1(T; test_options...)
     tol = sqrt(sqrt(eps(T)))
     Texph = exp(T(0.5))
     c = T[1, 1, 1]
@@ -436,7 +436,7 @@ function hypoperlog1(T, test_options)
     @test r.z ≈ c + A' * r.y atol=tol rtol=tol
 end
 
-function hypoperlog2(T, test_options)
+function hypoperlog2(T; test_options...)
     tol = sqrt(sqrt(eps(T)))
     c = T[-1, 0, 0]
     A = T[0 1 0]
@@ -450,7 +450,7 @@ function hypoperlog2(T, test_options)
     @test r.primal_obj ≈ 0 atol=tol rtol=tol
 end
 
-function hypoperlog3(T, test_options)
+function hypoperlog3(T; test_options...)
     tol = sqrt(sqrt(eps(T)))
     c = T[1, 1, 1]
     A = zeros(T, 0, 3)
@@ -466,7 +466,7 @@ function hypoperlog3(T, test_options)
     @test isempty(r.y)
 end
 
-function hypoperlog4(T, test_options)
+function hypoperlog4(T; test_options...)
     tol = sqrt(sqrt(eps(T)))
     Texp2 = exp(T(-2))
     c = T[0, 0, 1]
@@ -482,7 +482,7 @@ function hypoperlog4(T, test_options)
     @test r.x ≈ [-1, 1, Texp2] atol=tol rtol=tol
 end
 
-function hypoperlog5(T, test_options)
+function hypoperlog5(T; test_options...)
     tol = sqrt(sqrt(eps(T)))
     Tlogq = log(T(0.25))
     c = T[-1, 0, 0]
@@ -499,7 +499,7 @@ function hypoperlog5(T, test_options)
     @test r.y ≈ [2] atol=tol rtol=tol
 end
 
-function hypoperlog6(T, test_options)
+function hypoperlog6(T; test_options...)
     tol = sqrt(sqrt(eps(T)))
     c = T[-1, 0, 0]
     A = zeros(T, 0, 3)
@@ -515,7 +515,7 @@ function hypoperlog6(T, test_options)
     @test isempty(r.y)
 end
 
-function hypogeomean1(T, test_options)
+function hypogeomean1(T; test_options...)
     tol = sqrt(sqrt(eps(T)))
     c = T[-1, 0, 0]
     A = T[0 0 1; 0 1 0]
@@ -533,7 +533,7 @@ function hypogeomean1(T, test_options)
     end
 end
 
-function hypogeomean2(T, test_options)
+function hypogeomean2(T; test_options...)
     tol = sqrt(sqrt(eps(T)))
     l = 4
     c = vcat(zero(T), ones(T, l))
@@ -552,7 +552,7 @@ function hypogeomean2(T, test_options)
     end
 end
 
-function hypogeomean3(T, test_options)
+function hypogeomean3(T; test_options...)
     tol = sqrt(sqrt(eps(T)))
     l = 4
     c = ones(T, l)
@@ -571,7 +571,7 @@ function hypogeomean3(T, test_options)
     end
 end
 
-function power1(T, test_options)
+function power1(T; test_options...)
     tol = sqrt(sqrt(eps(T)))
     c = T[0, 0, 1]
     A = T[1 0 0; 0 1 0]
@@ -590,7 +590,7 @@ function power1(T, test_options)
     end
 end
 
-function power2(T, test_options)
+function power2(T; test_options...)
     tol = sqrt(sqrt(eps(T)))
     c = T[0, 0, -1, -1]
     A = T[0 1 0 0; 1 0 0 0]
@@ -610,7 +610,7 @@ function power2(T, test_options)
     end
 end
 
-function power3(T, test_options)
+function power3(T; test_options...)
     tol = sqrt(sqrt(eps(T)))
     l = 4
     c = vcat(ones(T, l), zeros(T, 2))
@@ -629,7 +629,7 @@ function power3(T, test_options)
     end
 end
 
-function power4(T, test_options)
+function power4(T; test_options...)
     tol = sqrt(sqrt(eps(T)))
     l = 4
     c = ones(T, l)
@@ -648,7 +648,7 @@ function power4(T, test_options)
     end
 end
 
-function epinormspectral1(T, test_options)
+function epinormspectral1(T; test_options...)
     tol = sqrt(sqrt(eps(T)))
     Random.seed!(1)
     (Xn, Xm) = (3, 4)
@@ -674,7 +674,7 @@ function epinormspectral1(T, test_options)
     end
 end
 
-function hypoperlogdettri1(T, test_options)
+function hypoperlogdettri1(T; test_options...)
     tol = sqrt(sqrt(eps(T)))
     Random.seed!(1)
     side = 4
@@ -701,7 +701,7 @@ function hypoperlogdettri1(T, test_options)
     @test r.z[1] * (logdet(Symmetric(sol_mat, :U) / r.z[1]) + T(side)) ≈ r.z[2] atol=tol rtol=tol
 end
 
-function hypoperlogdettri2(T, test_options)
+function hypoperlogdettri2(T; test_options...)
     tol = sqrt(sqrt(eps(T)))
     Random.seed!(1)
     side = 3
@@ -728,7 +728,7 @@ function hypoperlogdettri2(T, test_options)
     @test r.z[2] * logdet(Symmetric(sol_mat, :U) / r.z[2]) ≈ r.z[1] atol=tol rtol=tol
 end
 
-function hypoperlogdettri3(T, test_options)
+function hypoperlogdettri3(T; test_options...)
     tol = sqrt(sqrt(eps(T)))
     Random.seed!(1)
     side = 3
@@ -749,7 +749,7 @@ function hypoperlogdettri3(T, test_options)
     @test norm(r.x) ≈ 0 atol=tol rtol=tol
 end
 
-function epiperexp1(T, test_options)
+function epiperexp1(T; test_options...)
     tol = sqrt(sqrt(eps(T)))
     l = 5
     c = vcat(zero(T), -ones(T, l))
@@ -766,7 +766,7 @@ function epiperexp1(T, test_options)
     @test r.s[1] ≈ 1 atol=tol rtol=tol
 end
 
-function epiperexp2(T, test_options)
+function epiperexp2(T; test_options...)
     tol = sqrt(sqrt(eps(T)))
     l = 5
     c = vcat(zero(T), -ones(T, l))
@@ -783,7 +783,7 @@ function epiperexp2(T, test_options)
     @test r.s[2] * sum(exp, r.s[3:end] / r.s[2]) ≈ r.s[1] atol=tol rtol=tol
 end
 
-function primalinfeas1(T, test_options)
+function primalinfeas1(T; test_options...)
     tol = sqrt(sqrt(eps(T)))
     c = T[1, 0]
     A = T[1 1]
@@ -796,7 +796,7 @@ function primalinfeas1(T, test_options)
     @test r.status == :PrimalInfeasible
 end
 
-function primalinfeas2(T, test_options)
+function primalinfeas2(T; test_options...)
     tol = sqrt(sqrt(eps(T)))
     c = T[1, 1, 1]
     A = zeros(T, 0, 3)
@@ -809,7 +809,7 @@ function primalinfeas2(T, test_options)
     @test r.status == :PrimalInfeasible
 end
 
-function primalinfeas3(T, test_options)
+function primalinfeas3(T; test_options...)
     tol = sqrt(sqrt(eps(T)))
     c = zeros(T, 3)
     A = SparseMatrixCSC(-one(T) * I, 3, 3)
@@ -822,7 +822,7 @@ function primalinfeas3(T, test_options)
     @test r.status == :PrimalInfeasible
 end
 
-function dualinfeas1(T, test_options)
+function dualinfeas1(T; test_options...)
     tol = sqrt(sqrt(eps(T)))
     c = T[-1, -1, 0]
     A = zeros(T, 0, 3)
@@ -835,7 +835,7 @@ function dualinfeas1(T, test_options)
     @test r.status == :DualInfeasible
 end
 
-function dualinfeas2(T, test_options)
+function dualinfeas2(T; test_options...)
     tol = sqrt(sqrt(eps(T)))
     c = T[-1, 0]
     A = zeros(T, 0, 2)
@@ -848,7 +848,7 @@ function dualinfeas2(T, test_options)
     @test r.status == :DualInfeasible
 end
 
-function dualinfeas3(T, test_options)
+function dualinfeas3(T; test_options...)
     tol = sqrt(sqrt(eps(T)))
     c = T[0, 1, 1, 0]
     A = zeros(T, 0, 4)
