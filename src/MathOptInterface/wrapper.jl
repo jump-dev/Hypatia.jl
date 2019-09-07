@@ -467,15 +467,7 @@ function MOI.optimize!(opt::Optimizer{T}) where {T <: Real}
         return
     end
 
-
-
-    # model = opt.linear_model(copy(opt.c), (opt.use_dense ? Matrix(opt.A) : copy(opt.A)),
-    #     copy(opt.b), (opt.use_dense ? Matrix(opt.G) : copy(opt.G)), copy(opt.h),
-    #     opt.cones, obj_offset = opt.obj_offset)
-    # Solvers.load(opt.solver, model)
-    # Solvers.solve(solver)
-    # r = Solvers.get_certificates(solver, model, test = opt.test_certificates)
-
+    # build and solve the model
     opt.result = r = Solvers.build_solve_check(
         copy(opt.c),
         (opt.use_dense ? Matrix(opt.A) : copy(opt.A)),
@@ -486,11 +478,8 @@ function MOI.optimize!(opt::Optimizer{T}) where {T <: Real}
         test = opt.test_certificates, solver = opt.solver)
 
     opt.status = r.status
-    # opt.result.primal_obj = r.primal_obj
-    # opt.result.dual_obj = r.dual_obj
-    # opt.solve_time = Solvers.get_solve_time(solver)
 
-    # transform solution for MOI
+    # transform solution for MOI conventions
     opt.x = r.x
     opt.constr_prim_eq += opt.b - opt.A * opt.x
     opt.y = r.y
