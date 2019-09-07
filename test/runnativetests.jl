@@ -29,15 +29,6 @@ testfuns_preproc = [
     inconsistent2,
     ]
 
-@testset "preprocessing tests: $t, $s, $T" for t in testfuns_preproc, s in system_solvers, T in real_types
-    test_options = (
-        linear_model = MO.PreprocessedLinearModel,
-        system_solver = s,
-        solver_options = (verbose = true,),
-        )
-    t(T, test_options)
-end
-
 linear_models = [
     MO.PreprocessedLinearModel,
     MO.RawLinearModel,
@@ -69,8 +60,6 @@ testfuns_raw = [
     hypoperlog4,
     hypoperlog5,
     hypoperlog6,
-    epiperpower1,
-    epiperpower2,
     epiperexp1,
     epiperexp2,
     power1,
@@ -95,34 +84,18 @@ testfuns_raw = [
     dualinfeas3,
     ]
 
+@testset "preprocessing tests: $t, $s, $T" for t in testfuns_preproc, s in system_solvers, T in real_types
+    t(T, solver = SO.HSDSolver{T}(verbose = true, system_solver = s{T}()))
+end
+
 @testset "native tests: $t, $s, $m, $n, $T" for t in testfuns_raw, s in system_solvers, m in linear_models, n in use_infty_nbhd, T in real_types
-    if T == BigFloat && t == epinormspectral1
-        continue # Cannot get svdvals with BigFloat
-    end
-    if s == SO.QRCholHSDSystemSolver && m == MO.RawLinearModel
-        continue # QRChol linear system solver needs preprocessed model
-    end
-    test_options = (
-        linear_model = m,
-        system_solver = s,
-        linear_model_options = NamedTuple(),
-        system_solver_options = NamedTuple(),
-        stepper_options = (use_infty_nbhd = n,),
-        solver_options = (verbose = true,),
-        )
-    t(T, test_options)
+    T == BigFloat && t == epinormspectral1 && continue # Cannot get svdvals with BigFloat
+    s == SO.QRCholHSDSystemSolver && m == MO.RawLinearModel && continue # QRChol linear system solver needs preprocessed model
+    t(T, linear_model = m, solver = SO.HSDSolver{T}(verbose = false, use_infty_nbhd = n, system_solver = s{T}()))
 end
 
 @testset "native tests (iterative linear system solves): $t, $T" for t in testfuns_raw, T in real_types
-    if T == BigFloat
-        continue # IterativeSolvers does not work with BigFloat
-    end
-    test_options = (
-        linear_model = MO.RawLinearModel,
-        system_solver = SO.NaiveHSDSystemSolver,
-        linear_model_options = (use_iterative = true,),
-        system_solver_options = (use_iterative = true,),
-        solver_options = (verbose = false,),
-        )
-    t(T, test_options)
+    T == BigFloat && continue # IterativeSolvers does not work with BigFloat
+    t(T, linear_model = MO.RawLinearModel, linear_model_options = (use_iterative = true,),
+        solver = SO.HSDSolver{T}(verbose = true, system_solver = SO.NaiveHSDSystemSolver{T}(use_iterative = true)))
 end
