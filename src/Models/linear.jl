@@ -32,7 +32,7 @@ TODO
 - could optionally rescale rows of [A, b] and [G, h] and [A', G', c] and variables, for better numerics
 =#
 
-function initialize_cone_point(cones::Vector{<:Cones.Cone{T}}, cone_idxs::Vector{UnitRange{Int}}) where {T <: Real}
+function initialize_cone_point(cones::Vector{Cones.Cone{T}}, cone_idxs::Vector{UnitRange{Int}}) where {T <: Real}
     q = isempty(cones) ? 0 : sum(Cones.dimension, cones)
     point = Point(T[], T[], Vector{T}(undef, q), Vector{T}(undef, q), cones, cone_idxs)
     for k in eachindex(cones)

@@ -25,10 +25,8 @@ import Hypatia.BlockMatrix
 abstract type Solver{T <: Real} end
 
 # homogeneous self-dual embedding algorithm
-abstract type HSDStepper{T <: Real} end
-abstract type CombinedHSDSystemSolver{T <: Real} end
+abstract type HSDSystemSolver{T <: Real} end
 include("homogeneous_self_dual/solver.jl")
-include("homogeneous_self_dual/stepper.jl")
 include("homogeneous_self_dual/naive.jl")
 include("homogeneous_self_dual/naiveelim.jl")
 include("homogeneous_self_dual/symindef.jl")
@@ -74,19 +72,14 @@ function build_solve_check(
     cones::Vector{Cones.Cone{T}};
     obj_offset::T = zero(T),
     linear_model::Type{<:Models.LinearModel} = Models.PreprocessedLinearModel,
-    system_solver::Type{<:CombinedHSDSystemSolver} = Solvers.QRCholCombinedHSDSystemSolver,
     linear_model_options::NamedTuple = NamedTuple(),
-    system_solver_options::NamedTuple = NamedTuple(),
-    stepper_options::NamedTuple = NamedTuple(),
-    solver_options::NamedTuple = NamedTuple(),
+    solver::HSDSolver{T} = HSDSolver{T}(),
     test::Bool = true,
     atol::Real = sqrt(sqrt(eps(T))),
     rtol::Real = atol,
     ) where {T <: Real}
-    model = linear_model{T}(c, A, b, G, h, cones; obj_offset = obj_offset, linear_model_options...)
-    stepper = CombinedHSDStepper{T}(model, system_solver = system_solver{T}(model; system_solver_options...); stepper_options...)
-    solver = HSDSolver{T}(model, stepper = stepper; solver_options...)
-
+    model = linear_model{T}(c, A, b, G, h, cones, obj_offset = obj_offset, linear_model_options...)
+    load(solver, model)
     solve(solver)
 
     status = get_status(solver)

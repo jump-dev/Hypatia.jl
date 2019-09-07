@@ -6,8 +6,10 @@ solves linear system in naive.jl via a procedure similar to that described by S1
 http://www.seas.ucla.edu/~vandenbe/publications/coneprog.pdf
 =#
 
-mutable struct QRCholCombinedHSDSystemSolver{T <: Real} <: CombinedHSDSystemSolver{T}
+mutable struct QRCholHSDSystemSolver{T <: Real} <: HSDSystemSolver{T}
     use_sparse::Bool
+
+    solver::HSDSolver{T}
 
     xi::Matrix{T}
     yi::Matrix{T}
@@ -59,90 +61,98 @@ mutable struct QRCholCombinedHSDSystemSolver{T <: Real} <: CombinedHSDSystemSolv
     solvesol
     solvecache
 
-    function QRCholCombinedHSDSystemSolver{T}(model::Models.PreprocessedLinearModel{T}; use_sparse::Bool = false) where {T <: Real}
-        (n, p, q) = (model.n, model.p, model.q)
+    function QRCholHSDSystemSolver{T}(; use_sparse::Bool = false) where {T <: Real}
         system_solver = new{T}()
         system_solver.use_sparse = use_sparse
-
-        xi = Matrix{T}(undef, n, 3)
-        yi = Matrix{T}(undef, p, 3)
-        zi = Matrix{T}(undef, q, 3)
-        system_solver.xi = xi
-        system_solver.yi = yi
-        system_solver.zi = zi
-
-        system_solver.xi1 = view(xi, 1:p, :)
-        system_solver.xi2 = view(xi, (p + 1):n, :)
-        system_solver.x1 = view(xi, :, 1)
-        system_solver.y1 = view(yi, :, 1)
-        system_solver.z1 = view(zi, :, 1)
-        system_solver.x2 = view(xi, :, 2)
-        system_solver.y2 = view(yi, :, 2)
-        system_solver.z2 = view(zi, :, 2)
-        system_solver.x3 = view(xi, :, 3)
-        system_solver.y3 = view(yi, :, 3)
-        system_solver.z3 = view(zi, :, 3)
-        system_solver.z_k = [view(zi, idxs, :) for idxs in model.cone_idxs]
-        system_solver.z1_k = [view(zi, idxs, 1) for idxs in model.cone_idxs]
-        system_solver.z2_k = [view(zi, idxs, 2) for idxs in model.cone_idxs]
-        system_solver.z3_k = [view(zi, idxs, 3) for idxs in model.cone_idxs]
-        zi_temp = similar(zi)
-        system_solver.zi_temp = zi_temp
-        system_solver.z1_temp = view(zi_temp, :, 1)
-        system_solver.z2_temp = view(zi_temp, :, 2)
-        system_solver.z3_temp = view(zi_temp, :, 3)
-        system_solver.z_temp_k = [view(zi_temp, idxs, :) for idxs in model.cone_idxs]
-        system_solver.z1_temp_k = [view(zi_temp, idxs, 1) for idxs in model.cone_idxs]
-        system_solver.z2_temp_k = [view(zi_temp, idxs, 2) for idxs in model.cone_idxs]
-        system_solver.z3_temp_k = [view(zi_temp, idxs, 3) for idxs in model.cone_idxs]
-
-        nmp = n - p
-
-        if !isa(model.G, Matrix{T}) && isa(model.Ap_Q, SuiteSparse.SPQR.QRSparseQ)
-            # TODO very inefficient method used for sparse G * QRSparseQ : see https://github.com/JuliaLang/julia/issues/31124#issuecomment-501540818
-            # TODO remove workaround and warning
-            @warn("in QRChol, converting G to dense before multiplying by sparse Householder Q due to very inefficient dispatch")
-            GQ = Matrix(model.G) * model.Ap_Q
-        else
-            GQ = model.G * model.Ap_Q
-        end
-        system_solver.GQ1 = GQ[:, 1:p]
-        system_solver.GQ2 = GQ[:, (p + 1):end]
-        if use_sparse
-            if !issparse(GQ)
-                error("to use sparse factorization for direction finding, cannot use dense A or G matrices (GQ is of type $(typeof(GQ)))")
-            end
-            system_solver.HGQ2 = spzeros(T, q, nmp)
-            system_solver.Q2GHGQ2 = spzeros(T, nmp, nmp)
-        else
-            system_solver.HGQ2 = Matrix{T}(undef, q, nmp)
-            system_solver.Q2GHGQ2 = Matrix{T}(undef, nmp, nmp)
-        end
-        system_solver.QpbxGHbz = Matrix{T}(undef, n, 3)
-        system_solver.Q1pbxGHbz = view(system_solver.QpbxGHbz, 1:p, :)
-        system_solver.Q2div = view(system_solver.QpbxGHbz, (p + 1):n, :)
-        system_solver.GQ1x = Matrix{T}(undef, q, 3)
-        system_solver.HGQ1x = similar(system_solver.GQ1x)
-        system_solver.Gxi = similar(system_solver.GQ1x)
-        system_solver.HGxi = similar(system_solver.Gxi)
-
-        system_solver.HGQ1x_k = [view(system_solver.HGQ1x, idxs, :) for idxs in model.cone_idxs]
-        system_solver.GQ1x_k = [view(system_solver.GQ1x, idxs, :) for idxs in model.cone_idxs]
-        system_solver.HGQ2_k = [view(system_solver.HGQ2, idxs, :) for idxs in model.cone_idxs]
-        system_solver.GQ2_k = [view(system_solver.GQ2, idxs, :) for idxs in model.cone_idxs]
-        system_solver.HGxi_k = [view(system_solver.HGxi, idxs, :) for idxs in model.cone_idxs]
-        system_solver.Gxi_k = [view(system_solver.Gxi, idxs, :) for idxs in model.cone_idxs]
-
-        if !use_sparse
-            system_solver.solvesol = Matrix{T}(undef, nmp, 3)
-            system_solver.solvecache = HypBKSolveCache('U', system_solver.solvesol, system_solver.Q2GHGQ2, system_solver.Q2div, tol_diag = sqrt(eps(T)))
-        end
-
         return system_solver
     end
 end
 
-function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholCombinedHSDSystemSolver{T}) where {T <: Real}
+function load(system_solver::QRCholHSDSystemSolver{T}, solver::HSDSolver{T}) where {T <: Real}
+    system_solver.solver = solver
+
+    model = solver.model
+    (n, p, q) = (model.n, model.p, model.q)
+
+    xi = Matrix{T}(undef, n, 3)
+    yi = Matrix{T}(undef, p, 3)
+    zi = Matrix{T}(undef, q, 3)
+    system_solver.xi = xi
+    system_solver.yi = yi
+    system_solver.zi = zi
+
+    system_solver.xi1 = view(xi, 1:p, :)
+    system_solver.xi2 = view(xi, (p + 1):n, :)
+    system_solver.x1 = view(xi, :, 1)
+    system_solver.y1 = view(yi, :, 1)
+    system_solver.z1 = view(zi, :, 1)
+    system_solver.x2 = view(xi, :, 2)
+    system_solver.y2 = view(yi, :, 2)
+    system_solver.z2 = view(zi, :, 2)
+    system_solver.x3 = view(xi, :, 3)
+    system_solver.y3 = view(yi, :, 3)
+    system_solver.z3 = view(zi, :, 3)
+    system_solver.z_k = [view(zi, idxs, :) for idxs in model.cone_idxs]
+    system_solver.z1_k = [view(zi, idxs, 1) for idxs in model.cone_idxs]
+    system_solver.z2_k = [view(zi, idxs, 2) for idxs in model.cone_idxs]
+    system_solver.z3_k = [view(zi, idxs, 3) for idxs in model.cone_idxs]
+    zi_temp = similar(zi)
+    system_solver.zi_temp = zi_temp
+    system_solver.z1_temp = view(zi_temp, :, 1)
+    system_solver.z2_temp = view(zi_temp, :, 2)
+    system_solver.z3_temp = view(zi_temp, :, 3)
+    system_solver.z_temp_k = [view(zi_temp, idxs, :) for idxs in model.cone_idxs]
+    system_solver.z1_temp_k = [view(zi_temp, idxs, 1) for idxs in model.cone_idxs]
+    system_solver.z2_temp_k = [view(zi_temp, idxs, 2) for idxs in model.cone_idxs]
+    system_solver.z3_temp_k = [view(zi_temp, idxs, 3) for idxs in model.cone_idxs]
+
+    nmp = n - p
+
+    if !isa(model.G, Matrix{T}) && isa(model.Ap_Q, SuiteSparse.SPQR.QRSparseQ)
+        # TODO very inefficient method used for sparse G * QRSparseQ : see https://github.com/JuliaLang/julia/issues/31124#issuecomment-501540818
+        # TODO remove workaround and warning
+        @warn("in QRChol, converting G to dense before multiplying by sparse Householder Q due to very inefficient dispatch")
+        GQ = Matrix(model.G) * model.Ap_Q
+    else
+        GQ = model.G * model.Ap_Q
+    end
+    system_solver.GQ1 = GQ[:, 1:p]
+    system_solver.GQ2 = GQ[:, (p + 1):end]
+    if system_solver.use_sparse
+        if !issparse(GQ)
+            error("to use sparse factorization for direction finding, cannot use dense A or G matrices (GQ is of type $(typeof(GQ)))")
+        end
+        system_solver.HGQ2 = spzeros(T, q, nmp)
+        system_solver.Q2GHGQ2 = spzeros(T, nmp, nmp)
+    else
+        system_solver.HGQ2 = Matrix{T}(undef, q, nmp)
+        system_solver.Q2GHGQ2 = Matrix{T}(undef, nmp, nmp)
+    end
+    system_solver.QpbxGHbz = Matrix{T}(undef, n, 3)
+    system_solver.Q1pbxGHbz = view(system_solver.QpbxGHbz, 1:p, :)
+    system_solver.Q2div = view(system_solver.QpbxGHbz, (p + 1):n, :)
+    system_solver.GQ1x = Matrix{T}(undef, q, 3)
+    system_solver.HGQ1x = similar(system_solver.GQ1x)
+    system_solver.Gxi = similar(system_solver.GQ1x)
+    system_solver.HGxi = similar(system_solver.Gxi)
+
+    system_solver.HGQ1x_k = [view(system_solver.HGQ1x, idxs, :) for idxs in model.cone_idxs]
+    system_solver.GQ1x_k = [view(system_solver.GQ1x, idxs, :) for idxs in model.cone_idxs]
+    system_solver.HGQ2_k = [view(system_solver.HGQ2, idxs, :) for idxs in model.cone_idxs]
+    system_solver.GQ2_k = [view(system_solver.GQ2, idxs, :) for idxs in model.cone_idxs]
+    system_solver.HGxi_k = [view(system_solver.HGxi, idxs, :) for idxs in model.cone_idxs]
+    system_solver.Gxi_k = [view(system_solver.Gxi, idxs, :) for idxs in model.cone_idxs]
+
+    if !system_solver.use_sparse
+        system_solver.solvesol = Matrix{T}(undef, nmp, 3)
+        system_solver.solvecache = HypBKSolveCache('U', system_solver.solvesol, system_solver.Q2GHGQ2, system_solver.Q2div, tol_diag = sqrt(eps(T)))
+    end
+
+    return system_solver
+end
+
+function get_combined_directions(system_solver::QRCholHSDSystemSolver{T}) where {T <: Real}
+    solver = system_solver.solver
     model = solver.model
     cones = model.cones
     cone_idxs = model.cone_idxs

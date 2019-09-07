@@ -16,10 +16,10 @@ real_types = [
     ]
 
 system_solvers = [
-    SO.QRCholCombinedHSDSystemSolver,
-    SO.SymIndefCombinedHSDSystemSolver,
-    SO.NaiveElimCombinedHSDSystemSolver,
-    SO.NaiveCombinedHSDSystemSolver,
+    SO.QRCholHSDSystemSolver,
+    SO.SymIndefHSDSystemSolver,
+    SO.NaiveElimHSDSystemSolver,
+    SO.NaiveHSDSystemSolver,
     ]
 
 testfuns_preproc = [
@@ -99,7 +99,7 @@ testfuns_raw = [
     if T == BigFloat && t == epinormspectral1
         continue # Cannot get svdvals with BigFloat
     end
-    if s == SO.QRCholCombinedHSDSystemSolver && m == MO.RawLinearModel
+    if s == SO.QRCholHSDSystemSolver && m == MO.RawLinearModel
         continue # QRChol linear system solver needs preprocessed model
     end
     test_options = (
@@ -119,7 +119,7 @@ end
     end
     test_options = (
         linear_model = MO.RawLinearModel,
-        system_solver = SO.NaiveCombinedHSDSystemSolver,
+        system_solver = SO.NaiveHSDSystemSolver,
         linear_model_options = (use_iterative = true,),
         system_solver_options = (use_iterative = true,),
         solver_options = (verbose = false,),

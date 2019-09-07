@@ -14,7 +14,7 @@ kap + mu/(taubar^2)*tau = taurhs
 TODO reduce allocations
 =#
 
-mutable struct NaiveCombinedHSDSystemSolver{T <: Real} <: CombinedHSDSystemSolver{T}
+mutable struct NaiveHSDSystemSolver{T <: Real} <: HSDSystemSolver{T}
     use_iterative::Bool
     use_sparse::Bool
 
@@ -37,7 +37,7 @@ mutable struct NaiveCombinedHSDSystemSolver{T <: Real} <: CombinedHSDSystemSolve
     s2
     kap_row::Int
 
-    function NaiveCombinedHSDSystemSolver{T}(
+    function NaiveHSDSystemSolver{T}(
         model::Models.LinearModel{T};
         use_iterative::Bool = false,
         use_sparse::Bool = false,
@@ -133,7 +133,7 @@ mutable struct NaiveCombinedHSDSystemSolver{T <: Real} <: CombinedHSDSystemSolve
     end
 end
 
-function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveCombinedHSDSystemSolver{T}) where {T <: Real}
+function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveHSDSystemSolver{T}) where {T <: Real}
     model = solver.model
     cones = model.cones
     lhs = system_solver.lhs
