@@ -24,7 +24,7 @@ const rt2 = sqrt(2)
 function muconvexityJuMP(
     polyfun::Function,
     dom::MU.Domain;
-    use_wsos::Bool = true,
+    cone::String = "convexpoly",
     )
     n = MU.get_dimension(dom)
     DP.@polyvar x[1:n]
@@ -37,11 +37,13 @@ function muconvexityJuMP(
     convpoly = poly - 0.5 * mu * sum(x.^2)
     H = DP.differentiate(convpoly, x, 2)
 
-    if use_wsos
+    if cone == "wsos"
         d = div(maximum(DP.maxdegree.(H)) + 1, 2)
         (U, pts, P0, PWts, _) = MU.interpolate(dom, d, sample = true, sample_factor = 100)
         mat_wsos_cone = HYP.WSOSPolyInterpMatCone(n, U, [P0, PWts...])
         JuMP.@constraint(model, [H[i, j](x => pts[u, :]) * (i == j ? 1.0 : rt2) for i in 1:n for j in 1:i for u in 1:U] in mat_wsos_cone)
+    elseif cone == "convexpoly"
+        JuMP.@constraint(model, PolyJuMP.coefficients(convpoly) in HYP.WSOSConvexPolyMonomial{Float64}(n, DP.maxdegree(convpoly)))
     else
         PolyJuMP.setpolymodule!(model, SumOfSquares)
         JuMP.@constraint(model, H in JuMP.PSDCone(), domain = MU.get_domain_inequalities(dom, x))
@@ -50,14 +52,17 @@ function muconvexityJuMP(
     return (model = model, mu = mu)
 end
 
-muconvexityJuMP1() = muconvexityJuMP(x -> (x[1] + 1)^2 * (x[1] - 1)^2, MU.FreeDomain(1), use_wsos = true)
-muconvexityJuMP2() = muconvexityJuMP(x -> sum(x.^4) - sum(x.^2), MU.FreeDomain(3), use_wsos = true)
-muconvexityJuMP3() = muconvexityJuMP(x -> (x[1] + 1)^2 * (x[1] - 1)^2, MU.Box([-1.0], [1.0]), use_wsos = true)
-muconvexityJuMP4() = muconvexityJuMP(x -> sum(x.^4) - sum(x.^2), MU.Ball(ones(2), 5.0), use_wsos = true)
-muconvexityJuMP5() = muconvexityJuMP(x -> (x[1] + 1)^2 * (x[1] - 1)^2, MU.FreeDomain(1), use_wsos = false)
-muconvexityJuMP6() = muconvexityJuMP(x -> sum(x.^4) - sum(x.^2), MU.FreeDomain(3), use_wsos = false)
-muconvexityJuMP7() = muconvexityJuMP(x -> (x[1] + 1)^2 * (x[1] - 1)^2, MU.Box([-1.0], [1.0]), use_wsos = false)
-muconvexityJuMP8() = muconvexityJuMP(x -> sum(x.^4) - sum(x.^2), MU.Ball(ones(2), 5.0), use_wsos = false)
+# muconvexityJuMP1() = muconvexityJuMP(x -> (x[1] + 1)^2 * (x[1] - 1)^2, MU.FreeDomain(1), use_wsos = true)
+# muconvexityJuMP2() = muconvexityJuMP(x -> sum(x.^4) - sum(x.^2), MU.FreeDomain(3), use_wsos = true)
+# muconvexityJuMP3() = muconvexityJuMP(x -> (x[1] + 1)^2 * (x[1] - 1)^2, MU.Box([-1.0], [1.0]), use_wsos = true)
+# muconvexityJuMP4() = muconvexityJuMP(x -> sum(x.^4) - sum(x.^2), MU.Ball(ones(2), 5.0), use_wsos = true)
+# muconvexityJuMP5() = muconvexityJuMP(x -> (x[1] + 1)^2 * (x[1] - 1)^2, MU.FreeDomain(1), use_wsos = false)
+# muconvexityJuMP6() = muconvexityJuMP(x -> sum(x.^4) - sum(x.^2), MU.FreeDomain(3), use_wsos = false)
+# muconvexityJuMP7() = muconvexityJuMP(x -> (x[1] + 1)^2 * (x[1] - 1)^2, MU.Box([-1.0], [1.0]), use_wsos = false)
+# muconvexityJuMP8() = muconvexityJuMP(x -> sum(x.^4) - sum(x.^2), MU.Ball(ones(2), 5.0), use_wsos = false)
+
+muconvexityJuMP9() = muconvexityJuMP(x -> sum(x.^4) - sum(x.^2), MU.FreeDomain(2), cone = "convexpoly") # 4
+
 
 function test_muconvexityJuMP(instance::Tuple{Function, Float64}; options, rseed::Int = 1)
     Random.seed!(rseed)
@@ -66,6 +71,8 @@ function test_muconvexityJuMP(instance::Tuple{Function, Float64}; options, rseed
     JuMP.optimize!(d.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
     @test JuMP.value(d.mu) ≈ true_mu atol = 1e-4 rtol = 1e-4
 end
+
+test_muconvexityJuMP((muconvexityJuMP9, -2.0); verbose = true)
 
 test_muconvexityJuMP_all(; options...) = test_muconvexityJuMP.([
     (muconvexityJuMP1, -4.0),

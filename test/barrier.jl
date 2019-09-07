@@ -259,7 +259,7 @@ end
 
 function test_wsosconvexpolymonomial_barrier(T::Type{<:Real})
     Random.seed!(1)
-    for n in [2], deg in [4]
+    for n in [2, 3], deg in [4]
         println()
         @show n, deg
         cone = CO.WSOSConvexPolyMonomial{T}(n, deg)

@@ -24,7 +24,7 @@ import SumOfSquares
 import PolyJuMP
 const PJ = PolyJuMP
 import MathOptInterface
-const MOI = MathOptInterface
+# const MOI = MathOptInterface
 import JuMP
 import Hypatia
 const HYP = Hypatia
@@ -38,7 +38,8 @@ function shapeconregrJuMP(
     deg::Int;
     n::Int = size(X, 2),
     use_lsq_obj::Bool = true,
-    use_wsos::Bool = true,
+    # use_wsos::Bool = true,
+    cone::String = "convex",
     sample::Bool = true,
     mono_dom::MU.Domain = MU.Box(-ones(n), ones(n)),
     conv_dom::MU.Domain = mono_dom,
@@ -48,12 +49,12 @@ function shapeconregrJuMP(
     @assert n == size(X, 2)
     num_points = size(X, 1)
 
-    if use_wsos
+    if cone == "wsos"
         (regressor_points, _) = MU.get_interp_pts(MU.FreeDomain(n), deg, sample_factor = 50)
         lagrange_polys = MU.recover_lagrange_polys(regressor_points, deg)
 
         model = JuMP.Model()
-        JuMP.@variable(model, regressor, variable_type = PJ.Poly(PJ.FixedPolynomialBasis(lagrange_polys)))
+        # JuMP.@variable(model, regressor, variable_type = PJ.Poly(PJ.FixedPolynomialBasis(lagrange_polys))) # TODO change back basis
 
         if use_lsq_obj
             JuMP.@variable(model, z)
@@ -69,17 +70,17 @@ function shapeconregrJuMP(
         end
 
         # monotonicity
-        if !all(iszero, mono_profile)
-            gradient_halfdeg = div(deg, 2)
-            (mono_U, mono_points, mono_P0, mono_PWts, _) = MU.interpolate(mono_dom, gradient_halfdeg, sample = sample, sample_factor = 50)
-            mono_wsos_cone = HYP.WSOSPolyInterpCone(mono_U, [mono_P0, mono_PWts...])
-            for j in 1:n
-                if !iszero(mono_profile[j])
-                    gradient = DP.differentiate(regressor, DP.variables(regressor)[j])
-                    JuMP.@constraint(model, [mono_profile[j] * gradient(mono_points[u, :]) for u in 1:mono_U] in mono_wsos_cone)
-                end
-            end
-        end
+        # if !all(iszero, mono_profile)
+        #     gradient_halfdeg = div(deg, 2)
+        #     (mono_U, mono_points, mono_P0, mono_PWts, _) = MU.interpolate(mono_dom, gradient_halfdeg, sample = sample, sample_factor = 50)
+        #     mono_wsos_cone = HYP.WSOSPolyInterpCone(mono_U, [mono_P0, mono_PWts...])
+        #     for j in 1:n
+        #         if !iszero(mono_profile[j])
+        #             gradient = DP.differentiate(regressor, DP.variables(regressor)[j])
+        #             JuMP.@constraint(model, [mono_profile[j] * gradient(mono_points[u, :]) for u in 1:mono_U] in mono_wsos_cone)
+        #         end
+        #     end
+        # end
 
         # convexity
         if !iszero(conv_profile)
@@ -93,7 +94,7 @@ function shapeconregrJuMP(
         DP.@polyvar x[1:n]
 
         model = SumOfSquares.SOSModel()
-        JuMP.@variable(model, p, PJ.Poly(DP.monomials(x, 0:deg)))
+        JuMP.@variable(model, p, PJ.Poly(DP.monomials(x, 2:deg)))
 
         if use_lsq_obj
             JuMP.@variable(model, z)
@@ -118,11 +119,16 @@ function shapeconregrJuMP(
         end
 
         # convexity
-        if !iszero(conv_profile)
-            convex_set = MU.get_domain_inequalities(conv_dom, x)
-            hessian = DP.differentiate(p, x, 2)
-            JuMP.@constraint(model, conv_profile * hessian in JuMP.PSDCone(), domain = convex_set, maxdegree = 2 * div(deg - 1, 2))
+        if cone == "convex"
+            JuMP.@constraint(model, DP.coefficients(p) in Hypatia.WSOSConvexPolyMonomialCone(n, deg))
+        elseif cone == "psd"
+            if !iszero(conv_profile)
+                convex_set = MU.get_domain_inequalities(conv_dom, x)
+                hessian = DP.differentiate(p, x, 2)
+                JuMP.@constraint(model, conv_profile * hessian in JuMP.PSDCone(), domain = convex_set, maxdegree = 2 * div(deg - 1, 2))
+            end
         end
+
     end
 
     return (model = model,)
@@ -205,6 +211,10 @@ function test_shapeconregrJuMP(instance::Tuple{Function, Number}; options, rseed
     end
     return
 end
+
+Random.seed!(1)
+d = shapeconregrJuMP(2, 4, 100, x -> sum(x.^4), use_lsq_obj = false, cone = "convex")
+JuMP.optimize!(d.model, JuMP.with_optimizer(Hypatia.Optimizer{Float64}; verbose = true))
 
 test_shapeconregrJuMP_all(; options...) = test_shapeconregrJuMP.([
     (shapeconregrJuMP1, NaN),

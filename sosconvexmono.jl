@@ -164,16 +164,16 @@ end
 my_nullspace = zeros(18, 6)
 my_nullspace[5, 1] = 1
 my_nullspace[10, 1] = -1
-my_nullspace[2, 2] = 6
-my_nullspace[7, 2] = -3
-my_nullspace[16, 3] = 2
-my_nullspace[11, 3] = -2
-my_nullspace[14, 4] = 6
-my_nullspace[9, 4] = -3
-my_nullspace[3, 5] = 2
-my_nullspace[8, 5] = -1
-my_nullspace[8, 6] = 1
-my_nullspace[13, 6] = -2
+my_nullspace[2, 2] = (1 / 6)
+my_nullspace[7, 2] = (-1 / 3)
+my_nullspace[16, 3] = (1 / 2)
+my_nullspace[11, 3] = (-1 / 2)
+my_nullspace[14, 4] = (1 / 6)
+my_nullspace[9, 4] = (-1 / 3)
+my_nullspace[3, 5] = (1 / 2)
+my_nullspace[8, 5] = (-1 / 4)
+my_nullspace[8, 6] = (1 / 4)
+my_nullspace[13, 6] = (-1 / 2)
 
 integrator2 = copy(integrate(lifting))
 for j in 1:size(integrator2, 2)
@@ -195,12 +195,20 @@ function find_initial_point()
     model = Model(with_optimizer(Hypatia.Optimizer{Float64}, verbose = true, use_dense = false))
     # model = Model(with_optimizer(Mosek.Optimizer, QUIET = false))
     @variable(model, coeffs[1:length(monos_sqr)])
-    @variable(model, t)
-    hankel_old = lambda_direct(coeffs * 1)
-    hankel = monomial_lambda(lifting * inv(lifting' * lifting) * coeffs)
+    # @variable(model, t)
+    @variable(model, hess[1:(length(monos_hess) * div(n * (n + 1), 2))])
+    # hankel_old = lambda_direct(coeffs * 1)
+    # hankel = monomial_lambda(lifting * inv(lifting' * lifting) * coeffs)
+    N = nullspace(lifting')
+    @constraints(model, begin
+        lifting' * hess .== coeffs
+        N' * hess .== zeros(size(N, 2))
+        # my_nullspace' * hess .== zeros(6)
+    end)
+    hankel = monomial_lambda(hess * 1)
     s = size(hankel, 1)
 
-    @constraint(model, [hankel[i, j] - (i == j ? 0 : 0) for i in 1:s for j in 1:i] in MOI.PositiveSemidefiniteConeTriangle(s))
+    @constraint(model, [hankel[i, j] - (i == j ? 0.1 : 0) for i in 1:s for j in 1:i] in MOI.PositiveSemidefiniteConeTriangle(s))
     # @constraint(model, [t, 1,  [hankel[i, j] for i in 1:s for j in 1:i]...] in MOI.LogDetConeTriangle(s))
 
     # @SDconstraint(model, hankel ⪰ eps * I)
@@ -222,6 +230,7 @@ dp = 0
 for i in 1:n, j in 1:n, k in 1:length(monos_low), l in 1:length(monos_low)
     global dp += coefficient(hess[i, j], monos_low[k] * monos_low[l]) * hankel_sym[(i - 1) * 3 + k, (j - 1) * 3 + l] # * monos_low[k] * monos_low[l]
 end
+
 
 # 1.2000000000000002
 # -6.523353691671332e-17
