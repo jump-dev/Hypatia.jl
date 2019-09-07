@@ -18,6 +18,8 @@ mutable struct NaiveHSDSystemSolver{T <: Real} <: HSDSystemSolver{T}
     use_iterative::Bool
     use_sparse::Bool
 
+    solver::HSDSolver{T}
+
     lhs_copy
     lhs
     lhs_H_k
@@ -37,103 +39,107 @@ mutable struct NaiveHSDSystemSolver{T <: Real} <: HSDSystemSolver{T}
     s2
     kap_row::Int
 
-    function NaiveHSDSystemSolver{T}(
-        model::Models.LinearModel{T};
-        use_iterative::Bool = false,
-        use_sparse::Bool = false,
-        ) where {T <: Real}
-        (n, p, q) = (model.n, model.p, model.q)
-        dim = n + p + 2q + 2
+    function NaiveHSDSystemSolver{T}(; use_iterative::Bool = false, use_sparse::Bool = false) where {T <: Real}
         system_solver = new{T}()
         system_solver.use_iterative = use_iterative
         system_solver.use_sparse = use_sparse
-
-        system_solver.rhs = zeros(T, dim, 2)
-        rows = 1:n
-        system_solver.x1 = view(system_solver.rhs, rows, 1)
-        system_solver.x2 = view(system_solver.rhs, rows, 2)
-        rows = (n + 1):(n + p)
-        system_solver.y1 = view(system_solver.rhs, rows, 1)
-        system_solver.y2 = view(system_solver.rhs, rows, 2)
-        rows = (n + p + 1):(n + p + q)
-        system_solver.z1 = view(system_solver.rhs, rows, 1)
-        system_solver.z2 = view(system_solver.rhs, rows, 2)
-        z_start = n + p
-        system_solver.z1_k = [view(system_solver.rhs, z_start .+ model.cone_idxs[k], 1) for k in eachindex(model.cones)]
-        system_solver.z2_k = [view(system_solver.rhs, z_start .+ model.cone_idxs[k], 2) for k in eachindex(model.cones)]
-        rows = (n + p + q + 2):(n + p + 2q + 1)
-        system_solver.s1 = view(system_solver.rhs, rows, 1)
-        system_solver.s2 = view(system_solver.rhs, rows, 2)
-        system_solver.kap_row = n + p + q + 1
-
-        # x y z kap s tau
-        if use_iterative
-            system_solver.prevsol1 = zeros(T, dim)
-            system_solver.prevsol2 = zeros(T, dim)
-
-            # block matrix for efficient multiplication
-            rc1 = 1:n
-            rc2 = n .+ (1:p)
-            rc3 = (n + p) .+ (1:q)
-            rc4 = (n + p + q) .+ (1:1)
-            rc5 = (n + p + q + 1) .+ (1:q)
-            rc6 = dim:dim
-
-            cone_rows = UnitRange{Int}[]
-            cone_cols = UnitRange{Int}[]
-            for k in eachindex(model.cones)
-                rows = (n + p) .+ model.cone_idxs[k]
-                push!(cone_rows, rows)
-                push!(cone_rows, rows)
-                push!(cone_cols, rows)
-                push!(cone_cols, (q + 1) .+ rows)
-            end
-
-            system_solver.lhs = BlockMatrix{T}(
-                dim,
-                dim,
-                [fill(I, length(cone_rows))...,
-                model.A', model.G', reshape(model.c, :, 1), -model.A, reshape(model.b, :, 1), ones(T, 1, 1), -model.G, -I, reshape(model.h, :, 1), -model.c', -model.b', -model.h', -ones(T, 1, 1), ones(T, 1, 1)],
-                [cone_rows..., rc1, rc1, rc1, rc2, rc2, rc4, rc5, rc5, rc5, rc6, rc6, rc6, rc6, rc4],
-                [cone_cols..., rc2, rc3, rc6, rc1, rc6, rc4, rc1, rc5, rc6, rc1, rc2, rc3, rc4, rc6],
-                )
-
-        else
-            if use_sparse
-                system_solver.lhs_copy = T[
-                    spzeros(T,n,n)  model.A'        model.G'              spzeros(T,n)  spzeros(T,n,q)         model.c;
-                    -model.A        spzeros(T,p,p)  spzeros(T,p,q)        spzeros(T,p)  spzeros(T,p,q)         model.b;
-                    spzeros(T,q,n)  spzeros(T,q,p)  sparse(one(T)*I,q,q)  spzeros(T,q)  sparse(one(T)*I,q,q)   spzeros(T,q);
-                    spzeros(T,1,n)  spzeros(T,1,p)  spzeros(T,1,q)        one(T)        spzeros(T,1,q)         one(T);
-                    -model.G        spzeros(T,q,p)  spzeros(T,q,q)        spzeros(T,q)  sparse(-one(T)*I,q,q)  model.h;
-                    -model.c'       -model.b'       -model.h'             -one(T)       spzeros(T,1,q)         zero(T);
-                    ]
-                @assert issparse(system_solver.lhs_copy)
-            else
-                system_solver.lhs_copy = T[
-                    zeros(T,n,n)  model.A'      model.G'              zeros(T,n)  zeros(T,n,q)           model.c;
-                    -model.A      zeros(T,p,p)  zeros(T,p,q)          zeros(T,p)  zeros(T,p,q)           model.b;
-                    zeros(T,q,n)  zeros(T,q,p)  Matrix(one(T)*I,q,q)  zeros(T,q)  Matrix(one(T)*I,q,q)   zeros(T,q);
-                    zeros(T,1,n)  zeros(T,1,p)  zeros(T,1,q)          one(T)      zeros(T,1,q)           one(T);
-                    -model.G      zeros(T,q,p)  zeros(T,q,q)          zeros(T,q)  Matrix(-one(T)*I,q,q)  model.h;
-                    -model.c'     -model.b'     -model.h'             -one(T)     zeros(T,1,q)           zero(T);
-                    ]
-            end
-
-            system_solver.lhs = similar(system_solver.lhs_copy)
-            function view_k(k::Int)
-                rows = (n + p) .+ model.cone_idxs[k]
-                cols = Cones.use_dual(model.cones[k]) ? rows : (q + 1) .+ rows
-                return view(system_solver.lhs, rows, cols)
-            end
-            system_solver.lhs_H_k = [view_k(k) for k in eachindex(model.cones)]
-        end
-
         return system_solver
     end
 end
 
-function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveHSDSystemSolver{T}) where {T <: Real}
+function load(system_solver::NaiveHSDSystemSolver{T}, solver::HSDSolver{T}) where {T <: Real}
+    system_solver.solver = solver
+
+    model = solver.model
+    (n, p, q) = (model.n, model.p, model.q)
+    dim = n + p + 2q + 2
+
+    system_solver.rhs = zeros(T, dim, 2)
+    rows = 1:n
+    system_solver.x1 = view(system_solver.rhs, rows, 1)
+    system_solver.x2 = view(system_solver.rhs, rows, 2)
+    rows = (n + 1):(n + p)
+    system_solver.y1 = view(system_solver.rhs, rows, 1)
+    system_solver.y2 = view(system_solver.rhs, rows, 2)
+    rows = (n + p + 1):(n + p + q)
+    system_solver.z1 = view(system_solver.rhs, rows, 1)
+    system_solver.z2 = view(system_solver.rhs, rows, 2)
+    z_start = n + p
+    system_solver.z1_k = [view(system_solver.rhs, z_start .+ model.cone_idxs[k], 1) for k in eachindex(model.cones)]
+    system_solver.z2_k = [view(system_solver.rhs, z_start .+ model.cone_idxs[k], 2) for k in eachindex(model.cones)]
+    rows = (n + p + q + 2):(n + p + 2q + 1)
+    system_solver.s1 = view(system_solver.rhs, rows, 1)
+    system_solver.s2 = view(system_solver.rhs, rows, 2)
+    system_solver.kap_row = n + p + q + 1
+
+    # x y z kap s tau
+    if system_solver.use_iterative
+        system_solver.prevsol1 = zeros(T, dim)
+        system_solver.prevsol2 = zeros(T, dim)
+
+        # block matrix for efficient multiplication
+        rc1 = 1:n
+        rc2 = n .+ (1:p)
+        rc3 = (n + p) .+ (1:q)
+        rc4 = (n + p + q) .+ (1:1)
+        rc5 = (n + p + q + 1) .+ (1:q)
+        rc6 = dim:dim
+
+        cone_rows = UnitRange{Int}[]
+        cone_cols = UnitRange{Int}[]
+        for k in eachindex(model.cones)
+            rows = (n + p) .+ model.cone_idxs[k]
+            push!(cone_rows, rows)
+            push!(cone_rows, rows)
+            push!(cone_cols, rows)
+            push!(cone_cols, (q + 1) .+ rows)
+        end
+
+        system_solver.lhs = BlockMatrix{T}(
+            dim,
+            dim,
+            [fill(I, length(cone_rows))...,
+            model.A', model.G', reshape(model.c, :, 1), -model.A, reshape(model.b, :, 1), ones(T, 1, 1), -model.G, -I, reshape(model.h, :, 1), -model.c', -model.b', -model.h', -ones(T, 1, 1), ones(T, 1, 1)],
+            [cone_rows..., rc1, rc1, rc1, rc2, rc2, rc4, rc5, rc5, rc5, rc6, rc6, rc6, rc6, rc4],
+            [cone_cols..., rc2, rc3, rc6, rc1, rc6, rc4, rc1, rc5, rc6, rc1, rc2, rc3, rc4, rc6],
+            )
+
+    else
+        if system_solver.use_sparse
+            system_solver.lhs_copy = T[
+                spzeros(T,n,n)  model.A'        model.G'              spzeros(T,n)  spzeros(T,n,q)         model.c;
+                -model.A        spzeros(T,p,p)  spzeros(T,p,q)        spzeros(T,p)  spzeros(T,p,q)         model.b;
+                spzeros(T,q,n)  spzeros(T,q,p)  sparse(one(T)*I,q,q)  spzeros(T,q)  sparse(one(T)*I,q,q)   spzeros(T,q);
+                spzeros(T,1,n)  spzeros(T,1,p)  spzeros(T,1,q)        one(T)        spzeros(T,1,q)         one(T);
+                -model.G        spzeros(T,q,p)  spzeros(T,q,q)        spzeros(T,q)  sparse(-one(T)*I,q,q)  model.h;
+                -model.c'       -model.b'       -model.h'             -one(T)       spzeros(T,1,q)         zero(T);
+                ]
+            @assert issparse(system_solver.lhs_copy)
+        else
+            system_solver.lhs_copy = T[
+                zeros(T,n,n)  model.A'      model.G'              zeros(T,n)  zeros(T,n,q)           model.c;
+                -model.A      zeros(T,p,p)  zeros(T,p,q)          zeros(T,p)  zeros(T,p,q)           model.b;
+                zeros(T,q,n)  zeros(T,q,p)  Matrix(one(T)*I,q,q)  zeros(T,q)  Matrix(one(T)*I,q,q)   zeros(T,q);
+                zeros(T,1,n)  zeros(T,1,p)  zeros(T,1,q)          one(T)      zeros(T,1,q)           one(T);
+                -model.G      zeros(T,q,p)  zeros(T,q,q)          zeros(T,q)  Matrix(-one(T)*I,q,q)  model.h;
+                -model.c'     -model.b'     -model.h'             -one(T)     zeros(T,1,q)           zero(T);
+                ]
+        end
+
+        system_solver.lhs = similar(system_solver.lhs_copy)
+        function view_k(k::Int)
+            rows = (n + p) .+ model.cone_idxs[k]
+            cols = Cones.use_dual(model.cones[k]) ? rows : (q + 1) .+ rows
+            return view(system_solver.lhs, rows, cols)
+        end
+        system_solver.lhs_H_k = [view_k(k) for k in eachindex(model.cones)]
+    end
+
+    return system_solver
+end
+
+function get_combined_directions(system_solver::NaiveHSDSystemSolver{T}) where {T <: Real}
+    solver = system_solver.solver
     model = solver.model
     cones = model.cones
     lhs = system_solver.lhs

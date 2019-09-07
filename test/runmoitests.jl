@@ -13,14 +13,14 @@ real_types = [
 
 dense_options = [
     true,
-    # false,
+    false,
     ]
 
 system_solvers = [
     SO.QRCholHSDSystemSolver,
-    # SO.SymIndefHSDSystemSolver,
-    # SO.NaiveElimHSDSystemSolver,
-    # SO.NaiveHSDSystemSolver,
+    SO.SymIndefHSDSystemSolver,
+    SO.NaiveElimHSDSystemSolver,
+    SO.NaiveHSDSystemSolver,
     ]
 
 @info("starting MOI tests")
