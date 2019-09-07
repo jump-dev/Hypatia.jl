@@ -9,15 +9,7 @@ mutable struct Optimizer{T <: Real} <: MOI.AbstractOptimizer
     use_dense::Bool
     test_certificates::Bool
 
-    # verbose::Bool
-    # system_solver::Type{<:Solvers.CombinedHSDSystemSolver{T}}
-    # linear_model::Type{<:Models.LinearModel{T}}
-    # max_iters::Int
-    # time_limit::Float64
-    # tol_rel_opt::T
-    # tol_abs_opt::T
-    # tol_feas::T
-    # tol_slow::T
+    status::Symbol
 
     c::Vector{T}
     A
@@ -26,6 +18,14 @@ mutable struct Optimizer{T <: Real} <: MOI.AbstractOptimizer
     h::Vector{T}
     cones::Vector{Cones.Cone{T}}
     obj_offset::T
+
+    solver::Solvers.HSDSolver{T}
+
+    result::NamedTuple
+    x::Vector{T}
+    s::Vector{T}
+    y::Vector{T}
+    z::Vector{T}
 
     obj_sense::MOI.OptimizationSense
     num_eq_constrs::Int
@@ -36,47 +36,18 @@ mutable struct Optimizer{T <: Real} <: MOI.AbstractOptimizer
     interval_idxs::UnitRange{Int}
     interval_scales::Vector{T}
 
-    hypatia_options::NamedTuple
-    solver::Solvers.HSDSolver{T}
-    status::Symbol
-
-    result::NamedTuple
-    x::Vector{T}
-    s::Vector{T}
-    y::Vector{T}
-    z::Vector{T}
-
     function Optimizer{T}(;
         load_only::Bool = false,
         use_dense::Bool = true,
         test_certificates::Bool = false,
-        hypatia_options::NamedTuple = NamedTuple(),
-        # verbose::Bool = false,
-        # system_solver::Type{<:Solvers.CombinedHSDSystemSolver{T}} = Solvers.QRCholCombinedHSDSystemSolver{T},
-        # linear_model::Type{<:Models.LinearModel{T}} = Models.PreprocessedLinearModel{T},
-        # max_iters::Int = 1000,
-        # time_limit::Real = Inf,
-        # tol_rel_opt::Real = sqrt(eps(T)),
-        # tol_abs_opt::Real = tol_rel_opt,
-        # tol_feas::Real = tol_rel_opt,
-        # tol_slow::Real = T(1e-3),
+        solver_options...
         ) where {T <: Real}
         opt = new{T}()
 
         opt.load_only = load_only
         opt.use_dense = use_dense
         opt.test_certificates = test_certificates
-        opt.hypatia_options = hypatia_options
-        # opt.verbose = verbose
-        # opt.system_solver = system_solver
-        # opt.linear_model = linear_model
-        # opt.max_iters = max_iters
-        # opt.time_limit = time_limit
-        # opt.tol_rel_opt = tol_rel_opt
-        # opt.tol_abs_opt = tol_abs_opt
-        # opt.tol_feas = tol_feas
-        # opt.tol_slow = tol_slow
-
+        opt.solver = Solvers.HSDSolver{T}(; solver_options...)
         opt.status = :NotLoaded
 
         return opt
@@ -493,29 +464,26 @@ end
 
 function MOI.optimize!(opt::Optimizer{T}) where {T <: Real}
     if opt.load_only
-        return nothing
+        return
     end
-    # model = opt.linear_model(copy(opt.c), copy(opt.A), copy(opt.b), copy(opt.G), copy(opt.h), opt.cones, obj_offset = opt.obj_offset)
-    # stepper = Solvers.CombinedHSDStepper{T}(model, system_solver = opt.system_solver(model))
-    # solver = Solvers.HSDSolver{T}(
-    #     model, stepper = stepper,
-    #     verbose = opt.verbose, max_iters = opt.max_iters, time_limit = opt.time_limit,
-    #     tol_rel_opt = opt.tol_rel_opt, tol_abs_opt = opt.tol_abs_opt, tol_feas = opt.tol_feas, tol_slow = opt.tol_slow,
-    #     )
+
+
+
+    # model = opt.linear_model(copy(opt.c), (opt.use_dense ? Matrix(opt.A) : copy(opt.A)),
+    #     copy(opt.b), (opt.use_dense ? Matrix(opt.G) : copy(opt.G)), copy(opt.h),
+    #     opt.cones, obj_offset = opt.obj_offset)
+    # Solvers.load(opt.solver, model)
     # Solvers.solve(solver)
     # r = Solvers.get_certificates(solver, model, test = opt.test_certificates)
 
-    if opt.use_dense
-        A = Matrix(opt.A)
-        G = Matrix(opt.G)
-    else
-        A = copy(opt.A)
-        G = copy(opt.G)
-    end
-
-    r = Solvers.build_solve_check(copy(opt.c), A, copy(opt.b), G, copy(opt.h), opt.cones,
-        test = opt.test_certificates; opt.hypatia_options...)
-    opt.result = r
+    opt.result = r = Solvers.build_solve_check(
+        copy(opt.c),
+        (opt.use_dense ? Matrix(opt.A) : copy(opt.A)),
+        copy(opt.b),
+        (opt.use_dense ? Matrix(opt.G) : copy(opt.G)),
+        copy(opt.h),
+        opt.cones, obj_offset = opt.obj_offset,
+        test = opt.test_certificates, solver = opt.solver)
 
     opt.status = r.status
     # opt.result.primal_obj = r.primal_obj
@@ -547,17 +515,17 @@ function MOI.optimize!(opt::Optimizer{T}) where {T <: Real}
     opt.constr_prim_cone += opt.s
     opt.z[opt.interval_idxs] .*= opt.interval_scales
 
-    return nothing
+    return
 end
 
 MOI.supports(::Optimizer, ::MOI.Silent) = true
-MOI.set(opt::Optimizer, ::MOI.Silent, value::Bool) = (opt.hypatia_options.verbose = value)
-MOI.get(opt::Optimizer, ::MOI.Silent) = (isdefined(opt.hypatia_options.verbose) ? opt.hypatia_options.verbose : false)
+MOI.set(opt::Optimizer, ::MOI.Silent, value::Bool) = (opt.solver.verbose = value)
+MOI.get(opt::Optimizer, ::MOI.Silent) = opt.solver.verbose
 
 MOI.supports(::Optimizer, ::MOI.TimeLimitSec) = true
-MOI.set(opt::Optimizer, ::MOI.TimeLimitSec, value::Real) = (opt.hypatia_options.time_limit = value)
-MOI.set(opt::Optimizer, ::MOI.TimeLimitSec, ::Nothing) = (opt.hypatia_options.time_limit = Inf)
-MOI.get(opt::Optimizer, ::MOI.TimeLimitSec) = (isdefined(opt.hypatia_options.verbose) ? (isfinite(opt.hypatia_options.time_limit) ? opt.hypatia_options.time_limit : nothing) : nothing)
+MOI.set(opt::Optimizer, ::MOI.TimeLimitSec, value::Real) = (opt.solver.time_limit = value)
+MOI.set(opt::Optimizer, ::MOI.TimeLimitSec, ::Nothing) = (opt.solver.time_limit = Inf)
+MOI.get(opt::Optimizer, ::MOI.TimeLimitSec) = (isfinite(opt.solver.time_limit) ? opt.solver.time_limit : nothing)
 
 function MOI.get(opt::Optimizer, ::MOI.SolveTime)
     if opt.status in (:NotLoaded, :Loaded)

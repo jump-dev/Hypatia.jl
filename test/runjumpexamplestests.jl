@@ -27,7 +27,7 @@ include(joinpath(examples_dir, "shapeconregr/JuMP.jl"))
     JuMP_options = (
         verbose = false,
         test_certificates = true,
-        max_iters = 250,
+        iter_limit = 250,
         time_limit = 6e2, # 1 minute
         )
 

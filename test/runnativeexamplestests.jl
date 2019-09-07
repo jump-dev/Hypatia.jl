@@ -52,7 +52,7 @@ end
     tol = sqrt(sqrt(eps(T)))
     test_options = (
         linear_model = MO.RawLinearModel,
-        system_solver = SO.NaiveCombinedHSDSystemSolver,
+        system_solver = SO.NaiveHSDSystemSolver,
         linear_model_options = (use_iterative = true,),
         system_solver_options = (use_iterative = true,),
         solver_options = (verbose = false, tol_feas = tol / 10, tol_abs_opt = tol / 10, tol_rel_opt = tol / 10),

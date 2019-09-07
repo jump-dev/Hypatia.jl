@@ -178,7 +178,7 @@ function update_hess_prod(cone::HypoPerLogdetTri)
     h2end .*= ((cone.ldWv - cone.side) / cone.ldWvuv - 1) / z
 
     cone.hess_prod_updated = true
-    return nothing
+    return
 end
 
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPerLogdetTri)
