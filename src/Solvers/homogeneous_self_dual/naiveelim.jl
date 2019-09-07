@@ -30,6 +30,8 @@ TODO reduce allocations
 mutable struct NaiveElimHSDSystemSolver{T <: Real} <: HSDSystemSolver{T}
     use_sparse::Bool
 
+    solver::HSDSolver{T}
+
     lhs_copy
     lhs
     rhs::Matrix{T}
@@ -47,55 +49,63 @@ mutable struct NaiveElimHSDSystemSolver{T <: Real} <: HSDSystemSolver{T}
     s1_k
     s2_k
 
-    function NaiveElimHSDSystemSolver{T}(model::Models.LinearModel{T}; use_sparse::Bool = false) where {T <: Real}
-        (n, p, q) = (model.n, model.p, model.q)
-        npq1 = n + p + q + 1
+    function NaiveElimHSDSystemSolver{T}(; use_sparse::Bool = false) where {T <: Real}
         system_solver = new{T}()
         system_solver.use_sparse = use_sparse
-
-        if use_sparse
-            system_solver.lhs_copy = T[
-                spzeros(T,n,n)  model.A'        model.G'              model.c;
-                -model.A        spzeros(T,p,p)  spzeros(T,p,q)        model.b;
-                -model.G        spzeros(T,q,p)  sparse(one(T)*I,q,q)  model.h;
-                -model.c'       -model.b'       -model.h'             one(T);
-            ]
-            @assert issparse(system_solver.lhs_copy)
-        else
-            system_solver.lhs_copy = T[
-                zeros(T,n,n)  model.A'      model.G'              model.c;
-                -model.A      zeros(T,p,p)  zeros(T,p,q)          model.b;
-                -model.G      zeros(T,q,p)  Matrix(one(T)*I,q,q)  model.h;
-                -model.c'     -model.b'     -model.h'             one(T);
-            ]
-        end
-
-        system_solver.lhs = similar(system_solver.lhs_copy)
-
-        rhs = Matrix{T}(undef, npq1, 2)
-        system_solver.rhs = rhs
-        rows = 1:n
-        system_solver.x1 = view(rhs, rows, 1)
-        system_solver.x2 = view(rhs, rows, 2)
-        rows = (n + 1):(n + p)
-        system_solver.y1 = view(rhs, rows, 1)
-        system_solver.y2 = view(rhs, rows, 2)
-        rows = (n + p + 1):(n + p + q)
-        system_solver.z1 = view(rhs, rows, 1)
-        system_solver.z2 = view(rhs, rows, 2)
-        z_start = n + p
-        system_solver.z1_k = [view(rhs, z_start .+ model.cone_idxs[k], 1) for k in eachindex(model.cones)]
-        system_solver.z2_k = [view(rhs, z_start .+ model.cone_idxs[k], 2) for k in eachindex(model.cones)]
-        system_solver.s1 = similar(rhs, q)
-        system_solver.s2 = similar(rhs, q)
-        system_solver.s1_k = [view(system_solver.s1, model.cone_idxs[k]) for k in eachindex(model.cones)]
-        system_solver.s2_k = [view(system_solver.s2, model.cone_idxs[k]) for k in eachindex(model.cones)]
-
         return system_solver
     end
 end
 
-function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveElimHSDSystemSolver{T}) where {T <: Real}
+function load(system_solver::NaiveElimHSDSystemSolver{T}, solver::HSDSolver{T}) where {T <: Real}
+    system_solver.solver = solver
+
+    model = solver.model
+    (n, p, q) = (model.n, model.p, model.q)
+    npq1 = n + p + q + 1
+
+    if system_solver.use_sparse
+        system_solver.lhs_copy = T[
+            spzeros(T,n,n)  model.A'        model.G'              model.c;
+            -model.A        spzeros(T,p,p)  spzeros(T,p,q)        model.b;
+            -model.G        spzeros(T,q,p)  sparse(one(T)*I,q,q)  model.h;
+            -model.c'       -model.b'       -model.h'             one(T);
+        ]
+        @assert issparse(system_solver.lhs_copy)
+    else
+        system_solver.lhs_copy = T[
+            zeros(T,n,n)  model.A'      model.G'              model.c;
+            -model.A      zeros(T,p,p)  zeros(T,p,q)          model.b;
+            -model.G      zeros(T,q,p)  Matrix(one(T)*I,q,q)  model.h;
+            -model.c'     -model.b'     -model.h'             one(T);
+        ]
+    end
+
+    system_solver.lhs = similar(system_solver.lhs_copy)
+
+    rhs = Matrix{T}(undef, npq1, 2)
+    system_solver.rhs = rhs
+    rows = 1:n
+    system_solver.x1 = view(rhs, rows, 1)
+    system_solver.x2 = view(rhs, rows, 2)
+    rows = (n + 1):(n + p)
+    system_solver.y1 = view(rhs, rows, 1)
+    system_solver.y2 = view(rhs, rows, 2)
+    rows = (n + p + 1):(n + p + q)
+    system_solver.z1 = view(rhs, rows, 1)
+    system_solver.z2 = view(rhs, rows, 2)
+    z_start = n + p
+    system_solver.z1_k = [view(rhs, z_start .+ model.cone_idxs[k], 1) for k in eachindex(model.cones)]
+    system_solver.z2_k = [view(rhs, z_start .+ model.cone_idxs[k], 2) for k in eachindex(model.cones)]
+    system_solver.s1 = similar(rhs, q)
+    system_solver.s2 = similar(rhs, q)
+    system_solver.s1_k = [view(system_solver.s1, model.cone_idxs[k]) for k in eachindex(model.cones)]
+    system_solver.s2_k = [view(system_solver.s2, model.cone_idxs[k]) for k in eachindex(model.cones)]
+
+    return system_solver
+end
+
+function get_combined_directions(system_solver::NaiveElimHSDSystemSolver{T}) where {T <: Real}
+    solver = system_solver.solver
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
     cones = model.cones

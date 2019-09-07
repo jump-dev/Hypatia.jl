@@ -60,9 +60,11 @@ function test_moi(
     @testset "unit tests" begin
         MOIT.unittest(optimizer, config, unit_exclude)
     end
+    
     @testset "linear tests" begin
         MOIT.contlineartest(optimizer, config)
     end
+
     @testset "conic tests" begin
         MOIT.contconictest(MOIB.Constraint.Square{T}(MOIB.Constraint.RootDet{T}(optimizer)), config, conic_exclude)
     end
