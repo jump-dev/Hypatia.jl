@@ -8,10 +8,10 @@ barrier from "Self-Scaled Barriers and Interior-Point Methods for Convex Program
 -log(u^2 - norm_2(w)^2)
 =#
 
-mutable struct EpiNormEucl{T <: HypReal} <: Cone{T}
+mutable struct EpiNormEucl{T <: Real} <: Cone{T}
     use_dual::Bool
     dim::Int
-    point::AbstractVector{T}
+    point::Vector{T}
 
     feas_updated::Bool
     grad_updated::Bool
@@ -24,7 +24,8 @@ mutable struct EpiNormEucl{T <: HypReal} <: Cone{T}
 
     dist::T
 
-    function EpiNormEucl{T}(dim::Int, is_dual::Bool) where {T <: HypReal}
+    function EpiNormEucl{T}(dim::Int, is_dual::Bool) where {T <: Real}
+        @assert dim >= 2
         cone = new{T}()
         cone.use_dual = is_dual
         cone.dim = dim
@@ -32,14 +33,15 @@ mutable struct EpiNormEucl{T <: HypReal} <: Cone{T}
     end
 end
 
-EpiNormEucl{T}(dim::Int) where {T <: HypReal} = EpiNormEucl{T}(dim, false)
+EpiNormEucl{T}(dim::Int) where {T <: Real} = EpiNormEucl{T}(dim, false)
 
 reset_data(cone::EpiNormEucl) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
 
 # TODO maybe only allocate the fields we use
-function setup_data(cone::EpiNormEucl{T}) where {T <: HypReal}
+function setup_data(cone::EpiNormEucl{T}) where {T <: Real}
     reset_data(cone)
     dim = cone.dim
+    cone.point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
@@ -101,24 +103,22 @@ update_inv_hess_prod(cone::EpiNormEucl) = nothing
 
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormEucl)
     @assert cone.grad_updated
-    disth = cone.dist / 2
     @inbounds for j in 1:size(prod, 2)
-        @views aj = arr[:, j]
-        ga = dot(cone.grad, aj)
-        @. prod[:, j] = ga * cone.grad + aj / cone.dist
-        prod[1, j] -= arr[1, j] / disth
+        @views ga = dot(cone.grad, arr[:, j])
+        @. prod[:, j] = ga * cone.grad
     end
+    @. prod += arr / cone.dist
+    @. @views prod[1, :] -= 2 * arr[1, :] / cone.dist
     return prod
 end
 
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormEucl)
     @assert cone.is_feas
-    dist2 = cone.dist * 2
     @inbounds for j in 1:size(prod, 2)
-        @views aj = arr[:, j]
-        pa = dot(cone.point, aj)
-        @. prod[:, j] = pa * cone.point + cone.dist * aj
-        prod[1, j] -= arr[1, j] * dist2
+        @views pa = dot(cone.point, arr[:, j])
+        @. prod[:, j] = pa * cone.point
     end
+    @. prod += cone.dist * arr
+    @. @views prod[1, :] -= 2 * arr[1, :] * cone.dist
     return prod
 end

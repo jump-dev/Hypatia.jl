@@ -10,12 +10,11 @@ import Distributions
 import Random
 using Test
 import Hypatia
-import Hypatia.HypReal
-import Hypatia.HypBlockMatrix
+import Hypatia.BlockMatrix
 const CO = Hypatia.Cones
 
 function sparsepca(
-    T::Type{<:HypReal},
+    T::Type{<:Real},
     p::Int,
     k::Int;
     use_l1ball::Bool = true,
@@ -54,7 +53,6 @@ function sparsepca(
     end
     hpsd = zeros(T, dimx)
     cones = CO.Cone{T}[CO.PosSemidefTri{T, T}(dimx)]
-    cone_idxs = [1:dimx]
 
     if use_l1ball
         # l1 cone
@@ -73,14 +71,14 @@ function sparsepca(
             end
         end
         if use_linops
-            G = HypBlockMatrix{T}(
+            G = BlockMatrix{T}(
                 2 * dimx + 1,
                 dimx,
                 [-I, Gl1],
                 [1:dimx, (dimx + 2):(2 * dimx + 1)],
                 [1:dimx, 1:dimx]
                 )
-            A = HypBlockMatrix{T}(1, dimx, [A], [1:1], [1:dimx])
+            A = BlockMatrix{T}(1, dimx, [A], [1:1], [1:dimx])
         else
             G = [
                 Matrix{T}(-I, dimx, dimx); # psd cone
@@ -90,19 +88,18 @@ function sparsepca(
         end
         h = vcat(hpsd, T(k), zeros(T, dimx))
         push!(cones, CO.EpiNormInf{T}(1 + dimx, true))
-        push!(cone_idxs, (dimx + 1):(2 * dimx + 1))
     else
         id = Matrix{T}(I, dimx, dimx)
         l1 = [(i == j ? one(T) : T(2)) for i in 1:p for j in 1:i]
         if use_linops
-            A = HypBlockMatrix{T}(
+            A = BlockMatrix{T}(
                 dimx + 1,
                 3 * dimx,
                 [A, -I, -I, I],
                 [1:1, 2:(dimx + 1), 2:(dimx + 1), 2:(dimx + 1)],
                 [1:dimx, 1:dimx, (dimx + 1):(2 * dimx), (2 * dimx + 1):(3 * dimx)]
                 )
-            G = HypBlockMatrix{T}(
+            G = BlockMatrix{T}(
                 3 * dimx + 1,
                 3 * dimx,
                 [-I, -I, repeat(l1', 1, 2)],
@@ -124,20 +121,19 @@ function sparsepca(
         b = vcat(b, zeros(T, dimx))
         h = vcat(hpsd, zeros(T, 2 * dimx), k)
         push!(cones, CO.Nonnegative{T}(2 * dimx + 1))
-        push!(cone_idxs, (dimx + 1):(3 * dimx + 1))
     end
 
-    return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs, true_obj = true_obj)
+    return (c = c, A = A, b = b, G = G, h = h, cones = cones, true_obj = true_obj)
 end
 
-sparsepca1(T::Type{<:HypReal}) = sparsepca(T, 5, 3)
-sparsepca2(T::Type{<:HypReal}) = sparsepca(T, 5, 3, use_l1ball = false)
-sparsepca3(T::Type{<:HypReal}) = sparsepca(T, 10, 3)
-sparsepca4(T::Type{<:HypReal}) = sparsepca(T, 10, 3, use_l1ball = false)
-sparsepca5(T::Type{<:HypReal}) = sparsepca(T, 10, 3, noise_ratio = 10.0, use_linops = false)
-sparsepca6(T::Type{<:HypReal}) = sparsepca(T, 10, 3, noise_ratio = 10.0, use_linops = true)
-sparsepca7(T::Type{<:HypReal}) = sparsepca(T, 10, 3, noise_ratio = 10.0, use_l1ball = false, use_linops = false)
-sparsepca8(T::Type{<:HypReal}) = sparsepca(T, 10, 3, noise_ratio = 10.0, use_l1ball = false, use_linops = true)
+sparsepca1(T::Type{<:Real}) = sparsepca(T, 5, 3)
+sparsepca2(T::Type{<:Real}) = sparsepca(T, 5, 3, use_l1ball = false)
+sparsepca3(T::Type{<:Real}) = sparsepca(T, 10, 3)
+sparsepca4(T::Type{<:Real}) = sparsepca(T, 10, 3, use_l1ball = false)
+sparsepca5(T::Type{<:Real}) = sparsepca(T, 10, 3, noise_ratio = 10.0, use_linops = false)
+sparsepca6(T::Type{<:Real}) = sparsepca(T, 10, 3, noise_ratio = 10.0, use_linops = true)
+sparsepca7(T::Type{<:Real}) = sparsepca(T, 10, 3, noise_ratio = 10.0, use_l1ball = false, use_linops = false)
+sparsepca8(T::Type{<:Real}) = sparsepca(T, 10, 3, noise_ratio = 10.0, use_l1ball = false, use_linops = true)
 
 instances_sparsepca_all = [
     sparsepca1,
@@ -158,14 +154,13 @@ instances_sparsepca_few = [
     sparsepca2,
     ]
 
-function test_sparsepca(instance::Function; T::Type{<:HypReal} = Float64, test_options::NamedTuple = NamedTuple(), rseed::Int = 1)
+function test_sparsepca(instance::Function; T::Type{<:Real} = Float64, test_options::NamedTuple = (atol = sqrt(sqrt(eps(T))),), rseed::Int = 1)
     Random.seed!(rseed)
-    tol = max(1e-5, sqrt(sqrt(eps(T))))
     d = instance(T)
-    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs; test_options..., atol = tol, rtol = tol)
+    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; test_options...)
     @test r.status == :Optimal
     if !isnan(d.true_obj)
-        @test r.primal_obj ≈ d.true_obj atol = tol rtol = tol
+        @test r.primal_obj ≈ d.true_obj atol=test_options.atol rtol=test_options.atol
     end
     return
 end

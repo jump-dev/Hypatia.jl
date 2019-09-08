@@ -9,10 +9,10 @@ barrier from "Self-Scaled Barriers and Interior-Point Methods for Convex Program
 -log(2*u*v - norm_2(w)^2)
 =#
 
-mutable struct EpiPerSquare{T <: HypReal} <: Cone{T}
+mutable struct EpiPerSquare{T <: Real} <: Cone{T}
     use_dual::Bool
     dim::Int
-    point::AbstractVector{T}
+    point::Vector{T}
 
     feas_updated::Bool
     grad_updated::Bool
@@ -25,7 +25,8 @@ mutable struct EpiPerSquare{T <: HypReal} <: Cone{T}
 
     dist::T
 
-    function EpiPerSquare{T}(dim::Int, is_dual::Bool) where {T <: HypReal}
+    function EpiPerSquare{T}(dim::Int, is_dual::Bool) where {T <: Real}
+        @assert dim >= 3
         cone = new{T}()
         cone.use_dual = is_dual
         cone.dim = dim
@@ -33,13 +34,14 @@ mutable struct EpiPerSquare{T <: HypReal} <: Cone{T}
     end
 end
 
-EpiPerSquare{T}(dim::Int) where {T <: HypReal} = EpiPerSquare{T}(dim, false)
+EpiPerSquare{T}(dim::Int) where {T <: Real} = EpiPerSquare{T}(dim, false)
 
 reset_data(cone::EpiPerSquare) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
 
-function setup_data(cone::EpiPerSquare{T}) where {T <: HypReal}
+function setup_data(cone::EpiPerSquare{T}) where {T <: Real}
     reset_data(cone)
     dim = cone.dim
+    cone.point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
@@ -113,9 +115,11 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerS
     @inbounds for j in 1:size(prod, 2)
         ga = dot(cone.grad, view(arr, :, j))
         @. prod[:, j] = ga * cone.grad
-        @views @. prod[3:end, j] += arr[3:end, j] / cone.dist
-        prod[1, j] -= arr[2, j] / cone.dist
-        prod[2, j] -= arr[1, j] / cone.dist
+    end
+    @. @views begin
+        prod[3:end, :] += arr[3:end, :] / cone.dist
+        prod[1, :] -= arr[2, :] / cone.dist
+        prod[2, :] -= arr[1, :] / cone.dist
     end
     return prod
 end
@@ -125,9 +129,11 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Epi
     @inbounds for j in 1:size(prod, 2)
         pa = dot(cone.point, view(arr, :, j))
         @. prod[:, j] = pa * cone.point
-        @views @. prod[3:end, j] += cone.dist * arr[3:end, j]
-        prod[1, j] -= cone.dist * arr[2, j]
-        prod[2, j] -= cone.dist * arr[1, j]
+    end
+    @. @views begin
+        prod[3:end, :] += cone.dist * arr[3:end, :]
+        prod[1, :] -= cone.dist * arr[2, :]
+        prod[2, :] -= cone.dist * arr[1, :]
     end
     return prod
 end

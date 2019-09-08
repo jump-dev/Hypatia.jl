@@ -14,7 +14,7 @@ import Combinatorics
 import GSL: sf_gamma_inc_Q
 import DynamicPolynomials
 const DP = DynamicPolynomials
-include("interpolate.jl")
+include("interpolate.jl") # TODO remove dependence on DP
 
 import SemialgebraicSets
 const SAS = SemialgebraicSets

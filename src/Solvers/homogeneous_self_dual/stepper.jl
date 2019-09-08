@@ -4,7 +4,7 @@ Copyright 2018, Chris Coey and contributors
 interior point stepper and line search functions for algorithms based on homogeneous self dual embedding
 =#
 
-mutable struct CombinedHSDStepper{T <: HypReal} <: HSDStepper{T}
+mutable struct CombinedHSDStepper{T <: Real} <: HSDStepper{T}
     system_solver::CombinedHSDSystemSolver{T}
     max_nbhd::T
     use_infty_nbhd::Bool
@@ -26,7 +26,7 @@ mutable struct CombinedHSDStepper{T <: HypReal} <: HSDStepper{T}
         system_solver::CombinedHSDSystemSolver{T} = (model isa Models.PreprocessedLinearModel{T} ? QRCholCombinedHSDSystemSolver{T}(model) : NaiveCombinedHSDSystemSolver{T}(model)),
         use_infty_nbhd::Bool = true,
         max_nbhd::T = T(0.7), # TODO tune: maybe (use_infty_nbhd ? T(0.5) : T(0.75))
-        ) where {T <: HypReal}
+        ) where {T <: Real}
         stepper = new{T}()
 
         stepper.system_solver = system_solver
@@ -51,14 +51,12 @@ mutable struct CombinedHSDStepper{T <: HypReal} <: HSDStepper{T}
     end
 end
 
-function step(solver::HSDSolver{T}, stepper::CombinedHSDStepper{T}) where {T <: HypReal}
+function step(solver::HSDSolver{T}, stepper::CombinedHSDStepper{T}) where {T <: Real}
     model = solver.model
     point = solver.point
 
     # calculate affine/prediction and correction directions
     @timeit solver.timer "directions" (x_pred, x_corr, y_pred, y_corr, z_pred, z_corr, s_pred, s_corr, tau_pred, tau_corr, kap_pred, kap_corr) = get_combined_directions(solver, stepper.system_solver)
-
-    Cones.load_point.(solver.model.cones, stepper.primal_views)
 
     # calculate correction factor gamma by finding distance aff_alpha for stepping in affine direction
     # TODO try setting nbhd to T(Inf) and avoiding the neighborhood checks - requires tuning
@@ -105,13 +103,12 @@ function step(solver::HSDSolver{T}, stepper::CombinedHSDStepper{T}) where {T <: 
     solver.kap += alpha * kap_comb
     calc_mu(solver)
 
-    Cones.load_point.(solver.model.cones, solver.point.primal_views)
     @assert solver.tau > zero(T) && solver.kap > zero(T) && solver.mu > zero(T)
 
     return point
 end
 
-function print_iteration_stats(solver::HSDSolver{T}, stepper::CombinedHSDStepper{T}) where {T <: HypReal}
+function print_iteration_stats(solver::HSDSolver{T}, stepper::CombinedHSDStepper{T}) where {T <: Real}
     if iszero(solver.num_iters)
         @printf("\n%5s %12s %12s %9s %9s %9s %9s %9s %9s %9s %9s %9s %9s\n",
             "iter", "p_obj", "d_obj", "abs_gap", "rel_gap",
@@ -143,7 +140,7 @@ function find_max_alpha_in_nbhd(
     nbhd::T,
     prev_alpha::T,
     min_alpha::T,
-    ) where {T <: HypReal}
+    ) where {T <: Real}
     point = solver.point
     model = solver.model
     z_temp = stepper.z_temp
@@ -196,14 +193,18 @@ function check_nbhd(
     nbhd::T,
     cones::Vector{<:Cones.Cone{T}},
     stepper::CombinedHSDStepper{T},
-    ) where {T <: HypReal}
+    ) where {T <: Real}
+    sqrtmu = sqrt(mu_temp)
+
     if isfinite(nbhd)
-        rhs_nbhd = abs2(mu_temp * nbhd)
-        lhs_nbhd = abs2(taukap_temp - mu_temp)
+        rhs_nbhd = mu_temp * abs2(nbhd)
+        lhs_nbhd = abs2(taukap_temp / sqrtmu - sqrtmu)
         if lhs_nbhd >= rhs_nbhd
             return false
         end
     end
+
+    Cones.load_point.(cones, stepper.primal_views, sqrtmu)
 
     # accept primal iterate if it is inside the cone and neighborhood
     # first check inside cone for whichever cones were violated last line search iteration
@@ -233,7 +234,7 @@ function check_nbhd(
             # modifies dual_views
             duals_k = stepper.dual_views[k]
             g_k = Cones.grad(cone_k)
-            @. duals_k += mu_temp * g_k
+            @. duals_k += g_k * sqrtmu
 
             if stepper.use_infty_nbhd
                 k_nbhd = abs2(norm(duals_k, Inf) / norm(g_k, Inf))

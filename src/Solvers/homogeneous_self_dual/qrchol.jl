@@ -6,7 +6,7 @@ solves linear system in naive.jl via a procedure similar to that described by S1
 http://www.seas.ucla.edu/~vandenbe/publications/coneprog.pdf
 =#
 
-mutable struct QRCholCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSolver{T}
+mutable struct QRCholCombinedHSDSystemSolver{T <: Real} <: CombinedHSDSystemSolver{T}
     use_sparse::Bool
 
     xi::Matrix{T}
@@ -56,7 +56,10 @@ mutable struct QRCholCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemS
     HGxi_k
     Gxi_k
 
-    function QRCholCombinedHSDSystemSolver{T}(model::Models.PreprocessedLinearModel{T}; use_sparse::Bool = false) where {T <: HypReal}
+    solvesol
+    solvecache
+
+    function QRCholCombinedHSDSystemSolver{T}(model::Models.PreprocessedLinearModel{T}; use_sparse::Bool = false) where {T <: Real}
         (n, p, q) = (model.n, model.p, model.q)
         system_solver = new{T}()
         system_solver.use_sparse = use_sparse
@@ -130,11 +133,16 @@ mutable struct QRCholCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemS
         system_solver.HGxi_k = [view(system_solver.HGxi, idxs, :) for idxs in model.cone_idxs]
         system_solver.Gxi_k = [view(system_solver.Gxi, idxs, :) for idxs in model.cone_idxs]
 
+        if !use_sparse
+            system_solver.solvesol = Matrix{T}(undef, nmp, 3)
+            system_solver.solvecache = HypBKSolveCache('U', system_solver.solvesol, system_solver.Q2GHGQ2, system_solver.Q2div, tol_diag = sqrt(eps(T)))
+        end
+
         return system_solver
     end
 end
 
-function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholCombinedHSDSystemSolver{T}) where {T <: HypReal}
+function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholCombinedHSDSystemSolver{T}) where {T <: Real}
     model = solver.model
     cones = model.cones
     cone_idxs = model.cone_idxs
@@ -195,6 +203,7 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
     @. y2 = -solver.y_residual
     @. y3 = zero(T)
 
+    sqrtmu = sqrt(mu)
     @. z1_temp = model.h
     @. z2_temp = -solver.z_residual
     for k in eachindex(cones)
@@ -202,36 +211,25 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
         duals_k = solver.point.dual_views[k]
         @timeit solver.timer "grad1" grad_k = Cones.grad(cone_k)
         if Cones.use_dual(cone_k)
-            @. z1_temp_k[k] /= mu
-            @. z2_temp_k[k] = (duals_k + z2_temp_k[k]) / mu
-            @. z3_temp_k[k] = duals_k / mu + grad_k
+            @. z2_temp_k[k] = duals_k + z2_temp_k[k]
+            @. z3_temp_k[k] = duals_k + grad_k * sqrtmu
             @timeit solver.timer "invhess" Cones.inv_hess_prod!(z_k[k], z_temp_k[k], cone_k)
         else
-            @. z1_temp_k[k] *= mu
-            @. z2_temp_k[k] *= mu
             @timeit solver.timer "hess1" Cones.hess_prod!(z1_k[k], z1_temp_k[k], cone_k)
             @timeit solver.timer "hess2" Cones.hess_prod!(z2_k[k], z2_temp_k[k], cone_k)
             @. z2_k[k] += duals_k
-            @. z3_k[k] = duals_k + grad_k * mu
+            @. z3_k[k] = duals_k + grad_k * sqrtmu
         end
     end
 
-    end
-
-    # TODO maybe replace with Diagonal(blocks) matrix product
     function block_hessian_product!(prod_k, arr_k)
         for k in eachindex(cones)
             cone_k = cones[k]
             if Cones.use_dual(cone_k)
                 @timeit solver.timer "inv_hess_prod" begin
                 Cones.inv_hess_prod!(prod_k[k], arr_k[k], cone_k)
-                prod_k[k] ./= mu
-                end
             else
-                @timeit solver.timer "hess_prod" begin
-                @timeit solver.timer "hess_prod1" Cones.hess_prod!(prod_k[k], arr_k[k], cone_k)
-                @timeit solver.timer "hess_prod2" prod_k[k] .*= mu
-                end
+                @timeit solver.timer "hessprod" Cones.hess_prod!(prod_k[k], arr_k[k], cone_k)
             end
         end
     end
@@ -243,6 +241,8 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
     mul!(QpbxGHbz, model.G', zi, true, true)
     lmul!(model.Ap_Q', QpbxGHbz)
     end
+
+    copyto!(xi1, yi)
 
     if !iszero(size(Q2div, 1))
         @timeit solver.timer "Q2div" begin
@@ -259,38 +259,25 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
             if !issuccess(F)
                 println("sparse linear system matrix factorization failed")
                 mul!(Q2GHGQ2, GQ2', HGQ2)
-                F = ldlt(Symmetric(Q2GHGQ2), shift = T(1e-4), check = false)
+                F = ldlt(Symmetric(Q2GHGQ2), shift = cbrt(eps(T)), check = false)
                 if !issuccess(F)
                     error("could not fix failure of positive definiteness (mu is $mu); terminating")
                 end
             end
-            Q2div .= F \ Q2div # TODO eliminate allocs (see https://github.com/JuliaLang/julia/issues/30084)
+            xi2 .= F \ Q2div # TODO eliminate allocs (see https://github.com/JuliaLang/julia/issues/30084)
         else
-            @timeit solver.timer "chol" F = hyp_chol!(Symmetric(Q2GHGQ2)) # TODO prealloc blasreal cholesky auxiliary vectors using posvx
-            if !isposdef(F)
+            @timeit solver.timer "chol" if !hyp_bk_solve!(system_solver.solvecache, system_solver.solvesol, Q2GHGQ2, Q2div)
                 println("dense linear system matrix factorization failed")
-                mul!(Q2GHGQ2, GQ2', HGQ2)
-                Q2GHGQ2 += T(1e-8) * I
-                if T <: BlasReal
-                    F = bunchkaufman!(Symmetric(Q2GHGQ2), true, check = false) # TODO prealloc with old sysvx code; not implemented for generic reals
-                    # F = lu!(Symmetric(Q2GHGQ2), check = false) # TODO prealloc with old sysvx code; not implemented for generic reals
-                    if !issuccess(F)
-                        error("could not fix failure of positive definiteness (mu is $mu); terminating")
-                    end
-                else
-                    F = hyp_chol!(Symmetric(Q2GHGQ2)) # TODO prealloc blasreal cholesky auxiliary vectors using posvx
-                    if !isposdef(F)
-                        error("could not fix failure of positive definiteness (mu is $mu); terminating")
-                    end
+                @timeit solver.timer "notbk" mul!(Q2GHGQ2, GQ2', HGQ2)
+                Q2GHGQ2 += cbrt(eps(T)) * I
+                if !hyp_bk_solve!(system_solver.solvecache, system_solver.solvesol, Q2GHGQ2, Q2div)
+                    error("could not fix failure of positive definiteness (mu is $mu); terminating")
                 end
             end
-            @timeit solver.timer "ldiv_Q2div" ldiv!(F, Q2div)
+            copyto!(xi2, system_solver.solvesol)
         end
     end
 
-    @timeit solver.timer "xi" begin
-    copyto!(xi1, yi)
-    copyto!(xi2, Q2div)
     lmul!(model.Ap_Q, xi)
     end
 

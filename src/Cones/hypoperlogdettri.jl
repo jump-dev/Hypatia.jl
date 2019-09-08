@@ -7,16 +7,13 @@ Copyright 2018, Chris Coey and contributors
 
 barrier (guessed, based on analogy to hypoperlog barrier)
 -log(v*logdet(W/v) - u) - logdet(W) - log(v)
-
-TODO remove allocations
-TODO remove cone.vecn
 =#
 
-mutable struct HypoPerLogdetTri{T <: HypReal} <: Cone{T}
+mutable struct HypoPerLogdetTri{T <: Real} <: Cone{T}
     use_dual::Bool
     dim::Int
     side::Int
-    point::AbstractVector{T}
+    point::Vector{T}
 
     feas_updated::Bool
     grad_updated::Bool
@@ -32,8 +29,8 @@ mutable struct HypoPerLogdetTri{T <: HypReal} <: Cone{T}
     mat::Matrix{T}
     mat2::Matrix{T}
     mat3::Matrix{T}
-    vecn::Vector{T}
     fact_mat
+    chol_cache
     ldWv::T
     z::T
     Wi::Matrix{T}
@@ -42,9 +39,11 @@ mutable struct HypoPerLogdetTri{T <: HypReal} <: Cone{T}
     vzip1::T
     Wivzi::Matrix{T}
     tmp_hess::Symmetric{T, Matrix{T}}
-    hess_fact # TODO prealloc
+    hess_fact
+    hess_fact_cache
 
-    function HypoPerLogdetTri{T}(dim::Int, is_dual::Bool) where {T <: HypReal}
+    function HypoPerLogdetTri{T}(dim::Int, is_dual::Bool) where {T <: Real}
+        @assert dim >= 3
         cone = new{T}()
         cone.use_dual = is_dual
         cone.dim = dim
@@ -53,21 +52,23 @@ mutable struct HypoPerLogdetTri{T <: HypReal} <: Cone{T}
     end
 end
 
-HypoPerLogdetTri{T}(dim::Int) where {T <: HypReal} = HypoPerLogdetTri{T}(dim, false)
+HypoPerLogdetTri{T}(dim::Int) where {T <: Real} = HypoPerLogdetTri{T}(dim, false)
 
 reset_data(cone::HypoPerLogdetTri) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_prod_updated = cone.inv_hess_prod_updated = false)
 
-function setup_data(cone::HypoPerLogdetTri{T}) where {T <: HypReal}
+function setup_data(cone::HypoPerLogdetTri{T}) where {T <: Real}
     reset_data(cone)
     dim = cone.dim
+    cone.point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.tmp_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.mat = Matrix{T}(undef, cone.side, cone.side)
     cone.mat2 = similar(cone.mat)
     cone.mat3 = similar(cone.mat)
-    cone.vecn = Vector{T}(undef, cone.dim - 2)
+    cone.chol_cache = HypCholCache('U', cone.mat)
     cone.Wivzi = similar(cone.mat)
+    cone.hess_fact_cache = nothing
     return
 end
 
@@ -89,10 +90,9 @@ function update_feas(cone::HypoPerLogdetTri)
     @assert !cone.feas_updated
     u = cone.point[1]
     v = cone.point[2]
-
     if v > 0
         vec_to_mat_U!(cone.mat, view(cone.point, 3:cone.dim))
-        cone.fact_mat = hyp_chol!(Symmetric(cone.mat, :U)) # TODO remove allocs
+        cone.fact_mat = hyp_chol!(cone.chol_cache, cone.mat)
         if isposdef(cone.fact_mat)
             cone.ldWv = logdet(cone.fact_mat) - cone.side * log(v)
             cone.z = v * cone.ldWv - u
@@ -103,7 +103,6 @@ function update_feas(cone::HypoPerLogdetTri)
     else
         cone.is_feas = false
     end
-
     cone.feas_updated = true
     return cone.is_feas
 end
@@ -112,8 +111,8 @@ function update_grad(cone::HypoPerLogdetTri)
     @assert cone.is_feas
     u = cone.point[1]
     v = cone.point[2]
-
-    cone.Wi = inv(cone.fact_mat) # TODO remove allocs
+    cone.Wi = hyp_chol_inv!(cone.chol_cache, cone.fact_mat)
+    copytri!(cone.Wi, 'U')
     cone.nLz = (cone.side - cone.ldWv) / cone.z
     cone.ldWvuv = cone.ldWv - u / v
     cone.vzip1 = 1 + inv(cone.ldWvuv)
@@ -122,12 +121,10 @@ function update_grad(cone::HypoPerLogdetTri)
     gend = view(cone.grad, 3:cone.dim)
     mat_U_to_vec_scaled!(gend, cone.Wi)
     gend .*= -cone.vzip1
-
     cone.grad_updated = true
     return cone.grad
 end
 
-# TODO only work with upper triangle
 function update_hess(cone::HypoPerLogdetTri)
     if !cone.hess_prod_updated
         update_hess_prod(cone) # fill in first two rows of the Hessian and compute Wivzi
@@ -184,24 +181,23 @@ function update_hess_prod(cone::HypoPerLogdetTri)
     return nothing
 end
 
-function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPerLogdetTri{T}) where {T <: HypReal}
+function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPerLogdetTri)
     if !cone.hess_prod_updated
         update_hess_prod(cone)
     end
     Wi = cone.Wi
     @views mul!(prod[1:2, :], cone.hess[1:2, :], arr)
-    @views mul!(prod[3:cone.dim, :], cone.hess[3:cone.dim, 1:2], arr[1:2, :])
 
     @inbounds for i in 1:size(arr, 2)
-        vec_to_mat_U!(cone.mat, view(arr, 3:cone.dim, i))
-        mul!(cone.mat2, Symmetric(cone.mat, :U), cone.Wi)
-        mul!(cone.mat3, Symmetric(cone.Wi, :U), cone.mat2)
-        @. cone.mat3 *= cone.vzip1
-        dot_prod = dot(Symmetric(cone.mat, :U), Symmetric(cone.Wivzi, :U)) # TODO replace with faster dot product https://github.com/JuliaLang/julia/issues/32730
-        @. cone.mat3 += cone.Wivzi * dot_prod
-        mat_U_to_vec_scaled!(cone.vecn, cone.mat3)
-        view(prod, 3:cone.dim, i) .+= cone.vecn
+        vec_to_mat_U!(cone.mat2, view(arr, 3:cone.dim, i))
+        dot_prod = dot(Symmetric(cone.mat2, :U), Symmetric(cone.Wivzi, :U))
+        mul!(cone.mat3, Symmetric(cone.mat2, :U), cone.Wi)
+        copyto!(cone.mat2, cone.Wivzi)
+        @. cone.mat2 *= dot_prod
+        mul!(cone.mat2, Symmetric(cone.Wi, :U), cone.mat3, cone.vzip1, true)
+        mat_U_to_vec_scaled!(view(prod, 3:cone.dim, i), cone.mat2)
     end
+    @views mul!(prod[3:cone.dim, :], cone.hess[3:cone.dim, 1:2], arr[1:2, :], true, true)
 
     return prod
 end

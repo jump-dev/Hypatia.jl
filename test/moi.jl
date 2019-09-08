@@ -12,20 +12,6 @@ import Hypatia
 const MO = Hypatia.Models
 const SO = Hypatia.Solvers
 
-MOIU.@model(HypatiaModelData,
-    (),
-    (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan, MOI.Interval),
-    (MOI.Reals, MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives,
-        MOI.SecondOrderCone, MOI.RotatedSecondOrderCone,
-        MOI.PositiveSemidefiniteConeTriangle,
-        MOI.ExponentialCone, MOI.GeometricMeanCone, MOI.LogDetConeTriangle),
-    (MOI.PowerCone,),
-    (MOI.SingleVariable,),
-    (MOI.ScalarAffineFunction,),
-    (MOI.VectorOfVariables,),
-    (MOI.VectorAffineFunction,),
-    )
-
 config = MOIT.TestConfig(
     atol = 1e-4,
     rtol = 1e-4,
@@ -41,40 +27,49 @@ unit_exclude = [
     "solve_qp_edge_cases",
     "solve_integer_edge_cases",
     "solve_objbound_edge_cases",
+    "solve_zero_one_with_bounds_1",
+    "solve_zero_one_with_bounds_2",
+    "solve_zero_one_with_bounds_3",
+    "solve_unbounded_model", # dual equalities are inconsistent, so detect dual infeasibility but currently no certificate or status
     ]
 
 conic_exclude = String[
     # "lin",
+    # "norminf",
+    # "normone",
     # "soc",
     # "rsoc",
     # "exp",
     # "geomean",
+    # "pow",
     # "sdp",
     # "logdet",
     # "rootdet",
-    # TODO MOI bridges don't support square logdet or rootdet
+    # TODO currently some issue with square det transformation?
     "logdets",
     "rootdets",
     ]
 
 function test_moi(
     use_dense::Bool,
-    system_solver::Type{<:SO.CombinedHSDSystemSolver},
-    linear_model::Type{<:MO.LinearModel},
+    system_solver::Type{<:SO.CombinedHSDSystemSolver{T}},
+    linear_model::Type{<:MO.LinearModel{T}},
     verbose::Bool,
-    )
+    ) where {T <: Real}
     optimizer = MOIU.CachingOptimizer(
-        MOIU.UniversalFallback(HypatiaModelData{Float64}()),
-        Hypatia.Optimizer(
+        MOIU.UniversalFallback(MOIU.Model{T}()),
+        Hypatia.Optimizer{T}(
             use_dense = use_dense,
             test_certificates = true,
             verbose = verbose,
             system_solver = system_solver,
             linear_model = linear_model,
+            max_iters = 200,
             time_limit = 2e1,
             tol_rel_opt = 2e-8,
             tol_abs_opt = 2e-8,
             tol_feas = 1e-8,
+            tol_slow = 1e-7,
             )
         )
 
@@ -85,7 +80,7 @@ function test_moi(
         MOIT.contlineartest(optimizer, config)
     end
     @testset "conic tests" begin
-        MOIT.contconictest(MOIB.SquarePSD{Float64}(MOIB.RootDet{Float64}(optimizer)), config, conic_exclude)
+        MOIT.contconictest(MOIB.Constraint.Square{T}(MOIB.Constraint.RootDet{T}(optimizer)), config, conic_exclude)
     end
 
     return

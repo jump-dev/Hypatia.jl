@@ -16,15 +16,14 @@ using LinearAlgebra
 import Combinatorics
 using Test
 import Hypatia
-import Hypatia.HypReal
-import Hypatia.HypBlockMatrix
+import Hypatia.BlockMatrix
 const CO = Hypatia.Cones
 const MU = Hypatia.ModelUtilities
 
 include(joinpath(@__DIR__, "data.jl"))
 
 function polyminreal(
-    T::Type{<:HypReal},
+    T::Type{<:Real},
     polyname::Symbol,
     halfdeg::Int;
     use_primal::Bool = true,
@@ -57,18 +56,16 @@ function polyminreal(
 
     if use_wsos
         cones = CO.Cone{T}[CO.WSOSPolyInterp{T, T}(U, [P0, PWts...], !use_primal)]
-        cone_idxs = [1:U]
     else
         # will be set up iteratively
         cones = CO.Cone{T}[]
-        cone_idxs = UnitRange{Int}[]
     end
 
     if use_primal
         c = T[-1]
         if use_linops
-            A = HypBlockMatrix{T}(0, 1, Any[[]], [0:-1], [1:1])
-            G = HypBlockMatrix{T}(U, 1, [ones(T, U, 1)], [1:U], [1:1])
+            A = BlockMatrix{T}(0, 1, Any[[]], [0:-1], [1:1])
+            G = BlockMatrix{T}(U, 1, [ones(T, U, 1)], [1:U], [1:1])
         else
             A = zeros(T, 0, 1)
             G = ones(T, U, 1)
@@ -79,25 +76,23 @@ function polyminreal(
     else
         c = interp_vals
         if use_linops
-            A = HypBlockMatrix{T}(1, U, [ones(T, 1, U)], [1:1], [1:U])
+            A = BlockMatrix{T}(1, U, [ones(T, 1, U)], [1:1], [1:U])
         else
             A = ones(T, 1, U) # TODO eliminate constraint and first variable
         end
         b = T[1]
         if use_wsos
             if use_linops
-                G = HypBlockMatrix{T}(U, U, [-I], [1:U], [1:U])
+                G = BlockMatrix{T}(U, U, [-I], [1:U], [1:U])
             else
                 G = Diagonal(-one(T) * I, U)
             end
             h = zeros(T, U)
         else
             G_full = zeros(T, 0, U)
-            rowidx = 1
             for Pk in [P0, PWts...]
                 Lk = size(Pk, 2)
                 dk = div(Lk * (Lk + 1), 2)
-                push!(cone_idxs, rowidx:(rowidx + dk - 1))
                 push!(cones, CO.PosSemidefTri{T, T}(dk))
                 Gk = Matrix{T}(undef, dk, U)
                 l = 1
@@ -106,11 +101,10 @@ function polyminreal(
                     l += 1
                 end
                 G_full = vcat(G_full, Gk)
-                rowidx += dk
             end
             if use_linops
                 (nrows, ncols) = size(G_full)
-                G = HypBlockMatrix{T}(nrows, ncols, [G_full], [1:nrows], [1:ncols])
+                G = BlockMatrix{T}(nrows, ncols, [G_full], [1:nrows], [1:ncols])
             else
                 G = G_full
             end
@@ -118,39 +112,39 @@ function polyminreal(
         end
     end
 
-    return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs, true_obj = true_obj)
+    return (c = c, A = A, b = b, G = G, h = h, cones = cones, true_obj = true_obj)
 end
 
-polyminreal1(T::Type{<:HypReal}) = polyminreal(T, :heart, 2)
-polyminreal2(T::Type{<:HypReal}) = polyminreal(T, :schwefel, 2)
-polyminreal3(T::Type{<:HypReal}) = polyminreal(T, :magnetism7_ball, 2)
-polyminreal4(T::Type{<:HypReal}) = polyminreal(T, :motzkin_ellipsoid, 4)
-polyminreal5(T::Type{<:HypReal}) = polyminreal(T, :caprasse, 4)
-polyminreal6(T::Type{<:HypReal}) = polyminreal(T, :goldsteinprice, 7)
-polyminreal7(T::Type{<:HypReal}) = polyminreal(T, :lotkavolterra, 3)
-polyminreal8(T::Type{<:HypReal}) = polyminreal(T, :robinson, 8)
-polyminreal9(T::Type{<:HypReal}) = polyminreal(T, :robinson_ball, 8)
-polyminreal10(T::Type{<:HypReal}) = polyminreal(T, :rosenbrock, 5)
-polyminreal11(T::Type{<:HypReal}) = polyminreal(T, :butcher, 2)
-polyminreal12(T::Type{<:HypReal}) = polyminreal(T, :goldsteinprice_ellipsoid, 7)
-polyminreal13(T::Type{<:HypReal}) = polyminreal(T, :goldsteinprice_ball, 7)
-polyminreal14(T::Type{<:HypReal}) = polyminreal(T, :motzkin, 3, use_primal = false)
-polyminreal15(T::Type{<:HypReal}) = polyminreal(T, :motzkin, 3)
-polyminreal16(T::Type{<:HypReal}) = polyminreal(T, :reactiondiffusion, 4, use_primal = false)
-polyminreal17(T::Type{<:HypReal}) = polyminreal(T, :lotkavolterra, 3, use_primal = false)
-polyminreal18(T::Type{<:HypReal}) = polyminreal(T, :motzkin, 3, use_primal = false, use_wsos = false)
-polyminreal19(T::Type{<:HypReal}) = polyminreal(T, :motzkin, 3, use_primal = false, use_wsos = false)
-polyminreal20(T::Type{<:HypReal}) = polyminreal(T, :reactiondiffusion, 4, use_primal = false, use_wsos = false)
-polyminreal21(T::Type{<:HypReal}) = polyminreal(T, :lotkavolterra, 3, use_primal = false, use_wsos = false)
-polyminreal22(T::Type{<:HypReal}) = polyminreal(T, :random, 2, use_primal = true, use_wsos = true, n = 5, use_linops = true)
-polyminreal23(T::Type{<:HypReal}) = polyminreal(T, :random, 2, use_primal = true, use_wsos = true, n = 5, use_linops = false)
-polyminreal24(T::Type{<:HypReal}) = polyminreal(T, :random, 2, use_primal = false, use_wsos = true, n = 5, use_linops = true)
-polyminreal25(T::Type{<:HypReal}) = polyminreal(T, :random, 2, use_primal = false, use_wsos = false, n = 5, use_linops = false)
-polyminreal26(T::Type{<:HypReal}) = polyminreal(T, :random, 2, use_primal = false, use_wsos = true, n = 5, use_linops = true)
-polyminreal27(T::Type{<:HypReal}) = polyminreal(T, :random, 2, use_primal = false, use_wsos = false, n = 5, use_linops = false)
+polyminreal1(T::Type{<:Real}) = polyminreal(T, :heart, 2)
+polyminreal2(T::Type{<:Real}) = polyminreal(T, :schwefel, 2)
+polyminreal3(T::Type{<:Real}) = polyminreal(T, :magnetism7_ball, 2)
+polyminreal4(T::Type{<:Real}) = polyminreal(T, :motzkin_ellipsoid, 4)
+polyminreal5(T::Type{<:Real}) = polyminreal(T, :caprasse, 4)
+polyminreal6(T::Type{<:Real}) = polyminreal(T, :goldsteinprice, 7)
+polyminreal7(T::Type{<:Real}) = polyminreal(T, :lotkavolterra, 3)
+polyminreal8(T::Type{<:Real}) = polyminreal(T, :robinson, 8)
+polyminreal9(T::Type{<:Real}) = polyminreal(T, :robinson_ball, 8)
+polyminreal10(T::Type{<:Real}) = polyminreal(T, :rosenbrock, 5)
+polyminreal11(T::Type{<:Real}) = polyminreal(T, :butcher, 2)
+polyminreal12(T::Type{<:Real}) = polyminreal(T, :goldsteinprice_ellipsoid, 7)
+polyminreal13(T::Type{<:Real}) = polyminreal(T, :goldsteinprice_ball, 7)
+polyminreal14(T::Type{<:Real}) = polyminreal(T, :motzkin, 3, use_primal = false)
+polyminreal15(T::Type{<:Real}) = polyminreal(T, :motzkin, 3)
+polyminreal16(T::Type{<:Real}) = polyminreal(T, :reactiondiffusion, 4, use_primal = false)
+polyminreal17(T::Type{<:Real}) = polyminreal(T, :lotkavolterra, 3, use_primal = false)
+polyminreal18(T::Type{<:Real}) = polyminreal(T, :motzkin, 3, use_primal = false, use_wsos = false)
+polyminreal19(T::Type{<:Real}) = polyminreal(T, :motzkin, 3, use_primal = false, use_wsos = false)
+polyminreal20(T::Type{<:Real}) = polyminreal(T, :reactiondiffusion, 4, use_primal = false, use_wsos = false)
+polyminreal21(T::Type{<:Real}) = polyminreal(T, :lotkavolterra, 3, use_primal = false, use_wsos = false)
+polyminreal22(T::Type{<:Real}) = polyminreal(T, :random, 2, use_primal = true, use_wsos = true, n = 5, use_linops = true)
+polyminreal23(T::Type{<:Real}) = polyminreal(T, :random, 2, use_primal = true, use_wsos = true, n = 5, use_linops = false)
+polyminreal24(T::Type{<:Real}) = polyminreal(T, :random, 2, use_primal = false, use_wsos = true, n = 5, use_linops = true)
+polyminreal25(T::Type{<:Real}) = polyminreal(T, :random, 2, use_primal = false, use_wsos = false, n = 5, use_linops = false)
+polyminreal26(T::Type{<:Real}) = polyminreal(T, :random, 2, use_primal = false, use_wsos = true, n = 5, use_linops = true)
+polyminreal27(T::Type{<:Real}) = polyminreal(T, :random, 2, use_primal = false, use_wsos = false, n = 5, use_linops = false)
 
 function polymincomplex(
-    T::Type{<:HypReal},
+    T::Type{<:Real},
     polyname::Symbol,
     halfdeg::Int;
     use_primal::Bool = true,
@@ -224,25 +218,24 @@ function polymincomplex(
         h = zeros(T, U)
     end
     cones = CO.Cone{T}[CO.WSOSPolyInterp{T, Complex{T}}(U, P_data, !use_primal)]
-    cone_idxs = [1:U]
 
-    return (c = c, A = A, b = b, G = G, h = h, cones = cones, cone_idxs = cone_idxs, true_obj = true_obj)
+    return (c = c, A = A, b = b, G = G, h = h, cones = cones, true_obj = true_obj)
 end
 
-polymincomplex1(T::Type{<:HypReal}) = polymincomplex(T, :abs1d, 1)
-polymincomplex2(T::Type{<:HypReal}) = polymincomplex(T, :absunit1d, 1)
-polymincomplex3(T::Type{<:HypReal}) = polymincomplex(T, :negabsunit1d, 2)
-polymincomplex4(T::Type{<:HypReal}) = polymincomplex(T, :absball2d, 1)
-polymincomplex5(T::Type{<:HypReal}) = polymincomplex(T, :absbox2d, 2)
-polymincomplex6(T::Type{<:HypReal}) = polymincomplex(T, :negabsbox2d, 1)
-polymincomplex7(T::Type{<:HypReal}) = polymincomplex(T, :denseunit1d, 2)
-polymincomplex8(T::Type{<:HypReal}) = polymincomplex(T, :abs1d, 1, use_primal = false)
-polymincomplex9(T::Type{<:HypReal}) = polymincomplex(T, :absunit1d, 1, use_primal = false)
-polymincomplex10(T::Type{<:HypReal}) = polymincomplex(T, :negabsunit1d, 2, use_primal = false)
-polymincomplex11(T::Type{<:HypReal}) = polymincomplex(T, :absball2d, 1, use_primal = false)
-polymincomplex12(T::Type{<:HypReal}) = polymincomplex(T, :absbox2d, 2, use_primal = false)
-polymincomplex13(T::Type{<:HypReal}) = polymincomplex(T, :negabsbox2d, 1, use_primal = false)
-polymincomplex14(T::Type{<:HypReal}) = polymincomplex(T, :denseunit1d, 2, use_primal = false)
+polymincomplex1(T::Type{<:Real}) = polymincomplex(T, :abs1d, 1)
+polymincomplex2(T::Type{<:Real}) = polymincomplex(T, :absunit1d, 1)
+polymincomplex3(T::Type{<:Real}) = polymincomplex(T, :negabsunit1d, 2)
+polymincomplex4(T::Type{<:Real}) = polymincomplex(T, :absball2d, 1)
+polymincomplex5(T::Type{<:Real}) = polymincomplex(T, :absbox2d, 2)
+polymincomplex6(T::Type{<:Real}) = polymincomplex(T, :negabsbox2d, 1)
+polymincomplex7(T::Type{<:Real}) = polymincomplex(T, :denseunit1d, 2)
+polymincomplex8(T::Type{<:Real}) = polymincomplex(T, :abs1d, 1, use_primal = false)
+polymincomplex9(T::Type{<:Real}) = polymincomplex(T, :absunit1d, 1, use_primal = false)
+polymincomplex10(T::Type{<:Real}) = polymincomplex(T, :negabsunit1d, 2, use_primal = false)
+polymincomplex11(T::Type{<:Real}) = polymincomplex(T, :absball2d, 1, use_primal = false)
+polymincomplex12(T::Type{<:Real}) = polymincomplex(T, :absbox2d, 2, use_primal = false)
+polymincomplex13(T::Type{<:Real}) = polymincomplex(T, :negabsbox2d, 1, use_primal = false)
+polymincomplex14(T::Type{<:Real}) = polymincomplex(T, :denseunit1d, 2, use_primal = false)
 
 instances_polymin_all = [
     polyminreal1,
@@ -300,14 +293,13 @@ instances_polymin_few = [
     polymincomplex14,
     ]
 
-function test_polymin(instance::Function; T::Type{<:HypReal} = Float64, test_options::NamedTuple = NamedTuple(), rseed::Int = 1)
+function test_polymin(instance::Function; T::Type{<:Real} = Float64, test_options::NamedTuple = (atol = sqrt(sqrt(eps(T))),), rseed::Int = 1)
     Random.seed!(rseed)
-    tol = max(1e-5, sqrt(sqrt(eps(T))))
     d = instance(T)
-    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones, d.cone_idxs; test_options..., atol = tol, rtol = tol)
+    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; test_options...)
     @test r.status == :Optimal
     if !isnan(d.true_obj)
-        @test r.primal_obj ≈ d.true_obj atol = tol rtol = tol
+        @test r.primal_obj ≈ d.true_obj atol=test_options.atol rtol=test_options.atol
     end
     return
 end

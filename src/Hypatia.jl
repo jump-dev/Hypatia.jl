@@ -4,14 +4,12 @@ Copyright 2018, Chris Coey and contributors
 
 module Hypatia
 
+const RealOrComplex{T <: Real} = Union{T, Complex{T}}
+
 using LinearAlgebra
 
-const HypReal = Union{AbstractFloat, Rational}
-const HypRealOrComplex{T <: HypReal} = Union{T, Complex{T}}
-
+include("blockmatrix.jl")
 include("linearalgebra.jl")
-
-const HypLinMap{T <: HypReal} = Union{UniformScaling, AbstractMatrix{T}, HypBlockMatrix{T}}
 
 # submodules
 include("ModelUtilities/ModelUtilities.jl")

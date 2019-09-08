@@ -7,15 +7,15 @@ interpolation-based weighted-sum-of-squares (multivariate) polynomial cone param
 definition and dual barrier from "Sum-of-squares optimization without semidefinite programming" by D. Papp and S. Yildiz, available at https://arxiv.org/abs/1712.01792
 
 TODO
-- can perform loop for calculating g and H in parallel
+- perform loop for calculating g and H in parallel
 - scale the interior direction
 =#
 
-mutable struct WSOSPolyInterp{T <: HypReal, R <: HypRealOrComplex{T}} <: Cone{T}
+mutable struct WSOSPolyInterp{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     use_dual::Bool
     dim::Int
     Ps::Vector{Matrix{R}}
-    point::AbstractVector{T}
+    point::Vector{T}
 
     feas_updated::Bool
     grad_updated::Bool
@@ -32,10 +32,13 @@ mutable struct WSOSPolyInterp{T <: HypReal, R <: HypRealOrComplex{T}} <: Cone{T}
     tmpLU::Vector{Matrix{R}}
     tmpUU::Matrix{R}
     ΛFs::Vector
-    tmp_hess::Symmetric{T, Matrix{T}}
-    hess_fact # TODO prealloc
+    chol_caches::Vector
 
-    function WSOSPolyInterp{T, R}(dim::Int, Ps::Vector{Matrix{R}}, is_dual::Bool) where {R <: HypRealOrComplex{T}} where {T <: HypReal}
+    tmp_hess::Symmetric{T, Matrix{T}}
+    hess_fact
+    hess_fact_cache
+
+    function WSOSPolyInterp{T, R}(dim::Int, Ps::Vector{Matrix{R}}, is_dual::Bool) where {R <: RealOrComplex{T}} where {T <: Real}
         for k in eachindex(Ps)
             @assert size(Ps[k], 1) == dim
         end
@@ -47,12 +50,12 @@ mutable struct WSOSPolyInterp{T <: HypReal, R <: HypRealOrComplex{T}} <: Cone{T}
     end
 end
 
-WSOSPolyInterp{T, R}(dim::Int, Ps::Vector{Matrix{R}}) where {R <: HypRealOrComplex{T}} where {T <: HypReal} = WSOSPolyInterp{T, R}(dim, Ps, false)
+WSOSPolyInterp{T, R}(dim::Int, Ps::Vector{Matrix{R}}) where {R <: RealOrComplex{T}} where {T <: Real} = WSOSPolyInterp{T, R}(dim, Ps, false)
 
-# TODO maybe only allocate the fields we use
-function setup_data(cone::WSOSPolyInterp{T, R}) where {R <: HypRealOrComplex{T}} where {T <: HypReal}
+function setup_data(cone::WSOSPolyInterp{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     reset_data(cone)
     dim = cone.dim
+    cone.point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     Ps = cone.Ps
@@ -61,7 +64,9 @@ function setup_data(cone::WSOSPolyInterp{T, R}) where {R <: HypRealOrComplex{T}}
     cone.tmpLU = [Matrix{R}(undef, size(Pk, 2), dim) for Pk in Ps]
     cone.tmpUU = Matrix{R}(undef, dim, dim)
     cone.ΛFs = Vector{Any}(undef, length(Ps))
+    cone.chol_caches = [HypCholCache('L', LLk) for LLk in cone.tmpLL]
     cone.tmp_hess = Symmetric(zeros(T, dim, dim), :U)
+    cone.hess_fact_cache = nothing
     return
 end
 
@@ -83,8 +88,7 @@ function update_feas(cone::WSOSPolyInterp)
         LLk = cone.tmpLL[k]
         mul!(ULk, D, Pk)
         mul!(LLk, Pk', ULk)
-
-        ΛFk = hyp_chol!(Hermitian(LLk, :L))
+        ΛFk = hyp_chol!(cone.chol_caches[k], LLk)
         if !isposdef(ΛFk)
             cone.is_feas = false
             break
@@ -102,14 +106,12 @@ function update_grad(cone::WSOSPolyInterp)
     @assert cone.is_feas
     cone.grad .= 0
     @inbounds for k in eachindex(cone.Ps)
-        LUk = hyp_ldiv_chol_L!(cone.tmpLU[k], cone.ΛFs[k], cone.Ps[k]')
+        LUk = cone.tmpLU[k]
+        copyto!(LUk, cone.Ps[k]')
+        ldiv!(LowerTriangular(cone.ΛFs[k].L), LUk)
         @inbounds for j in 1:cone.dim
             cone.grad[j] -= sum(abs2, view(LUk, :, j))
         end
-        # hyp_AtA!(UU, LUk)
-        # for j in eachindex(cone.grad)
-        #     cone.grad[j] -= real(UU[j, j])
-        # end
     end
     cone.grad_updated = true
     return cone.grad
@@ -120,7 +122,6 @@ function update_hess(cone::WSOSPolyInterp)
     cone.hess .= 0
     @inbounds for k in eachindex(cone.Ps)
         UUk = hyp_AtA!(cone.tmpUU, cone.tmpLU[k])
-        # cone.hess.data += abs2.(UUk)
         @inbounds for j in 1:cone.dim, i in 1:j
             cone.hess.data[i, j] += abs2(UUk[i, j])
         end

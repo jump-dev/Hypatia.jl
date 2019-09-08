@@ -4,51 +4,66 @@ Copyright 2018, Chris Coey and contributors
 MathOptInterface wrapper of Hypatia solver
 =#
 
-mutable struct Optimizer <: MOI.AbstractOptimizer
+mutable struct Optimizer{T <: Real} <: MOI.AbstractOptimizer
+    load_only::Bool
     use_dense::Bool
     test_certificates::Bool
+
     verbose::Bool
-    system_solver::Type{<:Solvers.CombinedHSDSystemSolver}
-    linear_model::Type{<:Models.LinearModel}
-    tol_rel_opt::Float64
-    tol_abs_opt::Float64
-    tol_feas::Float64
+    system_solver::Type{<:Solvers.CombinedHSDSystemSolver{T}}
+    linear_model::Type{<:Models.LinearModel{T}}
     max_iters::Int
     time_limit::Float64
+    tol_rel_opt::T
+    tol_abs_opt::T
+    tol_feas::T
+    tol_slow::T
 
-    c::Vector{Float64}
-    A::HypLinMap{Float64}
-    b::Vector{Float64}
-    G::HypLinMap{Float64}
-    h::Vector{Float64}
-    cones::Vector{Cones.Cone{Float64}}
-    cone_idxs::Vector{UnitRange{Int}}
+    obj_offset::T
+    c::Vector{T}
+    A
+    b::Vector{T}
+    G
+    h::Vector{T}
+    cones::Vector{Cones.Cone{T}}
 
     solver::Solvers.HSDSolver
 
     obj_sense::MOI.OptimizationSense
-    obj_const::Float64
     num_eq_constrs::Int
     constr_offset_eq::Vector{Int}
-    constr_prim_eq::Vector{Float64}
+    constr_prim_eq::Vector{T}
     constr_offset_cone::Vector{Int}
-    constr_prim_cone::Vector{Float64}
+    constr_prim_cone::Vector{T}
     interval_idxs::UnitRange{Int}
-    interval_scales::Vector{Float64}
+    interval_scales::Vector{T}
 
-    x::Vector{Float64}
-    s::Vector{Float64}
-    y::Vector{Float64}
-    z::Vector{Float64}
+    x::Vector{T}
+    s::Vector{T}
+    y::Vector{T}
+    z::Vector{T}
     status::Symbol
     solve_time::Float64
-    primal_obj::Float64
-    dual_obj::Float64
+    primal_obj::T
+    dual_obj::T
 
-    load_only::Bool
+    function Optimizer{T}(;
+        load_only::Bool = false,
+        use_dense::Bool = true,
+        test_certificates::Bool = false,
+        verbose::Bool = false,
+        system_solver::Type{<:Solvers.CombinedHSDSystemSolver{T}} = Solvers.QRCholCombinedHSDSystemSolver{T},
+        linear_model::Type{<:Models.LinearModel{T}} = Models.PreprocessedLinearModel{T},
+        max_iters::Int = 1000,
+        time_limit::Real = Inf,
+        tol_rel_opt::Real = sqrt(eps(T)),
+        tol_abs_opt::Real = tol_rel_opt,
+        tol_feas::Real = tol_rel_opt,
+        tol_slow::Real = T(1e-3),
+        ) where {T <: Real}
+        opt = new{T}()
 
-    function Optimizer(use_dense::Bool, test_certificates::Bool, verbose::Bool, system_solver::Type{<:Solvers.CombinedHSDSystemSolver}, linear_model::Type{<:Models.LinearModel}, max_iters::Int, time_limit::Float64, tol_rel_opt::Float64, tol_abs_opt::Float64, tol_feas::Float64, load_only::Bool)
-        opt = new()
+        opt.load_only = load_only
         opt.use_dense = use_dense
         opt.test_certificates = test_certificates
         opt.verbose = verbose
@@ -59,60 +74,46 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
         opt.tol_rel_opt = tol_rel_opt
         opt.tol_abs_opt = tol_abs_opt
         opt.tol_feas = tol_feas
+        opt.tol_slow = tol_slow
+
         opt.status = :NotLoaded
-        opt.load_only = load_only
+
         return opt
     end
 end
 
-Optimizer(;
-    use_dense::Bool = true,
-    test_certificates::Bool = false,
-    verbose::Bool = false,
-    system_solver::Type{<:Solvers.CombinedHSDSystemSolver} = Solvers.QRCholCombinedHSDSystemSolver{Float64},
-    linear_model::Type{<:Models.LinearModel} = Models.PreprocessedLinearModel{Float64},
-    max_iters::Int = 500,
-    time_limit::Float64 = 3.6e3, # TODO should be Inf
-    tol_rel_opt::Float64 = 1e-6,
-    tol_abs_opt::Float64 = 1e-7,
-    tol_feas::Float64 = 1e-7,
-    load_only::Bool = false,
-    ) = Optimizer(use_dense, test_certificates, verbose, system_solver, linear_model, max_iters, time_limit, tol_rel_opt, tol_abs_opt, tol_feas, load_only)
-
 MOI.get(::Optimizer, ::MOI.SolverName) = "Hypatia"
+MOI.get(opt::Optimizer, ::MOI.RawSolver) = opt.solver
 
 MOI.is_empty(opt::Optimizer) = (opt.status == :NotLoaded)
-MOI.empty!(opt::Optimizer) = (opt.status = :NotLoaded) # TODO empty the data and results? keep options?
+MOI.empty!(opt::Optimizer) = (opt.status = :NotLoaded)
 
-MOI.supports(::Optimizer, ::Union{
+MOI.supports(::Optimizer{T}, ::Union{
     MOI.ObjectiveSense,
     MOI.ObjectiveFunction{MOI.SingleVariable},
-    MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}},
-    ) = true
+    MOI.ObjectiveFunction{MOI.ScalarAffineFunction{T}}},
+    ) where {T <: Real} = true
 
-# TODO don't restrict to Float64 type
-SupportedFuns = Union{
-    MOI.SingleVariable, MOI.ScalarAffineFunction{Float64},
-    MOI.VectorOfVariables, MOI.VectorAffineFunction{Float64},
-    }
+MOI.supports_constraint(::Optimizer{T},
+    ::Type{<:Union{MOI.SingleVariable, MOI.ScalarAffineFunction{T}}},
+    ::Type{<:Union{MOI.EqualTo{T}, MOI.GreaterThan{T}, MOI.LessThan{T}, MOI.Interval{T}}}
+    ) where {T <: Real} = true
+MOI.supports_constraint(::Optimizer{T},
+    ::Type{<:Union{MOI.VectorOfVariables, MOI.VectorAffineFunction{T}}},
+    ::Type{<:Union{MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives, MOIOtherCones{T}}}
+    ) where {T <: Real} = true
 
-SupportedSets = Union{
-    MOI.EqualTo{Float64}, MOI.Zeros,
-    MOI.GreaterThan{Float64}, MOI.Nonnegatives,
-    MOI.LessThan{Float64}, MOI.Nonpositives,
-    MOI.Interval{Float64},
-    MOIOtherCones...
-    }
-
-MOI.supports_constraint(::Optimizer, ::Type{<:SupportedFuns}, ::Type{<:SupportedSets}) = true
+MOI.supports(::Optimizer, ::MOI.Silent) = true
+MOI.set(opt::Optimizer, ::MOI.Silent, value::Bool) = (opt.verbose = value)
+MOI.get(opt::Optimizer, ::MOI.Silent) = opt.verbose
 
 # build representation as min c'x s.t. A*x = b, h - G*x in K
 function MOI.copy_to(
-    opt::Optimizer,
+    opt::Optimizer{T},
     src::MOI.ModelLike;
     copy_names::Bool = false,
     warn_attributes::Bool = true,
-    )
+    ) where {T <: Real}
     @assert !copy_names
     idx_map = Dict{MOI.Index, MOI.Index}()
 
@@ -128,19 +129,22 @@ function MOI.copy_to(
     # objective function
     F = MOI.get(src, MOI.ObjectiveFunctionType())
     if F == MOI.SingleVariable
-        obj = MOI.ScalarAffineFunction{Float64}(MOI.get(src, MOI.ObjectiveFunction{F}()))
-    elseif F == MOI.ScalarAffineFunction{Float64}
+        obj = MOI.ScalarAffineFunction{T}(MOI.get(src, MOI.ObjectiveFunction{F}()))
+    elseif F == MOI.ScalarAffineFunction{T}
         obj = MOI.get(src, MOI.ObjectiveFunction{F}())
     end
-    (Jc, Vc) = (Int[], Float64[])
+    (Jc, Vc) = (Int[], T[])
     for t in obj.terms
         push!(Jc, idx_map[t.variable_index].value)
         push!(Vc, t.coefficient)
     end
+    opt.obj_offset = obj.constant
     if MOI.get(src, MOI.ObjectiveSense()) == MOI.MAX_SENSE
-        Vc .*= -1.0
+        Vc .*= -1
+        opt.obj_offset = -obj.constant
+    else
+        opt.obj_offset = obj.constant
     end
-    opt.obj_const = obj.constant
     opt.obj_sense = MOI.get(src, MOI.ObjectiveSense())
     model_c = Vector(sparsevec(Jc, Vc, n))
 
@@ -152,29 +156,28 @@ function MOI.copy_to(
 
     # equality constraints
     p = 0 # rows of A (equality constraint matrix)
-    (IA, JA, VA) = (Int[], Int[], Float64[])
-    (Ib, Vb) = (Int[], Float64[])
-    (Icpe, Vcpe) = (Int[], Float64[]) # constraint set constants for opt.constr_prim_eq
+    (IA, JA, VA) = (Int[], Int[], T[])
+    (Ib, Vb) = (Int[], T[])
+    (Icpe, Vcpe) = (Int[], T[]) # constraint set constants for opt.constr_prim_eq
     constr_offset_eq = Vector{Int}()
 
-    # TODO can preprocess variables equal to constant
-    for ci in get_src_cons(MOI.SingleVariable, MOI.EqualTo{Float64})
+    for ci in get_src_cons(MOI.SingleVariable, MOI.EqualTo{T})
         i += 1
-        idx_map[ci] = MOI.ConstraintIndex{MOI.SingleVariable, MOI.EqualTo{Float64}}(i)
+        idx_map[ci] = MOI.ConstraintIndex{MOI.SingleVariable, MOI.EqualTo{T}}(i)
         push!(constr_offset_eq, p)
         p += 1
         push!(IA, p)
         push!(JA, idx_map[get_con_fun(ci).variable].value)
-        push!(VA, -1.0)
+        push!(VA, -1)
         push!(Ib, p)
         push!(Vb, -get_con_set(ci).value)
         push!(Icpe, p)
         push!(Vcpe, get_con_set(ci).value)
     end
 
-    for ci in get_src_cons(MOI.ScalarAffineFunction{Float64}, MOI.EqualTo{Float64})
+    for ci in get_src_cons(MOI.ScalarAffineFunction{T}, MOI.EqualTo{T})
         i += 1
-        idx_map[ci] = MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, MOI.EqualTo{Float64}}(i)
+        idx_map[ci] = MOI.ConstraintIndex{MOI.ScalarAffineFunction{T}, MOI.EqualTo{T}}(i)
         push!(constr_offset_eq, p)
         p += 1
         fi = get_con_fun(ci)
@@ -189,7 +192,6 @@ function MOI.copy_to(
         push!(Vcpe, get_con_set(ci).value)
     end
 
-    # TODO can preprocess variables equal to zero here
     for ci in get_src_cons(MOI.VectorOfVariables, MOI.Zeros)
         i += 1
         idx_map[ci] = MOI.ConstraintIndex{MOI.VectorOfVariables, MOI.Zeros}(i)
@@ -202,9 +204,9 @@ function MOI.copy_to(
         p += dim
     end
 
-    for ci in get_src_cons(MOI.VectorAffineFunction{Float64}, MOI.Zeros)
+    for ci in get_src_cons(MOI.VectorAffineFunction{T}, MOI.Zeros)
         i += 1
-        idx_map[ci] = MOI.ConstraintIndex{MOI.VectorAffineFunction{Float64}, MOI.Zeros}(i)
+        idx_map[ci] = MOI.ConstraintIndex{MOI.VectorAffineFunction{T}, MOI.Zeros}(i)
         push!(constr_offset_eq, p)
         fi = get_con_fun(ci)
         dim = MOI.output_dimension(fi)
@@ -224,40 +226,39 @@ function MOI.copy_to(
     else
         model_A = dropzeros!(sparse(IA, JA, VA, p, n))
     end
-    model_b = Vector(sparsevec(Ib, Vb, p)) # TODO if type less strongly, this can be sparse too
+    model_b = Vector(sparsevec(Ib, Vb, p))
     opt.num_eq_constrs = i
     opt.constr_prim_eq = Vector(sparsevec(Icpe, Vcpe, p))
     opt.constr_offset_eq = constr_offset_eq
 
     # conic constraints
     q = 0 # rows of G (cone constraint matrix)
-    (IG, JG, VG) = (Int[], Int[], Float64[])
-    (Ih, Vh) = (Int[], Float64[])
-    (Icpc, Vcpc) = (Int[], Float64[]) # constraint set constants for opt.constr_prim_eq
+    (IG, JG, VG) = (Int[], Int[], T[])
+    (Ih, Vh) = (Int[], T[])
+    (Icpc, Vcpc) = (Int[], T[]) # constraint set constants for opt.constr_prim_eq
     constr_offset_cone = Vector{Int}()
-    cones = Cones.Cone{Float64}[]
-    cone_idxs = UnitRange{Int}[]
+    cones = Cones.Cone{T}[]
 
     # build up one nonnegative cone
     nonneg_start = q
 
-    for ci in get_src_cons(MOI.SingleVariable, MOI.GreaterThan{Float64})
+    for ci in get_src_cons(MOI.SingleVariable, MOI.GreaterThan{T})
         i += 1
-        idx_map[ci] = MOI.ConstraintIndex{MOI.SingleVariable, MOI.GreaterThan{Float64}}(i)
+        idx_map[ci] = MOI.ConstraintIndex{MOI.SingleVariable, MOI.GreaterThan{T}}(i)
         push!(constr_offset_cone, q)
         q += 1
         push!(IG, q)
         push!(JG, idx_map[get_con_fun(ci).variable].value)
-        push!(VG, -1.0)
+        push!(VG, -1)
         push!(Ih, q)
         push!(Vh, -get_con_set(ci).lower)
         push!(Vcpc, get_con_set(ci).lower)
         push!(Icpc, q)
     end
 
-    for ci in get_src_cons(MOI.ScalarAffineFunction{Float64}, MOI.GreaterThan{Float64})
+    for ci in get_src_cons(MOI.ScalarAffineFunction{T}, MOI.GreaterThan{T})
         i += 1
-        idx_map[ci] = MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, MOI.GreaterThan{Float64}}(i)
+        idx_map[ci] = MOI.ConstraintIndex{MOI.ScalarAffineFunction{T}, MOI.GreaterThan{T}}(i)
         push!(constr_offset_cone, q)
         q += 1
         fi = get_con_fun(ci)
@@ -280,13 +281,13 @@ function MOI.copy_to(
             q += 1
             push!(IG, q)
             push!(JG, idx_map[vj].value)
-            push!(VG, -1.0)
+            push!(VG, -1)
         end
     end
 
-    for ci in get_src_cons(MOI.VectorAffineFunction{Float64}, MOI.Nonnegatives)
+    for ci in get_src_cons(MOI.VectorAffineFunction{T}, MOI.Nonnegatives)
         i += 1
-        idx_map[ci] = MOI.ConstraintIndex{MOI.VectorAffineFunction{Float64}, MOI.Nonnegatives}(i)
+        idx_map[ci] = MOI.ConstraintIndex{MOI.VectorAffineFunction{T}, MOI.Nonnegatives}(i)
         push!(constr_offset_cone, q)
         fi = get_con_fun(ci)
         dim = MOI.output_dimension(fi)
@@ -302,30 +303,29 @@ function MOI.copy_to(
 
     if q > nonneg_start
         # exists at least one nonnegative constraint
-        push!(cones, Cones.Nonnegative{Float64}(q - nonneg_start))
-        push!(cone_idxs, (nonneg_start + 1):q)
+        push!(cones, Cones.Nonnegative{T}(q - nonneg_start))
     end
 
     # build up one nonpositive cone
     nonpos_start = q
 
-    for ci in get_src_cons(MOI.SingleVariable, MOI.LessThan{Float64})
+    for ci in get_src_cons(MOI.SingleVariable, MOI.LessThan{T})
         i += 1
-        idx_map[ci] = MOI.ConstraintIndex{MOI.SingleVariable, MOI.LessThan{Float64}}(i)
+        idx_map[ci] = MOI.ConstraintIndex{MOI.SingleVariable, MOI.LessThan{T}}(i)
         push!(constr_offset_cone, q)
         q += 1
         push!(IG, q)
         push!(JG, idx_map[get_con_fun(ci).variable].value)
-        push!(VG, -1.0)
+        push!(VG, -1)
         push!(Ih, q)
         push!(Vh, -get_con_set(ci).upper)
         push!(Vcpc, get_con_set(ci).upper)
         push!(Icpc, q)
     end
 
-    for ci in get_src_cons(MOI.ScalarAffineFunction{Float64}, MOI.LessThan{Float64})
+    for ci in get_src_cons(MOI.ScalarAffineFunction{T}, MOI.LessThan{T})
         i += 1
-        idx_map[ci] = MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, MOI.LessThan{Float64}}(i)
+        idx_map[ci] = MOI.ConstraintIndex{MOI.ScalarAffineFunction{T}, MOI.LessThan{T}}(i)
         push!(constr_offset_cone, q)
         q += 1
         fi = get_con_fun(ci)
@@ -348,13 +348,13 @@ function MOI.copy_to(
             q += 1
             push!(IG, q)
             push!(JG, idx_map[vj].value)
-            push!(VG, -1.0)
+            push!(VG, -1)
         end
     end
 
-    for ci in get_src_cons(MOI.VectorAffineFunction{Float64}, MOI.Nonpositives)
+    for ci in get_src_cons(MOI.VectorAffineFunction{T}, MOI.Nonpositives)
         i += 1
-        idx_map[ci] = MOI.ConstraintIndex{MOI.VectorAffineFunction{Float64}, MOI.Nonpositives}(i)
+        idx_map[ci] = MOI.ConstraintIndex{MOI.VectorAffineFunction{T}, MOI.Nonpositives}(i)
         push!(constr_offset_cone, q)
         fi = get_con_fun(ci)
         dim = MOI.output_dimension(fi)
@@ -370,29 +370,28 @@ function MOI.copy_to(
 
     if q > nonpos_start
         # exists at least one nonpositive constraint
-        push!(cones, Cones.Nonpositive{Float64}(q - nonpos_start))
-        push!(cone_idxs, (nonpos_start + 1):q)
+        push!(cones, Cones.Nonpositive{T}(q - nonpos_start))
     end
 
     # build up one L_infinity norm cone from two-sided interval constraints
     interval_start = q
-    num_intervals = MOI.get(src, MOI.NumberOfConstraints{MOI.SingleVariable, MOI.Interval{Float64}}()) +
-        MOI.get(src, MOI.NumberOfConstraints{MOI.ScalarAffineFunction{Float64}, MOI.Interval{Float64}}())
-    interval_scales = Vector{Float64}(undef, num_intervals)
+    num_intervals = MOI.get(src, MOI.NumberOfConstraints{MOI.SingleVariable, MOI.Interval{T}}()) +
+        MOI.get(src, MOI.NumberOfConstraints{MOI.ScalarAffineFunction{T}, MOI.Interval{T}}())
+    interval_scales = Vector{T}(undef, num_intervals)
 
     if num_intervals > 0
         i += 1
         push!(constr_offset_cone, q)
         q += 1
         push!(Ih, q)
-        push!(Vh, 1.0)
+        push!(Vh, 1)
     end
 
     interval_count = 0
 
-    for ci in get_src_cons(MOI.SingleVariable, MOI.Interval{Float64})
+    for ci in get_src_cons(MOI.SingleVariable, MOI.Interval{T})
         i += 1
-        idx_map[ci] = MOI.ConstraintIndex{MOI.SingleVariable, MOI.Interval{Float64}}(i)
+        idx_map[ci] = MOI.ConstraintIndex{MOI.SingleVariable, MOI.Interval{T}}(i)
         push!(constr_offset_cone, q)
         q += 1
 
@@ -400,8 +399,8 @@ function MOI.copy_to(
         lower = get_con_set(ci).lower
         @assert isfinite(upper) && isfinite(lower)
         @assert upper > lower
-        mid = 0.5 * (upper + lower)
-        scal = 2.0 * inv(upper - lower)
+        mid = (upper + lower) / 2
+        scal = 2 * inv(upper - lower)
 
         push!(IG, q)
         push!(JG, idx_map[get_con_fun(ci).variable].value)
@@ -414,9 +413,9 @@ function MOI.copy_to(
         interval_scales[interval_count] = scal
     end
 
-    for ci in get_src_cons(MOI.ScalarAffineFunction{Float64}, MOI.Interval{Float64})
+    for ci in get_src_cons(MOI.ScalarAffineFunction{T}, MOI.Interval{T})
         i += 1
-        idx_map[ci] = MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, MOI.Interval{Float64}}(i)
+        idx_map[ci] = MOI.ConstraintIndex{MOI.ScalarAffineFunction{T}, MOI.Interval{T}}(i)
         push!(constr_offset_cone, q)
         q += 1
 
@@ -424,8 +423,8 @@ function MOI.copy_to(
         lower = get_con_set(ci).lower
         @assert isfinite(upper) && isfinite(lower)
         @assert upper > lower
-        mid = 0.5 * (upper + lower)
-        scal = 2.0 / (upper - lower)
+        mid = (upper + lower) / 2
+        scal = 2 / (upper - lower)
 
         fi = get_con_fun(ci)
         for vt in fi.terms
@@ -445,13 +444,12 @@ function MOI.copy_to(
     opt.interval_scales = interval_scales
     if q > interval_start
         # exists at least one interval-type constraint
-        push!(cones, Cones.EpiNormInf{Float64}(q - interval_start))
-        push!(cone_idxs, (interval_start + 1):q)
+        push!(cones, Cones.EpiNormInf{T}(q - interval_start))
     end
 
     # add non-LP conic constraints
 
-    for S in MOIOtherCones, F in (MOI.VectorOfVariables, MOI.VectorAffineFunction{Float64})
+    for S in MOIOtherConesList(T), F in (MOI.VectorOfVariables, MOI.VectorAffineFunction{T})
         for ci in get_src_cons(F, S)
             i += 1
             idx_map[ci] = MOI.ConstraintIndex{F, S}(i)
@@ -459,19 +457,23 @@ function MOI.copy_to(
             fi = get_con_fun(ci)
             si = get_con_set(ci)
             dim = MOI.output_dimension(fi)
+            conei = cone_from_moi(T, si)
             if F == MOI.VectorOfVariables
                 append!(JG, idx_map[vj].value for vj in fi.variables)
-                (IGi, VGi, conei) = build_var_cone(fi, si, dim, q)
+                IGi = (q + 1):(q + dim)
+                VGi = -ones(T, dim)
             else
                 append!(JG, idx_map[vt.scalar_term.variable_index].value for vt in fi.terms)
-                (IGi, VGi, Ihi, Vhi, conei) = build_constr_cone(fi, si, dim, q)
+                IGi = [q + vt.output_index for vt in fi.terms]
+                VGi = [-vt.scalar_term.coefficient for vt in fi.terms]
+                Ihi = (q + 1):(q + dim)
+                Vhi = fi.constants
                 append!(Ih, Ihi)
                 append!(Vh, Vhi)
             end
             append!(IG, IGi)
             append!(VG, VGi)
             push!(cones, conei)
-            push!(cone_idxs, (q + 1):(q + dim))
             q += dim
         end
     end
@@ -491,7 +493,6 @@ function MOI.copy_to(
     opt.G = model_G
     opt.h = model_h
     opt.cones = cones
-    opt.cone_idxs = cone_idxs
 
     opt.constr_offset_cone = constr_offset_cone
     opt.constr_prim_cone = Vector(sparsevec(Icpc, Vcpc, q))
@@ -501,16 +502,16 @@ function MOI.copy_to(
     return idx_map
 end
 
-function MOI.optimize!(opt::Optimizer)
+function MOI.optimize!(opt::Optimizer{T}) where {T <: Real}
     if opt.load_only
         return
     end
-    model = opt.linear_model(copy(opt.c), copy(opt.A), copy(opt.b), copy(opt.G), copy(opt.h), opt.cones, opt.cone_idxs)
-    stepper = Solvers.CombinedHSDStepper{Float64}(model, system_solver = opt.system_solver(model))
-    solver = Solvers.HSDSolver{Float64}(
+    model = opt.linear_model(copy(opt.c), copy(opt.A), copy(opt.b), copy(opt.G), copy(opt.h), opt.cones, obj_offset = opt.obj_offset)
+    stepper = Solvers.CombinedHSDStepper{T}(model, system_solver = opt.system_solver(model))
+    solver = Solvers.HSDSolver{T}(
         model, stepper = stepper,
         verbose = opt.verbose, max_iters = opt.max_iters, time_limit = opt.time_limit,
-        tol_rel_opt = opt.tol_rel_opt, tol_abs_opt = opt.tol_abs_opt, tol_feas = opt.tol_feas,
+        tol_rel_opt = opt.tol_rel_opt, tol_abs_opt = opt.tol_abs_opt, tol_feas = opt.tol_feas, tol_slow = opt.tol_slow,
         )
     Solvers.solve(solver)
     r = Solvers.get_certificates(solver, model, test = opt.test_certificates)
@@ -529,12 +530,13 @@ function MOI.optimize!(opt::Optimizer)
     opt.s[opt.interval_idxs] ./= opt.interval_scales
     for (k, cone_k) in enumerate(opt.cones)
         if cone_k isa Cones.PosSemidefTri || cone_k isa Cones.HypoPerLogdetTri # rescale duals for symmetric triangle cones
+            cone_idxs_k = Models.get_cone_idxs(model)[k]
             unscale_vec = (Cones.use_dual(cone_k) ? opt.s : opt.z)
-            idxs = (cone_k isa Cones.PosSemidefTri ? opt.cone_idxs[k] : opt.cone_idxs[k][3:end])
+            idxs = (cone_k isa Cones.PosSemidefTri ? cone_idxs_k : cone_idxs_k[3:end])
             offset = 1
             for i in 1:round(Int, sqrt(0.25 + 2 * length(idxs)) - 0.5)
                 for j in 1:(i - 1)
-                    unscale_vec[idxs[offset]] /= 2.0
+                    unscale_vec[idxs[offset]] /= 2
                     offset += 1
                 end
                 offset += 1
@@ -547,7 +549,19 @@ function MOI.optimize!(opt::Optimizer)
     return
 end
 
-# function MOI.free!(opt::Optimizer) # TODO ?
+MOI.supports(::Optimizer, ::MOI.TimeLimitSec) = true
+MOI.set(opt::Optimizer, ::MOI.TimeLimitSec, value::Real) = (opt.time_limit = value)
+MOI.set(opt::Optimizer, ::MOI.TimeLimitSec, ::Nothing) = (opt.time_limit = Inf)
+MOI.get(opt::Optimizer, ::MOI.TimeLimitSec) = (isfinite(opt.time_limit) ? opt.time_limit : nothing)
+
+function MOI.get(opt::Optimizer, ::MOI.SolveTime)
+    if opt.status in (:NotLoaded, :Loaded)
+        error("solve has not been called")
+    end
+    return opt.solve_time
+end
+
+MOI.get(opt::Optimizer, ::MOI.RawStatusString) = string(opt.status)
 
 function MOI.get(opt::Optimizer, ::MOI.TerminationStatus)
     if opt.status in (:NotLoaded, :Loaded)
@@ -578,7 +592,7 @@ function MOI.get(opt::Optimizer, ::MOI.PrimalStatus)
     elseif opt.status == :DualInfeasible
         return MOI.INFEASIBILITY_CERTIFICATE
     elseif opt.status == :IllPosed
-        return MOI.OTHER_RESULT_STATUS # TODO later distinguish primal/dual ill posed certificates
+        return MOI.OTHER_RESULT_STATUS
     else
         return MOI.UNKNOWN_RESULT_STATUS
     end
@@ -592,7 +606,7 @@ function MOI.get(opt::Optimizer, ::MOI.DualStatus)
     elseif opt.status == :DualInfeasible
         return MOI.INFEASIBLE_POINT
     elseif opt.status == :IllPosed
-        return MOI.OTHER_RESULT_STATUS # TODO later distinguish primal/dual ill posed certificates
+        return MOI.OTHER_RESULT_STATUS
     else
         return MOI.UNKNOWN_RESULT_STATUS
     end
@@ -600,19 +614,19 @@ end
 
 function MOI.get(opt::Optimizer, ::MOI.ObjectiveValue)
     if opt.obj_sense == MOI.MIN_SENSE
-        return opt.primal_obj + opt.obj_const
+        return opt.primal_obj
     elseif opt.obj_sense == MOI.MAX_SENSE
-        return -opt.primal_obj + opt.obj_const
+        return -opt.primal_obj
     else
         error("no objective sense is set")
     end
 end
 
-function MOI.get(opt::Optimizer, ::MOI.ObjectiveBound)
+function MOI.get(opt::Optimizer, ::Union{MOI.DualObjectiveValue, MOI.ObjectiveBound})
     if opt.obj_sense == MOI.MIN_SENSE
-        return opt.dual_obj + opt.obj_const
+        return opt.dual_obj
     elseif opt.obj_sense == MOI.MAX_SENSE
-        return -opt.dual_obj + opt.obj_const
+        return -opt.dual_obj
     else
         error("no objective sense is set")
     end

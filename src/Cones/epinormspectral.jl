@@ -8,17 +8,14 @@ W is vectorized column-by-column (i.e. vec(W) in Julia)
 
 barrier from "Interior-Point Polynomial Algorithms in Convex Programming" by Nesterov & Nemirovskii 1994
 -logdet(u*I_n - W*W'/u) - log(u)
-
-TODO eliminate allocations
-TODO type auxiliary fields
 =#
 
-mutable struct EpiNormSpectral{T <: HypReal} <: Cone{T}
+mutable struct EpiNormSpectral{T <: Real} <: Cone{T}
     use_dual::Bool
     dim::Int
     n::Int
     m::Int
-    point::AbstractVector{T}
+    point::Vector{T}
 
     feas_updated::Bool
     grad_updated::Bool
@@ -30,16 +27,24 @@ mutable struct EpiNormSpectral{T <: HypReal} <: Cone{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
 
-    W
-    X
+    W::Matrix{T}
+    WWt::Matrix{T}
+    Z::Matrix{T}
     fact_Z
-    Zi
-    Eu
-    tmp_hess::Symmetric{T, Matrix{T}}
-    hess_fact # TODO prealloc
+    chol_cache
+    Zi::Symmetric{T, Matrix{T}}
+    Eu::Symmetric{T, Matrix{T}}
+    ZiEuZi::Matrix{T}
+    tmpnn::Matrix{T}
+    tmpnm::Matrix{T}
+    tmpnm2::Matrix{T}
 
-    function EpiNormSpectral{T}(n::Int, m::Int, is_dual::Bool) where {T <: HypReal}
-        @assert n <= m
+    tmp_hess::Symmetric{T, Matrix{T}}
+    hess_fact
+    hess_fact_cache
+
+    function EpiNormSpectral{T}(n::Int, m::Int, is_dual::Bool) where {T <: Real}
+        @assert 1 <= n <= m
         dim = n * m + 1
         cone = new{T}()
         cone.use_dual = is_dual
@@ -50,15 +55,25 @@ mutable struct EpiNormSpectral{T <: HypReal} <: Cone{T}
     end
 end
 
-EpiNormSpectral{T}(n::Int, m::Int) where {T <: HypReal} = EpiNormSpectral{T}(n, m, false)
+EpiNormSpectral{T}(n::Int, m::Int) where {T <: Real} = EpiNormSpectral{T}(n, m, false)
 
-function setup_data(cone::EpiNormSpectral{T}) where {T <: HypReal}
+function setup_data(cone::EpiNormSpectral{T}) where {T <: Real}
     reset_data(cone)
     dim = cone.dim
+    cone.point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.tmp_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.W = Matrix{T}(undef, cone.n, cone.m)
+    cone.WWt = Matrix{T}(undef, cone.n, cone.n)
+    cone.Z = Matrix{T}(undef, cone.n, cone.n)
+    cone.chol_cache = HypCholCache('U', cone.Z)
+    cone.Eu = Symmetric(zeros(T, cone.n, cone.n))
+    cone.ZiEuZi = Matrix{T}(undef, cone.n, cone.n)
+    cone.tmpnn = Matrix{T}(undef, cone.n, cone.n)
+    cone.tmpnm = Matrix{T}(undef, cone.n, cone.m)
+    cone.tmpnm2 = Matrix{T}(undef, cone.n, cone.m)
+    cone.hess_fact_cache = nothing
     return
 end
 
@@ -75,9 +90,10 @@ function update_feas(cone::EpiNormSpectral)
     u = cone.point[1]
     if u > 0
         cone.W[:] .= view(cone.point, 2:cone.dim)
-        cone.X = Symmetric(cone.W * cone.W') # TODO use syrk
-        Z = Symmetric(u * I - cone.X / u)
-        cone.fact_Z = hyp_chol!(Z)
+        hyp_AAt!(cone.WWt, cone.W)
+        copyto!(cone.Z, u * I)
+        @. cone.Z -= cone.WWt / u
+        cone.fact_Z = hyp_chol!(cone.chol_cache, cone.Z)
         cone.is_feas = isposdef(cone.fact_Z)
     else
         cone.is_feas = false
@@ -89,48 +105,75 @@ end
 function update_grad(cone::EpiNormSpectral)
     @assert cone.is_feas
     u = cone.point[1]
-    cone.Zi = Symmetric(inv(cone.fact_Z))
-    cone.Eu = Symmetric(I + cone.X / u / u)
+    # ldiv!(cone.tmpnm, cone.fact_Z, cone.W)
+    cone.Zi = Symmetric(hyp_chol_inv!(cone.chol_cache, cone.fact_Z), :U) # NOTE: destroys cone.fact_Z
+    mul!(cone.tmpnm, cone.Zi, cone.W) # TODO could use ldiv (as above) instead for potentially better numerics
+    @. cone.Eu.data = cone.WWt / u / u
+    @inbounds for i in 1:cone.n
+        cone.Eu[i, i] += 1
+    end
     cone.grad[1] = -dot(cone.Zi, cone.Eu) - inv(u)
-    cone.grad[2:end] .= vec(2 * cone.Zi * cone.W / u)
+    @. cone.tmpnm /= u
+    @inbounds for i in 1:(cone.n * cone.m)
+        cone.grad[i + 1] = 2 * cone.tmpnm[i]
+    end
     cone.grad_updated = true
     return cone.grad
 end
 
-# TODO maybe this could be simpler/faster if use mul!(cone.hess, cone.grad, cone.grad') and build from there
 function update_hess(cone::EpiNormSpectral)
     @assert cone.grad_updated
     n = cone.n
     m = cone.m
     u = cone.point[1]
     W = cone.W
-    X = cone.X
+    WWt = cone.WWt
     Zi = cone.Zi
     Eu = cone.Eu
+    ZiEuZi = cone.ZiEuZi
+    tmpnn = cone.tmpnn
+    tmpnm = cone.tmpnm
+    tmpnm2 = cone.tmpnm2
     cone.hess .= 0
     H = cone.hess.data
 
-    ZiEuZi = Symmetric(Zi * Eu * Zi)
-    H[1, 1] = dot(ZiEuZi, Eu) + (2 * dot(Zi, X) / u + 1) / u / u
-    H[1, 2:end] = vec(-2 * (ZiEuZi + Zi / u) * W / u)
-
+    # calculate d^2F / dW_ij dW_kl, p and q are linear indices for (i, j) and (k, l)
     p = 2
     @inbounds for j in 1:m, i in 1:n
-        @views tmpmat = Zi[:, i] * W[:, j]' * Zi / u
-        term1 = Symmetric(tmpmat + tmpmat') # Zi * dZdWij * Zi
+        # tmpnn evaluates to Zi * dZdW_ij * Zi
+        @views mul!(tmpnn, Zi[:, i], tmpnm[:, j]')
+        @. tmpnn += tmpnn'
+        # add to terms where k = i, and l = j:n, inner product of Zi with d^2Z / dW_ij dW_kl nonzero only when j=l
         q = p
         viewij = view(H, p, q:(q + n - i))
+        # add inner product of Zi with d^2Z / dW_ij dW_kl, unscaled by 2 / u as well as shared term
         @views viewij .= Zi[i, i:n]
-        @views @. for ni in 1:n
-            viewij += W[ni, j] * term1[ni, i:n]
+        @. @views for ni in 1:n
+            viewij += W[ni, j] * tmpnn[ni, i:n]
         end
-        viewij .*= 2 / u
+        # add to terms where k > i, l = 1:n
         q += (n - i + 1)
-        ntermsij = n * (m - j)
-        @views H[p, q:(q + ntermsij - 1)] .+= vec(2 * term1 * W[:, (j + 1):m] / u)
-        q += ntermsij
+        if j <= m - 1
+            @views mul!(tmpnm2[1:n, 1:(m - j)], Symmetric(tmpnn, :U),  W[:, (j + 1):m])
+            @inbounds for l in 1:(m - j), k in 1:n
+                H[p, q] += tmpnm2[k, l]
+                q += 1
+            end
+        end
         p += 1
     end
+
+    # no BLAS method for product of two symmetric matrices, faster if one is not symmetric
+    copytri!(Zi.data, 'U')
+    mul!(tmpnn, Eu, Zi.data)
+    mul!(ZiEuZi, Zi, tmpnn)
+    mul!(tmpnm, ZiEuZi, W, true, true)
+    tmpnm .*= -1
+    @views copyto!(H[1, 2:end], tmpnm)
+
+    # scale everything
+    @. H = H / u * 2
+    H[1, 1] = dot(Symmetric(ZiEuZi, :U), Eu) + (2 * dot(Zi, Symmetric(WWt, :U)) / u + 1) / u / u
 
     cone.hess_updated = true
     return cone.hess

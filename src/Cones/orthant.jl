@@ -10,10 +10,10 @@ nonnegative cone: -sum_i(log(u_i))
 nonpositive cone: -sum_i(log(-u_i))
 =#
 
-mutable struct Nonnegative{T <: HypReal} <: Cone{T}
+mutable struct Nonnegative{T <: Real} <: Cone{T}
     use_dual::Bool
     dim::Int
-    point::AbstractVector{T}
+    point::Vector{T}
 
     feas_updated::Bool
     grad_updated::Bool
@@ -24,7 +24,8 @@ mutable struct Nonnegative{T <: HypReal} <: Cone{T}
     hess::Diagonal{T, Vector{T}}
     inv_hess::Diagonal{T, Vector{T}}
 
-    function Nonnegative{T}(dim::Int, is_dual::Bool) where {T <: HypReal}
+    function Nonnegative{T}(dim::Int, is_dual::Bool) where {T <: Real}
+        @assert dim >= 1
         cone = new{T}()
         cone.use_dual = is_dual
         cone.dim = dim
@@ -32,13 +33,13 @@ mutable struct Nonnegative{T <: HypReal} <: Cone{T}
     end
 end
 
-Nonnegative{T}(dim::Int) where {T <: HypReal} = Nonnegative{T}(dim, false)
-# Nonnegative{T}() where {T <: HypReal} = Nonnegative{T}(1)
+Nonnegative{T}(dim::Int) where {T <: Real} = Nonnegative{T}(dim, false)
+# Nonnegative{T}() where {T <: Real} = Nonnegative{T}(1)
 
-mutable struct Nonpositive{T <: HypReal} <: Cone{T}
+mutable struct Nonpositive{T <: Real} <: Cone{T}
     use_dual::Bool
     dim::Int
-    point::AbstractVector{T}
+    point::Vector{T}
 
     feas_updated::Bool
     grad_updated::Bool
@@ -49,7 +50,8 @@ mutable struct Nonpositive{T <: HypReal} <: Cone{T}
     hess::Diagonal{T, Vector{T}}
     inv_hess::Diagonal{T, Vector{T}}
 
-    function Nonpositive{T}(dim::Int, is_dual::Bool) where {T <: HypReal}
+    function Nonpositive{T}(dim::Int, is_dual::Bool) where {T <: Real}
+        @assert dim >= 1
         cone = new{T}()
         cone.use_dual = is_dual
         cone.dim = dim
@@ -57,17 +59,18 @@ mutable struct Nonpositive{T <: HypReal} <: Cone{T}
     end
 end
 
-Nonpositive{T}(dim::Int) where {T <: HypReal} = Nonpositive{T}(dim, false)
-# Nonpositive{T}() where {T <: HypReal} = Nonpositive{T}(1)
+Nonpositive{T}(dim::Int) where {T <: Real} = Nonpositive{T}(dim, false)
+# Nonpositive{T}() where {T <: Real} = Nonpositive{T}(1)
 
-const OrthantCone{T <: HypReal} = Union{Nonnegative{T}, Nonpositive{T}}
+const OrthantCone{T <: Real} = Union{Nonnegative{T}, Nonpositive{T}}
 
 reset_data(cone::OrthantCone) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
 
 # TODO maybe only allocate the fields we use
-function setup_data(cone::OrthantCone{T}) where {T <: HypReal}
+function setup_data(cone::OrthantCone{T}) where {T <: Real}
     reset_data(cone)
     dim = cone.dim
+    cone.point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Diagonal(zeros(T, dim))
     cone.inv_hess = Diagonal(zeros(T, dim))

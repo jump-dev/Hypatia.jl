@@ -14,7 +14,7 @@ kap + mu/(taubar^2)*tau = taurhs
 TODO reduce allocations
 =#
 
-mutable struct NaiveCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSolver{T}
+mutable struct NaiveCombinedHSDSystemSolver{T <: Real} <: CombinedHSDSystemSolver{T}
     use_iterative::Bool
     use_sparse::Bool
 
@@ -41,7 +41,7 @@ mutable struct NaiveCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSo
         model::Models.LinearModel{T};
         use_iterative::Bool = false,
         use_sparse::Bool = false,
-        ) where {T <: HypReal}
+        ) where {T <: Real}
         (n, p, q) = (model.n, model.p, model.q)
         dim = n + p + 2q + 2
         system_solver = new{T}()
@@ -89,7 +89,7 @@ mutable struct NaiveCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSo
                 push!(cone_cols, (q + 1) .+ rows)
             end
 
-            system_solver.lhs = HypBlockMatrix{T}(
+            system_solver.lhs = BlockMatrix{T}(
                 dim,
                 dim,
                 [fill(I, length(cone_rows))...,
@@ -133,7 +133,7 @@ mutable struct NaiveCombinedHSDSystemSolver{T <: HypReal} <: CombinedHSDSystemSo
     end
 end
 
-function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveCombinedHSDSystemSolver{T}) where {T <: HypReal}
+function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveCombinedHSDSystemSolver{T}) where {T <: Real}
     model = solver.model
     cones = model.cones
     lhs = system_solver.lhs
@@ -148,11 +148,12 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveCombi
     system_solver.x2 .= zero(T)
     system_solver.y1 .= solver.y_residual
     system_solver.y2 .= zero(T)
+    sqrtmu = sqrt(mu)
     for k in eachindex(cones)
         duals_k = solver.point.dual_views[k]
-        g = Cones.grad(cones[k])
+        grad_k = Cones.grad(cones[k])
         @. system_solver.z1_k[k] = -duals_k
-        @. system_solver.z2_k[k] = -duals_k - mu * g
+        @. system_solver.z2_k[k] = -duals_k - grad_k * sqrtmu
     end
     system_solver.s1 .= solver.z_residual
     system_solver.s2 .= zero(T)
@@ -169,7 +170,7 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveCombi
             cone_k = cones[k]
             # TODO use hess prod instead
 
-            lhs.blocks[b_idx + (Cones.use_dual(cone_k) ? 0 : 1)] = mu * Cones.hess(cone_k)
+            lhs.blocks[b_idx + (Cones.use_dual(cone_k) ? 0 : 1)] = Cones.hess(cone_k)
             b_idx += 2
         end
 
@@ -180,7 +181,7 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveCombi
         # TODO possibly fix IterativeSolvers so that methods can take matrix RHS, however the two columns may take different number of iters needed to converge
 
         dim = size(lhs, 2)
-        
+
         rhs1 = view(rhs, :, 1)
         IterativeSolvers.gmres!(system_solver.prevsol1, lhs, rhs1, restart = dim)
         copyto!(rhs1, system_solver.prevsol1)
@@ -194,7 +195,7 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveCombi
         lhs[kap_row, end] = mu / tau / tau
         for k in eachindex(cones)
             H = Cones.hess(cones[k])
-            @. system_solver.lhs_H_k[k] = mu * H
+            @. system_solver.lhs_H_k[k] = H
         end
 
         if system_solver.use_sparse
