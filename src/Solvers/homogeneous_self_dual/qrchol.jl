@@ -194,6 +194,8 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
     HGxi_k = system_solver.HGxi_k
     Gxi_k = system_solver.Gxi_k
 
+    @timeit solver.timer "setup" begin
+
     @. x1 = -model.c
     @. x2 = solver.x_residual
     @. x3 = zero(T)
@@ -207,45 +209,49 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
     for k in eachindex(cones)
         cone_k = cones[k]
         duals_k = solver.point.dual_views[k]
-        grad_k = Cones.grad(cone_k)
+        @timeit solver.timer "grad1" grad_k = Cones.grad(cone_k)
         if Cones.use_dual(cone_k)
             @. z2_temp_k[k] = duals_k + z2_temp_k[k]
             @. z3_temp_k[k] = duals_k + grad_k * sqrtmu
-            Cones.inv_hess_prod!(z_k[k], z_temp_k[k], cone_k)
+            @timeit solver.timer "invhess" Cones.inv_hess_prod!(z_k[k], z_temp_k[k], cone_k)
         else
-            Cones.hess_prod!(z1_k[k], z1_temp_k[k], cone_k)
-            Cones.hess_prod!(z2_k[k], z2_temp_k[k], cone_k)
+            @timeit solver.timer "hess1" Cones.hess_prod!(z1_k[k], z1_temp_k[k], cone_k)
+            @timeit solver.timer "hess2" Cones.hess_prod!(z2_k[k], z2_temp_k[k], cone_k)
             @. z2_k[k] += duals_k
             @. z3_k[k] = duals_k + grad_k * sqrtmu
         end
     end
+    end # setup
 
     function block_hessian_product!(prod_k, arr_k)
         for k in eachindex(cones)
             cone_k = cones[k]
             if Cones.use_dual(cone_k)
-                Cones.inv_hess_prod!(prod_k[k], arr_k[k], cone_k)
+                @timeit solver.timer "inv_hess_prod" Cones.inv_hess_prod!(prod_k[k], arr_k[k], cone_k)
             else
-                Cones.hess_prod!(prod_k[k], arr_k[k], cone_k)
+                @timeit solver.timer "hessprod" Cones.hess_prod!(prod_k[k], arr_k[k], cone_k)
             end
         end
     end
 
-    ldiv!(model.Ap_R', yi)
+    @timeit solver.timer "ldiv_yi" ldiv!(model.Ap_R', yi)
 
     copyto!(QpbxGHbz, xi)
+    @timeit solver.timer "QpbxGHbz" begin
     mul!(QpbxGHbz, model.G', zi, true, true)
     lmul!(model.Ap_Q', QpbxGHbz)
 
     copyto!(xi1, yi)
 
     if !iszero(size(Q2div, 1))
+        @timeit solver.timer "Q2div" begin
         mul!(GQ1x, GQ1, yi)
         block_hessian_product!(HGQ1x_k, GQ1x_k)
         mul!(Q2div, GQ2', HGQ1x, -1, true)
+        end
 
-        block_hessian_product!(HGQ2_k, GQ2_k)
-        mul!(Q2GHGQ2, GQ2', HGQ2)
+        @timeit solver.timer "Hprod" block_hessian_product!(HGQ2_k, GQ2_k)
+        @timeit solver.timer "GQ2prod" mul!(Q2GHGQ2, GQ2', HGQ2)
 
         if system_solver.use_sparse
             F = ldlt(Symmetric(Q2GHGQ2), check = false) # TODO not implemented for generic reals
@@ -259,9 +265,9 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
             end
             xi2 .= F \ Q2div # TODO eliminate allocs (see https://github.com/JuliaLang/julia/issues/30084)
         else
-            if !hyp_bk_solve!(system_solver.solvecache, system_solver.solvesol, Q2GHGQ2, Q2div)
+            @timeit solver.timer "fact" if !hyp_bk_solve!(system_solver.solvecache, system_solver.solvesol, Q2GHGQ2, Q2div)
                 println("dense linear system matrix factorization failed")
-                mul!(Q2GHGQ2, GQ2', HGQ2)
+                @timeit solver.timer "notbk" mul!(Q2GHGQ2, GQ2', HGQ2)
                 Q2GHGQ2 += cbrt(eps(T)) * I
                 if !hyp_bk_solve!(system_solver.solvecache, system_solver.solvesol, Q2GHGQ2, Q2div)
                     error("could not fix failure of positive definiteness (mu is $mu); terminating")
@@ -272,16 +278,21 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
     end
 
     lmul!(model.Ap_Q, xi)
+    end
 
+    @timeit solver.timer "HGxi" begin
     mul!(Gxi, model.G, xi)
     block_hessian_product!(HGxi_k, Gxi_k)
+    end
 
     @. zi = HGxi - zi
 
     if !iszero(length(yi))
+        @timeit solver.timer "yi" begin
         copyto!(yi, Q1pbxGHbz)
         mul!(yi, GQ1', HGxi, -1, true)
         ldiv!(model.Ap_R, yi)
+        end
     end
 
     # lift to HSDE space
