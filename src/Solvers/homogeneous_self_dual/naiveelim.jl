@@ -162,9 +162,9 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveElimC
 
     # solve system
     if system_solver.use_sparse
-        rhs .= lu(lhs) \ rhs
+        @timeit solver.timer "division" rhs .= lu(lhs) \ rhs
     else
-        ldiv!(lu!(lhs), rhs)
+        @timeit solver.timer "division" ldiv!(lu!(lhs), rhs)
     end
 
     # lift to get s and kap
