@@ -221,13 +221,13 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
             @. z3_k[k] = duals_k + grad_k * sqrtmu
         end
     end
+    end # setup
 
     function block_hessian_product!(prod_k, arr_k)
         for k in eachindex(cones)
             cone_k = cones[k]
             if Cones.use_dual(cone_k)
-                @timeit solver.timer "inv_hess_prod" begin
-                Cones.inv_hess_prod!(prod_k[k], arr_k[k], cone_k)
+                @timeit solver.timer "inv_hess_prod" Cones.inv_hess_prod!(prod_k[k], arr_k[k], cone_k)
             else
                 @timeit solver.timer "hessprod" Cones.hess_prod!(prod_k[k], arr_k[k], cone_k)
             end
@@ -240,7 +240,6 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
     @timeit solver.timer "QpbxGHbz" begin
     mul!(QpbxGHbz, model.G', zi, true, true)
     lmul!(model.Ap_Q', QpbxGHbz)
-    end
 
     copyto!(xi1, yi)
 
@@ -266,7 +265,7 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::QRCholComb
             end
             xi2 .= F \ Q2div # TODO eliminate allocs (see https://github.com/JuliaLang/julia/issues/30084)
         else
-            @timeit solver.timer "chol" if !hyp_bk_solve!(system_solver.solvecache, system_solver.solvesol, Q2GHGQ2, Q2div)
+            @timeit solver.timer "fact" if !hyp_bk_solve!(system_solver.solvecache, system_solver.solvesol, Q2GHGQ2, Q2div)
                 println("dense linear system matrix factorization failed")
                 @timeit solver.timer "notbk" mul!(Q2GHGQ2, GQ2', HGQ2)
                 Q2GHGQ2 += cbrt(eps(T)) * I
