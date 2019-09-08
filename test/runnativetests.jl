@@ -11,15 +11,16 @@ const SO = Hypatia.Solvers
 
 real_types = [
     Float64,
-    Float32,
-    BigFloat,
+    # Float32,
+    # BigFloat,
     ]
 
 system_solvers = [
-    SO.QRCholCombinedHSDSystemSolver,
-    SO.SymIndefCombinedHSDSystemSolver,
+    # SO.QRCholCombinedHSDSystemSolver,
+    # SO.SymIndefCombinedHSDSystemSolver,
     SO.NaiveElimCombinedHSDSystemSolver,
-    SO.NaiveCombinedHSDSystemSolver,
+    SO.NaiveElimPardisoCombinedHSDSystemSolver,
+    # SO.NaiveCombinedHSDSystemSolver,
     ]
 
 testfuns_preproc = [
@@ -45,7 +46,7 @@ linear_models = [
 
 use_infty_nbhd = [
     true,
-    false,
+    # false,
     ]
 
 testfuns_raw = [
@@ -69,8 +70,6 @@ testfuns_raw = [
     hypoperlog4,
     hypoperlog5,
     hypoperlog6,
-    epiperpower1,
-    epiperpower2,
     epiperexp1,
     epiperexp2,
     power1,
@@ -113,16 +112,16 @@ testfuns_raw = [
     t(T, test_options)
 end
 
-@testset "native tests (iterative linear system solves): $t, $T" for t in testfuns_raw, T in real_types
-    if T == BigFloat
-        continue # IterativeSolvers does not work with BigFloat
-    end
-    test_options = (
-        linear_model = MO.RawLinearModel,
-        system_solver = SO.NaiveCombinedHSDSystemSolver,
-        linear_model_options = (use_iterative = true,),
-        system_solver_options = (use_iterative = true,),
-        solver_options = (verbose = false,),
-        )
-    t(T, test_options)
-end
+# @testset "native tests (iterative linear system solves): $t, $T" for t in testfuns_raw, T in real_types
+#     if T == BigFloat
+#         continue # IterativeSolvers does not work with BigFloat
+#     end
+#     test_options = (
+#         linear_model = MO.RawLinearModel,
+#         system_solver = SO.NaiveCombinedHSDSystemSolver,
+#         linear_model_options = (use_iterative = true,),
+#         system_solver_options = (use_iterative = true,),
+#         solver_options = (verbose = false,),
+#         )
+#     t(T, test_options)
+# end
