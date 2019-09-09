@@ -4,7 +4,6 @@ Copyright 2019, Chris Coey and contributors
 
 include(joinpath(@__DIR__, "native.jl"))
 
-const MO = Hypatia.Models
 const SO = Hypatia.Solvers
 
 @info("starting native tests")
@@ -16,10 +15,20 @@ real_types = [
     ]
 
 system_solvers = [
-    SO.QRCholCombinedHSDSystemSolver,
-    SO.SymIndefCombinedHSDSystemSolver,
-    SO.NaiveElimCombinedHSDSystemSolver,
-    SO.NaiveCombinedHSDSystemSolver,
+    SO.QRCholSystemSolver,
+    SO.SymIndefSystemSolver,
+    SO.NaiveElimSystemSolver,
+    SO.NaiveSystemSolver,
+    ]
+
+use_infty_nbhd = [
+    true,
+    false,
+    ]
+
+preprocess = [
+    true,
+    false
     ]
 
 testfuns_preproc = [
@@ -27,25 +36,6 @@ testfuns_preproc = [
     consistent1,
     inconsistent1,
     inconsistent2,
-    ]
-
-@testset "preprocessing tests: $t, $s, $T" for t in testfuns_preproc, s in system_solvers, T in real_types
-    test_options = (
-        linear_model = MO.PreprocessedLinearModel,
-        system_solver = s,
-        solver_options = (verbose = true,),
-        )
-    t(T, test_options)
-end
-
-linear_models = [
-    MO.PreprocessedLinearModel,
-    MO.RawLinearModel,
-    ]
-
-use_infty_nbhd = [
-    true,
-    false,
     ]
 
 testfuns_raw = [
@@ -69,8 +59,6 @@ testfuns_raw = [
     hypoperlog4,
     hypoperlog5,
     hypoperlog6,
-    epiperpower1,
-    epiperpower2,
     epiperexp1,
     epiperexp2,
     power1,
@@ -95,34 +83,23 @@ testfuns_raw = [
     dualinfeas3,
     ]
 
-@testset "native tests: $t, $s, $m, $n, $T" for t in testfuns_raw, s in system_solvers, m in linear_models, n in use_infty_nbhd, T in real_types
-    if T == BigFloat && t == epinormspectral1
-        continue # Cannot get svdvals with BigFloat
-    end
-    if s == SO.QRCholCombinedHSDSystemSolver && m == MO.RawLinearModel
-        continue # QRChol linear system solver needs preprocessed model
-    end
-    test_options = (
-        linear_model = m,
-        system_solver = s,
-        linear_model_options = NamedTuple(),
-        system_solver_options = NamedTuple(),
-        stepper_options = (use_infty_nbhd = n,),
-        solver_options = (verbose = true,),
-        )
-    t(T, test_options)
+@info("starting preprocessing tests")
+@testset "preprocessing tests: $t, $s, $T" for t in testfuns_preproc, s in system_solvers, T in real_types
+    t(T, solver = SO.Solver{T}(verbose = true, system_solver = s{T}()))
 end
 
-@testset "native tests (iterative linear system solves): $t, $T" for t in testfuns_raw, T in real_types
-    if T == BigFloat
-        continue # IterativeSolvers does not work with BigFloat
-    end
-    test_options = (
-        linear_model = MO.RawLinearModel,
-        system_solver = SO.NaiveCombinedHSDSystemSolver,
-        linear_model_options = (use_iterative = true,),
-        system_solver_options = (use_iterative = true,),
-        solver_options = (verbose = false,),
-        )
-    t(T, test_options)
+@info("starting miscellaneous tests")
+@testset "miscellaneous tests: $t, $s, $n, $p, $T" for t in testfuns_raw, s in system_solvers, n in use_infty_nbhd, p in preprocess, T in real_types
+    T == BigFloat && t == epinormspectral1 && continue # Cannot get svdvals with BigFloat
+    !p && s == SO.QRCholSystemSolver && continue # Must use preprocessing if using QRCholSystemSolver
+    solver = SO.Solver{T}(verbose = false, preprocess = p, use_infty_nbhd = n, system_solver = s{T}())
+    t(T, solver = solver)
+end
+
+@info("starting iterative system solver tests")
+@testset "iterative system solver tests: $t, $T" for t in testfuns_raw, T in real_types
+    T == BigFloat && continue # IterativeSolvers does not work with BigFloat
+    solver = SO.Solver{T}(verbose = true, init_use_iterative = true, preprocess = false,
+        system_solver = SO.NaiveSystemSolver{T}(use_iterative = true))
+    t(T, solver = solver)
 end

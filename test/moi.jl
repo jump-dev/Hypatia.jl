@@ -9,7 +9,6 @@ const MOIT = MOI.Test
 const MOIB = MOI.Bridges
 const MOIU = MOI.Utilities
 import Hypatia
-const MO = Hypatia.Models
 const SO = Hypatia.Solvers
 
 config = MOIT.TestConfig(
@@ -51,34 +50,21 @@ conic_exclude = String[
     ]
 
 function test_moi(
-    use_dense::Bool,
-    system_solver::Type{<:SO.CombinedHSDSystemSolver{T}},
-    linear_model::Type{<:MO.LinearModel{T}},
-    verbose::Bool,
-    ) where {T <: Real}
-    optimizer = MOIU.CachingOptimizer(
-        MOIU.UniversalFallback(MOIU.Model{T}()),
-        Hypatia.Optimizer{T}(
-            use_dense = use_dense,
-            test_certificates = true,
-            verbose = verbose,
-            system_solver = system_solver,
-            linear_model = linear_model,
-            max_iters = 200,
-            time_limit = 2e1,
-            tol_rel_opt = 2e-8,
-            tol_abs_opt = 2e-8,
-            tol_feas = 1e-8,
-            tol_slow = 1e-7,
-            )
-        )
+    T::Type{<:Real},
+    use_dense::Bool;
+    options...
+    )
+    optimizer = MOIU.CachingOptimizer(MOIU.UniversalFallback(MOIU.Model{T}()),
+        Hypatia.Optimizer{T}(use_dense = use_dense; options...))
 
     @testset "unit tests" begin
         MOIT.unittest(optimizer, config, unit_exclude)
     end
+
     @testset "linear tests" begin
         MOIT.contlineartest(optimizer, config)
     end
+
     @testset "conic tests" begin
         MOIT.contconictest(MOIB.Constraint.Square{T}(MOIB.Constraint.RootDet{T}(optimizer)), config, conic_exclude)
     end
