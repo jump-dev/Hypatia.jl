@@ -182,16 +182,18 @@ function solve(solver::Solver{T}) where {T <: Real}
     solver.timer = TimerOutput()
 
     # preprocess and find initial point
-    (solver.model, solver.point) = (solver.preprocess ? preprocess_find_initial_point(solver) : find_initial_point(solver))
-    model = solver.model
-
-    solver.tau = one(T)
-    solver.kap = one(T)
-    calc_mu(solver)
-    if isnan(solver.mu) || abs(one(T) - solver.mu) > sqrt(eps(T))
-        error("initial mu is $(solver.mu) (should be 1)")
+    @timeit solver.timer "initialize" begin
+        @timeit solver.timer "init_cone" point = solver.point = initialize_cone_point(solver.orig_model.cones, solver.orig_model.cone_idxs)
+        @timeit solver.timer "find_point" solver.preprocess ? preprocess_find_initial_point(solver) : find_initial_point(solver)
+        model = solver.model
+        solver.tau = one(T)
+        solver.kap = one(T)
+        calc_mu(solver)
+        if isnan(solver.mu) || abs(one(T) - solver.mu) > sqrt(eps(T))
+            error("initial mu is $(solver.mu) (should be 1)")
+        end
+        Cones.load_point.(model.cones, point.primal_views)
     end
-    Cones.load_point.(model.cones, solver.point.primal_views)
 
     # setup iteration helpers
     solver.x_residual = similar(model.c)
@@ -238,7 +240,7 @@ function solve(solver::Solver{T}) where {T <: Real}
     solver.cones_infeas = trues(length(model.cones))
     solver.cones_loaded = trues(length(model.cones))
 
-    load(solver.system_solver, solver)
+    @timeit solver.timer "setup_system" load(solver.system_solver, solver)
 
     # iterate from initial point
     while true
@@ -268,12 +270,11 @@ function solve(solver::Solver{T}) where {T <: Real}
     end
 
     # calculate result and iteration statistics and finish
-    point = solver.point
     point.x ./= solver.tau
     point.y ./= solver.tau
     point.z ./= solver.tau
     point.s ./= solver.tau
-    Cones.load_point.(solver.model.cones, solver.point.primal_views)
+    Cones.load_point.(solver.model.cones, point.primal_views)
 
     solver.solve_time = time() - start_time
 
@@ -282,10 +283,22 @@ function solve(solver::Solver{T}) where {T <: Real}
     return solver
 end
 
-function calc_mu(solver::Solver{T}) where {T <: Real}
-    solver.mu = (dot(solver.point.z, solver.point.s) + solver.tau * solver.kap) /
-        (one(T) + solver.model.nu)
-    return solver.mu
+function initialize_cone_point(cones::Vector{Cones.Cone{T}}, cone_idxs::Vector{UnitRange{Int}}) where {T <: Real}
+    q = isempty(cones) ? 0 : sum(Cones.dimension, cones)
+    point = Models.Point(T[], T[], Vector{T}(undef, q), Vector{T}(undef, q), cones, cone_idxs)
+
+    for k in eachindex(cones)
+        cone_k = cones[k]
+        Cones.setup_data(cone_k)
+        primal_k = point.primal_views[k]
+        Cones.set_initial_point(primal_k, cone_k)
+        Cones.load_point(cone_k, primal_k)
+        @assert Cones.is_feas(cone_k)
+        g = Cones.grad(cone_k)
+        @. point.dual_views[k] = -g
+    end
+
+    return point
 end
 
 const sparse_QR_reals = Float64
@@ -294,15 +307,13 @@ const sparse_QR_reals = Float64
 # TODO precondition iterative methods
 # TODO pick default tol for iter methods
 function find_initial_point(solver::Solver{T}) where {T <: Real}
-    model = solver.orig_model
+    model = solver.model = solver.orig_model
     A = model.A
     G = model.G
     n = model.n
     p = model.p
     q = model.q
-
-    point = initialize_cone_point(model.cones, model.cone_idxs)
-    @assert q == length(point.z)
+    point = solver.point
 
     # solve for x as least squares solution to Ax = b, Gx = h - s
     if !iszero(n)
@@ -363,7 +374,7 @@ function find_initial_point(solver::Solver{T}) where {T <: Real}
         end
     end
 
-    return (model, point)
+    return point
 end
 
 # preprocess and get initial point for PreprocessedModel
@@ -376,9 +387,7 @@ function preprocess_find_initial_point(solver::Solver{T}) where {T <: Real}
     n = length(c)
     p = length(b)
     q = orig_model.q
-
-    point = initialize_cone_point(orig_model.cones, orig_model.cone_idxs)
-    @assert q == length(point.z)
+    point = solver.point
 
     # solve for x as least squares solution to Ax = b, Gx = h - s
     if !iszero(n)
@@ -485,26 +494,15 @@ function preprocess_find_initial_point(solver::Solver{T}) where {T <: Real}
 
     solver.x_keep_idxs = x_keep_idxs
     solver.y_keep_idxs = y_keep_idxs
-
-    return (Models.Model{T}(c, A, b, G, orig_model.h, orig_model.cones, obj_offset = orig_model.obj_offset), point)
-end
-
-function initialize_cone_point(cones::Vector{Cones.Cone{T}}, cone_idxs::Vector{UnitRange{Int}}) where {T <: Real}
-    q = isempty(cones) ? 0 : sum(Cones.dimension, cones)
-    point = Models.Point(T[], T[], Vector{T}(undef, q), Vector{T}(undef, q), cones, cone_idxs)
-
-    for k in eachindex(cones)
-        cone_k = cones[k]
-        Cones.setup_data(cone_k)
-        primal_k = point.primal_views[k]
-        Cones.set_initial_point(primal_k, cone_k)
-        Cones.load_point(cone_k, primal_k)
-        @assert Cones.is_feas(cone_k)
-        g = Cones.grad(cone_k)
-        @. point.dual_views[k] = -g
-    end
+    solver.model = Models.Model{T}(c, A, b, G, orig_model.h, orig_model.cones, obj_offset = orig_model.obj_offset)
 
     return point
+end
+
+function calc_mu(solver::Solver{T}) where {T <: Real}
+    solver.mu = (dot(solver.point.z, solver.point.s) + solver.tau * solver.kap) /
+        (one(T) + solver.model.nu)
+    return solver.mu
 end
 
 # NOTE (pivoted) QR factorizations are usually rank-revealing but may be unreliable, see http://www.math.sjsu.edu/~foster/rankrevealingcode.html
