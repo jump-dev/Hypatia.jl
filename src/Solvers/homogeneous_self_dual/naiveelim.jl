@@ -118,6 +118,7 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveElimC
     s2_k = system_solver.s2_k
 
     # update rhs matrix
+    @timeit solver.timer "rhs update" begin
     x1 .= solver.x_residual
     x2 .= zero(T)
     y1 .= solver.y_residual
@@ -133,8 +134,10 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveElimC
     end
     tau_rhs = [-kap, -kap + mu / tau]
     kap_rhs = [kap + solver.primal_obj_t - solver.dual_obj_t, zero(T)]
+    end # rhs
 
     # update lhs matrix
+    @timeit solver.timer "lhs update" begin
     copyto!(lhs, system_solver.lhs_copy)
     mtt = mu / tau / tau
     lhs[end, end] = mtt
@@ -149,16 +152,25 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveElimC
             lhs[rows, rows] .= H
         else
             # -mu*H_k*G_k*x + z_k + mu*H_k*h_k*tau = mu*H_k*zrhs_k + srhs_k
-            lhs[rows, 1:n] .= -H * model.G[idxs, :]
-            lhs[rows, end] .= H * model.h[idxs]
-            z1_k[k] .= H * z1_k[k]
-            z2_k[k] .= H * z2_k[k]
+            mul!(lhs[rows, 1:n], -H, model.G[idxs, :])
+            lhs_try = deepcopy(lhs[rows, 1:n])
+            # @timeit solver.timer "mul2" @views mul!(lhs[rows, end], H, model.h[idxs])
+            # @timeit solver.timer "mul3" mul!(z1_k[k], H, z1_k[k])
+            # @timeit solver.timer "mul4" mul!(z2_k[k], H, z2_k[k])
+            # @show typeof(lhs[rows, 1:n]), typeof(-H), typeof(model.G[idxs, :])
+            # @show typeof(lhs[rows, 1:n]), typeof(-H), typeof(model.G[idxs, :])
+            @timeit solver.timer "mul1" lhs[rows, 1:n] .= -H * model.G[idxs, :]
+            # @show norm(mul!(lhs[rows, 1:n], -H, model.G[idxs, :]) + H * model.G[idxs, :])
+            @timeit solver.timer "mul2" lhs[rows, end] .= H * model.h[idxs]
+            @timeit solver.timer "mul3" z1_k[k] .= H * z1_k[k]
+            @timeit solver.timer "mul4" z2_k[k] .= H * z2_k[k]
         end
     end
     z1 .+= s1
     z2 .+= s2
+    end # lhs
     # -c'x - b'y - h'z + mu/(taubar^2)*tau = taurhs + kaprhs
-    rhs[end, :] .= kap_rhs + tau_rhs
+    @timeit solver.timer "rhsend" rhs[end, :] .= kap_rhs + tau_rhs
 
     # solve system
     if system_solver.use_sparse
@@ -173,8 +185,13 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::NaiveElimC
 
     # s = -G*x + h*tau - zrhs
     # TODO remove allocs
-    s1 .= -model.G * x1 + model.h * tau1 - solver.z_residual
-    s2 .= -model.G * x2 + model.h * tau2
+    copyto!(s1, -solver.z_residual)
+    @. s1 += model.h * tau1
+    mul!(s1, model.G, x1, -true, true)
+    @. s2 = model.h * tau2
+    mul!(s2, model.G, x2, -true, true)
+    # s1 .= -model.G * x1 + model.h * tau1 - solver.z_residual
+    # s2 .= -model.G * x2 + model.h * tau2
 
     # kap = taurhs - mu/(taubar^2)*tau
     kap1 = tau_rhs[1] - mtt * tau1
