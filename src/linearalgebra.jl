@@ -92,7 +92,7 @@ for (potrf, potri, elty, rtyp) in (
             if c.info[] < 0
                 throw(ArgumentError("invalid argument #$(-c.info[]) to LAPACK call"))
             elseif c.info[] > 0
-                error("failed to calculate matrix inverse from cholesky")
+                @warn("inverse from Cholesky failed: $(c.info[])")
             end
 
             return fact_A.factors
@@ -164,7 +164,7 @@ for (sytrf, elty, rtyp) in (
             elseif c.lwork == -1
                 return BlasInt(real(c.work[1]))
             elseif c.info[] == c.n
-                println("RCOND is small: $(c.rcond[])")
+                @warn("condition number is small: $(c.rcond[])")
             end
 
             return BunchKaufman{$elty, typeof(A)}(A, c.ipiv, c.uplo, true, true, c.info[])
@@ -255,10 +255,10 @@ for (posvx, elty, rtyp) in (
             if c.info[] < 0
                 throw(ArgumentError("invalid argument #$(-c.info[]) to LAPACK call"))
             elseif 0 < c.info[] <= c.n
-                println("factorization failed: #$(c.info[])")
+                @warn("factorization failed: #$(c.info[])")
                 return false
             elseif c.info[] == c.n
-                println("RCOND is small: $(c.rcond[])")
+                @warn("condition number is small: $(c.rcond[])")
             end
             return true
         end
@@ -350,10 +350,10 @@ for (sysvx, elty, rtyp) in (
             if c.info[] < 0
                 throw(ArgumentError("invalid argument #$(-c.info[]) to LAPACK call"))
             elseif 0 < c.info[] <= c.n
-                println("factorization failed: #$(c.info[])")
+                @warn("factorization failed: #$(c.info[])")
                 return false
             elseif c.info[] == c.n
-                println("RCOND is small: $(c.rcond[])")
+                @warn("condition number is small: $(c.rcond[])")
             end
             return true
         end

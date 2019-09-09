@@ -26,7 +26,8 @@ real_types = [
 
 @info("starting miscellaneous tests")
 @testset "miscellaneous tests: $T" for T in real_types
-    options = (atol = sqrt(sqrt(eps(T))), solver = SO.Solver{T}(verbose = true))
+    options = (atol = sqrt(sqrt(eps(T))),
+        solver = SO.Solver{T}(verbose = true, iter_limit = 250, time_limit = 12e2))
 
     @testset "densityest" begin test_densityest.(instances_densityest_few, T = T, options = options) end
 
@@ -48,7 +49,8 @@ end
 @info("starting linear operators tests")
 @testset "linear operators tests: $T" for T in real_types
     tol = sqrt(sqrt(eps(T)))
-    options = (atol = 10 * tol, solver = SO.Solver{T}(verbose = true, init_use_iterative = true, preprocess = false,
+    options = (atol = 10 * tol, solver = SO.Solver{T}(verbose = true, init_use_iterative = true,
+        preprocess = false, iter_limit = 250, time_limit = 12e2,
         tol_feas = tol / 10, tol_abs_opt = tol / 10, tol_rel_opt = tol / 10,
         system_solver = SO.NaiveSystemSolver{T}(use_iterative = true)))
 
