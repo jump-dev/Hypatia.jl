@@ -78,6 +78,7 @@ mutable struct Solver{T <: Real}
     prev_z_feas::T
 
     # step helpers
+    keep_iterating::Bool
     prev_aff_alpha::T
     prev_gamma::T
     prev_alpha::T
@@ -184,13 +185,16 @@ function solve(solver::Solver{T}) where {T <: Real}
     # preprocess and find initial point
     @timeit solver.timer "initialize" begin
         @timeit solver.timer "init_cone" point = solver.point = initialize_cone_point(solver.orig_model.cones, solver.orig_model.cone_idxs)
+
         @timeit solver.timer "find_point" solver.preprocess ? preprocess_find_initial_point(solver) : find_initial_point(solver)
+        solver.status != :SolveCalled && return solver
         model = solver.model
+
         solver.tau = one(T)
         solver.kap = one(T)
         calc_mu(solver)
         if isnan(solver.mu) || abs(one(T) - solver.mu) > sqrt(eps(T))
-            error("initial mu is $(solver.mu) (should be 1)")
+            @warn("initial mu is $(solver.mu) but should be 1 (this could indicate a problem with cone barrier oracles)")
         end
         Cones.load_point.(model.cones, point.primal_views)
     end
@@ -243,7 +247,8 @@ function solve(solver::Solver{T}) where {T <: Real}
     @timeit solver.timer "setup_system" load(solver.system_solver, solver)
 
     # iterate from initial point
-    while true
+    solver.keep_iterating = true
+    while solver.keep_iterating
         @timeit solver.timer "calc_res" calc_residual(solver)
 
         @timeit solver.timer "calc_conv" calc_convergence_params(solver)
@@ -257,7 +262,6 @@ function solve(solver::Solver{T}) where {T <: Real}
             solver.status = :IterationLimit
             break
         end
-
         if time() - start_time >= solver.time_limit
             solver.verbose && println("time limit reached; terminating")
             solver.status = :TimeLimit
@@ -265,7 +269,6 @@ function solve(solver::Solver{T}) where {T <: Real}
         end
 
         @timeit solver.timer "step" step(solver)
-
         solver.num_iters += 1
     end
 
@@ -338,7 +341,7 @@ function find_initial_point(solver::Solver{T}) where {T <: Real}
 
             AG_rank = get_rank_est(AG_fact, solver.init_tol_qr)
             if AG_rank < n
-                @warn("some dual equalities appear to be dependent; try using PreprocessedModel")
+                @warn("some dual equalities appear to be dependent; try using preprocess = true")
             end
 
             point.x = AG_fact \ rhs
@@ -367,7 +370,7 @@ function find_initial_point(solver::Solver{T}) where {T <: Real}
 
             Ap_rank = get_rank_est(Ap_fact, solver.init_tol_qr)
             if Ap_rank < p
-                @warn("some primal equalities appear to be dependent; try using PreprocessedModel")
+                @warn("some primal equalities appear to be dependent; try using preprocess = true")
             end
 
             point.y = Ap_fact \ rhs
@@ -377,7 +380,7 @@ function find_initial_point(solver::Solver{T}) where {T <: Real}
     return point
 end
 
-# preprocess and get initial point for PreprocessedModel
+# preprocess and get initial point
 function preprocess_find_initial_point(solver::Solver{T}) where {T <: Real}
     orig_model = solver.orig_model
     c = copy(orig_model.c)
@@ -421,9 +424,11 @@ function preprocess_find_initial_point(solver::Solver{T}) where {T <: Real}
             end
             residual = norm(AG' * yz_sub - c, Inf)
             if residual > solver.init_tol_qr
-                error("some dual equality constraints are inconsistent (residual $residual, tolerance $(solver.init_tol_qr))")
+                solver.verbose && println("some dual equality constraints are inconsistent (residual $residual, tolerance $(solver.init_tol_qr))")
+                solver.status = :DualInconsistent
+                return point
             end
-            println("removed $(n - AG_rank) out of $n dual equality constraints")
+            solver.verbose && println("removed $(n - AG_rank) out of $n dual equality constraints")
 
             point.x = AG_R \ (Matrix{T}(I, AG_rank, p + q) * (AG_fact.Q' * vcat(b, orig_model.h - point.s)))
 
@@ -466,9 +471,10 @@ function preprocess_find_initial_point(solver::Solver{T}) where {T <: Real}
             end
             residual = norm(A * x_sub - b, Inf)
             if residual > solver.init_tol_qr
-                error("some primal equality constraints are inconsistent (residual $residual, tolerance $(solver.init_tol_qr))")
+                solver.verbose && println("some primal equality constraints are inconsistent (residual $residual, tolerance $(solver.init_tol_qr))")
+                solver.status = :PrimalInconsistent
             end
-            println("removed $(p - Ap_rank) out of $p primal equality constraints")
+            solver.verbose && println("removed $(p - Ap_rank) out of $p primal equality constraints")
         end
 
         point.y = Ap_R \ (Matrix{T}(I, Ap_rank, n) * (Ap_fact.Q' *  (-c - G' * point.z)))
@@ -598,6 +604,7 @@ function print_iteration_stats(solver::Solver{T}) where {T <: Real}
             )
     end
     flush(stdout)
+    return
 end
 
 function check_convergence(solver::Solver{T}) where {T <: Real}
@@ -688,10 +695,13 @@ function step(solver::Solver{T}) where {T <: Real}
         s_comb = s_corr
         tau_comb = tau_corr
         kap_comb = kap_corr
-        @timeit solver.timer "corr_alpha" alpha = find_max_alpha_in_nbhd(z_comb, s_comb, tau_comb, kap_comb, solver, nbhd = solver.max_nbhd, prev_alpha = one(T), min_alpha = T(1e-4))
+        @timeit solver.timer "corr_alpha" alpha = find_max_alpha_in_nbhd(z_comb, s_comb, tau_comb, kap_comb, solver, nbhd = solver.max_nbhd, prev_alpha = one(T), min_alpha = T(1e-6))
 
         if iszero(alpha)
-            error("could not step in correction direction; terminating")
+            @warn("numerical failure: could not step in correction direction; terminating")
+            solver.status = :NumericalFailure
+            solver.keep_iterating = false
+            return point
         end
         @. point.x += alpha * x_corr
         @. point.y += alpha * y_corr
@@ -708,7 +718,11 @@ function step(solver::Solver{T}) where {T <: Real}
     solver.kap += alpha * kap_comb
     calc_mu(solver)
 
-    @assert solver.tau > zero(T) && solver.kap > zero(T) && solver.mu > zero(T)
+    if solver.tau <= zero(T) || solver.kap <= zero(T) || solver.mu <= zero(T)
+        @warn("numerical failure: tau is $(solver.tau), kappa is $(solver.kap), mu is $(solver.mu); terminating")
+        solver.status = :NumericalFailure
+        solver.keep_iterating = false
+    end
 
     return point
 end
@@ -758,7 +772,7 @@ function find_max_alpha_in_nbhd(
         end
 
         if alpha < min_alpha
-            # alpha is very small so just let it be zero
+            # alpha is very small so finish
             alpha = zero(T)
             break
         end
@@ -779,12 +793,10 @@ function check_nbhd(
     cones = solver.model.cones
     sqrtmu = sqrt(mu_temp)
 
-    if isfinite(nbhd)
-        rhs_nbhd = mu_temp * abs2(nbhd)
-        lhs_nbhd = abs2(taukap_temp / sqrtmu - sqrtmu)
-        if lhs_nbhd >= rhs_nbhd
-            return false
-        end
+    rhs_nbhd = mu_temp * abs2(nbhd)
+    lhs_nbhd = abs2(taukap_temp / sqrtmu - sqrtmu)
+    if lhs_nbhd >= rhs_nbhd
+        return false
     end
 
     Cones.load_point.(cones, solver.primal_views, sqrtmu)
@@ -805,39 +817,37 @@ function check_nbhd(
         end
     end
 
-    if isfinite(nbhd)
-        for (k, cone_k) in enumerate(cones)
-            if !solver.cones_loaded[k]
-                Cones.reset_data(cone_k)
-                if !Cones.is_feas(cone_k)
-                    return false
-                end
-            end
-
-            # modifies dual_views
-            duals_k = solver.dual_views[k]
-            g_k = Cones.grad(cone_k)
-            @. duals_k += g_k * sqrtmu
-
-            if solver.use_infty_nbhd
-                k_nbhd = abs2(norm(duals_k, Inf) / norm(g_k, Inf))
-                # k_nbhd = abs2(maximum(abs(dj) / abs(gj) for (dj, gj) in zip(duals_k, g_k))) # TODO try this neighborhood
-                lhs_nbhd = max(lhs_nbhd, k_nbhd)
-            else
-                nbhd_temp_k = solver.nbhd_temp[k]
-                Cones.inv_hess_prod!(nbhd_temp_k, duals_k, cone_k)
-                k_nbhd = dot(duals_k, nbhd_temp_k)
-                if k_nbhd <= -cbrt(eps(T))
-                    println("numerical issue for cone: k_nbhd is $k_nbhd")
-                    return false
-                elseif k_nbhd > zero(T)
-                    lhs_nbhd += k_nbhd
-                end
-            end
-
-            if lhs_nbhd > rhs_nbhd
+    for (k, cone_k) in enumerate(cones)
+        if !solver.cones_loaded[k]
+            Cones.reset_data(cone_k)
+            if !Cones.is_feas(cone_k)
                 return false
             end
+        end
+
+        # modifies dual_views
+        duals_k = solver.dual_views[k]
+        g_k = Cones.grad(cone_k)
+        @. duals_k += g_k * sqrtmu
+
+        if solver.use_infty_nbhd
+            k_nbhd = abs2(norm(duals_k, Inf) / norm(g_k, Inf))
+            # k_nbhd = abs2(maximum(abs(dj) / abs(gj) for (dj, gj) in zip(duals_k, g_k))) # TODO try this neighborhood
+            lhs_nbhd = max(lhs_nbhd, k_nbhd)
+        else
+            nbhd_temp_k = solver.nbhd_temp[k]
+            Cones.inv_hess_prod!(nbhd_temp_k, duals_k, cone_k)
+            k_nbhd = dot(duals_k, nbhd_temp_k)
+            if k_nbhd <= -cbrt(eps(T))
+                @warn("numerical failure: cone neighborhood is $k_nbhd")
+                return false
+            elseif k_nbhd > zero(T)
+                lhs_nbhd += k_nbhd
+            end
+        end
+
+        if lhs_nbhd > rhs_nbhd
+            return false
         end
     end
 

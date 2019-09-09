@@ -191,7 +191,6 @@ function get_combined_directions(system_solver::SymIndefSystemSolver{T}) where {
         end
         rhs .= F \ rhs
     else
-        # TODO decide which factorization to use
         if T <: BlasReal
             F = bunchkaufman!(lhs_symm, true, check = true) # TODO doesn't work for generic reals - try LU, or need LDLT implementation
             ldiv!(F, rhs)
@@ -199,8 +198,6 @@ function get_combined_directions(system_solver::SymIndefSystemSolver{T}) where {
             F = lu!(lhs_symm) # TODO replace with a generic julia symmetric indefinite decomposition if available, see https://github.com/JuliaLang/julia/issues/10953
             ldiv!(F, rhs)
         end
-        # F = lu!(lhs_symm)
-        # ldiv!(F, rhs)
     end
 
     if !use_hess_inv
