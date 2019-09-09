@@ -9,17 +9,8 @@ mutable struct Optimizer{T <: Real} <: MOI.AbstractOptimizer
     use_dense::Bool
     test_certificates::Bool
 
-    status::Symbol
-
-    c::Vector{T}
-    A
-    b::Vector{T}
-    G
-    h::Vector{T}
-    cones::Vector{Cones.Cone{T}}
-    obj_offset::T
-
-    solver::Solvers.HSDSolver{T}
+    solver::Solvers.Solver{T}
+    model::Models.Model{T}
 
     result::NamedTuple
     x::Vector{T}
@@ -43,22 +34,26 @@ mutable struct Optimizer{T <: Real} <: MOI.AbstractOptimizer
         solver_options...
         ) where {T <: Real}
         opt = new{T}()
-
         opt.load_only = load_only
         opt.use_dense = use_dense
         opt.test_certificates = test_certificates
-        opt.solver = Solvers.HSDSolver{T}(; solver_options...)
-        opt.status = :NotLoaded
-
+        opt.solver = Solvers.Solver{T}(; solver_options...)
         return opt
     end
 end
 
+Optimizer(; options...) = Optimizer{Float64}(; options...) # default to Float64
+
 MOI.get(::Optimizer, ::MOI.SolverName) = "Hypatia"
 MOI.get(opt::Optimizer, ::MOI.RawSolver) = opt.solver
 
-MOI.is_empty(opt::Optimizer) = (opt.status == :NotLoaded)
-MOI.empty!(opt::Optimizer) = (opt.status = :NotLoaded)
+MOI.is_empty(opt::Optimizer) = (opt.solver.status == :NotLoaded)
+
+function MOI.empty!(opt::Optimizer)
+    opt.solver.status = :NotLoaded
+    opt.result = NamedTuple()
+    return
+end
 
 MOI.supports(::Optimizer{T}, ::Union{
     MOI.ObjectiveSense,
@@ -106,12 +101,10 @@ function MOI.copy_to(
         push!(Jc, idx_map[t.variable_index].value)
         push!(Vc, t.coefficient)
     end
-    opt.obj_offset = obj.constant
+    obj_offset = obj.constant
     if MOI.get(src, MOI.ObjectiveSense()) == MOI.MAX_SENSE
         Vc .*= -1
-        opt.obj_offset = -obj.constant
-    else
-        opt.obj_offset = obj.constant
+        obj_offset *= -1
     end
     opt.obj_sense = MOI.get(src, MOI.ObjectiveSense())
     model_c = Vector(sparsevec(Jc, Vc, n))
@@ -447,46 +440,34 @@ function MOI.copy_to(
     model_G = dropzeros!(sparse(IG, JG, VG, q, n))
     model_h = Vector(sparsevec(Ih, Vh, q))
 
-    opt.c = model_c
-    opt.A = model_A
-    opt.b = model_b
-    opt.G = model_G
-    opt.h = model_h
-    opt.cones = cones
+    if opt.use_dense
+        model_A = Matrix(model_A)
+        model_G = Matrix(model_G)
+    end
+
+    opt.model = Models.Model{T}(model_c, model_A, model_b, model_G, model_h, cones; obj_offset = obj_offset)
 
     opt.constr_offset_cone = constr_offset_cone
     opt.constr_prim_cone = Vector(sparsevec(Icpc, Vcpc, q))
-
-    opt.status = :Loaded
 
     return idx_map
 end
 
 function MOI.optimize!(opt::Optimizer{T}) where {T <: Real}
-    if opt.load_only
-        return
-    end
+    opt.load_only && return
 
     # build and solve the model
-    opt.result = r = Solvers.build_solve_check(
-        copy(opt.c),
-        (opt.use_dense ? Matrix(opt.A) : copy(opt.A)),
-        copy(opt.b),
-        (opt.use_dense ? Matrix(opt.G) : copy(opt.G)),
-        copy(opt.h),
-        opt.cones, obj_offset = opt.obj_offset,
-        test = opt.test_certificates, solver = opt.solver)
-
-    opt.status = r.status
+    model = opt.model
+    opt.result = r = Solvers.solve_check(model, solver = opt.solver, test = opt.test_certificates)
 
     # transform solution for MOI conventions
     opt.x = r.x
-    opt.constr_prim_eq += opt.b - opt.A * opt.x
+    opt.constr_prim_eq += model.b - model.A * opt.x
     opt.y = r.y
     opt.s = r.s
     opt.z = r.z
     opt.s[opt.interval_idxs] ./= opt.interval_scales
-    for (k, cone_k) in enumerate(opt.cones)
+    for (k, cone_k) in enumerate(model.cones)
         if cone_k isa Cones.PosSemidefTri || cone_k isa Cones.HypoPerLogdetTri # rescale duals for symmetric triangle cones
             cone_idxs_k = Models.get_cone_idxs(r.model)[k]
             unscale_vec = (Cones.use_dual(cone_k) ? opt.s : opt.z)
@@ -517,16 +498,16 @@ MOI.set(opt::Optimizer, ::MOI.TimeLimitSec, ::Nothing) = (opt.solver.time_limit 
 MOI.get(opt::Optimizer, ::MOI.TimeLimitSec) = (isfinite(opt.solver.time_limit) ? opt.solver.time_limit : nothing)
 
 function MOI.get(opt::Optimizer, ::MOI.SolveTime)
-    if opt.status in (:NotLoaded, :Loaded)
+    if opt.solver.status in (:NotLoaded, :Loaded)
         error("solve has not been called")
     end
     return opt.result.solve_time
 end
 
-MOI.get(opt::Optimizer, ::MOI.RawStatusString) = string(opt.result.status)
+MOI.get(opt::Optimizer, ::MOI.RawStatusString) = string(opt.solver.status)
 
 function MOI.get(opt::Optimizer, ::MOI.TerminationStatus)
-    status = opt.status
+    status = opt.solver.status
     if status in (:NotLoaded, :Loaded)
         return MOI.OPTIMIZE_NOT_CALLED
     elseif status == :Optimal
@@ -542,13 +523,13 @@ function MOI.get(opt::Optimizer, ::MOI.TerminationStatus)
     elseif status == :TimeLimit
         return MOI.TIME_LIMIT
     else
-        @warn("Hypatia status $(opt.status) not handled")
+        @warn("Hypatia status $(opt.solver.status) not handled")
         return MOI.OTHER_ERROR
     end
 end
 
 function MOI.get(opt::Optimizer, ::MOI.PrimalStatus)
-    status = opt.status
+    status = opt.solver.status
     if status == :Optimal
         return MOI.FEASIBLE_POINT
     elseif status == :PrimalInfeasible
@@ -563,7 +544,7 @@ function MOI.get(opt::Optimizer, ::MOI.PrimalStatus)
 end
 
 function MOI.get(opt::Optimizer, ::MOI.DualStatus)
-    status = opt.status
+    status = opt.solver.status
     if status == :Optimal
         return MOI.FEASIBLE_POINT
     elseif status == :PrimalInfeasible

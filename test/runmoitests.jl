@@ -4,8 +4,6 @@ Copyright 2019, Chris Coey and contributors
 
 include(joinpath(@__DIR__, "moi.jl"))
 
-verbose = false
-
 real_types = [
     Float64,
     # BigFloat, # TODO test this when MOI allows
@@ -17,10 +15,10 @@ dense_options = [
     ]
 
 system_solvers = [
-    SO.QRCholHSDSystemSolver,
-    SO.SymIndefHSDSystemSolver,
-    SO.NaiveElimHSDSystemSolver,
-    SO.NaiveHSDSystemSolver,
+    SO.QRCholSystemSolver,
+    # SO.SymIndefSystemSolver,
+    SO.NaiveElimSystemSolver,
+    # SO.NaiveSystemSolver,
     ]
 
 @info("starting MOI tests")

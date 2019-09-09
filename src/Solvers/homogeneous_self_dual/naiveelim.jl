@@ -27,10 +27,10 @@ kap + mu/(taubar^2)*tau = taurhs --> kap = taurhs - mu/(taubar^2)*tau
 TODO reduce allocations
 =#
 
-mutable struct NaiveElimHSDSystemSolver{T <: Real} <: HSDSystemSolver{T}
+mutable struct NaiveElimSystemSolver{T <: Real} <: SystemSolver{T}
     use_sparse::Bool
 
-    solver::HSDSolver{T}
+    solver::Solver{T}
 
     lhs_copy
     lhs
@@ -49,14 +49,14 @@ mutable struct NaiveElimHSDSystemSolver{T <: Real} <: HSDSystemSolver{T}
     s1_k
     s2_k
 
-    function NaiveElimHSDSystemSolver{T}(; use_sparse::Bool = false) where {T <: Real}
+    function NaiveElimSystemSolver{T}(; use_sparse::Bool = false) where {T <: Real}
         system_solver = new{T}()
         system_solver.use_sparse = use_sparse
         return system_solver
     end
 end
 
-function load(system_solver::NaiveElimHSDSystemSolver{T}, solver::HSDSolver{T}) where {T <: Real}
+function load(system_solver::NaiveElimSystemSolver{T}, solver::Solver{T}) where {T <: Real}
     system_solver.solver = solver
 
     model = solver.model
@@ -104,7 +104,7 @@ function load(system_solver::NaiveElimHSDSystemSolver{T}, solver::HSDSolver{T}) 
     return system_solver
 end
 
-function get_combined_directions(system_solver::NaiveElimHSDSystemSolver{T}) where {T <: Real}
+function get_combined_directions(system_solver::NaiveElimSystemSolver{T}) where {T <: Real}
     solver = system_solver.solver
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)

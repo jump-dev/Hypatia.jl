@@ -6,10 +6,10 @@ solves linear system in naive.jl via a procedure similar to that described by S1
 http://www.seas.ucla.edu/~vandenbe/publications/coneprog.pdf
 =#
 
-mutable struct QRCholHSDSystemSolver{T <: Real} <: HSDSystemSolver{T}
+mutable struct QRCholSystemSolver{T <: Real} <: SystemSolver{T}
     use_sparse::Bool
 
-    solver::HSDSolver{T}
+    solver::Solver{T}
 
     xi::Matrix{T}
     yi::Matrix{T}
@@ -61,14 +61,14 @@ mutable struct QRCholHSDSystemSolver{T <: Real} <: HSDSystemSolver{T}
     solvesol
     solvecache
 
-    function QRCholHSDSystemSolver{T}(; use_sparse::Bool = false) where {T <: Real}
+    function QRCholSystemSolver{T}(; use_sparse::Bool = false) where {T <: Real}
         system_solver = new{T}()
         system_solver.use_sparse = use_sparse
         return system_solver
     end
 end
 
-function load(system_solver::QRCholHSDSystemSolver{T}, solver::HSDSolver{T}) where {T <: Real}
+function load(system_solver::QRCholSystemSolver{T}, solver::Solver{T}) where {T <: Real}
     system_solver.solver = solver
 
     model = solver.model
@@ -108,13 +108,13 @@ function load(system_solver::QRCholHSDSystemSolver{T}, solver::HSDSolver{T}) whe
 
     nmp = n - p
 
-    if !isa(model.G, Matrix{T}) && isa(model.Ap_Q, SuiteSparse.SPQR.QRSparseQ)
+    if !isa(model.G, Matrix{T}) && isa(solver.Ap_Q, SuiteSparse.SPQR.QRSparseQ)
         # TODO very inefficient method used for sparse G * QRSparseQ : see https://github.com/JuliaLang/julia/issues/31124#issuecomment-501540818
         # TODO remove workaround and warning
         @warn("in QRChol, converting G to dense before multiplying by sparse Householder Q due to very inefficient dispatch")
-        GQ = Matrix(model.G) * model.Ap_Q
+        GQ = Matrix(model.G) * solver.Ap_Q
     else
-        GQ = model.G * model.Ap_Q
+        GQ = model.G * solver.Ap_Q
     end
     system_solver.GQ1 = GQ[:, 1:p]
     system_solver.GQ2 = GQ[:, (p + 1):end]
@@ -151,7 +151,7 @@ function load(system_solver::QRCholHSDSystemSolver{T}, solver::HSDSolver{T}) whe
     return system_solver
 end
 
-function get_combined_directions(system_solver::QRCholHSDSystemSolver{T}) where {T <: Real}
+function get_combined_directions(system_solver::QRCholSystemSolver{T}) where {T <: Real}
     solver = system_solver.solver
     model = solver.model
     cones = model.cones
@@ -241,11 +241,11 @@ function get_combined_directions(system_solver::QRCholHSDSystemSolver{T}) where 
         end
     end
 
-    ldiv!(model.Ap_R', yi)
+    ldiv!(solver.Ap_R', yi)
 
     copyto!(QpbxGHbz, xi)
     mul!(QpbxGHbz, model.G', zi, true, true)
-    lmul!(model.Ap_Q', QpbxGHbz)
+    lmul!(solver.Ap_Q', QpbxGHbz)
 
     copyto!(xi1, yi)
 
@@ -281,7 +281,7 @@ function get_combined_directions(system_solver::QRCholHSDSystemSolver{T}) where 
         end
     end
 
-    lmul!(model.Ap_Q, xi)
+    lmul!(solver.Ap_Q, xi)
 
     mul!(Gxi, model.G, xi)
     block_hessian_product!(HGxi_k, Gxi_k)
@@ -291,7 +291,7 @@ function get_combined_directions(system_solver::QRCholHSDSystemSolver{T}) where 
     if !iszero(length(yi))
         copyto!(yi, Q1pbxGHbz)
         mul!(yi, GQ1', HGxi, -1, true)
-        ldiv!(model.Ap_R, yi)
+        ldiv!(solver.Ap_R, yi)
     end
 
     # lift to HSDE space

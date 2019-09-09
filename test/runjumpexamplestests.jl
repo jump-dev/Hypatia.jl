@@ -23,45 +23,44 @@ include(joinpath(examples_dir, "shapeconregr/JuMP.jl"))
 
 @info("starting JuMP examples tests")
 @testset "JuMP examples" begin
-    # TODO rewrite like test/native.jl functions, to take T and all options and use build_solve_check
-    JuMP_options = (
-        verbose = false,
+    options = (
         test_certificates = true,
+        verbose = true,
         iter_limit = 250,
         time_limit = 6e2, # 1 minute
         )
 
-    # @testset "centralpolymat" begin test_centralpolymatJuMP(; JuMP_options...,
+    # @testset "centralpolymat" begin test_centralpolymatJuMP(; options...,
     #     tol_rel_opt = 1e-6, tol_abs_opt = 1e-6, tol_feas = 1e-7) end
     #
-    # @testset "contraction" begin test_contractionJuMP(; JuMP_options...,
+    # @testset "contraction" begin test_contractionJuMP(; options...,
     #     tol_rel_opt = 1e-4, tol_abs_opt = 1e-4, tol_feas = 1e-4) end
     #
-    # @testset "densityest" begin test_densityestJuMP(; JuMP_options...,
+    # @testset "densityest" begin test_densityestJuMP(; options...,
     #     tol_rel_opt = 1e-5, tol_abs_opt = 1e-5, tol_feas = 1e-6) end
 
-    @testset "envelope" begin test_envelopeJuMP(; JuMP_options...) end
+    @testset "envelope" begin test_envelopeJuMP(; options...) end
 
-    @testset "expdesign" begin test_expdesignJuMP(; JuMP_options...) end
+    @testset "expdesign" begin test_expdesignJuMP(; options...) end
 
-    @testset "lotkavolterra" begin test_lotkavolterraJuMP(; JuMP_options...,
+    @testset "lotkavolterra" begin test_lotkavolterraJuMP(; options...,
         tol_rel_opt = 1e-5, tol_abs_opt = 1e-6, tol_feas = 1e-6) end
 
-    # @testset "muconvexity" begin test_muconvexityJuMP(; JuMP_options...) end
+    # @testset "muconvexity" begin test_muconvexityJuMP(; options...) end
 
-    @testset "polymin" begin test_polyminJuMP(; JuMP_options...,
+    @testset "polymin" begin test_polyminJuMP(; options...,
         tol_rel_opt = 1e-9, tol_abs_opt = 1e-8, tol_feas = 1e-9) end
 
-    # @testset "polynorm" begin test_polynormJuMP(; JuMP_options...) end
+    # @testset "polynorm" begin test_polynormJuMP(; options...) end
 
-    # @testset "regionofattr" begin test_regionofattrJuMP(; JuMP_options...,
+    # @testset "regionofattr" begin test_regionofattrJuMP(; options...,
     #     tol_abs_opt = 1e-6, tol_rel_opt = 1e-6, tol_feas = 1e-6) end
     #
-    # @testset "secondorderpoly" begin test_secondorderpolyJuMP(; JuMP_options...) end
+    # @testset "secondorderpoly" begin test_secondorderpolyJuMP(; options...) end
     #
-    # @testset "semidefinitepoly" begin test_semidefinitepolyJuMP(; JuMP_options...,
+    # @testset "semidefinitepoly" begin test_semidefinitepolyJuMP(; options...,
     #     tol_abs_opt = 1e-7, tol_rel_opt = 1e-7, tol_feas = 1e-7) end
     #
-    # @testset "shapeconregr" begin test_shapeconregrJuMP(; JuMP_options...,
+    # @testset "shapeconregr" begin test_shapeconregrJuMP(; options...,
     #     tol_rel_opt = 1e-6, tol_abs_opt = 1e-6, tol_feas = 1e-6) end
 end

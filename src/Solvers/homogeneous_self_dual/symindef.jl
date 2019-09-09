@@ -21,11 +21,11 @@ and symmetrize the LHS matrix by multiplying some equations by -1
 TODO reduce allocations
 =#
 
-mutable struct SymIndefHSDSystemSolver{T <: Real} <: HSDSystemSolver{T}
+mutable struct SymIndefSystemSolver{T <: Real} <: SystemSolver{T}
     use_sparse::Bool
     use_hess_inv::Bool
 
-    solver::HSDSolver{T}
+    solver::Solver{T}
 
     lhs_copy
     lhs
@@ -50,7 +50,7 @@ mutable struct SymIndefHSDSystemSolver{T <: Real} <: HSDSystemSolver{T}
     s2_k
     s3_k
 
-    function SymIndefHSDSystemSolver{T}(; use_sparse::Bool = false, use_hess_inv::Bool = false) where {T <: Real}
+    function SymIndefSystemSolver{T}(; use_sparse::Bool = false, use_hess_inv::Bool = false) where {T <: Real}
         system_solver = new{T}()
         system_solver.use_sparse = use_sparse
         system_solver.use_hess_inv = use_hess_inv
@@ -58,7 +58,7 @@ mutable struct SymIndefHSDSystemSolver{T <: Real} <: HSDSystemSolver{T}
     end
 end
 
-function load(system_solver::SymIndefHSDSystemSolver{T}, solver::HSDSolver{T}) where {T <: Real}
+function load(system_solver::SymIndefSystemSolver{T}, solver::Solver{T}) where {T <: Real}
     system_solver.solver = solver
 
     model = solver.model
@@ -109,7 +109,7 @@ function load(system_solver::SymIndefHSDSystemSolver{T}, solver::HSDSolver{T}) w
     return system_solver
 end
 
-function get_combined_directions(system_solver::SymIndefHSDSystemSolver{T}) where {T <: Real}
+function get_combined_directions(system_solver::SymIndefSystemSolver{T}) where {T <: Real}
     solver = system_solver.solver
     use_hess_inv = system_solver.use_hess_inv
     model = solver.model
