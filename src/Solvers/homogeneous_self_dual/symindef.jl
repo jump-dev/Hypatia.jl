@@ -21,9 +21,11 @@ and symmetrize the LHS matrix by multiplying some equations by -1
 TODO reduce allocations
 =#
 
-mutable struct SymIndefCombinedHSDSystemSolver{T <: Real} <: CombinedHSDSystemSolver{T}
+mutable struct SymIndefSystemSolver{T <: Real} <: SystemSolver{T}
     use_sparse::Bool
     use_hess_inv::Bool
+
+    solver::Solver{T}
 
     lhs_copy
     lhs
@@ -48,59 +50,67 @@ mutable struct SymIndefCombinedHSDSystemSolver{T <: Real} <: CombinedHSDSystemSo
     s2_k
     s3_k
 
-    function SymIndefCombinedHSDSystemSolver{T}(model::Models.LinearModel{T}; use_sparse::Bool = false, use_hess_inv::Bool = false) where {T <: Real}
-        (n, p, q) = (model.n, model.p, model.q)
-        npq = n + p + q
+    function SymIndefSystemSolver{T}(; use_sparse::Bool = false, use_hess_inv::Bool = false) where {T <: Real}
         system_solver = new{T}()
         system_solver.use_sparse = use_sparse
         system_solver.use_hess_inv = use_hess_inv
-
-        # x y z
-        # symmetric, lower triangle filled only
-        if use_sparse
-            system_solver.lhs_copy = T[
-                spzeros(T,n,n)  spzeros(T,n,p)  spzeros(T,n,q);
-                model.A         spzeros(T,p,p)  spzeros(T,p,q);
-                model.G         spzeros(T,q,p)  sparse(-one(T)*I,q,q);
-            ]
-            @assert issparse(system_solver.lhs_copy)
-        else
-            system_solver.lhs_copy = T[
-                zeros(T,n,n)  zeros(T,n,p)  zeros(T,n,q);
-                model.A       zeros(T,p,p)  zeros(T,p,q);
-                model.G       zeros(T,q,p)  Matrix(-one(T)*I,q,q);
-            ]
-        end
-
-        system_solver.lhs = similar(system_solver.lhs_copy)
-
-        rhs = Matrix{T}(undef, npq, 3)
-        system_solver.rhs = rhs
-        rows = 1:n
-        system_solver.x1 = view(rhs, rows, 1)
-        system_solver.x2 = view(rhs, rows, 2)
-        system_solver.x3 = view(rhs, rows, 3)
-        rows = (n + 1):(n + p)
-        system_solver.y1 = view(rhs, rows, 1)
-        system_solver.y2 = view(rhs, rows, 2)
-        system_solver.y3 = view(rhs, rows, 3)
-        rows = (n + p + 1):(n + p + q)
-        system_solver.z1 = view(rhs, rows, 1)
-        system_solver.z2 = view(rhs, rows, 2)
-        system_solver.z3 = view(rhs, rows, 3)
-        z_start = n + p
-        system_solver.z1_k = [view(rhs, z_start .+ model.cone_idxs[k], 1) for k in eachindex(model.cones)]
-        system_solver.z2_k = [view(rhs, z_start .+ model.cone_idxs[k], 2) for k in eachindex(model.cones)]
-        system_solver.z3_k = [view(rhs, z_start .+ model.cone_idxs[k], 3) for k in eachindex(model.cones)]
-        system_solver.s1 = similar(rhs, q)
-        system_solver.s2 = similar(rhs, q)
-        system_solver.s3 = similar(rhs, q)
-
         return system_solver
     end
 end
 
-function get_combined_directions(solver::HSDSolver{T}, system_solver::SymIndefCombinedHSDSystemSolver{T}) where {T <: Real}
+function load(system_solver::SymIndefSystemSolver{T}, solver::Solver{T}) where {T <: Real}
+    system_solver.solver = solver
+
+    model = solver.model
+    (n, p, q) = (model.n, model.p, model.q)
+    npq = n + p + q
+
+    # x y z
+    # symmetric, lower triangle filled only
+    if system_solver.use_sparse
+        system_solver.lhs_copy = T[
+            spzeros(T,n,n)  spzeros(T,n,p)  spzeros(T,n,q);
+            model.A         spzeros(T,p,p)  spzeros(T,p,q);
+            model.G         spzeros(T,q,p)  sparse(-one(T)*I,q,q);
+        ]
+        @assert issparse(system_solver.lhs_copy)
+    else
+        system_solver.lhs_copy = T[
+            zeros(T,n,n)  zeros(T,n,p)  zeros(T,n,q);
+            model.A       zeros(T,p,p)  zeros(T,p,q);
+            model.G       zeros(T,q,p)  Matrix(-one(T)*I,q,q);
+        ]
+    end
+
+    system_solver.lhs = similar(system_solver.lhs_copy)
+
+    rhs = Matrix{T}(undef, npq, 3)
+    system_solver.rhs = rhs
+    rows = 1:n
+    system_solver.x1 = view(rhs, rows, 1)
+    system_solver.x2 = view(rhs, rows, 2)
+    system_solver.x3 = view(rhs, rows, 3)
+    rows = (n + 1):(n + p)
+    system_solver.y1 = view(rhs, rows, 1)
+    system_solver.y2 = view(rhs, rows, 2)
+    system_solver.y3 = view(rhs, rows, 3)
+    rows = (n + p + 1):(n + p + q)
+    system_solver.z1 = view(rhs, rows, 1)
+    system_solver.z2 = view(rhs, rows, 2)
+    system_solver.z3 = view(rhs, rows, 3)
+    z_start = n + p
+    system_solver.z1_k = [view(rhs, z_start .+ model.cone_idxs[k], 1) for k in eachindex(model.cones)]
+    system_solver.z2_k = [view(rhs, z_start .+ model.cone_idxs[k], 2) for k in eachindex(model.cones)]
+    system_solver.z3_k = [view(rhs, z_start .+ model.cone_idxs[k], 3) for k in eachindex(model.cones)]
+    system_solver.s1 = similar(rhs, q)
+    system_solver.s2 = similar(rhs, q)
+    system_solver.s3 = similar(rhs, q)
+
+    return system_solver
+end
+
+function get_combined_directions(system_solver::SymIndefSystemSolver{T}) where {T <: Real}
+    solver = system_solver.solver
     use_hess_inv = system_solver.use_hess_inv
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
@@ -181,7 +191,6 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::SymIndefCo
         end
         rhs .= F \ rhs
     else
-        # TODO decide which factorization to use
         if T <: BlasReal
             F = bunchkaufman!(lhs_symm, true, check = true) # TODO doesn't work for generic reals - try LU, or need LDLT implementation
             ldiv!(F, rhs)
@@ -189,8 +198,6 @@ function get_combined_directions(solver::HSDSolver{T}, system_solver::SymIndefCo
             F = lu!(lhs_symm) # TODO replace with a generic julia symmetric indefinite decomposition if available, see https://github.com/JuliaLang/julia/issues/10953
             ldiv!(F, rhs)
         end
-        # F = lu!(lhs_symm)
-        # ldiv!(F, rhs)
     end
 
     if !use_hess_inv

@@ -61,12 +61,12 @@ function update_inv_hess_prod(cone::Cone{T}) where {T}
     end
     cone.hess_fact = hyp_bk!(cone.hess_fact_cache, cone.tmp_hess.data)
     if !issuccess(cone.hess_fact) # TODO maybe better to not step to this point if the hessian factorization fails
-        println("primitive cone hessian factorization failed")
+        @warn("numerical failure: cannot factorize primitive cone hessian")
         copyto!(cone.tmp_hess, cone.hess)
         cone.tmp_hess += cbrt(eps(T)) * I
         cone.hess_fact = hyp_bk!(cone.hess_fact_cache, cone.tmp_hess.data)
         if !issuccess(cone.hess_fact)
-            error("cannot factorize primitive cone hessian")
+            @warn("numerical failure: could not fix failure of positive definiteness")
         end
     end
     cone.inv_hess_prod_updated = true
