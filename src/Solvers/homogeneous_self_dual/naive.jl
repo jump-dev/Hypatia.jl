@@ -14,11 +14,11 @@ kap + mu/(taubar^2)*tau = taurhs
 TODO reduce allocations
 =#
 
-mutable struct NaiveHSDSystemSolver{T <: Real} <: HSDSystemSolver{T}
+mutable struct NaiveSystemSolver{T <: Real} <: SystemSolver{T}
     use_iterative::Bool
     use_sparse::Bool
 
-    solver::HSDSolver{T}
+    solver::Solver{T}
 
     lhs_copy
     lhs
@@ -39,7 +39,7 @@ mutable struct NaiveHSDSystemSolver{T <: Real} <: HSDSystemSolver{T}
     s2
     kap_row::Int
 
-    function NaiveHSDSystemSolver{T}(; use_iterative::Bool = false, use_sparse::Bool = false) where {T <: Real}
+    function NaiveSystemSolver{T}(; use_iterative::Bool = false, use_sparse::Bool = false) where {T <: Real}
         system_solver = new{T}()
         system_solver.use_iterative = use_iterative
         system_solver.use_sparse = use_sparse
@@ -47,7 +47,7 @@ mutable struct NaiveHSDSystemSolver{T <: Real} <: HSDSystemSolver{T}
     end
 end
 
-function load(system_solver::NaiveHSDSystemSolver{T}, solver::HSDSolver{T}) where {T <: Real}
+function load(system_solver::NaiveSystemSolver{T}, solver::Solver{T}) where {T <: Real}
     system_solver.solver = solver
 
     model = solver.model
@@ -138,7 +138,7 @@ function load(system_solver::NaiveHSDSystemSolver{T}, solver::HSDSolver{T}) wher
     return system_solver
 end
 
-function get_combined_directions(system_solver::NaiveHSDSystemSolver{T}) where {T <: Real}
+function get_combined_directions(system_solver::NaiveSystemSolver{T}) where {T <: Real}
     solver = system_solver.solver
     model = solver.model
     cones = model.cones

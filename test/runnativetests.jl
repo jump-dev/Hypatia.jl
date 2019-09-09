@@ -4,7 +4,6 @@ Copyright 2019, Chris Coey and contributors
 
 include(joinpath(@__DIR__, "native.jl"))
 
-const MO = Hypatia.Models
 const SO = Hypatia.Solvers
 
 @info("starting native tests")
@@ -16,10 +15,20 @@ real_types = [
     ]
 
 system_solvers = [
-    SO.QRCholHSDSystemSolver,
-    SO.SymIndefHSDSystemSolver,
-    SO.NaiveElimHSDSystemSolver,
-    SO.NaiveHSDSystemSolver,
+    SO.QRCholSystemSolver,
+    SO.SymIndefSystemSolver,
+    SO.NaiveElimSystemSolver,
+    SO.NaiveSystemSolver,
+    ]
+
+use_infty_nbhd = [
+    true,
+    false,
+    ]
+
+preprocess = [
+    true,
+    false
     ]
 
 testfuns_preproc = [
@@ -27,16 +36,6 @@ testfuns_preproc = [
     consistent1,
     inconsistent1,
     inconsistent2,
-    ]
-
-linear_models = [
-    MO.PreprocessedLinearModel,
-    MO.RawLinearModel,
-    ]
-
-use_infty_nbhd = [
-    true,
-    false,
     ]
 
 testfuns_raw = [
@@ -84,18 +83,23 @@ testfuns_raw = [
     dualinfeas3,
     ]
 
+@info("starting preprocessing tests")
 @testset "preprocessing tests: $t, $s, $T" for t in testfuns_preproc, s in system_solvers, T in real_types
-    t(T, solver = SO.HSDSolver{T}(verbose = true, system_solver = s{T}()))
+    t(T, solver = SO.Solver{T}(verbose = true, system_solver = s{T}()))
 end
 
-@testset "native tests: $t, $s, $m, $n, $T" for t in testfuns_raw, s in system_solvers, m in linear_models, n in use_infty_nbhd, T in real_types
+@info("starting miscellaneous tests")
+@testset "miscellaneous tests: $t, $s, $n, $p, $T" for t in testfuns_raw, s in system_solvers, n in use_infty_nbhd, p in preprocess, T in real_types
     T == BigFloat && t == epinormspectral1 && continue # Cannot get svdvals with BigFloat
-    s == SO.QRCholHSDSystemSolver && m == MO.RawLinearModel && continue # QRChol linear system solver needs preprocessed model
-    t(T, linear_model = m, solver = SO.HSDSolver{T}(verbose = false, use_infty_nbhd = n, system_solver = s{T}()))
+    !p && s == SO.QRCholSystemSolver && continue # Must use preprocessing if using QRCholSystemSolver
+    solver = SO.Solver{T}(verbose = false, preprocess = p, use_infty_nbhd = n, system_solver = s{T}())
+    t(T, solver = solver)
 end
 
-@testset "native tests (iterative linear system solves): $t, $T" for t in testfuns_raw, T in real_types
+@info("starting iterative system solver tests")
+@testset "iterative system solver tests: $t, $T" for t in testfuns_raw, T in real_types
     T == BigFloat && continue # IterativeSolvers does not work with BigFloat
-    t(T, linear_model = MO.RawLinearModel, linear_model_options = (use_iterative = true,),
-        solver = SO.HSDSolver{T}(verbose = true, system_solver = SO.NaiveHSDSystemSolver{T}(use_iterative = true)))
+    solver = SO.Solver{T}(verbose = true, init_use_iterative = true, preprocess = false,
+        system_solver = SO.NaiveSystemSolver{T}(use_iterative = true))
+    t(T, solver = solver)
 end

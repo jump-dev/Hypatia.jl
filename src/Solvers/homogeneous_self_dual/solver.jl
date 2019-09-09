@@ -4,7 +4,7 @@ Copyright 2018, Chris Coey and contributors
 interior point type and functions for algorithms based on homogeneous self dual embedding
 =#
 
-mutable struct HSDSolver{T <: Real} <: Solver{T}
+mutable struct Solver{T <: Real}
     # main options
     verbose::Bool
     iter_limit::Int
@@ -13,9 +13,13 @@ mutable struct HSDSolver{T <: Real} <: Solver{T}
     tol_abs_opt::T
     tol_feas::T
     tol_slow::T
+    preprocess::Bool
+    init_use_iterative::Bool
+    init_tol_qr::T
+    init_use_fallback::Bool
     max_nbhd::T
     use_infty_nbhd::Bool
-    system_solver::HSDSystemSolver{T}
+    system_solver::SystemSolver{T}
 
     # current status of the solver object
     status::Symbol
@@ -25,8 +29,15 @@ mutable struct HSDSolver{T <: Real} <: Solver{T}
     timer::TimerOutput
     num_iters::Int
 
-    # model and current iterate
-    model::Models.LinearModel{T}
+    # model and preprocessed model data
+    orig_model::Models.Model{T}
+    model::Models.Model{T}
+    x_keep_idxs::AbstractVector{Int}
+    y_keep_idxs::AbstractVector{Int}
+    Ap_R::UpperTriangular{T, <:AbstractMatrix{T}}
+    Ap_Q::Union{UniformScaling, AbstractMatrix{T}}
+
+    # current iterate
     point::Models.Point{T}
     tau::T
     kap::T
@@ -78,20 +89,27 @@ mutable struct HSDSolver{T <: Real} <: Solver{T}
     cones_infeas::Vector{Bool}
     cones_loaded::Vector{Bool}
 
-    function HSDSolver{T}(;
+    function Solver{T}(;
         verbose::Bool = false,
         iter_limit::Int = 1000,
         time_limit::Real = Inf,
         tol_rel_opt::Real = sqrt(eps(T)),
-        tol_abs_opt::Real = tol_rel_opt,
-        tol_feas::Real = tol_rel_opt,
-        tol_slow::Real = T(1e-3),
-        max_nbhd::T = T(0.7),
+        tol_abs_opt::Real = sqrt(eps(T)),
+        tol_feas::Real = sqrt(eps(T)),
+        tol_slow::Real = 1e-3,
+        preprocess::Bool = true,
+        init_use_iterative::Bool = false,
+        init_tol_qr::Real = 100 * eps(T),
+        init_use_fallback::Bool = true,
+        max_nbhd::Real = 0.7,
         use_infty_nbhd::Bool = true,
-        system_solver::HSDSystemSolver{T} = QRCholHSDSystemSolver{T}(),
+        system_solver::SystemSolver{T} = QRCholSystemSolver{T}(),
         ) where {T <: Real}
-        solver = new{T}()
+        if isa(system_solver, QRCholSystemSolver{T})
+            @assert preprocess # require preprocessing for QRCholSystemSolver
+        end
 
+        solver = new{T}()
         solver.verbose = verbose
         solver.iter_limit = iter_limit
         solver.time_limit = time_limit
@@ -99,23 +117,73 @@ mutable struct HSDSolver{T <: Real} <: Solver{T}
         solver.tol_abs_opt = tol_abs_opt
         solver.tol_feas = tol_feas
         solver.tol_slow = tol_slow
+        solver.preprocess = preprocess
+        solver.init_use_iterative = init_use_iterative
+        solver.init_tol_qr = init_tol_qr
+        solver.init_use_fallback = init_use_fallback
         solver.max_nbhd = max_nbhd
         solver.use_infty_nbhd = use_infty_nbhd
         solver.system_solver = system_solver
-
         solver.status = :NotLoaded
 
         return solver
     end
 end
 
-function load(solver::HSDSolver{T}, model::Models.LinearModel{T}) where {T <: Real}
+get_timer(solver::Solver) = solver.timer
+
+get_status(solver::Solver) = solver.status
+get_solve_time(solver::Solver) = solver.solve_time
+get_num_iters(solver::Solver) = solver.num_iters
+
+get_primal_obj(solver::Solver) = solver.primal_obj
+get_dual_obj(solver::Solver) = solver.dual_obj
+
+get_s(solver::Solver) = copy(solver.point.s)
+get_z(solver::Solver) = copy(solver.point.z)
+
+function get_x(solver::Solver{T}) where {T <: Real}
+    if solver.preprocess
+        x = zeros(T, solver.orig_model.n)
+        x[solver.x_keep_idxs] = solver.point.x # unpreprocess solver's solution
+    else
+        x = copy(solver.point.x)
+    end
+    return x
+end
+
+function get_y(solver::Solver{T}) where {T <: Real}
+    if solver.preprocess
+        y = zeros(T, solver.orig_model.p)
+        y[solver.y_keep_idxs] = solver.point.y # unpreprocess solver's solution
+    else
+        y = copy(solver.point.y)
+    end
+    return y
+end
+
+get_tau(solver::Solver) = solver.tau
+get_kappa(solver::Solver) = solver.kap
+get_mu(solver::Solver) = solver.mu
+
+function load(solver::Solver{T}, model::Models.Model{T}) where {T <: Real}
+    # @assert solver.status == :NotLoaded # TODO maybe want a reset function that just keeps options
+    solver.orig_model = model
+    solver.status = :Loaded
+    return solver
+end
+
+function solve(solver::Solver{T}) where {T <: Real}
+    @assert solver.status == :Loaded
+    solver.status = :SolveCalled
+    start_time = time()
     solver.num_iters = 0
     solver.solve_time = NaN
     solver.timer = TimerOutput()
 
-    solver.model = model
-    solver.point = model.initial_point
+    # preprocess and find initial point
+    (solver.model, solver.point) = (solver.preprocess ? preprocess_find_initial_point(solver) : find_initial_point(solver))
+    model = solver.model
 
     solver.tau = one(T)
     solver.kap = one(T)
@@ -125,6 +193,7 @@ function load(solver::HSDSolver{T}, model::Models.LinearModel{T}) where {T <: Re
     end
     Cones.load_point.(model.cones, solver.point.primal_views)
 
+    # setup iteration helpers
     solver.x_residual = similar(model.c)
     solver.y_residual = similar(model.b)
     solver.z_residual = similar(model.h)
@@ -171,15 +240,6 @@ function load(solver::HSDSolver{T}, model::Models.LinearModel{T}) where {T <: Re
 
     load(solver.system_solver, solver)
 
-    solver.status = :Loaded
-
-    return solver
-end
-
-function solve(solver::HSDSolver{T}) where {T <: Real}
-    solver.status = :SolveCalled
-    start_time = time()
-
     # iterate from initial point
     while true
         @timeit solver.timer "calc_res" calc_residual(solver)
@@ -219,16 +279,248 @@ function solve(solver::HSDSolver{T}) where {T <: Real}
 
     solver.verbose && println("\nstatus is $(solver.status) after $(solver.num_iters) iterations and $(trunc(solver.solve_time, digits=3)) seconds\n")
 
-    return
+    return solver
 end
 
-function calc_mu(solver::HSDSolver{T}) where {T <: Real}
+function calc_mu(solver::Solver{T}) where {T <: Real}
     solver.mu = (dot(solver.point.z, solver.point.s) + solver.tau * solver.kap) /
         (one(T) + solver.model.nu)
     return solver.mu
 end
 
-function calc_residual(solver::HSDSolver{T}) where {T <: Real}
+const sparse_QR_reals = Float64
+
+# TODO optionally use row and col scaling on AG and apply to c, b, h
+# TODO precondition iterative methods
+# TODO pick default tol for iter methods
+function find_initial_point(solver::Solver{T}) where {T <: Real}
+    model = solver.orig_model
+    A = model.A
+    G = model.G
+    n = model.n
+    p = model.p
+    q = model.q
+
+    point = initialize_cone_point(model.cones, model.cone_idxs)
+    @assert q == length(point.z)
+
+    # solve for x as least squares solution to Ax = b, Gx = h - s
+    if !iszero(n)
+        rhs = vcat(model.b, model.h - point.s)
+        if solver.init_use_iterative
+            # use iterative solvers method TODO pick lsqr or lsmr
+            AG = BlockMatrix{T}(p + q, n, [A, G], [1:p, (p + 1):(p + q)], [1:n, 1:n])
+            point.x = zeros(T, n)
+            IterativeSolvers.lsqr!(point.x, AG, rhs)
+        else
+            AG = vcat(A, G)
+            if issparse(AG) && !(T <: sparse_QR_reals)
+                # TODO alternative fallback is to convert sparse{T} to sparse{Float64} and do the sparse LU
+                if solver.init_use_fallback
+                    @warn("using dense factorization of [A; G] in initial point finding because sparse factorization for number type $T is not supported by SparseArrays")
+                    AG = Matrix(AG)
+                else
+                    error("sparse factorization for number type $T is not supported by SparseArrays, so Hypatia cannot find an initial point")
+                end
+            end
+            AG_fact = issparse(AG) ? qr(AG) : qr!(AG)
+
+            AG_rank = get_rank_est(AG_fact, solver.init_tol_qr)
+            if AG_rank < n
+                @warn("some dual equalities appear to be dependent; try using PreprocessedModel")
+            end
+
+            point.x = AG_fact \ rhs
+        end
+    end
+
+    # solve for y as least squares solution to A'y = -c - G'z
+    if !iszero(p)
+        rhs = -model.c - G' * point.z
+        if solver.init_use_iterative
+            # use iterative solvers method TODO pick lsqr or lsmr
+            point.y = zeros(T, p)
+            IterativeSolvers.lsqr!(point.y, A', rhs)
+        else
+            if issparse(A) && !(T <: sparse_QR_reals)
+                # TODO alternative fallback is to convert sparse{T} to sparse{Float64} and do the sparse LU
+                if solver.init_use_fallback
+                    @warn("using dense factorization of A' in initial point finding because sparse factorization for number type $T is not supported by SparseArrays")
+                    Ap_fact = qr!(Matrix(A'))
+                else
+                    error("sparse factorization for number type $T is not supported by SparseArrays, so Hypatia cannot find an initial point")
+                end
+            else
+                Ap_fact = issparse(A) ? qr(sparse(A')) : qr!(Matrix(A'))
+            end
+
+            Ap_rank = get_rank_est(Ap_fact, solver.init_tol_qr)
+            if Ap_rank < p
+                @warn("some primal equalities appear to be dependent; try using PreprocessedModel")
+            end
+
+            point.y = Ap_fact \ rhs
+        end
+    end
+
+    return (model, point)
+end
+
+# preprocess and get initial point for PreprocessedModel
+function preprocess_find_initial_point(solver::Solver{T}) where {T <: Real}
+    orig_model = solver.orig_model
+    c = copy(orig_model.c)
+    A = copy(orig_model.A)
+    b = copy(orig_model.b)
+    G = copy(orig_model.G)
+    n = length(c)
+    p = length(b)
+    q = orig_model.q
+
+    point = initialize_cone_point(orig_model.cones, orig_model.cone_idxs)
+    @assert q == length(point.z)
+
+    # solve for x as least squares solution to Ax = b, Gx = h - s
+    if !iszero(n)
+        # get pivoted QR # TODO when Julia has a unified QR interface, replace this
+        AG = vcat(A, G)
+        if issparse(AG) && !(T <: sparse_QR_reals)
+            if solver.init_use_fallback
+                @warn("using dense factorization of [A; G] in preprocessing and initial point finding because sparse factorization for number type $T is not supported by SparseArrays")
+                AG = Matrix(AG)
+            else
+                error("sparse factorization for number type $T is not supported by SparseArrays, so Hypatia cannot preprocess and find an initial point")
+            end
+        end
+        AG_fact = issparse(AG) ? qr(AG, tol = solver.init_tol_qr) : qr(AG, Val(true))
+
+        AG_rank = get_rank_est(AG_fact, solver.init_tol_qr)
+        if AG_rank == n
+            # no dual equalities to remove
+            x_keep_idxs = 1:n
+            point.x = AG_fact \ vcat(b, orig_model.h - point.s)
+        else
+            col_piv = (AG_fact isa QRPivoted{T, Matrix{T}}) ? AG_fact.p : AG_fact.pcol
+            x_keep_idxs = col_piv[1:AG_rank]
+            AG_R = UpperTriangular(AG_fact.R[1:AG_rank, 1:AG_rank])
+
+            # TODO optimize all below
+            c_sub = c[x_keep_idxs]
+            yz_sub = AG_fact.Q * (Matrix{T}(I, p + q, AG_rank) * (AG_R' \ c_sub))
+            if !(AG_fact isa QRPivoted{T, Matrix{T}})
+                yz_sub = yz_sub[AG_fact.rpivinv]
+            end
+            residual = norm(AG' * yz_sub - c, Inf)
+            if residual > solver.init_tol_qr
+                error("some dual equality constraints are inconsistent (residual $residual, tolerance $(solver.init_tol_qr))")
+            end
+            println("removed $(n - AG_rank) out of $n dual equality constraints")
+
+            point.x = AG_R \ (Matrix{T}(I, AG_rank, p + q) * (AG_fact.Q' * vcat(b, orig_model.h - point.s)))
+
+            c = c_sub
+            A = A[:, x_keep_idxs]
+            G = G[:, x_keep_idxs]
+            n = AG_rank
+        end
+    else
+        x_keep_idxs = Int[]
+    end
+
+    # solve for y as least squares solution to A'y = -c - G'z
+    if !iszero(p)
+        if issparse(A) && !(T <: sparse_QR_reals)
+            if solver.init_use_fallback
+                @warn("using dense factorization of A' in preprocessing and initial point finding because sparse factorization for number type $T is not supported by SparseArrays")
+                Ap_fact = qr!(Matrix(A'), Val(true))
+            else
+                error("sparse factorization for number type $T is not supported by SparseArrays, so Hypatia cannot preprocess and find an initial point")
+            end
+        else
+            Ap_fact = issparse(A) ? qr(sparse(A'), tol = solver.init_tol_qr) : qr(A', Val(true))
+        end
+
+        Ap_rank = get_rank_est(Ap_fact, solver.init_tol_qr)
+
+        Ap_R = UpperTriangular(Ap_fact.R[1:Ap_rank, 1:Ap_rank])
+        col_piv = (Ap_fact isa QRPivoted{T, Matrix{T}}) ? Ap_fact.p : Ap_fact.pcol
+        y_keep_idxs = col_piv[1:Ap_rank]
+        Ap_Q = Ap_fact.Q
+
+        # TODO optimize all below
+        b_sub = b[y_keep_idxs]
+        if Ap_rank < p
+            # some dependent primal equalities, so check if they are consistent
+            x_sub = Ap_Q * (Matrix{T}(I, n, Ap_rank) * (Ap_R' \ b_sub))
+            if !(Ap_fact isa QRPivoted{T, Matrix{T}})
+                x_sub = x_sub[Ap_fact.rpivinv]
+            end
+            residual = norm(A * x_sub - b, Inf)
+            if residual > solver.init_tol_qr
+                error("some primal equality constraints are inconsistent (residual $residual, tolerance $(solver.init_tol_qr))")
+            end
+            println("removed $(p - Ap_rank) out of $p primal equality constraints")
+        end
+
+        point.y = Ap_R \ (Matrix{T}(I, Ap_rank, n) * (Ap_fact.Q' *  (-c - G' * point.z)))
+
+        if !(Ap_fact isa QRPivoted{T, Matrix{T}})
+            row_piv = Ap_fact.prow
+            A = A[y_keep_idxs, row_piv]
+            c = c[row_piv]
+            G = G[:, row_piv]
+            x_keep_idxs = x_keep_idxs[row_piv]
+        else
+            A = A[y_keep_idxs, :]
+        end
+        b = b_sub
+        p = Ap_rank
+        solver.Ap_R = Ap_R
+        solver.Ap_Q = Ap_Q
+    else
+        y_keep_idxs = Int[]
+        solver.Ap_R = UpperTriangular(zeros(T, 0, 0))
+        solver.Ap_Q = I
+    end
+
+    solver.x_keep_idxs = x_keep_idxs
+    solver.y_keep_idxs = y_keep_idxs
+
+    return (Models.Model{T}(c, A, b, G, orig_model.h, orig_model.cones, obj_offset = orig_model.obj_offset), point)
+end
+
+function initialize_cone_point(cones::Vector{Cones.Cone{T}}, cone_idxs::Vector{UnitRange{Int}}) where {T <: Real}
+    q = isempty(cones) ? 0 : sum(Cones.dimension, cones)
+    point = Models.Point(T[], T[], Vector{T}(undef, q), Vector{T}(undef, q), cones, cone_idxs)
+
+    for k in eachindex(cones)
+        cone_k = cones[k]
+        Cones.setup_data(cone_k)
+        primal_k = point.primal_views[k]
+        Cones.set_initial_point(primal_k, cone_k)
+        Cones.load_point(cone_k, primal_k)
+        @assert Cones.is_feas(cone_k)
+        g = Cones.grad(cone_k)
+        @. point.dual_views[k] = -g
+    end
+
+    return point
+end
+
+# NOTE (pivoted) QR factorizations are usually rank-revealing but may be unreliable, see http://www.math.sjsu.edu/~foster/rankrevealingcode.html
+# TODO could replace this with rank(Ap_fact) when available for both dense and sparse
+function get_rank_est(qr_fact, init_tol_qr::Real)
+    R = qr_fact.R
+    rank_est = 0
+    for i in 1:size(R, 1) # TODO could replace this with rank(AG_fact) when available for both dense and sparse
+        if abs(R[i, i]) > init_tol_qr
+            rank_est += 1
+        end
+    end
+    return rank_est
+end
+
+function calc_residual(solver::Solver{T}) where {T <: Real}
     model = solver.model
     point = solver.point
 
@@ -259,7 +551,7 @@ function calc_residual(solver::HSDSolver{T}) where {T <: Real}
     return
 end
 
-function calc_convergence_params(solver::HSDSolver{T}) where {T <: Real}
+function calc_convergence_params(solver::Solver{T}) where {T <: Real}
     model = solver.model
     point = solver.point
 
@@ -289,7 +581,7 @@ function calc_convergence_params(solver::HSDSolver{T}) where {T <: Real}
     return
 end
 
-function print_iteration_stats(solver::HSDSolver{T}) where {T <: Real}
+function print_iteration_stats(solver::Solver{T}) where {T <: Real}
     if iszero(solver.num_iters)
         @printf("\n%5s %12s %12s %9s %9s %9s %9s %9s %9s %9s %9s %9s %9s\n",
             "iter", "p_obj", "d_obj", "abs_gap", "rel_gap",
@@ -310,7 +602,7 @@ function print_iteration_stats(solver::HSDSolver{T}) where {T <: Real}
     flush(stdout)
 end
 
-function check_convergence(solver::HSDSolver{T}) where {T <: Real}
+function check_convergence(solver::Solver{T}) where {T <: Real}
     # check convergence criteria
     # TODO nearly primal or dual infeasible or nearly optimal cases?
     if max(solver.x_feas, solver.y_feas, solver.z_feas) <= solver.tol_feas &&
@@ -366,7 +658,7 @@ function check_convergence(solver::HSDSolver{T}) where {T <: Real}
     return false
 end
 
-function step(solver::HSDSolver{T}) where {T <: Real}
+function step(solver::Solver{T}) where {T <: Real}
     model = solver.model
     point = solver.point
 
@@ -429,7 +721,7 @@ function find_max_alpha_in_nbhd(
     s_dir::AbstractVector{T},
     tau_dir::T,
     kap_dir::T,
-    solver::HSDSolver{T};
+    solver::Solver{T};
     nbhd::T,
     prev_alpha::T,
     min_alpha::T,
@@ -484,7 +776,7 @@ function check_nbhd(
     mu_temp::T,
     taukap_temp::T,
     nbhd::T,
-    solver::HSDSolver{T},
+    solver::Solver{T},
     ) where {T <: Real}
     cones = solver.model.cones
     sqrtmu = sqrt(mu_temp)
@@ -553,7 +845,3 @@ function check_nbhd(
 
     return true
 end
-
-get_tau(solver::HSDSolver) = solver.tau
-get_kappa(solver::HSDSolver) = solver.kap
-get_mu(solver::HSDSolver) = solver.mu

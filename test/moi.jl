@@ -52,15 +52,15 @@ conic_exclude = String[
 function test_moi(
     T::Type{<:Real},
     use_dense::Bool;
-    solver_options...
+    options...
     )
     optimizer = MOIU.CachingOptimizer(MOIU.UniversalFallback(MOIU.Model{T}()),
-        Hypatia.Optimizer{T}(use_dense = use_dense; solver_options...))
+        Hypatia.Optimizer{T}(use_dense = use_dense; options...))
 
     @testset "unit tests" begin
         MOIT.unittest(optimizer, config, unit_exclude)
     end
-    
+
     @testset "linear tests" begin
         MOIT.contlineartest(optimizer, config)
     end
