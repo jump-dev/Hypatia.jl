@@ -18,7 +18,9 @@ eliminate tau via a procedure similar to that described by S7.4 of
 http://www.seas.ucla.edu/~vandenbe/publications/coneprog.pdf
 and symmetrize the LHS matrix by multiplying some equations by -1
 
-TODO reduce allocations
+TODO
+- add iterative method
+- improve numerics of method with use_hess_inv = false (possibly a bug)
 =#
 
 mutable struct SymIndefSystemSolver{T <: Real} <: SystemSolver{T}
@@ -43,6 +45,7 @@ mutable struct SymIndefSystemSolver{T <: Real} <: SystemSolver{T}
     z1_k
     z2_k
     z3_k
+    zcopy_k
     s1::Vector{T}
     s2::Vector{T}
     s3::Vector{T}
@@ -50,7 +53,10 @@ mutable struct SymIndefSystemSolver{T <: Real} <: SystemSolver{T}
     s2_k
     s3_k
 
-    function SymIndefSystemSolver{T}(; use_sparse::Bool = false, use_hess_inv::Bool = false) where {T <: Real}
+    solvesol
+    solvecache
+
+    function SymIndefSystemSolver{T}(; use_sparse::Bool = false, use_hess_inv::Bool = true) where {T <: Real}
         system_solver = new{T}()
         system_solver.use_sparse = use_sparse
         system_solver.use_hess_inv = use_hess_inv
@@ -102,9 +108,17 @@ function load(system_solver::SymIndefSystemSolver{T}, solver::Solver{T}) where {
     system_solver.z1_k = [view(rhs, z_start .+ model.cone_idxs[k], 1) for k in eachindex(model.cones)]
     system_solver.z2_k = [view(rhs, z_start .+ model.cone_idxs[k], 2) for k in eachindex(model.cones)]
     system_solver.z3_k = [view(rhs, z_start .+ model.cone_idxs[k], 3) for k in eachindex(model.cones)]
+    if !system_solver.use_hess_inv
+        system_solver.zcopy_k = [Cones.use_dual(model.cones[k]) ? T[] : similar(system_solver.z1_k[k]) for k in eachindex(model.cones)]
+    end
     system_solver.s1 = similar(rhs, q)
     system_solver.s2 = similar(rhs, q)
     system_solver.s3 = similar(rhs, q)
+
+    if T <: BlasReal && !system_solver.use_sparse
+        system_solver.solvesol = Matrix{T}(undef, size(system_solver.lhs, 1), 3)
+        system_solver.solvecache = HypBKSolveCache('L', system_solver.solvesol, system_solver.lhs, system_solver.rhs, tol_diag = eps(T))
+    end
 
     return system_solver
 end
@@ -143,7 +157,6 @@ function get_combined_directions(system_solver::SymIndefSystemSolver{T}) where {
     y1 .= model.b
     @. y2 = -solver.y_residual
     y3 .= zero(T)
-    z1 .= model.h
     @. z2 .= -solver.z_residual
     z3 .= zero(T)
 
@@ -159,24 +172,27 @@ function get_combined_directions(system_solver::SymIndefSystemSolver{T}) where {
         if Cones.use_dual(cone_k)
             # G_k*x - mu*H_k*z_k = zrhs_k + srhs_k
             H = Cones.hess(cone_k)
-            lhs[rows, rows] .= -H
+            @. lhs[rows, rows] = -H
             @. z2_k[k] += duals_k
             @. z3_k[k] = duals_k + grad_k * sqrtmu
+            @views copyto!(z1_k[k], model.h[idxs])
         else
             if use_hess_inv
                 # G_k*x - (mu*H_k)^-1*z_k = zrhs_k + (mu*H_k)^-1*srhs_k
-                muHinv = Cones.inv_hess(cone_k)
-                lhs[rows, rows] .= -muHinv
-                z2_k[k] .+= muHinv * duals_k
-                z3_k[k] .= muHinv * (duals_k + grad_k * sqrtmu)
+                Hinv = Cones.inv_hess(cone_k)
+                @. lhs[rows, rows] = -Hinv
+                mul!(z2_k[k], Hinv, duals_k, true, true)
+                @. z1_k[k] = duals_k + grad_k * sqrtmu
+                mul!(z3_k[k], Hinv, z1_k[k])
+                @views copyto!(z1_k[k], model.h[idxs])
             else
                 # mu*H_k*G_k*x - z_k = mu*H_k*zrhs_k + srhs_k
                 H = Cones.hess(cone_k)
-                lhs[rows, 1:n] .= H * model.G[idxs, :]
-                lhs[rows, rows] .= -H
-                z1_k[k] .= H * z1_k[k]
-                z2_k[k] .= H * z2_k[k]
-                @. z2_k[k] += duals_k
+                @views mul!(lhs[rows, 1:n], H, model.G[idxs, :])
+                @. lhs[rows, rows] = -H
+                @views mul!(z1_k[k], H, model.h[idxs])
+                @views mul!(z3_k[k], H, z2_k[k])
+                @. z2_k[k] = duals_k + z3_k[k]
                 @. z3_k[k] = duals_k + grad_k * sqrtmu
             end
         end
@@ -187,13 +203,15 @@ function get_combined_directions(system_solver::SymIndefSystemSolver{T}) where {
     if system_solver.use_sparse
         F = ldlt(lhs_symm, check = false)
         if !issuccess(F)
-            F = ldlt(lhs_symm, shift = 1e-6, check = true)
+            F = ldlt(lhs_symm, shift = eps(T), check = true)
         end
         rhs .= F \ rhs
     else
         if T <: BlasReal
-            F = bunchkaufman!(lhs_symm, true, check = true) # TODO doesn't work for generic reals - try LU, or need LDLT implementation
-            ldiv!(F, rhs)
+            if !hyp_bk_solve!(system_solver.solvecache, system_solver.solvesol, lhs_symm.data, rhs)
+                @warn("numerical failure: could not fix failure of positive definiteness (mu is $mu)")
+            end
+            copyto!(rhs, system_solver.solvesol)
         else
             F = lu!(lhs_symm) # TODO replace with a generic julia symmetric indefinite decomposition if available, see https://github.com/JuliaLang/julia/issues/10953
             ldiv!(F, rhs)
@@ -202,19 +220,20 @@ function get_combined_directions(system_solver::SymIndefSystemSolver{T}) where {
 
     if !use_hess_inv
         for k in eachindex(cones)
-            if !Cones.use_dual(cones[k])
+            cone_k = cones[k]
+            if !Cones.use_dual(cone_k)
                 # z_k is premultiplied by (mu * H_k)^-1
-                H = Cones.hess(cones[k])
-                # TODO combine into one
-                z1_k[k] .= H * z1_k[k]
-                z2_k[k] .= H * z2_k[k]
-                z3_k[k] .= H * z3_k[k]
+                temp_k = system_solver.zcopy_k[k]
+                H = Cones.hess(cone_k)
+                for zi_k in (z1_k, z2_k, z3_k)
+                    mul!(temp_k, H, zi_k[k])
+                    copyto!(zi_k[k], temp_k)
+                end
             end
         end
     end
 
     # lift to HSDE space
-    # if not using inverse hessians, use modified h
     tau_denom = mu / tau / tau - dot(model.c, x1) - dot(model.b, y1) - dot(model.h, z1)
 
     function lift!(x, y, z, s, tau_rhs, kap_rhs)
@@ -222,8 +241,8 @@ function get_combined_directions(system_solver::SymIndefSystemSolver{T}) where {
         @. x += tau_sol * x1
         @. y += tau_sol * y1
         @. z += tau_sol * z1
-        mul!(s, model.G, x)
-        @. s = -s + tau_sol * model.h
+        copyto!(s, model.h)
+        mul!(s, model.G, x, -1, tau_sol)
         kap_sol = -dot(model.c, x) - dot(model.b, y) - dot(model.h, z) - tau_rhs
         return (tau_sol, kap_sol)
     end
