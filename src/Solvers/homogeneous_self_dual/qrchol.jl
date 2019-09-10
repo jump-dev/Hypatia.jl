@@ -264,7 +264,7 @@ function get_combined_directions(system_solver::QRCholSystemSolver{T}) where {T 
                 mul!(Q2GHGQ2, GQ2', HGQ2)
                 F = ldlt(Symmetric(Q2GHGQ2), shift = cbrt(eps(T)), check = false)
                 if !issuccess(F)
-                    @warn("numerical failure: could not fix failure of positive definiteness (mu is $mu); terminating")
+                    @warn("numerical failure: could not fix failure of positive definiteness (mu is $mu)")
                 end
             end
             xi2 .= F \ Q2div # TODO eliminate allocs (see https://github.com/JuliaLang/julia/issues/30084)
@@ -274,7 +274,7 @@ function get_combined_directions(system_solver::QRCholSystemSolver{T}) where {T 
                 mul!(Q2GHGQ2, GQ2', HGQ2)
                 Q2GHGQ2 += cbrt(eps(T)) * I
                 if !hyp_bk_solve!(system_solver.solvecache, system_solver.solvesol, Q2GHGQ2, Q2div)
-                    @warn("numerical failure: could not fix failure of positive definiteness (mu is $mu); terminating")
+                    @warn("numerical failure: could not fix failure of positive definiteness (mu is $mu)")
                 end
             end
             copyto!(xi2, system_solver.solvesol)

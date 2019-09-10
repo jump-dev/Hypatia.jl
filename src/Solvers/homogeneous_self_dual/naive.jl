@@ -11,7 +11,7 @@ A'*y + G'*z + c*tau = xrhs
 (du bar) mu*H_k*z_k + s_k = srhs_k
 kap + mu/(taubar^2)*tau = taurhs
 
-TODO reduce allocations
+TODO optimize iterative method
 =#
 
 mutable struct NaiveSystemSolver{T <: Real} <: SystemSolver{T}
@@ -200,8 +200,7 @@ function get_combined_directions(system_solver::NaiveSystemSolver{T}) where {T <
         copyto!(lhs, system_solver.lhs_copy)
         lhs[kap_row, end] = mu / tau / tau
         for k in eachindex(cones)
-            H = Cones.hess(cones[k])
-            @. system_solver.lhs_H_k[k] = H
+            copyto!(system_solver.lhs_H_k[k], Cones.hess(cones[k]))
         end
 
         if system_solver.use_sparse

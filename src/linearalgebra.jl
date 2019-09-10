@@ -8,13 +8,13 @@ function set_min_diag!(A::Matrix{<:RealOrComplex{T}}, tol::T) where {T <: Real}
         return A
     end
     @inbounds for j in 1:size(A, 1)
-        if A[j, j] < tol
-            A[j, j] = tol
+        Ajj = A[j, j]
+        if abs(Ajj) < tol
+            A[j, j] = copysign(tol, Ajj)
         end
     end
     return A
 end
-
 
 import LinearAlgebra.BlasReal
 import LinearAlgebra.BlasFloat
@@ -27,7 +27,6 @@ hyp_AtA!(U::Matrix{T}, A::Matrix{T}) where {T <: RealOrComplex{<:Real}} = mul!(U
 hyp_AAt!(U::Matrix{T}, A::Matrix{T}) where {T <: BlasReal} = BLAS.syrk!('U', 'N', one(T), A, zero(T), U)
 hyp_AAt!(U::Matrix{T}, A::Matrix{T}) where {T <: RealOrComplex{<:Real}} = mul!(U, A, A')
 
-
 import LinearAlgebra.BlasInt
 import LinearAlgebra.BLAS.@blasfunc
 import LinearAlgebra.LAPACK.liblapack
@@ -35,9 +34,7 @@ import LinearAlgebra.issuccess
 
 LinearAlgebra.issuccess(F::Union{Cholesky, CholeskyPivoted}) = isposdef(F)
 
-
 # TODO equilibrate for cholesky and bk - use DPOEQUB/DSYEQUB
-
 
 # cache for LAPACK cholesky (like POTRF)
 mutable struct HypCholCache{R <: Real, T <: RealOrComplex{R}}
@@ -49,7 +46,7 @@ mutable struct HypCholCache{R <: Real, T <: RealOrComplex{R}}
     HypCholCache{R, T}() where {T <: RealOrComplex{R}} where {R <: Real} = new{R, T}()
 end
 
-function HypCholCache(uplo::Char, A::StridedMatrix{T}; tol_diag = zero(R)) where {T <: RealOrComplex{R}} where {R <: BlasReal}
+function HypCholCache(uplo::Char, A::StridedMatrix{T}; tol_diag::R = zero(R)) where {T <: RealOrComplex{R}} where {R <: BlasReal}
     LinearAlgebra.chkstride1(A)
     Base.require_one_based_indexing(A)
     c = HypCholCache{R, T}()
@@ -98,10 +95,9 @@ for (potrf, potri, elty, rtyp) in (
             return fact_A.factors
         end
     end
-
 end
 
-function HypCholCache(uplo::Char, A::AbstractMatrix{T}; tol_diag = zero(R)) where {T <: RealOrComplex{R}} where {R <: Real}
+function HypCholCache(uplo::Char, A::AbstractMatrix{T}; tol_diag::R = zero(R)) where {T <: RealOrComplex{R}} where {R <: Real}
     c = HypCholCache{R, T}()
     c.tol_diag = tol_diag
     c.uplo = uplo
@@ -130,7 +126,7 @@ mutable struct HypBKCache{R <: Real}
     HypBKCache{R}() where {R <: Real} = new{R}()
 end
 
-function HypBKCache(uplo::Char, A::AbstractMatrix{R}; tol_diag = zero(R)) where {R <: BlasReal}
+function HypBKCache(uplo::Char, A::AbstractMatrix{R}; tol_diag::R = zero(R)) where {R <: BlasReal}
     LinearAlgebra.chkstride1(A)
     c = HypBKCache{R}()
     c.tol_diag = tol_diag
@@ -172,7 +168,7 @@ for (sytrf, elty, rtyp) in (
     end
 end
 
-function HypBKCache(uplo::Char, A::AbstractMatrix{R}; tol_diag = zero(R)) where {R <: Real}
+function HypBKCache(uplo::Char, A::AbstractMatrix{R}; tol_diag::R = zero(R)) where {R <: Real}
     c = HypBKCache{R}()
     c.tol_diag = tol_diag
     c.uplo = uplo
@@ -208,7 +204,7 @@ mutable struct HypCholSolveCache{R <: Real}
 end
 
 # NOTE X (solution) argument needs to be a Matrix type or else silent failures occur
-function HypCholSolveCache(uplo::Char, X::Matrix{R}, A::AbstractMatrix{R}, B::AbstractMatrix{R}; tol_diag = zero(R)) where {R <: BlasReal}
+function HypCholSolveCache(uplo::Char, X::Matrix{R}, A::AbstractMatrix{R}, B::AbstractMatrix{R}; tol_diag::R = zero(R)) where {R <: BlasReal}
     LinearAlgebra.chkstride1(A)
     c = HypCholSolveCache{R}()
     c.tol_diag = tol_diag
@@ -265,7 +261,7 @@ for (posvx, elty, rtyp) in (
     end
 end
 
-function HypCholSolveCache(uplo::Char, X::Matrix{R}, A::AbstractMatrix{R}, B::AbstractMatrix{R}; tol_diag = zero(R)) where {R <: Real}
+function HypCholSolveCache(uplo::Char, X::Matrix{R}, A::AbstractMatrix{R}, B::AbstractMatrix{R}; tol_diag::R = zero(R)) where {R <: Real}
     c = HypCholSolveCache{R}()
     c.tol_diag = tol_diag
     c.uplo = uplo
@@ -305,7 +301,7 @@ mutable struct HypBKSolveCache{R <: Real}
 end
 
 # NOTE X (solution) argument needs to be a Matrix type or else silent failures occur
-function HypBKSolveCache(uplo::Char, X::Matrix{R}, A::AbstractMatrix{R}, B::AbstractMatrix{R}; tol_diag = zero(R)) where {R <: BlasReal}
+function HypBKSolveCache(uplo::Char, X::Matrix{R}, A::AbstractMatrix{R}, B::AbstractMatrix{R}; tol_diag::R = zero(R)) where {R <: BlasReal}
     LinearAlgebra.chkstride1(A)
     c = HypBKSolveCache{R}()
     c.tol_diag = tol_diag
@@ -360,7 +356,7 @@ for (sysvx, elty, rtyp) in (
     end
 end
 
-function HypBKSolveCache(uplo::Char, X::Matrix{R}, A::AbstractMatrix{R}, B::AbstractMatrix{R}; tol_diag = zero(R)) where {R <: Real}
+function HypBKSolveCache(uplo::Char, X::Matrix{R}, A::AbstractMatrix{R}, B::AbstractMatrix{R}; tol_diag::R = zero(R)) where {R <: Real}
     c = HypBKSolveCache{R}()
     c.tol_diag = tol_diag
     c.uplo = uplo
