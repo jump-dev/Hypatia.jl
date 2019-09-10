@@ -373,3 +373,91 @@ function hyp_bk_solve!(c::HypBKSolveCache{R}, X::Matrix{R}, A::AbstractMatrix{R}
     ldiv!(X, F, B)
     return true
 end
+
+
+
+#
+#
+# # cache for LAPACK LU with linear solve (like GESVXX)
+# mutable struct HypLUSolveCache{R <: Real}
+#     n
+#     lda
+#     ldaf
+#     nrhs
+#     ldb
+#     rcond
+#     lwork
+#     ferr
+#     berr
+#     work
+#     iwork
+#     AF
+#     ipiv
+#     info
+#     HypLUSolveCache{R}() where {R <: Real} = new{R}()
+# end
+#
+# function HypLUSolveCache(X::Matrix{R}, A::AbstractMatrix{R}, B::AbstractMatrix{R}) where {R <: BlasReal}
+#     LinearAlgebra.chkstride1(A)
+#     c = HypLUSolveCache{R}()
+#     c.n = LinearAlgebra.checksquare(A)
+#     @assert c.n == size(X, 1) == size(B, 1)
+#     @assert size(X, 2) == size(B, 2)
+#     c.lda = stride(A, 2)
+#     c.ldaf = c.n
+#     c.nrhs = size(B, 2)
+#     c.ldb = stride(B, 2)
+#     c.rcond = Ref{R}()
+#     c.lwork = Ref{BlasInt}(5 * c.n)
+#     c.ferr = Vector{R}(undef, c.nrhs)
+#     c.berr = Vector{R}(undef, c.nrhs)
+#     c.work = Vector{R}(undef, 5 * c.n)
+#     c.iwork = Vector{Int}(undef, c.n)
+#     c.AF = Matrix{R}(undef, c.n, c.n)
+#     c.ipiv = Vector{Int}(undef, c.n)
+#     c.info = Ref{BlasInt}()
+#     return c
+# end
+#
+# # access LAPACK functions
+# for (gesvxx, elty, rtyp) in (
+#     (:dgesvxx_, :Float64, :Float64),
+#     (:sgesvxx_, :Float32, :Float32),
+#     )
+#     @eval begin
+#         function hyp_bk_solve!(c::HypLUSolveCache{$elty}, X::Matrix{$elty}, A::AbstractMatrix{$elty}, B::AbstractMatrix{$elty})
+#             set_min_diag!(A, c.tol_diag)
+#
+#             ccall((@blasfunc($gesvxx), Base.liblapack_name), Cvoid,
+#                 (Ref{UInt8}, Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt},
+#                 Ptr{$elty}, Ref{BlasInt}, Ptr{$elty}, Ref{BlasInt},
+#                 Ptr{BlasInt}, Ptr{$elty}, Ref{BlasInt}, Ptr{$elty},
+#                 Ref{BlasInt}, Ptr{$elty}, Ptr{$elty}, Ptr{$elty},
+#                 Ptr{$elty}, Ptr{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt}),
+#                 'E', c.uplo, c.n, c.nrhs, A, c.lda, c.AF, c.ldaf, c.ipiv, B,
+#                 c.ldb, X, c.n, c.rcond, c.ferr, c.berr, c.work, c.lwork, c.iwork, c.info)
+#
+#             if c.info[] < 0
+#                 throw(ArgumentError("invalid argument #$(-c.info[]) to LAPACK call"))
+#             elseif 0 < c.info[] <= c.n
+#                 @warn("factorization failed: #$(c.info[])")
+#                 return false
+#             elseif c.info[] == c.n
+#                 @warn("condition number is small: $(c.rcond[])")
+#             end
+#             return true
+#         end
+#     end
+# end
+#
+# HypLUSolveCache(X::Matrix{R}, A::AbstractMatrix{R}, B::AbstractMatrix{R}) where {R <: Real} = HypLUSolveCache{R}()
+#
+# # fall back to generic LU solve for eltype not BlasReal
+# function hyp_bk_solve!(c::HypLUSolveCache{R}, X::Matrix{R}, A::AbstractMatrix{R}, B::AbstractMatrix{R}) where {R <: Real}
+#     F = lu!(A, check = false)
+#     if !issuccess(F)
+#         return false
+#     end
+#     ldiv!(X, F, B)
+#     return true
+# end
