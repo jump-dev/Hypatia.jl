@@ -252,7 +252,7 @@ function get_combined_directions(system_solver::QRCholSystemSolver{T}) where {T 
     if !iszero(size(Q2div, 1))
         mul!(GQ1x, GQ1, yi)
         block_hessian_product!(HGQ1x_k, GQ1x_k)
-        mul!(Q2div, GQ2', HGQ1x, -1, true)
+        mul!(Q2div, GQ2', HGQ1x, -one(T), true)
 
         block_hessian_product!(HGQ2_k, GQ2_k)
         mul!(Q2GHGQ2, GQ2', HGQ2)
@@ -290,7 +290,7 @@ function get_combined_directions(system_solver::QRCholSystemSolver{T}) where {T 
 
     if !iszero(length(yi))
         copyto!(yi, Q1pbxGHbz)
-        mul!(yi, GQ1', HGxi, -1, true)
+        mul!(yi, GQ1', HGxi, -one(T), true)
         ldiv!(solver.Ap_R, yi)
     end
 
@@ -303,7 +303,7 @@ function get_combined_directions(system_solver::QRCholSystemSolver{T}) where {T 
         @. y += tau_sol * y1
         @. z += tau_sol * z1
         copyto!(s, model.h)
-        mul!(s, model.G, x, -1, tau_sol)
+        mul!(s, model.G, x, -one(T), tau_sol)
         kap_sol = -dot(model.c, x) - dot(model.b, y) - dot(model.h, z) - tau_rhs
         return (tau_sol, kap_sol)
     end

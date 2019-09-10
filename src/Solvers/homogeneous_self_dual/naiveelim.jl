@@ -160,7 +160,7 @@ function get_combined_directions(system_solver::NaiveElimSystemSolver{T}) where 
             @views copyto!(z1_k[k], solver.z_residual[idxs])
         else
             # -mu*H_k*G_k*x + z_k + mu*H_k*h_k*tau = mu*H_k*zrhs_k + srhs_k
-            @views mul!(lhs[rows, 1:n], H, model.G[idxs, :], -1, false)
+            @views mul!(lhs[rows, 1:n], H, model.G[idxs, :], -one(T), false)
             @views mul!(lhs[rows, end], H, model.h[idxs])
             @views mul!(z1_k[k], H, solver.z_residual[idxs])
         end
@@ -184,9 +184,9 @@ function get_combined_directions(system_solver::NaiveElimSystemSolver{T}) where 
 
     # s = -G*x + h*tau - zrhs
     @. s1 = model.h * tau1 - solver.z_residual
-    mul!(s1, model.G, x1, -1, true)
+    mul!(s1, model.G, x1, -one(T), true)
     s2 .= model.h
-    mul!(s2, model.G, x2, -1, tau2)
+    mul!(s2, model.G, x2, -one(T), tau2)
 
     # kap = taurhs - mu/(taubar^2)*tau
     kap1 = tau_rhs1 - mtt * tau1
