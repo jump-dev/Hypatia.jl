@@ -9,26 +9,26 @@ const SO = Hypatia.Solvers
 @info("starting native tests")
 
 real_types = [
-    Float64,
+    # Float64,
     Float32,
-    BigFloat,
+    # BigFloat,
     ]
 
 system_solvers = [
-    SO.QRCholSystemSolver,
-    SO.SymIndefSystemSolver,
-    SO.NaiveElimSystemSolver,
+    # SO.QRCholSystemSolver,
+    # SO.SymIndefSystemSolver,
+    # SO.NaiveElimSystemSolver,
     SO.NaiveSystemSolver,
     ]
 
 use_infty_nbhd = [
     true,
-    false,
+    # false,
     ]
 
 preprocess = [
     true,
-    false
+    # false
     ]
 
 testfuns_preproc = [
@@ -96,10 +96,10 @@ end
     t(T, solver = solver)
 end
 
-@info("starting iterative system solver tests")
-@testset "iterative system solver tests: $t, $T" for t in testfuns_raw, T in real_types
-    T == BigFloat && continue # IterativeSolvers does not work with BigFloat
-    solver = SO.Solver{T}(verbose = true, init_use_iterative = true, preprocess = false,
-        system_solver = SO.NaiveSystemSolver{T}(use_iterative = true))
-    t(T, solver = solver)
-end
+# @info("starting iterative system solver tests")
+# @testset "iterative system solver tests: $t, $T" for t in testfuns_raw, T in real_types
+#     T == BigFloat && continue # IterativeSolvers does not work with BigFloat
+#     solver = SO.Solver{T}(verbose = true, init_use_iterative = true, preprocess = false,
+#         system_solver = SO.NaiveSystemSolver{T}(use_iterative = true))
+#     t(T, solver = solver)
+# end

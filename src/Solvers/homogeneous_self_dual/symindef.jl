@@ -209,7 +209,7 @@ function get_combined_directions(system_solver::SymIndefSystemSolver{T}) where {
     else
         if T <: BlasReal
             if !hyp_bk_solve!(system_solver.solvecache, system_solver.solvesol, lhs_symm.data, rhs)
-                @warn("numerical failure: could not fix failure of positive definiteness (mu is $mu)")
+                @warn("numerical failure: could not fix linear solve failure (mu is $mu)")
             end
             copyto!(rhs, system_solver.solvesol)
         else
