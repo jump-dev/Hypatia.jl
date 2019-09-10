@@ -39,6 +39,9 @@ mutable struct NaiveSystemSolver{T <: Real} <: SystemSolver{T}
     s2
     kap_row::Int
 
+    solvesol
+    solvecache
+
     function NaiveSystemSolver{T}(; use_iterative::Bool = false, use_sparse::Bool = false) where {T <: Real}
         system_solver = new{T}()
         system_solver.use_iterative = use_iterative
@@ -135,6 +138,11 @@ function load(system_solver::NaiveSystemSolver{T}, solver::Solver{T}) where {T <
         system_solver.lhs_H_k = [view_k(k) for k in eachindex(model.cones)]
     end
 
+    if !system_solver.use_sparse
+        system_solver.solvesol = Matrix{T}(undef, size(system_solver.lhs, 1), 2)
+        system_solver.solvecache = HypLUSolveCache(system_solver.solvesol, system_solver.lhs, system_solver.rhs)
+    end
+
     return system_solver
 end
 
@@ -206,7 +214,25 @@ function get_combined_directions(system_solver::NaiveSystemSolver{T}) where {T <
         if system_solver.use_sparse
             rhs .= lu(lhs) \ rhs
         else
-            ldiv!(lu!(lhs), rhs)
+            # lhs_2 = copy(lhs)
+            # rhs_2 = copy(rhs)
+            # lhs_3 = copy(lhs)
+            # rhs_3 = copy(rhs)
+
+            # @time ldiv!(lu!(lhs_2), rhs_2)
+            #
+            # @show norm(lhs * rhs_2 - rhs, Inf)
+
+            @time if !hyp_lu_solve!(system_solver.solvecache, system_solver.solvesol, lhs, rhs)
+                @warn("numerical failure: could not fix linear solve failure (mu is $mu)")
+            end
+            copyto!(rhs, system_solver.solvesol)
+
+            # @show norm(lhs * rhs_3 - rhs, Inf)
+            #
+            # println()
+
+            # rhs .= rhs_3
         end
     end
 

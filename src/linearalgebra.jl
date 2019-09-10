@@ -17,7 +17,7 @@ function set_min_diag!(A::Matrix{<:RealOrComplex{T}}, tol::T) where {T <: Real}
 end
 
 import LinearAlgebra.BlasReal
-import LinearAlgebra.BlasFloat
+# import LinearAlgebra.BlasFloat
 import LinearAlgebra.HermOrSym
 
 hyp_AtA!(U::Matrix{T}, A::Matrix{T}) where {T <: BlasReal} = BLAS.syrk!('U', 'T', one(T), A, zero(T), U)
@@ -68,6 +68,7 @@ for (potrf, potri, elty, rtyp) in (
         function hyp_chol!(c::HypCholCache{$rtyp, $elty}, A::StridedMatrix{$elty})
             set_min_diag!(A, c.tol_diag)
 
+            # call dposvx( fact, uplo, n, nrhs, a, lda, af, ldaf, equed, s, b, ldb, x, ldx, rcond, ferr, berr, work, iwork, info )
             ccall((@blasfunc($potrf), liblapack), Cvoid, (
                 Ref{UInt8}, Ref{BlasInt}, Ptr{$elty}, Ref{BlasInt}, Ptr{BlasInt},
                 ), c.uplo, c.n, A, c.lda, c.info)
@@ -150,6 +151,7 @@ for (sytrf, elty, rtyp) in (
         function hyp_bk!(c::HypBKCache{$elty}, A::AbstractMatrix{$elty})
             set_min_diag!(A, c.tol_diag)
 
+            # call dsytrf_rook( uplo, n, a, lda, ipiv, work, lwork, info )
             ccall((@blasfunc($sytrf), liblapack), Cvoid, (
                 Ref{UInt8}, Ref{BlasInt}, Ptr{$elty}, Ref{BlasInt},
                 Ptr{BlasInt}, Ptr{$elty}, Ref{BlasInt}, Ptr{BlasInt}
@@ -253,7 +255,7 @@ for (posvx, elty, rtyp) in (
             elseif 0 < c.info[] <= c.n
                 @warn("factorization failed: #$(c.info[])")
                 return false
-            elseif c.info[] == c.n
+            elseif c.info[] > c.n
                 @warn("condition number is small: $(c.rcond[])")
             end
             return true
@@ -334,6 +336,7 @@ for (sysvx, elty, rtyp) in (
         function hyp_bk_solve!(c::HypBKSolveCache{$elty}, X::Matrix{$elty}, A::AbstractMatrix{$elty}, B::AbstractMatrix{$elty})
             set_min_diag!(A, c.tol_diag)
 
+            # call dsysvx( fact, uplo, n, nrhs, a, lda, af, ldaf, ipiv, b, ldb, x, ldx, rcond, ferr, berr, work, lwork, iwork, info )
             ccall((@blasfunc($sysvx), Base.liblapack_name), Cvoid,
                 (Ref{UInt8}, Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt},
                 Ptr{$elty}, Ref{BlasInt}, Ptr{$elty}, Ref{BlasInt},
@@ -348,7 +351,7 @@ for (sysvx, elty, rtyp) in (
             elseif 0 < c.info[] <= c.n
                 @warn("factorization failed: #$(c.info[])")
                 return false
-            elseif c.info[] == c.n
+            elseif c.info[] > c.n
                 @warn("condition number is small: $(c.rcond[])")
             end
             return true
@@ -376,88 +379,103 @@ end
 
 
 
-#
-#
-# # cache for LAPACK LU with linear solve (like GESVXX)
-# mutable struct HypLUSolveCache{R <: Real}
-#     n
-#     lda
-#     ldaf
-#     nrhs
-#     ldb
-#     rcond
-#     lwork
-#     ferr
-#     berr
-#     work
-#     iwork
-#     AF
-#     ipiv
-#     info
-#     HypLUSolveCache{R}() where {R <: Real} = new{R}()
-# end
-#
-# function HypLUSolveCache(X::Matrix{R}, A::AbstractMatrix{R}, B::AbstractMatrix{R}) where {R <: BlasReal}
-#     LinearAlgebra.chkstride1(A)
-#     c = HypLUSolveCache{R}()
-#     c.n = LinearAlgebra.checksquare(A)
-#     @assert c.n == size(X, 1) == size(B, 1)
-#     @assert size(X, 2) == size(B, 2)
-#     c.lda = stride(A, 2)
-#     c.ldaf = c.n
-#     c.nrhs = size(B, 2)
-#     c.ldb = stride(B, 2)
-#     c.rcond = Ref{R}()
-#     c.lwork = Ref{BlasInt}(5 * c.n)
-#     c.ferr = Vector{R}(undef, c.nrhs)
-#     c.berr = Vector{R}(undef, c.nrhs)
-#     c.work = Vector{R}(undef, 5 * c.n)
-#     c.iwork = Vector{Int}(undef, c.n)
-#     c.AF = Matrix{R}(undef, c.n, c.n)
-#     c.ipiv = Vector{Int}(undef, c.n)
-#     c.info = Ref{BlasInt}()
-#     return c
-# end
-#
-# # access LAPACK functions
-# for (gesvxx, elty, rtyp) in (
-#     (:dgesvxx_, :Float64, :Float64),
-#     (:sgesvxx_, :Float32, :Float32),
-#     )
-#     @eval begin
-#         function hyp_bk_solve!(c::HypLUSolveCache{$elty}, X::Matrix{$elty}, A::AbstractMatrix{$elty}, B::AbstractMatrix{$elty})
-#             set_min_diag!(A, c.tol_diag)
-#
-#             ccall((@blasfunc($gesvxx), Base.liblapack_name), Cvoid,
-#                 (Ref{UInt8}, Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt},
-#                 Ptr{$elty}, Ref{BlasInt}, Ptr{$elty}, Ref{BlasInt},
-#                 Ptr{BlasInt}, Ptr{$elty}, Ref{BlasInt}, Ptr{$elty},
-#                 Ref{BlasInt}, Ptr{$elty}, Ptr{$elty}, Ptr{$elty},
-#                 Ptr{$elty}, Ptr{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt}),
-#                 'E', c.uplo, c.n, c.nrhs, A, c.lda, c.AF, c.ldaf, c.ipiv, B,
-#                 c.ldb, X, c.n, c.rcond, c.ferr, c.berr, c.work, c.lwork, c.iwork, c.info)
-#
-#             if c.info[] < 0
-#                 throw(ArgumentError("invalid argument #$(-c.info[]) to LAPACK call"))
-#             elseif 0 < c.info[] <= c.n
-#                 @warn("factorization failed: #$(c.info[])")
-#                 return false
-#             elseif c.info[] == c.n
-#                 @warn("condition number is small: $(c.rcond[])")
-#             end
-#             return true
-#         end
-#     end
-# end
-#
-# HypLUSolveCache(X::Matrix{R}, A::AbstractMatrix{R}, B::AbstractMatrix{R}) where {R <: Real} = HypLUSolveCache{R}()
-#
-# # fall back to generic LU solve for eltype not BlasReal
-# function hyp_bk_solve!(c::HypLUSolveCache{R}, X::Matrix{R}, A::AbstractMatrix{R}, B::AbstractMatrix{R}) where {R <: Real}
-#     F = lu!(A, check = false)
-#     if !issuccess(F)
-#         return false
-#     end
-#     ldiv!(X, F, B)
-#     return true
-# end
+
+
+# cache for LAPACK LU with linear solve (like GESVXX)
+mutable struct HypLUSolveCache{R <: Real}
+    n
+    nrhs
+    lda
+    AF
+    ldaf
+    ipiv
+    rvec
+    cvec
+    ldb
+    rcond
+    rpvgrw
+    berr
+    err_bnds_norm
+    err_bnds_comp
+    params
+    work
+    iwork
+    info
+    HypLUSolveCache{R}() where {R <: Real} = new{R}()
+end
+
+function HypLUSolveCache(X::Matrix{R}, A::AbstractMatrix{R}, B::AbstractMatrix{R}) where {R <: BlasReal}
+    LinearAlgebra.chkstride1(A)
+    c = HypLUSolveCache{R}()
+    c.n = LinearAlgebra.checksquare(A)
+    @assert c.n == size(X, 1) == size(B, 1)
+    @assert size(X, 2) == size(B, 2)
+    c.nrhs = size(B, 2)
+    c.lda = stride(A, 2)
+    c.AF = Matrix{R}(undef, c.n, c.n)
+    c.ldaf = c.n
+    c.ipiv = Vector{Int}(undef, c.n)
+    c.rvec = Vector{R}(undef, c.n)
+    c.cvec = Vector{R}(undef, c.n)
+    c.ldb = stride(B, 2)
+    c.rcond = Ref{R}()
+    c.rpvgrw = Ref{R}()
+    c.berr = Vector{R}(undef, c.nrhs)
+    c.err_bnds_norm = Matrix{R}(undef, c.nrhs, 0)
+    c.err_bnds_comp = Matrix{R}(undef, c.nrhs, 0)
+    c.params = Matrix{R}(undef, 1, 0)
+    c.work = Vector{R}(undef, 4 * c.n)
+    c.iwork = Vector{Int}(undef, c.n)
+    c.info = Ref{BlasInt}()
+    return c
+end
+
+# access LAPACK functions
+for (gesvxx, elty, rtyp) in (
+    (:dgesvxx_, :Float64, :Float64),
+    (:sgesvxx_, :Float32, :Float32),
+    )
+    @eval begin
+        function hyp_lu_solve!(c::HypLUSolveCache{$elty}, X::Matrix{$elty}, A::AbstractMatrix{$elty}, B::AbstractMatrix{$elty})
+            # call dgesvxx( fact, trans, n, nrhs, a, lda, af, ldaf, ipiv, equed, r, c, b, ldb, x, ldx, rcond, rpvgrw, berr, n_err_bnds, err_bnds_norm, err_bnds_comp, nparams, params, work, iwork, info )
+            ccall((@blasfunc($gesvxx), Base.liblapack_name), Cvoid,
+                (Ref{UInt8}, Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt},
+                Ptr{$elty}, Ref{BlasInt}, Ptr{$elty}, Ref{BlasInt},
+                Ptr{BlasInt}, Ref{UInt8}, Ptr{$elty}, Ptr{$elty},
+                Ptr{$elty}, Ref{BlasInt}, Ptr{$elty}, Ref{BlasInt},
+                Ptr{$elty}, Ptr{$elty}, Ptr{$elty}, Ref{BlasInt},
+                Ptr{$elty}, Ptr{$elty}, Ref{BlasInt}, Ptr{$elty},
+                Ptr{$elty}, Ptr{BlasInt}, Ptr{BlasInt}),
+                'E', 'N', c.n, c.nrhs,
+                A, c.lda, c.AF, c.ldaf,
+                c.ipiv, 'B', c.rvec, c.cvec,
+                B, c.ldb, X, c.n,
+                c.rcond, c.rpvgrw, c.berr, Ref{BlasInt}(0),
+                c.err_bnds_norm, c.err_bnds_comp, Ref{BlasInt}(0), c.params,
+                c.work, c.iwork, c.info,
+                )
+
+            if c.info[] < 0
+                throw(ArgumentError("invalid argument #$(-c.info[]) to LAPACK call"))
+            elseif 0 < c.info[] <= c.n
+                @warn("solve failed: #$(c.info[])")
+                return false
+            elseif c.info[] > c.n
+                @warn("condition number is small: $(c.rcond[])")
+            end
+            return true
+        end
+    end
+end
+
+HypLUSolveCache(X::Matrix{R}, A::AbstractMatrix{R}, B::AbstractMatrix{R}) where {R <: Real} = HypLUSolveCache{R}()
+
+# fall back to generic LU solve for eltype not BlasReal
+function hyp_lu_solve!(c::HypLUSolveCache{R}, X::Matrix{R}, A::AbstractMatrix{R}, B::AbstractMatrix{R}) where {R <: Real}
+    F = lu!(A, check = false)
+    if !issuccess(F)
+        return false
+    end
+    ldiv!(X, F, B)
+    return true
+end
