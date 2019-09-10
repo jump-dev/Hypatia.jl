@@ -242,7 +242,7 @@ function get_combined_directions(system_solver::SymIndefSystemSolver{T}) where {
         @. y += tau_sol * y1
         @. z += tau_sol * z1
         copyto!(s, model.h)
-        mul!(s, model.G, x, -1, tau_sol)
+        mul!(s, model.G, x, -one(T), tau_sol)
         kap_sol = -dot(model.c, x) - dot(model.b, y) - dot(model.h, z) - tau_rhs
         return (tau_sol, kap_sol)
     end
