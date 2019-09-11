@@ -20,8 +20,10 @@ import Hypatia.HypCholSolveCache
 import Hypatia.hyp_chol_solve!
 import Hypatia.HypBKSolveCache
 import Hypatia.hyp_bk_solve!
-import Hypatia.HypLUSolveCache
-import Hypatia.hyp_lu_solve!
+import Hypatia.HypLUxSolveCache
+import Hypatia.hyp_lu_xsolve!
+import Hypatia.HypBKxSolveCache
+import Hypatia.hyp_bk_xsolve!
 import Hypatia.BlockMatrix
 
 # homogeneous self-dual embedding algorithm

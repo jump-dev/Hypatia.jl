@@ -140,7 +140,7 @@ function load(system_solver::NaiveSystemSolver{T}, solver::Solver{T}) where {T <
 
     if !system_solver.use_sparse
         system_solver.solvesol = Matrix{T}(undef, size(system_solver.lhs, 1), 2)
-        system_solver.solvecache = HypLUSolveCache(system_solver.solvesol, system_solver.lhs, system_solver.rhs)
+        system_solver.solvecache = HypLUxSolveCache(system_solver.solvesol, system_solver.lhs, system_solver.rhs)
     end
 
     return system_solver
@@ -226,9 +226,8 @@ function get_combined_directions(system_solver::NaiveSystemSolver{T}) where {T <
                 nitref = 5
                 for i in 1:nitref
                     ldiv!(F, resi)
-                    rhs_new = rhs + resi
-                    # resi = rhs_fix - lhs_fix * rhs_new
-                    resi = BigFloat.(rhs_fix - lhs_fix * rhs_new)
+                    rhs_new = BigFloat.(rhs) + BigFloat.(resi)
+                    resi = rhs_fix - lhs_fix * rhs_new
                     nres = norm(resi, Inf)
                     if nres >= 0.8 * nresprev
                         if nres < nresprev
@@ -247,7 +246,7 @@ function get_combined_directions(system_solver::NaiveSystemSolver{T}) where {T <
 
             # @show norm(lhs * rhs_2 - rhs, Inf)
 
-            # @time if !hyp_lu_solve!(system_solver.solvecache, system_solver.solvesol, lhs, rhs)
+            # @time if !hyp_lu_xsolve!(system_solver.solvecache, system_solver.solvesol, lhs, rhs)
             #     @warn("numerical failure: could not fix linear solve failure (mu is $mu)")
             # end
             # copyto!(rhs, system_solver.solvesol)
