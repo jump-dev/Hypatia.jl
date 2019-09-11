@@ -108,19 +108,20 @@ function load(system_solver::QRCholSystemSolver{T}, solver::Solver{T}) where {T 
 
     nmp = n - p
 
-    if !isa(model.G, Matrix{T}) && isa(solver.Ap_Q, SuiteSparse.SPQR.QRSparseQ)
-        # TODO very inefficient method used for sparse G * QRSparseQ : see https://github.com/JuliaLang/julia/issues/31124#issuecomment-501540818
-        # TODO remove workaround and warning
-        @warn("in QRChol, converting G to dense before multiplying by sparse Householder Q due to very inefficient dispatch")
-        GQ = Matrix(model.G) * solver.Ap_Q
-    else
-        GQ = model.G * solver.Ap_Q
-    end
+    # if !isa(model.G, Matrix{T}) && isa(solver.Ap_Q, SuiteSparse.SPQR.QRSparseQ)
+    #     # TODO very inefficient method used for sparse G * QRSparseQ : see https://github.com/JuliaLang/julia/issues/31124#issuecomment-501540818
+    #     # TODO remove workaround and warning
+    #     @warn("in QRChol, converting G to dense before multiplying by sparse Householder Q due to very inefficient dispatch")
+    #     GQ = Matrix(model.G) * solver.Ap_Q
+    # else
+    #     GQ = model.G * solver.Ap_Q
+    # end
+    GQ = model.G * solver.Ap_Q # NOTE see commented code above
     system_solver.GQ1 = GQ[:, 1:p]
     system_solver.GQ2 = GQ[:, (p + 1):end]
     if system_solver.use_sparse
         if !issparse(GQ)
-            error("to use sparse factorization for direction finding, cannot use dense A or G matrices (GQ is of type $(typeof(GQ)))")
+            @warn("using sparse factorizations for direction finding, but A or G are dense (GQ is of type $(typeof(GQ))) - it is probably more efficient to use dense factorizations (set system_solver.use_sparse = false)")
         end
         system_solver.HGQ2 = spzeros(T, q, nmp)
         system_solver.Q2GHGQ2 = spzeros(T, nmp, nmp)
