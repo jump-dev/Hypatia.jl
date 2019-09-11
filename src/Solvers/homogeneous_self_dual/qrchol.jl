@@ -250,6 +250,7 @@ function get_combined_directions(system_solver::QRCholSystemSolver{T}) where {T 
     @timeit solver.timer "QpbxGHbz" begin
     mul!(QpbxGHbz, model.G', zi, true, true)
     lmul!(solver.Ap_Q', QpbxGHbz)
+    end
 
     copyto!(xi1, yi)
 

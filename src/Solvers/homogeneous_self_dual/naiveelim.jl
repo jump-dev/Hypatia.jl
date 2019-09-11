@@ -144,12 +144,14 @@ function get_combined_directions(system_solver::NaiveElimSystemSolver{T}) where 
     tau_rhs1 = -kap
     tau_rhs2 = -kap + mu / tau
     kap_rhs1 = kap + solver.primal_obj_t - solver.dual_obj_t
+    end
 
     # update lhs matrix
     @timeit solver.timer "lhs update" begin
     copyto!(lhs, system_solver.lhs_copy)
     mtt = mu / tau / tau
     lhs[end, end] = mtt
+    end
 
     for k in eachindex(cones)
         cone_k = cones[k]
