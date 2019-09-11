@@ -10,8 +10,8 @@ const SO = Hypatia.Solvers
 
 real_types = [
     Float64,
-    # Float32,
-    # BigFloat,
+    Float32,
+    BigFloat,
     ]
 
 system_solvers = [
@@ -23,7 +23,7 @@ system_solvers = [
 
 use_infty_nbhd = [
     true,
-    # false,
+    false,
     ]
 
 use_sparse = [
@@ -33,7 +33,7 @@ use_sparse = [
 
 preprocess = [
     true,
-    # false
+    false
     ]
 
 testfuns_preproc = [
@@ -88,10 +88,10 @@ testfuns_raw = [
     dualinfeas3,
     ]
 
-# @info("starting preprocessing tests")
-# @testset "preprocessing tests: $t, $s, $T" for t in testfuns_preproc, s in system_solvers, T in real_types
-#     t(T, solver = SO.Solver{T}(verbose = true, system_solver = s{T}()))
-# end
+@info("starting preprocessing tests")
+@testset "preprocessing tests: $t, $s, $T" for t in testfuns_preproc, s in system_solvers, T in real_types
+    t(T, solver = SO.Solver{T}(verbose = true, system_solver = s{T}()))
+end
 
 @info("starting miscellaneous tests")
 @testset "miscellaneous tests: $t, $s, $n, $sp, $p, $T" for t in testfuns_raw, s in system_solvers, n in use_infty_nbhd, sp in use_sparse, p in preprocess, T in real_types
@@ -102,10 +102,10 @@ testfuns_raw = [
     t(T, solver = solver)
 end
 
-# @info("starting iterative system solver tests")
-# @testset "iterative system solver tests: $t, $T" for t in testfuns_raw, T in real_types
-#     T == BigFloat && continue # IterativeSolvers does not work with BigFloat
-#     solver = SO.Solver{T}(verbose = true, init_use_iterative = true, preprocess = false,
-#         system_solver = SO.NaiveSystemSolver{T}(use_iterative = true))
-#     t(T, solver = solver)
-# end
+@info("starting iterative system solver tests")
+@testset "iterative system solver tests: $t, $T" for t in testfuns_raw, T in real_types
+    T == BigFloat && continue # IterativeSolvers does not work with BigFloat
+    solver = SO.Solver{T}(verbose = true, init_use_iterative = true, preprocess = false,
+        system_solver = SO.NaiveSystemSolver{T}(use_iterative = true))
+    t(T, solver = solver)
+end
