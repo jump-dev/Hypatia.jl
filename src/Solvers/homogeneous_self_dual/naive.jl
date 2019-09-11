@@ -214,19 +214,43 @@ function get_combined_directions(system_solver::NaiveSystemSolver{T}) where {T <
         if system_solver.use_sparse
             rhs .= lu(lhs) \ rhs
         else
-            # lhs_2 = copy(lhs)
-            # rhs_2 = copy(rhs)
-            # lhs_3 = copy(lhs)
-            # rhs_3 = copy(rhs)
+            rhs_fix = copy(rhs)
+            lhs_fix = copy(lhs)
+            F = lu!(lhs)
+            ldiv!(F, rhs)
+            resi = rhs_fix - lhs_fix * rhs
+            nres = norm(resi, Inf)
+            @show nres
+            if nres > 100 * eps(T)
+                nresprev = nres
+                nitref = 5
+                for i in 1:nitref
+                    ldiv!(F, resi)
+                    rhs_new = rhs + resi
+                    # resi = rhs_fix - lhs_fix * rhs_new
+                    resi = BigFloat.(rhs_fix - lhs_fix * rhs_new)
+                    nres = norm(resi, Inf)
+                    if nres >= 0.8 * nresprev
+                        if nres < nresprev
+                            rhs .= rhs_new
+                            @show nres
+                        end
+                        @show i
+                        break
+                    end
+                    rhs .= rhs_new
+                    @show nres
+                    nresprev = nres
+                end
+            end
+            println()
 
-            # @time ldiv!(lu!(lhs_2), rhs_2)
-            #
             # @show norm(lhs * rhs_2 - rhs, Inf)
 
-            @time if !hyp_lu_solve!(system_solver.solvecache, system_solver.solvesol, lhs, rhs)
-                @warn("numerical failure: could not fix linear solve failure (mu is $mu)")
-            end
-            copyto!(rhs, system_solver.solvesol)
+            # @time if !hyp_lu_solve!(system_solver.solvecache, system_solver.solvesol, lhs, rhs)
+            #     @warn("numerical failure: could not fix linear solve failure (mu is $mu)")
+            # end
+            # copyto!(rhs, system_solver.solvesol)
 
             # @show norm(lhs * rhs_3 - rhs, Inf)
             #
