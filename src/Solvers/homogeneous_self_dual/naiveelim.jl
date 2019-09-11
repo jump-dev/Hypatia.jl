@@ -24,7 +24,7 @@ kap + mu/(taubar^2)*tau = taurhs --> kap = taurhs - mu/(taubar^2)*tau
 -->
 -c'x - b'y - h'z + mu/(taubar^2)*tau = taurhs + kaprhs
 
-TODO reduce allocations
+TODO add iterative method
 =#
 
 mutable struct NaiveElimSystemSolver{T <: Real} <: SystemSolver{T}
@@ -133,8 +133,6 @@ function get_combined_directions(system_solver::NaiveElimSystemSolver{T}) where 
     x2 .= zero(T)
     y1 .= solver.y_residual
     y2 .= zero(T)
-    z1 .= solver.z_residual
-    z2 .= zero(T)
     sqrtmu = sqrt(mu)
     for k in eachindex(cones)
         duals_k = solver.point.dual_views[k]
@@ -142,9 +140,10 @@ function get_combined_directions(system_solver::NaiveElimSystemSolver{T}) where 
         @. s1_k[k] = -duals_k
         @. s2_k[k] = -duals_k - grad_k * sqrtmu
     end
-    tau_rhs = [-kap, -kap + mu / tau]
-    kap_rhs = [kap + solver.primal_obj_t - solver.dual_obj_t, zero(T)]
-    end # rhs
+
+    tau_rhs1 = -kap
+    tau_rhs2 = -kap + mu / tau
+    kap_rhs1 = kap + solver.primal_obj_t - solver.dual_obj_t
 
     # update lhs matrix
     @timeit solver.timer "lhs update" begin
@@ -159,28 +158,20 @@ function get_combined_directions(system_solver::NaiveElimSystemSolver{T}) where 
         H = Cones.hess(cone_k)
         if Cones.use_dual(cone_k)
             # -G_k*x + mu*H_k*z_k + h_k*tau = zrhs_k + srhs_k
-            lhs[rows, rows] .= H
+            @views copyto!(lhs[rows, rows], H)
+            @views copyto!(z1_k[k], solver.z_residual[idxs])
         else
             # -mu*H_k*G_k*x + z_k + mu*H_k*h_k*tau = mu*H_k*zrhs_k + srhs_k
-            mul!(lhs[rows, 1:n], -H, model.G[idxs, :])
-            lhs_try = deepcopy(lhs[rows, 1:n])
-            # @timeit solver.timer "mul2" @views mul!(lhs[rows, end], H, model.h[idxs])
-            # @timeit solver.timer "mul3" mul!(z1_k[k], H, z1_k[k])
-            # @timeit solver.timer "mul4" mul!(z2_k[k], H, z2_k[k])
-            # @show typeof(lhs[rows, 1:n]), typeof(-H), typeof(model.G[idxs, :])
-            # @show typeof(lhs[rows, 1:n]), typeof(-H), typeof(model.G[idxs, :])
-            @timeit solver.timer "mul1" lhs[rows, 1:n] .= -H * model.G[idxs, :]
-            # @show norm(mul!(lhs[rows, 1:n], -H, model.G[idxs, :]) + H * model.G[idxs, :])
-            @timeit solver.timer "mul2" lhs[rows, end] .= H * model.h[idxs]
-            @timeit solver.timer "mul3" z1_k[k] .= H * z1_k[k]
-            @timeit solver.timer "mul4" z2_k[k] .= H * z2_k[k]
+            @timeit solver.timer "mul1" @views mul!(lhs[rows, 1:n], H, model.G[idxs, :], -one(T), false)
+            @timeit solver.timer "mul2" @views mul!(lhs[rows, end], H, model.h[idxs])
+            @timeit solver.timer "mul3" @views mul!(z1_k[k], H, solver.z_residual[idxs])
         end
     end
     z1 .+= s1
-    z2 .+= s2
-    end # lhs
+    z2 .= s2
     # -c'x - b'y - h'z + mu/(taubar^2)*tau = taurhs + kaprhs
-    @timeit solver.timer "rhsend" rhs[end, :] .= kap_rhs + tau_rhs
+    rhs[end, 1] = kap_rhs1 + tau_rhs1
+    rhs[end, 2] = tau_rhs2
 
     # solve system
     if system_solver.use_sparse
@@ -194,18 +185,14 @@ function get_combined_directions(system_solver::NaiveElimSystemSolver{T}) where 
     tau2 = rhs[end, 2]
 
     # s = -G*x + h*tau - zrhs
-    # TODO remove allocs
-    copyto!(s1, -solver.z_residual)
-    @. s1 += model.h * tau1
-    mul!(s1, model.G, x1, -true, true)
-    @. s2 = model.h * tau2
-    mul!(s2, model.G, x2, -true, true)
-    # s1 .= -model.G * x1 + model.h * tau1 - solver.z_residual
-    # s2 .= -model.G * x2 + model.h * tau2
+    @. s1 = model.h * tau1 - solver.z_residual
+    @timeit solver.timer "mul4" mul!(s1, model.G, x1, -one(T), true)
+    s2 .= model.h
+    @timeit solver.timer "mul5" mul!(s2, model.G, x2, -one(T), tau2)
 
     # kap = taurhs - mu/(taubar^2)*tau
-    kap1 = tau_rhs[1] - mtt * tau1
-    kap2 = tau_rhs[2] - mtt * tau2
+    kap1 = tau_rhs1 - mtt * tau1
+    kap2 = tau_rhs2 - mtt * tau2
 
     return (x1, x2, y1, y2, z1, z2, s1, s2, tau1, tau2, kap1, kap2)
 end

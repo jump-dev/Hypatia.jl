@@ -257,7 +257,7 @@ function get_combined_directions(system_solver::QRCholSystemSolver{T}) where {T 
         @timeit solver.timer "Q2div" begin
         mul!(GQ1x, GQ1, yi)
         block_hessian_product!(HGQ1x_k, GQ1x_k)
-        mul!(Q2div, GQ2', HGQ1x, -1, true)
+        mul!(Q2div, GQ2', HGQ1x, -one(T), true)
         end
 
         @timeit solver.timer "Hprod" block_hessian_product!(HGQ2_k, GQ2_k)
@@ -270,7 +270,7 @@ function get_combined_directions(system_solver::QRCholSystemSolver{T}) where {T 
                 mul!(Q2GHGQ2, GQ2', HGQ2)
                 F = ldlt(Symmetric(Q2GHGQ2), shift = cbrt(eps(T)), check = false)
                 if !issuccess(F)
-                    @warn("numerical failure: could not fix failure of positive definiteness (mu is $mu); terminating")
+                    @warn("numerical failure: could not fix failure of positive definiteness (mu is $mu)")
                 end
             end
             xi2 .= F \ Q2div # TODO eliminate allocs (see https://github.com/JuliaLang/julia/issues/30084)
@@ -280,7 +280,7 @@ function get_combined_directions(system_solver::QRCholSystemSolver{T}) where {T 
                 @timeit solver.timer "notbk" mul!(Q2GHGQ2, GQ2', HGQ2)
                 Q2GHGQ2 += cbrt(eps(T)) * I
                 if !hyp_bk_solve!(system_solver.solvecache, system_solver.solvesol, Q2GHGQ2, Q2div)
-                    @warn("numerical failure: could not fix failure of positive definiteness (mu is $mu); terminating")
+                    @warn("numerical failure: could not fix failure of positive definiteness (mu is $mu)")
                 end
             end
             copyto!(xi2, system_solver.solvesol)
@@ -299,8 +299,9 @@ function get_combined_directions(system_solver::QRCholSystemSolver{T}) where {T 
     if !iszero(length(yi))
         @timeit solver.timer "yi" begin
         copyto!(yi, Q1pbxGHbz)
-        mul!(yi, GQ1', HGxi, -1, true)
+        mul!(yi, GQ1', HGxi, -one(T), true)
         ldiv!(solver.Ap_R, yi)
+        end
     end
 
     # lift to HSDE space
@@ -312,7 +313,7 @@ function get_combined_directions(system_solver::QRCholSystemSolver{T}) where {T 
         @. y += tau_sol * y1
         @. z += tau_sol * z1
         copyto!(s, model.h)
-        mul!(s, model.G, x, -1, tau_sol)
+        mul!(s, model.G, x, -one(T), tau_sol)
         kap_sol = -dot(model.c, x) - dot(model.b, y) - dot(model.h, z) - tau_rhs
         return (tau_sol, kap_sol)
     end
