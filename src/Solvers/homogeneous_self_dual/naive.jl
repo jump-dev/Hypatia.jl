@@ -14,10 +14,6 @@ kap + mu/(taubar^2)*tau = taurhs
 TODO optimize iterative method
 =#
 
-
-using IterativeRefinement
-
-
 mutable struct NaiveSystemSolver{T <: Real} <: SystemSolver{T}
     use_iterative::Bool
     use_sparse::Bool
@@ -220,12 +216,14 @@ function get_combined_directions(system_solver::NaiveSystemSolver{T}) where {T <
         else
             rhs_fix = copy(rhs)
             lhs_fix = copy(lhs)
+            rhsnorminf = norm(rhs, Inf) + 1
+            rhsnorm2 = norm(rhs, 2) + 1
 
             F = lu!(lhs)
             ldiv!(F, rhs)
 
             resi = BigFloat.(rhs_fix) - BigFloat.(lhs_fix) * BigFloat.(rhs)
-            @show norm(resi, Inf), norm(resi, 2)
+            println(norm(resi, Inf)/rhsnorminf, "\t", norm(resi, 2)/rhsnorm2)
 
             # if nres > 100 * eps(T)
             #     nresprev = nres
@@ -250,18 +248,15 @@ function get_combined_directions(system_solver::NaiveSystemSolver{T}) where {T <
             # end
             # println()
 
-            # @show norm(lhs * rhs_2 - rhs, Inf)
+            if !hyp_lu_xsolve!(system_solver.solvecache, system_solver.solvesol, lhs_fix, rhs_fix)
+                @warn("numerical failure: could not fix linear solve failure (mu is $mu)")
+            end
+            copyto!(rhs, system_solver.solvesol)
 
-            # @time if !hyp_lu_xsolve!(system_solver.solvecache, system_solver.solvesol, lhs_fix, rhs_fix)
-            #     @warn("numerical failure: could not fix linear solve failure (mu is $mu)")
-            # end
-            # copyto!(rhs, system_solver.solvesol)
-
-            
             resi = BigFloat.(rhs_fix) - BigFloat.(lhs_fix) * BigFloat.(rhs)
-            @show norm(resi, Inf), norm(resi, 2)
+            println(norm(resi, Inf)/rhsnorminf, "\t", norm(resi, 2)/rhsnorm2)
 
-            println()
+            # println()
         end
     end
 
