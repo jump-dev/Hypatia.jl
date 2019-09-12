@@ -173,7 +173,7 @@ function get_combined_directions(system_solver::NaiveElimSystemSolver{T}) where 
 
     # solve system
     if system_solver.use_sparse
-        rhs .= lu(lhs) \ rhs
+        rhs .= lu(lhs) \ rhs # TODO remove the copyto
     else
         ldiv!(lu!(lhs), rhs)
     end

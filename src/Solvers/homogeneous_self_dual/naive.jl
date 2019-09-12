@@ -27,6 +27,8 @@ mutable struct NaiveSystemSolver{T <: Real} <: SystemSolver{T}
     prevsol1::Vector{T}
     prevsol2::Vector{T}
 
+    block_lhs
+
     x1
     x2
     y1
@@ -72,38 +74,48 @@ function load(system_solver::NaiveSystemSolver{T}, solver::Solver{T}) where {T <
     system_solver.s2 = view(system_solver.rhs, rows, 2)
     system_solver.kap_row = n + p + q + 1
 
+
+
+    # block matrix for efficient multiplication
+    rc1 = 1:n
+    rc2 = n .+ (1:p)
+    rc3 = (n + p) .+ (1:q)
+    rc4 = (n + p + q) .+ (1:1)
+    rc5 = (n + p + q + 1) .+ (1:q)
+    rc6 = dim:dim
+
+    # TODO construct efficiently by preallocing the vectors
+    cone_rows = UnitRange{Int}[]
+    cone_cols = UnitRange{Int}[]
+    cone_blocks = Any[]
+    for k in eachindex(model.cones)
+        rows = (n + p) .+ model.cone_idxs[k]
+        push!(cone_rows, rows)
+        push!(cone_rows, rows)
+        push!(cone_cols, rows)
+        push!(cone_cols, (q + 1) .+ rows)
+        cone_k = model.cones[k]
+        if Cones.use_dual(cone_k)
+            push!(cone_blocks, cone_k)
+            push!(cone_blocks, I)
+        else
+            push!(cone_blocks, I)
+            push!(cone_blocks, cone_k)
+        end
+    end
+
+    system_solver.block_lhs = BlockMatrix{T}(
+        dim,
+        dim,
+        [cone_blocks..., model.A', model.G', reshape(model.c, :, 1), -model.A, reshape(model.b, :, 1), ones(T, 1, 1), -model.G, -I, reshape(model.h, :, 1), -model.c', -model.b', -model.h', -ones(T, 1, 1), ones(T, 1, 1)],
+        [cone_rows..., rc1, rc1, rc1, rc2, rc2, rc4, rc5, rc5, rc5, rc6, rc6, rc6, rc6, rc4],
+        [cone_cols..., rc2, rc3, rc6, rc1, rc6, rc4, rc1, rc5, rc6, rc1, rc2, rc3, rc4, rc6],
+        )
+
     # x y z kap s tau
     if system_solver.use_iterative
         system_solver.prevsol1 = zeros(T, dim)
         system_solver.prevsol2 = zeros(T, dim)
-
-        # block matrix for efficient multiplication
-        rc1 = 1:n
-        rc2 = n .+ (1:p)
-        rc3 = (n + p) .+ (1:q)
-        rc4 = (n + p + q) .+ (1:1)
-        rc5 = (n + p + q + 1) .+ (1:q)
-        rc6 = dim:dim
-
-        cone_rows = UnitRange{Int}[]
-        cone_cols = UnitRange{Int}[]
-        for k in eachindex(model.cones)
-            rows = (n + p) .+ model.cone_idxs[k]
-            push!(cone_rows, rows)
-            push!(cone_rows, rows)
-            push!(cone_cols, rows)
-            push!(cone_cols, (q + 1) .+ rows)
-        end
-
-        system_solver.lhs = BlockMatrix{T}(
-            dim,
-            dim,
-            [fill(I, length(cone_rows))...,
-            model.A', model.G', reshape(model.c, :, 1), -model.A, reshape(model.b, :, 1), ones(T, 1, 1), -model.G, -I, reshape(model.h, :, 1), -model.c', -model.b', -model.h', -ones(T, 1, 1), ones(T, 1, 1)],
-            [cone_rows..., rc1, rc1, rc1, rc2, rc2, rc4, rc5, rc5, rc5, rc6, rc6, rc6, rc6, rc4],
-            [cone_cols..., rc2, rc3, rc6, rc1, rc6, rc4, rc1, rc5, rc6, rc1, rc2, rc3, rc4, rc6],
-            )
-
     else
         if system_solver.use_sparse
             system_solver.lhs_copy = T[
@@ -168,18 +180,16 @@ function get_combined_directions(system_solver::NaiveSystemSolver{T}) where {T <
     rhs[end, 1] = kap + solver.primal_obj_t - solver.dual_obj_t
     rhs[end, 2] = zero(T)
 
+
+    block_lhs = system_solver.block_lhs
+
+    mtt = mu / tau / tau
+    block_lhs.blocks[end][1] = mtt # TODO only for residual
+
+
+
     # solve system
     if system_solver.use_iterative
-        lhs.blocks[end][1] = mu / tau / tau
-        b_idx = 1
-        for k in eachindex(cones)
-            cone_k = cones[k]
-            # TODO use hess prod instead
-
-            lhs.blocks[b_idx + (Cones.use_dual(cone_k) ? 0 : 1)] = Cones.hess(cone_k)
-            b_idx += 2
-        end
-
         # TODO need preconditioner
         # TODO optimize for this case, including applying the blocks of the LHS
         # TODO pick which square non-symm method to use
@@ -189,26 +199,100 @@ function get_combined_directions(system_solver::NaiveSystemSolver{T}) where {T <
         dim = size(lhs, 2)
 
         rhs1 = view(rhs, :, 1)
-        IterativeSolvers.gmres!(system_solver.prevsol1, lhs, rhs1, restart = dim)
+        IterativeSolvers.gmres!(system_solver.prevsol1, block_lhs, rhs1, restart = dim)
         copyto!(rhs1, system_solver.prevsol1)
 
         rhs2 = view(rhs, :, 2)
-        IterativeSolvers.gmres!(system_solver.prevsol2, lhs, rhs2, restart = dim)
+        IterativeSolvers.gmres!(system_solver.prevsol2, block_lhs, rhs2, restart = dim)
         copyto!(rhs2, system_solver.prevsol2)
     else
         # update lhs matrix
         copyto!(lhs, system_solver.lhs_copy)
-        lhs[kap_row, end] = mu / tau / tau
+        lhs[kap_row, end] = mtt
         for k in eachindex(cones)
             copyto!(system_solver.lhs_H_k[k], Cones.hess(cones[k]))
         end
+
+        lhs_copy = copy(lhs)
+        rhs_copy = copy(rhs)
+
 
         if system_solver.use_sparse
             rhs .= lu(lhs) \ rhs
         else
             ldiv!(lu!(lhs), rhs)
         end
+
+        res = copy(rhs)
+        mul!(res, block_lhs, rhs)
+        @show norm(rhs_copy - res, Inf)
+
+        iden = Matrix(Diagonal(1.0I, size(lhs, 1)))
+        testlhs = similar(iden)
+        mul!(testlhs, block_lhs, iden)
+        @show norm(testlhs - lhs_copy, Inf)
+        println()
     end
 
     return (system_solver.x1, system_solver.x2, system_solver.y1, system_solver.y2, system_solver.z1, system_solver.z2, system_solver.s1, system_solver.s2, rhs[end, 1], rhs[end, 2], rhs[kap_row, 1], rhs[kap_row, 2])
 end
+
+
+function setup_block_lhs(solver)
+    model = solver.model
+    (n, p, q) = (model.n, model.p, model.q)
+
+    # block matrix for efficient multiplication
+    rc1 = 1:n
+    rc2 = n .+ (1:p)
+    rc3 = (n + p) .+ (1:q)
+    rc4 = (n + p + q) .+ (1:1)
+    rc5 = (n + p + q + 1) .+ (1:q)
+    dim = n + p + 2q + 2
+    rc6 = dim:dim
+
+    # TODO construct efficiently by preallocing the vectors
+    cone_rows = UnitRange{Int}[]
+    cone_cols = UnitRange{Int}[]
+    cone_blocks = Any[]
+    for k in eachindex(model.cones)
+        rows = (n + p) .+ model.cone_idxs[k]
+        push!(cone_rows, rows)
+        push!(cone_rows, rows)
+        push!(cone_cols, rows)
+        push!(cone_cols, (q + 1) .+ rows)
+        cone_k = model.cones[k]
+        if Cones.use_dual(cone_k)
+            push!(cone_blocks, cone_k)
+            push!(cone_blocks, I)
+        else
+            push!(cone_blocks, I)
+            push!(cone_blocks, cone_k)
+        end
+    end
+
+    block_lhs = BlockMatrix{T}(
+        dim,
+        dim,
+        [cone_blocks..., model.A', model.G', reshape(model.c, :, 1), -model.A, reshape(model.b, :, 1), ones(T, 1, 1), -model.G, -I, reshape(model.h, :, 1), -model.c', -model.b', -model.h', -ones(T, 1, 1), ones(T, 1, 1)],
+        [cone_rows..., rc1, rc1, rc1, rc2, rc2, rc4, rc5, rc5, rc5, rc6, rc6, rc6, rc6, rc4],
+        [cone_cols..., rc2, rc3, rc6, rc1, rc6, rc4, rc1, rc5, rc6, rc1, rc2, rc3, rc4, rc6],
+        )
+
+    return block_lhs
+end
+
+
+function calc_directions_residuals(x_pred, x_corr, y_pred, y_corr, z_pred, z_corr, s_pred, s_corr, tau_pred, tau_corr, kap_pred, kap_corr)
+
+
+
+end
+
+
+
+# TODO calc residuals of system
+# TODO do steps iter ref in same precision until not improving
+# TODO do gmres to polish solution until not improving
+
+# TODO implement directions residual function more efficiently than blockmatrix

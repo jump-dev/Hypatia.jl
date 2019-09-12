@@ -727,6 +727,12 @@ function step(solver::Solver{T}) where {T <: Real}
     return point
 end
 
+
+
+
+
+
+
 # backtracking line search to find large distance to step in direction while remaining inside cones and inside a given neighborhood
 function find_max_alpha_in_nbhd(
     z_dir::AbstractVector{T},

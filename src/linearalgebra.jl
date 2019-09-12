@@ -17,7 +17,6 @@ function set_min_diag!(A::Matrix{<:RealOrComplex{T}}, tol::T) where {T <: Real}
 end
 
 import LinearAlgebra.BlasReal
-import LinearAlgebra.BlasFloat
 import LinearAlgebra.HermOrSym
 
 hyp_AtA!(U::Matrix{T}, A::Matrix{T}) where {T <: BlasReal} = BLAS.syrk!('U', 'T', one(T), A, zero(T), U)
@@ -253,7 +252,7 @@ for (posvx, elty, rtyp) in (
             elseif 0 < c.info[] <= c.n
                 @warn("factorization failed: #$(c.info[])")
                 return false
-            elseif c.info[] == c.n
+            elseif c.info[] > c.n
                 @warn("condition number is small: $(c.rcond[])")
             end
             return true
@@ -348,7 +347,7 @@ for (sysvx, elty, rtyp) in (
             elseif 0 < c.info[] <= c.n
                 @warn("factorization failed: #$(c.info[])")
                 return false
-            elseif c.info[] == c.n
+            elseif c.info[] > c.n
                 @warn("condition number is small: $(c.rcond[])")
             end
             return true

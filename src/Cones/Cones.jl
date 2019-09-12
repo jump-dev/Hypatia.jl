@@ -97,6 +97,23 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Con
     return ldiv!(prod, cone.hess_fact, arr) # TODO could use sysvx with already computed factorization here, for improved numerics
 end
 
+
+
+# TODO experimental - if block is a Cone, then define mul as hessian product
+# TODO optimize... maybe need for each cone a 5-arg hess prod
+import LinearAlgebra.mul!
+
+function mul!(y::AbstractVecOrMat{T}, A::Cones.Cone{T}, x::AbstractVecOrMat{T}, alpha::Number, beta::Number) where {T <: Real}
+    # ytemp = rmul!(y, beta)
+    ytemp = y * beta
+    Cones.hess_prod!(y, x, A)
+    rmul!(y, alpha)
+    y .+= ytemp
+    return y
+end
+
+
+
 # utilities for converting between symmetric/Hermitian matrix and vector triangle forms
 
 function mat_U_to_vec_scaled!(vec::AbstractVector{T}, mat::AbstractMatrix{T}) where {T}
