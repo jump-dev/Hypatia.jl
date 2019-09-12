@@ -213,25 +213,85 @@ function get_combined_directions(system_solver::NaiveSystemSolver{T}) where {T <
             copyto!(system_solver.lhs_H_k[k], Cones.hess(cones[k]))
         end
 
-        lhs_copy = copy(lhs)
-        rhs_copy = copy(rhs)
+        # lhs_copy = copy(lhs)
+        # rhs_copy = copy(rhs)
+
+
+        # if system_solver.use_sparse
+        #     rhs .= lu(lhs) \ rhs
+        # else
+        #     ldiv!(lu!(lhs), rhs)
+        # end
 
 
         if system_solver.use_sparse
             rhs .= lu(lhs) \ rhs
         else
-            ldiv!(lu!(lhs), rhs)
+            rhs_fix = copy(rhs)
+            lhs_fix = copy(lhs)
+            F = lu!(lhs)
+            ldiv!(F, rhs)
+
+            resi = rhs_fix - lhs_fix * rhs
+            println("ldiv:  ", norm(resi, Inf), " ", norm(resi, 2))
+
+            nres = norm(resi, Inf)
+
+            # if nres > 100 * eps(T)
+            #     nresprev = nres
+            #     nitref = 5
+            #     for i in 1:nitref
+            #         ldiv!(F, resi)
+            #         # rhs_new = BigFloat.(rhs) + BigFloat.(resi)
+            #         rhs_new = rhs + resi
+            #         resi = rhs_fix - lhs_fix * rhs_new
+            #         nres = norm(resi, Inf)
+            #         if nres >= 0.8 * nresprev
+            #             if nres < nresprev
+            #                 rhs .= rhs_new
+            #             end
+            #             break
+            #         end
+            #         rhs .= rhs_new
+            #         nresprev = nres
+            #     end
+            #
+            #     resi = rhs_fix - lhs_fix * rhs
+            #     println("iref:  ", norm(resi, Inf), " ", norm(resi, 2))
+            # end
+
+            if nres > 100 * eps(T)
+                dim = size(lhs, 2)
+
+                rhs_fix1 = view(rhs_fix, :, 1)
+                rhs1 = view(rhs, :, 1)
+                IterativeSolvers.gauss_seidel!(rhs1, block_lhs, rhs_fix1)
+                # IterativeSolvers.gmres!(rhs1, block_lhs, rhs_fix1, restart = dim)
+                # copyto!(rhs1, system_solver.prevsol1)
+
+                rhs_fix2 = view(rhs_fix, :, 2)
+                rhs2 = view(rhs, :, 2)
+                IterativeSolvers.gauss_seidel!(rhs2, block_lhs, rhs_fix2)
+                # IterativeSolvers.gmres!(rhs2, block_lhs, rhs_fix2, restart = dim)
+                # copyto!(rhs2, system_solver.prevsol2)
+
+                resi = rhs_fix - lhs_fix * rhs
+                println("iterm: ", norm(resi, Inf), " ", norm(resi, 2))
+            end
         end
 
-        res = copy(rhs)
-        mul!(res, block_lhs, rhs)
-        @show norm(rhs_copy - res, Inf)
-
-        iden = Matrix(Diagonal(1.0I, size(lhs, 1)))
-        testlhs = similar(iden)
-        mul!(testlhs, block_lhs, iden)
-        @show norm(testlhs - lhs_copy, Inf)
         println()
+
+
+        # res = copy(rhs)
+        # mul!(res, block_lhs, rhs)
+        # @show norm(rhs_copy - res, Inf)
+        #
+        # iden = Matrix(Diagonal(1.0I, size(lhs, 1)))
+        # testlhs = similar(iden)
+        # mul!(testlhs, block_lhs, iden)
+        # @show norm(testlhs - lhs_copy, Inf)
+        # println()
     end
 
     return (system_solver.x1, system_solver.x2, system_solver.y1, system_solver.y2, system_solver.z1, system_solver.z2, system_solver.s1, system_solver.s2, rhs[end, 1], rhs[end, 2], rhs[kap_row, 1], rhs[kap_row, 2])

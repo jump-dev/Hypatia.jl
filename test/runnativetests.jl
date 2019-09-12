@@ -75,12 +75,12 @@ testfuns_raw = [
     hypoperlogdettri1,
     hypoperlogdettri2,
     hypoperlogdettri3,
-    primalinfeas1,
-    primalinfeas2,
-    primalinfeas3,
-    dualinfeas1,
-    dualinfeas2,
-    dualinfeas3,
+    # primalinfeas1,
+    # primalinfeas2,
+    # primalinfeas3,
+    # dualinfeas1,
+    # dualinfeas2,
+    # dualinfeas3,
     ]
 
 # @info("starting preprocessing tests")
@@ -88,11 +88,14 @@ testfuns_raw = [
 #     t(T, solver = SO.Solver{T}(verbose = true, system_solver = s{T}()))
 # end
 #
+
+tol = 1e-15
 @info("starting miscellaneous tests")
 @testset "miscellaneous tests: $t, $s, $n, $p, $T" for t in testfuns_raw, s in system_solvers, n in use_infty_nbhd, p in preprocess, T in real_types
     T == BigFloat && t == epinormspectral1 && continue # Cannot get svdvals with BigFloat
     !p && s == SO.QRCholSystemSolver && continue # Must use preprocessing if using QRCholSystemSolver
-    solver = SO.Solver{T}(verbose = false, preprocess = p, use_infty_nbhd = n, system_solver = s{T}())
+    solver = SO.Solver{T}(verbose = true, preprocess = p, use_infty_nbhd = n, system_solver = s{T}(),
+        tol_feas = tol, tol_rel_opt = tol, tol_abs_opt = tol)
     t(T, solver = solver)
 end
 
