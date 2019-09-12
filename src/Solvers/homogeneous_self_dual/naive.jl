@@ -14,6 +14,10 @@ kap + mu/(taubar^2)*tau = taurhs
 TODO optimize iterative method
 =#
 
+
+using IterativeRefinement
+
+
 mutable struct NaiveSystemSolver{T <: Real} <: SystemSolver{T}
     use_iterative::Bool
     use_sparse::Bool
@@ -216,46 +220,48 @@ function get_combined_directions(system_solver::NaiveSystemSolver{T}) where {T <
         else
             rhs_fix = copy(rhs)
             lhs_fix = copy(lhs)
+
             F = lu!(lhs)
             ldiv!(F, rhs)
-            resi = rhs_fix - lhs_fix * rhs
-            nres = norm(resi, Inf)
-            @show nres
-            if nres > 100 * eps(T)
-                nresprev = nres
-                nitref = 5
-                for i in 1:nitref
-                    ldiv!(F, resi)
-                    rhs_new = BigFloat.(rhs) + BigFloat.(resi)
-                    resi = rhs_fix - lhs_fix * rhs_new
-                    nres = norm(resi, Inf)
-                    if nres >= 0.8 * nresprev
-                        if nres < nresprev
-                            rhs .= rhs_new
-                            @show nres
-                        end
-                        @show i
-                        break
-                    end
-                    rhs .= rhs_new
-                    @show nres
-                    nresprev = nres
-                end
-            end
-            println()
+
+            resi = BigFloat.(rhs_fix) - BigFloat.(lhs_fix) * BigFloat.(rhs)
+            @show norm(resi, Inf), norm(resi, 2)
+
+            # if nres > 100 * eps(T)
+            #     nresprev = nres
+            #     nitref = 5
+            #     for i in 1:nitref
+            #         ldiv!(F, resi)
+            #         rhs_new = BigFloat.(rhs) + BigFloat.(resi)
+            #         resi = rhs_fix - lhs_fix * rhs_new
+            #         nres = norm(resi, Inf)
+            #         if nres >= 0.8 * nresprev
+            #             if nres < nresprev
+            #                 rhs .= rhs_new
+            #                 @show nres
+            #             end
+            #             @show i
+            #             break
+            #         end
+            #         rhs .= rhs_new
+            #         @show nres
+            #         nresprev = nres
+            #     end
+            # end
+            # println()
 
             # @show norm(lhs * rhs_2 - rhs, Inf)
 
-            # @time if !hyp_lu_xsolve!(system_solver.solvecache, system_solver.solvesol, lhs, rhs)
+            # @time if !hyp_lu_xsolve!(system_solver.solvecache, system_solver.solvesol, lhs_fix, rhs_fix)
             #     @warn("numerical failure: could not fix linear solve failure (mu is $mu)")
             # end
             # copyto!(rhs, system_solver.solvesol)
 
-            # @show norm(lhs * rhs_3 - rhs, Inf)
-            #
-            # println()
+            
+            resi = BigFloat.(rhs_fix) - BigFloat.(lhs_fix) * BigFloat.(rhs)
+            @show norm(resi, Inf), norm(resi, 2)
 
-            # rhs .= rhs_3
+            println()
         end
     end
 
