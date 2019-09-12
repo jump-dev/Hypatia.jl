@@ -14,6 +14,10 @@ kap + mu/(taubar^2)*tau = taurhs
 TODO optimize iterative method
 =#
 
+
+using IterativeRefinement
+
+
 mutable struct NaiveSystemSolver{T <: Real} <: SystemSolver{T}
     use_iterative::Bool
     use_sparse::Bool
@@ -229,13 +233,19 @@ function get_combined_directions(system_solver::NaiveSystemSolver{T}) where {T <
         else
             rhs_fix = copy(rhs)
             lhs_fix = copy(lhs)
+
             F = lu!(lhs)
             ldiv!(F, rhs)
 
-            resi = rhs_fix - lhs_fix * rhs
+            resi = BigFloat.(rhs_fix) - BigFloat.(lhs_fix) * BigFloat.(rhs)
             println("ldiv:  ", norm(resi, Inf), " ", norm(resi, 2))
 
-            nres = norm(resi, Inf)
+            x, bnorm, bcomp = rfldiv(lhs_fix, rhs_fix)
+            @show bnorm, bcomp
+            rhs .= x
+            resi = BigFloat.(rhs_fix) - BigFloat.(lhs_fix) * BigFloat.(rhs)
+            println("rfld:  ", norm(resi, Inf), " ", norm(resi, 2))
+
 
             # if nres > 100 * eps(T)
             #     nresprev = nres
@@ -260,24 +270,24 @@ function get_combined_directions(system_solver::NaiveSystemSolver{T}) where {T <
             #     println("iref:  ", norm(resi, Inf), " ", norm(resi, 2))
             # end
 
-            if nres > 100 * eps(T)
-                dim = size(lhs, 2)
-
-                rhs_fix1 = view(rhs_fix, :, 1)
-                rhs1 = view(rhs, :, 1)
-                IterativeSolvers.gauss_seidel!(rhs1, block_lhs, rhs_fix1)
-                # IterativeSolvers.gmres!(rhs1, block_lhs, rhs_fix1, restart = dim)
-                # copyto!(rhs1, system_solver.prevsol1)
-
-                rhs_fix2 = view(rhs_fix, :, 2)
-                rhs2 = view(rhs, :, 2)
-                IterativeSolvers.gauss_seidel!(rhs2, block_lhs, rhs_fix2)
-                # IterativeSolvers.gmres!(rhs2, block_lhs, rhs_fix2, restart = dim)
-                # copyto!(rhs2, system_solver.prevsol2)
-
-                resi = rhs_fix - lhs_fix * rhs
-                println("iterm: ", norm(resi, Inf), " ", norm(resi, 2))
-            end
+            # if nres > 100 * eps(T)
+            #     dim = size(lhs, 2)
+            #
+            #     rhs_fix1 = view(rhs_fix, :, 1)
+            #     rhs1 = view(rhs, :, 1)
+            #     IterativeSolvers.gauss_seidel!(rhs1, block_lhs, rhs_fix1)
+            #     # IterativeSolvers.gmres!(rhs1, block_lhs, rhs_fix1, restart = dim)
+            #     # copyto!(rhs1, system_solver.prevsol1)
+            #
+            #     rhs_fix2 = view(rhs_fix, :, 2)
+            #     rhs2 = view(rhs, :, 2)
+            #     IterativeSolvers.gauss_seidel!(rhs2, block_lhs, rhs_fix2)
+            #     # IterativeSolvers.gmres!(rhs2, block_lhs, rhs_fix2, restart = dim)
+            #     # copyto!(rhs2, system_solver.prevsol2)
+            #
+            #     resi = rhs_fix - lhs_fix * rhs
+            #     println("iterm: ", norm(resi, Inf), " ", norm(resi, 2))
+            # end
         end
 
         println()
