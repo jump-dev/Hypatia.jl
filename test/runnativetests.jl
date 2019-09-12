@@ -15,10 +15,10 @@ real_types = [
     ]
 
 system_solvers = [
-    SO.QRCholSystemSolver,
+    # SO.QRCholSystemSolver,
     # SO.SymIndefSystemSolver,
     # SO.NaiveElimSystemSolver,
-    # SO.NaiveSystemSolver,
+    SO.NaiveSystemSolver,
     ]
 
 use_infty_nbhd = [
@@ -93,7 +93,7 @@ testfuns_raw = [
     T == BigFloat && t == epinormspectral1 && continue # Cannot get svdvals with BigFloat
     !p && s == SO.QRCholSystemSolver && continue # Must use preprocessing if using QRCholSystemSolver
 
-    tol = 1e-12
+    tol = 1e-14
     solver = SO.Solver{T}(verbose = false, preprocess = p, use_infty_nbhd = n, system_solver = s{T}(),
         tol_feas = tol, tol_rel_opt = tol, tol_abs_opt = tol)
     t(T, solver = solver)
