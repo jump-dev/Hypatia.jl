@@ -319,7 +319,7 @@ function find_initial_point(solver::Solver{T}) where {T <: Real}
     point = solver.point
 
     # solve for x as least squares solution to Ax = b, Gx = h - s
-    if !iszero(n)
+    @timeit solver.timer "initx" if !iszero(n)
         rhs = vcat(model.b, model.h - point.s)
         if solver.init_use_iterative
             # use iterative solvers method TODO pick lsqr or lsmr
@@ -337,7 +337,7 @@ function find_initial_point(solver::Solver{T}) where {T <: Real}
                     error("sparse factorization for number type $T is not supported by SparseArrays, so Hypatia cannot find an initial point")
                 end
             end
-            AG_fact = issparse(AG) ? qr(AG) : qr!(AG)
+            @timeit solver.timer "lsqrAG" AG_fact = issparse(AG) ? qr(AG) : qr!(AG)
 
             AG_rank = get_rank_est(AG_fact, solver.init_tol_qr)
             if AG_rank < n
@@ -349,7 +349,7 @@ function find_initial_point(solver::Solver{T}) where {T <: Real}
     end
 
     # solve for y as least squares solution to A'y = -c - G'z
-    if !iszero(p)
+    @timeit solver.timer "inity" if !iszero(p)
         rhs = -model.c - G' * point.z
         if solver.init_use_iterative
             # use iterative solvers method TODO pick lsqr or lsmr
@@ -360,12 +360,12 @@ function find_initial_point(solver::Solver{T}) where {T <: Real}
                 # TODO alternative fallback is to convert sparse{T} to sparse{Float64} and do the sparse LU
                 if solver.init_use_fallback
                     @warn("using dense factorization of A' in initial point finding because sparse factorization for number type $T is not supported by SparseArrays")
-                    Ap_fact = qr!(Matrix(A'))
+                    @timeit solver.timer "lsqrAp" Ap_fact = qr!(Matrix(A'))
                 else
                     error("sparse factorization for number type $T is not supported by SparseArrays, so Hypatia cannot find an initial point")
                 end
             else
-                Ap_fact = issparse(A) ? qr(sparse(A')) : qr!(Matrix(A'))
+                @timeit solver.timer "lsqrAp" Ap_fact = issparse(A) ? qr(sparse(A')) : qr!(Matrix(A'))
             end
 
             Ap_rank = get_rank_est(Ap_fact, solver.init_tol_qr)
@@ -393,7 +393,7 @@ function preprocess_find_initial_point(solver::Solver{T}) where {T <: Real}
     point = solver.point
 
     # solve for x as least squares solution to Ax = b, Gx = h - s
-    if !iszero(n)
+    @timeit solver.timer "leastsqrx" if !iszero(n)
         # get pivoted QR # TODO when Julia has a unified QR interface, replace this
         AG = vcat(A, G)
         if issparse(AG) && !(T <: sparse_QR_reals)
@@ -404,7 +404,7 @@ function preprocess_find_initial_point(solver::Solver{T}) where {T <: Real}
                 error("sparse factorization for number type $T is not supported by SparseArrays, so Hypatia cannot preprocess and find an initial point")
             end
         end
-        AG_fact = issparse(AG) ? qr(AG, tol = solver.init_tol_qr) : qr(AG, Val(true))
+        @timeit solver.timer "qrAG" AG_fact = issparse(AG) ? qr(AG, tol = solver.init_tol_qr) : qr(AG, Val(true))
 
         AG_rank = get_rank_est(AG_fact, solver.init_tol_qr)
         if AG_rank == n
@@ -442,7 +442,7 @@ function preprocess_find_initial_point(solver::Solver{T}) where {T <: Real}
     end
 
     # solve for y as least squares solution to A'y = -c - G'z
-    if !iszero(p)
+    @timeit solver.timer "leastsqry" if !iszero(p)
         if issparse(A) && !(T <: sparse_QR_reals)
             if solver.init_use_fallback
                 @warn("using dense factorization of A' in preprocessing and initial point finding because sparse factorization for number type $T is not supported by SparseArrays")
@@ -451,7 +451,7 @@ function preprocess_find_initial_point(solver::Solver{T}) where {T <: Real}
                 error("sparse factorization for number type $T is not supported by SparseArrays, so Hypatia cannot preprocess and find an initial point")
             end
         else
-            Ap_fact = issparse(A) ? qr(sparse(A'), tol = solver.init_tol_qr) : qr(A', Val(true))
+            @timeit solver.timer "qrAp" Ap_fact = issparse(A) ? qr(sparse(A'), tol = solver.init_tol_qr) : qr(A', Val(true))
         end
 
         Ap_rank = get_rank_est(Ap_fact, solver.init_tol_qr)
