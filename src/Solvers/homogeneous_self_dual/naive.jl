@@ -135,11 +135,11 @@ function load(system_solver::NaiveSystemSolver{T}, solver::Solver{T}) where {T <
             return view(system_solver.lhs, rows, cols)
         end
         system_solver.lhs_H_k = [view_k(k) for k in eachindex(model.cones)]
-    end
 
-    if !system_solver.use_sparse
-        system_solver.solvesol = Matrix{T}(undef, size(system_solver.lhs, 1), 2)
-        system_solver.solvecache = HypLUSolveCache(system_solver.solvesol, system_solver.lhs, system_solver.rhs)
+        if !system_solver.use_sparse
+            system_solver.solvesol = Matrix{T}(undef, size(system_solver.lhs, 1), 2)
+            system_solver.solvecache = HypLUSolveCache(system_solver.solvesol, system_solver.lhs, system_solver.rhs)
+        end
     end
 
     return system_solver
