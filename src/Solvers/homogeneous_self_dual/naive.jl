@@ -106,7 +106,6 @@ function load(system_solver::NaiveSystemSolver{T}, solver::Solver{T}) where {T <
             [cone_rows..., rc1, rc1, rc1, rc2, rc2, rc4, rc5, rc5, rc5, rc6, rc6, rc6, rc6, rc4],
             [cone_cols..., rc2, rc3, rc6, rc1, rc6, rc4, rc1, rc5, rc6, rc1, rc2, rc3, rc4, rc6],
             )
-
     else
         if system_solver.use_sparse
             system_solver.lhs_copy = T[
@@ -140,7 +139,7 @@ function load(system_solver::NaiveSystemSolver{T}, solver::Solver{T}) where {T <
 
     if !system_solver.use_sparse
         system_solver.solvesol = Matrix{T}(undef, size(system_solver.lhs, 1), 2)
-        system_solver.solvecache = HypLUxSolveCache(system_solver.solvesol, system_solver.lhs, system_solver.rhs)
+        system_solver.solvecache = HypLUSolveCache(system_solver.solvesol, system_solver.lhs, system_solver.rhs)
     end
 
     return system_solver
@@ -183,7 +182,6 @@ function get_combined_directions(system_solver::NaiveSystemSolver{T}) where {T <
         for k in eachindex(cones)
             cone_k = cones[k]
             # TODO use hess prod instead
-
             lhs.blocks[b_idx + (Cones.use_dual(cone_k) ? 0 : 1)] = Cones.hess(cone_k)
             b_idx += 2
         end
@@ -214,49 +212,10 @@ function get_combined_directions(system_solver::NaiveSystemSolver{T}) where {T <
         if system_solver.use_sparse
             rhs .= lu(lhs) \ rhs
         else
-            rhs_fix = copy(rhs)
-            lhs_fix = copy(lhs)
-            rhsnorminf = norm(rhs, Inf) + 1
-            rhsnorm2 = norm(rhs, 2) + 1
-
-            F = lu!(lhs)
-            ldiv!(F, rhs)
-
-            resi = BigFloat.(rhs_fix) - BigFloat.(lhs_fix) * BigFloat.(rhs)
-            println(norm(resi, Inf)/rhsnorminf, "\t", norm(resi, 2)/rhsnorm2)
-
-            # if nres > 100 * eps(T)
-            #     nresprev = nres
-            #     nitref = 5
-            #     for i in 1:nitref
-            #         ldiv!(F, resi)
-            #         rhs_new = BigFloat.(rhs) + BigFloat.(resi)
-            #         resi = rhs_fix - lhs_fix * rhs_new
-            #         nres = norm(resi, Inf)
-            #         if nres >= 0.8 * nresprev
-            #             if nres < nresprev
-            #                 rhs .= rhs_new
-            #                 @show nres
-            #             end
-            #             @show i
-            #             break
-            #         end
-            #         rhs .= rhs_new
-            #         @show nres
-            #         nresprev = nres
-            #     end
-            # end
-            # println()
-
-            if !hyp_lu_xsolve!(system_solver.solvecache, system_solver.solvesol, lhs_fix, rhs_fix)
+            if !hyp_lu_solve!(system_solver.solvecache, system_solver.solvesol, lhs, rhs)
                 @warn("numerical failure: could not fix linear solve failure (mu is $mu)")
             end
             copyto!(rhs, system_solver.solvesol)
-
-            resi = BigFloat.(rhs_fix) - BigFloat.(lhs_fix) * BigFloat.(rhs)
-            println(norm(resi, Inf)/rhsnorminf, "\t", norm(resi, 2)/rhsnorm2)
-
-            # println()
         end
     end
 

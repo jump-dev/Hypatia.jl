@@ -49,6 +49,9 @@ mutable struct NaiveElimSystemSolver{T <: Real} <: SystemSolver{T}
     s1_k
     s2_k
 
+    solvesol
+    solvecache
+
     function NaiveElimSystemSolver{T}(; use_sparse::Bool = false) where {T <: Real}
         system_solver = new{T}()
         system_solver.use_sparse = use_sparse
@@ -100,6 +103,11 @@ function load(system_solver::NaiveElimSystemSolver{T}, solver::Solver{T}) where 
     system_solver.s2 = similar(rhs, q)
     system_solver.s1_k = [view(system_solver.s1, model.cone_idxs[k]) for k in eachindex(model.cones)]
     system_solver.s2_k = [view(system_solver.s2, model.cone_idxs[k]) for k in eachindex(model.cones)]
+
+    if !system_solver.use_sparse
+        system_solver.solvesol = Matrix{T}(undef, size(system_solver.lhs, 1), 2)
+        system_solver.solvecache = HypLUSolveCache(system_solver.solvesol, system_solver.lhs, system_solver.rhs)
+    end
 
     return system_solver
 end
@@ -153,13 +161,19 @@ function get_combined_directions(system_solver::NaiveElimSystemSolver{T}) where 
         cone_k = cones[k]
         idxs = model.cone_idxs[k]
         rows = (n + p) .+ idxs
-        H = Cones.hess(cone_k)
+        # TODO optimize by preallocing the views
         if Cones.use_dual(cone_k)
             # -G_k*x + mu*H_k*z_k + h_k*tau = zrhs_k + srhs_k
-            @views copyto!(lhs[rows, rows], H)
+            @views copyto!(lhs[rows, rows], Cones.hess(cone_k))
             @views copyto!(z1_k[k], solver.z_residual[idxs])
         else
             # -mu*H_k*G_k*x + z_k + mu*H_k*h_k*tau = mu*H_k*zrhs_k + srhs_k
+            # @views Cones.hess_prod!(lhs[rows, 1:n], model.G[idxs, :], cone_k)
+            # @. lhs[rows, 1:n] *= -1
+            # @views Cones.hess_prod!(lhs[rows, end], model.h[idxs], cone_k)
+            # @views Cones.hess_prod!(z1_k[k], solver.z_residual[idxs], cone_k)
+            # TODO remove old code below and use above
+            H = Cones.hess(cone_k)
             @views mul!(lhs[rows, 1:n], H, model.G[idxs, :], -one(T), false)
             @views mul!(lhs[rows, end], H, model.h[idxs])
             @views mul!(z1_k[k], H, solver.z_residual[idxs])
@@ -175,7 +189,10 @@ function get_combined_directions(system_solver::NaiveElimSystemSolver{T}) where 
     if system_solver.use_sparse
         rhs .= lu(lhs) \ rhs
     else
-        ldiv!(lu!(lhs), rhs)
+        if !hyp_lu_solve!(system_solver.solvecache, system_solver.solvesol, lhs, rhs)
+            @warn("numerical failure: could not fix linear solve failure (mu is $mu)")
+        end
+        copyto!(rhs, system_solver.solvesol)
     end
 
     # lift to get s and kap
