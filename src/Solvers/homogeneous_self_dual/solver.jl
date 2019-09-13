@@ -319,13 +319,13 @@ function find_initial_point(solver::Solver{T}) where {T <: Real}
     point = solver.point
 
     # solve for x as least squares solution to Ax = b, Gx = h - s
-    @timeit solver.timer "initx" if !iszero(n)
+    @timeit solver.timer "init_x" if !iszero(n)
         rhs = vcat(model.b, model.h - point.s)
         if solver.init_use_iterative
             # use iterative solvers method TODO pick lsqr or lsmr
             AG = BlockMatrix{T}(p + q, n, [A, G], [1:p, (p + 1):(p + q)], [1:n, 1:n])
             point.x = zeros(T, n)
-            IterativeSolvers.lsqr!(point.x, AG, rhs)
+            @timeit solver.timer "lsqr_solve" IterativeSolvers.lsqr!(point.x, AG, rhs)
         else
             AG = vcat(A, G)
             if issparse(AG) && !(T <: sparse_QR_reals)
@@ -337,35 +337,35 @@ function find_initial_point(solver::Solver{T}) where {T <: Real}
                     error("sparse factorization for number type $T is not supported by SparseArrays, so Hypatia cannot find an initial point")
                 end
             end
-            @timeit solver.timer "lsqrAG" AG_fact = issparse(AG) ? qr(AG) : qr!(AG)
+            @timeit solver.timer "qr_fact" AG_fact = issparse(AG) ? qr(AG) : qr!(AG)
 
             AG_rank = get_rank_est(AG_fact, solver.init_tol_qr)
             if AG_rank < n
                 @warn("some dual equalities appear to be dependent; try using preprocess = true")
             end
 
-            point.x = AG_fact \ rhs
+            @timeit solver.timer "qr_solve" point.x = AG_fact \ rhs
         end
     end
 
     # solve for y as least squares solution to A'y = -c - G'z
-    @timeit solver.timer "inity" if !iszero(p)
+    @timeit solver.timer "init_y" if !iszero(p)
         rhs = -model.c - G' * point.z
         if solver.init_use_iterative
             # use iterative solvers method TODO pick lsqr or lsmr
             point.y = zeros(T, p)
-            IterativeSolvers.lsqr!(point.y, A', rhs)
+            @timeit solver.timer "lsqr_solve" IterativeSolvers.lsqr!(point.y, A', rhs)
         else
             if issparse(A) && !(T <: sparse_QR_reals)
                 # TODO alternative fallback is to convert sparse{T} to sparse{Float64} and do the sparse LU
                 if solver.init_use_fallback
                     @warn("using dense factorization of A' in initial point finding because sparse factorization for number type $T is not supported by SparseArrays")
-                    @timeit solver.timer "lsqrAp" Ap_fact = qr!(Matrix(A'))
+                    @timeit solver.timer "qr_fact" Ap_fact = qr!(Matrix(A'))
                 else
                     error("sparse factorization for number type $T is not supported by SparseArrays, so Hypatia cannot find an initial point")
                 end
             else
-                @timeit solver.timer "lsqrAp" Ap_fact = issparse(A) ? qr(sparse(A')) : qr!(Matrix(A'))
+                @timeit solver.timer "qr_fact" Ap_fact = issparse(A) ? qr(sparse(A')) : qr!(Matrix(A'))
             end
 
             Ap_rank = get_rank_est(Ap_fact, solver.init_tol_qr)
@@ -373,7 +373,7 @@ function find_initial_point(solver::Solver{T}) where {T <: Real}
                 @warn("some primal equalities appear to be dependent; try using preprocess = true")
             end
 
-            point.y = Ap_fact \ rhs
+            @timeit solver.timer "qr_solve" point.y = Ap_fact \ rhs
         end
     end
 
@@ -393,7 +393,7 @@ function preprocess_find_initial_point(solver::Solver{T}) where {T <: Real}
     point = solver.point
 
     # solve for x as least squares solution to Ax = b, Gx = h - s
-    @timeit solver.timer "leastsqrx" if !iszero(n)
+    @timeit solver.timer "preproc_x" if !iszero(n)
         # get pivoted QR # TODO when Julia has a unified QR interface, replace this
         AG = vcat(A, G)
         if issparse(AG) && !(T <: sparse_QR_reals)
@@ -404,13 +404,13 @@ function preprocess_find_initial_point(solver::Solver{T}) where {T <: Real}
                 error("sparse factorization for number type $T is not supported by SparseArrays, so Hypatia cannot preprocess and find an initial point")
             end
         end
-        @timeit solver.timer "qrAG" AG_fact = issparse(AG) ? qr(AG, tol = solver.init_tol_qr) : qr(AG, Val(true))
+        @timeit solver.timer "qr_fact" AG_fact = issparse(AG) ? qr(AG, tol = solver.init_tol_qr) : qr(AG, Val(true))
 
         AG_rank = get_rank_est(AG_fact, solver.init_tol_qr)
         if AG_rank == n
             # no dual equalities to remove
             x_keep_idxs = 1:n
-            point.x = AG_fact \ vcat(b, orig_model.h - point.s)
+            @timeit solver.timer "qr_solve" point.x = AG_fact \ vcat(b, orig_model.h - point.s)
         else
             col_piv = (AG_fact isa QRPivoted{T, Matrix{T}}) ? AG_fact.p : AG_fact.pcol
             x_keep_idxs = col_piv[1:AG_rank]
@@ -418,7 +418,7 @@ function preprocess_find_initial_point(solver::Solver{T}) where {T <: Real}
 
             # TODO optimize all below
             c_sub = c[x_keep_idxs]
-            yz_sub = AG_fact.Q * (Matrix{T}(I, p + q, AG_rank) * (AG_R' \ c_sub))
+            @timeit solver.timer "residual" yz_sub = AG_fact.Q * (Matrix{T}(I, p + q, AG_rank) * (AG_R' \ c_sub))
             if !(AG_fact isa QRPivoted{T, Matrix{T}})
                 yz_sub = yz_sub[AG_fact.rpivinv]
             end
@@ -430,7 +430,7 @@ function preprocess_find_initial_point(solver::Solver{T}) where {T <: Real}
             end
             solver.verbose && println("removed $(n - AG_rank) out of $n dual equality constraints")
 
-            point.x = AG_R \ (Matrix{T}(I, AG_rank, p + q) * (AG_fact.Q' * vcat(b, orig_model.h - point.s)))
+            @timeit solver.timer "qr_solve" point.x = AG_R \ (Matrix{T}(I, AG_rank, p + q) * (AG_fact.Q' * vcat(b, orig_model.h - point.s)))
 
             c = c_sub
             A = A[:, x_keep_idxs]
@@ -442,16 +442,16 @@ function preprocess_find_initial_point(solver::Solver{T}) where {T <: Real}
     end
 
     # solve for y as least squares solution to A'y = -c - G'z
-    @timeit solver.timer "leastsqry" if !iszero(p)
+    @timeit solver.timer "preproc_y" if !iszero(p)
         if issparse(A) && !(T <: sparse_QR_reals)
             if solver.init_use_fallback
                 @warn("using dense factorization of A' in preprocessing and initial point finding because sparse factorization for number type $T is not supported by SparseArrays")
-                Ap_fact = qr!(Matrix(A'), Val(true))
+                @timeit solver.timer "qr_fact" Ap_fact = qr!(Matrix(A'), Val(true))
             else
                 error("sparse factorization for number type $T is not supported by SparseArrays, so Hypatia cannot preprocess and find an initial point")
             end
         else
-            @timeit solver.timer "qrAp" Ap_fact = issparse(A) ? qr(sparse(A'), tol = solver.init_tol_qr) : qr(A', Val(true))
+            @timeit solver.timer "qr_fact" Ap_fact = issparse(A) ? qr(sparse(A'), tol = solver.init_tol_qr) : qr(A', Val(true))
         end
 
         Ap_rank = get_rank_est(Ap_fact, solver.init_tol_qr)
@@ -465,7 +465,7 @@ function preprocess_find_initial_point(solver::Solver{T}) where {T <: Real}
         b_sub = b[y_keep_idxs]
         if Ap_rank < p
             # some dependent primal equalities, so check if they are consistent
-            x_sub = Ap_Q * (Matrix{T}(I, n, Ap_rank) * (Ap_R' \ b_sub))
+            @timeit solver.timer "residual" x_sub = Ap_Q * (Matrix{T}(I, n, Ap_rank) * (Ap_R' \ b_sub))
             if !(Ap_fact isa QRPivoted{T, Matrix{T}})
                 x_sub = x_sub[Ap_fact.rpivinv]
             end
@@ -477,7 +477,7 @@ function preprocess_find_initial_point(solver::Solver{T}) where {T <: Real}
             solver.verbose && println("removed $(p - Ap_rank) out of $p primal equality constraints")
         end
 
-        point.y = Ap_R \ (Matrix{T}(I, Ap_rank, n) * (Ap_fact.Q' *  (-c - G' * point.z)))
+        @timeit solver.timer "qr_solve" point.y = Ap_R \ (Matrix{T}(I, Ap_rank, n) * (Ap_fact.Q' *  (-c - G' * point.z)))
 
         if !(Ap_fact isa QRPivoted{T, Matrix{T}})
             row_piv = Ap_fact.prow
