@@ -15,20 +15,20 @@ real_types = [
     ]
 
 system_solvers = [
-    # SO.QRCholSystemSolver,
-    # SO.SymIndefSystemSolver,
+    SO.QRCholSystemSolver,
+    SO.SymIndefSystemSolver,
     SO.NaiveElimSystemSolver,
     SO.NaiveSystemSolver,
     ]
 
 use_infty_nbhd = [
     true,
-    # false,
+    false,
     ]
 
 preprocess = [
     true,
-    # false
+    false
     ]
 
 testfuns_preproc = [
@@ -83,28 +83,23 @@ testfuns_raw = [
     dualinfeas3,
     ]
 
-# @info("starting preprocessing tests")
-# @testset "preprocessing tests: $t, $s, $T" for t in testfuns_preproc, s in system_solvers, T in real_types
-#     t(T, solver = SO.Solver{T}(verbose = true, system_solver = s{T}()))
-# end
+@info("starting preprocessing tests")
+@testset "preprocessing tests: $t, $s, $T" for t in testfuns_preproc, s in system_solvers, T in real_types
+    t(T, solver = SO.Solver{T}(verbose = true, system_solver = s{T}()))
+end
 
 @info("starting miscellaneous tests")
 @testset "miscellaneous tests: $t, $s, $n, $p, $T" for t in testfuns_raw, s in system_solvers, n in use_infty_nbhd, p in preprocess, T in real_types
     T == BigFloat && t == epinormspectral1 && continue # Cannot get svdvals with BigFloat
     !p && s == SO.QRCholSystemSolver && continue # Must use preprocessing if using QRCholSystemSolver
-
-    # tol = 1e-14
-    # solver = SO.Solver{T}(verbose = true, preprocess = p, use_infty_nbhd = n, system_solver = s{T}(),
-    #     tol_feas = tol, tol_rel_opt = tol, tol_abs_opt = tol)
-
-    solver = SO.Solver{T}(verbose = true, preprocess = p, use_infty_nbhd = n, system_solver = s{T}())
+    solver = SO.Solver{T}(verbose = false, preprocess = p, use_infty_nbhd = n, system_solver = s{T}())
     t(T, solver = solver)
 end
 
-# @info("starting iterative system solver tests")
-# @testset "iterative system solver tests: $t, $T" for t in testfuns_raw, T in real_types
-#     T == BigFloat && continue # IterativeSolvers does not work with BigFloat
-#     solver = SO.Solver{T}(verbose = true, init_use_iterative = true, preprocess = false,
-#         system_solver = SO.NaiveSystemSolver{T}(use_iterative = true))
-#     t(T, solver = solver)
-# end
+@info("starting iterative system solver tests")
+@testset "iterative system solver tests: $t, $T" for t in testfuns_raw, T in real_types
+    T == BigFloat && continue # IterativeSolvers does not work with BigFloat
+    solver = SO.Solver{T}(verbose = true, init_use_iterative = true, preprocess = false,
+        system_solver = SO.NaiveSystemSolver{T}(use_iterative = true))
+    t(T, solver = solver)
+end

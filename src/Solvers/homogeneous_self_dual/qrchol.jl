@@ -145,8 +145,7 @@ function load(system_solver::QRCholSystemSolver{T}, solver::Solver{T}) where {T 
 
     if !system_solver.use_sparse
         system_solver.solvesol = Matrix{T}(undef, nmp, 3)
-        # system_solver.solvecache = HypBKSolveCache('U', system_solver.solvesol, system_solver.Q2GHGQ2, system_solver.Q2div, tol_diag = sqrt(eps(T)))
-        system_solver.solvecache = HypBKxSolveCache('U', system_solver.solvesol, system_solver.Q2GHGQ2, system_solver.Q2div)
+        system_solver.solvecache = HypBKSolveCache('U', system_solver.solvesol, system_solver.Q2GHGQ2, system_solver.Q2div)
     end
 
     return system_solver
@@ -270,11 +269,11 @@ function get_combined_directions(system_solver::QRCholSystemSolver{T}) where {T 
             end
             xi2 .= F \ Q2div # TODO eliminate allocs (see https://github.com/JuliaLang/julia/issues/30084)
         else
-            if !hyp_bk_xsolve!(system_solver.solvecache, system_solver.solvesol, Q2GHGQ2, Q2div)
+            if !hyp_bk_solve!(system_solver.solvecache, system_solver.solvesol, Q2GHGQ2, Q2div)
                 @warn("dense linear system matrix factorization failed")
-                mul!(Q2GHGQ2, GQ2', HGQ2)
-                Q2GHGQ2 += cbrt(eps(T)) * I
-                if !hyp_bk_xsolve!(system_solver.solvecache, system_solver.solvesol, Q2GHGQ2, Q2div)
+                mul!(Q2GHGQ2, GQ2', HGQ2) # TODO is this needed? not if bk doesn't destroy
+                set_min_diag!(Q2GHGQ2, cbrt(eps(T)))
+                if !hyp_bk_solve!(system_solver.solvecache, system_solver.solvesol, Q2GHGQ2, Q2div)
                     @warn("numerical failure: could not fix failure of positive definiteness (mu is $mu)")
                 end
             end

@@ -164,7 +164,7 @@ function get_combined_directions(system_solver::NaiveElimSystemSolver{T}) where 
         # TODO optimize by preallocing the views
         if Cones.use_dual(cone_k)
             # -G_k*x + mu*H_k*z_k + h_k*tau = zrhs_k + srhs_k
-            @views copyto!(lhs[rows, rows], Cones.hess(cone_k))
+            lhs[rows, rows] .= Cones.hess(cone_k)
             @views copyto!(z1_k[k], solver.z_residual[idxs])
         else
             # -mu*H_k*G_k*x + z_k + mu*H_k*h_k*tau = mu*H_k*zrhs_k + srhs_k
