@@ -44,6 +44,7 @@ mutable struct NaiveSparseSystemSolver{T <: Real} <: SystemSolver{T}
     s1
     s2
     kap_row::Int
+    kap_idx::Int
 
     function NaiveSparseSystemSolver{T}(; use_iterative::Bool = false, use_sparse::Bool = false) where {T <: Real}
         system_solver = new{T}()
@@ -87,10 +88,7 @@ function load(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) wher
         -model.c'       -model.b'       -model.h'             -one(T)       spzeros(T,1,q)         zero(T);
         ]
 
-    # hess_nnzs = sum(length(Cones.nonzero_pattern(cone_k)[1]) for cone_k in model.cones)
     hess_nnzs = sum(Cones.dimension(cone_k) + Cones.dimension(cone_k) ^ 2 for cone_k in model.cones)
-    # hess_nnzs = 2q
-
 
     total_nnz = 2 * (nnz(sparse(model.A)) + nnz(sparse(model.G)) + n + p + q + 1) + q + 1 + hess_nnzs
     Is = system_solver.Is = Vector{Int}(undef, total_nnz)
@@ -146,9 +144,8 @@ function load(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) wher
     offset = add_I_J_V(offset, rc1, rc6, model.c)
     offset = add_I_J_V(offset, rc2, rc1, -sparse(model.A))
     offset = add_I_J_V(offset, rc2, rc6, model.b)
-    # offset = add_I_J_V(offset, rc3, rc3, sparse(one(T) * I, q, q)) # TODO
-    # offset = add_I_J_V(offset, rc3, rc5, sparse(one(T) * I, q, q)) # TODO
     offset = add_I_J_V(offset, rc4, rc4, [one(T)])
+    system_solver.kap_idx = offset
     offset = add_I_J_V(offset, rc4, rc6, [one(T)])
     offset = add_I_J_V(offset, rc5, rc1, -sparse(model.G))
     offset = add_I_J_V(offset, rc5, rc5, -sparse(one(T) * I, q, q))
@@ -159,7 +156,6 @@ function load(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) wher
     offset = add_I_J_V(offset, rc6, rc4, -[one(T)])
 
     H_indices = [Vector{Int}(undef, Cones.dimension(cone_k)) for cone_k in model.cones]
-
     for (k, cone_k) in enumerate(model.cones)
         cone_dim = Cones.dimension(cone_k)
         H_indices[k] = offset:(offset + cone_dim ^ 2 - 1)
@@ -173,9 +169,6 @@ function load(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) wher
     end
 
     system_solver.lhs_copy = sparse(Is, Js, Vs)
-    # @show n, p, q
-    # @show Matrix(system_solver.lhs_copy - lhs_actual)
-
     system_solver.lhs = similar(system_solver.lhs_copy)
 
     view_k(k::Int) = view(system_solver.Vs, H_indices[k])
@@ -253,8 +246,9 @@ function get_combined_directions(system_solver::NaiveSparseSystemSolver{T}) wher
         for k in eachindex(cones)
             copyto!(system_solver.lhs_H_Vs[k], vec(Cones.hess(cones[k])))
         end
+        system_solver.Vs[system_solver.kap_idx] = mu / tau / tau
         lhs = sparse(system_solver.Is, system_solver.Js, system_solver.Vs)
-        lhs[kap_row, end] = mu / tau / tau
+        # lhs[kap_row, end] = mu / tau / tau
 
 
 
