@@ -79,14 +79,15 @@ function load(system_solver::SymIndefSystemSolver{T}, solver::Solver{T}) where {
             spzeros(T,n,n)  spzeros(T,n,p)  spzeros(T,n,q);
             model.A         spzeros(T,p,p)  spzeros(T,p,q);
             model.G         spzeros(T,q,p)  sparse(-one(T)*I,q,q);
-        ]
+            ]
+        dropzeros!(system_solver.lhs_copy)
         @assert issparse(system_solver.lhs_copy)
     else
         system_solver.lhs_copy = T[
             zeros(T,n,n)  zeros(T,n,p)  zeros(T,n,q);
             model.A       zeros(T,p,p)  zeros(T,p,q);
             model.G       zeros(T,q,p)  Matrix(-one(T)*I,q,q);
-        ]
+            ]
     end
 
     system_solver.lhs = similar(system_solver.lhs_copy)
