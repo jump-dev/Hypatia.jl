@@ -168,15 +168,10 @@ function get_combined_directions(system_solver::NaiveElimSystemSolver{T}) where 
             @views copyto!(z1_k[k], solver.z_residual[idxs])
         else
             # -mu*H_k*G_k*x + z_k + mu*H_k*h_k*tau = mu*H_k*zrhs_k + srhs_k
-            # @views Cones.hess_prod!(lhs[rows, 1:n], model.G[idxs, :], cone_k)
-            # @. lhs[rows, 1:n] *= -1
-            # @views Cones.hess_prod!(lhs[rows, end], model.h[idxs], cone_k)
-            # @views Cones.hess_prod!(z1_k[k], solver.z_residual[idxs], cone_k)
-            # TODO remove old code below and use above
-            H = Cones.hess(cone_k)
-            @views mul!(lhs[rows, 1:n], H, model.G[idxs, :], -one(T), false)
-            @views mul!(lhs[rows, end], H, model.h[idxs])
-            @views mul!(z1_k[k], H, solver.z_residual[idxs])
+            @views Cones.hess_prod!(lhs[rows, 1:n], model.G[idxs, :], cone_k)
+            @. lhs[rows, 1:n] *= -1
+            @views Cones.hess_prod!(lhs[rows, end], model.h[idxs], cone_k)
+            @views Cones.hess_prod!(z1_k[k], solver.z_residual[idxs], cone_k)
         end
     end
     z1 .+= s1
