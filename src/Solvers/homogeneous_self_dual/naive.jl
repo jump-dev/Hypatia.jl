@@ -57,23 +57,24 @@ function load(system_solver::NaiveSystemSolver{T}, solver::Solver{T}) where {T <
     (n, p, q) = (model.n, model.p, model.q)
     dim = n + p + 2q + 2
 
-    system_solver.rhs = zeros(T, dim, 2)
+    rhs = zeros(T, dim, 2)
+    system_solver.rhs = rhs
     rows = 1:n
-    system_solver.x1 = view(system_solver.rhs, rows, 1)
-    system_solver.x2 = view(system_solver.rhs, rows, 2)
+    system_solver.x1 = view(rhs, rows, 1)
+    system_solver.x2 = view(rhs, rows, 2)
     rows = (n + 1):(n + p)
-    system_solver.y1 = view(system_solver.rhs, rows, 1)
-    system_solver.y2 = view(system_solver.rhs, rows, 2)
+    system_solver.y1 = view(rhs, rows, 1)
+    system_solver.y2 = view(rhs, rows, 2)
     rows = (n + p + 1):(n + p + q)
-    system_solver.z1 = view(system_solver.rhs, rows, 1)
-    system_solver.z2 = view(system_solver.rhs, rows, 2)
+    system_solver.z1 = view(rhs, rows, 1)
+    system_solver.z2 = view(rhs, rows, 2)
     tau_row = n + p + q + 1
     system_solver.tau_row = tau_row
     rows = tau_row .+ (1:q)
-    system_solver.s1 = view(system_solver.rhs, rows, 1)
-    system_solver.s2 = view(system_solver.rhs, rows, 2)
-    system_solver.s1_k = [view(system_solver.rhs, tau_row .+ model.cone_idxs[k], 1) for k in eachindex(model.cones)]
-    system_solver.s2_k = [view(system_solver.rhs, tau_row .+ model.cone_idxs[k], 2) for k in eachindex(model.cones)]
+    system_solver.s1 = view(rhs, rows, 1)
+    system_solver.s2 = view(rhs, rows, 2)
+    system_solver.s1_k = [view(rhs, tau_row .+ model.cone_idxs[k], 1) for k in eachindex(model.cones)]
+    system_solver.s2_k = [view(rhs, tau_row .+ model.cone_idxs[k], 2) for k in eachindex(model.cones)]
 
     # x y z kap s tau
     if system_solver.use_iterative
@@ -120,7 +121,7 @@ function load(system_solver::NaiveSystemSolver{T}, solver::Solver{T}) where {T <
 
         if !system_solver.use_sparse
             system_solver.solvesol = Matrix{T}(undef, size(system_solver.lhs, 1), 2)
-            system_solver.solvecache = HypLUSolveCache(system_solver.solvesol, system_solver.lhs, system_solver.rhs)
+            system_solver.solvecache = HypLUSolveCache(system_solver.solvesol, system_solver.lhs, rhs)
         end
     end
 
@@ -134,26 +135,37 @@ function get_combined_directions(system_solver::NaiveSystemSolver{T}) where {T <
     lhs = system_solver.lhs
     rhs = system_solver.rhs
     tau_row = system_solver.tau_row
+    x1 = system_solver.x1
+    x2 = system_solver.x2
+    y1 = system_solver.y1
+    y2 = system_solver.y2
+    z1 = system_solver.z1
+    z2 = system_solver.z2
+    s1 = system_solver.s1
+    s2 = system_solver.s2
+    s1_k = system_solver.s1_k
+    s2_k = system_solver.s2_k
+
+    sqrtmu = sqrt(solver.mu)
+    mtt = solver.mu / solver.tau / solver.tau
 
     # update rhs matrix
-    system_solver.x1 .= solver.x_residual
-    system_solver.x2 .= zero(T)
-    system_solver.y1 .= solver.y_residual
-    system_solver.y2 .= zero(T)
-    system_solver.z1 .= solver.z_residual
-    system_solver.z2 .= zero(T)
+    x1 .= solver.x_residual
+    x2 .= zero(T)
+    y1 .= solver.y_residual
+    y2 .= zero(T)
+    z1 .= solver.z_residual
+    z2 .= zero(T)
     rhs[tau_row, 1] = solver.kap + solver.primal_obj_t - solver.dual_obj_t
     rhs[tau_row, 2] = zero(T)
-    sqrtmu = sqrt(solver.mu)
     for k in eachindex(cones)
         duals_k = solver.point.dual_views[k]
         grad_k = Cones.grad(cones[k])
-        @. system_solver.s1_k[k] = -duals_k
-        @. system_solver.s2_k[k] = -duals_k - grad_k * sqrtmu
+        @. s1_k[k] = -duals_k
+        @. s2_k[k] = -duals_k - grad_k * sqrtmu
     end
     rhs[end, 1] = -solver.kap
     rhs[end, 2] = -solver.kap + solver.mu / solver.tau
-    mtt = solver.mu / solver.tau / solver.tau
 
     # solve system
     if system_solver.use_iterative
@@ -190,7 +202,7 @@ function get_combined_directions(system_solver::NaiveSystemSolver{T}) where {T <
         end
     end
 
-    return (system_solver.x1, system_solver.x2, system_solver.y1, system_solver.y2, system_solver.z1, system_solver.z2, rhs[tau_row, 1], rhs[tau_row, 2], system_solver.s1, system_solver.s2, rhs[end, 1], rhs[end, 2])
+    return (x1, x2, y1, y2, z1, z2, rhs[tau_row, 1], rhs[tau_row, 2], s1, s2, rhs[end, 1], rhs[end, 2])
 end
 
 # block matrix for efficient multiplication
