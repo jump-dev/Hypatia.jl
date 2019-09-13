@@ -10,13 +10,13 @@ const SO = Hypatia.Solvers
 
 real_types = [
     Float64,
-    Float32,
-    BigFloat,
+    # Float32,
+    # BigFloat,
     ]
 
 system_solvers = [
-    # SO.QRCholSystemSolver,
-    # SO.SymIndefSystemSolver,
+    SO.QRCholSystemSolver,
+    SO.SymIndefSystemSolver,
     SO.NaiveElimSystemSolver,
     SO.NaiveSystemSolver,
     ]
@@ -27,8 +27,8 @@ use_infty_nbhd = [
     ]
 
 preprocess = [
-    # true,
-    false
+    true,
+    # false
     ]
 
 testfuns_preproc = [
@@ -83,10 +83,10 @@ testfuns_raw = [
     dualinfeas3,
     ]
 
-# @info("starting preprocessing tests")
-# @testset "preprocessing tests: $t, $s, $T" for t in testfuns_preproc, s in system_solvers, T in real_types
-#     t(T, solver = SO.Solver{T}(verbose = true, system_solver = s{T}()))
-# end
+@info("starting preprocessing tests")
+@testset "preprocessing tests: $t, $s, $T" for t in testfuns_preproc, s in system_solvers, T in real_types
+    t(T, solver = SO.Solver{T}(verbose = true, system_solver = s{T}()))
+end
 
 @info("starting miscellaneous tests")
 @testset "miscellaneous tests: $t, $s, $n, $p, $T" for t in testfuns_raw, s in system_solvers, n in use_infty_nbhd, p in preprocess, T in real_types

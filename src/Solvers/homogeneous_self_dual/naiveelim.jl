@@ -24,6 +24,13 @@ mu/(taubar^2)*tau + kap = kaprhs --> kap = kaprhs - mu/(taubar^2)*tau
 -->
 -c'x - b'y - h'z + mu/(taubar^2)*tau = taurhs + kaprhs
 
+4x4 nonsymmetric system in (x, y, z, tau):
+A'*y + G'*z + c*tau = xrhs
+-A*x + b*tau = yrhs
+(pr bar) -mu*H_k*G_k*x + z_k + mu*H_k*h_k*tau = mu*H_k*zrhs_k + srhs_k
+(du bar) -G_k*x + mu*H_k*z_k + h_k*tau = zrhs_k + srhs_k
+-c'x - b'y - h'z + mu/(taubar^2)*tau = taurhs + kaprhs
+
 TODO add iterative method
 =#
 
@@ -115,7 +122,6 @@ end
 function get_combined_directions(system_solver::NaiveElimSystemSolver{T}) where {T <: Real}
     solver = system_solver.solver
     model = solver.model
-    (n, p, q) = (model.n, model.p, model.q)
     cones = model.cones
     lhs = system_solver.lhs
     rhs = system_solver.rhs
@@ -158,7 +164,7 @@ function get_combined_directions(system_solver::NaiveElimSystemSolver{T}) where 
     for k in eachindex(cones)
         cone_k = cones[k]
         idxs_k = model.cone_idxs[k]
-        rows_k = (n + p) .+ idxs_k
+        rows_k = (model.n + model.p) .+ idxs_k
         # TODO optimize by preallocing the views
         if Cones.use_dual(cone_k)
             # -G_k*x + mu*H_k*z_k + h_k*tau = zrhs_k + srhs_k
@@ -166,8 +172,8 @@ function get_combined_directions(system_solver::NaiveElimSystemSolver{T}) where 
             @views copyto!(z1_k[k], solver.z_residual[idxs_k])
         else
             # -mu*H_k*G_k*x + z_k + mu*H_k*h_k*tau = mu*H_k*zrhs_k + srhs_k
-            @views Cones.hess_prod!(lhs[rows_k, 1:n], model.G[idxs_k, :], cone_k)
-            @. lhs[rows_k, 1:n] *= -1
+            @views Cones.hess_prod!(lhs[rows_k, 1:model.n], model.G[idxs_k, :], cone_k)
+            @. lhs[rows_k, 1:model.n] *= -1
             @views Cones.hess_prod!(lhs[rows_k, end], model.h[idxs_k], cone_k)
             @views Cones.hess_prod!(z1_k[k], solver.z_residual[idxs_k], cone_k)
         end
@@ -180,7 +186,7 @@ function get_combined_directions(system_solver::NaiveElimSystemSolver{T}) where 
         rhs .= lu(lhs) \ rhs
     else
         if !hyp_lu_solve!(system_solver.solvecache, system_solver.solvesol, lhs, rhs)
-            @warn("numerical failure: could not fix linear solve failure (mu is $mu)")
+            @warn("numerical failure: could not fix linear solve failure (mu is $(solver.mu))")
         end
         copyto!(rhs, system_solver.solvesol)
     end

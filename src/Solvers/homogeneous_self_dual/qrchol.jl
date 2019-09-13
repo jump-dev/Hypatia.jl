@@ -155,8 +155,6 @@ function get_combined_directions(system_solver::QRCholSystemSolver{T}) where {T 
     solver = system_solver.solver
     model = solver.model
     cones = model.cones
-    cone_idxs = model.cone_idxs
-    mu = solver.mu
 
     xi = system_solver.xi
     yi = system_solver.yi
@@ -204,14 +202,15 @@ function get_combined_directions(system_solver::QRCholSystemSolver{T}) where {T 
     HGxi_k = system_solver.HGxi_k
     Gxi_k = system_solver.Gxi_k
 
+    sqrtmu = sqrt(solver.mu)
+
+    # update rhs and lhs matrices
     @. x1 = -model.c
     @. x2 = solver.x_residual
     @. x3 = zero(T)
     @. y1 = model.b
     @. y2 = -solver.y_residual
     @. y3 = zero(T)
-
-    sqrtmu = sqrt(mu)
     @. z1_temp = model.h
     @. z2_temp = -solver.z_residual
     for k in eachindex(cones)
@@ -264,7 +263,7 @@ function get_combined_directions(system_solver::QRCholSystemSolver{T}) where {T 
                 mul!(Q2GHGQ2, GQ2', HGQ2)
                 F = ldlt(Symmetric(Q2GHGQ2), shift = cbrt(eps(T)), check = false)
                 if !issuccess(F)
-                    @warn("numerical failure: could not fix failure of positive definiteness (mu is $mu)")
+                    @warn("numerical failure: could not fix failure of positive definiteness (mu is $(solver.mu)")
                 end
             end
             xi2 .= F \ Q2div # TODO eliminate allocs (see https://github.com/JuliaLang/julia/issues/30084)
@@ -274,7 +273,7 @@ function get_combined_directions(system_solver::QRCholSystemSolver{T}) where {T 
                 mul!(Q2GHGQ2, GQ2', HGQ2) # TODO is this needed? not if bk doesn't destroy
                 set_min_diag!(Q2GHGQ2, cbrt(eps(T)))
                 if !hyp_bk_solve!(system_solver.solvecache, system_solver.solvesol, Q2GHGQ2, Q2div)
-                    @warn("numerical failure: could not fix failure of positive definiteness (mu is $mu)")
+                    @warn("numerical failure: could not fix failure of positive definiteness (mu is $(solver.mu))")
                 end
             end
             copyto!(xi2, system_solver.solvesol)
@@ -294,8 +293,9 @@ function get_combined_directions(system_solver::QRCholSystemSolver{T}) where {T 
         ldiv!(solver.Ap_R, yi)
     end
 
-    # lift to HSDE space
-    tau_denom = mu / solver.tau / solver.tau - dot(model.c, x1) - dot(model.b, y1) - dot(model.h, z1)
+    # lift to get tau, s, and kap
+    # TODO refactor - used by qrchol and symindef
+    tau_denom = solver.mu / solver.tau / solver.tau - dot(model.c, x1) - dot(model.b, y1) - dot(model.h, z1)
 
     function lift!(x, y, z, s, tau_rhs, kap_rhs)
         tau_sol = (tau_rhs + kap_rhs + dot(model.c, x) + dot(model.b, y) + dot(model.h, z)) / tau_denom
@@ -310,7 +310,7 @@ function get_combined_directions(system_solver::QRCholSystemSolver{T}) where {T 
 
     (tau_pred, kap_pred) = lift!(x2, y2, z2, z2_temp, solver.kap + solver.primal_obj_t - solver.dual_obj_t, -solver.kap)
     @. z2_temp -= solver.z_residual
-    (tau_corr, kap_corr) = lift!(x3, y3, z3, z3_temp, zero(T), -solver.kap + mu / solver.tau)
+    (tau_corr, kap_corr) = lift!(x3, y3, z3, z3_temp, zero(T), -solver.kap + solver.mu / solver.tau)
 
-    return (x2, x3, y2, y3, z2, z3, z2_temp, z3_temp, tau_pred, tau_corr, kap_pred, kap_corr)
+    return (x2, x3, y2, y3, z2, z3, tau_pred, tau_corr, z2_temp, z3_temp, kap_pred, kap_corr)
 end
