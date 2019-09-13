@@ -91,7 +91,7 @@ function load(system_solver::SymIndefSystemSolver{T}, solver::Solver{T}) where {
 
     system_solver.lhs = similar(system_solver.lhs_copy)
 
-    rhs = Matrix{T}(undef, npq, 3)
+    rhs = zeros(T, npq, 3)
     system_solver.rhs = rhs
     rows = 1:n
     system_solver.x1 = view(rhs, rows, 1)
@@ -111,7 +111,7 @@ function load(system_solver::SymIndefSystemSolver{T}, solver::Solver{T}) where {
     system_solver.z3_k = [view(rhs, z_start .+ model.cone_idxs[k], 3) for k in eachindex(model.cones)]
     if !system_solver.use_hess_inv
         system_solver.z_k = [Cones.use_dual(model.cones[k]) ? nothing : view(rhs, z_start .+ model.cone_idxs[k], :) for k in eachindex(model.cones)]
-        system_solver.zcopy_k = [Cones.use_dual(model.cones[k]) ? nothing : Matrix{T}(undef, length(system_solver.z1_k[k]), 3) for k in eachindex(model.cones)]
+        system_solver.zcopy_k = [Cones.use_dual(model.cones[k]) ? nothing : zeros(T, length(system_solver.z1_k[k]), 3) for k in eachindex(model.cones)]
     end
     system_solver.s1 = similar(rhs, q)
     system_solver.s2 = similar(rhs, q)
