@@ -3,6 +3,7 @@ Copyright 2018, Chris Coey and contributors
 
 naive linear system solver
 
+6x6 nonsymmetric system in (x, y, z, tau, s, kap):
 A'*y + G'*z + c*tau = xrhs
 -A*x + b*tau = yrhs
 -G*x + h*tau - s = zrhs
@@ -196,7 +197,7 @@ function get_combined_directions(system_solver::NaiveSystemSolver{T}) where {T <
             rhs .= lu(lhs) \ rhs
         else
             if !hyp_lu_solve!(system_solver.solvecache, system_solver.solvesol, lhs, rhs)
-                @warn("numerical failure: could not fix linear solve failure (mu is $mu)")
+                @warn("numerical failure: could not fix linear solve failure (mu is $(solver.mu))")
             end
             copyto!(rhs, system_solver.solvesol)
         end
