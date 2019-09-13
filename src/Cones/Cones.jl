@@ -39,6 +39,7 @@ use_dual(cone::Cone) = cone.use_dual
 load_point(cone::Cone, point::AbstractVector{T}, scal::T) where {T} = (@. cone.point = point / scal)
 load_point(cone::Cone, point::AbstractVector) = copyto!(cone.point, point)
 dimension(cone::Cone) = cone.dim
+nonzero_pattern(cone::Cone) = (repeat(1:cone.dim, cone.dim), [fill(i, cone.dim) for i in 1:cone.dim])
 
 is_feas(cone::Cone) = (cone.feas_updated ? cone.is_feas : update_feas(cone))
 grad(cone::Cone) = (cone.grad_updated ? cone.grad : update_grad(cone))
