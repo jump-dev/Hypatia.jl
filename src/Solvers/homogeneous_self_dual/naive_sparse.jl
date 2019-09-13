@@ -25,6 +25,8 @@ mutable struct NaiveSparseSystemSolver{T <: Real} <: SystemSolver{T}
     lhs_H_Vs
     H_start::Int
     Hinv_start::Int
+    Is::Vector{Int}
+    Js::Vector{Int}
     Vs::Vector{T}
 
     rhs::Matrix{T}
@@ -91,8 +93,8 @@ function load(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) wher
 
 
     total_nnz = 2 * (nnz(sparse(model.A)) + nnz(sparse(model.G)) + n + p + q + 1) + q + 1 + hess_nnzs
-    Is = Vector{Int}(undef, total_nnz)
-    Js = Vector{Int}(undef, total_nnz)
+    Is = system_solver.Is = Vector{Int}(undef, total_nnz)
+    Js = system_solver.Js = Vector{Int}(undef, total_nnz)
     Vs = system_solver.Vs = Vector{T}(undef, total_nnz)
 
     function add_I_J_V(k, start_row, start_col, vec::Vector{T})
@@ -160,13 +162,13 @@ function load(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) wher
 
     for (k, cone_k) in enumerate(model.cones)
         cone_dim = Cones.dimension(cone_k)
-        H_indices[k] = (offset + 1):(offset + cone_dim ^ 2)
+        H_indices[k] = offset:(offset + cone_dim ^ 2 - 1)
         if Cones.use_dual(cone_k)
             offset = add_I_J_V(offset, rc3, rc3, sparse(ones(T, cone_dim, cone_dim)))
             offset = add_I_J_V(offset, rc3, rc5, sparse(one(T) * I, cone_dim, cone_dim))
         else
-            offset = add_I_J_V(offset, rc3, rc3, sparse(one(T) * I, cone_dim, cone_dim))
             offset = add_I_J_V(offset, rc3, rc5, sparse(ones(T, cone_dim, cone_dim)))
+            offset = add_I_J_V(offset, rc3, rc3, sparse(one(T) * I, cone_dim, cone_dim))
         end
     end
 
@@ -176,15 +178,15 @@ function load(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) wher
 
     system_solver.lhs = similar(system_solver.lhs_copy)
 
-    # view_k(k::Int) = view(system_solver.Vs, H_indices[k])
-    # system_solver.lhs_H_Vs = [view_k(k) for k in eachindex(model.cones)]
+    view_k(k::Int) = view(system_solver.Vs, H_indices[k])
+    system_solver.lhs_H_Vs = [view_k(k) for k in eachindex(model.cones)]
 
-    function view_k(k::Int)
-        rows = (n + p) .+ model.cone_idxs[k]
-        cols = Cones.use_dual(model.cones[k]) ? rows : (q + 1) .+ rows
-        return view(system_solver.lhs, rows, cols)
-    end
-    system_solver.lhs_H_k = [view_k(k) for k in eachindex(model.cones)]
+    # function view_k(k::Int)
+    #     rows = (n + p) .+ model.cone_idxs[k]
+    #     cols = Cones.use_dual(model.cones[k]) ? rows : (q + 1) .+ rows
+    #     return view(system_solver.lhs, rows, cols)
+    # end
+    # system_solver.lhs_H_k = [view_k(k) for k in eachindex(model.cones)]
 
     return system_solver
 end
@@ -231,12 +233,6 @@ function get_combined_directions(system_solver::NaiveSparseSystemSolver{T}) wher
             b_idx += 2
         end
 
-        # TODO need preconditioner
-        # TODO optimize for this case, including applying the blocks of the LHS
-        # TODO pick which square non-symm method to use
-        # TODO prealloc whatever is needed inside the solver
-        # TODO possibly fix IterativeSolvers so that methods can take matrix RHS, however the two columns may take different number of iters needed to converge
-
         dim = size(lhs, 2)
 
         rhs1 = view(rhs, :, 1)
@@ -248,17 +244,17 @@ function get_combined_directions(system_solver::NaiveSparseSystemSolver{T}) wher
         copyto!(rhs2, system_solver.prevsol2)
     else
         # update lhs matrix
-        copyto!(lhs, system_solver.lhs_copy)
-        lhs[kap_row, end] = mu / tau / tau
-        for k in eachindex(cones)
-            copyto!(system_solver.lhs_H_k[k], Cones.hess(cones[k]))
-        end
-
-        # for k in eachindex(cones)
-        #     copyto!(system_solver.lhs_H_Vs[k], vec(Cones.hess(cones[k])))
-        # end
         # copyto!(lhs, system_solver.lhs_copy)
         # lhs[kap_row, end] = mu / tau / tau
+        # for k in eachindex(cones)
+        #     copyto!(system_solver.lhs_H_k[k], Cones.hess(cones[k]))
+        # end
+
+        for k in eachindex(cones)
+            copyto!(system_solver.lhs_H_Vs[k], vec(Cones.hess(cones[k])))
+        end
+        lhs = sparse(system_solver.Is, system_solver.Js, system_solver.Vs)
+        lhs[kap_row, end] = mu / tau / tau
 
 
 
