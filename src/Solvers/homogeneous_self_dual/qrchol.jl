@@ -234,7 +234,7 @@ function get_combined_directions(system_solver::QRCholSystemSolver{T}) where {T 
 
     if !iszero(size(Q2div, 1))
         # TODO use third column is zero
-        mul!(GQ1x, GQ1, yi)
+        @views mul!(GQ1x, GQ1, yi)
         block_hessian_product!(cones, HGQ1x_k, GQ1x_k)
         mul!(Q2div, GQ2', HGQ1x, -one(T), true)
 
