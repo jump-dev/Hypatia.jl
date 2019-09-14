@@ -30,7 +30,6 @@ mutable struct QRCholSystemSolver{T <: Real} <: SystemSolver{T}
     z1_k
     z2_k
     z3_k
-    zi_temp
     z1_temp
     z2_temp
     z3_temp
@@ -39,6 +38,7 @@ mutable struct QRCholSystemSolver{T <: Real} <: SystemSolver{T}
     z2_temp_k
     z3_temp_k
 
+    Rpib
     GQ1
     GQ2
     QpbxGHbz
@@ -97,7 +97,6 @@ function load(system_solver::QRCholSystemSolver{T}, solver::Solver{T}) where {T 
     system_solver.z2_k = [view(zi, idxs, 2) for idxs in model.cone_idxs]
     system_solver.z3_k = [view(zi, idxs, 3) for idxs in model.cone_idxs]
     zi_temp = similar(zi)
-    system_solver.zi_temp = zi_temp
     system_solver.z1_temp = view(zi_temp, :, 1)
     system_solver.z2_temp = view(zi_temp, :, 2)
     system_solver.z3_temp = view(zi_temp, :, 3)
@@ -108,6 +107,7 @@ function load(system_solver::QRCholSystemSolver{T}, solver::Solver{T}) where {T 
 
     nmp = n - p
 
+    system_solver.Rpib = solver.Ap_R' * model.b
     if !isa(model.G, Matrix{T}) && isa(solver.Ap_Q, SuiteSparse.SPQR.QRSparseQ)
         # TODO very inefficient method used for sparse G * QRSparseQ : see https://github.com/JuliaLang/julia/issues/31124#issuecomment-501540818
         # TODO remove workaround and warning
@@ -155,7 +155,6 @@ function get_combined_directions(system_solver::QRCholSystemSolver{T}) where {T 
     solver = system_solver.solver
     model = solver.model
     cones = model.cones
-
     xi = system_solver.xi
     yi = system_solver.yi
     zi = system_solver.zi
@@ -174,7 +173,6 @@ function get_combined_directions(system_solver::QRCholSystemSolver{T}) where {T 
     z1_k = system_solver.z1_k
     z2_k = system_solver.z2_k
     z3_k = system_solver.z3_k
-    zi_temp = system_solver.zi_temp
     z1_temp = system_solver.z1_temp
     z2_temp = system_solver.z2_temp
     z3_temp = system_solver.z3_temp
@@ -182,7 +180,6 @@ function get_combined_directions(system_solver::QRCholSystemSolver{T}) where {T 
     z1_temp_k = system_solver.z1_temp_k
     z2_temp_k = system_solver.z2_temp_k
     z3_temp_k = system_solver.z3_temp_k
-
     GQ1 = system_solver.GQ1
     GQ2 = system_solver.GQ2
     QpbxGHbz = system_solver.QpbxGHbz
@@ -194,7 +191,6 @@ function get_combined_directions(system_solver::QRCholSystemSolver{T}) where {T 
     Q2GHGQ2 = system_solver.Q2GHGQ2
     Gxi = system_solver.Gxi
     HGxi = system_solver.HGxi
-
     HGQ1x_k = system_solver.HGQ1x_k
     GQ1x_k = system_solver.GQ1x_k
     HGQ2_k = system_solver.HGQ2_k
@@ -204,21 +200,14 @@ function get_combined_directions(system_solver::QRCholSystemSolver{T}) where {T 
 
     sqrtmu = sqrt(solver.mu)
 
-    # update rhs and lhs matrices
-    @. x1 = -model.c
-    @. x2 = solver.x_residual
-    @. x3 = zero(T)
-    @. y1 = model.b
-    @. y2 = -solver.y_residual
-    @. y3 = zero(T)
+    # solve 3x3 system
     @. z1_temp = model.h
     @. z2_temp = -solver.z_residual
-    for k in eachindex(cones)
-        cone_k = cones[k]
+    for (k, cone_k) in enumerate(cones)
         duals_k = solver.point.dual_views[k]
         grad_k = Cones.grad(cone_k)
         if Cones.use_dual(cone_k)
-            @. z2_temp_k[k] = duals_k + z2_temp_k[k]
+            @. z2_temp_k[k] += duals_k
             @. z3_temp_k[k] = duals_k + grad_k * sqrtmu
             Cones.inv_hess_prod!(z_k[k], z_temp_k[k], cone_k)
         else
@@ -229,35 +218,31 @@ function get_combined_directions(system_solver::QRCholSystemSolver{T}) where {T 
         end
     end
 
-    function block_hessian_product!(prod_k, arr_k)
-        for k in eachindex(cones)
-            cone_k = cones[k]
-            if Cones.use_dual(cone_k)
-                Cones.inv_hess_prod!(prod_k[k], arr_k[k], cone_k)
-            else
-                Cones.hess_prod!(prod_k[k], arr_k[k], cone_k)
-            end
-        end
-    end
+    @. y1 = system_solver.Rpib
+    @. y2 = -solver.y_residual
+    ldiv!(solver.Ap_R', y2)
+    @. y3 = zero(T)
 
-    ldiv!(solver.Ap_R', yi)
-
-    copyto!(QpbxGHbz, xi)
+    @. QpbxGHbz[:, 1] = -model.c
+    @. QpbxGHbz[:, 2] = solver.x_residual
+    @. QpbxGHbz[:, 3] = zero(T)
     mul!(QpbxGHbz, model.G', zi, true, true)
     lmul!(solver.Ap_Q', QpbxGHbz)
 
+    # TODO use first col constant and third column zero
     copyto!(xi1, yi)
 
     if !iszero(size(Q2div, 1))
+        # TODO use third column is zero
         mul!(GQ1x, GQ1, yi)
-        block_hessian_product!(HGQ1x_k, GQ1x_k)
+        block_hessian_product!(cones, HGQ1x_k, GQ1x_k)
         mul!(Q2div, GQ2', HGQ1x, -one(T), true)
 
-        block_hessian_product!(HGQ2_k, GQ2_k)
+        block_hessian_product!(cones, HGQ2_k, GQ2_k)
         mul!(Q2GHGQ2, GQ2', HGQ2)
 
         if system_solver.use_sparse
-            F = ldlt(Symmetric(Q2GHGQ2), check = false) # TODO not implemented for generic reals
+            F = ldlt(Symmetric(Q2GHGQ2), check = false)
             if !issuccess(F)
                 @warn("sparse linear system matrix factorization failed")
                 mul!(Q2GHGQ2, GQ2', HGQ2)
@@ -280,17 +265,17 @@ function get_combined_directions(system_solver::QRCholSystemSolver{T}) where {T 
         end
     end
 
-    lmul!(solver.Ap_Q, xi)
+    lmul!(solver.Ap_Q, xi) # x finished
 
     mul!(Gxi, model.G, xi)
-    block_hessian_product!(HGxi_k, Gxi_k)
+    block_hessian_product!(cones, HGxi_k, Gxi_k)
 
-    @. zi = HGxi - zi
+    @. zi = HGxi - zi # z finished
 
     if !iszero(length(yi))
         copyto!(yi, Q1pbxGHbz)
         mul!(yi, GQ1', HGxi, -one(T), true)
-        ldiv!(solver.Ap_R, yi)
+        ldiv!(solver.Ap_R, yi) # y finished
     end
 
     # lift to get tau, s, and kap
@@ -313,4 +298,14 @@ function get_combined_directions(system_solver::QRCholSystemSolver{T}) where {T 
     (tau_corr, kap_corr) = lift!(x3, y3, z3, z3_temp, zero(T), -solver.kap + solver.mu / solver.tau)
 
     return (x2, x3, y2, y3, z2, z3, tau_pred, tau_corr, z2_temp, z3_temp, kap_pred, kap_corr)
+end
+
+function block_hessian_product!(cones, prod_k, arr_k)
+    for (k, cone_k) in enumerate(cones)
+        if Cones.use_dual(cone_k)
+            Cones.inv_hess_prod!(prod_k[k], arr_k[k], cone_k)
+        else
+            Cones.hess_prod!(prod_k[k], arr_k[k], cone_k)
+        end
+    end
 end
