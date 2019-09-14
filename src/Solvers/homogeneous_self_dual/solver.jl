@@ -668,7 +668,7 @@ function step(solver::Solver{T}) where {T <: Real}
     point = solver.point
 
     # calculate affine/prediction and correction directions
-    @timeit solver.timer "directions" (x_pred, x_corr, y_pred, y_corr, z_pred, z_corr, s_pred, s_corr, tau_pred, tau_corr, kap_pred, kap_corr) = get_combined_directions(solver.system_solver)
+    @timeit solver.timer "directions" (x_pred, x_corr, y_pred, y_corr, z_pred, z_corr, tau_pred, tau_corr, s_pred, s_corr, kap_pred, kap_corr) = get_combined_directions(solver.system_solver)
 
     # calculate correction factor gamma by finding distance aff_alpha for stepping in affine direction
     # TODO try setting nbhd to T(Inf) and avoiding the neighborhood checks - requires tuning
