@@ -15,7 +15,43 @@ mu/(taubar^2)*tau + kap = kaprhs
 TODO not sure lhs_copy is needed
 =#
 
-using Pardiso
+import Pardiso
+
+struct DefaultSparseSolver end
+SparseSystemSolver = Union{DefaultSparseSolver, Pardiso.PardisoSolver}
+
+function analyze_sparse_system(ps::Pardiso.PardisoSolver, lhs::SparseMatrixCSC, rhs::Matrix)
+    Pardiso.pardisoinit(ps)
+    Pardiso.set_iparm!(ps, 1, 1)
+    Pardiso.set_iparm!(ps, 12, 1)
+    # Pardiso.set_iparm!(ps, 6, 1)
+    Pardiso.set_phase!(ps, Pardiso.ANALYSIS)
+    Pardiso.pardiso(ps, lhs, rhs)
+    return
+end
+analyze_sparse_system(::DefaultSparseSolver, ::SparseMatrixCSC, ::Matrix) = nothing
+
+function solve_sparse_system(ps::Pardiso.PardisoSolver, lhs::SparseMatrixCSC, rhs::Matrix)
+    # if Pardiso.get_phase(ps) == Pardiso.ANALYSIS_NUM_FACT_SOLVE_REFINE
+        analyze_sparse_system(ps, lhs, rhs)
+    # end
+    sol = copy(rhs)
+    Pardiso.set_phase!(ps, Pardiso.NUM_FACT_SOLVE_REFINE)
+    Pardiso.pardiso(ps, sol, lhs, rhs)
+    @show norm(rhs - lhs * sol)
+    rhs .= sol
+    return sol
+end
+
+solve_sparse_system(ps::DefaultSparseSolver, lhs::SparseMatrixCSC, rhs::Matrix) = rhs .= lu(lhs) \ rhs
+
+function free_sparse_solver_memory(ps::Pardiso.PardisoSolver)
+    Pardiso.set_phase!(ps, Pardiso.RELEASE_ALL)
+    Pardiso.pardiso(ps, sol, lhs, rhs)
+    return
+end
+free_sparse_solver_memory(::DefaultSparseSolver) = nothing
+free_sparse_solver_memory(s::SystemSolver) = free_sparse_solver_memory(s.sparse_solver)
 
 mutable struct NaiveSparseSystemSolver{T <: Real} <: SystemSolver{T}
     use_iterative::Bool
@@ -47,6 +83,7 @@ mutable struct NaiveSparseSystemSolver{T <: Real} <: SystemSolver{T}
     Is::Vector{Int}
     Js::Vector{Int}
     Vs::Vector{T}
+    sparse_solver::SparseSystemSolver
 
     rhs::Matrix{T}
     prevsol1::Vector{T}
@@ -55,10 +92,15 @@ mutable struct NaiveSparseSystemSolver{T <: Real} <: SystemSolver{T}
     solvesol
     solvecache
 
-    function NaiveSparseSystemSolver{T}(; use_iterative::Bool = false, use_sparse::Bool = false) where {T <: Real}
+    function NaiveSparseSystemSolver{T}(;
+            use_iterative::Bool = false,
+            use_sparse::Bool = false,
+            sparse_solver = Pardiso.PardisoSolver(),
+            ) where {T <: Real}
         system_solver = new{T}()
         system_solver.use_iterative = use_iterative
         system_solver.use_sparse = use_sparse
+        system_solver.sparse_solver = sparse_solver
         return system_solver
     end
 end
@@ -120,6 +162,16 @@ function load(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) wher
         end
         return k
     end
+
+    # function add_I_J_V(k, start_row, start_col, vec::Vector{T})
+    #     n = length(vec)
+    #     if !isempty(vec)
+    #         Is[k:(k + n - 1)] .= (start_row + 1):(start_row + n)
+    #         Js[k:(k + n - 1)] .= start_col + 1
+    #         Vs[k:(k + n - 1)] .= vec
+    #     end
+    #     return k + n
+    # end
 
     function add_I_J_V(k, start_row, start_col, vec::Adjoint{T, Array{T, 1}})
         if !isempty(vec)
@@ -206,7 +258,6 @@ function load(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) wher
     view_k2(k::Int) = view(system_solver.Vs, H_indices[k])
     system_solver.lhs_H_Vs = [view_k2(k) for k in eachindex(model.cones)]
 
-
     return system_solver
 end
 
@@ -265,10 +316,12 @@ function get_combined_directions(system_solver::NaiveSparseSystemSolver{T}) wher
     system_solver.Vs[system_solver.tau_idx] = mtt
     lhs = sparse(system_solver.Is, system_solver.Js, system_solver.Vs)
 
-    ps = PardisoSolver()
+    # ps = PardisoSolver()
     # rhs .= Pardiso.solve(ps, lhs, rhs)
 
-    rhs .= lu(lhs_actual) \ rhs
+    # rhs .= lu(lhs_actual) \ rhs
+    sol = copy(rhs)
+    solve_sparse_system(system_solver.sparse_solver, lhs, rhs)
 
     return (x1, x2, y1, y2, z1, z2, rhs[tau_row, 1], rhs[tau_row, 2], s1, s2, rhs[end, 1], rhs[end, 2])
 end

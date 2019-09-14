@@ -89,7 +89,7 @@ testfuns_raw = [
 #     t(T, solver = SO.Solver{T}(verbose = true, system_solver = s{T}()))
 # end
 
-tol = 1e-12
+tol = 1e-8
 
 @info("starting miscellaneous tests")
 @testset "miscellaneous tests: $t, $s, $n, $p, $T" for t in testfuns_raw, s in system_solvers, n in use_infty_nbhd, p in preprocess, T in real_types
