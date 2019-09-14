@@ -17,6 +17,7 @@ import Hypatia.hyp_chol!
 import Hypatia.hyp_chol_inv!
 import Hypatia.HypBKCache
 import Hypatia.hyp_bk!
+import Hypatia.set_min_diag!
 
 abstract type Cone{T <: Real} end
 
@@ -58,13 +59,13 @@ function update_inv_hess_prod(cone::Cone{T}) where {T}
     end
     copyto!(cone.tmp_hess, cone.hess)
     if isnothing(cone.hess_fact_cache)
-        cone.hess_fact_cache = HypBKCache(cone.tmp_hess.uplo, cone.tmp_hess.data, tol_diag = sqrt(eps(T)))
+        cone.hess_fact_cache = HypBKCache(cone.tmp_hess.uplo, cone.tmp_hess.data)
     end
     cone.hess_fact = hyp_bk!(cone.hess_fact_cache, cone.tmp_hess.data)
     if !issuccess(cone.hess_fact) # TODO maybe better to not step to this point if the hessian factorization fails
         @warn("numerical failure: cannot factorize primitive cone hessian")
         copyto!(cone.tmp_hess, cone.hess)
-        cone.tmp_hess += cbrt(eps(T)) * I
+        set_min_diag!(cone.tmp_hess.data, cbrt(eps(T)))
         cone.hess_fact = hyp_bk!(cone.hess_fact_cache, cone.tmp_hess.data)
         if !issuccess(cone.hess_fact)
             @warn("numerical failure: could not fix failure of positive definiteness")
@@ -214,4 +215,17 @@ function vec_to_mat_U!(mat::AbstractMatrix{Complex{T}}, vec::AbstractVector{T}) 
     return mat
 end
 
+end
+
+# TODO experimental - if block is a Cone, then define mul as hessian product
+# TODO optimize... maybe need for each cone a 5-arg hess prod
+import LinearAlgebra.mul!
+
+function mul!(y::AbstractVecOrMat{T}, A::Cones.Cone{T}, x::AbstractVecOrMat{T}, alpha::Number, beta::Number) where {T <: Real}
+    # ytemp = rmul!(y, beta)
+    ytemp = y * beta
+    Cones.hess_prod!(y, x, A)
+    rmul!(y, alpha)
+    y .+= ytemp
+    return y
 end
