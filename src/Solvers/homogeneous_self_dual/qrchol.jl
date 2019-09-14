@@ -131,7 +131,8 @@ function load(system_solver::QRCholSystemSolver{T}, solver::Solver{T}) where {T 
     system_solver.QpbxGHbz = Matrix{T}(undef, n, 3)
     system_solver.Q1pbxGHbz = view(system_solver.QpbxGHbz, 1:p, :)
     system_solver.Q2div = view(system_solver.QpbxGHbz, (p + 1):n, :)
-    system_solver.GQ1x = Matrix{T}(undef, q, 3)
+    system_solver.GQ1x = zeros(T, q, 3)
+    @views mul!(system_solver.GQ1x[:, 1], system_solver.GQ1, system_solver.Rpib)
     system_solver.HGQ1x = similar(system_solver.GQ1x)
     system_solver.Gxi = similar(system_solver.GQ1x)
     system_solver.HGxi = similar(system_solver.Gxi)
@@ -218,10 +219,10 @@ function get_combined_directions(system_solver::QRCholSystemSolver{T}) where {T 
         end
     end
 
-    @. y1 = system_solver.Rpib
-    @. y2 = -solver.y_residual
-    ldiv!(solver.Ap_R', y2)
-    @. y3 = zero(T)
+    @. xi1[:, 1] = system_solver.Rpib
+    @. xi1[:, 2] = -solver.y_residual
+    @views ldiv!(solver.Ap_R', xi1[:, 2])
+    @. xi1[:, 3] = zero(T)
 
     @. QpbxGHbz[:, 1] = -model.c
     @. QpbxGHbz[:, 2] = solver.x_residual
@@ -229,14 +230,21 @@ function get_combined_directions(system_solver::QRCholSystemSolver{T}) where {T 
     mul!(QpbxGHbz, model.G', zi, true, true)
     lmul!(solver.Ap_Q', QpbxGHbz)
 
-    # TODO use first col constant and third column zero
-    copyto!(xi1, yi)
-
     if !iszero(size(Q2div, 1))
-        # TODO use third column is zero
-        @views mul!(GQ1x, GQ1, yi)
-        block_hessian_product!(cones, HGQ1x_k, GQ1x_k)
-        mul!(Q2div, GQ2', HGQ1x, -one(T), true)
+        # TODO use first col is constant and third column is zero
+        @views mul!(GQ1x[:, 2], GQ1, xi1[:, 2])
+        for (k, cone_k) in enumerate(cones)
+            if Cones.use_dual(cone_k)
+                @views Cones.inv_hess_prod!(HGQ1x_k[k][:, 1:2], GQ1x_k[k][:, 1:2], cone_k)
+            else
+                @views Cones.hess_prod!(HGQ1x_k[k][:, 1:2], GQ1x_k[k][:, 1:2], cone_k)
+            end
+        end
+        @views mul!(Q2div[:, 1:2], GQ2', HGQ1x[:, 1:2], -one(T), true)
+
+        # mul!(GQ1x, GQ1, yi)
+        # block_hessian_product!(cones, HGQ1x_k, GQ1x_k)
+        # mul!(Q2div, GQ2', HGQ1x, -one(T), true)
 
         block_hessian_product!(cones, HGQ2_k, GQ2_k)
         mul!(Q2GHGQ2, GQ2', HGQ2)
