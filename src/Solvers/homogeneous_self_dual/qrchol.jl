@@ -107,7 +107,6 @@ function load(system_solver::QRCholSystemSolver{T}, solver::Solver{T}) where {T 
 
     nmp = n - p
 
-    system_solver.Rpib = solver.Ap_R' * model.b
     if !isa(model.G, Matrix{T}) && isa(solver.Ap_Q, SuiteSparse.SPQR.QRSparseQ)
         # TODO very inefficient method used for sparse G * QRSparseQ : see https://github.com/JuliaLang/julia/issues/31124#issuecomment-501540818
         # TODO remove workaround and warning
@@ -131,6 +130,7 @@ function load(system_solver::QRCholSystemSolver{T}, solver::Solver{T}) where {T 
     system_solver.QpbxGHbz = Matrix{T}(undef, n, 3)
     system_solver.Q1pbxGHbz = view(system_solver.QpbxGHbz, 1:p, :)
     system_solver.Q2div = view(system_solver.QpbxGHbz, (p + 1):n, :)
+    system_solver.Rpib = solver.Ap_R' \ model.b
     system_solver.GQ1x = zeros(T, q, 3)
     @views mul!(system_solver.GQ1x[:, 1], system_solver.GQ1, system_solver.Rpib)
     system_solver.HGQ1x = similar(system_solver.GQ1x)
@@ -231,7 +231,6 @@ function get_combined_directions(system_solver::QRCholSystemSolver{T}) where {T 
     lmul!(solver.Ap_Q', QpbxGHbz)
 
     if !iszero(size(Q2div, 1))
-        # TODO use first col is constant and third column is zero
         @views mul!(GQ1x[:, 2], GQ1, xi1[:, 2])
         for (k, cone_k) in enumerate(cones)
             if Cones.use_dual(cone_k)
@@ -241,10 +240,6 @@ function get_combined_directions(system_solver::QRCholSystemSolver{T}) where {T 
             end
         end
         @views mul!(Q2div[:, 1:2], GQ2', HGQ1x[:, 1:2], -one(T), true)
-
-        # mul!(GQ1x, GQ1, yi)
-        # block_hessian_product!(cones, HGQ1x_k, GQ1x_k)
-        # mul!(Q2div, GQ2', HGQ1x, -one(T), true)
 
         block_hessian_product!(cones, HGQ2_k, GQ2_k)
         mul!(Q2GHGQ2, GQ2', HGQ2)
@@ -278,11 +273,11 @@ function get_combined_directions(system_solver::QRCholSystemSolver{T}) where {T 
     mul!(Gxi, model.G, xi)
     block_hessian_product!(cones, HGxi_k, Gxi_k)
 
-    @. zi = HGxi - zi # z finished
+    axpby!(true, HGxi, -one(T), zi) # z finished
 
     if !iszero(length(yi))
-        copyto!(yi, Q1pbxGHbz)
-        mul!(yi, GQ1', HGxi, -one(T), true)
+        mul!(yi, GQ1', HGxi)
+        axpby!(true, Q1pbxGHbz, -one(T), yi)
         ldiv!(solver.Ap_R, yi) # y finished
     end
 
