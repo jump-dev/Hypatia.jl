@@ -31,23 +31,21 @@ adjoint(A::BlockMatrix{T}) where {T <: Real} = BlockMatrix{T}(A.ncols, A.nrows, 
 
 # TODO try to speed up by using better logic for alpha and beta (see Julia's 5-arg mul! code)
 # TODO check that this eliminates allocs when using IterativeSolvers methods, and that it is as fast as possible
-function mul!(y::AbstractVector{T}, A::BlockMatrix{T}, x::AbstractVector{T}, alpha::Number, beta::Number) where {T <: Real}
+function mul!(y::AbstractVecOrMat{T}, A::BlockMatrix{T}, x::AbstractVecOrMat{T}, alpha::Number, beta::Number) where {T <: Real}
     @assert size(x, 1) == A.ncols
     @assert size(y, 1) == A.nrows
     @assert size(x, 2) == size(y, 2)
-
-    @. y *= beta
+    rmul!(y, beta)
     for (b, r, c) in zip(A.blocks, A.rows, A.cols)
-        if isempty(r) || isempty(c)
-            continue
-        end
-        xk = view(x, c)
-        yk = view(y, r)
+        isempty(r) || isempty(c) && continue
+        xk = view(x, c, :)
+        yk = view(y, r, :)
         mul!(yk, b, xk, alpha, true)
     end
     return y
 end
 
 *(A::BlockMatrix{T}, x::AbstractVector{T}) where {T <: Real} = mul!(similar(x, size(A, 1)), A, x)
+*(A::BlockMatrix{T}, x::AbstractMatrix{T}) where {T <: Real} = mul!(similar(x, size(A, 1), size(x, 2)), A, x)
 
 -(A::BlockMatrix{T}) where {T <: Real} = BlockMatrix{T}(A.nrows, A.ncols, -A.blocks, A.rows, A.cols)
