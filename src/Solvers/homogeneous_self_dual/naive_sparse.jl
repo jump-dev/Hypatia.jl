@@ -11,8 +11,9 @@ A'*y + G'*z + c*tau = xrhs
 (du bar) mu*H_k*z_k + s_k = srhs_k
 kap + mu/(taubar^2)*tau = taurhs
 
-TODO optimize iterative method
+TODO iterative method
 =#
+using Pardiso
 
 mutable struct NaiveSparseSystemSolver{T <: Real} <: SystemSolver{T}
     use_iterative::Bool
@@ -264,6 +265,23 @@ function get_combined_directions(system_solver::NaiveSparseSystemSolver{T}) wher
             @show model.n, model.p, model.q
             @show system_solver.Is, system_solver.Js, system_solver.Vs
         end
+
+        ps = PardisoSolver()
+        # rhsold = copy(rhs)
+        # solve!(ps, rhs, lhs, rhs)
+        # @show norm(rhsold - lhs * rhs)
+
+        # A = sprandn(n, n, p)
+        # A = A + eps() * I
+        # B = A * rand(n, 2)
+        # Bold = copy(B)
+        # pardiso(ps, X, A, B)
+        # @show norm(Bold - A' * B)
+
+        X = similar(rhs)
+        solve!(ps, X, lhs, rhs)
+
+        # rhs .= X
 
         rhs .= lu(lhs) \ rhs
     end
