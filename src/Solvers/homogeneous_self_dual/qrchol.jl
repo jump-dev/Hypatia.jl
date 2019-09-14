@@ -2,8 +2,9 @@
 Copyright 2018, Chris Coey and contributors
 
 QR+Cholesky linear system solver
-solves linear system in naive.jl via a procedure similar to that described by S10.3 of
-http://www.seas.ucla.edu/~vandenbe/publications/coneprog.pdf
+requires precomputed QR factorization of A'
+solves linear system in naive.jl by first eliminating s, kap, and tau via the method in the symindef solver, then reducing the 3x3 symmetric indefinite system to a series of low-dimensional operations via a procedure similar to that described by S10.3 of
+http://www.seas.ucla.edu/~vandenbe/publications/coneprog.pdf (the dominating subroutine is a positive definite linear solve with RHS of dimension n-p x 3)
 =#
 
 mutable struct QRCholSystemSolver{T <: Real} <: SystemSolver{T}
@@ -18,7 +19,6 @@ mutable struct QRCholSystemSolver{T <: Real} <: SystemSolver{T}
     x1
     y1
     z1
-    xi1
     xi2
     x2
     y2
@@ -27,23 +27,21 @@ mutable struct QRCholSystemSolver{T <: Real} <: SystemSolver{T}
     y3
     z3
     z_k
-    z1_k
     z2_k
     z3_k
     z1_temp
     z2_temp
     z3_temp
     z_temp_k
-    z1_temp_k
     z2_temp_k
     z3_temp_k
 
-    Rpib
     GQ1
     GQ2
     QpbxGHbz
     Q1pbxGHbz
     Q2div
+    Rpib
     GQ1x
     HGQ1x
     HGQ2
@@ -51,12 +49,22 @@ mutable struct QRCholSystemSolver{T <: Real} <: SystemSolver{T}
     Gxi
     HGxi
 
-    HGQ1x_k
-    GQ1x_k
-    HGQ2_k
     GQ2_k
-    HGxi_k
+    HGQ2_k
     Gxi_k
+    HGxi_k
+
+    xi11
+    xi12
+    xi13
+    QpbxGHbz1
+    QpbxGHbz2
+    QpbxGHbz3
+    GQ1x2
+    GQ1x12_k
+    HGQ1x12_k
+    HGQ1x12
+    Q2div12
 
     solvesol
     solvecache
@@ -73,6 +81,9 @@ function load(system_solver::QRCholSystemSolver{T}, solver::Solver{T}) where {T 
 
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
+    nmp = n - p
+    cones = model.cones
+    cone_idxs = model.cone_idxs
 
     xi = Matrix{T}(undef, n, 3)
     yi = Matrix{T}(undef, p, 3)
@@ -81,7 +92,6 @@ function load(system_solver::QRCholSystemSolver{T}, solver::Solver{T}) where {T 
     system_solver.yi = yi
     system_solver.zi = zi
 
-    system_solver.xi1 = view(xi, 1:p, :)
     system_solver.xi2 = view(xi, (p + 1):n, :)
     system_solver.x1 = view(xi, :, 1)
     system_solver.y1 = view(yi, :, 1)
@@ -92,20 +102,17 @@ function load(system_solver::QRCholSystemSolver{T}, solver::Solver{T}) where {T 
     system_solver.x3 = view(xi, :, 3)
     system_solver.y3 = view(yi, :, 3)
     system_solver.z3 = view(zi, :, 3)
-    system_solver.z_k = [view(zi, idxs, :) for idxs in model.cone_idxs]
-    system_solver.z1_k = [view(zi, idxs, 1) for idxs in model.cone_idxs]
-    system_solver.z2_k = [view(zi, idxs, 2) for idxs in model.cone_idxs]
-    system_solver.z3_k = [view(zi, idxs, 3) for idxs in model.cone_idxs]
+    system_solver.z_k = [Cones.use_dual(cone_k) ? view(zi, idxs, :) : view(zi, idxs, 1:2) for (cone_k, idxs) in zip(cones, cone_idxs)]
+    system_solver.z2_k = [view(zi, idxs, 2) for idxs in cone_idxs]
+    system_solver.z3_k = [view(zi, idxs, 3) for idxs in cone_idxs]
     zi_temp = similar(zi)
     system_solver.z1_temp = view(zi_temp, :, 1)
     system_solver.z2_temp = view(zi_temp, :, 2)
     system_solver.z3_temp = view(zi_temp, :, 3)
-    system_solver.z_temp_k = [view(zi_temp, idxs, :) for idxs in model.cone_idxs]
-    system_solver.z1_temp_k = [view(zi_temp, idxs, 1) for idxs in model.cone_idxs]
-    system_solver.z2_temp_k = [view(zi_temp, idxs, 2) for idxs in model.cone_idxs]
-    system_solver.z3_temp_k = [view(zi_temp, idxs, 3) for idxs in model.cone_idxs]
+    system_solver.z_temp_k = [Cones.use_dual(cone_k) ? view(zi_temp, idxs, :) : view(zi_temp, idxs, 1:2) for (cone_k, idxs) in zip(cones, cone_idxs)]
+    system_solver.z2_temp_k = [view(zi_temp, idxs, 2) for idxs in cone_idxs]
+    system_solver.z3_temp_k = [view(zi_temp, idxs, 3) for idxs in cone_idxs]
 
-    nmp = n - p
 
     if !isa(model.G, Matrix{T}) && isa(solver.Ap_Q, SuiteSparse.SPQR.QRSparseQ)
         # TODO very inefficient method used for sparse G * QRSparseQ : see https://github.com/JuliaLang/julia/issues/31124#issuecomment-501540818
@@ -137,12 +144,22 @@ function load(system_solver::QRCholSystemSolver{T}, solver::Solver{T}) where {T 
     system_solver.Gxi = similar(system_solver.GQ1x)
     system_solver.HGxi = similar(system_solver.Gxi)
 
-    system_solver.HGQ1x_k = [view(system_solver.HGQ1x, idxs, :) for idxs in model.cone_idxs]
-    system_solver.GQ1x_k = [view(system_solver.GQ1x, idxs, :) for idxs in model.cone_idxs]
-    system_solver.HGQ2_k = [view(system_solver.HGQ2, idxs, :) for idxs in model.cone_idxs]
-    system_solver.GQ2_k = [view(system_solver.GQ2, idxs, :) for idxs in model.cone_idxs]
-    system_solver.HGxi_k = [view(system_solver.HGxi, idxs, :) for idxs in model.cone_idxs]
-    system_solver.Gxi_k = [view(system_solver.Gxi, idxs, :) for idxs in model.cone_idxs]
+    system_solver.GQ2_k = [view(system_solver.GQ2, idxs, :) for idxs in cone_idxs]
+    system_solver.HGQ2_k = [view(system_solver.HGQ2, idxs, :) for idxs in cone_idxs]
+    system_solver.Gxi_k = [view(system_solver.Gxi, idxs, :) for idxs in cone_idxs]
+    system_solver.HGxi_k = [view(system_solver.HGxi, idxs, :) for idxs in cone_idxs]
+
+    system_solver.xi11 = view(system_solver.xi, 1:p, 1)
+    system_solver.xi12 = view(system_solver.xi, 1:p, 2)
+    system_solver.xi13 = view(system_solver.xi, 1:p, 3)
+    system_solver.QpbxGHbz1 = view(system_solver.QpbxGHbz, :, 1)
+    system_solver.QpbxGHbz2 = view(system_solver.QpbxGHbz, :, 2)
+    system_solver.QpbxGHbz3 = view(system_solver.QpbxGHbz, :, 3)
+    system_solver.GQ1x2 = view(system_solver.GQ1x, :, 2)
+    system_solver.GQ1x12_k = [view(system_solver.GQ1x, idxs, 1:2) for idxs in cone_idxs]
+    system_solver.HGQ1x12_k = [view(system_solver.HGQ1x, idxs, 1:2) for idxs in cone_idxs]
+    system_solver.HGQ1x12 = view(system_solver.HGQ1x, :, 1:2)
+    system_solver.Q2div12 = view(system_solver.Q2div, :, 1:2)
 
     if !system_solver.use_sparse
         system_solver.solvesol = Matrix{T}(undef, nmp, 3)
@@ -159,7 +176,6 @@ function get_combined_directions(system_solver::QRCholSystemSolver{T}) where {T 
     xi = system_solver.xi
     yi = system_solver.yi
     zi = system_solver.zi
-    xi1 = system_solver.xi1
     xi2 = system_solver.xi2
     x1 = system_solver.x1
     y1 = system_solver.y1
@@ -171,14 +187,12 @@ function get_combined_directions(system_solver::QRCholSystemSolver{T}) where {T 
     y3 = system_solver.y3
     z3 = system_solver.z3
     z_k = system_solver.z_k
-    z1_k = system_solver.z1_k
     z2_k = system_solver.z2_k
     z3_k = system_solver.z3_k
     z1_temp = system_solver.z1_temp
     z2_temp = system_solver.z2_temp
     z3_temp = system_solver.z3_temp
     z_temp_k = system_solver.z_temp_k
-    z1_temp_k = system_solver.z1_temp_k
     z2_temp_k = system_solver.z2_temp_k
     z3_temp_k = system_solver.z3_temp_k
     GQ1 = system_solver.GQ1
@@ -186,18 +200,28 @@ function get_combined_directions(system_solver::QRCholSystemSolver{T}) where {T 
     QpbxGHbz = system_solver.QpbxGHbz
     Q1pbxGHbz = system_solver.Q1pbxGHbz
     Q2div = system_solver.Q2div
+    Rpib = system_solver.Rpib
     GQ1x = system_solver.GQ1x
     HGQ1x = system_solver.HGQ1x
     HGQ2 = system_solver.HGQ2
     Q2GHGQ2 = system_solver.Q2GHGQ2
     Gxi = system_solver.Gxi
     HGxi = system_solver.HGxi
-    HGQ1x_k = system_solver.HGQ1x_k
-    GQ1x_k = system_solver.GQ1x_k
-    HGQ2_k = system_solver.HGQ2_k
     GQ2_k = system_solver.GQ2_k
-    HGxi_k = system_solver.HGxi_k
+    HGQ2_k = system_solver.HGQ2_k
     Gxi_k = system_solver.Gxi_k
+    HGxi_k = system_solver.HGxi_k
+    xi11 = system_solver.xi11
+    xi12 = system_solver.xi12
+    xi13 = system_solver.xi13
+    QpbxGHbz1 = system_solver.QpbxGHbz1
+    QpbxGHbz2 = system_solver.QpbxGHbz2
+    QpbxGHbz3 = system_solver.QpbxGHbz3
+    GQ1x2 = system_solver.GQ1x2
+    GQ1x12_k = system_solver.GQ1x12_k
+    HGQ1x12_k = system_solver.HGQ1x12_k
+    HGQ1x12 = system_solver.HGQ1x12
+    Q2div12 = system_solver.Q2div12
 
     sqrtmu = sqrt(solver.mu)
 
@@ -212,34 +236,27 @@ function get_combined_directions(system_solver::QRCholSystemSolver{T}) where {T 
             @. z3_temp_k[k] = duals_k + grad_k * sqrtmu
             Cones.inv_hess_prod!(z_k[k], z_temp_k[k], cone_k)
         else
-            Cones.hess_prod!(z1_k[k], z1_temp_k[k], cone_k)
-            Cones.hess_prod!(z2_k[k], z2_temp_k[k], cone_k)
+            Cones.hess_prod!(z_k[k], z_temp_k[k], cone_k)
             @. z2_k[k] += duals_k
             @. z3_k[k] = duals_k + grad_k * sqrtmu
         end
     end
 
-    @. xi1[:, 1] = system_solver.Rpib
-    @. xi1[:, 2] = -solver.y_residual
-    @views ldiv!(solver.Ap_R', xi1[:, 2])
-    @. xi1[:, 3] = zero(T)
+    @. xi11 = Rpib
+    @. xi12 = -solver.y_residual
+    ldiv!(solver.Ap_R', xi12)
+    @. xi13 = zero(T)
 
-    @. QpbxGHbz[:, 1] = -model.c
-    @. QpbxGHbz[:, 2] = solver.x_residual
-    @. QpbxGHbz[:, 3] = zero(T)
+    @. QpbxGHbz1 = -model.c
+    @. QpbxGHbz2 = solver.x_residual
+    @. QpbxGHbz3 = zero(T)
     mul!(QpbxGHbz, model.G', zi, true, true)
     lmul!(solver.Ap_Q', QpbxGHbz)
 
-    if !iszero(size(Q2div, 1))
-        @views mul!(GQ1x[:, 2], GQ1, xi1[:, 2])
-        for (k, cone_k) in enumerate(cones)
-            if Cones.use_dual(cone_k)
-                @views Cones.inv_hess_prod!(HGQ1x_k[k][:, 1:2], GQ1x_k[k][:, 1:2], cone_k)
-            else
-                @views Cones.hess_prod!(HGQ1x_k[k][:, 1:2], GQ1x_k[k][:, 1:2], cone_k)
-            end
-        end
-        @views mul!(Q2div[:, 1:2], GQ2', HGQ1x[:, 1:2], -one(T), true)
+    if !isempty(Q2div)
+        mul!(GQ1x2, GQ1, xi12)
+        block_hessian_product!(cones, HGQ1x12_k, GQ1x12_k)
+        mul!(Q2div12, GQ2', HGQ1x12, -one(T), true)
 
         block_hessian_product!(cones, HGQ2_k, GQ2_k)
         mul!(Q2GHGQ2, GQ2', HGQ2)
@@ -275,32 +292,13 @@ function get_combined_directions(system_solver::QRCholSystemSolver{T}) where {T 
 
     axpby!(true, HGxi, -one(T), zi) # z finished
 
-    if !iszero(length(yi))
+    if !isempty(yi)
         mul!(yi, GQ1', HGxi)
         axpby!(true, Q1pbxGHbz, -one(T), yi)
         ldiv!(solver.Ap_R, yi) # y finished
     end
 
-    # lift to get tau, s, and kap
-    # TODO refactor - used by qrchol and symindef
-    tau_denom = solver.mu / solver.tau / solver.tau - dot(model.c, x1) - dot(model.b, y1) - dot(model.h, z1)
-
-    function lift!(x, y, z, s, tau_rhs, kap_rhs)
-        tau_sol = (tau_rhs + kap_rhs + dot(model.c, x) + dot(model.b, y) + dot(model.h, z)) / tau_denom
-        @. x += tau_sol * x1
-        @. y += tau_sol * y1
-        @. z += tau_sol * z1
-        copyto!(s, model.h)
-        mul!(s, model.G, x, -one(T), tau_sol)
-        kap_sol = -dot(model.c, x) - dot(model.b, y) - dot(model.h, z) - tau_rhs
-        return (tau_sol, kap_sol)
-    end
-
-    (tau_pred, kap_pred) = lift!(x2, y2, z2, z2_temp, solver.kap + solver.primal_obj_t - solver.dual_obj_t, -solver.kap)
-    @. z2_temp -= solver.z_residual
-    (tau_corr, kap_corr) = lift!(x3, y3, z3, z3_temp, zero(T), -solver.kap + solver.mu / solver.tau)
-
-    return (x2, x3, y2, y3, z2, z3, tau_pred, tau_corr, z2_temp, z3_temp, kap_pred, kap_corr)
+    return lift_twice(solver, x1, y1, z1, x2, y2, z2, z2_temp, x3, y3, z3, z3_temp)
 end
 
 function block_hessian_product!(cones, prod_k, arr_k)
