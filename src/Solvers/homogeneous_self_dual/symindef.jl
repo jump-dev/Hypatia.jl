@@ -25,7 +25,7 @@ A*x = [-yrhs, b]
 
 TODO
 - add iterative method
-- improve numerics of method with use_hess_inv = false (possibly a bug)
+- improve numerics of method with use_hess_inv = false
 =#
 
 mutable struct SymIndefSystemSolver{T <: Real} <: SystemSolver{T}
@@ -223,24 +223,34 @@ function get_combined_directions(system_solver::SymIndefSystemSolver{T}) where {
         end
     end
 
-    # lift to get tau, s, and kap
-    # TODO refactor - used by qrchol and symindef
+    return lift_twice(solver, x1, y1, z1, x2, y2, z2, s2, x3, y3, z3, s3)
+end
+
+# lift to get tau, s, and kap
+function lift_twice(solver::Solver{T}, x1, y1, z1, x2, y2, z2, s2, x3, y3, z3, s3) where {T <: Real}
+    model = solver.model
     tau_denom = solver.mu / solver.tau / solver.tau - dot(model.c, x1) - dot(model.b, y1) - dot(model.h, z1)
 
-    function lift!(x, y, z, s, tau_rhs, kap_rhs)
-        tau_sol = (tau_rhs + kap_rhs + dot(model.c, x) + dot(model.b, y) + dot(model.h, z)) / tau_denom
-        @. x += tau_sol * x1
-        @. y += tau_sol * y1
-        @. z += tau_sol * z1
-        copyto!(s, model.h)
-        mul!(s, model.G, x, -one(T), tau_sol)
-        kap_sol = -dot(model.c, x) - dot(model.b, y) - dot(model.h, z) - tau_rhs
-        return (tau_sol, kap_sol)
-    end
-
-    (tau_pred, kap_pred) = lift!(x2, y2, z2, s2, solver.kap + solver.primal_obj_t - solver.dual_obj_t, -solver.kap)
+    (tau_pred, kap_pred) = lift_once(solver, tau_denom, x1, y1, z1, x2, y2, z2, s2, solver.kap + solver.primal_obj_t - solver.dual_obj_t, -solver.kap)
     @. s2 -= solver.z_residual
-    (tau_corr, kap_corr) = lift!(x3, y3, z3, s3, zero(T), -solver.kap + solver.mu / solver.tau)
+
+    (tau_corr, kap_corr) = lift_once(solver, tau_denom, x1, y1, z1, x3, y3, z3, s3, zero(T), -solver.kap + solver.mu / solver.tau)
 
     return (x2, x3, y2, y3, z2, z3, tau_pred, tau_corr, s2, s3, kap_pred, kap_corr)
+end
+
+function lift_once(solver::Solver{T}, tau_denom, x1, y1, z1, x, y, z, s, tau_rhs, kap_rhs) where {T <: Real}
+    model = solver.model
+    tau_sol = (tau_rhs + kap_rhs + dot(model.c, x) + dot(model.b, y) + dot(model.h, z)) / tau_denom
+
+    @. x += tau_sol * x1
+    @. y += tau_sol * y1
+    @. z += tau_sol * z1
+
+    copyto!(s, model.h)
+    mul!(s, model.G, x, -one(T), tau_sol)
+
+    kap_sol = -dot(model.c, x) - dot(model.b, y) - dot(model.h, z) - tau_rhs
+
+    return (tau_sol, kap_sol)
 end
