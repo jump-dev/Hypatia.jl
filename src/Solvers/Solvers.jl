@@ -37,6 +37,8 @@ include("homogeneous_self_dual/naiveelim.jl")
 include("homogeneous_self_dual/symindef.jl")
 include("homogeneous_self_dual/qrchol.jl")
 
+free_memory(::SystemSolver) = nothing
+
 # solve, optionally test conic certificates, and return solve information
 function solve_check(
     model::Models.Model{T};
