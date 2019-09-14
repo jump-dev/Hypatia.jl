@@ -3,33 +3,47 @@ Copyright 2018, Chris Coey and contributors
 
 naive linear system solver
 
+6x6 nonsymmetric system in (x, y, z, tau, s, kap):
 A'*y + G'*z + c*tau = xrhs
 -A*x + b*tau = yrhs
--G*x - s + h*tau = zrhs
--c'*x - b'*y - h'*z - kap = kaprhs
+-G*x + h*tau - s = zrhs
+-c'*x - b'*y - h'*z - kap = taurhs
 (pr bar) z_k + mu*H_k*s_k = srhs_k
 (du bar) mu*H_k*z_k + s_k = srhs_k
-kap + mu/(taubar^2)*tau = taurhs
+mu/(taubar^2)*tau + kap = kaprhs
 
-TODO iterative method
+TODO not sure lhs_copy is needed
 =#
+
 using Pardiso
 
 mutable struct NaiveSparseSystemSolver{T <: Real} <: SystemSolver{T}
     use_iterative::Bool
+    use_sparse::Bool
 
     solver::Solver{T}
+
+    x1
+    x2
+    y1
+    y2
+    z1
+    z2
+    tau_row::Int # remove
+    tau_idx::Int
+    s1
+    s2
+    s1_k
+    s2_k
 
     lhs_copy
     lhs
     # for debugging
-    lhs_actual_copy
-    lhs_actual
+    lhs_actual_copy # remove
+    lhs_actual # remove
 
-    lhs_H_k
+    lhs_H_k # remove
     lhs_H_Vs
-    H_start::Int
-    Hinv_start::Int
     Is::Vector{Int}
     Js::Vector{Int}
     Vs::Vector{T}
@@ -38,22 +52,13 @@ mutable struct NaiveSparseSystemSolver{T <: Real} <: SystemSolver{T}
     prevsol1::Vector{T}
     prevsol2::Vector{T}
 
-    x1
-    x2
-    y1
-    y2
-    z1
-    z2
-    z1_k
-    z2_k
-    s1
-    s2
-    kap_row::Int
-    kap_idx::Int
+    solvesol
+    solvecache
 
     function NaiveSparseSystemSolver{T}(; use_iterative::Bool = false, use_sparse::Bool = false) where {T <: Real}
         system_solver = new{T}()
         system_solver.use_iterative = use_iterative
+        system_solver.use_sparse = use_sparse
         return system_solver
     end
 end
@@ -65,33 +70,37 @@ function load(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) wher
     (n, p, q) = (model.n, model.p, model.q)
     dim = n + p + 2q + 2
 
-    system_solver.rhs = zeros(T, dim, 2)
+    rhs = zeros(T, dim, 2)
+    system_solver.rhs = rhs
     rows = 1:n
-    system_solver.x1 = view(system_solver.rhs, rows, 1)
-    system_solver.x2 = view(system_solver.rhs, rows, 2)
+    system_solver.x1 = view(rhs, rows, 1)
+    system_solver.x2 = view(rhs, rows, 2)
     rows = (n + 1):(n + p)
-    system_solver.y1 = view(system_solver.rhs, rows, 1)
-    system_solver.y2 = view(system_solver.rhs, rows, 2)
+    system_solver.y1 = view(rhs, rows, 1)
+    system_solver.y2 = view(rhs, rows, 2)
     rows = (n + p + 1):(n + p + q)
-    system_solver.z1 = view(system_solver.rhs, rows, 1)
-    system_solver.z2 = view(system_solver.rhs, rows, 2)
-    z_start = n + p
-    system_solver.z1_k = [view(system_solver.rhs, z_start .+ model.cone_idxs[k], 1) for k in eachindex(model.cones)]
-    system_solver.z2_k = [view(system_solver.rhs, z_start .+ model.cone_idxs[k], 2) for k in eachindex(model.cones)]
-    rows = (n + p + q + 2):(n + p + 2q + 1)
-    system_solver.s1 = view(system_solver.rhs, rows, 1)
-    system_solver.s2 = view(system_solver.rhs, rows, 2)
-    system_solver.kap_row = n + p + q + 1
+    system_solver.z1 = view(rhs, rows, 1)
+    system_solver.z2 = view(rhs, rows, 2)
+    tau_row = n + p + q + 1 # remove
+    system_solver.tau_row = tau_row # remove
+    rows = tau_row .+ (1:q)
+    system_solver.s1 = view(rhs, rows, 1)
+    system_solver.s2 = view(rhs, rows, 2)
+    system_solver.s1_k = [view(rhs, tau_row .+ model.cone_idxs[k], 1) for k in eachindex(model.cones)]
+    system_solver.s2_k = [view(rhs, tau_row .+ model.cone_idxs[k], 2) for k in eachindex(model.cones)]
 
+    # x y z kap s tau
 
     system_solver.lhs_actual_copy = T[
-        spzeros(T,n,n)  model.A'        model.G'              spzeros(T,n)  spzeros(T,n,q)         model.c;
-        -model.A        spzeros(T,p,p)  spzeros(T,p,q)        spzeros(T,p)  spzeros(T,p,q)         model.b;
+        spzeros(T,n,n)  model.A'        model.G'              model.c       spzeros(T,n,q)         spzeros(T,n);
+        -model.A        spzeros(T,p,p)  spzeros(T,p,q)        model.b       spzeros(T,p,q)         spzeros(T,p);
+        -model.G        spzeros(T,q,p)  spzeros(T,q,q)        model.h       sparse(-one(T)*I,q,q)  spzeros(T,q);
+        -model.c'       -model.b'       -model.h'             zero(T)       spzeros(T,1,q)         -one(T);
         spzeros(T,q,n)  spzeros(T,q,p)  sparse(one(T)*I,q,q)  spzeros(T,q)  sparse(one(T)*I,q,q)   spzeros(T,q);
         spzeros(T,1,n)  spzeros(T,1,p)  spzeros(T,1,q)        one(T)        spzeros(T,1,q)         one(T);
-        -model.G        spzeros(T,q,p)  spzeros(T,q,q)        spzeros(T,q)  sparse(-one(T)*I,q,q)  model.h;
-        -model.c'       -model.b'       -model.h'             -one(T)       spzeros(T,1,q)         zero(T);
         ]
+    dropzeros!(system_solver.lhs_actual_copy)
+    system_solver.lhs_actual = similar(system_solver.lhs_actual_copy)
 
     hess_nnzs = sum(Cones.dimension(cone_k) + Cones.dimension(cone_k) ^ 2 for cone_k in model.cones)
 
@@ -142,52 +151,61 @@ function load(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) wher
     rc4 = n + p + q
     rc5 = n + p + q + 1
     rc6 = dim - 1
-
     offset = 1
     offset = add_I_J_V(offset, rc1, rc2, sparse(model.A'))
     offset = add_I_J_V(offset, rc1, rc3, sparse(model.G'))
-    offset = add_I_J_V(offset, rc1, rc6, model.c)
+    offset = add_I_J_V(offset, rc1, rc4, model.c)
     offset = add_I_J_V(offset, rc2, rc1, -sparse(model.A))
-    offset = add_I_J_V(offset, rc2, rc6, model.b)
-    offset = add_I_J_V(offset, rc4, rc4, [one(T)])
-    system_solver.kap_idx = offset
-    offset = add_I_J_V(offset, rc4, rc6, [one(T)])
-    offset = add_I_J_V(offset, rc5, rc1, -sparse(model.G))
-    offset = add_I_J_V(offset, rc5, rc5, -sparse(one(T) * I, q, q))
-    offset = add_I_J_V(offset, rc5, rc6, model.h)
-    offset = add_I_J_V(offset, rc6, rc1, -model.c')
-    offset = add_I_J_V(offset, rc6, rc2, -model.b')
-    offset = add_I_J_V(offset, rc6, rc3, -model.h')
-    offset = add_I_J_V(offset, rc6, rc4, -[one(T)])
+    offset = add_I_J_V(offset, rc2, rc4, model.b)
+    offset = add_I_J_V(offset, rc3, rc1, -sparse(model.G))
+    offset = add_I_J_V(offset, rc3, rc4, model.h)
+    offset = add_I_J_V(offset, rc3, rc5, sparse(-one(T) * I, q, q))
+    offset = add_I_J_V(offset, rc4, rc1, -model.c')
+    offset = add_I_J_V(offset, rc4, rc2, -model.b')
+    offset = add_I_J_V(offset, rc4, rc3, -model.h')
+    offset = add_I_J_V(offset, rc4, rc6, -[one(T)])
+    system_solver.tau_idx = offset
+    offset = add_I_J_V(offset, rc6, rc4, [one(T)])
+    offset = add_I_J_V(offset, rc6, rc6, [one(T)])
 
+    # add I, J, V for Hessians and cache indices to modify later
     H_indices = [Vector{Int}(undef, Cones.dimension(cone_k)) for cone_k in model.cones]
-    dims_added = 0
+    nz_rows_added = 0
     for (k, cone_k) in enumerate(model.cones)
         cone_dim = Cones.dimension(cone_k)
+        rows = rc5 + nz_rows_added
+        # indices of I, J, V affected
         H_indices[k] = offset:(offset + cone_dim ^ 2 - 1)
         if Cones.use_dual(cone_k)
-            offset = add_I_J_V(offset, rc3 + dims_added, rc3 + dims_added, sparse(ones(T, cone_dim, cone_dim)))
-            offset = add_I_J_V(offset, rc3 + dims_added, rc5 + dims_added, sparse(one(T) * I, cone_dim, cone_dim))
+            H_cols = rc3 + nz_rows_added
+            id_cols = rows
         else
-            offset = add_I_J_V(offset, rc3 + dims_added, rc5 + dims_added, sparse(ones(T, cone_dim, cone_dim)))
-            offset = add_I_J_V(offset, rc3 + dims_added, rc3 + dims_added, sparse(one(T) * I, cone_dim, cone_dim))
+            id_cols = rc3 + nz_rows_added
+            H_cols = rows
         end
-        dims_added += cone_dim
+        offset = add_I_J_V(offset, rows, H_cols, sparse(ones(T, cone_dim, cone_dim)))
+        offset = add_I_J_V(offset, rows, id_cols, sparse(one(T) * I, cone_dim, cone_dim))
+        nz_rows_added += cone_dim
     end
 
     system_solver.lhs_copy = sparse(Is, Js, Vs)
     system_solver.lhs = similar(system_solver.lhs_copy)
     system_solver.lhs_actual = similar(system_solver.lhs_actual_copy)
 
-    view_k2(k::Int) = view(system_solver.Vs, H_indices[k])
-    system_solver.lhs_H_Vs = [view_k2(k) for k in eachindex(model.cones)]
-
     function view_k(k::Int)
-        rows = (n + p) .+ model.cone_idxs[k]
-        cols = Cones.use_dual(model.cones[k]) ? rows : (q + 1) .+ rows
+        rows = tau_row .+ model.cone_idxs[k]
+        if Cones.use_dual(model.cones[k])
+            cols = (n + p) .+ model.cone_idxs[k]
+        else
+            cols = rows
+        end
         return view(system_solver.lhs_actual, rows, cols)
     end
     system_solver.lhs_H_k = [view_k(k) for k in eachindex(model.cones)]
+
+    view_k2(k::Int) = view(system_solver.Vs, H_indices[k])
+    system_solver.lhs_H_Vs = [view_k2(k) for k in eachindex(model.cones)]
+
 
     return system_solver
 end
@@ -198,93 +216,59 @@ function get_combined_directions(system_solver::NaiveSparseSystemSolver{T}) wher
     cones = model.cones
     lhs = system_solver.lhs
     lhs_actual = system_solver.lhs_actual
+
     rhs = system_solver.rhs
-    kap_row = system_solver.kap_row
-    mu = solver.mu
-    tau = solver.tau
-    kap = solver.kap
+    tau_row = system_solver.tau_row
+    x1 = system_solver.x1
+    x2 = system_solver.x2
+    y1 = system_solver.y1
+    y2 = system_solver.y2
+    z1 = system_solver.z1
+    z2 = system_solver.z2
+    s1 = system_solver.s1
+    s2 = system_solver.s2
+    s1_k = system_solver.s1_k
+    s2_k = system_solver.s2_k
+
+    sqrtmu = sqrt(solver.mu)
+    mtt = solver.mu / solver.tau / solver.tau
 
     # update rhs matrix
-    system_solver.x1 .= solver.x_residual
-    system_solver.x2 .= zero(T)
-    system_solver.y1 .= solver.y_residual
-    system_solver.y2 .= zero(T)
-    sqrtmu = sqrt(mu)
+    x1 .= solver.x_residual
+    x2 .= zero(T)
+    y1 .= solver.y_residual
+    y2 .= zero(T)
+    z1 .= solver.z_residual
+    z2 .= zero(T)
+    rhs[tau_row, 1] = solver.kap + solver.primal_obj_t - solver.dual_obj_t
+    rhs[tau_row, 2] = zero(T)
     for k in eachindex(cones)
         duals_k = solver.point.dual_views[k]
         grad_k = Cones.grad(cones[k])
-        @. system_solver.z1_k[k] = -duals_k
-        @. system_solver.z2_k[k] = -duals_k - grad_k * sqrtmu
+        @. s1_k[k] = -duals_k
+        @. s2_k[k] = -duals_k - grad_k * sqrtmu
     end
-    system_solver.s1 .= solver.z_residual
-    system_solver.s2 .= zero(T)
-    rhs[kap_row, 1] = -kap
-    rhs[kap_row, 2] = -kap + mu / tau
-    rhs[end, 1] = kap + solver.primal_obj_t - solver.dual_obj_t
-    rhs[end, 2] = zero(T)
+    rhs[end, 1] = -solver.kap
+    rhs[end, 2] = -solver.kap + solver.mu / solver.tau
 
     # solve system
-    if system_solver.use_iterative
-        lhs.blocks[end][1] = mu / tau / tau
-        b_idx = 1
-        for k in eachindex(cones)
-            cone_k = cones[k]
-            # TODO use hess prod instead
-
-            lhs.blocks[b_idx + (Cones.use_dual(cone_k) ? 0 : 1)] = Cones.hess(cone_k)
-            b_idx += 2
-        end
-
-        dim = size(lhs, 2)
-
-        rhs1 = view(rhs, :, 1)
-        IterativeSolvers.gmres!(system_solver.prevsol1, lhs, rhs1, restart = dim)
-        copyto!(rhs1, system_solver.prevsol1)
-
-        rhs2 = view(rhs, :, 2)
-        IterativeSolvers.gmres!(system_solver.prevsol2, lhs, rhs2, restart = dim)
-        copyto!(rhs2, system_solver.prevsol2)
-    else
-        # update lhs matrix
-        copyto!(lhs_actual, system_solver.lhs_actual_copy)
-        lhs_actual[kap_row, end] = mu / tau / tau
-        for k in eachindex(cones)
-            copyto!(system_solver.lhs_H_k[k], Cones.hess(cones[k]))
-        end
-        lhs_actual[kap_row, end] = mu / tau / tau
-
-        for k in eachindex(cones)
-            copyto!(system_solver.lhs_H_Vs[k], vec(Cones.hess(cones[k])))
-        end
-        system_solver.Vs[system_solver.kap_idx] = mu / tau / tau
-        lhs = sparse(system_solver.Is, system_solver.Js, system_solver.Vs)
-        # lhs[kap_row, end] = mu / tau / tau
-
-        if !isapprox(norm(Matrix(lhs_actual) - Matrix(lhs)), 0)
-            @show Matrix(lhs_actual) - Matrix(lhs)
-            @show model.n, model.p, model.q
-            @show system_solver.Is, system_solver.Js, system_solver.Vs
-        end
-
-        ps = PardisoSolver()
-        # rhsold = copy(rhs)
-        # solve!(ps, rhs, lhs, rhs)
-        # @show norm(rhsold - lhs * rhs)
-
-        # A = sprandn(n, n, p)
-        # A = A + eps() * I
-        # B = A * rand(n, 2)
-        # Bold = copy(B)
-        # pardiso(ps, X, A, B)
-        # @show norm(Bold - A' * B)
-
-        X = similar(rhs)
-        solve!(ps, X, lhs, rhs)
-
-        # rhs .= X
-
-        rhs .= lu(lhs) \ rhs
+    # update lhs matrix
+    copyto!(lhs_actual, system_solver.lhs_actual_copy)
+    lhs_actual[end, tau_row] = mtt
+    for k in eachindex(cones)
+        copyto!(system_solver.lhs_H_k[k], Cones.hess(cones[k]))
     end
 
-    return (system_solver.x1, system_solver.x2, system_solver.y1, system_solver.y2, system_solver.z1, system_solver.z2, system_solver.s1, system_solver.s2, rhs[end, 1], rhs[end, 2], rhs[kap_row, 1], rhs[kap_row, 2])
+    for k in eachindex(cones)
+        copyto!(system_solver.lhs_H_Vs[k], vec(Cones.hess(cones[k])))
+    end
+    system_solver.Vs[system_solver.tau_idx] = mtt
+    lhs = sparse(system_solver.Is, system_solver.Js, system_solver.Vs)
+
+    ps = PardisoSolver()
+    # rhs .= Pardiso.solve(ps, lhs, rhs)
+
+    rhs .= lu(lhs_actual) \ rhs
+
+    return (x1, x2, y1, y2, z1, z2, rhs[tau_row, 1], rhs[tau_row, 2], s1, s2, rhs[end, 1], rhs[end, 2])
 end
