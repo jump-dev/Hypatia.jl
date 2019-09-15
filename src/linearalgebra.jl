@@ -280,6 +280,7 @@ TODO try Aasen's version (http://www.netlib.org/lapack/lawnspdf/lawn294.pdf) and
 
 mutable struct HypBKSolveCache{R <: Real}
     uplo
+    F
     n
     lda
     ldaf
@@ -325,7 +326,7 @@ for (sysvx, elty, rtyp) in (
     (:ssysvx_, :Float32, :Float32),
     )
     @eval begin
-        function hyp_bk_solve!(c::HypBKSolveCache{$elty}, X::Matrix{$elty}, A::AbstractMatrix{$elty}, B::AbstractMatrix{$elty})
+        function hyp_bk_solve!(c::HypBKSolveCache{$elty}, X::Matrix{$elty}, A::AbstractMatrix{$elty}, B::AbstractMatrix{$elty}; factorize::Bool = true)
             # call dsysvx( fact, uplo, n, nrhs, a, lda, af, ldaf, ipiv, b, ldb, x, ldx, rcond, ferr, berr, work, lwork, iwork, info )
             ccall((@blasfunc($sysvx), Base.liblapack_name), Cvoid,
                 (Ref{UInt8}, Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt},
@@ -333,7 +334,7 @@ for (sysvx, elty, rtyp) in (
                 Ptr{BlasInt}, Ptr{$elty}, Ref{BlasInt}, Ptr{$elty},
                 Ref{BlasInt}, Ptr{$elty}, Ptr{$elty}, Ptr{$elty},
                 Ptr{$elty}, Ptr{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt}),
-                'N', c.uplo, c.n, c.nrhs,
+                (factorize ? 'N' : 'F'), c.uplo, c.n, c.nrhs,
                 A, c.lda, c.AF, c.ldaf,
                 c.ipiv, B, c.ldb, X,
                 c.n, c.rcond, c.ferr, c.berr,
@@ -359,12 +360,14 @@ function HypBKSolveCache(uplo::Char, X::Matrix{R}, A::AbstractMatrix{R}, B::Abst
 end
 
 # fall back to generic LU solve
-function hyp_bk_solve!(c::HypBKSolveCache{R}, X::Matrix{R}, A::AbstractMatrix{R}, B::AbstractMatrix{R}) where {R <: Real}
-    F = lu!(Symmetric(A, Symbol(c.uplo)), check = false)
-    if !issuccess(F)
-        return false
+function hyp_bk_solve!(c::HypBKSolveCache{R}, X::Matrix{R}, A::AbstractMatrix{R}, B::AbstractMatrix{R}; factorize::Bool = true) where {R <: Real}
+    if factorize
+        c.F = lu!(Symmetric(A, Symbol(c.uplo)), check = false)
+        if !issuccess(c.F)
+            return false
+        end
     end
-    ldiv!(X, F, B)
+    ldiv!(X, c.F, B)
     return true
 end
 

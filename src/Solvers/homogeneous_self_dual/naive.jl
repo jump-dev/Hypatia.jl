@@ -282,11 +282,11 @@ function apply_lhs(solver, x_in, y_in, z_in, tau_in, s_in, kap_in)
         if Cones.use_dual(cone_k)
             # (du bar) mu*H_k*z_k + s_k = srhs_k
             @views Cones.hess_prod!(s_out[idxs_k], z_in[idxs_k], cone_k)
-            @views @. s_out[idxs_k] += s_in[idxs_k]
+            @. @views s_out[idxs_k] += s_in[idxs_k]
         else
             # (pr bar) z_k + mu*H_k*s_k = srhs_k
             @views Cones.hess_prod!(s_out[idxs_k], s_in[idxs_k], cone_k)
-            @views @. s_out[idxs_k] += z_in[idxs_k]
+            @. @views s_out[idxs_k] += z_in[idxs_k]
         end
     end
 
