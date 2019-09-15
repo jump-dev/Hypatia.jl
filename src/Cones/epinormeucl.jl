@@ -78,7 +78,6 @@ function update_grad(cone::EpiNormEucl)
     return cone.grad
 end
 
-# TODO only work with upper triangle
 function update_hess(cone::EpiNormEucl)
     @assert cone.grad_updated
     mul!(cone.hess.data, cone.grad, cone.grad')
@@ -88,7 +87,6 @@ function update_hess(cone::EpiNormEucl)
     return cone.hess
 end
 
-# TODO only work with upper triangle
 function update_inv_hess(cone::EpiNormEucl)
     @assert cone.is_feas
     mul!(cone.inv_hess.data, cone.point, cone.point')
@@ -102,13 +100,18 @@ update_hess_prod(cone::EpiNormEucl) = nothing
 update_inv_hess_prod(cone::EpiNormEucl) = nothing
 
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormEucl)
-    @assert cone.grad_updated
+    @assert cone.is_feas
+    p1 = cone.point[1]
+    p2 = @view cone.point[2:end]
     @inbounds for j in 1:size(prod, 2)
-        @views ga = dot(cone.grad, arr[:, j])
-        @. prod[:, j] = ga * cone.grad
+        arr_1j = arr[1, j]
+        arr_2j = @view arr[2:end, j]
+        ga = dot(p2, arr_2j) - p1 * arr_1j
+        ga /= cone.dist
+        prod[1, j] = -ga * p1 - arr_1j
+        @. prod[2:end, j] = ga * p2 + arr_2j
     end
-    @. prod += arr / cone.dist
-    @. @views prod[1, :] -= 2 * arr[1, :] / cone.dist
+    @. prod ./= cone.dist
     return prod
 end
 
@@ -118,7 +121,7 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Epi
         @views pa = dot(cone.point, arr[:, j])
         @. prod[:, j] = pa * cone.point
     end
-    @. prod += cone.dist * arr
-    @. @views prod[1, :] -= 2 * arr[1, :] * cone.dist
+    @. @views prod[1, :] -= cone.dist * arr[1, :]
+    @. @views prod[2:end, :] += cone.dist * arr[2:end, :]
     return prod
 end
