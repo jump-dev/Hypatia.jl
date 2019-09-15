@@ -20,6 +20,12 @@ import Pardiso
 struct DefaultSparseSolver end
 SparseSystemSolver = Union{DefaultSparseSolver, Pardiso.PardisoSolver}
 
+function reset_sparse_solver(ps::Pardiso.PardisoSolver)
+    Pardiso.set_phase!(ps, Pardiso.ANALYSIS_NUM_FACT_SOLVE_REFINE)
+    return
+end
+reset_sparse_solver(::DefaultSparseSolver) = nothing
+
 function analyze_sparse_system(ps::Pardiso.PardisoSolver, lhs::SparseMatrixCSC, rhs::Matrix)
     Pardiso.pardisoinit(ps)
     Pardiso.set_iparm!(ps, 1, 1)
@@ -32,17 +38,17 @@ end
 analyze_sparse_system(::DefaultSparseSolver, ::SparseMatrixCSC, ::Matrix) = nothing
 
 function solve_sparse_system(ps::Pardiso.PardisoSolver, lhs::SparseMatrixCSC, rhs::Matrix)
-    # if Pardiso.get_phase(ps) == Pardiso.ANALYSIS_NUM_FACT_SOLVE_REFINE
+    if Pardiso.get_phase(ps) == Pardiso.ANALYSIS_NUM_FACT_SOLVE_REFINE
         analyze_sparse_system(ps, lhs, rhs)
-    # end
+    end
     sol = copy(rhs)
     Pardiso.set_phase!(ps, Pardiso.NUM_FACT_SOLVE_REFINE)
     Pardiso.pardiso(ps, sol, lhs, rhs)
+    # @printf("PARDISO performed %d iterative refinement steps.\n", Pardiso.get_iparm(ps, 7))
     @show norm(rhs - lhs * sol)
     rhs .= sol
     return sol
 end
-
 solve_sparse_system(ps::DefaultSparseSolver, lhs::SparseMatrixCSC, rhs::Matrix) = rhs .= lu(lhs) \ rhs
 
 function free_sparse_solver_memory(ps::Pardiso.PardisoSolver)
@@ -51,7 +57,7 @@ function free_sparse_solver_memory(ps::Pardiso.PardisoSolver)
     return
 end
 free_sparse_solver_memory(::DefaultSparseSolver) = nothing
-free_sparse_solver_memory(s::SystemSolver) = free_sparse_solver_memory(s.sparse_solver)
+free_sparse_solver_memory(s::NaiveSparseSystemSolver) = free_sparse_solver_memory(s.sparse_solver)
 
 mutable struct NaiveSparseSystemSolver{T <: Real} <: SystemSolver{T}
     use_iterative::Bool
@@ -95,7 +101,7 @@ mutable struct NaiveSparseSystemSolver{T <: Real} <: SystemSolver{T}
     function NaiveSparseSystemSolver{T}(;
             use_iterative::Bool = false,
             use_sparse::Bool = false,
-            sparse_solver = Pardiso.PardisoSolver(),
+            sparse_solver = DefaultSparseSolver() # Pardiso.PardisoSolver(),
             ) where {T <: Real}
         system_solver = new{T}()
         system_solver.use_iterative = use_iterative
@@ -111,6 +117,8 @@ function load(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) wher
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
     dim = n + p + 2q + 2
+
+    reset_sparse_solver(system_solver.sparse_solver)
 
     rhs = zeros(T, dim, 2)
     system_solver.rhs = rhs
@@ -151,38 +159,19 @@ function load(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) wher
     Js = system_solver.Js = Vector{Int}(undef, total_nnz)
     Vs = system_solver.Vs = Vector{T}(undef, total_nnz)
 
-    function add_I_J_V(k, start_row, start_col, vec::Vector{T})
+    function add_I_J_V(k, start_row, start_col, vec::Vector{T}, trans::Bool = false)
+        n = length(vec)
         if !isempty(vec)
-            for i in eachindex(vec)
-                Is[k] = i + start_row
-                Js[k] = start_col + 1
-                Vs[k] = vec[i]
-                k += 1
+            if trans
+                Is[k:(k + n - 1)] .= start_row + 1
+                Js[k:(k + n - 1)] .= (start_col + 1):(start_col + n)
+            else
+                Is[k:(k + n - 1)] .= (start_row + 1):(start_row + n)
+                Js[k:(k + n - 1)] .= start_col + 1
             end
+            Vs[k:(k + n - 1)] .= vec
         end
-        return k
-    end
-
-    # function add_I_J_V(k, start_row, start_col, vec::Vector{T})
-    #     n = length(vec)
-    #     if !isempty(vec)
-    #         Is[k:(k + n - 1)] .= (start_row + 1):(start_row + n)
-    #         Js[k:(k + n - 1)] .= start_col + 1
-    #         Vs[k:(k + n - 1)] .= vec
-    #     end
-    #     return k + n
-    # end
-
-    function add_I_J_V(k, start_row, start_col, vec::Adjoint{T, Array{T, 1}})
-        if !isempty(vec)
-            for j in eachindex(vec)
-                Is[k] = start_row + 1
-                Js[k] = j + start_col
-                Vs[k] = vec[j]
-                k += 1
-            end
-        end
-        return k
+        return k + n
     end
 
     function add_I_J_V(k, start_row, start_col, mat::SparseMatrixCSC{T, Int64})
@@ -203,7 +192,9 @@ function load(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) wher
     rc4 = n + p + q
     rc5 = n + p + q + 1
     rc6 = dim - 1
+    # count of nonzeros added so far
     offset = 1
+    # set up all nonzero elements apart from Hessians
     offset = add_I_J_V(offset, rc1, rc2, sparse(model.A'))
     offset = add_I_J_V(offset, rc1, rc3, sparse(model.G'))
     offset = add_I_J_V(offset, rc1, rc4, model.c)
@@ -212,22 +203,22 @@ function load(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) wher
     offset = add_I_J_V(offset, rc3, rc1, -sparse(model.G))
     offset = add_I_J_V(offset, rc3, rc4, model.h)
     offset = add_I_J_V(offset, rc3, rc5, sparse(-one(T) * I, q, q))
-    offset = add_I_J_V(offset, rc4, rc1, -model.c')
-    offset = add_I_J_V(offset, rc4, rc2, -model.b')
-    offset = add_I_J_V(offset, rc4, rc3, -model.h')
+    offset = add_I_J_V(offset, rc4, rc1, -model.c, true)
+    offset = add_I_J_V(offset, rc4, rc2, -model.b, true)
+    offset = add_I_J_V(offset, rc4, rc3, -model.h, true)
     offset = add_I_J_V(offset, rc4, rc6, -[one(T)])
     system_solver.tau_idx = offset
     offset = add_I_J_V(offset, rc6, rc4, [one(T)])
     offset = add_I_J_V(offset, rc6, rc6, [one(T)])
 
     # add I, J, V for Hessians and cache indices to modify later
-    H_indices = [Vector{Int}(undef, Cones.dimension(cone_k)) for cone_k in model.cones]
+    Hess_indices = [Vector{Int}(undef, Cones.dimension(cone_k)) for cone_k in model.cones]
     nz_rows_added = 0
     for (k, cone_k) in enumerate(model.cones)
         cone_dim = Cones.dimension(cone_k)
         rows = rc5 + nz_rows_added
         # indices of I, J, V affected
-        H_indices[k] = offset:(offset + cone_dim ^ 2 - 1)
+        Hess_indices[k] = offset:(offset + cone_dim ^ 2 - 1)
         if Cones.use_dual(cone_k)
             H_cols = rc3 + nz_rows_added
             id_cols = rows
@@ -255,7 +246,7 @@ function load(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) wher
     end
     system_solver.lhs_H_k = [view_k(k) for k in eachindex(model.cones)]
 
-    view_k2(k::Int) = view(system_solver.Vs, H_indices[k])
+    view_k2(k::Int) = view(system_solver.Vs, Hess_indices[k])
     system_solver.lhs_H_Vs = [view_k2(k) for k in eachindex(model.cones)]
 
     return system_solver
