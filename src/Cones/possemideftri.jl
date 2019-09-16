@@ -102,8 +102,9 @@ end
 
 function update_grad(cone::PosSemidefTri)
     @assert cone.is_feas
-    cone.inv_mat = hyp_chol_inv!(cone.chol_cache, cone.fact_mat)
-    copytri!(cone.inv_mat, 'U', cone.is_complex)
+    # cone.inv_mat = hyp_chol_inv!(cone.chol_cache, cone.fact_mat)
+    # copytri!(cone.inv_mat, 'U', cone.is_complex)
+    cone.inv_mat = inv(cone.fact_mat)
     mat_U_to_vec_scaled!(cone.grad, cone.inv_mat)
     cone.grad .*= -1
     copytri!(cone.mat, 'U', cone.is_complex)
@@ -208,11 +209,12 @@ update_hess_prod(cone::PosSemidefTri) = nothing
 update_inv_hess_prod(cone::PosSemidefTri) = nothing
 
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidefTri)
-    @assert cone.grad_updated
+    @assert is_feas(cone)
     @inbounds for i in 1:size(arr, 2)
         vec_to_mat_U!(cone.mat4, view(arr, :, i))
-        mul!(cone.mat3, Hermitian(cone.mat4, :U), cone.inv_mat)
-        mul!(cone.mat4, Hermitian(cone.inv_mat, :U), cone.mat3)
+        copytri!(cone.mat4, 'U', cone.is_complex)
+        rdiv!(cone.mat4, cone.fact_mat)
+        ldiv!(cone.fact_mat, cone.mat4)
         mat_U_to_vec_scaled!(view(prod, :, i), cone.mat4)
     end
     return prod
