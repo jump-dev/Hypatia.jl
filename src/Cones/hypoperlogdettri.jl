@@ -28,7 +28,6 @@ mutable struct HypoPerLogdetTri{T <: Real} <: Cone{T}
 
     mat::Matrix{T}
     mat2::Matrix{T}
-    mat3::Matrix{T}
     fact_mat
     chol_cache
     ldWv::T
@@ -65,7 +64,6 @@ function setup_data(cone::HypoPerLogdetTri{T}) where {T <: Real}
     cone.tmp_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.mat = Matrix{T}(undef, cone.side, cone.side)
     cone.mat2 = similar(cone.mat)
-    cone.mat3 = similar(cone.mat)
     cone.chol_cache = HypCholCache('U', cone.mat)
     cone.Wivzi = similar(cone.mat)
     cone.hess_fact_cache = nothing
@@ -111,8 +109,9 @@ function update_grad(cone::HypoPerLogdetTri)
     @assert cone.is_feas
     u = cone.point[1]
     v = cone.point[2]
-    cone.Wi = hyp_chol_inv!(cone.chol_cache, cone.fact_mat)
-    copytri!(cone.Wi, 'U')
+    # cone.Wi = hyp_chol_inv!(cone.chol_cache, cone.fact_mat)
+    # copytri!(cone.Wi, 'U')
+    cone.Wi = inv(cone.fact_mat)
     cone.nLz = (cone.side - cone.ldWv) / cone.z
     cone.ldWvuv = cone.ldWv - u / v
     cone.vzip1 = 1 + inv(cone.ldWvuv)
@@ -162,19 +161,17 @@ function update_hess_prod(cone::HypoPerLogdetTri)
     u = cone.point[1]
     v = cone.point[2]
     z = cone.z
-    Wi = cone.Wi
-    Wivzi = cone.Wivzi
     H = cone.hess.data
 
-    @. Wivzi = Wi / cone.ldWvuv
+    @. cone.Wivzi = cone.Wi / cone.ldWvuv
     H[1, 1] = inv(z) / z
     H[1, 2] = cone.nLz / z
     h1end = view(H, 1, 3:cone.dim)
-    mat_U_to_vec_scaled!(h1end, Wivzi)
+    mat_U_to_vec_scaled!(h1end, cone.Wivzi)
     h1end ./= -z
     H[2, 2] = abs2(cone.nLz) + (cone.side / z + inv(v)) / v
     h2end = view(H, 2, 3:cone.dim)
-    mat_U_to_vec_scaled!(h2end, Wi)
+    mat_U_to_vec_scaled!(h2end, cone.Wi)
     h2end .*= ((cone.ldWv - cone.side) / cone.ldWvuv - 1) / z
 
     cone.hess_prod_updated = true
@@ -185,16 +182,15 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPer
     if !cone.hess_prod_updated
         update_hess_prod(cone)
     end
-    Wi = cone.Wi
-    @views mul!(prod[1:2, :], cone.hess[1:2, :], arr)
 
+    @views mul!(prod[1:2, :], cone.hess[1:2, :], arr)
     @inbounds for i in 1:size(arr, 2)
         vec_to_mat_U!(cone.mat2, view(arr, 3:cone.dim, i))
         dot_prod = dot(Symmetric(cone.mat2, :U), Symmetric(cone.Wivzi, :U))
-        mul!(cone.mat3, Symmetric(cone.mat2, :U), cone.Wi)
-        copyto!(cone.mat2, cone.Wivzi)
-        @. cone.mat2 *= dot_prod
-        mul!(cone.mat2, Symmetric(cone.Wi, :U), cone.mat3, cone.vzip1, true)
+        copytri!(cone.mat2, 'U')
+        rdiv!(cone.mat2, cone.fact_mat)
+        ldiv!(cone.fact_mat, cone.mat2)
+        axpby!(dot_prod, cone.Wivzi, cone.vzip1, cone.mat2)
         mat_U_to_vec_scaled!(view(prod, 3:cone.dim, i), cone.mat2)
     end
     @views mul!(prod[3:cone.dim, :], cone.hess[3:cone.dim, 1:2], arr[1:2, :], true, true)

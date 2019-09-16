@@ -69,12 +69,12 @@ testfuns_raw = [
     # hypogeomean2,
     # hypogeomean3,
     # epinormspectral1,
-    possemideftri1,
-    possemideftri2,
-    possemideftricomplex1,
-    # hypoperlogdettri1,
-    # hypoperlogdettri2,
-    # hypoperlogdettri3,
+    # possemideftri1,
+    # possemideftri2,
+    # possemideftricomplex1,
+    hypoperlogdettri1,
+    hypoperlogdettri2,
+    hypoperlogdettri3,
     # primalinfeas1,
     # primalinfeas2,
     # primalinfeas3,
@@ -96,10 +96,10 @@ testfuns_raw = [
     t(T, solver = solver)
 end
 
-# @info("starting iterative system solver tests")
-# @testset "iterative system solver tests: $t, $T" for t in testfuns_raw, T in real_types
-#     T == BigFloat && continue # IterativeSolvers does not work with BigFloat
-#     solver = SO.Solver{T}(verbose = true, init_use_iterative = true, preprocess = false,
-#         system_solver = SO.NaiveSystemSolver{T}(use_iterative = true))
-#     t(T, solver = solver)
-# end
+@info("starting iterative system solver tests")
+@testset "iterative system solver tests: $t, $T" for t in testfuns_raw, T in real_types
+    T == BigFloat && continue # IterativeSolvers does not work with BigFloat
+    solver = SO.Solver{T}(verbose = true, init_use_iterative = true, preprocess = false,
+        system_solver = SO.NaiveSystemSolver{T}(use_iterative = true))
+    t(T, solver = solver)
+end
