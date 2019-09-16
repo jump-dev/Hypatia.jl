@@ -349,7 +349,7 @@ for (sysvx, elty, rtyp) in (
     end
 end
 
-function HypBKSolveCache(uplo::Char, X::Matrix{R}, A::AbstractMatrix{R}, B::AbstractMatrix{R}) where {R <: Real}
+function HypBKSolveCache(uplo::Char, A::AbstractMatrix{R}) where {R <: Real}
     c = HypBKSolveCache{R}()
     c.uplo = uplo
     return c
