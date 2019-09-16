@@ -23,6 +23,7 @@ import Hypatia.hyp_bk_solve!
 import Hypatia.HypCholSolveCache
 import Hypatia.hyp_chol_solve!
 import Hypatia.BlockMatrix
+import Hypatia.set_min_diag!
 
 # homogeneous self-dual embedding algorithm
 abstract type SystemSolver{T <: Real} end
