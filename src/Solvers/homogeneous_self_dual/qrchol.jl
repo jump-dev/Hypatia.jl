@@ -163,7 +163,7 @@ function load(system_solver::QRCholSystemSolver{T}, solver::Solver{T}) where {T 
 
     if !system_solver.use_sparse
         system_solver.solvesol = Matrix{T}(undef, nmp, 3)
-        system_solver.solvecache = HypBKSolveCache('U', system_solver.solvesol, system_solver.Q2GHGQ2, system_solver.Q2div)
+        system_solver.solvecache = HypBKSolveCache('U', system_solver.Q2GHGQ2)
     end
 
     return system_solver

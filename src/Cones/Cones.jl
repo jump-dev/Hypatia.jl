@@ -17,6 +17,8 @@ import Hypatia.hyp_chol!
 import Hypatia.hyp_chol_inv!
 import Hypatia.HypBKCache
 import Hypatia.hyp_bk!
+import Hypatia.HypBKSolveCache
+import Hypatia.hyp_bk_solve!
 import Hypatia.set_min_diag!
 
 abstract type Cone{T <: Real} end
@@ -62,9 +64,10 @@ function update_inv_hess_prod(cone::Cone{T}) where {T}
     end
     cone.hess_fact = hyp_bk!(cone.hess_fact_cache, cone.tmp_hess.data)
     if !issuccess(cone.hess_fact) # TODO maybe better to not step to this point if the hessian factorization fails
+        # TODO equilibration makes more sense than current recovery method
         @warn("numerical failure: cannot factorize primitive cone hessian")
         copyto!(cone.tmp_hess, cone.hess)
-        set_min_diag!(cone.tmp_hess.data, cbrt(eps(T)))
+        set_min_diag!(cone.tmp_hess.data, sqrt(eps(T)))
         cone.hess_fact = hyp_bk!(cone.hess_fact_cache, cone.tmp_hess.data)
         if !issuccess(cone.hess_fact)
             @warn("numerical failure: could not fix failure of positive definiteness")
@@ -78,12 +81,11 @@ function update_inv_hess(cone::Cone)
     if !cone.inv_hess_prod_updated
         update_inv_hess_prod(cone)
     end
-    cone.inv_hess = Symmetric(inv(cone.hess_fact), :U)
+    cone.inv_hess = Symmetric(inv(cone.hess_fact), :U) # TODO use in-place function
     cone.inv_hess_updated = true
     return cone.inv_hess
 end
 
-# TODO maybe write using linear operator form rather than needing explicit hess
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
     if !cone.hess_updated
         update_hess(cone)
