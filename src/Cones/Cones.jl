@@ -54,24 +54,36 @@ reset_data(cone::Cone) = (cone.feas_updated = cone.grad_updated = cone.hess_upda
 
 update_hess_prod(cone::Cone) = nothing
 
+# function update_inv_hess_prod(cone::Cone{T}) where {T}
+#     if !cone.hess_updated
+#         update_hess(cone)
+#     end
+#     copyto!(cone.tmp_hess, cone.hess)
+#     if isnothing(cone.hess_fact_cache)
+#         cone.hess_fact_cache = HypBKCache(cone.tmp_hess.uplo, cone.tmp_hess.data)
+#     end
+#     cone.hess_fact = hyp_bk!(cone.hess_fact_cache, cone.tmp_hess.data)
+#     if !issuccess(cone.hess_fact) # TODO maybe better to not step to this point if the hessian factorization fails
+#         # TODO equilibration makes more sense than current recovery method
+#         @warn("numerical failure: cannot factorize primitive cone hessian")
+#         copyto!(cone.tmp_hess, cone.hess)
+#         set_min_diag!(cone.tmp_hess.data, sqrt(eps(T)))
+#         cone.hess_fact = hyp_bk!(cone.hess_fact_cache, cone.tmp_hess.data)
+#         if !issuccess(cone.hess_fact)
+#             @warn("numerical failure: could not fix failure of positive definiteness")
+#         end
+#     end
+#     cone.inv_hess_prod_updated = true
+#     return
+# end
+
 function update_inv_hess_prod(cone::Cone{T}) where {T}
     if !cone.hess_updated
         update_hess(cone)
     end
     copyto!(cone.tmp_hess, cone.hess)
     if isnothing(cone.hess_fact_cache)
-        cone.hess_fact_cache = HypBKCache(cone.tmp_hess.uplo, cone.tmp_hess.data)
-    end
-    cone.hess_fact = hyp_bk!(cone.hess_fact_cache, cone.tmp_hess.data)
-    if !issuccess(cone.hess_fact) # TODO maybe better to not step to this point if the hessian factorization fails
-        # TODO equilibration makes more sense than current recovery method
-        @warn("numerical failure: cannot factorize primitive cone hessian")
-        copyto!(cone.tmp_hess, cone.hess)
-        set_min_diag!(cone.tmp_hess.data, sqrt(eps(T)))
-        cone.hess_fact = hyp_bk!(cone.hess_fact_cache, cone.tmp_hess.data)
-        if !issuccess(cone.hess_fact)
-            @warn("numerical failure: could not fix failure of positive definiteness")
-        end
+        cone.hess_fact_cache = HypBKSolveCache(cone.tmp_hess.uplo, cone.tmp_hess.data)
     end
     cone.inv_hess_prod_updated = true
     return
@@ -81,7 +93,8 @@ function update_inv_hess(cone::Cone)
     if !cone.inv_hess_prod_updated
         update_inv_hess_prod(cone)
     end
-    cone.inv_hess = Symmetric(inv(cone.hess_fact), :U) # TODO use in-place function
+    # cone.inv_hess = Symmetric(inv(cone.hess_fact), :U) # TODO use in-place function
+    cone.inv_hess = Symmetric(inv(cone.hess), :U) # TODO reuse BK cache
     cone.inv_hess_updated = true
     return cone.inv_hess
 end
@@ -96,9 +109,21 @@ end
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
     if !cone.inv_hess_prod_updated
         update_inv_hess_prod(cone)
+        hyp_bk_solve!(cone.hess_fact_cache, prod, cone.tmp_hess.data, arr, factorize = true)
+        return prod
+        # if !issuccess(cone.hess_fact) # TODO maybe better to not step to this point if the hessian factorization fails
+        #     # TODO equilibration makes more sense than current recovery method
+        #     @warn("numerical failure: cannot factorize primitive cone hessian")
+        #     copyto!(cone.tmp_hess, cone.hess)
+        #     set_min_diag!(cone.tmp_hess.data, sqrt(eps(T)))
+        #     cone.hess_fact = hyp_bk!(cone.hess_fact_cache, cone.tmp_hess.data)
+        #     if !issuccess(cone.hess_fact)
+        #         @warn("numerical failure: could not fix failure of positive definiteness")
+        #     end
+        # end
     end
-    @time return hyp_bk_solve!(cone.hess_fact_cache, prod, cone.tmp_hess.data, arr, factorize = false)
-    # return ldiv!(prod, cone.hess_fact, arr) # TODO could use sysvx with already computed factorization here, for improved numerics
+    hyp_bk_solve!(cone.hess_fact_cache, prod, cone.tmp_hess.data, arr, factorize = false)
+    return prod
 end
 
 # utilities for converting between symmetric/Hermitian matrix and vector triangle forms
