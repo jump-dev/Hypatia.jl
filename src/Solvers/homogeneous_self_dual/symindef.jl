@@ -118,7 +118,7 @@ function load(system_solver::SymIndefSystemSolver{T}, solver::Solver{T}) where {
 
     if !system_solver.use_sparse
         system_solver.solvesol = Matrix{T}(undef, size(system_solver.lhs, 1), 3)
-        system_solver.solvecache = HypBKSolveCache('L', system_solver.solvesol, system_solver.lhs, system_solver.rhs)
+        system_solver.solvecache = HypBKSolveCache('L', system_solver.lhs)
     end
 
     return system_solver
