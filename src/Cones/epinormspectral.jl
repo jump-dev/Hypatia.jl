@@ -34,7 +34,6 @@ mutable struct EpiNormSpectral{T <: Real} <: Cone{T}
     chol_cache
     Zi::Symmetric{T, Matrix{T}}
     Eu::Symmetric{T, Matrix{T}}
-    ZiEuZi::Matrix{T}
     tmpnn::Matrix{T}
     tmpnm::Matrix{T}
     tmpnm2::Matrix{T}
@@ -69,7 +68,6 @@ function setup_data(cone::EpiNormSpectral{T}) where {T <: Real}
     cone.Z = Matrix{T}(undef, cone.n, cone.n)
     cone.chol_cache = HypCholCache('U', cone.Z)
     cone.Eu = Symmetric(zeros(T, cone.n, cone.n))
-    cone.ZiEuZi = Matrix{T}(undef, cone.n, cone.n)
     cone.tmpnn = Matrix{T}(undef, cone.n, cone.n)
     cone.tmpnm = Matrix{T}(undef, cone.n, cone.m)
     cone.tmpnm2 = Matrix{T}(undef, cone.n, cone.m)
@@ -105,9 +103,10 @@ end
 function update_grad(cone::EpiNormSpectral)
     @assert cone.is_feas
     u = cone.point[1]
-    # ldiv!(cone.tmpnm, cone.fact_Z, cone.W)
-    cone.Zi = Symmetric(hyp_chol_inv!(cone.chol_cache, cone.fact_Z), :U) # NOTE: destroys cone.fact_Z
-    mul!(cone.tmpnm, cone.Zi, cone.W) # TODO could use ldiv (as above) instead for potentially better numerics
+    ldiv!(cone.tmpnm, cone.fact_Z, cone.W)
+    # cone.Zi = Symmetric(hyp_chol_inv!(cone.chol_cache, cone.fact_Z), :U) # NOTE: destroys cone.fact_Z
+    cone.Zi = Symmetric(inv(cone.fact_Z), :U)
+    # mul!(cone.tmpnm, cone.Zi, cone.W) # TODO could use ldiv (as above) instead for potentially better numerics
     @. cone.Eu.data = cone.WWt / u / u
     @inbounds for i in 1:cone.n
         cone.Eu[i, i] += 1
@@ -130,7 +129,6 @@ function update_hess(cone::EpiNormSpectral)
     WWt = cone.WWt
     Zi = cone.Zi
     Eu = cone.Eu
-    ZiEuZi = cone.ZiEuZi
     tmpnn = cone.tmpnn
     tmpnm = cone.tmpnm
     tmpnm2 = cone.tmpnm2
@@ -141,7 +139,7 @@ function update_hess(cone::EpiNormSpectral)
     p = 2
     @inbounds for j in 1:m, i in 1:n
         # tmpnn evaluates to Zi * dZdW_ij * Zi
-        @views mul!(tmpnn, Zi[:, i], tmpnm[:, j]')
+        @views mul!(tmpnn, Zi[:, i], tmpnm[:, j]') # TODO use ldiv! outside loop?
         @. tmpnn += tmpnn'
         # add to terms where k = i, and l = j:n, inner product of Zi with d^2Z / dW_ij dW_kl nonzero only when j=l
         q = p
@@ -165,15 +163,16 @@ function update_hess(cone::EpiNormSpectral)
 
     # no BLAS method for product of two symmetric matrices, faster if one is not symmetric
     copytri!(Zi.data, 'U')
-    mul!(tmpnn, Eu, Zi.data)
-    mul!(ZiEuZi, Zi, tmpnn)
-    mul!(tmpnm, ZiEuZi, W, true, true)
+    ldiv!(tmpnn, cone.fact_Z, Eu)
+    rdiv!(tmpnn, cone.fact_Z)
+    mul!(tmpnm, tmpnn, W, true, true)
     tmpnm .*= -1
     @views copyto!(H[1, 2:end], tmpnm)
 
     # scale everything
-    @. H = H / u * 2
-    H[1, 1] = dot(Symmetric(ZiEuZi, :U), Eu) + (2 * dot(Zi, Symmetric(WWt, :U)) / u + 1) / u / u
+    @. H /= u
+    @. H *= 2
+    H[1, 1] = dot(Symmetric(tmpnn, :U), Eu) + (2 * dot(Zi, Symmetric(WWt, :U)) / u + 1) / u / u
 
     cone.hess_updated = true
     return cone.hess
