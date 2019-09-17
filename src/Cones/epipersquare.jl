@@ -81,7 +81,6 @@ function update_grad(cone::EpiPerSquare)
     return cone.grad
 end
 
-# TODO only work with upper triangle
 function update_hess(cone::EpiPerSquare)
     @assert cone.grad_updated
     H = cone.hess.data
@@ -95,7 +94,6 @@ function update_hess(cone::EpiPerSquare)
     return cone.hess
 end
 
-# TODO only work with upper triangle
 function update_inv_hess(cone::EpiPerSquare)
     @assert cone.is_feas
     mul!(cone.inv_hess.data, cone.point, cone.point')
@@ -111,29 +109,31 @@ update_hess_prod(cone::EpiPerSquare) = nothing
 update_inv_hess_prod(cone::EpiPerSquare) = nothing
 
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerSquare)
-    @assert cone.grad_updated
+    p1 = cone.point[1]
+    p2 = cone.point[2]
+    p3 = @view cone.point[3:end]
     @inbounds for j in 1:size(prod, 2)
-        ga = dot(cone.grad, view(arr, :, j))
-        @. prod[:, j] = ga * cone.grad
+        arr_1j = arr[1, j]
+        arr_2j = arr[2, j]
+        arr_3j = @view arr[3:end, j]
+        ga = dot(p3, arr_3j) - p2 * arr_1j - p1 * arr_2j
+        ga /= cone.dist
+        prod[1, j] = -ga * p2 - arr_2j
+        prod[2, j] = -ga * p1 - arr_1j
+        @. prod[3:end, j] = ga * p3 + arr_3j
     end
-    @. @views begin
-        prod[3:end, :] += arr[3:end, :] / cone.dist
-        prod[1, :] -= arr[2, :] / cone.dist
-        prod[2, :] -= arr[1, :] / cone.dist
-    end
+    @. prod ./= cone.dist
     return prod
 end
 
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerSquare)
     @assert cone.is_feas
     @inbounds for j in 1:size(prod, 2)
-        pa = dot(cone.point, view(arr, :, j))
+        @views pa = dot(cone.point, arr[:, j])
         @. prod[:, j] = pa * cone.point
     end
-    @. @views begin
-        prod[3:end, :] += cone.dist * arr[3:end, :]
-        prod[1, :] -= cone.dist * arr[2, :]
-        prod[2, :] -= cone.dist * arr[1, :]
-    end
+    @. @views prod[1, :] -= cone.dist * arr[2, :]
+    @. @views prod[2, :] -= cone.dist * arr[1, :]
+    @. @views prod[3:end, :] += cone.dist * arr[3:end, :]
     return prod
 end

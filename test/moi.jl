@@ -12,8 +12,8 @@ import Hypatia
 const SO = Hypatia.Solvers
 
 config = MOIT.TestConfig(
-    atol = 1e-4,
-    rtol = 1e-4,
+    atol = 2e-4,
+    rtol = 2e-4,
     solve = true,
     query = true,
     modify_lhs = true,
