@@ -152,7 +152,7 @@ function load(system_solver::NaiveSparseSystemSolver{Float64}, solver::Solver{Fl
     # dropzeros!(system_solver.lhs_actual_copy)
     # system_solver.lhs_actual = similar(system_solver.lhs_actual_copy)
 
-    hess_nnzs = sum(Cones.dimension(cone_k) + Cones.dimension(cone_k) ^ 2 for cone_k in model.cones)
+    hess_nnzs = sum(Cones.dimension(cone_k) + Cones.hess_nnzs(cone_k) for cone_k in model.cones)
     total_nnz = 2 * (nnz(sparse(model.A)) + nnz(sparse(model.G)) + n + p + q + 1) + q + 1 + hess_nnzs
     Is = Vector{Int32}(undef, total_nnz)
     Js = Vector{Int32}(undef, total_nnz)
@@ -216,14 +216,12 @@ function load(system_solver::NaiveSparseSystemSolver{Float64}, solver::Solver{Fl
     for (k, cone_k) in enumerate(model.cones)
         cone_dim = Cones.dimension(cone_k)
         rows = rc5 + nz_rows_added
-        if Cones.use_dual(cone_k)
-            H_cols = rc3 + nz_rows_added
-            id_cols = rows
-        else
-            id_cols = rc3 + nz_rows_added
-            H_cols = rows
-        end
-        offset = add_I_J_V(offset, rows, H_cols, sparse(ones(T, cone_dim, cone_dim)))
+        dual_cols = rc3 + nz_rows_added
+        is_dual = Cones.use_dual(cone_k)
+        # add dense matrix in one placeholder block, identity in the other
+        H_cols = (is_dual ? dual_cols : rows)
+        id_cols = (is_dual ? rows : dual_cols)
+        offset = add_I_J_V(offset, rows, H_cols, Cones.hess_sparsity_pattern(cone_k))
         offset = add_I_J_V(offset, rows, id_cols, sparse(one(T) * I, cone_dim, cone_dim))
         nz_rows_added += cone_dim
     end
@@ -232,7 +230,6 @@ function load(system_solver::NaiveSparseSystemSolver{Float64}, solver::Solver{Fl
     @assert offset == total_nnz + 1
 
     @timeit solver.timer "build sparse" system_solver.lhs = sparse(Is, Js, Vs, Int32(dim), Int32(dim))
-    @show typeof(system_solver.lhs)
 
     # cache indices of placeholders of Hessians
     @timeit solver.timer "cache idxs" begin
@@ -247,10 +244,19 @@ function load(system_solver::NaiveSparseSystemSolver{Float64}, solver::Solver{Fl
             col_idx_start = system_solver.lhs.colptr[col]
             col_idx_end = system_solver.lhs.colptr[col + 1] - 1
             nz_rows = system_solver.lhs.rowval[col_idx_start:col_idx_end]
-            offset_in_row = findfirst(x -> x == row, nz_rows)
-            @assert nz_rows[offset_in_row + cone_dim - 1] == row + cone_dim - 1
-            hess_idx_start = col_idx_start + offset_in_row - 1
-            system_solver.hess_idxs[k][j] = hess_idx_start:(hess_idx_start + cone_dim - 1)
+            # if isa(cone_k, Cones.OrthantCone)
+            #     offset_in_row = findfirst(x -> x == row + j - 1, nz_rows)
+            #     hess_idx_start = col_idx_start + offset_in_row - 1
+            #     system_solver.hess_idxs[k][j] = hess_idx_start:hess_idx_start
+            # else
+                # nonzero rows in column j of the hessian
+                nz_hess_indices = Cones.hess_nz_idxs_j(cone_k, j)
+                @show j, nz_hess_indices
+                offset_in_row = findfirst(x -> x == row + nz_hess_indices[1] - 1, nz_rows)
+                hess_idx_start = col_idx_start + offset_in_row - nz_hess_indices[1]
+                # system_solver.hess_idxs[k][j] = hess_idx_start:(hess_idx_start + cone_dim - 1)
+                system_solver.hess_idxs[k][j] = hess_idx_start .+ nz_hess_indices .- 1
+            # end
             col_offset += 1
         end
         row += cone_dim
@@ -307,12 +313,15 @@ function get_combined_directions(system_solver::NaiveSparseSystemSolver{T}) wher
     rhs[end, 1] = -solver.kap
     rhs[end, 2] = -solver.kap + solver.mu / solver.tau
 
-    @timeit solver.timer "modify views" begin
+    # @timeit solver.timer "modify views" begin
     for (k, cone_k) in enumerate(cones), i in 1:Cones.dimension(cone_k)
-        @timeit solver.timer "views" v = view(system_solver.lhs.nzval, system_solver.hess_idxs[k][i])
-        @timeit solver.timer "get hess" @views copyto!(v, Cones.hess(cone_k)[:, i])
+        if isa(cone_k, Cones.OrthantCone)
+            @views copyto!(system_solver.lhs.nzval[system_solver.hess_idxs[k][i]], Cones.hess(cone_k)[i, i])
+        else
+            @views copyto!(system_solver.lhs.nzval[system_solver.hess_idxs[k][i]], Cones.hess(cone_k)[:, i])
+        end
     end
-    end # time views
+    # end # time views
     system_solver.lhs.nzval[system_solver.mtt_idx] = mtt
     @timeit solver.timer "solve system" solve_sparse_system(sparse_solver, sol, lhs, rhs, solver)
 
