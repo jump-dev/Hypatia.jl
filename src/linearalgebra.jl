@@ -17,7 +17,18 @@ hyp_AAt!(U::Matrix{T}, A::Matrix{T}) where {T <: BlasReal} = BLAS.syrk!('U', 'N'
 hyp_AAt!(U::Matrix{T}, A::Matrix{T}) where {T <: RealOrComplex{<:Real}} = mul!(U, A, A')
 
 #=
-helpers for factorizations and linear solves
+helpers for in-place
+- factorizations (with equilibration)
+- linear solves (with iterative refinement)
+- inverses
+
+for matrices of types
+- triangular
+- symmetric indefinite
+- symmetric PSD
+- square nonsymmetric
+- nonsquare
+
 TODO cleanup by
 - removing rtyp when not used
 - removing unnecessary fields in caches
@@ -27,8 +38,6 @@ import LinearAlgebra.BlasInt
 import LinearAlgebra.BLAS.@blasfunc
 import LinearAlgebra.LAPACK.liblapack
 import LinearAlgebra.issuccess
-
-LinearAlgebra.issuccess(F::Union{Cholesky, CholeskyPivoted}) = isposdef(F)
 
 # ensure diagonal terms in symm/herm that should be PSD are not too small
 function set_min_diag!(A::Matrix{<:RealOrComplex{T}}, tol::T) where {T <: Real}
@@ -45,78 +54,6 @@ function set_min_diag!(A::Matrix{<:RealOrComplex{T}}, tol::T) where {T <: Real}
 end
 
 # TODO equilibration (radix) functions for cholesky and bk and LU - use DPOEQUB/DSYEQUB/DGEEQUB
-
-#=
-UNpivoted Cholesky factorization (like POTRF) and inverse (like POTRI)
-=#
-
-mutable struct HypCholCache{R <: Real, T <: RealOrComplex{R}}
-    uplo
-    n
-    lda
-    info
-    HypCholCache{R, T}() where {T <: RealOrComplex{R}} where {R <: Real} = new{R, T}()
-end
-
-function HypCholCache(uplo::Char, A::StridedMatrix{T}) where {T <: RealOrComplex{R}} where {R <: BlasReal}
-    LinearAlgebra.chkstride1(A)
-    Base.require_one_based_indexing(A)
-    c = HypCholCache{R, T}()
-    c.uplo = uplo
-    c.n = LinearAlgebra.checksquare(A)
-    c.lda = max(1, stride(A, 2))
-    c.info = Ref{BlasInt}()
-    return c
-end
-
-for (potrf, potri, elty, rtyp) in (
-    (:dpotrf_, :dpotri_, :Float64, :Float64),
-    (:spotrf_, :spotri_, :Float32, :Float32),
-    (:zpotrf_, :zpotri_, :ComplexF64, :Float64),
-    (:cpotrf_, :cpotri_, :ComplexF32, :Float32),
-    )
-    @eval begin
-        function hyp_chol!(c::HypCholCache{$rtyp, $elty}, A::StridedMatrix{$elty})
-            # call dposvx( fact, uplo, n, nrhs, a, lda, af, ldaf, equed, s, b, ldb, x, ldx, rcond, ferr, berr, work, iwork, info )
-            ccall((@blasfunc($potrf), liblapack), Cvoid,
-                (Ref{UInt8}, Ref{BlasInt}, Ptr{$elty}, Ref{BlasInt}, Ptr{BlasInt}),
-                c.uplo, c.n, A, c.lda, c.info)
-
-            if c.info[] < 0
-                throw(ArgumentError("invalid argument #$(-c.info[]) to LAPACK call"))
-            end
-
-            return Cholesky{$elty, typeof(A)}(A, c.uplo, c.info[])
-        end
-    end
-
-    @eval begin
-        function hyp_chol_inv!(c::HypCholCache{$rtyp, $elty}, fact_A::Cholesky{$elty, <:StridedMatrix{$elty}})
-            # call dpotri( uplo, n, a, lda, info )
-            ccall((@blasfunc($potri), liblapack), Cvoid,
-                (Ref{UInt8}, Ref{BlasInt}, Ptr{$elty}, Ref{BlasInt}, Ptr{BlasInt}),
-                c.uplo, c.n, fact_A.factors, c.lda, c.info)
-
-            if c.info[] < 0
-                throw(ArgumentError("invalid argument #$(-c.info[]) to LAPACK call"))
-            elseif c.info[] > 0
-                @warn("inverse from Cholesky failed: $(c.info[])")
-            end
-
-            return fact_A.factors
-        end
-    end
-end
-
-function HypCholCache(uplo::Char, A::AbstractMatrix{T}) where {T <: RealOrComplex{R}} where {R <: Real}
-    c = HypCholCache{R, T}()
-    c.uplo = uplo
-    return c
-end
-
-hyp_chol!(c::HypCholCache{R, T}, A::AbstractMatrix{T}) where {T <: RealOrComplex{R}} where {R <: Real} = cholesky!(Hermitian(A, Symbol(c.uplo)), check = false)
-
-hyp_chol_inv!(c::HypCholCache{R, T}, fact_A::Cholesky{T, <:AbstractMatrix{T}}) where {T <: RealOrComplex{R}} where {R <: Real} = inv(fact_A)
 
 #=
 pivoted BunchKaufman factorization (like SYTRF_ROOK)
@@ -367,100 +304,6 @@ function hyp_bk_solve!(c::HypBKSolveCache{R}, X::Matrix{R}, A::AbstractMatrix{R}
     return true
 end
 
-#=
-Cholesky solve (like POSVX)
-=#
-
-mutable struct HypCholSolveCache{R <: Real}
-    uplo
-    n
-    lda
-    ldaf
-    nrhs
-    ldb
-    rcond
-    lwork
-    ferr
-    berr
-    work
-    iwork
-    AF
-    ipiv
-    S
-    info
-    HypCholSolveCache{R}() where {R <: Real} = new{R}()
-end
-
-function HypCholSolveCache(uplo::Char, X::Matrix{R}, A::AbstractMatrix{R}, B::AbstractMatrix{R}) where {R <: BlasReal}
-    LinearAlgebra.chkstride1(A)
-    c = HypCholSolveCache{R}()
-    c.uplo = uplo
-    c.n = LinearAlgebra.checksquare(A)
-    @assert c.n == size(X, 1) == size(B, 1)
-    @assert size(X, 2) == size(B, 2)
-    c.lda = stride(A, 2)
-    c.ldaf = c.n
-    c.nrhs = size(B, 2)
-    c.ldb = stride(B, 2)
-    c.rcond = Ref{R}()
-    c.lwork = Ref{BlasInt}(5 * c.n)
-    c.ferr = Vector{R}(undef, c.nrhs)
-    c.berr = Vector{R}(undef, c.nrhs)
-    c.work = Vector{R}(undef, 5 * c.n)
-    c.iwork = Vector{Int}(undef, c.n)
-    c.AF = Matrix{R}(undef, c.n, c.n)
-    c.ipiv = Vector{Int}(undef, c.n)
-    c.S = Vector{R}(undef, c.n)
-    c.info = Ref{BlasInt}()
-    return c
-end
-
-for (posvx, elty, rtyp) in (
-    (:dposvx_, :Float64, :Float64),
-    (:sposvx_, :Float32, :Float32),
-    )
-    @eval begin
-        function hyp_chol_solve!(c::HypCholSolveCache{$elty}, X::Matrix{$elty}, A::AbstractMatrix{$elty}, B::AbstractMatrix{$elty})
-            # call dposvx( fact, uplo, n, nrhs, a, lda, af, ldaf, equed, s, b, ldb, x, ldx, rcond, ferr, berr, work, iwork, info )
-            ccall((@blasfunc($posvx), liblapack), Cvoid,
-                (Ref{UInt8}, Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt},
-                Ptr{$elty}, Ref{BlasInt}, Ptr{$elty}, Ref{BlasInt},
-                Ref{UInt8}, Ptr{$elty}, Ptr{$elty}, Ref{BlasInt},
-                Ptr{$elty}, Ref{BlasInt}, Ptr{$elty}, Ptr{$elty},
-                Ptr{$elty}, Ptr{$elty}, Ptr{BlasInt}, Ptr{BlasInt}),
-                'E', c.uplo, c.n, c.nrhs,
-                A, c.lda, c.AF, c.ldaf,
-                'Y', c.S, B, c.ldb,
-                X, c.n, c.rcond, c.ferr,
-                c.berr, c.work, c.iwork, c.info)
-
-            if c.info[] < 0
-                throw(ArgumentError("invalid argument #$(-c.info[]) to LAPACK call"))
-            elseif 0 < c.info[] <= c.n
-                @warn("factorization failed: #$(c.info[])")
-                return false
-            elseif c.info[] > c.n
-                @warn("condition number is small: $(c.rcond[])")
-            end
-            return true
-        end
-    end
-end
-
-function HypCholSolveCache(uplo::Char, X::Matrix{R}, A::AbstractMatrix{R}, B::AbstractMatrix{R}) where {R <: Real}
-    c = HypCholSolveCache{R}()
-    c.uplo = uplo
-    return c
-end
-
-function hyp_chol_solve!(c::HypCholSolveCache{R}, X::Matrix{R}, A::AbstractMatrix{R}, B::AbstractMatrix{R}) where {R <: Real}
-    F = cholesky!(Symmetric(A, Symbol(c.uplo)), check = false)
-    if !isposdef(F)
-        return false
-    end
-    ldiv!(X, F, B)
-    return true
-end
 
 # #=
 # extra precise LU solve (like GESVXX) - requires MKL
