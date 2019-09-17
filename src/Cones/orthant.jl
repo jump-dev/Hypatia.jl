@@ -130,3 +130,9 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Ort
     @. prod = arr * cone.point * cone.point
     return prod
 end
+
+hess_nnzs(cone::OrthantCone) = cone.dim
+
+hess_sparsity_pattern(cone::OrthantCone{T}) where {T <: Real} = sparse(one(T) * I, cone.dim, cone.dim)
+
+hess_nz_idxs_j(cone::OrthantCone, j::Int) = j:j
