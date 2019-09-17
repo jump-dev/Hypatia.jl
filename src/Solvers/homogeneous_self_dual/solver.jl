@@ -727,6 +727,39 @@ function step(solver::Solver{T}) where {T <: Real}
     return point
 end
 
+# apply LHS of 6x6 system to x, y, z, tau, s, kap
+function apply_lhs(solver, x_in, y_in, z_in, tau_in, s_in, kap_in)
+    model = solver.model
+
+    # A'*y + G'*z + c*tau = xrhs
+    x_out = model.A' * y_in + model.G' * z_in + model.c * tau_in
+    # -A*x + b*tau = yrhs
+    y_out = -model.A * x_in + model.b * tau_in
+    # -G*x + h*tau - s = zrhs
+    z_out = -model.G * x_in + model.h * tau_in - s_in
+    # -c'*x - b'*y - h'*z - kap = taurhs
+    tau_out = -model.c' * x_in - model.b' * y_in - model.h' * z_in - kap_in
+
+    s_out = similar(z_out)
+    for (k, cone_k) in enumerate(model.cones)
+        idxs_k = model.cone_idxs[k]
+        if Cones.use_dual(cone_k)
+            # (du bar) mu*H_k*z_k + s_k = srhs_k
+            @views Cones.hess_prod!(s_out[idxs_k, :], z_in[idxs_k, :], cone_k)
+            @. @views s_out[idxs_k, :] += s_in[idxs_k, :]
+        else
+            # (pr bar) z_k + mu*H_k*s_k = srhs_k
+            @views Cones.hess_prod!(s_out[idxs_k, :], s_in[idxs_k, :], cone_k)
+            @. @views s_out[idxs_k, :] += z_in[idxs_k, :]
+        end
+    end
+
+    # mu/(taubar^2)*tau + kap = kaprhs
+    kap_out = kap_in + solver.mu / solver.tau * tau_in / solver.tau
+
+    return (x_out, y_out, z_out, tau_out, s_out, kap_out)
+end
+
 # backtracking line search to find large distance to step in direction while remaining inside cones and inside a given neighborhood
 function find_max_alpha_in_nbhd(
     z_dir::AbstractVector{T},
