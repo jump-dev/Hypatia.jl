@@ -12,36 +12,51 @@ A'*y + G'*z + c*tau = xrhs
 (du bar) mu*H_k*z_k + s_k = srhs_k
 mu/(taubar^2)*tau + kap = kaprhs
 
-TODO optimize iterative method
+TODO for iterative method
+- precondition
+- optimize operations
+- fix IterativeSolvers so that methods can take matrix RHS
+- try linear maps:
+    # lhs_lin_map(arr) = @views vcat(apply_lhs(solver, arr[1:n], arr[(n + 1):(n + p)], arr[(n + p + 1):(n + p + q)], arr[tau_row], arr[tau_row .+ (1:q)], arr[end]))
+    # system_solver.lhs_map = LinearMaps.FunctionMap{T}(lhs_lin_map)
+
+TODO remove the lhs_copy? only need if factorization overwrites lhs
 =#
 
 mutable struct NaiveSystemSolver{T <: Real} <: SystemSolver{T}
+    solver::Solver{T}
     use_iterative::Bool
     use_sparse::Bool
 
-    solver::Solver{T}
-
-    x1
-    x2
-    y1
-    y2
-    z1
-    z2
     tau_row::Int
-    s1
-    s2
-    s1_k
-    s2_k
+
+    rhs::Matrix{T}
+    rhs_x1
+    rhs_x2
+    rhs_y1
+    rhs_y2
+    rhs_z1
+    rhs_z2
+    rhs_s1
+    rhs_s2
+    rhs_s1_k
+    rhs_s2_k
+
+    sol::Matrix{T}
+    sol_x1
+    sol_x2
+    sol_y1
+    sol_y2
+    sol_z1
+    sol_z2
+    sol_s1
+    sol_s2
 
     lhs_copy
     lhs
     lhs_H_k
-    rhs::Matrix{T}
-    prevsol1::Vector{T}
-    prevsol2::Vector{T}
 
-    solvesol
-    solvecache
+    dense_cache
 
     function NaiveSystemSolver{T}(; use_iterative::Bool = false, use_sparse::Bool = false) where {T <: Real}
         system_solver = new{T}()
@@ -51,39 +66,45 @@ mutable struct NaiveSystemSolver{T <: Real} <: SystemSolver{T}
     end
 end
 
+# create the system_solver cache
 function load(system_solver::NaiveSystemSolver{T}, solver::Solver{T}) where {T <: Real}
     system_solver.solver = solver
-
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
+    cones = model.cones
+    cone_idxs = model.cone_idxs
     dim = n + p + 2q + 2
 
     rhs = zeros(T, dim, 2)
+    sol = zeros(T, dim, 2)
     system_solver.rhs = rhs
+    system_solver.sol = sol
     rows = 1:n
-    system_solver.x1 = view(rhs, rows, 1)
-    system_solver.x2 = view(rhs, rows, 2)
+    system_solver.rhs_x1 = view(rhs, rows, 1)
+    system_solver.rhs_x2 = view(rhs, rows, 2)
+    system_solver.sol_x1 = view(sol, rows, 1)
+    system_solver.sol_x2 = view(sol, rows, 2)
     rows = (n + 1):(n + p)
-    system_solver.y1 = view(rhs, rows, 1)
-    system_solver.y2 = view(rhs, rows, 2)
+    system_solver.rhs_y1 = view(rhs, rows, 1)
+    system_solver.rhs_y2 = view(rhs, rows, 2)
+    system_solver.sol_y1 = view(sol, rows, 1)
+    system_solver.sol_y2 = view(sol, rows, 2)
     rows = (n + p + 1):(n + p + q)
-    system_solver.z1 = view(rhs, rows, 1)
-    system_solver.z2 = view(rhs, rows, 2)
+    system_solver.rhs_z1 = view(rhs, rows, 1)
+    system_solver.rhs_z2 = view(rhs, rows, 2)
+    system_solver.sol_z1 = view(sol, rows, 1)
+    system_solver.sol_z2 = view(sol, rows, 2)
     tau_row = n + p + q + 1
     system_solver.tau_row = tau_row
     rows = tau_row .+ (1:q)
-    system_solver.s1 = view(rhs, rows, 1)
-    system_solver.s2 = view(rhs, rows, 2)
-    system_solver.s1_k = [view(rhs, tau_row .+ model.cone_idxs[k], 1) for k in eachindex(model.cones)]
-    system_solver.s2_k = [view(rhs, tau_row .+ model.cone_idxs[k], 2) for k in eachindex(model.cones)]
+    system_solver.rhs_s1 = view(rhs, rows, 1)
+    system_solver.rhs_s2 = view(rhs, rows, 2)
+    system_solver.sol_s1 = view(sol, rows, 1)
+    system_solver.sol_s2 = view(sol, rows, 2)
+    system_solver.rhs_s1_k = [view(rhs, tau_row .+ idxs_k, 1) for idxs_k in cone_idxs]
+    system_solver.rhs_s2_k = [view(rhs, tau_row .+ idxs_k, 2) for idxs_k in cone_idxs]
 
-    # x y z kap s tau
     if system_solver.use_iterative
-        system_solver.prevsol1 = zeros(T, dim)
-        system_solver.prevsol2 = zeros(T, dim)
-        # TODO compare approaches
-        # lhs_lin_map(arr) = @views vcat(apply_lhs(solver, arr[1:n], arr[(n + 1):(n + p)], arr[(n + p + 1):(n + p + q)], arr[tau_row], arr[tau_row .+ (1:q)], arr[end]))
-        # system_solver.lhs_map = LinearMaps.FunctionMap{T}(lhs_lin_map)
         system_solver.lhs = setup_block_lhs(solver)
     else
         if system_solver.use_sparse
@@ -109,104 +130,132 @@ function load(system_solver::NaiveSystemSolver{T}, solver::Solver{T}) where {T <
         end
 
         system_solver.lhs = similar(system_solver.lhs_copy)
-        function view_k(k::Int)
-            rows = tau_row .+ model.cone_idxs[k]
-            if Cones.use_dual(model.cones[k])
-                cols = (n + p) .+ model.cone_idxs[k]
-            else
-                cols = rows
-            end
+        function view_H_k(cone_k, idxs_k)
+            rows = tau_row .+ idxs_k
+            cols = Cones.use_dual(cone_k) ? (n + p) .+ idxs_k : rows
             return view(system_solver.lhs, rows, cols)
         end
-        system_solver.lhs_H_k = [view_k(k) for k in eachindex(model.cones)]
+        system_solver.lhs_H_k = [view_H_k(cone_k, idxs_k) for (cone_k, idxs_k) in zip(cones, cone_idxs)]
 
         if !system_solver.use_sparse
-            system_solver.solvesol = Matrix{T}(undef, size(system_solver.lhs, 1), 2)
-            system_solver.solvecache = HypLUSolveCache(system_solver.solvesol, system_solver.lhs, rhs)
+            system_solver.dense_cache = HypLUSolveCache(system_solver.sol, system_solver.lhs, rhs)
         end
     end
 
     return system_solver
 end
 
-function get_combined_directions(system_solver::NaiveSystemSolver{T}) where {T <: Real}
+# update the system solver cache to prepare for solve
+function update(system_solver::NaiveSystemSolver{T}) where {T <: Real}
     solver = system_solver.solver
-    model = solver.model
-    cones = model.cones
     lhs = system_solver.lhs
     rhs = system_solver.rhs
     tau_row = system_solver.tau_row
-    x1 = system_solver.x1
-    x2 = system_solver.x2
-    y1 = system_solver.y1
-    y2 = system_solver.y2
-    z1 = system_solver.z1
-    z2 = system_solver.z2
-    s1 = system_solver.s1
-    s2 = system_solver.s2
-    s1_k = system_solver.s1_k
-    s2_k = system_solver.s2_k
-
-    sqrtmu = sqrt(solver.mu)
-    mtt = solver.mu / solver.tau / solver.tau
 
     # update rhs matrix
-    x1 .= solver.x_residual
-    x2 .= zero(T)
-    y1 .= solver.y_residual
-    y2 .= zero(T)
-    z1 .= solver.z_residual
-    z2 .= zero(T)
+    system_solver.rhs_x1 .= solver.x_residual
+    system_solver.rhs_x2 .= zero(T)
+    system_solver.rhs_y1 .= solver.y_residual
+    system_solver.rhs_y2 .= zero(T)
+    system_solver.rhs_z1 .= solver.z_residual
+    system_solver.rhs_z2 .= zero(T)
     rhs[tau_row, 1] = solver.kap + solver.primal_obj_t - solver.dual_obj_t
     rhs[tau_row, 2] = zero(T)
-    for k in eachindex(cones)
+    sqrtmu = sqrt(solver.mu)
+    for (k, cone_k) in enumerate(solver.model.cones)
         duals_k = solver.point.dual_views[k]
-        grad_k = Cones.grad(cones[k])
-        @. s1_k[k] = -duals_k
-        @. s2_k[k] = -duals_k - grad_k * sqrtmu
+        grad_k = Cones.grad(cone_k)
+        @. system_solver.rhs_s1_k[k] = -duals_k
+        @. system_solver.rhs_s2_k[k] = -duals_k - grad_k * sqrtmu
     end
     rhs[end, 1] = -solver.kap
     rhs[end, 2] = -solver.kap + solver.mu / solver.tau
 
-    # solve system
+    # update lhs matrix
+    mtt = solver.mu / solver.tau / solver.tau
     if system_solver.use_iterative
-        # TODO need preconditioner
-        # TODO optimize for this case, including applying the blocks of the LHS
-        # TODO pick which square non-symm method to use
-        # TODO prealloc whatever is needed inside the solver
-        # TODO possibly fix IterativeSolvers so that methods can take matrix RHS, however the two columns may take different number of iters needed to converge
         lhs.blocks[end - 1][1] = mtt
-        dim = size(lhs, 2)
-
-        rhs1 = view(rhs, :, 1)
-        IterativeSolvers.gmres!(system_solver.prevsol1, lhs, rhs1, restart = dim)
-        copyto!(rhs1, system_solver.prevsol1)
-
-        rhs2 = view(rhs, :, 2)
-        IterativeSolvers.gmres!(system_solver.prevsol2, lhs, rhs2, restart = dim)
-        copyto!(rhs2, system_solver.prevsol2)
     else
-        # update lhs matrix
         copyto!(lhs, system_solver.lhs_copy)
         lhs[end, tau_row] = mtt
-        for k in eachindex(cones)
-            copyto!(system_solver.lhs_H_k[k], Cones.hess(cones[k]))
-        end
-
-        if system_solver.use_sparse
-            rhs .= lu(lhs) \ rhs
-        else
-            if !hyp_lu_solve!(system_solver.solvecache, system_solver.solvesol, lhs, rhs)
-                @warn("numerical failure: could not fix linear solve failure (mu is $(solver.mu))")
-            end
-            copyto!(rhs, system_solver.solvesol)
+        for (k, cone_k) in enumerate(solver.model.cones)
+            copyto!(system_solver.lhs_H_k[k], Cones.hess(cone_k))
         end
     end
 
-    return (x1, x2, y1, y2, z1, z2, rhs[tau_row, 1], rhs[tau_row, 2], s1, s2, rhs[end, 1], rhs[end, 2])
+    return system_solver
 end
 
-# block matrix for efficient multiplication
+# solve without outer iterative refinement
+function solve(system_solver::NaiveSystemSolver{T}, sol_curr, rhs_curr) where {T <: Real}
+    solver = system_solver.solver
+    lhs = system_solver.lhs
+
+    if system_solver.use_iterative
+        rhs1 = view(rhs_curr, :, 1)
+        rhs2 = view(rhs_curr, :, 2)
+        sol1 = view(sol_curr, :, 1)
+        sol2 = view(sol_curr, :, 2)
+        IterativeSolvers.gmres!(sol1, lhs, rhs1, restart = size(lhs, 2))
+        IterativeSolvers.gmres!(sol2, lhs, rhs2, restart = size(lhs, 2))
+    else
+        if system_solver.use_sparse
+            sol_curr .= lu(lhs) \ rhs_curr
+        else
+            if !hyp_lu_solve!(system_solver.dense_cache, sol_curr, lhs, rhs_curr)
+                @warn("numerical failure: could not fix linear solve failure (mu is $(solver.mu))")
+            end
+        end
+    end
+
+    return sol_curr
+end
+
+# return directions
+# TODO make this function the same for all system solvers, move to solver.jl
+function get_combined_directions(system_solver::NaiveSystemSolver{T}) where {T <: Real}
+    solver = system_solver.solver
+    lhs = system_solver.lhs
+    rhs = system_solver.rhs
+    sol = system_solver.sol
+
+    update(system_solver)
+    solve(system_solver, sol, copy(rhs)) # TODO remove need for copy
+
+
+    # test residual
+    # TODO use apply_lhs(solver, x_in, y_in, z_in, tau_in, s_in, kap_in)
+    res = apply_lhs(solver, sol) - rhs
+    sol_curr = zeros(T, size(res, 1), 2)
+    res_sol = solve(system_solver, sol_curr, copy(res)) # TODO remove need for copy
+    sol_new = sol - res_sol
+    res_new = apply_lhs(solver, sol_new) - rhs
+
+    norm_inf = norm(res, Inf)
+    norm_inf_new = norm(res_new, Inf)
+    norm_2 = norm(res, 2)
+    norm_2_new = norm(res_new, 2)
+    if norm_inf_new < norm_inf && norm_2_new < norm_2
+        println("used iter ref")
+        println(norm_inf, "\t", norm_2)
+        println(norm_inf_new, "\t", norm_2_new)
+        copyto!(sol, sol_new)
+    end
+
+
+    return (system_solver.sol_x1, system_solver.sol_x2, system_solver.sol_y1, system_solver.sol_y2, system_solver.sol_z1, system_solver.sol_z2, sol[system_solver.tau_row, 1], sol[system_solver.tau_row, 2], system_solver.sol_s1, system_solver.sol_s2, sol[end, 1], sol[end, 2])
+end
+
+# TODO make efficient
+function apply_lhs(solver, sol_in)
+    model = solver.model
+    (n, p, q) = (model.n, model.p, model.q)
+    tau_row = n + p + q + 1
+    return vcat(apply_lhs(solver, sol_in[1:n, :], sol_in[(n + 1):(n + p), :], sol_in[(n + p + 1):(n + p + q), :], sol_in[tau_row:tau_row, :], sol_in[tau_row .+ (1:q), :], sol_in[end:end, :])...)
+end
+
+# for iterative methods, build block matrix for efficient multiplication
+# TODO use apply_lhs instead of block matrix
 function setup_block_lhs(solver::Solver{T}) where {T <: Real}
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
@@ -262,36 +311,4 @@ function setup_block_lhs(solver::Solver{T}) where {T <: Real}
         )
 
     return block_lhs
-end
-
-function apply_lhs(solver, x_in, y_in, z_in, tau_in, s_in, kap_in)
-    model = solver.model
-
-    # A'*y + G'*z + c*tau = xrhs
-    x_out = model.A' * y_in + model.G' * z_in + model.c * tau_in
-    # -A*x + b*tau = yrhs
-    y_out = -model.A * x_in + model.b * tau_in
-    # -G*x + h*tau - s = zrhs
-    z_out = -model.G * x_in + model.h * tau_in - s_in
-    # -c'*x - b'*y - h'*z - kap = taurhs
-    tau_out = -dot(model.c, x_in) - dot(model.b, y_in) - dot(model.h, z_in) - kap_in
-
-    s_out = similar(z_out)
-    for (k, cone_k) in enumerate(model.cones)
-        idxs_k = model.cone_idxs[k]
-        if Cones.use_dual(cone_k)
-            # (du bar) mu*H_k*z_k + s_k = srhs_k
-            @views Cones.hess_prod!(s_out[idxs_k], z_in[idxs_k], cone_k)
-            @. @views s_out[idxs_k] += s_in[idxs_k]
-        else
-            # (pr bar) z_k + mu*H_k*s_k = srhs_k
-            @views Cones.hess_prod!(s_out[idxs_k], s_in[idxs_k], cone_k)
-            @. @views s_out[idxs_k] += z_in[idxs_k]
-        end
-    end
-
-    # mu/(taubar^2)*tau + kap = kaprhs
-    kap_out = kap_in + solver.mu / solver.tau * tau_in / solver.tau
-
-    return (x_out, y_out, z_out, tau_out, s_out, kap_out)
 end
