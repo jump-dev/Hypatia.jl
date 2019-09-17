@@ -194,7 +194,7 @@ portfolio5(T::Type{<:Real}) = portfolio(T, 4, [:linf, :l1], use_linfball = true,
 portfolio6(T::Type{<:Real}) = portfolio(T, 6, [:linf, :l1], use_linfball = false, use_l1ball = false)
 portfolio7(T::Type{<:Real}) = portfolio(T, 4, [:linf, :l1], use_l1ball = true, use_linops = false)
 portfolio8(T::Type{<:Real}) = portfolio(T, 4, [:linf, :l1], use_l1ball = true, use_linops = true)
-portfolio9(T::Type{<:Real}) = portfolio(T, 3, [:linf, :l1], use_l1ball = false, use_linops = false)
+portfolio9(T::Type{<:Real}) = portfolio(T, 300, [:linf], use_l1ball = false, use_linops = false)
 portfolio10(T::Type{<:Real}) = portfolio(T, 3, [:linf, :l1], use_l1ball = false, use_linops = true)
 portfolio11(T::Type{<:Real}) = portfolio(T, 4, [:entropic], use_l1ball = false, use_linops = false)
 portfolio12(T::Type{<:Real}) = portfolio(T, 4, [:entropic], use_l1ball = false, use_linops = true)
@@ -229,3 +229,13 @@ function test_portfolio(instance::Function; T::Type{<:Real} = Float64, options::
     @test r.status == :Optimal
     return
 end
+
+using TimerOutputs
+SO = Hypatia.Solvers
+T = Float64
+
+solver = SO.Solver{T}(verbose = true, system_solver = SO.NaiveSparseSystemSolver{T}())
+options = (solver = solver, )
+d = portfolio9(T)
+r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
+print_timer(solver.timer)

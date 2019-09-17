@@ -3,6 +3,7 @@ Copyright 2019, Chris Coey and contributors
 =#
 
 include(joinpath(@__DIR__, "native.jl"))
+using TimerOutputs
 
 const SO = Hypatia.Solvers
 
@@ -18,7 +19,7 @@ system_solvers = [
     # SO.QRCholSystemSolver,
     # SO.SymIndefSystemSolver,
     # SO.NaiveElimSystemSolver,
-    SO.NaiveSystemSolver,
+    # SO.NaiveSystemSolver,
     SO.NaiveSparseSystemSolver,
     ]
 
@@ -97,6 +98,7 @@ tol = 1e-8
     !p && s == SO.QRCholSystemSolver && continue # Must use preprocessing if using QRCholSystemSolver
     solver = SO.Solver{T}(verbose = false, preprocess = p, use_infty_nbhd = n, system_solver = s{T}(), tol_rel_opt = tol, tol_abs_opt = tol, tol_feas = tol)
     t(T, solver = solver)
+    # print_timer(solver.timer)
 end
 
 # @info("starting iterative system solver tests")

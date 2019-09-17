@@ -75,6 +75,7 @@ mutable struct NaiveSparseSystemSolver{T <: Real} <: SystemSolver{T}
 
     lhs
     hess_idxs
+    hess_view_k_j
     sparse_solver::SparseSystemSolver
 
     sol::Matrix{T}
@@ -241,22 +242,17 @@ function load(system_solver::NaiveSparseSystemSolver{Float64}, solver::Solver{Fl
         init_col = (Cones.use_dual(cone_k) ? rc3 : rc5)
         for j in 1:cone_dim
             col = init_col + col_offset
+            # get list of nonzero rows in the current column of the LHS
             col_idx_start = system_solver.lhs.colptr[col]
             col_idx_end = system_solver.lhs.colptr[col + 1] - 1
             nz_rows = system_solver.lhs.rowval[col_idx_start:col_idx_end]
-            # if isa(cone_k, Cones.OrthantCone)
-            #     offset_in_row = findfirst(x -> x == row + j - 1, nz_rows)
-            #     hess_idx_start = col_idx_start + offset_in_row - 1
-            #     system_solver.hess_idxs[k][j] = hess_idx_start:hess_idx_start
-            # else
-                # nonzero rows in column j of the hessian
-                nz_hess_indices = Cones.hess_nz_idxs_j(cone_k, j)
-                @show j, nz_hess_indices
-                offset_in_row = findfirst(x -> x == row + nz_hess_indices[1] - 1, nz_rows)
-                hess_idx_start = col_idx_start + offset_in_row - nz_hess_indices[1]
-                # system_solver.hess_idxs[k][j] = hess_idx_start:(hess_idx_start + cone_dim - 1)
-                system_solver.hess_idxs[k][j] = hess_idx_start .+ nz_hess_indices .- 1
-            # end
+            # nonzero rows in column j of the hessian
+            nz_hess_indices = Cones.hess_nz_idxs_j(cone_k, j)
+            # index corresponding to first nonzero Hessian element of the current column of the LHS
+            offset_in_row = findfirst(x -> x == row + nz_hess_indices[1] - 1, nz_rows)
+            # indices of nonzero values for cone k column j
+            system_solver.hess_idxs[k][j] = col_idx_start + offset_in_row - nz_hess_indices[1] .+ nz_hess_indices .- 1
+            # move to the next column
             col_offset += 1
         end
         row += cone_dim
@@ -265,6 +261,8 @@ function load(system_solver::NaiveSparseSystemSolver{Float64}, solver::Solver{Fl
 
     # get mtt index
     system_solver.mtt_idx = system_solver.lhs.colptr[rc4 + 2] - 1
+
+    system_solver.hess_view_k_j = [[view(cone_k.hess, :, j) for j in 1:Cones.dimension(cone_k)] for cone_k in model.cones]
 
     end # load timing
 
@@ -314,11 +312,15 @@ function get_combined_directions(system_solver::NaiveSparseSystemSolver{T}) wher
     rhs[end, 2] = -solver.kap + solver.mu / solver.tau
 
     # @timeit solver.timer "modify views" begin
-    for (k, cone_k) in enumerate(cones), i in 1:Cones.dimension(cone_k)
-        if isa(cone_k, Cones.OrthantCone)
-            @views copyto!(system_solver.lhs.nzval[system_solver.hess_idxs[k][i]], Cones.hess(cone_k)[i, i])
-        else
-            @views copyto!(system_solver.lhs.nzval[system_solver.hess_idxs[k][i]], Cones.hess(cone_k)[:, i])
+    for (k, cone_k) in enumerate(cones)
+        Cones.update_hess(cone_k)
+        for j in 1:Cones.dimension(cone_k)
+            if isa(cone_k, Cones.OrthantCone)
+                @views copyto!(system_solver.lhs.nzval[system_solver.hess_idxs[k][j]], Cones.hess(cone_k)[j, j])
+            else
+                # @views copyto!(system_solver.lhs.nzval[system_solver.hess_idxs[k][j]], model.cones[k].hess[:, j])
+                @views copyto!(system_solver.lhs.nzval[system_solver.hess_idxs[k][j]], system_solver.hess_view_k_j[k][j])
+            end
         end
     end
     # end # time views

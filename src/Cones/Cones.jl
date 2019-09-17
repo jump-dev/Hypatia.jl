@@ -9,6 +9,7 @@ module Cones
 using LinearAlgebra
 import LinearAlgebra.BlasFloat
 import LinearAlgebra.copytri!
+import SparseArrays.sparse
 import Hypatia.RealOrComplex
 import Hypatia.hyp_AtA!
 import Hypatia.hyp_AAt!
@@ -40,7 +41,6 @@ use_dual(cone::Cone) = cone.use_dual
 load_point(cone::Cone, point::AbstractVector{T}, scal::T) where {T} = (@. cone.point = point / scal)
 load_point(cone::Cone, point::AbstractVector) = copyto!(cone.point, point)
 dimension(cone::Cone) = cone.dim
-nonzero_pattern(cone::Cone) = (repeat(1:cone.dim, cone.dim), [fill(i, cone.dim) for i in 1:cone.dim])
 
 is_feas(cone::Cone) = (cone.feas_updated ? cone.is_feas : update_feas(cone))
 grad(cone::Cone) = (cone.grad_updated ? cone.grad : update_grad(cone))
@@ -48,6 +48,14 @@ hess(cone::Cone) = (cone.hess_updated ? cone.hess : update_hess(cone))
 inv_hess(cone::Cone) = (cone.inv_hess_updated ? cone.inv_hess : update_inv_hess(cone))
 
 # fallbacks
+hess_nnzs(cone::Cone) = dimension(cone) ^ 2
+
+hess_sparse(cone::Cone) = sparse(hess(cone))
+
+hess_sparsity_pattern(cone::Cone{T}) where {T} = sparse(ones(T, cone.dim, cone.dim))
+
+# the row indices of nonzero elements in column j
+hess_nz_idxs_j(cone::Cone, j::Int) = 1:cone.dim
 
 reset_data(cone::Cone) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.inv_hess_prod_updated = false)
 

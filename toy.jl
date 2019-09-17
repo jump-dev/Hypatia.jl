@@ -4,7 +4,7 @@ A = sprandn(n, n, 0.1);
 B = A * randn(n, 2);
 X = zeros(n, 2)
 
-ps = PardisoSolver()
+ps = MKLPardisoSolver()
 # At = get_matrix(ps, A, :T)
 set_phase!(ps, Pardiso.ANALYSIS)
 pardiso(ps, X, A, B)
@@ -12,10 +12,12 @@ set_phase!(ps, Pardiso.NUM_FACT_SOLVE_REFINE)
 pardiso(ps, X, A, B)
 @show norm(B - A' * X)
 
-B = A * randn(n, 2);
-set_phase!(ps, Pardiso.NUM_FACT_SOLVE_REFINE)
-pardiso(ps, X, A, B)
-@show norm(B - A' * X)
+for i in 1:50
+    B = A * randn(n, 2);
+    set_phase!(ps, Pardiso.NUM_FACT_SOLVE_REFINE)
+    pardiso(ps, X, A, B)
+    @show norm(B - A' * X)
+end
 
 
 set_phase!(ps, Pardiso.RELEASE_ALL)
