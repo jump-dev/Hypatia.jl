@@ -108,7 +108,7 @@ function load(system_solver::NaiveSystemSolver{T}, solver::Solver{T}) where {T <
         system_solver.lhs = setup_block_lhs(solver)
     else
         if system_solver.use_sparse
-            system_solver.lhs_copy = T[
+            system_solver.lhs = T[
                 spzeros(T,n,n)  model.A'        model.G'              model.c       spzeros(T,n,q)         spzeros(T,n);
                 -model.A        spzeros(T,p,p)  spzeros(T,p,q)        model.b       spzeros(T,p,q)         spzeros(T,p);
                 -model.G        spzeros(T,q,p)  spzeros(T,q,q)        model.h       sparse(-one(T)*I,q,q)  spzeros(T,q);
@@ -116,8 +116,8 @@ function load(system_solver::NaiveSystemSolver{T}, solver::Solver{T}) where {T <
                 spzeros(T,q,n)  spzeros(T,q,p)  sparse(one(T)*I,q,q)  spzeros(T,q)  sparse(one(T)*I,q,q)   spzeros(T,q);
                 spzeros(T,1,n)  spzeros(T,1,p)  spzeros(T,1,q)        one(T)        spzeros(T,1,q)         one(T);
                 ]
-            dropzeros!(system_solver.lhs_copy)
-            @assert issparse(system_solver.lhs_copy)
+            dropzeros!(system_solver.lhs)
+            @assert issparse(system_solver.lhs)
         else
             system_solver.lhs_copy = T[
                 zeros(T,n,n)  model.A'      model.G'              model.c     zeros(T,n,q)           zeros(T,n);
@@ -127,9 +127,9 @@ function load(system_solver::NaiveSystemSolver{T}, solver::Solver{T}) where {T <
                 zeros(T,q,n)  zeros(T,q,p)  Matrix(one(T)*I,q,q)  zeros(T,q)  Matrix(one(T)*I,q,q)   zeros(T,q);
                 zeros(T,1,n)  zeros(T,1,p)  zeros(T,1,q)          one(T)      zeros(T,1,q)           one(T);
                 ]
+            system_solver.lhs = similar(system_solver.lhs_copy)
         end
 
-        system_solver.lhs = similar(system_solver.lhs_copy)
         function view_H_k(cone_k, idxs_k)
             rows = tau_row .+ idxs_k
             cols = Cones.use_dual(cone_k) ? (n + p) .+ idxs_k : rows
@@ -171,13 +171,10 @@ function update(system_solver::NaiveSystemSolver{T}) where {T <: Real}
     rhs[end, 1] = -solver.kap
     rhs[end, 2] = -solver.kap + solver.mu / solver.tau
 
-    # update lhs matrix
-    mtt = solver.mu / solver.tau / solver.tau
-    if system_solver.use_iterative
-        lhs.blocks[end - 1][1] = mtt
-    else
+    if !system_solver.use_iterative
+        # update lhs matrix
         copyto!(lhs, system_solver.lhs_copy)
-        lhs[end, tau_row] = mtt
+        lhs[end, tau_row] = solver.mu / solver.tau / solver.tau
         for (k, cone_k) in enumerate(solver.model.cones)
             copyto!(system_solver.lhs_H_k[k], Cones.hess(cone_k))
         end
@@ -220,28 +217,31 @@ function get_combined_directions(system_solver::NaiveSystemSolver{T}) where {T <
     sol = system_solver.sol
 
     update(system_solver)
-    solve(system_solver, sol, copy(rhs)) # TODO remove need for copy
 
+    refine = true # TODO handle
+    if !refine
+        solve(system_solver, sol, rhs) # NOTE dense solve destroys RHS
+    else
+        solve(system_solver, sol, copy(rhs)) # TODO remove need for copy?
 
-    # test residual
-    # TODO use apply_lhs(solver, x_in, y_in, z_in, tau_in, s_in, kap_in)
-    res = apply_lhs(solver, sol) - rhs
-    sol_curr = zeros(T, size(res, 1), 2)
-    res_sol = solve(system_solver, sol_curr, copy(res)) # TODO remove need for copy
-    sol_new = sol - res_sol
-    res_new = apply_lhs(solver, sol_new) - rhs
+        # test residual
+        res = apply_lhs(solver, sol) - rhs
+        sol_curr = zeros(T, size(res, 1), 2)
+        res_sol = solve(system_solver, sol_curr, copy(res)) # TODO remove need for copy
+        sol_new = sol - res_sol
+        res_new = apply_lhs(solver, sol_new) - rhs
 
-    norm_inf = norm(res, Inf)
-    norm_inf_new = norm(res_new, Inf)
-    norm_2 = norm(res, 2)
-    norm_2_new = norm(res_new, 2)
-    if norm_inf_new < norm_inf && norm_2_new < norm_2
-        println("used iter ref")
-        println(norm_inf, "\t", norm_2)
-        println(norm_inf_new, "\t", norm_2_new)
-        copyto!(sol, sol_new)
+        norm_inf = norm(res, Inf)
+        norm_inf_new = norm(res_new, Inf)
+        norm_2 = norm(res, 2)
+        norm_2_new = norm(res_new, 2)
+        if norm_inf_new < norm_inf && norm_2_new < norm_2
+            println("used iter ref")
+            println(norm_inf, "\t", norm_2)
+            println(norm_inf_new, "\t", norm_2_new)
+            copyto!(sol, sol_new)
+        end
     end
-
 
     return (system_solver.sol_x1, system_solver.sol_x2, system_solver.sol_y1, system_solver.sol_y2, system_solver.sol_z1, system_solver.sol_z2, sol[system_solver.tau_row, 1], sol[system_solver.tau_row, 2], system_solver.sol_s1, system_solver.sol_s2, sol[end, 1], sol[end, 2])
 end
@@ -255,7 +255,6 @@ function apply_lhs(solver, sol_in)
 end
 
 # for iterative methods, build block matrix for efficient multiplication
-# TODO use apply_lhs instead of block matrix
 function setup_block_lhs(solver::Solver{T}) where {T <: Real}
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
@@ -295,7 +294,7 @@ function setup_block_lhs(solver::Solver{T}) where {T <: Real}
             -model.A, reshape(model.b, :, 1),
             -model.G, reshape(model.h, :, 1), -I,
             -model.c', -model.b', -model.h', -ones(T, 1, 1),
-            ones(T, 1, 1), ones(T, 1, 1)],
+            solver, ones(T, 1, 1)],
         [cone_rows...,
             rc1, rc1, rc1,
             rc2, rc2,
@@ -311,4 +310,23 @@ function setup_block_lhs(solver::Solver{T}) where {T <: Real}
         )
 
     return block_lhs
+end
+
+# TODO experimental for block LHS: if block is a Cone then define mul as hessian product, if block is solver then define mul by mu/tau/tau
+# TODO optimize... maybe need for each cone a 5-arg hess prod
+import LinearAlgebra.mul!
+
+function mul!(y::AbstractVecOrMat{T}, A::Cones.Cone{T}, x::AbstractVecOrMat{T}, alpha::Number, beta::Number) where {T <: Real}
+    # TODO in-place
+    ytemp = y * beta
+    Cones.hess_prod!(y, x, A)
+    rmul!(y, alpha)
+    y .+= ytemp
+    return y
+end
+
+function mul!(y::AbstractVecOrMat{T}, solver::Solvers.Solver{T}, x::AbstractVecOrMat{T}, alpha::Number, beta::Number) where {T <: Real}
+    rmul!(y, beta)
+    @. y += alpha * x / solver.tau * solver.mu / solver.tau
+    return y
 end
