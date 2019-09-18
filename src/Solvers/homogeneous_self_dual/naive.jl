@@ -56,7 +56,7 @@ mutable struct NaiveSystemSolver{T <: Real} <: SystemSolver{T}
     lhs
     lhs_H_k
 
-    dense_cache
+    fact_cache
 
     function NaiveSystemSolver{T}(; use_iterative::Bool = false, use_sparse::Bool = false) where {T <: Real}
         system_solver = new{T}()
@@ -128,6 +128,7 @@ function load(system_solver::NaiveSystemSolver{T}, solver::Solver{T}) where {T <
                 zeros(T,1,n)  zeros(T,1,p)  zeros(T,1,q)          one(T)      zeros(T,1,q)           one(T);
                 ]
             system_solver.lhs = similar(system_solver.lhs_copy)
+            # system_solver.fact_cache = HypLUSolveCache(system_solver.sol, system_solver.lhs, rhs)
         end
 
         function view_H_k(cone_k, idxs_k)
@@ -136,10 +137,6 @@ function load(system_solver::NaiveSystemSolver{T}, solver::Solver{T}) where {T <
             return view(system_solver.lhs, rows, cols)
         end
         system_solver.lhs_H_k = [view_H_k(cone_k, idxs_k) for (cone_k, idxs_k) in zip(cones, cone_idxs)]
-
-        if !system_solver.use_sparse
-            system_solver.dense_cache = HypLUSolveCache(system_solver.sol, system_solver.lhs, rhs)
-        end
     end
 
     return system_solver
@@ -180,28 +177,34 @@ function update(system_solver::NaiveSystemSolver{T}) where {T <: Real}
         end
     end
 
+    # factorize LHS
+    if !system_solver.use_iterative
+        system_solver.fact_cache = lu!(lhs)
+    end
+
     return system_solver
 end
 
 # solve without outer iterative refinement
 function solve(system_solver::NaiveSystemSolver{T}, sol_curr, rhs_curr) where {T <: Real}
     solver = system_solver.solver
-    lhs = system_solver.lhs
 
     if system_solver.use_iterative
         rhs1 = view(rhs_curr, :, 1)
         rhs2 = view(rhs_curr, :, 2)
         sol1 = view(sol_curr, :, 1)
         sol2 = view(sol_curr, :, 2)
-        IterativeSolvers.gmres!(sol1, lhs, rhs1, restart = size(lhs, 2))
-        IterativeSolvers.gmres!(sol2, lhs, rhs2, restart = size(lhs, 2))
+        IterativeSolvers.gmres!(sol1, system_solver.lhs, rhs1, restart = size(lhs, 2))
+        IterativeSolvers.gmres!(sol2, system_solver.lhs, rhs2, restart = size(lhs, 2))
     else
+        # TODO factorize above
         if system_solver.use_sparse
-            sol_curr .= lu(lhs) \ rhs_curr
+            sol_curr .= system_solver.fact_cache \ rhs_curr
         else
-            if !hyp_lu_solve!(system_solver.dense_cache, sol_curr, lhs, rhs_curr)
-                @warn("numerical failure: could not fix linear solve failure (mu is $(solver.mu))")
-            end
+            # if !hyp_lu_solve!(system_solver.fact_cache, sol_curr, lhs, rhs_curr)
+            #     @warn("numerical failure: could not fix linear solve failure (mu is $(solver.mu))")
+            # end
+            ldiv!(sol_curr, system_solver.fact_cache, rhs_curr)
         end
     end
 
@@ -210,36 +213,36 @@ end
 
 # return directions
 # TODO make this function the same for all system solvers, move to solver.jl
-function get_combined_directions(system_solver::NaiveSystemSolver{T}) where {T <: Real}
+# function get_combined_directions(system_solver::NaiveSystemSolver{T}) where {T <: Real}
+function get_combined_directions(system_solver::SystemSolver{T}) where {T <: Real}
     solver = system_solver.solver
     lhs = system_solver.lhs
     rhs = system_solver.rhs
     sol = system_solver.sol
 
     update(system_solver)
+    solve(system_solver, sol, rhs) # NOTE dense solve destroys RHS
 
     refine = true # TODO handle
-    if !refine
-        solve(system_solver, sol, rhs) # NOTE dense solve destroys RHS
-    else
-        solve(system_solver, sol, copy(rhs)) # TODO remove need for copy?
-
+    if refine
         # test residual
-        res = apply_lhs(solver, sol) - rhs
-        sol_curr = zeros(T, size(res, 1), 2)
-        res_sol = solve(system_solver, sol_curr, copy(res)) # TODO remove need for copy
-        sol_new = sol - res_sol
-        res_new = apply_lhs(solver, sol_new) - rhs
-
+        res = calc_system_residual(solver, sol)
         norm_inf = norm(res, Inf)
-        norm_inf_new = norm(res_new, Inf)
         norm_2 = norm(res, 2)
-        norm_2_new = norm(res_new, 2)
-        if norm_inf_new < norm_inf && norm_2_new < norm_2
-            println("used iter ref")
-            println(norm_inf, "\t", norm_2)
-            println(norm_inf_new, "\t", norm_2_new)
-            copyto!(sol, sol_new)
+
+        if norm_inf > eps(T)
+            sol_curr = zeros(T, size(res, 1), 2)
+            res_sol = solve(system_solver, sol_curr, res)
+            sol_new = sol - res_sol
+            res_new = calc_system_residual(solver, sol_new)
+            norm_inf_new = norm(res_new, Inf)
+            norm_2_new = norm(res_new, 2)
+            if norm_inf_new < norm_inf && norm_2_new < norm_2
+                println("used iter ref")
+                println(norm_inf, "\t", norm_2)
+                println(norm_inf_new, "\t", norm_2_new)
+                copyto!(sol, sol_new)
+            end
         end
     end
 
@@ -247,11 +250,57 @@ function get_combined_directions(system_solver::NaiveSystemSolver{T}) where {T <
 end
 
 # TODO make efficient
-function apply_lhs(solver, sol_in)
+function calc_system_residual(solver, sol_in)
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
     tau_row = n + p + q + 1
-    return vcat(apply_lhs(solver, sol_in[1:n, :], sol_in[(n + 1):(n + p), :], sol_in[(n + p + 1):(n + p + q), :], sol_in[tau_row:tau_row, :], sol_in[tau_row .+ (1:q), :], sol_in[end:end, :])...)
+    return vcat(calc_system_residual(solver, sol_in[1:n, :], sol_in[(n + 1):(n + p), :], sol_in[(n + p + 1):(n + p + q), :], sol_in[tau_row:tau_row, :], sol_in[tau_row .+ (1:q), :], sol_in[end:end, :])...)
+end
+
+# apply LHS of 6x6 system to x, y, z, tau, s, kap
+# TODO make efficient / in-place
+function calc_system_residual(solver, sol_x, sol_y, sol_z, sol_tau, sol_s, sol_kap)
+    model = solver.model
+
+    # A'*y + G'*z + c*tau = [x_residual, 0]
+    res_x = model.A' * sol_y + model.G' * sol_z + model.c * sol_tau
+    @. res_x[:, 1] -= solver.x_residual
+    # -A*x + b*tau = [y_residual, 0]
+    res_y = -model.A * sol_x + model.b * sol_tau
+    @. res_y[:, 1] -= solver.y_residual
+    # -G*x + h*tau - s = [z_residual, 0]
+    res_z = -model.G * sol_x + model.h * sol_tau - sol_s
+    @. res_z[:, 1] -= solver.z_residual
+    # -c'*x - b'*y - h'*z - kap = [kap + primal_obj_t - dual_obj_t, 0]
+    res_tau = -model.c' * sol_x - model.b' * sol_y - model.h' * sol_z - sol_kap
+    res_tau[1] -= solver.kap + solver.primal_obj_t - solver.dual_obj_t
+
+    sqrtmu = sqrt(solver.mu)
+    res_s = similar(res_z)
+    for (k, cone_k) in enumerate(model.cones)
+        idxs_k = model.cone_idxs[k]
+        if Cones.use_dual(cone_k)
+            # (du bar) mu*H_k*z_k + s_k = srhs_k
+            @views Cones.hess_prod!(res_s[idxs_k, :], sol_z[idxs_k, :], cone_k)
+            @. @views res_s[idxs_k, :] += sol_s[idxs_k, :]
+        else
+            # (pr bar) z_k + mu*H_k*s_k = srhs_k
+            @views Cones.hess_prod!(res_s[idxs_k, :], sol_s[idxs_k, :], cone_k)
+            @. @views res_s[idxs_k, :] += sol_z[idxs_k, :]
+        end
+        # srhs_k = [-duals_k, -duals_k - mu * grad_k]
+        duals_k = solver.point.dual_views[k]
+        grad_k = Cones.grad(cone_k)
+        @. @views res_s[idxs_k, 1] += duals_k
+        @. @views res_s[idxs_k, 2] += duals_k + grad_k * sqrtmu
+    end
+
+    # mu/(taubar^2)*tau + kap = [-kap, -kap + mu/tau]
+    res_kap = sol_kap + solver.mu / solver.tau * sol_tau / solver.tau
+    res_kap[1] += solver.kap
+    res_kap[2] += solver.kap - solver.mu / solver.tau
+
+    return (res_x, res_y, res_z, res_tau, res_s, res_kap)
 end
 
 # for iterative methods, build block matrix for efficient multiplication
