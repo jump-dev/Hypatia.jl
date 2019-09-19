@@ -16,9 +16,9 @@ real_types = [
 
 system_solvers = [
     # SO.QRCholSystemSolver,
-    # SO.SymIndefSystemSolver,
-    SO.NaiveElimSystemSolver,
-    SO.NaiveSystemSolver,
+    SO.SymIndefSystemSolver,
+    # SO.NaiveElimSystemSolver,
+    # SO.NaiveSystemSolver,
     ]
 
 use_infty_nbhd = [
