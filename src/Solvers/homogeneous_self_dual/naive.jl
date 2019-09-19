@@ -102,7 +102,7 @@ function load(system_solver::NaiveSystemSolver{T}, solver::Solver{T}) where {T <
     system_solver.sol_s2 = view(sol, rows, 2)
 
     if system_solver.use_iterative
-        system_solver.lhs = setup_block_lhs(solver)
+        system_solver.lhs = setup_block_lhs(system_solver)
     else
         if system_solver.use_sparse
             system_solver.lhs = T[
@@ -203,7 +203,7 @@ function update_fact(system_solver::NaiveSystemSolver{T}) where {T <: Real}
     solver = system_solver.solver
 
     if !system_solver.use_sparse
-        copyto!(lhs, system_solver.lhs_copy)
+        copyto!(system_solver.lhs, system_solver.lhs_copy)
     end
     system_solver.lhs[end, system_solver.tau_row] = solver.mu / solver.tau / solver.tau
     for (k, cone_k) in enumerate(solver.model.cones)
