@@ -2,7 +2,9 @@ using LinearAlgebra, SparseArrays
 import SuiteSparse
 import SuiteSparse: decrement, libumfpack
 import SuiteSparse:UMFPACK
-import SuiteSparse.UMFPACK: UmfpackLU, umfpack_numeric!, umfpack_symbolic!, umfpack_report_symbolic, umf_ctrl, umf_info, UMFPACK_WARNING_singular_matrix, umferror
+import SuiteSparse.UMFPACK: UmfpackLU, umfpack_numeric!, umfpack_symbolic!,
+    umfpack_report_symbolic, umf_ctrl, umf_info, UMFPACK_WARNING_singular_matrix,
+    umferror, solve!, UMFPACK_A, _AqldivB_kernel!
 
 const UmfpackIndexTypes = (:Int32, :Int64)
 const UMFITypes = Union{Int32, Int64}
@@ -21,7 +23,7 @@ zerobased = S.colptr[1] == 0
 U = UmfpackLU(C_NULL, C_NULL, S.m, S.n,
                 zerobased ? copy(S.colptr) : decrement(S.colptr),
                 zerobased ? copy(S.rowval) : decrement(S.rowval),
-                copy(S.nzval), 0)
+                S.nzval, 0)
 
 # calls to get umfpack_numeric! and umfpack_symbolic!
 umf_nm(nm,Tv,Ti) = "umfpack_" * (Tv == :Float64 ? "d" : "z") * (Ti == :Int64 ? "l_" : "i_") * nm
@@ -41,7 +43,7 @@ for itype in UmfpackIndexTypes
             return U
         end
         function umfpack_numeric!(U::UmfpackLU{Float64,$itype})
-            if U.numeric != C_NULL return U end
+            # if U.numeric != C_NULL return U end
             if U.symbolic == C_NULL umfpack_symbolic!(U) end
             tmp = Vector{Ptr{Cvoid}}(undef, 1)
             @isok status = ccall(($num_r, :libumfpack), $itype,
@@ -61,11 +63,20 @@ for itype in UmfpackIndexTypes
 end
 
 # try them
-umfpack_symbolic!(U) # ok
-umfpack_numeric!(U) # errors
+umfpack_symbolic!(U)
+umfpack_numeric!(U)
 
+# solve!(x, S, b, UMFPACK_A)
 
-norm(b - S * (U \ b))
+_AqldivB_kernel!(x, U, b, UMFPACK_A)
+norm(b - S * x)
+
+S[1, 1] = 10
+umfpack_numeric!(U)
+_AqldivB_kernel!(x, U, b, UMFPACK_A)
+norm(b - S * x)
+
+# norm(b - S * (U \ b))
 
 
 
