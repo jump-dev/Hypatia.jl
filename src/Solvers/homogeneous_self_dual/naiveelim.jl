@@ -153,12 +153,13 @@ function update_fact(system_solver::NaiveElimSystemSolver{T}) where {T <: Real}
     (n, p, q) = (model.n, model.p, model.q)
     lhs = system_solver.lhs
 
-    copyto!(lhs, system_solver.lhs_copy)
+    if !system_solver.use_sparse
+        copyto!(lhs, system_solver.lhs_copy)
+    end
     lhs[end, end] = solver.mu / solver.tau / solver.tau
     for (k, cone_k) in enumerate(model.cones)
         idxs_k = model.cone_idxs[k]
         z_rows_k = (n + p) .+ idxs_k
-        # TODO optimize by preallocing the views
         if Cones.use_dual(cone_k)
             # -G_k*x + mu*H_k*z_k + h_k*tau = zrhs_k + srhs_k
             lhs[z_rows_k, z_rows_k] .= Cones.hess(cone_k)
@@ -182,14 +183,12 @@ function solve_system(system_solver::NaiveElimSystemSolver{T}, sol_curr, rhs_cur
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
     tau_row = system_solver.tau_row
-    lhs = system_solver.lhs
 
     # TODO in-place
     sol4 = view(sol_curr, 1:tau_row, :)
     # rhs4 = view(rhs_curr, 1:tau_row, :)
     rhs4 = rhs_curr[1:tau_row, :]
 
-    # TODO optimize by preallocing the views
     for (k, cone_k) in enumerate(model.cones)
         z_rows_k = (n + p) .+ model.cone_idxs[k]
         s_rows_k = (q + 1) .+ z_rows_k

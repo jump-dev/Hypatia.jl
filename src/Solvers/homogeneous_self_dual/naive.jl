@@ -202,7 +202,9 @@ end
 function update_fact(system_solver::NaiveSystemSolver{T}) where {T <: Real}
     solver = system_solver.solver
 
-    copyto!(system_solver.lhs, system_solver.lhs_copy)
+    if !system_solver.use_sparse
+        copyto!(lhs, system_solver.lhs_copy)
+    end
     system_solver.lhs[end, system_solver.tau_row] = solver.mu / solver.tau / solver.tau
     for (k, cone_k) in enumerate(solver.model.cones)
         copyto!(system_solver.lhs_H_k[k], Cones.hess(cone_k))
