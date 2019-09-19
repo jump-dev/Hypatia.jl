@@ -115,7 +115,7 @@ function load(system_solver::NaiveElimSystemSolver{T}, solver::Solver{T}) where 
     system_solver.sol_s2 = view(sol, rows, 2)
 
     if system_solver.use_iterative
-        system_solver.lhs = setup_naiveelim_block(solver)
+        system_solver.lhs = setup_block_lhs(solver)
     else
         if system_solver.use_sparse
             system_solver.lhs = T[
@@ -142,7 +142,7 @@ function load(system_solver::NaiveElimSystemSolver{T}, solver::Solver{T}) where 
 end
 
 # for iterative methods, build block matrix for efficient multiplication
-function setup_naiveelim_block(solver::Solver{T}) where {T <: Real}
+function setup_block_lhs(system_solver::NaiveSystemSolver{T}) where {T <: Real}
     error("not implemented")
 end
 
@@ -226,6 +226,7 @@ function solve_system(system_solver::NaiveElimSystemSolver{T}, sol_curr, rhs_cur
     # lift to get s and kap
     tau = sol4[end:end, :]
 
+    # TODO refactor below for use with symindef and qrchol methods
     # s = -G*x + h*tau - zrhs
     s = @view sol_curr[(tau_row + 1):(end - 1), :]
     mul!(s, model.h, tau)

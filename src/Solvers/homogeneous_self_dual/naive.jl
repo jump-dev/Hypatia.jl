@@ -102,7 +102,7 @@ function load(system_solver::NaiveSystemSolver{T}, solver::Solver{T}) where {T <
     system_solver.sol_s2 = view(sol, rows, 2)
 
     if system_solver.use_iterative
-        system_solver.lhs = setup_naive_block(solver)
+        system_solver.lhs = setup_block_lhs(solver)
     else
         if system_solver.use_sparse
             system_solver.lhs = T[
@@ -140,10 +140,11 @@ function load(system_solver::NaiveSystemSolver{T}, solver::Solver{T}) where {T <
 end
 
 # for iterative methods, build block matrix for efficient multiplication
-function setup_naive_block(solver::Solver{T}) where {T <: Real}
+function setup_block_lhs(system_solver::NaiveSystemSolver{T}) where {T <: Real}
+    solver = system_solver.solver
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
-    tau_row = n + p + q + 1
+    tau_row = system_solver.tau_row
     rc1 = 1:n
     rc2 = n .+ (1:p)
     rc3 = (n + p) .+ (1:q)
