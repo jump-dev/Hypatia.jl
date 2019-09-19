@@ -179,7 +179,7 @@ function update_fact(system_solver::SymIndefSystemSolver{T}) where {T <: Real}
             system_solver.fact_cache = ldlt(lhs_symm, shift = eps(T))
         end
     else
-        system_solver.fact_cache = bunchkaufman!(lhs_symm)
+        system_solver.fact_cache = (T == BigFloat ? lu!(lhs_symm) : bunchkaufman!(lhs_symm))
     end
 
     return system_solver
