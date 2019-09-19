@@ -155,7 +155,6 @@ function update_fact(system_solver::NaiveElimSystemSolver{T}) where {T <: Real}
 
     copyto!(lhs, system_solver.lhs_copy)
     lhs[end, end] = solver.mu / solver.tau / solver.tau
-    sqrtmu = sqrt(solver.mu)
     for (k, cone_k) in enumerate(model.cones)
         idxs_k = model.cone_idxs[k]
         z_rows_k = (n + p) .+ idxs_k
@@ -165,7 +164,7 @@ function update_fact(system_solver::NaiveElimSystemSolver{T}) where {T <: Real}
             lhs[z_rows_k, z_rows_k] .= Cones.hess(cone_k)
         else
             # -mu*H_k*G_k*x + z_k + mu*H_k*h_k*tau = mu*H_k*zrhs_k + srhs_k
-            @views Cones.hess_prod!(lhs[z_rows_k, 1:model.n], model.G[idxs_k, :], cone_k)
+            @views Cones.hess_prod!(lhs[z_rows_k, 1:n], model.G[idxs_k, :], cone_k)
             @. lhs[z_rows_k, 1:n] *= -1
             @views Cones.hess_prod!(lhs[z_rows_k, end], model.h[idxs_k], cone_k)
         end
@@ -196,11 +195,11 @@ function solve_system(system_solver::NaiveElimSystemSolver{T}, sol_curr, rhs_cur
         s_rows_k = (q + 1) .+ z_rows_k
         if Cones.use_dual(cone_k)
             # -G_k*x + mu*H_k*z_k + h_k*tau = zrhs_k + srhs_k
-            @. @views rhs4[z_rows_k] += rhs_curr[s_rows_k]
+            @. @views rhs4[z_rows_k, :] += rhs_curr[s_rows_k, :]
         else
             # -mu*H_k*G_k*x + z_k + mu*H_k*h_k*tau = mu*H_k*zrhs_k + srhs_k
-            @views Cones.hess_prod!(rhs4[z_rows_k], rhs_curr[z_rows_k], cone_k)
-            @. @views rhs4[z_rows_k] += rhs_curr[s_rows_k]
+            @views Cones.hess_prod!(rhs4[z_rows_k, :], rhs_curr[z_rows_k, :], cone_k)
+            @. @views rhs4[z_rows_k, :] += rhs_curr[s_rows_k, :]
         end
     end
     # -c'x - b'y - h'z + mu/(taubar^2)*tau = taurhs + kaprhs
