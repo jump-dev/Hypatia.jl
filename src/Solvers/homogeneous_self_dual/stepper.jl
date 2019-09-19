@@ -4,73 +4,147 @@ Copyright 2019, Chris Coey and contributors
 interior point stepping routines for algorithms based on homogeneous self dual embedding
 =#
 
-# mutable struct CombinedStepper{T <: Real} <: Stepper{T}
-#     solver::Solver{T}
-#     use_iterative::Bool
-#     use_sparse::Bool
-#
-#     rhs::Matrix{T}
-#     rhs_x1
-#     rhs_x2
-#     rhs_y1
-#     rhs_y2
-#     rhs_z1
-#     rhs_z2
-#     rhs_s1
-#     rhs_s2
-#     rhs_s1_k
-#     rhs_s2_k
-#
-#     sol::Matrix{T}
-#     sol_x1
-#     sol_x2
-#     sol_y1
-#     sol_y2
-#     sol_z1
-#     sol_z2
-#     sol_s1
-#     sol_s2
-#
-#     lhs_copy
-#     lhs
-#
-#     fact_cache
-#
-# end
+mutable struct CombinedStepper{T <: Real} <: Stepper{T}
+    rhs::Matrix{T}
+    x_rhs
+    x_rhs1
+    x_rhs2
+    y_rhs
+    y_rhs1
+    y_rhs2
+    z_rhs
+    z_rhs1
+    z_rhs2
+    z_rhs_k
+    tau_rhs
+    s_rhs
+    s_rhs1
+    s_rhs2
+    s_rhs_k
+    s_rhs1_k
+    s_rhs2_k
+    kap_rhs
 
-function step(solver::Solver{T}) where {T <: Real}
+    dirs::Matrix{T}
+    x_dirs
+    x_pred
+    x_corr
+    y_dirs
+    y_pred
+    y_corr
+    z_dirs
+    z_pred
+    z_corr
+    tau_dirs
+    s_dirs
+    s_pred
+    s_corr
+    kap_dirs
+
+    tau_row::Int
+
+    CombinedStepper{T}() where {T <: Real} = new{T}()
+end
+
+# create the stepper cache
+function load(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     model = solver.model
+    (n, p, q) = (model.n, model.p, model.q)
+    cones = model.cones
+    cone_idxs = model.cone_idxs
+
+    dim = n + p + 2q + 2
+    rhs = zeros(T, dim, 2)
+    dirs = zeros(T, dim, 2)
+    stepper.rhs = rhs
+    stepper.dirs = dirs
+
+    rows = 1:n
+    stepper.x_rhs = view(rhs, rows, :)
+    stepper.x_rhs1 = view(rhs, rows, 1)
+    stepper.x_rhs2 = view(rhs, rows, 2)
+    stepper.x_dirs = view(dirs, rows, :)
+    stepper.x_pred = view(dirs, rows, 1)
+    stepper.x_corr = view(dirs, rows, 2)
+
+    rows = n .+ (1:p)
+    stepper.y_rhs = view(rhs, rows, :)
+    stepper.y_rhs1 = view(rhs, rows, 1)
+    stepper.y_rhs2 = view(rhs, rows, 2)
+    stepper.y_dirs = view(dirs, rows, :)
+    stepper.y_pred = view(dirs, rows, 1)
+    stepper.y_corr = view(dirs, rows, 2)
+
+    rows = (n + p) .+ (1:q)
+    stepper.z_rhs = view(rhs, rows, :)
+    stepper.z_rhs1 = view(rhs, rows, 1)
+    stepper.z_rhs2 = view(rhs, rows, 2)
+    stepper.z_rhs_k = [view(rhs, (n + p) .+ idxs_k, :) for idxs_k in cone_idxs]
+    stepper.z_dirs = view(dirs, rows, :)
+    stepper.z_pred = view(dirs, rows, 1)
+    stepper.z_corr = view(dirs, rows, 2)
+
+    tau_row = n + p + q + 1
+    stepper.tau_row = tau_row
+    stepper.tau_rhs = view(rhs, tau_row:tau_row, :)
+    stepper.tau_dirs = view(dirs, tau_row:tau_row, :)
+
+    rows = tau_row .+ (1:q)
+    stepper.s_rhs = view(rhs, rows, :)
+    stepper.s_rhs1 = view(rhs, rows, 1)
+    stepper.s_rhs2 = view(rhs, rows, 2)
+    stepper.s_rhs_k = [view(rhs, tau_row .+ idxs_k, :) for idxs_k in cone_idxs]
+    stepper.s_rhs1_k = [view(rhs, tau_row .+ idxs_k, 1) for idxs_k in cone_idxs]
+    stepper.s_rhs2_k = [view(rhs, tau_row .+ idxs_k, 2) for idxs_k in cone_idxs]
+    stepper.s_dirs = view(dirs, rows, :)
+    stepper.s_pred = view(dirs, rows, 1)
+    stepper.s_corr = view(dirs, rows, 2)
+
+    stepper.kap_rhs = view(rhs, dim:dim, :)
+    stepper.kap_dirs = view(dirs, dim:dim, :)
+
+    return stepper
+end
+
+function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     point = solver.point
 
     # calculate affine/prediction and correction directions
-    @timeit solver.timer "directions" (x_pred, x_corr, y_pred, y_corr, z_pred, z_corr, tau_pred, tau_corr, s_pred, s_corr, kap_pred, kap_corr) = get_combined_directions(solver.system_solver)
+    @timeit solver.timer "directions" dirs = get_directions(stepper, solver)
+    (tau_pred, tau_corr, kap_pred, kap_corr) = (stepper.tau_dirs[1], stepper.tau_dirs[2], stepper.kap_dirs[1], stepper.kap_dirs[2])
 
     # calculate correction factor gamma by finding distance aff_alpha for stepping in affine direction
     # TODO try setting nbhd to T(Inf) and avoiding the neighborhood checks - requires tuning
-    @timeit solver.timer "aff_alpha" aff_alpha = find_max_alpha_in_nbhd(z_pred, s_pred, tau_pred, kap_pred, solver, nbhd = one(T), prev_alpha = max(solver.prev_aff_alpha, T(2e-2)), min_alpha = T(2e-2))
+    @timeit solver.timer "aff_alpha" aff_alpha = find_max_alpha_in_nbhd(
+        stepper.z_pred, stepper.s_pred, tau_pred, kap_pred, solver,
+        nbhd = one(T), prev_alpha = max(solver.prev_aff_alpha, T(2e-2)), min_alpha = T(2e-2))
     solver.prev_aff_alpha = aff_alpha
 
     gamma = abs2(one(T) - aff_alpha) # TODO allow different function (heuristic)
     solver.prev_gamma = gamma
 
     # find distance alpha for stepping in combined direction
-    z_comb = z_pred
-    s_comb = s_pred
+    z_comb = stepper.z_pred
+    s_comb = stepper.s_pred
     pred_factor = one(T) - gamma
-    @. z_comb = pred_factor * z_pred + gamma * z_corr
-    @. s_comb = pred_factor * s_pred + gamma * s_corr
+    @. z_comb = pred_factor * stepper.z_pred + gamma * stepper.z_corr
+    @. s_comb = pred_factor * stepper.s_pred + gamma * stepper.s_corr
     tau_comb = pred_factor * tau_pred + gamma * tau_corr
     kap_comb = pred_factor * kap_pred + gamma * kap_corr
-    @timeit solver.timer "comb_alpha" alpha = find_max_alpha_in_nbhd(z_comb, s_comb, tau_comb, kap_comb, solver, nbhd = solver.max_nbhd, prev_alpha = solver.prev_alpha, min_alpha = T(1e-2))
+    @timeit solver.timer "comb_alpha" alpha = find_max_alpha_in_nbhd(
+        z_comb, s_comb, tau_comb, kap_comb, solver,
+        nbhd = solver.max_nbhd, prev_alpha = solver.prev_alpha, min_alpha = T(1e-2))
 
     if iszero(alpha)
         # could not step far in combined direction, so perform a pure correction step
         solver.verbose && println("performing correction step")
-        z_comb = z_corr
-        s_comb = s_corr
+        z_comb = stepper.z_corr
+        s_comb = stepper.s_corr
         tau_comb = tau_corr
         kap_comb = kap_corr
-        @timeit solver.timer "corr_alpha" alpha = find_max_alpha_in_nbhd(z_comb, s_comb, tau_comb, kap_comb, solver, nbhd = solver.max_nbhd, prev_alpha = one(T), min_alpha = T(1e-6))
+        @timeit solver.timer "corr_alpha" alpha = find_max_alpha_in_nbhd(
+            z_comb, s_comb, tau_comb, kap_comb, solver,
+            nbhd = solver.max_nbhd, prev_alpha = one(T), min_alpha = T(1e-6))
 
         if iszero(alpha)
             @warn("numerical failure: could not step in correction direction; terminating")
@@ -78,11 +152,11 @@ function step(solver::Solver{T}) where {T <: Real}
             solver.keep_iterating = false
             return point
         end
-        @. point.x += alpha * x_corr
-        @. point.y += alpha * y_corr
+        @. point.x += alpha * stepper.x_corr
+        @. point.y += alpha * stepper.y_corr
     else
-        @. point.x += alpha * (pred_factor * x_pred + gamma * x_corr)
-        @. point.y += alpha * (pred_factor * y_pred + gamma * y_corr)
+        @. point.x += alpha * (pred_factor * stepper.x_pred + gamma * stepper.x_corr)
+        @. point.y += alpha * (pred_factor * stepper.y_pred + gamma * stepper.y_corr)
     end
     solver.prev_alpha = alpha
 
@@ -104,42 +178,115 @@ end
 
 # return directions
 # TODO make this function the same for all system solvers, move to solver.jl
-# function get_combined_directions(system_solver::NaiveSystemSolver{T}) where {T <: Real}
-function get_combined_directions(system_solver::SystemSolver{T}) where {T <: Real}
-    solver = system_solver.solver
-    rhs = system_solver.rhs
-    sol = system_solver.sol
+# function get_directions(system_solver::NaiveSystemSolver{T}) where {T <: Real}
+function get_directions(stepper::Stepper{T}, solver::Solver{T}) where {T <: Real}
+    dirs = stepper.dirs
+    system_solver = solver.system_solver
 
-    update_rhs(system_solver)
-    if !system_solver.use_iterative
-        update_fact(system_solver)
-    end
-    solve_system(system_solver, sol, rhs) # NOTE dense solve with cache destroys RHS
+    rhs = update_rhs(stepper, solver)
+    update_fact(system_solver, solver)
+    solve_system(system_solver, solver, dirs, rhs) # NOTE dense solve with cache destroys RHS
 
-    iter_ref_steps = 4 # TODO handle, maybe change dynamically
+    iter_ref_steps = 3 # TODO handle, maybe change dynamically
+    dirs_new = rhs
+    dirs_new .= dirs # TODO avoid?
     for i in 1:iter_ref_steps
         # perform iterative refinement step
-        res = calc_system_residual(solver, sol)
+        res = calc_system_residual(stepper, solver) # modifies rhs
         norm_inf = norm(res, Inf)
         norm_2 = norm(res, 2)
 
         if norm_inf > eps(T)
-            sol_curr = zeros(T, size(res, 1), 2)
-            res_sol = solve_system(system_solver, sol_curr, res)
-            sol_new = sol - res_sol
-            res_new = calc_system_residual(solver, sol_new)
+            dirs_new .= zero(T)
+            solve_system(system_solver, solver, dirs_new, res)
+            dirs_new .*= -1
+            dirs_new .+= dirs
+            res_new = calc_system_residual(stepper, solver)
             norm_inf_new = norm(res_new, Inf)
             norm_2_new = norm(res_new, 2)
             if norm_inf_new < norm_inf && norm_2_new < norm_2
                 solver.verbose && @printf("used iter ref, norms: inf %9.2e to %9.2e, two %9.2e to %9.2e\n", norm_inf, norm_inf_new, norm_2, norm_2_new)
-                copyto!(sol, sol_new)
+                copyto!(dirs, dirs_new)
             else
                 break
             end
         end
     end
 
-    return (system_solver.sol_x1, system_solver.sol_x2, system_solver.sol_y1, system_solver.sol_y2, system_solver.sol_z1, system_solver.sol_z2, sol[system_solver.tau_row, 1], sol[system_solver.tau_row, 2], system_solver.sol_s1, system_solver.sol_s2, sol[end, 1], sol[end, 2])
+    return dirs
+end
+
+# update the 6x2 RHS matrix
+function update_rhs(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
+    rhs = stepper.rhs
+
+    stepper.x_rhs1 .= solver.x_residual
+    stepper.x_rhs2 .= zero(T)
+    stepper.y_rhs1 .= solver.y_residual
+    stepper.y_rhs2 .= zero(T)
+    stepper.z_rhs1 .= solver.z_residual
+    stepper.z_rhs2 .= zero(T)
+    rhs[stepper.tau_row, 1] = solver.kap + solver.primal_obj_t - solver.dual_obj_t
+    rhs[stepper.tau_row, 2] = zero(T)
+
+    sqrtmu = sqrt(solver.mu)
+    for (k, cone_k) in enumerate(solver.model.cones)
+        duals_k = solver.point.dual_views[k]
+        grad_k = Cones.grad(cone_k)
+        @. stepper.s_rhs1_k[k] = -duals_k
+        @. stepper.s_rhs2_k[k] = -duals_k - grad_k * sqrtmu
+    end
+
+    rhs[end, 1] = -solver.kap
+    rhs[end, 2] = -solver.kap + solver.mu / solver.tau
+
+    return rhs
+end
+
+# calculate residual on 6x6 linear system
+# TODO make efficient / in-place
+function calc_system_residual(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
+    model = solver.model
+
+    # A'*y + G'*z + c*tau = [x_residual, 0]
+    res_x = model.A' * stepper.y_rhs + model.G' * stepper.z_rhs + model.c * stepper.tau_rhs
+    @. res_x[:, 1] -= solver.x_residual
+    # -A*x + b*tau = [y_residual, 0]
+    res_y = -model.A * stepper.x_rhs + model.b * stepper.tau_rhs
+    @. res_y[:, 1] -= solver.y_residual
+    # -G*x + h*tau - s = [z_residual, 0]
+    res_z = -model.G * stepper.x_rhs + model.h * stepper.tau_rhs - stepper.s_rhs
+    @. res_z[:, 1] -= solver.z_residual
+    # -c'*x - b'*y - h'*z - kap = [kap + primal_obj_t - dual_obj_t, 0]
+    res_tau = -model.c' * stepper.x_rhs - model.b' * stepper.y_rhs - model.h' * stepper.z_rhs - stepper.kap_rhs
+    res_tau[1] -= solver.kap + solver.primal_obj_t - solver.dual_obj_t
+
+    sqrtmu = sqrt(solver.mu)
+    res_s = similar(res_z)
+    for (k, cone_k) in enumerate(model.cones)
+        idxs_k = model.cone_idxs[k]
+        if Cones.use_dual(cone_k)
+            # (du bar) mu*H_k*z_k + s_k = srhs_k
+            @views Cones.hess_prod!(res_s[idxs_k, :], stepper.z_rhs_k[k], cone_k)
+            @. @views res_s[idxs_k, :] += stepper.s_rhs_k[k]
+        else
+            # (pr bar) z_k + mu*H_k*s_k = srhs_k
+            @views Cones.hess_prod!(res_s[idxs_k, :], stepper.s_rhs_k[k], cone_k)
+            @. @views res_s[idxs_k, :] += stepper.z_rhs_k[k]
+        end
+        # srhs_k = [-duals_k, -duals_k - mu * grad_k]
+        duals_k = solver.point.dual_views[k]
+        grad_k = Cones.grad(cone_k)
+        @. @views res_s[idxs_k, 1] += duals_k
+        @. @views res_s[idxs_k, 2] += duals_k + grad_k * sqrtmu
+    end
+
+    # mu/(taubar^2)*tau + kap = [-kap, -kap + mu/tau]
+    res_kap = stepper.kap_rhs + solver.mu / solver.tau * stepper.tau_rhs / solver.tau
+    res_kap[1] += solver.kap
+    res_kap[2] += solver.kap - solver.mu / solver.tau
+
+    return vcat(res_x, res_y, res_z, res_tau, res_s, res_kap) # TODO don't vcat
 end
 
 # TODO experimental for block LHS: if block is a Cone then define mul as hessian product, if block is solver then define mul by mu/tau/tau
@@ -159,90 +306,6 @@ function mul!(y::AbstractVecOrMat{T}, solver::Solvers.Solver{T}, x::AbstractVecO
     rmul!(y, beta)
     @. y += alpha * x / solver.tau * solver.mu / solver.tau
     return y
-end
-
-# update the 6x2 RHS matrix
-function update_rhs(system_solver::SystemSolver{T}) where {T <: Real}
-    solver = system_solver.solver
-
-    system_solver.rhs_x1 .= solver.x_residual
-    system_solver.rhs_x2 .= zero(T)
-    system_solver.rhs_y1 .= solver.y_residual
-    system_solver.rhs_y2 .= zero(T)
-    system_solver.rhs_z1 .= solver.z_residual
-    system_solver.rhs_z2 .= zero(T)
-    system_solver.rhs[system_solver.tau_row, 1] = solver.kap + solver.primal_obj_t - solver.dual_obj_t
-    system_solver.rhs[system_solver.tau_row, 2] = zero(T)
-
-    sqrtmu = sqrt(solver.mu)
-    for (k, cone_k) in enumerate(solver.model.cones)
-        duals_k = solver.point.dual_views[k]
-        grad_k = Cones.grad(cone_k)
-        @. system_solver.rhs_s1_k[k] = -duals_k
-        @. system_solver.rhs_s2_k[k] = -duals_k - grad_k * sqrtmu
-    end
-
-    system_solver.rhs[end, 1] = -solver.kap
-    system_solver.rhs[end, 2] = -solver.kap + solver.mu / solver.tau
-
-    return system_solver.rhs
-end
-
-# calculate residual on 6x6 linear system
-# TODO make efficient / in-place
-function calc_system_residual(solver, sol)
-    model = solver.model
-    (n, p, q) = (model.n, model.p, model.q)
-    tau_row = n + p + q + 1
-
-    @views begin
-        sol_x = sol[1:n, :]
-        sol_y = sol[(n + 1):(n + p), :]
-        sol_z = sol[(n + p + 1):(n + p + q), :]
-        sol_tau = sol[tau_row:tau_row, :]
-        sol_s = sol[tau_row .+ (1:q), :]
-        sol_kap = sol[end:end, :]
-    end
-
-    # A'*y + G'*z + c*tau = [x_residual, 0]
-    res_x = model.A' * sol_y + model.G' * sol_z + model.c * sol_tau
-    @. res_x[:, 1] -= solver.x_residual
-    # -A*x + b*tau = [y_residual, 0]
-    res_y = -model.A * sol_x + model.b * sol_tau
-    @. res_y[:, 1] -= solver.y_residual
-    # -G*x + h*tau - s = [z_residual, 0]
-    res_z = -model.G * sol_x + model.h * sol_tau - sol_s
-    @. res_z[:, 1] -= solver.z_residual
-    # -c'*x - b'*y - h'*z - kap = [kap + primal_obj_t - dual_obj_t, 0]
-    res_tau = -model.c' * sol_x - model.b' * sol_y - model.h' * sol_z - sol_kap
-    res_tau[1] -= solver.kap + solver.primal_obj_t - solver.dual_obj_t
-
-    sqrtmu = sqrt(solver.mu)
-    res_s = similar(res_z)
-    for (k, cone_k) in enumerate(model.cones)
-        idxs_k = model.cone_idxs[k]
-        if Cones.use_dual(cone_k)
-            # (du bar) mu*H_k*z_k + s_k = srhs_k
-            @views Cones.hess_prod!(res_s[idxs_k, :], sol_z[idxs_k, :], cone_k)
-            @. @views res_s[idxs_k, :] += sol_s[idxs_k, :]
-        else
-            # (pr bar) z_k + mu*H_k*s_k = srhs_k
-            @views Cones.hess_prod!(res_s[idxs_k, :], sol_s[idxs_k, :], cone_k)
-            @. @views res_s[idxs_k, :] += sol_z[idxs_k, :]
-        end
-        # srhs_k = [-duals_k, -duals_k - mu * grad_k]
-        duals_k = solver.point.dual_views[k]
-        grad_k = Cones.grad(cone_k)
-        @. @views res_s[idxs_k, 1] += duals_k
-        @. @views res_s[idxs_k, 2] += duals_k + grad_k * sqrtmu
-    end
-
-    # mu/(taubar^2)*tau + kap = [-kap, -kap + mu/tau]
-    res_kap = sol_kap + solver.mu / solver.tau * sol_tau / solver.tau
-    res_kap[1] += solver.kap
-    res_kap[2] += solver.kap - solver.mu / solver.tau
-
-    return vcat(res_x, res_y, res_z, res_tau, res_s, res_kap)
 end
 
 # backtracking line search to find large distance to step in direction while remaining inside cones and inside a given neighborhood

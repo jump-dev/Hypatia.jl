@@ -35,37 +35,12 @@ TODO add iterative method
 =#
 
 mutable struct NaiveElimSystemSolver{T <: Real} <: SystemSolver{T}
-    solver::Solver{T}
     use_iterative::Bool
     use_sparse::Bool
 
-    tau_row::Int
-
-    rhs::Matrix{T}
-    rhs_x1
-    rhs_x2
-    rhs_y1
-    rhs_y2
-    rhs_z1
-    rhs_z2
-    rhs_s1
-    rhs_s2
-    rhs_s1_k
-    rhs_s2_k
-
-    sol::Matrix{T}
-    sol_x1
-    sol_x2
-    sol_y1
-    sol_y2
-    sol_z1
-    sol_z2
-    sol_s1
-    sol_s2
-
-    lhs_copy
+    tau_row
     lhs
-
+    lhs_copy
     fact_cache
 
     function NaiveElimSystemSolver{T}(; use_iterative::Bool = false, use_sparse::Bool = false) where {T <: Real}
@@ -78,44 +53,12 @@ end
 
 # create the system_solver cache
 function load(system_solver::NaiveElimSystemSolver{T}, solver::Solver{T}) where {T <: Real}
-    system_solver.solver = solver
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
-    cones = model.cones
-    cone_idxs = model.cone_idxs
-    dim = n + p + 2q + 2
-
-    rhs = zeros(T, dim, 2)
-    sol = zeros(T, dim, 2)
-    system_solver.rhs = rhs
-    system_solver.sol = sol
-    rows = 1:n
-    system_solver.rhs_x1 = view(rhs, rows, 1)
-    system_solver.rhs_x2 = view(rhs, rows, 2)
-    system_solver.sol_x1 = view(sol, rows, 1)
-    system_solver.sol_x2 = view(sol, rows, 2)
-    rows = (n + 1):(n + p)
-    system_solver.rhs_y1 = view(rhs, rows, 1)
-    system_solver.rhs_y2 = view(rhs, rows, 2)
-    system_solver.sol_y1 = view(sol, rows, 1)
-    system_solver.sol_y2 = view(sol, rows, 2)
-    rows = (n + p + 1):(n + p + q)
-    system_solver.rhs_z1 = view(rhs, rows, 1)
-    system_solver.rhs_z2 = view(rhs, rows, 2)
-    system_solver.sol_z1 = view(sol, rows, 1)
-    system_solver.sol_z2 = view(sol, rows, 2)
-    tau_row = n + p + q + 1
-    system_solver.tau_row = tau_row
-    rows = tau_row .+ (1:q)
-    system_solver.rhs_s1 = view(rhs, rows, 1)
-    system_solver.rhs_s2 = view(rhs, rows, 2)
-    system_solver.rhs_s1_k = [view(rhs, tau_row .+ idxs_k, 1) for idxs_k in cone_idxs]
-    system_solver.rhs_s2_k = [view(rhs, tau_row .+ idxs_k, 2) for idxs_k in cone_idxs]
-    system_solver.sol_s1 = view(sol, rows, 1)
-    system_solver.sol_s2 = view(sol, rows, 2)
+    system_solver.tau_row = n + p + q + 1
 
     if system_solver.use_iterative
-        system_solver.lhs = setup_block_lhs(system_solver)
+        error("not implemented")
     else
         if system_solver.use_sparse
             system_solver.lhs = T[
@@ -141,14 +84,10 @@ function load(system_solver::NaiveElimSystemSolver{T}, solver::Solver{T}) where 
     return system_solver
 end
 
-# for iterative methods, build block matrix for efficient multiplication
-function setup_block_lhs(system_solver::NaiveElimSystemSolver{T}) where {T <: Real}
-    error("not implemented")
-end
-
 # update the LHS factorization to prepare for solve
-function update_fact(system_solver::NaiveElimSystemSolver{T}) where {T <: Real}
-    solver = system_solver.solver
+function update_fact(system_solver::NaiveElimSystemSolver{T}, solver::Solver{T}) where {T <: Real}
+    system_solver.use_iterative && return system_solver
+
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
     lhs = system_solver.lhs
@@ -156,6 +95,7 @@ function update_fact(system_solver::NaiveElimSystemSolver{T}) where {T <: Real}
     if !system_solver.use_sparse
         copyto!(lhs, system_solver.lhs_copy)
     end
+
     lhs[end, end] = solver.mu / solver.tau / solver.tau
     for (k, cone_k) in enumerate(model.cones)
         idxs_k = model.cone_idxs[k]
@@ -171,42 +111,43 @@ function update_fact(system_solver::NaiveElimSystemSolver{T}) where {T <: Real}
         end
     end
 
-    # factorize LHS
-    system_solver.fact_cache = lu!(lhs)
+    if system_solver.use_sparse
+        system_solver.fact_cache = lu(system_solver.lhs)
+    else
+        system_solver.fact_cache = lu!(system_solver.lhs) # TODO use wrapped lapack function
+    end
 
     return system_solver
 end
 
 # solve system without outer iterative refinement
-function solve_system(system_solver::NaiveElimSystemSolver{T}, sol_curr, rhs_curr) where {T <: Real}
-    solver = system_solver.solver
+function solve_system(system_solver::NaiveElimSystemSolver{T}, solver::Solver{T}, sol, rhs) where {T <: Real}
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
     tau_row = system_solver.tau_row
 
     # TODO in-place
-    sol4 = view(sol_curr, 1:tau_row, :)
-    # rhs4 = view(rhs_curr, 1:tau_row, :)
-    rhs4 = rhs_curr[1:tau_row, :]
+    sol4 = view(sol, 1:tau_row, :)
+    rhs4 = rhs[1:tau_row, :]
 
     for (k, cone_k) in enumerate(model.cones)
         z_rows_k = (n + p) .+ model.cone_idxs[k]
         s_rows_k = (q + 1) .+ z_rows_k
         if Cones.use_dual(cone_k)
             # -G_k*x + mu*H_k*z_k + h_k*tau = zrhs_k + srhs_k
-            @. @views rhs4[z_rows_k, :] += rhs_curr[s_rows_k, :]
+            @. @views rhs4[z_rows_k, :] += rhs[s_rows_k, :]
         else
             # -mu*H_k*G_k*x + z_k + mu*H_k*h_k*tau = mu*H_k*zrhs_k + srhs_k
-            @views Cones.hess_prod!(rhs4[z_rows_k, :], rhs_curr[z_rows_k, :], cone_k)
-            @. @views rhs4[z_rows_k, :] += rhs_curr[s_rows_k, :]
+            @views Cones.hess_prod!(rhs4[z_rows_k, :], rhs[z_rows_k, :], cone_k)
+            @. @views rhs4[z_rows_k, :] += rhs[s_rows_k, :]
         end
     end
     # -c'x - b'y - h'z + mu/(taubar^2)*tau = taurhs + kaprhs
-    @. @views rhs4[end, :] += rhs_curr[end, :]
+    @. @views rhs4[end, :] += rhs[end, :]
 
     if system_solver.use_iterative
         error("not implemented")
-        # for j in 1:size(rhs_curr, 2)
+        # for j in 1:size(rhs, 2)
         #     rhs_j = view(rhs4, :, j)
         #     sol_j = view(sol4, :, j)
         #     IterativeSolvers.gmres!(sol_j, system_solver.lhs, rhs_j, restart = tau_row)
@@ -216,7 +157,7 @@ function solve_system(system_solver::NaiveElimSystemSolver{T}, sol_curr, rhs_cur
             sol4 .= system_solver.fact_cache \ rhs4
         else
             # if !hyp_lu_solve!(system_solver.fact_cache, sol4, lhs, rhs4)
-            #     @warn("numerical failure: could not fix linear solve failure (mu is $(solver.mu))")
+            #     @warn("numerical failure: could not fix linear solve failure")
             # end
             ldiv!(sol4, system_solver.fact_cache, rhs4)
         end
@@ -227,14 +168,14 @@ function solve_system(system_solver::NaiveElimSystemSolver{T}, sol_curr, rhs_cur
 
     # TODO refactor below for use with symindef and qrchol methods
     # s = -G*x + h*tau - zrhs
-    s = @view sol_curr[(tau_row + 1):(end - 1), :]
+    s = @view sol[(tau_row + 1):(end - 1), :]
     mul!(s, model.h, tau)
-    x = @view sol_curr[1:n, :]
+    x = @view sol[1:n, :]
     mul!(s, model.G, x, -one(T), true)
-    @. @views s -= rhs_curr[(n + p) .+ (1:q), :]
+    @. @views s -= rhs[(n + p) .+ (1:q), :]
 
     # kap = -mu/(taubar^2)*tau + kaprhs
-    @. @views sol_curr[end:end, :] = -solver.mu / solver.tau * tau / solver.tau + rhs_curr[end:end, :]
+    @. @views sol[end:end, :] = -solver.mu / solver.tau * tau / solver.tau + rhs[end:end, :]
 
-    return sol_curr
+    return sol
 end

@@ -74,6 +74,7 @@ function solve(solver::Solver{T}) where {T <: Real}
     solver.cones_infeas = trues(length(model.cones))
     solver.cones_loaded = trues(length(model.cones))
 
+    @timeit solver.timer "setup_stepper" load(solver.stepper, solver)
     @timeit solver.timer "setup_system" load(solver.system_solver, solver)
 
     # iterate from initial point
@@ -98,7 +99,7 @@ function solve(solver::Solver{T}) where {T <: Real}
             break
         end
 
-        @timeit solver.timer "step" step(solver)
+        @timeit solver.timer "step" step(solver.stepper, solver)
         solver.num_iters += 1
     end
 
