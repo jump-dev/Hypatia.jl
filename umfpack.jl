@@ -25,37 +25,38 @@ U = UmfpackLU(C_NULL, C_NULL, S.m, S.n,
 
 # calls to get umfpack_numeric! and umfpack_symbolic!
 umf_nm(nm,Tv,Ti) = "umfpack_" * (Tv == :Float64 ? "d" : "z") * (Ti == :Int64 ? "l_" : "i_") * nm
-itype = Int64
-sym_r = umf_nm("symbolic", :Float64, itype)
-num_r = umf_nm("numeric", :Float64, itype)
-@eval begin
-    function umfpack_symbolic!(U::UmfpackLU{Float64,$itype})
-        if U.symbolic != C_NULL return U end
-        tmp = Vector{Ptr{Cvoid}}(undef, 1)
-        @isok ccall(($sym_r, :libumfpack), $itype,
-                    ($itype, $itype, Ptr{$itype}, Ptr{$itype}, Ptr{Float64}, Ptr{Cvoid},
-                     Ptr{Float64}, Ptr{Float64}),
-                    U.m, U.n, U.colptr, U.rowval, U.nzval, tmp,
-                    umf_ctrl, umf_info)
-        U.symbolic = tmp[1]
-        return U
-    end
-    function umfpack_numeric!(U::UmfpackLU{Float64,$itype})
-        if U.numeric != C_NULL return U end
-        if U.symbolic == C_NULL umfpack_symbolic!(U) end
-        tmp = Vector{Ptr{Cvoid}}(undef, 1)
-        @isok status = ccall(($num_r, :libumfpack), $itype,
-                       (Ptr{$itype}, Ptr{$itype}, Ptr{Float64}, Ptr{Cvoid}, Ptr{Cvoid},
-                        Ptr{Float64}, Ptr{Float64}),
-                       U.colptr, U.rowval, U.nzval, U.symbolic, tmp,
-                       umf_ctrl, umf_info)
-        println(status)
-        if status != UMFPACK_WARNING_singular_matrix
-            umferror(status)
+for itype in UmfpackIndexTypes
+    sym_r = umf_nm("symbolic", :Float64, itype)
+    num_r = umf_nm("numeric", :Float64, itype)
+    @eval begin
+        function umfpack_symbolic!(U::UmfpackLU{Float64,$itype})
+            if U.symbolic != C_NULL return U end
+            tmp = Vector{Ptr{Cvoid}}(undef, 1)
+            @isok ccall(($sym_r, :libumfpack), $itype,
+                        ($itype, $itype, Ptr{$itype}, Ptr{$itype}, Ptr{Float64}, Ptr{Cvoid},
+                         Ptr{Float64}, Ptr{Float64}),
+                        U.m, U.n, U.colptr, U.rowval, U.nzval, tmp,
+                        umf_ctrl, umf_info)
+            U.symbolic = tmp[1]
+            return U
         end
-        U.numeric = tmp[1]
-        U.status = status
-        return U
+        function umfpack_numeric!(U::UmfpackLU{Float64,$itype})
+            if U.numeric != C_NULL return U end
+            if U.symbolic == C_NULL umfpack_symbolic!(U) end
+            tmp = Vector{Ptr{Cvoid}}(undef, 1)
+            @isok status = ccall(($num_r, :libumfpack), $itype,
+                           (Ptr{$itype}, Ptr{$itype}, Ptr{Float64}, Ptr{Cvoid}, Ptr{Cvoid},
+                            Ptr{Float64}, Ptr{Float64}),
+                           U.colptr, U.rowval, U.nzval, U.symbolic, tmp,
+                           umf_ctrl, umf_info)
+            println(status)
+            if status != UMFPACK_WARNING_singular_matrix
+                umferror(status)
+            end
+            U.numeric = tmp[1]
+            U.status = status
+            return U
+        end
     end
 end
 
