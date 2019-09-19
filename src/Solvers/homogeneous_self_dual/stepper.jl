@@ -131,9 +131,7 @@ function get_combined_directions(system_solver::SystemSolver{T}) where {T <: Rea
             norm_inf_new = norm(res_new, Inf)
             norm_2_new = norm(res_new, 2)
             if norm_inf_new < norm_inf && norm_2_new < norm_2
-                println("used iter ref")
-                println(norm_inf, "\t", norm_2)
-                println(norm_inf_new, "\t", norm_2_new)
+                solver.verbose && @printf("used iter ref, norms: inf %9.2e to %9.2e, two %9.2e to %9.2e\n", norm_inf, norm_inf_new, norm_2, norm_2_new)
                 copyto!(sol, sol_new)
             else
                 break

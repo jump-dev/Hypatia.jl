@@ -15,7 +15,7 @@ real_types = [
     ]
 
 system_solvers = [
-    # SO.QRCholSystemSolver,
+    SO.QRCholSystemSolver,
     SO.SymIndefSystemSolver,
     SO.NaiveElimSystemSolver,
     SO.NaiveSystemSolver,

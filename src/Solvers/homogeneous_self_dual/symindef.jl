@@ -261,24 +261,24 @@ function solve_system(system_solver::SymIndefSystemSolver{T}, sol_curr, rhs_curr
         end
     end
 
-    # lift to get tau
     x3 = @view sol3[1:n, 3]
     y3 = @view sol3[n .+ (1:p), 3]
     z3 = @view sol3[(n + p) .+ (1:q), 3]
-    x = @view sol3[1:n, 1:2]
-    y = @view sol3[n .+ (1:p), 1:2]
-    z = @view sol3[(n + p) .+ (1:q), 1:2]
+    x12 = @view sol3[1:n, 1:2]
+    y12 = @view sol3[n .+ (1:p), 1:2]
+    z12 = @view sol3[(n + p) .+ (1:q), 1:2]
 
+    # lift to get tau
     # TODO maybe use higher precision here
     tau_denom = solver.mu / solver.tau / solver.tau - dot(model.c, x3) - dot(model.b, y3) - dot(model.h, z3)
     tau = @view sol_curr[tau_row:tau_row, :]
     @. @views tau = rhs_curr[tau_row:tau_row, :] + rhs_curr[end:end, :]
-    tau .+= model.c' * x + model.b' * y + model.h' * z # TODO in place
+    tau .+= model.c' * x12 + model.b' * y12 + model.h' * z12 # TODO in place
     @. tau /= tau_denom
 
-    @. x += tau * x3
-    @. y += tau * y3
-    @. z += tau * z3
+    @. x12 += tau * x3
+    @. y12 += tau * y3
+    @. z12 += tau * z3
 
     @views sol_curr[1:dim3, :] = sol3[:, 1:2]
 
@@ -287,8 +287,7 @@ function solve_system(system_solver::SymIndefSystemSolver{T}, sol_curr, rhs_curr
     # s = -G*x + h*tau - zrhs
     s = @view sol_curr[(tau_row + 1):(end - 1), :]
     mul!(s, model.h, tau)
-    x = @view sol_curr[1:n, :]
-    mul!(s, model.G, x, -one(T), true)
+    mul!(s, model.G, sol_curr[1:n, :], -one(T), true)
     @. @views s -= rhs_curr[(n + p) .+ (1:q), :]
 
     # kap = -mu/(taubar^2)*tau + kaprhs

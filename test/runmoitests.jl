@@ -15,7 +15,7 @@ dense_options = [
     ]
 
 system_solvers = [
-    # SO.QRCholSystemSolver,
+    SO.QRCholSystemSolver,
     SO.SymIndefSystemSolver,
     SO.NaiveElimSystemSolver,
     SO.NaiveSystemSolver,
