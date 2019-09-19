@@ -111,7 +111,7 @@ function load(system_solver::SymIndefSystemSolver{T}, solver::Solver{T}) where {
 
     # symmetric, lower triangle filled only
     if system_solver.use_iterative
-        system_solver.lhs = setup_block_lhs(solver)
+        system_solver.lhs = setup_block_lhs(system_solver)
     else
         if system_solver.use_sparse
             system_solver.lhs = T[

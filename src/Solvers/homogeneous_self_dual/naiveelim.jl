@@ -115,7 +115,7 @@ function load(system_solver::NaiveElimSystemSolver{T}, solver::Solver{T}) where 
     system_solver.sol_s2 = view(sol, rows, 2)
 
     if system_solver.use_iterative
-        system_solver.lhs = setup_block_lhs(solver)
+        system_solver.lhs = setup_block_lhs(system_solver)
     else
         if system_solver.use_sparse
             system_solver.lhs = T[
@@ -142,7 +142,7 @@ function load(system_solver::NaiveElimSystemSolver{T}, solver::Solver{T}) where 
 end
 
 # for iterative methods, build block matrix for efficient multiplication
-function setup_block_lhs(system_solver::NaiveSystemSolver{T}) where {T <: Real}
+function setup_block_lhs(system_solver::NaiveElimSystemSolver{T}) where {T <: Real}
     error("not implemented")
 end
 
