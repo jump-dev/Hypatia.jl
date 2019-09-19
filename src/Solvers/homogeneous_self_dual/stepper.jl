@@ -116,7 +116,7 @@ function get_combined_directions(system_solver::SystemSolver{T}) where {T <: Rea
     end
     solve_system(system_solver, sol, rhs) # NOTE dense solve with cache destroys RHS
 
-    iter_ref_steps = 2 # TODO handle, maybe change dynamically
+    iter_ref_steps = 4 # TODO handle, maybe change dynamically
     for i in 1:iter_ref_steps
         # perform iterative refinement step
         res = calc_system_residual(solver, sol)

@@ -28,7 +28,7 @@ real_types = [
 @testset "miscellaneous tests: $T" for T in real_types
     options = (atol = sqrt(sqrt(eps(T))),
         solver = SO.Solver{T}(verbose = true, iter_limit = 250, time_limit = 12e2,
-        system_solver = SO.NaiveElimSystemSolver{T}()))
+        system_solver = SO.SymIndefSystemSolver{T}()))
 
     @testset "densityest" begin test_densityest.(instances_densityest_few, T = T, options = options) end
 
