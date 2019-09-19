@@ -52,9 +52,9 @@ inv_hess(cone::Cone) = (cone.inv_hess_updated ? cone.inv_hess : update_inv_hess(
 # fallbacks
 hess_nnzs(cone::Cone) = dimension(cone) ^ 2
 
-hess_sparse(cone::Cone) = sparse(hess(cone))
+# hess_sparse(cone::Cone) = sparse(hess(cone))
 
-hess_sparsity_pattern(cone::Cone{T}) where {T} = sparse(ones(T, cone.dim, cone.dim))
+# hess_sparsity_pattern(cone::Cone{T}) where {T} = sparse(ones(T, cone.dim, cone.dim))
 
 # the row indices of nonzero elements in column j
 hess_nz_idxs_j(cone::Cone, j::Int) = 1:cone.dim
