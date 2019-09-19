@@ -16,9 +16,6 @@ TODO for iterative method
 - precondition
 - optimize operations
 - fix IterativeSolvers so that methods can take matrix RHS
-- try linear maps:
-    # lhs_lin_map(arr) = @views vcat(apply_lhs(solver, arr[1:n], arr[(n + 1):(n + p)], arr[(n + p + 1):(n + p + q)], arr[tau_row], arr[tau_row .+ (1:q)], arr[end]))
-    # system_solver.lhs_map = LinearMaps.FunctionMap{T}(lhs_lin_map)
 
 TODO remove the lhs_copy? only need if factorization overwrites lhs
 =#
@@ -99,13 +96,13 @@ function load(system_solver::NaiveSystemSolver{T}, solver::Solver{T}) where {T <
     rows = tau_row .+ (1:q)
     system_solver.rhs_s1 = view(rhs, rows, 1)
     system_solver.rhs_s2 = view(rhs, rows, 2)
-    system_solver.sol_s1 = view(sol, rows, 1)
-    system_solver.sol_s2 = view(sol, rows, 2)
     system_solver.rhs_s1_k = [view(rhs, tau_row .+ idxs_k, 1) for idxs_k in cone_idxs]
     system_solver.rhs_s2_k = [view(rhs, tau_row .+ idxs_k, 2) for idxs_k in cone_idxs]
+    system_solver.sol_s1 = view(sol, rows, 1)
+    system_solver.sol_s2 = view(sol, rows, 2)
 
     if system_solver.use_iterative
-        system_solver.lhs = setup_block_lhs(solver)
+        system_solver.lhs = setup_naive_block(solver)
     else
         if system_solver.use_sparse
             system_solver.lhs = T[
@@ -142,169 +139,8 @@ function load(system_solver::NaiveSystemSolver{T}, solver::Solver{T}) where {T <
     return system_solver
 end
 
-# update the system solver cache to prepare for solve
-function update(system_solver::NaiveSystemSolver{T}) where {T <: Real}
-    solver = system_solver.solver
-    lhs = system_solver.lhs
-    rhs = system_solver.rhs
-    tau_row = system_solver.tau_row
-
-    # update rhs matrix
-    system_solver.rhs_x1 .= solver.x_residual
-    system_solver.rhs_x2 .= zero(T)
-    system_solver.rhs_y1 .= solver.y_residual
-    system_solver.rhs_y2 .= zero(T)
-    system_solver.rhs_z1 .= solver.z_residual
-    system_solver.rhs_z2 .= zero(T)
-    rhs[tau_row, 1] = solver.kap + solver.primal_obj_t - solver.dual_obj_t
-    rhs[tau_row, 2] = zero(T)
-    sqrtmu = sqrt(solver.mu)
-    for (k, cone_k) in enumerate(solver.model.cones)
-        duals_k = solver.point.dual_views[k]
-        grad_k = Cones.grad(cone_k)
-        @. system_solver.rhs_s1_k[k] = -duals_k
-        @. system_solver.rhs_s2_k[k] = -duals_k - grad_k * sqrtmu
-    end
-    rhs[end, 1] = -solver.kap
-    rhs[end, 2] = -solver.kap + solver.mu / solver.tau
-
-    if !system_solver.use_iterative
-        # update lhs matrix
-        copyto!(lhs, system_solver.lhs_copy)
-        lhs[end, tau_row] = solver.mu / solver.tau / solver.tau
-        for (k, cone_k) in enumerate(solver.model.cones)
-            copyto!(system_solver.lhs_H_k[k], Cones.hess(cone_k))
-        end
-    end
-
-    # factorize LHS
-    if !system_solver.use_iterative
-        system_solver.fact_cache = lu!(lhs)
-    end
-
-    return system_solver
-end
-
-# solve without outer iterative refinement
-function solve(system_solver::NaiveSystemSolver{T}, sol_curr, rhs_curr) where {T <: Real}
-    solver = system_solver.solver
-
-    if system_solver.use_iterative
-        rhs1 = view(rhs_curr, :, 1)
-        rhs2 = view(rhs_curr, :, 2)
-        sol1 = view(sol_curr, :, 1)
-        sol2 = view(sol_curr, :, 2)
-        IterativeSolvers.gmres!(sol1, system_solver.lhs, rhs1, restart = size(lhs, 2))
-        IterativeSolvers.gmres!(sol2, system_solver.lhs, rhs2, restart = size(lhs, 2))
-    else
-        # TODO factorize above
-        if system_solver.use_sparse
-            sol_curr .= system_solver.fact_cache \ rhs_curr
-        else
-            # if !hyp_lu_solve!(system_solver.fact_cache, sol_curr, lhs, rhs_curr)
-            #     @warn("numerical failure: could not fix linear solve failure (mu is $(solver.mu))")
-            # end
-            ldiv!(sol_curr, system_solver.fact_cache, rhs_curr)
-        end
-    end
-
-    return sol_curr
-end
-
-# return directions
-# TODO make this function the same for all system solvers, move to solver.jl
-# function get_combined_directions(system_solver::NaiveSystemSolver{T}) where {T <: Real}
-function get_combined_directions(system_solver::SystemSolver{T}) where {T <: Real}
-    solver = system_solver.solver
-    lhs = system_solver.lhs
-    rhs = system_solver.rhs
-    sol = system_solver.sol
-
-    update(system_solver)
-    solve(system_solver, sol, rhs) # NOTE dense solve destroys RHS
-
-    refine = true # TODO handle
-    if refine
-        # test residual
-        res = calc_system_residual(solver, sol)
-        norm_inf = norm(res, Inf)
-        norm_2 = norm(res, 2)
-
-        if norm_inf > eps(T)
-            sol_curr = zeros(T, size(res, 1), 2)
-            res_sol = solve(system_solver, sol_curr, res)
-            sol_new = sol - res_sol
-            res_new = calc_system_residual(solver, sol_new)
-            norm_inf_new = norm(res_new, Inf)
-            norm_2_new = norm(res_new, 2)
-            if norm_inf_new < norm_inf && norm_2_new < norm_2
-                println("used iter ref")
-                println(norm_inf, "\t", norm_2)
-                println(norm_inf_new, "\t", norm_2_new)
-                copyto!(sol, sol_new)
-            end
-        end
-    end
-
-    return (system_solver.sol_x1, system_solver.sol_x2, system_solver.sol_y1, system_solver.sol_y2, system_solver.sol_z1, system_solver.sol_z2, sol[system_solver.tau_row, 1], sol[system_solver.tau_row, 2], system_solver.sol_s1, system_solver.sol_s2, sol[end, 1], sol[end, 2])
-end
-
-# TODO make efficient
-function calc_system_residual(solver, sol_in)
-    model = solver.model
-    (n, p, q) = (model.n, model.p, model.q)
-    tau_row = n + p + q + 1
-    return vcat(calc_system_residual(solver, sol_in[1:n, :], sol_in[(n + 1):(n + p), :], sol_in[(n + p + 1):(n + p + q), :], sol_in[tau_row:tau_row, :], sol_in[tau_row .+ (1:q), :], sol_in[end:end, :])...)
-end
-
-# apply LHS of 6x6 system to x, y, z, tau, s, kap
-# TODO make efficient / in-place
-function calc_system_residual(solver, sol_x, sol_y, sol_z, sol_tau, sol_s, sol_kap)
-    model = solver.model
-
-    # A'*y + G'*z + c*tau = [x_residual, 0]
-    res_x = model.A' * sol_y + model.G' * sol_z + model.c * sol_tau
-    @. res_x[:, 1] -= solver.x_residual
-    # -A*x + b*tau = [y_residual, 0]
-    res_y = -model.A * sol_x + model.b * sol_tau
-    @. res_y[:, 1] -= solver.y_residual
-    # -G*x + h*tau - s = [z_residual, 0]
-    res_z = -model.G * sol_x + model.h * sol_tau - sol_s
-    @. res_z[:, 1] -= solver.z_residual
-    # -c'*x - b'*y - h'*z - kap = [kap + primal_obj_t - dual_obj_t, 0]
-    res_tau = -model.c' * sol_x - model.b' * sol_y - model.h' * sol_z - sol_kap
-    res_tau[1] -= solver.kap + solver.primal_obj_t - solver.dual_obj_t
-
-    sqrtmu = sqrt(solver.mu)
-    res_s = similar(res_z)
-    for (k, cone_k) in enumerate(model.cones)
-        idxs_k = model.cone_idxs[k]
-        if Cones.use_dual(cone_k)
-            # (du bar) mu*H_k*z_k + s_k = srhs_k
-            @views Cones.hess_prod!(res_s[idxs_k, :], sol_z[idxs_k, :], cone_k)
-            @. @views res_s[idxs_k, :] += sol_s[idxs_k, :]
-        else
-            # (pr bar) z_k + mu*H_k*s_k = srhs_k
-            @views Cones.hess_prod!(res_s[idxs_k, :], sol_s[idxs_k, :], cone_k)
-            @. @views res_s[idxs_k, :] += sol_z[idxs_k, :]
-        end
-        # srhs_k = [-duals_k, -duals_k - mu * grad_k]
-        duals_k = solver.point.dual_views[k]
-        grad_k = Cones.grad(cone_k)
-        @. @views res_s[idxs_k, 1] += duals_k
-        @. @views res_s[idxs_k, 2] += duals_k + grad_k * sqrtmu
-    end
-
-    # mu/(taubar^2)*tau + kap = [-kap, -kap + mu/tau]
-    res_kap = sol_kap + solver.mu / solver.tau * sol_tau / solver.tau
-    res_kap[1] += solver.kap
-    res_kap[2] += solver.kap - solver.mu / solver.tau
-
-    return (res_x, res_y, res_z, res_tau, res_s, res_kap)
-end
-
 # for iterative methods, build block matrix for efficient multiplication
-function setup_block_lhs(solver::Solver{T}) where {T <: Real}
+function setup_naive_block(solver::Solver{T}) where {T <: Real}
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
     tau_row = n + p + q + 1
@@ -361,21 +197,42 @@ function setup_block_lhs(solver::Solver{T}) where {T <: Real}
     return block_lhs
 end
 
-# TODO experimental for block LHS: if block is a Cone then define mul as hessian product, if block is solver then define mul by mu/tau/tau
-# TODO optimize... maybe need for each cone a 5-arg hess prod
-import LinearAlgebra.mul!
+# update the LHS factorization to prepare for solve
+function update_fact(system_solver::NaiveSystemSolver{T}) where {T <: Real}
+    solver = system_solver.solver
 
-function mul!(y::AbstractVecOrMat{T}, A::Cones.Cone{T}, x::AbstractVecOrMat{T}, alpha::Number, beta::Number) where {T <: Real}
-    # TODO in-place
-    ytemp = y * beta
-    Cones.hess_prod!(y, x, A)
-    rmul!(y, alpha)
-    y .+= ytemp
-    return y
+    copyto!(system_solver.lhs, system_solver.lhs_copy)
+    system_solver.lhs[end, system_solver.tau_row] = solver.mu / solver.tau / solver.tau
+    for (k, cone_k) in enumerate(solver.model.cones)
+        copyto!(system_solver.lhs_H_k[k], Cones.hess(cone_k))
+    end
+
+    system_solver.fact_cache = lu!(system_solver.lhs)
+
+    return system_solver
 end
 
-function mul!(y::AbstractVecOrMat{T}, solver::Solvers.Solver{T}, x::AbstractVecOrMat{T}, alpha::Number, beta::Number) where {T <: Real}
-    rmul!(y, beta)
-    @. y += alpha * x / solver.tau * solver.mu / solver.tau
-    return y
+# solve system without outer iterative refinement
+function solve_system(system_solver::NaiveSystemSolver{T}, sol_curr, rhs_curr) where {T <: Real}
+    solver = system_solver.solver
+
+    if system_solver.use_iterative
+        restarts = size(system_solver.lhs, 2) # TODO maybe too large to be efficient
+        for j in 1:size(rhs_curr, 2)
+            rhs_j = view(rhs_curr, :, j)
+            sol_j = view(sol_curr, :, j)
+            IterativeSolvers.gmres!(sol_j, system_solver.lhs, rhs_j, restart = restarts)
+        end
+    else
+        if system_solver.use_sparse
+            sol_curr .= system_solver.fact_cache \ rhs_curr
+        else
+            # if !hyp_lu_solve!(system_solver.fact_cache, sol_curr, lhs, rhs_curr)
+            #     @warn("numerical failure: could not fix linear solve failure (mu is $(solver.mu))")
+            # end
+            ldiv!(sol_curr, system_solver.fact_cache, rhs_curr)
+        end
+    end
+
+    return sol_curr
 end
