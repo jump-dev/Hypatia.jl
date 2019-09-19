@@ -10,15 +10,15 @@ const SO = Hypatia.Solvers
 
 real_types = [
     Float64,
-    # Float32,
-    # BigFloat,
+    Float32,
+    BigFloat,
     ]
 
 system_solvers = [
     # SO.QRCholSystemSolver,
     # SO.SymIndefSystemSolver,
     SO.NaiveElimSystemSolver,
-    # SO.NaiveSystemSolver,
+    SO.NaiveSystemSolver,
     ]
 
 use_infty_nbhd = [
