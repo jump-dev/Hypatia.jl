@@ -35,175 +35,147 @@ TODO add iterative method
 =#
 
 mutable struct NaiveElimSystemSolver{T <: Real} <: SystemSolver{T}
+    use_iterative::Bool
     use_sparse::Bool
 
-    solver::Solver{T}
-
-    x1
-    x2
-    y1
-    y2
-    z1
-    z2
-    z1_k
-    z2_k
-    s1::Vector{T}
-    s2::Vector{T}
-    s1_k
-    s2_k
-
-    lhs_copy
+    tau_row
     lhs
-    rhs::Matrix{T}
+    lhs_copy
+    fact_cache
 
-    solvesol
-    solvecache
-
-    function NaiveElimSystemSolver{T}(; use_sparse::Bool = false) where {T <: Real}
+    function NaiveElimSystemSolver{T}(; use_iterative::Bool = false, use_sparse::Bool = false) where {T <: Real}
         system_solver = new{T}()
+        system_solver.use_iterative = use_iterative
         system_solver.use_sparse = use_sparse
         return system_solver
     end
 end
 
+# create the system_solver cache
 function load(system_solver::NaiveElimSystemSolver{T}, solver::Solver{T}) where {T <: Real}
-    system_solver.solver = solver
-
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
+    system_solver.tau_row = n + p + q + 1
 
-    rhs = zeros(T, n + p + q + 1, 2)
-    system_solver.rhs = rhs
-    rows = 1:n
-    system_solver.x1 = view(rhs, rows, 1)
-    system_solver.x2 = view(rhs, rows, 2)
-    rows = (n + 1):(n + p)
-    system_solver.y1 = view(rhs, rows, 1)
-    system_solver.y2 = view(rhs, rows, 2)
-    rows = (n + p + 1):(n + p + q)
-    system_solver.z1 = view(rhs, rows, 1)
-    system_solver.z2 = view(rhs, rows, 2)
-    z_start = n + p
-    system_solver.z1_k = [view(rhs, z_start .+ model.cone_idxs[k], 1) for k in eachindex(model.cones)]
-    system_solver.z2_k = [view(rhs, z_start .+ model.cone_idxs[k], 2) for k in eachindex(model.cones)]
-    system_solver.s1 = zeros(T, q)
-    system_solver.s2 = zeros(T, q)
-    system_solver.s1_k = [view(system_solver.s1, model.cone_idxs[k]) for k in eachindex(model.cones)]
-    system_solver.s2_k = [view(system_solver.s2, model.cone_idxs[k]) for k in eachindex(model.cones)]
-
-    if system_solver.use_sparse
-        system_solver.lhs_copy = T[
-            spzeros(T,n,n)  model.A'        model.G'              model.c;
-            -model.A        spzeros(T,p,p)  spzeros(T,p,q)        model.b;
-            -model.G        spzeros(T,q,p)  sparse(one(T)*I,q,q)  model.h;
-            -model.c'       -model.b'       -model.h'             one(T);
-            ]
-        dropzeros!(system_solver.lhs_copy)
-        @assert issparse(system_solver.lhs_copy)
+    if system_solver.use_iterative
+        error("not implemented")
     else
-        system_solver.lhs_copy = T[
-            zeros(T,n,n)  model.A'      model.G'              model.c;
-            -model.A      zeros(T,p,p)  zeros(T,p,q)          model.b;
-            -model.G      zeros(T,q,p)  Matrix(one(T)*I,q,q)  model.h;
-            -model.c'     -model.b'     -model.h'             one(T);
-            ]
-    end
-
-    system_solver.lhs = similar(system_solver.lhs_copy)
-
-    if !system_solver.use_sparse
-        system_solver.solvesol = Matrix{T}(undef, size(system_solver.lhs, 1), 2)
-        system_solver.solvecache = HypLUSolveCache(system_solver.solvesol, system_solver.lhs, rhs)
+        if system_solver.use_sparse
+            system_solver.lhs = T[
+                spzeros(T,n,n)  model.A'        model.G'              model.c;
+                -model.A        spzeros(T,p,p)  spzeros(T,p,q)        model.b;
+                -model.G        spzeros(T,q,p)  sparse(one(T)*I,q,q)  model.h;
+                -model.c'       -model.b'       -model.h'             one(T);
+                ]
+            dropzeros!(system_solver.lhs)
+            @assert issparse(system_solver.lhs)
+        else
+            system_solver.lhs_copy = T[
+                zeros(T,n,n)  model.A'      model.G'              model.c;
+                -model.A      zeros(T,p,p)  zeros(T,p,q)          model.b;
+                -model.G      zeros(T,q,p)  Matrix(one(T)*I,q,q)  model.h;
+                -model.c'     -model.b'     -model.h'             one(T);
+                ]
+            system_solver.lhs = similar(system_solver.lhs_copy)
+            # system_solver.fact_cache = HypLUSolveCache(system_solver.sol, system_solver.lhs, rhs)
+        end
     end
 
     return system_solver
 end
 
-function get_combined_directions(system_solver::NaiveElimSystemSolver{T}) where {T <: Real}
-    solver = system_solver.solver
+# update the LHS factorization to prepare for solve
+function update_fact(system_solver::NaiveElimSystemSolver{T}, solver::Solver{T}) where {T <: Real}
+    system_solver.use_iterative && return system_solver
+
     model = solver.model
-    cones = model.cones
+    (n, p, q) = (model.n, model.p, model.q)
     lhs = system_solver.lhs
-    rhs = system_solver.rhs
-    x1 = system_solver.x1
-    x2 = system_solver.x2
-    y1 = system_solver.y1
-    y2 = system_solver.y2
-    z1 = system_solver.z1
-    z2 = system_solver.z2
-    z1_k = system_solver.z1_k
-    z2_k = system_solver.z2_k
-    s1 = system_solver.s1
-    s2 = system_solver.s2
-    s1_k = system_solver.s1_k
-    s2_k = system_solver.s2_k
 
-    sqrtmu = sqrt(solver.mu)
-
-    # update rhs and lhs matrices
-    x1 .= solver.x_residual
-    x2 .= zero(T)
-    y1 .= solver.y_residual
-    y2 .= zero(T)
-    for k in eachindex(cones)
-        duals_k = solver.point.dual_views[k]
-        grad_k = Cones.grad(cones[k])
-        @. s1_k[k] = -duals_k
-        @. s2_k[k] = -duals_k - grad_k * sqrtmu
+    if !system_solver.use_sparse
+        copyto!(lhs, system_solver.lhs_copy)
     end
 
-    # -c'x - b'y - h'z + mu/(taubar^2)*tau = taurhs + kaprhs
-    tau_rhs1 = solver.kap + solver.primal_obj_t - solver.dual_obj_t
-    kap_rhs1 = -solver.kap
-    kap_rhs2 = -solver.kap + solver.mu / solver.tau
-    rhs[end, 1] = tau_rhs1 + kap_rhs1
-    rhs[end, 2] = kap_rhs2
-
-    copyto!(lhs, system_solver.lhs_copy)
     lhs[end, end] = solver.mu / solver.tau / solver.tau
-    for k in eachindex(cones)
-        cone_k = cones[k]
+    for (k, cone_k) in enumerate(model.cones)
         idxs_k = model.cone_idxs[k]
-        rows_k = (model.n + model.p) .+ idxs_k
-        # TODO optimize by preallocing the views
+        z_rows_k = (n + p) .+ idxs_k
         if Cones.use_dual(cone_k)
             # -G_k*x + mu*H_k*z_k + h_k*tau = zrhs_k + srhs_k
-            lhs[rows_k, rows_k] .= Cones.hess(cone_k)
-            @views copyto!(z1_k[k], solver.z_residual[idxs_k])
+            lhs[z_rows_k, z_rows_k] .= Cones.hess(cone_k)
         else
             # -mu*H_k*G_k*x + z_k + mu*H_k*h_k*tau = mu*H_k*zrhs_k + srhs_k
-            @views Cones.hess_prod!(lhs[rows_k, 1:model.n], model.G[idxs_k, :], cone_k)
-            @. lhs[rows_k, 1:model.n] *= -1
-            @views Cones.hess_prod!(lhs[rows_k, end], model.h[idxs_k], cone_k)
-            @views Cones.hess_prod!(z1_k[k], solver.z_residual[idxs_k], cone_k)
+            @views Cones.hess_prod!(lhs[z_rows_k, 1:n], model.G[idxs_k, :], cone_k)
+            @. lhs[z_rows_k, 1:n] *= -1
+            @views Cones.hess_prod!(lhs[z_rows_k, end], model.h[idxs_k], cone_k)
         end
     end
-    z1 .+= s1
-    z2 .= s2
 
-    # solve system
     if system_solver.use_sparse
-        rhs .= lu(lhs) \ rhs
+        system_solver.fact_cache = lu(system_solver.lhs)
     else
-        if !hyp_lu_solve!(system_solver.solvecache, system_solver.solvesol, lhs, rhs)
-            @warn("numerical failure: could not fix linear solve failure (mu is $(solver.mu))")
+        system_solver.fact_cache = lu!(system_solver.lhs) # TODO use wrapped lapack function
+    end
+
+    return system_solver
+end
+
+# solve system without outer iterative refinement
+function solve_system(system_solver::NaiveElimSystemSolver{T}, solver::Solver{T}, sol, rhs) where {T <: Real}
+    model = solver.model
+    (n, p, q) = (model.n, model.p, model.q)
+    tau_row = system_solver.tau_row
+
+    # TODO in-place
+    sol4 = view(sol, 1:tau_row, :)
+    rhs4 = rhs[1:tau_row, :]
+
+    for (k, cone_k) in enumerate(model.cones)
+        z_rows_k = (n + p) .+ model.cone_idxs[k]
+        s_rows_k = (q + 1) .+ z_rows_k
+        if Cones.use_dual(cone_k)
+            # -G_k*x + mu*H_k*z_k + h_k*tau = zrhs_k + srhs_k
+            @. @views rhs4[z_rows_k, :] += rhs[s_rows_k, :]
+        else
+            # -mu*H_k*G_k*x + z_k + mu*H_k*h_k*tau = mu*H_k*zrhs_k + srhs_k
+            @views Cones.hess_prod!(rhs4[z_rows_k, :], rhs[z_rows_k, :], cone_k)
+            @. @views rhs4[z_rows_k, :] += rhs[s_rows_k, :]
         end
-        copyto!(rhs, system_solver.solvesol)
+    end
+    # -c'x - b'y - h'z + mu/(taubar^2)*tau = taurhs + kaprhs
+    @. @views rhs4[end, :] += rhs[end, :]
+
+    if system_solver.use_iterative
+        error("not implemented")
+        # for j in 1:size(rhs, 2)
+        #     rhs_j = view(rhs4, :, j)
+        #     sol_j = view(sol4, :, j)
+        #     IterativeSolvers.gmres!(sol_j, system_solver.lhs, rhs_j, restart = tau_row)
+        # end
+    else
+        if system_solver.use_sparse
+            sol4 .= system_solver.fact_cache \ rhs4
+        else
+            # if !hyp_lu_solve!(system_solver.fact_cache, sol4, lhs, rhs4)
+            #     @warn("numerical failure: could not fix linear solve failure")
+            # end
+            ldiv!(sol4, system_solver.fact_cache, rhs4)
+        end
     end
 
     # lift to get s and kap
-    tau1 = rhs[end, 1]
-    tau2 = rhs[end, 2]
+    tau = sol4[end:end, :]
 
-    # s = -G*x - zrhs + h*tau
-    @. s1 = model.h * tau1 - solver.z_residual
-    mul!(s1, model.G, x1, -one(T), true)
-    s2 .= model.h
-    mul!(s2, model.G, x2, -one(T), tau2)
+    # TODO refactor below for use with symindef and qrchol methods
+    # s = -G*x + h*tau - zrhs
+    s = @view sol[(tau_row + 1):(end - 1), :]
+    mul!(s, model.h, tau)
+    x = @view sol[1:n, :]
+    mul!(s, model.G, x, -one(T), true)
+    @. @views s -= rhs[(n + p) .+ (1:q), :]
 
-    # kap = kaprhs - mu/(taubar^2)*tau
-    kap1 = kap_rhs1 - solver.mu / solver.tau * tau1 / solver.tau
-    kap2 = kap_rhs2 - solver.mu / solver.tau * tau2 / solver.tau
+    # kap = -mu/(taubar^2)*tau + kaprhs
+    @. @views sol[end:end, :] = -solver.mu / solver.tau * tau / solver.tau + rhs[end:end, :]
 
-    return (x1, x2, y1, y2, z1, z2, tau1, tau2, s1, s2, kap1, kap2)
+    return sol
 end

@@ -39,9 +39,11 @@ conic_exclude = String[
     # "soc",
     # "rsoc",
     # "exp",
-    # "geomean",
+    "dualexp", # TODO
     # "pow",
+    "dualpow", # TODO
     # "sdp",
+    # "geomean",
     # "logdet",
     # "rootdet",
     # TODO currently some issue with square det transformation?
