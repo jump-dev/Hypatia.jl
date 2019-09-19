@@ -12,52 +12,78 @@ A'*y + G'*z + c*tau = xrhs
 (du bar) mu*H_k*z_k + s_k = srhs_k
 mu/(taubar^2)*tau + kap = kaprhs
 
-TODO treat epinorminf hessians as sparse
+TODO updates in Cones for epinorminf
 =#
-
+max_num_threads = length(Sys.cpu_info())
+ENV["OMP_NUM_THREADS"] = max_num_threads
 import Pardiso
+import SuiteSparse.UMFPACK
 
-struct DefaultSparseSolver end
-SparseSystemSolver = Union{DefaultSparseSolver, Pardiso.PardisoSolver}
-
-function reset_sparse_solver(ps::Pardiso.PardisoSolver)
-    Pardiso.set_phase!(ps, Pardiso.ANALYSIS_NUM_FACT_SOLVE_REFINE)
-    return
-end
-reset_sparse_solver(::DefaultSparseSolver) = nothing
-
-function analyze_sparse_system(ps::Pardiso.PardisoSolver, lhs::SparseMatrixCSC, rhs::Matrix)
-    Pardiso.pardisoinit(ps)
-    Pardiso.set_iparm!(ps, 1, 1)
-    Pardiso.set_iparm!(ps, 12, 1)
-    Pardiso.set_iparm!(ps, 6, 1)
-    Pardiso.set_phase!(ps, Pardiso.ANALYSIS)
-    Pardiso.pardiso(ps, lhs, rhs)
-    return
-end
-analyze_sparse_system(::DefaultSparseSolver, ::SparseMatrixCSC, ::Matrix) = nothing
-
-function solve_sparse_system(ps::Pardiso.PardisoSolver, sol::Matrix, lhs::SparseMatrixCSC, rhs::Matrix, solver)
-    if Pardiso.get_phase(ps) == Pardiso.ANALYSIS_NUM_FACT_SOLVE_REFINE
-        @timeit solver.timer "analyze" analyze_sparse_system(ps, lhs, rhs)
+mutable struct SuiteSparseSolver
+    fact::UMFPACK.UmfpackLU
+    analyzed::Bool
+    function SuiteSparseSolver()
+        solver = new()
+        solver.analyzed = false
+        return solver
     end
-    Pardiso.set_phase!(ps, Pardiso.NUM_FACT_SOLVE_REFINE)
-    @timeit solver.timer "solve" Pardiso.pardiso(ps, sol, lhs, rhs)
+end
+SparseSystemSolver = Union{SuiteSparseSolver, Pardiso.PardisoSolver}
+
+function reset_sparse_solver(sparse_solver::Pardiso.PardisoSolver)
+    Pardiso.set_phase!(sparse_solver, Pardiso.ANALYSIS_NUM_FACT_SOLVE_REFINE)
+    return
+end
+
+function reset_sparse_solver(sparse_solver::SuiteSparseSolver)
+    sparse_solver.analyzed = false
+    return nothing
+end
+
+function analyze_sparse_system(sparse_solver::Pardiso.PardisoSolver, lhs::SparseMatrixCSC, rhs::Matrix)
+    Pardiso.pardisoinit(sparse_solver)
+    Pardiso.set_iparm!(sparse_solver, 1, 1)
+    Pardiso.set_iparm!(sparse_solver, 12, 1)
+    Pardiso.set_iparm!(sparse_solver, 6, 1)
+    Pardiso.set_phase!(sparse_solver, Pardiso.ANALYSIS)
+    Pardiso.pardiso(sparse_solver, lhs, rhs)
+    return
+end
+
+function analyze_sparse_system(sparse_solver::SuiteSparseSolver, lhs::SparseMatrixCSC, ::Matrix)
+    sparse_solver.fact = lu(lhs)
+    sparse_solver.analyzed = true
+    return
+end
+
+function solve_sparse_system(sparse_solver::Pardiso.PardisoSolver, sol::Matrix, lhs::SparseMatrixCSC, rhs::Matrix, solver)
+    if Pardiso.get_phase(sparse_solver) == Pardiso.ANALYSIS_NUM_FACT_SOLVE_REFINE
+        @timeit solver.timer "analyze" analyze_sparse_system(sparse_solver, lhs, rhs)
+    end
+    Pardiso.set_phase!(sparse_solver, Pardiso.NUM_FACT_SOLVE_REFINE)
+    @timeit solver.timer "solve" Pardiso.pardiso(sparse_solver, sol, lhs, rhs)
     return sol
 end
-solve_sparse_system(ps::DefaultSparseSolver, ::Matrix, lhs::SparseMatrixCSC, rhs::Matrix, ::Any) = (rhs .= lu(lhs) \ rhs)
 
-function free_sparse_solver_memory(ps::Pardiso.PardisoSolver)
-    Pardiso.set_phase!(ps, Pardiso.RELEASE_ALL)
-    Pardiso.pardiso(ps, sol, lhs, rhs)
+function solve_sparse_system(sparse_solver::SuiteSparseSolver, sol::Matrix, lhs::SparseMatrixCSC, rhs::Matrix, solver)
+    if !sparse_solver.analyzed
+        analyze_sparse_system(sparse_solver, lhs, rhs)
+    end
+    copyto!(sparse_solver.fact.nzval, lhs.nzval)
+    sparse_solver.fact.numeric = C_NULL
+    @timeit solver.timer "solve" ldiv!(sol, sparse_solver.fact, rhs)
+    rhs .= sol
+    return sol
+end
+
+function free_sparse_solver_memory(sparse_solver::Pardiso.PardisoSolver)
+    Pardiso.set_phase!(sparse_solver, Pardiso.RELEASE_ALL)
+    Pardiso.pardiso(sparse_solver, sol, lhs, rhs)
     return
 end
-free_sparse_solver_memory(::DefaultSparseSolver) = nothing
+free_sparse_solver_memory(::SuiteSparseSolver) = nothing
 
 mutable struct NaiveSparseSystemSolver{T <: Real} <: SystemSolver{T}
-    use_iterative::Bool
-    use_sparse::Bool
-
     solver::Solver{T}
 
     x1
@@ -77,24 +103,17 @@ mutable struct NaiveSparseSystemSolver{T <: Real} <: SystemSolver{T}
     hess_idxs
     hess_view_k_j
     sparse_solver::SparseSystemSolver
-
     sol::Matrix{T}
-
     rhs::Matrix{T}
-    prevsol1::Vector{T}
-    prevsol2::Vector{T}
 
     solvesol
     solvecache
 
     function NaiveSparseSystemSolver{T}(;
-            use_iterative::Bool = false,
-            use_sparse::Bool = false,
-            sparse_solver = Pardiso.PardisoSolver() # DefaultSparseSolver()
+            # sparse_solver = Pardiso.PardisoSolver()
+            sparse_solver = SuiteSparseSolver()
             ) where {T <: Real}
         system_solver = new{T}()
-        system_solver.use_iterative = use_iterative
-        system_solver.use_sparse = use_sparse
         system_solver.sparse_solver = sparse_solver
         return system_solver
     end
@@ -186,6 +205,18 @@ function load(system_solver::NaiveSparseSystemSolver{Float64}, solver::Solver{Fl
         return k
     end
 
+    function add_I_J_V(k, start_row, start_col, cone::Cones.Cone)
+        for j in 1:Cones.dimension(cone)
+            nz_rows = Cones.hess_nz_idxs_j(cone, j)
+            n = length(nz_rows)
+            @. Is[k:(k + n - 1)] = start_row + nz_rows
+            @. Js[k:(k + n - 1)] = j + start_col
+            @. Vs[k:(k + n - 1)] = 1
+            k += n
+        end
+        return k
+    end
+
     rc1 = 0
     rc2 = n
     rc3 = n + p
@@ -219,10 +250,10 @@ function load(system_solver::NaiveSparseSystemSolver{Float64}, solver::Solver{Fl
         rows = rc5 + nz_rows_added
         dual_cols = rc3 + nz_rows_added
         is_dual = Cones.use_dual(cone_k)
-        # add dense matrix in one placeholder block, identity in the other
+        # add each Hessian's sparsity pattern in one placeholder block, an identity in the other
         H_cols = (is_dual ? dual_cols : rows)
         id_cols = (is_dual ? rows : dual_cols)
-        offset = add_I_J_V(offset, rows, H_cols, Cones.hess_sparsity_pattern(cone_k))
+        offset = add_I_J_V(offset, rows, H_cols, cone_k)
         offset = add_I_J_V(offset, rows, id_cols, sparse(one(T) * I, cone_dim, cone_dim))
         nz_rows_added += cone_dim
     end
@@ -231,6 +262,7 @@ function load(system_solver::NaiveSparseSystemSolver{Float64}, solver::Solver{Fl
     @assert offset == total_nnz + 1
 
     @timeit solver.timer "build sparse" system_solver.lhs = sparse(Is, Js, Vs, Int32(dim), Int32(dim))
+    lhs = system_solver.lhs
 
     # cache indices of placeholders of Hessians
     @timeit solver.timer "cache idxs" begin
@@ -243,9 +275,9 @@ function load(system_solver::NaiveSparseSystemSolver{Float64}, solver::Solver{Fl
         for j in 1:cone_dim
             col = init_col + col_offset
             # get list of nonzero rows in the current column of the LHS
-            col_idx_start = system_solver.lhs.colptr[col]
-            col_idx_end = system_solver.lhs.colptr[col + 1] - 1
-            nz_rows = system_solver.lhs.rowval[col_idx_start:col_idx_end]
+            col_idx_start = lhs.colptr[col]
+            col_idx_end = lhs.colptr[col + 1] - 1
+            nz_rows = lhs.rowval[col_idx_start:col_idx_end]
             # nonzero rows in column j of the hessian
             nz_hess_indices = Cones.hess_nz_idxs_j(cone_k, j)
             # index corresponding to first nonzero Hessian element of the current column of the LHS
@@ -260,8 +292,9 @@ function load(system_solver::NaiveSparseSystemSolver{Float64}, solver::Solver{Fl
     end # cache timing
 
     # get mtt index
-    system_solver.mtt_idx = system_solver.lhs.colptr[rc4 + 2] - 1
+    system_solver.mtt_idx = lhs.colptr[rc4 + 2] - 1
 
+    # TODO currently not used, follow up what goes wrong here for soc cone
     system_solver.hess_view_k_j = [[view(cone_k.hess, :, j) for j in 1:Cones.dimension(cone_k)] for cone_k in model.cones]
 
     end # load timing
@@ -311,21 +344,45 @@ function get_combined_directions(system_solver::NaiveSparseSystemSolver{T}) wher
     rhs[end, 1] = -solver.kap
     rhs[end, 2] = -solver.kap + solver.mu / solver.tau
 
-    # @timeit solver.timer "modify views" begin
+    @timeit solver.timer "modify views" begin
     for (k, cone_k) in enumerate(cones)
-        Cones.update_hess(cone_k)
+        @timeit solver.timer "update hess" Cones.update_hess(cone_k)
         for j in 1:Cones.dimension(cone_k)
-            if isa(cone_k, Cones.OrthantCone)
-                @views copyto!(system_solver.lhs.nzval[system_solver.hess_idxs[k][j]], Cones.hess(cone_k)[j, j])
-            else
-                # @views copyto!(system_solver.lhs.nzval[system_solver.hess_idxs[k][j]], model.cones[k].hess[:, j])
-                @views copyto!(system_solver.lhs.nzval[system_solver.hess_idxs[k][j]], system_solver.hess_view_k_j[k][j])
-            end
+            nz_rows = Cones.hess_nz_idxs_j(cone_k, j)
+            @views copyto!(system_solver.lhs.nzval[system_solver.hess_idxs[k][j]], cone_k.hess[nz_rows, j])
+            # @views copyto!(system_solver.lhs.nzval[system_solver.hess_idxs[k][j]], system_solver.hess_view_k_j[k][j])
         end
     end
-    # end # time views
+    end # time views
     system_solver.lhs.nzval[system_solver.mtt_idx] = mtt
     @timeit solver.timer "solve system" solve_sparse_system(sparse_solver, sol, lhs, rhs, solver)
+
+    n, p, q = model.n, model.p, model.q
+    lhs_check =
+        [spzeros(T,n,n)  model.A'        model.G'              model.c       spzeros(T,n,q)         spzeros(T,n);
+        -model.A        spzeros(T,p,p)  spzeros(T,p,q)        model.b       spzeros(T,p,q)         spzeros(T,p);
+        -model.G        spzeros(T,q,p)  spzeros(T,q,q)        model.h       sparse(-one(T)*I,q,q)  spzeros(T,q);
+        -model.c'       -model.b'       -model.h'             zero(T)       spzeros(T,1,q)         -one(T);
+        spzeros(T,q,n)  spzeros(T,q,p)  sparse(one(T)*I,q,q)  spzeros(T,q)  sparse(one(T)*I,q,q)   spzeros(T,q);
+        spzeros(T,1,n)  spzeros(T,1,p)  spzeros(T,1,q)        mtt        spzeros(T,1,q)         one(T);
+        ]
+    row = n + p + q + 2
+    dims_added = 1
+    for (k, cone_k) in enumerate(cones)
+        cone_dim = Cones.dimension(cone_k)
+        rows = row:(row + cone_dim - 1)
+        if Cones.use_dual(cone_k)
+            cols = (n + p + dims_added):(n + p + dims_added + cone_dim - 1)
+        else
+            cols = rows
+        end
+        lhs_check[row:(row + cone_dim - 1), cols] .= cone_k.hess
+        dims_added += cone_dim
+        row += cone_dim
+    end
+    if norm(lhs_check - lhs) > 1
+        println("shit")
+    end
 
     return (x1, x2, y1, y2, z1, z2, rhs[tau_row, 1], rhs[tau_row, 2], s1, s2, rhs[end, 1], rhs[end, 2])
 end
