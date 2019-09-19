@@ -24,7 +24,7 @@ import Hypatia.hyp_chol_solve!
 import Hypatia.set_min_diag!
 import Hypatia.BlockMatrix
 
-# abstract type Stepper{T <: Real} end
+abstract type Stepper{T <: Real} end
 
 abstract type SystemSolver{T <: Real} end
 
@@ -43,6 +43,7 @@ mutable struct Solver{T <: Real}
     init_use_fallback::Bool
     max_nbhd::T
     use_infty_nbhd::Bool
+    stepper::Stepper{T}
     system_solver::SystemSolver{T}
 
     # current status of the solver object
@@ -128,6 +129,7 @@ mutable struct Solver{T <: Real}
         init_use_fallback::Bool = true,
         max_nbhd::Real = 0.7,
         use_infty_nbhd::Bool = true,
+        stepper::Stepper{T} = CombinedStepper{T}(),
         system_solver::SystemSolver{T} = QRCholSystemSolver{T}(),
         ) where {T <: Real}
         if isa(system_solver, QRCholSystemSolver{T})
@@ -148,6 +150,7 @@ mutable struct Solver{T <: Real}
         solver.init_use_fallback = init_use_fallback
         solver.max_nbhd = max_nbhd
         solver.use_infty_nbhd = use_infty_nbhd
+        solver.stepper = stepper
         solver.system_solver = system_solver
         solver.status = :NotLoaded
 
