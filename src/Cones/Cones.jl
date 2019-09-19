@@ -217,16 +217,3 @@ function vec_to_mat_U!(mat::AbstractMatrix{Complex{T}}, vec::AbstractVector{T}) 
 end
 
 end
-
-# TODO experimental - if block is a Cone, then define mul as hessian product
-# TODO optimize... maybe need for each cone a 5-arg hess prod
-import LinearAlgebra.mul!
-
-function mul!(y::AbstractVecOrMat{T}, A::Cones.Cone{T}, x::AbstractVecOrMat{T}, alpha::Number, beta::Number) where {T <: Real}
-    # ytemp = rmul!(y, beta)
-    ytemp = y * beta
-    Cones.hess_prod!(y, x, A)
-    rmul!(y, alpha)
-    y .+= ytemp
-    return y
-end
