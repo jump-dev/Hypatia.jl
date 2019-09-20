@@ -90,7 +90,6 @@ function update_fact(system_solver::SymIndefSystemSolver{T}, solver::Solver{T}) 
         copyto!(lhs, system_solver.lhs_copy)
     end
 
-    lhs[end, end] = solver.mu / solver.tau / solver.tau
     for (k, cone_k) in enumerate(model.cones)
         idxs_k = model.cone_idxs[k]
         z_rows_k = (n + p) .+ idxs_k
