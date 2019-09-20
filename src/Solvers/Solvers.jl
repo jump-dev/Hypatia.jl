@@ -268,6 +268,7 @@ function build_solve_check(
     return solve_check(model; other_options...)
 end
 
+include("sparse.jl")
 include("homogeneous_self_dual/solver.jl")
 include("homogeneous_self_dual/stepper.jl")
 include("homogeneous_self_dual/naive.jl")

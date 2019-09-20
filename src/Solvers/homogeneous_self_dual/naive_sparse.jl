@@ -14,73 +14,8 @@ mu/(taubar^2)*tau + kap = kaprhs
 
 TODO updates in Cones for epinorminf
 =#
-max_num_threads = length(Sys.cpu_info())
-ENV["OMP_NUM_THREADS"] = max_num_threads
-import Pardiso
-import SuiteSparse.UMFPACK
-import Pardiso: PardisoSolver, pardiso
-import SuiteSparse.UMFPACK: UmfpackLU
 
-abstract type SparseSolverCache end
-
-mutable struct PardisoCache <: SparseSolverCache
-    analyzed::Bool
-    ps::PardisoSolver
-end
-PardisoCache() = PardisoCache(false, PardisoSolver())
-
-mutable struct SuiteSparseCache <: SparseSolverCache
-    analyzed::Bool
-    fact::UmfpackLU
-    function SuiteSparseCache()
-        cache = new()
-        cache.analyzed = false
-        return cache
-    end
-end
-
-reset_sparse_cache(cache::SparseSolverCache) = (cache.analyzed = false; cache)
-
-function analyze_sparse_system(cache::PardisoCache, A::SparseMatrixCSC, b::Matrix)
-    ps = cache.ps
-    Pardiso.pardisoinit(ps)
-    Pardiso.set_iparm!(ps, 1, 1)
-    Pardiso.set_iparm!(ps, 12, 1)
-    Pardiso.set_phase!(ps, Pardiso.ANALYSIS)
-    pardiso(ps, A, b)
-    return
-end
-
-function analyze_sparse_system(cache::SuiteSparseCache, A::SparseMatrixCSC, ::Matrix)
-    cache.fact = lu(A)
-    return
-end
-
-function solve_sparse_system(cache::PardisoCache, x::Matrix, A::SparseMatrixCSC, b::Matrix, solver)
-    ps = cache.ps
-    Pardiso.set_phase!(ps, Pardiso.NUM_FACT_SOLVE_REFINE)
-    @timeit solver.timer "solve" pardiso(ps, x, A, b)
-    return x
-end
-
-function solve_sparse_system(cache::SuiteSparseCache, x::Matrix, A::SparseMatrixCSC, b::Matrix, solver)
-    fact = cache.fact
-    # TODO this is a hack around lack of interface https://github.com/JuliaLang/julia/issues/33323
-    copyto!(fact.nzval, A.nzval)
-    fact.numeric = C_NULL
-    @timeit solver.timer "solve" ldiv!(x, fact, b)
-    return x
-end
-
-function release_sparse_cache(cache::PardisoCache)
-    ps = cache.ps
-    Pardiso.set_phase!(ps, Pardiso.RELEASE_ALL)
-    pardiso(ps)
-    return
-end
-release_sparse_cache(::SuiteSparseCache) = nothing
-
- mutable struct NaiveSparseSystemSolver <: SystemSolver{Float64}
+mutable struct NaiveSparseSystemSolver <: SystemSolver{Float64}
      tau_row
      lhs
      hess_idxs
@@ -91,7 +26,7 @@ release_sparse_cache(::SuiteSparseCache) = nothing
 
      function NaiveSparseSystemSolver(;
          # sparse_cache = PardisoCache()
-         sparse_cache = SuiteSparseCache()
+         sparse_cache = UMFPACKCache()
          )
          system_solver = new()
          system_solver.sparse_cache = sparse_cache
@@ -99,14 +34,12 @@ release_sparse_cache(::SuiteSparseCache) = nothing
      end
  end
 
-release_sparse_cache(s::NaiveSparseSystemSolver) = release_sparse_cache(s.sparse_cache)
-
 # create the system_solver cache
 function load(system_solver::NaiveSparseSystemSolver, solver::Solver{Float64})
     @timeit solver.timer "load" begin
     reset_sparse_cache(system_solver.sparse_cache)
-    # TODO remove
     model = solver.model
+    (A, G, b, h, c) = (model.A, model.G, model.b, model.h, model.c)
     (n, p, q) = (model.n, model.p, model.q)
     cones = model.cones
     cone_idxs = model.cone_idxs
@@ -114,11 +47,12 @@ function load(system_solver::NaiveSparseSystemSolver, solver::Solver{Float64})
     system_solver.tau_row = tau_row
     dim = n + p + 2q + 2
 
-    model.A = sparse(model.A)
-    model.G = sparse(model.G)
+    # TODO remove
+    A = sparse(A)
+    G = sparse(G)
 
-    dropzeros!(model.A)
-    dropzeros!(model.G)
+    dropzeros!(A)
+    dropzeros!(G)
 
     # x y z kap s tau
 
@@ -133,38 +67,46 @@ function load(system_solver::NaiveSparseSystemSolver, solver::Solver{Float64})
     # dropzeros!(system_solver.lhs_actual_copy)
     # system_solver.lhs_actual = similar(system_solver.lhs_actual_copy)
 
+    # count the number of nonzeros we will have in the lhs
     hess_nnzs = sum(Cones.dimension(cone_k) + Cones.hess_nnzs(cone_k) for cone_k in model.cones)
-    total_nnz = 2 * (nnz(sparse(model.A)) + nnz(sparse(model.G)) + n + p + q + 1) + q + 1 + hess_nnzs
-    Is = Vector{Int32}(undef, total_nnz)
-    Js = Vector{Int32}(undef, total_nnz)
-    Vs = Vector{Float64}(undef, total_nnz)
+    nnzs = 2 * (nnz(sparse(model.A)) + nnz(sparse(model.G)) + n + p + q + 1) + q + 1 + hess_nnzs
+    Is = Vector{Int32}(undef, nnzs)
+    Js = Vector{Int32}(undef, nnzs)
+    Vs = Vector{Float64}(undef, nnzs)
 
-    function add_I_J_V(k, start_row, start_col, vec::Vector{Float64}, trans::Bool = false)
-        n = length(vec)
-        if !isempty(vec)
-            if trans
-                Is[k:(k + n - 1)] .= start_row + 1
-                Js[k:(k + n - 1)] .= (start_col + 1):(start_col + n)
-            else
-                Is[k:(k + n - 1)] .= (start_row + 1):(start_row + n)
-                Js[k:(k + n - 1)] .= start_col + 1
-            end
-            Vs[k:(k + n - 1)] .= vec
-        end
-        return k + n
-    end
+    # compute the sarting rows/columns for each known block in the lhs
+    rc1 = 0
+    rc2 = n
+    rc3 = n + p
+    rc4 = n + p + q
+    rc5 = n + p + q + 1
+    rc6 = dim - 1
 
-    function add_I_J_V(k, start_row, start_col, mat)
-        if !isempty(mat)
-            for (i, j, v) in zip(findnz(mat)...)
-                Is[k] = i + start_row
-                Js[k] = j + start_col
-                Vs[k] = v
-                k += 1
-            end
-        end
-        return k
-    end
+    # count of nonzeros added so far
+    offset = 1
+    # add vectors in the lhs
+    offset = Solvers.add_I_J_V(
+        offset, Is, Js, Vs,
+        # start rows
+        [rc1, rc2, rc3, fill(rc4, 3)..., rc4, rc6, rc6],
+        # start cols
+        [fill(rc4, 3)..., rc1, rc2, rc3, rc6, rc4, rc6],
+        # vecs
+        [c, b, h, -c, -b, -h, [-1.0], [1.0], [1.0]],
+        # transpose
+        vcat(fill(false, 3), fill(true, 3), fill(false, 3)),
+        )
+    # add sparse matrix blocks to the lhs
+    offset = Solvers.add_I_J_V(
+        offset, Is, Js, Vs,
+        # start rows
+        [rc1, rc1, rc2, rc3, rc3],
+        # start cols
+        [rc2, rc3, rc1, rc1, rc5],
+        # mats
+        [sparse(A'), sparse(G'), -A, -G, sparse(-I, q, q)],
+        )
+
 
     function add_I_J_V(k, start_row, start_col, cone::Cones.Cone)
         for j in 1:Cones.dimension(cone)
@@ -178,31 +120,6 @@ function load(system_solver::NaiveSparseSystemSolver, solver::Solver{Float64})
         return k
     end
 
-    rc1 = 0
-    rc2 = n
-    rc3 = n + p
-    rc4 = n + p + q
-    rc5 = n + p + q + 1
-    rc6 = dim - 1
-    # count of nonzeros added so far
-    offset = 1
-    @timeit solver.timer "setup lhs" begin
-    # set up all nonzero elements apart from Hessians
-    offset = add_I_J_V(offset, rc1, rc2, sparse(model.A')) # slow but doesn't allocate much
-    offset = add_I_J_V(offset, rc1, rc3, sparse(model.G'))
-    offset = add_I_J_V(offset, rc1, rc4, model.c)
-    offset = add_I_J_V(offset, rc2, rc1, -model.A)
-    offset = add_I_J_V(offset, rc2, rc4, model.b)
-    offset = add_I_J_V(offset, rc3, rc1, -model.G)
-    offset = add_I_J_V(offset, rc3, rc4, model.h)
-    offset = add_I_J_V(offset, rc3, rc5, sparse(-I, q, q))
-    offset = add_I_J_V(offset, rc4, rc1, -model.c, true)
-    offset = add_I_J_V(offset, rc4, rc2, -model.b, true)
-    offset = add_I_J_V(offset, rc4, rc3, -model.h, true)
-    offset = add_I_J_V(offset, rc4, rc6, -[1.0])
-    offset = add_I_J_V(offset, rc6, rc4, [1.0])
-    offset = add_I_J_V(offset, rc6, rc6, [1.0])
-
     # add I, J, V for Hessians
     @timeit solver.timer "setup hess lhs" begin
     nz_rows_added = 0
@@ -215,12 +132,12 @@ function load(system_solver::NaiveSparseSystemSolver, solver::Solver{Float64})
         H_cols = (is_dual ? dual_cols : rows)
         id_cols = (is_dual ? rows : dual_cols)
         offset = add_I_J_V(offset, rows, H_cols, cone_k)
-        offset = add_I_J_V(offset, rows, id_cols, sparse(I, cone_dim, cone_dim))
+        offset = Solvers.add_I_J_V(offset, Is, Js, Vs, rows, id_cols, sparse(I, cone_dim, cone_dim))
         nz_rows_added += cone_dim
     end
     end # hess timing
-    end # setup lhs timing
-    @assert offset == total_nnz + 1
+    # end # setup lhs timing
+    @assert offset == nnzs + 1
 
     @timeit solver.timer "build sparse" system_solver.lhs = sparse(Is, Js, Vs, Int32(dim), Int32(dim))
     lhs = system_solver.lhs
