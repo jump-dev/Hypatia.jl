@@ -69,7 +69,7 @@ function load(system_solver::NaiveSparseSystemSolver, solver::Solver{Float64})
 
     # count the number of nonzeros we will have in the lhs
     hess_nnzs = sum(Cones.dimension(cone_k) + Cones.hess_nnzs(cone_k) for cone_k in model.cones)
-    nnzs = 2 * (nnz(sparse(model.A)) + nnz(sparse(model.G)) + n + p + q + 1) + q + 1 + hess_nnzs
+    nnzs = 2 * (nnz(A) + nnz(G) + n + p + q + 1) + q + 1 + hess_nnzs
     Is = Vector{Int32}(undef, nnzs)
     Js = Vector{Int32}(undef, nnzs)
     Vs = Vector{Float64}(undef, nnzs)
@@ -104,7 +104,9 @@ function load(system_solver::NaiveSparseSystemSolver, solver::Solver{Float64})
         # start cols
         [rc2, rc3, rc1, rc1, rc5],
         # mats
-        [sparse(A'), sparse(G'), -A, -G, sparse(-I, q, q)],
+        [A, G, -A, -G, sparse(-I, q, q)],
+        # transpose
+        [true, true, false, false, false],
         )
 
 
@@ -132,7 +134,7 @@ function load(system_solver::NaiveSparseSystemSolver, solver::Solver{Float64})
         H_cols = (is_dual ? dual_cols : rows)
         id_cols = (is_dual ? rows : dual_cols)
         offset = add_I_J_V(offset, rows, H_cols, cone_k)
-        offset = Solvers.add_I_J_V(offset, Is, Js, Vs, rows, id_cols, sparse(I, cone_dim, cone_dim))
+        offset = Solvers.add_I_J_V(offset, Is, Js, Vs, rows, id_cols, sparse(I, cone_dim, cone_dim), false)
         nz_rows_added += cone_dim
     end
     end # hess timing

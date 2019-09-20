@@ -24,10 +24,35 @@ end
 function load(system_solver::SymIndefSparseSystemSolver, solver::Solver{Float64})
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
+    (A, G, b, h, c) = (model.A, model.G, model.b, model.h, model.c)
     system_solver.tau_row = n + p + q + 1
-    model = solver.model
+    # TODO remove
+    A = sparse(A)
+    G = sparse(G)
     dropzeros!(model.A)
     dropzeros!(model.G)
+
+    # count the number of nonzeros we will have in the lhs
+    hess_nnzs = sum(Cones.dimension(cone_k) + Cones.hess_nnzs(cone_k) for cone_k in model.cones)
+    nnzs = 2 * (nnz(A) + nnz(G) + n + p + q + 1) + q + 1 + hess_nnzs
+    Is = Vector{Int32}(undef, nnzs)
+    Js = Vector{Int32}(undef, nnzs)
+    Vs = Vector{Float64}(undef, nnzs)
+
+    # count of nonzeros added so far
+    offset = 1
+    # add vectors in the lhs
+    offset = Solvers.add_I_J_V(
+        offset, Is, Js, Vs,
+        # start rows
+        [rc1, rc2, rc3, fill(rc4, 3)..., rc4, rc6, rc6],
+        # start cols
+        [fill(rc4, 3)..., rc1, rc2, rc3, rc6, rc4, rc6],
+        # vecs
+        [c, b, h, -c, -b, -h, [-1.0], [1.0], [1.0]],
+        # transpose
+        vcat(fill(false, 3), fill(true, 3), fill(false, 3)),
+        )
 
     # fill symmetric lower triangle
 
