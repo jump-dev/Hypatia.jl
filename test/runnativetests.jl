@@ -7,8 +7,6 @@ using TimerOutputs
 
 const SO = Hypatia.Solvers
 
-@info("starting native tests")
-
 real_types = [
     Float64,
     # Float32,
