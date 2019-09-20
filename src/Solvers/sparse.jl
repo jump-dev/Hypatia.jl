@@ -97,11 +97,11 @@ function add_I_J_V(
     n = length(vec)
     if !isempty(vec)
         if trans
-            Is[offset:(offset + n - 1)] .= start_row + 1
-            Js[offset:(offset + n - 1)] .= (start_col + 1):(start_col + n)
+            @views Is[offset:(offset + n - 1)] .= start_row + 1
+            @views Js[offset:(offset + n - 1)] .= (start_col + 1):(start_col + n)
         else
-            Is[offset:(offset + n - 1)] .= (start_row + 1):(start_row + n)
-            Js[offset:(offset + n - 1)] .= start_col + 1
+            @views Is[offset:(offset + n - 1)] .= (start_row + 1):(start_row + n)
+            @views Js[offset:(offset + n - 1)] .= start_col + 1
         end
         Vs[offset:(offset + n - 1)] .= vec
     end
@@ -116,7 +116,7 @@ function add_I_J_V(
     start_rows::Vector{Int},
     start_cols::Vector{Int},
     vecs::Vector{Vector{Float64}},
-    trans::Vector{Bool}
+    trans::Vector{Bool},
     )
     for (r, c, v, t) in zip(start_rows, start_cols, vecs, trans)
         offset = add_I_J_V(offset, Is, Js, Vs, r, c, v, t)
@@ -131,13 +131,23 @@ function add_I_J_V(
     Vs::Vector{Float64},
     start_row::Int,
     start_col::Int,
-    mat::SparseMatrixCSC
+    mat::SparseMatrixCSC,
+    trans::Bool,
     )
-    for (i, j, v) in zip(findnz(mat)...)
-        Is[offset] = i + start_row
-        Js[offset] = j + start_col
-        Vs[offset] = v
-        offset += 1
+    for j in 1:mat.n
+        col_idxs = mat.colptr[j]:(mat.colptr[j + 1] - 1)
+        rows = view(mat.rowval, col_idxs)
+        vals = view(mat.nzval, col_idxs)
+        m = length(rows)
+        if trans
+            @views Is[offset:(offset + m - 1)] .= start_row + j
+            @views Js[offset:(offset + m - 1)] .= start_col .+ rows
+        else
+            @views Is[offset:(offset + m - 1)] .= start_row .+ rows
+            @views Js[offset:(offset + m - 1)] .= start_col + j
+        end
+        @views Vs[offset:(offset + m - 1)] .= vals
+        offset += m
     end
     return offset
 end
@@ -149,10 +159,11 @@ function add_I_J_V(
     Vs::Vector{Float64},
     start_rows::Vector{Int},
     start_cols::Vector{Int},
-    mats::Vector{<: SparseMatrixCSC}
+    mats::Vector{<: SparseMatrixCSC},
+    trans::Vector{Bool},
     )
-    for (r, c, m) in zip(start_rows, start_cols, mats)
-        offset = add_I_J_V(offset, Is, Js, Vs, r, c, m)
+    for (r, c, m, t) in zip(start_rows, start_cols, mats, trans)
+        offset = add_I_J_V(offset, Is, Js, Vs, r, c, m, t)
     end
     return offset
 end
