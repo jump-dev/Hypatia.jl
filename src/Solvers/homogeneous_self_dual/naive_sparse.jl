@@ -18,70 +18,79 @@ max_num_threads = length(Sys.cpu_info())
 ENV["OMP_NUM_THREADS"] = max_num_threads
 import Pardiso
 import SuiteSparse.UMFPACK
+import Pardiso: PardisoSolver, pardiso
+import SuiteSparse.UMFPACK: UmfpackLU
 
-mutable struct SuiteSparseSolver
-    fact::UMFPACK.UmfpackLU
+abstract type SparseSolverCache end
+
+mutable struct PardisoCache <: SparseSolverCache
     analyzed::Bool
-    function SuiteSparseSolver()
-        solver = new()
-        solver.analyzed = false
-        return solver
+    ps::PardisoCache
+end
+PardisoCache() = PardisoCache(false, PardisoSolver())
+
+mutable struct SuiteSparseCache <: SparseSolverCache
+    analyzed::Bool
+    fact::UmfpackLU
+    function SuiteSparseCache()
+        cache = new()
+        cache.analyzed = false
+        return cache
     end
 end
-SparseSystemSolver = Union{SuiteSparseSolver, Pardiso.PardisoSolver}
 
-function reset_sparse_solver(sparse_solver::Pardiso.PardisoSolver)
-    Pardiso.set_phase!(sparse_solver, Pardiso.ANALYSIS_NUM_FACT_SOLVE_REFINE)
+reset_sparse_cache(cache::SparseSolverCache) = (cache.analyzed = false; cache)
+
+function analyze_sparse_system(cache::PardisoCache, A::SparseMatrixCSC, b::Matrix)
+    ps = cache.ps
+    Paridso.pardisoinit(ps)
+    Pardiso.set_iparm!(ps, 1, 1)
+    Pardiso.set_iparm!(ps, 12, 1)
+    Pardiso.set_iparm!(ps, 6, 1)
+    Pardiso.set_phase!(ps, Pardiso.ANALYSIS)
+    pardiso(ps, A, b)
+    cache.analyzed = true
     return
 end
 
-function reset_sparse_solver(sparse_solver::SuiteSparseSolver)
-    sparse_solver.analyzed = false
-    return nothing
-end
-
-function analyze_sparse_system(sparse_solver::Pardiso.PardisoSolver, lhs::SparseMatrixCSC, rhs::Matrix)
-    Pardiso.pardisoinit(sparse_solver)
-    Pardiso.set_iparm!(sparse_solver, 1, 1)
-    Pardiso.set_iparm!(sparse_solver, 12, 1)
-    Pardiso.set_iparm!(sparse_solver, 6, 1)
-    Pardiso.set_phase!(sparse_solver, Pardiso.ANALYSIS)
-    Pardiso.pardiso(sparse_solver, lhs, rhs)
+function analyze_sparse_system(cache::SuiteSparseCache, A::SparseMatrixCSC, ::Matrix)
+    cache.fact = lu(A)
+    cache.analyzed = true
     return
 end
 
-function analyze_sparse_system(sparse_solver::SuiteSparseSolver, lhs::SparseMatrixCSC, ::Matrix)
-    sparse_solver.fact = lu(lhs)
-    sparse_solver.analyzed = true
-    return
-end
-
-function solve_sparse_system(sparse_solver::Pardiso.PardisoSolver, sol::Matrix, lhs::SparseMatrixCSC, rhs::Matrix, solver)
-    if Pardiso.get_phase(sparse_solver) == Pardiso.ANALYSIS_NUM_FACT_SOLVE_REFINE
-        @timeit solver.timer "analyze" analyze_sparse_system(sparse_solver, lhs, rhs)
+function solve_sparse_system(cache::PardisoCache, x::Matrix, A::SparseMatrixCSC, b::Matrix, solver)
+    if !cache.analyzed
+        analyze_sparse_system(cache, A, b)
     end
-    Pardiso.set_phase!(sparse_solver, Pardiso.NUM_FACT_SOLVE_REFINE)
-    @timeit solver.timer "solve" Pardiso.pardiso(sparse_solver, sol, lhs, rhs)
-    return sol
+    ps = cache.ps
+    Pardiso.set_phase!(ps, Pardiso.NUM_FACT_SOLVE_REFINE)
+    @timeit solver.timer "solve" pardiso(ps, x, A, b)
+    return x
 end
 
-function solve_sparse_system(sparse_solver::SuiteSparseSolver, sol::Matrix, lhs::SparseMatrixCSC, rhs::Matrix, solver)
-    if !sparse_solver.analyzed
-        analyze_sparse_system(sparse_solver, lhs, rhs)
+function solve_sparse_system(cache::SuiteSparseCache, x::Matrix, A::SparseMatrixCSC, b::Matrix, solver)
+    if !cache.analyzed
+        analyze_sparse_system(cache, A, b)
     end
-    copyto!(sparse_solver.fact.nzval, lhs.nzval)
-    sparse_solver.fact.numeric = C_NULL
-    @timeit solver.timer "solve" ldiv!(sol, sparse_solver.fact, rhs)
-    rhs .= sol
-    return sol
+    fact = cache.fact
+    # TODO hack around lack of interface https://github.com/JuliaLang/julia/issues/33323
+    copyto!(fact.nzval, A.nzval)
+    fact.numeric = C_NULL
+    @timeit solver.timer "solve" ldiv!(x, fact, b)
+    # TODO maybe just store sol at the system solver level, this is a redundant copy in all sparse solvers
+    b .= x
+    return x
 end
 
-function free_sparse_solver_memory(sparse_solver::Pardiso.PardisoSolver)
-    Pardiso.set_phase!(sparse_solver, Pardiso.RELEASE_ALL)
-    Pardiso.pardiso(sparse_solver, sol, lhs, rhs)
+function release_sparse_cache(cache::PardisoCache)
+    ps = cache.ps
+    Pardiso.set_phase!(ps, Pardiso.RELEASE_ALL)
+    pardiso(ps)
     return
 end
-free_sparse_solver_memory(::SuiteSparseSolver) = nothing
+release_sparse_cache(::SuiteSparseCache) = nothing
+ # TODO add at system solver level
 
 mutable struct NaiveSparseSystemSolver{T <: Real} <: SystemSolver{T}
     solver::Solver{T}
@@ -102,7 +111,7 @@ mutable struct NaiveSparseSystemSolver{T <: Real} <: SystemSolver{T}
     lhs
     hess_idxs
     hess_view_k_j
-    sparse_solver::SparseSystemSolver
+    sparse_solver::SparseSolverCache
     sol::Matrix{T}
     rhs::Matrix{T}
 
@@ -110,8 +119,8 @@ mutable struct NaiveSparseSystemSolver{T <: Real} <: SystemSolver{T}
     solvecache
 
     function NaiveSparseSystemSolver{T}(;
-            # sparse_solver = Pardiso.PardisoSolver()
-            sparse_solver = SuiteSparseSolver()
+            # sparse_solver = PardisoCache()
+            sparse_solver = SuiteSparseCache()
             ) where {T <: Real}
         system_solver = new{T}()
         system_solver.sparse_solver = sparse_solver
@@ -119,7 +128,7 @@ mutable struct NaiveSparseSystemSolver{T <: Real} <: SystemSolver{T}
     end
 end
 
-free_sparse_solver_memory(s::NaiveSparseSystemSolver) = free_sparse_solver_memory(s.sparse_solver)
+release_sparse_cache(s::NaiveSparseSystemSolver) = release_sparse_cache(s.sparse_solver)
 
 function load(system_solver::NaiveSparseSystemSolver{Float64}, solver::Solver{Float64})
     T = Float64
@@ -130,7 +139,7 @@ function load(system_solver::NaiveSparseSystemSolver{Float64}, solver::Solver{Fl
     (n, p, q) = (model.n, model.p, model.q)
     dim = n + p + 2q + 2
 
-    reset_sparse_solver(system_solver.sparse_solver)
+    reset_sparse_cache(system_solver.sparse_solver)
 
     rhs = zeros(T, dim, 2)
     system_solver.rhs = rhs
