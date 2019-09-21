@@ -8,17 +8,21 @@ max_num_threads = length(Sys.cpu_info())
 ENV["OMP_NUM_THREADS"] = max_num_threads
 import Pardiso
 import SuiteSparse.UMFPACK
+import SuiteSparse.CHOLMOD
 import Pardiso: PardisoSolver, pardiso
 import SuiteSparse.UMFPACK: UmfpackLU
 import SuiteSparse.CHOLMOD: Factor
 
+abstract type SparseSystemSolver <: SystemSolver{Float64} end
+
 abstract type SparseSolverCache end
 
 mutable struct PardisoCache <: SparseSolverCache
+    use_symmetric::Bool
     analyzed::Bool
     ps::PardisoSolver
 end
-PardisoCache() = PardisoCache(false, PardisoSolver())
+PardisoCache(use_symmetric::Bool) = PardisoCache(use_symmetric, false, PardisoSolver())
 
 mutable struct UMFPACKCache <: SparseSolverCache
     analyzed::Bool
@@ -33,6 +37,7 @@ end
 mutable struct CHOLMODCache <: SparseSolverCache
     analyzed::Bool
     fact::Factor
+    backup_fact::UmfpackLU
     function CHOLMODCache()
         cache = new()
         cache.analyzed = false
@@ -44,9 +49,14 @@ reset_sparse_cache(cache::SparseSolverCache) = (cache.analyzed = false; cache)
 
 function analyze_sparse_system(cache::PardisoCache, A::SparseMatrixCSC, b::Matrix)
     ps = cache.ps
+    if cache.use_symmetric
+        Pardiso.set_matrixtype!(ps, Pardiso.REAL_SYM_INDEF)
+    end
     Pardiso.pardisoinit(ps)
     Pardiso.set_iparm!(ps, 1, 1)
-    Pardiso.set_iparm!(ps, 12, 1)
+    # if !cache.use_symmetric
+        Pardiso.set_iparm!(ps, 12, 1)
+    # end
     Pardiso.set_phase!(ps, Pardiso.ANALYSIS)
     pardiso(ps, A, b)
     return
@@ -57,10 +67,20 @@ function analyze_sparse_system(cache::UMFPACKCache, A::SparseMatrixCSC, ::Matrix
     return
 end
 
+function analyze_sparse_system(cache::CHOLMODCache, A::SparseMatrixCSC, ::Matrix)
+    # A.rowval = convert(Vecdtor{Float})
+    cache.fact = CHOLMOD.ldlt(Symmetric(A, :L), check = false)
+    return
+end
+
 function solve_sparse_system(cache::PardisoCache, x::Matrix, A::SparseMatrixCSC, b::Matrix, solver)
     ps = cache.ps
     Pardiso.set_phase!(ps, Pardiso.NUM_FACT_SOLVE_REFINE)
-    @timeit solver.timer "solve" pardiso(ps, x, A, b)
+    @timeit solver.timer "solve" if cache.use_symmetric
+        pardiso(ps, x, A, b)
+    else
+        pardiso(ps, x, A, b)
+    end
     return x
 end
 
@@ -73,6 +93,18 @@ function solve_sparse_system(cache::UMFPACKCache, x::Matrix, A::SparseMatrixCSC,
     return x
 end
 
+function solve_sparse_system(cache::CHOLMODCache, x::Matrix, A::SparseMatrixCSC, b::Matrix, solver)
+    A_symm = Symmetric(A, :L)
+    ldlt!(cache.fact, A_symm, check = false)
+    if issuccess(cache.fact)
+        @timeit solver.timer "solve" x .= cache.fact \ b
+    else
+        cache.backup_fact = lu(SparseMatrixCSC{eltype(A), SuiteSparse.CHOLMOD.SuiteSparse_long}(A_symm))
+        x .= cache.backup_fact \ b
+    end
+    return x
+end
+
 function release_sparse_cache(cache::PardisoCache)
     ps = cache.ps
     Pardiso.set_phase!(ps, Pardiso.RELEASE_ALL)
@@ -82,12 +114,16 @@ end
 
 release_sparse_cache(::UMFPACKCache) = nothing
 
-release_sparse_cache(s::SystemSolver) = release_sparse_cache(s.sparse_cache)
+release_sparse_cache(::CHOLMODCache) = nothing
+
+release_sparse_cache(s::SparseSystemSolver) = release_sparse_cache(s.sparse_cache)
+
+release_sparse_cache(s::SystemSolver) = nothing
 
 function add_I_J_V(
     offset::Int,
-    Is::Vector{Int32},
-    Js::Vector{Int32},
+    Is::Vector{<: Integer},
+    Js::Vector{<: Integer},
     Vs::Vector{Float64},
     start_row::Int,
     start_col::Int,
@@ -110,8 +146,8 @@ end
 
 function add_I_J_V(
     offset::Int,
-    Is::Vector{Int32},
-    Js::Vector{Int32},
+    Is::Vector{<: Integer},
+    Js::Vector{<: Integer},
     Vs::Vector{Float64},
     start_rows::Vector{Int},
     start_cols::Vector{Int},
@@ -126,8 +162,8 @@ end
 
 function add_I_J_V(
     offset::Int,
-    Is::Vector{Int32},
-    Js::Vector{Int32},
+    Is::Vector{<: Integer},
+    Js::Vector{<: Integer},
     Vs::Vector{Float64},
     start_row::Int,
     start_col::Int,
@@ -154,8 +190,8 @@ end
 
 function add_I_J_V(
     offset::Int,
-    Is::Vector{Int32},
-    Js::Vector{Int32},
+    Is::Vector{<: Integer},
+    Js::Vector{<: Integer},
     Vs::Vector{Float64},
     start_rows::Vector{Int},
     start_cols::Vector{Int},
@@ -168,5 +204,22 @@ function add_I_J_V(
     return offset
 end
 
-function add_hess_to_lhs()
+function add_I_J_V(
+    offset::Int,
+    Is::Vector{<: Integer},
+    Js::Vector{<: Integer},
+    Vs::Vector{Float64},
+    start_row::Int,
+    start_col::Int,
+    cone::Cones.Cone,
+    use_inv::Bool)
+    for j in 1:Cones.dimension(cone)
+        nz_rows = (use_inv ? Cones.inv_hess_nz_idxs_j(cone, j) : Cones.hess_nz_idxs_j(cone, j))
+        n = length(nz_rows)
+        @. Is[offset:(offset + n - 1)] = start_row + nz_rows
+        @. Js[offset:(offset + n - 1)] = j + start_col
+        @. Vs[offset:(offset + n - 1)] = 1
+        offset += n
+    end
+    return offset
 end

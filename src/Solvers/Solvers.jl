@@ -275,6 +275,7 @@ include("homogeneous_self_dual/naive.jl")
 include("homogeneous_self_dual/naive_sparse.jl")
 include("homogeneous_self_dual/naiveelim.jl")
 include("homogeneous_self_dual/symindef.jl")
+include("homogeneous_self_dual/symindef_sparse.jl")
 include("homogeneous_self_dual/qrchol.jl")
 
 end

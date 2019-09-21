@@ -15,7 +15,7 @@ mu/(taubar^2)*tau + kap = kaprhs
 TODO updates in Cones for epinorminf
 =#
 
-mutable struct NaiveSparseSystemSolver <: SystemSolver{Float64}
+mutable struct NaiveSparseSystemSolver <: SparseSystemSolver
      tau_row
      lhs
      hess_idxs
@@ -25,8 +25,8 @@ mutable struct NaiveSparseSystemSolver <: SystemSolver{Float64}
      mtt_idx::Int
 
      function NaiveSparseSystemSolver(;
-         # sparse_cache = PardisoCache()
-         sparse_cache = UMFPACKCache()
+         sparse_cache = PardisoCache(false)
+         # sparse_cache = UMFPACKCache()
          )
          system_solver = new()
          system_solver.sparse_cache = sparse_cache
@@ -85,7 +85,7 @@ function load(system_solver::NaiveSparseSystemSolver, solver::Solver{Float64})
     # count of nonzeros added so far
     offset = 1
     # add vectors in the lhs
-    offset = Solvers.add_I_J_V(
+    offset = add_I_J_V(
         offset, Is, Js, Vs,
         # start rows
         [rc1, rc2, rc3, fill(rc4, 3)..., rc4, rc6, rc6],
@@ -97,7 +97,7 @@ function load(system_solver::NaiveSparseSystemSolver, solver::Solver{Float64})
         vcat(fill(false, 3), fill(true, 3), fill(false, 3)),
         )
     # add sparse matrix blocks to the lhs
-    offset = Solvers.add_I_J_V(
+    offset = add_I_J_V(
         offset, Is, Js, Vs,
         # start rows
         [rc1, rc1, rc2, rc3, rc3],
@@ -108,19 +108,6 @@ function load(system_solver::NaiveSparseSystemSolver, solver::Solver{Float64})
         # transpose
         [true, true, false, false, false],
         )
-
-
-    function add_I_J_V(k, start_row, start_col, cone::Cones.Cone)
-        for j in 1:Cones.dimension(cone)
-            nz_rows = Cones.hess_nz_idxs_j(cone, j)
-            n = length(nz_rows)
-            @. Is[k:(k + n - 1)] = start_row + nz_rows
-            @. Js[k:(k + n - 1)] = j + start_col
-            @. Vs[k:(k + n - 1)] = 1
-            k += n
-        end
-        return k
-    end
 
     # add I, J, V for Hessians
     @timeit solver.timer "setup hess lhs" begin
@@ -133,12 +120,11 @@ function load(system_solver::NaiveSparseSystemSolver, solver::Solver{Float64})
         # add each Hessian's sparsity pattern in one placeholder block, an identity in the other
         H_cols = (is_dual ? dual_cols : rows)
         id_cols = (is_dual ? rows : dual_cols)
-        offset = add_I_J_V(offset, rows, H_cols, cone_k)
-        offset = Solvers.add_I_J_V(offset, Is, Js, Vs, rows, id_cols, sparse(I, cone_dim, cone_dim), false)
+        offset = add_I_J_V(offset, Is, Js, Vs, rows, H_cols, cone_k, false)
+        offset = add_I_J_V(offset, Is, Js, Vs, rows, id_cols, sparse(I, cone_dim, cone_dim), false)
         nz_rows_added += cone_dim
     end
     end # hess timing
-    # end # setup lhs timing
     @assert offset == nnzs + 1
 
     @timeit solver.timer "build sparse" system_solver.lhs = sparse(Is, Js, Vs, Int32(dim), Int32(dim))

@@ -58,6 +58,7 @@ hess_nnzs(cone::Cone) = dimension(cone) ^ 2
 
 # the row indices of nonzero elements in column j
 hess_nz_idxs_j(cone::Cone, j::Int) = 1:cone.dim
+inv_hess_nz_idxs_j(cone::Cone, j::Int) = 1:cone.dim
 
 reset_data(cone::Cone) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.inv_hess_prod_updated = false)
 

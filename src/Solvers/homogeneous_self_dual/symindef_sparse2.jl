@@ -9,17 +9,13 @@ pardiso wants Int32 -_- so do these differently to avoid allocs
 serious TODO add epsilons on the diagonal, in particular for pardiso
 =#
 
-mutable struct SymIndefSparseSystemSolver <: SparseSystemSolver
-    use_iterative::Bool # remove
-    use_sparse::Bool # remove
-    use_inv_hess::Bool # remove
+mutable struct SymIndefSparseSystemSolver <: SystemSolver{Float64}
+    use_inv_hess::Bool
 
     tau_row
     lhs
-    lhs_copy # remove
-    fact_cache # remove
-    sparse_cache
     hess_idxs
+    sparse_cache
 
     function SymIndefSparseSystemSolver(;
         # sparse_cache = PardisoCache(true)
@@ -34,9 +30,8 @@ end
 function load(system_solver::SymIndefSparseSystemSolver, solver::Solver{Float64})
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
-    system_solver.tau_row = n + p + q + 1
-
     (A, G, b, h, c) = (model.A, model.G, model.b, model.h, model.c)
+    system_solver.tau_row = n + p + q + 1
     # TODO remove
     A = sparse(A)
     G = sparse(G)
@@ -45,7 +40,7 @@ function load(system_solver::SymIndefSparseSystemSolver, solver::Solver{Float64}
 
     # count the number of nonzeros we will have in the lhs
     hess_nnzs = sum(Cones.hess_nnzs(cone_k) for cone_k in model.cones)
-    nnzs = nnz(A) + nnz(G) + hess_nnzs + q
+    nnzs = nnz(A) + nnz(G) + hess_nnzs
     Is = Vector{Int64}(undef, nnzs)
     Js = Vector{Int64}(undef, nnzs)
     Vs = Vector{Float64}(undef, nnzs)
@@ -53,17 +48,11 @@ function load(system_solver::SymIndefSparseSystemSolver, solver::Solver{Float64}
     # count of nonzeros added so far
     offset = 1
     # update I, J, V while adding A and G blocks to the lhs
-    # TODO investigate why adding n x n identity in the first block is so harmful
-    offset = Solvers.add_I_J_V(
-        offset, Is, Js, Vs,
-        [n, n + p, n],
-        [0, 0, n],
-        [A, G, sparse(eps() * I, q, q)],
-        fill(false, 3)
-        )
+    offset = Solvers.add_I_J_V(offset, Is, Js, Vs, [n, n + p], [0, 0], [A, G], [false, false])
     @timeit solver.timer "setup hess lhs" begin
     nz_rows_added = 0
     for (k, cone_k) in enumerate(model.cones)
+        @timeit solver.timer "update hess" Cones.update_hess(cone_k)
         cone_dim = Cones.dimension(cone_k)
         rows = n + p + nz_rows_added
         offset = add_I_J_V(offset, Is, Js, Vs, rows, rows, cone_k, !Cones.use_dual(cone_k))
@@ -100,6 +89,13 @@ function load(system_solver::SymIndefSparseSystemSolver, solver::Solver{Float64}
     end
     end # cache timing
 
+
+    # system_solver.lhs = T[
+    #     spzeros(T,n,n)  spzeros(T,n,p)  spzeros(T,n,q);
+    #     model.A         spzeros(T,p,p)  spzeros(T,p,q);
+    #     model.G         spzeros(T,q,p)  sparse(-one(T)*I,q,q);
+    #     ]
+
     return system_solver
 end
 
@@ -117,6 +113,34 @@ function update_fact(system_solver::SymIndefSparseSystemSolver, solver::Solver{F
         end
     end
     end # time views
+
+    model = solver.model
+    n, p, q = model.n, model.p, model.q
+    lhs_compare = [
+        spzeros(n,n)  spzeros(n,p)  spzeros(n,q);
+        model.A         spzeros(p,p)  spzeros(p,q);
+        model.G         spzeros(q,p)  sparse(-I,q,q);
+        ]
+    rc = n + p + 1
+    for (k, cone_k) in enumerate(cones)
+        dim = Cones.dimension(cone_k)
+        H = (Cones.use_dual(cone_k) ? -Cones.hess(cone_k) : -Cones.inv_hess(cone_k))
+        lhs_compare[rc:(rc + dim - 1), rc:(rc + dim - 1)] .= H
+        rc += dim
+    end
+
+    if norm(Symmetric(lhs_compare - system_solver.lhs, :L)) > 1
+        println("###############################")
+    end
+
+    #
+    # lhs_symm = Symmetric(lhs, :L)
+    # if system_solver.use_sparse
+    #     system_solver.fact_cache = ldlt(lhs_symm, shift = eps(T))
+    # else
+    #     system_solver.fact_cache = (T == BigFloat ? lu!(lhs_symm) : bunchkaufman!(lhs_symm))
+    # end
+
     return system_solver
 end
 
@@ -125,6 +149,8 @@ function solve_system(system_solver::SymIndefSparseSystemSolver, solver::Solver{
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
     tau_row = system_solver.tau_row
+    cache = system_solver.sparse_cache
+    lhs = system_solver.lhs
 
     # TODO in-place
     dim3 = tau_row - 1
@@ -159,14 +185,23 @@ function solve_system(system_solver::SymIndefSparseSystemSolver, solver::Solver{
         end
     end
 
-    # sol3 .= Symmetric(system_solver.lhs, :L) \ rhs3
-    lhs = system_solver.lhs
-    cache = system_solver.sparse_cache
-    if !cache.analyzed
-        analyze_sparse_system(cache, lhs, rhs3)
-        cache.analyzed = true
+    # if !cache.analyzed
+    #     analyze_sparse_system(cache, lhs, rhs3)
+    #     cache.analyzed = true
+    # end
+    # @timeit solver.timer "solve system" solve_sparse_system(cache, sol3, lhs, rhs3, solver)
+    sol3 .= Symmetric(lhs, :L) \ rhs3
+
+    if !system_solver.use_inv_hess
+        for (k, cone_k) in enumerate(model.cones)
+            if !Cones.use_dual(cone_k)
+                # recover z_k = mu*H_k*w_k
+                z_rows_k = (n + p) .+ model.cone_idxs[k]
+                z_copy_k = sol3[z_rows_k, :] # TODO do in-place
+                @views Cones.hess_prod!(sol3[z_rows_k, :], z_copy_k, cone_k)
+            end
+        end
     end
-    @timeit solver.timer "solve system" solve_sparse_system(cache, sol3, lhs, rhs3, solver)
 
     x3 = @view sol3[1:n, 3]
     y3 = @view sol3[n .+ (1:p), 3]

@@ -136,3 +136,4 @@ hess_nnzs(cone::OrthantCone) = cone.dim
 # hess_sparsity_pattern(cone::OrthantCone{T}) where {T <: Real} = sparse(one(T) * I, cone.dim, cone.dim)
 
 hess_nz_idxs_j(cone::OrthantCone, j::Int) = j:j
+inv_hess_nz_idxs_j(cone::OrthantCone, j::Int) = j:j
