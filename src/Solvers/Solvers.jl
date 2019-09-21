@@ -23,6 +23,7 @@ import Hypatia.HypCholSolveCache
 import Hypatia.hyp_chol_solve!
 import Hypatia.set_min_diag!
 import Hypatia.BlockMatrix
+import Hypatia: SparseSolverCache, PardisoCache, CHOLMODCache, UMFPACKCache, analyze_sparse_system, solve_sparse_system, release_sparse_cache, reset_sparse_cache
 
 abstract type Stepper{T <: Real} end
 

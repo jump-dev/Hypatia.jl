@@ -1,5 +1,5 @@
 #=
-Copyright 2018, Chris Coey, Lea Kapelevich and contributors
+Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
 see description in symindef.jl
 
@@ -20,8 +20,8 @@ mutable struct SymIndefSparseSystemSolver <: SparseSystemSolver
     hess_idxs
 
     function SymIndefSparseSystemSolver(;
-        sparse_cache = PardisoCache(true)
-        # sparse_cache = CHOLMODCache()
+        # sparse_cache = PardisoCache(true)
+        sparse_cache = CHOLMODCache()
         )
         system_solver = new()
         system_solver.sparse_cache = sparse_cache
