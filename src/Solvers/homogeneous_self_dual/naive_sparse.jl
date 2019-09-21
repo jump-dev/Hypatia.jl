@@ -20,7 +20,7 @@ mutable struct NaiveSparseSystemSolver <: SparseSystemSolver
      lhs
      hess_idxs
      hess_view_k_j
-     sparse_cache::SparseSolverCache # TODO type SparseSolverCache for nonsymmetric systems 
+     sparse_cache::SparseSolverCache # TODO type SparseSolverCache for nonsymmetric systems
      solvecache
      mtt_idx::Int
 
@@ -53,19 +53,6 @@ function load(system_solver::NaiveSparseSystemSolver, solver::Solver{Float64})
 
     dropzeros!(A)
     dropzeros!(G)
-
-    # x y z kap s tau
-
-    # system_solver.lhs_actual_copy = T[
-    #     spzeros(T,n,n)  model.A'        model.G'              model.c       spzeros(T,n,q)         spzeros(T,n);
-    #     -model.A        spzeros(T,p,p)  spzeros(T,p,q)        model.b       spzeros(T,p,q)         spzeros(T,p);
-    #     -model.G        spzeros(T,q,p)  spzeros(T,q,q)        model.h       sparse(-one(T)*I,q,q)  spzeros(T,q);
-    #     -model.c'       -model.b'       -model.h'             zero(T)       spzeros(T,1,q)         -one(T);
-    #     spzeros(T,q,n)  spzeros(T,q,p)  sparse(one(T)*I,q,q)  spzeros(T,q)  sparse(one(T)*I,q,q)   spzeros(T,q);
-    #     spzeros(T,1,n)  spzeros(T,1,p)  spzeros(T,1,q)        one(T)        spzeros(T,1,q)         one(T);
-    #     ]
-    # dropzeros!(system_solver.lhs_actual_copy)
-    # system_solver.lhs_actual = similar(system_solver.lhs_actual_copy)
 
     # count the number of nonzeros we will have in the lhs
     hess_nnzs = sum(Cones.dimension(cone_k) + Cones.hess_nnzs(cone_k) for cone_k in model.cones)

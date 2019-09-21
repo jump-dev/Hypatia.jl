@@ -38,7 +38,7 @@ mutable struct SymIndefSystemSolver{T <: Real} <: SystemSolver{T}
     lhs_copy
     fact_cache
 
-    function SymIndefSystemSolver{T}(; use_iterative::Bool = false, use_sparse::Bool = true, use_inv_hess::Bool = true) where {T <: Real}
+    function SymIndefSystemSolver{T}(; use_iterative::Bool = false, use_sparse::Bool = false, use_inv_hess::Bool = true) where {T <: Real}
         system_solver = new{T}()
         system_solver.use_iterative = use_iterative
         system_solver.use_sparse = use_sparse
@@ -51,13 +51,6 @@ function load(system_solver::SymIndefSystemSolver{T}, solver::Solver{T}) where {
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
     system_solver.tau_row = n + p + q + 1
-
-    (A, G, b, h, c) = (model.A, model.G, model.b, model.h, model.c)
-    # TODO remove
-    A = sparse(A)
-    G = sparse(G)
-    dropzeros!(A)
-    dropzeros!(G)
 
     # fill symmetric lower triangle
     if system_solver.use_iterative
@@ -87,7 +80,7 @@ end
 
 # update the LHS factorization to prepare for solve
 function update_fact(system_solver::SymIndefSystemSolver{T}, solver::Solver{T}) where {T <: Real}
-    # system_solver.use_iterative && return system_solver
+    system_solver.use_iterative && return system_solver
 
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
@@ -104,22 +97,22 @@ function update_fact(system_solver::SymIndefSystemSolver{T}, solver::Solver{T}) 
             # G_k*x - mu*H_k*z_k = [-zrhs_k - srhs_k, h_k]
             H = Cones.hess(cone_k)
             @. lhs[z_rows_k, z_rows_k] = -H
-        else
+        elseif system_solver.use_inv_hess
             # G_k*x - (mu*H_k)\z_k = [-zrhs_k - (mu*H_k)\srhs_k, h_k]
             Hinv = Cones.inv_hess(cone_k)
             @. lhs[z_rows_k, z_rows_k] = -Hinv
-        # else
-        #     # A'*y + sum_{pr bar} G_k'*mu*H_k*w_k + sum_{du bar} G_k'*z_k = [xrhs, -c]
-        #     # mu*H_k*G_k*x - mu*H_k*w_k = [-mu*H_k*zrhs_k - srhs_k, mu*H_k*h_k]
-        #     H = Cones.hess(cone_k)
-        #     @. lhs[z_rows_k, z_rows_k] = -H
-        #     @views Cones.hess_prod!(lhs[z_rows_k, 1:n], model.G[idxs_k, :], cone_k)
+        else
+            # A'*y + sum_{pr bar} G_k'*mu*H_k*w_k + sum_{du bar} G_k'*z_k = [xrhs, -c]
+            # mu*H_k*G_k*x - mu*H_k*w_k = [-mu*H_k*zrhs_k - srhs_k, mu*H_k*h_k]
+            H = Cones.hess(cone_k)
+            @. lhs[z_rows_k, z_rows_k] = -H
+            @views Cones.hess_prod!(lhs[z_rows_k, 1:n], model.G[idxs_k, :], cone_k)
         end
     end
 
     lhs_symm = Symmetric(lhs, :L)
     if system_solver.use_sparse
-        # system_solver.fact_cache = ldlt(lhs_symm, shift = eps(T))
+        system_solver.fact_cache = ldlt(lhs_symm, shift = eps(T))
     else
         system_solver.fact_cache = (T == BigFloat ? lu!(lhs_symm) : bunchkaufman!(lhs_symm))
     end
@@ -157,19 +150,19 @@ function solve_system(system_solver::SymIndefSystemSolver{T}, solver::Solver{T},
             # G_k*x - mu*H_k*z_k = [-zrhs_k - srhs_k, h_k]
             @. zk12_new = -zk12 - sk12
             @. zk3_new = hk
-        else
+        elseif system_solver.use_inv_hess
             # G_k*x - (mu*H_k)\z_k = [-zrhs_k - (mu*H_k)\srhs_k, h_k]
             Cones.inv_hess_prod!(zk12_new, sk12, cone_k)
             @. zk12_new *= -1
             @. zk12_new -= zk12
             @. zk3_new = hk
-        # else
-        #     # A'*y + sum_{pr bar} G_k'*mu*H_k*w_k + sum_{du bar} G_k'*z_k = [xrhs, -c]
-        #     # mu*H_k*G_k*x - mu*H_k*w_k = [-mu*H_k*zrhs_k - srhs_k, mu*H_k*h_k]
-        #     Cones.hess_prod!(zk12_new, zk12, cone_k)
-        #     @. zk12_new *= -1
-        #     @. zk12_new -= sk12
-        #     Cones.hess_prod!(zk3_new, hk, cone_k)
+        else
+            # A'*y + sum_{pr bar} G_k'*mu*H_k*w_k + sum_{du bar} G_k'*z_k = [xrhs, -c]
+            # mu*H_k*G_k*x - mu*H_k*w_k = [-mu*H_k*zrhs_k - srhs_k, mu*H_k*h_k]
+            Cones.hess_prod!(zk12_new, zk12, cone_k)
+            @. zk12_new *= -1
+            @. zk12_new -= sk12
+            Cones.hess_prod!(zk3_new, hk, cone_k)
         end
     end
 
@@ -182,8 +175,7 @@ function solve_system(system_solver::SymIndefSystemSolver{T}, solver::Solver{T},
         # end
     else
         if system_solver.use_sparse
-            # sol3 .= system_solver.fact_cache \ rhs3
-            sol3 .= Symmetric(system_solver.lhs, :L) \ rhs3
+            sol3 .= system_solver.fact_cache \ rhs3
         else
             # if !hyp_bk_solve!(system_solver.fact_cache, sol3, lhs, rhs3)
             #     @warn("numerical failure: could not fix linear solve failure (mu is $(solver.mu))")
