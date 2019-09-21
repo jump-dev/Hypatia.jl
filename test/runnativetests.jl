@@ -102,7 +102,7 @@ end
 # @info("starting iterative system solver tests")
 # @testset "iterative system solver tests: $t, $T" for t in testfuns_raw, T in real_types
 #     T == BigFloat && continue # IterativeSolvers does not work with BigFloat
-#     solver = SO.Solver{T}(verbose = true, init_use_iterative = true, preprocess = false,
-#         system_solver = SO.NaiveSystemSolver{T}(use_iterative = true))
+#     solver = SO.Solver{T}(verbose = true, init_use_indirect = true, preprocess = false,
+#         system_solver = SO.NaiveSystemSolver{T}(use_indirect = true))
 #     t(T, solver = solver)
 # end
