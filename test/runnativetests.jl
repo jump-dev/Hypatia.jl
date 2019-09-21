@@ -15,11 +15,11 @@ real_types = [
 
 system_solvers = [
     # SO.QRCholSystemSolver,
-    # SO.SymIndefSystemSolver{Float64},
+    # SO.SymIndefDenseSystemSolver{Float64},
     # SO.NaiveElimSystemSolver,
-    # SO.NaiveSystemSolver,
-    # SO.NaiveSparseSystemSolver,
-    SO.SymIndefSparseSystemSolver,
+    # SO.NaiveDenseSystemSolver{Float64},
+    SO.NaiveSparseSystemSolver{Float64},
+    # SO.SymIndefSparseSystemSolver{Float64},
     ]
 
 use_infty_nbhd = [
