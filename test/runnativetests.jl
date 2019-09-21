@@ -15,10 +15,11 @@ real_types = [
 
 system_solvers = [
     # SO.QRCholSystemSolver,
-    # SO.SymIndefSystemSolver,
+    # SO.SymIndefSystemSolver{Float64},
     # SO.NaiveElimSystemSolver,
     # SO.NaiveSystemSolver,
-    SO.NaiveSparseSystemSolver,
+    # SO.NaiveSparseSystemSolver,
+    SO.SymIndefSparseSystemSolver,
     ]
 
 use_infty_nbhd = [
@@ -94,9 +95,8 @@ tol = 1e-8
 @testset "miscellaneous tests: $t, $s, $n, $p, $T" for t in testfuns_raw, s in system_solvers, n in use_infty_nbhd, p in preprocess, T in real_types
     T == BigFloat && t == epinormspectral1 && continue # Cannot get svdvals with BigFloat
     !p && s == SO.QRCholSystemSolver && continue # Must use preprocessing if using QRCholSystemSolver
-    solver = SO.Solver{T}(verbose = false, preprocess = p, use_infty_nbhd = n, system_solver = s{T}(), tol_rel_opt = tol, tol_abs_opt = tol, tol_feas = tol)
+    solver = SO.Solver{T}(verbose = false, preprocess = p, use_infty_nbhd = n, system_solver = s())
     t(T, solver = solver)
-    # print_timer(solver.timer)
 end
 
 # @info("starting iterative system solver tests")
