@@ -153,7 +153,7 @@ mutable struct QRCholDenseSystemSolver{T <: Real} <: QRCholSystemSolver{T}
     GQ2_k
     HGx_k
     Gx_k
-    QRCholSystemSolver{T}() where {T <: Real} = new{T}()
+    QRCholDenseSystemSolver{T}() where {T <: Real} = new{T}()
 end
 
 function load(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}) where {T <: Real}

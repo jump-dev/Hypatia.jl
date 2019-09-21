@@ -26,7 +26,8 @@ indirect
 
 mutable struct NaiveIndirectSystemSolver{T <: Real} <: NaiveSystemSolver{T}
     lhs
-    NaiveSystemSolver{T}() where {T <: Real} = new{T}()
+    tau_row
+    NaiveIndirectSystemSolver{T}() where {T <: Real} = new{T}()
 end
 
 function load(system_solver::NaiveIndirectSystemSolver{T}, solver::Solver{T}) where {T <: Real}
