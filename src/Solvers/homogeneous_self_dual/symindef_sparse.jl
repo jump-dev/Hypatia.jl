@@ -4,9 +4,7 @@ Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 see description in symindef.jl
 
 TODO CHOLMOD ldlt expects sparse matrix to have Int64 rowvals/colptrs while
-pardiso wants Int32 -_- so do these differently to avoid allocs
-
-serious TODO add epsilons on the diagonal, in particular for pardiso
+pardiso wants Int32, so do these differently to avoid allocs
 =#
 
 mutable struct SymIndefSparseSystemSolver <: SparseSystemSolver
@@ -22,8 +20,8 @@ mutable struct SymIndefSparseSystemSolver <: SparseSystemSolver
     hess_idxs
 
     function SymIndefSparseSystemSolver(;
-        # sparse_cache = PardisoCache(true)
-        sparse_cache = CHOLMODCache()
+        sparse_cache = PardisoCache(true)
+        # sparse_cache = CHOLMODCache()
         )
         system_solver = new()
         system_solver.sparse_cache = sparse_cache
@@ -53,7 +51,7 @@ function load(system_solver::SymIndefSparseSystemSolver, solver::Solver{Float64}
     # count of nonzeros added so far
     offset = 1
     # update I, J, V while adding A and G blocks to the lhs
-    # TODO investigate why adding n x n identity in the first block is so harmful
+    # TODO investigate why adding n x n identity in the first block is so harmful, maybe also shouldn't add in the (2, 2) block
     offset = Solvers.add_I_J_V(
         offset, Is, Js, Vs,
         [n, n + p, n],

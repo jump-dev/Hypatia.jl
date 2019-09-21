@@ -2,6 +2,7 @@
 Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 
 TODO play around with SuiteSparse parameters e.g. iterative refinement
+TODO try not to fallback to lu
 =#
 
 max_num_threads = length(Sys.cpu_info())
@@ -58,6 +59,8 @@ function analyze_sparse_system(cache::PardisoCache, A::SparseMatrixCSC, b::Matri
         Pardiso.set_iparm!(ps, 12, 1)
     # end
     Pardiso.set_phase!(ps, Pardiso.ANALYSIS)
+    # TODO investigate why we need this
+    LinearAlgebra.copytri!(A, 'L')
     pardiso(ps, A, b)
     return
 end

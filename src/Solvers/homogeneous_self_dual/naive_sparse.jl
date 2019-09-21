@@ -20,7 +20,7 @@ mutable struct NaiveSparseSystemSolver <: SparseSystemSolver
      lhs
      hess_idxs
      hess_view_k_j
-     sparse_cache::SparseSolverCache
+     sparse_cache::SparseSolverCache # TODO type SparseSolverCache for nonsymmetric systems 
      solvecache
      mtt_idx::Int
 
