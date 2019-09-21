@@ -58,6 +58,8 @@ function solve_system(system_solver::NaiveElimSystemSolver{T}, solver::Solver{T}
     # -c'x - b'y - h'z + mu/(taubar^2)*tau = taurhs + kaprhs
     @. @views rhs4[end, :] += rhs[end, :]
 
+    # TODO use dispatch here
+    @assert system_solver isa NaiveElimDenseSystemSolver{T}
     ldiv!(sol4, system_solver.fact_cache, rhs4)
 
     # lift to get s and kap
