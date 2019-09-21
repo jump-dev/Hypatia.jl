@@ -115,7 +115,11 @@ mutable struct NaiveSparseSystemSolver{T <: Real} <: NaiveSystemSolver{T}
     sparse_cache::SparseSolverCache # TODO type SparseSolverCache for nonsymmetric systems
     solvecache
     mtt_idx::Int
-    NaiveSparseSystemSolver{T}() where {T <: Real} = new{T}()
+    function NaiveSparseSystemSolver{T}(; sparse_cache = UMFPACKCache()) where {T <: Real}
+        s = new{T}()
+        s.sparse_cache = sparse_cache
+        return s
+    end
 end
 
 function load(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
