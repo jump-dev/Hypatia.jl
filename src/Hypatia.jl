@@ -10,6 +10,7 @@ using LinearAlgebra
 
 include("blockmatrix.jl")
 include("linearalgebra.jl")
+include("sparselinearalgebra.jl")
 
 # submodules
 include("ModelUtilities/ModelUtilities.jl")
