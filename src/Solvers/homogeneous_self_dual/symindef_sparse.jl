@@ -1,7 +1,4 @@
 #=
-
-TODO delete
-
 Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
 see description in symindef.jl
@@ -11,7 +8,7 @@ pardiso wants Int32, so do these differently to avoid allocs
 =#
 
 mutable struct SymIndefSparseSystemSolver <: SparseSystemSolver
-    use_indirect::Bool # remove
+    use_iterative::Bool # remove
     use_sparse::Bool # remove
     use_inv_hess::Bool # remove
 

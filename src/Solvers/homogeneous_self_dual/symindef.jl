@@ -144,9 +144,13 @@ mutable struct SymIndefSparseSystemSolver{T <: Real} <: SymIndefSystemSolver{T}
     lhs
     sparse_cache
     hess_idxs
-    function SymIndefSparseSystemSolver{T}(; use_inv_hess::Bool = true) where {T <: Real}
+    function SymIndefSparseSystemSolver{T}(;
+        # sparse_cache = PardisoCache(true)
+        sparse_cache = CHOLMODCache()
+        ) where {T <: Real}
         system_solver = new{T}()
-        system_solver.use_inv_hess = use_inv_hess
+        system_solver.sparse_cache = sparse_cache
+        system_solver.use_inv_hess = true
         return system_solver
     end
 end
@@ -225,6 +229,7 @@ end
 
 function update_fact(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
     reset_sparse_cache(system_solver.sparse_cache)
+
     cones = solver.model.cones
     @timeit solver.timer "modify views" begin
     for (k, cone_k) in enumerate(cones)
