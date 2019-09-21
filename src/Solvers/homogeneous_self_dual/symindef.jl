@@ -1,5 +1,5 @@
 #=
-Copyright 2018, Chris Coey and contributors
+Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
 symmetric-indefinite linear system solver
 solves linear system in naive.jl by first eliminating s and kap via the method in naiveelim.jl and then eliminating tau via a procedure similar to that described by S7.4 of
@@ -22,105 +22,10 @@ A'*y + sum_{pr bar} G_k'*mu*H_k*w_k + sum_{du bar} G_k'*z_k = [xrhs, -c]
 A*x = [-yrhs, b]
 (pr bar) mu*H_k*G_k*x - mu*H_k*w_k = [-mu*H_k*zrhs_k - srhs_k, mu*H_k*h_k]
 (du bar) G_k*x - mu*H_k*z_k = [-zrhs_k - srhs_k, h_k]
-
-TODO
-- add iterative method
-- improve numerics of method with use_inv_hess = false
 =#
 
-mutable struct SymIndefSystemSolver{T <: Real} <: SystemSolver{T}
-    use_indirect::Bool
-    use_sparse::Bool
-    use_inv_hess::Bool
+abstract type SymIndefSystemSolver{T <: Real} <: SystemSolver{T} end
 
-    tau_row
-    lhs
-    lhs_copy
-    fact_cache
-
-    function SymIndefSystemSolver{T}(; use_indirect::Bool = false, use_sparse::Bool = false, use_inv_hess::Bool = true) where {T <: Real}
-        system_solver = new{T}()
-        system_solver.use_indirect = use_indirect
-        system_solver.use_sparse = use_sparse
-        system_solver.use_inv_hess = use_inv_hess
-        return system_solver
-    end
-end
-
-function load(system_solver::SymIndefSystemSolver{T}, solver::Solver{T}) where {T <: Real}
-    model = solver.model
-    (n, p, q) = (model.n, model.p, model.q)
-    system_solver.tau_row = n + p + q + 1
-
-    # fill symmetric lower triangle
-    if system_solver.use_indirect
-        error("not implemented")
-    else
-        if system_solver.use_sparse
-            system_solver.lhs = T[
-                spzeros(T,n,n)  spzeros(T,n,p)  spzeros(T,n,q);
-                model.A         spzeros(T,p,p)  spzeros(T,p,q);
-                model.G         spzeros(T,q,p)  sparse(-one(T)*I,q,q);
-                ]
-            dropzeros!(system_solver.lhs)
-            @assert issparse(system_solver.lhs)
-        else
-            system_solver.lhs_copy = T[
-                zeros(T,n,n)  zeros(T,n,p)  zeros(T,n,q);
-                model.A       zeros(T,p,p)  zeros(T,p,q);
-                model.G       zeros(T,q,p)  Matrix(-one(T)*I,q,q);
-                ]
-            system_solver.lhs = similar(system_solver.lhs_copy)
-            # system_solver.fact_cache = HypBKSolveCache(system_solver.sol, system_solver.lhs, rhs)
-        end
-    end
-
-    return system_solver
-end
-
-# update the LHS factorization to prepare for solve
-function update_fact(system_solver::SymIndefSystemSolver{T}, solver::Solver{T}) where {T <: Real}
-    system_solver.use_indirect && return system_solver
-
-    model = solver.model
-    (n, p, q) = (model.n, model.p, model.q)
-    lhs = system_solver.lhs
-
-    if !system_solver.use_sparse
-        copyto!(lhs, system_solver.lhs_copy)
-    end
-
-    for (k, cone_k) in enumerate(model.cones)
-        idxs_k = model.cone_idxs[k]
-        z_rows_k = (n + p) .+ idxs_k
-        if Cones.use_dual(cone_k)
-            # G_k*x - mu*H_k*z_k = [-zrhs_k - srhs_k, h_k]
-            H = Cones.hess(cone_k)
-            @. lhs[z_rows_k, z_rows_k] = -H
-        elseif system_solver.use_inv_hess
-            # G_k*x - (mu*H_k)\z_k = [-zrhs_k - (mu*H_k)\srhs_k, h_k]
-            Hinv = Cones.inv_hess(cone_k)
-            @. lhs[z_rows_k, z_rows_k] = -Hinv
-        else
-            # A'*y + sum_{pr bar} G_k'*mu*H_k*w_k + sum_{du bar} G_k'*z_k = [xrhs, -c]
-            # mu*H_k*G_k*x - mu*H_k*w_k = [-mu*H_k*zrhs_k - srhs_k, mu*H_k*h_k]
-            H = Cones.hess(cone_k)
-            @. lhs[z_rows_k, z_rows_k] = -H
-            @views Cones.hess_prod!(lhs[z_rows_k, 1:n], model.G[idxs_k, :], cone_k)
-        end
-    end
-
-    lhs_symm = Symmetric(lhs, :L)
-    if system_solver.use_sparse
-        system_solver.fact_cache = ldlt(lhs_symm, shift = eps(T))
-    else
-        system_solver.fact_cache = (T == BigFloat ? lu!(lhs_symm) : bunchkaufman!(lhs_symm))
-    end
-
-    return system_solver
-end
-
-# solve system without outer iterative refinement
 function solve_system(system_solver::SymIndefSystemSolver{T}, solver::Solver{T}, sol, rhs) where {T <: Real}
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
@@ -166,22 +71,21 @@ function solve_system(system_solver::SymIndefSystemSolver{T}, solver::Solver{T},
         end
     end
 
-    if system_solver.use_indirect
-        error("not implemented")
-        # for j in 1:size(rhs3, 2)
-        #     rhs_j = view(rhs3, :, j)
-        #     sol_j = view(sol3, :, j)
-        #     IterativeSolvers.minres!(sol_j, system_solver.lhs, rhs_j, restart = tau_row)
+    # TODO use dispatch here
+    if system_solver isa SymIndefDenseSystemSolver{T}
+        # if !hyp_bk_solve!(system_solver.fact_cache, sol3, lhs, rhs3)
+        #     @warn("numerical failure: could not fix linear solve failure (mu is $(solver.mu))")
         # end
+        ldiv!(sol3, system_solver.fact_cache, rhs3)
     else
-        if system_solver.use_sparse
-            sol3 .= system_solver.fact_cache \ rhs3
-        else
-            # if !hyp_bk_solve!(system_solver.fact_cache, sol3, lhs, rhs3)
-            #     @warn("numerical failure: could not fix linear solve failure (mu is $(solver.mu))")
-            # end
-            ldiv!(sol3, system_solver.fact_cache, rhs3)
+        @assert system_solver isa SymIndefSparseSystemSolver{T}
+        lhs = system_solver.lhs
+        cache = system_solver.sparse_cache
+        if !cache.analyzed
+            analyze_sparse_system(cache, lhs, rhs3)
+            cache.analyzed = true
         end
+        @timeit solver.timer "solve system" solve_sparse_system(cache, sol3, lhs, rhs3, solver)
     end
 
     if !system_solver.use_inv_hess
@@ -228,4 +132,172 @@ function solve_system(system_solver::SymIndefSystemSolver{T}, solver::Solver{T},
     @. @views sol[end:end, :] = -solver.mu / solver.tau * tau / solver.tau + rhs[end:end, :]
 
     return sol
+end
+
+#=
+direct sparse
+=#
+
+mutable struct SymIndefSparseSystemSolver{T <: Real} <: SymIndefSystemSolver{T}
+    use_inv_hess::Bool
+    tau_row
+    lhs
+    sparse_cache
+    hess_idxs
+    function SymIndefSparseSystemSolver{T}(; use_inv_hess::Bool = true) where {T <: Real}
+        system_solver = new{T}()
+        system_solver.use_inv_hess = use_inv_hess
+        return system_solver
+    end
+end
+
+function load(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
+    model = solver.model
+    (n, p, q) = (model.n, model.p, model.q)
+    system_solver.tau_row = n + p + q + 1
+
+    (A, G, b, h, c) = (model.A, model.G, model.b, model.h, model.c)
+    # TODO remove
+    A = sparse(A)
+    G = sparse(G)
+    dropzeros!(A)
+    dropzeros!(G)
+
+    # count the number of nonzeros we will have in the lhs
+    hess_nnzs = sum(Cones.hess_nnzs(cone_k) for cone_k in model.cones)
+    nnzs = nnz(A) + nnz(G) + hess_nnzs + q
+    Is = Vector{Int64}(undef, nnzs)
+    Js = Vector{Int64}(undef, nnzs)
+    Vs = Vector{Float64}(undef, nnzs)
+
+    # count of nonzeros added so far
+    offset = 1
+    # update I, J, V while adding A and G blocks to the lhs
+    # TODO investigate why adding n x n identity in the first block is so harmful, maybe also shouldn't add in the (2, 2) block
+    offset = Solvers.add_I_J_V(
+        offset, Is, Js, Vs,
+        [n, n + p, n],
+        [0, 0, n],
+        [A, G, sparse(eps() * I, q, q)],
+        fill(false, 3)
+        )
+    @timeit solver.timer "setup hess lhs" begin
+    nz_rows_added = 0
+    for (k, cone_k) in enumerate(model.cones)
+        cone_dim = Cones.dimension(cone_k)
+        rows = n + p + nz_rows_added
+        offset = add_I_J_V(offset, Is, Js, Vs, rows, rows, cone_k, !Cones.use_dual(cone_k))
+        nz_rows_added += cone_dim
+    end
+    end # hess timing
+    @assert offset == nnzs + 1
+    dim = n + p + q
+    # NOTE only lower block-triangle was constructed
+    @timeit solver.timer "build sparse" system_solver.lhs = sparse(Is, Js, Vs, Int64(dim), Int64(dim))
+    lhs = system_solver.lhs
+
+    # cache indices of placeholders of Hessians
+    @timeit solver.timer "cache idxs" begin
+    system_solver.hess_idxs = [Vector{UnitRange}(undef, Cones.dimension(cone_k)) for cone_k in model.cones]
+    row = col = n + p + 1
+    for (k, cone_k) in enumerate(model.cones)
+        cone_dim = Cones.dimension(cone_k)
+        for j in 1:cone_dim
+            # get list of nonzero rows in the current column of the LHS
+            col_idx_start = lhs.colptr[col]
+            col_idx_end = lhs.colptr[col + 1] - 1
+            nz_rows = lhs.rowval[col_idx_start:col_idx_end]
+            # nonzero rows in column j of the hessian
+            nz_hess_indices = Cones.hess_nz_idxs_j(cone_k, j)
+            # index corresponding to first nonzero Hessian element of the current column of the LHS
+            offset_in_row = findfirst(x -> x == row + nz_hess_indices[1] - 1, nz_rows)
+            # indices of nonzero values for cone k column j
+            system_solver.hess_idxs[k][j] = col_idx_start + offset_in_row - nz_hess_indices[1] .+ nz_hess_indices .- 1
+            # move to the next column
+            col += 1
+        end
+        row += cone_dim
+    end
+    end # cache timing
+
+    return system_solver
+end
+
+function update_fact(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
+    reset_sparse_cache(system_solver.sparse_cache)
+    cones = solver.model.cones
+    @timeit solver.timer "modify views" begin
+    for (k, cone_k) in enumerate(cones)
+        @timeit solver.timer "update hess" H = (Cones.use_dual(cone_k) ? -Cones.hess(cone_k) : -Cones.inv_hess(cone_k))
+        for j in 1:Cones.dimension(cone_k)
+            nz_rows = Cones.hess_nz_idxs_j(cone_k, j)
+            @views copyto!(system_solver.lhs.nzval[system_solver.hess_idxs[k][j]], H[nz_rows, j])
+        end
+    end
+    end # time views
+    return system_solver
+end
+
+#=
+direct dense
+=#
+
+mutable struct SymIndefDenseSystemSolver{T <: Real} <: SymIndefSystemSolver{T}
+    use_inv_hess::Bool
+    tau_row
+    lhs
+    lhs_copy
+    fact_cache
+    function SymIndefDenseSystemSolver{T}(; use_inv_hess::Bool = true) where {T <: Real}
+        system_solver = new{T}()
+        system_solver.use_inv_hess = use_inv_hess
+        return system_solver
+    end
+end
+
+function load(system_solver::SymIndefDenseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
+    model = solver.model
+    (n, p, q) = (model.n, model.p, model.q)
+    system_solver.tau_row = n + p + q + 1
+    # fill symmetric lower triangle
+    system_solver.lhs_copy = T[
+        zeros(T,n,n)  zeros(T,n,p)  zeros(T,n,q);
+        model.A       zeros(T,p,p)  zeros(T,p,q);
+        model.G       zeros(T,q,p)  Matrix(-one(T)*I,q,q);
+        ]
+    system_solver.lhs = similar(system_solver.lhs_copy)
+    # system_solver.fact_cache = HypBKSolveCache(system_solver.sol, system_solver.lhs, rhs)
+    return system_solver
+end
+
+function update_fact(system_solver::SymIndefDenseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
+    model = solver.model
+    (n, p, q) = (model.n, model.p, model.q)
+    lhs = system_solver.lhs
+    copyto!(lhs, system_solver.lhs_copy)
+
+    for (k, cone_k) in enumerate(model.cones)
+        idxs_k = model.cone_idxs[k]
+        z_rows_k = (n + p) .+ idxs_k
+        if Cones.use_dual(cone_k)
+            # G_k*x - mu*H_k*z_k = [-zrhs_k - srhs_k, h_k]
+            H = Cones.hess(cone_k)
+            @. lhs[z_rows_k, z_rows_k] = -H
+        elseif system_solver.use_inv_hess
+            # G_k*x - (mu*H_k)\z_k = [-zrhs_k - (mu*H_k)\srhs_k, h_k]
+            Hinv = Cones.inv_hess(cone_k)
+            @. lhs[z_rows_k, z_rows_k] = -Hinv
+        else
+            # A'*y + sum_{pr bar} G_k'*mu*H_k*w_k + sum_{du bar} G_k'*z_k = [xrhs, -c]
+            # mu*H_k*G_k*x - mu*H_k*w_k = [-mu*H_k*zrhs_k - srhs_k, mu*H_k*h_k]
+            H = Cones.hess(cone_k)
+            @. lhs[z_rows_k, z_rows_k] = -H
+            @views Cones.hess_prod!(lhs[z_rows_k, 1:n], model.G[idxs_k, :], cone_k)
+        end
+    end
+
+    lhs_symm = Symmetric(lhs, :L)
+    system_solver.fact_cache = (T == BigFloat ? lu!(lhs_symm) : bunchkaufman!(lhs_symm))
+
+    return system_solver
 end
