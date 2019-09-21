@@ -29,7 +29,7 @@ TODO
 =#
 
 mutable struct SymIndefSystemSolver{T <: Real} <: SystemSolver{T}
-    use_iterative::Bool
+    use_indirect::Bool
     use_sparse::Bool
     use_inv_hess::Bool
 
@@ -38,9 +38,9 @@ mutable struct SymIndefSystemSolver{T <: Real} <: SystemSolver{T}
     lhs_copy
     fact_cache
 
-    function SymIndefSystemSolver{T}(; use_iterative::Bool = false, use_sparse::Bool = false, use_inv_hess::Bool = true) where {T <: Real}
+    function SymIndefSystemSolver{T}(; use_indirect::Bool = false, use_sparse::Bool = false, use_inv_hess::Bool = true) where {T <: Real}
         system_solver = new{T}()
-        system_solver.use_iterative = use_iterative
+        system_solver.use_indirect = use_indirect
         system_solver.use_sparse = use_sparse
         system_solver.use_inv_hess = use_inv_hess
         return system_solver
@@ -53,7 +53,7 @@ function load(system_solver::SymIndefSystemSolver{T}, solver::Solver{T}) where {
     system_solver.tau_row = n + p + q + 1
 
     # fill symmetric lower triangle
-    if system_solver.use_iterative
+    if system_solver.use_indirect
         error("not implemented")
     else
         if system_solver.use_sparse
@@ -80,7 +80,7 @@ end
 
 # update the LHS factorization to prepare for solve
 function update_fact(system_solver::SymIndefSystemSolver{T}, solver::Solver{T}) where {T <: Real}
-    system_solver.use_iterative && return system_solver
+    system_solver.use_indirect && return system_solver
 
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
@@ -166,7 +166,7 @@ function solve_system(system_solver::SymIndefSystemSolver{T}, solver::Solver{T},
         end
     end
 
-    if system_solver.use_iterative
+    if system_solver.use_indirect
         error("not implemented")
         # for j in 1:size(rhs3, 2)
         #     rhs_j = view(rhs3, :, j)

@@ -35,7 +35,7 @@ TODO add iterative method
 =#
 
 mutable struct NaiveElimSystemSolver{T <: Real} <: SystemSolver{T}
-    use_iterative::Bool
+    use_indirect::Bool
     use_sparse::Bool
 
     tau_row
@@ -43,9 +43,9 @@ mutable struct NaiveElimSystemSolver{T <: Real} <: SystemSolver{T}
     lhs_copy
     fact_cache
 
-    function NaiveElimSystemSolver{T}(; use_iterative::Bool = false, use_sparse::Bool = false) where {T <: Real}
+    function NaiveElimSystemSolver{T}(; use_indirect::Bool = false, use_sparse::Bool = false) where {T <: Real}
         system_solver = new{T}()
-        system_solver.use_iterative = use_iterative
+        system_solver.use_indirect = use_indirect
         system_solver.use_sparse = use_sparse
         return system_solver
     end
@@ -57,7 +57,7 @@ function load(system_solver::NaiveElimSystemSolver{T}, solver::Solver{T}) where 
     (n, p, q) = (model.n, model.p, model.q)
     system_solver.tau_row = n + p + q + 1
 
-    if system_solver.use_iterative
+    if system_solver.use_indirect
         error("not implemented")
     else
         if system_solver.use_sparse
@@ -86,7 +86,7 @@ end
 
 # update the LHS factorization to prepare for solve
 function update_fact(system_solver::NaiveElimSystemSolver{T}, solver::Solver{T}) where {T <: Real}
-    system_solver.use_iterative && return system_solver
+    system_solver.use_indirect && return system_solver
 
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
@@ -145,7 +145,7 @@ function solve_system(system_solver::NaiveElimSystemSolver{T}, solver::Solver{T}
     # -c'x - b'y - h'z + mu/(taubar^2)*tau = taurhs + kaprhs
     @. @views rhs4[end, :] += rhs[end, :]
 
-    if system_solver.use_iterative
+    if system_solver.use_indirect
         error("not implemented")
         # for j in 1:size(rhs, 2)
         #     rhs_j = view(rhs4, :, j)

@@ -8,7 +8,7 @@ pardiso wants Int32, so do these differently to avoid allocs
 =#
 
 mutable struct SymIndefSparseSystemSolver <: SparseSystemSolver
-    use_iterative::Bool # remove
+    use_indirect::Bool # remove
     use_sparse::Bool # remove
     use_inv_hess::Bool # remove
 

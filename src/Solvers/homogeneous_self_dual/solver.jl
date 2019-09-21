@@ -155,7 +155,7 @@ function find_initial_point(solver::Solver{T}) where {T <: Real}
     # solve for x as least squares solution to Ax = b, Gx = h - s
     @timeit solver.timer "init_x" if !iszero(n)
         rhs = vcat(model.b, model.h - point.s)
-        if solver.init_use_iterative
+        if solver.init_use_indirect
             # use iterative solvers method TODO pick lsqr or lsmr
             AG = BlockMatrix{T}(p + q, n, [A, G], [1:p, (p + 1):(p + q)], [1:n, 1:n])
             point.x = zeros(T, n)
@@ -185,7 +185,7 @@ function find_initial_point(solver::Solver{T}) where {T <: Real}
     # solve for y as least squares solution to A'y = -c - G'z
     @timeit solver.timer "init_y" if !iszero(p)
         rhs = -model.c - G' * point.z
-        if solver.init_use_iterative
+        if solver.init_use_indirect
             # use iterative solvers method TODO pick lsqr or lsmr
             point.y = zeros(T, p)
             @timeit solver.timer "lsqr_solve" IterativeSolvers.lsqr!(point.y, A', rhs)

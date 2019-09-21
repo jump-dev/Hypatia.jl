@@ -38,7 +38,7 @@ mutable struct Solver{T <: Real}
     tol_feas::T
     tol_slow::T
     preprocess::Bool
-    init_use_iterative::Bool
+    init_use_indirect::Bool
     init_tol_qr::T
     init_use_fallback::Bool
     max_nbhd::T
@@ -124,7 +124,7 @@ mutable struct Solver{T <: Real}
         tol_feas::Real = sqrt(eps(T)),
         tol_slow::Real = 1e-3,
         preprocess::Bool = true,
-        init_use_iterative::Bool = false,
+        init_use_indirect::Bool = false,
         init_tol_qr::Real = 100 * eps(T),
         init_use_fallback::Bool = true,
         max_nbhd::Real = 0.7,
@@ -145,7 +145,7 @@ mutable struct Solver{T <: Real}
         solver.tol_feas = tol_feas
         solver.tol_slow = tol_slow
         solver.preprocess = preprocess
-        solver.init_use_iterative = init_use_iterative
+        solver.init_use_indirect = init_use_indirect
         solver.init_tol_qr = init_tol_qr
         solver.init_use_fallback = init_use_fallback
         solver.max_nbhd = max_nbhd

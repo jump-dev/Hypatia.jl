@@ -8,7 +8,7 @@ http://www.seas.ucla.edu/~vandenbe/publications/coneprog.pdf (the dominating sub
 =#
 
 mutable struct QRCholSystemSolver{T <: Real} <: SystemSolver{T}
-    use_iterative::Bool
+    use_indirect::Bool
     use_sparse::Bool
 
     lhs
@@ -31,9 +31,9 @@ mutable struct QRCholSystemSolver{T <: Real} <: SystemSolver{T}
     HGx_k
     Gx_k
 
-    function QRCholSystemSolver{T}(; use_iterative::Bool = false, use_sparse::Bool = false) where {T <: Real}
+    function QRCholSystemSolver{T}(; use_indirect::Bool = false, use_sparse::Bool = false) where {T <: Real}
         system_solver = new{T}()
-        system_solver.use_iterative = use_iterative
+        system_solver.use_indirect = use_indirect
         system_solver.use_sparse = use_sparse
         return system_solver
     end
@@ -44,7 +44,7 @@ function load(system_solver::QRCholSystemSolver{T}, solver::Solver{T}) where {T 
     (n, p, q) = (model.n, model.p, model.q)
     cone_idxs = model.cone_idxs
 
-    if system_solver.use_iterative
+    if system_solver.use_indirect
         error("not implemented")
     else
         if !isa(model.G, Matrix{T}) && isa(solver.Ap_Q, SuiteSparse.SPQR.QRSparseQ)
@@ -90,7 +90,7 @@ end
 
 # update the LHS factorization to prepare for solve
 function update_fact(system_solver::QRCholSystemSolver{T}, solver::Solver{T}) where {T <: Real}
-    system_solver.use_iterative && return system_solver
+    system_solver.use_indirect && return system_solver
 
     isempty(system_solver.Q2div) && return system_solver
 
@@ -162,7 +162,7 @@ function solve_system(system_solver::QRCholSystemSolver{T}, solver::Solver{T}, s
         block_hessian_product(model.cones, system_solver.HGQ1x_k, system_solver.GQ1x_k)
         mul!(system_solver.Q2div, system_solver.GQ2', system_solver.HGQ1x, -1, true)
 
-        if system_solver.use_iterative
+        if system_solver.use_indirect
             error("not implemented")
             # for j in 1:size(Q2div, 2)
             #     rhs_j = view(Q2div, :, j)
