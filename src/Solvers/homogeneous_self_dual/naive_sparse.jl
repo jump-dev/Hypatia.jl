@@ -1,9 +1,7 @@
 #=
-
 TODO delete
 
-
-Copyright 2018, Chris Coey and contributors
+Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
 naive linear system solver
 
