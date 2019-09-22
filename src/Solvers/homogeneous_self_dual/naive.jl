@@ -109,12 +109,13 @@ mutable struct NaiveSparseSystemSolver{T <: Real} <: NaiveSystemSolver{T}
     lhs
     hess_idxs
     hess_view_k_j
-    sparse_cache::SparseSolverCache # TODO type SparseSolverCache for nonsymmetric systems
-    solvecache
-    mtt_idx::Int
-    function NaiveSparseSystemSolver{T}(; sparse_cache = UMFPACKCache()) where {T <: Real}
-        s = new{T}()
-        s.sparse_cache = sparse_cache
+    fact_cache::SparseNonSymCache{T}
+    mtt_idx
+    function NaiveSparseSystemSolver{Float64}(;
+        fact_cache::SparseNonSymCache{Float64} = SparseNonSymCache(),
+        )
+        s = new{Float64}()
+        s.fact_cache = fact_cache
         return s
     end
 end
@@ -146,7 +147,7 @@ function load(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) wher
     rc4 = n + p + q
     rc5 = n + p + q + 1
     rc6 = n + p + 2q + 1
-    
+
     # count of nonzeros added so far
     offset = 1
     offset = add_I_J_V(offset, Is, Js, Vs, rc1, rc4, c, false)
@@ -225,8 +226,6 @@ function load(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) wher
 end
 
 function update_fact(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
-    reset_sparse_cache(system_solver.sparse_cache)
-
     @timeit solver.timer "modify views" begin
     for (k, cone_k) in enumerate(solver.model.cones)
         @timeit solver.timer "update hess" Cones.update_hess(cone_k)
@@ -246,13 +245,7 @@ function update_fact(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T
 end
 
 function solve_system(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}, sol, rhs) where {T <: Real}
-    cache = system_solver.sparse_cache
-    lhs = system_solver.lhs
-    if !cache.analyzed
-        analyze_sparse_system(cache, lhs, rhs)
-        cache.analyzed = true
-    end
-    @timeit solver.timer "solve system" solve_sparse_system(cache, sol, lhs, rhs, solver)
+    @timeit solver.timer "solve system" solve_sparse_system(system_solver.fact_cache, sol, system_solver.lhs, rhs)
     return sol
 end
 

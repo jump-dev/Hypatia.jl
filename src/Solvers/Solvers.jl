@@ -23,7 +23,11 @@ import Hypatia.HypCholSolveCache
 import Hypatia.hyp_chol_solve!
 import Hypatia.set_min_diag!
 import Hypatia.BlockMatrix
-import Hypatia: SparseSolverCache, PardisoCache, CHOLMODCache, UMFPACKCache, analyze_sparse_system, solve_sparse_system, release_sparse_cache, reset_sparse_cache
+import Hypatia.SparseNonSymCache
+import Hypatia.SparseSymCache
+import Hypatia.reset_sparse_cache
+import Hypatia.solve_sparse_system
+import Hypatia.free_memory
 
 abstract type Stepper{T <: Real} end
 
@@ -202,8 +206,6 @@ function load(solver::Solver{T}, model::Models.Model{T}) where {T <: Real}
     return solver
 end
 
-free_memory(::SystemSolver) = nothing
-
 # solve, optionally test conic certificates, and return solve information
 function solve_check(
     model::Models.Model{T};
@@ -276,7 +278,8 @@ include("homogeneous_self_dual/naiveelim.jl")
 include("homogeneous_self_dual/symindef.jl")
 include("homogeneous_self_dual/qrchol.jl")
 
-release_sparse_cache(s::SystemSolver) = nothing
-release_sparse_cache(s::Union{NaiveSparseSystemSolver, SymIndefSparseSystemSolver}) = release_sparse_cache(s.sparse_cache)
+# release memory used by sparse system solvers
+free_memory(::SystemSolver) = nothing
+free_memory(system_solver::Union{NaiveSparseSystemSolver, SymIndefSparseSystemSolver}) = free_memory(system_solver.fact_cache)
 
 end

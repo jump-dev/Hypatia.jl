@@ -79,13 +79,7 @@ function solve_system(system_solver::SymIndefSystemSolver{T}, solver::Solver{T},
         ldiv!(sol3, system_solver.fact_cache, rhs3)
     else
         @assert system_solver isa SymIndefSparseSystemSolver{T}
-        lhs = system_solver.lhs
-        cache = system_solver.sparse_cache
-        if !cache.analyzed
-            analyze_sparse_system(cache, lhs, rhs3)
-            cache.analyzed = true
-        end
-        @timeit solver.timer "solve system" solve_sparse_system(cache, sol3, lhs, rhs3, solver)
+        @timeit solver.timer "solve system" solve_sparse_system(system_solver.fact_cache, sol3, system_solver.lhs, rhs3)
     end
 
     if !system_solver.use_inv_hess
@@ -142,15 +136,15 @@ mutable struct SymIndefSparseSystemSolver{T <: Real} <: SymIndefSystemSolver{T}
     use_inv_hess::Bool
     tau_row
     lhs
-    sparse_cache
+    fact_cache::SparseSymCache{T}
     hess_idxs
-    function SymIndefSparseSystemSolver{T}(;
-        # sparse_cache = PardisoCache(true)
-        sparse_cache = CHOLMODCache()
-        ) where {T <: Real}
-        system_solver = new{T}()
-        system_solver.sparse_cache = sparse_cache
+    function SymIndefSparseSystemSolver{Float64}(;
+        use_inv_hess::Bool = true,
+        fact_cache::SparseSymCache{Float64} = SparseSymCache(),
+        )
+        system_solver = new{Float64}()
         system_solver.use_inv_hess = true
+        system_solver.fact_cache = fact_cache
         return system_solver
     end
 end
@@ -224,8 +218,6 @@ function load(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) w
 end
 
 function update_fact(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
-    reset_sparse_cache(system_solver.sparse_cache) # TODO is this needed? not used in naive it seems
-
     @timeit solver.timer "modify views" begin
     for (k, cone_k) in enumerate(solver.model.cones)
         @timeit solver.timer "update hess" H = (Cones.use_dual(cone_k) ? -Cones.hess(cone_k) : -Cones.inv_hess(cone_k))

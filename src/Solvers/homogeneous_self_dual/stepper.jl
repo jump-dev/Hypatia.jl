@@ -178,7 +178,6 @@ end
 
 # return directions
 # TODO make this function the same for all system solvers, move to solver.jl
-# function get_directions(system_solver::NaiveSystemSolver{T}) where {T <: Real}
 function get_directions(stepper::Stepper{T}, solver::Solver{T}) where {T <: Real}
     dirs = stepper.dirs
     system_solver = solver.system_solver
