@@ -105,12 +105,9 @@ function solve_sparse_system(cache::CHOLMODCache, x::Matrix, A::SparseMatrixCSC,
 end
 
 function release_sparse_cache(cache::PardisoCache)
-    ps = cache.ps
-    Pardiso.set_phase!(ps, Pardiso.RELEASE_ALL)
-    Pardiso.pardiso(ps)
+    Pardiso.set_phase!(cache.ps, Pardiso.RELEASE_ALL)
+    Pardiso.pardiso(cache.ps)
     return
 end
 
-release_sparse_cache(::UMFPACKCache) = nothing
-
-release_sparse_cache(::CHOLMODCache) = nothing
+release_sparse_cache(::SparseSolverCache) = nothing
