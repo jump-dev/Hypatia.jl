@@ -92,19 +92,15 @@ testfuns_raw = [
 
 tol = 1e-8
 
+# TODO test correct exception
+@test_throws Exception SO.SymIndefSparseSystemSolver(use_inv_hess = false)
+# TODO test invhess options for dense
+
 @info("starting miscellaneous tests")
 @testset "miscellaneous tests: $t, $s, $n, $p, $T" for t in testfuns_raw, s in system_solvers, n in use_infty_nbhd, p in preprocess, T in real_types
     T == BigFloat && t == epinormspectral1 && continue # Cannot get svdvals with BigFloat
-    T == BigFloat && isa(s, SO.NaiveIndirectSystemSolver) && continue
+    T == BigFloat && s <: SO.NaiveIndirectSystemSolver{T} where {T} && continue
     !p && s == SO.QRCholSystemSolver && continue # Must use preprocessing if using QRCholSystemSolver
     solver = SO.Solver{T}(verbose = false, preprocess = p, use_infty_nbhd = n, system_solver = s{T}())
     t(T, solver = solver)
 end
-
-# @info("starting iterative system solver tests")
-# @testset "iterative system solver tests: $t, $T" for t in testfuns_raw, T in real_types
-#     T == BigFloat && continue # IterativeSolvers does not work with BigFloat
-#     solver = SO.Solver{T}(verbose = true, init_use_indirect = true, preprocess = false,
-#         system_solver = SO.NaiveSystemSolver{T}(use_indirect = true))
-#     t(T, solver = solver)
-# end
