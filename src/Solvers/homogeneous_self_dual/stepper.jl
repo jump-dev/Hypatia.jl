@@ -289,25 +289,6 @@ function calc_system_residual(stepper::CombinedStepper{T}, solver::Solver{T}) wh
     return vcat(res_x, res_y, res_z, res_tau, res_s, res_kap) # TODO don't vcat
 end
 
-# TODO experimental for block LHS: if block is a Cone then define mul as hessian product, if block is solver then define mul by mu/tau/tau
-# TODO optimize... maybe need for each cone a 5-arg hess prod
-import LinearAlgebra.mul!
-
-function mul!(y::AbstractVecOrMat{T}, A::Cones.Cone{T}, x::AbstractVecOrMat{T}, alpha::Number, beta::Number) where {T <: Real}
-    # TODO in-place
-    ytemp = y * beta
-    Cones.hess_prod!(y, x, A)
-    rmul!(y, alpha)
-    y .+= ytemp
-    return y
-end
-
-function mul!(y::AbstractVecOrMat{T}, solver::Solvers.Solver{T}, x::AbstractVecOrMat{T}, alpha::Number, beta::Number) where {T <: Real}
-    rmul!(y, beta)
-    @. y += alpha * x / solver.tau * solver.mu / solver.tau
-    return y
-end
-
 # backtracking line search to find large distance to step in direction while remaining inside cones and inside a given neighborhood
 function find_max_alpha_in_nbhd(
     z_dir::AbstractVector{T},
@@ -433,4 +414,130 @@ function check_nbhd(
     end
 
     return true
+end
+
+# TODO experimental for block LHS: if block is a Cone then define mul as hessian product, if block is solver then define mul by mu/tau/tau
+# TODO optimize... maybe need for each cone a 5-arg hess prod
+import LinearAlgebra.mul!
+
+function mul!(y::AbstractVecOrMat{T}, A::Cones.Cone{T}, x::AbstractVecOrMat{T}, alpha::Number, beta::Number) where {T <: Real}
+    # TODO in-place
+    ytemp = y * beta
+    Cones.hess_prod!(y, x, A)
+    rmul!(y, alpha)
+    y .+= ytemp
+    return y
+end
+
+function mul!(y::AbstractVecOrMat{T}, solver::Solvers.Solver{T}, x::AbstractVecOrMat{T}, alpha::Number, beta::Number) where {T <: Real}
+    rmul!(y, beta)
+    @. y += alpha * x / solver.tau * solver.mu / solver.tau
+    return y
+end
+
+# helpers for sparse linear system solvers
+# TODO cleanup and simplify
+function add_I_J_V(
+    offset::Int,
+    Is::Vector{<:Integer},
+    Js::Vector{<:Integer},
+    Vs::Vector{Float64},
+    start_row::Int,
+    start_col::Int,
+    vec::Vector{Float64},
+    trans::Bool,
+    )
+    n = length(vec)
+    if !isempty(vec)
+        if trans
+            @views Is[offset:(offset + n - 1)] .= start_row + 1
+            @views Js[offset:(offset + n - 1)] .= (start_col + 1):(start_col + n)
+        else
+            @views Is[offset:(offset + n - 1)] .= (start_row + 1):(start_row + n)
+            @views Js[offset:(offset + n - 1)] .= start_col + 1
+        end
+        Vs[offset:(offset + n - 1)] .= vec
+    end
+    return offset + n
+end
+
+function add_I_J_V(
+    offset::Int,
+    Is::Vector{<:Integer},
+    Js::Vector{<:Integer},
+    Vs::Vector{Float64},
+    start_rows::Vector{Int},
+    start_cols::Vector{Int},
+    vecs::Vector{Vector{Float64}},
+    trans::Vector{Bool},
+    )
+    for (r, c, v, t) in zip(start_rows, start_cols, vecs, trans)
+        offset = add_I_J_V(offset, Is, Js, Vs, r, c, v, t)
+    end
+    return offset
+end
+
+function add_I_J_V(
+    offset::Int,
+    Is::Vector{<:Integer},
+    Js::Vector{<:Integer},
+    Vs::Vector{Float64},
+    start_row::Int,
+    start_col::Int,
+    mat::SparseMatrixCSC,
+    trans::Bool,
+    )
+    for j in 1:mat.n
+        col_idxs = mat.colptr[j]:(mat.colptr[j + 1] - 1)
+        rows = view(mat.rowval, col_idxs)
+        vals = view(mat.nzval, col_idxs)
+        m = length(rows)
+        if trans
+            @views Is[offset:(offset + m - 1)] .= start_row + j
+            @views Js[offset:(offset + m - 1)] .= start_col .+ rows
+        else
+            @views Is[offset:(offset + m - 1)] .= start_row .+ rows
+            @views Js[offset:(offset + m - 1)] .= start_col + j
+        end
+        @views Vs[offset:(offset + m - 1)] .= vals
+        offset += m
+    end
+    return offset
+end
+
+function add_I_J_V(
+    offset::Int,
+    Is::Vector{<:Integer},
+    Js::Vector{<:Integer},
+    Vs::Vector{Float64},
+    start_rows::Vector{Int},
+    start_cols::Vector{Int},
+    mats::Vector{<:SparseMatrixCSC},
+    trans::Vector{Bool},
+    )
+    for (r, c, m, t) in zip(start_rows, start_cols, mats, trans)
+        offset = add_I_J_V(offset, Is, Js, Vs, r, c, m, t)
+    end
+    return offset
+end
+
+function add_I_J_V(
+    offset::Int,
+    Is::Vector{<:Integer},
+    Js::Vector{<:Integer},
+    Vs::Vector{Float64},
+    start_row::Int,
+    start_col::Int,
+    cone::Cones.Cone,
+    use_inv::Bool,
+    )
+    for j in 1:Cones.dimension(cone)
+        nz_rows = (use_inv ? Cones.inv_hess_nz_idxs_j(cone, j) : Cones.hess_nz_idxs_j(cone, j))
+        n = length(nz_rows)
+        @. Is[offset:(offset + n - 1)] = start_row + nz_rows
+        @. Js[offset:(offset + n - 1)] = j + start_col
+        @. Vs[offset:(offset + n - 1)] = 1
+        offset += n
+    end
+    return offset
 end
