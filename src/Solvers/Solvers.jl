@@ -25,7 +25,7 @@ import Hypatia.set_min_diag!
 import Hypatia.BlockMatrix
 import Hypatia.SparseNonSymCache
 import Hypatia.SparseSymCache
-import Hypatia.reset_sparse_cache
+import Hypatia.update_sparse_fact
 import Hypatia.solve_sparse_system
 import Hypatia.free_memory
 

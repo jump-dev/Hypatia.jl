@@ -102,7 +102,7 @@ testfuns_raw = [
         T == BigFloat && t == epinormspectral1 && continue # cannot get svdvals with BigFloat
         T == BigFloat && s == SO.NaiveIndirectSystemSolver && continue # cannot use indirect methods with BigFloat
         T != Float64 && s in (SO.SymIndefSparseSystemSolver, SO.NaiveSparseSystemSolver) && continue # sparse system solvers only work with Float64
-        solver = SO.Solver{T}(verbose = false, preprocess = p, use_infty_nbhd = n, system_solver = s{T}())
+        solver = SO.Solver{T}(verbose = true, preprocess = p, use_infty_nbhd = n, system_solver = s{T}())
         t(T, solver = solver)
     end
 end
