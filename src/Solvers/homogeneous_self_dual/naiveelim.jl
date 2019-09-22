@@ -95,6 +95,7 @@ function load(system_solver::NaiveElimDenseSystemSolver{T}, solver::Solver{T}) w
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
     system_solver.tau_row = n + p + q + 1
+
     system_solver.lhs_copy = T[
         zeros(T,n,n)  model.A'      model.G'              model.c;
         -model.A      zeros(T,p,p)  zeros(T,p,q)          model.b;
@@ -103,15 +104,18 @@ function load(system_solver::NaiveElimDenseSystemSolver{T}, solver::Solver{T}) w
         ]
     system_solver.lhs = similar(system_solver.lhs_copy)
     # system_solver.fact_cache = HypLUSolveCache(system_solver.sol, system_solver.lhs, rhs)
+    
     return system_solver
 end
 
 function update_fact(system_solver::NaiveElimDenseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
     model = solver.model
-    (n, p, q) = (model.n, model.p, model.q)
+    (n, p) = (model.n, model.p)
     lhs = system_solver.lhs
+
     copyto!(lhs, system_solver.lhs_copy)
     lhs[end, end] = solver.mu / solver.tau / solver.tau
+
     for (k, cone_k) in enumerate(model.cones)
         idxs_k = model.cone_idxs[k]
         z_rows_k = (n + p) .+ idxs_k
@@ -125,6 +129,8 @@ function update_fact(system_solver::NaiveElimDenseSystemSolver{T}, solver::Solve
             @views Cones.hess_prod!(lhs[z_rows_k, end], model.h[idxs_k], cone_k)
         end
     end
+
     system_solver.fact_cache = lu!(system_solver.lhs) # TODO use wrapped lapack function
+
     return system_solver
 end

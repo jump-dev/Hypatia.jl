@@ -160,6 +160,7 @@ function load(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}) wher
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
     cone_idxs = model.cone_idxs
+
     if !isa(model.G, Matrix{T}) && isa(solver.Ap_Q, SuiteSparse.SPQR.QRSparseQ)
         # TODO very inefficient method used for sparse G * QRSparseQ : see https://github.com/JuliaLang/julia/issues/31124#issuecomment-501540818
         # TODO remove workaround and warning
@@ -168,6 +169,7 @@ function load(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}) wher
     else
         GQ = model.G * solver.Ap_Q
     end
+    
     system_solver.GQ1 = GQ[:, 1:p]
     system_solver.GQ2 = GQ[:, (p + 1):end]
     nmp = n - p
@@ -186,15 +188,19 @@ function load(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}) wher
     system_solver.GQ2_k = [view(system_solver.GQ2, idxs, :) for idxs in cone_idxs]
     system_solver.HGx_k = [view(system_solver.HGx, idxs, :) for idxs in cone_idxs]
     system_solver.Gx_k = [view(system_solver.Gx, idxs, :) for idxs in cone_idxs]
+
     return system_solver
 end
 
 function update_fact(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
     isempty(system_solver.Q2div) && return system_solver
+
     block_hessian_product(solver.model.cones, system_solver.HGQ2_k, system_solver.GQ2_k)
     mul!(system_solver.lhs, system_solver.GQ2', system_solver.HGQ2)
+
     lhs_psd = Symmetric(system_solver.lhs, :U)
     set_min_diag!(system_solver.lhs, sqrt(eps(T)))
     system_solver.fact_cache = (T == BigFloat ? cholesky!(lhs_psd) : bunchkaufman!(lhs_psd))
+
     return system_solver
 end

@@ -228,11 +228,10 @@ function load(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) w
 end
 
 function update_fact(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
-    reset_sparse_cache(system_solver.sparse_cache)
+    reset_sparse_cache(system_solver.sparse_cache) # TODO is this needed? not used in naive it seems
 
-    cones = solver.model.cones
     @timeit solver.timer "modify views" begin
-    for (k, cone_k) in enumerate(cones)
+    for (k, cone_k) in enumerate(solver.model.cones)
         @timeit solver.timer "update hess" H = (Cones.use_dual(cone_k) ? -Cones.hess(cone_k) : -Cones.inv_hess(cone_k))
         for j in 1:Cones.dimension(cone_k)
             nz_rows = Cones.hess_nz_idxs_j(cone_k, j)
@@ -240,6 +239,7 @@ function update_fact(system_solver::SymIndefSparseSystemSolver{T}, solver::Solve
         end
     end
     end # time views
+
     return system_solver
 end
 
@@ -264,6 +264,7 @@ function load(system_solver::SymIndefDenseSystemSolver{T}, solver::Solver{T}) wh
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
     system_solver.tau_row = n + p + q + 1
+
     # fill symmetric lower triangle
     system_solver.lhs_copy = T[
         zeros(T,n,n)  zeros(T,n,p)  zeros(T,n,q);
@@ -272,6 +273,7 @@ function load(system_solver::SymIndefDenseSystemSolver{T}, solver::Solver{T}) wh
         ]
     system_solver.lhs = similar(system_solver.lhs_copy)
     # system_solver.fact_cache = HypBKSolveCache(system_solver.sol, system_solver.lhs, rhs)
+
     return system_solver
 end
 
@@ -279,6 +281,7 @@ function update_fact(system_solver::SymIndefDenseSystemSolver{T}, solver::Solver
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
     lhs = system_solver.lhs
+
     copyto!(lhs, system_solver.lhs_copy)
 
     for (k, cone_k) in enumerate(model.cones)

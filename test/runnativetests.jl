@@ -3,7 +3,6 @@ Copyright 2019, Chris Coey and contributors
 =#
 
 include(joinpath(@__DIR__, "native.jl"))
-using TimerOutputs
 
 const SO = Hypatia.Solvers
 
@@ -16,10 +15,10 @@ real_types = [
 system_solvers = [
     SO.QRCholDenseSystemSolver,
     SO.SymIndefDenseSystemSolver,
+    SO.SymIndefSparseSystemSolver,
     SO.NaiveElimDenseSystemSolver,
     SO.NaiveDenseSystemSolver,
     SO.NaiveSparseSystemSolver,
-    SO.SymIndefSparseSystemSolver,
     SO.NaiveIndirectSystemSolver,
     ]
 
@@ -85,22 +84,25 @@ testfuns_raw = [
     dualinfeas3,
     ]
 
-# @info("starting preprocessing tests")
-# @testset "preprocessing tests: $t, $s, $T" for t in testfuns_preproc, s in system_solvers, T in real_types
-#     t(T, solver = SO.Solver{T}(verbose = true, system_solver = s{T}()))
-# end
+@info("starting native tests")
+@testset "native tests" begin
+    @info("starting preprocessing tests")
+    @testset "preprocessing tests: $t, $T" for t in testfuns_preproc, T in real_types
+        t(T, solver = SO.Solver{T}(verbose = true, system_solver = SO.QRCholDenseSystemSolver{T}()))
+    end
 
-tol = 1e-8
+    # TODO remove - both options should work
+    # @test_throws Exception SO.SymIndefSparseSystemSolver(use_inv_hess = false)
 
-# TODO test correct exception
-@test_throws Exception SO.SymIndefSparseSystemSolver(use_inv_hess = false)
-# TODO test invhess options for dense
+    # TODO test options to system solvers
 
-@info("starting miscellaneous tests")
-@testset "miscellaneous tests: $t, $s, $n, $p, $T" for t in testfuns_raw, s in system_solvers, n in use_infty_nbhd, p in preprocess, T in real_types
-    T == BigFloat && t == epinormspectral1 && continue # Cannot get svdvals with BigFloat
-    T == BigFloat && s <: SO.NaiveIndirectSystemSolver{T} where {T} && continue
-    !p && s == SO.QRCholSystemSolver && continue # Must use preprocessing if using QRCholSystemSolver
-    solver = SO.Solver{T}(verbose = false, preprocess = p, use_infty_nbhd = n, system_solver = s{T}())
-    t(T, solver = solver)
+    @info("starting miscellaneous tests")
+    @testset "miscellaneous tests: $t, $s, $n, $p, $T" for t in testfuns_raw, s in system_solvers, n in use_infty_nbhd, p in preprocess, T in real_types
+        !p && s == SO.QRCholSystemSolver && continue # must use preprocessing if using QRCholSystemSolver
+        T == BigFloat && t == epinormspectral1 && continue # cannot get svdvals with BigFloat
+        T == BigFloat && s == SO.NaiveIndirectSystemSolver && continue # cannot use indirect methods with BigFloat
+        T != Float64 && s in (SO.SymIndefSparseSystemSolver, SO.NaiveSparseSystemSolver) && continue # sparse system solvers only work with Float64
+        solver = SO.Solver{T}(verbose = false, preprocess = p, use_infty_nbhd = n, system_solver = s{T}())
+        t(T, solver = solver)
+    end
 end
