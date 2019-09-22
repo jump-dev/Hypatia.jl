@@ -238,9 +238,10 @@ function update_fact(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T
         end
     end
     end # time views
-
     system_solver.lhs.nzval[system_solver.mtt_idx] = solver.mu / solver.tau / solver.tau
 
+    update_sparse_fact(system_solver.fact_cache, system_solver.lhs)
+    
     return system_solver
 end
 

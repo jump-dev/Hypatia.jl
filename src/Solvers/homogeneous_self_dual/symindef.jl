@@ -163,7 +163,7 @@ function load(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) w
 
     # count the number of nonzeros we will have in the lhs
     hess_nnzs = sum(Cones.hess_nnzs(cone_k) for cone_k in model.cones)
-    nnzs = nnz(A) + nnz(G) + hess_nnzs + q
+    nnzs = nnz(A) + nnz(G) + hess_nnzs
     Is = Vector{Int64}(undef, nnzs)
     Js = Vector{Int64}(undef, nnzs)
     Vs = Vector{Float64}(undef, nnzs)
@@ -174,7 +174,6 @@ function load(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) w
     # TODO investigate why adding n x n identity in the first block is so harmful, maybe also shouldn't add in the (2, 2) block
     offset = add_I_J_V(offset, Is, Js, Vs, n, 0, A, false)
     offset = add_I_J_V(offset, Is, Js, Vs, n + p, 0, G, false)
-    offset = add_I_J_V(offset, Is, Js, Vs, n, n, sparse(eps() * I, q, q), false)
     @timeit solver.timer "setup hess lhs" begin
     nz_rows_added = 0
     for (k, cone_k) in enumerate(model.cones)
@@ -229,6 +228,8 @@ function update_fact(system_solver::SymIndefSparseSystemSolver{T}, solver::Solve
         end
     end
     end # time views
+
+    update_sparse_fact(system_solver.fact_cache, system_solver.lhs)
 
     return system_solver
 end

@@ -19,8 +19,6 @@ nonsymmetric
 
 abstract type SparseNonSymCache{T <: Real} end
 
-reset_sparse_cache(cache::SparseNonSymCache) = (cache.analyzed = false)
-
 mutable struct PardisoNonSymCache{T <: Real} <: SparseNonSymCache{T}
     analyzed::Bool
     pardiso::Pardiso.PardisoSolver
@@ -47,17 +45,22 @@ end
 UMFPACKNonSymCache{T}() where {T <: Real} = error("UMFPACK only works with real type Float64")
 UMFPACKNonSymCache() = UMFPACKNonSymCache{Float64}()
 
-function solve_sparse_system(cache::UMFPACKNonSymCache, x::Matrix{Float64}, A::SparseMatrixCSC{Float64, <:Integer}, b::Matrix{Float64})
+function update_sparse_fact(cache::UMFPACKNonSymCache, A::SparseMatrixCSC{Float64, <:Integer})
     if !cache.analyzed
-        cache.umfpack = lu(A)
+        cache.umfpack = lu(A) # symbolic and numeric factorization
+        cache.analyzed = true
+    else
+        # TODO this is a hack around lack of interface https://github.com/JuliaLang/julia/issues/33323
+        copyto!(umfpack.nzval, A.nzval)
+        umfpack.numeric = C_NULL
+        error() # TODO need numeric fact here
     end
+    return
+end
 
-    umfpack = cache.umfpack
-    # TODO this is a hack around lack of interface https://github.com/JuliaLang/julia/issues/33323
-    copyto!(umfpack.nzval, A.nzval)
-    umfpack.numeric = C_NULL
-    ldiv!(x, umfpack, b)
-
+function solve_sparse_system(cache::UMFPACKNonSymCache, x::Matrix{Float64}, A::SparseMatrixCSC{Float64, <:Integer}, b::Matrix{Float64})
+    ldiv!(x, cache.umfpack, b) # TODO do the numeric fact above in update_sparse_fact - only do the solve here
+    error()
     return x
 end
 
@@ -71,8 +74,6 @@ symmetric
 =#
 
 abstract type SparseSymCache{T <: Real} end
-
-reset_sparse_cache(cache::SparseSymCache) = (cache.analyzed = false)
 
 mutable struct PardisoSymCache{T <: Real} <: SparseSymCache{T}
     analyzed::Bool
@@ -100,22 +101,30 @@ end
 CHOLMODSymCache{T}() where {T <: Real} = error("CHOLMOD only works with real type Float64")
 CHOLMODSymCache() = CHOLMODSymCache{Float64}()
 
-function solve_sparse_system(cache::CHOLMODSymCache, x::Matrix{Float64}, A::SparseMatrixCSC{Float64, <:Integer}, b::Matrix{Float64})
-    if !cache.analyzed
-        cache.cholmod = SuiteSparse.CHOLMOD.ldlt(Symmetric(A, :L), check = false) # TODO do we need check = false? and the symmetric wrapper?
-    end
-
-    cholmod = cache.cholmod
+function update_sparse_fact(cache::CHOLMODSymCache, A::SparseMatrixCSC{Float64, <:Integer})
     A_symm = Symmetric(A, :L)
-    ldlt!(cholmod, A_symm, check = false)
-    if !issuccess(cholmod)
-        ldlt!(cholmod, A_symm, shift = sqrt(eps(Float64)), check = false)
-        if !issuccess(cholmod)
-            @warn("numerical failure: could not fix sparse factorization failure")
+    if !cache.analyzed
+        cache.cholmod = SuiteSparse.CHOLMOD.ldlt(A_symm, shift = 1e-10, check = false)
+        cache.analyzed = true
+    else
+        ldlt!(cache.cholmod, A_symm, shift = 1e-10, check = false) # TODO this fails very often - it cannot even factorize [0 1; 1 1] with LDLT
+    end
+    if !issuccess(cache.cholmod)
+        @warn("numerical failure: sparse factorization failed")
+        ldlt!(cache.cholmod, A_symm, shift = 1e-4, check = false)
+        if !issuccess(cache.cholmod)
+            @warn("numerical failure: sparse factorization failed again")
+            ldlt!(cache.cholmod, A_symm, shift = 1e-8 * maximum(abs, A[j, j] for j in 1:size(A_symm, 1)), check = false)
+            if !issuccess(cache.cholmod)
+                @warn("numerical failure: could not fix sparse factorization failure")
+            end
         end
     end
-    x .= cholmod \ b
+    return
+end
 
+function solve_sparse_system(cache::CHOLMODSymCache, x::Matrix{Float64}, A::SparseMatrixCSC{Float64, <:Integer}, b::Matrix{Float64})
+    x .= cache.cholmod \ b
     return x
 end
 
@@ -131,7 +140,7 @@ helpers
 PardisoSparseCache = Union{PardisoSymCache{Float64}, PardisoNonSymCache{Float64}}
 SuiteSparseSparseCache = Union{UMFPACKNonSymCache{Float64}, CHOLMODSymCache{Float64}}
 
-function solve_sparse_system(cache::PardisoSparseCache, x::Matrix{Float64}, A::SparseMatrixCSC{Float64, Int32}, b::Matrix{Float64})
+function update_sparse_fact(cache::PardisoSparseCache, A::SparseMatrixCSC{Float64, Int32})
     pardiso = cache.pardiso
 
     if !cache.analyzed
@@ -140,13 +149,19 @@ function solve_sparse_system(cache::PardisoSparseCache, x::Matrix{Float64}, A::S
         Pardiso.set_iparm!(pardiso, 1, 1)
         Pardiso.set_iparm!(pardiso, 12, 1)
         Pardiso.set_phase!(pardiso, Pardiso.ANALYSIS)
-        # LinearAlgebra.copytri!(A, 'L') # TODO should not be needed
         Pardiso.pardiso(pardiso, A, b)
+        cache.analyzed = true
     end
 
-    Pardiso.set_phase!(pardiso, Pardiso.NUM_FACT_SOLVE_REFINE) # TODO can this be moved up so it is only set once?
-    Pardiso.pardiso(pardiso, x, A, b) # TODO debug
+    Pardiso.set_phase!(pardiso, Pardiso.NUM_FACT)
+    Pardiso.pardiso(pardiso, A)
 
+    return
+end
+
+function solve_sparse_system(cache::PardisoSparseCache, x::Matrix{Float64}, A::SparseMatrixCSC{Float64, Int32}, b::Matrix{Float64})
+    Pardiso.set_phase!(pardiso, Pardiso.SOLVE_ITERATIVE_REFINE)
+    Pardiso.pardiso(pardiso, x, A, b) # TODO debug
     return x
 end
 
