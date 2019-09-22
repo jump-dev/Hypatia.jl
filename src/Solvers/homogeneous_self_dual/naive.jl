@@ -121,7 +121,6 @@ end
 
 function load(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
     @timeit solver.timer "load" begin
-    reset_sparse_cache(system_solver.sparse_cache)
     model = solver.model
     (A, G, b, h, c) = (model.A, model.G, model.b, model.h, model.c) # TODO use model.b etc for these
     (n, p, q) = (model.n, model.p, model.q)
@@ -147,33 +146,23 @@ function load(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) wher
     rc4 = n + p + q
     rc5 = n + p + q + 1
     rc6 = n + p + 2q + 1
-
+    
     # count of nonzeros added so far
     offset = 1
-    # add vectors in the lhs
-    offset = add_I_J_V(
-        offset, Is, Js, Vs,
-        # start rows
-        [rc1, rc2, rc3, fill(rc4, 3)..., rc4, rc6, rc6],
-        # start cols
-        [fill(rc4, 3)..., rc1, rc2, rc3, rc6, rc4, rc6],
-        # vecs
-        [c, b, h, -c, -b, -h, [-1.0], [1.0], [1.0]],
-        # transpose
-        vcat(fill(false, 3), fill(true, 3), fill(false, 3)),
-        )
-    # add sparse matrix blocks to the lhs
-    offset = add_I_J_V(
-        offset, Is, Js, Vs,
-        # start rows
-        [rc1, rc1, rc2, rc3, rc3],
-        # start cols
-        [rc2, rc3, rc1, rc1, rc5],
-        # mats
-        [A, G, -A, -G, sparse(-I, q, q)],
-        # transpose
-        [true, true, false, false, false],
-        )
+    offset = add_I_J_V(offset, Is, Js, Vs, rc1, rc4, c, false)
+    offset = add_I_J_V(offset, Is, Js, Vs, rc2, rc4, b, false)
+    offset = add_I_J_V(offset, Is, Js, Vs, rc3, rc4, h, false)
+    offset = add_I_J_V(offset, Is, Js, Vs, rc4, rc1, -c, true)
+    offset = add_I_J_V(offset, Is, Js, Vs, rc4, rc2, -b, true)
+    offset = add_I_J_V(offset, Is, Js, Vs, rc4, rc3, -h, true)
+    offset = add_I_J_V(offset, Is, Js, Vs, rc4, rc6, [-1.0], false)
+    offset = add_I_J_V(offset, Is, Js, Vs, rc6, rc4, [1.0], false)
+    offset = add_I_J_V(offset, Is, Js, Vs, rc6, rc6, [1.0], false)
+    offset = add_I_J_V(offset, Is, Js, Vs, rc1, rc2, A, true)
+    offset = add_I_J_V(offset, Is, Js, Vs, rc1, rc3, G, true)
+    offset = add_I_J_V(offset, Is, Js, Vs, rc2, rc1, -A, false)
+    offset = add_I_J_V(offset, Is, Js, Vs, rc3, rc1, -G, false)
+    offset = add_I_J_V(offset, Is, Js, Vs, rc3, rc5, sparse(-I, q, q), false)
 
     # add I, J, V for Hessians
     @timeit solver.timer "setup hess lhs" begin
@@ -236,9 +225,13 @@ function load(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) wher
 end
 
 function update_fact(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
+    reset_sparse_cache(system_solver.sparse_cache)
+
     @timeit solver.timer "modify views" begin
     for (k, cone_k) in enumerate(solver.model.cones)
         @timeit solver.timer "update hess" Cones.update_hess(cone_k)
+        # nz_rows = [Cones.hess_nz_idxs_j(cone_k, j) for j in 1:Cones.dimension(cone_k)]
+        # copyto!(view(system_solver.lhs.nzval, system_solver.hess_idxs[k]), view(cone_k.hess, nz_rows, :))
         for j in 1:Cones.dimension(cone_k)
             nz_rows = Cones.hess_nz_idxs_j(cone_k, j)
             @views copyto!(system_solver.lhs.nzval[system_solver.hess_idxs[k][j]], cone_k.hess[nz_rows, j])

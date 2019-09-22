@@ -178,13 +178,9 @@ function load(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) w
     offset = 1
     # update I, J, V while adding A and G blocks to the lhs
     # TODO investigate why adding n x n identity in the first block is so harmful, maybe also shouldn't add in the (2, 2) block
-    offset = Solvers.add_I_J_V(
-        offset, Is, Js, Vs,
-        [n, n + p, n],
-        [0, 0, n],
-        [A, G, sparse(eps() * I, q, q)],
-        fill(false, 3)
-        )
+    offset = add_I_J_V(offset, Is, Js, Vs, n, 0, A, false)
+    offset = add_I_J_V(offset, Is, Js, Vs, n + p, 0, G, false)
+    offset = add_I_J_V(offset, Is, Js, Vs, n, n, sparse(eps() * I, q, q), false)
     @timeit solver.timer "setup hess lhs" begin
     nz_rows_added = 0
     for (k, cone_k) in enumerate(model.cones)
@@ -233,6 +229,8 @@ function update_fact(system_solver::SymIndefSparseSystemSolver{T}, solver::Solve
     @timeit solver.timer "modify views" begin
     for (k, cone_k) in enumerate(solver.model.cones)
         @timeit solver.timer "update hess" H = (Cones.use_dual(cone_k) ? -Cones.hess(cone_k) : -Cones.inv_hess(cone_k))
+        # nz_rows = [Cones.hess_nz_idxs_j(cone_k, j) for j in 1:Cones.dimension(cone_k)]
+        # copyto!(view(system_solver.lhs.nzval, system_solver.hess_idxs[k]), view(H, nz_rows, :))
         for j in 1:Cones.dimension(cone_k)
             nz_rows = Cones.hess_nz_idxs_j(cone_k, j)
             @views copyto!(system_solver.lhs.nzval[system_solver.hess_idxs[k][j]], H[nz_rows, j])

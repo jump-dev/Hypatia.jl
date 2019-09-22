@@ -466,22 +466,6 @@ function add_I_J_V(
     Is::Vector{<:Integer},
     Js::Vector{<:Integer},
     Vs::Vector{Float64},
-    start_rows::Vector{Int},
-    start_cols::Vector{Int},
-    vecs::Vector{Vector{Float64}},
-    trans::Vector{Bool},
-    )
-    for (r, c, v, t) in zip(start_rows, start_cols, vecs, trans)
-        offset = add_I_J_V(offset, Is, Js, Vs, r, c, v, t)
-    end
-    return offset
-end
-
-function add_I_J_V(
-    offset::Int,
-    Is::Vector{<:Integer},
-    Js::Vector{<:Integer},
-    Vs::Vector{Float64},
     start_row::Int,
     start_col::Int,
     mat::SparseMatrixCSC,
@@ -501,22 +485,6 @@ function add_I_J_V(
         end
         @views Vs[offset:(offset + m - 1)] .= vals
         offset += m
-    end
-    return offset
-end
-
-function add_I_J_V(
-    offset::Int,
-    Is::Vector{<:Integer},
-    Js::Vector{<:Integer},
-    Vs::Vector{Float64},
-    start_rows::Vector{Int},
-    start_cols::Vector{Int},
-    mats::Vector{<:SparseMatrixCSC},
-    trans::Vector{Bool},
-    )
-    for (r, c, m, t) in zip(start_rows, start_cols, mats, trans)
-        offset = add_I_J_V(offset, Is, Js, Vs, r, c, m, t)
     end
     return offset
 end
