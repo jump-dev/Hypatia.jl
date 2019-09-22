@@ -17,7 +17,7 @@ hyp_AAt!(U::Matrix{T}, A::Matrix{T}) where {T <: BlasReal} = BLAS.syrk!('U', 'N'
 hyp_AAt!(U::Matrix{T}, A::Matrix{T}) where {T <: RealOrComplex{<:Real}} = mul!(U, A, A')
 
 #=
-helpers for factorizations and linear solves
+helpers for dense factorizations and linear solves
 TODO cleanup by
 - removing rtyp when not used
 - removing unnecessary fields in caches

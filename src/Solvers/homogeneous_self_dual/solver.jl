@@ -112,8 +112,8 @@ function solve(solver::Solver{T}) where {T <: Real}
 
     solver.solve_time = time() - start_time
 
-    # free memory used by system solvers
-    release_sparse_cache(solver.system_solver)
+    # free memory used by some system solvers
+    free_memory(solver.system_solver)
 
     solver.verbose && println("\nstatus is $(solver.status) after $(solver.num_iters) iterations and $(trunc(solver.solve_time, digits=3)) seconds\n")
 

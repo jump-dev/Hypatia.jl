@@ -8,8 +8,8 @@ const SO = Hypatia.Solvers
 
 real_types = [
     Float64,
-    Float32,
-    BigFloat,
+    # Float32,
+    # BigFloat,
     ]
 
 system_solvers = [
