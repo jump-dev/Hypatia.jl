@@ -13,13 +13,13 @@ real_types = [
     ]
 
 system_solvers = [
-    SO.QRCholDenseSystemSolver,
-    SO.SymIndefDenseSystemSolver,
+    # SO.QRCholDenseSystemSolver,
+    # SO.SymIndefDenseSystemSolver,
     SO.SymIndefSparseSystemSolver,
-    SO.NaiveElimDenseSystemSolver,
-    SO.NaiveDenseSystemSolver,
+    # SO.NaiveElimDenseSystemSolver,
+    # SO.NaiveDenseSystemSolver,
     SO.NaiveSparseSystemSolver,
-    SO.NaiveIndirectSystemSolver,
+    # SO.NaiveIndirectSystemSolver,
     ]
 
 use_infty_nbhd = [
@@ -86,10 +86,10 @@ testfuns_raw = [
 
 @info("starting native tests")
 @testset "native tests" begin
-    @info("starting preprocessing tests")
-    @testset "preprocessing tests: $t, $T" for t in testfuns_preproc, T in real_types
-        t(T, solver = SO.Solver{T}(verbose = true, system_solver = SO.QRCholDenseSystemSolver{T}()))
-    end
+    # @info("starting preprocessing tests")
+    # @testset "preprocessing tests: $t, $T" for t in testfuns_preproc, T in real_types
+    #     t(T, solver = SO.Solver{T}(verbose = true, system_solver = SO.QRCholDenseSystemSolver{T}()))
+    # end
 
     # TODO remove - both options should work
     # @test_throws Exception SO.SymIndefSparseSystemSolver(use_inv_hess = false)
