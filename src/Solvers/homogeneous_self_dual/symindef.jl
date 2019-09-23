@@ -150,6 +150,7 @@ mutable struct SymIndefSparseSystemSolver{T <: Real} <: SymIndefSystemSolver{T}
 end
 
 function load(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
+    system_solver.fact_cache.analyzed = false
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
     system_solver.tau_row = n + p + q + 1

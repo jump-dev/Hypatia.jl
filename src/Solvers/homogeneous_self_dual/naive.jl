@@ -122,6 +122,7 @@ end
 
 function load(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
     @timeit solver.timer "load" begin
+    system_solver.fact_cache.analyzed = false
     model = solver.model
     (A, G, b, h, c) = (model.A, model.G, model.b, model.h, model.c) # TODO use model.b etc for these
     (n, p, q) = (model.n, model.p, model.q)
@@ -241,7 +242,7 @@ function update_fact(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T
     system_solver.lhs.nzval[system_solver.mtt_idx] = solver.mu / solver.tau / solver.tau
 
     update_sparse_fact(system_solver.fact_cache, system_solver.lhs)
-    
+
     return system_solver
 end
 
