@@ -51,16 +51,15 @@ function update_sparse_fact(cache::UMFPACKNonSymCache, A::SparseMatrixCSC{Float6
         cache.analyzed = true
     else
         # TODO this is a hack around lack of interface https://github.com/JuliaLang/julia/issues/33323
-        copyto!(umfpack.nzval, A.nzval)
-        umfpack.numeric = C_NULL
-        error() # TODO need numeric fact here
+        copyto!(cache.umfpack.nzval, A.nzval)
+        cache.umfpack.numeric = C_NULL
+        cache.umfpack = lu(A) # will only repeat numeric factorization
     end
     return
 end
 
 function solve_sparse_system(cache::UMFPACKNonSymCache, x::Matrix{Float64}, A::SparseMatrixCSC{Float64, <:Integer}, b::Matrix{Float64})
-    ldiv!(x, cache.umfpack, b) # TODO do the numeric fact above in update_sparse_fact - only do the solve here
-    error()
+    ldiv!(x, cache.umfpack, b) # will not repeat factorizations
     return x
 end
 
