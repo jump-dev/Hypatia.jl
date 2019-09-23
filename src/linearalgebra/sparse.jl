@@ -51,9 +51,11 @@ function update_sparse_fact(cache::UMFPACKNonSymCache, A::SparseMatrixCSC{Float6
         cache.analyzed = true
     else
         # TODO this is a hack around lack of interface https://github.com/JuliaLang/julia/issues/33323
+        # update nzval field in the factorization
         copyto!(cache.umfpack.nzval, A.nzval)
+        # do not indicate that the numeric factorization has been computed
         cache.umfpack.numeric = C_NULL
-        cache.umfpack = lu(A) # will only repeat numeric factorization
+        SuiteSparse.UMFPACK.umfpack_numeric!(cache.umfpack) # will only repeat numeric factorization
     end
     return
 end
