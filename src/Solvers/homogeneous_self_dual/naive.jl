@@ -135,7 +135,7 @@ function load(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) wher
     dropzeros!(G)
 
     # count the number of nonzeros we will have in the lhs
-    hess_nnzs = sum(Cones.dimension(cone_k) + Cones.hess_nnzs(cone_k) for cone_k in cones)
+    hess_nnzs = sum(Cones.dimension(cone_k) + Cones.hess_nnzs(cone_k, false) for cone_k in cones)
     nnzs = 2 * (nnz(A) + nnz(G) + n + p + q + 1) + q + 1 + hess_nnzs
     Is = Vector{Int32}(undef, nnzs)
     Js = Vector{Int32}(undef, nnzs)
@@ -177,7 +177,7 @@ function load(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) wher
         # add each Hessian's sparsity pattern in one placeholder block, an identity in the other
         H_cols = (is_dual ? dual_cols : rows)
         id_cols = (is_dual ? rows : dual_cols)
-        offset = add_I_J_V(offset, Is, Js, Vs, rows, H_cols, cone_k, false)
+        offset = add_I_J_V(offset, Is, Js, Vs, rows, H_cols, cone_k, false, false)
         offset = add_I_J_V(offset, Is, Js, Vs, rows, id_cols, sparse(I, cone_dim, cone_dim), false)
         nz_rows_added += cone_dim
     end
@@ -203,7 +203,7 @@ function load(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) wher
             col_idx_end = lhs.colptr[col + 1] - 1
             nz_rows = lhs.rowval[col_idx_start:col_idx_end]
             # nonzero rows in column j of the hessian
-            nz_hess_indices = Cones.hess_nz_idxs_j(cone_k, j)
+            nz_hess_indices = Cones.hess_nz_idxs_j(cone_k, j, false)
             # index corresponding to first nonzero Hessian element of the current column of the LHS
             offset_in_row = findfirst(x -> x == row + nz_hess_indices[1] - 1, nz_rows)
             # indices of nonzero values for cone k column j
@@ -233,7 +233,7 @@ function update_fact(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T
         # nz_rows = [Cones.hess_nz_idxs_j(cone_k, j) for j in 1:Cones.dimension(cone_k)]
         # copyto!(view(system_solver.lhs.nzval, system_solver.hess_idxs[k]), view(cone_k.hess, nz_rows, :))
         for j in 1:Cones.dimension(cone_k)
-            nz_rows = Cones.hess_nz_idxs_j(cone_k, j)
+            nz_rows = Cones.hess_nz_idxs_j(cone_k, j, false)
             @views copyto!(system_solver.lhs.nzval[system_solver.hess_idxs[k][j]], cone_k.hess[nz_rows, j])
             # @views copyto!(system_solver.lhs.nzval[system_solver.hess_idxs[k][j]], system_solver.hess_view_k_j[k][j])
         end

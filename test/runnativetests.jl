@@ -22,6 +22,18 @@ system_solvers = [
     # SO.NaiveIndirectSystemSolver,
     ]
 
+cache_dict = Dict(
+    SO.SymIndefSparseSystemSolver => [
+        Hypatia.CHOLMODSymCache{Float64}(diag_pert = -sqrt(eps())),
+        Hypatia.PardisoSymCache(diag_pert = 0.0),
+        Hypatia.PardisoSymCache(diag_pert = -sqrt(eps())),
+        ],
+    SO.NaiveSparseSystemSolver => [
+        Hypatia.UMFPACKNonSymCache(),
+        Hypatia.PardisoNonSymCache(),
+        ],
+    )
+
 use_infty_nbhd = [
     true,
     # false,
@@ -102,7 +114,10 @@ testfuns_raw = [
         T == BigFloat && t == epinormspectral1 && continue # cannot get svdvals with BigFloat
         T == BigFloat && s == SO.NaiveIndirectSystemSolver && continue # cannot use indirect methods with BigFloat
         T != Float64 && s in (SO.SymIndefSparseSystemSolver, SO.NaiveSparseSystemSolver) && continue # sparse system solvers only work with Float64
-        solver = SO.Solver{T}(verbose = true, preprocess = p, use_infty_nbhd = n, system_solver = s{T}())
-        t(T, solver = solver)
+        caches = cache_dict[s]
+        @testset "$ci" for (ci, c) in enumerate(caches)
+            solver = SO.Solver{T}(verbose = true, preprocess = p, use_infty_nbhd = n, system_solver = s{T}(fact_cache = c))
+            t(T, solver = solver)
+        end
     end
 end

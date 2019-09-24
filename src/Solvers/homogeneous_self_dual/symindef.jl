@@ -149,6 +149,8 @@ mutable struct SymIndefSparseSystemSolver{T <: Real} <: SymIndefSystemSolver{T}
     end
 end
 
+import Hypatia.PardisoSymCache
+
 function load(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
     system_solver.fact_cache.analyzed = false
     model = solver.model
@@ -163,16 +165,29 @@ function load(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) w
     dropzeros!(G)
 
     # count the number of nonzeros we will have in the lhs
-    hess_nnzs = sum(Cones.hess_nnzs(cone_k) for cone_k in model.cones)
+    hess_nnzs = sum(Cones.hess_nnzs(cone_k, true) for cone_k in model.cones)
     nnzs = nnz(A) + nnz(G) + hess_nnzs
-    Is = Vector{Int64}(undef, nnzs)
-    Js = Vector{Int64}(undef, nnzs)
+    # optionally perturb zeros on the diagonal
+    diag_pert = !isnan(system_solver.fact_cache.diag_pert)
+    if diag_pert
+        nnzs += n + q
+    end
+
+    IT = system_solver.fact_cache.int_type
+    Is = Vector{IT}(undef, nnzs)
+    Js = Vector{IT}(undef, nnzs)
     Vs = Vector{Float64}(undef, nnzs)
 
-    # count of nonzeros added so far
-    offset = 1
+    if diag_pert
+        Is[1:(n + q)] .= 1:(n + q)
+        Js[1:(n + q)] .= 1:(n + q)
+        Vs[1:(n + q)] .= system_solver.fact_cache.diag_pert
+        # count of nonzeros added so far
+        offset = n + q + 1
+    else
+        offset = 1
+    end
     # update I, J, V while adding A and G blocks to the lhs
-    # TODO investigate why adding n x n identity in the first block is so harmful, maybe also shouldn't add in the (2, 2) block
     offset = add_I_J_V(offset, Is, Js, Vs, n, 0, A, false)
     offset = add_I_J_V(offset, Is, Js, Vs, n + p, 0, G, false)
     @timeit solver.timer "setup hess lhs" begin
@@ -180,14 +195,15 @@ function load(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) w
     for (k, cone_k) in enumerate(model.cones)
         cone_dim = Cones.dimension(cone_k)
         rows = n + p + nz_rows_added
-        offset = add_I_J_V(offset, Is, Js, Vs, rows, rows, cone_k, !Cones.use_dual(cone_k))
+        offset = add_I_J_V(offset, Is, Js, Vs, rows, rows, cone_k, !Cones.use_dual(cone_k), true)
         nz_rows_added += cone_dim
     end
     end # hess timing
+
     @assert offset == nnzs + 1
     dim = n + p + q
     # NOTE only lower block-triangle was constructed
-    @timeit solver.timer "build sparse" system_solver.lhs = sparse(Is, Js, Vs, Int64(dim), Int64(dim))
+    @timeit solver.timer "build sparse" system_solver.lhs = sparse(Is, Js, Vs, IT(dim), IT(dim))
     lhs = system_solver.lhs
 
     # cache indices of placeholders of Hessians
@@ -202,7 +218,7 @@ function load(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) w
             col_idx_end = lhs.colptr[col + 1] - 1
             nz_rows = lhs.rowval[col_idx_start:col_idx_end]
             # nonzero rows in column j of the hessian
-            nz_hess_indices = Cones.hess_nz_idxs_j(cone_k, j)
+            nz_hess_indices = Cones.hess_nz_idxs_j(cone_k, j, true)
             # index corresponding to first nonzero Hessian element of the current column of the LHS
             offset_in_row = findfirst(x -> x == row + nz_hess_indices[1] - 1, nz_rows)
             # indices of nonzero values for cone k column j
@@ -224,7 +240,7 @@ function update_fact(system_solver::SymIndefSparseSystemSolver{T}, solver::Solve
         # nz_rows = [Cones.hess_nz_idxs_j(cone_k, j) for j in 1:Cones.dimension(cone_k)]
         # copyto!(view(system_solver.lhs.nzval, system_solver.hess_idxs[k]), view(H, nz_rows, :))
         for j in 1:Cones.dimension(cone_k)
-            nz_rows = Cones.hess_nz_idxs_j(cone_k, j)
+            nz_rows = Cones.hess_nz_idxs_j(cone_k, j, true)
             @views copyto!(system_solver.lhs.nzval[system_solver.hess_idxs[k][j]], H[nz_rows, j])
         end
     end

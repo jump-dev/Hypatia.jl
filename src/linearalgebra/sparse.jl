@@ -79,23 +79,31 @@ abstract type SparseSymCache{T <: Real} end
 mutable struct PardisoSymCache{T <: Real} <: SparseSymCache{T}
     analyzed::Bool
     pardiso::Pardiso.PardisoSolver
-    function PardisoSymCache{Float64}()
+    diag_pert::Float64
+    int_type::Type{Int32}
+    function PardisoSymCache{Float64}(; diag_pert = NaN)
         cache = new{Float64}()
         cache.analyzed = false
         cache.pardiso = Pardiso.PardisoSolver()
         Pardiso.set_matrixtype!(cache.pardiso, Pardiso.REAL_SYM_INDEF) # tell Pardiso the matrix is symmetric indefinite
+        cache.diag_pert = diag_pert
+        cache.int_type = Int32
         return cache
     end
 end
 PardisoSymCache{T}() where {T <: Real} = error("Pardiso only works with real type Float64")
-PardisoSymCache() = PardisoSymCache{Float64}()
+PardisoSymCache(; diag_pert = NaN) = PardisoSymCache{Float64}(diag_pert = diag_pert)
 
 mutable struct CHOLMODSymCache{T <: Real} <: SparseSymCache{T}
     analyzed::Bool
     cholmod::SuiteSparse.CHOLMOD.Factor
-    function CHOLMODSymCache{Float64}()
+    diag_pert::Float64
+    int_type::Type{<: Integer}
+    function CHOLMODSymCache{Float64}(; diag_pert = NaN)
         cache = new{Float64}()
         cache.analyzed = false
+        cache.diag_pert = diag_pert
+        cache.int_type = SuiteSparse.CHOLMOD.SuiteSparse_long
         return cache
     end
 end
@@ -105,21 +113,21 @@ CHOLMODSymCache() = CHOLMODSymCache{Float64}()
 function update_sparse_fact(cache::CHOLMODSymCache, A::SparseMatrixCSC{Float64, <:Integer})
     A_symm = Symmetric(A, :L)
     if !cache.analyzed
-        cache.cholmod = SuiteSparse.CHOLMOD.ldlt(A_symm, shift = 1e-10, check = false)
+        cache.cholmod = SuiteSparse.CHOLMOD.ldlt(A_symm, check = false)
         cache.analyzed = true
     else
-        ldlt!(cache.cholmod, A_symm, shift = 1e-10, check = false) # TODO this fails very often - it cannot even factorize [0 1; 1 1] with LDLT
+        ldlt!(cache.cholmod, A_symm, check = true)
     end
     if !issuccess(cache.cholmod)
-        @warn("numerical failure: sparse factorization failed")
-        ldlt!(cache.cholmod, A_symm, shift = 1e-4, check = false)
-        if !issuccess(cache.cholmod)
-            @warn("numerical failure: sparse factorization failed again")
-            ldlt!(cache.cholmod, A_symm, shift = 1e-8 * maximum(abs, A[j, j] for j in 1:size(A_symm, 1)), check = false)
-            if !issuccess(cache.cholmod)
-                @warn("numerical failure: could not fix sparse factorization failure")
-            end
-        end
+        # @warn("numerical failure: sparse factorization failed")
+        # ldlt!(cache.cholmod, A_symm, shift = 1e-4, check = false)
+        # if !issuccess(cache.cholmod)
+        #     @warn("numerical failure: sparse factorization failed again")
+        #     ldlt!(cache.cholmod, A_symm, shift = 1e-8 * maximum(abs, A[j, j] for j in 1:size(A_symm, 1)), check = false)
+        #     if !issuccess(cache.cholmod)
+        #         @warn("numerical failure: could not fix sparse factorization failure")
+        #     end
+        # end
     end
     return
 end
@@ -147,22 +155,28 @@ function update_sparse_fact(cache::PardisoSparseCache, A::SparseMatrixCSC{Float6
     if !cache.analyzed
         # TODO comment what these lines do
         Pardiso.pardisoinit(pardiso)
+        # don't ignore other iparms
         Pardiso.set_iparm!(pardiso, 1, 1)
+        # solve transposed problem (Pardiso accepts CSR matrices)
         Pardiso.set_iparm!(pardiso, 12, 1)
+        # perturbation for small pivots
+        Pardiso.set_iparm!(pardiso, 10, 8)
         Pardiso.set_phase!(pardiso, Pardiso.ANALYSIS)
-        Pardiso.pardiso(pardiso, A, b)
+        Pardiso.pardiso(pardiso, A, Float64[])
         cache.analyzed = true
     end
 
     Pardiso.set_phase!(pardiso, Pardiso.NUM_FACT)
-    Pardiso.pardiso(pardiso, A)
+    Pardiso.pardiso(pardiso, A, Float64[])
 
     return
 end
 
 function solve_sparse_system(cache::PardisoSparseCache, x::Matrix{Float64}, A::SparseMatrixCSC{Float64, Int32}, b::Matrix{Float64})
+    pardiso = cache.pardiso
+
     Pardiso.set_phase!(pardiso, Pardiso.SOLVE_ITERATIVE_REFINE)
-    Pardiso.pardiso(pardiso, x, A, b) # TODO debug
+    Pardiso.pardiso(pardiso, x, A, b)
     return x
 end
 

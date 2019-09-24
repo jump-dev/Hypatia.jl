@@ -50,11 +50,18 @@ hess(cone::Cone) = (cone.hess_updated ? cone.hess : update_hess(cone))
 inv_hess(cone::Cone) = (cone.inv_hess_updated ? cone.inv_hess : update_inv_hess(cone))
 
 # fallbacks
-hess_nnzs(cone::Cone) = dimension(cone) ^ 2
+function hess_nnzs(cone::Cone, lower_only::Bool)
+    dim = dimension(cone)
+    if lower_only
+        return div(dim * (dim + 1), 2)
+    else
+        return dim ^ 2
+    end
+end
 
 # the row indices of nonzero elements in column j
-hess_nz_idxs_j(cone::Cone, j::Int) = 1:cone.dim
-inv_hess_nz_idxs_j(cone::Cone, j::Int) = 1:cone.dim
+hess_nz_idxs_j(cone::Cone, j::Int, lower_only::Bool) = (lower_only ? (j:cone.dim) : (1:cone.dim))
+inv_hess_nz_idxs_j(cone::Cone, j::Int, lower_only::Bool) = (lower_only ? (j:cone.dim) : (1:cone.dim))
 
 reset_data(cone::Cone) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.inv_hess_prod_updated = false)
 
