@@ -497,9 +497,10 @@ function add_I_J_V(
     start_col::Int,
     cone::Cones.Cone,
     use_inv::Bool,
+    lower_only::Bool = false,
     )
     for j in 1:Cones.dimension(cone)
-        nz_rows = (use_inv ? Cones.inv_hess_nz_idxs_j(cone, j) : Cones.hess_nz_idxs_j(cone, j))
+        nz_rows = (use_inv ? Cones.inv_hess_nz_idxs_j(cone, j, lower_only) : Cones.hess_nz_idxs_j(cone, j, lower_only))
         n = length(nz_rows)
         @. Is[offset:(offset + n - 1)] = start_row + nz_rows
         @. Js[offset:(offset + n - 1)] = j + start_col
