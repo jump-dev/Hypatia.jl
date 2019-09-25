@@ -60,7 +60,7 @@ function update_sparse_fact(cache::UMFPACKNonSymCache, A::SparseMatrixCSC{Float6
     return
 end
 
-function solve_sparse_system(cache::UMFPACKNonSymCache, x::Matrix{Float64}, A::SparseMatrixCSC{Float64, <:Integer}, b::Matrix{Float64})
+function solve_sparse_system(cache::UMFPACKNonSymCache, x::StridedMatrix{Float64}, A::SparseMatrixCSC{Float64, <:Integer}, b::StridedMatrix{Float64})
     ldiv!(x, cache.umfpack, b) # will not repeat factorizations
     return x
 end
@@ -153,14 +153,17 @@ function update_sparse_fact(cache::PardisoSparseCache, A::SparseMatrixCSC{Float6
     pardiso = cache.pardiso
 
     if !cache.analyzed
-        # TODO comment what these lines do
         Pardiso.pardisoinit(pardiso)
         # don't ignore other iparms
         Pardiso.set_iparm!(pardiso, 1, 1)
         # solve transposed problem (Pardiso accepts CSR matrices)
         Pardiso.set_iparm!(pardiso, 12, 1)
-        # perturbation for small pivots
-        Pardiso.set_iparm!(pardiso, 10, 8)
+        # perturbation for small pivots (default 8 for symmetric, 13 for nonsymmetric)
+        if Pardiso.get_matrixtype(pardiso) == Pardiso.REAL_SYM_INDEF
+            Pardiso.set_iparm!(pardiso, 10, 8)
+        end
+        # maximum number of iterative refinement steps (default = 2)
+        Pardiso.set_iparm!(pardiso, 8, 5)
         Pardiso.set_phase!(pardiso, Pardiso.ANALYSIS)
         Pardiso.pardiso(pardiso, A, Float64[])
         cache.analyzed = true

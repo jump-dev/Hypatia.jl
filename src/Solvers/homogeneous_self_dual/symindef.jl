@@ -71,16 +71,7 @@ function solve_system(system_solver::SymIndefSystemSolver{T}, solver::Solver{T},
         end
     end
 
-    # TODO use dispatch here
-    if system_solver isa SymIndefDenseSystemSolver{T}
-        # if !hyp_bk_solve!(system_solver.fact_cache, sol3, lhs, rhs3)
-        #     @warn("numerical failure: could not fix linear solve failure (mu is $(solver.mu))")
-        # end
-        ldiv!(sol3, system_solver.fact_cache, rhs3)
-    else
-        @assert system_solver isa SymIndefSparseSystemSolver{T}
-        @timeit solver.timer "solve system" solve_sparse_system(system_solver.fact_cache, sol3, system_solver.lhs, rhs3)
-    end
+    solve_subsystem(system_solver, solver, sol3, rhs3)
 
     if !system_solver.use_inv_hess
         for (k, cone_k) in enumerate(model.cones)
@@ -143,13 +134,14 @@ mutable struct SymIndefSparseSystemSolver{T <: Real} <: SymIndefSystemSolver{T}
         fact_cache::SparseSymCache{Float64} = SparseSymCache(),
         )
         system_solver = new{Float64}()
+        if !use_inv_hess
+            @warn("SymIndefSparseSystemSolver is not implemented with `use_inv_hess` set to `false`, using `true` instead.")
+        end
         system_solver.use_inv_hess = true
         system_solver.fact_cache = fact_cache
         return system_solver
     end
 end
-
-import Hypatia.PardisoSymCache
 
 function load(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
     system_solver.fact_cache.analyzed = false
@@ -170,7 +162,7 @@ function load(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) w
     # optionally perturb zeros on the diagonal
     diag_pert = !isnan(system_solver.fact_cache.diag_pert)
     if diag_pert
-        nnzs += n + q
+        nnzs += n + p
     end
 
     IT = system_solver.fact_cache.int_type
@@ -179,11 +171,11 @@ function load(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) w
     Vs = Vector{Float64}(undef, nnzs)
 
     if diag_pert
-        Is[1:(n + q)] .= 1:(n + q)
-        Js[1:(n + q)] .= 1:(n + q)
-        Vs[1:(n + q)] .= system_solver.fact_cache.diag_pert
+        Is[1:(n + p)] .= 1:(n + p)
+        Js[1:(n + p)] .= 1:(n + p)
+        Vs[1:(n + p)] .= system_solver.fact_cache.diag_pert
         # count of nonzeros added so far
-        offset = n + q + 1
+        offset = n + p + 1
     else
         offset = 1
     end
@@ -251,6 +243,11 @@ function update_fact(system_solver::SymIndefSparseSystemSolver{T}, solver::Solve
     return system_solver
 end
 
+function solve_subsystem(system_solver::SymIndefSparseSystemSolver, solver::Solver, sol, rhs)
+    @timeit solver.timer "solve system" solve_sparse_system(system_solver.fact_cache, sol, system_solver.lhs, rhs)
+    return sol
+end
+
 #=
 direct dense
 =#
@@ -316,4 +313,9 @@ function update_fact(system_solver::SymIndefDenseSystemSolver{T}, solver::Solver
     system_solver.fact_cache = (T == BigFloat ? lu!(lhs_symm) : bunchkaufman!(lhs_symm))
 
     return system_solver
+end
+
+function solve_subsystem(system_solver::SymIndefDenseSystemSolver, solver::Solver, sol, rhs)
+    ldiv!(sol, system_solver.fact_cache, rhs)
+    return sol
 end

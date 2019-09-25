@@ -19,32 +19,60 @@ include(joinpath(examples_dir, "sparsepca/native.jl"))
 
 real_types = [
     Float64,
-    Float32,
+    # Float32,
     ]
+
+
+system_solvers = [
+    # SO.QRCholDenseSystemSolver,
+    # SO.SymIndefDenseSystemSolver,
+    SO.SymIndefSparseSystemSolver,
+    # SO.NaiveElimDenseSystemSolver,
+    # SO.NaiveDenseSystemSolver,
+    # SO.NaiveSparseSystemSolver,
+    # SO.NaiveIndirectSystemSolver,
+    ]
+
+cache_dict = Dict(
+    SO.SymIndefSparseSystemSolver => [
+        Hypatia.CHOLMODSymCache{Float64}(diag_pert = -sqrt(eps())),
+        Hypatia.CHOLMODSymCache{Float64}(diag_pert = sqrt(eps())),
+        Hypatia.PardisoSymCache(diag_pert = 0.0),
+        Hypatia.PardisoSymCache(diag_pert = -sqrt(eps())),
+        Hypatia.PardisoSymCache(diag_pert = sqrt(eps())),
+        ],
+    SO.NaiveSparseSystemSolver => [
+        Hypatia.UMFPACKNonSymCache(),
+        Hypatia.PardisoNonSymCache(),
+        ],
+    )
 
 @info("starting native examples tests")
 @testset "native examples tests" begin
     @info("starting miscellaneous tests")
-    @testset "miscellaneous tests: $T" for T in real_types
+    @testset "miscellaneous tests: $T, $s" for T in real_types, s in system_solvers
+        caches = cache_dict[s]
+        @testset "$ci" for (ci, c) in enumerate(caches)
+
         options = (atol = sqrt(sqrt(eps(T))),
-            solver = SO.Solver{T}(verbose = false, iter_limit = 250, time_limit = 12e2,
-            system_solver = SO.SymIndefSparseSystemSolver{T}()))
+            solver = SO.Solver{T}(verbose = false, iter_limit = 250, time_limit = 12e2, system_solver = s{T}(fact_cache = c)))
 
-        @testset "densityest" begin test_densityest.(instances_densityest_few, T = T, options = options) end
+            @testset "densityest" begin test_densityest.(instances_densityest_few, T = T, options = options) end
 
-        @testset "envelope" begin test_envelope.(instances_envelope_few, T = T, options = options) end
+            @testset "envelope" begin test_envelope.(instances_envelope_few, T = T, options = options) end
 
-        @testset "expdesign" begin test_expdesign.(instances_expdesign_few, T = T, options = options) end
+            @testset "expdesign" begin test_expdesign.(instances_expdesign_few, T = T, options = options) end
 
-        @testset "linearopt" begin test_linearopt.(instances_linearopt_few, T = T, options = options) end
+            @testset "linearopt" begin test_linearopt.(instances_linearopt_few, T = T, options = options) end
 
-        @testset "matrixcompletion" begin test_matrixcompletion.(instances_matrixcompletion_few, T = T, options = options) end
+            @testset "matrixcompletion" begin test_matrixcompletion.(instances_matrixcompletion_few, T = T, options = options) end
 
-        @testset "sparsepca" begin test_sparsepca.(instances_sparsepca_few, T = T, options = options) end
+            @testset "sparsepca" begin test_sparsepca.(instances_sparsepca_few, T = T, options = options) end
 
-        @testset "polymin" begin test_polymin.(instances_polymin_few, T = T, options = options) end
+            @testset "polymin" begin test_polymin.(instances_polymin_few, T = T, options = options) end
 
-        @testset "portfolio" begin test_portfolio.(instances_portfolio_few, T = T, options = options) end
+            @testset "portfolio" begin test_portfolio.(instances_portfolio_few, T = T, options = options) end
+        end
     end
 
     # @info("starting linear operators tests")

@@ -55,13 +55,13 @@ function hess_nnzs(cone::Cone, lower_only::Bool)
     if lower_only
         return div(dim * (dim + 1), 2)
     else
-        return dim ^ 2
+        return abs2(dim)
     end
 end
 
 # the row indices of nonzero elements in column j
 hess_nz_idxs_j(cone::Cone, j::Int, lower_only::Bool) = (lower_only ? (j:cone.dim) : (1:cone.dim))
-inv_hess_nz_idxs_j(cone::Cone, j::Int, lower_only::Bool) = (lower_only ? (j:cone.dim) : (1:cone.dim))
+inv_hess_nz_idxs_j(cone::Cone, j::Int, lower_only::Bool) = hess_nz_idxs_j(cone, j, lower_only)
 
 reset_data(cone::Cone) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.inv_hess_prod_updated = false)
 
