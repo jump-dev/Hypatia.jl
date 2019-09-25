@@ -31,8 +31,8 @@ function solve_system(system_solver::SymIndefSystemSolver{T}, solver::Solver{T},
     (n, p, q) = (model.n, model.p, model.q)
     tau_row = system_solver.tau_row
 
-    sol3 = system_solver.sol
-    rhs3 = system_solver.rhs
+    sol3 = system_solver.sol3
+    rhs3 = system_solver.rhs3
 
     @. @views rhs3[1:n, 1:2] = rhs[1:n, :]
     @. @views rhs3[n .+ (1:p), 1:2] = -rhs[n .+ (1:p), :]
@@ -123,10 +123,10 @@ direct sparse
 
 mutable struct SymIndefSparseSystemSolver{T <: Real} <: SymIndefSystemSolver{T}
     use_inv_hess::Bool
-    tau_row
-    lhs
-    rhs::Matrix{Float64}
-    sol::Matrix{Float64}
+    tau_row::Int
+    lhs3::SparseMatrixCSC # TODO type will depend on Int type
+    rhs3::Matrix{T}
+    sol3::Matrix{T}
     fact_cache::SparseSymCache{T}
     hess_idxs
     function SymIndefSparseSystemSolver{Float64}(;
@@ -148,8 +148,8 @@ function load(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) w
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
     system_solver.tau_row = n + p + q + 1
-    system_solver.sol = zeros(n + p + q, 3)
-    system_solver.rhs = similar(system_solver.sol)
+    system_solver.sol3 = zeros(n + p + q, 3)
+    system_solver.rhs3 = similar(system_solver.sol3)
 
     (A, G, b, h, c) = (model.A, model.G, model.b, model.h, model.c)
     # TODO remove
@@ -197,8 +197,8 @@ function load(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) w
     @assert offset == nnzs + 1
     dim = n + p + q
     # NOTE only lower block-triangle was constructed
-    @timeit solver.timer "build sparse" system_solver.lhs = sparse(Is, Js, Vs, IT(dim), IT(dim))
-    lhs = system_solver.lhs
+    @timeit solver.timer "build sparse" system_solver.lhs3 = sparse(Is, Js, Vs, IT(dim), IT(dim))
+    lhs3 = system_solver.lhs3
 
     # cache indices of placeholders of Hessians
     @timeit solver.timer "cache idxs" begin
@@ -208,9 +208,9 @@ function load(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) w
         cone_dim = Cones.dimension(cone_k)
         for j in 1:cone_dim
             # get list of nonzero rows in the current column of the LHS
-            col_idx_start = lhs.colptr[col]
-            col_idx_end = lhs.colptr[col + 1] - 1
-            nz_rows = lhs.rowval[col_idx_start:col_idx_end]
+            col_idx_start = lhs3.colptr[col]
+            col_idx_end = lhs3.colptr[col + 1] - 1
+            nz_rows = lhs3.rowval[col_idx_start:col_idx_end]
             # nonzero rows in column j of the hessian
             nz_hess_indices = Cones.hess_nz_idxs_j(cone_k, j, true)
             # index corresponding to first nonzero Hessian element of the current column of the LHS
@@ -232,22 +232,22 @@ function update_fact(system_solver::SymIndefSparseSystemSolver{T}, solver::Solve
     for (k, cone_k) in enumerate(solver.model.cones)
         @timeit solver.timer "update hess" H = (Cones.use_dual(cone_k) ? -Cones.hess(cone_k) : -Cones.inv_hess(cone_k))
         # nz_rows = [Cones.hess_nz_idxs_j(cone_k, j) for j in 1:Cones.dimension(cone_k)]
-        # copyto!(view(system_solver.lhs.nzval, system_solver.hess_idxs[k]), view(H, nz_rows, :))
+        # copyto!(view(system_solver.lhs3.nzval, system_solver.hess_idxs[k]), view(H, nz_rows, :))
         for j in 1:Cones.dimension(cone_k)
             nz_rows = Cones.hess_nz_idxs_j(cone_k, j, true)
-            @views copyto!(system_solver.lhs.nzval[system_solver.hess_idxs[k][j]], H[nz_rows, j])
+            @views copyto!(system_solver.lhs3.nzval[system_solver.hess_idxs[k][j]], H[nz_rows, j])
         end
     end
     end # time views
 
-    update_sparse_fact(system_solver.fact_cache, system_solver.lhs)
+    update_sparse_fact(system_solver.fact_cache, system_solver.lhs3)
 
     return system_solver
 end
 
-function solve_subsystem(system_solver::SymIndefSparseSystemSolver, solver::Solver, sol, rhs)
-    @timeit solver.timer "solve system" solve_sparse_system(system_solver.fact_cache, sol, system_solver.lhs, rhs)
-    return sol
+function solve_subsystem(system_solver::SymIndefSparseSystemSolver, solver::Solver, sol3, rhs3)
+    @timeit solver.timer "solve system" solve_sparse_system(system_solver.fact_cache, sol3, system_solver.lhs3, rhs3)
+    return sol3
 end
 
 #=
@@ -256,11 +256,11 @@ direct dense
 
 mutable struct SymIndefDenseSystemSolver{T <: Real} <: SymIndefSystemSolver{T}
     use_inv_hess::Bool
-    tau_row
-    lhs
-    rhs::Matrix{Float64}
-    sol::Matrix{Float64}
-    lhs_copy
+    tau_row::Int
+    lhs3::Matrix{T}
+    lhs3_copy::Matrix{T}
+    rhs3::Matrix{T}
+    sol3::Matrix{T}
     fact_cache
     function SymIndefDenseSystemSolver{T}(; use_inv_hess::Bool = true) where {T <: Real}
         system_solver = new{T}()
@@ -273,17 +273,17 @@ function load(system_solver::SymIndefDenseSystemSolver{T}, solver::Solver{T}) wh
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
     system_solver.tau_row = n + p + q + 1
-    system_solver.sol = zeros(T, n + p + q, 3)
-    system_solver.rhs = similar(system_solver.sol)
+    system_solver.sol3 = zeros(T, n + p + q, 3)
+    system_solver.rhs3 = similar(system_solver.sol3)
 
     # fill symmetric lower triangle
-    system_solver.lhs_copy = T[
+    system_solver.lhs3_copy = T[
         zeros(T,n,n)  zeros(T,n,p)  zeros(T,n,q);
         model.A       zeros(T,p,p)  zeros(T,p,q);
         model.G       zeros(T,q,p)  Matrix(-one(T)*I,q,q);
         ]
-    system_solver.lhs = similar(system_solver.lhs_copy)
-    # system_solver.fact_cache = HypBKSolveCache(system_solver.sol, system_solver.lhs, rhs)
+    system_solver.lhs3 = similar(system_solver.lhs3_copy)
+    # system_solver.fact_cache = HypBKSolveCache(system_solver.sol, system_solver.lhs3, rhs3)
 
     return system_solver
 end
@@ -291,9 +291,9 @@ end
 function update_fact(system_solver::SymIndefDenseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
-    lhs = system_solver.lhs
+    lhs3 = system_solver.lhs3
 
-    copyto!(lhs, system_solver.lhs_copy)
+    copyto!(lhs3, system_solver.lhs3_copy)
 
     for (k, cone_k) in enumerate(model.cones)
         idxs_k = model.cone_idxs[k]
@@ -301,27 +301,27 @@ function update_fact(system_solver::SymIndefDenseSystemSolver{T}, solver::Solver
         if Cones.use_dual(cone_k)
             # G_k*x - mu*H_k*z_k = [-zrhs_k - srhs_k, h_k]
             H = Cones.hess(cone_k)
-            @. lhs[z_rows_k, z_rows_k] = -H
+            @. lhs3[z_rows_k, z_rows_k] = -H
         elseif system_solver.use_inv_hess
             # G_k*x - (mu*H_k)\z_k = [-zrhs_k - (mu*H_k)\srhs_k, h_k]
             Hinv = Cones.inv_hess(cone_k)
-            @. lhs[z_rows_k, z_rows_k] = -Hinv
+            @. lhs3[z_rows_k, z_rows_k] = -Hinv
         else
             # A'*y + sum_{pr bar} G_k'*mu*H_k*w_k + sum_{du bar} G_k'*z_k = [xrhs, -c]
             # mu*H_k*G_k*x - mu*H_k*w_k = [-mu*H_k*zrhs_k - srhs_k, mu*H_k*h_k]
             H = Cones.hess(cone_k)
-            @. lhs[z_rows_k, z_rows_k] = -H
-            @views Cones.hess_prod!(lhs[z_rows_k, 1:n], model.G[idxs_k, :], cone_k)
+            @. lhs3[z_rows_k, z_rows_k] = -H
+            @views Cones.hess_prod!(lhs3[z_rows_k, 1:n], model.G[idxs_k, :], cone_k)
         end
     end
 
-    lhs_symm = Symmetric(lhs, :L)
-    system_solver.fact_cache = (T == BigFloat ? lu!(lhs_symm) : bunchkaufman!(lhs_symm))
+    lhs3_symm = Symmetric(lhs3, :L)
+    system_solver.fact_cache = (T == BigFloat ? lu!(lhs3_symm) : bunchkaufman!(lhs3_symm))
 
     return system_solver
 end
 
-function solve_subsystem(system_solver::SymIndefDenseSystemSolver, solver::Solver, sol, rhs)
-    ldiv!(sol, system_solver.fact_cache, rhs)
-    return sol
+function solve_subsystem(system_solver::SymIndefDenseSystemSolver, solver::Solver, sol3, rhs3)
+    ldiv!(sol3, system_solver.fact_cache, rhs3)
+    return sol3
 end

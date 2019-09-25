@@ -39,9 +39,8 @@ function solve_system(system_solver::NaiveElimSystemSolver{T}, solver::Solver{T}
     (n, p, q) = (model.n, model.p, model.q)
     tau_row = system_solver.tau_row
 
-    # TODO in-place
-    sol4 = system_solver.sol
-    rhs4 = system_solver.rhs
+    sol4 = system_solver.sol4
+    rhs4 = system_solver.rhs4
     @views copyto!(rhs4, rhs[1:tau_row, :])
 
     for (k, cone_k) in enumerate(model.cones)
@@ -89,11 +88,10 @@ direct sparse
 
 mutable struct NaiveElimSparseSystemSolver{T <: Real} <: NaiveElimSystemSolver{T}
     use_inv_hess::Bool
-    tau_row
-    lhs
-    lhs_copy
-    rhs::Matrix{Float64}
-    sol::Matrix{Float64}
+    tau_row::Int
+    lhs4::SparseMatrixCSC # TODO CSC type will depend on factor cache Int type
+    rhs4::Matrix{T}
+    sol4::Matrix{T}
     fact_cache::SparseNonSymCache{T}
     hess_idxs
     function NaiveElimSparseSystemSolver{T}(;
@@ -115,8 +113,8 @@ function load(system_solver::NaiveElimSparseSystemSolver{T}, solver::Solver{T}) 
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
     system_solver.tau_row = n + p + q + 1
-    system_solver.sol = zeros(system_solver.tau_row, 2)
-    system_solver.rhs = similar(system_solver.sol)
+    system_solver.sol4 = zeros(system_solver.tau_row, 2)
+    system_solver.rhs4 = similar(system_solver.sol4)
 
     # TODO remove
     model.A = sparse(model.A)
@@ -165,8 +163,8 @@ function load(system_solver::NaiveElimSparseSystemSolver{T}, solver::Solver{T}) 
 
     @assert offset == nnzs + 1
     dim = n + p + q + 1
-    @timeit solver.timer "build sparse" system_solver.lhs = sparse(Is, Js, Vs, Int32(dim), Int32(dim))
-    lhs = system_solver.lhs
+    @timeit solver.timer "build sparse" system_solver.lhs4 = sparse(Is, Js, Vs, Int32(dim), Int32(dim))
+    lhs4 = system_solver.lhs4
 
     # cache indices of placeholders of Hessians
     @timeit solver.timer "cache idxs" begin
@@ -176,9 +174,9 @@ function load(system_solver::NaiveElimSparseSystemSolver{T}, solver::Solver{T}) 
         cone_dim = Cones.dimension(cone_k)
         for j in 1:cone_dim
             # get list of nonzero rows in the current column of the LHS
-            col_idx_start = lhs.colptr[col]
-            col_idx_end = lhs.colptr[col + 1] - 1
-            nz_rows = lhs.rowval[col_idx_start:col_idx_end]
+            col_idx_start = lhs4.colptr[col]
+            col_idx_end = lhs4.colptr[col + 1] - 1
+            nz_rows = lhs4.rowval[col_idx_start:col_idx_end]
             # nonzero rows in column j of the hessian
             nz_hess_indices = Cones.hess_nz_idxs_j(cone_k, j, false)
             # index corresponding to first nonzero Hessian element of the current column of the LHS
@@ -201,21 +199,19 @@ function update_fact(system_solver::NaiveElimSparseSystemSolver{T}, solver::Solv
         @timeit solver.timer "update hess" H = (Cones.use_dual(cone_k) ? Cones.hess(cone_k) : Cones.inv_hess(cone_k))
         for j in 1:Cones.dimension(cone_k)
             nz_rows = Cones.hess_nz_idxs_j(cone_k, j, false)
-            @views copyto!(system_solver.lhs.nzval[system_solver.hess_idxs[k][j]], H[nz_rows, j])
+            @views copyto!(system_solver.lhs4.nzval[system_solver.hess_idxs[k][j]], H[nz_rows, j])
         end
     end
     end # time views
 
-    update_sparse_fact(system_solver.fact_cache, system_solver.lhs)
+    update_sparse_fact(system_solver.fact_cache, system_solver.lhs4)
 
     return system_solver
 end
 
-function solve_subsystem(system_solver::NaiveElimSparseSystemSolver, solver::Solver, sol, rhs)
-    sol_copy = convert(Matrix{Float64}, sol)
-    @timeit solver.timer "solve system" solve_sparse_system(system_solver.fact_cache, sol_copy, system_solver.lhs, rhs)
-    sol .= sol_copy
-    return sol_copy
+function solve_subsystem(system_solver::NaiveElimSparseSystemSolver{T}, solver::Solver{T}, sol4::Matrix{T}, rhs4::Matrix{T}) where {T <: Real}
+    @timeit solver.timer "solve system" solve_sparse_system(system_solver.fact_cache, sol4, system_solver.lhs4, rhs4)
+    return sol4
 end
 
 #=
@@ -224,11 +220,11 @@ direct dense
 
 mutable struct NaiveElimDenseSystemSolver{T <: Real} <: NaiveElimSystemSolver{T}
     use_inv_hess::Bool
-    tau_row
-    lhs
-    lhs_copy
-    rhs::Matrix{Float64}
-    sol::Matrix{Float64}
+    tau_row::Int
+    lhs4::Matrix{T}
+    lhs4_copy::Matrix{T}
+    rhs4::Matrix{T}
+    sol4::Matrix{T}
     fact_cache
     function NaiveElimDenseSystemSolver{T}(;
         use_inv_hess::Bool = true,
@@ -244,17 +240,17 @@ function load(system_solver::NaiveElimDenseSystemSolver{T}, solver::Solver{T}) w
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
     system_solver.tau_row = n + p + q + 1
-    system_solver.sol = zeros(T, system_solver.tau_row, 2)
-    system_solver.rhs = similar(system_solver.sol)
+    system_solver.sol4 = zeros(T, system_solver.tau_row, 2)
+    system_solver.rhs4 = similar(system_solver.sol4)
 
-    system_solver.lhs_copy = T[
+    system_solver.lhs4_copy = T[
         zeros(T,n,n)  model.A'      model.G'              model.c;
         -model.A      zeros(T,p,p)  zeros(T,p,q)          model.b;
         -model.G      zeros(T,q,p)  Matrix(one(T)*I,q,q)  model.h;
         -model.c'     -model.b'     -model.h'             one(T);
         ]
-    system_solver.lhs = similar(system_solver.lhs_copy)
-    # system_solver.fact_cache = HypLUSolveCache(system_solver.sol, system_solver.lhs, rhs)
+    system_solver.lhs4 = similar(system_solver.lhs4_copy)
+    # system_solver.fact_cache = HypLUSolveCache(system_solver.sol, system_solver.lhs4, rhs4)
 
     return system_solver
 end
@@ -262,33 +258,33 @@ end
 function update_fact(system_solver::NaiveElimDenseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
     model = solver.model
     (n, p) = (model.n, model.p)
-    lhs = system_solver.lhs
+    lhs4 = system_solver.lhs4
 
-    copyto!(lhs, system_solver.lhs_copy)
-    lhs[end, end] = solver.mu / solver.tau / solver.tau
+    copyto!(lhs4, system_solver.lhs4_copy)
+    lhs4[end, end] = solver.mu / solver.tau / solver.tau
 
     for (k, cone_k) in enumerate(model.cones)
         idxs_k = model.cone_idxs[k]
         z_rows_k = (n + p) .+ idxs_k
         if Cones.use_dual(cone_k)
             # -G_k*x + mu*H_k*z_k + h_k*tau = zrhs_k + srhs_k
-            lhs[z_rows_k, z_rows_k] .= Cones.hess(cone_k)
+            lhs4[z_rows_k, z_rows_k] .= Cones.hess(cone_k)
         elseif system_solver.use_inv_hess
-            lhs[z_rows_k, z_rows_k] .= Cones.inv_hess(cone_k)
+            lhs4[z_rows_k, z_rows_k] .= Cones.inv_hess(cone_k)
         else
             # -mu*H_k*G_k*x + z_k + mu*H_k*h_k*tau = mu*H_k*zrhs_k + srhs_k
-            @views Cones.hess_prod!(lhs[z_rows_k, 1:n], model.G[idxs_k, :], cone_k)
-            @. lhs[z_rows_k, 1:n] *= -1
-            @views Cones.hess_prod!(lhs[z_rows_k, end], model.h[idxs_k], cone_k)
+            @views Cones.hess_prod!(lhs4[z_rows_k, 1:n], model.G[idxs_k, :], cone_k)
+            @. lhs4[z_rows_k, 1:n] *= -1
+            @views Cones.hess_prod!(lhs4[z_rows_k, end], model.h[idxs_k], cone_k)
         end
     end
 
-    system_solver.fact_cache = lu!(system_solver.lhs) # TODO use wrapped lapack function
+    system_solver.fact_cache = lu!(system_solver.lhs4) # TODO use wrapped lapack function
 
     return system_solver
 end
 
-function solve_subsystem(system_solver::NaiveElimDenseSystemSolver, solver::Solver, sol, rhs)
-    ldiv!(sol, system_solver.fact_cache, rhs)
-    return sol
+function solve_subsystem(system_solver::NaiveElimDenseSystemSolver{T}, solver::Solver{T}, sol4::Matrix{T}, rhs4::Matrix{T}) where {T <: Real}
+    ldiv!(sol4, system_solver.fact_cache, rhs4)
+    return sol4
 end
