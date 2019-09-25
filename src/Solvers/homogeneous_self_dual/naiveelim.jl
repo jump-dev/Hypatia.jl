@@ -63,6 +63,7 @@ function solve_system(system_solver::NaiveElimSystemSolver{T}, solver::Solver{T}
     @. @views rhs4[end, :] += rhs[end, :]
 
     solve_subsystem(system_solver, solver, sol4, rhs4)
+    # ldiv!(sol4, lu(convert(Matrix{Float64}, system_solver.lhs4)), rhs4)
     @views copyto!(sol[1:tau_row, :], sol4)
 
     # lift to get s and kap
@@ -94,6 +95,7 @@ mutable struct NaiveElimSparseSystemSolver{T <: Real} <: NaiveElimSystemSolver{T
     sol4::Matrix{T}
     fact_cache::SparseNonSymCache{T}
     hess_idxs
+
     function NaiveElimSparseSystemSolver{T}(;
         use_inv_hess::Bool = true,
         fact_cache::SparseNonSymCache{Float64} = SparseNonSymCache(),
@@ -149,7 +151,7 @@ function load(system_solver::NaiveElimSparseSystemSolver{T}, solver::Solver{T}) 
     offset = add_I_J_V(offset, Is, Js, Vs, rc4, rc1, -model.c, true)
     offset = add_I_J_V(offset, Is, Js, Vs, rc4, rc2, -model.b, true)
     offset = add_I_J_V(offset, Is, Js, Vs, rc4, rc3, -model.h, true)
-    offset = add_I_J_V(offset, Is, Js, Vs, rc4, rc4, [1.0], false)
+    offset = add_I_J_V(offset, Is, Js, Vs, rc4, rc4, [1.0], false) # mu / tau / tau placeholder
 
     @timeit solver.timer "setup hess lhs" begin
     nz_rows_added = 0
@@ -203,6 +205,8 @@ function update_fact(system_solver::NaiveElimSparseSystemSolver{T}, solver::Solv
         end
     end
     end # time views
+    # update mu / tau / tau placeholder, which is the last nonzero added
+    system_solver.lhs4.nzval[end] = solver.mu / solver.tau / solver.tau
 
     update_sparse_fact(system_solver.fact_cache, system_solver.lhs4)
 
