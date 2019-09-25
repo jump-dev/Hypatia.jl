@@ -60,7 +60,7 @@ function update_sparse_fact(cache::UMFPACKNonSymCache, A::SparseMatrixCSC{Float6
     return
 end
 
-function solve_sparse_system(cache::UMFPACKNonSymCache, x::StridedMatrix{Float64}, A::SparseMatrixCSC{Float64, <:Integer}, b::StridedMatrix{Float64})
+function solve_sparse_system(cache::UMFPACKNonSymCache, x::Matrix{Float64}, A::SparseMatrixCSC{Float64, <:Integer}, b::Matrix{Float64})
     ldiv!(x, cache.umfpack, b) # will not repeat factorizations
     return x
 end

@@ -31,10 +31,8 @@ function solve_system(system_solver::SymIndefSystemSolver{T}, solver::Solver{T},
     (n, p, q) = (model.n, model.p, model.q)
     tau_row = system_solver.tau_row
 
-    # TODO in-place
-    dim3 = tau_row - 1
-    sol3 = zeros(T, dim3, 3)
-    rhs3 = zeros(T, dim3, 3)
+    sol3 = system_solver.sol
+    rhs3 = system_solver.rhs
 
     @. @views rhs3[1:n, 1:2] = rhs[1:n, :]
     @. @views rhs3[n .+ (1:p), 1:2] = -rhs[n .+ (1:p), :]
@@ -103,7 +101,7 @@ function solve_system(system_solver::SymIndefSystemSolver{T}, solver::Solver{T},
     @. y12 += tau * y3
     @. z12 += tau * z3
 
-    @views sol[1:dim3, :] = sol3[:, 1:2]
+    @views sol[1:(tau_row - 1), :] = sol3[:, 1:2]
 
     # lift to get s and kap
     # TODO refactor below for use with symindef and qrchol methods
@@ -127,6 +125,8 @@ mutable struct SymIndefSparseSystemSolver{T <: Real} <: SymIndefSystemSolver{T}
     use_inv_hess::Bool
     tau_row
     lhs
+    rhs::Matrix{Float64}
+    sol::Matrix{Float64}
     fact_cache::SparseSymCache{T}
     hess_idxs
     function SymIndefSparseSystemSolver{Float64}(;
@@ -148,6 +148,8 @@ function load(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) w
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
     system_solver.tau_row = n + p + q + 1
+    system_solver.sol = zeros(n + p + q, 3)
+    system_solver.rhs = similar(system_solver.sol)
 
     (A, G, b, h, c) = (model.A, model.G, model.b, model.h, model.c)
     # TODO remove
@@ -256,6 +258,8 @@ mutable struct SymIndefDenseSystemSolver{T <: Real} <: SymIndefSystemSolver{T}
     use_inv_hess::Bool
     tau_row
     lhs
+    rhs::Matrix{Float64}
+    sol::Matrix{Float64}
     lhs_copy
     fact_cache
     function SymIndefDenseSystemSolver{T}(; use_inv_hess::Bool = true) where {T <: Real}
@@ -269,6 +273,8 @@ function load(system_solver::SymIndefDenseSystemSolver{T}, solver::Solver{T}) wh
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
     system_solver.tau_row = n + p + q + 1
+    system_solver.sol = zeros(T, n + p + q, 3)
+    system_solver.rhs = similar(system_solver.sol)
 
     # fill symmetric lower triangle
     system_solver.lhs_copy = T[

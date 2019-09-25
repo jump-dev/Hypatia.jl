@@ -24,22 +24,25 @@ system_solvers = [
     ]
 
 cache_dict = Dict(
+    SO.SymIndefDenseSystemSolver => [nothing],
     SO.SymIndefSparseSystemSolver => [
         Hypatia.CHOLMODSymCache{Float64}(diag_pert = sqrt(eps())),
         Hypatia.PardisoSymCache(diag_pert = 0.0),
         Hypatia.PardisoSymCache(diag_pert = sqrt(eps())),
         ],
     SO.NaiveSparseSystemSolver => [
-        Hypatia.UMFPACKNonSymCache(),
-        # Hypatia.PardisoNonSymCache(),
+        # Hypatia.UMFPACKNonSymCache(),
+        Hypatia.PardisoNonSymCache(),
         ],
     SO.NaiveElimDenseSystemSolver => [nothing],
     SO.NaiveElimSparseSystemSolver => [
         Hypatia.UMFPACKNonSymCache(),
+        # Hypatia.PardisoNonSymCache(),
         ],
     )
 
 options_dict = Dict(
+    SO.SymIndefDenseSystemSolver => NamedTuple(),
     SO.SymIndefSparseSystemSolver => [
         (use_inv_hess = true,)
         ],

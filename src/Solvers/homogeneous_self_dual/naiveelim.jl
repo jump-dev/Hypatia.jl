@@ -11,7 +11,7 @@ z_k + mu*H_k*s_k = srhs_k --> s_k = (mu*H_k)\(srhs_k - z_k)
 -->
 -G_k*x + (mu*H_k)\z_k + h_k*tau = zrhs_k + (mu*H_k)\srhs_k
 -->
--mu*H_k*G_k*x + z_k + mu*H_k*h_k*tau = mu*H_k*zrhs_k + srhs_k
+-mu*H_k*G_k*x + z_k + mu*H_k*h_k*tau = mu*H_k*zrhs_k + srhs_k (if use_inv_hess = false)
 or if using dual barrier
 mu*H_k*z_k + s_k = srhs_k --> s_k = srhs_k - mu*H_k*z_k
 -->
@@ -40,8 +40,9 @@ function solve_system(system_solver::NaiveElimSystemSolver{T}, solver::Solver{T}
     tau_row = system_solver.tau_row
 
     # TODO in-place
-    sol4 = view(sol, 1:tau_row, :)
-    rhs4 = rhs[1:tau_row, :]
+    sol4 = system_solver.sol
+    rhs4 = system_solver.rhs
+    @views copyto!(rhs4, rhs[1:tau_row, :])
 
     for (k, cone_k) in enumerate(model.cones)
         z_rows_k = (n + p) .+ model.cone_idxs[k]
@@ -63,6 +64,7 @@ function solve_system(system_solver::NaiveElimSystemSolver{T}, solver::Solver{T}
     @. @views rhs4[end, :] += rhs[end, :]
 
     solve_subsystem(system_solver, solver, sol4, rhs4)
+    @views copyto!(sol[1:tau_row, :], sol4)
 
     # lift to get s and kap
     tau = sol4[end:end, :]
@@ -90,6 +92,8 @@ mutable struct NaiveElimSparseSystemSolver{T <: Real} <: NaiveElimSystemSolver{T
     tau_row
     lhs
     lhs_copy
+    rhs::Matrix{Float64}
+    sol::Matrix{Float64}
     fact_cache::SparseNonSymCache{T}
     hess_idxs
     function NaiveElimSparseSystemSolver{T}(;
@@ -111,6 +115,8 @@ function load(system_solver::NaiveElimSparseSystemSolver{T}, solver::Solver{T}) 
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
     system_solver.tau_row = n + p + q + 1
+    system_solver.sol = zeros(system_solver.tau_row, 2)
+    system_solver.rhs = similar(system_solver.sol)
 
     # TODO remove
     model.A = sparse(model.A)
@@ -206,8 +212,10 @@ function update_fact(system_solver::NaiveElimSparseSystemSolver{T}, solver::Solv
 end
 
 function solve_subsystem(system_solver::NaiveElimSparseSystemSolver, solver::Solver, sol, rhs)
-    @timeit solver.timer "solve system" solve_sparse_system(system_solver.fact_cache, sol, system_solver.lhs, rhs)
-    return sol
+    sol_copy = convert(Matrix{Float64}, sol)
+    @timeit solver.timer "solve system" solve_sparse_system(system_solver.fact_cache, sol_copy, system_solver.lhs, rhs)
+    sol .= sol_copy
+    return sol_copy
 end
 
 #=
@@ -219,6 +227,8 @@ mutable struct NaiveElimDenseSystemSolver{T <: Real} <: NaiveElimSystemSolver{T}
     tau_row
     lhs
     lhs_copy
+    rhs::Matrix{Float64}
+    sol::Matrix{Float64}
     fact_cache
     function NaiveElimDenseSystemSolver{T}(;
         use_inv_hess::Bool = true,
@@ -234,6 +244,8 @@ function load(system_solver::NaiveElimDenseSystemSolver{T}, solver::Solver{T}) w
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
     system_solver.tau_row = n + p + q + 1
+    system_solver.sol = zeros(T, system_solver.tau_row, 2)
+    system_solver.rhs = similar(system_solver.sol)
 
     system_solver.lhs_copy = T[
         zeros(T,n,n)  model.A'      model.G'              model.c;
