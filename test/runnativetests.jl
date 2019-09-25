@@ -15,22 +15,43 @@ real_types = [
 system_solvers = [
     # SO.QRCholDenseSystemSolver,
     # SO.SymIndefDenseSystemSolver,
-    SO.SymIndefSparseSystemSolver,
-    # SO.NaiveElimDenseSystemSolver,
+    # SO.SymIndefSparseSystemSolver,
+    SO.NaiveElimDenseSystemSolver,
+    SO.NaiveElimSparseSystemSolver,
     # SO.NaiveDenseSystemSolver,
-    SO.NaiveSparseSystemSolver,
+    # SO.NaiveSparseSystemSolver,
     # SO.NaiveIndirectSystemSolver,
     ]
 
 cache_dict = Dict(
     SO.SymIndefSparseSystemSolver => [
-        Hypatia.CHOLMODSymCache{Float64}(diag_pert = -sqrt(eps())),
+        Hypatia.CHOLMODSymCache{Float64}(diag_pert = sqrt(eps())),
         Hypatia.PardisoSymCache(diag_pert = 0.0),
-        Hypatia.PardisoSymCache(diag_pert = -sqrt(eps())),
+        Hypatia.PardisoSymCache(diag_pert = sqrt(eps())),
         ],
     SO.NaiveSparseSystemSolver => [
         Hypatia.UMFPACKNonSymCache(),
-        Hypatia.PardisoNonSymCache(),
+        # Hypatia.PardisoNonSymCache(),
+        ],
+    SO.NaiveElimDenseSystemSolver => [nothing],
+    SO.NaiveElimSparseSystemSolver => [
+        Hypatia.UMFPACKNonSymCache(),
+        ],
+    )
+
+options_dict = Dict(
+    SO.SymIndefSparseSystemSolver => [
+        (use_inv_hess = true,)
+        ],
+    SO.NaiveSparseSystemSolver => [
+        NamedTuple(),
+        ],
+    SO.NaiveElimDenseSystemSolver => [
+        (use_inv_hess = true,),
+        (use_inv_hess = false,),
+        ],
+    SO.NaiveElimSparseSystemSolver => [
+        (use_inv_hess = true,),
         ],
     )
 
@@ -96,6 +117,8 @@ testfuns_raw = [
     dualinfeas3,
     ]
 
+tol = 1e-8
+
 @info("starting native tests")
 @testset "native tests" begin
     # @info("starting preprocessing tests")
@@ -115,8 +138,10 @@ testfuns_raw = [
         T == BigFloat && s == SO.NaiveIndirectSystemSolver && continue # cannot use indirect methods with BigFloat
         T != Float64 && s in (SO.SymIndefSparseSystemSolver, SO.NaiveSparseSystemSolver) && continue # sparse system solvers only work with Float64
         caches = cache_dict[s]
-        @testset "$ci" for (ci, c) in enumerate(caches)
-            solver = SO.Solver{T}(verbose = true, preprocess = p, use_infty_nbhd = n, system_solver = s{T}(fact_cache = c))
+        options = options_dict[s]
+        @testset "$ci, $oi" for (ci, c) in enumerate(caches), (oi, o) in enumerate(options)
+            solver = SO.Solver{T}(verbose = false, preprocess = p, use_infty_nbhd = n,
+                system_solver = s{T}(; fact_cache = c, o...), tol_abs_opt = tol, tol_rel_opt = tol, tol_feas = tol)
             t(T, solver = solver)
         end
     end
