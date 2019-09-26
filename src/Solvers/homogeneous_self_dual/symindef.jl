@@ -262,7 +262,8 @@ mutable struct SymIndefDenseSystemSolver{T <: Real} <: SymIndefSystemSolver{T}
     rhs3::Matrix{T}
     sol3::Matrix{T}
     fact_cache
-    function SymIndefDenseSystemSolver{T}(; use_inv_hess::Bool = true) where {T <: Real}
+    # TODO fact_cache kwarg?
+    function SymIndefDenseSystemSolver{T}(; use_inv_hess::Bool = true, fact_cache = nothing) where {T <: Real}
         system_solver = new{T}()
         system_solver.use_inv_hess = use_inv_hess
         return system_solver
