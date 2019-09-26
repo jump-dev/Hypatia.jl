@@ -106,11 +106,10 @@ direct sparse
 =#
 
 mutable struct NaiveSparseSystemSolver{T <: Real} <: NaiveSystemSolver{T}
-    lhs
-    hess_idxs
-    hess_view_k_j
+    lhs::SparseMatrixCSC # TODO inttype
+    hess_idxs::Vector{Vector{UnitRange}}
     fact_cache::SparseNonSymCache{T}
-    mtt_idx
+    mtt_idx::Int
     function NaiveSparseSystemSolver{Float64}(;
         fact_cache::SparseNonSymCache{Float64} = SparseNonSymCache(),
         )
@@ -124,19 +123,17 @@ function load(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) wher
     @timeit solver.timer "load" begin
     system_solver.fact_cache.analyzed = false
     model = solver.model
-    (A, G, b, h, c) = (model.A, model.G, model.b, model.h, model.c) # TODO use model.b etc for these
     (n, p, q) = (model.n, model.p, model.q)
     cones = model.cones
 
-    # TODO remove
-    A = sparse(A)
-    G = sparse(G)
-    dropzeros!(A)
-    dropzeros!(G)
+    model.A = sparse(model.A)
+    model.G = sparse(model.G)
+    dropzeros!(model.A)
+    dropzeros!(model.G)
 
     # count the number of nonzeros we will have in the lhs
     hess_nnzs = sum(Cones.dimension(cone_k) + Cones.hess_nnzs(cone_k, false) for cone_k in cones)
-    nnzs = 2 * (nnz(A) + nnz(G) + n + p + q + 1) + q + 1 + hess_nnzs
+    nnzs = 2 * (nnz(model.A) + nnz(model.G) + n + p + q + 1) + q + 1 + hess_nnzs
     Is = Vector{Int32}(undef, nnzs)
     Js = Vector{Int32}(undef, nnzs)
     Vs = Vector{Float64}(undef, nnzs)
@@ -151,19 +148,19 @@ function load(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) wher
 
     # count of nonzeros added so far
     offset = 1
-    offset = add_I_J_V(offset, Is, Js, Vs, rc1, rc4, c, false)
-    offset = add_I_J_V(offset, Is, Js, Vs, rc2, rc4, b, false)
-    offset = add_I_J_V(offset, Is, Js, Vs, rc3, rc4, h, false)
-    offset = add_I_J_V(offset, Is, Js, Vs, rc4, rc1, -c, true)
-    offset = add_I_J_V(offset, Is, Js, Vs, rc4, rc2, -b, true)
-    offset = add_I_J_V(offset, Is, Js, Vs, rc4, rc3, -h, true)
+    offset = add_I_J_V(offset, Is, Js, Vs, rc1, rc4, model.c, false)
+    offset = add_I_J_V(offset, Is, Js, Vs, rc2, rc4, model.b, false)
+    offset = add_I_J_V(offset, Is, Js, Vs, rc3, rc4, model.h, false)
+    offset = add_I_J_V(offset, Is, Js, Vs, rc4, rc1, -model.c, true)
+    offset = add_I_J_V(offset, Is, Js, Vs, rc4, rc2, -model.b, true)
+    offset = add_I_J_V(offset, Is, Js, Vs, rc4, rc3, -model.h, true)
     offset = add_I_J_V(offset, Is, Js, Vs, rc4, rc6, [-1.0], false)
     offset = add_I_J_V(offset, Is, Js, Vs, rc6, rc4, [1.0], false)
     offset = add_I_J_V(offset, Is, Js, Vs, rc6, rc6, [1.0], false)
-    offset = add_I_J_V(offset, Is, Js, Vs, rc1, rc2, A, true)
-    offset = add_I_J_V(offset, Is, Js, Vs, rc1, rc3, G, true)
-    offset = add_I_J_V(offset, Is, Js, Vs, rc2, rc1, -A, false)
-    offset = add_I_J_V(offset, Is, Js, Vs, rc3, rc1, -G, false)
+    offset = add_I_J_V(offset, Is, Js, Vs, rc1, rc2, model.A, true)
+    offset = add_I_J_V(offset, Is, Js, Vs, rc1, rc3, model.G, true)
+    offset = add_I_J_V(offset, Is, Js, Vs, rc2, rc1, -model.A, false)
+    offset = add_I_J_V(offset, Is, Js, Vs, rc3, rc1, -model.G, false)
     offset = add_I_J_V(offset, Is, Js, Vs, rc3, rc5, sparse(-I, q, q), false)
 
     # add I, J, V for Hessians
@@ -218,9 +215,6 @@ function load(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) wher
     # get mtt index
     system_solver.mtt_idx = lhs.colptr[rc4 + 2] - 1
 
-    # TODO currently not used, follow up what goes wrong here for soc cone
-    system_solver.hess_view_k_j = [[view(cone_k.hess, :, j) for j in 1:Cones.dimension(cone_k)] for cone_k in cones]
-
     end # load timing
 
     return system_solver
@@ -230,18 +224,15 @@ function update_fact(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T
     @timeit solver.timer "modify views" begin
     for (k, cone_k) in enumerate(solver.model.cones)
         @timeit solver.timer "update hess" Cones.update_hess(cone_k)
-        # nz_rows = [Cones.hess_nz_idxs_j(cone_k, j) for j in 1:Cones.dimension(cone_k)]
-        # copyto!(view(system_solver.lhs.nzval, system_solver.hess_idxs[k]), view(cone_k.hess, nz_rows, :))
         for j in 1:Cones.dimension(cone_k)
             nz_rows = Cones.hess_nz_idxs_j(cone_k, j, false)
             @views copyto!(system_solver.lhs.nzval[system_solver.hess_idxs[k][j]], cone_k.hess[nz_rows, j])
-            # @views copyto!(system_solver.lhs.nzval[system_solver.hess_idxs[k][j]], system_solver.hess_view_k_j[k][j])
         end
     end
     end # time views
     system_solver.lhs.nzval[system_solver.mtt_idx] = solver.mu / solver.tau / solver.tau
 
-    update_sparse_fact(system_solver.fact_cache, system_solver.lhs)
+    @timeit solver.timer "update_sparse_fact" update_sparse_fact(system_solver.fact_cache, system_solver.lhs)
 
     return system_solver
 end
@@ -256,12 +247,13 @@ direct dense
 =#
 
 mutable struct NaiveDenseSystemSolver{T <: Real} <: NaiveSystemSolver{T}
-    tau_row
-    lhs
-    lhs_copy
+    tau_row::Int
+    lhs::Matrix{T}
+    lhs_copy::Matrix{T}
     lhs_H_k
     fact_cache
-    NaiveDenseSystemSolver{T}() where {T <: Real} = new{T}()
+    # TODO handle fact_cache
+    NaiveDenseSystemSolver{T}(; fact_cache = nothing) where {T <: Real} = new{T}()
 end
 
 function load(system_solver::NaiveDenseSystemSolver{T}, solver::Solver{T}) where {T <: Real}

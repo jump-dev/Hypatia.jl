@@ -127,6 +127,7 @@ function load(system_solver::NaiveElimSparseSystemSolver{T}, solver::Solver{T}) 
     hess_nnzs = sum(Cones.hess_nnzs(cone_k, false) for cone_k in model.cones)
     nnzs = 2 * (nnz(model.A) + nnz(model.G) + n + p + q) + hess_nnzs + 1
 
+    # NOTE if more caches are added, Int32 will need to be updated so that it is not hard coded
     Is = Vector{Int32}(undef, nnzs)
     Js = Vector{Int32}(undef, nnzs)
     Vs = Vector{Float64}(undef, nnzs)

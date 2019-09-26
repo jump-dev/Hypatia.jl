@@ -13,6 +13,8 @@ import SparseArrays.SparseMatrixCSC
 import Pardiso # TODO make optional
 import SuiteSparse
 
+using TimerOutputs
+
 #=
 nonsymmetric
 =#
@@ -51,11 +53,11 @@ function update_sparse_fact(cache::UMFPACKNonSymCache, A::SparseMatrixCSC{Float6
         cache.analyzed = true
     else
         # TODO this is a hack around lack of interface https://github.com/JuliaLang/julia/issues/33323
-        # update nzval field in the factorization
-        copyto!(cache.umfpack.nzval, A.nzval)
+        # update nzval field in the factorizationTimer
+        @timeit "copyto" copyto!(cache.umfpack.nzval, A.nzval)
         # do not indicate that the numeric factorization has been computed
         cache.umfpack.numeric = C_NULL
-        SuiteSparse.UMFPACK.umfpack_numeric!(cache.umfpack) # will only repeat numeric factorization
+        @timeit "numeric" SuiteSparse.UMFPACK.umfpack_numeric!(cache.umfpack) # will only repeat numeric factorization
     end
     return
 end
@@ -179,7 +181,7 @@ function solve_sparse_system(cache::PardisoSparseCache, x::Matrix{Float64}, A::S
     pardiso = cache.pardiso
 
     Pardiso.set_phase!(pardiso, Pardiso.SOLVE_ITERATIVE_REFINE)
-    Pardiso.pardiso(pardiso, x, A, b)
+    @timeit "pardiso" Pardiso.pardiso(pardiso, x, A, b)
     return x
 end
 

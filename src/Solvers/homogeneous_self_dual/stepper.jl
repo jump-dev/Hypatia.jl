@@ -182,25 +182,25 @@ function get_directions(stepper::Stepper{T}, solver::Solver{T}) where {T <: Real
     dirs = stepper.dirs
     system_solver = solver.system_solver
 
-    rhs = update_rhs(stepper, solver)
-    update_fact(system_solver, solver)
-    solve_system(system_solver, solver, dirs, rhs) # NOTE dense solve with cache destroys RHS
+    @timeit solver.timer "update_rhs" rhs = update_rhs(stepper, solver)
+    @timeit solver.timer "update_fact" update_fact(system_solver, solver)
+    @timeit solver.timer "in sys solver" solve_system(system_solver, solver, dirs, rhs) # NOTE dense solve with cache destroys RHS
 
     iter_ref_steps = 3 # TODO handle, maybe change dynamically
     dirs_new = rhs
     dirs_new .= dirs # TODO avoid?
     for i in 1:iter_ref_steps
         # perform iterative refinement step
-        res = calc_system_residual(stepper, solver) # modifies rhs
+        @timeit solver.timer "calc res" res = calc_system_residual(stepper, solver) # modifies rhs
         norm_inf = norm(res, Inf)
         norm_2 = norm(res, 2)
 
         if norm_inf > eps(T)
             dirs_new .= zero(T)
-            solve_system(system_solver, solver, dirs_new, res)
+            @timeit solver.timer "in sys solver" solve_system(system_solver, solver, dirs_new, res)
             dirs_new .*= -1
             dirs_new .+= dirs
-            res_new = calc_system_residual(stepper, solver)
+            @timeit solver.timer "calc res" res_new = calc_system_residual(stepper, solver)
             norm_inf_new = norm(res_new, Inf)
             norm_2_new = norm(res_new, 2)
             if norm_inf_new < norm_inf && norm_2_new < norm_2

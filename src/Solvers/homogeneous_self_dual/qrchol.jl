@@ -153,7 +153,8 @@ mutable struct QRCholDenseSystemSolver{T <: Real} <: QRCholSystemSolver{T}
     GQ2_k
     HGx_k
     Gx_k
-    QRCholDenseSystemSolver{T}() where {T <: Real} = new{T}()
+    # TODO fact cache
+    QRCholDenseSystemSolver{T}(; fact_cache = nothing) where {T <: Real} = new{T}()
 end
 
 function load(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
@@ -169,7 +170,7 @@ function load(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}) wher
     else
         GQ = model.G * solver.Ap_Q
     end
-    
+
     system_solver.GQ1 = GQ[:, 1:p]
     system_solver.GQ2 = GQ[:, (p + 1):end]
     nmp = n - p
