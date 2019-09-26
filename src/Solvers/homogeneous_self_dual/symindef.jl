@@ -184,24 +184,21 @@ function load(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) w
     # update I, J, V while adding A and G blocks to the lhs
     offset = add_I_J_V(offset, Is, Js, Vs, n, 0, A, false)
     offset = add_I_J_V(offset, Is, Js, Vs, n + p, 0, G, false)
-    @timeit solver.timer "setup hess lhs" begin
     nz_rows_added = 0
-    for (k, cone_k) in enumerate(model.cones)
+    @timeit solver.timer "setup_hess_lhs" for (k, cone_k) in enumerate(model.cones)
         cone_dim = Cones.dimension(cone_k)
         rows = n + p + nz_rows_added
         offset = add_I_J_V(offset, Is, Js, Vs, rows, rows, cone_k, !Cones.use_dual(cone_k), true)
         nz_rows_added += cone_dim
     end
-    end # hess timing
 
     @assert offset == nnzs + 1
     dim = n + p + q
     # NOTE only lower block-triangle was constructed
-    @timeit solver.timer "build sparse" system_solver.lhs3 = sparse(Is, Js, Vs, IT(dim), IT(dim))
+    @timeit solver.timer "build_sparse" system_solver.lhs3 = sparse(Is, Js, Vs, IT(dim), IT(dim))
     lhs3 = system_solver.lhs3
 
     # cache indices of placeholders of Hessians
-    @timeit solver.timer "cache idxs" begin
     system_solver.hess_idxs = [Vector{UnitRange}(undef, Cones.dimension(cone_k)) for cone_k in model.cones]
     row = col = n + p + 1
     for (k, cone_k) in enumerate(model.cones)
@@ -222,31 +219,26 @@ function load(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) w
         end
         row += cone_dim
     end
-    end # cache timing
 
     return system_solver
 end
 
 function update_fact(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
-    @timeit solver.timer "modify views" begin
     for (k, cone_k) in enumerate(solver.model.cones)
-        @timeit solver.timer "update hess" H = (Cones.use_dual(cone_k) ? -Cones.hess(cone_k) : -Cones.inv_hess(cone_k))
-        # nz_rows = [Cones.hess_nz_idxs_j(cone_k, j) for j in 1:Cones.dimension(cone_k)]
-        # copyto!(view(system_solver.lhs3.nzval, system_solver.hess_idxs[k]), view(H, nz_rows, :))
+        @timeit solver.timer "update_hess" H = (Cones.use_dual(cone_k) ? -Cones.hess(cone_k) : -Cones.inv_hess(cone_k))
         for j in 1:Cones.dimension(cone_k)
             nz_rows = Cones.hess_nz_idxs_j(cone_k, j, true)
             @views copyto!(system_solver.lhs3.nzval[system_solver.hess_idxs[k][j]], H[nz_rows, j])
         end
     end
-    end # time views
 
-    update_sparse_fact(system_solver.fact_cache, system_solver.lhs3)
+    @timeit solver.timer "update_sparse_fact" update_sparse_fact(system_solver.fact_cache, system_solver.lhs3)
 
     return system_solver
 end
 
 function solve_subsystem(system_solver::SymIndefSparseSystemSolver, solver::Solver, sol3, rhs3)
-    @timeit solver.timer "solve system" solve_sparse_system(system_solver.fact_cache, sol3, system_solver.lhs3, rhs3)
+    @timeit solver.timer "solve_sparse_system" solve_sparse_system(system_solver.fact_cache, sol3, system_solver.lhs3, rhs3)
     return sol3
 end
 

@@ -25,7 +25,7 @@ TODO
 =#
 
 mutable struct NaiveIndirectSystemSolver{T <: Real} <: NaiveSystemSolver{T}
-    lhs
+    lhs6
     NaiveIndirectSystemSolver{T}() where {T <: Real} = new{T}()
 end
 
@@ -66,7 +66,7 @@ function load(system_solver::NaiveIndirectSystemSolver{T}, solver::Solver{T}) wh
         end
     end
 
-    system_solver.lhs = BlockMatrix{T}(dim, dim,
+    system_solver.lhs6 = BlockMatrix{T}(dim, dim,
         [cone_blocks...,
             model.A', model.G', reshape(model.c, :, 1),
             -model.A, reshape(model.b, :, 1),
@@ -92,13 +92,13 @@ end
 
 update_fact(system_solver::NaiveIndirectSystemSolver{T}, solver::Solver{T}) where {T <: Real} = system_solver
 
-function solve_system(system_solver::NaiveIndirectSystemSolver{T}, solver::Solver{T}, sol, rhs) where {T <: Real}
-    for j in 1:size(rhs, 2)
-        rhs_j = view(rhs, :, j)
-        sol_j = view(sol, :, j)
-        IterativeSolvers.gmres!(sol_j, system_solver.lhs, rhs_j, restart = size(rhs, 1))
+function solve_system(system_solver::NaiveIndirectSystemSolver{T}, solver::Solver{T}, sol6, rhs6) where {T <: Real}
+    for j in 1:size(rhs6, 2)
+        rhs_j = view(rhs6, :, j)
+        sol_j = view(sol6, :, j)
+        IterativeSolvers.gmres!(sol_j, system_solver.lhs6, rhs_j, restart = size(rhs6, 1))
     end
-    return sol
+    return sol6
 end
 
 #=
@@ -106,7 +106,7 @@ direct sparse
 =#
 
 mutable struct NaiveSparseSystemSolver{T <: Real} <: NaiveSystemSolver{T}
-    lhs::SparseMatrixCSC # TODO inttype
+    lhs6::SparseMatrixCSC # TODO inttype
     hess_idxs::Vector{Vector{UnitRange}}
     fact_cache::SparseNonSymCache{T}
     mtt_idx::Int
@@ -120,7 +120,6 @@ mutable struct NaiveSparseSystemSolver{T <: Real} <: NaiveSystemSolver{T}
 end
 
 function load(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
-    @timeit solver.timer "load" begin
     system_solver.fact_cache.analyzed = false
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
@@ -164,9 +163,8 @@ function load(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) wher
     offset = add_I_J_V(offset, Is, Js, Vs, rc3, rc5, sparse(-I, q, q), false)
 
     # add I, J, V for Hessians
-    @timeit solver.timer "setup hess lhs" begin
     nz_rows_added = 0
-    for (k, cone_k) in enumerate(cones)
+    @timeit solver.timer "setup_hess_lhs" for (k, cone_k) in enumerate(cones)
         cone_dim = Cones.dimension(cone_k)
         rows = rc5 + nz_rows_added
         dual_cols = rc3 + nz_rows_added
@@ -178,15 +176,13 @@ function load(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) wher
         offset = add_I_J_V(offset, Is, Js, Vs, rows, id_cols, sparse(I, cone_dim, cone_dim), false)
         nz_rows_added += cone_dim
     end
-    end # hess timing
     @assert offset == nnzs + 1
 
     dim32 = Int32(n + p + 2q + 2)
-    @timeit solver.timer "build sparse" system_solver.lhs = sparse(Is, Js, Vs, dim32, dim32)
-    lhs = system_solver.lhs
+    @timeit solver.timer "build_sparse" system_solver.lhs6 = sparse(Is, Js, Vs, dim32, dim32)
+    lhs6 = system_solver.lhs6
 
     # cache indices of placeholders of Hessians
-    @timeit solver.timer "cache idxs" begin
     system_solver.hess_idxs = [Vector{UnitRange}(undef, Cones.dimension(cone_k)) for cone_k in cones]
     row = rc5 + 1
     col_offset = 1
@@ -196,9 +192,9 @@ function load(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) wher
         for j in 1:cone_dim
             col = init_col + col_offset
             # get list of nonzero rows in the current column of the LHS
-            col_idx_start = lhs.colptr[col]
-            col_idx_end = lhs.colptr[col + 1] - 1
-            nz_rows = lhs.rowval[col_idx_start:col_idx_end]
+            col_idx_start = lhs6.colptr[col]
+            col_idx_end = lhs6.colptr[col + 1] - 1
+            nz_rows = lhs6.rowval[col_idx_start:col_idx_end]
             # nonzero rows in column j of the hessian
             nz_hess_indices = Cones.hess_nz_idxs_j(cone_k, j, false)
             # index corresponding to first nonzero Hessian element of the current column of the LHS
@@ -210,36 +206,31 @@ function load(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) wher
         end
         row += cone_dim
     end
-    end # cache timing
 
     # get mtt index
-    system_solver.mtt_idx = lhs.colptr[rc4 + 2] - 1
-
-    end # load timing
+    system_solver.mtt_idx = lhs6.colptr[rc4 + 2] - 1
 
     return system_solver
 end
 
 function update_fact(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
-    @timeit solver.timer "modify views" begin
     for (k, cone_k) in enumerate(solver.model.cones)
-        @timeit solver.timer "update hess" Cones.update_hess(cone_k)
+        @timeit solver.timer "update_hess" Cones.update_hess(cone_k)
         for j in 1:Cones.dimension(cone_k)
             nz_rows = Cones.hess_nz_idxs_j(cone_k, j, false)
-            @views copyto!(system_solver.lhs.nzval[system_solver.hess_idxs[k][j]], cone_k.hess[nz_rows, j])
+            @views copyto!(system_solver.lhs6.nzval[system_solver.hess_idxs[k][j]], cone_k.hess[nz_rows, j])
         end
     end
-    end # time views
-    system_solver.lhs.nzval[system_solver.mtt_idx] = solver.mu / solver.tau / solver.tau
+    system_solver.lhs6.nzval[system_solver.mtt_idx] = solver.mu / solver.tau / solver.tau
 
-    @timeit solver.timer "update_sparse_fact" update_sparse_fact(system_solver.fact_cache, system_solver.lhs)
+    @timeit solver.timer "update_sparse_fact" update_sparse_fact(system_solver.fact_cache, system_solver.lhs6)
 
     return system_solver
 end
 
-function solve_system(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}, sol, rhs) where {T <: Real}
-    @timeit solver.timer "solve system" solve_sparse_system(system_solver.fact_cache, sol, system_solver.lhs, rhs)
-    return sol
+function solve_system(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}, sol6::Matrix{T}, rhs6::Matrix{T}) where {T <: Real}
+    @timeit solver.timer "solve_sparse_system" solve_sparse_system(system_solver.fact_cache, sol6, system_solver.lhs6, rhs6)
+    return sol6
 end
 
 #=
@@ -248,9 +239,9 @@ direct dense
 
 mutable struct NaiveDenseSystemSolver{T <: Real} <: NaiveSystemSolver{T}
     tau_row::Int
-    lhs::Matrix{T}
-    lhs_copy::Matrix{T}
-    lhs_H_k
+    lhs6::Matrix{T}
+    lhs6_copy::Matrix{T}
+    lhs6_H_k
     fact_cache
     # TODO handle fact_cache
     NaiveDenseSystemSolver{T}(; fact_cache = nothing) where {T <: Real} = new{T}()
@@ -263,7 +254,7 @@ function load(system_solver::NaiveDenseSystemSolver{T}, solver::Solver{T}) where
     cone_idxs = model.cone_idxs
     system_solver.tau_row = n + p + q + 1
 
-    system_solver.lhs_copy = T[
+    system_solver.lhs6_copy = T[
         zeros(T,n,n)  model.A'      model.G'              model.c     zeros(T,n,q)           zeros(T,n);
         -model.A      zeros(T,p,p)  zeros(T,p,q)          model.b     zeros(T,p,q)           zeros(T,p);
         -model.G      zeros(T,q,p)  zeros(T,q,q)          model.h     Matrix(-one(T)*I,q,q)  zeros(T,q);
@@ -271,36 +262,36 @@ function load(system_solver::NaiveDenseSystemSolver{T}, solver::Solver{T}) where
         zeros(T,q,n)  zeros(T,q,p)  Matrix(one(T)*I,q,q)  zeros(T,q)  Matrix(one(T)*I,q,q)   zeros(T,q);
         zeros(T,1,n)  zeros(T,1,p)  zeros(T,1,q)          one(T)      zeros(T,1,q)           one(T);
         ]
-    system_solver.lhs = similar(system_solver.lhs_copy)
-    # system_solver.fact_cache = HypLUSolveCache(system_solver.sol, system_solver.lhs, rhs)
+    system_solver.lhs6 = similar(system_solver.lhs6_copy)
+    # system_solver.fact_cache = HypLUSolveCache(system_solver.sol, system_solver.lhs6, rhs6)
 
     function view_H_k(cone_k, idxs_k)
         rows = system_solver.tau_row .+ idxs_k
         cols = Cones.use_dual(cone_k) ? (n + p) .+ idxs_k : rows
-        return view(system_solver.lhs, rows, cols)
+        return view(system_solver.lhs6, rows, cols)
     end
-    system_solver.lhs_H_k = [view_H_k(cone_k, idxs_k) for (cone_k, idxs_k) in zip(cones, cone_idxs)]
+    system_solver.lhs6_H_k = [view_H_k(cone_k, idxs_k) for (cone_k, idxs_k) in zip(cones, cone_idxs)]
 
     return system_solver
 end
 
 function update_fact(system_solver::NaiveDenseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
-    copyto!(system_solver.lhs, system_solver.lhs_copy)
-    system_solver.lhs[end, system_solver.tau_row] = solver.mu / solver.tau / solver.tau
+    copyto!(system_solver.lhs6, system_solver.lhs6_copy)
+    system_solver.lhs6[end, system_solver.tau_row] = solver.mu / solver.tau / solver.tau
 
     for (k, cone_k) in enumerate(solver.model.cones)
-        copyto!(system_solver.lhs_H_k[k], Cones.hess(cone_k))
+        copyto!(system_solver.lhs6_H_k[k], Cones.hess(cone_k))
     end
 
-    system_solver.fact_cache = lu!(system_solver.lhs) # TODO use wrapped lapack function
+    system_solver.fact_cache = lu!(system_solver.lhs6) # TODO use wrapped lapack function
 
     return system_solver
 end
 
-function solve_system(system_solver::NaiveDenseSystemSolver{T}, solver::Solver{T}, sol, rhs) where {T <: Real}
-    # if !hyp_lu_solve!(system_solver.fact_cache, sol, lhs, rhs)
+function solve_system(system_solver::NaiveDenseSystemSolver{T}, solver::Solver{T}, sol6::Matrix{T}, rhs6::Matrix{T}) where {T <: Real}
+    # if !hyp_lu_solve!(system_solver.fact_cache, sol6, lhs6, rhs6)
     #     @warn("numerical failure: could not fix linear solve failure")
     # end
-    ldiv!(sol, system_solver.fact_cache, rhs) # TODO use wrapped lapack function
-    return sol
+    @timeit solver.timer "ldiv!" ldiv!(sol6, system_solver.fact_cache, rhs6) # TODO use wrapped lapack function
+    return sol6
 end

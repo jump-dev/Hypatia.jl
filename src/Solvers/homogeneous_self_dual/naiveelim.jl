@@ -34,7 +34,7 @@ A'*y + G'*z + c*tau = xrhs
 
 abstract type NaiveElimSystemSolver{T <: Real} <: SystemSolver{T} end
 
-function solve_system(system_solver::NaiveElimSystemSolver{T}, solver::Solver{T}, sol, rhs) where {T <: Real}
+function solve_system(system_solver::NaiveElimSystemSolver{T}, solver::Solver{T}, sol::Matrix{T}, rhs::Matrix{T}) where {T <: Real}
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
     tau_row = system_solver.tau_row
@@ -153,23 +153,20 @@ function load(system_solver::NaiveElimSparseSystemSolver{T}, solver::Solver{T}) 
     offset = add_I_J_V(offset, Is, Js, Vs, rc4, rc3, -model.h, true)
     offset = add_I_J_V(offset, Is, Js, Vs, rc4, rc4, [1.0], false) # mu / tau / tau placeholder
 
-    @timeit solver.timer "setup hess lhs" begin
     nz_rows_added = 0
-    for (k, cone_k) in enumerate(model.cones)
+    @timeit solver.timer "setup_hess" for (k, cone_k) in enumerate(model.cones)
         cone_dim = Cones.dimension(cone_k)
         rows = n + p + nz_rows_added
         offset = add_I_J_V(offset, Is, Js, Vs, rows, rows, cone_k, !Cones.use_dual(cone_k), false)
         nz_rows_added += cone_dim
     end
-    end # hess timing
 
     @assert offset == nnzs + 1
     dim = n + p + q + 1
-    @timeit solver.timer "build sparse" system_solver.lhs4 = sparse(Is, Js, Vs, Int32(dim), Int32(dim))
+    @timeit solver.timer "build_sparse" system_solver.lhs4 = sparse(Is, Js, Vs, Int32(dim), Int32(dim))
     lhs4 = system_solver.lhs4
 
     # cache indices of placeholders of Hessians
-    @timeit solver.timer "cache idxs" begin
     system_solver.hess_idxs = [Vector{UnitRange}(undef, Cones.dimension(cone_k)) for cone_k in model.cones]
     row = col = n + p + 1
     for (k, cone_k) in enumerate(model.cones)
@@ -190,21 +187,18 @@ function load(system_solver::NaiveElimSparseSystemSolver{T}, solver::Solver{T}) 
         end
         row += cone_dim
     end
-    end # cache timing
 
     return system_solver
 end
 
 function update_fact(system_solver::NaiveElimSparseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
-    @timeit solver.timer "modify views" begin
     for (k, cone_k) in enumerate(solver.model.cones)
-        @timeit solver.timer "update hess" H = (Cones.use_dual(cone_k) ? Cones.hess(cone_k) : Cones.inv_hess(cone_k))
+        @timeit solver.timer "update_hess" H = (Cones.use_dual(cone_k) ? Cones.hess(cone_k) : Cones.inv_hess(cone_k))
         for j in 1:Cones.dimension(cone_k)
             nz_rows = Cones.hess_nz_idxs_j(cone_k, j, false)
             @views copyto!(system_solver.lhs4.nzval[system_solver.hess_idxs[k][j]], H[nz_rows, j])
         end
     end
-    end # time views
     # update mu / tau / tau placeholder, which is the last nonzero added
     system_solver.lhs4.nzval[end] = solver.mu / solver.tau / solver.tau
 
@@ -214,7 +208,7 @@ function update_fact(system_solver::NaiveElimSparseSystemSolver{T}, solver::Solv
 end
 
 function solve_subsystem(system_solver::NaiveElimSparseSystemSolver{T}, solver::Solver{T}, sol4::Matrix{T}, rhs4::Matrix{T}) where {T <: Real}
-    @timeit solver.timer "solve system" solve_sparse_system(system_solver.fact_cache, sol4, system_solver.lhs4, rhs4)
+    @timeit solver.timer "solve_sparse_system" solve_sparse_system(system_solver.fact_cache, sol4, system_solver.lhs4, rhs4)
     return sol4
 end
 
