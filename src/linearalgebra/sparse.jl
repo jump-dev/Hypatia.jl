@@ -165,7 +165,7 @@ function update_sparse_fact(cache::PardisoSparseCache, A::SparseMatrixCSC{Float6
             Pardiso.set_iparm!(pardiso, 10, 8)
         end
         # maximum number of iterative refinement steps (default = 2)
-        Pardiso.set_iparm!(pardiso, 8, 5)
+        Pardiso.set_iparm!(pardiso, 8, 2)
         Pardiso.set_phase!(pardiso, Pardiso.ANALYSIS)
         Pardiso.pardiso(pardiso, A, Float64[])
         cache.analyzed = true
