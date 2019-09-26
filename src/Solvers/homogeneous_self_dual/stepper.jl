@@ -184,7 +184,7 @@ function get_directions(stepper::Stepper{T}, solver::Solver{T}) where {T <: Real
 
     @timeit solver.timer "update_rhs" rhs = update_rhs(stepper, solver)
     @timeit solver.timer "update_fact" update_fact(system_solver, solver)
-    @timeit solver.timer "in sys solver" solve_system(system_solver, solver, dirs, rhs) # NOTE dense solve with cache destroys RHS
+    @timeit solver.timer "solve_system" solve_system(system_solver, solver, dirs, rhs) # NOTE dense solve with cache destroys RHS
 
     iter_ref_steps = 3 # TODO handle, maybe change dynamically
     dirs_new = rhs
@@ -197,10 +197,10 @@ function get_directions(stepper::Stepper{T}, solver::Solver{T}) where {T <: Real
 
         if norm_inf > eps(T)
             dirs_new .= zero(T)
-            @timeit solver.timer "in sys solver" solve_system(system_solver, solver, dirs_new, res)
+            @timeit solver.timer "solve_system" solve_system(system_solver, solver, dirs_new, res)
             dirs_new .*= -1
             dirs_new .+= dirs
-            @timeit solver.timer "calc res" res_new = calc_system_residual(stepper, solver)
+            @timeit solver.timer "calc_system_residual" res_new = calc_system_residual(stepper, solver)
             norm_inf_new = norm(res_new, Inf)
             norm_2_new = norm(res_new, 2)
             if norm_inf_new < norm_inf && norm_2_new < norm_2
