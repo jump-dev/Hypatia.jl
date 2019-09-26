@@ -13,25 +13,27 @@ real_types = [
     ]
 
 system_solvers = [
-    # SO.QRCholDenseSystemSolver,
-    # SO.SymIndefDenseSystemSolver,
+    SO.QRCholDenseSystemSolver,
+    SO.SymIndefDenseSystemSolver,
     SO.SymIndefSparseSystemSolver,
-    # SO.NaiveElimDenseSystemSolver,
-    # SO.NaiveElimSparseSystemSolver,
-    # SO.NaiveDenseSystemSolver,
-    # SO.NaiveSparseSystemSolver,
-    # SO.NaiveIndirectSystemSolver,
+    SO.NaiveElimDenseSystemSolver,
+    SO.NaiveElimSparseSystemSolver,
+    SO.NaiveDenseSystemSolver,
+    SO.NaiveSparseSystemSolver,
+    SO.NaiveIndirectSystemSolver,
     ]
 
 cache_dict = Dict(
+    SO.QRCholDenseSystemSolver => [nothing],
     SO.SymIndefDenseSystemSolver => [nothing],
     SO.SymIndefSparseSystemSolver => [
-        # Hypatia.CHOLMODSymCache{Float64}(diag_pert = sqrt(eps())),
+        Hypatia.CHOLMODSymCache{Float64}(diag_pert = sqrt(eps())),
         Hypatia.PardisoSymCache(diag_pert = 0.0),
-        # Hypatia.PardisoSymCache(diag_pert = sqrt(eps())),
+        Hypatia.PardisoSymCache(diag_pert = sqrt(eps())),
         ],
+    SO.NaiveDenseSystemSolver => [nothing],
     SO.NaiveSparseSystemSolver => [
-        # Hypatia.UMFPACKNonSymCache(),
+        Hypatia.UMFPACKNonSymCache(),
         Hypatia.PardisoNonSymCache(),
         ],
     SO.NaiveElimDenseSystemSolver => [nothing],
@@ -39,16 +41,17 @@ cache_dict = Dict(
         Hypatia.UMFPACKNonSymCache(),
         # Hypatia.PardisoNonSymCache(),
         ],
+    SO.NaiveIndirectSystemSolver => [nothing],
     )
 
 options_dict = Dict(
+    SO.QRCholDenseSystemSolver => [NamedTuple()],
     SO.SymIndefDenseSystemSolver => [NamedTuple()],
     SO.SymIndefSparseSystemSolver => [
         (use_inv_hess = true,)
         ],
-    SO.NaiveSparseSystemSolver => [
-        NamedTuple(),
-        ],
+    SO.NaiveDenseSystemSolver => [NamedTuple()],
+    SO.NaiveSparseSystemSolver => [NamedTuple()],
     SO.NaiveElimDenseSystemSolver => [
         (use_inv_hess = true,),
         (use_inv_hess = false,),
@@ -56,6 +59,7 @@ options_dict = Dict(
     SO.NaiveElimSparseSystemSolver => [
         (use_inv_hess = true,),
         ],
+    SO.NaiveIndirectSystemSolver => [NamedTuple()],
     )
 
 use_infty_nbhd = [
@@ -129,11 +133,6 @@ tol = 1e-8
     #     t(T, solver = SO.Solver{T}(verbose = true, system_solver = SO.QRCholDenseSystemSolver{T}()))
     # end
 
-    # TODO remove - both options should work
-    # @test_throws Exception SO.SymIndefSparseSystemSolver(use_inv_hess = false)
-
-    # TODO test options to system solvers
-
     @info("starting miscellaneous tests")
     @testset "miscellaneous tests: $t, $s, $n, $p, $T" for t in testfuns_raw, s in system_solvers, n in use_infty_nbhd, p in preprocess, T in real_types
         !p && s == SO.QRCholSystemSolver && continue # must use preprocessing if using QRCholSystemSolver
@@ -143,8 +142,9 @@ tol = 1e-8
         caches = cache_dict[s]
         options = options_dict[s]
         @testset "$ci, $oi" for (ci, c) in enumerate(caches), (oi, o) in enumerate(options)
+            system_solver = (c === nothing ? system_solver = s{T}(; o...) : system_solver = s{T}(; fact_cache = c, o...))
             solver = SO.Solver{T}(verbose = false, preprocess = p, use_infty_nbhd = n,
-                system_solver = s{T}(; fact_cache = c, o...), tol_abs_opt = tol, tol_rel_opt = tol, tol_feas = tol)
+                system_solver = system_solver, tol_abs_opt = tol, tol_rel_opt = tol, tol_feas = tol)
             t(T, solver = solver)
         end
     end
