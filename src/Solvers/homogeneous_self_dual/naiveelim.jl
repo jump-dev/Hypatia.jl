@@ -63,7 +63,6 @@ function solve_system(system_solver::NaiveElimSystemSolver{T}, solver::Solver{T}
     @. @views rhs4[end, :] += rhs[end, :]
 
     solve_subsystem(system_solver, solver, sol4, rhs4)
-    # ldiv!(sol4, lu(convert(Matrix{Float64}, system_solver.lhs4)), rhs4)
     @views copyto!(sol[1:tau_row, :], sol4)
 
     # lift to get s and kap
