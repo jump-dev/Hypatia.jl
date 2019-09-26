@@ -135,7 +135,7 @@ mutable struct Solver{T <: Real}
         max_nbhd::Real = 0.7,
         use_infty_nbhd::Bool = true,
         stepper::Stepper{T} = CombinedStepper{T}(),
-        system_solver::SystemSolver{T} = QRCholSystemSolver{T}(),
+        system_solver::SystemSolver{T} = QRCholDenseSystemSolver{T}(),
         ) where {T <: Real}
         if isa(system_solver, QRCholSystemSolver{T})
             @assert preprocess # require preprocessing for QRCholSystemSolver
