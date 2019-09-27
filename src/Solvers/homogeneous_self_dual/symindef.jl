@@ -148,76 +148,67 @@ function load(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) w
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
     system_solver.tau_row = n + p + q + 1
+    cones = model.cones
+    cone_idxs = model.cone_idxs
+
     system_solver.sol3 = zeros(n + p + q, 3)
     system_solver.rhs3 = similar(system_solver.sol3)
 
-    (A, G, b, h, c) = (model.A, model.G, model.b, model.h, model.c)
-    # TODO remove
-    A = sparse(A)
-    G = sparse(G)
-    dropzeros!(A)
-    dropzeros!(G)
+    # form sparse LHS without Hessians and inverse Hessians in z/z block
+    pert = T(system_solver.fact_cache.diag_pert) # TODO not happy with where this is stored
+    lhs3 = T[
+        sparse(pert*I,n,n)  spzeros(T,n,p)       spzeros(T,n,q);
+        model.A             sparse(-pert*I,p,p)  spzeros(T,p,q);
+        model.G             spzeros(T,q,p)       sparse(-one(T)*I,q,q);
+        ]
+    @assert issparse(lhs3)
+    dropzeros!(lhs3)
+    (Is, Js, Vs) = findnz(lhs3)
 
-    # count the number of nonzeros we will have in the lhs
-    hess_nnzs = sum(Cones.hess_nnzs(cone_k, true) for cone_k in model.cones)
-    nnzs = nnz(A) + nnz(G) + hess_nnzs
-    # optionally perturb zeros on the diagonal
-    diag_pert = !isnan(system_solver.fact_cache.diag_pert)
-    if diag_pert
-        nnzs += n + p
-    end
-
-    IT = system_solver.fact_cache.int_type
-    Is = Vector{IT}(undef, nnzs)
-    Js = Vector{IT}(undef, nnzs)
-    Vs = Vector{Float64}(undef, nnzs)
-
-    if diag_pert
-        Is[1:(n + p)] .= 1:(n + p)
-        Js[1:(n + p)] .= 1:(n + p)
-        Vs[1:(n + p)] .= system_solver.fact_cache.diag_pert
-        # count of nonzeros added so far
-        offset = n + p + 1
-    else
-        offset = 1
-    end
-    # update I, J, V while adding A and G blocks to the lhs
-    offset = add_I_J_V(offset, Is, Js, Vs, n, 0, A, false)
-    offset = add_I_J_V(offset, Is, Js, Vs, n + p, 0, G, false)
-    nz_rows_added = 0
-    @timeit solver.timer "setup_hess_lhs" for (k, cone_k) in enumerate(model.cones)
-        cone_dim = Cones.dimension(cone_k)
-        rows = n + p + nz_rows_added
-        offset = add_I_J_V(offset, Is, Js, Vs, rows, rows, cone_k, !Cones.use_dual(cone_k), true)
-        nz_rows_added += cone_dim
-    end
-
-    @assert offset == nnzs + 1
-    dim = n + p + q
-    # NOTE only lower block-triangle was constructed
-    @timeit solver.timer "build_sparse" system_solver.lhs3 = sparse(Is, Js, Vs, IT(dim), IT(dim))
-    lhs3 = system_solver.lhs3
-
-    # cache indices of placeholders of Hessians
-    system_solver.hess_idxs = [Vector{UnitRange}(undef, Cones.dimension(cone_k)) for cone_k in model.cones]
-    row = col = n + p + 1
-    for (k, cone_k) in enumerate(model.cones)
-        cone_dim = Cones.dimension(cone_k)
-        for j in 1:cone_dim
-            # get list of nonzero rows in the current column of the LHS
-            col_idx_start = lhs3.colptr[col]
-            col_idx_end = lhs3.colptr[col + 1] - 1
-            nz_rows = lhs3.rowval[col_idx_start:col_idx_end]
-            # nonzero rows in column j of the hessian
-            nz_hess_indices = Cones.hess_nz_idxs_j(cone_k, j, true)
-            # index corresponding to first nonzero Hessian element of the current column of the LHS
-            offset_in_row = findfirst(x -> x == row + nz_hess_indices[1] - 1, nz_rows)
-            # indices of nonzero values for cone k column j
-            system_solver.hess_idxs[k][j] = col_idx_start + offset_in_row - nz_hess_indices[1] .+ nz_hess_indices .- 1
-            # move to the next column
-            col += 1
+    # add I, J, V for Hessians and inverse Hessians
+    hess_nnzs = sum(Cones.hess_nnzs(cone_k, true) for cone_k in cones)
+    H_Is = Vector{Int32}(undef, hess_nnzs)
+    H_Js = Vector{Int32}(undef, hess_nnzs)
+    H_Vs = Vector{Float64}(undef, hess_nnzs)
+    offset = 1
+    y_start = n + p - 1
+    for (k, cone_k) in enumerate(cones)
+        cone_idxs_k = cone_idxs[k]
+        z_start_k = y_start + first(cone_idxs_k)
+        for j in 1:Cones.dimension(cone_k)
+            nz_rows_kj = z_start_k .+ (Cones.use_dual(cone_k) ? Cones.hess_nz_idxs_j(cone_k, j, true) : Cones.inv_hess_nz_idxs_j(cone_k, j, true))
+            len_kj = length(nz_rows_kj)
+            IJV_idxs = offset:(offset + len_kj - 1)
+            offset += len_kj
+            @. H_Is[IJV_idxs] = nz_rows_kj
+            @. H_Js[IJV_idxs] = z_start_k + j
+            @. H_Vs[IJV_idxs] = one(Float64)
         end
-        row += cone_dim
+    end
+    @assert offset == hess_nnzs + 1
+    append!(Is, H_Is)
+    append!(Js, H_Js)
+    append!(Vs, H_Vs)
+    dim32 = Int32(size(lhs3, 1))
+    lhs3 = system_solver.lhs3 = sparse(Is, Js, Vs, dim32, dim32)
+
+    # cache indices of nonzeros of Hessians and inverse Hessians in sparse LHS nonzeros vector
+    system_solver.hess_idxs = [Vector{UnitRange}(undef, Cones.dimension(cone_k)) for cone_k in cones]
+    for (k, cone_k) in enumerate(cones)
+        cone_idxs_k = cone_idxs[k]
+        z_start_k = y_start + first(cone_idxs_k)
+        for j in 1:Cones.dimension(cone_k)
+            col = z_start_k + j
+            # get nonzero rows in the current column of the LHS
+            col_idx_start = lhs3.colptr[col]
+            nz_rows = lhs3.rowval[col_idx_start:(lhs3.colptr[col + 1] - 1)]
+            # get nonzero rows in column j of the Hessian or inverse Hessian
+            nz_hess_indices = (Cones.use_dual(cone_k) ? Cones.hess_nz_idxs_j(cone_k, j, true) : Cones.inv_hess_nz_idxs_j(cone_k, j, true))
+            # get index corresponding to first nonzero Hessian element of the current column of the LHS
+            first_H = findfirst(isequal(z_start_k + first(nz_hess_indices)), nz_rows)
+            # indices of nonzero values for cone k column j
+            system_solver.hess_idxs[k][j] = (col_idx_start + first_H - first(nz_hess_indices) - 1) .+ nz_hess_indices
+        end
     end
 
     return system_solver
@@ -225,10 +216,10 @@ end
 
 function update_fact(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
     for (k, cone_k) in enumerate(solver.model.cones)
-        @timeit solver.timer "update_hess" H = (Cones.use_dual(cone_k) ? -Cones.hess(cone_k) : -Cones.inv_hess(cone_k))
+        H = (Cones.use_dual(cone_k) ? Cones.hess(cone_k) : Cones.inv_hess(cone_k))
         for j in 1:Cones.dimension(cone_k)
             nz_rows = Cones.hess_nz_idxs_j(cone_k, j, true)
-            @views copyto!(system_solver.lhs3.nzval[system_solver.hess_idxs[k][j]], H[nz_rows, j])
+            @. @views system_solver.lhs3.nzval[system_solver.hess_idxs[k][j]] = -H[nz_rows, j]
         end
     end
 
