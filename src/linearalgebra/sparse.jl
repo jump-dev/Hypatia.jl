@@ -10,7 +10,7 @@ TODO handle conditional dependencies / glue code, see https://github.com/JuliaLa
 ENV["OMP_NUM_THREADS"] = length(Sys.cpu_info())
 
 import SparseArrays.SparseMatrixCSC
-import Pardiso # TODO make optional
+# import Pardiso # TODO make optional
 import SuiteSparse
 
 using TimerOutputs
@@ -23,12 +23,12 @@ abstract type SparseNonSymCache{T <: Real} end
 
 mutable struct PardisoNonSymCache{T <: Real} <: SparseNonSymCache{T}
     analyzed::Bool
-    pardiso::Pardiso.PardisoSolver
+    # pardiso::Pardiso.PardisoSolver
     function PardisoNonSymCache{Float64}()
         cache = new{Float64}()
         cache.analyzed = false
-        cache.pardiso = Pardiso.PardisoSolver()
-        Pardiso.set_matrixtype!(cache.pardiso, Pardiso.REAL_NONSYM) # tell Pardiso the matrix is nonsymmetric
+        # cache.pardiso = Pardiso.PardisoSolver()
+        # Pardiso.set_matrixtype!(cache.pardiso, Pardiso.REAL_NONSYM) # tell Pardiso the matrix is nonsymmetric
         return cache
     end
 end
@@ -80,14 +80,14 @@ abstract type SparseSymCache{T <: Real} end
 
 mutable struct PardisoSymCache{T <: Real} <: SparseSymCache{T}
     analyzed::Bool
-    pardiso::Pardiso.PardisoSolver
+    # pardiso::Pardiso.PardisoSolver
     diag_pert::Float64
     int_type::Type{Int32}
     function PardisoSymCache{Float64}(; diag_pert = NaN)
         cache = new{Float64}()
         cache.analyzed = false
-        cache.pardiso = Pardiso.PardisoSolver()
-        Pardiso.set_matrixtype!(cache.pardiso, Pardiso.REAL_SYM_INDEF) # tell Pardiso the matrix is symmetric indefinite
+        # cache.pardiso = Pardiso.PardisoSolver()
+        # Pardiso.set_matrixtype!(cache.pardiso, Pardiso.REAL_SYM_INDEF) # tell Pardiso the matrix is symmetric indefinite
         cache.diag_pert = diag_pert
         cache.int_type = Int32
         return cache
@@ -152,42 +152,42 @@ PardisoSparseCache = Union{PardisoSymCache{Float64}, PardisoNonSymCache{Float64}
 SuiteSparseSparseCache = Union{UMFPACKNonSymCache{Float64}, CHOLMODSymCache{Float64}}
 
 function update_sparse_fact(cache::PardisoSparseCache, A::SparseMatrixCSC{Float64, Int32})
-    pardiso = cache.pardiso
-
-    if !cache.analyzed
-        Pardiso.pardisoinit(pardiso)
-        # don't ignore other iparms
-        Pardiso.set_iparm!(pardiso, 1, 1)
-        # solve transposed problem (Pardiso accepts CSR matrices)
-        Pardiso.set_iparm!(pardiso, 12, 1)
-        # perturbation for small pivots (default 8 for symmetric, 13 for nonsymmetric)
-        if Pardiso.get_matrixtype(pardiso) == Pardiso.REAL_SYM_INDEF
-            Pardiso.set_iparm!(pardiso, 10, 8)
-        end
-        # maximum number of iterative refinement steps (default = 2)
-        Pardiso.set_iparm!(pardiso, 8, 2)
-        Pardiso.set_phase!(pardiso, Pardiso.ANALYSIS)
-        Pardiso.pardiso(pardiso, A, Float64[])
-        cache.analyzed = true
-    end
-
-    Pardiso.set_phase!(pardiso, Pardiso.NUM_FACT)
-    Pardiso.pardiso(pardiso, A, Float64[])
+    # pardiso = cache.pardiso
+    #
+    # if !cache.analyzed
+    #     Pardiso.pardisoinit(pardiso)
+    #     # don't ignore other iparms
+    #     Pardiso.set_iparm!(pardiso, 1, 1)
+    #     # solve transposed problem (Pardiso accepts CSR matrices)
+    #     Pardiso.set_iparm!(pardiso, 12, 1)
+    #     # perturbation for small pivots (default 8 for symmetric, 13 for nonsymmetric)
+    #     if Pardiso.get_matrixtype(pardiso) == Pardiso.REAL_SYM_INDEF
+    #         Pardiso.set_iparm!(pardiso, 10, 8)
+    #     end
+    #     # maximum number of iterative refinement steps (default = 2)
+    #     Pardiso.set_iparm!(pardiso, 8, 2)
+    #     Pardiso.set_phase!(pardiso, Pardiso.ANALYSIS)
+    #     Pardiso.pardiso(pardiso, A, Float64[])
+    #     cache.analyzed = true
+    # end
+    #
+    # Pardiso.set_phase!(pardiso, Pardiso.NUM_FACT)
+    # Pardiso.pardiso(pardiso, A, Float64[])
 
     return
 end
 
 function solve_sparse_system(cache::PardisoSparseCache, x::Matrix{Float64}, A::SparseMatrixCSC{Float64, Int32}, b::Matrix{Float64})
-    pardiso = cache.pardiso
-
-    Pardiso.set_phase!(pardiso, Pardiso.SOLVE_ITERATIVE_REFINE)
-    @timeit "pardiso" Pardiso.pardiso(pardiso, x, A, b)
+    # pardiso = cache.pardiso
+    #
+    # Pardiso.set_phase!(pardiso, Pardiso.SOLVE_ITERATIVE_REFINE)
+    # @timeit "pardiso" Pardiso.pardiso(pardiso, x, A, b)
     return x
 end
 
 function free_memory(cache::PardisoSparseCache)
-    Pardiso.set_phase!(cache.pardiso, Pardiso.RELEASE_ALL)
-    Pardiso.pardiso(cache.pardiso)
+    # Pardiso.set_phase!(cache.pardiso, Pardiso.RELEASE_ALL)
+    # Pardiso.pardiso(cache.pardiso)
     return
 end
 free_memory(::SuiteSparseSparseCache) = nothing
