@@ -64,7 +64,7 @@ mutable struct CHOLMODSymCache{T <: Real} <: SparseSymCache{T}
     cholmod::SuiteSparse.CHOLMOD.Factor
     diag_pert::Float64
     int_type::Type{<: Integer}
-    function CHOLMODSymCache{Float64}(; diag_pert = NaN)
+    function CHOLMODSymCache{Float64}(; diag_pert = sqrt(eps(Float64)))
         cache = new{Float64}()
         cache.analyzed = false
         cache.diag_pert = diag_pert

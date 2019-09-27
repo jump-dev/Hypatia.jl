@@ -9,7 +9,7 @@ eliminate s
 so if using primal barrier
 z_k + mu*H_k*s_k = srhs_k --> s_k = (mu*H_k)\(srhs_k - z_k)
 -->
--G_k*x + (mu*H_k)\z_k + h_k*tau = zrhs_k + (mu*H_k)\srhs_k
+-G_k*x + (mu*H_k)\z_k + h_k*tau = zrhs_k + (mu*H_k)\srhs_k (if use_inv_hess = true)
 -->
 -mu*H_k*G_k*x + z_k + mu*H_k*h_k*tau = mu*H_k*zrhs_k + srhs_k (if use_inv_hess = false)
 or if using dual barrier
@@ -255,6 +255,7 @@ function update_fact(system_solver::NaiveElimDenseSystemSolver{T}, solver::Solve
             # -G_k*x + mu*H_k*z_k + h_k*tau = zrhs_k + srhs_k
             lhs4[z_rows_k, z_rows_k] .= Cones.hess(cone_k)
         elseif system_solver.use_inv_hess
+            # -G_k*x + (mu*H_k)\z_k + h_k*tau = zrhs_k + (mu*H_k)\srhs_k
             lhs4[z_rows_k, z_rows_k] .= Cones.inv_hess(cone_k)
         else
             # -mu*H_k*G_k*x + z_k + mu*H_k*h_k*tau = mu*H_k*zrhs_k + srhs_k
