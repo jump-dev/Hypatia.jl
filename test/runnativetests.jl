@@ -13,14 +13,14 @@ real_types = [
     ]
 
 system_solvers = [
-    SO.QRCholDenseSystemSolver,
-    SO.SymIndefDenseSystemSolver,
-    SO.SymIndefSparseSystemSolver,
-    SO.NaiveElimDenseSystemSolver,
-    SO.NaiveElimSparseSystemSolver,
-    SO.NaiveDenseSystemSolver,
+    # SO.QRCholDenseSystemSolver,
+    # SO.SymIndefDenseSystemSolver,
+    # SO.SymIndefSparseSystemSolver,
+    # SO.NaiveElimDenseSystemSolver,
+    # SO.NaiveElimSparseSystemSolver,
+    # SO.NaiveDenseSystemSolver,
     SO.NaiveSparseSystemSolver,
-    SO.NaiveIndirectSystemSolver,
+    # SO.NaiveIndirectSystemSolver,
     ]
 
 cache_dict = Dict(
@@ -34,7 +34,7 @@ cache_dict = Dict(
     SO.NaiveDenseSystemSolver => [nothing],
     SO.NaiveSparseSystemSolver => [
         Hypatia.UMFPACKNonSymCache(),
-        Hypatia.PardisoNonSymCache(),
+        # Hypatia.PardisoNonSymCache(),
         ],
     SO.NaiveElimDenseSystemSolver => [nothing],
     SO.NaiveElimSparseSystemSolver => [
@@ -124,7 +124,7 @@ testfuns_raw = [
     dualinfeas3,
     ]
 
-tol = 1e-8
+tol = 1e-8 # TODO delete later
 
 @info("starting native tests")
 @testset "native tests" begin
@@ -143,7 +143,7 @@ tol = 1e-8
         options = options_dict[s]
         @testset "$ci, $oi" for (ci, c) in enumerate(caches), (oi, o) in enumerate(options)
             system_solver = (c === nothing ? system_solver = s{T}(; o...) : system_solver = s{T}(; fact_cache = c, o...))
-            solver = SO.Solver{T}(verbose = false, preprocess = p, use_infty_nbhd = n,
+            solver = SO.Solver{T}(verbose = true, preprocess = p, use_infty_nbhd = n,
                 system_solver = system_solver, tol_abs_opt = tol, tol_rel_opt = tol, tol_feas = tol)
             t(T, solver = solver)
         end

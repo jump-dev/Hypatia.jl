@@ -38,12 +38,12 @@ function load(system_solver::NaiveIndirectSystemSolver{T}, solver::Solver{T}) wh
     dim = tau_row + q + 1
 
     # setup block LHS
-    rc1 = 1:n
-    rc2 = n .+ (1:p)
-    rc3 = (n + p) .+ (1:q)
-    rc4 = tau_row:tau_row
-    rc5 = tau_row .+ (1:q)
-    rc6 = dim:dim
+    x_idxs = 1:n
+    y_idxs = n .+ (1:p)
+    z_idxs = (n + p) .+ (1:q)
+    tau_idxs = tau_row:tau_row
+    s_idxs = tau_row .+ (1:q)
+    kap_idxs = dim:dim
 
     k_len = 2 * length(cones)
     cone_rows = Vector{UnitRange{Int}}(undef, k_len)
@@ -74,17 +74,17 @@ function load(system_solver::NaiveIndirectSystemSolver{T}, solver::Solver{T}) wh
             -model.c', -model.b', -model.h', -ones(T, 1, 1),
             solver, ones(T, 1, 1)],
         [cone_rows...,
-            rc1, rc1, rc1,
-            rc2, rc2,
-            rc3, rc3, rc3,
-            rc4, rc4, rc4, rc4,
-            rc6, rc6],
+            x_idxs, x_idxs, x_idxs,
+            y_idxs, y_idxs,
+            z_idxs, z_idxs, z_idxs,
+            tau_idxs, tau_idxs, tau_idxs, tau_idxs,
+            kap_idxs, kap_idxs],
         [cone_cols...,
-            rc2, rc3, rc4,
-            rc1, rc4,
-            rc1, rc4, rc5,
-            rc1, rc2, rc3, rc6,
-            rc4, rc6],
+            y_idxs, z_idxs, tau_idxs,
+            x_idxs, tau_idxs,
+            x_idxs, tau_idxs, s_idxs,
+            x_idxs, y_idxs, z_idxs, kap_idxs,
+            tau_idxs, kap_idxs],
         )
 
     return system_solver
@@ -123,102 +123,84 @@ function load(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) wher
     system_solver.fact_cache.analyzed = false
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
+    tau_row = n + p + q + 1
     cones = model.cones
+    cone_idxs = model.cone_idxs
 
-    model.A = sparse(model.A)
-    model.G = sparse(model.G)
-    dropzeros!(model.A)
-    dropzeros!(model.G)
-
-    # count the number of nonzeros we will have in the lhs
-    hess_nnzs = sum(Cones.dimension(cone_k) + Cones.hess_nnzs(cone_k, false) for cone_k in cones)
-    nnzs = 2 * (nnz(model.A) + nnz(model.G) + n + p + q + 1) + q + 1 + hess_nnzs
-    Is = Vector{Int32}(undef, nnzs)
-    Js = Vector{Int32}(undef, nnzs)
-    Vs = Vector{Float64}(undef, nnzs)
-
-    # compute the starting rows/columns for each known block in the lhs
-    rc1 = 0
-    rc2 = n
-    rc3 = n + p
-    rc4 = n + p + q
-    rc5 = n + p + q + 1
-    rc6 = n + p + 2q + 1
-
-    # count of nonzeros added so far
-    offset = 1
-    offset = add_I_J_V(offset, Is, Js, Vs, rc1, rc4, model.c, false)
-    offset = add_I_J_V(offset, Is, Js, Vs, rc2, rc4, model.b, false)
-    offset = add_I_J_V(offset, Is, Js, Vs, rc3, rc4, model.h, false)
-    offset = add_I_J_V(offset, Is, Js, Vs, rc4, rc1, -model.c, true)
-    offset = add_I_J_V(offset, Is, Js, Vs, rc4, rc2, -model.b, true)
-    offset = add_I_J_V(offset, Is, Js, Vs, rc4, rc3, -model.h, true)
-    offset = add_I_J_V(offset, Is, Js, Vs, rc4, rc6, [-1.0], false)
-    offset = add_I_J_V(offset, Is, Js, Vs, rc6, rc4, [1.0], false)
-    offset = add_I_J_V(offset, Is, Js, Vs, rc6, rc6, [1.0], false)
-    offset = add_I_J_V(offset, Is, Js, Vs, rc1, rc2, model.A, true)
-    offset = add_I_J_V(offset, Is, Js, Vs, rc1, rc3, model.G, true)
-    offset = add_I_J_V(offset, Is, Js, Vs, rc2, rc1, -model.A, false)
-    offset = add_I_J_V(offset, Is, Js, Vs, rc3, rc1, -model.G, false)
-    offset = add_I_J_V(offset, Is, Js, Vs, rc3, rc5, sparse(-I, q, q), false)
+    # form sparse LHS with s row zeroed-out
+    lhs6 = T[
+        spzeros(T,n,n)  model.A'        model.G'              model.c       spzeros(T,n,q)         spzeros(T,n);
+        -model.A        spzeros(T,p,p)  spzeros(T,p,q)        model.b       spzeros(T,p,q)         spzeros(T,p);
+        -model.G        spzeros(T,q,p)  spzeros(T,q,q)        model.h       sparse(-one(T)*I,q,q)  spzeros(T,q);
+        -model.c'       -model.b'       -model.h'             zero(T)       spzeros(T,1,q)         -one(T);
+        spzeros(T,q,n)  spzeros(T,q,p)  sparse(one(T)*I,q,q)  spzeros(T,q)  sparse(one(T)*I,q,q)   spzeros(T,q);
+        spzeros(T,1,n)  spzeros(T,1,p)  spzeros(T,1,q)        one(T)        spzeros(T,1,q)         one(T);
+        ]
+    @assert issparse(lhs6)
+    dropzeros!(lhs6)
+    (Is, Js, Vs) = findnz(lhs6)
 
     # add I, J, V for Hessians
-    nz_rows_added = 0
-    @timeit solver.timer "setup_hess_lhs" for (k, cone_k) in enumerate(cones)
-        cone_dim = Cones.dimension(cone_k)
-        rows = rc5 + nz_rows_added
-        dual_cols = rc3 + nz_rows_added
-        is_dual = Cones.use_dual(cone_k)
-        # add each Hessian's sparsity pattern in one placeholder block, an identity in the other
-        H_cols = (is_dual ? dual_cols : rows)
-        id_cols = (is_dual ? rows : dual_cols)
-        offset = add_I_J_V(offset, Is, Js, Vs, rows, H_cols, cone_k, false, false)
-        offset = add_I_J_V(offset, Is, Js, Vs, rows, id_cols, sparse(I, cone_dim, cone_dim), false)
-        nz_rows_added += cone_dim
-    end
-    @assert offset == nnzs + 1
-
-    dim32 = Int32(n + p + 2q + 2)
-    @timeit solver.timer "build_sparse" system_solver.lhs6 = sparse(Is, Js, Vs, dim32, dim32)
-    lhs6 = system_solver.lhs6
-
-    # cache indices of placeholders of Hessians
-    system_solver.hess_idxs = [Vector{UnitRange}(undef, Cones.dimension(cone_k)) for cone_k in cones]
-    row = rc5 + 1
-    col_offset = 1
+    hess_nnzs = sum(Cones.hess_nnzs(cone_k, false) for cone_k in cones)
+    H_Is = Vector{Int32}(undef, hess_nnzs)
+    H_Js = Vector{Int32}(undef, hess_nnzs)
+    H_Vs = Vector{Float64}(undef, hess_nnzs)
+    offset = 1
     for (k, cone_k) in enumerate(cones)
-        cone_dim = Cones.dimension(cone_k)
-        init_col = (Cones.use_dual(cone_k) ? rc3 : rc5)
-        for j in 1:cone_dim
-            col = init_col + col_offset
-            # get list of nonzero rows in the current column of the LHS
-            col_idx_start = lhs6.colptr[col]
-            col_idx_end = lhs6.colptr[col + 1] - 1
-            nz_rows = lhs6.rowval[col_idx_start:col_idx_end]
-            # nonzero rows in column j of the hessian
-            nz_hess_indices = Cones.hess_nz_idxs_j(cone_k, j, false)
-            # index corresponding to first nonzero Hessian element of the current column of the LHS
-            offset_in_row = findfirst(x -> x == row + nz_hess_indices[1] - 1, nz_rows)
-            # indices of nonzero values for cone k column j
-            system_solver.hess_idxs[k][j] = col_idx_start + offset_in_row - nz_hess_indices[1] .+ nz_hess_indices .- 1
-            # move to the next column
-            col_offset += 1
+        cone_idxs_k = cone_idxs[k]
+        z_start_k = n + p + first(cone_idxs_k) - 1
+        s_start_k = tau_row + first(cone_idxs_k) - 1
+        H_start_k = Cones.use_dual(cone_k) ? z_start_k : s_start_k
+        for j in 1:Cones.dimension(cone_k)
+            nz_rows_kj = s_start_k .+ Cones.hess_nz_idxs_j(cone_k, j, false)
+            len_kj = length(nz_rows_kj)
+            IJV_idxs = offset:(offset + len_kj - 1)
+            offset += len_kj
+            @. H_Is[IJV_idxs] = nz_rows_kj
+            @. H_Js[IJV_idxs] = H_start_k + j
+            @. H_Vs[IJV_idxs] = one(Float64)
         end
-        row += cone_dim
+    end
+    @assert offset == hess_nnzs + 1
+    append!(Is, H_Is)
+    append!(Js, H_Js)
+    append!(Vs, H_Vs)
+    dim32 = Int32(tau_row + q + 1)
+    lhs6 = system_solver.lhs6 = sparse(Is, Js, Vs, dim32, dim32)
+
+    # cache indices of nonzeros of Hessians in sparse LHS nonzeros vector
+    system_solver.hess_idxs = [Vector{UnitRange}(undef, Cones.dimension(cone_k)) for cone_k in cones]
+    for (k, cone_k) in enumerate(cones)
+        cone_idxs_k = cone_idxs[k]
+        z_start_k = n + p + first(cone_idxs_k) - 1
+        s_start_k = tau_row + first(cone_idxs_k) - 1
+        H_start_k = Cones.use_dual(cone_k) ? z_start_k : s_start_k
+        for j in 1:Cones.dimension(cone_k)
+            col = H_start_k + j
+            # get nonzero rows in the current column of the LHS
+            col_idx_start = lhs6.colptr[col]
+            nz_rows = lhs6.rowval[col_idx_start:(lhs6.colptr[col + 1] - 1)]
+            # get nonzero rows in column j of the hessian
+            nz_hess_indices = Cones.hess_nz_idxs_j(cone_k, j, false)
+            # get index corresponding to first nonzero Hessian element of the current column of the LHS
+            first_H = findfirst(isequal(s_start_k + first(nz_hess_indices)), nz_rows)
+            # indices of nonzero values for cone k column j
+            system_solver.hess_idxs[k][j] = (col_idx_start + first_H - first(nz_hess_indices) - 1) .+ nz_hess_indices
+        end
     end
 
     # get mtt index
-    system_solver.mtt_idx = lhs6.colptr[rc4 + 2] - 1
+    system_solver.mtt_idx = lhs6.colptr[tau_row + 1] - 1
 
     return system_solver
 end
 
 function update_fact(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
     for (k, cone_k) in enumerate(solver.model.cones)
-        @timeit solver.timer "update_hess" Cones.update_hess(cone_k)
+        H = Cones.hess(cone_k)
         for j in 1:Cones.dimension(cone_k)
             nz_rows = Cones.hess_nz_idxs_j(cone_k, j, false)
-            @views copyto!(system_solver.lhs6.nzval[system_solver.hess_idxs[k][j]], cone_k.hess[nz_rows, j])
+            @views copyto!(system_solver.lhs6.nzval[system_solver.hess_idxs[k][j]], H[nz_rows, j])
         end
     end
     system_solver.lhs6.nzval[system_solver.mtt_idx] = solver.mu / solver.tau / solver.tau

@@ -86,6 +86,89 @@ end
 direct sparse
 =#
 
+
+
+# TODO delete - no longer needed
+
+# helpers for sparse linear system solvers
+function add_I_J_V(
+    offset::Int,
+    Is::Vector{<:Integer},
+    Js::Vector{<:Integer},
+    Vs::Vector{Float64},
+    start_row::Int,
+    start_col::Int,
+    vec::Vector{Float64},
+    trans::Bool,
+    )
+    n = length(vec)
+    idxs = offset:(offset + n - 1)
+    if !isempty(vec)
+        if trans
+            @. Is[idxs] = start_row + 1
+            @. Js[idxs] = (start_col + 1):(start_col + n)
+        else
+            @. Is[idxs] = (start_row + 1):(start_row + n)
+            @. Js[idxs] = start_col + 1
+        end
+        @. Vs[idxs] = vec
+    end
+    return offset + n
+end
+
+function add_I_J_V(
+    offset::Int,
+    Is::Vector{<:Integer},
+    Js::Vector{<:Integer},
+    Vs::Vector{Float64},
+    start_row::Int,
+    start_col::Int,
+    mat::SparseMatrixCSC,
+    trans::Bool,
+    )
+    for j in 1:size(mat, 2)
+        col_idxs = mat.colptr[j]:(mat.colptr[j + 1] - 1)
+        rows = view(mat.rowval, col_idxs)
+        m = length(rows)
+        idxs = offset:(offset + m - 1)
+        if trans
+            @. Is[idxs] = start_row + j
+            @. Js[idxs] = start_col + rows
+        else
+            @. Is[idxs] = start_row + rows
+            @. Js[idxs] = start_col + j
+        end
+        Vs[idxs] .= view(mat.nzval, col_idxs)
+        offset += m
+    end
+    return offset
+end
+
+function add_I_J_V(
+    offset::Int,
+    Is::Vector{<:Integer},
+    Js::Vector{<:Integer},
+    Vs::Vector{Float64},
+    start_row::Int,
+    start_col::Int,
+    cone::Cones.Cone,
+    use_inv::Bool,
+    lower_only::Bool = false,
+    )
+    for j in 1:Cones.dimension(cone)
+        nz_rows = (use_inv ? Cones.inv_hess_nz_idxs_j(cone, j, lower_only) : Cones.hess_nz_idxs_j(cone, j, lower_only))
+        n = length(nz_rows)
+        idxs = offset:(offset + n - 1)
+        @. Is[idxs] = start_row + nz_rows
+        @. Js[idxs] = j + start_col
+        @. Vs[idxs] = 1
+        offset += n
+    end
+    return offset
+end
+
+
+
 mutable struct NaiveElimSparseSystemSolver{T <: Real} <: NaiveElimSystemSolver{T}
     use_inv_hess::Bool
     tau_row::Int
