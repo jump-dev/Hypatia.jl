@@ -15,11 +15,11 @@ real_types = [
 system_solvers = [
     # SO.QRCholDenseSystemSolver,
     # SO.SymIndefDenseSystemSolver,
-    # SO.SymIndefSparseSystemSolver,
+    SO.SymIndefSparseSystemSolver,
     # SO.NaiveElimDenseSystemSolver,
     # SO.NaiveElimSparseSystemSolver,
     # SO.NaiveDenseSystemSolver,
-    SO.NaiveSparseSystemSolver,
+    # SO.NaiveSparseSystemSolver,
     # SO.NaiveIndirectSystemSolver,
     ]
 
@@ -28,8 +28,8 @@ cache_dict = Dict(
     SO.SymIndefDenseSystemSolver => [nothing],
     SO.SymIndefSparseSystemSolver => [
         Hypatia.CHOLMODSymCache{Float64}(diag_pert = sqrt(eps())),
-        Hypatia.PardisoSymCache(diag_pert = 0.0),
-        Hypatia.PardisoSymCache(diag_pert = sqrt(eps())),
+        # Hypatia.PardisoSymCache(diag_pert = 0.0),
+        # Hypatia.PardisoSymCache(diag_pert = sqrt(eps())),
         ],
     SO.NaiveDenseSystemSolver => [nothing],
     SO.NaiveSparseSystemSolver => [

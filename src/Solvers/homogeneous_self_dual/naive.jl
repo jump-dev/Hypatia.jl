@@ -127,7 +127,7 @@ function load(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) wher
     cones = model.cones
     cone_idxs = model.cone_idxs
 
-    # form sparse LHS with s row zeroed-out
+    # form sparse LHS without Hessians in s row
     lhs6 = T[
         spzeros(T,n,n)  model.A'        model.G'              model.c       spzeros(T,n,q)         spzeros(T,n);
         -model.A        spzeros(T,p,p)  spzeros(T,p,q)        model.b       spzeros(T,p,q)         spzeros(T,p);
@@ -165,7 +165,7 @@ function load(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) wher
     append!(Is, H_Is)
     append!(Js, H_Js)
     append!(Vs, H_Vs)
-    dim32 = Int32(tau_row + q + 1)
+    dim32 = Int32(size(lhs6, 1))
     lhs6 = system_solver.lhs6 = sparse(Is, Js, Vs, dim32, dim32)
 
     # cache indices of nonzeros of Hessians in sparse LHS nonzeros vector
@@ -180,7 +180,7 @@ function load(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) wher
             # get nonzero rows in the current column of the LHS
             col_idx_start = lhs6.colptr[col]
             nz_rows = lhs6.rowval[col_idx_start:(lhs6.colptr[col + 1] - 1)]
-            # get nonzero rows in column j of the hessian
+            # get nonzero rows in column j of the Hessian
             nz_hess_indices = Cones.hess_nz_idxs_j(cone_k, j, false)
             # get index corresponding to first nonzero Hessian element of the current column of the LHS
             first_H = findfirst(isequal(s_start_k + first(nz_hess_indices)), nz_rows)
@@ -189,7 +189,7 @@ function load(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) wher
         end
     end
 
-    # get mtt index
+    # get mu/tau/tau index
     system_solver.mtt_idx = lhs6.colptr[tau_row + 1] - 1
 
     return system_solver
