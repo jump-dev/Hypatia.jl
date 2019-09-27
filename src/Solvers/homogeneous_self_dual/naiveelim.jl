@@ -132,7 +132,7 @@ function load(system_solver::NaiveElimSparseSystemSolver{T}, solver::Solver{T}) 
     (Is, Js, Vs) = findnz(lhs4)
 
     # add I, J, V for Hessians and inverse Hessians
-    hess_nnzs = sum(Cones.hess_nnzs(cone_k, false) for cone_k in cones)
+    hess_nnzs = isempty(cones) ? 0 : sum(Cones.hess_nnzs(cone_k, false) for cone_k in cones)
     H_Is = Vector{Int32}(undef, hess_nnzs)
     H_Js = Vector{Int32}(undef, hess_nnzs)
     H_Vs = Vector{Float64}(undef, hess_nnzs)
