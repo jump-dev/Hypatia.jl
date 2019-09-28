@@ -50,14 +50,6 @@ hess(cone::Cone) = (cone.hess_updated ? cone.hess : update_hess(cone))
 inv_hess(cone::Cone) = (cone.inv_hess_updated ? cone.inv_hess : update_inv_hess(cone))
 
 # fallbacks
-function hess_nnzs(cone::Cone, lower_only::Bool)
-    dim = dimension(cone)
-    if lower_only
-        return div(dim * (dim + 1), 2)
-    else
-        return abs2(dim)
-    end
-end
 
 # the row indices of nonzero elements in column j
 hess_nz_idxs_j(cone::Cone, j::Int, lower_only::Bool) = (lower_only ? (j:cone.dim) : (1:cone.dim))
