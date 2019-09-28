@@ -107,7 +107,7 @@ direct sparse
 
 mutable struct NaiveSparseSystemSolver{T <: Real} <: NaiveSystemSolver{T}
     lhs6::SparseMatrixCSC # TODO inttype
-    hess_idxs::Vector{Vector{UnitRange}}
+    hess_idxs
     fact_cache::SparseNonSymCache{T}
     mtt_idx::Int
     function NaiveSparseSystemSolver{Float64}(;
@@ -143,10 +143,7 @@ function load(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) wher
     IType = int_type(system_solver.fact_cache)
 
     # add I, J, V for Hessians
-    hess_nnzs = 0
-    for cone_k in cones, j in 1:Cones.dimension(cone_k)
-        hess_nnzs += Cones.use_dual(cone_k) ? length(Cones.hess_nz_idxs_j(cone_k, j, false)) : length(Cones.inv_hess_nz_idxs_j(cone_k, j, false))
-    end
+    hess_nnzs = sum(Cones.hess_nnzs(cone_k, false) for cone_k in cones)
     H_Is = Vector{IType}(undef, hess_nnzs)
     H_Js = Vector{IType}(undef, hess_nnzs)
     H_Vs = Vector{Float64}(undef, hess_nnzs)
@@ -177,7 +174,7 @@ function load(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) wher
     lhs6 = system_solver.lhs6 = sparse(Is, Js, Vs, dim, dim)
 
     # cache indices of nonzeros of Hessians in sparse LHS nonzeros vector
-    system_solver.hess_idxs = [Vector{UnitRange}(undef, Cones.dimension(cone_k)) for cone_k in cones]
+    system_solver.hess_idxs = [Vector{Union{UnitRange, Vector{Int}}}(undef, Cones.dimension(cone_k)) for cone_k in cones]
     for (k, cone_k) in enumerate(cones)
         cone_idxs_k = cone_idxs[k]
         z_start_k = n + p + first(cone_idxs_k) - 1
@@ -193,7 +190,7 @@ function load(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) wher
             # get index corresponding to first nonzero Hessian element of the current column of the LHS
             first_H = findfirst(isequal(s_start_k + first(nz_hess_indices)), nz_rows)
             # indices of nonzero values for cone k column j
-            system_solver.hess_idxs[k][j] = (col_idx_start + first_H - first(nz_hess_indices) - 1) .+ nz_hess_indices
+            system_solver.hess_idxs[k][j] = (col_idx_start + first_H - 2) .+ (1:length(nz_hess_indices))
         end
     end
 

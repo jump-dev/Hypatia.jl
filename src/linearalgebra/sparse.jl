@@ -66,15 +66,15 @@ mutable struct CHOLMODSymCache{T <: Real} <: SparseSymCache{T}
     analyzed::Bool
     cholmod::SuiteSparse.CHOLMOD.Factor
     diag_pert::Float64
-    function CHOLMODSymCache{Float64}(; diag_pert = sqrt(eps(Float64)))
+    function CHOLMODSymCache{Float64}(; diag_pert::Float64 = sqrt(eps(Float64)))
         cache = new{Float64}()
         cache.analyzed = false
         cache.diag_pert = diag_pert
         return cache
     end
 end
-CHOLMODSymCache{T}() where {T <: Real} = error("CHOLMOD only works with real type Float64")
-CHOLMODSymCache() = CHOLMODSymCache{Float64}()
+CHOLMODSymCache{T}(; diag_pert = NaN) where {T <: Real} = error("CHOLMOD only works with real type Float64")
+CHOLMODSymCache(; diag_pert::Float64 = sqrt(eps(Float64))) = CHOLMODSymCache{Float64}(diag_pert = diag_pert)
 int_type(::CHOLMODSymCache) = SuiteSparseInt
 
 function update_sparse_fact(cache::CHOLMODSymCache, A::SparseMatrixCSC{Float64, SuiteSparseInt})

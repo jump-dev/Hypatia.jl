@@ -25,7 +25,7 @@ mutable struct PardisoSymCache{T <: Real} <: SparseSymCache{T}
     analyzed::Bool
     pardiso::Pardiso.PardisoSolver
     diag_pert::Float64
-    function PardisoSymCache{Float64}(; diag_pert = 0)
+    function PardisoSymCache{Float64}(; diag_pert::Float64 = 0.0)
         cache = new{Float64}()
         cache.analyzed = false
         cache.pardiso = Pardiso.PardisoSolver()
@@ -34,8 +34,8 @@ mutable struct PardisoSymCache{T <: Real} <: SparseSymCache{T}
         return cache
     end
 end
-PardisoSymCache{T}() where {T <: Real} = error("Pardiso only works with real type Float64")
-PardisoSymCache(; diag_pert = sqrt(eps())) = PardisoSymCache{Float64}(diag_pert = diag_pert)
+PardisoSymCache{T}(; diag_pert = 0.0) where {T <: Real} = error("Pardiso only works with real type Float64")
+PardisoSymCache(; diag_pert = 0.0) = PardisoSymCache{Float64}(diag_pert = diag_pert)
 
 PardisoSparseCache = Union{PardisoSymCache{Float64}, PardisoNonSymCache{Float64}}
 int_type(::PardisoSparseCache) = Int32
