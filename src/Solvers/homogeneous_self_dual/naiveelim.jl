@@ -134,10 +134,7 @@ function load(system_solver::NaiveElimSparseSystemSolver{T}, solver::Solver{T}) 
     IType = int_type(system_solver.fact_cache)
 
     # add I, J, V for Hessians and inverse Hessians
-    hess_nnzs = 0
-    for cone_k in cones, j in 1:Cones.dimension(cone_k)
-        hess_nnzs += Cones.use_dual(cone_k) ? length(Cones.hess_nz_idxs_j(cone_k, j, false)) : length(Cones.inv_hess_nz_idxs_j(cone_k, j, false))
-    end
+    hess_nnzs = sum(Cones.use_dual(cone_k) ? Cones.hess_nnzs(cone_k, false) : Cones.inv_hess_nnzs(cone_k, false) for cone_k in cones)
     H_Is = Vector{IType}(undef, hess_nnzs)
     H_Js = Vector{IType}(undef, hess_nnzs)
     H_Vs = Vector{Float64}(undef, hess_nnzs)
@@ -180,7 +177,7 @@ function load(system_solver::NaiveElimSparseSystemSolver{T}, solver::Solver{T}) 
             # get index corresponding to first nonzero Hessian element of the current column of the LHS
             first_H = findfirst(isequal(z_start_k + first(nz_hess_indices)), nz_rows)
             # indices of nonzero values for cone k column j
-            system_solver.hess_idxs[k][j] = (col_idx_start + first_H - first(nz_hess_indices) - 1) .+ nz_hess_indices
+            system_solver.hess_idxs[k][j] = (col_idx_start + first_H - 2) .+ (1:length(nz_hess_indices))
         end
     end
 
@@ -191,7 +188,7 @@ function update_fact(system_solver::NaiveElimSparseSystemSolver{T}, solver::Solv
     for (k, cone_k) in enumerate(solver.model.cones)
         H = (Cones.use_dual(cone_k) ? Cones.hess(cone_k) : Cones.inv_hess(cone_k))
         for j in 1:Cones.dimension(cone_k)
-            nz_rows = Cones.hess_nz_idxs_j(cone_k, j, false)
+            nz_rows = (Cones.use_dual(cone_k) ? Cones.hess_nz_idxs_j(cone_k, j, false) : Cones.inv_hess_nz_idxs_j(cone_k, j, false))
             @views copyto!(system_solver.lhs4.nzval[system_solver.hess_idxs[k][j]], H[nz_rows, j])
         end
     end
