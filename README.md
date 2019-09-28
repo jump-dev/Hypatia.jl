@@ -2,7 +2,7 @@
 
 Under construction. Only works on Julia master.
 
-An interior point solver for general convex conic optimization problems. An extension of methods in [CVXOPT](https://github.com/cvxopt/cvxopt/blob/master/src/python/coneprog.py) and [Alfonso](https://github.com/dpapp-github/alfonso). 
+An interior point solver for general convex conic optimization problems. An extension of methods in [CVXOPT](https://github.com/cvxopt/cvxopt/blob/master/src/python/coneprog.py) and [Alfonso](https://github.com/dpapp-github/alfonso).
 
 Solves a pair of primal and dual cone programs:
 
@@ -28,4 +28,17 @@ The primal-dual optimality conditions are:
             s'z == 0
               s in K
               z in K*
+```
+
+### Example with Pardiso
+
+```julia
+import Hypatia
+const SO = Hypatia.Solvers
+include("test/native.jl")
+
+ENV["OMP_NUM_THREADS"] = length(Sys.cpu_info())
+import Pardiso
+
+orthant1(Float64, solver = SO.Solver{Float64}(system_solver = SO.NaiveElimSparseSystemSolver{Float64}(fact_cache = Hypatia.PardisoNonSymCache())))
 ```

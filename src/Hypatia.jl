@@ -11,7 +11,7 @@ using LinearAlgebra
 include("linearalgebra/blockmatrix.jl")
 include("linearalgebra/dense.jl")
 include("linearalgebra/sparse.jl")
-include("linearalgebra/Pardiso.jl")
+include("init.jl")
 
 # submodules
 include("ModelUtilities/ModelUtilities.jl")
