@@ -105,7 +105,6 @@ options = (verbose = false,)
     @testset "NaiveSparse tests: $t" for t in testfuns
         T = Float64
         t(T, solver = SO.Solver{T}(system_solver = SO.NaiveSparseSystemSolver{T}(); options...))
-        t(T, solver = SO.Solver{T}(system_solver = SO.NaiveSparseSystemSolver{T}(fact_cache = Hypatia.PardisoNonSymCache()); options...))
     end
     @testset "NaiveIndirect tests: $t" for t in testfuns
         T = Float64
@@ -117,7 +116,6 @@ options = (verbose = false,)
     @testset "NaiveElimSparse tests: $t" for t in testfuns
         T = Float64
         t(T, solver = SO.Solver{T}(system_solver = SO.NaiveElimSparseSystemSolver{T}(); options...))
-        t(T, solver = SO.Solver{T}(system_solver = SO.NaiveElimSparseSystemSolver{T}(fact_cache = Hypatia.PardisoNonSymCache()); options...))
     end
     @testset "SymIndefDense tests: $t, $T, $h" for t in testfuns, T in real_types, h in [true, false]
         t(T, solver = SO.Solver{T}(system_solver = SO.SymIndefDenseSystemSolver{T}(use_inv_hess = h); options...))
@@ -125,7 +123,6 @@ options = (verbose = false,)
     @testset "SymIndefSparse tests: $t" for t in testfuns
         T = Float64
         t(T, solver = SO.Solver{T}(system_solver = SO.SymIndefSparseSystemSolver{T}(); options...))
-        t(T, solver = SO.Solver{T}(system_solver = SO.SymIndefSparseSystemSolver{T}(fact_cache = Hypatia.PardisoSymCache()); options...))
     end
     @testset "QRCholDense tests: $t, $T" for t in testfuns, T in real_types
         t(T, solver = SO.Solver{T}(system_solver = SO.QRCholDenseSystemSolver{T}(); options...))
