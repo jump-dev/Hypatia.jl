@@ -4,8 +4,8 @@ Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 TODO handle conditional dependencies / glue code, see https://github.com/JuliaLang/Pkg.jl/issues/1285
 =#
 
-ENV["OMP_NUM_THREADS"] = length(Sys.cpu_info())
-import Pardiso
+# ENV["OMP_NUM_THREADS"] = length(Sys.cpu_info())
+# import Pardiso
 
 mutable struct PardisoNonSymCache{T <: Real} <: SparseNonSymCache{T}
     analyzed::Bool
