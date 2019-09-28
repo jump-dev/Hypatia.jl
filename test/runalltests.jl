@@ -12,4 +12,5 @@ using Test
     include(joinpath(@__DIR__, "runmoitests.jl"))
     include(joinpath(@__DIR__, "runnativeexamplestests.jl"))
     include(joinpath(@__DIR__, "runjumpexamplestests.jl"))
+    include(joinpath(@__DIR__, "runlinearalgebratests.jl"))
 end

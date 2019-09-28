@@ -164,11 +164,17 @@ function load(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) w
     @assert issparse(lhs3)
     dropzeros!(lhs3)
     (Is, Js, Vs) = findnz(lhs3)
+    # integer type supported by the sparse system solver library to be used
+    IType = int_type(system_solver.fact_cache)
 
     # add I, J, V for Hessians and inverse Hessians
-    hess_nnzs = isempty(cones) ? 0 : sum(Cones.hess_nnzs(cone_k, true) for cone_k in cones)
-    H_Is = Vector{Int32}(undef, hess_nnzs)
-    H_Js = Vector{Int32}(undef, hess_nnzs)
+    # count of nonzeros to add
+    hess_nnzs = 0
+    for cone_k in cones, j in 1:Cones.dimension(cone_k)
+        hess_nnzs += Cones.use_dual(cone_k) ? length(Cones.hess_nz_idxs_j(cone_k, j, true)) : length(Cones.inv_hess_nz_idxs_j(cone_k, j, true))
+    end
+    H_Is = Vector{IType}(undef, hess_nnzs)
+    H_Js = Vector{IType}(undef, hess_nnzs)
     H_Vs = Vector{Float64}(undef, hess_nnzs)
     offset = 1
     y_start = n + p - 1
@@ -189,8 +195,11 @@ function load(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) w
     append!(Is, H_Is)
     append!(Js, H_Js)
     append!(Vs, H_Vs)
-    dim32 = Int32(size(lhs3, 1))
-    lhs3 = system_solver.lhs3 = sparse(Is, Js, Vs, dim32, dim32)
+    dim = IType(size(lhs3, 1))
+    # prefer conversions of integer types to happen here than inside external wrappers
+    Is = convert(Vector{IType}, Is)
+    Js = convert(Vector{IType}, Js)
+    lhs3 = system_solver.lhs3 = sparse(Is, Js, Vs, dim, dim)
 
     # cache indices of nonzeros of Hessians and inverse Hessians in sparse LHS nonzeros vector
     system_solver.hess_idxs = [Vector{UnitRange}(undef, Cones.dimension(cone_k)) for cone_k in cones]
