@@ -5,7 +5,7 @@ tests using Pardiso sparse linear system solver caches
 requires that Pardiso.jl be installed and built successfully; Requires.jl handles this optional dependency
 =#
 
-using Pardiso
+import HSL
 
 include(joinpath(@__DIR__, "native.jl"))
 
@@ -58,8 +58,8 @@ testfuns = [
 
 options = (verbose = false,)
 
-@info("starting Pardiso cache tests")
-@testset "Pardiso cache tests" begin
+@info("starting HSL cache tests")
+@testset "HSL cache tests" begin
     @testset "cache setup tests: $cache_type" for cache_type in [Hypatia.HSLSymCache]
         cache = cache_type()
         @test cache.analyzed == false
