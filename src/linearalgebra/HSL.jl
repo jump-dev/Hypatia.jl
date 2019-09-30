@@ -38,12 +38,11 @@ function solve_sparse_system(cache::HSLSymCache, x::Matrix{Float64}, A::SparseMa
     ma57 = cache.ma57
     copyto!(x, b)
     HSL.ma57_solve!(ma57, x)
-    
+
     # info we could print
     # ma57.info.backward_error1
     # ma57.info.backward_error2
     # ma57.info.matrix_inf_norm
-    # @show ma57.info.solution_inf_norm
     # ma57.info.scaled_residuals
     # ma57.info.cond1
     # ma57.info.cond2
