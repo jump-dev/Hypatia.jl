@@ -1,7 +1,7 @@
 #=
 Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
-tests using Pardiso sparse linear system solver caches
+tests using HSL sparse linear system solver caches
 requires that HSL.jl be installed and built successfully; Requires.jl handles this optional dependency
 =#
 

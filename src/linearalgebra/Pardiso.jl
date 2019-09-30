@@ -4,8 +4,7 @@ Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 TODO handle conditional dependencies / glue code, see https://github.com/JuliaLang/Pkg.jl/issues/1285
 =#
 
-# ENV["OMP_NUM_THREADS"] = length(Sys.cpu_info())
-# import Pardiso
+using TimerOutputs
 
 mutable struct PardisoNonSymCache{T <: Real} <: SparseNonSymCache{T}
     analyzed::Bool
@@ -44,7 +43,7 @@ function update_sparse_fact(cache::PardisoSparseCache, A::SparseMatrixCSC{Float6
     pardiso = cache.pardiso
 
     if !cache.analyzed
-        Pardiso.pardisoinit(pardiso)
+        @timeit "init" Pardiso.pardisoinit(pardiso)
         # don't ignore other iparms
         Pardiso.set_iparm!(pardiso, 1, 1)
         # solve transposed problem (Pardiso accepts CSR matrices)
@@ -56,12 +55,12 @@ function update_sparse_fact(cache::PardisoSparseCache, A::SparseMatrixCSC{Float6
         # maximum number of iterative refinement steps (default = 2)
         Pardiso.set_iparm!(pardiso, 8, 2)
         Pardiso.set_phase!(pardiso, Pardiso.ANALYSIS)
-        Pardiso.pardiso(pardiso, A, Float64[])
+        @timeit "analysis" Pardiso.pardiso(pardiso, A, Float64[])
         cache.analyzed = true
     end
 
     Pardiso.set_phase!(pardiso, Pardiso.NUM_FACT)
-    Pardiso.pardiso(pardiso, A, Float64[])
+    @timeit "numeric_fact" Pardiso.pardiso(pardiso, A, Float64[])
 
     return
 end
@@ -70,7 +69,7 @@ function solve_sparse_system(cache::PardisoSparseCache, x::Matrix{Float64}, A::S
     pardiso = cache.pardiso
 
     Pardiso.set_phase!(pardiso, Pardiso.SOLVE_ITERATIVE_REFINE)
-    @timeit "pardiso" Pardiso.pardiso(pardiso, x, A, b)
+    @timeit "solve" Pardiso.pardiso(pardiso, x, A, b)
 
     return x
 end

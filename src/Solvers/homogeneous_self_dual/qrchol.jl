@@ -196,12 +196,12 @@ end
 function update_fact(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
     isempty(system_solver.Q2div) && return system_solver
 
-    block_hessian_product(solver.model.cones, system_solver.HGQ2_k, system_solver.GQ2_k)
-    mul!(system_solver.lhs, system_solver.GQ2', system_solver.HGQ2)
+    @timeit solver.timer "block_hess_prod" block_hessian_product(solver.model.cones, system_solver.HGQ2_k, system_solver.GQ2_k)
+    @timeit solver.timer "Q2GHGQ2" mul!(system_solver.lhs, system_solver.GQ2', system_solver.HGQ2)
 
     lhs_psd = Symmetric(system_solver.lhs, :U)
     set_min_diag!(system_solver.lhs, sqrt(eps(T)))
-    system_solver.fact_cache = (T == BigFloat ? cholesky!(lhs_psd) : bunchkaufman!(lhs_psd))
+    @timeit solver.timer "factorize" system_solver.fact_cache = (T == BigFloat ? cholesky!(lhs_psd) : bunchkaufman!(lhs_psd))
 
     return system_solver
 end
