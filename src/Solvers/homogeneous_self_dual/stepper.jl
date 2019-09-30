@@ -191,7 +191,7 @@ function get_directions(stepper::Stepper{T}, solver::Solver{T}) where {T <: Real
     dirs_new .= dirs # TODO avoid?
     for i in 1:iter_ref_steps
         # perform iterative refinement step
-        @timeit solver.timer "calc res" res = calc_system_residual(stepper, solver) # modifies rhs
+        @timeit solver.timer "calc_sys_res" res = calc_system_residual(stepper, solver) # modifies rhs
         norm_inf = norm(res, Inf)
         norm_2 = norm(res, 2)
 
@@ -200,7 +200,7 @@ function get_directions(stepper::Stepper{T}, solver::Solver{T}) where {T <: Real
             @timeit solver.timer "solve_system" solve_system(system_solver, solver, dirs_new, res)
             dirs_new .*= -1
             dirs_new .+= dirs
-            @timeit solver.timer "calc_system_residual" res_new = calc_system_residual(stepper, solver)
+            @timeit solver.timer "calc_sys_res" res_new = calc_system_residual(stepper, solver)
             norm_inf_new = norm(res_new, Inf)
             norm_2_new = norm(res_new, 2)
             if norm_inf_new < norm_inf && norm_2_new < norm_2
@@ -248,21 +248,21 @@ function calc_system_residual(stepper::CombinedStepper{T}, solver::Solver{T}) wh
     model = solver.model
 
     # A'*y + G'*z + c*tau = [x_residual, 0]
-    res_x = model.A' * stepper.y_rhs + model.G' * stepper.z_rhs + model.c * stepper.tau_rhs
+    @timeit solver.timer "resx" res_x = model.A' * stepper.y_rhs + model.G' * stepper.z_rhs + model.c * stepper.tau_rhs
     @. res_x[:, 1] -= solver.x_residual
     # -A*x + b*tau = [y_residual, 0]
-    res_y = -model.A * stepper.x_rhs + model.b * stepper.tau_rhs
+    @timeit solver.timer "resy" res_y = -model.A * stepper.x_rhs + model.b * stepper.tau_rhs
     @. res_y[:, 1] -= solver.y_residual
     # -G*x + h*tau - s = [z_residual, 0]
-    res_z = -model.G * stepper.x_rhs + model.h * stepper.tau_rhs - stepper.s_rhs
+    @timeit solver.timer "resz" res_z = -model.G * stepper.x_rhs + model.h * stepper.tau_rhs - stepper.s_rhs
     @. res_z[:, 1] -= solver.z_residual
     # -c'*x - b'*y - h'*z - kap = [kap + primal_obj_t - dual_obj_t, 0]
-    res_tau = -model.c' * stepper.x_rhs - model.b' * stepper.y_rhs - model.h' * stepper.z_rhs - stepper.kap_rhs
+    @timeit solver.timer "restau" res_tau = -model.c' * stepper.x_rhs - model.b' * stepper.y_rhs - model.h' * stepper.z_rhs - stepper.kap_rhs
     res_tau[1] -= solver.kap + solver.primal_obj_t - solver.dual_obj_t
 
     sqrtmu = sqrt(solver.mu)
     res_s = similar(res_z)
-    for (k, cone_k) in enumerate(model.cones)
+    @timeit solver.timer "resz" for (k, cone_k) in enumerate(model.cones)
         idxs_k = model.cone_idxs[k]
         if Cones.use_dual(cone_k)
             # (du bar) mu*H_k*z_k + s_k = srhs_k

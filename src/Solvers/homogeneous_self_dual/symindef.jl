@@ -155,23 +155,20 @@ function load(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) w
     system_solver.rhs3 = similar(system_solver.sol3)
 
     # form sparse LHS without Hessians and inverse Hessians in z/z block
-    pert = T(system_solver.fact_cache.diag_pert) # TODO not happy with where this is stored
     lhs3 = T[
-        sparse(pert*I,n,n)  spzeros(T,n,p)       spzeros(T,n,q);
-        model.A             sparse(-pert*I,p,p)  spzeros(T,p,q);
-        model.G             spzeros(T,q,p)       sparse(-one(T)*I,q,q);
+        spzeros(T, n, n)  spzeros(T, n, p)  spzeros(T, n, q);
+        model.A           spzeros(T, p, p)  spzeros(T, p, q);
+        model.G           spzeros(T, q, p)  sparse(-one(T) * I, q, q);
         ]
     @assert issparse(lhs3)
     dropzeros!(lhs3)
     (Is, Js, Vs) = findnz(lhs3)
-    # integer type supported by the sparse system solver library to be used
-    IType = int_type(system_solver.fact_cache)
 
     # add I, J, V for Hessians and inverse Hessians
     # count of nonzeros to add
     hess_nnzs = sum(Cones.use_dual(cone_k) ? Cones.hess_nnzs(cone_k, true) : Cones.inv_hess_nnzs(cone_k, true) for cone_k in cones)
-    H_Is = Vector{IType}(undef, hess_nnzs)
-    H_Js = Vector{IType}(undef, hess_nnzs)
+    H_Is = Vector{Int}(undef, hess_nnzs)
+    H_Js = Vector{Int}(undef, hess_nnzs)
     H_Vs = Vector{Float64}(undef, hess_nnzs)
     offset = 1
     y_start = n + p - 1
@@ -192,15 +189,19 @@ function load(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) w
     append!(Is, H_Is)
     append!(Js, H_Js)
     append!(Vs, H_Vs)
-    if iszero(pert)
-        append!(Is, 1:(n + p))
-        append!(Js, 1:(n + p))
-        append!(Vs, zeros(n + p))
-    end
-    dim = IType(size(lhs3, 1))
+
+    pert = T(system_solver.fact_cache.diag_pert) # TODO not happy with where this is stored
+    append!(Is, 1:(n + p))
+    append!(Js, 1:(n + p))
+    append!(Vs, fill(pert, n))
+    append!(Vs, fill(-pert, p))
+
+    dim = size(lhs3, 1)
+    # integer type supported by the sparse system solver library to be used
+    Ti = int_type(system_solver.fact_cache)
     # prefer conversions of integer types to happen here than inside external wrappers
-    Is = convert(Vector{IType}, Is)
-    Js = convert(Vector{IType}, Js)
+    Is = convert(Vector{Ti}, Is)
+    Js = convert(Vector{Ti}, Js)
     lhs3 = system_solver.lhs3 = sparse(Is, Js, Vs, dim, dim)
 
     # cache indices of nonzeros of Hessians and inverse Hessians in sparse LHS nonzeros vector
