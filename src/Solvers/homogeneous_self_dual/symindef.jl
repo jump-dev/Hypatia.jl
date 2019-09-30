@@ -192,6 +192,11 @@ function load(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) w
     append!(Is, H_Is)
     append!(Js, H_Js)
     append!(Vs, H_Vs)
+    if iszero(pert)
+        append!(Is, 1:(n + p))
+        append!(Js, 1:(n + p))
+        append!(Vs, zeros(n + p))
+    end
     dim = IType(size(lhs3, 1))
     # prefer conversions of integer types to happen here than inside external wrappers
     Is = convert(Vector{IType}, Is)

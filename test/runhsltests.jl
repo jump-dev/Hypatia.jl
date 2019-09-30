@@ -2,7 +2,7 @@
 Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
 tests using Pardiso sparse linear system solver caches
-requires that Pardiso.jl be installed and built successfully; Requires.jl handles this optional dependency
+requires that HSL.jl be installed and built successfully; Requires.jl handles this optional dependency
 =#
 
 import HSL
@@ -68,16 +68,6 @@ options = (verbose = false,)
         @test cache32.analyzed == false
         @test_throws Exception cache_type{BigFloat}() # TODO make error more specific
     end
-
-    # @testset "NaiveSparse tests: $t" for t in testfuns
-    #     T = Float64
-    #     t(T, solver = SO.Solver{T}(system_solver = SO.NaiveSparseSystemSolver{T}(fact_cache = Hypatia.HSLSymCache()); options...))
-    # end
-    #
-    # @testset "NaiveElimSparse tests: $t" for t in testfuns
-    #     T = Float64
-    #     t(T, solver = SO.Solver{T}(system_solver = SO.NaiveElimSparseSystemSolver{T}(fact_cache = Hypatia.HSLSymCache()); options...))
-    # end
 
     @testset "SymIndefSparse tests: $t" for t in testfuns
         T = Float64

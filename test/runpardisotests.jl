@@ -5,7 +5,7 @@ tests using Pardiso sparse linear system solver caches
 requires that Pardiso.jl be installed and built successfully; Requires.jl handles this optional dependency
 =#
 
-using Pardiso
+import Pardiso
 
 include(joinpath(@__DIR__, "native.jl"))
 

@@ -71,8 +71,7 @@ function solve_sparse_system(cache::PardisoSparseCache, x::Matrix{Float64}, A::S
 
     Pardiso.set_phase!(pardiso, Pardiso.SOLVE_ITERATIVE_REFINE)
     @timeit "pardiso" Pardiso.pardiso(pardiso, x, A, b)
-    @show norm(b - Symmetric(A, :L) * x), norm(b - Symmetric(A, :L) * x) / norm(b)
-    
+
     return x
 end
 
