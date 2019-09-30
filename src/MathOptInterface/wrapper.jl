@@ -6,7 +6,6 @@ MathOptInterface wrapper of Hypatia solver
 
 mutable struct Optimizer{T <: Real} <: MOI.AbstractOptimizer
     load_only::Bool
-    use_dense::Bool
     test_certificates::Bool
 
     solver::Solvers.Solver{T}
@@ -29,13 +28,11 @@ mutable struct Optimizer{T <: Real} <: MOI.AbstractOptimizer
 
     function Optimizer{T}(;
         load_only::Bool = false,
-        use_dense::Bool = true,
         test_certificates::Bool = false,
         solver_options...
         ) where {T <: Real}
         opt = new{T}()
         opt.load_only = load_only
-        opt.use_dense = use_dense
         opt.test_certificates = test_certificates
         opt.solver = Solvers.Solver{T}(; solver_options...)
         return opt
@@ -439,11 +436,6 @@ function MOI.copy_to(
 
     model_G = dropzeros!(sparse(IG, JG, VG, q, n))
     model_h = Vector(sparsevec(Ih, Vh, q))
-
-    if opt.use_dense
-        model_A = Matrix(model_A)
-        model_G = Matrix(model_G)
-    end
 
     opt.model = Models.Model{T}(model_c, model_A, model_b, model_G, model_h, cones; obj_offset = obj_offset)
 

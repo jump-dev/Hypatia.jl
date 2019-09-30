@@ -9,7 +9,7 @@ eliminate s
 so if using primal barrier
 z_k + mu*H_k*s_k = srhs_k --> s_k = (mu*H_k)\(srhs_k - z_k)
 -->
--G_k*x + (mu*H_k)\z_k + h_k*tau = zrhs_k + (mu*H_k)\srhs_k
+-G_k*x + (mu*H_k)\z_k + h_k*tau = zrhs_k + (mu*H_k)\srhs_k (if use_inv_hess = true)
 -->
 -mu*H_k*G_k*x + z_k + mu*H_k*h_k*tau = mu*H_k*zrhs_k + srhs_k (if use_inv_hess = false)
 or if using dual barrier
@@ -130,11 +130,13 @@ function load(system_solver::NaiveElimSparseSystemSolver{T}, solver::Solver{T}) 
     @assert issparse(lhs4)
     dropzeros!(lhs4)
     (Is, Js, Vs) = findnz(lhs4)
+    # integer type supported by the sparse system solver library to be used
+    IType = int_type(system_solver.fact_cache)
 
     # add I, J, V for Hessians and inverse Hessians
-    hess_nnzs = sum(Cones.hess_nnzs(cone_k, false) for cone_k in cones)
-    H_Is = Vector{Int32}(undef, hess_nnzs)
-    H_Js = Vector{Int32}(undef, hess_nnzs)
+    hess_nnzs = sum(Cones.use_dual(cone_k) ? Cones.hess_nnzs(cone_k, false) : Cones.inv_hess_nnzs(cone_k, false) for cone_k in cones)
+    H_Is = Vector{IType}(undef, hess_nnzs)
+    H_Js = Vector{IType}(undef, hess_nnzs)
     H_Vs = Vector{Float64}(undef, hess_nnzs)
     offset = 1
     for (k, cone_k) in enumerate(cones)
@@ -154,8 +156,11 @@ function load(system_solver::NaiveElimSparseSystemSolver{T}, solver::Solver{T}) 
     append!(Is, H_Is)
     append!(Js, H_Js)
     append!(Vs, H_Vs)
-    dim32 = Int32(size(lhs4, 1))
-    lhs4 = system_solver.lhs4 = sparse(Is, Js, Vs, dim32, dim32)
+    dim = IType(size(lhs4, 1))
+    # prefer conversions of integer types to happen here than inside external wrappers
+    Is = convert(Vector{IType}, Is)
+    Js = convert(Vector{IType}, Js)
+    lhs4 = system_solver.lhs4 = sparse(Is, Js, Vs, dim, dim)
 
     # cache indices of nonzeros of Hessians and inverse Hessians in sparse LHS nonzeros vector
     system_solver.hess_idxs = [Vector{UnitRange}(undef, Cones.dimension(cone_k)) for cone_k in cones]
@@ -172,7 +177,7 @@ function load(system_solver::NaiveElimSparseSystemSolver{T}, solver::Solver{T}) 
             # get index corresponding to first nonzero Hessian element of the current column of the LHS
             first_H = findfirst(isequal(z_start_k + first(nz_hess_indices)), nz_rows)
             # indices of nonzero values for cone k column j
-            system_solver.hess_idxs[k][j] = (col_idx_start + first_H - first(nz_hess_indices) - 1) .+ nz_hess_indices
+            system_solver.hess_idxs[k][j] = (col_idx_start + first_H - 2) .+ (1:length(nz_hess_indices))
         end
     end
 
@@ -183,7 +188,7 @@ function update_fact(system_solver::NaiveElimSparseSystemSolver{T}, solver::Solv
     for (k, cone_k) in enumerate(solver.model.cones)
         H = (Cones.use_dual(cone_k) ? Cones.hess(cone_k) : Cones.inv_hess(cone_k))
         for j in 1:Cones.dimension(cone_k)
-            nz_rows = Cones.hess_nz_idxs_j(cone_k, j, false)
+            nz_rows = (Cones.use_dual(cone_k) ? Cones.hess_nz_idxs_j(cone_k, j, false) : Cones.inv_hess_nz_idxs_j(cone_k, j, false))
             @views copyto!(system_solver.lhs4.nzval[system_solver.hess_idxs[k][j]], H[nz_rows, j])
         end
     end
@@ -255,6 +260,7 @@ function update_fact(system_solver::NaiveElimDenseSystemSolver{T}, solver::Solve
             # -G_k*x + mu*H_k*z_k + h_k*tau = zrhs_k + srhs_k
             lhs4[z_rows_k, z_rows_k] .= Cones.hess(cone_k)
         elseif system_solver.use_inv_hess
+            # -G_k*x + (mu*H_k)\z_k + h_k*tau = zrhs_k + (mu*H_k)\srhs_k
             lhs4[z_rows_k, z_rows_k] .= Cones.inv_hess(cone_k)
         else
             # -mu*H_k*G_k*x + z_k + mu*H_k*h_k*tau = mu*H_k*zrhs_k + srhs_k
