@@ -6,6 +6,7 @@ using Test
 import Random
 using LinearAlgebra
 using SparseArrays
+import GenericSVD.svdvals
 import Hypatia
 import Hypatia.Solvers.build_solve_check
 const CO = Hypatia.Cones
@@ -665,11 +666,11 @@ function epinormspectral1(T; options...)
         r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
         @test r.status == :Optimal
         if is_dual
-            @test sum(svdvals!(reshape(r.s[2:end], Xn, Xm))) ≈ r.s[1] atol=tol rtol=tol
-            @test svdvals!(reshape(r.z[2:end], Xn, Xm))[1] ≈ r.z[1] atol=tol rtol=tol
+            @test sum(svdvals(reshape(r.s[2:end], Xn, Xm))) ≈ r.s[1] atol=tol rtol=tol
+            @test svdvals(reshape(r.z[2:end], Xn, Xm))[1] ≈ r.z[1] atol=tol rtol=tol
         else
-            @test svdvals!(reshape(r.s[2:end], Xn, Xm))[1] ≈ r.s[1] atol=tol rtol=tol
-            @test sum(svdvals!(reshape(r.z[2:end], Xn, Xm))) ≈ r.z[1] atol=tol rtol=tol
+            @test svdvals(reshape(r.s[2:end], Xn, Xm))[1] ≈ r.s[1] atol=tol rtol=tol
+            @test sum(svdvals(reshape(r.z[2:end], Xn, Xm))) ≈ r.z[1] atol=tol rtol=tol
         end
     end
 end

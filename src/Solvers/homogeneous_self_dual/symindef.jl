@@ -164,11 +164,14 @@ function load(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) w
     @assert issparse(lhs3)
     dropzeros!(lhs3)
     (Is, Js, Vs) = findnz(lhs3)
+    # integer type supported by the sparse system solver library to be used
+    IType = int_type(system_solver.fact_cache)
 
     # add I, J, V for Hessians and inverse Hessians
-    hess_nnzs = sum(Cones.hess_nnzs(cone_k, true) for cone_k in cones)
-    H_Is = Vector{Int32}(undef, hess_nnzs)
-    H_Js = Vector{Int32}(undef, hess_nnzs)
+    # count of nonzeros to add
+    hess_nnzs = sum(Cones.use_dual(cone_k) ? Cones.hess_nnzs(cone_k, true) : Cones.inv_hess_nnzs(cone_k, true) for cone_k in cones)
+    H_Is = Vector{IType}(undef, hess_nnzs)
+    H_Js = Vector{IType}(undef, hess_nnzs)
     H_Vs = Vector{Float64}(undef, hess_nnzs)
     offset = 1
     y_start = n + p - 1
@@ -189,8 +192,16 @@ function load(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) w
     append!(Is, H_Is)
     append!(Js, H_Js)
     append!(Vs, H_Vs)
-    dim32 = Int32(size(lhs3, 1))
-    lhs3 = system_solver.lhs3 = sparse(Is, Js, Vs, dim32, dim32)
+    if iszero(pert)
+        append!(Is, 1:(n + p))
+        append!(Js, 1:(n + p))
+        append!(Vs, zeros(n + p))
+    end
+    dim = IType(size(lhs3, 1))
+    # prefer conversions of integer types to happen here than inside external wrappers
+    Is = convert(Vector{IType}, Is)
+    Js = convert(Vector{IType}, Js)
+    lhs3 = system_solver.lhs3 = sparse(Is, Js, Vs, dim, dim)
 
     # cache indices of nonzeros of Hessians and inverse Hessians in sparse LHS nonzeros vector
     system_solver.hess_idxs = [Vector{UnitRange}(undef, Cones.dimension(cone_k)) for cone_k in cones]
@@ -207,7 +218,7 @@ function load(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) w
             # get index corresponding to first nonzero Hessian element of the current column of the LHS
             first_H = findfirst(isequal(z_start_k + first(nz_hess_indices)), nz_rows)
             # indices of nonzero values for cone k column j
-            system_solver.hess_idxs[k][j] = (col_idx_start + first_H - first(nz_hess_indices) - 1) .+ nz_hess_indices
+            system_solver.hess_idxs[k][j] = (col_idx_start + first_H - 2) .+ (1:length(nz_hess_indices))
         end
     end
 
@@ -218,7 +229,7 @@ function update_fact(system_solver::SymIndefSparseSystemSolver{T}, solver::Solve
     for (k, cone_k) in enumerate(solver.model.cones)
         H = (Cones.use_dual(cone_k) ? Cones.hess(cone_k) : Cones.inv_hess(cone_k))
         for j in 1:Cones.dimension(cone_k)
-            nz_rows = Cones.hess_nz_idxs_j(cone_k, j, true)
+            nz_rows = (Cones.use_dual(cone_k) ? Cones.hess_nz_idxs_j(cone_k, j, true) : Cones.inv_hess_nz_idxs_j(cone_k, j, true))
             @. @views system_solver.lhs3.nzval[system_solver.hess_idxs[k][j]] = -H[nz_rows, j]
         end
     end

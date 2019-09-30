@@ -28,6 +28,7 @@ import Hypatia.SparseSymCache
 import Hypatia.update_sparse_fact
 import Hypatia.solve_sparse_system
 import Hypatia.free_memory
+import Hypatia.int_type
 
 abstract type Stepper{T <: Real} end
 

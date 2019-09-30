@@ -4,12 +4,6 @@ Copyright 2019, Chris Coey and contributors
 
 include(joinpath(@__DIR__, "barrier.jl"))
 
-real_types = [
-    Float64,
-    Float32,
-    BigFloat,
-    ]
-
 barrier_testfuns = [
     test_orthant_barrier,
     test_epinorminf_barrier,
@@ -27,6 +21,12 @@ barrier_testfuns = [
     # NOTE not updated for generic reals or for new cone oracles interface
     # test_wsospolyinterpmat_barrier,
     # test_wsospolyinterpsoc_barrier,
+    ]
+
+real_types = [
+    Float64,
+    Float32,
+    BigFloat,
     ]
 
 @info("starting barrier tests")
