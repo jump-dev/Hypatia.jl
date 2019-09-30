@@ -130,13 +130,11 @@ function load(system_solver::NaiveElimSparseSystemSolver{T}, solver::Solver{T}) 
     @assert issparse(lhs4)
     dropzeros!(lhs4)
     (Is, Js, Vs) = findnz(lhs4)
-    # integer type supported by the sparse system solver library to be used
-    IType = int_type(system_solver.fact_cache)
 
     # add I, J, V for Hessians and inverse Hessians
     hess_nnzs = sum(Cones.use_dual(cone_k) ? Cones.hess_nnzs(cone_k, false) : Cones.inv_hess_nnzs(cone_k, false) for cone_k in cones)
-    H_Is = Vector{IType}(undef, hess_nnzs)
-    H_Js = Vector{IType}(undef, hess_nnzs)
+    H_Is = Vector{Int}(undef, hess_nnzs)
+    H_Js = Vector{Int}(undef, hess_nnzs)
     H_Vs = Vector{Float64}(undef, hess_nnzs)
     offset = 1
     for (k, cone_k) in enumerate(cones)
@@ -156,10 +154,13 @@ function load(system_solver::NaiveElimSparseSystemSolver{T}, solver::Solver{T}) 
     append!(Is, H_Is)
     append!(Js, H_Js)
     append!(Vs, H_Vs)
-    dim = IType(size(lhs4, 1))
+
     # prefer conversions of integer types to happen here than inside external wrappers
-    Is = convert(Vector{IType}, Is)
-    Js = convert(Vector{IType}, Js)
+    dim = size(lhs4, 1)
+    # integer type supported by the sparse system solver library to be used
+    Ti = int_type(system_solver.fact_cache)
+    Is = convert(Vector{Ti}, Is)
+    Js = convert(Vector{Ti}, Js)
     lhs4 = system_solver.lhs4 = sparse(Is, Js, Vs, dim, dim)
 
     # cache indices of nonzeros of Hessians and inverse Hessians in sparse LHS nonzeros vector
