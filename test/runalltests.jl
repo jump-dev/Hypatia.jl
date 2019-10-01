@@ -16,4 +16,5 @@ using Test
     # require optional dependencies:
     # TODO maybe only run it if Pkg says the right dependency is installed
     include(joinpath(@__DIR__, "runpardisotests.jl"))
+    include(joinpath(@__DIR__, "runhsltests.jl"))
 end
