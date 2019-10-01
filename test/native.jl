@@ -20,7 +20,7 @@ function dimension1(T; options...)
     h = T[1]
     cones = CO.Cone{T}[CO.Nonnegative{T}(1, false)]
 
-    for use_sparse in (true)
+    for use_sparse in (false, true)
         if use_sparse
             A = sparse(A)
             G = sparse(G)
