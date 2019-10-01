@@ -24,7 +24,9 @@ mutable struct UMFPACKNonSymCache{T <: Real} <: SparseNonSymCache{T}
 end
 UMFPACKNonSymCache{T}() where {T <: Real} = error("UMFPACK only works with real type Float64")
 UMFPACKNonSymCache() = UMFPACKNonSymCache{Float64}()
-int_type(::UMFPACKNonSymCache) = Int # NOTE Int64 or Int32 both work
+# NOTE UMFPACK restricts to Int32 if Int(ccall((:jl_cholmod_sizeof_long,:libsuitesparse_wrapper),Csize_t,())) == 4
+# easiest to restrict int type to SuiteSparse_long
+int_type(::UMFPACKNonSymCache) = SuiteSparse.CHOLMOD.SuiteSparse_long
 
 function update_sparse_fact(cache::UMFPACKNonSymCache, A::SparseMatrixCSC{Float64, Int})
     if !cache.analyzed
