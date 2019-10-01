@@ -34,11 +34,13 @@ The primal-dual optimality conditions are:
 
 ```julia
 import Hypatia
-const SO = Hypatia.Solvers
-include("test/native.jl")
 
 ENV["OMP_NUM_THREADS"] = length(Sys.cpu_info())
 import Pardiso
 
-orthant1(Float64, solver = SO.Solver{Float64}(system_solver = SO.NaiveElimSparseSystemSolver{Float64}(fact_cache = Hypatia.PardisoNonSymCache())))
+system_solver = Hypatia.Solvers.NaiveElimSparseSystemSolver{Float64}(fact_cache = Hypatia.PardisoNonSymCache())
+solver = Hypatia.Solvers.Solver{Float64}(system_solver)
+
+include("test/native.jl")
+orthant1(Float64, solver = solver)
 ```
