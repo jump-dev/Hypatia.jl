@@ -93,7 +93,7 @@ mutable struct NaiveElimSparseSystemSolver{T <: Real} <: NaiveElimSystemSolver{T
     rhs4::Matrix{T}
     sol4::Matrix{T}
     fact_cache::SparseNonSymCache{T}
-    hess_idxs
+    hess_idxs::Vector{Vector{Union{UnitRange, Vector{Int}}}}
 
     function NaiveElimSparseSystemSolver{T}(;
         use_inv_hess::Bool = true,
@@ -162,7 +162,7 @@ function load(system_solver::NaiveElimSparseSystemSolver{T}, solver::Solver{T}) 
     lhs4 = system_solver.lhs4 = sparse(Is, Js, Vs, dim, dim)
 
     # cache indices of nonzeros of Hessians and inverse Hessians in sparse LHS nonzeros vector
-    system_solver.hess_idxs = [Vector{UnitRange}(undef, Cones.dimension(cone_k)) for cone_k in cones]
+    system_solver.hess_idxs = [Vector{Union{UnitRange, Vector{Int}}}(undef, Cones.dimension(cone_k)) for cone_k in cones]
     for (k, cone_k) in enumerate(cones)
         cone_idxs_k = cone_idxs[k]
         z_start_k = n + p + first(cone_idxs_k) - 1
@@ -233,10 +233,10 @@ function load(system_solver::NaiveElimDenseSystemSolver{T}, solver::Solver{T}) w
     system_solver.rhs4 = similar(system_solver.sol4)
 
     system_solver.lhs4_copy = T[
-        zeros(T,n,n)  model.A'      model.G'              model.c;
-        -model.A      zeros(T,p,p)  zeros(T,p,q)          model.b;
-        -model.G      zeros(T,q,p)  Matrix(one(T)*I,q,q)  model.h;
-        -model.c'     -model.b'     -model.h'             one(T);
+        zeros(T, n, n)  model.A'        model.G'                  model.c;
+        -model.A        zeros(T, p, p)  zeros(T, p, q)            model.b;
+        -model.G        zeros(T, q, p)  Matrix(one(T) * I, q, q)  model.h;
+        -model.c'       -model.b'       -model.h'                 one(T);
         ]
     system_solver.lhs4 = similar(system_solver.lhs4_copy)
     # system_solver.fact_cache = HypLUSolveCache(system_solver.sol, system_solver.lhs4, rhs4)

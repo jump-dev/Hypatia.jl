@@ -106,8 +106,8 @@ direct sparse
 =#
 
 mutable struct NaiveSparseSystemSolver{T <: Real} <: NaiveSystemSolver{T}
-    lhs6::SparseMatrixCSC # TODO inttype
-    hess_idxs
+    lhs6::SparseMatrixCSC
+    hess_idxs::Vector{Vector{Union{UnitRange, Vector{Int}}}}
     fact_cache::SparseNonSymCache{T}
     mtt_idx::Int
     function NaiveSparseSystemSolver{Float64}(;
