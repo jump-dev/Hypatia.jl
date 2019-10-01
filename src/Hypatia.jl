@@ -4,6 +4,8 @@ Copyright 2018, Chris Coey and contributors
 
 module Hypatia
 
+using TimerOutputs
+
 const RealOrComplex{T <: Real} = Union{T, Complex{T}}
 
 # linear algebra helpers

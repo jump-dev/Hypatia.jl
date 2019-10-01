@@ -2,15 +2,10 @@
 Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
 helpers for sparse factorizations and linear solves
-
 =#
 
 import SparseArrays.SparseMatrixCSC
 import SuiteSparse
-
-using TimerOutputs
-
-const SuiteSparseInt = SuiteSparse.CHOLMOD.SuiteSparse_long
 
 #=
 nonsymmetric
@@ -29,9 +24,9 @@ mutable struct UMFPACKNonSymCache{T <: Real} <: SparseNonSymCache{T}
 end
 UMFPACKNonSymCache{T}() where {T <: Real} = error("UMFPACK only works with real type Float64")
 UMFPACKNonSymCache() = UMFPACKNonSymCache{Float64}()
-int_type(::UMFPACKNonSymCache) = SuiteSparseInt
+int_type(::UMFPACKNonSymCache) = Int # NOTE Int64 or Int32 both work
 
-function update_sparse_fact(cache::UMFPACKNonSymCache, A::SparseMatrixCSC{Float64, SuiteSparseInt})
+function update_sparse_fact(cache::UMFPACKNonSymCache, A::SparseMatrixCSC{Float64, Int})
     if !cache.analyzed
         cache.umfpack = lu(A) # symbolic and numeric factorization
         cache.analyzed = true
@@ -46,7 +41,7 @@ function update_sparse_fact(cache::UMFPACKNonSymCache, A::SparseMatrixCSC{Float6
     return
 end
 
-function solve_sparse_system(cache::UMFPACKNonSymCache, x::Matrix{Float64}, A::SparseMatrixCSC{Float64, SuiteSparseInt}, b::Matrix{Float64})
+function solve_sparse_system(cache::UMFPACKNonSymCache, x::Matrix{Float64}, A::SparseMatrixCSC{Float64, Int}, b::Matrix{Float64})
     ldiv!(x, cache.umfpack, b) # will not repeat factorizations
     return x
 end
@@ -75,9 +70,9 @@ mutable struct CHOLMODSymCache{T <: Real} <: SparseSymCache{T}
 end
 CHOLMODSymCache{T}(; diag_pert = NaN) where {T <: Real} = error("CHOLMOD only works with real type Float64")
 CHOLMODSymCache(; diag_pert::Float64 = sqrt(eps(Float64))) = CHOLMODSymCache{Float64}(diag_pert = diag_pert)
-int_type(::CHOLMODSymCache) = SuiteSparseInt
+int_type(::CHOLMODSymCache) = SuiteSparse.CHOLMOD.SuiteSparse_long
 
-function update_sparse_fact(cache::CHOLMODSymCache, A::SparseMatrixCSC{Float64, SuiteSparseInt})
+function update_sparse_fact(cache::CHOLMODSymCache, A::SparseMatrixCSC{Float64, SuiteSparse.CHOLMOD.SuiteSparse_long})
     A_symm = Symmetric(A, :L)
     if !cache.analyzed
         cache.cholmod = SuiteSparse.CHOLMOD.ldlt(A_symm, check = false)
@@ -99,7 +94,7 @@ function update_sparse_fact(cache::CHOLMODSymCache, A::SparseMatrixCSC{Float64, 
     return
 end
 
-function solve_sparse_system(cache::CHOLMODSymCache, x::Matrix{Float64}, A::SparseMatrixCSC{Float64, SuiteSparseInt}, b::Matrix{Float64})
+function solve_sparse_system(cache::CHOLMODSymCache, x::Matrix{Float64}, A::SparseMatrixCSC{Float64, SuiteSparse.CHOLMOD.SuiteSparse_long}, b::Matrix{Float64})
     x .= cache.cholmod \ b
     return x
 end
@@ -113,6 +108,4 @@ SparseSymCache() = SparseSymCache{Float64}()
 helpers
 =#
 
-SuiteSparseSparseCache = Union{UMFPACKNonSymCache{Float64}, CHOLMODSymCache{Float64}}
-
-free_memory(::SuiteSparseSparseCache) = nothing
+free_memory(::Union{UMFPACKNonSymCache{Float64}, CHOLMODSymCache{Float64}}) = nothing

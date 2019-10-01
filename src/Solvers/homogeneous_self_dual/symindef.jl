@@ -166,29 +166,27 @@ function load(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) w
 
     # add I, J, V for Hessians and inverse Hessians
     # count of nonzeros to add
-    hess_nnzs = sum(Cones.use_dual(cone_k) ? Cones.hess_nnzs(cone_k, true) : Cones.inv_hess_nnzs(cone_k, true) for cone_k in cones)
-    H_Is = Vector{Int}(undef, hess_nnzs)
-    H_Js = Vector{Int}(undef, hess_nnzs)
-    H_Vs = Vector{Float64}(undef, hess_nnzs)
+    hess_nz_total = sum(Cones.use_dual(cone_k) ? Cones.hess_nz_count(cone_k, true) : Cones.inv_hess_nz_count(cone_k, true) for cone_k in cones)
+    H_Is = Vector{Int}(undef, hess_nz_total)
+    H_Js = Vector{Int}(undef, hess_nz_total)
     offset = 1
     y_start = n + p - 1
     for (k, cone_k) in enumerate(cones)
         cone_idxs_k = cone_idxs[k]
         z_start_k = y_start + first(cone_idxs_k)
         for j in 1:Cones.dimension(cone_k)
-            nz_rows_kj = z_start_k .+ (Cones.use_dual(cone_k) ? Cones.hess_nz_idxs_j(cone_k, j, true) : Cones.inv_hess_nz_idxs_j(cone_k, j, true))
+            nz_rows_kj = z_start_k .+ (Cones.use_dual(cone_k) ? Cones.hess_nz_idxs_col(cone_k, j, true) : Cones.inv_hess_nz_idxs_col(cone_k, j, true))
             len_kj = length(nz_rows_kj)
             IJV_idxs = offset:(offset + len_kj - 1)
             offset += len_kj
             @. H_Is[IJV_idxs] = nz_rows_kj
             @. H_Js[IJV_idxs] = z_start_k + j
-            @. H_Vs[IJV_idxs] = one(Float64)
         end
     end
-    @assert offset == hess_nnzs + 1
+    @assert offset == hess_nz_total + 1
     append!(Is, H_Is)
     append!(Js, H_Js)
-    append!(Vs, H_Vs)
+    append!(Vs, ones(T, hess_nz_total))
 
     pert = T(system_solver.fact_cache.diag_pert) # TODO not happy with where this is stored
     append!(Is, 1:(n + p))
@@ -215,7 +213,7 @@ function load(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) w
             col_idx_start = lhs3.colptr[col]
             nz_rows = lhs3.rowval[col_idx_start:(lhs3.colptr[col + 1] - 1)]
             # get nonzero rows in column j of the Hessian or inverse Hessian
-            nz_hess_indices = (Cones.use_dual(cone_k) ? Cones.hess_nz_idxs_j(cone_k, j, true) : Cones.inv_hess_nz_idxs_j(cone_k, j, true))
+            nz_hess_indices = (Cones.use_dual(cone_k) ? Cones.hess_nz_idxs_col(cone_k, j, true) : Cones.inv_hess_nz_idxs_col(cone_k, j, true))
             # get index corresponding to first nonzero Hessian element of the current column of the LHS
             first_H = findfirst(isequal(z_start_k + first(nz_hess_indices)), nz_rows)
             # indices of nonzero values for cone k column j
@@ -230,7 +228,7 @@ function update_fact(system_solver::SymIndefSparseSystemSolver{T}, solver::Solve
     for (k, cone_k) in enumerate(solver.model.cones)
         H = (Cones.use_dual(cone_k) ? Cones.hess(cone_k) : Cones.inv_hess(cone_k))
         for j in 1:Cones.dimension(cone_k)
-            nz_rows = (Cones.use_dual(cone_k) ? Cones.hess_nz_idxs_j(cone_k, j, true) : Cones.inv_hess_nz_idxs_j(cone_k, j, true))
+            nz_rows = (Cones.use_dual(cone_k) ? Cones.hess_nz_idxs_col(cone_k, j, true) : Cones.inv_hess_nz_idxs_col(cone_k, j, true))
             @. @views system_solver.lhs3.nzval[system_solver.hess_idxs[k][j]] = -H[nz_rows, j]
         end
     end

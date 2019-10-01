@@ -60,7 +60,7 @@ options = (verbose = false,)
 
 @info("starting HSL cache tests")
 @testset "HSL cache tests" begin
-    @testset "cache setup tests: $cache_type" for cache_type in [Hypatia.HSLSymCache]
+    @testset "cache setup tests: $cache_type" for cache_type in [Hypatia.HSLSymCache] # TODO wrap and test a HSLNonSymCache
         cache = cache_type()
         @test cache.analyzed == false
         @test isa(cache, cache_type{Float64})
