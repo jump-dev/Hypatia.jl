@@ -128,7 +128,7 @@ mutable struct SymIndefSparseSystemSolver{T <: Real} <: SymIndefSystemSolver{T}
     rhs3::Matrix{T}
     sol3::Matrix{T}
     fact_cache::SparseSymCache{T}
-    hess_idxs
+    hess_idxs::Vector{Vector{Union{UnitRange, Vector{Int}}}}
     function SymIndefSparseSystemSolver{Float64}(;
         use_inv_hess::Bool = true,
         fact_cache::SparseSymCache{Float64} = SparseSymCache(),
@@ -203,7 +203,7 @@ function load(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) w
     lhs3 = system_solver.lhs3 = sparse(Is, Js, Vs, dim, dim)
 
     # cache indices of nonzeros of Hessians and inverse Hessians in sparse LHS nonzeros vector
-    system_solver.hess_idxs = [Vector{UnitRange}(undef, Cones.dimension(cone_k)) for cone_k in cones]
+    system_solver.hess_idxs = [Vector{Union{UnitRange, Vector{Int}}}(undef, Cones.dimension(cone_k)) for cone_k in cones]
     for (k, cone_k) in enumerate(cones)
         cone_idxs_k = cone_idxs[k]
         z_start_k = y_start + first(cone_idxs_k)
@@ -272,9 +272,9 @@ function load(system_solver::SymIndefDenseSystemSolver{T}, solver::Solver{T}) wh
 
     # fill symmetric lower triangle
     system_solver.lhs3_copy = T[
-        zeros(T,n,n)  zeros(T,n,p)  zeros(T,n,q);
-        model.A       zeros(T,p,p)  zeros(T,p,q);
-        model.G       zeros(T,q,p)  Matrix(-one(T)*I,q,q);
+        zeros(T, n, n)  zeros(T, n, p)  zeros(T, n, q);
+        model.A         zeros(T, p, p)  zeros(T, p, q);
+        model.G         zeros(T, q, p)  Matrix(-one(T) * I, q, q);
         ]
     system_solver.lhs3 = similar(system_solver.lhs3_copy)
     # system_solver.fact_cache = HypBKSolveCache(system_solver.sol, system_solver.lhs3, rhs3)

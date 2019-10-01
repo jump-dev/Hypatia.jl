@@ -16,7 +16,7 @@ mutable struct HSLSymCache{T <: BlasReal} <: SparseSymCache{T}
     end
 end
 HSLSymCache{T}() where {T <: Real} = error("HSL only works with real type Float64 or Float32")
-HSLSymCache(; diag_pert::Float64 = zero(Float64)) = HSLSymCache{Float64}(diag_pert = diag_pert)
+HSLSymCache() = HSLSymCache{Float64}()
 
 int_type(::HSLSymCache) = Int
 
