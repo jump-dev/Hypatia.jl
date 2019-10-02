@@ -15,13 +15,13 @@ using Test
 using TimerOutputs
 import Hypatia.Cones
 import Hypatia.Models
-import Hypatia.HypLUSolveCache
-import Hypatia.hyp_lu_solve!
-import Hypatia.HypBKSolveCache
-import Hypatia.hyp_bk_solve!
-import Hypatia.HypCholSolveCache
-import Hypatia.hyp_chol_solve!
-import Hypatia.set_min_diag!
+# import Hypatia.HypLUSolveCache
+# import Hypatia.hyp_lu_solve!
+# import Hypatia.HypBKSolveCache
+# import Hypatia.hyp_bk_solve!
+# import Hypatia.HypCholSolveCache
+# import Hypatia.hyp_chol_solve!
+# import Hypatia.set_min_diag!
 import Hypatia.BlockMatrix
 import Hypatia.SparseNonSymCache
 import Hypatia.SparseSymCache
@@ -29,6 +29,9 @@ import Hypatia.update_sparse_fact
 import Hypatia.solve_sparse_system
 import Hypatia.free_memory
 import Hypatia.int_type
+import Hypatia.GESVXNonSymCache
+import Hypatia.solve_dense_system
+import Hypatia.reset_fact
 
 abstract type Stepper{T <: Real} end
 
