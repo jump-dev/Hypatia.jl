@@ -84,15 +84,11 @@ function update_sparse_fact(cache::CHOLMODSymCache, A::SparseMatrixCSC{Float64, 
         ldlt!(cache.cholmod, A_symm, check = true)
     end
     if !issuccess(cache.cholmod)
-        # @warn("numerical failure: sparse factorization failed")
-        # ldlt!(cache.cholmod, A_symm, shift = 1e-4, check = false)
-        # if !issuccess(cache.cholmod)
-        #     @warn("numerical failure: sparse factorization failed again")
-        #     ldlt!(cache.cholmod, A_symm, shift = 1e-8 * maximum(abs, A[j, j] for j in 1:size(A_symm, 1)), check = false)
-        #     if !issuccess(cache.cholmod)
-        #         @warn("numerical failure: could not fix sparse factorization failure")
-        #     end
-        # end
+        @warn("numerical failure: sparse factorization failed")
+        ldlt!(cache.cholmod, A_symm, shift = 1e-4, check = false)
+        if !issuccess(cache.cholmod)
+            @warn("numerical failure: could not fix sparse factorization failure")
+        end
     end
     return
 end
