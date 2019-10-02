@@ -23,6 +23,12 @@ import Hypatia.HypCholSolveCache
 import Hypatia.hyp_chol_solve!
 import Hypatia.set_min_diag!
 import Hypatia.BlockMatrix
+import Hypatia.SparseNonSymCache
+import Hypatia.SparseSymCache
+import Hypatia.update_sparse_fact
+import Hypatia.solve_sparse_system
+import Hypatia.free_memory
+import Hypatia.int_type
 
 abstract type Stepper{T <: Real} end
 
@@ -38,7 +44,7 @@ mutable struct Solver{T <: Real}
     tol_feas::T
     tol_slow::T
     preprocess::Bool
-    init_use_iterative::Bool
+    init_use_indirect::Bool
     init_tol_qr::T
     init_use_fallback::Bool
     max_nbhd::T
@@ -124,13 +130,13 @@ mutable struct Solver{T <: Real}
         tol_feas::Real = sqrt(eps(T)),
         tol_slow::Real = 1e-3,
         preprocess::Bool = true,
-        init_use_iterative::Bool = false,
+        init_use_indirect::Bool = false,
         init_tol_qr::Real = 100 * eps(T),
         init_use_fallback::Bool = true,
         max_nbhd::Real = 0.7,
         use_infty_nbhd::Bool = true,
         stepper::Stepper{T} = CombinedStepper{T}(),
-        system_solver::SystemSolver{T} = QRCholSystemSolver{T}(),
+        system_solver::SystemSolver{T} = QRCholDenseSystemSolver{T}(),
         ) where {T <: Real}
         if isa(system_solver, QRCholSystemSolver{T})
             @assert preprocess # require preprocessing for QRCholSystemSolver
@@ -145,7 +151,7 @@ mutable struct Solver{T <: Real}
         solver.tol_feas = tol_feas
         solver.tol_slow = tol_slow
         solver.preprocess = preprocess
-        solver.init_use_iterative = init_use_iterative
+        solver.init_use_indirect = init_use_indirect
         solver.init_tol_qr = init_tol_qr
         solver.init_use_fallback = init_use_fallback
         solver.max_nbhd = max_nbhd
@@ -272,5 +278,9 @@ include("homogeneous_self_dual/naive.jl")
 include("homogeneous_self_dual/naiveelim.jl")
 include("homogeneous_self_dual/symindef.jl")
 include("homogeneous_self_dual/qrchol.jl")
+
+# release memory used by sparse system solvers
+free_memory(::SystemSolver) = nothing
+free_memory(system_solver::Union{NaiveSparseSystemSolver, SymIndefSparseSystemSolver}) = free_memory(system_solver.fact_cache)
 
 end

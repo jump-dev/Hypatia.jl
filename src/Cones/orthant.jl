@@ -130,3 +130,9 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Ort
     @. prod = arr * cone.point * cone.point
     return prod
 end
+
+hess_nz_count(cone::OrthantCone, ::Bool) = cone.dim
+inv_hess_nz_count(cone::OrthantCone, lower_only::Bool) = hess_nz_count(cone, lower_only)
+
+hess_nz_idxs_col(cone::OrthantCone, j::Int, ::Bool) = j:j
+inv_hess_nz_idxs_col(cone::OrthantCone, j::Int, lower_only::Bool) = hess_nz_idxs_col(cone, j, lower_only)

@@ -161,3 +161,16 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Epi
     end
     return prod
 end
+
+hess_nz_count(cone::EpiNormInf, lower_only::Bool) = (lower_only ? 2 * cone.dim - 1 : 3 * cone.dim - 2)
+
+# the row indices of nonzero elements in column j, inverse Hessian is fully dense (sum of a diagonal plus rank-one matrix)
+function hess_nz_idxs_col(cone::EpiNormInf, j::Int, lower_only::Bool)
+    if j == 1
+        return 1:cone.dim
+    elseif lower_only
+        return j:j
+    else
+        return [1, j]
+    end
+end
