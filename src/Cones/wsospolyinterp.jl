@@ -99,7 +99,7 @@ function update_feas(cone::WSOSPolyInterp)
     return cone.is_feas
 end
 
-# TODO decide whether to compute the hyp_AtA in grad or in hess (only diag needed for grad)
+# TODO decide whether to compute the LUk' * LUk in grad or in hess (only diag needed for grad)
 # TODO can be done in parallel
 # TODO may be faster (but less numerically stable) with explicit inverse here
 function update_grad(cone::WSOSPolyInterp)
@@ -121,7 +121,8 @@ function update_hess(cone::WSOSPolyInterp)
     @assert cone.grad_updated
     cone.hess .= 0
     @inbounds for k in eachindex(cone.Ps)
-        UUk = hyp_AtA!(cone.tmpUU, cone.tmpLU[k])
+        LUk = cone.tmpLU[k]
+        UUk = mul!(cone.tmpUU, LUk', LUk)
         @inbounds for j in 1:cone.dim, i in 1:j
             cone.hess.data[i, j] += abs2(UUk[i, j])
         end

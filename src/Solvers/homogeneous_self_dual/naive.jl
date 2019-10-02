@@ -108,8 +108,8 @@ direct sparse
 mutable struct NaiveSparseSystemSolver{T <: Real} <: NaiveSystemSolver{T}
     lhs6::SparseMatrixCSC
     hess_idxs::Vector{Vector{Union{UnitRange, Vector{Int}}}}
-    fact_cache::SparseNonSymCache{T}
     mtt_idx::Int
+    fact_cache::SparseNonSymCache{T}
     function NaiveSparseSystemSolver{Float64}(;
         fact_cache::SparseNonSymCache{Float64} = SparseNonSymCache(),
         )
@@ -229,7 +229,6 @@ mutable struct NaiveDenseSystemSolver{T <: Real} <: NaiveSystemSolver{T}
     lhs6_copy::Matrix{T}
     lhs6_H_k
     fact_cache
-    # TODO handle fact_cache
     NaiveDenseSystemSolver{T}(; fact_cache = nothing) where {T <: Real} = new{T}()
 end
 
@@ -249,7 +248,6 @@ function load(system_solver::NaiveDenseSystemSolver{T}, solver::Solver{T}) where
         zeros(T,1,n)  zeros(T,1,p)  zeros(T,1,q)          one(T)      zeros(T,1,q)           one(T);
         ]
     system_solver.lhs6 = similar(system_solver.lhs6_copy)
-    # system_solver.fact_cache = HypLUSolveCache(system_solver.sol, system_solver.lhs6, rhs6)
 
     function view_H_k(cone_k, idxs_k)
         rows = system_solver.tau_row .+ idxs_k
@@ -257,6 +255,8 @@ function load(system_solver::NaiveDenseSystemSolver{T}, solver::Solver{T}) where
         return view(system_solver.lhs6, rows, cols)
     end
     system_solver.lhs6_H_k = [view_H_k(cone_k, idxs_k) for (cone_k, idxs_k) in zip(cones, cone_idxs)]
+
+    system_solver.fact_cache = GESVXNonSymCache(system_solver.lhs6)
 
     return system_solver
 end
@@ -269,15 +269,16 @@ function update_fact(system_solver::NaiveDenseSystemSolver{T}, solver::Solver{T}
         copyto!(system_solver.lhs6_H_k[k], Cones.hess(cone_k))
     end
 
-    system_solver.fact_cache = lu!(system_solver.lhs6) # TODO use wrapped lapack function
+    reset_fact(cache)
+    # system_solver.fact_cache = lu!(system_solver.lhs6) # TODO use wrapped lapack function
 
     return system_solver
 end
 
 function solve_system(system_solver::NaiveDenseSystemSolver{T}, solver::Solver{T}, sol6::Matrix{T}, rhs6::Matrix{T}) where {T <: Real}
-    # if !hyp_lu_solve!(system_solver.fact_cache, sol6, lhs6, rhs6)
-    #     @warn("numerical failure: could not fix linear solve failure")
-    # end
-    @timeit solver.timer "ldiv!" ldiv!(sol6, system_solver.fact_cache, rhs6) # TODO use wrapped lapack function
+    if !solve_dense_system(system_solver.fact_cache, sol6, lhs6, rhs6)
+        @warn("numerical failure: could not fix linear solve failure")
+    end
+    # @timeit solver.timer "ldiv!" ldiv!(sol6, system_solver.fact_cache, rhs6) # TODO use wrapped lapack function
     return sol6
 end

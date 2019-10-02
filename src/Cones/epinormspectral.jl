@@ -88,7 +88,7 @@ function update_feas(cone::EpiNormSpectral)
     u = cone.point[1]
     if u > 0
         cone.W[:] .= view(cone.point, 2:cone.dim)
-        hyp_AAt!(cone.WWt, cone.W)
+        mul!(cone.WWt, cone.W, cone.W')
         copyto!(cone.Z, u * I)
         @. cone.Z -= cone.WWt / u
         cone.fact_Z = hyp_chol!(cone.chol_cache, cone.Z)
