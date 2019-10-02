@@ -6,27 +6,21 @@ include(joinpath(@__DIR__, "native.jl"))
 
 const SO = Hypatia.Solvers
 
-real_types = [
-    Float64,
-    Float32,
-    BigFloat,
-    ]
-
-system_solvers = [
-    SO.QRCholSystemSolver,
-    SO.SymIndefSystemSolver,
-    SO.NaiveElimSystemSolver,
-    SO.NaiveSystemSolver,
-    ]
-
-use_infty_nbhd = [
-    true,
-    false,
-    ]
-
-preprocess = [
-    true,
-    false
+testfuns_no_preproc = [
+    orthant1,
+    epinorminf1,
+    epinormeucl1,
+    epipersquare1,
+    hypoperlog1,
+    epiperexp1,
+    power1,
+    hypogeomean1,
+    epinormspectral1,
+    possemideftri1,
+    possemideftricomplex1,
+    hypoperlogdettri1,
+    primalinfeas1,
+    dualinfeas1,
     ]
 
 testfuns_preproc = [
@@ -36,7 +30,7 @@ testfuns_preproc = [
     inconsistent2,
     ]
 
-testfuns_raw = [
+testfuns = [
     orthant1,
     orthant2,
     orthant3,
@@ -81,26 +75,56 @@ testfuns_raw = [
     dualinfeas3,
     ]
 
+real_types = [
+    Float64,
+    Float32,
+    BigFloat,
+    ]
+
+options = (verbose = false,)
+
 @info("starting native tests")
 @testset "native tests" begin
-    @info("starting preprocessing tests")
-    @testset "preprocessing tests: $t, $s, $T" for t in testfuns_preproc, s in system_solvers, T in real_types
-        t(T, solver = SO.Solver{T}(verbose = true, system_solver = s{T}()))
+    # test with and without preprocessing
+    @testset "no preprocessing tests: $t, $T" for t in testfuns_no_preproc, T in real_types
+        t(T, solver = SO.Solver{T}(preprocess = false, system_solver = SO.SymIndefDenseSystemSolver{T}(); options...)) # TODO make default system solver depend on preprocess
+    end
+    @testset "preprocessing tests: $t, $T" for t in testfuns_preproc, T in real_types
+        t(T, solver = SO.Solver{T}(preprocess = true; options...))
     end
 
-    @info("starting miscellaneous tests")
-    @testset "miscellaneous tests: $t, $s, $n, $p, $T" for t in testfuns_raw, s in system_solvers, n in use_infty_nbhd, p in preprocess, T in real_types
-        T == BigFloat && t == epinormspectral1 && continue # Cannot get svdvals with BigFloat
-        !p && s == SO.QRCholSystemSolver && continue # Must use preprocessing if using QRCholSystemSolver
-        solver = SO.Solver{T}(verbose = false, preprocess = p, use_infty_nbhd = n, system_solver = s{T}())
-        t(T, solver = solver)
+    # test with different neighborhood functions
+    @testset "neighborhood function tests: $t, $T, $n" for t in testfuns, T in real_types, n in [true, false]
+        t(T, solver = SO.Solver{T}(use_infty_nbhd = n; options...))
     end
 
-    @info("starting iterative system solver tests")
-    @testset "iterative system solver tests: $t, $T" for t in testfuns_raw, T in real_types
-        T == BigFloat && continue # IterativeSolvers does not work with BigFloat
-        solver = SO.Solver{T}(verbose = true, init_use_iterative = true, preprocess = false,
-            system_solver = SO.NaiveSystemSolver{T}(use_iterative = true))
-        t(T, solver = solver)
+    # test each system solver
+    @testset "NaiveDense tests: $t, $T" for t in testfuns, T in real_types
+        t(T, solver = SO.Solver{T}(system_solver = SO.NaiveDenseSystemSolver{T}(); options...))
+    end
+    @testset "NaiveSparse tests: $t" for t in testfuns
+        T = Float64
+        t(T, solver = SO.Solver{T}(system_solver = SO.NaiveSparseSystemSolver{T}(); options...))
+    end
+    @testset "NaiveIndirect tests: $t" for t in testfuns
+        T = Float64
+        t(T, solver = SO.Solver{T}(init_use_indirect = true, system_solver = SO.NaiveIndirectSystemSolver{T}(); options...))
+    end
+    @testset "NaiveElimDense tests: $t, $T, $h" for t in testfuns, T in real_types, h in [true, false]
+        t(T, solver = SO.Solver{T}(system_solver = SO.NaiveElimDenseSystemSolver{T}(use_inv_hess = h); options...))
+    end
+    @testset "NaiveElimSparse tests: $t" for t in testfuns
+        T = Float64
+        t(T, solver = SO.Solver{T}(system_solver = SO.NaiveElimSparseSystemSolver{T}(); options...))
+    end
+    @testset "SymIndefDense tests: $t, $T, $h" for t in testfuns, T in real_types, h in [true, false]
+        t(T, solver = SO.Solver{T}(system_solver = SO.SymIndefDenseSystemSolver{T}(use_inv_hess = h); options...))
+    end
+    @testset "SymIndefSparse tests: $t" for t in testfuns
+        T = Float64
+        t(T, solver = SO.Solver{T}(system_solver = SO.SymIndefSparseSystemSolver{T}(); options...))
+    end
+    @testset "QRCholDense tests: $t, $T" for t in testfuns, T in real_types
+        t(T, solver = SO.Solver{T}(system_solver = SO.QRCholDenseSystemSolver{T}(); options...))
     end
 end

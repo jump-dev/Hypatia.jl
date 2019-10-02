@@ -7,108 +7,8 @@ solves linear system in naive.jl by first eliminating s, kap, and tau via the me
 http://www.seas.ucla.edu/~vandenbe/publications/coneprog.pdf (the dominating subroutine is a positive definite linear solve with RHS of dimension n-p x 3)
 =#
 
-mutable struct QRCholSystemSolver{T <: Real} <: SystemSolver{T}
-    use_iterative::Bool
-    use_sparse::Bool
+abstract type QRCholSystemSolver{T <: Real} <: SystemSolver{T} end
 
-    lhs
-    fact_cache
-
-    GQ1
-    GQ2
-    QpbxGHbz
-    Q1pbxGHbz
-    Q2div
-    GQ1x
-    HGQ1x
-    HGQ2
-    Gx
-    HGx
-    HGQ1x_k
-    GQ1x_k
-    HGQ2_k
-    GQ2_k
-    HGx_k
-    Gx_k
-
-    function QRCholSystemSolver{T}(; use_iterative::Bool = false, use_sparse::Bool = false) where {T <: Real}
-        system_solver = new{T}()
-        system_solver.use_iterative = use_iterative
-        system_solver.use_sparse = use_sparse
-        return system_solver
-    end
-end
-
-function load(system_solver::QRCholSystemSolver{T}, solver::Solver{T}) where {T <: Real}
-    model = solver.model
-    (n, p, q) = (model.n, model.p, model.q)
-    cone_idxs = model.cone_idxs
-
-    if system_solver.use_iterative
-        error("not implemented")
-    else
-        if !isa(model.G, Matrix{T}) && isa(solver.Ap_Q, SuiteSparse.SPQR.QRSparseQ)
-            # TODO very inefficient method used for sparse G * QRSparseQ : see https://github.com/JuliaLang/julia/issues/31124#issuecomment-501540818
-            # TODO remove workaround and warning
-            @warn("in QRChol, converting G to dense before multiplying by sparse Householder Q due to very inefficient dispatch")
-            GQ = Matrix(model.G) * solver.Ap_Q
-        else
-            GQ = model.G * solver.Ap_Q
-        end
-        system_solver.GQ1 = GQ[:, 1:p]
-        system_solver.GQ2 = GQ[:, (p + 1):end]
-
-        nmp = n - p
-        if system_solver.use_sparse
-            if !issparse(GQ)
-                error("to use sparse factorization for direction finding, cannot use dense A or G matrices (GQ is of type $(typeof(GQ)))")
-            end
-            system_solver.HGQ2 = spzeros(T, q, nmp)
-            system_solver.lhs = spzeros(T, nmp, nmp)
-        else
-            system_solver.HGQ2 = Matrix{T}(undef, q, nmp)
-            system_solver.lhs = Matrix{T}(undef, nmp, nmp)
-        end
-    end
-
-    system_solver.QpbxGHbz = Matrix{T}(undef, n, 3)
-    system_solver.Q1pbxGHbz = view(system_solver.QpbxGHbz, 1:p, :)
-    system_solver.Q2div = view(system_solver.QpbxGHbz, (p + 1):n, :)
-    system_solver.GQ1x = Matrix{T}(undef, q, 3)
-    system_solver.HGQ1x = similar(system_solver.GQ1x)
-    system_solver.Gx = similar(system_solver.GQ1x)
-    system_solver.HGx = similar(system_solver.Gx)
-    system_solver.HGQ1x_k = [view(system_solver.HGQ1x, idxs, :) for idxs in cone_idxs]
-    system_solver.GQ1x_k = [view(system_solver.GQ1x, idxs, :) for idxs in cone_idxs]
-    system_solver.HGQ2_k = [view(system_solver.HGQ2, idxs, :) for idxs in cone_idxs]
-    system_solver.GQ2_k = [view(system_solver.GQ2, idxs, :) for idxs in cone_idxs]
-    system_solver.HGx_k = [view(system_solver.HGx, idxs, :) for idxs in cone_idxs]
-    system_solver.Gx_k = [view(system_solver.Gx, idxs, :) for idxs in cone_idxs]
-
-    return system_solver
-end
-
-# update the LHS factorization to prepare for solve
-function update_fact(system_solver::QRCholSystemSolver{T}, solver::Solver{T}) where {T <: Real}
-    system_solver.use_iterative && return system_solver
-
-    isempty(system_solver.Q2div) && return system_solver
-
-    block_hessian_product(solver.model.cones, system_solver.HGQ2_k, system_solver.GQ2_k)
-    mul!(system_solver.lhs, system_solver.GQ2', system_solver.HGQ2)
-
-    lhs_psd = Symmetric(system_solver.lhs, :U)
-    if system_solver.use_sparse
-        system_solver.fact_cache = ldlt(lhs_psd, shift = sqrt(eps(T)))
-    else
-        set_min_diag!(system_solver.lhs, sqrt(eps(T)))
-        system_solver.fact_cache = (T == BigFloat ? cholesky!(lhs_psd) : bunchkaufman!(lhs_psd))
-    end
-
-    return system_solver
-end
-
-# solve system without outer iterative refinement
 function solve_system(system_solver::QRCholSystemSolver{T}, solver::Solver{T}, sol, rhs) where {T <: Real}
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
@@ -162,23 +62,12 @@ function solve_system(system_solver::QRCholSystemSolver{T}, solver::Solver{T}, s
         block_hessian_product(model.cones, system_solver.HGQ1x_k, system_solver.GQ1x_k)
         mul!(system_solver.Q2div, system_solver.GQ2', system_solver.HGQ1x, -1, true)
 
-        if system_solver.use_iterative
-            error("not implemented")
-            # for j in 1:size(Q2div, 2)
-            #     rhs_j = view(Q2div, :, j)
-            #     sol_j = view(x_sub2, :, j)
-            #     IterativeSolvers.minres!(sol_j, system_solver.lhs, rhs_j, restart = size(Q2div, 1))
-            # end
-        else
-            if system_solver.use_sparse
-                x_sub2 .= system_solver.fact_cache \ system_solver.Q2div
-            else
-                # if !hyp_bk_solve!(system_solver.fact_cache, x_sub2, lhs, Q2div)
-                #     @warn("numerical failure: could not fix linear solve failure (mu is $(solver.mu))")
-                # end
-                ldiv!(x_sub2, system_solver.fact_cache, system_solver.Q2div)
-            end
-        end
+        # TODO use dispatch here
+        @assert system_solver isa QRCholDenseSystemSolver{T}
+        # if !hyp_bk_solve!(system_solver.fact_cache, x_sub2, lhs, Q2div)
+        #     @warn("numerical failure: could not fix linear solve failure (mu is $(solver.mu))")
+        # end
+        ldiv!(x_sub2, system_solver.fact_cache, system_solver.Q2div)
     end
 
     lmul!(solver.Ap_Q, x)
@@ -239,4 +128,80 @@ function block_hessian_product(cones, prod_k, arr_k)
             Cones.hess_prod!(prod_k[k], arr_k[k], cone_k)
         end
     end
+end
+
+#=
+direct dense
+=#
+
+mutable struct QRCholDenseSystemSolver{T <: Real} <: QRCholSystemSolver{T}
+    lhs
+    fact_cache
+    GQ1
+    GQ2
+    QpbxGHbz
+    Q1pbxGHbz
+    Q2div
+    GQ1x
+    HGQ1x
+    HGQ2
+    Gx
+    HGx
+    HGQ1x_k
+    GQ1x_k
+    HGQ2_k
+    GQ2_k
+    HGx_k
+    Gx_k
+    # TODO fact cache
+    QRCholDenseSystemSolver{T}(; fact_cache = nothing) where {T <: Real} = new{T}()
+end
+
+function load(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
+    model = solver.model
+    (n, p, q) = (model.n, model.p, model.q)
+    cone_idxs = model.cone_idxs
+
+    if !isa(model.G, Matrix{T}) && isa(solver.Ap_Q, SuiteSparse.SPQR.QRSparseQ)
+        # TODO very inefficient method used for sparse G * QRSparseQ : see https://github.com/JuliaLang/julia/issues/31124#issuecomment-501540818
+        # TODO remove workaround and warning
+        @warn("in QRChol, converting G to dense before multiplying by sparse Householder Q due to very inefficient dispatch")
+        GQ = Matrix(model.G) * solver.Ap_Q
+    else
+        GQ = model.G * solver.Ap_Q
+    end
+
+    system_solver.GQ1 = GQ[:, 1:p]
+    system_solver.GQ2 = GQ[:, (p + 1):end]
+    nmp = n - p
+    system_solver.HGQ2 = Matrix{T}(undef, q, nmp)
+    system_solver.lhs = Matrix{T}(undef, nmp, nmp)
+    system_solver.QpbxGHbz = Matrix{T}(undef, n, 3)
+    system_solver.Q1pbxGHbz = view(system_solver.QpbxGHbz, 1:p, :)
+    system_solver.Q2div = view(system_solver.QpbxGHbz, (p + 1):n, :)
+    system_solver.GQ1x = Matrix{T}(undef, q, 3)
+    system_solver.HGQ1x = similar(system_solver.GQ1x)
+    system_solver.Gx = similar(system_solver.GQ1x)
+    system_solver.HGx = similar(system_solver.Gx)
+    system_solver.HGQ1x_k = [view(system_solver.HGQ1x, idxs, :) for idxs in cone_idxs]
+    system_solver.GQ1x_k = [view(system_solver.GQ1x, idxs, :) for idxs in cone_idxs]
+    system_solver.HGQ2_k = [view(system_solver.HGQ2, idxs, :) for idxs in cone_idxs]
+    system_solver.GQ2_k = [view(system_solver.GQ2, idxs, :) for idxs in cone_idxs]
+    system_solver.HGx_k = [view(system_solver.HGx, idxs, :) for idxs in cone_idxs]
+    system_solver.Gx_k = [view(system_solver.Gx, idxs, :) for idxs in cone_idxs]
+
+    return system_solver
+end
+
+function update_fact(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
+    isempty(system_solver.Q2div) && return system_solver
+
+    @timeit solver.timer "block_hess_prod" block_hessian_product(solver.model.cones, system_solver.HGQ2_k, system_solver.GQ2_k)
+    @timeit solver.timer "Q2GHGQ2" mul!(system_solver.lhs, system_solver.GQ2', system_solver.HGQ2)
+
+    lhs_psd = Symmetric(system_solver.lhs, :U)
+    set_min_diag!(system_solver.lhs, sqrt(eps(T)))
+    @timeit solver.timer "factorize" system_solver.fact_cache = (T == BigFloat ? cholesky!(lhs_psd) : bunchkaufman!(lhs_psd))
+
+    return system_solver
 end

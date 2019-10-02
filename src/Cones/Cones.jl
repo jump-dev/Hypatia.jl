@@ -9,6 +9,7 @@ module Cones
 using LinearAlgebra
 import LinearAlgebra.BlasFloat
 import LinearAlgebra.copytri!
+import SparseArrays.sparse
 import Hypatia.RealOrComplex
 import Hypatia.hyp_AtA!
 import Hypatia.hyp_AAt!
@@ -49,6 +50,14 @@ hess(cone::Cone) = (cone.hess_updated ? cone.hess : update_hess(cone))
 inv_hess(cone::Cone) = (cone.inv_hess_updated ? cone.inv_hess : update_inv_hess(cone))
 
 # fallbacks
+
+# number of nonzeros in the Hessian and inverse
+hess_nz_count(cone::Cone, lower_only::Bool) = (lower_only ? div(cone.dim * (cone.dim + 1), 2) : abs2(cone.dim))
+inv_hess_nz_count(cone::Cone, lower_only::Bool) = (lower_only ? div(cone.dim * (cone.dim + 1), 2) : abs2(cone.dim))
+
+# the row indices of nonzero elements in column j
+hess_nz_idxs_col(cone::Cone, j::Int, lower_only::Bool) = (lower_only ? (j:cone.dim) : (1:cone.dim))
+inv_hess_nz_idxs_col(cone::Cone, j::Int, lower_only::Bool) = (lower_only ? (j:cone.dim) : (1:cone.dim))
 
 reset_data(cone::Cone) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.inv_hess_prod_updated = false)
 

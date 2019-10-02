@@ -112,6 +112,9 @@ function solve(solver::Solver{T}) where {T <: Real}
 
     solver.solve_time = time() - start_time
 
+    # free memory used by some system solvers
+    free_memory(solver.system_solver)
+
     solver.verbose && println("\nstatus is $(solver.status) after $(solver.num_iters) iterations and $(trunc(solver.solve_time, digits=3)) seconds\n")
 
     return solver
@@ -152,7 +155,7 @@ function find_initial_point(solver::Solver{T}) where {T <: Real}
     # solve for x as least squares solution to Ax = b, Gx = h - s
     @timeit solver.timer "init_x" if !iszero(n)
         rhs = vcat(model.b, model.h - point.s)
-        if solver.init_use_iterative
+        if solver.init_use_indirect
             # use iterative solvers method TODO pick lsqr or lsmr
             AG = BlockMatrix{T}(p + q, n, [A, G], [1:p, (p + 1):(p + q)], [1:n, 1:n])
             point.x = zeros(T, n)
@@ -162,10 +165,10 @@ function find_initial_point(solver::Solver{T}) where {T <: Real}
             if issparse(AG) && !(T <: sparse_QR_reals)
                 # TODO alternative fallback is to convert sparse{T} to sparse{Float64} and do the sparse LU
                 if solver.init_use_fallback
-                    @warn("using dense factorization of [A; G] in initial point finding because sparse factorization for number type $T is not supported by SparseArrays")
+                    @warn("using dense factorization of [A; G] in initial point finding because sparse factorization for number type $T is not supported by SuiteSparse packages")
                     AG = Matrix(AG)
                 else
-                    error("sparse factorization for number type $T is not supported by SparseArrays, so Hypatia cannot find an initial point")
+                    error("sparse factorization for number type $T is not supported by SuiteSparse packages, so Hypatia cannot find an initial point")
                 end
             end
             @timeit solver.timer "qr_fact" AG_fact = issparse(AG) ? qr(AG) : qr!(AG)
@@ -182,7 +185,7 @@ function find_initial_point(solver::Solver{T}) where {T <: Real}
     # solve for y as least squares solution to A'y = -c - G'z
     @timeit solver.timer "init_y" if !iszero(p)
         rhs = -model.c - G' * point.z
-        if solver.init_use_iterative
+        if solver.init_use_indirect
             # use iterative solvers method TODO pick lsqr or lsmr
             point.y = zeros(T, p)
             @timeit solver.timer "lsqr_solve" IterativeSolvers.lsqr!(point.y, A', rhs)
@@ -190,10 +193,10 @@ function find_initial_point(solver::Solver{T}) where {T <: Real}
             if issparse(A) && !(T <: sparse_QR_reals)
                 # TODO alternative fallback is to convert sparse{T} to sparse{Float64} and do the sparse LU
                 if solver.init_use_fallback
-                    @warn("using dense factorization of A' in initial point finding because sparse factorization for number type $T is not supported by SparseArrays")
+                    @warn("using dense factorization of A' in initial point finding because sparse factorization for number type $T is not supported by SuiteSparse packages")
                     @timeit solver.timer "qr_fact" Ap_fact = qr!(Matrix(A'))
                 else
-                    error("sparse factorization for number type $T is not supported by SparseArrays, so Hypatia cannot find an initial point")
+                    error("sparse factorization for number type $T is not supported by SuiteSparse packages, so Hypatia cannot find an initial point")
                 end
             else
                 @timeit solver.timer "qr_fact" Ap_fact = issparse(A) ? qr(sparse(A')) : qr!(Matrix(A'))
@@ -229,10 +232,10 @@ function preprocess_find_initial_point(solver::Solver{T}) where {T <: Real}
         AG = vcat(A, G)
         if issparse(AG) && !(T <: sparse_QR_reals)
             if solver.init_use_fallback
-                @warn("using dense factorization of [A; G] in preprocessing and initial point finding because sparse factorization for number type $T is not supported by SparseArrays")
+                @warn("using dense factorization of [A; G] in preprocessing and initial point finding because sparse factorization for number type $T is not supported by SuiteSparse packages")
                 AG = Matrix(AG)
             else
-                error("sparse factorization for number type $T is not supported by SparseArrays, so Hypatia cannot preprocess and find an initial point")
+                error("sparse factorization for number type $T is not supported by SuiteSparse packages, so Hypatia cannot preprocess and find an initial point")
             end
         end
         @timeit solver.timer "qr_fact" AG_fact = issparse(AG) ? qr(AG, tol = solver.init_tol_qr) : qr(AG, Val(true))
@@ -276,10 +279,10 @@ function preprocess_find_initial_point(solver::Solver{T}) where {T <: Real}
     @timeit solver.timer "preproc_y" if !iszero(p)
         if issparse(A) && !(T <: sparse_QR_reals)
             if solver.init_use_fallback
-                @warn("using dense factorization of A' in preprocessing and initial point finding because sparse factorization for number type $T is not supported by SparseArrays")
+                @warn("using dense factorization of A' in preprocessing and initial point finding because sparse factorization for number type $T is not supported by SuiteSparse packages")
                 @timeit solver.timer "qr_fact" Ap_fact = qr!(Matrix(A'), Val(true))
             else
-                error("sparse factorization for number type $T is not supported by SparseArrays, so Hypatia cannot preprocess and find an initial point")
+                error("sparse factorization for number type $T is not supported by SuiteSparse packages, so Hypatia cannot preprocess and find an initial point")
             end
         else
             @timeit solver.timer "qr_fact" Ap_fact = issparse(A) ? qr(sparse(A'), tol = solver.init_tol_qr) : qr(A', Val(true))
