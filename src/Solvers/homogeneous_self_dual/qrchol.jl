@@ -62,12 +62,7 @@ function solve_system(system_solver::QRCholSystemSolver{T}, solver::Solver{T}, s
         block_hessian_product(model.cones, system_solver.HGQ1x_k, system_solver.GQ1x_k)
         mul!(system_solver.Q2div, system_solver.GQ2', system_solver.HGQ1x, -1, true)
 
-        # TODO use dispatch here
-        @assert system_solver isa QRCholDenseSystemSolver{T}
-        # if !hyp_bk_solve!(system_solver.fact_cache, x_sub2, lhs, Q2div)
-        #     @warn("numerical failure: could not fix linear solve failure (mu is $(solver.mu))")
-        # end
-        ldiv!(x_sub2, system_solver.fact_cache, system_solver.Q2div)
+        solve_subsystem(system_solver, x_sub2, system_solver.Q2div)
     end
 
     lmul!(solver.Ap_Q, x)
@@ -135,7 +130,7 @@ direct dense
 =#
 
 mutable struct QRCholDenseSystemSolver{T <: Real} <: QRCholSystemSolver{T}
-    lhs
+    lhs1::Symmetric{T, Matrix{T}}
     fact_cache
     GQ1
     GQ2
@@ -153,8 +148,11 @@ mutable struct QRCholDenseSystemSolver{T <: Real} <: QRCholSystemSolver{T}
     GQ2_k
     HGx_k
     Gx_k
-    # TODO fact cache
-    QRCholDenseSystemSolver{T}(; fact_cache = nothing) where {T <: Real} = new{T}()
+    function QRCholDenseSystemSolver{T}(; fact_cache::DensePosDefCache{T} = DensePosDefCache{T}()) where {T <: Real}
+        system_solver = new{T}()
+        system_solver.fact_cache = fact_cache
+        return system_solver
+    end
 end
 
 function load(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
@@ -175,7 +173,7 @@ function load(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}) wher
     system_solver.GQ2 = GQ[:, (p + 1):end]
     nmp = n - p
     system_solver.HGQ2 = Matrix{T}(undef, q, nmp)
-    system_solver.lhs = Matrix{T}(undef, nmp, nmp)
+    system_solver.lhs1 = Symmetric(Matrix{T}(undef, nmp, nmp), :U)
     system_solver.QpbxGHbz = Matrix{T}(undef, n, 3)
     system_solver.Q1pbxGHbz = view(system_solver.QpbxGHbz, 1:p, :)
     system_solver.Q2div = view(system_solver.QpbxGHbz, (p + 1):n, :)
@@ -190,18 +188,26 @@ function load(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}) wher
     system_solver.HGx_k = [view(system_solver.HGx, idxs, :) for idxs in cone_idxs]
     system_solver.Gx_k = [view(system_solver.Gx, idxs, :) for idxs in cone_idxs]
 
+    load_dense_matrix(system_solver.fact_cache, system_solver.lhs1)
+
     return system_solver
 end
 
-function update_fact(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
+function update_fact(system_solver::QRCholDenseSystemSolver, solver::Solver)
     isempty(system_solver.Q2div) && return system_solver
 
     @timeit solver.timer "block_hess_prod" block_hessian_product(solver.model.cones, system_solver.HGQ2_k, system_solver.GQ2_k)
-    @timeit solver.timer "Q2GHGQ2" mul!(system_solver.lhs, system_solver.GQ2', system_solver.HGQ2)
+    @timeit solver.timer "Q2GHGQ2" mul!(system_solver.lhs1.data, system_solver.GQ2', system_solver.HGQ2)
 
-    lhs_psd = Symmetric(system_solver.lhs, :U)
-    set_min_diag!(system_solver.lhs, sqrt(eps(T)))
-    @timeit solver.timer "factorize" system_solver.fact_cache = (T == BigFloat ? cholesky!(lhs_psd) : bunchkaufman!(lhs_psd))
+    reset_fact(system_solver.fact_cache)
 
     return system_solver
+end
+
+function solve_subsystem(system_solver::QRCholDenseSystemSolver, sol1, rhs1)
+    if !solve_dense_system(system_solver.fact_cache, sol1, system_solver.lhs1, rhs1)
+        # TODO recover somehow
+        @warn("numerical failure: could not solve linear system")
+    end
+    return sol1
 end
