@@ -43,6 +43,7 @@ mutable struct Solver{T <: Real}
     tol_feas::T
     tol_slow::T
     preprocess::Bool
+    reduce::Bool
     init_use_indirect::Bool
     init_tol_qr::T
     init_use_fallback::Bool
@@ -128,8 +129,9 @@ mutable struct Solver{T <: Real}
         tol_abs_opt::Real = sqrt(eps(T)),
         tol_feas::Real = sqrt(eps(T)),
         tol_slow::Real = 1e-3,
-        preprocess::Bool = true,
-        init_use_indirect::Bool = false,
+        preprocess::Bool = false,
+        reduce::Bool = false,
+        init_use_indirect::Bool = true,
         init_tol_qr::Real = 100 * eps(T),
         init_use_fallback::Bool = true,
         max_nbhd::Real = 0.7,
@@ -138,10 +140,11 @@ mutable struct Solver{T <: Real}
         system_solver::SystemSolver{T} = QRCholDenseSystemSolver{T}(),
         ) where {T <: Real}
         if isa(system_solver, QRCholSystemSolver{T})
-            @assert preprocess # require preprocessing for QRCholSystemSolver
+            @assert reduce || preprocess # require reduction or preprocessing for QRCholSystemSolver
         end
 
         solver = new{T}()
+
         solver.verbose = verbose
         solver.iter_limit = iter_limit
         solver.time_limit = time_limit
@@ -150,6 +153,7 @@ mutable struct Solver{T <: Real}
         solver.tol_feas = tol_feas
         solver.tol_slow = tol_slow
         solver.preprocess = preprocess
+        solver.reduce = reduce
         solver.init_use_indirect = init_use_indirect
         solver.init_tol_qr = init_tol_qr
         solver.init_use_fallback = init_use_fallback
@@ -179,6 +183,9 @@ function get_x(solver::Solver{T}) where {T <: Real}
     if solver.preprocess
         x = zeros(T, solver.orig_model.n)
         x[solver.x_keep_idxs] = solver.point.x # unpreprocess solver's solution
+        if solver.reduce
+            error("TODO")
+        end
     else
         x = copy(solver.point.x)
     end
@@ -189,6 +196,9 @@ function get_y(solver::Solver{T}) where {T <: Real}
     if solver.preprocess
         y = zeros(T, solver.orig_model.p)
         y[solver.y_keep_idxs] = solver.point.y # unpreprocess solver's solution
+        if solver.reduce
+            error("TODO")
+        end
     else
         y = copy(solver.point.y)
     end

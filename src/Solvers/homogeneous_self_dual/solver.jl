@@ -328,28 +328,42 @@ function preprocess_find_initial_point(solver::Solver{T}) where {T <: Real}
             solver.verbose && println("removed $(p - Ap_rank) out of $p primal equality constraints")
         end
 
-        @timeit solver.timer "qr_solve" begin
-            # point.y = Ap_R \ ((Ap_fact.Q' * (-c - G' * point.z))[1:Ap_rank])
-            tmp = -c
-            mul!(tmp, G', point.z, -1, true)
-            lmul!(Ap_fact.Q', tmp)
-            point.y = tmp[1:Ap_rank]
-            ldiv!(Ap_R, point.y)
-        end
-
-        if !(Ap_fact isa QRPivoted{T, Matrix{T}})
-            row_piv = Ap_fact.prow
-            A = A[y_keep_idxs, row_piv]
-            c = c[row_piv]
-            G = G[:, row_piv]
-            x_keep_idxs = x_keep_idxs[row_piv]
+        if solver.reduce
+            # remove all primal equalities by making A and b empty with n = n0 - p0 and p = 0:
+            # [cQ1 cQ2] = c0' * Q
+            # c = cQ2
+            # offset = offset0 + cQ1 * (R' \ b0)
+            # [GQ1 GQ2] = G0 * Q # NOTE avoid calculating GQ1 explicitly if possible
+            # h = h0 - GQ1 * (R' \ b0)
+            # G = GQ2
+            # recover original-space solution using:
+            # x0 = Q * [(R' \ b0), x]
+            # y0 = R \ (-cQ1' - GQ1' * z0)
         else
-            A = A[y_keep_idxs, :]
+            # keep non-redundant primal equalities
+            @timeit solver.timer "qr_solve" begin
+                # point.y = Ap_R \ ((Ap_fact.Q' * (-c - G' * point.z))[1:Ap_rank])
+                tmp = -c
+                mul!(tmp, G', point.z, -1, true)
+                lmul!(Ap_fact.Q', tmp)
+                point.y = tmp[1:Ap_rank]
+                ldiv!(Ap_R, point.y)
+            end
+
+            if !(Ap_fact isa QRPivoted{T, Matrix{T}})
+                row_piv = Ap_fact.prow
+                A = A[y_keep_idxs, row_piv]
+                c = c[row_piv]
+                G = G[:, row_piv]
+                x_keep_idxs = x_keep_idxs[row_piv]
+            else
+                A = A[y_keep_idxs, :]
+            end
+            b = b_sub
+            p = Ap_rank
+            solver.Ap_R = Ap_R
+            solver.Ap_Q = Ap_Q
         end
-        b = b_sub
-        p = Ap_rank
-        solver.Ap_R = Ap_R
-        solver.Ap_Q = Ap_Q
     else
         y_keep_idxs = Int[]
         solver.Ap_R = UpperTriangular(zeros(T, 0, 0))
