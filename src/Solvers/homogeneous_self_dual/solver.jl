@@ -158,7 +158,7 @@ function find_initial_point(solver::Solver{T}) where {T <: Real}
         if solver.init_use_indirect
             # use iterative solvers method TODO pick lsqr or lsmr
             AG = BlockMatrix{T}(p + q, n, [A, G], [1:p, (p + 1):(p + q)], [1:n, 1:n])
-            @timeit solver.timer "lsqr_solve" point.x = IterativeSolvers.lsqr!(AG, rhs)
+            @timeit solver.timer "lsqr_solve" point.x = IterativeSolvers.lsqr(AG, rhs)
         else
             AG = vcat(A, G)
             if issparse(AG) && !(T <: sparse_QR_reals)
