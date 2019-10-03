@@ -45,7 +45,7 @@ function update_sparse_fact(cache::UMFPACKNonSymCache, A::SparseMatrixCSC{Float6
 end
 
 function solve_sparse_system(cache::UMFPACKNonSymCache, x::Matrix{Float64}, A::SparseMatrixCSC{Float64, SuiteSparseInt}, b::Matrix{Float64})
-    ldiv!(x, cache.umfpack, b) # will not repeat factorizations
+    ldiv!(x, cache.umfpack, b) # does not repeat symbolic or numeric factorization
     return x
 end
 
@@ -94,7 +94,7 @@ function update_sparse_fact(cache::CHOLMODSymCache, A::SparseMatrixCSC{Float64, 
 end
 
 function solve_sparse_system(cache::CHOLMODSymCache, x::Matrix{Float64}, A::SparseMatrixCSC{Float64, SuiteSparseInt}, b::Matrix{Float64})
-    x .= cache.cholmod \ b
+    x .= cache.cholmod \ b # TODO try to make this in-place
     return x
 end
 

@@ -62,7 +62,7 @@ function solve_system(system_solver::NaiveElimSystemSolver{T}, solver::Solver{T}
     # -c'x - b'y - h'z + mu/(taubar^2)*tau = taurhs + kaprhs
     @. @views rhs4[end, :] += rhs[end, :]
 
-    solve_subsystem(system_solver, solver, sol4, rhs4)
+    @timeit solver.timer "solve_sparse_system" solve_subsystem(system_solver, sol4, rhs4)
     @views copyto!(sol[1:tau_row, :], sol4)
 
     # lift to get s and kap
@@ -97,7 +97,7 @@ mutable struct NaiveElimSparseSystemSolver{T <: Real} <: NaiveElimSystemSolver{T
 
     function NaiveElimSparseSystemSolver{T}(;
         use_inv_hess::Bool = true,
-        fact_cache::SparseNonSymCache{Float64} = SparseNonSymCache(),
+        fact_cache::SparseNonSymCache{Float64} = SparseNonSymCache{Float64}(),
         ) where {T <: Real}
         system_solver = new{T}()
         if !use_inv_hess
@@ -198,8 +198,8 @@ function update_fact(system_solver::NaiveElimSparseSystemSolver{T}, solver::Solv
     return system_solver
 end
 
-function solve_subsystem(system_solver::NaiveElimSparseSystemSolver{T}, solver::Solver{T}, sol4::Matrix{T}, rhs4::Matrix{T}) where {T <: Real}
-    @timeit solver.timer "solve_sparse_system" solve_sparse_system(system_solver.fact_cache, sol4, system_solver.lhs4, rhs4)
+function solve_subsystem(system_solver::NaiveElimSparseSystemSolver{T}, sol4::Matrix{T}, rhs4::Matrix{T}) where {T <: Real}
+    solve_sparse_system(system_solver.fact_cache, sol4, system_solver.lhs4, rhs4)
     return sol4
 end
 
@@ -217,10 +217,11 @@ mutable struct NaiveElimDenseSystemSolver{T <: Real} <: NaiveElimSystemSolver{T}
     fact_cache
     function NaiveElimDenseSystemSolver{T}(;
         use_inv_hess::Bool = true,
-        fact_cache = nothing,
+        fact_cache::DenseNonSymCache{T} = DenseNonSymCache{T}(),
         ) where {T <: Real}
         system_solver = new{T}()
         system_solver.use_inv_hess = use_inv_hess
+        system_solver.fact_cache = fact_cache
         return system_solver
     end
 end
@@ -239,7 +240,8 @@ function load(system_solver::NaiveElimDenseSystemSolver{T}, solver::Solver{T}) w
         -model.c'       -model.b'       -model.h'                 one(T);
         ]
     system_solver.lhs4 = similar(system_solver.lhs4_copy)
-    # system_solver.fact_cache = HypLUSolveCache(system_solver.sol, system_solver.lhs4, rhs4)
+
+    load_dense_matrix(system_solver.fact_cache, system_solver.lhs4)
 
     return system_solver
 end
@@ -269,12 +271,15 @@ function update_fact(system_solver::NaiveElimDenseSystemSolver{T}, solver::Solve
         end
     end
 
-    system_solver.fact_cache = lu!(system_solver.lhs4) # TODO use wrapped lapack function
+    reset_fact(system_solver.fact_cache)
 
     return system_solver
 end
 
-function solve_subsystem(system_solver::NaiveElimDenseSystemSolver{T}, solver::Solver{T}, sol4::Matrix{T}, rhs4::Matrix{T}) where {T <: Real}
-    ldiv!(sol4, system_solver.fact_cache, rhs4)
+function solve_subsystem(system_solver::NaiveElimDenseSystemSolver{T}, sol4::Matrix{T}, rhs4::Matrix{T}) where {T <: Real}
+    if !solve_dense_system(system_solver.fact_cache, sol4, system_solver.lhs4, rhs4)
+        # TODO recover somehow
+        @warn("numerical failure: could not solve linear system")
+    end
     return sol4
 end
