@@ -3,6 +3,7 @@ Copyright 2019, Chris Coey and contributors
 
 helpers for dense factorizations and linear solves
 NOTE: factorization routines destroy the LHS matrix
+TODO use optimal sizes of work arrays etc from LAPACK
 =#
 
 import LinearAlgebra.BlasReal
@@ -48,8 +49,8 @@ function load_dense_matrix(cache::GESVXNonSymCache{T}, A::Matrix{T}) where {T <:
     cache.rvec = Vector{T}(undef, n)
     cache.cvec = Vector{T}(undef, n)
     cache.rcond = Ref{T}()
-    cache.ferr = Vector{T}(undef, 1) # NOTE ferr and berr are resized if too small
-    cache.berr = Vector{T}(undef, 1)
+    cache.ferr = Vector{T}(undef, 0) # NOTE ferr and berr are resized if too small
+    cache.berr = Vector{T}(undef, 0)
     cache.work = Vector{T}(undef, 4 * n)
     cache.iwork = Vector{Int}(undef, n)
     cache.info = Ref{BlasInt}()
@@ -59,12 +60,12 @@ end
 # wrap LAPACK function
 for (gesvx, elty) in [(:dgesvx_, :Float64), (:sgesvx_, :Float32)]
     @eval begin
-        function solve_dense_system(cache::GESVXNonSymCache{$elty}, X::StridedVecOrMat{$elty}, A::Matrix{$elty}, B::StridedVecOrMat{$elty})
+        function solve_dense_system(cache::GESVXNonSymCache{$elty}, X::VecOrMat{$elty}, A::Matrix{$elty}, B::VecOrMat{$elty})
             nrhs = size(B, 2)
             @assert size(X, 2) == nrhs
             if length(cache.ferr) < nrhs
-                resize!(cache.rvec, nrhs)
-                resize!(cache.cvec, nrhs)
+                resize!(cache.ferr, nrhs)
+                resize!(cache.berr, nrhs)
             end
 
             if cache.is_factorized
@@ -85,7 +86,7 @@ for (gesvx, elty) in [(:dgesvx_, :Float64), (:sgesvx_, :Float32)]
                 do_fact, 'N', cache.n, nrhs,
                 A, cache.lda, cache.AF, cache.n,
                 cache.ipiv, cache.equed, cache.rvec, cache.cvec,
-                B, stride(B, 2), X, cache.n,
+                B, stride(B, 2), X, stride(X, 2),
                 cache.rcond, cache.ferr, cache.berr, cache.work,
                 cache.iwork, cache.info)
 
@@ -133,6 +134,130 @@ end
 # default to GESVXNonSymCache for BlasReals, otherwise generic LUNonSymCache
 DenseNonSymCache{T}() where {T <: BlasReal} = GESVXNonSymCache{T}()
 DenseNonSymCache{T}() where {T <: Real} = LUNonSymCache{T}()
+
+#=
+symmetric indefinite: SYSVX (and LU fallback)
+TODO add a generic BunchKaufman implementation to Julia and use that instead of LU for generic case
+TODO try Aasen's version (http://www.netlib.org/lapack/lawnspdf/lawn294.pdf) and others
+=#
+
+abstract type DenseSymCache{T <: Real} end
+
+reset_fact(cache::DenseSymCache) = (cache.is_factorized = false)
+
+mutable struct SYSVXSymCache{T <: BlasReal} <: DenseSymCache{T}
+    is_factorized::Bool
+    n
+    lda
+    AF
+    ipiv
+    rcond
+    ferr
+    berr
+    work
+    lwork
+    iwork
+    info
+    SYSVXSymCache{T}() where {T <: BlasReal} = new{T}()
+end
+
+function load_dense_matrix(cache::SYSVXSymCache{T}, A::Symmetric{T, Matrix{T}}) where {T <: BlasReal}
+    cache.is_factorized = false
+    LinearAlgebra.chkstride1(A.data)
+    n = cache.n = LinearAlgebra.checksquare(A.data)
+    cache.lda = stride(A.data, 2)
+    cache.AF = Matrix{T}(undef, n, n)
+    cache.ipiv = Vector{Int}(undef, n)
+    cache.rcond = Ref{T}()
+    cache.ferr = Vector{T}(undef, 0) # NOTE ferr and berr are resized if too small
+    cache.berr = Vector{T}(undef, 0)
+    cache.work = Vector{T}(undef, 5 * n)
+    cache.lwork = Ref{BlasInt}(5 * n)
+    cache.iwork = Vector{Int}(undef, n)
+    cache.info = Ref{BlasInt}()
+    return cache
+end
+
+# wrap LAPACK function
+for (sysvx, elty) in [(:dsysvx_, :Float64), (:ssysvx_, :Float32)]
+    @eval begin
+        function solve_dense_system(cache::SYSVXSymCache{$elty}, X::VecOrMat{$elty}, A::Symmetric{$elty, Matrix{$elty}}, B::VecOrMat{$elty})
+            nrhs = size(B, 2)
+            @assert size(X, 2) == nrhs
+            if length(cache.ferr) < nrhs
+                resize!(cache.ferr, nrhs)
+                resize!(cache.berr, nrhs)
+            end
+
+            if cache.is_factorized
+                cache.is_factorized = true
+                do_fact = 'F'
+            else
+                do_fact = 'N'
+            end
+
+            # call dsysvx( fact, uplo, n, nrhs, a, lda, af, ldaf, ipiv, b, ldb, x, ldx, rcond, ferr, berr, work, lwork, iwork, info )
+            ccall((@blasfunc($sysvx), Base.liblapack_name), Cvoid,
+                (Ref{UInt8}, Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt},
+                Ptr{$elty}, Ref{BlasInt}, Ptr{$elty}, Ref{BlasInt},
+                Ptr{BlasInt}, Ptr{$elty}, Ref{BlasInt}, Ptr{$elty},
+                Ref{BlasInt}, Ptr{$elty}, Ptr{$elty}, Ptr{$elty},
+                Ptr{$elty}, Ptr{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt}),
+                do_fact, A.uplo, cache.n, nrhs,
+                A.data, cache.lda, cache.AF, cache.n,
+                cache.ipiv, B, stride(B, 2), X,
+                stride(X, 2), cache.rcond, cache.ferr, cache.berr,
+                cache.work, cache.lwork, cache.iwork, cache.info)
+
+            if cache.info[] < 0
+                throw(ArgumentError("invalid argument #$(-cache.info[]) to LAPACK call"))
+            elseif 0 < cache.info[] <= cache.n
+                @warn("factorization failed: #$(cache.info[])")
+                return false
+            elseif cache.info[] > cache.n
+                @warn("condition number is small: $(cache.rcond[])")
+            end
+
+            return true
+        end
+    end
+end
+
+mutable struct LUSymCache{T <: Real} <: DenseSymCache{T}
+    is_factorized::Bool
+    fact
+    LUSymCache{T}() where {T <: Real} = new{T}()
+end
+
+function load_dense_matrix(cache::LUSymCache{T}, A::Symmetric{T, <:AbstractMatrix{T}}) where {T <: Real}
+    cache.is_factorized = false
+    return cache
+end
+
+function solve_dense_system(cache::LUSymCache{T}, X::AbstractMatrix{T}, A::Symmetric{T, <:AbstractMatrix{T}}, B::AbstractMatrix{T}) where {T <: Real}
+    if !cache.is_factorized
+        cache.is_factorized = true
+        cache.fact = lu!(A, check = false)
+        if !issuccess(cache.fact)
+            @warn("numerical failure: LU factorization failed")
+            return false
+        end
+    end
+
+    ldiv!(X, cache.fact, B)
+
+    return true
+end
+
+# default to SYSVXSymCache for BlasReals, otherwise generic LUSymCache
+DenseSymCache{T}() where {T <: BlasReal} = SYSVXSymCache{T}()
+DenseSymCache{T}() where {T <: Real} = LUSymCache{T}()
+
+
+
+
+
+
 
 
 

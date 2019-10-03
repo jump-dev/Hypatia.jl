@@ -99,9 +99,9 @@ options = (verbose = true,)
     # end
 
     # test each system solver
-    @testset "NaiveDense tests: $t, $T" for t in testfuns, T in real_types
-        t(T, solver = SO.Solver{T}(system_solver = SO.NaiveDenseSystemSolver{T}(); options...))
-    end
+    # @testset "NaiveDense tests: $t, $T" for t in testfuns, T in real_types
+    #     t(T, solver = SO.Solver{T}(system_solver = SO.NaiveDenseSystemSolver{T}(); options...))
+    # end
     # @testset "NaiveSparse tests: $t" for t in testfuns
     #     T = Float64
     #     t(T, solver = SO.Solver{T}(system_solver = SO.NaiveSparseSystemSolver{T}(); options...))
@@ -110,16 +110,16 @@ options = (verbose = true,)
     #     T = Float64
     #     t(T, solver = SO.Solver{T}(init_use_indirect = true, system_solver = SO.NaiveIndirectSystemSolver{T}(); options...))
     # end
-    @testset "NaiveElimDense tests: $t, $T, $h" for t in testfuns, T in real_types, h in [true, false]
-        t(T, solver = SO.Solver{T}(system_solver = SO.NaiveElimDenseSystemSolver{T}(use_inv_hess = h); options...))
-    end
+    # @testset "NaiveElimDense tests: $t, $T, $h" for t in testfuns, T in real_types, h in [true, false]
+    #     t(T, solver = SO.Solver{T}(system_solver = SO.NaiveElimDenseSystemSolver{T}(use_inv_hess = h); options...))
+    # end
     # @testset "NaiveElimSparse tests: $t" for t in testfuns
     #     T = Float64
     #     t(T, solver = SO.Solver{T}(system_solver = SO.NaiveElimSparseSystemSolver{T}(); options...))
     # end
-    # @testset "SymIndefDense tests: $t, $T, $h" for t in testfuns, T in real_types, h in [true, false]
-    #     t(T, solver = SO.Solver{T}(system_solver = SO.SymIndefDenseSystemSolver{T}(use_inv_hess = h); options...))
-    # end
+    @testset "SymIndefDense tests: $t, $T, $h" for t in testfuns, T in real_types, h in [true, false]
+        t(T, solver = SO.Solver{T}(system_solver = SO.SymIndefDenseSystemSolver{T}(use_inv_hess = h); options...))
+    end
     # @testset "SymIndefSparse tests: $t" for t in testfuns
     #     T = Float64
     #     t(T, solver = SO.Solver{T}(system_solver = SO.SymIndefSparseSystemSolver{T}(); options...))

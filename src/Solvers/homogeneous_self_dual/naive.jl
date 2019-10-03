@@ -258,7 +258,7 @@ function load(system_solver::NaiveDenseSystemSolver{T}, solver::Solver{T}) where
     end
     system_solver.lhs6_H_k = [view_H_k(cone_k, idxs_k) for (cone_k, idxs_k) in zip(cones, cone_idxs)]
 
-    load_dense_matrix(system_solver.fact_cache, system_solver.lhs6_copy)
+    load_dense_matrix(system_solver.fact_cache, system_solver.lhs6)
 
     return system_solver
 end

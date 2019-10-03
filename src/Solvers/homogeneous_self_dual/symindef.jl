@@ -250,15 +250,18 @@ direct dense
 mutable struct SymIndefDenseSystemSolver{T <: Real} <: SymIndefSystemSolver{T}
     use_inv_hess::Bool
     tau_row::Int
-    lhs3::Matrix{T}
-    lhs3_copy::Matrix{T}
+    lhs3::Symmetric{T, Matrix{T}}
+    lhs3_copy::Symmetric{T, Matrix{T}}
     rhs3::Matrix{T}
     sol3::Matrix{T}
     fact_cache
-    # TODO fact_cache kwarg?
-    function SymIndefDenseSystemSolver{T}(; use_inv_hess::Bool = true, fact_cache = nothing) where {T <: Real}
+    function SymIndefDenseSystemSolver{T}(;
+        use_inv_hess::Bool = true,
+        fact_cache::DenseSymCache{T} = DenseSymCache{T}(),
+        ) where {T <: Real}
         system_solver = new{T}()
         system_solver.use_inv_hess = use_inv_hess
+        system_solver.fact_cache = fact_cache
         return system_solver
     end
 end
@@ -271,13 +274,14 @@ function load(system_solver::SymIndefDenseSystemSolver{T}, solver::Solver{T}) wh
     system_solver.rhs3 = similar(system_solver.sol3)
 
     # fill symmetric lower triangle
-    system_solver.lhs3_copy = T[
+    system_solver.lhs3_copy = Symmetric(T[
         zeros(T, n, n)  zeros(T, n, p)  zeros(T, n, q);
         model.A         zeros(T, p, p)  zeros(T, p, q);
         model.G         zeros(T, q, p)  Matrix(-one(T) * I, q, q);
-        ]
+        ], :L)
     system_solver.lhs3 = similar(system_solver.lhs3_copy)
-    # system_solver.fact_cache = HypBKSolveCache(system_solver.sol, system_solver.lhs3, rhs3)
+
+    load_dense_matrix(system_solver.fact_cache, system_solver.lhs3)
 
     return system_solver
 end
@@ -287,7 +291,8 @@ function update_fact(system_solver::SymIndefDenseSystemSolver{T}, solver::Solver
     (n, p, q) = (model.n, model.p, model.q)
     lhs3 = system_solver.lhs3
 
-    copyto!(lhs3, system_solver.lhs3_copy)
+    copyto!(lhs3, system_solver.lhs3_copy) # TODO can avoid this for BK since doesn't equilibrate - maybe make function "needs_copy(cache)"
+    lhs3 = lhs3.data
 
     for (k, cone_k) in enumerate(model.cones)
         idxs_k = model.cone_idxs[k]
@@ -309,13 +314,15 @@ function update_fact(system_solver::SymIndefDenseSystemSolver{T}, solver::Solver
         end
     end
 
-    lhs3_symm = Symmetric(lhs3, :L)
-    system_solver.fact_cache = (T == BigFloat ? lu!(lhs3_symm) : bunchkaufman!(lhs3_symm))
+    reset_fact(system_solver.fact_cache)
 
     return system_solver
 end
 
 function solve_subsystem(system_solver::SymIndefDenseSystemSolver, solver::Solver, sol3, rhs3)
-    ldiv!(sol3, system_solver.fact_cache, rhs3)
+    @timeit solver.timer "solve_dense_system" if !solve_dense_system(system_solver.fact_cache, sol3, system_solver.lhs3, rhs3)
+        # TODO recover somehow
+        @warn("numerical failure: could not solve linear system")
+    end
     return sol3
 end
