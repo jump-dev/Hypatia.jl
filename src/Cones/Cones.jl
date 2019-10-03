@@ -11,8 +11,6 @@ import LinearAlgebra.BlasFloat
 import LinearAlgebra.copytri!
 import SparseArrays.sparse
 import Hypatia.RealOrComplex
-import Hypatia.hyp_AtA!
-import Hypatia.hyp_AAt!
 import Hypatia.HypCholCache
 import Hypatia.hyp_chol!
 import Hypatia.hyp_chol_inv!

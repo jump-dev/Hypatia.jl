@@ -81,7 +81,7 @@ real_types = [
     BigFloat,
     ]
 
-options = (verbose = false,)
+options = (verbose = true,)
 
 @info("starting native tests")
 @testset "native tests" begin

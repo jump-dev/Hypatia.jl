@@ -108,11 +108,9 @@ direct sparse
 mutable struct NaiveSparseSystemSolver{T <: Real} <: NaiveSystemSolver{T}
     lhs6::SparseMatrixCSC
     hess_idxs::Vector{Vector{Union{UnitRange, Vector{Int}}}}
-    fact_cache::SparseNonSymCache{T}
     mtt_idx::Int
-    function NaiveSparseSystemSolver{Float64}(;
-        fact_cache::SparseNonSymCache{Float64} = SparseNonSymCache(),
-        )
+    fact_cache::SparseNonSymCache{T}
+    function NaiveSparseSystemSolver{Float64}(; fact_cache::SparseNonSymCache{Float64} = SparseNonSymCache{Float64}())
         s = new{Float64}()
         s.fact_cache = fact_cache
         return s
@@ -229,8 +227,11 @@ mutable struct NaiveDenseSystemSolver{T <: Real} <: NaiveSystemSolver{T}
     lhs6_copy::Matrix{T}
     lhs6_H_k
     fact_cache
-    # TODO handle fact_cache
-    NaiveDenseSystemSolver{T}(; fact_cache = nothing) where {T <: Real} = new{T}()
+    function NaiveDenseSystemSolver{T}(; fact_cache::DenseNonSymCache{T} = DenseNonSymCache{T}()) where {T <: Real}
+        system_solver = new{T}()
+        system_solver.fact_cache = fact_cache
+        return system_solver
+    end
 end
 
 function load(system_solver::NaiveDenseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
@@ -249,7 +250,6 @@ function load(system_solver::NaiveDenseSystemSolver{T}, solver::Solver{T}) where
         zeros(T,1,n)  zeros(T,1,p)  zeros(T,1,q)          one(T)      zeros(T,1,q)           one(T);
         ]
     system_solver.lhs6 = similar(system_solver.lhs6_copy)
-    # system_solver.fact_cache = HypLUSolveCache(system_solver.sol, system_solver.lhs6, rhs6)
 
     function view_H_k(cone_k, idxs_k)
         rows = system_solver.tau_row .+ idxs_k
@@ -257,6 +257,8 @@ function load(system_solver::NaiveDenseSystemSolver{T}, solver::Solver{T}) where
         return view(system_solver.lhs6, rows, cols)
     end
     system_solver.lhs6_H_k = [view_H_k(cone_k, idxs_k) for (cone_k, idxs_k) in zip(cones, cone_idxs)]
+
+    load_dense_matrix(system_solver.fact_cache, system_solver.lhs6)
 
     return system_solver
 end
@@ -269,15 +271,15 @@ function update_fact(system_solver::NaiveDenseSystemSolver{T}, solver::Solver{T}
         copyto!(system_solver.lhs6_H_k[k], Cones.hess(cone_k))
     end
 
-    system_solver.fact_cache = lu!(system_solver.lhs6) # TODO use wrapped lapack function
+    reset_fact(system_solver.fact_cache)
 
     return system_solver
 end
 
 function solve_system(system_solver::NaiveDenseSystemSolver{T}, solver::Solver{T}, sol6::Matrix{T}, rhs6::Matrix{T}) where {T <: Real}
-    # if !hyp_lu_solve!(system_solver.fact_cache, sol6, lhs6, rhs6)
-    #     @warn("numerical failure: could not fix linear solve failure")
-    # end
-    @timeit solver.timer "ldiv!" ldiv!(sol6, system_solver.fact_cache, rhs6) # TODO use wrapped lapack function
+    @timeit solver.timer "solve_dense_system" if !solve_dense_system(system_solver.fact_cache, sol6, system_solver.lhs6, rhs6)
+        # TODO recover somehow
+        @warn("numerical failure: could not solve linear system")
+    end
     return sol6
 end
