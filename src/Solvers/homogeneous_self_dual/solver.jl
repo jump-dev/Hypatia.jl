@@ -264,7 +264,7 @@ function preprocess_find_initial_point(solver::Solver{T}) where {T <: Real}
             end
             solver.verbose && println("removed $(n - AG_rank) out of $n dual equality constraints")
 
-            @timeit solver.timer "qr_solve" point.x = AG_R \ (Matrix{T}(I, AG_rank, p + q) * (AG_fact.Q' * vcat(b, orig_model.h - point.s)))
+            @timeit solver.timer "qr_solve" point.x = AG_R \ ((AG_fact.Q' * vcat(b, orig_model.h - point.s))[1:AG_rank])
 
             c = c_sub
             A = A[:, x_keep_idxs]
@@ -311,7 +311,7 @@ function preprocess_find_initial_point(solver::Solver{T}) where {T <: Real}
             solver.verbose && println("removed $(p - Ap_rank) out of $p primal equality constraints")
         end
 
-        @timeit solver.timer "qr_solve" point.y = Ap_R \ (Matrix{T}(I, Ap_rank, n) * (Ap_fact.Q' *  (-c - G' * point.z)))
+        @timeit solver.timer "qr_solve" point.y = Ap_R \ ((Ap_fact.Q' *  (-c - G' * point.z))[1:Ap_rank])
 
         if !(Ap_fact isa QRPivoted{T, Matrix{T}})
             row_piv = Ap_fact.prow
