@@ -158,8 +158,7 @@ function find_initial_point(solver::Solver{T}) where {T <: Real}
         if solver.init_use_indirect
             # use iterative solvers method TODO pick lsqr or lsmr
             AG = BlockMatrix{T}(p + q, n, [A, G], [1:p, (p + 1):(p + q)], [1:n, 1:n])
-            point.x = zeros(T, n)
-            @timeit solver.timer "lsqr_solve" IterativeSolvers.lsqr!(point.x, AG, rhs)
+            @timeit solver.timer "lsqr_solve" point.x = IterativeSolvers.lsqr!(AG, rhs)
         else
             AG = vcat(A, G)
             if issparse(AG) && !(T <: sparse_QR_reals)
@@ -187,8 +186,7 @@ function find_initial_point(solver::Solver{T}) where {T <: Real}
         rhs = -model.c - G' * point.z
         if solver.init_use_indirect
             # use iterative solvers method TODO pick lsqr or lsmr
-            point.y = zeros(T, p)
-            @timeit solver.timer "lsqr_solve" IterativeSolvers.lsqr!(point.y, A', rhs)
+            @timeit solver.timer "lsqr_solve" point.y = IterativeSolvers.lsqr(A', rhs)
         else
             if issparse(A) && !(T <: sparse_QR_reals)
                 # TODO alternative fallback is to convert sparse{T} to sparse{Float64} and do the sparse LU
@@ -250,9 +248,15 @@ function preprocess_find_initial_point(solver::Solver{T}) where {T <: Real}
             x_keep_idxs = col_piv[1:AG_rank]
             AG_R = UpperTriangular(AG_fact.R[1:AG_rank, 1:AG_rank])
 
-            # TODO optimize all below
             c_sub = c[x_keep_idxs]
-            @timeit solver.timer "residual" yz_sub = AG_fact.Q * (Matrix{T}(I, p + q, AG_rank) * (AG_R' \ c_sub))
+            @timeit solver.timer "residual" begin
+                # yz_sub = AG_fact.Q * vcat((AG_R' \ c_sub), zeros(p + q - AG_rank))
+                yz_sub = zeros(p + q)
+                yz_sub1 = view(yz_sub, 1:AG_rank)
+                copyto!(yz_sub1, c_sub)
+                ldiv!(AG_R', yz_sub1)
+                lmul!(AG_fact.Q, yz_sub)
+            end
             if !(AG_fact isa QRPivoted{T, Matrix{T}})
                 yz_sub = yz_sub[AG_fact.rpivinv]
             end
@@ -264,7 +268,13 @@ function preprocess_find_initial_point(solver::Solver{T}) where {T <: Real}
             end
             solver.verbose && println("removed $(n - AG_rank) out of $n dual equality constraints")
 
-            @timeit solver.timer "qr_solve" point.x = AG_R \ ((AG_fact.Q' * vcat(b, orig_model.h - point.s))[1:AG_rank])
+            @timeit solver.timer "qr_solve" begin
+                # point.x = AG_R \ ((AG_fact.Q' * vcat(b, orig_model.h - point.s))[1:AG_rank])
+                tmp = vcat(b, orig_model.h - point.s)
+                lmul!(AG_fact.Q', tmp)
+                point.x = tmp[1:AG_rank]
+                ldiv!(AG_R, point.x)
+            end
 
             c = c_sub
             A = A[:, x_keep_idxs]
@@ -295,11 +305,18 @@ function preprocess_find_initial_point(solver::Solver{T}) where {T <: Real}
         y_keep_idxs = col_piv[1:Ap_rank]
         Ap_Q = Ap_fact.Q
 
-        # TODO optimize all below
         b_sub = b[y_keep_idxs]
         if Ap_rank < p
             # some dependent primal equalities, so check if they are consistent
-            @timeit solver.timer "residual" x_sub = Ap_Q * (Matrix{T}(I, n, Ap_rank) * (Ap_R' \ b_sub))
+            @timeit solver.timer "residual" begin
+                # x_sub = Ap_Q * vcat((Ap_R' \ b_sub), zeros(n - Ap_rank))
+                x_sub = zeros(n)
+                x_sub1 = view(x_sub, 1:Ap_rank)
+                copyto!(x_sub1, b_sub)
+                ldiv!(Ap_R', x_sub1)
+                lmul!(Ap_Q, x_sub)
+            end
+
             if !(Ap_fact isa QRPivoted{T, Matrix{T}})
                 x_sub = x_sub[Ap_fact.rpivinv]
             end
@@ -311,7 +328,14 @@ function preprocess_find_initial_point(solver::Solver{T}) where {T <: Real}
             solver.verbose && println("removed $(p - Ap_rank) out of $p primal equality constraints")
         end
 
-        @timeit solver.timer "qr_solve" point.y = Ap_R \ ((Ap_fact.Q' *  (-c - G' * point.z))[1:Ap_rank])
+        @timeit solver.timer "qr_solve" begin
+            # point.y = Ap_R \ ((Ap_fact.Q' * (-c - G' * point.z))[1:Ap_rank])
+            tmp = -c
+            mul!(tmp, G', point.z, -1, true)
+            lmul!(Ap_fact.Q', tmp)
+            point.y = tmp[1:Ap_rank]
+            ldiv!(Ap_R, point.y)
+        end
 
         if !(Ap_fact isa QRPivoted{T, Matrix{T}})
             row_piv = Ap_fact.prow
