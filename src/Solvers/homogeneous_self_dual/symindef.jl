@@ -131,7 +131,7 @@ mutable struct SymIndefSparseSystemSolver{T <: Real} <: SymIndefSystemSolver{T}
     hess_idxs::Vector{Vector{Union{UnitRange, Vector{Int}}}}
     function SymIndefSparseSystemSolver{Float64}(;
         use_inv_hess::Bool = true,
-        fact_cache::SparseSymCache{Float64} = SparseSymCache(),
+        fact_cache::SparseSymCache{Float64} = SparseSymCache{Float64}(),
         )
         system_solver = new{Float64}()
         if !use_inv_hess
