@@ -40,6 +40,7 @@ end
 
 function load_dense_matrix(cache::GESVXNonSymCache{T}, A::Matrix{T}) where {T <: BlasReal}
     cache.is_factorized = false
+    LinearAlgebra.require_one_based_indexing(A)
     LinearAlgebra.chkstride1(A)
     n = cache.n = LinearAlgebra.checksquare(A)
     cache.lda = stride(A, 2)
@@ -60,7 +61,10 @@ end
 # wrap LAPACK function
 for (gesvx, elty) in [(:dgesvx_, :Float64), (:sgesvx_, :Float32)]
     @eval begin
-        function solve_dense_system(cache::GESVXNonSymCache{$elty}, X::VecOrMat{$elty}, A::Matrix{$elty}, B::VecOrMat{$elty})
+        function solve_dense_system(cache::GESVXNonSymCache{$elty}, X::AbstractVecOrMat{$elty}, A::Matrix{$elty}, B::AbstractVecOrMat{$elty})
+            LinearAlgebra.require_one_based_indexing(X, B)
+            LinearAlgebra.chkstride1(X, B)
+
             nrhs = size(B, 2)
             @assert size(X, 2) == nrhs
             if length(cache.ferr) < nrhs
@@ -79,7 +83,7 @@ for (gesvx, elty) in [(:dgesvx_, :Float64), (:sgesvx_, :Float32)]
             ccall((@blasfunc($gesvx), Base.liblapack_name), Cvoid,
                 (Ref{UInt8}, Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt},
                 Ptr{$elty}, Ref{BlasInt}, Ptr{$elty}, Ref{BlasInt},
-                Ptr{BlasInt}, Ref{UInt8}, Ptr{$elty}, Ptr{$elty},
+                Ptr{BlasInt}, Ptr{UInt8}, Ptr{$elty}, Ptr{$elty},
                 Ptr{$elty}, Ref{BlasInt}, Ptr{$elty}, Ref{BlasInt},
                 Ptr{$elty}, Ptr{$elty}, Ptr{$elty}, Ptr{$elty},
                 Ptr{BlasInt}, Ptr{BlasInt}),
@@ -115,8 +119,7 @@ function load_dense_matrix(cache::LUNonSymCache{T}, A::AbstractMatrix{T}) where 
     return cache
 end
 
-
-function solve_dense_system(cache::LUNonSymCache{T}, X::AbstractMatrix{T}, A::AbstractMatrix{T}, B::AbstractMatrix{T}) where {T <: Real}
+function solve_dense_system(cache::LUNonSymCache{T}, X::AbstractVecOrMat{T}, A::AbstractMatrix{T}, B::AbstractVecOrMat{T}) where {T <: Real}
     if !cache.is_factorized
         cache.is_factorized = true
         cache.fact = lu!(A, check = false)
@@ -128,7 +131,7 @@ function solve_dense_system(cache::LUNonSymCache{T}, X::AbstractMatrix{T}, A::Ab
 
     ldiv!(X, cache.fact, B)
 
-    return true
+    return issuccess(cache.fact)
 end
 
 # default to GESVXNonSymCache for BlasReals, otherwise generic LUNonSymCache
@@ -136,7 +139,7 @@ DenseNonSymCache{T}() where {T <: BlasReal} = GESVXNonSymCache{T}()
 DenseNonSymCache{T}() where {T <: Real} = LUNonSymCache{T}()
 
 #=
-symmetric indefinite: SYSVX (and LU fallback)
+symmetric indefinite: BunchKaufman / SYSVX (and LU fallback)
 TODO add a generic BunchKaufman implementation to Julia and use that instead of LU for generic case
 TODO try Aasen's version (http://www.netlib.org/lapack/lawnspdf/lawn294.pdf) and others
 =#
@@ -163,6 +166,7 @@ end
 
 function load_dense_matrix(cache::SYSVXSymCache{T}, A::Symmetric{T, Matrix{T}}) where {T <: BlasReal}
     cache.is_factorized = false
+    LinearAlgebra.require_one_based_indexing(A.data)
     LinearAlgebra.chkstride1(A.data)
     n = cache.n = LinearAlgebra.checksquare(A.data)
     cache.lda = stride(A.data, 2)
@@ -171,8 +175,8 @@ function load_dense_matrix(cache::SYSVXSymCache{T}, A::Symmetric{T, Matrix{T}}) 
     cache.rcond = Ref{T}()
     cache.ferr = Vector{T}(undef, 0) # NOTE ferr and berr are resized if too small
     cache.berr = Vector{T}(undef, 0)
-    cache.work = Vector{T}(undef, 5 * n)
-    cache.lwork = Ref{BlasInt}(5 * n)
+    cache.work = Vector{T}(undef, 1) # NOTE this will be resized according to query
+    cache.lwork = BlasInt(-1) # NOTE this initiates a query for optimal size of work
     cache.iwork = Vector{Int}(undef, n)
     cache.info = Ref{BlasInt}()
     return cache
@@ -181,7 +185,10 @@ end
 # wrap LAPACK function
 for (sysvx, elty) in [(:dsysvx_, :Float64), (:ssysvx_, :Float32)]
     @eval begin
-        function solve_dense_system(cache::SYSVXSymCache{$elty}, X::VecOrMat{$elty}, A::Symmetric{$elty, Matrix{$elty}}, B::VecOrMat{$elty})
+        function solve_dense_system(cache::SYSVXSymCache{$elty}, X::AbstractVecOrMat{$elty}, A::Symmetric{$elty, Matrix{$elty}}, B::AbstractVecOrMat{$elty})
+            LinearAlgebra.require_one_based_indexing(X, B)
+            LinearAlgebra.chkstride1(X, B)
+
             nrhs = size(B, 2)
             @assert size(X, 2) == nrhs
             if length(cache.ferr) < nrhs
@@ -202,12 +209,18 @@ for (sysvx, elty) in [(:dsysvx_, :Float64), (:ssysvx_, :Float32)]
                 Ptr{$elty}, Ref{BlasInt}, Ptr{$elty}, Ref{BlasInt},
                 Ptr{BlasInt}, Ptr{$elty}, Ref{BlasInt}, Ptr{$elty},
                 Ref{BlasInt}, Ptr{$elty}, Ptr{$elty}, Ptr{$elty},
-                Ptr{$elty}, Ptr{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt}),
+                Ptr{$elty}, Ref{BlasInt}, Ptr{BlasInt}, Ptr{BlasInt}),
                 do_fact, A.uplo, cache.n, nrhs,
                 A.data, cache.lda, cache.AF, cache.n,
                 cache.ipiv, B, stride(B, 2), X,
                 stride(X, 2), cache.rcond, cache.ferr, cache.berr,
                 cache.work, cache.lwork, cache.iwork, cache.info)
+
+            if cache.lwork < 0 # query for optimal work size, and resize work before solving
+                cache.lwork = BlasInt(cache.work[1])
+                resize!(cache.work, cache.lwork)
+                return solve_dense_system(cache, X, A, B)
+            end
 
             if cache.info[] < 0
                 throw(ArgumentError("invalid argument #$(-cache.info[]) to LAPACK call"))
@@ -234,7 +247,7 @@ function load_dense_matrix(cache::LUSymCache{T}, A::Symmetric{T, <:AbstractMatri
     return cache
 end
 
-function solve_dense_system(cache::LUSymCache{T}, X::AbstractMatrix{T}, A::Symmetric{T, <:AbstractMatrix{T}}, B::AbstractMatrix{T}) where {T <: Real}
+function solve_dense_system(cache::LUSymCache{T}, X::AbstractVecOrMat{T}, A::Symmetric{T, <:AbstractMatrix{T}}, B::AbstractVecOrMat{T}) where {T <: Real}
     if !cache.is_factorized
         cache.is_factorized = true
         cache.fact = lu!(A, check = false)
@@ -252,6 +265,128 @@ end
 # default to SYSVXSymCache for BlasReals, otherwise generic LUSymCache
 DenseSymCache{T}() where {T <: BlasReal} = SYSVXSymCache{T}()
 DenseSymCache{T}() where {T <: Real} = LUSymCache{T}()
+
+#=
+symmetric positive definite: Cholesky / POSVX
+=#
+
+abstract type DensePosDefCache{T <: Real} end
+
+reset_fact(cache::DensePosDefCache) = (cache.is_factorized = false)
+
+mutable struct POSVXSymCache{T <: BlasReal} <: DensePosDefCache{T}
+    is_factorized::Bool
+    n
+    lda
+    AF
+    equed
+    s
+    rcond
+    ferr
+    berr
+    work
+    iwork
+    info
+    POSVXSymCache{T}() where {T <: BlasReal} = new{T}()
+end
+
+function load_dense_matrix(cache::POSVXSymCache{T}, A::Symmetric{T, Matrix{T}}) where {T <: BlasReal}
+    cache.is_factorized = false
+    LinearAlgebra.require_one_based_indexing(A.data)
+    LinearAlgebra.chkstride1(A.data)
+    n = cache.n = LinearAlgebra.checksquare(A.data)
+    cache.lda = stride(A.data, 2)
+    cache.AF = Matrix{T}(undef, n, n)
+    cache.equed = Ref{UInt8}('E')
+    cache.s = Vector{T}(undef, n)
+    cache.rcond = Ref{T}()
+    cache.ferr = Vector{T}(undef, 0) # NOTE ferr and berr are resized if too small
+    cache.berr = Vector{T}(undef, 0)
+    cache.work = Vector{T}(undef, 3 * n)
+    cache.iwork = Vector{Int}(undef, n)
+    cache.info = Ref{BlasInt}()
+    return cache
+end
+
+# wrap LAPACK function
+for (posvx, elty) in [(:dposvx_, :Float64), (:sposvx_, :Float32)]
+    @eval begin
+        function solve_dense_system(cache::POSVXSymCache{$elty}, X::AbstractVecOrMat{$elty}, A::Symmetric{$elty, Matrix{$elty}}, B::AbstractVecOrMat{$elty})
+            LinearAlgebra.require_one_based_indexing(X, B)
+            LinearAlgebra.chkstride1(X, B)
+
+            nrhs = size(B, 2)
+            @assert size(X, 2) == nrhs
+            if length(cache.ferr) < nrhs
+                resize!(cache.ferr, nrhs)
+                resize!(cache.berr, nrhs)
+            end
+
+            set_min_diag!(A.data, sqrt(eps($elty)))
+
+            if cache.is_factorized
+                cache.is_factorized = true
+                do_fact = 'F'
+            else
+                do_fact = 'E'
+            end
+
+            # call dposvx( fact, uplo, n, nrhs, a, lda, af, ldaf, equed, s, b, ldb, x, ldx, rcond, ferr, berr, work, iwork, info )
+            ccall((@blasfunc($posvx), Base.liblapack_name), Cvoid,
+                (Ref{UInt8}, Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt},
+                Ptr{$elty}, Ref{BlasInt}, Ptr{$elty}, Ref{BlasInt},
+                Ptr{UInt8}, Ptr{$elty}, Ptr{$elty}, Ref{BlasInt},
+                Ptr{$elty}, Ref{BlasInt}, Ptr{$elty}, Ptr{$elty},
+                Ptr{$elty}, Ptr{$elty}, Ptr{BlasInt}, Ptr{BlasInt}),
+                do_fact, A.uplo, cache.n, nrhs,
+                A.data, cache.lda, cache.AF, cache.n,
+                cache.equed, cache.s, B, stride(B, 2),
+                X, stride(X, 2), cache.rcond, cache.ferr,
+                cache.berr, cache.work, cache.iwork, cache.info)
+
+            if cache.info[] < 0
+                throw(ArgumentError("invalid argument #$(-cache.info[]) to LAPACK call"))
+            elseif 0 < cache.info[] <= cache.n
+                @warn("factorization failed: #$(cache.info[])")
+                return false
+            elseif cache.info[] > cache.n
+                @warn("condition number is small: $(cache.rcond[])")
+            end
+
+            return true
+        end
+    end
+end
+
+mutable struct CholSymCache{T <: Real} <: DensePosDefCache{T}
+    is_factorized::Bool
+    fact
+    CholSymCache{T}() where {T <: Real} = new{T}()
+end
+
+function load_dense_matrix(cache::CholSymCache{T}, A::Symmetric{T, <:AbstractMatrix{T}}) where {T <: Real}
+    cache.is_factorized = false
+    return cache
+end
+
+function solve_dense_system(cache::CholSymCache{T}, X::AbstractVecOrMat{T}, A::Symmetric{T, <:AbstractMatrix{T}}, B::AbstractVecOrMat{T}) where {T <: Real}
+    if !cache.is_factorized
+        cache.is_factorized = true
+        cache.fact = cholesky!(A, check = false)
+        if !issuccess(cache.fact)
+            @warn("numerical failure: Cholesky factorization failed")
+            return false
+        end
+    end
+
+    ldiv!(X, cache.fact, B)
+
+    return true
+end
+
+# default to POSVXSymCache for BlasReals, otherwise generic CholSymCache
+DensePosDefCache{T}() where {T <: BlasReal} = POSVXSymCache{T}()
+DensePosDefCache{T}() where {T <: Real} = CholSymCache{T}()
 
 
 
@@ -512,100 +647,5 @@ function hyp_bk_solve!(c::HypBKSolveCache{R}, X::Matrix{R}, A::AbstractMatrix{R}
         end
     end
     ldiv!(X, c.F, B)
-    return true
-end
-
-#=
-Cholesky solve (like POSVX)
-=#
-
-mutable struct HypCholSolveCache{R <: Real}
-    uplo
-    n
-    lda
-    ldaf
-    nrhs
-    ldb
-    rcond
-    lwork
-    ferr
-    berr
-    work
-    iwork
-    AF
-    ipiv
-    S
-    info
-    HypCholSolveCache{R}() where {R <: Real} = new{R}()
-end
-
-function HypCholSolveCache(uplo::Char, X::Matrix{R}, A::AbstractMatrix{R}, B::AbstractMatrix{R}) where {R <: BlasReal}
-    LinearAlgebra.chkstride1(A)
-    c = HypCholSolveCache{R}()
-    c.uplo = uplo
-    c.n = LinearAlgebra.checksquare(A)
-    @assert c.n == size(X, 1) == size(B, 1)
-    @assert size(X, 2) == size(B, 2)
-    c.lda = stride(A, 2)
-    c.ldaf = c.n
-    c.nrhs = size(B, 2)
-    c.ldb = stride(B, 2)
-    c.rcond = Ref{R}()
-    c.lwork = Ref{BlasInt}(5 * c.n)
-    c.ferr = Vector{R}(undef, c.nrhs)
-    c.berr = Vector{R}(undef, c.nrhs)
-    c.work = Vector{R}(undef, 5 * c.n)
-    c.iwork = Vector{Int}(undef, c.n)
-    c.AF = Matrix{R}(undef, c.n, c.n)
-    c.ipiv = Vector{Int}(undef, c.n)
-    c.S = Vector{R}(undef, c.n)
-    c.info = Ref{BlasInt}()
-    return c
-end
-
-for (posvx, elty, rtyp) in (
-    (:dposvx_, :Float64, :Float64),
-    (:sposvx_, :Float32, :Float32),
-    )
-    @eval begin
-        function hyp_chol_solve!(c::HypCholSolveCache{$elty}, X::Matrix{$elty}, A::AbstractMatrix{$elty}, B::AbstractMatrix{$elty})
-            # call dposvx( fact, uplo, n, nrhs, a, lda, af, ldaf, equed, s, b, ldb, x, ldx, rcond, ferr, berr, work, iwork, info )
-            ccall((@blasfunc($posvx), liblapack), Cvoid,
-                (Ref{UInt8}, Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt},
-                Ptr{$elty}, Ref{BlasInt}, Ptr{$elty}, Ref{BlasInt},
-                Ref{UInt8}, Ptr{$elty}, Ptr{$elty}, Ref{BlasInt},
-                Ptr{$elty}, Ref{BlasInt}, Ptr{$elty}, Ptr{$elty},
-                Ptr{$elty}, Ptr{$elty}, Ptr{BlasInt}, Ptr{BlasInt}),
-                'E', c.uplo, c.n, c.nrhs,
-                A, c.lda, c.AF, c.ldaf,
-                'Y', c.S, B, c.ldb,
-                X, c.n, c.rcond, c.ferr,
-                c.berr, c.work, c.iwork, c.info)
-
-            if c.info[] < 0
-                throw(ArgumentError("invalid argument #$(-c.info[]) to LAPACK call"))
-            elseif 0 < c.info[] <= c.n
-                @warn("factorization failed: #$(c.info[])")
-                return false
-            elseif c.info[] > c.n
-                @warn("condition number is small: $(c.rcond[])")
-            end
-            return true
-        end
-    end
-end
-
-function HypCholSolveCache(uplo::Char, X::Matrix{R}, A::AbstractMatrix{R}, B::AbstractMatrix{R}) where {R <: Real}
-    c = HypCholSolveCache{R}()
-    c.uplo = uplo
-    return c
-end
-
-function hyp_chol_solve!(c::HypCholSolveCache{R}, X::Matrix{R}, A::AbstractMatrix{R}, B::AbstractMatrix{R}) where {R <: Real}
-    F = cholesky!(Symmetric(A, Symbol(c.uplo)), check = false)
-    if !isposdef(F)
-        return false
-    end
-    ldiv!(X, F, B)
     return true
 end

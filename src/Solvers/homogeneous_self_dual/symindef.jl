@@ -69,7 +69,7 @@ function solve_system(system_solver::SymIndefSystemSolver{T}, solver::Solver{T},
         end
     end
 
-    solve_subsystem(system_solver, solver, sol3, rhs3)
+    @timeit solver.timer "solve_sparse_system" solve_subsystem(system_solver, sol3, rhs3)
 
     if !system_solver.use_inv_hess
         for (k, cone_k) in enumerate(model.cones)
@@ -238,8 +238,8 @@ function update_fact(system_solver::SymIndefSparseSystemSolver{T}, solver::Solve
     return system_solver
 end
 
-function solve_subsystem(system_solver::SymIndefSparseSystemSolver, solver::Solver, sol3, rhs3)
-    @timeit solver.timer "solve_sparse_system" solve_sparse_system(system_solver.fact_cache, sol3, system_solver.lhs3, rhs3)
+function solve_subsystem(system_solver::SymIndefSparseSystemSolver, sol3, rhs3)
+    solve_sparse_system(system_solver.fact_cache, sol3, system_solver.lhs3, rhs3)
     return sol3
 end
 
@@ -319,10 +319,11 @@ function update_fact(system_solver::SymIndefDenseSystemSolver{T}, solver::Solver
     return system_solver
 end
 
-function solve_subsystem(system_solver::SymIndefDenseSystemSolver, solver::Solver, sol3, rhs3)
-    @timeit solver.timer "solve_dense_system" if !solve_dense_system(system_solver.fact_cache, sol3, system_solver.lhs3, rhs3)
+function solve_subsystem(system_solver::SymIndefDenseSystemSolver, sol3, rhs3)
+    if !solve_dense_system(system_solver.fact_cache, sol3, system_solver.lhs3, rhs3)
         # TODO recover somehow
         @warn("numerical failure: could not solve linear system")
     end
+    # sol3 .= system_solver.lhs3 \ rhs3 # TODO remove. but first investigate why it causes fewer native test failures
     return sol3
 end
