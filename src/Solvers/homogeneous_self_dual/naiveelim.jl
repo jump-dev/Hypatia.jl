@@ -241,7 +241,7 @@ function load(system_solver::NaiveElimDenseSystemSolver{T}, solver::Solver{T}) w
         ]
     system_solver.lhs4 = similar(system_solver.lhs4_copy)
 
-    load_dense_matrix(system_solver.fact_cache, system_solver.lhs4_copy)
+    load_dense_matrix(system_solver.fact_cache, system_solver.lhs4)
 
     return system_solver
 end
