@@ -32,56 +32,56 @@ testfuns_preproc = [
 
 testfuns = [
     orthant1,
-    # orthant2,
-    # orthant3,
-    # orthant4,
+    orthant2,
+    orthant3,
+    orthant4,
     epinorminf1,
-    # epinorminf2,
-    # epinorminf3,
-    # epinorminf4,
-    # epinorminf5,
-    # epinormeucl1,
-    # epinormeucl2,
-    # epipersquare1,
-    # epipersquare2,
-    # epipersquare3,
+    epinorminf2,
+    epinorminf3,
+    epinorminf4,
+    epinorminf5,
+    epinormeucl1,
+    epinormeucl2,
+    epipersquare1,
+    epipersquare2,
+    epipersquare3,
     hypoperlog1,
-    # hypoperlog2,
-    # hypoperlog3,
-    # hypoperlog4,
-    # hypoperlog5,
-    # hypoperlog6,
-    # epiperexp1,
-    # epiperexp2,
-    # power1,
-    # power2,
-    # power3,
-    # power4,
-    # hypogeomean1,
-    # hypogeomean2,
-    # hypogeomean3,
-    # epinormspectral1,
-    # possemideftri1,
-    # possemideftri2,
-    # possemideftricomplex1,
-    # hypoperlogdettri1,
-    # hypoperlogdettri2,
-    # hypoperlogdettri3,
-    # primalinfeas1,
-    # primalinfeas2,
-    # primalinfeas3,
-    # dualinfeas1,
-    # dualinfeas2,
-    # dualinfeas3,
+    hypoperlog2,
+    hypoperlog3,
+    hypoperlog4,
+    hypoperlog5,
+    hypoperlog6,
+    epiperexp1,
+    epiperexp2,
+    power1,
+    power2,
+    power3,
+    power4,
+    hypogeomean1,
+    hypogeomean2,
+    hypogeomean3,
+    epinormspectral1,
+    possemideftri1,
+    possemideftri2,
+    possemideftricomplex1,
+    hypoperlogdettri1,
+    hypoperlogdettri2,
+    hypoperlogdettri3,
+    primalinfeas1,
+    primalinfeas2,
+    primalinfeas3,
+    dualinfeas1,
+    dualinfeas2,
+    dualinfeas3,
     ]
 
 real_types = [
     Float64,
     Float32,
-    # BigFloat,
+    BigFloat,
     ]
 
-options = (verbose = false,)
+options = (verbose = true,)
 
 @info("starting native tests")
 @testset "native tests" begin
@@ -110,9 +110,9 @@ options = (verbose = false,)
     #     T = Float64
     #     t(T, solver = SO.Solver{T}(init_use_indirect = true, system_solver = SO.NaiveIndirectSystemSolver{T}(); options...))
     # end
-    # @testset "NaiveElimDense tests: $t, $T, $h" for t in testfuns, T in real_types, h in [true, false]
-    #     t(T, solver = SO.Solver{T}(system_solver = SO.NaiveElimDenseSystemSolver{T}(use_inv_hess = h); options...))
-    # end
+    @testset "NaiveElimDense tests: $t, $T, $h" for t in testfuns, T in real_types, h in [true, false]
+        t(T, solver = SO.Solver{T}(system_solver = SO.NaiveElimDenseSystemSolver{T}(use_inv_hess = h); options...))
+    end
     # @testset "NaiveElimSparse tests: $t" for t in testfuns
     #     T = Float64
     #     t(T, solver = SO.Solver{T}(system_solver = SO.NaiveElimSparseSystemSolver{T}(); options...))

@@ -34,25 +34,26 @@ mutable struct GESVXNonSymCache{T <: BlasReal} <: DenseNonSymCache{T}
     work
     iwork
     info
-    function GESVXNonSymCache{T}(A::Matrix{T}) where {T <: BlasReal}
-        LinearAlgebra.chkstride1(A)
-        cache = new{T}()
-        cache.is_factorized = false
-        cache.n = LinearAlgebra.checksquare(A)
-        cache.lda = stride(A, 2)
-        cache.AF = Matrix{T}(undef, cache.n, cache.n)
-        cache.ipiv = Vector{Int}(undef, cache.n)
-        cache.equed = Ref{UInt8}('E')
-        cache.rvec = Vector{T}(undef, cache.n)
-        cache.cvec = Vector{T}(undef, cache.n)
-        cache.rcond = Ref{T}()
-        cache.ferr = Vector{T}(undef, 1) # NOTE ferr and berr are resized if too small
-        cache.berr = Vector{T}(undef, 1)
-        cache.work = Vector{T}(undef, 4 * cache.n)
-        cache.iwork = Vector{Int}(undef, cache.n)
-        cache.info = Ref{BlasInt}()
-        return cache
-    end
+    GESVXNonSymCache{T}() where {T <: BlasReal} = new{T}()
+end
+
+function load_dense_matrix(cache::GESVXNonSymCache{T}, A::Matrix{T}) where {T <: BlasReal}
+    cache.is_factorized = false
+    LinearAlgebra.chkstride1(A)
+    n = cache.n = LinearAlgebra.checksquare(A)
+    cache.lda = stride(A, 2)
+    cache.AF = Matrix{T}(undef, n, n)
+    cache.ipiv = Vector{Int}(undef, n)
+    cache.equed = Ref{UInt8}('E')
+    cache.rvec = Vector{T}(undef, n)
+    cache.cvec = Vector{T}(undef, n)
+    cache.rcond = Ref{T}()
+    cache.ferr = Vector{T}(undef, 1) # NOTE ferr and berr are resized if too small
+    cache.berr = Vector{T}(undef, 1)
+    cache.work = Vector{T}(undef, 4 * n)
+    cache.iwork = Vector{Int}(undef, n)
+    cache.info = Ref{BlasInt}()
+    return cache
 end
 
 # wrap LAPACK function
@@ -67,8 +68,8 @@ for (gesvx, elty) in [(:dgesvx_, :Float64), (:sgesvx_, :Float32)]
             end
 
             if cache.is_factorized
-                do_fact = 'F'
                 cache.is_factorized = true
+                do_fact = 'F'
             else
                 do_fact = 'E'
             end
@@ -105,21 +106,23 @@ end
 mutable struct LUNonSymCache{T <: Real} <: DenseNonSymCache{T}
     is_factorized::Bool
     fact
-    function LUNonSymCache{T}(A::AbstractMatrix{T}) where {T <: Real}
-        cache = new{T}()
-        cache.is_factorized = false
-        return cache
-    end
+    LUNonSymCache{T}() where {T <: Real} = new{T}()
 end
+
+function load_dense_matrix(cache::LUNonSymCache{T}, A::AbstractMatrix{T}) where {T <: Real}
+    cache.is_factorized = false
+    return cache
+end
+
 
 function solve_dense_system(cache::LUNonSymCache{T}, X::AbstractMatrix{T}, A::AbstractMatrix{T}, B::AbstractMatrix{T}) where {T <: Real}
     if !cache.is_factorized
+        cache.is_factorized = true
         cache.fact = lu!(A, check = false)
         if !issuccess(cache.fact)
             @warn("numerical failure: LU factorization failed")
             return false
         end
-        cache.is_factorized = true
     end
 
     ldiv!(X, cache.fact, B)
@@ -127,6 +130,9 @@ function solve_dense_system(cache::LUNonSymCache{T}, X::AbstractMatrix{T}, A::Ab
     return true
 end
 
+# default to GESVXNonSymCache for BlasReals, otherwise generic LUNonSymCache
+DenseNonSymCache{T}() where {T <: BlasReal} = GESVXNonSymCache{T}()
+DenseNonSymCache{T}() where {T <: Real} = LUNonSymCache{T}()
 
 
 
