@@ -140,7 +140,7 @@ mutable struct Solver{T <: Real}
         system_solver::SystemSolver{T} = QRCholDenseSystemSolver{T}(),
         ) where {T <: Real}
         if isa(system_solver, QRCholSystemSolver{T})
-            @assert reduce || preprocess # require reduction or preprocessing for QRCholSystemSolver
+            @assert reduce || preprocess # require reduction or preprocessing for QRCholSystemSolver # TODO only need primal eq preprocessing
         end
 
         solver = new{T}()
