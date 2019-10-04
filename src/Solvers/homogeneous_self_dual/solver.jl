@@ -212,6 +212,60 @@ function find_initial_point(solver::Solver{T}) where {T <: Real}
     return point
 end
 
+# reduce model by removing all primal equalities
+function preprocess_find_initial_point(solver::Solver{T}) where {T <: Real}
+    orig_model = solver.orig_model
+    A = copy(orig_model.A)
+    b = copy(orig_model.b)
+    G = copy(orig_model.G)
+    h = copy(orig_model.h)
+    obj_offset = orig_model.obj_offset
+    n = length(c)
+    p = length(b)
+    q = orig_model.q
+
+    # remove all primal equalities by making A and b empty with n = n0 - p0 and p = 0:
+    Q1_idxs = 1:Ap_rank
+    Q2_idxs = (Ap_rank + 1):n
+    # TODO improve efficiency, and maybe move some of the transformations above to here
+    # NOTE avoid calculating GQ1 explicitly if possible
+    # [cQ1 cQ2] = c0' * Q
+    cQ = orig_model.c' * Ap_Q
+    cQ1 = cQ[Q1_idxs]
+    cQ2 = cQ[Q2_idxs]
+    # c = cQ2
+    c = cQ2
+    # offset = offset0 + cQ1 * (R' \ b0)
+    Rpib0 = Ap_R' \ b
+    obj_offset += dot(cQ1, Rpib0)
+    # [GQ1 GQ2] = G0 * Q
+    GQ = G * Ap_Q
+    GQ1 = GQ[:, Q1_idxs]
+    GQ2 = GQ[:, Q2_idxs]
+    # h = h0 - GQ1 * (R' \ b0)
+    h -= GQ1 * Rpib0
+    # G = GQ2
+    G = GQ2
+
+    # A and b empty
+    n = length(c)
+    p = 0
+    A = zeros(T, 0, n)
+    b = zeros(T, 0)
+    solver.Ap_R = UpperTriangular(zeros(T, 0, 0))
+    solver.Ap_Q = I
+
+    point.y = zeros(T, 0)
+    point.x =
+
+    # recover original-space solution using:
+    # x0 = Q * [(R' \ b0), x]
+    # y0 = R \ (-cQ1' - GQ1' * z0)
+    # TODO save what's needed
+
+    solver.model = Models.Model{T}(c, A, b, G, h, orig_model.cones, obj_offset = obj_offset)
+end
+
 # preprocess and get initial point
 function preprocess_find_initial_point(solver::Solver{T}) where {T <: Real}
     orig_model = solver.orig_model
@@ -239,6 +293,10 @@ function preprocess_find_initial_point(solver::Solver{T}) where {T <: Real}
         @timeit solver.timer "qr_fact" AG_fact = issparse(AG) ? qr(AG, tol = solver.init_tol_qr) : qr(AG, Val(true))
 
         AG_rank = get_rank_est(AG_fact, solver.init_tol_qr)
+        if solver.reduce
+            @assert AG_rank == n # TODO cannot preprocess dual equalities if have used reduction, since reduction stores matrices needed for transformation to original space at end of solve
+        end
+
         if AG_rank == n
             # no dual equalities to remove
             x_keep_idxs = 1:n
@@ -328,42 +386,28 @@ function preprocess_find_initial_point(solver::Solver{T}) where {T <: Real}
             solver.verbose && println("removed $(p - Ap_rank) out of $p primal equality constraints")
         end
 
-        if solver.reduce
-            # remove all primal equalities by making A and b empty with n = n0 - p0 and p = 0:
-            # [cQ1 cQ2] = c0' * Q
-            # c = cQ2
-            # offset = offset0 + cQ1 * (R' \ b0)
-            # [GQ1 GQ2] = G0 * Q # NOTE avoid calculating GQ1 explicitly if possible
-            # h = h0 - GQ1 * (R' \ b0)
-            # G = GQ2
-            # recover original-space solution using:
-            # x0 = Q * [(R' \ b0), x]
-            # y0 = R \ (-cQ1' - GQ1' * z0)
-        else
-            # keep non-redundant primal equalities
-            @timeit solver.timer "qr_solve" begin
-                # point.y = Ap_R \ ((Ap_fact.Q' * (-c - G' * point.z))[1:Ap_rank])
-                tmp = -c
-                mul!(tmp, G', point.z, -1, true)
-                lmul!(Ap_fact.Q', tmp)
-                point.y = tmp[1:Ap_rank]
-                ldiv!(Ap_R, point.y)
-            end
-
-            if !(Ap_fact isa QRPivoted{T, Matrix{T}})
-                row_piv = Ap_fact.prow
-                A = A[y_keep_idxs, row_piv]
-                c = c[row_piv]
-                G = G[:, row_piv]
-                x_keep_idxs = x_keep_idxs[row_piv]
-            else
-                A = A[y_keep_idxs, :]
-            end
-            b = b_sub
-            p = Ap_rank
-            solver.Ap_R = Ap_R
-            solver.Ap_Q = Ap_Q
+        @timeit solver.timer "qr_solve" begin
+            # point.y = Ap_R \ ((Ap_fact.Q' * (-c - G' * point.z))[1:Ap_rank])
+            tmp = -c
+            mul!(tmp, G', point.z, -1, true)
+            lmul!(Ap_fact.Q', tmp)
+            point.y = tmp[1:Ap_rank]
+            ldiv!(Ap_R, point.y)
         end
+
+        if !(Ap_fact isa QRPivoted{T, Matrix{T}})
+            row_piv = Ap_fact.prow
+            A = A[y_keep_idxs, row_piv]
+            c = c[row_piv]
+            G = G[:, row_piv]
+            x_keep_idxs = x_keep_idxs[row_piv]
+        else
+            A = A[y_keep_idxs, :]
+        end
+        b = b_sub
+        p = Ap_rank
+        solver.Ap_R = Ap_R
+        solver.Ap_Q = Ap_Q
     else
         y_keep_idxs = Int[]
         solver.Ap_R = UpperTriangular(zeros(T, 0, 0))
