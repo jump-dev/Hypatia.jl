@@ -350,8 +350,8 @@ function find_initial_y(solver::Solver{T}, reducing::Bool) where {T <: Real}
         # recover original-space solution using:
         # x0 = Q * [(R' \ b0), x]
         # y0 = R \ (-cQ1' - GQ1' * z0)
-        Q1_idxs = 1:p
-        Q2_idxs = (p + 1):n
+        Q1_idxs = 1:Ap_rank
+        Q2_idxs = (Ap_rank + 1):n
         if !(Ap_fact isa QRPivoted{T, Matrix{T}})
             row_piv = Ap_fact.prow
             model.c = model.c[row_piv]
@@ -369,7 +369,7 @@ function find_initial_y(solver::Solver{T}, reducing::Bool) where {T <: Real}
         model.c = cQ2
         model.n = length(model.c)
         # offset = offset0 + cQ1 * (R' \ b0)
-        Rpib0 = solver.reduce_Rpib0 = vcat(Ap_R' \ b_sub, zeros(p - Ap_rank))
+        Rpib0 = solver.reduce_Rpib0 = Ap_R' \ b_sub
         # solver.Rpib0 = Rpib0 # TODO
         model.obj_offset += dot(cQ1, Rpib0)
 
