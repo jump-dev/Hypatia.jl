@@ -125,7 +125,7 @@ options = (verbose = true,)
     end
     @testset "NaiveIndirect tests: $t" for t in testfuns
         T = Float64
-        t(T, solver = SO.Solver{T}(preprocess = false, init_use_indirect = true, system_solver = SO.NaiveIndirectSystemSolver{T}(); options...))
+        t(T, solver = SO.Solver{T}(preprocess = false, init_use_indirect = true, reduce = false, system_solver = SO.NaiveIndirectSystemSolver{T}(); options...))
     end
     @testset "NaiveElimDense tests: $t, $T, $h" for t in testfuns, T in generic_reals, h in [true, false]
         t(T, solver = SO.Solver{T}(system_solver = SO.NaiveElimDenseSystemSolver{T}(use_inv_hess = h); options...))
