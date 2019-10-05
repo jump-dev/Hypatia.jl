@@ -92,9 +92,8 @@ mutable struct NaiveElimSparseSystemSolver{T <: Real} <: NaiveElimSystemSolver{T
     lhs4::SparseMatrixCSC # TODO CSC type will depend on factor cache Int type
     rhs4::Matrix{T}
     sol4::Matrix{T}
+    hess_idxs::Vector
     fact_cache::SparseNonSymCache{T}
-    hess_idxs::Vector{Vector{Union{UnitRange, Vector{Int}}}}
-
     function NaiveElimSparseSystemSolver{T}(;
         use_inv_hess::Bool = true,
         fact_cache::SparseNonSymCache{Float64} = SparseNonSymCache{Float64}(),
@@ -183,7 +182,7 @@ function load(system_solver::NaiveElimSparseSystemSolver{T}, solver::Solver{T}) 
     return system_solver
 end
 
-function update_fact(system_solver::NaiveElimSparseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
+function update_fact(system_solver::NaiveElimSparseSystemSolver, solver::Solver)
     for (k, cone_k) in enumerate(solver.model.cones)
         H = (Cones.use_dual(cone_k) ? Cones.hess(cone_k) : Cones.inv_hess(cone_k))
         for j in 1:Cones.dimension(cone_k)
@@ -198,7 +197,7 @@ function update_fact(system_solver::NaiveElimSparseSystemSolver{T}, solver::Solv
     return system_solver
 end
 
-function solve_subsystem(system_solver::NaiveElimSparseSystemSolver{T}, sol4::Matrix{T}, rhs4::Matrix{T}) where {T <: Real}
+function solve_subsystem(system_solver::NaiveElimSparseSystemSolver, sol4::Matrix, rhs4::Matrix)
     solve_sparse_system(system_solver.fact_cache, sol4, system_solver.lhs4, rhs4)
     return sol4
 end
@@ -214,7 +213,7 @@ mutable struct NaiveElimDenseSystemSolver{T <: Real} <: NaiveElimSystemSolver{T}
     lhs4_copy::Matrix{T}
     rhs4::Matrix{T}
     sol4::Matrix{T}
-    fact_cache
+    fact_cache::DenseNonSymCache{T}
     function NaiveElimDenseSystemSolver{T}(;
         use_inv_hess::Bool = true,
         fact_cache::DenseNonSymCache{T} = DenseNonSymCache{T}(),
@@ -276,7 +275,7 @@ function update_fact(system_solver::NaiveElimDenseSystemSolver{T}, solver::Solve
     return system_solver
 end
 
-function solve_subsystem(system_solver::NaiveElimDenseSystemSolver{T}, sol4::Matrix{T}, rhs4::Matrix{T}) where {T <: Real}
+function solve_subsystem(system_solver::NaiveElimDenseSystemSolver, sol4::Matrix, rhs4::Matrix)
     if !solve_dense_system(system_solver.fact_cache, sol4, system_solver.lhs4, rhs4)
         # TODO recover somehow
         @warn("numerical failure: could not solve linear system")

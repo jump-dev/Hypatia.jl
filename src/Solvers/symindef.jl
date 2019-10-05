@@ -26,7 +26,7 @@ A*x = [-yrhs, b]
 
 abstract type SymIndefSystemSolver{T <: Real} <: SystemSolver{T} end
 
-function solve_system(system_solver::SymIndefSystemSolver{T}, solver::Solver{T}, sol, rhs) where {T <: Real}
+function solve_system(system_solver::SymIndefSystemSolver{T}, solver::Solver{T}, sol::Matrix{T}, rhs::Matrix{T}) where {T <: Real}
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
     tau_row = system_solver.tau_row
@@ -127,8 +127,8 @@ mutable struct SymIndefSparseSystemSolver{T <: Real} <: SymIndefSystemSolver{T}
     lhs3::SparseMatrixCSC # TODO type will depend on Int type
     rhs3::Matrix{T}
     sol3::Matrix{T}
+    hess_idxs::Vector
     fact_cache::SparseSymCache{T}
-    hess_idxs::Vector{Vector{Union{UnitRange, Vector{Int}}}}
     function SymIndefSparseSystemSolver{Float64}(;
         use_inv_hess::Bool = true,
         fact_cache::SparseSymCache{Float64} = SparseSymCache{Float64}(),
@@ -224,7 +224,7 @@ function load(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) w
     return system_solver
 end
 
-function update_fact(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
+function update_fact(system_solver::SymIndefSparseSystemSolver, solver::Solver)
     for (k, cone_k) in enumerate(solver.model.cones)
         H = (Cones.use_dual(cone_k) ? Cones.hess(cone_k) : Cones.inv_hess(cone_k))
         for j in 1:Cones.dimension(cone_k)
@@ -254,7 +254,7 @@ mutable struct SymIndefDenseSystemSolver{T <: Real} <: SymIndefSystemSolver{T}
     lhs3_copy::Symmetric{T, Matrix{T}}
     rhs3::Matrix{T}
     sol3::Matrix{T}
-    fact_cache
+    fact_cache::DenseSymCache{T}
     function SymIndefDenseSystemSolver{T}(;
         use_inv_hess::Bool = true,
         fact_cache::DenseSymCache{T} = DenseSymCache{T}(),
@@ -286,7 +286,7 @@ function load(system_solver::SymIndefDenseSystemSolver{T}, solver::Solver{T}) wh
     return system_solver
 end
 
-function update_fact(system_solver::SymIndefDenseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
+function update_fact(system_solver::SymIndefDenseSystemSolver, solver::Solver)
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
     lhs3 = system_solver.lhs3
@@ -319,7 +319,7 @@ function update_fact(system_solver::SymIndefDenseSystemSolver{T}, solver::Solver
     return system_solver
 end
 
-function solve_subsystem(system_solver::SymIndefDenseSystemSolver, sol3, rhs3)
+function solve_subsystem(system_solver::SymIndefDenseSystemSolver, sol3::Matrix, rhs3::Matrix)
     if !solve_dense_system(system_solver.fact_cache, sol3, system_solver.lhs3, rhs3)
         # TODO recover somehow
         @warn("numerical failure: could not solve linear system")
