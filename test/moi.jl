@@ -30,6 +30,8 @@ unit_exclude = [
     "solve_zero_one_with_bounds_2",
     "solve_zero_one_with_bounds_3",
     "solve_unbounded_model", # dual equalities are inconsistent, so detect dual infeasibility but currently no certificate or status
+    "number_threads", # no way to set threads currently
+    "solve_result_index", # TODO only get one result from Hypatia
     ]
 
 conic_exclude = String[

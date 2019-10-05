@@ -129,7 +129,7 @@ mutable struct Solver{T <: Real}
     cones_loaded::Vector{Bool}
 
     function Solver{T}(;
-        verbose::Bool = false,
+        verbose::Bool = true,
         iter_limit::Int = 1000,
         time_limit::Real = Inf,
         tol_rel_opt::Real = sqrt(eps(T)),
