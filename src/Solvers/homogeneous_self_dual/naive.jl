@@ -139,7 +139,7 @@ function load(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) wher
     (Is, Js, Vs) = findnz(lhs6)
 
     # add I, J, V for Hessians
-    hess_nz_total = sum(Cones.hess_nz_count(cone_k, false) for cone_k in cones)
+    hess_nz_total = isempty(cones) ? 0 : sum(Cones.hess_nz_count(cone_k, false) for cone_k in cones)
     H_Is = Vector{Int}(undef, hess_nz_total)
     H_Js = Vector{Int}(undef, hess_nz_total)
     offset = 1

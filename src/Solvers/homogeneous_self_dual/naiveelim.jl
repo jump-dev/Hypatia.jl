@@ -132,7 +132,7 @@ function load(system_solver::NaiveElimSparseSystemSolver{T}, solver::Solver{T}) 
     (Is, Js, Vs) = findnz(lhs4)
 
     # add I, J, V for Hessians and inverse Hessians
-    hess_nz_total = sum(Cones.use_dual(cone_k) ? Cones.hess_nz_count(cone_k, false) : Cones.inv_hess_nz_count(cone_k, false) for cone_k in cones)
+    hess_nz_total = isempty(cones) ? 0 : sum(Cones.use_dual(cone_k) ? Cones.hess_nz_count(cone_k, false) : Cones.inv_hess_nz_count(cone_k, false) for cone_k in cones)
     H_Is = Vector{Int}(undef, hess_nz_total)
     H_Js = Vector{Int}(undef, hess_nz_total)
     offset = 1
