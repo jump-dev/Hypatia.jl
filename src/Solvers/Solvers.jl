@@ -67,6 +67,11 @@ mutable struct Solver{T <: Real}
     y_keep_idxs::AbstractVector{Int}
     Ap_R::UpperTriangular{T, <:AbstractMatrix{T}}
     Ap_Q::Union{UniformScaling, AbstractMatrix{T}}
+    reduce_cQ1
+    reduce_Rpib0
+    reduce_GQ1
+    reduce_Ap_R
+    reduce_Ap_Q
 
     # current iterate
     point::Models.Point{T}
@@ -142,6 +147,7 @@ mutable struct Solver{T <: Real}
         if isa(system_solver, QRCholSystemSolver{T})
             @assert reduce || preprocess # require reduction or preprocessing for QRCholSystemSolver # TODO only need primal eq preprocessing
         end
+        @assert !(init_use_indirect && preprocess) # cannot use preprocessing and indirect methods for initial point
 
         solver = new{T}()
 
@@ -181,10 +187,20 @@ get_z(solver::Solver) = copy(solver.point.z)
 
 function get_x(solver::Solver{T}) where {T <: Real}
     if solver.preprocess
-        x = zeros(T, solver.orig_model.n)
-        x[solver.x_keep_idxs] = solver.point.x # unpreprocess solver's solution
+        # unpreprocess solver's solution
         if solver.reduce
-            error("TODO")
+            # unreduce solver's solution
+            # x0 = Q * [(R' \ b0), x]
+            x = vcat(solver.reduce_Rpib0, solver.point.x)
+            @show solver.orig_model.n
+            @show solver.x_keep_idxs
+            @show size(solver.x_keep_idxs)
+            @show size(solver.reduce_Ap_Q)
+            @show length(x)
+            lmul!(solver.reduce_Ap_Q, x)
+        else
+            x = zeros(T, solver.orig_model.n)
+            x[solver.x_keep_idxs] = solver.point.x
         end
     else
         x = copy(solver.point.x)
@@ -194,10 +210,17 @@ end
 
 function get_y(solver::Solver{T}) where {T <: Real}
     if solver.preprocess
-        y = zeros(T, solver.orig_model.p)
-        y[solver.y_keep_idxs] = solver.point.y # unpreprocess solver's solution
+        # unpreprocess solver's solution
         if solver.reduce
-            error("TODO")
+            # unreduce solver's solution
+            # y0 = R \ (-cQ1' - GQ1' * z0)
+            y = solver.reduce_cQ1
+            mul!(y, solver.reduce_GQ1', solver.point.z, -1, -1)
+            @show y, solver.y_keep_idxs, solver.orig_model.p
+            ldiv!(solver.reduce_Ap_R, y)
+        else
+            y = zeros(T, solver.orig_model.p)
+            y[solver.y_keep_idxs] = solver.point.y
         end
     else
         y = copy(solver.point.y)
