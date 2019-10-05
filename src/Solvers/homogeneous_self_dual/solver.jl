@@ -187,19 +187,30 @@ function find_initial_x(solver::Solver{T}) where {T <: Real}
     # direct method
     if iszero(p)
         # A is empty
-        AG = (issparse(G) ? G : copy(G))
+        if issparse(G)
+            AG = G
+        elseif G isa Matrix{T}
+            AG = copy(G)
+        else
+            AG = Matrix(G)
+        end
     else
         AG = vcat(A, G)
     end
-    if issparse(AG) && !(T <: sparse_QR_reals)
-        if solver.init_use_fallback
-            @warn("using dense factorization of [A; G] in preprocessing and initial point finding because sparse factorization for number type $T is not supported by SuiteSparse packages")
-            AG = Matrix(AG)
+    @timeit solver.timer "qr_fact" if issparse(AG)
+        if !(T <: sparse_QR_reals)
+            if solver.init_use_fallback
+                @warn("using dense factorization of [A; G] in preprocessing and initial point finding because sparse factorization for number type $T is not supported by SuiteSparse packages")
+                AG = Matrix(AG)
+            else
+                error("sparse factorization for number type $T is not supported by SuiteSparse packages, so Hypatia cannot preprocess and find an initial point")
+            end
         else
-            error("sparse factorization for number type $T is not supported by SuiteSparse packages, so Hypatia cannot preprocess and find an initial point")
+            AG_fact = qr(AG, tol = solver.init_tol_qr)
         end
+    else
+        AG_fact = qr!(AG, Val(true))
     end
-    @timeit solver.timer "qr_fact" AG_fact = issparse(AG) ? qr(AG, tol = solver.init_tol_qr) : qr(AG, Val(true))
     AG_rank = get_rank_est(AG_fact, solver.init_tol_qr)
 
     if !solver.preprocess || (AG_rank == n)
@@ -280,15 +291,19 @@ function find_initial_y(solver::Solver{T}, reducing::Bool) where {T <: Real}
     end
 
     # factorize A'
-    if issparse(A) && !(T <: sparse_QR_reals)
-        if solver.init_use_fallback
-            @warn("using dense factorization of A' in preprocessing and initial point finding because sparse factorization for number type $T is not supported by SuiteSparse packages")
-            @timeit solver.timer "qr_fact" Ap_fact = qr!(Matrix(A'), Val(true))
+    @timeit solver.timer "qr_fact" if issparse(A)
+        if !(T <: sparse_QR_reals)
+            if solver.init_use_fallback
+                @warn("using dense factorization of A' in preprocessing and initial point finding because sparse factorization for number type $T is not supported by SuiteSparse packages")
+                Ap_fact = qr!(Matrix(A'), Val(true))
+            else
+                error("sparse factorization for number type $T is not supported by SuiteSparse packages, so Hypatia cannot preprocess and find an initial point")
+            end
         else
-            error("sparse factorization for number type $T is not supported by SuiteSparse packages, so Hypatia cannot preprocess and find an initial point")
+            Ap_fact = qr(sparse(A'), tol = solver.init_tol_qr)
         end
     else
-        @timeit solver.timer "qr_fact" Ap_fact = issparse(A) ? qr(sparse(A'), tol = solver.init_tol_qr) : qr(A', Val(true))
+        Ap_fact = qr!(Matrix(A'), Val(true))
     end
     Ap_rank = get_rank_est(Ap_fact, solver.init_tol_qr)
 
@@ -317,7 +332,8 @@ function find_initial_y(solver::Solver{T}, reducing::Bool) where {T <: Real}
         end
 
         if !(Ap_fact isa QRPivoted{T, Matrix{T}})
-            x_sub = x_sub[Ap_fact.rpivinv]
+            row_piv_inv = Ap_fact.rpivinv
+            x_sub = x_sub[row_piv_inv]
         end
         residual = norm(A * x_sub - model.b, Inf)
         if residual > solver.init_tol_qr
@@ -337,7 +353,16 @@ function find_initial_y(solver::Solver{T}, reducing::Bool) where {T <: Real}
         # y0 = R \ (-cQ1' - GQ1' * z0)
         Q1_idxs = 1:p
         Q2_idxs = (p + 1):n
+        if !(Ap_fact isa QRPivoted{T, Matrix{T}})
+            row_piv = Ap_fact.prow
+            model.c = model.c[row_piv]
+            model.G = model.G[:, row_piv]
+            solver.reduce_row_piv_inv = Ap_fact.rpivinv
+        else
+            solver.reduce_row_piv_inv = Int[]
+        end
 
+        @show issparse(Ap_R)
         # [cQ1 cQ2] = c0' * Q
         cQ = model.c' * Ap_Q
         cQ1 = solver.reduce_cQ1 = cQ[Q1_idxs]

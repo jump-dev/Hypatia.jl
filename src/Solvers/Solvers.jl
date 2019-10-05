@@ -73,6 +73,7 @@ mutable struct Solver{T <: Real}
     reduce_Ap_R
     reduce_Ap_Q
     reduce_y_keep_idxs
+    reduce_row_piv_inv
 
     # current iterate
     point::Models.Point{T}
@@ -146,7 +147,10 @@ mutable struct Solver{T <: Real}
         system_solver::SystemSolver{T} = QRCholDenseSystemSolver{T}(),
         ) where {T <: Real}
         if isa(system_solver, QRCholSystemSolver{T})
-            @assert reduce || preprocess # require reduction or preprocessing for QRCholSystemSolver # TODO only need primal eq preprocessing
+            @assert preprocess # require preprocessing for QRCholSystemSolver # TODO only need primal eq preprocessing or reduction
+        end
+        if reduce
+            @assert preprocess # cannot use reduction without preprocessing # TODO only need primal eq preprocessing
         end
         @assert !(init_use_indirect && preprocess) # cannot use preprocessing and indirect methods for initial point
 
@@ -194,6 +198,9 @@ function get_x(solver::Solver{T}) where {T <: Real}
             # x0 = Q * [(R' \ b0), x]
             x = vcat(solver.reduce_Rpib0, solver.point.x)
             lmul!(solver.reduce_Ap_Q, x)
+            if !isempty(solver.reduce_row_piv_inv)
+                x = x[solver.reduce_row_piv_inv]
+            end
         else
             x = zeros(T, solver.orig_model.n)
             x[solver.x_keep_idxs] = solver.point.x
