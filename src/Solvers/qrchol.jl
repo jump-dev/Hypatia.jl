@@ -9,7 +9,7 @@ http://www.seas.ucla.edu/~vandenbe/publications/coneprog.pdf (the dominating sub
 
 abstract type QRCholSystemSolver{T <: Real} <: SystemSolver{T} end
 
-function solve_system(system_solver::QRCholSystemSolver{T}, solver::Solver{T}, sol, rhs) where {T <: Real}
+function solve_system(system_solver::QRCholSystemSolver{T}, solver::Solver{T}, sol::Matrix{T}, rhs::Matrix{T}) where {T <: Real}
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
     tau_row = n + p + q + 1
@@ -115,7 +115,7 @@ function solve_system(system_solver::QRCholSystemSolver{T}, solver::Solver{T}, s
     return sol
 end
 
-function block_hessian_product(cones, prod_k, arr_k)
+function block_hessian_product(cones::Vector, prod_k::Vector, arr_k::Vector)
     for (k, cone_k) in enumerate(cones)
         if Cones.use_dual(cone_k)
             Cones.inv_hess_prod!(prod_k[k], arr_k[k], cone_k)
@@ -131,7 +131,6 @@ direct dense
 
 mutable struct QRCholDenseSystemSolver{T <: Real} <: QRCholSystemSolver{T}
     lhs1::Symmetric{T, Matrix{T}}
-    fact_cache
     GQ1
     GQ2
     QpbxGHbz
@@ -148,6 +147,7 @@ mutable struct QRCholDenseSystemSolver{T <: Real} <: QRCholSystemSolver{T}
     GQ2_k
     HGx_k
     Gx_k
+    fact_cache::DensePosDefCache{T}
     function QRCholDenseSystemSolver{T}(; fact_cache::DensePosDefCache{T} = DensePosDefCache{T}()) where {T <: Real}
         system_solver = new{T}()
         system_solver.fact_cache = fact_cache
@@ -205,7 +205,7 @@ function update_fact(system_solver::QRCholDenseSystemSolver, solver::Solver)
     return system_solver
 end
 
-function solve_subsystem(system_solver::QRCholDenseSystemSolver, sol1, rhs1)
+function solve_subsystem(system_solver::QRCholDenseSystemSolver, sol1::AbstractMatrix, rhs1::AbstractMatrix)
     if !solve_dense_system(system_solver.fact_cache, sol1, system_solver.lhs1, rhs1)
         # TODO recover somehow
         @warn("numerical failure: could not solve linear system")
