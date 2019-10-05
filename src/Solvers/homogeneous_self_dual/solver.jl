@@ -201,7 +201,7 @@ function find_initial_x(solver::Solver{T}) where {T <: Real}
         if !(T <: sparse_QR_reals)
             if solver.init_use_fallback
                 @warn("using dense factorization of [A; G] in preprocessing and initial point finding because sparse factorization for number type $T is not supported by SuiteSparse packages")
-                AG = Matrix(AG)
+                AG_fact = qr!(Matrix(AG), Val(true))
             else
                 error("sparse factorization for number type $T is not supported by SuiteSparse packages, so Hypatia cannot preprocess and find an initial point")
             end
@@ -332,8 +332,7 @@ function find_initial_y(solver::Solver{T}, reducing::Bool) where {T <: Real}
         end
 
         if !(Ap_fact isa QRPivoted{T, Matrix{T}})
-            row_piv_inv = Ap_fact.rpivinv
-            x_sub = x_sub[row_piv_inv]
+            x_sub = x_sub[Ap_fact.rpivinv]
         end
         residual = norm(A * x_sub - model.b, Inf)
         if residual > solver.init_tol_qr
