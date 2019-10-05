@@ -43,6 +43,7 @@ mutable struct Solver{T <: Real}
     tol_feas::T
     tol_slow::T
     preprocess::Bool
+    reduce::Bool
     init_use_indirect::Bool
     init_tol_qr::T
     init_use_fallback::Bool
@@ -66,6 +67,13 @@ mutable struct Solver{T <: Real}
     y_keep_idxs::AbstractVector{Int}
     Ap_R::UpperTriangular{T, <:AbstractMatrix{T}}
     Ap_Q::Union{UniformScaling, AbstractMatrix{T}}
+    reduce_cQ1
+    reduce_Rpib0
+    reduce_GQ1
+    reduce_Ap_R
+    reduce_Ap_Q
+    reduce_y_keep_idxs
+    reduce_row_piv_inv
 
     # current iterate
     point::Models.Point{T}
@@ -129,6 +137,7 @@ mutable struct Solver{T <: Real}
         tol_feas::Real = sqrt(eps(T)),
         tol_slow::Real = 1e-3,
         preprocess::Bool = true,
+        reduce::Bool = true,
         init_use_indirect::Bool = false,
         init_tol_qr::Real = 100 * eps(T),
         init_use_fallback::Bool = true,
@@ -138,10 +147,15 @@ mutable struct Solver{T <: Real}
         system_solver::SystemSolver{T} = QRCholDenseSystemSolver{T}(),
         ) where {T <: Real}
         if isa(system_solver, QRCholSystemSolver{T})
-            @assert preprocess # require preprocessing for QRCholSystemSolver
+            @assert preprocess # require preprocessing for QRCholSystemSolver # TODO only need primal eq preprocessing or reduction
         end
+        if reduce
+            @assert preprocess # cannot use reduction without preprocessing # TODO only need primal eq preprocessing
+        end
+        @assert !(init_use_indirect && preprocess) # cannot use preprocessing and indirect methods for initial point
 
         solver = new{T}()
+
         solver.verbose = verbose
         solver.iter_limit = iter_limit
         solver.time_limit = time_limit
@@ -150,6 +164,7 @@ mutable struct Solver{T <: Real}
         solver.tol_feas = tol_feas
         solver.tol_slow = tol_slow
         solver.preprocess = preprocess
+        solver.reduce = reduce
         solver.init_use_indirect = init_use_indirect
         solver.init_tol_qr = init_tol_qr
         solver.init_use_fallback = init_use_fallback
@@ -176,22 +191,44 @@ get_s(solver::Solver) = copy(solver.point.s)
 get_z(solver::Solver) = copy(solver.point.z)
 
 function get_x(solver::Solver{T}) where {T <: Real}
-    if solver.preprocess
-        x = zeros(T, solver.orig_model.n)
-        x[solver.x_keep_idxs] = solver.point.x # unpreprocess solver's solution
+    if solver.preprocess && !iszero(solver.orig_model.n) && !any(isnan, solver.point.x)
+        # unpreprocess solver's solution
+        if solver.reduce && !iszero(solver.orig_model.p)
+            # unreduce solver's solution
+            # x0 = Q * [(R' \ b0), x]
+            x = vcat(solver.reduce_Rpib0, solver.point.x)
+            lmul!(solver.reduce_Ap_Q, x)
+            if !isempty(solver.reduce_row_piv_inv)
+                x = x[solver.reduce_row_piv_inv]
+            end
+        else
+            x = zeros(T, solver.orig_model.n)
+            x[solver.x_keep_idxs] = solver.point.x
+        end
     else
         x = copy(solver.point.x)
     end
+
     return x
 end
 
 function get_y(solver::Solver{T}) where {T <: Real}
-    if solver.preprocess
+    if solver.preprocess && !iszero(solver.orig_model.p) && !any(isnan, solver.point.y)
+        # unpreprocess solver's solution
         y = zeros(T, solver.orig_model.p)
-        y[solver.y_keep_idxs] = solver.point.y # unpreprocess solver's solution
+        if solver.reduce
+            # unreduce solver's solution
+            # y0 = R \ (-cQ1' - GQ1' * z0)
+            y0 = solver.reduce_cQ1
+            mul!(y0, solver.reduce_GQ1', solver.point.z, -1, -1)
+            y[solver.reduce_y_keep_idxs] = ldiv!(solver.reduce_Ap_R, y0[1:length(solver.reduce_y_keep_idxs)])
+        else
+            y[solver.y_keep_idxs] = solver.point.y
+        end
     else
         y = copy(solver.point.y)
     end
+
     return y
 end
 

@@ -160,6 +160,7 @@ function load(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}) wher
     (n, p, q) = (model.n, model.p, model.q)
     cone_idxs = model.cone_idxs
 
+    # TODO optimize for case of empty A
     if !isa(model.G, Matrix{T}) && isa(solver.Ap_Q, SuiteSparse.SPQR.QRSparseQ)
         # TODO very inefficient method used for sparse G * QRSparseQ : see https://github.com/JuliaLang/julia/issues/31124#issuecomment-501540818
         # TODO remove workaround and warning
