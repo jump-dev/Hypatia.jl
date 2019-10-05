@@ -362,7 +362,6 @@ function find_initial_y(solver::Solver{T}, reducing::Bool) where {T <: Real}
             solver.reduce_row_piv_inv = Int[]
         end
 
-        @show issparse(Ap_R)
         # [cQ1 cQ2] = c0' * Q
         cQ = model.c' * Ap_Q
         cQ1 = solver.reduce_cQ1 = cQ[Q1_idxs]
