@@ -72,6 +72,7 @@ mutable struct Solver{T <: Real}
     reduce_GQ1
     reduce_Ap_R
     reduce_Ap_Q
+    reduce_y_keep_idxs
 
     # current iterate
     point::Models.Point{T}
@@ -134,9 +135,9 @@ mutable struct Solver{T <: Real}
         tol_abs_opt::Real = sqrt(eps(T)),
         tol_feas::Real = sqrt(eps(T)),
         tol_slow::Real = 1e-3,
-        preprocess::Bool = false,
-        reduce::Bool = false,
-        init_use_indirect::Bool = true,
+        preprocess::Bool = true,
+        reduce::Bool = true,
+        init_use_indirect::Bool = false,
         init_tol_qr::Real = 100 * eps(T),
         init_use_fallback::Bool = true,
         max_nbhd::Real = 0.7,
@@ -186,17 +187,12 @@ get_s(solver::Solver) = copy(solver.point.s)
 get_z(solver::Solver) = copy(solver.point.z)
 
 function get_x(solver::Solver{T}) where {T <: Real}
-    if solver.preprocess
+    if solver.preprocess && !iszero(solver.orig_model.n) && !any(isnan, solver.point.x)
         # unpreprocess solver's solution
-        if solver.reduce
+        if solver.reduce && !iszero(solver.orig_model.p)
             # unreduce solver's solution
             # x0 = Q * [(R' \ b0), x]
             x = vcat(solver.reduce_Rpib0, solver.point.x)
-            @show solver.orig_model.n
-            @show solver.x_keep_idxs
-            @show size(solver.x_keep_idxs)
-            @show size(solver.reduce_Ap_Q)
-            @show length(x)
             lmul!(solver.reduce_Ap_Q, x)
         else
             x = zeros(T, solver.orig_model.n)
@@ -205,26 +201,27 @@ function get_x(solver::Solver{T}) where {T <: Real}
     else
         x = copy(solver.point.x)
     end
+
     return x
 end
 
 function get_y(solver::Solver{T}) where {T <: Real}
-    if solver.preprocess
+    if solver.preprocess && !iszero(solver.orig_model.p) && !any(isnan, solver.point.y)
         # unpreprocess solver's solution
+        y = zeros(T, solver.orig_model.p)
         if solver.reduce
             # unreduce solver's solution
             # y0 = R \ (-cQ1' - GQ1' * z0)
-            y = solver.reduce_cQ1
-            mul!(y, solver.reduce_GQ1', solver.point.z, -1, -1)
-            @show y, solver.y_keep_idxs, solver.orig_model.p
-            ldiv!(solver.reduce_Ap_R, y)
+            y0 = solver.reduce_cQ1
+            mul!(y0, solver.reduce_GQ1', solver.point.z, -1, -1)
+            y[solver.reduce_y_keep_idxs] = ldiv!(solver.reduce_Ap_R, y0[1:length(solver.reduce_y_keep_idxs)])
         else
-            y = zeros(T, solver.orig_model.p)
             y[solver.y_keep_idxs] = solver.point.y
         end
     else
         y = copy(solver.point.y)
     end
+
     return y
 end
 

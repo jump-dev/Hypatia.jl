@@ -12,39 +12,6 @@ function solve(solver::Solver{T}) where {T <: Real}
     solver.solve_time = NaN
     solver.timer = TimerOutput()
 
-    # preprocess and find initial point
-    @timeit solver.timer "initialize" begin
-        orig_model = solver.orig_model
-        model = solver.model = Models.Model{T}(orig_model.c, orig_model.A, orig_model.b, orig_model.G, orig_model.h, orig_model.cones, obj_offset = orig_model.obj_offset) # copy original model to solver.model, which may be modified
-
-        @timeit solver.timer "init_cone" point = solver.point = initialize_cone_point(solver.orig_model.cones, solver.orig_model.cone_idxs)
-
-        if solver.reduce
-            # TODO don't find point / unnecessary stuff before reduce
-            @timeit solver.timer "preproc_init_y" point.y = find_initial_y(solver)
-            @timeit solver.timer "remove_prim_eq" remove_prim_eq(solver)
-            @timeit solver.timer "preproc_init_x" point.x = find_initial_x(solver)
-            @timeit solver.timer "preproc_init_y" point.y = find_initial_y(solver)
-        else
-            @timeit solver.timer "preproc_init_x" point.x = find_initial_x(solver)
-            @timeit solver.timer "preproc_init_y" point.y = find_initial_y(solver)
-        end
-
-        solver.status != :SolveCalled && return solver
-
-        solver.tau = one(T)
-        solver.kap = one(T)
-        calc_mu(solver)
-        if isnan(solver.mu) || abs(one(T) - solver.mu) > sqrt(eps(T))
-            @warn("initial mu is $(solver.mu) but should be 1 (this could indicate a problem with cone barrier oracles)")
-        end
-        Cones.load_point.(model.cones, point.primal_views)
-    end
-
-    # setup iteration helpers
-    solver.x_residual = similar(model.c)
-    solver.y_residual = similar(model.b)
-    solver.z_residual = similar(model.h)
     solver.x_norm_res_t = NaN
     solver.y_norm_res_t = NaN
     solver.z_norm_res_t = NaN
@@ -61,6 +28,42 @@ function solve(solver::Solver{T}) where {T <: Real}
     solver.x_feas = NaN
     solver.y_feas = NaN
     solver.z_feas = NaN
+
+    # preprocess and find initial point
+    @timeit solver.timer "initialize" begin
+        orig_model = solver.orig_model
+        model = solver.model = Models.Model{T}(orig_model.c, orig_model.A, orig_model.b, orig_model.G, orig_model.h, orig_model.cones, obj_offset = orig_model.obj_offset) # copy original model to solver.model, which may be modified
+
+        @timeit solver.timer "init_cone" point = solver.point = initialize_cone_point(solver.orig_model.cones, solver.orig_model.cone_idxs)
+
+        if solver.reduce
+            # TODO don't find point / unnecessary stuff before reduce
+            @timeit solver.timer "remove_prim_eq" point.y = find_initial_y(solver, true)
+            @timeit solver.timer "preproc_init_x" point.x = find_initial_x(solver)
+        else
+            @timeit solver.timer "preproc_init_x" point.x = find_initial_x(solver)
+            @timeit solver.timer "preproc_init_y" point.y = find_initial_y(solver, false)
+        end
+
+        if solver.status != :SolveCalled
+            point.x = fill(NaN, orig_model.n)
+            point.y = fill(NaN, orig_model.p)
+            return solver
+        end
+
+        solver.tau = one(T)
+        solver.kap = one(T)
+        calc_mu(solver)
+        if isnan(solver.mu) || abs(one(T) - solver.mu) > sqrt(eps(T))
+            @warn("initial mu is $(solver.mu) but should be 1 (this could indicate a problem with cone barrier oracles)")
+        end
+        Cones.load_point.(model.cones, point.primal_views)
+    end
+
+    # setup iteration helpers
+    solver.x_residual = similar(model.c)
+    solver.y_residual = similar(model.b)
+    solver.z_residual = similar(model.h)
 
     solver.x_conv_tol = inv(max(one(T), norm(model.c)))
     solver.y_conv_tol = inv(max(one(T), norm(model.b)))
@@ -207,7 +210,7 @@ function find_initial_x(solver::Solver{T}) where {T <: Real}
 
     # preprocess dual equalities
     col_piv = (AG_fact isa QRPivoted{T, Matrix{T}}) ? AG_fact.p : AG_fact.pcol
-    x_keep_idxs = solver.x_keep_idxs = col_piv[1:AG_rank]
+    x_keep_idxs = col_piv[1:AG_rank]
     AG_R = UpperTriangular(AG_fact.R[1:AG_rank, 1:AG_rank])
 
     c_sub = model.c[x_keep_idxs]
@@ -235,6 +238,7 @@ function find_initial_x(solver::Solver{T}) where {T <: Real}
     model.A = A[:, x_keep_idxs]
     model.G = G[:, x_keep_idxs]
     model.n = AG_rank
+    solver.x_keep_idxs = x_keep_idxs
 
     @timeit solver.timer "qr_solve" begin
         # init_x = AG_R \ ((AG_fact.Q' * vcat(b, h - point.s))[1:AG_rank])
@@ -248,7 +252,7 @@ function find_initial_x(solver::Solver{T}) where {T <: Real}
 end
 
 # optionally preprocess primal equalities and solve for y as least squares solution to A'y = -c - G'z
-function find_initial_y(solver::Solver{T}) where {T <: Real}
+function find_initial_y(solver::Solver{T}, reducing::Bool) where {T <: Real}
     model = solver.model
     p = model.p
     if iszero(p) # y is empty (no primal variables)
@@ -262,18 +266,20 @@ function find_initial_y(solver::Solver{T}) where {T <: Real}
     A = model.A
     solver.y_keep_idxs = 1:p
 
-    # rhs = -c - G' * point.z
-    rhs = copy(model.c)
-    mul!(rhs, model.G', solver.point.z, -1, -1)
+    if !reducing
+        # rhs = -c - G' * point.z
+        rhs = copy(model.c)
+        mul!(rhs, model.G', solver.point.z, -1, -1)
 
-    # indirect method
-    if solver.init_use_indirect
-        # TODO pick lsqr or lsmr
-        @timeit solver.timer "lsqr_solve" init_y = IterativeSolvers.lsqr(A', rhs)
-        return init_y
+        # indirect method
+        if solver.init_use_indirect
+            # TODO pick lsqr or lsmr
+            @timeit solver.timer "lsqr_solve" init_y = IterativeSolvers.lsqr(A', rhs)
+            return init_y
+        end
     end
 
-    # direct method
+    # factorize A'
     if issparse(A) && !(T <: sparse_QR_reals)
         if solver.init_use_fallback
             @warn("using dense factorization of A' in preprocessing and initial point finding because sparse factorization for number type $T is not supported by SuiteSparse packages")
@@ -286,7 +292,7 @@ function find_initial_y(solver::Solver{T}) where {T <: Real}
     end
     Ap_rank = get_rank_est(Ap_fact, solver.init_tol_qr)
 
-    if !solver.preprocess
+    if !reducing && !solver.preprocess
         Ap_rank < p && @warn("some primal equalities appear to be dependent (possibly inconsistent); try using preprocess = true")
         @timeit solver.timer "qr_solve" init_y = Ap_fact \ rhs
         return init_y
@@ -295,7 +301,7 @@ function find_initial_y(solver::Solver{T}) where {T <: Real}
     # preprocess dual equalities
     Ap_R = UpperTriangular(Ap_fact.R[1:Ap_rank, 1:Ap_rank])
     col_piv = (Ap_fact isa QRPivoted{T, Matrix{T}}) ? Ap_fact.p : Ap_fact.pcol
-    y_keep_idxs = solver.y_keep_idxs = col_piv[1:Ap_rank]
+    y_keep_idxs = col_piv[1:Ap_rank]
     Ap_Q = Ap_fact.Q
 
     b_sub = model.b[y_keep_idxs]
@@ -317,8 +323,54 @@ function find_initial_y(solver::Solver{T}) where {T <: Real}
         if residual > solver.init_tol_qr
             solver.verbose && println("some primal equality constraints are inconsistent (residual $residual, tolerance $(solver.init_tol_qr))")
             solver.status = :PrimalInconsistent
+            return zeros(T, 0)
         end
         solver.verbose && println("removed $(p - Ap_rank) out of $p primal equality constraints")
+    end
+
+    if reducing
+        # remove all primal equalities by making A and b empty with n = n0 - p0 and p = 0
+        # TODO improve efficiency
+        # TODO avoid calculating GQ1 explicitly if possible
+        # recover original-space solution using:
+        # x0 = Q * [(R' \ b0), x]
+        # y0 = R \ (-cQ1' - GQ1' * z0)
+        Q1_idxs = 1:p
+        Q2_idxs = (p + 1):n
+
+        # [cQ1 cQ2] = c0' * Q
+        cQ = model.c' * Ap_Q
+        cQ1 = solver.reduce_cQ1 = cQ[Q1_idxs]
+        cQ2 = cQ[Q2_idxs]
+        # c = cQ2
+        model.c = cQ2
+        model.n = length(model.c)
+        # offset = offset0 + cQ1 * (R' \ b0)
+        Rpib0 = solver.reduce_Rpib0 = vcat(Ap_R' \ b_sub, zeros(p - Ap_rank))
+        # solver.Rpib0 = Rpib0 # TODO
+        model.obj_offset += dot(cQ1, Rpib0)
+
+        # [GQ1 GQ2] = G0 * Q
+        GQ = model.G * Ap_Q
+        GQ1 = solver.reduce_GQ1 = GQ[:, Q1_idxs]
+        GQ2 = GQ[:, Q2_idxs]
+        # h = h0 - GQ1 * (R' \ b0)
+        model.h -= GQ1 * Rpib0
+        # G = GQ2
+        model.G = GQ2
+
+        # A and b empty
+        model.p = 0
+        model.A = zeros(T, 0, model.n)
+        model.b = zeros(T, 0)
+        solver.reduce_Ap_R = Ap_R
+        solver.reduce_Ap_Q = Ap_Q
+
+        solver.reduce_y_keep_idxs = y_keep_idxs
+        solver.Ap_R = UpperTriangular(zeros(T, 0, 0))
+        solver.Ap_Q = I
+
+        return zeros(T, 0)
     end
 
     @timeit solver.timer "qr_solve" begin
@@ -343,286 +395,12 @@ function find_initial_y(solver::Solver{T}) where {T <: Real}
     end
     model.b = b_sub
     model.p = Ap_rank
+    solver.y_keep_idxs = y_keep_idxs
     solver.Ap_R = Ap_R
     solver.Ap_Q = Ap_Q
 
     return init_y
 end
-
-# reduce model by removing all primal equalities
-# remove all primal equalities by making A and b empty with n = n0 - p0 and p = 0
-# TODO improve efficiency, and maybe move some of the transformations above to here
-# TODO avoid calculating GQ1 explicitly if possible
-# TODO don't calculate init x and y before reduce
-# recover original-space solution using:
-# x0 = Q * [(R' \ b0), x]
-# y0 = R \ (-cQ1' - GQ1' * z0)
-function remove_prim_eq(solver::Solver{T}) where {T <: Real}
-    model = solver.model # will be modified
-    Q1_idxs = 1:model.p
-    Q2_idxs = (model.p + 1):model.n
-
-    # [cQ1 cQ2] = c0' * Q
-    cQ = model.c' * solver.Ap_Q
-    cQ1 = solver.reduce_cQ1 = cQ[Q1_idxs]
-    cQ2 = cQ[Q2_idxs]
-    # c = cQ2
-    model.c = cQ2
-    model.n = length(model.c)
-    # offset = offset0 + cQ1 * (R' \ b0)
-    Rpib0 = solver.reduce_Rpib0 = solver.Ap_R' \ model.b
-    # solver.Rpib0 = Rpib0 # TODO
-    model.obj_offset += dot(cQ1, Rpib0)
-
-    # [GQ1 GQ2] = G0 * Q
-    GQ = model.G * solver.Ap_Q
-    GQ1 = solver.reduce_GQ1 = GQ[:, Q1_idxs]
-    GQ2 = GQ[:, Q2_idxs]
-    # h = h0 - GQ1 * (R' \ b0)
-    model.h -= GQ1 * Rpib0
-    # G = GQ2
-    model.G = GQ2
-
-    # A and b empty
-    model.p = 0
-    model.A = zeros(T, 0, model.n)
-    model.b = zeros(T, 0)
-    solver.reduce_Ap_R = solver.Ap_R
-    solver.reduce_Ap_Q = solver.Ap_Q
-    solver.Ap_R = UpperTriangular(zeros(T, 0, 0))
-    solver.Ap_Q = I
-
-    return
-end
-
-
-# TODO optionally use row and col scaling on AG and apply to c, b, h
-# TODO precondition iterative methods
-# TODO pick default tol for iter methods
-
-# function find_initial_point(solver::Solver{T}) where {T <: Real}
-#     model = solver.model = solver.orig_model
-#     A = model.A
-#     G = model.G
-#     n = model.n
-#     p = model.p
-#     q = model.q
-#     point = solver.point
-#
-#     # solve for x as least squares solution to Ax = b, Gx = h - s
-#     @timeit solver.timer "init_x" if !iszero(n)
-#         rhs = vcat(model.b, model.h - point.s)
-#         if solver.init_use_indirect
-#             # use iterative solvers method TODO pick lsqr or lsmr
-#             AG = BlockMatrix{T}(p + q, n, [A, G], [1:p, (p + 1):(p + q)], [1:n, 1:n])
-#             @timeit solver.timer "lsqr_solve" point.x = IterativeSolvers.lsqr(AG, rhs)
-#         else
-#             AG = vcat(A, G)
-#             if issparse(AG) && !(T <: sparse_QR_reals)
-#                 # TODO alternative fallback is to convert sparse{T} to sparse{Float64} and do the sparse LU
-#                 if solver.init_use_fallback
-#                     @warn("using dense factorization of [A; G] in initial point finding because sparse factorization for number type $T is not supported by SuiteSparse packages")
-#                     AG = Matrix(AG)
-#                 else
-#                     error("sparse factorization for number type $T is not supported by SuiteSparse packages, so Hypatia cannot find an initial point")
-#                 end
-#             end
-#             @timeit solver.timer "qr_fact" AG_fact = issparse(AG) ? qr(AG) : qr!(AG)
-#
-#             AG_rank = get_rank_est(AG_fact, solver.init_tol_qr)
-#             if AG_rank < n
-#                 @warn("some dual equalities appear to be dependent; try using preprocess = true")
-#             end
-#
-#             @timeit solver.timer "qr_solve" point.x = AG_fact \ rhs
-#         end
-#     end
-#
-#     # solve for y as least squares solution to A'y = -c - G'z
-#     @timeit solver.timer "init_y" if !iszero(p)
-#         rhs = -model.c - G' * point.z
-#         if solver.init_use_indirect
-#             # use iterative solvers method TODO pick lsqr or lsmr
-#             @timeit solver.timer "lsqr_solve" point.y = IterativeSolvers.lsqr(A', rhs)
-#         else
-#             if issparse(A) && !(T <: sparse_QR_reals)
-#                 # TODO alternative fallback is to convert sparse{T} to sparse{Float64} and do the sparse LU
-#                 if solver.init_use_fallback
-#                     @warn("using dense factorization of A' in initial point finding because sparse factorization for number type $T is not supported by SuiteSparse packages")
-#                     @timeit solver.timer "qr_fact" Ap_fact = qr!(Matrix(A'))
-#                 else
-#                     error("sparse factorization for number type $T is not supported by SuiteSparse packages, so Hypatia cannot find an initial point")
-#                 end
-#             else
-#                 @timeit solver.timer "qr_fact" Ap_fact = issparse(A) ? qr(sparse(A')) : qr!(Matrix(A'))
-#             end
-#
-#             Ap_rank = get_rank_est(Ap_fact, solver.init_tol_qr)
-#             if Ap_rank < p
-#                 @warn("some primal equalities appear to be dependent; try using preprocess = true")
-#             end
-#
-#             @timeit solver.timer "qr_solve" point.y = Ap_fact \ rhs
-#         end
-#     end
-#
-#     return point
-# end
-
-# # preprocess and get initial point
-# function preprocess_find_initial_point(solver::Solver{T}) where {T <: Real}
-#     orig_model = solver.orig_model
-#     c = copy(orig_model.c)
-#     A = copy(orig_model.A)
-#     b = copy(orig_model.b)
-#     G = copy(orig_model.G)
-#     n = length(c)
-#     p = length(b)
-#     q = orig_model.q
-#     point = solver.point
-#
-#     # solve for x as least squares solution to Ax = b, Gx = h - s
-#     @timeit solver.timer "preproc_x" if !iszero(n)
-#         # get pivoted QR # TODO when Julia has a unified QR interface, replace this
-#         AG = vcat(A, G)
-#         if issparse(AG) && !(T <: sparse_QR_reals)
-#             if solver.init_use_fallback
-#                 @warn("using dense factorization of [A; G] in preprocessing and initial point finding because sparse factorization for number type $T is not supported by SuiteSparse packages")
-#                 AG = Matrix(AG)
-#             else
-#                 error("sparse factorization for number type $T is not supported by SuiteSparse packages, so Hypatia cannot preprocess and find an initial point")
-#             end
-#         end
-#         @timeit solver.timer "qr_fact" AG_fact = issparse(AG) ? qr(AG, tol = solver.init_tol_qr) : qr(AG, Val(true))
-#
-#         AG_rank = get_rank_est(AG_fact, solver.init_tol_qr)
-#         if solver.reduce
-#             @assert AG_rank == n # TODO cannot preprocess dual equalities if have used reduction, since reduction stores matrices needed for transformation to original space at end of solve
-#         end
-#
-#         if AG_rank == n
-#             # no dual equalities to remove
-#             x_keep_idxs = 1:n
-#             @timeit solver.timer "qr_solve" point.x = AG_fact \ vcat(b, orig_model.h - point.s)
-#         else
-#             col_piv = (AG_fact isa QRPivoted{T, Matrix{T}}) ? AG_fact.p : AG_fact.pcol
-#             x_keep_idxs = col_piv[1:AG_rank]
-#             AG_R = UpperTriangular(AG_fact.R[1:AG_rank, 1:AG_rank])
-#
-#             c_sub = c[x_keep_idxs]
-#             @timeit solver.timer "residual" begin
-#                 # yz_sub = AG_fact.Q * vcat((AG_R' \ c_sub), zeros(p + q - AG_rank))
-#                 yz_sub = zeros(p + q)
-#                 yz_sub1 = view(yz_sub, 1:AG_rank)
-#                 copyto!(yz_sub1, c_sub)
-#                 ldiv!(AG_R', yz_sub1)
-#                 lmul!(AG_fact.Q, yz_sub)
-#             end
-#             if !(AG_fact isa QRPivoted{T, Matrix{T}})
-#                 yz_sub = yz_sub[AG_fact.rpivinv]
-#             end
-#             residual = norm(AG' * yz_sub - c, Inf)
-#             if residual > solver.init_tol_qr
-#                 solver.verbose && println("some dual equality constraints are inconsistent (residual $residual, tolerance $(solver.init_tol_qr))")
-#                 solver.status = :DualInconsistent
-#                 return point
-#             end
-#             solver.verbose && println("removed $(n - AG_rank) out of $n dual equality constraints")
-#
-#             @timeit solver.timer "qr_solve" begin
-#                 # point.x = AG_R \ ((AG_fact.Q' * vcat(b, orig_model.h - point.s))[1:AG_rank])
-#                 tmp = vcat(b, orig_model.h - point.s)
-#                 lmul!(AG_fact.Q', tmp)
-#                 point.x = tmp[1:AG_rank]
-#                 ldiv!(AG_R, point.x)
-#             end
-#
-#             c = c_sub
-#             A = A[:, x_keep_idxs]
-#             G = G[:, x_keep_idxs]
-#             n = AG_rank
-#         end
-#     else
-#         x_keep_idxs = Int[]
-#     end
-#
-#     # solve for y as least squares solution to A'y = -c - G'z
-#     @timeit solver.timer "preproc_y" if !iszero(p)
-#         if issparse(A) && !(T <: sparse_QR_reals)
-#             if solver.init_use_fallback
-#                 @warn("using dense factorization of A' in preprocessing and initial point finding because sparse factorization for number type $T is not supported by SuiteSparse packages")
-#                 @timeit solver.timer "qr_fact" Ap_fact = qr!(Matrix(A'), Val(true))
-#             else
-#                 error("sparse factorization for number type $T is not supported by SuiteSparse packages, so Hypatia cannot preprocess and find an initial point")
-#             end
-#         else
-#             @timeit solver.timer "qr_fact" Ap_fact = issparse(A) ? qr(sparse(A'), tol = solver.init_tol_qr) : qr(A', Val(true))
-#         end
-#
-#         Ap_rank = get_rank_est(Ap_fact, solver.init_tol_qr)
-#
-#         Ap_R = UpperTriangular(Ap_fact.R[1:Ap_rank, 1:Ap_rank])
-#         col_piv = (Ap_fact isa QRPivoted{T, Matrix{T}}) ? Ap_fact.p : Ap_fact.pcol
-#         y_keep_idxs = col_piv[1:Ap_rank]
-#         Ap_Q = Ap_fact.Q
-#
-#         b_sub = b[y_keep_idxs]
-#         if Ap_rank < p
-#             # some dependent primal equalities, so check if they are consistent
-#             @timeit solver.timer "residual" begin
-#                 # x_sub = Ap_Q * vcat((Ap_R' \ b_sub), zeros(n - Ap_rank))
-#                 x_sub = zeros(n)
-#                 x_sub1 = view(x_sub, 1:Ap_rank)
-#                 copyto!(x_sub1, b_sub)
-#                 ldiv!(Ap_R', x_sub1)
-#                 lmul!(Ap_Q, x_sub)
-#             end
-#
-#             if !(Ap_fact isa QRPivoted{T, Matrix{T}})
-#                 x_sub = x_sub[Ap_fact.rpivinv]
-#             end
-#             residual = norm(A * x_sub - b, Inf)
-#             if residual > solver.init_tol_qr
-#                 solver.verbose && println("some primal equality constraints are inconsistent (residual $residual, tolerance $(solver.init_tol_qr))")
-#                 solver.status = :PrimalInconsistent
-#             end
-#             solver.verbose && println("removed $(p - Ap_rank) out of $p primal equality constraints")
-#         end
-#
-#         @timeit solver.timer "qr_solve" begin
-#             # point.y = Ap_R \ ((Ap_fact.Q' * (-c - G' * point.z))[1:Ap_rank])
-#             tmp = -c
-#             mul!(tmp, G', point.z, -1, true)
-#             lmul!(Ap_fact.Q', tmp)
-#             point.y = tmp[1:Ap_rank]
-#             ldiv!(Ap_R, point.y)
-#         end
-#
-#         if !(Ap_fact isa QRPivoted{T, Matrix{T}})
-#             row_piv = Ap_fact.prow
-#             A = A[y_keep_idxs, row_piv]
-#             c = c[row_piv]
-#             G = G[:, row_piv]
-#             x_keep_idxs = x_keep_idxs[row_piv]
-#         else
-#             A = A[y_keep_idxs, :]
-#         end
-#         b = b_sub
-#         p = Ap_rank
-#         solver.Ap_R = Ap_R
-#         solver.Ap_Q = Ap_Q
-#     else
-#         y_keep_idxs = Int[]
-#         solver.Ap_R = UpperTriangular(zeros(T, 0, 0))
-#         solver.Ap_Q = I
-#     end
-#
-#     solver.x_keep_idxs = x_keep_idxs
-#     solver.y_keep_idxs = y_keep_idxs
-#     solver.model = Models.Model{T}(c, A, b, G, orig_model.h, orig_model.cones, obj_offset = orig_model.obj_offset)
-#
-#     return point
-# end
 
 function calc_mu(solver::Solver{T}) where {T <: Real}
     solver.mu = (dot(solver.point.z, solver.point.s) + solver.tau * solver.kap) /
