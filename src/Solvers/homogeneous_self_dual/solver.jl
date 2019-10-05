@@ -236,7 +236,7 @@ function find_initial_x(solver::Solver{T}) where {T <: Real}
     if !(AG_fact isa QRPivoted{T, Matrix{T}})
         yz_sub = yz_sub[AG_fact.rpivinv]
     end
-    residual = norm(AG' * yz_sub - model.c, Inf)
+    @views residual = norm(A' * yz_sub[1:p] + G' * yz_sub[(p + 1):end] - model.c, Inf)
     if residual > solver.init_tol_qr
         solver.verbose && println("some dual equality constraints are inconsistent (residual $residual, tolerance $(solver.init_tol_qr))")
         solver.status = :DualInconsistent
