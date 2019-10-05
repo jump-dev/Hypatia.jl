@@ -176,45 +176,6 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     return point
 end
 
-# return directions
-# TODO make this function the same for all system solvers, move to solver.jl
-function get_directions(stepper::Stepper{T}, solver::Solver{T}) where {T <: Real}
-    dirs = stepper.dirs
-    system_solver = solver.system_solver
-
-    @timeit solver.timer "update_rhs" rhs = update_rhs(stepper, solver)
-    @timeit solver.timer "update_fact" update_fact(system_solver, solver)
-    @timeit solver.timer "solve_system" solve_system(system_solver, solver, dirs, rhs) # NOTE dense solve with cache destroys RHS
-
-    iter_ref_steps = 3 # TODO handle, maybe change dynamically
-    dirs_new = rhs
-    dirs_new .= dirs # TODO avoid?
-    for i in 1:iter_ref_steps
-        # perform iterative refinement step
-        @timeit solver.timer "calc_sys_res" res = calc_system_residual(stepper, solver) # modifies rhs
-        norm_inf = norm(res, Inf)
-        norm_2 = norm(res, 2)
-
-        if norm_inf > eps(T)
-            dirs_new .= zero(T)
-            @timeit solver.timer "solve_system" solve_system(system_solver, solver, dirs_new, res)
-            dirs_new .*= -1
-            dirs_new .+= dirs
-            @timeit solver.timer "calc_sys_res" res_new = calc_system_residual(stepper, solver)
-            norm_inf_new = norm(res_new, Inf)
-            norm_2_new = norm(res_new, 2)
-            if norm_inf_new < norm_inf && norm_2_new < norm_2
-                solver.verbose && @printf("used iter ref, norms: inf %9.2e to %9.2e, two %9.2e to %9.2e\n", norm_inf, norm_inf_new, norm_2, norm_2_new)
-                copyto!(dirs, dirs_new)
-            else
-                break
-            end
-        end
-    end
-
-    return dirs
-end
-
 # update the 6x2 RHS matrix
 function update_rhs(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     rhs = stepper.rhs
@@ -286,6 +247,45 @@ function calc_system_residual(stepper::CombinedStepper{T}, solver::Solver{T}) wh
     res_kap[2] += solver.kap - solver.mu / solver.tau
 
     return vcat(res_x, res_y, res_z, res_tau, res_s, res_kap) # TODO don't vcat
+end
+
+# return directions
+# TODO make this function the same for all system solvers, move to solver.jl
+function get_directions(stepper::Stepper{T}, solver::Solver{T}) where {T <: Real}
+    dirs = stepper.dirs
+    system_solver = solver.system_solver
+
+    @timeit solver.timer "update_rhs" rhs = update_rhs(stepper, solver)
+    @timeit solver.timer "update_fact" update_fact(system_solver, solver)
+    @timeit solver.timer "solve_system" solve_system(system_solver, solver, dirs, rhs) # NOTE dense solve with cache destroys RHS
+
+    iter_ref_steps = 3 # TODO handle, maybe change dynamically
+    dirs_new = rhs
+    dirs_new .= dirs # TODO avoid?
+    for i in 1:iter_ref_steps
+        # perform iterative refinement step
+        @timeit solver.timer "calc_sys_res" res = calc_system_residual(stepper, solver) # modifies rhs
+        norm_inf = norm(res, Inf)
+        norm_2 = norm(res, 2)
+
+        if norm_inf > eps(T)
+            dirs_new .= zero(T)
+            @timeit solver.timer "solve_system" solve_system(system_solver, solver, dirs_new, res)
+            dirs_new .*= -1
+            dirs_new .+= dirs
+            @timeit solver.timer "calc_sys_res" res_new = calc_system_residual(stepper, solver)
+            norm_inf_new = norm(res_new, Inf)
+            norm_2_new = norm(res_new, 2)
+            if norm_inf_new < norm_inf && norm_2_new < norm_2
+                solver.verbose && @printf("used iter ref, norms: inf %9.2e to %9.2e, two %9.2e to %9.2e\n", norm_inf, norm_inf_new, norm_2, norm_2_new)
+                copyto!(dirs, dirs_new)
+            else
+                break
+            end
+        end
+    end
+
+    return dirs
 end
 
 # backtracking line search to find large distance to step in direction while remaining inside cones and inside a given neighborhood
@@ -415,7 +415,7 @@ function check_nbhd(
     return true
 end
 
-# TODO experimental for block LHS: if block is a Cone then define mul as hessian product, if block is solver then define mul by mu/tau/tau
+# TODO experimental for BlockMatrix LHS: if block is a Cone then define mul as hessian product, if block is solver then define mul by mu/tau/tau
 # TODO optimize... maybe need for each cone a 5-arg hess prod
 import LinearAlgebra.mul!
 

@@ -106,6 +106,9 @@ options = (verbose = true,)
     end
 
     # test with reduction (removing all primal equalities)
+    @testset "no reduction tests: $t, $T" for t in testfuns_reduce, T in generic_reals
+        t(T, solver = SO.Solver{T}(preprocess = true, init_use_indirect = false, reduce = false, system_solver = SO.QRCholDenseSystemSolver{T}(); options...))
+    end
     @testset "reduction tests: $t, $T" for t in testfuns_reduce, T in generic_reals
         t(T, solver = SO.Solver{T}(preprocess = true, init_use_indirect = false, reduce = true, system_solver = SO.QRCholDenseSystemSolver{T}(); options...))
     end
