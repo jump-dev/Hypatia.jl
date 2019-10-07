@@ -59,16 +59,16 @@ function solve_system(system_solver::QRCholSystemSolver{T}, solver::Solver{T}, s
 
     if !isempty(system_solver.Q2div)
         mul!(system_solver.GQ1x, system_solver.GQ1, y)
-        block_hessian_product(model.cones, system_solver.HGQ1x_k, system_solver.GQ1x_k)
+        @timeit solver.timer "block_hess_prod" block_hessian_product(model.cones, system_solver.HGQ1x_k, system_solver.GQ1x_k)
         mul!(system_solver.Q2div, system_solver.GQ2', system_solver.HGQ1x, -1, true)
 
-        solve_subsystem(system_solver, x_sub2, system_solver.Q2div)
+        @timeit solver.timer "solve_subsystem" solve_subsystem(system_solver, x_sub2, system_solver.Q2div)
     end
 
     lmul!(solver.Ap_Q, x)
 
     mul!(system_solver.Gx, model.G, x)
-    block_hessian_product(model.cones, system_solver.HGx_k, system_solver.Gx_k)
+    @timeit solver.timer "block_hess_prod" block_hessian_product(model.cones, system_solver.HGx_k, system_solver.Gx_k)
 
     @. z = system_solver.HGx - z
 
