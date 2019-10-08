@@ -33,7 +33,7 @@ mutable struct EpiPerExp{T <: Real} <: Cone{T}
     expwv::Vector{T}
     tmp_hess::Symmetric{T, Matrix{T}}
     hess_fact
-    hess_fact_cache
+    # hess_fact_cache
 
     function EpiPerExp{T}(dim::Int, is_dual::Bool) where {T <: Real}
         @assert dim >= 3
@@ -55,7 +55,6 @@ function setup_data(cone::EpiPerExp{T}) where {T <: Real}
     cone.expwv = zeros(T, dim - 2)
     cone.dzdw = zeros(T, dim - 2)
     cone.tmp_hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.hess_fact_cache = nothing
     return
 end
 

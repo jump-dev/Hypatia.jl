@@ -29,7 +29,6 @@ mutable struct HypoPerLogdetTri{T <: Real} <: Cone{T}
     mat::Matrix{T}
     mat2::Matrix{T}
     fact_mat
-    chol_cache
     ldWv::T
     z::T
     Wi::Matrix{T}
@@ -39,7 +38,7 @@ mutable struct HypoPerLogdetTri{T <: Real} <: Cone{T}
     Wivzi::Matrix{T}
     tmp_hess::Symmetric{T, Matrix{T}}
     hess_fact
-    hess_fact_cache
+    # hess_fact_cache
 
     function HypoPerLogdetTri{T}(dim::Int, is_dual::Bool) where {T <: Real}
         @assert dim >= 3
@@ -64,9 +63,7 @@ function setup_data(cone::HypoPerLogdetTri{T}) where {T <: Real}
     cone.tmp_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.mat = Matrix{T}(undef, cone.side, cone.side)
     cone.mat2 = similar(cone.mat)
-    cone.chol_cache = HypCholCache('U', cone.mat)
     cone.Wivzi = similar(cone.mat)
-    cone.hess_fact_cache = nothing
     return
 end
 
@@ -90,7 +87,7 @@ function update_feas(cone::HypoPerLogdetTri)
     v = cone.point[2]
     if v > 0
         vec_to_mat_U!(cone.mat, view(cone.point, 3:cone.dim))
-        cone.fact_mat = hyp_chol!(cone.chol_cache, cone.mat)
+        cone.fact_mat = cholesky!(Symmetric(cone.mat, :U), check = false)
         if isposdef(cone.fact_mat)
             cone.ldWv = logdet(cone.fact_mat) - cone.side * log(v)
             cone.z = v * cone.ldWv - u
@@ -109,8 +106,6 @@ function update_grad(cone::HypoPerLogdetTri)
     @assert cone.is_feas
     u = cone.point[1]
     v = cone.point[2]
-    # cone.Wi = hyp_chol_inv!(cone.chol_cache, cone.fact_mat)
-    # copytri!(cone.Wi, 'U')
     cone.Wi = inv(cone.fact_mat)
     cone.nLz = (cone.side - cone.ldWv) / cone.z
     cone.ldWvuv = cone.ldWv - u / v
