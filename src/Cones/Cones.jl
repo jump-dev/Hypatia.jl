@@ -7,17 +7,8 @@ functions and caches for cones
 module Cones
 
 using LinearAlgebra
-import LinearAlgebra.BlasFloat
 import LinearAlgebra.copytri!
-import SparseArrays.sparse
 import Hypatia.RealOrComplex
-import Hypatia.HypCholCache
-import Hypatia.hyp_chol!
-import Hypatia.hyp_chol_inv!
-import Hypatia.HypBKCache
-import Hypatia.hyp_bk!
-import Hypatia.HypBKSolveCache
-import Hypatia.hyp_bk_solve!
 import Hypatia.set_min_diag!
 
 abstract type Cone{T <: Real} end
@@ -61,23 +52,23 @@ reset_data(cone::Cone) = (cone.feas_updated = cone.grad_updated = cone.hess_upda
 
 update_hess_prod(cone::Cone) = nothing
 
+# TODO replace with dense caches (with iter ref and equil etc)
+factorize_hess(H::Symmetric{T, Matrix{T}}) where {T <: LinearAlgebra.BlasReal} = bunchkaufman!(H, check = false) # more reliable than cholesky but only available for BlasReals
+factorize_hess(H::Symmetric{T, Matrix{T}}) where {T <: Real} = cholesky!(H, check = false)
+
 function update_inv_hess_prod(cone::Cone{T}) where {T}
     if !cone.hess_updated
         update_hess(cone)
     end
     copyto!(cone.tmp_hess, cone.hess)
-    if isnothing(cone.hess_fact_cache)
-        cone.hess_fact_cache = HypBKCache(cone.tmp_hess.uplo, cone.tmp_hess.data)
-    end
-    cone.hess_fact = hyp_bk!(cone.hess_fact_cache, cone.tmp_hess.data)
+    cone.hess_fact = factorize_hess(cone.tmp_hess)
     if !issuccess(cone.hess_fact) # TODO maybe better to not step to this point if the hessian factorization fails
-        # TODO equilibration makes more sense than current recovery method
         @warn("numerical failure: cannot factorize primitive cone hessian")
         copyto!(cone.tmp_hess, cone.hess)
         set_min_diag!(cone.tmp_hess.data, sqrt(eps(T)))
-        cone.hess_fact = hyp_bk!(cone.hess_fact_cache, cone.tmp_hess.data)
+        cone.hess_fact = factorize_hess(cone.tmp_hess)
         if !issuccess(cone.hess_fact)
-            @warn("numerical failure: could not fix failure of positive definiteness")
+            @warn("numerical failure: could not fix failure to factorize primitive cone hessian")
         end
     end
     cone.inv_hess_prod_updated = true

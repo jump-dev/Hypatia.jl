@@ -147,8 +147,8 @@ mutable struct QRCholDenseSystemSolver{T <: Real} <: QRCholSystemSolver{T}
     GQ2_k
     HGx_k
     Gx_k
-    fact_cache::DensePosDefCache{T}
-    function QRCholDenseSystemSolver{T}(; fact_cache::DensePosDefCache{T} = DensePosDefCache{T}()) where {T <: Real}
+    fact_cache::Union{DensePosDefCache{T}, DenseSymCache{T}} # can use BunchKaufman or Cholesky
+    function QRCholDenseSystemSolver{T}(; fact_cache::Union{DensePosDefCache{T}, DenseSymCache{T}} = DenseSymCache{T}()) where {T <: Real}
         system_solver = new{T}()
         system_solver.fact_cache = fact_cache
         return system_solver

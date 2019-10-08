@@ -32,11 +32,10 @@ mutable struct WSOSPolyInterp{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     tmpLU::Vector{Matrix{R}}
     tmpUU::Matrix{R}
     ΛFs::Vector
-    chol_caches::Vector
 
     tmp_hess::Symmetric{T, Matrix{T}}
     hess_fact
-    hess_fact_cache
+    # hess_fact_cache
 
     function WSOSPolyInterp{T, R}(dim::Int, Ps::Vector{Matrix{R}}, is_dual::Bool) where {R <: RealOrComplex{T}} where {T <: Real}
         for k in eachindex(Ps)
@@ -64,9 +63,7 @@ function setup_data(cone::WSOSPolyInterp{T, R}) where {R <: RealOrComplex{T}} wh
     cone.tmpLU = [Matrix{R}(undef, size(Pk, 2), dim) for Pk in Ps]
     cone.tmpUU = Matrix{R}(undef, dim, dim)
     cone.ΛFs = Vector{Any}(undef, length(Ps))
-    cone.chol_caches = [HypCholCache('L', LLk) for LLk in cone.tmpLL]
     cone.tmp_hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.hess_fact_cache = nothing
     return
 end
 
@@ -88,7 +85,7 @@ function update_feas(cone::WSOSPolyInterp)
         LLk = cone.tmpLL[k]
         mul!(ULk, D, Pk)
         mul!(LLk, Pk', ULk)
-        ΛFk = hyp_chol!(cone.chol_caches[k], LLk)
+        ΛFk = cholesky!(Hermitian(LLk, :U), check = false)
         if !isposdef(ΛFk)
             cone.is_feas = false
             break

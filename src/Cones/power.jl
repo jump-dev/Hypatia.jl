@@ -34,7 +34,7 @@ mutable struct Power{T <: Real} <: Cone{T}
     tmpm::Vector{T}
     tmp_hess::Symmetric{T, Matrix{T}}
     hess_fact
-    hess_fact_cache
+    # hess_fact_cache
 
     function Power{T}(alpha::Vector{T}, n::Int, is_dual::Bool) where {T <: Real}
         @assert n >= 1
@@ -63,7 +63,6 @@ function setup_data(cone::Power{T}) where {T <: Real}
     cone.tmp_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.alphaui = zeros(length(cone.alpha))
     cone.tmpm = zeros(length(cone.alpha))
-    cone.hess_fact_cache = nothing
     return
 end
 
