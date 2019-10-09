@@ -148,7 +148,9 @@ mutable struct QRCholDenseSystemSolver{T <: Real} <: QRCholSystemSolver{T}
     HGx_k
     Gx_k
     fact_cache::Union{DensePosDefCache{T}, DenseSymCache{T}} # can use BunchKaufman or Cholesky
-    function QRCholDenseSystemSolver{T}(; fact_cache::Union{DensePosDefCache{T}, DenseSymCache{T}} = DenseSymCache{T}()) where {T <: Real}
+    function QRCholDenseSystemSolver{T}(;
+        fact_cache::Union{DensePosDefCache{T}, DenseSymCache{T}} = (T <: LinearAlgebra.BlasReal ? DenseSymCache{T}() : DensePosDefCache{T}()),
+        ) where {T <: Real}
         system_solver = new{T}()
         system_solver.fact_cache = fact_cache
         return system_solver
@@ -161,14 +163,12 @@ function load(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}) wher
     cone_idxs = model.cone_idxs
 
     # TODO optimize for case of empty A
-    if !isa(model.G, Matrix{T}) && isa(solver.Ap_Q, SuiteSparse.SPQR.QRSparseQ)
-        # TODO very inefficient method used for sparse G * QRSparseQ : see https://github.com/JuliaLang/julia/issues/31124#issuecomment-501540818
-        # TODO remove workaround and warning
+    # TODO very inefficient method used for sparse G * QRSparseQ : see https://github.com/JuliaLang/julia/issues/31124#issuecomment-501540818
+    if !isa(model.G, Matrix{T})
         @warn("in QRChol, converting G to dense before multiplying by sparse Householder Q due to very inefficient dispatch")
-        GQ = Matrix(model.G) * solver.Ap_Q
-    else
-        GQ = model.G * solver.Ap_Q
     end
+    G = Matrix(model.G)
+    GQ = rmul!(G, solver.Ap_Q)
 
     system_solver.GQ1 = GQ[:, 1:p]
     system_solver.GQ2 = GQ[:, (p + 1):end]

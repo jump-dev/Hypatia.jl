@@ -25,6 +25,7 @@ mutable struct HypoPerLogdetTri{T <: Real} <: Cone{T}
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
+    hess_fact_cache
 
     mat::Matrix{T}
     mat2::Matrix{T}
@@ -36,16 +37,18 @@ mutable struct HypoPerLogdetTri{T <: Real} <: Cone{T}
     ldWvuv::T
     vzip1::T
     Wivzi::Matrix{T}
-    tmp_hess::Symmetric{T, Matrix{T}}
-    hess_fact
-    # hess_fact_cache
 
-    function HypoPerLogdetTri{T}(dim::Int, is_dual::Bool) where {T <: Real}
+    function HypoPerLogdetTri{T}(
+        dim::Int,
+        is_dual::Bool;
+        hess_fact_cache = DenseSymCache{T}(),
+        ) where {T <: Real}
         @assert dim >= 3
         cone = new{T}()
         cone.use_dual = is_dual
         cone.dim = dim
         cone.side = round(Int, sqrt(0.25 + 2 * (dim - 2)) - 0.5)
+        cone.hess_fact_cache = hess_fact_cache
         return cone
     end
 end
@@ -60,7 +63,8 @@ function setup_data(cone::HypoPerLogdetTri{T}) where {T <: Real}
     cone.point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.tmp_hess = Symmetric(zeros(T, dim, dim), :U)
+    cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
+    load_dense_matrix(cone.hess_fact_cache, cone.hess)
     cone.mat = Matrix{T}(undef, cone.side, cone.side)
     cone.mat2 = similar(cone.mat)
     cone.Wivzi = similar(cone.mat)
@@ -85,6 +89,7 @@ function update_feas(cone::HypoPerLogdetTri)
     @assert !cone.feas_updated
     u = cone.point[1]
     v = cone.point[2]
+
     if v > 0
         vec_to_mat_U!(cone.mat, view(cone.point, 3:cone.dim))
         cone.fact_mat = cholesky!(Symmetric(cone.mat, :U), check = false)
@@ -98,6 +103,7 @@ function update_feas(cone::HypoPerLogdetTri)
     else
         cone.is_feas = false
     end
+
     cone.feas_updated = true
     return cone.is_feas
 end
@@ -106,6 +112,7 @@ function update_grad(cone::HypoPerLogdetTri)
     @assert cone.is_feas
     u = cone.point[1]
     v = cone.point[2]
+
     cone.Wi = inv(cone.fact_mat)
     cone.nLz = (cone.side - cone.ldWv) / cone.z
     cone.ldWvuv = cone.ldWv - u / v
@@ -115,6 +122,7 @@ function update_grad(cone::HypoPerLogdetTri)
     gend = view(cone.grad, 3:cone.dim)
     mat_U_to_vec_scaled!(gend, cone.Wi)
     gend .*= -cone.vzip1
+
     cone.grad_updated = true
     return cone.grad
 end

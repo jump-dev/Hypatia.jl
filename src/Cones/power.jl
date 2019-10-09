@@ -25,6 +25,7 @@ mutable struct Power{T <: Real} <: Cone{T}
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
+    hess_fact_cache
 
     logprodu::T
     produ::T
@@ -32,11 +33,13 @@ mutable struct Power{T <: Real} <: Cone{T}
     produw::T
     alphaui::Vector{T}
     tmpm::Vector{T}
-    tmp_hess::Symmetric{T, Matrix{T}}
-    hess_fact
-    # hess_fact_cache
 
-    function Power{T}(alpha::Vector{T}, n::Int, is_dual::Bool) where {T <: Real}
+    function Power{T}(
+        alpha::Vector{T},
+        n::Int,
+        is_dual::Bool;
+        hess_fact_cache = DenseSymCache{T}(),
+        ) where {T <: Real}
         @assert n >= 1
         dim = length(alpha) + n
         @assert dim >= 3
@@ -48,19 +51,22 @@ mutable struct Power{T <: Real} <: Cone{T}
         cone.use_dual = is_dual
         cone.dim = dim
         cone.alpha = alpha
+        cone.hess_fact_cache = hess_fact_cache
         return cone
     end
 end
 
 Power{T}(alpha::Vector{T}, n::Int) where {T <: Real} = Power{T}(alpha, n, false)
 
+# TODO only allocate the fields we use
 function setup_data(cone::Power{T}) where {T <: Real}
     reset_data(cone)
     dim = cone.dim
     cone.point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.tmp_hess = Symmetric(zeros(T, dim, dim), :U)
+    cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
+    load_dense_matrix(cone.hess_fact_cache, cone.hess)
     cone.alphaui = zeros(length(cone.alpha))
     cone.tmpm = zeros(length(cone.alpha))
     return

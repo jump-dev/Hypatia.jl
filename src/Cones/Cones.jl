@@ -11,6 +11,18 @@ import LinearAlgebra.copytri!
 import Hypatia.RealOrComplex
 import Hypatia.set_min_diag!
 
+
+import Hypatia.DenseSymCache
+
+import Hypatia.load_dense_matrix
+
+import Hypatia.solve_dense_system
+
+import Hypatia.reset_fact
+
+
+
+
 abstract type Cone{T <: Real} end
 
 include("orthant.jl")
@@ -52,24 +64,13 @@ reset_data(cone::Cone) = (cone.feas_updated = cone.grad_updated = cone.hess_upda
 
 update_hess_prod(cone::Cone) = nothing
 
-# TODO replace with dense caches (with iter ref and equil etc)
-factorize_hess(H::Symmetric{T, Matrix{T}}) where {T <: LinearAlgebra.BlasReal} = bunchkaufman!(H, check = false) # more reliable than cholesky but only available for BlasReals
-factorize_hess(H::Symmetric{T, Matrix{T}}) where {T <: Real} = cholesky!(H, check = false)
-
 function update_inv_hess_prod(cone::Cone{T}) where {T}
     if !cone.hess_updated
         update_hess(cone)
     end
-    copyto!(cone.tmp_hess, cone.hess)
-    cone.hess_fact = factorize_hess(cone.tmp_hess)
-    if !issuccess(cone.hess_fact) # TODO maybe better to not step to this point if the hessian factorization fails
+    reset_fact(cone.hess_fact_cache)
+    if !solve_dense_system(cone.hess_fact_cache, zeros(T, size(cone.hess, 1), 0), cone.hess, zeros(T, size(cone.hess, 1), 0)) # TODO just wrap sytrf_rook
         @warn("numerical failure: cannot factorize primitive cone hessian")
-        copyto!(cone.tmp_hess, cone.hess)
-        set_min_diag!(cone.tmp_hess.data, sqrt(eps(T)))
-        cone.hess_fact = factorize_hess(cone.tmp_hess)
-        if !issuccess(cone.hess_fact)
-            @warn("numerical failure: could not fix failure to factorize primitive cone hessian")
-        end
     end
     cone.inv_hess_prod_updated = true
     return
@@ -79,7 +80,8 @@ function update_inv_hess(cone::Cone)
     if !cone.inv_hess_prod_updated
         update_inv_hess_prod(cone)
     end
-    cone.inv_hess = Symmetric(inv(cone.hess_fact), :U) # TODO use in-place function
+    copyto!(cone.inv_hess.data, cone.hess_fact_cache.AF)
+    LAPACK.sytri_rook!(cone.hess.uplo, cone.inv_hess.data, cone.hess_fact_cache.ipiv) # TODO put in dense.jl. careful - for cholesky, equilibration happens, so inverse must be unequiled
     cone.inv_hess_updated = true
     return cone.inv_hess
 end
@@ -95,7 +97,7 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Con
     if !cone.inv_hess_prod_updated
         update_inv_hess_prod(cone)
     end
-    return ldiv!(prod, cone.hess_fact, arr) # TODO could use sysvx with already computed factorization here, for improved numerics
+    solve_dense_system(cone.hess_fact_cache, prod, cone.hess, arr)
 end
 
 # utilities for converting between symmetric/Hermitian matrix and vector triangle forms
