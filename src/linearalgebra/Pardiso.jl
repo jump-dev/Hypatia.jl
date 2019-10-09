@@ -37,7 +37,7 @@ PardisoSymCache(; diag_pert = 0.0) = PardisoSymCache{Float64}(diag_pert = diag_p
 PardisoSparseCache = Union{PardisoSymCache{Float64}, PardisoNonSymCache{Float64}}
 int_type(::PardisoSparseCache) = Int32
 
-function update_sparse_fact(cache::PardisoSparseCache, A::SparseMatrixCSC{Float64, Int32})
+function update_fact(cache::PardisoSparseCache, A::SparseMatrixCSC{Float64, Int32})
     pardiso = cache.pardiso
 
     if !cache.analyzed
@@ -63,7 +63,7 @@ function update_sparse_fact(cache::PardisoSparseCache, A::SparseMatrixCSC{Float6
     return
 end
 
-function solve_sparse_system(cache::PardisoSparseCache, x::Matrix{Float64}, A::SparseMatrixCSC{Float64, Int32}, b::Matrix{Float64})
+function solve_system(cache::PardisoSparseCache, x::Matrix{Float64}, A::SparseMatrixCSC{Float64, Int32}, b::Matrix{Float64})
     pardiso = cache.pardiso
 
     Pardiso.set_phase!(pardiso, Pardiso.SOLVE_ITERATIVE_REFINE)
