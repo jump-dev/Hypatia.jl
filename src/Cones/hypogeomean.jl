@@ -62,7 +62,7 @@ function setup_data(cone::HypoGeomean{T}) where {T <: Real}
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
-    load_dense_matrix(cone.hess_fact_cache, cone.hess)
+    load_matrix(cone.hess_fact_cache, cone.hess)
     cone.a1ww = zeros(T, dim - 1)
     cone.alphaiw = zeros(T, dim - 1)
     cone.tmpnn = zeros(T, dim - 1, dim - 1)

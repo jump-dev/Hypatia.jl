@@ -189,7 +189,7 @@ function load(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}) wher
     system_solver.HGx_k = [view(system_solver.HGx, idxs, :) for idxs in cone_idxs]
     system_solver.Gx_k = [view(system_solver.Gx, idxs, :) for idxs in cone_idxs]
 
-    load_dense_matrix(system_solver.fact_cache, system_solver.lhs1)
+    load_matrix(system_solver.fact_cache, system_solver.lhs1)
 
     return system_solver
 end
@@ -200,15 +200,14 @@ function update_fact(system_solver::QRCholDenseSystemSolver, solver::Solver)
     @timeit solver.timer "block_hess_prod" block_hessian_product(solver.model.cones, system_solver.HGQ2_k, system_solver.GQ2_k)
     @timeit solver.timer "Q2GHGQ2" mul!(system_solver.lhs1.data, system_solver.GQ2', system_solver.HGQ2)
 
-    reset_fact(system_solver.fact_cache)
+    update_fact(system_solver.fact_cache, system_solver.lhs1)
 
     return system_solver
 end
 
 function solve_subsystem(system_solver::QRCholDenseSystemSolver, sol1::AbstractMatrix, rhs1::AbstractMatrix)
-    if !solve_dense_system(system_solver.fact_cache, sol1, system_solver.lhs1, rhs1)
-        # TODO recover somehow
-        @warn("numerical failure: could not solve linear system")
-    end
+    copyto!(sol1, rhs1)
+    solve_system(system_solver.fact_cache, sol1)
+    # TODO recover if fails - check issuccess
     return sol1
 end

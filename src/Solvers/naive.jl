@@ -207,13 +207,13 @@ function update_fact(system_solver::NaiveSparseSystemSolver, solver::Solver)
     end
     system_solver.lhs6.nzval[system_solver.mtt_idx] = solver.mu / solver.tau / solver.tau
 
-    @timeit solver.timer "update_sparse_fact" update_sparse_fact(system_solver.fact_cache, system_solver.lhs6)
+    @timeit solver.timer "update_fact" update_fact(system_solver.fact_cache, system_solver.lhs6)
 
     return system_solver
 end
 
 function solve_system(system_solver::NaiveSparseSystemSolver, solver::Solver, sol6::Matrix, rhs6::Matrix)
-    @timeit solver.timer "solve_sparse_system" solve_sparse_system(system_solver.fact_cache, sol6, system_solver.lhs6, rhs6)
+    @timeit solver.timer "solve_system" solve_system(system_solver.fact_cache, sol6, system_solver.lhs6, rhs6)
     return sol6
 end
 
@@ -258,7 +258,7 @@ function load(system_solver::NaiveDenseSystemSolver{T}, solver::Solver{T}) where
     end
     system_solver.lhs6_H_k = [view_H_k(cone_k, idxs_k) for (cone_k, idxs_k) in zip(cones, cone_idxs)]
 
-    load_dense_matrix(system_solver.fact_cache, system_solver.lhs6)
+    load_matrix(system_solver.fact_cache, system_solver.lhs6)
 
     return system_solver
 end
@@ -277,7 +277,7 @@ function update_fact(system_solver::NaiveDenseSystemSolver, solver::Solver)
 end
 
 function solve_system(system_solver::NaiveDenseSystemSolver, solver::Solver, sol6::Matrix, rhs6::Matrix)
-    @timeit solver.timer "solve_dense_system" if !solve_dense_system(system_solver.fact_cache, sol6, system_solver.lhs6, rhs6)
+    @timeit solver.timer "solve_system" if !solve_system(system_solver.fact_cache, sol6, system_solver.lhs6, rhs6)
         # TODO recover somehow
         @warn("numerical failure: could not solve linear system")
     end

@@ -9,19 +9,11 @@ module Cones
 using LinearAlgebra
 import LinearAlgebra.copytri!
 import Hypatia.RealOrComplex
-import Hypatia.set_min_diag!
-
-
 import Hypatia.DenseSymCache
-
-import Hypatia.load_dense_matrix
-
-import Hypatia.solve_dense_system
-
-import Hypatia.reset_fact
-
-
-
+import Hypatia.load_matrix
+import Hypatia.update_fact
+import Hypatia.solve_system
+import Hypatia.invert
 
 abstract type Cone{T <: Real} end
 
@@ -68,10 +60,8 @@ function update_inv_hess_prod(cone::Cone{T}) where {T}
     if !cone.hess_updated
         update_hess(cone)
     end
-    reset_fact(cone.hess_fact_cache)
-    if !solve_dense_system(cone.hess_fact_cache, zeros(T, size(cone.hess, 1), 0), cone.hess, zeros(T, size(cone.hess, 1), 0)) # TODO just wrap sytrf_rook
-        @warn("numerical failure: cannot factorize primitive cone hessian")
-    end
+    update_fact(cone.hess_fact_cache, cone.hess)
+    # TODO recover if fails - check issuccess
     cone.inv_hess_prod_updated = true
     return
 end
@@ -80,8 +70,7 @@ function update_inv_hess(cone::Cone)
     if !cone.inv_hess_prod_updated
         update_inv_hess_prod(cone)
     end
-    copyto!(cone.inv_hess.data, cone.hess_fact_cache.AF)
-    LAPACK.sytri_rook!(cone.hess.uplo, cone.inv_hess.data, cone.hess_fact_cache.ipiv) # TODO put in dense.jl. careful - for cholesky, equilibration happens, so inverse must be unequiled
+    invert(cone.hess_fact_cache, cone.inv_hess)
     cone.inv_hess_updated = true
     return cone.inv_hess
 end
@@ -97,7 +86,9 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Con
     if !cone.inv_hess_prod_updated
         update_inv_hess_prod(cone)
     end
-    solve_dense_system(cone.hess_fact_cache, prod, cone.hess, arr)
+    copyto!(prod, arr)
+    solve_system(cone.hess_fact_cache, prod)
+    return prod
 end
 
 # utilities for converting between symmetric/Hermitian matrix and vector triangle forms

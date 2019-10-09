@@ -62,7 +62,7 @@ function solve_system(system_solver::NaiveElimSystemSolver{T}, solver::Solver{T}
     # -c'x - b'y - h'z + mu/(taubar^2)*tau = taurhs + kaprhs
     @. @views rhs4[end, :] += rhs[end, :]
 
-    @timeit solver.timer "solve_sparse_system" solve_subsystem(system_solver, sol4, rhs4)
+    @timeit solver.timer "solve_system" solve_subsystem(system_solver, sol4, rhs4)
     @views copyto!(sol[1:tau_row, :], sol4)
 
     # lift to get s and kap
@@ -192,13 +192,13 @@ function update_fact(system_solver::NaiveElimSparseSystemSolver, solver::Solver)
     end
     system_solver.lhs4.nzval[end] = solver.mu / solver.tau / solver.tau
 
-    update_sparse_fact(system_solver.fact_cache, system_solver.lhs4)
+    update_fact(system_solver.fact_cache, system_solver.lhs4)
 
     return system_solver
 end
 
 function solve_subsystem(system_solver::NaiveElimSparseSystemSolver, sol4::Matrix, rhs4::Matrix)
-    solve_sparse_system(system_solver.fact_cache, sol4, system_solver.lhs4, rhs4)
+    solve_system(system_solver.fact_cache, sol4, system_solver.lhs4, rhs4)
     return sol4
 end
 
@@ -240,7 +240,7 @@ function load(system_solver::NaiveElimDenseSystemSolver{T}, solver::Solver{T}) w
         ]
     system_solver.lhs4 = similar(system_solver.lhs4_copy)
 
-    load_dense_matrix(system_solver.fact_cache, system_solver.lhs4)
+    load_matrix(system_solver.fact_cache, system_solver.lhs4)
 
     return system_solver
 end
@@ -276,7 +276,7 @@ function update_fact(system_solver::NaiveElimDenseSystemSolver{T}, solver::Solve
 end
 
 function solve_subsystem(system_solver::NaiveElimDenseSystemSolver, sol4::Matrix, rhs4::Matrix)
-    if !solve_dense_system(system_solver.fact_cache, sol4, system_solver.lhs4, rhs4)
+    if !solve_system(system_solver.fact_cache, sol4, system_solver.lhs4, rhs4)
         # TODO recover somehow
         @warn("numerical failure: could not solve linear system")
     end

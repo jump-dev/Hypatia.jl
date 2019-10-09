@@ -56,7 +56,7 @@ function setup_data(cone::EpiPerExp{T}) where {T <: Real}
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
-    load_dense_matrix(cone.hess_fact_cache, cone.hess)
+    load_matrix(cone.hess_fact_cache, cone.hess)
     cone.expwv = zeros(T, dim - 2)
     cone.dzdw = zeros(T, dim - 2)
     return

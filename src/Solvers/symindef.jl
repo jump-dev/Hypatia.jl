@@ -69,7 +69,7 @@ function solve_system(system_solver::SymIndefSystemSolver{T}, solver::Solver{T},
         end
     end
 
-    @timeit solver.timer "solve_sparse_system" solve_subsystem(system_solver, sol3, rhs3)
+    @timeit solver.timer "solve_system" solve_subsystem(system_solver, sol3, rhs3)
 
     if !system_solver.use_inv_hess
         for (k, cone_k) in enumerate(model.cones)
@@ -233,13 +233,13 @@ function update_fact(system_solver::SymIndefSparseSystemSolver, solver::Solver)
         end
     end
 
-    @timeit solver.timer "update_sparse_fact" update_sparse_fact(system_solver.fact_cache, system_solver.lhs3)
+    @timeit solver.timer "update_fact" update_fact(system_solver.fact_cache, system_solver.lhs3)
 
     return system_solver
 end
 
 function solve_subsystem(system_solver::SymIndefSparseSystemSolver, sol3, rhs3)
-    solve_sparse_system(system_solver.fact_cache, sol3, system_solver.lhs3, rhs3)
+    solve_system(system_solver.fact_cache, sol3, system_solver.lhs3, rhs3)
     return sol3
 end
 
@@ -281,7 +281,7 @@ function load(system_solver::SymIndefDenseSystemSolver{T}, solver::Solver{T}) wh
         ], :L)
     system_solver.lhs3 = similar(system_solver.lhs3_copy)
 
-    load_dense_matrix(system_solver.fact_cache, system_solver.lhs3)
+    load_matrix(system_solver.fact_cache, system_solver.lhs3)
 
     return system_solver
 end
@@ -314,16 +314,14 @@ function update_fact(system_solver::SymIndefDenseSystemSolver, solver::Solver)
         end
     end
 
-    reset_fact(system_solver.fact_cache)
+    update_fact(system_solver.fact_cache, system_solver.lhs3)
 
     return system_solver
 end
 
 function solve_subsystem(system_solver::SymIndefDenseSystemSolver, sol3::Matrix, rhs3::Matrix)
-    if !solve_dense_system(system_solver.fact_cache, sol3, system_solver.lhs3, rhs3)
-        # TODO recover somehow
-        @warn("numerical failure: could not solve linear system")
-    end
-    # sol3 .= system_solver.lhs3 \ rhs3 # TODO remove. but first investigate why it causes fewer native test failures
+    copyto!(sol3, rhs3)
+    solve_system(system_solver.fact_cache, sol3)
+    # TODO recover if fails - check issuccess
     return sol3
 end
