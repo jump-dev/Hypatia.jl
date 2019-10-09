@@ -6,7 +6,6 @@ using Test
 import Random
 using LinearAlgebra
 using SparseArrays
-import GenericSVD.svdvals
 import Hypatia
 import Hypatia.Solvers.build_solve_check
 const CO = Hypatia.Cones
@@ -651,6 +650,7 @@ end
 
 function epinormspectral1(T; options...)
     tol = sqrt(sqrt(eps(T)))
+    float_tol = sqrt(sqrt(eps(Float64)))
     Random.seed!(1)
     (Xn, Xm) = (3, 4)
     Xnm = Xn * Xm
@@ -665,12 +665,17 @@ function epinormspectral1(T; options...)
 
         r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
         @test r.status == :Optimal
+        # TODO use don't convert to Float64 when possible to get reliable generic svdvals
+        s_val = Float64.(r.s)
+        z_val = Float64.(r.z)
+        s_svdvals = svdvals(reshape(s_val[2:end], Xn, Xm))
+        z_svdvals = svdvals(reshape(z_val[2:end], Xn, Xm))
         if is_dual
-            @test sum(svdvals(reshape(r.s[2:end], Xn, Xm))) ≈ r.s[1] atol=tol rtol=tol
-            @test svdvals(reshape(r.z[2:end], Xn, Xm))[1] ≈ r.z[1] atol=tol rtol=tol
+            @test sum(s_svdvals) ≈ s_val[1] atol=float_tol rtol=float_tol
+            @test z_svdvals[1] ≈ z_val[1] atol=float_tol rtol=float_tol
         else
-            @test svdvals(reshape(r.s[2:end], Xn, Xm))[1] ≈ r.s[1] atol=tol rtol=tol
-            @test sum(svdvals(reshape(r.z[2:end], Xn, Xm))) ≈ r.z[1] atol=tol rtol=tol
+            @test s_svdvals[1] ≈ s_val[1] atol=float_tol rtol=float_tol
+            @test sum(z_svdvals) ≈ z_val[1] atol=float_tol rtol=float_tol
         end
     end
 end
