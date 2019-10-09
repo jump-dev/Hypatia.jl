@@ -42,7 +42,7 @@ EpiNormInf{T}(dim::Int) where {T <: Real} = EpiNormInf{T}(dim, false)
 
 reset_data(cone::EpiNormInf) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
 
-# TODO maybe only allocate the fields we use
+# TODO only allocate the fields we use
 function setup_data(cone::EpiNormInf{T}) where {T <: Real}
     reset_data(cone)
     dim = cone.dim

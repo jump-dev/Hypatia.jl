@@ -26,17 +26,19 @@ mutable struct HypoGeomean{T <: Real} <: Cone{T}
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
+    hess_fact_cache
 
     wiaa::T
     wiw::T
     alphaiw::Vector{T}
     a1ww::Vector{T}
     tmpnn::Matrix{T}
-    tmp_hess::Symmetric{T, Matrix{T}}
-    hess_fact
-    # hess_fact_cache
 
-    function HypoGeomean{T}(alpha::Vector{T}, is_dual::Bool) where {T <: Real}
+    function HypoGeomean{T}(
+        alpha::Vector{T},
+        is_dual::Bool;
+        hess_fact_cache = DenseSymCache{T}(),
+        ) where {T <: Real}
         dim = length(alpha) + 1
         @assert dim >= 2
         @assert all(ai > 0 for ai in alpha)
@@ -46,6 +48,7 @@ mutable struct HypoGeomean{T <: Real} <: Cone{T}
         cone.use_dual = !is_dual # using dual barrier
         cone.dim = dim
         cone.alpha = alpha
+        cone.hess_fact_cache = hess_fact_cache
         return cone
     end
 end
@@ -58,7 +61,8 @@ function setup_data(cone::HypoGeomean{T}) where {T <: Real}
     cone.point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.tmp_hess = Symmetric(zeros(T, dim, dim), :U)
+    cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
+    load_dense_matrix(cone.hess_fact_cache, cone.hess)
     cone.a1ww = zeros(T, dim - 1)
     cone.alphaiw = zeros(T, dim - 1)
     cone.tmpnn = zeros(T, dim - 1, dim - 1)

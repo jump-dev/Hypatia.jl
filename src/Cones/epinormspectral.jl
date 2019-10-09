@@ -26,6 +26,7 @@ mutable struct EpiNormSpectral{T <: Real} <: Cone{T}
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
+    hess_fact_cache
 
     W::Matrix{T}
     WWt::Matrix{T}
@@ -37,11 +38,12 @@ mutable struct EpiNormSpectral{T <: Real} <: Cone{T}
     tmpnm::Matrix{T}
     tmpnm2::Matrix{T}
 
-    tmp_hess::Symmetric{T, Matrix{T}}
-    hess_fact
-    # hess_fact_cache
-
-    function EpiNormSpectral{T}(n::Int, m::Int, is_dual::Bool) where {T <: Real}
+    function EpiNormSpectral{T}(
+        n::Int,
+        m::Int,
+        is_dual::Bool;
+        hess_fact_cache = DenseSymCache{T}(),
+        ) where {T <: Real}
         @assert 1 <= n <= m
         dim = n * m + 1
         cone = new{T}()
@@ -49,6 +51,7 @@ mutable struct EpiNormSpectral{T <: Real} <: Cone{T}
         cone.dim = dim
         cone.n = n
         cone.m = m
+        cone.hess_fact_cache = hess_fact_cache
         return cone
     end
 end
@@ -61,7 +64,8 @@ function setup_data(cone::EpiNormSpectral{T}) where {T <: Real}
     cone.point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.tmp_hess = Symmetric(zeros(T, dim, dim), :U)
+    cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
+    load_dense_matrix(cone.hess_fact_cache, cone.hess)
     cone.W = Matrix{T}(undef, cone.n, cone.m)
     cone.WWt = Matrix{T}(undef, cone.n, cone.n)
     cone.Z = Matrix{T}(undef, cone.n, cone.n)

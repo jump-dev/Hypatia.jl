@@ -37,7 +37,7 @@ EpiNormEucl{T}(dim::Int) where {T <: Real} = EpiNormEucl{T}(dim, false)
 
 reset_data(cone::EpiNormEucl) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
 
-# TODO maybe only allocate the fields we use
+# TODO only allocate the fields we use
 function setup_data(cone::EpiNormEucl{T}) where {T <: Real}
     reset_data(cone)
     dim = cone.dim

@@ -26,6 +26,7 @@ mutable struct WSOSPolyInterp{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
+    hess_fact_cache
 
     tmpLL::Vector{Matrix{R}}
     tmpUL::Vector{Matrix{R}}
@@ -33,11 +34,12 @@ mutable struct WSOSPolyInterp{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     tmpUU::Matrix{R}
     ΛFs::Vector
 
-    tmp_hess::Symmetric{T, Matrix{T}}
-    hess_fact
-    # hess_fact_cache
-
-    function WSOSPolyInterp{T, R}(dim::Int, Ps::Vector{Matrix{R}}, is_dual::Bool) where {R <: RealOrComplex{T}} where {T <: Real}
+    function WSOSPolyInterp{T, R}(
+        dim::Int,
+        Ps::Vector{Matrix{R}},
+        is_dual::Bool;
+        hess_fact_cache = DenseSymCache{T}(),
+        ) where {R <: RealOrComplex{T}} where {T <: Real}
         for k in eachindex(Ps)
             @assert size(Ps[k], 1) == dim
         end
@@ -45,6 +47,7 @@ mutable struct WSOSPolyInterp{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
         cone.use_dual = !is_dual # using dual barrier
         cone.dim = dim
         cone.Ps = Ps
+        cone.hess_fact_cache = hess_fact_cache
         return cone
     end
 end
@@ -57,13 +60,14 @@ function setup_data(cone::WSOSPolyInterp{T, R}) where {R <: RealOrComplex{T}} wh
     cone.point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
+    cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
+    load_dense_matrix(cone.hess_fact_cache, cone.hess)
     Ps = cone.Ps
     cone.tmpLL = [Matrix{R}(undef, size(Pk, 2), size(Pk, 2)) for Pk in Ps]
     cone.tmpUL = [Matrix{R}(undef, dim, size(Pk, 2)) for Pk in Ps]
     cone.tmpLU = [Matrix{R}(undef, size(Pk, 2), dim) for Pk in Ps]
     cone.tmpUU = Matrix{R}(undef, dim, dim)
     cone.ΛFs = Vector{Any}(undef, length(Ps))
-    cone.tmp_hess = Symmetric(zeros(T, dim, dim), :U)
     return
 end
 
@@ -85,7 +89,7 @@ function update_feas(cone::WSOSPolyInterp)
         LLk = cone.tmpLL[k]
         mul!(ULk, D, Pk)
         mul!(LLk, Pk', ULk)
-        ΛFk = cholesky!(Hermitian(LLk, :U), check = false)
+        ΛFk = cholesky!(Hermitian(LLk, :L), check = false)
         if !isposdef(ΛFk)
             cone.is_feas = false
             break
