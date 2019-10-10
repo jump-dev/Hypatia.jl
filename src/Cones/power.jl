@@ -76,7 +76,7 @@ get_nu(cone::Power) = length(cone.alpha) + 1
 
 function set_initial_point(arr::AbstractVector, cone::Power)
     m = length(cone.alpha)
-    arr[1:m] .= 1
+    @. arr[1:m] = sqrt(1 + cone.alpha)
     arr[(m + 1):cone.dim] .= 0
     return arr
 end

@@ -60,8 +60,10 @@ end
 get_nu(cone::HypoPerLog) = cone.dim
 
 function set_initial_point(arr::AbstractVector, cone::HypoPerLog)
-    arr .= 1
-    arr[1] = -1
+    (u, v, w) = get_central_params(cone)
+    arr[1] = u
+    arr[2] = v
+    arr[3:end] .= w
     return arr
 end
 
@@ -120,4 +122,38 @@ function update_hess(cone::HypoPerLog)
 
     cone.hess_updated = true
     return cone.hess
+end
+
+# see analysis in https://github.com/lkapelevich/HypatiaBenchmarks.jl/tree/master/centralpoints
+function get_central_params(cone::HypoPerLog)
+    n = cone.dim - 2
+    # lookup points where n <= 10
+    central_points = [
+    -0.827838399  0.805102005  1.290927713
+    -0.689609381  0.724604185  1.224619879
+    -0.584372734  0.681280549  1.182421998
+    -0.503500819  0.654485416  1.153054181
+    -0.440285901  0.636444221  1.131466932
+    -0.389979933  0.623569273  1.114979598
+    -0.349256801  0.613977662  1.102014462
+    -0.315769104  0.60658984  1.091577909
+    -0.287837755  0.600745276  1.083013006
+    -0.264242795  0.596018958  1.075868819
+    ]
+
+    if n <= 10
+        (u, v, w) = (central_points[n, 1], central_points[n, 2], central_points[n, 3])
+    else
+        x = inv(n)
+        if n <= 70
+            u = -2.647364 * x - 0.008411
+            v = 0.424679 * x + 0.553392
+            w = 0.760415 * x + 1.001795
+        else
+            u = -3.016339 * x - 0.000078
+            v = 0.394332 * x + 0.553963
+            w = 0.838584 * x + 1.000016
+        end
+    end
+    return (u, v, w)
 end

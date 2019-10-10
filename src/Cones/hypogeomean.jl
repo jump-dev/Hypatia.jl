@@ -72,8 +72,9 @@ end
 get_nu(cone::HypoGeomean) = cone.dim
 
 function set_initial_point(arr::AbstractVector, cone::HypoGeomean)
-    arr .= 1
-    arr[1] = -prod(cone.alpha[i] ^ (-cone.alpha[i]) for i in eachindex(cone.alpha)) / cone.dim
+    (u, w) = get_central_params(cone)
+    arr[1] = u
+    arr[2:end] .= w
     return arr
 end
 
@@ -126,4 +127,28 @@ function update_hess(cone::HypoGeomean)
 
     cone.hess_updated = true
     return cone.hess
+end
+
+# see analysis in https://github.com/lkapelevich/HypatiaBenchmarks.jl/tree/master/centralpoints
+function get_central_params(cone::HypoGeomean)
+    # regress for w_i given alpha_i and n, and compute u in closed form
+    n = cone.dim - 1
+    alpha = cone.alpha
+    w = Vector{Float64}(undef, n)
+    if n == 1
+        w[1] = 1.30656
+    elseif n == 2
+        @. w = 0.371639 * alpha ^ 3 - 0.408226 * alpha ^ 2 + 0.337555 * alpha + 0.999426
+    elseif n <= 5
+        @. w = 0.908167 - 0.025458 * log(n) + 0.129344 * exp(alpha)
+    elseif n <= 20
+        @. w = 0.9309527 - 0.0044293 * log(n) + 0.0794201 * exp(alpha)
+    elseif n <= 100
+        @. w = 9.828e-01 - 2.148e-04 * log(n) + 1.803e-02 * exp(alpha)
+    else
+        @. w = 9.968e-01 - 9.606e-06 * log(n) + 3.216e-03 * exp(alpha)
+    end
+    wiaa = exp(-sum(alpha[i] * log(alpha[i] / w[i]) for i in eachindex(alpha)))
+    u = sum(wiaa .* alpha ./ (alpha .- 1 .+ abs2.(w)) .- wiaa) / n
+    return (u, w)
 end

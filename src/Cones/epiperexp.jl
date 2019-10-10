@@ -65,9 +65,10 @@ end
 get_nu(cone::EpiPerExp) = 3
 
 function set_initial_point(arr::AbstractVector{T}, cone::EpiPerExp{T}) where {T <: Real}
-    @. arr = -log(T(cone.dim - 2))
-    arr[1] = exp(1)
-    arr[2] = 1
+    (u, v, w) = get_central_params(cone)
+    @. arr = w
+    arr[1] = u
+    arr[2] = v
     return arr
 end
 
@@ -158,4 +159,39 @@ function update_hess(cone::EpiPerExp)
 
     cone.hess_updated = true
     return cone.hess
+end
+
+# see analysis in https://github.com/lkapelevich/HypatiaBenchmarks.jl/tree/master/centralpoints
+function get_central_params(cone::EpiPerExp)
+    n = cone.dim - 2
+    # lookup points where x=f'(x) when length(w) <= 10
+    central_points = [
+        1.290927717	 0.805102006  -0.827838393
+        1.331573688	 0.578857833  -0.667770596
+        1.336363141	 0.451381764  -0.5803413
+        1.332517701	 0.372146651  -0.521033456
+        1.326602341	 0.318456053  -0.477223632
+        1.320449568	 0.279670855  -0.443132253
+        1.314603812	 0.250292511  -0.415618383
+        1.309209025	 0.227223256  -0.392801051
+        1.304275758	 0.208591886  -0.373475297
+        1.299770819	 0.193203028  -0.356828868
+        ]
+
+    if n <= 10
+        (u, v, w) = (central_points[n, 1], central_points[n, 2], central_points[n, 3])
+    elseif n <= 40
+        u = -0.041733 * log(n) + 1.395274
+        v = 0.764987 * inv(sqrt(n)) - 0.052697
+        w = -1.056456 * inv(sqrt(n)) - 0.025051
+    elseif n <= 110
+        u = -0.033464 * log(n) + 1.365173
+        v = 0.571198 * inv(sqrt(n)) - 0.019661
+        w = -1.151376 * inv(sqrt(n)) - 0.008744
+    else
+        u = 0.433844 * log(n) - 0.006782
+        v = 0.433844 * inv(sqrt(n)) - 0.006782
+        w = -1.212255 * inv(sqrt(n)) - 0.003031
+    end
+    return (u, v, w)
 end
