@@ -108,7 +108,7 @@ end
 
 function update_fact(cache::LUNonSymCache{T}, A::AbstractMatrix{T}) where {T <: Real}
     copyto!(cache.AF, A)
-    cache.fact = lu!(A)
+    cache.fact = lu!(A, check = false)
     return issuccess(cache.fact)
 end
 
@@ -227,21 +227,22 @@ mutable struct LUSymCache{T <: Real} <: DenseSymCache{T}
 end
 
 function load_matrix(cache::LUSymCache{T}, A::Symmetric{T, <:AbstractMatrix{T}}) where {T <: Real}
-    n = LinearAlgebra.checksquare(A)
-    cache.AF = copy(A)
+    n = size(A, 1)
+    cache.AF = copy(A) # keeps same uplo
     return cache
 end
 
 function update_fact(cache::LUSymCache{T}, A::Symmetric{T, <:AbstractMatrix{T}}) where {T <: Real}
     copyto!(cache.AF, A)
-    cache.fact = lu!(A)
+    cache.fact = lu!(cache.AF, check = false) # no generic symmetric indefinite factorization so fallback LU of symmetric matrix
     return issuccess(cache.fact)
 end
 
 solve_system(cache::LUSymCache{T}, X::AbstractVecOrMat{T}) where {T <: Real} = ldiv!(cache.fact, X)
 
 function invert(cache::LUSymCache{T}, X::Symmetric{T, <:AbstractMatrix{T}}) where {T <: Real}
-    copyto!(X.data, inv(cache.fact))
+    copyto!(X.data, I)
+    ldiv!(cache.fact, X.data) # just ldiv an identity matrix - LinearAlgebra currently does the same
     return X
 end
 
@@ -343,20 +344,24 @@ end
 
 function load_matrix(cache::CholPosDefCache{T}, A::Symmetric{T, <:AbstractMatrix{T}}) where {T <: Real}
     n = LinearAlgebra.checksquare(A)
-    cache.AF = copy(A)
+    cache.AF = copy(A) # keeps same uplo
     return cache
 end
 
 function update_fact(cache::CholPosDefCache{T}, A::Symmetric{T, <:AbstractMatrix{T}}) where {T <: Real}
     copyto!(cache.AF, A)
-    cache.fact = cholesky!(A)
+    cache.fact = cholesky!(cache.AF, check = false)
+    if !issuccess(cache.fact)
+        cache.fact = lu!(cache.AF, check = false) # fallback to LU of symmetric matrix
+    end
     return issuccess(cache.fact)
 end
 
 solve_system(cache::CholPosDefCache{T}, X::AbstractVecOrMat{T}) where {T <: Real} = ldiv!(cache.fact, X)
 
 function invert(cache::CholPosDefCache{T}, X::Symmetric{T, <:AbstractMatrix{T}}) where {T <: Real}
-    copyto!(X.data, inv(cache.fact))
+    copyto!(X.data, I)
+    ldiv!(cache.fact, X.data) # just ldiv an identity matrix - LinearAlgebra currently does the same
     return X
 end
 
