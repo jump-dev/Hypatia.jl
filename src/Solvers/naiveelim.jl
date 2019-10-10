@@ -131,7 +131,11 @@ function load(system_solver::NaiveElimSparseSystemSolver{T}, solver::Solver{T}) 
     (Is, Js, Vs) = findnz(lhs4)
 
     # add I, J, V for Hessians and inverse Hessians
-    hess_nz_total = isempty(cones) ? 0 : sum(Cones.use_dual(cone_k) ? Cones.hess_nz_count(cone_k, false) : Cones.inv_hess_nz_count(cone_k, false) for cone_k in cones)
+    if isempty(cones)
+        hess_nz_total = 0
+    else
+        hess_nz_total = sum(Cones.use_dual(cone_k) ? Cones.hess_nz_count(cone_k, false) : Cones.inv_hess_nz_count(cone_k, false) for cone_k in cones)
+    end
     H_Is = Vector{Int}(undef, hess_nz_total)
     H_Js = Vector{Int}(undef, hess_nz_total)
     offset = 1
@@ -270,15 +274,14 @@ function update_fact(system_solver::NaiveElimDenseSystemSolver{T}, solver::Solve
         end
     end
 
-    reset_fact(system_solver.fact_cache)
+    update_fact(system_solver.fact_cache, system_solver.lhs4)
 
     return system_solver
 end
 
 function solve_subsystem(system_solver::NaiveElimDenseSystemSolver, sol4::Matrix, rhs4::Matrix)
-    if !solve_system(system_solver.fact_cache, sol4, system_solver.lhs4, rhs4)
-        # TODO recover somehow
-        @warn("numerical failure: could not solve linear system")
-    end
+    copyto!(sol4, rhs4)
+    solve_system(system_solver.fact_cache, sol4)
+    # TODO recover if fails - check issuccess
     return sol4
 end
