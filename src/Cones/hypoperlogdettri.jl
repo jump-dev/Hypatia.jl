@@ -41,7 +41,7 @@ mutable struct HypoPerLogdetTri{T <: Real} <: Cone{T}
     function HypoPerLogdetTri{T}(
         dim::Int,
         is_dual::Bool;
-        hess_fact_cache = DenseSymCache{T}(),
+        hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
         @assert dim >= 3
         cone = new{T}()

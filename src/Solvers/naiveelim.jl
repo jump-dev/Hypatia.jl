@@ -214,7 +214,6 @@ mutable struct NaiveElimDenseSystemSolver{T <: Real} <: NaiveElimSystemSolver{T}
     use_inv_hess::Bool
     tau_row::Int
     lhs4::Matrix{T}
-    lhs4_copy::Matrix{T}
     rhs4::Matrix{T}
     sol4::Matrix{T}
     fact_cache::DenseNonSymCache{T}
@@ -236,13 +235,12 @@ function load(system_solver::NaiveElimDenseSystemSolver{T}, solver::Solver{T}) w
     system_solver.sol4 = zeros(T, system_solver.tau_row, 2)
     system_solver.rhs4 = similar(system_solver.sol4)
 
-    system_solver.lhs4_copy = T[
+    system_solver.lhs4 = T[
         zeros(T, n, n)  model.A'        model.G'                  model.c;
         -model.A        zeros(T, p, p)  zeros(T, p, q)            model.b;
         -model.G        zeros(T, q, p)  Matrix(one(T) * I, q, q)  model.h;
         -model.c'       -model.b'       -model.h'                 one(T);
         ]
-    system_solver.lhs4 = similar(system_solver.lhs4_copy)
 
     load_matrix(system_solver.fact_cache, system_solver.lhs4)
 
@@ -254,7 +252,6 @@ function update_fact(system_solver::NaiveElimDenseSystemSolver{T}, solver::Solve
     (n, p) = (model.n, model.p)
     lhs4 = system_solver.lhs4
 
-    copyto!(lhs4, system_solver.lhs4_copy)
     lhs4[end, end] = solver.mu / solver.tau / solver.tau
 
     for (k, cone_k) in enumerate(model.cones)

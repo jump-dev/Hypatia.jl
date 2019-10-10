@@ -254,7 +254,6 @@ mutable struct SymIndefDenseSystemSolver{T <: Real} <: SymIndefSystemSolver{T}
     use_inv_hess::Bool
     tau_row::Int
     lhs3::Symmetric{T, Matrix{T}}
-    lhs3_copy::Symmetric{T, Matrix{T}}
     rhs3::Matrix{T}
     sol3::Matrix{T}
     fact_cache::DenseSymCache{T}
@@ -277,12 +276,11 @@ function load(system_solver::SymIndefDenseSystemSolver{T}, solver::Solver{T}) wh
     system_solver.rhs3 = similar(system_solver.sol3)
 
     # fill symmetric lower triangle
-    system_solver.lhs3_copy = Symmetric(T[
+    system_solver.lhs3 = Symmetric(T[
         zeros(T, n, n)  zeros(T, n, p)  zeros(T, n, q);
         model.A         zeros(T, p, p)  zeros(T, p, q);
         model.G         zeros(T, q, p)  Matrix(-one(T) * I, q, q);
         ], :L)
-    system_solver.lhs3 = similar(system_solver.lhs3_copy)
 
     load_matrix(system_solver.fact_cache, system_solver.lhs3)
 
@@ -292,10 +290,7 @@ end
 function update_fact(system_solver::SymIndefDenseSystemSolver, solver::Solver)
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
-    lhs3 = system_solver.lhs3
-
-    copyto!(lhs3, system_solver.lhs3_copy) # TODO can avoid this for BK since doesn't equilibrate - maybe make function "needs_copy(cache)"
-    lhs3 = lhs3.data
+    lhs3 = system_solver.lhs3.data
 
     for (k, cone_k) in enumerate(model.cones)
         idxs_k = model.cone_idxs[k]
