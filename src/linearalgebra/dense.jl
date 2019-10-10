@@ -278,7 +278,6 @@ for (potrf, elty) in [(:dpotrf_, :Float64), (:spotrf_, :Float32)]
         function update_fact(cache::LAPACKPosDefCache{$elty}, A::Symmetric{$elty, <:AbstractMatrix{$elty}})
             n = size(cache.AF, 1)
             copyto!(cache.AF, A.data)
-            @show cache.uplo
 
             # call dpotrf( uplo, n, a, lda, info )
             ccall((@blasfunc($potrf), liblapack), Cvoid,
