@@ -2,8 +2,6 @@
 Copyright 2019, Chris Coey and contributors
 
 helpers for dense factorizations and linear solves
-NOTE: factorization routines destroy the LHS matrix
-TODO use optimal sizes of work arrays etc from LAPACK
 =#
 
 import LinearAlgebra.BlasReal
@@ -49,7 +47,7 @@ function load_matrix(cache::LAPACKNonSymCache{T}, A::Matrix{T}) where {T <: Blas
 end
 
 # wrap LAPACK functions
-for (getrf, elty) in [(:dgetrf_, :Float64), (:spotrf_, :Float32)]
+for (getrf, elty) in [(:dgetrf_, :Float64), (:sgetrf_, :Float32)]
     @eval begin
         function update_fact(cache::LAPACKNonSymCache{$elty}, A::AbstractMatrix{$elty})
             n = LinearAlgebra.checksquare(A)
@@ -59,7 +57,7 @@ for (getrf, elty) in [(:dgetrf_, :Float64), (:spotrf_, :Float32)]
             ccall((@blasfunc($getrf), liblapack), Cvoid,
                 (Ref{BlasInt}, Ref{BlasInt}, Ptr{$elty}, Ref{BlasInt},
                 Ptr{BlasInt}, Ptr{BlasInt}),
-                n, n, cache.AF, stride(cache.AF, 2),
+                n, n, cache.AF, max(stride(cache.AF, 2), 1),
                 cache.ipiv, cache.info)
 
             if cache.info[] < 0
@@ -88,7 +86,7 @@ for (getrs, elty) in [(:dgetrs_, :Float64), (:sgetrs_, :Float32)]
                 Ref{BlasInt}, Ptr{BlasInt}, Ptr{$elty}, Ref{BlasInt},
                 Ptr{BlasInt}),
                 'N', size(cache.AF, 1), size(X, 2), cache.AF,
-                stride(cache.AF, 2), cache.ipiv, X, stride(X, 2),
+                max(stride(cache.AF, 2), 1), cache.ipiv, X, max(stride(X, 2), 1),
                 cache.info)
 
             return X
@@ -155,13 +153,14 @@ end
 for (sytrf_rook, elty) in [(:dsytrf_rook_, :Float64), (:ssytrf_rook_, :Float32)]
     @eval begin
         function update_fact(cache::LAPACKSymCache{$elty}, A::Symmetric{$elty, <:AbstractMatrix{$elty}})
+            n = LinearAlgebra.checksquare(A)
             copyto!(cache.AF, A.data)
 
             # call dsytrf_rook( uplo, n, a, lda, ipiv, work, lwork, info )
             ccall((@blasfunc($sytrf_rook), liblapack), Cvoid,
                 (Ref{UInt8}, Ref{BlasInt}, Ptr{$elty}, Ref{BlasInt},
                 Ptr{BlasInt}, Ptr{$elty}, Ref{BlasInt}, Ptr{BlasInt}),
-                cache.uplo, size(cache.AF, 1), cache.AF, stride(cache.AF, 2),
+                cache.uplo, n, cache.AF, max(stride(cache.AF, 2), 1),
                 cache.ipiv, cache.work, cache.lwork, cache.info)
 
             if cache.lwork < 0 # query for optimal work size, and resize work before solving
@@ -172,10 +171,10 @@ for (sytrf_rook, elty) in [(:dsytrf_rook_, :Float64), (:ssytrf_rook_, :Float32)]
 
             if cache.info[] < 0
                 throw(ArgumentError("invalid argument #$(-cache.info[]) to LAPACK call"))
-            elseif 0 < cache.info[] <= size(cache.AF, 1)
+            elseif 0 < cache.info[] <= n
                 @warn("factorization failed: #$(cache.info[])")
                 return false
-            # elseif cache.info[] > size(cache.AF, 1)
+            # elseif cache.info[] > n
             #     @warn("condition number is small: $(cache.rcond[])")
             end
 
@@ -196,7 +195,7 @@ for (sytrs_rook, elty) in [(:dsytrs_rook_, :Float64), (:ssytrs_rook_, :Float32)]
                 Ref{BlasInt}, Ptr{BlasInt}, Ptr{$elty}, Ref{BlasInt},
                 Ptr{BlasInt}),
                 cache.uplo, size(cache.AF, 1), size(X, 2), cache.AF,
-                stride(cache.AF, 2), cache.ipiv, X, stride(X, 2),
+                max(stride(cache.AF, 2), 1), cache.ipiv, X, max(stride(X, 2), 1),
                 cache.info)
 
             return X
@@ -213,7 +212,7 @@ for (sytri_rook, elty) in [(:dsytri_rook_, :Float64), (:ssytri_rook_, :Float32)]
             ccall((@blasfunc($sytri_rook), liblapack), Cvoid,
                 (Ref{UInt8}, Ref{BlasInt}, Ptr{$elty}, Ref{BlasInt},
                 Ptr{BlasInt}, Ptr{$elty}, Ptr{BlasInt}),
-                X.uplo, size(X.data, 1), X.data, stride(X.data, 2),
+                X.uplo, size(X.data, 1), X.data, max(stride(X.data, 2), 1),
                 cache.ipiv, cache.work, cache.info)
 
             return X
@@ -277,21 +276,23 @@ end
 for (potrf, elty) in [(:dpotrf_, :Float64), (:spotrf_, :Float32)]
     @eval begin
         function update_fact(cache::LAPACKPosDefCache{$elty}, A::Symmetric{$elty, <:AbstractMatrix{$elty}})
+            n = size(cache.AF, 1)
             copyto!(cache.AF, A.data)
+            @show cache.uplo
 
             # call dpotrf( uplo, n, a, lda, info )
             ccall((@blasfunc($potrf), liblapack), Cvoid,
                 (Ref{UInt8}, Ref{BlasInt}, Ptr{$elty}, Ref{BlasInt},
                 Ptr{BlasInt}),
-                cache.uplo, size(cache.AF, 1), cache.AF, stride(cache.AF, 2),
+                cache.uplo, n, cache.AF, max(stride(cache.AF, 2), 1),
                 cache.info)
 
             if cache.info[] < 0
                 throw(ArgumentError("invalid argument #$(-cache.info[]) to LAPACK call"))
-            elseif 0 < cache.info[] <= size(cache.AF, 1)
+            elseif 0 < cache.info[] <= n
                 @warn("factorization failed: #$(cache.info[])")
                 return false
-            # elseif cache.info[] > size(cache.AF, 1)
+            # elseif cache.info[] > n
             #     @warn("condition number is small: $(cache.rcond[])")
             end
 
@@ -311,7 +312,7 @@ for (potrs, elty) in [(:dpotrs_, :Float64), (:spotrs_, :Float32)]
                 (Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{$elty},
                 Ref{BlasInt}, Ptr{BlasInt}, Ref{BlasInt}, Ptr{BlasInt}),
                 cache.uplo, size(cache.AF, 1), size(X, 2), cache.AF,
-                stride(cache.AF, 2), X, stride(X, 2), cache.info)
+                max(stride(cache.AF, 2), 1), X, max(stride(X, 2), 1), cache.info)
 
             return X
         end
@@ -327,7 +328,7 @@ for (potri, elty) in [(:dpotri_, :Float64), (:spotri_, :Float32)]
             ccall((@blasfunc($potri), liblapack), Cvoid,
                 (Ref{UInt8}, Ref{BlasInt}, Ptr{$elty}, Ref{BlasInt},
                 Ptr{BlasInt}),
-                X.uplo, size(X.data, 1), X.data, stride(X.data, 2),
+                X.uplo, size(X.data, 1), X.data, max(stride(X.data, 2), 1),
                 cache.info)
 
             return X
