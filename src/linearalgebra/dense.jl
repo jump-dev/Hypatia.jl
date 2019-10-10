@@ -42,7 +42,7 @@ function load_matrix(cache::LAPACKNonSymCache{T}, A::Matrix{T}; copy_A::Bool = t
     LinearAlgebra.chkstride1(A)
     n = LinearAlgebra.checksquare(A)
     cache.copy_A = copy_A
-    cache.AF = (copy_A ? Matrix{T}(undef, n, n) : A) # copy over A to new matrix or use A directly
+    cache.AF = (copy_A ? similar(A) : A) # copy over A to new matrix or use A directly
     cache.ipiv = Vector{Int}(undef, n)
     cache.info = Ref{BlasInt}()
     return cache
@@ -106,7 +106,7 @@ end
 function load_matrix(cache::LUNonSymCache{T}, A::AbstractMatrix{T}; copy_A::Bool = true) where {T <: Real}
     n = LinearAlgebra.checksquare(A)
     cache.copy_A = copy_A
-    cache.AF = (copy_A ? zeros(T, n, n) : A) # copy over A to new matrix or use A directly
+    cache.AF = (copy_A ? similar(A) : A) # copy over A to new matrix or use A directly
     return cache
 end
 
@@ -132,7 +132,6 @@ abstract type DenseSymCache{T <: Real} end
 
 mutable struct LAPACKSymCache{T <: BlasReal} <: DenseSymCache{T}
     copy_A
-    uplo
     AF
     ipiv
     work
@@ -145,9 +144,8 @@ function load_matrix(cache::LAPACKSymCache{T}, A::Symmetric{T, <:AbstractMatrix{
     LinearAlgebra.require_one_based_indexing(A.data)
     LinearAlgebra.chkstride1(A.data)
     n = LinearAlgebra.checksquare(A.data)
-    cache.uplo = A.uplo
     cache.copy_A = copy_A
-    cache.AF = (copy_A ? Matrix{T}(undef, n, n) : A) # copy over A to new matrix or use A directly
+    cache.AF = (copy_A ? similar(A) : A) # copy over A to new matrix or use A directly
     cache.ipiv = Vector{Int}(undef, n)
     cache.work = Vector{T}(undef, n) # NOTE this will be resized according to query
     cache.lwork = BlasInt(-1) # NOTE -1 initiates a query for optimal size of work
@@ -160,13 +158,14 @@ for (sytrf_rook, elty) in [(:dsytrf_rook_, :Float64), (:ssytrf_rook_, :Float32)]
     @eval begin
         function update_fact(cache::LAPACKSymCache{$elty}, A::Symmetric{$elty, <:AbstractMatrix{$elty}})
             n = LinearAlgebra.checksquare(A)
-            cache.copy_A && copyto!(cache.AF, A.data)
+            cache.copy_A && copyto!(cache.AF, A)
+            AF = cache.AF.data
 
             # call dsytrf_rook( uplo, n, a, lda, ipiv, work, lwork, info )
             ccall((@blasfunc($sytrf_rook), liblapack), Cvoid,
                 (Ref{UInt8}, Ref{BlasInt}, Ptr{$elty}, Ref{BlasInt},
                 Ptr{BlasInt}, Ptr{$elty}, Ref{BlasInt}, Ptr{BlasInt}),
-                cache.uplo, n, cache.AF, max(stride(cache.AF, 2), 1),
+                cache.AF.uplo, n, AF, max(stride(AF, 2), 1),
                 cache.ipiv, cache.work, cache.lwork, cache.info)
 
             if cache.lwork < 0 # query for optimal work size, and resize work before solving
@@ -194,14 +193,15 @@ for (sytrs_rook, elty) in [(:dsytrs_rook_, :Float64), (:ssytrs_rook_, :Float32)]
         function solve_system(cache::LAPACKSymCache{$elty}, X::AbstractVecOrMat{$elty})
             LinearAlgebra.require_one_based_indexing(X)
             LinearAlgebra.chkstride1(X)
+            AF = cache.AF.data
 
             # call dsytrs_rook( uplo, n, nrhs, a, lda, ipiv, b, ldb, info )
             ccall((@blasfunc($sytrs_rook), liblapack), Cvoid,
                 (Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{$elty},
                 Ref{BlasInt}, Ptr{BlasInt}, Ptr{$elty}, Ref{BlasInt},
                 Ptr{BlasInt}),
-                cache.uplo, size(cache.AF, 1), size(X, 2), cache.AF,
-                max(stride(cache.AF, 2), 1), cache.ipiv, X, max(stride(X, 2), 1),
+                cache.AF.uplo, size(AF, 1), size(X, 2), AF,
+                max(stride(AF, 2), 1), cache.ipiv, X, max(stride(X, 2), 1),
                 cache.info)
 
             return X
@@ -212,7 +212,7 @@ end
 for (sytri_rook, elty) in [(:dsytri_rook_, :Float64), (:ssytri_rook_, :Float32)]
     @eval begin
         function invert(cache::LAPACKSymCache{$elty}, X::Symmetric{$elty, Matrix{$elty}})
-            copyto!(X.data, cache.AF)
+            copyto!(X.data, cache.AF.data)
 
             # call dsytri_rook( uplo, n, a, lda, ipiv, work, info )
             ccall((@blasfunc($sytri_rook), liblapack), Cvoid,
@@ -236,7 +236,7 @@ end
 function load_matrix(cache::LUSymCache{T}, A::Symmetric{T, <:AbstractMatrix{T}}; copy_A::Bool = true) where {T <: Real}
     n = size(A, 1)
     cache.copy_A = copy_A
-    cache.AF = (copy_A ? copy(A) : A) # copy over A (symmetric) to new matrix or use A directly
+    cache.AF = (copy_A ? similar(A) : A) # copy over A (symmetric) to new matrix or use A directly
     return cache
 end
 
@@ -266,7 +266,6 @@ abstract type DensePosDefCache{T <: Real} end
 
 mutable struct LAPACKPosDefCache{T <: BlasReal} <: DensePosDefCache{T}
     copy_A
-    uplo
     AF
     info
     LAPACKPosDefCache{T}() where {T <: BlasReal} = new{T}()
@@ -276,9 +275,8 @@ function load_matrix(cache::LAPACKPosDefCache{T}, A::Symmetric{T, <:AbstractMatr
     LinearAlgebra.require_one_based_indexing(A.data)
     LinearAlgebra.chkstride1(A.data)
     n = LinearAlgebra.checksquare(A.data)
-    cache.uplo = A.uplo
     cache.copy_A = copy_A
-    cache.AF = (copy_A ? Matrix{T}(undef, n, n) : A) # copy over A to new matrix or use A directly
+    cache.AF = (copy_A ? similar(A) : A) # copy over A to new matrix or use A directly
     cache.info = Ref{BlasInt}()
     return cache
 end
@@ -288,13 +286,14 @@ for (potrf, elty) in [(:dpotrf_, :Float64), (:spotrf_, :Float32)]
     @eval begin
         function update_fact(cache::LAPACKPosDefCache{$elty}, A::Symmetric{$elty, <:AbstractMatrix{$elty}})
             n = size(cache.AF, 1)
-            cache.copy_A && copyto!(cache.AF, A.data)
+            cache.copy_A && copyto!(cache.AF, A)
+            AF = cache.AF.data
 
             # call dpotrf( uplo, n, a, lda, info )
             ccall((@blasfunc($potrf), liblapack), Cvoid,
                 (Ref{UInt8}, Ref{BlasInt}, Ptr{$elty}, Ref{BlasInt},
                 Ptr{BlasInt}),
-                cache.uplo, n, cache.AF, max(stride(cache.AF, 2), 1),
+                cache.AF.uplo, n, AF, max(stride(AF, 2), 1),
                 cache.info)
 
             if cache.info[] < 0
@@ -316,13 +315,14 @@ for (potrs, elty) in [(:dpotrs_, :Float64), (:spotrs_, :Float32)]
         function solve_system(cache::LAPACKPosDefCache{$elty}, X::AbstractVecOrMat{$elty})
             LinearAlgebra.require_one_based_indexing(X)
             LinearAlgebra.chkstride1(X)
+            AF = cache.AF.data
 
             # call dpotrs( uplo, n, nrhs, a, lda, b, ldb, info )
             ccall((@blasfunc($potrs), liblapack), Cvoid,
                 (Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{$elty},
                 Ref{BlasInt}, Ptr{BlasInt}, Ref{BlasInt}, Ptr{BlasInt}),
-                cache.uplo, size(cache.AF, 1), size(X, 2), cache.AF,
-                max(stride(cache.AF, 2), 1), X, max(stride(X, 2), 1), cache.info)
+                cache.AF.uplo, size(AF, 1), size(X, 2), AF,
+                max(stride(AF, 2), 1), X, max(stride(X, 2), 1), cache.info)
 
             return X
         end
@@ -332,7 +332,7 @@ end
 for (potri, elty) in [(:dpotri_, :Float64), (:spotri_, :Float32)]
     @eval begin
         function invert(cache::LAPACKPosDefCache{$elty}, X::Symmetric{$elty, Matrix{$elty}})
-            copyto!(X.data, cache.AF)
+            copyto!(X.data, cache.AF.data)
 
             # call dpotri( uplo, n, a, lda, info )
             ccall((@blasfunc($potri), liblapack), Cvoid,
@@ -356,7 +356,7 @@ end
 function load_matrix(cache::CholPosDefCache{T}, A::Symmetric{T, <:AbstractMatrix{T}}; copy_A::Bool = true) where {T <: Real}
     n = LinearAlgebra.checksquare(A)
     cache.copy_A = copy_A
-    cache.AF = (copy_A ? copy(A) : A) # copy over A (symmetric) to new matrix or use A directly
+    cache.AF = (copy_A ? similar(A) : A) # copy over A (symmetric) to new matrix or use A directly
     return cache
 end
 
