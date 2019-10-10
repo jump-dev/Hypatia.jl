@@ -139,7 +139,11 @@ function load(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) wher
     (Is, Js, Vs) = findnz(lhs6)
 
     # add I, J, V for Hessians
-    hess_nz_total = isempty(cones) ? 0 : sum(Cones.hess_nz_count(cone_k, false) for cone_k in cones)
+    if isempty(cones)
+        hess_nz_total = 0
+    else
+        hess_nz_total = sum(Cones.hess_nz_count(cone_k, false) for cone_k in cones)
+    end
     H_Is = Vector{Int}(undef, hess_nz_total)
     H_Js = Vector{Int}(undef, hess_nz_total)
     offset = 1
@@ -207,13 +211,13 @@ function update_fact(system_solver::NaiveSparseSystemSolver, solver::Solver)
     end
     system_solver.lhs6.nzval[system_solver.mtt_idx] = solver.mu / solver.tau / solver.tau
 
-    @timeit solver.timer "update_sparse_fact" update_sparse_fact(system_solver.fact_cache, system_solver.lhs6)
+    @timeit solver.timer "update_fact" update_fact(system_solver.fact_cache, system_solver.lhs6)
 
     return system_solver
 end
 
 function solve_system(system_solver::NaiveSparseSystemSolver, solver::Solver, sol6::Matrix, rhs6::Matrix)
-    @timeit solver.timer "solve_sparse_system" solve_sparse_system(system_solver.fact_cache, sol6, system_solver.lhs6, rhs6)
+    @timeit solver.timer "solve_system" solve_system(system_solver.fact_cache, sol6, system_solver.lhs6, rhs6)
     return sol6
 end
 
@@ -224,7 +228,6 @@ direct dense
 mutable struct NaiveDenseSystemSolver{T <: Real} <: NaiveSystemSolver{T}
     tau_row::Int
     lhs6::Matrix{T}
-    lhs6_copy::Matrix{T}
     lhs6_H_k::Vector
     fact_cache::DenseNonSymCache{T}
     function NaiveDenseSystemSolver{T}(; fact_cache::DenseNonSymCache{T} = DenseNonSymCache{T}()) where {T <: Real}
@@ -241,15 +244,14 @@ function load(system_solver::NaiveDenseSystemSolver{T}, solver::Solver{T}) where
     cone_idxs = model.cone_idxs
     system_solver.tau_row = n + p + q + 1
 
-    system_solver.lhs6_copy = T[
-        zeros(T,n,n)  model.A'      model.G'              model.c     zeros(T,n,q)           zeros(T,n);
-        -model.A      zeros(T,p,p)  zeros(T,p,q)          model.b     zeros(T,p,q)           zeros(T,p);
-        -model.G      zeros(T,q,p)  zeros(T,q,q)          model.h     Matrix(-one(T)*I,q,q)  zeros(T,q);
-        -model.c'     -model.b'     -model.h'             zero(T)     zeros(T,1,q)           -one(T);
-        zeros(T,q,n)  zeros(T,q,p)  Matrix(one(T)*I,q,q)  zeros(T,q)  Matrix(one(T)*I,q,q)   zeros(T,q);
-        zeros(T,1,n)  zeros(T,1,p)  zeros(T,1,q)          one(T)      zeros(T,1,q)           one(T);
+    system_solver.lhs6 = T[
+        zeros(T, n, n)  model.A'        model.G'                  model.c      zeros(T, n, q)             zeros(T, n);
+        -model.A        zeros(T, p, p)  zeros(T, p, q)            model.b      zeros(T, p, q)             zeros(T, p);
+        -model.G        zeros(T, q, p)  zeros(T, q, q)            model.h      Matrix(-one(T) * I, q, q)  zeros(T, q);
+        -model.c'       -model.b'       -model.h'                 zero(T)      zeros(T, 1, q)             -one(T);
+        zeros(T, q, n)  zeros(T, q, p)  Matrix(one(T) * I, q, q)  zeros(T, q)  Matrix(one(T) * I, q, q)   zeros(T, q);
+        zeros(T, 1, n)  zeros(T, 1, p)  zeros(T, 1, q)            one(T)       zeros(T, 1, q)             one(T);
         ]
-    system_solver.lhs6 = similar(system_solver.lhs6_copy)
 
     function view_H_k(cone_k, idxs_k)
         rows = system_solver.tau_row .+ idxs_k
@@ -258,28 +260,26 @@ function load(system_solver::NaiveDenseSystemSolver{T}, solver::Solver{T}) where
     end
     system_solver.lhs6_H_k = [view_H_k(cone_k, idxs_k) for (cone_k, idxs_k) in zip(cones, cone_idxs)]
 
-    load_dense_matrix(system_solver.fact_cache, system_solver.lhs6)
+    load_matrix(system_solver.fact_cache, system_solver.lhs6)
 
     return system_solver
 end
 
 function update_fact(system_solver::NaiveDenseSystemSolver, solver::Solver)
-    copyto!(system_solver.lhs6, system_solver.lhs6_copy)
     system_solver.lhs6[end, system_solver.tau_row] = solver.mu / solver.tau / solver.tau
 
     for (k, cone_k) in enumerate(solver.model.cones)
         copyto!(system_solver.lhs6_H_k[k], Cones.hess(cone_k))
     end
 
-    reset_fact(system_solver.fact_cache)
+    update_fact(system_solver.fact_cache, system_solver.lhs6)
 
     return system_solver
 end
 
 function solve_system(system_solver::NaiveDenseSystemSolver, solver::Solver, sol6::Matrix, rhs6::Matrix)
-    @timeit solver.timer "solve_dense_system" if !solve_dense_system(system_solver.fact_cache, sol6, system_solver.lhs6, rhs6)
-        # TODO recover somehow
-        @warn("numerical failure: could not solve linear system")
-    end
+    copyto!(sol6, rhs6)
+    solve_system(system_solver.fact_cache, sol6)
+    # TODO recover if fails - check issuccess
     return sol6
 end

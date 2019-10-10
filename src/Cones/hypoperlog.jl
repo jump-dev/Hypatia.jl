@@ -22,35 +22,38 @@ mutable struct HypoPerLog{T <: Real} <: Cone{T}
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
+    hess_fact_cache
 
     lwv::T
     vlwvu::T
     vwivlwvu::Vector{T}
-    tmp_hess::Symmetric{T, Matrix{T}}
-    hess_fact
-    hess_fact_cache
 
-    function HypoPerLog{T}(dim::Int, is_dual::Bool) where {T <: Real}
+    function HypoPerLog{T}(
+        dim::Int,
+        is_dual::Bool;
+        hess_fact_cache = hessian_cache(T),
+        ) where {T <: Real}
         @assert dim >= 3
         cone = new{T}()
         cone.use_dual = is_dual
         cone.dim = dim
+        cone.hess_fact_cache = hess_fact_cache
         return cone
     end
 end
 
 HypoPerLog{T}(dim::Int) where {T <: Real} = HypoPerLog{T}(dim, false)
 
-# TODO maybe only allocate the fields we use
+# TODO only allocate the fields we use
 function setup_data(cone::HypoPerLog{T}) where {T <: Real}
     reset_data(cone)
     dim = cone.dim
     cone.point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.tmp_hess = Symmetric(zeros(T, dim, dim), :U)
+    cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
+    load_matrix(cone.hess_fact_cache, cone.hess)
     cone.vwivlwvu = zeros(T, dim - 2)
-    cone.hess_fact_cache = nothing
     return
 end
 

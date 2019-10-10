@@ -37,7 +37,6 @@ mutable struct PosSemidefTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     mat4::Matrix{R}
     inv_mat::Matrix{R}
     fact_mat
-    chol_cache
 
     function PosSemidefTri{T, R}(dim::Int, is_dual::Bool) where {R <: RealOrComplex{T}} where {T <: Real}
         @assert dim >= 1
@@ -73,7 +72,6 @@ function setup_data(cone::PosSemidefTri{T, R}) where {R <: RealOrComplex{T}} whe
     cone.mat2 = similar(cone.mat)
     cone.mat3 = similar(cone.mat)
     cone.mat4 = similar(cone.mat)
-    cone.chol_cache = HypCholCache('U', cone.mat2)
     return
 end
 
@@ -94,7 +92,7 @@ function update_feas(cone::PosSemidefTri)
     @assert !cone.feas_updated
     vec_to_mat_U!(cone.mat, cone.point)
     copyto!(cone.mat2, cone.mat)
-    cone.fact_mat = hyp_chol!(cone.chol_cache, cone.mat2)
+    cone.fact_mat = cholesky!(Hermitian(cone.mat2, :U), check = false)
     cone.is_feas = isposdef(cone.fact_mat)
     cone.feas_updated = true
     return cone.is_feas
@@ -102,8 +100,6 @@ end
 
 function update_grad(cone::PosSemidefTri)
     @assert cone.is_feas
-    # cone.inv_mat = hyp_chol_inv!(cone.chol_cache, cone.fact_mat)
-    # copytri!(cone.inv_mat, 'U', cone.is_complex)
     cone.inv_mat = inv(cone.fact_mat)
     mat_U_to_vec_scaled!(cone.grad, cone.inv_mat)
     cone.grad .*= -1

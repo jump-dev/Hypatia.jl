@@ -107,7 +107,7 @@ function check_in_cone(cone::WSOSPolyInterpSOC{T}) where {T <: Real}
         @. tmp1 = ipwtj' * point_pq'
         mul!(tmp4, tmp1, ipwtj)
         mat .= tmp4
-        lambdafact[j] = hyp_chol!(Symmetric(tmp4, :L))
+        lambdafact[j] = cholesky!(Symmetric(tmp4, :L), check = false)
         if !isposdef(lambdafact[j])
             return false
         end
@@ -126,7 +126,7 @@ function check_in_cone(cone::WSOSPolyInterpSOC{T}) where {T <: Real}
             uo += cone.U
         end
 
-        matfact[j] = hyp_chol!(Symmetric(mat, :U))
+        matfact[j] = cholesky!(Symmetric(mat, :U), check = false)
         if !isposdef(matfact[j])
             return false
         end

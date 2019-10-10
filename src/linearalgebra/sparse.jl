@@ -29,7 +29,7 @@ UMFPACKNonSymCache() = UMFPACKNonSymCache{Float64}()
 # easiest to restrict int type to SuiteSparse_long
 int_type(::UMFPACKNonSymCache) = SuiteSparseInt
 
-function update_sparse_fact(cache::UMFPACKNonSymCache, A::SparseMatrixCSC{Float64, SuiteSparseInt})
+function update_fact(cache::UMFPACKNonSymCache, A::SparseMatrixCSC{Float64, SuiteSparseInt})
     if !cache.analyzed
         cache.umfpack = lu(A) # symbolic and numeric factorization
         cache.analyzed = true
@@ -44,7 +44,7 @@ function update_sparse_fact(cache::UMFPACKNonSymCache, A::SparseMatrixCSC{Float6
     return
 end
 
-function solve_sparse_system(cache::UMFPACKNonSymCache, x::Matrix{Float64}, A::SparseMatrixCSC{Float64, SuiteSparseInt}, b::Matrix{Float64})
+function solve_system(cache::UMFPACKNonSymCache, x::Matrix{Float64}, A::SparseMatrixCSC{Float64, SuiteSparseInt}, b::Matrix{Float64})
     ldiv!(x, cache.umfpack, b) # does not repeat symbolic or numeric factorization
     return x
 end
@@ -75,7 +75,7 @@ CHOLMODSymCache{T}(; diag_pert = NaN) where {T <: Real} = error("CHOLMOD only wo
 CHOLMODSymCache(; diag_pert::Float64 = sqrt(eps(Float64))) = CHOLMODSymCache{Float64}(diag_pert = diag_pert)
 int_type(::CHOLMODSymCache) = SuiteSparseInt
 
-function update_sparse_fact(cache::CHOLMODSymCache, A::SparseMatrixCSC{Float64, SuiteSparseInt})
+function update_fact(cache::CHOLMODSymCache, A::SparseMatrixCSC{Float64, SuiteSparseInt})
     A_symm = Symmetric(A, :L)
     if !cache.analyzed
         cache.cholmod = SuiteSparse.CHOLMOD.ldlt(A_symm, check = false)
@@ -93,7 +93,7 @@ function update_sparse_fact(cache::CHOLMODSymCache, A::SparseMatrixCSC{Float64, 
     return
 end
 
-function solve_sparse_system(cache::CHOLMODSymCache, x::Matrix{Float64}, A::SparseMatrixCSC{Float64, SuiteSparseInt}, b::Matrix{Float64})
+function solve_system(cache::CHOLMODSymCache, x::Matrix{Float64}, A::SparseMatrixCSC{Float64, SuiteSparseInt}, b::Matrix{Float64})
     x .= cache.cholmod \ b # TODO try to make this in-place
     return x
 end

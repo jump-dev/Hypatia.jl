@@ -69,7 +69,7 @@ function solve_system(system_solver::SymIndefSystemSolver{T}, solver::Solver{T},
         end
     end
 
-    @timeit solver.timer "solve_sparse_system" solve_subsystem(system_solver, sol3, rhs3)
+    @timeit solver.timer "solve_system" solve_subsystem(system_solver, sol3, rhs3)
 
     if !system_solver.use_inv_hess
         for (k, cone_k) in enumerate(model.cones)
@@ -165,8 +165,11 @@ function load(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) w
     (Is, Js, Vs) = findnz(lhs3)
 
     # add I, J, V for Hessians and inverse Hessians
-    # count of nonzeros to add
-    hess_nz_total = isempty(cones) ? 0 : sum(Cones.use_dual(cone_k) ? Cones.hess_nz_count(cone_k, true) : Cones.inv_hess_nz_count(cone_k, true) for cone_k in cones)
+    if isempty(cones)
+        hess_nz_total = 0
+    else
+        hess_nz_total = sum(Cones.use_dual(cone_k) ? Cones.hess_nz_count(cone_k, true) : Cones.inv_hess_nz_count(cone_k, true) for cone_k in cones)
+    end
     H_Is = Vector{Int}(undef, hess_nz_total)
     H_Js = Vector{Int}(undef, hess_nz_total)
     offset = 1
@@ -233,13 +236,13 @@ function update_fact(system_solver::SymIndefSparseSystemSolver, solver::Solver)
         end
     end
 
-    @timeit solver.timer "update_sparse_fact" update_sparse_fact(system_solver.fact_cache, system_solver.lhs3)
+    @timeit solver.timer "update_fact" update_fact(system_solver.fact_cache, system_solver.lhs3)
 
     return system_solver
 end
 
-function solve_subsystem(system_solver::SymIndefSparseSystemSolver, sol3, rhs3)
-    solve_sparse_system(system_solver.fact_cache, sol3, system_solver.lhs3, rhs3)
+function solve_subsystem(system_solver::SymIndefSparseSystemSolver, sol3::Matrix, rhs3::Matrix)
+    solve_system(system_solver.fact_cache, sol3, system_solver.lhs3, rhs3)
     return sol3
 end
 
@@ -251,7 +254,6 @@ mutable struct SymIndefDenseSystemSolver{T <: Real} <: SymIndefSystemSolver{T}
     use_inv_hess::Bool
     tau_row::Int
     lhs3::Symmetric{T, Matrix{T}}
-    lhs3_copy::Symmetric{T, Matrix{T}}
     rhs3::Matrix{T}
     sol3::Matrix{T}
     fact_cache::DenseSymCache{T}
@@ -274,14 +276,13 @@ function load(system_solver::SymIndefDenseSystemSolver{T}, solver::Solver{T}) wh
     system_solver.rhs3 = similar(system_solver.sol3)
 
     # fill symmetric lower triangle
-    system_solver.lhs3_copy = Symmetric(T[
+    system_solver.lhs3 = Symmetric(T[
         zeros(T, n, n)  zeros(T, n, p)  zeros(T, n, q);
         model.A         zeros(T, p, p)  zeros(T, p, q);
         model.G         zeros(T, q, p)  Matrix(-one(T) * I, q, q);
         ], :L)
-    system_solver.lhs3 = similar(system_solver.lhs3_copy)
 
-    load_dense_matrix(system_solver.fact_cache, system_solver.lhs3)
+    load_matrix(system_solver.fact_cache, system_solver.lhs3)
 
     return system_solver
 end
@@ -289,10 +290,7 @@ end
 function update_fact(system_solver::SymIndefDenseSystemSolver, solver::Solver)
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
-    lhs3 = system_solver.lhs3
-
-    copyto!(lhs3, system_solver.lhs3_copy) # TODO can avoid this for BK since doesn't equilibrate - maybe make function "needs_copy(cache)"
-    lhs3 = lhs3.data
+    lhs3 = system_solver.lhs3.data
 
     for (k, cone_k) in enumerate(model.cones)
         idxs_k = model.cone_idxs[k]
@@ -314,16 +312,14 @@ function update_fact(system_solver::SymIndefDenseSystemSolver, solver::Solver)
         end
     end
 
-    reset_fact(system_solver.fact_cache)
+    update_fact(system_solver.fact_cache, system_solver.lhs3)
 
     return system_solver
 end
 
 function solve_subsystem(system_solver::SymIndefDenseSystemSolver, sol3::Matrix, rhs3::Matrix)
-    if !solve_dense_system(system_solver.fact_cache, sol3, system_solver.lhs3, rhs3)
-        # TODO recover somehow
-        @warn("numerical failure: could not solve linear system")
-    end
-    # sol3 .= system_solver.lhs3 \ rhs3 # TODO remove. but first investigate why it causes fewer native test failures
+    copyto!(sol3, rhs3)
+    solve_system(system_solver.fact_cache, sol3)
+    # TODO recover if fails - check issuccess
     return sol3
 end

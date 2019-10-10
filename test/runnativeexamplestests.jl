@@ -21,7 +21,8 @@ T = Float64
 
 options = (atol = sqrt(sqrt(eps(T))), solver = SO.Solver{T}(
     verbose = true, iter_limit = 250, time_limit = 12e2,
-    system_solver = SO.QRCholDenseSystemSolver{T}()))
+    system_solver = SO.QRCholDenseSystemSolver{T}(),
+    ))
 
 @info("starting native examples tests")
 @testset "native examples tests" begin

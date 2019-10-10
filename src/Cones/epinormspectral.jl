@@ -26,23 +26,24 @@ mutable struct EpiNormSpectral{T <: Real} <: Cone{T}
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
+    hess_fact_cache
 
     W::Matrix{T}
     WWt::Matrix{T}
     Z::Matrix{T}
     fact_Z
-    chol_cache
     Zi::Symmetric{T, Matrix{T}}
     Eu::Symmetric{T, Matrix{T}}
     tmpnn::Matrix{T}
     tmpnm::Matrix{T}
     tmpnm2::Matrix{T}
 
-    tmp_hess::Symmetric{T, Matrix{T}}
-    hess_fact
-    hess_fact_cache
-
-    function EpiNormSpectral{T}(n::Int, m::Int, is_dual::Bool) where {T <: Real}
+    function EpiNormSpectral{T}(
+        n::Int,
+        m::Int,
+        is_dual::Bool;
+        hess_fact_cache = hessian_cache(T),
+        ) where {T <: Real}
         @assert 1 <= n <= m
         dim = n * m + 1
         cone = new{T}()
@@ -50,6 +51,7 @@ mutable struct EpiNormSpectral{T <: Real} <: Cone{T}
         cone.dim = dim
         cone.n = n
         cone.m = m
+        cone.hess_fact_cache = hess_fact_cache
         return cone
     end
 end
@@ -62,16 +64,15 @@ function setup_data(cone::EpiNormSpectral{T}) where {T <: Real}
     cone.point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.tmp_hess = Symmetric(zeros(T, dim, dim), :U)
+    cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
+    load_matrix(cone.hess_fact_cache, cone.hess)
     cone.W = Matrix{T}(undef, cone.n, cone.m)
     cone.WWt = Matrix{T}(undef, cone.n, cone.n)
     cone.Z = Matrix{T}(undef, cone.n, cone.n)
-    cone.chol_cache = HypCholCache('U', cone.Z)
     cone.Eu = Symmetric(zeros(T, cone.n, cone.n))
     cone.tmpnn = Matrix{T}(undef, cone.n, cone.n)
     cone.tmpnm = Matrix{T}(undef, cone.n, cone.m)
     cone.tmpnm2 = Matrix{T}(undef, cone.n, cone.m)
-    cone.hess_fact_cache = nothing
     return
 end
 
@@ -86,16 +87,18 @@ end
 function update_feas(cone::EpiNormSpectral)
     @assert !cone.feas_updated
     u = cone.point[1]
+
     if u > 0
         cone.W[:] .= view(cone.point, 2:cone.dim)
         mul!(cone.WWt, cone.W, cone.W')
         copyto!(cone.Z, u * I)
         @. cone.Z -= cone.WWt / u
-        cone.fact_Z = hyp_chol!(cone.chol_cache, cone.Z)
+        cone.fact_Z = cholesky!(Symmetric(cone.Z, :U), check = false)
         cone.is_feas = isposdef(cone.fact_Z)
     else
         cone.is_feas = false
     end
+
     cone.feas_updated = true
     return cone.is_feas
 end
@@ -103,19 +106,20 @@ end
 function update_grad(cone::EpiNormSpectral)
     @assert cone.is_feas
     u = cone.point[1]
+
     ldiv!(cone.tmpnm, cone.fact_Z, cone.W)
-    # cone.Zi = Symmetric(hyp_chol_inv!(cone.chol_cache, cone.fact_Z), :U) # NOTE: destroys cone.fact_Z
     cone.Zi = Symmetric(inv(cone.fact_Z), :U)
-    # mul!(cone.tmpnm, cone.Zi, cone.W) # TODO could use ldiv (as above) instead for potentially better numerics
     @. cone.Eu.data = cone.WWt / u / u
     @inbounds for i in 1:cone.n
         cone.Eu[i, i] += 1
     end
+
     cone.grad[1] = -dot(cone.Zi, cone.Eu) - inv(u)
     @. cone.tmpnm /= u
     @inbounds for i in 1:(cone.n * cone.m)
         cone.grad[i + 1] = 2 * cone.tmpnm[i]
     end
+
     cone.grad_updated = true
     return cone.grad
 end
