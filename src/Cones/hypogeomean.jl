@@ -69,8 +69,18 @@ end
 get_nu(cone::HypoGeomean) = cone.dim
 
 function set_initial_point(arr::AbstractVector, cone::HypoGeomean)
-    arr .= 1
-    arr[1] = -prod(cone.alpha[i] ^ (-cone.alpha[i]) for i in eachindex(cone.alpha)) / cone.dim
+    # TODO do this piecewise, will still be pretty rough
+    n = cone.dim - 1
+    alpha = cone.alpha
+    w = view(arr, 2:cone.dim)
+    if n == 1
+        w[1] = 1.30656
+    else
+        @. w = 0.8256110 + 0.0012969 * log(n) + 0.1654036 * exp(alpha)
+    end
+    wiaa = exp(-sum(alpha[i] * log(alpha[i] / w[i]) for i in eachindex(alpha)))
+    # choice of i=1 is arbitrary, this holds for all i
+    arr[1] = wiaa * alpha[1]  / (alpha[1] - 1 + abs2(w[1])) - wiaa
     return arr
 end
 

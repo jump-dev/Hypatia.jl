@@ -52,7 +52,7 @@ get_nu(cone::EpiNormEucl) = 2
 
 function set_initial_point(arr::AbstractVector, cone::EpiNormEucl)
     arr .= 0
-    arr[1] = 1
+    arr[1] = sqrt(2)
     return arr
 end
 

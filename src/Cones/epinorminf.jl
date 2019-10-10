@@ -61,7 +61,7 @@ get_nu(cone::EpiNormInf) = cone.dim
 
 function set_initial_point(arr::AbstractVector, cone::EpiNormInf)
     arr .= 0
-    arr[1] = 1
+    arr[1] = sqrt(cone.dim)
     return arr
 end
 

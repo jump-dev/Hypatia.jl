@@ -72,13 +72,35 @@ end
 
 get_nu(cone::HypoPerLogdetTri) = cone.side + 2
 
-function set_initial_point(arr::AbstractVector, cone::HypoPerLogdetTri)
+function set_initial_point(arr::AbstractVector, cone::HypoPerLogdetTri{T}) where {T <: Real}
+    central_points = [
+    -0.827838399  0.805102005  1.290927713
+    -0.689609381  0.724604185  1.224619879
+    -0.584372734  0.681280549  1.182421998
+    -0.503500819  0.654485416  1.153054181
+    -0.440285901  0.636444221  1.131466932
+    ]
+    side = cone.side
+    if side <= 5
+        (u, v, w) = (central_points[side, 1], central_points[side, 2], central_points[side, 3])
+    else
+        x = inv(side)
+        if side <= 16
+            u = -2.070906x - 0.052713
+            v = 0.420764x + 0.553790
+            w = 0.629959x + 1.011841
+        else
+            u = -2.878002x - 0.001136
+            v = 0.410904x + 0.553842
+            w = 0.805068x + 1.000288
+        end
+    end
     arr .= 0
-    arr[1] = -1
-    arr[2] = 1
+    arr[1] = u
+    arr[2] = v
     k = 3
     @inbounds for i in 1:cone.side
-        arr[k] = 1
+        arr[k] = w
         k += i + 1
     end
     return arr

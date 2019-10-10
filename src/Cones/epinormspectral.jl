@@ -79,7 +79,7 @@ get_nu(cone::EpiNormSpectral) = cone.n + 1
 
 function set_initial_point(arr::AbstractVector, cone::EpiNormSpectral)
     arr .= 0
-    arr[1] = 1
+    arr[1] = sqrt(cone.n + 1)
     return arr
 end
 
