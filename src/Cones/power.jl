@@ -38,7 +38,7 @@ mutable struct Power{T <: Real} <: Cone{T}
         alpha::Vector{T},
         n::Int,
         is_dual::Bool;
-        hess_fact_cache = DenseSymCache{T}(),
+        hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
         @assert n >= 1
         dim = length(alpha) + n

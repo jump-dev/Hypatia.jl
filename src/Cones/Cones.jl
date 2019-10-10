@@ -10,10 +10,14 @@ using LinearAlgebra
 import LinearAlgebra.copytri!
 import Hypatia.RealOrComplex
 import Hypatia.DenseSymCache
+import Hypatia.DensePosDefCache
 import Hypatia.load_matrix
 import Hypatia.update_fact
 import Hypatia.solve_system
 import Hypatia.invert
+
+hessian_cache(T::Type{<:LinearAlgebra.BlasReal}) = DenseSymCache{T}() # use BunchKaufman for BlasReals
+hessian_cache(T::Type{<:Real}) = DensePosDefCache{T}() # use Cholesky for generic reals
 
 abstract type Cone{T <: Real} end
 

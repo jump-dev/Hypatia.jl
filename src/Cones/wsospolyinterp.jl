@@ -38,7 +38,7 @@ mutable struct WSOSPolyInterp{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
         dim::Int,
         Ps::Vector{Matrix{R}},
         is_dual::Bool;
-        hess_fact_cache = DenseSymCache{T}(),
+        hess_fact_cache = hessian_cache(T),
         ) where {R <: RealOrComplex{T}} where {T <: Real}
         for k in eachindex(Ps)
             @assert size(Ps[k], 1) == dim

@@ -37,7 +37,7 @@ mutable struct HypoGeomean{T <: Real} <: Cone{T}
     function HypoGeomean{T}(
         alpha::Vector{T},
         is_dual::Bool;
-        hess_fact_cache = DenseSymCache{T}(),
+        hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
         dim = length(alpha) + 1
         @assert dim >= 2

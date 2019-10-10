@@ -228,7 +228,6 @@ direct dense
 mutable struct NaiveDenseSystemSolver{T <: Real} <: NaiveSystemSolver{T}
     tau_row::Int
     lhs6::Matrix{T}
-    lhs6_copy::Matrix{T}
     lhs6_H_k::Vector
     fact_cache::DenseNonSymCache{T}
     function NaiveDenseSystemSolver{T}(; fact_cache::DenseNonSymCache{T} = DenseNonSymCache{T}()) where {T <: Real}
@@ -245,7 +244,7 @@ function load(system_solver::NaiveDenseSystemSolver{T}, solver::Solver{T}) where
     cone_idxs = model.cone_idxs
     system_solver.tau_row = n + p + q + 1
 
-    system_solver.lhs6_copy = T[
+    system_solver.lhs6 = T[
         zeros(T, n, n)  model.A'        model.G'                  model.c      zeros(T, n, q)             zeros(T, n);
         -model.A        zeros(T, p, p)  zeros(T, p, q)            model.b      zeros(T, p, q)             zeros(T, p);
         -model.G        zeros(T, q, p)  zeros(T, q, q)            model.h      Matrix(-one(T) * I, q, q)  zeros(T, q);
@@ -253,7 +252,6 @@ function load(system_solver::NaiveDenseSystemSolver{T}, solver::Solver{T}) where
         zeros(T, q, n)  zeros(T, q, p)  Matrix(one(T) * I, q, q)  zeros(T, q)  Matrix(one(T) * I, q, q)   zeros(T, q);
         zeros(T, 1, n)  zeros(T, 1, p)  zeros(T, 1, q)            one(T)       zeros(T, 1, q)             one(T);
         ]
-    system_solver.lhs6 = similar(system_solver.lhs6_copy)
 
     function view_H_k(cone_k, idxs_k)
         rows = system_solver.tau_row .+ idxs_k
@@ -268,7 +266,6 @@ function load(system_solver::NaiveDenseSystemSolver{T}, solver::Solver{T}) where
 end
 
 function update_fact(system_solver::NaiveDenseSystemSolver, solver::Solver)
-    copyto!(system_solver.lhs6, system_solver.lhs6_copy)
     system_solver.lhs6[end, system_solver.tau_row] = solver.mu / solver.tau / solver.tau
 
     for (k, cone_k) in enumerate(solver.model.cones)

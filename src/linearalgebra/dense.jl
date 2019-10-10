@@ -30,17 +30,19 @@ nonsymmetric: LU
 abstract type DenseNonSymCache{T <: Real} end
 
 mutable struct LAPACKNonSymCache{T <: BlasReal} <: DenseNonSymCache{T}
+    copy_A
     AF
     ipiv
     info
     LAPACKNonSymCache{T}() where {T <: BlasReal} = new{T}()
 end
 
-function load_matrix(cache::LAPACKNonSymCache{T}, A::Matrix{T}) where {T <: BlasReal}
+function load_matrix(cache::LAPACKNonSymCache{T}, A::Matrix{T}; copy_A::Bool = true) where {T <: BlasReal}
     LinearAlgebra.require_one_based_indexing(A)
     LinearAlgebra.chkstride1(A)
     n = LinearAlgebra.checksquare(A)
-    cache.AF = Matrix{T}(undef, n, n)
+    cache.copy_A = copy_A
+    cache.AF = (copy_A ? Matrix{T}(undef, n, n) : A) # copy over A to new matrix or use A directly
     cache.ipiv = Vector{Int}(undef, n)
     cache.info = Ref{BlasInt}()
     return cache
@@ -51,7 +53,7 @@ for (getrf, elty) in [(:dgetrf_, :Float64), (:sgetrf_, :Float32)]
     @eval begin
         function update_fact(cache::LAPACKNonSymCache{$elty}, A::AbstractMatrix{$elty})
             n = LinearAlgebra.checksquare(A)
-            copyto!(cache.AF, A)
+            cache.copy_A && copyto!(cache.AF, A)
 
             # call dgetrf( m, n, a, lda, ipiv, info )
             ccall((@blasfunc($getrf), liblapack), Cvoid,
@@ -95,20 +97,22 @@ for (getrs, elty) in [(:dgetrs_, :Float64), (:sgetrs_, :Float32)]
 end
 
 mutable struct LUNonSymCache{T <: Real} <: DenseNonSymCache{T}
+    copy_A
     AF
     fact
     LUNonSymCache{T}() where {T <: Real} = new{T}()
 end
 
-function load_matrix(cache::LUNonSymCache{T}, A::AbstractMatrix{T}) where {T <: Real}
+function load_matrix(cache::LUNonSymCache{T}, A::AbstractMatrix{T}; copy_A::Bool = true) where {T <: Real}
     n = LinearAlgebra.checksquare(A)
-    cache.AF = zeros(T, n, n)
+    cache.copy_A = copy_A
+    cache.AF = (copy_A ? zeros(T, n, n) : A) # copy over A to new matrix or use A directly
     return cache
 end
 
 function update_fact(cache::LUNonSymCache{T}, A::AbstractMatrix{T}) where {T <: Real}
-    copyto!(cache.AF, A)
-    cache.fact = lu!(A, check = false)
+    cache.copy_A && copyto!(cache.AF, A)
+    cache.fact = lu!(cache.AF, check = false)
     return issuccess(cache.fact)
 end
 
@@ -127,6 +131,7 @@ TODO try Aasen's version (http://www.netlib.org/lapack/lawnspdf/lawn294.pdf) and
 abstract type DenseSymCache{T <: Real} end
 
 mutable struct LAPACKSymCache{T <: BlasReal} <: DenseSymCache{T}
+    copy_A
     uplo
     AF
     ipiv
@@ -136,12 +141,13 @@ mutable struct LAPACKSymCache{T <: BlasReal} <: DenseSymCache{T}
     LAPACKSymCache{T}() where {T <: BlasReal} = new{T}()
 end
 
-function load_matrix(cache::LAPACKSymCache{T}, A::Symmetric{T, <:AbstractMatrix{T}}) where {T <: BlasReal}
+function load_matrix(cache::LAPACKSymCache{T}, A::Symmetric{T, <:AbstractMatrix{T}}; copy_A::Bool = true) where {T <: BlasReal}
     LinearAlgebra.require_one_based_indexing(A.data)
     LinearAlgebra.chkstride1(A.data)
     n = LinearAlgebra.checksquare(A.data)
     cache.uplo = A.uplo
-    cache.AF = Matrix{T}(undef, n, n)
+    cache.copy_A = copy_A
+    cache.AF = (copy_A ? Matrix{T}(undef, n, n) : A) # copy over A to new matrix or use A directly
     cache.ipiv = Vector{Int}(undef, n)
     cache.work = Vector{T}(undef, n) # NOTE this will be resized according to query
     cache.lwork = BlasInt(-1) # NOTE -1 initiates a query for optimal size of work
@@ -154,7 +160,7 @@ for (sytrf_rook, elty) in [(:dsytrf_rook_, :Float64), (:ssytrf_rook_, :Float32)]
     @eval begin
         function update_fact(cache::LAPACKSymCache{$elty}, A::Symmetric{$elty, <:AbstractMatrix{$elty}})
             n = LinearAlgebra.checksquare(A)
-            copyto!(cache.AF, A.data)
+            cache.copy_A && copyto!(cache.AF, A.data)
 
             # call dsytrf_rook( uplo, n, a, lda, ipiv, work, lwork, info )
             ccall((@blasfunc($sytrf_rook), liblapack), Cvoid,
@@ -221,19 +227,21 @@ for (sytri_rook, elty) in [(:dsytri_rook_, :Float64), (:ssytri_rook_, :Float32)]
 end
 
 mutable struct LUSymCache{T <: Real} <: DenseSymCache{T}
+    copy_A
     AF
     fact
     LUSymCache{T}() where {T <: Real} = new{T}()
 end
 
-function load_matrix(cache::LUSymCache{T}, A::Symmetric{T, <:AbstractMatrix{T}}) where {T <: Real}
+function load_matrix(cache::LUSymCache{T}, A::Symmetric{T, <:AbstractMatrix{T}}; copy_A::Bool = true) where {T <: Real}
     n = size(A, 1)
-    cache.AF = copy(A) # keeps same uplo
+    cache.copy_A = copy_A
+    cache.AF = (copy_A ? copy(A) : A) # copy over A (symmetric) to new matrix or use A directly
     return cache
 end
 
 function update_fact(cache::LUSymCache{T}, A::Symmetric{T, <:AbstractMatrix{T}}) where {T <: Real}
-    copyto!(cache.AF, A)
+    cache.copy_A && copyto!(cache.AF, A)
     cache.fact = lu!(cache.AF, check = false) # no generic symmetric indefinite factorization so fallback LU of symmetric matrix
     return issuccess(cache.fact)
 end
@@ -257,18 +265,20 @@ symmetric positive definite: Cholesky
 abstract type DensePosDefCache{T <: Real} end
 
 mutable struct LAPACKPosDefCache{T <: BlasReal} <: DensePosDefCache{T}
+    copy_A
     uplo
     AF
     info
     LAPACKPosDefCache{T}() where {T <: BlasReal} = new{T}()
 end
 
-function load_matrix(cache::LAPACKPosDefCache{T}, A::Symmetric{T, <:AbstractMatrix{T}}) where {T <: BlasReal}
+function load_matrix(cache::LAPACKPosDefCache{T}, A::Symmetric{T, <:AbstractMatrix{T}}; copy_A::Bool = true) where {T <: BlasReal}
     LinearAlgebra.require_one_based_indexing(A.data)
     LinearAlgebra.chkstride1(A.data)
     n = LinearAlgebra.checksquare(A.data)
     cache.uplo = A.uplo
-    cache.AF = Matrix{T}(undef, n, n)
+    cache.copy_A = copy_A
+    cache.AF = (copy_A ? Matrix{T}(undef, n, n) : A) # copy over A to new matrix or use A directly
     cache.info = Ref{BlasInt}()
     return cache
 end
@@ -278,7 +288,7 @@ for (potrf, elty) in [(:dpotrf_, :Float64), (:spotrf_, :Float32)]
     @eval begin
         function update_fact(cache::LAPACKPosDefCache{$elty}, A::Symmetric{$elty, <:AbstractMatrix{$elty}})
             n = size(cache.AF, 1)
-            copyto!(cache.AF, A.data)
+            cache.copy_A && copyto!(cache.AF, A.data)
 
             # call dpotrf( uplo, n, a, lda, info )
             ccall((@blasfunc($potrf), liblapack), Cvoid,
@@ -337,22 +347,25 @@ for (potri, elty) in [(:dpotri_, :Float64), (:spotri_, :Float32)]
 end
 
 mutable struct CholPosDefCache{T <: Real} <: DensePosDefCache{T}
+    copy_A
     AF
     fact
     CholPosDefCache{T}() where {T <: Real} = new{T}()
 end
 
-function load_matrix(cache::CholPosDefCache{T}, A::Symmetric{T, <:AbstractMatrix{T}}) where {T <: Real}
+function load_matrix(cache::CholPosDefCache{T}, A::Symmetric{T, <:AbstractMatrix{T}}; copy_A::Bool = true) where {T <: Real}
     n = LinearAlgebra.checksquare(A)
-    cache.AF = copy(A) # keeps same uplo
+    cache.copy_A = copy_A
+    cache.AF = (copy_A ? copy(A) : A) # copy over A (symmetric) to new matrix or use A directly
     return cache
 end
 
 function update_fact(cache::CholPosDefCache{T}, A::Symmetric{T, <:AbstractMatrix{T}}) where {T <: Real}
-    copyto!(cache.AF, A)
+    cache.copy_A && copyto!(cache.AF, A)
     cache.fact = cholesky!(cache.AF, check = false)
-    if !issuccess(cache.fact)
-        cache.fact = lu!(cache.AF, check = false) # fallback to LU of symmetric matrix
+    if !issuccess(cache.fact) && cache.copy_A # fallback to LU of symmetric matrix
+        copyto!(cache.AF, A)
+        cache.fact = lu!(cache.AF, check = false)
     end
     return issuccess(cache.fact)
 end
