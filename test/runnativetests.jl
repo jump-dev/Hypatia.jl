@@ -88,7 +88,7 @@ blas_reals = [
     Float32,
     ]
 
-options = (verbose = true,)
+options = (verbose = false,)
 
 @info("starting native tests")
 @testset "native tests" begin
@@ -144,7 +144,7 @@ options = (verbose = true,)
         T = Float64
         t(T, solver = SO.Solver{T}(system_solver = SO.SymIndefSparseSystemSolver{T}(); options...))
     end
-    @testset "QRCholDense tests: $t, $T" for t in testfuns, T in generic_reals
-        t(T, solver = SO.Solver{T}(system_solver = SO.QRCholDenseSystemSolver{T}(); options...))
+    @testset "QRCholDense tests: $t, $T, $ss" for t in testfuns, T in generic_reals, ss in [Hypatia.DenseSymCache, Hypatia.DensePosDefCache]
+        t(T, solver = SO.Solver{T}(system_solver = SO.QRCholDenseSystemSolver{T}(fact_cache = ss{T}()); options...))
     end
 end

@@ -147,8 +147,10 @@ mutable struct QRCholDenseSystemSolver{T <: Real} <: QRCholSystemSolver{T}
     GQ2_k
     HGx_k
     Gx_k
-    fact_cache::DensePosDefCache{T}
-    function QRCholDenseSystemSolver{T}(; fact_cache::DensePosDefCache{T} = DensePosDefCache{T}()) where {T <: Real}
+    fact_cache::Union{DensePosDefCache{T}, DenseSymCache{T}} # can use BunchKaufman or Cholesky
+    function QRCholDenseSystemSolver{T}(;
+        fact_cache::Union{DensePosDefCache{T}, DenseSymCache{T}} = (T <: LinearAlgebra.BlasReal ? DenseSymCache{T}() : DensePosDefCache{T}()),
+        ) where {T <: Real}
         system_solver = new{T}()
         system_solver.fact_cache = fact_cache
         return system_solver
@@ -161,14 +163,12 @@ function load(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}) wher
     cone_idxs = model.cone_idxs
 
     # TODO optimize for case of empty A
-    if !isa(model.G, Matrix{T}) && isa(solver.Ap_Q, SuiteSparse.SPQR.QRSparseQ)
-        # TODO very inefficient method used for sparse G * QRSparseQ : see https://github.com/JuliaLang/julia/issues/31124#issuecomment-501540818
-        # TODO remove workaround and warning
+    # TODO very inefficient method used for sparse G * QRSparseQ : see https://github.com/JuliaLang/julia/issues/31124#issuecomment-501540818
+    if !isa(model.G, Matrix{T})
         @warn("in QRChol, converting G to dense before multiplying by sparse Householder Q due to very inefficient dispatch")
-        GQ = Matrix(model.G) * solver.Ap_Q
-    else
-        GQ = model.G * solver.Ap_Q
     end
+    G = Matrix(model.G)
+    GQ = rmul!(G, solver.Ap_Q)
 
     system_solver.GQ1 = GQ[:, 1:p]
     system_solver.GQ2 = GQ[:, (p + 1):end]
@@ -189,7 +189,7 @@ function load(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}) wher
     system_solver.HGx_k = [view(system_solver.HGx, idxs, :) for idxs in cone_idxs]
     system_solver.Gx_k = [view(system_solver.Gx, idxs, :) for idxs in cone_idxs]
 
-    load_dense_matrix(system_solver.fact_cache, system_solver.lhs1)
+    load_matrix(system_solver.fact_cache, system_solver.lhs1, copy_A = false) # overwrite lhs1 with new factorization each time update_fact is called
 
     return system_solver
 end
@@ -197,18 +197,18 @@ end
 function update_fact(system_solver::QRCholDenseSystemSolver, solver::Solver)
     isempty(system_solver.Q2div) && return system_solver
 
+    # TODO can be faster and numerically better for some cones to use L factor of cholesky of hessian here, with BLAS.syrk updating
     @timeit solver.timer "block_hess_prod" block_hessian_product(solver.model.cones, system_solver.HGQ2_k, system_solver.GQ2_k)
     @timeit solver.timer "Q2GHGQ2" mul!(system_solver.lhs1.data, system_solver.GQ2', system_solver.HGQ2)
 
-    reset_fact(system_solver.fact_cache)
+    update_fact(system_solver.fact_cache, system_solver.lhs1) # overwrites lhs1 with new factorization
 
     return system_solver
 end
 
 function solve_subsystem(system_solver::QRCholDenseSystemSolver, sol1::AbstractMatrix, rhs1::AbstractMatrix)
-    if !solve_dense_system(system_solver.fact_cache, sol1, system_solver.lhs1, rhs1)
-        # TODO recover somehow
-        @warn("numerical failure: could not solve linear system")
-    end
+    copyto!(sol1, rhs1)
+    solve_system(system_solver.fact_cache, sol1)
+    # TODO recover if fails - check issuccess
     return sol1
 end

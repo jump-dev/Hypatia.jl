@@ -99,7 +99,7 @@ function check_in_cone(cone::WSOSPolyInterpMat{T}) where {T <: Real}
             uo += cone.U
         end
 
-        cone.matfact[j] = hyp_chol!(Symmetric(mat, :L))
+        cone.matfact[j] = cholesky!(Symmetric(mat, :L), check = false)
         if !isposdef(cone.matfact[j])
             return false
         end

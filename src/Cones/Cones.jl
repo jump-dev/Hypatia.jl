@@ -7,18 +7,17 @@ functions and caches for cones
 module Cones
 
 using LinearAlgebra
-import LinearAlgebra.BlasFloat
 import LinearAlgebra.copytri!
-import SparseArrays.sparse
 import Hypatia.RealOrComplex
-import Hypatia.HypCholCache
-import Hypatia.hyp_chol!
-import Hypatia.hyp_chol_inv!
-import Hypatia.HypBKCache
-import Hypatia.hyp_bk!
-import Hypatia.HypBKSolveCache
-import Hypatia.hyp_bk_solve!
-import Hypatia.set_min_diag!
+import Hypatia.DenseSymCache
+import Hypatia.DensePosDefCache
+import Hypatia.load_matrix
+import Hypatia.update_fact
+import Hypatia.solve_system
+import Hypatia.invert
+
+hessian_cache(T::Type{<:LinearAlgebra.BlasReal}) = DenseSymCache{T}() # use BunchKaufman for BlasReals
+hessian_cache(T::Type{<:Real}) = DensePosDefCache{T}() # use Cholesky for generic reals
 
 abstract type Cone{T <: Real} end
 
@@ -65,21 +64,8 @@ function update_inv_hess_prod(cone::Cone{T}) where {T}
     if !cone.hess_updated
         update_hess(cone)
     end
-    copyto!(cone.tmp_hess, cone.hess)
-    if isnothing(cone.hess_fact_cache)
-        cone.hess_fact_cache = HypBKCache(cone.tmp_hess.uplo, cone.tmp_hess.data)
-    end
-    cone.hess_fact = hyp_bk!(cone.hess_fact_cache, cone.tmp_hess.data)
-    if !issuccess(cone.hess_fact) # TODO maybe better to not step to this point if the hessian factorization fails
-        # TODO equilibration makes more sense than current recovery method
-        @warn("numerical failure: cannot factorize primitive cone hessian")
-        copyto!(cone.tmp_hess, cone.hess)
-        set_min_diag!(cone.tmp_hess.data, sqrt(eps(T)))
-        cone.hess_fact = hyp_bk!(cone.hess_fact_cache, cone.tmp_hess.data)
-        if !issuccess(cone.hess_fact)
-            @warn("numerical failure: could not fix failure of positive definiteness")
-        end
-    end
+    update_fact(cone.hess_fact_cache, cone.hess)
+    # TODO recover if fails - check issuccess
     cone.inv_hess_prod_updated = true
     return
 end
@@ -88,7 +74,7 @@ function update_inv_hess(cone::Cone)
     if !cone.inv_hess_prod_updated
         update_inv_hess_prod(cone)
     end
-    cone.inv_hess = Symmetric(inv(cone.hess_fact), :U) # TODO use in-place function
+    invert(cone.hess_fact_cache, cone.inv_hess)
     cone.inv_hess_updated = true
     return cone.inv_hess
 end
@@ -104,7 +90,9 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Con
     if !cone.inv_hess_prod_updated
         update_inv_hess_prod(cone)
     end
-    return ldiv!(prod, cone.hess_fact, arr) # TODO could use sysvx with already computed factorization here, for improved numerics
+    copyto!(prod, arr)
+    solve_system(cone.hess_fact_cache, prod)
+    return prod
 end
 
 # utilities for converting between symmetric/Hermitian matrix and vector triangle forms

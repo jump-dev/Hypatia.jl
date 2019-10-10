@@ -62,7 +62,7 @@ function solve_system(system_solver::NaiveElimSystemSolver{T}, solver::Solver{T}
     # -c'x - b'y - h'z + mu/(taubar^2)*tau = taurhs + kaprhs
     @. @views rhs4[end, :] += rhs[end, :]
 
-    @timeit solver.timer "solve_sparse_system" solve_subsystem(system_solver, sol4, rhs4)
+    @timeit solver.timer "solve_system" solve_subsystem(system_solver, sol4, rhs4)
     @views copyto!(sol[1:tau_row, :], sol4)
 
     # lift to get s and kap
@@ -131,7 +131,11 @@ function load(system_solver::NaiveElimSparseSystemSolver{T}, solver::Solver{T}) 
     (Is, Js, Vs) = findnz(lhs4)
 
     # add I, J, V for Hessians and inverse Hessians
-    hess_nz_total = isempty(cones) ? 0 : sum(Cones.use_dual(cone_k) ? Cones.hess_nz_count(cone_k, false) : Cones.inv_hess_nz_count(cone_k, false) for cone_k in cones)
+    if isempty(cones)
+        hess_nz_total = 0
+    else
+        hess_nz_total = sum(Cones.use_dual(cone_k) ? Cones.hess_nz_count(cone_k, false) : Cones.inv_hess_nz_count(cone_k, false) for cone_k in cones)
+    end
     H_Is = Vector{Int}(undef, hess_nz_total)
     H_Js = Vector{Int}(undef, hess_nz_total)
     offset = 1
@@ -192,13 +196,13 @@ function update_fact(system_solver::NaiveElimSparseSystemSolver, solver::Solver)
     end
     system_solver.lhs4.nzval[end] = solver.mu / solver.tau / solver.tau
 
-    update_sparse_fact(system_solver.fact_cache, system_solver.lhs4)
+    update_fact(system_solver.fact_cache, system_solver.lhs4)
 
     return system_solver
 end
 
 function solve_subsystem(system_solver::NaiveElimSparseSystemSolver, sol4::Matrix, rhs4::Matrix)
-    solve_sparse_system(system_solver.fact_cache, sol4, system_solver.lhs4, rhs4)
+    solve_system(system_solver.fact_cache, sol4, system_solver.lhs4, rhs4)
     return sol4
 end
 
@@ -210,7 +214,6 @@ mutable struct NaiveElimDenseSystemSolver{T <: Real} <: NaiveElimSystemSolver{T}
     use_inv_hess::Bool
     tau_row::Int
     lhs4::Matrix{T}
-    lhs4_copy::Matrix{T}
     rhs4::Matrix{T}
     sol4::Matrix{T}
     fact_cache::DenseNonSymCache{T}
@@ -232,15 +235,14 @@ function load(system_solver::NaiveElimDenseSystemSolver{T}, solver::Solver{T}) w
     system_solver.sol4 = zeros(T, system_solver.tau_row, 2)
     system_solver.rhs4 = similar(system_solver.sol4)
 
-    system_solver.lhs4_copy = T[
+    system_solver.lhs4 = T[
         zeros(T, n, n)  model.A'        model.G'                  model.c;
         -model.A        zeros(T, p, p)  zeros(T, p, q)            model.b;
         -model.G        zeros(T, q, p)  Matrix(one(T) * I, q, q)  model.h;
         -model.c'       -model.b'       -model.h'                 one(T);
         ]
-    system_solver.lhs4 = similar(system_solver.lhs4_copy)
 
-    load_dense_matrix(system_solver.fact_cache, system_solver.lhs4)
+    load_matrix(system_solver.fact_cache, system_solver.lhs4)
 
     return system_solver
 end
@@ -250,7 +252,6 @@ function update_fact(system_solver::NaiveElimDenseSystemSolver{T}, solver::Solve
     (n, p) = (model.n, model.p)
     lhs4 = system_solver.lhs4
 
-    copyto!(lhs4, system_solver.lhs4_copy)
     lhs4[end, end] = solver.mu / solver.tau / solver.tau
 
     for (k, cone_k) in enumerate(model.cones)
@@ -270,15 +271,14 @@ function update_fact(system_solver::NaiveElimDenseSystemSolver{T}, solver::Solve
         end
     end
 
-    reset_fact(system_solver.fact_cache)
+    update_fact(system_solver.fact_cache, system_solver.lhs4)
 
     return system_solver
 end
 
 function solve_subsystem(system_solver::NaiveElimDenseSystemSolver, sol4::Matrix, rhs4::Matrix)
-    if !solve_dense_system(system_solver.fact_cache, sol4, system_solver.lhs4, rhs4)
-        # TODO recover somehow
-        @warn("numerical failure: could not solve linear system")
-    end
+    copyto!(sol4, rhs4)
+    solve_system(system_solver.fact_cache, sol4)
+    # TODO recover if fails - check issuccess
     return sol4
 end

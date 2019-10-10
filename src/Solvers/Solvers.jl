@@ -18,16 +18,17 @@ import Hypatia.Models
 import Hypatia.BlockMatrix
 import Hypatia.SparseNonSymCache
 import Hypatia.SparseSymCache
-import Hypatia.update_sparse_fact
-import Hypatia.solve_sparse_system
+import Hypatia.update_fact
+import Hypatia.solve_system
 import Hypatia.free_memory
 import Hypatia.int_type
 import Hypatia.DenseNonSymCache
 import Hypatia.DenseSymCache
 import Hypatia.DensePosDefCache
-import Hypatia.load_dense_matrix
-import Hypatia.solve_dense_system
-import Hypatia.reset_fact
+import Hypatia.load_matrix
+import Hypatia.update_fact
+import Hypatia.solve_system
+import Hypatia.invert
 
 abstract type Stepper{T <: Real} end
 

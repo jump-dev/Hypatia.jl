@@ -20,7 +20,7 @@ HSLSymCache() = HSLSymCache{Float64}()
 
 int_type(::HSLSymCache) = Int
 
-function update_sparse_fact(cache::HSLSymCache, A::SparseMatrixCSC{<:HSL.Ma57Data, Int})
+function update_fact(cache::HSLSymCache, A::SparseMatrixCSC{<:HSL.Ma57Data, Int})
     if !cache.analyzed
         cache.ma57 = HSL.Ma57(A)
         cache.analyzed = true
@@ -33,7 +33,7 @@ end
 
 using DataFrames, CSV
 
-function solve_sparse_system(cache::HSLSymCache, x::Matrix{Float64}, A::SparseMatrixCSC{<:HSL.Ma57Data, Int}, b::Matrix{Float64})
+function solve_system(cache::HSLSymCache, x::Matrix{Float64}, A::SparseMatrixCSC{<:HSL.Ma57Data, Int}, b::Matrix{Float64})
     # NOTE MA57 only has the option to take iterative refinement steps for a single-column RHS
     ma57 = cache.ma57
     copyto!(x, b)
