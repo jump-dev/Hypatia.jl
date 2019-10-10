@@ -31,120 +31,93 @@ nonsymmetric: LU
 
 abstract type DenseNonSymCache{T <: Real} end
 
-reset_fact(cache::DenseNonSymCache) = (cache.is_factorized = false)
-
-mutable struct GESVXNonSymCache{T <: BlasReal} <: DenseNonSymCache{T}
-    is_factorized::Bool
-    n
-    lda
+mutable struct LAPACKNonSymCache{T <: BlasReal} <: DenseNonSymCache{T}
     AF
     ipiv
-    equed
-    rvec
-    cvec
-    rcond
-    ferr
-    berr
-    work
-    iwork
     info
-    GESVXNonSymCache{T}() where {T <: BlasReal} = new{T}()
+    LAPACKNonSymCache{T}() where {T <: BlasReal} = new{T}()
 end
 
-function load_matrix(cache::GESVXNonSymCache{T}, A::Matrix{T}) where {T <: BlasReal}
-    cache.is_factorized = false
+function load_matrix(cache::LAPACKNonSymCache{T}, A::Matrix{T}) where {T <: BlasReal}
     LinearAlgebra.require_one_based_indexing(A)
     LinearAlgebra.chkstride1(A)
-    n = cache.n = LinearAlgebra.checksquare(A)
-    cache.lda = stride(A, 2)
+    n = LinearAlgebra.checksquare(A)
     cache.AF = Matrix{T}(undef, n, n)
     cache.ipiv = Vector{Int}(undef, n)
-    cache.equed = Ref{UInt8}('E')
-    cache.rvec = Vector{T}(undef, n)
-    cache.cvec = Vector{T}(undef, n)
-    cache.rcond = Ref{T}()
-    cache.ferr = Vector{T}(undef, 0) # NOTE ferr and berr are resized if too small
-    cache.berr = Vector{T}(undef, 0)
-    cache.work = Vector{T}(undef, 4 * n)
-    cache.iwork = Vector{Int}(undef, n)
     cache.info = Ref{BlasInt}()
     return cache
 end
 
-# wrap LAPACK function
-for (gesvx, elty) in [(:dgesvx_, :Float64), (:sgesvx_, :Float32)]
+# wrap LAPACK functions
+for (getrf, elty) in [(:dgetrf_, :Float64), (:spotrf_, :Float32)]
     @eval begin
-        function solve_system(cache::GESVXNonSymCache{$elty}, X::AbstractVecOrMat{$elty}, A::Matrix{$elty}, B::AbstractVecOrMat{$elty})
-            LinearAlgebra.require_one_based_indexing(X, B)
-            LinearAlgebra.chkstride1(X, B)
+        function update_fact(cache::LAPACKNonSymCache{$elty}, A::AbstractMatrix{$elty})
+            n = LinearAlgebra.checksquare(A)
+            copyto!(cache.AF, A)
 
-            nrhs = size(B, 2)
-            @assert size(X, 2) == nrhs
-            if length(cache.ferr) < nrhs
-                resize!(cache.ferr, nrhs)
-                resize!(cache.berr, nrhs)
-            end
-
-            do_fact = (cache.is_factorized ? 'F' : 'E')
-
-            # call dgesvx( fact, trans, n, nrhs, a, lda, af, ldaf, ipiv, equed, r, c, b, ldb, x, ldx, rcond, ferr, berr, work, iwork, info )
-            ccall((@blasfunc($gesvx), Base.liblapack_name), Cvoid,
-                (Ref{UInt8}, Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt},
-                Ptr{$elty}, Ref{BlasInt}, Ptr{$elty}, Ref{BlasInt},
-                Ptr{BlasInt}, Ptr{UInt8}, Ptr{$elty}, Ptr{$elty},
-                Ptr{$elty}, Ref{BlasInt}, Ptr{$elty}, Ref{BlasInt},
-                Ptr{$elty}, Ptr{$elty}, Ptr{$elty}, Ptr{$elty},
+            # call dgetrf( m, n, a, lda, ipiv, info )
+            ccall((@blasfunc($getrf), liblapack), Cvoid,
+                (Ref{BlasInt}, Ref{BlasInt}, Ptr{$elty}, Ref{BlasInt},
                 Ptr{BlasInt}, Ptr{BlasInt}),
-                do_fact, 'N', cache.n, nrhs,
-                A, cache.lda, cache.AF, cache.n,
-                cache.ipiv, cache.equed, cache.rvec, cache.cvec,
-                B, stride(B, 2), X, stride(X, 2),
-                cache.rcond, cache.ferr, cache.berr, cache.work,
-                cache.iwork, cache.info)
+                n, n, cache.AF, stride(cache.AF, 2),
+                cache.ipiv, cache.info)
 
             if cache.info[] < 0
                 throw(ArgumentError("invalid argument #$(-cache.info[]) to LAPACK call"))
-            elseif 0 < cache.info[] <= cache.n
+            elseif 0 < cache.info[] <= n
                 @warn("factorization failed: #$(cache.info[])")
                 return false
-            # elseif cache.info[] > cache.n
+            # elseif cache.info[] > n
             #     @warn("condition number is small: $(cache.rcond[])")
             end
 
-            cache.is_factorized = true
             return true
         end
     end
 end
 
+for (getrs, elty) in [(:dgetrs_, :Float64), (:sgetrs_, :Float32)]
+    @eval begin
+        function solve_system(cache::LAPACKNonSymCache{$elty}, X::AbstractVecOrMat{$elty})
+            LinearAlgebra.require_one_based_indexing(X)
+            LinearAlgebra.chkstride1(X)
+
+            # call dgetrs( trans, n, nrhs, a, lda, ipiv, b, ldb, info )
+            ccall((@blasfunc($getrs), liblapack), Cvoid,
+                (Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{$elty},
+                Ref{BlasInt}, Ptr{BlasInt}, Ptr{$elty}, Ref{BlasInt},
+                Ptr{BlasInt}),
+                'N', size(cache.AF, 1), size(X, 2), cache.AF,
+                stride(cache.AF, 2), cache.ipiv, X, stride(X, 2),
+                cache.info)
+
+            return X
+        end
+    end
+end
+
 mutable struct LUNonSymCache{T <: Real} <: DenseNonSymCache{T}
-    is_factorized::Bool
+    AF
     fact
     LUNonSymCache{T}() where {T <: Real} = new{T}()
 end
 
 function load_matrix(cache::LUNonSymCache{T}, A::AbstractMatrix{T}) where {T <: Real}
-    cache.is_factorized = false
+    n = LinearAlgebra.checksquare(A)
+    cache.AF = zeros(T, n, n)
     return cache
 end
 
-function solve_system(cache::LUNonSymCache{T}, X::AbstractVecOrMat{T}, A::AbstractMatrix{T}, B::AbstractVecOrMat{T}) where {T <: Real}
-    if !cache.is_factorized
-        cache.is_factorized = true
-        cache.fact = lu!(A, check = false)
-        if !issuccess(cache.fact)
-            @warn("numerical failure: LU factorization failed")
-            return false
-        end
-    end
-
-    ldiv!(X, cache.fact, B)
-
+function update_fact(cache::LUNonSymCache{T}, A::AbstractMatrix{T}) where {T <: Real}
+    copyto!(cache.AF, A)
+    cache.fact = lu!(A)
     return issuccess(cache.fact)
 end
 
-# default to GESVXNonSymCache for BlasReals, otherwise generic LUNonSymCache
-DenseNonSymCache{T}() where {T <: BlasReal} = GESVXNonSymCache{T}()
+solve_system(cache::LUNonSymCache{T}, X::AbstractVecOrMat{T}) where {T <: Real} = ldiv!(cache.fact, X)
+
+# default to LAPACKNonSymCache for BlasReals, otherwise generic LUNonSymCache
+DenseNonSymCache{T}() where {T <: BlasReal} = LAPACKNonSymCache{T}()
 DenseNonSymCache{T}() where {T <: Real} = LUNonSymCache{T}()
 
 #=
@@ -165,7 +138,7 @@ mutable struct LAPACKSymCache{T <: BlasReal} <: DenseSymCache{T}
     LAPACKSymCache{T}() where {T <: BlasReal} = new{T}()
 end
 
-function load_matrix(cache::LAPACKSymCache{T}, A::Symmetric{T, Matrix{T}}) where {T <: BlasReal}
+function load_matrix(cache::LAPACKSymCache{T}, A::Symmetric{T, <:AbstractMatrix{T}}) where {T <: BlasReal}
     LinearAlgebra.require_one_based_indexing(A.data)
     LinearAlgebra.chkstride1(A.data)
     n = LinearAlgebra.checksquare(A.data)
@@ -233,7 +206,7 @@ end
 
 for (sytri_rook, elty) in [(:dsytri_rook_, :Float64), (:ssytri_rook_, :Float32)]
     @eval begin
-        function invert(cache::LAPACKSymCache{$elty}, X::Symmetric{$elty, <:Matrix{$elty}})
+        function invert(cache::LAPACKSymCache{$elty}, X::Symmetric{$elty, Matrix{$elty}})
             copyto!(X.data, cache.AF)
 
             # call dsytri_rook( uplo, n, a, lda, ipiv, work, info )
@@ -249,29 +222,28 @@ for (sytri_rook, elty) in [(:dsytri_rook_, :Float64), (:ssytri_rook_, :Float32)]
 end
 
 mutable struct LUSymCache{T <: Real} <: DenseSymCache{T}
-    is_factorized::Bool
+    AF
     fact
     LUSymCache{T}() where {T <: Real} = new{T}()
 end
 
 function load_matrix(cache::LUSymCache{T}, A::Symmetric{T, <:AbstractMatrix{T}}) where {T <: Real}
-    cache.is_factorized = false
+    n = LinearAlgebra.checksquare(A)
+    cache.AF = copy(A)
     return cache
 end
 
-function solve_system(cache::LUSymCache{T}, X::AbstractVecOrMat{T}, A::Symmetric{T, <:AbstractMatrix{T}}, B::AbstractVecOrMat{T}) where {T <: Real}
-    if !cache.is_factorized
-        cache.is_factorized = true
-        cache.fact = lu!(A, check = false)
-        if !issuccess(cache.fact)
-            @warn("numerical failure: LU factorization failed")
-            return false
-        end
-    end
+function update_fact(cache::LUSymCache{T}, A::Symmetric{T, <:AbstractMatrix{T}}) where {T <: Real}
+    copyto!(cache.AF, A)
+    cache.fact = lu!(A)
+    return issuccess(cache.fact)
+end
 
-    ldiv!(X, cache.fact, B)
+solve_system(cache::LUSymCache{T}, X::AbstractVecOrMat{T}) where {T <: Real} = ldiv!(cache.fact, X)
 
-    return true
+function invert(cache::LUSymCache{T}, X::Symmetric{T, <:AbstractMatrix{T}}) where {T <: Real}
+    copyto!(X.data, inv(cache.fact))
+    return X
 end
 
 # default to LAPACKSymCache for BlasReals, otherwise generic LUSymCache
@@ -291,7 +263,7 @@ mutable struct LAPACKPosDefCache{T <: BlasReal} <: DensePosDefCache{T}
     LAPACKPosDefCache{T}() where {T <: BlasReal} = new{T}()
 end
 
-function load_matrix(cache::LAPACKPosDefCache{T}, A::Symmetric{T, Matrix{T}}) where {T <: BlasReal}
+function load_matrix(cache::LAPACKPosDefCache{T}, A::Symmetric{T, <:AbstractMatrix{T}}) where {T <: BlasReal}
     LinearAlgebra.require_one_based_indexing(A.data)
     LinearAlgebra.chkstride1(A.data)
     n = LinearAlgebra.checksquare(A.data)
@@ -348,7 +320,7 @@ end
 
 for (potri, elty) in [(:dpotri_, :Float64), (:spotri_, :Float32)]
     @eval begin
-        function invert(cache::LAPACKPosDefCache{$elty}, X::Symmetric{$elty, <:Matrix{$elty}})
+        function invert(cache::LAPACKPosDefCache{$elty}, X::Symmetric{$elty, Matrix{$elty}})
             copyto!(X.data, cache.AF)
 
             # call dpotri( uplo, n, a, lda, info )
@@ -364,29 +336,28 @@ for (potri, elty) in [(:dpotri_, :Float64), (:spotri_, :Float32)]
 end
 
 mutable struct CholPosDefCache{T <: Real} <: DensePosDefCache{T}
-    is_factorized::Bool
+    AF
     fact
     CholPosDefCache{T}() where {T <: Real} = new{T}()
 end
 
 function load_matrix(cache::CholPosDefCache{T}, A::Symmetric{T, <:AbstractMatrix{T}}) where {T <: Real}
-    cache.is_factorized = false
+    n = LinearAlgebra.checksquare(A)
+    cache.AF = copy(A)
     return cache
 end
 
-function solve_system(cache::CholPosDefCache{T}, X::AbstractVecOrMat{T}, A::Symmetric{T, <:AbstractMatrix{T}}, B::AbstractVecOrMat{T}) where {T <: Real}
-    if !cache.is_factorized
-        cache.is_factorized = true
-        cache.fact = cholesky!(A, check = false)
-        if !issuccess(cache.fact)
-            @warn("numerical failure: Cholesky factorization failed")
-            return false
-        end
-    end
+function update_fact(cache::CholPosDefCache{T}, A::Symmetric{T, <:AbstractMatrix{T}}) where {T <: Real}
+    copyto!(cache.AF, A)
+    cache.fact = cholesky!(A)
+    return issuccess(cache.fact)
+end
 
-    ldiv!(X, cache.fact, B)
+solve_system(cache::CholPosDefCache{T}, X::AbstractVecOrMat{T}) where {T <: Real} = ldiv!(cache.fact, X)
 
-    return true
+function invert(cache::CholPosDefCache{T}, X::Symmetric{T, <:AbstractMatrix{T}}) where {T <: Real}
+    copyto!(X.data, inv(cache.fact))
+    return X
 end
 
 # default to LAPACKPosDefCache for BlasReals, otherwise generic CholPosDefCache

@@ -165,8 +165,11 @@ function load(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) w
     (Is, Js, Vs) = findnz(lhs3)
 
     # add I, J, V for Hessians and inverse Hessians
-    # count of nonzeros to add
-    hess_nz_total = isempty(cones) ? 0 : sum(Cones.use_dual(cone_k) ? Cones.hess_nz_count(cone_k, true) : Cones.inv_hess_nz_count(cone_k, true) for cone_k in cones)
+    if isempty(cones)
+        hess_nz_total = 0
+    else
+        hess_nz_total = sum(Cones.use_dual(cone_k) ? Cones.hess_nz_count(cone_k, true) : Cones.inv_hess_nz_count(cone_k, true) for cone_k in cones)
+    end
     H_Is = Vector{Int}(undef, hess_nz_total)
     H_Js = Vector{Int}(undef, hess_nz_total)
     offset = 1
@@ -238,7 +241,7 @@ function update_fact(system_solver::SymIndefSparseSystemSolver, solver::Solver)
     return system_solver
 end
 
-function solve_subsystem(system_solver::SymIndefSparseSystemSolver, sol3, rhs3)
+function solve_subsystem(system_solver::SymIndefSparseSystemSolver, sol3::Matrix, rhs3::Matrix)
     solve_system(system_solver.fact_cache, sol3, system_solver.lhs3, rhs3)
     return sol3
 end
