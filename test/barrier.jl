@@ -30,10 +30,9 @@ function test_barrier_oracles(
     @test CO.is_feas(cone)
     grad = CO.grad(cone)
     # test centrality of direction
-    @show point, grad
     @test dot(point, -grad) / norm(point) / norm(-grad) ≈ 1 atol=init_point_tol rtol=init_point_tol
     # test point = -grad specifically
-    @test norm(point + grad) ≈ 0 atol=init_point_tol rtol=init_point_tol
+    @test point ≈ -grad atol=init_point_tol rtol=init_point_tol
     init_point_only && return
 
     # tests for perturbed point
@@ -145,7 +144,6 @@ end
 
 function test_epiperexp_barrier(T::Type{<:Real}; init_point_only::Bool = false, dim_range = [3, 5, 10, 22])
     for dim in dim_range
-        @show dim
         cone = CO.EpiPerExp{T}(dim)
         function barrier(s)
             u = s[1]
@@ -153,7 +151,7 @@ function test_epiperexp_barrier(T::Type{<:Real}; init_point_only::Bool = false, 
             w = s[3:end]
             return -log(v * log(u / v) - v * log(sum(wi -> exp(wi / v), w))) - log(u) - log(v)
         end
-        test_barrier_oracles(cone, barrier, init_point_tol = T(0.5), init_point_only = init_point_only)
+        test_barrier_oracles(cone, barrier, init_point_tol = T(0.3), init_point_only = init_point_only)
     end
     return
 end
@@ -185,7 +183,7 @@ function test_hypogeomean_barrier(T::Type{<:Real}; init_point_only::Bool = false
             w = s[2:end]
             return -log(prod((w[j] / alpha[j]) ^ alpha[j] for j in eachindex(w)) + u) - sum((1 - alpha[j]) * log(w[j] / alpha[j]) for j in eachindex(w)) - log(-u)
         end
-        test_barrier_oracles(cone, barrier, init_point_tol = T(0.5), init_point_only = init_point_only)
+        test_barrier_oracles(cone, barrier, init_point_tol = T(0.3), init_point_only = init_point_only)
     end
     return
 end

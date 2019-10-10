@@ -37,11 +37,12 @@ real_types = [
 # TODO store kwargs for cones and not type these out
 @info("starting large barrier tests")
 @testset "large barrier tests: $T" for T in real_types
-    # test_orthant_barrier(T, init_point_only = true, dim_range = [100, 200])
-    # test_epinorminf_barrier(T, init_point_only = true, dim_range = [100, 200])
-    # test_epinormspectral_barrier(T, init_point_only = true, nm_range = [(10, 100), (20, 200)])
-    # test_epiperexp_barrier(T, init_point_only = true, dim_range = [10, 20, 60, 100])
-    test_hypogeomean_barrier(T, init_point_only = true, dim_range = [2, 3, 4, 5, 10, 20, 40, 60, 100])
-    # test_hypoperlog_barrier(T, init_point_only = true, dim_range = [5, 10, 20, 40, 60, 100])
-    # test_hypoperlogdettri_barrier(T, init_point_only = true, side_range = [5, 10, 20, 40, 60, 100])
+    test_epinormeucl_barrier(T, init_point_only = true, dim_range = [100, 200])
+    test_orthant_barrier(T, init_point_only = true, dim_range = [100, 200])
+    test_epinorminf_barrier(T, init_point_only = true, dim_range = [100, 200])
+    test_epinormspectral_barrier(T, init_point_only = true, nm_range = [(10, 100), (20, 200)])
+    test_epiperexp_barrier(T, init_point_only = true, dim_range = [10, 20, 60, 100])
+    test_hypogeomean_barrier(T, init_point_only = true, dim_range = [4, 5, 6, 10, 15, 20, 40, 60, 100])
+    test_hypoperlog_barrier(T, init_point_only = true, dim_range = [5, 10, 20, 40, 60, 100])
+    test_hypoperlogdettri_barrier(T, init_point_only = true, side_range = [5, 10, 20, 40, 60, 100])
 end

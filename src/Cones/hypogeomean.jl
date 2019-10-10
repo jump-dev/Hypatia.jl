@@ -87,17 +87,8 @@ function set_initial_point(arr::AbstractVector, cone::HypoGeomean)
         @. w = 9.968e-01 - 9.606e-06 * log(n) + 3.216e-03 * exp(alpha)
     end
     wiaa = exp(-sum(alpha[i] * log(alpha[i] / w[i]) for i in eachindex(alpha)))
-    # can use any w_i to calculate this, the i that correponds to largest alpha seems to work as well as averaging
-    i = argmax(alpha)
-    arr[1] = wiaa * alpha[i] / (alpha[i] - 1 .+ abs2(w[i])) - wiaa
-
-    # arr[1] = sum(wiaa .* alpha ./ (alpha .- 1 .+ abs2.(w)) .- wiaa) / n
-
-
-    # @show wiaa * alpha[1]  / (alpha[1] - 1 + abs2(w[1])) - wiaa
-    # @show wiaa * alpha[2]  / (alpha[2] - 1 + abs2(w[2])) - wiaa
-    # @show wiaa * alpha[3]  / (alpha[3] - 1 + abs2(w[3])) - wiaa
-    # @show arr[1]
+    # can use any w_i to calculate this, take the mean
+    arr[1] = sum(wiaa .* alpha ./ (alpha .- 1 .+ abs2.(w)) .- wiaa) / n
     return arr
 end
 
