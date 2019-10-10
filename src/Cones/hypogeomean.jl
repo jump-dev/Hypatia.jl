@@ -75,12 +75,29 @@ function set_initial_point(arr::AbstractVector, cone::HypoGeomean)
     w = view(arr, 2:cone.dim)
     if n == 1
         w[1] = 1.30656
+    elseif n == 2
+        @. w = 0.371639 * alpha ^ 3 - 0.408226 * alpha ^ 2 + 0.337555 * alpha + 0.999426
+    elseif n <= 5
+        @. w = 0.908167 - 0.025458 * log(n) + 0.129344 * exp(alpha)
+    elseif n <= 20
+        @. w = 0.9309527 - 0.0044293 * log(n) + 0.0794201 * exp(alpha)
+    elseif n <= 100
+        @. w = 9.828e-01 - 2.148e-04 * log(n) + 1.803e-02 * exp(alpha)
     else
-        @. w = 0.8256110 + 0.0012969 * log(n) + 0.1654036 * exp(alpha)
+        @. w = 9.968e-01 - 9.606e-06 * log(n) + 3.216e-03 * exp(alpha)
     end
     wiaa = exp(-sum(alpha[i] * log(alpha[i] / w[i]) for i in eachindex(alpha)))
-    # choice of i=1 is arbitrary, this holds for all i
-    arr[1] = wiaa * alpha[1]  / (alpha[1] - 1 + abs2(w[1])) - wiaa
+    # can use any w_i to calculate this, the i that correponds to largest alpha seems to work as well as averaging
+    i = argmax(alpha)
+    arr[1] = wiaa * alpha[i] / (alpha[i] - 1 .+ abs2(w[i])) - wiaa
+
+    # arr[1] = sum(wiaa .* alpha ./ (alpha .- 1 .+ abs2.(w)) .- wiaa) / n
+
+
+    # @show wiaa * alpha[1]  / (alpha[1] - 1 + abs2(w[1])) - wiaa
+    # @show wiaa * alpha[2]  / (alpha[2] - 1 + abs2(w[2])) - wiaa
+    # @show wiaa * alpha[3]  / (alpha[3] - 1 + abs2(w[3])) - wiaa
+    # @show arr[1]
     return arr
 end
 
