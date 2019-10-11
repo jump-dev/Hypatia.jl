@@ -29,14 +29,11 @@ mutable struct EpiNormSpectral{T <: Real} <: Cone{T}
     hess_fact_cache
 
     W::Matrix{T}
-    WWt::Matrix{T}
     Z::Matrix{T}
     fact_Z
     Zi::Symmetric{T, Matrix{T}}
-    Eu::Symmetric{T, Matrix{T}}
-    tmpnn::Matrix{T}
+    tmpmm::Matrix{T}
     tmpnm::Matrix{T}
-    tmpnm2::Matrix{T}
 
     function EpiNormSpectral{T}(
         n::Int,
@@ -67,12 +64,9 @@ function setup_data(cone::EpiNormSpectral{T}) where {T <: Real}
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
     cone.W = Matrix{T}(undef, cone.n, cone.m)
-    cone.WWt = Matrix{T}(undef, cone.n, cone.n)
     cone.Z = Matrix{T}(undef, cone.n, cone.n)
-    cone.Eu = Symmetric(zeros(T, cone.n, cone.n))
-    cone.tmpnn = Matrix{T}(undef, cone.n, cone.n)
+    cone.tmpmm = Matrix{T}(undef, cone.m, cone.m)
     cone.tmpnm = Matrix{T}(undef, cone.n, cone.m)
-    cone.tmpnm2 = Matrix{T}(undef, cone.n, cone.m)
     return
 end
 
@@ -90,9 +84,8 @@ function update_feas(cone::EpiNormSpectral)
 
     if u > 0
         cone.W[:] .= view(cone.point, 2:cone.dim)
-        mul!(cone.WWt, cone.W, cone.W')
-        copyto!(cone.Z, u * I)
-        @. cone.Z -= cone.WWt / u
+        copyto!(cone.Z, abs2(u) * I)
+        mul!(cone.Z, cone.W, cone.W', -1, true)
         cone.fact_Z = cholesky!(Symmetric(cone.Z, :U), check = false)
         cone.is_feas = isposdef(cone.fact_Z)
     else
@@ -108,17 +101,12 @@ function update_grad(cone::EpiNormSpectral)
     u = cone.point[1]
 
     ldiv!(cone.tmpnm, cone.fact_Z, cone.W)
-    cone.Zi = Symmetric(inv(cone.fact_Z), :U)
-    @. cone.Eu.data = cone.WWt / u / u
-    @inbounds for i in 1:cone.n
-        cone.Eu[i, i] += 1
-    end
+    cone.Zi = Symmetric(inv(cone.fact_Z), :U) # TODO only need trace of inverse here, which we can get from the cholesky factor - if cheap, don't do the inverse until needed in the hessian
 
-    cone.grad[1] = -dot(cone.Zi, cone.Eu) - inv(u)
-    @. cone.tmpnm /= u
-    @inbounds for i in 1:(cone.n * cone.m)
-        cone.grad[i + 1] = 2 * cone.tmpnm[i]
-    end
+    cone.grad[1] = -u * tr(cone.Zi)
+    cone.grad[2:end] = cone.tmpnm
+    cone.grad .*= 2
+    cone.grad[1] += (cone.n - 1) / u
 
     cone.grad_updated = true
     return cone.grad
@@ -129,55 +117,38 @@ function update_hess(cone::EpiNormSpectral)
     n = cone.n
     m = cone.m
     u = cone.point[1]
-    W = cone.W
-    WWt = cone.WWt
     Zi = cone.Zi
-    Eu = cone.Eu
-    tmpnn = cone.tmpnn
+    tmpmm = cone.tmpmm
     tmpnm = cone.tmpnm
-    tmpnm2 = cone.tmpnm2
-    cone.hess .= 0
     H = cone.hess.data
 
-    # calculate d^2F / dW_ij dW_kl, p and q are linear indices for (i, j) and (k, l)
-    p = 2
-    @inbounds for j in 1:m, i in 1:n
-        # tmpnn evaluates to Zi * dZdW_ij * Zi
-        @views mul!(tmpnn, Zi[:, i], tmpnm[:, j]') # TODO use ldiv! outside loop?
-        @. tmpnn += tmpnn'
-        # add to terms where k = i, and l = j:n, inner product of Zi with d^2Z / dW_ij dW_kl nonzero only when j=l
-        q = p
-        viewij = view(H, p, q:(q + n - i))
-        # add inner product of Zi with d^2Z / dW_ij dW_kl, unscaled by 2 / u as well as shared term
-        @views viewij .= Zi[i, i:n]
-        @. @views for ni in 1:n
-            viewij += W[ni, j] * tmpnn[ni, i:n]
-        end
-        # add to terms where k > i, l = 1:n
-        q += (n - i + 1)
-        if j <= m - 1
-            @views mul!(tmpnm2[1:n, 1:(m - j)], Symmetric(tmpnn, :U),  W[:, (j + 1):m])
-            @inbounds for l in 1:(m - j), k in 1:n
-                H[p, q] += tmpnm2[k, l]
-                q += 1
+    # H_W_W part
+    mul!(tmpmm, cone.W', tmpnm) # symmetric, W' * Zi * W. TODO calculate using ldiv with L then syrk?
+    # TODO parallelize loops
+    for i in 1:m
+        r = 1 + (i - 1) * n
+        for j in 1:n
+            r2 = r + j
+            @. @views @inbounds H[r2, r .+ (j:n)] = Zi[j:n, j] * tmpmm[i, i] + tmpnm[j:n, i] * tmpnm[j, i] + Zi[j, j:n]
+            c2 = r + n
+            for k in (i + 1):m
+                @. @views @inbounds H[r2, c2 .+ (1:n)] = Zi[1:n, j] * tmpmm[i, k] + tmpnm[1:n, i] * tmpnm[j, k]
+                c2 += n
             end
         end
-        p += 1
     end
+    H .*= 2
 
-    # no BLAS method for product of two symmetric matrices, faster if one is not symmetric
-    copytri!(Zi.data, 'U')
-    ldiv!(tmpnn, cone.fact_Z, Eu)
-    rdiv!(tmpnn, cone.fact_Z)
-    mul!(tmpnm, tmpnn, W, true, true)
-    tmpnm .*= -1
-    @views copyto!(H[1, 2:end], tmpnm)
+    # H_u_W part (careful: modifies tmpnm)
+    ldiv!(cone.fact_Z, tmpnm)
+    tmpnm .*= -4u
+    H[1, 2:end] = tmpnm
 
-    # scale everything
-    @. H /= u
-    @. H *= 2
-    H[1, 1] = dot(Symmetric(tmpnn, :U), Eu) + (2 * dot(Zi, Symmetric(WWt, :U)) / u + 1) / u / u
+    # H_u_u part
+    H[1, 1] = 4 * abs2(u) * sum(abs2, Zi) + (cone.grad[1] - 2 * (n - 1) / u) / u
 
     cone.hess_updated = true
     return cone.hess
 end
+
+# TODO try to get inverse hessian using analogy to epinormeucl barrier
