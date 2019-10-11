@@ -128,26 +128,34 @@ function update_hess(cone::EpiNormSpectral)
     WWt = cone.WWt
     Zi = cone.Zi
     # Eu = cone.Eu
-    tmpnn = cone.tmpnn
+    # tmpnn = cone.tmpnn
     tmpnm = cone.tmpnm
-    tmpnm2 = cone.tmpnm2
+    # tmpnm2 = cone.tmpnm2
     cone.hess .= 0
     H = cone.hess.data
 
     tmpmm = W' * tmpnm # symmetric, W' * Zi * W. TODO inplace, calculate using ldiv with L and syrk?
 
-    r = 1
-    c = 1
-    @inbounds for i in 1:m
-        @inbounds for j in 1:n
-            @views mul!(tmpnm2, Zi[:, j], tmpmm[:, i]')
-            @views mul!(tmpnm2, tmpnm[:, i], tmpnm[j, :]', 2.0, 2.0)
-            H[r + j, 2:end] = tmpnm2
+    # H_W_W part
+    # TODO parallelize loops, @inbounds
+    for i in 1:m
+        r = 1 + (i - 1) * n
+        for j in 1:n
+            r2 = r + j
+            @. H[r2, r .+ (j:n)] = Zi[j:n, j] * tmpmm[i, i] + tmpnm[j:n, i] * tmpnm[j, i] + Zi[j, j:n]
+            c2 = r + n
+            for k in (i + 1):m
+                @. H[r2, c2 .+ (1:n)] = Zi[1:n, j] * tmpmm[i, k] + tmpnm[1:n, i] * tmpnm[j, k]
+                c2 += n
+            end
         end
-        @. H[r .+ (1:n), c .+ (1:n)] += 2 * Zi
-        r += n
-        c += n
     end
+    H .*= 2
+    @assert istriu(H[2:end, 2:end]) # TODO remove
+
+    # H_W_u part
+
+    # H_u_u part
 
     # # no BLAS method for product of two symmetric matrices, faster if one is not symmetric
     # copytri!(Zi.data, 'U')

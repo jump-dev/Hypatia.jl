@@ -178,7 +178,7 @@ function test_hypogeomean_barrier(T::Type{<:Real})
 end
 
 function test_epinormspectral_barrier(T::Type{<:Real})
-    for (n, m) in [(1, 2), (2, 2), (2, 3)]
+    for (n, m) in [(1, 2), (2, 2), (2, 3), (3, 5)]
         cone = CO.EpiNormSpectral{T}(n, m)
         function barrier(s)
             u = s[1]
