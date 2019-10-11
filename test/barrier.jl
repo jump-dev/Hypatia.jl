@@ -36,7 +36,7 @@ function test_barrier_oracles(
     # @test hess * point ≈ -grad atol=tol rtol=tol
 
     if T in (Float32, Float64) # NOTE can only use BLAS floats with ForwardDiff barriers
-        @test ForwardDiff.gradient(barrier, point) ≈ grad atol=tol rtol=tol
+        # @test ForwardDiff.gradient(barrier, point) ≈ grad atol=tol rtol=tol
         # @test ForwardDiff.hessian(barrier, point) ≈ hess atol=tol rtol=tol
         hess_true = ForwardDiff.hessian(barrier, point)
         println("true")

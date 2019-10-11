@@ -110,10 +110,10 @@ function update_grad(cone::EpiNormSpectral)
     ldiv!(cone.tmpnm, cone.fact_Z, cone.W)
     cone.Zi = Symmetric(inv(cone.fact_Z), :U) # TODO only need trace of inverse here, which we can get from the cholesky factor - if cheap, don't do the inverse until needed in the hessian
 
-    cone.grad[1] = -2 * u * tr(cone.Zi) + (cone.n - 1) / u
-    @inbounds for i in 1:(cone.n * cone.m) # TODO this can be a 1-liner
-        cone.grad[i + 1] = 2 * cone.tmpnm[i]
-    end
+    cone.grad[1] = -u * tr(cone.Zi)
+    cone.grad[2:end] = cone.tmpnm
+    cone.grad .*= 2
+    cone.grad[1] += (cone.n - 1) / u
 
     cone.grad_updated = true
     return cone.grad
@@ -130,60 +130,25 @@ function update_hess(cone::EpiNormSpectral)
     # Eu = cone.Eu
     tmpnn = cone.tmpnn
     tmpnm = cone.tmpnm
-    # tmpnm2 = cone.tmpnm2
+    tmpnm2 = cone.tmpnm2
     cone.hess .= 0
     H = cone.hess.data
 
-    Wptmpnm = W' * tmpnm
+    tmpmm = W' * tmpnm # symmetric, W' * Zi * W. TODO inplace, calculate using ldiv with L and syrk?
 
-    # mul!(H, cone.grad, cone.grad') # H_WW gets overwritten below
-    for i in 1:m, j in 1:n
-        # mul!(tmpnn, Zi[:, j], tmpnm[:, i]')
-        # @. tmpnn += tmpnn'
-        # tmp = Symmetric(tmpnn, :U) * W
-
-        # tmp2 = Zi[:, j] * tmpnm[:, i]' * W + tmpnm[:, i] * Zi[j, :]' * W
-        # tmp2 = Zi[:, j] * tmpnm[:, i]' * W + tmpnm[:, i] * tmpnm[j, :]'
-        # tmp2 = Zi[:, j] * (Zi * W[:, i])' * W + tmpnm[:, i] * tmpnm[j, :]'
-        # tmp2 = Zi[:, j] * Wptmpnm[i, :]' + tmpnm[:, i] * tmpnm[j, :]'
-        # @show tmp - tmp2
-        for k in 1:m, l in 1:n
-            r = 1 + (i - 1) * n + j
-            c = 1 + (k - 1) * n + l
-            # H[r, c] = 2 * tmp2[l, k]
-            H[r, c] = 2 * (Zi[l, j] * Wptmpnm[i, k]' + tmpnm[l, i] * tmpnm[j, k]) # latter part is like grad * grad'
-            if i == k
-                H[r, c] += sum(((p == j == q == l) ? 2 : (((p == j && q == l) || (p == l && q == j)) ? 1 : 0)) * Zi[p, q] for p in 1:n for q in 1:n)
-            end
+    r = 1
+    c = 1
+    @inbounds for i in 1:m
+        @inbounds for j in 1:n
+            @views mul!(tmpnm2, Zi[:, j], tmpmm[:, i]')
+            @views mul!(tmpnm2, tmpnm[:, i], tmpnm[j, :]', 2.0, 2.0)
+            H[r + j, 2:end] = tmpnm2
         end
+        @. H[r .+ (1:n), c .+ (1:n)] += 2 * Zi
+        r += n
+        c += n
     end
 
-    # # calculate d^2F / dW_ij dW_kl, p and q are linear indices for (i, j) and (k, l)
-    # p = 2
-    # @inbounds for j in 1:m, i in 1:n
-    #     # tmpnn evaluates to Zi * dZdW_ij * Zi
-    #     @views mul!(tmpnn, Zi[:, i], tmpnm[:, j]') # TODO use ldiv! outside loop?
-    #     @. tmpnn += tmpnn'
-    #     # add to terms where k = i, and l = j:n, inner product of Zi with d^2Z / dW_ij dW_kl nonzero only when j=l
-    #     q = p
-    #     viewij = view(H, p, q:(q + n - i))
-    #     # add inner product of Zi with d^2Z / dW_ij dW_kl, unscaled by 2 / u as well as shared term
-    #     @views viewij .= Zi[i, i:n]
-    #     @. @views for ni in 1:n
-    #         viewij += W[ni, j] * tmpnn[ni, i:n]
-    #     end
-    #     # add to terms where k > i, l = 1:n
-    #     q += (n - i + 1)
-    #     if j <= m - 1
-    #         @views mul!(tmpnm2[1:n, 1:(m - j)], Symmetric(tmpnn, :U),  W[:, (j + 1):m])
-    #         @inbounds for l in 1:(m - j), k in 1:n
-    #             H[p, q] += tmpnm2[k, l]
-    #             q += 1
-    #         end
-    #     end
-    #     p += 1
-    # end
-    #
     # # no BLAS method for product of two symmetric matrices, faster if one is not symmetric
     # copytri!(Zi.data, 'U')
     # ldiv!(tmpnn, cone.fact_Z, Eu)
