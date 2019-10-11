@@ -14,7 +14,7 @@ function test_barrier_oracles(
     cone::CO.Cone{T},
     barrier::Function;
     noise::Real = 0.2,
-    scale::Real = 1, #10000,
+    scale::Real = 10000,
     tol::Real = 100eps(T),
     ) where {T <: Real}
     CO.setup_data(cone)
@@ -33,31 +33,24 @@ function test_barrier_oracles(
     grad = CO.grad(cone)
     @test dot(point, grad) ≈ -nu atol=tol rtol=tol
     hess = CO.hess(cone)
-    # @test hess * point ≈ -grad atol=tol rtol=tol
+    @test hess * point ≈ -grad atol=tol rtol=tol
 
     if T in (Float32, Float64) # NOTE can only use BLAS floats with ForwardDiff barriers
-        # @test ForwardDiff.gradient(barrier, point) ≈ grad atol=tol rtol=tol
-        # @test ForwardDiff.hessian(barrier, point) ≈ hess atol=tol rtol=tol
-        hess_true = ForwardDiff.hessian(barrier, point)
-        println("true")
-        println(UpperTriangular(round.(hess_true[2:end, 2:end], digits=6)))
-        println("ours")
-        println(UpperTriangular(round.(hess[2:end, 2:end], digits=6)))
+        @test ForwardDiff.gradient(barrier, point) ≈ grad atol=tol rtol=tol
+        @test ForwardDiff.hessian(barrier, point) ≈ hess atol=tol rtol=tol
     end
-    println()
-    println()
 
-    # inv_hess = CO.inv_hess(cone)
-    # @test hess * inv_hess ≈ I atol=tol rtol=tol
-    #
-    # CO.update_hess_prod(cone)
-    # CO.update_inv_hess_prod(cone)
-    # prod = similar(point)
-    # @test CO.hess_prod!(prod, point, cone) ≈ -grad atol=tol rtol=tol
-    # @test CO.inv_hess_prod!(prod, grad, cone) ≈ -point atol=tol rtol=tol
-    # prod = similar(point, dim, dim)
-    # @test CO.hess_prod!(prod, Matrix(inv_hess), cone) ≈ I atol=tol rtol=tol
-    # @test CO.inv_hess_prod!(prod, Matrix(hess), cone) ≈ I atol=tol rtol=tol
+    inv_hess = CO.inv_hess(cone)
+    @test hess * inv_hess ≈ I atol=tol rtol=tol
+
+    CO.update_hess_prod(cone)
+    CO.update_inv_hess_prod(cone)
+    prod = similar(point)
+    @test CO.hess_prod!(prod, point, cone) ≈ -grad atol=tol rtol=tol
+    @test CO.inv_hess_prod!(prod, grad, cone) ≈ -point atol=tol rtol=tol
+    prod = similar(point, dim, dim)
+    @test CO.hess_prod!(prod, Matrix(inv_hess), cone) ≈ I atol=tol rtol=tol
+    @test CO.inv_hess_prod!(prod, Matrix(hess), cone) ≈ I atol=tol rtol=tol
 
     return
 end
@@ -178,7 +171,7 @@ function test_hypogeomean_barrier(T::Type{<:Real})
 end
 
 function test_epinormspectral_barrier(T::Type{<:Real})
-    for (n, m) in [(1, 2), (2, 2), (2, 3), (3, 5)]
+    for (n, m) in [(1, 2), (2, 2), (2, 3)]
         cone = CO.EpiNormSpectral{T}(n, m)
         function barrier(s)
             u = s[1]
