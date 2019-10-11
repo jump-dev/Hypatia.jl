@@ -61,7 +61,7 @@ get_nu(cone::EpiNormInf) = cone.dim
 
 function set_initial_point(arr::AbstractVector, cone::EpiNormInf{T}) where {T <: Real}
     arr .= 0
-    arr[1] = sqrt(T(cone.dim))
+    arr[1] = sqrt(T(get_nu(cone)))
     return arr
 end
 

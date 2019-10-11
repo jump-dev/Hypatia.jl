@@ -73,6 +73,7 @@ end
 
 get_nu(cone::WSOSPolyInterp) = sum(size(Pk, 2) for Pk in cone.Ps)
 
+# TODO find "central" initial point, like for other cones
 set_initial_point(arr::AbstractVector, cone::WSOSPolyInterp) = (arr .= 1)
 
 # TODO order the k indices so that fastest and most recently infeasible k are first

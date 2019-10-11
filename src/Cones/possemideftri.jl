@@ -10,9 +10,6 @@ W \in S^n : 0 >= eigmin(W)
 
 barrier from "Self-Scaled Barriers and Interior-Point Methods for Convex Programming" by Nesterov & Todd
 -logdet(W)
-
-TODO
-- eliminate allocations for inverse-finding
 =#
 
 mutable struct PosSemidefTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
@@ -78,7 +75,7 @@ end
 get_nu(cone::PosSemidefTri) = cone.side
 
 function set_initial_point(arr::AbstractVector, cone::PosSemidefTri)
-    incr = cone.is_complex ? 2 : 1
+    incr = (cone.is_complex ? 2 : 1)
     arr .= 0
     k = 1
     @inbounds for i in 1:cone.side

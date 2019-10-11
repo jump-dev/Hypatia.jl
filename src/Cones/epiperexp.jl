@@ -65,10 +65,8 @@ end
 get_nu(cone::EpiPerExp) = 3
 
 function set_initial_point(arr::AbstractVector{T}, cone::EpiPerExp{T}) where {T <: Real}
-    (u, v, w) = get_central_params(cone)
-    @. arr = w
-    arr[1] = u
-    arr[2] = v
+    (arr[1], arr[2], w) = get_central_params(cone)
+    arr[3:end] .= w
     return arr
 end
 

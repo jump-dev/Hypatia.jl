@@ -205,7 +205,7 @@ end
 # see analysis in https://github.com/lkapelevich/HypatiaBenchmarks.jl/tree/master/centralpoints
 function get_central_params(cone::HypoPerLogdetTri)
     side = cone.side
-    # # lookup points where n <= 5
+    # lookup points where side <= 5
     central_points = [
         -0.827838399  0.805102005  1.290927713
         -0.689609381  0.724604185  1.224619879
