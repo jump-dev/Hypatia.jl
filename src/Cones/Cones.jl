@@ -39,7 +39,12 @@ include("wsospolyinterp.jl")
 use_dual(cone::Cone) = cone.use_dual
 load_point(cone::Cone, point::AbstractVector{T}, scal::T) where {T} = (@. cone.point = point / scal)
 load_point(cone::Cone, point::AbstractVector) = copyto!(cone.point, point)
+load_dual_point(cone::Cone, point::AbstractVector) = nothing
 dimension(cone::Cone) = cone.dim
+
+# scaling_matrix(cone::Cone) = inv_hess(cone)
+lambda_dot_W(cone::Cone{T}) where {T} = cone.use_dual ? hess(cone) : Matrix{T}(I, cone.dim, cone.dim)
+lambda_Winv(cone::Cone{T}) where {T} = cone.use_dual ?  Matrix{T}(I, cone.dim, cone.dim) : hess(cone)
 
 is_feas(cone::Cone) = (cone.feas_updated ? cone.is_feas : update_feas(cone))
 grad(cone::Cone) = (cone.grad_updated ? cone.grad : update_grad(cone))

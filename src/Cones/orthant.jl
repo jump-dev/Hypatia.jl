@@ -14,15 +14,20 @@ mutable struct Nonnegative{T <: Real} <: Cone{T}
     use_dual::Bool
     dim::Int
     point::Vector{T}
+    dual_point::Vector{T}
 
     feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
     inv_hess_updated::Bool
+    # scaling_matrix_updated::Bool
     is_feas::Bool
     grad::Vector{T}
     hess::Diagonal{T, Vector{T}}
     inv_hess::Diagonal{T, Vector{T}}
+
+    scaling_matrix::Diagonal{T, Vector{T}}
+    centered_point::Vector{T}
 
     function Nonnegative{T}(dim::Int, is_dual::Bool) where {T <: Real}
         @assert dim >= 1
@@ -129,6 +134,32 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Ort
     @assert cone.is_feas
     @. prod = arr * cone.point * cone.point
     return prod
+end
+
+function scaling_matrix(cone::OrthantCone)
+    @. cone.scaling_matrix.diag = sqrt(cone.point / cone.dual_point)
+    return cone.scaling_matrix
+end
+
+function centered_point_prod(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::OrthantCone)
+    @. prod = arr * cone.centered_point
+    return prod
+end
+
+function lambda_W(cone::OrthantCone)
+    Diagonal(cone.point)
+end
+
+function lambda_Winv(cone::OrthantCone)
+    Diagonal(cone.dual_point)
+end
+
+function lambda_sqr(cone::OrthantCone)
+    cone.point .* cone.dual_point
+end
+
+function cone_prod(x, y, cone::OrthantCone)
+    return x .* y
 end
 
 hess_nz_count(cone::OrthantCone, ::Bool) = cone.dim
