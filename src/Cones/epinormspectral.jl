@@ -150,12 +150,15 @@ function update_hess(cone::EpiNormSpectral)
             end
         end
     end
-    H .*= 2
     @assert istriu(H[2:end, 2:end]) # TODO remove
+    H .*= 2 # TODO move lower if used again for other parts
 
     # H_W_u part
 
+
+
     # H_u_u part
+
 
     # # no BLAS method for product of two symmetric matrices, faster if one is not symmetric
     # copytri!(Zi.data, 'U')
