@@ -7,6 +7,8 @@ Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 barrier (guessed)
 -log(v*log(u/v) - v*logsumexp(w/v)) - log(u) - log(v)
 in the three dimensional case this matches the barrier for hypoperlog (self-concordant)
+
+TODO improve initial point
 =#
 
 mutable struct EpiPerExp{T <: Real} <: Cone{T}
@@ -179,17 +181,17 @@ function get_central_params(cone::EpiPerExp)
     if n <= 10
         (u, v, w) = (central_points[n, 1], central_points[n, 2], central_points[n, 3])
     elseif n <= 40
-        u = -0.041733 * log(n) + 1.395274
-        v = 0.764987 * inv(sqrt(n)) - 0.052697
-        w = -1.056456 * inv(sqrt(n)) - 0.025051
+        u = -0.04146118  * log(n) + 1.39451677
+        v = 0.75813593 * inv(sqrt(n)) - 0.05095272
+        w = -1.06004023 * inv(sqrt(n)) - 0.02413893
     elseif n <= 110
-        u = -0.033464 * log(n) + 1.365173
-        v = 0.571198 * inv(sqrt(n)) - 0.019661
-        w = -1.151376 * inv(sqrt(n)) - 0.008744
+        u = -0.03306423 * log(n) + 1.36341636
+        v = 0.56297099 * inv(sqrt(n)) - 0.01873313
+        w = -1.155095575 * inv(sqrt(n)) - 0.008324484
     else
-        u = 0.433844 * log(n) - 0.006782
-        v = 0.433844 * inv(sqrt(n)) - 0.006782
-        w = -1.212255 * inv(sqrt(n)) - 0.003031
+        u = 0.7778534 * inv(sqrt(n)) + 1.1361277
+        v = 0.433843790 * inv(sqrt(n)) - 0.006782253
+        w = -1.212254815 * inv(sqrt(n)) - 0.003030561
     end
     return (u, v, w)
 end
