@@ -7,6 +7,8 @@ Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 barrier (guessed)
 -log(v*log(u/v) - v*logsumexp(w/v)) - log(u) - log(v)
 in the three dimensional case this matches the barrier for hypoperlog (self-concordant)
+
+TODO improve initial point
 =#
 
 mutable struct EpiPerExp{T <: Real} <: Cone{T}
@@ -65,9 +67,8 @@ end
 get_nu(cone::EpiPerExp) = 3
 
 function set_initial_point(arr::AbstractVector{T}, cone::EpiPerExp{T}) where {T <: Real}
-    @. arr = -log(T(cone.dim - 2))
-    arr[1] = exp(1)
-    arr[2] = 1
+    (arr[1], arr[2], w) = get_central_ray_epiperexp(cone.dim - 2)
+    arr[3:end] .= w
     return arr
 end
 
@@ -159,3 +160,39 @@ function update_hess(cone::EpiPerExp)
     cone.hess_updated = true
     return cone.hess
 end
+
+# see analysis in https://github.com/lkapelevich/HypatiaBenchmarks.jl/tree/master/centralpoints
+function get_central_ray_epiperexp(wdim::Int)
+    if wdim <= 10
+        # lookup points where x = f'(x)
+        return central_rays_epiperexp[wdim, :]
+    end
+    # use nonlinear fit for higher dimensions
+    if wdim <= 40
+        u = -0.04146118 * log(wdim) + 1.39451677
+        v = 0.75813593 / sqrt(wdim) - 0.05095272
+        w = -1.06004023 / sqrt(wdim) - 0.02413893
+    elseif wdim <= 110
+        u = -0.03306423 * log(wdim) + 1.36341636
+        v = 0.56297099 / sqrt(wdim) - 0.01873313
+        w = -1.155095575 / sqrt(wdim) - 0.008324484
+    else
+        u = 0.7778534 / sqrt(wdim) + 1.1361277
+        v = 0.433843790 / sqrt(wdim) - 0.006782253
+        w = -1.212254815 / sqrt(wdim) - 0.003030561
+    end
+    return [u, v, w]
+end
+
+const central_rays_epiperexp = [
+    1.290927717	 0.805102006  -0.827838393;
+    1.331573688	 0.578857833  -0.667770596;
+    1.336363141	 0.451381764  -0.580341300;
+    1.332517701	 0.372146651  -0.521033456;
+    1.326602341	 0.318456053  -0.477223632;
+    1.320449568	 0.279670855  -0.443132253;
+    1.314603812	 0.250292511  -0.415618383;
+    1.309209025	 0.227223256  -0.392801051;
+    1.304275758	 0.208591886  -0.373475297;
+    1.299770819	 0.193203028  -0.356828868;
+    ]

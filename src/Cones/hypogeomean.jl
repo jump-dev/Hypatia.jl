@@ -9,6 +9,7 @@ dual barrier (modified by reflecting around u = 0 and using dual cone definition
 -log(prod_i((w_i/alpha_i)^alpha_i) + u) - sum_i((1 - alpha_i)*log(w_i/alpha_i)) - log(-u)
 
 TODO try to make barrier evaluation more efficient
+TODO investigate initial point more closely
 =#
 
 mutable struct HypoGeomean{T <: Real} <: Cone{T}
@@ -72,8 +73,8 @@ end
 get_nu(cone::HypoGeomean) = cone.dim
 
 function set_initial_point(arr::AbstractVector, cone::HypoGeomean)
-    arr .= 1
-    arr[1] = -prod(cone.alpha[i] ^ (-cone.alpha[i]) for i in eachindex(cone.alpha)) / cone.dim
+    (arr[1], w) = get_central_ray_hypogeomean(cone.alpha)
+    arr[2:end] .= w
     return arr
 end
 
@@ -126,4 +127,28 @@ function update_hess(cone::HypoGeomean)
 
     cone.hess_updated = true
     return cone.hess
+end
+
+# see analysis in https://github.com/lkapelevich/HypatiaBenchmarks.jl/tree/master/centralpoints
+function get_central_ray_hypogeomean(alpha::Vector{<:Real})
+    wdim = length(alpha)
+    # predict each w_i given alpha_i and n
+    w = zeros(wdim)
+    if wdim == 1
+        w .= 1.30656
+    elseif wdim == 2
+        @. w = 0.371639 * alpha ^ 3 - 0.408226 * alpha ^ 2 + 0.337555 * alpha + 0.999426
+    elseif wdim <= 5
+        @. w = 0.90687113 - 0.02417035 * log(wdim) + 0.12939174 * exp(alpha)
+    elseif wdim <= 20
+        @. w = 0.927309483 - 0.004331391 * log(wdim) + 0.082597680 * exp(alpha)
+    elseif wdim <= 100
+        @. w = 0.9830810972 - 0.0002152296 * log(wdim) + 0.0177761654 * exp(alpha)
+    else
+        @. w = 9.968391e-01 - 9.605928e-06 * log(wdim) + 3.215512e-03 * exp(alpha)
+    end
+    # get u in closed form from w
+    wiaa = exp(-sum(alpha[i] * log(alpha[i] / w[i]) for i in eachindex(alpha)))
+    u = sum(wiaa .* alpha ./ (alpha .- 1 .+ abs2.(w)) .- wiaa) / wdim
+    return [u, w]
 end

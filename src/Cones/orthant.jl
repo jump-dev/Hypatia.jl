@@ -34,7 +34,6 @@ mutable struct Nonnegative{T <: Real} <: Cone{T}
 end
 
 Nonnegative{T}(dim::Int) where {T <: Real} = Nonnegative{T}(dim, false)
-# Nonnegative{T}() where {T <: Real} = Nonnegative{T}(1)
 
 mutable struct Nonpositive{T <: Real} <: Cone{T}
     use_dual::Bool
@@ -60,7 +59,6 @@ mutable struct Nonpositive{T <: Real} <: Cone{T}
 end
 
 Nonpositive{T}(dim::Int) where {T <: Real} = Nonpositive{T}(dim, false)
-# Nonpositive{T}() where {T <: Real} = Nonpositive{T}(1)
 
 const OrthantCone{T <: Real} = Union{Nonnegative{T}, Nonpositive{T}}
 

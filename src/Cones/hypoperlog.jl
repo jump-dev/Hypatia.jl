@@ -60,8 +60,8 @@ end
 get_nu(cone::HypoPerLog) = cone.dim
 
 function set_initial_point(arr::AbstractVector, cone::HypoPerLog)
-    arr .= 1
-    arr[1] = -1
+    (arr[1], arr[2], w) = get_central_ray_hypoperlog(cone.dim - 2)
+    arr[3:end] .= w
     return arr
 end
 
@@ -121,3 +121,35 @@ function update_hess(cone::HypoPerLog)
     cone.hess_updated = true
     return cone.hess
 end
+
+# see analysis in https://github.com/lkapelevich/HypatiaBenchmarks.jl/tree/master/centralpoints
+function get_central_ray_hypoperlog(wdim::Int)
+    if wdim <= 10
+        # lookup points where x = f'(x)
+        return central_rays_hypoperlog[wdim, :]
+    end
+    # use nonlinear fit for higher dimensions
+    if wdim <= 70
+        u = -2.647364 / wdim - 0.008411
+        v = 0.424679 / wdim + 0.553392
+        w = 0.760415 / wdim + 1.001795
+    else
+        u = -3.016339 / wdim - 0.000078
+        v = 0.394332 / wdim + 0.553963
+        w = 0.838584 / wdim + 1.000016
+    end
+    return [u, v, w]
+end
+
+const central_rays_hypoperlog = [
+    -0.827838399  0.805102005  1.290927713;
+    -0.689609381  0.724604185  1.224619879;
+    -0.584372734  0.681280549  1.182421998;
+    -0.503500819  0.654485416  1.153054181;
+    -0.440285901  0.636444221  1.131466932;
+    -0.389979933  0.623569273  1.114979598;
+    -0.349256801  0.613977662  1.102014462;
+    -0.315769104  0.60658984   1.091577909;
+    -0.287837755  0.600745276  1.083013006;
+    -0.264242795  0.596018958  1.075868819;
+    ]
