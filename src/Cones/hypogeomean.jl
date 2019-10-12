@@ -9,6 +9,7 @@ dual barrier (modified by reflecting around u = 0 and using dual cone definition
 -log(prod_i((w_i/alpha_i)^alpha_i) + u) - sum_i((1 - alpha_i)*log(w_i/alpha_i)) - log(-u)
 
 TODO try to make barrier evaluation more efficient
+TODO investigate initial point more closely
 =#
 
 mutable struct HypoGeomean{T <: Real} <: Cone{T}
@@ -140,13 +141,14 @@ function get_central_params(cone::HypoGeomean)
     elseif n == 2
         @. w = 0.371639 * alpha ^ 3 - 0.408226 * alpha ^ 2 + 0.337555 * alpha + 0.999426
     elseif n <= 5
-        @. w = 0.908167 - 0.025458 * log(n) + 0.129344 * exp(alpha)
+        @. w = 0.90687113 - 0.02417035 * log(n) + 0.12939174 * exp(alpha)
     elseif n <= 20
-        @. w = 0.9309527 - 0.0044293 * log(n) + 0.0794201 * exp(alpha)
+        # @. w = 0.9309527 - 0.0044293 * log(n) + 0.0794201 * exp(alpha)
+        @. w = 0.927309483 - 0.004331391 * log(n) + 0.082597680 * exp(alpha)
     elseif n <= 100
-        @. w = 9.828e-01 - 2.148e-04 * log(n) + 1.803e-02 * exp(alpha)
+        @. w = 0.9830810972 - 0.0002152296 * log(n) + 0.0177761654 * exp(alpha)
     else
-        @. w = 9.968e-01 - 9.606e-06 * log(n) + 3.216e-03 * exp(alpha)
+        @. w = 9.968391e-01 - 9.605928e-06 * log(n) + 3.215512e-03 * exp(alpha)
     end
     wiaa = exp(-sum(alpha[i] * log(alpha[i] / w[i]) for i in eachindex(alpha)))
     u = sum(wiaa .* alpha ./ (alpha .- 1 .+ abs2.(w)) .- wiaa) / n
