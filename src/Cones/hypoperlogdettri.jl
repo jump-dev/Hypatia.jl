@@ -74,10 +74,8 @@ end
 get_nu(cone::HypoPerLogdetTri) = cone.side + 2
 
 function set_initial_point(arr::AbstractVector, cone::HypoPerLogdetTri{T}) where {T <: Real}
-    (u, v, w) = get_central_params(cone)
     arr .= 0
-    arr[1] = u
-    arr[2] = v
+    (arr[1], arr[2], w) = get_central_ray_hypoperlogdettri(cone.side)
     k = 3
     @inbounds for i in 1:cone.side
         arr[k] = w
@@ -203,30 +201,28 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPer
 end
 
 # see analysis in https://github.com/lkapelevich/HypatiaBenchmarks.jl/tree/master/centralpoints
-function get_central_params(cone::HypoPerLogdetTri)
-    side = cone.side
-    # lookup points where side <= 5
-    central_points = [
-        -0.827838399  0.805102005  1.290927713
-        -0.689609381  0.724604185  1.224619879
-        -0.584372734  0.681280549  1.182421998
-        -0.503500819  0.654485416  1.153054181
-        -0.440285901  0.636444221  1.131466932
-        ]
-
-    if side <= 5
-        (u, v, w) = (central_points[side, 1], central_points[side, 2], central_points[side, 3])
-    else
-        x = inv(side)
-        if side <= 16
-            u = -2.070906 * x - 0.052713
-            v = 0.420764 * x + 0.553790
-            w = 0.629959 * x + 1.011841
-        else
-            u = -2.878002 * x - 0.001136
-            v = 0.410904 * x + 0.553842
-            w = 0.805068 * x + 1.000288
-        end
+function get_central_ray_hypoperlogdettri(Wside::Int)
+    if Wside <= 5
+        # lookup points where x = f'(x)
+        return central_rays_hypoperlogdettri[Wside, :]
     end
-    return (u, v, w)
+    # use nonlinear fit for higher dimensions
+    if Wside <= 16
+        u = -2.070906 / Wside - 0.052713
+        v = 0.420764 / Wside + 0.553790
+        w = 0.629959 / Wside + 1.011841
+    else
+        u = -2.878002 / Wside - 0.001136
+        v = 0.410904 / Wside + 0.553842
+        w = 0.805068 / Wside + 1.000288
+    end
+    return [u, v, w]
 end
+
+const central_rays_hypoperlogdettri = [
+    -0.827838399  0.805102005  1.290927713;
+    -0.689609381  0.724604185  1.224619879;
+    -0.584372734  0.681280549  1.182421998;
+    -0.503500819  0.654485416  1.153054181;
+    -0.440285901  0.636444221  1.131466932;
+    ]
