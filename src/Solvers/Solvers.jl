@@ -895,6 +895,7 @@ include("stepper.jl")
 include("naive.jl")
 include("naiveelim.jl")
 include("symindef.jl")
+include("symindef_expanded.jl")
 include("qrchol.jl")
 
 # release memory used by sparse system solvers
