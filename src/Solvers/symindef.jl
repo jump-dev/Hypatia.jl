@@ -38,6 +38,7 @@ function solve_system(system_solver::SymIndefSystemSolver{T}, solver::Solver{T},
     @. @views rhs3[n .+ (1:p), 1:2] = -rhs[n .+ (1:p), :]
     @. rhs3[1:n, 3] = -model.c
     @. rhs3[n .+ (1:p), 3] = model.b
+    @show "earlier actual", rhs3
 
     for (k, cone_k) in enumerate(model.cones)
         idxs_k = model.cone_idxs[k]
@@ -69,7 +70,9 @@ function solve_system(system_solver::SymIndefSystemSolver{T}, solver::Solver{T},
         end
     end
 
+    # @show "actual", rhs3
     @timeit solver.timer "solve_system" solve_subsystem(system_solver, sol3, rhs3)
+    # @show "actual", sol3
 
     if !system_solver.use_inv_hess
         for (k, cone_k) in enumerate(model.cones)
@@ -113,6 +116,7 @@ function solve_system(system_solver::SymIndefSystemSolver{T}, solver::Solver{T},
 
     # kap = -mu/(taubar^2)*tau + kaprhs
     @. @views sol[end:end, :] = -solver.mu / solver.tau * tau / solver.tau + rhs[end:end, :]
+    # @show "actual", sol
 
     return sol
 end
@@ -237,6 +241,7 @@ function update_fact(system_solver::SymIndefSparseSystemSolver, solver::Solver)
     end
 
     @timeit solver.timer "update_fact" update_fact(system_solver.fact_cache, system_solver.lhs3)
+    # @show "actual" Matrix(system_solver.lhs3)
 
     return system_solver
 end
