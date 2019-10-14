@@ -33,7 +33,7 @@ testfuns_preproc = [
 testfuns_reduce = vcat(testfuns_no_preproc, testfuns_preproc)
 
 testfuns = [
-    orthant1,
+    # orthant1,
     # orthant2,
     # orthant3,
     # orthant4,
@@ -42,8 +42,8 @@ testfuns = [
     # epinorminf3,
     # epinorminf4,
     # epinorminf5,
-    # epinormeucl1,
-    # epinormeucl2,
+    epinormeucl1,
+    epinormeucl2,
     # epipersquare1,
     # epipersquare2,
     # epipersquare3,
@@ -56,7 +56,7 @@ testfuns = [
     # epiperexp1,
     # epiperexp2,
     # power1,
-    # power2,
+    power2,
     # power3,
     # power4,
     # hypogeomean1,
@@ -68,12 +68,13 @@ testfuns = [
     # possemideftricomplex1,
     # hypoperlogdettri1,
     # hypoperlogdettri2,
-    # hypoperlogdettri3,
-    # primalinfeas1,
-    # primalinfeas2,
-    # primalinfeas3,
-    # dualinfeas1,
-    # dualinfeas2,
+    hypoperlogdettri3,
+    primalinfeas1,
+    primalinfeas2a,
+    primalinfeas2b,
+    primalinfeas3,
+    dualinfeas1,
+    dualinfeas2,
     # dualinfeas3,
     ]
 
@@ -88,7 +89,7 @@ blas_reals = [
     # Float32,
     ]
 
-options = (verbose = false,)
+options = (verbose = false, iter_limit = 500)
 
 @info("starting native tests")
 @testset "native tests" begin
@@ -140,13 +141,14 @@ options = (verbose = false,)
     # @testset "SymIndefDense tests: $t, $T, $h" for t in testfuns, T in generic_reals, h in [true, false]
     #     t(T, solver = SO.Solver{T}(system_solver = SO.SymIndefDenseSystemSolver{T}(use_inv_hess = h); options...))
     # end
-    @testset "SymIndefSparse tests: $t" for t in testfuns
-        T = Float64
-        t(T, solver = SO.Solver{T}(system_solver = SO.SymIndefSparseSystemSolver{T}(); options...))
-    end
+    # @testset "SymIndefSparse tests: $t" for t in testfuns
+    #     T = Float64
+    #     t(T, solver = SO.Solver{T}(system_solver = SO.SymIndefSparseSystemSolver{T}(); options...))
+    # end
     @testset "SymIndefSparse tests: $t" for t in testfuns
         T = Float64
         t(T, solver = SO.Solver{T}(system_solver = SO.SymIndefSparseExpandedSystemSolver{T}(); options...))
+        # t(T, solver = SO.Solver{T}(system_solver = SO.SymIndefSparseExpandedSystemSolver{T}(fact_cache = Hypatia.PardisoSymCache()); options...))
     end
     # @testset "QRCholDense tests: $t, $T, $ss" for t in testfuns, T in generic_reals, ss in [Hypatia.DenseSymCache, Hypatia.DensePosDefCache]
     #     t(T, solver = SO.Solver{T}(system_solver = SO.QRCholDenseSystemSolver{T}(fact_cache = ss{T}()); options...))

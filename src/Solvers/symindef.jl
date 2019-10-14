@@ -70,9 +70,12 @@ function solve_system(system_solver::SymIndefSystemSolver{T}, solver::Solver{T},
         end
     end
 
-    # @show "actual", rhs3
+    # @show "actual"
+    # @show rhs3
     @timeit solver.timer "solve_system" solve_subsystem(system_solver, sol3, rhs3)
-    # @show "actual", sol3
+    # @show "actual"
+    # @show sol3
+    # error()
 
     if !system_solver.use_inv_hess
         for (k, cone_k) in enumerate(model.cones)
@@ -241,7 +244,9 @@ function update_fact(system_solver::SymIndefSparseSystemSolver, solver::Solver)
     end
 
     @timeit solver.timer "update_fact" update_fact(system_solver.fact_cache, system_solver.lhs3)
-    # @show "actual" Matrix(system_solver.lhs3)
+    # @show "actual"
+    # @show Matrix(system_solver.lhs3)
+    # error()
 
     return system_solver
 end

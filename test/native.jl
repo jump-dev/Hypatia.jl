@@ -797,7 +797,20 @@ function primalinfeas1(T; options...)
     @test r.status == :PrimalInfeasible
 end
 
-function primalinfeas2(T; options...)
+function primalinfeas2a(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    c = T[1, 1, 1]
+    A = zeros(T, 0, 3)
+    b = T[]
+    G = vcat(Diagonal([one(T), one(T), -one(T)]), SparseMatrixCSC(-one(T) * I, 3, 3))
+    h = vcat(one(T), one(T), -T(2), zeros(T, 3))
+    cones = CO.Cone{T}[CO.Nonnegative{T}(3), CO.EpiNormEucl{T}(3)]
+
+    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+    @test r.status == :PrimalInfeasible
+end
+
+function primalinfeas2b(T; options...)
     tol = sqrt(sqrt(eps(T)))
     c = T[1, 1, 1]
     A = zeros(T, 0, 3)

@@ -28,8 +28,10 @@ mutable struct SymIndefSparseExpandedSystemSolver{T <: Real} <: SymIndefSystemSo
     use_inv_hess::Bool
     tau_row::Int
     lhs3::SparseMatrixCSC # TODO type will depend on Int type
+    other_lhs3::SparseMatrixCSC
     rhs3::Matrix{T}
     rhs3_expanded::Matrix{T}
+    other_rhs3::Matrix{T}
     sol3::Matrix{T}
     sol3_expanded::Matrix{T}
     hess_idxs::Vector
@@ -56,6 +58,7 @@ function solve_system(system_solver::SymIndefSparseExpandedSystemSolver{T}, solv
     sol3 = system_solver.sol3
     sol3_expanded = system_solver.sol3_expanded
     rhs3 = system_solver.rhs3_expanded
+    # other_rhs3 = system_solver.other_rhs3
 
     @. @views rhs3[1:n, 1:2] = rhs[1:n, :]
     @. @views rhs3[n .+ (1:p), 1:2] = -rhs[n .+ (1:p), :]
@@ -90,13 +93,27 @@ function solve_system(system_solver::SymIndefSparseExpandedSystemSolver{T}, solv
             @. zk12_new *= -1
             @. zk12_new -= sk12
             Cones.hess_prod!(zk3_new, hk, cone_k)
-            if isa(cone_k, Cones.EpiNormEucl)
-                ns_added += 1
-            end
+        end
+        if isa(cone_k, Cones.EpiNormEucl)
+            ns_added += 1
         end
     end
 
+    # @views copyto!(other_rhs3[1:(n + p), :], rhs3[1:(n + p), :])
+    # idx = n + p + 1
+    # ns_added = 0
+    # for (k, cone_k) in enumerate(model.cones)
+    #     dim = Cones.dimension(cone_k)
+    #     @views copyto!(other_rhs3[idx:(idx + dim - 1), :], rhs3[(idx + ns_added):(idx + ns_added + dim - 1), :])
+    #     idx += dim
+    #     if isa(cone_k, Cones.EpiNormEucl)
+    #         ns_added += 1
+    #     end
+    # end
+
+    # @show rhs3, system_solver.other_rhs3
     @timeit solver.timer "solve_system" solve_subsystem(system_solver, sol3_expanded, rhs3)
+    # sol3_other = Symmetric(system_solver.other_lhs3, :L) \ system_solver.other_rhs3
 
     @views copyto!(sol3[1:(n + p), :], sol3_expanded[1:(n + p), :])
     idx = n + p + 1
@@ -165,23 +182,53 @@ function load(system_solver::SymIndefSparseExpandedSystemSolver{T}, solver::Solv
     cone_idxs = model.cone_idxs
 
     ns = sum(isa(cone_k, Cones.EpiNormEucl) for cone_k in cones)
+    qns = q + ns
 
     system_solver.sol3 = zeros(n + p + q, 3)
     system_solver.sol3_expanded = zeros(n + p + q + ns, 3)
     system_solver.rhs3 = similar(system_solver.sol3)
-    system_solver.rhs3_expanded = similar(system_solver.sol3_expanded)
+    system_solver.rhs3_expanded = zeros(n + p + q + ns, 3)
+    # system_solver.other_rhs3 = zeros(n + p + q, 3)
 
     # form sparse LHS without Hessians and inverse Hessians in z/z block
-    pert = sqrt(eps(T))
     lhs3 = T[
-        sparse(pert * I, n, n)    spzeros(T, n, p)         spzeros(T, n, q)           spzeros(T, n, ns);
-        model.A                   sparse(pert * I, p, p)   spzeros(T, p, q)           spzeros(T, p, ns);
-        model.G                   spzeros(T, q, p)         sparse(-one(T) * I, q, q)  spzeros(T, q, ns);
-        spzeros(T, ns, n)         spzeros(T, ns, p)        spzeros(T, ns, q)          sparse(-one(T) * I, ns, ns)
+        spzeros(T, n, n)   spzeros(T, n, p)    spzeros(T, n, qns);
+        model.A            spzeros(T, p, p)    spzeros(T, p, qns);
+        spzeros(T, qns, n) spzeros(T, qns, p)  sparse(-one(T) * I, qns, qns);
         ]
+    idx = 1
+    ns_added = 0
+    for (k, cone_k) in enumerate(model.cones)
+        dim = Cones.dimension(cone_k)
+        @. @views lhs3[(n + p + idx + ns_added):(n + p + idx + dim - 1 + ns_added), 1:n] = model.G[idx:(idx + dim - 1), :]
+        idx += dim
+        if isa(cone_k, Cones.EpiNormEucl)
+            ns_added += 1
+        end
+    end
+
     @assert issparse(lhs3)
     dropzeros!(lhs3)
     (Is, Js, Vs) = findnz(lhs3)
+    pert = T(system_solver.fact_cache.diag_pert) # TODO not happy with where this is stored
+    append!(Is, 1:(n + p))
+    append!(Js, 1:(n + p))
+    append!(Vs, fill(pert, n))
+    append!(Vs, fill(-pert, p))
+
+    # other_lhs3 = T[
+    #     spzeros(T, n, n)   spzeros(T, n, p)   spzeros(T, n, q)           ;
+    #     model.A            spzeros(T, p, p)   spzeros(T, p, q)           ;
+    #     model.G            spzeros(T, q, p)   sparse(-one(T) * I, q, q)  ;
+    #     ]
+    # @assert issparse(other_lhs3)
+    # dropzeros!(other_lhs3)
+    # (Is2, Js2, Vs2) = findnz(other_lhs3)
+    # append!(Is2, 1:(n + p))
+    # append!(Js2, 1:(n + p))
+    # append!(Vs2, fill(pert, n))
+    # append!(Vs2, fill(-pert, p))
+    # other_dim = size(other_lhs3, 1)
 
     dim = size(lhs3, 1)
     # integer type supported by the sparse system solver library to be used
@@ -189,7 +236,10 @@ function load(system_solver::SymIndefSparseExpandedSystemSolver{T}, solver::Solv
     # prefer conversions of integer types to happen here than inside external wrappers
     Is = convert(Vector{Ti}, Is)
     Js = convert(Vector{Ti}, Js)
+    # Is2 = convert(Vector{Ti}, Is2)
+    # Js2 = convert(Vector{Ti}, Js2)
     lhs3 = system_solver.lhs3 = sparse(Is, Js, Vs, dim, dim)
+    # other_lhs3 = system_solver.other_lhs3 = sparse(Is2, Js2, Vs2, other_dim, other_dim)
 
     return system_solver
 end
@@ -199,13 +249,20 @@ function update_fact(system_solver::SymIndefSparseExpandedSystemSolver, solver::
     for (k, cone_k) in enumerate(solver.model.cones)
         dim = Cones.dimension(cone_k)
         if isa(cone_k, Cones.EpiNormEucl)
-            # Cones.update_feas(cone_k)
-            system_solver.lhs3[idx, idx] = -cone_k.dist
-            for j in (idx + 1):(idx + dim - 1)
-                system_solver.lhs3[j, j] = cone_k.dist
+            if Cones.use_dual(cone_k)
+                vec = cone_k.grad
+                scal = inv(cone_k.dist)
+            else
+                vec = cone_k.point
+                scal = cone_k.dist
             end
-            system_solver.lhs3[(idx + dim), (idx + dim)] = -1
-            system_solver.lhs3[(idx + dim), idx:(idx + dim - 1)] .= cone_k.point
+            # Cones.update_feas(cone_k)
+            system_solver.lhs3[idx, idx] = scal
+            for j in (idx + 1):(idx + dim - 1)
+                system_solver.lhs3[j, j] = -scal
+            end
+            system_solver.lhs3[(idx + dim), (idx + dim)] = 1
+            system_solver.lhs3[(idx + dim), idx:(idx + dim - 1)] .= -vec
             idx += (dim + 1)
         else
             H = (Cones.use_dual(cone_k) ? Cones.hess(cone_k) : Cones.inv_hess(cone_k))
@@ -214,12 +271,22 @@ function update_fact(system_solver::SymIndefSparseExpandedSystemSolver, solver::
         end
     end
 
+    idx = solver.model.n + solver.model.p + 1
+    for (k, cone_k) in enumerate(solver.model.cones)
+        dim = Cones.dimension(cone_k)
+        H = (Cones.use_dual(cone_k) ? Cones.hess(cone_k) : Cones.inv_hess(cone_k))
+        # system_solver.other_lhs3[idx:(idx + dim - 1), idx:(idx + dim - 1)] .= -H
+        idx += dim
+    end
+
     @timeit solver.timer "update_fact" update_fact(system_solver.fact_cache, system_solver.lhs3)
 
     return system_solver
 end
 
-function solve_subsystem(system_solver::SymIndefSparseExpandedSystemSolver, sol3::Matrix, rhs3::Matrix)
-    solve_system(system_solver.fact_cache, sol3, system_solver.lhs3, rhs3)
-    return sol3
+function solve_subsystem(system_solver::SymIndefSparseExpandedSystemSolver, sol3_expanded::Matrix, rhs3::Matrix)
+    # solve_system(system_solver.fact_cache, sol3, system_solver.lhs3, rhs3)
+    sol3_expanded .= Symmetric(system_solver.lhs3, :L) \ rhs3
+
+    return sol3_expanded
 end

@@ -488,8 +488,11 @@ function find_initial_y(solver::Solver{T}, reducing::Bool) where {T <: Real}
 
     # preprocess dual equalities
     Ap_R = UpperTriangular(Ap_fact.R[1:Ap_rank, 1:Ap_rank])
+
     col_piv = (Ap_fact isa QRPivoted{T, Matrix{T}}) ? Ap_fact.p : Ap_fact.pcol
+
     y_keep_idxs = col_piv[1:Ap_rank]
+
     Ap_Q = Ap_fact.Q
 
     b_sub = model.b[y_keep_idxs]
@@ -699,7 +702,6 @@ function print_iteration_stats(solver::Solver{T}) where {T <: Real}
             solver.prev_gamma, solver.prev_alpha,
             )
     end
-    flush(stdout)
     return
 end
 
