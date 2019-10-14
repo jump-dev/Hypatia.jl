@@ -194,6 +194,51 @@ function load(system_solver::SymIndefSparseExpandedSystemSolver{T}, solver::Solv
     @assert issparse(lhs3)
     dropzeros!(lhs3)
     (Is, Js, Vs) = findnz(lhs3)
+
+    # add I, J, V for Hessians and inverse Hessians
+    if isempty(cones) || all(isa.(cones, Cones.EpiNormEucl))
+        hess_nz_total = 0
+    else
+        hess_nz_total = sum(Cones.use_dual(cone_k) ? Cones.hess_nz_count(cone_k, true) : Cones.inv_hess_nz_count(cone_k, true) for cone_k in cones if !isa(cone_k, Cones.EpiNormEucl))
+    end
+    H_Is = Vector{Int}(undef, hess_nz_total)
+    H_Js = Vector{Int}(undef, hess_nz_total)
+    SOC_Is = Int[]
+    SOC_Js = Int[]
+    SOC_Vs = Float64[]
+    offset = 1
+    y_start = n + p - 1
+    ns_added = 0
+    for (k, cone_k) in enumerate(cones)
+        cone_idxs_k = cone_idxs[k]
+        z_start_k = y_start + first(cone_idxs_k) .+ ns_added
+        dim = Cones.dimension(cone_k)
+        if isa(cone_k, Cones.EpiNormEucl)
+            ns_added += 1
+            push!(SOC_Is, collect((z_start_k + 1):(z_start_k + dim))...)
+            push!(SOC_Js, collect((z_start_k + 1):(z_start_k + dim))...)
+            push!(SOC_Is, fill(z_start_k + dim + 1, dim + 1)...)
+            push!(SOC_Js, collect((z_start_k + 1):(z_start_k + dim + 1))...)
+            push!(SOC_Vs, ones(2 * dim + 1)...)
+        else
+            for j in 1:dim
+                nz_rows_kj = z_start_k .+ (Cones.use_dual(cone_k) ? Cones.hess_nz_idxs_col(cone_k, j, true) : Cones.inv_hess_nz_idxs_col(cone_k, j, true))
+                len_kj = length(nz_rows_kj)
+                IJV_idxs = offset:(offset + len_kj - 1)
+                offset += len_kj
+                @. H_Is[IJV_idxs] = nz_rows_kj
+                @. H_Js[IJV_idxs] = z_start_k + j
+            end
+        end
+    end
+    @assert offset == hess_nz_total + 1
+    append!(Is, H_Is)
+    append!(Js, H_Js)
+    append!(Vs, ones(T, hess_nz_total))
+    append!(Is, SOC_Is)
+    append!(Js, SOC_Js)
+    append!(Vs, SOC_Vs)
+
     pert = T(system_solver.fact_cache.diag_pert) # TODO not happy with where this is stored
     append!(Is, 1:(n + p))
     append!(Js, 1:(n + p))
@@ -208,14 +253,40 @@ function load(system_solver::SymIndefSparseExpandedSystemSolver{T}, solver::Solv
     Js = convert(Vector{Ti}, Js)
     lhs3 = system_solver.lhs3 = sparse(Is, Js, Vs, dim, dim)
 
+    # cache indices of nonzeros of Hessians and inverse Hessians in sparse LHS nonzeros vector
+    system_solver.hess_idxs = [Vector{Union{UnitRange, Vector{Int}}}(undef, Cones.dimension(cone_k)) for cone_k in cones]
+    ns_added = 0
+    for (k, cone_k) in enumerate(cones)
+        if isa(cone_k, Cones.EpiNormEucl)
+            ns_added += 1
+            continue
+        end
+        cone_idxs_k = cone_idxs[k]
+        z_start_k = y_start + first(cone_idxs_k) + ns_added
+        for j in 1:Cones.dimension(cone_k)
+            col = z_start_k + j
+            # get nonzero rows in the current column of the LHS
+            col_idx_start = lhs3.colptr[col]
+            nz_rows = lhs3.rowval[col_idx_start:(lhs3.colptr[col + 1] - 1)]
+            # get nonzero rows in column j of the Hessian or inverse Hessian
+            nz_hess_indices = (Cones.use_dual(cone_k) ? Cones.hess_nz_idxs_col(cone_k, j, true) : Cones.inv_hess_nz_idxs_col(cone_k, j, true))
+            # get index corresponding to first nonzero Hessian element of the current column of the LHS
+            first_H = findfirst(isequal(z_start_k + first(nz_hess_indices)), nz_rows)
+            # indices of nonzero values for cone k column j
+            system_solver.hess_idxs[k][j] = (col_idx_start + first_H - 2) .+ (1:length(nz_hess_indices))
+        end
+    end
+
     return system_solver
 end
 
 function update_fact(system_solver::SymIndefSparseExpandedSystemSolver, solver::Solver)
+    ns_added = 0
     idx = solver.model.n + solver.model.p + 1
     for (k, cone_k) in enumerate(solver.model.cones)
         dim = Cones.dimension(cone_k)
         if isa(cone_k, Cones.EpiNormEucl)
+            ns_added += 1
             if Cones.use_dual(cone_k)
                 vec = cone_k.grad
                 scal = inv(cone_k.dist)
@@ -223,7 +294,6 @@ function update_fact(system_solver::SymIndefSparseExpandedSystemSolver, solver::
                 vec = cone_k.point
                 scal = cone_k.dist
             end
-            # Cones.update_feas(cone_k)
             system_solver.lhs3[idx, idx] = scal
             for j in (idx + 1):(idx + dim - 1)
                 system_solver.lhs3[j, j] = -scal
@@ -233,10 +303,38 @@ function update_fact(system_solver::SymIndefSparseExpandedSystemSolver, solver::
             idx += (dim + 1)
         else
             H = (Cones.use_dual(cone_k) ? Cones.hess(cone_k) : Cones.inv_hess(cone_k))
-            system_solver.lhs3[idx:(idx + dim - 1), idx:(idx + dim - 1)] .= -H
+            for j in 1:Cones.dimension(cone_k)
+                nz_rows = (Cones.use_dual(cone_k) ? Cones.hess_nz_idxs_col(cone_k, j, true) : Cones.inv_hess_nz_idxs_col(cone_k, j, true))
+                @. @views system_solver.lhs3.nzval[system_solver.hess_idxs[k][j]] = -H[nz_rows, j]
+            end
             idx += dim
         end
     end
+    #
+    # idx = solver.model.n + solver.model.p + 1
+    # for (k, cone_k) in enumerate(solver.model.cones)
+    #     dim = Cones.dimension(cone_k)
+    #     if isa(cone_k, Cones.EpiNormEucl)
+    #         if Cones.use_dual(cone_k)
+    #             vec = cone_k.grad
+    #             scal = inv(cone_k.dist)
+    #         else
+    #             vec = cone_k.point
+    #             scal = cone_k.dist
+    #         end
+    #         system_solver.lhs3[idx, idx] = scal
+    #         for j in (idx + 1):(idx + dim - 1)
+    #             system_solver.lhs3[j, j] = -scal
+    #         end
+    #         system_solver.lhs3[(idx + dim), (idx + dim)] = 1
+    #         system_solver.lhs3[(idx + dim), idx:(idx + dim - 1)] .= -vec
+    #         idx += (dim + 1)
+    #     else
+    #         H = (Cones.use_dual(cone_k) ? Cones.hess(cone_k) : Cones.inv_hess(cone_k))
+    #         system_solver.lhs3[idx:(idx + dim - 1), idx:(idx + dim - 1)] .= -H
+    #         idx += dim
+    #     end
+    # end
 
     @timeit solver.timer "update_fact" update_fact(system_solver.fact_cache, system_solver.lhs3)
 
