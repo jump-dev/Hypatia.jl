@@ -38,7 +38,7 @@ function solve_system(system_solver::SymIndefSystemSolver{T}, solver::Solver{T},
     @. @views rhs3[n .+ (1:p), 1:2] = -rhs[n .+ (1:p), :]
     @. rhs3[1:n, 3] = -model.c
     @. rhs3[n .+ (1:p), 3] = model.b
-    @show "earlier actual", rhs3
+    # @show "earlier actual", rhs3
 
     for (k, cone_k) in enumerate(model.cones)
         idxs_k = model.cone_idxs[k]
