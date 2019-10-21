@@ -9,7 +9,7 @@ W is vectorized column-by-column (i.e. vec(W) in Julia)
 barrier from "Interior-Point Polynomial Algorithms in Convex Programming" by Nesterov & Nemirovskii 1994
 -logdet(u*I_n - W*W'/u) - log(u)
 
-Hessian terms H[r, s] from differentiatin wrt W_{ri, rj} and W_{si, sj} consist of
+Hessian terms H[r, s] from differentiating wrt W_{ri, rj} and W_{si, sj} consist of
 - grad[r_i, r_j] * grad[s_i, s_j]
 - Zi[r_i, s_i] when r_j = s_j
 - Zi[s_i, r_i] * (W * Zi * W)[r_j, s_j], complicating
