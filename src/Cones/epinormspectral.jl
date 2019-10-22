@@ -8,6 +8,13 @@ W is vectorized column-by-column (i.e. vec(W) in Julia)
 
 barrier from "Interior-Point Polynomial Algorithms in Convex Programming" by Nesterov & Nemirovskii 1994
 -logdet(u*I_n - W*W'/u) - log(u)
+
+Hessian terms H[r, s] from differentiating wrt W_{ri, rj} and W_{si, sj} include
+- grad[r_i, r_j] * grad[s_i, s_j]
+- Zi[r_i, s_i] when r_j = s_j
+- Zi[s_i, r_i] * (W * Zi * W)[r_j, s_j], complicating
+where Zi = inv(u^2*I_n - W*W')
+note that the complicating term does not appear in epinormeucl because w'w is seperable by w_i, but WW' is not separable by W_ij
 =#
 
 mutable struct EpiNormSpectral{T <: Real} <: Cone{T}
@@ -129,8 +136,10 @@ function update_hess(cone::EpiNormSpectral)
         r = 1 + (i - 1) * n
         for j in 1:n
             r2 = r + j
+            # second derivative with respect to r2-th element in W and everything in the same column and in a row beneath it
             @. @views @inbounds H[r2, r .+ (j:n)] = Zi[j:n, j] * tmpmm[i, i] + tmpnm[j:n, i] * tmpnm[j, i] + Zi[j, j:n]
             c2 = r + n
+            # second derivative with respect to r2-th element in W and everything in columns after it
             for k in (i + 1):m
                 @. @views @inbounds H[r2, c2 .+ (1:n)] = Zi[1:n, j] * tmpmm[i, k] + tmpnm[1:n, i] * tmpnm[j, k]
                 c2 += n
