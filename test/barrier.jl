@@ -247,16 +247,37 @@ function test_wsospolyinterp_barrier(T::Type{<:Real})
     return
 end
 
-# function test_wsospolyinterpmat_barrier(T::Type{<:Real})
-#     Random.seed!(1)
-#     for n in 1:3, halfdeg in 1:3, R in 1:3
-#         (U, _, P0, _, _) = MU.interpolate(MU.FreeDomain(n), halfdeg, sample = false)
-#         P0 = convert(Matrix{T}, P0)
-#         cone = CO.WSOSPolyInterpMat{T}(R, U, [P0], true)
-#         test_barrier_oracles(cone)
-#     end
-#     return
-# end
+function test_wsospolyinterpmat_barrier(T::Type{<:HypReal})
+    Random.seed!(1)
+    for n in 1:3, halfdeg in 1:3, R in 1:3
+        (U, _, P0, _, _) = MU.interpolate(MU.FreeDomain(n), halfdeg, sample = false)
+        P0 = convert(Matrix{T}, P0)
+        cone = CO.WSOSPolyInterpMat{T}(R, U, [P0], true)
+        function barrier(s)
+            lambda_block(s) = Symmetric(P0' * Diagonal(s) * P0)
+            rt2i = convert(eltype(s), inv(sqrt(T(2))))
+            L = size(P0, 2)
+            Lambda = Symmetric(zeros(eltype(s), R * L, R * L), :L)
+            uo = 1
+            rows = 1
+            for i in 1:R
+                cols = 1
+                for j in 1:i
+                    slice = s[uo:(uo + U - 1)]
+                    uo += U
+                    fact = (i == j ? one(T) : rt2i)
+                    Lambda.data[rows:(rows + L - 1), cols:(cols + L - 1)] = lambda_block(slice) * fact
+                    cols += L
+                end
+                rows += L
+            end
+            return -logdet(cholesky!(Lambda))
+        end
+        test_barrier_oracles(cone, barrier)
+        test_barrier_oracles(cone, barrier, noise = 0.1)
+    end
+    return
+end
 #
 # function test_wsospolyinterpsoc_barrier(T::Type{<:Real})
 #     Random.seed!(1)
