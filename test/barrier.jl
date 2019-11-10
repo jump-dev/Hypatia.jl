@@ -247,7 +247,7 @@ function test_wsospolyinterp_barrier(T::Type{<:Real})
     return
 end
 
-function test_wsospolyinterpmat_barrier(T::Type{<:HypReal})
+function test_wsospolyinterpmat_barrier(T::Type{<:Real})
     Random.seed!(1)
     for n in 1:3, halfdeg in 1:3, R in 1:3
         (U, _, P0, _, _) = MU.interpolate(MU.FreeDomain(n), halfdeg, sample = false)
@@ -273,8 +273,7 @@ function test_wsospolyinterpmat_barrier(T::Type{<:HypReal})
             end
             return -logdet(cholesky!(Lambda))
         end
-        test_barrier_oracles(cone, barrier)
-        test_barrier_oracles(cone, barrier, noise = 0.1)
+        test_barrier_oracles(cone, barrier, init_tol = Inf)
     end
     return
 end

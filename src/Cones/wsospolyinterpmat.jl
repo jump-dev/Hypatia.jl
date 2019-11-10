@@ -23,6 +23,7 @@ mutable struct WSOSPolyInterpMat{T <: Real} <: Cone{T}
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
+    hess_fact_cache
 
     rt2::T
     rt2i::T
@@ -32,10 +33,14 @@ mutable struct WSOSPolyInterpMat{T <: Real} <: Cone{T}
     LUs::Vector{Matrix{T}}
     UU1::Matrix{T}
     UU2::Matrix{T}
-    tmp_hess::Symmetric{T, Matrix{T}}
-    hess_fact
 
-    function WSOSPolyInterpMat{T}(R::Int, U::Int, Ps::Vector{Matrix{T}}, is_dual::Bool) where {T <: HypReal}
+    function WSOSPolyInterpMat{T}(
+        R::Int,
+        U::Int,
+        Ps::Vector{Matrix{T}},
+        is_dual::Bool;
+        hess_fact_cache = hessian_cache(T),
+        ) where {T <: Real}
         for Pj in Ps
             @assert size(Pj, 1) == U
         end
@@ -46,21 +51,24 @@ mutable struct WSOSPolyInterpMat{T <: Real} <: Cone{T}
         cone.R = R
         cone.U = U
         cone.Ps = Ps
+        cone.hess_fact_cache = hess_fact_cache
         return cone
     end
 end
 
-WSOSPolyInterpMat{T}(R::Int, U::Int, Ps::Vector{Matrix{T}}) where {T <: HypReal} = WSOSPolyInterpMat{T}(R, U, Ps, false)
+WSOSPolyInterpMat{T}(R::Int, U::Int, Ps::Vector{Matrix{T}}) where {T <: Real} = WSOSPolyInterpMat{T}(R, U, Ps, false)
 
-function setup_data(cone::WSOSPolyInterpMat{T}) where {T <: HypReal}
+function setup_data(cone::WSOSPolyInterpMat{T}) where {T <: Real}
     reset_data(cone)
     dim = cone.dim
     U = cone.U
     R = cone.R
     Ps = cone.Ps
-    cone.grad = Vector{T}(undef, dim)
+    cone.point = zeros(T, dim)
+    cone.grad = similar(cone.point)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.tmp_hess = Symmetric(zeros(T, dim, dim), :U)
+    cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
+    load_matrix(cone.hess_fact_cache, cone.hess)
     cone.rt2 = sqrt(T(2))
     cone.rt2i = inv(cone.rt2)
     cone.slice = Vector{T}(undef, U)
@@ -106,7 +114,7 @@ function update_feas(cone::WSOSPolyInterpMat)
             end
             rowo += L
         end
-        cone.ΛFs[j] = hyp_chol!(Λ)
+        cone.ΛFs[j] = cholesky!(Λ, check = false)
         if !isposdef(cone.ΛFs[j])
             cone.is_feas = false
             break
