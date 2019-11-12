@@ -45,7 +45,7 @@ const MOIOtherConesList(::Type{T}) where {T <: Real} = (
     MOI.PositiveSemidefiniteConeTriangle,
     MOI.LogDetConeTriangle,
     WSOSPolyInterpCone{T},
-    # WSOSPolyInterpMatCone{T},
+    WSOSPolyInterpMatCone{T},
     # WSOSPolyInterpSOCCone{T},
     )
 
@@ -60,7 +60,7 @@ const MOIOtherCones{T <: Real} = Union{
     MOI.PositiveSemidefiniteConeTriangle,
     MOI.LogDetConeTriangle,
     WSOSPolyInterpCone{T},
-    # WSOSPolyInterpMatCone{T},
+    WSOSPolyInterpMatCone{T},
     # WSOSPolyInterpSOCCone{T},
     }
 
@@ -75,6 +75,6 @@ cone_from_moi(::Type{T}, s::MOI.PowerCone{T}) where {T <: Real} = Cones.Power{T}
 cone_from_moi(::Type{T}, s::MOI.PositiveSemidefiniteConeTriangle) where {T <: Real} = Cones.PosSemidefTri{T, T}(MOI.dimension(s))
 cone_from_moi(::Type{T}, s::MOI.LogDetConeTriangle) where {T <: Real} = Cones.HypoPerLogdetTri{T}(MOI.dimension(s))
 cone_from_moi(::Type{T}, s::WSOSPolyInterpCone{T}) where {T <: Real} = Cones.WSOSPolyInterp{T, T}(s.dimension, s.Ps, s.is_dual)
-# cone_from_moi(::Type{T}, s::WSOSPolyInterpMatCone{T}) where {T <: Real} = Cones.WSOSPolyInterpMat{T}(s.R, s.U, s.ipwt, s.is_dual)
+cone_from_moi(::Type{T}, s::WSOSPolyInterpMatCone{T}) where {T <: Real} = Cones.WSOSPolyInterpMat{T}(s.R, s.U, s.ipwt, s.is_dual)
 # cone_from_moi(::Type{T}, s::WSOSPolyInterpSOCCone{T}) where {T <: Real} = Cones.WSOSPolyInterpSOC{T}(s.R, s.U, s.ipwt, s.is_dual)
 cone_from_moi(::Type{T}, s::MOI.AbstractVectorSet) where {T <: Real} = error("MOI set $s is not recognized")
