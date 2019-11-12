@@ -156,14 +156,14 @@ function production_data()
     df = CSV.read(joinpath(@__DIR__, "data", "naics5811.csv"), copycols = true)
     DataFrames.deleterows!(df, 157) # outlier
     # number of non production employees
-    df[:prode] .= df[:emp] - df[:prode]
+    df[!, :prode] .= df[!, :emp] - df[!, :prode]
     # group by industry codes
     df_aggr = DataFrames.aggregate(DataFrames.dropmissing(df), :naics, sum)
     # four covariates: non production employees, production worker hours, production workers, total capital stock
     # use the log transform of covariates
-    X = log.(convert(Matrix{Float64}, df_aggr[[:prode_sum, :prodh_sum, :prodw_sum, :cap_sum]])) # n = 4
+    X = log.(convert(Matrix{Float64}, df_aggr[!, [:prode_sum, :prodh_sum, :prodw_sum, :cap_sum]])) # n = 4
     # value of shipment
-    y = convert(Vector{Float64}, df_aggr[:vship_sum])
+    y = convert(Vector{Float64}, df_aggr[!, :vship_sum])
     # mean center
     X .-= sum(X, dims = 1) ./ size(X, 1)
     y .-= sum(y) / length(y)
