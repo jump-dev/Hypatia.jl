@@ -277,14 +277,28 @@ function test_wsospolyinterpmat_barrier(T::Type{<:Real})
     end
     return
 end
-#
-# function test_wsospolyinterpsoc_barrier(T::Type{<:Real})
-#     Random.seed!(1)
-#     for n in 1:2, halfdeg in 1:2, R in 3:3
-#         (U, _, P0, _, _) = MU.interpolate(MU.FreeDomain(n), halfdeg, sample = false)
-#         P0 = convert(Matrix{T}, P0)
-#         cone = CO.WSOSPolyInterpSOC{T}(R, U, [P0], true)
-#         test_barrier_oracles(cone)
-#     end
-#     return
-# end
+
+function test_wsospolyinterpsoc_barrier(T::Type{<:Real})
+    Random.seed!(1)
+    for n in 1:2, halfdeg in 1:2, R in 3:3
+        (U, _, P0, _, _) = MU.interpolate(MU.FreeDomain(n), halfdeg, sample = false)
+        P0 = convert(Matrix{T}, P0)
+        cone = CO.WSOSPolyInterpSOC{T}(R, U, [P0], true)
+
+        function barrier(s)
+            L = size(P0, 2)
+            Lambda1 = Symmetric(P0' * Diagonal(s[1:U]) * P0)
+            Lambda = copy(Lambda1)
+            uo = U + 1
+            for _ in 2:R
+                slice = s[uo:(uo + U - 1)]
+                lambda_i = P0' * Diagonal(slice) * P0
+                Lambda -= lambda_i * (Lambda1 \ lambda_i)
+                uo += U
+            end
+            return -logdet(cholesky!(Lambda))
+        end
+        test_barrier_oracles(cone, barrier, init_tol = Inf)
+    end
+    return
+end
