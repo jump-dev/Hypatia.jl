@@ -4,6 +4,10 @@ Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 interpolation-based weighted-sum-of-squares (multivariate) polynomial second order cone parametrized by interpolation points Ps
 
 definition and dual barrier extended from "Sum-of-squares optimization without semidefinite programming" by D. Papp and S. Yildiz, available at https://arxiv.org/abs/1712.01792
+
+barrier is -logdet(shcur(Lambda)) - logdet(Lambda_11)
+if schur(M) = A - B * inv(D) * C
+logdet(schur) = logdet(M) - logdet(D) = logdet(Lambda) - (R - 1) * logdet(Lambda_11) since our D is an (R - 1)x(R - 1) block diagonal matrix
 =#
 
 mutable struct WSOSPolyInterpSOC{T <: Real} <: Cone{T}
@@ -35,8 +39,10 @@ mutable struct WSOSPolyInterpSOC{T <: Real} <: Cone{T}
     tmp2::Vector{Matrix{T}}
     tmp3::Matrix{T}
     tmp4::Vector{Matrix{T}}
-    li_lambda::Vector{Vector{Matrix{T}}}
-    PlambdaiP::Vector{Vector{Vector{Matrix{T}}}}
+
+    Λi_Λ::Vector{Vector{Matrix{T}}}
+    tmpLU::Vector{Matrix{T}}
+    PΛiPs::Vector{Vector{Vector{Matrix{T}}}}
     lambdafact::Vector
 
     function WSOSPolyInterpSOC{T}(
@@ -82,22 +88,23 @@ function setup_data(cone::WSOSPolyInterpSOC{T}) where {T <: Real}
     cone.tmp2 = [similar(cone.grad, size(Psj, 2), U) for Psj in Ps]
     cone.tmp3 = similar(cone.grad, U, U)
     cone.tmp4 = [similar(cone.grad, size(Psj, 2), size(Psj, 2)) for Psj in Ps]
-    cone.li_lambda = [Vector{Matrix{T}}(undef, R - 1) for Psj in Ps]
+    cone.Λi_Λ = [Vector{Matrix{T}}(undef, R - 1) for Psj in Ps]
     for j in eachindex(Ps), r in 1:(R - 1)
-        cone.li_lambda[j][r] = similar(cone.grad, size(Ps[j], 2), size(Ps[j], 2))
+        cone.Λi_Λ[j][r] = similar(cone.grad, size(Ps[j], 2), size(Ps[j], 2))
     end
-    cone.PlambdaiP = [Vector{Vector{Matrix{T}}}(undef, R) for Psj in Ps]
+    cone.tmpLU = [similar(cone.grad, size(Psj, 2), U) for Psj in Ps]
+    cone.PΛiPs = [Vector{Vector{Matrix{T}}}(undef, R) for Psj in Ps]
     for j in eachindex(Ps), r1 in 1:R
-        cone.PlambdaiP[j][r1] = Vector{Matrix{T}}(undef, r1)
+        cone.PΛiPs[j][r1] = Vector{Matrix{T}}(undef, r1)
         for r2 in 1:r1
-            cone.PlambdaiP[j][r1][r2] = similar(cone.grad, U, U)
+            cone.PΛiPs[j][r1][r2] = similar(cone.grad, U, U)
         end
     end
     cone.lambdafact = Vector{Any}(undef, length(Ps))
     return
 end
 
-get_nu(cone::WSOSPolyInterpSOC) = sum(size(Psj, 2) for Psj in cone.Ps)
+get_nu(cone::WSOSPolyInterpSOC) = 2 * sum(size(Psj, 2) for Psj in cone.Ps)
 
 function set_initial_point(arr::AbstractVector{T}, cone::WSOSPolyInterpSOC{T}) where {T <: Real}
     arr .= zero(T)
@@ -111,7 +118,7 @@ function update_feas(cone::WSOSPolyInterpSOC)
     cone.is_feas = true
     for j in eachindex(cone.Ps)
         Psj = cone.Ps[j]
-        li_lambda = cone.li_lambda[j]
+        Λi_Λ = cone.Λi_Λ[j]
         tmp1 = cone.tmp1[j]
         tmp2 = cone.tmp2[j]
         tmp4 = cone.tmp4[j]
@@ -125,7 +132,7 @@ function update_feas(cone::WSOSPolyInterpSOC)
         @. tmp1 = Psj' * point_pq'
         mul!(tmp4, tmp1, Psj)
         mat .= tmp4
-        lambdafact[j] = cholesky!(Symmetric(tmp4, :L), check = false, Val(true)) # TODO don't pivot?
+        lambdafact[j] = cholesky!(Symmetric(tmp4, :L), check = false)
         if !isposdef(lambdafact[j])
             cone.is_feas = false
             break
@@ -140,12 +147,12 @@ function update_feas(cone::WSOSPolyInterpSOC)
             # mul!(tmp4, tmp1, Psj)
 
             # avoiding lambdafact.L \ lambda because lambdafact \ lambda is useful later
-            li_lambda[r - 1] .= lambdafact[j] \ tmp4
-            mat -= tmp4 * li_lambda[r - 1]
+            Λi_Λ[r - 1] .= lambdafact[j] \ tmp4
+            mat -= tmp4 * Λi_Λ[r - 1]
             uo += cone.U
         end
 
-        matfact[j] = cholesky!(Symmetric(mat, :U), check = false, Val(true)) # TODO don't pivot?
+        matfact[j] = cholesky!(Symmetric(mat, :U), check = false)
         if !isposdef(matfact[j])
             cone.is_feas = false
             break
@@ -159,86 +166,50 @@ end
 function update_grad(cone::WSOSPolyInterpSOC{T}) where {T}
     @assert cone.is_feas
     cone.grad .= 0
-    cone.hess .= 0
     for j in eachindex(cone.Ps)
         Psj = cone.Ps[j]
         tmp1 = cone.tmp1[j]
         tmp2 = cone.tmp2[j]
-        tmp3 = cone.tmp3
-        PlambdaiP = cone.PlambdaiP[j]
-        li_lambda = cone.li_lambda[j]
+        PΛiPs = cone.PΛiPs[j]
+        LUj = cone.tmpLU[j]
+        Λi_Λ = cone.Λi_Λ[j]
         lambdafact = cone.lambdafact
         matfact = cone.matfact
 
-        # prep PlambdaiP
-        # block-(1,1) is P*inv(mat)*P'
-        tmp1 .= view(Psj', matfact[j].p, :)
-        ldiv!(matfact[j].L, tmp1)
-        PlambdaiP[1][1] = Symmetric(tmp1' * tmp1)
+        # prep PΛiPs
+        # block-(1,1) is P * inv(mat) * P'
+        copyto!(tmp1, Psj')
+        ldiv!(LowerTriangular(matfact[j].L), tmp1)
+        mul!(PΛiPs[1][1], tmp1', tmp1)
 
         # cache lambda0 \ Psj' in tmp1
         tmp1 .= lambdafact[j] \ Psj'
+        # get all the PΛiPs that are in row one or on the diagonal
         for r in 2:cone.R
-            PlambdaiP[r][1] = -Psj * li_lambda[r - 1] * (matfact[j] \ Psj')
-            for r2 in 2:(r - 1)
-                PlambdaiP[r][r2] .= Psj * li_lambda[r - 1] * (matfact[j] \ (li_lambda[r2 - 1]' * Psj'))
-                # mul!(tmp2, li_lambda[r2 - 1]', Psj')
-                # ldiv!(matfact[j], tmp2)
-                # mul!(tmp5, li_lambda[r - 1], tmp2)
-                # mul!(PlambdaiP[r][r2], Psj, tmp5)
-            end
-            # PlambdaiP[r][r] .= Symmetric(Psj * li_lambda[r - 1] * (matfact[j] \ (li_lambda[r - 1]' * Psj')), :U)
-            mul!(tmp2, li_lambda[r - 1]', Psj')
-            tmp2 .= view(tmp2, matfact[j].p, :)
+            PΛiPs[r][1] = -Psj * Λi_Λ[r - 1] * (matfact[j] \ Psj')
+            # PΛiPs[r][r] .= Symmetric(Psj * Λi_Λ[r - 1] * (matfact[j] \ (Λi_Λ[r - 1]' * Psj')), :U)
+            mul!(tmp2, Λi_Λ[r - 1]', Psj')
             ldiv!(matfact[j].L, tmp2)
-            BLAS.syrk!('U', 'T', one(T), tmp2, zero(T), PlambdaiP[r][r])
-            PlambdaiP[r][r] .+= Symmetric(Psj * tmp1, :U)
+            mul!(PΛiPs[r][r], tmp2', tmp2)
+            PΛiPs[r][r] .+= Symmetric(Psj * tmp1, :U)
         end
 
-        # part of gradient/hessian when p=1
-        tmp2 .= view(Psj', cone.lambdafact[j].p, :)
-        ldiv!(cone.lambdafact[j].L, tmp2)
-        BLAS.syrk!('U', 'T', one(T), tmp2, zero(T), tmp3)
+        # get half of P * inv(Λ_11) * P for (1, 1) hessian block and first gradient block
+        copyto!(LUj, Psj')
+        ldiv!(LowerTriangular(cone.lambdafact[j].L), LUj)
 
+        # (1, 1)-block
+        # gradient is diag of sum(-PΛiPs[i][i] for i in 1:R) + (R - 1) * Lambda_11 - Lambda_11
         for i in 1:cone.U
-            cone.grad[i] += tmp3[i, i] * (cone.R - 1)
+            cone.grad[i] += sum(abs2, view(LUj, :, i)) * (cone.R - 2)
             for r in 1:cone.R
-                cone.grad[i] -= PlambdaiP[r][r][i, i]
-            end
-            for k in 1:i
-                cone.hess.data[k, i] -= abs2(tmp3[k, i]) * (cone.R - 1)
+                cone.grad[i] -= PΛiPs[r][r][i, i]
             end
         end
-
-        cone.hess.data[1:cone.U, 1:cone.U] .+= Symmetric(PlambdaiP[1][1], :U).^2
-        for r in 2:cone.R
-            idxs2 = ((r - 1) * cone.U + 1):(r * cone.U)
-            for s in 1:(r - 1)
-                # block (1,1)
-                tmp3 .= PlambdaiP[r][s].^2
-                cone.hess.data[1:cone.U, 1:cone.U] .+= Symmetric(tmp3 + tmp3', :U)
-                # blocks (1,r)
-                cone.hess.data[1:cone.U, idxs2] += 2 * PlambdaiP[s][1] .* PlambdaiP[r][s]'
-            end
-            # block (1,1)
-            cone.hess.data[1:cone.U, 1:cone.U] .+= PlambdaiP[r][r].^2
-            # blocks (1,r)
-            cone.hess.data[1:cone.U, idxs2] += 2 * PlambdaiP[r][1] .* Symmetric(PlambdaiP[r][r], :U)
-            # blocks (1,r)
-            for s in (r + 1):cone.R
-                cone.hess.data[1:cone.U, idxs2] += 2 * PlambdaiP[s][1] .* PlambdaiP[s][r]
-            end
-
-            # blocks (r, r2)
-            idxs = ((r - 1) * cone.U + 1):(r * cone.U)
-            for i in 1:cone.U
-                cone.grad[idxs[i]] -= 2 * PlambdaiP[r][1][i, i]
-            end
-            cone.hess.data[idxs, idxs2] .+= 2 * Symmetric(Symmetric(PlambdaiP[1][1], :U) .* Symmetric(PlambdaiP[r][r], :U) + PlambdaiP[r][1] .* PlambdaiP[r][1]', :U)
-            for r2 in (r + 1):cone.R
-                idxs2 = ((r2 - 1) * cone.U + 1):(r2 * cone.U)
-                cone.hess.data[idxs, idxs2] .+= 2 * (PlambdaiP[1][1] .* PlambdaiP[r2][r]' + PlambdaiP[r][1] .* PlambdaiP[r2][1]')
-            end
+        idx = cone.U + 1
+        for r in 2:cone.R, i in 1:cone.U
+            cone.grad[idx] -= 2 * PΛiPs[r][1][i, i]
+            idx += 1
         end
     end # j
 
@@ -248,6 +219,56 @@ end
 
 function update_hess(cone::WSOSPolyInterpSOC)
     @assert cone.grad_updated
+    cone.hess .= 0
+
+    for j in eachindex(cone.Ps)
+        Psj = cone.Ps[j]
+        tmp3 = cone.tmp3
+        PΛiPs = cone.PΛiPs[j]
+        LUj = cone.tmpLU[j]
+        Λi_Λ = cone.Λi_Λ[j]
+        matfact = cone.matfact
+
+        # get the PΛiPs not calculated in update_grad
+        for r in 2:cone.R, r2 in 2:(r - 1)
+            PΛiPs[r][r2] .= Psj * Λi_Λ[r - 1] * (matfact[j] \ (Λi_Λ[r2 - 1]' * Psj'))
+        end
+
+        # tmp3 = P * inv(Lambda_11) * P'
+        mul!(tmp3, LUj', LUj)
+        @inbounds for i in 1:cone.U, k in 1:i
+            cone.hess.data[k, i] -= abs2(tmp3[k, i]) * (cone.R - 2)
+        end
+
+        cone.hess.data[1:cone.U, 1:cone.U] .+= Symmetric(PΛiPs[1][1], :U).^2
+        for r in 2:cone.R
+            idxs2 = ((r - 1) * cone.U + 1):(r * cone.U)
+            for s in 1:(r - 1)
+                # block (1,1)
+                tmp3 .= PΛiPs[r][s].^2
+                cone.hess.data[1:cone.U, 1:cone.U] .+= Symmetric(tmp3 + tmp3', :U)
+                # blocks (1,r)
+                cone.hess.data[1:cone.U, idxs2] += 2 * PΛiPs[s][1] .* PΛiPs[r][s]'
+            end
+            # block (1,1)
+            cone.hess.data[1:cone.U, 1:cone.U] .+= PΛiPs[r][r].^2
+            # blocks (1,r)
+            cone.hess.data[1:cone.U, idxs2] += 2 * PΛiPs[r][1] .* Symmetric(PΛiPs[r][r], :U)
+            # blocks (1,r)
+            for s in (r + 1):cone.R
+                cone.hess.data[1:cone.U, idxs2] += 2 * PΛiPs[s][1] .* PΛiPs[s][r]
+            end
+
+            # blocks (r, r2)
+            idxs = ((r - 1) * cone.U + 1):(r * cone.U)
+            cone.hess.data[idxs, idxs2] .+= 2 * Symmetric(Symmetric(PΛiPs[1][1], :U) .* Symmetric(PΛiPs[r][r], :U) + PΛiPs[r][1] .* PΛiPs[r][1]', :U)
+            for r2 in (r + 1):cone.R
+                idxs2 = ((r2 - 1) * cone.U + 1):(r2 * cone.U)
+                cone.hess.data[idxs, idxs2] .+= 2 * (PΛiPs[1][1] .* PΛiPs[r2][r]' + PΛiPs[r][1] .* PΛiPs[r2][1]')
+            end
+        end
+
+    end
     cone.hess_updated = true
     return cone.hess
 end
