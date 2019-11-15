@@ -91,8 +91,6 @@ function set_initial_point(arr::AbstractVector, cone::WSOSPolyInterpMat)
     return arr
 end
 
-_blockrange(inner::Int, outer::Int) = (outer * (inner - 1) + 1):(outer * inner)
-
 function update_feas(cone::WSOSPolyInterpMat)
     @assert !cone.feas_updated
     cone.is_feas = true
@@ -152,6 +150,7 @@ end
 function update_hess(cone::WSOSPolyInterpMat)
     @assert is_feas(cone)
     cone.hess .= 0
+    U = cone.U
     UU1 = cone.UU1
     UU2 = cone.UU2
     for j in eachindex(cone.Ps)
@@ -163,9 +162,9 @@ function update_hess(cone::WSOSPolyInterpMat)
         for p in 1:cone.R, q in 1:p
             uo += 1
             fact = (p == q) ? 1 : cone.rt2
-            rinds = _blockrange(p, L)
-            cinds = _blockrange(q, L)
-            idxs = _blockrange(uo, cone.U)
+            rinds = (L * (p - 1) + 1):(L * p)
+            cinds = (L * (q - 1) + 1):(L * q)
+            idxs = (U * (uo - 1) + 1):(U * uo)
 
             uo2 = 0
             for p2 in 1:cone.R, q2 in 1:p2
@@ -173,10 +172,9 @@ function update_hess(cone::WSOSPolyInterpMat)
                 if uo2 < uo
                     continue
                 end
-
-                rinds2 = _blockrange(p2, L)
-                cinds2 = _blockrange(q2, L)
-                idxs2 = _blockrange(uo2, cone.U)
+                rinds2 = (L * (p2 - 1) + 1):(L * p2)
+                cinds2 = (L * (q2 - 1) + 1):(L * q2)
+                idxs2 = (U * (uo2 - 1) + 1):(U * uo2)
 
                 mul!(LU, view(W_inv_j, rinds, rinds2), Pj')
                 mul!(UU1, Pj, LU)
@@ -192,9 +190,9 @@ function update_hess(cone::WSOSPolyInterpMat)
                     mul!(UU2, Pj, LU)
                     @. cone.hess.data[idxs, idxs2] += UU1 * UU2 * fact
                 end
-            end
-        end
-    end
+            end # p2, q2
+        end #p, q
+    end # Ps
     cone.hess_updated = true
     return cone.hess
 end
