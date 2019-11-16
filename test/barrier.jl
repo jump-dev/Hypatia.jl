@@ -249,31 +249,37 @@ end
 
 function test_wsospolyinterpmat_barrier(T::Type{<:Real})
     Random.seed!(1)
-    for n in 1:3, halfdeg in 1:3, R in 1:3
-        (U, _, P0, _, _) = MU.interpolate(MU.FreeDomain(n), halfdeg, sample = false)
-        P0 = convert(Matrix{T}, P0)
-        cone = CO.WSOSPolyInterpMat{T}(R, U, [P0], true)
+    for n in 1:3, halfdeg in 1:2, R in 1:3
+        # (U, _, P0, PWts, _) = MU.interpolate(MU.FreeDomain(n), halfdeg, sample = false)
+        (U, _, P0, PWts, _) = MU.interpolate(MU.Box(-ones(n), ones(n)), halfdeg, sample = false)
+        Ps = vcat([P0], PWts)
+        Ps = convert.(Matrix{T}, Ps)
+        cone = CO.WSOSPolyInterpMat{T}(R, U, Ps, true)
         function barrier(s)
-            lambda_block(s) = Symmetric(P0' * Diagonal(s) * P0)
+            lambda_block(s, P) = Symmetric(P' * Diagonal(s) * P)
+            bar = zero(eltype(s))
             rt2i = convert(eltype(s), inv(sqrt(T(2))))
-            L = size(P0, 2)
-            Lambda = Symmetric(zeros(eltype(s), R * L, R * L), :L)
-            uo = 1
-            rows = 1
-            for i in 1:R
-                cols = 1
-                for j in 1:i
-                    slice = s[uo:(uo + U - 1)]
-                    uo += U
-                    fact = (i == j ? one(T) : rt2i)
-                    Lambda.data[rows:(rows + L - 1), cols:(cols + L - 1)] = lambda_block(slice) * fact
-                    cols += L
+            for P in Ps
+                L = size(P, 2)
+                Lambda = Symmetric(zeros(eltype(s), R * L, R * L), :L)
+                uo = 1
+                rows = 1
+                for i in 1:R
+                    cols = 1
+                    for j in 1:i
+                        slice = s[uo:(uo + U - 1)]
+                        uo += U
+                        fact = (i == j ? one(T) : rt2i)
+                        Lambda.data[rows:(rows + L - 1), cols:(cols + L - 1)] = lambda_block(slice, P) * fact
+                        cols += L
+                    end
+                    rows += L
                 end
-                rows += L
+                bar -= logdet(cholesky!(Lambda))
             end
-            return -logdet(cholesky!(Lambda))
+            return bar
         end
-        test_barrier_oracles(cone, barrier, init_tol = Inf)
+        test_barrier_oracles(cone, barrier, init_tol = Inf, tol = 100eps(T))
     end
     return
 end
@@ -296,7 +302,7 @@ function test_wsospolyinterpsoc_barrier(T::Type{<:Real})
                 Lambda -= lambda_i * (Lambda1 \ lambda_i)
                 uo += U
             end
-            return -logdet(cholesky!(Lambda))
+            return -logdet(cholesky!(Lambda)) - logdet(cholesky!(Lambda1))
         end
         test_barrier_oracles(cone, barrier, init_tol = Inf)
     end
