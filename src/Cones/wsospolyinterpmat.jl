@@ -35,8 +35,6 @@ mutable struct WSOSPolyInterpMat{T <: Real} <: Cone{T}
     UU1::Matrix{T}
     UU2::Matrix{T}
 
-    blockmats::Vector{Vector{Vector{Matrix{T}}}}
-    blockfacts::Vector{Vector{Cholesky{T, Matrix{T}}}}
     PlambdaP::Vector{Matrix{T}}
 
     function WSOSPolyInterpMat{T}(

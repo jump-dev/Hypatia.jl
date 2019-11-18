@@ -5,7 +5,7 @@ interpolation-based weighted-sum-of-squares (multivariate) polynomial second ord
 
 definition and dual barrier extended from "Sum-of-squares optimization without semidefinite programming" by D. Papp and S. Yildiz, available at https://arxiv.org/abs/1712.01792
 
-barrier is -logdet(shcur(Lambda)) - logdet(Lambda_11)
+barrier is -logdet(schur(Lambda)) - logdet(Lambda_11)
 if schur(M) = A - B * inv(D) * C
 logdet(schur) = logdet(M) - logdet(D) = logdet(Lambda) - (R - 1) * logdet(Lambda_11) since our D is an (R - 1)x(R - 1) block diagonal matrix
 =#
