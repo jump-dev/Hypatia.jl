@@ -167,6 +167,26 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     solver.kap += alpha * kap_comb
     calc_mu(solver)
 
+    z = point.dual_views[1]
+    u = z[1]
+    v = z[2]
+    n = solver.model.cones[1].side
+    unscale = [(i == j ? one(T) : inv(T(2))) for i in 1:n for j in 1:i]
+    dim = solver.model.cones[1].dim
+    if u < 0
+        mat = Cones.vec_to_mat_U!(zeros(n, n), view(z, 3:dim) .* unscale)
+        fac = cholesky(Symmetric(mat, :U), check = false)
+        if isposdef(fac)
+            feas = (u * (logdet(fac) - n * log(-u) + n) - v < 0)
+            @show "inequality = $feas"
+        else
+            @show "not psd"
+        end
+    else
+        @show "u nonneg"
+    end
+
+
     if solver.tau <= zero(T) || solver.kap <= zero(T) || solver.mu <= zero(T)
         @warn("numerical failure: tau is $(solver.tau), kappa is $(solver.kap), mu is $(solver.mu); terminating")
         solver.status = :NumericalFailure
