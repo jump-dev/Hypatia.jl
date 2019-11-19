@@ -164,6 +164,12 @@ function test_grad_hess(
 
     dim = length(point)
     prod_mat = similar(point, dim, dim)
+
+    # TODO delete
+    # hess_try = CO.hess_prod!(prod_mat, Matrix(one(T) * I, dim, dim), cone)
+    # println(round.(hess_try - hess, digits=10))
+    # @test hess_try ≈ hess atol=tol rtol=tol
+
     @test CO.hess_prod!(prod_mat, Matrix(inv_hess), cone) ≈ I atol=tol rtol=tol
     @test CO.inv_hess_prod!(prod_mat, Matrix(hess), cone) ≈ I atol=tol rtol=tol
 
@@ -303,31 +309,9 @@ function test_epinorminf_barrier(T::Type{<:Real})
             (u, wr) = (s[1], s[2:end])
             w = zeros(Complex{eltype(s)}, n)
             CO.rvec_to_cvec!(w, wr)
-            # w = [ws[2i - 1] + ws[2i] * im for i in 1:n] # TODO use CO.rvec_to_cvec!
             return -sum(log(abs2(u) - abs2(wj)) for wj in w) + (n - 1) * log(u)
         end
         test_barrier_oracles(CO.EpiNormInf{T, Complex{T}}(1 + 2n), C_barrier)
-    end
-    return
-end
-
-function test_epinorminfsymm_barrier(T::Type{<:Real})
-    # real epinorminf cone
-    for n in [1, 3]
-        function R_barrier(s)
-            (u, w) = (s[1], s[2:end])
-            return -sum(log(abs2(u) - abs2(wj)) for wj in w) + (length(w) - 1) * log(u)
-        end
-        # test_barrier_oracles(CO.EpiNormInf{T, T}(1 + n), R_barrier)
-        test_barrier_oracles(CO.EpiNormInfSymm{T}(1 + n), R_barrier)
-
-        # # complex epinorminf cone
-        # function C_barrier(s)
-        #     (u, ws) = (s[1], s[2:end])
-        #     w = [ws[2i - 1] + ws[2i] * im for i in 1:n]
-        #     return -sum(log(abs2(u) - abs2(wj)) for wj in w) + (length(w) - 1) * log(u)
-        # end
-        # test_barrier_oracles(CO.EpiNormInf{T, Complex{T}}(1 + 2n), C_barrier)
     end
     return
 end
@@ -434,7 +418,7 @@ function test_hypogeomean2_barrier(T::Type{<:Real})
 end
 
 function test_epinormspectral_barrier(T::Type{<:Real})
-    for (n, m) in [(1, 2), (2, 2), (2, 3), (3, 5)]
+    for (n, m) in [(1, 2), (1, 3), (2, 2), (2, 3)]
         # real epinormspectral barrier
         function R_barrier(s)
             (u, W) = (s[1], reshape(s[2:end], n, m))
