@@ -193,16 +193,11 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNorm
         # prod_2j = 2 * cone.fact_Z \ (((tmpnm * W' + W * tmpnm' - (2 * u * arr_1j) * I) / cone.fact_Z) * W + tmpnm)
         mul!(tmpnn, tmpnm, W')
         @inbounds for j in 1:cone.n
-            @inbounds for i in 1:(j - 1)
-                tmpnn[j, i] = tmpnn[i, j] += tmpnn[j, i]
-            end
+            @views @. tmpnn[1:(j - 1), j] += tmpnn[j, 1:(j - 1)]
             tmpnn[j, j] -= u * arr_1j
             tmpnn[j, j] *= 2
         end
-        # TODO compare speed and numerics of equivalent lines below
-        mul!(tmpnm, tmpnn, cone.ZiW, 2, 2)
-        # rdiv!(tmpnn, cone.fact_Z)
-        # mul!(tmpnm, tmpnn, W, 2, 2)
+        mul!(tmpnm, Symmetric(tmpnn, :U), cone.ZiW, 2, 2)
         ldiv!(cone.fact_Z, tmpnm)
         prod[2:end, j] .= vec(tmpnm)
     end
