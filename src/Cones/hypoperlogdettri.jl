@@ -61,10 +61,11 @@ mutable struct HypoPerLogdetTri{T <: Real} <: Cone{T}
         cone.sc_try = sc_try
         cone.side = round(Int, sqrt(0.25 + 2 * (dim - 2)) - 0.5)
         if cone.sc_try == :conic_hull
-            # this should be correct and ready
+            # this should be correct and ready (sc as is)
+            # NOTE not simplifying to make k and gamma easier to change
             n = cone.side + 1
             k = cone.k = 4n
-            cone.gamma = (k^(3 / 2) / (k - n)^(3 / 2) + (1 + k / (k - n))^(3 / 2) / sqrt(k))^2
+            cone.gamma = abs2(k ^ (3 / 2) / (k - n) ^ (3 / 2) + (1 + k / (k - n)) ^ (3 / 2) / sqrt(k))
         elseif sc_try == :composition
             # this is not correct and ready, need to figure out beta
             cone.beta = cone.side
