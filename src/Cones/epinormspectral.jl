@@ -174,7 +174,6 @@ function update_hess(cone::EpiNormSpectral)
     return cone.hess
 end
 
-# TODO try to reduce allocs further
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormSpectral)
     if !cone.hess_prod_updated
         update_hess_prod(cone)
@@ -205,4 +204,28 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNorm
     return prod
 end
 
-# TODO try to get inverse hessian using analogy to epinormeucl barrier
+# TODO fix
+function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormSpectral)
+    # if !cone.hess_prod_updated
+    #     update_hess_prod(cone)
+    # end
+    u = cone.point[1]
+    W = cone.W
+    tmpnm = cone.tmpnm
+    # tmpnn = cone.tmpnn
+
+    Z = abs2(u) * I - W * W' # TODO use previous, but need to make cholesky not overwrite it
+
+    @inbounds for j in 1:size(prod, 2)
+        arr_1j = arr[1, j]
+        tmpnm[:] .= @view arr[2:end, j]
+
+        pa = (tmpnm * W' + W * tmpnm') / 2 + u * arr_1j * I
+        prod[1, j] = tr(pa) * u - tr(Z) * arr_1j / 2
+
+        tmpnm .= pa * W + Z * tmpnm / 2
+        prod[2:end, j] .= vec(tmpnm)
+    end
+
+    return prod
+end
