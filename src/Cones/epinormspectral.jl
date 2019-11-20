@@ -194,12 +194,17 @@ function update_hess(cone::EpiNormSpectral)
     end
     Hi ./= 2
 
+    # H_u_W and H_u_u parts
+    Hi[1, 2:end] .= vec(u * W)
+
+
     Hi_try = Symmetric(Hi, :U)
-    println(round.(Hi_try[2:end, 2:end], digits=10))
     Hi_true = inv(cholesky(cone.hess))
-    println(round.(Hi_true[2:end, 2:end], digits=10))
-    println(round.((Hi_try - Hi_true)[2:end, 2:end], digits=10))
+    println(round.(Hi_try[:, 2:end], digits=10))
+    println(round.(Hi_true[:, 2:end], digits=10))
+    println(round.((Hi_try - Hi_true)[:, 2:end], digits=10))
     println()
+
 
 
 

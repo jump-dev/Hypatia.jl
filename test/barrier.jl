@@ -320,6 +320,7 @@ function test_epinorminf_barrier(T::Type{<:Real})
     return
 end
 
+# TODO delete
 function test_epinorminfsymm_barrier(T::Type{<:Real})
     # real epinorminf cone
     for n in [1, 3]
