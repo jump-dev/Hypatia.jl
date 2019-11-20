@@ -139,6 +139,8 @@ function step(stepper::ScalingStepper{T}, solver::Solver{T}) where {T <: Real}
     @. point.x += alpha * stepper.x_dir
     @. point.y += alpha * stepper.y_dir
     @. point.z += alpha * stepper.z_dir
+    Cones.is_dual_feas(solver.model.cones[1])
+
     @. point.s += alpha * stepper.s_dir
     solver.tau += alpha * stepper.dir[stepper.tau_row]
     solver.kap += alpha * stepper.dir[stepper.kap_row]
@@ -151,6 +153,13 @@ function step(stepper::ScalingStepper{T}, solver::Solver{T}) where {T <: Real}
     Cones.is_feas.(solver.model.cones)
     Cones.grad.(solver.model.cones)
     Cones.step_and_update_scaling.(solver.model.cones, stepper.s_dir_k, stepper.z_dir_k, alpha)
+
+    phi1 = point.z + solver.model.cones[1].grad * solver.mu
+    inv_hess1 = Cones.inv_hess(solver.model.cones[1])
+    phi2 = solver.kap + solver.mu / solver.tau
+    inv_hess2 = abs2(solver.tau)
+    INNBHD = phi1' * inv_hess1 * phi1 + phi2 * inv_hess2 * phi2 < solver.mu
+    @show INNBHD
 
     if solver.tau <= zero(T) || solver.kap <= zero(T) || solver.mu <= zero(T)
         @warn("numerical failure: tau is $(solver.tau), kappa is $(solver.kap), mu is $(solver.mu); terminating")
@@ -228,7 +237,6 @@ function find_max_alpha(stepper::ScalingStepper{T}, solver::Solver{T}) where {T 
     return alpha
 end
 
-# this part I'm unsure about. we want to replace all the s+delta_s and z+detla_z with cone.scaled_point + delta_s and cone.scaled_point + delta_z
 function check_nbhd(
     mu_temp::T,
     taukap_temp::T,
@@ -237,7 +245,6 @@ function check_nbhd(
     ) where {T <: Real}
     cones = solver.model.cones
 
-    # so here we would Cones.load_scaled_point.(cones, ) but I don't know how this will work
     Cones.load_point.(cones, solver.primal_views)
     Cones.load_dual_point.(cones, solver.dual_views)
 
@@ -246,7 +253,7 @@ function check_nbhd(
     for (k, cone_k) in enumerate(cones)
         if solver.cones_infeas[k]
             Cones.reset_data(cone_k)
-            if Cones.is_feas(cone_k) # && Cones.is_dual_feas(cone_k)
+            if Cones.is_feas(cone_k) #&& Cones.is_dual_feas(cone_k)
                 solver.cones_infeas[k] = false
                 solver.cones_loaded[k] = true
             else

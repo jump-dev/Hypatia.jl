@@ -79,6 +79,8 @@ function test_barrier_oracles(
     if CO.use_3order_corr(cone) && dim < 8 && T in (Float32, Float64)
         FD_3deriv = ForwardDiff.jacobian(x -> ForwardDiff.hessian(barrier, x), point)
         # check log-homog property that F'''(point)[point] = -2F''(point)
+        # @show size(FD_3deriv)
+        @show FD_3deriv[5, :]
         @test reshape(FD_3deriv * point, dim, dim) ≈ -2 * hess
         # check correction term agrees with directional 3rd derivative
         s_dir = perturb_scale(zeros(T, dim), noise, one(T))
@@ -160,16 +162,17 @@ function test_grad_hess(
     hess = CO.hess(cone)
     inv_hess = CO.inv_hess(cone)
 
-    # @test dot(point, grad) ≈ -nu atol=tol rtol=tol
+    @test dot(point, grad) ≈ -nu atol=tol rtol=tol
     # @test hess * inv_hess ≈ I atol=tol rtol=tol
-    #
-    # dim = length(point)
-    # prod_mat = similar(point, dim, dim)
+
+    dim = length(point)
+    prod_mat = similar(point, dim, dim)
     # @test CO.hess_prod!(prod_mat, Matrix(inv_hess), cone) ≈ I atol=tol rtol=tol
     # @test CO.inv_hess_prod!(prod_mat, Matrix(hess), cone) ≈ I atol=tol rtol=tol
 
-    # println(dim)
-    # inv_hess_try = CO.inv_hess_prod!(prod_mat, Matrix(1.0I, dim, dim), cone)
+    println(dim)
+    inv_hess_try = CO.inv_hess_prod!(prod_mat, Matrix(1.0I, dim, dim), cone)
+    # @show inv_hess_try ./ inv_hess
     # println(round.(inv_hess - inv_hess_try, digits=10))
     # println(round.(inv_hess, digits=10))
     # println(round.(inv_hess_try, digits=10))
@@ -426,7 +429,7 @@ end
 
 function test_hypogeomean2_barrier(T::Type{<:Real})
     Random.seed!(1)
-    for dim in [2, 3, 5, 15, 90, 120, 500]
+    for dim in [3, 5, 15, 90, 120, 500]
         alpha = rand(T, dim - 1) .+ 1
         alpha ./= sum(alpha)
         function barrier(s)
