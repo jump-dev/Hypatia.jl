@@ -144,13 +144,14 @@ function update_hess(cone::EpiNormSpectral)
     n = cone.n
     m = cone.m
     u = cone.point[1]
+    W = cone.W
     Zi = cone.Zi
     ZiW = cone.ZiW
     tmpmm = cone.tmpmm
     H = cone.hess.data
 
     # H_W_W part
-    mul!(tmpmm, cone.W', ZiW) # symmetric, W' * Zi * W
+    mul!(tmpmm, W', ZiW) # symmetric, W' * Zi * W
     # TODO parallelize loops
     @inbounds for i in 1:m
         r = 1 + (i - 1) * n
@@ -169,6 +170,38 @@ function update_hess(cone::EpiNormSpectral)
     # H_u_W and H_u_u parts
     H[1, 2:end] .= vec(cone.HuW)
     H[1, 1] = cone.Huu
+
+
+    # TODO try replacing Zi with Z in order to derive an inv hess
+    # H_W_W part
+    Hi = similar(H)
+    Hi .= 0
+    Z = Symmetric(abs2(u) * I - W * W')
+    ZW = Z * W
+    tmpmm = W' * ZW
+
+    @inbounds for i in 1:m
+        r = 1 + (i - 1) * n
+        for j in 1:n
+            r2 = r + j
+            @. @views Hi[r2, r .+ (j:n)] = Z[j:n, j] * tmpmm[i, i] + ZW[j:n, i] * ZW[j, i] + Z[j, j:n]
+            c2 = r + n
+            @inbounds for k in (i + 1):m
+                @. @views Hi[r2, c2 .+ (1:n)] = Z[1:n, j] * tmpmm[i, k] + ZW[1:n, i] * ZW[j, k]
+                c2 += n
+            end
+        end
+    end
+    Hi ./= 2
+
+    Hi_try = Symmetric(Hi, :U)
+    println(round.(Hi_try[2:end, 2:end], digits=10))
+    Hi_true = inv(cholesky(cone.hess))
+    println(round.(Hi_true[2:end, 2:end], digits=10))
+    println(round.((Hi_try - Hi_true)[2:end, 2:end], digits=10))
+    println()
+
+
 
     cone.hess_updated = true
     return cone.hess
@@ -205,27 +238,62 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNorm
 end
 
 # TODO fix
-function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormSpectral)
-    # if !cone.hess_prod_updated
-    #     update_hess_prod(cone)
-    # end
-    u = cone.point[1]
-    W = cone.W
-    tmpnm = cone.tmpnm
-    # tmpnn = cone.tmpnn
-
-    Z = abs2(u) * I - W * W' # TODO use previous, but need to make cholesky not overwrite it
-
-    @inbounds for j in 1:size(prod, 2)
-        arr_1j = arr[1, j]
-        tmpnm[:] .= @view arr[2:end, j]
-
-        pa = (tmpnm * W' + W * tmpnm') / 2 + u * arr_1j * I
-        prod[1, j] = tr(pa) * u - tr(Z) * arr_1j / 2
-
-        tmpnm .= pa * W + Z * tmpnm / 2
-        prod[2:end, j] .= vec(tmpnm)
-    end
-
-    return prod
-end
+# function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormSpectral)
+#     # if !cone.hess_prod_updated
+#     #     update_hess_prod(cone)
+#     # end
+#     u = cone.point[1]
+#     W = cone.W
+#     tmpnm = cone.tmpnm
+#     # tmpnn = cone.tmpnn
+#
+#     Z = abs2(u) * I - W * W' # TODO use previous, but need to make cholesky not overwrite it
+#
+#     @inbounds for j in 1:size(prod, 2)
+#         arr_1j = arr[1, j]
+#         tmpnm[:] .= @view arr[2:end, j]
+#
+#         pa = (tmpnm * W' + W * tmpnm') / 2 + (cone.n * u * arr_1j) * I
+#         prod[1, j] = tr(pa) * u - tr(Z) * arr_1j / 2
+#
+#         tmpnm2 = pa * W + Z / 2 * tmpnm
+#         prod[2:end, j] .= vec(tmpnm2)
+#     end
+#
+#     return prod
+# end
+#
+# function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormSpectral)
+#     if !cone.hess_prod_updated
+#         update_hess_prod(cone)
+#     end
+#     u = cone.point[1]
+#     W = cone.W
+#     tmpnm = cone.tmpnm
+#     tmpnn = cone.tmpnn
+#
+#     Z = abs2(u) * I - W * W'
+#
+#     @inbounds for j in 1:size(prod, 2)
+#         arr_1j = arr[1, j]
+#         tmpnm[:] .= @view arr[2:end, j]
+#
+#         prod[1, j] = cone.Huu * arr_1j + dot(cone.HuW, tmpnm)
+#
+#         # prod_2j = 2 * cone.fact_Z \ (((tmpnm * W' + W * tmpnm' - (2 * u * arr_1j) * I) / cone.fact_Z) * W + tmpnm)
+#         mul!(tmpnn, tmpnm, W')
+#         @inbounds for j in 1:cone.n
+#             @views @. tmpnn[1:(j - 1), j] += tmpnn[j, 1:(j - 1)]
+#             tmpnn[j, j] -= u * arr_1j
+#             tmpnn[j, j] *= 2
+#         end
+#         tmpnm += Symmetric(tmpnn, :U) * Z * W
+#         tmpnm /= 2
+#         tmpnm .= Z * tmpnm
+#         # mul!(tmpnm, Symmetric(tmpnn, :U), cone.ZiW, 2, 2)
+#         # ldiv!(cone.fact_Z, tmpnm)
+#         prod[2:end, j] .= vec(tmpnm)
+#     end
+#
+#     return prod
+# end
