@@ -10,6 +10,7 @@ barrier from Constructing self-concordant barriers for convex cones by Yu. Neste
 =#
 
 mutable struct HypoGeomean2{T <: Real} <: Cone{T}
+    use_3order_corr::Bool
     use_dual::Bool
     dim::Int
     alpha::Vector{T}
@@ -29,10 +30,12 @@ mutable struct HypoGeomean2{T <: Real} <: Cone{T}
     wprod::T
     wprodu::T
     tmpn::Vector{T}
+    correction::Vector{T}
 
     function HypoGeomean2{T}(
         alpha::Vector{T},
         is_dual::Bool;
+        use_3order_corr::Bool = true,
         hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
         dim = length(alpha) + 1
@@ -41,6 +44,7 @@ mutable struct HypoGeomean2{T <: Real} <: Cone{T}
         tol = 1e3 * eps(T)
         @assert sum(alpha) ≈ 1 atol=tol rtol=tol
         cone = new{T}()
+        cone.use_3order_corr = use_3order_corr
         cone.use_dual = is_dual
         cone.dim = dim
         cone.alpha = alpha
@@ -51,6 +55,8 @@ end
 
 HypoGeomean2{T}(alpha::Vector{T}) where {T <: Real} = HypoGeomean2{T}(alpha, false)
 
+use_3order_corr(cone::HypoGeomean2) = cone.use_3order_corr
+
 function setup_data(cone::HypoGeomean2{T}) where {T <: Real}
     reset_data(cone)
     dim = cone.dim
@@ -60,6 +66,7 @@ function setup_data(cone::HypoGeomean2{T}) where {T <: Real}
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
     cone.tmpn = zeros(T, dim - 1)
+    cone.correction = zeros(T, dim)
     return
 end
 
@@ -123,6 +130,58 @@ function update_hess(cone::HypoGeomean2)
     end
     cone.hess_updated = true
     return cone.hess
+end
+
+# TODO make more efficient in math and code
+function correction(cone::HypoGeomean2, s_sol::AbstractVector, z_sol::AbstractVector)
+    @show "here"
+    if !cone.hess_updated
+        update_hess(cone)
+    end
+    u = cone.point[1]
+    w = view(cone.point, 2:cone.dim)
+    wprod = cone.wprod
+    wprodu = cone.wprodu
+    wwprodu = wprod / wprodu
+    alpha = cone.alpha
+    Hinv_z = inv_hess(cone) * z_sol
+    corr = cone.correction
+    corr .= 0
+    for i in eachindex(w), j in eachindex(w), k in eachindex(w)
+        @show (i, j, k)
+        if i == j == k == 1
+            corr[k + 1] += wprodu * s_sol[i] * Hinv_z[j]
+        elseif i == j == 1
+            corr[k + 1] += alpha[k] * wprod / w[k] / wprodu ^ 3 * s_sol[i] * Hinv_z[j]
+        elseif i == k == 1
+            corr[k + 1] += alpha[j] * wprod / w[j] / wprodu ^ 3 * s_sol[i] * Hinv_z[j]
+        elseif j == k == 1
+            corr[k + 1] += alpha[i] * wprod / w[i] / wprodu ^ 3 * s_sol[i] * Hinv_z[j]
+        elseif i == 1 && j == k
+            corr[k + 1] += wprod * alpha[j] / abs2(wprodu) / abs2(w[j]) * (-alpha[j] + 1 + wwprodu * alpha[j]) * s_sol[i] * Hinv_z[j]
+        elseif (j == 1 && i == k) || ( k == 1 && i == j)
+            corr[k + 1] += wprod * alpha[i] / abs2(wprodu) / abs2(w[i]) * (-alpha[i] + 1 + wwprodu * alpha[i]) * s_sol[i] * Hinv_z[j]
+        elseif i == 1
+            corr[k + 1] += wwprodu / wprodu * alpha[j] * alpha[k] / w[j] / w[k] * (wwprodu - 1) * s_sol[i] * Hinv_z[j]
+        elseif j == 1
+            corr[k + 1] += wwprodu / wprodu * alpha[i] * alpha[k] / w[i] / w[k] * (wwprodu - 1) * s_sol[i] * Hinv_z[j]
+        elseif k == 1
+            corr[k + 1] += wwprodu / wprodu * alpha[j] * alpha[i] / w[j] / w[i] * (wwprodu - 1) * s_sol[i] * Hinv_z[j]
+        elseif i == j == k
+            corr[k + 1] += (wwprodu * alpha[i] / (w[i]) ^ 3 * (wwprodu * alpha[i] * (alpha[i] - 1) -
+                (alpha[i] - 1) * (alpha[i] - 2) - abs2(wwprodu) * abs2(alpha[i]) + 2 * alpha[i] * (alpha[i] - 1) * wwprodu) - 2 / w[i] ^ 3) * s_sol[i] * Hinv_z[j]
+        elseif i == j
+            corr[k] += (wwprodu * alpha[i] * alpha[k] / w[i] / w[k] * ((alpha[i] - 1) / abs2(w[i]) * (wwprodu - 1) + wwprodu * (2 - prod / w[i]))) * s_sol[i] * Hinv_z[j]
+        elseif i == k
+            corr[k + 1] += (wwprodu * alpha[i] * alpha[j] / w[i] / w[j] * ((alpha[i] - 1) / abs2(w[i]) * (wwprodu - 1) + wwprodu * (2 - prod / w[i]))) * s_sol[i] * Hinv_z[j]
+        elseif j == k
+            corr[k + 1] += (wwprodu * alpha[i] * alpha[j] / w[i] / w[j] * ((alpha[j] - 1) / abs2(w[j]) * (wwprodu - 1) + wwprodu * (2 - prod / w[j]))) * s_sol[i] * Hinv_z[j]
+        else
+            corr[k + 1] += (alpha[i] * alpha[j] * alpha[k] / w[i] / w[j] / w[k] * wwprodu * (3 * wwprodu - 1 - abs2(wwprodu))) * s_sol[i] * Hinv_z[j]
+        end
+    end
+
+    return corr
 end
 
 # see analysis in https://github.com/lkapelevich/HypatiaBenchmarks.jl/tree/master/centralpoints

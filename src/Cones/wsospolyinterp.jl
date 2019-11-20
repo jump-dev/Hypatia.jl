@@ -12,8 +12,8 @@ TODO
 =#
 
 mutable struct WSOSPolyInterp{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
-    use_dual::Bool
     use_3order_corr::Bool
+    use_dual::Bool
     dim::Int
     Ps::Vector{Matrix{R}}
     point::Vector{T}
@@ -49,6 +49,7 @@ mutable struct WSOSPolyInterp{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
             @assert size(Ps[k], 1) == dim
         end
         cone = new{T, R}()
+        cone.use_3order_corr = use_3order_corr
         cone.use_dual = !is_dual # using dual barrier
         cone.dim = dim
         cone.Ps = Ps
