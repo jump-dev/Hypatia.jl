@@ -489,3 +489,52 @@ function step_max_dist(cone::EpiNormEucl{T}, s_sol::AbstractVector{T}, z_sol::Ab
     end
     return step_dist
 end
+
+
+
+# TODO cleanup below and implement this function (for scaling and without scaling)
+# function hess_Uprod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Nonnegative)
+
+
+# function hess_L_fact(cone::EpiNormEucl{T}) where {T} # remove T
+#     dist = (abs2(cone.point[1]) - sum(abs2, cone.point[2:end])) # replace by cone.dist when figured out how to double things correctly
+#     # dist = cone.dist
+#     dim = cone.dim
+#     L = zeros(T, dim, dim)
+#     w = cone.point[2:dim]
+#     dist_sqrt = sqrt(dist)
+#     mul!(L[2:dim, 2:dim], w, w')
+#     # hyp_aat!(L_main, w) # maybe does dispatch to the right thing
+#     @. L[2:dim, 2:dim] /= (cone.point[1] + dist_sqrt)
+#     # L_main += dist_sqrt * I # returns an array
+#     L[2:dim, 2:dim] += dist_sqrt * I
+#     L[2:dim, 2:dim] = w * w' / (cone.point[1] + dist_sqrt) + dist_sqrt * I
+#     L[1, 2:dim] = L[2:dim, 1] = -cone.point[2:dim]
+#     L[1, 1] = cone.point[1]
+#     @. L /= dist
+#     @. L *= sqrt(2)
+#     return L
+# end
+#
+# hess_U_fact(cone::EpiNormEucl) = hess_L_fact(cone)
+#
+# hess_U_prod!(prod, arr, cone::EpiNormEucl) = mul!(prod, hess_L_fact(cone), arr)
+#
+# function hess_L_div!(dividend, arr, cone::EpiNormEucl{T}) where {T} # remove T
+#     dist = (abs2(cone.point[1]) - sum(abs2, cone.point[2:end])) # replace by cone.dist when figured out how to double things correctly
+#     # dist = cone.dist
+#     dim = cone.dim
+#     L = zeros(T, dim, dim)
+#     w = cone.point[2:dim]
+#     dist_sqrt = sqrt(dist)
+#     mul!(L[2:dim, 2:dim], w, w')
+#     # hyp_aat!(L_main, w) # maybe does dispatch to the right thing
+#     @. L[2:dim, 2:dim] /= (cone.point[1] + dist_sqrt)
+#     # L_main += dist_sqrt * I # returns an array
+#     L[2:dim, 2:dim] += dist_sqrt * I
+#     L[2:dim, 2:dim] = w * w' / (cone.point[1] + dist_sqrt) + dist_sqrt * I
+#     L[1, 2:dim] = L[2:dim, 1] = cone.point[2:dim]
+#     L[1, 1] = cone.point[1]
+#     @. L /= sqrt(2)
+#     return mul!(dividend, L, arr)
+# end
