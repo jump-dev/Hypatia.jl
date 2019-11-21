@@ -39,7 +39,7 @@ function test_barrier_oracles(
     cone::CO.Cone{T},
     barrier::Function;
     noise::T = T(0.1),
-    scale::T = T(1e-1),
+    scale::T = T(1e-3),
     tol::T = 100eps(T),
     init_tol::T = tol,
     init_only::Bool = false,
@@ -79,8 +79,6 @@ function test_barrier_oracles(
     if CO.use_3order_corr(cone) && dim < 8 && T in (Float32, Float64)
         FD_3deriv = ForwardDiff.jacobian(x -> ForwardDiff.hessian(barrier, x), point)
         # check log-homog property that F'''(point)[point] = -2F''(point)
-        # @show size(FD_3deriv)
-        @show FD_3deriv[5, :]
         @test reshape(FD_3deriv * point, dim, dim) ≈ -2 * hess
         # check correction term agrees with directional 3rd derivative
         s_dir = perturb_scale(zeros(T, dim), noise, one(T))
@@ -163,33 +161,24 @@ function test_grad_hess(
     inv_hess = CO.inv_hess(cone)
 
     @test dot(point, grad) ≈ -nu atol=tol rtol=tol
-    # @test hess * inv_hess ≈ I atol=tol rtol=tol
+    @test hess * inv_hess ≈ I atol=tol rtol=tol
 
     dim = length(point)
     prod_mat = similar(point, dim, dim)
-    # @test CO.hess_prod!(prod_mat, Matrix(inv_hess), cone) ≈ I atol=tol rtol=tol
-    # @test CO.inv_hess_prod!(prod_mat, Matrix(hess), cone) ≈ I atol=tol rtol=tol
+    @test CO.hess_prod!(prod_mat, Matrix(inv_hess), cone) ≈ I atol=tol rtol=tol
+    @test CO.inv_hess_prod!(prod_mat, Matrix(hess), cone) ≈ I atol=tol rtol=tol
 
-    println(dim)
-    inv_hess_try = CO.inv_hess_prod!(prod_mat, Matrix(1.0I, dim, dim), cone)
-    # @show inv_hess_try ./ inv_hess
-    # println(round.(inv_hess - inv_hess_try, digits=10))
-    # println(round.(inv_hess, digits=10))
-    # println(round.(inv_hess_try, digits=10))
-    # println()
+    if !CO.use_scaling(cone)
+        prod = similar(point)
+        @test hess * point ≈ -grad atol=tol rtol=tol
+        @test CO.hess_prod!(prod, point, cone) ≈ -grad atol=tol rtol=tol
+        @test CO.inv_hess_prod!(prod, grad, cone) ≈ -point atol=tol rtol=tol
+    end
 
-
-    # if !CO.use_scaling(cone)
-    #     prod = similar(point)
-    #     @test hess * point ≈ -grad atol=tol rtol=tol
-    #     @test CO.hess_prod!(prod, point, cone) ≈ -grad atol=tol rtol=tol
-    #     @test CO.inv_hess_prod!(prod, grad, cone) ≈ -point atol=tol rtol=tol
-    # end
-    #
-    # if !isempty(dual_point)
-    #     @test hess * point ≈ dual_point atol=tol rtol=tol
-    #     @test inv_hess * dual_point ≈ point atol=tol rtol=tol
-    # end
+    if !isempty(dual_point)
+        @test hess * point ≈ dual_point atol=tol rtol=tol
+        @test inv_hess * dual_point ≈ point atol=tol rtol=tol
+    end
 
     return
 end
@@ -323,7 +312,6 @@ function test_epinorminf_barrier(T::Type{<:Real})
     return
 end
 
-# TODO delete
 function test_epinorminfsymm_barrier(T::Type{<:Real})
     # real epinorminf cone
     for n in [1, 3]
@@ -429,7 +417,7 @@ end
 
 function test_hypogeomean2_barrier(T::Type{<:Real})
     Random.seed!(1)
-    for dim in [3, 5, 15, 90, 120, 500]
+    for dim in [2, 3, 5, 15, 90, 120, 500]
         alpha = rand(T, dim - 1) .+ 1
         alpha ./= sum(alpha)
         function barrier(s)
@@ -447,7 +435,7 @@ function test_hypogeomean2_barrier(T::Type{<:Real})
 end
 
 function test_epinormspectral_barrier(T::Type{<:Real})
-    for (n, m) in [(1, 2), (1, 5), (2, 2), ]#(2, 3), (3, 5)]
+    for (n, m) in [(1, 2), (2, 2), (2, 3), (3, 5)]
         # real epinormspectral barrier
         function R_barrier(s)
             (u, W) = (s[1], reshape(s[2:end], n, m))

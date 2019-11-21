@@ -147,7 +147,6 @@ function correction(cone::HypoGeomean2, s_sol::AbstractVector, z_sol::AbstractVe
     Hinv_z = inv_hess(cone) * z_sol
     corr = cone.correction
     corr .= 0
-    @show alpha[1] * alpha[2] * wwprodu / abs2(w[1]) / w[2] * (2 * wwprodu - 1) * (alpha[1] - 1 - alpha[1] * wwprodu)
     for i in 1:dim, j in 1:dim, k in 1:dim
         (i1, j1, k1) = (i - 1, j - 1, k - 1)
         if i == j == k == 1
@@ -172,15 +171,16 @@ function correction(cone::HypoGeomean2, s_sol::AbstractVector, z_sol::AbstractVe
             corr[k] += (wwprodu * alpha[i1] / (w[i1]) ^ 3 * (wwprodu * alpha[i1] * (alpha[i1] - 1) -
                 (alpha[i1] - 1) * (alpha[i1] - 2) - 2 * abs2(wwprodu) * abs2(alpha[i1]) + 2 * alpha[i1] * (alpha[i1] - 1) * wwprodu) - 2 / w[i1] ^ 3) * s_sol[i] * Hinv_z[j]
         elseif i == j
-            corr[k] += (wwprodu * alpha[i1] * alpha[k1] / w[i1] / w[k1] * ((alpha[i1] - 1) / abs2(w[i1]) * (wwprodu - 1) + 2 * wwprodu * (1 - wprod / w[i1]))) * s_sol[i] * Hinv_z[j]
+            corr[k] += (wwprodu - 1) * (alpha[k1] * alpha[i1] * wwprodu / w[k1] / abs2(w[i1]) * (alpha[i1] - 1 - 2 * alpha[i1] * wwprodu)) * s_sol[i] * Hinv_z[j]
         elseif i == k
-            corr[k] += (wwprodu * alpha[i1] * alpha[j1] / w[i1] / w[j1] * ((alpha[i1] - 1) / abs2(w[i1]) * (wwprodu - 1) + 2 * wwprodu * (1 - wprod / w[i1]))) * s_sol[i] * Hinv_z[j]
+            corr[k] += (wwprodu - 1) * (alpha[j1] * alpha[i1] * wwprodu / w[j1] / abs2(w[i1]) * (alpha[i1] - 1 - 2 * alpha[i1] * wwprodu)) * s_sol[i] * Hinv_z[j]
         elseif j == k
-            corr[k] += (wwprodu * alpha[i1] * alpha[j1] / w[i1] / w[j1] * ((alpha[j1] - 1) / abs2(w[j1]) * (wwprodu - 1) + 2 * wwprodu * (1 - wprod / w[j1]))) * s_sol[i] * Hinv_z[j]
+            corr[k] += (wwprodu - 1) * (alpha[i1] * alpha[j1] * wwprodu / w[i1] / abs2(w[j1]) * (alpha[j1] - 1 - 2 * alpha[j1] * wwprodu)) * s_sol[i] * Hinv_z[j]
         else
             corr[k] += (alpha[i1] * alpha[j1] * alpha[k1] / w[i1] / w[j1] / w[k1] * wwprodu * (3 * wwprodu - 1 - abs2(wwprodu))) * s_sol[i] * Hinv_z[j]
         end
     end
+    corr ./= -2
 
     return corr
 end
