@@ -18,7 +18,7 @@ import Hypatia.update_fact
 import Hypatia.solve_system
 import Hypatia.invert
 
-hessian_cache(T::Type{<:LinearAlgebra.BlasReal}) = DenseSymCache{T}() # use BunchKaufman for BlasReals
+# hessian_cache(T::Type{<:LinearAlgebra.BlasReal}) = DenseSymCache{T}() # use BunchKaufman for BlasReals
 hessian_cache(T::Type{<:Real}) = DensePosDefCache{T}() # use Cholesky for generic reals
 
 abstract type Cone{T <: Real} end
@@ -42,7 +42,7 @@ include("wsospolyinterp.jl")
 
 use_scaling(cone::Cone) = false
 use_3order_corr(cone::Cone) = false
-try_scaled_updates(cone::Cone) = false
+try_scaled_updates(cone::Cone) = false # TODO delete
 
 use_dual(cone::Cone) = cone.use_dual
 load_point(cone::Cone, point::AbstractVector) = copyto!(cone.point, point)
@@ -109,6 +109,13 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
     return mul!(prod, cone.hess, arr)
 end
 
+function hess_Uprod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
+    if !cone.inv_hess_prod_updated # TODO rename
+        update_inv_hess_prod(cone)
+    end
+    return mul!(prod, UpperTriangular(cone.hess_fact_cache.AF), arr)
+end
+
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
     if !cone.inv_hess_prod_updated
         update_inv_hess_prod(cone)
@@ -116,6 +123,15 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Con
     copyto!(prod, arr)
     solve_system(cone.hess_fact_cache, prod)
     return prod
+end
+
+function inv_hess_Uprod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
+    if !cone.inv_hess_prod_updated # TODO rename
+        update_inv_hess_prod(cone)
+    end
+    copyto!(prod, arr)
+    return ldiv!(UpperTriangular(cone.hess_fact_cache.AF.data), prod)
+    # return ldiv!(prod, UpperTriangular(cone.hess_fact_cache.AF.data), arr)
 end
 
 # utilities for converting between symmetric/Hermitian matrix and vector triangle forms
