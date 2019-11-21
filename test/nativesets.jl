@@ -16,7 +16,7 @@ testfuns_few = [
     hypogeomean1,
     epinormspectral1,
     possemideftri1,
-    possemideftricomplex1,
+    possemideftri5,
     hypoperlogdettri1,
     primalinfeas1,
     primalinfeas2,
@@ -68,9 +68,9 @@ testfuns_many = [
     possemideftri2,
     possemideftri3,
     possemideftri4,
-    possemideftricomplex1, # TODO rename to possemideftri
-    possemideftricomplex2,
-    possemideftricomplex3,
+    possemideftri5, # TODO rename to possemideftri
+    possemideftri6,
+    possemideftri7,
     # hypoperlogdettri1,
     # hypoperlogdettri2,
     # hypoperlogdettri3,

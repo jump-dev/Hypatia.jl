@@ -203,6 +203,9 @@ function load(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}) wher
     return system_solver
 end
 
+outer_prod(UGQ2::Matrix{T}, lhs1::Matrix{T}) where {T <: LinearAlgebra.BlasReal} = BLAS.syrk!('U', 'T', true, UGQ2, false, lhs1)
+outer_prod(UGQ2::Matrix{T}, lhs1::Matrix{T}) where {T <: Real} = mul!(lhs1, UGQ2', UGQ2)
+
 function update_fact(system_solver::QRCholDenseSystemSolver, solver::Solver)
     isempty(system_solver.Q2div) && return system_solver
     model = solver.model
@@ -225,7 +228,7 @@ function update_fact(system_solver::QRCholDenseSystemSolver, solver::Solver)
             end
         end
     end
-    BLAS.syrk!('U', 'T', true, system_solver.HGQ2, false, system_solver.lhs1.data)
+    outer_prod(system_solver.HGQ2, system_solver.lhs1.data)
 
 
     update_fact(system_solver.fact_cache, system_solver.lhs1) # overwrites lhs1 with new factorization

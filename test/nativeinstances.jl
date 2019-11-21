@@ -328,8 +328,8 @@ function possemideftri1(T; options...)
     b = T[0.5, 1]
     G = Matrix{T}(-I, 3, 3)
     h = zeros(T, 3)
-
     cones = CO.Cone{T}[CO.PosSemidefTri{T, T}(3)]
+
     r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
     @test r.status == :Optimal
     @test r.primal_obj ≈ -one(T) atol=tol rtol=tol
@@ -343,7 +343,6 @@ function possemideftri2(T; options...)
     b = T[0]
     G = Diagonal(-one(T) * I, 3)
     h = zeros(T, 3)
-
     cones = CO.Cone{T}[CO.PosSemidefTri{T, T}(3)]
 
     r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
@@ -391,7 +390,7 @@ function possemideftri4(T; options...)
     @test r.primal_obj ≈ -eig_max atol=tol rtol=tol
 end
 
-function possemideftricomplex1(T; options...)
+function possemideftri5(T; options...)
     tol = sqrt(sqrt(eps(T)))
     Trt2 = sqrt(T(2))
     Trt2i = inv(Trt2)
@@ -409,7 +408,7 @@ function possemideftricomplex1(T; options...)
 end
 
 # maximum eigenvalue problem
-function possemideftricomplex2(T; options...)
+function possemideftri6(T; options...)
     tol = sqrt(sqrt(eps(T)))
     rt2 = sqrt(T(2))
     c = T[1]
@@ -428,7 +427,7 @@ function possemideftricomplex2(T; options...)
 end
 
 # dual formulation to the above
-function possemideftricomplex3(T; options...)
+function possemideftri7(T; options...)
     tol = sqrt(sqrt(eps(T)))
     rt2 = sqrt(T(2))
     s = 3
