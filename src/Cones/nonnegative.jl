@@ -118,6 +118,16 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Nonnega
     return prod
 end
 
+function hess_Uprod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Nonnegative)
+    @assert cone.is_feas
+    if cone.use_scaling
+        @. prod = arr * sqrt(cone.dual_point) / sqrt(cone.point) # TODO do sqrts once and cache
+    else
+        @. prod = arr / cone.point
+    end
+    return prod
+end
+
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Nonnegative)
     @assert cone.is_feas
     if cone.use_scaling
@@ -127,6 +137,16 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Non
     end
     return prod
 end
+
+# function inv_hess_Uprod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Nonnegative)
+#     @assert cone.is_feas
+#     if cone.use_scaling
+#         @. prod = arr * sqrt(cone.point) / sqrt(cone.dual_point)
+#     else
+#         @. prod = arr * cone.point
+#     end
+#     return prod
+# end
 
 function step_max_dist(cone::Nonnegative{T}, s_sol::AbstractVector{T}, z_sol::AbstractVector{T}) where {T <: Real}
     @assert cone.is_feas

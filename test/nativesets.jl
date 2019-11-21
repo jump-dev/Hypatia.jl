@@ -28,9 +28,9 @@ testfuns_few = [
 
 # TODO check all native instances are in this list
 testfuns_many = [
-    # nonnegative1,
-    # nonnegative2,
-    # nonnegative3,
+    nonnegative1,
+    nonnegative2,
+    nonnegative3,
     # epinorminf1,
     # epinorminf2,
     # epinorminf3,
@@ -64,13 +64,13 @@ testfuns_many = [
     # epinormspectral1,
     # epinormspectral2,
     # epinormspectral3,
-    # possemideftri1,
-    # possemideftri2,
-    # possemideftri3,
-    # possemideftri4,
-    # possemideftricomplex1,
-    # possemideftricomplex2,
-    # possemideftricomplex3,
+    possemideftri1,
+    possemideftri2,
+    possemideftri3,
+    possemideftri4,
+    possemideftricomplex1, # TODO rename to possemideftri
+    possemideftricomplex2,
+    possemideftricomplex3,
     # hypoperlogdettri1,
     # hypoperlogdettri2,
     # hypoperlogdettri3,
@@ -80,9 +80,9 @@ testfuns_many = [
     # dualinfeas1,
     # dualinfeas2,
     # dualinfeas3,
-    wsospolyinterp1,
-    wsospolyinterp2,
-    wsospolyinterp3,
+    # wsospolyinterp1,
+    # wsospolyinterp2,
+    # wsospolyinterp3,
     ]
 
 # TODO add more preprocessing test instances

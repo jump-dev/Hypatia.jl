@@ -54,7 +54,7 @@ mutable struct PosSemidefTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
         dim::Int;
         use_scaling::Bool = true,
         use_3order_corr::Bool = true,
-        try_scaled_updates::Bool = false,
+        try_scaled_updates::Bool = true,
         ) where {R <: RealOrComplex{T}} where {T <: Real}
         @assert dim >= 1
         cone = new{T, R}()
@@ -271,17 +271,50 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemi
     return prod
 end
 
+function hess_Uprod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidefTri)
+    @assert cone.is_feas
+    if cone.use_scaling
+        @inbounds for i in 1:size(arr, 2)
+            svec_to_smat!(cone.work_mat2, view(arr, :, i), cone.rt2)
+            mul!(cone.work_mat, Hermitian(cone.work_mat2, :U), cone.scalmat_sqrti')
+            mul!(cone.work_mat2, cone.scalmat_sqrti, cone.work_mat)
+            smat_to_svec!(view(prod, :, i), cone.work_mat2, cone.rt2)
+        end
+    else
+        @inbounds for i in 1:size(arr, 2)
+            svec_to_smat!(cone.work_mat2, view(arr, :, i), cone.rt2)
+            copytri!(cone.work_mat2, 'U', cone.is_complex)
+            rdiv!(cone.work_mat2, cone.fact.U)
+            ldiv!(cone.fact.U', cone.work_mat2)
+            smat_to_svec!(view(prod, :, i), cone.work_mat2, cone.rt2)
+        end
+    end
+    return prod
+end
+
 # TODO don't need to special case here
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidefTri)
     @assert is_feas(cone)
     if cone.use_scaling
         mul!(cone.work_mat3, cone.scalmat_sqrt, cone.scalmat_sqrt') # TODO fix inefficiency of the mul
-        herm_congruence_prod!(prod, arr, cone.work_mat3, cone)
+        gen_congruence_prod!(prod, arr, cone.work_mat3, cone)
     else
-        herm_congruence_prod!(prod, arr, cone.mat, cone)
+        gen_congruence_prod!(prod, arr, cone.mat, cone)
     end
     return prod
 end
+
+# function inv_hess_Uprod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidefTri)
+#     @assert cone.is_feas
+#     if cone.use_scaling
+#         println("inv hess U prod")
+#         herm_congruence_prod!(prod, arr, cone.scalmat_sqrt, cone)
+#     else
+#         println("inv hess U prod no scal")
+#         herm_congruence_prod!(prod, arr, cone.fact.U, cone)
+#     end
+#     return prod
+# end
 
 function dist_to_bndry(cone::PosSemidefTri{T, R}, fact, dir::AbstractVector{T}) where {R <: RealOrComplex{T}} where {T <: Real}
     svec_to_smat!(cone.work_mat, dir, cone.rt2)

@@ -92,7 +92,7 @@ function solve_3x3_subsystem(system_solver::QRCholSystemSolver{T}, solver::Solve
 
     if !isempty(system_solver.Q2div)
         mul!(system_solver.GQ1x, system_solver.GQ1, y)
-        block_hessian_product(solver, model.cones, system_solver.HGQ1x_k, system_solver.GQ1x_k)
+        block_hess_prod(solver, model.cones, system_solver.HGQ1x_k, system_solver.GQ1x_k)
         mul!(system_solver.Q2div, system_solver.GQ2', system_solver.HGQ1x, -1, true)
 
         solve_subsystem(system_solver, x_sub2, system_solver.Q2div)
@@ -101,7 +101,7 @@ function solve_3x3_subsystem(system_solver::QRCholSystemSolver{T}, solver::Solve
     lmul!(solver.Ap_Q, x)
 
     mul!(system_solver.Gx, model.G, x)
-    block_hessian_product(solver, model.cones, system_solver.HGx_k, system_solver.Gx_k)
+    block_hess_prod(solver, model.cones, system_solver.HGx_k, system_solver.Gx_k)
 
     @. z = system_solver.HGx - z
 
@@ -114,7 +114,7 @@ function solve_3x3_subsystem(system_solver::QRCholSystemSolver{T}, solver::Solve
     return rhs3
 end
 
-function block_hessian_product(solver::Solver, cones::Vector, prods::Vector, arrs::Vector)
+function block_hess_prod(solver::Solver, cones::Vector, prods::Vector, arrs::Vector)
     for (cone_k, prod_k, arr_k) in zip(cones, prods, arrs)
         if Cones.use_dual(cone_k) # no scaling
             Cones.inv_hess_prod!(prod_k, arr_k, cone_k)
@@ -207,9 +207,26 @@ function update_fact(system_solver::QRCholDenseSystemSolver, solver::Solver)
     isempty(system_solver.Q2div) && return system_solver
     model = solver.model
 
-    # TODO can be faster and numerically better for some cones to use L factor of cholesky of hessian here, with BLAS.syrk updating
-    block_hessian_product(solver, model.cones, system_solver.HGQ2_k, system_solver.GQ2_k)
-    mul!(system_solver.lhs1.data, system_solver.GQ2', system_solver.HGQ2)
+
+    # # TODO can be faster and numerically better for some cones to use L factor of cholesky of hessian here, with BLAS.syrk updating
+    # block_hess_prod(solver, model.cones, system_solver.HGQ2_k, system_solver.GQ2_k)
+    # mul!(system_solver.lhs1.data, system_solver.GQ2', system_solver.HGQ2)
+
+    # TODO rename HGQ2_k to UGQ2_k etc
+    sqrtmu = sqrt(solver.mu)
+    for (cone_k, prod_k, arr_k) in zip(model.cones, system_solver.HGQ2_k, system_solver.GQ2_k)
+        if Cones.use_dual(cone_k) # no scaling
+            Cones.inv_hess_Uprod!(prod_k, arr_k, cone_k)
+            prod_k ./= sqrtmu
+        else
+            Cones.hess_Uprod!(prod_k, arr_k, cone_k)
+            if !Cones.use_scaling(cone_k)
+                prod_k .*= sqrtmu
+            end
+        end
+    end
+    BLAS.syrk!('U', 'T', true, system_solver.HGQ2, false, system_solver.lhs1.data)
+
 
     update_fact(system_solver.fact_cache, system_solver.lhs1) # overwrites lhs1 with new factorization
 

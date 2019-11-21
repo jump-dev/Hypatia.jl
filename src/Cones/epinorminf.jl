@@ -247,6 +247,49 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNorm
     return prod
 end
 
+# TODO cleanup and simplify a lot, generalize for complex
+# U_factor * arr = U_bar * (P' * arr) where (P' * arr) swaps first and last rows of arr
+# functin implicitly forms the diagonal, edge, and point of U_bar, swaps rows in arr, and multiplies  U_bar by permuted arr
+function hess_Uprod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
+    @assert cone.grad_updated
+
+    function _swap_first_last_rows!(mat::AbstractVecOrMat)
+        @. mat[1, :] += mat[end, :]
+        @. mat[end, :] = mat[1, :] - mat[end, :]
+        @. mat[1, :] = mat[1, :] - mat[end, :]
+        return mat
+    end
+
+    # implicitly swaps rows and columns in Hessian
+    d = sqrt.(vcat(cone.diag[end], cone.diag[1:(end - 1)]))
+    e = vcat(cone.edge[end], cone.edge[1:(end - 1)]) ./ d
+    point = sqrt(cone.diag11 - dot(e, e))
+    # materialize L
+    Lbar = similar(cone.point, cone.dim, cone.dim)
+    Lbar[end, 1:(end - 1)] = e
+    for i in 1:(cone.dim - 1)
+        Lbar[i, i] = d[i]
+    end
+    Lbar[end, end] = point
+    # swap rows, as Lbar*Lbar' = PHP'
+    _swap_first_last_rows!(Lbar)
+
+    mul!(prod, Lbar', arr)
+
+    (m, n) = size(arr)
+    diag_sqrt = sqrt.(cone.diag)
+    edge_sqrt = cone.edge ./ diag_sqrt
+    for i in 1:n
+        prod[1, i] = diag_sqrt[end] * arr[m, i] + edge_sqrt[end] * arr[1, i]
+        for j in 2:(m - 1)
+            prod[j, i] = diag_sqrt[j - 1] * arr[j, i] + edge_sqrt[j - 1] * arr[1, i]
+        end
+        prod[m, i] = sqrt(cone.diag11 - dot(edge_sqrt, edge_sqrt)) * arr[1, i]
+    end
+
+    return prod
+end
+
 # uses invedge, schur, diag, offdiag, det
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
     if !cone.hess_inv_hess_prod_updated
@@ -270,6 +313,11 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Epi
     end
 
     return prod
+end
+
+# TODO
+function inv_hess_Uprod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Nonnegative)
+    error("TODO")
 end
 
 # TODO depends on complex/real
