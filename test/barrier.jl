@@ -1,8 +1,5 @@
 #=
 Copyright 2018, Chris Coey, Lea Kapelevich and contributors
-
-TODO
-- add optional heuristic tests for log-homogeneity and self-concordancy of barrier function
 =#
 
 using Test
@@ -70,7 +67,6 @@ function test_barrier_oracles(
     # check gradient and Hessian agree with ForwardDiff
     grad = CO.grad(cone)
     hess = CO.hess(cone)
-
     @test ForwardDiff.gradient(barrier, point) ≈ grad atol=tol rtol=tol
     @test ForwardDiff.hessian(barrier, point) ≈ hess atol=tol rtol=tol
 
@@ -157,22 +153,30 @@ function test_grad_hess(
     ) where {T <: Real}
     nu = CO.get_nu(cone)
     grad = CO.grad(cone)
-    hess = CO.hess(cone)
-    inv_hess = CO.inv_hess(cone)
+    hess = Matrix(CO.hess(cone))
+    inv_hess = Matrix(CO.inv_hess(cone))
 
     @test dot(point, grad) ≈ -nu atol=tol rtol=tol
     @test hess * inv_hess ≈ I atol=tol rtol=tol
 
     dim = length(point)
     prod_mat = similar(point, dim, dim)
-    @test CO.hess_prod!(prod_mat, Matrix(inv_hess), cone) ≈ I atol=tol rtol=tol
-    @test CO.inv_hess_prod!(prod_mat, Matrix(hess), cone) ≈ I atol=tol rtol=tol
+    @test CO.hess_prod!(prod_mat, inv_hess, cone) ≈ I atol=tol rtol=tol
+    @test CO.inv_hess_prod!(prod_mat, hess, cone) ≈ I atol=tol rtol=tol
+
+    prod_mat2 = Matrix(CO.hess_Uprod!(prod_mat, inv_hess, cone)')
+    @test CO.hess_Uprod!(prod_mat, prod_mat2, cone) ≈ I atol=tol rtol=tol
 
     if !CO.use_scaling(cone)
         prod = similar(point)
         @test hess * point ≈ -grad atol=tol rtol=tol
         @test CO.hess_prod!(prod, point, cone) ≈ -grad atol=tol rtol=tol
         @test CO.inv_hess_prod!(prod, grad, cone) ≈ -point atol=tol rtol=tol
+
+        if isdefined(cone, :use_dual)
+            prod_mat2 = Matrix(CO.inv_hess_Uprod!(prod_mat, hess, cone)')
+            @test CO.inv_hess_Uprod!(prod_mat, prod_mat2, cone) ≈ I atol=tol rtol=tol
+        end
     end
 
     if !isempty(dual_point)
@@ -308,27 +312,6 @@ function test_epinorminf_barrier(T::Type{<:Real})
             return -sum(log(abs2(u) - abs2(wj)) for wj in w) + (n - 1) * log(u)
         end
         test_barrier_oracles(CO.EpiNormInf{T, Complex{T}}(1 + 2n), C_barrier)
-    end
-    return
-end
-
-function test_epinorminfsymm_barrier(T::Type{<:Real})
-    # real epinorminf cone
-    for n in [1, 3]
-        function R_barrier(s)
-            (u, w) = (s[1], s[2:end])
-            return -sum(log(abs2(u) - abs2(wj)) for wj in w) + (length(w) - 1) * log(u)
-        end
-        # test_barrier_oracles(CO.EpiNormInf{T, T}(1 + n), R_barrier)
-        test_barrier_oracles(CO.EpiNormInfSymm{T}(1 + n), R_barrier)
-
-        # # complex epinorminf cone
-        # function C_barrier(s)
-        #     (u, ws) = (s[1], s[2:end])
-        #     w = [ws[2i - 1] + ws[2i] * im for i in 1:n]
-        #     return -sum(log(abs2(u) - abs2(wj)) for wj in w) + (length(w) - 1) * log(u)
-        # end
-        # test_barrier_oracles(CO.EpiNormInf{T, Complex{T}}(1 + 2n), C_barrier)
     end
     return
 end

@@ -297,24 +297,12 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Pos
     @assert is_feas(cone)
     if cone.use_scaling
         mul!(cone.work_mat3, cone.scalmat_sqrt, cone.scalmat_sqrt') # TODO fix inefficiency of the mul
-        gen_congruence_prod!(prod, arr, cone.work_mat3, cone)
+        herm_congruence_prod!(prod, arr, cone.work_mat3, cone)
     else
-        gen_congruence_prod!(prod, arr, cone.mat, cone)
+        herm_congruence_prod!(prod, arr, cone.mat, cone)
     end
     return prod
 end
-
-# function inv_hess_Uprod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidefTri)
-#     @assert cone.is_feas
-#     if cone.use_scaling
-#         println("inv hess U prod")
-#         herm_congruence_prod!(prod, arr, cone.scalmat_sqrt, cone)
-#     else
-#         println("inv hess U prod no scal")
-#         herm_congruence_prod!(prod, arr, cone.fact.U, cone)
-#     end
-#     return prod
-# end
 
 function dist_to_bndry(cone::PosSemidefTri{T, R}, fact, dir::AbstractVector{T}) where {R <: RealOrComplex{T}} where {T <: Real}
     svec_to_smat!(cone.work_mat, dir, cone.rt2)
