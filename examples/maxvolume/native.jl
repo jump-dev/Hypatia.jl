@@ -1,8 +1,9 @@
 #=
 Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
-find maximum volume hypercube with edges parallel to the axes inside a polyhdedron
+find maximum volume hypercube with edges parallel to the axes inside a polyhedron
 =#
+
 using LinearAlgebra
 import Random
 using Test
@@ -23,7 +24,6 @@ function maxvolume(
     G = -Matrix{T}(I, n + 1, n + 1)
     h = zeros(T, n + 1)
     cones = [CO.Hypogeomean(fill(inv(T(n)), n))]
-
 
     return (c = c, A = A, b = b, G = G, h = h, cones = cones)
 end

@@ -1,27 +1,20 @@
 #=
 Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
-References minimizing the spectral norm:
+references minimizing the nuclear norm:
 Minimization of a Particular Singular Value by Alborz Alavian and Michael Rotkowitz
-The Power of Convex Relaxation Emmanuel J. Candès and  Terence Tao
+The Power of Convex Relaxation Emmanuel J. Candï¿½s and  Terence Tao
 http://www.mit.edu/~parrilo/pubs/talkfiles/ISMP2009.pdf
 other:
 https://www.cvxpy.org/examples/dgp/pf_matrix_completion.html
 
-possible extended formulations to (u, W) ? EpiNormSpectral(true):
+hypogeomean constraint inspired by:
+https://www.cvxpy.org/examples/dgp/pf_matrix_completion.html
 
-lectures on convex programming (could replace m with any number of largest singular values)
-u - ms - tr(Z) = 0
-Z ? 0
-Z - X + sI_m ? 0
-s = 0
-assumes X symmetric (generalization is probably replace Z with symmetrization of Z)
-
-http://www.mit.edu/~parrilo/pubs/talkfiles/ISMP2009.pdf
+extended formulations to (u, W) in EpiNormSpectral(true) uses:
 min 1/2(tr(W1) + tr(W2))
-[W1  X; X'  W2] ? 0
-
-
+[W1 X; X' W2] âª° 0
+from http://www.mit.edu/~parrilo/pubs/talkfiles/ISMP2009.pdf
 =#
 
 using LinearAlgebra
