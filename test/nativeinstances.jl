@@ -14,9 +14,11 @@ using LinearAlgebra
 import GenericLinearAlgebra.svdvals
 import GenericLinearAlgebra.eigvals
 using SparseArrays
+import DynamicPolynomials
 import Hypatia
 import Hypatia.Solvers.build_solve_check
 const CO = Hypatia.Cones
+const MU = Hypatia.ModelUtilities
 
 function dimension1(T; options...)
     tol = sqrt(sqrt(eps(T)))
@@ -928,6 +930,62 @@ function hypoperlogdettri3(T; options...)
     @test r.status == :Optimal
     @test r.x[1] ≈ -r.primal_obj atol=tol rtol=tol
     @test norm(r.x) ≈ 0 atol=tol rtol=tol
+end
+
+function wsospolyinterp1(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    (U, pts, P0, PWts, _) = MU.interpolate(MU.Box{T}(-ones(T, 2), ones(T, 2)), 2, sample = false)
+    DynamicPolynomials.@polyvar x y
+    fn = x ^ 4 + x ^ 2 * y ^ 2 + 4 * y ^ 2 + 4
+
+    c = T[-1]
+    A = zeros(T, 0, 1)
+    b = T[]
+    G = ones(T, U, 1)
+    h = T[fn(pts[j, :]...) for j in 1:U]
+    cones = CO.Cone{T}[CO.WSOSPolyInterp{T, T}(U, [P0, PWts...])]
+
+    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+    @test r.status == :Optimal
+    @test r.primal_obj ≈ T(4) atol=tol rtol=tol
+    @test r.x[1] ≈ -T(4) atol=tol rtol=tol
+end
+
+function wsospolyinterp2(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    (U, pts, P0, PWts, _) = MU.interpolate(MU.Box{T}(zeros(T, 2), fill(T(3), 2)), 2, sample = false)
+    DynamicPolynomials.@polyvar x y
+    fn = (x - 2) ^ 2 + (x * y - 3) ^ 2
+
+    c = T[-1]
+    A = zeros(T, 0, 1)
+    b = T[]
+    G = ones(T, U, 1)
+    h = T[fn(pts[j, :]...) for j in 1:U]
+    cones = CO.Cone{T}[CO.WSOSPolyInterp{T, T}(U, [P0, PWts...])]
+
+    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+    @test r.status == :Optimal
+    @test r.primal_obj ≈ zero(T) atol=tol rtol=tol
+    @test r.x[1] ≈ zero(T) atol=tol rtol=tol
+end
+
+function wsospolyinterp3(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    (U, pts, P0, PWts, _) = MU.interpolate(MU.Box{T}(zeros(T, 2), fill(T(3), 2)), 2, sample = false)
+    DynamicPolynomials.@polyvar x y
+    fn = (x - 2) ^ 2 + (x * y - 3) ^ 2
+
+    c = T[fn(pts[j, :]...) for j in 1:U]
+    A = ones(T, 1, U)
+    b = T[1]
+    G = Diagonal(-one(T) * I, U)
+    h = zeros(T, U)
+    cones = CO.Cone{T}[CO.WSOSPolyInterp{T, T}(U, [P0, PWts...], true)]
+
+    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+    @test r.status == :Optimal
+    @test r.primal_obj ≈ zero(T) atol=tol rtol=tol
 end
 
 function primalinfeas1(T; options...)

@@ -71,15 +71,18 @@ testfuns_many = [
     # possemideftricomplex1,
     # possemideftricomplex2,
     # possemideftricomplex3,
-    hypoperlogdettri1,
-    hypoperlogdettri2,
-    hypoperlogdettri3,
+    # hypoperlogdettri1,
+    # hypoperlogdettri2,
+    # hypoperlogdettri3,
     # primalinfeas1,
     # primalinfeas2,
     # primalinfeas3,
     # dualinfeas1,
     # dualinfeas2,
     # dualinfeas3,
+    wsospolyinterp1,
+    wsospolyinterp2,
+    wsospolyinterp3,
     ]
 
 # TODO add more preprocessing test instances
