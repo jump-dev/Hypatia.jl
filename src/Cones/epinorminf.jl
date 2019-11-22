@@ -296,18 +296,18 @@ end
 # TODO generalize for complex
 function inv_hess_Uprod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
     @assert cone.grad_updated
-    (m, n) = size(arr)
-    diag = cone.tmp # TODO rename
-    edge = cone.tmpR
+    rtdiag = cone.tmp
+    edgertdiag = cone.tmpR
+    # TODO cache this with a U prod update function
+    @. rtdiag = sqrt(cone.diag)
+    @. edgertdiag = cone.edge / rtdiag
+    endfact = sqrt(cone.diag11 - sum(abs2, edgertdiag))
 
-    @. diag = sqrt(cone.diag)
-    @. edge = cone.edge / diag
-    @inbounds for i in 1:n
-        prod[1, i] = arr[end, i] / diag[end]
-        @. @views prod[2:(m - 1), i] = arr[2:(m - 1), i] / diag[1:(m - 2)]
-        @views prod[m, i] = arr[1, i] - prod[1, i] * edge[end] - dot(prod[2:(m - 1), i], edge[1:(m - 2)])
-        prod[m, i] /= sqrt(cone.diag11 - dot(edge, edge))
-    end
+    @. @views prod[1, :] = arr[end, :] / rtdiag[end]
+    @. @views prod[2:(end - 1), :] = arr[2:(end - 1), :] / rtdiag[1:(end - 1)]
+    @. @views prod[end, :] = arr[1, :] - prod[1, :] * edgertdiag[end]
+    @views mul!(prod[end, :], prod[2:(end - 1), :]', edgertdiag[1:(end - 1)], -1, true)
+    @. prod[end, :] /= endfact
 
     return prod
 end
