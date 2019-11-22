@@ -301,16 +301,16 @@ function inv_hess_Uprod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Ep
     @assert cone.grad_updated
     (m, n) = size(arr)
     @assert size(prod) == (m, n)
-    # the diag and edge in the U factor
     diag = cone.tmp
     edge = cone.tmpR
     @. diag = sqrt(cone.diag)
     # TODO check what to do for complex
     @. edge = cone.edge / diag
-    for i in 1:n
-        prod[1, i] = arr[m, i] / sqrt(cone.diag11 - dot(edge, edge))
-        @. prod[2:(m - 1), i] = (arr[2:(m - 1), i] - prod[1, i] * edge[1:(m - 2)]) / diag[1:(m - 2)]
-        prod[m, i] = (arr[1, i] - prod[1, i] * edge[end]) / diag[end]
+    @inbounds for i in 1:n
+        prod[1, i] = arr[end, i] / diag[end]
+        @. @views prod[2:(m - 1), i] = arr[2:(m - 1), i] / diag[1:(m - 2)]
+        @views prod[m, i] = arr[1, i] - prod[1, i] * edge[end] - dot(prod[2:(m - 1), i], edge[1:(m - 2)])
+        prod[m, i] /= sqrt(cone.diag11 - dot(edge, edge))
     end
     return prod
 end

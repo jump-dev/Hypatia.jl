@@ -130,7 +130,7 @@ function inv_hess_Uprod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Co
         update_inv_hess_prod(cone)
     end
     copyto!(prod, arr)
-    return ldiv!(UpperTriangular(cone.hess_fact_cache.AF.data), prod)
+    return ldiv!(UpperTriangular(cone.hess_fact_cache.AF.data)', prod)
     # return ldiv!(prod, UpperTriangular(cone.hess_fact_cache.AF.data), arr)
 end
 

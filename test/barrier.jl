@@ -175,7 +175,7 @@ function test_grad_hess(
 
         if isdefined(cone, :use_dual)
             CO.inv_hess_Uprod!(prod_mat2, Matrix(one(T) * I, dim, dim), cone)
-            @test CO.hess_Uprod!(prod_mat, inv_hess, cone) ≈ prod_mat2' atol=tol rtol=tol
+            @test prod_mat2' * prod_mat2 ≈ inv_hess atol=tol rtol=tol
         end
     end
 
