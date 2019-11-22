@@ -386,28 +386,9 @@ function test_hypogeomean_barrier(T::Type{<:Real})
         alpha ./= sum(alpha)
         function barrier(s)
             (u, w) = (s[1], s[2:end])
-            return -log(prod((w[j] / alpha[j]) ^ alpha[j] for j in eachindex(w)) + u) - sum((1 - alpha[j]) * log(w[j] / alpha[j]) for j in eachindex(w)) - log(-u)
-        end
-        cone = CO.HypoGeomean{T}(alpha)
-        if dim <= 3
-            test_barrier_oracles(cone, barrier, init_tol = T(1e-2))
-        else
-            test_barrier_oracles(cone, barrier, init_tol = T(3e-1), init_only = true)
-        end
-    end
-    return
-end
-
-function test_hypogeomean2_barrier(T::Type{<:Real})
-    Random.seed!(1)
-    for dim in [2, 3, 5, 15, 90, 120, 500]
-        alpha = rand(T, dim - 1) .+ 1
-        alpha ./= sum(alpha)
-        function barrier(s)
-            (u, w) = (s[1], s[2:end])
             return -log(prod(w[j] ^ alpha[j] for j in eachindex(w)) - u) - sum(log(wi) for wi in w)
         end
-        cone = CO.HypoGeomean2{T}(alpha)
+        cone = CO.HypoGeomean{T}(alpha)
         if dim <= 3
             test_barrier_oracles(cone, barrier, init_tol = T(1e-2))
         else
