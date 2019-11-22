@@ -249,34 +249,11 @@ end
 
 # TODO cleanup and simplify a lot, generalize for complex
 # U_factor * arr = U_bar * (P' * arr) where (P' * arr) swaps first and last rows of arr
-# functin implicitly forms the diagonal, edge, and point of U_bar, swaps rows in arr, and multiplies  U_bar by permuted arr
+# function implicitly forms the diagonal, edge, and point of U_bar, swaps rows in arr, and multiplies  U_bar by permuted arr
 function hess_Uprod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
     @assert cone.grad_updated
-
-    function _swap_first_last_rows!(mat::AbstractVecOrMat)
-        @. mat[1, :] += mat[end, :]
-        @. mat[end, :] = mat[1, :] - mat[end, :]
-        @. mat[1, :] = mat[1, :] - mat[end, :]
-        return mat
-    end
-
-    # implicitly swaps rows and columns in Hessian
-    d = sqrt.(vcat(cone.diag[end], cone.diag[1:(end - 1)]))
-    e = vcat(cone.edge[end], cone.edge[1:(end - 1)]) ./ d
-    point = sqrt(cone.diag11 - dot(e, e))
-    # materialize L
-    Lbar = similar(cone.point, cone.dim, cone.dim)
-    Lbar[end, 1:(end - 1)] = e
-    for i in 1:(cone.dim - 1)
-        Lbar[i, i] = d[i]
-    end
-    Lbar[end, end] = point
-    # swap rows, as Lbar*Lbar' = PHP'
-    _swap_first_last_rows!(Lbar)
-
-    mul!(prod, Lbar', arr)
-
     (m, n) = size(arr)
+    @assert size(prod) == (m, n)
     diag_sqrt = sqrt.(cone.diag)
     edge_sqrt = cone.edge ./ diag_sqrt
     for i in 1:n
@@ -286,7 +263,6 @@ function hess_Uprod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNor
         end
         prod[m, i] = sqrt(cone.diag11 - dot(edge_sqrt, edge_sqrt)) * arr[1, i]
     end
-
     return prod
 end
 
@@ -315,9 +291,20 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Epi
     return prod
 end
 
-# TODO
-function inv_hess_Uprod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Nonnegative)
-    error("TODO")
+function inv_hess_Uprod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
+    @assert cone.grad_updated
+    (m, n) = size(arr)
+    @assert size(prod) == (m, n)
+    diag_sqrt = sqrt.(cone.diag)
+    edge_sqrt = cone.edge ./ diag_sqrt
+    for i in 1:n
+        prod[1, i] = arr[m, i] / sqrt(cone.diag11 - dot(edge_sqrt, edge_sqrt))
+        for j in 2:(m - 1)
+            prod[j, i] = (arr[j, i] - prod[1, i] * edge_sqrt[j - 1]) / diag_sqrt[j - 1]
+        end
+        prod[m, i] = (arr[1, i] - prod[1, i] * edge_sqrt[end]) / diag_sqrt[end]
+    end
+    return prod
 end
 
 # TODO depends on complex/real
