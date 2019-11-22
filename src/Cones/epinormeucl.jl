@@ -412,23 +412,6 @@ end
 #     return prod
 # end
 
-# scaling is symmetric, trans kwarg ignored TODO factor as another function?
-function scalmat_ldiv!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormEucl; trans::Bool = false)
-    if !cone.scaling_updated
-        update_scaling(cone)
-    end
-    prod .= cone.v
-    @views prod[2:end, :] *= -1
-    @inbounds @views for j in 1:size(arr, 2)
-        prod[:, j] *= 2 * jdot(cone.v, arr[:, j])
-    end
-
-    @views prod[1, :] .-= arr[1, :]
-    @views prod[2:end, :] .+= arr[2:end, :]
-    prod .*= sqrt(sqrt(cone.dual_dist) / sqrt(cone.dist))
-    return prod
-end
-
 # # TODO refactor into Cones.jl
 # # returns W_inv \circ lambda \diamond correction
 # function correction(cone::EpiNormEucl, s_sol::AbstractVector, z_sol::AbstractVector)
@@ -491,50 +474,34 @@ function step_max_dist(cone::EpiNormEucl{T}, s_sol::AbstractVector{T}, z_sol::Ab
 end
 
 
-
-# TODO cleanup below and implement this function (for scaling and without scaling)
-# function hess_Uprod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Nonnegative)
-
-
-# function hess_L_fact(cone::EpiNormEucl{T}) where {T} # remove T
-#     dist = (abs2(cone.point[1]) - sum(abs2, cone.point[2:end])) # replace by cone.dist when figured out how to double things correctly
-#     # dist = cone.dist
-#     dim = cone.dim
-#     L = zeros(T, dim, dim)
-#     w = cone.point[2:dim]
-#     dist_sqrt = sqrt(dist)
-#     mul!(L[2:dim, 2:dim], w, w')
-#     # hyp_aat!(L_main, w) # maybe does dispatch to the right thing
-#     @. L[2:dim, 2:dim] /= (cone.point[1] + dist_sqrt)
-#     # L_main += dist_sqrt * I # returns an array
-#     L[2:dim, 2:dim] += dist_sqrt * I
-#     L[2:dim, 2:dim] = w * w' / (cone.point[1] + dist_sqrt) + dist_sqrt * I
-#     L[1, 2:dim] = L[2:dim, 1] = -cone.point[2:dim]
-#     L[1, 1] = cone.point[1]
-#     @. L /= dist
-#     @. L *= sqrt(2)
-#     return L
-# end
-#
-# hess_U_fact(cone::EpiNormEucl) = hess_L_fact(cone)
-#
-# hess_U_prod!(prod, arr, cone::EpiNormEucl) = mul!(prod, hess_L_fact(cone), arr)
-#
-# function hess_L_div!(dividend, arr, cone::EpiNormEucl{T}) where {T} # remove T
-#     dist = (abs2(cone.point[1]) - sum(abs2, cone.point[2:end])) # replace by cone.dist when figured out how to double things correctly
-#     # dist = cone.dist
-#     dim = cone.dim
-#     L = zeros(T, dim, dim)
-#     w = cone.point[2:dim]
-#     dist_sqrt = sqrt(dist)
-#     mul!(L[2:dim, 2:dim], w, w')
-#     # hyp_aat!(L_main, w) # maybe does dispatch to the right thing
-#     @. L[2:dim, 2:dim] /= (cone.point[1] + dist_sqrt)
-#     # L_main += dist_sqrt * I # returns an array
-#     L[2:dim, 2:dim] += dist_sqrt * I
-#     L[2:dim, 2:dim] = w * w' / (cone.point[1] + dist_sqrt) + dist_sqrt * I
-#     L[1, 2:dim] = L[2:dim, 1] = cone.point[2:dim]
-#     L[1, 1] = cone.point[1]
-#     @. L /= sqrt(2)
-#     return mul!(dividend, L, arr)
-# end
+function hess_Uprod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormEucl)
+    @assert cone.is_feas
+    if cone.use_scaling
+        @assert cone.scaling_updated
+        prod .= cone.v
+        @views prod[2:end, :] *= -1
+        @inbounds @views for j in 1:size(arr, 2)
+            prod[:, j] *= 2 * jdot(cone.v, arr[:, j])
+        end
+        @views prod[1, :] .-= arr[1, :]
+        @views prod[2:end, :] .+= arr[2:end, :]
+        prod .*= sqrt(sqrt(cone.dual_dist) / sqrt(cone.dist))
+    else
+        # TODO debug, failing tests
+        u = cone.point[1]
+        w = view(cone.point, 2:cone.dim)
+        rtdist = sqrt(cone.dist)
+        @. prod = cone.point
+        @inbounds @views for j in 1:size(arr, 2)
+            prod[2:end, j] *= dot(w, arr[2:end, j]) / (u + rtdist)
+        end
+        @. @views prod[2:end, :] += arr[2:end, :] / rtdist
+        # TODO allocating, can't broadcast if prod is a vector
+        @views prod[2:end, :] -= w .* arr[2:end, :]
+        @. @views prod[1, :] *= arr[1, :]
+        # TODO allocating, issues broadcasting if prod is a vector
+        @views prod[1, :] -= arr[2:end, :]' * w
+        prod ./= cone.dist
+    end
+    return prod
+end
