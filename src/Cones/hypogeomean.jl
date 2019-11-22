@@ -74,7 +74,7 @@ get_nu(cone::HypoGeomean) = cone.dim
 
 # TODO work out how to get central ray
 function set_initial_point(arr::AbstractVector{T}, cone::HypoGeomean{T}) where {T}
-    (arr[1], w) = get_central_ray_hypogeomean2(cone.alpha)
+    (arr[1], w) = get_central_ray_hypogeomean(cone.alpha)
     arr[2:end] .= w
     return arr
 end
@@ -208,7 +208,7 @@ function correction(cone::HypoGeomean, s_sol::AbstractVector, z_sol::AbstractVec
 end
 
 # see analysis in https://github.com/lkapelevich/HypatiaBenchmarks.jl/tree/master/centralpoints
-function get_central_ray_hypogeomean2(alpha::Vector{<:Real})
+function get_central_ray_hypogeomean(alpha::Vector{<:Real})
     wdim = length(alpha)
     # predict each w_i given alpha_i and n
     w = zeros(wdim)
