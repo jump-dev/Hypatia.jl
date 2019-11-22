@@ -39,6 +39,8 @@ mutable struct EpiNormInf{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     invedgeR::Vector{R}
     diag11::T
     schur::T
+    tmp::Vector{T}
+    tmpR::Vector{R}
 
     function EpiNormInf{T, R}(
         dim::Int, # TODO maybe change to n (dim of the normed vector)
@@ -73,6 +75,8 @@ function setup_data(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where 
     cone.diag = zeros(T, dim - 1)
     cone.edge = zeros(T, dim - 1)
     cone.invedge = zeros(T, dim - 1)
+    cone.tmp = zeros(T, dim - 1)
+    cone.tmpR = zeros(R, dim - 1)
     if cone.is_complex
         cone.w = zeros(R, n)
         cone.offdiag = zeros(T, n)
@@ -254,14 +258,16 @@ function hess_Uprod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNor
     @assert cone.grad_updated
     (m, n) = size(arr)
     @assert size(prod) == (m, n)
-    diag_sqrt = sqrt.(cone.diag)
-    edge_sqrt = cone.edge ./ diag_sqrt
+    # the diag and edge in the U factor
+    diag = cone.tmp
+    edge = cone.tmpR
+    @. diag = sqrt(cone.diag)
+    # TODO check what to do for complex
+    @. edge = cone.edge / diag
     for i in 1:n
-        prod[1, i] = diag_sqrt[end] * arr[m, i] + edge_sqrt[end] * arr[1, i]
-        for j in 2:(m - 1)
-            prod[j, i] = diag_sqrt[j - 1] * arr[j, i] + edge_sqrt[j - 1] * arr[1, i]
-        end
-        prod[m, i] = sqrt(cone.diag11 - dot(edge_sqrt, edge_sqrt)) * arr[1, i]
+        prod[1, i] = diag[end] * arr[m, i] + edge[end] * arr[1, i]
+        @. @views prod[2:(m - 1), i] = diag[1:(m - 2)] * arr[2:(m - 1), i] + edge[1:(m - 2)] * arr[1, i]
+        prod[m, i] = sqrt(cone.diag11 - dot(edge, edge)) * arr[1, i]
     end
     return prod
 end
@@ -295,14 +301,16 @@ function inv_hess_Uprod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Ep
     @assert cone.grad_updated
     (m, n) = size(arr)
     @assert size(prod) == (m, n)
-    diag_sqrt = sqrt.(cone.diag)
-    edge_sqrt = cone.edge ./ diag_sqrt
+    # the diag and edge in the U factor
+    diag = cone.tmp
+    edge = cone.tmpR
+    @. diag = sqrt(cone.diag)
+    # TODO check what to do for complex
+    @. edge = cone.edge / diag
     for i in 1:n
-        prod[1, i] = arr[m, i] / sqrt(cone.diag11 - dot(edge_sqrt, edge_sqrt))
-        for j in 2:(m - 1)
-            prod[j, i] = (arr[j, i] - prod[1, i] * edge_sqrt[j - 1]) / diag_sqrt[j - 1]
-        end
-        prod[m, i] = (arr[1, i] - prod[1, i] * edge_sqrt[end]) / diag_sqrt[end]
+        prod[1, i] = arr[m, i] / sqrt(cone.diag11 - dot(edge, edge))
+        @. prod[2:(m - 1), i] = (arr[2:(m - 1), i] - prod[1, i] * edge[1:(m - 2)]) / diag[1:(m - 2)]
+        prod[m, i] = (arr[1, i] - prod[1, i] * edge[end]) / diag[end]
     end
     return prod
 end
