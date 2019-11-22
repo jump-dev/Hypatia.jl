@@ -487,19 +487,17 @@ function hess_Uprod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNor
         @views prod[2:end, :] .+= arr[2:end, :]
         prod .*= sqrt(sqrt(cone.dual_dist) / sqrt(cone.dist))
     else
-        # TODO debug, failing tests
+        # TODO figure out if can be simplified like the scaling case above
+        rtdist = sqrt(cone.dist)
         u = cone.point[1]
         w = view(cone.point, 2:cone.dim)
-        rtdist = sqrt(cone.dist)
         @. prod = cone.point
         @inbounds @views for j in 1:size(arr, 2)
             prod[2:end, j] *= dot(w, arr[2:end, j]) / (u + rtdist)
         end
-        @. @views prod[2:end, :] += arr[2:end, :] / rtdist
-        # TODO allocating, can't broadcast if prod is a vector
-        @views prod[2:end, :] -= w .* arr[2:end, :]
+        @. @views prod[2:end, :] += arr[2:end, :] * rtdist - w * arr[1, :]'
         @. @views prod[1, :] *= arr[1, :]
-        # TODO allocating, issues broadcasting if prod is a vector
+        # TODO allocating
         @views prod[1, :] -= arr[2:end, :]' * w
         prod ./= cone.dist
     end
