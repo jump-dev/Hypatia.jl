@@ -15,8 +15,8 @@ const SO = Hypatia.Solvers
 
 generic_reals = [
     Float64,
-    Float32,
-    BigFloat,
+    # Float32,
+    # BigFloat,
     ]
 
 options = (verbose = true,)
@@ -51,9 +51,9 @@ options = (verbose = true,)
     # end
 
     # # test each system solver
-    # @testset "NaiveDense tests: $t, $T" for t in testfuns_many, T in generic_reals
-    #     t(T, solver = SO.Solver{T}(system_solver = SO.NaiveDenseSystemSolver{T}(); options...))
-    # end
+    @testset "NaiveDense tests: $t, $T" for t in testfuns_many, T in generic_reals
+        t(T, solver = SO.Solver{T}(system_solver = SO.NaiveDenseSystemSolver{T}(); options...))
+    end
     # @testset "NaiveSparse tests: $t" for t in testfuns_many
     #     T = Float64
     #     t(T, solver = SO.Solver{T}(system_solver = SO.NaiveSparseSystemSolver{T}(); options...))

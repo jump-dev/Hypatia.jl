@@ -301,8 +301,8 @@ for (potrf, elty) in [(:dpotrf_, :Float64), (:spotrf_, :Float32)]
             elseif 0 < cache.info[] <= n
                 @warn("factorization failed: #$(cache.info[])")
                 return false
-            # elseif cache.info[] > n
-            #     @warn("condition number is small: $(cache.rcond[])")
+            elseif cache.info[] > n
+                @warn("condition number is small: $(cache.rcond[])")
             end
 
             return true

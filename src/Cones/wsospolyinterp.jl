@@ -42,7 +42,7 @@ mutable struct WSOSPolyInterp{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
         dim::Int,
         Ps::Vector{Matrix{R}},
         is_dual::Bool;
-        use_3order_corr::Bool = true,
+        use_3order_corr::Bool = false,
         hess_fact_cache = hessian_cache(T),
         ) where {R <: RealOrComplex{T}} where {T <: Real}
         for k in eachindex(Ps)
@@ -146,14 +146,14 @@ function update_hess(cone::WSOSPolyInterp)
 end
 
 # TODO try to improve efficiency and simplify to remove inverse hessian product?
-function correction(cone::WSOSPolyInterp, s_sol::AbstractVector, z_sol::AbstractVector)
+function correction(cone::WSOSPolyInterp, primal_dir::AbstractVector, dual_dir::AbstractVector)
     if !cone.hess_updated
         update_hess(cone)
     end
-    Hinv_z = inv_hess_prod!(cone.tmpU, z_sol, cone)
+    Hinv_z = inv_hess_prod!(cone.tmpU, dual_dir, cone)
     corr = cone.correction
     @inbounds for k in eachindex(corr)
-        corr[k] = sum(sum(PΛiP[i, j] * PΛiP[i, k] * PΛiP[j, k] for PΛiP in cone.PΛiPs) * s_sol[i] * Hinv_z[j] for i in eachindex(corr), j in eachindex(corr))
+        corr[k] = sum(sum(PΛiP[i, j] * PΛiP[i, k] * PΛiP[j, k] for PΛiP in cone.PΛiPs) * primal_dir[i] * Hinv_z[j] for i in eachindex(corr), j in eachindex(corr))
     end
     return corr
 end

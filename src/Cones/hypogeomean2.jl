@@ -128,6 +128,7 @@ function update_hess(cone::HypoGeomean2)
         end
         H[j1, j1] = fact * (1 - alpha[j] + alpha[j] * wwprodu) / w[j] + inv(w[j]) / w[j]
     end
+
     cone.hess_updated = true
     return cone.hess
 end

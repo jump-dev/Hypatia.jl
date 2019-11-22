@@ -77,11 +77,11 @@ function test_barrier_oracles(
         # check log-homog property that F'''(point)[point] = -2F''(point)
         @test reshape(FD_3deriv * point, dim, dim) ≈ -2 * hess
         # check correction term agrees with directional 3rd derivative
-        s_dir = perturb_scale(zeros(T, dim), noise, one(T))
-        z_dir = perturb_scale(zeros(T, dim), noise, one(T))
-        Hinv_z = CO.inv_hess_prod!(similar(z_dir), z_dir, cone)
-        FD_corr = reshape(FD_3deriv * s_dir, dim, dim) * Hinv_z / -2
-        @test FD_corr ≈ CO.correction(cone, s_dir, z_dir) atol=tol rtol=tol
+        primal_dir = perturb_scale(zeros(T, dim), noise, one(T))
+        dual_dir = perturb_scale(zeros(T, dim), noise, one(T))
+        Hinv_z = CO.inv_hess_prod!(similar(dual_dir), dual_dir, cone)
+        FD_corr = reshape(FD_3deriv * primal_dir, dim, dim) * Hinv_z / -2
+        @test FD_corr ≈ CO.correction(cone, primal_dir, dual_dir) atol=tol rtol=tol
     end
 
     # TODO max step distances

@@ -22,9 +22,9 @@ mutable struct ScalingStepper{T <: Real} <: Stepper{T}
     x_dir
     y_dir
     z_dir
-    z_dir_k
+    dual_dir_k
     s_dir
-    s_dir_k
+    primal_dir_k
 
     dir_temp::Vector{T}
 
@@ -70,7 +70,6 @@ function load(stepper::ScalingStepper{T}, solver::Solver{T}) where {T <: Real}
     rows = (n + p) .+ (1:q)
     stepper.z_rhs = view(rhs, rows)
     stepper.z_dir = view(dir, rows)
-    stepper.z_dir_k = [view(dir, (n + p) .+ idxs_k) for idxs_k in cone_idxs]
     stepper.z_res = view(res, rows)
 
     tau_row = n + p + q + 1
@@ -80,9 +79,16 @@ function load(stepper::ScalingStepper{T}, solver::Solver{T}) where {T <: Real}
     stepper.s_rhs = view(rhs, rows)
     stepper.s_rhs_k = [view(rhs, tau_row .+ idxs_k) for idxs_k in cone_idxs]
     stepper.s_dir = view(dir, rows)
-    stepper.s_dir_k = [view(dir, tau_row .+ idxs_k) for idxs_k in cone_idxs]
     stepper.s_res = view(res, rows)
     stepper.s_res_k = [view(res, tau_row .+ idxs_k) for idxs_k in cone_idxs]
+
+    stepper.primal_dir_k = similar(stepper.s_res_k)
+    stepper.dual_dir_k = similar(stepper.s_res_k)
+    for (k, idxs_k) in enumerate(cone_idxs)
+        s_k = view(dir, tau_row .+ idxs_k)
+        z_k = view(dir, (n + p) .+ idxs_k)
+        (stepper.primal_dir_k[k], stepper.dual_dir_k[k]) = (Cones.use_dual(cones[k]) ? (z_k, s_k) : (s_k, z_k))
+    end
 
     stepper.kap_row = dim
 
@@ -151,7 +157,7 @@ function step(stepper::ScalingStepper{T}, solver::Solver{T}) where {T <: Real}
     Cones.reset_data.(solver.model.cones)
     Cones.is_feas.(solver.model.cones)
     Cones.grad.(solver.model.cones)
-    Cones.step_and_update_scaling.(solver.model.cones, stepper.s_dir_k, stepper.z_dir_k, alpha)
+    Cones.step_and_update_scaling.(solver.model.cones, stepper.primal_dir_k, stepper.dual_dir_k, alpha)
 
     if solver.tau <= zero(T) || solver.kap <= zero(T) || solver.mu <= zero(T)
         @warn("numerical failure: tau is $(solver.tau), kappa is $(solver.kap), mu is $(solver.mu); terminating")
@@ -179,7 +185,7 @@ function find_max_alpha(stepper::ScalingStepper{T}, solver::Solver{T}) where {T 
     # didn't we say that if we are going to use a linesearch, we do it either for all cones or no cones?
     for (k, cone_k) in enumerate(solver.model.cones)
         if Cones.use_scaling(cone_k)
-            dist_k = Cones.step_max_dist(cone_k, stepper.s_dir_k[k], stepper.z_dir_k[k])
+            dist_k = Cones.step_max_dist(cone_k, stepper.primal_dir_k[k], stepper.dual_dir_k[k])
             alpha = min(alpha, dist_k)
         end
     end
@@ -370,7 +376,7 @@ function update_rhs(stepper::ScalingStepper{T}, solver::Solver{T}) where {T <: R
             @. stepper.s_rhs_k[k] -= gamma_mu * grad_k
             if Cones.use_3order_corr(cone_k)
                 # TODO check math here for case of cone.use_dual true - should s and z be swapped then?
-                stepper.s_rhs_k[k] .-= Cones.correction(cone_k, stepper.s_dir_k[k], stepper.z_dir_k[k])
+                stepper.s_rhs_k[k] .-= Cones.correction(cone_k, stepper.primal_dir_k[k], stepper.dual_dir_k[k])
             end
         end
 
@@ -408,21 +414,14 @@ function apply_LHS(stepper::ScalingStepper{T}, solver::Solver{T}) where {T <: Re
 
     # s
     for (k, cone_k) in enumerate(model.cones)
-        if Cones.use_dual(cone_k)
-            # (du bar) mu*H_k*z_k + s_k
-            Hzs_k = stepper.z_dir_k[k]
-            zs_k = stepper.s_dir_k[k]
-        else
-            # (pr bar) z_k + mu*H_k*s_k
-            Hzs_k = stepper.s_dir_k[k]
-            zs_k = stepper.z_dir_k[k]
-        end
+        # (du bar) mu*H_k*z_k + s_k
+        # (pr bar) z_k + mu*H_k*s_k
         s_res_k = stepper.s_res_k[k]
-        Cones.hess_prod!(s_res_k, Hzs_k, cone_k)
+        Cones.hess_prod!(s_res_k, stepper.primal_dir_k[k], cone_k)
         if !Cones.use_scaling(cone_k)
             lmul!(solver.mu, s_res_k)
         end
-        @. s_res_k += zs_k
+        @. s_res_k += stepper.dual_dir_k[k]
     end
 
     # tau + taubar / kapbar * kap
