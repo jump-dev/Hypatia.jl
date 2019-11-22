@@ -497,8 +497,7 @@ function hess_Uprod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNor
         end
         @. @views prod[2:end, :] += arr[2:end, :] * rtdist - w * arr[1, :]'
         @. @views prod[1, :] *= arr[1, :]
-        # TODO allocating
-        @views prod[1, :] -= arr[2:end, :]' * w
+        @views mul!(prod[1, :], arr[2:end, :]', w, -1, 1)
         prod ./= cone.dist
     end
     return prod
