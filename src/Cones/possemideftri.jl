@@ -321,16 +321,16 @@ function dist_to_bndry(cone::PosSemidefTri{T, R}, fact, dir::AbstractVector{T}) 
 end
 
 # TODO refactor this better with dist_to_bndry
-function step_max_dist(cone::PosSemidefTri, s_sol::AbstractVector, z_sol::AbstractVector)
+function step_max_dist(cone::PosSemidefTri, primal_dir::AbstractVector, dual_dir::AbstractVector)
     @assert cone.is_feas
 
     svec_to_smat!(cone.fact_mat, cone.point, cone.rt2)
     cone.fact = cholesky!(Hermitian(cone.fact_mat, :U))
-    primal_dist = dist_to_bndry(cone, cone.fact, s_sol)
+    primal_dist = dist_to_bndry(cone, cone.fact, primal_dir)
 
     svec_to_smat!(cone.dual_fact_mat, cone.dual_point, cone.rt2)
     cone.dual_fact = cholesky!(Hermitian(cone.dual_fact_mat, :U))
-    dual_dist = dist_to_bndry(cone, cone.dual_fact, z_sol)
+    dual_dist = dist_to_bndry(cone, cone.dual_fact, dual_dir)
 
     return min(primal_dist, dual_dist)
 end
@@ -339,11 +339,11 @@ end
 # Pinv = inv(smat(point))
 # smat correction = (Pinv * S * Z + Z * S * Pinv) / 2
 # TODO cleanup
-function correction(cone::PosSemidefTri, s_sol::AbstractVector, z_sol::AbstractVector)#, primal_point)
+function correction(cone::PosSemidefTri, primal_dir::AbstractVector, dual_dir::AbstractVector)#, primal_point)
     @assert cone.grad_updated
 
-    S = copytri!(svec_to_smat!(cone.work_mat, s_sol, cone.rt2), 'U', cone.is_complex)
-    Z = Hermitian(svec_to_smat!(cone.work_mat2, z_sol, cone.rt2))
+    S = copytri!(svec_to_smat!(cone.work_mat, primal_dir, cone.rt2), 'U', cone.is_complex)
+    Z = Hermitian(svec_to_smat!(cone.work_mat2, dual_dir, cone.rt2))
 
     # TODO compare the following numerically
     # Pinv_S_Z = mul!(cone.work_mat3, ldiv!(cone.fact, S), Z)
@@ -360,14 +360,14 @@ function correction(cone::PosSemidefTri, s_sol::AbstractVector, z_sol::AbstractV
     return cone.correction
 end
 
-# s_sol and z_sol are scaled by an old scaling
-function step_and_update_scaling(cone::PosSemidefTri{T, R}, s_sol::AbstractVector, z_sol::AbstractVector, step_size::T) where {R <: RealOrComplex{T}} where {T <: Real}
+# primal_dir and dual_dir are scaled by an old scaling
+function step_and_update_scaling(cone::PosSemidefTri{T, R}, primal_dir::AbstractVector, dual_dir::AbstractVector, step_size::T) where {R <: RealOrComplex{T}} where {T <: Real}
     if cone.try_scaled_updates
         # get the next s, z but in the old scaling
         # TODO improve efficiency below
-        svec_to_smat!(cone.work_mat, s_sol, cone.rt2)
+        svec_to_smat!(cone.work_mat, primal_dir, cone.rt2)
         cone.work_mat2 = cone.new_scal_point + step_size * cone.scalmat_sqrti * Hermitian(cone.work_mat, :U) * cone.scalmat_sqrti'
-        svec_to_smat!(cone.work_mat, z_sol, cone.rt2)
+        svec_to_smat!(cone.work_mat, dual_dir, cone.rt2)
         cone.work_mat3 = cone.new_scal_point + step_size * cone.scalmat_sqrt' * Hermitian(cone.work_mat, :U) * cone.scalmat_sqrt
 
         # update old scaling

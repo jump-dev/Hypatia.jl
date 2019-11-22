@@ -414,12 +414,12 @@ end
 
 # # TODO refactor into Cones.jl
 # # returns W_inv \circ lambda \diamond correction
-# function correction(cone::EpiNormEucl, s_sol::AbstractVector, z_sol::AbstractVector)
+# function correction(cone::EpiNormEucl, primal_dir::AbstractVector, dual_dir::AbstractVector)
 #     if !cone.scaling_updated
 #         update_scaling(cone)
 #     end
-#     tmp_s = scalmat_ldiv!(similar(s_sol), s_sol, cone)
-#     tmp_z = scalmat_prod!(similar(z_sol), z_sol, cone)
+#     tmp_s = scalmat_ldiv!(similar(primal_dir), primal_dir, cone)
+#     tmp_z = scalmat_prod!(similar(dual_dir), dual_dir, cone)
 #
 #     mehrotra_term = conic_prod!(similar(cone.point), tmp_s, tmp_z, cone)
 #
@@ -431,17 +431,17 @@ end
 
 # from MOSEK paper
 # TODO cleanup
-function correction(cone::EpiNormEucl, s_sol::AbstractVector, z_sol::AbstractVector)
+function correction(cone::EpiNormEucl, primal_dir::AbstractVector, dual_dir::AbstractVector)
     @assert cone.grad_updated
     corr = cone.correction
     point = cone.point
 
-    jdot_p_s = jdot(point, s_sol)
-    @. corr = jdot_p_s * z_sol
-    dot_s_z = dot(s_sol, z_sol)
-    dot_p_z = dot(point, z_sol)
-    corr[1] += dot_s_z * point[1] - dot_p_z * s_sol[1]
-    @. @views corr[2:end] += -dot_s_z * point[2:end] + dot_p_z * s_sol[2:end]
+    jdot_p_s = jdot(point, primal_dir)
+    @. corr = jdot_p_s * dual_dir
+    dot_s_z = dot(primal_dir, dual_dir)
+    dot_p_z = dot(point, dual_dir)
+    corr[1] += dot_s_z * point[1] - dot_p_z * primal_dir[1]
+    @. @views corr[2:end] += -dot_s_z * point[2:end] + dot_p_z * primal_dir[2:end]
     corr ./= cone.dist
 
     return corr
@@ -458,9 +458,9 @@ function dist_to_bndry(::EpiNormEucl{T}, point::Vector{T}, dir::AbstractVector{T
     return -point_dir_dist + sqrt(dist2n)
 end
 
-function step_max_dist(cone::EpiNormEucl{T}, s_sol::AbstractVector{T}, z_sol::AbstractVector{T}) where {T}
-    primal_step_dist = sqrt(cone.dist) / dist_to_bndry(cone, cone.normalized_point, s_sol)
-    dual_step_dist = sqrt(cone.dual_dist) / dist_to_bndry(cone, cone.normalized_dual_point, z_sol)
+function step_max_dist(cone::EpiNormEucl{T}, primal_dir::AbstractVector{T}, dual_dir::AbstractVector{T}) where {T}
+    primal_step_dist = sqrt(cone.dist) / dist_to_bndry(cone, cone.normalized_point, primal_dir)
+    dual_step_dist = sqrt(cone.dual_dist) / dist_to_bndry(cone, cone.normalized_dual_point, dual_dir)
 
     # TODO refactor
     step_dist = T(Inf)

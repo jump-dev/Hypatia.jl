@@ -150,39 +150,39 @@ end
 
 # directional third derivative term from MOSEK paper
 # TODO make efficient and improve numerics, reuse values stored in cone fields
-function correction(cone::EpiPerExp{T}, s_sol::AbstractVector{T}, z_sol::AbstractVector{T}) where {T}
+function correction(cone::EpiPerExp{T}, primal_dir::AbstractVector{T}, dual_dir::AbstractVector{T}) where {T}
     update_hess(cone)
     update_inv_hess_prod(cone)
     corr = cone.correction
     (u, v, w) = (cone.point[1], cone.point[2], cone.point[3])
 
-    Hi_z = similar(z_sol) # TODO prealloc
-    inv_hess_prod!(Hi_z, z_sol, cone)
+    Hi_z = similar(dual_dir) # TODO prealloc
+    inv_hess_prod!(Hi_z, dual_dir, cone)
 
     # -log(v * log(u / v) - w) part
     ψ = cone.vluvw
     ψp = T[v / u, cone.luv - 1, -one(T)]
     gpp = Symmetric(cone.hess - Diagonal(T[abs2(inv(u)), abs2(inv(v)), zero(T)]), :U) # TODO improve
-    zz3ψp = (z_sol[1:2] + z_sol[3] * ψp[1:2]) / (ψ + 2 * v)
+    zz3ψp = (dual_dir[1:2] + dual_dir[3] * ψp[1:2]) / (ψ + 2 * v)
     ψpp_Hi_z = T[v * (zz3ψp[2] * v / u - zz3ψp[1]), u * zz3ψp[1] - v * zz3ψp[2], zero(T)]
 
     # term1
-    corr .= z_sol[3] * 2 * ψ * gpp * s_sol
+    corr .= dual_dir[3] * 2 * ψ * gpp * primal_dir
     # term2
-    corr[1] += z_sol[3] * (-v * s_sol[1] / u + s_sol[2]) / u
-    corr[2] += z_sol[3] * (s_sol[1] / u - s_sol[2] / v)
+    corr[1] += dual_dir[3] * (-v * primal_dir[1] / u + primal_dir[2]) / u
+    corr[2] += dual_dir[3] * (primal_dir[1] / u - primal_dir[2] / v)
     # term3
-    corr[1] += ((2 * v / u * Hi_z[1] - Hi_z[2]) / u * -s_sol[1] / u + Hi_z[1] / u * s_sol[2] / u) / ψ
-    corr[2] += (Hi_z[1] / u * s_sol[1] / u - Hi_z[2] / v * s_sol[2] / v) / ψ
+    corr[1] += ((2 * v / u * Hi_z[1] - Hi_z[2]) / u * -primal_dir[1] / u + Hi_z[1] / u * primal_dir[2] / u) / ψ
+    corr[2] += (Hi_z[1] / u * primal_dir[1] / u - Hi_z[2] / v * primal_dir[2] / v) / ψ
     # term4
-    corr += (ψpp_Hi_z * dot(ψp, s_sol) + ψp * dot(ψpp_Hi_z, s_sol)) / ψ
+    corr += (ψpp_Hi_z * dot(ψp, primal_dir) + ψp * dot(ψpp_Hi_z, primal_dir)) / ψ
 
     # scale
     corr /= -2
 
     # - log(u) - log(v) part
-    corr[1] += Hi_z[1] / u * s_sol[1] / u / u
-    corr[2] += Hi_z[2] / v * s_sol[2] / v / v
+    corr[1] += Hi_z[1] / u * primal_dir[1] / u / u
+    corr[2] += Hi_z[2] / v * primal_dir[2] / v / v
 
     return corr
 end

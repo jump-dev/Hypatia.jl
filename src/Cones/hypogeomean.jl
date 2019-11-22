@@ -133,7 +133,7 @@ function update_hess(cone::HypoGeomean)
 end
 
 # TODO make more efficient in math and code
-function correction(cone::HypoGeomean, s_sol::AbstractVector, z_sol::AbstractVector)
+function correction(cone::HypoGeomean, primal_dir::AbstractVector, dual_dir::AbstractVector)
     if !cone.hess_updated
         update_hess(cone)
     end
@@ -144,34 +144,34 @@ function correction(cone::HypoGeomean, s_sol::AbstractVector, z_sol::AbstractVec
     wprodu = cone.wprodu
     wwprodu = wprod / wprodu
     alpha = cone.alpha
-    Hinv_z = inv_hess(cone) * z_sol
+    Hinv_z = inv_hess(cone) * dual_dir
     corr = cone.correction
     corr .= 0
 
     # case where i = j = k = 1
-    corr[1] += 2 / wprodu ^ 3 * s_sol[1] * Hinv_z[1]
+    corr[1] += 2 / wprodu ^ 3 * primal_dir[1] * Hinv_z[1]
     for i in 2:dim
         i1 = i - 1
         # case where i = k = 1, and j > 1, and symmetric case where j = k = 1, and i > 1
-        sz = s_sol[i] * Hinv_z[1] + s_sol[1] * Hinv_z[i]
+        sz = primal_dir[i] * Hinv_z[1] + primal_dir[1] * Hinv_z[i]
         corr[1] += (-2 * alpha[i1] * wprod / w[i1] / wprodu ^ 3) * sz
         # cases where k = 1 and i != j and i > 1 or j > 1
         for j in 2:(i - 1)
             j1 = j - 1
-            sz = s_sol[i] * Hinv_z[j] + s_sol[j] * Hinv_z[i]
+            sz = primal_dir[i] * Hinv_z[j] + primal_dir[j] * Hinv_z[i]
             corr[1] += wwprodu / wprodu * alpha[j1] * alpha[i1] / w[j1] / w[i1] * (2 * wwprodu - 1) * sz
         end
         # case where i = j
-        corr[1] += wprod * alpha[i1] / abs2(wprodu) / abs2(w[i1]) * (-alpha[i1] + 1 + 2 * wwprodu * alpha[i1]) * s_sol[i] * Hinv_z[i]
+        corr[1] += wprod * alpha[i1] / abs2(wprodu) / abs2(w[i1]) * (-alpha[i1] + 1 + 2 * wwprodu * alpha[i1]) * primal_dir[i] * Hinv_z[i]
     end
 
     for k in 2:dim
         k1 = k - 1
         # i = j = 1, k > 1
-        corr[k] += -2 * alpha[k1] * wprod / w[k1] / wprodu ^ 3 * s_sol[1] * Hinv_z[1]
+        corr[k] += -2 * alpha[k1] * wprod / w[k1] / wprodu ^ 3 * primal_dir[1] * Hinv_z[1]
         for i in 2:dim
             i1 = i - 1
-            sz = (s_sol[i] * Hinv_z[1] +  s_sol[1] * Hinv_z[i])
+            sz = (primal_dir[i] * Hinv_z[1] +  primal_dir[1] * Hinv_z[i])
             if i == k
                 # case where j = 1 and i = k, symmetric case is i = 1 and j = k
                 corr[k] += wprod * alpha[i1] / abs2(wprodu) / abs2(w[i1]) * (-alpha[i1] + 1 + 2 * wwprodu * alpha[i1]) * sz
@@ -181,7 +181,7 @@ function correction(cone::HypoGeomean, s_sol::AbstractVector, z_sol::AbstractVec
             end
             for j in 2:(i - 1)
                 j1 = j - 1
-                sz = s_sol[i] * Hinv_z[j] + s_sol[j] * Hinv_z[i]
+                sz = primal_dir[i] * Hinv_z[j] + primal_dir[j] * Hinv_z[i]
                 if i == k || j == k
                     l = (i == k ? j1 : i1)
                     corr[k] += (wwprodu - 1) * (alpha[l] * alpha[k1] * wwprodu / w[l] / abs2(w[k1]) * (alpha[k1] - 1 - 2 * alpha[k1] * wwprodu)) * sz
@@ -191,7 +191,7 @@ function correction(cone::HypoGeomean, s_sol::AbstractVector, z_sol::AbstractVec
                 end
             end
             # case where i = j
-            sz = s_sol[i] * Hinv_z[i]
+            sz = primal_dir[i] * Hinv_z[i]
             # case where i == j == k
             if i == k
                 corr[k] += (wwprodu * alpha[i1] / (w[i1]) ^ 3 * (wwprodu * alpha[i1] * (alpha[i1] - 1) -

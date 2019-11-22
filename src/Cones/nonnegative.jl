@@ -138,24 +138,24 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Non
     return prod
 end
 
-function step_max_dist(cone::Nonnegative{T}, s_sol::AbstractVector{T}, z_sol::AbstractVector{T}) where {T <: Real}
+function step_max_dist(cone::Nonnegative{T}, primal_dir::AbstractVector{T}, dual_dir::AbstractVector{T}) where {T <: Real}
     @assert cone.is_feas
     point = cone.point
     dual_point = cone.dual_point
     dist = T(Inf)
     @inbounds for i in eachindex(point)
-        if s_sol[i] < 0
-            dist = min(dist, -point[i] / s_sol[i])
+        if primal_dir[i] < 0
+            dist = min(dist, -point[i] / primal_dir[i])
         end
-        if z_sol[i] < 0
-            dist = min(dist, -dual_point[i] / z_sol[i])
+        if dual_dir[i] < 0
+            dist = min(dist, -dual_point[i] / dual_dir[i])
         end
     end
     return dist
 end
 
-function correction(cone::Nonnegative, s_sol::AbstractVector, z_sol::AbstractVector)
-    @. cone.correction = s_sol * z_sol / cone.point
+function correction(cone::Nonnegative, primal_dir::AbstractVector, dual_dir::AbstractVector)
+    @. cone.correction = primal_dir * dual_dir / cone.point
     return cone.correction
 end
 
