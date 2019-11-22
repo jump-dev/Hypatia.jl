@@ -303,15 +303,15 @@ function test_epinorminf_barrier(T::Type{<:Real})
         end
         test_barrier_oracles(CO.EpiNormInf{T, T}(1 + n), R_barrier)
 
-        # complex epinorminf cone
-        function C_barrier(s)
-            (u, wr) = (s[1], s[2:end])
-            w = zeros(Complex{eltype(s)}, n)
-            CO.rvec_to_cvec!(w, wr)
-            # w = [ws[2i - 1] + ws[2i] * im for i in 1:n] # TODO use CO.rvec_to_cvec!
-            return -sum(log(abs2(u) - abs2(wj)) for wj in w) + (n - 1) * log(u)
-        end
-        test_barrier_oracles(CO.EpiNormInf{T, Complex{T}}(1 + 2n), C_barrier)
+        # # complex epinorminf cone
+        # function C_barrier(s)
+        #     (u, wr) = (s[1], s[2:end])
+        #     w = zeros(Complex{eltype(s)}, n)
+        #     CO.rvec_to_cvec!(w, wr)
+        #     # w = [ws[2i - 1] + ws[2i] * im for i in 1:n] # TODO use CO.rvec_to_cvec!
+        #     return -sum(log(abs2(u) - abs2(wj)) for wj in w) + (n - 1) * log(u)
+        # end
+        # test_barrier_oracles(CO.EpiNormInf{T, Complex{T}}(1 + 2n), C_barrier)
     end
     return
 end
