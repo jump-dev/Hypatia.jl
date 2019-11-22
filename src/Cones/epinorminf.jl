@@ -251,24 +251,27 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNorm
     return prod
 end
 
-# TODO cleanup and simplify a lot, generalize for complex
-# U_factor * arr = U_bar * (P' * arr) where (P' * arr) swaps first and last rows of arr
-# function implicitly forms the diagonal, edge, and point of U_bar, swaps rows in arr, and multiplies  U_bar by permuted arr
+# TODO generalize for complex
 function hess_Uprod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
     @assert cone.grad_updated
     (m, n) = size(arr)
-    @assert size(prod) == (m, n)
-    # the diag and edge in the U factor
-    diag = cone.tmp
+    diag = cone.tmp # TODO rename
     edge = cone.tmpR
+
     @. diag = sqrt(cone.diag)
-    # TODO check what to do for complex
     @. edge = cone.edge / diag
     for i in 1:n
         prod[1, i] = diag[end] * arr[m, i] + edge[end] * arr[1, i]
         @. @views prod[2:(m - 1), i] = diag[1:(m - 2)] * arr[2:(m - 1), i] + edge[1:(m - 2)] * arr[1, i]
         prod[m, i] = sqrt(cone.diag11 - dot(edge, edge)) * arr[1, i]
     end
+
+    # @. @views prod[1, :] = diag[end] * arr[m, :] + edge[end] * arr[1, :]
+    # @. @views prod[2:(m - 1), :] = diag[1:(m - 2)] * arr[2:(m - 1), :] + edge[1:(m - 2)] * arr[1, :]
+    # rtdiagedge = sqrt(cone.diag11 - sum(abs2, edge))
+    # @. @views prod[end, :] = rtdiagedge * arr[1, :]
+
+
     return prod
 end
 
@@ -297,14 +300,14 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Epi
     return prod
 end
 
+# TODO generalize for complex
 function inv_hess_Uprod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
     @assert cone.grad_updated
     (m, n) = size(arr)
-    @assert size(prod) == (m, n)
-    diag = cone.tmp
+    diag = cone.tmp # TODO rename
     edge = cone.tmpR
+
     @. diag = sqrt(cone.diag)
-    # TODO check what to do for complex
     @. edge = cone.edge / diag
     @inbounds for i in 1:n
         prod[1, i] = arr[end, i] / diag[end]
@@ -312,6 +315,7 @@ function inv_hess_Uprod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Ep
         @views prod[m, i] = arr[1, i] - prod[1, i] * edge[end] - dot(prod[2:(m - 1), i], edge[1:(m - 2)])
         prod[m, i] /= sqrt(cone.diag11 - dot(edge, edge))
     end
+
     return prod
 end
 
