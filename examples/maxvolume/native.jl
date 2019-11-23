@@ -64,15 +64,13 @@ function maxvolume(
     elseif constr_cone == :soc
         # number of variables inside geometric mean is n
         # number of layers of variables
-        l = MathOptInterface.Bridges.Constraint.ilog2(n)
-        @show l
+        num_layers = MathOptInterface.Bridges.Constraint.ilog2(n)
         # number of new variables = 1 + 2 + ... + 2^(l - 1) = 2^l - 1
-        N = 2 ^ l
-        num_new_vars = N - 1
+        num_new_vars = 2 ^ num_layers - 1
 
         c = vcat(c, zeros(T, num_new_vars))
         A = hcat(A, zeros(T, n, num_new_vars))
-        rtN = sqrt(T(N))
+        rtfact = sqrt(T(2) ^ num_layers)
         # excludes original hypograph variable, padded later
         G_rsoc = zeros(T, 3 * num_new_vars, n + num_new_vars)
         cones = CO.Cone{T}[]
@@ -80,22 +78,22 @@ function maxvolume(
         offset = offset_next = 0
         row = 1
         # loop over layers, layer 1 describes hypograph variable
-        for i in 1:l
+        for i in 1:num_layers
             incr = 2 ^ (i - 1)
             offset_next = offset + incr
             # loop over variables in each layer
             for j in 1:incr
-                if i == l
+                if i == num_layers
                     # in the last layer, we use the original variables
                     if 2j - 1 > n
                         # if we are beyond the number of variables in the actual geometric mean, we are adding the buffer variable
-                        G_rsoc[row, n + 1] = -inv(rtN)
+                        G_rsoc[row, n + 1] = -inv(rtfact)
                     else
                         G_rsoc[row, 2j - 1] = -1
                     end
                     if 2j > n
                         # if we are beyond the number of variables in the actual geometric mean, we are adding the buffer variable
-                        G_rsoc[row + 1, n + 1] = -inv(rtN)
+                        G_rsoc[row + 1, n + 1] = -inv(rtfact)
                     else
                         G_rsoc[row + 1, 2j] = -1
                     end
@@ -111,14 +109,14 @@ function maxvolume(
         end
         # account for original hypograph variable
         G = [
-            zeros(T, 3(N - 1))  G_rsoc;
-            one(T)  zeros(T, 1, n)  -inv(rtN)  zeros(T, 1, num_new_vars - 1);
+            zeros(T, 3 * num_new_vars)  G_rsoc;
+            one(T)  zeros(T, 1, n)  -inv(rtfact)  zeros(T, 1, num_new_vars - 1);
             zeros(T, num_new_vars, n + 1)  -Matrix{T}(I, num_new_vars, num_new_vars)
             ]
         push!(cones, CO.Nonnegative{T}(1))
         # TODO does this need to be imposed for all variables explicitly?
         push!(cones, CO.Nonnegative{T}(num_new_vars))
-        h = zeros(T, 3 * (N - 1) + 1 + num_new_vars)
+        h = zeros(T, 4 * num_new_vars + 1)
 
     else
         error("unknown cone $(constr_cone)")
@@ -127,9 +125,9 @@ function maxvolume(
     return (c = c, A = A, b = b, G = G, h = h, cones = cones)
 end
 
-maxvolume1(T::Type{<:Real}) = maxvolume(T, 10, constr_cone = :geomean)
-maxvolume2(T::Type{<:Real}) = maxvolume(T, 10, constr_cone = :power3d)
-maxvolume3(T::Type{<:Real}) = maxvolume(T, 10, constr_cone = :soc)
+maxvolume1(T::Type{<:Real}) = maxvolume(T, 3, constr_cone = :geomean)
+maxvolume2(T::Type{<:Real}) = maxvolume(T, 3, constr_cone = :power3d)
+maxvolume3(T::Type{<:Real}) = maxvolume(T, 3, constr_cone = :soc)
 
 maxvolume_all = [
     maxvolume1,
