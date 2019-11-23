@@ -108,7 +108,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
     return mul!(prod, cone.hess, arr)
 end
 
-function hess_Uprod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
+function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
     if !cone.inv_hess_prod_updated # TODO rename
         update_inv_hess_prod(cone)
     end
@@ -124,7 +124,7 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Con
     return prod
 end
 
-function inv_hess_Uprod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
+function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
     if !cone.inv_hess_prod_updated # TODO rename
         update_inv_hess_prod(cone)
     end

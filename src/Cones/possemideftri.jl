@@ -271,7 +271,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemi
     return prod
 end
 
-function hess_Uprod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidefTri)
+function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidefTri)
     @assert cone.is_feas
     if cone.use_scaling
         @inbounds for i in 1:size(arr, 2)

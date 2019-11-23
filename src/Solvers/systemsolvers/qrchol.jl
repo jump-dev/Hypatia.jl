@@ -219,10 +219,10 @@ function update_fact(system_solver::QRCholDenseSystemSolver, solver::Solver)
     sqrtmu = sqrt(solver.mu)
     for (cone_k, prod_k, arr_k) in zip(model.cones, system_solver.HGQ2_k, system_solver.GQ2_k)
         if Cones.use_dual(cone_k) # no scaling
-            Cones.inv_hess_Uprod!(prod_k, arr_k, cone_k)
+            Cones.inv_hess_sqrt_prod!(prod_k, arr_k, cone_k)
             prod_k ./= sqrtmu
         else
-            Cones.hess_Uprod!(prod_k, arr_k, cone_k)
+            Cones.hess_sqrt_prod!(prod_k, arr_k, cone_k)
             if !Cones.use_scaling(cone_k)
                 prod_k .*= sqrtmu
             end

@@ -474,7 +474,7 @@ function step_max_dist(cone::EpiNormEucl{T}, primal_dir::AbstractVector{T}, dual
 end
 
 
-function hess_Uprod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormEucl)
+function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormEucl)
     @assert cone.is_feas
     if cone.use_scaling
         @assert cone.scaling_updated

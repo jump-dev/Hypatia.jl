@@ -20,7 +20,8 @@ mutable struct EpiNormInf{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     grad_updated::Bool
     hess_updated::Bool
     inv_hess_updated::Bool
-    hess_inv_hess_prod_updated::Bool
+    hess_inv_hess_updated::Bool
+    hess_inv_hess_sqrt_prod_updated::Bool
     is_feas::Bool
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
@@ -39,8 +40,10 @@ mutable struct EpiNormInf{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     invedgeR::Vector{R}
     diag11::T
     schur::T
-    tmp::Vector{T}
-    tmpR::Vector{R}
+    rtdiag::Vector{T}
+    edgertdiag::Vector{T}
+    invUrow1::Vector{T}
+    sqrt_prodend::T
 
     function EpiNormInf{T, R}(
         dim::Int, # TODO maybe change to n (dim of the normed vector)
@@ -58,7 +61,7 @@ end
 
 EpiNormInf{T, R}(dim::Int) where {R <: RealOrComplex{T}} where {T <: Real} = EpiNormInf{T, R}(dim, false)
 
-reset_data(cone::EpiNormInf) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_inv_hess_prod_updated = false)
+reset_data(cone::EpiNormInf) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_inv_hess_updated = cone.hess_inv_hess_sqrt_prod_updated = false)
 
 # TODO only allocate the fields we use
 function setup_data(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
@@ -75,8 +78,9 @@ function setup_data(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where 
     cone.diag = zeros(T, dim - 1)
     cone.edge = zeros(T, dim - 1)
     cone.invedge = zeros(T, dim - 1)
-    cone.tmp = zeros(T, dim - 1)
-    cone.tmpR = zeros(R, dim - 1)
+    cone.rtdiag = zeros(T, dim - 1)
+    cone.edgertdiag = zeros(T, dim - 1)
+    cone.invUrow1 = zeros(T, dim)
     if cone.is_complex
         cone.w = zeros(R, n)
         cone.offdiag = zeros(T, n)
@@ -134,9 +138,8 @@ function update_grad(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where
 end
 
 # calculate edge, invedge, diag11, diag, offdiag, schur
-function hess_inv_hess_prod_updated(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
+function update_hess_inv_hess(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     @assert cone.grad_updated
-    @assert !cone.hess_inv_hess_prod_updated
     u = cone.point[1]
     w = cone.w
     (edge, invedge) = (cone.is_complex ? (cone.edgeR, cone.invedgeR) : (cone.edge, cone.invedge))
@@ -174,15 +177,31 @@ function hess_inv_hess_prod_updated(cone::EpiNormInf{T, R}) where {R <: RealOrCo
         cvec_to_rvec!(cone.invedge, invedge)
     end
 
-    cone.hess_inv_hess_prod_updated = true
+    cone.hess_inv_hess_updated = true
+    return nothing
+end
+
+# calculate rtdiag, edgertdiag, sqrt_prodend
+function update_hess_inv_hess_sqrt_prod(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
+    if !cone.hess_inv_hess_updated
+        hess_inv_hess_updated(cone)
+    end
+
+    @. cone.rtdiag = sqrt(cone.diag)
+    @. cone.edgertdiag = cone.edge / cone.rtdiag
+    cone.sqrt_prodend = sqrt(cone.diag11 - sum(abs2, cone.edgertdiag))
+    cone.invUrow1[1] = inv(cone.sqrt_prodend)
+    @. cone.invUrow1[2:end] = cone.edge / cone.diag / -cone.sqrt_prodend
+
+    cone.hess_inv_hess_sqrt_prod_updated = true
     return nothing
 end
 
 # symmetric arrow matrix
 # TODO maybe make explicit H a sparse matrix
 function update_hess(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
-    if !cone.hess_inv_hess_prod_updated
-        hess_inv_hess_prod_updated(cone)
+    if !cone.hess_inv_hess_updated
+        update_hess_inv_hess(cone)
     end
     H = cone.hess.data
 
@@ -203,8 +222,8 @@ end
 
 # Diag(0, inv(diag)) + xx' / schur, where x = (-1, edge ./ diag)
 function update_inv_hess(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
-    if !cone.hess_inv_hess_prod_updated
-        hess_inv_hess_prod_updated(cone)
+    if !cone.hess_inv_hess_updated
+        update_hess_inv_hess(cone)
     end
     Hi = cone.inv_hess.data
 
@@ -233,8 +252,8 @@ end
 
 # uses edge, diag11, diag, offdiag
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
-    if !cone.hess_inv_hess_prod_updated
-        hess_inv_hess_prod_updated(cone)
+    if !cone.hess_inv_hess_updated
+        hess_inv_hess_updated(cone)
     end
 
     @views copyto!(prod[1, :], arr[1, :])
@@ -252,26 +271,27 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNorm
 end
 
 # TODO generalize for complex
-function hess_Uprod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
-    @assert cone.grad_updated
-    rtdiag = cone.tmp
-    edgertdiag = cone.tmpR
-    # TODO cache this with a U prod update function
-    @. rtdiag = sqrt(cone.diag)
-    @. edgertdiag = cone.edge / rtdiag
-    endfact = sqrt(cone.diag11 - sum(abs2, edgertdiag))
+function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
+    if !cone.hess_inv_hess_sqrt_prod_updated
+        update_hess_inv_hess_sqrt_prod(cone)
+    end
 
-    @. @views prod[1, :] = rtdiag[end] * arr[end, :] + edgertdiag[end] * arr[1, :]
-    @. @views prod[2:(end - 1), :] = rtdiag[1:(end - 1)] * arr[2:(end - 1), :] + edgertdiag[1:(end - 1)] * arr[1, :]'
-    @. @views prod[end, :] = endfact * arr[1, :]
+    @. @views prod[1, :] = cone.rtdiag[end] * arr[end, :] + cone.edgertdiag[end] * arr[1, :]
+    @. @views prod[2:(end - 1), :] = cone.rtdiag[1:(end - 1)] * arr[2:(end - 1), :] + cone.edgertdiag[1:(end - 1)] * arr[1, :]'
+    @. @views prod[end, :] = cone.sqrt_prodend * arr[1, :]
+    # if cone.is_complex
+    #     for (j, oj) in enumerate(cone.offdiag)
+    #         # TODO
+    #     end
+    # end
 
     return prod
 end
 
 # uses invedge, schur, diag, offdiag, det
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
-    if !cone.hess_inv_hess_prod_updated
-        hess_inv_hess_prod_updated(cone)
+    if !cone.hess_inv_hess_updated
+        hess_inv_hess_updated(cone)
     end
 
     @views copyto!(prod[1, :], arr[1, :])
@@ -294,20 +314,19 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Epi
 end
 
 # TODO generalize for complex
-function inv_hess_Uprod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
-    @assert cone.grad_updated
-    rtdiag = cone.tmp
-    edgertdiag = cone.tmpR
-    # TODO cache this with a U prod update function
-    @. rtdiag = sqrt(cone.diag)
-    @. edgertdiag = cone.edge / rtdiag
-    endfact = sqrt(cone.diag11 - sum(abs2, edgertdiag))
+function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
+    if !cone.hess_inv_hess_sqrt_prod_updated
+        update_hess_inv_hess_sqrt_prod(cone)
+    end
 
-    @. @views prod[1, :] = arr[end, :] / rtdiag[end]
-    @. @views prod[2:(end - 1), :] = arr[2:(end - 1), :] / rtdiag[1:(end - 1)]
-    @. @views prod[end, :] = arr[1, :] - prod[1, :] * edgertdiag[end]
-    @views mul!(prod[end, :], prod[2:(end - 1), :]', edgertdiag[1:(end - 1)], -1, true)
-    @. prod[end, :] /= endfact
+    # multiply by sparse U factor of inverse hessian
+    @views mul!(prod[1, :], arr', cone.invUrow1)
+    @. @views prod[2:end, :] = arr[2:end, :] / cone.rtdiag
+    if cone.is_complex
+        for (j, oj) in enumerate(cone.offdiag)
+            # TODO
+        end
+    end
 
     return prod
 end

@@ -118,7 +118,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Nonnega
     return prod
 end
 
-function hess_Uprod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Nonnegative)
+function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Nonnegative)
     @assert cone.is_feas
     if cone.use_scaling
         @. prod = arr * sqrt(cone.dual_point) / sqrt(cone.point) # TODO do sqrts once and cache

@@ -36,7 +36,7 @@ function test_barrier_oracles(
     cone::CO.Cone{T},
     barrier::Function;
     noise::T = T(0.1),
-    scale::T = T(1e-3),
+    scale::T = T(1e-1),
     tol::T = 100eps(T),
     init_tol::T = tol,
     init_only::Bool = false,
@@ -156,33 +156,52 @@ function test_grad_hess(
     hess = Matrix(CO.hess(cone))
     inv_hess = Matrix(CO.inv_hess(cone))
 
-    @test dot(point, grad) ≈ -nu atol=tol rtol=tol
-    @test hess * inv_hess ≈ I atol=tol rtol=tol
+    println()
+    # @show T
+    # @show hess
+    hessU = cholesky(CO.hess(cone)).U
+    # @show hessU
+    # @show inv_hess
+    invhessU = cholesky(CO.inv_hess(cone)).U
+    # @show invhessU
 
     dim = length(point)
     prod_mat = similar(point, dim, dim)
-    @test CO.hess_prod!(prod_mat, inv_hess, cone) ≈ I atol=tol rtol=tol
-    @test CO.inv_hess_prod!(prod_mat, hess, cone) ≈ I atol=tol rtol=tol
+    hp = CO.hess_sqrt_prod!(prod_mat, Matrix(one(T) * I, dim, dim), cone)
+    @show hessU
+    @show hp
+    ihp = CO.inv_hess_sqrt_prod!(prod_mat, Matrix(one(T) * I, dim, dim), cone)
+    @show invhessU
+    @show ihp
 
-    prod_mat2 = Matrix(CO.hess_Uprod!(prod_mat, inv_hess, cone)')
-    @test CO.hess_Uprod!(prod_mat, prod_mat2, cone) ≈ I atol=tol rtol=tol
+
+    # @test dot(point, grad) ≈ -nu atol=tol rtol=tol
+    # @test hess * inv_hess ≈ I atol=tol rtol=tol
+    #
+    dim = length(point)
+    prod_mat = similar(point, dim, dim)
+    # @test CO.hess_prod!(prod_mat, inv_hess, cone) ≈ I atol=tol rtol=tol
+    # @test CO.inv_hess_prod!(prod_mat, hess, cone) ≈ I atol=tol rtol=tol
+    #
+    prod_mat2 = Matrix(CO.hess_sqrt_prod!(prod_mat, inv_hess, cone)')
+    @test CO.hess_sqrt_prod!(prod_mat, prod_mat2, cone) ≈ I atol=tol rtol=tol
 
     if !CO.use_scaling(cone)
-        prod = similar(point)
-        @test hess * point ≈ -grad atol=tol rtol=tol
-        @test CO.hess_prod!(prod, point, cone) ≈ -grad atol=tol rtol=tol
-        @test CO.inv_hess_prod!(prod, grad, cone) ≈ -point atol=tol rtol=tol
+        # prod = similar(point)
+        # @test hess * point ≈ -grad atol=tol rtol=tol
+        # @test CO.hess_prod!(prod, point, cone) ≈ -grad atol=tol rtol=tol
+        # @test CO.inv_hess_prod!(prod, grad, cone) ≈ -point atol=tol rtol=tol
 
         if isdefined(cone, :use_dual)
-            CO.inv_hess_Uprod!(prod_mat2, Matrix(one(T) * I, dim, dim), cone)
+            CO.inv_hess_sqrt_prod!(prod_mat2, Matrix(one(T) * I, dim, dim), cone)
             @test prod_mat2' * prod_mat2 ≈ inv_hess atol=tol rtol=tol
         end
     end
 
-    if !isempty(dual_point)
-        @test hess * point ≈ dual_point atol=tol rtol=tol
-        @test inv_hess * dual_point ≈ point atol=tol rtol=tol
-    end
+    # if !isempty(dual_point)
+    #     @test hess * point ≈ dual_point atol=tol rtol=tol
+    #     @test inv_hess * dual_point ≈ point atol=tol rtol=tol
+    # end
 
     return
 end
@@ -306,9 +325,7 @@ function test_epinorminf_barrier(T::Type{<:Real})
         # # complex epinorminf cone
         # function C_barrier(s)
         #     (u, wr) = (s[1], s[2:end])
-        #     w = zeros(Complex{eltype(s)}, n)
-        #     CO.rvec_to_cvec!(w, wr)
-        #     # w = [ws[2i - 1] + ws[2i] * im for i in 1:n] # TODO use CO.rvec_to_cvec!
+        #     w = CO.rvec_to_cvec!(zeros(Complex{eltype(s)}, n), wr)
         #     return -sum(log(abs2(u) - abs2(wj)) for wj in w) + (n - 1) * log(u)
         # end
         # test_barrier_oracles(CO.EpiNormInf{T, Complex{T}}(1 + 2n), C_barrier)
