@@ -9,7 +9,7 @@ import Random
 using Test
 import Hypatia
 const CO = Hypatia.Cones
-# TODO remove
+# TODO remove?
 import MathOptInterface
 
 function maxvolume(
@@ -64,6 +64,7 @@ function maxvolume(
     elseif constr_cone == :soc
         # number of variables inside geometric mean is n
         # number of layers of variables
+        # TODO keep as is or copy function in?
         num_layers = MathOptInterface.Bridges.Constraint.ilog2(n)
         # number of new variables = 1 + 2 + ... + 2^(l - 1) = 2^l - 1
         num_new_vars = 2 ^ num_layers - 1
@@ -78,35 +79,39 @@ function maxvolume(
         offset = offset_next = 0
         row = 1
         # loop over layers, layer 1 describes hypograph variable
-        for i in 1:num_layers
-            incr = 2 ^ (i - 1)
-            offset_next = offset + incr
+        for i in 1:(num_layers - 1)
+            num_lvars = 2 ^ (i - 1)
+            offset_next = offset + num_lvars
             # loop over variables in each layer
-            for j in 1:incr
-                if i == num_layers
-                    # in the last layer, we use the original variables
-                    if 2j - 1 > n
-                        # if we are beyond the number of variables in the actual geometric mean, we are adding the buffer variable
-                        G_rsoc[row, n + 1] = -inv(rtfact)
-                    else
-                        G_rsoc[row, 2j - 1] = -1
-                    end
-                    if 2j > n
-                        # if we are beyond the number of variables in the actual geometric mean, we are adding the buffer variable
-                        G_rsoc[row + 1, n + 1] = -inv(rtfact)
-                    else
-                        G_rsoc[row + 1, 2j] = -1
-                    end
-                else
-                    G_rsoc[row, n + offset_next + 2j - 1] = -1
-                    G_rsoc[row + 1, n + offset_next + 2j] = -1
-                end
+            for j in 1:num_lvars
+                G_rsoc[row, n + offset_next + 2j - 1] = -1
+                G_rsoc[row + 1, n + offset_next + 2j] = -1
                 G_rsoc[row + 2, n + offset + j] = -1
                 push!(cones, CO.EpiPerSquare{T}(3))
                 row += 3
             end
             offset = offset_next
         end
+
+        for j in 1:(2 ^ (num_layers - 1))
+            # in the last layer, we use the original variables
+            if 2j - 1 > n
+                # if we are beyond the number of variables in the actual geometric mean, we are adding the buffer variable
+                G_rsoc[row, n + 1] = -inv(rtfact)
+            else
+                G_rsoc[row, 2j - 1] = -1
+            end
+            if 2j > n
+                # if we are beyond the number of variables in the actual geometric mean, we are adding the buffer variable
+                G_rsoc[row + 1, n + 1] = -inv(rtfact)
+            else
+                G_rsoc[row + 1, 2j] = -1
+            end
+            G_rsoc[row + 2, n + offset + j] = -1
+            push!(cones, CO.EpiPerSquare{T}(3))
+            row += 3
+        end
+
         # account for original hypograph variable
         G = [
             zeros(T, 3 * num_new_vars)  G_rsoc;
@@ -114,7 +119,7 @@ function maxvolume(
             zeros(T, num_new_vars, n + 1)  -Matrix{T}(I, num_new_vars, num_new_vars)
             ]
         push!(cones, CO.Nonnegative{T}(1))
-        # TODO does this need to be imposed for all variables explicitly?
+        # TODO does this need to be imposed for all variables explicitly? keeping for now just in case
         push!(cones, CO.Nonnegative{T}(num_new_vars))
         h = zeros(T, 4 * num_new_vars + 1)
 
@@ -147,5 +152,3 @@ function test_maxvolume(instance::Function; T::Type{<:Real} = Float64, options::
     @test r.status == :Optimal
     return
 end
-
-test_maxvolume.(maxvolume_all)
