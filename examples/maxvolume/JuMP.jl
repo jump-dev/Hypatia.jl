@@ -14,7 +14,7 @@ import Random
 
 function maxvolumeJuMP(
     n::Int;
-    constr_cone::Symbol = :soc
+    constr_cone::Symbol = :soc,
     )
 
     model = JuMP.Model()
@@ -31,11 +31,11 @@ function maxvolumeJuMP(
         # number of variables inside geometric mean is n
         # number of layers of variables
         l = MathOptInterface.Bridges.Constraint.ilog2(n)
-        @show l
         # number of new variables = 1 + 2 + ... + 2^(l - 1) = 2^l - 1
         N = 2 ^ l
         num_new_vars = N - 1
         JuMP.@variable(model, new_vars[1:num_new_vars] >= 0)
+        # JuMP.@constraint(model, new_vars[1] >= 0)
         rtN =√N
         xl1 = new_vars[1]
         JuMP.@constraint(model, t <= xl1 / rtN)
@@ -53,9 +53,13 @@ function maxvolumeJuMP(
         offset = offset_next = 0
         # loop over layers, layer 1 describes hypograph variable
         for i in 1:l
-            offset_next = offset + i
+            offset_next = offset + 2 ^ (i - 1) # **********************
             # loop over variables in each layer
+            @show i
             for j in 1:(2 ^ (i - 1))
+                @show j
+                @show offset, offset_next
+                @show offset + j, offset_next + 2j - 1, offset_next + 2j
                 if i == l
                     # in the last layer, we use the original variables
                     a = _getx(2j - 1)
