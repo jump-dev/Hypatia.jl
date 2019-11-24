@@ -20,7 +20,7 @@ function maxvolumeJuMP(
     JuMP.@variable(model, end_pts[1:n])
     JuMP.@objective(model, Max, t)
     poly_hrep = Matrix{Float64}(I, n, n)
-    poly_hrep .+= randn(n, n) * 10.0 ^ (-n)
+    poly_hrep .+= randn(n, n) / n
     JuMP.@constraint(model, poly_hrep * end_pts .<= ones(n))
 
     if constr_cone == :geomean
@@ -78,6 +78,10 @@ end
 
 maxvolumeJuMP1() = maxvolumeJuMP(3, constr_cone = :geomean)
 maxvolumeJuMP2() = maxvolumeJuMP(3, constr_cone = :soc)
+maxvolumeJuMP3() = maxvolumeJuMP(6, constr_cone = :geomean)
+maxvolumeJuMP4() = maxvolumeJuMP(6, constr_cone = :soc)
+maxvolumeJuMP5() = maxvolumeJuMP(25, constr_cone = :geomean)
+maxvolumeJuMP6() = maxvolumeJuMP(25, constr_cone = :soc)
 
 function test_maxvolumeJuMP(instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
@@ -90,6 +94,10 @@ end
 test_maxvolumeJuMP_all(; options...) = test_maxvolumeJuMP.([
     maxvolumeJuMP1,
     maxvolumeJuMP2,
+    maxvolumeJuMP3,
+    maxvolumeJuMP4,
+    maxvolumeJuMP5,
+    maxvolumeJuMP6,
     ], options = options)
 
 test_maxvolumeJuMP(; options...) = test_maxvolumeJuMP.([

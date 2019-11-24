@@ -29,9 +29,8 @@ function maxvolume(
     n::Int;
     constr_cone::Symbol = :epinormeucl,
     )
-
     poly_hrep = Matrix{T}(I, n, n)
-    poly_hrep .+= randn(n, n) * T(10) ^ (-n)
+    poly_hrep .+= T.(randn(n, n)) / n
     c = vcat(-1, zeros(T, n))
     A = hcat(zeros(T, n), poly_hrep)
     b = ones(T, n)
@@ -144,11 +143,22 @@ end
 maxvolume1(T::Type{<:Real}) = maxvolume(T, 3, constr_cone = :hypogeomean)
 maxvolume2(T::Type{<:Real}) = maxvolume(T, 3, constr_cone = :power)
 maxvolume3(T::Type{<:Real}) = maxvolume(T, 3, constr_cone = :epinormeucl)
+maxvolume4(T::Type{<:Real}) = maxvolume(T, 6, constr_cone = :hypogeomean)
+maxvolume5(T::Type{<:Real}) = maxvolume(T, 6, constr_cone = :power)
+maxvolume6(T::Type{<:Real}) = maxvolume(T, 6, constr_cone = :epinormeucl)
+maxvolume7(T::Type{<:Real}) = maxvolume(T, 25, constr_cone = :hypogeomean)
+maxvolume8(T::Type{<:Real}) = maxvolume(T, 25, constr_cone = :power)
+maxvolume9(T::Type{<:Real}) = maxvolume(T, 25, constr_cone = :epinormeucl)
 
 instances_maxvolume_all = [
     maxvolume1,
     maxvolume2,
     maxvolume3,
+    maxvolume5,
+    maxvolume6,
+    maxvolume7,
+    maxvolume8,
+    maxvolume9,
     ]
 instances_maxvolume_few = [
     maxvolume1,
