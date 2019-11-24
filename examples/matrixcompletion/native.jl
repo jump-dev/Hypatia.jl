@@ -237,19 +237,19 @@ function matrixcompletion(
     return (c = c, A = A, b = b, G = G, h = h, cones = cones)
 end
 
-matrixcompletion1(T::Type{<:Real}) = matrixcompletion(T, 5, 6)
-matrixcompletion2(T::Type{<:Real}) = matrixcompletion(T, 5, 6, use_natural = false)
-matrixcompletion3(T::Type{<:Real}) = matrixcompletion(T, 5, 6, nuclearnorm_obj = false)
-matrixcompletion4(T::Type{<:Real}) = matrixcompletion(T, 5, 6, nuclearnorm_obj = false, use_natural = false)
-matrixcompletion5(T::Type{<:Real}) = matrixcompletion(T, 5, 6, constraints = Symbol[])
+matrixcompletion1(T::Type{<:Real}) = matrixcompletion(T, 2, 3)
+matrixcompletion2(T::Type{<:Real}) = matrixcompletion(T, 2, 3, use_natural = false)
+matrixcompletion3(T::Type{<:Real}) = matrixcompletion(T, 2, 3, nuclearnorm_obj = false)
+matrixcompletion4(T::Type{<:Real}) = matrixcompletion(T, 2, 3, nuclearnorm_obj = false, use_natural = false)
+matrixcompletion5(T::Type{<:Real}) = matrixcompletion(T, 2, 3, constraints = Symbol[])
 matrixcompletion6(T::Type{<:Real}) = matrixcompletion(T, 6, 8)
 matrixcompletion7(T::Type{<:Real}) = matrixcompletion(T, 6, 8, use_natural = false)
 matrixcompletion8(T::Type{<:Real}) = matrixcompletion(T, 6, 8, nuclearnorm_obj = false)
 matrixcompletion9(T::Type{<:Real}) = matrixcompletion(T, 6, 8, nuclearnorm_obj = false, use_natural = false)
-matrixcompletion10(T::Type{<:Real}) = matrixcompletion(T, 8, 8)
-matrixcompletion11(T::Type{<:Real}) = matrixcompletion(T, 8, 8, use_natural = false)
-matrixcompletion12(T::Type{<:Real}) = matrixcompletion(T, 8, 8, nuclearnorm_obj = false)
-matrixcompletion13(T::Type{<:Real}) = matrixcompletion(T, 8, 8, nuclearnorm_obj = false, use_natural = false)
+matrixcompletion10(T::Type{<:Real}) = matrixcompletion(T, 12, 24)
+matrixcompletion11(T::Type{<:Real}) = matrixcompletion(T, 12, 24, use_natural = false)
+matrixcompletion12(T::Type{<:Real}) = matrixcompletion(T, 12, 24, nuclearnorm_obj = false)
+matrixcompletion13(T::Type{<:Real}) = matrixcompletion(T, 12, 24, nuclearnorm_obj = false, use_natural = false)
 
 instances_matrixcompletion_all = [
     matrixcompletion1,
