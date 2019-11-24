@@ -241,14 +241,15 @@ matrixcompletion1(T::Type{<:Real}) = matrixcompletion(T, 5, 6)
 matrixcompletion2(T::Type{<:Real}) = matrixcompletion(T, 5, 6, use_natural = false)
 matrixcompletion3(T::Type{<:Real}) = matrixcompletion(T, 5, 6, nuclearnorm_obj = false)
 matrixcompletion4(T::Type{<:Real}) = matrixcompletion(T, 5, 6, nuclearnorm_obj = false, use_natural = false)
-matrixcompletion5(T::Type{<:Real}) = matrixcompletion(T, 6, 8)
-matrixcompletion6(T::Type{<:Real}) = matrixcompletion(T, 6, 8, use_natural = false)
-matrixcompletion7(T::Type{<:Real}) = matrixcompletion(T, 6, 8, nuclearnorm_obj = false)
-matrixcompletion8(T::Type{<:Real}) = matrixcompletion(T, 6, 8, nuclearnorm_obj = false, use_natural = false)
-matrixcompletion9(T::Type{<:Real}) = matrixcompletion(T, 8, 8)
-matrixcompletion10(T::Type{<:Real}) = matrixcompletion(T, 8, 8, use_natural = false)
-matrixcompletion11(T::Type{<:Real}) = matrixcompletion(T, 8, 8, nuclearnorm_obj = false)
-matrixcompletion12(T::Type{<:Real}) = matrixcompletion(T, 8, 8, nuclearnorm_obj = false, use_natural = false)
+matrixcompletion5(T::Type{<:Real}) = matrixcompletion(T, 5, 6, constraints = Symbol[])
+matrixcompletion6(T::Type{<:Real}) = matrixcompletion(T, 6, 8)
+matrixcompletion7(T::Type{<:Real}) = matrixcompletion(T, 6, 8, use_natural = false)
+matrixcompletion8(T::Type{<:Real}) = matrixcompletion(T, 6, 8, nuclearnorm_obj = false)
+matrixcompletion9(T::Type{<:Real}) = matrixcompletion(T, 6, 8, nuclearnorm_obj = false, use_natural = false)
+matrixcompletion10(T::Type{<:Real}) = matrixcompletion(T, 8, 8)
+matrixcompletion11(T::Type{<:Real}) = matrixcompletion(T, 8, 8, use_natural = false)
+matrixcompletion12(T::Type{<:Real}) = matrixcompletion(T, 8, 8, nuclearnorm_obj = false)
+matrixcompletion13(T::Type{<:Real}) = matrixcompletion(T, 8, 8, nuclearnorm_obj = false, use_natural = false)
 
 instances_matrixcompletion_all = [
     matrixcompletion1,
@@ -263,12 +264,14 @@ instances_matrixcompletion_all = [
     matrixcompletion10,
     matrixcompletion11,
     matrixcompletion12,
+    matrixcompletion13,
     ]
 instances_matrixcompletion_few = [
     matrixcompletion1,
     matrixcompletion2,
     matrixcompletion3,
     matrixcompletion4,
+    matrixcompletion5,
     ]
 
 function test_matrixcompletion(instance::Function; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)

@@ -2,8 +2,6 @@
 Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
 see description in maxvolume/native.jl
-
-SOC formulation inspired by MOI bridge
 =#
 
 using LinearAlgebra

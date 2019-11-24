@@ -2,6 +2,7 @@
 Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
 find maximum volume hypercube with edges parallel to the axes inside a polyhedron
+second-order cone (EpiNormEucl) extended formulation inspired by MOI bridge
 =#
 
 using LinearAlgebra
@@ -26,7 +27,7 @@ end
 function maxvolume(
     T::Type{<:Real},
     n::Int;
-    constr_cone::Symbol = :soc,
+    constr_cone::Symbol = :epinormeucl,
     )
 
     poly_hrep = Matrix{T}(I, n, n)
@@ -35,12 +36,12 @@ function maxvolume(
     A = hcat(zeros(T, n), poly_hrep)
     b = ones(T, n)
 
-    if constr_cone == :geomean
+    if constr_cone == :hypogeomean
         G = -Matrix{T}(I, n + 1, n + 1)
         h = zeros(T, n + 1)
         cones = CO.Cone{T}[CO.HypoGeomean{T}(fill(inv(T(n)), n))]
 
-    elseif constr_cone == :power3d
+    elseif constr_cone == :power
         cones = CO.Cone{T}[]
         # number of 3-dimensional power cones needed is n - 1, number of new variables is n - 2
         len_power = 3 * (n - 1)
@@ -72,7 +73,7 @@ function maxvolume(
         push!(cones, CO.Power{T}([inv(T(n)), T(n - 1) / T(n)], 1))
         h = zeros(T, 3 * (n - 1))
 
-    elseif constr_cone == :soc
+    elseif constr_cone == :epinormeucl
         # number of variables inside geometric mean is n
         # number of layers of variables
         num_layers = log_floor(n)
@@ -140,9 +141,9 @@ function maxvolume(
     return (c = c, A = A, b = b, G = G, h = h, cones = cones)
 end
 
-maxvolume1(T::Type{<:Real}) = maxvolume(T, 3, constr_cone = :geomean)
-maxvolume2(T::Type{<:Real}) = maxvolume(T, 3, constr_cone = :power3d)
-maxvolume3(T::Type{<:Real}) = maxvolume(T, 3, constr_cone = :soc)
+maxvolume1(T::Type{<:Real}) = maxvolume(T, 3, constr_cone = :hypogeomean)
+maxvolume2(T::Type{<:Real}) = maxvolume(T, 3, constr_cone = :power)
+maxvolume3(T::Type{<:Real}) = maxvolume(T, 3, constr_cone = :epinormeucl)
 
 instances_maxvolume_all = [
     maxvolume1,
