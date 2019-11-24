@@ -12,10 +12,10 @@ const CO = Hypatia.Cones
 
 # modified from https://github.com/JuliaOpt/MathOptInterface.jl/blob/master/src/Bridges/Constraint/geomean.jl
 function log_floor(n, i)
-    if n <= (one(n) << i)
+    if n <= 2 ^ i
         i
     else
-        log_floor(n, i+1)
+        log_floor(n, i + 1)
     end
 end
 function log_floor(n::Integer)
