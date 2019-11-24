@@ -12,7 +12,7 @@ import Random
 
 function maxvolumeJuMP(
     n::Int;
-    constr_cone::Symbol = :soc,
+    use_hypogeomean::Bool = true,
     )
 
     model = JuMP.Model()
@@ -23,9 +23,9 @@ function maxvolumeJuMP(
     poly_hrep .+= randn(n, n) / n
     JuMP.@constraint(model, poly_hrep * end_pts .<= ones(n))
 
-    if constr_cone == :geomean
+    if use_hypogeomean
         JuMP.@constraint(model, vcat(t, end_pts) in MOI.GeometricMeanCone(n + 1))
-    elseif constr_cone == :soc
+    else
         # number of variables inside geometric mean is n
         # number of layers of variables
         num_layers = MOI.Bridges.Constraint.ilog2(n)
@@ -69,19 +69,17 @@ function maxvolumeJuMP(
             w = new_vars[offset + j]
             JuMP.@constraint(model, [u, v, w] in JuMP.RotatedSecondOrderCone())
         end
-    else
-        error("unknown cone $(constr_cone)")
     end
 
     return (model = model,)
 end
 
-maxvolumeJuMP1() = maxvolumeJuMP(3, constr_cone = :geomean)
-maxvolumeJuMP2() = maxvolumeJuMP(3, constr_cone = :soc)
-maxvolumeJuMP3() = maxvolumeJuMP(6, constr_cone = :geomean)
-maxvolumeJuMP4() = maxvolumeJuMP(6, constr_cone = :soc)
-maxvolumeJuMP5() = maxvolumeJuMP(25, constr_cone = :geomean)
-maxvolumeJuMP6() = maxvolumeJuMP(25, constr_cone = :soc)
+maxvolumeJuMP1() = maxvolumeJuMP(3, use_hypogeomean = true)
+maxvolumeJuMP2() = maxvolumeJuMP(3, use_hypogeomean = false)
+maxvolumeJuMP3() = maxvolumeJuMP(6, use_hypogeomean = true)
+maxvolumeJuMP4() = maxvolumeJuMP(6, use_hypogeomean = false)
+maxvolumeJuMP5() = maxvolumeJuMP(25, use_hypogeomean = true)
+maxvolumeJuMP6() = maxvolumeJuMP(25, use_hypogeomean = false)
 
 function test_maxvolumeJuMP(instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)

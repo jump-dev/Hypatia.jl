@@ -27,9 +27,10 @@ function matrixcompletion(
     T::Type{<:Real},
     m::Int,
     n::Int;
-    constraints = Symbol[:geomean],
-    nuclearnorm_obj::Bool = true,
-    use_natural::Bool = true,
+    geomean_constr::Bool = true, # whether to add a constraint on the geomean of unknown values
+    nuclearnorm_obj::Bool = true, # whether to use a nuclear norm as opposed to spectral norm in the objective
+    use_hypogeomean::Bool = true, # natural/extended formulation for geomean constraint
+    use_epinormspectral::Bool = true,  # natural/extended formulation for the objective
     )
     @assert m <= n
     mn = m * n
@@ -55,7 +56,7 @@ function matrixcompletion(
     num_unknown = m * n - num_known
 
     # epinormspectral cone or its dual- get vec(X) in G and h
-    if use_natural
+    if use_epinormspectral
         c = vcat(one(T), zeros(T, num_unknown))
         G_norm = zeros(T, mn, num_unknown)
         total_idx = 1
@@ -168,8 +169,8 @@ function matrixcompletion(
     G = G_norm
     h = h_norm
 
-    if :geomean in constraints
-        if use_natural
+    if geomean_constr
+        if use_hypogeomean
             # hypogeomean for values to be filled
             G_geo = zeros(T, num_unknown + 1, size(G, 2))
             total_idx = 1
@@ -216,8 +217,13 @@ function matrixcompletion(
 
             # if using extended with spectral objective G_geo needs to be prepadded with an epigraph variable
             if nuclearnorm_obj
-                prepad = zeros(T, len_power, 0)
-                postpad = zeros(T, len_power, size(G_norm, 2) - num_unknown)
+                if use_epinormspectral
+                    prepad = zeros(T, len_power, 1)
+                    postpad = zeros(T, len_power, 0)
+                else
+                    prepad = zeros(T, len_power, 0)
+                    postpad = zeros(T, len_power, size(G_norm, 2) - num_unknown)
+                end
             else
                 prepad = zeros(T, len_power, 1)
                 postpad = zeros(T, len_power, 0)
@@ -237,19 +243,25 @@ function matrixcompletion(
     return (c = c, A = A, b = b, G = G, h = h, cones = cones)
 end
 
-matrixcompletion1(T::Type{<:Real}) = matrixcompletion(T, 2, 3)
-matrixcompletion2(T::Type{<:Real}) = matrixcompletion(T, 2, 3, use_natural = false)
-matrixcompletion3(T::Type{<:Real}) = matrixcompletion(T, 2, 3, nuclearnorm_obj = false)
-matrixcompletion4(T::Type{<:Real}) = matrixcompletion(T, 2, 3, nuclearnorm_obj = false, use_natural = false)
-matrixcompletion5(T::Type{<:Real}) = matrixcompletion(T, 2, 3, constraints = Symbol[])
-matrixcompletion6(T::Type{<:Real}) = matrixcompletion(T, 6, 8)
-matrixcompletion7(T::Type{<:Real}) = matrixcompletion(T, 6, 8, use_natural = false)
-matrixcompletion8(T::Type{<:Real}) = matrixcompletion(T, 6, 8, nuclearnorm_obj = false)
-matrixcompletion9(T::Type{<:Real}) = matrixcompletion(T, 6, 8, nuclearnorm_obj = false, use_natural = false)
-matrixcompletion10(T::Type{<:Real}) = matrixcompletion(T, 12, 24)
-matrixcompletion11(T::Type{<:Real}) = matrixcompletion(T, 12, 24, use_natural = false)
-matrixcompletion12(T::Type{<:Real}) = matrixcompletion(T, 12, 24, nuclearnorm_obj = false)
-matrixcompletion13(T::Type{<:Real}) = matrixcompletion(T, 12, 24, nuclearnorm_obj = false, use_natural = false)
+matrixcompletion1(T::Type{<:Real}) = matrixcompletion(T, 2, 3, geomean_constr = false)
+matrixcompletion2(T::Type{<:Real}) = matrixcompletion(T, 2, 3, geomean_constr = true)
+matrixcompletion3(T::Type{<:Real}) = matrixcompletion(T, 2, 3, geomean_constr = true, nuclearnorm_obj = false)
+matrixcompletion4(T::Type{<:Real}) = matrixcompletion(T, 2, 3, geomean_constr = true, nuclearnorm_obj = false, use_epinormspectral = false)
+matrixcompletion5(T::Type{<:Real}) = matrixcompletion(T, 2, 3, geomean_constr = true, nuclearnorm_obj = true)
+matrixcompletion6(T::Type{<:Real}) = matrixcompletion(T, 2, 3, geomean_constr = true, nuclearnorm_obj = true, use_epinormspectral = false)
+matrixcompletion7(T::Type{<:Real}) = matrixcompletion(T, 2, 3, geomean_constr = false, use_hypogeomean = false)
+matrixcompletion8(T::Type{<:Real}) = matrixcompletion(T, 2, 3, geomean_constr = true, nuclearnorm_obj = false, use_hypogeomean = false)
+matrixcompletion9(T::Type{<:Real}) = matrixcompletion(T, 2, 3, geomean_constr = true, nuclearnorm_obj = false, use_epinormspectral = false, use_hypogeomean = false)
+matrixcompletion10(T::Type{<:Real}) = matrixcompletion(T, 2, 3, geomean_constr = true, nuclearnorm_obj = true, use_hypogeomean = false)
+matrixcompletion11(T::Type{<:Real}) = matrixcompletion(T, 2, 3, geomean_constr = true, nuclearnorm_obj = true, use_epinormspectral = false, use_hypogeomean = false)
+matrixcompletion12(T::Type{<:Real}) = matrixcompletion(T, 6, 8, geomean_constr = true, nuclearnorm_obj = false, use_epinormspectral = false, use_hypogeomean = false)
+matrixcompletion13(T::Type{<:Real}) = matrixcompletion(T, 6, 8, geomean_constr = true, nuclearnorm_obj = false, use_epinormspectral = true, use_hypogeomean = true)
+matrixcompletion14(T::Type{<:Real}) = matrixcompletion(T, 6, 8, geomean_constr = true, nuclearnorm_obj = true, use_epinormspectral = false, use_hypogeomean = false)
+matrixcompletion15(T::Type{<:Real}) = matrixcompletion(T, 6, 8, geomean_constr = true, nuclearnorm_obj = true, use_epinormspectral = true, use_hypogeomean = true)
+matrixcompletion16(T::Type{<:Real}) = matrixcompletion(T, 12, 24, geomean_constr = true, nuclearnorm_obj = false, use_epinormspectral = false, use_hypogeomean = false)
+matrixcompletion17(T::Type{<:Real}) = matrixcompletion(T, 12, 24, geomean_constr = true, nuclearnorm_obj = false, use_epinormspectral = true, use_hypogeomean = true)
+matrixcompletion18(T::Type{<:Real}) = matrixcompletion(T, 12, 24, geomean_constr = true, nuclearnorm_obj = true, use_epinormspectral = false, use_hypogeomean = false)
+matrixcompletion19(T::Type{<:Real}) = matrixcompletion(T, 12, 24, geomean_constr = true, nuclearnorm_obj = true, use_epinormspectral = true, use_hypogeomean = true)
 
 instances_matrixcompletion_all = [
     matrixcompletion1,
@@ -265,6 +277,12 @@ instances_matrixcompletion_all = [
     matrixcompletion11,
     matrixcompletion12,
     matrixcompletion13,
+    matrixcompletion14,
+    matrixcompletion15,
+    matrixcompletion16,
+    matrixcompletion17,
+    matrixcompletion18,
+    matrixcompletion19,
     ]
 instances_matrixcompletion_few = [
     matrixcompletion1,
@@ -272,6 +290,12 @@ instances_matrixcompletion_few = [
     matrixcompletion3,
     matrixcompletion4,
     matrixcompletion5,
+    matrixcompletion6,
+    matrixcompletion7,
+    matrixcompletion8,
+    matrixcompletion9,
+    matrixcompletion10,
+    matrixcompletion11,
     ]
 
 function test_matrixcompletion(instance::Function; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
