@@ -164,7 +164,7 @@ function matrixcompletion(
             cones = CO.Cone{T}[CO.PosSemidefTri{T, T}(num_rows)]
             c = vcat(one(T), zeros(T, num_unknown))
         end
-    end # objective natrual true/false
+    end # objective natural true/false
     G = G_norm
     h = h_norm
 
@@ -208,7 +208,7 @@ function matrixcompletion(
                 offset += 3
             end
 
-            # last row also special becuase hypograph variable is fixed
+            # last row also special because hypograph variable is fixed
             G_geo_unknown[offset, num_unknown] = -1
             G_geo_newvars[offset + 1, num_unknown - 2] = -1
             push!(cones, CO.Power{T}([inv(T(num_unknown)), T(num_unknown - 1) / T(num_unknown)], 1))
