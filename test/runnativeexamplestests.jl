@@ -13,6 +13,7 @@ include(joinpath(examples_dir, "envelope/native.jl"))
 include(joinpath(examples_dir, "expdesign/native.jl"))
 include(joinpath(examples_dir, "linearopt/native.jl"))
 include(joinpath(examples_dir, "matrixcompletion/native.jl"))
+include(joinpath(examples_dir, "maxvolume/native.jl"))
 include(joinpath(examples_dir, "polymin/native.jl"))
 include(joinpath(examples_dir, "portfolio/native.jl"))
 include(joinpath(examples_dir, "sparsepca/native.jl"))
@@ -30,6 +31,7 @@ options = (atol = sqrt(sqrt(eps(T))), solver = SO.Solver{T}(
     @testset "envelope" begin test_envelope.(instances_envelope_few, T = T, options = options) end
     @testset "expdesign" begin test_expdesign.(instances_expdesign_few, T = T, options = options) end
     @testset "linearopt" begin test_linearopt.(instances_linearopt_few, T = T, options = options) end
+    @testset "maxvolume" begin test_maxvolume.(instances_maxvolume_few, T = T, options = options) end
     @testset "matrixcompletion" begin test_matrixcompletion.(instances_matrixcompletion_few, T = T, options = options) end
     @testset "sparsepca" begin test_sparsepca.(instances_sparsepca_few, T = T, options = options) end
     @testset "polymin" begin test_polymin.(instances_polymin_few, T = T, options = options) end
