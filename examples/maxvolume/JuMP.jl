@@ -30,8 +30,7 @@ function maxvolumeJuMP(
     elseif constr_cone == :soc
         # number of variables inside geometric mean is n
         # number of layers of variables
-        # TODO leave as is or copy in function?
-        num_layers = MathOptInterface.Bridges.Constraint.ilog2(n)
+        num_layers = MOI.Bridges.Constraint.ilog2(n)
         # number of new variables = 1 + 2 + ... + 2^(l - 1) = 2^l - 1
         num_new_vars = 2 ^ num_layers - 1
         JuMP.@variable(model, new_vars[1:num_new_vars] >= 0)
