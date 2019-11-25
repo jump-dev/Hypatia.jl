@@ -7,6 +7,7 @@ sets of native test instances
 testfuns_few = [
     nonnegative1,
     epinorminf1,
+    epinorminf6,
     epinormeucl1,
     epipersquare1,
     epiperexp1,
@@ -28,14 +29,17 @@ testfuns_few = [
 
 # TODO check all native instances are in this list
 testfuns_many = [
-    nonnegative1,
-    nonnegative2,
-    nonnegative3,
-    # epinorminf1,
-    # epinorminf2,
-    # epinorminf3,
-    # epinorminf4,
-    # epinorminf5,
+    # nonnegative1,
+    # nonnegative2,
+    # nonnegative3,
+    epinorminf1,
+    epinorminf2,
+    epinorminf3,
+    epinorminf4,
+    epinorminf5,
+    epinorminf6,
+    epinorminf7,
+    epinorminf8,
     # epinormeucl1,
     # epinormeucl2,
     # epinormeucl3,
