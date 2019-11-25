@@ -42,7 +42,6 @@ function maxvolume(
         G = -Matrix{T}(I, n + 1, n + 1)
         h = zeros(T, n + 1)
         cones = CO.Cone{T}[CO.HypoGeomean{T}(fill(inv(T(n)), n))]
-
     elseif use_power
         cones = CO.Cone{T}[]
         # number of 3-dimensional power cones needed is n - 1, number of new variables is n - 2
@@ -74,7 +73,6 @@ function maxvolume(
             ]
         push!(cones, CO.Power{T}([inv(T(n)), T(n - 1) / T(n)], 1))
         h = zeros(T, 3 * (n - 1))
-
     else
         @assert use_epinormeucl == true
         # number of variables inside geometric mean is n
@@ -136,18 +134,16 @@ function maxvolume(
         # TODO does this need to be imposed for all variables explicitly? keeping for now just in case
         push!(cones, CO.Nonnegative{T}(num_new_vars))
         h = zeros(T, 4 * num_new_vars + 1)
-
     end
-
     return (c = c, A = A, b = b, G = G, h = h, cones = cones)
 end
 
 maxvolume1(T::Type{<:Real}) = maxvolume(T, 3, use_hypogeomean = true)
 maxvolume2(T::Type{<:Real}) = maxvolume(T, 3, use_power = true)
 maxvolume3(T::Type{<:Real}) = maxvolume(T, 3, use_epinormeucl = true)
-maxvolume4(T::Type{<:Real}) = maxvolume(T, 6, use_hypogeomean = true)
-maxvolume5(T::Type{<:Real}) = maxvolume(T, 6, use_power = true)
-maxvolume6(T::Type{<:Real}) = maxvolume(T, 6, use_epinormeucl = true)
+maxvolume4(T::Type{<:Real}) = maxvolume(T, 10, use_hypogeomean = true)
+maxvolume5(T::Type{<:Real}) = maxvolume(T, 10, use_power = true)
+maxvolume6(T::Type{<:Real}) = maxvolume(T, 10, use_epinormeucl = true)
 maxvolume7(T::Type{<:Real}) = maxvolume(T, 25, use_hypogeomean = true)
 maxvolume8(T::Type{<:Real}) = maxvolume(T, 25, use_power = true)
 maxvolume9(T::Type{<:Real}) = maxvolume(T, 25, use_epinormeucl = true)

@@ -187,7 +187,6 @@ function portfolio(
         A = Hypatia.BlockMatrix{T}(last_idx(A_rows), last_idx(A_cols), A_blocks, A_rows, A_cols)
         G = Hypatia.BlockMatrix{T}(last_idx(G_rows), last_idx(G_cols), G_blocks, G_rows, G_cols)
     end
-
     return (c = c, A = A, b = b, G = G, h = h, cones = cones)
 end
 
@@ -203,6 +202,8 @@ portfolio9(T::Type{<:Real}) = portfolio(T, 3, epinorminf_constr = true, epinormi
 portfolio10(T::Type{<:Real}) = portfolio(T, 3, epinorminf_constr = true, epinorminfdual_constr = true, use_epinorminfdual = false, use_linops = true)
 portfolio11(T::Type{<:Real}) = portfolio(T, 4, hypoperlog_constr = true, use_epinorminfdual = false, use_linops = false)
 portfolio12(T::Type{<:Real}) = portfolio(T, 4, hypoperlog_constr = true, use_epinorminfdual = false, use_linops = true)
+portfolio13(T::Type{<:Real}) = portfolio(T, 20, epinorminf_constr = true, epinorminfdual_constr = true, use_epinorminf = false, use_epinorminfdual = false)
+portfolio14(T::Type{<:Real}) = portfolio(T, 30, epinorminf_constr = true, epinorminfdual_constr = true, use_epinorminfdual = true, use_linops = false)
 
 instances_portfolio_all = [
     portfolio1,
@@ -213,7 +214,10 @@ instances_portfolio_all = [
     portfolio6,
     portfolio7,
     portfolio9,
+    portfolio10,
     portfolio11,
+    portfolio12,
+    portfolio13,
     ]
 instances_portfolio_few = [
     portfolio1,
