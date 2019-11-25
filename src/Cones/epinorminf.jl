@@ -21,7 +21,6 @@ mutable struct EpiNormInf{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     hess_updated::Bool
     inv_hess_updated::Bool
     hess_inv_hess_updated::Bool
-    hess_inv_hess_sqrt_prod_updated::Bool
     is_feas::Bool
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
@@ -41,7 +40,6 @@ mutable struct EpiNormInf{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     diag11::T
     schur::T
     rtdiag::Vector{T}
-    invUrow1::Vector{T}
 
     function EpiNormInf{T, R}(
         dim::Int, # TODO maybe change to n (dim of the normed vector)
@@ -59,7 +57,7 @@ end
 
 EpiNormInf{T, R}(dim::Int) where {R <: RealOrComplex{T}} where {T <: Real} = EpiNormInf{T, R}(dim, false)
 
-reset_data(cone::EpiNormInf) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_inv_hess_updated = cone.hess_inv_hess_sqrt_prod_updated = false)
+reset_data(cone::EpiNormInf) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_inv_hess_updated = false)
 
 # TODO only allocate the fields we use
 function setup_data(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
@@ -77,7 +75,6 @@ function setup_data(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where 
     cone.edge = zeros(T, dim - 1)
     cone.invedge = zeros(T, dim - 1)
     cone.rtdiag = zeros(T, dim - 1)
-    cone.invUrow1 = zeros(T, dim)
     if cone.is_complex
         cone.w = zeros(R, n)
         cone.offdiag = zeros(T, n)
@@ -178,28 +175,6 @@ function update_hess_inv_hess(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{
     return nothing
 end
 
-function update_hess_inv_hess_sqrt_prod(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
-    if !cone.hess_inv_hess_updated
-        update_hess_inv_hess(cone) # TODO needed?
-    end
-
-    # TODO only used for inv sqrt
-    cone.invUrow1[1] = 1
-    @. cone.invUrow1[2:end] = cone.invedge
-    @. cone.invUrow1 /= sqrt(cone.schur)
-
-    if cone.is_complex
-        # for (j, oj) in enumerate(cone.offdiag)
-        #     TODO cache useful fields
-        # end
-    else
-        @. cone.rtdiag = sqrt(cone.diag)
-    end
-
-    cone.hess_inv_hess_sqrt_prod_updated = true
-    return nothing
-end
-
 # symmetric arrow matrix
 # TODO maybe make explicit H a sparse matrix
 function update_hess(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
@@ -273,23 +248,27 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNorm
     return prod
 end
 
+# multiply by a sparse sqrt of hessian
 function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
-    if !cone.hess_inv_hess_sqrt_prod_updated
-        update_hess_inv_hess_sqrt_prod(cone)
+    if !cone.hess_inv_hess_updated
+        update_hess_inv_hess(cone) # TODO needed?
     end
+    @. cone.rtdiag = sqrt(cone.diag) # TODO update
 
-    # multiply by a sparse sqrt of hessian
     @. @views prod[1, :] = sqrt(cone.schur) * arr[1, :]
     if cone.is_complex
         for (j, oj) in enumerate(cone.offdiag)
-            # TODO cache these fields
-            ejr = cone.edge[2j - 1]
-            eji = cone.edge[2j]
+            # TODO cache these fields?
+            erj = cone.edge[2j - 1]
+            eij = cone.edge[2j]
             rtd1j = sqrt(cone.diag[2j - 1])
             rtdetj = sqrt(cone.detdiag[j])
             ortd1j = oj / rtd1j
-            @. @views prod[2j, :] = ejr / rtd1j * arr[1, :] + rtd1j * arr[2j, :] + ortd1j * arr[2j + 1, :]
-            @. @views prod[2j + 1, :] = (eji * rtd1j - ortd1j * ejr) / rtdetj * arr[1, :] + rtdetj / rtd1j * arr[2j + 1, :]
+            side1j = erj / rtd1j
+            side2j = (eij * rtd1j - erj * ortd1j) / rtdetj
+            rtdetd1j = rtdetj / rtd1j
+            @. @views prod[2j, :] = side1j * arr[1, :] + rtd1j * arr[2j, :] + ortd1j * arr[2j + 1, :]
+            @. @views prod[2j + 1, :] = side2j * arr[1, :] + rtdetd1j * arr[2j + 1, :]
         end
     else
         @. @views prod[2:end, :] = cone.edge / cone.rtdiag * arr[1, :]' + cone.rtdiag * arr[2:end, :]
@@ -323,20 +302,24 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Epi
     return prod
 end
 
+# multiply by sparse U factor of inverse hessian
 function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
-    if !cone.hess_inv_hess_sqrt_prod_updated
-        update_hess_inv_hess_sqrt_prod(cone)
+    if !cone.hess_inv_hess_updated
+        update_hess_inv_hess(cone) # TODO needed?
     end
+    @. cone.rtdiag = sqrt(cone.diag) # TODO update
 
-    # multiply by sparse U factor of inverse hessian
-    @views mul!(prod[1, :], arr', cone.invUrow1)
+    @. @views prod[1, :] = arr[1, :]
+    @views mul!(prod[1, :], arr[2:end, :]', cone.invedge, true, true)
+    prod[1, :] ./= sqrt(cone.schur)
     if cone.is_complex
         for (j, oj) in enumerate(cone.offdiag)
-            # TODO cache these fields
+            # TODO cache these fields?
             rtd2j = sqrt(cone.diag[2j])
             rtdetj = sqrt(cone.detdiag[j])
-            ortd2j = oj / rtd2j
-            @. @views prod[2j, :] = (rtd2j * arr[2j, :] - ortd2j * arr[2j + 1, :]) / rtdetj
+            rtd2detj = rtd2j / rtdetj
+            ortd2detj = oj / rtd2j / rtdetj
+            @. @views prod[2j, :] = rtd2detj * arr[2j, :] - ortd2detj * arr[2j + 1, :]
             @. @views prod[2j + 1, :] = arr[2j + 1, :] / rtd2j
         end
     else
