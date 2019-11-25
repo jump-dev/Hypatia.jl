@@ -41,9 +41,7 @@ mutable struct EpiNormInf{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     diag11::T
     schur::T
     rtdiag::Vector{T}
-    edgertdiag::Vector{T}
     invUrow1::Vector{T}
-    sqrt_prodend::T
 
     function EpiNormInf{T, R}(
         dim::Int, # TODO maybe change to n (dim of the normed vector)
@@ -79,7 +77,6 @@ function setup_data(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where 
     cone.edge = zeros(T, dim - 1)
     cone.invedge = zeros(T, dim - 1)
     cone.rtdiag = zeros(T, dim - 1)
-    cone.edgertdiag = zeros(T, dim - 1)
     cone.invUrow1 = zeros(T, dim)
     if cone.is_complex
         cone.w = zeros(R, n)
@@ -181,17 +178,23 @@ function update_hess_inv_hess(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{
     return nothing
 end
 
-# calculate rtdiag, edgertdiag, sqrt_prodend
 function update_hess_inv_hess_sqrt_prod(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     if !cone.hess_inv_hess_updated
-        hess_inv_hess_updated(cone)
+        update_hess_inv_hess(cone) # TODO needed?
     end
 
-    @. cone.rtdiag = sqrt(cone.diag)
-    @. cone.edgertdiag = cone.edge / cone.rtdiag
-    cone.sqrt_prodend = sqrt(cone.diag11 - sum(abs2, cone.edgertdiag))
-    cone.invUrow1[1] = inv(cone.sqrt_prodend)
-    @. cone.invUrow1[2:end] = cone.edge / cone.diag / -cone.sqrt_prodend
+    # TODO only used for inv sqrt
+    cone.invUrow1[1] = 1
+    @. cone.invUrow1[2:end] = cone.invedge
+    @. cone.invUrow1 /= sqrt(cone.schur)
+
+    if cone.is_complex
+        # for (j, oj) in enumerate(cone.offdiag)
+        #     TODO cache useful fields
+        # end
+    else
+        @. cone.rtdiag = sqrt(cone.diag)
+    end
 
     cone.hess_inv_hess_sqrt_prod_updated = true
     return nothing
@@ -253,37 +256,44 @@ end
 # uses edge, diag11, diag, offdiag
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
     if !cone.hess_inv_hess_updated
-        hess_inv_hess_updated(cone)
+        update_hess_inv_hess(cone)
     end
 
     @views copyto!(prod[1, :], arr[1, :])
     @views mul!(prod[1, :], arr[2:end, :]', cone.edge, true, cone.diag11)
     @views mul!(prod[2:end, :], cone.edge, arr[1, :]')
-    @views @. prod[2:end, :] += cone.diag * arr[2:end, :]
+    @. @views prod[2:end, :] += cone.diag * arr[2:end, :]
     if cone.is_complex
         for (j, oj) in enumerate(cone.offdiag)
-            @views @. prod[2j, :] += oj * arr[2j + 1, :]
-            @views @. prod[2j + 1, :] += oj * arr[2j, :]
+            @. @views prod[2j, :] += oj * arr[2j + 1, :]
+            @. @views prod[2j + 1, :] += oj * arr[2j, :]
         end
     end
 
     return prod
 end
 
-# TODO generalize for complex
 function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
     if !cone.hess_inv_hess_sqrt_prod_updated
         update_hess_inv_hess_sqrt_prod(cone)
     end
 
-    @. @views prod[1, :] = cone.rtdiag[end] * arr[end, :] + cone.edgertdiag[end] * arr[1, :]
-    @. @views prod[2:(end - 1), :] = cone.rtdiag[1:(end - 1)] * arr[2:(end - 1), :] + cone.edgertdiag[1:(end - 1)] * arr[1, :]'
-    @. @views prod[end, :] = cone.sqrt_prodend * arr[1, :]
-    # if cone.is_complex
-    #     for (j, oj) in enumerate(cone.offdiag)
-    #         # TODO
-    #     end
-    # end
+    # multiply by a sparse sqrt of hessian
+    @. @views prod[1, :] = sqrt(cone.schur) * arr[1, :]
+    if cone.is_complex
+        for (j, oj) in enumerate(cone.offdiag)
+            # TODO cache these fields
+            ejr = cone.edge[2j - 1]
+            eji = cone.edge[2j]
+            rtd1j = sqrt(cone.diag[2j - 1])
+            rtdetj = sqrt(cone.detdiag[j])
+            ortd1j = oj / rtd1j
+            @. @views prod[2j, :] = ejr / rtd1j * arr[1, :] + rtd1j * arr[2j, :] + ortd1j * arr[2j + 1, :]
+            @. @views prod[2j + 1, :] = (eji * rtd1j - ortd1j * ejr) / rtdetj * arr[1, :] + rtdetj / rtd1j * arr[2j + 1, :]
+        end
+    else
+        @. @views prod[2:end, :] = cone.edge / cone.rtdiag * arr[1, :]' + cone.rtdiag * arr[2:end, :]
+    end
 
     return prod
 end
@@ -291,29 +301,28 @@ end
 # uses invedge, schur, diag, offdiag, det
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
     if !cone.hess_inv_hess_updated
-        hess_inv_hess_updated(cone)
+        update_hess_inv_hess(cone)
     end
 
     @views copyto!(prod[1, :], arr[1, :])
     @views mul!(prod[1, :], arr[2:end, :]', cone.invedge, true, true)
-    @views @. prod[2:end, :] = cone.invedge * prod[1, :]'
+    @. @views prod[2:end, :] = cone.invedge * prod[1, :]'
     prod ./= cone.schur
     if cone.is_complex
         for (j, oj) in enumerate(cone.offdiag)
             detj = cone.detdiag[j]
             d1j = cone.diag[2j - 1]
             d2j = cone.diag[2j]
-            @views @. prod[2j, :] += (d2j * arr[2j, :] - oj * arr[2j + 1, :]) / detj
-            @views @. prod[2j + 1, :] += (d1j * arr[2j + 1, :] - oj * arr[2j, :]) / detj
+            @. @views prod[2j, :] += (d2j * arr[2j, :] - oj * arr[2j + 1, :]) / detj
+            @. @views prod[2j + 1, :] += (d1j * arr[2j + 1, :] - oj * arr[2j, :]) / detj
         end
     else
-        @views @. prod[2:end, :] += arr[2:end, :] / cone.diag
+        @. @views prod[2:end, :] += arr[2:end, :] / cone.diag
     end
 
     return prod
 end
 
-# TODO generalize for complex
 function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
     if !cone.hess_inv_hess_sqrt_prod_updated
         update_hess_inv_hess_sqrt_prod(cone)
@@ -321,11 +330,17 @@ function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone
 
     # multiply by sparse U factor of inverse hessian
     @views mul!(prod[1, :], arr', cone.invUrow1)
-    @. @views prod[2:end, :] = arr[2:end, :] / cone.rtdiag
     if cone.is_complex
         for (j, oj) in enumerate(cone.offdiag)
-            # TODO
+            # TODO cache these fields
+            rtd2j = sqrt(cone.diag[2j])
+            rtdetj = sqrt(cone.detdiag[j])
+            ortd2j = oj / rtd2j
+            @. @views prod[2j, :] = (rtd2j * arr[2j, :] - ortd2j * arr[2j + 1, :]) / rtdetj
+            @. @views prod[2j + 1, :] = arr[2j + 1, :] / rtd2j
         end
+    else
+        @. @views prod[2:end, :] = arr[2:end, :] / cone.rtdiag
     end
 
     return prod

@@ -259,7 +259,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNorm
         # prod_2j = 2 * cone.fact_Z \ (((tmpnm * W' + W * tmpnm' - (2 * u * arr_1j) * I) / cone.fact_Z) * W + tmpnm)
         mul!(tmpnn, tmpnm, W')
         @inbounds for j in 1:cone.n
-            @views @. tmpnn[1:(j - 1), j] += tmpnn[j, 1:(j - 1)]
+            @. @views tmpnn[1:(j - 1), j] += tmpnn[j, 1:(j - 1)]
             tmpnn[j, j] -= u * arr_1j
             tmpnn[j, j] *= 2
         end
@@ -317,7 +317,7 @@ end
 #         # prod_2j = 2 * cone.fact_Z \ (((tmpnm * W' + W * tmpnm' - (2 * u * arr_1j) * I) / cone.fact_Z) * W + tmpnm)
 #         mul!(tmpnn, tmpnm, -W')
 #         @inbounds for j in 1:cone.n
-#             @views @. tmpnn[1:(j - 1), j] += tmpnn[j, 1:(j - 1)]
+#             @. @views tmpnn[1:(j - 1), j] += tmpnn[j, 1:(j - 1)]
 #             tmpnn[j, j] -= u * arr_1j
 #             tmpnn[j, j] *= 2
 #         end

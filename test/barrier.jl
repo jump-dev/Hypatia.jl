@@ -156,41 +156,22 @@ function test_grad_hess(
     hess = Matrix(CO.hess(cone))
     inv_hess = Matrix(CO.inv_hess(cone))
 
-    println()
-    # @show T
-    # @show hess
-    hessU = cholesky(CO.hess(cone)).U
-    # @show hessU
-    # @show inv_hess
-    invhessU = cholesky(CO.inv_hess(cone)).U
-    # @show invhessU
+    @test dot(point, grad) ≈ -nu atol=tol rtol=tol
+    @test hess * inv_hess ≈ I atol=tol rtol=tol
 
     dim = length(point)
     prod_mat = similar(point, dim, dim)
-    hp = CO.hess_sqrt_prod!(prod_mat, Matrix(one(T) * I, dim, dim), cone)
-    @show hessU
-    @show hp
-    ihp = CO.inv_hess_sqrt_prod!(prod_mat, Matrix(one(T) * I, dim, dim), cone)
-    @show invhessU
-    @show ihp
+    @test CO.hess_prod!(prod_mat, inv_hess, cone) ≈ I atol=tol rtol=tol
+    @test CO.inv_hess_prod!(prod_mat, hess, cone) ≈ I atol=tol rtol=tol
 
-
-    # @test dot(point, grad) ≈ -nu atol=tol rtol=tol
-    # @test hess * inv_hess ≈ I atol=tol rtol=tol
-    #
-    dim = length(point)
-    prod_mat = similar(point, dim, dim)
-    # @test CO.hess_prod!(prod_mat, inv_hess, cone) ≈ I atol=tol rtol=tol
-    # @test CO.inv_hess_prod!(prod_mat, hess, cone) ≈ I atol=tol rtol=tol
-    #
     prod_mat2 = Matrix(CO.hess_sqrt_prod!(prod_mat, inv_hess, cone)')
     @test CO.hess_sqrt_prod!(prod_mat, prod_mat2, cone) ≈ I atol=tol rtol=tol
 
     if !CO.use_scaling(cone)
-        # prod = similar(point)
-        # @test hess * point ≈ -grad atol=tol rtol=tol
-        # @test CO.hess_prod!(prod, point, cone) ≈ -grad atol=tol rtol=tol
-        # @test CO.inv_hess_prod!(prod, grad, cone) ≈ -point atol=tol rtol=tol
+        prod = similar(point)
+        @test hess * point ≈ -grad atol=tol rtol=tol
+        @test CO.hess_prod!(prod, point, cone) ≈ -grad atol=tol rtol=tol
+        @test CO.inv_hess_prod!(prod, grad, cone) ≈ -point atol=tol rtol=tol
 
         if isdefined(cone, :use_dual)
             CO.inv_hess_sqrt_prod!(prod_mat2, Matrix(one(T) * I, dim, dim), cone)
@@ -198,10 +179,10 @@ function test_grad_hess(
         end
     end
 
-    # if !isempty(dual_point)
-    #     @test hess * point ≈ dual_point atol=tol rtol=tol
-    #     @test inv_hess * dual_point ≈ point atol=tol rtol=tol
-    # end
+    if !isempty(dual_point)
+        @test hess * point ≈ dual_point atol=tol rtol=tol
+        @test inv_hess * dual_point ≈ point atol=tol rtol=tol
+    end
 
     return
 end
@@ -314,7 +295,7 @@ function test_possemideftri_barrier(T::Type{<:Real})
 end
 
 function test_epinorminf_barrier(T::Type{<:Real})
-    for n in [1, 2, 3, 5]
+    for n in [5]# [1, 2, 3, 5]
         # real epinorminf cone
         function R_barrier(s)
             (u, w) = (s[1], s[2:end])
@@ -322,13 +303,13 @@ function test_epinorminf_barrier(T::Type{<:Real})
         end
         test_barrier_oracles(CO.EpiNormInf{T, T}(1 + n), R_barrier)
 
-        # # complex epinorminf cone
-        # function C_barrier(s)
-        #     (u, wr) = (s[1], s[2:end])
-        #     w = CO.rvec_to_cvec!(zeros(Complex{eltype(s)}, n), wr)
-        #     return -sum(log(abs2(u) - abs2(wj)) for wj in w) + (n - 1) * log(u)
-        # end
-        # test_barrier_oracles(CO.EpiNormInf{T, Complex{T}}(1 + 2n), C_barrier)
+        # complex epinorminf cone
+        function C_barrier(s)
+            (u, wr) = (s[1], s[2:end])
+            w = CO.rvec_to_cvec!(zeros(Complex{eltype(s)}, n), wr)
+            return -sum(log(abs2(u) - abs2(wj)) for wj in w) + (n - 1) * log(u)
+        end
+        test_barrier_oracles(CO.EpiNormInf{T, Complex{T}}(1 + 2n), C_barrier)
     end
     return
 end
