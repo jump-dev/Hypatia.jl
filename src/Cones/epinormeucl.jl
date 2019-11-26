@@ -163,8 +163,8 @@ function update_scaling(cone::EpiNormEucl)
     #
     # v .*= 2 * vq
     # v[1] -= normalized_point[1] / 2 / gamma
-    # @views @. v[2:end] += normalized_point / gamma / 2
-    # @views @. v[2:end] -= normalized_dual_point /  gamma / 2
+    # @. @views v[2:end] += normalized_point / gamma / 2
+    # @. @views v[2:end] -= normalized_dual_point /  gamma / 2
     # v[1] += 1
     # v ./=  sqrt(2 * v[1])
 
