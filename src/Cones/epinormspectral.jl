@@ -179,23 +179,39 @@ function update_hess(cone::EpiNormSpectral)
     # Z = Symmetric(abs2(u) * I - W * W')
     # ZW = Z * W
     # tmpmm = W' * ZW
+    # # tmpmm = W' * W
     #
-    # @inbounds for i in 1:m
-    #     r = 1 + (i - 1) * n
-    #     for j in 1:n
-    #         r2 = r + j
-    #         @. @views Hi[r2, r .+ (j:n)] = Z[j:n, j] * tmpmm[i, i] + ZW[j:n, i] * ZW[j, i] + Z[j, j:n]
-    #         c2 = r + n
-    #         @inbounds for k in (i + 1):m
-    #             @. @views Hi[r2, c2 .+ (1:n)] = Z[1:n, j] * tmpmm[i, k] + ZW[1:n, i] * ZW[j, k]
-    #             c2 += n
-    #         end
-    #     end
-    # end
-    # Hi ./= 2
+    # # @show W
+    # # @show ZW
+    # # @show tmpmm
     #
     # # H_u_W and H_u_u parts
+    # @views mul!(Hi, cone.point, cone.point')
+    # for i in 1:m
+    #     r = 2 + (i - 1) * n
+    #     rows = r:(r + n - 1)
+    #     Hi[rows, rows] += Z / 2
+    # end
+    #
     # Hi[1, 2:end] .= vec(u * W)
+    #
+    # @show W - ZW \ tmpmm
+    # # @inbounds for i in 1:m
+    # #     r = 1 + (i - 1) * n
+    # #     for j in 1:n
+    # #         r2 = r + j
+    # #         # @. @views Hi[r2, r .+ (j:n)] = Z[j:n, j] * tmpmm[i, i] + ZW[j:n, i] * ZW[j, i] + Z[j, j:n]
+    # #         @. @views Hi[r2, r .+ (j:n)] = Z[j:n, j] * tmpmm[i, i] + Z[j, j:n]
+    # #         c2 = r + n
+    # #         @inbounds for k in (i + 1):m
+    # #             # @. @views Hi[r2, c2 .+ (1:n)] = Z[1:n, j] * tmpmm[i, k] + ZW[1:n, i] * ZW[j, k]
+    # #             @. @views Hi[r2, c2 .+ (1:n)] = Z[1:n, j] * tmpmm[i, k]
+    # #             c2 += n
+    # #         end
+    # #     end
+    # # end
+    # # Hi ./= 2
+    #
     #
     #
     # Hi_try = Symmetric(Hi, :U)
@@ -270,6 +286,43 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNorm
 
     return prod
 end
+
+function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormSpectral)
+    if !cone.hess_prod_updated
+        update_hess_prod(cone)
+    end
+    u = cone.point[1]
+    W = cone.W
+    tmpnm = cone.tmpnm
+    tmpnn = cone.tmpnn
+
+    @inbounds for j in 1:size(prod, 2)
+        arr_1j = arr[1, j]
+        tmpnm[:] .= @view arr[2:end, j]
+
+        prod[1, j] = sqrt(cone.Huu) * arr_1j + dot(cone.HuW, tmpnm) / sqrt(cone.Huu)
+
+        # prod_2j = 2 * cone.fact_Z \ (((tmpnm * W' + W * tmpnm' - (2 * u * arr_1j) * I) / cone.fact_Z) * W + tmpnm)
+        mul!(tmpnn, tmpnm, W')
+        @inbounds for j in 1:cone.n
+            @. @views tmpnn[1:(j - 1), j] += tmpnn[j, 1:(j - 1)]
+            tmpnn[j, j] -= u * arr_1j
+            tmpnn[j, j] *= 2
+        end
+        # mul!(tmpnm, Symmetric(tmpnn, :U), cone.ZiW, 2, 2)
+        ZihW = cone.fact_Z.U \ W
+        mul!(tmpnm, Symmetric(tmpnn, :U), ZihW, sqrt(2), sqrt(2))
+        ldiv!(cone.fact_Z.U', tmpnm)
+        prod[2:end, j] .= vec(tmpnm)
+    end
+
+    @show prod
+    @show tmpnm
+    @show W
+
+    return prod
+end
+
 
 # TODO fix
 # function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormSpectral)

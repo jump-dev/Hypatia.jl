@@ -152,14 +152,16 @@ function test_grad_hess(
     tol::T = 100eps(T),
     ) where {T <: Real}
     nu = CO.get_nu(cone)
+    dim = length(point)
     grad = CO.grad(cone)
     hess = Matrix(CO.hess(cone))
     inv_hess = Matrix(CO.inv_hess(cone))
 
+    @show dim
+    
     @test dot(point, grad) ≈ -nu atol=tol rtol=tol
     @test hess * inv_hess ≈ I atol=tol rtol=tol
 
-    dim = length(point)
     prod_mat = similar(point, dim, dim)
     @test CO.hess_prod!(prod_mat, inv_hess, cone) ≈ I atol=tol rtol=tol
     @test CO.inv_hess_prod!(prod_mat, hess, cone) ≈ I atol=tol rtol=tol
@@ -397,7 +399,7 @@ function test_hypogeomean_barrier(T::Type{<:Real})
 end
 
 function test_epinormspectral_barrier(T::Type{<:Real})
-    for (n, m) in [(1, 2), (2, 2), (2, 3), (3, 5)]
+    for (n, m) in [(1, 2), (2, 2), ]#(2, 3), (3, 5)]
         # real epinormspectral barrier
         function R_barrier(s)
             (u, W) = (s[1], reshape(s[2:end], n, m))
