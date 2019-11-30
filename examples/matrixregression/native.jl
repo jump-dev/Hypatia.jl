@@ -126,7 +126,6 @@ function matrixregression(
         end
 
         append!(model_h, zeros(q_glr))
-        @show G_glr
         model_G = T[
             model_G  zeros(model_q, data_p);
             G_glr;
@@ -155,7 +154,6 @@ function matrixregression(
         end
 
         append!(model_h, zeros(q_glc))
-        @show G_glc
         model_G = T[
             model_G  zeros(model_q, data_m);
             G_glc;
@@ -220,7 +218,7 @@ end
 T = Float64
 options = (atol = sqrt(sqrt(eps(T))), solver = Hypatia.Solvers.Solver{T}(
     verbose = true, iter_limit = 250, time_limit = 12e2,
-    tol_rel_opt = 1e-5, tol_abs_opt = 1e-6, tol_feas = 1e-6,
+    # tol_rel_opt = 1e-5, tol_abs_opt = 1e-6, tol_feas = 1e-6,
     system_solver = Hypatia.Solvers.QRCholDenseSystemSolver{T}(),
     # system_solver = Hypatia.Solvers.NaiveDenseSystemSolver{T}(),
     ))
