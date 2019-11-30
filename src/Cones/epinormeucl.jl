@@ -49,7 +49,7 @@ mutable struct EpiNormEucl{T <: Real} <: Cone{T}
 
     function EpiNormEucl{T}(
         dim::Int;
-        use_scaling::Bool = false,
+        use_scaling::Bool = true,
         use_3order_corr::Bool = false,
         ) where {T <: Real}
         @assert dim >= 2
@@ -477,7 +477,9 @@ end
 function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormEucl)
     @assert cone.is_feas
     if cone.use_scaling
-        @assert cone.scaling_updated
+        if !cone.scaling_updated
+            update_scaling(cone)
+        end
         prod .= cone.v
         @views prod[2:end, :] *= -1
         @inbounds @views for j in 1:size(arr, 2)
