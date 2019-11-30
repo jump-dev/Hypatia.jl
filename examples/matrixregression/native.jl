@@ -51,13 +51,13 @@ function matrixregression(
 
     # use EpiNormEucl for the sum(abs2, R * A) part
     # (R * A)_k,j = sum_i(R_k,k2 * A_k2,j)
-    # z >= ||R * A||^2 is equivalent to (z, 1, vec(R * A)) in EpiPerSquare is equivalent to (z + 1, z - 1, vec(-R * A)) in EpiNormEucl
+    # z >= ||R * A||^2 is equivalent to (z, 1/2, vec(R * A)) in EpiPerSquare is equivalent to ((z + 1/2)/sqrt(2), (z - 1/2)/sqrt(2), vec(-R * A)) in EpiNormEucl
     model_h = zeros(T, model_q)
-    model_h[1] = 1
-    model_h[2] = -1
+    rtT2 = sqrt(T(2))
+    model_h[1] = rtT2 / 4
+    model_h[2] = -model_h[1]
     model_G = zeros(T, model_q, model_n)
-    model_G[1, 1] = -1
-    model_G[2, 1] = -1
+    model_G[1:2, 1] .= -inv(rtT2)
     r_idx = 3
     for k in 1:data_p
         c_idx = 2
@@ -72,15 +72,34 @@ function matrixregression(
     # put -dot(X' * Y, A) term in objective, ignore constant 1/2 * sum(abs2, Y)
     model_c = vcat(inv(T(2)), vec(-X' * Y))
 
+    # optional: add frobenius norm regularizer
+    if !iszero(lam_fro)
+        @warn("TODO")
+
+    end
+
+    # optional: add nuclear norm regularizer
+    if !iszero(lam_nuc)
+        @warn("TODO")
+
+    end
+
+    # optional: add vector lasso regularizer
+    if !iszero(lam_las)
+        @warn("TODO")
+
+    end
+
     return (c = model_c, A = zeros(T, 0, model_n), b = zeros(T, 0), G = model_G, h = model_h, cones = cones)
 end
 
-(n, m, p) = (10, 5, 8)
-Y = rand(n, m)
-X = rand(n, p)
-A_try = X \ Y
-@show 1/2 * sum(abs2, Y - X * A_try) - 1/2 * sum(abs2, Y)
-@show sum(abs2, X * A_try)
+# TODO remove toy problem
+# (n, m, p) = (10, 5, 8)
+# Y = rand(n, m)
+# X = rand(n, p)
+# A_try = X \ Y
+# @show 1/2 * sum(abs2, Y - X * A_try) - 1/2 * sum(abs2, Y)
+# @show sum(abs2, X * A_try)
 
 
 matrixregression1(T::Type{<:Real}) = matrixregression(Y, X)
@@ -111,6 +130,7 @@ function test_matrixregression(instance::Function; T::Type{<:Real} = Float64, op
     d = instance(T)
     r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
     # @test r.status == :Optimal
+    @show r.primal_obj
     A_opt = reshape(r.x[2:end], p, m)
     @show 1/2 * sum(abs2, X * A_opt) - dot(X' * Y, A_opt)
     return
