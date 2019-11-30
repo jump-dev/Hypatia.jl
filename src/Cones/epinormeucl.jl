@@ -50,7 +50,7 @@ mutable struct EpiNormEucl{T <: Real} <: Cone{T}
     function EpiNormEucl{T}(
         dim::Int;
         use_scaling::Bool = true,
-        use_3order_corr::Bool = false,
+        use_3order_corr::Bool = true,
         ) where {T <: Real}
         @assert dim >= 2
         cone = new{T}()
