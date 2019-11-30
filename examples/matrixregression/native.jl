@@ -19,9 +19,8 @@ function matrixregression(
     lam_fro::T = zero(T),
     lam_nuc::T = zero(T),
     lam_las::T = zero(T),
-    # TODO row and column group lasso
-    # lam_glr::T = zero(T),
-    # lam_glc::T = zero(T),
+    lam_glr::T = zero(T),
+    lam_glc::T = zero(T),
     ) where {T <: Real}
     @assert lam_fro >= 0
     @assert lam_nuc >= 0
@@ -72,7 +71,7 @@ function matrixregression(
     # put -dot(X' * Y, A) term in objective, ignore constant 1/2 * sum(abs2, Y)
     model_c = vcat(inv(T(2)), vec(-X' * Y))
 
-    # list of optional regularizers
+    # list of optional regularizers (group lasso handled separately below)
     reg_cone_dim = 1 + data_pm
     lams = [
         (lam_fro, CO.EpiNormEucl{T}(reg_cone_dim)), # frobenius norm (vector L2 norm)
@@ -110,18 +109,78 @@ function matrixregression(
         push!(cones, cone)
     end
 
+    # row group lasso regularizer (one lambda for all rows)
+    if !iszero(lam_glr)
+        append!(model_c, fill(lam_glr, data_p))
+
+        q_glr = data_p * (1 + data_m)
+        G_glr = zeros(T, q_glr, model_n + data_p)
+        row_idx = 1
+        for k in 1:data_p
+            G_glr[row_idx, model_n + k] = -1
+            row_idx += 1
+            for j in 1:data_m
+                G_glr[row_idx, 1 + k + (j - 1) * data_p] = -1
+                row_idx += 1
+            end
+        end
+
+        append!(model_h, zeros(q_glr))
+        @show G_glr
+        model_G = T[
+            model_G  zeros(model_q, data_p);
+            G_glr;
+            ]
+
+        model_n += data_p
+        model_q += q_glr
+
+        append!(cones, CO.Cone{T}[CO.EpiNormEucl{T}(data_m + 1) for k in 1:data_p])
+    end
+
+    # column group lasso regularizer (one lambda for all columns)
+    if !iszero(lam_glc)
+        append!(model_c, fill(lam_glc, data_m))
+
+        q_glc = data_m * (1 + data_p)
+        G_glc = zeros(T, q_glc, model_n + data_m)
+        row_idx = 1
+        for j in 1:data_m
+            G_glc[row_idx, model_n + j] = -1
+            row_idx += 1
+            for k in 1:data_p
+                G_glc[row_idx, 1 + k + (j - 1) * data_p] = -1
+                row_idx += 1
+            end
+        end
+
+        append!(model_h, zeros(q_glc))
+        @show G_glc
+        model_G = T[
+            model_G  zeros(model_q, data_m);
+            G_glc;
+            ]
+
+        model_n += data_m
+        model_q += q_glc
+
+        append!(cones, CO.Cone{T}[CO.EpiNormEucl{T}(data_p + 1) for k in 1:data_m])
+    end
+
     return (c = model_c, A = zeros(T, 0, model_n), b = zeros(T, 0), G = model_G, h = model_h, cones = cones)
 end
 
+
 # TODO remove toy problem
-# (n, m, p) = (5, 3, 4)
-# Y = rand(n, m)
-# X = rand(n, p)
+(n, m, p) = (5, 3, 4)
+Y = rand(n, m)
+X = rand(n, p)
 # A_try = X \ Y
 # # @show 1/2 * sum(abs2, Y - X * A_try) - 1/2 * sum(abs2, Y)
 # # @show sum(abs2, X * A_try)
 
-matrixregression1(T::Type{<:Real}) = matrixregression(Y, X, lam_nuc = 0.1, lam_fro = 0.1, lam_las = 0.1)
+# matrixregression1(T::Type{<:Real}) = matrixregression(Y, X, lam_nuc = 0.1, lam_fro = 0.1, lam_las = 0.1)
+matrixregression1(T::Type{<:Real}) = matrixregression(Y, X, lam_glc = 0.5, lam_glr = 0.3)
 
 instances_matrixregression_all = [
     matrixregression1,
@@ -145,7 +204,7 @@ instances_matrixregression_few = [
     ]
 
 function test_matrixregression(instance::Function; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
-    Random.seed!(rseed)
+    # Random.seed!(rseed)
     d = instance(T)
     r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
     # @test r.status == :Optimal
@@ -153,8 +212,17 @@ function test_matrixregression(instance::Function; T::Type{<:Real} = Float64, op
     A_opt = reshape(r.x[2:(1 + p * m)], p, m)
     # @show 1/2 * sum(abs2, X * A_opt) - dot(X' * Y, A_opt)
     # @show 1/2 * sum(abs2, X * A_opt) - dot(X' * Y, A_opt) + 0.1 * sum(svd(A_opt).S) + 0.1 * norm(A_opt, 2) + 0.1 * norm(A_opt, 1)
+    @show 1/2 * sum(abs2, X * A_opt) - dot(X' * Y, A_opt) + 0.5 * sum(norm, eachcol(A_opt)) + 0.3 * sum(norm, eachrow(A_opt))
     @show A_opt
     return
 end
 
-test_matrixregression(matrixregression1)
+T = Float64
+options = (atol = sqrt(sqrt(eps(T))), solver = Hypatia.Solvers.Solver{T}(
+    verbose = true, iter_limit = 250, time_limit = 12e2,
+    tol_rel_opt = 1e-5, tol_abs_opt = 1e-6, tol_feas = 1e-6,
+    system_solver = Hypatia.Solvers.QRCholDenseSystemSolver{T}(),
+    # system_solver = Hypatia.Solvers.NaiveDenseSystemSolver{T}(),
+    ))
+
+test_matrixregression(matrixregression1, options = options)
