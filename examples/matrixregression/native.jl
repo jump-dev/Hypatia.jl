@@ -73,7 +73,6 @@ function matrixregression(
     model_c = vcat(inv(T(2)), vec(-X' * Y))
 
     # list of optional regularizers
-    # TODO think spectral has wrong ordering because data_p >= data_m
     reg_cone_dim = 1 + data_pm
     lams = [
         (lam_fro, CO.EpiNormEucl{T}(reg_cone_dim)), # frobenius norm (vector L2 norm)
@@ -83,20 +82,18 @@ function matrixregression(
 
     for (lam, cone) in lams
         if iszero(lam)
-            continue
+            continue # ignore regularizer because corresponding is zero
         end
         # obj term: lam * z
         # constraint: (z, data_A) in cone
         push!(model_c, lam)
+
         if cone isa CO.EpiNormSpectral{T}
             # permute identity because need transpose of data_A since data_p >= data_m
             iden_mat = zeros(T, data_pm, data_pm)
-            # row_idx = 1
-            # col_idx = 1
             for j in 1:data_m, k in 1:data_p
                 iden_mat[j + (k - 1) * data_m, k + (j - 1) * data_p] = 1
             end
-            @show iden_mat
         else
             iden_mat = Matrix(-one(T) * I, data_pm, data_pm)
         end
@@ -106,8 +103,10 @@ function matrixregression(
             zeros(T, data_pm, 1)  iden_mat  zeros(T, data_pm, model_n - data_pm);
             ]
         append!(model_h, zeros(reg_cone_dim))
+
         model_n += 1
         model_q += reg_cone_dim
+
         push!(cones, cone)
     end
 
@@ -115,13 +114,12 @@ function matrixregression(
 end
 
 # TODO remove toy problem
-(n, m, p) = (5, 3, 4)
-Y = rand(n, m)
-X = rand(n, p)
-A_try = X \ Y
-# @show 1/2 * sum(abs2, Y - X * A_try) - 1/2 * sum(abs2, Y)
-# @show sum(abs2, X * A_try)
-
+# (n, m, p) = (5, 3, 4)
+# Y = rand(n, m)
+# X = rand(n, p)
+# A_try = X \ Y
+# # @show 1/2 * sum(abs2, Y - X * A_try) - 1/2 * sum(abs2, Y)
+# # @show sum(abs2, X * A_try)
 
 matrixregression1(T::Type{<:Real}) = matrixregression(Y, X, lam_nuc = 0.1, lam_fro = 0.1, lam_las = 0.1)
 
@@ -153,8 +151,8 @@ function test_matrixregression(instance::Function; T::Type{<:Real} = Float64, op
     # @test r.status == :Optimal
     @show r.primal_obj
     A_opt = reshape(r.x[2:(1 + p * m)], p, m)
-    @show 1/2 * sum(abs2, X * A_opt) - dot(X' * Y, A_opt)
-    @show 1/2 * sum(abs2, X * A_opt) - dot(X' * Y, A_opt) + 0.1 * sum(svd(A_opt).S) + 0.1 * norm(A_opt, 2) + 0.1 * norm(A_opt, 1)
+    # @show 1/2 * sum(abs2, X * A_opt) - dot(X' * Y, A_opt)
+    # @show 1/2 * sum(abs2, X * A_opt) - dot(X' * Y, A_opt) + 0.1 * sum(svd(A_opt).S) + 0.1 * norm(A_opt, 2) + 0.1 * norm(A_opt, 1)
     @show A_opt
     return
 end
