@@ -8,6 +8,7 @@ TODO
 =#
 
 using LinearAlgebra
+using SparseArrays
 import Random
 using Test
 import Hypatia
@@ -40,9 +41,9 @@ function matrixregression(
     # so can get a lower dimensional sum of squared terms
     R_factor = qr(X).R # TODO careful - assumes no pivoting TODO may be faster as cholesky(X' * X)
 
-    # loss function is minimize 1/2 squared frobenius norm of residuals, which we formulate with epipersquare
-    # 1/2 * ||Y - X * A||_fro^2
-    # = 1/2 * sum(abs2, R * A) - dot(X' * Y, A) + 1/2 * sum(abs2, Y)
+    # loss function is minimize 1/(2n) squared frobenius norm of residuals, which we formulate with epipersquare
+    # 1/(2n) * ||Y - X * A||_fro^2
+    # = 1/(2n) * sum(abs2, R * A) - 1/n * dot(X' * Y, A) + 1/(2n) * sum(abs2, Y)
     data_pm = data_p * data_m
     model_n = 1 + data_pm
     model_p = 0
@@ -68,8 +69,9 @@ function matrixregression(
     end
     cones = CO.Cone{T}[CO.EpiNormEucl{T}(model_q)]
 
-    # put -dot(X' * Y, A) term in objective, ignore constant 1/2 * sum(abs2, Y)
+    # put -1/n * dot(X' * Y, A) term in objective, ignore constant 1/(2n) * sum(abs2, Y)
     model_c = vcat(inv(T(2)), vec(-X' * Y))
+    model_c /= data_n
 
     # list of optional regularizers (group lasso handled separately below)
     reg_cone_dim = 1 + data_pm
@@ -165,62 +167,73 @@ function matrixregression(
         append!(cones, CO.Cone{T}[CO.EpiNormEucl{T}(data_p + 1) for k in 1:data_m])
     end
 
-    return (c = model_c, A = zeros(T, 0, model_n), b = zeros(T, 0), G = model_G, h = model_h, cones = cones)
+    return (
+        c = model_c, A = zeros(T, 0, model_n), b = zeros(T, 0), G = model_G, h = model_h, cones = cones,
+        n = data_n, m = data_m, p = data_p, Y = Y, X = X,
+        lam_fro = lam_fro, lam_nuc = lam_nuc, lam_las = lam_las, lam_glr = lam_glr, lam_glc = lam_glc
+        )
 end
 
+function matrixregression(
+    T::Type{<:Real},
+    n::Int,
+    m::Int,
+    p::Int;
+    A_max_rank::Int = div(m, 2) + 1,
+    A_sparsity::Real = max(0.2, inv(sqrt(m * p))),
+    Y_noise::Real = 0.01,
+    model_kwargs...
+    )
+    @assert n >= p >= m
+    @assert 1 <= A_max_rank <= m
+    @assert 0 < A_sparsity <= 1
 
-# TODO remove toy problem
-(n, m, p) = (5, 3, 4)
-Y = rand(n, m)
-X = rand(n, p)
-# A_try = X \ Y
-# # @show 1/2 * sum(abs2, Y - X * A_try) - 1/2 * sum(abs2, Y)
-# # @show sum(abs2, X * A_try)
+    A_left = sprandn(T, p, A_max_rank, A_sparsity)
+    A_right = sprandn(T, A_max_rank, m, A_sparsity)
+    A = 10 * A_left * A_right
+    X = randn(T, n, p)
+    Y = X * A + Y_noise * randn(T, n, m)
 
-# matrixregression1(T::Type{<:Real}) = matrixregression(Y, X, lam_nuc = 0.1, lam_fro = 0.1, lam_las = 0.1)
-matrixregression1(T::Type{<:Real}) = matrixregression(Y, X, lam_glc = 0.5, lam_glr = 0.3)
+    Y = Matrix{T}(Y)
+    X = Matrix{T}(X)
+    # A = Matrix{T}(A)
+    # @show A
+    # @show X
+    # @show Y
+
+    return matrixregression(Y, X; model_kwargs...)
+end
+
+matrixregression1(T::Type{<:Real}) = matrixregression(Float64, 5, 3, 4)
+matrixregression2(T::Type{<:Real}) = matrixregression(Float64, 5, 3, 4, lam_fro = 0.1, lam_nuc = 0.1, lam_las = 0.1, lam_glc = 0.2, lam_glr = 0.2)
+matrixregression3(T::Type{<:Real}) = matrixregression(Float64, 100, 8, 12)
+matrixregression4(T::Type{<:Real}) = matrixregression(Float64, 100, 8, 12, lam_fro = 0.0, lam_nuc = 0.4, lam_las = 1.0, lam_glc = 0.1, lam_glr = 2.0)
+matrixregression5(T::Type{<:Real}) = matrixregression(Float64, 100, 8, 12, lam_fro = 0.0, lam_nuc = 0.0, lam_las = 0.0, lam_glc = 0.2, lam_glr = 1.5)
 
 instances_matrixregression_all = [
     matrixregression1,
-    # matrixregression2,
-    # matrixregression3,
-    # matrixregression4,
-    # matrixregression5,
-    # matrixregression6,
-    # matrixregression7,
-    # matrixregression8,
-    # matrixregression9,
-    # matrixregression10,
-    # matrixregression11,
-    # matrixregression12,
+    matrixregression2,
+    matrixregression3,
+    matrixregression4,
+    matrixregression5,
     ]
 instances_matrixregression_few = [
     matrixregression1,
-    # matrixregression2,
-    # matrixregression3,
-    # matrixregression4,
+    matrixregression2,
     ]
 
 function test_matrixregression(instance::Function; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
-    # Random.seed!(rseed)
+    Random.seed!(rseed)
     d = instance(T)
     r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
-    # @test r.status == :Optimal
-    @show r.primal_obj
-    A_opt = reshape(r.x[2:(1 + p * m)], p, m)
-    # @show 1/2 * sum(abs2, X * A_opt) - dot(X' * Y, A_opt)
-    # @show 1/2 * sum(abs2, X * A_opt) - dot(X' * Y, A_opt) + 0.1 * sum(svd(A_opt).S) + 0.1 * norm(A_opt, 2) + 0.1 * norm(A_opt, 1)
-    @show 1/2 * sum(abs2, X * A_opt) - dot(X' * Y, A_opt) + 0.5 * sum(norm, eachcol(A_opt)) + 0.3 * sum(norm, eachrow(A_opt))
-    @show A_opt
+    @test r.status == :Optimal
+    # check objective value is correct
+    A_opt = reshape(r.x[2:(1 + d.p * d.m)], d.p, d.m)
+    loss = (1/2 * sum(abs2, d.X * A_opt) - dot(d.X' * d.Y, A_opt)) / d.n
+    # TODO don't calculate norms for which lambda is 0
+    obj_try = loss + d.lam_fro * norm(vec(A_opt), 2) + d.lam_nuc * sum(svd(A_opt).S) + d.lam_las * norm(vec(A_opt), 1) + d.lam_glr * sum(norm, eachrow(A_opt)) + d.lam_glc * sum(norm, eachcol(A_opt))
+    @test r.primal_obj ≈ obj_try atol = 1e-4 rtol = 1e-4
+    # A_opt[abs.(A_opt) .< 1e-4] .= 0
+    # @show A_opt
     return
 end
-
-T = Float64
-options = (atol = sqrt(sqrt(eps(T))), solver = Hypatia.Solvers.Solver{T}(
-    verbose = true, iter_limit = 250, time_limit = 12e2,
-    # tol_rel_opt = 1e-5, tol_abs_opt = 1e-6, tol_feas = 1e-6,
-    system_solver = Hypatia.Solvers.QRCholDenseSystemSolver{T}(),
-    # system_solver = Hypatia.Solvers.NaiveDenseSystemSolver{T}(),
-    ))
-
-test_matrixregression(matrixregression1, options = options)
