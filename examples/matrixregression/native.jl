@@ -261,5 +261,5 @@ function test_matrixregression(instance::Function; T::Type{<:Real} = Float64, op
 end
 
 # TODO delete
-# @testset begin test_matrixregression.(instances_matrixregression_few) end
+@testset begin test_matrixregression.(instances_matrixregression_few) end
 # @testset begin test_matrixregression.(instances_matrixregression_all) end

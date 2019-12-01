@@ -157,8 +157,6 @@ function test_grad_hess(
     hess = Matrix(CO.hess(cone))
     inv_hess = Matrix(CO.inv_hess(cone))
 
-    @show dim
-    
     @test dot(point, grad) ≈ -nu atol=tol rtol=tol
     @test hess * inv_hess ≈ I atol=tol rtol=tol
 
