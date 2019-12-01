@@ -29,44 +29,53 @@ function matrixregression(
     (data_n, data_m) = size(Y)
     data_p = size(X, 2)
     @assert size(X, 1) == data_n
-    @assert data_n >= data_p >= data_m
+    @assert data_p >= data_m
+    data_pm = data_p * data_m
+    data_nm = data_n * data_m
     # n is number of samples, m is number of responses, p is number of predictors
     # data_A (p * m) is matrix variable of coefficients, data_Y (n * m) is response matrix, data_X (n * p) is design matrix
+    model_n = 1 + data_pm
+    model_p = 0
 
+    # loss function is 1/(2n) * ||Y - X * A||_fro^2, which we formulate with epipersquare
     # ||Y - X * A||^2 = tr((Y - X * A)' * (Y - X * A)) = tr((Y' - A' * X') * (Y - X * A))
     # = tr(A' * X' * X * A + Y' * Y - A' * X' * Y - Y' * X * A)
     # = tr(A' * X' * X * A) - 2 * tr(Y' * X * A) + tr(Y' * Y)
     # = sum(abs2, X * A) - 2 * dot(X' * Y, A) + sum(abs2, Y)
-    # and sum(abs2, X * A) = sum(abs2, cholesky(X' * X).U * A) = sum(abs2, qr(X).R * A)
-    # so can get a lower dimensional sum of squared terms
-    R_factor = qr(X).R # TODO careful - assumes no pivoting TODO may be faster as cholesky(X' * X)
+    # use EpiNormEucl for the sum(abs2, X * A) part
+    # z >= ||Z||^2 is equivalent to (z, 1/2, vec(Z)) in EpiPerSquare is equivalent to ((z + 1/2)/sqrt(2), (z - 1/2)/sqrt(2), vec(Z)) in EpiNormEucl
+    if data_n > data_p
+        # more samples than predictors: overdetermined
+        # sum(abs2, X * A) = sum(abs2, cholesky(X' * X).U * A) = sum(abs2, qr(X).R * A)
+        # so can get a lower dimensional sum of squared terms
+        Qhalf = qr(X).R
+        # (Qhalf * A)_k,j = sum_k2 (Qhalf_k,k2 * A_k2,j)
+        model_q = 2 + data_pm
+    else
+        # fewer (or equal) samples than predictors: underdetermined (or exactly determined)
+        # X * A is already low dimensional
+        Qhalf = X
+        # (X * A)_i,j = sum_k2 (X_i,k2 * A_k2,j)
+        model_q = 2 + data_nm
+    end
 
-    # loss function is minimize 1/(2n) squared frobenius norm of residuals, which we formulate with epipersquare
-    # 1/(2n) * ||Y - X * A||_fro^2
-    # = 1/(2n) * sum(abs2, R * A) - 1/n * dot(X' * Y, A) + 1/(2n) * sum(abs2, Y)
-    data_pm = data_p * data_m
-    model_n = 1 + data_pm
-    model_p = 0
-    model_q = 1 + model_n
-
-    # use EpiNormEucl for the sum(abs2, R * A) part
-    # (R * A)_k,j = sum_i(R_k,k2 * A_k2,j)
-    # z >= ||R * A||^2 is equivalent to (z, 1/2, vec(R * A)) in EpiPerSquare is equivalent to ((z + 1/2)/sqrt(2), (z - 1/2)/sqrt(2), vec(-R * A)) in EpiNormEucl
     model_h = zeros(T, model_q)
     rtT2 = sqrt(T(2))
     model_h[1] = rtT2 / 4
     model_h[2] = -model_h[1]
+
     model_G = zeros(T, model_q, model_n)
     model_G[1:2, 1] .= -inv(rtT2)
     r_idx = 3
-    for k in 1:data_p
+    for l in 1:min(data_p, data_n)
         c_idx = 2
         for j in 1:data_m
-            @. @views model_G[r_idx, c_idx:(c_idx + data_p - 1)] = R_factor[k, :]
+            @. @views model_G[r_idx, c_idx:(c_idx + data_p - 1)] = Qhalf[l, :]
             r_idx += 1
             c_idx += data_p
         end
     end
+
     cones = CO.Cone{T}[CO.EpiNormEucl{T}(model_q)]
 
     # put -1/n * dot(X' * Y, A) term in objective, ignore constant 1/(2n) * sum(abs2, Y)
@@ -184,7 +193,7 @@ function matrixregression(
     Y_noise::Real = 0.01,
     model_kwargs...
     )
-    @assert n >= p >= m
+    @assert p >= m
     @assert 1 <= A_max_rank <= m
     @assert 0 < A_sparsity <= 1
 
@@ -206,9 +215,14 @@ end
 
 matrixregression1(T::Type{<:Real}) = matrixregression(Float64, 5, 3, 4)
 matrixregression2(T::Type{<:Real}) = matrixregression(Float64, 5, 3, 4, lam_fro = 0.1, lam_nuc = 0.1, lam_las = 0.1, lam_glc = 0.2, lam_glr = 0.2)
-matrixregression3(T::Type{<:Real}) = matrixregression(Float64, 100, 8, 12)
-matrixregression4(T::Type{<:Real}) = matrixregression(Float64, 100, 8, 12, lam_fro = 0.0, lam_nuc = 0.4, lam_las = 1.0, lam_glc = 0.1, lam_glr = 2.0)
-matrixregression5(T::Type{<:Real}) = matrixregression(Float64, 100, 8, 12, lam_fro = 0.0, lam_nuc = 0.0, lam_las = 0.0, lam_glc = 0.2, lam_glr = 1.5)
+matrixregression3(T::Type{<:Real}) = matrixregression(Float64, 3, 4, 5)
+matrixregression4(T::Type{<:Real}) = matrixregression(Float64, 3, 4, 5, lam_fro = 0.1, lam_nuc = 0.1, lam_las = 0.1, lam_glc = 0.2, lam_glr = 0.2)
+matrixregression5(T::Type{<:Real}) = matrixregression(Float64, 100, 8, 12)
+matrixregression6(T::Type{<:Real}) = matrixregression(Float64, 100, 8, 12, lam_fro = 0.0, lam_nuc = 0.4, lam_las = 1.0, lam_glc = 0.1, lam_glr = 2.0)
+matrixregression7(T::Type{<:Real}) = matrixregression(Float64, 100, 8, 12, lam_fro = 0.0, lam_nuc = 0.0, lam_las = 0.0, lam_glc = 0.2, lam_glr = 1.5)
+matrixregression8(T::Type{<:Real}) = matrixregression(Float64, 15, 10, 20)
+matrixregression9(T::Type{<:Real}) = matrixregression(Float64, 15, 10, 20, lam_fro = 0.0, lam_nuc = 0.4, lam_las = 1.0, lam_glc = 0.1, lam_glr = 2.0)
+matrixregression10(T::Type{<:Real}) = matrixregression(Float64, 15, 10, 20, lam_fro = 0.0, lam_nuc = 0.0, lam_las = 0.0, lam_glc = 0.2, lam_glr = 1.5)
 
 instances_matrixregression_all = [
     matrixregression1,
@@ -216,10 +230,17 @@ instances_matrixregression_all = [
     matrixregression3,
     matrixregression4,
     matrixregression5,
+    matrixregression6,
+    matrixregression7,
+    matrixregression8,
+    matrixregression9,
+    matrixregression10,
     ]
 instances_matrixregression_few = [
     matrixregression1,
     matrixregression2,
+    matrixregression3,
+    matrixregression4,
     ]
 
 function test_matrixregression(instance::Function; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
@@ -237,3 +258,7 @@ function test_matrixregression(instance::Function; T::Type{<:Real} = Float64, op
     # @show A_opt
     return
 end
+
+# TODO delete
+# @testset begin test_matrixregression.(instances_matrixregression_few) end
+# @testset begin test_matrixregression.(instances_matrixregression_all) end
