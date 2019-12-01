@@ -448,7 +448,7 @@ function correction(cone::EpiNormEucl, primal_dir::AbstractVector, dual_dir::Abs
 end
 
 function dist_to_bndry(::EpiNormEucl{T}, point::Vector{T}, dir::AbstractVector{T}) where {T}
-    point_dir_dist = point[1] * dir[1] - sum(point[i] * dir[i] for i in 2:length(point))
+    point_dir_dist = jdot(point, dir)
     fact = (point_dir_dist + dir[1]) / (point[1] + 1)
 
     dist2n = zero(T)
@@ -459,6 +459,7 @@ function dist_to_bndry(::EpiNormEucl{T}, point::Vector{T}, dir::AbstractVector{T
 end
 
 function step_max_dist(cone::EpiNormEucl{T}, primal_dir::AbstractVector{T}, dual_dir::AbstractVector{T}) where {T}
+    @assert cone.scaling_updated
     primal_step_dist = sqrt(cone.dist) / dist_to_bndry(cone, cone.normalized_point, primal_dir)
     dual_step_dist = sqrt(cone.dual_dist) / dist_to_bndry(cone, cone.normalized_dual_point, dual_dir)
 
