@@ -14,9 +14,10 @@ using Test
 import Hypatia
 const CO = Hypatia.Cones
 
+# TODO generalize for sparse Y,X but make sure qr factorization does not permute
 function matrixregression(
-    Y::AbstractMatrix{T},
-    X::AbstractMatrix{T};
+    Y::Matrix{T},
+    X::Matrix{T};
     lam_fro::T = zero(T),
     lam_nuc::T = zero(T),
     lam_las::T = zero(T),
