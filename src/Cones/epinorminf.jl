@@ -343,26 +343,3 @@ function hess_nz_idxs_col(cone::EpiNormInf, j::Int, lower_only::Bool)
         return [1, j]
     end
 end
-
-# utilities for converting between real and complex vectors
-function rvec_to_cvec!(cvec::AbstractVector{Complex{T}}, rvec::AbstractVector{T}) where {T}
-    k = 1
-    # @inbounds for i in eachindex(cvec)
-    for i in eachindex(cvec)
-        cvec[i] = Complex(rvec[k], rvec[k + 1])
-        k += 2
-    end
-    return cvec
-end
-
-function cvec_to_rvec!(rvec::AbstractVector{T}, cvec::AbstractVector{Complex{T}}) where {T}
-    k = 1
-    # @inbounds for i in eachindex(cvec)
-    for i in eachindex(cvec)
-        ci = cvec[i]
-        rvec[k] = real(ci)
-        rvec[k + 1] = imag(ci)
-        k += 2
-    end
-    return rvec
-end
