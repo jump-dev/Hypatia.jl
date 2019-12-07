@@ -14,6 +14,7 @@ using SparseArrays
 import Random
 using Test
 import Hypatia
+import Hypatia.RealOrComplex
 const CO = Hypatia.Cones
 
 function matrixregression(
@@ -296,7 +297,7 @@ instances_matrixregression_few = [
     matrixregression4,
     ]
 
-function test_matrixregression(instance::Function; R::Type{<:RealOrComplex{T}} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
+function test_matrixregression(instance::Function; R::Type{<:RealOrComplex{T}} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1) where {T <: Real}
     Random.seed!(rseed)
     d = instance(R)
     r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
