@@ -403,16 +403,15 @@ function test_epinormspectral_barrier(T::Type{<:Real})
             (u, W) = (s[1], reshape(s[2:end], n, m))
             return -logdet(cholesky!(Hermitian(abs2(u) * I - W * W'))) + (n - 1) * log(u)
         end
-        test_barrier_oracles(CO.EpiNormSpectral{T}(n, m), R_barrier)
-        # test_barrier_oracles(CO.EpiNormSpectral{T, T}(n, m), R_barrier)
+        test_barrier_oracles(CO.EpiNormSpectral{T, T}(n, m), R_barrier)
 
-        # # complex epinormspectral barrier
-        # function C_barrier(s)
-        #     (u, Ws) = (s[1], reshape(s[2:end], n, 2m))
-        #     W = [Ws[i, 2j - 1] + Ws[i, 2j] * im for i in 1:n, j in 1:m]
-        #     return -logdet(cholesky!(Hermitian(abs2(u) * I - W * W'))) + (n - 1) * log(u)
-        # end
-        # test_barrier_oracles(CO.EpiNormSpectral{Complex{T}, T}(n, m), C_barrier)
+        # complex epinormspectral barrier
+        function C_barrier(s)
+            (u, Ws) = (s[1], reshape(s[2:end], n, 2m))
+            W = [Ws[i, 2j - 1] + Ws[i, 2j] * im for i in 1:n, j in 1:m]
+            return -logdet(cholesky!(Hermitian(abs2(u) * I - W * W'))) + (n - 1) * log(u)
+        end
+        test_barrier_oracles(CO.EpiNormSpectral{T, Complex{T}}(n, m), C_barrier)
     end
     return
 end
