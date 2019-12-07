@@ -29,9 +29,9 @@ function maxvolume(
     n::Int;
     use_hypogeomean::Bool = false,
     use_power::Bool = false,
-    use_epinormeucl::Bool = false,
+    use_epipersquare::Bool = false,
     )
-    @assert use_hypogeomean + use_power + use_epinormeucl == 1
+    @assert use_hypogeomean + use_power + use_epipersquare == 1
     poly_hrep = Matrix{T}(I, n, n)
     poly_hrep .+= T.(randn(n, n)) / n
     c = vcat(-1, zeros(T, n))
@@ -74,7 +74,7 @@ function maxvolume(
         push!(cones, CO.Power{T}([inv(T(n)), T(n - 1) / T(n)], 1))
         h = zeros(T, 3 * (n - 1))
     else
-        @assert use_epinormeucl == true
+        @assert use_epipersquare == true
         # number of variables inside geometric mean is n
         # number of layers of variables
         num_layers = log_floor(n)
@@ -128,25 +128,22 @@ function maxvolume(
         G = [
             zeros(T, 3 * num_new_vars)  G_rsoc;
             one(T)  zeros(T, 1, n)  -inv(rtfact)  zeros(T, 1, num_new_vars - 1);
-            zeros(T, num_new_vars, n + 1)  -Matrix{T}(I, num_new_vars, num_new_vars)
             ]
         push!(cones, CO.Nonnegative{T}(1))
-        # TODO does this need to be imposed for all variables explicitly? keeping for now just in case
-        push!(cones, CO.Nonnegative{T}(num_new_vars))
-        h = zeros(T, 4 * num_new_vars + 1)
+        h = zeros(T, 3 * num_new_vars + 1)
     end
     return (c = c, A = A, b = b, G = G, h = h, cones = cones)
 end
 
 maxvolume1(T::Type{<:Real}) = maxvolume(T, 3, use_hypogeomean = true)
 maxvolume2(T::Type{<:Real}) = maxvolume(T, 3, use_power = true)
-maxvolume3(T::Type{<:Real}) = maxvolume(T, 3, use_epinormeucl = true)
+maxvolume3(T::Type{<:Real}) = maxvolume(T, 3, use_epipersquare = true)
 maxvolume4(T::Type{<:Real}) = maxvolume(T, 10, use_hypogeomean = true)
 maxvolume5(T::Type{<:Real}) = maxvolume(T, 10, use_power = true)
-maxvolume6(T::Type{<:Real}) = maxvolume(T, 10, use_epinormeucl = true)
+maxvolume6(T::Type{<:Real}) = maxvolume(T, 10, use_epipersquare = true)
 maxvolume7(T::Type{<:Real}) = maxvolume(T, 25, use_hypogeomean = true)
 maxvolume8(T::Type{<:Real}) = maxvolume(T, 25, use_power = true)
-maxvolume9(T::Type{<:Real}) = maxvolume(T, 25, use_epinormeucl = true)
+maxvolume9(T::Type{<:Real}) = maxvolume(T, 25, use_epipersquare = true)
 
 instances_maxvolume_all = [
     maxvolume1,

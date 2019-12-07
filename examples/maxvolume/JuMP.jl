@@ -31,7 +31,7 @@ function maxvolumeJuMP(
         num_layers = MOI.Bridges.Constraint.ilog2(n)
         # number of new variables = 1 + 2 + ... + 2^(l - 1) = 2^l - 1
         num_new_vars = 2 ^ num_layers - 1
-        JuMP.@variable(model, new_vars[1:num_new_vars] >= 0)
+        JuMP.@variable(model, new_vars[1:num_new_vars])
         rtfact = sqrt(2 ^ num_layers)
         xl1 = new_vars[1]
         JuMP.@constraint(model, t <= xl1 / rtfact)
