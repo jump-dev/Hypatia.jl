@@ -62,26 +62,13 @@ function test_barrier_oracles(
     @test load_reset_check(cone, point)
 
     # test gradient and Hessian oracles
-    # test_grad_hess(cone, point, tol = tol)
+    test_grad_hess(cone, point, tol = tol)
 
     # check gradient and Hessian agree with ForwardDiff
     grad = CO.grad(cone)
-    # @show grad
-    # hess = CO.hess(cone)
-    # @test ForwardDiff.gradient(barrier, point) ≈ grad atol=tol rtol=tol
-    # @test ForwardDiff.hessian(barrier, point) ≈ hess atol=tol rtol=tol
-
-    println(dim)
-    println()
     hess = CO.hess(cone)
-    println()
-    hessWW = UpperTriangular(hess[2:end, 2:end])
-    @show hessWW
-    println()
-    true_HWW = UpperTriangular(ForwardDiff.hessian(barrier, point)[2:end, 2:end])
-    @show true_HWW
-    # @show UpperTriangular(ForwardDiff.hessian(barrier, point))
-    println()
+    @test ForwardDiff.gradient(barrier, point) ≈ grad atol=tol rtol=tol
+    @test ForwardDiff.hessian(barrier, point) ≈ hess atol=tol rtol=tol
 
     # check 3rd order corrector agrees with ForwardDiff
     # too slow if cone is too large or not using BlasReals
@@ -167,35 +154,35 @@ function test_grad_hess(
     nu = CO.get_nu(cone)
     dim = length(point)
     grad = CO.grad(cone)
-    # hess = Matrix(CO.hess(cone))
-    # inv_hess = Matrix(CO.inv_hess(cone))
+    hess = Matrix(CO.hess(cone))
+    inv_hess = Matrix(CO.inv_hess(cone))
 
     @test dot(point, grad) ≈ -nu atol=tol rtol=tol
-    # @test hess * inv_hess ≈ I atol=tol rtol=tol
+    @test hess * inv_hess ≈ I atol=tol rtol=tol
 
-    # prod_mat = similar(point, dim, dim)
-    # @test CO.hess_prod!(prod_mat, inv_hess, cone) ≈ I atol=tol rtol=tol
-    # @test CO.inv_hess_prod!(prod_mat, hess, cone) ≈ I atol=tol rtol=tol
-    #
-    # prod_mat2 = Matrix(CO.hess_sqrt_prod!(prod_mat, inv_hess, cone)')
-    # @test CO.hess_sqrt_prod!(prod_mat, prod_mat2, cone) ≈ I atol=tol rtol=tol
-    #
-    # if !CO.use_scaling(cone)
-    #     prod = similar(point)
-    #     @test hess * point ≈ -grad atol=tol rtol=tol
-    #     @test CO.hess_prod!(prod, point, cone) ≈ -grad atol=tol rtol=tol
-    #     @test CO.inv_hess_prod!(prod, grad, cone) ≈ -point atol=tol rtol=tol
-    #
-    #     if isdefined(cone, :use_dual)
-    #         CO.inv_hess_sqrt_prod!(prod_mat2, Matrix(one(T) * I, dim, dim), cone)
-    #         @test prod_mat2' * prod_mat2 ≈ inv_hess atol=tol rtol=tol
-    #     end
-    # end
-    #
-    # if !isempty(dual_point)
-    #     @test hess * point ≈ dual_point atol=tol rtol=tol
-    #     @test inv_hess * dual_point ≈ point atol=tol rtol=tol
-    # end
+    prod_mat = similar(point, dim, dim)
+    @test CO.hess_prod!(prod_mat, inv_hess, cone) ≈ I atol=tol rtol=tol
+    @test CO.inv_hess_prod!(prod_mat, hess, cone) ≈ I atol=tol rtol=tol
+
+    prod_mat2 = Matrix(CO.hess_sqrt_prod!(prod_mat, inv_hess, cone)')
+    @test CO.hess_sqrt_prod!(prod_mat, prod_mat2, cone) ≈ I atol=tol rtol=tol
+
+    if !CO.use_scaling(cone)
+        prod = similar(point)
+        @test hess * point ≈ -grad atol=tol rtol=tol
+        @test CO.hess_prod!(prod, point, cone) ≈ -grad atol=tol rtol=tol
+        @test CO.inv_hess_prod!(prod, grad, cone) ≈ -point atol=tol rtol=tol
+
+        if isdefined(cone, :use_dual)
+            CO.inv_hess_sqrt_prod!(prod_mat2, Matrix(one(T) * I, dim, dim), cone)
+            @test prod_mat2' * prod_mat2 ≈ inv_hess atol=tol rtol=tol
+        end
+    end
+
+    if !isempty(dual_point)
+        @test hess * point ≈ dual_point atol=tol rtol=tol
+        @test inv_hess * dual_point ≈ point atol=tol rtol=tol
+    end
 
     return
 end
@@ -410,13 +397,13 @@ function test_hypogeomean_barrier(T::Type{<:Real})
 end
 
 function test_epinormspectral_barrier(T::Type{<:Real})
-    for (n, m) in [(1, 1), (1, 2), (2, 2)]#, (2, 3), (3, 5)]
-        # # real epinormspectral barrier
-        # function R_barrier(s)
-        #     (u, W) = (s[1], reshape(s[2:end], n, m))
-        #     return -logdet(cholesky!(Hermitian(abs2(u) * I - W * W'))) + (n - 1) * log(u)
-        # end
-        # test_barrier_oracles(CO.EpiNormSpectral{T, T}(n, m), R_barrier)
+    for (n, m) in [(1, 1), (1, 2), (2, 2), ]#(2, 3), (3, 5)]
+        # real epinormspectral barrier
+        function R_barrier(s)
+            (u, W) = (s[1], reshape(s[2:end], n, m))
+            return -logdet(cholesky!(Hermitian(abs2(u) * I - W * W'))) + (n - 1) * log(u)
+        end
+        test_barrier_oracles(CO.EpiNormSpectral{T, T}(n, m), R_barrier)
 
         # complex epinormspectral barrier
         function C_barrier(s)

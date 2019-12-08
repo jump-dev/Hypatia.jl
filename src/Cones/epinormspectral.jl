@@ -144,6 +144,21 @@ function update_hess_prod(cone::EpiNormSpectral)
     return nothing
 end
 
+function _build_hess(H::Matrix{T}, r_idx::Int, c_idx::Int, term1::T, term2::T) where {T <: Real}
+    @inbounds H[r_idx, c_idx] = term1 + term2
+    return nothing
+end
+
+function _build_hess(H::Matrix{T}, r_idx::Int, c_idx::Int, term1::Complex{T}, term2::Complex{T}) where {T <: Real}
+    @inbounds begin
+        H[r_idx, c_idx] = real(term1) + real(term2)
+        H[r_idx + 1, c_idx] = imag(term2) - imag(term1)
+        H[r_idx, c_idx + 1] = imag(term1) + imag(term2)
+        H[r_idx + 1, c_idx + 1] = real(term1) - real(term2)
+    end
+    return nothing
+end
+
 function update_hess(cone::EpiNormSpectral)
     if !cone.hess_prod_updated
         update_hess_prod(cone)
@@ -159,99 +174,27 @@ function update_hess(cone::EpiNormSpectral)
 
     # H_W_W part
     mul!(tmpmm, W', ZiW) # TODO Hermitian? W' * Zi * W
+    tmpmm += I # TODO inefficient
+
     # TODO parallelize loops
-    if cone.is_complex
-        for i in 1:m
-            r = (i - 1) * n
-            for j in 1:n
-                r2 = r + j
-                for l in j:n
-                    # @show Zi[l, j] * tmpmm[i, i]
-                    # @show ZiW[l, i] * ZiW[j, i]
-                    # @show Zi[j, l]
-                    comp1 = Zi[l, j] * tmpmm[i, i] + ZiW[l, i] * ZiW[j, i] + Zi[j, l]
-                    comp2 = Zi[l, j] * tmpmm[i, i] + ZiW[l, i] * ZiW[j, i] - Zi[j, l]
-                    comp3 = Zi[l, j] * tmpmm[i, i] - ZiW[l, i] * ZiW[j, i] + Zi[j, l]
-                    comp4 = Zi[l, j] * tmpmm[i, i] - ZiW[l, i] * ZiW[j, i] - Zi[j, l]
-                    @show comp1
-                    @show comp2
-                    @show comp3
-                    @show comp4
-                    println()
-
-                    r_idx = 2 * r2
-                    c_idx = 2 * (r + l)
-                    # @show r_idx, c_idx
-
-                    H[r_idx, c_idx] = real(comp1)
-                    H[r_idx, c_idx + 1] = imag(comp2)
-                    H[r_idx + 1, c_idx] = -imag(comp4) # TODO needed?
-                    H[r_idx + 1, c_idx + 1] = real(comp3)
-
-                end
-                c2 = r + n
-                for k in (i + 1):m
-                    for l in 1:n
-                        comp1 = Zi[l, j] * tmpmm[i, k] + ZiW[l, i] * ZiW[j, k]
-                        comp2 = Zi[l, j] * tmpmm[i, k] - ZiW[l, i] * ZiW[j, k]
-
-                        # @show Zi[l, j] * tmpmm[i, k]
-                        # @show ZiW[l, i] * ZiW[j, k]
-                        # @show comp
-
-                        r_idx = 2 * r2
-                        c_idx = 2 * (c2 + l)
-                        # @show r_idx, c_idx
-
-                        H[r_idx, c_idx] = real(comp1)
-                        H[r_idx, c_idx + 1] = imag(comp1)
-                        H[r_idx + 1, c_idx] = -imag(comp2) # TODO needed?
-                        H[r_idx + 1, c_idx + 1] = real(comp2)
-                    end
-                    c2 += n
-                end
+    idx_incr = (cone.is_complex ? 2 : 1)
+    r_idx = 2
+    for i in 1:m, j in 1:n
+        c_idx = r_idx
+        @inbounds for k in i:m
+            ZiWjk = ZiW[j, k]
+            tmpmmik = tmpmm[i, k]
+            lstart = (i == k ? j : 1)
+            @inbounds for l in lstart:n
+                term1 = Zi[l, j] * tmpmmik
+                term2 = ZiW[l, i] * ZiWjk
+                _build_hess(H, r_idx, c_idx, term1, term2)
+                c_idx += idx_incr
             end
         end
-        H .*= 2
-
-
-        HWW = zeros(eltype(Zi), n * m, n * m)
-        for i in 1:m
-            r = (i - 1) * n
-            for j in 1:n
-                r2 = r + j
-                for l in j:n
-                    HWW[r2, r + l] = Zi[l, j]' * tmpmm[i, i] + ZiW[l, i] * ZiW[j, i] + Zi[j, l]
-                end
-                c2 = r + n
-                for k in (i + 1):m
-                    for l in 1:n
-                        HWW[r2, c2 + l] = Zi[l, j]' * tmpmm[i, k] + ZiW[l, i] * ZiW[j, k]
-                    end
-                    c2 += n
-                end
-            end
-        end
-        HWW .*= 2
-
-        println()
-        @show HWW
-
-    else
-        for i in 1:m
-            r = 1 + (i - 1) * n
-            for j in 1:n
-                r2 = r + j
-                @inbounds @. @views H[r2, r .+ (j:n)] = Zi[j:n, j] * tmpmm[i, i] + ZiW[j:n, i] * ZiW[j, i] + Zi[j, j:n]
-                c2 = r + n
-                for k in (i + 1):m
-                    @inbounds @. @views H[r2, c2 .+ (1:n)] = Zi[1:n, j] * tmpmm[i, k] + ZiW[1:n, i] * ZiW[j, k]
-                    c2 += n
-                end
-            end
-        end
-        H .*= 2
+        r_idx += idx_incr
     end
+    H .*= 2
 
     # H_u_W and H_u_u parts
     if cone.is_complex
@@ -260,7 +203,6 @@ function update_hess(cone::EpiNormSpectral)
         H[1, 2:end] = cone.HuW
     end
     H[1, 1] = cone.Huu
-
 
     # # TODO try replacing Zi with Z in order to derive an inv hess
     # # H_W_W part
@@ -310,9 +252,6 @@ function update_hess(cone::EpiNormSpectral)
     # println(round.(Hi_true[:, 2:end], digits=10))
     # println(round.((Hi_try - Hi_true)[:, 2:end], digits=10))
     # println()
-
-
-
 
     cone.hess_updated = true
     return cone.hess
