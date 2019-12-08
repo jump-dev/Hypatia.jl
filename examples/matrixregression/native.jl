@@ -81,12 +81,11 @@ function matrixregression(
                     Qlk2 = Qhalf[l, k2]
                     model_G[r_idx, c_idx] = real(Qlk2)
                     model_G[r_idx, c_idx + 1] = -imag(Qlk2)
-                    r_idx += 1
-                    model_G[r_idx, c_idx] = imag(Qlk2)
-                    model_G[r_idx, c_idx + 1] = real(Qlk2)
-                    r_idx += 1
+                    model_G[r_idx + 1, c_idx] = imag(Qlk2)
+                    model_G[r_idx + 1, c_idx + 1] = real(Qlk2)
                     c_idx += 2
                 end
+                r_idx += 2
             else
                 @. @views model_G[r_idx, c_idx:(c_idx + data_p - 1)] = Qhalf[l, :]
                 r_idx += 1
@@ -102,7 +101,7 @@ function matrixregression(
     model_c = zeros(T, model_n)
     mXpY = -X' * Y
     if is_complex
-        @views cvec_to_rvec!(model_c[2:end], vec(mXpY))
+        @views CO.cvec_to_rvec!(model_c[2:end], vec(mXpY))
     else
         model_c[2:end] .= vec(mXpY)
     end
@@ -238,7 +237,7 @@ function matrixregression(
 end
 
 function matrixregression(
-    R::Type{RealOrComplex{T}},
+    R::Type{<:RealOrComplex{T}},
     n::Int,
     m::Int,
     p::Int;
@@ -259,10 +258,10 @@ function matrixregression(
 
     Y = Matrix{R}(Y)
     X = Matrix{R}(X)
-    A = Matrix{T}(A)
-    @show A
-    @show X
-    @show Y
+    # A = Matrix{R}(A)
+    # @show A
+    # @show X
+    # @show Y
 
     return matrixregression(Y, X; model_kwargs...)
 end
@@ -307,22 +306,30 @@ function test_matrixregression(instance::Function; R::Type{<:RealOrComplex{T}} =
         A_opt_real = reshape(r.x[2:(1 + 2 * d.p * d.m)], 2 * d.p, d.m)
         A_opt = zeros(R, d.p, d.m)
         for k in 1:d.p
-            @. @views A_opt[k, :] = A_opt_real[2k - 1, :] + A_opt_real[2k, :]
+            @. @views A_opt[k, :] = A_opt_real[2k - 1, :] + A_opt_real[2k, :] * im
         end
     else
         A_opt = reshape(r.x[2:(1 + d.p * d.m)], d.p, d.m)
     end
-    loss = (1/2 * sum(abs2, d.X * A_opt) - dot(d.X' * d.Y, A_opt)) / d.n
-    # TODO don't calculate norms for which lambda is 0
+    loss = (1/2 * sum(abs2, d.X * A_opt) - real(dot(d.X' * d.Y, A_opt))) / d.n
     obj_try = loss + d.lam_fro * norm(vec(A_opt), 2) +
         d.lam_nuc * sum(svd(A_opt).S) + d.lam_las * norm(vec(A_opt), 1) +
         d.lam_glr * sum(norm, eachrow(A_opt)) + d.lam_glc * sum(norm, eachcol(A_opt))
     @test r.primal_obj ≈ obj_try atol = 1e-4 rtol = 1e-4
-    # A_opt[abs.(A_opt) .< 1e-4] .= 0
-    # @show A_opt
     return
 end
 
+
+
 # TODO delete
-# @testset begin test_matrixregression.(instances_matrixregression_few) end
-# @testset begin test_matrixregression.(instances_matrixregression_all) end
+T = Float64
+R = Complex{T}
+
+options = (atol = 1e-2, solver = Hypatia.Solvers.Solver{T}(
+    verbose = true, iter_limit = 250, time_limit = 12e2,
+    tol_feas = 1e-5, tol_rel_opt = 1e-5, tol_abs_opt = 1e-5,
+    system_solver = Hypatia.Solvers.QRCholDenseSystemSolver{T}(),
+    ))
+
+instances = instances_matrixregression_all
+@testset begin test_matrixregression.(instances, R = R, options = options) end
