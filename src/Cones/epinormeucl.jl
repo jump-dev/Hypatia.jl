@@ -10,22 +10,24 @@ barrier from "Self-Scaled Barriers and Interior-Point Methods for Convex Program
 contains some adapted code from https://github.com/embotech/ecos
 TODO all oracles assumed we are using dense version of the Nesterov Todd scaling
 TODO factor out repetitions in products, hessians, inverse hessians
-TODO factor out eta
 TODO probably undo (a-b)(a+b) dist calculations
+TODO can get rid of jdot if don't like it
 =#
 
 mutable struct EpiNormEucl{T <: Real} <: Cone{T}
     use_scaling::Bool
     use_3order_corr::Bool
+    try_scaled_updates::Bool # run algorithm in scaled variables for numerical reasons TODO decide whether to keep this as an option
     dim::Int
     point::Vector{T}
     dual_point::Vector{T}
+    scaled_point::Vector{T} # TODO not in other cones, including in this one because suspecting step max dist issues without using this
 
     feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
     inv_hess_updated::Bool
-    scaling_updated::Bool
+    scaling_updated::Bool # TODO remove
     is_feas::Bool
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
@@ -33,30 +35,25 @@ mutable struct EpiNormEucl{T <: Real} <: Cone{T}
 
     normalized_point::Vector{T} # TODO can this and normalized_dual_point be removed?
     normalized_dual_point::Vector{T}
-    w::Vector{T} # TODO rename - confusing with w part of point
-    # experimental
-    lambda::Vector{T} # TODO think about naming, it's w_bar in cvxopt paper
-    # TODO improve naming of short 1 letter variable names below
-    v::Vector{T}
+    nt_point::Vector{T} # actually a normalized NT point
+    nt_point_sqrt::Vector{T}
 
     dist::T
     dual_dist::T
-    gamma::T
-    ww::T
-    b::T
-    c::T
     correction::Vector{T}
 
     function EpiNormEucl{T}(
         dim::Int;
         use_scaling::Bool = true,
         use_3order_corr::Bool = true,
+        try_scaled_updates::Bool = false,
         ) where {T <: Real}
         @assert dim >= 2
         cone = new{T}()
         cone.dim = dim
         cone.use_scaling = use_scaling
         cone.use_3order_corr = use_3order_corr
+        cone.try_scaled_updates = try_scaled_updates
         return cone
     end
 end
@@ -67,11 +64,11 @@ use_scaling(cone::EpiNormEucl) = cone.use_scaling
 
 use_3order_corr(cone::EpiNormEucl) = cone.use_3order_corr
 
-# try_scaled_updates(cone::EpiNormEucl) = cone.try_scaled_updates # TODO
+try_scaled_updates(cone::EpiNormEucl) = cone.try_scaled_updates
 
 load_dual_point(cone::EpiNormEucl, dual_point::AbstractVector) = copyto!(cone.dual_point, dual_point)
 
-reset_data(cone::EpiNormEucl) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.scaling_updated = false)
+reset_data(cone::EpiNormEucl) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
 
 # TODO only allocate the fields we use
 function setup_data(cone::EpiNormEucl{T}) where {T <: Real}
@@ -79,14 +76,24 @@ function setup_data(cone::EpiNormEucl{T}) where {T <: Real}
     dim = cone.dim
     cone.point = zeros(T, dim)
     cone.dual_point = zeros(T, dim)
+    cone.scaled_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.normalized_point = zeros(T, dim)
     cone.normalized_dual_point = zeros(T, dim)
-    cone.w = zeros(T, dim)
-    cone.v = zeros(T, dim)
+    cone.nt_point = zeros(T, dim)
+    cone.nt_point_sqrt = zeros(T, dim)
     cone.correction = zeros(T, dim)
+    # initial values for scaling related fields, using fact that initial point is identity
+    if cone.use_scaling
+        cone.nt_point[1] = 1
+        cone.nt_point_sqrt[1] = 1
+        cone.normalized_point[1] = 1
+        cone.normalized_dual_point[1] = 1
+        cone.scaled_point[1] = 1
+        cone.dual_dist = 1
+    end
     return
 end
 
@@ -123,55 +130,19 @@ function update_grad(cone::EpiNormEucl)
     return cone.grad
 end
 
-function update_scaling(cone::EpiNormEucl)
-    @assert !cone.scaling_updated
-    @assert cone.feas_updated
-    w = cone.w
-    v = cone.v
-    normalized_point = cone.normalized_point
-    normalized_dual_point = cone.normalized_dual_point
-
-    @views cone.dual_dist = abs2(cone.dual_point[1]) - sum(abs2, cone.dual_point[2:end])
-    @assert cone.dual_dist >= 0
-    normalized_point .= cone.point ./ sqrt(cone.dist)
-    normalized_dual_point .= cone.dual_point ./ sqrt(cone.dual_dist)
-    cone.gamma = sqrt((1 + dot(normalized_point, normalized_dual_point)) / 2)
-
-    w[1] = normalized_point[1] + normalized_dual_point[1]
-    @. @views w[2:end] = normalized_point[2:end] - normalized_dual_point[2:end]
-    w ./= 2 * cone.gamma
-    w1 = w[1]
-
-    copyto!(v, w)
-    v[1] += 1
-    v ./= sqrt(2 * (w1 + 1))
-
-    @views w2nw2n = sum(abs2, w[2:end])
-    cone.ww = abs2(w1) + w2nw2n
-    w11 = 1 + w1
-    w2nw2ndiv = w2nw2n / w11
-    cone.b = 1 + (2 + w2nw2ndiv) / w11
-    cone.c = w11 + w2nw2ndiv
-
-    cone.scaling_updated = true
-    return cone.scaling_updated
-end
-
 function update_hess(cone::EpiNormEucl)
     @assert cone.grad_updated
     @assert cone.is_feas
 
     if cone.use_scaling
-        if !cone.scaling_updated
-            update_scaling(cone)
-        end
-        w = cone.w
-        hess = cone.hess.data
-        hess[1, 1] = cone.ww
-        @. @views hess[1, 2:end] = -cone.c * w[2:end]
-        @views mul!(hess[2:end, 2:end], w[2:end], w[2:end]', cone.b, false)
-        hess[2:end, 2:end] += I # TODO inefficient
-        hess .*= sqrt(cone.dual_dist / cone.dist)
+        # analogous to W as a function of nt_point_sqrt
+        # H = (2 * J * nt_point * nt_point' * J - J) * constant
+        mul!(cone.hess.data, cone.nt_point, cone.nt_point', 2, false)
+        cone.hess.data[:, 1] *= -1
+        cone.hess += I # TODO inefficient
+        cone.hess.data[1, :] *= -1
+        # TODO refactor this constant
+        cone.hess.data .*= sqrt(cone.dual_dist / cone.dist)
     else
         mul!(cone.hess.data, cone.grad, cone.grad', 2, false)
         cone.hess += inv(cone.dist) * I # TODO inefficient
@@ -186,16 +157,11 @@ function update_inv_hess(cone::EpiNormEucl)
     @assert cone.is_feas
 
     if cone.use_scaling
-        if !cone.scaling_updated
-            update_scaling(cone)
-        end
-        w = cone.w
-        inv_hess = cone.inv_hess.data
-        inv_hess[1, 1] = cone.ww
-        @. @views inv_hess[1, 2:end] = cone.c * w[2:end]
-        @views mul!(inv_hess[2:end, 2:end], w[2:end], w[2:end]', cone.b, false)
-        inv_hess[2:end, 2:end] += I # TODO inefficient
-        inv_hess .*= sqrt(cone.dist / cone.dual_dist)
+        # Hinv = (2 * nt_point * nt_point' - J) * constant
+        mul!(cone.inv_hess.data, cone.nt_point, cone.nt_point', 2, false)
+        cone.inv_hess += I # TODO inefficient
+        cone.inv_hess[1, 1] -= 2
+        cone.inv_hess.data .*= sqrt(cone.dist / cone.dual_dist)
     else
         mul!(cone.inv_hess.data, cone.point, cone.point', 2, false)
         cone.inv_hess += cone.dist * I
@@ -213,17 +179,12 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNorm
     @assert cone.is_feas
 
     if cone.use_scaling
-        if !cone.scaling_updated
-            update_scaling(cone)
-        end
-        w = cone.w
-        @views prod[1, :] = cone.ww * arr[1, :] - cone.c * arr[2:end, :]' * w[2:end]
         for j in 1:size(prod, 2)
-            @views pa = dot(w[2:end], arr[2:end, j])
-            @. @views prod[2:end, j] = pa * w[2:end] * cone.b
+            @views pa = -2 * jdot(cone.nt_point, arr[:, j])
+            @. @views prod[:, j] = pa * cone.nt_point
         end
-        @. @views prod[2:end, :] += arr[2:end, :]
-        @. @views prod[2:end, :] -= cone.c * arr[1, :]' * w[2:end]
+        @. prod += arr
+        @. @views prod[1, :] *= -1
         prod .*= sqrt(cone.dual_dist / cone.dist)
     else
         p1 = cone.point[1]
@@ -245,17 +206,12 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Epi
     @assert cone.is_feas
 
     if cone.use_scaling
-        if !cone.scaling_updated
-            update_scaling(cone)
-        end
-        w = cone.w
-        @views prod[1, :] = cone.ww * arr[1, :] + cone.c * arr[2:end, :]' * w[2:end]
         for j in 1:size(prod, 2)
-            @views pa = dot(w[2:end], arr[2:end, j])
-            @. @views prod[2:end, j] = pa * w[2:end] * cone.b
+            @views pa = 2 * dot(cone.nt_point, arr[:, j])
+            @. @views prod[:, j] = pa * cone.nt_point
         end
-        @. @views prod[2:end, :] += arr[2:end, :]
-        @. @views prod[2:end, :] += cone.c * arr[1, :]' * w[2:end]
+        @. prod[1, :] -= arr[1, :]
+        @. prod[2:end, :] += arr[2:end, :]
         prod .*= sqrt(cone.dist / cone.dual_dist)
     else
         @inbounds for j in 1:size(prod, 2)
@@ -273,20 +229,14 @@ function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Ep
     @assert cone.is_feas
 
     if cone.use_scaling
-        if !cone.scaling_updated
-            update_scaling(cone)
-        end
-        v = cone.v
-        vu = v[1]
-        @views vw = v[2:end]
-        divdist = sqrt(sqrt(cone.dual_dist) / sqrt(cone.dist))
+        nt_point_sqrt = cone.nt_point_sqrt
         @inbounds for j in 1:size(arr, 2)
-            uj = arr[1, j]
-            @views wj = arr[2:end, j]
-            vmul = 2 * (uj * vu - dot(wj, vw)) * divdist
-            prod[1, j] = vmul * vu - uj * divdist
-            @. prod[2:end, j] = -vmul * vw + wj * divdist
+            pa = jdot(arr[:, j], nt_point_sqrt)
+            @. @views prod[:, j] = -2 * nt_point_sqrt * pa + arr[:, j]
         end
+        @. @views prod[2:end, :] *= -1
+        # TODO this factor is so poorly unrefactored, sort it out
+        prod ./= sqrt(sqrt(cone.dist / cone.dual_dist))
     else
         u = cone.point[1]
         w = view(cone.point, 2:cone.dim)
@@ -323,8 +273,9 @@ function correction(cone::EpiNormEucl, primal_dir::AbstractVector, dual_dir::Abs
 end
 
 function step_max_dist(cone::EpiNormEucl{T}, primal_dir::AbstractVector{T}, dual_dir::AbstractVector{T}) where {T}
-    @assert cone.scaling_updated
-
+    # TODO remove if updated properly in step_and_update_scaling
+    cone.normalized_point .= cone.point ./ distnorm(cone.point)
+    cone.normalized_dual_point .= cone.dual_point ./ distnorm(cone.dual_point)
     primal_step_dist = sqrt(cone.dist) / dist_to_bndry(cone, cone.normalized_point, primal_dir)
     dual_step_dist = sqrt(cone.dual_dist) / dist_to_bndry(cone, cone.normalized_dual_point, dual_dir)
     step_dist = T(Inf)
@@ -346,4 +297,96 @@ function dist_to_bndry(::EpiNormEucl{T}, point::Vector{T}, dir::AbstractVector{T
         dist2n += abs2(dir[i] - fact * point[i])
     end
     return -point_dir_dist + sqrt(dist2n)
+end
+
+function distnorm(x::AbstractVector)
+    x1 = x[1]
+    @views x2 = norm(x[2:end])
+    return sqrt(x1 - x2) * sqrt(x1 + x2)
+end
+
+jdot(x::AbstractVector, y::AbstractVector) = @views x[1] * y[1] - dot(x[2:end], y[2:end])
+
+function step_and_update_scaling(cone::EpiNormEucl{T}, primal_dir::AbstractVector, dual_dir::AbstractVector, step_size::T) where {T}
+    @assert cone.feas_updated
+    nt_point = cone.nt_point
+    nt_point_sqrt = cone.nt_point_sqrt
+    normalized_point = cone.normalized_point
+    normalized_dual_point = cone.normalized_dual_point
+
+    # TODO put this somehwere more appropriate
+    @views cone.dual_dist = abs2(cone.dual_point[1]) - sum(abs2, cone.dual_point[2:end])
+    @assert cone.dual_dist >= 0
+
+    # if cone.try_scaled_updates
+
+        # from CVXOPT code
+
+        # TODO sort out naming
+        # new primal/dual points but in the old scaling
+        scaled_point = cone.scaled_point
+        normalized_point = scaled_point + primal_dir * step_size
+        normalized_dual_point = scaled_point + dual_dir * step_size
+        # normalize new primal/dual points but in the old scaling
+        primal_dir_dist = distnorm(normalized_point)
+        dual_dir_dist = distnorm(normalized_dual_point)
+        normalized_point ./= primal_dir_dist
+        normalized_dual_point ./= dual_dir_dist
+
+        gamma = sqrt((1 + dot(normalized_point, normalized_dual_point)) / 2)
+        vs = dot(nt_point_sqrt, normalized_point)
+        vz = jdot(nt_point_sqrt, normalized_dual_point)
+        vq = (vs + vz) / 2 / gamma
+        vu = vs - vz
+        scaled_point[1] = gamma
+
+        w1 = 2 * nt_point_sqrt[1] * vq - (normalized_point[1] + normalized_dual_point[1] ) / 2 / gamma
+        d = (nt_point_sqrt[1] * vu - (normalized_point[1] - normalized_dual_point[1]) / 2) / (w1 + 1)
+
+        @views copyto!(scaled_point[2:end], nt_point_sqrt[2:end])
+        @. scaled_point[2:end] *= (vu - 2 * d * vq)
+        @. scaled_point[2:end] += normalized_point[2:end] * (1 - d / gamma) / 2
+        @. scaled_point[2:end] += normalized_dual_point[2:end] * (1 + d / gamma) / 2
+        @. scaled_point *= sqrt(primal_dir_dist * dual_dir_dist)
+
+        @. nt_point_sqrt *= 2 * vq
+        nt_point_sqrt[1] -= normalized_point[1] / 2 / gamma
+        @. @views nt_point_sqrt[2:end] += normalized_point[2:end] / gamma / 2
+        @. nt_point_sqrt -= normalized_dual_point / gamma / 2
+
+        nt_point .= nt_point_sqrt
+        cache = copy(nt_point_sqrt)
+
+        nt_point_sqrt[1] += 1
+        @. nt_point_sqrt /= sqrt(2 * nt_point_sqrt[1])
+
+        v_cache = copy(nt_point_sqrt)
+        w_cache = copy(nt_point)
+        l_cache = copy(scaled_point)
+
+    # else
+        # section 4 CVXOPT paper / part of ECOS' update each iteration
+        normalized_point .= cone.point ./ sqrt(cone.dist)
+        normalized_dual_point .= cone.dual_point ./ sqrt(cone.dual_dist)
+        gamma = sqrt((1 + dot(normalized_point, normalized_dual_point)) / 2)
+
+        nt_point[1] = normalized_point[1] + normalized_dual_point[1]
+        @. @views nt_point[2:end] = normalized_point[2:end] - normalized_dual_point[2:end]
+        nt_point ./= 2 * gamma
+
+        copyto!(nt_point_sqrt, nt_point)
+        nt_point_sqrt[1] += 1
+        nt_point_sqrt ./= sqrt(2 * nt_point_sqrt[1])
+
+        lambda = hess_sqrt_prod!(similar(cone.point), cone.point, cone)
+
+        @show norm(nt_point_sqrt - v_cache)
+        @show norm(nt_point - w_cache)
+        @show norm(lambda - l_cache)
+
+        # cone.scaled_point .= lambda
+
+    # end
+
+    return
 end
