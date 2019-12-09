@@ -317,19 +317,19 @@ function test_matrixregression(instance::Function; R::Type{<:RealOrComplex{T}} =
 end
 
 
-# TODO delete
-T = Float64
-R = Complex{T}
-
-options = (atol = 1e-2, solver = Hypatia.Solvers.Solver{T}(
-    verbose = true, iter_limit = 250, time_limit = 12e2,
-    tol_feas = 1e-6, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6,
-    use_infty_nbhd = false,
-    # max_nbhd = 0.7,
-    system_solver = Hypatia.Solvers.QRCholDenseSystemSolver{T}(),
-    # system_solver = Hypatia.Solvers.SymIndefDenseSystemSolver{T}(),
-    ))
-
-instances = instances_matrixregression_few
-# instances = [matrixregression1, matrixregression3, matrixregression5]
-@testset begin test_matrixregression.(instances, R = R, options = options) end
+# # TODO delete
+# T = Float64
+# R = Complex{T}
+#
+# options = (atol = 1e-2, solver = Hypatia.Solvers.Solver{T}(
+#     verbose = true, iter_limit = 250, time_limit = 12e2,
+#     tol_feas = 1e-6, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6,
+#     use_infty_nbhd = false,
+#     max_nbhd = 0.7,
+#     system_solver = Hypatia.Solvers.QRCholDenseSystemSolver{T}(),
+#     # system_solver = Hypatia.Solvers.SymIndefDenseSystemSolver{T}(),
+#     ))
+#
+# instances = instances_matrixregression_all
+# # instances = [matrixregression1, matrixregression3, matrixregression5]
+# @testset begin test_matrixregression.(instances, R = R, options = options) end
