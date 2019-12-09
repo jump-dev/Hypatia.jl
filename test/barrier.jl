@@ -110,7 +110,8 @@ function test_barrier_scaling_oracles(
     @test load_reset_check(cone, point, dual_point)
 
     # run twice: first run scaling will be the identity
-    for _ in 1:2
+    for i in 1:2
+        @show i
         s_dir = perturb_scale(zeros(T, dim), noise, one(T))
         z_dir = perturb_scale(zeros(T, dim), noise, one(T))
         alpha = T(0.1)
@@ -180,6 +181,7 @@ function test_grad_hess(
     end
 
     if !isempty(dual_point)
+        lambda = CO.hess_sqrt_prod!(similar(cone.point), cone.point, cone) * sqrt(sqrt(cone.dist / cone.dual_dist))
         @test hess * point ≈ dual_point atol=tol rtol=tol
         @test inv_hess * dual_point ≈ point atol=tol rtol=tol
     end
@@ -261,8 +263,12 @@ function test_epinormeucl_barrier(T::Type{<:Real})
         return -log(abs2(u) - sum(abs2, w)) / 2
     end
     for dim in [2, 4, 6]
+        @show "no scaling"
         test_barrier_oracles(CO.EpiNormEucl{T}(dim, use_scaling = false), barrier)
-        test_barrier_scaling_oracles(CO.EpiNormEucl{T}(dim, use_scaling = true), barrier)
+        @show "no scaled updates"
+        test_barrier_scaling_oracles(CO.EpiNormEucl{T}(dim, use_scaling = true, try_scaled_updates = false), barrier)
+        @show "scaled updates"
+        test_barrier_scaling_oracles(CO.EpiNormEucl{T}(dim, use_scaling = true, try_scaled_updates = true), barrier)
     end
     return
 end

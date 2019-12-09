@@ -140,7 +140,7 @@ mutable struct Solver{T <: Real}
         preprocess::Bool = true,
         reduce::Bool = true,
         init_use_indirect::Bool = false,
-        init_tol_qr::Real = 100 * eps(T),
+        init_tol_qr::Real = 1000 * eps(T),
         init_use_fallback::Bool = true,
         max_nbhd::Real = 0.5,
         use_infty_nbhd::Bool = true,
