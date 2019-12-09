@@ -321,6 +321,9 @@ end
 
 
 
+
+# matrixregression2(R::Type{<:RealOrComplex}) = matrixregression(R, 5, 3, 4)#, lam_fro = 0.1, lam_nuc = 0.1, lam_las = 0.1, lam_glc = 0.2, lam_glr = 0.2)
+
 # TODO delete
 T = Float64
 R = Complex{T}
@@ -328,8 +331,11 @@ R = Complex{T}
 options = (atol = 1e-2, solver = Hypatia.Solvers.Solver{T}(
     verbose = true, iter_limit = 250, time_limit = 12e2,
     tol_feas = 1e-5, tol_rel_opt = 1e-5, tol_abs_opt = 1e-5,
+    max_nbhd = 0.7,
     system_solver = Hypatia.Solvers.QRCholDenseSystemSolver{T}(),
+    # system_solver = Hypatia.Solvers.SymIndefDenseSystemSolver{T}(),
     ))
 
-instances = instances_matrixregression_all
+instances = instances_matrixregression_few
+# instances = [matrixregression1, matrixregression3, matrixregression5]
 @testset begin test_matrixregression.(instances, R = R, options = options) end
