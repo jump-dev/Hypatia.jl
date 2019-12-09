@@ -6,7 +6,7 @@ include(joinpath(@__DIR__, "barrier.jl"))
 
 barrier_testfuns = [
     # test_nonnegative_barrier,
-    test_epinormeucl_barrier,
+    # test_epinormeucl_barrier,
     # test_possemideftri_barrier,
     # test_epinorminf_barrier,
     # test_epipersquare_barrier, # TODO implement and test NT scaling
@@ -15,7 +15,7 @@ barrier_testfuns = [
     # test_hypopersumlog_barrier,
     # test_power_barrier,
     # test_hypogeomean_barrier,
-    # test_epinormspectral_barrier,
+    test_epinormspectral_barrier,
     # test_hypoperlogdettri_barrier,
     # test_wsospolyinterp_barrier,
     # TODO next 2 fail with BigFloat

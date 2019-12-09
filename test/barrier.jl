@@ -403,7 +403,7 @@ function test_hypogeomean_barrier(T::Type{<:Real})
 end
 
 function test_epinormspectral_barrier(T::Type{<:Real})
-    for (n, m) in [(1, 2), (2, 2), ]#(2, 3), (3, 5)]
+    for (n, m) in [(1, 1), (1, 2), (2, 2), (2, 4), (3, 4)]
         # real epinormspectral barrier
         function R_barrier(s)
             (u, W) = (s[1], reshape(s[2:end], n, m))
@@ -413,8 +413,8 @@ function test_epinormspectral_barrier(T::Type{<:Real})
 
         # complex epinormspectral barrier
         function C_barrier(s)
-            (u, Ws) = (s[1], reshape(s[2:end], n, 2m))
-            W = [Ws[i, 2j - 1] + Ws[i, 2j] * im for i in 1:n, j in 1:m]
+            (u, Ws) = (s[1], reshape(s[2:end], 2n, m))
+            W = [Ws[2i - 1, j] + Ws[2i, j] * im for i in 1:n, j in 1:m]
             return -logdet(cholesky!(Hermitian(abs2(u) * I - W * W'))) + (n - 1) * log(u)
         end
         test_barrier_oracles(CO.EpiNormSpectral{T, Complex{T}}(n, m), C_barrier)
