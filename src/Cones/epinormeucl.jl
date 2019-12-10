@@ -40,6 +40,8 @@ mutable struct EpiNormEucl{T <: Real} <: Cone{T}
 
     dist::T
     dual_dist::T
+    rt_dist_ratio::T # sqrt(dist / dual_dist)
+    rt_rt_dist_ratio::T # sqrt(sqrt(dist / dual_dist))
     correction::Vector{T}
 
     function EpiNormEucl{T}(
@@ -93,6 +95,8 @@ function setup_data(cone::EpiNormEucl{T}) where {T <: Real}
         cone.normalized_dual_point[1] = 1
         cone.scaled_point[1] = 1
         cone.dual_dist = 1
+        cone.rt_dist_ratio = 1
+        cone.rt_rt_dist_ratio = 1
     end
     return
 end
@@ -136,13 +140,11 @@ function update_hess(cone::EpiNormEucl)
 
     if cone.use_scaling
         # analogous to W as a function of nt_point_sqrt
-        # H = (2 * J * nt_point * nt_point' * J - J) * constant
         mul!(cone.hess.data, cone.nt_point, cone.nt_point', 2, false)
         cone.hess.data[:, 1] *= -1
         cone.hess += I # TODO inefficient
         cone.hess.data[1, :] *= -1
-        # TODO refactor this constant
-        cone.hess.data .*= sqrt(cone.dual_dist / cone.dist)
+        cone.hess.data ./= cone.rt_dist_ratio
     else
         mul!(cone.hess.data, cone.grad, cone.grad', 2, false)
         cone.hess += inv(cone.dist) * I # TODO inefficient
@@ -161,7 +163,7 @@ function update_inv_hess(cone::EpiNormEucl)
         mul!(cone.inv_hess.data, cone.nt_point, cone.nt_point', 2, false)
         cone.inv_hess += I # TODO inefficient
         cone.inv_hess[1, 1] -= 2
-        cone.inv_hess.data .*= sqrt(cone.dist / cone.dual_dist)
+        cone.inv_hess.data .*= cone.rt_dist_ratio
     else
         mul!(cone.inv_hess.data, cone.point, cone.point', 2, false)
         cone.inv_hess += cone.dist * I
@@ -179,13 +181,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNorm
     @assert cone.is_feas
 
     if cone.use_scaling
-        for j in 1:size(prod, 2)
-            @views pa = -2 * jdot(cone.nt_point, arr[:, j])
-            @. @views prod[:, j] = pa * cone.nt_point
-        end
-        @. prod += arr
-        @. @views prod[1, :] *= -1
-        prod .*= sqrt(cone.dual_dist / cone.dist)
+        hyperbolic_householder(prod, arr, cone.nt_point, cone.rt_dist_ratio, Winv = true)
     else
         p1 = cone.point[1]
         @views p2 = cone.point[2:end]
@@ -206,13 +202,7 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Epi
     @assert cone.is_feas
 
     if cone.use_scaling
-        for j in 1:size(prod, 2)
-            @views pa = 2 * dot(cone.nt_point, arr[:, j])
-            @. @views prod[:, j] = pa * cone.nt_point
-        end
-        @. prod[1, :] -= arr[1, :]
-        @. prod[2:end, :] += arr[2:end, :]
-        prod .*= sqrt(cone.dist / cone.dual_dist)
+        hyperbolic_householder(prod, arr, cone.nt_point, cone.rt_dist_ratio, Winv = false)
     else
         @inbounds for j in 1:size(prod, 2)
             @views pa = 2 * dot(cone.point, arr[:, j])
@@ -229,14 +219,7 @@ function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Ep
     @assert cone.is_feas
 
     if cone.use_scaling
-        nt_point_sqrt = cone.nt_point_sqrt
-        @inbounds for j in 1:size(arr, 2)
-            pa = jdot(arr[:, j], nt_point_sqrt)
-            @. @views prod[:, j] = -2 * nt_point_sqrt * pa + arr[:, j]
-        end
-        @. @views prod[2:end, :] *= -1
-        # TODO this factor is so poorly unrefactored, sort it out
-        prod ./= sqrt(sqrt(cone.dist / cone.dual_dist))
+        hyperbolic_householder(prod, arr, cone.nt_point_sqrt, cone.rt_rt_dist_ratio, Winv = true)
     else
         u = cone.point[1]
         w = view(cone.point, 2:cone.dim)
@@ -318,16 +301,22 @@ function step_and_update_scaling(cone::EpiNormEucl{T}, primal_dir::AbstractVecto
     @views cone.dual_dist = abs2(cone.dual_point[1]) - sum(abs2, cone.dual_point[2:end])
     @assert cone.dual_dist >= 0
 
-    # if cone.try_scaled_updates
+    if cone.try_scaled_updates
 
-        # from CVXOPT code
+        # based on CVXOPT code
 
         # TODO sort out naming
-        # new primal/dual points but in the old scaling
+        # scale the primal and dual directions under old scaling, store results as point to be normalized
+        hyperbolic_householder(normalized_point, primal_dir, nt_point_sqrt, cone.rt_rt_dist_ratio, Winv = true)
+        hyperbolic_householder(normalized_dual_point, dual_dir, nt_point_sqrt, cone.rt_rt_dist_ratio)
+        # get new primal/dual points but in the old scaling
         scaled_point = cone.scaled_point
-        normalized_point = scaled_point + primal_dir * step_size
-        normalized_dual_point = scaled_point + dual_dir * step_size
-        # normalize new primal/dual points but in the old scaling
+        @. normalized_point *= step_size
+        @. normalized_dual_point *= step_size
+        @. normalized_point += scaled_point
+        @. normalized_dual_point += scaled_point
+
+        # normalize
         primal_dir_dist = distnorm(normalized_point)
         dual_dir_dist = distnorm(normalized_dual_point)
         normalized_point ./= primal_dir_dist
@@ -351,20 +340,22 @@ function step_and_update_scaling(cone::EpiNormEucl{T}, primal_dir::AbstractVecto
 
         @. nt_point_sqrt *= 2 * vq
         nt_point_sqrt[1] -= normalized_point[1] / 2 / gamma
-        @. @views nt_point_sqrt[2:end] += normalized_point[2:end] / gamma / 2
+        @. @views nt_point_sqrt[2:end] += normalized_point[2:end] / 2 / gamma
         @. nt_point_sqrt -= normalized_dual_point / gamma / 2
 
         nt_point .= nt_point_sqrt
-        cache = copy(nt_point_sqrt)
 
         nt_point_sqrt[1] += 1
         @. nt_point_sqrt /= sqrt(2 * nt_point_sqrt[1])
 
-        v_cache = copy(nt_point_sqrt)
-        w_cache = copy(nt_point)
-        l_cache = copy(scaled_point)
+        cone.rt_dist_ratio *= primal_dir_dist / dual_dir_dist
+        cone.rt_rt_dist_ratio *= sqrt(primal_dir_dist / dual_dir_dist)
 
-    # else
+        # v_cache = copy(nt_point_sqrt)
+        # w_cache = copy(nt_point)
+        # l_cache = copy(scaled_point)
+
+    else
         # section 4 CVXOPT paper / part of ECOS' update each iteration
         normalized_point .= cone.point ./ sqrt(cone.dist)
         normalized_dual_point .= cone.dual_point ./ sqrt(cone.dual_dist)
@@ -378,15 +369,60 @@ function step_and_update_scaling(cone::EpiNormEucl{T}, primal_dir::AbstractVecto
         nt_point_sqrt[1] += 1
         nt_point_sqrt ./= sqrt(2 * nt_point_sqrt[1])
 
-        lambda = hess_sqrt_prod!(similar(cone.point), cone.point, cone)
+        cone.rt_dist_ratio = sqrt(cone.dist / cone.dual_dist)
+        cone.rt_rt_dist_ratio = sqrt(cone.rt_dist_ratio)
 
-        @show norm(nt_point_sqrt - v_cache)
-        @show norm(nt_point - w_cache)
-        @show norm(lambda - l_cache)
+        # lambda = hess_sqrt_prod!(similar(cone.point), cone.point, cone)
+        # @show lambda[1]
+
+        # @show norm(nt_point_sqrt - v_cache)
+        # @show norm(nt_point - w_cache)
+        # @show norm(lambda - l_cache)
+        # @show lambda[1]
 
         # cone.scaled_point .= lambda
 
-    # end
+    end
 
     return
+end
+
+# calculates fact * (2vv' - J) * X if Winv = false
+# calculates 1/fact * (2Jvv'J - J) * X if Winv = true
+# function hyperbolic_householder(prod::AbstractVecOrMat, arr::AbstractVecOrMat, v::AbstractVector, fact::Real; Winv::Bool = false)
+#     if !Winv
+#         v[2:end] *= -1
+#     end
+#     @inbounds for j in 1:size(arr, 2)
+#         @views pa = jdot(arr[:, j], v)
+#         @. @views prod[:, j] = -2 * v * pa
+#     end
+#     @. prod += arr
+#     @. @views prod[1, :] *= -1
+#     if Winv
+#         prod ./= fact
+#     else
+#         v[2:end] *= -1
+#         prod .*= fact
+#     end
+#     return prod
+# end
+
+function hyperbolic_householder(prod::AbstractVecOrMat, arr::AbstractVecOrMat, v::AbstractVector, fact::Real; Winv::Bool = false)
+    if Winv
+        v[2:end] *= -1
+    end
+    for j in 1:size(prod, 2)
+        @views pa = 2 * dot(v, arr[:, j])
+        @. @views prod[:, j] = pa * v
+    end
+    @. prod[1, :] -= arr[1, :]
+    @. prod[2:end, :] += arr[2:end, :]
+    if Winv
+        prod ./= fact
+        v[2:end] *= -1
+    else
+        prod .*= fact
+    end
+    return prod
 end
