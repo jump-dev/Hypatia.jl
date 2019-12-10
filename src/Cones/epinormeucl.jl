@@ -140,6 +140,7 @@ function update_hess(cone::EpiNormEucl)
 
     if cone.use_scaling
         # analogous to W as a function of nt_point_sqrt
+        # H = (2 * J * nt_point * nt_point' * J - J) * constant
         mul!(cone.hess.data, cone.nt_point, cone.nt_point', 2, false)
         cone.hess.data[:, 1] *= -1
         cone.hess += I # TODO inefficient
@@ -244,7 +245,7 @@ function correction(cone::EpiNormEucl, primal_dir::AbstractVector, dual_dir::Abs
     corr = cone.correction
     point = cone.point
 
-    @views jdot_p_s = point[1] * primal_dir[1] - dot(point[2:end], primal_dir[2:end])
+    jdot_p_s = jdot(point, primal_dir)
     @. corr = jdot_p_s * dual_dir
     dot_s_z = dot(primal_dir, dual_dir)
     dot_p_z = dot(point, dual_dir)
@@ -255,10 +256,13 @@ function correction(cone::EpiNormEucl, primal_dir::AbstractVector, dual_dir::Abs
     return corr
 end
 
+# TODO try using scaled_point instead of primal and dual points
 function step_max_dist(cone::EpiNormEucl{T}, primal_dir::AbstractVector{T}, dual_dir::AbstractVector{T}) where {T}
-    # TODO remove if updated properly in step_and_update_scaling
-    cone.normalized_point .= cone.point ./ distnorm(cone.point)
-    cone.normalized_dual_point .= cone.dual_point ./ distnorm(cone.dual_point)
+    if cone.try_scaled_updates
+        # these were not calculated
+        cone.normalized_point .= cone.point ./ sqrt(cone.dist)
+        cone.normalized_dual_point .= cone.dual_point ./ sqrt(cone.dual_dist)
+    end
     primal_step_dist = sqrt(cone.dist) / dist_to_bndry(cone, cone.normalized_point, primal_dir)
     dual_step_dist = sqrt(cone.dual_dist) / dist_to_bndry(cone, cone.normalized_dual_point, dual_dir)
     step_dist = T(Inf)
@@ -273,7 +277,7 @@ function step_max_dist(cone::EpiNormEucl{T}, primal_dir::AbstractVector{T}, dual
 end
 
 function dist_to_bndry(::EpiNormEucl{T}, point::Vector{T}, dir::AbstractVector{T}) where {T}
-    @views point_dir_dist = point[1] * dir[1] - dot(point[2:end], dir[2:end])
+    @views point_dir_dist = jdot(point, dir)
     fact = (point_dir_dist + dir[1]) / (point[1] + 1)
     dist2n = zero(T)
     for i in 2:length(point)
@@ -282,14 +286,6 @@ function dist_to_bndry(::EpiNormEucl{T}, point::Vector{T}, dir::AbstractVector{T
     return -point_dir_dist + sqrt(dist2n)
 end
 
-function distnorm(x::AbstractVector)
-    x1 = x[1]
-    @views x2 = norm(x[2:end])
-    return sqrt(x1 - x2) * sqrt(x1 + x2)
-end
-
-jdot(x::AbstractVector, y::AbstractVector) = @views x[1] * y[1] - dot(x[2:end], y[2:end])
-
 function step_and_update_scaling(cone::EpiNormEucl{T}, primal_dir::AbstractVector, dual_dir::AbstractVector, step_size::T) where {T}
     @assert cone.feas_updated
     nt_point = cone.nt_point
@@ -297,16 +293,13 @@ function step_and_update_scaling(cone::EpiNormEucl{T}, primal_dir::AbstractVecto
     normalized_point = cone.normalized_point
     normalized_dual_point = cone.normalized_dual_point
 
-    # TODO put this somehwere more appropriate
+    # TODO put this somehwere more appropriate, better to judge when scaled updates are decided upon
     @views cone.dual_dist = abs2(cone.dual_point[1]) - sum(abs2, cone.dual_point[2:end])
     @assert cone.dual_dist >= 0
 
     if cone.try_scaled_updates
-
         # based on CVXOPT code
-
-        # TODO sort out naming
-        # scale the primal and dual directions under old scaling, store results as point to be normalized
+        # scale the primal and dual directions under old scaling, store results as points to be normalized
         hyperbolic_householder(normalized_point, primal_dir, nt_point_sqrt, cone.rt_rt_dist_ratio, Winv = true)
         hyperbolic_householder(normalized_dual_point, dual_dir, nt_point_sqrt, cone.rt_rt_dist_ratio)
         # get new primal/dual points but in the old scaling
@@ -332,29 +325,26 @@ function step_and_update_scaling(cone::EpiNormEucl{T}, primal_dir::AbstractVecto
         w1 = 2 * nt_point_sqrt[1] * vq - (normalized_point[1] + normalized_dual_point[1] ) / 2 / gamma
         d = (nt_point_sqrt[1] * vu - (normalized_point[1] - normalized_dual_point[1]) / 2) / (w1 + 1)
 
+        # updates the scaled point
         @views copyto!(scaled_point[2:end], nt_point_sqrt[2:end])
         @. scaled_point[2:end] *= (vu - 2 * d * vq)
         @. scaled_point[2:end] += normalized_point[2:end] * (1 - d / gamma) / 2
         @. scaled_point[2:end] += normalized_dual_point[2:end] * (1 + d / gamma) / 2
         @. scaled_point *= sqrt(primal_dir_dist * dual_dir_dist)
 
-        @. nt_point_sqrt *= 2 * vq
-        nt_point_sqrt[1] -= normalized_point[1] / 2 / gamma
-        @. @views nt_point_sqrt[2:end] += normalized_point[2:end] / 2 / gamma
-        @. nt_point_sqrt -= normalized_dual_point / gamma / 2
+        # updates the NT scaling point
+        @. nt_point = 2 * vq * nt_point_sqrt
+        nt_point[1] -= normalized_point[1] / 2 / gamma
+        @. @views nt_point[2:end] += normalized_point[2:end] / 2 / gamma
+        @. nt_point -= normalized_dual_point / gamma / 2
 
-        nt_point .= nt_point_sqrt
-
+        # updates the squareroot of the NT scaling point
+        copyto!(nt_point_sqrt, nt_point)
         nt_point_sqrt[1] += 1
         @. nt_point_sqrt /= sqrt(2 * nt_point_sqrt[1])
 
         cone.rt_dist_ratio *= primal_dir_dist / dual_dir_dist
         cone.rt_rt_dist_ratio *= sqrt(primal_dir_dist / dual_dir_dist)
-
-        # v_cache = copy(nt_point_sqrt)
-        # w_cache = copy(nt_point)
-        # l_cache = copy(scaled_point)
-
     else
         # section 4 CVXOPT paper / part of ECOS' update each iteration
         normalized_point .= cone.point ./ sqrt(cone.dist)
@@ -371,17 +361,6 @@ function step_and_update_scaling(cone::EpiNormEucl{T}, primal_dir::AbstractVecto
 
         cone.rt_dist_ratio = sqrt(cone.dist / cone.dual_dist)
         cone.rt_rt_dist_ratio = sqrt(cone.rt_dist_ratio)
-
-        # lambda = hess_sqrt_prod!(similar(cone.point), cone.point, cone)
-        # @show lambda[1]
-
-        # @show norm(nt_point_sqrt - v_cache)
-        # @show norm(nt_point - w_cache)
-        # @show norm(lambda - l_cache)
-        # @show lambda[1]
-
-        # cone.scaled_point .= lambda
-
     end
 
     return
@@ -407,7 +386,6 @@ end
 #     end
 #     return prod
 # end
-
 function hyperbolic_householder(prod::AbstractVecOrMat, arr::AbstractVecOrMat, v::AbstractVector, fact::Real; Winv::Bool = false)
     if Winv
         v[2:end] *= -1
@@ -426,3 +404,11 @@ function hyperbolic_householder(prod::AbstractVecOrMat, arr::AbstractVecOrMat, v
     end
     return prod
 end
+
+function distnorm(x::AbstractVector)
+    x1 = x[1]
+    @views x2 = norm(x[2:end])
+    return sqrt(x1 - x2) * sqrt(x1 + x2)
+end
+
+jdot(x::AbstractVector, y::AbstractVector) = @views x[1] * y[1] - dot(x[2:end], y[2:end])
