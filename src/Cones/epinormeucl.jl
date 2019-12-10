@@ -262,9 +262,15 @@ function step_max_dist(cone::EpiNormEucl{T}, primal_dir::AbstractVector{T}, dual
         # these were not calculated
         cone.normalized_point .= cone.point ./ sqrt(cone.dist)
         cone.normalized_dual_point .= cone.dual_point ./ sqrt(cone.dual_dist)
+        # hyperbolic_householder(cone.normalized_point, primal_dir, cone.nt_point_sqrt, cone.rt_rt_dist_ratio, Winv = true) # TODO cache
+        # hyperbolic_householder(cone.normalized_dual_point, dual_dir, cone.nt_point_sqrt, cone.rt_rt_dist_ratio)
+        # scaled_dist = distnorm(cone.scaled_point)
+        # primal_step_dist = scaled_dist / dist_to_bndry(cone, cone.scaled_point ./ scaled_dist, cone.normalized_point) # TODO allocates
+        # dual_step_dist = scaled_dist / dist_to_bndry(cone, cone.scaled_point ./ scaled_dist, cone.normalized_dual_point)
+    else
+        primal_step_dist = sqrt(cone.dist) / dist_to_bndry(cone, cone.normalized_point, primal_dir)
+        dual_step_dist = sqrt(cone.dual_dist) / dist_to_bndry(cone, cone.normalized_dual_point, dual_dir)
     end
-    primal_step_dist = sqrt(cone.dist) / dist_to_bndry(cone, cone.normalized_point, primal_dir)
-    dual_step_dist = sqrt(cone.dual_dist) / dist_to_bndry(cone, cone.normalized_dual_point, dual_dir)
     step_dist = T(Inf)
     if primal_step_dist > 0
         step_dist = min(step_dist, primal_step_dist)
