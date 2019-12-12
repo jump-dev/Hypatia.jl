@@ -1,7 +1,7 @@
 #=
 Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
-hypograph of root determinant
+hypograph of the root determinant of a (row-wise lower triangle) symmetric positive definite matrix
 (u in R, W in S_n+) : u <= det(W)^(1/n)
 
 barrier from correspondence with A. Nemirovski
