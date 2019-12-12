@@ -31,9 +31,12 @@ mutable struct HypoRootDetTri{T <: Real} <: Cone{T}
 
     W::Matrix{T}
     work_mat::Matrix{T}
+    fact_W
+    Wi::Matrix{T}
     rootdet::T
     rootdetu::T
-    fact_W
+    frac::T
+    twentyfive_ninths::T
 
     function HypoRootDetTri{T}(
         dim::Int,
@@ -55,6 +58,7 @@ function setup_data(cone::HypoRootDetTri{T}) where {T <: Real}
     reset_data(cone)
     dim = cone.dim
     cone.side = round(Int, sqrt(0.25 + 2 * (dim - 1)) - 0.5)
+    cone.twentyfive_ninths = T(25) / T(9)
     cone.point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
@@ -65,17 +69,18 @@ function setup_data(cone::HypoRootDetTri{T}) where {T <: Real}
     return
 end
 
-get_nu(cone::HypoRootDetTri) = (cone.side + 1) * 25 / 9
+get_nu(cone::HypoRootDetTri) = (cone.side + 1) * cone.twentyfive_ninths
 
-function set_initial_point(arr::AbstractVector, cone::HypoRootDetTri)
+# TODO not everything needs a T(.), what's the style?
+function set_initial_point(arr::AbstractVector, cone::HypoRootDetTri{T}) where {T}
     arr .= 0
     n = cone.side
-    fact1 = sqrt(5 * abs2(n) + 2 * n + 1)
-    fact2 = sqrt((3 * n - fact1 + 1) / (n + 1))
-    arr[1] = -5 * fact2 / 3 / sqrt(2)
+    fact1 = sqrt(T(5) * abs2(T(n)) + T(2) * T(n) + one(T))
+    fact2 = sqrt((T(3) * T(n) - fact1 + one(T)) / (T(n) + one(T)))
+    arr[1] = -T(5) * fact2 / T(3) / sqrt(T(2))
     k = 2
     @inbounds for i in 1:cone.side
-        arr[k] = 5 * fact2 * (n + fact1 + 1) / n / 6 / sqrt(2)
+        arr[k] = T(5) * fact2 * (T(n) + fact1 + one(T)) / T(n) / T(6) / sqrt(T(2))
         k += i + 1
     end
     return arr
@@ -105,10 +110,11 @@ function update_grad(cone::HypoRootDetTri)
     W = cone.W
 
     cone.grad[1] = inv(cone.rootdetu)
-    Wi = inv(cone.fact_W)
-    @views mat_U_to_vec_scaled!(cone.grad[2:cone.dim], Wi)
-    @. @views cone.grad[2:cone.dim] *= -(cone.rootdet / cone.side / cone.rootdetu + 1)
-    @. cone.grad *= 25 / 9
+    cone.Wi = inv(cone.fact_W)
+    @views mat_U_to_vec_scaled!(cone.grad[2:cone.dim], cone.Wi)
+    cone.frac = cone.rootdet / cone.side / cone.rootdetu
+    @. @views cone.grad[2:cone.dim] *= -(cone.frac + 1)
+    @. cone.grad *= cone.twentyfive_ninths
     cone.grad_updated = true
     return cone.grad
 end
@@ -118,20 +124,18 @@ function update_hess(cone::HypoRootDetTri)
     @assert cone.grad_updated
     u = cone.point[1]
     rootdetu = cone.rootdetu
-    # rootdet / rootdetu
-    frac = cone.rootdet / cone.rootdetu
-    side = cone.side
-
+    # rootdet / rootdetu / side
+    frac = cone.frac
+    Wi = cone.Wi
     hess = cone.hess.data
+
     hess[1, 1] = cone.grad[1] / rootdetu
-
-    # TODO reuse calculations from the gradient
-    Wi = inv(cone.fact_W)
     @views mat_U_to_vec_scaled!(hess[1, 2:cone.dim], Wi)
-    @. hess[1, 2:end] *= -25 / 9 * frac / side / rootdetu
+    # will scale by 25 / 9 at the end
+    @. hess[1, 2:end] *= -frac / rootdetu
 
-    const1 = frac / side + 2
-    const2 = (1 - frac) * frac / side / side
+    const1 = frac + 1
+    const2 = (abs2(frac) - frac / cone.side)
     k1 = 2
     for i in 1:cone.side, j in 1:i
         k2 = 2
@@ -139,7 +143,7 @@ function update_hess(cone::HypoRootDetTri)
             if (i == j) && (i2 == j2)
                 hess[k2, k1] = abs2(Wi[i2, i]) * const1 + Wi[i, i] * Wi[i2, i2] * const2
             elseif (i != j) && (i2 != j2)
-                hess[k2, k1] = 2 * (Wi[i2, i] * Wi[j, j2] + Wi[j2, i] * Wi[j, i2]) * const1 + const2 * Wi[i, j] * Wi[i2, j2]
+                hess[k2, k1] = 2 * (Wi[i2, i] * Wi[j, j2] + Wi[j2, i] * Wi[j, i2]) * const1 + 4 * Wi[i, j] * Wi[i2, j2] * const2
             else
                 hess[k2, k1] = 2 * (Wi[i2, i] * Wi[j, j2] * const1 + Wi[i, j] * Wi[i2, j2] * const2)
             end
@@ -150,7 +154,7 @@ function update_hess(cone::HypoRootDetTri)
         end
         k1 += 1
     end
-    @. @views hess[2:end, 2:end] *= 25 / 9
+    @. @views hess[1:end, 2:end] *= cone.twentyfive_ninths
 
     cone.hess_updated = true
     return cone.hess
