@@ -230,6 +230,23 @@ function test_hypoperlogdettri_barrier(T::Type{<:Real})
     return
 end
 
+function test_hyporootdettri_barrier(T::Type{<:Real})
+    for side in [1, 2, 5]
+        @show side
+        function barrier(s)
+            (u, W) = (s[1], similar(s, side, side))
+            CO.vec_to_mat_U!(W, s[2:end])
+            fact_W = cholesky!(Symmetric(W, :U))
+            return -abs2(5 / 3) * (log(det(fact_W) ^ inv(side) - u) +  logdet(fact_W))
+        end
+        dim = 1 + div(side * (side + 1), 2)
+        cone = CO.HypoRootDetTri{T}(dim)
+        # TODO init_tol, OK in Float64 but failing in BigFloat
+        test_barrier_oracles(cone, barrier, init_tol = 1e-4)
+    end
+    return
+end
+
 function test_wsospolyinterp_barrier(T::Type{<:Real})
     Random.seed!(1)
     for (n, halfdeg) in [(1, 1), (1, 2), (1, 3), (2, 2), (3, 2), (2, 3)]
