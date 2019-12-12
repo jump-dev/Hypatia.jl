@@ -232,7 +232,6 @@ end
 
 function test_hyporootdettri_barrier(T::Type{<:Real})
     for side in [1, 2, 5]
-        @show side
         function barrier(s)
             (u, W) = (s[1], similar(s, side, side))
             CO.vec_to_mat_U!(W, s[2:end])

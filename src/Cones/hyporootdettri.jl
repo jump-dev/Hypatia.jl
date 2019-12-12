@@ -8,8 +8,6 @@ barrier from correspondence with A. Nemirovski
 -(5 / 3) ^ 2 * (log(det(W) ^ (1 / n) - u) + logdet(W))
 
 TODO needs updating to smat/svec as on dev branch
-TODO hess_prod.
-this is very similar to logdet situation. part of the hessian has a kronecker form.
 =#
 
 mutable struct HypoRootDetTri{T <: Real} <: Cone{T}
@@ -22,6 +20,7 @@ mutable struct HypoRootDetTri{T <: Real} <: Cone{T}
     grad_updated::Bool
     hess_updated::Bool
     inv_hess_updated::Bool
+    hess_prod_updated::Bool
     inv_hess_prod_updated::Bool
     is_feas::Bool
     grad::Vector{T}
@@ -36,6 +35,9 @@ mutable struct HypoRootDetTri{T <: Real} <: Cone{T}
     rootdet::T
     rootdetu::T
     frac::T
+    # constants for Kronecker product and dot product components of the Hessian
+    kron_const::T
+    dot_const::T
     twentyfive_ninths::T
 
     function HypoRootDetTri{T}(
@@ -53,6 +55,8 @@ mutable struct HypoRootDetTri{T <: Real} <: Cone{T}
 end
 
 HypoRootDetTri{T}(dim::Int) where {T <: Real} = HypoRootDetTri{T}(dim, false)
+
+reset_data(cone::HypoRootDetTri) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_prod_updated = cone.inv_hess_prod_updated = false)
 
 function setup_data(cone::HypoRootDetTri{T}) where {T <: Real}
     reset_data(cone)
@@ -91,8 +95,8 @@ function update_feas(cone::HypoRootDetTri)
     u = cone.point[1]
 
     vec_to_mat_U!(cone.W, view(cone.point, 2:cone.dim))
-    copyto!(cone.work_mat, cone.W)
-    cone.fact_W = cholesky!(Symmetric(cone.work_mat, :U), check = false)
+    # mutates W, which isn't used anywhere else
+    cone.fact_W = cholesky!(Symmetric(cone.W, :U), check = false)
     if isposdef(cone.fact_W)
         cone.rootdet = det(cone.fact_W) ^ (inv(cone.side))
         cone.rootdetu = cone.rootdet - u
@@ -107,7 +111,6 @@ end
 function update_grad(cone::HypoRootDetTri)
     @assert cone.is_feas
     u = cone.point[1]
-    W = cone.W
 
     cone.grad[1] = inv(cone.rootdetu)
     cone.Wi = inv(cone.fact_W)
@@ -119,33 +122,26 @@ function update_grad(cone::HypoRootDetTri)
     return cone.grad
 end
 
-# TODO refactor and save fields from gradient
 function update_hess(cone::HypoRootDetTri)
-    @assert cone.grad_updated
-    u = cone.point[1]
-    rootdetu = cone.rootdetu
-    # rootdet / rootdetu / side
-    frac = cone.frac
+    if !cone.hess_prod_updated
+         # fills in first row of the Hessian and calculates constants
+        update_hess_prod(cone)
+    end
     Wi = cone.Wi
-    hess = cone.hess.data
+    H = cone.hess.data
+    kron_const = cone.kron_const
+    dot_const = cone.dot_const
 
-    hess[1, 1] = cone.grad[1] / rootdetu
-    @views mat_U_to_vec_scaled!(hess[1, 2:cone.dim], Wi)
-    # will scale by 25 / 9 at the end
-    @. hess[1, 2:end] *= -frac / rootdetu
-
-    const1 = frac + 1
-    const2 = (abs2(frac) - frac / cone.side)
     k1 = 2
     for i in 1:cone.side, j in 1:i
         k2 = 2
         @inbounds for i2 in 1:cone.side, j2 in 1:i2
             if (i == j) && (i2 == j2)
-                hess[k2, k1] = abs2(Wi[i2, i]) * const1 + Wi[i, i] * Wi[i2, i2] * const2
+                H[k2, k1] = abs2(Wi[i2, i]) * kron_const + Wi[i, i] * Wi[i2, i2] * dot_const
             elseif (i != j) && (i2 != j2)
-                hess[k2, k1] = 2 * (Wi[i2, i] * Wi[j, j2] + Wi[j2, i] * Wi[j, i2]) * const1 + 4 * Wi[i, j] * Wi[i2, j2] * const2
+                H[k2, k1] = 2 * (Wi[i2, i] * Wi[j, j2] + Wi[j2, i] * Wi[j, i2]) * kron_const + 4 * Wi[i, j] * Wi[i2, j2] * dot_const
             else
-                hess[k2, k1] = 2 * (Wi[i2, i] * Wi[j, j2] * const1 + Wi[i, j] * Wi[i2, j2] * const2)
+                H[k2, k1] = 2 * (Wi[i2, i] * Wi[j, j2] * kron_const + Wi[i, j] * Wi[i2, j2] * dot_const)
             end
             if k2 == k1
                 break
@@ -154,8 +150,53 @@ function update_hess(cone::HypoRootDetTri)
         end
         k1 += 1
     end
-    @. @views hess[1:end, 2:end] *= cone.twentyfive_ninths
+    @. @views H[2:end, 2:end] *= cone.twentyfive_ninths
 
     cone.hess_updated = true
     return cone.hess
+end
+
+# updates first row of the Hessian
+function update_hess_prod(cone::HypoRootDetTri)
+    @assert cone.grad_updated
+    # rootdet / rootdetu / side
+    frac = cone.frac
+    # update constants used in the Hessian
+    cone.kron_const = frac + 1
+    cone.dot_const = (abs2(frac) - frac / cone.side)
+    # update first row in the Hessian
+    rootdetu = cone.rootdetu
+    Wi = cone.Wi
+    hess = cone.hess.data
+    hess[1, 1] = cone.grad[1] / rootdetu
+    @views mat_U_to_vec_scaled!(hess[1, 2:cone.dim], Wi)
+    @. hess[1, 2:end] *= -frac / rootdetu * cone.twentyfive_ninths
+
+    cone.hess_prod_updated = true
+    return
+end
+
+function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoRootDetTri)
+    if !cone.hess_prod_updated
+        # fills in first row of the Hessian and calculates constants
+        update_hess_prod(cone)
+    end
+    Wi = cone.Wi
+    kron_const = cone.kron_const
+    dot_const = cone.dot_const
+
+    @views mul!(prod[1, :]', cone.hess[1, :]', arr)
+    @inbounds for i in 1:size(arr, 2)
+        vec_to_mat_U!(cone.work_mat, view(arr, 2:cone.dim, i))
+        dot_prod = dot(Symmetric(cone.work_mat, :U), Symmetric(cone.Wi, :U))
+        copytri!(cone.work_mat, 'U')
+        rdiv!(cone.work_mat, cone.fact_W)
+        ldiv!(cone.fact_W, cone.work_mat)
+        axpby!(dot_prod * dot_const, cone.Wi, kron_const, cone.work_mat)
+        @views mat_U_to_vec_scaled!(prod[2:cone.dim, i], cone.work_mat)
+    end
+    @. @views prod[2:cone.dim, :] *= cone.twentyfive_ninths
+    @views mul!(prod[2:cone.dim, :], cone.hess[2:cone.dim, 1], arr[1, :]', true, true)
+
+    return prod
 end
