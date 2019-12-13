@@ -62,8 +62,6 @@ function test_barrier_oracles(
     inv_hess = CO.inv_hess(cone)
     @test hess * inv_hess ≈ I atol=tol rtol=tol
 
-    # CO.update_hess_prod(cone)
-    # CO.update_inv_hess_prod(cone)
     prod = similar(point)
     @test CO.hess_prod!(prod, point, cone) ≈ -grad atol=tol rtol=tol
     @test CO.inv_hess_prod!(prod, grad, cone) ≈ -point atol=tol rtol=tol
