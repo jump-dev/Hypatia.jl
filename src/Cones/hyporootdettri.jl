@@ -39,7 +39,7 @@ mutable struct HypoRootDetTri{T <: Real} <: Cone{T}
     # constants for Kronecker product and dot product components of the Hessian
     kron_const::T
     dot_const::T
-    twentyfive_ninths::T
+    sc_const::T
 
     function HypoRootDetTri{T}(
         dim::Int,
@@ -64,7 +64,7 @@ function setup_data(cone::HypoRootDetTri{T}) where {T <: Real}
     reset_data(cone)
     dim = cone.dim
     cone.side = round(Int, sqrt(0.25 + 2 * (dim - 1)) - 0.5)
-    cone.twentyfive_ninths = T(25) / T(9)
+    cone.sc_const = T(25) / T(9)
     cone.point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
@@ -75,18 +75,18 @@ function setup_data(cone::HypoRootDetTri{T}) where {T <: Real}
     return
 end
 
-get_nu(cone::HypoRootDetTri) = (cone.side + 1) * cone.twentyfive_ninths
+get_nu(cone::HypoRootDetTri) = (cone.side + 1) * cone.sc_const
 
-# TODO not everything needs a T(.), what's the style?
-function set_initial_point(arr::AbstractVector, cone::HypoRootDetTri{T}) where {T}
+function set_initial_point(arr::AbstractVector{T}, cone::HypoRootDetTri{T}) where {T <: Real}
     arr .= 0
-    n = cone.side
-    fact1 = sqrt(T(5) * abs2(T(n)) + T(2) * T(n) + one(T))
-    fact2 = sqrt((T(3) * T(n) - fact1 + one(T)) / (T(n) + one(T)))
-    arr[1] = -T(5) * fact2 / T(3) / sqrt(T(2))
+    side = cone.side
+    const1 = sqrt(T(5side^2 + 2side + 1))
+    const2 = sqrt(T(3side - const1 + 1) / T(side + 1))
+    const3 = arr[1] = -5 * const2 / (3 * sqrt(T(2)))
+    const4 = -const3 * (side + 1 + const1) / side / 2
     k = 2
     @inbounds for i in 1:cone.side
-        arr[k] = T(5) * fact2 * (T(n) + fact1 + one(T)) / T(n) / T(6) / sqrt(T(2))
+        arr[k] = const4
         k += i + 1
     end
     return arr
@@ -119,7 +119,7 @@ function update_grad(cone::HypoRootDetTri)
     @views smat_to_svec!(cone.grad[2:cone.dim], cone.Wi, cone.rt2)
     cone.frac = cone.rootdet / cone.side / cone.rootdetu
     @. @views cone.grad[2:cone.dim] *= -(cone.frac + 1)
-    @. cone.grad *= cone.twentyfive_ninths
+    @. cone.grad *= cone.sc_const
     cone.grad_updated = true
     return cone.grad
 end
@@ -152,7 +152,7 @@ function update_hess(cone::HypoRootDetTri)
         end
         k1 += 1
     end
-    @. @views H[2:end, 2:end] *= cone.twentyfive_ninths
+    @. @views H[2:end, 2:end] *= cone.sc_const
 
     cone.hess_updated = true
     return cone.hess
@@ -172,7 +172,7 @@ function update_hess_prod(cone::HypoRootDetTri)
     hess = cone.hess.data
     hess[1, 1] = cone.grad[1] / rootdetu
     @views smat_to_svec!(hess[1, 2:cone.dim], Wi, cone.rt2)
-    @. hess[1, 2:end] *= -frac / rootdetu * cone.twentyfive_ninths
+    @. hess[1, 2:end] *= -frac / rootdetu * cone.sc_const
 
     cone.hess_prod_updated = true
     return
@@ -197,7 +197,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoRoo
         axpby!(dot_prod * dot_const, cone.Wi, kron_const, cone.work_mat)
         @views smat_to_svec!(prod[2:cone.dim, i], cone.work_mat, cone.rt2)
     end
-    @. @views prod[2:cone.dim, :] *= cone.twentyfive_ninths
+    @. @views prod[2:cone.dim, :] *= cone.sc_const
     @views mul!(prod[2:cone.dim, :], cone.hess[2:cone.dim, 1], arr[1, :]', true, true)
 
     return prod
