@@ -127,7 +127,6 @@ function matrixcompletion(
             MU.vec_to_svec_cols!(G_norm, sqrt(T(2)))
             MU.vec_to_svec!(h_norm, sqrt(T(2)))
             cones = CO.Cone{T}[CO.PosSemidefTri{T, T}(num_rows)]
-            # TODO change to c_W1 = CO.mat_U_to_vec_scaled!(zeros(T, num_W1_vars), Diagonal(one(T) * I, m), sqrt(T(2)))
             c_W1 = CO.smat_to_svec!(zeros(T, num_W1_vars), Diagonal(one(T) * I, m), sqrt(T(2)))
             c_W2 = CO.smat_to_svec!(zeros(T, num_W2_vars), Diagonal(one(T) * I, n), sqrt(T(2)))
             c = vcat(zeros(T, num_unknown), c_W1, c_W2) / 2
