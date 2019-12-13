@@ -191,7 +191,7 @@ function epinorminf1(T; options...)
     b = [one(T), Tirt2]
     G = SparseMatrixCSC(-one(T) * I, 3, 3)
     h = zeros(T, 3)
-    cones = CO.Cone{T}[CO.EpiNormInf{T}(3)]
+    cones = CO.Cone{T}[CO.EpiNormInf{T, T}(3)]
 
     r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
     @test r.status == :Optimal
@@ -210,7 +210,7 @@ function epinorminf2(T; options...)
     b = T[0, 0]
     G = [spzeros(T, 1, L); sparse(one(T) * I, L, L); spzeros(T, 1, L); sparse(T(2) * I, L, L)]
     h = zeros(T, 2L + 2); h[1] = 1; h[L + 2] = 1
-    cones = CO.Cone{T}[CO.EpiNormInf{T}(L + 1, true), CO.EpiNormInf{T}(L + 1, false)]
+    cones = CO.Cone{T}[CO.EpiNormInf{T, T}(L + 1, true), CO.EpiNormInf{T, T}(L + 1, false)]
 
     r = build_solve_check(c, A, b, G, h, cones; atol = tol, obj_offset = one(T), options...)
     @test r.status == :Optimal
@@ -227,12 +227,15 @@ function epinorminf3(T; options...)
     b = zeros(T, 0)
     G = Diagonal(-one(T) * I, 6)
     h = zeros(T, 6)
-    cones = CO.Cone{T}[CO.EpiNormInf{T}(6)]
 
-    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
-    @test r.status == :Optimal
-    @test r.primal_obj ≈ 0 atol=tol rtol=tol
-    @test norm(r.x) ≈ 0 atol=tol rtol=tol
+    for is_dual in (true, false)
+        cones = CO.Cone{T}[CO.EpiNormInf{T, T}(6, is_dual)]
+
+        r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+        @test r.status == :Optimal
+        @test r.primal_obj ≈ 0 atol=tol rtol=tol
+        @test norm(r.x) ≈ 0 atol=tol rtol=tol
+    end
 end
 
 function epinorminf4(T; options...)
@@ -242,7 +245,7 @@ function epinorminf4(T; options...)
     b = T[1, -0.4]
     G = Diagonal(-one(T) * I, 3)
     h = zeros(T, 3)
-    cones = CO.Cone{T}[CO.EpiNormInf{T}(3, true)]
+    cones = CO.Cone{T}[CO.EpiNormInf{T, T}(3, true)]
 
     r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
     @test r.status == :Optimal
@@ -259,11 +262,61 @@ function epinorminf5(T; options...)
     b = vec(sum(A, dims = 2))
     G = rand(T, 6, 6)
     h = vec(sum(G, dims = 2))
-    cones = CO.Cone{T}[CO.EpiNormInf{T}(6, true)]
+    cones = CO.Cone{T}[CO.EpiNormInf{T, T}(6, true)]
 
     r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
     @test r.status == :Optimal
     @test r.primal_obj ≈ 1 atol=tol rtol=tol
+end
+
+function epinorminf6(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    c = T[0, -1, -1, -1, -1]
+    A = T[1 0 0 0 0; 0 1 0 0 0; 0 0 0 1 0; 0 0 0 0 1]
+    b = T[2, 0, 1, 0]
+    G = SparseMatrixCSC(-one(T) * I, 5, 5)
+    h = zeros(T, 5)
+    cones = CO.Cone{T}[CO.EpiNormInf{T, Complex{T}}(5)]
+
+    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+    @test r.status == :Optimal
+    @test r.primal_obj ≈ -3 atol=tol rtol=tol
+    @test r.x ≈ [2, 0, 2, 1, 0] atol=tol rtol=tol
+end
+
+function epinorminf7(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    c = T[1, 0, 0, 0, 0, 0, 0]
+    A = zeros(T, 0, 7)
+    b = zeros(T, 0)
+    G = Diagonal(-one(T) * I, 7)
+    h = zeros(T, 7)
+
+    for is_dual in (true, false)
+        cones = CO.Cone{T}[CO.EpiNormInf{T, Complex{T}}(7, is_dual)]
+
+        r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+        @test r.status == :Optimal
+        @test r.primal_obj ≈ 0 atol=tol rtol=tol
+        @test norm(r.x) ≈ 0 atol=tol rtol=tol
+    end
+end
+
+function epinorminf8(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    c = T[1, -1, 1, 1]
+    A = T[1 0 0 0 ; 0 1 0 0; 0 0 1 0]
+    b = T[-0.4, 0.3, -0.3]
+    G = vcat(zeros(T, 1, 4), Diagonal(T[-1, -1, -1, -1]))
+    h = T[1, 0, 0, 0, 0]
+    cones = CO.Cone{T}[CO.EpiNormInf{T, Complex{T}}(5, true)]
+
+    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+    @test r.status == :Optimal
+    @test r.primal_obj ≈ -1.4 atol=tol rtol=tol
+    @test r.x ≈ [-0.4, 0.3, -0.3, -0.4] atol=tol rtol=tol
+    @test r.y ≈ [0, 0.25, -0.25] atol=tol rtol=tol
+    @test r.z ≈ [1.25, 1, -0.75, 0.75, 1] atol=tol rtol=tol
 end
 
 function epinormeucl1(T; options...)
@@ -661,7 +714,7 @@ function epinormspectral1(T; options...)
     h = vcat(zero(T), rand(T, Xnm))
 
     for is_dual in (true, false)
-        cones = CO.Cone{T}[CO.EpiNormSpectral{T}(Xn, Xm, is_dual)]
+        cones = CO.Cone{T}[CO.EpiNormSpectral{T, T}(Xn, Xm, is_dual)]
 
         r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
         @test r.status == :Optimal
@@ -671,6 +724,57 @@ function epinormspectral1(T; options...)
         else
             @test svdvals(reshape(r.s[2:end], Xn, Xm))[1] ≈ r.s[1] atol=tol rtol=tol
             @test sum(svdvals(reshape(r.z[2:end], Xn, Xm))) ≈ r.z[1] atol=tol rtol=tol
+        end
+    end
+end
+
+function epinormspectral2(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    mat = T[2 3 4; 4 6 8]
+    c = T[1, 0, 0, 0]
+    A = zeros(T, 3, 4)
+    A[1, 2] = 1
+    A[2, 3] = 1
+    A[3, 4] = 1
+    b = T[4, 6, 4]
+    G = zeros(T, 7, 4)
+    G[1, 1] = G[3, 2] = G[5, 3] = G[6, 4] = -1
+    h = T[0, 2, 0, 3, 0, 0, 8]
+
+    for is_dual in (true, false)
+        cones = CO.Cone{T}[CO.EpiNormSpectral{T, T}(2, 3, is_dual)]
+        r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+        @test r.status == :Optimal
+        if is_dual
+            @test sum(svdvals(mat)) ≈ r.s[1] atol=tol rtol=tol
+        else
+            @test svdvals(mat)[1] ≈ r.s[1] atol=tol rtol=tol
+        end
+    end
+end
+
+function epinormspectral3(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    Random.seed!(1)
+    (Xn, Xm) = (3, 4)
+    Xnm = Xn * Xm
+    mat = rand(T, Xn, Xm)
+    c = -vec(mat)
+    A = zeros(T, 0, Xnm)
+    b = T[]
+    G = vcat(zeros(T, 1, Xnm), Matrix{T}(-I, Xnm, Xnm))
+    h = vcat(one(T), zeros(T, Xnm))
+
+    for is_dual in (true, false)
+        cones = CO.Cone{T}[CO.EpiNormSpectral{T, T}(Xn, Xm, is_dual)]
+        r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+        @test r.status == :Optimal
+        if is_dual
+            # the dual to the dual is the spectral norm
+            @test r.primal_obj ≈ -svdvals(mat)[1] atol=tol rtol=tol
+        else
+            # the dual to the primal is the nuclear norm
+            @test r.primal_obj ≈ -sum(svdvals(mat)) atol=tol rtol=tol
         end
     end
 end
