@@ -234,7 +234,7 @@ function test_hyporootdettri_barrier(T::Type{<:Real})
     for side in [1, 2, 5]
         function barrier(s)
             (u, W) = (s[1], similar(s, side, side))
-            CO.vec_to_mat_U!(W, s[2:end])
+            CO.svec_to_smat!(W, s[2:end], sqrt(T(2)))
             fact_W = cholesky!(Symmetric(W, :U))
             return -abs2(5 / 3) * (log(det(fact_W) ^ inv(side) - u) +  logdet(fact_W))
         end
