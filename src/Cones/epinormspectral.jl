@@ -221,7 +221,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNorm
         arr_1j = arr[1, j]
         @views vec_copy_to!(tmpnm[:], arr[2:end, j])
 
-        prod[1, j] = cone.Huu * arr_1j + real_dot(cone.HuW, tmpnm)
+        prod[1, j] = cone.Huu * arr_1j + real(dot(cone.HuW, tmpnm))
 
         # prod_2j = 2 * cone.fact_Z \ (((tmpnm * W' + W * tmpnm' - (2 * u * arr_1j) * I) / cone.fact_Z) * W + tmpnm)
         mul!(tmpnn, tmpnm, W')
@@ -238,6 +238,3 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNorm
 
     return prod
 end
-
-real_dot(a1::AbstractMatrix{R}, a2::AbstractMatrix{R}) where {R <: Real} = dot(a1, a2)
-real_dot(a1::AbstractMatrix{R}, a2::AbstractMatrix{R}) where {R <: Complex} = sum(real(a1i) * real(a2i) + imag(a1i) * imag(a2i) for (a1i, a2i) in zip(a1, a2))

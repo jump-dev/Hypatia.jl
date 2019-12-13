@@ -180,7 +180,7 @@ function test_hypogeomean_barrier(T::Type{<:Real})
 end
 
 function test_epinormspectral_barrier(T::Type{<:Real})
-    for (n, m) in [(1, 1), (1, 2), (2, 2), ]#(2, 4), (3, 4)]
+    for (n, m) in [(1, 1), (1, 2), (2, 2), (2, 4), (3, 4)]
         # real epinormspectral barrier
         function R_barrier(s)
             (u, W) = (s[1], reshape(s[2:end], n, m))
