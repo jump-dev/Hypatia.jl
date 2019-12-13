@@ -63,9 +63,10 @@ function setup_data(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where 
     dim = cone.dim
     cone.point = zeros(T, dim)
     cone.grad = zeros(T, dim)
-    # cone.hess = Symmetric(zeros(T, dim, dim), :U) # TODO this is expensive to allocate. maybe use sparse. don't alloc if not using
-    # cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
+    cone.hess = Symmetric(zeros(T, dim, dim), :U) # TODO this is expensive to allocate. maybe use sparse. don't alloc if not using
+    cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     n = cone.n
+    cone.w = zeros(R, n)
     cone.wden = zeros(R, n)
     cone.den = zeros(T, n)
     cone.uden = zeros(R, n)
@@ -74,7 +75,6 @@ function setup_data(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where 
     cone.invedge = zeros(T, dim - 1)
     # cone.rtdiag = zeros(T, dim - 1)
     if cone.is_complex
-        cone.w = zeros(R, n)
         cone.offdiag = zeros(T, n)
         cone.detdiag = zeros(T, n)
         cone.edgeR = zeros(R, n)
@@ -94,12 +94,9 @@ end
 function update_feas(cone::EpiNormInf)
     @assert !cone.feas_updated
     u = cone.point[1]
-    @views w = cone.point[2:end]
+    @views vec_copy_to!(cone.w, cone.point[2:end])
 
-    if cone.is_complex
-        w = rvec_to_cvec!(cone.w, w)
-    end
-    cone.is_feas = (u > 0 && u > norm(w, Inf))
+    cone.is_feas = (u > 0 && u > norm(cone.w, Inf))
 
     cone.feas_updated = true
     return cone.is_feas
@@ -108,9 +105,6 @@ end
 function update_grad(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     @assert cone.is_feas
     u = cone.point[1]
-    if !cone.is_complex
-        @views cone.w = cone.point[2:end]
-    end
     w = cone.w
 
     usqr = abs2(u)
@@ -119,11 +113,7 @@ function update_grad(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where
     @. cone.wden = 2 * w / cone.den
 
     cone.grad[1] = (length(w) - 1) / u - sum(cone.uden)
-    if cone.is_complex
-        @views cvec_to_rvec!(cone.grad[2:end], cone.wden)
-    else
-        cone.grad[2:end] .= cone.wden
-    end
+    @views vec_copy_to!(cone.grad[2:end], cone.wden)
 
     cone.grad_updated = true
     return cone.grad
@@ -140,7 +130,7 @@ function update_hess_inv_hess(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{
 
     schur = zero(T)
     usqr = abs2(u)
-    for (j, wj) in enumerate(w) # TODO inbounds
+    @inbounds for (j, wj) in enumerate(w)
         wdenj = cone.wden[j]
         invdenj = 2 / cone.den[j]
 
@@ -183,11 +173,11 @@ function update_hess(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where
 
     H[1, 1] = cone.diag11
     H[1, 2:end] .= cone.edge
-    for (j, dj) in enumerate(cone.diag)
+    @inbounds for (j, dj) in enumerate(cone.diag)
         H[j + 1, j + 1] = dj
     end
     if cone.is_complex
-        for (j, oj) in enumerate(cone.offdiag)
+        @inbounds for (j, oj) in enumerate(cone.offdiag)
             H[2j, 2j + 1] = oj
         end
     end
@@ -205,19 +195,19 @@ function update_inv_hess(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} w
 
     Hi[1, 1] = 1
     Hi[1, 2:end] .= cone.invedge
-    for j in 2:cone.dim, i in 2:j
+    @inbounds for j in 2:cone.dim, i in 2:j
         Hi[i, j] = Hi[1, j] * Hi[1, i]
     end
     Hi ./= cone.schur
     if cone.is_complex
-        for (j, oj) in enumerate(cone.offdiag)
+        @inbounds for (j, oj) in enumerate(cone.offdiag)
             detj = cone.detdiag[j]
             Hi[2j, 2j] += cone.diag[2j] / detj
             Hi[2j + 1, 2j + 1] += cone.diag[2j - 1] / detj
             Hi[2j, 2j + 1] -= oj / detj
         end
     else
-        for (j, dj) in enumerate(cone.diag)
+        @inbounds for (j, dj) in enumerate(cone.diag)
             Hi[j + 1, j + 1] += inv(dj)
         end
     end
@@ -237,7 +227,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNorm
     @views mul!(prod[2:end, :], cone.edge, arr[1, :]')
     @. @views prod[2:end, :] += cone.diag * arr[2:end, :]
     if cone.is_complex
-        for (j, oj) in enumerate(cone.offdiag)
+        @inbounds for (j, oj) in enumerate(cone.offdiag)
             @. @views prod[2j, :] += oj * arr[2j + 1, :]
             @. @views prod[2j + 1, :] += oj * arr[2j, :]
         end
@@ -286,7 +276,7 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Epi
     @. @views prod[2:end, :] = cone.invedge * prod[1, :]'
     prod ./= cone.schur
     if cone.is_complex
-        for (j, oj) in enumerate(cone.offdiag)
+        @inbounds for (j, oj) in enumerate(cone.offdiag)
             detj = cone.detdiag[j]
             d1j = cone.diag[2j - 1]
             d2j = cone.diag[2j]

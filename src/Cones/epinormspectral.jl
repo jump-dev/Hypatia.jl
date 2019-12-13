@@ -96,11 +96,6 @@ function update_feas(cone::EpiNormSpectral)
 
     if u > 0
         @views vec_copy_to!(cone.W[:], cone.point[2:end])
-        # if cone.is_complex
-        #     @views rvec_to_cvec!(cone.W[:], cone.point[2:end])
-        # else
-        #     @views cone.W[:] .= cone.point[2:end]
-        # end
         copyto!(cone.Z, abs2(u) * I) # TODO inefficient
         mul!(cone.Z, cone.W, cone.W', -1, true)
         cone.fact_Z = cholesky!(Hermitian(cone.Z, :U), check = false)
@@ -122,11 +117,6 @@ function update_grad(cone::EpiNormSpectral)
 
     cone.grad[1] = -u * tr(cone.Zi)
     @views vec_copy_to!(cone.grad[2:end], cone.ZiW[:])
-    # if cone.is_complex
-    #     @views cvec_to_rvec!(cone.grad[2:end], cone.ZiW[:])
-    # else
-    #     cone.grad[2:end] = cone.ZiW
-    # end
     cone.grad .*= 2
     cone.grad[1] += (cone.n - 1) / u
 
