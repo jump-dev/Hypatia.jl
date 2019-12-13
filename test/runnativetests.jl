@@ -42,6 +42,9 @@ testfuns = [
     epinorminf3,
     epinorminf4,
     epinorminf5,
+    epinorminf6,
+    epinorminf7,
+    epinorminf8,
     epinormeucl1,
     epinormeucl2,
     epipersquare1,
@@ -63,6 +66,8 @@ testfuns = [
     hypogeomean2,
     hypogeomean3,
     epinormspectral1,
+    epinormspectral2,
+    epinormspectral3,
     possemideftri1,
     possemideftri2,
     possemideftricomplex1,
@@ -88,7 +93,7 @@ blas_reals = [
     Float32,
     ]
 
-options = (verbose = false,)
+options = (verbose = true,)
 
 @info("starting native tests")
 @testset "native tests" begin
@@ -144,7 +149,7 @@ options = (verbose = false,)
         T = Float64
         t(T, solver = SO.Solver{T}(system_solver = SO.SymIndefSparseSystemSolver{T}(); options...))
     end
-    @testset "QRCholDense tests: $t, $T, $ss" for t in testfuns, T in generic_reals, ss in [Hypatia.DenseSymCache, Hypatia.DensePosDefCache]
+    @testset "QRCholDense tests: $t, $T, $ss" for t in testfuns, T in generic_reals, ss in [Hypatia.DenseSymCache]#, Hypatia.DensePosDefCache]
         t(T, solver = SO.Solver{T}(system_solver = SO.QRCholDenseSystemSolver{T}(fact_cache = ss{T}()); options...))
     end
 end
