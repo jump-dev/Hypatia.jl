@@ -62,8 +62,6 @@ function test_barrier_oracles(
     inv_hess = CO.inv_hess(cone)
     @test hess * inv_hess ≈ I atol=tol rtol=tol
 
-    # CO.update_hess_prod(cone)
-    # CO.update_inv_hess_prod(cone)
     prod = similar(point)
     @test CO.hess_prod!(prod, point, cone) ≈ -grad atol=tol rtol=tol
     @test CO.inv_hess_prod!(prod, grad, cone) ≈ -point atol=tol rtol=tol
@@ -85,12 +83,21 @@ function test_orthant_barrier(T::Type{<:Real})
 end
 
 function test_epinorminf_barrier(T::Type{<:Real})
-    function barrier(s)
-        (u, w) = (s[1], s[2:end])
-        return -sum(log(u - abs2(wj) / u) for wj in w) - log(u)
-    end
-    for dim in [2, 4]
-        test_barrier_oracles(CO.EpiNormInf{T}(dim), barrier)
+    for n in [1, 2, 3, 5]
+        # real epinorminf cone
+        function R_barrier(s)
+            (u, w) = (s[1], s[2:end])
+            return -sum(log(abs2(u) - abs2(wj)) for wj in w) + (n - 1) * log(u)
+        end
+        test_barrier_oracles(CO.EpiNormInf{T, T}(1 + n), R_barrier)
+
+        # complex epinorminf cone
+        function C_barrier(s)
+            (u, wr) = (s[1], s[2:end])
+            w = CO.rvec_to_cvec!(zeros(Complex{eltype(s)}, n), wr)
+            return -sum(log(abs2(u) - abs2(wj)) for wj in w) + (n - 1) * log(u)
+        end
+        test_barrier_oracles(CO.EpiNormInf{T, Complex{T}}(1 + 2n), C_barrier)
     end
     return
 end
@@ -180,16 +187,24 @@ function test_hypogeomean_barrier(T::Type{<:Real})
 end
 
 function test_epinormspectral_barrier(T::Type{<:Real})
-    for (n, m) in [(1, 2), (2, 2), (2, 3), (3, 5)]
-        function barrier(s)
+    for (n, m) in [(1, 1), (1, 2), (2, 2), (2, 4), (3, 4)]
+        # real epinormspectral barrier
+        function R_barrier(s)
             (u, W) = (s[1], reshape(s[2:end], n, m))
-            return -logdet(cholesky!(Symmetric(u * I - W * W' / u))) - log(u)
+            return -logdet(cholesky!(Hermitian(abs2(u) * I - W * W'))) + (n - 1) * log(u)
         end
-        test_barrier_oracles(CO.EpiNormSpectral{T}(n, m), barrier)
+        test_barrier_oracles(CO.EpiNormSpectral{T, T}(n, m), R_barrier)
+
+        # complex epinormspectral barrier
+        function C_barrier(s)
+            (u, Ws) = (s[1], reshape(s[2:end], 2n, m))
+            W = [Ws[2i - 1, j] + Ws[2i, j] * im for i in 1:n, j in 1:m]
+            return -logdet(cholesky!(Hermitian(abs2(u) * I - W * W'))) + (n - 1) * log(u)
+        end
+        test_barrier_oracles(CO.EpiNormSpectral{T, Complex{T}}(n, m), C_barrier)
     end
     return
 end
-
 function test_possemideftri_barrier(T::Type{<:Real})
     for side in [1, 2, 5]
         # real PSD cone
@@ -236,12 +251,11 @@ function test_hyporootdettri_barrier(T::Type{<:Real})
             (u, W) = (s[1], similar(s, side, side))
             CO.svec_to_smat!(W, s[2:end], sqrt(T(2)))
             fact_W = cholesky!(Symmetric(W, :U))
-            return -abs2(5 / 3) * (log(det(fact_W) ^ inv(side) - u) +  logdet(fact_W))
+            return -abs2(T(5) / T(3)) * (log(det(fact_W) ^ inv(side) - u) + logdet(fact_W)) # TODO could it be numerically better to do inv(det ^ side)?
         end
         dim = 1 + div(side * (side + 1), 2)
         cone = CO.HypoRootDetTri{T}(dim)
-        # TODO init_tol, OK in Float64 but failing in BigFloat
-        test_barrier_oracles(cone, barrier, init_tol = 1e-4)
+        test_barrier_oracles(cone, barrier)#, init_tol = 1e-4) TODO shouldn't need to relax if we have correct closed-form
     end
     return
 end
