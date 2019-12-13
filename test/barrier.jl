@@ -180,16 +180,24 @@ function test_hypogeomean_barrier(T::Type{<:Real})
 end
 
 function test_epinormspectral_barrier(T::Type{<:Real})
-    for (n, m) in [(1, 2), (2, 2), (2, 3), (3, 5)]
-        function barrier(s)
+    for (n, m) in [(1, 1), (1, 2), (2, 2), ]#(2, 4), (3, 4)]
+        # real epinormspectral barrier
+        function R_barrier(s)
             (u, W) = (s[1], reshape(s[2:end], n, m))
-            return -logdet(cholesky!(Symmetric(u * I - W * W' / u))) - log(u)
+            return -logdet(cholesky!(Hermitian(abs2(u) * I - W * W'))) + (n - 1) * log(u)
         end
-        test_barrier_oracles(CO.EpiNormSpectral{T}(n, m), barrier)
+        test_barrier_oracles(CO.EpiNormSpectral{T, T}(n, m), R_barrier)
+
+        # complex epinormspectral barrier
+        function C_barrier(s)
+            (u, Ws) = (s[1], reshape(s[2:end], 2n, m))
+            W = [Ws[2i - 1, j] + Ws[2i, j] * im for i in 1:n, j in 1:m]
+            return -logdet(cholesky!(Hermitian(abs2(u) * I - W * W'))) + (n - 1) * log(u)
+        end
+        test_barrier_oracles(CO.EpiNormSpectral{T, Complex{T}}(n, m), C_barrier)
     end
     return
 end
-
 function test_possemideftri_barrier(T::Type{<:Real})
     for side in [1, 2, 5]
         # real PSD cone
