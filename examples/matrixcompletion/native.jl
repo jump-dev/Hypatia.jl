@@ -22,6 +22,7 @@ import Random
 using Test
 import Hypatia
 const CO = Hypatia.Cones
+const MU = Hypatia.ModelUtilities
 
 function matrixcompletion(
     T::Type{<:Real},
@@ -77,7 +78,7 @@ function matrixcompletion(
         h_norm_x = vcat(zero(T), h_norm_x)
         h_norm = h_norm_x
 
-        cones = CO.Cone{T}[CO.EpiNormSpectral{T}(m, n, nuclearnorm_obj)]
+        cones = CO.Cone{T}[CO.EpiNormSpectral{T, T}(m, n, nuclearnorm_obj)]
     else
         # build an extended formulation for the norm used in the objective
         if nuclearnorm_obj
@@ -123,10 +124,12 @@ function matrixcompletion(
                     G_norm[offset + idx, num_unknown + num_W1_vars + W2_var_idx] = -1
                 end
             end
+            MU.vec_to_svec_cols!(G_norm, sqrt(T(2)))
+            MU.vec_to_svec!(h_norm, sqrt(T(2)))
             cones = CO.Cone{T}[CO.PosSemidefTri{T, T}(num_rows)]
             # TODO change to c_W1 = CO.mat_U_to_vec_scaled!(zeros(T, num_W1_vars), Diagonal(one(T) * I, m), sqrt(T(2)))
-            c_W1 = CO.mat_U_to_vec_scaled!(zeros(T, num_W1_vars), Matrix{T}(I, m, m))
-            c_W2 = CO.mat_U_to_vec_scaled!(zeros(T, num_W2_vars), Matrix{T}(I, n, n))
+            c_W1 = CO.smat_to_svec!(zeros(T, num_W1_vars), Diagonal(one(T) * I, m), sqrt(T(2)))
+            c_W2 = CO.smat_to_svec!(zeros(T, num_W2_vars), Diagonal(one(T) * I, n), sqrt(T(2)))
             c = vcat(zeros(T, num_unknown), c_W1, c_W2) / 2
         else
             # extended formulation for spectral norm
@@ -162,32 +165,37 @@ function matrixcompletion(
                 idx += i
                 G_norm[offset + idx - 1, 1] = -1
             end
+            MU.vec_to_svec_cols!(G_norm, sqrt(T(2)))
+            MU.vec_to_svec!(h_norm, sqrt(T(2)))
             cones = CO.Cone{T}[CO.PosSemidefTri{T, T}(num_rows)]
             c = vcat(one(T), zeros(T, num_unknown))
         end
     end # objective natural true/false
-    G = G_norm
-    h = h_norm
 
     if geomean_constr
         if use_hypogeomean
             # hypogeomean for values to be filled
-            G_geo = zeros(T, num_unknown + 1, size(G, 2))
-            total_idx = 1
-            unknown_idx = 1
-            for j in 1:n, i in 1:m
-                if !is_known[mat_to_vec_idx(i, j)]
-                    G_geo[unknown_idx, unknown_idx + 1] = -1
-                    unknown_idx += 1
+            G_geo = vcat(zeros(T, 1, num_unknown), Matrix{T}(-I, num_unknown, num_unknown))
+            h = vcat(h_norm, one(T), zeros(T, num_unknown))
+
+            # if using extended with spectral objective G_geo needs to be prepadded with an epigraph variable
+            if nuclearnorm_obj
+                if use_epinormspectral
+                    prepad = zeros(T, num_unknown + 1, 1)
+                    postpad = zeros(T, num_unknown + 1, 0)
+                else
+                    prepad = zeros(T, num_unknown + 1, 0)
+                    postpad = zeros(T, num_unknown + 1, size(G_norm, 2) - num_unknown)
                 end
-                total_idx += 1
+            else
+                prepad = zeros(T, num_unknown + 1, 1)
+                postpad = zeros(T, num_unknown + 1, 0)
             end
-            # first component of the vector in the in power cone, elements multiply to one
-            h = vcat(h_norm, zeros(T, num_unknown), one(T))
-            @assert total_idx - 1 == m * n
-            @assert unknown_idx - 1 == num_unknown
-            G = vcat(G_norm, G_geo)
-            push!(cones, CO.Power{T}(fill(inv(T(num_unknown)), num_unknown), 1))
+            G = [
+                G_norm;
+                prepad  G_geo  postpad
+                ]
+            push!(cones, CO.HypoGeomean{T}(fill(inv(T(num_unknown)), num_unknown)))
         else
             # number of 3-dimensional power cones needed is num_unknown - 1, number of new variables is num_unknown - 2
             # first num_unknown columns overlap with G_norm, column for the epigraph variable of the spectral cone added later
@@ -234,8 +242,11 @@ function matrixcompletion(
                 ]
 
             c = vcat(c, zeros(T, num_unknown - 2))
-        end
-    end # constraints natural true/false
+        end # constraints natural true/false
+    else
+        G = G_norm
+        h = h_norm
+    end # add geomean constraint
 
     A = zeros(T, 0, size(G, 2))
     b = T[]
