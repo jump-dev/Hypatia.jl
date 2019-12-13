@@ -234,4 +234,8 @@ function cvec_to_rvec!(rvec::AbstractVector{T}, cvec::AbstractVector{Complex{T}}
     return rvec
 end
 
+vec_copy_to!(v1::AbstractVector{T}, v2::AbstractVector{T}) where {T <: Real} = copyto!(v1, v2)
+vec_copy_to!(v1::AbstractVector{T}, v2::AbstractVector{Complex{T}}) where {T <: Real} = cvec_to_rvec!(v1, v2)
+vec_copy_to!(v1::AbstractVector{Complex{T}}, v2::AbstractVector{T}) where {T <: Real} = rvec_to_cvec!(v1, v2)
+
 end
