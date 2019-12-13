@@ -706,75 +706,92 @@ function epinormspectral1(T; options...)
     tol = sqrt(sqrt(eps(T)))
     Random.seed!(1)
     (Xn, Xm) = (3, 4)
-    Xnm = Xn * Xm
-    c = vcat(one(T), zeros(T, Xnm))
-    A = hcat(zeros(T, Xnm, 1), Matrix{T}(I, Xnm, Xnm))
-    b = rand(T, Xnm)
-    G = Matrix{T}(-I, Xnm + 1, Xnm + 1)
-    h = vcat(zero(T), rand(T, Xnm))
+    for is_complex in (false, true)
+        dim = Xn * Xm
+        if is_complex
+            dim *= 2
+        end
+        c = vcat(one(T), zeros(T, dim))
+        A = hcat(zeros(T, dim, 1), Matrix{T}(I, dim, dim))
+        b = rand(T, dim)
+        G = Matrix{T}(-I, dim + 1, dim + 1)
+        h = vcat(zero(T), rand(T, dim))
 
-    for is_dual in (true, false)
-        cones = CO.Cone{T}[CO.EpiNormSpectral{T, T}(Xn, Xm, is_dual)]
+        for is_dual in (true, false)
+            R = (is_complex ? Complex{T} : T)
+            cones = CO.Cone{T}[CO.EpiNormSpectral{T, R}(Xn, Xm, is_dual)]
 
-        r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
-        @test r.status == :Optimal
-        if is_dual
-            @test sum(svdvals(reshape(r.s[2:end], Xn, Xm))) ≈ r.s[1] atol=tol rtol=tol
-            @test svdvals(reshape(r.z[2:end], Xn, Xm))[1] ≈ r.z[1] atol=tol rtol=tol
-        else
-            @test svdvals(reshape(r.s[2:end], Xn, Xm))[1] ≈ r.s[1] atol=tol rtol=tol
-            @test sum(svdvals(reshape(r.z[2:end], Xn, Xm))) ≈ r.z[1] atol=tol rtol=tol
+            r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+            @test r.status == :Optimal
+
+            S = zeros(R, Xn, Xm)
+            @views CO.vec_copy_to!(S[:], r.s[2:end])
+            prim_svdvals = svdvals(S)
+            Z = similar(S)
+            @views CO.vec_copy_to!(Z[:], r.z[2:end])
+            dual_svdvals = svdvals(Z)
+            if is_dual
+                @test sum(prim_svdvals) ≈ r.s[1] atol=tol rtol=tol
+                @test dual_svdvals[1] ≈ r.z[1] atol=tol rtol=tol
+            else
+                @test prim_svdvals[1] ≈ r.s[1] atol=tol rtol=tol
+                @test sum(dual_svdvals) ≈ r.z[1] atol=tol rtol=tol
+            end
         end
     end
 end
 
 function epinormspectral2(T; options...)
     tol = sqrt(sqrt(eps(T)))
-    mat = T[2 3 4; 4 6 8]
-    c = T[1, 0, 0, 0]
-    A = zeros(T, 3, 4)
-    A[1, 2] = 1
-    A[2, 3] = 1
-    A[3, 4] = 1
-    b = T[4, 6, 4]
-    G = zeros(T, 7, 4)
-    G[1, 1] = G[3, 2] = G[5, 3] = G[6, 4] = -1
-    h = T[0, 2, 0, 3, 0, 0, 8]
+    Random.seed!(1)
+    (Xn, Xm) = (3, 4)
+    for is_complex in (false, true)
+        R = (is_complex ? Complex{T} : T)
+        dim = Xn * Xm
+        if is_complex
+            dim *= 2
+        end
+        mat = rand(R, Xn, Xm)
+        c = zeros(T, dim)
+        CO.vec_copy_to!(c, -mat[:])
+        A = zeros(T, 0, dim)
+        b = T[]
+        G = vcat(zeros(T, 1, dim), Matrix{T}(-I, dim, dim))
+        h = vcat(one(T), zeros(T, dim))
 
-    for is_dual in (true, false)
-        cones = CO.Cone{T}[CO.EpiNormSpectral{T, T}(2, 3, is_dual)]
-        r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
-        @test r.status == :Optimal
-        if is_dual
-            @test sum(svdvals(mat)) ≈ r.s[1] atol=tol rtol=tol
-        else
-            @test svdvals(mat)[1] ≈ r.s[1] atol=tol rtol=tol
+        for is_dual in (true, false)
+            cones = CO.Cone{T}[CO.EpiNormSpectral{T, R}(Xn, Xm, is_dual)]
+            r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+            @test r.status == :Optimal
+            if is_dual
+                @test r.primal_obj ≈ -svdvals(mat)[1] atol=tol rtol=tol
+            else
+                @test r.primal_obj ≈ -sum(svdvals(mat)) atol=tol rtol=tol
+            end
         end
     end
 end
 
 function epinormspectral3(T; options...)
     tol = sqrt(sqrt(eps(T)))
-    Random.seed!(1)
-    (Xn, Xm) = (3, 4)
-    Xnm = Xn * Xm
-    mat = rand(T, Xn, Xm)
-    c = -vec(mat)
-    A = zeros(T, 0, Xnm)
-    b = T[]
-    G = vcat(zeros(T, 1, Xnm), Matrix{T}(-I, Xnm, Xnm))
-    h = vcat(one(T), zeros(T, Xnm))
+    for is_complex in (false, true), (Xn, Xm) in ((1, 1), (1, 3), (2, 2))
+        dim = Xn * Xm
+        if is_complex
+            dim *= 2
+        end
+        c = fill(-one(T), dim)
+        A = zeros(T, 0, dim)
+        b = T[]
+        G = vcat(zeros(T, 1, dim), Matrix{T}(-I, dim, dim))
+        h = zeros(T, dim + 1)
 
-    for is_dual in (true, false)
-        cones = CO.Cone{T}[CO.EpiNormSpectral{T, T}(Xn, Xm, is_dual)]
-        r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
-        @test r.status == :Optimal
-        if is_dual
-            # the dual to the dual is the spectral norm
-            @test r.primal_obj ≈ -svdvals(mat)[1] atol=tol rtol=tol
-        else
-            # the dual to the primal is the nuclear norm
-            @test r.primal_obj ≈ -sum(svdvals(mat)) atol=tol rtol=tol
+        for is_dual in (true, false)
+            R = (is_complex ? Complex{T} : T)
+            cones = CO.Cone{T}[CO.EpiNormSpectral{T, R}(Xn, Xm, is_dual)]
+            r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+            @test r.status == :Optimal
+            @test r.primal_obj ≈ 0 atol=tol rtol=tol
+            @test norm(r.x) ≈ 0 atol=tol rtol=tol
         end
     end
 end
