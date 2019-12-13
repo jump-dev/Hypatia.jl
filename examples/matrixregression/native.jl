@@ -1,6 +1,8 @@
 #=
 Copyright 2019, Chris Coey, Lea Kapelevich and contributors
+
 regularized matrix regression problems
+
 TODO
 - describe, references
 - generalize for sparse Y,X but make sure qr factorization does not permute
@@ -255,10 +257,6 @@ function matrixregression(
 
     Y = Matrix{R}(Y)
     X = Matrix{R}(X)
-    # A = Matrix{R}(A)
-    # @show A
-    # @show X
-    # @show Y
 
     return matrixregression(Y, X; model_kwargs...)
 end
@@ -298,6 +296,7 @@ function test_matrixregression(instance::Function; R::Type{<:RealOrComplex{T}} =
     d = instance(R)
     r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
     @test r.status == :Optimal
+
     # check objective value is correct
     if R <: Complex
         A_opt_real = reshape(r.x[2:(1 + 2 * d.p * d.m)], 2 * d.p, d.m)
