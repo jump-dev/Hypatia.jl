@@ -13,6 +13,7 @@ include(joinpath(examples_dir, "envelope/native.jl"))
 include(joinpath(examples_dir, "expdesign/native.jl"))
 include(joinpath(examples_dir, "linearopt/native.jl"))
 include(joinpath(examples_dir, "matrixcompletion/native.jl"))
+include(joinpath(examples_dir, "matrixregression/native.jl"))
 include(joinpath(examples_dir, "maxvolume/native.jl"))
 include(joinpath(examples_dir, "polymin/native.jl"))
 include(joinpath(examples_dir, "portfolio/native.jl"))
@@ -32,6 +33,8 @@ options = (atol = sqrt(sqrt(eps(T))), solver = SO.Solver{T}(
     @testset "expdesign" begin test_expdesign.(instances_expdesign_few, T = T, options = options) end
     @testset "linearopt" begin test_linearopt.(instances_linearopt_few, T = T, options = options) end
     @testset "matrixcompletion" begin test_matrixcompletion.(instances_matrixcompletion_few, T = T, options = options) end
+    @testset "matrixregression" begin test_matrixregression.(instances_matrixregression_few, R = T, options = options) end # real
+    @testset "matrixregression" begin test_matrixregression.(instances_matrixregression_few, R = Complex{T}, options = options) end # complex
     @testset "maxvolume" begin test_maxvolume.(instances_maxvolume_few, T = T, options = options) end
     @testset "sparsepca" begin test_sparsepca.(instances_sparsepca_few, T = T, options = options) end
     @testset "polymin" begin test_polymin.(instances_polymin_few, T = T, options = options) end
