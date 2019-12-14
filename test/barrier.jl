@@ -255,7 +255,7 @@ function test_hyporootdettri_barrier(T::Type{<:Real})
         end
         dim = 1 + div(side * (side + 1), 2)
         cone = CO.HypoRootDetTri{T}(dim)
-        test_barrier_oracles(cone, barrier) # TODO shouldn't need to relax for BigFloat if we have correct closed-form
+        test_barrier_oracles(cone, barrier)
     end
     return
 end
