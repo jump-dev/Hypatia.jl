@@ -36,7 +36,10 @@ mutable struct PosSemidefTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     inv_mat::Matrix{R}
     fact_mat
 
-    function PosSemidefTri{T, R}(dim::Int, is_dual::Bool) where {R <: RealOrComplex{T}} where {T <: Real}
+    function PosSemidefTri{T, R}(
+        dim::Int,
+        is_dual::Bool,
+        ) where {R <: RealOrComplex{T}} where {T <: Real}
         @assert dim >= 1
         cone = new{T, R}()
         cone.use_dual = is_dual
