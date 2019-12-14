@@ -4,7 +4,7 @@ Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 hypograph of the root determinant of a (row-wise lower triangle) symmetric positive definite matrix
 (u in R, W in S_n+) : u <= det(W)^(1/n)
 
-barrier from correspondence with A. Nemirovski
+SC barrier from correspondence with A. Nemirovski
 -(5 / 3) ^ 2 * (log(det(W) ^ (1 / n) - u) + logdet(W))
 =#
 
@@ -112,10 +112,10 @@ function update_grad(cone::HypoRootDetTri)
     u = cone.point[1]
 
     cone.grad[1] = inv(cone.rootdetu)
-    cone.Wi = inv(cone.fact_W)
+    cone.Wi = inv(cone.fact_W) # TODO in-place
     @views smat_to_svec!(cone.grad[2:cone.dim], cone.Wi, cone.rt2)
     cone.frac = cone.rootdet / cone.side / cone.rootdetu
-    @. @views cone.grad[2:cone.dim] *= -(cone.frac + 1)
+    @. @views cone.grad[2:cone.dim] *= -cone.frac - 1
     @. cone.grad *= cone.sc_const
 
     cone.grad_updated = true
@@ -124,13 +124,12 @@ end
 
 function update_hess(cone::HypoRootDetTri)
     if !cone.hess_prod_updated
-         # fills in first row of the Hessian and calculates constants
-        update_hess_prod(cone)
+        update_hess_prod(cone) # fills in first row of the Hessian and calculates constants
     end
     Wi = cone.Wi
-    H = cone.hess.data
     kron_const = cone.kron_const
     dot_const = cone.dot_const
+    H = cone.hess.data
 
     k1 = 2
     for i in 1:cone.side, j in 1:i
@@ -160,11 +159,10 @@ end
 function update_hess_prod(cone::HypoRootDetTri)
     @assert cone.grad_updated
 
-    # rootdet / rootdetu / side
-    frac = cone.frac
+    frac = cone.frac # rootdet / rootdetu / side
     # update constants used in the Hessian
     cone.kron_const = frac + 1
-    cone.dot_const = (abs2(frac) - frac / cone.side)
+    cone.dot_const = abs2(frac) - frac / cone.side
     # update first row in the Hessian
     rootdetu = cone.rootdetu
     Wi = cone.Wi
@@ -179,12 +177,8 @@ end
 
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoRootDetTri)
     if !cone.hess_prod_updated
-        # fills in first row of the Hessian and calculates constants
-        update_hess_prod(cone)
+        update_hess_prod(cone) # fills in first row of the Hessian and calculates constants
     end
-    Wi = cone.Wi
-    kron_const = cone.kron_const
-    dot_const = cone.dot_const
 
     @views mul!(prod[1, :]', cone.hess[1, :]', arr)
     @inbounds for i in 1:size(arr, 2)
@@ -193,7 +187,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoRoo
         copytri!(cone.work_mat, 'U')
         rdiv!(cone.work_mat, cone.fact_W)
         ldiv!(cone.fact_W, cone.work_mat)
-        axpby!(dot_prod * dot_const, cone.Wi, kron_const, cone.work_mat)
+        axpby!(dot_prod * cone.dot_const, cone.Wi, cone.kron_const, cone.work_mat)
         @views smat_to_svec!(prod[2:cone.dim, i], cone.work_mat, cone.rt2)
     end
     @. @views prod[2:cone.dim, :] *= cone.sc_const
