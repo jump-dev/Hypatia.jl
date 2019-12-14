@@ -251,7 +251,7 @@ function test_hyporootdettri_barrier(T::Type{<:Real})
             (u, W) = (s[1], similar(s, side, side))
             CO.svec_to_smat!(W, s[2:end], sqrt(T(2)))
             fact_W = cholesky!(Symmetric(W, :U))
-            return -abs2(T(5) / T(3)) * (log(det(fact_W) ^ inv(side) - u) + logdet(fact_W)) # TODO could it be numerically better to do inv(det ^ side)?
+            return -T(25) / T(9) * (log(det(fact_W) ^ inv(T(side)) - u) + logdet(fact_W)) # TODO could it be numerically better to do inv(det ^ side)?
         end
         dim = 1 + div(side * (side + 1), 2)
         cone = CO.HypoRootDetTri{T}(dim)
