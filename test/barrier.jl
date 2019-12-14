@@ -47,7 +47,6 @@ function test_barrier_oracles(
     @test cone.point == point
     @test CO.is_feas(cone)
 
-    # CO.update_grad(cone)
     grad = CO.grad(cone)
     nu = CO.get_nu(cone)
     @test dot(point, grad) ≈ -nu atol=tol rtol=tol
