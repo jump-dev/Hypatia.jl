@@ -6,8 +6,6 @@ hypograph of the root determinant of a (row-wise lower triangle) symmetric posit
 
 barrier from correspondence with A. Nemirovski
 -(5 / 3) ^ 2 * (log(det(W) ^ (1 / n) - u) + logdet(W))
-
-TODO needs updating to smat/svec as on dev branch
 =#
 
 mutable struct HypoRootDetTri{T <: Real} <: Cone{T}
@@ -92,14 +90,14 @@ function set_initial_point(arr::AbstractVector{T}, cone::HypoRootDetTri{T}) wher
     return arr
 end
 
-function update_feas(cone::HypoRootDetTri)
+function update_feas(cone::HypoRootDetTri{T}) where {T}
     @assert !cone.feas_updated
     u = cone.point[1]
 
     svec_to_smat!(cone.W, view(cone.point, 2:cone.dim), cone.rt2)
     cone.fact_W = cholesky!(Symmetric(cone.W, :U), check = false) # mutates W, which isn't used anywhere else
     if isposdef(cone.fact_W)
-        cone.rootdet = det(cone.fact_W) ^ inv(cone.side)
+        cone.rootdet = det(cone.fact_W) ^ inv(T(cone.side))
         cone.rootdetu = cone.rootdet - u
         cone.is_feas = (cone.rootdetu > 0)
     else
