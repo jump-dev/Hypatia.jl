@@ -49,6 +49,8 @@ mutable struct HypoRootdetTri{T <: Real} <: Cone{T}
         cone.use_dual = is_dual
         cone.dim = dim
         cone.rt2 = sqrt(T(2))
+        cone.side = round(Int, sqrt(0.25 + 2 * (dim - 1)) - 0.5)
+        cone.sc_const = T(25) / T(9)
         cone.hess_fact_cache = hess_fact_cache
         return cone
     end
@@ -61,8 +63,6 @@ reset_data(cone::HypoRootdetTri) = (cone.feas_updated = cone.grad_updated = cone
 function setup_data(cone::HypoRootdetTri{T}) where {T <: Real}
     reset_data(cone)
     dim = cone.dim
-    cone.side = round(Int, sqrt(0.25 + 2 * (dim - 1)) - 0.5)
-    cone.sc_const = T(25) / T(9)
     cone.point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
@@ -82,7 +82,7 @@ function set_initial_point(arr::AbstractVector{T}, cone::HypoRootdetTri{T}) wher
     const2 = arr[1] = -5 * sqrt((3side + 1 - const1) / T(side + 1)) / (3 * sqrt(T(2)))
     const3 = -const2 * (side + 1 + const1) / side / 2
     k = 2
-    @inbounds for i in 1:cone.side
+    @inbounds for i in 1:side
         arr[k] = const3
         k += i + 1
     end
@@ -93,7 +93,7 @@ function update_feas(cone::HypoRootdetTri{T}) where {T}
     @assert !cone.feas_updated
     u = cone.point[1]
 
-    svec_to_smat!(cone.W, view(cone.point, 2:cone.dim), cone.rt2)
+    @views svec_to_smat!(cone.W, cone.point[2:end], cone.rt2)
     cone.fact_W = cholesky!(Symmetric(cone.W, :U), check = false) # mutates W, which isn't used anywhere else
     if isposdef(cone.fact_W)
         cone.rootdet = det(cone.fact_W) ^ inv(T(cone.side))
@@ -115,8 +115,8 @@ function update_grad(cone::HypoRootdetTri)
     cone.Wi = inv(cone.fact_W) # TODO in-place
     @views smat_to_svec!(cone.grad[2:cone.dim], cone.Wi, cone.rt2)
     cone.frac = cone.rootdet / cone.side / cone.rootdetu
-    @. @views cone.grad[2:cone.dim] *= -cone.frac - 1
-    @. cone.grad *= cone.sc_const
+    cone.grad[1] *= cone.sc_const
+    @. cone.grad[2:end] *= -cone.sc_const * (cone.frac + 1)
 
     cone.grad_updated = true
     return cone.grad
@@ -124,7 +124,7 @@ end
 
 function update_hess(cone::HypoRootdetTri)
     if !cone.hess_prod_updated
-        update_hess_prod(cone) # fills in first row of the Hessian and calculates constants
+        update_hess_prod(cone)
     end
     Wi = cone.Wi
     kron_const = cone.kron_const
@@ -177,7 +177,7 @@ end
 
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoRootdetTri)
     if !cone.hess_prod_updated
-        update_hess_prod(cone) # fills in first row of the Hessian and calculates constants
+        update_hess_prod(cone)
     end
 
     @views mul!(prod[1, :]', cone.hess[1, :]', arr)
