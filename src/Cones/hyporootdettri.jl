@@ -81,7 +81,7 @@ function set_initial_point(arr::AbstractVector{T}, cone::HypoRootDetTri{T}) wher
     arr .= 0
     side = cone.side
     const1 = sqrt(T(5side^2 + 2side + 1))
-    const2 = sqrt(T(3side - const1 + 1) / T(side + 1))
+    const2 = sqrt((3side + 1 - const1) / T(side + 1))
     const3 = arr[1] = -5 * const2 / (3 * sqrt(T(2)))
     const4 = -const3 * (side + 1 + const1) / side / 2
     k = 2
@@ -97,15 +97,15 @@ function update_feas(cone::HypoRootDetTri)
     u = cone.point[1]
 
     svec_to_smat!(cone.W, view(cone.point, 2:cone.dim), cone.rt2)
-    # mutates W, which isn't used anywhere else
-    cone.fact_W = cholesky!(Symmetric(cone.W, :U), check = false)
+    cone.fact_W = cholesky!(Symmetric(cone.W, :U), check = false) # mutates W, which isn't used anywhere else
     if isposdef(cone.fact_W)
-        cone.rootdet = det(cone.fact_W) ^ (inv(cone.side))
+        cone.rootdet = det(cone.fact_W) ^ inv(cone.side)
         cone.rootdetu = cone.rootdet - u
-        cone.is_feas = cone.rootdetu > 0
+        cone.is_feas = (cone.rootdetu > 0)
     else
         cone.is_feas = false
     end
+
     cone.feas_updated = true
     return cone.is_feas
 end
@@ -120,6 +120,7 @@ function update_grad(cone::HypoRootDetTri)
     cone.frac = cone.rootdet / cone.side / cone.rootdetu
     @. @views cone.grad[2:cone.dim] *= -(cone.frac + 1)
     @. cone.grad *= cone.sc_const
+
     cone.grad_updated = true
     return cone.grad
 end
@@ -161,6 +162,7 @@ end
 # updates first row of the Hessian
 function update_hess_prod(cone::HypoRootDetTri)
     @assert cone.grad_updated
+
     # rootdet / rootdetu / side
     frac = cone.frac
     # update constants used in the Hessian
