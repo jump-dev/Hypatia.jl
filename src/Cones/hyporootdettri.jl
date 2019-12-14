@@ -6,8 +6,6 @@ hypograph of the root determinant of a (row-wise lower triangle) symmetric posit
 
 barrier from correspondence with A. Nemirovski
 -(5 / 3) ^ 2 * (log(det(W) ^ (1 / n) - u) + logdet(W))
-
-TODO needs updating to smat/svec as on dev branch
 =#
 
 mutable struct HypoRootDetTri{T <: Real} <: Cone{T}
