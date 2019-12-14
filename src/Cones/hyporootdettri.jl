@@ -79,12 +79,11 @@ function set_initial_point(arr::AbstractVector{T}, cone::HypoRootDetTri{T}) wher
     arr .= 0
     side = cone.side
     const1 = sqrt(T(5side^2 + 2side + 1))
-    const2 = sqrt((3side + 1 - const1) / T(side + 1))
-    const3 = arr[1] = -5 * const2 / (3 * sqrt(T(2)))
-    const4 = -const3 * (side + 1 + const1) / side / 2
+    const2 = arr[1] = -5 * sqrt((3side + 1 - const1) / T(side + 1)) / (3 * sqrt(T(2)))
+    const3 = -const2 * (side + 1 + const1) / side / 2
     k = 2
     @inbounds for i in 1:cone.side
-        arr[k] = const4
+        arr[k] = const3
         k += i + 1
     end
     return arr
