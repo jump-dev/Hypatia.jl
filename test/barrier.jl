@@ -245,7 +245,7 @@ function test_hypoperlogdettri_barrier(T::Type{<:Real})
     return
 end
 
-function test_hyporootdettri_barrier(T::Type{<:Real})
+function test_HypoRootdetTri_barrier(T::Type{<:Real})
     for side in [1, 2, 5]
         function barrier(s)
             (u, W) = (s[1], similar(s, side, side))
@@ -254,7 +254,7 @@ function test_hyporootdettri_barrier(T::Type{<:Real})
             return -T(25) / T(9) * (log(det(fact_W) ^ inv(T(side)) - u) + logdet(fact_W))
         end
         dim = 1 + div(side * (side + 1), 2)
-        cone = CO.HypoRootDetTri{T}(dim)
+        cone = CO.HypoRootdetTri{T}(dim)
         test_barrier_oracles(cone, barrier)
     end
     return

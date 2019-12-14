@@ -8,7 +8,7 @@ SC barrier from correspondence with A. Nemirovski
 -(5 / 3) ^ 2 * (log(det(W) ^ (1 / n) - u) + logdet(W))
 =#
 
-mutable struct HypoRootDetTri{T <: Real} <: Cone{T}
+mutable struct HypoRootdetTri{T <: Real} <: Cone{T}
     use_dual::Bool
     dim::Int
     side::Int
@@ -39,7 +39,7 @@ mutable struct HypoRootDetTri{T <: Real} <: Cone{T}
     dot_const::T
     sc_const::T
 
-    function HypoRootDetTri{T}(
+    function HypoRootdetTri{T}(
         dim::Int,
         is_dual::Bool;
         hess_fact_cache = hessian_cache(T),
@@ -54,11 +54,11 @@ mutable struct HypoRootDetTri{T <: Real} <: Cone{T}
     end
 end
 
-HypoRootDetTri{T}(dim::Int) where {T <: Real} = HypoRootDetTri{T}(dim, false)
+HypoRootdetTri{T}(dim::Int) where {T <: Real} = HypoRootdetTri{T}(dim, false)
 
-reset_data(cone::HypoRootDetTri) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_prod_updated = cone.inv_hess_prod_updated = false)
+reset_data(cone::HypoRootdetTri) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_prod_updated = cone.inv_hess_prod_updated = false)
 
-function setup_data(cone::HypoRootDetTri{T}) where {T <: Real}
+function setup_data(cone::HypoRootdetTri{T}) where {T <: Real}
     reset_data(cone)
     dim = cone.dim
     cone.side = round(Int, sqrt(0.25 + 2 * (dim - 1)) - 0.5)
@@ -73,9 +73,9 @@ function setup_data(cone::HypoRootDetTri{T}) where {T <: Real}
     return
 end
 
-get_nu(cone::HypoRootDetTri) = (cone.side + 1) * cone.sc_const
+get_nu(cone::HypoRootdetTri) = (cone.side + 1) * cone.sc_const
 
-function set_initial_point(arr::AbstractVector{T}, cone::HypoRootDetTri{T}) where {T <: Real}
+function set_initial_point(arr::AbstractVector{T}, cone::HypoRootdetTri{T}) where {T <: Real}
     arr .= 0
     side = cone.side
     const1 = sqrt(T(5side^2 + 2side + 1))
@@ -89,7 +89,7 @@ function set_initial_point(arr::AbstractVector{T}, cone::HypoRootDetTri{T}) wher
     return arr
 end
 
-function update_feas(cone::HypoRootDetTri{T}) where {T}
+function update_feas(cone::HypoRootdetTri{T}) where {T}
     @assert !cone.feas_updated
     u = cone.point[1]
 
@@ -107,7 +107,7 @@ function update_feas(cone::HypoRootDetTri{T}) where {T}
     return cone.is_feas
 end
 
-function update_grad(cone::HypoRootDetTri)
+function update_grad(cone::HypoRootdetTri)
     @assert cone.is_feas
     u = cone.point[1]
 
@@ -122,7 +122,7 @@ function update_grad(cone::HypoRootDetTri)
     return cone.grad
 end
 
-function update_hess(cone::HypoRootDetTri)
+function update_hess(cone::HypoRootdetTri)
     if !cone.hess_prod_updated
         update_hess_prod(cone) # fills in first row of the Hessian and calculates constants
     end
@@ -156,7 +156,7 @@ function update_hess(cone::HypoRootDetTri)
 end
 
 # updates first row of the Hessian
-function update_hess_prod(cone::HypoRootDetTri)
+function update_hess_prod(cone::HypoRootdetTri)
     @assert cone.grad_updated
 
     frac = cone.frac # rootdet / rootdetu / side
@@ -175,7 +175,7 @@ function update_hess_prod(cone::HypoRootDetTri)
     return
 end
 
-function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoRootDetTri)
+function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoRootdetTri)
     if !cone.hess_prod_updated
         update_hess_prod(cone) # fills in first row of the Hessian and calculates constants
     end

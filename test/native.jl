@@ -872,6 +872,74 @@ function hypoperlogdettri3(T; options...)
     @test norm(r.x) ≈ 0 atol=tol rtol=tol
 end
 
+
+# TODO fix up below tests
+function hyporootdettri1(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    rt2 = sqrt(T(2))
+    Random.seed!(1)
+    side = 4
+    dim = 1 + div(side * (side + 1), 2)
+    c = T[-1]
+    A = zeros(T, 0, 1)
+    b = T[]
+    G = Matrix{T}(-I, dim, 1)
+    mat_half = rand(T, side, side)
+    mat = mat_half * mat_half'
+    h = zeros(T, dim)
+    CO.smat_to_svec!(view(h, 2:dim), mat, rt2)
+    cones = CO.Cone{T}[CO.HypoRootdetTri{T}(dim)]
+
+    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+    @test r.status == :Optimal
+    @test r.x[1] ≈ -r.primal_obj atol=tol rtol=tol
+    sol_mat = zeros(T, side, side)
+    CO.svec_to_smat!(sol_mat, r.s[2:end], rt2)
+    @test det(Symmetric(sol_mat, :U)) ^ inv(T(side)) ≈ r.s[1] atol=tol rtol=tol
+    # TODO use convex conjugate of rootdet function to get dual condition to test, like for logdet below
+    # CO.svec_to_smat!(sol_mat, -r.z[2:end], rt2)
+    # @test r.z[1] * (logdet(Symmetric(sol_mat, :U) / r.z[1]) + T(side)) ≈ r.z[2] atol=tol rtol=tol
+end
+
+# function hyporootdettri2(T; options...)
+#     tol = sqrt(sqrt(eps(T)))
+#     rt2 = sqrt(T(2))
+#     Random.seed!(1)
+#     side = 3
+#     dim = 1 + div(side * (side + 1), 2)
+# 
+#     cones = CO.Cone{T}[CO.HypoRootdetTri{T}(dim, true)]
+#
+#     r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+#     @test r.status == :Optimal
+#     @test r.x[2] ≈ r.primal_obj atol=tol rtol=tol
+#     @test r.x[1] ≈ -1 atol=tol rtol=tol
+#     sol_mat = zeros(T, side, side)
+#     CO.svec_to_smat!(sol_mat, -r.s[3:end], rt2)
+#     @test r.s[1] * (logdet(Symmetric(sol_mat, :U) / r.s[1]) + T(side)) ≈ r.s[2] atol=tol rtol=tol
+#     CO.svec_to_smat!(sol_mat, r.z[3:end], rt2)
+#     @test r.z[2] * logdet(Symmetric(sol_mat, :U) / r.z[2]) ≈ r.z[1] atol=tol rtol=tol
+# end
+#
+# function hyporootdettri3(T; options...)
+#     tol = sqrt(sqrt(eps(T)))
+#     rt2 = sqrt(T(2))
+#     Random.seed!(1)
+#     side = 3
+#     dim = 1 + div(side * (side + 1), 2)
+#
+#     cones = CO.Cone{T}[CO.HypoRootdetTri{T}(dim)]
+#
+#     r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+#     @test r.status == :Optimal
+#     @test r.x[1] ≈ -r.primal_obj atol=tol rtol=tol
+#     @test norm(r.x) ≈ 0 atol=tol rtol=tol
+# end
+
+
+
+
+
 function epiperexp1(T; options...)
     tol = sqrt(sqrt(eps(T)))
     l = 5
