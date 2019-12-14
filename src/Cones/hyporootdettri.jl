@@ -90,7 +90,7 @@ function set_initial_point(arr::AbstractVector{T}, cone::HypoRootDetTri{T}) wher
     return arr
 end
 
-function update_feas(cone::HypoRootDetTri)
+function update_feas(cone::HypoRootDetTri{T}) where {T}
     @assert !cone.feas_updated
     u = cone.point[1]
 
@@ -98,7 +98,7 @@ function update_feas(cone::HypoRootDetTri)
     # mutates W, which isn't used anywhere else
     cone.fact_W = cholesky!(Symmetric(cone.W, :U), check = false)
     if isposdef(cone.fact_W)
-        cone.rootdet = det(cone.fact_W) ^ (inv(cone.side))
+        cone.rootdet = det(cone.fact_W) ^ (inv(T(cone.side)))
         cone.rootdetu = cone.rootdet - u
         cone.is_feas = cone.rootdetu > 0
     else
