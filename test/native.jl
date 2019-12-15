@@ -801,26 +801,29 @@ function hypoperlogdettri1(T; options...)
     rt2 = sqrt(T(2))
     Random.seed!(1)
     side = 4
-    dim = 2 + div(side * (side + 1), 2)
-    c = T[-1, 0]
-    A = T[0 1]
-    b = T[1]
-    G = Matrix{T}(-I, dim, 2)
-    mat_half = rand(T, side, side)
-    mat = mat_half * mat_half'
-    h = zeros(T, dim)
-    CO.smat_to_svec!(view(h, 3:dim), mat, rt2)
-    cones = CO.Cone{T}[CO.HypoPerLogdetTri{T}(dim)]
+    for is_complex in (false, true)
+        dim = (is_complex ? 2 + side^2 : 2 + div(side * (side + 1), 2))
+        R = (is_complex ? Complex{T} : T)
+        c = T[-1, 0]
+        A = T[0 1]
+        b = T[1]
+        G = Matrix{T}(-I, dim, 2)
+        mat_half = rand(R, side, side)
+        mat = mat_half * mat_half'
+        h = zeros(T, dim)
+        CO.smat_to_svec!(view(h, 3:dim), mat, rt2)
+        cones = CO.Cone{T}[CO.HypoPerLogdetTri{T, R}(dim)]
 
-    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
-    @test r.status == :Optimal
-    @test r.x[1] ≈ -r.primal_obj atol=tol rtol=tol
-    @test r.x[2] ≈ 1 atol=tol rtol=tol
-    sol_mat = zeros(T, side, side)
-    CO.svec_to_smat!(sol_mat, r.s[3:end], rt2)
-    @test r.s[2] * logdet(Symmetric(sol_mat, :U) / r.s[2]) ≈ r.s[1] atol=tol rtol=tol
-    CO.svec_to_smat!(sol_mat, -r.z[3:end], rt2)
-    @test r.z[1] * (logdet(Symmetric(sol_mat, :U) / r.z[1]) + T(side)) ≈ r.z[2] atol=tol rtol=tol
+        r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+        @test r.status == :Optimal
+        @test r.x[1] ≈ -r.primal_obj atol=tol rtol=tol
+        @test r.x[2] ≈ 1 atol=tol rtol=tol
+        sol_mat = zeros(R, side, side)
+        CO.svec_to_smat!(sol_mat, r.s[3:end], rt2)
+        @test r.s[2] * logdet(Hermitian(sol_mat, :U) / r.s[2]) ≈ r.s[1] atol=tol rtol=tol
+        CO.svec_to_smat!(sol_mat, -r.z[3:end], rt2)
+        @test r.z[1] * (logdet(Hermitian(sol_mat, :U) / r.z[1]) + T(side)) ≈ r.z[2] atol=tol rtol=tol
+    end
 end
 
 function hypoperlogdettri2(T; options...)
@@ -828,26 +831,29 @@ function hypoperlogdettri2(T; options...)
     rt2 = sqrt(T(2))
     Random.seed!(1)
     side = 3
-    dim = 2 + div(side * (side + 1), 2)
-    c = T[0, 1]
-    A = T[1 0]
-    b = T[-1]
-    G = Matrix{T}(-I, dim, 2)
-    mat_half = rand(T, side, side)
-    mat = mat_half * mat_half'
-    h = zeros(T, dim)
-    CO.smat_to_svec!(view(h, 3:dim), mat, rt2)
-    cones = CO.Cone{T}[CO.HypoPerLogdetTri{T}(dim, true)]
+    for is_complex in (false, true)
+        dim = (is_complex ? 2 + side^2 : 2 + div(side * (side + 1), 2))
+        R = (is_complex ? Complex{T} : T)
+        c = T[0, 1]
+        A = T[1 0]
+        b = T[-1]
+        G = Matrix{T}(-I, dim, 2)
+        mat_half = rand(R, side, side)
+        mat = mat_half * mat_half'
+        h = zeros(T, dim)
+        CO.smat_to_svec!(view(h, 3:dim), mat, rt2)
+        cones = CO.Cone{T}[CO.HypoPerLogdetTri{T, R}(dim, true)]
 
-    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
-    @test r.status == :Optimal
-    @test r.x[2] ≈ r.primal_obj atol=tol rtol=tol
-    @test r.x[1] ≈ -1 atol=tol rtol=tol
-    sol_mat = zeros(T, side, side)
-    CO.svec_to_smat!(sol_mat, -r.s[3:end], rt2)
-    @test r.s[1] * (logdet(Symmetric(sol_mat, :U) / r.s[1]) + T(side)) ≈ r.s[2] atol=tol rtol=tol
-    CO.svec_to_smat!(sol_mat, r.z[3:end], rt2)
-    @test r.z[2] * logdet(Symmetric(sol_mat, :U) / r.z[2]) ≈ r.z[1] atol=tol rtol=tol
+        r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+        @test r.status == :Optimal
+        @test r.x[2] ≈ r.primal_obj atol=tol rtol=tol
+        @test r.x[1] ≈ -1 atol=tol rtol=tol
+        sol_mat = zeros(R, side, side)
+        CO.svec_to_smat!(sol_mat, -r.s[3:end], rt2)
+        @test r.s[1] * (logdet(Hermitian(sol_mat, :U) / r.s[1]) + T(side)) ≈ r.s[2] atol=tol rtol=tol
+        CO.svec_to_smat!(sol_mat, r.z[3:end], rt2)
+        @test r.z[2] * logdet(Hermitian(sol_mat, :U) / r.z[2]) ≈ r.z[1] atol=tol rtol=tol
+    end
 end
 
 function hypoperlogdettri3(T; options...)
@@ -855,21 +861,24 @@ function hypoperlogdettri3(T; options...)
     rt2 = sqrt(T(2))
     Random.seed!(1)
     side = 3
-    dim = 2 + div(side * (side + 1), 2)
-    c = T[-1, 0]
-    A = T[0 1]
-    b = T[0]
-    G = SparseMatrixCSC(-one(T) * I, dim, 2)
-    mat_half = rand(T, side, side)
-    mat = mat_half * mat_half'
-    h = zeros(T, dim)
-    CO.smat_to_svec!(view(h, 3:dim), mat, rt2)
-    cones = CO.Cone{T}[CO.HypoPerLogdetTri{T}(dim)]
+    for is_complex in (false, true)
+        dim = (is_complex ? 2 + side^2 : 2 + div(side * (side + 1), 2))
+        R = (is_complex ? Complex{T} : T)
+        c = T[-1, 0]
+        A = T[0 1]
+        b = T[0]
+        G = SparseMatrixCSC(-one(T) * I, dim, 2)
+        mat_half = rand(R, side, side)
+        mat = mat_half * mat_half'
+        h = zeros(T, dim)
+        CO.smat_to_svec!(view(h, 3:dim), mat, rt2)
+        cones = CO.Cone{T}[CO.HypoPerLogdetTri{T, R}(dim)]
 
-    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
-    @test r.status == :Optimal
-    @test r.x[1] ≈ -r.primal_obj atol=tol rtol=tol
-    @test norm(r.x) ≈ 0 atol=tol rtol=tol
+        r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+        @test r.status == :Optimal
+        @test r.x[1] ≈ -r.primal_obj atol=tol rtol=tol
+        @test norm(r.x) ≈ 0 atol=tol rtol=tol
+    end
 end
 
 function hyporootdettri1(T; options...)
@@ -943,7 +952,7 @@ function hyporootdettri3(T; options...)
         A = zeros(T, 0, 1)
         b = T[]
         G = SparseMatrixCSC(-one(T) * I, dim, 1)
-        mat_half = 0.2 * randn(R, side, side - 1)
+        mat_half = T(0.2) * rand(R, side, side - 1)
         mat = mat_half * mat_half'
         h = zeros(T, dim)
         CO.smat_to_svec!(view(h, 2:dim), mat, rt2)
