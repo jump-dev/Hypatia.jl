@@ -926,7 +926,7 @@ end
 
 function hyporootdettri3(T; options...)
     # max u: u <= rootdet(W) where W is not full rank
-    tol = sqrt(sqrt(eps(T)))
+    tol = 5 * sqrt(sqrt(eps(T)))
     rt2 = sqrt(T(2))
     Random.seed!(1)
     side = 3
@@ -943,9 +943,8 @@ function hyporootdettri3(T; options...)
 
     r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
     @test r.status == :Optimal
-    @test r.x[1] ≈ -r.primal_obj atol=tol rtol=tol
-    # TODO think about the right condition to test
-    @test r.x[1] ≈ zero(T) atol=tol^(inv(T(side))) rtol=tol^(inv(T(side)))
+    @test r.primal_obj ≈ 0 atol=tol rtol=tol
+    @test r.x[1] ≈ zero(T) atol=tol rtol=tol
 end
 
 function epiperexp1(T; options...)

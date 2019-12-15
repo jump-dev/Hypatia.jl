@@ -133,7 +133,6 @@ function update_grad(cone::HypoRootdetTri)
     return cone.grad
 end
 
-# TODO refactor the hessian element parts
 function update_hess(cone::HypoRootdetTri)
     if !cone.hess_prod_updated
         update_hess_prod(cone)
@@ -147,33 +146,29 @@ function update_hess(cone::HypoRootdetTri)
         for j in 1:(i - 1)
             row_idx = (cone.is_complex ? (i - 1)^2 + 2j : 1 + div((i - 1) * i, 2) + j)
             col_idx = row_idx
-            for k in i:side
-                for l in (i == k ? j : 1):(k - 1)
+            @inbounds for k in i:side
+                @inbounds for l in (i == k ? j : 1):(k - 1)
                     terma = Wi[k, i] * Wi[j, l]
                     termb = Wi[l, i] * Wi[j, k]
                     Wiji = Wi[j, i]
                     Wijk = Wi[l, k]
                     term1 = (terma + termb) * cone.kron_const + Wiji * 2 * real(Wijk) * cone.dot_const
-
                     H[row_idx, col_idx] = real(term1)
-                    if cone.is_complex
+                    @inbounds if cone.is_complex
                         H[row_idx + 1, col_idx] = -imag(term1)
                         term2 = (terma - termb) * cone.kron_const - Wiji * 2im * imag(Wijk) * cone.dot_const
                         H[row_idx, col_idx + 1] = imag(term2)
                         H[row_idx + 1, col_idx + 1] = real(term2)
                     end
-
                     col_idx += idx_incr
                 end
 
                 l = k
                 term = cone.rt2 * (Wi[i, k] * Wi[k, j] * cone.kron_const + Wi[i, j] * Wi[k, k] * cone.dot_const)
                 H[row_idx, col_idx] = real(term)
-
-                if cone.is_complex
+                @inbounds if cone.is_complex
                     H[row_idx + 1, col_idx] = imag(term)
                 end
-
                 col_idx += 1
             end
         end
@@ -181,22 +176,18 @@ function update_hess(cone::HypoRootdetTri)
         j = i
         row_idx = (cone.is_complex ? (i - 1)^2 + 2j : 1 + div((i - 1) * i, 2) + j)
         col_idx = row_idx
-        for k in i:side
-            for l in (i == k ? j : 1):(k - 1)
+        @inbounds for k in i:side
+            @inbounds for l in (i == k ? j : 1):(k - 1)
                 term = cone.rt2 * (Wi[k, i] * Wi[j, l] * cone.kron_const + Wi[i, j] * Wi[k, l] * cone.dot_const)
-
                 H[row_idx, col_idx] = real(term)
-                if cone.is_complex
+                @inbounds if cone.is_complex
                     H[row_idx, col_idx + 1] = imag(term)
                 end
-
                 col_idx += idx_incr
             end
 
             l = k
-
             H[row_idx, col_idx] = abs2(Wi[k, i]) * cone.kron_const + Wi[i, i] * Wi[k, k] * cone.dot_const
-
             col_idx += 1
         end
     end
@@ -205,33 +196,6 @@ function update_hess(cone::HypoRootdetTri)
     cone.hess_updated = true
     return cone.hess
 end
-
-# # TODO maybe can refactor with spectral cone etc
-# # TODO @inbounds
-# function _hess_WW_element(H::Matrix{T}, r_idx::Int, c_idx::Int, term1::T, term2::T) where {T <: Real}
-#     H[r_idx, c_idx] = term1 + term2
-#     return nothing
-# end
-#
-# function _hess_WW_element(H::Matrix{T}, r_idx::Int, c_idx::Int, term1::Complex{T}, term2::Complex{T}) where {T <: Real}
-#     # @inbounds begin
-#         H[r_idx, c_idx] = real(term1) + real(term2)
-#         H[r_idx + 1, c_idx] = imag(term2) - imag(term1)
-#         H[r_idx, c_idx + 1] = imag(term1) + imag(term2)
-#         H[r_idx + 1, c_idx + 1] = real(term1) - real(term2)
-#     # end
-#     return nothing
-# end
-#
-# function _hess_WW_element(H::Matrix{T}, r_idx::Int, c_idx::Int, term1::Complex{T}, term2::Complex{T}) where {T <: Real}
-#     # @inbounds begin
-#         H[r_idx, c_idx] = real(term1) + real(term2)
-#         H[r_idx + 1, c_idx] = imag(term2) - imag(term1)
-#         H[r_idx, c_idx + 1] = imag(term1) + imag(term2)
-#         H[r_idx + 1, c_idx + 1] = real(term1) - real(term2)
-#     # end
-#     return nothing
-# end
 
 # updates first row of the Hessian
 function update_hess_prod(cone::HypoRootdetTri)
@@ -253,23 +217,23 @@ function update_hess_prod(cone::HypoRootdetTri)
     return
 end
 
-# function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoRootdetTri)
-#     if !cone.hess_prod_updated
-#         update_hess_prod(cone)
-#     end
-#
-#     @views mul!(prod[1, :]', cone.hess[1, :]', arr)
-#     @inbounds for i in 1:size(arr, 2)
-#         svec_to_smat!(cone.work_mat, view(arr, 2:cone.dim, i), cone.rt2)
-#         dot_prod = dot(Hermitian(cone.work_mat, :U), Hermitian(cone.Wi, :U))
-#         copytri!(cone.work_mat, 'U')
-#         rdiv!(cone.work_mat, cone.fact_W)
-#         ldiv!(cone.fact_W, cone.work_mat)
-#         axpby!(dot_prod * cone.dot_const, cone.Wi, cone.kron_const, cone.work_mat)
-#         @views smat_to_svec!(prod[2:cone.dim, i], cone.work_mat, cone.rt2)
-#     end
-#     @. @views prod[2:cone.dim, :] *= cone.sc_const
-#     @views mul!(prod[2:cone.dim, :], cone.hess[2:cone.dim, 1], arr[1, :]', true, true)
-#
-#     return prod
-# end
+function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoRootdetTri)
+    if !cone.hess_prod_updated
+        update_hess_prod(cone)
+    end
+
+    @views mul!(prod[1, :]', cone.hess[1, :]', arr)
+    @inbounds for i in 1:size(arr, 2)
+        svec_to_smat!(cone.work_mat, view(arr, 2:cone.dim, i), cone.rt2)
+        dot_prod = dot(Hermitian(cone.work_mat, :U), Hermitian(cone.Wi, :U))
+        copytri!(cone.work_mat, 'U', cone.is_complex)
+        rdiv!(cone.work_mat, cone.fact_W)
+        ldiv!(cone.fact_W, cone.work_mat)
+        axpby!(dot_prod * cone.dot_const, cone.Wi, cone.kron_const, cone.work_mat)
+        @views smat_to_svec!(prod[2:cone.dim, i], cone.work_mat, cone.rt2)
+    end
+    @. @views prod[2:cone.dim, :] *= cone.sc_const
+    @views mul!(prod[2:cone.dim, :], cone.hess[2:cone.dim, 1], arr[1, :]', true, true)
+
+    return prod
+end
