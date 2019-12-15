@@ -304,13 +304,10 @@ end
 function test_wsospolyinterpmat_barrier(T::Type{<:Real})
     Random.seed!(1)
     for n in 1:3, halfdeg in 1:2, R in 1:3
-        # (U, _, P0, PWts, _) = MU.interpolate(MU.FreeDomain(n), halfdeg, sample = false)
-        (U, _, P0, PWts, _) = MU.interpolate(MU.Box(-ones(n), ones(n)), halfdeg, sample = false)
-        Ps = vcat([P0], PWts)
-        Ps = convert.(Matrix{T}, Ps)
+        (U, _, P0, Ps, _) = MU.interpolate(MU.Box{T}(-ones(T, n), ones(T, n)), halfdeg, sample = false)
+        Ps = vcat([P0], Ps)
         cone = CO.WSOSPolyInterpMat{T}(R, U, Ps, true)
         function barrier(s)
-            lambda_block(s, P) = Symmetric(P' * Diagonal(s) * P)
             bar = zero(eltype(s))
             rt2i = convert(eltype(s), inv(sqrt(T(2))))
             for P in Ps
@@ -324,7 +321,7 @@ function test_wsospolyinterpmat_barrier(T::Type{<:Real})
                         slice = s[uo:(uo + U - 1)]
                         uo += U
                         fact = (i == j ? one(T) : rt2i)
-                        Lambda.data[rows:(rows + L - 1), cols:(cols + L - 1)] = lambda_block(slice, P) * fact
+                        Lambda.data[rows:(rows + L - 1), cols:(cols + L - 1)] = Symmetric(P' * Diagonal(slice) * P) * fact
                         cols += L
                     end
                     rows += L
@@ -341,22 +338,26 @@ end
 function test_wsospolyinterpsoc_barrier(T::Type{<:Real})
     Random.seed!(1)
     for n in 1:2, halfdeg in 1:2, R in 3:3
-        (U, _, P0, _, _) = MU.interpolate(MU.FreeDomain(n), halfdeg, sample = false)
-        P0 = convert(Matrix{T}, P0)
-        cone = CO.WSOSPolyInterpSOC{T}(R, U, [P0], true)
+        (U, _, P0, Ps, _) = MU.interpolate(MU.Box{T}(-ones(T, n), ones(T, n)), halfdeg, sample = false)
+        Ps = vcat([P0], Ps)
+        cone = CO.WSOSPolyInterpMat{T}(R, U, Ps, true)
 
         function barrier(s)
-            L = size(P0, 2)
-            Lambda1 = Symmetric(P0' * Diagonal(s[1:U]) * P0)
-            Lambda = copy(Lambda1)
-            uo = U + 1
-            for _ in 2:R
-                slice = s[uo:(uo + U - 1)]
-                lambda_i = P0' * Diagonal(slice) * P0
-                Lambda -= lambda_i * (Lambda1 \ lambda_i)
-                uo += U
+            bar = zero(eltype(s))
+            for P in Ps
+                L = size(P, 2)
+                Lambda1 = Symmetric(P' * Diagonal(s[1:U]) * P)
+                Lambda = copy(Lambda1)
+                uo = U + 1
+                for _ in 2:R
+                    slice = s[uo:(uo + U - 1)]
+                    lambda_i = P' * Diagonal(slice) * P
+                    Lambda -= lambda_i * (Lambda1 \ lambda_i)
+                    uo += U
+                end
+                bar -= logdet(cholesky!(Lambda)) - logdet(cholesky!(Lambda1))
             end
-            return -logdet(cholesky!(Lambda)) - logdet(cholesky!(Lambda1))
+            return bar
         end
         test_barrier_oracles(cone, barrier, init_tol = Inf)
     end

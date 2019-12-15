@@ -1,7 +1,8 @@
 #=
 Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 
-interpolation-based weighted-sum-of-squares (multivariate) polynomial second order cone parametrized by interpolation points Ps
+interpolation-based weighted-sum-of-squares (multivariate) polynomial epinormeucl (AKA second-order cone) parametrized by interpolation points Ps
+TODO improve description
 
 definition and dual barrier extended from "Sum-of-squares optimization without semidefinite programming" by D. Papp and S. Yildiz, available at https://arxiv.org/abs/1712.01792
 
