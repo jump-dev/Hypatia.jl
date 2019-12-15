@@ -40,18 +40,16 @@ function polyminreal(
             error("`n` should be specified as a positive keyword argument if randomly generating a polynomial")
         end
         true_obj = NaN
-        dom = MU.Box(-ones(n), ones(n))
+        dom = MU.Box{T}(-ones(T, n), ones(T, n))
         (U, pts, P0, PWts, _) = MU.interpolate(dom, halfdeg, sample = true)
         interp_vals = T.(randn(U))
     else
-        (x, fn, dom, true_obj) = getpolydata(polyname)
+        (x, fn, dom, true_obj) = getpolydata(polyname, T = T)
         sample = (length(x) >= 5) || !isa(dom, MU.Box)
         (U, pts, P0, PWts, _) = MU.interpolate(dom, halfdeg, sample = sample)
         # set up problem data
         interp_vals = T[fn(pts[j, :]...) for j in 1:U]
     end
-    # TODO remove below conversions when ModelUtilities can use T <: Real
-    P0 = T.(P0)
     PWts = convert.(Matrix{T}, PWts)
 
     if use_wsos
