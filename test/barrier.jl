@@ -50,23 +50,28 @@ function test_barrier_oracles(
     grad = CO.grad(cone)
     nu = CO.get_nu(cone)
     @test dot(point, grad) ≈ -nu atol=tol rtol=tol
-    # hess = CO.hess(cone)
-    # @test hess * point ≈ -grad atol=tol rtol=tol
+    hess = CO.hess(cone)
+    @test hess * point ≈ -grad atol=tol rtol=tol
+    # fd_hess = ForwardDiff.hessian(barrier, point)
+    # @show hess
+    # @show fd_hess
+    # @show trunc.(hess - fd_hess, digits = 6)
+    # println()
 
     if T in (Float32, Float64) # NOTE can only use BLAS floats with ForwardDiff barriers
         @test ForwardDiff.gradient(barrier, point) ≈ grad atol=tol rtol=tol
-        # @test ForwardDiff.hessian(barrier, point) ≈ hess atol=tol rtol=tol
+        @test ForwardDiff.hessian(barrier, point) ≈ hess atol=tol rtol=tol
     end
 
-    # inv_hess = CO.inv_hess(cone)
-    # @test hess * inv_hess ≈ I atol=tol rtol=tol
-    #
-    # prod = similar(point)
-    # @test CO.hess_prod!(prod, point, cone) ≈ -grad atol=tol rtol=tol
-    # @test CO.inv_hess_prod!(prod, grad, cone) ≈ -point atol=tol rtol=tol
-    # prod = similar(point, dim, dim)
-    # @test CO.hess_prod!(prod, Matrix(inv_hess), cone) ≈ I atol=tol rtol=tol
-    # @test CO.inv_hess_prod!(prod, Matrix(hess), cone) ≈ I atol=tol rtol=tol
+    inv_hess = CO.inv_hess(cone)
+    @test hess * inv_hess ≈ I atol=tol rtol=tol
+
+    prod = similar(point)
+    @test CO.hess_prod!(prod, point, cone) ≈ -grad atol=tol rtol=tol
+    @test CO.inv_hess_prod!(prod, grad, cone) ≈ -point atol=tol rtol=tol
+    prod = similar(point, dim, dim)
+    @test CO.hess_prod!(prod, Matrix(inv_hess), cone) ≈ I atol=tol rtol=tol
+    @test CO.inv_hess_prod!(prod, Matrix(hess), cone) ≈ I atol=tol rtol=tol
 
     return
 end
@@ -204,6 +209,7 @@ function test_epinormspectral_barrier(T::Type{<:Real})
     end
     return
 end
+
 function test_possemideftri_barrier(T::Type{<:Real})
     for side in [1, 2, 5]
         # real PSD cone
