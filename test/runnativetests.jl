@@ -74,6 +74,9 @@ testfuns = [
     hypoperlogdettri1,
     hypoperlogdettri2,
     hypoperlogdettri3,
+    hyporootdettri1,
+    hyporootdettri2,
+    hyporootdettri3,
     primalinfeas1,
     primalinfeas2,
     primalinfeas3,
@@ -84,8 +87,8 @@ testfuns = [
 
 generic_reals = [
     Float64,
-    Float32,
-    BigFloat,
+    # Float32,
+    # BigFloat,
     ]
 
 blas_reals = [
@@ -149,7 +152,7 @@ options = (verbose = true,)
         T = Float64
         t(T, solver = SO.Solver{T}(system_solver = SO.SymIndefSparseSystemSolver{T}(); options...))
     end
-    @testset "QRCholDense tests: $t, $T, $ss" for t in testfuns, T in generic_reals, ss in [Hypatia.DenseSymCache]#, Hypatia.DensePosDefCache]
+    @testset "QRCholDense tests: $t, $T, $ss" for t in testfuns, T in generic_reals, ss in [Hypatia.DenseSymCache, Hypatia.DensePosDefCache]
         t(T, solver = SO.Solver{T}(system_solver = SO.QRCholDenseSystemSolver{T}(fact_cache = ss{T}()); options...))
     end
 end

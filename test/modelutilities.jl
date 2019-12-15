@@ -76,3 +76,16 @@ function test_recover_cheb_polys()
     cheb_polys = MU.get_chebyshev_polys(x, halfdeg)
     @test cheb_polys == [1, x[1], x[2], 2x[1]^2 - 1, x[1] * x[2], 2x[2]^2 - 1]
 end
+
+function test_svec_conversion(T::DataType)
+    tol = 10eps(T)
+    rt2 = sqrt(T(2))
+    vec = rand(T, 6)
+    vec_copy = copy(vec)
+    MU.vec_to_svec!(vec, rt2)
+    @test vec ≈ vec_copy .* [1, rt2, 1, rt2, rt2, 1] atol=tol rtol=tol
+    mat = rand(T, 10, 3)
+    mat_copy = copy(mat)
+    MU.vec_to_svec_cols!(mat, rt2)
+    @test mat ≈ mat_copy .* [1, rt2, 1, rt2, rt2, 1, rt2, rt2, rt2, 1] atol=tol rtol=tol
+end
