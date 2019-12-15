@@ -876,26 +876,29 @@ function hyporootdettri1(T; options...)
     tol = sqrt(sqrt(eps(T)))
     rt2 = sqrt(T(2))
     Random.seed!(1)
-    side = 4
-    dim = 1 + div(side * (side + 1), 2)
-    c = T[-1]
-    A = zeros(T, 0, 1)
-    b = T[]
-    G = Matrix{T}(-I, dim, 1)
-    mat_half = rand(T, side, side)
-    mat = mat_half * mat_half'
-    h = zeros(T, dim)
-    CO.smat_to_svec!(view(h, 2:dim), mat, rt2)
-    cones = CO.Cone{T}[CO.HypoRootdetTri{T, T}(dim)]
+    side = 3
+    for is_complex in (false, true)
+        dim = (is_complex ? 1 + side^2 : 1 + div(side * (side + 1), 2))
+        R = (is_complex ? Complex{T} : T)
+        c = T[-1]
+        A = zeros(T, 0, 1)
+        b = T[]
+        G = Matrix{T}(-I, dim, 1)
+        mat_half = rand(R, side, side)
+        mat = mat_half * mat_half'
+        h = zeros(T, dim)
+        CO.smat_to_svec!(view(h, 2:dim), mat, rt2)
+        cones = CO.Cone{T}[CO.HypoRootdetTri{T, R}(dim)]
 
-    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
-    @test r.status == :Optimal
-    @test r.x[1] ≈ -r.primal_obj atol=tol rtol=tol
-    sol_mat = zeros(T, side, side)
-    CO.svec_to_smat!(sol_mat, r.s[2:end], rt2)
-    @test det(Symmetric(sol_mat, :U)) ^ inv(T(side)) ≈ r.s[1] atol=tol rtol=tol
-    CO.svec_to_smat!(sol_mat, r.z[2:end] .* T(side), rt2)
-    @test det(Symmetric(sol_mat, :U)) ^ inv(T(side)) ≈ -r.z[1] atol=tol rtol=tol
+        r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+        @test r.status == :Optimal
+        @test r.x[1] ≈ -r.primal_obj atol=tol rtol=tol
+        sol_mat = zeros(R, side, side)
+        CO.svec_to_smat!(sol_mat, r.s[2:end], rt2)
+        @test det(Hermitian(sol_mat, :U)) ^ inv(T(side)) ≈ r.s[1] atol=tol rtol=tol
+        CO.svec_to_smat!(sol_mat, r.z[2:end] .* T(side), rt2)
+        @test det(Hermitian(sol_mat, :U)) ^ inv(T(side)) ≈ -r.z[1] atol=tol rtol=tol
+    end
 end
 
 function hyporootdettri2(T; options...)
@@ -903,25 +906,28 @@ function hyporootdettri2(T; options...)
     rt2 = sqrt(T(2))
     Random.seed!(1)
     side = 4
-    dim = 1 + div(side * (side + 1), 2)
-    c = T[1]
-    A = zeros(T, 0, 1)
-    b = T[]
-    G = Matrix{T}(-I, dim, 1)
-    mat_half = rand(T, side, side)
-    mat = mat_half * mat_half'
-    h = zeros(T, dim)
-    CO.smat_to_svec!(view(h, 2:dim), mat, rt2)
-    cones = CO.Cone{T}[CO.HypoRootdetTri{T, T}(dim, true)]
+    for is_complex in (false, true)
+        dim = (is_complex ? 1 + side^2 : 1 + div(side * (side + 1), 2))
+        R = (is_complex ? Complex{T} : T)
+        c = T[1]
+        A = zeros(T, 0, 1)
+        b = T[]
+        G = Matrix{T}(-I, dim, 1)
+        mat_half = rand(R, side, side)
+        mat = mat_half * mat_half'
+        h = zeros(T, dim)
+        CO.smat_to_svec!(view(h, 2:dim), mat, rt2)
+        cones = CO.Cone{T}[CO.HypoRootdetTri{T, R}(dim, true)]
 
-    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
-    @test r.status == :Optimal
-    @test r.x[1] ≈ r.primal_obj atol=tol rtol=tol
-    sol_mat = zeros(T, side, side)
-    CO.svec_to_smat!(sol_mat, r.s[2:end] .* T(side), rt2)
-    @test det(Symmetric(sol_mat, :U)) ^ inv(T(side)) ≈ -r.s[1] atol=tol rtol=tol
-    CO.svec_to_smat!(sol_mat, r.z[2:end], rt2)
-    @test det(Symmetric(sol_mat, :U)) ^ inv(T(side)) ≈ r.z[1] atol=tol rtol=tol
+        r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+        @test r.status == :Optimal
+        @test r.x[1] ≈ r.primal_obj atol=tol rtol=tol
+        sol_mat = zeros(R, side, side)
+        CO.svec_to_smat!(sol_mat, r.s[2:end] .* T(side), rt2)
+        @test det(Hermitian(sol_mat, :U)) ^ inv(T(side)) ≈ -r.s[1] atol=tol rtol=tol
+        CO.svec_to_smat!(sol_mat, r.z[2:end], rt2)
+        @test det(Hermitian(sol_mat, :U)) ^ inv(T(side)) ≈ r.z[1] atol=tol rtol=tol
+    end
 end
 
 function hyporootdettri3(T; options...)
@@ -930,21 +936,24 @@ function hyporootdettri3(T; options...)
     rt2 = sqrt(T(2))
     Random.seed!(1)
     side = 3
-    dim = 1 + div(side * (side + 1), 2)
-    c = T[-1]
-    A = zeros(T, 0, 1)
-    b = T[]
-    G = SparseMatrixCSC(-one(T) * I, dim, 1)
-    mat_half = rand(T, side, side - 1)
-    mat = mat_half * mat_half'
-    h = zeros(T, dim)
-    CO.smat_to_svec!(view(h, 2:dim), mat, rt2)
-    cones = CO.Cone{T}[CO.HypoRootdetTri{T, T}(dim)]
+    for is_complex in (false, true)
+        dim = (is_complex ? 1 + side^2 : 1 + div(side * (side + 1), 2))
+        R = (is_complex ? Complex{T} : T)
+        c = T[-1]
+        A = zeros(T, 0, 1)
+        b = T[]
+        G = SparseMatrixCSC(-one(T) * I, dim, 1)
+        mat_half = 0.2 * randn(R, side, side - 1)
+        mat = mat_half * mat_half'
+        h = zeros(T, dim)
+        CO.smat_to_svec!(view(h, 2:dim), mat, rt2)
+        cones = CO.Cone{T}[CO.HypoRootdetTri{T, R}(dim)]
 
-    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
-    @test r.status == :Optimal
-    @test r.primal_obj ≈ 0 atol=tol rtol=tol
-    @test r.x[1] ≈ zero(T) atol=tol rtol=tol
+        r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+        @test r.status == :Optimal
+        @test r.primal_obj ≈ 0 atol=tol rtol=tol
+        @test r.x[1] ≈ zero(T) atol=tol rtol=tol
+    end
 end
 
 function epiperexp1(T; options...)
