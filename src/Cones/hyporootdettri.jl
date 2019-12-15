@@ -6,6 +6,9 @@ hypograph of the root determinant of a (row-wise lower triangle) symmetric posit
 
 SC barrier from correspondence with A. Nemirovski
 -(5 / 3) ^ 2 * (log(det(W) ^ (1 / n) - u) + logdet(W))
+
+TODO
+- describe complex case
 =#
 
 mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
@@ -100,7 +103,7 @@ function set_initial_point(arr::AbstractVector{T}, cone::HypoRootdetTri{T, R}) w
     return arr
 end
 
-function update_feas(cone::HypoRootdetTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
+function update_feas(cone::HypoRootdetTri)
     @assert !cone.feas_updated
     u = cone.point[1]
 
@@ -151,12 +154,12 @@ function update_hess(cone::HypoRootdetTri)
                     terma = Wi[k, i] * Wi[j, l]
                     termb = Wi[l, i] * Wi[j, k]
                     Wiji = Wi[j, i]
-                    Wijk = Wi[l, k]
-                    term1 = (terma + termb) * cone.kron_const + Wiji * 2 * real(Wijk) * cone.dot_const
+                    Wilk = Wi[l, k]
+                    term1 = (terma + termb) * cone.kron_const + Wiji * 2 * real(Wilk) * cone.dot_const
                     H[row_idx, col_idx] = real(term1)
                     @inbounds if cone.is_complex
                         H[row_idx + 1, col_idx] = -imag(term1)
-                        term2 = (terma - termb) * cone.kron_const - Wiji * 2im * imag(Wijk) * cone.dot_const
+                        term2 = (terma - termb) * cone.kron_const - Wiji * 2im * imag(Wilk) * cone.dot_const
                         H[row_idx, col_idx + 1] = imag(term2)
                         H[row_idx + 1, col_idx + 1] = real(term2)
                     end
@@ -187,7 +190,7 @@ function update_hess(cone::HypoRootdetTri)
             end
 
             l = k
-            H[row_idx, col_idx] = abs2(Wi[k, i]) * cone.kron_const + Wi[i, i] * Wi[k, k] * cone.dot_const
+            H[row_idx, col_idx] = abs2(Wi[k, i]) * cone.kron_const + real(Wi[i, i] * Wi[k, k]) * cone.dot_const
             col_idx += 1
         end
     end
@@ -197,7 +200,7 @@ function update_hess(cone::HypoRootdetTri)
     return cone.hess
 end
 
-# updates first row of the Hessian
+# update first row of the Hessian
 function update_hess_prod(cone::HypoRootdetTri)
     @assert cone.grad_updated
 
@@ -230,7 +233,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoRoo
         rdiv!(cone.work_mat, cone.fact_W)
         ldiv!(cone.fact_W, cone.work_mat)
         axpby!(dot_prod * cone.dot_const, cone.Wi, cone.kron_const, cone.work_mat)
-        @views smat_to_svec!(prod[2:cone.dim, i], cone.work_mat, cone.rt2)
+        smat_to_svec!(view(prod, 2:cone.dim, i), cone.work_mat, cone.rt2)
     end
     @. @views prod[2:cone.dim, :] *= cone.sc_const
     @views mul!(prod[2:cone.dim, :], cone.hess[2:cone.dim, 1], arr[1, :]', true, true)

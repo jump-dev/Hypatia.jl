@@ -52,11 +52,6 @@ function test_barrier_oracles(
     @test dot(point, grad) ≈ -nu atol=tol rtol=tol
     hess = CO.hess(cone)
     @test hess * point ≈ -grad atol=tol rtol=tol
-    # fd_hess = ForwardDiff.hessian(barrier, point)
-    # @show hess
-    # @show fd_hess
-    # @show trunc.(hess - fd_hess, digits = 6)
-    # println()
 
     if T in (Float32, Float64) # NOTE can only use BLAS floats with ForwardDiff barriers
         @test ForwardDiff.gradient(barrier, point) ≈ grad atol=tol rtol=tol
@@ -235,17 +230,32 @@ end
 
 function test_hypoperlogdettri_barrier(T::Type{<:Real})
     for side in [1, 2, 3, 4, 5, 6, 12, 20]
-        function barrier(s)
+        # real logdet barrier
+        function R_barrier(s)
             (u, v, W) = (s[1], s[2], zeros(eltype(s), side, side))
             CO.svec_to_smat!(W, s[3:end], sqrt(T(2)))
             return -log(v * logdet(cholesky!(Symmetric(W / v, :U))) - u) - logdet(cholesky!(Symmetric(W, :U))) - log(v)
         end
         dim = 2 + div(side * (side + 1), 2)
-        cone = CO.HypoPerLogdetTri{T}(dim)
+        cone = CO.HypoPerLogdetTri{T, T}(dim)
         if side <= 5
-            test_barrier_oracles(cone, barrier, init_tol = 1e-5)
+            test_barrier_oracles(cone, R_barrier, init_tol = 1e-5)
         else
-            test_barrier_oracles(cone, barrier, init_tol = 1e-1, init_only = true)
+            test_barrier_oracles(cone, R_barrier, init_tol = 1e-1, init_only = true)
+        end
+
+        # complex logdet barrier
+        function C_barrier(s)
+            (u, v, W) = (s[1], s[2], zeros(Complex{eltype(s)}, side, side))
+            CO.svec_to_smat!(W, s[3:end], sqrt(T(2)))
+            return -log(v * logdet(cholesky!(Hermitian(W / v, :U))) - u) - logdet(cholesky!(Hermitian(W, :U))) - log(v)
+        end
+        dim = 2 + side^2
+        cone = CO.HypoPerLogdetTri{T, Complex{T}}(dim)
+        if side <= 4
+            test_barrier_oracles(cone, C_barrier, init_tol = 1e-5)
+        else
+            test_barrier_oracles(cone, C_barrier, init_tol = 1e-1, init_only = true)
         end
     end
     return
