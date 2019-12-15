@@ -42,6 +42,9 @@ testfuns = [
     epinorminf3,
     epinorminf4,
     epinorminf5,
+    epinorminf6,
+    epinorminf7,
+    epinorminf8,
     epinormeucl1,
     epinormeucl2,
     epipersquare1,
@@ -63,12 +66,20 @@ testfuns = [
     hypogeomean2,
     hypogeomean3,
     epinormspectral1,
+    epinormspectral2,
+    epinormspectral3,
     possemideftri1,
     possemideftri2,
     possemideftricomplex1,
     hypoperlogdettri1,
     hypoperlogdettri2,
     hypoperlogdettri3,
+    hyporootdettri1,
+    hyporootdettri2,
+    hyporootdettri3,
+    wsospolyinterp1,
+    wsospolyinterp2,
+    wsospolyinterp3,
     primalinfeas1,
     primalinfeas2,
     primalinfeas3,
@@ -79,8 +90,8 @@ testfuns = [
 
 generic_reals = [
     Float64,
-    Float32,
-    BigFloat,
+    # Float32,
+    # BigFloat,
     ]
 
 blas_reals = [
@@ -88,7 +99,7 @@ blas_reals = [
     Float32,
     ]
 
-options = (verbose = false,)
+options = (verbose = true,)
 
 @info("starting native tests")
 @testset "native tests" begin

@@ -10,6 +10,7 @@ using Test
 import Hypatia
 import Hypatia.BlockMatrix
 const CO = Hypatia.Cones
+const MU = Hypatia.ModelUtilities
 const HYP = Hypatia
 
 function expdesign(
@@ -47,10 +48,11 @@ function expdesign(
             end
             l += 1
         end
+        MU.vec_to_svec_cols!(G_logdet, sqrt(T(2)))
         @assert l - 1 == dimvec
         # pad with hypograph variable and perspective variable
         h_logdet = vcat(zero(T), one(T), zeros(T, dimvec))
-        push!(cones, CO.HypoPerLogdetTri{T}(dimvec + 2))
+        push!(cones, CO.HypoPerLogdetTri{T, T}(dimvec + 2))
 
         if use_linops
             A = BlockMatrix{T}(1, p + 1, [A], [1:1], [2:(p + 1)])
@@ -124,6 +126,7 @@ function expdesign(
             G_psd[l, p + diag_idx(i)] = -1
             l += 1
         end
+        MU.vec_to_svec_cols!(G_psd, sqrt(T(2)))
 
         h_psd = zeros(T, dimvec)
         push!(cones, CO.PosSemidefTri{T, T}(dimvec))

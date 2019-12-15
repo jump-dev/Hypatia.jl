@@ -13,6 +13,8 @@ include(joinpath(examples_dir, "envelope/native.jl"))
 include(joinpath(examples_dir, "expdesign/native.jl"))
 include(joinpath(examples_dir, "linearopt/native.jl"))
 include(joinpath(examples_dir, "matrixcompletion/native.jl"))
+include(joinpath(examples_dir, "matrixregression/native.jl"))
+include(joinpath(examples_dir, "maxvolume/native.jl"))
 include(joinpath(examples_dir, "polymin/native.jl"))
 include(joinpath(examples_dir, "portfolio/native.jl"))
 include(joinpath(examples_dir, "sparsepca/native.jl"))
@@ -31,14 +33,19 @@ options = (atol = sqrt(sqrt(eps(T))), solver = SO.Solver{T}(
     @testset "expdesign" begin test_expdesign.(instances_expdesign_few, T = T, options = options) end
     @testset "linearopt" begin test_linearopt.(instances_linearopt_few, T = T, options = options) end
     @testset "matrixcompletion" begin test_matrixcompletion.(instances_matrixcompletion_few, T = T, options = options) end
+    @testset "matrixregression" begin test_matrixregression.(instances_matrixregression_few, R = T, options = options) end # real
+    @testset "matrixregression" begin test_matrixregression.(instances_matrixregression_few, R = Complex{T}, options = options) end # complex
+    @testset "maxvolume" begin test_maxvolume.(instances_maxvolume_few, T = T, options = options) end
     @testset "sparsepca" begin test_sparsepca.(instances_sparsepca_few, T = T, options = options) end
-    @testset "polymin" begin test_polymin.(instances_polymin_few, T = T, options = options) end
+    if T == Float64 # not all domains work with other types
+        @testset "polymin" begin test_polymin.(instances_polymin_few, T = T, options = options) end
+    end
     @testset "portfolio" begin test_portfolio.(instances_portfolio_few, T = T, options = options) end
 end
 
 tol = sqrt(sqrt(eps(T)))
 options = (atol = 10 * tol, solver = SO.Solver{T}(
-    verbose = true, init_use_indirect = true, preprocess = false, iter_limit = 250,
+    verbose = true, init_use_indirect = true, reduce = false, preprocess = false, iter_limit = 250,
     time_limit = 12e2, tol_feas = tol / 10, tol_abs_opt = tol / 10, tol_rel_opt = tol / 10,
     system_solver = SO.NaiveIndirectSystemSolver{T}()))
 

@@ -32,6 +32,7 @@ include("hypogeomean.jl")
 include("epinormspectral.jl")
 include("possemideftri.jl")
 include("hypoperlogdettri.jl")
+include("HypoRootdetTri.jl")
 include("wsospolyinterp.jl")
 include("wsospolyinterpmat.jl")
 # include("wsospolyinterpsoc.jl")
@@ -97,35 +98,36 @@ end
 
 # utilities for converting between symmetric/Hermitian matrix and vector triangle forms
 
-function mat_U_to_vec_scaled!(vec::AbstractVector{T}, mat::AbstractMatrix{T}) where {T}
+# TODO fix later, rt2::T doesn't work with tests using ForwardDiff
+function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{T}, rt2::Number) where {T}
     k = 1
     m = size(mat, 1)
     @inbounds for j in 1:m, i in 1:j
         if i == j
             vec[k] = mat[i, j]
         else
-            vec[k] = 2 * mat[i, j]
+            vec[k] = mat[i, j] * rt2
         end
         k += 1
     end
     return vec
 end
 
-function vec_to_mat_U_scaled!(mat::AbstractMatrix{T}, vec::AbstractVector{T}) where {T}
+function svec_to_smat!(mat::AbstractMatrix{T}, vec::AbstractVector{T}, rt2::Number) where {T}
     k = 1
     m = size(mat, 1)
     @inbounds for j in 1:m, i in 1:j
         if i == j
             mat[i, j] = vec[k]
         else
-            mat[i, j] = vec[k] / 2
+            mat[i, j] = vec[k] / rt2
         end
         k += 1
     end
     return mat
 end
 
-function mat_U_to_vec_scaled!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}) where {T}
+function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}, rt2::Number) where {T}
     k = 1
     m = size(mat, 1)
     @inbounds for j in 1:m, i in 1:j
@@ -133,7 +135,7 @@ function mat_U_to_vec_scaled!(vec::AbstractVector{T}, mat::AbstractMatrix{Comple
             vec[k] = real(mat[i, j])
             k += 1
         else
-            ck = 2 * mat[i, j]
+            ck = mat[i, j] * rt2
             vec[k] = real(ck)
             k += 1
             vec[k] = -imag(ck)
@@ -143,7 +145,7 @@ function mat_U_to_vec_scaled!(vec::AbstractVector{T}, mat::AbstractMatrix{Comple
     return vec
 end
 
-function vec_to_mat_U_scaled!(mat::AbstractMatrix{Complex{T}}, vec::AbstractVector{T}) where {T}
+function svec_to_smat!(mat::AbstractMatrix{Complex{T}}, vec::AbstractVector{T}, rt2::Number) where {T}
     k = 1
     m = size(mat, 1)
     @inbounds for j in 1:m, i in 1:j
@@ -151,64 +153,38 @@ function vec_to_mat_U_scaled!(mat::AbstractMatrix{Complex{T}}, vec::AbstractVect
             mat[i, j] = vec[k]
             k += 1
         else
-            mat[i, j] = Complex(vec[k], -vec[k + 1]) / 2
+            mat[i, j] = Complex(vec[k], -vec[k + 1]) / rt2
             k += 2
         end
     end
     return mat
 end
 
-function mat_U_to_vec!(vec::AbstractVector{T}, mat::AbstractMatrix{T}) where {T}
+# utilities for converting between real and complex vectors
+function rvec_to_cvec!(cvec::AbstractVector{Complex{T}}, rvec::AbstractVector{T}) where {T}
     k = 1
-    m = size(mat, 1)
-    @inbounds for j in 1:m, i in 1:j
-        vec[k] = mat[i, j]
-        k += 1
+    # @inbounds for i in eachindex(cvec)
+    for i in eachindex(cvec)
+        cvec[i] = Complex(rvec[k], rvec[k + 1])
+        k += 2
     end
-    return vec
+    return cvec
 end
 
-function vec_to_mat_U!(mat::AbstractMatrix{T}, vec::AbstractVector{T}) where {T}
+function cvec_to_rvec!(rvec::AbstractVector{T}, cvec::AbstractVector{Complex{T}}) where {T}
     k = 1
-    m = size(mat, 1)
-    @inbounds for j in 1:m, i in 1:j
-        mat[i, j] = vec[k]
-        k += 1
+    # @inbounds for i in eachindex(cvec)
+    for i in eachindex(cvec)
+        ci = cvec[i]
+        rvec[k] = real(ci)
+        rvec[k + 1] = imag(ci)
+        k += 2
     end
-    return mat
+    return rvec
 end
 
-function mat_U_to_vec!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}) where {T}
-    k = 1
-    m = size(mat, 1)
-    @inbounds for j in 1:m, i in 1:j
-        if i == j
-            vec[k] = real(mat[i, j])
-            k += 1
-        else
-            ck = mat[i, j]
-            vec[k] = real(ck)
-            k += 1
-            vec[k] = -imag(ck)
-            k += 1
-        end
-    end
-    return vec
-end
-
-function vec_to_mat_U!(mat::AbstractMatrix{Complex{T}}, vec::AbstractVector{T}) where {T}
-    k = 1
-    m = size(mat, 1)
-    @inbounds for j in 1:m, i in 1:j
-        if i == j
-            mat[i, j] = vec[k]
-            k += 1
-        else
-            mat[i, j] = Complex(vec[k], -vec[k + 1])
-            k += 2
-        end
-    end
-    return mat
-end
+vec_copy_to!(v1::AbstractVector{T}, v2::AbstractVector{T}) where {T <: Real} = copyto!(v1, v2)
+vec_copy_to!(v1::AbstractVector{T}, v2::AbstractVector{Complex{T}}) where {T <: Real} = cvec_to_rvec!(v1, v2)
+vec_copy_to!(v1::AbstractVector{Complex{T}}, v2::AbstractVector{T}) where {T <: Real} = rvec_to_cvec!(v1, v2)
 
 end
