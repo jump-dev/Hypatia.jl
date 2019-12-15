@@ -43,7 +43,7 @@ end
 
 tol = sqrt(sqrt(eps(T)))
 options = (atol = 10 * tol, solver = SO.Solver{T}(
-    verbose = true, init_use_indirect = true, preprocess = false, iter_limit = 250,
+    verbose = true, init_use_indirect = true, reduce = false, preprocess = false, iter_limit = 250,
     time_limit = 12e2, tol_feas = tol / 10, tol_abs_opt = tol / 10, tol_rel_opt = tol / 10,
     system_solver = SO.NaiveIndirectSystemSolver{T}()))
 
