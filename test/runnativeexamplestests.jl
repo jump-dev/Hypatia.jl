@@ -37,7 +37,9 @@ options = (atol = sqrt(sqrt(eps(T))), solver = SO.Solver{T}(
     @testset "matrixregression" begin test_matrixregression.(instances_matrixregression_few, R = Complex{T}, options = options) end # complex
     @testset "maxvolume" begin test_maxvolume.(instances_maxvolume_few, T = T, options = options) end
     @testset "sparsepca" begin test_sparsepca.(instances_sparsepca_few, T = T, options = options) end
-    @testset "polymin" begin test_polymin.(instances_polymin_few, T = T, options = options) end
+    if T == Float64 # not all domains work with other types
+        @testset "polymin" begin test_polymin.(instances_polymin_few, T = T, options = options) end
+    end
     @testset "portfolio" begin test_portfolio.(instances_portfolio_few, T = T, options = options) end
 end
 

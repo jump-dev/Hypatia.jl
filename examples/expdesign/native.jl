@@ -52,7 +52,7 @@ function expdesign(
         @assert l - 1 == dimvec
         # pad with hypograph variable and perspective variable
         h_logdet = vcat(zero(T), one(T), zeros(T, dimvec))
-        push!(cones, CO.HypoPerLogdetTri{T}(dimvec + 2))
+        push!(cones, CO.HypoPerLogdetTri{T, T}(dimvec + 2))
 
         if use_linops
             A = BlockMatrix{T}(1, p + 1, [A], [1:1], [2:(p + 1)])
