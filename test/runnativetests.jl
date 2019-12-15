@@ -75,7 +75,7 @@ testfuns = [
     # hypoperlogdettri2,
     # hypoperlogdettri3,
     hyporootdettri1,
-    # hyporootdettri2,
+    hyporootdettri2,
     hyporootdettri3,
     # primalinfeas1,
     # primalinfeas2,
