@@ -1,15 +1,12 @@
 #=
-Copyright 2018, Chris Coey and contributors
+Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 
 hypograph of generalized geomean (product of powers) parametrized by alpha in R_+^n on unit simplex
 (u in R, w in R_+^n) : u <= prod_i(w_i^alpha_i)
 where sum_i(alpha_i) = 1, alpha_i >= 0
 
-dual barrier (modified by reflecting around u = 0 and using dual cone definition) from "On self-concordant barriers for generalized power cones" by Roy & Xiao 2018
--log(prod_i((w_i/alpha_i)^alpha_i) + u) - sum_i((1 - alpha_i)*log(w_i/alpha_i)) - log(-u)
-
-TODO try to make barrier evaluation more efficient
-TODO investigate initial point more closely
+barrier from Constructing self-concordant barriers for convex cones by Yu. Nesterov
+-log(prod_i(w_i^alpha_i) - u) - sum_i(log(w_i))
 =#
 
 mutable struct HypoGeomean{T <: Real} <: Cone{T}
@@ -29,11 +26,9 @@ mutable struct HypoGeomean{T <: Real} <: Cone{T}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
 
-    wiaa::T
-    wiw::T
-    alphaiw::Vector{T}
-    a1ww::Vector{T}
-    tmpnn::Matrix{T}
+    wprod::T
+    wprodu::T
+    tmpn::Vector{T}
 
     function HypoGeomean{T}(
         alpha::Vector{T},
@@ -46,7 +41,7 @@ mutable struct HypoGeomean{T <: Real} <: Cone{T}
         tol = 1e3 * eps(T)
         @assert sum(alpha) ≈ 1 atol=tol rtol=tol
         cone = new{T}()
-        cone.use_dual = !is_dual # using dual barrier
+        cone.use_dual = is_dual
         cone.dim = dim
         cone.alpha = alpha
         cone.hess_fact_cache = hess_fact_cache
@@ -64,15 +59,14 @@ function setup_data(cone::HypoGeomean{T}) where {T <: Real}
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
-    cone.a1ww = zeros(T, dim - 1)
-    cone.alphaiw = zeros(T, dim - 1)
-    cone.tmpnn = zeros(T, dim - 1, dim - 1)
+    cone.tmpn = zeros(T, dim - 1)
     return
 end
 
 get_nu(cone::HypoGeomean) = cone.dim
 
-function set_initial_point(arr::AbstractVector, cone::HypoGeomean)
+# TODO work out how to get central ray
+function set_initial_point(arr::AbstractVector{T}, cone::HypoGeomean{T}) where {T}
     (arr[1], w) = get_central_ray_hypogeomean(cone.alpha)
     arr[2:end] .= w
     return arr
@@ -82,10 +76,10 @@ function update_feas(cone::HypoGeomean)
     @assert !cone.feas_updated
     u = cone.point[1]
     w = view(cone.point, 2:cone.dim)
-    @. cone.alphaiw = cone.alpha / w
-    if u < 0 && all(wi -> wi > 0, w)
-        cone.wiaa = -sum(cone.alpha[i] * log(cone.alphaiw[i]) for i in eachindex(cone.alpha))
-        cone.is_feas = (cone.wiaa > log(-u))
+    if all(wi -> wi > 0, w)
+        # wprod always calculated because used in update_grad
+        cone.wprod = sum(cone.alpha[i] * log(w[i]) for i in eachindex(cone.alpha))
+        cone.is_feas = (u <= 0) || (cone.wprod > log(u))
     else
         cone.is_feas = false
     end
@@ -97,12 +91,11 @@ function update_grad(cone::HypoGeomean)
     @assert cone.is_feas
     u = cone.point[1]
     w = view(cone.point, 2:cone.dim)
-    cone.wiaa = exp(cone.wiaa)
-    wiaau = cone.wiaa + u
-    cone.wiw = cone.wiaa / wiaau
-    @. cone.a1ww = cone.alphaiw * (1 - cone.wiw)
-    cone.grad[1] = -inv(wiaau) - inv(u)
-    @. cone.grad[2:end] = cone.a1ww - inv(w)
+    wprod = cone.wprod = exp(cone.wprod)
+    wprodu = cone.wprodu = cone.wprod - u
+    cone.grad[1] = inv(wprodu)
+    @. cone.tmpn = wprod * cone.alpha / w / wprodu
+    @. cone.grad[2:end] = -cone.tmpn - 1 / w
     cone.grad_updated = true
     return cone.grad
 end
@@ -111,20 +104,23 @@ function update_hess(cone::HypoGeomean)
     @assert cone.grad_updated
     u = cone.point[1]
     w = view(cone.point, 2:cone.dim)
+    alpha = cone.alpha
+    wprod = cone.wprod
+    wprodu = cone.wprodu
+    wwprodu = wprod / wprodu
+    tmpn = cone.tmpn
     H = cone.hess.data
 
-    wiaau = cone.wiaa + u
-    H[1, 1] = inv(wiaau) / wiaau + inv(u) / u
+    H[1, 1] = cone.grad[1] / wprodu
     @inbounds for j in eachindex(w)
         j1 = j + 1
-        wiwaw = -cone.wiw * cone.alpha[j] / w[j]
-        H[1, j1] = -wiwaw / wiaau
+        fact = tmpn[j]
+        H[1, j1] = -fact / wprodu
         @inbounds for i in 1:(j - 1)
-            H[i + 1, j1] = wiwaw * cone.a1ww[i]
+            H[i + 1, j1] = fact * alpha[i] / w[i] * (wwprodu - 1)
         end
-        H[j1, j1] = wiwaw * cone.grad[j1] + (1 - cone.alpha[j]) / w[j] / w[j]
+        H[j1, j1] = fact * (1 - alpha[j] + alpha[j] * wwprodu) / w[j] + inv(w[j]) / w[j]
     end
-
     cone.hess_updated = true
     return cone.hess
 end
@@ -135,20 +131,20 @@ function get_central_ray_hypogeomean(alpha::Vector{<:Real})
     # predict each w_i given alpha_i and n
     w = zeros(wdim)
     if wdim == 1
-        w .= 1.30656
+        w .= 1.306563
     elseif wdim == 2
-        @. w = 0.371639 * alpha ^ 3 - 0.408226 * alpha ^ 2 + 0.337555 * alpha + 0.999426
+        @. w = 1.005320 + 0.298108 * alpha
     elseif wdim <= 5
-        @. w = 0.90687113 - 0.02417035 * log(wdim) + 0.12939174 * exp(alpha)
+        @. w = 1.0049327 - 0.0006020 * wdim + 0.2998672 * alpha
     elseif wdim <= 20
-        @. w = 0.927309483 - 0.004331391 * log(wdim) + 0.082597680 * exp(alpha)
+        @. w = 1.001146 - 4.463046e-05 * wdim + 3.034014e-01 * alpha
     elseif wdim <= 100
-        @. w = 0.9830810972 - 0.0002152296 * log(wdim) + 0.0177761654 * exp(alpha)
+        @. w = 1.000066 - 5.202270e-07 * wdim + 3.074873e-01 * alpha
     else
-        @. w = 9.968391e-01 - 9.605928e-06 * log(wdim) + 3.215512e-03 * exp(alpha)
+        @. w = 1 + 3.086695e-01 * alpha
     end
     # get u in closed form from w
-    wiaa = exp(-sum(alpha[i] * log(alpha[i] / w[i]) for i in eachindex(alpha)))
-    u = sum(wiaa .* alpha ./ (alpha .- 1 .+ abs2.(w)) .- wiaa) / wdim
+    p = exp(sum(alpha[i] * log(w[i]) for i in eachindex(alpha)))
+    u = sum(p .- alpha .* p ./ (abs2.(w) .- 1)) / wdim
     return [u, w]
 end
