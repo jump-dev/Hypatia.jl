@@ -103,7 +103,7 @@ function set_initial_point(arr::AbstractVector{T}, cone::HypoRootdetTri{T, R}) w
     return arr
 end
 
-function update_feas(cone::HypoRootdetTri)
+function update_feas(cone::HypoRootdetTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     @assert !cone.feas_updated
     u = cone.point[1]
 
