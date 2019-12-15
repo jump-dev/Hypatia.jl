@@ -12,13 +12,18 @@ const CO = Hypatia.Cones
 
 function portfolio(
     T::Type{<:Real},
-    num_stocks::Int,
-    risk_measures::Vector{Symbol};
-    use_l1ball::Bool = true,
-    use_linfball::Bool = true,
+    num_stocks::Int;
     use_linops::Bool = false,
+    epipernormeucl_constr::Bool = false,
+    epinorminf_constr::Bool = false,
+    epinorminfdual_constr::Bool = false,
+    hypoperlog_constr::Bool = false,
+    use_epinormeucl::Bool = true,
+    use_epinorminf::Bool = true,
+    use_epinorminfdual::Bool = true,
+    use_hypoperlog::Bool = true,
     )
-    if :entropic in risk_measures && length(risk_measures) > 1
+    if hypoperlog_constr && (epipernormeucl_constr + epinorminf_constr + epinorminfdual_constr + hypoperlog_constr > 1)
         error("if using entropic ball, cannot specify other risk measures")
     end
 
@@ -62,17 +67,17 @@ function portfolio(
         cone_offset += num_stocks + 1
     end
 
-    if :quadratic in risk_measures
+    if epipernormeucl_constr
         add_single_ball(CO.EpiNormEucl{T}(num_stocks + 1), gamma)
     end
-    if :l1 in risk_measures && use_l1ball
+    if epinorminfdual_constr && use_epinorminfdual
         add_single_ball(CO.EpiNormInf{T}(num_stocks + 1, true), gamma * sqrt(T(num_stocks)))
     end
-    if :linf in risk_measures && use_linfball
+    if epinorminf_constr && use_epinorminf
         add_single_ball(CO.EpiNormInf{T}(num_stocks + 1), gamma)
     end
 
-    if :l1 in risk_measures && !use_l1ball
+    if epinorminfdual_constr && !use_epinorminfdual
         c = vcat(c, zeros(T, 2 * num_stocks))
         if use_linops
             push!(A_blocks, sigma_half)
@@ -112,7 +117,7 @@ function portfolio(
         cone_offset += 2 * num_stocks + 1
     end
 
-    if :linf in risk_measures && !use_linfball
+    if epinorminf_constr && use_epinorminf
         if use_linops
             push!(G_blocks, sigma_half)
             push!(G_blocks, -sigma_half)
@@ -133,7 +138,7 @@ function portfolio(
         cone_offset += 2 * num_stocks
     end
 
-    if :entropic in risk_measures
+    if hypoperlog_constr
         # sigma_half = abs.(sigma_half) TODO will this always be feasible?
         c = vcat(c, zeros(T, 2 * num_stocks))
         b = vcat(b, gamma^2)
@@ -182,22 +187,23 @@ function portfolio(
         A = Hypatia.BlockMatrix{T}(last_idx(A_rows), last_idx(A_cols), A_blocks, A_rows, A_cols)
         G = Hypatia.BlockMatrix{T}(last_idx(G_rows), last_idx(G_cols), G_blocks, G_rows, G_cols)
     end
-
     return (c = c, A = A, b = b, G = G, h = h, cones = cones)
 end
 
-portfolio1(T::Type{<:Real}) = portfolio(T, 4, [:l1], use_l1ball = true)
-portfolio2(T::Type{<:Real}) = portfolio(T, 6, [:l1], use_l1ball = false)
-portfolio3(T::Type{<:Real}) = portfolio(T, 4, [:linf], use_linfball = true)
-portfolio4(T::Type{<:Real}) = portfolio(T, 6, [:linf], use_linfball = false)
-portfolio5(T::Type{<:Real}) = portfolio(T, 4, [:linf, :l1], use_linfball = true, use_l1ball = true)
-portfolio6(T::Type{<:Real}) = portfolio(T, 6, [:linf, :l1], use_linfball = false, use_l1ball = false)
-portfolio7(T::Type{<:Real}) = portfolio(T, 4, [:linf, :l1], use_l1ball = true, use_linops = false)
-portfolio8(T::Type{<:Real}) = portfolio(T, 4, [:linf, :l1], use_l1ball = true, use_linops = true)
-portfolio9(T::Type{<:Real}) = portfolio(T, 3, [:linf, :l1], use_l1ball = false, use_linops = false)
-portfolio10(T::Type{<:Real}) = portfolio(T, 3, [:linf, :l1], use_l1ball = false, use_linops = true)
-portfolio11(T::Type{<:Real}) = portfolio(T, 4, [:entropic], use_l1ball = false, use_linops = false)
-portfolio12(T::Type{<:Real}) = portfolio(T, 4, [:entropic], use_l1ball = false, use_linops = true)
+portfolio1(T::Type{<:Real}) = portfolio(T, 4, epinorminfdual_constr = true, use_epinorminfdual = true)
+portfolio2(T::Type{<:Real}) = portfolio(T, 6, epinorminfdual_constr = true, use_epinorminfdual = false)
+portfolio3(T::Type{<:Real}) = portfolio(T, 4, epinorminf_constr = true, use_epinorminf = true)
+portfolio4(T::Type{<:Real}) = portfolio(T, 6, epinorminf_constr = true, use_epinorminf = false)
+portfolio5(T::Type{<:Real}) = portfolio(T, 4, epinorminf_constr = true, epinorminfdual_constr = true, use_epinorminf = true, use_epinorminfdual = true)
+portfolio6(T::Type{<:Real}) = portfolio(T, 6, epinorminf_constr = true, epinorminfdual_constr = true, use_epinorminf = false, use_epinorminfdual = false)
+portfolio7(T::Type{<:Real}) = portfolio(T, 4, epinorminf_constr = true, epinorminfdual_constr = true, use_epinorminfdual = true, use_linops = false)
+portfolio8(T::Type{<:Real}) = portfolio(T, 4, epinorminf_constr = true, epinorminfdual_constr = true, use_epinorminfdual = true, use_linops = true)
+portfolio9(T::Type{<:Real}) = portfolio(T, 3, epinorminf_constr = true, epinorminfdual_constr = true, use_epinorminfdual = false, use_linops = false)
+portfolio10(T::Type{<:Real}) = portfolio(T, 3, epinorminf_constr = true, epinorminfdual_constr = true, use_epinorminfdual = false, use_linops = true)
+portfolio11(T::Type{<:Real}) = portfolio(T, 4, hypoperlog_constr = true, use_epinorminfdual = false, use_linops = false)
+portfolio12(T::Type{<:Real}) = portfolio(T, 4, hypoperlog_constr = true, use_epinorminfdual = false, use_linops = true)
+portfolio13(T::Type{<:Real}) = portfolio(T, 20, epinorminf_constr = true, epinorminfdual_constr = true, use_epinorminf = false, use_epinorminfdual = false)
+portfolio14(T::Type{<:Real}) = portfolio(T, 30, epinorminf_constr = true, epinorminfdual_constr = true, use_epinorminfdual = true, use_linops = false)
 
 instances_portfolio_all = [
     portfolio1,
@@ -208,7 +214,10 @@ instances_portfolio_all = [
     portfolio6,
     portfolio7,
     portfolio9,
+    portfolio10,
     portfolio11,
+    portfolio12,
+    portfolio13,
     ]
 instances_portfolio_few = [
     portfolio1,
