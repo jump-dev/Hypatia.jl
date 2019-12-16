@@ -226,8 +226,9 @@ function update_feas(cone::WSOSPolyInterpMat)
             end
             rowo += L
         end
-        cone.ΛFs[j] = cholesky!(Λ)
+        cone.ΛFs[j] = cholesky!(Λ, check = false)
         if !isposdef(cone.ΛFs[j])
+            cone.is_feas = false
             break
         end
     end
