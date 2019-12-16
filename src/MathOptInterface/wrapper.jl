@@ -64,7 +64,7 @@ MOI.supports_constraint(::Optimizer{T},
     ) where {T <: Real} = true
 MOI.supports_constraint(::Optimizer{T},
     ::Type{<:Union{MOI.VectorOfVariables, MOI.VectorAffineFunction{T}}},
-    ::Type{<:Union{MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives, MOIOtherCones{T}}}
+    ::Type{<:Union{MOI.Zeros, MOI.Nonnegatives, MOIOtherCones{T}}}
     ) where {T <: Real} = true
 
 # build representation as min c'x s.t. A*x = b, h - G*x in K
@@ -193,7 +193,11 @@ function MOI.copy_to(
     constr_offset_cone = Vector{Int}()
     cones = Cones.Cone{T}[]
 
-    # build up one nonnegative cone
+
+
+
+
+    # build up one nonnegative cone from LP constraints
     nonneg_start = q
 
     for ci in get_src_cons(MOI.SingleVariable, MOI.GreaterThan{T})
@@ -260,6 +264,10 @@ function MOI.copy_to(
         push!(cones, Cones.Nonnegative{T}(q - nonneg_start))
     end
 
+
+
+    # TODO remove nonpositive cone - use nonnegative cone as above
+
     # build up one nonpositive cone
     nonpos_start = q
 
@@ -324,8 +332,14 @@ function MOI.copy_to(
 
     if q > nonpos_start
         # exists at least one nonpositive constraint
+        error("broken")
         push!(cones, Cones.Nonpositive{T}(q - nonpos_start))
     end
+
+
+
+
+
 
     # build up one L_infinity norm cone from two-sided interval constraints
     interval_start = q
