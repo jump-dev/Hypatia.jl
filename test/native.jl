@@ -1096,7 +1096,8 @@ function wsospolyinterpmat2(T; options...)
     b = T[]
     # the "one" polynomial on the diagonal
     G = vcat(ones(T, U, 1), zeros(T, U, 1), ones(T, U, 1))
-    h = T[H[i, j](pts[u, :]...) * (i == j ? 1 : sqrt(T(2))) for i in 1:n for j in 1:i for u in 1:U]
+    h = T[H[i, j](pts[u, :]...) for i in 1:n for j in 1:i for u in 1:U]
+    MU.vec_to_svec!(h, sqrt(T(2)), incr = U)
     cones = CO.Cone{T}[CO.WSOSPolyInterpMat{T}(n, U, [P0])]
 
     r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
@@ -1120,7 +1121,8 @@ function wsospolyinterpmat3(T; options...)
     b = T[]
     # the "one" polynomial on the diagonal
     G = vcat(ones(T, U, 1), zeros(T, U, 1), ones(T, U, 1), zeros(T, U, 1), zeros(T, U, 1), ones(T, U, 1))
-    h = T[H[i, j](pts[u, :]...) * (i == j ? 1 : sqrt(T(2))) for i in 1:n for j in 1:i for u in 1:U]
+    h = T[H[i, j](pts[u, :]...) for i in 1:n for j in 1:i for u in 1:U]
+    MU.vec_to_svec!(h, sqrt(T(2)), incr = U)
     cones = CO.Cone{T}[CO.WSOSPolyInterpMat{T}(n, U, [P0])]
 
     r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
