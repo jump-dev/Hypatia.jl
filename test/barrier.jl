@@ -1,5 +1,7 @@
 #=
 Copyright 2018, Chris Coey, Lea Kapelevich and contributors
+
+tests for primitive cone barrier oracles
 =#
 
 using Test
@@ -9,67 +11,6 @@ import ForwardDiff
 import Hypatia
 const CO = Hypatia.Cones
 const MU = Hypatia.ModelUtilities
-
-# function test_barrier_oracles(
-#     cone::CO.Cone{T},
-#     barrier::Function;
-#     noise::Real = 0.2,
-#     scale::Real = 10000,
-#     tol::Real = 100eps(T),
-#     init_tol::Real = tol,
-#     init_only::Bool = false,
-#     ) where {T <: Real}
-#     CO.setup_data(cone)
-#     dim = CO.dimension(cone)
-#     point = Vector{T}(undef, dim)
-#
-#     if isfinite(init_tol)
-#         # tests for centrality of initial point
-#         CO.set_initial_point(point, cone)
-#         CO.load_point(cone, point)
-#         @test cone.point == point
-#         @test CO.is_feas(cone)
-#         grad = CO.grad(cone)
-#         @test dot(point, -grad) ≈ norm(point) * norm(grad) atol=init_tol rtol=init_tol
-#         @test point ≈ -grad atol=init_tol rtol=init_tol
-#     end
-#     init_only && return
-#
-#     # tests for perturbed point
-#     CO.reset_data(cone)
-#     CO.set_initial_point(point, cone)
-#     if !iszero(noise)
-#         point += T(noise) * (rand(T, dim) .- inv(T(2)))
-#         point /= scale
-#     end
-#
-#     CO.load_point(cone, point)
-#     @test cone.point == point
-#     @test CO.is_feas(cone)
-#
-#     grad = CO.grad(cone)
-#     nu = CO.get_nu(cone)
-#     @test dot(point, grad) ≈ -nu atol=tol rtol=tol
-#     hess = CO.hess(cone)
-#     @test hess * point ≈ -grad atol=tol rtol=tol
-#
-#     if T in (Float32, Float64) # NOTE can only use BLAS floats with ForwardDiff barriers
-#         @test ForwardDiff.gradient(barrier, point) ≈ grad atol=tol rtol=tol
-#         @test ForwardDiff.hessian(barrier, point) ≈ hess atol=tol rtol=tol
-#     end
-#
-#     inv_hess = CO.inv_hess(cone)
-#     @test hess * inv_hess ≈ I atol=tol rtol=tol
-#
-#     prod = similar(point)
-#     @test CO.hess_prod!(prod, point, cone) ≈ -grad atol=tol rtol=tol
-#     @test CO.inv_hess_prod!(prod, grad, cone) ≈ -point atol=tol rtol=tol
-#     prod = similar(point, dim, dim)
-#     @test CO.hess_prod!(prod, Matrix(inv_hess), cone) ≈ I atol=tol rtol=tol
-#     @test CO.inv_hess_prod!(prod, Matrix(hess), cone) ≈ I atol=tol rtol=tol
-#
-#     return
-# end
 
 function test_barrier_oracles(
     cone::CO.Cone{T},
@@ -146,8 +87,9 @@ function test_grad_hess(
     @test CO.hess_prod!(prod_mat, inv_hess, cone) ≈ I atol=tol rtol=tol
     @test CO.inv_hess_prod!(prod_mat, hess, cone) ≈ I atol=tol rtol=tol
 
-    prod_mat2 = Matrix(CO.hess_sqrt_prod!(prod_mat, inv_hess, cone)')
-    @test CO.hess_sqrt_prod!(prod_mat, prod_mat2, cone) ≈ I atol=tol rtol=tol
+    # TODO add hess sqrt oracles
+    # prod_mat2 = Matrix(CO.hess_sqrt_prod!(prod_mat, inv_hess, cone)')
+    # @test CO.hess_sqrt_prod!(prod_mat, prod_mat2, cone) ≈ I atol=tol rtol=tol
 
     if !CO.use_scaling(cone)
         prod = similar(point)
@@ -155,16 +97,8 @@ function test_grad_hess(
         @test CO.hess_prod!(prod, point, cone) ≈ -grad atol=tol rtol=tol
         @test CO.inv_hess_prod!(prod, grad, cone) ≈ -point atol=tol rtol=tol
 
-        if isdefined(cone, :use_dual)
-            CO.inv_hess_sqrt_prod!(prod_mat2, Matrix(one(T) * I, dim, dim), cone)
-            @test prod_mat2' * prod_mat2 ≈ inv_hess atol=tol rtol=tol
-        end
-    end
-
-    if !isempty(dual_point)
-        lambda = CO.hess_sqrt_prod!(similar(cone.point), cone.point, cone) * sqrt(sqrt(cone.dist / cone.dual_dist))
-        @test hess * point ≈ dual_point atol=tol rtol=tol
-        @test inv_hess * dual_point ≈ point atol=tol rtol=tol
+        # CO.inv_hess_sqrt_prod!(prod_mat2, Matrix(one(T) * I, dim, dim), cone)
+        # @test prod_mat2' * prod_mat2 ≈ inv_hess atol=tol rtol=tol
     end
 
     return
