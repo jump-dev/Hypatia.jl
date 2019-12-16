@@ -431,7 +431,6 @@ function epiperexp4(T; options...)
     G = SparseMatrixCSC(-one(T) * I, 3, 3)
     h = zeros(T, 3)
     cones = CO.Cone{T}[CO.EpiPerExp{T}(true)]
-    @warn "not sure if use_dual should work for EpiPerExp now" # TODO fix
 
     r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
     @test r.status == :Optimal
@@ -439,41 +438,7 @@ function epiperexp4(T; options...)
     @test r.x ≈ [Texp2, 1, -1] atol=tol rtol=tol
 end
 
-function epipersumexp1(T; options...)
-    tol = sqrt(sqrt(eps(T)))
-    l = 5
-    c = vcat(zero(T), -ones(T, l))
-    A = hcat(one(T), zeros(T, 1, l))
-    b = T[1]
-    G = [-one(T) zeros(T, 1, l); zeros(T, 1, l + 1); zeros(T, l, 1) sparse(-one(T) * I, l, l)]
-    h = zeros(T, l + 2)
-    cones = CO.Cone{T}[CO.EpiPerSumExp{T}(l + 2)]
-
-    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
-    @test r.status == :Optimal
-    @test r.x[1] ≈ 1 atol=tol rtol=tol
-    @test r.s[2] ≈ 0 atol=tol rtol=tol
-    @test r.s[1] ≈ 1 atol=tol rtol=tol
-end
-
-function epipersumexp2(T; options...)
-    tol = sqrt(sqrt(eps(T)))
-    l = 5
-    c = vcat(zero(T), -ones(T, l))
-    A = hcat(one(T), zeros(T, 1, l))
-    b = T[1]
-    G = [-one(T) spzeros(T, 1, l); spzeros(T, 1, l + 1); spzeros(T, l, 1) sparse(-one(T) * I, l, l)]
-    h = zeros(T, l + 2); h[2] = 1
-    cones = CO.Cone{T}[CO.EpiPerSumExp{T}(l + 2)]
-
-    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
-    @test r.status == :Optimal
-    @test r.x[1] ≈ 1 atol=tol rtol=tol
-    @test r.s[2] ≈ 1 atol=tol rtol=tol
-    @test r.s[2] * sum(exp, r.s[3:end] / r.s[2]) ≈ r.s[1] atol=tol rtol=tol
-end
-
-function hypopersumlog1(T; options...)
+function hypoperlog1(T; options...)
     tol = sqrt(sqrt(eps(T)))
     Texph = exp(T(0.5))
     c = T[1, 1, 1]
@@ -481,7 +446,7 @@ function hypopersumlog1(T; options...)
     b = T[2, 1]
     G = Matrix{T}(-I, 3, 3)
     h = zeros(T, 3)
-    cones = CO.Cone{T}[CO.HypoPerSumLog{T}(3)]
+    cones = CO.Cone{T}[CO.HypoPerLog{T}(3)]
 
     r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
     @test r.status == :Optimal
@@ -491,28 +456,28 @@ function hypopersumlog1(T; options...)
     @test r.z ≈ c + A' * r.y atol=tol rtol=tol
 end
 
-function hypopersumlog2(T; options...)
+function hypoperlog2(T; options...)
     tol = sqrt(sqrt(eps(T)))
     c = T[-1, 0, 0]
     A = T[0 1 0]
     b = T[0]
     G = Diagonal(-one(T) * I, 3)
     h = zeros(T, 3)
-    cones = CO.Cone{T}[CO.HypoPerSumLog{T}(3)]
+    cones = CO.Cone{T}[CO.HypoPerLog{T}(3)]
 
     r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
     @test r.status == :Optimal
     @test r.primal_obj ≈ 0 atol=tol rtol=tol
 end
 
-function hypopersumlog3(T; options...)
+function hypoperlog3(T; options...)
     tol = sqrt(sqrt(eps(T)))
     c = T[1, 1, 1]
     A = zeros(T, 0, 3)
     b = zeros(T, 0)
     G = sparse([1, 2, 3, 4], [1, 2, 3, 1], -ones(T, 4))
     h = zeros(T, 4)
-    cones = CO.Cone{T}[CO.HypoPerSumLog{T}(3), CO.Nonnegative{T}(1)]
+    cones = CO.Cone{T}[CO.HypoPerLog{T}(3), CO.Nonnegative{T}(1)]
 
     r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
     @test r.status == :Optimal
@@ -521,7 +486,7 @@ function hypopersumlog3(T; options...)
     @test isempty(r.y)
 end
 
-function hypopersumlog4(T; options...)
+function hypoperlog4(T; options...)
     tol = sqrt(sqrt(eps(T)))
     Texp2 = exp(T(-2))
     c = T[0, 0, 1]
@@ -529,7 +494,7 @@ function hypopersumlog4(T; options...)
     b = T[1, -1]
     G = SparseMatrixCSC(-one(T) * I, 3, 3)
     h = zeros(T, 3)
-    cones = CO.Cone{T}[CO.HypoPerSumLog{T}(3, true)]
+    cones = CO.Cone{T}[CO.HypoPerLog{T}(3, true)]
 
     r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
     @test r.status == :Optimal
@@ -537,7 +502,7 @@ function hypopersumlog4(T; options...)
     @test r.x ≈ [-1, 1, Texp2] atol=tol rtol=tol
 end
 
-function hypopersumlog5(T; options...)
+function hypoperlog5(T; options...)
     tol = sqrt(sqrt(eps(T)))
     Tlogq = log(T(0.25))
     c = T[-1, 0, 0]
@@ -545,7 +510,7 @@ function hypopersumlog5(T; options...)
     b = T[1]
     G = sparse([1, 3, 4], [1, 2, 3], -ones(T, 3))
     h = T[0, 1, 0, 0]
-    cones = CO.Cone{T}[CO.HypoPerSumLog{T}(4)]
+    cones = CO.Cone{T}[CO.HypoPerLog{T}(4)]
 
     r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
     @test r.status == :Optimal
@@ -554,14 +519,14 @@ function hypopersumlog5(T; options...)
     @test r.y ≈ [2] atol=tol rtol=tol
 end
 
-function hypopersumlog6(T; options...)
+function hypoperlog6(T; options...)
     tol = sqrt(sqrt(eps(T)))
     c = T[-1, 0, 0]
     A = zeros(T, 0, 3)
     b = zeros(T, 0)
     G = sparse([1, 3, 4], [1, 2, 3], -ones(T, 3))
     h = zeros(T, 4)
-    cones = CO.Cone{T}[CO.HypoPerSumLog{T}(4)]
+    cones = CO.Cone{T}[CO.HypoPerLog{T}(4)]
 
     r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
     @test r.status == :Optimal
@@ -579,7 +544,7 @@ function hypogeomean1(T; options...)
     h = zeros(T, 3)
 
     for is_dual in (true, false)
-        cones = CO.Cone{T}[CO.HypoGeomean2{T}(ones(T, 2) / 2, is_dual)]
+        cones = CO.Cone{T}[CO.HypoGeomean{T}(ones(T, 2) / 2, is_dual)]
 
         r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
         @test r.status == :Optimal
@@ -598,7 +563,7 @@ function hypogeomean2(T; options...)
 
     for is_dual in (true, false)
         b = is_dual ? [-one(T)] : [one(T)]
-        cones = CO.Cone{T}[CO.HypoGeomean2{T}(fill(inv(T(l)), l), is_dual)]
+        cones = CO.Cone{T}[CO.HypoGeomean{T}(fill(inv(T(l)), l), is_dual)]
 
         r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
         @test r.status == :Optimal
@@ -617,7 +582,7 @@ function hypogeomean3(T; options...)
     h = zeros(T, l + 1)
 
     for is_dual in (true, false)
-        cones = CO.Cone{T}[CO.HypoGeomean2{T}(fill(inv(T(l)), l), is_dual)]
+        cones = CO.Cone{T}[CO.HypoGeomean{T}(fill(inv(T(l)), l), is_dual)]
 
         r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
         @test r.status == :Optimal
@@ -668,9 +633,9 @@ end
 function power3(T; options...)
     tol = sqrt(sqrt(eps(T)))
     l = 4
-    c = vcat(ones(T, l), zeros(T, 2))
+    c = vcat(fill(T(10), l), zeros(T, 2))
     A = T[zeros(T, 1, l) one(T) zero(T); zeros(T, 1, l) zero(T) one(T)]
-    G = SparseMatrixCSC(-one(T) * I, l + 2, l + 2)
+    G = SparseMatrixCSC(-T(10) * I, l + 2, l + 2)
     h = zeros(T, l + 2)
 
     for is_dual in (true, false)
@@ -679,7 +644,7 @@ function power3(T; options...)
 
         r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
         @test r.status == :Optimal
-        @test r.primal_obj ≈ (is_dual ? 1 : T(l)) atol=tol rtol=tol
+        @test r.primal_obj ≈ (is_dual ? 10 : 10 * T(l)) atol=tol rtol=tol
         @test r.x[1:l] ≈ (is_dual ? fill(inv(T(l)), l) : ones(l)) atol=tol rtol=tol
     end
 end
@@ -1180,7 +1145,7 @@ function primalinfeas3(T; options...)
     b = [one(T), one(T), T(3)]
     G = SparseMatrixCSC(-one(T) * I, 3, 3)
     h = zeros(T, 3)
-    cones = CO.Cone{T}[CO.HypoPerSumLog{T}(3)]
+    cones = CO.Cone{T}[CO.HypoPerLog{T}(3)]
 
     r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
     @test r.status == :PrimalInfeasible
