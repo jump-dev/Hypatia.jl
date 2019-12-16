@@ -50,12 +50,26 @@ inv_hess(cone::Cone) = (cone.inv_hess_updated ? cone.inv_hess : update_inv_hess(
 # fallbacks
 
 # number of nonzeros in the Hessian and inverse
-hess_nz_count(cone::Cone, lower_only::Bool) = (lower_only ? div(cone.dim * (cone.dim + 1), 2) : abs2(cone.dim))
-inv_hess_nz_count(cone::Cone, lower_only::Bool) = (lower_only ? div(cone.dim * (cone.dim + 1), 2) : abs2(cone.dim))
+function hess_nz_count(cone::Cone, lower_only::Bool)
+    dim = dimension(cone)
+    if lower_only
+        return div(dim * (dim + 1), 2)
+    else
+        return abs2(dim)
+    end
+end
+inv_hess_nz_count(cone::Cone, lower_only::Bool) = hess_nz_count(cone, lower_only) # NOTE careful: fallback yields same for inv hess as hess
 
 # the row indices of nonzero elements in column j
-hess_nz_idxs_col(cone::Cone, j::Int, lower_only::Bool) = (lower_only ? (j:cone.dim) : (1:cone.dim))
-inv_hess_nz_idxs_col(cone::Cone, j::Int, lower_only::Bool) = (lower_only ? (j:cone.dim) : (1:cone.dim))
+function hess_nz_idxs_col(cone::Cone, j::Int, lower_only::Bool)
+    dim = dimension(cone)
+    if lower_only
+        return j:dim
+    else
+        return 1:dim
+    end
+end
+inv_hess_nz_idxs_col(cone::Cone, j::Int, lower_only::Bool) = hess_nz_idxs_col(cone, j, lower_only) # NOTE careful: fallback yields same for inv hess as hess
 
 reset_data(cone::Cone) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.inv_hess_prod_updated = false)
 
@@ -96,14 +110,30 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Con
     return prod
 end
 
+# function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
+#     if !cone.inv_hess_prod_updated # TODO rename
+#         update_inv_hess_prod(cone)
+#     end
+#     return mul!(prod, UpperTriangular(cone.hess_fact_cache.AF), arr)
+# end
+#
+# function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
+#     if !cone.inv_hess_prod_updated # TODO rename
+#         update_inv_hess_prod(cone)
+#     end
+#     copyto!(prod, arr)
+#     return ldiv!(UpperTriangular(cone.hess_fact_cache.AF.data)', prod)
+#     # return ldiv!(prod, UpperTriangular(cone.hess_fact_cache.AF.data), arr)
+# end
+
 # utilities for converting between symmetric/Hermitian matrix and vector triangle forms
 
 # TODO fix later, rt2::T doesn't work with tests using ForwardDiff
 function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{T}, rt2::Number) where {T}
     k = 1
     m = size(mat, 1)
-    @inbounds for j in 1:m, i in 1:j
-        if i == j
+    for j in 1:m, i in 1:j
+        @inbounds if i == j
             vec[k] = mat[i, j]
         else
             vec[k] = mat[i, j] * rt2
@@ -116,8 +146,8 @@ end
 function svec_to_smat!(mat::AbstractMatrix{T}, vec::AbstractVector{T}, rt2::Number) where {T}
     k = 1
     m = size(mat, 1)
-    @inbounds for j in 1:m, i in 1:j
-        if i == j
+    for j in 1:m, i in 1:j
+        @inbounds if i == j
             mat[i, j] = vec[k]
         else
             mat[i, j] = vec[k] / rt2
@@ -130,8 +160,8 @@ end
 function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}, rt2::Number) where {T}
     k = 1
     m = size(mat, 1)
-    @inbounds for j in 1:m, i in 1:j
-        if i == j
+    for j in 1:m, i in 1:j
+        @inbounds if i == j
             vec[k] = real(mat[i, j])
             k += 1
         else
@@ -163,8 +193,7 @@ end
 # utilities for converting between real and complex vectors
 function rvec_to_cvec!(cvec::AbstractVector{Complex{T}}, rvec::AbstractVector{T}) where {T}
     k = 1
-    # @inbounds for i in eachindex(cvec)
-    for i in eachindex(cvec)
+    @inbounds for i in eachindex(cvec)
         cvec[i] = Complex(rvec[k], rvec[k + 1])
         k += 2
     end
@@ -173,8 +202,7 @@ end
 
 function cvec_to_rvec!(rvec::AbstractVector{T}, cvec::AbstractVector{Complex{T}}) where {T}
     k = 1
-    # @inbounds for i in eachindex(cvec)
-    for i in eachindex(cvec)
+    @inbounds for i in eachindex(cvec)
         ci = cvec[i]
         rvec[k] = real(ci)
         rvec[k + 1] = imag(ci)

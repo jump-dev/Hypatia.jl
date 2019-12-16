@@ -17,13 +17,12 @@ function test_barrier_oracles(
     barrier::Function;
     noise::T = T(0.1),
     scale::T = T(1e-1),
-    tol::T = 100eps(T),
-    init_tol::T = tol,
+    tol::Real = 100eps(T),
+    init_tol::Real = tol,
     init_only::Bool = false,
     ) where {T <: Real}
     Random.seed!(1)
 
-    @test !CO.use_scaling(cone)
     CO.setup_data(cone)
     dim = CO.dimension(cone)
     point = Vector{T}(undef, dim)
@@ -68,12 +67,7 @@ function test_barrier_oracles(
     return
 end
 
-function test_grad_hess(
-    cone::CO.Cone{T},
-    point::Vector{T},
-    dual_point::Vector{T} = T[];
-    tol::T = 100eps(T),
-    ) where {T <: Real}
+function test_grad_hess(cone::CO.Cone{T}, point::Vector{T}; tol::Real = 100eps(T)) where {T <: Real}
     nu = CO.get_nu(cone)
     dim = length(point)
     grad = CO.grad(cone)
@@ -87,26 +81,22 @@ function test_grad_hess(
     @test CO.hess_prod!(prod_mat, inv_hess, cone) ≈ I atol=tol rtol=tol
     @test CO.inv_hess_prod!(prod_mat, hess, cone) ≈ I atol=tol rtol=tol
 
+    prod = similar(point)
+    @test hess * point ≈ -grad atol=tol rtol=tol
+    @test CO.hess_prod!(prod, point, cone) ≈ -grad atol=tol rtol=tol
+    @test CO.inv_hess_prod!(prod, grad, cone) ≈ -point atol=tol rtol=tol
+
     # TODO add hess sqrt oracles
     # prod_mat2 = Matrix(CO.hess_sqrt_prod!(prod_mat, inv_hess, cone)')
     # @test CO.hess_sqrt_prod!(prod_mat, prod_mat2, cone) ≈ I atol=tol rtol=tol
-
-    if !CO.use_scaling(cone)
-        prod = similar(point)
-        @test hess * point ≈ -grad atol=tol rtol=tol
-        @test CO.hess_prod!(prod, point, cone) ≈ -grad atol=tol rtol=tol
-        @test CO.inv_hess_prod!(prod, grad, cone) ≈ -point atol=tol rtol=tol
-
-        # CO.inv_hess_sqrt_prod!(prod_mat2, Matrix(one(T) * I, dim, dim), cone)
-        # @test prod_mat2' * prod_mat2 ≈ inv_hess atol=tol rtol=tol
-    end
+    # CO.inv_hess_sqrt_prod!(prod_mat2, Matrix(one(T) * I, dim, dim), cone)
+    # @test prod_mat2' * prod_mat2 ≈ inv_hess atol=tol rtol=tol
 
     return
 end
 
-function load_reset_check(cone::CO.Cone{T}, point::Vector{T}, dual_point::Vector{T} = T[]) where {T <: Real}
+function load_reset_check(cone::CO.Cone{T}, point::Vector{T}) where {T <: Real}
     CO.load_point(cone, point)
-    !isempty(dual_point) && CO.load_dual_point(cone, dual_point)
     CO.reset_data(cone)
     return CO.is_feas(cone)
 end
@@ -178,35 +168,20 @@ function test_epiperexp_barrier(T::Type{<:Real})
         (u, v, w) = (s[1], s[2], s[3])
         return -log(v * log(u / v) - w) - log(u) - log(v)
     end
-    test_barrier_oracles(CO.EpiPerExp{T}(), barrier, init_tol = T(1e-6))
+    test_barrier_oracles(CO.EpiPerExp{T}(), barrier, init_tol = 1e-6)
     return
 end
 
-function test_epipersumexp_barrier(T::Type{<:Real})
-    function barrier(s)
-        (u, v, w) = (s[1], s[2], s[3:end])
-        return -log(v * log(u / v) - v * log(sum(wi -> exp(wi / v), w))) - log(u) - log(v)
-    end
-    for dim in [3, 5, 10]
-        test_barrier_oracles(CO.EpiPerSumExp{T}(dim), barrier, init_tol = T(1e-5))
-    end
-    # NOTE when initial point improved, take tests up to dim=500 and tighten tolerance
-    for dim in [15, 35 , 45, 100, 120, 200]
-        test_barrier_oracles(CO.EpiPerSumExp{T}(dim), barrier, init_tol = T(7e-1), init_only = true)
-    end
-    return
-end
-
-function test_hypopersumlog_barrier(T::Type{<:Real})
+function test_hypoperlog_barrier(T::Type{<:Real})
     function barrier(s)
         (u, v, w) = (s[1], s[2], s[3:end])
         return -log(v * sum(log(wj / v) for wj in w) - u) - sum(log, w) - log(v)
     end
     for dim in [3, 5, 10]
-        test_barrier_oracles(CO.HypoPerSumLog{T}(dim), barrier, init_tol = T(1e-5))
+        test_barrier_oracles(CO.HypoPerLog{T}(dim), barrier, init_tol = 1e-5)
     end
     for dim in [15, 65, 75, 100, 500]
-        test_barrier_oracles(CO.HypoPerSumLog{T}(dim), barrier, init_tol = T(1e-1), init_only = true)
+        test_barrier_oracles(CO.HypoPerLog{T}(dim), barrier, init_tol = 1e-1, init_only = true)
     end
     return
 end
@@ -236,9 +211,9 @@ function test_hypogeomean_barrier(T::Type{<:Real})
         end
         cone = CO.HypoGeomean{T}(alpha)
         if dim <= 3
-            test_barrier_oracles(cone, barrier, init_tol = T(1e-2))
+            test_barrier_oracles(cone, barrier, init_tol = 1e-2)
         else
-            test_barrier_oracles(cone, barrier, init_tol = T(1e-2), init_only = true)
+            test_barrier_oracles(cone, barrier, init_tol = 1e-2, init_only = true)
         end
     end
     return
@@ -354,7 +329,7 @@ function test_wsospolyinterp_barrier(T::Type{<:Real})
         Ps = vcat([P0], Ps)
         barrier(s) = -sum(logdet(cholesky!(Symmetric(P' * Diagonal(s) * P))) for P in Ps)
         cone = CO.WSOSPolyInterp{T, T}(U, Ps, true)
-        test_barrier_oracles(cone, barrier, init_tol = T(100)) # TODO center and test initial points
+        test_barrier_oracles(cone, barrier, init_tol = 1e2) # TODO center and test initial points
     end
     # TODO also test complex case CO.WSOSPolyInterp{T, Complex{T}} - need complex MU interp functions first
     return
