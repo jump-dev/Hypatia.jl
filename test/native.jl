@@ -1069,7 +1069,7 @@ function wsospolyinterpmat1(T; options...)
     c = T[-1]
     A = zeros(T, 0, 1)
     b = T[]
-    # the "1" polynomial
+    # the "one" polynomial
     G = ones(T, U, 1)
     # dimension of the Hessian is 1x1
     h = T[H(pts[u, :]...) for u in 1:U]
@@ -1094,7 +1094,7 @@ function wsospolyinterpmat2(T; options...)
     c = T[-1]
     A = zeros(T, 0, 1)
     b = T[]
-    # the "1" polynomial on the diagonal
+    # the "one" polynomial on the diagonal
     G = vcat(ones(T, U, 1), zeros(T, U, 1), ones(T, U, 1))
     h = T[H[i, j](pts[u, :]...) * (i == j ? 1 : sqrt(T(2))) for i in 1:n for j in 1:i for u in 1:U]
     cones = CO.Cone{T}[CO.WSOSPolyInterpMat{T}(n, U, [P0])]
@@ -1118,7 +1118,7 @@ function wsospolyinterpmat3(T; options...)
     c = T[-1]
     A = zeros(T, 0, 1)
     b = T[]
-    # the "1" polynomial on the diagonal
+    # the "one" polynomial on the diagonal
     G = vcat(ones(T, U, 1), zeros(T, U, 1), ones(T, U, 1), zeros(T, U, 1), zeros(T, U, 1), ones(T, U, 1))
     h = T[H[i, j](pts[u, :]...) * (i == j ? 1 : sqrt(T(2))) for i in 1:n for j in 1:i for u in 1:U]
     cones = CO.Cone{T}[CO.WSOSPolyInterpMat{T}(n, U, [P0])]
@@ -1127,6 +1127,86 @@ function wsospolyinterpmat3(T; options...)
     @test r.status == :Optimal
     @test r.primal_obj ≈ T(2) atol=tol rtol=tol
     @test r.x[1] ≈ -T(2) atol=tol rtol=tol
+end
+
+function wsospolyinterpsoc1(T; options...)
+    # mint t(x) : t(x) ^ 2 >= x ^ 4 on [-1, 1] where t(x) a constant (interpolant coefficients all equal)
+    tol = sqrt(sqrt(eps(T)))
+    DynamicPolynomials.@polyvar x
+    fn = x ^ 2
+    # the half-degree is div(2, 2) = 1
+    (U, pts, P0, PWts, _) = MU.interpolate(MU.Box{T}([-one(T)], [one(T)]), 1, sample = false)
+    @test U == 3
+
+    # the variable t(x) is a polynomial
+    c = ones(T, U)
+    A = T[1 -1 0; 1 0 -1; 0 1 -1]
+    b = zeros(T, 3)
+    G = vcat(-Matrix{T}(I, U, U), zeros(T, U, U))
+    h = vcat(zeros(T, U), T[fn(pts[u, :]...) for u in 1:U])
+    cones = CO.Cone{T}[CO.WSOSPolyInterpSOC{T}(2, U, [P0, PWts...])]
+
+    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+    @test r.status == :Optimal
+    # the solution is the "one" polynomial, all coefficients are one
+    @test r.primal_obj ≈ T(U) atol=tol rtol=tol
+    @test r.x ≈ ones(T, U) atol=tol rtol=tol
+end
+
+function wsospolyinterpsoc2(T; options...)
+    # min t(x) : t(x) ^ 2 >= x ^ 4 + (x - 1) ^ 2 on [-1, 1]^2 where t(x) a constant (interpolant coefficients all equal)
+    tol = sqrt(sqrt(eps(T)))
+    DynamicPolynomials.@polyvar x
+    fn1 = x ^ 2
+    fn2 = (x - 1)
+    # the half-degree is div(2, 2) = 1
+    (U, pts, P0, PWts, _) = MU.interpolate(MU.Box{T}([-one(T)], [one(T)]), 1, sample = false)
+
+    # the variable t(x) is a polynomial
+    c = ones(T, U)
+    num_A_rows = binomial(U, 2)
+    A = T[1 -1 0; 1 0 -1; 0 1 -1]
+    b = zeros(T, num_A_rows)
+    G = vcat(-Matrix{T}(I, U, U), zeros(T, U, U), zeros(T, U, U))
+    h = vcat(zeros(T, U), T[fn1(pts[u, :]...) for u in 1:U], T[fn2(pts[u, :]...) for u in 1:U])
+    cones = CO.Cone{T}[CO.WSOSPolyInterpSOC{T}(3, U, [P0, PWts...])]
+
+    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+    @test r.status == :Optimal
+    # the solution is t(x) ^ 2 = 5
+    @test r.primal_obj ≈ sqrt(T(5)) * U atol=tol rtol=tol
+    @test r.x ≈ fill(sqrt(T(5)), U) atol=tol rtol=tol
+end
+
+function wsospolyinterpsoc3(T; options...)
+    # min t(x) : t(x) ^ 2 >= x ^ 8 + (y - 1) ^ 2 on [-1, 1]^2 where t(x) a constant (interpolant coefficients all equal)
+    tol = sqrt(sqrt(eps(T)))
+    DynamicPolynomials.@polyvar x y
+    fn1 = x ^ 4 * y ^ 0
+    fn2 = (y - 1) * x ^ 0
+    # the half-degree is div(4, 2) = 2
+    (U, pts, P0, PWts, _) = MU.interpolate(MU.Box{T}(-ones(T, 2), ones(T, 2)), 2, sample = false)
+
+    # the variable t(x) is a polynomial
+    c = ones(T, U)
+    num_A_rows = binomial(U, 2)
+    A = zeros(T, num_A_rows, U)
+    k = 1
+    for i in 1:U, j in (i + 1):U
+        A[k, i] = 1
+        A[k, j] = -1
+        k += 1
+    end
+    b = zeros(T, num_A_rows)
+    G = vcat(-Matrix{T}(I, U, U), zeros(T, U, U), zeros(T, U, U))
+    h = vcat(zeros(T, U), T[fn1(pts[u, :]...) for u in 1:U], T[fn2(pts[u, :]...) for u in 1:U])
+    cones = CO.Cone{T}[CO.WSOSPolyInterpSOC{T}(3, U, [P0, PWts...])]
+
+    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+    @test r.status == :Optimal
+    # the solution is t(x) ^ 2 = 5
+    @test r.primal_obj ≈ sqrt(T(5)) * U atol=tol rtol=tol
+    @test r.x ≈ fill(sqrt(T(5)), U) atol=tol rtol=tol
 end
 
 function primalinfeas1(T; options...)
