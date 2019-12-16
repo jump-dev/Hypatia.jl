@@ -29,11 +29,11 @@ julia = "^1.4"
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
-GenericSVD = "01680d73-4ee2-5a08-a1aa-533608c188bb"
+GenericLinearAlgebra = "14197337-ba66-59df-a3e3-ca00e7dcff7a"
 JuMP = "4076af6c-e467-56ae-b986-b466b2749572"
 PolyJuMP = "ddf597a6-d67e-5340-b84c-e37d84115374"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 SumOfSquares = "4b9e565b-77fc-50a5-a571-1244f986bda1"
 
 [targets]
-test = ["CSV", "DataFrames", "ForwardDiff", "GenericSVD", "JuMP", "PolyJuMP", "Random", "SumOfSquares"]
+test = ["CSV", "DataFrames", "ForwardDiff", "GenericLinearAlgebra", "JuMP", "PolyJuMP", "Random", "SumOfSquares"]

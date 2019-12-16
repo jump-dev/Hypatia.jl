@@ -1,5 +1,7 @@
 #=
 Copyright 2018, Chris Coey, Lea Kapelevich and contributors
+
+tests for primitive cone barrier oracles
 =#
 
 using Test
@@ -13,70 +15,108 @@ const MU = Hypatia.ModelUtilities
 function test_barrier_oracles(
     cone::CO.Cone{T},
     barrier::Function;
-    noise::Real = 0.2,
-    scale::Real = 10000,
+    noise::T = T(0.1),
+    scale::T = T(1e-1),
     tol::Real = 100eps(T),
     init_tol::Real = tol,
     init_only::Bool = false,
     ) where {T <: Real}
+    Random.seed!(1)
+
     CO.setup_data(cone)
     dim = CO.dimension(cone)
     point = Vector{T}(undef, dim)
+    CO.set_initial_point(point, cone)
+    @test load_reset_check(cone, point)
+    @test cone.point == point
 
-    if isfinite(init_tol)
-        # tests for centrality of initial point
-        CO.set_initial_point(point, cone)
-        CO.load_point(cone, point)
-        @test cone.point == point
-        @test CO.is_feas(cone)
-        grad = CO.grad(cone)
-        @test dot(point, -grad) ≈ norm(point) * norm(grad) atol=init_tol rtol=init_tol
-        @test point ≈ -grad atol=init_tol rtol=init_tol
-    end
+    # tests for centrality of initial point
+    grad = CO.grad(cone)
+    @test dot(point, -grad) ≈ norm(point) * norm(grad) atol=init_tol rtol=init_tol
+    @test point ≈ -grad atol=init_tol rtol=init_tol
     init_only && return
 
-    # tests for perturbed point
-    CO.reset_data(cone)
-    CO.set_initial_point(point, cone)
-    if !iszero(noise)
-        point += T(noise) * (rand(T, dim) .- inv(T(2)))
-        point /= scale
-    end
+    # perturb and scale the initial point and check feasible
+    perturb_scale(point, noise, scale)
+    @test load_reset_check(cone, point)
 
-    CO.load_point(cone, point)
-    @test cone.point == point
-    @test CO.is_feas(cone)
+    # test gradient and Hessian oracles
+    test_grad_hess(cone, point, tol = tol)
 
+    # check gradient and Hessian agree with ForwardDiff
     grad = CO.grad(cone)
-    nu = CO.get_nu(cone)
-    @test dot(point, grad) ≈ -nu atol=tol rtol=tol
     hess = CO.hess(cone)
-    @test hess * point ≈ -grad atol=tol rtol=tol
+    @test ForwardDiff.gradient(barrier, point) ≈ grad atol=tol rtol=tol
+    @test ForwardDiff.hessian(barrier, point) ≈ hess atol=tol rtol=tol
 
-    if T in (Float32, Float64) # NOTE can only use BLAS floats with ForwardDiff barriers
-        @test ForwardDiff.gradient(barrier, point) ≈ grad atol=tol rtol=tol
-        @test ForwardDiff.hessian(barrier, point) ≈ hess atol=tol rtol=tol
-    end
-
-    inv_hess = CO.inv_hess(cone)
-    @test hess * inv_hess ≈ I atol=tol rtol=tol
-
-    prod = similar(point)
-    @test CO.hess_prod!(prod, point, cone) ≈ -grad atol=tol rtol=tol
-    @test CO.inv_hess_prod!(prod, grad, cone) ≈ -point atol=tol rtol=tol
-    prod = similar(point, dim, dim)
-    @test CO.hess_prod!(prod, Matrix(inv_hess), cone) ≈ I atol=tol rtol=tol
-    @test CO.inv_hess_prod!(prod, Matrix(hess), cone) ≈ I atol=tol rtol=tol
+    # TODO decide whether to add
+    # # check 3rd order corrector agrees with ForwardDiff
+    # # too slow if cone is too large or not using BlasReals
+    # if CO.use_3order_corr(cone) && dim < 8 && T in (Float32, Float64)
+    #     FD_3deriv = ForwardDiff.jacobian(x -> ForwardDiff.hessian(barrier, x), point)
+    #     # check log-homog property that F'''(point)[point] = -2F''(point)
+    #     @test reshape(FD_3deriv * point, dim, dim) ≈ -2 * hess
+    #     # check correction term agrees with directional 3rd derivative
+    #     primal_dir = perturb_scale(zeros(T, dim), noise, one(T))
+    #     dual_dir = perturb_scale(zeros(T, dim), noise, one(T))
+    #     Hinv_z = CO.inv_hess_prod!(similar(dual_dir), dual_dir, cone)
+    #     FD_corr = reshape(FD_3deriv * primal_dir, dim, dim) * Hinv_z / -2
+    #     @test FD_corr ≈ CO.correction(cone, primal_dir, dual_dir) atol=tol rtol=tol
+    # end
 
     return
 end
 
-function test_orthant_barrier(T::Type{<:Real})
-    nonneg_barrier = (s -> -sum(log, s))
-    nonpos_barrier = (s -> -sum(log, -s))
+function test_grad_hess(cone::CO.Cone{T}, point::Vector{T}; tol::Real = 100eps(T)) where {T <: Real}
+    nu = CO.get_nu(cone)
+    dim = length(point)
+    grad = CO.grad(cone)
+    hess = Matrix(CO.hess(cone))
+    inv_hess = Matrix(CO.inv_hess(cone))
+
+    @test dot(point, grad) ≈ -nu atol=tol rtol=tol
+    @test hess * inv_hess ≈ I atol=tol rtol=tol
+
+    prod_mat = similar(point, dim, dim)
+    @test CO.hess_prod!(prod_mat, inv_hess, cone) ≈ I atol=tol rtol=tol
+    @test CO.inv_hess_prod!(prod_mat, hess, cone) ≈ I atol=tol rtol=tol
+
+    prod = similar(point)
+    @test hess * point ≈ -grad atol=tol rtol=tol
+    @test CO.hess_prod!(prod, point, cone) ≈ -grad atol=tol rtol=tol
+    @test CO.inv_hess_prod!(prod, grad, cone) ≈ -point atol=tol rtol=tol
+
+    # TODO add hess sqrt oracles
+    # prod_mat2 = Matrix(CO.hess_sqrt_prod!(prod_mat, inv_hess, cone)')
+    # @test CO.hess_sqrt_prod!(prod_mat, prod_mat2, cone) ≈ I atol=tol rtol=tol
+    # CO.inv_hess_sqrt_prod!(prod_mat2, Matrix(one(T) * I, dim, dim), cone)
+    # @test prod_mat2' * prod_mat2 ≈ inv_hess atol=tol rtol=tol
+
+    return
+end
+
+function load_reset_check(cone::CO.Cone{T}, point::Vector{T}) where {T <: Real}
+    CO.load_point(cone, point)
+    CO.reset_data(cone)
+    return CO.is_feas(cone)
+end
+
+function perturb_scale(point::Vector{T}, noise::T, scale::T) where {T <: Real}
+    if !iszero(noise)
+        @. point += 2 * noise * rand(T) - noise
+    end
+    if !isone(scale)
+        point .*= scale
+    end
+    return point
+end
+
+# primitive cone barrier tests
+
+function test_nonnegative_barrier(T::Type{<:Real})
+    barrier = (s -> -sum(log, s))
     for dim in [1, 3, 6]
-        test_barrier_oracles(CO.Nonnegative{T}(dim), nonneg_barrier)
-        test_barrier_oracles(CO.Nonpositive{T}(dim), nonpos_barrier)
+        test_barrier_oracles(CO.Nonnegative{T}(dim), barrier)
     end
     return
 end
@@ -123,6 +163,15 @@ function test_epipersquare_barrier(T::Type{<:Real})
     return
 end
 
+function test_epiperexp_barrier(T::Type{<:Real})
+    function barrier(s)
+        (u, v, w) = (s[1], s[2], s[3])
+        return -log(v * log(u / v) - w) - log(u) - log(v)
+    end
+    test_barrier_oracles(CO.EpiPerExp{T}(), barrier, init_tol = 1e-6)
+    return
+end
+
 function test_hypoperlog_barrier(T::Type{<:Real})
     function barrier(s)
         (u, v, w) = (s[1], s[2], s[3:end])
@@ -133,21 +182,6 @@ function test_hypoperlog_barrier(T::Type{<:Real})
     end
     for dim in [15, 65, 75, 100, 500]
         test_barrier_oracles(CO.HypoPerLog{T}(dim), barrier, init_tol = 1e-1, init_only = true)
-    end
-    return
-end
-
-function test_epiperexp_barrier(T::Type{<:Real})
-    function barrier(s)
-        (u, v, w) = (s[1], s[2], s[3:end])
-        return -log(v * log(u / v) - v * log(sum(wi -> exp(wi / v), w))) - log(u) - log(v)
-    end
-    for dim in [3, 5, 10]
-        test_barrier_oracles(CO.EpiPerExp{T}(dim), barrier, init_tol = 1e-5)
-    end
-    # NOTE when initial point improved, take tests up to dim=500 and tighten tolerance
-    for dim in [15, 35 , 45, 100, 120, 200]
-        test_barrier_oracles(CO.EpiPerExp{T}(dim), barrier, init_tol = 7e-1, init_only = true)
     end
     return
 end
@@ -177,9 +211,9 @@ function test_hypogeomean_barrier(T::Type{<:Real})
         end
         cone = CO.HypoGeomean{T}(alpha)
         if dim <= 3
-            test_barrier_oracles(cone, barrier, init_tol = T(1e-2))
+            test_barrier_oracles(cone, barrier, init_tol = 1e-2)
         else
-            test_barrier_oracles(cone, barrier, init_tol = T(1e-2), init_only = true)
+            test_barrier_oracles(cone, barrier, init_tol = 1e-2, init_only = true)
         end
     end
     return
@@ -295,7 +329,7 @@ function test_wsospolyinterp_barrier(T::Type{<:Real})
         Ps = vcat([P0], Ps)
         barrier(s) = -sum(logdet(cholesky!(Symmetric(P' * Diagonal(s) * P))) for P in Ps)
         cone = CO.WSOSPolyInterp{T, T}(U, Ps, true)
-        test_barrier_oracles(cone, barrier, init_tol = T(100)) # TODO center and test initial points
+        test_barrier_oracles(cone, barrier, init_tol = 1e2) # TODO center and test initial points
     end
     # TODO also test complex case CO.WSOSPolyInterp{T, Complex{T}} - need complex MU interp functions first
     return

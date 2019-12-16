@@ -5,13 +5,13 @@ Copyright 2019, Chris Coey and contributors
 include(joinpath(@__DIR__, "moi.jl"))
 
 system_solvers = [
-    SO.NaiveDenseSystemSolver,
-    SO.NaiveSparseSystemSolver,
-    SO.NaiveIndirectSystemSolver,
-    SO.NaiveElimDenseSystemSolver,
-    SO.NaiveElimSparseSystemSolver,
-    SO.SymIndefDenseSystemSolver,
-    SO.SymIndefSparseSystemSolver,
+    # SO.NaiveDenseSystemSolver,
+    # SO.NaiveSparseSystemSolver,
+    # SO.NaiveIndirectSystemSolver,
+    # SO.NaiveElimDenseSystemSolver,
+    # SO.NaiveElimSparseSystemSolver,
+    # SO.SymIndefDenseSystemSolver,
+    # SO.SymIndefSparseSystemSolver,
     SO.QRCholDenseSystemSolver,
     ]
 
