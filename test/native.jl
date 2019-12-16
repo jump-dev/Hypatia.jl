@@ -1057,6 +1057,80 @@ function wsospolyinterp3(T; options...)
     @test r.primal_obj ≈ zero(T) atol=tol rtol=tol
 end
 
+function wsospolyinterpmat1(T; options...)
+    # convexity parameter for (x + 1) ^ 2 * (x - 1) ^ 2
+    tol = sqrt(sqrt(eps(T)))
+    DynamicPolynomials.@polyvar x
+    fn = (x + 1) ^ 2 * (x - 1) ^ 2
+    # the half-degree is div(4 - 2, 2) = 1
+    (U, pts, P0, PWts, _) = MU.interpolate(MU.Box{T}([-one(T)], [one(T)]), 1, sample = false)
+    H = DynamicPolynomials.differentiate(fn, x, 2)
+
+    c = T[-1]
+    A = zeros(T, 0, 1)
+    b = T[]
+    # the "1" polynomial
+    G = ones(T, U, 1)
+    # this is a univariate example, the dimension of the Hessian is 1x1
+    h = T[H(pts[u, :]...) for u in 1:U]
+    cones = CO.Cone{T}[CO.WSOSPolyInterpMat{T}(1, U, [P0, PWts...])]
+
+    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+    @test r.status == :Optimal
+    @test r.primal_obj ≈ T(4) atol=tol rtol=tol
+    @test r.x[1] ≈ -T(4) atol=tol rtol=tol
+end
+
+function wsospolyinterpmat2(T; options...)
+    # convexity parameter for sum(x .^ 4) - sum(x .^ 2) + (y + 1) ^ 2 * (y - 1) ^ 2
+    tol = sqrt(sqrt(eps(T)))
+    n = 2
+    DynamicPolynomials.@polyvar x y
+    fn = x ^ 4 - x ^ 2 + (y + 1) ^ 2 * (y - 1) ^ 2
+    # the half-degree is div(4 - 2, 2) = 1
+    (U, pts, P0, PWts, _) = MU.interpolate(MU.FreeDomain{T}(2), 1, sample = false)
+    H = DynamicPolynomials.differentiate(fn, [x, y], 2)
+
+    c = T[-1]
+    A = zeros(T, 0, 1)
+    b = T[]
+    # the "1" polynomial
+    G = ones(T, U * div(n * (n + 1), 2), 1)
+    h = T[H[i, j](pts[u, :]...) for i in 1:n for j in 1:i for u in 1:U]
+    cones = CO.Cone{T}[CO.WSOSPolyInterpMat{T}(n, U, [P0, PWts...])]
+
+    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+    @test r.status == :Optimal
+    # the convexity parameter is min(2, 4)
+    @test r.primal_obj ≈ T(2) atol=tol rtol=tol
+    @test r.x[1] ≈ -T(2) atol=tol rtol=tol
+end
+
+function wsospolyinterpmat3(T; options...)
+    # convexity parameter for sum(x .^ 4) - sum(x .^ 2) + (y + 1) ^ 2 * (y - 1) ^ 2
+    tol = sqrt(sqrt(eps(T)))
+    n = 3
+    DynamicPolynomials.@polyvar x[1:n]
+    fn = sum(x .^ 6) - sum(x .^ 2)
+    # the half-degree is div(6 - 2, 2) = 2
+    (U, pts, P0, PWts, _) = MU.interpolate(MU.Box{T}(-ones(T, n), ones(T, n)), 2, sample = false)
+    H = DynamicPolynomials.differentiate(fn, x, 2)
+
+    c = T[-1]
+    A = zeros(T, 0, 1)
+    b = T[]
+    # the "1" polynomial
+    G = ones(T, U * div(n * (n + 1), 2), 1)
+    h = T[H[i, j](pts[u, :]...) for i in 1:n for j in 1:i for u in 1:U]
+    cones = CO.Cone{T}[CO.WSOSPolyInterpMat{T}(n, U, [P0, PWts...])]
+
+    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+    @test r.status == :Optimal
+    # the convexity parameter is min(2, 4)
+    @test r.primal_obj ≈ T(2) atol=tol rtol=tol
+    @test r.x[1] ≈ -T(2) atol=tol rtol=tol
+end
+
 function primalinfeas1(T; options...)
     tol = sqrt(sqrt(eps(T)))
     c = T[1, 0]
