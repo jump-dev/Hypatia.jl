@@ -87,7 +87,7 @@ function sparsepca(
                 ]
         end
         h = vcat(hpsd, T(k), zeros(T, dimx))
-        push!(cones, CO.EpiNormInf{T}(1 + dimx, true))
+        push!(cones, CO.EpiNormInf{T, T}(1 + dimx, true))
     else
         id = Matrix{T}(I, dimx, dimx)
         l1 = [(i == j ? one(T) : T(2)) for i in 1:p for j in 1:i]

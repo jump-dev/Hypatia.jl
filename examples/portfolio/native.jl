@@ -71,10 +71,10 @@ function portfolio(
         add_single_ball(CO.EpiNormEucl{T}(num_stocks + 1), gamma)
     end
     if epinorminfdual_constr && use_epinorminfdual
-        add_single_ball(CO.EpiNormInf{T}(num_stocks + 1, true), gamma * sqrt(T(num_stocks)))
+        add_single_ball(CO.EpiNormInf{T, T}(num_stocks + 1, true), gamma * sqrt(T(num_stocks)))
     end
     if epinorminf_constr && use_epinorminf
-        add_single_ball(CO.EpiNormInf{T}(num_stocks + 1), gamma)
+        add_single_ball(CO.EpiNormInf{T, T}(num_stocks + 1), gamma)
     end
 
     if epinorminfdual_constr && !use_epinorminfdual

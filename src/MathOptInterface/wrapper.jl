@@ -398,7 +398,7 @@ function MOI.copy_to(
     opt.interval_scales = interval_scales
     if q > interval_start
         # exists at least one interval-type constraint
-        push!(cones, Cones.EpiNormInf{T}(q - interval_start))
+        push!(cones, Cones.EpiNormInf{T, T}(q - interval_start))
     end
 
     # add non-LP conic constraints
