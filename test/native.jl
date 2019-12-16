@@ -1088,21 +1088,21 @@ function wsospolyinterpmat2(T; options...)
     DynamicPolynomials.@polyvar x[1:n]
     fn = x[1] ^ 4 - 3 * x[2] ^ 2
     # the half-degree is div(4 - 2, 2) = 1
-    (U, pts, P0, _, _) = MU.interpolate(MU.FreeDomain{T}(2), 1, sample = false)
+    (U, pts, P0, _, _) = MU.interpolate(MU.FreeDomain{T}(n), 1, sample = false)
     H = DynamicPolynomials.differentiate(fn, x, 2)
 
     c = T[-1]
     A = zeros(T, 0, 1)
     b = T[]
-    # the "1" polynomial
-    G = ones(T, U * div(n * (n + 1), 2), 1)
-    h = T[H[i, j](pts[u, :]...) for i in 1:n for j in 1:i for u in 1:U]
+    # the "1" polynomial on the diagonal
+    G = vcat(ones(T, U, 1), zeros(T, U, 1), ones(T, U, 1))
+    h = T[H[i, j](pts[u, :]...) * (i == j ? 1 : sqrt(T(2))) for i in 1:n for j in 1:i for u in 1:U]
     cones = CO.Cone{T}[CO.WSOSPolyInterpMat{T}(n, U, [P0])]
 
     r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
     @test r.status == :Optimal
-    @test r.primal_obj ≈ T(12) atol=tol rtol=tol
-    @test r.x[1] ≈ -T(12) atol=tol rtol=tol
+    @test r.primal_obj ≈ T(6) atol=tol rtol=tol
+    @test r.x[1] ≈ -T(6) atol=tol rtol=tol
 end
 
 function wsospolyinterpmat3(T; options...)
@@ -1118,9 +1118,9 @@ function wsospolyinterpmat3(T; options...)
     c = T[-1]
     A = zeros(T, 0, 1)
     b = T[]
-    # the "1" polynomial
-    G = ones(T, U * div(n * (n + 1), 2), 1)
-    h = T[H[i, j](pts[u, :]...) for i in 1:n for j in 1:i for u in 1:U]
+    # the "1" polynomial on the diagonal
+    G = vcat(ones(T, U, 1), zeros(T, U, 1), ones(T, U, 1), zeros(T, U, 1), zeros(T, U, 1), ones(T, U, 1))
+    h = T[H[i, j](pts[u, :]...) * (i == j ? 1 : sqrt(T(2))) for i in 1:n for j in 1:i for u in 1:U]
     cones = CO.Cone{T}[CO.WSOSPolyInterpMat{T}(n, U, [P0])]
 
     r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
