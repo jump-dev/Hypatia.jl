@@ -2,9 +2,10 @@
 Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 
 interpolation-based weighted-sum-of-squares (multivariate) polynomial epinormeucl (AKA second-order cone) parametrized by interpolation points Ps
-TODO improve description
+certifies that u(x)^2 <= sum(w_i(x)^2) for all x in the domain described by input Ps
+u(x), w_1(x), ...,  w_R(x) are polynomials with U coefficients
 
-definition and dual barrier extended from "Sum-of-squares optimization without semidefinite programming" by D. Papp and S. Yildiz, available at https://arxiv.org/abs/1712.01792
+dual barrier extended from "Sum-of-squares optimization without semidefinite programming" by D. Papp and S. Yildiz, available at https://arxiv.org/abs/1712.01792
 
 barrier is -logdet(schur(Lambda)) - logdet(Lambda_11)
 if schur(M) = A - B * inv(D) * C
