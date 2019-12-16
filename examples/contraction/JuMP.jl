@@ -57,8 +57,10 @@ function contractionJuMP(
         deg_R = maximum(DP.maxdegree.(R))
         d_R = div(deg_R + 1, 2)
         (U_R, pts_R, P0_R, _, _) = MU.interpolate(dom, d_R, sample = true)
-        JuMP.@constraint(model, [M[i, j](pts_M[u, :]) * (i == j ? 1.0 : rt2) - (i == j ? delta : 0.0) for i in 1:n for j in 1:i for u in 1:U_M] in HYP.WSOSPolyInterpMatCone(n, U_M, [P0_M]))
-        JuMP.@constraint(model, [-R[i, j](pts_R[u, :]) * (i == j ? 1.0 : rt2) - (i == j ? delta : 0.0) for i in 1:n for j in 1:i for u in 1:U_R] in HYP.WSOSPolyInterpMatCone(n, U_R, [P0_R]))
+        M_gap = [M[i, j](pts_M[u, :]) - (i == j ? delta : 0.0) for i in 1:n for j in 1:i for u in 1:U_M]
+        R_gap = [-R[i, j](pts_R[u, :]) - (i == j ? delta : 0.0) for i in 1:n for j in 1:i for u in 1:U_R]
+        JuMP.@constraint(model, MU.vec_to_svec!(M_gap, sqrt(2), incr = U_M) in HYP.WSOSPolyInterpMatCone(n, U_M, [P0_M]))
+        JuMP.@constraint(model, MU.vec_to_svec!(R_gap, sqrt(2), incr = U_R) in HYP.WSOSPolyInterpMatCone(n, U_R, [P0_R]))
     else
         PJ.setpolymodule!(model, SumOfSquares)
         JuMP.@constraint(model, M - Matrix(delta * I, n, n) in JuMP.PSDCone())

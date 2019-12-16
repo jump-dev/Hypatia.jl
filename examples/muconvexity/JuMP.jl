@@ -41,7 +41,8 @@ function muconvexityJuMP(
         d = div(maximum(DP.maxdegree.(H)) + 1, 2)
         (U, pts, P0, PWts, _) = MU.interpolate(dom, d, sample = true, sample_factor = 100)
         mat_wsos_cone = HYP.WSOSPolyInterpMatCone(n, U, [P0, PWts...])
-        JuMP.@constraint(model, [H[i, j](x => pts[u, :]) * (i == j ? 1.0 : rt2) for i in 1:n for j in 1:i for u in 1:U] in mat_wsos_cone)
+        H_interp = [H[i, j](x => pts[u, :]) for i in 1:n for j in 1:i for u in 1:U]
+        JuMP.@constraint(model, MU.vec_to_svec!(H_interp, sqrt(2), incr = U) in mat_wsos_cone)
     else
         PolyJuMP.setpolymodule!(model, SumOfSquares)
         JuMP.@constraint(model, H in JuMP.PSDCone(), domain = MU.get_domain_inequalities(dom, x))
