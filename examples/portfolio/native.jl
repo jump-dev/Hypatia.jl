@@ -117,7 +117,7 @@ function portfolio(
         cone_offset += 2 * num_stocks + 1
     end
 
-    if epinorminf_constr && use_epinorminf
+    if epinorminf_constr && !use_epinorminf
         if use_linops
             push!(G_blocks, sigma_half)
             push!(G_blocks, -sigma_half)
