@@ -97,6 +97,7 @@ function polyminreal(
                     @. Gk[l, :] = -Pk[:, i] * Pk[:, j]
                     l += 1
                 end
+                MU.vec_to_svec_cols!(Gk, sqrt(T(2)))
                 G_full = vcat(G_full, Gk)
             end
             if use_linops
@@ -125,7 +126,7 @@ polyminreal10(T::Type{<:Real}) = polyminreal(T, :rosenbrock, 5)
 polyminreal11(T::Type{<:Real}) = polyminreal(T, :butcher, 2)
 polyminreal12(T::Type{<:Real}) = polyminreal(T, :goldsteinprice_ellipsoid, 7)
 polyminreal13(T::Type{<:Real}) = polyminreal(T, :goldsteinprice_ball, 7)
-polyminreal14(T::Type{<:Real}) = polyminreal(T, :motzkin, 3, use_primal = false)
+polyminreal14(T::Type{<:Real}) = polyminreal(T, :motzkin, 3, use_primal = false) # TODO repetition of 18
 polyminreal15(T::Type{<:Real}) = polyminreal(T, :motzkin, 3)
 polyminreal16(T::Type{<:Real}) = polyminreal(T, :reactiondiffusion, 4, use_primal = false)
 polyminreal17(T::Type{<:Real}) = polyminreal(T, :lotkavolterra, 3, use_primal = false)
