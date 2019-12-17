@@ -28,7 +28,7 @@ function polyminJuMP(
     if use_wsos
         Random.seed!(rseed)
         (U, pts, Ps, _) = MU.interpolate(dom, halfdeg, sample = sample, sample_factor = 100)
-        cone = HYP.WSOSPolyInterpCone(U, Ps, !primal_wsos)
+        cone = HYP.WSOSInterpNonnegativeCone(U, Ps, !primal_wsos)
         interp_vals = [f(x => pts[j, :]) for j in 1:U]
 
         model = JuMP.Model()

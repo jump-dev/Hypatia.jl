@@ -33,9 +33,9 @@ include("epinormspectral.jl")
 include("possemideftri.jl")
 include("hypoperlogdettri.jl")
 include("hyporootdettri.jl")
-include("wsospolyinterp.jl")
-# include("wsospolyinterpmat.jl")
-# include("wsospolyinterpsoc.jl")
+include("wsosinterpnonnegative.jl")
+include("wsosinterppossemideftri.jl")
+include("wsosinterpepinormeucl.jl")
 
 use_dual(cone::Cone) = cone.use_dual
 load_point(cone::Cone, point::AbstractVector) = copyto!(cone.point, point)
@@ -125,7 +125,11 @@ end
 #     # return ldiv!(prod, UpperTriangular(cone.hess_fact_cache.AF.data), arr)
 # end
 
-# utilities for converting between symmetric/Hermitian matrix and vector triangle forms
+# utilities for arrays
+
+svec_idx(row::Int, col::Int) = (div((row - 1) * row, 2) + col)
+
+block_idxs(incr::Int, block::Int) = (incr * (block - 1) .+ (1:incr))
 
 # TODO fix later, rt2::T doesn't work with tests using ForwardDiff
 function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{T}, rt2::Number) where {T}

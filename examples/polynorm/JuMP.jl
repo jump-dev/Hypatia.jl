@@ -31,7 +31,7 @@ function polynormJuMP(n::Int, deg::Int, npolys::Int)
 
     fpoly = dot(f, lagrange_polys)
     rand_polys = [dot(polys[:, i], lagrange_polys) for i in 1:npolys]
-    cone = HYP.WSOSPolyInterpSOCCone(npolys + 1, U, Ps)
+    cone = HYP.WSOSInterpEpiNormEuclCone(npolys + 1, U, Ps)
     JuMP.@constraint(model, vcat(f, [polys[:, i] for i in 1:npolys]...) in cone)
 
     return (model = model,)
