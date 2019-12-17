@@ -56,7 +56,7 @@ function densityest(
         # U variables
         h_poly = zeros(T, U)
         b_poly = T[]
-        push!(cones, CO.WSOSPolyInterp{T, T}(U, [P0, PWts...]))
+        push!(cones, CO.WSOSInterpNonnegative{T, T}(U, [P0, PWts...]))
         cone_offset += U
         num_psd_vars = 0
     else

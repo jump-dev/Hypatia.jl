@@ -1,8 +1,8 @@
 #=
-Copyright 2018, Chris Coey and contributors
+Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 Copyright 2018, David Papp, Sercan Yildiz
 
-interpolation-based weighted-sum-of-squares (multivariate) polynomial cone parametrized by interpolation points Ps
+interpolation-based weighted-sum-of-squares (multivariate) polynomial cone parametrized by interpolation matrices Ps
 
 definition and dual barrier from "Sum-of-squares optimization without semidefinite programming" by D. Papp and S. Yildiz, available at https://arxiv.org/abs/1712.01792
 
@@ -11,7 +11,7 @@ TODO
 - scale the interior direction
 =#
 
-mutable struct WSOSPolyInterp{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
+mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     use_dual::Bool
     dim::Int
     Ps::Vector{Matrix{R}}
@@ -34,27 +34,27 @@ mutable struct WSOSPolyInterp{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     tmpUU::Matrix{R}
     ΛFs::Vector
 
-    function WSOSPolyInterp{T, R}(
-        dim::Int,
+    function WSOSInterpNonnegative{T, R}(
+        U::Int,
         Ps::Vector{Matrix{R}},
         is_dual::Bool;
         hess_fact_cache = hessian_cache(T),
         ) where {R <: RealOrComplex{T}} where {T <: Real}
-        for k in eachindex(Ps)
-            @assert size(Ps[k], 1) == dim
+        for Pj in Ps
+            @assert size(Pj, 1) == U
         end
         cone = new{T, R}()
         cone.use_dual = !is_dual # using dual barrier
-        cone.dim = dim
+        cone.dim = U
         cone.Ps = Ps
         cone.hess_fact_cache = hess_fact_cache
         return cone
     end
 end
 
-WSOSPolyInterp{T, R}(dim::Int, Ps::Vector{Matrix{R}}) where {R <: RealOrComplex{T}} where {T <: Real} = WSOSPolyInterp{T, R}(dim, Ps, false)
+WSOSInterpNonnegative{T, R}(dim::Int, Ps::Vector{Matrix{R}}) where {R <: RealOrComplex{T}} where {T <: Real} = WSOSInterpNonnegative{T, R}(dim, Ps, false)
 
-function setup_data(cone::WSOSPolyInterp{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
+function setup_data(cone::WSOSInterpNonnegative{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     reset_data(cone)
     dim = cone.dim
     cone.point = zeros(T, dim)
@@ -71,16 +71,17 @@ function setup_data(cone::WSOSPolyInterp{T, R}) where {R <: RealOrComplex{T}} wh
     return
 end
 
-get_nu(cone::WSOSPolyInterp) = sum(size(Pk, 2) for Pk in cone.Ps)
+get_nu(cone::WSOSInterpNonnegative) = sum(size(Pk, 2) for Pk in cone.Ps)
 
 # TODO find "central" initial point, like for other cones
-set_initial_point(arr::AbstractVector, cone::WSOSPolyInterp) = (arr .= 1)
+set_initial_point(arr::AbstractVector, cone::WSOSInterpNonnegative) = (arr .= 1)
 
 # TODO order the k indices so that fastest and most recently infeasible k are first
 # TODO can be done in parallel
-function update_feas(cone::WSOSPolyInterp)
+function update_feas(cone::WSOSInterpNonnegative)
     @assert !cone.feas_updated
     D = Diagonal(cone.point)
+
     cone.is_feas = true
     @inbounds for k in eachindex(cone.Ps)
         # Λ = Pk' * Diagonal(point) * Pk
@@ -97,6 +98,7 @@ function update_feas(cone::WSOSPolyInterp)
         end
         cone.ΛFs[k] = ΛFk
     end
+
     cone.feas_updated = true
     return cone.is_feas
 end
@@ -104,8 +106,9 @@ end
 # TODO decide whether to compute the LUk' * LUk in grad or in hess (only diag needed for grad)
 # TODO can be done in parallel
 # TODO may be faster (but less numerically stable) with explicit inverse here
-function update_grad(cone::WSOSPolyInterp)
+function update_grad(cone::WSOSInterpNonnegative)
     @assert cone.is_feas
+
     cone.grad .= 0
     @inbounds for k in eachindex(cone.Ps)
         LUk = cone.tmpLU[k]
@@ -115,12 +118,14 @@ function update_grad(cone::WSOSPolyInterp)
             cone.grad[j] -= sum(abs2, view(LUk, :, j))
         end
     end
+
     cone.grad_updated = true
     return cone.grad
 end
 
-function update_hess(cone::WSOSPolyInterp)
+function update_hess(cone::WSOSInterpNonnegative)
     @assert cone.grad_updated
+
     cone.hess .= 0
     @inbounds for k in eachindex(cone.Ps)
         LUk = cone.tmpLU[k]
@@ -129,6 +134,7 @@ function update_hess(cone::WSOSPolyInterp)
             cone.hess.data[i, j] += abs2(UUk[i, j])
         end
     end
+    
     cone.hess_updated = true
     return cone.hess
 end

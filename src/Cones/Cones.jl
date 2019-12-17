@@ -33,9 +33,9 @@ include("epinormspectral.jl")
 include("possemideftri.jl")
 include("hypoperlogdettri.jl")
 include("HypoRootdetTri.jl")
-include("wsospolyinterp.jl")
-include("wsospolyinterpmat.jl")
-include("wsospolyinterpsoc.jl")
+include("wsosinterpnonnegative.jl")
+include("wsosinterppossemideftri.jl")
+include("wsosinterpepinormeucl.jl")
 
 use_dual(cone::Cone) = cone.use_dual
 load_point(cone::Cone, point::AbstractVector{T}, scal::T) where {T} = (@. cone.point = point / scal)
