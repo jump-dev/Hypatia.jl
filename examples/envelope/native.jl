@@ -27,15 +27,11 @@ function envelope(
     # generate interpolation
     @assert rand_halfdeg <= env_halfdeg
     domain = MU.Box{T}(-ones(T, n), ones(T, n))
-    (U, pts, P0, PWts, w) = MU.interpolate(domain, env_halfdeg, sample = false, calc_w = true)
-    # TODO remove below conversions when ModelUtilities can use T <: Real
-    w = T.(w)
-    P0 = T.(P0)
-    PWts = convert.(Matrix{T}, PWts)
+    (U, pts, Ps, w) = MU.interpolate(domain, env_halfdeg, sample = false, calc_w = true)
 
     # generate random data
     L = binomial(n + rand_halfdeg, n)
-    c_or_h = vec(P0[:, 1:L] * rand(T(-9):T(9), L, npoly))
+    c_or_h = vec(Ps[1][:, 1:L] * rand(T(-9):T(9), L, npoly))
 
     if primal_wsos
         # WSOS cone in primal
@@ -53,7 +49,7 @@ function envelope(
         h = zeros(T, npoly * U)
     end
 
-    cones = CO.Cone{T}[CO.WSOSInterpNonnegative{T, T}(U, [P0, PWts...], !primal_wsos) for k in 1:npoly]
+    cones = CO.Cone{T}[CO.WSOSInterpNonnegative{T, T}(U, Ps, !primal_wsos) for k in 1:npoly]
 
     return (c = c, A = A, b = b, G = G, h = h, cones = cones)
 end

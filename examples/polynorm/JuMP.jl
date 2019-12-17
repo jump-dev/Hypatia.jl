@@ -19,19 +19,19 @@ const MU = HYP.ModelUtilities
 function polynormJuMP(n::Int, deg::Int, npolys::Int)
     dom = MU.FreeDomain{Float64}(n)
     halfdeg = div(deg + 1, 2)
-    (U, pts, P0, _, w) = MU.interpolate(dom, halfdeg, sample = false, calc_w = true)
+    (U, pts, Ps, w) = MU.interpolate(dom, halfdeg, sample = false, calc_w = true)
     lagrange_polys = MU.recover_lagrange_polys(pts, 2 * halfdeg)
 
     model = JuMP.Model()
     JuMP.@variable(model, f[1:U])
     JuMP.@objective(model, Min, dot(w, f))
 
-    L = size(P0, 2)
-    polys = P0[:, 1:L] * rand(-9:9, L, npolys)
+    L = size(Ps[1], 2)
+    polys = Ps[1] * rand(-9:9, L, npolys)
 
     fpoly = dot(f, lagrange_polys)
     rand_polys = [dot(polys[:, i], lagrange_polys) for i in 1:npolys]
-    cone = HYP.WSOSInterpEpiNormEuclCone(npolys + 1, U, [P0])
+    cone = HYP.WSOSInterpEpiNormEuclCone(npolys + 1, U, Ps)
     JuMP.@constraint(model, vcat(f, [polys[:, i] for i in 1:npolys]...) in cone)
 
     return (model = model,)

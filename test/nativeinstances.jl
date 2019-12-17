@@ -1058,7 +1058,7 @@ end
 
 function wsosinterpnonnegative1(T; options...)
     tol = sqrt(sqrt(eps(T)))
-    (U, pts, P0, PWts, _) = MU.interpolate(MU.Box{T}(-ones(T, 2), ones(T, 2)), 2, sample = false)
+    (U, pts, Ps, _) = MU.interpolate(MU.Box{T}(-ones(T, 2), ones(T, 2)), 2, sample = false)
     DynamicPolynomials.@polyvar x y
     fn = x ^ 4 + x ^ 2 * y ^ 2 + 4 * y ^ 2 + 4
 
@@ -1067,7 +1067,7 @@ function wsosinterpnonnegative1(T; options...)
     b = T[]
     G = ones(T, U, 1)
     h = T[fn(pts[j, :]...) for j in 1:U]
-    cones = CO.Cone{T}[CO.WSOSInterpNonnegative{T, T}(U, [P0, PWts...])]
+    cones = CO.Cone{T}[CO.WSOSInterpNonnegative{T, T}(U, Ps)]
 
     r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
     @test r.status == :Optimal
@@ -1077,7 +1077,7 @@ end
 
 function wsosinterpnonnegative2(T; options...)
     tol = sqrt(sqrt(eps(T)))
-    (U, pts, P0, PWts, _) = MU.interpolate(MU.Box{T}(zeros(T, 2), fill(T(3), 2)), 2, sample = false)
+    (U, pts, Ps, _) = MU.interpolate(MU.Box{T}(zeros(T, 2), fill(T(3), 2)), 2, sample = false)
     DynamicPolynomials.@polyvar x y
     fn = (x - 2) ^ 2 + (x * y - 3) ^ 2
 
@@ -1086,7 +1086,7 @@ function wsosinterpnonnegative2(T; options...)
     b = T[]
     G = ones(T, U, 1)
     h = T[fn(pts[j, :]...) for j in 1:U]
-    cones = CO.Cone{T}[CO.WSOSInterpNonnegative{T, T}(U, [P0, PWts...])]
+    cones = CO.Cone{T}[CO.WSOSInterpNonnegative{T, T}(U, Ps)]
 
     r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
     @test r.status == :Optimal
@@ -1096,7 +1096,7 @@ end
 
 function wsosinterpnonnegative3(T; options...)
     tol = sqrt(sqrt(eps(T)))
-    (U, pts, P0, PWts, _) = MU.interpolate(MU.Box{T}(zeros(T, 2), fill(T(3), 2)), 2, sample = false)
+    (U, pts, Ps, _) = MU.interpolate(MU.Box{T}(zeros(T, 2), fill(T(3), 2)), 2, sample = false)
     DynamicPolynomials.@polyvar x y
     fn = (x - 2) ^ 2 + (x * y - 3) ^ 2
 
@@ -1105,7 +1105,7 @@ function wsosinterpnonnegative3(T; options...)
     b = T[1]
     G = Diagonal(-one(T) * I, U)
     h = zeros(T, U)
-    cones = CO.Cone{T}[CO.WSOSInterpNonnegative{T, T}(U, [P0, PWts...], true)]
+    cones = CO.Cone{T}[CO.WSOSInterpNonnegative{T, T}(U, Ps, true)]
 
     r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
     @test r.status == :Optimal
@@ -1118,7 +1118,7 @@ function wsosinterppossemideftri1(T; options...)
     DynamicPolynomials.@polyvar x
     fn = (x + 1) ^ 2 * (x - 1) ^ 2
     # the half-degree is div(4 - 2, 2) = 1
-    (U, pts, P0, PWts, _) = MU.interpolate(MU.Box{T}([-one(T)], [one(T)]), 1, sample = false)
+    (U, pts, Ps, _) = MU.interpolate(MU.Box{T}([-one(T)], [one(T)]), 1, sample = false)
     H = DynamicPolynomials.differentiate(fn, x, 2)
 
     c = T[-1]
@@ -1128,7 +1128,7 @@ function wsosinterppossemideftri1(T; options...)
     G = ones(T, U, 1)
     # dimension of the Hessian is 1x1
     h = T[H(pts[u, :]...) for u in 1:U]
-    cones = CO.Cone{T}[CO.WSOSInterpPosSemidefTri{T}(1, U, [P0, PWts...])]
+    cones = CO.Cone{T}[CO.WSOSInterpPosSemidefTri{T}(1, U, Ps)]
 
     r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
     @test r.status == :Optimal
@@ -1143,7 +1143,7 @@ function wsosinterppossemideftri2(T; options...)
     DynamicPolynomials.@polyvar x[1:n]
     fn = x[1] ^ 4 - 3 * x[2] ^ 2
     # the half-degree is div(4 - 2, 2) = 1
-    (U, pts, P0, _, _) = MU.interpolate(MU.FreeDomain{T}(n), 1, sample = false)
+    (U, pts, Ps, _) = MU.interpolate(MU.FreeDomain{T}(n), 1, sample = false)
     H = DynamicPolynomials.differentiate(fn, x, 2)
 
     c = T[-1]
@@ -1153,7 +1153,7 @@ function wsosinterppossemideftri2(T; options...)
     G = vcat(ones(T, U, 1), zeros(T, U, 1), ones(T, U, 1))
     h = T[H[i, j](pts[u, :]...) for i in 1:n for j in 1:i for u in 1:U]
     MU.vec_to_svec!(h, sqrt(T(2)), incr = U)
-    cones = CO.Cone{T}[CO.WSOSInterpPosSemidefTri{T}(n, U, [P0])]
+    cones = CO.Cone{T}[CO.WSOSInterpPosSemidefTri{T}(n, U, Ps)]
 
     r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
     @test r.status == :Optimal
@@ -1168,7 +1168,7 @@ function wsosinterppossemideftri3(T; options...)
     DynamicPolynomials.@polyvar x[1:n]
     fn = sum(x .^ 4) - sum(x .^ 2)
     # half-degree is div(6 - 2, 2) = 2
-    (U, pts, P0, _, _) = MU.interpolate(MU.FreeDomain{T}(n), 2, sample = false)
+    (U, pts, Ps, _) = MU.interpolate(MU.FreeDomain{T}(n), 2, sample = false)
     H = DynamicPolynomials.differentiate(fn, x, 2)
 
     c = T[-1]
@@ -1178,7 +1178,7 @@ function wsosinterppossemideftri3(T; options...)
     G = vcat(ones(T, U, 1), zeros(T, U, 1), ones(T, U, 1), zeros(T, U, 1), zeros(T, U, 1), ones(T, U, 1))
     h = T[H[i, j](pts[u, :]...) for i in 1:n for j in 1:i for u in 1:U]
     MU.vec_to_svec!(h, sqrt(T(2)), incr = U)
-    cones = CO.Cone{T}[CO.WSOSInterpPosSemidefTri{T}(n, U, [P0])]
+    cones = CO.Cone{T}[CO.WSOSInterpPosSemidefTri{T}(n, U, Ps)]
 
     r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
     @test r.status == :Optimal
@@ -1192,7 +1192,7 @@ function wsosinterpepinormeucl1(T; options...)
     DynamicPolynomials.@polyvar x
     fn = x ^ 2
     # the half-degree is div(2, 2) = 1
-    (U, pts, P0, PWts, _) = MU.interpolate(MU.Box{T}([-one(T)], [one(T)]), 1, sample = false)
+    (U, pts, Ps, _) = MU.interpolate(MU.Box{T}([-one(T)], [one(T)]), 1, sample = false)
     @test U == 3
 
     # the variable t(x) is a polynomial
@@ -1201,7 +1201,7 @@ function wsosinterpepinormeucl1(T; options...)
     b = zeros(T, 3)
     G = vcat(-Matrix{T}(I, U, U), zeros(T, U, U))
     h = vcat(zeros(T, U), T[fn(pts[u, :]...) for u in 1:U])
-    cones = CO.Cone{T}[CO.WSOSInterpEpiNormEucl{T}(2, U, [P0, PWts...])]
+    cones = CO.Cone{T}[CO.WSOSInterpEpiNormEucl{T}(2, U, Ps)]
 
     r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
     @test r.status == :Optimal
@@ -1217,7 +1217,7 @@ function wsosinterpepinormeucl2(T; options...)
     fn1 = x ^ 2
     fn2 = (x - 1)
     # the half-degree is div(2, 2) = 1
-    (U, pts, P0, PWts, _) = MU.interpolate(MU.Box{T}([-one(T)], [one(T)]), 1, sample = false)
+    (U, pts, Ps, _) = MU.interpolate(MU.Box{T}([-one(T)], [one(T)]), 1, sample = false)
 
     # the variable t(x) is a polynomial
     c = ones(T, U)
@@ -1226,7 +1226,7 @@ function wsosinterpepinormeucl2(T; options...)
     b = zeros(T, num_A_rows)
     G = vcat(-Matrix{T}(I, U, U), zeros(T, U, U), zeros(T, U, U))
     h = vcat(zeros(T, U), T[fn1(pts[u, :]...) for u in 1:U], T[fn2(pts[u, :]...) for u in 1:U])
-    cones = CO.Cone{T}[CO.WSOSInterpEpiNormEucl{T}(3, U, [P0, PWts...])]
+    cones = CO.Cone{T}[CO.WSOSInterpEpiNormEucl{T}(3, U, Ps)]
 
     r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
     @test r.status == :Optimal
@@ -1242,7 +1242,7 @@ function wsosinterpepinormeucl3(T; options...)
     fn1 = x ^ 4 * y ^ 0
     fn2 = (y - 1) * x ^ 0
     # the half-degree is div(4, 2) = 2
-    (U, pts, P0, PWts, _) = MU.interpolate(MU.Box{T}(-ones(T, 2), ones(T, 2)), 2, sample = false)
+    (U, pts, Ps, _) = MU.interpolate(MU.Box{T}(-ones(T, 2), ones(T, 2)), 2, sample = false)
 
     # the variable t(x) is a polynomial
     c = ones(T, U)
@@ -1257,7 +1257,7 @@ function wsosinterpepinormeucl3(T; options...)
     b = zeros(T, num_A_rows)
     G = vcat(-Matrix{T}(I, U, U), zeros(T, U, U), zeros(T, U, U))
     h = vcat(zeros(T, U), T[fn1(pts[u, :]...) for u in 1:U], T[fn2(pts[u, :]...) for u in 1:U])
-    cones = CO.Cone{T}[CO.WSOSInterpEpiNormEucl{T}(3, U, [P0, PWts...])]
+    cones = CO.Cone{T}[CO.WSOSInterpEpiNormEucl{T}(3, U, Ps)]
 
     r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
     @test r.status == :Optimal
