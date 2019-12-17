@@ -7,6 +7,10 @@ u(x), w_1(x), ...,  w_R(x) are polynomials with U coefficients
 
 dual barrier extended from "Sum-of-squares optimization without semidefinite programming" by D. Papp and S. Yildiz, available at https://arxiv.org/abs/1712.01792
 and "Semidefinite Characterization of Sum-of-Squares Cones in Algebras" by D. Papp and F. Alizadeh
+-logdet(schur(Lambda)) - logdet(Lambda_11)
+note that if schur(M) = A - B * inv(D) * C then
+logdet(schur) = logdet(M) - logdet(D) = logdet(Lambda) - (R - 1) * logdet(Lambda_11)
+since our D is an (R - 1) x (R - 1) block diagonal matrix
 =#
 
 mutable struct WSOSInterpEpiNormEucl{T <: Real} <: Cone{T}
@@ -104,9 +108,6 @@ function set_initial_point(arr::AbstractVector, cone::WSOSInterpEpiNormEucl)
     return arr
 end
 
-# the barrier we will use is -logdet(schur(Lambda)) - logdet(Lambda_11)
-# if schur(M) = A - B * inv(D) * C
-# logdet(schur) = logdet(M) - logdet(D) = logdet(Lambda) - (R - 1) * logdet(Lambda_11) since our D is an (R - 1) x (R - 1) block diagonal matrix
 function update_feas(cone::WSOSInterpEpiNormEucl)
     @assert !cone.feas_updated
 
@@ -139,7 +140,7 @@ function update_feas(cone::WSOSInterpEpiNormEucl)
             @. LUj = Psj' * point_pq'
             mul!(LLj, LUj, Psj)
 
-            # avoiding lambdafact.L \ lambda because lambdafact \ lambda is useful later
+            # not using lambdafact.L \ lambda because lambdafact \ lambda is useful later
             Λi_Λ[r - 1] .= lambdafact[j] \ LLj
             mat -= LLj * Λi_Λ[r - 1]
             uo += cone.U
