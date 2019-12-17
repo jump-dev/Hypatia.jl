@@ -65,14 +65,16 @@ function densityest(
             num_psd_vars += dim
             push!(psd_var_list, zeros(T, U, dim))
             idx = 1
-            for k in 1:L, l in 1:k
-                # off diagonals are doubled
-                psd_var_list[i][:, idx] = Ps[i][:, k] .* Ps[i][:, l]
+            # we will work with PSD vars with scaled off-diagonals
+            # relevant columns (not rows) in A need to be scaled by sqrt(2) also
+            for k in 1:L
+                for l in 1:(k - 1)
+                    psd_var_list[i][:, idx] = Ps[i][:, k] .* Ps[i][:, l] * sqrt(T(2))
+                    idx += 1
+                end
+                psd_var_list[i][:, idx] = Ps[i][:, k] .* Ps[i][:, k]
                 idx += 1
             end
-            # we will work with PSD vars with scaled off-diagonals
-            # block in A needs to be scaled by sqrt(2) also
-            MU.vec_to_svec_cols!(psd_var_list[i], sqrt(T(2)))
             push!(cones, CO.PosSemidefTri{T, T}(dim))
             cone_offset += dim
         end
@@ -147,27 +149,35 @@ end
 densityest(T::Type{<:Real}, nobs::Int, n::Int, deg::Int; options...) = densityest(T, randn(T, nobs, n), deg; options...)
 
 densityest1(T::Type{<:Real}) = densityest(T, iris_data(), 4)
-densityest2(T::Type{<:Real}) = densityest(T, cancer_data(), 4)
-densityest3(T::Type{<:Real}) = densityest(T, 50, 1, 4)
-densityest4(T::Type{<:Real}) = densityest(T, 50, 1, 4, use_wsos = false)
-densityest5(T::Type{<:Real}) = densityest(T, 10, 1, 2, use_linops = true)
-densityest6(T::Type{<:Real}) = densityest(T, 10, 1, 2, use_wsos = false, use_linops = true)
+densityest2(T::Type{<:Real}) = densityest(T, iris_data(), 4, use_wsos = false)
+densityest3(T::Type{<:Real}) = densityest(T, cancer_data(), 4)
+densityest4(T::Type{<:Real}) = densityest(T, cancer_data(), 4, use_wsos = false)
+densityest5(T::Type{<:Real}) = densityest(T, 50, 1, 4)
+densityest6(T::Type{<:Real}) = densityest(T, 50, 1, 4, use_wsos = false)
+densityest7(T::Type{<:Real}) = densityest(T, 20, 2, 4)
+densityest8(T::Type{<:Real}) = densityest(T, 20, 2, 4, use_wsos = false)
+densityest9(T::Type{<:Real}) = densityest(T, 10, 1, 2, use_linops = true)
+densityest10(T::Type{<:Real}) = densityest(T, 10, 1, 2, use_wsos = false, use_linops = true)
 
 instances_densityest_all = [
     densityest1,
     densityest2,
     densityest3,
     densityest4,
-    ]
-instances_densityest_linops = [
     densityest5,
     densityest6,
+    densityest7,
+    densityest8,
+    ]
+instances_densityest_linops = [
+    densityest9,
+    densityest10,
     ]
 instances_densityest_few = [
     densityest1,
-    densityest2,
     densityest3,
-    densityest4,
+    densityest5,
+    densityest6,
     ]
 
 function test_densityest(instance::Function; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
