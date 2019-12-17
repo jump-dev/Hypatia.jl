@@ -83,15 +83,11 @@ end
 
 get_nu(cone::WSOSInterpPosSemidefTri) = cone.R * sum(size(Pk, 2) for Pk in cone.Ps)
 
-# TODO move to Cones.jl and use elsewhere
-_svec_idx(row::Int, col::Int) = div((row - 1) * row, 2) + col
-_block_idxs(incr::Int, block::Int) = (incr * (block - 1) .+ (1:incr))
-
 function set_initial_point(arr::AbstractVector, cone::WSOSInterpPosSemidefTri)
     arr .= 0
     block = 1
     @inbounds for i in 1:cone.R
-        arr[_block_idxs(cone.U, block)] .= 1
+        arr[block_idxs(cone.U, block)] .= 1
         block += i + 1
     end
     return arr
@@ -108,12 +104,12 @@ function update_feas(cone::WSOSInterpPosSemidefTri)
         Λ = cone.tmpLRLR[k]
 
         for p in 1:cone.R, q in 1:p
-            @. @views cone.tmpU = cone.point[_block_idxs(cone.U, _svec_idx(p, q))]
+            @. @views cone.tmpU = cone.point[block_idxs(cone.U, svec_idx(p, q))]
             if p != q
                 cone.tmpU .*= cone.rt2i
             end
             mul!(LU, Pk', Diagonal(cone.tmpU)) # TODO check efficiency
-            @views mul!(Λ.data[_block_idxs(L, p), _block_idxs(L, q)], LU, Pk)
+            @views mul!(Λ.data[block_idxs(L, p), block_idxs(L, q)], LU, Pk)
         end
 
         ΛFLk = cone.ΛFL[k] = cholesky!(Λ, check = false)
@@ -130,11 +126,50 @@ end
 function update_grad(cone::WSOSInterpPosSemidefTri)
     @assert is_feas(cone)
     U = cone.U
+    R = cone.R
 
-    _update_PlambdaP(cone)
+    # update PlambdaP
+    for k in eachindex(cone.PlambdaP)
+        L = size(cone.Ps[k], 2)
+        ΛFL = cone.ΛFL[k].L
+        ΛFLP = cone.ΛFLP[k]
+
+        # given cholesky L factor ΛFL, get ΛFLP = ΛFL * kron(I, P')
+        @inbounds for p in 1:R
+            block_U_p_idxs = block_idxs(U, p)
+            block_L_p_idxs = block_idxs(L, p)
+            @views ΛFLP_pp = ΛFLP[block_L_p_idxs, block_U_p_idxs]
+            # ΛFLP_pp = ΛFL_pp \ P'
+            @views copyto!(ΛFLP_pp, cone.Ps[k]')
+            ldiv!(LowerTriangular(ΛFL[block_L_p_idxs, block_L_p_idxs]), ΛFLP_pp)
+            # to get off-diagonals in ΛFLP, subtract known blocks aggregated in ΛFLP_qp
+            @inbounds for q in (p + 1):R
+                block_L_q_idxs = block_idxs(L, q)
+                @views ΛFLP_qp = ΛFLP[block_L_q_idxs, block_U_p_idxs]
+                ΛFLP_qp .= 0
+                @inbounds for p2 in p:(q - 1)
+                    block_L_p2_idxs = block_idxs(L, p2)
+                    @views mul!(ΛFLP_qp, ΛFL[block_L_q_idxs, block_L_p2_idxs], ΛFLP[block_L_p2_idxs, block_U_p_idxs], -1, 1)
+                end
+                @views ldiv!(LowerTriangular(ΛFL[block_L_q_idxs, block_L_q_idxs]), ΛFLP_qp)
+            end
+        end
+
+        # PlambdaP = ΛFLP' * ΛFLP
+        PlambdaPk = cone.PlambdaP[k]
+        for p in 1:R, q in p:R
+            block_p_idxs = block_idxs(U, p)
+            block_q_idxs = block_idxs(U, q)
+            # since ΛFLP is block lower triangular rows only from max(p,q) start making a nonzero contribution to the product
+            row_range = ((q - 1) * L + 1):(L * R)
+            @inbounds @views mul!(PlambdaPk[block_p_idxs, block_q_idxs], ΛFLP[row_range, block_p_idxs]', ΛFLP[row_range, block_q_idxs])
+        end
+    end
+
+    # update gradient
     for p in 1:cone.R, q in 1:p
         scal = (p == q ? -1 : -cone.rt2)
-        idx = (_svec_idx(p, q) - 1) * U
+        idx = (svec_idx(p, q) - 1) * U
         block_p = (p - 1) * U
         block_q = (q - 1) * U
         for i in 1:U
@@ -156,19 +191,19 @@ function update_hess(cone::WSOSInterpPosSemidefTri)
 
     H .= 0
     for p in 1:R, q in 1:p
-        block = _svec_idx(p, q)
-        idxs = _block_idxs(U, block)
-        block_p_idxs = _block_idxs(U, p)
-        block_q_idxs = _block_idxs(U, q)
+        block = svec_idx(p, q)
+        idxs = block_idxs(U, block)
+        block_p_idxs = block_idxs(U, p)
+        block_q_idxs = block_idxs(U, q)
 
         for p2 in 1:R, q2 in 1:p2
-            block2 = _svec_idx(p2, q2)
+            block2 = svec_idx(p2, q2)
             if block2 < block
                 continue
             end
-            idxs2 = _block_idxs(U, block2)
-            block_p_idxs2 = _block_idxs(U, p2)
-            block_q_idxs2 = _block_idxs(U, q2)
+            idxs2 = block_idxs(U, block2)
+            block_p_idxs2 = block_idxs(U, p2)
+            block_q_idxs2 = block_idxs(U, q2)
 
             @views Hview = H[idxs, idxs2]
             for k in eachindex(cone.Ps)
@@ -186,48 +221,4 @@ function update_hess(cone::WSOSInterpPosSemidefTri)
 
     cone.hess_updated = true
     return cone.hess
-end
-
-function _update_PlambdaP(cone::WSOSInterpPosSemidefTri)
-    R = cone.R
-    U = cone.U
-
-    for k in eachindex(cone.PlambdaP)
-        L = size(cone.Ps[k], 2)
-        ΛFL = cone.ΛFL[k].L
-        ΛFLP = cone.ΛFLP[k]
-
-        # given cholesky L factor ΛFL, get ΛFLP = ΛFL * kron(I, P')
-        @inbounds for p in 1:R
-            block_U_p_idxs = _block_idxs(U, p)
-            block_L_p_idxs = _block_idxs(L, p)
-            @views ΛFLP_pp = ΛFLP[block_L_p_idxs, block_U_p_idxs]
-            # ΛFLP_pp = ΛFL_pp \ P'
-            @views copyto!(ΛFLP_pp, cone.Ps[k]')
-            ldiv!(LowerTriangular(ΛFL[block_L_p_idxs, block_L_p_idxs]), ΛFLP_pp)
-            # to get off-diagonals in ΛFLP, subtract known blocks aggregated in ΛFLP_qp
-            @inbounds for q in (p + 1):R
-                block_L_q_idxs = _block_idxs(L, q)
-                @views ΛFLP_qp = ΛFLP[block_L_q_idxs, block_U_p_idxs]
-                ΛFLP_qp .= 0
-                @inbounds for p2 in p:(q - 1)
-                    block_L_p2_idxs = _block_idxs(L, p2)
-                    @views mul!(ΛFLP_qp, ΛFL[block_L_q_idxs, block_L_p2_idxs], ΛFLP[block_L_p2_idxs, block_U_p_idxs], -1, 1)
-                end
-                @views ldiv!(LowerTriangular(ΛFL[block_L_q_idxs, block_L_q_idxs]), ΛFLP_qp)
-            end
-        end
-
-        # PlambdaP = ΛFLP' * ΛFLP
-        PlambdaPk = cone.PlambdaP[k]
-        for p in 1:R, q in p:R
-            block_p_idxs = _block_idxs(U, p)
-            block_q_idxs = _block_idxs(U, q)
-            # since ΛFLP is block lower triangular rows only from max(p,q) start making a nonzero contribution to the product
-            row_range = ((q - 1) * L + 1):(L * R)
-            @inbounds @views mul!(PlambdaPk[block_p_idxs, block_q_idxs], ΛFLP[row_range, block_p_idxs]', ΛFLP[row_range, block_q_idxs])
-        end
-    end
-
-    return cone.PlambdaP
 end

@@ -91,6 +91,7 @@ function update_feas(cone::WSOSInterpNonnegative)
         LLk = cone.tmpLL[k]
         mul!(ULk, D, Pk)
         mul!(LLk, Pk', ULk)
+        
         ΛFk = cholesky!(Hermitian(LLk, :L), check = false)
         if !isposdef(ΛFk)
             cone.is_feas = false
