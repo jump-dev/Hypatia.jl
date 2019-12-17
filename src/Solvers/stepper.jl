@@ -189,12 +189,11 @@ function update_rhs(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: 
     rhs[stepper.tau_row, 1] = solver.kap + solver.primal_obj_t - solver.dual_obj_t
     rhs[stepper.tau_row, 2] = zero(T)
 
-    sqrtmu = sqrt(solver.mu)
     for (k, cone_k) in enumerate(solver.model.cones)
         duals_k = solver.point.dual_views[k]
         grad_k = Cones.grad(cone_k)
         @. stepper.s_rhs1_k[k] = -duals_k
-        @. stepper.s_rhs2_k[k] = -duals_k - grad_k * sqrtmu
+        @. stepper.s_rhs2_k[k] = -duals_k - grad_k * solver.mu
     end
 
     rhs[end, 1] = -solver.kap
@@ -228,24 +227,26 @@ function calc_system_residual(stepper::CombinedStepper{T}, solver::Solver{T}) wh
         res_y = stepper.y_rhs
     end
 
-    sqrtmu = sqrt(solver.mu)
     res_s = similar(res_z)
     for (k, cone_k) in enumerate(model.cones)
         idxs_k = model.cone_idxs[k]
+        @views res_s_k = res_s[idxs_k, :]
         if Cones.use_dual(cone_k)
             # (du bar) mu*H_k*z_k + s_k = srhs_k
-            @views Cones.hess_prod!(res_s[idxs_k, :], stepper.z_rhs_k[k], cone_k)
-            @. @views res_s[idxs_k, :] += stepper.s_rhs_k[k]
+            Cones.hess_prod!(res_s_k, stepper.z_rhs_k[k], cone_k)
+            @. res_s_k *= solver.mu
+            @. res_s_k += stepper.s_rhs_k[k]
         else
             # (pr bar) z_k + mu*H_k*s_k = srhs_k
-            @views Cones.hess_prod!(res_s[idxs_k, :], stepper.s_rhs_k[k], cone_k)
-            @. @views res_s[idxs_k, :] += stepper.z_rhs_k[k]
+            Cones.hess_prod!(res_s_k, stepper.s_rhs_k[k], cone_k)
+            @. res_s_k *= solver.mu
+            @. res_s_k += stepper.z_rhs_k[k]
         end
         # srhs_k = [-duals_k, -duals_k - mu * grad_k]
         duals_k = solver.point.dual_views[k]
         grad_k = Cones.grad(cone_k)
-        @. @views res_s[idxs_k, 1] += duals_k
-        @. @views res_s[idxs_k, 2] += duals_k + grad_k * sqrtmu
+        @. res_s[idxs_k, 1] += duals_k
+        @. res_s[idxs_k, 2] += duals_k + grad_k * solver.mu
     end
 
     # mu/(taubar^2)*tau + kap = [-kap, -kap + mu/tau]
@@ -360,15 +361,14 @@ function check_nbhd(
     solver::Solver{T},
     ) where {T <: Real}
     cones = solver.model.cones
-    sqrtmu = sqrt(mu_temp)
 
     rhs_nbhd = mu_temp * abs2(nbhd)
-    lhs_nbhd = abs2(taukap_temp / sqrtmu - sqrtmu)
+    lhs_nbhd = abs2(taukap_temp - mu_temp) / mu_temp
     if lhs_nbhd >= rhs_nbhd
         return false
     end
 
-    Cones.load_point.(cones, solver.primal_views, sqrtmu)
+    Cones.load_point.(cones, solver.primal_views)
 
     # accept primal iterate if it is inside the cone and neighborhood
     # first check inside cone for whichever cones were violated last line search iteration
@@ -394,19 +394,23 @@ function check_nbhd(
             end
         end
 
-        # modifies dual_views
-        duals_k = solver.dual_views[k]
-        g_k = Cones.grad(cone_k)
-        @. duals_k += g_k * sqrtmu
-
         if solver.use_infty_nbhd
-            k_nbhd = abs2(norm(duals_k, Inf) / norm(g_k, Inf))
+            g_k = Cones.grad(cone_k)
+            tmp_k = copy(solver.dual_views[k]) # TODO prealloc
+            @. tmp_k += g_k * mu_temp
+            k_nbhd = abs2(norm(tmp_k, Inf) / norm(g_k, Inf)) / mu_temp
             # k_nbhd = abs2(maximum(abs(dj) / abs(gj) for (dj, gj) in zip(duals_k, g_k))) # TODO try this neighborhood
             lhs_nbhd = max(lhs_nbhd, k_nbhd)
         else
+            # TODO use inv hess sqrt
+            g_k = Cones.grad(cone_k)
+            tmp_k = copy(solver.dual_views[k]) # TODO prealloc
+            @. tmp_k += g_k * mu_temp
             nbhd_temp_k = solver.nbhd_temp[k]
-            Cones.inv_hess_prod!(nbhd_temp_k, duals_k, cone_k)
-            k_nbhd = dot(duals_k, nbhd_temp_k)
+            Cones.inv_hess_prod!(nbhd_temp_k, tmp_k, cone_k)
+            @. nbhd_temp_k ./= mu_temp
+            k_nbhd = dot(tmp_k, nbhd_temp_k)
+            # TODO not needed if use sum abs2 of inv hess sqrt
             if k_nbhd <= -cbrt(eps(T))
                 @warn("numerical failure: cone neighborhood is $k_nbhd")
                 return false

@@ -40,12 +40,16 @@ function solve_system(system_solver::QRCholSystemSolver{T}, solver::Solver{T}, s
         if Cones.use_dual(cone_k)
             zk12_temp = -zk12 - sk12 # TODO in place
             Cones.inv_hess_prod!(zk12_new, zk12_temp, cone_k)
+            @. zk12_new /= solver.mu
             Cones.inv_hess_prod!(zk3_new, hk, cone_k)
+            @. zk3_new /= solver.mu
         else
             Cones.hess_prod!(zk12_new, zk12, cone_k)
+            @. zk12_new *= solver.mu
             @. zk12_new *= -1
             @. zk12_new -= sk12
             Cones.hess_prod!(zk3_new, hk, cone_k)
+            @. zk3_new *= solver.mu
         end
     end
 
@@ -59,7 +63,7 @@ function solve_system(system_solver::QRCholSystemSolver{T}, solver::Solver{T}, s
 
     if !isempty(system_solver.Q2div)
         mul!(system_solver.GQ1x, system_solver.GQ1, y)
-        @timeit solver.timer "block_hess_prod" block_hessian_product(model.cones, system_solver.HGQ1x_k, system_solver.GQ1x_k)
+        @timeit solver.timer "block_hess_prod" block_hessian_product(model.cones, system_solver.HGQ1x_k, system_solver.GQ1x_k, solver.mu)
         mul!(system_solver.Q2div, system_solver.GQ2', system_solver.HGQ1x, -1, true)
 
         @timeit solver.timer "solve_subsystem" solve_subsystem(system_solver, x_sub2, system_solver.Q2div)
@@ -68,7 +72,7 @@ function solve_system(system_solver::QRCholSystemSolver{T}, solver::Solver{T}, s
     lmul!(solver.Ap_Q, x)
 
     mul!(system_solver.Gx, model.G, x)
-    @timeit solver.timer "block_hess_prod" block_hessian_product(model.cones, system_solver.HGx_k, system_solver.Gx_k)
+    @timeit solver.timer "block_hess_prod" block_hessian_product(model.cones, system_solver.HGx_k, system_solver.Gx_k, solver.mu)
 
     @. z = system_solver.HGx - z
 
@@ -115,12 +119,14 @@ function solve_system(system_solver::QRCholSystemSolver{T}, solver::Solver{T}, s
     return sol
 end
 
-function block_hessian_product(cones::Vector, prod_k::Vector, arr_k::Vector)
+function block_hessian_product(cones::Vector, prod_k::Vector, arr_k::Vector, mu::Real)
     for (k, cone_k) in enumerate(cones)
         if Cones.use_dual(cone_k)
             Cones.inv_hess_prod!(prod_k[k], arr_k[k], cone_k)
+            @. prod_k[k] /= mu
         else
             Cones.hess_prod!(prod_k[k], arr_k[k], cone_k)
+            @. prod_k[k] *= mu
         end
     end
 end
@@ -198,7 +204,7 @@ function update_fact(system_solver::QRCholDenseSystemSolver, solver::Solver)
     isempty(system_solver.Q2div) && return system_solver
 
     # TODO can be faster and numerically better for some cones to use L factor of cholesky of hessian here, with BLAS.syrk updating
-    @timeit solver.timer "block_hess_prod" block_hessian_product(solver.model.cones, system_solver.HGQ2_k, system_solver.GQ2_k)
+    @timeit solver.timer "block_hess_prod" block_hessian_product(solver.model.cones, system_solver.HGQ2_k, system_solver.GQ2_k, solver.mu)
     @timeit solver.timer "Q2GHGQ2" mul!(system_solver.lhs1.data, system_solver.GQ2', system_solver.HGQ2)
 
     update_fact(system_solver.fact_cache, system_solver.lhs1) # overwrites lhs1 with new factorization

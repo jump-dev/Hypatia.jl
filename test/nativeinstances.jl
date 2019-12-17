@@ -263,7 +263,7 @@ function epinorminf7(T; options...)
 end
 
 function epinorminf8(T; options...)
-    tol = sqrt(sqrt(eps(T)))
+    tol = eps(T) ^ 0.2
     c = T[1, -1, 1, 1]
     A = T[1 0 0 0 ; 0 1 0 0; 0 0 1 0]
     b = T[-0.4, 0.3, -0.3]
@@ -278,7 +278,6 @@ function epinorminf8(T; options...)
     @test r.y ≈ [0, 0.25, -0.25] atol=tol rtol=tol
     @test r.z ≈ [1.25, 1, -0.75, 0.75, 1] atol=tol rtol=tol
 end
-
 
 function epinormeucl1(T; options...)
     tol = sqrt(sqrt(eps(T)))
@@ -910,10 +909,10 @@ function hypoperlogdettri1(T; options...)
         @test r.x[1] ≈ -r.primal_obj atol=tol rtol=tol
         @test r.x[2] ≈ 1 atol=tol rtol=tol
         sol_mat = zeros(R, side, side)
-        CO.svec_to_smat!(sol_mat, r.s[3:end], rt2)
-        @test r.s[2] * logdet(Hermitian(sol_mat, :U) / r.s[2]) ≈ r.s[1] atol=tol rtol=tol
-        CO.svec_to_smat!(sol_mat, -r.z[3:end], rt2)
-        @test r.z[1] * (logdet(Hermitian(sol_mat, :U) / r.z[1]) + T(side)) ≈ r.z[2] atol=tol rtol=tol
+        CO.svec_to_smat!(sol_mat, r.s[3:end] / r.s[2], rt2)
+        @test r.s[2] * logdet(cholesky!(Hermitian(sol_mat, :U))) ≈ r.s[1] atol=tol rtol=tol
+        CO.svec_to_smat!(sol_mat, -r.z[3:end] / r.z[1], rt2)
+        @test r.z[1] * (logdet(cholesky!(Hermitian(sol_mat, :U))) + T(side)) ≈ r.z[2] atol=tol rtol=tol
     end
 end
 
@@ -940,10 +939,10 @@ function hypoperlogdettri2(T; options...)
         @test r.x[2] ≈ r.primal_obj atol=tol rtol=tol
         @test r.x[1] ≈ -1 atol=tol rtol=tol
         sol_mat = zeros(R, side, side)
-        CO.svec_to_smat!(sol_mat, -r.s[3:end], rt2)
-        @test r.s[1] * (logdet(Hermitian(sol_mat, :U) / r.s[1]) + T(side)) ≈ r.s[2] atol=tol rtol=tol
-        CO.svec_to_smat!(sol_mat, r.z[3:end], rt2)
-        @test r.z[2] * logdet(Hermitian(sol_mat, :U) / r.z[2]) ≈ r.z[1] atol=tol rtol=tol
+        CO.svec_to_smat!(sol_mat, -r.s[3:end] / r.s[1], rt2)
+        @test r.s[1] * (logdet(cholesky!(Hermitian(sol_mat, :U))) + T(side)) ≈ r.s[2] atol=tol rtol=tol
+        CO.svec_to_smat!(sol_mat, r.z[3:end] / r.z[2], rt2)
+        @test r.z[2] * logdet(cholesky!(Hermitian(sol_mat, :U))) ≈ r.z[1] atol=tol rtol=tol
     end
 end
 
@@ -995,9 +994,9 @@ function hyporootdettri1(T; options...)
         @test r.x[1] ≈ -r.primal_obj atol=tol rtol=tol
         sol_mat = zeros(R, side, side)
         CO.svec_to_smat!(sol_mat, r.s[2:end], rt2)
-        @test det(Hermitian(sol_mat, :U)) ^ inv(T(side)) ≈ r.s[1] atol=tol rtol=tol
+        @test det(cholesky!(Hermitian(sol_mat, :U))) ^ inv(T(side)) ≈ r.s[1] atol=tol rtol=tol
         CO.svec_to_smat!(sol_mat, r.z[2:end] .* T(side), rt2)
-        @test det(Hermitian(sol_mat, :U)) ^ inv(T(side)) ≈ -r.z[1] atol=tol rtol=tol
+        @test det(cholesky!(Hermitian(sol_mat, :U))) ^ inv(T(side)) ≈ -r.z[1] atol=tol rtol=tol
     end
 end
 
@@ -1024,15 +1023,15 @@ function hyporootdettri2(T; options...)
         @test r.x[1] ≈ r.primal_obj atol=tol rtol=tol
         sol_mat = zeros(R, side, side)
         CO.svec_to_smat!(sol_mat, r.s[2:end] .* T(side), rt2)
-        @test det(Hermitian(sol_mat, :U)) ^ inv(T(side)) ≈ -r.s[1] atol=tol rtol=tol
+        @test det(cholesky!(Hermitian(sol_mat, :U))) ^ inv(T(side)) ≈ -r.s[1] atol=tol rtol=tol
         CO.svec_to_smat!(sol_mat, r.z[2:end], rt2)
-        @test det(Hermitian(sol_mat, :U)) ^ inv(T(side)) ≈ r.z[1] atol=tol rtol=tol
+        @test det(cholesky!(Hermitian(sol_mat, :U))) ^ inv(T(side)) ≈ r.z[1] atol=tol rtol=tol
     end
 end
 
 function hyporootdettri3(T; options...)
     # max u: u <= rootdet(W) where W is not full rank
-    tol = 5 * sqrt(sqrt(eps(T)))
+    tol = eps(T) ^ 0.15
     rt2 = sqrt(T(2))
     Random.seed!(1)
     side = 3
