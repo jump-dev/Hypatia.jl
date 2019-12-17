@@ -40,9 +40,9 @@ options = (
     @testset "maxvolume" begin test_maxvolumeJuMP(; tol_rel_opt = 1e-6, tol_abs_opt = 1e-7, tol_feas = 1e-7, options...) end
     # @testset "muconvexity" begin test_muconvexityJuMP(; options...) end
     @testset "polymin" begin test_polyminJuMP(; tol_rel_opt = 1e-7, tol_abs_opt = 1e-8, tol_feas = 1e-8, options...) end
-    # @testset "polynorm" begin test_polynormJuMP(; options...) end
-    # @testset "regionofattr" begin test_regionofattrJuMP(; tol_abs_opt = 1e-6, tol_rel_opt = 1e-6, tol_feas = 1e-6, options...) end
-    # @testset "secondorderpoly" begin test_secondorderpolyJuMP(; options...) end
-    # @testset "semidefinitepoly" begin test_semidefinitepolyJuMP(; tol_abs_opt = 1e-7, tol_rel_opt = 1e-7, tol_feas = 1e-7, options...) end
-    # @testset "shapeconregr" begin test_shapeconregrJuMP(; tol_rel_opt = 1e-6, tol_abs_opt = 1e-6, tol_feas = 1e-6, options...) end
+    @testset "polynorm" begin test_polynormJuMP(; options...) end
+    @testset "regionofattr" begin test_regionofattrJuMP(; tol_abs_opt = 1e-6, tol_rel_opt = 1e-6, tol_feas = 1e-6, options...) end
+    @testset "secondorderpoly" begin test_secondorderpolyJuMP(; options...) end
+    @testset "semidefinitepoly" begin test_semidefinitepolyJuMP(; tol_abs_opt = 1e-7, tol_rel_opt = 1e-7, tol_feas = 1e-7, options...) end
+    @testset "shapeconregr" begin test_shapeconregrJuMP(; tol_rel_opt = 1e-6, tol_abs_opt = 1e-6, tol_feas = 1e-6, options...) end
 end

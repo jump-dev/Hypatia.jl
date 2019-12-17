@@ -1,9 +1,11 @@
 #=
 Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 
-interpolation-based weighted-sum-of-squares (multivariate) polynomial matrix cone parametrized by interpolation matrices Ps
+interpolation-based weighted-sum-of-squares (multivariate) polynomial positive semidefinite cone parametrized by interpolation matrices Ps
+certifies that a polynomial valued R x R matrix is in the positive semidefinite cone for all x in the domain defined by Ps
 
-definition and dual barrier extended from "Sum-of-squares optimization without semidefinite programming" by D. Papp and S. Yildiz, available at https://arxiv.org/abs/1712.01792
+dual barrier extended from "Sum-of-squares optimization without semidefinite programming" by D. Papp and S. Yildiz, available at https://arxiv.org/abs/1712.01792
+and "Semidefinite Characterization of Sum-of-Squares Cones in Algebras" by D. Papp and F. Alizadeh
 =#
 
 mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
