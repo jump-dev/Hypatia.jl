@@ -6,9 +6,7 @@ certifies that u(x)^2 <= sum(w_i(x)^2) for all x in the domain described by inpu
 u(x), w_1(x), ...,  w_R(x) are polynomials with U coefficients
 
 dual barrier extended from "Sum-of-squares optimization without semidefinite programming" by D. Papp and S. Yildiz, available at https://arxiv.org/abs/1712.01792
--logdet(schur(Lambda)) - logdet(Lambda_11)
-if schur(M) = A - B * inv(D) * C
-logdet(schur) = logdet(M) - logdet(D) = logdet(Lambda) - (R - 1) * logdet(Lambda_11) since our D is an (R - 1)x(R - 1) block diagonal matrix
+and "Semidefinite Characterization of Sum-of-Squares Cones in Algebras" by D. Papp and F. Alizadeh
 =#
 
 mutable struct WSOSInterpEpiNormEucl{T <: Real} <: Cone{T}
@@ -106,6 +104,9 @@ function set_initial_point(arr::AbstractVector, cone::WSOSInterpEpiNormEucl)
     return arr
 end
 
+# the barrier we will use is -logdet(schur(Lambda)) - logdet(Lambda_11)
+# if schur(M) = A - B * inv(D) * C
+# logdet(schur) = logdet(M) - logdet(D) = logdet(Lambda) - (R - 1) * logdet(Lambda_11) since our D is an (R - 1) x (R - 1) block diagonal matrix
 function update_feas(cone::WSOSInterpEpiNormEucl)
     @assert !cone.feas_updated
 
