@@ -322,37 +322,75 @@ function test_hyporootdettri_barrier(T::Type{<:Real})
     return
 end
 
-function test_wsospolyinterp_barrier(T::Type{<:Real})
+function test_wsosinterpnonnegative_barrier(T::Type{<:Real})
     Random.seed!(1)
     for (n, halfdeg) in [(1, 1), (1, 2), (1, 3), (2, 1), (2, 2), (3, 1)]
         (U, _, P0, Ps, _) = MU.interpolate(MU.Box{T}(-ones(T, n), ones(T, n)), halfdeg, sample = false) # use a unit box domain
         Ps = vcat([P0], Ps)
         barrier(s) = -sum(logdet(cholesky!(Symmetric(P' * Diagonal(s) * P))) for P in Ps)
-        cone = CO.WSOSPolyInterp{T, T}(U, Ps, true)
+        cone = CO.WSOSInterpNonnegative{T, T}(U, Ps, true)
         test_barrier_oracles(cone, barrier, init_tol = 1e2) # TODO center and test initial points
     end
-    # TODO also test complex case CO.WSOSPolyInterp{T, Complex{T}} - need complex MU interp functions first
+    # TODO also test complex case CO.WSOSInterpNonnegative{T, Complex{T}} - need complex MU interp functions first
     return
 end
 
-# function test_wsospolyinterpmat_barrier(T::Type{<:Real})
-#     Random.seed!(1)
-#     for n in 1:3, halfdeg in 1:3, R in 1:3
-#         (U, _, P0, _, _) = MU.interpolate(MU.FreeDomain(n), halfdeg, sample = false)
-#         P0 = convert(Matrix{T}, P0)
-#         cone = CO.WSOSPolyInterpMat{T}(R, U, [P0], true)
-#         test_barrier_oracles(cone)
-#     end
-#     return
-# end
-#
-# function test_wsospolyinterpsoc_barrier(T::Type{<:Real})
-#     Random.seed!(1)
-#     for n in 1:2, halfdeg in 1:2, R in 3:3
-#         (U, _, P0, _, _) = MU.interpolate(MU.FreeDomain(n), halfdeg, sample = false)
-#         P0 = convert(Matrix{T}, P0)
-#         cone = CO.WSOSPolyInterpSOC{T}(R, U, [P0], true)
-#         test_barrier_oracles(cone)
-#     end
-#     return
-# end
+function test_wsosinterppossemideftri_barrier(T::Type{<:Real})
+    Random.seed!(1)
+    rt2i = inv(sqrt(T(2)))
+    for n in 1:3, halfdeg in 1:2, R in 1:3
+        (U, _, P0, Ps, _) = MU.interpolate(MU.Box{T}(-ones(T, n), ones(T, n)), halfdeg, sample = false)
+        Ps = vcat([P0], Ps)
+        cone = CO.WSOSInterpPosSemidefTri{T}(R, U, Ps, true)
+        function barrier(s)
+            bar = zero(eltype(s))
+            for P in Ps
+                L = size(P, 2)
+                Lambda = zeros(eltype(s), R * L, R * L)
+                uo = 1
+                rows = 1
+                for i in 1:R
+                    cols = 1
+                    for j in 1:i
+                        scal = (i == j ? one(T) : rt2i)
+                        Lambda[rows:(rows + L - 1), cols:(cols + L - 1)] = P' * Diagonal(s[uo:(uo + U - 1)]) * P * scal
+                        uo += U
+                        cols += L
+                    end
+                    rows += L
+                end
+                bar -= logdet(cholesky!(Symmetric(Lambda, :L)))
+            end
+            return bar
+        end
+        test_barrier_oracles(cone, barrier, init_tol = Inf)
+    end
+    return
+end
+
+function test_wsosinterpepinormeucl_barrier(T::Type{<:Real})
+    Random.seed!(1)
+    for n in 1:3, halfdeg in 1:2, R in 2:3
+        (U, _, P0, Ps, _) = MU.interpolate(MU.Box{T}(-ones(T, n), ones(T, n)), halfdeg, sample = false)
+        Ps = vcat([P0], Ps)
+        cone = CO.WSOSInterpEpiNormEucl{T}(R, U, Ps, true)
+        function barrier(s)
+            bar = zero(eltype(s))
+            for P in Ps
+                Lambda = P' * Diagonal(s[1:U]) * P
+                Lambda1fact = cholesky!(Symmetric(copy(Lambda), :L))
+                uo = U + 1
+                for _ in 2:R
+                    Lambdai = P' * Diagonal(s[uo:(uo + U - 1)]) * P
+                    ldiv!(Lambda1fact.L, Lambdai)
+                    Lambda -= Lambdai' * Lambdai
+                    uo += U
+                end
+                bar -= logdet(cholesky!(Symmetric(Lambda))) + logdet(Lambda1fact)
+            end
+            return bar
+        end
+        test_barrier_oracles(cone, barrier, init_tol = Inf)
+    end
+    return
+end
