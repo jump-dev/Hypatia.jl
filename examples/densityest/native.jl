@@ -21,9 +21,8 @@ include(joinpath(@__DIR__, "data.jl"))
 
 function densityest(
     T::Type{<:Real},
-    X::Matrix{Float64},
+    X::Matrix{<:Real},
     deg::Int;
-    use_sumlog::Bool = false,
     use_wsos::Bool = true,
     sample_factor::Int = 100,
     use_linops::Bool = false,
@@ -82,131 +81,93 @@ function densityest(
         h_poly = zeros(T, num_psd_vars)
     end
 
-    if use_sumlog
-        h_log = zeros(T, nobs + 2)
-        h_log[2] = 1
-        G_log = zeros(T, 2 + nobs, 1 + U)
-        G_log[1, 1] = -1
-        for i in 1:nobs
-            G_log[i + 2, 2:(1 + U)] = -basis_evals[i, :]
-        end
-        push!(cones, CO.HypoPerLog{T}(nobs + 2))
-        num_hypo_vars = 1
-    else
-        h_log = zeros(T, 3 * nobs)
-        G_log = zeros(T, 3 * nobs, nobs + U)
-        offset = 1
-        for i in 1:nobs
-            G_log[offset, i] = -1.0
-            G_log[offset + 2, (nobs + 1):(nobs + U)] = -basis_evals[i, :]
-            h_log[offset + 1] = 1.0
-            offset += 3
-            push!(cones, CO.HypoPerLog{T}(3))
-            cone_offset += 3
-        end
-        num_hypo_vars = nobs
+    h_exp = zeros(T, 3 * nobs)
+    G_exp = zeros(T, 3 * nobs, nobs + U)
+    offset = 1
+    for i in 1:nobs
+        G_exp[offset, (nobs + 1):(nobs + U)] = -basis_evals[i, :]
+        h_exp[offset + 1] = 1
+        G_exp[offset + 2, i] = -1
+        offset += 3
+        push!(cones, CO.EpiPerExp{T}())
+        cone_offset += 3
     end
+    num_epi_vars = nobs
 
-    (log_rows, log_cols) = size(G_log)
+    (log_rows, log_cols) = size(G_exp)
     if use_linops
         if use_wsos
-            A = BlockMatrix{T}(
-                1,
-                num_hypo_vars + U,
-                [T.(w')],
+            A = BlockMatrix{T}(1,num_epi_vars + U,
+                [w'],
                 [1:1],
-                [(num_hypo_vars + 1):(num_hypo_vars + U)]
-            )
-            G = BlockMatrix{T}(
-                U + log_rows,
-                num_hypo_vars + U,
-                [-I, G_log],
+                [(num_epi_vars + 1):(num_epi_vars + U)]
+                )
+            G = BlockMatrix{T}(U + log_rows, num_epi_vars + U,
+                [-I, G_exp],
                 [1:U, (U + 1):(U + log_rows)],
-                [(num_hypo_vars + 1):(num_hypo_vars + U), 1:(num_hypo_vars + U)],
-            )
+                [(num_epi_vars + 1):(num_epi_vars + U), 1:(num_epi_vars + U)],
+                )
         else
-            A = BlockMatrix{T}(
-                U + 1,
-                num_hypo_vars + U + num_psd_vars,
-                [-I, A_psd, T.(w')],
+            A = BlockMatrix{T}(U + 1, num_epi_vars + U + num_psd_vars,
+                [-I, A_psd, w'],
                 [1:U, 1:U, (U + 1):(U + 1)],
-                [(num_hypo_vars + 1):(num_hypo_vars + U), (num_hypo_vars + U + 1):(num_hypo_vars + U + num_psd_vars), (num_hypo_vars + 1):(num_hypo_vars + U)],
-            )
-            G = BlockMatrix{T}(
-                num_psd_vars + log_rows,
-                num_hypo_vars + U + num_psd_vars,
-                [-I, G_log],
+                [(num_epi_vars + 1):(num_epi_vars + U), (num_epi_vars + U + 1):(num_epi_vars + U + num_psd_vars), (num_epi_vars + 1):(num_epi_vars + U)],
+                )
+            G = BlockMatrix{T}(num_psd_vars + log_rows, num_epi_vars + U + num_psd_vars,
+                [-I, G_exp],
                 [1:num_psd_vars, (num_psd_vars + 1):(num_psd_vars + log_rows)],
-                [(num_hypo_vars + U + 1):(num_hypo_vars + U + num_psd_vars), 1:(num_hypo_vars + U)],
-            )
+                [(num_epi_vars + U + 1):(num_epi_vars + U + num_psd_vars), 1:(num_epi_vars + U)],
+                )
         end
     else
         if use_wsos
-            A = [
-                zeros(T, 1, num_hypo_vars)    T.(w');
-                ]
+            A = hcat(zeros(T, 1, num_epi_vars), w')
             G = [
-                zeros(T, U, num_hypo_vars)    Matrix{T}(-I, U, U);
-                G_log;
+                zeros(T, U, num_epi_vars)    Matrix{T}(-I, U, U);
+                G_exp;
                 ]
         else
             A = [
-                zeros(T, U, num_hypo_vars)    Matrix{T}(-I, U, U)    A_psd;
-                zeros(T, 1, num_hypo_vars)    T.(w')    zeros(T, 1, num_psd_vars);
+                zeros(T, U, num_epi_vars)    Matrix{T}(-I, U, U)    A_psd;
+                zeros(T, 1, num_epi_vars)    w'    zeros(T, 1, num_psd_vars);
                 ]
             G = [
-                zeros(T, num_psd_vars, num_hypo_vars + U)  -Matrix{T}(I, num_psd_vars, num_psd_vars);
-                G_log   zeros(T, log_rows, num_psd_vars);
+                zeros(T, num_psd_vars, num_epi_vars + U)  -Matrix{T}(I, num_psd_vars, num_psd_vars);
+                G_exp   zeros(T, log_rows, num_psd_vars);
                 ]
         end
     end
-    h = vcat(h_poly, h_log)
-    c = vcat(-ones(T, num_hypo_vars), zeros(T, U + num_psd_vars))
+    h = vcat(h_poly, h_exp)
+    c = vcat(-ones(T, num_epi_vars), zeros(T, U + num_psd_vars))
     b = vcat(b_poly, one(T))
 
     return (c = c, A = A, b = b, G = G, h = h, cones = cones)
 end
 
-densityest(T::Type{<:Real}, nobs::Int, n::Int, deg::Int; options...) = densityest(T, randn(nobs, n), deg; options...)
+densityest(T::Type{<:Real}, nobs::Int, n::Int, deg::Int; options...) = densityest(T, randn(T, nobs, n), deg; options...)
 
-densityest1(T::Type{<:Real}) = densityest(T, iris_data(), 4, use_sumlog = true)
-densityest2(T::Type{<:Real}) = densityest(T, iris_data(), 4, use_sumlog = false)
-densityest3(T::Type{<:Real}) = densityest(T, cancer_data(), 4, use_sumlog = true)
-densityest4(T::Type{<:Real}) = densityest(T, cancer_data(), 4, use_sumlog = false)
-densityest5(T::Type{<:Real}) = densityest(T, 50, 1, 4, use_sumlog = true)
-densityest6(T::Type{<:Real}) = densityest(T, 50, 1, 4, use_sumlog = false)
-densityest7(T::Type{<:Real}) = densityest(T, 50, 1, 4, use_sumlog = true, use_wsos = false)
-densityest8(T::Type{<:Real}) = densityest(T, 50, 1, 4, use_sumlog = false, use_wsos = false)
-densityest9(T::Type{<:Real}) = densityest(T, 10, 1, 2, use_sumlog = true, use_wsos = true, use_linops = true)
-densityest10(T::Type{<:Real}) = densityest(T, 10, 1, 2, use_sumlog = true, use_wsos = false, use_linops = true)
-densityest11(T::Type{<:Real}) = densityest(T, 10, 1, 2, use_sumlog = false, use_wsos = true, use_linops = true)
-densityest12(T::Type{<:Real}) = densityest(T, 10, 1, 2, use_sumlog = false, use_wsos = false, use_linops = true)
+densityest1(T::Type{<:Real}) = densityest(T, iris_data(), 4)
+densityest2(T::Type{<:Real}) = densityest(T, cancer_data(), 4)
+densityest3(T::Type{<:Real}) = densityest(T, 50, 1, 4)
+densityest4(T::Type{<:Real}) = densityest(T, 50, 1, 4, use_wsos = false)
+densityest5(T::Type{<:Real}) = densityest(T, 10, 1, 2, use_linops = true)
+densityest6(T::Type{<:Real}) = densityest(T, 10, 1, 2, use_wsos = false, use_linops = true)
 
 instances_densityest_all = [
     densityest1,
     densityest2,
     densityest3,
     densityest4,
-    densityest5,
-    densityest6,
-    densityest7,
-    densityest8,
     ]
 instances_densityest_linops = [
-    densityest9,
-    densityest10,
-    densityest11,
-    densityest12,
+    densityest5,
+    densityest6,
     ]
 instances_densityest_few = [
     densityest1,
     densityest2,
     densityest3,
     densityest4,
-    densityest5,
-    densityest6,
-    densityest7,
-    densityest8,
     ]
 
 function test_densityest(instance::Function; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
