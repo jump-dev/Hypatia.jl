@@ -128,13 +128,13 @@ function wsos_box_params(dom::Box{T}, n::Int, d::Int; calc_w::Bool = false) wher
     PWts = [Wtsfun(j) .* P0sub for j in 1:get_dimension(dom)]
     trpts = pts .* pscale' .+ pshift'
 
-    return (U = U, pts = trpts, P0 = P0, PWts = PWts, w = w)
+    return (U = U, pts = trpts, Ps = [P0, PWts...], w = w)
 end
 
 function wsos_box_params(dom::FreeDomain{T}, n::Int, d::Int; calc_w::Bool = false) where {T <: Real}
     # n could be larger than the dimension of dom if the original domain was a SemiFreeDomain
     (U, pts, P0, P0sub, w) = wsos_box_params(T, n, d, calc_w)
-    return (U = U, pts = pts, P0 = P0, PWts = [], w = w)
+    return (U = U, pts = pts, Ps = [P0], w = w)
 end
 
 function wsos_box_params(T::DataType, n::Int, d::Int, calc_w::Bool)
@@ -363,7 +363,7 @@ function wsos_sample_params(
     (pts, P0, P0sub, w) = make_wsos_arrays(dom, candidate_pts, 2d, U, L, calc_w = calc_w)
     g = get_weights(dom, pts)
     PWts = [sqrt.(gi) .* P0sub for gi in g]
-    return (U = U, pts = pts, P0 = P0, PWts = PWts, w = w)
+    return (U = U, pts = pts, Ps = [P0, PWts...], w = w)
 end
 
 # TODO should work without sampling too
