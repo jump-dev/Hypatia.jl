@@ -40,7 +40,7 @@ function shapeconregrJuMP(
     use_lsq_obj::Bool = true,
     use_wsos::Bool = true,
     sample::Bool = true,
-    mono_dom::MU.Domain = MU.Box(-ones(n), ones(n)),
+    mono_dom::MU.Domain = MU.Box{Float64}(-ones(n), ones(n)),
     conv_dom::MU.Domain = mono_dom,
     mono_profile::Vector{Int} = ones(Int, n),
     conv_profile::Int = 1,
@@ -49,7 +49,7 @@ function shapeconregrJuMP(
     num_points = size(X, 1)
 
     if use_wsos
-        (regressor_points, _) = MU.get_interp_pts(MU.FreeDomain(n), deg, sample_factor = 50)
+        (regressor_points, _) = MU.get_interp_pts(MU.FreeDomain{Float64}(n), deg, sample_factor = 50)
         lagrange_polys = MU.recover_lagrange_polys(regressor_points, deg)
 
         model = JuMP.Model()
@@ -72,7 +72,7 @@ function shapeconregrJuMP(
         if !all(iszero, mono_profile)
             gradient_halfdeg = div(deg, 2)
             (mono_U, mono_points, mono_Ps, _) = MU.interpolate(mono_dom, gradient_halfdeg, sample = sample, sample_factor = 50)
-            mono_wsos_cone = HYP.WSOSPolyInterpCone(mono_U, mono_Ps)
+            mono_wsos_cone = HYP.WSOSInterpNonnegativeCone(mono_U, mono_Ps)
             for j in 1:n
                 if !iszero(mono_profile[j])
                     gradient = DP.differentiate(regressor, DP.variables(regressor)[j])
@@ -85,9 +85,10 @@ function shapeconregrJuMP(
         if !iszero(conv_profile)
             hessian_halfdeg = div(deg - 1, 2)
             (conv_U, conv_points, conv_Ps, _) = MU.interpolate(conv_dom, hessian_halfdeg, sample = sample, sample_factor = 50)
-            conv_wsos_cone = HYP.WSOSPolyInterpMatCone(n, conv_U, conv_Ps)
+            conv_wsos_cone = HYP.WSOSInterpPossemidefTriCone(n, conv_U, conv_Ps)
             hessian = DP.differentiate(regressor, DP.variables(regressor), 2)
-            JuMP.@constraint(model, [conv_profile * hessian[i, j](conv_points[u, :]) * (i == j ? 1.0 : rt2) for i in 1:n for j in 1:i for u in 1:conv_U] in conv_wsos_cone)
+            hessian_interp = [hessian[i, j](conv_points[u, :]) for i in 1:n for j in 1:i for u in 1:conv_U]
+            JuMP.@constraint(model, conv_profile * MU.vec_to_svec!(hessian_interp, sqrt(2), incr = conv_U) in conv_wsos_cone)
         end
     else
         DP.@polyvar x[1:n]
@@ -156,14 +157,14 @@ function production_data()
     df = CSV.read(joinpath(@__DIR__, "data", "naics5811.csv"), copycols = true)
     DataFrames.deleterows!(df, 157) # outlier
     # number of non production employees
-    df[:prode] .= df[:emp] - df[:prode]
+    df[!, :prode] .= df[!, :emp] - df[!, :prode]
     # group by industry codes
     df_aggr = DataFrames.aggregate(DataFrames.dropmissing(df), :naics, sum)
     # four covariates: non production employees, production worker hours, production workers, total capital stock
     # use the log transform of covariates
-    X = log.(convert(Matrix{Float64}, df_aggr[[:prode_sum, :prodh_sum, :prodw_sum, :cap_sum]])) # n = 4
+    X = log.(convert(Matrix{Float64}, df_aggr[!, [:prode_sum, :prodh_sum, :prodw_sum, :cap_sum]])) # n = 4
     # value of shipment
-    y = convert(Vector{Float64}, df_aggr[:vship_sum])
+    y = convert(Vector{Float64}, df_aggr[!, :vship_sum])
     # mean center
     X .-= sum(X, dims = 1) ./ size(X, 1)
     y .-= sum(y) / length(y)
@@ -173,18 +174,20 @@ function production_data()
     return (X, y)
 end
 
-shapeconregrJuMP1() = shapeconregrJuMP(production_data()..., 4, mono_dom = MU.FreeDomain(4), mono_profile = zeros(Int, 4))
+# TODO for odd degrees WSOS/PSD formulations don't match, modeling issue
+
+shapeconregrJuMP1() = shapeconregrJuMP(production_data()..., 4, mono_dom = MU.FreeDomain{Float64}(4), mono_profile = zeros(Int, 4))
 shapeconregrJuMP2() = shapeconregrJuMP(2, 3, 100, x -> sum(x.^3), use_lsq_obj = false)
 shapeconregrJuMP3() = shapeconregrJuMP(2, 3, 100, x -> sum(x.^4), use_lsq_obj = false)
 shapeconregrJuMP4() = shapeconregrJuMP(2, 3, 100, x -> sum(x.^3), signal_ratio = 50.0, use_lsq_obj = false)
 shapeconregrJuMP5() = shapeconregrJuMP(2, 3, 100, x -> sum(x.^4), signal_ratio = 50.0, use_lsq_obj = false)
 shapeconregrJuMP6() = shapeconregrJuMP(2, 3, 100, x -> exp(norm(x)))
 shapeconregrJuMP7() = shapeconregrJuMP(2, 3, 100, x -> sum(x.^4), signal_ratio = 50.0)
-shapeconregrJuMP8() = shapeconregrJuMP(2, 4, 100, x -> -inv(1 + exp(-10.0 * norm(x))), mono_dom = MU.Box(zeros(2), ones(2)))
-shapeconregrJuMP9() = shapeconregrJuMP(2, 4, 100, x -> -inv(1 + exp(-10.0 * norm(x))), signal_ratio = 10.0, mono_dom = MU.Box(zeros(2), ones(2)))
+shapeconregrJuMP8() = shapeconregrJuMP(2, 4, 100, x -> -inv(1 + exp(-10.0 * norm(x))), mono_dom = MU.Box{Float64}(zeros(2), ones(2)))
+shapeconregrJuMP9() = shapeconregrJuMP(2, 4, 100, x -> -inv(1 + exp(-10.0 * norm(x))), signal_ratio = 10.0, mono_dom = MU.Box{Float64}(zeros(2), ones(2)))
 shapeconregrJuMP10() = shapeconregrJuMP(2, 4, 100, x -> exp(norm(x)))
-shapeconregrJuMP11() = shapeconregrJuMP(2, 5, 100, x -> exp(norm(x)), signal_ratio = 10.0, mono_dom = MU.Box(0.5 * ones(2), 2 * ones(2)))
-shapeconregrJuMP12() = shapeconregrJuMP(2, 6, 100, x -> exp(norm(x)), signal_ratio = 1.0, mono_dom = MU.Box(0.5 * ones(2), 2 * ones(2)), use_wsos = false)
+shapeconregrJuMP11() = shapeconregrJuMP(2, 5, 100, x -> exp(norm(x)), signal_ratio = 10.0, mono_dom = MU.Box{Float64}(0.5 * ones(2), 2 * ones(2)))
+shapeconregrJuMP12() = shapeconregrJuMP(2, 6, 100, x -> exp(norm(x)), signal_ratio = 1.0, mono_dom = MU.Box{Float64}(0.5 * ones(2), 2 * ones(2)), use_wsos = false)
 shapeconregrJuMP13() = shapeconregrJuMP(2, 6, 100, x -> exp(norm(x)), signal_ratio = 1.0, use_lsq_obj = false)
 shapeconregrJuMP14() = shapeconregrJuMP(5, 5, 50, x -> exp(norm(x)), use_wsos = false)
 shapeconregrJuMP15() = shapeconregrJuMP(2, 3, 100, x -> exp(norm(x)), use_lsq_obj = false, use_wsos = false)

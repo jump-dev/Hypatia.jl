@@ -17,11 +17,9 @@ barrier_testfuns = [
     test_possemideftri_barrier,
     test_hypoperlogdettri_barrier,
     test_hyporootdettri_barrier,
-    test_wsospolyinterp_barrier,
-    # TODO next 2 fail with BigFloat
-    # NOTE not updated for generic reals or for new cone oracles interface
-    # test_wsospolyinterpmat_barrier,
-    # test_wsospolyinterpsoc_barrier,
+    test_wsosinterpnonnegative_barrier,
+    test_wsosinterppossemideftri_barrier,
+    test_wsosinterpepinormeucl_barrier,
     ]
 
 real_types = [

@@ -53,7 +53,7 @@ function densityest(
         # U variables
         h_poly = zeros(T, U)
         b_poly = T[]
-        push!(cones, CO.WSOSPolyInterp{T, T}(U, Ps))
+        push!(cones, CO.WSOSInterpNonnegative{T, T}(U, Ps))
         cone_offset += U
     else
         # U polynomial coefficient variables plus PSD variables
