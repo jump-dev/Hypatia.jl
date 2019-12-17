@@ -21,7 +21,7 @@ include(joinpath(@__DIR__, "data.jl"))
 
 function densityest(
     T::Type{<:Real},
-    X::Matrix{Float64},
+    X::Matrix{<:Real},
     deg::Int;
     use_wsos::Bool = true,
     sample_factor::Int = 100,
@@ -86,8 +86,8 @@ function densityest(
     offset = 1
     for i in 1:nobs
         G_exp[offset, (nobs + 1):(nobs + U)] = -basis_evals[i, :]
-        h_exp[offset + 1] = 1.0
-        G_exp[offset + 2, i] = -1.0
+        h_exp[offset + 1] = 1
+        G_exp[offset + 2, i] = -1
         offset += 3
         push!(cones, CO.EpiPerExp{T}())
         cone_offset += 3
@@ -97,41 +97,31 @@ function densityest(
     (log_rows, log_cols) = size(G_exp)
     if use_linops
         if use_wsos
-            A = BlockMatrix{T}(
-                1,
-                num_epi_vars + U,
-                [T.(w')],
+            A = BlockMatrix{T}(1,num_epi_vars + U,
+                [w'],
                 [1:1],
                 [(num_epi_vars + 1):(num_epi_vars + U)]
-            )
-            G = BlockMatrix{T}(
-                U + log_rows,
-                num_epi_vars + U,
+                )
+            G = BlockMatrix{T}(U + log_rows, num_epi_vars + U,
                 [-I, G_exp],
                 [1:U, (U + 1):(U + log_rows)],
                 [(num_epi_vars + 1):(num_epi_vars + U), 1:(num_epi_vars + U)],
-            )
+                )
         else
-            A = BlockMatrix{T}(
-                U + 1,
-                num_epi_vars + U + num_psd_vars,
-                [-I, A_psd, T.(w')],
+            A = BlockMatrix{T}(U + 1, num_epi_vars + U + num_psd_vars,
+                [-I, A_psd, w'],
                 [1:U, 1:U, (U + 1):(U + 1)],
                 [(num_epi_vars + 1):(num_epi_vars + U), (num_epi_vars + U + 1):(num_epi_vars + U + num_psd_vars), (num_epi_vars + 1):(num_epi_vars + U)],
-            )
-            G = BlockMatrix{T}(
-                num_psd_vars + log_rows,
-                num_epi_vars + U + num_psd_vars,
+                )
+            G = BlockMatrix{T}(num_psd_vars + log_rows, num_epi_vars + U + num_psd_vars,
                 [-I, G_exp],
                 [1:num_psd_vars, (num_psd_vars + 1):(num_psd_vars + log_rows)],
                 [(num_epi_vars + U + 1):(num_epi_vars + U + num_psd_vars), 1:(num_epi_vars + U)],
-            )
+                )
         end
     else
         if use_wsos
-            A = [
-                zeros(T, 1, num_epi_vars)    T.(w');
-                ]
+            A = hcat(zeros(T, 1, num_epi_vars), w')
             G = [
                 zeros(T, U, num_epi_vars)    Matrix{T}(-I, U, U);
                 G_exp;
@@ -139,7 +129,7 @@ function densityest(
         else
             A = [
                 zeros(T, U, num_epi_vars)    Matrix{T}(-I, U, U)    A_psd;
-                zeros(T, 1, num_epi_vars)    T.(w')    zeros(T, 1, num_psd_vars);
+                zeros(T, 1, num_epi_vars)    w'    zeros(T, 1, num_psd_vars);
                 ]
             G = [
                 zeros(T, num_psd_vars, num_epi_vars + U)  -Matrix{T}(I, num_psd_vars, num_psd_vars);
@@ -154,7 +144,7 @@ function densityest(
     return (c = c, A = A, b = b, G = G, h = h, cones = cones)
 end
 
-densityest(T::Type{<:Real}, nobs::Int, n::Int, deg::Int; options...) = densityest(T, randn(nobs, n), deg; options...)
+densityest(T::Type{<:Real}, nobs::Int, n::Int, deg::Int; options...) = densityest(T, randn(T, nobs, n), deg; options...)
 
 densityest1(T::Type{<:Real}) = densityest(T, iris_data(), 4)
 densityest2(T::Type{<:Real}) = densityest(T, cancer_data(), 4)
