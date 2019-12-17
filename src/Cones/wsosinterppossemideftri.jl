@@ -27,13 +27,11 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
 
     rt2::T
     rt2i::T
-    slice::Vector{T}
-    LL::Vector{Symmetric{T, Matrix{T}}}
-    ΛFs::Vector
-    ΛFP::Vector{Matrix{T}}
-    LUs::Vector{Matrix{T}}
-    UU1::Matrix{T}
-    UU2::Matrix{T}
+    tmpU::Vector{T}
+    tmpLRLR::Vector{Symmetric{T, Matrix{T}}}
+    ΛFL::Vector
+    ΛFLP::Vector{Matrix{T}}
+    tmpLU::Vector{Matrix{T}}
     PlambdaP::Vector{Matrix{T}}
 
     function WSOSInterpPosSemidefTri{T}(
@@ -43,8 +41,8 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
         is_dual::Bool;
         hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
-        for Pj in Ps
-            @assert size(Pj, 1) == U
+        for Pk in Ps
+            @assert size(Pk, 1) == U
         end
         cone = new{T}()
         cone.use_dual = !is_dual # using dual barrier
@@ -72,25 +70,27 @@ function setup_data(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     load_matrix(cone.hess_fact_cache, cone.hess)
     cone.rt2 = sqrt(T(2))
     cone.rt2i = inv(cone.rt2)
-    cone.slice = Vector{T}(undef, U)
-    cone.LL = [Symmetric(zeros(T, size(Pj, 2) * R, size(Pj, 2) * R), :L) for Pj in Ps]
-    cone.ΛFs = Vector{Any}(undef, length(Ps))
-    cone.ΛFP = [Matrix{T}(undef, R * size(Pj, 2), R * U) for Pj in Ps]
-    cone.LUs = [Matrix{T}(undef, size(Pj, 2), U) for Pj in Ps]
-    cone.UU1 = Matrix{T}(undef, U, U)
-    cone.UU2 = similar(cone.UU1)
+    cone.tmpU = Vector{T}(undef, U)
+    cone.tmpLRLR = [Symmetric(zeros(T, size(Pk, 2) * R, size(Pk, 2) * R), :L) for Pk in Ps]
+    cone.tmpLU = [Matrix{T}(undef, size(Pk, 2), U) for Pk in Ps]
+    cone.ΛFL = Vector{Any}(undef, length(Ps))
+    cone.ΛFLP = [Matrix{T}(undef, R * size(Pk, 2), R * U) for Pk in Ps]
     cone.PlambdaP = [zeros(T, R * U, R * U) for _ in eachindex(Ps)]
     return
 end
 
-get_nu(cone::WSOSInterpPosSemidefTri) = cone.R * sum(size(Pj, 2) for Pj in cone.Ps)
+get_nu(cone::WSOSInterpPosSemidefTri) = cone.R * sum(size(Pk, 2) for Pk in cone.Ps)
+
+# TODO move to Cones.jl and use elsewhere
+_svec_idx(row::Int, col::Int) = div((row - 1) * row, 2) + col
+_block_idxs(incr::Int, block::Int) = (incr * (block - 1) .+ (1:incr))
 
 function set_initial_point(arr::AbstractVector, cone::WSOSInterpPosSemidefTri)
     arr .= 0
-    idx = 1
+    block = 1
     @inbounds for i in 1:cone.R
-        arr[idx:(idx + cone.U - 1)] .= 1
-        idx += (i + 1) * cone.U
+        arr[_block_idxs(cone.U, block)] .= 1
+        block += i + 1
     end
     return arr
 end
@@ -99,26 +99,23 @@ function update_feas(cone::WSOSInterpPosSemidefTri)
     @assert !cone.feas_updated
 
     cone.is_feas = true
-    @inbounds for j in eachindex(cone.Ps)
-        Pj = cone.Ps[j]
-        LU = cone.LUs[j]
-        L = size(Pj, 2)
-        Λ = cone.LL[j]
-        uo = rowo = 1
-        @inbounds for p in 1:cone.R
-            colo = 1
-            @inbounds for q in 1:p
-                fact = (p == q ? 1 : cone.rt2i)
-                cone.slice .= view(cone.point, uo:(uo + cone.U - 1)) * fact
-                mul!(LU, Pj', Diagonal(cone.slice))
-                mul!(view(Λ.data, rowo:(rowo + L - 1), colo:(colo + L - 1)), LU, Pj)
-                uo += cone.U
-                colo += L
+    @inbounds for k in eachindex(cone.Ps)
+        Pk = cone.Ps[k]
+        LU = cone.tmpLU[k]
+        L = size(Pk, 2)
+        Λ = cone.tmpLRLR[k]
+
+        for p in 1:cone.R, q in 1:p
+            @. @views cone.tmpU = cone.point[_block_idxs(cone.U, _svec_idx(p, q))]
+            if p != q
+                cone.tmpU .*= cone.rt2i
             end
-            rowo += L
+            mul!(LU, Pk', Diagonal(cone.tmpU)) # TODO check efficiency
+            @views mul!(Λ.data[_block_idxs(L, p), _block_idxs(L, q)], LU, Pk)
         end
-        cone.ΛFs[j] = cholesky!(Λ, check = false)
-        if !isposdef(cone.ΛFs[j])
+
+        ΛFLk = cone.ΛFL[k] = cholesky!(Λ, check = false)
+        if !isposdef(ΛFLk)
             cone.is_feas = false
             break
         end
@@ -130,22 +127,18 @@ end
 
 function update_grad(cone::WSOSInterpPosSemidefTri)
     @assert is_feas(cone)
-    R = cone.R
     U = cone.U
 
-    cone.grad .= 0
-    @inbounds for j in eachindex(cone.Ps)
-        Pj = cone.Ps[j]
-        L = size(Pj, 2)
-        get_PlambdaP(cone, j)
-        PlambdaP = Symmetric(cone.PlambdaP[j], :U)
-        idx = rowo = 1
-        @inbounds for p in 1:R, q in 1:p
-            fact = (p == q ? 1 : cone.rt2)
-            @inbounds for i in 1:cone.U
-                cone.grad[idx] -= PlambdaP[(p - 1) * U + i, (q - 1) * U + i] * fact
-                idx += 1
-            end
+    _update_PlambdaP(cone)
+    for p in 1:cone.R, q in 1:p
+        scal = (p == q ? -1 : -cone.rt2)
+        idx = (_svec_idx(p, q) - 1) * U
+        block_p = (p - 1) * U
+        block_q = (q - 1) * U
+        for i in 1:U
+            block_p_i = block_p + i
+            block_q_i = block_q + i
+            @inbounds cone.grad[idx + i] = scal * sum(PlambdaPk[block_q_i, block_p_i] for PlambdaPk in cone.PlambdaP)
         end
     end
 
@@ -154,200 +147,85 @@ function update_grad(cone::WSOSInterpPosSemidefTri)
 end
 
 function update_hess(cone::WSOSInterpPosSemidefTri)
-    @assert is_feas(cone)
-
-    cone.hess .= 0
+    @assert cone.grad_updated
+    R = cone.R
     U = cone.U
-    @inbounds for j in eachindex(cone.Ps)
-        PlambdaP = Symmetric(cone.PlambdaP[j], :U)
-        uo = 0
-        @inbounds for p in 1:cone.R, q in 1:p
-            uo += 1
-            fact = (p == q) ? 1 : cone.rt2
-            rinds = (U * (p - 1) + 1):(U * p)
-            cinds = (U * (q - 1) + 1):(U * q)
-            idxs = (U * (uo - 1) + 1):(U * uo)
+    H = cone.hess.data
 
-            uo2 = 0
-            @inbounds for p2 in 1:cone.R, q2 in 1:p2
-                uo2 += 1
-                if uo2 < uo
-                    continue
+    H .= 0
+    for p in 1:R, q in 1:p
+        block = _svec_idx(p, q)
+        idxs = _block_idxs(U, block)
+        block_p_idxs = _block_idxs(U, p)
+        block_q_idxs = _block_idxs(U, q)
+
+        for p2 in 1:R, q2 in 1:p2
+            block2 = _svec_idx(p2, q2)
+            if block2 < block
+                continue
+            end
+            idxs2 = _block_idxs(U, block2)
+            block_p_idxs2 = _block_idxs(U, p2)
+            block_q_idxs2 = _block_idxs(U, q2)
+
+            @views Hview = H[idxs, idxs2]
+            for k in eachindex(cone.Ps)
+                PlambdaPk = Symmetric(cone.PlambdaP[k], :U)
+                @inbounds @. @views Hview += PlambdaPk[block_p_idxs, block_p_idxs2] * PlambdaPk[block_q_idxs, block_q_idxs2]
+                if (p != q) || (p2 != q2)
+                    @inbounds @. @views Hview += PlambdaPk[block_p_idxs, block_q_idxs2] * PlambdaPk[block_q_idxs, block_p_idxs2]
                 end
-                rinds2 = (U * (p2 - 1) + 1):(U * p2)
-                cinds2 = (U * (q2 - 1) + 1):(U * q2)
-                idxs2 = (U * (uo2 - 1) + 1):(U * uo2)
-
-                fact = xor(p == q, p2 == q2) ? cone.rt2i : 1
-                @. cone.hess.data[idxs, idxs2] += PlambdaP[rinds, rinds2] * PlambdaP[cinds, cinds2] * fact
-
-                @inbounds if (p != q) || (p2 != q2)
-                    @. cone.hess.data[idxs, idxs2] += PlambdaP[rinds, cinds2] * PlambdaP[cinds, rinds2] * fact
-                end
-            end # p2, q2
-        end #p, q
-    end # Ps
+            end
+            if xor(p == q, p2 == q2)
+                @. Hview *= cone.rt2i
+            end
+        end
+    end
 
     cone.hess_updated = true
     return cone.hess
 end
 
-function get_PlambdaP(cone::WSOSInterpPosSemidefTri{T}, j::Int) where {T}
+function _update_PlambdaP(cone::WSOSInterpPosSemidefTri)
     R = cone.R
     U = cone.U
-    L = size(cone.Ps[j], 2)
-    PlambdaP = cone.PlambdaP[j]
-    ΛF = cone.ΛFs[j].L
-    LU = cone.LUs[j]
-    ΛFP = cone.ΛFP[j]
 
-    # given cholesky factorization L factor ΛF, get ΛFP = ΛF * kron(I, P')
-    @inbounds for k in 1:R
-        # kth column block of ΛFP
-        cols = ((k - 1) * U + 1):(k * U)
-        # block (k, k) of L factor of ΛF
-        ΛF_kk = view(ΛF, ((k - 1) * L + 1):(k * L), ((k - 1) * L + 1):(k * L))
-        # block (k, k) of ΛFP
-        ΛFP_kk = view(ΛFP, ((k - 1) * L + 1):(k * L), cols)
-        # ΛFP_kk = ΛF_kk \ P'
-        copyto!(ΛFP_kk, cone.Ps[j]')
-        ldiv!(LowerTriangular(ΛF_kk), ΛFP_kk)
-        # to get off-diagonals in ΛFP, subtract known blocks aggregated in LU
-        @inbounds for r in (k + 1):R
-            LU .= 0
-            @inbounds for s in k:(r - 1)
-                # block (s, k) of ΛFP
-                ΛFP_ks = view(ΛFP, ((s - 1) * L + 1):(s * L), cols)
-                # block (r, s) of L factor of ΛF
-                ΛF_rs = view(ΛF, ((r - 1) * L + 1):(r * L), ((s - 1) * L + 1):(s * L))
-                mul!(LU, ΛF_rs, ΛFP_ks, -one(T), one(T))
+    for k in eachindex(cone.PlambdaP)
+        L = size(cone.Ps[k], 2)
+        ΛFL = cone.ΛFL[k].L
+        ΛFLP = cone.ΛFLP[k]
+
+        # given cholesky L factor ΛFL, get ΛFLP = ΛFL * kron(I, P')
+        @inbounds for p in 1:R
+            block_U_p_idxs = _block_idxs(U, p)
+            block_L_p_idxs = _block_idxs(L, p)
+            @views ΛFLP_pp = ΛFLP[block_L_p_idxs, block_U_p_idxs]
+            # ΛFLP_pp = ΛFL_pp \ P'
+            @views copyto!(ΛFLP_pp, cone.Ps[k]')
+            ldiv!(LowerTriangular(ΛFL[block_L_p_idxs, block_L_p_idxs]), ΛFLP_pp)
+            # to get off-diagonals in ΛFLP, subtract known blocks aggregated in ΛFLP_qp
+            @inbounds for q in (p + 1):R
+                block_L_q_idxs = _block_idxs(L, q)
+                @views ΛFLP_qp = ΛFLP[block_L_q_idxs, block_U_p_idxs]
+                ΛFLP_qp .= 0
+                @inbounds for p2 in p:(q - 1)
+                    block_L_p2_idxs = _block_idxs(L, p2)
+                    @views mul!(ΛFLP_qp, ΛFL[block_L_q_idxs, block_L_p2_idxs], ΛFLP[block_L_p2_idxs, block_U_p_idxs], -1, 1)
+                end
+                @views ldiv!(LowerTriangular(ΛFL[block_L_q_idxs, block_L_q_idxs]), ΛFLP_qp)
             end
-            # block (r, r) of ΛF
-            ΛF_rr = view(ΛF, ((r - 1) * L + 1):(r * L), ((r - 1) * L + 1):(r * L))
-            # block (r, k) of ΛFP
-            ΛFP_rk = view(ΛFP, ((r - 1) * L + 1):(r * L), cols)
-            copyto!(ΛFP_rk, LU)
-            ldiv!(LowerTriangular(ΛF_rr), ΛFP_rk)
+        end
+
+        # PlambdaP = ΛFLP' * ΛFLP
+        PlambdaPk = cone.PlambdaP[k]
+        for p in 1:R, q in p:R
+            block_p_idxs = _block_idxs(U, p)
+            block_q_idxs = _block_idxs(U, q)
+            # since ΛFLP is block lower triangular rows only from max(p,q) start making a nonzero contribution to the product
+            row_range = ((q - 1) * L + 1):(L * R)
+            @inbounds @views mul!(PlambdaPk[block_p_idxs, block_q_idxs], ΛFLP[row_range, block_p_idxs]', ΛFLP[row_range, block_q_idxs])
         end
     end
 
-    # PlambdaP = ΛFP' * ΛFP
-    @inbounds for r in 1:R
-        rinds = ((r - 1) * U + 1):(r * U)
-        @inbounds for s in r:R
-            cinds = ((s - 1) * U + 1):(s * U)
-            # since ΛFP is block lower triangular rows only from max(i,j) start making a nonzero contribution to the product
-            mulrange = ((s - 1) * L + 1):(L * R)
-            @views mul!(PlambdaP[rinds, cinds], ΛFP[mulrange, rinds]',  ΛFP[mulrange, cinds])
-        end
-    end
-
-    return PlambdaP
+    return cone.PlambdaP
 end
-
-# TODO decide whether to keep
-# function update_feas(cone::WSOSInterpPosSemidefTri)
-#     @assert !cone.feas_updated
-#     cone.is_feas = true
-#     for j in eachindex(cone.Ps)
-#         Pj = cone.Ps[j]
-#         LU = cone.LUs[j]
-#         L = size(Pj, 2)
-#         Λ = cone.LL[j]
-#         uo = rowo = 1
-#         for p in 1:cone.R
-#             colo = 1
-#             for q in 1:p
-#                 fact = (p == q ? 1 : cone.rt2i)
-#                 cone.slice .= view(cone.point, uo:(uo + cone.U - 1)) * fact
-#                 mul!(LU, Pj', Diagonal(cone.slice))
-#                 mul!(view(Λ.data, rowo:(rowo + L - 1), colo:(colo + L - 1)), LU, Pj)
-#                 uo += cone.U
-#                 colo += L
-#             end
-#             rowo += L
-#         end
-#         cone.ΛFs[j] = cholesky!(Λ, check = false)
-#         if !isposdef(cone.ΛFs[j])
-#             cone.is_feas = false
-#             break
-#         end
-#     end
-#     cone.feas_updated = true
-#     return cone.is_feas
-# end
-#
-# function update_grad(cone::WSOSInterpPosSemidefTri)
-#     @assert is_feas(cone)
-#     cone.grad .= 0
-#     for j in eachindex(cone.Ps)
-#         W_inv_j = inv(cone.ΛFs[j]) # TODO store
-#         Pj = cone.Ps[j]
-#         L = size(Pj, 2)
-#         idx = rowo = 1
-#         for p in 1:cone.R
-#             colo = 1
-#             for q in 1:p
-#                 fact = (p == q) ? 1 : cone.rt2
-#                 for i in 1:cone.U
-#                     cone.grad[idx] -= Pj[i, :]' * view(W_inv_j, rowo:(rowo + L - 1), colo:(colo + L - 1)) * Pj[i, :] * fact
-#                     idx += 1
-#                 end
-#                 colo += L
-#             end
-#             rowo += L
-#         end
-#     end
-#     cone.grad_updated = true
-#     return cone.grad
-# end
-#
-# function update_hess(cone::WSOSInterpPosSemidefTri)
-#     @assert is_feas(cone)
-#     cone.hess .= 0
-#     U = cone.U
-#     UU1 = cone.UU1
-#     UU2 = cone.UU2
-#     for j in eachindex(cone.Ps)
-#         W_inv_j = inv(cone.ΛFs[j]) # TODO store
-#         Pj = cone.Ps[j]
-#         LU = cone.LUs[j]
-#         L = size(Pj, 2)
-#         uo = 0
-#         for p in 1:cone.R, q in 1:p
-#             uo += 1
-#             fact = (p == q) ? 1 : cone.rt2
-#             rinds = (L * (p - 1) + 1):(L * p)
-#             cinds = (L * (q - 1) + 1):(L * q)
-#             idxs = (U * (uo - 1) + 1):(U * uo)
-#
-#             uo2 = 0
-#             for p2 in 1:cone.R, q2 in 1:p2
-#                 uo2 += 1
-#                 if uo2 < uo
-#                     continue
-#                 end
-#                 rinds2 = (L * (p2 - 1) + 1):(L * p2)
-#                 cinds2 = (L * (q2 - 1) + 1):(L * q2)
-#                 idxs2 = (U * (uo2 - 1) + 1):(U * uo2)
-#
-#                 mul!(LU, view(W_inv_j, rinds, rinds2), Pj')
-#                 mul!(UU1, Pj, LU)
-#                 mul!(LU, view(W_inv_j, cinds, cinds2), Pj')
-#                 mul!(UU2, Pj, LU)
-#                 fact = xor(p == q, p2 == q2) ? cone.rt2i : 1
-#                 @. cone.hess.data[idxs, idxs2] += UU1 * UU2 * fact
-#
-#                 if (p != q) || (p2 != q2)
-#                     mul!(LU, view(W_inv_j, rinds, cinds2), Pj')
-#                     mul!(UU1, Pj, LU)
-#                     mul!(LU, view(W_inv_j, cinds, rinds2), Pj')
-#                     mul!(UU2, Pj, LU)
-#                     @. cone.hess.data[idxs, idxs2] += UU1 * UU2 * fact
-#                 end
-#             end # p2, q2
-#         end #p, q
-#     end # Ps
-#     cone.hess_updated = true
-#     return cone.hess
-# end

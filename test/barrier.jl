@@ -338,7 +338,7 @@ end
 function test_wsosinterppossemideftri_barrier(T::Type{<:Real})
     Random.seed!(1)
     rt2i = inv(sqrt(T(2)))
-    for n in 1:2, halfdeg in 1:2, R in 1:3
+    for n in 1:3, halfdeg in 1:2, R in 1:3
         (U, _, P0, Ps, _) = MU.interpolate(MU.Box{T}(-ones(T, n), ones(T, n)), halfdeg, sample = false)
         Ps = vcat([P0], Ps)
         cone = CO.WSOSInterpPosSemidefTri{T}(R, U, Ps, true)
@@ -370,7 +370,7 @@ end
 
 function test_wsosinterpepinormeucl_barrier(T::Type{<:Real})
     Random.seed!(1)
-    for n in 1:2, halfdeg in 1:2, R in 2:3
+    for n in 1:3, halfdeg in 1:2, R in 2:3
         (U, _, P0, Ps, _) = MU.interpolate(MU.Box{T}(-ones(T, n), ones(T, n)), halfdeg, sample = false)
         Ps = vcat([P0], Ps)
         cone = CO.WSOSInterpEpiNormEucl{T}(R, U, Ps, true)
