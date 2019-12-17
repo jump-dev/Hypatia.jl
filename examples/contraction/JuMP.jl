@@ -33,7 +33,7 @@ function contractionJuMP(
     dom = MU.FreeDomain{Float64}(n)
 
     M_halfdeg = div(M_deg + 1, 2)
-    (U_M, pts_M, P0_M, _, _) = MU.interpolate(dom, M_halfdeg, sample = false)
+    (U_M, pts_M, Ps_M, _) = MU.interpolate(dom, M_halfdeg, sample = false)
     lagrange_polys = MU.recover_lagrange_polys(pts_M, 2 * M_halfdeg)
 
     polyjump_basis = PJ.FixedPolynomialBasis(lagrange_polys)
@@ -56,9 +56,9 @@ function contractionJuMP(
     if use_wsos
         deg_R = maximum(DP.maxdegree.(R))
         d_R = div(deg_R + 1, 2)
-        (U_R, pts_R, P0_R, _, _) = MU.interpolate(dom, d_R, sample = true)
-        JuMP.@constraint(model, [M[i, j](pts_M[u, :]) * (i == j ? 1.0 : rt2) - (i == j ? delta : 0.0) for i in 1:n for j in 1:i for u in 1:U_M] in HYP.WSOSPolyInterpMatCone(n, U_M, [P0_M]))
-        JuMP.@constraint(model, [-R[i, j](pts_R[u, :]) * (i == j ? 1.0 : rt2) - (i == j ? delta : 0.0) for i in 1:n for j in 1:i for u in 1:U_R] in HYP.WSOSPolyInterpMatCone(n, U_R, [P0_R]))
+        (U_R, pts_R, Ps_R, _) = MU.interpolate(dom, d_R, sample = true)
+        JuMP.@constraint(model, [M[i, j](pts_M[u, :]) * (i == j ? 1.0 : rt2) - (i == j ? delta : 0.0) for i in 1:n for j in 1:i for u in 1:U_M] in HYP.WSOSPolyInterpMatCone(n, U_M, Ps_M))
+        JuMP.@constraint(model, [-R[i, j](pts_R[u, :]) * (i == j ? 1.0 : rt2) - (i == j ? delta : 0.0) for i in 1:n for j in 1:i for u in 1:U_R] in HYP.WSOSPolyInterpMatCone(n, U_R, Ps_R))
     else
         PJ.setpolymodule!(model, SumOfSquares)
         JuMP.@constraint(model, M - Matrix(delta * I, n, n) in JuMP.PSDCone())

@@ -1058,7 +1058,7 @@ end
 
 function wsospolyinterp1(T; options...)
     tol = sqrt(sqrt(eps(T)))
-    (U, pts, P0, PWts, _) = MU.interpolate(MU.Box{T}(-ones(T, 2), ones(T, 2)), 2, sample = false)
+    (U, pts, Ps, _) = MU.interpolate(MU.Box{T}(-ones(T, 2), ones(T, 2)), 2, sample = false)
     DynamicPolynomials.@polyvar x y
     fn = x ^ 4 + x ^ 2 * y ^ 2 + 4 * y ^ 2 + 4
 
@@ -1067,7 +1067,7 @@ function wsospolyinterp1(T; options...)
     b = T[]
     G = ones(T, U, 1)
     h = T[fn(pts[j, :]...) for j in 1:U]
-    cones = CO.Cone{T}[CO.WSOSPolyInterp{T, T}(U, [P0, PWts...])]
+    cones = CO.Cone{T}[CO.WSOSPolyInterp{T, T}(U, Ps)]
 
     r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
     @test r.status == :Optimal
@@ -1077,7 +1077,7 @@ end
 
 function wsospolyinterp2(T; options...)
     tol = sqrt(sqrt(eps(T)))
-    (U, pts, P0, PWts, _) = MU.interpolate(MU.Box{T}(zeros(T, 2), fill(T(3), 2)), 2, sample = false)
+    (U, pts, Ps, _) = MU.interpolate(MU.Box{T}(zeros(T, 2), fill(T(3), 2)), 2, sample = false)
     DynamicPolynomials.@polyvar x y
     fn = (x - 2) ^ 2 + (x * y - 3) ^ 2
 
@@ -1086,7 +1086,7 @@ function wsospolyinterp2(T; options...)
     b = T[]
     G = ones(T, U, 1)
     h = T[fn(pts[j, :]...) for j in 1:U]
-    cones = CO.Cone{T}[CO.WSOSPolyInterp{T, T}(U, [P0, PWts...])]
+    cones = CO.Cone{T}[CO.WSOSPolyInterp{T, T}(U, Ps)]
 
     r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
     @test r.status == :Optimal
@@ -1096,7 +1096,7 @@ end
 
 function wsospolyinterp3(T; options...)
     tol = sqrt(sqrt(eps(T)))
-    (U, pts, P0, PWts, _) = MU.interpolate(MU.Box{T}(zeros(T, 2), fill(T(3), 2)), 2, sample = false)
+    (U, pts, Ps, _) = MU.interpolate(MU.Box{T}(zeros(T, 2), fill(T(3), 2)), 2, sample = false)
     DynamicPolynomials.@polyvar x y
     fn = (x - 2) ^ 2 + (x * y - 3) ^ 2
 
@@ -1105,7 +1105,7 @@ function wsospolyinterp3(T; options...)
     b = T[1]
     G = Diagonal(-one(T) * I, U)
     h = zeros(T, U)
-    cones = CO.Cone{T}[CO.WSOSPolyInterp{T, T}(U, [P0, PWts...], true)]
+    cones = CO.Cone{T}[CO.WSOSPolyInterp{T, T}(U, Ps, true)]
 
     r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
     @test r.status == :Optimal

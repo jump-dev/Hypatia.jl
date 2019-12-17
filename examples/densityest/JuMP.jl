@@ -34,7 +34,7 @@ function densityestJuMP(
     X ./= (maxX - minX) / 2
 
     halfdeg = div(deg + 1, 2)
-    (U, pts, P0, PWts, w) = MU.interpolate(domain, halfdeg, sample = true, calc_w = true, sample_factor = sample_factor)
+    (U, pts, Ps, w) = MU.interpolate(domain, halfdeg, sample = true, calc_w = true, sample_factor = sample_factor)
 
     model = JuMP.Model()
     JuMP.@variable(model, z[1:nobs])
@@ -48,7 +48,7 @@ function densityestJuMP(
         JuMP.@variable(model, f, PolyJuMP.Poly(PX))
         JuMP.@constraints(model, begin
             sum(w[i] * f(pts[i, :]) for i in 1:U) == 1.0 # integrate to 1
-            [f(pts[i, :]) for i in 1:U] in HYP.WSOSPolyInterpCone(U, [P0, PWts...]) # density nonnegative
+            [f(pts[i, :]) for i in 1:U] in HYP.WSOSPolyInterpCone(U, Ps) # density nonnegative
             [i in 1:nobs], vcat(z[i], 1.0, f(X[i, :])) in MOI.ExponentialCone() # hypograph of log
         end)
     else
@@ -61,7 +61,7 @@ function densityestJuMP(
         JuMP.@variable(model, f[1:U])
         JuMP.@constraints(model, begin
             dot(w, f) == 1.0 # integrate to 1
-            f in HYP.WSOSPolyInterpCone(U, [P0, PWts...]) # density nonnegative
+            f in HYP.WSOSPolyInterpCone(U, Ps) # density nonnegative
             [i in 1:nobs], vcat(z[i], 1.0, dot(f, basis_evals[i, :])) in MOI.ExponentialCone() # hypograph of log
         end)
     end
