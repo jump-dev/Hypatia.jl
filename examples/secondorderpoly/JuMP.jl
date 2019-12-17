@@ -18,11 +18,11 @@ const rt2 = sqrt(2)
 
 function secondorderpolyJuMP(polyvec::Function, deg::Int)
     halfdeg = div(deg + 1, 2)
-    (U, pts, P0, _, _) = MU.interpolate(MU.FreeDomain{Float64}(1), halfdeg, sample = false)
+    (U, pts, Ps, _) = MU.interpolate(MU.FreeDomain{Float64}(1), halfdeg, sample = false)
 
     vals = polyvec.(pts)
     l = length(vals[1])
-    cone = HYP.WSOSPolyInterpSOCCone(l, U, [P0])
+    cone = HYP.WSOSPolyInterpSOCCone(l, U, Ps)
 
     model = JuMP.Model()
     JuMP.@constraint(model, [v[i] for i in 1:l for v in vals] in cone)

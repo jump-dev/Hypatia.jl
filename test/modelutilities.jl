@@ -17,13 +17,13 @@ function fekete_sample(T::DataType)
     free = MU.FreeDomain{T}(n)
 
     for sample in (true, false)
-        (box_U, box_pts, box_P0, box_PWts, _) = MU.interpolate(box, halfdeg, sample = sample, sample_factor = 20)
-        (free_U, free_pts, free_P0, free_PWts, _) = MU.interpolate(free, halfdeg, sample = sample, sample_factor = 20)
-        @test isempty(free_PWts)
+        (box_U, box_pts, box_Ps, _) = MU.interpolate(box, halfdeg, sample = sample, sample_factor = 20)
+        (free_U, free_pts, free_Ps, _) = MU.interpolate(free, halfdeg, sample = sample, sample_factor = 20)
+        @test length(free_Ps) == 1
         @test box_U == free_U
         @test size(box_pts) == size(free_pts)
-        @test size(box_P0) == size(free_P0)
-        @test norm(box_P0) ≈ norm(free_P0) atol=1e-1 rtol=1e-1
+        @test size(box_Ps[1]) == size(free_Ps[1])
+        @test norm(box_Ps[1]) ≈ norm(free_Ps[1]) atol=1e-1 rtol=1e-1
     end
 end
 
@@ -63,7 +63,7 @@ function test_recover_lagrange_polys(T::DataType)
             @test_broken MU.interpolate(MU.FreeDomain{T}(n), halfdeg, sample = sample, calc_w = true)
             continue
         end
-        (U, pts, P0, PWts, w) = MU.interpolate(MU.FreeDomain{T}(n), halfdeg, sample = sample, calc_w = true)
+        (U, pts, Ps, w) = MU.interpolate(MU.FreeDomain{T}(n), halfdeg, sample = sample, calc_w = true)
         DynamicPolynomials.@polyvar x[1:n]
         monos = DynamicPolynomials.monomials(x, 0:(2 * halfdeg))
         lagrange_polys = MU.recover_lagrange_polys(pts, 2 * halfdeg)
