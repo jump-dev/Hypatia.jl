@@ -33,7 +33,7 @@ function envelopeJuMP(
     model = JuMP.Model()
     JuMP.@variable(model, fpv[j in 1:U]) # values at Fekete points
     JuMP.@objective(model, Max, dot(fpv, w)) # integral over domain (via quadrature)
-    JuMP.@constraint(model, [i in 1:npoly], polys[:, i] .- fpv in HYP.WSOSPolyInterpCone(U, Ps))
+    JuMP.@constraint(model, [i in 1:npoly], polys[:, i] .- fpv in HYP.WSOSInterpNonnegativeCone(U, Ps))
 
     return (model = model,)
 end

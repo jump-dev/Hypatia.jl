@@ -22,7 +22,7 @@ function secondorderpolyJuMP(polyvec::Function, deg::Int)
 
     vals = polyvec.(pts)
     l = length(vals[1])
-    cone = HYP.WSOSPolyInterpSOCCone(l, U, Ps)
+    cone = HYP.WSOSInterpEpiNormEuclCone(l, U, Ps)
 
     model = JuMP.Model()
     JuMP.@constraint(model, [v[i] for i in 1:l for v in vals] in cone)

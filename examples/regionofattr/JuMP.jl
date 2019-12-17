@@ -44,9 +44,9 @@ function regionofattrJuMP(deg::Int; use_WSOS::Bool = true)
         (U1, pts1, Ps1, quad_weights) = MU.interpolate(dom1, halfdeg, sample = false, calc_w = true)
         (U2, pts2, Ps2, _) = MU.interpolate(dom2, halfdeg, sample = false)
         (U3, pts3, Ps3, _) = MU.interpolate(dom3, halfdeg - 1, sample = false)
-        wsos_cone1 = HYP.WSOSPolyInterpCone(U1, Ps1)
-        wsos_cone2 = HYP.WSOSPolyInterpCone(U2, Ps2)
-        wsos_cone3 = HYP.WSOSPolyInterpCone(U3, Ps3)
+        wsos_cone1 = HYP.WSOSInterpNonnegativeCone(U1, Ps1)
+        wsos_cone2 = HYP.WSOSInterpNonnegativeCone(U2, Ps2)
+        wsos_cone3 = HYP.WSOSInterpNonnegativeCone(U3, Ps3)
 
         JuMP.@objective(model, Min, sum(quad_weights[u] * w(pts1[u, :]) for u in 1:U1))
         JuMP.@constraints(model, begin

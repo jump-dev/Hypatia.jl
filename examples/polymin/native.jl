@@ -52,7 +52,7 @@ function polyminreal(
     end
 
     if use_wsos
-        cones = CO.Cone{T}[CO.WSOSPolyInterp{T, T}(U, Ps, !use_primal)]
+        cones = CO.Cone{T}[CO.WSOSInterpNonnegative{T, T}(U, Ps, !use_primal)]
     else
         # will be set up iteratively
         cones = CO.Cone{T}[]
@@ -214,7 +214,7 @@ function polymincomplex(
         G = Diagonal(-one(T) * I, U)
         h = zeros(T, U)
     end
-    cones = CO.Cone{T}[CO.WSOSPolyInterp{T, Complex{T}}(U, P_data, !use_primal)]
+    cones = CO.Cone{T}[CO.WSOSInterpNonnegative{T, Complex{T}}(U, P_data, !use_primal)]
 
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, true_obj = true_obj)
 end
