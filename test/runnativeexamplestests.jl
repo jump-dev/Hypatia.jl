@@ -29,18 +29,18 @@ options = (atol = sqrt(sqrt(eps(T))), solver = SO.Solver{T}(
 @info("starting native examples tests")
 @testset "native examples tests" begin
     @testset "densityest" begin test_densityest.(instances_densityest_few, T = T, options = options) end
-    # @testset "envelope" begin test_envelope.(instances_envelope_few, T = T, options = options) end
-    # @testset "expdesign" begin test_expdesign.(instances_expdesign_few, T = T, options = options) end
-    # @testset "linearopt" begin test_linearopt.(instances_linearopt_few, T = T, options = options) end
-    # @testset "matrixcompletion" begin test_matrixcompletion.(instances_matrixcompletion_few, T = T, options = options) end
-    # @testset "matrixregression" begin test_matrixregression.(instances_matrixregression_few, R = T, options = options) end # real
-    # @testset "matrixregression" begin test_matrixregression.(instances_matrixregression_few, R = Complex{T}, options = options) end # complex
-    # @testset "maxvolume" begin test_maxvolume.(instances_maxvolume_few, T = T, options = options) end
-    # @testset "sparsepca" begin test_sparsepca.(instances_sparsepca_few, T = T, options = options) end
-    # if T == Float64 # some ModelUtilities functions only work with Float64
-    #     @testset "polymin" begin test_polymin.(instances_polymin_few, T = T, options = options) end
-    # end
-    # @testset "portfolio" begin test_portfolio.(instances_portfolio_few, T = T, options = options) end
+    @testset "envelope" begin test_envelope.(instances_envelope_few, T = T, options = options) end
+    @testset "expdesign" begin test_expdesign.(instances_expdesign_few, T = T, options = options) end
+    @testset "linearopt" begin test_linearopt.(instances_linearopt_few, T = T, options = options) end
+    @testset "matrixcompletion" begin test_matrixcompletion.(instances_matrixcompletion_few, T = T, options = options) end
+    @testset "matrixregression" begin test_matrixregression.(instances_matrixregression_few, R = T, options = options) end # real
+    @testset "matrixregression" begin test_matrixregression.(instances_matrixregression_few, R = Complex{T}, options = options) end # complex
+    @testset "maxvolume" begin test_maxvolume.(instances_maxvolume_few, T = T, options = options) end
+    @testset "sparsepca" begin test_sparsepca.(instances_sparsepca_few, T = T, options = options) end
+    if T == Float64 # some ModelUtilities functions only work with Float64
+        @testset "polymin" begin test_polymin.(instances_polymin_few, T = T, options = options) end
+    end
+    @testset "portfolio" begin test_portfolio.(instances_portfolio_few, T = T, options = options) end
 end
 
 tol = sqrt(sqrt(eps(T)))
@@ -52,8 +52,8 @@ options = (atol = 10 * tol, solver = SO.Solver{T}(
 @info("starting native examples linear operators tests")
 @testset "native examples linear operators tests" begin
     @testset "densityest" begin test_densityest.(instances_densityest_linops, T = T, options = options) end
-    # @testset "expdesign" begin test_expdesign.(instances_expdesign_linops, T = T, options = options) end
-    # @testset "sparsepca" begin test_sparsepca.(instances_sparsepca_linops, T = T, options = options) end
-    # @testset "polymin" begin test_polymin.(instances_polymin_linops, T = T, options = options) end
-    # @testset "portfolio" begin test_portfolio.(instances_portfolio_linops, T = T, options = options) end
+    @testset "expdesign" begin test_expdesign.(instances_expdesign_linops, T = T, options = options) end
+    @testset "sparsepca" begin test_sparsepca.(instances_sparsepca_linops, T = T, options = options) end
+    @testset "polymin" begin test_polymin.(instances_polymin_linops, T = T, options = options) end
+    @testset "portfolio" begin test_portfolio.(instances_portfolio_linops, T = T, options = options) end
 end
