@@ -32,7 +32,7 @@ mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T
     tmpUL::Vector{Matrix{R}}
     tmpLU::Vector{Matrix{R}}
     tmpUU::Matrix{R}
-    ΛFs::Vector
+    ΛF::Vector
 
     function WSOSInterpNonnegative{T, R}(
         U::Int,
@@ -40,8 +40,8 @@ mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T
         is_dual::Bool;
         hess_fact_cache = hessian_cache(T),
         ) where {R <: RealOrComplex{T}} where {T <: Real}
-        for Pj in Ps
-            @assert size(Pj, 1) == U
+        for Pk in Ps
+            @assert size(Pk, 1) == U
         end
         cone = new{T, R}()
         cone.use_dual = !is_dual # using dual barrier
@@ -67,7 +67,7 @@ function setup_data(cone::WSOSInterpNonnegative{T, R}) where {R <: RealOrComplex
     cone.tmpUL = [Matrix{R}(undef, dim, size(Pk, 2)) for Pk in Ps]
     cone.tmpLU = [Matrix{R}(undef, size(Pk, 2), dim) for Pk in Ps]
     cone.tmpUU = Matrix{R}(undef, dim, dim)
-    cone.ΛFs = Vector{Any}(undef, length(Ps))
+    cone.ΛF = Vector{Any}(undef, length(Ps))
     return
 end
 
@@ -96,7 +96,7 @@ function update_feas(cone::WSOSInterpNonnegative)
             cone.is_feas = false
             break
         end
-        cone.ΛFs[k] = ΛFk
+        cone.ΛF[k] = ΛFk
     end
 
     cone.feas_updated = true
@@ -113,7 +113,7 @@ function update_grad(cone::WSOSInterpNonnegative)
     @inbounds for k in eachindex(cone.Ps)
         LUk = cone.tmpLU[k]
         copyto!(LUk, cone.Ps[k]')
-        ldiv!(cone.ΛFs[k].L, LUk)
+        ldiv!(cone.ΛF[k].L, LUk)
         @inbounds for j in 1:cone.dim
             cone.grad[j] -= sum(abs2, view(LUk, :, j))
         end
