@@ -5,34 +5,34 @@ definitions of conic sets not already defined by MathOptInterface
 and functions for converting between Hypatia and MOI cone definitions
 =#
 
-export WSOSPolyInterpCone
+export WSOSInterpNonnegativeCone
 
-struct WSOSPolyInterpCone{T <: Real} <: MOI.AbstractVectorSet # real case only
-    dimension::Int
+struct WSOSInterpNonnegativeCone{T <: Real} <: MOI.AbstractVectorSet # real case only
+    U::Int
     Ps::Vector{Matrix{T}}
     is_dual::Bool
 end
-WSOSPolyInterpCone(dimension::Int, Ps::Vector{Matrix{T}}) where {T <: Real} = WSOSPolyInterpCone{T}(dimension, Ps, false)
+WSOSInterpNonnegativeCone(U::Int, Ps::Vector{Matrix{T}}) where {T <: Real} = WSOSInterpNonnegativeCone{T}(U, Ps, false)
 
-export WSOSPolyInterpMatCone # TODO rename
+export WSOSInterpPossemidefTriCone
 
-struct WSOSPolyInterpMatCone{T <: Real} <: MOI.AbstractVectorSet
+struct WSOSInterpPossemidefTriCone{T <: Real} <: MOI.AbstractVectorSet
     R::Int
     U::Int
-    ipwt::Vector{Matrix{T}}
+    Ps::Vector{Matrix{T}}
     is_dual::Bool
 end
-WSOSPolyInterpMatCone(R::Int, U::Int, ipwt::Vector{Matrix{T}}) where {T <: Real} = WSOSPolyInterpMatCone{T}(R, U, ipwt, false)
+WSOSInterpPossemidefTriCone(R::Int, U::Int, Ps::Vector{Matrix{T}}) where {T <: Real} = WSOSInterpPossemidefTriCone{T}(R, U, Ps, false)
 
-export WSOSPolyInterpSOCCone # TODO rename
+export WSOSInterpEpiNormEuclCone
 
-struct WSOSPolyInterpSOCCone{T <: Real} <: MOI.AbstractVectorSet
+struct WSOSInterpEpiNormEuclCone{T <: Real} <: MOI.AbstractVectorSet
     R::Int
     U::Int
-    ipwt::Vector{Matrix{T}}
+    Ps::Vector{Matrix{T}}
     is_dual::Bool
 end
-WSOSPolyInterpSOCCone(R::Int, U::Int, ipwt::Vector{Matrix{T}}) where {T <: Real} = WSOSPolyInterpSOCCone{T}(R, U, ipwt, false)
+WSOSInterpEpiNormEuclCone(R::Int, U::Int, Ps::Vector{Matrix{T}}) where {T <: Real} = WSOSInterpEpiNormEuclCone{T}(R, U, Ps, false)
 
 const MOIOtherConesList(::Type{T}) where {T <: Real} = (
     MOI.NormInfinityCone,
@@ -44,9 +44,9 @@ const MOIOtherConesList(::Type{T}) where {T <: Real} = (
     MOI.GeometricMeanCone,
     MOI.PositiveSemidefiniteConeTriangle,
     MOI.LogDetConeTriangle,
-    WSOSPolyInterpCone{T},
-    WSOSPolyInterpMatCone{T},
-    # WSOSPolyInterpSOCCone{T},
+    WSOSInterpNonnegativeCone{T},
+    WSOSInterpPossemidefTriCone{T},
+    WSOSInterpEpiNormEuclCone{T},
     )
 
 const MOIOtherCones{T <: Real} = Union{
@@ -59,9 +59,9 @@ const MOIOtherCones{T <: Real} = Union{
     MOI.GeometricMeanCone,
     MOI.PositiveSemidefiniteConeTriangle,
     MOI.LogDetConeTriangle,
-    WSOSPolyInterpCone{T},
-    WSOSPolyInterpMatCone{T},
-    WSOSPolyInterpSOCCone{T},
+    WSOSInterpNonnegativeCone{T},
+    WSOSInterpPossemidefTriCone{T},
+    WSOSInterpEpiNormEuclCone{T},
     }
 
 # MOI cones for which no transformation is needed
@@ -74,7 +74,7 @@ cone_from_moi(::Type{T}, s::MOI.GeometricMeanCone) where {T <: Real} = (l = MOI.
 cone_from_moi(::Type{T}, s::MOI.PowerCone{T}) where {T <: Real} = Cones.Power{T}([s.exponent, 1 - s.exponent], 1)
 cone_from_moi(::Type{T}, s::MOI.PositiveSemidefiniteConeTriangle) where {T <: Real} = Cones.PosSemidefTri{T, T}(MOI.dimension(s))
 cone_from_moi(::Type{T}, s::MOI.LogDetConeTriangle) where {T <: Real} = Cones.HypoPerLogdetTri{T}(MOI.dimension(s))
-cone_from_moi(::Type{T}, s::WSOSPolyInterpCone{T}) where {T <: Real} = Cones.WSOSPolyInterp{T, T}(s.dimension, s.Ps, s.is_dual)
-cone_from_moi(::Type{T}, s::WSOSPolyInterpMatCone{T}) where {T <: Real} = Cones.WSOSPolyInterpMat{T}(s.R, s.U, s.ipwt, s.is_dual)
-cone_from_moi(::Type{T}, s::WSOSPolyInterpSOCCone{T}) where {T <: Real} = Cones.WSOSPolyInterpSOC{T}(s.R, s.U, s.ipwt, s.is_dual)
+cone_from_moi(::Type{T}, s::WSOSInterpNonnegativeCone{T}) where {T <: Real} = Cones.WSOSInterpNonnegative{T, T}(s.U, s.Ps, s.is_dual)
+cone_from_moi(::Type{T}, s::WSOSInterpPossemidefTriCone{T}) where {T <: Real} = Cones.WSOSInterpPosSemidefTri{T}(s.R, s.U, s.Ps, s.is_dual)
+cone_from_moi(::Type{T}, s::WSOSInterpEpiNormEuclCone{T}) where {T <: Real} = Cones.WSOSInterpEpiNormEucl{T}(s.R, s.U, s.Ps, s.is_dual)
 cone_from_moi(::Type{T}, s::MOI.AbstractVectorSet) where {T <: Real} = error("MOI set $s is not recognized")

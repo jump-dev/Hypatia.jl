@@ -1056,7 +1056,7 @@ function hyporootdettri3(T; options...)
     end
 end
 
-function wsospolyinterp1(T; options...)
+function wsosinterpnonnegative1(T; options...)
     tol = sqrt(sqrt(eps(T)))
     (U, pts, P0, PWts, _) = MU.interpolate(MU.Box{T}(-ones(T, 2), ones(T, 2)), 2, sample = false)
     DynamicPolynomials.@polyvar x y
@@ -1067,7 +1067,7 @@ function wsospolyinterp1(T; options...)
     b = T[]
     G = ones(T, U, 1)
     h = T[fn(pts[j, :]...) for j in 1:U]
-    cones = CO.Cone{T}[CO.WSOSPolyInterp{T, T}(U, [P0, PWts...])]
+    cones = CO.Cone{T}[CO.WSOSInterpNonnegative{T, T}(U, [P0, PWts...])]
 
     r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
     @test r.status == :Optimal
@@ -1075,7 +1075,7 @@ function wsospolyinterp1(T; options...)
     @test r.x[1] ≈ T(4) atol=tol rtol=tol
 end
 
-function wsospolyinterp2(T; options...)
+function wsosinterpnonnegative2(T; options...)
     tol = sqrt(sqrt(eps(T)))
     (U, pts, P0, PWts, _) = MU.interpolate(MU.Box{T}(zeros(T, 2), fill(T(3), 2)), 2, sample = false)
     DynamicPolynomials.@polyvar x y
@@ -1086,7 +1086,7 @@ function wsospolyinterp2(T; options...)
     b = T[]
     G = ones(T, U, 1)
     h = T[fn(pts[j, :]...) for j in 1:U]
-    cones = CO.Cone{T}[CO.WSOSPolyInterp{T, T}(U, [P0, PWts...])]
+    cones = CO.Cone{T}[CO.WSOSInterpNonnegative{T, T}(U, [P0, PWts...])]
 
     r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
     @test r.status == :Optimal
@@ -1094,7 +1094,7 @@ function wsospolyinterp2(T; options...)
     @test r.x[1] ≈ zero(T) atol=tol rtol=tol
 end
 
-function wsospolyinterp3(T; options...)
+function wsosinterpnonnegative3(T; options...)
     tol = sqrt(sqrt(eps(T)))
     (U, pts, P0, PWts, _) = MU.interpolate(MU.Box{T}(zeros(T, 2), fill(T(3), 2)), 2, sample = false)
     DynamicPolynomials.@polyvar x y
@@ -1105,14 +1105,14 @@ function wsospolyinterp3(T; options...)
     b = T[1]
     G = Diagonal(-one(T) * I, U)
     h = zeros(T, U)
-    cones = CO.Cone{T}[CO.WSOSPolyInterp{T, T}(U, [P0, PWts...], true)]
+    cones = CO.Cone{T}[CO.WSOSInterpNonnegative{T, T}(U, [P0, PWts...], true)]
 
     r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
     @test r.status == :Optimal
     @test r.primal_obj ≈ zero(T) atol=tol rtol=tol
 end
 
-function wsospolyinterpmat1(T; options...)
+function wsosinterppossemideftri1(T; options...)
     # convexity parameter for (x + 1) ^ 2 * (x - 1) ^ 2
     tol = sqrt(sqrt(eps(T)))
     DynamicPolynomials.@polyvar x
@@ -1128,7 +1128,7 @@ function wsospolyinterpmat1(T; options...)
     G = ones(T, U, 1)
     # dimension of the Hessian is 1x1
     h = T[H(pts[u, :]...) for u in 1:U]
-    cones = CO.Cone{T}[CO.WSOSPolyInterpMat{T}(1, U, [P0, PWts...])]
+    cones = CO.Cone{T}[CO.WSOSInterpPosSemidefTri{T}(1, U, [P0, PWts...])]
 
     r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
     @test r.status == :Optimal
@@ -1136,7 +1136,7 @@ function wsospolyinterpmat1(T; options...)
     @test r.x[1] ≈ -T(4) atol=tol rtol=tol
 end
 
-function wsospolyinterpmat2(T; options...)
+function wsosinterppossemideftri2(T; options...)
     # convexity parameter for x[1] ^ 4 - 3 * x[2] ^ 2
     tol = sqrt(sqrt(eps(T)))
     n = 2
@@ -1153,7 +1153,7 @@ function wsospolyinterpmat2(T; options...)
     G = vcat(ones(T, U, 1), zeros(T, U, 1), ones(T, U, 1))
     h = T[H[i, j](pts[u, :]...) for i in 1:n for j in 1:i for u in 1:U]
     MU.vec_to_svec!(h, sqrt(T(2)), incr = U)
-    cones = CO.Cone{T}[CO.WSOSPolyInterpMat{T}(n, U, [P0])]
+    cones = CO.Cone{T}[CO.WSOSInterpPosSemidefTri{T}(n, U, [P0])]
 
     r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
     @test r.status == :Optimal
@@ -1161,7 +1161,7 @@ function wsospolyinterpmat2(T; options...)
     @test r.x[1] ≈ -T(6) atol=tol rtol=tol
 end
 
-function wsospolyinterpmat3(T; options...)
+function wsosinterppossemideftri3(T; options...)
     # convexity parameter for sum(x .^ 6) - sum(x .^ 2)
     tol = sqrt(sqrt(eps(T)))
     n = 3
@@ -1178,7 +1178,7 @@ function wsospolyinterpmat3(T; options...)
     G = vcat(ones(T, U, 1), zeros(T, U, 1), ones(T, U, 1), zeros(T, U, 1), zeros(T, U, 1), ones(T, U, 1))
     h = T[H[i, j](pts[u, :]...) for i in 1:n for j in 1:i for u in 1:U]
     MU.vec_to_svec!(h, sqrt(T(2)), incr = U)
-    cones = CO.Cone{T}[CO.WSOSPolyInterpMat{T}(n, U, [P0])]
+    cones = CO.Cone{T}[CO.WSOSInterpPosSemidefTri{T}(n, U, [P0])]
 
     r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
     @test r.status == :Optimal
@@ -1186,7 +1186,7 @@ function wsospolyinterpmat3(T; options...)
     @test r.x[1] ≈ -T(2) atol=tol rtol=tol
 end
 
-function wsospolyinterpsoc1(T; options...)
+function wsosinterpepinormeucl1(T; options...)
     # mint t(x) : t(x) ^ 2 >= x ^ 4 on [-1, 1] where t(x) a constant (interpolant coefficients all equal)
     tol = sqrt(sqrt(eps(T)))
     DynamicPolynomials.@polyvar x
@@ -1201,7 +1201,7 @@ function wsospolyinterpsoc1(T; options...)
     b = zeros(T, 3)
     G = vcat(-Matrix{T}(I, U, U), zeros(T, U, U))
     h = vcat(zeros(T, U), T[fn(pts[u, :]...) for u in 1:U])
-    cones = CO.Cone{T}[CO.WSOSPolyInterpSOC{T}(2, U, [P0, PWts...])]
+    cones = CO.Cone{T}[CO.WSOSInterpEpiNormEucl{T}(2, U, [P0, PWts...])]
 
     r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
     @test r.status == :Optimal
@@ -1210,7 +1210,7 @@ function wsospolyinterpsoc1(T; options...)
     @test r.x ≈ ones(T, U) atol=tol rtol=tol
 end
 
-function wsospolyinterpsoc2(T; options...)
+function wsosinterpepinormeucl2(T; options...)
     # min t(x) : t(x) ^ 2 >= x ^ 4 + (x - 1) ^ 2 on [-1, 1]^2 where t(x) a constant (interpolant coefficients all equal)
     tol = sqrt(sqrt(eps(T)))
     DynamicPolynomials.@polyvar x
@@ -1226,7 +1226,7 @@ function wsospolyinterpsoc2(T; options...)
     b = zeros(T, num_A_rows)
     G = vcat(-Matrix{T}(I, U, U), zeros(T, U, U), zeros(T, U, U))
     h = vcat(zeros(T, U), T[fn1(pts[u, :]...) for u in 1:U], T[fn2(pts[u, :]...) for u in 1:U])
-    cones = CO.Cone{T}[CO.WSOSPolyInterpSOC{T}(3, U, [P0, PWts...])]
+    cones = CO.Cone{T}[CO.WSOSInterpEpiNormEucl{T}(3, U, [P0, PWts...])]
 
     r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
     @test r.status == :Optimal
@@ -1235,7 +1235,7 @@ function wsospolyinterpsoc2(T; options...)
     @test r.x ≈ fill(sqrt(T(5)), U) atol=tol rtol=tol
 end
 
-function wsospolyinterpsoc3(T; options...)
+function wsosinterpepinormeucl3(T; options...)
     # min t(x) : t(x) ^ 2 >= x ^ 8 + (y - 1) ^ 2 on [-1, 1]^2 where t(x) a constant (interpolant coefficients all equal)
     tol = sqrt(sqrt(eps(T)))
     DynamicPolynomials.@polyvar x y
@@ -1257,7 +1257,7 @@ function wsospolyinterpsoc3(T; options...)
     b = zeros(T, num_A_rows)
     G = vcat(-Matrix{T}(I, U, U), zeros(T, U, U), zeros(T, U, U))
     h = vcat(zeros(T, U), T[fn1(pts[u, :]...) for u in 1:U], T[fn2(pts[u, :]...) for u in 1:U])
-    cones = CO.Cone{T}[CO.WSOSPolyInterpSOC{T}(3, U, [P0, PWts...])]
+    cones = CO.Cone{T}[CO.WSOSInterpEpiNormEucl{T}(3, U, [P0, PWts...])]
 
     r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
     @test r.status == :Optimal

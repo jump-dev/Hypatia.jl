@@ -72,7 +72,7 @@ function shapeconregrJuMP(
         if !all(iszero, mono_profile)
             gradient_halfdeg = div(deg, 2)
             (mono_U, mono_points, mono_P0, mono_PWts, _) = MU.interpolate(mono_dom, gradient_halfdeg, sample = sample, sample_factor = 50)
-            mono_wsos_cone = HYP.WSOSPolyInterpCone(mono_U, [mono_P0, mono_PWts...])
+            mono_wsos_cone = HYP.WSOSInterpNonnegativeCone(mono_U, [mono_P0, mono_PWts...])
             for j in 1:n
                 if !iszero(mono_profile[j])
                     gradient = DP.differentiate(regressor, DP.variables(regressor)[j])
@@ -85,7 +85,7 @@ function shapeconregrJuMP(
         if !iszero(conv_profile)
             hessian_halfdeg = div(deg - 1, 2)
             (conv_U, conv_points, conv_P0, conv_PWts, _) = MU.interpolate(conv_dom, hessian_halfdeg, sample = sample, sample_factor = 50)
-            conv_wsos_cone = HYP.WSOSPolyInterpMatCone(n, conv_U, [conv_P0, conv_PWts...])
+            conv_wsos_cone = HYP.WSOSInterpPossemidefTriCone(n, conv_U, [conv_P0, conv_PWts...])
             hessian = DP.differentiate(regressor, DP.variables(regressor), 2)
             hessian_interp = hessian[i, j](conv_points[u, :]) for i in 1:n for j in 1:i for u in 1:conv_U]
             JuMP.@constraint(model, conv_profile * MU.vec_to_svec!(hessian_interp, sqrt(2), incr = conv_U) in conv_wsos_cone)

@@ -322,25 +322,25 @@ function test_hyporootdettri_barrier(T::Type{<:Real})
     return
 end
 
-function test_wsospolyinterp_barrier(T::Type{<:Real})
+function test_wsosinterpnonnegative_barrier(T::Type{<:Real})
     Random.seed!(1)
     for (n, halfdeg) in [(1, 1), (1, 2), (1, 3), (2, 1), (2, 2), (3, 1)]
         (U, _, P0, Ps, _) = MU.interpolate(MU.Box{T}(-ones(T, n), ones(T, n)), halfdeg, sample = false) # use a unit box domain
         Ps = vcat([P0], Ps)
         barrier(s) = -sum(logdet(cholesky!(Symmetric(P' * Diagonal(s) * P))) for P in Ps)
-        cone = CO.WSOSPolyInterp{T, T}(U, Ps, true)
+        cone = CO.WSOSInterpNonnegative{T, T}(U, Ps, true)
         test_barrier_oracles(cone, barrier, init_tol = 1e2) # TODO center and test initial points
     end
-    # TODO also test complex case CO.WSOSPolyInterp{T, Complex{T}} - need complex MU interp functions first
+    # TODO also test complex case CO.WSOSInterpNonnegative{T, Complex{T}} - need complex MU interp functions first
     return
 end
 
-function test_wsospolyinterpmat_barrier(T::Type{<:Real})
+function test_wsosinterppossemideftri_barrier(T::Type{<:Real})
     Random.seed!(1)
     for n in 1:3, halfdeg in 1:2, R in 1:3
         (U, _, P0, Ps, _) = MU.interpolate(MU.Box{T}(-ones(T, n), ones(T, n)), halfdeg, sample = false)
         Ps = vcat([P0], Ps)
-        cone = CO.WSOSPolyInterpMat{T}(R, U, Ps, true)
+        cone = CO.WSOSInterpPosSemidefTri{T}(R, U, Ps, true)
         function barrier(s)
             bar = zero(eltype(s))
             rt2i = convert(eltype(s), inv(sqrt(T(2))))
@@ -369,13 +369,12 @@ function test_wsospolyinterpmat_barrier(T::Type{<:Real})
     return
 end
 
-function test_wsospolyinterpsoc_barrier(T::Type{<:Real})
+function test_wsosinterpepinormeucl_barrier(T::Type{<:Real})
     Random.seed!(1)
     for n in 1:2, halfdeg in 1:2, R in 3:3
         (U, _, P0, Ps, _) = MU.interpolate(MU.Box{T}(-ones(T, n), ones(T, n)), halfdeg, sample = false)
         Ps = vcat([P0], Ps)
-        cone = CO.WSOSPolyInterpMat{T}(R, U, Ps, true)
-
+        cone = CO.WSOSInterpEpiNormEucl{T}(R, U, Ps, true)
         function barrier(s)
             bar = zero(eltype(s))
             for P in Ps
