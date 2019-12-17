@@ -384,11 +384,11 @@ function test_wsosinterpepinormeucl_barrier(T::Type{<:Real})
                 uo = U + 1
                 for _ in 2:R
                     slice = s[uo:(uo + U - 1)]
-                    lambda_i = P' * Diagonal(slice) * P
-                    Lambda -= lambda_i * (Lambda1 \ lambda_i)
+                    lambda_i = Symmetric(P' * Diagonal(slice) * P)
+                    Lambda -= Symmetric(lambda_i * (Lambda1 \ lambda_i))
                     uo += U
                 end
-                bar -= logdet(cholesky!(Lambda)) - logdet(cholesky!(Lambda1))
+                bar -= logdet(cholesky!(Lambda)) + logdet(cholesky!(Lambda1))
             end
             return bar
         end
