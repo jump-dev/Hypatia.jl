@@ -129,7 +129,7 @@ polyminreal14(T::Type{<:Real}) = polyminreal(T, :motzkin, 3, use_primal = false)
 polyminreal15(T::Type{<:Real}) = polyminreal(T, :motzkin, 3)
 polyminreal16(T::Type{<:Real}) = polyminreal(T, :reactiondiffusion, 4, use_primal = false)
 polyminreal17(T::Type{<:Real}) = polyminreal(T, :lotkavolterra, 3, use_primal = false)
-polyminreal18(T::Type{<:Real}) = polyminreal(T, :motzkin, 3, use_primal = false, use_wsos = false)
+polyminreal18(T::Type{<:Real}) = polyminreal(T, :motzkin, 3, use_primal = false, use_wsos = true)
 polyminreal19(T::Type{<:Real}) = polyminreal(T, :motzkin, 3, use_primal = false, use_wsos = false)
 polyminreal20(T::Type{<:Real}) = polyminreal(T, :reactiondiffusion, 4, use_primal = false, use_wsos = false)
 polyminreal21(T::Type{<:Real}) = polyminreal(T, :lotkavolterra, 3, use_primal = false, use_wsos = false)
@@ -280,14 +280,15 @@ instances_polymin_linops = [
     polyminreal26,
     ]
 instances_polymin_few = [
-    polyminreal2,
-    polyminreal3,
-    polyminreal12,
-    polyminreal14,
+    # polyminreal2,
+    # polyminreal3,
+    # polyminreal12,
+    # polyminreal14,
     polyminreal18,
-    polyminreal23,
-    polymincomplex7,
-    polymincomplex14,
+    polyminreal19,
+    # polyminreal23,
+    # polymincomplex7,
+    # polymincomplex14,
     ]
 
 function test_polymin(instance::Function; T::Type{<:Real} = Float64, options::NamedTuple = (atol = sqrt(sqrt(eps(T))),), rseed::Int = 1)
