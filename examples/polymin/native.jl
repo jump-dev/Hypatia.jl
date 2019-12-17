@@ -41,19 +41,19 @@ function polyminreal(
         end
         true_obj = NaN
         dom = MU.Box{T}(-ones(T, n), ones(T, n))
-        (U, pts, P0, PWts, _) = MU.interpolate(dom, halfdeg, sample = true)
+        (U, pts, Ps, _) = MU.interpolate(dom, halfdeg, sample = true)
         interp_vals = T.(randn(U))
     else
         (x, fn, dom, true_obj) = getpolydata(polyname, T = T)
         sample = (length(x) >= 5) || !isa(dom, MU.Box)
-        (U, pts, P0, PWts, _) = MU.interpolate(dom, halfdeg, sample = sample)
+        (U, pts, Ps, _) = MU.interpolate(dom, halfdeg, sample = sample)
         # set up problem data
         interp_vals = T[fn(pts[j, :]...) for j in 1:U]
     end
     PWts = convert.(Matrix{T}, PWts)
 
     if use_wsos
-        cones = CO.Cone{T}[CO.WSOSPolyInterp{T, T}(U, [P0, PWts...], !use_primal)]
+        cones = CO.Cone{T}[CO.WSOSPolyInterp{T, T}(U, Ps, !use_primal)]
     else
         # will be set up iteratively
         cones = CO.Cone{T}[]
@@ -88,7 +88,7 @@ function polyminreal(
             h = zeros(T, U)
         else
             G_full = zeros(T, 0, U)
-            for Pk in [P0, PWts...]
+            for Pk in Ps
                 Lk = size(Pk, 2)
                 dk = div(Lk * (Lk + 1), 2)
                 push!(cones, CO.PosSemidefTri{T, T}(dk))

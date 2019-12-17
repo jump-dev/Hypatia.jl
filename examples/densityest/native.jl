@@ -39,15 +39,12 @@ function densityest(
     X ./= (maxX - minX) / 2
 
     halfdeg = div(deg + 1, 2)
-    (U, pts, P0, PWts, w) = MU.interpolate(domain, halfdeg, sample = true, calc_w = true, sample_factor = sample_factor)
+    (U, pts, Ps, w) = MU.interpolate(domain, halfdeg, sample = true, calc_w = true, sample_factor = sample_factor)
     lagrange_polys = MU.recover_lagrange_polys(pts, 2 * halfdeg)
     basis_evals = Matrix{T}(undef, nobs, U)
     for i in 1:nobs, j in 1:U
         basis_evals[i, j] = lagrange_polys[j](X[i, :])
     end
-    # TODO remove below conversions when ModelUtilities can use T <: Real
-    P0 = T.(P0)
-    PWts = convert.(Matrix{T}, PWts)
 
     cones = CO.Cone{T}[]
     cone_offset = 1
@@ -56,39 +53,26 @@ function densityest(
         # U variables
         h_poly = zeros(T, U)
         b_poly = T[]
-        push!(cones, CO.WSOSPolyInterp{T, T}(U, [P0, PWts...]))
+        push!(cones, CO.WSOSPolyInterp{T, T}(U, Ps))
         cone_offset += U
         num_psd_vars = 0
     else
         # U polynomial coefficient variables plus PSD variables
-        # there are n new PSD variables, we will store them scaled, lower triangle, row-wise
-        n = length(PWts) + 1
+        # there are length(Ps) new PSD variables, we will store them scaled, lower triangle, row-wise
+        num_psd_vars = 0
         psd_var_list = Matrix{T}[]
-        L = size(P0, 2)
-        dim = div(L * (L + 1), 2)
-        num_psd_vars = dim
-        # first part of A
-        push!(psd_var_list, zeros(T, U, dim))
-        idx = 1
-        for k in 1:L, l in 1:k
-            # off diagonals are doubled
-            psd_var_list[1][:, idx] = P0[:, k] .* P0[:, l] * (k == l ? 1 : 2)
-            idx += 1
-        end
-        push!(cones, CO.PosSemidefTri{T, T}(dim))
-        cone_offset += dim
-
-        for i in 1:(n - 1)
-            L = size(PWts[i], 2)
+        for i in eachindex(Ps)
+            L = size(Ps[i], 2)
             dim = div(L * (L + 1), 2)
             num_psd_vars += dim
             push!(psd_var_list, zeros(T, U, dim))
             idx = 1
             for k in 1:L, l in 1:k
                 # off diagonals are doubled
-                psd_var_list[i + 1][:, idx] = PWts[i][:, k] .* PWts[i][:, l] * (k == l ? 1 : 2)
+                psd_var_list[i][:, idx] = PWts[i][:, k] .* PWts[i][:, l]
                 idx += 1
             end
+            MU.vec_to_svec_cols!(psd_var_list[i], sqrt(T(2)))
             push!(cones, CO.PosSemidefTri{T, T}(dim))
             cone_offset += dim
         end
