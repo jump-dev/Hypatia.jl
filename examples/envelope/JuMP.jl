@@ -23,17 +23,17 @@ function envelopeJuMP(
     )
     # generate interpolation
     @assert rand_halfdeg <= env_halfdeg
-    (U, pts, P0, PWts, w) = MU.interpolate(domain, env_halfdeg, sample = sample, calc_w = true)
+    (U, pts, Ps, w) = MU.interpolate(domain, env_halfdeg, sample = sample, calc_w = true)
 
     # generate random polynomials
     n = MU.get_dimension(domain)
     L = binomial(n + rand_halfdeg, n)
-    polys = P0[:, 1:L] * rand(-9:9, L, npoly)
+    polys = Ps[1][:, 1:L] * rand(-9:9, L, npoly)
 
     model = JuMP.Model()
     JuMP.@variable(model, fpv[j in 1:U]) # values at Fekete points
     JuMP.@objective(model, Max, dot(fpv, w)) # integral over domain (via quadrature)
-    JuMP.@constraint(model, [i in 1:npoly], polys[:, i] .- fpv in HYP.WSOSPolyInterpCone(U, [P0, PWts...]))
+    JuMP.@constraint(model, [i in 1:npoly], polys[:, i] .- fpv in HYP.WSOSPolyInterpCone(U, Ps))
 
     return (model = model,)
 end
