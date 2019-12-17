@@ -49,17 +49,16 @@ function densityest(
     cones = CO.Cone{T}[]
     cone_offset = 1
 
+    num_psd_vars = 0
     if use_wsos
         # U variables
         h_poly = zeros(T, U)
         b_poly = T[]
         push!(cones, CO.WSOSPolyInterp{T, T}(U, Ps))
         cone_offset += U
-        num_psd_vars = 0
     else
         # U polynomial coefficient variables plus PSD variables
         # there are length(Ps) new PSD variables, we will store them scaled, lower triangle, row-wise
-        num_psd_vars = 0
         psd_var_list = Matrix{T}[]
         for i in eachindex(Ps)
             L = size(Ps[i], 2)
@@ -69,9 +68,11 @@ function densityest(
             idx = 1
             for k in 1:L, l in 1:k
                 # off diagonals are doubled
-                psd_var_list[i][:, idx] = PWts[i][:, k] .* PWts[i][:, l]
+                psd_var_list[i][:, idx] = Ps[i][:, k] .* Ps[i][:, l]
                 idx += 1
             end
+            # we will work with PSD vars with scaled off-diagonals
+            # block in A needs to be scaled by sqrt(2) also
             MU.vec_to_svec_cols!(psd_var_list[i], sqrt(T(2)))
             push!(cones, CO.PosSemidefTri{T, T}(dim))
             cone_offset += dim
@@ -131,11 +132,10 @@ function densityest(
                 [1:U, 1:U, (U + 1):(U + 1)],
                 [(num_hypo_vars + 1):(num_hypo_vars + U), (num_hypo_vars + U + 1):(num_hypo_vars + U + num_psd_vars), (num_hypo_vars + 1):(num_hypo_vars + U)],
             )
-            I_scaled = MU.vec_to_svec_cols!(Diagonal(I * one(T), num_psd_vars), sqrt(T(2)))
             G = BlockMatrix{T}(
                 num_psd_vars + log_rows,
                 num_hypo_vars + U + num_psd_vars,
-                [-I_scaled, G_log],
+                [-I, G_log],
                 [1:num_psd_vars, (num_psd_vars + 1):(num_psd_vars + log_rows)],
                 [(num_hypo_vars + U + 1):(num_hypo_vars + U + num_psd_vars), 1:(num_hypo_vars + U)],
             )
@@ -154,9 +154,8 @@ function densityest(
                 zeros(T, U, num_hypo_vars)    Matrix{T}(-I, U, U)    A_psd;
                 zeros(T, 1, num_hypo_vars)    T.(w')    zeros(T, 1, num_psd_vars);
                 ]
-            I_scaled = MU.vec_to_svec_cols!(Matrix{T}(I, num_psd_vars, num_psd_vars), sqrt(T(2)))
             G = [
-                zeros(T, num_psd_vars, num_hypo_vars + U)  -I_scaled;
+                zeros(T, num_psd_vars, num_hypo_vars + U)  -Matrix{T}(I, num_psd_vars, num_psd_vars);
                 G_log   zeros(T, log_rows, num_psd_vars);
                 ]
         end
