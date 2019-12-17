@@ -50,7 +50,6 @@ function polyminreal(
         # set up problem data
         interp_vals = T[fn(pts[j, :]...) for j in 1:U]
     end
-    PWts = convert.(Matrix{T}, PWts)
 
     if use_wsos
         cones = CO.Cone{T}[CO.WSOSPolyInterp{T, T}(U, Ps, !use_primal)]
