@@ -113,7 +113,7 @@ function update_grad(cone::WSOSInterpNonnegative)
     @inbounds for k in eachindex(cone.Ps)
         LUk = cone.tmpLU[k]
         copyto!(LUk, cone.Ps[k]')
-        ldiv!(LowerTriangular(cone.ΛFs[k].L), LUk)
+        ldiv!(cone.ΛFs[k].L, LUk)
         @inbounds for j in 1:cone.dim
             cone.grad[j] -= sum(abs2, view(LUk, :, j))
         end
@@ -134,7 +134,7 @@ function update_hess(cone::WSOSInterpNonnegative)
             cone.hess.data[i, j] += abs2(UUk[i, j])
         end
     end
-    
+
     cone.hess_updated = true
     return cone.hess
 end
