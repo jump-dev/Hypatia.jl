@@ -188,7 +188,6 @@ function update_grad(cone::WSOSInterpEpiNormEucl{T}) where {T}
             PΛiPs[r][r] .+= UUj
         end
 
-
         # (1, 1)-block
         # gradient is diag of sum(-PΛiPs[i][i] for i in 1:R) + (R - 1) * Lambda_11 - Lambda_11
         # TODO use UUj
