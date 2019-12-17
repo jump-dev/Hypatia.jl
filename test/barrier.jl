@@ -337,58 +337,56 @@ end
 
 function test_wsosinterppossemideftri_barrier(T::Type{<:Real})
     Random.seed!(1)
-    for n in 1:3, halfdeg in 1:2, R in 1:3
+    rt2i = inv(sqrt(T(2)))
+    for n in 1:2, halfdeg in 1:2, R in 1:3
         (U, _, P0, Ps, _) = MU.interpolate(MU.Box{T}(-ones(T, n), ones(T, n)), halfdeg, sample = false)
         Ps = vcat([P0], Ps)
         cone = CO.WSOSInterpPosSemidefTri{T}(R, U, Ps, true)
         function barrier(s)
             bar = zero(eltype(s))
-            rt2i = convert(eltype(s), inv(sqrt(T(2))))
             for P in Ps
                 L = size(P, 2)
-                Lambda = Symmetric(zeros(eltype(s), R * L, R * L), :L)
+                Lambda = zeros(eltype(s), R * L, R * L)
                 uo = 1
                 rows = 1
                 for i in 1:R
                     cols = 1
                     for j in 1:i
-                        slice = s[uo:(uo + U - 1)]
+                        scal = (i == j ? one(T) : rt2i)
+                        Lambda[rows:(rows + L - 1), cols:(cols + L - 1)] = P' * Diagonal(s[uo:(uo + U - 1)]) * P * scal
                         uo += U
-                        fact = (i == j ? one(T) : rt2i)
-                        Lambda.data[rows:(rows + L - 1), cols:(cols + L - 1)] = Symmetric(P' * Diagonal(slice) * P) * fact
                         cols += L
                     end
                     rows += L
                 end
-                bar -= logdet(cholesky!(Lambda))
+                bar -= logdet(cholesky!(Symmetric(Lambda, :L)))
             end
             return bar
         end
-        test_barrier_oracles(cone, barrier, init_tol = Inf, tol = 100eps(T))
+        test_barrier_oracles(cone, barrier, init_tol = Inf)
     end
     return
 end
 
 function test_wsosinterpepinormeucl_barrier(T::Type{<:Real})
     Random.seed!(1)
-    for n in 1:2, halfdeg in 1:2, R in 3:3
+    for n in 1:2, halfdeg in 1:2, R in 2:3
         (U, _, P0, Ps, _) = MU.interpolate(MU.Box{T}(-ones(T, n), ones(T, n)), halfdeg, sample = false)
         Ps = vcat([P0], Ps)
         cone = CO.WSOSInterpEpiNormEucl{T}(R, U, Ps, true)
         function barrier(s)
             bar = zero(eltype(s))
             for P in Ps
-                L = size(P, 2)
-                Lambda1 = Symmetric(P' * Diagonal(s[1:U]) * P)
-                Lambda = copy(Lambda1)
+                Lambda = P' * Diagonal(s[1:U]) * P
+                Lambda1fact = cholesky!(Symmetric(copy(Lambda), :L))
                 uo = U + 1
                 for _ in 2:R
-                    slice = s[uo:(uo + U - 1)]
-                    lambda_i = Symmetric(P' * Diagonal(slice) * P)
-                    Lambda -= Symmetric(lambda_i * (Lambda1 \ lambda_i))
+                    Lambdai = P' * Diagonal(s[uo:(uo + U - 1)]) * P
+                    ldiv!(Lambda1fact.L, Lambdai)
+                    Lambda -= Lambdai' * Lambdai
                     uo += U
                 end
-                bar -= logdet(cholesky!(Lambda)) + logdet(cholesky!(Lambda1))
+                bar -= logdet(cholesky!(Symmetric(Lambda))) + logdet(Lambda1fact)
             end
             return bar
         end
