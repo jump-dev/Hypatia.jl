@@ -40,9 +40,10 @@ mutable struct WSOSInterpEpiNormEucl{T <: Real} <: Cone{T}
     Λ11::Vector{Matrix{T}}
     tmpLL::Vector{Matrix{T}}
     tmpLU::Vector{Matrix{T}}
-    tmpUU::Vector{Matrix{T}}
+    tmpUU::Vector{Matrix{T}} # reused in update_hess
     PΛiPs::Vector{Vector{Vector{Matrix{T}}}}
     lambdafact::Vector
+    point_views
 
     function WSOSInterpEpiNormEucl{T}(
         R::Int,
@@ -97,6 +98,7 @@ function setup_data(cone::WSOSInterpEpiNormEucl{T}) where {T <: Real}
         end
     end
     cone.lambdafact = Vector{Any}(undef, length(Ps))
+    cone.point_views = [view(cone.point, block_idxs(U, i)) for i in 1:R]
     return
 end
 
@@ -121,10 +123,10 @@ function update_feas(cone::WSOSInterpEpiNormEucl)
         mat = cone.mat[j]
         lambdafact = cone.lambdafact
         matfact = cone.matfact
+        point_views = cone.point_views
 
         # first lambda
-        point_pq = cone.point[1:cone.U]
-        @. LUj = Psj' * point_pq'
+        @. LUj = Psj' * point_views[1]'
         mul!(Λ11j, LUj, Psj)
         copyto!(mat, Λ11j)
         lambdafact[j] = cholesky!(Symmetric(Λ11j, :U), check = false)
@@ -133,16 +135,16 @@ function update_feas(cone::WSOSInterpEpiNormEucl)
             break
         end
 
-        # minus others
+        # subtract others
         uo = cone.U + 1
         @inbounds for r in 2:cone.R
-            point_pq = cone.point[uo:(uo + cone.U - 1)] # TODO prealloc
-            @. LUj = Psj' * point_pq'
+            @. LUj = Psj' * point_views[r]'
             mul!(LLj, LUj, Psj)
 
-            # not using lambdafact.L \ lambda because lambdafact \ lambda is useful later
-            Λi_Λ[r - 1] .= lambdafact[j] \ LLj
-            mat -= LLj * Λi_Λ[r - 1]
+            # not using lambdafact.L \ lambda with an syrk because storing lambdafact \ lambda is useful later
+            copyto!(Λi_Λ[r - 1], LLj)
+            ldiv!(lambdafact[j], Λi_Λ[r - 1])
+            mul!(mat, LLj, Λi_Λ[r - 1], -1, true)
             uo += cone.U
         end
 
@@ -182,7 +184,9 @@ function update_grad(cone::WSOSInterpEpiNormEucl{T}) where {T}
         mul!(PΛiPs[1][1], LUj', LUj)
         # get all the PΛiPs that are in row one or on the diagonal
         @inbounds for r in 2:cone.R
-            PΛiPs[r][1] = -Psj * Λi_Λ[r - 1] * (matfact[j] \ Psj')
+            copyto!(LUj, Psj')
+            ldiv!(matfact[j], LUj)
+            PΛiPs[r][1] = -Psj * Λi_Λ[r - 1] * LUj # TODO
             # PΛiPs[r][r] .= Symmetric(Psj * Λi_Λ[r - 1] * (matfact[j] \ (Λi_Λ[r - 1]' * Psj')), :U)
             mul!(LUj, Λi_Λ[r - 1]', Psj')
             ldiv!(matfact[j].L, LUj)
@@ -212,53 +216,64 @@ end
 function update_hess(cone::WSOSInterpEpiNormEucl)
     @assert cone.grad_updated
     hess = cone.hess.data
+    tmp3 = cone.tmp3
 
     hess .= 0
     @inbounds for j in eachindex(cone.Ps)
         Psj = cone.Ps[j]
-        tmp3 = cone.tmp3
         PΛiPs = cone.PΛiPs[j]
         Λi_Λ = cone.Λi_Λ[j]
         matfact = cone.matfact
         UUj = cone.tmpUU[j]
+        LUj = cone.tmpLU[j]
+        LLj = cone.tmpLL[j]
 
         # get the PΛiPs not calculated in update_grad
         @inbounds for r in 2:cone.R, r2 in 2:(r - 1)
-            PΛiPs[r][r2] .= Psj * Λi_Λ[r - 1] * (matfact[j] \ (Λi_Λ[r2 - 1]' * Psj'))
+            mul!(LUj, Λi_Λ[r2 - 1]', Psj')
+            ldiv!(matfact[j], LUj)
+            PΛiPs[r][r2] .= Psj * Λi_Λ[r - 1] * LUj # TODO
         end
 
         @inbounds for i in 1:cone.U, k in 1:i
             hess[k, i] -= abs2(UUj[k, i]) * (cone.R - 2)
         end
 
-        @. hess[1:cone.U, 1:cone.U] += PΛiPs[1][1]^2
+        @. hess[1:cone.U, 1:cone.U] += abs2(PΛiPs[1][1])
         @inbounds for r in 2:cone.R
-            idxs2 = ((r - 1) * cone.U + 1):(r * cone.U)
+            idxs = block_idxs(cone.U, r)
             @inbounds for s in 1:(r - 1)
                 # block (1,1)
-                tmp3 .= PΛiPs[r][s].^2
-                hess[1:cone.U, 1:cone.U] .+= Symmetric(tmp3 + tmp3', :U)
+                @. tmp3 = abs2(PΛiPs[r][s])
+                # safe to ovewrite UUj now
+                @. UUj = tmp3 + tmp3'
+                @. hess[1:cone.U, 1:cone.U] += UUj
                 # blocks (1,r)
-                @. hess[1:cone.U, idxs2] += 2 * PΛiPs[s][1] * PΛiPs[r][s]'
+                @. hess[1:cone.U, idxs] += PΛiPs[s][1] * PΛiPs[r][s]'
             end
             # block (1,1)
-            @. hess[1:cone.U, 1:cone.U] += PΛiPs[r][r]^2
+            @. hess[1:cone.U, 1:cone.U] += abs2(PΛiPs[r][r])
             # blocks (1,r)
-            @. hess[1:cone.U, idxs2] += 2 * PΛiPs[r][1] * PΛiPs[r][r]
+            @. hess[1:cone.U, idxs] += PΛiPs[r][1] * PΛiPs[r][r]
             # blocks (1,r)
             @inbounds for s in (r + 1):cone.R
-                @. hess[1:cone.U, idxs2] += 2 * PΛiPs[s][1] * PΛiPs[s][r]
+                @. hess[1:cone.U, idxs] += PΛiPs[s][1] * PΛiPs[s][r]
             end
 
             # blocks (r, r2)
-            idxs = ((r - 1) * cone.U + 1):(r * cone.U)
-            hess[idxs, idxs2] .+= 2 * Symmetric(Symmetric(PΛiPs[1][1], :U) .* Symmetric(PΛiPs[r][r], :U) + PΛiPs[r][1] .* PΛiPs[r][1]', :U)
+            # NOTE for hess[idxs, idxs], tmp3 and UUj are symmetric
+            @. tmp3 = PΛiPs[r][1] * PΛiPs[r][1]'
+            @. UUj = PΛiPs[1][1] * PΛiPs[r][r]
+            @. hess[idxs, idxs] += tmp3 + UUj
             @inbounds for r2 in (r + 1):cone.R
-                idxs2 = ((r2 - 1) * cone.U + 1):(r2 * cone.U)
-                hess[idxs, idxs2] .+= 2 * (PΛiPs[1][1] .* PΛiPs[r2][r]' + PΛiPs[r][1] .* PΛiPs[r2][1]')
+                @. tmp3 = PΛiPs[r][1] * PΛiPs[r2][1]'
+                @. UUj = PΛiPs[1][1] * PΛiPs[r2][r]'
+                idxs2 = block_idxs(cone.U, r2)
+                @. hess[idxs, idxs2] += tmp3 + UUj
             end
         end
     end
+    @. hess[:, (cone.U + 1):cone.dim] *= 2
 
     cone.hess_updated = true
     return cone.hess
