@@ -38,7 +38,6 @@ include("wsospolyinterp.jl")
 # include("wsospolyinterpsoc.jl")
 
 use_dual(cone::Cone) = cone.use_dual
-load_point(cone::Cone, point::AbstractVector{T}, scal::T) where {T} = (@. cone.point = point / scal)
 load_point(cone::Cone, point::AbstractVector) = copyto!(cone.point, point)
 dimension(cone::Cone) = cone.dim
 

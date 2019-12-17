@@ -125,7 +125,7 @@ mutable struct Solver{T <: Real}
     s_temp::Vector{T}
     primal_views
     dual_views
-    nbhd_temp
+    nbhd_temp::Vector
     cones_infeas::Vector{Bool}
     cones_loaded::Vector{Bool}
 
