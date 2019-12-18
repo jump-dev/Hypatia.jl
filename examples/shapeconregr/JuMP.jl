@@ -88,7 +88,7 @@ function shapeconregrJuMP(
             conv_wsos_cone = HYP.WSOSInterpPossemidefTriCone(n, conv_U, conv_Ps)
             hessian = DP.differentiate(regressor, DP.variables(regressor), 2)
             hessian_interp = [hessian[i, j](conv_points[u, :]) for i in 1:n for j in 1:i for u in 1:conv_U]
-            JuMP.@constraint(model, conv_profile * MU.vec_to_svec!(hessian_interp, sqrt(2), incr = conv_U) in conv_wsos_cone)
+            JuMP.@constraint(model, conv_profile * MU.vec_to_svec!(hessian_interp, incr = conv_U) in conv_wsos_cone)
         end
     else
         DP.@polyvar x[1:n]
@@ -237,7 +237,7 @@ test_shapeconregrJuMP(; options...) = test_shapeconregrJuMP.([
     (shapeconregrJuMP2, NaN),
     (shapeconregrJuMP4, NaN),
     (shapeconregrJuMP6, NaN),
-    (shapeconregrJuMP12, NaN),
+    # (shapeconregrJuMP12, NaN), # TODO fix slowness
     (shapeconregrJuMP15, NaN),
     (shapeconregrJuMP16, NaN),
     (shapeconregrJuMP17, NaN),

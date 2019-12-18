@@ -97,7 +97,7 @@ function polyminreal(
                     @. Gk[l, :] = -Pk[:, i] * Pk[:, j]
                     l += 1
                 end
-                MU.vec_to_svec_cols!(Gk, sqrt(T(2)))
+                MU.vec_to_svec!(Gk, rt2 = sqrt(T(2)))
                 G_full = vcat(G_full, Gk)
             end
             if use_linops
@@ -127,11 +127,11 @@ polyminreal11(T::Type{<:Real}) = polyminreal(T, :butcher, 2)
 polyminreal12(T::Type{<:Real}) = polyminreal(T, :goldsteinprice_ellipsoid, 7)
 polyminreal13(T::Type{<:Real}) = polyminreal(T, :goldsteinprice_ball, 7)
 polyminreal14(T::Type{<:Real}) = polyminreal(T, :motzkin, 3, use_primal = true, use_wsos = true)
-# polyminreal15(T::Type{<:Real}) = polyminreal(T, :motzkin, 3, use_primal = true, use_wsos = false)
+polyminreal15(T::Type{<:Real}) = polyminreal(T, :motzkin, 3, use_primal = true, use_wsos = false)
 polyminreal16(T::Type{<:Real}) = polyminreal(T, :motzkin, 3, use_primal = false, use_wsos = true)
 polyminreal17(T::Type{<:Real}) = polyminreal(T, :motzkin, 3, use_primal = false, use_wsos = false)
 polyminreal18(T::Type{<:Real}) = polyminreal(T, :reactiondiffusion, 4, use_primal = true, use_wsos = true)
-# polyminreal19(T::Type{<:Real}) = polyminreal(T, :reactiondiffusion, 4, use_primal = true, use_wsos = false)
+polyminreal19(T::Type{<:Real}) = polyminreal(T, :reactiondiffusion, 4, use_primal = true, use_wsos = false)
 polyminreal20(T::Type{<:Real}) = polyminreal(T, :lotkavolterra, 3, use_primal = false, use_wsos = true)
 polyminreal21(T::Type{<:Real}) = polyminreal(T, :lotkavolterra, 3, use_primal = false, use_wsos = false)
 polyminreal22(T::Type{<:Real}) = polyminreal(T, :random, 2, use_primal = true, use_wsos = true, n = 5, use_linops = true)

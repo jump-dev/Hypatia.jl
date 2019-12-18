@@ -6,6 +6,8 @@ utilities for constructing Hypatia native models and PolyJuMP.jl models
 
 module ModelUtilities
 
+const RealOrComplex{T <: Real} = Union{T, Complex{T}}
+
 include("domains.jl")
 
 using LinearAlgebra
@@ -20,27 +22,35 @@ import SemialgebraicSets
 const SAS = SemialgebraicSets
 include("semialgebraicsets.jl")
 
-# utilities for symmetric matrix scalings
-function vec_to_svec!(vec::AbstractVector, rt2::Number; incr::Int = 1)
-    n = length(vec)
+# utilities for in-place vector and matrix rescalings for svec form
+function vec_to_svec!(arr::AbstractVecOrMat; rt2 = sqrt(2), incr::Int = 1)
+    n = size(arr, 1)
     @assert iszero(rem(n, incr))
     side = round(Int, sqrt(0.25 + 2 * div(n, incr)) - 0.5)
     k = 1
-    @inbounds for i in 1:side
+    for i in 1:side
         for j in 1:(i - 1)
-            vec[k:(k + incr - 1)] *= rt2
+            @. arr[k:(k + incr - 1), :] *= rt2
             k += incr
         end
         k += incr
     end
-    return vec
+    return arr
 end
 
-function vec_to_svec_cols!(A::AbstractMatrix, rt2::Number; incr::Int = 1)
-    @inbounds for j in 1:size(A, 2)
-        @views vec_to_svec!(A[:, j], rt2, incr = incr)
+function svec_to_vec!(arr::AbstractVecOrMat; rt2 = sqrt(2), incr::Int = 1)
+    n = size(arr, 1)
+    @assert iszero(rem(n, incr))
+    side = round(Int, sqrt(0.25 + 2 * div(n, incr)) - 0.5)
+    k = 1
+    for i in 1:side
+        for j in 1:(i - 1)
+            @. arr[k:(k + incr - 1), :] /= rt2
+            k += incr
+        end
+        k += incr
     end
-    return A
+    return arr
 end
 
 end
