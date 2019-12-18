@@ -190,8 +190,7 @@ function update_grad(cone::WSOSInterpEpiNormEucl{T}) where {T}
         mul!(PΛiPs[1][1], LUk', LUk)
         # get all the PΛiPs that are in row one or on the diagonal
         @inbounds for r in 2:R
-            copyto!(LUk, Psk')
-            ldiv!(matfact[k], LUk)
+            ldiv!(LUk, matfact[k], Psk')
             mul!(LUk2, Λi_Λ[r - 1], LUk)
             mul!(PΛiPs[r][1], Psk, LUk2, -1, false)
             # PΛiPs[r][r] .= Symmetric(Psk * Λi_Λ[r - 1] * (matfact[k] \ (Λi_Λ[r - 1]' * Psk')), :U)
