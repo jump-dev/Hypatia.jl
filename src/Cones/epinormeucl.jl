@@ -124,27 +124,6 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNorm
     return prod
 end
 
-# function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormEucl)
-#     @assert cone.is_feas
-#
-#     if cone.use_scaling
-#         hyperbolic_householder(prod, arr, cone.nt_point, cone.rt_dist_ratio, Winv = true)
-#     else
-#         p1 = cone.point[1]
-#         @views p2 = cone.point[2:end]
-#         @inbounds for j in 1:size(prod, 2)
-#             arr_1j = arr[1, j]
-#             @views arr_2j = arr[2:end, j]
-#             ga = 2 * (dot(p2, arr_2j) - p1 * arr_1j) / cone.dist
-#             prod[1, j] = -ga * p1 - arr_1j
-#             @. prod[2:end, j] = ga * p2 + arr_2j
-#         end
-#         @. prod ./= cone.dist
-#     end
-#
-#     return prod
-# end
-
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormEucl)
     @assert cone.is_feas
 
