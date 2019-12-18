@@ -1151,7 +1151,7 @@ function wsosinterppossemideftri2(T; options...)
     # the "one" polynomial on the diagonal
     G = vcat(ones(T, U, 1), zeros(T, U, 1), ones(T, U, 1))
     h = T[H[i, j](pts[u, :]...) for i in 1:n for j in 1:i for u in 1:U]
-    MU.vec_to_svec!(h, sqrt(T(2)), incr = U)
+    MU.vec_to_svec!(h, incr = U)
     cones = CO.Cone{T}[CO.WSOSInterpPosSemidefTri{T}(n, U, Ps)]
 
     r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
@@ -1176,7 +1176,7 @@ function wsosinterppossemideftri3(T; options...)
     # the "one" polynomial on the diagonal
     G = vcat(ones(T, U, 1), zeros(T, U, 1), ones(T, U, 1), zeros(T, U, 1), zeros(T, U, 1), ones(T, U, 1))
     h = T[H[i, j](pts[u, :]...) for i in 1:n for j in 1:i for u in 1:U]
-    MU.vec_to_svec!(h, sqrt(T(2)), incr = U)
+    MU.vec_to_svec!(h, incr = U)
     cones = CO.Cone{T}[CO.WSOSInterpPosSemidefTri{T}(n, U, Ps)]
 
     r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)

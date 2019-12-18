@@ -35,6 +35,7 @@ function matrixcompletion(
     )
     @assert m <= n
     mn = m * n
+    rt2 = sqrt(T(2))
 
     num_known = round(Int, mn * 0.1)
     known_rows = rand(1:m, num_known)
@@ -124,11 +125,11 @@ function matrixcompletion(
                     G_norm[offset + idx, num_unknown + num_W1_vars + W2_var_idx] = -1
                 end
             end
-            MU.vec_to_svec_cols!(G_norm, sqrt(T(2)))
-            MU.vec_to_svec!(h_norm, sqrt(T(2)))
+            MU.vec_to_svec!(G_norm, rt2 = rt2)
+            MU.vec_to_svec!(h_norm, rt2 = rt2)
             cones = CO.Cone{T}[CO.PosSemidefTri{T, T}(num_rows)]
-            c_W1 = CO.smat_to_svec!(zeros(T, num_W1_vars), Diagonal(one(T) * I, m), sqrt(T(2)))
-            c_W2 = CO.smat_to_svec!(zeros(T, num_W2_vars), Diagonal(one(T) * I, n), sqrt(T(2)))
+            c_W1 = CO.smat_to_svec!(zeros(T, num_W1_vars), Diagonal(one(T) * I, m), rt2)
+            c_W2 = CO.smat_to_svec!(zeros(T, num_W2_vars), Diagonal(one(T) * I, n), rt2)
             c = vcat(zeros(T, num_unknown), c_W1, c_W2) / 2
         else
             # extended formulation for spectral norm
@@ -164,8 +165,8 @@ function matrixcompletion(
                 idx += i
                 G_norm[offset + idx - 1, 1] = -1
             end
-            MU.vec_to_svec_cols!(G_norm, sqrt(T(2)))
-            MU.vec_to_svec!(h_norm, sqrt(T(2)))
+            MU.vec_to_svec!(G_norm, rt2 = rt2)
+            MU.vec_to_svec!(h_norm, rt2 = rt2)
             cones = CO.Cone{T}[CO.PosSemidefTri{T, T}(num_rows)]
             c = vcat(one(T), zeros(T, num_unknown))
         end

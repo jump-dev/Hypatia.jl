@@ -97,7 +97,7 @@ test_densityestJuMP_all(; options...) = test_densityestJuMP.([
 
 test_densityestJuMP(; options...) = test_densityestJuMP.([
     densityestJuMP1,
-    densityestJuMP3,
+    # densityestJuMP3, # TODO fix slowness
     densityestJuMP5,
     densityestJuMP6,
     ], options = options)

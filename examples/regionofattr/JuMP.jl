@@ -88,5 +88,5 @@ test_regionofattrJuMP_all(; options...) = test_regionofattrJuMP.([
 
 test_regionofattrJuMP(; options...) = test_regionofattrJuMP.([
     regionofattrJuMP1,
-    regionofattrJuMP2,
+    # regionofattrJuMP2, # TODO fix slowness
     ], options = options)

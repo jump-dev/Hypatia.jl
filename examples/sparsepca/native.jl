@@ -43,10 +43,9 @@ function sparsepca(
         true_obj = NaN
     end
 
-    rt2 = sqrt(T(2))
     dimx = div(p * (p + 1), 2)
     # x will be the svec (lower triangle, row-wise) of the matrix solution we seek
-    c = CO.smat_to_svec!(zeros(T, dimx), -sigma, rt2)
+    c = CO.smat_to_svec!(zeros(T, dimx), -sigma, sqrt(T(2)))
     b = T[1]
     A = zeros(T, 1, dimx)
     for i in 1:p
@@ -64,7 +63,7 @@ function sparsepca(
         else
             Gl1 = -Matrix{T}(I, dimx, dimx)
         end
-        MU.vec_to_svec_cols!(Gl1, rt2)
+        MU.vec_to_svec!(Gl1, rt2 = sqrt(T(2)))
         if use_linops
             G = BlockMatrix{T}(
                 2 * dimx + 1,
@@ -85,7 +84,7 @@ function sparsepca(
         push!(cones, CO.EpiNormInf{T, T}(1 + dimx, true))
     else
         id = Matrix{T}(I, dimx, dimx)
-        l1 = MU.vec_to_svec!(ones(T, dimx), rt2)
+        l1 = MU.vec_to_svec!(ones(T, dimx), rt2 = sqrt(T(2)))
         if use_linops
             A = BlockMatrix{T}(
                 dimx + 1,
