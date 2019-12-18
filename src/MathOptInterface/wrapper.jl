@@ -320,11 +320,9 @@ function MOI.copy_to(
     end
 
     # single nonnegative cone
+    opt.nonpos_idxs = (nonpos_start + 1):q
     if q > nonneg_start
         push!(cones, Cones.Nonnegative{T}(q - nonneg_start))
-
-        # save indices of nonpositive-like constraints
-        opt.nonpos_idxs = (nonpos_start + 1):q
     end
 
     # build up one L_infinity norm cone from two-sided interval constraints
@@ -412,19 +410,19 @@ function MOI.copy_to(
             dim = MOI.output_dimension(fi)
             conei = cone_from_moi(T, si)
             if F == MOI.VectorOfVariables
-                append!(JG, idx_map[vj].value for vj in fi.variables)
                 IGi = (q + 1):(q + dim)
-                VGi = -ones(T, dim)
+                JGi = (idx_map[vj].value for vj in fi.variables)
+                VGi = get_affine_data_vov(conei, dim)
             else
-                append!(JG, idx_map[vt.scalar_term.variable_index].value for vt in fi.terms)
                 IGi = [q + vt.output_index for vt in fi.terms]
-                VGi = [-vt.scalar_term.coefficient for vt in fi.terms]
+                JGi = (idx_map[vt.scalar_term.variable_index].value for vt in fi.terms)
                 Ihi = (q + 1):(q + dim)
-                Vhi = fi.constants
+                (VGi, Vhi) = get_affine_data_vaf(conei, fi, dim)
                 append!(Ih, Ihi)
                 append!(Vh, Vhi)
             end
             append!(IG, IGi)
+            append!(JG, JGi)
             append!(VG, VGi)
             push!(cones, conei)
             q += dim
@@ -461,8 +459,9 @@ function MOI.optimize!(opt::Optimizer{T}) where {T <: Real}
     opt.s[opt.nonpos_idxs] .*= -1
     opt.z[opt.nonpos_idxs] .*= -1
     opt.s[opt.interval_idxs] ./= opt.interval_scales
-    for (cone_k, idxs_k) in zip(model.cones, Models.get_cone_idxs(r.model))
-        @views untransform_cone_vec(cone_k, opt.s[idxs_k], opt.z[idxs_k])
+    for (cone, idxs) in zip(model.cones, Models.get_cone_idxs(r.model))
+        @views untransform_cone_vec(cone, opt.s[idxs])
+        @views untransform_cone_vec(cone, opt.z[idxs])
     end
     opt.constr_prim_cone .+= opt.s
     opt.z[opt.interval_idxs] .*= opt.interval_scales
