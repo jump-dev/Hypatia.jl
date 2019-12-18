@@ -5,19 +5,19 @@ Copyright 2019, Chris Coey and contributors
 include(joinpath(@__DIR__, "moi.jl"))
 
 system_solvers = [
-    # SO.NaiveDenseSystemSolver,
+    SO.NaiveDenseSystemSolver,
     # SO.NaiveSparseSystemSolver,
     # SO.NaiveIndirectSystemSolver,
-    # SO.NaiveElimDenseSystemSolver,
+    SO.NaiveElimDenseSystemSolver,
     # SO.NaiveElimSparseSystemSolver,
-    # SO.SymIndefDenseSystemSolver,
+    SO.SymIndefDenseSystemSolver,
     # SO.SymIndefSparseSystemSolver,
     SO.QRCholDenseSystemSolver,
     ]
 
 real_types = [
     Float64,
-    # BigFloat, # TODO test this when MOI allows
+    # BigFloat, # TODO test when MOI allows
     ]
 
 @info("starting MOI tests")
