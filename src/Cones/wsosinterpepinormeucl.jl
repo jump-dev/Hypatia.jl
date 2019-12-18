@@ -195,7 +195,7 @@ function update_grad(cone::WSOSInterpEpiNormEucl{T}) where {T}
             mul!(LUk, Λi_Λ[r - 1]', Psk')
             ldiv!(matfact[k].L, LUk)
             mul!(PΛiPs[r][r], LUk', LUk)
-            PΛiPs[r][r] .+= UUk
+            @. PΛiPs[r][r] += UUk
         end
 
         # (1, 1)-block
