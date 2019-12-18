@@ -23,6 +23,7 @@ mutable struct Optimizer{T <: Real} <: MOI.AbstractOptimizer
     constr_prim_eq::Vector{T}
     constr_offset_cone::Vector{Int}
     constr_prim_cone::Vector{T}
+    nonpos_idxs::UnitRange{Int}
     interval_idxs::UnitRange{Int}
     interval_scales::Vector{T}
 
@@ -64,7 +65,7 @@ MOI.supports_constraint(::Optimizer{T},
     ) where {T <: Real} = true
 MOI.supports_constraint(::Optimizer{T},
     ::Type{<:Union{MOI.VectorOfVariables, MOI.VectorAffineFunction{T}}},
-    ::Type{<:Union{MOI.Zeros, MOI.Nonnegatives, MOIOtherCones{T}}}
+    ::Type{<:Union{MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives, MOIOtherCones{T}}}
     ) where {T <: Real} = true
 
 # build representation as min c'x s.t. A*x = b, h - G*x in K
@@ -193,13 +194,10 @@ function MOI.copy_to(
     constr_offset_cone = Vector{Int}()
     cones = Cones.Cone{T}[]
 
-
-
-
-
     # build up one nonnegative cone from LP constraints
     nonneg_start = q
 
+    # nonnegative-like constraints
     for ci in get_src_cons(MOI.SingleVariable, MOI.GreaterThan{T})
         i += 1
         idx_map[ci] = MOI.ConstraintIndex{MOI.SingleVariable, MOI.GreaterThan{T}}(i)
@@ -259,16 +257,7 @@ function MOI.copy_to(
         q += dim
     end
 
-    if q > nonneg_start
-        # exists at least one nonnegative constraint
-        push!(cones, Cones.Nonnegative{T}(q - nonneg_start))
-    end
-
-
-
-    # TODO remove nonpositive cone - use nonnegative cone as above
-
-    # build up one nonpositive cone
+    # nonpositive-like constraints
     nonpos_start = q
 
     for ci in get_src_cons(MOI.SingleVariable, MOI.LessThan{T})
@@ -278,9 +267,9 @@ function MOI.copy_to(
         q += 1
         push!(IG, q)
         push!(JG, idx_map[get_con_fun(ci).variable].value)
-        push!(VG, -1)
+        push!(VG, 1)
         push!(Ih, q)
-        push!(Vh, -get_con_set(ci).upper)
+        push!(Vh, get_con_set(ci).upper)
         push!(Vcpc, get_con_set(ci).upper)
         push!(Icpc, q)
     end
@@ -294,10 +283,10 @@ function MOI.copy_to(
         for vt in fi.terms
             push!(IG, q)
             push!(JG, idx_map[vt.variable_index].value)
-            push!(VG, -vt.coefficient)
+            push!(VG, vt.coefficient)
         end
         push!(Ih, q)
-        push!(Vh, fi.constant - get_con_set(ci).upper)
+        push!(Vh, -fi.constant + get_con_set(ci).upper)
         push!(Vcpc, get_con_set(ci).upper)
         push!(Icpc, q)
     end
@@ -310,7 +299,7 @@ function MOI.copy_to(
             q += 1
             push!(IG, q)
             push!(JG, idx_map[vj].value)
-            push!(VG, -1)
+            push!(VG, 1)
         end
     end
 
@@ -323,23 +312,20 @@ function MOI.copy_to(
         for vt in fi.terms
             push!(IG, q + vt.output_index)
             push!(JG, idx_map[vt.scalar_term.variable_index].value)
-            push!(VG, -vt.scalar_term.coefficient)
+            push!(VG, vt.scalar_term.coefficient)
         end
         append!(Ih, (q + 1):(q + dim))
-        append!(Vh, fi.constants)
+        append!(Vh, -fi.constants)
         q += dim
     end
 
-    if q > nonpos_start
-        # exists at least one nonpositive constraint
-        error("broken")
-        push!(cones, Cones.Nonpositive{T}(q - nonpos_start))
+    # single nonnegative cone
+    if q > nonneg_start
+        push!(cones, Cones.Nonnegative{T}(q - nonneg_start))
+
+        # save indices of nonpositive-like constraints
+        opt.nonpos_idxs = (nonpos_start + 1):q
     end
-
-
-
-
-
 
     # build up one L_infinity norm cone from two-sided interval constraints
     interval_start = q
@@ -415,8 +401,7 @@ function MOI.copy_to(
         push!(cones, Cones.EpiNormInf{T, T}(q - interval_start))
     end
 
-    # add non-LP conic constraints
-
+    # non-LP conic constraints
     for S in MOIOtherConesList(T), F in (MOI.VectorOfVariables, MOI.VectorAffineFunction{T})
         for ci in get_src_cons(F, S)
             i += 1
@@ -448,6 +433,7 @@ function MOI.copy_to(
 
     push!(constr_offset_cone, q)
 
+    # finalize
     model_G = dropzeros!(sparse(IG, JG, VG, q, n))
     model_h = Vector(sparsevec(Ih, Vh, q))
 
@@ -472,11 +458,13 @@ function MOI.optimize!(opt::Optimizer{T}) where {T <: Real}
     opt.y = r.y
     opt.s = r.s
     opt.z = r.z
+    opt.s[opt.nonpos_idxs] .*= -1
+    opt.z[opt.nonpos_idxs] .*= -1
     opt.s[opt.interval_idxs] ./= opt.interval_scales
     for (cone_k, idxs_k) in zip(model.cones, Models.get_cone_idxs(r.model))
         @views untransform_cone_vec(cone_k, opt.s[idxs_k], opt.z[idxs_k])
     end
-    opt.constr_prim_cone += opt.s
+    opt.constr_prim_cone .+= opt.s
     opt.z[opt.interval_idxs] .*= opt.interval_scales
 
     return
