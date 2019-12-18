@@ -427,21 +427,21 @@ function check_nbhd(
     return true
 end
 
-# TODO experimental for BlockMatrix LHS: if block is a Cone then define mul as hessian product, if block is solver then define mul by mu/tau/tau
-# TODO optimize... maybe need for each cone a 5-arg hess prod
-import LinearAlgebra.mul!
-
-function mul!(y::AbstractVecOrMat{T}, A::Cones.Cone{T}, x::AbstractVecOrMat{T}, alpha::Number, beta::Number) where {T <: Real}
-    # TODO in-place
-    ytemp = y * beta
-    Cones.hess_prod!(y, x, A)
-    rmul!(y, alpha)
-    y .+= ytemp
-    return y
-end
-
-function mul!(y::AbstractVecOrMat{T}, solver::Solvers.Solver{T}, x::AbstractVecOrMat{T}, alpha::Number, beta::Number) where {T <: Real}
-    rmul!(y, beta)
-    @. y += alpha * x / solver.tau * solver.mu / solver.tau
-    return y
-end
+# # TODO experimental for BlockMatrix LHS: if block is a Cone then define mul as hessian product, if block is solver then define mul by mu/tau/tau
+# # TODO optimize... maybe need for each cone a 5-arg hess prod
+# import LinearAlgebra.mul!
+#
+# function mul!(y::AbstractVecOrMat{T}, A::Cones.Cone{T}, x::AbstractVecOrMat{T}, alpha::Number, beta::Number) where {T <: Real}
+#     # TODO in-place
+#     ytemp = y * beta
+#     Cones.hess_prod!(y, x, A)
+#     rmul!(y, alpha)
+#     y .+= ytemp
+#     return y
+# end
+#
+# function mul!(y::AbstractVecOrMat{T}, solver::Solvers.Solver{T}, x::AbstractVecOrMat{T}, alpha::Number, beta::Number) where {T <: Real}
+#     rmul!(y, beta)
+#     @. y += alpha * x / solver.tau * solver.mu / solver.tau
+#     return y
+# end

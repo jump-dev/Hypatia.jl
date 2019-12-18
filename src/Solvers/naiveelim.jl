@@ -52,10 +52,12 @@ function solve_system(system_solver::NaiveElimSystemSolver{T}, solver::Solver{T}
         elseif system_solver.use_inv_hess
             # -G_k*x + (mu*H_k)\z_k + h_k*tau = zrhs_k + (mu*H_k)\srhs_k
             @views Cones.inv_hess_prod!(rhs4[z_rows_k, :], rhs[s_rows_k, :], cone_k)
+            @. rhs4[z_rows_k, :] /= solver.mu
             @. @views rhs4[z_rows_k, :] += rhs[z_rows_k, :]
         else
             # -mu*H_k*G_k*x + z_k + mu*H_k*h_k*tau = mu*H_k*zrhs_k + srhs_k
             @views Cones.hess_prod!(rhs4[z_rows_k, :], rhs[z_rows_k, :], cone_k)
+            @. rhs4[z_rows_k, :] *= solver.mu
             @. @views rhs4[z_rows_k, :] += rhs[s_rows_k, :]
         end
     end
@@ -188,10 +190,15 @@ end
 
 function update_fact(system_solver::NaiveElimSparseSystemSolver, solver::Solver)
     for (k, cone_k) in enumerate(solver.model.cones)
-        H = (Cones.use_dual(cone_k) ? Cones.hess(cone_k) : Cones.inv_hess(cone_k))
+        H_k = (Cones.use_dual(cone_k) ? Cones.hess(cone_k) : Cones.inv_hess(cone_k))
         for j in 1:Cones.dimension(cone_k)
-            nz_rows = (Cones.use_dual(cone_k) ? Cones.hess_nz_idxs_col(cone_k, j, false) : Cones.inv_hess_nz_idxs_col(cone_k, j, false))
-            @views copyto!(system_solver.lhs4.nzval[system_solver.hess_idxs[k][j]], H[nz_rows, j])
+            if Cones.use_dual(cone_k)
+                nz_rows = Cones.hess_nz_idxs_col(cone_k, j, false)
+                @. @views system_solver.lhs4.nzval[system_solver.hess_idxs[k][j]] = H_k[nz_rows, j] * solver.mu
+            else
+                nz_rows = Cones.inv_hess_nz_idxs_col(cone_k, j, false)
+                @. @views system_solver.lhs4.nzval[system_solver.hess_idxs[k][j]] = H_k[nz_rows, j] / solver.mu
+            end
         end
     end
     system_solver.lhs4.nzval[end] = solver.mu / solver.tau / solver.tau
@@ -259,15 +266,19 @@ function update_fact(system_solver::NaiveElimDenseSystemSolver{T}, solver::Solve
         z_rows_k = (n + p) .+ idxs_k
         if Cones.use_dual(cone_k)
             # -G_k*x + mu*H_k*z_k + h_k*tau = zrhs_k + srhs_k
-            lhs4[z_rows_k, z_rows_k] .= Cones.hess(cone_k)
+            H_k = Cones.hess(cone_k)
+            @. lhs4[z_rows_k, z_rows_k] = solver.mu * H_k
         elseif system_solver.use_inv_hess
             # -G_k*x + (mu*H_k)\z_k + h_k*tau = zrhs_k + (mu*H_k)\srhs_k
-            lhs4[z_rows_k, z_rows_k] .= Cones.inv_hess(cone_k)
+            Hi_k = Cones.inv_hess(cone_k)
+            @. lhs4[z_rows_k, z_rows_k] = Hi_k / solver.mu
         else
             # -mu*H_k*G_k*x + z_k + mu*H_k*h_k*tau = mu*H_k*zrhs_k + srhs_k
             @views Cones.hess_prod!(lhs4[z_rows_k, 1:n], model.G[idxs_k, :], cone_k)
+            @. lhs4[z_rows_k, 1:n] *= solver.mu
             @. lhs4[z_rows_k, 1:n] *= -1
             @views Cones.hess_prod!(lhs4[z_rows_k, end], model.h[idxs_k], cone_k)
+            @. lhs4[z_rows_k, end] *= solver.mu
         end
     end
 
