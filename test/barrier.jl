@@ -114,7 +114,7 @@ end
 
 function test_nonnegative_barrier(T::Type{<:Real})
     barrier = (s -> -sum(log, s))
-    for dim in [1, 3, 6]
+    for dim in [1, 2, 3, 6]
         test_barrier_oracles(CO.Nonnegative{T}(dim), barrier)
     end
     return
@@ -145,7 +145,7 @@ function test_epinormeucl_barrier(T::Type{<:Real})
         (u, w) = (s[1], s[2:end])
         return -log(abs2(u) - sum(abs2, w))
     end
-    for dim in [2, 4]
+    for dim in [2, 3, 4, 6]
         test_barrier_oracles(CO.EpiNormEucl{T}(dim), barrier)
     end
     return
@@ -156,7 +156,7 @@ function test_epipersquare_barrier(T::Type{<:Real})
         (u, v, w) = (s[1], s[2], s[3:end])
         return -log(2 * u * v - sum(abs2, w))
     end
-    for dim in [3, 5]
+    for dim in [3, 4, 5, 7]
         test_barrier_oracles(CO.EpiPerSquare{T}(dim), barrier)
     end
     return
