@@ -114,18 +114,18 @@ end
 
 function update_feas(cone::WSOSInterpEpiNormEucl)
     @assert !cone.feas_updated
+    lambdafact = cone.lambdafact
+    matfact = cone.matfact
+    point_views = cone.point_views
 
     cone.is_feas = true
     @inbounds for k in eachindex(cone.Ps)
         Psk = cone.Ps[k]
         Λ11j = cone.Λ11[k]
-        LLj = cone.tmpLL[k]
+        LLk = cone.tmpLL[k]
         LUk = cone.tmpLU[k]
         Λi_Λ = cone.Λi_Λ[k]
         mat = cone.mat[k]
-        lambdafact = cone.lambdafact
-        matfact = cone.matfact
-        point_views = cone.point_views
 
         # first lambda
         @. LUk = Psk' * point_views[1]'
@@ -141,12 +141,12 @@ function update_feas(cone::WSOSInterpEpiNormEucl)
         uo = cone.U + 1
         @inbounds for r in 2:cone.R
             @. LUk = Psk' * point_views[r]'
-            mul!(LLj, LUk, Psk)
+            mul!(LLk, LUk, Psk)
 
             # not using lambdafact.L \ lambda with an syrk because storing lambdafact \ lambda is useful later
-            copyto!(Λi_Λ[r - 1], LLj)
+            copyto!(Λi_Λ[r - 1], LLk)
             ldiv!(lambdafact[k], Λi_Λ[r - 1])
-            mul!(mat, LLj, Λi_Λ[r - 1], -1, true)
+            mul!(mat, LLk, Λi_Λ[r - 1], -1, true)
             uo += cone.U
         end
 
@@ -163,6 +163,8 @@ end
 
 function update_grad(cone::WSOSInterpEpiNormEucl{T}) where {T}
     @assert cone.is_feas
+    lambdafact = cone.lambdafact
+    matfact = cone.matfact
 
     cone.grad .= 0
     @inbounds for k in eachindex(cone.Ps)
@@ -172,8 +174,6 @@ function update_grad(cone::WSOSInterpEpiNormEucl{T}) where {T}
         UUk = cone.tmpUU_vec[k]
         PΛiPs = cone.PΛiPs[k]
         Λi_Λ = cone.Λi_Λ[k]
-        lambdafact = cone.lambdafact
-        matfact = cone.matfact
 
         # P * inv(Λ_11) * P' for (1, 1) hessian block and adding to PΛiPs[r][r]
         copyto!(LUk, Psk')
@@ -221,17 +221,16 @@ function update_hess(cone::WSOSInterpEpiNormEucl)
     @assert cone.grad_updated
     hess = cone.hess.data
     UU = cone.tmpUU
+    matfact = cone.matfact
 
     hess .= 0
     @inbounds for k in eachindex(cone.Ps)
         Psk = cone.Ps[k]
         PΛiPs = cone.PΛiPs[k]
         Λi_Λ = cone.Λi_Λ[k]
-        matfact = cone.matfact
         UUk = cone.tmpUU_vec[k]
         LUk = cone.tmpLU[k]
         LUk2 = cone.tmpLU2[k]
-        LLj = cone.tmpLL[k]
 
         # get the PΛiPs not calculated in update_grad
         @inbounds for r in 2:cone.R, r2 in 2:(r - 1)
