@@ -113,5 +113,4 @@ test_polyminJuMP(; options...) = test_polyminJuMP.([
     polyminJuMP3,
     polyminJuMP12,
     polyminJuMP14,
-    polyminJuMP20,
     ], options = options)

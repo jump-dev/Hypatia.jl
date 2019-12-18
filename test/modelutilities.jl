@@ -87,17 +87,17 @@ function test_svec_conversion(T::DataType)
     rt2 = sqrt(T(2))
     vec = rand(T, 6)
     vec_copy = copy(vec)
-    MU.vec_to_svec!(vec, rt2)
+    MU.vec_to_svec!(vec)
     @test vec ≈ vec_copy .* [1, rt2, 1, rt2, rt2, 1] atol=tol rtol=tol
     copyto!(vec, vec_copy)
-    MU.vec_to_svec!(vec, rt2, incr = 2)
+    MU.vec_to_svec!(vec, incr = 2)
     @test vec ≈ vec_copy .* [1, 1, rt2, rt2, 1, 1] atol=tol rtol=tol
     mat = rand(T, 10, 3)
     mat_copy = copy(mat)
-    MU.vec_to_svec_cols!(mat, rt2)
+    MU.vec_to_svec!(mat)
     @test mat ≈ mat_copy .* [1, rt2, 1, rt2, rt2, 1, rt2, rt2, rt2, 1] atol=tol rtol=tol
     mat = rand(T, 12, 3)
     mat_copy = copy(mat)
-    MU.vec_to_svec_cols!(mat, rt2, incr = 2)
+    MU.vec_to_svec!(mat, incr = 2)
     @test mat ≈ mat_copy .* [1, 1, rt2, rt2, 1, 1, rt2, rt2, rt2, rt2, 1, 1] atol=tol rtol=tol
 end
