@@ -114,7 +114,7 @@ end
 function build_var_cone(fi::MOI.VectorOfVariables, si::MOI.LogDetConeTriangle, dim::Int, q::Int)
     IGi = (q + 1):(q + dim)
     VGi = vcat(-1.0, -1.0, -svec_scale(dim - 2))
-    conei = Cones.HypoPerLogdetTri{Float64}(dim)
+    conei = Cones.HypoPerLogdetTri{Float64, Float64}(dim)
     return (IGi, VGi, conei)
 end
 
@@ -124,7 +124,7 @@ function build_constr_cone(fi::MOI.VectorAffineFunction{Float64}, si::MOI.LogDet
     VGi = [-vt.scalar_term.coefficient * scalevec[vt.output_index] for vt in fi.terms]
     Ihi = (q + 1):(q + dim)
     Vhi = scalevec .* fi.constants
-    conei = Cones.HypoPerLogdetTri{Float64}(dim)
+    conei = Cones.HypoPerLogdetTri{Float64, Float64}(dim)
     return (IGi, VGi, Ihi, Vhi, conei)
 end
 
