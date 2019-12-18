@@ -86,11 +86,10 @@ function test_grad_hess(cone::CO.Cone{T}, point::Vector{T}; tol::Real = 100eps(T
     @test CO.hess_prod!(prod, point, cone) ≈ -grad atol=tol rtol=tol
     @test CO.inv_hess_prod!(prod, grad, cone) ≈ -point atol=tol rtol=tol
 
-    # TODO add hess sqrt oracles
-    # prod_mat2 = Matrix(CO.hess_sqrt_prod!(prod_mat, inv_hess, cone)')
-    # @test CO.hess_sqrt_prod!(prod_mat, prod_mat2, cone) ≈ I atol=tol rtol=tol
-    # CO.inv_hess_sqrt_prod!(prod_mat2, Matrix(one(T) * I, dim, dim), cone)
-    # @test prod_mat2' * prod_mat2 ≈ inv_hess atol=tol rtol=tol
+    prod_mat2 = Matrix(CO.hess_sqrt_prod!(prod_mat, inv_hess, cone)')
+    @test CO.hess_sqrt_prod!(prod_mat, prod_mat2, cone) ≈ I atol=tol rtol=tol
+    CO.inv_hess_sqrt_prod!(prod_mat2, Matrix(one(T) * I, dim, dim), cone)
+    @test prod_mat2' * prod_mat2 ≈ inv_hess atol=tol rtol=tol
 
     return
 end

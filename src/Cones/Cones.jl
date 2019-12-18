@@ -16,7 +16,7 @@ import Hypatia.update_fact
 import Hypatia.solve_system
 import Hypatia.invert
 
-hessian_cache(T::Type{<:LinearAlgebra.BlasReal}) = DenseSymCache{T}() # use BunchKaufman for BlasReals
+# hessian_cache(T::Type{<:LinearAlgebra.BlasReal}) = DenseSymCache{T}() # use BunchKaufman for BlasReals
 hessian_cache(T::Type{<:Real}) = DensePosDefCache{T}() # use Cholesky for generic reals
 
 abstract type Cone{T <: Real} end
@@ -109,21 +109,21 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Con
     return prod
 end
 
-# function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
-#     if !cone.inv_hess_prod_updated # TODO rename
-#         update_inv_hess_prod(cone)
-#     end
-#     return mul!(prod, UpperTriangular(cone.hess_fact_cache.AF), arr)
-# end
-#
-# function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
-#     if !cone.inv_hess_prod_updated # TODO rename
-#         update_inv_hess_prod(cone)
-#     end
-#     copyto!(prod, arr)
-#     return ldiv!(UpperTriangular(cone.hess_fact_cache.AF.data)', prod)
-#     # return ldiv!(prod, UpperTriangular(cone.hess_fact_cache.AF.data), arr)
-# end
+function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
+    if !cone.inv_hess_prod_updated # TODO rename
+        update_inv_hess_prod(cone)
+    end
+    return mul!(prod, UpperTriangular(cone.hess_fact_cache.AF), arr)
+end
+
+function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
+    if !cone.inv_hess_prod_updated # TODO rename
+        update_inv_hess_prod(cone)
+    end
+    copyto!(prod, arr)
+    return ldiv!(UpperTriangular(cone.hess_fact_cache.AF.data)', prod)
+    # return ldiv!(prod, UpperTriangular(cone.hess_fact_cache.AF.data), arr)
+end
 
 # utilities for arrays
 
