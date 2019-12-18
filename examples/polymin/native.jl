@@ -75,7 +75,7 @@ function polyminreal(
         if use_linops
             A = BlockMatrix{T}(1, U, [ones(T, 1, U)], [1:1], [1:U])
         else
-            A = ones(T, 1, U) # TODO eliminate constraint and first variable
+            A = ones(T, 1, U) # NOTE can eliminate constraint and a variable
         end
         b = T[1]
         if use_wsos
@@ -126,13 +126,13 @@ polyminreal10(T::Type{<:Real}) = polyminreal(T, :rosenbrock, 5)
 polyminreal11(T::Type{<:Real}) = polyminreal(T, :butcher, 2)
 polyminreal12(T::Type{<:Real}) = polyminreal(T, :goldsteinprice_ellipsoid, 7)
 polyminreal13(T::Type{<:Real}) = polyminreal(T, :goldsteinprice_ball, 7)
-polyminreal14(T::Type{<:Real}) = polyminreal(T, :motzkin, 3, use_primal = false) # TODO repetition of 18
-polyminreal15(T::Type{<:Real}) = polyminreal(T, :motzkin, 3)
-polyminreal16(T::Type{<:Real}) = polyminreal(T, :reactiondiffusion, 4, use_primal = false)
-polyminreal17(T::Type{<:Real}) = polyminreal(T, :lotkavolterra, 3, use_primal = false)
-polyminreal18(T::Type{<:Real}) = polyminreal(T, :motzkin, 3, use_primal = false, use_wsos = true)
-polyminreal19(T::Type{<:Real}) = polyminreal(T, :motzkin, 3, use_primal = false, use_wsos = false)
-polyminreal20(T::Type{<:Real}) = polyminreal(T, :reactiondiffusion, 4, use_primal = false, use_wsos = false)
+polyminreal14(T::Type{<:Real}) = polyminreal(T, :motzkin, 3, use_primal = true, use_wsos = true)
+# polyminreal15(T::Type{<:Real}) = polyminreal(T, :motzkin, 3, use_primal = true, use_wsos = false)
+polyminreal16(T::Type{<:Real}) = polyminreal(T, :motzkin, 3, use_primal = false, use_wsos = true)
+polyminreal17(T::Type{<:Real}) = polyminreal(T, :motzkin, 3, use_primal = false, use_wsos = false)
+polyminreal18(T::Type{<:Real}) = polyminreal(T, :reactiondiffusion, 4, use_primal = true, use_wsos = true)
+# polyminreal19(T::Type{<:Real}) = polyminreal(T, :reactiondiffusion, 4, use_primal = true, use_wsos = false)
+polyminreal20(T::Type{<:Real}) = polyminreal(T, :lotkavolterra, 3, use_primal = false, use_wsos = true)
 polyminreal21(T::Type{<:Real}) = polyminreal(T, :lotkavolterra, 3, use_primal = false, use_wsos = false)
 polyminreal22(T::Type{<:Real}) = polyminreal(T, :random, 2, use_primal = true, use_wsos = true, n = 5, use_linops = true)
 polyminreal23(T::Type{<:Real}) = polyminreal(T, :random, 2, use_primal = true, use_wsos = true, n = 5, use_linops = false)
@@ -210,7 +210,7 @@ function polymincomplex(
         true_obj = -true_obj
     else
         c = f.(points)
-        A = ones(T, 1, U) # TODO can eliminate equality and a variable
+        A = ones(T, 1, U) # NOTE can eliminate equality and a variable
         b = T[1]
         G = Diagonal(-one(T) * I, U)
         h = zeros(T, U)
@@ -281,15 +281,16 @@ instances_polymin_linops = [
     polyminreal26,
     ]
 instances_polymin_few = [
-    # polyminreal2,
-    # polyminreal3,
-    # polyminreal12,
-    # polyminreal14,
-    polyminreal18,
-    polyminreal19,
-    # polyminreal23,
-    # polymincomplex7,
-    # polymincomplex14,
+    polyminreal2,
+    polyminreal3,
+    polyminreal4,
+    polyminreal12,
+    polyminreal14,
+    polyminreal16,
+    polyminreal17,
+    polyminreal23,
+    polymincomplex7,
+    polymincomplex14,
     ]
 
 function test_polymin(instance::Function; T::Type{<:Real} = Float64, options::NamedTuple = (atol = sqrt(sqrt(eps(T))),), rseed::Int = 1)
