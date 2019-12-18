@@ -34,13 +34,14 @@ mutable struct WSOSInterpEpiNormEucl{T <: Real} <: Cone{T}
 
     mat::Vector{Matrix{T}}
     matfact::Vector
-    tmp3::Matrix{T}
 
     Λi_Λ::Vector{Vector{Matrix{T}}}
     Λ11::Vector{Matrix{T}}
     tmpLL::Vector{Matrix{T}}
     tmpLU::Vector{Matrix{T}}
-    tmpUU::Vector{Matrix{T}} # reused in update_hess
+    tmpLU2::Vector{Matrix{T}}
+    tmpUU_vec::Vector{Matrix{T}} # reused in update_hess
+    tmpUU::Matrix{T}
     PΛiPs::Vector{Vector{Vector{Matrix{T}}}}
     lambdafact::Vector
     point_views
@@ -79,22 +80,23 @@ function setup_data(cone::WSOSInterpEpiNormEucl{T}) where {T <: Real}
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
-    cone.mat = [similar(cone.grad, size(Psj, 2), size(Psj, 2)) for Psj in Ps]
+    cone.mat = [similar(cone.grad, size(Psk, 2), size(Psk, 2)) for Psk in Ps]
     cone.matfact = Vector{Any}(undef, length(Ps))
-    cone.tmp3 = similar(cone.grad, U, U)
-    cone.Λi_Λ = [Vector{Matrix{T}}(undef, R - 1) for Psj in Ps]
-    @inbounds for j in eachindex(Ps), r in 1:(R - 1)
-        cone.Λi_Λ[j][r] = similar(cone.grad, size(Ps[j], 2), size(Ps[j], 2))
+    cone.Λi_Λ = [Vector{Matrix{T}}(undef, R - 1) for Psk in Ps]
+    @inbounds for k in eachindex(Ps), r in 1:(R - 1)
+        cone.Λi_Λ[k][r] = similar(cone.grad, size(Ps[k], 2), size(Ps[k], 2))
     end
-    cone.Λ11 = [similar(cone.grad, size(Psj, 2), size(Psj, 2)) for Psj in Ps]
-    cone.tmpLL = [similar(cone.grad, size(Psj, 2), size(Psj, 2)) for Psj in Ps]
-    cone.tmpLU = [similar(cone.grad, size(Psj, 2), U) for Psj in Ps]
-    cone.tmpUU = [similar(cone.grad, U, U) for _ in eachindex(Ps)]
-    cone.PΛiPs = [Vector{Vector{Matrix{T}}}(undef, R) for Psj in Ps]
-    @inbounds for j in eachindex(Ps), r1 in 1:R
-        cone.PΛiPs[j][r1] = Vector{Matrix{T}}(undef, r1)
+    cone.Λ11 = [similar(cone.grad, size(Psk, 2), size(Psk, 2)) for Psk in Ps]
+    cone.tmpLL = [similar(cone.grad, size(Psk, 2), size(Psk, 2)) for Psk in Ps]
+    cone.tmpLU = [similar(cone.grad, size(Psk, 2), U) for Psk in Ps]
+    cone.tmpLU2 = [similar(cone.grad, size(Psk, 2), U) for Psk in Ps]
+    cone.tmpUU_vec = [similar(cone.grad, U, U) for _ in eachindex(Ps)]
+    cone.tmpUU = similar(cone.grad, U, U)
+    cone.PΛiPs = [Vector{Vector{Matrix{T}}}(undef, R) for Psk in Ps]
+    @inbounds for k in eachindex(Ps), r1 in 1:R
+        cone.PΛiPs[k][r1] = Vector{Matrix{T}}(undef, r1)
         for r2 in 1:r1
-            cone.PΛiPs[j][r1][r2] = similar(cone.grad, U, U)
+            cone.PΛiPs[k][r1][r2] = similar(cone.grad, U, U)
         end
     end
     cone.lambdafact = Vector{Any}(undef, length(Ps))
@@ -102,7 +104,7 @@ function setup_data(cone::WSOSInterpEpiNormEucl{T}) where {T <: Real}
     return
 end
 
-get_nu(cone::WSOSInterpEpiNormEucl) = 2 * sum(size(Psj, 2) for Psj in cone.Ps)
+get_nu(cone::WSOSInterpEpiNormEucl) = 2 * sum(size(Psk, 2) for Psk in cone.Ps)
 
 function set_initial_point(arr::AbstractVector, cone::WSOSInterpEpiNormEucl)
     arr[1:cone.U] .= 1
@@ -114,23 +116,23 @@ function update_feas(cone::WSOSInterpEpiNormEucl)
     @assert !cone.feas_updated
 
     cone.is_feas = true
-    @inbounds for j in eachindex(cone.Ps)
-        Psj = cone.Ps[j]
-        Λ11j = cone.Λ11[j]
-        LLj = cone.tmpLL[j]
-        LUj = cone.tmpLU[j]
-        Λi_Λ = cone.Λi_Λ[j]
-        mat = cone.mat[j]
+    @inbounds for k in eachindex(cone.Ps)
+        Psk = cone.Ps[k]
+        Λ11j = cone.Λ11[k]
+        LLj = cone.tmpLL[k]
+        LUk = cone.tmpLU[k]
+        Λi_Λ = cone.Λi_Λ[k]
+        mat = cone.mat[k]
         lambdafact = cone.lambdafact
         matfact = cone.matfact
         point_views = cone.point_views
 
         # first lambda
-        @. LUj = Psj' * point_views[1]'
-        mul!(Λ11j, LUj, Psj)
+        @. LUk = Psk' * point_views[1]'
+        mul!(Λ11j, LUk, Psk)
         copyto!(mat, Λ11j)
-        lambdafact[j] = cholesky!(Symmetric(Λ11j, :U), check = false)
-        if !isposdef(lambdafact[j])
+        lambdafact[k] = cholesky!(Symmetric(Λ11j, :U), check = false)
+        if !isposdef(lambdafact[k])
             cone.is_feas = false
             break
         end
@@ -138,18 +140,18 @@ function update_feas(cone::WSOSInterpEpiNormEucl)
         # subtract others
         uo = cone.U + 1
         @inbounds for r in 2:cone.R
-            @. LUj = Psj' * point_views[r]'
-            mul!(LLj, LUj, Psj)
+            @. LUk = Psk' * point_views[r]'
+            mul!(LLj, LUk, Psk)
 
             # not using lambdafact.L \ lambda with an syrk because storing lambdafact \ lambda is useful later
             copyto!(Λi_Λ[r - 1], LLj)
-            ldiv!(lambdafact[j], Λi_Λ[r - 1])
+            ldiv!(lambdafact[k], Λi_Λ[r - 1])
             mul!(mat, LLj, Λi_Λ[r - 1], -1, true)
             uo += cone.U
         end
 
-        matfact[j] = cholesky!(Symmetric(mat, :U), check = false)
-        if !isposdef(matfact[j])
+        matfact[k] = cholesky!(Symmetric(mat, :U), check = false)
+        if !isposdef(matfact[k])
             cone.is_feas = false
             break
         end
@@ -163,41 +165,43 @@ function update_grad(cone::WSOSInterpEpiNormEucl{T}) where {T}
     @assert cone.is_feas
 
     cone.grad .= 0
-    @inbounds for j in eachindex(cone.Ps)
-        Psj = cone.Ps[j]
-        LUj = cone.tmpLU[j]
-        UUj = cone.tmpUU[j]
-        PΛiPs = cone.PΛiPs[j]
-        Λi_Λ = cone.Λi_Λ[j]
+    @inbounds for k in eachindex(cone.Ps)
+        Psk = cone.Ps[k]
+        LUk = cone.tmpLU[k]
+        LUk2 = cone.tmpLU2[k]
+        UUk = cone.tmpUU_vec[k]
+        PΛiPs = cone.PΛiPs[k]
+        Λi_Λ = cone.Λi_Λ[k]
         lambdafact = cone.lambdafact
         matfact = cone.matfact
 
         # P * inv(Λ_11) * P' for (1, 1) hessian block and adding to PΛiPs[r][r]
-        copyto!(LUj, Psj')
-        ldiv!(cone.lambdafact[j].L, LUj) # TODO may be more efficient to do ldiv(fact.U', B) than ldiv(fact.L, B) here and elsewhere since the factorizations are of symmetric :U matrices
-        mul!(UUj, LUj', LUj)
+        copyto!(LUk, Psk')
+        ldiv!(cone.lambdafact[k].L, LUk) # TODO may be more efficient to do ldiv(fact.U', B) than ldiv(fact.L, B) here and elsewhere since the factorizations are of symmetric :U matrices
+        mul!(UUk, LUk', LUk)
 
         # prep PΛiPs
         # block-(1,1) is P * inv(mat) * P'
-        copyto!(LUj, Psj')
-        ldiv!(matfact[j].L, LUj)
-        mul!(PΛiPs[1][1], LUj', LUj)
+        copyto!(LUk, Psk')
+        ldiv!(matfact[k].L, LUk)
+        mul!(PΛiPs[1][1], LUk', LUk)
         # get all the PΛiPs that are in row one or on the diagonal
         @inbounds for r in 2:cone.R
-            copyto!(LUj, Psj')
-            ldiv!(matfact[j], LUj)
-            PΛiPs[r][1] = -Psj * Λi_Λ[r - 1] * LUj # TODO
-            # PΛiPs[r][r] .= Symmetric(Psj * Λi_Λ[r - 1] * (matfact[j] \ (Λi_Λ[r - 1]' * Psj')), :U)
-            mul!(LUj, Λi_Λ[r - 1]', Psj')
-            ldiv!(matfact[j].L, LUj)
-            mul!(PΛiPs[r][r], LUj', LUj)
-            PΛiPs[r][r] .+= UUj
+            copyto!(LUk, Psk')
+            ldiv!(matfact[k], LUk)
+            mul!(LUk2, Λi_Λ[r - 1], LUk)
+            mul!(PΛiPs[r][1], Psk, LUk2, -1, false)
+            # PΛiPs[r][r] .= Symmetric(Psk * Λi_Λ[r - 1] * (matfact[k] \ (Λi_Λ[r - 1]' * Psk')), :U)
+            mul!(LUk, Λi_Λ[r - 1]', Psk')
+            ldiv!(matfact[k].L, LUk)
+            mul!(PΛiPs[r][r], LUk', LUk)
+            PΛiPs[r][r] .+= UUk
         end
 
         # (1, 1)-block
         # gradient is diag of sum(-PΛiPs[i][i] for i in 1:R) + (R - 1) * Lambda_11 - Lambda_11
         @inbounds for i in 1:cone.U
-            cone.grad[i] += UUj[i, i] * (cone.R - 2)
+            cone.grad[i] += UUk[i, i] * (cone.R - 2)
             @inbounds for r in 1:cone.R
                 cone.grad[i] -= PΛiPs[r][r][i, i]
             end
@@ -216,27 +220,29 @@ end
 function update_hess(cone::WSOSInterpEpiNormEucl)
     @assert cone.grad_updated
     hess = cone.hess.data
-    tmp3 = cone.tmp3
+    UU = cone.tmpUU
 
     hess .= 0
-    @inbounds for j in eachindex(cone.Ps)
-        Psj = cone.Ps[j]
-        PΛiPs = cone.PΛiPs[j]
-        Λi_Λ = cone.Λi_Λ[j]
+    @inbounds for k in eachindex(cone.Ps)
+        Psk = cone.Ps[k]
+        PΛiPs = cone.PΛiPs[k]
+        Λi_Λ = cone.Λi_Λ[k]
         matfact = cone.matfact
-        UUj = cone.tmpUU[j]
-        LUj = cone.tmpLU[j]
-        LLj = cone.tmpLL[j]
+        UUk = cone.tmpUU_vec[k]
+        LUk = cone.tmpLU[k]
+        LUk2 = cone.tmpLU2[k]
+        LLj = cone.tmpLL[k]
 
         # get the PΛiPs not calculated in update_grad
         @inbounds for r in 2:cone.R, r2 in 2:(r - 1)
-            mul!(LUj, Λi_Λ[r2 - 1]', Psj')
-            ldiv!(matfact[j], LUj)
-            PΛiPs[r][r2] .= Psj * Λi_Λ[r - 1] * LUj # TODO
+            mul!(LUk, Λi_Λ[r2 - 1]', Psk')
+            ldiv!(matfact[k], LUk)
+            mul!(LUk2, Λi_Λ[r - 1], LUk)
+            mul!(PΛiPs[r][r2], Psk, LUk2)
         end
 
         @inbounds for i in 1:cone.U, k in 1:i
-            hess[k, i] -= abs2(UUj[k, i]) * (cone.R - 2)
+            hess[k, i] -= abs2(UUk[k, i]) * (cone.R - 2)
         end
 
         @. hess[1:cone.U, 1:cone.U] += abs2(PΛiPs[1][1])
@@ -244,10 +250,10 @@ function update_hess(cone::WSOSInterpEpiNormEucl)
             idxs = block_idxs(cone.U, r)
             @inbounds for s in 1:(r - 1)
                 # block (1,1)
-                @. tmp3 = abs2(PΛiPs[r][s])
-                # safe to ovewrite UUj now
-                @. UUj = tmp3 + tmp3'
-                @. hess[1:cone.U, 1:cone.U] += UUj
+                @. UU = abs2(PΛiPs[r][s])
+                # safe to ovewrite UUk now
+                @. UUk = UU + UU'
+                @. hess[1:cone.U, 1:cone.U] += UUk
                 # blocks (1,r)
                 @. hess[1:cone.U, idxs] += PΛiPs[s][1] * PΛiPs[r][s]'
             end
@@ -261,15 +267,15 @@ function update_hess(cone::WSOSInterpEpiNormEucl)
             end
 
             # blocks (r, r2)
-            # NOTE for hess[idxs, idxs], tmp3 and UUj are symmetric
-            @. tmp3 = PΛiPs[r][1] * PΛiPs[r][1]'
-            @. UUj = PΛiPs[1][1] * PΛiPs[r][r]
-            @. hess[idxs, idxs] += tmp3 + UUj
+            # NOTE for hess[idxs, idxs], UU and UUk are symmetric
+            @. UU = PΛiPs[r][1] * PΛiPs[r][1]'
+            @. UUk = PΛiPs[1][1] * PΛiPs[r][r]
+            @. hess[idxs, idxs] += UU + UUk
             @inbounds for r2 in (r + 1):cone.R
-                @. tmp3 = PΛiPs[r][1] * PΛiPs[r2][1]'
-                @. UUj = PΛiPs[1][1] * PΛiPs[r2][r]'
+                @. UU = PΛiPs[r][1] * PΛiPs[r2][1]'
+                @. UUk = PΛiPs[1][1] * PΛiPs[r2][r]'
                 idxs2 = block_idxs(cone.U, r2)
-                @. hess[idxs, idxs2] += tmp3 + UUj
+                @. hess[idxs, idxs2] += UU + UUk
             end
         end
     end
