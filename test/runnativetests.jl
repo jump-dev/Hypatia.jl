@@ -9,8 +9,8 @@ const SO = Hypatia.Solvers
 
 generic_reals = [
     Float64,
-    # Float32,
-    # BigFloat,
+    Float32,
+    BigFloat,
     ]
 
 blas_reals = [
@@ -18,7 +18,7 @@ blas_reals = [
     Float32,
     ]
 
-options = (verbose = true,)
+options = (verbose = false,)
 
 @info("starting native tests")
 @testset "native tests" begin
