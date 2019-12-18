@@ -93,6 +93,18 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Non
     return prod
 end
 
+function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Nonnegative)
+    @assert cone.is_feas
+    @. prod = arr / cone.point
+    return prod
+end
+
+function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Nonnegative)
+    @assert cone.is_feas
+    @. prod = arr * cone.point
+    return prod
+end
+
 hess_nz_count(cone::Nonnegative, ::Bool) = cone.dim
 inv_hess_nz_count(cone::Nonnegative, lower_only::Bool) = hess_nz_count(cone, lower_only)
 

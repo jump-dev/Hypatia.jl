@@ -1,15 +1,16 @@
 #=
-Copyright 2018, Chris Coey and contributors
+Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 
-TODO describe hermitian complex PSD cone
-on-diagonal (real) elements have one slot in the vector and below diagonal (complex) elements have two consecutive slots in the vector
-
-row-wise lower triangle of positive semidefinite matrix cone
+row-wise lower triangle of positive semidefinite matrix cone (scaled "svec" form)
 W \in S^n : 0 >= eigmin(W)
-(see equivalent MathOptInterface PositiveSemidefiniteConeTriangle definition)
 
+NOTE on-diagonal (real) elements have one slot in the vector and below diagonal (complex) elements have two consecutive slots in the vector
 barrier from "Self-Scaled Barriers and Interior-Point Methods for Convex Programming" by Nesterov & Todd
 -logdet(W)
+
+TODO
+- describe svec scaling
+- describe hermitian complex PSD cone
 =#
 
 mutable struct PosSemidefTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
@@ -92,22 +93,90 @@ end
 
 function update_feas(cone::PosSemidefTri)
     @assert !cone.feas_updated
+
     svec_to_smat!(cone.mat, cone.point, cone.rt2)
     copyto!(cone.mat2, cone.mat)
     cone.fact_mat = cholesky!(Hermitian(cone.mat2, :U), check = false)
     cone.is_feas = isposdef(cone.fact_mat)
+
     cone.feas_updated = true
     return cone.is_feas
 end
 
 function update_grad(cone::PosSemidefTri)
     @assert cone.is_feas
+
     cone.inv_mat = inv(cone.fact_mat)
     smat_to_svec!(cone.grad, cone.inv_mat, cone.rt2)
     cone.grad .*= -1
     copytri!(cone.mat, 'U', cone.is_complex)
+
     cone.grad_updated = true
     return cone.grad
+end
+
+function update_hess(cone::PosSemidefTri)
+    @assert cone.grad_updated
+    _build_hess(cone.hess.data, cone.inv_mat, cone.rt2)
+    cone.hess_updated = true
+    return cone.hess
+end
+
+function update_inv_hess(cone::PosSemidefTri)
+    @assert is_feas(cone)
+    _build_hess(cone.inv_hess.data, cone.mat, cone.rt2)
+    cone.inv_hess_updated = true
+    return cone.inv_hess
+end
+
+update_hess_prod(cone::PosSemidefTri) = nothing
+update_inv_hess_prod(cone::PosSemidefTri) = nothing
+
+function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidefTri)
+    @assert is_feas(cone)
+    @inbounds for i in 1:size(arr, 2)
+        svec_to_smat!(cone.mat4, view(arr, :, i), cone.rt2)
+        copytri!(cone.mat4, 'U', cone.is_complex)
+        rdiv!(cone.mat4, cone.fact_mat)
+        ldiv!(cone.fact_mat, cone.mat4)
+        smat_to_svec!(view(prod, :, i), cone.mat4, cone.rt2)
+    end
+    return prod
+end
+
+function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidefTri)
+    @assert is_feas(cone)
+    @inbounds for i in 1:size(arr, 2)
+        svec_to_smat!(cone.mat4, view(arr, :, i), cone.rt2)
+        mul!(cone.mat3, Hermitian(cone.mat4, :U), cone.mat)
+        mul!(cone.mat4, Hermitian(cone.mat, :U), cone.mat3)
+        smat_to_svec!(view(prod, :, i), cone.mat4, cone.rt2)
+    end
+    return prod
+end
+
+function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidefTri)
+    @assert is_feas(cone)
+    @inbounds for i in 1:size(arr, 2)
+        svec_to_smat!(cone.mat4, view(arr, :, i), cone.rt2)
+        copytri!(cone.mat4, 'U', cone.is_complex)
+        rdiv!(cone.mat4, cone.fact_mat.U)
+        ldiv!(cone.fact_mat.U', cone.mat4)
+        smat_to_svec!(view(prod, :, i), cone.mat4, cone.rt2)
+    end
+    return prod
+end
+
+function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidefTri)
+    @assert is_feas(cone)
+    @inbounds for i in 1:size(arr, 2)
+        svec_to_smat!(cone.mat4, view(arr, :, i), cone.rt2)
+        copytri!(cone.mat4, 'U', cone.is_complex)
+        rmul!(cone.mat4, cone.fact_mat.U')
+        lmul!(cone.fact_mat.U, cone.mat4)
+        smat_to_svec!(view(prod, :, i), cone.mat4, cone.rt2)
+    end
+    return prod
 end
 
 # TODO parallelize
@@ -183,44 +252,4 @@ function _build_hess(H::Matrix{T}, mat::Matrix{Complex{T}}, rt2::T) where {T <: 
         end
     end
     return H
-end
-
-function update_hess(cone::PosSemidefTri)
-    @assert cone.grad_updated
-    _build_hess(cone.hess.data, cone.inv_mat, cone.rt2)
-    cone.hess_updated = true
-    return cone.hess
-end
-
-function update_inv_hess(cone::PosSemidefTri)
-    @assert is_feas(cone)
-    _build_hess(cone.inv_hess.data, cone.mat, cone.rt2)
-    cone.inv_hess_updated = true
-    return cone.inv_hess
-end
-
-update_hess_prod(cone::PosSemidefTri) = nothing
-update_inv_hess_prod(cone::PosSemidefTri) = nothing
-
-function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidefTri)
-    @assert is_feas(cone)
-    @inbounds for i in 1:size(arr, 2)
-        svec_to_smat!(cone.mat4, view(arr, :, i), cone.rt2)
-        copytri!(cone.mat4, 'U', cone.is_complex)
-        rdiv!(cone.mat4, cone.fact_mat)
-        ldiv!(cone.fact_mat, cone.mat4)
-        smat_to_svec!(view(prod, :, i), cone.mat4, cone.rt2)
-    end
-    return prod
-end
-
-function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidefTri)
-    @assert is_feas(cone)
-    @inbounds for i in 1:size(arr, 2)
-        svec_to_smat!(cone.mat4, view(arr, :, i), cone.rt2)
-        mul!(cone.mat3, Hermitian(cone.mat4, :U), cone.mat)
-        mul!(cone.mat4, Hermitian(cone.mat, :U), cone.mat3)
-        smat_to_svec!(view(prod, :, i), cone.mat4, cone.rt2)
-    end
-    return prod
 end
