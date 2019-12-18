@@ -43,6 +43,7 @@ options = (atol = sqrt(sqrt(eps(T))), solver = SO.Solver{T}(
     @testset "sparsepca" begin test_sparsepca.(instances_sparsepca_few, T = T, options = options) end
 end
 
+# TODO currently broken
 # tol = sqrt(sqrt(eps(T)))
 # options = (atol = 10 * tol, solver = SO.Solver{T}(
 #     verbose = true, init_use_indirect = true, reduce = false, preprocess = false, iter_limit = 250,
