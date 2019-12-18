@@ -137,48 +137,43 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Epi
     return prod
 end
 
-function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormEucl{T}) where {T}
+function hess_sqrt_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiNormEucl{T}) where {T <: Real}
     @assert cone.is_feas
     u = cone.point[1]
     w = view(cone.point, 2:cone.dim)
 
-    # TODO don't change cone.dist
-    cone.dist *= 2
+    rt2 = sqrt(T(2))
+    distrt2 = cone.dist * rt2
     rtdist = sqrt(cone.dist)
-    urtdist = u + rtdist
+    urtdist = u + rtdist * rt2
     @inbounds for j in 1:size(arr, 2)
         uj = arr[1, j]
         @views wj = arr[2:end, j]
         dotwwj = dot(w, wj)
-        prod[1, j] = (u * uj - dotwwj) / cone.dist
-        wmulj = (dotwwj / urtdist - uj) / cone.dist
+        prod[1, j] = (u * uj - dotwwj) / distrt2
+        wmulj = (dotwwj / urtdist - uj) / distrt2
         @. prod[2:end, j] = w * wmulj + wj / rtdist
     end
-    prod .*= sqrt(T(2))
-    cone.dist /= 2
 
     return prod
 end
 
-function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormEucl{T}) where {T}
+function inv_hess_sqrt_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiNormEucl{T}) where {T <: Real}
     @assert cone.is_feas
     u = cone.point[1]
     w = view(cone.point, 2:cone.dim)
 
-    # TODO don't change cone.dist
-    cone.dist *= 2
+    rt2 = sqrt(T(2))
     rtdist = sqrt(cone.dist)
-    urtdist = u + rtdist
+    urtdist = u + rtdist * rt2
     @inbounds for j in 1:size(arr, 2)
         uj = arr[1, j]
         @views wj = arr[2:end, j]
         dotwwj = dot(w, wj)
-        prod[1, j] = (u * uj + dotwwj)
-        wmulj = (dotwwj / urtdist + uj)
+        prod[1, j] = (u * uj + dotwwj) / rt2
+        wmulj = (dotwwj / urtdist + uj) / rt2
         @. prod[2:end, j] = w * wmulj + wj * rtdist
     end
-    prod ./= sqrt(T(2))
-    cone.dist /= 2
 
     return prod
 end
