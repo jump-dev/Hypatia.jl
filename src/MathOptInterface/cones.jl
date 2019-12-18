@@ -43,10 +43,13 @@ const MOIOtherConesList(::Type{T}) where {T <: Real} = (
     MOI.SecondOrderCone,
     MOI.RotatedSecondOrderCone,
     MOI.ExponentialCone,
+    MOI.DualExponentialCone,
     MOI.PowerCone{T},
+    MOI.DualPowerCone{T},
     MOI.GeometricMeanCone,
     MOI.PositiveSemidefiniteConeTriangle,
     MOI.LogDetConeTriangle,
+    MOI.RootDetConeTriangle,
     WSOSInterpNonnegativeCone{T},
     WSOSInterpPossemidefTriCone{T},
     WSOSInterpEpiNormEuclCone{T},
@@ -58,98 +61,62 @@ const MOIOtherCones{T <: Real} = Union{
     MOI.SecondOrderCone,
     MOI.RotatedSecondOrderCone,
     MOI.ExponentialCone,
+    MOI.DualExponentialCone,
     MOI.PowerCone{T},
+    MOI.DualPowerCone{T},
     MOI.GeometricMeanCone,
     MOI.PositiveSemidefiniteConeTriangle,
     MOI.LogDetConeTriangle,
+    MOI.RootDetConeTriangle,
     WSOSInterpNonnegativeCone{T},
     WSOSInterpPossemidefTriCone{T},
     WSOSInterpEpiNormEuclCone{T},
     }
 
 # MOI cones for which no transformation is needed
+cone_from_moi(::Type{<:Real}, s::MOI.AbstractVectorSet) = error("MOI set $s is not recognized")
 cone_from_moi(::Type{T}, s::MOI.NormInfinityCone) where {T <: Real} = Cones.EpiNormInf{T, T}(MOI.dimension(s))
 cone_from_moi(::Type{T}, s::MOI.NormOneCone) where {T <: Real} = Cones.EpiNormInf{T, T}(MOI.dimension(s), true)
 cone_from_moi(::Type{T}, s::MOI.SecondOrderCone) where {T <: Real} = Cones.EpiNormEucl{T}(MOI.dimension(s))
 cone_from_moi(::Type{T}, s::MOI.RotatedSecondOrderCone) where {T <: Real} = Cones.EpiPerSquare{T}(MOI.dimension(s))
-cone_from_moi(::Type{T}, s::MOI.ExponentialCone) where {T <: Real} = Cones.HypoPerLog{T}(3)
-cone_from_moi(::Type{T}, s::MOI.GeometricMeanCone) where {T <: Real} = (l = MOI.dimension(s) - 1; Cones.HypoGeomean{T}(fill(inv(l), l)))
+cone_from_moi(::Type{T}, s::MOI.ExponentialCone) where {T <: Real} = Cones.HypoPerLog{T}(3) # TODO EpiPerExp
+cone_from_moi(::Type{T}, s::MOI.DualExponentialCone) where {T <: Real} = Cones.HypoPerLog{T}(3, true) # TODO EpiPerExp
 cone_from_moi(::Type{T}, s::MOI.PowerCone{T}) where {T <: Real} = Cones.Power{T}([s.exponent, 1 - s.exponent], 1)
+cone_from_moi(::Type{T}, s::MOI.DualPowerCone{T}) where {T <: Real} = Cones.Power{T}([s.exponent, 1 - s.exponent], 1, true)
+cone_from_moi(::Type{T}, s::MOI.GeometricMeanCone) where {T <: Real} = (l = MOI.dimension(s) - 1; Cones.HypoGeomean{T}(fill(inv(l), l)))
 cone_from_moi(::Type{T}, s::MOI.PositiveSemidefiniteConeTriangle) where {T <: Real} = Cones.PosSemidefTri{T, T}(MOI.dimension(s))
 cone_from_moi(::Type{T}, s::MOI.LogDetConeTriangle) where {T <: Real} = Cones.HypoPerLogdetTri{T, T}(MOI.dimension(s))
 cone_from_moi(::Type{T}, s::MOI.RootDetConeTriangle) where {T <: Real} = Cones.HypoRootdetTri{T, T}(MOI.dimension(s))
 cone_from_moi(::Type{T}, s::WSOSInterpNonnegativeCone{T}) where {T <: Real} = Cones.WSOSInterpNonnegative{T, T}(s.U, s.Ps, s.is_dual)
 cone_from_moi(::Type{T}, s::WSOSInterpPossemidefTriCone{T}) where {T <: Real} = Cones.WSOSInterpPosSemidefTri{T}(s.R, s.U, s.Ps, s.is_dual)
 cone_from_moi(::Type{T}, s::WSOSInterpEpiNormEuclCone{T}) where {T <: Real} = Cones.WSOSInterpEpiNormEucl{T}(s.R, s.U, s.Ps, s.is_dual)
-cone_from_moi(::Type{T}, s::MOI.AbstractVectorSet) where {T <: Real} = error("MOI set $s is not recognized")
 
+SvecCone = Union{Cones.PosSemidefTri, Cones.HypoPerLogdetTri, Cones.HypoRootdetTri}
+svec_offset(cone::Cones.PosSemidefTri) = 0
+svec_offset(cone::Cones.HypoPerLogdetTri) = 2
+svec_offset(cone::Cones.HypoRootdetTri) = 1
 
+untransform_cone_vec(cone::Cones.Cone, vec::AbstractVector) = nothing
+untransform_cone_vec(cone::SvecCone, vec::AbstractVector) = (@views ModelUtilities.svec_to_vec!(vec[(1 + svec_offset(cone)):end]))
 
-
-# TODO delete
 const rt2 = sqrt(2)
-const rt2i = inv(rt2)
 svec_scale(dim) = [(i == j ? 1.0 : rt2) for i in 1:round(Int, sqrt(0.25 + 2 * dim) - 0.5) for j in 1:i]
-svec_unscale(dim) = [(i == j ? 1.0 : rt2i) for i in 1:round(Int, sqrt(0.25 + 2 * dim) - 0.5) for j in 1:i]
 
-# PSD cone: convert from smat to svec form (scale off-diagonals)
-function build_var_cone(fi::MOI.VectorOfVariables, si::MOI.PositiveSemidefiniteConeTriangle, dim::Int, q::Int)
-    IGi = (q + 1):(q + dim)
-    VGi = -svec_scale(dim)
-    conei = Cones.PosSemidefTri{Float64, Float64}(dim)
-    return (IGi, VGi, conei)
+get_affine_data_vov(cone::Cones.Cone, dim::Int) = fill(-1.0, dim)
+function get_affine_data_vov(cone::SvecCone, dim::Int)
+    offset = svec_offset(cone)
+    VGi = vcat(ones(offset), svec_scale(dim - offset))
+    VGi .*= -1
+    return VGi
 end
 
-function build_constr_cone(fi::MOI.VectorAffineFunction{Float64}, si::MOI.PositiveSemidefiniteConeTriangle, dim::Int, q::Int)
-    scalevec = svec_scale(dim)
-    IGi = [q + vt.output_index for vt in fi.terms]
+get_affine_data_vaf(cone::Cones.Cone, fi::MOI.VectorAffineFunction{Float64}, dim::Int) = ([-vt.scalar_term.coefficient for vt in fi.terms], fi.constants)
+function get_affine_data_vaf(cone::SvecCone, fi::MOI.VectorAffineFunction{Float64}, dim::Int)
+    offset = svec_offset(cone)
+    scalevec = vcat(ones(offset), svec_scale(dim - offset))
     VGi = [-vt.scalar_term.coefficient * scalevec[vt.output_index] for vt in fi.terms]
-    Ihi = (q + 1):(q + dim)
     Vhi = scalevec .* fi.constants
-    conei = Cones.PosSemidefTri{Float64, Float64}(dim)
-    return (IGi, VGi, Ihi, Vhi, conei)
-end
-
-# logdet cone: convert from smat to svec form (scale off-diagonals)
-function build_var_cone(fi::MOI.VectorOfVariables, si::MOI.LogDetConeTriangle, dim::Int, q::Int)
-    IGi = (q + 1):(q + dim)
-    VGi = vcat(-1.0, -1.0, -svec_scale(dim - 2))
-    conei = Cones.HypoPerLogdetTri{Float64, Float64}(dim)
-    return (IGi, VGi, conei)
-end
-
-function build_constr_cone(fi::MOI.VectorAffineFunction{Float64}, si::MOI.LogDetConeTriangle, dim::Int, q::Int)
-    scalevec = vcat(1.0, 1.0, svec_scale(dim - 2))
-    IGi = [q + vt.output_index for vt in fi.terms]
-    VGi = [-vt.scalar_term.coefficient * scalevec[vt.output_index] for vt in fi.terms]
-    Ihi = (q + 1):(q + dim)
-    Vhi = scalevec .* fi.constants
-    conei = Cones.HypoPerLogdetTri{Float64, Float64}(dim)
-    return (IGi, VGi, Ihi, Vhi, conei)
-end
-
-
-
-
-
-untransform_cone_vec(cone::Cones.Cone, ::AbstractVector, z::AbstractVector) = nothing
-
-function untransform_cone_vec(cone::Cones.PosSemidefTri, s::AbstractVector, z::AbstractVector)
-    ModelUtilities.svec_to_vec!(s)
-    ModelUtilities.svec_to_vec!(z)
-    return nothing
-end
-
-function untransform_cone_vec(cone::Cones.HypoPerLogdetTri, s::AbstractVector, z::AbstractVector)
-    @views ModelUtilities.svec_to_vec!(s[3:end])
-    @views ModelUtilities.svec_to_vec!(z[3:end])
-    return nothing
-end
-
-function untransform_cone_vec(cone::Cones.HypoRootdetTri, s::AbstractVector, z::AbstractVector)
-    @views ModelUtilities.svec_to_vec!(s[2:end])
-    @views ModelUtilities.svec_to_vec!(z[2:end])
-    return nothing
+    return (VGi, Vhi)
 end
 
 # TODO scale for WSOSInterpPossemidefTriCone?

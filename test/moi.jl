@@ -41,28 +41,25 @@ conic_exclude = String[
     # "soc",
     # "rsoc",
     # "exp",
-    "dualexp", # TODO
+    # "dualexp",
     # "pow",
-    "dualpow", # TODO
-    # "sdp",
+    # "dualpow",
     # "geomean",
-    # "logdet",
-    # "rootdet",
-    # TODO currently some issue with square det transformation?
-    "logdets",
-    "rootdets",
+    # "sdp",
+    "logdet",
+    "rootdet",
     ]
 
 function test_moi(T::Type{<:Real}; options...)
     optimizer = MOIU.CachingOptimizer(MOIU.UniversalFallback(MOIU.Model{T}()), Hypatia.Optimizer{T}(; options...))
 
-    # @testset "unit tests" begin
-    #     MOIT.unittest(optimizer, config, unit_exclude)
-    # end
+    @testset "unit tests" begin
+        MOIT.unittest(optimizer, config, unit_exclude)
+    end
 
-    # @testset "linear tests" begin
-    #     MOIT.contlineartest(optimizer, config)
-    # end
+    @testset "linear tests" begin
+        MOIT.contlineartest(optimizer, config)
+    end
 
     @testset "conic tests" begin
         MOIT.contconictest(MOIB.Constraint.Square{T}(optimizer), config, conic_exclude)
