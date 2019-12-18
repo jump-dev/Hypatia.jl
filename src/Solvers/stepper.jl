@@ -398,25 +398,34 @@ function check_nbhd(
             g_k = Cones.grad(cone_k)
             tmp_k = copy(solver.dual_views[k]) # TODO prealloc
             @. tmp_k += g_k * mu_temp
-            k_nbhd = abs2(norm(tmp_k, Inf) / norm(g_k, Inf)) / mu_temp
-            # k_nbhd = abs2(maximum(abs(dj) / abs(gj) for (dj, gj) in zip(duals_k, g_k))) # TODO try this neighborhood
-            lhs_nbhd = max(lhs_nbhd, k_nbhd)
+            nbhd_k = abs2(norm(tmp_k, Inf) / norm(g_k, Inf)) / mu_temp
+            # nbhd_k = abs2(maximum(abs(dj) / abs(gj) for (dj, gj) in zip(duals_k, g_k))) # TODO try this neighborhood
+            lhs_nbhd = max(lhs_nbhd, nbhd_k)
         else
-            # TODO use inv hess sqrt
+            # TODO clean up below
+            # TODO currently inv hess prod is more stable than inv hess sqrt prod perhaps because trtrs does chklapackerror
+            # TODO need to implement new linear algebra functions to use pivoted cholesky and to allow trtrs without failure (even if need to change some zeros to epsilons etc)
             g_k = Cones.grad(cone_k)
             tmp_k = copy(solver.dual_views[k]) # TODO prealloc
             @. tmp_k += g_k * mu_temp
             nbhd_temp_k = solver.nbhd_temp[k]
-            Cones.inv_hess_prod!(nbhd_temp_k, tmp_k, cone_k)
-            @. nbhd_temp_k ./= mu_temp
-            k_nbhd = dot(tmp_k, nbhd_temp_k)
-            # TODO not needed if use sum abs2 of inv hess sqrt
-            if k_nbhd <= -cbrt(eps(T))
-                @warn("numerical failure: cone neighborhood is $k_nbhd")
-                return false
-            elseif k_nbhd > zero(T)
-                lhs_nbhd += k_nbhd
-            end
+
+            Cones.inv_hess_sqrt_prod!(nbhd_temp_k, tmp_k, cone_k)
+            # nbhd_temp_k ./= sqrt(mu_temp)
+            # nbhd_k = sum(abs2, nbhd_temp_k)
+            nbhd_k = sum(abs2, nbhd_temp_k) / mu_temp
+            lhs_nbhd += nbhd_k
+
+            # Cones.inv_hess_prod!(nbhd_temp_k, tmp_k, cone_k)
+            # @. nbhd_temp_k ./= mu_temp
+            # nbhd_k = dot(tmp_k, nbhd_temp_k)
+            # # TODO not needed if use sum abs2 of inv hess sqrt
+            # if nbhd_k <= -cbrt(eps(T))
+            #     @warn("numerical failure: cone neighborhood is $nbhd_k")
+            #     return false
+            # elseif nbhd_k > zero(T)
+            #     lhs_nbhd += nbhd_k
+            # end
         end
 
         if lhs_nbhd > rhs_nbhd
