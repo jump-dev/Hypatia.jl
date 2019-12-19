@@ -64,6 +64,7 @@ EpiNormSpectral{T, R}(n::Int, m::Int) where {R <: RealOrComplex{T}} where {T <: 
 
 reset_data(cone::EpiNormSpectral) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_prod_updated = cone.inv_hess_prod_updated = false)
 
+# TODO only allocate the fields we use
 function setup_data(cone::EpiNormSpectral{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     reset_data(cone)
     dim = cone.dim
