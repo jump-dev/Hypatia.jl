@@ -51,8 +51,8 @@ end
 get_nu(cone::EpiPerSquare) = 2
 
 function set_initial_point(arr::AbstractVector, cone::EpiPerSquare)
-    arr .= 0
     arr[1:2] .= 1
+    arr[3:end] .= 0
     return arr
 end
 
@@ -60,6 +60,7 @@ function update_feas(cone::EpiPerSquare)
     @assert !cone.feas_updated
     u = cone.point[1]
     v = cone.point[2]
+
     if u > 0 && v > 0
         w = view(cone.point, 3:cone.dim)
         cone.dist = u * v - sum(abs2, w) / 2
@@ -67,16 +68,19 @@ function update_feas(cone::EpiPerSquare)
     else
         cone.is_feas = false
     end
+
     cone.feas_updated = true
     return cone.is_feas
 end
 
 function update_grad(cone::EpiPerSquare)
     @assert cone.is_feas
+
     @. cone.grad = cone.point / cone.dist
     g2 = cone.grad[2]
     cone.grad[2] = -cone.grad[1]
     cone.grad[1] = -g2
+
     cone.grad_updated = true
     return cone.grad
 end
@@ -84,23 +88,27 @@ end
 function update_hess(cone::EpiPerSquare)
     @assert cone.grad_updated
     H = cone.hess.data
+
     mul!(H, cone.grad, cone.grad')
     invdist = inv(cone.dist)
     @inbounds for j in 3:cone.dim
         H[j, j] += invdist
     end
     H[1, 2] -= invdist
+
     cone.hess_updated = true
     return cone.hess
 end
 
 function update_inv_hess(cone::EpiPerSquare)
     @assert cone.is_feas
+
     mul!(cone.inv_hess.data, cone.point, cone.point')
     @inbounds for j in 3:cone.dim
         cone.inv_hess.data[j, j] += cone.dist
     end
     cone.inv_hess.data[1, 2] -= cone.dist
+
     cone.inv_hess_updated = true
     return cone.inv_hess
 end
@@ -109,25 +117,27 @@ update_hess_prod(cone::EpiPerSquare) = nothing
 update_inv_hess_prod(cone::EpiPerSquare) = nothing
 
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerSquare)
-    p1 = cone.point[1]
-    p2 = cone.point[2]
-    p3 = @view cone.point[3:end]
+    u = cone.point[1]
+    v = cone.point[2]
+    w = @view cone.point[3:end]
+
     @inbounds for j in 1:size(prod, 2)
-        arr_1j = arr[1, j]
-        arr_2j = arr[2, j]
-        arr_3j = @view arr[3:end, j]
-        ga = dot(p3, arr_3j) - p2 * arr_1j - p1 * arr_2j
-        ga /= cone.dist
-        prod[1, j] = -ga * p2 - arr_2j
-        prod[2, j] = -ga * p1 - arr_1j
-        @. prod[3:end, j] = ga * p3 + arr_3j
+        uj = arr[1, j]
+        vj = arr[2, j]
+        wj = @view arr[3:end, j]
+        ga = (dot(w, wj) - v * uj - u * vj) / cone.dist
+        prod[1, j] = -ga * v - vj
+        prod[2, j] = -ga * u - uj
+        @. prod[3:end, j] = ga * w + wj
     end
-    @. prod ./= cone.dist
+    @. prod /= cone.dist
+
     return prod
 end
 
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerSquare)
     @assert cone.is_feas
+
     @inbounds for j in 1:size(prod, 2)
         @views pa = dot(cone.point, arr[:, j])
         @. prod[:, j] = pa * cone.point
@@ -135,5 +145,55 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Epi
     @. @views prod[1, :] -= cone.dist * arr[2, :]
     @. @views prod[2, :] -= cone.dist * arr[1, :]
     @. @views prod[3:end, :] += cone.dist * arr[3:end, :]
+
+    return prod
+end
+
+# TODO fix
+function hess_sqrt_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiPerSquare{T}) where {T <: Real}
+    @assert cone.is_feas
+    u = cone.point[1]
+    v = cone.point[2]
+    w = @view cone.point[3:end]
+
+    rt2 = sqrt(T(2))
+    distrt2 = cone.dist * rt2
+    rtdist = sqrt(cone.dist)
+    urtdist = u + rtdist * rt2
+    @inbounds for j in 1:size(arr, 2)
+        uj = arr[1, j]
+        vj = arr[2, j]
+        @views wj = arr[3:end, j]
+        dotwwj = dot(w, wj)
+        prod[1, j] = (v * vj - dotwwj) / distrt2
+        prod[2, j] = (u * uj - dotwwj) / distrt2
+        wmulj = (dotwwj / urtdist - (uj + vj) / 2) / distrt2
+        @. prod[3:end, j] = w * wmulj + wj / rtdist
+    end
+
+    return prod
+end
+
+# TODO fix
+function inv_hess_sqrt_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiPerSquare{T}) where {T <: Real}
+    @assert cone.is_feas
+    u = cone.point[1]
+    v = cone.point[2]
+    w = @view cone.point[3:end]
+
+    rt2 = sqrt(T(2))
+    rtdist = sqrt(cone.dist)
+    urtdist = u + rtdist * rt2
+    @inbounds for j in 1:size(arr, 2)
+        uj = arr[1, j]
+        vj = arr[2, j]
+        @views wj = arr[3:end, j]
+        dotwwj = dot(w, wj)
+        prod[1, j] = (v * vj + dotwwj) / rt2
+        prod[2, j] = (u * uj + dotwwj) / rt2
+        wmulj = (dotwwj / urtdist + uj + vj) / rt2
+        @. prod[3:end, j] = w * wmulj + wj * rtdist
+    end
+
     return prod
 end

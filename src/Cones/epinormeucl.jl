@@ -21,6 +21,7 @@ mutable struct EpiNormEucl{T <: Real} <: Cone{T}
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
+
     dist::T
 
     function EpiNormEucl{T}(dim::Int, is_dual::Bool) where {T <: Real}
@@ -85,7 +86,7 @@ function update_hess(cone::EpiNormEucl)
     @assert cone.grad_updated
 
     mul!(cone.hess.data, cone.grad, cone.grad')
-    cone.hess += inv(cone.dist) * I
+    cone.hess += inv(cone.dist) * I # TODO inefficient?
     cone.hess[1, 1] -= 2 / cone.dist
 
     cone.hess_updated = true
@@ -96,7 +97,7 @@ function update_inv_hess(cone::EpiNormEucl)
     @assert cone.is_feas
 
     mul!(cone.inv_hess.data, cone.point, cone.point')
-    cone.inv_hess += cone.dist * I
+    cone.inv_hess += cone.dist * I # TODO inefficient?
     cone.inv_hess[1, 1] -= 2 * cone.dist
 
     cone.inv_hess_updated = true
@@ -108,16 +109,15 @@ update_inv_hess_prod(cone::EpiNormEucl) = nothing
 
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormEucl)
     @assert cone.is_feas
+    u = cone.point[1]
+    w = @view cone.point[2:end]
 
-    p1 = cone.point[1]
-    p2 = @view cone.point[2:end]
     @inbounds for j in 1:size(prod, 2)
-        arr_1j = arr[1, j]
-        arr_2j = @view arr[2:end, j]
-        ga = dot(p2, arr_2j) - p1 * arr_1j
-        ga /= cone.dist
-        prod[1, j] = -ga * p1 - arr_1j
-        @. prod[2:end, j] = ga * p2 + arr_2j
+        uj = arr[1, j]
+        wj = @view arr[2:end, j]
+        ga = (dot(w, wj) - u * uj) / cone.dist
+        prod[1, j] = -ga * u - uj
+        @. prod[2:end, j] = ga * w + wj
     end
     @. prod ./= cone.dist
 
@@ -140,7 +140,7 @@ end
 function hess_sqrt_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiNormEucl{T}) where {T <: Real}
     @assert cone.is_feas
     u = cone.point[1]
-    w = view(cone.point, 2:cone.dim)
+    w = @view cone.point[2:end]
 
     rt2 = sqrt(T(2))
     distrt2 = cone.dist * rt2
@@ -150,6 +150,7 @@ function hess_sqrt_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, co
         uj = arr[1, j]
         @views wj = arr[2:end, j]
         dotwwj = dot(w, wj)
+
         prod[1, j] = (u * uj - dotwwj) / distrt2
         wmulj = (dotwwj / urtdist - uj) / distrt2
         @. prod[2:end, j] = w * wmulj + wj / rtdist
@@ -161,7 +162,7 @@ end
 function inv_hess_sqrt_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiNormEucl{T}) where {T <: Real}
     @assert cone.is_feas
     u = cone.point[1]
-    w = view(cone.point, 2:cone.dim)
+    w = @view cone.point[2:end]
 
     rt2 = sqrt(T(2))
     rtdist = sqrt(cone.dist)
