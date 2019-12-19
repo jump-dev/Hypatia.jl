@@ -8,7 +8,8 @@ self-concordant barrier from "A homogeneous interior-point algorithm for nonsymm
 -log(v*log(u/v) - w) - log(u) - log(v)
 
 TODO
-use StaticArrays?
+- use StaticArrays?
+- code hess/invhess sqrt prod using symmetric sqrt?
 =#
 
 mutable struct EpiPerExp{T <: Real} <: Cone{T}
@@ -19,19 +20,26 @@ mutable struct EpiPerExp{T <: Real} <: Cone{T}
     grad_updated::Bool
     hess_updated::Bool
     inv_hess_updated::Bool
+    hess_prod_updated::Bool
+    inv_hess_prod_updated::Bool
     is_feas::Bool
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
+    hess_fact_cache
 
     luv::T
     vluvw::T
     g1a::T
     g2a::T
 
-    function EpiPerExp{T}(is_dual::Bool) where {T <: Real}
+    function EpiPerExp{T}(
+        is_dual::Bool;
+        hess_fact_cache = hessian_cache(T),
+        ) where {T <: Real}
         cone = new{T}()
         cone.use_dual = is_dual
+        cone.hess_fact_cache = hess_fact_cache
         return cone
     end
 end
@@ -40,7 +48,7 @@ EpiPerExp{T}() where {T <: Real} = EpiPerExp{T}(false)
 
 dimension(cone::EpiPerExp) = 3
 
-reset_data(cone::EpiPerExp) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
+reset_data(cone::EpiPerExp) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_prod_updated = cone.inv_hess_prod_updated = false)
 
 # TODO only allocate the fields we use
 function setup_data(cone::EpiPerExp{T}) where {T <: Real}
@@ -49,6 +57,7 @@ function setup_data(cone::EpiPerExp{T}) where {T <: Real}
     cone.grad = zeros(T, 3)
     cone.hess = Symmetric(zeros(T, 3, 3), :U)
     cone.inv_hess = Symmetric(zeros(T, 3, 3), :U)
+    load_matrix(cone.hess_fact_cache, cone.hess)
     return
 end
 
@@ -109,35 +118,38 @@ function update_hess(cone::EpiPerExp)
     return cone.hess
 end
 
-function update_inv_hess(cone::EpiPerExp)
-    @assert cone.is_feas
-    (u, v, w) = (cone.point[1], cone.point[2], cone.point[3])
-    Hi = cone.inv_hess.data
-    vluvw = cone.vluvw
-    vluv = vluvw + w
-    denom = vluvw + 2 * v
-    uvdenom = u * v / denom
+# TODO add hess prod function
 
-    Hi[1, 1] = u * (vluvw + v) / denom * u
-    Hi[2, 2] = v * (vluvw + v) / denom * v
-    Hi[3, 3] = 2 * (abs2(vluv - v) + vluv * (v - w)) + abs2(w) - v / denom * abs2(vluv - 2 * v)
-    Hi[1, 2] = uvdenom * v
-    Hi[1, 3] = uvdenom * (2 * vluv - w)
-    Hi[2, 3] = (abs2(vluv) + w * (v - vluv)) / denom * v
-
-    cone.inv_hess_updated = true
-    return cone.inv_hess
-end
-
-function update_inv_hess_prod(cone::EpiPerExp)
-    if !cone.inv_hess_updated
-        update_inv_hess(cone)
-    end
-    return nothing
-end
-
-function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerExp)
-    update_inv_hess_prod(cone)
-    mul!(prod, cone.inv_hess, arr)
-    return prod
-end
+# TODO decide whether to keep
+# function update_inv_hess(cone::EpiPerExp)
+#     @assert cone.is_feas
+#     (u, v, w) = (cone.point[1], cone.point[2], cone.point[3])
+#     Hi = cone.inv_hess.data
+#     vluvw = cone.vluvw
+#     vluv = vluvw + w
+#     denom = vluvw + 2 * v
+#     uvdenom = u * v / denom
+#
+#     Hi[1, 1] = u * (vluvw + v) / denom * u
+#     Hi[2, 2] = v * (vluvw + v) / denom * v
+#     Hi[3, 3] = 2 * (abs2(vluv - v) + vluv * (v - w)) + abs2(w) - v / denom * abs2(vluv - 2 * v)
+#     Hi[1, 2] = uvdenom * v
+#     Hi[1, 3] = uvdenom * (2 * vluv - w)
+#     Hi[2, 3] = (abs2(vluv) + w * (v - vluv)) / denom * v
+#
+#     cone.inv_hess_updated = true
+#     return cone.inv_hess
+# end
+#
+# function update_inv_hess_prod(cone::EpiPerExp)
+#     if !cone.inv_hess_updated
+#         update_inv_hess(cone)
+#     end
+#     return nothing
+# end
+#
+# function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerExp)
+#     update_inv_hess_prod(cone)
+#     mul!(prod, cone.inv_hess, arr)
+#     return prod
+# end
