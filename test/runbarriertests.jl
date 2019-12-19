@@ -7,8 +7,8 @@ include(joinpath(@__DIR__, "barrier.jl"))
 barrier_testfuns = [
     # test_nonnegative_barrier,
     # test_epinorminf_barrier,
-    test_epinormeucl_barrier,
-    # test_epipersquare_barrier,
+    # test_epinormeucl_barrier,
+    test_epipersquare_barrier,
     # test_epiperexp_barrier,
     # test_hypoperlog_barrier,
     # test_power_barrier,
