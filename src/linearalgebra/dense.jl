@@ -43,7 +43,7 @@ function load_matrix(cache::LAPACKNonSymCache{T}, A::Matrix{T}; copy_A::Bool = t
     n = LinearAlgebra.checksquare(A)
     cache.copy_A = copy_A
     cache.AF = (copy_A ? similar(A) : A) # copy over A to new matrix or use A directly
-    cache.ipiv = Vector{Int}(undef, n)
+    cache.ipiv = Vector{BlasInt}(undef, n)
     cache.info = Ref{BlasInt}()
     return cache
 end
@@ -146,7 +146,7 @@ function load_matrix(cache::LAPACKSymCache{T}, A::Symmetric{T, <:AbstractMatrix{
     n = LinearAlgebra.checksquare(A.data)
     cache.copy_A = copy_A
     cache.AF = (copy_A ? similar(A) : A) # copy over A to new matrix or use A directly
-    cache.ipiv = Vector{Int}(undef, n)
+    cache.ipiv = Vector{BlasInt}(undef, n)
     cache.work = Vector{T}(undef, n) # NOTE this will be resized according to query
     cache.lwork = BlasInt(-1) # NOTE -1 initiates a query for optimal size of work
     cache.info = Ref{BlasInt}()
@@ -259,7 +259,7 @@ DenseSymCache{T}() where {T <: BlasReal} = LAPACKSymCache{T}()
 DenseSymCache{T}() where {T <: Real} = LUSymCache{T}()
 
 #=
-symmetric positive definite: Cholesky
+symmetric positive definite: unpivoted Cholesky
 =#
 
 abstract type DensePosDefCache{T <: Real} end

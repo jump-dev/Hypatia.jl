@@ -118,5 +118,3 @@ function get_affine_data_vaf(cone::SvecCone, fi::MOI.VectorAffineFunction{Float6
     Vhi = scalevec .* fi.constants
     return (VGi, Vhi)
 end
-
-# TODO scale for WSOSInterpPossemidefTriCone?

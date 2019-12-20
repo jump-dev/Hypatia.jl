@@ -46,9 +46,9 @@ testfuns_many = [
     epinormeucl1,
     epinormeucl2,
     epinormeucl3,
-    # epipersquare1,
-    # epipersquare2,
-    # epipersquare3,
+    epipersquare1,
+    epipersquare2,
+    epipersquare3,
     epiperexp1,
     epiperexp2,
     epiperexp3,
@@ -95,7 +95,7 @@ testfuns_many = [
     primalinfeas2,
     primalinfeas3,
     dualinfeas1,
-    # dualinfeas2,
+    dualinfeas2,
     dualinfeas3,
     ]
 
