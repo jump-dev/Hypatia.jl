@@ -18,12 +18,18 @@ mutable struct EpiPerSquare{T <: Real} <: Cone{T}
     grad_updated::Bool
     hess_updated::Bool
     inv_hess_updated::Bool
+    hess_sqrt_prod_updated::Bool
+    inv_hess_sqrt_prod_updated::Bool
     is_feas::Bool
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
 
     dist::T
+    rtdist::T
+    denom::T
+    hess_sqrt_vec::Vector{T}
+    inv_hess_sqrt_vec::Vector{T}
 
     function EpiPerSquare{T}(dim::Int, is_dual::Bool) where {T <: Real}
         @assert dim >= 3
@@ -36,7 +42,7 @@ end
 
 EpiPerSquare{T}(dim::Int) where {T <: Real} = EpiPerSquare{T}(dim, false)
 
-reset_data(cone::EpiPerSquare) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
+reset_data(cone::EpiPerSquare) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_sqrt_prod_updated = cone.inv_hess_sqrt_prod_updated = false)
 
 function setup_data(cone::EpiPerSquare{T}) where {T <: Real}
     reset_data(cone)
@@ -45,6 +51,8 @@ function setup_data(cone::EpiPerSquare{T}) where {T <: Real}
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
+    cone.hess_sqrt_vec = zeros(T, dim)
+    cone.inv_hess_sqrt_vec = zeros(T, dim)
     return
 end
 
@@ -149,20 +157,45 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Epi
     return prod
 end
 
-function hess_sqrt_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiPerSquare{T}) where {T <: Real}
+function update_hess_sqrt_prod(cone::EpiPerSquare)
     @assert cone.is_feas
+    @assert !cone.hess_sqrt_prod_updated
 
-    # TODO setup function (maybe for epinormeucl too?)
-    tmp = similar(cone.point)
-    rtdist = sqrt(cone.dist)
-    @. @views tmp[3:end] = cone.point[3:end] / rtdist
-    tmp[1] = -cone.point[2] / rtdist - 1
-    tmp[2] = -cone.point[1] / rtdist - 1
-    tmp ./= sqrt(2 * rtdist + cone.point[1] + cone.point[2])
+    rtdist = cone.rtdist = sqrt(cone.dist)
+    cone.denom = 2 * rtdist + cone.point[1] + cone.point[2]
+    vec = cone.hess_sqrt_vec
+    @. @views vec[3:end] = cone.point[3:end] / rtdist
+    vec[1] = -cone.point[2] / rtdist - 1
+    vec[2] = -cone.point[1] / rtdist - 1
+
+    cone.hess_sqrt_prod_updated = true
+    return nothing
+end
+
+function update_inv_hess_sqrt_prod(cone::EpiPerSquare)
+    @assert cone.is_feas
+    @assert !cone.inv_hess_sqrt_prod_updated
+
+    rtdist = cone.rtdist = sqrt(cone.dist)
+    cone.denom = 2 * rtdist + cone.point[1] + cone.point[2]
+    vec = cone.inv_hess_sqrt_vec
+    copyto!(vec, cone.point)
+    vec[1:2] .+= rtdist
+
+    cone.inv_hess_sqrt_prod_updated = true
+    return nothing
+end
+
+function hess_sqrt_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiPerSquare{T}) where {T <: Real}
+    if !cone.hess_sqrt_prod_updated
+        update_hess_sqrt_prod(cone)
+    end
+    vec = cone.hess_sqrt_vec
+    rtdist = cone.rtdist
 
     @inbounds for j in 1:size(arr, 2)
-        @views dotj = dot(tmp, arr[:, j])
-        @. prod[:, j] = dotj * tmp
+        @views dotj = dot(vec, arr[:, j]) / cone.denom
+        @. prod[:, j] = dotj * vec
     end
     @. @views prod[1, :] -= arr[2, :] / rtdist
     @. @views prod[2, :] -= arr[1, :] / rtdist
@@ -172,18 +205,15 @@ function hess_sqrt_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, co
 end
 
 function inv_hess_sqrt_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiPerSquare{T}) where {T <: Real}
-    @assert cone.is_feas
-
-    # TODO setup function
-    tmp = similar(cone.point)
-    rtdist = sqrt(cone.dist)
-    copyto!(tmp, cone.point)
-    tmp[1:2] .+= rtdist
-    tmp ./= sqrt(2 * rtdist + cone.point[1] + cone.point[2])
+    if !cone.inv_hess_sqrt_prod_updated
+        update_inv_hess_sqrt_prod(cone)
+    end
+    vec = cone.inv_hess_sqrt_vec
+    rtdist = cone.rtdist
 
     @inbounds for j in 1:size(arr, 2)
-        @views dotj = dot(tmp, arr[:, j])
-        @. prod[:, j] = dotj * tmp
+        @views dotj = dot(vec, arr[:, j]) / cone.denom
+        @. prod[:, j] = dotj * vec
     end
     @. @views prod[1, :] -= arr[2, :] * rtdist
     @. @views prod[2, :] -= arr[1, :] * rtdist
