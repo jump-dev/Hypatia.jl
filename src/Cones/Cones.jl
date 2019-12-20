@@ -70,23 +70,45 @@ function hess_nz_idxs_col(cone::Cone, j::Int, lower_only::Bool)
 end
 inv_hess_nz_idxs_col(cone::Cone, j::Int, lower_only::Bool) = hess_nz_idxs_col(cone, j, lower_only) # NOTE careful: fallback yields same for inv hess as hess
 
-reset_data(cone::Cone) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.inv_hess_prod_updated = false)
+reset_data(cone::Cone) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = false)
 
 update_hess_prod(cone::Cone) = nothing
 
-function update_inv_hess_prod(cone::Cone{T}) where {T}
+function update_hess_fact(cone::Cone{T}) where {T <: LinearAlgebra.BlasReal}
+    @assert !cone.hess_fact_updated
     if !cone.hess_updated
         update_hess(cone)
     end
-    update_fact(cone.hess_fact_cache, cone.hess)
-    # TODO recover if fails - check issuccess
-    cone.inv_hess_prod_updated = true
+    if !update_fact(cone.hess_fact_cache, cone.hess)
+        warn("Hessian factorization failed")
+        if cone.hess_fact_cache isa DensePosDefCache{T}
+            @warn("Switching from Cholesky to Bunch Kaufman")
+            cone.hess_fact_cache = DenseSymCache{T}()
+            load_matrix(cone.hess_fact_cache, cone.hess)
+        else
+            cone.hess += sqrt(eps(T)) * I # attempt recovery
+        end
+        if !update_fact(cone.hess_fact_cache, cone.hess)
+            warn("Bunch Kaufman factorization failed")
+        end
+    end
+    cone.hess_fact_updated = true
     return
 end
 
+# function update_hess_fact(cone::Cone{T}) where {T}
+#     if !cone.hess_updated
+#         update_hess(cone)
+#     end
+#     update_fact(cone.hess_fact_cache, cone.hess)
+#     # TODO recover if fails - check issuccess
+#     cone.hess_fact_updated = true
+#     return
+# end
+
 function update_inv_hess(cone::Cone)
-    if !cone.inv_hess_prod_updated
-        update_inv_hess_prod(cone)
+    if !cone.hess_fact_updated
+        update_hess_fact(cone)
     end
     invert(cone.hess_fact_cache, cone.inv_hess)
     cone.inv_hess_updated = true
@@ -101,8 +123,8 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
 end
 
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
-    if !cone.inv_hess_prod_updated
-        update_inv_hess_prod(cone)
+    if !cone.hess_fact_updated
+        update_hess_fact(cone)
     end
     copyto!(prod, arr)
     solve_system(cone.hess_fact_cache, prod)
@@ -110,15 +132,15 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Con
 end
 
 function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
-    if !cone.inv_hess_prod_updated # TODO rename
-        update_inv_hess_prod(cone)
+    if !cone.hess_fact_updated # TODO rename
+        update_hess_fact(cone)
     end
     return mul!(prod, UpperTriangular(cone.hess_fact_cache.AF), arr)
 end
 
 function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
-    if !cone.inv_hess_prod_updated # TODO rename
-        update_inv_hess_prod(cone)
+    if !cone.hess_fact_updated # TODO rename
+        update_hess_fact(cone)
     end
     copyto!(prod, arr)
     return ldiv!(UpperTriangular(cone.hess_fact_cache.AF.data)', prod)

@@ -121,8 +121,8 @@ function update_inv_hess(cone::EpiPerSquare)
     return cone.inv_hess
 end
 
-update_hess_prod(cone::EpiPerSquare) = nothing
-update_inv_hess_prod(cone::EpiPerSquare) = nothing
+# update_hess_prod(cone::EpiPerSquare) = nothing
+# update_inv_hess_prod(cone::EpiPerSquare) = nothing
 
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerSquare)
     u = cone.point[1]
@@ -169,7 +169,7 @@ function update_hess_sqrt_prod(cone::EpiPerSquare)
     vec[2] = -cone.point[1] / rtdist - 1
 
     cone.hess_sqrt_prod_updated = true
-    return nothing
+    return
 end
 
 function update_inv_hess_sqrt_prod(cone::EpiPerSquare)
@@ -183,7 +183,7 @@ function update_inv_hess_sqrt_prod(cone::EpiPerSquare)
     vec[1:2] .+= rtdist
 
     cone.inv_hess_sqrt_prod_updated = true
-    return nothing
+    return
 end
 
 function hess_sqrt_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiPerSquare{T}) where {T <: Real}
