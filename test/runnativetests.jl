@@ -9,8 +9,8 @@ const SO = Hypatia.Solvers
 
 generic_reals = [
     Float64,
-    Float32,
-    BigFloat,
+    # Float32,
+    # BigFloat,
     ]
 
 blas_reals = [
@@ -80,10 +80,10 @@ options = (verbose = true,)
         # Hypatia.DensePosDefCache
         ]
     qrchol_sqrt_hess_prod = [
-        true,
-        # false,
+        # true,
+        false,
         ]
     @testset "QRCholDense tests: $t, $T, $c, $p" for t in testfuns_many, T in generic_reals, c in qrchol_cache, p in qrchol_sqrt_hess_prod
-        t(T, solver = SO.Solver{T}(system_solver = SO.QRCholDenseSystemSolver{T}(fact_cache = c{T}(), use_hess_sqrt = p); options...))
+        t(T, solver = SO.Solver{T}(tol_feas = 1e-6, system_solver = SO.QRCholDenseSystemSolver{T}(fact_cache = c{T}(), use_hess_sqrt = p); options...))
     end
 end
