@@ -149,51 +149,45 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Epi
     return prod
 end
 
-# TODO fix
 function hess_sqrt_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiPerSquare{T}) where {T <: Real}
     @assert cone.is_feas
-    u = cone.point[1]
-    v = cone.point[2]
-    w = @view cone.point[3:end]
 
-    rt2 = sqrt(T(2))
-    distrt2 = cone.dist * rt2
+    # TODO setup function (maybe for epinormeucl too?)
+    tmp = similar(cone.point)
     rtdist = sqrt(cone.dist)
-    urtdist = u + rtdist * rt2
+    @. @views tmp[3:end] = cone.point[3:end] / rtdist
+    tmp[1] = -cone.point[2] / rtdist - 1
+    tmp[2] = -cone.point[1] / rtdist - 1
+    tmp ./= sqrt(2 * rtdist + cone.point[1] + cone.point[2])
+
     @inbounds for j in 1:size(arr, 2)
-        uj = arr[1, j]
-        vj = arr[2, j]
-        @views wj = arr[3:end, j]
-        dotwwj = dot(w, wj)
-        prod[1, j] = (v * vj - dotwwj) / distrt2
-        prod[2, j] = (u * uj - dotwwj) / distrt2
-        wmulj = (dotwwj / urtdist - (uj + vj) / 2) / distrt2
-        @. prod[3:end, j] = w * wmulj + wj / rtdist
+        @views dotj = dot(tmp, arr[:, j])
+        @. prod[:, j] = dotj * tmp
     end
+    @. @views prod[1, :] -= arr[2, :] / rtdist
+    @. @views prod[2, :] -= arr[1, :] / rtdist
+    @. @views prod[3:end, :] += arr[3:end, :] / rtdist
 
     return prod
 end
 
-# TODO fix
 function inv_hess_sqrt_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiPerSquare{T}) where {T <: Real}
     @assert cone.is_feas
-    u = cone.point[1]
-    v = cone.point[2]
-    w = @view cone.point[3:end]
 
-    rt2 = sqrt(T(2))
+    # TODO setup function
+    tmp = similar(cone.point)
     rtdist = sqrt(cone.dist)
-    urtdist = u + rtdist * rt2
+    copyto!(tmp, cone.point)
+    tmp[1:2] .+= rtdist
+    tmp ./= sqrt(2 * rtdist + cone.point[1] + cone.point[2])
+
     @inbounds for j in 1:size(arr, 2)
-        uj = arr[1, j]
-        vj = arr[2, j]
-        @views wj = arr[3:end, j]
-        dotwwj = dot(w, wj)
-        prod[1, j] = (v * vj + dotwwj) / rt2
-        prod[2, j] = (u * uj + dotwwj) / rt2
-        wmulj = (dotwwj / urtdist + uj + vj) / rt2
-        @. prod[3:end, j] = w * wmulj + wj * rtdist
+        @views dotj = dot(tmp, arr[:, j])
+        @. prod[:, j] = dotj * tmp
     end
+    @. @views prod[1, :] -= arr[2, :] * rtdist
+    @. @views prod[2, :] -= arr[1, :] * rtdist
+    @. @views prod[3:end, :] += arr[3:end, :] * rtdist
 
     return prod
 end
