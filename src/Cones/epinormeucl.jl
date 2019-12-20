@@ -150,7 +150,6 @@ function hess_sqrt_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, co
         uj = arr[1, j]
         @views wj = arr[2:end, j]
         dotwwj = dot(w, wj)
-
         prod[1, j] = (u * uj - dotwwj) / distrt2
         wmulj = (dotwwj / urtdist - uj) / distrt2
         @. prod[2:end, j] = w * wmulj + wj / rtdist
