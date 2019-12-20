@@ -162,7 +162,7 @@ function update_hess_inv_hess(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{
     end
 
     cone.hess_inv_hess_updated = true
-    return nothing
+    return
 end
 
 # symmetric arrow matrix
