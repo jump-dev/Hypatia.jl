@@ -24,7 +24,7 @@ mutable struct EpiNormSpectral{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     hess_updated::Bool
     inv_hess_updated::Bool
     hess_prod_updated::Bool
-    inv_hess_prod_updated::Bool
+    hess_fact_updated::Bool
     is_feas::Bool
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
@@ -62,7 +62,7 @@ end
 
 EpiNormSpectral{T, R}(n::Int, m::Int) where {R <: RealOrComplex{T}} where {T <: Real} = EpiNormSpectral{T, R}(n, m, false)
 
-reset_data(cone::EpiNormSpectral) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_prod_updated = cone.inv_hess_prod_updated = false)
+reset_data(cone::EpiNormSpectral) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_prod_updated = cone.hess_fact_updated = false)
 
 # TODO only allocate the fields we use
 function setup_data(cone::EpiNormSpectral{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
@@ -136,7 +136,7 @@ function update_hess_prod(cone::EpiNormSpectral)
     cone.Huu = 4 * abs2(u) * sum(abs2, cone.Zi) + (cone.grad[1] - 2 * (cone.n - 1) / u) / u
 
     cone.hess_prod_updated = true
-    return nothing
+    return
 end
 
 function update_hess(cone::EpiNormSpectral)
@@ -186,7 +186,7 @@ end
 
 function _hess_WW_element(H::Matrix{T}, r_idx::Int, c_idx::Int, term1::T, term2::T) where {T <: Real}
     @inbounds H[r_idx, c_idx] = term1 + term2
-    return nothing
+    return
 end
 
 function _hess_WW_element(H::Matrix{T}, r_idx::Int, c_idx::Int, term1::Complex{T}, term2::Complex{T}) where {T <: Real}
@@ -196,7 +196,7 @@ function _hess_WW_element(H::Matrix{T}, r_idx::Int, c_idx::Int, term1::Complex{T
         H[r_idx, c_idx + 1] = imag(term1) + imag(term2)
         H[r_idx + 1, c_idx + 1] = real(term1) - real(term2)
     end
-    return nothing
+    return
 end
 
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormSpectral)

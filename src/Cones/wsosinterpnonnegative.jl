@@ -21,7 +21,7 @@ mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T
     grad_updated::Bool
     hess_updated::Bool
     inv_hess_updated::Bool
-    inv_hess_prod_updated::Bool
+    hess_fact_updated::Bool
     is_feas::Bool
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}

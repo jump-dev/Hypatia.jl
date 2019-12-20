@@ -78,8 +78,8 @@ function update_inv_hess(cone::Nonnegative)
     return cone.inv_hess
 end
 
-update_hess_prod(cone::Nonnegative) = nothing
-update_inv_hess_prod(cone::Nonnegative) = nothing
+# update_hess_prod(cone::Nonnegative) = nothing
+# update_inv_hess_prod(cone::Nonnegative) = nothing
 
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Nonnegative)
     @assert cone.is_feas
