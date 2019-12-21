@@ -91,7 +91,7 @@ function update_feas(cone::WSOSInterpNonnegative)
         LLk = cone.tmpLL[k]
         mul!(ULk, D, Pk)
         mul!(LLk, Pk', ULk)
-        
+
         ΛFk = cholesky!(Hermitian(LLk, :L), check = false)
         if !isposdef(ΛFk)
             cone.is_feas = false
@@ -113,8 +113,7 @@ function update_grad(cone::WSOSInterpNonnegative)
     cone.grad .= 0
     @inbounds for k in eachindex(cone.Ps)
         LUk = cone.tmpLU[k]
-        copyto!(LUk, cone.Ps[k]')
-        ldiv!(cone.ΛF[k].L, LUk)
+        ldiv!(LUk, cone.ΛF[k].L, cone.Ps[k]')
         @inbounds for j in 1:cone.dim
             cone.grad[j] -= sum(abs2, view(LUk, :, j))
         end
