@@ -140,8 +140,7 @@ function update_grad(cone::WSOSInterpPosSemidefTri)
             block_L_p_idxs = block_idxs(L, p)
             @views ΛFLP_pp = ΛFLP[block_L_p_idxs, block_U_p_idxs]
             # ΛFLP_pp = ΛFL_pp \ P'
-            @views copyto!(ΛFLP_pp, cone.Ps[k]')
-            ldiv!(LowerTriangular(ΛFL[block_L_p_idxs, block_L_p_idxs]), ΛFLP_pp)
+            @views ldiv!(ΛFLP_pp, LowerTriangular(ΛFL[block_L_p_idxs, block_L_p_idxs]), cone.Ps[k]')
             # to get off-diagonals in ΛFLP, subtract known blocks aggregated in ΛFLP_qp
             @inbounds for q in (p + 1):R
                 block_L_q_idxs = block_idxs(L, q)
