@@ -179,14 +179,12 @@ function update_grad(cone::WSOSInterpEpiNormEucl{T}) where {T}
         Λi_Λ = cone.Λi_Λ[k]
 
         # P * inv(Λ_11) * P' for (1, 1) hessian block and adding to PΛiPs[r][r]
-        copyto!(LUk, Psk')
-        ldiv!(cone.lambdafact[k].L, LUk) # TODO may be more efficient to do ldiv(fact.U', B) than ldiv(fact.L, B) here and elsewhere since the factorizations are of symmetric :U matrices
+        ldiv!(LUk, cone.lambdafact[k].L, Psk') # TODO may be more efficient to do ldiv(fact.U', B) than ldiv(fact.L, B) here and elsewhere since the factorizations are of symmetric :U matrices
         mul!(UUk, LUk', LUk)
 
         # prep PΛiPs
         # block-(1,1) is P * inv(mat) * P'
-        copyto!(LUk, Psk')
-        ldiv!(matfact[k].L, LUk)
+        ldiv!(LUk, matfact[k].L, Psk')
         mul!(PΛiPs[1][1], LUk', LUk)
         # get all the PΛiPs that are in row one or on the diagonal
         @inbounds for r in 2:R
