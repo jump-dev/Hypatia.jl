@@ -249,7 +249,7 @@ function update_fact(system_solver::SymIndefSparseSystemSolver, solver::Solver)
 end
 
 function solve_subsystem(system_solver::SymIndefSparseSystemSolver, sol3::Matrix, rhs3::Matrix)
-    solve_system(system_solver.fact_cache, sol3, system_solver.lhs3, rhs3)
+    inv_prod(system_solver.fact_cache, sol3, system_solver.lhs3, rhs3)
     return sol3
 end
 

@@ -217,7 +217,7 @@ function update_fact(system_solver::NaiveSparseSystemSolver, solver::Solver)
 end
 
 function solve_system(system_solver::NaiveSparseSystemSolver, solver::Solver, sol6::Matrix, rhs6::Matrix)
-    @timeit solver.timer "solve_system" solve_system(system_solver.fact_cache, sol6, system_solver.lhs6, rhs6)
+    @timeit solver.timer "solve_system" inv_prod(system_solver.fact_cache, sol6, system_solver.lhs6, rhs6)
     return sol6
 end
 
