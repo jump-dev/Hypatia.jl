@@ -49,9 +49,9 @@ options = (verbose = true,)
     # end
     #
     # # test each system solver
-    # @testset "NaiveDense tests: $t, $T" for t in testfuns_many, T in generic_reals
-    #     t(T, solver = SO.Solver{T}(system_solver = SO.NaiveDenseSystemSolver{T}(); options...))
-    # end
+    @testset "NaiveDense tests: $t, $T" for t in testfuns_many, T in generic_reals
+        t(T, solver = SO.Solver{T}(system_solver = SO.NaiveDenseSystemSolver{T}(); options...))
+    end
     # @testset "NaiveSparse tests: $t" for t in testfuns_many
     #     T = Float64
     #     t(T, solver = SO.Solver{T}(system_solver = SO.NaiveSparseSystemSolver{T}(); options...))
@@ -79,11 +79,7 @@ options = (verbose = true,)
         Hypatia.DenseSymCache,
         # Hypatia.DensePosDefCache
         ]
-    qrchol_sqrt_hess_prod = [
-        # true,
-        false,
-        ]
-    @testset "QRCholDense tests: $t, $T, $c, $p" for t in testfuns_many, T in generic_reals, c in qrchol_cache, p in qrchol_sqrt_hess_prod
-        t(T, solver = SO.Solver{T}(tol_feas = 1e-6, system_solver = SO.QRCholDenseSystemSolver{T}(fact_cache = c{T}(), use_hess_sqrt = p); options...))
+    @testset "QRCholDense tests: $t, $T, $c" for t in testfuns_many, T in generic_reals, c in qrchol_cache
+        t(T, solver = SO.Solver{T}(system_solver = SO.QRCholDenseSystemSolver{T}(fact_cache = c{T}()); options...))
     end
 end

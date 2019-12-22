@@ -321,15 +321,6 @@ end
 
 # TODO depends on complex/real
 # TODO don't form sparse hessian explicitly - inefficient
-hess_nz_count(cone::EpiNormInf, lower_only::Bool) = (lower_only ? 2 * cone.dim - 1 : 3 * cone.dim - 2)
-
-# the row indices of nonzero elements in column j, inverse Hessian is fully dense (sum of a diagonal plus rank-one matrix)
-function hess_nz_idxs_col(cone::EpiNormInf, j::Int, lower_only::Bool)
-    if j == 1
-        return 1:cone.dim
-    elseif lower_only
-        return j:j
-    else
-        return [1, j]
-    end
-end
+hess_nz_count(cone::EpiNormInf) = 3 * cone.dim - 2
+hess_nz_count_tril(cone::EpiNormInf) = 2 * cone.dim - 1
+hess_nz_idxs_col(cone::EpiNormInf, j::Int) = (j == 1 ? (1:cone.dim) : [1, j])
