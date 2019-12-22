@@ -78,7 +78,7 @@ end
 
 for (getrs, elty) in [(:dgetrs_, :Float64), (:sgetrs_, :Float32)]
     @eval begin
-        function solve_system(cache::LAPACKNonSymCache{$elty}, X::AbstractVecOrMat{$elty})
+        function inv_prod(cache::LAPACKNonSymCache{$elty}, X::AbstractVecOrMat{$elty})
             LinearAlgebra.require_one_based_indexing(X)
             LinearAlgebra.chkstride1(X)
 
@@ -116,7 +116,7 @@ function update_fact(cache::LUNonSymCache{T}, A::AbstractMatrix{T}) where {T <: 
     return issuccess(cache.fact)
 end
 
-solve_system(cache::LUNonSymCache{T}, X::AbstractVecOrMat{T}) where {T <: Real} = ldiv!(cache.fact, X)
+inv_prod(cache::LUNonSymCache{T}, X::AbstractVecOrMat{T}) where {T <: Real} = ldiv!(cache.fact, X)
 
 # default to LAPACKNonSymCache for BlasReals, otherwise generic LUNonSymCache
 DenseNonSymCache{T}() where {T <: BlasReal} = LAPACKNonSymCache{T}()
@@ -190,7 +190,7 @@ end
 
 for (sytrs_rook, elty) in [(:dsytrs_rook_, :Float64), (:ssytrs_rook_, :Float32)]
     @eval begin
-        function solve_system(cache::LAPACKSymCache{$elty}, X::AbstractVecOrMat{$elty})
+        function inv_prod(cache::LAPACKSymCache{$elty}, X::AbstractVecOrMat{$elty})
             LinearAlgebra.require_one_based_indexing(X)
             LinearAlgebra.chkstride1(X)
             AF = cache.AF.data
@@ -246,7 +246,7 @@ function update_fact(cache::LUSymCache{T}, A::Symmetric{T, <:AbstractMatrix{T}})
     return issuccess(cache.fact)
 end
 
-solve_system(cache::LUSymCache{T}, X::AbstractVecOrMat{T}) where {T <: Real} = ldiv!(cache.fact, X)
+inv_prod(cache::LUSymCache{T}, X::AbstractVecOrMat{T}) where {T <: Real} = ldiv!(cache.fact, X)
 
 function invert(cache::LUSymCache{T}, X::Symmetric{T, <:AbstractMatrix{T}}) where {T <: Real}
     copyto!(X.data, I)
@@ -310,25 +310,6 @@ for (potrf, elty) in [(:dpotrf_, :Float64), (:spotrf_, :Float32)]
     end
 end
 
-for (potrs, elty) in [(:dpotrs_, :Float64), (:spotrs_, :Float32)]
-    @eval begin
-        function solve_system(cache::LAPACKPosDefCache{$elty}, X::AbstractVecOrMat{$elty})
-            LinearAlgebra.require_one_based_indexing(X)
-            LinearAlgebra.chkstride1(X)
-            AF = cache.AF.data
-
-            # call dpotrs( uplo, n, nrhs, a, lda, b, ldb, info )
-            ccall((@blasfunc($potrs), liblapack), Cvoid,
-                (Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{$elty},
-                Ref{BlasInt}, Ptr{BlasInt}, Ref{BlasInt}, Ptr{BlasInt}),
-                cache.AF.uplo, size(AF, 1), size(X, 2), AF,
-                max(stride(AF, 2), 1), X, max(stride(X, 2), 1), cache.info)
-
-            return X
-        end
-    end
-end
-
 for (potri, elty) in [(:dpotri_, :Float64), (:spotri_, :Float32)]
     @eval begin
         function invert(cache::LAPACKPosDefCache{$elty}, X::Symmetric{$elty, Matrix{$elty}})
@@ -340,6 +321,25 @@ for (potri, elty) in [(:dpotri_, :Float64), (:spotri_, :Float32)]
                 Ptr{BlasInt}),
                 X.uplo, size(X.data, 1), X.data, max(stride(X.data, 2), 1),
                 cache.info)
+
+            return X
+        end
+    end
+end
+
+for (potrs, elty) in [(:dpotrs_, :Float64), (:spotrs_, :Float32)]
+    @eval begin
+        function inv_prod(cache::LAPACKPosDefCache{$elty}, X::AbstractVecOrMat{$elty})
+            LinearAlgebra.require_one_based_indexing(X)
+            LinearAlgebra.chkstride1(X)
+            AF = cache.AF.data
+
+            # call dpotrs( uplo, n, nrhs, a, lda, b, ldb, info )
+            ccall((@blasfunc($potrs), liblapack), Cvoid,
+                (Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{$elty},
+                Ref{BlasInt}, Ptr{BlasInt}, Ref{BlasInt}, Ptr{BlasInt}),
+                cache.AF.uplo, size(AF, 1), size(X, 2), AF,
+                max(stride(AF, 2), 1), X, max(stride(X, 2), 1), cache.info)
 
             return X
         end
@@ -370,13 +370,19 @@ function update_fact(cache::CholPosDefCache{T}, A::Symmetric{T, <:AbstractMatrix
     return issuccess(cache.fact)
 end
 
-solve_system(cache::CholPosDefCache{T}, X::AbstractVecOrMat{T}) where {T <: Real} = ldiv!(cache.fact, X)
-
 function invert(cache::CholPosDefCache{T}, X::Symmetric{T, <:AbstractMatrix{T}}) where {T <: Real}
     copyto!(X.data, I)
     ldiv!(cache.fact, X.data) # just ldiv an identity matrix - LinearAlgebra currently does the same
     return X
 end
+
+inv_prod(cache::CholPosDefCache{T}, X::AbstractVecOrMat{T}) where {T <: Real} = ldiv!(cache.fact, X)
+
+const PosDefCache{T <: Real} = Union{LAPACKPosDefCache{T}, CholPosDefCache{T}}
+
+sqrt_prod(cache::PosDefCache{T}, prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}) where {T <: Real} = mul!(prod, UpperTriangular(cache.AF.data), arr)
+
+inv_sqrt_prod(cache::PosDefCache{T}, prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}) where {T <: Real} = mul!(prod, UpperTriangular(cache.AF.data)', arr)
 
 # default to LAPACKPosDefCache for BlasReals, otherwise generic CholPosDefCache
 DensePosDefCache{T}() where {T <: BlasReal} = LAPACKPosDefCache{T}()

@@ -170,7 +170,7 @@ function load(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) w
     if isempty(cones)
         hess_nz_total = 0
     else
-        hess_nz_total = sum(Cones.use_dual(cone_k) ? Cones.hess_nz_count(cone_k, true) : Cones.inv_hess_nz_count(cone_k, true) for cone_k in cones)
+        hess_nz_total = sum(Cones.use_dual(cone_k) ? Cones.hess_nz_count_tril(cone_k) : Cones.inv_hess_nz_count_tril(cone_k) for cone_k in cones)
     end
     H_Is = Vector{Int}(undef, hess_nz_total)
     H_Js = Vector{Int}(undef, hess_nz_total)
@@ -180,7 +180,7 @@ function load(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) w
         cone_idxs_k = cone_idxs[k]
         z_start_k = y_start + first(cone_idxs_k)
         for j in 1:Cones.dimension(cone_k)
-            nz_rows_kj = z_start_k .+ (Cones.use_dual(cone_k) ? Cones.hess_nz_idxs_col(cone_k, j, true) : Cones.inv_hess_nz_idxs_col(cone_k, j, true))
+            nz_rows_kj = z_start_k .+ (Cones.use_dual(cone_k) ? Cones.hess_nz_idxs_col_tril(cone_k, j) : Cones.inv_hess_nz_idxs_col_tril(cone_k, j))
             len_kj = length(nz_rows_kj)
             IJV_idxs = offset:(offset + len_kj - 1)
             offset += len_kj
@@ -218,7 +218,7 @@ function load(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) w
             col_idx_start = lhs3.colptr[col]
             nz_rows = lhs3.rowval[col_idx_start:(lhs3.colptr[col + 1] - 1)]
             # get nonzero rows in column j of the Hessian or inverse Hessian
-            nz_hess_indices = (Cones.use_dual(cone_k) ? Cones.hess_nz_idxs_col(cone_k, j, true) : Cones.inv_hess_nz_idxs_col(cone_k, j, true))
+            nz_hess_indices = (Cones.use_dual(cone_k) ? Cones.hess_nz_idxs_col_tril(cone_k, j) : Cones.inv_hess_nz_idxs_col_tril(cone_k, j))
             # get index corresponding to first nonzero Hessian element of the current column of the LHS
             first_H = findfirst(isequal(z_start_k + first(nz_hess_indices)), nz_rows)
             # indices of nonzero values for cone k column j
@@ -234,10 +234,10 @@ function update_fact(system_solver::SymIndefSparseSystemSolver, solver::Solver)
         H_k = (Cones.use_dual(cone_k) ? Cones.hess(cone_k) : Cones.inv_hess(cone_k))
         for j in 1:Cones.dimension(cone_k)
             if Cones.use_dual(cone_k)
-                nz_rows = Cones.hess_nz_idxs_col(cone_k, j, true)
+                nz_rows = Cones.hess_nz_idxs_col_tril(cone_k, j)
                 @. @views system_solver.lhs3.nzval[system_solver.hess_idxs[k][j]] = H_k[nz_rows, j] * -solver.mu
             else
-                nz_rows = Cones.inv_hess_nz_idxs_col(cone_k, j, true)
+                nz_rows = Cones.inv_hess_nz_idxs_col_tril(cone_k, j)
                 @. @views system_solver.lhs3.nzval[system_solver.hess_idxs[k][j]] = H_k[nz_rows, j] / -solver.mu
             end
         end
@@ -327,7 +327,7 @@ end
 
 function solve_subsystem(system_solver::SymIndefDenseSystemSolver, sol3::Matrix, rhs3::Matrix)
     copyto!(sol3, rhs3)
-    solve_system(system_solver.fact_cache, sol3)
+    inv_prod(system_solver.fact_cache, sol3)
     # TODO recover if fails - check issuccess
     return sol3
 end
