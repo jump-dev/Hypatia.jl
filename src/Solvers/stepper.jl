@@ -117,9 +117,10 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     # TODO try setting nbhd to T(Inf) and avoiding the neighborhood checks - requires tuning
     @timeit solver.timer "aff_alpha" aff_alpha = find_max_alpha_in_nbhd(
         stepper.z_pred, stepper.s_pred, tau_pred, kap_pred, solver,
+        # nbhd = T(Inf), prev_alpha = max(solver.prev_aff_alpha, T(2e-2)), min_alpha = T(2e-2)) # TODO
         nbhd = one(T), prev_alpha = max(solver.prev_aff_alpha, T(2e-2)), min_alpha = T(2e-2))
     solver.prev_aff_alpha = aff_alpha
-
+    # gamma = (1 - aff_alpha) * min(abs2(1 - aff_alpha), T(0.25))
     gamma = abs2(one(T) - aff_alpha) # TODO allow different function (heuristic)
     solver.prev_gamma = gamma
 
@@ -288,7 +289,7 @@ function get_directions(stepper::Stepper{T}, solver::Solver{T}) where {T <: Real
             break
         end
         # residual has improved, so use the iterative refinement
-        solver.verbose && @printf("used iter ref, norms: inf %9.2e to %9.2e, two %9.2e to %9.2e\n", norm_inf, norm_inf_new, norm_2, norm_2_new)
+        # solver.verbose && @printf("used iter ref, norms: inf %9.2e to %9.2e, two %9.2e to %9.2e\n", norm_inf, norm_inf_new, norm_2, norm_2_new)
         copyto!(dirs, dirs_new)
         norm_inf = norm_inf_new
         norm_2 = norm_2_new
@@ -348,7 +349,7 @@ function find_max_alpha_in_nbhd(
         end
 
         # iterate is outside the neighborhood: decrease alpha
-        alpha *= T(0.8) # TODO option for parameter
+        alpha *= T(0.9) # TODO option for parameter
     end
 
     return alpha
@@ -386,6 +387,10 @@ function check_nbhd(
         end
     end
 
+    if !isfinite(nbhd)
+        return true
+    end
+
     for (k, cone_k) in enumerate(cones)
         if !solver.cones_loaded[k]
             Cones.reset_data(cone_k)
@@ -396,29 +401,32 @@ function check_nbhd(
 
         temp_k = solver.nbhd_temp[k]
         g_k = Cones.grad(cone_k)
+        if hasfield(typeof(cone_k), :hess_fact_cache) && !Cones.update_hess_fact(cone_k)
+            return false
+        end
         @. temp_k = solver.dual_views[k] + g_k * mu_temp
 
         # TODO optionally could use multiple nbhd checks (add separate bool options and separate max_nbhd value options), eg smaller hess nbhd for each cone and larger hess nbhd for sum of cone nbhds
-        # TODO clean up below
         if solver.use_infty_nbhd
             nbhd_k = abs2(norm(temp_k, Inf) / norm(g_k, Inf)) / mu_temp
             # nbhd_k = abs2(maximum(abs(dj) / abs(gj) for (dj, gj) in zip(duals_k, g_k))) # TODO try this neighborhood
             lhs_nbhd = max(lhs_nbhd, nbhd_k)
         else
             temp2_k = similar(temp_k) # TODO prealloc
-
-            Cones.inv_hess_sqrt_prod!(temp2_k, temp_k, cone_k)
-            nbhd_k = sum(abs2, temp2_k) / mu_temp
+            # TODO use dispatch
+            if hasfield(typeof(cone_k), :hess_fact_cache) && cone_k.hess_fact_cache isa DenseSymCache{T}
+                Cones.inv_hess_prod!(temp2_k, temp_k, cone_k)
+                nbhd_k = dot(temp_k, temp2_k) / mu_temp
+                if nbhd_k <= -cbrt(eps(T))
+                    @warn("numerical failure: cone neighborhood is $nbhd_k")
+                    return false
+                end
+                nbhd_k = abs(nbhd_k)
+            else
+                Cones.inv_hess_sqrt_prod!(temp2_k, temp_k, cone_k)
+                nbhd_k = sum(abs2, temp2_k) / mu_temp
+            end
             lhs_nbhd += nbhd_k
-
-            # Cones.inv_hess_prod!(temp2_k, temp_k, cone_k)
-            # nbhd_k = dot(temp_k, temp2_k) / mu_temp
-            # if nbhd_k <= -cbrt(eps(T))
-            #     @warn("numerical failure: cone neighborhood is $nbhd_k")
-            #     return false
-            # elseif nbhd_k > zero(T)
-            #     lhs_nbhd += nbhd_k
-            # end
         end
 
         if lhs_nbhd > rhs_nbhd

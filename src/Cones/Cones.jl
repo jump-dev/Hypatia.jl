@@ -18,8 +18,8 @@ import Hypatia.sqrt_prod
 import Hypatia.inv_sqrt_prod
 import Hypatia.invert
 
-# hessian_cache(T::Type{<:LinearAlgebra.BlasReal}) = DenseSymCache{T}() # use BunchKaufman for BlasReals
-hessian_cache(T::Type{<:Real}) = DensePosDefCache{T}() # use Cholesky for generic reals
+# hessian_cache(T::Type{<:LinearAlgebra.BlasReal}) = DenseSymCache{T}() # use Bunch Kaufman for BlasReals from start
+hessian_cache(T::Type{<:Real}) = DensePosDefCache{T}()
 
 abstract type Cone{T <: Real} end
 
@@ -59,26 +59,26 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
     return mul!(prod, cone.hess, arr)
 end
 
-function update_hess_fact(cone::Cone{T}) where {T <: LinearAlgebra.BlasReal}
+function update_hess_fact(cone::Cone{T}) where {T <: Real}
     @assert !cone.hess_fact_updated
     cone.hess_updated || update_hess(cone)
 
     if !update_fact(cone.hess_fact_cache, cone.hess)
-        @warn("Hessian factorization failed")
-        if cone.hess_fact_cache isa DensePosDefCache{T}
-            @warn("Switching from Cholesky to Bunch Kaufman")
+        if T <: LinearAlgebra.BlasReal && cone.hess_fact_cache isa DensePosDefCache{T}
+            @warn("Switching Hessian cache from Cholesky to Bunch Kaufman")
             cone.hess_fact_cache = DenseSymCache{T}()
             load_matrix(cone.hess_fact_cache, cone.hess)
         else
             cone.hess += sqrt(eps(T)) * I # attempt recovery # TODO make more efficient
         end
         if !update_fact(cone.hess_fact_cache, cone.hess)
-            @warn("Bunch Kaufman factorization failed")
+            @warn("Hessian factorization failed after recovery")
+            return false
         end
     end
 
     cone.hess_fact_updated = true
-    return
+    return true
 end
 
 function update_inv_hess(cone::Cone)
@@ -97,14 +97,12 @@ end
 
 function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
     cone.hess_fact_updated || update_hess_fact(cone)
-    # return sqrt_prod(cone.hess_fact_cache, prod, arr)
-    return mul!(prod, UpperTriangular(cone.hess_fact_cache.AF.data), arr)
+    return sqrt_prod(cone.hess_fact_cache, prod, arr)
 end
 
 function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
     cone.hess_fact_updated || update_hess_fact(cone)
-    # return inv_sqrt_prod(cone.hess_fact_cache, prod, arr)
-    return ldiv!(prod, UpperTriangular(cone.hess_fact_cache.AF.data)', arr) # TODO check if efficient
+    return inv_sqrt_prod(cone.hess_fact_cache, prod, arr)
 end
 
 # fallbacks for sparse linear system solvers

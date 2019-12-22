@@ -256,9 +256,9 @@ function solve(solver::Solver{T}) where {T <: Real}
     solver.s_temp = similar(model.h)
     solver.primal_views = [view(Cones.use_dual(model.cones[k]) ? solver.z_temp : solver.s_temp, model.cone_idxs[k]) for k in eachindex(model.cones)]
     solver.dual_views = [view(Cones.use_dual(model.cones[k]) ? solver.s_temp : solver.z_temp, model.cone_idxs[k]) for k in eachindex(model.cones)]
-    if !solver.use_infty_nbhd
+    # if !solver.use_infty_nbhd
         solver.nbhd_temp = [Vector{T}(undef, length(model.cone_idxs[k])) for k in eachindex(model.cones)]
-    end
+    # end
     solver.cones_infeas = trues(length(model.cones))
     solver.cones_loaded = trues(length(model.cones))
 
