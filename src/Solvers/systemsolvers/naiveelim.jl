@@ -209,7 +209,7 @@ function update_fact(system_solver::NaiveElimSparseSystemSolver, solver::Solver)
 end
 
 function solve_subsystem(system_solver::NaiveElimSparseSystemSolver, sol4::Matrix, rhs4::Matrix)
-    solve_system(system_solver.fact_cache, sol4, system_solver.lhs4, rhs4)
+    inv_prod(system_solver.fact_cache, sol4, system_solver.lhs4, rhs4)
     return sol4
 end
 

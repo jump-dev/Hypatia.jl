@@ -177,13 +177,30 @@ for (sytrf_rook, elty) in [(:dsytrf_rook_, :Float64), (:ssytrf_rook_, :Float32)]
             if cache.info[] < 0
                 throw(ArgumentError("invalid argument #$(-cache.info[]) to LAPACK call"))
             elseif 0 < cache.info[] <= n
-                @warn("factorization failed: #$(cache.info[])")
+                # @warn("factorization failed: #$(cache.info[])")
                 return false
             # elseif cache.info[] > n
             #     @warn("condition number is small: $(cache.rcond[])")
             end
 
             return true
+        end
+    end
+end
+
+for (sytri_rook, elty) in [(:dsytri_rook_, :Float64), (:ssytri_rook_, :Float32)]
+    @eval begin
+        function invert(cache::LAPACKSymCache{$elty}, X::Symmetric{$elty, Matrix{$elty}})
+            copyto!(X.data, cache.AF.data)
+
+            # call dsytri_rook( uplo, n, a, lda, ipiv, work, info )
+            ccall((@blasfunc($sytri_rook), liblapack), Cvoid,
+                (Ref{UInt8}, Ref{BlasInt}, Ptr{$elty}, Ref{BlasInt},
+                Ptr{BlasInt}, Ptr{$elty}, Ptr{BlasInt}),
+                X.uplo, size(X.data, 1), X.data, max(stride(X.data, 2), 1),
+                cache.ipiv, cache.work, cache.info)
+
+            return X
         end
     end
 end
@@ -203,23 +220,6 @@ for (sytrs_rook, elty) in [(:dsytrs_rook_, :Float64), (:ssytrs_rook_, :Float32)]
                 cache.AF.uplo, size(AF, 1), size(X, 2), AF,
                 max(stride(AF, 2), 1), cache.ipiv, X, max(stride(X, 2), 1),
                 cache.info)
-
-            return X
-        end
-    end
-end
-
-for (sytri_rook, elty) in [(:dsytri_rook_, :Float64), (:ssytri_rook_, :Float32)]
-    @eval begin
-        function invert(cache::LAPACKSymCache{$elty}, X::Symmetric{$elty, Matrix{$elty}})
-            copyto!(X.data, cache.AF.data)
-
-            # call dsytri_rook( uplo, n, a, lda, ipiv, work, info )
-            ccall((@blasfunc($sytri_rook), liblapack), Cvoid,
-                (Ref{UInt8}, Ref{BlasInt}, Ptr{$elty}, Ref{BlasInt},
-                Ptr{BlasInt}, Ptr{$elty}, Ptr{BlasInt}),
-                X.uplo, size(X.data, 1), X.data, max(stride(X.data, 2), 1),
-                cache.ipiv, cache.work, cache.info)
 
             return X
         end
@@ -299,7 +299,7 @@ for (potrf, elty) in [(:dpotrf_, :Float64), (:spotrf_, :Float32)]
             if cache.info[] < 0
                 throw(ArgumentError("invalid argument #$(-cache.info[]) to LAPACK call"))
             elseif 0 < cache.info[] <= n
-                @warn("factorization failed: #$(cache.info[])")
+                # @warn("factorization failed: #$(cache.info[])")
                 return false
             # elseif cache.info[] > n
             #     @warn("condition number is small: $(cache.rcond[])")
@@ -382,7 +382,7 @@ const PosDefCache{T <: Real} = Union{LAPACKPosDefCache{T}, CholPosDefCache{T}}
 
 sqrt_prod(cache::PosDefCache{T}, prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}) where {T <: Real} = mul!(prod, UpperTriangular(cache.AF.data), arr)
 
-inv_sqrt_prod(cache::PosDefCache{T}, prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}) where {T <: Real} = mul!(prod, UpperTriangular(cache.AF.data)', arr)
+inv_sqrt_prod(cache::PosDefCache{T}, prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}) where {T <: Real} = ldiv!(prod, UpperTriangular(cache.AF.data)', arr)
 
 # default to LAPACKPosDefCache for BlasReals, otherwise generic CholPosDefCache
 DensePosDefCache{T}() where {T <: BlasReal} = LAPACKPosDefCache{T}()

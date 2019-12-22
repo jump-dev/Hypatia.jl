@@ -63,7 +63,7 @@ function solve_system(system_solver::QRCholSystemSolver{T}, solver::Solver{T}, s
 
     if !isempty(system_solver.Q2div)
         mul!(system_solver.GQ1x, system_solver.GQ1, y)
-        @timeit solver.timer "block_hess_prod" block_hessian_product(model.cones, system_solver.HGQ1x_k, system_solver.GQ1x_k, solver.mu)
+        @timeit solver.timer "block_hess_prod" block_hessian_product.(model.cones, system_solver.HGQ1x_k, system_solver.GQ1x_k, solver.mu)
         mul!(system_solver.Q2div, system_solver.GQ2', system_solver.HGQ1x, -1, true)
 
         @timeit solver.timer "solve_subsystem" solve_subsystem(system_solver, x_sub2, system_solver.Q2div)
@@ -72,7 +72,7 @@ function solve_system(system_solver::QRCholSystemSolver{T}, solver::Solver{T}, s
     lmul!(solver.Ap_Q, x)
 
     mul!(system_solver.Gx, model.G, x)
-    @timeit solver.timer "block_hess_prod" block_hessian_product(model.cones, system_solver.HGx_k, system_solver.Gx_k, solver.mu)
+    @timeit solver.timer "block_hess_prod" block_hessian_product.(model.cones, system_solver.HGx_k, system_solver.Gx_k, solver.mu)
 
     @. z = system_solver.HGx - z
 
@@ -119,16 +119,15 @@ function solve_system(system_solver::QRCholSystemSolver{T}, solver::Solver{T}, s
     return sol
 end
 
-function block_hessian_product(cones::Vector, prod_k::Vector, arr_k::Vector, mu::Real)
-    for (k, cone_k) in enumerate(cones)
-        if Cones.use_dual(cone_k)
-            Cones.inv_hess_prod!(prod_k[k], arr_k[k], cone_k)
-            @. prod_k[k] /= mu
-        else
-            Cones.hess_prod!(prod_k[k], arr_k[k], cone_k)
-            @. prod_k[k] *= mu
-        end
+function block_hessian_product(cone_k::Cones.Cone{T}, prod_k::AbstractMatrix{T}, arr_k::AbstractMatrix{T}, mu::T) where {T <: Real}
+    if Cones.use_dual(cone_k)
+        Cones.inv_hess_prod!(prod_k, arr_k, cone_k)
+        @. prod_k /= mu
+    else
+        Cones.hess_prod!(prod_k, arr_k, cone_k)
+        @. prod_k *= mu
     end
+    return
 end
 
 #=
@@ -136,7 +135,6 @@ direct dense
 =#
 
 mutable struct QRCholDenseSystemSolver{T <: Real} <: QRCholSystemSolver{T}
-    use_hess_sqrt::Bool
     lhs1::Symmetric{T, Matrix{T}}
     GQ1
     GQ2
@@ -156,7 +154,7 @@ mutable struct QRCholDenseSystemSolver{T <: Real} <: QRCholSystemSolver{T}
     Gx_k
     fact_cache::Union{DensePosDefCache{T}, DenseSymCache{T}} # can use BunchKaufman or Cholesky
     function QRCholDenseSystemSolver{T}(;
-        fact_cache::Union{DensePosDefCache{T}, DenseSymCache{T}} = (T <: LinearAlgebra.BlasReal ? DenseSymCache{T}() : DensePosDefCache{T}()),
+        fact_cache::Union{DensePosDefCache{T}, DenseSymCache{T}} = DensePosDefCache{T}(),
         ) where {T <: Real}
         system_solver = new{T}()
         system_solver.fact_cache = fact_cache # TODO start with cholesky and then switch to BK if numerical issues
@@ -196,42 +194,51 @@ function load(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}) wher
     system_solver.HGx_k = [view(system_solver.HGx, idxs, :) for idxs in cone_idxs]
     system_solver.Gx_k = [view(system_solver.Gx, idxs, :) for idxs in cone_idxs]
 
-    load_matrix(system_solver.fact_cache, system_solver.lhs1, copy_A = false) # overwrite lhs1 with new factorization each time update_fact is called
+    load_matrix(system_solver.fact_cache, system_solver.lhs1) # overwrite lhs1 with new factorization each time update_fact is called
 
     return system_solver
 end
 
 # TODO move to dense.jl?
-outer_prod(UGQ2::Matrix{T}, lhs1::Matrix{T}) where {T <: LinearAlgebra.BlasReal} = BLAS.syrk!('U', 'T', true, UGQ2, false, lhs1)
-outer_prod(UGQ2::Matrix{T}, lhs1::Matrix{T}) where {T <: Real} = mul!(lhs1, UGQ2', UGQ2)
+outer_prod(UGQ2::AbstractMatrix{T}, lhs1::AbstractMatrix{T}) where {T <: LinearAlgebra.BlasReal} = BLAS.syrk!('U', 'T', true, UGQ2, true, lhs1)
+outer_prod(UGQ2::AbstractMatrix{T}, lhs1::AbstractMatrix{T}) where {T <: Real} = mul!(lhs1, UGQ2', UGQ2, true, true)
 
-function update_fact(system_solver::QRCholDenseSystemSolver, solver::Solver)
+function update_fact(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
     isempty(system_solver.Q2div) && return system_solver
     model = solver.model
 
-    # if system_solver.use_hess_sqrt # TODO delete option if not using
+    # TODO use dispatch
+    # TODO faster if only do one syrk from the first block of indices and one mul from the second block
+    system_solver.lhs1.data .= 0
     sqrtmu = sqrt(solver.mu)
     for (cone_k, prod_k, arr_k) in zip(model.cones, system_solver.HGQ2_k, system_solver.GQ2_k)
-        if Cones.use_dual(cone_k)
-            Cones.inv_hess_sqrt_prod!(prod_k, arr_k, cone_k)
-            prod_k ./= sqrtmu
+        if hasfield(typeof(cone_k), :hess_fact_cache) && cone_k.hess_fact_cache isa DenseSymCache{T}
+            block_hessian_product(cone_k, prod_k, arr_k, solver.mu)
+            mul!(system_solver.lhs1.data, arr_k', prod_k, true, true)
         else
-            Cones.hess_sqrt_prod!(prod_k, arr_k, cone_k)
-            prod_k .*= sqrtmu
+            if Cones.use_dual(cone_k)
+                Cones.inv_hess_sqrt_prod!(prod_k, arr_k, cone_k)
+                prod_k ./= sqrtmu
+            else
+                Cones.hess_sqrt_prod!(prod_k, arr_k, cone_k)
+                prod_k .*= sqrtmu
+            end
+            outer_prod(prod_k, system_solver.lhs1.data)
         end
     end
-    outer_prod(system_solver.HGQ2, system_solver.lhs1.data)
-    # # else
-    #     block_hessian_product(model.cones, system_solver.HGQ2_k, system_solver.GQ2_k, solver.mu)
-    #     mul!(system_solver.lhs1.data, system_solver.GQ2', system_solver.HGQ2)
-    # # end
 
-    # TODO start cache with cholesky and then switch to BK if numerical issues
     if !update_fact(system_solver.fact_cache, system_solver.lhs1)
-        system_solver.lhs1 += sqrt(eps(T)) * I # attempt recovery # TODO make more efficient
-        update_fact(system_solver.fact_cache, system_solver.lhs1)
+        if system_solver.fact_cache isa DensePosDefCache{T}
+            @warn("Switching QRChol solver from Cholesky to Bunch Kaufman")
+            system_solver.fact_cache = DenseSymCache{T}()
+            load_matrix(system_solver.fact_cache, system_solver.lhs1)
+        else
+            system_solver.lhs1 += sqrt(eps(T)) * I # attempt recovery # TODO make more efficient
+        end
+        if !update_fact(system_solver.fact_cache, system_solver.lhs1)
+            @warn("QRChol Bunch Kaufman factorization failed")
+        end
     end
-
 
     return system_solver
 end
@@ -239,6 +246,5 @@ end
 function solve_subsystem(system_solver::QRCholDenseSystemSolver, sol1::AbstractMatrix, rhs1::AbstractMatrix)
     copyto!(sol1, rhs1)
     inv_prod(system_solver.fact_cache, sol1)
-    # TODO recover if fails - check issuccess
     return sol1
 end
