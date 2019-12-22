@@ -19,15 +19,13 @@ import Hypatia.BlockMatrix
 import Hypatia.SparseNonSymCache
 import Hypatia.SparseSymCache
 import Hypatia.update_fact
-import Hypatia.solve_system
+import Hypatia.inv_prod
 import Hypatia.free_memory
 import Hypatia.int_type
 import Hypatia.DenseNonSymCache
 import Hypatia.DenseSymCache
 import Hypatia.DensePosDefCache
 import Hypatia.load_matrix
-import Hypatia.update_fact
-import Hypatia.solve_system
 import Hypatia.invert
 
 abstract type Stepper{T <: Real} end

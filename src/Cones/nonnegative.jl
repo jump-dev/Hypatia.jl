@@ -105,8 +105,11 @@ function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone
     return prod
 end
 
-hess_nz_count(cone::Nonnegative, ::Bool) = cone.dim
-inv_hess_nz_count(cone::Nonnegative, lower_only::Bool) = hess_nz_count(cone, lower_only)
-
-hess_nz_idxs_col(cone::Nonnegative, j::Int, ::Bool) = j:j
-inv_hess_nz_idxs_col(cone::Nonnegative, j::Int, lower_only::Bool) = hess_nz_idxs_col(cone, j, lower_only)
+hess_nz_count(cone::Nonnegative) = cone.dim
+hess_nz_count_tril(cone::Nonnegative) = cone.dim
+inv_hess_nz_count(cone::Nonnegative) = cone.dim
+inv_hess_nz_count_tril(cone::Nonnegative) = cone.dim
+hess_nz_idxs_col(cone::Nonnegative, j::Int) = [j]
+hess_nz_idxs_col_tril(cone::Nonnegative, j::Int) = [j]
+inv_hess_nz_idxs_col(cone::Nonnegative, j::Int) = [j]
+inv_hess_nz_idxs_col_tril(cone::Nonnegative, j::Int) = [j]
