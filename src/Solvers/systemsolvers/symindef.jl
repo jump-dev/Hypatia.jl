@@ -100,10 +100,10 @@ mutable struct SymIndefSparseSystemSolver{T <: Real} <: SymIndefSystemSolver{T}
     fact_cache::SparseSymCache{T}
     const_sol::Vector{T}
     const_rhs::Vector{T}
-    function SymIndefSparseSystemSolver{Float64}(;
-        fact_cache::SparseSymCache{Float64} = SparseSymCache{Float64}(),
-        )
-        system_solver = new{Float64}()
+    function SymIndefSparseSystemSolver{T}(;
+        fact_cache::SparseSymCache{T} = SparseSymCache{T}(),
+        ) where {T <: Real}
+        system_solver = new{T}()
         system_solver.fact_cache = fact_cache
         return system_solver
     end

@@ -51,7 +51,7 @@ end
 
 # default to UMFPACK
 SparseNonSymCache{Float64}() = UMFPACKNonSymCache{Float64}()
-SparseNonSymCache{T}() where {T <: Real} = error("Sparse caches only work with real type Float64")
+SparseNonSymCache{T}() where {T <: Real} = error("SparseNonSymCache caches only work with real type Float64")
 SparseNonSymCache() = SparseNonSymCache{Float64}()
 
 #=
@@ -71,7 +71,7 @@ mutable struct CHOLMODSymCache{T <: Real} <: SparseSymCache{T}
         return cache
     end
 end
-CHOLMODSymCache{T}(; diag_pert = NaN) where {T <: Real} = error("CHOLMOD only works with real type Float64")
+CHOLMODSymCache{T}(; diag_pert = NaN) where {T <: Real} = error("CHOLMODSymCache only works with real type Float64")
 CHOLMODSymCache(; diag_pert::Float64 = sqrt(eps(Float64))) = CHOLMODSymCache{Float64}(diag_pert = diag_pert)
 int_type(::CHOLMODSymCache) = SuiteSparseInt
 
@@ -100,7 +100,7 @@ end
 
 # default to CHOLMOD
 SparseSymCache{Float64}() = CHOLMODSymCache{Float64}()
-SparseSymCache{T}() where {T <: Real} = error("Sparse caches only work with real type Float64")
+SparseSymCache{T}() where {T <: Real} = error("CHOLMODSymCache only works with real type Float64")
 SparseSymCache() = SparseSymCache{Float64}()
 
 #=
