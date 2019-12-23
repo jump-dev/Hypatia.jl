@@ -31,8 +31,6 @@ function update_fact(cache::HSLSymCache, A::SparseMatrixCSC{<:HSL.Ma57Data, Int}
     return
 end
 
-using DataFrames, CSV
-
 function inv_prod(cache::HSLSymCache, x::Vector{Float64}, A::SparseMatrixCSC{<:HSL.Ma57Data, Int}, b::Vector{Float64})
     # NOTE MA57 only has the option to take iterative refinement steps for a single-column RHS
     ma57 = cache.ma57
