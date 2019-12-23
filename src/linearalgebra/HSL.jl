@@ -15,7 +15,7 @@ mutable struct HSLSymCache{T <: BlasReal} <: SparseSymCache{T}
         return cache
     end
 end
-HSLSymCache{T}() where {T <: Real} = error("HSL only works with real type Float64 or Float32")
+HSLSymCache{T}() where {T <: Real} = error("HSLSymCache only works with real type Float64 or Float32")
 HSLSymCache() = HSLSymCache{Float64}()
 
 int_type(::HSLSymCache) = Int
@@ -31,7 +31,7 @@ function update_fact(cache::HSLSymCache, A::SparseMatrixCSC{<:HSL.Ma57Data, Int}
     return
 end
 
-function inv_prod(cache::HSLSymCache, x::Vector{Float64}, A::SparseMatrixCSC{<:HSL.Ma57Data, Int}, b::Vector{Float64})
+function inv_prod(cache::HSLSymCache, x::Vector{T}, A::SparseMatrixCSC{<:HSL.Ma57Data, Int}, b::Vector{T}) where {T <: BlasReal}
     # NOTE MA57 only has the option to take iterative refinement steps for a single-column RHS
     ma57 = cache.ma57
     copyto!(x, b)
