@@ -23,7 +23,7 @@ mutable struct EpiNormInf{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     hess_inv_hess_updated::Bool
     is_feas::Bool
     grad::Vector{T}
-    hess::Symmetric{T, Matrix{T}}
+    hess::Symmetric{T, SparseMatrixCSC{T, Int}}
     inv_hess::Symmetric{T, Matrix{T}}
 
     w::AbstractVector{R}
@@ -65,7 +65,6 @@ function setup_data(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where 
     dim = cone.dim
     cone.point = zeros(T, dim)
     cone.grad = zeros(T, dim)
-    cone.hess = Symmetric(zeros(T, dim, dim), :U) # TODO this is expensive to allocate. maybe use sparse. don't alloc if not using
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     n = cone.n
     cone.w = zeros(R, n)
@@ -171,18 +170,59 @@ function update_hess(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where
     if !cone.hess_inv_hess_updated
         update_hess_inv_hess(cone)
     end
-    H = cone.hess.data
+    n = cone.n
 
-    H[1, 1] = cone.diag11
-    H[1, 2:end] .= cone.edge
-    @inbounds for (j, dj) in enumerate(cone.diag)
-        H[j + 1, j + 1] = dj
+    if !isdefined(cone, :hess)
+        # initialize sparse idxs for upper triangle of Hessian
+        dim = cone.dim
+        H_nnz_tri = 2 * dim - 1 + (cone.is_complex ? n : 0)
+        I = Vector{Int}(undef, H_nnz_tri)
+        J = Vector{Int}(undef, H_nnz_tri)
+        idxs1 = 1:dim
+        I[idxs1] .= 1
+        J[idxs1] .= idxs1
+        idxs2 = (dim + 1):(2 * dim - 1)
+        I[idxs2] .= 2:dim
+        J[idxs2] .= 2:dim
+        if cone.is_complex
+            idxs3 = (2 * dim):H_nnz_tri
+            I[idxs3] .= 2:2:dim
+            J[idxs3] .= 3:2:dim
+        end
+        V = ones(T, H_nnz_tri)
+        cone.hess = Symmetric(sparse(I, J, V, dim, dim), :U)
     end
-    if cone.is_complex
-        @inbounds for (j, oj) in enumerate(cone.offdiag)
-            H[2j, 2j + 1] = oj
+
+    # modify nonzeros of sparse data structure of upper triangle of Hessian
+    H_nzval = cone.hess.data.nzval
+    H_nzval[1] = cone.diag11
+    nz_idx = 2
+    diag_idx = 1
+    # @inbounds for j in 1:n
+    for j in 1:n
+        H_nzval[nz_idx] = cone.edge[diag_idx]
+        H_nzval[nz_idx + 1] = cone.diag[diag_idx]
+        nz_idx += 2
+        diag_idx += 1
+        if cone.is_complex
+            H_nzval[nz_idx] = cone.edge[diag_idx]
+            H_nzval[nz_idx + 1] = cone.offdiag[j]
+            H_nzval[nz_idx + 2] = cone.diag[diag_idx]
+            nz_idx += 3
+            diag_idx += 1
         end
     end
+
+    # H[1, 1] = cone.diag11
+    # H[1, 2:end] .= cone.edge
+    # @inbounds for (j, dj) in enumerate(cone.diag)
+    #     H[j + 1, j + 1] = dj
+    # end
+    # if cone.is_complex
+    #     @inbounds for (j, oj) in enumerate(cone.offdiag)
+    #         H[2j, 2j + 1] = oj
+    #     end
+    # end
 
     cone.hess_updated = true
     return cone.hess
@@ -321,6 +361,11 @@ end
 
 # TODO depends on complex/real
 # TODO don't form sparse hessian explicitly - inefficient
-hess_nz_count(cone::EpiNormInf) = 3 * cone.dim - 2
-hess_nz_count_tril(cone::EpiNormInf) = 2 * cone.dim - 1
-hess_nz_idxs_col(cone::EpiNormInf, j::Int) = (j == 1 ? (1:cone.dim) : [1, j])
+hess_nz_count(cone::EpiNormInf{<:Real, <:Real}) = 3 * cone.dim - 2
+hess_nz_count(cone::EpiNormInf{<:Real, <:Complex}) = 3 * cone.dim - 2 + 2 * cone.n
+hess_nz_count_tril(cone::EpiNormInf{<:Real, <:Real}) = 2 * cone.dim - 1
+hess_nz_count_tril(cone::EpiNormInf{<:Real, <:Complex}) = 2 * cone.dim - 1 + cone.n
+hess_nz_idxs_col(cone::EpiNormInf{<:Real, <:Real}, j::Int) = (j == 1 ? (1:cone.dim) : [1, j])
+hess_nz_idxs_col(cone::EpiNormInf{<:Real, <:Complex}, j::Int) = (j == 1 ? (1:cone.dim) : (iseven(j) ? [1, j, j + 1] : [1, j - 1, j]))
+hess_nz_idxs_col_tril(cone::EpiNormInf{<:Real, <:Real}, j::Int) = (j == 1 ? (1:cone.dim) : [j])
+hess_nz_idxs_col_tril(cone::EpiNormInf{<:Real, <:Complex}, j::Int) = (j == 1 ? (1:cone.dim) : (iseven(j) ? [j, j + 1] : [j]))

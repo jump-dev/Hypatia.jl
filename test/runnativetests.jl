@@ -52,10 +52,10 @@ options = (verbose = false,)
     # @testset "NaiveDense tests: $t, $T" for t in testfuns_many, T in generic_reals
     #     t(T, solver = SO.Solver{T}(system_solver = SO.NaiveDenseSystemSolver{T}(); options...))
     # end
-    # @testset "NaiveSparse tests: $t" for t in testfuns_many
-    #     T = Float64
-    #     t(T, solver = SO.Solver{T}(system_solver = SO.NaiveSparseSystemSolver{T}(); options...))
-    # end
+    @testset "NaiveSparse tests: $t" for t in testfuns_many
+        T = Float64
+        t(T, solver = SO.Solver{T}(system_solver = SO.NaiveSparseSystemSolver{T}(); options...))
+    end
     # # TODO currently broken
     # # @testset "NaiveIndirect tests: $t" for t in testfuns_many
     # #     T = Float64
@@ -64,22 +64,22 @@ options = (verbose = false,)
     # @testset "NaiveElimDense tests: $t, $T, $h" for t in testfuns_many, T in generic_reals, h in [true, false]
     #     t(T, solver = SO.Solver{T}(system_solver = SO.NaiveElimDenseSystemSolver{T}(use_inv_hess = h); options...))
     # end
-    # @testset "NaiveElimSparse tests: $t" for t in testfuns_many
-    #     T = Float64
-    #     t(T, solver = SO.Solver{T}(system_solver = SO.NaiveElimSparseSystemSolver{T}(); options...))
-    # end
+    @testset "NaiveElimSparse tests: $t" for t in testfuns_many
+        T = Float64
+        t(T, solver = SO.Solver{T}(system_solver = SO.NaiveElimSparseSystemSolver{T}(); options...))
+    end
     # @testset "SymIndefDense tests: $t, $T" for t in testfuns_many, T in generic_reals
     #     t(T, solver = SO.Solver{T}(system_solver = SO.SymIndefDenseSystemSolver{T}(); options...))
     # end
-    # @testset "SymIndefSparse tests: $t" for t in testfuns_many
-    #     T = Float64
-    #     t(T, solver = SO.Solver{T}(system_solver = SO.SymIndefSparseSystemSolver{T}(); options...))
-    # end
-    qrchol_cache = [
-        # Hypatia.DenseSymCache,
-        Hypatia.DensePosDefCache
-        ]
-    @testset "QRCholDense tests: $t, $T, $c" for t in testfuns_many, T in generic_reals, c in qrchol_cache
-        t(T, solver = SO.Solver{T}(system_solver = SO.QRCholDenseSystemSolver{T}(fact_cache = c{T}()); options...))
+    @testset "SymIndefSparse tests: $t" for t in testfuns_many
+        T = Float64
+        t(T, solver = SO.Solver{T}(system_solver = SO.SymIndefSparseSystemSolver{T}(); options...))
     end
+    # qrchol_cache = [
+    #     # Hypatia.DenseSymCache,
+    #     Hypatia.DensePosDefCache
+    #     ]
+    # @testset "QRCholDense tests: $t, $T, $c" for t in testfuns_many, T in generic_reals, c in qrchol_cache
+    #     t(T, solver = SO.Solver{T}(system_solver = SO.QRCholDenseSystemSolver{T}(fact_cache = c{T}()); options...))
+    # end
 end
