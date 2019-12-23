@@ -15,7 +15,7 @@ mutable struct PardisoNonSymCache{T <: Real} <: SparseNonSymCache{T}
         return cache
     end
 end
-PardisoNonSymCache{T}() where {T <: Real} = error("Pardiso only works with real type Float64")
+PardisoNonSymCache{T}() where {T <: Real} = error("PardisoNonSymCache only works with real type Float64")
 PardisoNonSymCache() = PardisoNonSymCache{Float64}()
 
 mutable struct PardisoSymCache{T <: Real} <: SparseSymCache{T}
@@ -31,7 +31,7 @@ mutable struct PardisoSymCache{T <: Real} <: SparseSymCache{T}
         return cache
     end
 end
-PardisoSymCache{T}(; diag_pert = 0.0) where {T <: Real} = error("Pardiso only works with real type Float64")
+PardisoSymCache{T}(; diag_pert = 0.0) where {T <: Real} = error("PardisoNonSymCache only works with real type Float64")
 PardisoSymCache(; diag_pert = 0.0) = PardisoSymCache{Float64}(diag_pert = diag_pert)
 
 PardisoSparseCache = Union{PardisoSymCache{Float64}, PardisoNonSymCache{Float64}}
@@ -63,7 +63,7 @@ function update_fact(cache::PardisoSparseCache, A::SparseMatrixCSC{Float64, Int3
     return
 end
 
-function solve_system(cache::PardisoSparseCache, x::Matrix{Float64}, A::SparseMatrixCSC{Float64, Int32}, b::Matrix{Float64})
+function inv_prod(cache::PardisoSparseCache, x::Vector{Float64}, A::SparseMatrixCSC{Float64, Int32}, b::Vector{Float64})
     pardiso = cache.pardiso
 
     Pardiso.set_phase!(pardiso, Pardiso.SOLVE_ITERATIVE_REFINE)
