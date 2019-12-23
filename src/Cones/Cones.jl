@@ -8,6 +8,7 @@ module Cones
 
 using LinearAlgebra
 import LinearAlgebra.copytri!
+using SparseArrays
 import Hypatia.RealOrComplex
 import Hypatia.DenseSymCache
 import Hypatia.DensePosDefCache
