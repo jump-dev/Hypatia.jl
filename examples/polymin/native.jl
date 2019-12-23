@@ -89,7 +89,7 @@ function polyminreal(
             G_full = zeros(T, 0, U)
             for Pk in Ps
                 Lk = size(Pk, 2)
-                dk = div(Lk * (Lk + 1), 2)
+                dk = CO.svec_length(Lk)
                 push!(cones, CO.PosSemidefTri{T, T}(dk))
                 Gk = Matrix{T}(undef, dk, U)
                 l = 1

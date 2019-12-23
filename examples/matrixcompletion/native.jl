@@ -85,8 +85,8 @@ function matrixcompletion(
         if nuclearnorm_obj
             # extended formulation for nuclear norm
             # X, W_1, W_2
-            num_W1_vars = div(m * (m + 1), 2)
-            num_W2_vars = div(n * (n + 1), 2)
+            num_W1_vars = CO.svec_length(m)
+            num_W2_vars = CO.svec_length(n)
             num_vars = num_W1_vars + num_W2_vars + num_unknown
 
             A = zeros(T, 0, num_vars)
@@ -133,14 +133,14 @@ function matrixcompletion(
             c = vcat(zeros(T, num_unknown), c_W1, c_W2) / 2
         else
             # extended formulation for spectral norm
-            num_rows = div(m * (m + 1), 2) + m * n + div(n * (n + 1), 2)
+            num_rows = CO.svec_length(m) + m * n + CO.svec_length(n)
             G_norm = zeros(T, num_rows, num_unknown + 1)
             h_norm = zeros(T, num_rows)
             # first block epigraph variable * I
             for i in 1:m
                 G_norm[sum(1:i), 1] = -1
             end
-            offset = div(m * (m + 1), 2)
+            offset = CO.svec_length(m)
             # index to count rows in the bottom half of the large to-be-PSD matrix
             idx = 1
             # index only in X

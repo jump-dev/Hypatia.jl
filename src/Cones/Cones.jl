@@ -108,9 +108,9 @@ end
 # fallbacks for sparse linear system solvers
 # number of nonzeros in the Hessian and inverse
 hess_nz_count(cone::Cone) = dimension(cone) ^ 2
-hess_nz_count_tril(cone::Cone) = div(dimension(cone) * (dimension(cone) + 1), 2)
+hess_nz_count_tril(cone::Cone) = svec_length(dimension(cone))
 inv_hess_nz_count(cone::Cone) = dimension(cone) ^ 2
-inv_hess_nz_count_tril(cone::Cone) = div(dimension(cone) * (dimension(cone) + 1), 2)
+inv_hess_nz_count_tril(cone::Cone) = svec_length(dimension(cone))
 # row indices of nonzero elements in column j
 hess_nz_idxs_col(cone::Cone, j::Int) = 1:dimension(cone)
 hess_nz_idxs_col_tril(cone::Cone, j::Int) = j:dimension(cone)
@@ -118,6 +118,8 @@ inv_hess_nz_idxs_col(cone::Cone, j::Int) = 1:dimension(cone)
 inv_hess_nz_idxs_col_tril(cone::Cone, j::Int) = j:dimension(cone)
 
 # utilities for arrays
+
+svec_length(side::Int) = div(side * (side + 1), 2)
 
 svec_idx(row::Int, col::Int) = (div((row - 1) * row, 2) + col)
 
