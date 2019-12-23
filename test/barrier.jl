@@ -246,7 +246,7 @@ function test_possemideftri_barrier(T::Type{<:Real})
             CO.svec_to_smat!(S, s, sqrt(T(2)))
             return -logdet(cholesky!(Symmetric(S, :U)))
         end
-        dim = div(side * (side + 1), 2)
+        dim = CO.svec_length(side)
         test_barrier_oracles(CO.PosSemidefTri{T, T}(dim), R_barrier)
 
         # complex PSD cone
@@ -269,7 +269,7 @@ function test_hypoperlogdettri_barrier(T::Type{<:Real})
             CO.svec_to_smat!(W, s[3:end], sqrt(T(2)))
             return -log(v * logdet(cholesky!(Symmetric(W / v, :U))) - u) - logdet(cholesky!(Symmetric(W, :U))) - log(v)
         end
-        dim = 2 + div(side * (side + 1), 2)
+        dim = 2 + CO.svec_length(side)
         cone = CO.HypoPerLogdetTri{T, T}(dim)
         if side <= 5
             test_barrier_oracles(cone, R_barrier, init_tol = 1e-5)
@@ -303,7 +303,7 @@ function test_hyporootdettri_barrier(T::Type{<:Real})
             fact_W = cholesky!(Symmetric(W, :U))
             return -T(25) / T(9) * (log(det(fact_W) ^ inv(T(side)) - u) + logdet(fact_W))
         end
-        dim = 1 + div(side * (side + 1), 2)
+        dim = 1 + CO.svec_length(side)
         cone = CO.HypoRootdetTri{T, T}(dim)
         test_barrier_oracles(cone, R_barrier)
 

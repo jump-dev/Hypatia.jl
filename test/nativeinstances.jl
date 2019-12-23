@@ -892,7 +892,7 @@ function hypoperlogdettri1(T; options...)
     Random.seed!(1)
     side = 4
     for is_complex in (false, true)
-        dim = (is_complex ? 2 + side^2 : 2 + div(side * (side + 1), 2))
+        dim = (is_complex ? 2 + side^2 : 2 + CO.svec_length(side))
         R = (is_complex ? Complex{T} : T)
         c = T[-1, 0]
         A = T[0 1]
@@ -922,7 +922,7 @@ function hypoperlogdettri2(T; options...)
     Random.seed!(1)
     side = 3
     for is_complex in (false, true)
-        dim = (is_complex ? 2 + side^2 : 2 + div(side * (side + 1), 2))
+        dim = (is_complex ? 2 + side^2 : 2 + CO.svec_length(side))
         R = (is_complex ? Complex{T} : T)
         c = T[0, 1]
         A = T[1 0]
@@ -952,7 +952,7 @@ function hypoperlogdettri3(T; options...)
     Random.seed!(1)
     side = 3
     for is_complex in (false, true)
-        dim = (is_complex ? 2 + side^2 : 2 + div(side * (side + 1), 2))
+        dim = (is_complex ? 2 + side^2 : 2 + CO.svec_length(side))
         R = (is_complex ? Complex{T} : T)
         c = T[-1, 0]
         A = T[0 1]
@@ -977,7 +977,7 @@ function hyporootdettri1(T; options...)
     Random.seed!(1)
     side = 3
     for is_complex in (false, true)
-        dim = (is_complex ? 1 + side^2 : 1 + div(side * (side + 1), 2))
+        dim = (is_complex ? 1 + side^2 : 1 + CO.svec_length(side))
         R = (is_complex ? Complex{T} : T)
         c = T[-1]
         A = zeros(T, 0, 1)
@@ -1006,7 +1006,7 @@ function hyporootdettri2(T; options...)
     Random.seed!(1)
     side = 4
     for is_complex in (false, true)
-        dim = (is_complex ? 1 + side^2 : 1 + div(side * (side + 1), 2))
+        dim = (is_complex ? 1 + side^2 : 1 + CO.svec_length(side))
         R = (is_complex ? Complex{T} : T)
         c = T[1]
         A = zeros(T, 0, 1)
@@ -1036,7 +1036,7 @@ function hyporootdettri3(T; options...)
     Random.seed!(1)
     side = 3
     for is_complex in (false, true)
-        dim = (is_complex ? 1 + side^2 : 1 + div(side * (side + 1), 2))
+        dim = (is_complex ? 1 + side^2 : 1 + CO.svec_length(side))
         R = (is_complex ? Complex{T} : T)
         c = T[-1]
         A = zeros(T, 0, 1)

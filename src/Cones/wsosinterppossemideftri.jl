@@ -48,7 +48,7 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
         end
         cone = new{T}()
         cone.use_dual = !is_dual # using dual barrier
-        cone.dim = U * div(R * (R + 1), 2)
+        cone.dim = U * svec_length(R)
         cone.R = R
         cone.U = U
         cone.Ps = Ps
