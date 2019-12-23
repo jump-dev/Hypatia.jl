@@ -61,7 +61,7 @@ function densityest(
         psd_var_list = Matrix{T}[]
         for i in eachindex(Ps)
             L = size(Ps[i], 2)
-            dim = div(L * (L + 1), 2)
+            dim = CO.svec_length(L)
             num_psd_vars += dim
             push!(psd_var_list, zeros(T, U, dim))
             idx = 1

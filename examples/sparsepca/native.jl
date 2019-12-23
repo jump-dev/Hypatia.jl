@@ -43,7 +43,7 @@ function sparsepca(
         true_obj = NaN
     end
 
-    dimx = div(p * (p + 1), 2)
+    dimx = CO.svec_length(p)
     # x will be the svec (lower triangle, row-wise) of the matrix solution we seek
     c = CO.smat_to_svec!(zeros(T, dimx), -sigma, sqrt(T(2)))
     b = T[1]
