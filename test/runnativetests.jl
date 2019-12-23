@@ -18,7 +18,7 @@ blas_reals = [
     Float32,
     ]
 
-options = (verbose = true,)
+options = (verbose = false,)
 
 @info("starting native tests")
 @testset "native tests" begin
@@ -68,8 +68,8 @@ options = (verbose = true,)
         T = Float64
         t(T, solver = SO.Solver{T}(system_solver = SO.NaiveElimSparseSystemSolver{T}(); options...))
     end
-    @testset "SymIndefDense tests: $t, $T, $h" for t in testfuns_many, T in generic_reals, h in [true, false]
-        t(T, solver = SO.Solver{T}(system_solver = SO.SymIndefDenseSystemSolver{T}(use_inv_hess = h); options...))
+    @testset "SymIndefDense tests: $t, $T" for t in testfuns_many, T in generic_reals
+        t(T, solver = SO.Solver{T}(system_solver = SO.SymIndefDenseSystemSolver{T}(); options...))
     end
     @testset "SymIndefSparse tests: $t" for t in testfuns_many
         T = Float64
