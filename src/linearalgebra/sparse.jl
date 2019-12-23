@@ -44,7 +44,7 @@ function update_fact(cache::UMFPACKNonSymCache, A::SparseMatrixCSC{Float64, Suit
     return
 end
 
-function inv_prod(cache::UMFPACKNonSymCache, x::Matrix{Float64}, A::SparseMatrixCSC{Float64, SuiteSparseInt}, b::Matrix{Float64})
+function inv_prod(cache::UMFPACKNonSymCache, x::Vector{Float64}, A::SparseMatrixCSC{Float64, SuiteSparseInt}, b::Vector{Float64})
     ldiv!(x, cache.umfpack, b) # does not repeat symbolic or numeric factorization
     return x
 end
@@ -93,7 +93,7 @@ function update_fact(cache::CHOLMODSymCache, A::SparseMatrixCSC{Float64, SuiteSp
     return
 end
 
-function inv_prod(cache::CHOLMODSymCache, x::Matrix{Float64}, A::SparseMatrixCSC{Float64, SuiteSparseInt}, b::Matrix{Float64})
+function inv_prod(cache::CHOLMODSymCache, x::Vector{Float64}, A::SparseMatrixCSC{Float64, SuiteSparseInt}, b::Vector{Float64})
     x .= cache.cholmod \ b # TODO try to make this in-place
     return x
 end
