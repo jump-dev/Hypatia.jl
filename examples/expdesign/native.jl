@@ -39,7 +39,7 @@ function expdesign(
         c = vcat(-one(T), zeros(T, p))
 
         # dimension of vectorized matrix V*diag(np)*V'
-        dimvec = div(q * (q + 1), 2)
+        dimvec = CO.svec_length(q)
         G_logdet = zeros(T, dimvec, p)
         l = 1
         for i in 1:q, j in 1:i
@@ -80,7 +80,7 @@ function expdesign(
         h = vcat(h_nonneg, h_nmax, h_logdet)
     else
         # requires an upper triangular matrix of additional variables, ordered row wise
-        num_trivars = div(q * (q + 1), 2)
+        num_trivars = CO.svec_length(q)
         if use_sumlog
             dimx = p + num_trivars + 1
             padx = num_trivars + 1

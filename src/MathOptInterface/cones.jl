@@ -24,7 +24,7 @@ struct WSOSInterpPossemidefTriCone{T <: Real} <: MOI.AbstractVectorSet
     is_dual::Bool
 end
 WSOSInterpPossemidefTriCone(R::Int, U::Int, Ps::Vector{Matrix{T}}) where {T <: Real} = WSOSInterpPossemidefTriCone{T}(R, U, Ps, false)
-MOI.dimension(cone::WSOSInterpPossemidefTriCone) = U * div(R * (R + 1), 2)
+MOI.dimension(cone::WSOSInterpPossemidefTriCone) = U * Cones.svec_length(R)
 
 export WSOSInterpEpiNormEuclCone
 
