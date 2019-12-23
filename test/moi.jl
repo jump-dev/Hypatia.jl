@@ -46,8 +46,11 @@ conic_exclude = String[
     # "dualpow",
     # "geomean",
     # "sdp",
-    "logdet",
-    "rootdet",
+    # "logdet",
+    # "rootdet",
+    # square logdet and rootdet cones not handled
+    "logdets",
+    "rootdets",
     ]
 
 function test_moi(T::Type{<:Real}; options...)

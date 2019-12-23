@@ -6,12 +6,12 @@ include(joinpath(@__DIR__, "moi.jl"))
 
 system_solvers = [
     SO.NaiveDenseSystemSolver,
-    # SO.NaiveSparseSystemSolver,
+    SO.NaiveSparseSystemSolver,
     # SO.NaiveIndirectSystemSolver,
     SO.NaiveElimDenseSystemSolver,
-    # SO.NaiveElimSparseSystemSolver,
+    SO.NaiveElimSparseSystemSolver,
     SO.SymIndefDenseSystemSolver,
-    # SO.SymIndefSparseSystemSolver,
+    SO.SymIndefSparseSystemSolver,
     SO.QRCholDenseSystemSolver,
     ]
 
