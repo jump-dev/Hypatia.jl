@@ -24,13 +24,13 @@ options = (verbose = false,)
     end
 
     T = Float64
-    @testset "NaiveSparse tests: $t" for t in testfuns
+    @testset "NaiveSparse tests: $t" for t in testfuns_many
         t(T, solver = SO.Solver{T}(system_solver = SO.NaiveSparseSystemSolver{T}(fact_cache = Hypatia.PardisoNonSymCache()); options...))
     end
-    @testset "NaiveElimSparse tests: $t" for t in testfuns
+    @testset "NaiveElimSparse tests: $t" for t in testfuns_many
         t(T, solver = SO.Solver{T}(system_solver = SO.NaiveElimSparseSystemSolver{T}(fact_cache = Hypatia.PardisoNonSymCache()); options...))
     end
-    @testset "SymIndefSparse tests: $t" for t in testfuns
+    @testset "SymIndefSparse tests: $t" for t in testfuns_many
         t(T, solver = SO.Solver{T}(system_solver = SO.SymIndefSparseSystemSolver{T}(fact_cache = Hypatia.PardisoSymCache()); options...))
     end
 end
