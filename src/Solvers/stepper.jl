@@ -403,7 +403,8 @@ function get_directions(stepper::CombinedStepper{T}, solver::Solver{T}) where {T
         end
 
         # residual has improved, so use the iterative refinement
-        solver.verbose && @printf("iter ref round %d norms: inf %9.2e to %9.2e, two %9.2e to %9.2e\n", i, norm_inf, norm_inf_new, norm_2, norm_2_new)
+        # TODO only print if using debug mode
+        # solver.verbose && @printf("iter ref round %d norms: inf %9.2e to %9.2e, two %9.2e to %9.2e\n", i, norm_inf, norm_inf_new, norm_2, norm_2_new)
         copyto!(dir_temp, dir)
         norm_inf = norm_inf_new
         norm_2 = norm_2_new
