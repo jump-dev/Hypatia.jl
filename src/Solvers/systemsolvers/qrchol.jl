@@ -71,34 +71,6 @@ function solve_system(system_solver::QRCholSystemSolver{T}, solver::Solver{T}, s
     # TODO NT: kap = kapbar/taubar*(kaprhs - tau)
     # sol[end] = kapontau * (rhs[end] - sol_tau)
 
-
-    # # lift to get tau
-    # # TODO maybe use higher precision here
-    # tau_denom = solver.mu / solver.tau / solver.tau - dot(model.c, x3) - dot(model.b, y3) - dot(model.h, z3)
-    # tau = @view sol[tau_row:tau_row, :]
-    # @. @views tau = rhs[tau_row:tau_row, :] + rhs[end:end, :]
-    # tau .+= model.c' * x12 + model.b' * y12 + model.h' * z12 # TODO in place
-    # @. tau /= tau_denom
-    #
-    # @. x12 += tau * x3
-    # @. y12 += tau * y3
-    # @. z12 += tau * z3
-    #
-    # @views sol[1:n, :] = x12
-    # @views sol[n .+ (1:p), :] = y12
-    # @views sol[(n + p) .+ (1:q), :] = z12
-    #
-    # # lift to get s and kap
-    # # TODO refactor below for use with symindef and qrchol methods
-    # # s = -G*x + h*tau - zrhs
-    # s = @view sol[(tau_row + 1):(end - 1), :]
-    # mul!(s, model.h, tau)
-    # mul!(s, model.G, sol[1:n, :], -one(T), true)
-    # @. @views s -= rhs[(n + p) .+ (1:q), :]
-    #
-    # # kap = -mu/(taubar^2)*tau + kaprhs
-    # @. @views sol[end:end, :] = -solver.mu / solver.tau * tau / solver.tau + rhs[end:end, :]
-
     return sol
 end
 
