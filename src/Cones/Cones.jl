@@ -94,8 +94,8 @@ end
 
 function update_inv_hess(cone::Cone)
     @assert !cone.inv_hess_updated
-    if !cone.hess_updated
-        @timeit cone.timer "update_hess" update_hess(cone)
+    if !cone.hess_fact_updated
+        @timeit cone.timer "update_hess_fact" update_hess_fact(cone)
     end
     @timeit cone.timer "invert_hess" invert(cone.hess_fact_cache, cone.inv_hess)
     cone.inv_hess_updated = true
@@ -103,8 +103,8 @@ function update_inv_hess(cone::Cone)
 end
 
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
-    if !cone.hess_updated
-        @timeit cone.timer "update_hess" update_hess(cone)
+    if !cone.hess_fact_updated
+        @timeit cone.timer "update_hess_fact" update_hess_fact(cone)
     end
     copyto!(prod, arr)
     @timeit cone.timer "inv_hess_prod" inv_prod(cone.hess_fact_cache, prod)
@@ -112,8 +112,8 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Con
 end
 
 function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
-    if !cone.hess_updated
-        @timeit cone.timer "update_hess" update_hess(cone)
+    if !cone.hess_fact_updated
+        @timeit cone.timer "update_hess_fact" update_hess_fact(cone)
     end
     copyto!(prod, arr)
     @timeit cone.timer "hess_sqrt_prod" sqrt_prod(cone.hess_fact_cache, prod)
@@ -121,8 +121,8 @@ function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Co
 end
 
 function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
-    if !cone.hess_updated
-        @timeit cone.timer "update_hess" update_hess(cone)
+    if !cone.hess_fact_updated
+        @timeit cone.timer "update_hess_fact" update_hess_fact(cone)
     end
     copyto!(prod, arr)
     @timeit cone.timer "inv_hess_sqrt_prod" inv_sqrt_prod(cone.hess_fact_cache, prod)
