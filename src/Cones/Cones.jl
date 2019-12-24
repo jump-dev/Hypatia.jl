@@ -6,6 +6,7 @@ functions and caches for cones
 
 module Cones
 
+using TimerOutputs
 using LinearAlgebra
 import LinearAlgebra.copytri!
 using SparseArrays
@@ -44,6 +45,7 @@ use_dual(cone::Cone) = cone.use_dual
 use_3order_corr(cone::Cone) = false
 load_point(cone::Cone, point::AbstractVector) = copyto!(cone.point, point)
 dimension(cone::Cone) = cone.dim
+set_timer(cone::Cone, timer::TimerOutput) = (cone.timer = timer)
 
 is_feas(cone::Cone) = (cone.feas_updated ? cone.is_feas : update_feas(cone))
 grad(cone::Cone) = (cone.grad_updated ? cone.grad : update_grad(cone))
@@ -57,15 +59,21 @@ reset_data(cone::Cone) = (cone.feas_updated = cone.grad_updated = cone.hess_upda
 update_hess_prod(cone::Cone) = nothing
 
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
-    cone.hess_updated || update_hess(cone)
-    return mul!(prod, cone.hess, arr)
+    if !cone.hess_updated
+        @timeit cone.timer "update_hess" update_hess(cone)
+    end
+    @timeit cone.timer "hess_prod" mul!(prod, cone.hess, arr)
+    return prod
 end
 
 function update_hess_fact(cone::Cone{T}) where {T <: Real}
     @assert !cone.hess_fact_updated
-    cone.hess_updated || update_hess(cone)
+    if !cone.hess_updated
+        @timeit cone.timer "update_hess" update_hess(cone)
+    end
 
-    if !update_fact(cone.hess_fact_cache, cone.hess)
+    @timeit cone.timer "hess_fact" fact_success = update_fact(cone.hess_fact_cache, cone.hess)
+    if !fact_success
         if T <: LinearAlgebra.BlasReal && cone.hess_fact_cache isa DensePosDefCache{T}
             @warn("Switching Hessian cache from Cholesky to Bunch Kaufman")
             cone.hess_fact_cache = DenseSymCache{T}()
@@ -73,7 +81,8 @@ function update_hess_fact(cone::Cone{T}) where {T <: Real}
         else
             cone.hess += sqrt(eps(T)) * I # attempt recovery # TODO make more efficient
         end
-        if !update_fact(cone.hess_fact_cache, cone.hess)
+        @timeit cone.timer "hess_fact2" fact2_success = update_fact(cone.hess_fact_cache, cone.hess)
+        if !fact2_success
             @warn("Hessian factorization failed after recovery")
             return false
         end
@@ -85,28 +94,39 @@ end
 
 function update_inv_hess(cone::Cone)
     @assert !cone.inv_hess_updated
-    cone.hess_fact_updated || update_hess_fact(cone)
-    invert(cone.hess_fact_cache, cone.inv_hess)
+    if !cone.hess_updated
+        @timeit cone.timer "update_hess" update_hess(cone)
+    end
+    @timeit cone.timer "invert_hess" invert(cone.hess_fact_cache, cone.inv_hess)
     cone.inv_hess_updated = true
     return cone.inv_hess
 end
 
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
-    cone.hess_fact_updated || update_hess_fact(cone)
+    if !cone.hess_updated
+        @timeit cone.timer "update_hess" update_hess(cone)
+    end
     copyto!(prod, arr)
-    return inv_prod(cone.hess_fact_cache, prod)
+    @timeit cone.timer "inv_hess_prod" inv_prod(cone.hess_fact_cache, prod)
+    return prod
 end
 
 function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
-    cone.hess_fact_updated || update_hess_fact(cone)
+    if !cone.hess_updated
+        @timeit cone.timer "update_hess" update_hess(cone)
+    end
     copyto!(prod, arr)
-    return sqrt_prod(cone.hess_fact_cache, prod)
+    @timeit cone.timer "hess_sqrt_prod" sqrt_prod(cone.hess_fact_cache, prod)
+    return prod
 end
 
 function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
-    cone.hess_fact_updated || update_hess_fact(cone)
+    if !cone.hess_updated
+        @timeit cone.timer "update_hess" update_hess(cone)
+    end
     copyto!(prod, arr)
-    return inv_sqrt_prod(cone.hess_fact_cache, prod)
+    @timeit cone.timer "inv_hess_sqrt_prod" inv_sqrt_prod(cone.hess_fact_cache, prod)
+    return prod
 end
 
 # fallbacks for sparse linear system solvers
