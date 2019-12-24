@@ -165,7 +165,6 @@ function update_hess_inv_hess(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{
 end
 
 # symmetric arrow matrix
-# TODO maybe make explicit H a sparse matrix
 function update_hess(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     if !cone.hess_inv_hess_updated
         update_hess_inv_hess(cone)
@@ -198,8 +197,7 @@ function update_hess(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where
     H_nzval[1] = cone.diag11
     nz_idx = 2
     diag_idx = 1
-    # @inbounds for j in 1:n
-    for j in 1:n
+    @inbounds for j in 1:n
         H_nzval[nz_idx] = cone.edge[diag_idx]
         H_nzval[nz_idx + 1] = cone.diag[diag_idx]
         nz_idx += 2
@@ -212,17 +210,6 @@ function update_hess(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where
             diag_idx += 1
         end
     end
-
-    # H[1, 1] = cone.diag11
-    # H[1, 2:end] .= cone.edge
-    # @inbounds for (j, dj) in enumerate(cone.diag)
-    #     H[j + 1, j + 1] = dj
-    # end
-    # if cone.is_complex
-    #     @inbounds for (j, oj) in enumerate(cone.offdiag)
-    #         H[2j, 2j + 1] = oj
-    #     end
-    # end
 
     cone.hess_updated = true
     return cone.hess
@@ -359,8 +346,6 @@ function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone
     return prod
 end
 
-# TODO depends on complex/real
-# TODO don't form sparse hessian explicitly - inefficient
 hess_nz_count(cone::EpiNormInf{<:Real, <:Real}) = 3 * cone.dim - 2
 hess_nz_count(cone::EpiNormInf{<:Real, <:Complex}) = 3 * cone.dim - 2 + 2 * cone.n
 hess_nz_count_tril(cone::EpiNormInf{<:Real, <:Real}) = 2 * cone.dim - 1
