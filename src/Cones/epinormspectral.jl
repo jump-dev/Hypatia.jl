@@ -18,6 +18,7 @@ mutable struct EpiNormSpectral{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     m::Int
     is_complex::Bool
     point::Vector{T}
+    timer::TimerOutput
 
     feas_updated::Bool
     grad_updated::Bool

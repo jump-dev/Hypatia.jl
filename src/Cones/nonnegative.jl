@@ -13,6 +13,7 @@ mutable struct Nonnegative{T <: Real} <: Cone{T}
     use_3order_corr::Bool
     dim::Int
     point::Vector{T}
+    timer::TimerOutput
 
     feas_updated::Bool
     grad_updated::Bool
@@ -29,7 +30,7 @@ mutable struct Nonnegative{T <: Real} <: Cone{T}
         @assert dim >= 1
         cone = new{T}()
         cone.use_dual = is_dual
-        cone.use_3order_corr = true # TODO option
+        cone.use_3order_corr = false # TODO option
         cone.dim = dim
         return cone
     end

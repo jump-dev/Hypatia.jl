@@ -5,12 +5,13 @@ preprocessing and initial point finding functions for interior point algorithms
 =#
 
 # TODO rewrite using a new function in Cones.jl - for most cones we want to just set the dual point same as primal point rather than taking gradient
-function initialize_cone_point(cones::Vector{Cones.Cone{T}}, cone_idxs::Vector{UnitRange{Int}}) where {T <: Real}
+function initialize_cone_point(cones::Vector{Cones.Cone{T}}, cone_idxs::Vector{UnitRange{Int}}, timer::TimerOutput) where {T <: Real}
     q = isempty(cones) ? 0 : sum(Cones.dimension, cones)
     point = Models.Point(T[], T[], Vector{T}(undef, q), Vector{T}(undef, q), cones, cone_idxs)
 
     for (k, cone_k) in enumerate(cones)
         Cones.setup_data(cone_k)
+        Cones.set_timer(cone_k, timer)
         primal_k = point.primal_views[k]
         Cones.set_initial_point(primal_k, cone_k)
         Cones.load_point(cone_k, primal_k)

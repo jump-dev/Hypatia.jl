@@ -15,6 +15,7 @@ TODO
 mutable struct EpiPerExp{T <: Real} <: Cone{T}
     use_dual::Bool
     point::Vector{T}
+    timer::TimerOutput
 
     feas_updated::Bool
     grad_updated::Bool

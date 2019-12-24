@@ -20,6 +20,7 @@ mutable struct WSOSInterpEpiNormEucl{T <: Real} <: Cone{T}
     U::Int
     Ps::Vector{Matrix{T}}
     point::Vector{T}
+    timer::TimerOutput
 
     feas_updated::Bool
     grad_updated::Bool

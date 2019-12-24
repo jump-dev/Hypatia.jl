@@ -15,6 +15,7 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
     U::Int
     Ps::Vector{Matrix{T}}
     point::AbstractVector{T}
+    timer::TimerOutput
 
     feas_updated::Bool
     grad_updated::Bool
