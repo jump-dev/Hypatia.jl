@@ -379,11 +379,9 @@ end
 
 inv_prod(cache::CholPosDefCache{T}, prod::AbstractVecOrMat{T}) where {T <: Real} = ldiv!(cache.fact, prod)
 
-const PosDefCache{T <: Real} = Union{LAPACKPosDefCache{T}, CholPosDefCache{T}}
+sqrt_prod(cache::Union{LAPACKPosDefCache{T}, CholPosDefCache{T}}, prod::AbstractVecOrMat{T}) where {T <: Real} = lmul!(UpperTriangular(cache.AF.data), prod)
 
-sqrt_prod(cache::PosDefCache{T}, prod::AbstractVecOrMat{T}) where {T <: Real} = lmul!(UpperTriangular(cache.AF.data), prod)
-
-inv_sqrt_prod(cache::PosDefCache{T}, prod::AbstractVecOrMat{T}) where {T <: Real} = ldiv!(UpperTriangular(cache.AF.data)', prod)
+inv_sqrt_prod(cache::Union{LAPACKPosDefCache{T}, CholPosDefCache{T}}, prod::AbstractVecOrMat{T}) where {T <: Real} = ldiv!(UpperTriangular(cache.AF.data)', prod)
 
 # default to LAPACKPosDefCache for BlasReals, otherwise generic CholPosDefCache
 DensePosDefCache{T}() where {T <: BlasReal} = LAPACKPosDefCache{T}()

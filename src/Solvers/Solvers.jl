@@ -22,6 +22,8 @@ import Hypatia.update_fact
 import Hypatia.inv_prod
 import Hypatia.free_memory
 import Hypatia.int_type
+import Hypatia.LAPACKSymCache
+import Hypatia.LUSymCache
 import Hypatia.DenseNonSymCache
 import Hypatia.DenseSymCache
 import Hypatia.DensePosDefCache

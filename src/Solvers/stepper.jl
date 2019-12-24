@@ -345,7 +345,7 @@ function check_nbhd(
                 end
             end
             temp2_k = similar(temp_k) # TODO prealloc
-            if hasfield(typeof(cone_k), :hess_fact_cache) && cone_k.hess_fact_cache isa DenseSymCache{T}
+            if hasfield(typeof(cone_k), :hess_fact_cache) && cone_k.hess_fact_cache isa Union{LAPACKSymCache, LUSymCache}
                 Cones.inv_hess_prod!(temp2_k, temp_k, cone_k)
                 nbhd_k = dot(temp_k, temp2_k) / mu_temp
                 if nbhd_k <= -cbrt(eps(T))
