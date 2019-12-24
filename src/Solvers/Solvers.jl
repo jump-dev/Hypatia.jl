@@ -16,6 +16,9 @@ using TimerOutputs
 import Hypatia.Cones
 import Hypatia.Models
 import Hypatia.BlockMatrix
+import Hypatia.NonSymCache
+import Hypatia.SymCache
+import Hypatia.PosDefCache
 import Hypatia.SparseNonSymCache
 import Hypatia.SparseSymCache
 import Hypatia.update_fact

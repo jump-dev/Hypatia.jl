@@ -118,6 +118,8 @@ end
 
 inv_prod(cache::LUNonSymCache{T}, prod::AbstractVecOrMat{T}) where {T <: Real} = ldiv!(cache.fact, prod)
 
+const NonSymCache{T <: Real} = Union{LAPACKNonSymCache{T}, LUNonSymCache{T}}
+
 # default to LAPACKNonSymCache for BlasReals, otherwise generic LUNonSymCache
 DenseNonSymCache{T}() where {T <: BlasReal} = LAPACKNonSymCache{T}()
 DenseNonSymCache{T}() where {T <: Real} = LUNonSymCache{T}()
@@ -253,6 +255,8 @@ function invert(cache::LUSymCache{T}, X::Symmetric{T, <:AbstractMatrix{T}}) wher
 end
 
 inv_prod(cache::LUSymCache{T}, prod::AbstractVecOrMat{T}) where {T <: Real} = ldiv!(cache.fact, prod)
+
+const SymCache{T <: Real} = Union{LAPACKSymCache{T}, LUSymCache{T}}
 
 # default to LAPACKSymCache for BlasReals, otherwise generic LUSymCache
 DenseSymCache{T}() where {T <: BlasReal} = LAPACKSymCache{T}()
