@@ -10,6 +10,7 @@ barrier from "Self-Scaled Barriers and Interior-Point Methods for Convex Program
 
 mutable struct Nonnegative{T <: Real} <: Cone{T}
     use_dual::Bool
+    use_3order_corr::Bool
     dim::Int
     point::Vector{T}
 
@@ -22,16 +23,21 @@ mutable struct Nonnegative{T <: Real} <: Cone{T}
     hess::Diagonal{T, Vector{T}}
     inv_hess::Diagonal{T, Vector{T}}
 
+    correction::Vector{T}
+
     function Nonnegative{T}(dim::Int, is_dual::Bool) where {T <: Real}
         @assert dim >= 1
         cone = new{T}()
         cone.use_dual = is_dual
+        cone.use_3order_corr = true # TODO option
         cone.dim = dim
         return cone
     end
 end
 
 Nonnegative{T}(dim::Int) where {T <: Real} = Nonnegative{T}(dim, false)
+
+use_3order_corr(cone::Nonnegative) = cone.use_3order_corr
 
 reset_data(cone::Nonnegative) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
 
@@ -43,6 +49,7 @@ function setup_data(cone::Nonnegative{T}) where {T <: Real}
     cone.grad = zeros(T, dim)
     cone.hess = Diagonal(zeros(T, dim))
     cone.inv_hess = Diagonal(zeros(T, dim))
+    cone.correction = zeros(T, dim)
     return
 end
 
@@ -113,3 +120,8 @@ hess_nz_idxs_col(cone::Nonnegative, j::Int) = [j]
 hess_nz_idxs_col_tril(cone::Nonnegative, j::Int) = [j]
 inv_hess_nz_idxs_col(cone::Nonnegative, j::Int) = [j]
 inv_hess_nz_idxs_col_tril(cone::Nonnegative, j::Int) = [j]
+
+function correction(cone::Nonnegative, primal_dir::AbstractVector, dual_dir::AbstractVector)
+    @. cone.correction = primal_dir * dual_dir / cone.point
+    return cone.correction
+end
