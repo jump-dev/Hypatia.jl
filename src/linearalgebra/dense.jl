@@ -116,7 +116,7 @@ function update_fact(cache::LUNonSymCache{T}, A::AbstractMatrix{T}) where {T <: 
     return issuccess(cache.fact)
 end
 
-inv_prod(cache::LUNonSymCache{T}, X::AbstractVecOrMat{T}) where {T <: Real} = ldiv!(cache.fact, X)
+inv_prod(cache::LUNonSymCache{T}, prod::AbstractVecOrMat{T}) where {T <: Real} = ldiv!(cache.fact, prod)
 
 # default to LAPACKNonSymCache for BlasReals, otherwise generic LUNonSymCache
 DenseNonSymCache{T}() where {T <: BlasReal} = LAPACKNonSymCache{T}()
@@ -246,13 +246,13 @@ function update_fact(cache::LUSymCache{T}, A::Symmetric{T, <:AbstractMatrix{T}})
     return issuccess(cache.fact)
 end
 
-inv_prod(cache::LUSymCache{T}, X::AbstractVecOrMat{T}) where {T <: Real} = ldiv!(cache.fact, X)
-
 function invert(cache::LUSymCache{T}, X::Symmetric{T, <:AbstractMatrix{T}}) where {T <: Real}
     copyto!(X.data, I)
     ldiv!(cache.fact, X.data) # just ldiv an identity matrix - LinearAlgebra currently does the same
     return X
 end
+
+inv_prod(cache::LUSymCache{T}, prod::AbstractVecOrMat{T}) where {T <: Real} = ldiv!(cache.fact, prod)
 
 # default to LAPACKSymCache for BlasReals, otherwise generic LUSymCache
 DenseSymCache{T}() where {T <: BlasReal} = LAPACKSymCache{T}()
@@ -376,13 +376,13 @@ function invert(cache::CholPosDefCache{T}, X::Symmetric{T, <:AbstractMatrix{T}})
     return X
 end
 
-inv_prod(cache::CholPosDefCache{T}, X::AbstractVecOrMat{T}) where {T <: Real} = ldiv!(cache.fact, X)
+inv_prod(cache::CholPosDefCache{T}, prod::AbstractVecOrMat{T}) where {T <: Real} = ldiv!(cache.fact, prod)
 
 const PosDefCache{T <: Real} = Union{LAPACKPosDefCache{T}, CholPosDefCache{T}}
 
-sqrt_prod(cache::PosDefCache{T}, prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}) where {T <: Real} = mul!(prod, UpperTriangular(cache.AF.data), arr)
+sqrt_prod(cache::PosDefCache{T}, prod::AbstractVecOrMat{T}) where {T <: Real} = lmul!(UpperTriangular(cache.AF.data), prod)
 
-inv_sqrt_prod(cache::PosDefCache{T}, prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}) where {T <: Real} = ldiv!(prod, UpperTriangular(cache.AF.data)', arr)
+inv_sqrt_prod(cache::PosDefCache{T}, prod::AbstractVecOrMat{T}) where {T <: Real} = ldiv!(UpperTriangular(cache.AF.data)', prod)
 
 # default to LAPACKPosDefCache for BlasReals, otherwise generic CholPosDefCache
 DensePosDefCache{T}() where {T <: BlasReal} = LAPACKPosDefCache{T}()

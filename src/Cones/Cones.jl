@@ -93,17 +93,19 @@ end
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
     cone.hess_fact_updated || update_hess_fact(cone)
     copyto!(prod, arr)
-    return inv_prod(cone.hess_fact_cache, prod) # TODO change signature to match sqrt_prod
+    return inv_prod(cone.hess_fact_cache, prod)
 end
 
 function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
     cone.hess_fact_updated || update_hess_fact(cone)
-    return sqrt_prod(cone.hess_fact_cache, prod, arr)
+    copyto!(prod, arr)
+    return sqrt_prod(cone.hess_fact_cache, prod)
 end
 
 function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
     cone.hess_fact_updated || update_hess_fact(cone)
-    return inv_sqrt_prod(cone.hess_fact_cache, prod, arr)
+    copyto!(prod, arr)
+    return inv_sqrt_prod(cone.hess_fact_cache, prod)
 end
 
 # fallbacks for sparse linear system solvers

@@ -335,6 +335,7 @@ function check_nbhd(
         @. temp_k = solver.dual_views[k] + g_k * mu_temp
 
         # TODO optionally could use multiple nbhd checks (add separate bool options and separate max_nbhd value options), eg smaller hess nbhd for each cone and larger hess nbhd for sum of cone nbhds
+        # TODO could use infinity nbhd (cheaper) for affine line search and hess nbhd for combined line search
         if solver.use_infty_nbhd
             nbhd_k = abs2(norm(temp_k, Inf) / norm(g_k, Inf)) / mu_temp
             # nbhd_k = abs2(maximum(abs(dj) / abs(gj) for (dj, gj) in zip(duals_k, g_k))) # TODO try this neighborhood
