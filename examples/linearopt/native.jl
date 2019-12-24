@@ -35,19 +35,25 @@ function linearopt(
 end
 
 linearopt1(T::Type{<:Real}) = linearopt(T, 500, 1000)
-linearopt2(T::Type{<:Real}) = linearopt(T, 15, 20)
-linearopt3(T::Type{<:Real}) = linearopt(T, 500, 1000, nzfrac = 0.05)
-linearopt4(T::Type{<:Real}) = linearopt(T, 15, 20, nzfrac = 0.25)
+linearopt2(T::Type{<:Real}) = linearopt(T, 50, 100)
+linearopt3(T::Type{<:Real}) = linearopt(T, 15, 20)
+linearopt4(T::Type{<:Real}) = linearopt(T, 500, 1000, nzfrac = 0.05)
+linearopt5(T::Type{<:Real}) = linearopt(T, 50, 100, nzfrac = 0.15)
+linearopt6(T::Type{<:Real}) = linearopt(T, 15, 20, nzfrac = 0.25)
 
 instances_linearopt_all = [
     linearopt1,
     linearopt2,
     linearopt3,
     linearopt4,
+    linearopt5,
+    linearopt6,
     ]
 instances_linearopt_few = [
     linearopt2,
-    linearopt4,
+    linearopt3,
+    linearopt5,
+    linearopt6,
     ]
 
 function test_linearopt(instance::Function; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
