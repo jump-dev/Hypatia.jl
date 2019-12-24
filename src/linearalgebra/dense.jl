@@ -118,8 +118,6 @@ end
 
 inv_prod(cache::LUNonSymCache{T}, prod::AbstractVecOrMat{T}) where {T <: Real} = ldiv!(cache.fact, prod)
 
-const NonSymCache{T <: Real} = Union{LAPACKNonSymCache{T}, LUNonSymCache{T}}
-
 # default to LAPACKNonSymCache for BlasReals, otherwise generic LUNonSymCache
 DenseNonSymCache{T}() where {T <: BlasReal} = LAPACKNonSymCache{T}()
 DenseNonSymCache{T}() where {T <: Real} = LUNonSymCache{T}()
@@ -256,8 +254,6 @@ end
 
 inv_prod(cache::LUSymCache{T}, prod::AbstractVecOrMat{T}) where {T <: Real} = ldiv!(cache.fact, prod)
 
-const SymCache{T <: Real} = Union{LAPACKSymCache{T}, LUSymCache{T}}
-
 # default to LAPACKSymCache for BlasReals, otherwise generic LUSymCache
 DenseSymCache{T}() where {T <: BlasReal} = LAPACKSymCache{T}()
 DenseSymCache{T}() where {T <: Real} = LUSymCache{T}()
@@ -383,11 +379,9 @@ end
 
 inv_prod(cache::CholPosDefCache{T}, prod::AbstractVecOrMat{T}) where {T <: Real} = ldiv!(cache.fact, prod)
 
-const PosDefCache{T <: Real} = Union{LAPACKPosDefCache{T}, CholPosDefCache{T}}
+sqrt_prod(cache::Union{LAPACKPosDefCache{T}, CholPosDefCache{T}}, prod::AbstractVecOrMat{T}) where {T <: Real} = lmul!(UpperTriangular(cache.AF.data), prod)
 
-sqrt_prod(cache::PosDefCache{T}, prod::AbstractVecOrMat{T}) where {T <: Real} = lmul!(UpperTriangular(cache.AF.data), prod)
-
-inv_sqrt_prod(cache::PosDefCache{T}, prod::AbstractVecOrMat{T}) where {T <: Real} = ldiv!(UpperTriangular(cache.AF.data)', prod)
+inv_sqrt_prod(cache::Union{LAPACKPosDefCache{T}, CholPosDefCache{T}}, prod::AbstractVecOrMat{T}) where {T <: Real} = ldiv!(UpperTriangular(cache.AF.data)', prod)
 
 # default to LAPACKPosDefCache for BlasReals, otherwise generic CholPosDefCache
 DensePosDefCache{T}() where {T <: BlasReal} = LAPACKPosDefCache{T}()
