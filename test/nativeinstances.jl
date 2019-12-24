@@ -1192,7 +1192,7 @@ function wsosinterpepinormeucl1(T; options...)
     fn = x ^ 2
     # the half-degree is div(2, 2) = 1
     (U, pts, Ps, _) = MU.interpolate(MU.Box{T}([-one(T)], [one(T)]), 1, sample = false)
-    @test U == 3
+    @assert U == 3
 
     # the variable t(x) is a polynomial
     c = ones(T, U)

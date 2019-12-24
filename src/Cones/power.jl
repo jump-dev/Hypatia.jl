@@ -15,6 +15,7 @@ mutable struct Power{T <: Real} <: Cone{T}
     alpha::Vector{T}
     n::Int
     point::Vector{T}
+    timer::TimerOutput
 
     feas_updated::Bool
     grad_updated::Bool
