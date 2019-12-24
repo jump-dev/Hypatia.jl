@@ -67,8 +67,8 @@ for (getrf, elty) in [(:dgetrf_, :Float64), (:sgetrf_, :Float32)]
             elseif 0 < cache.info[] <= n
                 @warn("factorization failed: #$(cache.info[])")
                 return false
-            # elseif cache.info[] > n
-            #     @warn("condition number is small: $(cache.rcond[])")
+            elseif cache.info[] > n
+                @warn("condition number is small: $(cache.rcond[])")
             end
 
             return true
@@ -179,8 +179,8 @@ for (sytrf_rook, elty) in [(:dsytrf_rook_, :Float64), (:ssytrf_rook_, :Float32)]
             elseif 0 < cache.info[] <= n
                 # @warn("factorization failed: #$(cache.info[])")
                 return false
-            # elseif cache.info[] > n
-            #     @warn("condition number is small: $(cache.rcond[])")
+            elseif cache.info[] > n
+                @warn("condition number is small: $(cache.rcond[])")
             end
 
             return true
@@ -301,8 +301,9 @@ for (potrf, elty) in [(:dpotrf_, :Float64), (:spotrf_, :Float32)]
             elseif 0 < cache.info[] <= n
                 # @warn("factorization failed: #$(cache.info[])")
                 return false
-            # elseif cache.info[] > n
-            #     @warn("condition number is small: $(cache.rcond[])")
+            elseif cache.info[] > n
+                @warn("condition number is small: $(cache.rcond[])")
+                return false
             end
 
             return true
