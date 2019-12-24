@@ -5,7 +5,7 @@ hypograph of generalized geomean (product of powers) parametrized by alpha in R_
 (u in R, w in R_+^n) : u <= prod_i(w_i^alpha_i)
 where sum_i(alpha_i) = 1, alpha_i >= 0
 
-barrier from Constructing self-concordant barriers for convex cones by Yu. Nesterov
+barrier from "Constructing self-concordant barriers for convex cones" by Yu. Nesterov
 -log(prod_i(w_i^alpha_i) - u) - sum_i(log(w_i))
 =#
 
