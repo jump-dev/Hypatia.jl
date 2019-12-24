@@ -15,6 +15,7 @@ TODO
 
 mutable struct PosSemidefTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     use_dual::Bool
+    use_3order_corr::Bool
     dim::Int
     side::Int
     is_complex::Bool
@@ -35,8 +36,10 @@ mutable struct PosSemidefTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     mat2::Matrix{R}
     mat3::Matrix{R}
     mat4::Matrix{R}
+    mat5::Matrix{R}
     inv_mat::Matrix{R}
     fact_mat
+    correction::Vector{T}
 
     function PosSemidefTri{T, R}(
         dim::Int,
@@ -45,6 +48,7 @@ mutable struct PosSemidefTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
         @assert dim >= 1
         cone = new{T, R}()
         cone.use_dual = is_dual
+        cone.use_3order_corr = false # TODO option
         cone.dim = dim # real vector dimension
         cone.rt2 = sqrt(T(2))
         if R <: Complex
@@ -63,6 +67,8 @@ end
 
 PosSemidefTri{T, R}(dim::Int) where {R <: RealOrComplex{T}} where {T <: Real} = PosSemidefTri{T, R}(dim, false)
 
+use_3order_corr(cone::PosSemidefTri) = cone.use_3order_corr
+
 reset_data(cone::PosSemidefTri) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
 
 function setup_data(cone::PosSemidefTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
@@ -76,6 +82,8 @@ function setup_data(cone::PosSemidefTri{T, R}) where {R <: RealOrComplex{T}} whe
     cone.mat2 = similar(cone.mat)
     cone.mat3 = similar(cone.mat)
     cone.mat4 = similar(cone.mat)
+    cone.mat5 = similar(cone.mat)
+    cone.correction = zeros(T, dim)
     return
 end
 
@@ -178,6 +186,32 @@ function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone
         smat_to_svec!(view(prod, :, i), cone.mat4, cone.rt2)
     end
     return prod
+end
+
+# smat correction = (Pinv * S * Z + Z * S * Pinv) / 2
+# Pinv = inv(smat(point))
+# TODO cleanup and improve efficiency
+function correction(cone::PosSemidefTri, primal_dir::AbstractVector, dual_dir::AbstractVector)
+    @assert cone.grad_updated
+
+    S = copytri!(svec_to_smat!(cone.mat3, primal_dir, cone.rt2), 'U', cone.is_complex)
+    Z = Hermitian(svec_to_smat!(cone.mat4, dual_dir, cone.rt2), :U)
+
+    # TODO compare the following numerically
+    # Pinv_S_Z = mul!(cone.work_mat3, ldiv!(cone.fact, S), Z)
+    # Pinv_S_Z = ldiv!(cone.fact, mul!(cone.work_mat3, S, Z))
+    # TODO reuse factorization if useful
+    # fact = cholesky(Hermitian(svec_to_smat!(cone.work_mat3, primal_point, cone.rt2), :U))
+    # fact = cholesky(Hermitian(svec_to_smat!(cone.work_mat3, cone.point, cone.rt2), :U))
+
+    Pinv_S_Z_symm = mul!(cone.mat5, ldiv!(cone.fact_mat, S), Z)
+    @inbounds for j in 1:cone.side, i in 1:j
+        Pinv_S_Z_symm[i, j] += Pinv_S_Z_symm[j, i]'
+        Pinv_S_Z_symm[i, j] /= 2
+    end
+    smat_to_svec!(cone.correction, Pinv_S_Z_symm, cone.rt2)
+
+    return cone.correction
 end
 
 # TODO parallelize

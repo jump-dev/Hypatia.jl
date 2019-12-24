@@ -453,7 +453,9 @@ function update_rhs(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: 
 
         # kap rhs
         rhs[end] += solver.mu / solver.tau
-        # TODO NT rhs[end] += (solver.mu - stepper.dir[stepper.tau_row] * stepper.dir[stepper.kap_row]) / solver.kap
+        # rhs[end] += (solver.mu - stepper.dir[stepper.tau_row] * stepper.dir[stepper.kap_row]) / solver.tau
+        # TODO NT
+        # rhs[end] += (solver.mu - stepper.dir[stepper.tau_row] * stepper.dir[stepper.kap_row]) / solver.kap
     end
 
     return rhs

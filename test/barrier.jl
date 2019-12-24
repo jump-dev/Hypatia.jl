@@ -50,19 +50,19 @@ function test_barrier_oracles(
     @test ForwardDiff.hessian(barrier, point) ≈ hess atol=tol rtol=tol
 
     # TODO decide whether to add
-    # # check 3rd order corrector agrees with ForwardDiff
-    # # too slow if cone is too large or not using BlasReals
-    # if CO.use_3order_corr(cone) && dim < 8 && T in (Float32, Float64)
-    #     FD_3deriv = ForwardDiff.jacobian(x -> ForwardDiff.hessian(barrier, x), point)
-    #     # check log-homog property that F'''(point)[point] = -2F''(point)
-    #     @test reshape(FD_3deriv * point, dim, dim) ≈ -2 * hess
-    #     # check correction term agrees with directional 3rd derivative
-    #     primal_dir = perturb_scale(zeros(T, dim), noise, one(T))
-    #     dual_dir = perturb_scale(zeros(T, dim), noise, one(T))
-    #     Hinv_z = CO.inv_hess_prod!(similar(dual_dir), dual_dir, cone)
-    #     FD_corr = reshape(FD_3deriv * primal_dir, dim, dim) * Hinv_z / -2
-    #     @test FD_corr ≈ CO.correction(cone, primal_dir, dual_dir) atol=tol rtol=tol
-    # end
+    # check 3rd order corrector agrees with ForwardDiff
+    # too slow if cone is too large or not using BlasReals
+    if CO.use_3order_corr(cone) && dim < 8 && T in (Float32, Float64)
+        FD_3deriv = ForwardDiff.jacobian(x -> ForwardDiff.hessian(barrier, x), point)
+        # check log-homog property that F'''(point)[point] = -2F''(point)
+        @test reshape(FD_3deriv * point, dim, dim) ≈ -2 * hess
+        # check correction term agrees with directional 3rd derivative
+        primal_dir = perturb_scale(zeros(T, dim), noise, one(T))
+        dual_dir = perturb_scale(zeros(T, dim), noise, one(T))
+        Hinv_z = CO.inv_hess_prod!(similar(dual_dir), dual_dir, cone)
+        FD_corr = reshape(FD_3deriv * primal_dir, dim, dim) * Hinv_z / -2
+        @test FD_corr ≈ CO.correction(cone, primal_dir, dual_dir) atol=tol rtol=tol
+    end
 
     return
 end
