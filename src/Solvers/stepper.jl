@@ -329,9 +329,6 @@ function check_nbhd(
 
         temp_k = solver.nbhd_temp[k]
         g_k = Cones.grad(cone_k)
-        if hasfield(typeof(cone_k), :hess_fact_cache) && !Cones.update_hess_fact(cone_k)
-            return false
-        end
         @. temp_k = solver.dual_views[k] + g_k * mu_temp
 
         # TODO optionally could use multiple nbhd checks (add separate bool options and separate max_nbhd value options), eg smaller hess nbhd for each cone and larger hess nbhd for sum of cone nbhds
@@ -341,8 +338,13 @@ function check_nbhd(
             # nbhd_k = abs2(maximum(abs(dj) / abs(gj) for (dj, gj) in zip(duals_k, g_k))) # TODO try this neighborhood
             lhs_nbhd = max(lhs_nbhd, nbhd_k)
         else
-            temp2_k = similar(temp_k) # TODO prealloc
             # TODO use dispatch
+            if hasfield(typeof(cone_k), :hess_fact_cache)
+                @timeit solver.timer "update_hess_fact" if !Cones.update_hess_fact(cone_k)
+                    return false
+                end
+            end
+            temp2_k = similar(temp_k) # TODO prealloc
             if hasfield(typeof(cone_k), :hess_fact_cache) && cone_k.hess_fact_cache isa DenseSymCache{T}
                 Cones.inv_hess_prod!(temp2_k, temp_k, cone_k)
                 nbhd_k = dot(temp_k, temp2_k) / mu_temp
@@ -443,10 +445,10 @@ function update_rhs(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: 
             grad_k = Cones.grad(cone_k)
             @. stepper.s_rhs_k[k] -= solver.mu * grad_k
             # TODO 3-order corrector?
-            # if Cones.use_3order_corr(cone_k)
-            #     # TODO check math here for case of cone.use_dual true - should s and z be swapped then?
-            #     stepper.s_rhs_k[k] .-= Cones.correction(cone_k, stepper.primal_dir_k[k], stepper.dual_dir_k[k])
-            # end
+            if Cones.use_3order_corr(cone_k)
+                # TODO check math here for case of cone.use_dual true - should s and z be swapped then?
+                stepper.s_rhs_k[k] .-= Cones.correction(cone_k, stepper.primal_dir_k[k], stepper.dual_dir_k[k])
+            end
         end
 
         # kap rhs
