@@ -19,6 +19,7 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     is_complex::Bool
     point::Vector{T}
     rt2::T
+    timer::TimerOutput
 
     feas_updated::Bool
     grad_updated::Bool

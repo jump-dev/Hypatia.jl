@@ -13,6 +13,7 @@ mutable struct EpiPerSquare{T <: Real} <: Cone{T}
     use_dual::Bool
     dim::Int
     point::Vector{T}
+    timer::TimerOutput
 
     feas_updated::Bool
     grad_updated::Bool

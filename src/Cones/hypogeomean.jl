@@ -14,6 +14,7 @@ mutable struct HypoGeomean{T <: Real} <: Cone{T}
     dim::Int
     alpha::Vector{T}
     point::Vector{T}
+    timer::TimerOutput
 
     feas_updated::Bool
     grad_updated::Bool
