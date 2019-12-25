@@ -23,9 +23,14 @@ function expdesignJuMP(
     p::Int,
     n::Int,
     nmax::Int;
+    logdet_obj::Bool = false,
+    rootdet_obj::Bool = false,
+    geomean_obj::Bool = false,
     use_logdet::Bool = true,
+    use_rootdet::Bool = true,
     )
     @assert (p > q) && (n > q) && (nmax <= n)
+    @assert xor(logdet_obj, geomean_obj, rootdet_obj)
     V = randn(q, p)
 
     model = JuMP.Model()
@@ -34,40 +39,82 @@ function expdesignJuMP(
     JuMP.@constraint(model, sum(np) == n) # n experiments total
     v1 = [Q[i, j] for i in 1:q for j in 1:i] # vectorized Q
 
-    if use_logdet
-        JuMP.@variable(model, hypo) # hypograph of logdet variable
+    if (logdet_obj && use_logdet) || (rootdet_obj && use_rootdet) || geomean_obj
+        # hypograph of logdet/rootdet
+        JuMP.@variable(model, hypo)
         JuMP.@objective(model, Max, hypo)
-        JuMP.@constraint(model, vcat(hypo, 1.0, v1) in MOI.LogDetConeTriangle(q)) # hypograph of logdet of information matrix
-    else
-        JuMP.@variables(model, begin
-            hypo[1:q]
-            lowertri[i in 1:q, j in 1:i]
-        end)
-        v2 = vcat([vcat(zeros(i - 1), [lowertri[j, i] for j in i:q], zeros(i - 1), lowertri[i, i]) for i in 1:q]...)
-        JuMP.@constraints(model, begin
-            vcat(v1, v2) in MOI.PositiveSemidefiniteConeTriangle(2q)
-            [i in 1:q], [hypo[i], 1.0, lowertri[i, i]] in MOI.ExponentialCone()
-        end)
-        JuMP.@objective(model, Max, sum(hypo))
     end
+
+    if (logdet_obj && !use_logdet) || geomean_obj
+        JuMP.@variable(model, lowertri[i in 1:q, j in 1:i])
+    end
+
+    if logdet_obj
+        if use_logdet
+            JuMP.@constraint(model, vcat(hypo, 1.0, v1) in MOI.LogDetConeTriangle(q)) # hypograph of logdet of information matrix
+        else
+            JuMP.@variable(model, hypo[1:q])
+            v2 = vcat([vcat(zeros(i - 1), [lowertri[j, i] for j in i:q], zeros(i - 1), lowertri[i, i]) for i in 1:q]...)
+            JuMP.@constraints(model, begin
+                vcat(v1, v2) in MOI.PositiveSemidefiniteConeTriangle(2q)
+                [i in 1:q], [hypo[i], 1.0, lowertri[i, i]] in MOI.ExponentialCone()
+            end)
+            JuMP.@objective(model, Max, sum(hypo))
+        end # use_logdet
+    elseif rootdet_obj
+        if use_rootdet
+            JuMP.@constraint(model, vcat(hypo, v1) in MOI.RootDetConeTriangle(q))
+        else
+            # TODO extended formulation for rootdet
+        end
+    else
+        # hypogeomean/soc formulation
+        JuMP.@variable(model, W[1:p, 1:q])
+        VW = V * W
+        # TODO iterate in constraint
+        for i in 1:q
+            for j in 1:i
+                JuMP.@constraint(model, VW[i, j] == lowertri[i, j])
+            end
+            for j in (i + 1):q
+                JuMP.@constraint(model, VW[i, j] == 0)
+            end
+        end
+        JuMP.@constraints(model, begin
+            vcat(hypo, [lowertri[i, i] for i in 1:q]) in MOI.GeometricMeanCone(q + 1)
+            [i in 1:p], vcat(sqrt(q) * np[i], W[i, :]) in JuMP.SecondOrderCone()
+        end)
+    end # obj
+
     return (model = model,)
 end
 
-expdesignJuMP1() = expdesignJuMP(25, 75, 125, 5)
-expdesignJuMP2() = expdesignJuMP(10, 30, 50, 5)
-expdesignJuMP3() = expdesignJuMP(5, 15, 25, 5)
-expdesignJuMP4() = expdesignJuMP(4, 8, 12, 3)
-expdesignJuMP5() = expdesignJuMP(3, 5, 7, 2)
-expdesignJuMP6() = expdesignJuMP(25, 75, 125, 5, use_logdet = false)
-expdesignJuMP7() = expdesignJuMP(10, 30, 50, 5, use_logdet = false)
-expdesignJuMP8() = expdesignJuMP(5, 15, 25, 5, use_logdet = false)
-expdesignJuMP9() = expdesignJuMP(4, 8, 12, 3, use_logdet = false)
-expdesignJuMP10() = expdesignJuMP(3, 5, 7, 2, use_logdet = false)
+expdesignJuMP1() = expdesignJuMP(25, 75, 125, 5, logdet_obj = true)
+expdesignJuMP2() = expdesignJuMP(10, 30, 50, 5, logdet_obj = true)
+expdesignJuMP3() = expdesignJuMP(5, 15, 25, 5, logdet_obj = true)
+expdesignJuMP4() = expdesignJuMP(4, 8, 12, 3, logdet_obj = true)
+expdesignJuMP5() = expdesignJuMP(3, 5, 7, 2, logdet_obj = true)
+expdesignJuMP6() = expdesignJuMP(25, 75, 125, 5, use_logdet = false, logdet_obj = true)
+expdesignJuMP7() = expdesignJuMP(10, 30, 50, 5, use_logdet = false, logdet_obj = true)
+expdesignJuMP8() = expdesignJuMP(5, 15, 25, 5, use_logdet = false, logdet_obj = true)
+expdesignJuMP9() = expdesignJuMP(4, 8, 12, 3, use_logdet = false, logdet_obj = true)
+expdesignJuMP10() = expdesignJuMP(3, 5, 7, 2, use_logdet = false, logdet_obj = true)
+expdesignJuMP11() = expdesignJuMP(25, 75, 125, 5, rootdet_obj = true)
+expdesignJuMP12() = expdesignJuMP(10, 30, 50, 5, rootdet_obj = true)
+expdesignJuMP13() = expdesignJuMP(5, 15, 25, 5, rootdet_obj = true)
+expdesignJuMP14() = expdesignJuMP(4, 8, 12, 3, rootdet_obj = true)
+expdesignJuMP15() = expdesignJuMP(3, 5, 7, 2, rootdet_obj = true)
+expdesignJuMP16() = expdesignJuMP(20, 40, 80, 5, geomean_obj = true) # other big size difficult for this formulation
+expdesignJuMP17() = expdesignJuMP(10, 30, 50, 5, geomean_obj = true)
+expdesignJuMP18() = expdesignJuMP(5, 15, 25, 5, geomean_obj = true)
+expdesignJuMP19() = expdesignJuMP(4, 8, 12, 3, geomean_obj = true)
+expdesignJuMP20() = expdesignJuMP(3, 5, 7, 2, geomean_obj = true)
 
 function test_expdesignJuMP(instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
     d = instance()
     JuMP.optimize!(d.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
+    @show JuMP.value.(d.model[:np])
     @test JuMP.termination_status(d.model) == MOI.OPTIMAL
     return
 end
@@ -83,9 +130,21 @@ test_expdesignJuMP_all(; options...) = test_expdesignJuMP.([
     expdesignJuMP8,
     expdesignJuMP9,
     expdesignJuMP10,
+    expdesignJuMP11,
+    expdesignJuMP12,
+    expdesignJuMP13,
+    expdesignJuMP14,
+    expdesignJuMP15,
+    expdesignJuMP16,
+    expdesignJuMP17,
+    expdesignJuMP18,
+    expdesignJuMP19,
+    expdesignJuMP20,
     ], options = options)
 
 test_expdesignJuMP(; options...) = test_expdesignJuMP.([
     expdesignJuMP3,
     expdesignJuMP8,
+    expdesignJuMP13,
+    expdesignJuMP18,
     ], options = options)
