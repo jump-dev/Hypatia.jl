@@ -40,7 +40,7 @@ function expdesignJuMP(
     v1 = [Q[i, j] for i in 1:q for j in 1:i] # vectorized Q
 
     if (logdet_obj && use_logdet) || rootdet_obj || geomean_obj
-        # hypograph of logdet/rootdet
+        # hypograph of logdet/rootdet/geomean
         JuMP.@variable(model, hypo)
         JuMP.@objective(model, Max, hypo)
     end
@@ -146,6 +146,11 @@ test_expdesignJuMP_all(; options...) = test_expdesignJuMP.([
     expdesignJuMP18,
     expdesignJuMP19,
     expdesignJuMP20,
+    expdesignJuMP21,
+    expdesignJuMP22,
+    expdesignJuMP23,
+    expdesignJuMP24,
+    expdesignJuMP25,
     ], options = options)
 
 test_expdesignJuMP(; options...) = test_expdesignJuMP.([
