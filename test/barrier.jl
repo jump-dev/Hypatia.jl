@@ -8,9 +8,12 @@ using Test
 import Random
 using LinearAlgebra
 import ForwardDiff
+import TimerOutputs
 import Hypatia
 const CO = Hypatia.Cones
 const MU = Hypatia.ModelUtilities
+
+timer = TimerOutputs.TimerOutput()
 
 function test_barrier_oracles(
     cone::CO.Cone{T},
@@ -24,16 +27,19 @@ function test_barrier_oracles(
     Random.seed!(1)
 
     CO.setup_data(cone)
+    CO.set_timer(cone, timer)
     dim = CO.dimension(cone)
     point = Vector{T}(undef, dim)
     CO.set_initial_point(point, cone)
     @test load_reset_check(cone, point)
     @test cone.point == point
 
-    # tests for centrality of initial point
-    grad = CO.grad(cone)
-    @test dot(point, -grad) ≈ norm(point) * norm(grad) atol=init_tol rtol=init_tol
-    @test point ≈ -grad atol=init_tol rtol=init_tol
+    if isfinite(init_tol)
+        # tests for centrality of initial point
+        grad = CO.grad(cone)
+        @test dot(point, -grad) ≈ norm(point) * norm(grad) atol=init_tol rtol=init_tol
+        @test point ≈ -grad atol=init_tol rtol=init_tol
+    end
     init_only && return
 
     # perturb and scale the initial point and check feasible
@@ -238,6 +244,22 @@ function test_epinormspectral_barrier(T::Type{<:Real})
     return
 end
 
+function test_linmatrixineq_barrier(T::Type{<:Real})
+    Random.seed!(1)
+    Rs_list = [[T, T], [Complex{T}, Complex{T}], [T, Complex{T}, T], [Complex{T}, T, T]]
+    for side in [2, 3, 5], Rs in Rs_list
+        As = Vector{LinearAlgebra.HermOrSym{<:R, Matrix{R}} where R<:Hypatia.RealOrComplex{T}}(undef, length(Rs))
+        A_1_half = rand(Rs[1], side, side)
+        As[1] = Hermitian(A_1_half * A_1_half' + I, :U)
+        for i in 2:length(Rs)
+            As[i] = Hermitian(rand(Rs[i], side, side), :U)
+        end
+        barrier(s) = -logdet(cholesky!(sum(s_i * A_i for (s_i, A_i) in zip(s, As))))
+        test_barrier_oracles(CO.LinMatrixIneq{T}(As), barrier, init_tol = Inf)
+    end
+    return
+end
+
 function test_possemideftri_barrier(T::Type{<:Real})
     for side in [1, 2, 5]
         # real PSD cone
@@ -327,7 +349,7 @@ function test_wsosinterpnonnegative_barrier(T::Type{<:Real})
         (U, _, Ps, _) = MU.interpolate(MU.Box{T}(-ones(T, n), ones(T, n)), halfdeg, sample = false) # use a unit box domain
         barrier(s) = -sum(logdet(cholesky!(Symmetric(P' * Diagonal(s) * P))) for P in Ps)
         cone = CO.WSOSInterpNonnegative{T, T}(U, Ps, true)
-        test_barrier_oracles(cone, barrier, init_tol = 1e2) # TODO center and test initial points
+        test_barrier_oracles(cone, barrier, init_tol = Inf) # TODO center and test initial points
     end
     # TODO also test complex case CO.WSOSInterpNonnegative{T, Complex{T}} - need complex MU interp functions first
     return
