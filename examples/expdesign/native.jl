@@ -90,6 +90,59 @@ function expdesign(
         return (c = c, A = A, b = b, G = G, h = h, cones = cones)
     end
 
+    if geomean_obj
+        # auxiliary matrix variable has pq elements represented row-major, auxiliary lower triangular variable has svec_length(q) elements also row-major
+        pq = p * q
+        qq = q ^ 2
+        num_trivars = CO.svec_length(q)
+        c = vcat(-one(T), zeros(T, p + pq + num_trivars))
+
+        A_VW = zeros(T, qq, pq)
+        A_lowertri = zeros(T, qq, num_trivars)
+        # rows index (i, j)
+        row_idx = 1
+        for i in 1:q
+            col_offset = sum(1:(i - 1)) + 1
+            A_lowertri[row_idx:(row_idx + i - 1), col_offset:(col_offset + i - 1)] = -Matrix{T}(-I, i, i)
+            for j in 1:q
+                for k in 1:p
+                    # columns index (k, j)
+                    col_idx = (k - 1) * q + j
+                    A_VW[row_idx, col_idx] = V[i, k]
+                end
+                row_idx += 1
+            end
+        end
+
+        A = [
+            zero(T)    A    zeros(1, pq + num_trivars);
+            zeros(T, qq, 1 + p)    A_VW    A_lowertri;
+            ]
+        b = vcat(b, zeros(T, qq))
+
+        push!(cones, CO.HypoGeomean{T}(fill(inv(T(p)), p)))
+        G_soc_epi = zeros(T, pq + p, p)
+        G_soc = zeros(T, pq + p, pq)
+        epi_idx = 1
+        col_idx = 1
+        for i in 1:p
+            push!(cones, CO.EpiNormEucl{T}(q + 1))
+            G_soc_epi[epi_idx, i] = -sqrt(T(q))
+            G_soc[(epi_idx + 1):(epi_idx + q), col_idx:(col_idx + q - 1)] = Matrix{T}(-I, q, q)
+            epi_idx += q + 1
+            col_idx += q
+        end
+        G = [
+            zeros(T, p)    Matrix{T}(-I, p, p)    zeros(T, p, pq + num_trivars); # nonnegativity
+            zeros(T, p)    Matrix{T}(-I, p, p)    zeros(T, p, pq + num_trivars); # upper bound
+            Matrix{T}(-I, p + 1, p + 1)    zeros(T, p + 1, pq + num_trivars); # geomean
+            zeros(T, pq + p)    G_soc_epi    G_soc    zeros(T, pq + p, num_trivars); # epinormeucl
+            ]
+        h = vcat(h_nonneg, h_nmax, zeros(2p + 1 + pq))
+
+        return (c = c, A = A, b = b, G = G, h = h, cones = cones)
+    end
+
     if rootdet_obj
         # TODO extended
     elseif logdet_obj
@@ -230,6 +283,11 @@ expdesign16(T::Type{<:Real}) = expdesign(T, 10, 30, 50, 5, use_rootdet = true, r
 expdesign17(T::Type{<:Real}) = expdesign(T, 5, 15, 25, 5, use_rootdet = true, rootdet_obj = true)
 expdesign18(T::Type{<:Real}) = expdesign(T, 4, 8, 12, 3, use_rootdet = true, rootdet_obj = true)
 expdesign19(T::Type{<:Real}) = expdesign(T, 3, 5, 7, 2, use_rootdet = true, rootdet_obj = true)
+expdesign20(T::Type{<:Real}) = expdesign(T, 25, 75, 125, 5, geomean_obj = true)
+expdesign21(T::Type{<:Real}) = expdesign(T, 10, 30, 50, 5, geomean_obj = true)
+expdesign22(T::Type{<:Real}) = expdesign(T, 5, 15, 25, 5, geomean_obj = true)
+expdesign23(T::Type{<:Real}) = expdesign(T, 4, 8, 12, 3, geomean_obj = true)
+expdesign24(T::Type{<:Real}) = expdesign(T, 3, 5, 7, 2, geomean_obj = true)
 
 instances_expdesign_all = [
     expdesign1,
@@ -249,6 +307,11 @@ instances_expdesign_all = [
     expdesign17,
     expdesign18,
     expdesign19,
+    expdesign20,
+    expdesign21,
+    expdesign22,
+    expdesign23,
+    expdesign24,
     ]
 instances_expdesign_linops = [
     expdesign11,
@@ -259,6 +322,7 @@ instances_expdesign_few = [
     expdesign5,
     expdesign10,
     expdesign19,
+    expdesign24,
     ]
 
 function test_expdesign(instance::Function; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
