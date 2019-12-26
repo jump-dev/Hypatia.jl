@@ -39,14 +39,19 @@ function expdesignJuMP(
     JuMP.@constraint(model, sum(np) == n) # n experiments total
     v1 = [Q[i, j] for i in 1:q for j in 1:i] # vectorized Q
 
-    if (logdet_obj && use_logdet) || (rootdet_obj && use_rootdet) || geomean_obj
+    if (logdet_obj && use_logdet) || rootdet_obj || geomean_obj
         # hypograph of logdet/rootdet
         JuMP.@variable(model, hypo)
         JuMP.@objective(model, Max, hypo)
     end
 
-    if (logdet_obj && !use_logdet) || geomean_obj
+    if (logdet_obj && !use_logdet) || (rootdet_obj && !use_rootdet) || geomean_obj
         JuMP.@variable(model, lowertri[i in 1:q, j in 1:i])
+    end
+
+    if (logdet_obj && !use_logdet) || (rootdet_obj && !use_rootdet)
+        v2 = vcat([vcat(zeros(i - 1), [lowertri[j, i] for j in i:q], zeros(i - 1), lowertri[i, i]) for i in 1:q]...)
+        JuMP.@constraint(model, vcat(v1, v2) in MOI.PositiveSemidefiniteConeTriangle(2q))
     end
 
     if logdet_obj
@@ -54,18 +59,14 @@ function expdesignJuMP(
             JuMP.@constraint(model, vcat(hypo, 1.0, v1) in MOI.LogDetConeTriangle(q)) # hypograph of logdet of information matrix
         else
             JuMP.@variable(model, hypo[1:q])
-            v2 = vcat([vcat(zeros(i - 1), [lowertri[j, i] for j in i:q], zeros(i - 1), lowertri[i, i]) for i in 1:q]...)
-            JuMP.@constraints(model, begin
-                vcat(v1, v2) in MOI.PositiveSemidefiniteConeTriangle(2q)
-                [i in 1:q], [hypo[i], 1.0, lowertri[i, i]] in MOI.ExponentialCone()
-            end)
+            JuMP.@constraint(model, [i in 1:q], [hypo[i], 1.0, lowertri[i, i]] in MOI.ExponentialCone())
             JuMP.@objective(model, Max, sum(hypo))
         end # use_logdet
     elseif rootdet_obj
         if use_rootdet
             JuMP.@constraint(model, vcat(hypo, v1) in MOI.RootDetConeTriangle(q))
         else
-            # TODO extended formulation for rootdet
+            JuMP.@constraint(model, vcat(hypo, [lowertri[i, i] for i in 1:q]) in MOI.GeometricMeanCone(q + 1))
         end
     else
         # hypogeomean/soc formulation
@@ -109,6 +110,11 @@ expdesignJuMP17() = expdesignJuMP(10, 30, 50, 5, geomean_obj = true)
 expdesignJuMP18() = expdesignJuMP(5, 15, 25, 5, geomean_obj = true)
 expdesignJuMP19() = expdesignJuMP(4, 8, 12, 3, geomean_obj = true)
 expdesignJuMP20() = expdesignJuMP(3, 5, 7, 2, geomean_obj = true)
+expdesignJuMP21() = expdesignJuMP(25, 75, 125, 5, rootdet_obj = true, use_rootdet = false)
+expdesignJuMP22() = expdesignJuMP(10, 30, 50, 5, rootdet_obj = true, use_rootdet = false)
+expdesignJuMP23() = expdesignJuMP(5, 15, 25, 5, rootdet_obj = true, use_rootdet = false)
+expdesignJuMP24() = expdesignJuMP(4, 8, 12, 3, rootdet_obj = true, use_rootdet = false)
+expdesignJuMP25() = expdesignJuMP(3, 5, 7, 2, rootdet_obj = true, use_rootdet = false)
 
 function test_expdesignJuMP(instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
@@ -147,4 +153,5 @@ test_expdesignJuMP(; options...) = test_expdesignJuMP.([
     expdesignJuMP8,
     expdesignJuMP13,
     expdesignJuMP18,
+    expdesignJuMP23,
     ], options = options)
