@@ -9,6 +9,7 @@ module Cones
 using TimerOutputs
 using LinearAlgebra
 import LinearAlgebra.copytri!
+import LinearAlgebra.HermOrSym
 using SparseArrays
 import Hypatia.RealOrComplex
 import Hypatia.DenseSymCache
@@ -36,6 +37,7 @@ include("hypoperlog.jl")
 include("epiperexp.jl")
 include("hypogeomean.jl")
 include("epinormspectral.jl")
+include("linmatrixineq.jl")
 include("possemideftri.jl")
 include("hypoperlogdettri.jl")
 include("hyporootdettri.jl")
