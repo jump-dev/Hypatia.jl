@@ -248,7 +248,7 @@ function test_linmatrixineq_barrier(T::Type{<:Real})
     Random.seed!(1)
     Rs_list = [[T, T], [Complex{T}, Complex{T}], [T, Complex{T}, T], [Complex{T}, T, T]]
     for side in [2, 3, 5], Rs in Rs_list
-        As = Vector{LinearAlgebra.HermOrSym{<:R, Matrix{R}} where R<:Hypatia.RealOrComplex{T}}(undef, length(Rs))
+        As = Vector{LinearAlgebra.HermOrSym{R, Matrix{R}} where {R <: Hypatia.RealOrComplex{T}}}(undef, length(Rs))
         A_1_half = rand(Rs[1], side, side)
         As[1] = Hermitian(A_1_half * A_1_half' + I, :U)
         for i in 2:length(Rs)

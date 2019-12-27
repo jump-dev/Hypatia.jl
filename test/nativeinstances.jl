@@ -761,6 +761,73 @@ function epinormspectral3(T; options...)
     end
 end
 
+function linmatrixineq1(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    Random.seed!(1)
+    for side in [2, 3, 5], R in [T, Complex{T}]
+        c = T[1]
+        A = zeros(T, 0, 1)
+        b = T[]
+        G = zeros(T, 2, 1)
+        G[1, 1] = -1
+        h = T[0, 2]
+        A_1_half = rand(R, side, side)
+        A_1 = Hermitian(A_1_half * A_1_half' + 2I)
+        F = eigen(A_1)
+        val_1 = F.values[end]
+        vec_1 = F.vectors[:, end]
+        As = [A_1, Hermitian(-vec_1 * vec_1')]
+        cones = CO.Cone{T}[CO.LinMatrixIneq{T}(As)]
+
+        r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+        @test r.status == :Optimal
+        @test r.primal_obj ≈ 2 / val_1 atol=tol rtol=tol
+        @test r.s ≈ [2 / val_1, 2] atol=tol rtol=tol
+    end
+end
+
+function linmatrixineq2(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    Random.seed!(1)
+    for Rs in [[T, T], [Complex{T}, Complex{T}], [T, Complex{T}, T], [Complex{T}, T, T]]
+        dim = length(Rs)
+        c = ones(T, dim - 1)
+        A = zeros(T, 0, dim - 1)
+        b = T[]
+        G = vcat(spzeros(T, 1, dim - 1), sparse(-one(T) * I, dim - 1, dim - 1))
+        h = zeros(T, dim)
+        h[1] = 1
+        As = Hermitian[]
+        for R in Rs
+            A_half = rand(R, 3, 3)
+            push!(As, Hermitian(A_half * A_half'))
+        end
+        As[1] += I
+        cones = CO.Cone{T}[CO.LinMatrixIneq{T}(As)]
+
+        r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+        @test r.status == :Optimal
+        @test r.primal_obj < 0
+    end
+end
+
+function linmatrixineq3(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    c = T[1]
+    A = zeros(T, 0, 1)
+    b = T[]
+    G = zeros(T, 2, 1)
+    G[1, 1] = -1
+    h = T[0, -1]
+    As = [Symmetric(Matrix(one(T) * I, 2, 2)), Symmetric(T[1 0; 0 -1])]
+    cones = CO.Cone{T}[CO.LinMatrixIneq{T}(As)]
+
+    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+    @test r.status == :Optimal
+    @test r.primal_obj ≈ 1 atol=tol rtol=tol
+    @test r.s ≈ [1, -1] atol=tol rtol=tol
+end
+
 function possemideftri1(T; options...)
     tol = sqrt(sqrt(eps(T)))
     c = T[0, -1, 0]
@@ -795,6 +862,7 @@ end
 function possemideftri3(T; options...)
     tol = sqrt(sqrt(eps(T)))
     rt2 = sqrt(T(2))
+    Random.seed!(1)
     c = T[1]
     A = zeros(T, 0, 1)
     b = T[]
@@ -814,6 +882,7 @@ end
 function possemideftri4(T; options...)
     tol = sqrt(sqrt(eps(T)))
     rt2 = sqrt(T(2))
+    Random.seed!(1)
     s = 3
     rand_mat = Hermitian(rand(T, s, s), :U)
     dim = sum(1:s)
@@ -851,6 +920,7 @@ end
 function possemideftri6(T; options...)
     tol = sqrt(sqrt(eps(T)))
     rt2 = sqrt(T(2))
+    Random.seed!(1)
     c = T[1]
     A = zeros(T, 0, 1)
     b = T[]
@@ -870,6 +940,7 @@ end
 function possemideftri7(T; options...)
     tol = sqrt(sqrt(eps(T)))
     rt2 = sqrt(T(2))
+    Random.seed!(1)
     s = 3
     rand_mat = Hermitian(rand(Complex{T}, s, s), :U)
     dim = abs2(s)
