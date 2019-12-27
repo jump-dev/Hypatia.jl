@@ -214,7 +214,7 @@ function update_fact(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T
     system_solver.lhs1.data .= 0
     sqrtmu = sqrt(solver.mu)
     for (cone_k, prod_k, arr_k) in zip(model.cones, system_solver.HGQ2_k, system_solver.GQ2_k)
-        if hasfield(typeof(cone_k), :hess_fact_cache) && cone_k.hess_fact_cache isa Union{LAPACKSymCache, LUSymCache}
+        if hasfield(typeof(cone_k), :hess_fact_cache) && cone_k.hess_fact_cache isa DenseSymCache{T}
             block_hess_prod(cone_k, prod_k, arr_k, solver.mu)
             mul!(system_solver.lhs1.data, arr_k', prod_k, true, true)
         else
@@ -230,7 +230,7 @@ function update_fact(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T
     end
 
     if !update_fact(system_solver.fact_cache, system_solver.lhs1)
-        if system_solver.fact_cache isa DensePosDefCache{T}
+        if T <: LinearAlgebra.BlasReal && system_solver.fact_cache isa DensePosDefCache{T}
             @warn("Switching QRChol solver from Cholesky to Bunch Kaufman")
             system_solver.fact_cache = DenseSymCache{T}()
             load_matrix(system_solver.fact_cache, system_solver.lhs1)
