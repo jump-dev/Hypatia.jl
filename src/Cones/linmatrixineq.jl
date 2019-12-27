@@ -4,13 +4,15 @@ Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 TODO
 - write description
 - assumes first A matrix is PSD (eg identity)
+- loosen type signature - some of the matrices could be eg diagonal or identity types
+- reduce allocs etc
 =#
 
 mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
     use_dual::Bool
     dim::Int
     side::Int
-    As::Vector{<:HermOrSym}
+    As::Vector{HermOrSym{R, Matrix{R}} where {R <: RealOrComplex{T}}}
     is_complex::Bool
     point::Vector{T}
     timer::TimerOutput
@@ -31,7 +33,7 @@ mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
     sumAinvAs
 
     function LinMatrixIneq{T}(
-        As::Vector{HermOrSym{<:R, Matrix{R}} where {R <: RealOrComplex{T}}},
+        As::Vector,
         is_dual::Bool;
         hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
@@ -40,6 +42,7 @@ mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
         side = size(first(As), 1)
         @assert side > 1
         for A_i in As
+            @assert A_i isa HermOrSym{R, Matrix{R}} where {R <: RealOrComplex{T}}
             @assert size(A_i, 1) == side
             @assert eltype(A_i) <: RealOrComplex{T}
         end
@@ -55,7 +58,7 @@ mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
     end
 end
 
-LinMatrixIneq{T}(As::Vector{HermOrSym{<:R, Matrix{R}} where {R <: RealOrComplex{T}}}) where {T <: Real} = LinMatrixIneq{T}(As, false)
+LinMatrixIneq{T}(As::Vector) where {T <: Real} = LinMatrixIneq{T}(As, false)
 
 # TODO only allocate the fields we use
 function setup_data(cone::LinMatrixIneq{T}) where {T <: Real}
