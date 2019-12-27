@@ -38,7 +38,7 @@ function expdesign(
     # constraint on total number of trials
     A = ones(T, 1, p)
     b = T[n]
-    # constraints on onnegativity of number of trials and nonnegativity of numbers of trials
+    # constraints on upper bound of number of trials and nonnegativity of numbers of trials
     h_nonneg = zeros(T, p)
     h_nmax = fill(T(nmax), p)
     cones = CO.Cone{T}[CO.Nonnegative{T}(p), CO.Nonnegative{T}(p)]
