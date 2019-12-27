@@ -120,7 +120,11 @@ function expdesign(
             ]
         b = vcat(b, zeros(T, qq))
 
-        push!(cones, CO.HypoGeomean{T}(fill(inv(T(p)), p)))
+        G_geo = zeros(T, q, num_trivars)
+        for i in 1:q
+            G_geo[i, sum(1:i)] = -1
+        end
+        push!(cones, CO.HypoGeomean{T}(fill(inv(T(q)), q)))
         G_soc_epi = zeros(T, pq + p, p)
         G_soc = zeros(T, pq + p, pq)
         epi_idx = 1
@@ -135,10 +139,11 @@ function expdesign(
         G = [
             zeros(T, p)    Matrix{T}(-I, p, p)    zeros(T, p, pq + num_trivars); # nonnegativity
             zeros(T, p)    Matrix{T}(-I, p, p)    zeros(T, p, pq + num_trivars); # upper bound
-            Matrix{T}(-I, p + 1, p + 1)    zeros(T, p + 1, pq + num_trivars); # geomean
+            -one(T)    zeros(T, 1, p + pq + num_trivars); # geomean
+            zeros(T, q, 1 + p + pq)    G_geo; # geomean
             zeros(T, pq + p)    G_soc_epi    G_soc    zeros(T, pq + p, num_trivars); # epinormeucl
             ]
-        h = vcat(h_nonneg, h_nmax, zeros(2p + 1 + pq))
+        h = vcat(h_nonneg, h_nmax, zeros(p + 1 + q + pq))
 
         return (c = c, A = A, b = b, G = G, h = h, cones = cones, p = p)
     end
@@ -185,7 +190,6 @@ function expdesign(
         push!(cones, CO.PosSemidefTri{T, T}(dimvec))
     end
 
-
     if rootdet_obj
         @assert !use_rootdet
         c = vcat(zeros(T, p + num_trivars), -one(T))
@@ -193,7 +197,7 @@ function expdesign(
         h_geo = zeros(T, q + 1)
         G_geo = zeros(T, q, num_trivars)
         for i in 1:q
-            G_geo[i, sum(1:i)] = -1
+            G_geo[i, diag_idx(i)] = -1
         end
         push!(cones, CO.HypoGeomean{T}(fill(inv(T(q)), q)))
         # all conic constraints
@@ -356,7 +360,7 @@ instances_expdesign_linops = [
     expdesign11,
     expdesign12,
     expdesign14,
-]
+    ]
 instances_expdesign_few = [
     expdesign5,
     expdesign10,
@@ -380,3 +384,4 @@ test_expdesign.(instances_expdesign_few)
 # [1.9848817473638083, 2.2756593374286678, 2.150225974602002, 9.154905833419491e-8, 23.9316009078927]
 # [0.5892325002481775, 1.9848819598634755, 2.2756594566610353, 2.150226071709818, 1.151749451366868e-8]
 # [1.4000000006502067, 1.3999999992790264, 1.3999999998436734, 1.4000000000280783, 1.4000000001990138]
+# [1.9848819404931661, 2.2756594493409343, 2.150226060578647, 1.7699395060688516e-8, 23.931602255702302]
