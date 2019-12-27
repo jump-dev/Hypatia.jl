@@ -3,11 +3,14 @@ Copyright 2018, Chris Coey and contributors
 
 D-optimal experimental design
 adapted from Boyd and Vandenberghe, "Convex Optimization", section 7.5
-  maximize    logdet(V*diagm(np)*V')
+  maximize    F(V*diagm(np)*V')
   subject to  sum(np) == n
               0 .<= np .<= nmax
 where np is a vector of variables representing the number of experiment p to run (fractional),
 and the columns of V are the vectors representing each experiment
+
+if logdet_obj or rootdet_obj is true, F is the logdet or rootdet function
+if geomean_obj is true, we use a formulation from https://picos-api.gitlab.io/picos/optdes.html that finds an equivalent minimizer
 =#
 
 using LinearAlgebra

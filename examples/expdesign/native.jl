@@ -35,8 +35,10 @@ function expdesign(
         error("linear operators only implemented with logdet objective")
     end
 
+    # constraint on total number of trials
     A = ones(T, 1, p)
     b = T[n]
+    # constraints on onnegativity of number of trials and nonnegativity of numbers of trials
     h_nonneg = zeros(T, p)
     h_nmax = fill(T(nmax), p)
     cones = CO.Cone{T}[CO.Nonnegative{T}(p), CO.Nonnegative{T}(p)]
@@ -87,11 +89,11 @@ function expdesign(
         G = vcat(G_nonneg, G_nmax, G_detcone)
         h = vcat(h_nonneg, h_nmax, h_detcone)
 
-        return (c = c, A = A, b = b, G = G, h = h, cones = cones, p = p)
+        return (c = c, A = A, b = b, G = G, h = h, cones = cones)
     end
 
     if geomean_obj
-        # auxiliary matrix variable has pq elements represented row-major, auxiliary lower triangular variable has svec_length(q) elements also row-major
+        # auxiliary matrix variable has pq elements stored row-major, auxiliary lower triangular variable has svec_length(q) elements, also stored row-major
         pq = p * q
         qq = q ^ 2
         num_trivars = CO.svec_length(q)
@@ -113,7 +115,6 @@ function expdesign(
                 row_idx += 1
             end
         end
-
         A = [
             zero(T)    A    zeros(1, pq + num_trivars);
             zeros(T, qq, 1 + p)    A_VW    A_lowertri;
@@ -145,18 +146,18 @@ function expdesign(
             ]
         h = vcat(h_nonneg, h_nmax, zeros(p + 1 + q + pq))
 
-        return (c = c, A = A, b = b, G = G, h = h, cones = cones, p = p)
+        return (c = c, A = A, b = b, G = G, h = h, cones = cones)
     end
 
     if (rootdet_obj && !use_rootdet) || (logdet_obj && !use_logdet)
-        # requires an upper triangular matrix of additional variables, ordered row wise
+        # extended formulations require an upper triangular matrix of additional variables
+        # we will store this matrix row-major
         num_trivars = CO.svec_length(q)
-
-        # vectorized dimension of psd matrix
+        # vectorized dimension of extended psd matrix
         dimvec = q * (2 * q + 1)
         G_psd = zeros(T, dimvec, p + num_trivars)
 
-        # variables in upper triangular matrix numbered row-wise
+        # index of diagonal elements in upper triangular matrix
         diag_idx(i::Int) = (i == 1 ? 1 : 1 + sum(q - j for j in 0:(i - 2)))
 
         # V*diag(np)*V
@@ -193,7 +194,7 @@ function expdesign(
     if rootdet_obj
         @assert !use_rootdet
         c = vcat(zeros(T, p + num_trivars), -one(T))
-        A = [A zeros(T, 1, num_trivars + 1)]
+        A = hcat(A, zeros(T, 1, num_trivars + 1))
         h_geo = zeros(T, q + 1)
         G_geo = zeros(T, q, num_trivars)
         for i in 1:q
@@ -209,7 +210,7 @@ function expdesign(
             zeros(T, q, p)    G_geo    zeros(T, q); # hypogeomean
             ]
         h = vcat(h_nonneg, h_nmax, h_psd, h_geo)
-        return (c = c, A = A, b = b, G = G, h = h, cones = cones, p = p)
+        return (c = c, A = A, b = b, G = G, h = h, cones = cones)
     end
 
     if logdet_obj
@@ -244,12 +245,9 @@ function expdesign(
                     G_logvars[i, diag_idx(i)] = -1
                 end
                 G_log = [
-                    # hypograph row
-                    zeros(T, 1, p + num_trivars)    -one(T)
-                    # perspective row
-                    zeros(T, 1, dimx)
-                    # log row
-                    zeros(T, q, p)    G_logvars    zeros(T, q)
+                    zeros(T, 1, p + num_trivars)    -one(T); # hypograph row
+                    zeros(T, 1, dimx); # perspective row
+                    zeros(T, q, p)    G_logvars    zeros(T, q); # log row
                     ]
                 h_log = vcat(zero(T), one(T), zeros(T, q))
                 push!(cones, CO.HypoPerLog{T}(q + 2))
@@ -280,21 +278,18 @@ function expdesign(
             else
                 # pad with triangle matrix variables and q hypoperlog cone hypograph variables
                 A = [A zeros(T, 1, padx)]
-                G_nonneg = hcat(Matrix{T}(-I, p, p), zeros(T, p, padx))
-                G_nmax = hcat(Matrix{T}(-I, p, p), zeros(T, p, padx))
                 # all conic constraints
                 G = [
-                    G_nonneg;
-                    G_nmax;
+                    Matrix{T}(-I, p, p)    zeros(T, p, padx); # nonneg
+                    Matrix{T}(-I, p, p)    zeros(T, p, padx); # nmax
                     G_psd    zeros(T, dimvec, num_hypo);
                     G_log;
                     ]
             end
             h = vcat(h_nonneg, h_nmax, h_psd, h_log)
         end
+        return (c = c, A = A, b = b, G = G, h = h, cones = cones)
     end
-
-    return (c = c, A = A, b = b, G = G, h = h, cones = cones, p = p)
 end
 
 expdesign1(T::Type{<:Real}) = expdesign(T, 25, 75, 125, 5, use_logdet = true, logdet_obj = true)
@@ -373,15 +368,6 @@ function test_expdesign(instance::Function; T::Type{<:Real} = Float64, options::
     Random.seed!(rseed)
     d = instance(T)
     r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
-    @show r.x[2:(d.p + 1)]
     @test r.status == :Optimal
     return
 end
-
-test_expdesign.(instances_expdesign_few)
-
-# [0.5892327034087503, 1.9848818350565813, 2.2756593473710542, 2.1502260256372683, 8.852634136857773e-8]
-# [1.9848817473638083, 2.2756593374286678, 2.150225974602002, 9.154905833419491e-8, 23.9316009078927]
-# [0.5892325002481775, 1.9848819598634755, 2.2756594566610353, 2.150226071709818, 1.151749451366868e-8]
-# [1.4000000006502067, 1.3999999992790264, 1.3999999998436734, 1.4000000000280783, 1.4000000001990138]
-# [1.9848819404931661, 2.2756594493409343, 2.150226060578647, 1.7699395060688516e-8, 23.931602255702302]
