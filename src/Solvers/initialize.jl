@@ -19,6 +19,7 @@ function initialize_cone_point(cones::Vector{Cones.Cone{T}}, cone_idxs::Vector{U
         @assert Cones.is_feas(cone_k)
         g = Cones.grad(cone_k)
         @. dual_k = -g
+        hasfield(typeof(cone_k), :hess_fact_cache) && Cones.update_hess_fact(cone_k)
     end
 
     return point

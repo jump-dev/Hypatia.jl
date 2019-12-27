@@ -14,6 +14,7 @@ barrier_testfuns = [
     test_power_barrier,
     test_hypogeomean_barrier,
     test_epinormspectral_barrier,
+    test_linmatrixineq_barrier,
     test_possemideftri_barrier,
     test_hypoperlogdettri_barrier,
     test_hyporootdettri_barrier,
