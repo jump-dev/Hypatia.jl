@@ -111,7 +111,14 @@ end
 
 function update_grad(cone::MatrixEpiPerSquare)
     @assert cone.is_feas
+    U = cone.U
+    W = cone.W
+    v = cone.point[cone.per_idx]
 
+    Zi = inv(cone.fact_Z)
+    cone.grad[cone.per_idx] = -2 * sum(Zi .* U) + (cone.n - 1) / v
+    @views smat_to_svec!(cone.grad[1:(cone.per_idx - 1)], -2 .* Zi .* v, cone.rt2)
+    cone.grad[(cone.per_idx + 1):end] .= 2 * vec(Zi * cone.W)
 
     cone.grad_updated = true
     return cone.grad
@@ -119,7 +126,69 @@ end
 
 function update_hess(cone::MatrixEpiPerSquare)
     @assert cone.grad_updated
+    n = cone.n
+    m = cone.m
+    per_idx = cone.per_idx
+    U = cone.U
+    W = cone.W
+    v = cone.point[cone.per_idx]
+    H = cone.hess.data
 
+    Zi = inv(cone.fact_Z)
+    ZiW = cone.fact_Z \ W
+    tmpmm = zeros(m, m)
+
+    # H_W_W part
+    mul!(tmpmm, W', ZiW) # TODO Hermitian? W' * Zi * W
+    tmpmm += I # TODO inefficient
+
+    # TODO parallelize loops
+    idx_incr = (cone.is_complex ? 2 : 1)
+    r_idx = per_idx + 1
+    for i in 1:m, j in 1:n
+        c_idx = r_idx
+        @inbounds for k in i:m
+            ZiWjk = ZiW[j, k]
+            tmpmmik = tmpmm[i, k]
+            lstart = (i == k ? j : 1)
+            @inbounds for l in lstart:n
+                term1 = Zi[l, j] * tmpmmik
+                term2 = ZiW[l, i] * ZiWjk
+                _hess_WW_element(H, r_idx, c_idx, term1, term2)
+                c_idx += idx_incr
+            end
+        end
+        r_idx += idx_incr
+    end
+    H[(per_idx + 1):end, (per_idx + 1):end] .*= 2
+
+    # H_U_U part
+    @views _build_hess(H[1:(per_idx - 1), 1:(per_idx - 1)], Zi, cone.rt2)
+    H[1:(per_idx - 1), 1:(per_idx - 1)] .*= 4 * v ^ 2
+
+    # H_v_v part
+    H[per_idx, per_idx] = sum((Zi * U * Zi) .* U) * 4 + (cone.n - 1) / v / v
+
+    # H_U_W part
+    row_idx = 1
+    Zi2 = Zi^2
+    for i in 1:n, j in 1:i
+        col_idx = per_idx + 1
+        for k in 1:n, l in 1:m
+            H[row_idx, col_idx] = -2 * Zi2[i, j] * W[k, l]
+            @show row_idx, col_idx
+            col_idx += 1
+        end
+        row_idx += 1
+    end
+    H[1:(per_idx - 1), (per_idx + 1):end] .*= 2 * v
+
+    # H_U_v part
+    mat = (Zi ^ 2 .* v * U .* 2 .- Zi) .* 2
+    @views smat_to_svec!(H[1:(per_idx - 1), per_idx], mat, cone.rt2)
+
+    # H_v_W part
+    H[per_idx, (per_idx + 1):end] = -2 * Zi ^ 2 * U * W * 2
 
     cone.hess_updated = true
     return cone.hess
