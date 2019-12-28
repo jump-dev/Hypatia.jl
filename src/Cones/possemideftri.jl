@@ -181,7 +181,7 @@ function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone
 end
 
 # TODO parallelize
-function _build_hess(H::Matrix{T}, mat::Matrix{T}, rt2::T) where {T <: Real}
+function _build_hess(H::AbstractMatrix{T}, mat::Matrix{T}, rt2::T) where {T <: Real}
     side = size(mat, 1)
     k = 1
     for i in 1:side, j in 1:i
@@ -204,7 +204,7 @@ function _build_hess(H::Matrix{T}, mat::Matrix{T}, rt2::T) where {T <: Real}
     return H
 end
 
-function _build_hess(H::Matrix{T}, mat::Matrix{Complex{T}}, rt2::T) where {T <: Real}
+function _build_hess(H::AbstractMatrix{T}, mat::Matrix{Complex{T}}, rt2::T) where {T <: Real}
     side = size(mat, 1)
     k = 1
     for i in 1:side, j in 1:i
