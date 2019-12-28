@@ -739,7 +739,7 @@ end
 
 function epinormspectral3(T; options...)
     tol = sqrt(sqrt(eps(T)))
-    for is_complex in (false, true), (Xn, Xm) in ((1, 1), (1, 3), (2, 2))
+    for is_complex in (false, true), (Xn, Xm) in ((1, 1), (1, 3), (2, 2), (3, 4))
         dim = Xn * Xm
         if is_complex
             dim *= 2
@@ -764,8 +764,7 @@ end
 function matrixepipersquare1(T; options...)
     tol = sqrt(sqrt(eps(T)))
     Random.seed!(1)
-    (Xn, Xm) = (3, 4)
-    for is_complex in (false, true)
+    for is_complex in (false, true), (Xn, Xm) in [(1, 1), (1, 3), (2, 2), (2, 3)]
         R = (is_complex ? Complex{T} : T)
         per_idx = (is_complex ? Xn ^ 2 + 1 : CO.svec_length(Xn) + 1)
         dim = per_idx + (is_complex ? 2 : 1) * Xn * Xm
@@ -778,12 +777,89 @@ function matrixepipersquare1(T; options...)
         @views CO.smat_to_svec!(h[1:(per_idx - 1)], Matrix{R}(I, Xn, Xn), sqrt(T(2)))
         W = rand(R, Xn, Xm)
         @views CO.vec_copy_to!(h[(per_idx + 1):end], W[:])
-        cones = CO.Cone{T}[CO.MatrixEpiPerSquare{T, R}(Xn, Xm)]
+        WWt = Hermitian(W * W')
+        dual_epi = tr(WWt) / 2
+        primal_epi = svdvals(WWt)[1] / 2
 
-        r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
-        @test r.status == :Optimal
-        singvals = svdvals(W * W')
-        @test r.primal_obj ≈ abs2(singvals[1]) / 2 atol=tol rtol=tol
+        for is_dual in (false, true)
+            cones = CO.Cone{T}[CO.MatrixEpiPerSquare{T, R}(Xn, Xm, is_dual)]
+            r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+            @test r.status == :Optimal
+            @test r.primal_obj >= 0
+            if is_dual
+                @test r.primal_obj ≈ dual_epi atol=tol rtol=tol
+                @test r.s[per_idx] ≈ dual_epi atol=tol rtol=tol
+                @test r.z[per_idx] ≈ primal_epi atol=tol rtol=tol
+            else
+                @test r.primal_obj ≈ primal_epi atol=tol rtol=tol
+                @test r.s[per_idx] ≈ primal_epi atol=tol rtol=tol
+                @test r.z[per_idx] ≈ dual_epi atol=tol rtol=tol
+            end
+        end
+    end
+end
+
+function matrixepipersquare2(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    Random.seed!(1)
+    (Xn, Xm) = (3, 4)
+    for is_complex in (false, true)
+        R = (is_complex ? Complex{T} : T)
+        per_idx = (is_complex ? Xn ^ 2 + 1 : CO.svec_length(Xn) + 1)
+        dim = per_idx + (is_complex ? 2 : 1) * Xn * Xm
+        c = T[1]
+        A = zeros(T, 0, 1)
+        b = T[]
+        G = zeros(T, dim, 1)
+        G[per_idx] = -1
+        h = zeros(T, dim)
+        U_half = rand(R, Xn, Xn)
+        U = U_half * U_half'
+        @views CO.smat_to_svec!(h[1:(per_idx - 1)], U, sqrt(T(2)))
+        W = rand(R, Xn, Xm)
+        @views CO.vec_copy_to!(h[(per_idx + 1):end], W[:])
+
+        for is_dual in (false, true)
+            cones = CO.Cone{T}[CO.MatrixEpiPerSquare{T, R}(Xn, Xm, is_dual)]
+            r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+            @test r.status == :Optimal
+            @test r.primal_obj >= 0
+            primal_mat = Hermitian(2 * r.s[per_idx] * U - W * W')
+            dual_mat = Hermitian(2 * r.z[per_idx] - tr(W * U \ W'))
+            @test eigmin(primal_mat) ≈ 0 atol=tol rtol=tol
+            @test eigmin(dual_mat) ≈ 0 atol=tol rtol=tol
+        end
+    end
+end
+
+function matrixepipersquare3(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    Random.seed!(1)
+    (Xn, Xm) = (2, 4)
+    for is_complex in (false, true)
+        R = (is_complex ? Complex{T} : T)
+        per_idx = (is_complex ? Xn ^ 2 + 1 : CO.svec_length(Xn) + 1)
+        W_dim = (is_complex ? 2 : 1) * Xn * Xm
+        dim = per_idx + W_dim
+        c = ones(T, W_dim)
+        A = zeros(T, 0, W_dim)
+        b = T[]
+        G = vcat(zeros(T, per_idx, W_dim), Matrix{T}(-I, W_dim, W_dim))
+        h = zeros(T, dim)
+        U_half = rand(R, Xn, Xn)
+        U = U_half * U_half'
+        @views CO.smat_to_svec!(h[1:(per_idx - 1)], U, sqrt(T(2)))
+        W = rand(R, Xn, Xm)
+        @views CO.vec_copy_to!(h[(per_idx + 1):end], W[:])
+
+        for is_dual in (false, true)
+            cones = CO.Cone{T}[CO.MatrixEpiPerSquare{T, R}(Xn, Xm, is_dual)]
+            r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+            @test r.status == :Optimal
+            @test r.primal_obj ≈ 0 atol=tol rtol=tol
+            @test norm(r.s[(per_idx + 1):end]) ≈ 0 atol=tol rtol=tol
+            @test norm(r.z[(per_idx + 1):end]) ≈ 0 atol=tol rtol=tol
+        end
     end
 end
 
