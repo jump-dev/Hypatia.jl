@@ -783,7 +783,7 @@ function matrixepipersquare1(T; options...)
         r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
         @test r.status == :Optimal
         singvals = svdvals(W * W')
-        @test r.primal_obj ≈ abs2(singvals[1]) atol=tol rtol=tol
+        @test r.primal_obj ≈ abs2(singvals[1]) / 2 atol=tol rtol=tol
     end
 end
 
