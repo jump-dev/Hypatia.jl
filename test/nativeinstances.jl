@@ -766,10 +766,26 @@ function matrixepipersquare1(T; options...)
     Random.seed!(1)
     (Xn, Xm) = (3, 4)
     for is_complex in (false, true)
-        # TODO
+        R = (is_complex ? Complex{T} : T)
+        per_idx = (is_complex ? Xn ^ 2 + 1 : CO.svec_length(Xn) + 1)
+        dim = per_idx + (is_complex ? 2 : 1) * Xn * Xm
+        c = T[1]
+        A = zeros(T, 0, 1)
+        b = T[]
+        G = zeros(T, dim, 1)
+        G[per_idx] = -1
+        h = zeros(T, dim)
+        @views CO.smat_to_svec!(h[1:(per_idx - 1)], Matrix{R}(I, Xn, Xn), sqrt(T(2)))
+        W = rand(R, Xn, Xm)
+        @views CO.vec_copy_to!(h[(per_idx + 1):end], W[:])
+        cones = CO.Cone{T}[CO.MatrixEpiPerSquare{T, R}(Xn, Xm)]
+
+        r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+        @test r.status == :Optimal
+        singvals = svdvals(W * W')
+        @test r.primal_obj ≈ abs2(singvals[1]) atol=tol rtol=tol
     end
 end
-
 
 function linmatrixineq1(T; options...)
     tol = sqrt(sqrt(eps(T)))
