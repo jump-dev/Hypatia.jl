@@ -761,6 +761,16 @@ function epinormspectral3(T; options...)
     end
 end
 
+function matrixepipersquare1(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    Random.seed!(1)
+    (Xn, Xm) = (3, 4)
+    for is_complex in (false, true)
+        # TODO
+    end
+end
+
+
 function linmatrixineq1(T; options...)
     tol = sqrt(sqrt(eps(T)))
     Random.seed!(1)
