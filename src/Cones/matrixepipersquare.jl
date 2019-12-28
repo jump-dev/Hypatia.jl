@@ -167,28 +167,48 @@ function update_hess(cone::MatrixEpiPerSquare)
     H[1:(per_idx - 1), 1:(per_idx - 1)] .*= 4 * v ^ 2
 
     # H_v_v part
-    H[per_idx, per_idx] = sum((Zi * U * Zi) .* U) * 4 + (cone.n - 1) / v / v
+    H[per_idx, per_idx] = sum((Zi * U * Zi) .* U) * 4 - (cone.n - 1) / v / v
 
     # H_U_W part
     row_idx = 1
     Zi2 = Zi^2
+    ZiW = Zi * W
     for i in 1:n, j in 1:i
         col_idx = per_idx + 1
         for k in 1:n, l in 1:m
-            H[row_idx, col_idx] = -2 * Zi2[i, j] * W[k, l]
-            @show row_idx, col_idx
+            H[row_idx, col_idx] = 0
+            for q in 1:n
+                if (i == j) && (k == q)
+                    H[row_idx, col_idx] += abs2(Zi[i, j]) * W[q, l]
+                elseif (i != j) && (k != q)
+                    H[row_idx, col_idx] += (Zi[i, k] * Zi[q, j] + Zi[j, k] * Zi[q, i]) * W[q, l]
+                else
+                    H[row_idx, col_idx] += cone.rt2 * Zi[k, i] * Zi[j, q] * W[q, l]
+                end
+            end
             col_idx += 1
         end
         row_idx += 1
     end
-    H[1:(per_idx - 1), (per_idx + 1):end] .*= 2 * v
+    H[1:(per_idx - 1), (per_idx + 1):end] .*= -4 * v
+
+    # if (i == j) && (i2 == j2)
+    #     H[k2, k] = abs2(mat[i2, i])
+    # elseif (i != j) && (i2 != j2)
+    #     H[k2, k] = mat[i2, i] * mat[j, j2] + mat[j2, i] * mat[j, i2]
+    # else
+    #     H[k2, k] = rt2 * mat[i2, i] * mat[j, j2]
+    # end
+    # if k2 == k
+    #     break
+    # end
 
     # H_U_v part
-    mat = (Zi ^ 2 .* v * U .* 2 .- Zi) .* 2
+    mat = (Zi .* v * U .* 2 * Zi .- Zi) .* 2
     @views smat_to_svec!(H[1:(per_idx - 1), per_idx], mat, cone.rt2)
 
     # H_v_W part
-    H[per_idx, (per_idx + 1):end] = -2 * Zi ^ 2 * U * W * 2
+    H[per_idx, (per_idx + 1):end] = -2 * Zi * U * Zi * W * 2
 
     cone.hess_updated = true
     return cone.hess
