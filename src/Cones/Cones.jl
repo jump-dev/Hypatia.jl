@@ -240,8 +240,10 @@ vec_copy_to!(v1::AbstractVector{T}, v2::AbstractVector{T}) where {T <: Real} = c
 vec_copy_to!(v1::AbstractVector{T}, v2::AbstractVector{Complex{T}}) where {T <: Real} = cvec_to_rvec!(v1, v2)
 vec_copy_to!(v1::AbstractVector{Complex{T}}, v2::AbstractVector{T}) where {T <: Real} = rvec_to_cvec!(v1, v2)
 
+# utilities for hessians for cones with PSD parts
+
 # TODO parallelize
-function _symm_kron(H::AbstractMatrix{T}, mat::AbstractMatrix{T}, rt2::T) where {T <: Real}
+function symm_kron(H::AbstractMatrix{T}, mat::AbstractMatrix{T}, rt2::T) where {T <: Real}
     side = size(mat, 1)
     k = 1
     for i in 1:side, j in 1:i
@@ -264,7 +266,7 @@ function _symm_kron(H::AbstractMatrix{T}, mat::AbstractMatrix{T}, rt2::T) where 
     return H
 end
 
-function _symm_kron(H::AbstractMatrix{T}, mat::AbstractMatrix{Complex{T}}, rt2::T) where {T <: Real}
+function symm_kron(H::AbstractMatrix{T}, mat::AbstractMatrix{Complex{T}}, rt2::T) where {T <: Real}
     side = size(mat, 1)
     k = 1
     for i in 1:side, j in 1:i
@@ -315,12 +317,12 @@ function _symm_kron(H::AbstractMatrix{T}, mat::AbstractMatrix{Complex{T}}, rt2::
     return H
 end
 
-function _hess_WW_element(H::Matrix{T}, r_idx::Int, c_idx::Int, term1::T, term2::T) where {T <: Real}
+function hess_element(H::Matrix{T}, r_idx::Int, c_idx::Int, term1::T, term2::T) where {T <: Real}
     @inbounds H[r_idx, c_idx] = term1 + term2
     return
 end
 
-function _hess_WW_element(H::Matrix{T}, r_idx::Int, c_idx::Int, term1::Complex{T}, term2::Complex{T}) where {T <: Real}
+function hess_element(H::Matrix{T}, r_idx::Int, c_idx::Int, term1::Complex{T}, term2::Complex{T}) where {T <: Real}
     @inbounds begin
         H[r_idx, c_idx] = real(term1) + real(term2)
         H[r_idx + 1, c_idx] = imag(term2) - imag(term1)

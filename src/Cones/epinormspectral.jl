@@ -168,7 +168,7 @@ function update_hess(cone::EpiNormSpectral)
             @inbounds for l in lstart:n
                 term1 = Zi[l, j] * tmpmmik
                 term2 = ZiW[l, i] * ZiWjk
-                _hess_WW_element(H, r_idx, c_idx, term1, term2)
+                hess_element(H, r_idx, c_idx, term1, term2)
                 c_idx += idx_incr
             end
         end

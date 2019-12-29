@@ -11,7 +11,6 @@ mutable struct MatrixEpiPerSquare{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     dim::Int
     n::Int
     m::Int
-    per_idx::Int
     is_complex::Bool
     point::Vector{T}
     rt2::T
@@ -28,6 +27,9 @@ mutable struct MatrixEpiPerSquare{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
 
+    U_idxs::UnitRange{Int}
+    v_idx::Int
+    W_idxs::UnitRange{Int}
     U
     W
     Z::Hermitian{R,Matrix{R}}
@@ -47,12 +49,14 @@ mutable struct MatrixEpiPerSquare{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
         cone = new{T, R}()
         cone.use_dual = is_dual
         cone.is_complex = (R <: Complex)
-        cone.per_idx = (cone.is_complex ? n ^ 2 + 1 : svec_length(n) + 1)
-        cone.dim = cone.per_idx + (cone.is_complex ? 2 : 1) * n * m
+        cone.v_idx = (cone.is_complex ? n ^ 2 + 1 : svec_length(n) + 1)
+        cone.dim = cone.v_idx + (cone.is_complex ? 2 : 1) * n * m
         cone.n = n
         cone.m = m
         cone.rt2 = sqrt(T(2))
         cone.hess_fact_cache = hess_fact_cache
+        cone.U_idxs = 1:(cone.v_idx - 1)
+        cone.W_idxs = (cone.v_idx + 1):cone.dim
         return cone
     end
 end
@@ -89,17 +93,20 @@ function set_initial_point(arr::AbstractVector, cone::MatrixEpiPerSquare{T, R}) 
         arr[k] = 1
         k += incr * i + 1
     end
-    arr[cone.per_idx] = 1
+    arr[cone.v_idx] = 1
     return arr
 end
 
+
+# TODO save U, v, W row idxs ranges in struct
+
 function update_feas(cone::MatrixEpiPerSquare)
     @assert !cone.feas_updated
-    v = cone.point[cone.per_idx]
+    v = cone.point[cone.v_idx]
 
     if v > 0
-        @views U = svec_to_smat!(cone.U.data, cone.point[1:(cone.per_idx - 1)], cone.rt2)
-        @views W = vec_copy_to!(cone.W[:], cone.point[(cone.per_idx + 1):end])
+        @views U = svec_to_smat!(cone.U.data, cone.point[cone.U_idxs], cone.rt2)
+        @views W = vec_copy_to!(cone.W[:], cone.point[cone.W_idxs])
         copyto!(cone.Z.data, U)
         mul!(cone.Z.data, cone.W, cone.W', -1, 2 * v)
         cone.fact_Z = cholesky!(cone.Z, check = false)
@@ -117,15 +124,15 @@ function update_grad(cone::MatrixEpiPerSquare)
     U = cone.U
     W = cone.W
     dim = cone.dim
-    v = cone.point[cone.per_idx]
+    v = cone.point[cone.v_idx]
 
     Zi = cone.Zi = Hermitian(inv(cone.fact_Z), :U)
-    @views smat_to_svec!(cone.grad[1:(cone.per_idx - 1)], Zi, cone.rt2)
-    @views cone.grad[1:(cone.per_idx - 1)] .*= -2v
-    cone.grad[cone.per_idx] = -2 * dot(Zi, U) + (cone.n - 1) / v
+    @views smat_to_svec!(cone.grad[cone.U_idxs], Zi, cone.rt2)
+    @views cone.grad[cone.U_idxs] .*= -2v
+    cone.grad[cone.v_idx] = -2 * dot(Zi, U) + (cone.n - 1) / v
     ldiv!(cone.ZiW, cone.fact_Z, W)
-    @views vec_copy_to!(cone.grad[(cone.per_idx + 1):dim], cone.ZiW[:])
-    @. @views cone.grad[(cone.per_idx + 1):dim] *= 2
+    @views vec_copy_to!(cone.grad[cone.W_idxs], cone.ZiW[:])
+    @. @views cone.grad[cone.W_idxs] *= 2
 
     cone.grad_updated = true
     return cone.grad
@@ -136,10 +143,12 @@ function update_hess(cone::MatrixEpiPerSquare)
     n = cone.n
     m = cone.m
     dim = cone.dim
-    per_idx = cone.per_idx
+    U_idxs = cone.U_idxs
+    v_idx = cone.v_idx
+    W_idxs = cone.W_idxs
     U = cone.U
     W = cone.W
-    v = cone.point[cone.per_idx]
+    v = cone.point[cone.v_idx]
     H = cone.hess.data
     tmpmm = cone.tmpmm
     tmpnn = cone.tmpnn
@@ -153,7 +162,7 @@ function update_hess(cone::MatrixEpiPerSquare)
     # TODO parallelize loops
     # TODO inbounds
     idx_incr = (cone.is_complex ? 2 : 1)
-    r_idx = per_idx + 1
+    r_idx = v_idx + 1
     for i in 1:m, j in 1:n
         c_idx = r_idx
         @inbounds for k in i:m
@@ -163,51 +172,53 @@ function update_hess(cone::MatrixEpiPerSquare)
             @inbounds for l in lstart:n
                 term1 = Zi[l, j] * tmpmmik
                 term2 = ZiW[l, i] * ZiWjk
-                _hess_WW_element(H, r_idx, c_idx, term1, term2)
+                hess_element(H, r_idx, c_idx, term1, term2)
                 c_idx += idx_incr
             end
         end
         r_idx += idx_incr
     end
-    @views H[(per_idx + 1):dim, (per_idx + 1):dim] .*= 2
+    @views H[W_idxs, W_idxs] .*= 2
 
     # H_U_U part
-    @views _symm_kron(H[1:(per_idx - 1), 1:(per_idx - 1)], Zi, cone.rt2)
-    @. @views H[1:(per_idx - 1), 1:(per_idx - 1)] *= 4 * abs2(v)
+    @views H_U_U = H[U_idxs, U_idxs]
+    symm_kron(H_U_U, Zi, cone.rt2)
+    @. @views H_U_U *= 4 * abs2(v)
 
     # H_v_v part
-    mul!(tmpnn, U, Zi)
-    ldiv!(cone.fact_Z, tmpnn)
-    ZiUZi = tmpnn
-
-    @views H[per_idx, per_idx] = 4 * dot(ZiUZi, U) - (cone.n - 1) / v / v
+    ldiv!(tmpnn, cone.fact_Z, U)
+    rdiv!(tmpnn, cone.fact_Z)
+    ZiUZi = Hermitian(tmpnn)
+    @views H[v_idx, v_idx] = 4 * dot(ZiUZi, U) - (cone.n - 1) / v / v
 
     # H_U_W part
     # TODO inbounds
+    # TODO don't iterate over more indices than necessary
     row_idx = 1
     for i in 1:n, j in 1:i
-        col_idx = per_idx + 1
+        col_idx = v_idx + 1
         for l in 1:m, k in 1:n
-            H[row_idx, col_idx] = Zi[i, k] * ZiW[j, l] + Zi[k, j] * ZiW[i, l]
+            term = Zi[i, k] * ZiW[j, l] + Zi[k, j] * ZiW[i, l]
             if i != j
-                H[row_idx, col_idx] *= cone.rt2
+                term *= cone.rt2
             end
+            H[row_idx, col_idx] = term
             col_idx += 1
         end
         row_idx += 1
     end
-    @. @views H[1:(per_idx - 1), (per_idx + 1):dim] *= -2v
+    @. @views H[U_idxs, W_idxs] *= -2v
 
     # H_v_W part
-    mul!(ZiW, ZiUZi, W)
-    @views H_v_W = H[per_idx, (per_idx + 1):dim]
-    @views vec_copy_to!(H_v_W, ZiW[:])
-    @. H_v_W *= -4
+    # NOTE overwrites ZiW
+    # TODO better to do ZiU * ZiW?
+    mul!(ZiW, ZiUZi, W, -4, false)
+    @views vec_copy_to!(H[v_idx, W_idxs], ZiW[:])
 
     # H_U_v part
     # NOTE overwrites ZiUZi
     axpby!(-2, Zi, 4v, tmpnn)
-    @views smat_to_svec!(H[1:(per_idx - 1), per_idx], tmpnn, cone.rt2)
+    @views smat_to_svec!(H[U_idxs, v_idx], tmpnn, cone.rt2)
 
     cone.hess_updated = true
     return cone.hess
