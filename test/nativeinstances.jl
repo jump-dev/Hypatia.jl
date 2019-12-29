@@ -829,7 +829,7 @@ function matrixepipersquare2(T; options...)
                 @test 2 * r.s[per_idx] ≈ tr(W' * (U \ W)) atol=tol rtol=tol
             else
                 primal_viol = Hermitian(2 * r.s[per_idx] * U - W * W')
-                @test eigmin(primal_viol) ≈ 0 atol=tol rtol=tol
+                @test minimum(eigvals(primal_viol)) ≈ 0 atol=tol rtol=tol
             end
         end
     end
