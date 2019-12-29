@@ -185,21 +185,6 @@ function update_hess(cone::EpiNormSpectral)
     return cone.hess
 end
 
-function _hess_WW_element(H::Matrix{T}, r_idx::Int, c_idx::Int, term1::T, term2::T) where {T <: Real}
-    @inbounds H[r_idx, c_idx] = term1 + term2
-    return
-end
-
-function _hess_WW_element(H::Matrix{T}, r_idx::Int, c_idx::Int, term1::Complex{T}, term2::Complex{T}) where {T <: Real}
-    @inbounds begin
-        H[r_idx, c_idx] = real(term1) + real(term2)
-        H[r_idx + 1, c_idx] = imag(term2) - imag(term1)
-        H[r_idx, c_idx + 1] = imag(term1) + imag(term2)
-        H[r_idx + 1, c_idx + 1] = real(term1) - real(term2)
-    end
-    return
-end
-
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormSpectral)
     if !cone.hess_prod_updated
         update_hess_prod(cone)

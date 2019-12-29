@@ -240,4 +240,94 @@ vec_copy_to!(v1::AbstractVector{T}, v2::AbstractVector{T}) where {T <: Real} = c
 vec_copy_to!(v1::AbstractVector{T}, v2::AbstractVector{Complex{T}}) where {T <: Real} = cvec_to_rvec!(v1, v2)
 vec_copy_to!(v1::AbstractVector{Complex{T}}, v2::AbstractVector{T}) where {T <: Real} = rvec_to_cvec!(v1, v2)
 
+# TODO parallelize
+function _symm_kron(H::AbstractMatrix{T}, mat::AbstractMatrix{T}, rt2::T) where {T <: Real}
+    side = size(mat, 1)
+    k = 1
+    for i in 1:side, j in 1:i
+        k2 = 1
+        @inbounds for i2 in 1:side, j2 in 1:i2
+            if (i == j) && (i2 == j2)
+                H[k2, k] = abs2(mat[i2, i])
+            elseif (i != j) && (i2 != j2)
+                H[k2, k] = mat[i2, i] * mat[j, j2] + mat[j2, i] * mat[j, i2]
+            else
+                H[k2, k] = rt2 * mat[i2, i] * mat[j, j2]
+            end
+            if k2 == k
+                break
+            end
+            k2 += 1
+        end
+        k += 1
+    end
+    return H
+end
+
+function _symm_kron(H::AbstractMatrix{T}, mat::AbstractMatrix{Complex{T}}, rt2::T) where {T <: Real}
+    side = size(mat, 1)
+    k = 1
+    for i in 1:side, j in 1:i
+        k2 = 1
+        if i == j
+            @inbounds for i2 in 1:side, j2 in 1:i2
+                if i2 == j2
+                    H[k2, k] = abs2(mat[i2, i])
+                    k2 += 1
+                else
+                    c = rt2 * mat[i, i2] * mat[j2, j]
+                    H[k2, k] = real(c)
+                    k2 += 1
+                    H[k2, k] = -imag(c)
+                    k2 += 1
+                end
+                if k2 > k
+                    break
+                end
+            end
+            k += 1
+        else
+            @inbounds for i2 in 1:side, j2 in 1:i2
+                if i2 == j2
+                    c = rt2 * mat[i2, i] * mat[j, j2]
+                    H[k2, k] = real(c)
+                    H[k2, k + 1] = -imag(c)
+                    k2 += 1
+                else
+                    b1 = mat[i2, i] * mat[j, j2]
+                    b2 = mat[j2, i] * mat[j, i2]
+                    c1 = b1 + b2
+                    H[k2, k] = real(c1)
+                    H[k2, k + 1] = -imag(c1)
+                    k2 += 1
+                    c2 = b1 - b2
+                    H[k2, k] = imag(c2)
+                    H[k2, k + 1] = real(c2)
+                    k2 += 1
+                end
+                if k2 > k
+                    break
+                end
+            end
+            k += 2
+        end
+    end
+    return H
+end
+
+function _hess_WW_element(H::Matrix{T}, r_idx::Int, c_idx::Int, term1::T, term2::T) where {T <: Real}
+    @inbounds H[r_idx, c_idx] = term1 + term2
+    return
+end
+
+function _hess_WW_element(H::Matrix{T}, r_idx::Int, c_idx::Int, term1::Complex{T}, term2::Complex{T}) where {T <: Real}
+    @inbounds begin
+        H[r_idx, c_idx] = real(term1) + real(term2)
+        H[r_idx + 1, c_idx] = imag(term2) - imag(term1)
+        H[r_idx, c_idx + 1] = imag(term1) + imag(term2)
+        H[r_idx + 1, c_idx + 1] = real(term1) - real(term2)
+    end
+    return
+end
+
 end
