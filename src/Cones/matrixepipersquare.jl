@@ -35,6 +35,7 @@ mutable struct MatrixEpiPerSquare{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     Zi::Hermitian{R, Matrix{R}}
     ZiW::Matrix{R}
     tmpmm::Matrix{R}
+    tmpnn::Matrix{R}
 
     function MatrixEpiPerSquare{T, R}(
         n::Int,
@@ -74,6 +75,7 @@ function setup_data(cone::MatrixEpiPerSquare{T, R}) where {R <: RealOrComplex{T}
     cone.Z = Hermitian(zeros(R, n, n), :U)
     cone.ZiW = Matrix{R}(undef, n, m)
     cone.tmpmm = Matrix{R}(undef, m, m)
+    cone.tmpnn = Matrix{R}(undef, n, n)
     return
 end
 
@@ -120,12 +122,13 @@ function update_grad(cone::MatrixEpiPerSquare)
     W = cone.W
     dim = cone.dim
     v = cone.point[cone.per_idx]
-    mm = cone.tmpmm
+    tmpnn = cone.tmpnn
 
     Zi = cone.Zi = Hermitian(inv(cone.fact_Z), :U)
     @views smat_to_svec!(cone.grad[1:(cone.per_idx - 1)], Zi, cone.rt2)
     @views cone.grad[1:(cone.per_idx - 1)] .*= -2v
-    cone.grad[cone.per_idx] = -2 * sum(Zi .* U) + (cone.n - 1) / v # TODO allocs
+    @. tmpnn = Zi * U
+    cone.grad[cone.per_idx] = -2 * sum(tmpnn) + (cone.n - 1) / v # TODO simpler?
     ldiv!(cone.ZiW, cone.fact_Z, W)
     @views vec_copy_to!(cone.grad[(cone.per_idx + 1):dim], cone.ZiW[:])
     @. @views cone.grad[(cone.per_idx + 1):dim] *= 2
@@ -134,16 +137,18 @@ function update_grad(cone::MatrixEpiPerSquare)
     return cone.grad
 end
 
-function update_hess(cone::MatrixEpiPerSquare{T}) where {T}
+function update_hess(cone::MatrixEpiPerSquare)
     @assert cone.grad_updated
     n = cone.n
     m = cone.m
+    dim = cone.dim
     per_idx = cone.per_idx
     U = cone.U
     W = cone.W
     v = cone.point[cone.per_idx]
     H = cone.hess.data
     tmpmm = cone.tmpmm
+    tmpnn = cone.tmpnn
     Zi = cone.Zi
     ZiW = cone.ZiW
 
@@ -173,7 +178,7 @@ function update_hess(cone::MatrixEpiPerSquare{T}) where {T}
 
     # H_U_U part
     @views _symm_kron(H[1:(per_idx - 1), 1:(per_idx - 1)], Zi, cone.rt2)
-    H[1:(per_idx - 1), 1:(per_idx - 1)] .*= 4 * v ^ 2
+    @. @views H[1:(per_idx - 1), 1:(per_idx - 1)] *= 4 * abs2(v)
 
     # H_v_v part
     H[per_idx, per_idx] = sum((Zi * U * Zi) .* U) * 4 - (cone.n - 1) / v / v
@@ -191,14 +196,19 @@ function update_hess(cone::MatrixEpiPerSquare{T}) where {T}
         end
         row_idx += 1
     end
-    H[1:(per_idx - 1), (per_idx + 1):end] .*= -2 * v
+    @. @views H[1:(per_idx - 1), (per_idx + 1):dim] *= -2v
 
     # H_U_v part
     mat = (Zi .* v * U .* 2 * Zi .- Zi) .* 2
     @views smat_to_svec!(H[1:(per_idx - 1), per_idx], mat, cone.rt2)
 
     # H_v_W part
-    H[per_idx, (per_idx + 1):end] = -2 * Zi * U * Zi * W * 2
+    mul!(tmpnn, U, Zi)
+    ldiv!(cone.fact_Z, tmpnn)
+    # NOTE ZiW is overwritten
+    mul!(ZiW, tmpnn, W)
+    @. ZiW *= -4
+    @views vec_copy_to!(H[per_idx, (per_idx + 1):dim], ZiW[:])
 
     cone.hess_updated = true
     return cone.hess
