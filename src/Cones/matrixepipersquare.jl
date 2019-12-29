@@ -170,55 +170,21 @@ function update_hess(cone::MatrixEpiPerSquare)
     H[per_idx, per_idx] = sum((Zi * U * Zi) .* U) * 4 - (cone.n - 1) / v / v
 
     # H_U_W part
-    # row_idx = 1
-    # Zi2 = Zi^2
-    # ZiW = Zi * W
-    # for i in 1:n, j in 1:i
-    #     col_idx = per_idx + 1
-    #     for l in 1:m, k in 1:n
-    #         H[row_idx, col_idx] = 0
-    #         for q in 1:n
-    #             if (i == j) && (k == q)
-    #                 H[row_idx, col_idx] += Zi[i, j] * Zi[k, q] * W[q, l]
-    #                 # H[row_idx, col_idx] += abs2(Zi[i, j]) * W[q, l]
-    #             elseif i != j
-    #                 H[row_idx, col_idx] += Zi[i, j] * Zi[k, q] * W[q, l] * cone.rt2
-    #             elseif (i != j) && (k != q)
-    #                 H[row_idx, col_idx] += Zi[i, j] * Zi[k, q] * W[q, l]
-    #                 # H[row_idx, col_idx] += (Zi[i, k] * Zi[q, j] + Zi[j, k] * Zi[q, i]) * W[q, l]
-    #             else
-    #                 H[row_idx, col_idx] += Zi[i, j] * Zi[k, q] * W[q, l]
-    #                 # H[row_idx, col_idx] += cone.rt2 * Zi[k, i] * Zi[j, q] * W[q, l]
-    #             end
-    #         end
-    #         col_idx += 1
-    #     end
-    #     row_idx += 1
-    # end
-    # H[1:(per_idx - 1), (per_idx + 1):end] .*= -4 * v
-
-    col_idx = per_idx + 1
-    for l in 1:m, k in 1:n
-        mat1 = zeros(n, n)
-        mat1[k, :] += vec(W[:, l])
-        mat1[:, k] += vec(W[:, l])
-        mat = Zi * mat1 * Zi
-        @views smat_to_svec!(H[1:(per_idx - 1), col_idx], mat, cone.rt2)
-        col_idx += 1
+    row_idx = 1
+    Zi2 = Zi^2
+    ZiW = Zi * W
+    for i in 1:n, j in 1:i
+        col_idx = per_idx + 1
+        for l in 1:m, k in 1:n
+            H[row_idx, col_idx] = Zi[i, k] * ZiW[j, l] + Zi[k, j] * ZiW[i, l]
+            if i != j
+                H[row_idx, col_idx] *= cone.rt2
+            end
+            col_idx += 1
+        end
+        row_idx += 1
     end
     H[1:(per_idx - 1), (per_idx + 1):end] .*= -2 * v
-
-
-    # if (i == j) && (i2 == j2)
-    #     H[k2, k] = abs2(mat[i2, i])
-    # elseif (i != j) && (i2 != j2)
-    #     H[k2, k] = mat[i2, i] * mat[j, j2] + mat[j2, i] * mat[j, i2]
-    # else
-    #     H[k2, k] = rt2 * mat[i2, i] * mat[j, j2]
-    # end
-    # if k2 == k
-    #     break
-    # end
 
     # H_U_v part
     mat = (Zi .* v * U .* 2 * Zi .- Zi) .* 2
