@@ -151,6 +151,7 @@ function update_hess(cone::MatrixEpiPerSquare)
     tmpmm += I # TODO inefficient
 
     # TODO parallelize loops
+    # TODO inbounds
     idx_incr = (cone.is_complex ? 2 : 1)
     r_idx = per_idx + 1
     for i in 1:m, j in 1:n
@@ -175,9 +176,14 @@ function update_hess(cone::MatrixEpiPerSquare)
     @. @views H[1:(per_idx - 1), 1:(per_idx - 1)] *= 4 * abs2(v)
 
     # H_v_v part
-    @views H[per_idx, per_idx] = sum((Zi * U * Zi) .* U) * 4 - (cone.n - 1) / v / v
+    mul!(tmpnn, U, Zi)
+    ldiv!(cone.fact_Z, tmpnn)
+    ZiUZi = tmpnn
+
+    @views H[per_idx, per_idx] = 4 * dot(ZiUZi, U) - (cone.n - 1) / v / v
 
     # H_U_W part
+    # TODO inbounds
     row_idx = 1
     for i in 1:n, j in 1:i
         col_idx = per_idx + 1
@@ -192,21 +198,16 @@ function update_hess(cone::MatrixEpiPerSquare)
     end
     @. @views H[1:(per_idx - 1), (per_idx + 1):dim] *= -2v
 
-    # H_U_v part
-    mul!(tmpnn, U, Zi)
-    ldiv!(cone.fact_Z, tmpnn)
-    ZiUZi = tmpnn
-
     # H_v_W part
-    # NOTE ZiW is overwritten
     mul!(ZiW, ZiUZi, W)
-    @. ZiW *= -4
-    @views vec_copy_to!(H[per_idx, (per_idx + 1):dim], ZiW[:])
+    @views H_v_W = H[per_idx, (per_idx + 1):dim]
+    @views vec_copy_to!(H_v_W, ZiW[:])
+    @. H_v_W *= -4
 
-    @. ZiUZi *= 2v
-    @. ZiUZi -= Zi
-    @. ZiUZi *= 2
-    @views smat_to_svec!(H[1:(per_idx - 1), per_idx], ZiUZi, cone.rt2)
+    # H_U_v part
+    # NOTE overwrites ZiUZi
+    axpby!(-2, Zi, 4v, tmpnn)
+    @views smat_to_svec!(H[1:(per_idx - 1), per_idx], tmpnn, cone.rt2)
 
     cone.hess_updated = true
     return cone.hess

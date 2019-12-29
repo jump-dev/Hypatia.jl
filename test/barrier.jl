@@ -259,15 +259,15 @@ function test_matrixepipersquare_barrier(T::Type{<:Real})
         end
         test_barrier_oracles(CO.MatrixEpiPerSquare{T, T}(n, m), R_barrier)
 
-        # complex matrixepipersquare barrier
-        per_idx = n ^ 2 + 1
-        function C_barrier(s)
-            U = CO.svec_to_smat!(zeros(Complex{eltype(s)}, n, n), s[1:(per_idx - 1)], sqrt(T(2)))
-            v = s[per_idx]
-            W = CO.rvec_to_cvec!(zeros(Complex{eltype(s)}, n, m), s[(per_idx + 1):end])
-            return -logdet(cholesky!(Hermitian(2 * v * U - W * W', :U))) + (n - 1) * log(v)
-        end
-        test_barrier_oracles(CO.MatrixEpiPerSquare{T, Complex{T}}(n, m), C_barrier)
+        # # complex matrixepipersquare barrier
+        # per_idx = n ^ 2 + 1
+        # function C_barrier(s)
+        #     U = CO.svec_to_smat!(zeros(Complex{eltype(s)}, n, n), s[1:(per_idx - 1)], sqrt(T(2)))
+        #     v = s[per_idx]
+        #     W = CO.rvec_to_cvec!(zeros(Complex{eltype(s)}, n, m), s[(per_idx + 1):end])
+        #     return -logdet(cholesky!(Hermitian(2 * v * U - W * W', :U))) + (n - 1) * log(v)
+        # end
+        # test_barrier_oracles(CO.MatrixEpiPerSquare{T, Complex{T}}(n, m), C_barrier)
     end
     return
 end
