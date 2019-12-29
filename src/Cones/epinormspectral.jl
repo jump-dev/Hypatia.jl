@@ -116,7 +116,6 @@ function update_grad(cone::EpiNormSpectral)
 
     ldiv!(cone.ZiW, cone.fact_Z, cone.W)
     cone.Zi = Hermitian(inv(cone.fact_Z), :U) # TODO only need trace of inverse here, which we can get from the cholesky factor - if cheap, don't do the inverse until needed in the hessian
-
     cone.grad[1] = -u * tr(cone.Zi)
     @views vec_copy_to!(cone.grad[2:end], cone.ZiW[:])
     cone.grad .*= 2
