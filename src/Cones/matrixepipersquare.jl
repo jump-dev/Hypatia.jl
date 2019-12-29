@@ -98,12 +98,8 @@ function update_feas(cone::MatrixEpiPerSquare)
     v = cone.point[cone.per_idx]
 
     if v > 0
-        U = cone.U
-        @views svec_to_smat!(U.data, cone.point[1:(cone.per_idx - 1)], cone.rt2)
-        W = cone.W
-        @views vec_copy_to!(W[:], cone.point[(cone.per_idx + 1):end])
-
-        # TODO check posdef of U first? not necessary, but if need fact of U then may as well
+        @views U = svec_to_smat!(cone.U.data, cone.point[1:(cone.per_idx - 1)], cone.rt2)
+        @views W = vec_copy_to!(cone.W[:], cone.point[(cone.per_idx + 1):end])
         copyto!(cone.Z.data, U)
         mul!(cone.Z.data, cone.W, cone.W', -1, 2 * v)
         cone.fact_Z = cholesky!(cone.Z, check = false)
@@ -122,13 +118,11 @@ function update_grad(cone::MatrixEpiPerSquare)
     W = cone.W
     dim = cone.dim
     v = cone.point[cone.per_idx]
-    tmpnn = cone.tmpnn
 
     Zi = cone.Zi = Hermitian(inv(cone.fact_Z), :U)
     @views smat_to_svec!(cone.grad[1:(cone.per_idx - 1)], Zi, cone.rt2)
     @views cone.grad[1:(cone.per_idx - 1)] .*= -2v
-    @. tmpnn = Zi * U
-    cone.grad[cone.per_idx] = -2 * sum(tmpnn) + (cone.n - 1) / v # TODO simpler?
+    cone.grad[cone.per_idx] = -2 * dot(Zi, U) + (cone.n - 1) / v
     ldiv!(cone.ZiW, cone.fact_Z, W)
     @views vec_copy_to!(cone.grad[(cone.per_idx + 1):dim], cone.ZiW[:])
     @. @views cone.grad[(cone.per_idx + 1):dim] *= 2
