@@ -34,13 +34,13 @@ function test_barrier_oracles(
     @test load_reset_check(cone, point)
     @test cone.point == point
 
-    # if isfinite(init_tol)
-    #     # tests for centrality of initial point
-    #     grad = CO.grad(cone)
-    #     @test dot(point, -grad) ≈ norm(point) * norm(grad) atol=init_tol rtol=init_tol
-    #     @test point ≈ -grad atol=init_tol rtol=init_tol
-    # end
-    # init_only && return
+    if isfinite(init_tol)
+        # tests for centrality of initial point
+        grad = CO.grad(cone)
+        @test dot(point, -grad) ≈ norm(point) * norm(grad) atol=init_tol rtol=init_tol
+        @test point ≈ -grad atol=init_tol rtol=init_tol
+    end
+    init_only && return
 
     # perturb and scale the initial point and check feasible
     perturb_scale(point, noise, scale)
