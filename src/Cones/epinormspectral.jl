@@ -97,7 +97,7 @@ function update_feas(cone::EpiNormSpectral)
     u = cone.point[1]
 
     if u > 0
-        @views vec_copy_to!(cone.W[:], cone.point[2:end])
+        @views vec_copy_to!(cone.W, cone.point[2:end])
         copyto!(cone.Z, abs2(u) * I) # TODO inefficient
         mul!(cone.Z, cone.W, cone.W', -1, true)
         cone.fact_Z = cholesky!(Hermitian(cone.Z, :U), check = false)
@@ -116,9 +116,8 @@ function update_grad(cone::EpiNormSpectral)
 
     ldiv!(cone.ZiW, cone.fact_Z, cone.W)
     cone.Zi = Hermitian(inv(cone.fact_Z), :U) # TODO only need trace of inverse here, which we can get from the cholesky factor - if cheap, don't do the inverse until needed in the hessian
-
     cone.grad[1] = -u * tr(cone.Zi)
-    @views vec_copy_to!(cone.grad[2:end], cone.ZiW[:])
+    @views vec_copy_to!(cone.grad[2:end], cone.ZiW)
     cone.grad .*= 2
     cone.grad[1] += (cone.n - 1) / u
 
@@ -154,7 +153,7 @@ function update_hess(cone::EpiNormSpectral)
     H = cone.hess.data
 
     # H_W_W part
-    mul!(tmpmm, W', ZiW) # TODO Hermitian? W' * Zi * W
+    mul!(tmpmm, W', ZiW)
     tmpmm += I # TODO inefficient
 
     # TODO parallelize loops
@@ -169,7 +168,7 @@ function update_hess(cone::EpiNormSpectral)
             @inbounds for l in lstart:n
                 term1 = Zi[l, j] * tmpmmik
                 term2 = ZiW[l, i] * ZiWjk
-                _hess_WW_element(H, r_idx, c_idx, term1, term2)
+                hess_element(H, r_idx, c_idx, term1, term2)
                 c_idx += idx_incr
             end
         end
@@ -178,26 +177,11 @@ function update_hess(cone::EpiNormSpectral)
     H .*= 2
 
     # H_u_W and H_u_u parts
-    @views vec_copy_to!(H[1, 2:end], cone.HuW[:])
+    @views vec_copy_to!(H[1, 2:end], cone.HuW)
     H[1, 1] = cone.Huu
 
     cone.hess_updated = true
     return cone.hess
-end
-
-function _hess_WW_element(H::Matrix{T}, r_idx::Int, c_idx::Int, term1::T, term2::T) where {T <: Real}
-    @inbounds H[r_idx, c_idx] = term1 + term2
-    return
-end
-
-function _hess_WW_element(H::Matrix{T}, r_idx::Int, c_idx::Int, term1::Complex{T}, term2::Complex{T}) where {T <: Real}
-    @inbounds begin
-        H[r_idx, c_idx] = real(term1) + real(term2)
-        H[r_idx + 1, c_idx] = imag(term2) - imag(term1)
-        H[r_idx, c_idx + 1] = imag(term1) + imag(term2)
-        H[r_idx + 1, c_idx + 1] = real(term1) - real(term2)
-    end
-    return
 end
 
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormSpectral)
@@ -211,7 +195,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNorm
 
     @inbounds for j in 1:size(prod, 2)
         arr_1j = arr[1, j]
-        @views vec_copy_to!(tmpnm[:], arr[2:end, j])
+        @views vec_copy_to!(tmpnm, arr[2:end, j])
 
         prod[1, j] = cone.Huu * arr_1j + real(dot(cone.HuW, tmpnm))
 
@@ -225,7 +209,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNorm
         end
         mul!(tmpnm, Hermitian(tmpnn, :U), cone.ZiW, 2, 2)
         ldiv!(cone.fact_Z, tmpnm)
-        @views vec_copy_to!(prod[2:end, j], tmpnm[:])
+        @views vec_copy_to!(prod[2:end, j], tmpnm)
     end
 
     return prod
