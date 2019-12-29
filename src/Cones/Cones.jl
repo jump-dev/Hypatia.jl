@@ -216,7 +216,7 @@ function svec_to_smat!(mat::AbstractMatrix{Complex{T}}, vec::AbstractVector{T}, 
 end
 
 # utilities for converting between real and complex vectors
-function rvec_to_cvec!(cvec::AbstractVector{Complex{T}}, rvec::AbstractVector{T}) where {T}
+function rvec_to_cvec!(cvec::AbstractVecOrMat{Complex{T}}, rvec::AbstractVecOrMat{T}) where {T}
     k = 1
     @inbounds for i in eachindex(cvec)
         cvec[i] = Complex(rvec[k], rvec[k + 1])
@@ -225,7 +225,7 @@ function rvec_to_cvec!(cvec::AbstractVector{Complex{T}}, rvec::AbstractVector{T}
     return cvec
 end
 
-function cvec_to_rvec!(rvec::AbstractVector{T}, cvec::AbstractVector{Complex{T}}) where {T}
+function cvec_to_rvec!(rvec::AbstractVecOrMat{T}, cvec::AbstractVecOrMat{Complex{T}}) where {T}
     k = 1
     @inbounds for i in eachindex(cvec)
         ci = cvec[i]
@@ -236,9 +236,9 @@ function cvec_to_rvec!(rvec::AbstractVector{T}, cvec::AbstractVector{Complex{T}}
     return rvec
 end
 
-vec_copy_to!(v1::AbstractVector{T}, v2::AbstractVector{T}) where {T <: Real} = copyto!(v1, v2)
-vec_copy_to!(v1::AbstractVector{T}, v2::AbstractVector{Complex{T}}) where {T <: Real} = cvec_to_rvec!(v1, v2)
-vec_copy_to!(v1::AbstractVector{Complex{T}}, v2::AbstractVector{T}) where {T <: Real} = rvec_to_cvec!(v1, v2)
+vec_copy_to!(v1::AbstractVecOrMat{T}, v2::AbstractVecOrMat{T}) where {T <: Real} = copyto!(v1, v2)
+vec_copy_to!(v1::AbstractVecOrMat{T}, v2::AbstractVecOrMat{Complex{T}}) where {T <: Real} = cvec_to_rvec!(v1, v2)
+vec_copy_to!(v1::AbstractVecOrMat{Complex{T}}, v2::AbstractVecOrMat{T}) where {T <: Real} = rvec_to_cvec!(v1, v2)
 
 # utilities for hessians for cones with PSD parts
 

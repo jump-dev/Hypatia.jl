@@ -690,10 +690,10 @@ function epinormspectral1(T; options...)
             @test r.status == :Optimal
 
             S = zeros(R, Xn, Xm)
-            @views CO.vec_copy_to!(S[:], r.s[2:end])
+            @views CO.vec_copy_to!(S, r.s[2:end])
             prim_svdvals = svdvals(S)
             Z = similar(S)
-            @views CO.vec_copy_to!(Z[:], r.z[2:end])
+            @views CO.vec_copy_to!(Z, r.z[2:end])
             dual_svdvals = svdvals(Z)
             if is_dual
                 @test sum(prim_svdvals) ≈ r.s[1] atol=tol rtol=tol
@@ -718,7 +718,8 @@ function epinormspectral2(T; options...)
         end
         mat = rand(R, Xn, Xm)
         c = zeros(T, dim)
-        CO.vec_copy_to!(c, -mat[:])
+        CO.vec_copy_to!(c, mat)
+        c .*= -1
         A = zeros(T, 0, dim)
         b = T[]
         G = vcat(zeros(T, 1, dim), Matrix{T}(-I, dim, dim))
@@ -764,7 +765,7 @@ end
 function matrixepipersquare1(T; options...)
     tol = sqrt(sqrt(eps(T)))
     Random.seed!(1)
-    for is_complex in (false, ), (Xn, Xm) in [(1, 1), (1, 3), (2, 2), (2, 3)]
+    for is_complex in (false, true), (Xn, Xm) in [(1, 1), (1, 3), (2, 2), (2, 3)]
         R = (is_complex ? Complex{T} : T)
         per_idx = (is_complex ? Xn ^ 2 + 1 : CO.svec_length(Xn) + 1)
         dim = per_idx + (is_complex ? 2 : 1) * Xn * Xm
@@ -776,7 +777,7 @@ function matrixepipersquare1(T; options...)
         h = zeros(T, dim)
         @views CO.smat_to_svec!(h[1:(per_idx - 1)], Matrix{R}(I, Xn, Xn), sqrt(T(2)))
         W = rand(R, Xn, Xm)
-        @views CO.vec_copy_to!(h[(per_idx + 1):end], W[:])
+        @views CO.vec_copy_to!(h[(per_idx + 1):end], W)
         WWt = Hermitian(W * W')
         dual_epi = tr(WWt) / 2
         primal_epi = svdvals(WWt)[1] / 2
@@ -803,7 +804,7 @@ function matrixepipersquare2(T; options...)
     tol = sqrt(sqrt(eps(T)))
     Random.seed!(1)
     (Xn, Xm) = (3, 4)
-    for is_complex in (false, )
+    for is_complex in (false, true)
         R = (is_complex ? Complex{T} : T)
         per_idx = (is_complex ? Xn ^ 2 + 1 : CO.svec_length(Xn) + 1)
         dim = per_idx + (is_complex ? 2 : 1) * Xn * Xm
@@ -817,7 +818,7 @@ function matrixepipersquare2(T; options...)
         U = Hermitian(U_half * U_half')
         @views CO.smat_to_svec!(h[1:(per_idx - 1)], U.data, sqrt(T(2)))
         W = rand(R, Xn, Xm)
-        @views CO.vec_copy_to!(h[(per_idx + 1):end], W[:])
+        @views CO.vec_copy_to!(h[(per_idx + 1):end], W)
 
         for is_dual in (false, true)
             cones = CO.Cone{T}[CO.MatrixEpiPerSquare{T, R}(Xn, Xm, is_dual)]
@@ -838,7 +839,7 @@ function matrixepipersquare3(T; options...)
     tol = sqrt(sqrt(eps(T)))
     Random.seed!(1)
     (Xn, Xm) = (2, 4)
-    for is_complex in (false, )
+    for is_complex in (false, true)
         R = (is_complex ? Complex{T} : T)
         per_idx = (is_complex ? Xn ^ 2 + 1 : CO.svec_length(Xn) + 1)
         W_dim = (is_complex ? 2 : 1) * Xn * Xm
@@ -856,8 +857,7 @@ function matrixepipersquare3(T; options...)
             cones = CO.Cone{T}[CO.MatrixEpiPerSquare{T, R}(Xn, Xm, is_dual)]
             r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
             @test r.status == :Optimal
-            @test r.primal_obj ≈ 0 atol=10tol rtol=10tol
-            @test norm(r.s[(per_idx + 1):end]) ≈ 0 atol=tol rtol=tol
+            @test norm(r.x) ≈ 0 atol=2tol rtol=2tol
         end
     end
 end

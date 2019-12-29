@@ -97,16 +97,13 @@ function set_initial_point(arr::AbstractVector, cone::MatrixEpiPerSquare{T, R}) 
     return arr
 end
 
-
-# TODO save U, v, W row idxs ranges in struct
-
 function update_feas(cone::MatrixEpiPerSquare)
     @assert !cone.feas_updated
     v = cone.point[cone.v_idx]
 
     if v > 0
         @views U = svec_to_smat!(cone.U.data, cone.point[cone.U_idxs], cone.rt2)
-        @views W = vec_copy_to!(cone.W[:], cone.point[cone.W_idxs])
+        @views W = vec_copy_to!(cone.W, cone.point[cone.W_idxs])
         copyto!(cone.Z.data, U)
         mul!(cone.Z.data, cone.W, cone.W', -1, 2 * v)
         cone.fact_Z = cholesky!(cone.Z, check = false)
@@ -131,7 +128,7 @@ function update_grad(cone::MatrixEpiPerSquare)
     @views cone.grad[cone.U_idxs] .*= -2v
     cone.grad[cone.v_idx] = -2 * dot(Zi, U) + (cone.n - 1) / v
     ldiv!(cone.ZiW, cone.fact_Z, W)
-    @views vec_copy_to!(cone.grad[cone.W_idxs], cone.ZiW[:])
+    @views vec_copy_to!(cone.grad[cone.W_idxs], cone.ZiW)
     @. @views cone.grad[cone.W_idxs] *= 2
 
     cone.grad_updated = true
@@ -154,6 +151,7 @@ function update_hess(cone::MatrixEpiPerSquare)
     tmpnn = cone.tmpnn
     Zi = cone.Zi
     ZiW = cone.ZiW
+    idx_incr = (cone.is_complex ? 2 : 1)
 
     # H_W_W part
     mul!(tmpmm, W', ZiW) # TODO Hermitian? W' * Zi * W
@@ -161,7 +159,6 @@ function update_hess(cone::MatrixEpiPerSquare)
 
     # TODO parallelize loops
     # TODO inbounds
-    idx_incr = (cone.is_complex ? 2 : 1)
     r_idx = v_idx + 1
     for i in 1:m, j in 1:n
         c_idx = r_idx
@@ -193,27 +190,49 @@ function update_hess(cone::MatrixEpiPerSquare)
 
     # H_U_W part
     # TODO inbounds
-    # TODO don't iterate over more indices than necessary
     row_idx = 1
-    for i in 1:n, j in 1:i
+    for i in 1:n, j in 1:i # U lower tri idxs
         col_idx = v_idx + 1
-        for l in 1:m, k in 1:n
-            term = Zi[i, k] * ZiW[j, l] + Zi[k, j] * ZiW[i, l]
-            if i != j
-                term *= cone.rt2
+        for l in 1:m, k in 1:n # W idxs
+            # TODO dispatch
+            if cone.is_complex
+                term1 = Zi[k, i] * ZiW[j, l]
+                term2 = Zi[k, j] * ZiW[i, l]
+                if i != j
+                    term1 *= cone.rt2
+                    term2 *= cone.rt2
+                end
+                term1 *= -2v # TODO delete
+                term2 *= -2v
+                H[row_idx, col_idx] = real(term1) + real(term2)
+                H[row_idx, col_idx + 1] = imag(term1) + imag(term2)
+                if i != j
+                    H[row_idx + 1, col_idx] = imag(term2) - imag(term1)
+                    H[row_idx + 1, col_idx + 1] = real(term1) - real(term2)
+                end
+            else
+                term = Zi[i, k] * ZiW[j, l] + Zi[k, j] * ZiW[i, l]
+                if i != j
+                    term *= cone.rt2
+                end
+                # H[row_idx, col_idx] = term
+                H[row_idx, col_idx] = -2v * term
             end
-            H[row_idx, col_idx] = term
-            col_idx += 1
+            col_idx += idx_incr
         end
-        row_idx += 1
+        if i != j
+            row_idx += idx_incr
+        else
+            row_idx += 1
+        end
     end
-    @. @views H[U_idxs, W_idxs] *= -2v
+    # @. @views H[U_idxs, W_idxs] *= -2v # TODO uncomment
 
     # H_v_W part
     # NOTE overwrites ZiW
     # TODO better to do ZiU * ZiW?
     mul!(ZiW, ZiUZi, W, -4, false)
-    @views vec_copy_to!(H[v_idx, W_idxs], ZiW[:])
+    @views vec_copy_to!(H[v_idx, W_idxs], ZiW)
 
     # H_U_v part
     # NOTE overwrites ZiUZi
