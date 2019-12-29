@@ -174,14 +174,14 @@ function update_hess(cone::MatrixEpiPerSquare)
         end
         r_idx += idx_incr
     end
-    H[(per_idx + 1):end, (per_idx + 1):end] .*= 2
+    @views H[(per_idx + 1):dim, (per_idx + 1):dim] .*= 2
 
     # H_U_U part
     @views _symm_kron(H[1:(per_idx - 1), 1:(per_idx - 1)], Zi, cone.rt2)
     @. @views H[1:(per_idx - 1), 1:(per_idx - 1)] *= 4 * abs2(v)
 
     # H_v_v part
-    H[per_idx, per_idx] = sum((Zi * U * Zi) .* U) * 4 - (cone.n - 1) / v / v
+    @views H[per_idx, per_idx] = sum((Zi * U * Zi) .* U) * 4 - (cone.n - 1) / v / v
 
     # H_U_W part
     row_idx = 1
@@ -199,16 +199,20 @@ function update_hess(cone::MatrixEpiPerSquare)
     @. @views H[1:(per_idx - 1), (per_idx + 1):dim] *= -2v
 
     # H_U_v part
-    mat = (Zi .* v * U .* 2 * Zi .- Zi) .* 2
-    @views smat_to_svec!(H[1:(per_idx - 1), per_idx], mat, cone.rt2)
-
-    # H_v_W part
     mul!(tmpnn, U, Zi)
     ldiv!(cone.fact_Z, tmpnn)
+    ZiUZi = tmpnn
+
+    # H_v_W part
     # NOTE ZiW is overwritten
-    mul!(ZiW, tmpnn, W)
+    mul!(ZiW, ZiUZi, W)
     @. ZiW *= -4
     @views vec_copy_to!(H[per_idx, (per_idx + 1):dim], ZiW[:])
+
+    @. ZiUZi *= 2v
+    @. ZiUZi -= Zi
+    @. ZiUZi *= 2
+    @views smat_to_svec!(H[1:(per_idx - 1), per_idx], ZiUZi, cone.rt2)
 
     cone.hess_updated = true
     return cone.hess
