@@ -764,7 +764,7 @@ end
 function matrixepipersquare1(T; options...)
     tol = sqrt(sqrt(eps(T)))
     Random.seed!(1)
-    for is_complex in (false, true), (Xn, Xm) in [(1, 1), (1, 3), (2, 2), (2, 3)]
+    for is_complex in (false, ), (Xn, Xm) in [(1, 1), (1, 3), (2, 2), (2, 3)]
         R = (is_complex ? Complex{T} : T)
         per_idx = (is_complex ? Xn ^ 2 + 1 : CO.svec_length(Xn) + 1)
         dim = per_idx + (is_complex ? 2 : 1) * Xn * Xm
@@ -789,11 +789,11 @@ function matrixepipersquare1(T; options...)
             if is_dual
                 @test r.primal_obj ≈ dual_epi atol=tol rtol=tol
                 @test r.s[per_idx] ≈ dual_epi atol=tol rtol=tol
-                @test r.z[per_idx] ≈ primal_epi atol=tol rtol=tol
+                @test r.z[per_idx] ≈ 1 atol=tol rtol=tol
             else
                 @test r.primal_obj ≈ primal_epi atol=tol rtol=tol
                 @test r.s[per_idx] ≈ primal_epi atol=tol rtol=tol
-                @test r.z[per_idx] ≈ dual_epi atol=tol rtol=tol
+                @test r.z[per_idx] ≈ 1 atol=tol rtol=tol
             end
         end
     end
@@ -803,7 +803,7 @@ function matrixepipersquare2(T; options...)
     tol = sqrt(sqrt(eps(T)))
     Random.seed!(1)
     (Xn, Xm) = (3, 4)
-    for is_complex in (false, true)
+    for is_complex in (false, )
         R = (is_complex ? Complex{T} : T)
         per_idx = (is_complex ? Xn ^ 2 + 1 : CO.svec_length(Xn) + 1)
         dim = per_idx + (is_complex ? 2 : 1) * Xn * Xm
@@ -814,8 +814,8 @@ function matrixepipersquare2(T; options...)
         G[per_idx] = -1
         h = zeros(T, dim)
         U_half = rand(R, Xn, Xn)
-        U = U_half * U_half'
-        @views CO.smat_to_svec!(h[1:(per_idx - 1)], U, sqrt(T(2)))
+        U = Hermitian(U_half * U_half')
+        @views CO.smat_to_svec!(h[1:(per_idx - 1)], U.data, sqrt(T(2)))
         W = rand(R, Xn, Xm)
         @views CO.vec_copy_to!(h[(per_idx + 1):end], W[:])
 
@@ -824,10 +824,12 @@ function matrixepipersquare2(T; options...)
             r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
             @test r.status == :Optimal
             @test r.primal_obj >= 0
-            primal_mat = Hermitian(2 * r.s[per_idx] * U - W * W')
-            dual_mat = Hermitian(2 * r.z[per_idx] - tr(W * U \ W'))
-            @test eigmin(primal_mat) ≈ 0 atol=tol rtol=tol
-            @test eigmin(dual_mat) ≈ 0 atol=tol rtol=tol
+            if is_dual
+                @test 2 * r.s[per_idx] ≈ tr(W' * (U \ W)) atol=tol rtol=tol
+            else
+                primal_viol = Hermitian(2 * r.s[per_idx] * U - W * W')
+                @test eigmin(primal_viol) ≈ 0 atol=tol rtol=tol
+            end
         end
     end
 end
@@ -836,7 +838,7 @@ function matrixepipersquare3(T; options...)
     tol = sqrt(sqrt(eps(T)))
     Random.seed!(1)
     (Xn, Xm) = (2, 4)
-    for is_complex in (false, true)
+    for is_complex in (false, )
         R = (is_complex ? Complex{T} : T)
         per_idx = (is_complex ? Xn ^ 2 + 1 : CO.svec_length(Xn) + 1)
         W_dim = (is_complex ? 2 : 1) * Xn * Xm
@@ -844,21 +846,18 @@ function matrixepipersquare3(T; options...)
         c = ones(T, W_dim)
         A = zeros(T, 0, W_dim)
         b = T[]
-        G = vcat(zeros(T, per_idx, W_dim), Matrix{T}(-I, W_dim, W_dim))
+        G = vcat(zeros(T, per_idx, W_dim), Matrix{T}(-10I, W_dim, W_dim))
         h = zeros(T, dim)
         U_half = rand(R, Xn, Xn)
-        U = U_half * U_half'
-        @views CO.smat_to_svec!(h[1:(per_idx - 1)], U, sqrt(T(2)))
-        W = rand(R, Xn, Xm)
-        @views CO.vec_copy_to!(h[(per_idx + 1):end], W[:])
+        U = Hermitian(U_half * U_half')
+        @views CO.smat_to_svec!(h[1:(per_idx - 1)], U.data, sqrt(T(2)))
 
         for is_dual in (false, true)
             cones = CO.Cone{T}[CO.MatrixEpiPerSquare{T, R}(Xn, Xm, is_dual)]
             r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
             @test r.status == :Optimal
-            @test r.primal_obj ≈ 0 atol=tol rtol=tol
+            @test r.primal_obj ≈ 0 atol=10tol rtol=10tol
             @test norm(r.s[(per_idx + 1):end]) ≈ 0 atol=tol rtol=tol
-            @test norm(r.z[(per_idx + 1):end]) ≈ 0 atol=tol rtol=tol
         end
     end
 end
