@@ -34,26 +34,30 @@ function test_barrier_oracles(
     @test load_reset_check(cone, point)
     @test cone.point == point
 
-    # if isfinite(init_tol)
-    #     # tests for centrality of initial point
-    #     grad = CO.grad(cone)
-    #     @test dot(point, -grad) ≈ norm(point) * norm(grad) atol=init_tol rtol=init_tol
-    #     @test point ≈ -grad atol=init_tol rtol=init_tol
-    # end
-    # init_only && return
-    #
-    # # perturb and scale the initial point and check feasible
-    # perturb_scale(point, noise, scale)
-    # @test load_reset_check(cone, point)
-    #
-    # # test gradient and Hessian oracles
-    # test_grad_hess(cone, point, tol = tol)
-    #
-    # # check gradient and Hessian agree with ForwardDiff
-    # grad = CO.grad(cone)
-    # hess = CO.hess(cone)
-    # @test ForwardDiff.gradient(barrier, point) ≈ grad atol=tol rtol=tol
-    # @test ForwardDiff.hessian(barrier, point) ≈ hess atol=tol rtol=tol
+    if isfinite(init_tol)
+        # tests for centrality of initial point
+        grad = CO.grad(cone)
+        @test dot(point, -grad) ≈ norm(point) * norm(grad) atol=init_tol rtol=init_tol
+        @test point ≈ -grad atol=init_tol rtol=init_tol
+    end
+    init_only && return
+
+    # perturb and scale the initial point and check feasible
+    perturb_scale(point, noise, scale)
+    @test load_reset_check(cone, point)
+
+    # test gradient and Hessian oracles
+    test_grad_hess(cone, point, tol = tol)
+
+    # check gradient and Hessian agree with ForwardDiff
+    if dim < 10 # too slow if dimension is large
+        grad = CO.grad(cone)
+        fd_grad = ForwardDiff.gradient(barrier, point)
+        @test grad ≈ fd_grad atol=tol rtol=tol
+        hess = CO.hess(cone)
+        fd_hess = ForwardDiff.hessian(barrier, point)
+        @test hess ≈ fd_hess atol=tol rtol=tol
+    end
 
     # TODO decide whether to add
     # # check 3rd order corrector agrees with ForwardDiff

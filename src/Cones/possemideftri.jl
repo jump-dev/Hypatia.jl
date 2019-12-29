@@ -118,14 +118,14 @@ end
 
 function update_hess(cone::PosSemidefTri)
     @assert cone.grad_updated
-    _build_hess(cone.hess.data, cone.inv_mat, cone.rt2)
+    symm_kron(cone.hess.data, cone.inv_mat, cone.rt2)
     cone.hess_updated = true
     return cone.hess
 end
 
 function update_inv_hess(cone::PosSemidefTri)
     @assert is_feas(cone)
-    _build_hess(cone.inv_hess.data, cone.mat, cone.rt2)
+    symm_kron(cone.inv_hess.data, cone.mat, cone.rt2)
     cone.inv_hess_updated = true
     return cone.inv_hess
 end
@@ -178,79 +178,4 @@ function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone
         smat_to_svec!(view(prod, :, i), cone.mat4, cone.rt2)
     end
     return prod
-end
-
-# TODO parallelize
-function _build_hess(H::Matrix{T}, mat::Matrix{T}, rt2::T) where {T <: Real}
-    side = size(mat, 1)
-    k = 1
-    for i in 1:side, j in 1:i
-        k2 = 1
-        @inbounds for i2 in 1:side, j2 in 1:i2
-            if (i == j) && (i2 == j2)
-                H[k2, k] = abs2(mat[i2, i])
-            elseif (i != j) && (i2 != j2)
-                H[k2, k] = mat[i2, i] * mat[j, j2] + mat[j2, i] * mat[j, i2]
-            else
-                H[k2, k] = rt2 * mat[i2, i] * mat[j, j2]
-            end
-            if k2 == k
-                break
-            end
-            k2 += 1
-        end
-        k += 1
-    end
-    return H
-end
-
-function _build_hess(H::Matrix{T}, mat::Matrix{Complex{T}}, rt2::T) where {T <: Real}
-    side = size(mat, 1)
-    k = 1
-    for i in 1:side, j in 1:i
-        k2 = 1
-        if i == j
-            @inbounds for i2 in 1:side, j2 in 1:i2
-                if i2 == j2
-                    H[k2, k] = abs2(mat[i2, i])
-                    k2 += 1
-                else
-                    c = rt2 * mat[i, i2] * mat[j2, j]
-                    H[k2, k] = real(c)
-                    k2 += 1
-                    H[k2, k] = -imag(c)
-                    k2 += 1
-                end
-                if k2 > k
-                    break
-                end
-            end
-            k += 1
-        else
-            @inbounds for i2 in 1:side, j2 in 1:i2
-                if i2 == j2
-                    c = rt2 * mat[i2, i] * mat[j, j2]
-                    H[k2, k] = real(c)
-                    H[k2, k + 1] = -imag(c)
-                    k2 += 1
-                else
-                    b1 = mat[i2, i] * mat[j, j2]
-                    b2 = mat[j2, i] * mat[j, i2]
-                    c1 = b1 + b2
-                    H[k2, k] = real(c1)
-                    H[k2, k + 1] = -imag(c1)
-                    k2 += 1
-                    c2 = b1 - b2
-                    H[k2, k] = imag(c2)
-                    H[k2, k + 1] = real(c2)
-                    k2 += 1
-                end
-                if k2 > k
-                    break
-                end
-            end
-            k += 2
-        end
-    end
-    return H
 end
