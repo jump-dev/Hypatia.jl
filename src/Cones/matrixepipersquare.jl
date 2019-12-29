@@ -30,8 +30,11 @@ mutable struct MatrixEpiPerSquare{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
 
     U
     W
-    Z
+    Z::Hermitian{R,Matrix{R}}
     fact_Z
+    Zi::Hermitian{R, Matrix{R}}
+    ZiW::Matrix{R}
+    tmpmm::Matrix{R}
 
     function MatrixEpiPerSquare{T, R}(
         n::Int,
@@ -69,6 +72,8 @@ function setup_data(cone::MatrixEpiPerSquare{T, R}) where {R <: RealOrComplex{T}
     cone.U = Hermitian(zeros(R, n, n), :U)
     cone.W = zeros(R, n, m)
     cone.Z = Hermitian(zeros(R, n, n), :U)
+    cone.ZiW = Matrix{R}(undef, n, m)
+    cone.tmpmm = Matrix{R}(undef, m, m)
     return
 end
 
@@ -113,18 +118,23 @@ function update_grad(cone::MatrixEpiPerSquare)
     @assert cone.is_feas
     U = cone.U
     W = cone.W
+    dim = cone.dim
     v = cone.point[cone.per_idx]
+    mm = cone.tmpmm
 
-    Zi = inv(cone.fact_Z)
-    cone.grad[cone.per_idx] = -2 * sum(Zi .* U) + (cone.n - 1) / v
-    @views smat_to_svec!(cone.grad[1:(cone.per_idx - 1)], -2 .* Zi .* v, cone.rt2)
-    cone.grad[(cone.per_idx + 1):end] .= 2 * vec(Zi * cone.W)
+    Zi = cone.Zi = Hermitian(inv(cone.fact_Z), :U)
+    @views smat_to_svec!(cone.grad[1:(cone.per_idx - 1)], Zi, cone.rt2)
+    @views cone.grad[1:(cone.per_idx - 1)] .*= -2v
+    cone.grad[cone.per_idx] = -2 * sum(Zi .* U) + (cone.n - 1) / v # TODO allocs
+    ldiv!(cone.ZiW, cone.fact_Z, W)
+    @views vec_copy_to!(cone.grad[(cone.per_idx + 1):dim], cone.ZiW[:])
+    @. @views cone.grad[(cone.per_idx + 1):dim] *= 2
 
     cone.grad_updated = true
     return cone.grad
 end
 
-function update_hess(cone::MatrixEpiPerSquare)
+function update_hess(cone::MatrixEpiPerSquare{T}) where {T}
     @assert cone.grad_updated
     n = cone.n
     m = cone.m
@@ -133,10 +143,9 @@ function update_hess(cone::MatrixEpiPerSquare)
     W = cone.W
     v = cone.point[cone.per_idx]
     H = cone.hess.data
-
-    Zi = inv(cone.fact_Z)
-    ZiW = cone.fact_Z \ W
-    tmpmm = zeros(m, m)
+    tmpmm = cone.tmpmm
+    Zi = cone.Zi
+    ZiW = cone.ZiW
 
     # H_W_W part
     mul!(tmpmm, W', ZiW) # TODO Hermitian? W' * Zi * W
@@ -163,7 +172,7 @@ function update_hess(cone::MatrixEpiPerSquare)
     H[(per_idx + 1):end, (per_idx + 1):end] .*= 2
 
     # H_U_U part
-    @views _build_hess(H[1:(per_idx - 1), 1:(per_idx - 1)], Zi, cone.rt2)
+    @views _symm_kron(H[1:(per_idx - 1), 1:(per_idx - 1)], Zi, cone.rt2)
     H[1:(per_idx - 1), 1:(per_idx - 1)] .*= 4 * v ^ 2
 
     # H_v_v part
@@ -171,8 +180,6 @@ function update_hess(cone::MatrixEpiPerSquare)
 
     # H_U_W part
     row_idx = 1
-    Zi2 = Zi^2
-    ZiW = Zi * W
     for i in 1:n, j in 1:i
         col_idx = per_idx + 1
         for l in 1:m, k in 1:n
