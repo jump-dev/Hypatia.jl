@@ -30,8 +30,8 @@ mutable struct MatrixEpiPerSquare{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     U_idxs::UnitRange{Int}
     v_idx::Int
     W_idxs::UnitRange{Int}
-    U
-    W
+    U::Hermitian{R,Matrix{R}}
+    W::Matrix{R}
     Z::Hermitian{R,Matrix{R}}
     fact_Z
     Zi::Hermitian{R, Matrix{R}}
@@ -154,11 +154,10 @@ function update_hess(cone::MatrixEpiPerSquare)
     idx_incr = (cone.is_complex ? 2 : 1)
 
     # H_W_W part
-    mul!(tmpmm, W', ZiW) # TODO Hermitian? W' * Zi * W
+    mul!(tmpmm, W', ZiW)
     tmpmm += I # TODO inefficient
 
     # TODO parallelize loops
-    # TODO inbounds
     r_idx = v_idx + 1
     for i in 1:m, j in 1:n
         c_idx = r_idx
@@ -189,21 +188,19 @@ function update_hess(cone::MatrixEpiPerSquare)
     @views H[v_idx, v_idx] = 4 * dot(ZiUZi, U) - (cone.n - 1) / v / v
 
     # H_U_W part
-    # TODO inbounds
+    # TODO parallelize loops
+    # TODO use dispatch for complex part and clean up
     row_idx = 1
     for i in 1:n, j in 1:i # U lower tri idxs
         col_idx = v_idx + 1
         for l in 1:m, k in 1:n # W idxs
-            # TODO dispatch
-            if cone.is_complex
+            @inbounds if cone.is_complex
                 term1 = Zi[k, i] * ZiW[j, l]
                 term2 = Zi[k, j] * ZiW[i, l]
                 if i != j
                     term1 *= cone.rt2
                     term2 *= cone.rt2
                 end
-                term1 *= -2v # TODO delete
-                term2 *= -2v
                 H[row_idx, col_idx] = real(term1) + real(term2)
                 H[row_idx, col_idx + 1] = imag(term1) + imag(term2)
                 if i != j
@@ -215,8 +212,7 @@ function update_hess(cone::MatrixEpiPerSquare)
                 if i != j
                     term *= cone.rt2
                 end
-                # H[row_idx, col_idx] = term
-                H[row_idx, col_idx] = -2v * term
+                H[row_idx, col_idx] = term
             end
             col_idx += idx_incr
         end
@@ -226,7 +222,7 @@ function update_hess(cone::MatrixEpiPerSquare)
             row_idx += 1
         end
     end
-    # @. @views H[U_idxs, W_idxs] *= -2v # TODO uncomment
+    @. @views H[U_idxs, W_idxs] *= -2v
 
     # H_v_W part
     # NOTE overwrites ZiW

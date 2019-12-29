@@ -153,7 +153,7 @@ function update_hess(cone::EpiNormSpectral)
     H = cone.hess.data
 
     # H_W_W part
-    mul!(tmpmm, W', ZiW) # TODO Hermitian? W' * Zi * W
+    mul!(tmpmm, W', ZiW)
     tmpmm += I # TODO inefficient
 
     # TODO parallelize loops
