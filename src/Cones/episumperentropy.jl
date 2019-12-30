@@ -9,6 +9,7 @@ barrier from "Primal-Dual Interior-Point Methods for Domain-Driven Formulations"
 
 TODO
 - central ray initial point
+- write native tests for use_dual = true
 =#
 
 mutable struct EpiSumPerEntropy{T <: Real} <: Cone{T}
