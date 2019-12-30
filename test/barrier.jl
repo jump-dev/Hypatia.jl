@@ -54,6 +54,7 @@ function test_barrier_oracles(
         grad = CO.grad(cone)
         fd_grad = ForwardDiff.gradient(barrier, point)
         @test grad ≈ fd_grad atol=tol rtol=tol
+
         hess = CO.hess(cone)
         fd_hess = ForwardDiff.hessian(barrier, point)
         @test hess ≈ fd_hess atol=tol rtol=tol
@@ -191,6 +192,18 @@ function test_hypoperlog_barrier(T::Type{<:Real})
     end
     for dim in [15, 65, 75, 100, 500]
         test_barrier_oracles(CO.HypoPerLog{T}(dim), barrier, init_tol = 1e-1, init_only = true)
+    end
+    return
+end
+
+function test_episumperentropy_barrier(T::Type{<:Real})
+    for w_dim in [3, 4, 6]
+        dim = 1 + 2 * w_dim
+        function barrier(s)
+            (u, v, w) = (s[1], s[2:(w_dim + 1)], s[(w_dim + 2):dim])
+            return -log(u - sum(wi * log(wi / vi) for (vi, wi) in zip(v, w))) - sum(log(vi) + log(wi) for (vi, wi) in zip(v, w))
+        end
+        test_barrier_oracles(CO.EpiSumPerEntropy{T}(dim), barrier, init_tol = Inf) # TODO tighten initial point tol
     end
     return
 end
