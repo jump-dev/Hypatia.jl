@@ -388,6 +388,7 @@ function get_directions(stepper::CombinedStepper{T}, solver::Solver{T}) where {T
     res .-= rhs
     norm_inf = norm(res, Inf)
     norm_2 = norm(res, 2)
+    @show norm_inf, norm_2
     for i in 1:iter_ref_steps
         if norm_inf < 100 * eps(T) # TODO change tolerance dynamically
             break
@@ -407,7 +408,7 @@ function get_directions(stepper::CombinedStepper{T}, solver::Solver{T}) where {T
 
         # residual has improved, so use the iterative refinement
         # TODO only print if using debug mode
-        # solver.verbose && @printf("iter ref round %d norms: inf %9.2e to %9.2e, two %9.2e to %9.2e\n", i, norm_inf, norm_inf_new, norm_2, norm_2_new)
+        solver.verbose && @printf("iter ref round %d norms: inf %9.2e to %9.2e, two %9.2e to %9.2e\n", i, norm_inf, norm_inf_new, norm_2, norm_2_new)
         copyto!(dir_temp, dir)
         norm_inf = norm_inf_new
         norm_2 = norm_2_new
@@ -445,10 +446,10 @@ function update_rhs(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: 
             grad_k = Cones.grad(cone_k)
             @. stepper.s_rhs_k[k] -= solver.mu * grad_k
             # TODO 3-order corrector?
-            if Cones.use_3order_corr(cone_k)
-                # TODO check math here for case of cone.use_dual true - should s and z be swapped then?
-                stepper.s_rhs_k[k] .-= Cones.correction(cone_k, stepper.primal_dir_k[k], stepper.dual_dir_k[k])
-            end
+            # if Cones.use_3order_corr(cone_k)
+            #     # TODO check math here for case of cone.use_dual true - should s and z be swapped then?
+            #     stepper.s_rhs_k[k] .-= Cones.correction(cone_k, stepper.primal_dir_k[k], stepper.dual_dir_k[k])
+            # end
         end
 
         # kap rhs

@@ -152,7 +152,8 @@ mutable struct QRCholDenseSystemSolver{T <: Real} <: QRCholSystemSolver{T}
     Gx_k
     fact_cache::Union{DensePosDefCache{T}, DenseSymCache{T}} # can use BunchKaufman or Cholesky
     function QRCholDenseSystemSolver{T}(;
-        fact_cache::Union{DensePosDefCache{T}, DenseSymCache{T}} = DensePosDefCache{T}(),
+        # fact_cache::Union{DensePosDefCache{T}, DenseSymCache{T}} = DensePosDefCache{T}(),
+        fact_cache::Union{DensePosDefCache{T}, DenseSymCache{T}} = DenseSymCache{T}(),
         ) where {T <: Real}
         system_solver = new{T}()
         system_solver.fact_cache = fact_cache # TODO start with cholesky and then switch to BK if numerical issues
@@ -173,6 +174,7 @@ function load(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}) wher
         @warn("in QRChol, converting G to dense before multiplying by sparse Householder Q due to very inefficient dispatch")
     end
     G = Matrix(model.G)
+    @show solver.Ap_Q
     GQ = rmul!(G, solver.Ap_Q)
 
     system_solver.GQ1 = GQ[:, 1:p]
