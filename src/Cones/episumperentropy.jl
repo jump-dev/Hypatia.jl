@@ -6,6 +6,9 @@ Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
 barrier from "Primal-Dual Interior-Point Methods for Domain-Driven Formulations" by Karimi & Tuncel, 2019
 -log(u - sum_i w_i*log(w_i/v_i)) - sum_i (log(v_i) + log(w_i))
+
+TODO
+- central ray initial point
 =#
 
 mutable struct EpiSumPerEntropy{T <: Real} <: Cone{T}
@@ -28,7 +31,9 @@ mutable struct EpiSumPerEntropy{T <: Real} <: Cone{T}
 
     v_idxs::UnitRange{Int}
     w_idxs::UnitRange{Int}
+    lwv1d::Vector{T}
     diff::T
+    wvdiff::Vector{T}
 
     function EpiSumPerEntropy{T}(
         dim::Int,
@@ -58,6 +63,8 @@ function setup_data(cone::EpiSumPerEntropy{T}) where {T <: Real}
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
+    cone.lwv1d = zeros(T, cone.w_dim)
+    cone.wvdiff = zeros(T, cone.w_dim)
     return
 end
 
@@ -80,8 +87,8 @@ function update_feas(cone::EpiSumPerEntropy)
         @views v = cone.point[cone.v_idxs]
         @views w = cone.point[cone.w_idxs]
         if all(vi -> vi > 0, w) && all(wi -> wi > 0, w)
-            wlwv = sum(wi * log(wi / vi) for (vi, wi) in zip(v, w))
-            cone.diff = u - wlwv
+            @. cone.lwv1d = log(w / v)
+            cone.diff = u - dot(w, cone.lwv1d)
             cone.is_feas = (cone.diff > 0)
         end
     end
@@ -97,36 +104,18 @@ function update_grad(cone::EpiSumPerEntropy)
     @views w = cone.point[cone.w_idxs]
     diff = cone.diff
     g = cone.grad
+    lwv1d = cone.lwv1d
 
+    @. lwv1d += 1
+    @. lwv1d /= -diff
     g[1] = -inv(diff)
     @. g[cone.v_idxs] = (-w / diff - 1) / v
-    @. g[cone.w_idxs] = -inv(w) + (log(w / v) + 1) / diff # TODO reuse log(w/v) from feas
+    @. g[cone.w_idxs] = -inv(w) - lwv1d
 
     cone.grad_updated = true
     return cone.grad
 end
 
-# (1/(u - w1 log(w1/v1) - w2 log(w2/v2))^2
-# w1/(v1 (u - w1 log(w1/v1) - w2 log(w2/v2))^2)
-# w2/(v2 (u - w1 log(w1/v1) - w2 log(w2/v2))^2)
-# (-log(w1/v1) - 1)/(u - w1 log(w1/v1) - w2 log(w2/v2))^2
-# (-log(w2/v2) - 1)/(u - w1 log(w1/v1) - w2 log(w2/v2))^2
-#
-# w1^2/(v1^2 (u - w1 log(w1/v1) - w2 log(w2/v2))^2) + w1/(v1^2 (u - w1 log(w1/v1) - w2 log(w2/v2))) + 1/v1^2
-# (w1 w2)/(v1 v2 (u - w1 log(w1/v1) - w2 log(w2/v2))^2)
-# (w1 (-log(w1/v1) - 1))/(v1 (u - w1 log(w1/v1) - w2 log(w2/v2))^2) - 1/(v1 (u - w1 log(w1/v1) - w2 log(w2/v2)))
-# (w1 (-log(w2/v2) - 1))/(v1 (u - w1 log(w1/v1) - w2 log(w2/v2))^2)
-#
-# w2^2/(v2^2 (u - w1 log(w1/v1) - w2 log(w2/v2))^2) + w2/(v2^2 (u - w1 log(w1/v1) - w2 log(w2/v2))) + 1/v2^2
-# (w2 (-log(w1/v1) - 1))/(v2 (u - w1 log(w1/v1) - w2 log(w2/v2))^2)
-# (w2 (-log(w2/v2) - 1))/(v2 (u - w1 log(w1/v1) - w2 log(w2/v2))^2) - 1/(v2 (u - w1 log(w1/v1) - w2 log(w2/v2)))
-#
-# (-log(w1/v1) - 1)^2/(u - w1 log(w1/v1) - w2 log(w2/v2))^2 + 1/(w1 (u - w1 log(w1/v1) - w2 log(w2/v2))) + 1/w1^2
-# ((-log(w1/v1) - 1) (-log(w2/v2) - 1))/(u - w1 log(w1/v1) - w2 log(w2/v2))^2
-#
-# (-log(w2/v2) - 1)^2/(u - w1 log(w1/v1) - w2 log(w2/v2))^2 + 1/(w2 (u - w1 log(w1/v1) - w2 log(w2/v2))) + 1/w2^2)
-
-# TODO improve efficiency and numerics and style
 function update_hess(cone::EpiSumPerEntropy)
     @assert cone.grad_updated
     w_dim = cone.w_dim
@@ -136,40 +125,36 @@ function update_hess(cone::EpiSumPerEntropy)
     point = cone.point
     @views v = point[v_idxs]
     @views w = point[w_idxs]
+    lwv1d = cone.lwv1d
     diff = cone.diff
+    wvdiff = cone.wvdiff
     g = cone.grad
     g1 = g[1]
     H = cone.hess.data
 
     # H_u_u, H_u_v, H_u_w parts
     H[1, 1] = abs2(g1)
-    @. H[1, v_idxs] = w / v / diff / diff
-    @. H[1, w_idxs] = -(log(w / v) + 1) / diff / diff # TODO reuse from g
+    @. wvdiff = w / v / diff
+    @. H[1, v_idxs] = cone.wvdiff / diff
+    @. H[1, w_idxs] = lwv1d / diff
 
     # H_v_v, H_v_w, H_w_w parts
-    for (i, v_idx, w_idx) in zip(1:w_dim, v_idxs, w_idxs)
+    @inbounds for (i, v_idx, w_idx) in zip(1:w_dim, v_idxs, w_idxs)
         vi = point[v_idx]
         wi = point[w_idx]
-        H[v_idx, v_idx] = (abs2(wi / diff) + wi / diff + 1) / vi / vi # TODO calc wi / diff once
-        H[v_idx, w_idx] = (wi * (-log(wi / vi) - 1)) / (vi * diff^2) - inv(diff) / vi
-        H[w_idx, w_idx] = (-log(wi / vi) - 1)^2 / diff^2 + inv(diff) / wi + inv(wi)^2
+        lwv1di = lwv1d[i]
+        wvdiffi = wvdiff[i]
+        invvi = inv(vi)
 
-        for j in 1:(i - 1)
-            v_idx2 = v_idxs[j]
-            w_idx2 = w_idxs[j]
-            vj = point[v_idx2]
-            wj = point[w_idx2]
-            H[v_idx, w_idx2] = wi * (-log(wj / vj) - 1) / vi / diff / diff
-        end
+        H[v_idx, v_idx] = abs2(wvdiffi) + (wvdiffi + invvi) / vi
+        H[w_idx, w_idx] = abs2(lwv1di) + (inv(diff) + inv(wi)) / wi
 
-        for j in (i + 1):w_dim
-            v_idx2 = v_idxs[j]
-            w_idx2 = w_idxs[j]
-            vj = point[v_idx2]
-            wj = point[w_idx2]
-            H[v_idx, v_idx2] = (wi * wj) / (vi * vj * diff^2) # TODO faster as wi / vi / diff * (..)
-            H[v_idx, w_idx2] = wi * (-log(wj / vj) - 1) / vi / diff / diff
-            H[w_idx, w_idx2] = (-log(wi / vi) - 1) * (-log(wj / vj) - 1) / diff / diff
+        @. H[v_idx, w_idxs] = wvdiffi * lwv1d
+        H[v_idx, w_idx] -= invvi / diff
+
+        @inbounds for j in (i + 1):w_dim
+            H[v_idx, v_idxs[j]] = wvdiffi * wvdiff[j]
+            H[w_idx, w_idxs[j]] = lwv1di * lwv1d[j]
         end
     end
 
