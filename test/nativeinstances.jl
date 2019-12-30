@@ -437,6 +437,65 @@ function epiperexp4(T; options...)
     @test r.x ≈ [Texp2, 1, -1] atol=tol rtol=tol
 end
 
+# TODO add use_dual = true tests
+function episumperentropy1(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    Random.seed!(1)
+    for w_dim in [1, 2, 3]
+        dim = 1 + 2 * w_dim
+        c = T[1]
+        A = zeros(T, 0, 1)
+        b = zeros(T, 0)
+        G = zeros(T, dim, 1)
+        G[1, 1] = -1
+        h = zeros(T, dim)
+        h[2:(w_dim + 1)] .= 1
+        w = rand(T, w_dim) .+ 1
+        h[(w_dim + 2):end] .= w
+        cones = CO.Cone{T}[CO.EpiSumPerEntropy{T}(dim, false)]
+
+        r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+        @test r.status == :Optimal
+        @test r.primal_obj ≈ sum(wi * log(wi) for wi in w) atol=tol rtol=tol
+    end
+end
+
+function episumperentropy2(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    for w_dim in [1, 2, 4]
+        dim = 1 + 2 * w_dim
+        c = fill(-one(T), w_dim)
+        A = zeros(T, 0, w_dim)
+        b = zeros(T, 0)
+        G = vcat(zeros(T, 1 + w_dim, w_dim), Matrix{T}(-I, w_dim, w_dim))
+        h = vcat(zero(T), ones(T, w_dim), zeros(T, w_dim))
+        cones = CO.Cone{T}[CO.EpiSumPerEntropy{T}(dim, false)]
+
+        r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+        @test r.status == :Optimal
+        @test r.primal_obj ≈ -w_dim atol=tol rtol=tol
+        @test r.x ≈ fill(1, w_dim) atol=tol rtol=tol
+    end
+end
+
+function episumperentropy3(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    for w_dim in [2, 4]
+        dim = 1 + 2 * w_dim
+        c = fill(-one(T), w_dim)
+        A = ones(T, 1, w_dim)
+        b = T[dim]
+        G = vcat(zeros(T, 1, w_dim), Matrix{T}(-I, w_dim, w_dim), zeros(T, w_dim, w_dim))
+        h = vcat(zeros(T, 1 + w_dim), ones(T, w_dim))
+        cones = CO.Cone{T}[CO.EpiSumPerEntropy{T}(dim, false)]
+
+        r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+        @test r.status == :Optimal
+        @test r.primal_obj ≈ -dim atol=tol rtol=tol
+        @test r.x ≈ fill(dim / w_dim, w_dim) atol=tol rtol=tol
+    end
+end
+
 function hypoperlog1(T; options...)
     tol = sqrt(sqrt(eps(T)))
     Texph = exp(T(0.5))
