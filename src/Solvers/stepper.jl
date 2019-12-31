@@ -388,7 +388,7 @@ function get_directions(stepper::CombinedStepper{T}, solver::Solver{T}) where {T
     res .-= rhs
     norm_inf = norm(res, Inf)
     norm_2 = norm(res, 2)
-    @show norm_inf, norm_2
+
     for i in 1:iter_ref_steps
         if norm_inf < 100 * eps(T) # TODO change tolerance dynamically
             break
@@ -408,7 +408,7 @@ function get_directions(stepper::CombinedStepper{T}, solver::Solver{T}) where {T
 
         # residual has improved, so use the iterative refinement
         # TODO only print if using debug mode
-        solver.verbose && @printf("iter ref round %d norms: inf %9.2e to %9.2e, two %9.2e to %9.2e\n", i, norm_inf, norm_inf_new, norm_2, norm_2_new)
+        # solver.verbose && @printf("iter ref round %d norms: inf %9.2e to %9.2e, two %9.2e to %9.2e\n", i, norm_inf, norm_inf_new, norm_2, norm_2_new)
         copyto!(dir_temp, dir)
         norm_inf = norm_inf_new
         norm_2 = norm_2_new

@@ -88,7 +88,7 @@ function update_hess_fact(cone::Cone{T}) where {T <: Real}
         end
         @timeit cone.timer "hess_fact2" fact2_success = update_fact(cone.hess_fact_cache, cone.hess)
         if !fact2_success
-            @warn("Hessian factorization failed after recovery")
+            @warn("Hessian Bunch-Kaufman factorization failed after recovery")
             return false
         end
     end
