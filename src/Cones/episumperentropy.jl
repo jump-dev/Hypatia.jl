@@ -72,10 +72,9 @@ end
 get_nu(cone::EpiSumPerEntropy) = cone.dim
 
 function set_initial_point(arr::AbstractVector, cone::EpiSumPerEntropy)
-    # (arr[1], v, w) = get_central_ray_episumperentropy(cone.w_dim) # TODO if needed
-    arr[1] = 1
-    arr[cone.v_idxs] .= 1
-    arr[cone.w_idxs] .= 1
+    (arr[1], v, w) = get_central_ray_episumperentropy(div(cone.dim - 1, 2))
+    arr[cone.v_idxs] .= v
+    arr[cone.w_idxs] .= w
     return arr
 end
 
@@ -162,3 +161,35 @@ function update_hess(cone::EpiSumPerEntropy)
     cone.hess_updated = true
     return cone.hess
 end
+
+# see analysis in https://github.com/lkapelevich/HypatiaBenchmarks.jl/tree/master/centralpoints
+function get_central_ray_episumperentropy(w_dim::Int)
+    if w_dim <= 10
+        # lookup points where x = f'(x)
+        return central_rays_episumperentropy[w_dim, :]
+    end
+    # use nonlinear fit for higher dimensions
+    if w_dim <= 20
+        u = 1.2023 / sqrt(w_dim) - 0.015
+        v = 0.432 / sqrt(w_dim) + 1.0125
+        w = -0.3057 / sqrt(w_dim) + 0.972
+    else
+        u = 1.1513 / sqrt(w_dim) - 0.0069
+        v = 0.4873 / sqrt(w_dim) + 1.0008
+        w = -0.4247 / sqrt(w_dim) + 0.9961
+    end
+    return [u, v, w]
+end
+
+const central_rays_episumperentropy = [
+    0.827838399	1.290927714	0.805102005;
+    0.708612491	1.256859155	0.818070438;
+    0.622618845	1.231401008	0.829317079;
+    0.558111266	1.211710888	0.838978357;
+    0.508038611	1.196018952	0.847300431;
+    0.468039614	1.183194753	0.854521307;
+    0.435316653	1.172492397	0.860840992;
+    0.408009282	1.163403374	0.866420017;
+    0.38483862	1.155570329	0.871385499;
+    0.364899122	1.148735192	0.875838068;
+    ]
