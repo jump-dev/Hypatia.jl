@@ -11,7 +11,7 @@ testfuns_few = [
     epinormeucl1,
     epipersquare1,
     epiperexp1,
-    episumperentropy3,
+    episumperentropy1,
     hypoperlog1,
     power1,
     hypogeomean1,

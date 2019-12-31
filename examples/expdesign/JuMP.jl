@@ -123,7 +123,6 @@ function test_expdesignJuMP(instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
     d = instance()
     JuMP.optimize!(d.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
-    @show JuMP.value.(d.model[:np])
     @test JuMP.termination_status(d.model) == MOI.OPTIMAL
     return
 end
