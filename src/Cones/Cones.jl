@@ -71,7 +71,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
 end
 
 function update_hess_fact(cone::Cone{T}) where {T <: Real}
-    @assert !cone.hess_fact_updated
+    cone.hess_fact_updated && return true
     if !cone.hess_updated
         @timeit cone.timer "update_hess" update_hess(cone)
     end
