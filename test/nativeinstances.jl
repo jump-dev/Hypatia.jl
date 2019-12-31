@@ -1452,7 +1452,27 @@ function wsosinterpepinormeucl2(T; options...)
 end
 
 function wsosinterpepinormeucl3(T; options...)
-    @warn("TODO")
+    # max: w'f: 25x^4 >= f(x)^4 + 9x^4 on [-1, 1], soln is +/- 4x^2
+    tol = sqrt(sqrt(eps(T)))
+    DynamicPolynomials.@polyvar x
+    # TODO when calc_w = true works with BigFloat, enable it
+    (U, pts, Ps, _) = MU.interpolate(MU.Box{T}([-one(T)], [one(T)]), 1, sample = false, calc_w = false)
+    w = fill(T(1 / 3), 3)
+    fn1 = 5x^2
+    fn2 = 3x^2
+
+    c = -w
+    A = zeros(T, 0, U)
+    b = T[]
+    G = vcat(spzeros(T, U, U), Diagonal(-one(T) * I, U), spzeros(T, U, U))
+    h = vcat(T[fn1(pts[u, :]...) for u in 1:U], zeros(T, U), T[fn2(pts[u, :]...) for u in 1:U])
+    cones = CO.Cone{T}[CO.WSOSInterpEpiNormEucl{T}(3, U, Ps)]
+
+    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+    @test r.status == :Optimal
+    @test r.primal_obj ≈ -8 / 3 atol=tol rtol=tol
+    fn_sol = 4x^2
+    @test abs2.(r.x) ≈ abs2.([fn_sol(pts[u, :]...) for u in 1:U]) atol=tol rtol=tol
 end
 
 function primalinfeas1(T; options...)
