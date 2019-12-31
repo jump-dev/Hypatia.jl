@@ -97,7 +97,7 @@ function find_initial_x(solver::Solver{T}) where {T <: Real}
     c_sub = model.c[x_keep_idxs]
     @timeit solver.timer "residual" begin
         # yz_sub = AG_fact.Q * vcat((AG_R' \ c_sub), zeros(p + q - AG_rank))
-        yz_sub = zeros(p + q)
+        yz_sub = zeros(T, p + q)
         yz_sub1 = view(yz_sub, 1:AG_rank)
         copyto!(yz_sub1, c_sub)
         ldiv!(AG_R', yz_sub1)
@@ -194,7 +194,7 @@ function find_initial_y(solver::Solver{T}, reducing::Bool) where {T <: Real}
         # some dependent primal equalities, so check if they are consistent
         @timeit solver.timer "residual" begin
             # x_sub = Ap_Q * vcat((Ap_R' \ b_sub), zeros(n - Ap_rank))
-            x_sub = zeros(n)
+            x_sub = zeros(T, n)
             x_sub1 = view(x_sub, 1:Ap_rank)
             copyto!(x_sub1, b_sub)
             ldiv!(Ap_R', x_sub1)
