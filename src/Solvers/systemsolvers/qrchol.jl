@@ -241,9 +241,14 @@ function update_fact(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T
                 load_matrix(system_solver.fact_cache, system_solver.lhs1)
             else
                 system_solver.lhs1 += sqrt(eps(T)) * I # attempt recovery # TODO make more efficient
+                println("here")
             end
             if !update_fact(system_solver.fact_cache, system_solver.lhs1)
                 @warn("QRChol Bunch-Kaufman factorization failed after recovery")
+                system_solver.lhs1 += sqrt(eps(T)) * I # attempt recovery # TODO make more efficient
+                if !update_fact(system_solver.fact_cache, system_solver.lhs1)
+                    @warn("QRChol Bunch-Kaufman factorization failed twice after recovery")
+                end
             end
         end
     end
