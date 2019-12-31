@@ -153,6 +153,7 @@ mutable struct QRCholDenseSystemSolver{T <: Real} <: QRCholSystemSolver{T}
     fact_cache::Union{DensePosDefCache{T}, DenseSymCache{T}} # can use BunchKaufman or Cholesky
     function QRCholDenseSystemSolver{T}(;
         fact_cache::Union{DensePosDefCache{T}, DenseSymCache{T}} = DensePosDefCache{T}(),
+        # fact_cache::Union{DensePosDefCache{T}, DenseSymCache{T}} = DenseSymCache{T}(),
         ) where {T <: Real}
         system_solver = new{T}()
         system_solver.fact_cache = fact_cache # TODO start with cholesky and then switch to BK if numerical issues
@@ -206,18 +207,22 @@ outer_prod(UGQ2::AbstractMatrix{T}, lhs1::AbstractMatrix{T}) where {T <: LinearA
 outer_prod(UGQ2::AbstractMatrix{T}, lhs1::AbstractMatrix{T}) where {T <: Real} = mul!(lhs1, UGQ2', UGQ2, true, true)
 
 function update_fact(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
-    isempty(system_solver.Q2div) && return system_solver
     model = solver.model
 
-    # TODO use dispatch
-    # TODO faster if only do one syrk from the first block of indices and one mul from the second block
-    system_solver.lhs1.data .= 0
-    sqrtmu = sqrt(solver.mu)
-    for (cone_k, prod_k, arr_k) in zip(model.cones, system_solver.HGQ2_k, system_solver.GQ2_k)
-        if hasfield(typeof(cone_k), :hess_fact_cache) && cone_k.hess_fact_cache isa DenseSymCache{T}
-            block_hess_prod(cone_k, prod_k, arr_k, solver.mu)
-            mul!(system_solver.lhs1.data, arr_k', prod_k, true, true)
-        else
+    if !isempty(system_solver.Q2div)
+        # TODO use dispatch
+        # TODO faster if only do one syrk from the first block of indices and one mul from the second block
+        system_solver.lhs1.data .= 0
+        sqrtmu = sqrt(solver.mu)
+        for (cone_k, prod_k, arr_k) in zip(model.cones, system_solver.HGQ2_k, system_solver.GQ2_k)
+            if hasfield(typeof(cone_k), :hess_fact_cache)
+                Cones.update_hess_fact(cone_k)
+                if cone_k.hess_fact_cache isa DenseSymCache{T}
+                    block_hess_prod(cone_k, prod_k, arr_k, solver.mu)
+                    mul!(system_solver.lhs1.data, arr_k', prod_k, true, true)
+                    continue
+                end
+            end
             if Cones.use_dual(cone_k)
                 Cones.inv_hess_sqrt_prod!(prod_k, arr_k, cone_k)
                 prod_k ./= sqrtmu
@@ -227,18 +232,23 @@ function update_fact(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T
             end
             outer_prod(prod_k, system_solver.lhs1.data)
         end
-    end
 
-    if !update_fact(system_solver.fact_cache, system_solver.lhs1)
-        if T <: LinearAlgebra.BlasReal && system_solver.fact_cache isa DensePosDefCache{T}
-            @warn("Switching QRChol solver from Cholesky to Bunch Kaufman")
-            system_solver.fact_cache = DenseSymCache{T}()
-            load_matrix(system_solver.fact_cache, system_solver.lhs1)
-        else
-            system_solver.lhs1 += sqrt(eps(T)) * I # attempt recovery # TODO make more efficient
-        end
         if !update_fact(system_solver.fact_cache, system_solver.lhs1)
-            @warn("QRChol Bunch Kaufman factorization failed")
+            @warn("QRChol factorization failed")
+            if T <: LinearAlgebra.BlasReal && system_solver.fact_cache isa DensePosDefCache{T}
+                @warn("Switching QRChol solver from Cholesky to Bunch Kaufman")
+                system_solver.fact_cache = DenseSymCache{T}()
+                load_matrix(system_solver.fact_cache, system_solver.lhs1)
+            else
+                system_solver.lhs1 += sqrt(eps(T)) * I # attempt recovery # TODO make more efficient
+            end
+            if !update_fact(system_solver.fact_cache, system_solver.lhs1)
+                @warn("QRChol Bunch-Kaufman factorization failed after recovery")
+                system_solver.lhs1 += sqrt(eps(T)) * I # attempt recovery # TODO make more efficient
+                if !update_fact(system_solver.fact_cache, system_solver.lhs1)
+                    @warn("QRChol Bunch-Kaufman factorization failed twice after recovery")
+                end
+            end
         end
     end
 

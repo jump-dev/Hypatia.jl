@@ -71,7 +71,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
 end
 
 function update_hess_fact(cone::Cone{T}) where {T <: Real}
-    @assert !cone.hess_fact_updated
+    cone.hess_fact_updated && return true
     if !cone.hess_updated
         @timeit cone.timer "update_hess" update_hess(cone)
     end
@@ -88,7 +88,7 @@ function update_hess_fact(cone::Cone{T}) where {T <: Real}
         end
         @timeit cone.timer "hess_fact2" fact2_success = update_fact(cone.hess_fact_cache, cone.hess)
         if !fact2_success
-            @warn("Hessian factorization failed after recovery")
+            @warn("Hessian Bunch-Kaufman factorization failed after recovery")
             return false
         end
     end
