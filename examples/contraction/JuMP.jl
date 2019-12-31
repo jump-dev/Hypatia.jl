@@ -59,8 +59,8 @@ function contractionJuMP(
         (U_R, pts_R, Ps_R, _) = MU.interpolate(dom, d_R, sample = true)
         M_gap = [M[i, j](pts_M[u, :]) - (i == j ? delta : 0.0) for i in 1:n for j in 1:i for u in 1:U_M]
         R_gap = [-R[i, j](pts_R[u, :]) - (i == j ? delta : 0.0) for i in 1:n for j in 1:i for u in 1:U_R]
-        JuMP.@constraint(model, MU.vec_to_svec!(M_gap, incr = U_M) in HYP.WSOSInterpPossemidefTriCone(n, U_M, Ps_M))
-        JuMP.@constraint(model, MU.vec_to_svec!(R_gap, incr = U_R) in HYP.WSOSInterpPossemidefTriCone(n, U_R, Ps_R))
+        JuMP.@constraint(model, MU.vec_to_svec!(M_gap, incr = U_M) in HYP.WSOSInterpPosSemidefTriCone(n, U_M, Ps_M))
+        JuMP.@constraint(model, MU.vec_to_svec!(R_gap, incr = U_R) in HYP.WSOSInterpPosSemidefTriCone(n, U_R, Ps_R))
     else
         PJ.setpolymodule!(model, SumOfSquares)
         JuMP.@constraint(model, M - Matrix(delta * I, n, n) in JuMP.PSDCone())
