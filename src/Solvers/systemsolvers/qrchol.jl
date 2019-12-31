@@ -152,8 +152,8 @@ mutable struct QRCholDenseSystemSolver{T <: Real} <: QRCholSystemSolver{T}
     Gx_k
     fact_cache::Union{DensePosDefCache{T}, DenseSymCache{T}} # can use BunchKaufman or Cholesky
     function QRCholDenseSystemSolver{T}(;
-        # fact_cache::Union{DensePosDefCache{T}, DenseSymCache{T}} = DensePosDefCache{T}(),
-        fact_cache::Union{DensePosDefCache{T}, DenseSymCache{T}} = DenseSymCache{T}(),
+        fact_cache::Union{DensePosDefCache{T}, DenseSymCache{T}} = DensePosDefCache{T}(),
+        # fact_cache::Union{DensePosDefCache{T}, DenseSymCache{T}} = DenseSymCache{T}(),
         ) where {T <: Real}
         system_solver = new{T}()
         system_solver.fact_cache = fact_cache # TODO start with cholesky and then switch to BK if numerical issues
@@ -215,19 +215,22 @@ function update_fact(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T
         system_solver.lhs1.data .= 0
         sqrtmu = sqrt(solver.mu)
         for (cone_k, prod_k, arr_k) in zip(model.cones, system_solver.HGQ2_k, system_solver.GQ2_k)
-            if hasfield(typeof(cone_k), :hess_fact_cache) && cone_k.hess_fact_cache isa DenseSymCache{T}
-                block_hess_prod(cone_k, prod_k, arr_k, solver.mu)
-                mul!(system_solver.lhs1.data, arr_k', prod_k, true, true)
-            else
-                if Cones.use_dual(cone_k)
-                    Cones.inv_hess_sqrt_prod!(prod_k, arr_k, cone_k)
-                    prod_k ./= sqrtmu
-                else
-                    Cones.hess_sqrt_prod!(prod_k, arr_k, cone_k)
-                    prod_k .*= sqrtmu
+            if hasfield(typeof(cone_k), :hess_fact_cache)
+                Cones.update_hess_fact(cone_k)
+                if cone_k.hess_fact_cache isa DenseSymCache{T}
+                    block_hess_prod(cone_k, prod_k, arr_k, solver.mu)
+                    mul!(system_solver.lhs1.data, arr_k', prod_k, true, true)
+                    continue
                 end
-                outer_prod(prod_k, system_solver.lhs1.data)
             end
+            if Cones.use_dual(cone_k)
+                Cones.inv_hess_sqrt_prod!(prod_k, arr_k, cone_k)
+                prod_k ./= sqrtmu
+            else
+                Cones.hess_sqrt_prod!(prod_k, arr_k, cone_k)
+                prod_k .*= sqrtmu
+            end
+            outer_prod(prod_k, system_solver.lhs1.data)
         end
 
         if !update_fact(system_solver.fact_cache, system_solver.lhs1)
