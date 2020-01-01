@@ -92,7 +92,7 @@ struct PowerCone{T <: Real} <: MOI.AbstractVectorSet
     is_dual::Bool
 end
 PowerCone{T}(alpha::Vector{T}, n::Int) where {T <: Real} = PowerCone{T}(alpha, n, false)
-MOI.dimension(cone::PowerCone) = cone.dim
+MOI.dimension(cone::PowerCone) = length(cone.alpha) + cone.n
 cone_from_moi(::Type{T}, s::PowerCone{T}) where {T <: Real} = Cones.Power{T}(s.alpha, s.n, s.is_dual)
 
 export HypoPerLogCone
@@ -137,7 +137,8 @@ struct EpiNormSpectralCone{T <: Real, R <: RealOrComplex{T}} <: MOI.AbstractVect
     is_dual::Bool
 end
 EpiNormSpectralCone{T, R}(n::Int, m::Int) where {R <: RealOrComplex{T}} where {T <: Real} = EpiNormSpectralCone{T, R}(n, m, false)
-MOI.dimension(cone::EpiNormSpectralCone) = 1 + cone.n * cone.m
+MOI.dimension(cone::EpiNormSpectralCone{T, T} where {T <: Real}) = 1 + cone.n * cone.m
+MOI.dimension(cone::EpiNormSpectralCone{T, Complex{T}} where {T <: Real}) = 1 + 2 * cone.n * cone.m
 cone_from_moi(::Type{T}, s::EpiNormSpectralCone{T, R}) where {R <: RealOrComplex{T}} where {T <: Real} = Cones.EpiNormSpectral{T, R}(s.n, s.m, s.is_dual)
 
 export MatrixEpiPerSquareCone
@@ -153,40 +154,38 @@ cone_from_moi(::Type{T}, s::MatrixEpiPerSquareCone{T, R}) where {R <: RealOrComp
 
 export LinMatrixIneqCone
 struct LinMatrixIneqCone{T <: Real} <: MOI.AbstractVectorSet
-    As::Vector{LinearAlgebra.HermOrSym{R, Matrix{R}} where {R <: RealOrComplex{T}}}
+    As::Vector
     is_dual::Bool
 end
-LinMatrixIneqCone(As::Vector{LinearAlgebra.HermOrSym{R, Matrix{R}} where {R <: RealOrComplex{T}}}) where {T <: Real} = LinMatrixIneqCone{T}(As, false)
+LinMatrixIneqCone{T}(As::Vector) where {T <: Real} = LinMatrixIneqCone{T}(As, false)
 MOI.dimension(cone::LinMatrixIneqCone) = length(cone.As)
 cone_from_moi(::Type{T}, s::LinMatrixIneqCone{T}) where {T <: Real} = Cones.LinMatrixIneq{T}(s.As, s.is_dual)
 
 export PosSemidefTriCone
 struct PosSemidefTriCone{T <: Real, R <: RealOrComplex{T}} <: MOI.AbstractVectorSet
-    side::Int
+    dim::Int
 end
-MOI.dimension(cone::PosSemidefTriCone{T, T} where {T <: Real}) = Cones.svec_length(cone.side)
-MOI.dimension(cone::PosSemidefTriCone{T, Complex{T}} where {T <: Real}) = cone.side ^ 2
-cone_from_moi(::Type{T}, s::PosSemidefTriCone{T, R}) where {R <: RealOrComplex{T}} where {T <: Real} = Cones.PosSemidefTri{T, R}(s.side)
+MOI.dimension(cone::PosSemidefTriCone{T, T} where {T <: Real}) = cone.dim
+MOI.dimension(cone::PosSemidefTriCone{T, Complex{T}} where {T <: Real}) = cone.dim
+cone_from_moi(::Type{T}, s::PosSemidefTriCone{T, R}) where {R <: RealOrComplex{T}} where {T <: Real} = Cones.PosSemidefTri{T, R}(s.dim)
 
 export HypoPerLogdetTriCone
 struct HypoPerLogdetTriCone{T <: Real, R <: RealOrComplex{T}} <: MOI.AbstractVectorSet
-    side::Int
+    dim::Int
     is_dual::Bool
 end
-HypoPerLogdetTriCone{T, R}(side::Int) where {R <: RealOrComplex{T}} where {T <: Real} = HypoPerLogdetTriCone{T, R}(side, false)
-MOI.dimension(cone::HypoPerLogdetTriCone{T, T} where {T <: Real}) = 2 + Cones.svec_length(cone.side)
-MOI.dimension(cone::HypoPerLogdetTriCone{T, Complex{T}} where {T <: Real}) = 2 + cone.side ^ 2
-cone_from_moi(::Type{T}, s::HypoPerLogdetTriCone{T, R}) where {R <: RealOrComplex{T}} where {T <: Real} = Cones.HypoPerLogdetTri{T, R}(s.side, cone.is_dual)
+HypoPerLogdetTriCone{T, R}(dim::Int) where {R <: RealOrComplex{T}} where {T <: Real} = HypoPerLogdetTriCone{T, R}(dim, false)
+MOI.dimension(cone::HypoPerLogdetTriCone) = cone.dim
+cone_from_moi(::Type{T}, s::HypoPerLogdetTriCone{T, R}) where {R <: RealOrComplex{T}} where {T <: Real} = Cones.HypoPerLogdetTri{T, R}(s.dim, s.is_dual)
 
 export HypoRootdetTriCone
 struct HypoRootdetTriCone{T <: Real, R <: RealOrComplex{T}} <: MOI.AbstractVectorSet
-    side::Int
+    dim::Int
     is_dual::Bool
 end
-HypoRootdetTriCone{T, R}(side::Int) where {R <: RealOrComplex{T}} where {T <: Real} = HypoRootdetTriCone{T, R}(side, false)
-MOI.dimension(cone::HypoRootdetTriCone{T, T} where {T <: Real}) = 1 + Cones.svec_length(cone.side)
-MOI.dimension(cone::HypoRootdetTriCone{T, Complex{T}} where {T <: Real}) = 1 + cone.side ^ 2
-cone_from_moi(::Type{T}, s::HypoRootdetTriCone{T, R}) where {R <: RealOrComplex{T}} where {T <: Real} = Cones.HypoRootdetTri{T, R}(s.side, cone.is_dual)
+HypoRootdetTriCone{T, R}(dim::Int) where {R <: RealOrComplex{T}} where {T <: Real} = HypoRootdetTriCone{T, R}(dim, false)
+MOI.dimension(cone::HypoRootdetTriCone where {T <: Real}) = cone.dim
+cone_from_moi(::Type{T}, s::HypoRootdetTriCone{T, R}) where {R <: RealOrComplex{T}} where {T <: Real} = Cones.HypoRootdetTri{T, R}(s.dim, s.is_dual)
 
 export WSOSInterpNonnegativeCone
 struct WSOSInterpNonnegativeCone{T <: Real, R <: RealOrComplex{T}} <: MOI.AbstractVectorSet
@@ -196,7 +195,7 @@ struct WSOSInterpNonnegativeCone{T <: Real, R <: RealOrComplex{T}} <: MOI.Abstra
 end
 WSOSInterpNonnegativeCone{T, R}(U::Int, Ps::Vector{Matrix{R}}) where {R <: RealOrComplex{T}} where {T <: Real} = WSOSInterpNonnegativeCone{T, R}(U, Ps, false)
 MOI.dimension(cone::WSOSInterpNonnegativeCone) = cone.U
-cone_from_moi(::Type{T}, s::WSOSInterpNonnegativeCone{T}) where {T <: Real} = Cones.WSOSInterpNonnegative{T, T}(s.U, s.Ps, s.is_dual)
+cone_from_moi(::Type{T}, s::WSOSInterpNonnegativeCone{T, R}) where {R <: RealOrComplex{T}} where {T <: Real} = Cones.WSOSInterpNonnegative{T, R}(s.U, s.Ps, s.is_dual)
 
 export WSOSInterpPosSemidefTriCone
 struct WSOSInterpPosSemidefTriCone{T <: Real} <: MOI.AbstractVectorSet
@@ -206,7 +205,7 @@ struct WSOSInterpPosSemidefTriCone{T <: Real} <: MOI.AbstractVectorSet
     is_dual::Bool
 end
 WSOSInterpPosSemidefTriCone{T}(R::Int, U::Int, Ps::Vector{Matrix{T}}) where {T <: Real} = WSOSInterpPosSemidefTriCone{T}(R, U, Ps, false)
-MOI.dimension(cone::WSOSInterpPosSemidefTriCone) = U * Cones.svec_length(R)
+MOI.dimension(cone::WSOSInterpPosSemidefTriCone) = cone.U * Cones.svec_length(cone.R)
 cone_from_moi(::Type{T}, s::WSOSInterpPosSemidefTriCone{T}) where {T <: Real} = Cones.WSOSInterpPosSemidefTri{T}(s.R, s.U, s.Ps, s.is_dual)
 
 export WSOSInterpEpiNormEuclCone
@@ -217,7 +216,7 @@ struct WSOSInterpEpiNormEuclCone{T <: Real} <: MOI.AbstractVectorSet
     is_dual::Bool
 end
 WSOSInterpEpiNormEuclCone{T}(R::Int, U::Int, Ps::Vector{Matrix{T}}) where {T <: Real} = WSOSInterpEpiNormEuclCone{T}(R, U, Ps, false)
-MOI.dimension(cone::WSOSInterpEpiNormEuclCone) = U * R
+MOI.dimension(cone::WSOSInterpEpiNormEuclCone) = cone.U * cone.R
 cone_from_moi(::Type{T}, s::WSOSInterpEpiNormEuclCone{T}) where {T <: Real} = Cones.WSOSInterpEpiNormEucl{T}(s.R, s.U, s.Ps, s.is_dual)
 
 # all cones
