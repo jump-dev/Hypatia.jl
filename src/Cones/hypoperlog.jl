@@ -124,20 +124,20 @@ function update_hess(cone::HypoPerLog)
 end
 
 # see analysis in https://github.com/lkapelevich/HypatiaBenchmarks.jl/tree/master/centralpoints
-function get_central_ray_hypoperlog(wdim::Int)
-    if wdim <= 10
+function get_central_ray_hypoperlog(w_dim::Int)
+    if w_dim <= 10
         # lookup points where x = f'(x)
-        return central_rays_hypoperlog[wdim, :]
+        return central_rays_hypoperlog[w_dim, :]
     end
     # use nonlinear fit for higher dimensions
-    if wdim <= 70
-        u = -2.647364 / wdim - 0.008411
-        v = 0.424679 / wdim + 0.553392
-        w = 0.760415 / wdim + 1.001795
+    if w_dim <= 70
+        u = -2.647364 / w_dim - 0.008411
+        v = 0.424679 / w_dim + 0.553392
+        w = 0.760415 / w_dim + 1.001795
     else
-        u = -3.016339 / wdim - 0.000078
-        v = 0.394332 / wdim + 0.553963
-        w = 0.838584 / wdim + 1.000016
+        u = -3.016339 / w_dim - 0.000078
+        v = 0.394332 / w_dim + 0.553963
+        w = 0.838584 / w_dim + 1.000016
     end
     return [u, v, w]
 end
