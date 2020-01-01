@@ -45,8 +45,7 @@ mutable struct Power{T <: Real} <: Cone{T}
         dim = length(alpha) + n
         @assert dim >= 3
         @assert all(ai > 0 for ai in alpha)
-        tol = 1000 * eps(T)
-        @assert sum(alpha) ≈ 1 atol=tol rtol=tol
+        @assert sum(alpha) ≈ 1
         cone = new{T}()
         cone.n = n
         cone.use_dual = is_dual
@@ -58,6 +57,8 @@ mutable struct Power{T <: Real} <: Cone{T}
 end
 
 Power{T}(alpha::Vector{T}, n::Int) where {T <: Real} = Power{T}(alpha, n, false)
+
+dimension(cone::Power) = length(cone.alpha) + cone.n
 
 # TODO only allocate the fields we use
 function setup_data(cone::Power{T}) where {T <: Real}

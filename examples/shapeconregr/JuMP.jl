@@ -85,7 +85,7 @@ function shapeconregrJuMP(
         if !iszero(conv_profile)
             hessian_halfdeg = div(deg - 1, 2)
             (conv_U, conv_points, conv_Ps, _) = MU.interpolate(conv_dom, hessian_halfdeg, sample = sample, sample_factor = 50)
-            conv_wsos_cone = HYP.WSOSInterpPossemidefTriCone(n, conv_U, conv_Ps)
+            conv_wsos_cone = HYP.WSOSInterpPosSemidefTriCone(n, conv_U, conv_Ps)
             hessian = DP.differentiate(regressor, DP.variables(regressor), 2)
             hessian_interp = [hessian[i, j](conv_points[u, :]) for i in 1:n for j in 1:i for u in 1:conv_U]
             JuMP.@constraint(model, conv_profile * MU.vec_to_svec!(hessian_interp, incr = conv_U) in conv_wsos_cone)

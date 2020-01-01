@@ -40,7 +40,7 @@ function muconvexityJuMP(
     if use_wsos
         d = div(maximum(DP.maxdegree.(H)) + 1, 2)
         (U, pts, Ps, _) = MU.interpolate(dom, d, sample = true, sample_factor = 100)
-        mat_wsos_cone = HYP.WSOSInterpPossemidefTriCone(n, U, Ps)
+        mat_wsos_cone = HYP.WSOSInterpPosSemidefTriCone(n, U, Ps)
         H_interp = [H[i, j](x => pts[u, :]) for i in 1:n for j in 1:i for u in 1:U]
         JuMP.@constraint(model, MU.vec_to_svec!(H_interp, incr = U) in mat_wsos_cone)
     else

@@ -39,8 +39,7 @@ mutable struct HypoGeomean{T <: Real} <: Cone{T}
         dim = length(alpha) + 1
         @assert dim >= 2
         @assert all(ai > 0 for ai in alpha)
-        tol = 1e3 * eps(T)
-        @assert sum(alpha) ≈ 1 atol=tol rtol=tol
+        @assert sum(alpha) ≈ 1
         cone = new{T}()
         cone.use_dual = is_dual
         cone.dim = dim
