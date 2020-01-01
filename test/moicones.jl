@@ -13,6 +13,112 @@ const HYP = Hypatia
 const CO = HYP.Cones
 
 function test_moi_cones(T::Type{<:Real})
+    # MOI predefined cones
+
+    @testset "NormInfinityCone" begin
+        moi_cone = MOI.NormInfinityCone(3)
+        hyp_cone = HYP.cone_from_moi(T, moi_cone)
+        @test hyp_cone isa CO.EpiNormInf{T, T}
+        @test MOI.dimension(moi_cone) == CO.dimension(hyp_cone) == 3
+        @test !CO.use_dual(hyp_cone)
+    end
+
+    @testset "NormOneCone" begin
+        moi_cone = MOI.NormOneCone(3)
+        hyp_cone = HYP.cone_from_moi(T, moi_cone)
+        @test hyp_cone isa CO.EpiNormInf{T, T}
+        @test MOI.dimension(moi_cone) == CO.dimension(hyp_cone) == 3
+        @test CO.use_dual(hyp_cone)
+    end
+
+    @testset "SecondOrderCone" begin
+        moi_cone = MOI.SecondOrderCone(3)
+        hyp_cone = HYP.cone_from_moi(T, moi_cone)
+        @test hyp_cone isa CO.EpiNormEucl{T}
+        @test MOI.dimension(moi_cone) == CO.dimension(hyp_cone) == 3
+        @test !CO.use_dual(hyp_cone)
+    end
+
+    @testset "RotatedSecondOrderCone" begin
+        moi_cone = MOI.RotatedSecondOrderCone(3)
+        hyp_cone = HYP.cone_from_moi(T, moi_cone)
+        @test hyp_cone isa CO.EpiPerSquare{T}
+        @test MOI.dimension(moi_cone) == CO.dimension(hyp_cone) == 3
+        @test !CO.use_dual(hyp_cone)
+    end
+
+    @testset "ExponentialCone" begin
+        moi_cone = MOI.ExponentialCone()
+        hyp_cone = HYP.cone_from_moi(T, moi_cone)
+        @test hyp_cone isa CO.HypoPerLog{T}
+        @test MOI.dimension(moi_cone) == CO.dimension(hyp_cone) == 3
+        @test !CO.use_dual(hyp_cone)
+    end
+
+    @testset "DualExponentialCone" begin
+        moi_cone = MOI.DualExponentialCone()
+        hyp_cone = HYP.cone_from_moi(T, moi_cone)
+        @test hyp_cone isa CO.HypoPerLog{T}
+        @test MOI.dimension(moi_cone) == CO.dimension(hyp_cone) == 3
+        @test CO.use_dual(hyp_cone)
+    end
+
+    @testset "PowerCone" begin
+        iT5 = inv(T(5))
+        moi_cone = MOI.PowerCone{T}(iT5)
+        hyp_cone = HYP.cone_from_moi(T, moi_cone)
+        @test hyp_cone isa CO.Power{T}
+        @test MOI.dimension(moi_cone) == CO.dimension(hyp_cone) == 3
+        @test !CO.use_dual(hyp_cone)
+        @test hyp_cone.alpha == T[iT5, 1 - iT5]
+    end
+
+    @testset "DualPowerCone" begin
+        iT5 = inv(T(5))
+        moi_cone = MOI.DualPowerCone{T}(iT5)
+        hyp_cone = HYP.cone_from_moi(T, moi_cone)
+        @test hyp_cone isa CO.Power{T}
+        @test MOI.dimension(moi_cone) == CO.dimension(hyp_cone) == 3
+        @test CO.use_dual(hyp_cone)
+        @test hyp_cone.alpha == T[iT5, 1 - iT5]
+    end
+
+    @testset "GeometricMeanCone" begin
+        moi_cone = MOI.GeometricMeanCone(3)
+        hyp_cone = HYP.cone_from_moi(T, moi_cone)
+        @test hyp_cone isa CO.HypoGeomean{T}
+        @test MOI.dimension(moi_cone) == CO.dimension(hyp_cone) == 3
+        @test !CO.use_dual(hyp_cone)
+        iT2 = inv(T(2))
+        @test hyp_cone.alpha == T[iT2, iT2]
+    end
+
+    @testset "PositiveSemidefiniteConeTriangle" begin
+        moi_cone = MOI.PositiveSemidefiniteConeTriangle(3)
+        hyp_cone = HYP.cone_from_moi(T, moi_cone)
+        @test hyp_cone isa CO.PosSemidefTri{T, T}
+        @test MOI.dimension(moi_cone) == CO.dimension(hyp_cone) == 6
+        @test !CO.use_dual(hyp_cone)
+    end
+
+    @testset "LogDetConeTriangle" begin
+        moi_cone = MOI.LogDetConeTriangle(3)
+        hyp_cone = HYP.cone_from_moi(T, moi_cone)
+        @test hyp_cone isa CO.HypoPerLogdetTri{T, T}
+        @test MOI.dimension(moi_cone) == CO.dimension(hyp_cone) == 8
+        @test !CO.use_dual(hyp_cone)
+    end
+
+    @testset "RootDetConeTriangle" begin
+        moi_cone = MOI.RootDetConeTriangle(3)
+        hyp_cone = HYP.cone_from_moi(T, moi_cone)
+        @test hyp_cone isa CO.HypoRootdetTri{T, T}
+        @test MOI.dimension(moi_cone) == CO.dimension(hyp_cone) == 7
+        @test !CO.use_dual(hyp_cone)
+    end
+
+    # Hypatia predefined cones
+
     @testset "Nonnegative" begin
         moi_cone = HYP.NonnegativeCone{T}(3)
         hyp_cone = HYP.cone_from_moi(T, moi_cone)
