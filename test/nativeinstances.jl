@@ -1159,7 +1159,9 @@ function possemideftri8(T; options...)
     @test r.status == :Optimal
     rt6 = sqrt(T(6))
     @test r.primal_obj ≈ rt6 atol=tol rtol=tol
-    @test r.s ≈ [rt6, 0, rt6, 0, 0, rt6, rt2, rt2, rt2, rt6, rt2, rt2, rt2, 0, rt6] atol=tol rtol=tol
+    @test r.s[[1, 3, 6, 10, 15]] ≈ fill(rt6, 5) atol=tol rtol=tol
+    @test r.s[[2, 4, 5]] ≈ zeros(3) atol=tol rtol=tol
+    @test r.s[[7, 8, 9, 11, 12, 13]] ≈ fill(rt2, 6) atol=tol rtol=tol
     @test r.z[[1, 3, 6]] ≈ fill(inv(T(6)), 3) atol=tol rtol=tol
     @test r.z[[10, 15]] ≈ fill(inv(T(4)), 2) atol=tol rtol=tol
     @test r.z[[7, 8, 9, 11, 12, 13]] ≈ fill(-inv(rt2 * rt6), 6) atol=tol rtol=tol
@@ -1184,8 +1186,6 @@ function possemideftri9(T; options...)
     r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
     @test r.status == :Optimal
     rt6 = sqrt(T(6))
-    @show r.s
-    @show r.z
     @test r.primal_obj ≈ rt6 atol=tol rtol=tol
     @test r.s[1] ≈ 0 atol=tol rtol=tol
     @test r.s[15] ≈ rt6 / rt2 atol=tol rtol=tol
