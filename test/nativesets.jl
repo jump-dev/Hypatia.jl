@@ -74,6 +74,7 @@ testfuns_many = [
     epinormspectral1,
     epinormspectral2,
     epinormspectral3,
+    epinormspectral4,
     matrixepipersquare1,
     matrixepipersquare2,
     matrixepipersquare3,
