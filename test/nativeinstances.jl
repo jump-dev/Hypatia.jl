@@ -821,6 +821,26 @@ function epinormspectral3(T; options...)
     end
 end
 
+function epinormspectral4(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    c = T[1]
+    A = zeros(T, 0, 1)
+    b = T[]
+    G = zeros(T, 7, 1)
+    G[1, 1] = -1
+    h = ones(T, 7)
+    h[1] = 0
+    cones = CO.Cone{T}[CO.EpiNormSpectral{T, T}(2, 3)]
+
+    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+    @test r.status == :Optimal
+    rt6 = sqrt(T(6))
+    @test r.primal_obj ≈ rt6 atol=tol rtol=tol
+    @test r.s[1] ≈ rt6 atol=tol rtol=tol
+    @test r.z[1] ≈ 1 atol=tol rtol=tol
+    @test r.z[2:end] ≈ fill(-inv(rt6), 6) atol=tol rtol=tol
+end
+
 function matrixepipersquare1(T; options...)
     tol = sqrt(sqrt(eps(T)))
     Random.seed!(1)
