@@ -88,6 +88,8 @@ testfuns_many = [
     possemideftri5,
     possemideftri6,
     possemideftri7,
+    possemideftri8,
+    possemideftri9,
     hypoperlogdettri1,
     hypoperlogdettri2,
     hypoperlogdettri3,
