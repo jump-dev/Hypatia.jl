@@ -830,15 +830,21 @@ function epinormspectral4(T; options...)
     G[1, 1] = -1
     h = ones(T, 7)
     h[1] = 0
-    cones = CO.Cone{T}[CO.EpiNormSpectral{T, T}(2, 3)]
 
-    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
-    @test r.status == :Optimal
-    rt6 = sqrt(T(6))
-    @test r.primal_obj ≈ rt6 atol=tol rtol=tol
-    @test r.s[1] ≈ rt6 atol=tol rtol=tol
-    @test r.z[1] ≈ 1 atol=tol rtol=tol
-    @test r.z[2:end] ≈ fill(-inv(rt6), 6) atol=tol rtol=tol
+    for is_dual in (true, false)
+        cones = CO.Cone{T}[CO.EpiNormSpectral{T, T}(2, 3, is_dual)]
+        r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+        @test r.status == :Optimal
+        rt6 = sqrt(T(6))
+        @test r.primal_obj ≈ rt6 atol=tol rtol=tol
+        @test r.s[1] ≈ rt6 atol=tol rtol=tol
+        @test r.z[1] ≈ 1 atol=tol rtol=tol
+        if is_dual
+            @test sum(r.z[2:end]) ≈ -rt6 atol=tol rtol=tol
+        else
+            @test r.z[2:end] ≈ fill(-inv(rt6), 6) atol=tol rtol=tol
+        end
+    end
 end
 
 function matrixepipersquare1(T; options...)
@@ -1135,6 +1141,62 @@ function possemideftri7(T; options...)
     @test r.status == :Optimal
     eig_max = maximum(eigvals(rand_mat))
     @test r.primal_obj ≈ -eig_max atol=tol rtol=tol
+end
+
+function possemideftri8(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    rt2 = sqrt(T(2))
+    c = T[1]
+    A = zeros(T, 0, 1)
+    b = T[]
+    G = zeros(T, 15, 1)
+    G[[1, 3, 6, 10, 15]] .= -1
+    h = zeros(T, 15)
+    h[[7, 8, 9, 11, 12, 13]] .= rt2
+    cones = CO.Cone{T}[CO.PosSemidefTri{T, T}(15)]
+
+    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+    @test r.status == :Optimal
+    rt6 = sqrt(T(6))
+    @test r.primal_obj ≈ rt6 atol=tol rtol=tol
+    @test r.s[[1, 3, 6, 10, 15]] ≈ fill(rt6, 5) atol=tol rtol=tol
+    @test r.s[[2, 4, 5]] ≈ zeros(3) atol=tol rtol=tol
+    @test r.s[[7, 8, 9, 11, 12, 13]] ≈ fill(rt2, 6) atol=tol rtol=tol
+    @test r.z[[1, 3, 6]] ≈ fill(inv(T(6)), 3) atol=tol rtol=tol
+    @test r.z[[10, 15]] ≈ fill(inv(T(4)), 2) atol=tol rtol=tol
+    @test r.z[[7, 8, 9, 11, 12, 13]] ≈ fill(-inv(rt2 * rt6), 6) atol=tol rtol=tol
+end
+
+function possemideftri9(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    rt2 = sqrt(T(2))
+    inv2 = inv(T(2))
+    c = vcat(one(T), zeros(T, 9))
+    A = zeros(T, 0, 10)
+    b = T[]
+    G = vcat(T[-1, inv2, 0, inv2, 0, 0, inv2, inv2, 0, inv2]', zeros(T, 15, 10))
+    G[2, 2] = G[4, 4] = G[7, 7] = -1
+    G[3, 3] = G[5, 5] = G[6, 6] = -rt2
+    G[11, 8] = G[16, 10] = -1
+    G[15, 9] = -rt2
+    h = zeros(T, 16)
+    h[[8, 9, 10, 12, 13, 14]] .= rt2
+    cones = CO.Cone{T}[CO.Nonnegative{T}(1), CO.PosSemidefTri{T, T}(15)]
+
+    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+    @test r.status == :Optimal
+    rt6 = sqrt(T(6))
+    @test r.primal_obj ≈ rt6 atol=tol rtol=tol
+    @test r.s[1] ≈ 0 atol=tol rtol=tol
+    @test r.s[15] ≈ rt6 / rt2 atol=tol rtol=tol
+    @test r.s[[2, 4, 7]] ≈ fill(rt6 / 3, 3) atol=tol rtol=tol
+    @test r.s[[11, 16]] ≈ fill(rt6 / 2, 2) atol=tol rtol=tol
+    @test r.s[[3, 5, 6]] ≈ fill(2 * rt2 / rt6, 3) atol=tol rtol=tol
+    @test r.s[[8, 9, 10, 12, 13, 14]] ≈ fill(rt2, 6) atol=tol rtol=tol
+    @test r.z[1] ≈ 1 atol=tol rtol=tol
+    @test r.z[[2, 4, 7, 11, 16]] ≈ fill(inv2, 5) atol=tol rtol=tol
+    @test r.z[[3, 5, 6, 15]] ≈ zeros(T, 4) atol=tol rtol=tol
+    @test r.z[[8, 9, 10, 12, 13, 14]] ≈ fill(-inv(rt2 * rt6), 6) atol=tol rtol=tol
 end
 
 function hypoperlogdettri1(T; options...)
