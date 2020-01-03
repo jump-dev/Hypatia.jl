@@ -10,6 +10,7 @@ P, -tI] in S_-
 
 TODO use triangle cone?
 figure out how to ensure problem is feasible so we can test
+move cone_dim and svec_to_smat to MU from Cones?
 =#
 
 using LinearAlgebra
@@ -19,9 +20,10 @@ import MathOptInterface
 const MOI = MathOptInterface
 import JuMP
 import Hypatia
+const MU = Hypatia.ModelUtilities
 
-function lyapunov(
-    side::Int,
+function lyapunovJuMP(
+    side::Int;
     use_matrixepipersquare::Bool = true,
     )
     A = randn(side, side)
@@ -33,16 +35,21 @@ function lyapunov(
     JuMP.@variable(model, P[1:side, 1:side], Symmetric)
     JuMP.@variable(model, t)
     U = A' * P .+ P * A .+ alpha * P .+ t * gamma ^ 2
-    JuMP.@constraints(model, begin
-        P - I in JuMP.PSDCone()
-        vcat(vec(-U), t, vec(-P)) in Hypatia.MatrixEpiPerSquareCone{Float64, Float64}(side, side)
-    end)
+    JuMP.@constraint(model, P - I in JuMP.PSDCone())
+    if use_matrixepipersquare
+        U_vec = [U[i, j] for i in 1:side for j in 1:i]
+        MU.vec_to_svec!(U_vec)
+        JuMP.@constraint(model, vcat(-U_vec, t, vec(-P)) in Hypatia.MatrixEpiPerSquareCone{Float64, Float64}(side, side))
+    else
+        JuMP.@constraint(model, [-U -P; -P t .* Matrix{Float64}(I, side, side)] in JuMP.PSDCone())
+    end
     JuMP.@objective(model, Min, 0)
 
     return (model = model,)
 end
 
-lyapunovJuMP1() = lyapunovJuMP(10, 20)
+lyapunovJuMP1() = lyapunovJuMP(10, use_matrixepipersquare = true)
+lyapunovJuMP2() = lyapunovJuMP(10, use_matrixepipersquare = false)
 
 function test_lyapunovJuMP(instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
@@ -55,8 +62,10 @@ end
 
 test_expdesignJuMP_all(; options...) = test_lyapunovJuMP.([
     lyapunovJuMP1,
+    lyapunovJuMP2,
     ], options = options)
 
 test_lyapunovJuMP(; options...) = test_lyapunovJuMP.([
     lyapunovJuMP1,
+    lyapunovJuMP2,
     ], options = options)
