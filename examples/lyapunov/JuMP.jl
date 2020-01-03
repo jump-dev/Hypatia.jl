@@ -9,8 +9,8 @@ P - I in S_+
 P, -tI] in S_-
 
 TODO use triangle cone?
-figure out how to ensure problem is feasible so we can test
-move cone_dim and svec_to_smat to MU from Cones?
+figure out how to ensure problem is feasible without example being trivial
+
 =#
 
 using LinearAlgebra
@@ -27,13 +27,13 @@ function lyapunovJuMP(
     use_matrixepipersquare::Bool = true,
     )
     A = randn(side, side)
-    alpha = rand()
-    gamma = rand()
-    cone_dim = div(side * (side + 1), 2)
+    A = -A * A' - I
+    alpha = 0
+    gamma = 0
 
     model = JuMP.Model()
     JuMP.@variable(model, P[1:side, 1:side], Symmetric)
-    JuMP.@variable(model, t)
+    JuMP.@variable(model, t >= 0)
     U = A' * P .+ P * A .+ alpha * P .+ t * gamma ^ 2
     JuMP.@constraint(model, P - I in JuMP.PSDCone())
     if use_matrixepipersquare
@@ -43,9 +43,9 @@ function lyapunovJuMP(
     else
         JuMP.@constraint(model, [-U -P; -P t .* Matrix{Float64}(I, side, side)] in JuMP.PSDCone())
     end
-    JuMP.@objective(model, Min, 0)
+    JuMP.@objective(model, Min, t)
 
-    return (model = model,)
+    return (model = model, U = U)
 end
 
 lyapunovJuMP1() = lyapunovJuMP(10, use_matrixepipersquare = true)
@@ -57,6 +57,7 @@ function test_lyapunovJuMP(instance::Function; options, rseed::Int = 1)
     JuMP.set_optimizer(d.model, Hypatia.Optimizer)
     JuMP.optimize!(d.model,)
     @test JuMP.termination_status(d.model) == MOI.OPTIMAL
+    @show JuMP.value.(d.U)
     return
 end
 
