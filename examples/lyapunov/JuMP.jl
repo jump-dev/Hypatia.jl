@@ -39,7 +39,7 @@ function lyapunovJuMP(
     if use_matrixepipersquare
         U_vec = [U[i, j] for i in 1:side for j in 1:i]
         MU.vec_to_svec!(U_vec)
-        JuMP.@constraint(model, vcat(-U_vec, t, vec(-P)) in Hypatia.MatrixEpiPerSquareCone{Float64, Float64}(side, side))
+        JuMP.@constraint(model, vcat(-U_vec, t / 2, vec(-P)) in Hypatia.MatrixEpiPerSquareCone{Float64, Float64}(side, side))
     else
         JuMP.@constraint(model, [-U -P; -P t .* Matrix{Float64}(I, side, side)] in JuMP.PSDCone())
     end
@@ -48,8 +48,12 @@ function lyapunovJuMP(
     return (model = model, U = U)
 end
 
-lyapunovJuMP1() = lyapunovJuMP(10, use_matrixepipersquare = true)
-lyapunovJuMP2() = lyapunovJuMP(10, use_matrixepipersquare = false)
+lyapunovJuMP1() = lyapunovJuMP(5, use_matrixepipersquare = true)
+lyapunovJuMP2() = lyapunovJuMP(5, use_matrixepipersquare = false)
+lyapunovJuMP3() = lyapunovJuMP(10, use_matrixepipersquare = true)
+lyapunovJuMP4() = lyapunovJuMP(10, use_matrixepipersquare = false)
+lyapunovJuMP5() = lyapunovJuMP(25, use_matrixepipersquare = true)
+lyapunovJuMP6() = lyapunovJuMP(25, use_matrixepipersquare = false)
 
 function test_lyapunovJuMP(instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
@@ -57,13 +61,16 @@ function test_lyapunovJuMP(instance::Function; options, rseed::Int = 1)
     JuMP.set_optimizer(d.model, Hypatia.Optimizer)
     JuMP.optimize!(d.model,)
     @test JuMP.termination_status(d.model) == MOI.OPTIMAL
-    @show JuMP.value.(d.U)
     return
 end
 
-test_expdesignJuMP_all(; options...) = test_lyapunovJuMP.([
+test_lyapunovJuMP_all(; options...) = test_lyapunovJuMP.([
     lyapunovJuMP1,
     lyapunovJuMP2,
+    lyapunovJuMP3,
+    lyapunovJuMP4,
+    lyapunovJuMP5,
+    lyapunovJuMP6,
     ], options = options)
 
 test_lyapunovJuMP(; options...) = test_lyapunovJuMP.([
