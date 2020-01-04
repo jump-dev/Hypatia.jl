@@ -48,7 +48,7 @@ function densityestJuMP(
         JuMP.@variable(model, f, PolyJuMP.Poly(PX))
         JuMP.@constraints(model, begin
             sum(w[i] * f(pts[i, :]) for i in 1:U) == 1.0 # integrate to 1
-            [f(pts[i, :]) for i in 1:U] in HYP.WSOSInterpNonnegativeCone(U, Ps) # density nonnegative
+            [f(pts[i, :]) for i in 1:U] in HYP.WSOSInterpNonnegativeCone{Float64, Float64}(U, Ps) # density nonnegative
             [i in 1:nobs], vcat(z[i], 1.0, f(X[i, :])) in MOI.ExponentialCone() # hypograph of log
         end)
     else
@@ -81,7 +81,8 @@ densityestJuMP6() = densityestJuMP(200, 1, 4, true)
 function test_densityestJuMP(instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
     d = instance()
-    JuMP.optimize!(d.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
+    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer(; options...))
+    JuMP.optimize!(d.model)
     @test JuMP.termination_status(d.model) == MOI.OPTIMAL
     return
 end

@@ -22,7 +22,7 @@ function secondorderpolyJuMP(polyvec::Function, deg::Int)
 
     vals = polyvec.(pts)
     l = length(vals[1])
-    cone = HYP.WSOSInterpEpiNormEuclCone(l, U, Ps)
+    cone = HYP.WSOSInterpEpiNormEuclCone{Float64}(l, U, Ps)
 
     model = JuMP.Model()
     JuMP.@constraint(model, [v[i] for i in 1:l for v in vals] in cone)
@@ -43,7 +43,8 @@ secondorderpolyJuMP9() = secondorderpolyJuMP(x -> [x - 1, x, x], 2)
 function test_secondorderpolyJuMP(instance; options)
     (instance, isfeas) = instance
     d = instance()
-    JuMP.optimize!(d.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
+    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer(; options...))
+    JuMP.optimize!(d.model)
     @test JuMP.termination_status(d.model) == (isfeas ? MOI.OPTIMAL : MOI.INFEASIBLE)
 end
 

@@ -40,7 +40,7 @@ function muconvexityJuMP(
     if use_wsos
         d = div(maximum(DP.maxdegree.(H)) + 1, 2)
         (U, pts, Ps, _) = MU.interpolate(dom, d, sample = true, sample_factor = 100)
-        mat_wsos_cone = HYP.WSOSInterpPosSemidefTriCone(n, U, Ps)
+        mat_wsos_cone = HYP.WSOSInterpPosSemidefTriCone{Float64}(n, U, Ps)
         H_interp = [H[i, j](x => pts[u, :]) for i in 1:n for j in 1:i for u in 1:U]
         JuMP.@constraint(model, MU.vec_to_svec!(H_interp, incr = U) in mat_wsos_cone)
     else
@@ -64,7 +64,8 @@ function test_muconvexityJuMP(instance::Tuple{Function, Float64}; options, rseed
     Random.seed!(rseed)
     (instance, true_mu) = instance
     d = instance()
-    JuMP.optimize!(d.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
+    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer(; options...))
+    JuMP.optimize!(d.model)
     @test JuMP.value(d.mu) ≈ true_mu atol = 1e-4 rtol = 1e-4
 end
 

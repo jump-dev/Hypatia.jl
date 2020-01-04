@@ -28,7 +28,7 @@ function polyminJuMP(
     if use_wsos
         Random.seed!(rseed)
         (U, pts, Ps, _) = MU.interpolate(dom, halfdeg, sample = sample, sample_factor = 100)
-        cone = HYP.WSOSInterpNonnegativeCone(U, Ps, !primal_wsos)
+        cone = HYP.WSOSInterpNonnegativeCone{Float64, Float64}(U, Ps, !primal_wsos)
         interp_vals = [f(x => pts[j, :]) for j in 1:U]
 
         model = JuMP.Model()
@@ -78,7 +78,8 @@ polyminJuMP22() = polyminJuMP(:caprasse, 4, use_wsos = false)
 
 function test_polyminJuMP(instance::Function; options)
     d = instance()
-    JuMP.optimize!(d.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
+    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer(; options...))
+    JuMP.optimize!(d.model)
     @test JuMP.objective_value(d.model) ≈ d.true_obj atol = 1e-4 rtol = 1e-4
     return
 end
