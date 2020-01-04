@@ -3,7 +3,7 @@ Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
 matrix epigraph of matrix square
 
-(U, v, W) in (S_+^n, R_+, R^(n x m)) such that 2Uv - WW'  in S_+^n
+(U, v, W) in (S_+^n, R_+, R^(n, m)) such that 2 * U * v - W * W' in S_+^n
 =#
 
 mutable struct MatrixEpiPerSquare{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
