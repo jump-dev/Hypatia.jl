@@ -41,7 +41,7 @@ function lyapunovJuMP(
         MU.vec_to_svec!(U_vec)
         JuMP.@constraint(model, vcat(-U_vec, t / 2, vec(-P)) in Hypatia.MatrixEpiPerSquareCone{Float64, Float64}(side, side))
     else
-        JuMP.@constraint(model, [-U -P; -P t .* Matrix{Float64}(I, side, side)] in JuMP.PSDCone())
+        JuMP.@constraint(model, [-U -P; -P t .* Matrix(I, side, side)] in JuMP.PSDCone())
     end
     JuMP.@objective(model, Min, t)
 
@@ -58,8 +58,8 @@ lyapunovJuMP6() = lyapunovJuMP(25, use_matrixepipersquare = false)
 function test_lyapunovJuMP(instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
     d = instance()
-    JuMP.set_optimizer(d.model, Hypatia.Optimizer)
-    JuMP.optimize!(d.model,)
+    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer(; options...))
+    JuMP.optimize!(d.model)
     @test JuMP.termination_status(d.model) == MOI.OPTIMAL
     return
 end
