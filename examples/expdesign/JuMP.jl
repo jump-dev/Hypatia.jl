@@ -122,7 +122,8 @@ expdesignJuMP25() = expdesignJuMP(3, 5, 7, 2, rootdet_obj = true, use_rootdet = 
 function test_expdesignJuMP(instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
     d = instance()
-    JuMP.optimize!(d.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
+    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer(; options...))
+    JuMP.optimize!(d.model)
     @test JuMP.termination_status(d.model) == MOI.OPTIMAL
     return
 end
