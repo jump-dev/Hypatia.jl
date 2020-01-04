@@ -29,7 +29,7 @@ function semidefinitepolyJuMP(x::Vector{DP.PolyVar{true}}, H::Matrix; use_wsos::
         n = DP.nvariables(x)
         dom = MU.FreeDomain{Float64}(n)
         (U, pts, Ps, _) = MU.interpolate(dom, halfdeg, sample_factor = 20, sample = true)
-        mat_wsos_cone = HYP.WSOSInterpPosSemidefTriCone(matdim, U, Ps, use_dual)
+        mat_wsos_cone = HYP.WSOSInterpPosSemidefTriCone{Float64}(matdim, U, Ps, use_dual)
 
         if use_dual
             JuMP.@variable(model, z[i in 1:n, 1:i, 1:U])
@@ -128,7 +128,8 @@ function test_semidefinitepolyJuMP(instance::Tuple{Function,Bool}; options, rsee
     Random.seed!(1)
     (instance, is_feas) = instance
     d = instance()
-    JuMP.optimize!(d.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
+    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer(; options...))
+    JuMP.optimize!(d.model)
     @test JuMP.termination_status(d.model) == (is_feas ? MOI.OPTIMAL : MOI.INFEASIBLE)
 end
 

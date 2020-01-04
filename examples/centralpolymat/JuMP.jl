@@ -55,7 +55,8 @@ centralpolymatJuMP4() = centralpolymatJuMP(3, 2, use_logdet = false)
 function test_centralpolymatJuMP(instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
     d = instance()
-    JuMP.optimize!(d.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
+    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer(; options...))
+    JuMP.optimize!(d.model)
     @test JuMP.termination_status(d.model) == MOI.OPTIMAL
     @test d.poly_rand ≈ JuMP.value(d.poly_Q)
     return

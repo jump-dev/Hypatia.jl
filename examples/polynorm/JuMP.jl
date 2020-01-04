@@ -31,7 +31,7 @@ function polynormJuMP(n::Int, deg::Int, npolys::Int)
 
     fpoly = dot(f, lagrange_polys)
     rand_polys = [dot(polys[:, i], lagrange_polys) for i in 1:npolys]
-    cone = HYP.WSOSInterpEpiNormEuclCone(npolys + 1, U, Ps)
+    cone = HYP.WSOSInterpEpiNormEuclCone{Float64}(npolys + 1, U, Ps)
     JuMP.@constraint(model, vcat(f, [polys[:, i] for i in 1:npolys]...) in cone)
 
     return (model = model,)
@@ -43,7 +43,8 @@ polynormJuMP2() = polynormJuMP(2, 1, 3)
 function test_polynormJuMP(instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
     d = instance()
-    JuMP.optimize!(d.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
+    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer(; options...))
+    JuMP.optimize!(d.model)
     @test JuMP.termination_status(d.model) == MOI.OPTIMAL
     return
 end

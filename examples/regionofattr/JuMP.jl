@@ -44,9 +44,9 @@ function regionofattrJuMP(deg::Int; use_WSOS::Bool = true)
         (U1, pts1, Ps1, quad_weights) = MU.interpolate(dom1, halfdeg, sample = false, calc_w = true)
         (U2, pts2, Ps2, _) = MU.interpolate(dom2, halfdeg, sample = false)
         (U3, pts3, Ps3, _) = MU.interpolate(dom3, halfdeg - 1, sample = false)
-        wsos_cone1 = HYP.WSOSInterpNonnegativeCone(U1, Ps1)
-        wsos_cone2 = HYP.WSOSInterpNonnegativeCone(U2, Ps2)
-        wsos_cone3 = HYP.WSOSInterpNonnegativeCone(U3, Ps3)
+        wsos_cone1 = HYP.WSOSInterpNonnegativeCone{Float64, Float64}(U1, Ps1)
+        wsos_cone2 = HYP.WSOSInterpNonnegativeCone{Float64, Float64}(U2, Ps2)
+        wsos_cone3 = HYP.WSOSInterpNonnegativeCone{Float64, Float64}(U3, Ps3)
 
         JuMP.@objective(model, Min, sum(quad_weights[u] * w(pts1[u, :]) for u in 1:U1))
         JuMP.@constraints(model, begin
@@ -76,7 +76,8 @@ regionofattrJuMP2() = regionofattrJuMP(4, use_WSOS = false)
 function test_regionofattrJuMP(instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
     d = instance()
-    JuMP.optimize!(d.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
+    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer(; options...))
+    JuMP.optimize!(d.model)
     @test JuMP.termination_status(d.model) == MOI.OPTIMAL
     return
 end

@@ -72,7 +72,7 @@ function shapeconregrJuMP(
         if !all(iszero, mono_profile)
             gradient_halfdeg = div(deg, 2)
             (mono_U, mono_points, mono_Ps, _) = MU.interpolate(mono_dom, gradient_halfdeg, sample = sample, sample_factor = 50)
-            mono_wsos_cone = HYP.WSOSInterpNonnegativeCone(mono_U, mono_Ps)
+            mono_wsos_cone = HYP.WSOSInterpNonnegativeCone{Float64, Float64}(mono_U, mono_Ps)
             for j in 1:n
                 if !iszero(mono_profile[j])
                     gradient = DP.differentiate(regressor, DP.variables(regressor)[j])
@@ -85,7 +85,7 @@ function shapeconregrJuMP(
         if !iszero(conv_profile)
             hessian_halfdeg = div(deg - 1, 2)
             (conv_U, conv_points, conv_Ps, _) = MU.interpolate(conv_dom, hessian_halfdeg, sample = sample, sample_factor = 50)
-            conv_wsos_cone = HYP.WSOSInterpPosSemidefTriCone(n, conv_U, conv_Ps)
+            conv_wsos_cone = HYP.WSOSInterpPosSemidefTriCone{Float64}(n, conv_U, conv_Ps)
             hessian = DP.differentiate(regressor, DP.variables(regressor), 2)
             hessian_interp = [hessian[i, j](conv_points[u, :]) for i in 1:n for j in 1:i for u in 1:conv_U]
             JuMP.@constraint(model, conv_profile * MU.vec_to_svec!(hessian_interp, incr = conv_U) in conv_wsos_cone)
@@ -201,7 +201,8 @@ function test_shapeconregrJuMP(instance::Tuple{Function, Number}; options, rseed
     Random.seed!(rseed)
     (instance, true_obj) = instance
     d = instance()
-    JuMP.optimize!(d.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
+    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer(; options...))
+    JuMP.optimize!(d.model)
     @test JuMP.termination_status(d.model) == MOI.OPTIMAL
     if !isnan(true_obj)
         @test JuMP.objective_value(d.model) ≈ true_obj atol = 1e-4 rtol = 1e-4

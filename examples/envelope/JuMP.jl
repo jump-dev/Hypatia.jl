@@ -33,7 +33,7 @@ function envelopeJuMP(
     model = JuMP.Model()
     JuMP.@variable(model, fpv[j in 1:U]) # values at Fekete points
     JuMP.@objective(model, Max, dot(fpv, w)) # integral over domain (via quadrature)
-    JuMP.@constraint(model, [i in 1:npoly], polys[:, i] .- fpv in HYP.WSOSInterpNonnegativeCone(U, Ps))
+    JuMP.@constraint(model, [i in 1:npoly], polys[:, i] .- fpv in HYP.WSOSInterpNonnegativeCone{Float64, Float64}(U, Ps))
 
     return (model = model,)
 end
@@ -45,7 +45,8 @@ envelopeJuMP3() = envelopeJuMP(2, 3, 4, MU.Box{Float64}(-ones(2), ones(2)), samp
 function test_envelopeJuMP(instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
     d = instance()
-    JuMP.optimize!(d.model, JuMP.with_optimizer(Hypatia.Optimizer; options...))
+     JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer(; options...))
+    JuMP.optimize!(d.model)
     @test JuMP.termination_status(d.model) == MOI.OPTIMAL
     return
 end
