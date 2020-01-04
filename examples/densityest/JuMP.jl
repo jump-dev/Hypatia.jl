@@ -61,7 +61,7 @@ function densityestJuMP(
         JuMP.@variable(model, f[1:U])
         JuMP.@constraints(model, begin
             dot(w, f) == 1.0 # integrate to 1
-            f in HYP.WSOSInterpNonnegativeCone(U, Ps) # density nonnegative
+            f in HYP.WSOSInterpNonnegativeCone{Float64, Float64}(U, Ps) # density nonnegative
             [i in 1:nobs], vcat(z[i], 1.0, dot(f, basis_evals[i, :])) in MOI.ExponentialCone() # hypograph of log
         end)
     end
