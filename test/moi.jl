@@ -37,21 +37,21 @@ unit_exclude = [
     ]
 
 conic_exclude = String[
-    "lin",
-    "norminf",
-    "normone",
-    "soc",
-    "rsoc",
-    "exp",
-    "dualexp",
-    "pow",
-    "dualpow",
-    "geomean",
+    # "lin",
+    # "norminf",
+    # "normone",
+    # "soc",
+    # "rsoc",
+    # "exp",
+    # "dualexp",
+    # "pow",
+    # "dualpow",
+    # "geomean",
     # "normspec",
     # "normnuc",
-    "sdp",
-    "logdet",
-    "rootdet",
+    # "sdp",
+    # "logdet",
+    # "rootdet",
     # square logdet and rootdet cones not handled
     "logdets",
     "rootdets",
@@ -60,13 +60,13 @@ conic_exclude = String[
 function test_moi(T::Type{<:Real}; options...)
     optimizer = MOIU.CachingOptimizer(MOIU.UniversalFallback(MOIU.Model{T}()), Hypatia.Optimizer{T}(; options...))
 
-    # @testset "unit tests" begin
-    #     MOIT.unittest(optimizer, config, unit_exclude)
-    # end
-    #
-    # @testset "linear tests" begin
-    #     MOIT.contlineartest(optimizer, config)
-    # end
+    @testset "unit tests" begin
+        MOIT.unittest(optimizer, config, unit_exclude)
+    end
+
+    @testset "linear tests" begin
+        MOIT.contlineartest(optimizer, config)
+    end
 
     @testset "conic tests" begin
         MOIT.contconictest(MOIB.Constraint.Square{T}(optimizer), config, conic_exclude)
