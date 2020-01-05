@@ -510,7 +510,7 @@ function episumperentropy4(T; options...)
     entr = 2 * log(T(2)) + 3 * log(3 / T(5))
     @test r.primal_obj ≈ entr atol=tol rtol=tol
     @test r.s ≈ [entr, 1, 5, 2, 3] atol=tol rtol=tol
-    @test r.z ≈ [1, 2, 3 / T(5), log(inv(T(2))) - 1, log(inv(3 / T(5))) - 1] atol=tol rtol=tol
+    @test r.z ≈ [1, 2, 3 / T(5), log(inv(T(2))) - 1, log(5 / T(3)) - 1] atol=tol rtol=tol
 end
 
 function hypoperlog1(T; options...)
