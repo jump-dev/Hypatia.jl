@@ -18,6 +18,7 @@ cone_from_moi(::Type{T}, s::MOI.DualExponentialCone) where {T <: Real} = Cones.H
 cone_from_moi(::Type{T}, s::MOI.PowerCone{T}) where {T <: Real} = Cones.Power{T}(T[s.exponent, 1 - s.exponent], 1)
 cone_from_moi(::Type{T}, s::MOI.DualPowerCone{T}) where {T <: Real} = Cones.Power{T}(T[s.exponent, 1 - s.exponent], 1, true)
 cone_from_moi(::Type{T}, s::MOI.GeometricMeanCone) where {T <: Real} = (l = MOI.dimension(s) - 1; Cones.HypoGeomean{T}(fill(inv(T(l)), l)))
+cone_from_moi(::Type{T}, s::MOI.RelativeEntropyCone) where {T <: Real} = Cones.EpiSumPerEntropy{T}(MOI.dimension(s))
 cone_from_moi(::Type{T}, s::MOI.PositiveSemidefiniteConeTriangle) where {T <: Real} = Cones.PosSemidefTri{T, T}(MOI.dimension(s))
 cone_from_moi(::Type{T}, s::MOI.LogDetConeTriangle) where {T <: Real} = Cones.HypoPerLogdetTri{T, T}(MOI.dimension(s))
 cone_from_moi(::Type{T}, s::MOI.RootDetConeTriangle) where {T <: Real} = Cones.HypoRootdetTri{T, T}(MOI.dimension(s))
@@ -232,6 +233,7 @@ const MOIOtherConesList(::Type{T}) where {T <: Real} = (
     MOI.PowerCone{T},
     MOI.DualPowerCone{T},
     MOI.GeometricMeanCone,
+    MOI.RelativeEntropyCone,
     MOI.PositiveSemidefiniteConeTriangle,
     MOI.LogDetConeTriangle,
     MOI.RootDetConeTriangle,
@@ -272,6 +274,7 @@ const MOIOtherCones{T <: Real} = Union{
     MOI.PowerCone{T},
     MOI.DualPowerCone{T},
     MOI.GeometricMeanCone,
+    MOI.RelativeEntropyCone,
     MOI.PositiveSemidefiniteConeTriangle,
     MOI.LogDetConeTriangle,
     MOI.RootDetConeTriangle,

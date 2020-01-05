@@ -47,6 +47,7 @@ conic_exclude = String[
     # "pow",
     # "dualpow",
     # "geomean",
+    # "relentr"
     # "sdp",
     # "logdet",
     # "rootdet",
