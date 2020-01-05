@@ -3,14 +3,10 @@ Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
 Lyapunov stability example from https://stanford.edu/class/ee363/sessions/s4notes.pdf
 
-min 0
+min t
 P - I in S_+
 [A'*P + P*A + alpha*P + t*gamma^2*I, P;
 P, -tI] in S_-
-
-TODO use triangle cone?
-figure out how to ensure problem is feasible without example being trivial
-
 =#
 
 using LinearAlgebra
@@ -27,15 +23,16 @@ function lyapunovJuMP(
     use_matrixepipersquare::Bool = true,
     )
     A = randn(side, side)
+    # this means P = -A is a feasible solution, with alpha and gamma sufficiently small
     A = -A * A' - I
-    alpha = 0
-    gamma = 0
+    alpha = 0.01
+    gamma = 0.01
 
     model = JuMP.Model()
     JuMP.@variable(model, P[1:side, 1:side], Symmetric)
     JuMP.@variable(model, t >= 0)
     U = A' * P .+ P * A .+ alpha * P .+ t * gamma ^ 2
-    JuMP.@constraint(model, P - I in JuMP.PSDCone())
+    JuMP.@constraint(model, Symmetric(P - I) in JuMP.PSDCone())
     if use_matrixepipersquare
         U_vec = [U[i, j] for i in 1:side for j in 1:i]
         MU.vec_to_svec!(U_vec)
