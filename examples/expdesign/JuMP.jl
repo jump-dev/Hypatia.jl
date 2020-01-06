@@ -33,7 +33,7 @@ function expdesignJuMP(
     use_rootdet::Bool = true,
     )
     @assert (p > q) && (n > q) && (nmax <= n)
-    @assert xor(logdet_obj, geomean_obj, rootdet_obj)
+    @assert logdet_obj + geomean_obj + rootdet_obj == 1
     V = randn(q, p)
 
     model = JuMP.Model()
