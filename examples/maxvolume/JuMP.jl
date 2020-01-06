@@ -14,7 +14,7 @@ function maxvolumeJuMP(
     n::Int;
     use_hypogeomean::Bool = true,
     )
-
+    @assert n > 2
     model = JuMP.Model()
     JuMP.@variable(model, t)
     JuMP.@variable(model, end_pts[1:n])
