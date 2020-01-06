@@ -7,6 +7,9 @@ min t
 P - I in S_+
 [A'*P + P*A + alpha*P + t*gamma^2*I, P;
 P, -tI] in S_-
+
+originally a feasibility problem, a feasible P and t prove the existence of a Lyapunov function
+for the system x_dot = A*x+g(x), norm(g(x)) <= gamma*norm(x)
 =#
 
 using LinearAlgebra
@@ -42,7 +45,7 @@ function lyapunovJuMP(
     end
     JuMP.@objective(model, Min, t)
 
-    return (model = model, U = U)
+    return (model = model,)
 end
 
 lyapunovJuMP1() = lyapunovJuMP(5, use_matrixepipersquare = true)
