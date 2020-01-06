@@ -1,7 +1,7 @@
 #=
 Copyright 2020, Chris Coey, Lea Kapelevich and contributors
 
-eigenvalue problem relating to Lyapunov stability example from sections 2.2.2 / 6.3.2
+eigenvalue problem related to Lyapunov stability example from sections 2.2.2 / 6.3.2
 "Linear Matrix Inequalities in System and Control Theory"  by
 S. Boyd, L. El Ghaoui, E. Feron, and V. Balakrishnan
 
