@@ -1,9 +1,9 @@
 #=
 Copyright 2020, Chris Coey, Lea Kapelevich and contributors
 
-problem 1 (linear = true)
+problem 1 (linear_dynamics = true)
 eigenvalue problem related to Lyapunov stability example from sections 2.2.2 / 6.3.2
-"Linear Matrix Inequalities in System and Control Theory"  by
+"Linear Matrix Inequalities in System and Control Theory" by
 S. Boyd, L. El Ghaoui, E. Feron, and V. Balakrishnan:
 min t
 P in S_+
@@ -33,11 +33,11 @@ const CO = Hypatia.Cones
 function lyapunovstabilityJuMP(
     side::Int;
     use_matrixepipersquare::Bool = true,
-    linear::Bool = true,
+    linear_dynamics::Bool = true,
     )
     model = JuMP.Model()
     JuMP.@variable(model, t)
-    if linear
+    if linear_dynamics
         A = randn(side, side)
         A = -A * A'
         B = randn(side, side)
@@ -55,7 +55,7 @@ function lyapunovstabilityJuMP(
         JuMP.@variable(model, P[1:side, 1:side], Symmetric)
         JuMP.@constraint(model, Symmetric(P - I) in JuMP.PSDCone())
         U = -A' * P .- P * A .- alpha * P .- t * gamma ^ 2
-        W = vec(-P)
+        W = -P
     end
 
     if use_matrixepipersquare
@@ -75,12 +75,12 @@ lyapunovstabilityJuMP3() = lyapunovstabilityJuMP(10, use_matrixepipersquare = tr
 lyapunovstabilityJuMP4() = lyapunovstabilityJuMP(10, use_matrixepipersquare = false)
 lyapunovstabilityJuMP5() = lyapunovstabilityJuMP(25, use_matrixepipersquare = true)
 lyapunovstabilityJuMP6() = lyapunovstabilityJuMP(25, use_matrixepipersquare = false)
-lyapunovstabilityJuMP7() = lyapunovstabilityJuMP(5, use_matrixepipersquare = true, linear = false)
-lyapunovstabilityJuMP8() = lyapunovstabilityJuMP(5, use_matrixepipersquare = false, linear = false)
-lyapunovstabilityJuMP9() = lyapunovstabilityJuMP(10, use_matrixepipersquare = true, linear = false)
-lyapunovstabilityJuMP10() = lyapunovstabilityJuMP(10, use_matrixepipersquare = false, linear = false)
-lyapunovstabilityJuMP11() = lyapunovstabilityJuMP(25, use_matrixepipersquare = true, linear = false)
-lyapunovstabilityJuMP12() = lyapunovstabilityJuMP(25, use_matrixepipersquare = false, linear = false)
+lyapunovstabilityJuMP7() = lyapunovstabilityJuMP(5, use_matrixepipersquare = true, linear_dynamics = false)
+lyapunovstabilityJuMP8() = lyapunovstabilityJuMP(5, use_matrixepipersquare = false, linear_dynamics = false)
+lyapunovstabilityJuMP9() = lyapunovstabilityJuMP(10, use_matrixepipersquare = true, linear_dynamics = false)
+lyapunovstabilityJuMP10() = lyapunovstabilityJuMP(10, use_matrixepipersquare = false, linear_dynamics = false)
+lyapunovstabilityJuMP11() = lyapunovstabilityJuMP(25, use_matrixepipersquare = true, linear_dynamics = false)
+lyapunovstabilityJuMP12() = lyapunovstabilityJuMP(25, use_matrixepipersquare = false, linear_dynamics = false)
 
 function test_lyapunovstabilityJuMP(instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
