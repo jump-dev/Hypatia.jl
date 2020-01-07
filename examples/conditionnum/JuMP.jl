@@ -1,7 +1,7 @@
 #=
 Copyright 2020, Chris Coey, Lea Kapelevich and contributors
 
-minimize the condition number of M(x) = M_0 + sum_i x_i*M_i
+minimize the condition number of positive definite matrix M(x) = M_0 + sum_i x_i*M_i
 subject to F(x) = F_0 + sum_i x_i*F_i in S_+
 
 from section 3.2 "Linear Matrix Inequalities in System and Control Theory" by
@@ -37,25 +37,34 @@ function conditionnumJuMP(
     len_y::Int;
     use_linmatrixineq::Bool = true,
     )
-    Mi = [Symmetric(randn(side, side)) for i in 1:len_y]
+    Mi = [zeros(side, side) for i in 1:len_y]
+    for i in eachindex(Mi)
+        Mi_half = randn(side)
+        Mi[i] = Symmetric(Mi_half * Mi_half')
+    end
     M0 = randn(side, side)
     M0 = Symmetric(M0 * M0')
     Fi = [Symmetric(randn(side, side)) for i in 1:len_y]
-    F0 = randn(side, side)
-    F0 = Symmetric(F0 * F0')
+    F0 = Symmetric(randn(side, side))
+    # choose to make some F_i matrices pd so feasible solution exists
+    pd_idxs = rand(1:len_y, max(1, div(len_y, 5)))
+    for i in pd_idxs
+        Fi[i] = Symmetric(Fi[i] * Fi[i]')
+    end
 
     model = JuMP.Model()
     JuMP.@variables(model, begin
         gamma
         nu
         persp == -1
+        zero_var == 0
         y[1:len_y]
     end)
     if use_linmatrixineq
         JuMP.@constraints(model, begin
-            vcat(nu, y) in Hypatia.LinMatrixIneqCone{Float64}([F0, Fi...])
-            vcat(persp, nu, y) in Hypatia.LinMatrixIneqCone{Float64}([Symmetric(Matrix{Float64}(I, side, side)), M0, Mi...])
-            vcat(gamma, -nu, -y) in Hypatia.LinMatrixIneqCone{Float64}([Symmetric(Matrix{Float64}(I, side, side)), M0, Mi...])
+            vcat(zero_var, nu, y) in Hypatia.LinMatrixIneqCone{Float64}([Matrix(I, side, side), F0, Fi...])
+            vcat(persp, nu, y) in Hypatia.LinMatrixIneqCone{Float64}([Matrix(I, side, side), M0, Mi...])
+            vcat(gamma, -nu, -y) in Hypatia.LinMatrixIneqCone{Float64}([Matrix(I, side, side), M0, Mi...])
         end)
     else
         JuMP.@constraints(model, begin
