@@ -18,7 +18,7 @@ introduce nu = inv(mu), y = x/mu:
 min gamma
 nu*F_0 + sum_i y_i*F_i in S_+
 nu*M_0 + sum_i y_i*M_i - I in S_+
-gamma*I - nu*M_0 + sum_i y_i*M_i in S_+
+gamma*I - nu*M_0 - sum_i y_i*M_i in S_+
 
 we make F_0 and M_0 positive definite to ensure existence of a feasible solution
 =#
@@ -73,6 +73,7 @@ function conditionnumJuMP(
             Symmetric(gamma .* Matrix(I, side, side) - nu .* M0 - sum(y[i] .* Mi[i] for i in eachindex(y))) in JuMP.PSDCone()
         end)
     end
+    JuMP.@objective(model, Min, gamma)
 
     return (model = model,)
 end
