@@ -27,7 +27,7 @@ function expdesign(
     use_sumlog::Bool = true,
     use_rootdet::Bool = true,
     )
-    @assert xor(logdet_obj, geomean_obj, rootdet_obj)
+    @assert logdet_obj + geomean_obj + rootdet_obj == 1
     @assert (p > q) && (n > q) && (nmax <= n)
     V = T(4) * rand(T, q, p) .- T(2)
 

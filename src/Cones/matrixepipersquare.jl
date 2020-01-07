@@ -1,9 +1,9 @@
 #=
-Copyright 2018, Chris Coey, Lea Kapelevich and contributors
+Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
 matrix epigraph of matrix square
 
-TODO describe
+(U, v, W) in (S_+^n, R_+, R^(n, m)) such that 2 * U * v - W * W' in S_+^n
 =#
 
 mutable struct MatrixEpiPerSquare{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
