@@ -49,7 +49,7 @@ mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
             # @assert eltype(A_i) <: RealOrComplex{T}
             @assert ishermitian(A_i)
         end
-        @assert isposdef(first(As)) # TODO reuse factorization from here later if useful
+        @assert isposdef(first(As))
         @assert side > 0
         cone = new{T}()
         cone.use_dual = is_dual
@@ -84,8 +84,8 @@ function set_initial_point(arr::AbstractVector, cone::LinMatrixIneq{T}) where {T
 end
 
 lmi_fact(arr::Union{UniformScaling{R}, Diagonal{R}}) where {R} = arr # NOTE could use SymTridiagonal here when that type gets a isposdef and ldiv in Julia
-# lmi_fact(arr::AbstractSparseMatrix{R}) where {R} = cholesky(Hermitian(arr), shift=false, check=false)
-lmi_fact(arr::AbstractMatrix{R}) where {R} = cholesky(Hermitian(arr), check=false)
+lmi_fact(arr::AbstractSparseMatrix{R}) where {R} = cholesky(Hermitian(arr), shift=false, check=false)
+lmi_fact(arr::AbstractMatrix{R}) where {R} = cholesky!(Hermitian(arr), check=false)
 
 function update_feas(cone::LinMatrixIneq{T}) where {T <: Real}
     @assert !cone.feas_updated
@@ -107,45 +107,6 @@ function update_grad(cone::LinMatrixIneq{T}) where {T <: Real}
 
     # grad[i] = -tr(inv(sumA) * A[i])
     cone.sumAinvAs = [cone.fact \ A_i for A_i in cone.As] # TODO if dense, can do in-place
-
-    # TODO experiment with optional iterative refinement on each sumAinvAs[i] to improve numerics
-    # iter_ref_steps = 3 # TODO option
-    # if iter_ref_steps > 0
-    #     for (A_i, dir) in zip(cone.As, cone.sumAinvAs)
-    #         # TODO do more in-place
-    #         dir_temp = copy(dir)
-    #         res = cone.sumA * dir - A_i
-    #         # @show norm(res)
-    #         norm_inf = norm(res, Inf)
-    #         norm_2 = norm(res, 2)
-    #
-    #         for s in 1:iter_ref_steps
-    #             # @show s
-    #             if norm_inf < 100 * eps(T) # TODO change tolerance dynamically
-    #                 break
-    #             end
-    #             dir = dir_temp - cone.fact \ res
-    #             res = cone.sumA * dir - A_i
-    #
-    #             norm_inf_new = norm(res, Inf)
-    #             norm_2_new = norm(res, 2)
-    #             if norm_inf_new > norm_inf || norm_2_new > norm_2
-    #                 # residual has not improved
-    #                 # println("no improve")
-    #                 copyto!(dir, dir_temp)
-    #                 break
-    #             end
-    #
-    #             # residual has improved, so use the iterative refinement
-    #             println("improve")
-    #             # @show norm(res)
-    #             copyto!(dir_temp, dir)
-    #             norm_inf = norm_inf_new
-    #             norm_2 = norm_2_new
-    #         end
-    #     end
-    # end
-
     @inbounds for (i, sumAinvAs_i) in enumerate(cone.sumAinvAs)
         cone.grad[i] = -sum(real(sumAinvAs_i[k, k]) for k in 1:cone.side)
     end
