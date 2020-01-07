@@ -32,6 +32,7 @@ function maxvolume(
     use_epipersquare::Bool = false,
     )
     @assert use_hypogeomean + use_power + use_epipersquare == 1
+    @assert n > 2
     poly_hrep = Matrix{T}(I, n, n)
     poly_hrep .+= T.(randn(n, n)) / n
     c = vcat(-1, zeros(T, n))
