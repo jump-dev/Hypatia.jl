@@ -93,6 +93,14 @@ function test_moi_cones(T::Type{<:Real})
         @test hyp_cone.alpha == T[iT2, iT2]
     end
 
+    @testset "RelativeEntropyCone" begin
+        moi_cone = MOI.RelativeEntropyCone(3)
+        hyp_cone = HYP.cone_from_moi(T, moi_cone)
+        @test hyp_cone isa CO.EpiSumPerEntropy{T}
+        @test MOI.dimension(moi_cone) == CO.dimension(hyp_cone) == 3
+        @test !CO.use_dual(hyp_cone)
+    end
+
     @testset "NormSpectralCone" begin
         moi_cone = MOI.NormSpectralCone(2, 3)
         hyp_cone = HYP.cone_from_moi(T, moi_cone)
