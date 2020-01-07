@@ -29,7 +29,6 @@ const MOI = MathOptInterface
 import JuMP
 import Hypatia
 const CO = Hypatia.Cones
-const MU = Hypatia.ModelUtilities
 
 function lyapunovstabilityJuMP(
     side::Int;
