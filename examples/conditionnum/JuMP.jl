@@ -37,7 +37,6 @@ function conditionnumJuMP(
     len_y::Int;
     use_linmatrixineq::Bool = true,
     )
-
     Mi = [Symmetric(randn(side, side)) for i in 1:len_y]
     M0 = randn(side, side)
     M0 = Symmetric(M0 * M0')
