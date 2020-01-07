@@ -9,9 +9,9 @@ min t
 P in S_+
 [-A'*P - P*A - C'C, P*B;
 B'*P, tI] in S_+
-for the system x_dot = A*x
+for the system with linear dynamics x_dot = A*x
 
-problem 2
+problem 2 (linear_dynamics = false)
 Lyapunov stability example from https://stanford.edu/class/ee363/sessions/s4notes.pdf:
 min t
 P - I in S_+
