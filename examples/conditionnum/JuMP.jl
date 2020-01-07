@@ -62,8 +62,8 @@ function conditionnumJuMP(
     if use_linmatrixineq
         JuMP.@constraints(model, begin
             vcat(nu, y) in Hypatia.LinMatrixIneqCone{Float64}([F0, Fi...])
-            vcat(-1, nu, y) in Hypatia.LinMatrixIneqCone{Float64}([Matrix(I, side, side), M0, Mi...])
-            vcat(gamma, -nu, -y) in Hypatia.LinMatrixIneqCone{Float64}([Matrix(I, side, side), M0, Mi...])
+            vcat(-1, nu, y) in Hypatia.LinMatrixIneqCone{Float64}([I, M0, Mi...])
+            vcat(gamma, -nu, -y) in Hypatia.LinMatrixIneqCone{Float64}([I, M0, Mi...])
         end)
     else
         JuMP.@constraints(model, begin
