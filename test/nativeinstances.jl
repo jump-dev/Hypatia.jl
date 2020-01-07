@@ -1018,20 +1018,42 @@ function linmatrixineq2(T; options...)
 end
 
 function linmatrixineq3(T; options...)
-    tol = sqrt(sqrt(eps(T)))
-    c = T[1]
-    A = zeros(T, 0, 1)
-    b = T[]
-    G = zeros(T, 2, 1)
-    G[1, 1] = -1
-    h = T[0, -1]
-    As = [Symmetric(Matrix(one(T) * I, 2, 2)), Symmetric(T[1 0; 0 -1])]
-    cones = CO.Cone{T}[CO.LinMatrixIneq{T}(As)]
+    dense1 = [1 0; 0 1]
+    dense2 = [1 0; 0 -1]
+    sparse1 = sparse(dense1)
+    sparse2 = sparse(dense2)
+    diag1 = Diagonal([1, 1])
+    diag2 = Diagonal([1, -1])
+    # NOTE not all combinations work due to missing methods in LinearAlgebra
+    As_list = [
+        [dense1, dense2],
+        # [dense1, sparse2],
+        [dense1, diag2],
+        # [sparse1, dense2],
+        [sparse1, sparse2],
+        # [sparse1, diag2],
+        [diag1, dense2],
+        # [diag1, sparse2],
+        [diag1, diag2],
+        [I, dense2],
+        # [I, sparse2],
+        [I, diag2],
+        ]
+    for As in As_list
+        tol = sqrt(sqrt(eps(T)))
+        c = T[1]
+        A = zeros(T, 0, 1)
+        b = T[]
+        G = zeros(T, 2, 1)
+        G[1, 1] = -1
+        h = T[0, -1]
+        cones = CO.Cone{T}[CO.LinMatrixIneq{T}(As)]
 
-    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
-    @test r.status == :Optimal
-    @test r.primal_obj ≈ 1 atol=tol rtol=tol
-    @test r.s ≈ [1, -1] atol=tol rtol=tol
+        r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+        @test r.status == :Optimal
+        @test r.primal_obj ≈ 1 atol=tol rtol=tol
+        @test r.s ≈ [1, -1] atol=tol rtol=tol
+    end
 end
 
 function possemideftri1(T; options...)
