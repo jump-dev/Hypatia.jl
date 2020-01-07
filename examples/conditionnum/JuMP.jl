@@ -45,8 +45,9 @@ function conditionnumJuMP(
     M0 = randn(side, side)
     M0 = Symmetric(M0 * M0')
     Fi = [Symmetric(randn(side, side)) for i in 1:len_y]
-    F0 = Symmetric(randn(side, side))
-    # choose to make some F_i matrices pd so feasible solution exists
+    F0 = randn(side, side)
+    F0 = Symmetric(F0 * F0')
+    # choose to make some F_i matrices pd so several feasible solutions exists
     pd_idxs = rand(1:len_y, max(1, div(len_y, 5)))
     for i in pd_idxs
         Fi[i] = Symmetric(Fi[i] * Fi[i]')
@@ -57,12 +58,11 @@ function conditionnumJuMP(
         gamma
         nu
         persp == -1
-        zero_var == 0
         y[1:len_y]
     end)
     if use_linmatrixineq
         JuMP.@constraints(model, begin
-            vcat(zero_var, nu, y) in Hypatia.LinMatrixIneqCone{Float64}([Matrix(I, side, side), F0, Fi...])
+            vcat(nu, y) in Hypatia.LinMatrixIneqCone{Float64}([F0, Fi...])
             vcat(persp, nu, y) in Hypatia.LinMatrixIneqCone{Float64}([Matrix(I, side, side), M0, Mi...])
             vcat(gamma, -nu, -y) in Hypatia.LinMatrixIneqCone{Float64}([Matrix(I, side, side), M0, Mi...])
         end)
