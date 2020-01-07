@@ -452,7 +452,7 @@ function episumperentropy1(T; options...)
         h[2:(w_dim + 1)] .= 1
         w = rand(T, w_dim) .+ 1
         h[(w_dim + 2):end] .= w
-        cones = CO.Cone{T}[CO.EpiSumPerEntropy{T}(dim, false)]
+        cones = CO.Cone{T}[CO.EpiSumPerEntropy{T}(dim)]
 
         r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
         @test r.status == :Optimal
@@ -469,7 +469,7 @@ function episumperentropy2(T; options...)
         b = zeros(T, 0)
         G = vcat(zeros(T, 1 + w_dim, w_dim), Matrix{T}(-I, w_dim, w_dim))
         h = vcat(zero(T), ones(T, w_dim), zeros(T, w_dim))
-        cones = CO.Cone{T}[CO.EpiSumPerEntropy{T}(dim, false)]
+        cones = CO.Cone{T}[CO.EpiSumPerEntropy{T}(dim)]
 
         r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
         @test r.status == :Optimal
@@ -487,13 +487,30 @@ function episumperentropy3(T; options...)
         b = T[dim]
         G = vcat(zeros(T, 1, w_dim), Matrix{T}(-I, w_dim, w_dim), zeros(T, w_dim, w_dim))
         h = vcat(zeros(T, 1 + w_dim), ones(T, w_dim))
-        cones = CO.Cone{T}[CO.EpiSumPerEntropy{T}(dim, false)]
+        cones = CO.Cone{T}[CO.EpiSumPerEntropy{T}(dim)]
 
         r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
         @test r.status == :Optimal
         @test r.primal_obj ≈ -dim atol=tol rtol=tol
         @test r.x ≈ fill(dim / w_dim, w_dim) atol=tol rtol=tol
     end
+end
+
+function episumperentropy4(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    c = T[1]
+    A = zeros(T, 0, 1)
+    b = zeros(T, 0)
+    G = Matrix{T}(-I, 5, 1)
+    h = T[0, 1, 5, 2, 3]
+    cones = CO.Cone{T}[CO.EpiSumPerEntropy{T}(5)]
+
+    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+    @test r.status == :Optimal
+    entr = 2 * log(T(2)) + 3 * log(3 / T(5))
+    @test r.primal_obj ≈ entr atol=tol rtol=tol
+    @test r.s ≈ [entr, 1, 5, 2, 3] atol=tol rtol=tol
+    @test r.z ≈ [1, 2, 3 / T(5), log(inv(T(2))) - 1, log(5 / T(3)) - 1] atol=tol rtol=tol
 end
 
 function hypoperlog1(T; options...)
@@ -1001,20 +1018,42 @@ function linmatrixineq2(T; options...)
 end
 
 function linmatrixineq3(T; options...)
-    tol = sqrt(sqrt(eps(T)))
-    c = T[1]
-    A = zeros(T, 0, 1)
-    b = T[]
-    G = zeros(T, 2, 1)
-    G[1, 1] = -1
-    h = T[0, -1]
-    As = [Symmetric(Matrix(one(T) * I, 2, 2)), Symmetric(T[1 0; 0 -1])]
-    cones = CO.Cone{T}[CO.LinMatrixIneq{T}(As)]
+    dense1 = [1 0; 0 1]
+    dense2 = [1 0; 0 -1]
+    sparse1 = sparse(dense1)
+    sparse2 = sparse(dense2)
+    diag1 = Diagonal([1, 1])
+    diag2 = Diagonal([1, -1])
+    # NOTE not all combinations work due to missing methods in LinearAlgebra
+    As_list = [
+        [dense1, dense2],
+        # [dense1, sparse2],
+        [dense1, diag2],
+        # [sparse1, dense2],
+        [sparse1, sparse2],
+        # [sparse1, diag2],
+        [diag1, dense2],
+        # [diag1, sparse2],
+        [diag1, diag2],
+        [I, dense2],
+        # [I, sparse2],
+        [I, diag2],
+        ]
+    for As in As_list
+        tol = sqrt(sqrt(eps(T)))
+        c = T[1]
+        A = zeros(T, 0, 1)
+        b = T[]
+        G = zeros(T, 2, 1)
+        G[1, 1] = -1
+        h = T[0, -1]
+        cones = CO.Cone{T}[CO.LinMatrixIneq{T}(As)]
 
-    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
-    @test r.status == :Optimal
-    @test r.primal_obj ≈ 1 atol=tol rtol=tol
-    @test r.s ≈ [1, -1] atol=tol rtol=tol
+        r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+        @test r.status == :Optimal
+        @test r.primal_obj ≈ 1 atol=tol rtol=tol
+        @test r.s ≈ [1, -1] atol=tol rtol=tol
+    end
 end
 
 function possemideftri1(T; options...)

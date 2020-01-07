@@ -4,15 +4,13 @@ Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 TODO
 - write description
 - assumes first A matrix is PSD (eg identity)
-- loosen type signature - some of the matrices could be eg diagonal or identity types
-- reduce allocs etc
 =#
 
 mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
     use_dual::Bool
     dim::Int
     side::Int
-    As::Vector{HermOrSym{R, Matrix{R}} where {R <: RealOrComplex{T}}}
+    As::Vector
     is_complex::Bool
     point::Vector{T}
     timer::TimerOutput
@@ -28,9 +26,9 @@ mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
 
-    sumA::HermOrSym
+    sumA
     fact
-    sumAinvAs
+    sumAinvAs::Vector
 
     function LinMatrixIneq{T}(
         As::Vector,
@@ -39,15 +37,20 @@ mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
         ) where {T <: Real}
         dim = length(As)
         @assert dim > 1
-        side = size(first(As), 1)
-        @assert side > 1
+        side = 0
         for A_i in As
-            @assert A_i isa HermOrSym{R, Matrix{R}} where {R <: RealOrComplex{T}}
-            @assert size(A_i, 1) == side
-            @assert eltype(A_i) <: RealOrComplex{T}
+            if A_i isa AbstractMatrix
+                if iszero(side)
+                    side = size(A_i, 1)
+                else
+                    @assert size(A_i, 1) == side
+                end
+            end
+            # @assert eltype(A_i) <: RealOrComplex{T}
+            @assert ishermitian(A_i)
         end
-        @assert isposdef(first(As)) # TODO reuse factorization from here later if useful
-        # TODO check all are upper tri hermitian if useful?
+        @assert isposdef(first(As))
+        @assert side > 0
         cone = new{T}()
         cone.use_dual = is_dual
         cone.dim = dim
@@ -80,26 +83,32 @@ function set_initial_point(arr::AbstractVector, cone::LinMatrixIneq{T}) where {T
     return arr
 end
 
-function update_feas(cone::LinMatrixIneq)
+lmi_fact(arr::Union{UniformScaling{R}, Diagonal{R}}) where {R} = arr # NOTE could use SymTridiagonal here when that type gets a isposdef and ldiv in Julia
+lmi_fact(arr::AbstractSparseMatrix{R}) where {R} = cholesky(Hermitian(arr), shift=false, check=false)
+lmi_fact(arr::AbstractMatrix{R}) where {R} = cholesky!(Hermitian(arr), check=false)
+
+function update_feas(cone::LinMatrixIneq{T}) where {T <: Real}
     @assert !cone.feas_updated
 
-    cone.sumA = sum(w_i * A_i for (w_i, A_i) in zip(cone.point, cone.As)) # TODO in-place with 5-arg mul
+    # NOTE not in-place because typeof(A) is AbstractMatrix eg sparse
+    # TODO if sumA is dense, can do in-place
+    cone.sumA = sum(w_i * A_i for (w_i, A_i) in zip(cone.point, cone.As))
     @assert ishermitian(cone.sumA) # TODO delete
-    cone.fact = cholesky!(cone.sumA, check = false)
+    @assert eltype(cone.sumA) <: RealOrComplex{T}
+    cone.fact = lmi_fact(cone.sumA)
     cone.is_feas = isposdef(cone.fact)
 
     cone.feas_updated = true
     return cone.is_feas
 end
 
-function update_grad(cone::LinMatrixIneq)
+function update_grad(cone::LinMatrixIneq{T}) where {T <: Real}
     @assert cone.is_feas
 
     # grad[i] = -tr(inv(sumA) * A[i])
-    cone.sumAinvAs = [cone.fact \ A_i for A_i in cone.As] # TODO make efficient and save ldiv
-    for i in 1:cone.dim
-        sumAinvAsi = cone.sumAinvAs[i]
-        @inbounds cone.grad[i] = -sum(real(sumAinvAsi[k, k]) for k in 1:cone.side)
+    cone.sumAinvAs = [cone.fact \ A_i for A_i in cone.As] # TODO if dense, can do in-place
+    @inbounds for (i, sumAinvAs_i) in enumerate(cone.sumAinvAs)
+        cone.grad[i] = -sum(real(sumAinvAs_i[k, k]) for k in 1:cone.side)
     end
 
     cone.grad_updated = true
@@ -112,8 +121,8 @@ function update_hess(cone::LinMatrixIneq)
     H = cone.hess.data
 
     # H[i, j] = tr((cone.fact \ A_i) * (cone.fact \ A_j))
-    for i in 1:cone.dim, j in i:cone.dim
-        @inbounds H[i, j] = real(dot(sumAinvAs[i], sumAinvAs[j]'))
+    @inbounds for i in 1:cone.dim, j in i:cone.dim
+        H[i, j] = real(dot(sumAinvAs[i], sumAinvAs[j]'))
     end
 
     cone.hess_updated = true
