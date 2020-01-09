@@ -455,3 +455,50 @@ function test_wsosinterpepinormeucl_barrier(T::Type{<:Real})
     end
     return
 end
+
+using SparseArrays
+function test_possemideftrisparse_barrier(T::Type{<:Real})
+    Random.seed!(1)
+    for side in [1, 2, 4, 8]
+        # real sparse PSD cone
+        # generate random sparsity pattern for lower triangle
+        sparse_factor = inv(sqrt(side))
+        row_idxs = Int[]
+        col_idxs = Int[]
+        for i in 1:side
+            # on diagonal
+            push!(row_idxs, i)
+            push!(col_idxs, i)
+            for j in 1:(i - 1)
+                # off diagonal
+                if rand() < sparse_factor
+                    push!(row_idxs, i)
+                    push!(col_idxs, j)
+                end
+            end
+        end
+
+        rt2 = sqrt(T(2))
+        function R_barrier(s)
+            scal_s = copy(s)
+            for i in eachindex(s)
+                if row_idxs[i] != col_idxs[i]
+                    scal_s[i] /= rt2
+                end
+            end
+            S = Matrix(sparse(row_idxs, col_idxs, scal_s, side, side))
+            return -logdet(cholesky(Symmetric(S, :L)))
+        end
+        test_barrier_oracles(CO.PosSemidefTriSparse{T, T}(side, row_idxs, col_idxs), R_barrier)
+
+        # # complex sparse PSD cone
+        # function C_barrier(s)
+        #     S = zeros(Complex{eltype(s)}, side, side)
+        #     CO.svec_to_smat!(S, s, sqrt(T(2)))
+        #     return -logdet(cholesky!(Hermitian(S, :U)))
+        # end
+        # dim = side^2
+        # test_barrier_oracles(CO.PosSemidefTri{T, Complex{T}}(dim), C_barrier)
+    end
+    return
+end
