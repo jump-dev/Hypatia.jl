@@ -34,12 +34,7 @@ function update_fact(cache::UMFPACKNonSymCache, A::SparseMatrixCSC{Float64, Suit
         cache.umfpack = lu(A) # symbolic and numeric factorization
         cache.analyzed = true
     else
-        # TODO this is a hack around lack of interface https://github.com/JuliaLang/julia/issues/33323
-        # update nzval field in the factorizationTimer
-        copyto!(cache.umfpack.nzval, A.nzval)
-        # do not indicate that the numeric factorization has been computed
-        cache.umfpack.numeric = C_NULL
-        SuiteSparse.UMFPACK.umfpack_numeric!(cache.umfpack) # will only repeat numeric factorization
+        lu!(cache.umfpack, A, check = true)
     end
     return
 end
@@ -81,7 +76,7 @@ function update_fact(cache::CHOLMODSymCache, A::SparseMatrixCSC{Float64, SuiteSp
         cache.cholmod = SuiteSparse.CHOLMOD.ldlt(A_symm, check = false)
         cache.analyzed = true
     else
-        ldlt!(cache.cholmod, A_symm, check = true)
+        ldlt!(cache.cholmod, A_symm, check = false)
     end
     if !issuccess(cache.cholmod)
         @warn("numerical failure: sparse factorization failed")
