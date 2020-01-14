@@ -44,7 +44,7 @@ function lyapunovstabilityJuMP(
         B = randn(W_rows, W_cols)
         C = randn(W_rows, W_rows)
         JuMP.@variable(model, P[1:W_rows, 1:W_rows], PSD)
-        U = -A' * P .- P * A .- C' * C
+        U = -A' * P .- P * A .- C' * C ./ 100
         W = P * B
     else
         A = randn(W_rows, W_rows)
