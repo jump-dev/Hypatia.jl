@@ -64,7 +64,7 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
             cone.is_complex = false
         end
         cone.side = side
-        cone.sc_const = T(25) / T(9)
+        cone.sc_const = T(400) / T(9)
         cone.hess_fact_cache = hess_fact_cache
         return cone
     end

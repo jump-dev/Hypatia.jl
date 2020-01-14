@@ -69,8 +69,8 @@ function lyapunovstabilityJuMP(
     return (model = model,)
 end
 
-lyapunovstabilityJuMP1() = lyapunovstabilityJuMP(5, use_matrixepipersquare = true)
-lyapunovstabilityJuMP2() = lyapunovstabilityJuMP(5, use_matrixepipersquare = false)
+lyapunovstabilityJuMP1() = lyapunovstabilityJuMP(25, use_matrixepipersquare = true)
+lyapunovstabilityJuMP2() = lyapunovstabilityJuMP(25, use_matrixepipersquare = false)
 lyapunovstabilityJuMP3() = lyapunovstabilityJuMP(10, use_matrixepipersquare = true)
 lyapunovstabilityJuMP4() = lyapunovstabilityJuMP(10, use_matrixepipersquare = false)
 lyapunovstabilityJuMP5() = lyapunovstabilityJuMP(25, use_matrixepipersquare = true)
@@ -82,12 +82,15 @@ lyapunovstabilityJuMP10() = lyapunovstabilityJuMP(10, use_matrixepipersquare = f
 lyapunovstabilityJuMP11() = lyapunovstabilityJuMP(25, use_matrixepipersquare = true, linear_dynamics = false)
 lyapunovstabilityJuMP12() = lyapunovstabilityJuMP(25, use_matrixepipersquare = false, linear_dynamics = false)
 
+using TimerOutputs
+
 function test_lyapunovstabilityJuMP(instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
     d = instance()
     JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer(; options...))
     JuMP.optimize!(d.model)
     @test JuMP.termination_status(d.model) == MOI.OPTIMAL
+    print_timer(JuMP.backend(d.model).optimizer.model.optimizer.solver.timer)
     return
 end
 
@@ -109,6 +112,9 @@ test_lyapunovstabilityJuMP_all(; options...) = test_lyapunovstabilityJuMP.([
 test_lyapunovstabilityJuMP(; options...) = test_lyapunovstabilityJuMP.([
     lyapunovstabilityJuMP1,
     lyapunovstabilityJuMP2,
-    lyapunovstabilityJuMP6,
-    lyapunovstabilityJuMP7,
+    # lyapunovstabilityJuMP6,
+    # lyapunovstabilityJuMP7,
     ], options = options)
+
+options = (use_infty_nbhd = true,)
+test_lyapunovstabilityJuMP(; options...)
