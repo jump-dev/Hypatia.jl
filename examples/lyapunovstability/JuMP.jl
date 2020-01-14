@@ -31,50 +31,50 @@ import Hypatia
 const CO = Hypatia.Cones
 
 function lyapunovstabilityJuMP(
-    side::Int;
+    W_rows::Int,
+    W_cols::Int = W_rows;
     use_matrixepipersquare::Bool = true,
     linear_dynamics::Bool = true,
     )
     model = JuMP.Model()
     JuMP.@variable(model, t)
     if linear_dynamics
-        A = randn(side, side)
+        A = randn(W_rows, W_rows)
         A = -A * A'
-        B = randn(side, side)
-        B = B * B'
-        C = randn(side, side) ./ 10
-        JuMP.@variable(model, P[1:side, 1:side], PSD)
-        U = -A' * P .- P * A .- C' * C
+        B = randn(W_rows, W_cols)
+        C = randn(W_rows, W_rows)
+        JuMP.@variable(model, P[1:W_rows, 1:W_rows], PSD)
+        U = -A' * P .- P * A .- C' * C ./ 100
         W = P * B
     else
-        A = randn(side, side)
+        A = randn(W_rows, W_rows)
         # this means P = -A is a feasible solution, with alpha and gamma sufficiently small
         A = -A * A' - I
         alpha = 0.01
         gamma = 0.01
-        JuMP.@variable(model, P[1:side, 1:side], Symmetric)
+        JuMP.@variable(model, P[1:W_rows, 1:W_rows], Symmetric)
         JuMP.@constraint(model, Symmetric(P - I) in JuMP.PSDCone())
         U = -A' * P .- P * A .- alpha * P .- t * gamma ^ 2
         W = -P
     end
 
     if use_matrixepipersquare
-        U_svec = CO.smat_to_svec!(zeros(eltype(U), CO.svec_length(side)), U, sqrt(2))
-        JuMP.@constraint(model, vcat(U_svec, t / 2, vec(W)) in Hypatia.MatrixEpiPerSquareCone{Float64, Float64}(side, side))
+        U_svec = CO.smat_to_svec!(zeros(eltype(U), CO.svec_length(W_rows)), U, sqrt(2))
+        JuMP.@constraint(model, vcat(U_svec, t / 2, vec(W)) in Hypatia.MatrixEpiPerSquareCone{Float64, Float64}(W_rows, W_cols))
     else
-        JuMP.@constraint(model, [U W; W' t .* Matrix(I, side, side)] in JuMP.PSDCone())
+        JuMP.@constraint(model, [t .* Matrix(I, W_cols, W_cols) W'; W U] in JuMP.PSDCone())
     end
     JuMP.@objective(model, Min, t)
 
     return (model = model,)
 end
 
-lyapunovstabilityJuMP1() = lyapunovstabilityJuMP(5, use_matrixepipersquare = true)
-lyapunovstabilityJuMP2() = lyapunovstabilityJuMP(5, use_matrixepipersquare = false)
-lyapunovstabilityJuMP3() = lyapunovstabilityJuMP(10, use_matrixepipersquare = true)
-lyapunovstabilityJuMP4() = lyapunovstabilityJuMP(10, use_matrixepipersquare = false)
-lyapunovstabilityJuMP5() = lyapunovstabilityJuMP(25, use_matrixepipersquare = true)
-lyapunovstabilityJuMP6() = lyapunovstabilityJuMP(25, use_matrixepipersquare = false)
+lyapunovstabilityJuMP1() = lyapunovstabilityJuMP(5, 6, use_matrixepipersquare = true)
+lyapunovstabilityJuMP2() = lyapunovstabilityJuMP(5, 6, use_matrixepipersquare = false)
+lyapunovstabilityJuMP3() = lyapunovstabilityJuMP(10, 20, use_matrixepipersquare = true)
+lyapunovstabilityJuMP4() = lyapunovstabilityJuMP(10, 20, use_matrixepipersquare = false)
+lyapunovstabilityJuMP5() = lyapunovstabilityJuMP(25, 30, use_matrixepipersquare = true)
+lyapunovstabilityJuMP6() = lyapunovstabilityJuMP(25, 30, use_matrixepipersquare = false)
 lyapunovstabilityJuMP7() = lyapunovstabilityJuMP(5, use_matrixepipersquare = true, linear_dynamics = false)
 lyapunovstabilityJuMP8() = lyapunovstabilityJuMP(5, use_matrixepipersquare = false, linear_dynamics = false)
 lyapunovstabilityJuMP9() = lyapunovstabilityJuMP(10, use_matrixepipersquare = true, linear_dynamics = false)
