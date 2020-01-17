@@ -39,12 +39,12 @@ include("epinormspectral.jl")
 include("matrixepipersquare.jl")
 include("linmatrixineq.jl")
 include("possemideftri.jl")
+include("possemideftrisparse.jl")
 include("hypoperlogdettri.jl")
 include("hyporootdettri.jl")
 include("wsosinterpnonnegative.jl")
 include("wsosinterppossemideftri.jl")
 include("wsosinterpepinormeucl.jl")
-include("possemideftrisparse.jl")
 
 use_dual(cone::Cone) = cone.use_dual
 use_3order_corr(cone::Cone) = false

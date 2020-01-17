@@ -1234,6 +1234,56 @@ function possemideftri9(T; options...)
     @test r.z ≈ [1, inv2, 0, inv2, 0, 0, inv2, -inv2, -inv2, 0, inv2, -invrt6, invrt6, -invrt6, 0, inv2] atol=tol rtol=tol
 end
 
+
+
+
+
+function possemideftrisparse1(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    c = T[0, -1, 0]
+    A = T[1 0 0; 0 0 1]
+    b = T[0.5, 1]
+    G = Matrix{T}(-I, 3, 3)
+    h = zeros(T, 3)
+    row_idxs = [1, 2, 2]
+    col_idxs = [1, 1, 2]
+    cones = CO.Cone{T}[CO.PosSemidefTriSparse{T, T}(2, row_idxs, col_idxs)]
+
+    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+    @test r.status == :Optimal
+    @test r.primal_obj ≈ -one(T) atol=tol rtol=tol
+    @test r.x[2] ≈ one(T) atol=tol rtol=tol
+end
+
+function possemideftrisparse2(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    rt2 = sqrt(T(2))
+    c = T[1]
+    A = zeros(T, 0, 1)
+    b = T[]
+    G = zeros(T, 10, 1)
+    G[[1, 2, 3, 6, 10]] .= -1
+    h = zeros(T, 10)
+    @. h[[4, 5, 7, 8, 9]] = rt2 * [1, 1, 1, -1, 1]
+    row_idxs = [1, 2, 3, 4, 4, 4, 5, 5, 5, 5]
+    col_idxs = [1, 2, 3, 1, 2, 4, 1, 2, 3, 5]
+    cones = CO.Cone{T}[CO.PosSemidefTriSparse{T, T}(5, row_idxs, col_idxs)]
+
+    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+    @test r.status == :Optimal
+    rt3 = sqrt(T(3))
+    @test r.primal_obj ≈ rt3 atol=tol rtol=tol
+    @test r.s ≈ [rt3, rt3, rt3, rt2, rt2, rt3, rt2, -rt2, rt2, rt3] atol=tol rtol=tol
+    inv6 = inv(T(6))
+    rt2inv6 = rt2 / 6
+    invrt6 = inv(rt2 * rt3)
+    @test r.z ≈ [inv6, inv6, inv6, 0, 0, 0, -invrt6, invrt6, -invrt6, inv(T(2))] atol=tol rtol=tol
+end
+
+
+
+
+
 function hypoperlogdettri1(T; options...)
     tol = sqrt(sqrt(eps(T)))
     rt2 = sqrt(T(2))
