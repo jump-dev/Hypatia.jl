@@ -39,6 +39,7 @@ mutable struct PosSemidefTriSparse{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
 
+    pointR::Vector{R}
     symb_mat
     fact_mat
     perm
@@ -64,15 +65,21 @@ mutable struct PosSemidefTriSparse{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
         is_dual::Bool;
         hess_fact_cache = hessian_cache(T), # TODO get inverse hessian directly
         ) where {R <: RealOrComplex{T}} where {T <: Real}
-        @assert R <: Real # TODO generalize and delete
-        dim = length(row_idxs) # TODO doesn't work for complex
-        @assert dim >= 1
-        @assert length(col_idxs) == dim
+        num_nz = length(row_idxs)
+        @assert length(col_idxs) == num_nz
         @assert all(col_idxs .<= row_idxs .<= side) # TODO improve efficiency
-        # TODO check diagonals are all present. maybe diagonals go first in point, then remaining elements are just the nonzeros off diag, and row/col idxs are only the off diags
         cone = new{T, R}()
+        if R <: Real
+            cone.dim = num_nz
+            cone.is_complex = false
+        else
+            tril_dim = num_nz - side
+            cone.dim = side + 2 * tril_dim
+            cone.is_complex = true
+        end
+        @assert cone.dim >= 1
+        # TODO check diagonals are all present. maybe diagonals go first in point, then remaining elements are just the nonzeros off diag, and row/col idxs are only the off diags
         cone.use_dual = is_dual
-        cone.dim = dim # real vector dimension
         cone.side = side # side dimension of sparse matrix
         cone.row_idxs = row_idxs
         cone.col_idxs = col_idxs
@@ -101,16 +108,16 @@ end
 # setup symbolic factorization
 function setup_symbfact(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     side = cone.side
+    dimR = length(cone.row_idxs)
 
     cm = CHOLMOD.defaults(CHOLMOD.common_struct)
-    # unsafe_store!(CHOLMOD.common_print[], 1)
+    unsafe_store!(CHOLMOD.common_print[], 0)
     unsafe_store!(CHOLMOD.common_postorder[], 1)
     # unsafe_store!(CHOLMOD.common_final_ll[], 1)
     unsafe_store!(CHOLMOD.common_supernodal[], 2)
 
-    tmp = cone.grad
-    tmp .= 1
-    mat = CHOLMOD.Sparse(Symmetric(sparse(cone.row_idxs, cone.col_idxs, tmp, side, side), :L))
+    cone.pointR = ones(R, dimR)
+    mat = CHOLMOD.Sparse(Hermitian(sparse(cone.row_idxs, cone.col_idxs, cone.pointR, side, side), :L))
     symb_mat = cone.symb_mat = CHOLMOD.fact_(mat, cm)
 
     cone.perm = symb_mat.p
@@ -169,9 +176,9 @@ function setup_symbfact(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrCompl
     num_cols = cone.num_cols = Vector{Int}(undef, num_super)
     num_rows = cone.num_rows = Vector{Int}(undef, num_super)
     J_rows = cone.J_rows = Vector{Vector}(undef, num_super)
-    cone.L_blocks = Vector{Matrix{Float64}}(undef, num_super)
-    cone.V_blocks = Vector{Matrix{Float64}}(undef, num_super)
-    cone.inv_blocks = Vector{Matrix{Float64}}(undef, num_super)
+    cone.L_blocks = Vector{Matrix{R}}(undef, num_super)
+    cone.V_blocks = Vector{Matrix{R}}(undef, num_super)
+    cone.inv_blocks = Vector{Matrix{R}}(undef, num_super)
     for k in 1:num_super
         num_col = num_cols[k] = supers[k + 1] - supers[k]
         num_row = num_rows[k] = fpi[k + 1] - fpi[k] # n rows
@@ -180,21 +187,24 @@ function setup_symbfact(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrCompl
         Jk = J_rows[k] = fs[fpi[k]:(fpi[k + 1] - 1)]
         @assert length(Jk) == num_row
 
-        cone.inv_blocks[k] = zeros(num_row, num_col)
+        cone.inv_blocks[k] = zeros(R, num_row, num_col)
     end
 
-    map_blocks = cone.map_blocks = Vector{Tuple{Int, Int, Int, Bool}}(undef, cone.dim)
-    for i in 1:cone.dim
+    map_blocks = cone.map_blocks = Vector{Tuple{Int, Int, Int, Bool, Bool}}(undef, dimR)
+    for i in 1:dimR
         row = cone.iperm[cone.row_idxs[i]]
         col = cone.iperm[cone.col_idxs[i]]
         if row < col
             (row, col) = (col, row)
+            swapped = true
+        else
+            swapped = false
         end
         super = supermap[col]
         J = J_rows[super]
         row_idx = findfirst(r -> r == row, J)
         col_idx = col - supers[super] + 1
-        map_blocks[i] = (super, row_idx, col_idx, row != col)
+        map_blocks[i] = (super, row_idx, col_idx, row != col, swapped)
     end
 
     return
@@ -202,10 +212,10 @@ end
 
 get_nu(cone::PosSemidefTriSparse) = cone.side
 
-function set_initial_point(arr::AbstractVector, cone::PosSemidefTriSparse)
+# real
+function set_initial_point(arr::AbstractVector, cone::PosSemidefTriSparse{T, T}) where {T <: Real}
     # set diagonal elements to 1
-    # TODO improve efficiency - maybe order diag elements at start
-    for i in 1:cone.dim
+    for i in eachindex(cone.pointR)
         if cone.row_idxs[i] == cone.col_idxs[i]
             arr[i] = 1
         else
@@ -215,19 +225,53 @@ function set_initial_point(arr::AbstractVector, cone::PosSemidefTriSparse)
     return arr
 end
 
-function update_feas(cone::PosSemidefTriSparse)
-    @assert !cone.feas_updated
-
-    # svec scale point
-    scal_point = copy(cone.point)
-    for i in 1:cone.dim
-        if cone.row_idxs[i] != cone.col_idxs[i]
-            scal_point[i] /= cone.rt2
+# complex
+function set_initial_point(arr::AbstractVector, cone::PosSemidefTriSparse{T, Complex{T}}) where {T <: Real}
+    # set diagonal elements to 1
+    idx = 1
+    for i in eachindex(cone.pointR)
+        if cone.row_idxs[i] == cone.col_idxs[i]
+            arr[idx] = 1
+            idx += 1
+        else
+            arr[idx] = 0
+            idx += 1
+            arr[idx] = 0
+            idx += 1
         end
     end
+    return arr
+end
+
+function update_feas(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
+    @assert !cone.feas_updated
+    point = cone.point
+    pointR = cone.pointR
+
+    # svec scale point
+    if cone.is_complex
+        idx = 1
+        for i in eachindex(pointR)
+            if cone.row_idxs[i] == cone.col_idxs[i]
+                pointR[i] = point[idx]
+                idx += 1
+            else
+                pointR[i] = Complex(point[idx], point[idx + 1]) / cone.rt2
+                idx += 2
+            end
+        end
+    else
+        copyto!(pointR, point)
+        for i in eachindex(pointR)
+            if cone.row_idxs[i] != cone.col_idxs[i]
+                pointR[i] /= cone.rt2
+            end
+        end
+    end
+
     # TODO make more efficient
-    sparse_point = sparse(cone.row_idxs, cone.col_idxs, scal_point, cone.side, cone.side)
-    mat = CHOLMOD.Sparse(Symmetric(sparse_point, :L))
+    sparse_point = sparse(cone.row_idxs, cone.col_idxs, pointR, cone.side, cone.side)
+    mat = CHOLMOD.Sparse(Hermitian(sparse_point, :L))
     # compute numeric factorization
     cone.fact_mat = CHOLMOD.cholesky!(cone.symb_mat, mat; check = false)
     cone.is_feas = isposdef(cone.fact_mat)
@@ -236,7 +280,7 @@ function update_feas(cone::PosSemidefTriSparse)
     return cone.is_feas
 end
 
-function update_grad(cone::PosSemidefTriSparse)
+function update_grad(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     @assert cone.is_feas
     num_super = length(cone.supers) - 1
     children = cone.children
@@ -268,13 +312,13 @@ function update_grad(cone::PosSemidefTriSparse)
         @views FD_nn = LowerTriangular(L_block[idxs_n, :])
         FD_inv = inv(FD_nn)
 
-        F = zeros(num_row, num_row)
-        @views F_nn = Symmetric(F[idxs_n, idxs_n], :L)
+        F = zeros(R, num_row, num_row)
+        @views F_nn = Hermitian(F[idxs_n, idxs_n], :L)
         mul!(F_nn.data, FD_inv', FD_inv)
 
         if num_row > num_col
             idxs_a = (num_col + 1):num_row
-            @views F_aa = Symmetric(F[idxs_a, idxs_a], :L)
+            @views F_aa = Hermitian(F[idxs_a, idxs_a], :L)
             @views F_an = F[idxs_a, idxs_n]
             L_a = @views rdiv!(L_block[idxs_a, :], FD_nn)
 
@@ -289,17 +333,29 @@ function update_grad(cone::PosSemidefTriSparse)
         for k2 in children[k]
             A2 = J_rows[k2][(num_cols[k2] + 1):end]
             EJA2 = Bool[i == j for i in J, j in A2]
-            V_blocks[k2] = Symmetric(EJA2' * Symmetric(F, :L) * EJA2, :L)
+            V_blocks[k2] = Hermitian(EJA2' * Hermitian(F, :L) * EJA2, :L)
         end
 
         inv_blocks[k] = F[:, idxs_n]
     end
 
     g = cone.grad
-    for (i, (super, row_idx, col_idx, scal)) in enumerate(cone.map_blocks)
-        g[i] = -inv_blocks[super][row_idx, col_idx]
+    @show cone.map_blocks
+    idx = 1
+    for (i, (super, row_idx, col_idx, scal, swapped)) in enumerate(cone.map_blocks)
+        giR = -inv_blocks[super][row_idx, col_idx]
         if scal
-            g[i] *= cone.rt2
+            giR *= cone.rt2
+        end
+        if cone.is_complex
+            g[idx] = real(giR)
+            idx += 1
+            if scal
+                g[idx] = swapped ? -imag(giR) : imag(giR)
+                idx += 1
+            end
+        else
+            g[i] = giR
         end
     end
 
@@ -307,7 +363,7 @@ function update_grad(cone::PosSemidefTriSparse)
     return cone.grad
 end
 
-function update_hess(cone::PosSemidefTriSparse)
+function update_hess(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     @assert cone.grad_updated
     H = cone.hess.data
     rt2 = sqrt(2)
@@ -320,13 +376,13 @@ function update_hess(cone::PosSemidefTriSparse)
         for H_block in in_blocks
             H_block .= 0
         end
-        (super, row_idx, col_idx, scal1) = cone.map_blocks[j]
+        (super, row_idx, col_idx, scal1, swapped1) = cone.map_blocks[j]
         @assert row_idx >= col_idx
         in_blocks[super][row_idx, col_idx] = (scal1 ? invrt2 : 1)
 
         out_blocks = H_prod_col(cone, in_blocks)
         for i in 1:j
-            (super, row_idx, col_idx, scal2) = cone.map_blocks[i]
+            (super, row_idx, col_idx, scal2, swapped2) = cone.map_blocks[i]
             H[i, j] = out_blocks[super][row_idx, col_idx]
             if scal2
                 H[i, j] *= rt2
@@ -340,7 +396,7 @@ end
 
 # TODO refactor parts to make easy to implement (inv)hess prod, (inv)hess sqrt prod
 # TODO need to split step 2 into two parts for sqrt prod
-function H_prod_col(cone::PosSemidefTriSparse, in_blocks)
+function H_prod_col(cone::PosSemidefTriSparse{T, R}, in_blocks) where {R <: RealOrComplex{T}} where {T <: Real}
     @assert cone.grad_updated
     num_super = length(cone.supers) - 1
     children = cone.children
@@ -349,11 +405,10 @@ function H_prod_col(cone::PosSemidefTriSparse, in_blocks)
     num_rows = cone.num_rows
     J_rows = cone.J_rows
     L_blocks = cone.L_blocks
-    # V_blocks = cone.V_blocks # TODO decide whether to keep preallocated / delete below
+    V_blocks = cone.V_blocks
     inv_blocks = cone.inv_blocks
 
     # step 1
-    V_blocks = Vector{Matrix{Float64}}(undef, num_super)
     for k in 1:num_super
         num_col = num_cols[k]
         num_row = num_rows[k]
@@ -362,22 +417,22 @@ function H_prod_col(cone::PosSemidefTriSparse, in_blocks)
         L_block = L_blocks[k]
         in_block = in_blocks[k]
 
-        F = zeros(num_row, num_row)
+        F = zeros(R, num_row, num_row)
         F[:, idxs_n] = in_block
 
         for k2 in children[k]
             U2 = V_blocks[k2]
             A2 = J_rows[k2][(num_cols[k2] + 1):end]
             EJA2 = Bool[i == j for i in J, j in A2]
-            F += Symmetric(EJA2 * Symmetric(U2, :L) * EJA2', :L)
+            F += Hermitian(EJA2 * Hermitian(U2, :L) * EJA2', :L)
         end
 
         if num_row > num_col
             idxs_a = (num_col + 1):num_row
             @views L_a = L_block[idxs_a, :]
             @views F_an = F[idxs_a, idxs_n]
-            @views F_aa = Symmetric(F[idxs_a, idxs_a], :L)
-            @views F_nn = Symmetric(F[idxs_n, idxs_n], :L)
+            @views F_aa = Hermitian(F[idxs_a, idxs_a], :L)
+            @views F_nn = Hermitian(F[idxs_n, idxs_n], :L)
 
             mul!(F_aa.data, L_a, F_an', -1, true)
             mul!(F_an, L_a, F_nn, -1, true)
@@ -390,7 +445,6 @@ function H_prod_col(cone::PosSemidefTriSparse, in_blocks)
     end
 
     # step 2
-    V_blocks = Vector{Matrix{Float64}}(undef, num_super)
     for k in reverse(1:num_super)
         num_col = num_cols[k]
         num_row = num_rows[k]
@@ -400,7 +454,7 @@ function H_prod_col(cone::PosSemidefTriSparse, in_blocks)
         inv_block = inv_blocks[k]
         in_block = in_blocks[k]
 
-        F = zeros(num_row, num_row)
+        F = zeros(R, num_row, num_row)
 
         if num_row > num_col
             idxs_a = (num_col + 1):num_row
@@ -418,11 +472,11 @@ function H_prod_col(cone::PosSemidefTriSparse, in_blocks)
         for k2 in children[k]
             A2 = J_rows[k2][(num_cols[k2] + 1):end]
             EJA2 = Bool[i == j for i in J, j in A2]
-            V_blocks[k2] = Symmetric(EJA2' * Symmetric(F, :L) * EJA2, :L)
+            V_blocks[k2] = Hermitian(EJA2' * Hermitian(F, :L) * EJA2, :L)
         end
 
         @views in_block_n = in_block[idxs_n, :]
-        copytri!(in_block_n, 'L')
+        copytri!(in_block_n, 'L', cone.is_complex)
         FD_nn = LowerTriangular(L_block[idxs_n, :])
         ldiv!(FD_nn, in_block_n)
         ldiv!(FD_nn', in_block_n)
@@ -432,7 +486,6 @@ function H_prod_col(cone::PosSemidefTriSparse, in_blocks)
     end
 
     # step 3
-    V_blocks = Vector{Matrix{Float64}}(undef, num_super)
     for k in reverse(1:num_super)
         num_col = num_cols[k]
         num_row = num_rows[k]
@@ -441,15 +494,15 @@ function H_prod_col(cone::PosSemidefTriSparse, in_blocks)
         L_block = L_blocks[k]
         in_block = in_blocks[k]
 
-        F = zeros(num_row, num_row)
+        F = zeros(R, num_row, num_row)
         F[:, idxs_n] = in_block
 
         if num_row > num_col
             idxs_a = (num_col + 1):num_row
             L_a = L_block[idxs_a, :]
             @views F_an = F[idxs_a, idxs_n]
-            @views F_aa = Symmetric(F[idxs_a, idxs_a], :L)
-            @views F_nn = Symmetric(F[idxs_n, idxs_n], :L)
+            @views F_aa = Hermitian(F[idxs_a, idxs_a], :L)
+            @views F_nn = Hermitian(F[idxs_n, idxs_n], :L)
 
             V = V_blocks[k]
             copyto!(F_aa.data, V)
@@ -462,7 +515,7 @@ function H_prod_col(cone::PosSemidefTriSparse, in_blocks)
         for k2 in children[k]
             A2 = J_rows[k2][(num_cols[k2] + 1):end]
             EJA2 = Bool[i == j for i in J, j in A2]
-            V_blocks[k2] = Symmetric(EJA2' * Symmetric(F, :L) * EJA2, :L)
+            V_blocks[k2] = Hermitian(EJA2' * Hermitian(F, :L) * EJA2, :L)
         end
 
         in_blocks[k] = tril!(F[:, idxs_n])
