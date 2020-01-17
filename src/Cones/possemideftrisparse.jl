@@ -12,7 +12,10 @@ TODO
 - describe
 - hermitian case
 - reference
+- doesn't seem to need to be chordal/filled
 =#
+
+import SuiteSparse.CHOLMOD
 
 mutable struct PosSemidefTriSparse{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     use_dual::Bool
@@ -36,8 +39,23 @@ mutable struct PosSemidefTriSparse{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
 
+    symb_mat
     fact_mat
-    inv_mat
+    perm
+    iperm
+    supers
+    fpx
+    xptr
+    supermap
+    parents # TODO don't save if not used
+    children
+    num_cols
+    num_rows
+    J_rows
+    L_blocks
+    V_blocks
+    inv_blocks
+    map_blocks
 
     function PosSemidefTriSparse{T, R}(
         side::Int,
@@ -76,13 +94,116 @@ function setup_data(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{T
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
+    setup_symbfact(cone)
+    return
+end
+
+# setup symbolic factorization
+function setup_symbfact(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
+    side = cone.side
+
+    cm = CHOLMOD.defaults(CHOLMOD.common_struct)
+    # unsafe_store!(CHOLMOD.common_print[], 1)
+    unsafe_store!(CHOLMOD.common_postorder[], 1)
+    # unsafe_store!(CHOLMOD.common_final_ll[], 1)
+    unsafe_store!(CHOLMOD.common_supernodal[], 2)
+
+    tmp = cone.grad
+    tmp .= 1
+    mat = CHOLMOD.Sparse(Symmetric(sparse(cone.row_idxs, cone.col_idxs, tmp, side, side), :L))
+    symb_mat = cone.symb_mat = CHOLMOD.fact_(mat, cm)
+
+    cone.perm = symb_mat.p
+    cone.iperm = invperm(cone.perm)
+
+    f = unsafe_load(pointer(symb_mat))
+    @assert f.n == cone.side
+    @assert f.is_ll != 0
+    @assert f.is_super != 0
+
+    num_super = Int(f.nsuper)
+    ssize = Int(f.ssize)
+    supers = f.super
+    fpi = f.pi
+    fpx = f.px
+    fs = f.s
+    fx = f.x
+
+    supers = cone.supers = [unsafe_load(supers, i) + 1 for i in 1:num_super]
+    fpi = [unsafe_load(fpi, i) + 1 for i in 1:num_super]
+    fpx = cone.fpx = [unsafe_load(fpx, i) + 1 for i in 1:num_super]
+    fs = [unsafe_load(fs, i) + 1 for i in 1:ssize]
+    cone.xptr = f.x
+
+    push!(supers, side + 1)
+    push!(fpi, length(fs) + 1)
+
+    # construct supermap
+    # supermap[k] = s if column k is in supernode s
+    supermap = cone.supermap = zeros(Int, side)
+    for s in 1:num_super, k in supers[s]:(supers[s + 1] - 1)
+        supermap[k] = s
+    end
+
+    # construct supernode tree
+    parents = cone.parents = zeros(Int, num_super)
+    children = cone.children = [Int[] for k in 1:num_super]
+    for k in 1:num_super
+        nn = supers[k + 1] - supers[k] # n cols
+        nj = fpi[k + 1] - fpi[k] # n rows
+        na = nj - nn # n rows below tri
+        @assert nn >= 0
+        @assert nj >= 0
+        @assert na >= 0
+
+        if !iszero(na)
+            kparloc = fs[fpi[k] + nn]
+            kparent = supermap[kparloc]
+            # @assert k < kparent <= num_super
+            @assert supers[kparent] <= kparloc < supers[kparent + 1]
+            parents[k] = kparent
+            push!(children[kparent], k)
+        end
+    end
+
+    num_cols = cone.num_cols = Vector{Int}(undef, num_super)
+    num_rows = cone.num_rows = Vector{Int}(undef, num_super)
+    J_rows = cone.J_rows = Vector{Vector}(undef, num_super)
+    cone.L_blocks = Vector{Matrix{Float64}}(undef, num_super)
+    cone.V_blocks = Vector{Matrix{Float64}}(undef, num_super)
+    cone.inv_blocks = Vector{Matrix{Float64}}(undef, num_super)
+    for k in 1:num_super
+        num_col = num_cols[k] = supers[k + 1] - supers[k]
+        num_row = num_rows[k] = fpi[k + 1] - fpi[k] # n rows
+        @assert 0 < num_col <= num_row
+
+        Jk = J_rows[k] = fs[fpi[k]:(fpi[k + 1] - 1)]
+        @assert length(Jk) == num_row
+
+        cone.inv_blocks[k] = zeros(num_row, num_col)
+    end
+
+    map_blocks = cone.map_blocks = Vector{Tuple{Int, Int, Int, Bool}}(undef, cone.dim)
+    for i in 1:cone.dim
+        row = cone.iperm[cone.row_idxs[i]]
+        col = cone.iperm[cone.col_idxs[i]]
+        if row < col
+            (row, col) = (col, row)
+        end
+        super = supermap[col]
+        J = J_rows[super]
+        row_idx = findfirst(r -> r == row, J)
+        col_idx = col - supers[super] + 1
+        map_blocks[i] = (super, row_idx, col_idx, row != col)
+    end
+
     return
 end
 
 get_nu(cone::PosSemidefTriSparse) = cone.side
 
 function set_initial_point(arr::AbstractVector, cone::PosSemidefTriSparse)
-    # TODO set diagonal elements to 1
+    # set diagonal elements to 1
     # TODO improve efficiency - maybe order diag elements at start
     for i in 1:cone.dim
         if cone.row_idxs[i] == cone.col_idxs[i]
@@ -97,14 +218,18 @@ end
 function update_feas(cone::PosSemidefTriSparse)
     @assert !cone.feas_updated
 
+    # svec scale point
     scal_point = copy(cone.point)
     for i in 1:cone.dim
         if cone.row_idxs[i] != cone.col_idxs[i]
             scal_point[i] /= cone.rt2
         end
     end
-    mat = Symmetric(Matrix(sparse(cone.row_idxs, cone.col_idxs, scal_point, cone.side, cone.side)), :L) # TODO not dense
-    cone.fact_mat = cholesky(mat, check = false)
+    # TODO make more efficient
+    sparse_point = sparse(cone.row_idxs, cone.col_idxs, scal_point, cone.side, cone.side)
+    mat = CHOLMOD.Sparse(Symmetric(sparse_point, :L))
+    # compute numeric factorization
+    cone.fact_mat = CHOLMOD.cholesky!(cone.symb_mat, mat; check = false)
     cone.is_feas = isposdef(cone.fact_mat)
 
     cone.feas_updated = true
@@ -113,12 +238,68 @@ end
 
 function update_grad(cone::PosSemidefTriSparse)
     @assert cone.is_feas
+    num_super = length(cone.supers) - 1
+    children = cone.children
+    # parents = cone.parents
+    num_cols = cone.num_cols
+    num_rows = cone.num_rows
+    J_rows = cone.J_rows
+    L_blocks = cone.L_blocks
+    V_blocks = cone.V_blocks
+    inv_blocks = cone.inv_blocks
 
-    cone.inv_mat = inv(cone.fact_mat)
-    for i in 1:cone.dim
-        cone.grad[i] = -cone.inv_mat[cone.row_idxs[i], cone.col_idxs[i]]
-        if cone.row_idxs[i] != cone.col_idxs[i]
-            cone.grad[i] *= cone.rt2
+    # update L blocks from numerical factorization
+    f = unsafe_load(pointer(cone.symb_mat))
+    for k in 1:num_super
+        num_col = num_cols[k]
+        num_row = num_rows[k]
+        x_idxs = cone.fpx[k] - 1 .+ (1:(num_row * num_col))
+        L_blocks[k] = reshape([unsafe_load(f.x, i) for i in x_idxs], num_row, num_col)
+    end
+
+    # build inv blocks
+    for k in reverse(1:num_super)
+        num_col = num_cols[k]
+        num_row = num_rows[k]
+        idxs_n = 1:num_col
+        J = J_rows[k]
+        L_block = L_blocks[k]
+
+        @views FD_nn = LowerTriangular(L_block[idxs_n, :])
+        FD_inv = inv(FD_nn)
+
+        F = zeros(num_row, num_row)
+        @views F_nn = Symmetric(F[idxs_n, idxs_n], :L)
+        mul!(F_nn.data, FD_inv', FD_inv)
+
+        if num_row > num_col
+            idxs_a = (num_col + 1):num_row
+            @views F_aa = Symmetric(F[idxs_a, idxs_a], :L)
+            @views F_an = F[idxs_a, idxs_n]
+            L_a = @views rdiv!(L_block[idxs_a, :], FD_nn)
+
+            V = V_blocks[k]
+            copyto!(F_aa.data, V)
+
+            mul!(F_an, V, L_a, -1, false)
+            mul!(F_nn.data, F_an', L_a, -1, true)
+        end
+
+        # TODO not very efficient since zeros in V
+        for k2 in children[k]
+            A2 = J_rows[k2][(num_cols[k2] + 1):end]
+            EJA2 = Bool[i == j for i in J, j in A2]
+            V_blocks[k2] = Symmetric(EJA2' * Symmetric(F, :L) * EJA2, :L)
+        end
+
+        inv_blocks[k] = F[:, idxs_n]
+    end
+
+    g = cone.grad
+    for (i, (super, row_idx, col_idx, scal)) in enumerate(cone.map_blocks)
+        g[i] = -inv_blocks[super][row_idx, col_idx]
+        if scal
+            g[i] *= cone.rt2
         end
     end
 
@@ -129,13 +310,163 @@ end
 function update_hess(cone::PosSemidefTriSparse)
     @assert cone.grad_updated
     H = cone.hess.data
+    rt2 = sqrt(2)
+    invrt2 = inv(rt2)
 
-    svec_dim = svec_length(cone.side)
-    full_kron = Symmetric(symm_kron(zeros(eltype(H), svec_dim, svec_dim), cone.inv_mat, cone.rt2), :U)
-    for i in 1:cone.dim, j in i:cone.dim
-        H[i, j] = full_kron[svec_idx(cone.row_idxs[i], cone.col_idxs[i]), svec_idx(cone.row_idxs[j], cone.col_idxs[j])]
+    # for each column in identity, get hess prod to build explicit hess
+    # TODO not very efficient way to do the hessian explicitly, but somewhat efficient for hess_prod
+    for j in 1:cone.dim
+        in_blocks = [copy(L_block) for L_block in cone.L_blocks]
+        for H_block in in_blocks
+            H_block .= 0
+        end
+        (super, row_idx, col_idx, scal1) = cone.map_blocks[j]
+        @assert row_idx >= col_idx
+        in_blocks[super][row_idx, col_idx] = (scal1 ? invrt2 : 1)
+
+        out_blocks = H_prod_col(cone, in_blocks)
+        for i in 1:j
+            (super, row_idx, col_idx, scal2) = cone.map_blocks[i]
+            H[i, j] = out_blocks[super][row_idx, col_idx]
+            if scal2
+                H[i, j] *= rt2
+            end
+        end
     end
 
     cone.hess_updated = true
     return cone.hess
+end
+
+# TODO refactor parts to make easy to implement (inv)hess prod, (inv)hess sqrt prod
+# TODO need to split step 2 into two parts for sqrt prod
+function H_prod_col(cone::PosSemidefTriSparse, in_blocks)
+    @assert cone.grad_updated
+    num_super = length(cone.supers) - 1
+    children = cone.children
+    # parents = cone.parents
+    num_cols = cone.num_cols
+    num_rows = cone.num_rows
+    J_rows = cone.J_rows
+    L_blocks = cone.L_blocks
+    # V_blocks = cone.V_blocks # TODO decide whether to keep preallocated / delete below
+    inv_blocks = cone.inv_blocks
+
+    # step 1
+    V_blocks = Vector{Matrix{Float64}}(undef, num_super)
+    for k in 1:num_super
+        num_col = num_cols[k]
+        num_row = num_rows[k]
+        idxs_n = 1:num_col
+        J = J_rows[k]
+        L_block = L_blocks[k]
+        in_block = in_blocks[k]
+
+        F = zeros(num_row, num_row)
+        F[:, idxs_n] = in_block
+
+        for k2 in children[k]
+            U2 = V_blocks[k2]
+            A2 = J_rows[k2][(num_cols[k2] + 1):end]
+            EJA2 = Bool[i == j for i in J, j in A2]
+            F += Symmetric(EJA2 * Symmetric(U2, :L) * EJA2', :L)
+        end
+
+        if num_row > num_col
+            idxs_a = (num_col + 1):num_row
+            @views L_a = L_block[idxs_a, :]
+            @views F_an = F[idxs_a, idxs_n]
+            @views F_aa = Symmetric(F[idxs_a, idxs_a], :L)
+            @views F_nn = Symmetric(F[idxs_n, idxs_n], :L)
+
+            mul!(F_aa.data, L_a, F_an', -1, true)
+            mul!(F_an, L_a, F_nn, -1, true)
+            mul!(F_aa.data, F_an, L_a', -1, true)
+
+            V_blocks[k] = F_aa
+        end
+
+        in_blocks[k] = tril!(F[:, idxs_n])
+    end
+
+    # step 2
+    V_blocks = Vector{Matrix{Float64}}(undef, num_super)
+    for k in reverse(1:num_super)
+        num_col = num_cols[k]
+        num_row = num_rows[k]
+        idxs_n = 1:num_col
+        J = J_rows[k]
+        L_block = L_blocks[k]
+        inv_block = inv_blocks[k]
+        in_block = in_blocks[k]
+
+        F = zeros(num_row, num_row)
+
+        if num_row > num_col
+            idxs_a = (num_col + 1):num_row
+            V = V_blocks[k]
+
+            @views in_block_a = in_block[idxs_a, :]
+            @views F_an = mul!(F[idxs_a, idxs_n], V, in_block_a)
+            copyto!(in_block_a, F_an)
+
+            F[idxs_a, idxs_a] = V
+        end
+
+        F[:, idxs_n] = inv_block
+
+        for k2 in children[k]
+            A2 = J_rows[k2][(num_cols[k2] + 1):end]
+            EJA2 = Bool[i == j for i in J, j in A2]
+            V_blocks[k2] = Symmetric(EJA2' * Symmetric(F, :L) * EJA2, :L)
+        end
+
+        @views in_block_n = in_block[idxs_n, :]
+        copytri!(in_block_n, 'L')
+        FD_nn = LowerTriangular(L_block[idxs_n, :])
+        ldiv!(FD_nn, in_block_n)
+        ldiv!(FD_nn', in_block_n)
+        rdiv!(in_block, FD_nn')
+        rdiv!(in_block, FD_nn)
+        tril!(in_block)
+    end
+
+    # step 3
+    V_blocks = Vector{Matrix{Float64}}(undef, num_super)
+    for k in reverse(1:num_super)
+        num_col = num_cols[k]
+        num_row = num_rows[k]
+        idxs_n = 1:num_col
+        J = J_rows[k]
+        L_block = L_blocks[k]
+        in_block = in_blocks[k]
+
+        F = zeros(num_row, num_row)
+        F[:, idxs_n] = in_block
+
+        if num_row > num_col
+            idxs_a = (num_col + 1):num_row
+            L_a = L_block[idxs_a, :]
+            @views F_an = F[idxs_a, idxs_n]
+            @views F_aa = Symmetric(F[idxs_a, idxs_a], :L)
+            @views F_nn = Symmetric(F[idxs_n, idxs_n], :L)
+
+            V = V_blocks[k]
+            copyto!(F_aa.data, V)
+
+            mul!(F_nn.data, F_an', L_a, -1, true)
+            mul!(F_an, F_aa, L_a, -1, true)
+            mul!(F_nn.data, L_a', F_an, -1, true)
+        end
+
+        for k2 in children[k]
+            A2 = J_rows[k2][(num_cols[k2] + 1):end]
+            EJA2 = Bool[i == j for i in J, j in A2]
+            V_blocks[k2] = Symmetric(EJA2' * Symmetric(F, :L) * EJA2, :L)
+        end
+
+        in_blocks[k] = tril!(F[:, idxs_n])
+    end
+
+    return in_blocks
 end
