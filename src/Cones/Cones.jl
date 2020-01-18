@@ -10,6 +10,7 @@ using TimerOutputs
 using LinearAlgebra
 import LinearAlgebra.copytri!
 import LinearAlgebra.HermOrSym
+import LinearAlgebra.BlasReal
 using SparseArrays
 import Hypatia.RealOrComplex
 import Hypatia.DenseSymCache
@@ -21,7 +22,7 @@ import Hypatia.sqrt_prod
 import Hypatia.inv_sqrt_prod
 import Hypatia.invert
 
-# hessian_cache(T::Type{<:LinearAlgebra.BlasReal}) = DenseSymCache{T}() # use Bunch Kaufman for BlasReals from start
+# hessian_cache(T::Type{<:BlasReal}) = DenseSymCache{T}() # use Bunch Kaufman for BlasReals from start
 hessian_cache(T::Type{<:Real}) = DensePosDefCache{T}()
 
 abstract type Cone{T <: Real} end
@@ -79,7 +80,7 @@ function update_hess_fact(cone::Cone{T}) where {T <: Real}
 
     @timeit cone.timer "hess_fact" fact_success = update_fact(cone.hess_fact_cache, cone.hess)
     if !fact_success
-        if T <: LinearAlgebra.BlasReal && cone.hess_fact_cache isa DensePosDefCache{T}
+        if T <: BlasReal && cone.hess_fact_cache isa DensePosDefCache{T}
             @warn("Switching Hessian cache from Cholesky to Bunch Kaufman")
             cone.hess_fact_cache = DenseSymCache{T}()
             load_matrix(cone.hess_fact_cache, cone.hess)
