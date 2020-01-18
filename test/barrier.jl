@@ -56,9 +56,9 @@ function test_barrier_oracles(
         fd_grad = ForwardDiff.gradient(barrier, point)
         @test grad ≈ fd_grad atol=tol rtol=tol
 
-        # hess = CO.hess(cone)
-        # fd_hess = ForwardDiff.hessian(barrier, point)
-        # @test hess ≈ fd_hess atol=tol rtol=tol
+        hess = CO.hess(cone)
+        fd_hess = ForwardDiff.hessian(barrier, point)
+        @test hess ≈ fd_hess atol=tol rtol=tol
     # end
 
     # TODO decide whether to add
@@ -343,7 +343,7 @@ function test_possemideftrisparse_barrier(T::Type{<:Real})
     # append!(row_idxs, 1:17)
     # append!(col_idxs, 1:17)
 
-    for side in [1, 2, 4, 6, 8, 12, 15, 20, 25, 30, ]#40, 50, 60, 70, 80, 100, 150, 200]
+    for side in [1, 2, 3, 4, 6, 8, 12, 15, 20, 25, 30, 40, 50, 60, 70, 80, ]#100, 150, 200]
         @show side
         invrt2 = inv(sqrt(T(2)))
 
@@ -364,19 +364,21 @@ function test_possemideftrisparse_barrier(T::Type{<:Real})
             end
         end
 
-        # real sparse PSD cone
-        function R_barrier(s)
-            scal_s = copy(s)
-            for i in eachindex(s)
-                if row_idxs[i] != col_idxs[i]
-                    scal_s[i] *= invrt2
-                end
-            end
-            S = Matrix(sparse(row_idxs, col_idxs, scal_s, side, side))
-            return -logdet(cholesky(Symmetric(S, :L)))
-        end
-        test_barrier_oracles(CO.PosSemidefTriSparse{T, T}(side, row_idxs, col_idxs), R_barrier)
+        # println("real")
+        # # real sparse PSD cone
+        # function R_barrier(s)
+        #     scal_s = copy(s)
+        #     for i in eachindex(s)
+        #         if row_idxs[i] != col_idxs[i]
+        #             scal_s[i] *= invrt2
+        #         end
+        #     end
+        #     S = Matrix(sparse(row_idxs, col_idxs, scal_s, side, side))
+        #     return -logdet(cholesky(Symmetric(S, :L)))
+        # end
+        # test_barrier_oracles(CO.PosSemidefTriSparse{T, T}(side, row_idxs, col_idxs), R_barrier)
 
+        println("complex")
         # complex sparse PSD cone
         function C_barrier(s)
             scal_s = zeros(Complex{eltype(s)}, length(row_idxs))

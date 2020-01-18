@@ -340,7 +340,6 @@ function update_grad(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{
     end
 
     g = cone.grad
-    @show cone.map_blocks
     idx = 1
     for (i, (super, row_idx, col_idx, scal, swapped)) in enumerate(cone.map_blocks)
         giR = -inv_blocks[super][row_idx, col_idx]
@@ -363,29 +362,94 @@ function update_grad(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{
     return cone.grad
 end
 
+# for each column in identity, get hess prod to build explicit hess
+# TODO not very efficient way to do the hessian explicitly, but somewhat efficient for hess_prod
 function update_hess(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     @assert cone.grad_updated
     H = cone.hess.data
-    rt2 = sqrt(2)
+    rt2 = cone.rt2
     invrt2 = inv(rt2)
 
-    # for each column in identity, get hess prod to build explicit hess
-    # TODO not very efficient way to do the hessian explicitly, but somewhat efficient for hess_prod
-    for j in 1:cone.dim
-        in_blocks = [copy(L_block) for L_block in cone.L_blocks]
+
+    # for j in 1:cone.dim
+    #     in_blocks = [copy(L_block) for L_block in cone.L_blocks]
+    #     for H_block in in_blocks
+    #         H_block .= 0
+    #     end
+    #     (super, row_idx, col_idx, scal1, swapped1) = cone.map_blocks[j]
+    #     @assert row_idx >= col_idx
+    #     in_blocks[super][row_idx, col_idx] = (scal1 ? invrt2 : 1)
+    #
+    #     out_blocks = H_prod_col(cone, in_blocks)
+    #     for i in 1:j
+    #         (super, row_idx, col_idx, scal2, swapped2) = cone.map_blocks[i]
+    #         H[i, j] = out_blocks[super][row_idx, col_idx]
+    #         if scal2
+    #             H[i, j] *= rt2
+    #         end
+    #     end
+    # end
+
+    in_blocks = [similar(L_block) for L_block in cone.L_blocks] # TODO prealloc
+
+    H_idx_j = 1
+    for (j, (super_j, row_idx_j, col_idx_j, scal_j, swapped_j)) in enumerate(cone.map_blocks)
         for H_block in in_blocks
             H_block .= 0
         end
-        (super, row_idx, col_idx, scal1, swapped1) = cone.map_blocks[j]
-        @assert row_idx >= col_idx
-        in_blocks[super][row_idx, col_idx] = (scal1 ? invrt2 : 1)
 
-        out_blocks = H_prod_col(cone, in_blocks)
-        for i in 1:j
-            (super, row_idx, col_idx, scal2, swapped2) = cone.map_blocks[i]
-            H[i, j] = out_blocks[super][row_idx, col_idx]
-            if scal2
-                H[i, j] *= rt2
+        if cone.is_complex
+            # real part j
+            in_blocks[super_j][row_idx_j, col_idx_j] = (scal_j ? invrt2 : 1)
+            out_blocks = H_prod_col(cone, in_blocks)
+            H_idx_i = 1
+            for i in 1:j
+                (super_i, row_idx_i, col_idx_i, scal_i, swapped_i) = cone.map_blocks[i]
+                HijR = out_blocks[super_i][row_idx_i, col_idx_i]
+                if scal_i
+                    HijR *= rt2
+                end
+                H[H_idx_i, H_idx_j] = real(HijR) # real part i
+                H_idx_i += 1
+                if row_idx_i != col_idx_i
+                    H[H_idx_i, H_idx_j] = swapped_i ? -imag(HijR) : imag(HijR) # complex part i
+                    H_idx_i += 1
+                end
+            end
+            H_idx_j += 1
+
+            if row_idx_j != col_idx_j
+                # complex part j
+                for H_block in in_blocks
+                    H_block .= 0
+                end
+                in_blocks[super_j][row_idx_j, col_idx_j] = (scal_j ? invrt2 : 1) * im
+                out_blocks = H_prod_col(cone, in_blocks)
+                H_idx_i = 1
+                for i in 1:j
+                    (super_i, row_idx_i, col_idx_i, scal_i, swapped_i) = cone.map_blocks[i]
+                    HijR = out_blocks[super_i][row_idx_i, col_idx_i]
+                    if scal_i
+                        HijR *= rt2
+                    end
+                    H[H_idx_i, H_idx_j] = swapped_j ? -real(HijR) : real(HijR) # real part i
+                    H_idx_i += 1
+                    if row_idx_i != col_idx_i
+                        H[H_idx_i, H_idx_j] = xor(swapped_i, swapped_j) ? -imag(HijR) : imag(HijR) # complex part i
+                        H_idx_i += 1
+                    end
+                end
+                H_idx_j += 1
+            end
+        else
+            in_blocks[super_j][row_idx_j, col_idx_j] = (scal_j ? invrt2 : 1)
+            out_blocks = H_prod_col(cone, in_blocks)
+            for i in 1:j
+                (super_i, row_idx_i, col_idx_i, scal_i, swapped_i) = cone.map_blocks[i]
+                H[i, j] = out_blocks[super_i][row_idx_i, col_idx_i]
+                if scal_i
+                    H[i, j] *= rt2
+                end
             end
         end
     end
