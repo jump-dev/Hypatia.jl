@@ -17,7 +17,7 @@ TODO
 
 import SuiteSparse.CHOLMOD
 
-mutable struct PosSemidefTriSparse{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
+mutable struct PosSemidefTriSparse{T <: BlasReal, R <: RealOrComplex{T}} <: Cone{T}
     use_dual::Bool
     dim::Int
     side::Int
@@ -64,7 +64,7 @@ mutable struct PosSemidefTriSparse{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
         col_idxs::Vector{Int},
         is_dual::Bool;
         hess_fact_cache = hessian_cache(T), # TODO get inverse hessian directly
-        ) where {R <: RealOrComplex{T}} where {T <: Real}
+        ) where {R <: RealOrComplex{T}} where {T <: BlasReal}
         num_nz = length(row_idxs)
         @assert length(col_idxs) == num_nz
         @assert all(col_idxs .<= row_idxs .<= side) # TODO improve efficiency
@@ -89,11 +89,11 @@ mutable struct PosSemidefTriSparse{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     end
 end
 
-PosSemidefTriSparse{T, R}(side::Int, row_idxs::Vector{Int}, col_idxs::Vector{Int}) where {R <: RealOrComplex{T}} where {T <: Real} = PosSemidefTriSparse{T, R}(side, row_idxs, col_idxs, false)
+PosSemidefTriSparse{T, R}(side::Int, row_idxs::Vector{Int}, col_idxs::Vector{Int}) where {R <: RealOrComplex{T}} where {T <: BlasReal} = PosSemidefTriSparse{T, R}(side, row_idxs, col_idxs, false)
 
 # reset_data(cone::PosSemidefTriSparse) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
 
-function setup_data(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
+function setup_data(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{T}} where {T <: BlasReal}
     reset_data(cone)
     dim = cone.dim
     cone.point = zeros(T, dim)
@@ -106,7 +106,7 @@ function setup_data(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{T
 end
 
 # setup symbolic factorization
-function setup_symbfact(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
+function setup_symbfact(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{T}} where {T <: BlasReal}
     side = cone.side
     dimR = length(cone.row_idxs)
 
@@ -213,7 +213,7 @@ end
 get_nu(cone::PosSemidefTriSparse) = cone.side
 
 # real
-function set_initial_point(arr::AbstractVector, cone::PosSemidefTriSparse{T, T}) where {T <: Real}
+function set_initial_point(arr::AbstractVector, cone::PosSemidefTriSparse{T, T}) where {T <: BlasReal}
     # set diagonal elements to 1
     for i in eachindex(cone.pointR)
         if cone.row_idxs[i] == cone.col_idxs[i]
@@ -226,7 +226,7 @@ function set_initial_point(arr::AbstractVector, cone::PosSemidefTriSparse{T, T})
 end
 
 # complex
-function set_initial_point(arr::AbstractVector, cone::PosSemidefTriSparse{T, Complex{T}}) where {T <: Real}
+function set_initial_point(arr::AbstractVector, cone::PosSemidefTriSparse{T, Complex{T}}) where {T <: BlasReal}
     # set diagonal elements to 1
     idx = 1
     for i in eachindex(cone.pointR)
@@ -243,7 +243,7 @@ function set_initial_point(arr::AbstractVector, cone::PosSemidefTriSparse{T, Com
     return arr
 end
 
-function update_feas(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
+function update_feas(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{T}} where {T <: BlasReal}
     @assert !cone.feas_updated
     point = cone.point
     pointR = cone.pointR
@@ -280,7 +280,7 @@ function update_feas(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{
     return cone.is_feas
 end
 
-function update_grad(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
+function update_grad(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{T}} where {T <: BlasReal}
     @assert cone.is_feas
     num_super = length(cone.supers) - 1
     children = cone.children
@@ -364,31 +364,11 @@ end
 
 # for each column in identity, get hess prod to build explicit hess
 # TODO not very efficient way to do the hessian explicitly, but somewhat efficient for hess_prod
-function update_hess(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
+function update_hess(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{T}} where {T <: BlasReal}
     @assert cone.grad_updated
     H = cone.hess.data
     rt2 = cone.rt2
     invrt2 = inv(rt2)
-
-
-    # for j in 1:cone.dim
-    #     in_blocks = [copy(L_block) for L_block in cone.L_blocks]
-    #     for H_block in in_blocks
-    #         H_block .= 0
-    #     end
-    #     (super, row_idx, col_idx, scal1, swapped1) = cone.map_blocks[j]
-    #     @assert row_idx >= col_idx
-    #     in_blocks[super][row_idx, col_idx] = (scal1 ? invrt2 : 1)
-    #
-    #     out_blocks = H_prod_col(cone, in_blocks)
-    #     for i in 1:j
-    #         (super, row_idx, col_idx, scal2, swapped2) = cone.map_blocks[i]
-    #         H[i, j] = out_blocks[super][row_idx, col_idx]
-    #         if scal2
-    #             H[i, j] *= rt2
-    #         end
-    #     end
-    # end
 
     in_blocks = [similar(L_block) for L_block in cone.L_blocks] # TODO prealloc
 
@@ -460,7 +440,7 @@ end
 
 # TODO refactor parts to make easy to implement (inv)hess prod, (inv)hess sqrt prod
 # TODO need to split step 2 into two parts for sqrt prod
-function H_prod_col(cone::PosSemidefTriSparse{T, R}, in_blocks) where {R <: RealOrComplex{T}} where {T <: Real}
+function H_prod_col(cone::PosSemidefTriSparse{T, R}, in_blocks) where {R <: RealOrComplex{T}} where {T <: BlasReal}
     @assert cone.grad_updated
     num_super = length(cone.supers) - 1
     children = cone.children
