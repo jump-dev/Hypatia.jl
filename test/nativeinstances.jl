@@ -1270,7 +1270,7 @@ function possemideftrisparse3(T; options...)
     tol = sqrt(sqrt(eps(T)))
     rt2 = sqrt(T(2))
     Random.seed!(1)
-    for is_complex in (false, true), side in [1, 2, 3, 5]
+    for is_complex in (false, true), side in [1, 2, 5, 20]
         R = (is_complex ? Complex{T} : T)
         rand_mat_L = tril!(sprand(R, side, side, inv(sqrt(side))) + I)
         (row_idxs, col_idxs, vals) = findnz(rand_mat_L)
