@@ -13,6 +13,7 @@ TODO
 - hermitian case
 - reference
 - doesn't seem to need to be chordal/filled
+- try to reuse S blocks from grad for the step 2 hess
 =#
 
 import SuiteSparse.CHOLMOD
@@ -48,13 +49,13 @@ mutable struct PosSemidefTriSparse{T <: BlasReal, R <: RealOrComplex{T}} <: Cone
     fpx
     xptr
     supermap
-    parents # TODO don't save if not used
-    children
+    parents
+    children # TODO don't save if not used
     num_cols
     num_rows
     J_rows
+    F_blocks
     L_blocks
-    V_blocks
     inv_blocks
     map_blocks
 
@@ -73,8 +74,7 @@ mutable struct PosSemidefTriSparse{T <: BlasReal, R <: RealOrComplex{T}} <: Cone
             cone.dim = num_nz
             cone.is_complex = false
         else
-            tril_dim = num_nz - side
-            cone.dim = side + 2 * tril_dim
+            cone.dim = side + 2 * (num_nz - side)
             cone.is_complex = true
         end
         @assert cone.dim >= 1
@@ -176,8 +176,8 @@ function setup_symbfact(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrCompl
     num_cols = cone.num_cols = Vector{Int}(undef, num_super)
     num_rows = cone.num_rows = Vector{Int}(undef, num_super)
     J_rows = cone.J_rows = Vector{Vector}(undef, num_super)
+    cone.F_blocks = Vector{Matrix{R}}(undef, num_super)
     cone.L_blocks = Vector{Matrix{R}}(undef, num_super)
-    cone.V_blocks = Vector{Matrix{R}}(undef, num_super)
     cone.inv_blocks = Vector{Matrix{R}}(undef, num_super)
     for k in 1:num_super
         num_col = num_cols[k] = supers[k + 1] - supers[k]
@@ -187,6 +187,8 @@ function setup_symbfact(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrCompl
         Jk = J_rows[k] = fs[fpi[k]:(fpi[k + 1] - 1)]
         @assert length(Jk) == num_row
 
+        cone.F_blocks[k] = zeros(R, num_row, num_row)
+        # cone.L_blocks = Vector{Matrix{R}}(undef, num_super) # TODO init
         cone.inv_blocks[k] = zeros(R, num_row, num_col)
     end
 
@@ -282,67 +284,53 @@ end
 
 function update_grad(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{T}} where {T <: BlasReal}
     @assert cone.is_feas
-    num_super = length(cone.supers) - 1
-    children = cone.children
-    # parents = cone.parents
     num_cols = cone.num_cols
     num_rows = cone.num_rows
-    J_rows = cone.J_rows
-    L_blocks = cone.L_blocks
-    V_blocks = cone.V_blocks
-    inv_blocks = cone.inv_blocks
 
     # update L blocks from numerical factorization
     f = unsafe_load(pointer(cone.symb_mat))
-    for k in 1:num_super
+    for k in 1:length(num_cols)
         num_col = num_cols[k]
         num_row = num_rows[k]
         x_idxs = cone.fpx[k] - 1 .+ (1:(num_row * num_col))
-        L_blocks[k] = reshape([unsafe_load(f.x, i) for i in x_idxs], num_row, num_col)
+        cone.L_blocks[k] = reshape([unsafe_load(f.x, i) for i in x_idxs], num_row, num_col)
     end
 
     # build inv blocks
-    for k in reverse(1:num_super)
+    for k in reverse(1:length(num_cols))
         num_col = num_cols[k]
         num_row = num_rows[k]
         idxs_n = 1:num_col
-        J = J_rows[k]
-        L_block = L_blocks[k]
+        F_block = cone.F_blocks[k]
+        L_block = cone.L_blocks[k]
 
         @views FD_nn = LowerTriangular(L_block[idxs_n, :])
         FD_inv = inv(FD_nn)
 
-        F = zeros(R, num_row, num_row)
-        @views F_nn = Hermitian(F[idxs_n, idxs_n], :L)
+        @views F_nn = Hermitian(F_block[idxs_n, idxs_n], :L)
         mul!(F_nn.data, FD_inv', FD_inv)
 
         if num_row > num_col
             idxs_a = (num_col + 1):num_row
-            @views F_aa = Hermitian(F[idxs_a, idxs_a], :L)
-            @views F_an = F[idxs_a, idxs_n]
-            L_a = @views rdiv!(L_block[idxs_a, :], FD_nn)
+            @views F_aa = Hermitian(F_block[idxs_a, idxs_a], :L)
+            @views F_an = F_block[idxs_a, idxs_n]
+            @views L_a = rdiv!(L_block[idxs_a, :], FD_nn)
 
-            V = V_blocks[k]
-            copyto!(F_aa.data, V)
+            k_par = cone.parents[k]
+            EJA2 = Bool[i == j for i in cone.J_rows[k_par], j in cone.J_rows[k][(num_col + 1):end]]
+            F_aa.data .= Hermitian(EJA2' * Hermitian(cone.F_blocks[k_par], :L) * EJA2, :L)
 
-            mul!(F_an, V, L_a, -1, false)
+            mul!(F_an, F_aa, L_a, -1, false)
             mul!(F_nn.data, F_an', L_a, -1, true)
         end
 
-        # TODO not very efficient since zeros in V
-        for k2 in children[k]
-            A2 = J_rows[k2][(num_cols[k2] + 1):end]
-            EJA2 = Bool[i == j for i in J, j in A2]
-            V_blocks[k2] = Hermitian(EJA2' * Hermitian(F, :L) * EJA2, :L)
-        end
-
-        inv_blocks[k] = F[:, idxs_n]
+        @views cone.inv_blocks[k] = F_block[:, idxs_n]
     end
 
     g = cone.grad
     idx = 1
     for (i, (super, row_idx, col_idx, scal, swapped)) in enumerate(cone.map_blocks)
-        giR = -inv_blocks[super][row_idx, col_idx]
+        giR = -cone.inv_blocks[super][row_idx, col_idx]
         if scal
             giR *= cone.rt2
         end
@@ -364,24 +352,29 @@ end
 
 # for each column in identity, get hess prod to build explicit hess
 # TODO not very efficient way to do the hessian explicitly, but somewhat efficient for hess_prod
+# TODO function update_hess(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{T}} where {T <: BlasReal}
+
+
+# for each column in identity, get hess prod to build explicit hess
+# TODO not very efficient way to do the hessian explicitly, but somewhat efficient for hess_prod
 function update_hess(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{T}} where {T <: BlasReal}
     @assert cone.grad_updated
     H = cone.hess.data
     rt2 = cone.rt2
     invrt2 = inv(rt2)
 
-    in_blocks = [similar(L_block) for L_block in cone.L_blocks] # TODO prealloc
+    temp_blocks = [similar(L_block) for L_block in cone.L_blocks] # TODO prealloc
 
     H_idx_j = 1
     for (j, (super_j, row_idx_j, col_idx_j, scal_j, swapped_j)) in enumerate(cone.map_blocks)
-        for H_block in in_blocks
+        for H_block in temp_blocks
             H_block .= 0
         end
 
         if cone.is_complex
             # real part j
-            in_blocks[super_j][row_idx_j, col_idx_j] = (scal_j ? invrt2 : 1)
-            out_blocks = H_prod_col(cone, in_blocks)
+            temp_blocks[super_j][row_idx_j, col_idx_j] = (scal_j ? invrt2 : 1)
+            out_blocks = _hess_prod_blocks(cone, temp_blocks)
             H_idx_i = 1
             for i in 1:j
                 (super_i, row_idx_i, col_idx_i, scal_i, swapped_i) = cone.map_blocks[i]
@@ -400,11 +393,11 @@ function update_hess(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{
 
             if row_idx_j != col_idx_j
                 # complex part j
-                for H_block in in_blocks
+                for H_block in temp_blocks
                     H_block .= 0
                 end
-                in_blocks[super_j][row_idx_j, col_idx_j] = (scal_j ? invrt2 : 1) * im
-                out_blocks = H_prod_col(cone, in_blocks)
+                temp_blocks[super_j][row_idx_j, col_idx_j] = (scal_j ? invrt2 : 1) * im
+                out_blocks = _hess_prod_blocks(cone, temp_blocks)
                 H_idx_i = 1
                 for i in 1:j
                     (super_i, row_idx_i, col_idx_i, scal_i, swapped_i) = cone.map_blocks[i]
@@ -422,8 +415,8 @@ function update_hess(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{
                 H_idx_j += 1
             end
         else
-            in_blocks[super_j][row_idx_j, col_idx_j] = (scal_j ? invrt2 : 1)
-            out_blocks = H_prod_col(cone, in_blocks)
+            temp_blocks[super_j][row_idx_j, col_idx_j] = (scal_j ? invrt2 : 1)
+            out_blocks = _hess_prod_blocks(cone, temp_blocks)
             for i in 1:j
                 (super_i, row_idx_i, col_idx_i, scal_i, swapped_i) = cone.map_blocks[i]
                 H[i, j] = out_blocks[super_i][row_idx_i, col_idx_i]
@@ -438,132 +431,120 @@ function update_hess(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{
     return cone.hess
 end
 
-# TODO refactor parts to make easy to implement (inv)hess prod, (inv)hess sqrt prod
-# TODO need to split step 2 into two parts for sqrt prod
-function H_prod_col(cone::PosSemidefTriSparse{T, R}, in_blocks) where {R <: RealOrComplex{T}} where {T <: BlasReal}
+function _hess_prod_blocks(cone::PosSemidefTriSparse{T, R}, temp_blocks) where {R <: RealOrComplex{T}} where {T <: BlasReal}
+    _hess_step1(cone, temp_blocks)
+    _hess_step2(cone, temp_blocks)
+    _hess_step3(cone, temp_blocks)
+    return temp_blocks
+end
+
+function _hess_step1(cone::PosSemidefTriSparse{T, R}, temp_blocks) where {R <: RealOrComplex{T}} where {T <: BlasReal}
     @assert cone.grad_updated
-    num_super = length(cone.supers) - 1
-    children = cone.children
-    # parents = cone.parents
-    num_cols = cone.num_cols
-    num_rows = cone.num_rows
-    J_rows = cone.J_rows
-    L_blocks = cone.L_blocks
-    V_blocks = cone.V_blocks
-    inv_blocks = cone.inv_blocks
 
-    # step 1
-    for k in 1:num_super
-        num_col = num_cols[k]
-        num_row = num_rows[k]
+    for k in eachindex(cone.num_cols)
+        num_col = cone.num_cols[k]
+        num_row = cone.num_rows[k]
         idxs_n = 1:num_col
-        J = J_rows[k]
-        L_block = L_blocks[k]
-        in_block = in_blocks[k]
+        idxs_a = (num_col + 1):num_row
+        F_block = cone.F_blocks[k]
+        temp_block = temp_blocks[k]
 
-        F = zeros(R, num_row, num_row)
-        F[:, idxs_n] = in_block
+        F_block[idxs_a, idxs_a] .= 0
+        F_block[:, idxs_n] = temp_block
+    end
 
-        for k2 in children[k]
-            U2 = V_blocks[k2]
-            A2 = J_rows[k2][(num_cols[k2] + 1):end]
-            EJA2 = Bool[i == j for i in J, j in A2]
-            F += Hermitian(EJA2 * Hermitian(U2, :L) * EJA2', :L)
-        end
+    for k in eachindex(cone.num_cols)
+        num_col = cone.num_cols[k]
+        num_row = cone.num_rows[k]
+        idxs_n = 1:num_col
+        idxs_a = (num_col + 1):num_row
+        F_block = cone.F_blocks[k]
+        temp_block = temp_blocks[k]
 
         if num_row > num_col
-            idxs_a = (num_col + 1):num_row
-            @views L_a = L_block[idxs_a, :]
-            @views F_an = F[idxs_a, idxs_n]
-            @views F_aa = Hermitian(F[idxs_a, idxs_a], :L)
-            @views F_nn = Hermitian(F[idxs_n, idxs_n], :L)
+            @views L_a = cone.L_blocks[k][idxs_a, :]
+            @views F_an = F_block[idxs_a, idxs_n]
+            @views F_aa = Hermitian(F_block[idxs_a, idxs_a], :L)
+            @views F_nn = Hermitian(F_block[idxs_n, idxs_n], :L)
 
             mul!(F_aa.data, L_a, F_an', -1, true)
             mul!(F_an, L_a, F_nn, -1, true)
             mul!(F_aa.data, F_an, L_a', -1, true)
 
-            V_blocks[k] = F_aa
+            k_par = cone.parents[k]
+            EJA2 = Bool[i == j for i in cone.J_rows[k_par], j in cone.J_rows[k][(num_col + 1):end]]
+            cone.F_blocks[k_par] += Hermitian(EJA2 * F_aa * EJA2', :L)
         end
 
-        in_blocks[k] = tril!(F[:, idxs_n])
+        @views copyto!(temp_block, F_block[:, idxs_n])
     end
 
-    # step 2
-    for k in reverse(1:num_super)
-        num_col = num_cols[k]
-        num_row = num_rows[k]
-        idxs_n = 1:num_col
-        J = J_rows[k]
-        L_block = L_blocks[k]
-        inv_block = inv_blocks[k]
-        in_block = in_blocks[k]
+    return temp_blocks
+end
 
-        F = zeros(R, num_row, num_row)
+function _hess_step2(cone::PosSemidefTriSparse{T, R}, temp_blocks) where {R <: RealOrComplex{T}} where {T <: BlasReal}
+    for k in reverse(1:length(cone.num_cols))
+        num_col = cone.num_cols[k]
+        num_row = cone.num_rows[k]
+        idxs_n = 1:num_col
+        F_block = cone.F_blocks[k]
+        temp_block = temp_blocks[k]
 
         if num_row > num_col
             idxs_a = (num_col + 1):num_row
-            V = V_blocks[k]
+            @views F_aa = Hermitian(F_block[idxs_a, idxs_a], :L)
 
-            @views in_block_a = in_block[idxs_a, :]
-            @views F_an = mul!(F[idxs_a, idxs_n], V, in_block_a)
-            copyto!(in_block_a, F_an)
+            k_par = cone.parents[k]
+            EJA2 = Bool[i == j for i in cone.J_rows[k_par], j in cone.J_rows[k][(num_col + 1):end]]
+            F_aa.data .= Hermitian(EJA2' * Hermitian(cone.F_blocks[k_par], :L) * EJA2, :L)
 
-            F[idxs_a, idxs_a] = V
+            @views temp_block_a = temp_block[idxs_a, :]
+            @views F_an = mul!(F_block[idxs_a, idxs_n], F_aa, temp_block_a)
+            copyto!(temp_block_a, F_an)
         end
 
-        F[:, idxs_n] = inv_block
+        F_block[:, idxs_n] = cone.inv_blocks[k]
 
-        for k2 in children[k]
-            A2 = J_rows[k2][(num_cols[k2] + 1):end]
-            EJA2 = Bool[i == j for i in J, j in A2]
-            V_blocks[k2] = Hermitian(EJA2' * Hermitian(F, :L) * EJA2, :L)
-        end
-
-        @views in_block_n = in_block[idxs_n, :]
-        copytri!(in_block_n, 'L', cone.is_complex)
-        FD_nn = LowerTriangular(L_block[idxs_n, :])
-        ldiv!(FD_nn, in_block_n)
-        ldiv!(FD_nn', in_block_n)
-        rdiv!(in_block, FD_nn')
-        rdiv!(in_block, FD_nn)
-        tril!(in_block)
+        @views temp_block_n = temp_block[idxs_n, :]
+        copytri!(temp_block_n, 'L', cone.is_complex)
+        FD_nn = LowerTriangular(cone.L_blocks[k][idxs_n, :])
+        ldiv!(FD_nn, temp_block_n)
+        ldiv!(FD_nn', temp_block_n)
+        rdiv!(temp_block, FD_nn')
+        rdiv!(temp_block, FD_nn)
     end
 
-    # step 3
-    for k in reverse(1:num_super)
-        num_col = num_cols[k]
-        num_row = num_rows[k]
-        idxs_n = 1:num_col
-        J = J_rows[k]
-        L_block = L_blocks[k]
-        in_block = in_blocks[k]
+    return temp_blocks
+end
 
-        F = zeros(R, num_row, num_row)
-        F[:, idxs_n] = in_block
+function _hess_step3(cone::PosSemidefTriSparse{T, R}, temp_blocks) where {R <: RealOrComplex{T}} where {T <: BlasReal}
+    for k in reverse(1:length(cone.num_cols))
+        num_col = cone.num_cols[k]
+        num_row = cone.num_rows[k]
+        idxs_n = 1:num_col
+        F_block = cone.F_blocks[k]
+        temp_block = temp_blocks[k]
+
+        F_block[:, idxs_n] = temp_block
 
         if num_row > num_col
             idxs_a = (num_col + 1):num_row
-            L_a = L_block[idxs_a, :]
-            @views F_an = F[idxs_a, idxs_n]
-            @views F_aa = Hermitian(F[idxs_a, idxs_a], :L)
-            @views F_nn = Hermitian(F[idxs_n, idxs_n], :L)
+            @views L_a = cone.L_blocks[k][idxs_a, :]
+            @views F_an = F_block[idxs_a, idxs_n]
+            @views F_aa = Hermitian(F_block[idxs_a, idxs_a], :L)
+            @views F_nn = Hermitian(F_block[idxs_n, idxs_n], :L)
 
-            V = V_blocks[k]
-            copyto!(F_aa.data, V)
+            k_par = cone.parents[k]
+            EJA2 = Bool[i == j for i in cone.J_rows[k_par], j in cone.J_rows[k][(num_col + 1):end]]
+            F_aa.data .= Hermitian(EJA2' * Hermitian(cone.F_blocks[k_par], :L) * EJA2, :L)
 
             mul!(F_nn.data, F_an', L_a, -1, true)
             mul!(F_an, F_aa, L_a, -1, true)
             mul!(F_nn.data, L_a', F_an, -1, true)
         end
 
-        for k2 in children[k]
-            A2 = J_rows[k2][(num_cols[k2] + 1):end]
-            EJA2 = Bool[i == j for i in J, j in A2]
-            V_blocks[k2] = Hermitian(EJA2' * Hermitian(F, :L) * EJA2, :L)
-        end
-
-        in_blocks[k] = tril!(F[:, idxs_n])
+        @views copyto!(temp_block, F_block[:, idxs_n])
     end
 
-    return in_blocks
+    return temp_blocks
 end
