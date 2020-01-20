@@ -57,6 +57,7 @@ mutable struct PosSemidefTriSparse{T <: BlasReal, R <: RealOrComplex{T}} <: Cone
     S_blocks
     inv_blocks
     map_blocks
+    temp_blocks
     rel_idxs
 
     function PosSemidefTriSparse{T, R}(
@@ -176,10 +177,11 @@ function setup_symbfact(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrCompl
     num_cols = cone.num_cols = Vector{Int}(undef, num_super)
     num_rows = cone.num_rows = Vector{Int}(undef, num_super)
     J_rows = cone.J_rows = Vector{Vector}(undef, num_super)
-    cone.F_blocks = Vector{Matrix{R}}(undef, num_super)
-    cone.L_blocks = Vector{Matrix{R}}(undef, num_super)
-    cone.S_blocks = Vector{Matrix{R}}(undef, num_super)
-    cone.inv_blocks = Vector{Matrix{R}}(undef, num_super)
+    F_blocks = cone.F_blocks = Vector{Matrix{R}}(undef, num_super)
+    L_blocks = cone.L_blocks = Vector{Matrix{R}}(undef, num_super)
+    S_blocks = cone.S_blocks = Vector{Matrix{R}}(undef, num_super)
+    inv_blocks = cone.inv_blocks = Vector{Matrix{R}}(undef, num_super)
+    temp_blocks = cone.temp_blocks = Vector{Matrix{R}}(undef, num_super)
     rel_idxs = cone.rel_idxs = [Tuple{Int, Int}[] for k in 1:num_super]
     for k in reverse(1:num_super)
         num_col = num_cols[k] = supers[k + 1] - supers[k]
@@ -189,16 +191,17 @@ function setup_symbfact(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrCompl
         J_k = J_rows[k] = fs[fpi[k]:(fpi[k + 1] - 1)]
         @assert length(J_k) == num_row
 
-        cone.F_blocks[k] = zeros(R, num_row, num_row)
-        # cone.L_blocks = # TODO init
+        F_blocks[k] = zeros(R, num_row, num_row)
+        # L_blocks = # TODO init
         num_below = num_row - num_col
-        cone.S_blocks[k] = zeros(R, num_below, num_below)
-        cone.inv_blocks[k] = zeros(R, num_row, num_col)
+        S_blocks[k] = zeros(R, num_below, num_below)
+        inv_blocks[k] = zeros(R, num_row, num_col)
+        temp_blocks[k] = zeros(R, num_row, num_col)
 
         if num_row > num_col
             # setup relative indices in frontal matrix
             rel_idx = rel_idxs[k]
-            k_par = cone.parents[k]
+            k_par = parents[k]
             I_k = J_k[(num_col + 1):end]
             for (idx_i, i) in enumerate(I_k), (idx_j, j) in enumerate(J_rows[k_par])
                 if i == j
@@ -320,17 +323,16 @@ function update_grad(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{
         F_block = cone.F_blocks[k]
         L_block = cone.L_blocks[k]
 
-        @views FD_nn = LowerTriangular(L_block[idxs_n, :])
-        FD_inv = inv(FD_nn) # TODO in-place?
-
-        @views F_nn = Hermitian(F_block[idxs_n, idxs_n], :L)
-        mul!(F_nn.data, FD_inv', FD_inv)
+        @views L_n = L_block[idxs_n, :]
+        @views F_nn = F_block[idxs_n, idxs_n]
+        copyto!(F_nn, L_n)
+        LAPACK.potri!('L', F_nn)
 
         if num_row > num_col
             idxs_a = (num_col + 1):num_row
             @views F_aa = Hermitian(F_block[idxs_a, idxs_a], :L)
             @views F_an = F_block[idxs_a, idxs_n]
-            @views L_a = rdiv!(L_block[idxs_a, :], FD_nn)
+            @views L_a = rdiv!(L_block[idxs_a, :], LowerTriangular(L_n))
 
             F_aa.data .= 0
             F_par = Hermitian(cone.F_blocks[cone.parents[k]], :L)
@@ -340,7 +342,7 @@ function update_grad(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{
             end
 
             mul!(F_an, F_aa, L_a, -1, false)
-            mul!(F_nn.data, F_an', L_a, -1, true)
+            mul!(F_nn, F_an', L_a, -1, true)
 
             copyto!(cone.S_blocks[k], F_aa.data) # for use in Hessian calculations
         end
@@ -372,19 +374,12 @@ function update_grad(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{
 end
 
 # for each column in identity, get hess prod to build explicit hess
-# TODO not very efficient way to do the hessian explicitly, but somewhat efficient for hess_prod
-# TODO function update_hess(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{T}} where {T <: BlasReal}
-
-
-# for each column in identity, get hess prod to build explicit hess
-# TODO not very efficient way to do the hessian explicitly, but somewhat efficient for hess_prod
 function update_hess(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{T}} where {T <: BlasReal}
     @assert cone.grad_updated
-    H = cone.hess.data
+    temp_blocks = cone.temp_blocks
     rt2 = cone.rt2
     invrt2 = inv(rt2)
-
-    temp_blocks = [similar(L_block) for L_block in cone.L_blocks] # TODO prealloc
+    H = cone.hess.data
 
     H_idx_j = 1
     for (j, (super_j, row_idx_j, col_idx_j, scal_j, swapped_j)) in enumerate(cone.map_blocks)
@@ -452,9 +447,25 @@ function update_hess(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{
     return cone.hess
 end
 
+function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidefTriSparse)
+    @assert cone.grad_updated
+    temp_blocks = cone.temp_blocks
+    @inbounds for i in 1:size(arr, 2)
+        # setup blocks from column
+        @views svec_to_smat_sparse!(temp_blocks, arr[:, i], cone)
+        # get hess prod with blocks
+        _hess_prod_blocks(cone, temp_blocks)
+        # transform blocks back to column
+        @views smat_to_svec_sparse!(prod[:, i], temp_blocks, cone)
+    end
+    return prod
+end
+
 function _hess_prod_blocks(cone::PosSemidefTriSparse{T, R}, temp_blocks) where {R <: RealOrComplex{T}} where {T <: BlasReal}
     _hess_step1(cone, temp_blocks)
-    _hess_step2(cone, temp_blocks)
+    _hess_step2(cone, temp_blocks) # TODO compare speed to 2a-2b (which requires cholesky but less data movement since only triangular muls)
+    # _hess_step2a(cone, temp_blocks)
+    # _hess_step2b(cone, temp_blocks)
     _hess_step3(cone, temp_blocks)
     return temp_blocks
 end
@@ -522,11 +533,56 @@ function _hess_step2(cone::PosSemidefTriSparse{T, R}, temp_blocks) where {R <: R
 
         @views temp_block_n = temp_block[idxs_n, :]
         copytri!(temp_block_n, 'L', cone.is_complex)
-        FD_nn = LowerTriangular(cone.L_blocks[k][idxs_n, :])
-        ldiv!(FD_nn, temp_block_n)
-        ldiv!(FD_nn', temp_block_n)
-        rdiv!(temp_block, FD_nn')
-        rdiv!(temp_block, FD_nn)
+        L_n = LowerTriangular(cone.L_blocks[k][idxs_n, :])
+        ldiv!(L_n, temp_block_n)
+        ldiv!(L_n', temp_block_n)
+        rdiv!(temp_block, L_n')
+        rdiv!(temp_block, L_n)
+    end
+
+    return temp_blocks
+end
+
+# TODO factorize S_blocks[k] once (possibly just in gradient - check succeeds)
+function _hess_step2a(cone::PosSemidefTriSparse{T, R}, temp_blocks) where {R <: RealOrComplex{T}} where {T <: BlasReal}
+    for k in 1:length(cone.num_cols)
+        num_col = cone.num_cols[k]
+        num_row = cone.num_rows[k]
+        idxs_n = 1:num_col
+        temp_block = temp_blocks[k]
+
+        @views temp_block_n = temp_block[idxs_n, :]
+        copytri!(temp_block_n, 'L', cone.is_complex)
+        L_n = LowerTriangular(cone.L_blocks[k][idxs_n, :])
+        ldiv!(L_n, temp_block_n)
+        rdiv!(temp_block, L_n')
+
+        if num_row > num_col
+            SL = cholesky(Hermitian(cone.S_blocks[k], :L)).L # TODO
+            @views lmul!(SL', temp_block[(num_col + 1):num_row, :])
+        end
+    end
+
+    return temp_blocks
+end
+
+function _hess_step2b(cone::PosSemidefTriSparse{T, R}, temp_blocks) where {R <: RealOrComplex{T}} where {T <: BlasReal}
+    for k in 1:length(cone.num_cols)
+        num_col = cone.num_cols[k]
+        num_row = cone.num_rows[k]
+        idxs_n = 1:num_col
+        temp_block = temp_blocks[k]
+
+        @views temp_block_n = temp_block[idxs_n, :]
+        copytri!(temp_block_n, 'L', cone.is_complex)
+        L_n = LowerTriangular(cone.L_blocks[k][idxs_n, :])
+        ldiv!(L_n', temp_block_n)
+        rdiv!(temp_block, L_n)
+
+        if num_row > num_col
+            SL = cholesky(Hermitian(cone.S_blocks[k], :L)).L # TODO
+            @views lmul!(SL, temp_block[(num_col + 1):num_row, :])
+        end
     end
 
     return temp_blocks
@@ -565,4 +621,63 @@ function _hess_step3(cone::PosSemidefTriSparse{T, R}, temp_blocks) where {R <: R
     end
 
     return temp_blocks
+end
+
+function svec_to_smat_sparse!(blocks::Vector{Matrix{T}}, vec::AbstractVector{T}, cone::PosSemidefTriSparse{T, T}) where {T <: BlasReal}
+    for b in blocks
+        b .= 0
+    end
+    for (i, (super, row_idx, col_idx, scal, swapped)) in enumerate(cone.map_blocks)
+        vec_i = vec[i]
+        if scal
+            vec_i /= cone.rt2
+        end
+        blocks[super][row_idx, col_idx] = vec_i
+    end
+    return blocks
+end
+
+function smat_to_svec_sparse!(vec::AbstractVector{T}, blocks::Vector{Matrix{T}}, cone::PosSemidefTriSparse{T, T}) where {T <: BlasReal}
+    for (i, (super, row_idx, col_idx, scal, swapped)) in enumerate(cone.map_blocks)
+        vec_i = blocks[super][row_idx, col_idx]
+        if scal
+            vec_i *= cone.rt2
+        end
+        vec[i] = vec_i
+    end
+    return vec
+end
+
+function svec_to_smat_sparse!(blocks::Vector{Matrix{Complex{T}}}, vec::AbstractVector{T}, cone::PosSemidefTriSparse{T, Complex{T}}) where {T <: BlasReal}
+    for b in blocks
+        b .= 0
+    end
+    idx = 1
+    for (i, (super, row_idx, col_idx, scal, swapped)) in enumerate(cone.map_blocks)
+        if scal
+            blocks[super][row_idx, col_idx] = Complex(vec[idx], (swapped ? -vec[idx + 1] : vec[idx + 1])) / cone.rt2
+            idx += 2
+        else
+            blocks[super][row_idx, col_idx] = vec[idx]
+            idx += 1
+        end
+    end
+    return blocks
+end
+
+function smat_to_svec_sparse!(vec::AbstractVector{T}, blocks::Vector{Matrix{Complex{T}}}, cone::PosSemidefTriSparse{T, Complex{T}}) where {T <: BlasReal}
+    idx = 1
+    for (i, (super, row_idx, col_idx, scal, swapped)) in enumerate(cone.map_blocks)
+        vec_R = blocks[super][row_idx, col_idx]
+        if scal
+            vec_R *= cone.rt2
+            vec[idx] = real(vec_R)
+            vec[idx + 1] = swapped ? -imag(vec_R) : imag(vec_R)
+            idx += 2
+        else
+            vec[idx] = real(vec_R)
+            idx += 1
+        end
+    end
+    return vec
 end
