@@ -337,8 +337,8 @@ end
 function test_possemideftrisparse_barrier(T::Type{<:Real})
     Random.seed!(1)
     # for side in [1, 2, 3, 4, 5, 10, 15, 20, 25, 30, 40, 50, 60, 70, 80, ]#100, 150, 200]
-    # for side in [25, 30, 40, 50, 60]#, 70, 80, ]#100, 150, 200]
-    for side in [18]#, 70, 80, ]#100, 150, 200]
+    for side in [25, 30, 40, 50]#, 60]#, 70, 80, ]#100, 150, 200]
+    # for side in [18]#, 70, 80, ]#100, 150, 200]
         # TODO pick final sizes
         @show side
         invrt2 = inv(sqrt(T(2)))

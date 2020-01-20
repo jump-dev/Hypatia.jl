@@ -10,10 +10,8 @@ dual is sparse PSD completable
 
 TODO
 - describe
-- hermitian case
 - reference
 - doesn't seem to need to be chordal/filled
-- try to reuse S blocks from grad for the step 2 hess
 =#
 
 import SuiteSparse.CHOLMOD
@@ -56,6 +54,7 @@ mutable struct PosSemidefTriSparse{T <: BlasReal, R <: RealOrComplex{T}} <: Cone
     J_rows
     F_blocks
     L_blocks
+    S_blocks
     inv_blocks
     map_blocks
     rel_idxs
@@ -179,6 +178,7 @@ function setup_symbfact(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrCompl
     J_rows = cone.J_rows = Vector{Vector}(undef, num_super)
     cone.F_blocks = Vector{Matrix{R}}(undef, num_super)
     cone.L_blocks = Vector{Matrix{R}}(undef, num_super)
+    cone.S_blocks = Vector{Matrix{R}}(undef, num_super)
     cone.inv_blocks = Vector{Matrix{R}}(undef, num_super)
     rel_idxs = cone.rel_idxs = [Tuple{Int, Int}[] for k in 1:num_super]
     for k in reverse(1:num_super)
@@ -190,7 +190,9 @@ function setup_symbfact(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrCompl
         @assert length(J_k) == num_row
 
         cone.F_blocks[k] = zeros(R, num_row, num_row)
-        # cone.L_blocks = Vector{Matrix{R}}(undef, num_super) # TODO init
+        # cone.L_blocks = # TODO init
+        num_below = num_row - num_col
+        cone.S_blocks[k] = zeros(R, num_below, num_below)
         cone.inv_blocks[k] = zeros(R, num_row, num_col)
 
         if num_row > num_col
@@ -339,6 +341,8 @@ function update_grad(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{
 
             mul!(F_an, F_aa, L_a, -1, false)
             mul!(F_nn.data, F_an', L_a, -1, true)
+
+            copyto!(cone.S_blocks[k], F_aa.data) # for use in Hessian calculations
         end
 
         @views cone.inv_blocks[k] = F_block[:, idxs_n]
@@ -502,30 +506,19 @@ function _hess_step1(cone::PosSemidefTriSparse{T, R}, temp_blocks) where {R <: R
 end
 
 function _hess_step2(cone::PosSemidefTriSparse{T, R}, temp_blocks) where {R <: RealOrComplex{T}} where {T <: BlasReal}
-    for k in reverse(1:length(cone.num_cols))
+    for k in 1:length(cone.num_cols)
         num_col = cone.num_cols[k]
         num_row = cone.num_rows[k]
         idxs_n = 1:num_col
-        F_block = cone.F_blocks[k]
         temp_block = temp_blocks[k]
 
         if num_row > num_col
             idxs_a = (num_col + 1):num_row
-            @views F_aa = Hermitian(F_block[idxs_a, idxs_a], :L)
-
-            F_aa.data .= 0
-            F_par = Hermitian(cone.F_blocks[cone.parents[k]], :L)
-            rel_idx = cone.rel_idxs[k]
-            for (i, j) in rel_idx, (i2, j2) in rel_idx # TODO only lower tri
-                F_aa.data[i, i2] = F_par[j, j2]
-            end
-
             @views temp_block_a = temp_block[idxs_a, :]
-            @views F_an = mul!(F_block[idxs_a, idxs_n], F_aa, temp_block_a)
+            @views F_an = cone.F_blocks[k][idxs_a, idxs_n]
+            mul!(F_an, Hermitian(cone.S_blocks[k], :L), temp_block_a)
             copyto!(temp_block_a, F_an)
         end
-
-        F_block[:, idxs_n] = cone.inv_blocks[k]
 
         @views temp_block_n = temp_block[idxs_n, :]
         copytri!(temp_block_n, 'L', cone.is_complex)
