@@ -58,6 +58,7 @@ mutable struct PosSemidefTriSparse{T <: BlasReal, R <: RealOrComplex{T}} <: Cone
     L_blocks
     inv_blocks
     map_blocks
+    rel_idxs
 
     function PosSemidefTriSparse{T, R}(
         side::Int,
@@ -179,17 +180,30 @@ function setup_symbfact(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrCompl
     cone.F_blocks = Vector{Matrix{R}}(undef, num_super)
     cone.L_blocks = Vector{Matrix{R}}(undef, num_super)
     cone.inv_blocks = Vector{Matrix{R}}(undef, num_super)
-    for k in 1:num_super
+    rel_idxs = cone.rel_idxs = [Tuple{Int, Int}[] for k in 1:num_super]
+    for k in reverse(1:num_super)
         num_col = num_cols[k] = supers[k + 1] - supers[k]
         num_row = num_rows[k] = fpi[k + 1] - fpi[k] # n rows
         @assert 0 < num_col <= num_row
 
-        Jk = J_rows[k] = fs[fpi[k]:(fpi[k + 1] - 1)]
-        @assert length(Jk) == num_row
+        J_k = J_rows[k] = fs[fpi[k]:(fpi[k + 1] - 1)]
+        @assert length(J_k) == num_row
 
         cone.F_blocks[k] = zeros(R, num_row, num_row)
         # cone.L_blocks = Vector{Matrix{R}}(undef, num_super) # TODO init
         cone.inv_blocks[k] = zeros(R, num_row, num_col)
+
+        if num_row > num_col
+            # setup relative indices in frontal matrix
+            rel_idx = rel_idxs[k]
+            k_par = cone.parents[k]
+            I_k = J_k[(num_col + 1):end]
+            for (idx_i, i) in enumerate(I_k), (idx_j, j) in enumerate(J_rows[k_par])
+                if i == j
+                    push!(rel_idx, (idx_i, idx_j))
+                end
+            end
+        end
     end
 
     map_blocks = cone.map_blocks = Vector{Tuple{Int, Int, Int, Bool, Bool}}(undef, dimR)
@@ -293,7 +307,7 @@ function update_grad(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{
         num_col = num_cols[k]
         num_row = num_rows[k]
         x_idxs = cone.fpx[k] - 1 .+ (1:(num_row * num_col))
-        cone.L_blocks[k] = reshape([unsafe_load(f.x, i) for i in x_idxs], num_row, num_col)
+        cone.L_blocks[k] = reshape([unsafe_load(f.x, i) for i in x_idxs], num_row, num_col) # TODO in-place?
     end
 
     # build inv blocks
@@ -305,7 +319,7 @@ function update_grad(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{
         L_block = cone.L_blocks[k]
 
         @views FD_nn = LowerTriangular(L_block[idxs_n, :])
-        FD_inv = inv(FD_nn)
+        FD_inv = inv(FD_nn) # TODO in-place?
 
         @views F_nn = Hermitian(F_block[idxs_n, idxs_n], :L)
         mul!(F_nn.data, FD_inv', FD_inv)
@@ -316,9 +330,12 @@ function update_grad(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{
             @views F_an = F_block[idxs_a, idxs_n]
             @views L_a = rdiv!(L_block[idxs_a, :], FD_nn)
 
-            k_par = cone.parents[k]
-            EJA2 = Bool[i == j for i in cone.J_rows[k_par], j in cone.J_rows[k][(num_col + 1):end]]
-            F_aa.data .= Hermitian(EJA2' * Hermitian(cone.F_blocks[k_par], :L) * EJA2, :L)
+            F_aa.data .= 0
+            F_par = Hermitian(cone.F_blocks[cone.parents[k]], :L)
+            rel_idx = cone.rel_idxs[k]
+            for (i, j) in rel_idx, (i2, j2) in rel_idx # TODO only lower tri
+                F_aa.data[i, i2] = F_par[j, j2]
+            end
 
             mul!(F_an, F_aa, L_a, -1, false)
             mul!(F_nn.data, F_an', L_a, -1, true)
@@ -457,11 +474,11 @@ function _hess_step1(cone::PosSemidefTriSparse{T, R}, temp_blocks) where {R <: R
         num_col = cone.num_cols[k]
         num_row = cone.num_rows[k]
         idxs_n = 1:num_col
-        idxs_a = (num_col + 1):num_row
         F_block = cone.F_blocks[k]
         temp_block = temp_blocks[k]
 
         if num_row > num_col
+            idxs_a = (num_col + 1):num_row
             @views L_a = cone.L_blocks[k][idxs_a, :]
             @views F_an = F_block[idxs_a, idxs_n]
             @views F_aa = Hermitian(F_block[idxs_a, idxs_a], :L)
@@ -471,9 +488,11 @@ function _hess_step1(cone::PosSemidefTriSparse{T, R}, temp_blocks) where {R <: R
             mul!(F_an, L_a, F_nn, -1, true)
             mul!(F_aa.data, F_an, L_a', -1, true)
 
-            k_par = cone.parents[k]
-            EJA2 = Bool[i == j for i in cone.J_rows[k_par], j in cone.J_rows[k][(num_col + 1):end]]
-            cone.F_blocks[k_par] += Hermitian(EJA2 * F_aa * EJA2', :L)
+            F_par = cone.F_blocks[cone.parents[k]]
+            rel_idx = cone.rel_idxs[k]
+            for (i, j) in rel_idx, (i2, j2) in rel_idx # TODO only lower tri
+                F_par[j, j2] += F_aa[i, i2]
+            end
         end
 
         @views copyto!(temp_block, F_block[:, idxs_n])
@@ -494,9 +513,12 @@ function _hess_step2(cone::PosSemidefTriSparse{T, R}, temp_blocks) where {R <: R
             idxs_a = (num_col + 1):num_row
             @views F_aa = Hermitian(F_block[idxs_a, idxs_a], :L)
 
-            k_par = cone.parents[k]
-            EJA2 = Bool[i == j for i in cone.J_rows[k_par], j in cone.J_rows[k][(num_col + 1):end]]
-            F_aa.data .= Hermitian(EJA2' * Hermitian(cone.F_blocks[k_par], :L) * EJA2, :L)
+            F_aa.data .= 0
+            F_par = Hermitian(cone.F_blocks[cone.parents[k]], :L)
+            rel_idx = cone.rel_idxs[k]
+            for (i, j) in rel_idx, (i2, j2) in rel_idx # TODO only lower tri
+                F_aa.data[i, i2] = F_par[j, j2]
+            end
 
             @views temp_block_a = temp_block[idxs_a, :]
             @views F_an = mul!(F_block[idxs_a, idxs_n], F_aa, temp_block_a)
@@ -534,9 +556,12 @@ function _hess_step3(cone::PosSemidefTriSparse{T, R}, temp_blocks) where {R <: R
             @views F_aa = Hermitian(F_block[idxs_a, idxs_a], :L)
             @views F_nn = Hermitian(F_block[idxs_n, idxs_n], :L)
 
-            k_par = cone.parents[k]
-            EJA2 = Bool[i == j for i in cone.J_rows[k_par], j in cone.J_rows[k][(num_col + 1):end]]
-            F_aa.data .= Hermitian(EJA2' * Hermitian(cone.F_blocks[k_par], :L) * EJA2, :L)
+            F_aa.data .= 0
+            F_par = Hermitian(cone.F_blocks[cone.parents[k]], :L)
+            rel_idx = cone.rel_idxs[k]
+            for (i, j) in rel_idx, (i2, j2) in rel_idx # TODO only lower tri
+                F_aa.data[i, i2] = F_par[j, j2]
+            end
 
             mul!(F_nn.data, F_an', L_a, -1, true)
             mul!(F_an, F_aa, L_a, -1, true)
