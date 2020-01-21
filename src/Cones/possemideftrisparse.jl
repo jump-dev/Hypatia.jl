@@ -43,22 +43,16 @@ mutable struct PosSemidefTriSparse{T <: BlasReal, R <: RealOrComplex{T}} <: Cone
     sparse_point
     sparse_point_map
     symb_mat
-    fact_mat
-    perm
-    iperm
     supers
-    fpx
-    xptr
-    supermap
+    super_map
     parents
-    children # TODO don't save if not used
     num_cols
     num_rows
     J_rows
+    L_idxs
     F_blocks
     L_blocks
     S_blocks
-    inv_blocks
     map_blocks
     temp_blocks
     rel_idxs
@@ -68,11 +62,11 @@ mutable struct PosSemidefTriSparse{T <: BlasReal, R <: RealOrComplex{T}} <: Cone
         row_idxs::Vector{Int},
         col_idxs::Vector{Int},
         is_dual::Bool;
-        hess_fact_cache = hessian_cache(T), # TODO get inverse hessian directly
+        hess_fact_cache = hessian_cache(T),
         ) where {R <: RealOrComplex{T}} where {T <: BlasReal}
+        # check validity of inputs
         num_nz = length(row_idxs)
         @assert length(col_idxs) == num_nz
-        # check validity of inputs
         # TODO maybe also check no off-diags appear twice?
         diag_present = falses(side)
         for (row_idx, col_idx) in zip(row_idxs, col_idxs)
@@ -130,14 +124,11 @@ function setup_symbfact(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrCompl
     fake_point = [R(l) for l in 1:dim_R]
     sparse_point = cone.sparse_point = CHOLMOD.Sparse(Hermitian(sparse(cone.row_idxs, cone.col_idxs, fake_point, side, side), :L))
     sparse_point_map = cone.sparse_point_map = zeros(Int, dim_R)
-    sxptr = unsafe_load(pointer(sparse_point)).x
+    sx_ptr = unsafe_load(pointer(sparse_point)).x
     for l in 1:dim_R
-        sparse_point_map[Int(unsafe_load(sxptr, l))] = l
+        sparse_point_map[Int(unsafe_load(sx_ptr, l))] = l
     end
     symb_mat = cone.symb_mat = CHOLMOD.fact_(sparse_point, cm)
-
-    cone.perm = symb_mat.p
-    cone.iperm = invperm(cone.perm)
 
     f = unsafe_load(pointer(symb_mat))
     @assert f.n == cone.side
@@ -145,32 +136,22 @@ function setup_symbfact(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrCompl
     @assert f.is_super != 0
 
     num_super = Int(f.nsuper)
-    ssize = Int(f.ssize)
-    supers = f.super
-    fpi = f.pi
-    fpx = f.px
-    fs = f.s
-    fx = f.x
-
-    supers = cone.supers = [unsafe_load(supers, i) + 1 for i in 1:num_super]
-    fpi = [unsafe_load(fpi, i) + 1 for i in 1:num_super]
-    fpx = cone.fpx = [unsafe_load(fpx, i) + 1 for i in 1:num_super]
-    fs = [unsafe_load(fs, i) + 1 for i in 1:ssize]
-    cone.xptr = f.x
-
+    supers = cone.supers = [unsafe_load(f.super, i) + 1 for i in 1:num_super]
     push!(supers, side + 1)
+    fs = [unsafe_load(f.s, i) + 1 for i in 1:Int(f.ssize)]
+    fpi = [unsafe_load(f.pi, i) + 1 for i in 1:num_super]
     push!(fpi, length(fs) + 1)
+    fpx = [unsafe_load(f.px, i) + 1 for i in 1:num_super]
 
-    # construct supermap
-    # supermap[k] = s if column k is in supernode s
-    supermap = cone.supermap = zeros(Int, side)
+    # construct super_map
+    # super_map[k] = s if column k is in supernode s
+    super_map = cone.super_map = zeros(Int, side)
     for s in 1:num_super, k in supers[s]:(supers[s + 1] - 1)
-        supermap[k] = s
+        super_map[k] = s
     end
 
     # construct supernode tree
     parents = cone.parents = zeros(Int, num_super)
-    children = cone.children = [Int[] for k in 1:num_super]
     for k in 1:num_super
         nn = supers[k + 1] - supers[k] # n cols
         nj = fpi[k + 1] - fpi[k] # n rows
@@ -181,20 +162,19 @@ function setup_symbfact(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrCompl
 
         if !iszero(na)
             kparloc = fs[fpi[k] + nn]
-            kparent = supermap[kparloc]
+            kparent = super_map[kparloc]
             @assert supers[kparent] <= kparloc < supers[kparent + 1]
             parents[k] = kparent
-            push!(children[kparent], k)
         end
     end
 
     num_cols = cone.num_cols = Vector{Int}(undef, num_super)
     num_rows = cone.num_rows = Vector{Int}(undef, num_super)
+    L_idxs = cone.L_idxs = Vector{UnitRange{Int}}(undef, num_super)
     J_rows = cone.J_rows = Vector{Vector}(undef, num_super)
     F_blocks = cone.F_blocks = Vector{Matrix{R}}(undef, num_super)
     L_blocks = cone.L_blocks = Vector{Matrix{R}}(undef, num_super)
     S_blocks = cone.S_blocks = Vector{Matrix{R}}(undef, num_super)
-    inv_blocks = cone.inv_blocks = Vector{Matrix{R}}(undef, num_super)
     temp_blocks = cone.temp_blocks = Vector{Matrix{R}}(undef, num_super)
     rel_idxs = cone.rel_idxs = [Tuple{Int, Int}[] for k in 1:num_super]
     for k in reverse(1:num_super)
@@ -205,11 +185,12 @@ function setup_symbfact(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrCompl
         J_k = J_rows[k] = fs[fpi[k]:(fpi[k + 1] - 1)]
         @assert length(J_k) == num_row
 
+        L_idxs[k] = fpx[k] - 1 .+ (1:(num_row * num_col))
+
         F_blocks[k] = zeros(R, num_row, num_row)
         num_below = num_row - num_col
         L_blocks[k] = zeros(R, num_row, num_col)
         S_blocks[k] = zeros(R, num_below, num_below)
-        inv_blocks[k] = zeros(R, num_row, num_col)
         temp_blocks[k] = zeros(R, num_row, num_col)
 
         if num_row > num_col
@@ -225,17 +206,18 @@ function setup_symbfact(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrCompl
         end
     end
 
+    iperm = invperm(symb_mat.p)
     map_blocks = cone.map_blocks = Vector{Tuple{Int, Int, Int, Bool, Bool}}(undef, dim_R)
     for i in 1:dim_R
-        row = cone.iperm[cone.row_idxs[i]]
-        col = cone.iperm[cone.col_idxs[i]]
+        row = iperm[cone.row_idxs[i]]
+        col = iperm[cone.col_idxs[i]]
         if row < col
             (row, col) = (col, row)
             swapped = true
         else
             swapped = false
         end
-        super = supermap[col]
+        super = super_map[col]
         J = J_rows[super]
         row_idx = findfirst(r -> r == row, J)
         col_idx = col - supers[super] + 1
@@ -280,7 +262,7 @@ function update_feas(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{
     sparse_point = cone.sparse_point
 
     # svec scale point and copy directly to CHOLDMOD Sparse data structure
-    sxptr = unsafe_load(pointer(sparse_point)).x
+    sx_ptr = unsafe_load(pointer(sparse_point)).x
     if cone.is_complex
         idx = 1
         for (p_idx, s_idx) in enumerate(cone.sparse_point_map)
@@ -291,7 +273,7 @@ function update_feas(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{
                 p = Complex(point[idx], point[idx + 1]) / cone.rt2
                 idx += 2
             end
-            unsafe_store!(sxptr, p, s_idx)
+            unsafe_store!(sx_ptr, p, s_idx)
         end
     else
         for (p_idx, s_idx) in enumerate(cone.sparse_point_map)
@@ -299,13 +281,12 @@ function update_feas(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{
             if cone.row_idxs[p_idx] != cone.col_idxs[p_idx]
                 p /= cone.rt2
             end
-            unsafe_store!(sxptr, p, s_idx)
+            unsafe_store!(sx_ptr, p, s_idx)
         end
     end
 
-    # compute numeric factorization
-    cone.fact_mat = CHOLMOD.cholesky!(cone.symb_mat, sparse_point; check = false)
-    cone.is_feas = isposdef(cone.fact_mat)
+    # update numeric factorization
+    cone.is_feas = isposdef(CHOLMOD.cholesky!(cone.symb_mat, sparse_point; check = false))
 
     cone.feas_updated = true
     return cone.is_feas
@@ -317,14 +298,11 @@ function update_grad(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{
     num_rows = cone.num_rows
 
     # update L blocks from CHOLMOD numerical factorization
-    lxptr = unsafe_load(pointer(cone.symb_mat)).x
+    lx_ptr = unsafe_load(pointer(cone.symb_mat)).x
     for k in 1:length(num_cols)
-        num_col = num_cols[k]
-        num_row = num_rows[k]
         L_block = cone.L_blocks[k]
-        x_idxs = cone.fpx[k] - 1 .+ (1:(num_row * num_col))
-        for (l, lx_idx) in enumerate(x_idxs)
-            L_block[l] = unsafe_load(lxptr, lx_idx)
+        for (l, lx_idx) in enumerate(cone.L_idxs[k])
+            L_block[l] = unsafe_load(lx_ptr, lx_idx)
         end
     end
 
@@ -360,10 +338,10 @@ function update_grad(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{
             copyto!(cone.S_blocks[k], F_aa.data) # for use in Hessian calculations
         end
 
-        @views cone.inv_blocks[k] = F_block[:, idxs_n]
+        @views cone.temp_blocks[k] = F_block[:, idxs_n]
     end
 
-    smat_to_svec_sparse!(cone.grad, cone.inv_blocks, cone)
+    smat_to_svec_sparse!(cone.grad, cone.temp_blocks, cone)
     cone.grad .*= -1
 
     cone.grad_updated = true
