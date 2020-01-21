@@ -98,19 +98,11 @@ function test_grad_hess(cone::CO.Cone{T}, point::Vector{T}; tol::Real = 100eps(T
     @test CO.hess_prod!(prod, point, cone) ≈ -grad atol=tol rtol=tol
     @test CO.inv_hess_prod!(prod, grad, cone) ≈ -point atol=tol rtol=tol
 
-    # @show cholesky(hess).L
-    # CO.hess_sqrt_prod!(prod_mat, Matrix(one(T) * I, dim, dim), cone)
-    # @show hess
-    # @show prod_mat
-    # @show norm(hess - prod_mat' * prod_mat)
-    # @show cone.perm
-    # @show cone.iperm
-    # @show cone.supers
-    # @show cone.J_rows
-    # prod_mat2 = Matrix(CO.hess_sqrt_prod!(prod_mat, inv_hess, cone)')
-    # @test CO.hess_sqrt_prod!(prod_mat, prod_mat2, cone) ≈ I atol=tol rtol=tol
-    # CO.inv_hess_sqrt_prod!(prod_mat2, Matrix(one(T) * I, dim, dim), cone)
-    # @test prod_mat2' * prod_mat2 ≈ inv_hess atol=tol rtol=tol
+    CO.hess_sqrt_prod!(prod_mat, Matrix(one(T) * I, dim, dim), cone)
+    prod_mat2 = Matrix(CO.hess_sqrt_prod!(prod_mat, inv_hess, cone)')
+    @test CO.hess_sqrt_prod!(prod_mat, prod_mat2, cone) ≈ I atol=tol rtol=tol
+    CO.inv_hess_sqrt_prod!(prod_mat2, Matrix(one(T) * I, dim, dim), cone)
+    @test prod_mat2' * prod_mat2 ≈ inv_hess atol=tol rtol=tol
 
     return
 end
@@ -347,23 +339,14 @@ function test_possemideftrisparse_barrier(T::Type{<:Real})
     Random.seed!(1)
     invrt2 = inv(sqrt(T(2)))
 
-    # side = 17
-    # A = 10I + sparse(
-    #     [3, 3, 4, 4, 5, 5, 8, 9, 9, 9, 9, 11, 13, 13, 13, 14, 14, 14, 14, 15, 15, 15, 15, 15, 15, 16, 16, 16, 16, 16, 16, 16, 17, 17, 17, 17, 17, 17, 17],
-    #     [1, 2, 2, 3, 3, 4, 7, 5, 6, 7, 8, 10, 10, 11, 12, 10, 11, 12, 13, 3, 4, 5, 7, 8, 9, 5, 6, 9, 12, 13, 14, 15, 10, 11, 12, 13, 14, 15, 16],
-    #     inv.(1:39), side, side)
-    #
-    # row_idxs, col_idxs, AV = findnz(A)
-
-    # for side in [1, 2, 3, 4, 5, 10, 15, 20, ]#25, 30, 40, 50, 60, 70, 80, ]#100, 150, 200]
-    for side in [25, ]#10, 18, 25, ]#30, 40, 50, 60, 70, 80, ]#100, 150, 200]
+    # for side in [1, 2, 3, 4, 5, 10, 15, 20, 25, 30, 40, ]#50, 60, 70, 80, ]#100, 150, 200]
+    for side in [10, 18, 25, 30, 40, 50, ]#60, 70, 80, ]#100, 150, 200]
         # TODO pick final sizes, delete printing
         @show side
 
-
         # generate random sparsity pattern for lower triangle
-        # sparse_factor = inv(sqrt(side))
-        sparse_factor = 1.0
+        sparse_factor = inv(sqrt(side))
+        # sparse_factor = 1.0
         row_idxs = Int[]
         col_idxs = Int[]
         for i in 1:side
@@ -393,24 +376,24 @@ function test_possemideftrisparse_barrier(T::Type{<:Real})
         end
         test_barrier_oracles(CO.PosSemidefTriSparse{T, T}(side, row_idxs, col_idxs), R_barrier)
 
-        # println("complex")
-        # # complex sparse PSD cone
-        # function C_barrier(s)
-        #     scal_s = zeros(Complex{eltype(s)}, length(row_idxs))
-        #     idx = 1
-        #     for i in eachindex(scal_s)
-        #         if row_idxs[i] == col_idxs[i]
-        #             scal_s[i] = s[idx]
-        #             idx += 1
-        #         else
-        #             scal_s[i] = invrt2 * Complex(s[idx], s[idx + 1])
-        #             idx += 2
-        #         end
-        #     end
-        #     S = Matrix(sparse(row_idxs, col_idxs, scal_s, side, side))
-        #     return -logdet(cholesky!(Hermitian(S, :L)))
-        # end
-        # test_barrier_oracles(CO.PosSemidefTriSparse{T, Complex{T}}(side, row_idxs, col_idxs), C_barrier)
+        println("complex")
+        # complex sparse PSD cone
+        function C_barrier(s)
+            scal_s = zeros(Complex{eltype(s)}, length(row_idxs))
+            idx = 1
+            for i in eachindex(scal_s)
+                if row_idxs[i] == col_idxs[i]
+                    scal_s[i] = s[idx]
+                    idx += 1
+                else
+                    scal_s[i] = invrt2 * Complex(s[idx], s[idx + 1])
+                    idx += 2
+                end
+            end
+            S = Matrix(sparse(row_idxs, col_idxs, scal_s, side, side))
+            return -logdet(cholesky!(Hermitian(S, :L)))
+        end
+        test_barrier_oracles(CO.PosSemidefTriSparse{T, Complex{T}}(side, row_idxs, col_idxs), C_barrier)
     end
     return
 end
