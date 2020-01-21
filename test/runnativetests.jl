@@ -49,9 +49,9 @@ options = (verbose = true,)
     # end
 
     # # test each system solver
-    # @testset "NaiveDense tests: $t, $T" for t in testfuns_many, T in generic_reals
-    #     t(T, solver = SO.Solver{T}(system_solver = SO.NaiveDenseSystemSolver{T}(); options...))
-    # end
+    @testset "NaiveDense tests: $t, $T" for t in testfuns_many, T in generic_reals
+        t(T, solver = SO.Solver{T}(system_solver = SO.NaiveDenseSystemSolver{T}(); options...))
+    end
     # @testset "NaiveSparse tests: $t" for t in testfuns_many
     #     T = Float64
     #     t(T, solver = SO.Solver{T}(system_solver = SO.NaiveSparseSystemSolver{T}(); options...))
