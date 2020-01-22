@@ -2,18 +2,25 @@
 Copyright 2020, Chris Coey, Lea Kapelevich and contributors
 
 sparse lower triangle of positive semidefinite matrix cone (unscaled "smat" form)
-W \in S^n : 0 >= eigmin(W)
+dense(W) \in S^n : 0 >= eigmin(W)
 
-NOTE on-diagonal (real) elements have one slot in the vector and below diagonal (complex) elements have two consecutive slots in the vector
+specified with ordered lists of row and column indices for elements in lower triangle
+dual cone is cone of PSD-completable matrices given the same sparsity pattern
+real symmetric or complex Hermitian cases
 
-dual is sparse PSD completable
+NOTE in complex Hermitian case, on-diagonal (real) elements have one slot in the vector and below diagonal (complex) elements have two consecutive slots in the vector, but row and column indices are not repeated
+
+see "Logarithmic barriers for sparse matrix cones" by Andersen, Dahl, Vandenberghe (2012)
+but note that we do not restrict the sparsity pattern to be chordal here (at the cost of not being able to obtain "closed form" hess sqrt and inv hess oracles)
+barrier is -logdet(dense(W))
+
+NOTE only implemented for BLAS real types (Float32 and Float64) because implementation calls SuiteSparse.CHOLMOD
 
 TODO
-- describe
-- reference
-- doesn't seem to need to be chordal/filled to get grad/hess at least, but for other oracles need sparsity pattern to match for cone and for supernodal representation
 - improve efficiency of hessian calculations using structure
 - use inbounds
+- improve efficiency of frontal matrix scattering etc
+- maybe allow passing more options to CHOLMOD eg through a common_struct argument to cone
 =#
 
 import SuiteSparse.CHOLMOD
@@ -115,7 +122,6 @@ function setup_symbfact(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrCompl
     side = cone.side
     dim_R = length(cone.row_idxs)
 
-    # TODO maybe allow passing more options to CHOLMOD eg through a common_struct argument to cone
     cm = CHOLMOD.defaults(CHOLMOD.common_struct)
     unsafe_store!(CHOLMOD.common_print[], 0)
     unsafe_store!(CHOLMOD.common_postorder[], 1)

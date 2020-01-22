@@ -1231,6 +1231,9 @@ function possemideftri9(T; options...)
 end
 
 function possemideftrisparse1(T; options...)
+    if !(T <: LinearAlgebra.BlasReal)
+        return # only works with BLAS real types
+    end
     tol = sqrt(sqrt(eps(T)))
     c = T[0, -1, 0]
     A = T[1 0 0; 0 0 1]
@@ -1248,6 +1251,9 @@ function possemideftrisparse1(T; options...)
 end
 
 function possemideftrisparse2(T; options...)
+    if !(T <: LinearAlgebra.BlasReal)
+        return # only works with BLAS real types
+    end
     tol = sqrt(sqrt(eps(T)))
     Trt2 = sqrt(T(2))
     Trt2i = inv(Trt2)
@@ -1267,6 +1273,9 @@ function possemideftrisparse2(T; options...)
 end
 
 function possemideftrisparse3(T; options...)
+    if !(T <: LinearAlgebra.BlasReal)
+        return # only works with BLAS real types
+    end
     tol = sqrt(sqrt(eps(T)))
     rt2 = sqrt(T(2))
     Random.seed!(1)
@@ -1304,6 +1313,9 @@ function possemideftrisparse3(T; options...)
 end
 
 function possemideftrisparse4(T; options...)
+    if !(T <: LinearAlgebra.BlasReal)
+        return # only works with BLAS real types
+    end
     tol = sqrt(sqrt(eps(T)))
     rt2 = sqrt(T(2))
     c = T[1]
@@ -1329,6 +1341,9 @@ function possemideftrisparse4(T; options...)
 end
 
 function possemideftrisparse5(T; options...)
+    if !(T <: LinearAlgebra.BlasReal)
+        return # only works with BLAS real types
+    end
     tol = sqrt(sqrt(eps(T)))
     rt2 = sqrt(T(2))
     inv2 = inv(T(2))
