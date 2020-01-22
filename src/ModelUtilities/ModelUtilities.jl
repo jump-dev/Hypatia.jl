@@ -23,7 +23,7 @@ const SAS = SemialgebraicSets
 include("semialgebraicsets.jl")
 
 # utilities for in-place vector and matrix rescalings for svec form
-function vec_to_svec!(arr::AbstractVecOrMat; rt2 = sqrt(2), incr::Int = 1)
+function vec_to_svec!(arr::AbstractVecOrMat{T}; rt2 = sqrt(T(2)), incr::Int = 1) where {T <: Real}
     n = size(arr, 1)
     @assert iszero(rem(n, incr))
     side = round(Int, sqrt(0.25 + 2 * div(n, incr)) - 0.5)
@@ -38,7 +38,7 @@ function vec_to_svec!(arr::AbstractVecOrMat; rt2 = sqrt(2), incr::Int = 1)
     return arr
 end
 
-function svec_to_vec!(arr::AbstractVecOrMat; rt2 = sqrt(2), incr::Int = 1)
+function svec_to_vec!(arr::AbstractVecOrMat{T}; rt2 = sqrt(T(2)), incr::Int = 1) where {T <: Real}
     n = size(arr, 1)
     @assert iszero(rem(n, incr))
     side = round(Int, sqrt(0.25 + 2 * div(n, incr)) - 0.5)
