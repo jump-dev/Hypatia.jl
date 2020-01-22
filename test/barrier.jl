@@ -7,6 +7,7 @@ tests for primitive cone barrier oracles
 using Test
 import Random
 using LinearAlgebra
+using SparseArrays
 import ForwardDiff
 import TimerOutputs
 import Hypatia
@@ -19,7 +20,7 @@ function test_barrier_oracles(
     cone::CO.Cone{T},
     barrier::Function;
     noise::T = T(0.1),
-    scale::T = T(1e-1),
+    scale::T = T(1e-2),
     tol::Real = 100eps(T),
     init_tol::Real = tol,
     init_only::Bool = false,
@@ -329,6 +330,65 @@ function test_possemideftri_barrier(T::Type{<:Real})
         end
         dim = side^2
         test_barrier_oracles(CO.PosSemidefTri{T, Complex{T}}(dim), C_barrier)
+    end
+    return
+end
+
+function test_possemideftrisparse_barrier(T::Type{<:Real})
+    if !(T <: LinearAlgebra.BlasReal)
+        return # only works with BLAS real types
+    end
+    Random.seed!(1)
+    invrt2 = inv(sqrt(T(2)))
+
+    for side in [1, 2, 3, 5, 10, 20, 40, 80]
+        # generate random sparsity pattern for lower triangle
+        sparsity = inv(sqrt(side))
+        row_idxs = Int[]
+        col_idxs = Int[]
+        for i in 1:side
+            # on diagonal
+            push!(row_idxs, i)
+            push!(col_idxs, i)
+            for j in 1:(i - 1)
+                # off diagonal
+                if rand() < sparsity
+                    push!(row_idxs, i)
+                    push!(col_idxs, j)
+                end
+            end
+        end
+
+        # real sparse PSD cone
+        function R_barrier(s)
+            scal_s = copy(s)
+            for i in eachindex(s)
+                if row_idxs[i] != col_idxs[i]
+                    scal_s[i] *= invrt2
+                end
+            end
+            S = Matrix(sparse(row_idxs, col_idxs, scal_s, side, side))
+            return -logdet(cholesky(Symmetric(S, :L)))
+        end
+        test_barrier_oracles(CO.PosSemidefTriSparse{T, T}(side, row_idxs, col_idxs), R_barrier)
+
+        # complex sparse PSD cone
+        function C_barrier(s)
+            scal_s = zeros(Complex{eltype(s)}, length(row_idxs))
+            idx = 1
+            for i in eachindex(scal_s)
+                if row_idxs[i] == col_idxs[i]
+                    scal_s[i] = s[idx]
+                    idx += 1
+                else
+                    scal_s[i] = invrt2 * Complex(s[idx], s[idx + 1])
+                    idx += 2
+                end
+            end
+            S = Matrix(sparse(row_idxs, col_idxs, scal_s, side, side))
+            return -logdet(cholesky!(Hermitian(S, :L)))
+        end
+        test_barrier_oracles(CO.PosSemidefTriSparse{T, Complex{T}}(side, row_idxs, col_idxs), C_barrier)
     end
     return
 end

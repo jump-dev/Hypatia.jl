@@ -10,7 +10,7 @@ const SO = Hypatia.Solvers
 generic_reals = [
     Float64,
     Float32,
-    # BigFloat,
+    BigFloat,
     ]
 
 blas_reals = [
