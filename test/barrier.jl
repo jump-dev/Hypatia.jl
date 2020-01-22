@@ -20,7 +20,7 @@ function test_barrier_oracles(
     cone::CO.Cone{T},
     barrier::Function;
     noise::T = T(0.1),
-    scale::T = T(1e-1),
+    scale::T = T(1e-2),
     tol::Real = 100eps(T),
     init_tol::Real = tol,
     init_only::Bool = false,
@@ -51,7 +51,7 @@ function test_barrier_oracles(
     test_grad_hess(cone, point, tol = tol)
 
     # check gradient and Hessian agree with ForwardDiff
-    # if dim < 10 # too slow if dimension is large
+    if dim < 10 # too slow if dimension is large
         grad = CO.grad(cone)
         fd_grad = ForwardDiff.gradient(barrier, point)
         @test grad ≈ fd_grad atol=tol rtol=tol
@@ -59,7 +59,7 @@ function test_barrier_oracles(
         hess = CO.hess(cone)
         fd_hess = ForwardDiff.hessian(barrier, point)
         @test hess ≈ fd_hess atol=tol rtol=tol
-    # end
+    end
 
     # TODO decide whether to add
     # # check 3rd order corrector agrees with ForwardDiff
@@ -336,17 +336,15 @@ function test_possemideftri_barrier(T::Type{<:Real})
 end
 
 function test_possemideftrisparse_barrier(T::Type{<:Real})
+    if !(T <: LinearAlgebra.BlasReal)
+        return # only works with BLAS real types
+    end
     Random.seed!(1)
     invrt2 = inv(sqrt(T(2)))
 
-    # for side in [1, 2, 3, 4, 5, 10, 15, 20, 25, 30, 40, ]#50, 60, 70, 80, ]#100, 150, 200]
-    for side in [10, 18, 25, 30, 40, 50, ]#60, 70, 80, ]#100, 150, 200]
-        # TODO pick final sizes, delete printing
-        @show side
-
+    for side in [1, 2, 3, 5, 10, 20, 40, 80]
         # generate random sparsity pattern for lower triangle
-        sparse_factor = inv(sqrt(side))
-        # sparse_factor = 1.0
+        sparsity = inv(sqrt(side))
         row_idxs = Int[]
         col_idxs = Int[]
         for i in 1:side
@@ -355,14 +353,13 @@ function test_possemideftrisparse_barrier(T::Type{<:Real})
             push!(col_idxs, i)
             for j in 1:(i - 1)
                 # off diagonal
-                if rand() < sparse_factor
+                if rand() < sparsity
                     push!(row_idxs, i)
                     push!(col_idxs, j)
                 end
             end
         end
 
-        println("real")
         # real sparse PSD cone
         function R_barrier(s)
             scal_s = copy(s)
@@ -376,7 +373,6 @@ function test_possemideftrisparse_barrier(T::Type{<:Real})
         end
         test_barrier_oracles(CO.PosSemidefTriSparse{T, T}(side, row_idxs, col_idxs), R_barrier)
 
-        println("complex")
         # complex sparse PSD cone
         function C_barrier(s)
             scal_s = zeros(Complex{eltype(s)}, length(row_idxs))
