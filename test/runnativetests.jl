@@ -48,7 +48,7 @@ options = (verbose = false,)
         t(T, solver = SO.Solver{T}(use_infty_nbhd = n; options...))
     end
 
-    # # test each system solver
+    # test each system solver
     @testset "NaiveDense tests: $t, $T" for t in testfuns_many, T in generic_reals
         t(T, solver = SO.Solver{T}(system_solver = SO.NaiveDenseSystemSolver{T}(); options...))
     end
