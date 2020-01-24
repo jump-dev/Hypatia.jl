@@ -22,7 +22,7 @@ function densityestJuMP(
     deg::Int;
     use_monomials::Bool = false, # use variables in monomial space, else interpolation space
     use_wsos::Bool = true, # use WSOS cone formulation, else PSD formulation
-    use_geomean::Bool = true, # use geomean formulation, else exponential cone sum-log formulation
+    geomean_obj::Bool = true, # use geomean formulation, else exponential cone sum-log formulation
     sample_factor::Int = 100,
     )
     (nobs, dim) = size(X)
@@ -57,7 +57,7 @@ function densityestJuMP(
 
     JuMP.@constraint(model, dot(w, f_pts) == 1.0) # integrate to 1
 
-    if use_geomean
+    if geomean_obj
         JuMP.@variable(model, z)
         JuMP.@objective(model, Max, z)
         JuMP.@constraint(model, vcat(z, f_X) in MOI.GeometricMeanCone(1 + length(f_X)))
@@ -90,14 +90,14 @@ densityestJuMP1() = densityestJuMP(iris_data(), 4)
 densityestJuMP2() = densityestJuMP(iris_data(), 6)
 densityestJuMP3() = densityestJuMP(cancer_data(), 4)
 densityestJuMP4() = densityestJuMP(cancer_data(), 6)
-densityestJuMP5() = densityestJuMP(200, 2, 3, use_monomials = false, use_wsos = true, use_geomean = false)
-densityestJuMP6() = densityestJuMP(200, 2, 3, use_monomials = true, use_wsos = true, use_geomean = false)
-densityestJuMP7() = densityestJuMP(200, 2, 3, use_monomials = false, use_wsos = false, use_geomean = false)
-densityestJuMP8() = densityestJuMP(200, 2, 3, use_monomials = true, use_wsos = false, use_geomean = false)
-densityestJuMP9() = densityestJuMP(200, 2, 3, use_monomials = false, use_wsos = true, use_geomean = true)
-densityestJuMP10() = densityestJuMP(200, 2, 3, use_monomials = true, use_wsos = true, use_geomean = true)
-densityestJuMP11() = densityestJuMP(200, 2, 3, use_monomials = false, use_wsos = false, use_geomean = true)
-densityestJuMP12() = densityestJuMP(200, 2, 3, use_monomials = true, use_wsos = false, use_geomean = true)
+densityestJuMP5() = densityestJuMP(200, 2, 3, use_monomials = false, use_wsos = true, geomean_obj = false)
+densityestJuMP6() = densityestJuMP(200, 2, 3, use_monomials = true, use_wsos = true, geomean_obj = false)
+densityestJuMP7() = densityestJuMP(200, 2, 3, use_monomials = false, use_wsos = false, geomean_obj = false)
+densityestJuMP8() = densityestJuMP(200, 2, 3, use_monomials = true, use_wsos = false, geomean_obj = false)
+densityestJuMP9() = densityestJuMP(200, 2, 3, use_monomials = false, use_wsos = true, geomean_obj = true)
+densityestJuMP10() = densityestJuMP(200, 2, 3, use_monomials = true, use_wsos = true, geomean_obj = true)
+densityestJuMP11() = densityestJuMP(200, 2, 3, use_monomials = false, use_wsos = false, geomean_obj = true)
+densityestJuMP12() = densityestJuMP(200, 2, 3, use_monomials = true, use_wsos = false, geomean_obj = true)
 
 function test_densityestJuMP(instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
