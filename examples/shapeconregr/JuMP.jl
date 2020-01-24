@@ -11,7 +11,9 @@ where
     - ℓ is a convex loss function.
 see e.g. Chapter 8 of thesis by G. Hall (2018)
 
-TODO reduce dimension in case of more observations by doing cholesky trick, as in matrixregression example
+TODO
+- reduce dimension in case of more observations by doing cholesky trick, as in matrixregression example
+- ? for odd degrees WSOS/PSD formulations don't match, modeling issue
 =#
 
 import LinearAlgebra: norm
@@ -29,8 +31,7 @@ import MathOptInterface
 const MOI = MathOptInterface
 import JuMP
 import Hypatia
-const HYP = Hypatia
-const MU = HYP.ModelUtilities
+const MU = Hypatia.ModelUtilities
 
 const rt2 = sqrt(2)
 
@@ -39,8 +40,8 @@ function shapeconregrJuMP(
     y::Vector{Float64},
     deg::Int;
     n::Int = size(X, 2),
-    use_lsq_obj::Bool = true,
-    use_wsos::Bool = true,
+    use_wsos::Bool = true, # use WSOS cone formulation, else SDP formulation
+    use_L1_obj::Bool = false, # in objective function use L1 norm, else L2 norm
     sample::Bool = true,
     mono_dom::MU.Domain = MU.Box{Float64}(-ones(n), ones(n)),
     conv_dom::MU.Domain = mono_dom,
@@ -57,24 +58,11 @@ function shapeconregrJuMP(
         model = JuMP.Model()
         JuMP.@variable(model, regressor, variable_type = PJ.Poly(PJ.FixedPolynomialBasis(lagrange_polys)))
 
-        if use_lsq_obj
-            JuMP.@variable(model, z)
-            JuMP.@objective(model, Min, z / num_points)
-            JuMP.@constraint(model, vcat([z], [y[i] - regressor(X[i, :]) for i in 1:num_points]) in MOI.SecondOrderCone(1 + num_points))
-         else
-            JuMP.@variable(model, z[1:num_points])
-            JuMP.@objective(model, Min, sum(z) / num_points)
-            JuMP.@constraints(model, begin
-                [i in 1:num_points], z[i] >= y[i] - regressor(X[i, :])
-                [i in 1:num_points], z[i] >= -y[i] + regressor(X[i, :])
-            end)
-        end
-
         # monotonicity
         if !all(iszero, mono_profile)
             gradient_halfdeg = div(deg, 2)
             (mono_U, mono_points, mono_Ps, _) = MU.interpolate(mono_dom, gradient_halfdeg, sample = sample, sample_factor = 50)
-            mono_wsos_cone = HYP.WSOSInterpNonnegativeCone{Float64, Float64}(mono_U, mono_Ps)
+            mono_wsos_cone = Hypatia.WSOSInterpNonnegativeCone{Float64, Float64}(mono_U, mono_Ps)
             for j in 1:n
                 if !iszero(mono_profile[j])
                     gradient = DP.differentiate(regressor, DP.variables(regressor)[j])
@@ -87,35 +75,23 @@ function shapeconregrJuMP(
         if !iszero(conv_profile)
             hessian_halfdeg = div(deg - 1, 2)
             (conv_U, conv_points, conv_Ps, _) = MU.interpolate(conv_dom, hessian_halfdeg, sample = sample, sample_factor = 50)
-            conv_wsos_cone = HYP.WSOSInterpPosSemidefTriCone{Float64}(n, conv_U, conv_Ps)
+            conv_wsos_cone = Hypatia.WSOSInterpPosSemidefTriCone{Float64}(n, conv_U, conv_Ps)
             hessian = DP.differentiate(regressor, DP.variables(regressor), 2)
             hessian_interp = [hessian[i, j](conv_points[u, :]) for i in 1:n for j in 1:i for u in 1:conv_U]
-            JuMP.@constraint(model, conv_profile * MU.vec_to_svec!(hessian_interp, incr = conv_U) in conv_wsos_cone)
+            MU.vec_to_svec!(hessian_interp, rt2 = sqrt(2), incr = conv_U)
+            JuMP.@constraint(model, conv_profile * hessian_interp in conv_wsos_cone)
         end
     else
         DP.@polyvar x[1:n]
 
         model = SumOfSquares.SOSModel()
-        JuMP.@variable(model, p, PJ.Poly(DP.monomials(x, 0:deg)))
-
-        if use_lsq_obj
-            JuMP.@variable(model, z)
-            JuMP.@objective(model, Min, z / num_points)
-            JuMP.@constraint(model, vcat([z], [y[i] - p(X[i, :]) for i in 1:num_points]) in MOI.SecondOrderCone(1 + num_points))
-         else
-            JuMP.@variable(model, z[1:num_points])
-            JuMP.@objective(model, Min, sum(z) / num_points)
-            JuMP.@constraints(model, begin
-                [i in 1:num_points], z[i] >= y[i] - p(X[i, :])
-                [i in 1:num_points], z[i] >= -y[i] + p(X[i, :])
-            end)
-        end
+        JuMP.@variable(model, regressor, PJ.Poly(DP.monomials(x, 0:deg)))
 
         # monotonicity
         monotonic_set = MU.get_domain_inequalities(mono_dom, x)
         for j in 1:n
             if !iszero(mono_profile[j])
-                gradient = DP.differentiate(p, x[j])
+                gradient = DP.differentiate(regressor, x[j])
                 JuMP.@constraint(model, mono_profile[j] * gradient >= 0, domain = monotonic_set, maxdegree = 2 * div(deg, 2))
             end
         end
@@ -123,10 +99,16 @@ function shapeconregrJuMP(
         # convexity
         if !iszero(conv_profile)
             convex_set = MU.get_domain_inequalities(conv_dom, x)
-            hessian = DP.differentiate(p, x, 2)
+            hessian = DP.differentiate(regressor, x, 2)
             JuMP.@constraint(model, conv_profile * hessian in JuMP.PSDCone(), domain = convex_set, maxdegree = 2 * div(deg - 1, 2))
         end
     end
+
+    # objective function
+    JuMP.@variable(model, z)
+    JuMP.@objective(model, Min, z / num_points)
+    obj_cone = (use_L1_obj ? MOI.NormOneCone(1 + num_points) : MOI.SecondOrderCone(1 + num_points))
+    JuMP.@constraint(model, vcat(z, [y[i] - regressor(X[i, :]) for i in 1:num_points]) in obj_cone)
 
     return (model = model,)
 end
@@ -162,6 +144,7 @@ function production_data()
     df[!, :prode] .= df[!, :emp] - df[!, :prode]
     # group by industry codes
     df_aggr = DataFrames.aggregate(DataFrames.dropmissing(df), :naics, sum)
+
     # four covariates: non production employees, production worker hours, production workers, total capital stock
     # use the log transform of covariates
     X = log.(convert(Matrix{Float64}, df_aggr[!, [:prode_sum, :prodh_sum, :prodw_sum, :cap_sum]])) # n = 4
@@ -173,31 +156,30 @@ function production_data()
     # normalize to unit norm
     X ./= norm.(eachcol(X))'
     y /= norm(y)
+
     return (X, y)
 end
 
-# TODO for odd degrees WSOS/PSD formulations don't match, modeling issue
-
 shapeconregrJuMP1() = shapeconregrJuMP(production_data()..., 4, mono_dom = MU.FreeDomain{Float64}(4), mono_profile = zeros(Int, 4))
-shapeconregrJuMP2() = shapeconregrJuMP(2, 3, 100, x -> sum(x.^3), use_lsq_obj = false)
-shapeconregrJuMP3() = shapeconregrJuMP(2, 3, 100, x -> sum(x.^4), use_lsq_obj = false)
-shapeconregrJuMP4() = shapeconregrJuMP(2, 3, 100, x -> sum(x.^3), signal_ratio = 50.0, use_lsq_obj = false)
-shapeconregrJuMP5() = shapeconregrJuMP(2, 3, 100, x -> sum(x.^4), signal_ratio = 50.0, use_lsq_obj = false)
+shapeconregrJuMP2() = shapeconregrJuMP(2, 3, 100, x -> sum(x .^ 3), use_L1_obj = true)
+shapeconregrJuMP3() = shapeconregrJuMP(2, 3, 100, x -> sum(x .^ 4), use_L1_obj = true)
+shapeconregrJuMP4() = shapeconregrJuMP(2, 3, 100, x -> sum(x .^ 3), signal_ratio = 50.0, use_L1_obj = true)
+shapeconregrJuMP5() = shapeconregrJuMP(2, 3, 100, x -> sum(x .^ 4), signal_ratio = 50.0, use_L1_obj = true)
 shapeconregrJuMP6() = shapeconregrJuMP(2, 3, 100, x -> exp(norm(x)))
-shapeconregrJuMP7() = shapeconregrJuMP(2, 3, 100, x -> sum(x.^4), signal_ratio = 50.0)
+shapeconregrJuMP7() = shapeconregrJuMP(2, 3, 100, x -> sum(x .^ 4), signal_ratio = 50.0)
 shapeconregrJuMP8() = shapeconregrJuMP(2, 4, 100, x -> -inv(1 + exp(-10.0 * norm(x))), mono_dom = MU.Box{Float64}(zeros(2), ones(2)))
 shapeconregrJuMP9() = shapeconregrJuMP(2, 4, 100, x -> -inv(1 + exp(-10.0 * norm(x))), signal_ratio = 10.0, mono_dom = MU.Box{Float64}(zeros(2), ones(2)))
 shapeconregrJuMP10() = shapeconregrJuMP(2, 4, 100, x -> exp(norm(x)))
 shapeconregrJuMP11() = shapeconregrJuMP(2, 5, 100, x -> exp(norm(x)), signal_ratio = 10.0, mono_dom = MU.Box{Float64}(0.5 * ones(2), 2 * ones(2)))
-shapeconregrJuMP12() = shapeconregrJuMP(2, 6, 100, x -> exp(norm(x)), signal_ratio = 1.0, mono_dom = MU.Box{Float64}(0.5 * ones(2), 2 * ones(2)), use_wsos = false)
-shapeconregrJuMP13() = shapeconregrJuMP(2, 6, 100, x -> exp(norm(x)), signal_ratio = 1.0, use_lsq_obj = false)
-shapeconregrJuMP14() = shapeconregrJuMP(5, 5, 50, x -> exp(norm(x)), use_wsos = false)
-shapeconregrJuMP15() = shapeconregrJuMP(2, 3, 100, x -> exp(norm(x)), use_lsq_obj = false, use_wsos = false)
-shapeconregrJuMP16() = shapeconregrJuMP(5, 4, 100, x -> sum(x.^2), signal_ratio = 9.0) # see https://arxiv.org/pdf/1509.08165v1.pdf (example 1)
+shapeconregrJuMP12() = shapeconregrJuMP(2, 5, 100, x -> exp(norm(x)), signal_ratio = 1.0, mono_dom = MU.Box{Float64}(0.5 * ones(2), 2 * ones(2)), use_wsos = false)
+shapeconregrJuMP13() = shapeconregrJuMP(2, 6, 100, x -> exp(norm(x)), signal_ratio = 1.0, use_L1_obj = true)
+shapeconregrJuMP14() = shapeconregrJuMP(5, 2, 50, x -> exp(norm(x)), use_L1_obj = true, use_wsos = false)
+shapeconregrJuMP15() = shapeconregrJuMP(2, 3, 100, x -> exp(norm(x)), use_L1_obj = true, use_wsos = false)
+shapeconregrJuMP16() = shapeconregrJuMP(5, 4, 100, x -> sum(x .^ 2), signal_ratio = 9.0) # see https://arxiv.org/pdf/1509.08165v1.pdf (example 1)
 shapeconregrJuMP17() = shapeconregrJuMP(5, 4, 100, x -> (5x[1] + 0.5x[2] + x[3])^2 + sqrt(x[4]^2 + x[5]^2), signal_ratio = 9.0) # see https://arxiv.org/pdf/1509.08165v1.pdf (example 5)
-shapeconregrJuMP18() = shapeconregrJuMP(2, 4, 100, x -> sum((x .+ 1).^4), signal_ratio = 0.0)
-shapeconregrJuMP19() = shapeconregrJuMP(3, 4, 100, x -> sum((0.5 * x .+ 1).^3), signal_ratio = 0.0)
-shapeconregrJuMP20() = shapeconregrJuMP(3, 6, 100, x -> sum((x .+ 1).^5 .- 2), signal_ratio = 0.0)
+shapeconregrJuMP18() = shapeconregrJuMP(2, 4, 100, x -> sum((x .+ 1) .^ 4), signal_ratio = 0.0)
+shapeconregrJuMP19() = shapeconregrJuMP(3, 4, 100, x -> sum((0.5 * x .+ 1) .^ 3), signal_ratio = 0.0)
+shapeconregrJuMP20() = shapeconregrJuMP(3, 6, 100, x -> sum((x .+ 1) .^ 5 .- 2), signal_ratio = 0.0)
 
 function test_shapeconregrJuMP(instance::Tuple{Function, Number}; options, rseed::Int = 1)
     Random.seed!(rseed)
@@ -226,8 +208,8 @@ test_shapeconregrJuMP_all(; options...) = test_shapeconregrJuMP.([
     (shapeconregrJuMP11, NaN),
     (shapeconregrJuMP12, NaN),
     (shapeconregrJuMP13, NaN),
-    # (shapeconregrJuMP14, NaN), # very large sdp
-    # (shapeconregrJuMP15, NaN), # very large sdp
+    (shapeconregrJuMP14, NaN),
+    (shapeconregrJuMP15, NaN),
     (shapeconregrJuMP16, NaN),
     (shapeconregrJuMP17, NaN),
     (shapeconregrJuMP18, 0.0),
@@ -240,9 +222,11 @@ test_shapeconregrJuMP(; options...) = test_shapeconregrJuMP.([
     (shapeconregrJuMP2, NaN),
     (shapeconregrJuMP4, NaN),
     (shapeconregrJuMP6, NaN),
-    # (shapeconregrJuMP12, NaN), # TODO fix slowness
+    (shapeconregrJuMP12, NaN),
     (shapeconregrJuMP15, NaN),
     (shapeconregrJuMP16, NaN),
     (shapeconregrJuMP17, NaN),
-    (shapeconregrJuMP18, 0),
+    (shapeconregrJuMP18, 0.0),
+    (shapeconregrJuMP19, 0.0),
+    (shapeconregrJuMP20, 0.0),
     ], options = options)
