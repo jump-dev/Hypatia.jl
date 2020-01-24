@@ -31,15 +31,22 @@ function expdesignJuMP(
     geomean_obj::Bool = false,
     use_logdet::Bool = true,
     use_rootdet::Bool = true,
+    use_epinorminf::Bool = true,
     )
     @assert (p > q) && (n > q) && (nmax <= n)
     @assert logdet_obj + geomean_obj + rootdet_obj == 1
     V = randn(q, p)
 
     model = JuMP.Model()
-    JuMP.@variable(model, 0 <= np[1:p] <= nmax) # number of each experiment
+    JuMP.@variable(model, np[1:p])
+    if use_epinorminf
+        JuMP.@constraint(model, vcat(nmax / 2, np .- nmax / 2) in MOI.NormInfinityCone(p + 1))
+    else
+        JuMP.@constraint(model, 0 .<= np .<= nmax)
+    end
+    # JuMP.@variable(model, 0 <= np[1:p] <= nmax) # number of each experiment
     Q = V * diagm(np) * V' # information matrix
-    JuMP.@constraint(model, sum(np) == n) # n experiments total
+    JuMP.@constraint(model, sum(np) == n)
     v1 = [Q[i, j] for i in 1:q for j in 1:i] # vectorized Q
 
     if (logdet_obj && use_logdet) || rootdet_obj || geomean_obj
@@ -103,11 +110,11 @@ expdesignJuMP7() = expdesignJuMP(10, 30, 50, 5, use_logdet = false, logdet_obj =
 expdesignJuMP8() = expdesignJuMP(5, 15, 25, 5, use_logdet = false, logdet_obj = true)
 expdesignJuMP9() = expdesignJuMP(4, 8, 12, 3, use_logdet = false, logdet_obj = true)
 expdesignJuMP10() = expdesignJuMP(3, 5, 7, 2, use_logdet = false, logdet_obj = true)
-expdesignJuMP11() = expdesignJuMP(25, 75, 125, 5, rootdet_obj = true)
-expdesignJuMP12() = expdesignJuMP(10, 30, 50, 5, rootdet_obj = true)
-expdesignJuMP13() = expdesignJuMP(5, 15, 25, 5, rootdet_obj = true)
-expdesignJuMP14() = expdesignJuMP(4, 8, 12, 3, rootdet_obj = true)
-expdesignJuMP15() = expdesignJuMP(3, 5, 7, 2, rootdet_obj = true)
+expdesignJuMP11() = expdesignJuMP(25, 75, 125, 5, rootdet_obj = true, use_epinorminf = false)
+expdesignJuMP12() = expdesignJuMP(10, 30, 50, 5, rootdet_obj = true, use_epinorminf = false)
+expdesignJuMP13() = expdesignJuMP(5, 15, 25, 5, rootdet_obj = true, use_epinorminf = false)
+expdesignJuMP14() = expdesignJuMP(4, 8, 12, 3, rootdet_obj = true, use_epinorminf = false)
+expdesignJuMP15() = expdesignJuMP(3, 5, 7, 2, rootdet_obj = true, use_epinorminf = false)
 expdesignJuMP16() = expdesignJuMP(20, 40, 80, 5, geomean_obj = true) # other big size difficult for this formulation
 expdesignJuMP17() = expdesignJuMP(10, 30, 50, 5, geomean_obj = true)
 expdesignJuMP18() = expdesignJuMP(5, 15, 25, 5, geomean_obj = true)
