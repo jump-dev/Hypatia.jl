@@ -26,6 +26,7 @@ function expdesign(
     use_logdet::Bool = true,
     use_sumlog::Bool = true,
     use_rootdet::Bool = true,
+    use_epinorminf::Bool = true,
     )
     @assert logdet_obj + geomean_obj + rootdet_obj == 1
     @assert (p > q) && (n > q) && (nmax <= n)
@@ -35,13 +36,19 @@ function expdesign(
         error("linear operators only implemented with logdet objective")
     end
 
+    # constraints on upper bound of number of trials and nonnegativity of numbers of trials
+    if use_epinorminf
+        h_norminf = vcat(T(nmax) / 2, fill(-T(nmax) / 2, p))
+        G_nominf = vcat(zeros(T, 1, p), -Matrix{T}(I, p, p))
+        cones = CO.Cone{T}[CO.EpiNormInf{T, T}(p + 1)]
+    else
+        h_norminf = vcat(zeros(T, p), fill(T(nmax), p))
+        G_nominf = vcat(Matrix{T}(-I, p, p), Matrix{T}(-I, p, p))
+        cones = CO.Cone{T}[CO.Nonnegative{T}(p), CO.Nonnegative{T}(p)]
+    end
     # constraint on total number of trials
     A = ones(T, 1, p)
     b = T[n]
-    # constraints on upper bound of number of trials and nonnegativity of numbers of trials
-    h_nonneg = zeros(T, p)
-    h_nmax = fill(T(nmax), p)
-    cones = CO.Cone{T}[CO.Nonnegative{T}(p), CO.Nonnegative{T}(p)]
 
     if (logdet_obj && use_logdet) || (rootdet_obj && use_rootdet) && !use_linops
         # maximize the hypograph variable of the cone
@@ -49,8 +56,7 @@ function expdesign(
 
         # pad with hypograph variable
         A = hcat(zero(T), A)
-        G_nonneg = hcat(zeros(T, p), Matrix{T}(-I, p, p))
-        G_nmax = hcat(zeros(T, p), Matrix{T}(-I, p, p))
+        G_nominf = hcat(zeros(T, size(G_nominf, 1)), G_nominf)
 
         # dimension of vectorized matrix V*diag(np)*V'
         dimvec = CO.svec_length(q)
@@ -86,8 +92,8 @@ function expdesign(
                 ]
         end # logdet/rootdet
         # all conic constraints
-        G = vcat(G_nonneg, G_nmax, G_detcone)
-        h = vcat(h_nonneg, h_nmax, h_detcone)
+        G = vcat(G_nominf, G_detcone)
+        h = vcat(h_norminf, h_detcone)
 
         return (c = c, A = A, b = b, G = G, h = h, cones = cones)
     end
@@ -144,7 +150,7 @@ function expdesign(
             zeros(T, q, 1 + p + pq)    G_geo; # geomean
             zeros(T, pq + p)    G_soc_epi    G_soc    zeros(T, pq + p, num_trivars); # epinormeucl
             ]
-        h = vcat(h_nonneg, h_nmax, zeros(p + 1 + q + pq))
+        h = vcat(h_norminf, zeros(p + 1 + q + pq))
 
         return (c = c, A = A, b = b, G = G, h = h, cones = cones)
     end
@@ -209,7 +215,7 @@ function expdesign(
             zeros(T, 1, p)    zeros(T, 1, num_trivars)    -one(T); # hypogeomean
             zeros(T, q, p)    G_geo    zeros(T, q); # hypogeomean
             ]
-        h = vcat(h_nonneg, h_nmax, h_psd, h_geo)
+        h = vcat(h_norminf, h_psd, h_geo)
         return (c = c, A = A, b = b, G = G, h = h, cones = cones)
     end
 
@@ -224,7 +230,7 @@ function expdesign(
                 [1:p, (p + 1):(2 * p), (2 * p + 1):(2 * p + 1), (2 * p + 3):(2 * p + 2 + dimvec)],
                 [2:(p + 1), 2:(p + 1), 1:1, 2:(p + 1)]
                 )
-            h = vcat(h_nonneg, h_nmax, h_detcone)
+            h = vcat(h_norminf, h_detcone)
         else
             if use_sumlog
                 dimx = p + num_trivars + 1
@@ -286,7 +292,7 @@ function expdesign(
                     G_log;
                     ]
             end
-            h = vcat(h_nonneg, h_nmax, h_psd, h_log)
+            h = vcat(h_norminf, h_psd, h_log)
         end
         return (c = c, A = A, b = b, G = G, h = h, cones = cones)
     end
@@ -297,11 +303,11 @@ expdesign2(T::Type{<:Real}) = expdesign(T, 10, 30, 50, 5, use_logdet = true, log
 expdesign3(T::Type{<:Real}) = expdesign(T, 5, 15, 25, 5, use_logdet = true, logdet_obj = true)
 expdesign4(T::Type{<:Real}) = expdesign(T, 4, 8, 12, 3, use_logdet = true, logdet_obj = true)
 expdesign5(T::Type{<:Real}) = expdesign(T, 3, 5, 7, 2, use_logdet = true, logdet_obj = true)
-expdesign6(T::Type{<:Real}) = expdesign(T, 25, 75, 125, 5, use_logdet = false, logdet_obj = true)
-expdesign7(T::Type{<:Real}) = expdesign(T, 10, 30, 50, 5, use_logdet = false, logdet_obj = true)
-expdesign8(T::Type{<:Real}) = expdesign(T, 5, 15, 25, 5, use_logdet = false, logdet_obj = true)
-expdesign9(T::Type{<:Real}) = expdesign(T, 4, 8, 12, 3, use_logdet = false, logdet_obj = true)
-expdesign10(T::Type{<:Real}) = expdesign(T, 3, 5, 7, 2, use_logdet = false, logdet_obj = true)
+expdesign6(T::Type{<:Real}) = expdesign(T, 25, 75, 125, 5, use_logdet = false, logdet_obj = true, use_epinorminf = false)
+expdesign7(T::Type{<:Real}) = expdesign(T, 10, 30, 50, 5, use_logdet = false, logdet_obj = true, use_epinorminf = false)
+expdesign8(T::Type{<:Real}) = expdesign(T, 5, 15, 25, 5, use_logdet = false, logdet_obj = true, use_epinorminf = false)
+expdesign9(T::Type{<:Real}) = expdesign(T, 4, 8, 12, 3, use_logdet = false, logdet_obj = true, use_epinorminf = false)
+expdesign10(T::Type{<:Real}) = expdesign(T, 3, 5, 7, 2, use_logdet = false, logdet_obj = true, use_epinorminf = false)
 expdesign11(T::Type{<:Real}) = expdesign(T, 4, 8, 12, 3, use_logdet = true, use_linops = true, logdet_obj = true)
 expdesign12(T::Type{<:Real}) = expdesign(T, 4, 8, 12, 3, use_logdet = false, use_sumlog = false, use_linops = true, logdet_obj = true)
 expdesign13(T::Type{<:Real}) = expdesign(T, 4, 8, 12, 3, use_logdet = false, use_sumlog = false, use_linops = false, logdet_obj = true)
