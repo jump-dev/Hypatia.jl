@@ -7,6 +7,8 @@ find a density function f maximizing the log likelihood of the observations
     -zᵢ + log(f(Xᵢ)) ≥ 0 ∀ i = 1,...,n
     ∫f = 1
     f ≥ 0
+
+TODO maximize geomean objective should be more efficient
 ==#
 
 using LinearAlgebra
@@ -24,8 +26,8 @@ function densityest(
     X::Matrix{<:Real},
     deg::Int;
     use_wsos::Bool = true,
-    sample_factor::Int = 100,
     use_linops::Bool = false,
+    sample_factor::Int = 100,
     )
     (nobs, dim) = size(X)
     X = convert(Matrix{T}, X)

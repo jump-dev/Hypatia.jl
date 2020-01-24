@@ -4,6 +4,7 @@ Copyright 2019, Chris Coey and contributors
 
 using Test
 import Hypatia
+const SO = Hypatia.Solvers
 
 examples_dir = joinpath(@__DIR__, "../examples")
 
@@ -22,13 +23,14 @@ include(joinpath(examples_dir, "secondorderpoly/JuMP.jl"))
 include(joinpath(examples_dir, "semidefinitepoly/JuMP.jl"))
 include(joinpath(examples_dir, "shapeconregr/JuMP.jl"))
 
+T = Float64
 options = (
     test_certificates = false,
     verbose = true,
     iter_limit = 250,
     time_limit = 6e2, # 1 minute
-    # system_solver = SO.QRCholDenseSystemSolver{T}(),
-    system_solver = SO.SymIndefSparseSystemSolver{T}(),
+    system_solver = SO.QRCholDenseSystemSolver{T}(),
+    # system_solver = SO.SymIndefSparseSystemSolver{T}(),
     )
 
 @info("starting JuMP examples tests")

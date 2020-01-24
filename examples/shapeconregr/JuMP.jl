@@ -10,6 +10,8 @@ where
     - D is a domain such as a box or an ellipsoid,
     - ℓ is a convex loss function.
 see e.g. Chapter 8 of thesis by G. Hall (2018)
+
+TODO reduce dimension in case of more observations by doing cholesky trick, as in matrixregression example
 =#
 
 import LinearAlgebra: norm
