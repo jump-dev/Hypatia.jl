@@ -22,6 +22,7 @@ function densityestJuMP(
     deg::Int;
     use_monomials::Bool = false, # use variables in monomial space, else interpolation space
     use_wsos::Bool = true, # use WSOS cone formulation, else PSD formulation
+    use_geomean::Bool = true, # use geomean formulation, else exponential cone sum-log formulation
     sample_factor::Int = 100,
     )
     (nobs, dim) = size(X)
@@ -37,8 +38,6 @@ function densityestJuMP(
     (U, pts, Ps, w) = MU.interpolate(domain, halfdeg, sample = true, calc_w = true, sample_factor = sample_factor)
 
     model = JuMP.Model()
-    JuMP.@variable(model, z[1:nobs])
-    JuMP.@objective(model, Max, sum(z))
 
     if use_monomials
         DynamicPolynomials.@polyvar x[1:dim]
@@ -57,9 +56,18 @@ function densityestJuMP(
     end
 
     JuMP.@constraint(model, dot(w, f_pts) == 1.0) # integrate to 1
-    JuMP.@constraint(model, [i in 1:nobs], vcat(z[i], 1.0, f_X[i]) in MOI.ExponentialCone()) # hypograph of log
-    # density nonnegative
 
+    if use_geomean
+        JuMP.@variable(model, z)
+        JuMP.@objective(model, Max, z)
+        JuMP.@constraint(model, vcat(z, f_X) in MOI.GeometricMeanCone(1 + length(f_X)))
+    else
+        JuMP.@variable(model, z[1:nobs])
+        JuMP.@objective(model, Max, sum(z))
+        JuMP.@constraint(model, [i in 1:nobs], vcat(z[i], 1.0, f_X[i]) in MOI.ExponentialCone()) # hypograph of log
+    end
+
+    # density nonnegative
     if use_wsos
         JuMP.@constraint(model, f_pts in Hypatia.WSOSInterpNonnegativeCone{Float64, Float64}(U, Ps))
     else
@@ -82,10 +90,14 @@ densityestJuMP1() = densityestJuMP(iris_data(), 4)
 densityestJuMP2() = densityestJuMP(iris_data(), 6)
 densityestJuMP3() = densityestJuMP(cancer_data(), 4)
 densityestJuMP4() = densityestJuMP(cancer_data(), 6)
-densityestJuMP5() = densityestJuMP(200, 2, 3, use_monomials = false, use_wsos = true)
-densityestJuMP6() = densityestJuMP(200, 2, 3, use_monomials = true, use_wsos = true)
-densityestJuMP7() = densityestJuMP(200, 2, 3, use_monomials = false, use_wsos = false)
-densityestJuMP8() = densityestJuMP(200, 2, 3, use_monomials = true, use_wsos = false)
+densityestJuMP5() = densityestJuMP(200, 2, 3, use_monomials = false, use_wsos = true, use_geomean = false)
+densityestJuMP6() = densityestJuMP(200, 2, 3, use_monomials = true, use_wsos = true, use_geomean = false)
+densityestJuMP7() = densityestJuMP(200, 2, 3, use_monomials = false, use_wsos = false, use_geomean = false)
+densityestJuMP8() = densityestJuMP(200, 2, 3, use_monomials = true, use_wsos = false, use_geomean = false)
+densityestJuMP9() = densityestJuMP(200, 2, 3, use_monomials = false, use_wsos = true, use_geomean = true)
+densityestJuMP10() = densityestJuMP(200, 2, 3, use_monomials = true, use_wsos = true, use_geomean = true)
+densityestJuMP11() = densityestJuMP(200, 2, 3, use_monomials = false, use_wsos = false, use_geomean = true)
+densityestJuMP12() = densityestJuMP(200, 2, 3, use_monomials = true, use_wsos = false, use_geomean = true)
 
 function test_densityestJuMP(instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
@@ -105,13 +117,21 @@ test_densityestJuMP_all(; options...) = test_densityestJuMP.([
     densityestJuMP6,
     densityestJuMP7,
     densityestJuMP8,
+    densityestJuMP9,
+    densityestJuMP10,
+    densityestJuMP11,
+    densityestJuMP12,
     ], options = options)
 
 test_densityestJuMP(; options...) = test_densityestJuMP.([
-    # densityestJuMP1,
-    # # densityestJuMP3, # TODO fix slowness
+    densityestJuMP1,
+    densityestJuMP3,
     densityestJuMP5,
     densityestJuMP6,
     densityestJuMP7,
     densityestJuMP8,
+    densityestJuMP9,
+    densityestJuMP10,
+    densityestJuMP11,
+    densityestJuMP12,
     ], options = options)
