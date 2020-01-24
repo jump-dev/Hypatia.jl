@@ -387,7 +387,7 @@ function MOI.copy_to(
             push!(VG, -vt.coefficient * scal)
         end
         push!(Ih, q)
-        push!(Vh, (fi.constant - mid)*scal)
+        push!(Vh, (fi.constant - mid) * scal)
         push!(Vcpc, mid)
         push!(Icpc, q)
         interval_count += 1
