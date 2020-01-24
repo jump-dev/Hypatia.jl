@@ -42,9 +42,9 @@ function expdesignJuMP(
     if use_epinorminf
         JuMP.@constraint(model, vcat(nmax / 2, np .- nmax / 2) in MOI.NormInfinityCone(p + 1))
     else
-        JuMP.@constraint(model, 0 .<= np .<= nmax)
+        JuMP.@constraint(model, 0 .<= np)
+        JuMP.@constraint(model, np .<= nmax)
     end
-    # JuMP.@variable(model, 0 <= np[1:p] <= nmax) # number of each experiment
     Q = V * diagm(np) * V' # information matrix
     JuMP.@constraint(model, sum(np) == n)
     v1 = [Q[i, j] for i in 1:q for j in 1:i] # vectorized Q
