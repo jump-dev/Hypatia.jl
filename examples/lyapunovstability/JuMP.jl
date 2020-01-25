@@ -15,8 +15,8 @@ problem 2 (linear_dynamics = false)
 Lyapunov stability example from https://stanford.edu/class/ee363/sessions/s4notes.pdf:
 min t
 P - I in S_+
-[A'*P + P*A + alpha*P + t*gamma^2*I, P;
-P, -tI] in S_-
+[-A'*P - P*A - alpha*P - t*gamma^2*I, -P;
+-P, tI] in S_+
 originally a feasibility problem, a feasible P and t prove the existence of a Lyapunov function
 for the system x_dot = A*x+g(x), norm(g(x)) <= gamma*norm(x)
 =#
@@ -38,23 +38,25 @@ function lyapunovstabilityJuMP(
     )
     model = JuMP.Model()
     JuMP.@variable(model, t)
+    JuMP.@objective(model, Min, t)
+
     if linear_dynamics
         A = randn(W_rows, W_rows)
         A = -A * A'
         B = randn(W_rows, W_cols)
         C = randn(W_rows, W_rows)
         JuMP.@variable(model, P[1:W_rows, 1:W_rows], PSD)
-        U = -A' * P .- P * A .- C' * C ./ 100
+        U = -A' * P - P * A - C' * C / 100
         W = P * B
     else
+        # P = -A is a feasible solution, with alpha and gamma sufficiently small
         A = randn(W_rows, W_rows)
-        # this means P = -A is a feasible solution, with alpha and gamma sufficiently small
         A = -A * A' - I
         alpha = 0.01
         gamma = 0.01
         JuMP.@variable(model, P[1:W_rows, 1:W_rows], Symmetric)
         JuMP.@constraint(model, Symmetric(P - I) in JuMP.PSDCone())
-        U = -A' * P .- P * A .- alpha * P .- t * gamma ^ 2
+        U = -A' * P - P * A - alpha * P - (t * gamma ^ 2) .* Matrix(I, W_rows, W_rows)
         W = -P
     end
 
@@ -62,9 +64,8 @@ function lyapunovstabilityJuMP(
         U_svec = CO.smat_to_svec!(zeros(eltype(U), CO.svec_length(W_rows)), U, sqrt(2))
         JuMP.@constraint(model, vcat(U_svec, t / 2, vec(W)) in Hypatia.MatrixEpiPerSquareCone{Float64, Float64}(W_rows, W_cols))
     else
-        JuMP.@constraint(model, [t .* Matrix(I, W_cols, W_cols) W'; W U] in JuMP.PSDCone())
+        JuMP.@constraint(model, Symmetric([t .* Matrix(I, W_cols, W_cols) W'; W U]) in JuMP.PSDCone())
     end
-    JuMP.@objective(model, Min, t)
 
     return (model = model,)
 end
@@ -109,6 +110,6 @@ test_lyapunovstabilityJuMP_all(; options...) = test_lyapunovstabilityJuMP.([
 test_lyapunovstabilityJuMP(; options...) = test_lyapunovstabilityJuMP.([
     lyapunovstabilityJuMP1,
     lyapunovstabilityJuMP2,
-    lyapunovstabilityJuMP6,
     lyapunovstabilityJuMP7,
+    lyapunovstabilityJuMP8,
     ], options = options)
