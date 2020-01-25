@@ -19,6 +19,7 @@ include(joinpath(examples_dir, "muconvexity/JuMP.jl"))
 include(joinpath(examples_dir, "polymin/JuMP.jl"))
 include(joinpath(examples_dir, "polynorm/JuMP.jl"))
 include(joinpath(examples_dir, "regionofattr/JuMP.jl"))
+include(joinpath(examples_dir, "robustgeomprog/JuMP.jl"))
 include(joinpath(examples_dir, "secondorderpoly/JuMP.jl"))
 include(joinpath(examples_dir, "semidefinitepoly/JuMP.jl"))
 include(joinpath(examples_dir, "shapeconregr/JuMP.jl"))
@@ -46,6 +47,7 @@ options = (
     @testset "polymin" begin test_polyminJuMP(; tol_rel_opt = 1e-7, tol_abs_opt = 1e-8, tol_feas = 1e-8, options...) end
     @testset "polynorm" begin test_polynormJuMP(; options...) end
     @testset "regionofattr" begin test_regionofattrJuMP(; tol_abs_opt = 1e-6, tol_rel_opt = 1e-6, tol_feas = 1e-6, options...) end
+    @testset "robustgeomprog" begin test_robustgeomprogJuMP(; tol_abs_opt = 1e-7, tol_rel_opt = 1e-7, tol_feas = 1e-7, options...) end
     @testset "secondorderpoly" begin test_secondorderpolyJuMP(; options...) end
     @testset "semidefinitepoly" begin test_semidefinitepolyJuMP(; tol_abs_opt = 1e-7, tol_rel_opt = 1e-7, tol_feas = 1e-7, options...) end
     @testset "shapeconregr" begin test_shapeconregrJuMP(; tol_rel_opt = 1e-6, tol_abs_opt = 1e-6, tol_feas = 1e-6, options...) end
