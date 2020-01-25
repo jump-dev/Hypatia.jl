@@ -16,7 +16,7 @@ TODO
 - ? for odd degrees WSOS/PSD formulations don't match, modeling issue
 =#
 
-import LinearAlgebra: norm
+using LinearAlgebra
 import Random
 import Distributions
 using Test
@@ -105,10 +105,27 @@ function shapeconregrJuMP(
     end
 
     # objective function
+    variables = JuMP.all_variables(model)
+    num_vars = length(variables)
+    @assert num_vars == DP.nterms(regressor)
     JuMP.@variable(model, z)
-    JuMP.@objective(model, Min, z / num_points)
-    obj_cone = (use_L1_obj ? MOI.NormOneCone(1 + num_points) : MOI.SecondOrderCone(1 + num_points))
-    JuMP.@constraint(model, vcat(z, [y[i] - regressor(X[i, :]) for i in 1:num_points]) in obj_cone)
+    JuMP.@objective(model, Min, z)
+    norm_vec = [y[i] - regressor(X[i, :]) for i in 1:num_points]
+    if use_L1_obj || (num_points <= num_vars)
+        obj_cone = (use_L1_obj ? MOI.NormOneCone(1 + num_points) : MOI.SecondOrderCone(1 + num_points))
+        JuMP.@constraint(model, vcat(z, norm_vec) in obj_cone)
+    else
+        # using L2 norm objective and number of samples exceeds variables, so use qr trick to reduce dimension
+        coef_mat = zeros(num_points, num_vars + 1)
+        for (i, expr_i) in enumerate(norm_vec)
+            for (c, v) in JuMP.linear_terms(expr_i)
+                coef_mat[i, JuMP.index(v).value] = c
+            end
+            coef_mat[i, end] = JuMP.constant(expr_i)
+        end
+        coef_R = qr(coef_mat).R
+        JuMP.@constraint(model, vcat(z, coef_R * vcat(variables, 1)) in MOI.SecondOrderCone(2 + num_vars))
+    end
 
     return (model = model,)
 end
@@ -175,7 +192,7 @@ shapeconregrJuMP12() = shapeconregrJuMP(2, 5, 100, x -> exp(norm(x)), signal_rat
 shapeconregrJuMP13() = shapeconregrJuMP(2, 6, 100, x -> exp(norm(x)), signal_ratio = 1.0, use_L1_obj = true)
 shapeconregrJuMP14() = shapeconregrJuMP(5, 2, 50, x -> exp(norm(x)), use_L1_obj = true, use_wsos = false)
 shapeconregrJuMP15() = shapeconregrJuMP(2, 3, 100, x -> exp(norm(x)), use_L1_obj = true, use_wsos = false)
-shapeconregrJuMP16() = shapeconregrJuMP(5, 4, 100, x -> sum(x .^ 2), signal_ratio = 9.0) # see https://arxiv.org/pdf/1509.08165v1.pdf (example 1)
+shapeconregrJuMP16() = shapeconregrJuMP(5, 3, 100, x -> sum(x .^ 2), signal_ratio = 9.0) # see https://arxiv.org/pdf/1509.08165v1.pdf (example 1)
 shapeconregrJuMP17() = shapeconregrJuMP(5, 4, 100, x -> (5x[1] + 0.5x[2] + x[3])^2 + sqrt(x[4]^2 + x[5]^2), signal_ratio = 9.0) # see https://arxiv.org/pdf/1509.08165v1.pdf (example 5)
 shapeconregrJuMP18() = shapeconregrJuMP(2, 4, 100, x -> sum((x .+ 1) .^ 4), signal_ratio = 0.0)
 shapeconregrJuMP19() = shapeconregrJuMP(3, 4, 100, x -> sum((0.5 * x .+ 1) .^ 3), signal_ratio = 0.0)
