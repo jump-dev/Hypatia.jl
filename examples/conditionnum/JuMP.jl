@@ -59,6 +59,8 @@ function conditionnumJuMP(
         nu
         y[1:len_y]
     end)
+    JuMP.@objective(model, Min, gamma)
+    
     if use_linmatrixineq
         JuMP.@constraints(model, begin
             vcat(nu, y) in Hypatia.LinMatrixIneqCone{Float64}([F0, Fi...])
@@ -72,7 +74,6 @@ function conditionnumJuMP(
             Symmetric(gamma .* Matrix(I, side, side) - nu .* M0 - sum(y[i] .* Mi[i] for i in eachindex(y))) in JuMP.PSDCone()
         end)
     end
-    JuMP.@objective(model, Min, gamma)
 
     return (model = model,)
 end
@@ -105,4 +106,6 @@ test_conditionnumJuMP_all(; options...) = test_conditionnumJuMP.([
 test_conditionnumJuMP(; options...) = test_conditionnumJuMP.([
     conditionnumJuMP1,
     conditionnumJuMP2,
+    conditionnumJuMP3,
+    conditionnumJuMP4,
     ], options = options)
