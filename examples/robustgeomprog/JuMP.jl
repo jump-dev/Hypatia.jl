@@ -22,8 +22,7 @@ function robustgeomprogJuMP(
     n::Int,
     k::Int;
     B::Matrix{Float64} = randn(k, n), # linear constraint matrix
-    alphas::Vector{Float64} = rand(k) .+ 1, # for geomean constraint for set C
-    betas::Vector{Float64} = rand(k) .+ 1, # for entropy constraint for set C
+    alphas::Vector{Float64} = rand(k) .+ 1, # for entropy constraint for set C
     )
     @assert n < k # want some degrees of freedom for v
     model = JuMP.Model()
@@ -33,20 +32,17 @@ function robustgeomprogJuMP(
     JuMP.@variable(model, c[1:k])
     JuMP.@variable(model, v[1:k])
 
-    JuMP.@constraint(model, vcat(t, ℯ * c, v) in Hypatia.EpiSumPerEntropyCone{Float64}(1 + 2k))
+    JuMP.@constraint(model, vcat(t, ℯ * c, v) in MOI.RelativeEntropyCone(1 + 2k))
 
     JuMP.@constraint(model, B' * v .== 0)
 
     # use bounded convex set C of R_+^k excluding origin (note that the entropy constraint already forces c >= 0)
-    # satisfy a geomean constraint with powers vector alphas (note c = ones(k) is feasible)
-    @assert all(alphas .> 1e-6)
+    # satisfy a geomean constraint (note c = ones(k) is feasible and origin is excluded)
+    JuMP.@constraint(model, vcat(1, c) in MOI.GeometricMeanCone(1 + k))
+    # satisfy an entropy constraint with perspective vector alphas (note c = ones(k) is feasible and no c variable can go to infinity)
+    @assert all(alphas .> 1e-5)
     alphas /= sum(alphas)
-    JuMP.@constraint(model, vcat(1, c) in Hypatia.HypoGeomeanCone{Float64}(alphas))
-    # satisfy an entropy constraint with perspective vector betas (note c = ones(k) is feasible)
-    @assert all(betas .> 1e-6)
-    betas /= sum(betas)
-    epi_value = -sum(log, betas)
-    JuMP.@constraint(model, vcat(epi_value, betas, c) in Hypatia.EpiSumPerEntropyCone{Float64}(1 + 2k))
+    JuMP.@constraint(model, vcat(-sum(log, alphas), alphas, c) in MOI.RelativeEntropyCone(1 + 2k))
 
     return (model = model,)
 end
