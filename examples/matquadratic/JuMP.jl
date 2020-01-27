@@ -6,7 +6,7 @@ min tr(Y)
 s.t. Y - A*X*B*B'*X'*A' - C*X*D - (C*X*D)' - E in S_+
 X .>= Q
 
-Y - A*X*B*B'*X'*C - C*X*D - (C*X*D)' in S_+ equivalent to
+Y - A*X*B*B'*X'*C - C*X*D - (C*X*D)' - E in S_+ equivalent to
 [
 I      (A*X*B)'
 A*X*B  Y-C*X*D-(C*X*D)'-E
