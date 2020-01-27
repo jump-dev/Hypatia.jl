@@ -25,23 +25,18 @@ import Hypatia
 CO = Hypatia.Cones
 import Random
 using LinearAlgebra
+using SparseArrays
 using Test
 
-function matquadraticJuMP(
+function tbdJuMP(
     W_rows::Int,
     W_cols::Int;
     use_matrixepipersquare::Bool = true,
     )
     C = randn(W_cols, W_rows)
-    num_fixed = div(W_rows, 2)
-    fixed_rows = rand(1:W_rows, num_fixed)
-    fixed_cols = rand(1:W_rows, num_fixed)
-    fixed_vals = randn(num_fixed)
-    for i in 1:num_fixed
-        if fixed_rows[i] > fixed_cols[i]
-            (fixed_rows[i], fixed_cols[i]) = (fixed_cols[i], fixed_rows[i])
-        end
-    end
+    # NOTE prescribed values may not guarantee feasibility
+    P = tril!(sprandn(W_rows, W_rows, 0.1))
+    (row_idxs, col_idxs, P_vals) = findnz(P)
 
     model = JuMP.Model()
     JuMP.@variable(model, X[1:W_rows, 1:W_cols])
@@ -49,26 +44,25 @@ function matquadraticJuMP(
     JuMP.@objective(model, Max, tr(C * X))
 
     if use_matrixepipersquare
-        # U = Symmetric(Y)
         U_svec = CO.smat_to_svec!(zeros(eltype(Y.data .* 1), CO.svec_length(W_rows)), Y.data .* 1, sqrt(2))
         JuMP.@constraint(model, vcat(U_svec, 0.5, vec(X)) in Hypatia.MatrixEpiPerSquareCone{Float64, Float64}(W_rows, W_cols))
     else
         JuMP.@constraint(model, Symmetric([Matrix(I, W_cols, W_cols) X'; X Y]) in JuMP.PSDCone())
     end
     JuMP.@constraint(model, sum(Y) == 1)
-    JuMP.@constraint(model, [k in 1:num_fixed], Y[fixed_rows[k], fixed_cols[k]]  == fixed_vals[k])
+    JuMP.@constraint(model, [k in eachindex(row_idxs)], Y[row_idxs[k], col_idxs[k]] == P_vals[k])
 
     return (model = model,)
 end
 
-matquadraticJuMP1() = matquadraticJuMP(5, 6, use_matrixepipersquare = true)
-matquadraticJuMP2() = matquadraticJuMP(5, 6, use_matrixepipersquare = false)
-matquadraticJuMP3() = matquadraticJuMP(10, 20, use_matrixepipersquare = true)
-matquadraticJuMP4() = matquadraticJuMP(10, 20, use_matrixepipersquare = false)
-matquadraticJuMP5() = matquadraticJuMP(25, 30, use_matrixepipersquare = true)
-matquadraticJuMP6() = matquadraticJuMP(25, 30, use_matrixepipersquare = false)
+tbdJuMP1() = tbdJuMP(5, 6, use_matrixepipersquare = true)
+tbdJuMP2() = tbdJuMP(5, 6, use_matrixepipersquare = false)
+tbdJuMP3() = tbdJuMP(10, 20, use_matrixepipersquare = true)
+tbdJuMP4() = tbdJuMP(10, 20, use_matrixepipersquare = false)
+tbdJuMP5() = tbdJuMP(25, 30, use_matrixepipersquare = true)
+tbdJuMP6() = tbdJuMP(25, 30, use_matrixepipersquare = false)
 
-function test_matquadraticJuMP(instance::Function; options, rseed::Int = 1)
+function test_tbdJuMP(instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
     d = instance()
     JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer(; options...))
@@ -77,18 +71,18 @@ function test_matquadraticJuMP(instance::Function; options, rseed::Int = 1)
     return
 end
 
-test_matquadraticJuMP_all(; options...) = test_matquadraticJuMP.([
-    matquadraticJuMP1,
-    matquadraticJuMP2,
-    matquadraticJuMP3,
-    matquadraticJuMP4,
-    matquadraticJuMP5,
-    matquadraticJuMP6,
+test_tbdJuMP_all(; options...) = test_tbdJuMP.([
+    tbdJuMP1,
+    tbdJuMP2,
+    tbdJuMP3,
+    tbdJuMP4,
+    tbdJuMP5,
+    tbdJuMP6,
     ], options = options)
 
-test_matquadraticJuMP(; options...) = test_matquadraticJuMP.([
-    matquadraticJuMP1,
-    matquadraticJuMP2,
-    matquadraticJuMP3,
-    matquadraticJuMP4,
+test_tbdJuMP(; options...) = test_tbdJuMP.([
+    tbdJuMP1,
+    tbdJuMP2,
+    tbdJuMP3,
+    tbdJuMP4,
     ], options = options)
