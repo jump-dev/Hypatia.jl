@@ -6,6 +6,8 @@ MOI wrapper Hypatia cone tests
 
 using Test
 using LinearAlgebra
+import SparseArrays
+import Random
 import MathOptInterface
 const MOI = MathOptInterface
 import Hypatia
@@ -260,6 +262,24 @@ function test_moi_cones(T::Type{<:Real})
         hyp_cone = HYP.cone_from_moi(T, moi_cone)
         @test hyp_cone isa CO.PosSemidefTri{T, Complex{T}}
         @test MOI.dimension(moi_cone) == CO.dimension(hyp_cone) == 9
+    end
+
+    @testset "PosSemidefTriSparse" begin
+        if T <: LinearAlgebra.BlasReal # only works with BLAS real types
+            Random.seed!(1)
+            side = 5
+            (row_idxs, col_idxs, _) = findnz(tril!(SparseArrays.sprand(Bool, side, side, 0.3)) + I)
+
+            moi_cone = HYP.PosSemidefTriSparseCone{T, T}(side, row_idxs, col_idxs)
+            hyp_cone = HYP.cone_from_moi(T, moi_cone)
+            @test hyp_cone isa CO.PosSemidefTriSparse{T, T}
+            @test MOI.dimension(moi_cone) == CO.dimension(hyp_cone) == length(row_idxs)
+
+            moi_cone = HYP.PosSemidefTriSparseCone{T, Complex{T}}(side, row_idxs, col_idxs)
+            hyp_cone = HYP.cone_from_moi(T, moi_cone)
+            @test hyp_cone isa CO.PosSemidefTriSparse{T, Complex{T}}
+            @test MOI.dimension(moi_cone) == CO.dimension(hyp_cone) == 2 * length(row_idxs) - side
+        end
     end
 
     @testset "HypoPerLogdetTri" begin
