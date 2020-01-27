@@ -39,11 +39,7 @@ include(joinpath(@__DIR__, "data.jl"))
 function signomialminJuMP(
     signomialname::Symbol,
     )
-    # (c, A, true_obj) = signomials[polyname]
-    c = rand(5); c[1] - 1
-    A = rand(5, 3)
-    true_obj = 0
-
+    (c, A, true_obj) = signomials[signomialname]
     (m, n) = size(A)
     @assert length(c) == m
 
@@ -63,14 +59,14 @@ function signomialminJuMP(
     return (model = model, true_obj = true_obj)
 end
 
-signomialminJuMP1() = signomialminJuMP(:todoname)
+signomialminJuMP1() = signomialminJuMP(:motzkin)
 
 function test_signomialminJuMP(instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
     d = instance()
     JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer(; options...))
     JuMP.optimize!(d.model)
-    # @test JuMP.objective_value(d.model) ≈ d.true_obj atol = 1e-4 rtol = 1e-4
+    @test JuMP.objective_value(d.model) ≈ d.true_obj atol = 1e-4 rtol = 1e-4
     return
 end
 

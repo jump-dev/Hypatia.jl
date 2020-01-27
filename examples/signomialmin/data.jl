@@ -7,10 +7,9 @@ list of predefined signomials and domains from various applications
 =#
 
 signomials = Dict{Symbol, NamedTuple}(
-    :denseunit1d => (n = 1,
-        f = (z -> 1 + 2real(z[1]) + abs(z[1])^2 + 2real(z[1]^2) + 2real(z[1]^2 * conj(z[1])) + abs(z[1])^4),
-        gs = [z -> 1 - abs2(z[1])],
-        g_halfdegs = [1],
+    :motzkin => ( # 1 - 3*x1^2*x2^2 + x1^2*x2^4 + x1^4*x2^2
+        c = [1, -3, 1, 1],
+        A = [0 0; 2 2; 2 4; 4 2],
         truemin = 0,
         ),
     )
