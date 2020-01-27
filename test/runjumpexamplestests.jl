@@ -18,6 +18,7 @@ include(joinpath(examples_dir, "lotkavolterra/JuMP.jl"))
 include(joinpath(examples_dir, "lyapunovstability/JuMP.jl"))
 include(joinpath(examples_dir, "maxvolume/JuMP.jl"))
 include(joinpath(examples_dir, "muconvexity/JuMP.jl"))
+include(joinpath(examples_dir, "nearestpsd/JuMP.jl"))
 include(joinpath(examples_dir, "polymin/JuMP.jl"))
 include(joinpath(examples_dir, "polynorm/JuMP.jl"))
 include(joinpath(examples_dir, "regionofattr/JuMP.jl"))
@@ -48,6 +49,7 @@ options = (
     @testset "lyapunovstability" begin test_lyapunovstabilityJuMP(; tol_rel_opt = 1e-5, tol_abs_opt = 1e-5, tol_feas = 1e-5, options...) end
     @testset "maxvolume" begin test_maxvolumeJuMP(; tol_rel_opt = 1e-6, tol_abs_opt = 1e-7, tol_feas = 1e-7, options...) end
     @testset "muconvexity" begin test_muconvexityJuMP(; options...) end
+    @testset "nearestpsd" begin test_nearestpsdJuMP(; options...) end
     @testset "polymin" begin test_polyminJuMP(; tol_rel_opt = 1e-7, tol_abs_opt = 1e-8, tol_feas = 1e-8, options...) end
     @testset "polynorm" begin test_polynormJuMP(; options...) end
     @testset "regionofattr" begin test_regionofattrJuMP(; tol_abs_opt = 1e-6, tol_rel_opt = 1e-6, tol_feas = 1e-6, options...) end
