@@ -59,21 +59,23 @@ function signomialminJuMP(
     return (model = model, true_obj = true_obj)
 end
 
-signomialminJuMP1() = signomialminJuMP(:motzkin)
+signomialminJuMP1() = signomialminJuMP(:motzkin2)
+signomialminJuMP2() = signomialminJuMP(:motzkin3)
+signomialminJuMP3() = signomialminJuMP(:MCW19ex8_13)
 
 function test_signomialminJuMP(instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
     d = instance()
     JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer(; options...))
     JuMP.optimize!(d.model)
-    @test JuMP.objective_value(d.model) ≈ d.true_obj atol = 1e-4 rtol = 1e-4
+    @test JuMP.objective_value(d.model) ≈ d.true_obj atol = 1e-3 rtol = 1e-3
     return
 end
 
 test_signomialminJuMP_all(; options...) = test_signomialminJuMP.([
     signomialminJuMP1,
-    # signomialminJuMP2,
-    # signomialminJuMP3,
+    signomialminJuMP2,
+    signomialminJuMP3,
     # signomialminJuMP4,
     # signomialminJuMP5,
     # signomialminJuMP6,
@@ -82,8 +84,8 @@ test_signomialminJuMP_all(; options...) = test_signomialminJuMP.([
 
 test_signomialminJuMP(; options...) = test_signomialminJuMP.([
     signomialminJuMP1,
-    # signomialminJuMP2,
-    # signomialminJuMP3,
+    signomialminJuMP2,
+    signomialminJuMP3,
     # signomialminJuMP4,
     # signomialminJuMP5,
     ], options = options)
