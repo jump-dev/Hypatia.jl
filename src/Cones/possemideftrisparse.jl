@@ -89,7 +89,7 @@ mutable struct PosSemidefTriSparse{T <: BlasReal, R <: RealOrComplex{T}} <: Cone
             cone.dim = num_nz
             cone.is_complex = false
         else
-            cone.dim = side + 2 * (num_nz - side)
+            cone.dim = 2 * num_nz - side
             cone.is_complex = true
         end
         @assert cone.dim >= 1
