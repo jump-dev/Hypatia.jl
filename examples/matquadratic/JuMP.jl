@@ -12,7 +12,9 @@ I      (A*X*B)'
 A*X*B  Y-C*X*D-(C*X*D)'-E
 ]
 in S_+
-reformulation from Lecture 4 Lectures on Convex Programming
+(see Lecture 4, Lectures on Convex Optimization by Y. Nesterov)
+and also equivalent to
+(Y-C*X*D-(C*X*D)'-E, 1, A*X*B) in MatrixEpiPerSquareCone()
 =#
 
 import JuMP
@@ -35,11 +37,12 @@ function matquadraticJuMP(
     D = randn(W_rows, W_rows)
     E = randn(W_rows, W_rows)
     E = E + E'
+    P = randn(W_rows, W_rows)
 
     model = JuMP.Model()
     JuMP.@variable(model, X[1:W_rows, 1:W_rows])
     JuMP.@variable(model, Y[1:W_rows, 1:W_rows], Symmetric)
-    JuMP.@objective(model, Min, tr(Y))
+    JuMP.@objective(model, Min, tr(Y * P))
 
     U = Symmetric(Y - C * X * D - (C * X * D)' - E)
     W = A * X * B
