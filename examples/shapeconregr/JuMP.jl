@@ -144,7 +144,7 @@ function shapeconregrJuMP(
     y = [f(X[p, :]) for p in 1:num_points]
 
     if !iszero(signal_ratio)
-        noise = rand(Distributions.Normal(), num_points)
+        noise = randn(num_points)
         noise .*= norm(y) / sqrt(signal_ratio) / norm(noise)
         y .+= noise
     end
