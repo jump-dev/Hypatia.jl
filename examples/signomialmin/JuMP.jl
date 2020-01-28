@@ -37,11 +37,17 @@ import Random
 include(joinpath(@__DIR__, "data.jl"))
 
 function signomialminJuMP(
-    signomialname::Symbol,
+    c::Vector{<:Real},
+    A::Matrix{<:Real};
+    x::Vector = [],
+    obj_ub = NaN,
     )
-    (c, A, true_obj) = signomials[signomialname]
     (m, n) = size(A)
     @assert length(c) == m
+    if isnan(obj_ub)
+        @assert !isempty(x)
+        obj_ub = eval_signomial(c, A, x)
+    end
 
     model = JuMP.Model()
     JuMP.@variable(model, g)
@@ -56,19 +62,37 @@ function signomialminJuMP(
     JuMP.@constraint(model, [k in 1:m, i in 1:n], dot(A[notk[k], i] .- A[k, i], V[k, :]) == 0)
     JuMP.@constraint(model, [k in 1:m], vcat(C[k, k] + sum(V[k, :]), C[k, notk[k]], V[k, :]) in MOI.RelativeEntropyCone(2m - 1))
 
-    return (model = model, true_obj = true_obj)
+    return (model = model, obj_ub = obj_ub)
+end
+
+function signomialminJuMP(signomial_name::Symbol)
+    (c, A, x, obj_ub) = signomials[signomial_name]
+    return signomialminJuMP(c, A; x = x, obj_ub = obj_ub)
+end
+
+function signomialminJuMP(m::Int, n::Int)
+    (c, A, obj_ub) = random_signomial(m, n)
+    return signomialminJuMP(c, A; obj_ub = obj_ub)
 end
 
 signomialminJuMP1() = signomialminJuMP(:motzkin2)
 signomialminJuMP2() = signomialminJuMP(:motzkin3)
-signomialminJuMP3() = signomialminJuMP(:MCW19ex8_13)
+signomialminJuMP3() = signomialminJuMP(:CS16ex8_13)
+signomialminJuMP4() = signomialminJuMP(:CS16ex8_14)
+signomialminJuMP5() = signomialminJuMP(:CS16ex18)
+signomialminJuMP6() = signomialminJuMP(3, 2)
+signomialminJuMP7() = signomialminJuMP(4, 4)
+signomialminJuMP8() = signomialminJuMP(8, 4)
+signomialminJuMP9() = signomialminJuMP(12, 6)
 
 function test_signomialminJuMP(instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
     d = instance()
     JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer(; options...))
     JuMP.optimize!(d.model)
-    @test JuMP.objective_value(d.model) ≈ d.true_obj atol = 1e-3 rtol = 1e-3
+    @test JuMP.objective_value(d.model) <= d.obj_ub
+    @show JuMP.objective_value(d.model)
+    @show d.obj_ub
     return
 end
 
@@ -76,16 +100,22 @@ test_signomialminJuMP_all(; options...) = test_signomialminJuMP.([
     signomialminJuMP1,
     signomialminJuMP2,
     signomialminJuMP3,
-    # signomialminJuMP4,
-    # signomialminJuMP5,
-    # signomialminJuMP6,
-    # signomialminJuMP7,
+    signomialminJuMP4,
+    signomialminJuMP5,
+    signomialminJuMP6,
+    signomialminJuMP7,
+    signomialminJuMP8,
+    signomialminJuMP9,
     ], options = options)
 
 test_signomialminJuMP(; options...) = test_signomialminJuMP.([
-    signomialminJuMP1,
-    signomialminJuMP2,
-    signomialminJuMP3,
+    # signomialminJuMP1,
+    # signomialminJuMP2,
+    # signomialminJuMP3,
     # signomialminJuMP4,
     # signomialminJuMP5,
+    signomialminJuMP6,
+    signomialminJuMP7,
+    signomialminJuMP8,
+    signomialminJuMP9,
     ], options = options)
