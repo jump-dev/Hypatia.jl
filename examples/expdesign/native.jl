@@ -406,6 +406,11 @@ instances_expdesign_all = [
     expdesign47,
     expdesign48,
     expdesign49,
+    expdesign50,
+    expdesign51,
+    expdesign52,
+    expdesign53,
+    expdesign54,
     ]
 instances_expdesign_linops = [
     expdesign11,
