@@ -26,7 +26,6 @@ function expdesign(
     use_logdet::Bool = true,
     use_sumlog::Bool = true,
     use_rootdet::Bool = true,
-    use_epinorminf::Bool = true,
     )
     @assert logdet_obj + geomean_obj + rootdet_obj == 1
     @assert (p > q) && (n > q) && (nmax <= n)
@@ -37,15 +36,9 @@ function expdesign(
     end
 
     # constraints on upper bound of number of trials and nonnegativity of numbers of trials
-    if use_epinorminf
-        h_norminf = vcat(T(nmax) / 2, fill(-T(nmax) / 2, p))
-        G_nominf = vcat(zeros(T, 1, p), -Matrix{T}(I, p, p))
-        cones = CO.Cone{T}[CO.EpiNormInf{T, T}(p + 1)]
-    else
-        h_norminf = vcat(zeros(T, p), fill(T(nmax), p))
-        G_nominf = vcat(Matrix{T}(-I, p, p), Matrix{T}(-I, p, p))
-        cones = CO.Cone{T}[CO.Nonnegative{T}(p), CO.Nonnegative{T}(p)]
-    end
+    h_norminf = vcat(zeros(T, p), fill(T(nmax), p))
+    G_nominf = vcat(Matrix{T}(-I, p, p), Matrix{T}(-I, p, p))
+    cones = CO.Cone{T}[CO.Nonnegative{T}(p), CO.Nonnegative{T}(p)]
     # constraint on total number of trials
     A = ones(T, 1, p)
     b = T[n]
@@ -303,11 +296,11 @@ expdesign2(T::Type{<:Real}) = expdesign(T, 10, 30, 50, 5, use_logdet = true, log
 expdesign3(T::Type{<:Real}) = expdesign(T, 5, 15, 25, 5, use_logdet = true, logdet_obj = true)
 expdesign4(T::Type{<:Real}) = expdesign(T, 4, 8, 12, 3, use_logdet = true, logdet_obj = true)
 expdesign5(T::Type{<:Real}) = expdesign(T, 3, 5, 7, 2, use_logdet = true, logdet_obj = true)
-expdesign6(T::Type{<:Real}) = expdesign(T, 25, 75, 125, 5, use_logdet = false, logdet_obj = true, use_epinorminf = false)
-expdesign7(T::Type{<:Real}) = expdesign(T, 10, 30, 50, 5, use_logdet = false, logdet_obj = true, use_epinorminf = false)
-expdesign8(T::Type{<:Real}) = expdesign(T, 5, 15, 25, 5, use_logdet = false, logdet_obj = true, use_epinorminf = false)
-expdesign9(T::Type{<:Real}) = expdesign(T, 4, 8, 12, 3, use_logdet = false, logdet_obj = true, use_epinorminf = false)
-expdesign10(T::Type{<:Real}) = expdesign(T, 3, 5, 7, 2, use_logdet = false, logdet_obj = true, use_epinorminf = false)
+expdesign6(T::Type{<:Real}) = expdesign(T, 25, 75, 125, 5, use_logdet = false, logdet_obj = true)
+expdesign7(T::Type{<:Real}) = expdesign(T, 10, 30, 50, 5, use_logdet = false, logdet_obj = true)
+expdesign8(T::Type{<:Real}) = expdesign(T, 5, 15, 25, 5, use_logdet = false, logdet_obj = true)
+expdesign9(T::Type{<:Real}) = expdesign(T, 4, 8, 12, 3, use_logdet = false, logdet_obj = true)
+expdesign10(T::Type{<:Real}) = expdesign(T, 3, 5, 7, 2, use_logdet = false, logdet_obj = true)
 expdesign11(T::Type{<:Real}) = expdesign(T, 4, 8, 12, 3, use_logdet = true, use_linops = true, logdet_obj = true)
 expdesign12(T::Type{<:Real}) = expdesign(T, 4, 8, 12, 3, use_logdet = false, use_sumlog = false, use_linops = true, logdet_obj = true)
 expdesign13(T::Type{<:Real}) = expdesign(T, 4, 8, 12, 3, use_logdet = false, use_sumlog = false, use_linops = false, logdet_obj = true)
@@ -340,7 +333,6 @@ instances_expdesign_all = [
     expdesign9,
     expdesign10,
     expdesign13,
-    expdesign14,
     expdesign15,
     expdesign16,
     expdesign17,
