@@ -26,6 +26,7 @@ include(joinpath(examples_dir, "robustgeomprog/JuMP.jl"))
 include(joinpath(examples_dir, "secondorderpoly/JuMP.jl"))
 include(joinpath(examples_dir, "semidefinitepoly/JuMP.jl"))
 include(joinpath(examples_dir, "shapeconregr/JuMP.jl"))
+include(joinpath(examples_dir, "signomialmin/JuMP.jl"))
 
 T = Float64
 options = (
@@ -33,8 +34,8 @@ options = (
     verbose = true,
     iter_limit = 250,
     time_limit = 6e2, # 1 minute
-    system_solver = SO.QRCholDenseSystemSolver{T}(),
-    # system_solver = SO.SymIndefSparseSystemSolver{T}(),
+    # system_solver = SO.QRCholDenseSystemSolver{T}(),
+    system_solver = SO.SymIndefSparseSystemSolver{T}(),
     )
 
 @info("starting JuMP examples tests")
@@ -57,4 +58,5 @@ options = (
     @testset "secondorderpoly" begin test_secondorderpolyJuMP(; options...) end
     @testset "semidefinitepoly" begin test_semidefinitepolyJuMP(; tol_abs_opt = 1e-7, tol_rel_opt = 1e-7, tol_feas = 1e-7, options...) end
     @testset "shapeconregr" begin test_shapeconregrJuMP(; tol_rel_opt = 1e-6, tol_abs_opt = 1e-6, tol_feas = 1e-6, options...) end
+    @testset "signomialmin" begin test_signomialminJuMP(; tol_rel_opt = 1e-7, tol_abs_opt = 1e-6, tol_feas = 1e-7, options...) end
 end

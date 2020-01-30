@@ -167,5 +167,5 @@ complexpolys = Dict{Symbol, NamedTuple}(
         gs = [z -> 1 - abs2(z[1])],
         g_halfdegs = [1],
         truemin = 0,
+        ),
     )
-)
