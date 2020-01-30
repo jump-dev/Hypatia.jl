@@ -39,20 +39,17 @@ import Random
 include(joinpath(@__DIR__, "data.jl"))
 
 function signomialminJuMP(
-    fc::Vector{<:Real},
-    fA::Matrix{<:Real},
+    fc::Vector,
+    fA::AbstractMatrix,
     gc::Vector,
     gA::Vector;
     x::Vector = [],
     obj_ub = NaN,
     )
-    (mc, n) = size(fA)
-    @assert length(fc) == mc
+    (fm, n) = size(fA)
+    @assert length(fc) == fm
     if isnan(obj_ub)
         @assert !isempty(x)
-        for (gc_p, gA_p) in zip(gc, gA)
-            @show eval_signomial(gc_p, gA_p, x)
-        end
         @assert all(eval_signomial(gc_p, gA_p, x) >= 0 for (gc_p, gA_p) in zip(gc, gA))
         obj_ub = eval_signomial(fc, fA, x)
     end
@@ -61,17 +58,56 @@ function signomialminJuMP(
     @assert all(size(gA_p, 2) == n for gA_p in gA)
     @assert all(size(gA_p, 1) == length(gc_p) for (gc_p, gA_p) in zip(gc, gA))
 
-    # let c and A contain all terms
-    # currently assuming terms in each g_p are unique among all terms in f and gs
-    # TODO merge like-terms
-    A = vcat(fA, gA...)
+    # find unique terms
+    unique_terms = Dict{Vector, Tuple{Vector{Int}, Vector{Tuple{Int, Int}}}}()
+    for k in 1:size(fA, 1)
+        row_k = fA[k, :]
+        if row_k in keys(unique_terms)
+            push!(unique_terms[row_k][1], k)
+        else
+            unique_terms[row_k] = (Int[k], Tuple{Int, Int}[])
+        end
+    end
+    for (p, gA_p) in enumerate(gA)
+        for k in 1:size(gA_p, 1)
+            p_row_k = gA_p[k, :]
+            if p_row_k in keys(unique_terms)
+                push!(unique_terms[p_row_k][2], (p, k))
+            else
+                unique_terms[p_row_k] = (Int[], Tuple{Int, Int}[(p, k)])
+            end
+        end
+    end
+    A = vcat((row_k' for row_k in keys(unique_terms))...)
     m = size(A, 1)
 
     model = JuMP.Model()
     JuMP.@variable(model, γ)
     JuMP.@objective(model, Max, γ)
     JuMP.@variable(model, μ[1:q] >= 0)
-    d = vcat(fc, zeros(m - mc)) - vcat(γ, zeros(m - 1)) - vcat(zeros(mc), vcat((μ .* gc)...))
+
+    d = zeros(JuMP.AffExpr, m)
+    const_found = false
+    for k in 1:m
+        row_k = A[k, :]
+        (ks, pks) = unique_terms[row_k]
+        for k2 in ks
+            d[k] += fc[k2]
+        end
+        for (p, k2) in pks
+            d[k] -= μ[p] * gc[p][k2]
+        end
+        if iszero(norm(row_k))
+            # row is a constant term
+            d[k] -= γ
+            @assert !const_found
+            const_found = true
+        end
+    end
+    if !const_found
+        A = vcat(A, zeros(A, 1, n))
+        d = vcat(d, -γ)
+    end
 
     # setup SAGE constraints
     notk = [[l for l in 1:m if l != k] for k in 1:m]
@@ -90,7 +126,7 @@ function signomialminJuMP(signomial_name::Symbol)
 end
 
 function signomialminJuMP(m::Int, n::Int)
-    (fc, fA, gc, gA, obj_ub) = random_signomial(m, n)
+    (fc, fA, gc, gA, obj_ub) = random_instance(m, n)
     return signomialminJuMP(fc, fA, gc, gA; obj_ub = obj_ub)
 end
 
@@ -101,19 +137,23 @@ signomialminJuMP4() = signomialminJuMP(:CS16ex8_14)
 signomialminJuMP5() = signomialminJuMP(:CS16ex18)
 signomialminJuMP6() = signomialminJuMP(:CS16ex12)
 signomialminJuMP7() = signomialminJuMP(:CS16ex13)
-# signomialminJuMP6() = signomialminJuMP(3, 2)
-# signomialminJuMP7() = signomialminJuMP(4, 4)
-# signomialminJuMP8() = signomialminJuMP(8, 4)
-# signomialminJuMP9() = signomialminJuMP(12, 6)
+signomialminJuMP8() = signomialminJuMP(:MCW19ex1_mod)
+signomialminJuMP9() = signomialminJuMP(:MCW19ex8)
+signomialminJuMP10() = signomialminJuMP(3, 2)
+signomialminJuMP11() = signomialminJuMP(3, 3)
+signomialminJuMP12() = signomialminJuMP(4, 3)
+signomialminJuMP13() = signomialminJuMP(6, 2)
+signomialminJuMP14() = signomialminJuMP(6, 4)
+signomialminJuMP15() = signomialminJuMP(6, 6)
+signomialminJuMP16() = signomialminJuMP(8, 4)
 
 function test_signomialminJuMP(instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
     d = instance()
     JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer(; options...))
     JuMP.optimize!(d.model)
+    @test JuMP.termination_status(d.model) == MOI.OPTIMAL
     @test JuMP.objective_value(d.model) <= d.obj_ub
-    @show JuMP.objective_value(d.model)
-    @show d.obj_ub
     return
 end
 
@@ -127,16 +167,30 @@ test_signomialminJuMP_all(; options...) = test_signomialminJuMP.([
     signomialminJuMP7,
     signomialminJuMP8,
     signomialminJuMP9,
+    signomialminJuMP10,
+    signomialminJuMP11,
+    signomialminJuMP12,
+    signomialminJuMP13,
+    signomialminJuMP14,
+    signomialminJuMP15,
+    signomialminJuMP16,
     ], options = options)
 
 test_signomialminJuMP(; options...) = test_signomialminJuMP.([
-    # signomialminJuMP1,
-    # signomialminJuMP2,
-    # signomialminJuMP3,
-    # signomialminJuMP4,
-    # signomialminJuMP5,
-    # signomialminJuMP6,
+    signomialminJuMP1,
+    signomialminJuMP2,
+    signomialminJuMP3,
+    signomialminJuMP4,
+    signomialminJuMP5,
+    signomialminJuMP6,
     signomialminJuMP7,
-    # signomialminJuMP8,
-    # signomialminJuMP9,
+    signomialminJuMP8,
+    signomialminJuMP9,
+    signomialminJuMP10,
+    signomialminJuMP11,
+    signomialminJuMP12,
+    signomialminJuMP13,
+    signomialminJuMP14,
+    signomialminJuMP15,
+    signomialminJuMP16,
     ], options = options)
