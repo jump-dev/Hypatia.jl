@@ -24,7 +24,7 @@ import Random
 using LinearAlgebra
 using Test
 
-function matquadraticJuMP(
+function matrixquadraticJuMP(
     W_rows::Int,
     W_cols::Int;
     use_matrixepipersquare::Bool = true,
@@ -35,12 +35,11 @@ function matquadraticJuMP(
     D = randn(W_rows, W_rows)
     E = randn(W_rows, W_rows)
     E = E + E'
-    P = randn(W_rows, W_rows)
 
     model = JuMP.Model()
     JuMP.@variable(model, X[1:W_rows, 1:W_rows])
     JuMP.@variable(model, Y[1:W_rows, 1:W_rows], Symmetric)
-    JuMP.@objective(model, Min, tr(Y * P))
+    JuMP.@objective(model, Min, tr(Y))
 
     U = Symmetric(Y - C * X * D - (C * X * D)' - E)
     W = A * X * B
@@ -55,14 +54,14 @@ function matquadraticJuMP(
     return (model = model,)
 end
 
-matquadraticJuMP1() = matquadraticJuMP(5, 6, use_matrixepipersquare = true)
-matquadraticJuMP2() = matquadraticJuMP(5, 6, use_matrixepipersquare = false)
-matquadraticJuMP3() = matquadraticJuMP(10, 20, use_matrixepipersquare = true)
-matquadraticJuMP4() = matquadraticJuMP(10, 20, use_matrixepipersquare = false)
-matquadraticJuMP5() = matquadraticJuMP(25, 30, use_matrixepipersquare = true)
-matquadraticJuMP6() = matquadraticJuMP(25, 30, use_matrixepipersquare = false)
+matrixquadraticJuMP1() = matrixquadraticJuMP(5, 6, use_matrixepipersquare = true)
+matrixquadraticJuMP2() = matrixquadraticJuMP(5, 6, use_matrixepipersquare = false)
+matrixquadraticJuMP3() = matrixquadraticJuMP(10, 20, use_matrixepipersquare = true)
+matrixquadraticJuMP4() = matrixquadraticJuMP(10, 20, use_matrixepipersquare = false)
+matrixquadraticJuMP5() = matrixquadraticJuMP(25, 30, use_matrixepipersquare = true)
+matrixquadraticJuMP6() = matrixquadraticJuMP(25, 30, use_matrixepipersquare = false)
 
-function test_matquadraticJuMP(instance::Function; options, rseed::Int = 1)
+function test_matrixquadraticJuMP(instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
     d = instance()
     JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer(; options...))
@@ -71,18 +70,18 @@ function test_matquadraticJuMP(instance::Function; options, rseed::Int = 1)
     return
 end
 
-test_matquadraticJuMP_all(; options...) = test_matquadraticJuMP.([
-    matquadraticJuMP1,
-    matquadraticJuMP2,
-    matquadraticJuMP3,
-    matquadraticJuMP4,
-    matquadraticJuMP5,
-    matquadraticJuMP6,
+test_matrixquadraticJuMP_all(; options...) = test_matrixquadraticJuMP.([
+    matrixquadraticJuMP1,
+    matrixquadraticJuMP2,
+    matrixquadraticJuMP3,
+    matrixquadraticJuMP4,
+    matrixquadraticJuMP5,
+    matrixquadraticJuMP6,
     ], options = options)
 
-test_matquadraticJuMP(; options...) = test_matquadraticJuMP.([
-    matquadraticJuMP1,
-    matquadraticJuMP2,
-    matquadraticJuMP3,
-    matquadraticJuMP4,
+test_matrixquadraticJuMP(; options...) = test_matrixquadraticJuMP.([
+    matrixquadraticJuMP1,
+    matrixquadraticJuMP2,
+    matrixquadraticJuMP3,
+    matrixquadraticJuMP4,
     ], options = options)
