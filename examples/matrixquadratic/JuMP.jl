@@ -1,21 +1,16 @@
 #=
 Copyright 2020, Chris Coey, Lea Kapelevich and contributors
 
-maximization with a matrix quadratic
-max tr(CX)
-s.t. Y - X*X' in S_+
-P .<= Y .<= Q
-with P .<= 0, Q .>= 0
+for variables X in R^{n, m} and Y in S^n:
+    max tr(C*X)
+    s.t. Y - X*X' in S^n_+
+    P .<= Y .<= Q
+    with P .<= 0, Q .>= 0
 
-Y - XX' in S_+ equivalent to
-[
-I  X'
-X  Y
-]
-in S_+
-(see Lecture 4, Lectures on Convex Optimization by Y. Nesterov)
-and also equivalent to
-(Y, 0.5, X) in MatrixEpiPerSquareCone()
+the nonlinear constraint Y - X*X' in S^n_+ is equivalent to
+the conic constraint (Y, 0.5, X) in MatrixEpiPerSquareCone(),
+and also to the larger conic constraint [I X'; X Y] in S^{n + m}_+
+(see Lecture 4 of "Lectures on Convex Optimization" (2018) by Y. Nesterov)
 =#
 
 import JuMP
