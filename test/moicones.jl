@@ -268,7 +268,7 @@ function test_moi_cones(T::Type{<:Real})
         if T <: LinearAlgebra.BlasReal # only works with BLAS real types
             Random.seed!(1)
             side = 5
-            (row_idxs, col_idxs, _) = findnz(tril!(SparseArrays.sprand(Bool, side, side, 0.3)) + I)
+            (row_idxs, col_idxs, _) = SparseArrays.findnz(tril!(SparseArrays.sprand(Bool, side, side, 0.3)) + I)
 
             moi_cone = HYP.PosSemidefTriSparseCone{T, T}(side, row_idxs, col_idxs)
             hyp_cone = HYP.cone_from_moi(T, moi_cone)
