@@ -1,7 +1,7 @@
 #=
 Copyright 2020, Chris Coey, Lea Kapelevich and contributors
 
-minimize the trace of the epigraph of a matrix quadratic function
+maximization with a matrix quadratic
 max tr(CX)
 s.t. Y - X*X' in S_+
 P .<= Y .<= Q
