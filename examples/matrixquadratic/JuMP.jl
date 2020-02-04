@@ -1,18 +1,21 @@
 #=
 Copyright 2020, Chris Coey, Lea Kapelevich and contributors
+
 minimize the trace of the epigraph of a matrix quadratic function
-min tr(Y)
-s.t. Y - A*X*B*B'*X'*A' - C*X*D - (C*X*D)' - E in S_+
-X .>= Q
-Y - A*X*B*B'*X'*C - C*X*D - (C*X*D)' - E in S_+ equivalent to
+max tr(CX)
+s.t. Y - X*X' in S_+
+P .<= Y .<= Q
+with P .<= 0, Q .>= 0
+
+Y - XX' in S_+ equivalent to
 [
-I      (A*X*B)'
-A*X*B  Y-C*X*D-(C*X*D)'-E
+I  X'
+X  Y
 ]
 in S_+
 (see Lecture 4, Lectures on Convex Optimization by Y. Nesterov)
 and also equivalent to
-(Y-C*X*D-(C*X*D)'-E, 1, A*X*B) in MatrixEpiPerSquareCone()
+(Y, 0.5, X) in MatrixEpiPerSquareCone()
 =#
 
 import JuMP
@@ -22,6 +25,7 @@ import Hypatia
 CO = Hypatia.Cones
 import Random
 using LinearAlgebra
+using SparseArrays
 using Test
 
 function matrixquadraticJuMP(
@@ -29,27 +33,23 @@ function matrixquadraticJuMP(
     W_cols::Int;
     use_matrixepipersquare::Bool = true,
     )
-    A = randn(W_rows, W_rows)
-    B = randn(W_rows, W_cols)
-    C = randn(W_rows, W_rows)
-    D = randn(W_rows, W_rows)
-    E = randn(W_rows, W_rows)
-    E = E + E'
+    C = randn(W_cols, W_rows)
+    P = rand(W_rows, W_rows)
+    Q = rand(W_rows, W_rows)
 
     model = JuMP.Model()
-    JuMP.@variable(model, X[1:W_rows, 1:W_rows])
+    JuMP.@variable(model, X[1:W_rows, 1:W_cols])
     JuMP.@variable(model, Y[1:W_rows, 1:W_rows], Symmetric)
-    JuMP.@objective(model, Min, tr(Y))
+    JuMP.@objective(model, Max, tr(C * X))
 
-    U = Symmetric(Y - C * X * D - (C * X * D)' - E)
-    W = A * X * B
     if use_matrixepipersquare
-        U_svec = CO.smat_to_svec!(zeros(eltype(U), CO.svec_length(W_rows)), U, sqrt(2))
-        JuMP.@constraint(model, vcat(U_svec, 0.5, vec(W)) in Hypatia.MatrixEpiPerSquareCone{Float64, Float64}(W_rows, W_cols))
+        U_svec = CO.smat_to_svec!(zeros(eltype(Y.data .* 1), CO.svec_length(W_rows)), Y.data .* 1, sqrt(2))
+        JuMP.@constraint(model, vcat(U_svec, 0.5, vec(X)) in Hypatia.MatrixEpiPerSquareCone{Float64, Float64}(W_rows, W_cols))
     else
-        JuMP.@constraint(model, Symmetric([Matrix(I, W_cols, W_cols) W'; W U]) in JuMP.PSDCone())
+        JuMP.@constraint(model, Symmetric([Matrix(I, W_cols, W_cols) X'; X Y]) in JuMP.PSDCone())
     end
-    JuMP.@constraint(model, X .>= randn(W_rows, W_rows))
+    JuMP.@constraint(model, Y .+ P .>= 0)
+    JuMP.@constraint(model, Q .- Y .>= 0)
 
     return (model = model,)
 end
