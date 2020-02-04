@@ -2,10 +2,10 @@
 Copyright 2020, Chris Coey, Lea Kapelevich and contributors
 
 for variables X in R^{n, m} and Y in S^n:
-    max tr(C*X)
-    s.t. Y - X*X' in S^n_+
-    P .<= Y .<= Q
-    with P .<= 0, Q .>= 0
+    max tr(C*X) :
+    Y - X*X' in S^n_+
+    Y_ij = P_ij for (i, j) in Omega
+where Omega is a set of fixed indices and P is a random PSD matrix
 
 the nonlinear constraint Y - X*X' in S^n_+ is equivalent to
 the conic constraint (Y, 0.5, X) in MatrixEpiPerSquareCone(),
@@ -29,22 +29,23 @@ function matrixquadraticJuMP(
     use_matrixepipersquare::Bool = true,
     )
     C = randn(W_cols, W_rows)
-    P = rand(W_rows, W_rows)
-    Q = rand(W_rows, W_rows)
+    P = randn(W_rows, W_rows)
+    P = Symmetric(P * P')
+    (row_idxs, col_idxs, _) = findnz(tril!(sprand(Bool, W_rows, W_rows, inv(sqrt(W_rows)))) + I)
 
     model = JuMP.Model()
     JuMP.@variable(model, X[1:W_rows, 1:W_cols])
     JuMP.@variable(model, Y[1:W_rows, 1:W_rows], Symmetric)
     JuMP.@objective(model, Max, tr(C * X))
+    JuMP.@constraint(model, [(row, col) in zip(row_idxs, col_idxs)], Y[row, col] == P[row, col])
 
     if use_matrixepipersquare
-        U_svec = CO.smat_to_svec!(zeros(eltype(Y.data .* 1), CO.svec_length(W_rows)), Y.data .* 1, sqrt(2))
+        U_svec = zeros(JuMP.GenericAffExpr{Float64, JuMP.VariableRef}, CO.svec_length(W_rows))
+        U_svec = CO.smat_to_svec!(U_svec, 1.0 * Y, sqrt(2))
         JuMP.@constraint(model, vcat(U_svec, 0.5, vec(X)) in Hypatia.MatrixEpiPerSquareCone{Float64, Float64}(W_rows, W_cols))
     else
         JuMP.@constraint(model, Symmetric([Matrix(I, W_cols, W_cols) X'; X Y]) in JuMP.PSDCone())
     end
-    JuMP.@constraint(model, Y .+ P .>= 0)
-    JuMP.@constraint(model, Q .- Y .>= 0)
 
     return (model = model,)
 end
