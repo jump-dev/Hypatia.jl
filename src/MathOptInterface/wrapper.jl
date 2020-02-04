@@ -489,6 +489,8 @@ end
 
 MOI.get(opt::Optimizer, ::MOI.RawStatusString) = string(opt.solver.status)
 
+MOI.get(opt::Optimizer, ::MOI.BarrierIterations) = opt.solver.num_iters
+
 function MOI.get(opt::Optimizer, ::MOI.TerminationStatus)
     status = opt.solver.status
     if status in (:NotLoaded, :Loaded)
