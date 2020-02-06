@@ -18,7 +18,6 @@ function portfolio(
     epinorminf_constr::Bool = false,
     epinorminfdual_constr::Bool = false,
     hypoperlog_constr::Bool = false,
-    use_epinormeucl::Bool = true,
     use_epinorminf::Bool = true,
     use_epinorminfdual::Bool = true,
     use_hypoperlog::Bool = true,
@@ -35,7 +34,7 @@ function portfolio(
     x ./= norm(x)
     gamma = sum(abs, sigma_half * x) / sqrt(T(num_stocks))
 
-    c = returns
+    c = -returns
     # investments add to one, nonnegativity
     if use_linops
         A_blocks = Any[ones(T, 1, num_stocks)]
