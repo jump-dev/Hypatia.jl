@@ -74,6 +74,9 @@ test_portfolioJuMP_all(; options...) = test_portfolioJuMP.([
     portfolioJuMP8,
     portfolioJuMP9,
     portfolioJuMP10,
+    portfolioJuMP11,
+    portfolioJuMP12,
+    portfolioJuMP13,
     ], options = options)
 
 test_portfolioJuMP(; options...) = test_portfolioJuMP.([
@@ -87,7 +90,4 @@ test_portfolioJuMP(; options...) = test_portfolioJuMP.([
     portfolioJuMP8,
     portfolioJuMP9,
     portfolioJuMP10,
-    portfolioJuMP11,
-    portfolioJuMP12,
-    portfolioJuMP13,
     ], options = options)
