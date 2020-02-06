@@ -26,7 +26,7 @@ function portfolioJuMP(
 
     model = JuMP.Model()
     JuMP.@variable(model, invest[1:num_stocks] >= 0)
-    JuMP.@objective(model, Min, dot(returns, invest))
+    JuMP.@objective(model, Max, dot(returns, invest))
     JuMP.@constraint(model, sum(invest) == 1)
     if epipernormeucl_constr
         JuMP.@constraint(model, vcat(gamma, sigma_half * invest) in JuMP.SecondOrderCone())
