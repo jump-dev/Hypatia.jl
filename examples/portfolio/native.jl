@@ -205,18 +205,18 @@ portfolio13(T::Type{<:Real}) = portfolio(T, 20, epinorminf_constr = true, epinor
 portfolio14(T::Type{<:Real}) = portfolio(T, 30, epinorminf_constr = true, epinorminfdual_constr = true, use_epinorminfdual = true, use_linops = false)
 
 instances_portfolio_all = [
-    # portfolio1,
-    # portfolio2,
-    # portfolio3,
+    portfolio1,
+    portfolio2,
+    portfolio3,
     portfolio4,
-    # portfolio5,
-    # portfolio6,
-    # portfolio7,
-    # portfolio9,
-    # portfolio10,
-    # portfolio11,
-    # portfolio12,
-    # portfolio13,
+    portfolio5,
+    portfolio6,
+    portfolio7,
+    portfolio9,
+    portfolio10,
+    portfolio11,
+    portfolio12,
+    portfolio13,
     ]
 instances_portfolio_few = [
     portfolio1,
