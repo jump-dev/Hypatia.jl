@@ -27,6 +27,7 @@ const DP = DynamicPolynomials
 import SumOfSquares
 import PolyJuMP
 const PJ = PolyJuMP
+import MultivariateBases: FixedPolynomialBasis
 import MathOptInterface
 const MOI = MathOptInterface
 import JuMP
@@ -56,7 +57,7 @@ function shapeconregrJuMP(
         lagrange_polys = MU.recover_lagrange_polys(regressor_points, deg)
 
         model = JuMP.Model()
-        JuMP.@variable(model, regressor, variable_type = PJ.Poly(PJ.FixedPolynomialBasis(lagrange_polys)))
+        JuMP.@variable(model, regressor, variable_type = PJ.Poly(FixedPolynomialBasis(lagrange_polys)))
 
         # monotonicity
         if !all(iszero, mono_profile)
