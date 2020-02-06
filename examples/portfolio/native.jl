@@ -18,7 +18,6 @@ function portfolio(
     epinorminf_constr::Bool = false,
     epinorminfdual_constr::Bool = false,
     hypoperlog_constr::Bool = false,
-    use_epinormeucl::Bool = true,
     use_epinorminf::Bool = true,
     use_epinorminfdual::Bool = true,
     use_hypoperlog::Bool = true,
@@ -35,7 +34,7 @@ function portfolio(
     x ./= norm(x)
     gamma = sum(abs, sigma_half * x) / sqrt(T(num_stocks))
 
-    c = returns
+    c = -returns
     # investments add to one, nonnegativity
     if use_linops
         A_blocks = Any[ones(T, 1, num_stocks)]
@@ -206,18 +205,18 @@ portfolio13(T::Type{<:Real}) = portfolio(T, 20, epinorminf_constr = true, epinor
 portfolio14(T::Type{<:Real}) = portfolio(T, 30, epinorminf_constr = true, epinorminfdual_constr = true, use_epinorminfdual = true, use_linops = false)
 
 instances_portfolio_all = [
-    portfolio1,
-    portfolio2,
-    portfolio3,
+    # portfolio1,
+    # portfolio2,
+    # portfolio3,
     portfolio4,
-    portfolio5,
-    portfolio6,
-    portfolio7,
-    portfolio9,
-    portfolio10,
-    portfolio11,
-    portfolio12,
-    portfolio13,
+    # portfolio5,
+    # portfolio6,
+    # portfolio7,
+    # portfolio9,
+    # portfolio10,
+    # portfolio11,
+    # portfolio12,
+    # portfolio13,
     ]
 instances_portfolio_few = [
     portfolio1,
