@@ -22,11 +22,22 @@ function polyminJuMP(
     primal_wsos::Bool = false,
     sample::Bool = true,
     rseed::Int = 1,
+    n::Int = 0,
     )
-    (x, f, dom, true_obj) = getpolydata(polyname)
+    if polyname == :random
+        if n <= 0
+            error("`n` should be specified as a positive keyword argument if randomly generating a polynomial")
+        end
+        DP.@polyvar(x[1:n])
+        monos = DP.monomials(x, 0:2halfdeg)
+        f = dot(rand(length(monos)), monos)
+        dom = MU.Box{Float64}(-ones(n), ones(n))
+        true_obj = NaN
+    else
+        (x, f, dom, true_obj) = getpolydata(polyname)
+    end
 
     if use_wsos
-        Random.seed!(rseed)
         (U, pts, Ps, _) = MU.interpolate(dom, halfdeg, sample = sample, sample_factor = 100)
         cone = HYP.WSOSInterpNonnegativeCone{Float64, Float64}(U, Ps, !primal_wsos)
         interp_vals = [f(x => pts[j, :]) for j in 1:U]
@@ -75,12 +86,18 @@ polyminJuMP19() = polyminJuMP(:schwefel, 2, use_wsos = false)
 polyminJuMP20() = polyminJuMP(:magnetism7_ball, 2, use_wsos = false)
 polyminJuMP21() = polyminJuMP(:motzkin_ellipsoid, 4, use_wsos = false)
 polyminJuMP22() = polyminJuMP(:caprasse, 4, use_wsos = false)
+polyminJuMP23() = polyminJuMP(:random, 2, primal_wsos = false, use_wsos = true, n = 5)
+polyminJuMP24() = polyminJuMP(:random, 2, primal_wsos = true, use_wsos = true, n = 5)
+polyminJuMP25() = polyminJuMP(:random, 2, primal_wsos = true, use_wsos = false, n = 5)
 
-function test_polyminJuMP(instance::Function; options)
+function test_polyminJuMP(instance::Function; options, rseed::Int = 1)
+    Random.seed!(rseed)
     d = instance()
     JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer(; options...))
     JuMP.optimize!(d.model)
-    @test JuMP.objective_value(d.model) ≈ d.true_obj atol = 1e-4 rtol = 1e-4
+    if !isnan(d.true_obj)
+        @test JuMP.objective_value(d.model) ≈ d.true_obj atol = 1e-4 rtol = 1e-4
+    end
     return
 end
 
@@ -107,6 +124,9 @@ test_polyminJuMP_all(; options...) = test_polyminJuMP.([
     polyminJuMP20,
     polyminJuMP21,
     polyminJuMP22,
+    polyminJuMP23,
+    polyminJuMP24,
+    polyminJuMP25,
     ], options = options)
 
 test_polyminJuMP(; options...) = test_polyminJuMP.([
@@ -114,4 +134,5 @@ test_polyminJuMP(; options...) = test_polyminJuMP.([
     polyminJuMP3,
     polyminJuMP12,
     polyminJuMP14,
+    polyminJuMP23,
     ], options = options)
