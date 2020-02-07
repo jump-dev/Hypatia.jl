@@ -7,18 +7,21 @@ TODO generalize all code for T <: Real
 =#
 
 mutable struct Optimizer{T <: Real} <: MOI.AbstractOptimizer
-    load_only::Bool
-    test_certificates::Bool
+    load_only::Bool # don't optimize
+    use_dense_model::Bool # make the model use dense A and G data instead of sparse
+    test_certificates::Bool # test that conic certificates satisfy certain tolerances
 
-    solver::Solvers.Solver{T}
-    model::Models.Model{T}
+    solver::Solvers.Solver{T} # Hypatia solver object
+    model::Models.Model{T} # Hypatia model object
 
+    # result data
     result::NamedTuple
     x::Vector{T}
     s::Vector{T}
     y::Vector{T}
     z::Vector{T}
 
+    # data for transforming certificates
     obj_sense::MOI.OptimizationSense
     num_eq_constrs::Int
     constr_offset_eq::Vector{Int}
@@ -31,11 +34,13 @@ mutable struct Optimizer{T <: Real} <: MOI.AbstractOptimizer
 
     function Optimizer{T}(;
         load_only::Bool = false,
+        use_dense_model::Bool = true,
         test_certificates::Bool = false,
         solver_options...
         ) where {T <: Real}
         opt = new{T}()
         opt.load_only = load_only
+        opt.use_dense_model = use_dense_model
         opt.test_certificates = test_certificates
         opt.solver = Solvers.Solver{T}(; solver_options...)
         return opt
@@ -433,11 +438,14 @@ function MOI.copy_to(
 
     push!(constr_offset_cone, q)
 
-    # finalize
+    # finalize model
     model_G = dropzeros!(sparse(IG, JG, VG, q, n))
     model_h = Vector(sparsevec(Ih, Vh, q))
 
     opt.model = Models.Model{T}(model_c, model_A, model_b, model_G, model_h, cones; obj_offset = obj_offset)
+    if opt.use_dense_model # convert A and G to dense
+        Models.densify!(opt.model)
+    end
 
     opt.constr_offset_cone = constr_offset_cone
     opt.constr_prim_cone = Vector(sparsevec(Icpc, Vcpc, q))

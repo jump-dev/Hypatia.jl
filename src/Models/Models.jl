@@ -127,4 +127,11 @@ end
 
 get_cone_idxs(model::Model) = model.cone_idxs
 
+# make the model's A and G matrices dense
+function densify!(model::Model{T}) where {T <: Real}
+    model.A = convert(Matrix{T}, model.A)
+    model.G = convert(Matrix{T}, model.G)
+    return model
+end
+
 end

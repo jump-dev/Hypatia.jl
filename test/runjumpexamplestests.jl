@@ -36,8 +36,8 @@ options = (
     verbose = true,
     iter_limit = 250,
     time_limit = 6e2, # 1 minute
-    # system_solver = SO.QRCholDenseSystemSolver{T}(),
-    system_solver = SO.SymIndefSparseSystemSolver{T}(),
+    system_solver = SO.QRCholDenseSystemSolver{T}(),
+    # system_solver = SO.SymIndefSparseSystemSolver{T}(),
     )
 
 @info("starting JuMP examples tests")
