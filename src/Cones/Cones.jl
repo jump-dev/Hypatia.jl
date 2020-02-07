@@ -12,6 +12,7 @@ import LinearAlgebra.copytri!
 import LinearAlgebra.HermOrSym
 import LinearAlgebra.BlasReal
 using SparseArrays
+import SuiteSparse.CHOLMOD
 import Hypatia.RealOrComplex
 import Hypatia.DenseSymCache
 import Hypatia.DensePosDefCache

@@ -23,8 +23,6 @@ TODO
 - maybe allow passing more options to CHOLMOD eg through a common_struct argument to cone
 =#
 
-import SuiteSparse.CHOLMOD
-
 mutable struct PosSemidefTriSparse{T <: BlasReal, R <: RealOrComplex{T}} <: Cone{T}
     use_dual::Bool
     dim::Int
@@ -122,7 +120,7 @@ function setup_symbfact(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrCompl
     side = cone.side
     dim_R = length(cone.row_idxs)
 
-    cm = CHOLMOD.defaults(CHOLMOD.common_struct)
+    cm = CHOLMOD.defaults(CHOLMOD.common_struct[Base.Threads.threadid()])
     unsafe_store!(CHOLMOD.common_print[], 0)
     unsafe_store!(CHOLMOD.common_postorder[], 1)
     unsafe_store!(CHOLMOD.common_supernodal[], 2)
