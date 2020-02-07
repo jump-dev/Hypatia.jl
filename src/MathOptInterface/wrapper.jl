@@ -7,7 +7,6 @@ TODO generalize all code for T <: Real
 =#
 
 mutable struct Optimizer{T <: Real} <: MOI.AbstractOptimizer
-    load_only::Bool # don't optimize
     use_dense_model::Bool # make the model use dense A and G data instead of sparse
     test_certificates::Bool # test that conic certificates satisfy certain tolerances
 
@@ -33,13 +32,11 @@ mutable struct Optimizer{T <: Real} <: MOI.AbstractOptimizer
     interval_scales::Vector{T}
 
     function Optimizer{T}(;
-        load_only::Bool = false,
         use_dense_model::Bool = true,
         test_certificates::Bool = false,
         solver_options...
         ) where {T <: Real}
         opt = new{T}()
-        opt.load_only = load_only
         opt.use_dense_model = use_dense_model
         opt.test_certificates = test_certificates
         opt.solver = Solvers.Solver{T}(; solver_options...)
@@ -454,8 +451,6 @@ function MOI.copy_to(
 end
 
 function MOI.optimize!(opt::Optimizer{T}) where {T <: Real}
-    opt.load_only && return
-
     # build and solve the model
     model = opt.model
     opt.result = r = Solvers.solve_check(model, solver = opt.solver, test = opt.test_certificates)
