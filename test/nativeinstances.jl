@@ -513,6 +513,42 @@ function episumperentropy4(T; options...)
     @test r.z ≈ [1, 2, 3 / T(5), log(inv(T(2))) - 1, log(5 / T(3)) - 1] atol=tol rtol=tol
 end
 
+function episumperentropy5(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    c = T[0, -1]
+    A = zeros(T, 0, 2)
+    b = zeros(T, 0)
+    G = vcat(zeros(T, 4, 2), fill(-one(T), 3, 2), [-1, 0]')
+    h = T[0, 1, 1, 1, 0, 0, 0, 0]
+    cones = CO.Cone{T}[CO.EpiSumPerEntropy{T}(7), CO.Nonnegative{T}(1)]
+
+    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+    @test r.status == :Optimal
+    @test r.primal_obj ≈ -1 atol=tol rtol=tol
+    @test r.s ≈ [0, 1, 1, 1, 1, 1, 1, 0] atol=tol rtol=tol
+    @test r.z ≈ inv(T(3)) * [1, 1, 1, 1, -1, -1, -1, 3] atol=tol rtol=tol
+end
+
+function episumperentropy6(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    c = T[-1, 0, 0, 0, 0]
+    A = zeros(T, 0, 5)
+    b = zeros(T, 0)
+    G = sparse(
+        [2, 3, 4, 5, 6, 7, 5, 6, 7, 8, 9, 9, 9],
+        [2, 3, 4, 1, 1, 1, 5, 5, 5, 5, 2, 3, 4],
+        T[-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 1, 1, 1],
+        9, 5)
+    h = vcat(zeros(T, 8), T(3))
+    cones = CO.Cone{T}[CO.EpiSumPerEntropy{T}(7), CO.Nonnegative{T}(2)]
+
+    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+    @test r.status == :Optimal
+    @test r.primal_obj ≈ -1 atol=tol rtol=tol
+    @test r.s ≈ [0, 1, 1, 1, 1, 1, 1, 0, 0] atol=tol rtol=tol
+    @test r.z ≈ inv(T(3)) * [1, 1, 1, 1, -1, -1, -1, 3, 1] atol=tol rtol=tol
+end
+
 function hypoperlog1(T; options...)
     tol = sqrt(sqrt(eps(T)))
     Texph = exp(T(0.5))
@@ -664,6 +700,23 @@ function hypogeomean3(T; options...)
         @test r.primal_obj ≈ 0 atol=tol rtol=tol
         @test norm(r.x) ≈ 0 atol=tol rtol=tol
     end
+end
+
+function hypogeomean4(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    c = T[-1, 0, 0, 0]
+    A = zeros(T, 0, 4)
+    b = zeros(T, 0)
+    G = vcat(Matrix{T}(-I, 4, 4), T[0, 1, 1, 1]')
+    h = T[0, 0, 0, 0, 3]
+    cones = CO.Cone{T}[CO.HypoGeomean{T}(fill(inv(T(3)), 3)), CO.Nonnegative{T}(1)]
+
+    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+    @test r.status == :Optimal
+    @test r.primal_obj ≈ -1 atol=tol rtol=tol
+    @test r.x ≈ [1, 1, 1, 1] atol=tol rtol=tol
+    @test r.s ≈ [1, 1, 1, 1, 0] atol=tol rtol=tol
+    @test r.z ≈ vcat(-1, fill(inv(T(3)), 4)) atol=tol rtol=tol
 end
 
 function power1(T; options...)
