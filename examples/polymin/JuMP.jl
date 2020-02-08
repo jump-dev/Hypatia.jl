@@ -11,7 +11,6 @@ import JuMP
 const MOI = JuMP.MOI
 import SumOfSquares
 const PJ = SumOfSquares.PolyJuMP
-import SemialgebraicSets
 import Hypatia
 const HYP = Hypatia
 const MU = HYP.ModelUtilities
@@ -151,4 +150,5 @@ test_polyminJuMP(; options...) = test_polyminJuMP.([
     polyminJuMP12,
     polyminJuMP14,
     polyminJuMP23,
+    polyminJuMP26,
     ], options = options)
