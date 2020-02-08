@@ -7,7 +7,6 @@ compute a gram matrix of a polynomial, minimizing its log-determinant or root-de
 import DynamicPolynomials
 const DP = DynamicPolynomials
 import JuMP
-import PolyJuMP
 import MathOptInterface
 const MOI = MathOptInterface
 import Hypatia
@@ -32,7 +31,8 @@ function centralpolymatJuMP(
     JuMP.@variable(model, Q[i in 1:L, 1:L], Symmetric)
     v1 = [Q[i, j] for i in 1:L for j in 1:i] # vectorized Q
     poly_Q = sum(Q[i, j] * monomials[i] * monomials[j] * (i == j ? 1 : 2) for i in 1:L for j in 1:i)
-    JuMP.@constraint(model, poly_rand == poly_Q)
+    zero_coeffs = DP.coefficients(poly_Q - poly_rand)
+    JuMP.@constraint(model, [i in eachindex(zero_coeffs)], zero_coeffs[i] == 0)
 
     if use_natural
         JuMP.@variable(model, hypo)
@@ -76,7 +76,7 @@ function test_centralpolymatJuMP(instance::Function; options, rseed::Int = 1)
     JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer(; options...))
     JuMP.optimize!(d.model)
     @test JuMP.termination_status(d.model) == MOI.OPTIMAL
-    @test d.poly_rand ≈ JuMP.value(d.poly_Q)
+    @test DP.coefficients(d.poly_rand) ≈ JuMP.value.(DP.coefficients(d.poly_Q))
     return
 end
 
