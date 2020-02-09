@@ -8,7 +8,7 @@ import Random
 using LinearAlgebra
 using Test
 import JuMP
-import SumOfSquares
+const MOI = JuMP.MOI
 import Hypatia
 const HYP = Hypatia
 const MU = HYP.ModelUtilities
@@ -19,7 +19,7 @@ function polyminJuMP(
     polyname::Symbol,
     halfdeg::Int;
     use_wsos::Bool = true,
-    primal_wsos::Bool = false,
+    use_primal::Bool = false,
     sample::Bool = true,
     rseed::Int = 1,
     n::Int = 0,
@@ -36,29 +36,42 @@ function polyminJuMP(
     else
         (x, f, dom, true_obj) = getpolydata(polyname)
     end
+    (U, pts, Ps, _) = MU.interpolate(dom, halfdeg, sample = sample, sample_factor = 100)
+    interp_vals = [f(x => pts[j, :]) for j in 1:U]
+
+    model = JuMP.Model()
+    if use_primal
+        JuMP.@variable(model, a)
+        JuMP.@objective(model, Max, a)
+    else
+        JuMP.@variable(model, μ[1:U])
+        JuMP.@objective(model, Min, dot(μ, interp_vals))
+        JuMP.@constraint(model, sum(μ) == 1.0) # TODO can remove this constraint and a variable
+    end
 
     if use_wsos
-        (U, pts, Ps, _) = MU.interpolate(dom, halfdeg, sample = sample, sample_factor = 100)
-        cone = HYP.WSOSInterpNonnegativeCone{Float64, Float64}(U, Ps, !primal_wsos)
-        interp_vals = [f(x => pts[j, :]) for j in 1:U]
-
-        model = JuMP.Model()
-        if primal_wsos
-            JuMP.@variable(model, a)
-            JuMP.@objective(model, Max, a)
+        cone = HYP.WSOSInterpNonnegativeCone{Float64, Float64}(U, Ps, !use_primal)
+        if use_primal
             JuMP.@constraint(model, interp_vals .- a in cone)
         else
-            JuMP.@variable(model, μ[1:U])
-            JuMP.@objective(model, Min, dot(μ, interp_vals))
-            JuMP.@constraint(model, sum(μ) == 1.0) # TODO can remove this constraint and a variable
             JuMP.@constraint(model, μ in cone)
         end
     else
-        model = SumOfSquares.SOSModel()
-        JuMP.@variable(model, a)
-        JuMP.@objective(model, Max, a)
-        bss = MU.get_domain_inequalities(dom, x)
-        JuMP.@constraint(model, f >= a, domain = bss, maxdegree = 2 * halfdeg)
+        if use_primal
+            psd_vars = []
+            for (k, P) in enumerate(Ps)
+                Lk = size(P, 2)
+                psd_k = JuMP.@variable(model, [1:Lk, 1:Lk], Symmetric)
+                push!(psd_vars, psd_k)
+                JuMP.@SDconstraint(model, psd_k >= 0)
+            end
+            JuMP.@constraint(model, sum(diag(P * psd_k * P') for (P, psd_k) in zip(Ps, psd_vars)) .== interp_vals - a * ones(U))
+        else
+            for P in Ps
+                L = size(P, 2)
+                JuMP.@constraint(model, [sum(P[u, i] * P[u, j] * μ[u] for u in 1:U) for i in 1:L for j in 1:i] in MOI.PositiveSemidefiniteConeTriangle(L))
+            end
+        end
     end
 
     return (model = model, true_obj = true_obj)
@@ -77,18 +90,19 @@ polyminJuMP10() = polyminJuMP(:rosenbrock, 5)
 polyminJuMP11() = polyminJuMP(:butcher, 2)
 polyminJuMP12() = polyminJuMP(:goldsteinprice_ellipsoid, 7)
 polyminJuMP13() = polyminJuMP(:goldsteinprice_ball, 7)
-polyminJuMP14() = polyminJuMP(:motzkin, 3, primal_wsos = false)
+polyminJuMP14() = polyminJuMP(:motzkin, 3, use_primal = false)
 polyminJuMP15() = polyminJuMP(:motzkin, 3)
-polyminJuMP16() = polyminJuMP(:reactiondiffusion, 4, primal_wsos = false)
-polyminJuMP17() = polyminJuMP(:lotkavolterra, 3, primal_wsos = false)
+polyminJuMP16() = polyminJuMP(:reactiondiffusion, 4, use_primal = false)
+polyminJuMP17() = polyminJuMP(:lotkavolterra, 3, use_primal = false)
 polyminJuMP18() = polyminJuMP(:heart, 2, use_wsos = false)
 polyminJuMP19() = polyminJuMP(:schwefel, 2, use_wsos = false)
 polyminJuMP20() = polyminJuMP(:magnetism7_ball, 2, use_wsos = false)
 polyminJuMP21() = polyminJuMP(:motzkin_ellipsoid, 4, use_wsos = false)
 polyminJuMP22() = polyminJuMP(:caprasse, 4, use_wsos = false)
-polyminJuMP23() = polyminJuMP(:random, 2, primal_wsos = false, use_wsos = true, n = 5)
-polyminJuMP24() = polyminJuMP(:random, 2, primal_wsos = true, use_wsos = true, n = 5)
-polyminJuMP25() = polyminJuMP(:random, 2, primal_wsos = true, use_wsos = false, n = 5)
+polyminJuMP23() = polyminJuMP(:random, 2, use_primal = true, use_wsos = true, n = 5)
+polyminJuMP24() = polyminJuMP(:random, 2, use_primal = true, use_wsos = false, n = 5)
+polyminJuMP25() = polyminJuMP(:random, 2, use_primal = false, use_wsos = true, n = 5)
+polyminJuMP26() = polyminJuMP(:random, 2, use_primal = false, use_wsos = false, n = 5)
 
 function test_polyminJuMP(instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
@@ -127,6 +141,7 @@ test_polyminJuMP_all(; options...) = test_polyminJuMP.([
     polyminJuMP23,
     polyminJuMP24,
     polyminJuMP25,
+    polyminJuMP26,
     ], options = options)
 
 test_polyminJuMP(; options...) = test_polyminJuMP.([
@@ -135,4 +150,5 @@ test_polyminJuMP(; options...) = test_polyminJuMP.([
     polyminJuMP12,
     polyminJuMP14,
     polyminJuMP23,
+    polyminJuMP26,
     ], options = options)
