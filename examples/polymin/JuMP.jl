@@ -9,8 +9,6 @@ using LinearAlgebra
 using Test
 import JuMP
 const MOI = JuMP.MOI
-import SumOfSquares
-const PJ = SumOfSquares.PolyJuMP
 import Hypatia
 const HYP = Hypatia
 const MU = HYP.ModelUtilities
@@ -38,11 +36,8 @@ function polyminJuMP(
     else
         (x, f, dom, true_obj) = getpolydata(polyname)
     end
-
-    if use_wsos || !use_primal
-        (U, pts, Ps, _) = MU.interpolate(dom, halfdeg, sample = sample, sample_factor = 100)
-        interp_vals = [f(x => pts[j, :]) for j in 1:U]
-    end
+    (U, pts, Ps, _) = MU.interpolate(dom, halfdeg, sample = sample, sample_factor = 100)
+    interp_vals = [f(x => pts[j, :]) for j in 1:U]
 
     model = JuMP.Model()
     if use_primal
@@ -63,9 +58,14 @@ function polyminJuMP(
         end
     else
         if use_primal
-            PJ.setpolymodule!(model, SumOfSquares)
-            bss = MU.get_domain_inequalities(dom, x)
-            JuMP.@constraint(model, f >= a, domain = bss, maxdegree = 2 * halfdeg)
+            psd_vars = []
+            for (k, P) in enumerate(Ps)
+                Lk = size(P, 2)
+                psd_k = JuMP.@variable(model, [1:Lk, 1:Lk], Symmetric)
+                push!(psd_vars, psd_k)
+                JuMP.@SDconstraint(model, psd_k >= 0)
+            end
+            JuMP.@constraint(model, sum(diag(P * psd_k * P') for (P, psd_k) in zip(Ps, psd_vars)) .== interp_vals - a * ones(U))
         else
             for P in Ps
                 L = size(P, 2)
