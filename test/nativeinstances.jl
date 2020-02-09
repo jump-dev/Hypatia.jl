@@ -719,6 +719,41 @@ function hypogeomean4(T; options...)
     @test r.z ≈ vcat(-1, fill(inv(T(3)), 4)) atol=tol rtol=tol
 end
 
+function hypogeomean5(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    c = T[-2, 0]
+    A = zeros(T, 0, 2)
+    b = zeros(T, 0)
+    G = sparse([1, 2, 3], [1, 2, 2], T[-1, -1, 1], 3, 2)
+    h = T[0, 0, 2]
+    cones = CO.Cone{T}[CO.HypoGeomean{T}([one(T)]), CO.Nonnegative{T}(1)]
+
+    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+    @test r.status == :Optimal
+    @test r.primal_obj ≈ -4 atol=tol rtol=tol
+    @test r.x ≈ [2, 2] atol=tol rtol=tol
+    @test r.s ≈ [2, 2, 0] atol=tol rtol=tol
+    @test r.z ≈ [-2, 2, 2] atol=tol rtol=tol
+end
+
+function hypogeomean6(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    c = zeros(T, 10)
+    c[1] = -1
+    A = hcat(zeros(T, 9), Matrix{T}(I, 9, 9))
+    b = ones(T, 9)
+    G = Matrix{T}(-I, 10, 10)
+    h = zeros(T, 10)
+    cones = CO.Cone{T}[CO.HypoGeomean{T}(fill(inv(T(9)), 9))]
+
+    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+    @test r.status == :Optimal
+    @test r.primal_obj ≈ -1 atol=tol rtol=tol
+    @test r.x ≈ ones(T, 10) atol=tol rtol=tol
+    @test r.z ≈ vcat(-one(T), fill(inv(T(9)), 9)) atol=tol rtol=tol
+    @test r.y ≈ fill(inv(T(9)), 9) atol=tol rtol=tol
+end
+
 function power1(T; options...)
     tol = sqrt(sqrt(eps(T)))
     c = T[0, 0, 1]
