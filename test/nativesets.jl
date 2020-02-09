@@ -77,6 +77,8 @@ testfuns_many = [
     hypogeomean2,
     hypogeomean3,
     hypogeomean4,
+    hypogeomean5,
+    hypogeomean6,
     epinormspectral1,
     epinormspectral2,
     epinormspectral3,
