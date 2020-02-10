@@ -6,7 +6,6 @@ regularized matrix regression problems
 TODO
 - describe, references
 - generalize for sparse Y,X but make sure qr factorization does not permute
-- frobenius norm penalty may need to be squared (like in the JuMP example)
 =#
 
 using LinearAlgebra
