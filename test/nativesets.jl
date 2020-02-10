@@ -57,6 +57,8 @@ testfuns_many = [
     epiperexp2,
     epiperexp3,
     epiperexp4,
+    epiperexp5,
+    epiperexp6,
     episumperentropy1,
     episumperentropy2,
     episumperentropy3,
