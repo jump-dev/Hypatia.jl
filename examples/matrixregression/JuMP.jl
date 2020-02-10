@@ -38,10 +38,15 @@ function matrixregressionJuMP(
 
     model = JuMP.Model()
     JuMP.@variable(model, A[1:data_p, 1:data_m])
-    JuMP.@variable(model, t_fro)
-    JuMP.@constraint(model, vcat(t_fro, vec(Xhalf * A)) in JuMP.SecondOrderCone())
-    obj = (t_fro - 2 * dot(X' * Y, A)) / (2 * data_n)
+    JuMP.@variable(model, u_fro)
+    JuMP.@constraint(model, vcat(u_fro, 0.5, vec(Xhalf * A)) in JuMP.RotatedSecondOrderCone())
+    obj = (u_fro - 2 * dot(X' * Y, A)) / (2 * data_n)
 
+    if !iszero(lam_fro)
+        JuMP.@variable(model, t_fro)
+        JuMP.@constraint(model, vec(t_fro, 0.5, vec(A)) in JuMP.RotatedSecondOrderCone())
+        obj += lam_nuc * t_nuc
+    end
     if !iszero(lam_nuc)
         JuMP.@variable(model, t_nuc)
         JuMP.@constraint(model, vec(t_nuc, vec(A)) in MOI.NormNuclearCone(data_n, data_p))
@@ -54,12 +59,12 @@ function matrixregressionJuMP(
     end
     if !iszero(lam_glr)
         JuMP.@variable(model, t_glr[1:data_p])
-        JuMP.@constraint(model, [i = 1:data_p], vec(t_glr[i], A[i, :]) in JuMP.SecondOrderCone())
+        JuMP.@constraint(model, [i = 1:data_p], vec(t_glr[i], 0.5, A[i, :]) in JuMP.RotatedSecondOrderCone())
         obj += lam_glr * sum(t_glr)
     end
     if !iszero(lam_glr)
         JuMP.@variable(model, t_glc[1:data_m])
-        JuMP.@constraint(model, [i = 1:data_m], vec(t_glc[i], A[:, i]) in JuMP.SecondOrderCone())
+        JuMP.@constraint(model, [i = 1:data_m], vec(t_glc[i], 0.5, A[:, i]) in JuMP.RotatedSecondOrderCone())
         obj += lam_glc * sum(t_glc)
     end
 
@@ -91,8 +96,10 @@ function matrixregressionJuMP(
     return matrixregressionJuMP(Y, X; model_kwargs...)
 end
 
-matrixregressionJuMP1() = matrixregressionJuMP(10, 10, 10)
-
+matrixregressionJuMP1() = matrixregression(5, 3, 4)
+matrixregressionJuMP2() = matrixregression(5, 3, 4, lam_fro = 0.1, lam_nuc = 0.1, lam_las = 0.1, lam_glc = 0.2, lam_glr = 0.2)
+matrixregressionJuMP3() = matrixregression(3, 4, 5)
+matrixregressionJuMP4() = matrixregression(3, 4, 5, lam_fro = 0.1, lam_nuc = 0.1, lam_las = 0.1, lam_glc = 0.2, lam_glr = 0.2)
 
 function test_matrixregressionJuMP(instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
@@ -105,6 +112,9 @@ end
 
 test_matrixregressionJuMP_all(; options...) = test_matrixregressionJuMP.([
     matrixregressionJuMP1,
+    matrixregressionJuMP2,
+    matrixregressionJuMP3,
+    matrixregressionJuMP4,
     ], options = options)
 
 test_matrixregressionJuMP(; options...) = test_matrixregressionJuMP.([
