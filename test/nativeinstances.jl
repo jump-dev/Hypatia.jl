@@ -437,6 +437,52 @@ function epiperexp4(T; options...)
     @test r.x ≈ [Texp2, 1, -1] atol=tol rtol=tol
 end
 
+function epiperexp5(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    c = zeros(T, 8)
+    c[1] = -1
+    A = zeros(T, 0, 8)
+    b = zeros(T, 0)
+    G = sparse(
+        [1, 1, 1, 2, 2, 3, 3, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+        [2, 3, 4, 5, 1, 6, 7, 8, 2, 5, 6, 3, 5, 7, 4, 5, 8],
+        T[1, 1, 1, -1, 1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
+        12, 8)
+    h = zeros(T, 12)
+    h[1] = 3
+    cones = CO.Cone{T}[CO.Nonnegative{T}(3), CO.EpiPerExp{T}(), CO.EpiPerExp{T}(), CO.EpiPerExp{T}()]
+
+    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+    @test r.status == :Optimal
+    @test r.primal_obj ≈ -1 atol=tol rtol=tol
+    @test r.x ≈ [1, 1, 1, 1, 1, 0, 0, 0] atol=tol rtol=tol
+    @test r.s ≈ [0, 0, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0] atol=tol rtol=tol
+    @test r.z ≈ inv(T(3)) * [1, 3, 1, 1, -1, -1, 1, -1, -1, 1, -1, -1] atol=tol rtol=tol
+end
+
+function epiperexp6(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    c = zeros(T, 4)
+    c[1] = -2
+    A = zeros(T, 0, 4)
+    b = zeros(T, 0)
+    G = sparse(
+        [1, 2, 2, 3, 4, 5, 6],
+        [2, 1, 3, 4, 2, 3, 4],
+        T[1, 1, -1, -1, -1, -1, -1],
+        6, 4)
+    h = zeros(T, 6)
+    h[1] = 2
+    cones = CO.Cone{T}[CO.Nonnegative{T}(3), CO.EpiPerExp{T}()]
+
+    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+    @test r.status == :Optimal
+    @test r.primal_obj ≈ -4 atol=tol rtol=tol
+    @test r.x ≈ [2, 2, 2, 0] atol=tol rtol=tol
+    @test r.s ≈ [0, 0, 0, 2, 2, 0] atol=tol rtol=tol
+    @test r.z ≈ [2, 2, 2, 2, -2, -2] atol=tol rtol=tol
+end
+
 # TODO add use_dual = true tests
 function episumperentropy1(T; options...)
     tol = sqrt(sqrt(eps(T)))
