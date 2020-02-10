@@ -44,7 +44,8 @@ function matrixregressionJuMP(
 
     if !iszero(lam_fro)
         JuMP.@variable(model, t_fro)
-        JuMP.@constraint(model, vcat(t_fro, 0.5, vec(A)) in JuMP.RotatedSecondOrderCone())
+        # NOTE this penalty is usually squared
+        JuMP.@constraint(model, vcat(t_fro, vec(A)) in JuMP.SecondOrderCone())
         obj += lam_fro * t_fro
     end
     if !iszero(lam_nuc)
