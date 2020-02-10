@@ -43,7 +43,7 @@ real_types = [
 
 @info("starting MOI.Test tests")
 @testset "MOI.Test tests" begin
-    @testset "MOI.Test tests: $s, $T" for s in system_solvers, T in real_types
-        test_moi(T, verbose = false, system_solver = s{T}())
+    @testset "MOI.Test tests: $s, $T" for s in system_solvers, T in real_types, use_dense_model in (false, true)
+        test_moi(T, use_dense_model, verbose = false, system_solver = s{T}())
     end
 end

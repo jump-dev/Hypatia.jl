@@ -47,7 +47,7 @@ conic_exclude = String[
     # "pow",
     # "dualpow",
     # "geomean",
-    # "relentr"
+    # "relentr",
     # "normspec",
     # "normnuc",
     # "sdp",
@@ -58,8 +58,8 @@ conic_exclude = String[
     "rootdets",
     ]
 
-function test_moi(T::Type{<:Real}; options...)
-    optimizer = MOIU.CachingOptimizer(MOIU.UniversalFallback(MOIU.Model{T}()), Hypatia.Optimizer{T}(; options...))
+function test_moi(T::Type{<:Real}, use_dense_model::Bool; solver_options...)
+    optimizer = MOIU.CachingOptimizer(MOIU.UniversalFallback(MOIU.Model{T}()), Hypatia.Optimizer{T}(use_dense_model = use_dense_model; solver_options...))
 
     @testset "unit tests" begin
         MOIT.unittest(optimizer, config, unit_exclude)

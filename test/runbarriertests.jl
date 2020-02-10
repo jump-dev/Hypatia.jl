@@ -18,6 +18,7 @@ barrier_testfuns = [
     test_matrixepipersquare_barrier,
     test_linmatrixineq_barrier,
     test_possemideftri_barrier,
+    test_possemideftrisparse_barrier,
     test_hypoperlogdettri_barrier,
     test_hyporootdettri_barrier,
     test_wsosinterpnonnegative_barrier,
