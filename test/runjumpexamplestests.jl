@@ -18,6 +18,7 @@ include(joinpath(examples_dir, "lotkavolterra/JuMP.jl"))
 include(joinpath(examples_dir, "lyapunovstability/JuMP.jl"))
 include(joinpath(examples_dir, "matrixcompletion/JuMP.jl"))
 include(joinpath(examples_dir, "matrixquadratic/JuMP.jl"))
+include(joinpath(examples_dir, "matrixregression/JuMP.jl"))
 include(joinpath(examples_dir, "maxvolume/JuMP.jl"))
 include(joinpath(examples_dir, "muconvexity/JuMP.jl"))
 include(joinpath(examples_dir, "nearestpsd/JuMP.jl"))
@@ -53,6 +54,7 @@ options = (
     @testset "lyapunovstability" begin test_lyapunovstabilityJuMP(; tol_rel_opt = 1e-5, tol_abs_opt = 1e-5, tol_feas = 1e-5, options...) end
     @testset "matrixcompletion" begin test_matrixcompletionJuMP(; options...) end
     @testset "matrixquadratic" begin test_matrixquadraticJuMP(; tol_rel_opt = 1e-6, tol_abs_opt = 1e-7, tol_feas = 1e-7, options...) end
+    @testset "matrixcompletion" begin test_matrixregressionJuMP(; options...) end
     @testset "maxvolume" begin test_maxvolumeJuMP(; tol_rel_opt = 1e-6, tol_abs_opt = 1e-7, tol_feas = 1e-7, options...) end
     @testset "muconvexity" begin test_muconvexityJuMP(; options...) end
     @testset "nearestpsd" begin test_nearestpsdJuMP(; options...) end
