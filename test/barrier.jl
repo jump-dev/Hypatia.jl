@@ -420,7 +420,7 @@ function test_hyporootdettri_barrier(T::Type{<:Real})
             (u, W) = (s[1], zeros(eltype(s), side, side))
             CO.svec_to_smat!(W, s[2:end], sqrt(T(2)))
             fact_W = cholesky!(Symmetric(W, :U))
-            return -T(400) / T(9) * (log(det(fact_W) ^ inv(T(side)) - u) + logdet(fact_W))
+            return -T(25) / T(9) * (log(det(fact_W) ^ inv(T(side)) - u) + logdet(fact_W))
         end
         dim = 1 + CO.svec_length(side)
         cone = CO.HypoRootdetTri{T, T}(dim)
@@ -431,7 +431,7 @@ function test_hyporootdettri_barrier(T::Type{<:Real})
             (u, W) = (s[1], zeros(Complex{eltype(s)}, side, side))
             CO.svec_to_smat!(W, s[2:end], sqrt(T(2)))
             fact_W = cholesky!(Hermitian(W, :U))
-            return -T(400) / T(9) * (log(det(fact_W) ^ inv(T(side)) - u) + logdet(fact_W))
+            return -T(25) / T(9) * (log(det(fact_W) ^ inv(T(side)) - u) + logdet(fact_W))
         end
         dim = 1 + side^2
         cone = CO.HypoRootdetTri{T, Complex{T}}(dim)
