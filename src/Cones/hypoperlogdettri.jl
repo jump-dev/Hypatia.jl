@@ -5,7 +5,7 @@ Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 (u in R, v in R_+, w in S_+) : u <= v*logdet(W/v)
 (see equivalent MathOptInterface LogDetConeConeTriangle definition)
 
-barrier (self-concordance follows from theorem 5.1.4 Interior-Point Polynomil Algorithms in Convex Programming
+barrier (self-concordance follows from theorem 5.1.4, Interior-Point Polynomial Algorithms in Convex Programming
 by Y. Nesterov and A. Nemirovski)
 theta^2 * (-log(v*logdet(W/v) - u) - logdet(W) - (n + 1) log(v))
 we use theta = 16
