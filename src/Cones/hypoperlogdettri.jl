@@ -5,8 +5,10 @@ Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 (u in R, v in R_+, w in S_+) : u <= v*logdet(W/v)
 (see equivalent MathOptInterface LogDetConeConeTriangle definition)
 
-barrier (guessed, based on analogy to 3D exponential cone barrier)
--log(v*logdet(W/v) - u) - logdet(W) - log(v)
+barrier (self-concordance follows from theorem 5.1.4 Interior-Point Polynomil Algorithms in Convex Programming
+by Y. Nesterov and A. Nemirovski)
+theta^2 * (-log(v*logdet(W/v) - u) - logdet(W) - (n + 1) log(v))
+we use theta = 16
 
 TODO
 - describe complex case
@@ -43,14 +45,12 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     ldWvuv::T
     vzip1::T
     Wivzi::Matrix{R}
-
-    sc_try::Int
+    sc_const::T
 
     function HypoPerLogdetTri{T, R}(
         dim::Int,
         is_dual::Bool;
         hess_fact_cache = hessian_cache(T),
-        sc_try::Int = 16,
         ) where {R <: RealOrComplex{T}} where {T <: Real}
         @assert dim >= 3
         cone = new{T, R}()
@@ -67,9 +67,8 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
             cone.is_complex = false
         end
         cone.side = side
+        cone.sc_const = T(256)
         cone.hess_fact_cache = hess_fact_cache
-        cone.sc_try = sc_try
-        @show sc_try
         return cone
     end
 end
@@ -92,7 +91,7 @@ function setup_data(cone::HypoPerLogdetTri{T, R}) where {R <: RealOrComplex{T}} 
     return
 end
 
-get_nu(cone::HypoPerLogdetTri) = ((cone.sc_try == 1) ? cone.side + 2 : 2 * cone.sc_try ^ 2 * (cone.side + 1))
+get_nu(cone::HypoPerLogdetTri) = 2 * cone.sc_const * (cone.side + 1)
 
 function set_initial_point(arr::AbstractVector{T}, cone::HypoPerLogdetTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     arr .= 0
@@ -139,12 +138,11 @@ function update_grad(cone::HypoPerLogdetTri)
     cone.ldWvuv = cone.ldWv - u / v
     cone.vzip1 = 1 + inv(cone.ldWvuv)
     cone.grad[1] = inv(cone.z)
-    cone.grad[2] = cone.nLz - inv(v) * (cone.sc_try == 1 ? 1 : cone.side + 1)
+    cone.grad[2] = cone.nLz - inv(v) * (cone.side + 1)
     gend = view(cone.grad, 3:cone.dim)
     smat_to_svec!(gend, cone.Wi, cone.rt2)
     gend .*= -cone.vzip1
-
-    @. cone.grad *= cone.sc_try ^ 2
+    @. cone.grad *= cone.sc_const
 
     cone.grad_updated = true
     return cone.grad
@@ -211,7 +209,7 @@ function update_hess(cone::HypoPerLogdetTri)
         end
     end
 
-    @. cone.hess.data[3:end, :] *= cone.sc_try ^ 2
+    @. cone.hess.data[3:end, :] *= cone.sc_const
 
     cone.hess_updated = true
     return cone.hess
@@ -231,12 +229,11 @@ function update_hess_prod(cone::HypoPerLogdetTri)
     h1end = view(H, 1, 3:cone.dim)
     smat_to_svec!(h1end, cone.Wivzi, cone.rt2)
     h1end ./= -z
-    H[2, 2] = abs2(cone.nLz) + (cone.side / z + inv(v) * (cone.sc_try == 1 ? 1 : cone.side + 1)) / v
+    H[2, 2] = abs2(cone.nLz) + (cone.side / z + inv(v) * (cone.side + 1)) / v
     h2end = view(H, 2, 3:cone.dim)
     smat_to_svec!(h2end, cone.Wi, cone.rt2)
     h2end .*= ((cone.ldWv - cone.side) / cone.ldWvuv - 1) / z
-
-    @. cone.hess.data[1:2, :] *= cone.sc_try ^ 2
+    @. cone.hess.data[1:2, :] *= cone.sc_const
 
     cone.hess_prod_updated = true
     return
@@ -257,9 +254,8 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPer
         axpby!(dot_prod, cone.Wivzi, cone.vzip1, cone.mat2)
         smat_to_svec!(view(prod, 3:cone.dim, i), cone.mat2, cone.rt2)
     end
-    @. prod[3:end, :] *= cone.sc_try ^ 2
+    @. prod[3:end, :] *= cone.sc_const
     @views mul!(prod[3:cone.dim, :], cone.hess[3:cone.dim, 1:2], arr[1:2, :], true, true)
-
 
     return prod
 end
