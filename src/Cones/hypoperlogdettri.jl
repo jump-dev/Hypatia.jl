@@ -209,7 +209,7 @@ function update_hess(cone::HypoPerLogdetTri)
         end
     end
 
-    @. cone.hess.data[3:end, :] *= cone.sc_const
+    @. @views cone.hess.data[3:cone.dim, :] *= cone.sc_const
 
     cone.hess_updated = true
     return cone.hess
@@ -233,7 +233,7 @@ function update_hess_prod(cone::HypoPerLogdetTri)
     h2end = view(H, 2, 3:cone.dim)
     smat_to_svec!(h2end, cone.Wi, cone.rt2)
     h2end .*= ((cone.ldWv - cone.side) / cone.ldWvuv - 1) / z
-    @. cone.hess.data[1:2, :] *= cone.sc_const
+    @. @views cone.hess.data[1:2, :] *= cone.sc_const
 
     cone.hess_prod_updated = true
     return
@@ -254,7 +254,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPer
         axpby!(dot_prod, cone.Wivzi, cone.vzip1, cone.mat2)
         smat_to_svec!(view(prod, 3:cone.dim, i), cone.mat2, cone.rt2)
     end
-    @. prod[3:end, :] *= cone.sc_const
+    @. @views prod[3:cone.dim, :] *= cone.sc_const
     @views mul!(prod[3:cone.dim, :], cone.hess[3:cone.dim, 1:2], arr[1:2, :], true, true)
 
     return prod
