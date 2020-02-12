@@ -381,17 +381,12 @@ function test_possemideftrisparse_barrier(T::Type{<:Real})
 end
 
 function test_hypoperlogdettri_barrier(T::Type{<:Real})
-    sc_try = 10
     for side in [1, 2, 3, 4, 5, 6, 12, 20]
         # real logdet barrier
         function R_barrier(s)
             (u, v, W) = (s[1], s[2], zeros(eltype(s), side, side))
             CO.svec_to_smat!(W, s[3:end], sqrt(T(2)))
-            if sc_try == 1
-                return -log(v * logdet(cholesky!(Symmetric(W / v, :U))) - u) - logdet(cholesky!(Symmetric(W, :U))) - log(v)
-            else
-                return sc_try ^ 2 * (-log(v * logdet(cholesky!(Symmetric(W / v, :U))) - u) - logdet(cholesky!(Symmetric(W, :U))) - log(v) * (side + 1))
-            end
+            return T(256) * (-log(v * logdet(cholesky!(Symmetric(W / v, :U))) - u) - logdet(cholesky!(Symmetric(W, :U))) - (side + 1) * log(v))
         end
         dim = 2 + CO.svec_length(side)
         cone = CO.HypoPerLogdetTri{T, T}(dim)
@@ -402,18 +397,18 @@ function test_hypoperlogdettri_barrier(T::Type{<:Real})
         end
 
         # complex logdet barrier
-        # function C_barrier(s)
-        #     (u, v, W) = (s[1], s[2], zeros(Complex{eltype(s)}, side, side))
-        #     CO.svec_to_smat!(W, s[3:end], sqrt(T(2)))
-        #     return -log(v * logdet(cholesky!(Hermitian(W / v, :U))) - u) - logdet(cholesky!(Hermitian(W, :U))) - log(v)
-        # end
-        # dim = 2 + side^2
-        # cone = CO.HypoPerLogdetTri{T, Complex{T}}(dim)
-        # if side <= 4
-        #     test_barrier_oracles(cone, C_barrier, init_tol = 1e-5)
-        # else
-        #     test_barrier_oracles(cone, C_barrier, init_tol = 1e-1, init_only = true)
-        # end
+        function C_barrier(s)
+            (u, v, W) = (s[1], s[2], zeros(Complex{eltype(s)}, side, side))
+            CO.svec_to_smat!(W, s[3:end], sqrt(T(2)))
+            return T(256) * (-log(v * logdet(cholesky!(Hermitian(W / v, :U))) - u) - logdet(cholesky!(Hermitian(W, :U))) - (side + 1) * log(v))
+        end
+        dim = 2 + side^2
+        cone = CO.HypoPerLogdetTri{T, Complex{T}}(dim)
+        if side <= 4
+            test_barrier_oracles(cone, C_barrier, init_tol = 1e-5)
+        else
+            test_barrier_oracles(cone, C_barrier, init_tol = 1e-1, init_only = true)
+        end
     end
     return
 end
