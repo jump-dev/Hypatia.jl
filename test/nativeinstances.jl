@@ -143,6 +143,23 @@ function nonnegative3(T; options...)
     @test r.status == :Optimal
 end
 
+function nonnegative4(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    c = T[-2, 0]
+    A = zeros(T, 0, 2)
+    b = zeros(T, 0)
+    G = sparse([1, 1, 2, 3], [1, 2, 2, 2], T[1, -1, 1, -1], 3, 2)
+    h = T[0, 2, 0]
+    cones = CO.Cone{T}[CO.Nonnegative{T}(3)]
+
+    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+    @test r.status == :Optimal
+    @test r.primal_obj ≈ -4 atol=tol rtol=tol
+    @test r.x ≈ [2, 2] atol=tol rtol=tol
+    @test r.s ≈ [0, 0, 2] atol=tol rtol=tol
+    @test r.z ≈ [2, 2, 0] atol=tol rtol=tol
+end
+
 function epinorminf1(T; options...)
     tol = sqrt(sqrt(eps(T)))
     Tirt2 = inv(sqrt(T(2)))
@@ -367,10 +384,36 @@ function epipersquare3(T; options...)
     h = zeros(T, 4)
     cones = CO.Cone{T}[CO.EpiPerSquare{T}(4)]
 
-    r = build_solve_check(c, A, b, G, h, cones; atol = tol, obj_offset = zero(T), options...)
+    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
     @test r.status == :Optimal
     @test r.primal_obj ≈ 0 atol=tol rtol=tol
     @test norm(r.x) ≈ 0 atol=tol rtol=tol
+end
+
+function epipersquare4(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    c = zeros(7)
+    c[1] = -1
+    A = zeros(T, 0, 7)
+    b = zeros(T, 0)
+    G = sparse(
+        [1, 1, 2, 2, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+        [1, 7, 2, 3, 4, 2, 3, 5, 4, 7, 6, 5, 6, 7],
+        T[1, -0.5, 1, 1, 1, -1, -1, -1, -1, -0.5, -1, -1, -1, -1],
+        11, 7)
+    h = zeros(T, 11)
+    h[2] = 3
+    cones = CO.Cone{T}[CO.Nonnegative{T}(2), CO.EpiPerSquare{T}(3), CO.EpiPerSquare{T}(3), CO.EpiPerSquare{T}(3)]
+
+    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+    @test r.status == :Optimal
+    @test r.primal_obj ≈ -1 atol=tol rtol=tol
+    rt2 = sqrt(T(2))
+    @test r.x ≈ [1, 1, 1, 1, rt2, rt2, 2] atol=tol rtol=tol
+    @test r.s ≈ [0, 0, 1, 1, rt2, 1, 1, rt2, rt2, rt2, 2] atol=tol rtol=tol
+    inv3 = inv(T(3))
+    rt2inv3 = inv3 * rt2
+    @test r.z ≈ [1, inv3, inv3, inv3, -rt2inv3, inv3, inv3, -rt2inv3, rt2inv3, rt2inv3, -2 * inv3] atol=tol rtol=tol
 end
 
 function epiperexp1(T; options...)
@@ -1587,6 +1630,28 @@ function hypoperlogdettri3(T; options...)
     end
 end
 
+function hypoperlogdettri4(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    rt2 = sqrt(T(2))
+    c = T[-1, 0, 0, 0, 0]
+    A = zeros(T, 1, 5)
+    A[1, 2] = 1
+    b = T[1]
+    G = zeros(T, 7, 5)
+    G[1, 1] = G[2, 2] = G[3, 3] = G[5, 5] = -1
+    G[4, 4] = -rt2
+    G[6, 3] = G[7, 5] = 1
+    h = T[0, 0, 0, 0, 0, 1, 1]
+    cones = CO.Cone{T}[CO.HypoPerLogdetTri{T, T}(5), CO.Nonnegative{T}(2)]
+
+    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+    @test r.status == :Optimal
+    @test r.primal_obj ≈ 0 atol=tol rtol=tol
+    @test r.x ≈ [0, 1, 1, 0, 1] atol=tol rtol=tol
+    @test r.y ≈ [-2] atol=tol rtol=tol
+    @test r.z ≈ [-1, -2, 1, 0, 1, 1, 1] atol=tol rtol=tol
+end
+
 function hyporootdettri1(T; options...)
     tol = sqrt(sqrt(eps(T)))
     rt2 = sqrt(T(2))
@@ -1669,6 +1734,26 @@ function hyporootdettri3(T; options...)
         @test r.primal_obj ≈ 0 atol=tol rtol=tol
         @test r.x[1] ≈ zero(T) atol=tol rtol=tol
     end
+end
+
+function hyporootdettri4(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    rt2 = sqrt(T(2))
+    c = T[-1, 0, 0, 0]
+    A = zeros(T, 0, 4)
+    b = T[]
+    G = zeros(T, 6, 4)
+    G[1, 1] = G[2, 2] = G[4, 4] = -1
+    G[3, 3] = -rt2
+    G[5, 2] = G[6, 4] = 1
+    h = T[0, 0, 0, 0, 1, 1]
+    cones = CO.Cone{T}[CO.HypoRootdetTri{T, T}(4), CO.Nonnegative{T}(2)]
+
+    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+    @test r.status == :Optimal
+    @test r.primal_obj ≈ -1 atol=tol rtol=tol
+    @test r.x ≈ [1, 1, 0, 1] atol=tol rtol=tol
+    @test r.z ≈ [-1, 0.5, 0, 0.5, 0.5, 0.5] atol=tol rtol=tol
 end
 
 function wsosinterpnonnegative1(T; options...)
