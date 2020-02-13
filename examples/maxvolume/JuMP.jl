@@ -1,7 +1,9 @@
 #=
 Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
-see description in maxvolume/native.jl
+find maximum volume hypercube with edges parallel to the axes inside a polyhedron
+defined with l_1 and l_infty constraints (different to native.jl)
+second-order cone (EpiNormEucl) extended formulation inspired by MOI bridge
 =#
 
 using LinearAlgebra
@@ -9,77 +11,44 @@ import JuMP
 const MOI = JuMP.MOI
 import Hypatia
 import Random
+using Test
 
 function maxvolumeJuMP(
     n::Int;
-    use_hypogeomean::Bool = true,
+    epipernormeucl_constr::Bool = false,
+    epinorminf_constr::Bool = false,
+    epinorminfdual_constr::Bool = false,
     )
     @assert n > 2
+    A = randn(n, n)
+    # ensure there will be a feasible solution
+    x = randn(n)
+    gamma = norm(A * x) / sqrt(n)
+
     model = JuMP.Model()
     JuMP.@variable(model, t)
     JuMP.@variable(model, end_pts[1:n])
     JuMP.@objective(model, Max, t)
-    poly_hrep = Matrix{Float64}(I, n, n)
-    poly_hrep .+= randn(n, n) / n
-    JuMP.@constraint(model, poly_hrep * end_pts .<= ones(n))
-
-    if use_hypogeomean
-        JuMP.@constraint(model, vcat(t, end_pts) in MOI.GeometricMeanCone(n + 1))
-    else
-        # number of variables inside geometric mean is n
-        # number of layers of variables
-        num_layers = MOI.Bridges.Constraint.ilog2(n)
-        # number of new variables = 1 + 2 + ... + 2^(l - 1) = 2^l - 1
-        num_new_vars = 2 ^ num_layers - 1
-        JuMP.@variable(model, new_vars[1:num_new_vars])
-        rtfact = sqrt(2 ^ num_layers)
-        xl1 = new_vars[1]
-        JuMP.@constraint(model, t <= xl1 / rtfact)
-
-        offset = offset_next = 0
-        # loop over layers, layer 1 describes hypograph variable
-        for i in 1:(num_layers - 1)
-            num_lvars = 2 ^ (i - 1)
-            offset_next = offset + num_lvars
-            # loop over variables in each layer
-            for j in 1:num_lvars
-                u = new_vars[offset_next + 2j - 1]
-                v = new_vars[offset_next + 2j]
-                w = new_vars[offset + j]
-                JuMP.@constraint(model, [u, v, w] in JuMP.RotatedSecondOrderCone())
-            end
-            offset = offset_next
-        end
-        # we are beyond the number of variables new variables, we are in the largest layer
-        for j in 1:(2 ^ (num_layers - 1))
-            if 2j - 1 > n
-                # buffer variable bounds hypograph variable
-                u = v = xl1 / rtfact
-            else
-                # original problem variables
-                u = end_pts[2j - 1]
-                if 2j > n
-                    # buffer variable bounds hypograph variable
-                    v = xl1 / rtfact
-                else
-                    # original problem variables
-                    v = end_pts[2j]
-                end
-            end
-            w = new_vars[offset + j]
-            JuMP.@constraint(model, [u, v, w] in JuMP.RotatedSecondOrderCone())
-        end
+    if epipernormeucl_constr
+        JuMP.@constraint(model, vcat(gamma, A * end_pts) in JuMP.SecondOrderCone())
     end
+    if epinorminf_constr
+        JuMP.@constraint(model, vcat(gamma, A * end_pts) in MOI.NormInfinityCone(n + 1))
+    end
+    if epinorminfdual_constr
+        JuMP.@constraint(model, vcat(sqrt(n) * gamma, A * end_pts) in MOI.NormOneCone(n + 1))
+    end
+    JuMP.@constraint(model, vcat(t, end_pts) in MOI.GeometricMeanCone(n + 1))
 
     return (model = model,)
 end
 
-maxvolumeJuMP1() = maxvolumeJuMP(3, use_hypogeomean = true)
-maxvolumeJuMP2() = maxvolumeJuMP(3, use_hypogeomean = false)
-maxvolumeJuMP3() = maxvolumeJuMP(6, use_hypogeomean = true)
-maxvolumeJuMP4() = maxvolumeJuMP(6, use_hypogeomean = false)
-maxvolumeJuMP5() = maxvolumeJuMP(25, use_hypogeomean = true)
-maxvolumeJuMP6() = maxvolumeJuMP(25, use_hypogeomean = false)
+maxvolumeJuMP1() = maxvolumeJuMP(3, epipernormeucl_constr = true)
+maxvolumeJuMP2() = maxvolumeJuMP(3, epipernormeucl_constr = true, epinorminf_constr = true, epinorminfdual_constr = true)
+maxvolumeJuMP3() = maxvolumeJuMP(6, epipernormeucl_constr = true)
+maxvolumeJuMP4() = maxvolumeJuMP(6, epipernormeucl_constr = true, epinorminf_constr = true, epinorminfdual_constr = true)
+maxvolumeJuMP5() = maxvolumeJuMP(25, epipernormeucl_constr = true)
+maxvolumeJuMP6() = maxvolumeJuMP(25, epipernormeucl_constr = true, epinorminf_constr = true, epinorminfdual_constr = true)
 
 function test_maxvolumeJuMP(instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
