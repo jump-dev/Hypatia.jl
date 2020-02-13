@@ -391,9 +391,9 @@ function test_hypoperlogdettri_barrier(T::Type{<:Real})
         dim = 2 + CO.svec_length(side)
         cone = CO.HypoPerLogdetTri{T, T}(dim)
         if side <= 5
-            test_barrier_oracles(cone, R_barrier, init_tol = Inf)
+            test_barrier_oracles(cone, R_barrier, init_tol = 1e-5)
         else
-            test_barrier_oracles(cone, R_barrier, init_tol = Inf, init_only = true)
+            test_barrier_oracles(cone, R_barrier, init_tol = 1e-1, init_only = true)
         end
 
         # complex logdet barrier
@@ -405,9 +405,9 @@ function test_hypoperlogdettri_barrier(T::Type{<:Real})
         dim = 2 + side^2
         cone = CO.HypoPerLogdetTri{T, Complex{T}}(dim)
         if side <= 4
-            test_barrier_oracles(cone, C_barrier, init_tol = Inf)
+            test_barrier_oracles(cone, C_barrier, init_tol = 1e-5)
         else
-            test_barrier_oracles(cone, C_barrier, init_tol = Inf, init_only = true)
+            test_barrier_oracles(cone, C_barrier, init_tol = 1e-1, init_only = true)
         end
     end
     return
