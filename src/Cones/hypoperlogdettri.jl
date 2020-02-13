@@ -5,8 +5,10 @@ Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 (u in R, v in R_+, w in S_+) : u <= v*logdet(W/v)
 (see equivalent MathOptInterface LogDetConeConeTriangle definition)
 
-barrier (guessed, based on analogy to 3D exponential cone barrier)
--log(v*logdet(W/v) - u) - logdet(W) - log(v)
+barrier (self-concordance follows from theorem 5.1.4, Interior-Point Polynomial Algorithms in Convex Programming
+by Y. Nesterov and A. Nemirovski)
+theta^2 * (-log(v*logdet(W/v) - u) - logdet(W) - (n + 1) log(v))
+we use theta = 16
 
 TODO
 - describe complex case
@@ -43,6 +45,7 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     ldWvuv::T
     vzip1::T
     Wivzi::Matrix{R}
+    sc_const::T
 
     function HypoPerLogdetTri{T, R}(
         dim::Int,
@@ -64,6 +67,7 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
             cone.is_complex = false
         end
         cone.side = side
+        cone.sc_const = T(256)
         cone.hess_fact_cache = hess_fact_cache
         return cone
     end
@@ -87,7 +91,7 @@ function setup_data(cone::HypoPerLogdetTri{T, R}) where {R <: RealOrComplex{T}} 
     return
 end
 
-get_nu(cone::HypoPerLogdetTri) = cone.side + 2
+get_nu(cone::HypoPerLogdetTri) = 2 * cone.sc_const * (cone.side + 1)
 
 function set_initial_point(arr::AbstractVector{T}, cone::HypoPerLogdetTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     arr .= 0
@@ -134,10 +138,11 @@ function update_grad(cone::HypoPerLogdetTri)
     cone.ldWvuv = cone.ldWv - u / v
     cone.vzip1 = 1 + inv(cone.ldWvuv)
     cone.grad[1] = inv(cone.z)
-    cone.grad[2] = cone.nLz - inv(v)
+    cone.grad[2] = cone.nLz - inv(v) * (cone.side + 1)
     gend = view(cone.grad, 3:cone.dim)
     smat_to_svec!(gend, cone.Wi, cone.rt2)
     gend .*= -cone.vzip1
+    @. cone.grad *= cone.sc_const
 
     cone.grad_updated = true
     return cone.grad
@@ -204,6 +209,8 @@ function update_hess(cone::HypoPerLogdetTri)
         end
     end
 
+    @. @views cone.hess.data[3:cone.dim, :] *= cone.sc_const
+
     cone.hess_updated = true
     return cone.hess
 end
@@ -222,10 +229,11 @@ function update_hess_prod(cone::HypoPerLogdetTri)
     h1end = view(H, 1, 3:cone.dim)
     smat_to_svec!(h1end, cone.Wivzi, cone.rt2)
     h1end ./= -z
-    H[2, 2] = abs2(cone.nLz) + (cone.side / z + inv(v)) / v
+    H[2, 2] = abs2(cone.nLz) + (cone.side / z + inv(v) * (cone.side + 1)) / v
     h2end = view(H, 2, 3:cone.dim)
     smat_to_svec!(h2end, cone.Wi, cone.rt2)
     h2end .*= ((cone.ldWv - cone.side) / cone.ldWvuv - 1) / z
+    @. @views cone.hess.data[1:2, :] *= cone.sc_const
 
     cone.hess_prod_updated = true
     return
@@ -246,6 +254,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPer
         axpby!(dot_prod, cone.Wivzi, cone.vzip1, cone.mat2)
         smat_to_svec!(view(prod, 3:cone.dim, i), cone.mat2, cone.rt2)
     end
+    @. @views prod[3:cone.dim, :] *= cone.sc_const
     @views mul!(prod[3:cone.dim, :], cone.hess[3:cone.dim, 1:2], arr[1:2, :], true, true)
 
     return prod
@@ -253,27 +262,27 @@ end
 
 # see analysis in https://github.com/lkapelevich/HypatiaBenchmarks.jl/tree/master/centralpoints
 function get_central_ray_hypoperlogdettri(Wside::Int)
-    if Wside <= 5
+    if Wside <= 10
         # lookup points where x = f'(x)
         return central_rays_hypoperlogdettri[Wside, :]
     end
     # use nonlinear fit for higher dimensions
-    if Wside <= 16
-        u = -2.070906 / Wside - 0.052713
-        v = 0.420764 / Wside + 0.553790
-        w = 0.629959 / Wside + 1.011841
-    else
-        u = -2.878002 / Wside - 0.001136
-        v = 0.410904 / Wside + 0.553842
-        w = 0.805068 / Wside + 1.000288
-    end
+    x = log10(Wside)
+    u = -0.102485 * x ^ 4 + 0.908632 * x ^ 3 - 3.029054 * x ^ 2 + 4.528779 * x - 13.901470
+    v = 0.358933 * x ^ 3 - 2.592002 * x ^ 2 + 6.354740 * x + 17.280377
+    w = 0.027883 * x ^ 3 - 0.231444 * x ^ 2 + 0.652673 * x + 21.997811
     return [u, v, w]
 end
 
 const central_rays_hypoperlogdettri = [
-    -0.827838399  0.805102005  1.290927713;
-    -0.689609381  0.724604185  1.224619879;
-    -0.584372734  0.681280549  1.182421998;
-    -0.503500819  0.654485416  1.153054181;
-    -0.440285901  0.636444221  1.131466932;
+    -14.06325335	17.86151855	22.52090275
+    -13.08878205	18.91121795	22.4393585
+    -12.54888342	19.60639116	22.40621157
+    -12.22471372	20.09640151	22.39805249
+    -12.01656536	20.45698931	22.40140061
+    -11.87537532	20.73162694	22.4097267
+    -11.77522327	20.9468238	22.41993593
+    -11.70152722	21.11948341	22.4305642
+    -11.64562635	21.26079849	22.44092946
+    -11.6021318	    21.37842775	22.45073131
     ]

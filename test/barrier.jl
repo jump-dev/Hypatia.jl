@@ -386,7 +386,7 @@ function test_hypoperlogdettri_barrier(T::Type{<:Real})
         function R_barrier(s)
             (u, v, W) = (s[1], s[2], zeros(eltype(s), side, side))
             CO.svec_to_smat!(W, s[3:end], sqrt(T(2)))
-            return -log(v * logdet(cholesky!(Symmetric(W / v, :U))) - u) - logdet(cholesky!(Symmetric(W, :U))) - log(v)
+            return T(256) * (-log(v * logdet(cholesky!(Symmetric(W / v, :U))) - u) - logdet(cholesky!(Symmetric(W, :U))) - (side + 1) * log(v))
         end
         dim = 2 + CO.svec_length(side)
         cone = CO.HypoPerLogdetTri{T, T}(dim)
@@ -400,7 +400,7 @@ function test_hypoperlogdettri_barrier(T::Type{<:Real})
         function C_barrier(s)
             (u, v, W) = (s[1], s[2], zeros(Complex{eltype(s)}, side, side))
             CO.svec_to_smat!(W, s[3:end], sqrt(T(2)))
-            return -log(v * logdet(cholesky!(Hermitian(W / v, :U))) - u) - logdet(cholesky!(Hermitian(W, :U))) - log(v)
+            return T(256) * (-log(v * logdet(cholesky!(Hermitian(W / v, :U))) - u) - logdet(cholesky!(Hermitian(W, :U))) - (side + 1) * log(v))
         end
         dim = 2 + side^2
         cone = CO.HypoPerLogdetTri{T, Complex{T}}(dim)
