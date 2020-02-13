@@ -9,6 +9,7 @@ SC barrier from correspondence with A. Nemirovski
 
 TODO
 - describe complex case
+- initial point
 =#
 
 mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
