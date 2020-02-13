@@ -2,7 +2,7 @@
 Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
 find maximum volume hypercube with edges parallel to the axes inside a polyhedron
-defined with l_1 and l_infty constraints (different to native.jl)
+defined with l_1, l_infty, or l_2 constraints (different to native.jl)
 second-order cone (EpiNormEucl) extended formulation inspired by MOI bridge
 =#
 
