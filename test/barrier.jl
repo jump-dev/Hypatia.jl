@@ -246,6 +246,9 @@ function test_hypogeomean_barrier(T::Type{<:Real})
         else
             test_barrier_oracles(cone, barrier, init_tol = 1e-2, init_only = true)
         end
+        # test initial point when all alphas are the same
+        cone = CO.HypoGeomean{T}(fill(inv(T(dim - 1)), dim - 1))
+        test_barrier_oracles(cone, barrier, init_tol = sqrt(eps(T)), init_only = true)
     end
     return
 end
