@@ -13,6 +13,7 @@ where e = exp(1) and d(a, b) = sum_i a_i*log(a_i/b_i) is the relative entropy of
 =#
 
 using LinearAlgebra
+using Test
 import JuMP
 const MOI = JuMP.MOI
 import Hypatia
