@@ -67,8 +67,15 @@ get_nu(cone::HypoGeomean) = cone.dim
 
 # TODO work out how to get central ray
 function set_initial_point(arr::AbstractVector{T}, cone::HypoGeomean{T}) where {T}
-    (arr[1], w) = get_central_ray_hypogeomean(cone.alpha)
-    arr[2:end] .= w
+    if all(a -> a == inv(cone.dim - 1), cone.alpha)
+        n = cone.dim - 1
+        c = sqrt(5 * n ^ 2 + 2 * n + 1)
+        arr[1] = -sqrt((-c + 3 * n + 1) / (2 * n + 2))
+        arr[2:end] .= (c - n + 1) / ((n + 1) * sqrt((-2 * c + 6 * n + 2) / (n + 1)))
+    else
+        (arr[1], w) = get_central_ray_hypogeomean(cone.alpha)
+        arr[2:end] .= w
+    end
     return arr
 end
 
