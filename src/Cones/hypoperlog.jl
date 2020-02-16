@@ -90,11 +90,12 @@ function update_grad(cone::HypoPerLog)
     u = cone.point[1]
     v = cone.point[2]
     w = view(cone.point, 3:cone.dim)
+    d = length(w)
     g = cone.grad
 
     g[1] = inv(cone.vlwvu)
-    cone.lvwnivlwvu = (length(cone.vwivlwvu) - cone.lwv) / cone.vlwvu
-    g[2] = cone.lvwnivlwvu - inv(v)
+    cone.lvwnivlwvu = (d - cone.lwv) / cone.vlwvu
+    g[2] = cone.lvwnivlwvu - d * inv(v)
     gden = -1 - inv(cone.lwv - u / v)
     @. g[3:end] = gden / w
 
@@ -107,6 +108,7 @@ function update_hess(cone::HypoPerLog)
     u = cone.point[1]
     v = cone.point[2]
     w = view(cone.point, 3:cone.dim)
+    d = length(w)
     vwivlwvu = cone.vwivlwvu
     lvwnivlwvu = cone.lvwnivlwvu
     g = cone.grad
@@ -117,10 +119,10 @@ function update_hess(cone::HypoPerLog)
     H[1, 1] = abs2(g[1])
     H[1, 2] = lvwnivlwvu / cone.vlwvu
     @. H[1, 3:end] = -vwivlwvu / cone.vlwvu
-    H[2, 2] = abs2(lvwnivlwvu) + (length(vwivlwvu) / cone.vlwvu + inv(v)) / v
+    H[2, 2] = abs2(lvwnivlwvu) + d * (g[1] + inv(v)) / v
     hden = (-v * lvwnivlwvu - 1) / cone.vlwvu
     @. H[2, 3:end] = hden / w
-    @inbounds for j in eachindex(vwivlwvu)
+    @inbounds for j in 1:d
         j2 = 2 + j
         @inbounds for i in 1:j
             H[2 + i, j2] = vwivlwvu[i] * vwivlwvu[j]

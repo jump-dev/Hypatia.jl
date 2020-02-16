@@ -186,7 +186,7 @@ end
 function test_hypoperlog_barrier(T::Type{<:Real})
     function barrier(s)
         (u, v, w) = (s[1], s[2], s[3:end])
-        return -log(v * sum(log(wj / v) for wj in w) - u) - sum(log, w) - log(v)
+        return -log(v * sum(log(wj / v) for wj in w) - u) - sum(log, w) - length(w) * log(v)
     end
     for dim in [3, 5, 10]
         test_barrier_oracles(CO.HypoPerLog{T}(dim), barrier, init_tol = 1e-5)
