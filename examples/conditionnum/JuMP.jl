@@ -55,7 +55,7 @@ function conditionnumJuMP(
 
     model = JuMP.Model()
     JuMP.@variables(model, begin
-        gamma >= 0
+        gamma
         nu >= 0
         y[1:len_y]
     end)
