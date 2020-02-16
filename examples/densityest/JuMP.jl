@@ -66,19 +66,47 @@ function densityestJuMP(
         JuMP.@objective(model, Max, sum(z))
         JuMP.@constraint(model, [i in 1:nobs], vcat(z[i], 1.0, f_X[i]) in MOI.ExponentialCone()) # hypograph of log
     end
+    @show "got exp constraints"
+    flush(stdout)
 
     # density nonnegative
     if use_wsos
         JuMP.@constraint(model, f_pts in Hypatia.WSOSInterpNonnegativeCone{Float64, Float64}(U, Ps))
     else
-        psd_vars = []
-        for (r, Pr) in enumerate(Ps)
+        @show "starting sdp buildup"
+        flush(stdout)
+        coeffs_vec = zeros(JuMP.GenericAffExpr{Float64,JuMP.VariableRef}, U)
+        for Pr in Ps
             Lr = size(Pr, 2)
-            psd_r = JuMP.@variable(model, [1:Lr, 1:Lr], Symmetric)
-            push!(psd_vars, psd_r)
+            JuMP.@variable(model, psd_r[1:Lr, 1:Lr], Symmetric)
             JuMP.@SDconstraint(model, psd_r >= 0)
+            for i in 1:U
+                JuMP.add_to_expression!(coeffs_vec[i], sum(Pr[i, j] * Pr[i, k] * psd_r[j, k] for j in 1:Lr for k in 1:Lr))
+            end
         end
-        JuMP.@constraint(model, sum(diag(Pr * psd_r * Pr') for (Pr, psd_r) in zip(Ps, psd_vars)) .== f_pts)
+        # @show "starting sdp constraint"
+        # flush(stdout)
+        # for (r, Pr) in enumerate(Ps)
+        #     L = size(Pr, 2)
+        #     for i in 1:U
+        #         JuMP.add_to_expression!(coeffs_vec[i], sum(Pr[i, j] * Pr[i, k] * psd_vars[r][j, k] for j in 1:L for k in 1:L))
+        #         # coeffs_vec[i] += sum(Pr[i, j] * Pr[i, k] * psd_vars[r][j, k] for j in 1:L for k in 1:L)
+        #         # for j in 1:L
+        #         #     for k in 1:(j - 1)
+        #         #         JuMP.add_to_expression!(coeffs_vec[i], Pr[i, j] * Pr[i, k] * psd_vars[r][j, k] * 2)
+        #         #     end
+        #         #     JuMP.add_to_expression!(coeffs_vec[i], Pr[i, j] * Pr[i, j] * psd_vars[r][j, j])
+        #         # end
+        #     end
+        # end
+        # expr = JuMP.@expression(model, diag(Ps[1] * psd_vars[1] * Ps[1]'))
+        # for i in eachindex(Ps[2:end])
+        #     expr .+= diag(Ps[i] * psd_vars[i] * Ps[i]')
+        # end
+        JuMP.@constraint(model, coeffs_vec .== f_pts)
+        # JuMP.@constraint(model, sum(diag(Pr * psd_r * Pr') for (Pr, psd_r) in zip(Ps, psd_vars)) .== f_pts)
+        @show "finished sdp constraint"
+        flush(stdout)
     end
 
     return (model = model,)
