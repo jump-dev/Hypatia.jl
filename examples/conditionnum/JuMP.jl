@@ -55,12 +55,12 @@ function conditionnumJuMP(
 
     model = JuMP.Model()
     JuMP.@variables(model, begin
-        gamma
-        nu
+        gamma >= 0
+        nu >= 0
         y[1:len_y]
     end)
     JuMP.@objective(model, Min, gamma)
-    
+
     if use_linmatrixineq
         JuMP.@constraints(model, begin
             vcat(nu, y) in Hypatia.LinMatrixIneqCone{Float64}([F0, Fi...])
