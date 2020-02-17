@@ -9,13 +9,14 @@ S. Boyd, L. El Ghaoui, E. Feron, and V. Balakrishnan
 
 original formulation:
 min gamma
-F(x) in S_+
 mu >= 0
+F(x) in S_+
 M(x) - mu*I in S_+
 mu*gamma*I - M(x) in S_+
 
 introduce nu = inv(mu), y = x/mu:
 min gamma
+nu >= 0
 nu*F_0 + sum_i y_i*F_i in S_+
 nu*M_0 + sum_i y_i*M_i - I in S_+
 gamma*I - nu*M_0 - sum_i y_i*M_i in S_+
@@ -56,11 +57,11 @@ function conditionnumJuMP(
     model = JuMP.Model()
     JuMP.@variables(model, begin
         gamma
-        nu
+        nu >= 0
         y[1:len_y]
     end)
     JuMP.@objective(model, Min, gamma)
-    
+
     if use_linmatrixineq
         JuMP.@constraints(model, begin
             vcat(nu, y) in Hypatia.LinMatrixIneqCone{Float64}([F0, Fi...])
