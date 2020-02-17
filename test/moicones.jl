@@ -195,13 +195,6 @@ function test_moi_cones(T::Type{<:Real})
         @test MOI.dimension(moi_cone) == CO.dimension(hyp_cone) == 4
     end
 
-    @testset "EpiPerExp" begin
-        moi_cone = HYP.EpiPerExpCone{T}()
-        hyp_cone = HYP.cone_from_moi(T, moi_cone)
-        @test hyp_cone isa CO.EpiPerExp{T}
-        @test MOI.dimension(moi_cone) == CO.dimension(hyp_cone) == 3
-    end
-
     @testset "EpiSumPerEntropy" begin
         moi_cone = HYP.EpiSumPerEntropyCone{T}(4)
         hyp_cone = HYP.cone_from_moi(T, moi_cone)

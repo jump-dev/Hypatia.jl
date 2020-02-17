@@ -13,8 +13,8 @@ cone_from_moi(::Type{T}, cone::MOI.NormInfinityCone) where {T <: Real} = Cones.E
 cone_from_moi(::Type{T}, cone::MOI.NormOneCone) where {T <: Real} = Cones.EpiNormInf{T, T}(MOI.dimension(cone), true)
 cone_from_moi(::Type{T}, cone::MOI.SecondOrderCone) where {T <: Real} = Cones.EpiNormEucl{T}(MOI.dimension(cone))
 cone_from_moi(::Type{T}, cone::MOI.RotatedSecondOrderCone) where {T <: Real} = Cones.EpiPerSquare{T}(MOI.dimension(cone))
-cone_from_moi(::Type{T}, cone::MOI.ExponentialCone) where {T <: Real} = Cones.HypoPerLog{T}(3) # TODO EpiPerExp
-cone_from_moi(::Type{T}, cone::MOI.DualExponentialCone) where {T <: Real} = Cones.HypoPerLog{T}(3, true) # TODO EpiPerExp
+cone_from_moi(::Type{T}, cone::MOI.ExponentialCone) where {T <: Real} = Cones.HypoPerLog{T}(3)
+cone_from_moi(::Type{T}, cone::MOI.DualExponentialCone) where {T <: Real} = Cones.HypoPerLog{T}(3, true)
 cone_from_moi(::Type{T}, cone::MOI.PowerCone{T}) where {T <: Real} = Cones.Power{T}(T[cone.exponent, 1 - cone.exponent], 1)
 cone_from_moi(::Type{T}, cone::MOI.DualPowerCone{T}) where {T <: Real} = Cones.Power{T}(T[cone.exponent, 1 - cone.exponent], 1, true)
 cone_from_moi(::Type{T}, cone::MOI.GeometricMeanCone) where {T <: Real} = (l = MOI.dimension(cone) - 1; Cones.HypoGeomean{T}(fill(inv(T(l)), l)))
@@ -106,14 +106,6 @@ end
 HypoPerLogCone{T}(dim::Int) where {T <: Real} = HypoPerLogCone{T}(dim, false)
 MOI.dimension(cone::HypoPerLogCone) = cone.dim
 cone_from_moi(::Type{T}, cone::HypoPerLogCone{T}) where {T <: Real} = Cones.HypoPerLog{T}(cone.dim, cone.is_dual)
-
-export EpiPerExpCone
-struct EpiPerExpCone{T <: Real} <: MOI.AbstractVectorSet
-    is_dual::Bool
-end
-EpiPerExpCone{T}() where {T <: Real} = EpiPerExpCone{T}(false)
-MOI.dimension(cone::EpiPerExpCone) = 3
-cone_from_moi(::Type{T}, cone::EpiPerExpCone{T}) where {T <: Real} = Cones.EpiPerExp{T}(cone.is_dual)
 
 export EpiSumPerEntropyCone
 struct EpiSumPerEntropyCone{T <: Real} <: MOI.AbstractVectorSet
@@ -259,7 +251,6 @@ const MOIOtherConesList(::Type{T}) where {T <: Real} = (
     EpiPerSquareCone{T},
     PowerCone{T},
     HypoPerLogCone{T},
-    EpiPerExpCone{T},
     EpiSumPerEntropyCone{T},
     HypoGeomeanCone{T},
     EpiNormSpectralCone{T, T},
@@ -304,7 +295,6 @@ const MOIOtherCones{T <: Real} = Union{
     EpiPerSquareCone{T},
     PowerCone{T},
     HypoPerLogCone{T},
-    EpiPerExpCone{T},
     EpiSumPerEntropyCone{T},
     HypoGeomeanCone{T},
     EpiNormSpectralCone{T, T},

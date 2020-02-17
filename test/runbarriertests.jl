@@ -9,7 +9,6 @@ barrier_testfuns = [
     test_epinorminf_barrier,
     test_epinormeucl_barrier,
     test_epipersquare_barrier,
-    test_epiperexp_barrier,
     test_hypoperlog_barrier,
     test_episumperentropy_barrier,
     test_power_barrier,

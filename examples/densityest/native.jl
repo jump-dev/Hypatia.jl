@@ -93,7 +93,7 @@ function densityest(
         h_exp[offset + 1] = 1
         G_exp[offset + 2, i] = -1
         offset += 3
-        push!(cones, CO.EpiPerExp{T}())
+        push!(cones, CO.EpiPerExp{T}()) # TODO change to HypoPerLog(3) and reverse indices
         cone_offset += 3
     end
     num_epi_vars = nobs
