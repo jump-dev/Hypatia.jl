@@ -78,7 +78,7 @@ function densityestJuMP(
         coeffs_vec = zeros(JuMP.GenericAffExpr{Float64,JuMP.VariableRef}, U)
         for Pr in Ps
             Lr = size(Pr, 2)
-            JuMP.@variable(model, psd_r[1:Lr, 1:Lr], Symmetric)
+            psd_r = JuMP.@variable(model, [1:Lr, 1:Lr], Symmetric)
             JuMP.@SDconstraint(model, psd_r >= 0)
             for i in 1:U
                 JuMP.add_to_expression!(coeffs_vec[i], sum(Pr[i, j] * Pr[i, k] * psd_r[j, k] for j in 1:Lr for k in 1:Lr))

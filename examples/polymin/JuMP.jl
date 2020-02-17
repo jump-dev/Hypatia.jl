@@ -21,6 +21,7 @@ function polyminJuMP(
     use_wsos::Bool = true,
     use_primal::Bool = false,
     sample::Bool = true,
+    sample_factor::Int = 100,
     rseed::Int = 1,
     n::Int = 0,
     )
@@ -36,7 +37,7 @@ function polyminJuMP(
     else
         (x, f, dom, true_obj) = getpolydata(polyname)
     end
-    (U, pts, Ps, _) = MU.interpolate(dom, halfdeg, sample = sample, sample_factor = 100)
+    (U, pts, Ps, _) = MU.interpolate(dom, halfdeg, sample = sample, sample_factor = sample_factor)
     interp_vals = [f(x => pts[j, :]) for j in 1:U]
 
     model = JuMP.Model()
@@ -67,10 +68,42 @@ function polyminJuMP(
             end
             JuMP.@constraint(model, sum(diag(P * psd_k * P') for (P, psd_k) in zip(Ps, psd_vars)) .== interp_vals - a * ones(U))
         else
+            println("starting to add psd constraints")
+            flush(stdout)
+            # for P in Ps
+            #     L = size(P, 2)
+            #     println("adding one")
+            #     flush(stdout)
+            #     JuMP.@constraint(model, [sum(P[u, i] * P[u, j] * μ[u] for u in 1:U) for i in 1:L for j in 1:i] in MOI.PositiveSemidefiniteConeTriangle(L))
+            #     println("done with one")
+            #     flush(stdout)
+            # end
             for P in Ps
                 L = size(P, 2)
-                JuMP.@constraint(model, [sum(P[u, i] * P[u, j] * μ[u] for u in 1:U) for i in 1:L for j in 1:i] in MOI.PositiveSemidefiniteConeTriangle(L))
+                psd_dim = CO.svec_length(L)
+                println("making storage")
+                flush(stdout)
+                psd_vec = zeros(JuMP.GenericAffExpr{Float64,JuMP.VariableRef}, psd_dim)
+                println("done")
+                flush(stdout)
+                k = 0
+                println("populating it")
+                flush(stdout)
+                for i in 1:L, j in 1:i
+                    k += 1
+                    psd_vec[k] = sum(P[u, i] * P[u, j] * μ[u] for u in 1:U)
+                end
+                println("done")
+                flush(stdout)
+
+                println("adding constraint")
+                flush(stdout)
+                JuMP.@constraint(model, psd_vec in MOI.PositiveSemidefiniteConeTriangle(L))
+                println("done")
+                flush(stdout)
             end
+            println("finished to add psd constraints")
+            flush(stdout)
         end
     end
 
