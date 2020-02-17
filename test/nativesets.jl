@@ -66,6 +66,7 @@ testfuns_many = [
     hypoperlog4,
     hypoperlog5,
     hypoperlog6,
+    hypoperlog7,
     power1,
     power2,
     power3,
