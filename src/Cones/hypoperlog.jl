@@ -59,7 +59,7 @@ function setup_data(cone::HypoPerLog{T}) where {T <: Real}
     return
 end
 
-get_nu(cone::HypoPerLog) = cone.dim
+get_nu(cone::HypoPerLog) = 1 + 2 * (cone.dim - 2)
 
 function set_initial_point(arr::AbstractVector, cone::HypoPerLog)
     (arr[1], arr[2], w) = get_central_ray_hypoperlog(cone.dim - 2)
@@ -95,7 +95,7 @@ function update_grad(cone::HypoPerLog)
 
     g[1] = inv(cone.vlwvu)
     cone.lvwnivlwvu = (d - cone.lwv) / cone.vlwvu
-    g[2] = cone.lvwnivlwvu - d * inv(v)
+    g[2] = cone.lvwnivlwvu - d / v
     gden = -1 - inv(cone.lwv - u / v)
     @. g[3:end] = gden / w
 
