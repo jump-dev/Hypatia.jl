@@ -416,116 +416,6 @@ function epipersquare4(T; options...)
     @test r.z ≈ [1, inv3, inv3, inv3, -rt2inv3, inv3, inv3, -rt2inv3, rt2inv3, rt2inv3, -2 * inv3] atol=tol rtol=tol
 end
 
-function epiperexp1(T; options...)
-    tol = sqrt(sqrt(eps(T)))
-    Texph = exp(T(0.5))
-    c = T[1, 1, 1]
-    A = T[0 1 0; 1 0 0]
-    b = T[2, 1]
-    G = sparse([3, 2, 1], [1, 2, 3], -ones(T, 3))
-    h = zeros(T, 3)
-    cones = CO.Cone{T}[CO.EpiPerExp{T}()]
-
-    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
-    @test r.status == :Optimal
-    @test r.primal_obj ≈ 2 * Texph + 3 atol=tol rtol=tol
-    @test r.x ≈ [1, 2, 2 * Texph] atol=tol rtol=tol
-    @test r.y ≈ -[1 + Texph / 2, 1 + Texph] atol=tol rtol=tol
-    @test r.z ≈ -G * (c + A' * r.y) atol=tol rtol=tol
-end
-
-function epiperexp2(T; options...)
-    tol = sqrt(sqrt(eps(T)))
-    c = T[0, 0, -1]
-    A = T[0 1 0]
-    b = T[0]
-    G = Diagonal(-one(T) * I, 3)
-    h = zeros(T, 3)
-    cones = CO.Cone{T}[CO.EpiPerExp{T}()]
-
-    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
-    @test r.status == :Optimal
-    @test r.primal_obj ≈ 0 atol=tol rtol=tol
-end
-
-function epiperexp3(T; options...)
-    tol = sqrt(sqrt(eps(T)))
-    c = T[1, 1, 1]
-    A = zeros(T, 0, 3)
-    b = zeros(T, 0)
-    G = sparse([3, 2, 1, 4], [1, 2, 3, 1], -ones(T, 4))
-    h = zeros(T, 4)
-    cones = CO.Cone{T}[CO.EpiPerExp{T}(), CO.Nonnegative{T}(1)]
-
-    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
-    @test r.status == :Optimal
-    @test r.primal_obj ≈ 0 atol=tol rtol=tol
-    @test norm(r.x) ≈ 0 atol=tol rtol=tol
-    @test isempty(r.y)
-end
-
-function epiperexp4(T; options...)
-    tol = sqrt(sqrt(eps(T)))
-    Texp2 = exp(T(-2))
-    c = T[1, 0, 0]
-    A = T[0 1 0; 0 0 1]
-    b = T[1, -1]
-    G = SparseMatrixCSC(-one(T) * I, 3, 3)
-    h = zeros(T, 3)
-    cones = CO.Cone{T}[CO.EpiPerExp{T}(true)]
-
-    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
-    @test r.status == :Optimal
-    @test r.primal_obj ≈ Texp2 atol=tol rtol=tol
-    @test r.x ≈ [Texp2, 1, -1] atol=tol rtol=tol
-end
-
-function epiperexp5(T; options...)
-    tol = sqrt(sqrt(eps(T)))
-    c = zeros(T, 8)
-    c[1] = -1
-    A = zeros(T, 0, 8)
-    b = zeros(T, 0)
-    G = sparse(
-        [1, 1, 1, 2, 2, 3, 3, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
-        [2, 3, 4, 5, 1, 6, 7, 8, 2, 5, 6, 3, 5, 7, 4, 5, 8],
-        T[1, 1, 1, -1, 1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
-        12, 8)
-    h = zeros(T, 12)
-    h[1] = 3
-    cones = CO.Cone{T}[CO.Nonnegative{T}(3), CO.EpiPerExp{T}(), CO.EpiPerExp{T}(), CO.EpiPerExp{T}()]
-
-    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
-    @test r.status == :Optimal
-    @test r.primal_obj ≈ -1 atol=tol rtol=tol
-    @test r.x ≈ [1, 1, 1, 1, 1, 0, 0, 0] atol=tol rtol=tol
-    @test r.s ≈ [0, 0, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0] atol=tol rtol=tol
-    @test r.z ≈ inv(T(3)) * [1, 3, 1, 1, -1, -1, 1, -1, -1, 1, -1, -1] atol=tol rtol=tol
-end
-
-function epiperexp6(T; options...)
-    tol = sqrt(sqrt(eps(T)))
-    c = zeros(T, 4)
-    c[1] = -2
-    A = zeros(T, 0, 4)
-    b = zeros(T, 0)
-    G = sparse(
-        [1, 2, 2, 3, 4, 5, 6],
-        [2, 1, 3, 4, 2, 3, 4],
-        T[1, 1, -1, -1, -1, -1, -1],
-        6, 4)
-    h = zeros(T, 6)
-    h[1] = 2
-    cones = CO.Cone{T}[CO.Nonnegative{T}(3), CO.EpiPerExp{T}()]
-
-    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
-    @test r.status == :Optimal
-    @test r.primal_obj ≈ -4 atol=tol rtol=tol
-    @test r.x ≈ [2, 2, 2, 0] atol=tol rtol=tol
-    @test r.s ≈ [0, 0, 0, 2, 2, 0] atol=tol rtol=tol
-    @test r.z ≈ [2, 2, 2, 2, -2, -2] atol=tol rtol=tol
-end
-
 # TODO add use_dual = true tests
 function episumperentropy1(T; options...)
     tol = sqrt(sqrt(eps(T)))
@@ -733,6 +623,29 @@ function hypoperlog6(T; options...)
     @test r.primal_obj ≈ 0 atol=tol rtol=tol
     @test r.x[1] ≈ 0 atol=tol rtol=tol
     @test isempty(r.y)
+end
+
+function hypoperlog7(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    c = zeros(T, 4)
+    c[1] = -2
+    A = zeros(T, 0, 4)
+    b = zeros(T, 0)
+    G = sparse(
+        [1, 2, 2, 3, 4, 5, 6],
+        [2, 1, 3, 4, 4, 3, 2],
+        T[1, 1, -1, -1, -1, -1, -1],
+        6, 4)
+    h = zeros(T, 6)
+    h[1] = 2
+    cones = CO.Cone{T}[CO.Nonnegative{T}(3), CO.HypoPerLog{T}(3)]
+
+    r = build_solve_check(c, A, b, G, h, cones; atol = tol, options...)
+    @test r.status == :Optimal
+    @test r.primal_obj ≈ -4 atol=tol rtol=tol
+    @test r.x ≈ [2, 2, 2, 0] atol=tol rtol=tol
+    @test r.s ≈ [0, 0, 0, 0, 2, 2] atol=tol rtol=tol
+    @test r.z ≈ [2, 2, 2, -2, -2, 2] atol=tol rtol=tol
 end
 
 function hypogeomean1(T; options...)
@@ -1880,7 +1793,7 @@ function wsosinterppossemideftri3(T; options...)
 end
 
 function wsosinterpepinormeucl1(T; options...)
-    # mint t(x) : t(x) ^ 2 >= x ^ 4 on [-1, 1] where t(x) a constant
+    # min t(x) : t(x) ^ 2 >= x ^ 4 on [-1, 1] where t(x) a constant
     tol = sqrt(sqrt(eps(T)))
     DynamicPolynomials.@polyvar x
     fn = x ^ 2
