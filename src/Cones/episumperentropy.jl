@@ -80,14 +80,15 @@ end
 function update_feas(cone::EpiSumPerEntropy)
     @assert !cone.feas_updated
     u = cone.point[1]
-
-    cone.is_feas = false
     @views v = cone.point[cone.v_idxs]
     @views w = cone.point[cone.w_idxs]
+
     if all(vi -> vi > 0, v) && all(wi -> wi > 0, w)
         @. cone.lwv1d = log(w / v)
         cone.diff = u - dot(w, cone.lwv1d)
         cone.is_feas = (cone.diff > 0)
+    else
+        cone.is_feas = false
     end
 
     cone.feas_updated = true
