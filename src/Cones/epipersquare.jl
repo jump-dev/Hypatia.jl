@@ -122,9 +122,6 @@ function update_inv_hess(cone::EpiPerSquare)
     return cone.inv_hess
 end
 
-# update_hess_prod(cone::EpiPerSquare) = nothing
-# update_inv_hess_prod(cone::EpiPerSquare) = nothing
-
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerSquare)
     u = cone.point[1]
     v = cone.point[2]

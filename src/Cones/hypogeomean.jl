@@ -29,7 +29,6 @@ mutable struct HypoGeomean{T <: Real} <: Cone{T}
 
     wprod::T
     wprodu::T
-    tmpn::Vector{T}
 
     function HypoGeomean{T}(
         alpha::Vector{T},
@@ -59,14 +58,13 @@ function setup_data(cone::HypoGeomean{T}) where {T <: Real}
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
-    cone.tmpn = zeros(T, dim - 1)
     return
 end
 
 get_nu(cone::HypoGeomean) = cone.dim
 
-# TODO work out how to get central ray
 function set_initial_point(arr::AbstractVector{T}, cone::HypoGeomean{T}) where {T}
+    # get closed form central ray if all powers are equal, else use fitting
     if all(isequal(inv(T(cone.dim - 1))), cone.alpha)
         n = cone.dim - 1
         c = sqrt(T(5 * n ^ 2 + 2 * n + 1))
@@ -83,13 +81,15 @@ function update_feas(cone::HypoGeomean)
     @assert !cone.feas_updated
     u = cone.point[1]
     w = view(cone.point, 2:cone.dim)
-    if all(wi -> wi > 0, w)
-        # wprod always calculated because used in update_grad
-        cone.wprod = sum(cone.alpha[i] * log(w[i]) for i in eachindex(cone.alpha))
-        cone.is_feas = (u <= 0) || (cone.wprod > log(u))
+
+    if all(>(zero(u)), w)
+        cone.wprod = exp(sum(cone.alpha[i] * log(w[i]) for i in eachindex(cone.alpha)))
+        cone.wprodu = cone.wprod - u
+        cone.is_feas = (u < 0) || (wprodu > 0)
     else
         cone.is_feas = false
     end
+
     cone.feas_updated = true
     return cone.is_feas
 end
@@ -98,11 +98,11 @@ function update_grad(cone::HypoGeomean)
     @assert cone.is_feas
     u = cone.point[1]
     w = view(cone.point, 2:cone.dim)
-    wprod = cone.wprod = exp(cone.wprod)
-    wprodu = cone.wprodu = cone.wprod - u
-    cone.grad[1] = inv(wprodu)
-    @. cone.tmpn = wprod * cone.alpha / w / wprodu
-    @. cone.grad[2:end] = -cone.tmpn - 1 / w
+
+    cone.grad[1] = inv(cone.wprodu)
+    wwprodu = -cone.wprod / cone.wprodu
+    @. cone.grad[2:end] = (wwprodu * cone.alpha - 1) / w
+
     cone.grad_updated = true
     return cone.grad
 end
@@ -112,22 +112,25 @@ function update_hess(cone::HypoGeomean)
     u = cone.point[1]
     w = view(cone.point, 2:cone.dim)
     alpha = cone.alpha
-    wprod = cone.wprod
     wprodu = cone.wprodu
-    wwprodu = wprod / wprodu
-    tmpn = cone.tmpn
+    wwprodu = cone.wprod / wprodu
+    wwprodum1 = wwprodu - 1
     H = cone.hess.data
 
     H[1, 1] = cone.grad[1] / wprodu
     @inbounds for j in eachindex(w)
         j1 = j + 1
-        fact = tmpn[j]
-        H[1, j1] = -fact / wprodu
+        wj = w[j]
+        aj = alpha[j]
+        awwwprodu = wwprodu / wj * aj
+        H[1, j1] = -awwwprodu / wprodu
+        awwwprodum1 = awwwprodu * wwprodum1
         @inbounds for i in 1:(j - 1)
-            H[i + 1, j1] = fact * alpha[i] / w[i] * (wwprodu - 1)
+            H[i + 1, j1] = awwwprodum1 * alpha[i] / w[i]
         end
-        H[j1, j1] = fact * (1 - alpha[j] + alpha[j] * wwprodu) / w[j] + inv(w[j]) / w[j]
+        H[j1, j1] = (awwwprodu * (1 + aj * wwprodum1) + inv(wj)) / wj
     end
+
     cone.hess_updated = true
     return cone.hess
 end
