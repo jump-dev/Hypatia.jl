@@ -21,6 +21,7 @@ function polyminJuMP(
     use_wsos::Bool = true,
     use_primal::Bool = false,
     sample::Bool = true,
+    sample_factor::Int = 10,
     rseed::Int = 1,
     n::Int = 0,
     )
@@ -36,7 +37,7 @@ function polyminJuMP(
     else
         (x, f, dom, true_obj) = getpolydata(polyname)
     end
-    (U, pts, Ps, _) = MU.interpolate(dom, halfdeg, sample = sample, sample_factor = 100)
+    (U, pts, Ps, _) = MU.interpolate(dom, halfdeg, sample = sample, sample_factor = sample_factor)
     interp_vals = [f(x => pts[j, :]) for j in 1:U]
 
     model = JuMP.Model()
