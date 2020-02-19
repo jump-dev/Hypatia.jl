@@ -82,9 +82,10 @@ function update_feas(cone::HypoGeomean)
     u = cone.point[1]
     w = view(cone.point, 2:cone.dim)
 
-    if all(wi -> wi > 0, w)
-        cone.wprod = sum(cone.alpha[i] * log(w[i]) for i in eachindex(cone.alpha))
-        cone.is_feas = (u <= 0) || (cone.wprod > log(u))
+    if all(>(zero(u)), w)
+        cone.wprod = exp(sum(cone.alpha[i] * log(w[i]) for i in eachindex(cone.alpha)))
+        cone.wprodu = cone.wprod - u
+        cone.is_feas = (u < 0) || (wprodu > 0)
     else
         cone.is_feas = false
     end
@@ -98,11 +99,9 @@ function update_grad(cone::HypoGeomean)
     u = cone.point[1]
     w = view(cone.point, 2:cone.dim)
 
-    cone.wprod = exp(cone.wprod)
-    cone.wprodu = cone.wprod - u
     cone.grad[1] = inv(cone.wprodu)
-    wwprodu = cone.wprod / cone.wprodu
-    @. cone.grad[2:end] = (wwprodu * cone.alpha + 1) / -w
+    wwprodu = -cone.wprod / cone.wprodu
+    @. cone.grad[2:end] = (wwprodu * cone.alpha - 1) / w
 
     cone.grad_updated = true
     return cone.grad
@@ -113,9 +112,8 @@ function update_hess(cone::HypoGeomean)
     u = cone.point[1]
     w = view(cone.point, 2:cone.dim)
     alpha = cone.alpha
-    wprod = cone.wprod
     wprodu = cone.wprodu
-    wwprodu = wprod / wprodu
+    wwprodu = cone.wprod / wprodu
     wwprodum1 = wwprodu - 1
     H = cone.hess.data
 
