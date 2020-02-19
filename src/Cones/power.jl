@@ -28,12 +28,11 @@ mutable struct Power{T <: Real} <: Cone{T}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
 
-    logprodu::T
     produ::T
-    produ_produw::T
     produw::T
-    alphaui::Vector{T}
-    tmpm::Vector{T}
+    produuw::T
+    aui::Vector{T}
+    auiproduuw::Vector{T}
 
     function Power{T}(
         alpha::Vector{T},
@@ -69,8 +68,8 @@ function setup_data(cone::Power{T}) where {T <: Real}
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
-    cone.alphaui = zeros(length(cone.alpha))
-    cone.tmpm = zeros(length(cone.alpha))
+    cone.aui = zeros(length(cone.alpha))
+    cone.auiproduuw = zeros(length(cone.alpha))
     return
 end
 
@@ -83,15 +82,16 @@ function set_initial_point(arr::AbstractVector, cone::Power)
     return arr
 end
 
-function update_feas(cone::Power)
+function update_feas(cone::Power{T}) where {T <: Real}
     @assert !cone.feas_updated
     m = length(cone.alpha)
     u = cone.point[1:m]
     w = view(cone.point, (m + 1):cone.dim)
 
-    if all(>(zero(u)), u)
-        cone.logprodu = sum(cone.alpha[i] * log(u[i]) for i in eachindex(cone.alpha))
-        cone.is_feas = (cone.logprodu > log(norm(w)))
+    if all(>(zero(T)), u)
+        cone.produ = exp(2 * sum(cone.alpha[i] * log(u[i]) for i in eachindex(cone.alpha)))
+        cone.produw = cone.produ - sum(abs2, w)
+        cone.is_feas = (cone.produw > 0)
     else
         cone.is_feas = false
     end
@@ -106,15 +106,12 @@ function update_grad(cone::Power)
     u = cone.point[1:m]
     w = view(cone.point, (m + 1):cone.dim)
 
-    @. cone.alphaui = 2 * cone.alpha / u
-    # prod_i((u_i)^(2 * alpha_i))
-    cone.produ = exp(2 * cone.logprodu)
-    # violation term
-    cone.produw = cone.produ - sum(abs2, w)
-    # ratio of product and violation
-    cone.produ_produw = cone.produ / cone.produw
-    @. cone.grad[1:m] = -cone.alphaui * cone.produ_produw - (1 - cone.alpha) / u
-    @. cone.grad[(m + 1):end] = w * 2 / cone.produw
+    @. cone.aui = 2 * cone.alpha / u
+    cone.produuw = cone.produ / cone.produw
+    @. cone.auiproduuw = -cone.aui * cone.produuw
+    @. cone.grad[1:m] = cone.auiproduuw - (1 - cone.alpha) / u
+    produwi2 = 2 / cone.produw
+    @. cone.grad[(m + 1):end] = produwi2 * w
 
     cone.grad_updated = true
     return cone.grad
@@ -125,46 +122,37 @@ function update_hess(cone::Power)
     m = length(cone.alpha)
     u = cone.point[1:m]
     w = view(cone.point, (m + 1):cone.dim)
+    aui = cone.aui
+    auiproduuw = cone.auiproduuw
+    g = cone.grad
     H = cone.hess.data
-    alpha = cone.alpha
-    alphaui = cone.alphaui
-    produ = cone.produ
-    produw = cone.produw
-    produ_produw = cone.produ_produw
 
-    # double derivative wrt u
+    produuwm1 = 1 - cone.produuw
     @inbounds for j in 1:m
-        awj_ratio = alphaui[j] * produ_produw
-        awj_ratio_ratio = awj_ratio * (produ_produw - 1)
+        auiproduuwm1 = auiproduuw[j] * produuwm1
         @inbounds for i in 1:j
-            H[i, j] = alphaui[i] * awj_ratio_ratio
+            H[i, j] = aui[i] * auiproduuwm1
         end
-        H[j, j] = awj_ratio_ratio * alphaui[j] + (awj_ratio + (1 - alpha[j]) / u[j]) / u[j]
+        H[j, j] -= g[j] / u[j]
     end
 
-    offset = 2 / produw
-    scal = 2 * offset / produw
-    @. cone.tmpm = -2 * alphaui * produ_produw / produw
-    for j in 1:cone.n
-        jm = j + m
-
-        # derivative wrt u and w
+    offset = 2 / cone.produw
+    for j in m .+ (1:cone.n)
+        gj = g[j]
         @inbounds for i in 1:m
-            H[i, jm] = cone.tmpm[i] * w[j]
+            H[i, j] = auiproduuw[i] * gj
         end
-
-        # double derivative wrt w
-        @inbounds for i in 1:j
-            H[i + m, jm] = scal * w[i] * w[j]
+        @inbounds for i in (m + 1):j
+            H[i, j] = g[i] * gj
         end
-        H[jm, jm] += offset
+        H[j, j] += offset
     end
 
     cone.hess_updated = true
     return cone.hess
 end
 
-# TODO benchmark to decide whether this improves speed/numerics
+# TODO update and benchmark to decide whether this improves speed/numerics
 # function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Power)
 #     @assert cone.grad_updated
 #     m = length(cone.alpha)
@@ -174,22 +162,22 @@ end
 #     alpha = cone.alpha
 #     produw = cone.produw
 #     tmpm = cone.tmpm
-#     alphaui = cone.alphaui
-#     produ_produw = cone.produ_produw
-#     @. tmpm = 2 * produ_produw * alphaui / produw
+#     aui = cone.aui
+#     produuw = cone.produuw
+#     @. tmpm = 2 * produuw * aui / produw
 #
-#     @. @views prod[1:m, :] = alphaui * produ_produw * (produ_produw - 1)
+#     @. @views prod[1:m, :] = aui * produuw * (produuw - 1)
 #     @. @views prod[(m + 1):dim, :] = 2 / produw
 #     @views @inbounds for i in 1:size(arr, 2)
-#         dotm = dot(alphaui, arr[1:m, i])
+#         dotm = dot(aui, arr[1:m, i])
 #         dotn = dot(w, arr[(m + 1):dim, i])
 #         prod[1:m, i] .*= dotm
 #         prod[(m + 1):dim, i] .*= dotn
 #         @. prod[1:m, i] -= tmpm * dotn
-#         @. prod[(m + 1):dim, i] -= produ_produw * dotm
+#         @. prod[(m + 1):dim, i] -= produuw * dotm
 #     end
 #     @. @views begin
-#         prod[1:m, :] += arr[1:m, :] * (produ_produw * alphaui + (1 - alpha) / u) / u
+#         prod[1:m, :] += arr[1:m, :] * (produuw * aui + (1 - alpha) / u) / u
 #         prod[(m + 1):dim, :] *= w
 #         prod[(m + 1):dim, :] += arr[(m + 1):dim, :]
 #         prod[(m + 1):dim, :] *= 2
