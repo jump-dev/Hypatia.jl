@@ -30,6 +30,7 @@ function polyminreal(
     use_wsos::Bool = true,
     n::Int = 0,
     use_linops::Bool = false,
+    sample_factor::Int = 10,
     )
     if use_primal && !use_wsos
         error("primal psd formulation is not implemented yet")
@@ -41,12 +42,12 @@ function polyminreal(
         end
         true_obj = NaN
         dom = MU.Box{T}(-ones(T, n), ones(T, n))
-        (U, pts, Ps, _) = MU.interpolate(dom, halfdeg, sample = true)
+        (U, pts, Ps, _) = MU.interpolate(dom, halfdeg, sample = true, sample_factor = sample_factor)
         interp_vals = T.(randn(U))
     else
         (x, fn, dom, true_obj) = getpolydata(polyname, T = T)
         sample = (length(x) >= 5) || !isa(dom, MU.Box)
-        (U, pts, Ps, _) = MU.interpolate(dom, halfdeg, sample = sample)
+        (U, pts, Ps, _) = MU.interpolate(dom, halfdeg, sample = sample, sample_factor = sample_factor)
         # set up problem data
         interp_vals = T[fn(pts[j, :]...) for j in 1:U]
     end
