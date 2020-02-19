@@ -137,42 +137,6 @@ function update_hess(cone::HypoGeomean)
     return cone.hess
 end
 
-# function update_inv_hess(cone::HypoGeomean)
-#     @assert cone.grad_updated
-#     u = cone.point[1]
-#     w = view(cone.point, 2:cone.dim)
-#     alpha = cone.alpha
-#     wprod = cone.wprod
-#     wprodu = cone.wprodu
-#     wwprodu = wprod / wprodu
-#     wwprodum1 = wwprodu - 1
-#     Hi = cone.inv_hess.data
-#
-#
-#     cone.inv_hess_updated = true
-#     return cone.inv_hess
-# end
-
-# function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoGeomean)
-#     @assert cone.grad_updated
-#     u = cone.point[1]
-#     w = view(cone.point, 2:cone.dim)
-#
-#     @inbounds for j in 1:size(prod, 2)
-#         uj = arr[1, j]
-#         vj = arr[2, j]
-#         wj = @view arr[3:end, j]
-#         ga = (dot(w, wj) - v * uj - u * vj) / cone.dist
-#         prod[1, j] = -ga * v - vj
-#         prod[2, j] = -ga * u - uj
-#         @. prod[3:end, j] = ga * w + wj
-#     end
-#     @. prod /= cone.dist
-#
-#     return prod
-# end
-
-
 # see analysis in https://github.com/lkapelevich/HypatiaBenchmarks.jl/tree/master/centralpoints
 function get_central_ray_hypogeomean(alpha::Vector{<:Real})
     wdim = length(alpha)
