@@ -8,7 +8,6 @@ barrier from "Primal-Dual Interior-Point Methods for Domain-Driven Formulations"
 -log(u - sum_i w_i*log(w_i/v_i)) - sum_i (log(v_i) + log(w_i))
 
 TODO
-- central ray initial point
 - write native tests for use_dual = true
 =#
 
