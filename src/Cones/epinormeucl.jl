@@ -87,8 +87,11 @@ function update_hess(cone::EpiNormEucl)
     @assert cone.grad_updated
 
     mul!(cone.hess.data, cone.grad, cone.grad')
-    cone.hess += inv(cone.dist) * I # TODO inefficient?
-    cone.hess[1, 1] -= 2 / cone.dist
+    inv_dist = inv(cone.dist)
+    @inbounds for j in eachindex(cone.grad)
+        cone.hess[j, j] += inv_dist
+    end
+    cone.hess[1, 1] -= inv_dist + inv_dist
 
     cone.hess_updated = true
     return cone.hess
@@ -98,15 +101,14 @@ function update_inv_hess(cone::EpiNormEucl)
     @assert cone.is_feas
 
     mul!(cone.inv_hess.data, cone.point, cone.point')
-    cone.inv_hess += cone.dist * I # TODO inefficient?
-    cone.inv_hess[1, 1] -= 2 * cone.dist
+    @inbounds for j in eachindex(cone.grad)
+        cone.hess[j, j] += cone.dist
+    end
+    cone.inv_hess[1, 1] -= cone.dist + cone.dist
 
     cone.inv_hess_updated = true
     return cone.inv_hess
 end
-
-# update_hess_prod(cone::EpiNormEucl) = nothing
-# update_inv_hess_prod(cone::EpiNormEucl) = nothing
 
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormEucl)
     @assert cone.is_feas

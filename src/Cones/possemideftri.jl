@@ -130,9 +130,6 @@ function update_inv_hess(cone::PosSemidefTri)
     return cone.inv_hess
 end
 
-# update_hess_prod(cone::PosSemidefTri) = nothing
-# update_inv_hess_prod(cone::PosSemidefTri) = nothing
-
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidefTri)
     @assert is_feas(cone)
     @inbounds for i in 1:size(arr, 2)

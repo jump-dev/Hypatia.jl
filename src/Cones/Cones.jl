@@ -136,7 +136,6 @@ function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone
     return prod
 end
 
-# fallbacks for sparse linear system solvers
 # number of nonzeros in the Hessian and inverse
 hess_nz_count(cone::Cone) = dimension(cone) ^ 2
 hess_nz_count_tril(cone::Cone) = svec_length(dimension(cone))
@@ -147,6 +146,14 @@ hess_nz_idxs_col(cone::Cone, j::Int) = 1:dimension(cone)
 hess_nz_idxs_col_tril(cone::Cone, j::Int) = j:dimension(cone)
 inv_hess_nz_idxs_col(cone::Cone, j::Int) = 1:dimension(cone)
 inv_hess_nz_idxs_col_tril(cone::Cone, j::Int) = j:dimension(cone)
+
+# (z + mu * grad) * H^-1 * (z + mu * grad)
+function neighborhood(cone::Cone{T}, dual_point::AbstractVector{T}, mu::T) where {T <: Real}
+    g = grad(cone)
+    @. cone.nbhd_tmp = dual_point + mu * g
+    inv_hess_sqrt_prod!(cone.nbhd_tmp2, cone.nbhd_tmp, cone)
+    return sum(abs2, cone.nbhd_tmp2)
+end
 
 # utilities for arrays
 

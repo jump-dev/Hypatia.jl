@@ -86,9 +86,6 @@ function update_inv_hess(cone::Nonnegative)
     return cone.inv_hess
 end
 
-# update_hess_prod(cone::Nonnegative) = nothing
-# update_inv_hess_prod(cone::Nonnegative) = nothing
-
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Nonnegative)
     @assert cone.is_feas
     @. prod = arr / cone.point / cone.point
@@ -121,6 +118,10 @@ hess_nz_idxs_col(cone::Nonnegative, j::Int) = [j]
 hess_nz_idxs_col_tril(cone::Nonnegative, j::Int) = [j]
 inv_hess_nz_idxs_col(cone::Nonnegative, j::Int) = [j]
 inv_hess_nz_idxs_col_tril(cone::Nonnegative, j::Int) = [j]
+
+function neighborhood(cone::Nonnegative, dual_point::AbstractVector, mu::Real)
+    return abs2(cone.point * dual_point - mu)
+end
 
 function correction(cone::Nonnegative, primal_dir::AbstractVector, dual_dir::AbstractVector)
     @. cone.correction = primal_dir * dual_dir / cone.point
