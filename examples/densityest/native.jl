@@ -129,16 +129,16 @@ function densityest(
         G_likl = zeros(T, 3 * num_obs, num_obs + U)
         offset = 1
         for i in 1:num_obs
-            # G_likl[offset + 1, (num_obs + 1):(num_obs + U)] = -basis_evals[i, :]
-            # h_likl[offset + 2] = 1
-            # G_likl[offset, i] = 1
-            # offset += 3
-            # push!(cones, CO.EpiSumPerEntropy{T}(3))
-            G_likl[offset + 2, (num_obs + 1):(num_obs + U)] = -basis_evals[i, :]
-            h_likl[offset + 1] = 1
-            G_likl[offset, i] = -1
+            G_likl[offset + 1, (num_obs + 1):(num_obs + U)] = -basis_evals[i, :]
+            h_likl[offset + 2] = 1
+            G_likl[offset, i] = 1
             offset += 3
-            push!(cones, CO.HypoPerLog{T}(3))
+            push!(cones, CO.EpiSumPerEntropy{T}(3))
+            # G_likl[offset + 2, (num_obs + 1):(num_obs + U)] = -basis_evals[i, :]
+            # h_likl[offset + 1] = 1
+            # G_likl[offset, i] = -1
+            # offset += 3
+            # push!(cones, CO.HypoPerLog{T}(3))
         end
     end
 
@@ -173,24 +173,40 @@ end
 
 densityest(T::Type{<:Real}, num_obs::Int, n::Int, deg::Int; options...) = densityest(T, randn(T, num_obs, n), deg; options...)
 
-densityest1(T::Type{<:Real}) = densityest(T, iris_data(), 4, hypogeomean_obj = false)
+densityest1(T::Type{<:Real}) = densityest(T, iris_data(), 4)
 densityest2(T::Type{<:Real}) = densityest(T, iris_data(), 4, use_wsos = false)
 densityest3(T::Type{<:Real}) = densityest(T, cancer_data(), 4)
 densityest4(T::Type{<:Real}) = densityest(T, cancer_data(), 4, use_wsos = false)
 densityest5(T::Type{<:Real}) = densityest(T, 50, 1, 4)
 densityest6(T::Type{<:Real}) = densityest(T, 50, 1, 4, use_wsos = false)
-densityest7(T::Type{<:Real}) = densityest(T, 20, 2, 4, hypogeomean_obj = true, use_hypogeomean = false, use_wsos = true)
+densityest7(T::Type{<:Real}) = densityest(T, 20, 2, 4)
 densityest8(T::Type{<:Real}) = densityest(T, 20, 2, 4, use_wsos = false)
+densityest9(T::Type{<:Real}) = densityest(T, 50, 1, 4, use_hypogeomean = false)
+densityest10(T::Type{<:Real}) = densityest(T, 50, 1, 4, use_wsos = false, use_hypogeomean = false)
+densityest11(T::Type{<:Real}) = densityest(T, 20, 2, 4, use_hypogeomean = false)
+densityest12(T::Type{<:Real}) = densityest(T, 20, 2, 4, use_wsos = false, use_hypogeomean = false)
+densityest13(T::Type{<:Real}) = densityest(T, 50, 1, 4, hypogeomean_obj = false)
+densityest14(T::Type{<:Real}) = densityest(T, 50, 1, 4, use_wsos = false, hypogeomean_obj = false)
+densityest15(T::Type{<:Real}) = densityest(T, 20, 2, 4, hypogeomean_obj = false)
+densityest16(T::Type{<:Real}) = densityest(T, 20, 2, 4, use_wsos = false, hypogeomean_obj = false)
 
 instances_densityest_all = [
-    # densityest1,
-    # densityest2,
-    # densityest3,
-    # densityest4,
-    # densityest5,
-    # densityest6,
+    densityest1,
+    densityest2,
+    densityest3,
+    densityest4,
+    densityest5,
+    densityest6,
     densityest7,
-    # densityest8,
+    densityest8,
+    densityest9,
+    densityest10,
+    densityest11,
+    densityest12,
+    densityest13,
+    densityest14,
+    densityest15,
+    densityest16,
     ]
 instances_densityest_few = [
     densityest1,
@@ -204,7 +220,5 @@ function test_densityest(instance::Function; T::Type{<:Real} = Float64, options:
     d = instance(T)
     r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
     @test r.status == :Optimal
-    @show r.primal_obj
-    @show 20 * log((-r.primal_obj))
     return
 end
