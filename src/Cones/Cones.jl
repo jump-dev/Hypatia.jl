@@ -151,7 +151,7 @@ hess_nz_idxs_col_tril(cone::Cone, j::Int) = j:dimension(cone)
 inv_hess_nz_idxs_col(cone::Cone, j::Int) = 1:dimension(cone)
 inv_hess_nz_idxs_col_tril(cone::Cone, j::Int) = j:dimension(cone)
 
-function neighborhood(cone::Cone{T}, dual_point::AbstractVector{T}, mu::T) where {T <: Real}
+function neighborhood(cone::Cone, dual_point::AbstractVector, mu::Real)
     # norm(H^(-1/2) * (z + mu * grad))
     g = grad(cone)
     @. cone.nbhd_tmp = dual_point + mu * g
@@ -159,7 +159,7 @@ function neighborhood(cone::Cone{T}, dual_point::AbstractVector{T}, mu::T) where
     return norm(cone.nbhd_tmp2)
 end
 
-function in_neighborhood(cone::Cone{T}, dual_point::AbstractVector{T}, mu::T) where {T <: Real}
+function in_neighborhood(cone::Cone, dual_point::AbstractVector, mu::Real)
     return (neighborhood(cone, dual_point, mu) < mu * cone.max_neighborhood)
 end
 

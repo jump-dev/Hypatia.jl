@@ -11,6 +11,7 @@ barrier from "Self-Scaled Barriers and Interior-Point Methods for Convex Program
 mutable struct Nonnegative{T <: Real} <: Cone{T}
     use_dual::Bool
     use_3order_corr::Bool
+    max_neighborhood::T
     dim::Int
     point::Vector{T}
     timer::TimerOutput
@@ -30,7 +31,8 @@ mutable struct Nonnegative{T <: Real} <: Cone{T}
         @assert dim >= 1
         cone = new{T}()
         cone.use_dual = is_dual
-        cone.use_3order_corr = false # TODO option
+        cone.use_3order_corr = false # TODO maybe make it a function rather than a field
+        cone.max_neighborhood = 0.1
         cone.dim = dim
         return cone
     end
@@ -121,6 +123,10 @@ inv_hess_nz_idxs_col_tril(cone::Nonnegative, j::Int) = [j]
 
 function neighborhood(cone::Nonnegative, dual_point::AbstractVector, mu::Real)
     return maximum(si * zi - mu for (si, zi) in zip(cone.point, dual_point))
+end
+
+function in_neighborhood(cone::Nonnegative, dual_point::AbstractVector, mu::Real)
+    return all((si * zi - mu < cone.max_neighborhood for (si, zi) in zip(cone.point, dual_point)))
 end
 
 function correction(cone::Nonnegative, primal_dir::AbstractVector, dual_dir::AbstractVector)
