@@ -11,6 +11,7 @@ barrier from "Barrier Functions in Interior Point Methods" by Osman Guler
 
 mutable struct EpiNormInf{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     use_dual::Bool
+    max_neighborhood::T
     dim::Int
     n::Int
     is_complex::Bool
@@ -26,6 +27,8 @@ mutable struct EpiNormInf{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     grad::Vector{T}
     hess::Symmetric{T, SparseMatrixCSC{T, Int}}
     inv_hess::Symmetric{T, Matrix{T}}
+    nbhd_tmp::Vector{T}
+    nbhd_tmp2::Vector{T}
 
     w::AbstractVector{R}
     den::AbstractVector{T}
@@ -49,6 +52,7 @@ mutable struct EpiNormInf{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
         @assert dim >= 2
         cone = new{T, R}()
         cone.use_dual = is_dual
+        cone.max_neighborhood = 0.1
         cone.dim = dim # TODO
         cone.is_complex = (R <: Complex)
         cone.n = (cone.is_complex ? div(dim - 1, 2) : dim - 1)
@@ -66,6 +70,8 @@ function setup_data(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where 
     dim = cone.dim
     cone.point = zeros(T, dim)
     cone.grad = zeros(T, dim)
+    cone.nbhd_tmp = zeros(T, dim)
+    cone.nbhd_tmp2 = zeros(T, dim)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     n = cone.n
     cone.w = zeros(R, n)

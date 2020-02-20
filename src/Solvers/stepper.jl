@@ -243,16 +243,9 @@ function check_nbhd(
         return false
     end
 
-    # rhs_nbhd = mu_temp * abs2(nbhd)
-    # lhs_nbhd = abs2(taukap_temp - mu_temp) / mu_temp
-    # if lhs_nbhd >= rhs_nbhd
-    #     return false
-    # end
-
-    Cones.load_point.(cones, solver.primal_views) # TODO only for cones that need to be checked?
-
     # accept primal iterate if it is inside the cone and neighborhood
     # first check inside cone for whichever cones were violated last line search iteration
+    Cones.load_point.(cones, solver.primal_views) # TODO only for cones that need to be checked?
     for (k, cone_k) in enumerate(cones)
         if solver.cones_infeas[k]
             Cones.reset_data(cone_k)
@@ -279,7 +272,7 @@ function check_nbhd(
             end
         end
 
-        if !Cones.in_neighborhood(cone_k, solver.dual_views[k], mu)
+        if !Cones.in_neighborhood(cone_k, solver.dual_views[k], mu_temp)
             return false
         end
 
