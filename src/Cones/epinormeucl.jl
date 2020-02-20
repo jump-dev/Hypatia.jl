@@ -6,10 +6,14 @@ epigraph of Euclidean (2-)norm (AKA second-order cone)
 
 barrier from "Self-Scaled Barriers and Interior-Point Methods for Convex Programming" by Nesterov & Todd
 -log(u^2 - norm_2(w)^2)
+
+TODO
+- try to derive faster neighborhood calculations for this cone specifically
 =#
 
 mutable struct EpiNormEucl{T <: Real} <: Cone{T}
     use_dual::Bool
+    max_neighborhood::T
     dim::Int
     point::Vector{T}
     timer::TimerOutput
@@ -22,6 +26,8 @@ mutable struct EpiNormEucl{T <: Real} <: Cone{T}
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
+    nbhd_tmp::Vector{T}
+    nbhd_tmp2::Vector{T}
 
     dist::T
 
@@ -29,6 +35,7 @@ mutable struct EpiNormEucl{T <: Real} <: Cone{T}
         @assert dim >= 2
         cone = new{T}()
         cone.use_dual = is_dual
+        cone.max_neighborhood = 0.1
         cone.dim = dim
         return cone
     end
@@ -46,6 +53,8 @@ function setup_data(cone::EpiNormEucl{T}) where {T <: Real}
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
+    cone.nbhd_tmp = zeros(T, dim)
+    cone.nbhd_tmp2 = zeros(T, dim)
     return
 end
 

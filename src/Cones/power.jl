@@ -11,6 +11,7 @@ barrier from "On self-concordant barriers for generalized power cones" by Roy & 
 
 mutable struct Power{T <: Real} <: Cone{T}
     use_dual::Bool
+    max_neighborhood::T
     dim::Int
     alpha::Vector{T}
     n::Int
@@ -27,6 +28,8 @@ mutable struct Power{T <: Real} <: Cone{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
+    nbhd_tmp::Vector{T}
+    nbhd_tmp2::Vector{T}
 
     produ::T
     produw::T
@@ -48,6 +51,7 @@ mutable struct Power{T <: Real} <: Cone{T}
         cone = new{T}()
         cone.n = n
         cone.use_dual = is_dual
+        cone.max_neighborhood = 0.1
         cone.dim = dim
         cone.alpha = alpha
         cone.hess_fact_cache = hess_fact_cache
@@ -67,6 +71,8 @@ function setup_data(cone::Power{T}) where {T <: Real}
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
+    cone.nbhd_tmp = zeros(T, dim)
+    cone.nbhd_tmp2 = zeros(T, dim)
     load_matrix(cone.hess_fact_cache, cone.hess)
     cone.aui = zeros(length(cone.alpha))
     cone.auiproduuw = zeros(length(cone.alpha))

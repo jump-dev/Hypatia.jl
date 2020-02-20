@@ -392,7 +392,7 @@ end
 
 function epipersquare4(T; options...)
     tol = sqrt(sqrt(eps(T)))
-    c = zeros(7)
+    c = zeros(T, 7)
     c[1] = -1
     A = zeros(T, 0, 7)
     b = zeros(T, 0)

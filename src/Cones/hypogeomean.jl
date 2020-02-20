@@ -11,6 +11,7 @@ barrier from "Constructing self-concordant barriers for convex cones" by Yu. Nes
 
 mutable struct HypoGeomean{T <: Real} <: Cone{T}
     use_dual::Bool
+    max_neighborhood::T
     dim::Int
     alpha::Vector{T}
     point::Vector{T}
@@ -26,6 +27,8 @@ mutable struct HypoGeomean{T <: Real} <: Cone{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
+    nbhd_tmp::Vector{T}
+    nbhd_tmp2::Vector{T}
 
     wprod::T
     wprodu::T
@@ -41,6 +44,7 @@ mutable struct HypoGeomean{T <: Real} <: Cone{T}
         @assert sum(alpha) ≈ 1
         cone = new{T}()
         cone.use_dual = is_dual
+        cone.max_neighborhood = 0.1
         cone.dim = dim
         cone.alpha = alpha
         cone.hess_fact_cache = hess_fact_cache
@@ -58,6 +62,8 @@ function setup_data(cone::HypoGeomean{T}) where {T <: Real}
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
+    cone.nbhd_tmp = zeros(T, dim)
+    cone.nbhd_tmp2 = zeros(T, dim)
     return
 end
 
@@ -85,7 +91,7 @@ function update_feas(cone::HypoGeomean)
     if all(>(zero(u)), w)
         cone.wprod = exp(sum(cone.alpha[i] * log(w[i]) for i in eachindex(cone.alpha)))
         cone.wprodu = cone.wprod - u
-        cone.is_feas = (u < 0) || (wprodu > 0)
+        cone.is_feas = (u < 0) || (cone.wprodu > 0)
     else
         cone.is_feas = false
     end

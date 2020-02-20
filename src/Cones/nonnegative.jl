@@ -121,10 +121,6 @@ hess_nz_idxs_col_tril(cone::Nonnegative, j::Int) = [j]
 inv_hess_nz_idxs_col(cone::Nonnegative, j::Int) = [j]
 inv_hess_nz_idxs_col_tril(cone::Nonnegative, j::Int) = [j]
 
-function neighborhood(cone::Nonnegative, dual_point::AbstractVector, mu::Real)
-    return maximum(si * zi - mu for (si, zi) in zip(cone.point, dual_point))
-end
-
 function in_neighborhood(cone::Nonnegative, dual_point::AbstractVector, mu::Real)
     return all((si * zi - mu < cone.max_neighborhood for (si, zi) in zip(cone.point, dual_point)))
 end

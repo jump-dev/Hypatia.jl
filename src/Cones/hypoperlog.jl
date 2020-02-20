@@ -10,6 +10,7 @@ barrier modified from "Primal-Dual Interior-Point Methods for Domain-Driven Form
 
 mutable struct HypoPerLog{T <: Real} <: Cone{T}
     use_dual::Bool
+    max_neighborhood::T
     dim::Int
     point::Vector{T}
     timer::TimerOutput
@@ -24,6 +25,8 @@ mutable struct HypoPerLog{T <: Real} <: Cone{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
+    nbhd_tmp::Vector{T}
+    nbhd_tmp2::Vector{T}
 
     lwv::T
     vlwvu::T
@@ -38,6 +41,7 @@ mutable struct HypoPerLog{T <: Real} <: Cone{T}
         @assert dim >= 3
         cone = new{T}()
         cone.use_dual = is_dual
+        cone.max_neighborhood = 0.1
         cone.dim = dim
         cone.hess_fact_cache = hess_fact_cache
         return cone
@@ -55,6 +59,8 @@ function setup_data(cone::HypoPerLog{T}) where {T <: Real}
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
+    cone.nbhd_tmp = zeros(T, dim)
+    cone.nbhd_tmp2 = zeros(T, dim)
     cone.vwivlwvu = zeros(T, dim - 2)
     return
 end

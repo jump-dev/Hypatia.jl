@@ -11,6 +11,7 @@ barrier from "Self-Scaled Barriers and Interior-Point Methods for Convex Program
 TODO
 - describe svec scaling
 - describe hermitian complex PSD cone
+- try to derive faster neighborhood calculations for this cone specifically
 =#
 
 mutable struct PosSemidefTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
