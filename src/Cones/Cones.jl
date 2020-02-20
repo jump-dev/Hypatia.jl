@@ -85,8 +85,12 @@ function update_hess_fact(cone::Cone{T}) where {T <: Real}
             cone.hess_fact_cache = DenseSymCache{T}()
             load_matrix(cone.hess_fact_cache, cone.hess)
         else
-            # TODO probably better to only change the copy of the hessian that is getting factorized, not the hessian itself
-            cone.hess += sqrt(eps(T)) * I # attempt recovery # TODO make more efficient
+            # attempt recovery
+            # TODO probably safer to only change the copy of the hessian that is getting factorized, not the hessian itself
+            rteps = sqrt(eps(T))
+            @inbounds for i in 1:size(cone.hess, 1)
+                cone.hess[i, i] += rteps
+            end
         end
         @timeit cone.timer "hess_fact2" fact2_success = update_fact(cone.hess_fact_cache, cone.hess)
         if !fact2_success
@@ -147,12 +151,16 @@ hess_nz_idxs_col_tril(cone::Cone, j::Int) = j:dimension(cone)
 inv_hess_nz_idxs_col(cone::Cone, j::Int) = 1:dimension(cone)
 inv_hess_nz_idxs_col_tril(cone::Cone, j::Int) = j:dimension(cone)
 
-# (z + mu * grad) * H^-1 * (z + mu * grad)
 function neighborhood(cone::Cone{T}, dual_point::AbstractVector{T}, mu::T) where {T <: Real}
+    # norm(H^(-1/2) * (z + mu * grad))
     g = grad(cone)
     @. cone.nbhd_tmp = dual_point + mu * g
     inv_hess_sqrt_prod!(cone.nbhd_tmp2, cone.nbhd_tmp, cone)
-    return sum(abs2, cone.nbhd_tmp2)
+    return norm(cone.nbhd_tmp2)
+end
+
+function in_neighborhood(cone::Cone{T}, dual_point::AbstractVector{T}, mu::T) where {T <: Real}
+    return (neighborhood(cone, dual_point, mu) < mu * cone.max_neighborhood)
 end
 
 # utilities for arrays

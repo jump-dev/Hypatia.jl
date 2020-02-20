@@ -120,7 +120,7 @@ inv_hess_nz_idxs_col(cone::Nonnegative, j::Int) = [j]
 inv_hess_nz_idxs_col_tril(cone::Nonnegative, j::Int) = [j]
 
 function neighborhood(cone::Nonnegative, dual_point::AbstractVector, mu::Real)
-    return abs2(cone.point * dual_point - mu)
+    return maximum(si * zi - mu for (si, zi) in zip(cone.point, dual_point))
 end
 
 function correction(cone::Nonnegative, primal_dir::AbstractVector, dual_dir::AbstractVector)
