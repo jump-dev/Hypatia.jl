@@ -26,10 +26,11 @@ function densityest(
     X::Matrix{<:Real},
     deg::Int;
     use_wsos::Bool = true,
-    use_linops::Bool = false,
+    hypogeomean_obj::Bool = true, # use root of likelihood, else log of likelihood
+    use_hypogeomean::Bool = true,
     sample_factor::Int = 100,
     )
-    (nobs, dim) = size(X)
+    (num_obs, dim) = size(X)
     X = convert(Matrix{T}, X)
 
     domain = MU.Box{T}(-ones(T, dim), ones(T, dim))
@@ -42,13 +43,12 @@ function densityest(
     halfdeg = div(deg + 1, 2)
     (U, pts, Ps, w) = MU.interpolate(domain, halfdeg, sample = true, calc_w = true, sample_factor = sample_factor)
     lagrange_polys = MU.recover_lagrange_polys(pts, 2 * halfdeg)
-    basis_evals = Matrix{T}(undef, nobs, U)
-    for i in 1:nobs, j in 1:U
+    basis_evals = Matrix{T}(undef, num_obs, U)
+    for i in 1:num_obs, j in 1:U
         basis_evals[i, j] = lagrange_polys[j](X[i, :])
     end
 
     cones = CO.Cone{T}[]
-    cone_offset = 1
 
     num_psd_vars = 0
     if use_wsos
@@ -56,7 +56,6 @@ function densityest(
         h_poly = zeros(T, U)
         b_poly = T[]
         push!(cones, CO.WSOSInterpNonnegative{T, T}(U, Ps))
-        cone_offset += U
     else
         # U polynomial coefficient variables plus PSD variables
         # there are length(Ps) new PSD variables, we will store them scaled, lower triangle, row-wise
@@ -78,102 +77,120 @@ function densityest(
                 idx += 1
             end
             push!(cones, CO.PosSemidefTri{T, T}(dim))
-            cone_offset += dim
         end
         A_psd = hcat(psd_var_list...)
         b_poly = zeros(T, U)
         h_poly = zeros(T, num_psd_vars)
     end
 
-    h_exp = zeros(T, 3 * nobs)
-    G_exp = zeros(T, 3 * nobs, nobs + U)
-    offset = 1
-    for i in 1:nobs
-        G_exp[offset, (nobs + 1):(nobs + U)] = -basis_evals[i, :]
-        h_exp[offset + 1] = 1
-        G_exp[offset + 2, i] = -1
-        offset += 3
-        push!(cones, CO.EpiPerExp{T}()) # TODO change to HypoPerLog(3) and reverse indices
-        cone_offset += 3
-    end
-    num_epi_vars = nobs
-
-    (log_rows, log_cols) = size(G_exp)
-    if use_linops
-        if use_wsos
-            A = BlockMatrix{T}(1,num_epi_vars + U,
-                [w'],
-                [1:1],
-                [(num_epi_vars + 1):(num_epi_vars + U)]
-                )
-            G = BlockMatrix{T}(U + log_rows, num_epi_vars + U,
-                [-I, G_exp],
-                [1:U, (U + 1):(U + log_rows)],
-                [(num_epi_vars + 1):(num_epi_vars + U), 1:(num_epi_vars + U)],
-                )
+    if hypogeomean_obj
+        num_hypo_vars = 1
+        if use_hypogeomean
+            G_likl = [
+                -one(T) zeros(T, 1, U)
+                zeros(T, num_obs) -basis_evals
+                ]
+            h_likl = zeros(T, 1 + num_obs)
+            push!(cones, CO.HypoGeomean{T}(fill(inv(T(num_obs)), num_obs)))
+            A_ext = zeros(T, 0, num_obs)
         else
-            A = BlockMatrix{T}(U + 1, num_epi_vars + U + num_psd_vars,
-                [-I, A_psd, w'],
-                [1:U, 1:U, (U + 1):(U + 1)],
-                [(num_epi_vars + 1):(num_epi_vars + U), (num_epi_vars + U + 1):(num_epi_vars + U + num_psd_vars), (num_epi_vars + 1):(num_epi_vars + U)],
-                )
-            G = BlockMatrix{T}(num_psd_vars + log_rows, num_epi_vars + U + num_psd_vars,
-                [-I, G_exp],
-                [1:num_psd_vars, (num_psd_vars + 1):(num_psd_vars + log_rows)],
-                [(num_epi_vars + U + 1):(num_epi_vars + U + num_psd_vars), 1:(num_epi_vars + U)],
-                )
+            num_ext_geom_vars = 1 + num_obs
+            h_likl = zeros(T,  3 * num_obs + 2)
+            # order of variables is: hypograph vars, f(obs), psd_vars, geomean ext vars
+            G_likl = zeros(T, 0, 2 + U + num_psd_vars + num_obs)
+            # u - y <= 0
+            G_likl = vcat(G_likl, hcat(one(T), zeros(T, 1, U + num_psd_vars), -one(T), zeros(T, 1, num_obs)))
+            push!(cones, CO.Nonnegative{T}(1))
+            # e'z >= 0
+            G_likl = vcat(G_likl, hcat(zeros(T, 1, 2 + U + num_psd_vars), -ones(T, 1, num_obs)))
+            push!(cones, CO.Nonnegative{T}(1))
+            # -f(x) >= y * log(y / z) or  f(x) <= y * log(z / y)
+            G_likl = vcat(G_likl, zeros(T, 3 * num_obs, size(G_likl, 2)))
+            # offset for rows
+            offset = 3
+            # number of columns before extended variable starts
+            ext_offset = 2 + U + num_psd_vars
+            for i in 1:num_obs
+                G_likl[offset, ext_offset + i] = 1
+                G_likl[offset + 2, ext_offset] = -1
+                G_likl[offset + 1, 2:(1 + U)] = -basis_evals[i, :]
+                offset += 3
+                push!(cones, CO.EpiSumPerEntropy{T}(3))
+                # G_likl[offset, ext_offset + i] = -1
+                # G_likl[offset + 1, ext_offset] = -1
+                # G_likl[offset + 2, 2:(1 + U)] = -basis_evals[i, :]
+                # offset += 3
+                # push!(cones, CO.HypoPerLog{T}(3))
+            end
         end
     else
-        if use_wsos
-            A = hcat(zeros(T, 1, num_epi_vars), w')
-            G = [
-                zeros(T, U, num_epi_vars)    Matrix{T}(-I, U, U);
-                G_exp;
-                ]
-        else
-            A = [
-                zeros(T, U, num_epi_vars)    Matrix{T}(-I, U, U)    A_psd;
-                zeros(T, 1, num_epi_vars)    w'    zeros(T, 1, num_psd_vars);
-                ]
-            G = [
-                zeros(T, num_psd_vars, num_epi_vars + U)  -Matrix{T}(I, num_psd_vars, num_psd_vars);
-                G_exp   zeros(T, log_rows, num_psd_vars);
-                ]
+        num_hypo_vars = num_obs
+        h_likl = zeros(T, 3 * num_obs)
+        G_likl = zeros(T, 3 * num_obs, num_obs + U)
+        offset = 1
+        for i in 1:num_obs
+            # G_likl[offset + 1, (num_obs + 1):(num_obs + U)] = -basis_evals[i, :]
+            # h_likl[offset + 2] = 1
+            # G_likl[offset, i] = 1
+            # offset += 3
+            # push!(cones, CO.EpiSumPerEntropy{T}(3))
+            G_likl[offset + 2, (num_obs + 1):(num_obs + U)] = -basis_evals[i, :]
+            h_likl[offset + 1] = 1
+            G_likl[offset, i] = -1
+            offset += 3
+            push!(cones, CO.HypoPerLog{T}(3))
         end
     end
-    h = vcat(h_poly, h_exp)
-    c = vcat(-ones(T, num_epi_vars), zeros(T, U + num_psd_vars))
+
+    # extended formulation variables for geomean come after psd ones, so they were already accounted for
+    if !hypogeomean_obj || use_hypogeomean
+        G_likl = hcat(G_likl, zeros(T, size(G_likl, 1), num_psd_vars))
+        num_ext_geom_vars = 0
+    end
+    c = vcat(-ones(T, num_hypo_vars), zeros(T, U + num_psd_vars + num_ext_geom_vars))
+    h = vcat(h_poly, h_likl)
     b = vcat(b_poly, one(T))
+
+    if use_wsos
+        A = hcat(zeros(T, 1, num_hypo_vars), w', zeros(T, 1, num_ext_geom_vars))
+        G = [
+            zeros(T, U, num_hypo_vars)  Matrix{T}(-I, U, U)  zeros(T, U, num_ext_geom_vars);
+            G_likl;
+            ]
+    else
+        A = [
+            zeros(T, U, num_hypo_vars)    Matrix{T}(-I, U, U)    A_psd  zeros(T, U, num_ext_geom_vars);
+            zeros(T, 1, num_hypo_vars)    w'    zeros(T, 1, num_psd_vars)  zeros(T, 1, num_ext_geom_vars);
+            ]
+        G = [
+            zeros(T, num_psd_vars, num_hypo_vars + U)  -Matrix{T}(I, num_psd_vars, num_psd_vars)   zeros(T, num_psd_vars, num_ext_geom_vars);
+            G_likl;
+            ]
+    end
 
     return (c = c, A = A, b = b, G = G, h = h, cones = cones)
 end
 
-densityest(T::Type{<:Real}, nobs::Int, n::Int, deg::Int; options...) = densityest(T, randn(T, nobs, n), deg; options...)
+densityest(T::Type{<:Real}, num_obs::Int, n::Int, deg::Int; options...) = densityest(T, randn(T, num_obs, n), deg; options...)
 
-densityest1(T::Type{<:Real}) = densityest(T, iris_data(), 4)
+densityest1(T::Type{<:Real}) = densityest(T, iris_data(), 4, hypogeomean_obj = false)
 densityest2(T::Type{<:Real}) = densityest(T, iris_data(), 4, use_wsos = false)
 densityest3(T::Type{<:Real}) = densityest(T, cancer_data(), 4)
 densityest4(T::Type{<:Real}) = densityest(T, cancer_data(), 4, use_wsos = false)
 densityest5(T::Type{<:Real}) = densityest(T, 50, 1, 4)
 densityest6(T::Type{<:Real}) = densityest(T, 50, 1, 4, use_wsos = false)
-densityest7(T::Type{<:Real}) = densityest(T, 20, 2, 4)
+densityest7(T::Type{<:Real}) = densityest(T, 20, 2, 4, hypogeomean_obj = true, use_hypogeomean = false, use_wsos = true)
 densityest8(T::Type{<:Real}) = densityest(T, 20, 2, 4, use_wsos = false)
-densityest9(T::Type{<:Real}) = densityest(T, 10, 1, 2, use_linops = true)
-densityest10(T::Type{<:Real}) = densityest(T, 10, 1, 2, use_wsos = false, use_linops = true)
 
 instances_densityest_all = [
-    densityest1,
-    densityest2,
-    densityest3,
-    densityest4,
-    densityest5,
-    densityest6,
+    # densityest1,
+    # densityest2,
+    # densityest3,
+    # densityest4,
+    # densityest5,
+    # densityest6,
     densityest7,
-    densityest8,
-    ]
-instances_densityest_linops = [
-    densityest9,
-    densityest10,
+    # densityest8,
     ]
 instances_densityest_few = [
     densityest1,
@@ -187,5 +204,7 @@ function test_densityest(instance::Function; T::Type{<:Real} = Float64, options:
     d = instance(T)
     r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
     @test r.status == :Optimal
+    @show r.primal_obj
+    @show 20 * log((-r.primal_obj))
     return
 end
