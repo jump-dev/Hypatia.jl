@@ -10,6 +10,7 @@ and "Semidefinite Characterization of Sum-of-Squares Cones in Algebras" by D. Pa
 
 mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
     use_dual::Bool
+    max_neighborhood::T
     dim::Int
     R::Int
     U::Int
@@ -27,6 +28,8 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
+    nbhd_tmp::Vector{T}
+    nbhd_tmp2::Vector{T}
 
     rt2::T
     rt2i::T
@@ -49,6 +52,7 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
         end
         cone = new{T}()
         cone.use_dual = !is_dual # using dual barrier
+        cone.max_neighborhood = 0.1
         cone.dim = U * svec_length(R)
         cone.R = R
         cone.U = U
@@ -71,6 +75,8 @@ function setup_data(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
+    cone.nbhd_tmp = zeros(T, dim)
+    cone.nbhd_tmp2 = zeros(T, dim)
     cone.rt2 = sqrt(T(2))
     cone.rt2i = inv(cone.rt2)
     cone.tmpU = Vector{T}(undef, U)

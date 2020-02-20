@@ -15,6 +15,7 @@ since our D is an (R - 1) x (R - 1) block diagonal matrix
 
 mutable struct WSOSInterpEpiNormEucl{T <: Real} <: Cone{T}
     use_dual::Bool
+    max_neighborhood::T
     dim::Int
     R::Int
     U::Int
@@ -32,6 +33,8 @@ mutable struct WSOSInterpEpiNormEucl{T <: Real} <: Cone{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
+    nbhd_tmp::Vector{T}
+    nbhd_tmp2::Vector{T}
 
     mat::Vector{Matrix{T}}
     matfact::Vector
@@ -59,6 +62,7 @@ mutable struct WSOSInterpEpiNormEucl{T <: Real} <: Cone{T}
         end
         cone = new{T}()
         cone.use_dual = !is_dual # using dual barrier
+        cone.max_neighborhood = 0.1
         cone.dim = U * R
         cone.R = R
         cone.U = U
@@ -81,6 +85,8 @@ function setup_data(cone::WSOSInterpEpiNormEucl{T}) where {T <: Real}
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
+    cone.nbhd_tmp = zeros(T, dim)
+    cone.nbhd_tmp2 = zeros(T, dim)
     cone.mat = [similar(cone.grad, size(Psk, 2), size(Psk, 2)) for Psk in Ps]
     cone.matfact = Vector{Any}(undef, length(Ps))
     cone.Λi_Λ = [Vector{Matrix{T}}(undef, R - 1) for Psk in Ps]

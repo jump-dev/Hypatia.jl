@@ -25,6 +25,7 @@ TODO
 
 mutable struct PosSemidefTriSparse{T <: BlasReal, R <: RealOrComplex{T}} <: Cone{T}
     use_dual::Bool
+    max_neighborhood::T
     dim::Int
     side::Int
     row_idxs::Vector{Int}
@@ -44,6 +45,8 @@ mutable struct PosSemidefTriSparse{T <: BlasReal, R <: RealOrComplex{T}} <: Cone
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
+    nbhd_tmp::Vector{T}
+    nbhd_tmp2::Vector{T}
 
     sparse_point
     sparse_point_map
@@ -92,6 +95,7 @@ mutable struct PosSemidefTriSparse{T <: BlasReal, R <: RealOrComplex{T}} <: Cone
         end
         @assert cone.dim >= 1
         cone.use_dual = is_dual
+        cone.max_neighborhood = 0.1
         cone.side = side # side dimension of sparse matrix
         cone.row_idxs = row_idxs
         cone.col_idxs = col_idxs
@@ -111,6 +115,8 @@ function setup_data(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{T
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
+    cone.nbhd_tmp = zeros(T, dim)
+    cone.nbhd_tmp2 = zeros(T, dim)
     setup_symbfact(cone)
     return
 end
