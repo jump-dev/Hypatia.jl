@@ -108,19 +108,14 @@ function densityest(
             G_likl = vcat(G_likl, zeros(T, 3 * num_obs, size(G_likl, 2)))
             # offset for rows
             offset = 3
-            # number of columns before extended variable starts
+            # number of columns before extended variables start
             ext_offset = 2 + U + num_psd_vars
             for i in 1:num_obs
-                G_likl[offset, ext_offset + i] = 1
-                G_likl[offset + 2, ext_offset] = -1
-                G_likl[offset + 1, 2:(1 + U)] = -basis_evals[i, :]
+                G_likl[offset, ext_offset + i] = -1
+                G_likl[offset + 1, ext_offset] = -1
+                G_likl[offset + 2, 2:(1 + U)] = -basis_evals[i, :]
                 offset += 3
-                push!(cones, CO.EpiSumPerEntropy{T}(3))
-                # G_likl[offset, ext_offset + i] = -1
-                # G_likl[offset + 1, ext_offset] = -1
-                # G_likl[offset + 2, 2:(1 + U)] = -basis_evals[i, :]
-                # offset += 3
-                # push!(cones, CO.HypoPerLog{T}(3))
+                push!(cones, CO.HypoPerLog{T}(3))
             end
         end
     else
@@ -129,16 +124,11 @@ function densityest(
         G_likl = zeros(T, 3 * num_obs, num_obs + U)
         offset = 1
         for i in 1:num_obs
-            G_likl[offset + 1, (num_obs + 1):(num_obs + U)] = -basis_evals[i, :]
-            h_likl[offset + 2] = 1
-            G_likl[offset, i] = 1
+            G_likl[offset + 2, (num_obs + 1):(num_obs + U)] = -basis_evals[i, :]
+            h_likl[offset + 1] = 1
+            G_likl[offset, i] = -1
             offset += 3
-            push!(cones, CO.EpiSumPerEntropy{T}(3))
-            # G_likl[offset + 2, (num_obs + 1):(num_obs + U)] = -basis_evals[i, :]
-            # h_likl[offset + 1] = 1
-            # G_likl[offset, i] = -1
-            # offset += 3
-            # push!(cones, CO.HypoPerLog{T}(3))
+            push!(cones, CO.HypoPerLog{T}(3))
         end
     end
 
