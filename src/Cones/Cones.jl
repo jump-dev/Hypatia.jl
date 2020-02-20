@@ -151,16 +151,30 @@ hess_nz_idxs_col_tril(cone::Cone, j::Int) = j:dimension(cone)
 inv_hess_nz_idxs_col(cone::Cone, j::Int) = 1:dimension(cone)
 inv_hess_nz_idxs_col_tril(cone::Cone, j::Int) = j:dimension(cone)
 
-function neighborhood(cone::Cone, dual_point::AbstractVector, mu::Real)
+function in_neighborhood(cone::Cone{T}, dual_point::AbstractVector, mu::Real) where {T <: Real}
     # norm(H^(-1/2) * (z + mu * grad))
+    nbhd_tmp = cone.nbhd_tmp
+    nbhd_tmp2 = cone.nbhd_tmp2
     g = grad(cone)
-    @. cone.nbhd_tmp = dual_point + mu * g
-    inv_hess_sqrt_prod!(cone.nbhd_tmp2, cone.nbhd_tmp, cone)
-    return norm(cone.nbhd_tmp2)
-end
+    @. nbhd_tmp = dual_point + mu * g
 
-function in_neighborhood(cone::Cone, dual_point::AbstractVector, mu::Real)
-    return (neighborhood(cone, dual_point, mu) < mu * cone.max_neighborhood)
+    if hasfield(typeof(cone), :hess_fact_cache) && !update_hess_fact(cone)
+        return false
+    end
+    if hasfield(typeof(cone), :hess_fact_cache) && cone.hess_fact_cache isa DenseSymCache{T}
+        inv_hess_prod!(nbhd_tmp2, nbhd_tmp, cone)
+        nbhd_sqr = dot(nbhd_tmp2, nbhd_tmp)
+        if nbhd_sqr < -eps(T) # TODO possibly loosen
+            @warn("numerical failure: cone neighborhood is $nbhd_sqr")
+            return false
+        end
+        nbhd = sqrt(abs(nbhd_sqr))
+    else
+        inv_hess_sqrt_prod!(nbhd_tmp2, nbhd_tmp, cone)
+        nbhd = norm(nbhd_tmp2)
+    end
+
+    return (nbhd < mu * cone.max_neighborhood)
 end
 
 # utilities for arrays

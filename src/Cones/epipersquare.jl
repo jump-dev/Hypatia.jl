@@ -11,6 +11,7 @@ barrier from "Self-Scaled Barriers and Interior-Point Methods for Convex Program
 
 mutable struct EpiPerSquare{T <: Real} <: Cone{T}
     use_dual::Bool
+    max_neighborhood::T
     dim::Int
     point::Vector{T}
     timer::TimerOutput
@@ -25,6 +26,8 @@ mutable struct EpiPerSquare{T <: Real} <: Cone{T}
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
+    nbhd_tmp::Vector{T}
+    nbhd_tmp2::Vector{T}
 
     dist::T
     rtdist::T
@@ -36,6 +39,7 @@ mutable struct EpiPerSquare{T <: Real} <: Cone{T}
         @assert dim >= 3
         cone = new{T}()
         cone.use_dual = is_dual
+        cone.max_neighborhood = 0.1
         cone.dim = dim
         return cone
     end
@@ -54,6 +58,8 @@ function setup_data(cone::EpiPerSquare{T}) where {T <: Real}
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.hess_sqrt_vec = zeros(T, dim)
     cone.inv_hess_sqrt_vec = zeros(T, dim)
+    cone.nbhd_tmp = zeros(T, dim)
+    cone.nbhd_tmp2 = zeros(T, dim)
     return
 end
 

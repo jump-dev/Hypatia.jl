@@ -4,10 +4,14 @@ Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 matrix epigraph of matrix square
 
 (U, v, W) in (S_+^n, R_+, R^(n, m)) such that 2 * U * v - W * W' in S_+^n
+
+TODO
+- try to derive faster neighborhood calculations for this cone specifically
 =#
 
 mutable struct MatrixEpiPerSquare{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     use_dual::Bool
+    max_neighborhood::T
     dim::Int
     n::Int
     m::Int
@@ -26,6 +30,8 @@ mutable struct MatrixEpiPerSquare{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
+    nbhd_tmp::Vector{T}
+    nbhd_tmp2::Vector{T}
 
     U_idxs::UnitRange{Int}
     v_idx::Int
@@ -48,6 +54,7 @@ mutable struct MatrixEpiPerSquare{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
         @assert 1 <= n <= m
         cone = new{T, R}()
         cone.use_dual = is_dual
+        cone.max_neighborhood = 0.1
         cone.is_complex = (R <: Complex)
         cone.v_idx = (cone.is_complex ? n ^ 2 + 1 : svec_length(n) + 1)
         cone.dim = cone.v_idx + (cone.is_complex ? 2 : 1) * n * m
@@ -72,6 +79,8 @@ function setup_data(cone::MatrixEpiPerSquare{T, R}) where {R <: RealOrComplex{T}
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
+    cone.nbhd_tmp = zeros(T, dim)
+    cone.nbhd_tmp2 = zeros(T, dim)
     n = cone.n
     m = cone.m
     cone.U = Hermitian(zeros(R, n, n), :U)

@@ -70,9 +70,9 @@ function setup_data(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where 
     dim = cone.dim
     cone.point = zeros(T, dim)
     cone.grad = zeros(T, dim)
+    cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
-    cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     n = cone.n
     cone.w = zeros(R, n)
     cone.wden = zeros(R, n)
