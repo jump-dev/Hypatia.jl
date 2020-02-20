@@ -13,6 +13,7 @@ TODO
 
 mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     use_dual::Bool
+    max_neighborhood::T
     dim::Int
     Ps::Vector{Matrix{R}}
     point::Vector{T}
@@ -28,6 +29,8 @@ mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
+    nbhd_tmp::Vector{T}
+    nbhd_tmp2::Vector{T}
 
     tmpLL::Vector{Matrix{R}}
     tmpUL::Vector{Matrix{R}}
@@ -46,6 +49,7 @@ mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T
         end
         cone = new{T, R}()
         cone.use_dual = !is_dual # using dual barrier
+        cone.max_neighborhood = 0.1
         cone.dim = U
         cone.Ps = Ps
         cone.hess_fact_cache = hess_fact_cache
@@ -63,6 +67,8 @@ function setup_data(cone::WSOSInterpNonnegative{T, R}) where {R <: RealOrComplex
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
+    cone.nbhd_tmp = zeros(T, dim)
+    cone.nbhd_tmp2 = zeros(T, dim)
     Ps = cone.Ps
     cone.tmpLL = [Matrix{R}(undef, size(Pk, 2), size(Pk, 2)) for Pk in Ps]
     cone.tmpUL = [Matrix{R}(undef, dim, size(Pk, 2)) for Pk in Ps]
