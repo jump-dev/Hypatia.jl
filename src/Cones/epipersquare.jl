@@ -99,11 +99,11 @@ function update_hess(cone::EpiPerSquare)
     H = cone.hess.data
 
     mul!(H, cone.grad, cone.grad')
-    invdist = inv(cone.dist)
+    inv_dist = inv(cone.dist)
     @inbounds for j in 3:cone.dim
-        H[j, j] += invdist
+        H[j, j] += inv_dist
     end
-    H[1, 2] -= invdist
+    H[1, 2] -= inv_dist
 
     cone.hess_updated = true
     return cone.hess
