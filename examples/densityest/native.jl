@@ -99,10 +99,10 @@ function densityest(
             # order of variables is: hypograph vars, f(obs), psd_vars, geomean ext vars (y, z)
             G_likl = zeros(T, 3 * num_obs + 2, 2 + U + num_psd_vars + num_obs)
             # u - y <= 0
-            G_likl[1, :] .= vcat(one(T), zeros(T, U + num_psd_vars), -one(T), zeros(T, num_obs))
+            G_likl[1, :] = vcat(one(T), zeros(T, U + num_psd_vars), -one(T), zeros(T, num_obs))
             push!(cones, CO.Nonnegative{T}(1))
             # e'z >= 0
-            G_likl[2, :] .= vcat(zeros(T, 2 + U + num_psd_vars), -ones(T, num_obs))
+            G_likl[2, :] = vcat(zeros(T, 2 + U + num_psd_vars), -ones(T, num_obs))
             push!(cones, CO.Nonnegative{T}(1))
             # f(x) <= y * log(z / y)
             row_offset = 3
@@ -130,7 +130,7 @@ function densityest(
         end
     end
 
-    # extended formulation variables for geomean come after psd ones, so psd vars were already accounted for in hypogeomean_obj && !use_hypogeomean path
+    # extended formulation variables for hypogeomean cone are added after psd ones, so psd vars were already accounted for in hypogeomean_obj && !use_hypogeomean path
     if !hypogeomean_obj || use_hypogeomean
         G_likl = hcat(G_likl, zeros(T, size(G_likl, 1), num_psd_vars))
         num_ext_geom_vars = 0
