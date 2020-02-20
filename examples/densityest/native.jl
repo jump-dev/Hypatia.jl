@@ -96,25 +96,23 @@ function densityest(
         else
             num_ext_geom_vars = 1 + num_obs
             h_likl = zeros(T,  3 * num_obs + 2)
-            # order of variables is: hypograph vars, f(obs), psd_vars, geomean ext vars
-            G_likl = zeros(T, 0, 2 + U + num_psd_vars + num_obs)
+            # order of variables is: hypograph vars, f(obs), psd_vars, geomean ext vars (y, z)
+            G_likl = zeros(T, 3 * num_obs + 2, 2 + U + num_psd_vars + num_obs)
             # u - y <= 0
-            G_likl = vcat(G_likl, hcat(one(T), zeros(T, 1, U + num_psd_vars), -one(T), zeros(T, 1, num_obs)))
+            G_likl[1, :] .= vcat(one(T), zeros(T, U + num_psd_vars), -one(T), zeros(T, num_obs))
             push!(cones, CO.Nonnegative{T}(1))
             # e'z >= 0
-            G_likl = vcat(G_likl, hcat(zeros(T, 1, 2 + U + num_psd_vars), -ones(T, 1, num_obs)))
+            G_likl[2, :] .= vcat(zeros(T, 2 + U + num_psd_vars), -ones(T, num_obs))
             push!(cones, CO.Nonnegative{T}(1))
-            # -f(x) >= y * log(y / z) or  f(x) <= y * log(z / y)
-            G_likl = vcat(G_likl, zeros(T, 3 * num_obs, size(G_likl, 2)))
-            # offset for rows
-            offset = 3
+            # f(x) <= y * log(z / y)
+            row_offset = 3
             # number of columns before extended variables start
             ext_offset = 2 + U + num_psd_vars
             for i in 1:num_obs
-                G_likl[offset, ext_offset + i] = -1
-                G_likl[offset + 1, ext_offset] = -1
-                G_likl[offset + 2, 2:(1 + U)] = -basis_evals[i, :]
-                offset += 3
+                G_likl[row_offset, ext_offset + i] = -1
+                G_likl[row_offset + 1, ext_offset] = -1
+                G_likl[row_offset + 2, 2:(1 + U)] = -basis_evals[i, :]
+                row_offset += 3
                 push!(cones, CO.HypoPerLog{T}(3))
             end
         end
@@ -132,7 +130,7 @@ function densityest(
         end
     end
 
-    # extended formulation variables for geomean come after psd ones, so they were already accounted for
+    # extended formulation variables for geomean come after psd ones, so psd vars were already accounted for in hypogeomean_obj && !use_hypogeomean path
     if !hypogeomean_obj || use_hypogeomean
         G_likl = hcat(G_likl, zeros(T, size(G_likl, 1), num_psd_vars))
         num_ext_geom_vars = 0
