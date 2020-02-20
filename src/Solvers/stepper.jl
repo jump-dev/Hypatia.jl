@@ -89,72 +89,16 @@ end
 function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     point = solver.point
 
-    # @timeit solver.timer "update_fact" update_fact(solver.system_solver, solver)
-    #
-    # # calculate affine/prediction and combined directions
-    # # TODO cleanup booleans
-    # stepper.in_affine_phase = true
-    # @timeit solver.timer "aff_dir" get_directions(stepper, solver)
-    # z_pred = copy(stepper.z_dir)
-    # s_pred = copy(stepper.s_dir)
-    # tau_pred = stepper.dir[stepper.tau_row]
-    # kap_pred = stepper.dir[stepper.kap_row]
-    # stepper.in_affine_phase = false
-    # @timeit solver.timer "comb_dir" get_directions(stepper, solver)
-    # stepper.in_affine_phase = true
-    #
-    # # calculate correction factor gamma by finding distance aff_alpha for stepping in affine direction
-    # solver.prev_aff_alpha = aff_alpha = find_max_alpha(stepper, solver)
-    # @timeit solver.timer "aff_alpha" solver.prev_aff_alpha = aff_alpha = find_max_alpha(
-    #     z_pred, s_pred, tau_pred, kap_pred, solver,
-    #     nbhd = T(Inf), prev_alpha = max(solver.prev_aff_alpha, T(2e-2)), min_alpha = T(2e-2)) # TODO
-    #     # nbhd = one(T), prev_alpha = max(solver.prev_aff_alpha, T(2e-2)), min_alpha = T(2e-2))
-    # @assert 0 <= aff_alpha <= 1
-    # # TODO allow different function (heuristic)
-    # # gamma = abs2(1 - aff_alpha)
-    # # gamma = (1 - aff_alpha) * min(abs2(1 - aff_alpha), T(0.25)) # from MOSEK paper
-    # solver.prev_gamma = stepper.gamma = gamma
-    #
-    # # find distance alpha for stepping in combined direction
-    # solver.prev_alpha = alpha = T(0.99) * find_max_alpha(stepper, solver) # TODO make the constant an option, depends on eps(T)?
-    # if iszero(alpha)
-    #     @warn("numerical failure: could not step in combined direction; terminating")
-    #     solver.status = :NumericalFailure
-    #     solver.keep_iterating = false
-    #     return point
-    # end
-    #
-    # # step distance alpha in combined directions
-    # # TODO allow stepping different alphas in primal and dual cone directions? some solvers do
-    # @. point.x += alpha * stepper.x_dir
-    # @. point.y += alpha * stepper.y_dir
-    # @. point.z += alpha * stepper.z_dir
-    # @. point.s += alpha * stepper.s_dir
-    # solver.tau += alpha * stepper.dir[stepper.tau_row]
-    # solver.kap += alpha * stepper.dir[stepper.kap_row]
-    # calc_mu(solver)
-    #
-    # if solver.tau <= zero(T) || solver.kap <= zero(T) || solver.mu <= zero(T)
-    #     @warn("numerical failure: tau is $(solver.tau), kappa is $(solver.kap), mu is $(solver.mu); terminating")
-    #     solver.status = :NumericalFailure
-    #     solver.keep_iterating = false
-    # end
-
-
-
-    # # calculate affine/prediction and correction directions
-    # @timeit solver.timer "directions" dirs = get_directions(stepper, solver)
-    # (tau_pred, tau_corr, kap_pred, kap_corr) = (stepper.tau_dirs[1], stepper.tau_dirs[2], stepper.kap_dirs[1], stepper.kap_dirs[2])
-
     @timeit solver.timer "update_fact" update_fact(solver.system_solver, solver)
 
     # calculate affine/prediction and combined directions
     # TODO cleanup booleans
     stepper.in_affine_phase = true
     @timeit solver.timer "aff_dir" get_directions(stepper, solver)
-    z_pred = copy(stepper.z_dir) # TODO prealloc, cleanup
+    # TODO prealloc, cleanup
+    z_pred = copy(stepper.z_dir)
     s_pred = copy(stepper.s_dir)
-    x_pred = copy(stepper.x_dir) # TODO prealloc, cleanup
+    x_pred = copy(stepper.x_dir)
     y_pred = copy(stepper.y_dir)
     tau_pred = stepper.dir[stepper.tau_row]
     kap_pred = stepper.dir[stepper.kap_row]
@@ -283,6 +227,7 @@ function find_max_alpha(
     return alpha
 end
 
+# TODO maybe just combine with above function if can simplify
 function check_nbhd(
     mu_temp::T,
     taukap_temp::T,
@@ -291,13 +236,20 @@ function check_nbhd(
     ) where {T <: Real}
     cones = solver.model.cones
 
-    rhs_nbhd = mu_temp * abs2(nbhd)
-    lhs_nbhd = abs2(taukap_temp - mu_temp) / mu_temp
-    if lhs_nbhd >= rhs_nbhd
+    # TODO use a vector of bools for which cones are already in nbhd?
+
+    # check neighborhood for tau and kappa
+    if taukap_temp - mu_temp >= nbhd
         return false
     end
 
-    Cones.load_point.(cones, solver.primal_views)
+    # rhs_nbhd = mu_temp * abs2(nbhd)
+    # lhs_nbhd = abs2(taukap_temp - mu_temp) / mu_temp
+    # if lhs_nbhd >= rhs_nbhd
+    #     return false
+    # end
+
+    Cones.load_point.(cones, solver.primal_views) # TODO only for cones that need to be checked?
 
     # accept primal iterate if it is inside the cone and neighborhood
     # first check inside cone for whichever cones were violated last line search iteration
@@ -327,42 +279,48 @@ function check_nbhd(
             end
         end
 
-        temp_k = solver.nbhd_temp[k]
-        g_k = Cones.grad(cone_k)
-        @. temp_k = solver.dual_views[k] + g_k * mu_temp
-
-        # TODO optionally could use multiple nbhd checks (add separate bool options and separate max_nbhd value options), eg smaller hess nbhd for each cone and larger hess nbhd for sum of cone nbhds
-        # TODO could use infinity nbhd (cheaper) for affine line search and hess nbhd for combined line search
-        if solver.use_infty_nbhd
-            nbhd_k = abs2(norm(temp_k, Inf) / norm(g_k, Inf)) / mu_temp
-            # nbhd_k = abs2(maximum(abs(dj) / abs(gj) for (dj, gj) in zip(duals_k, g_k))) # TODO try this neighborhood
-            lhs_nbhd = max(lhs_nbhd, nbhd_k)
-        else
-            # TODO use dispatch
-            if hasfield(typeof(cone_k), :hess_fact_cache)
-                @timeit solver.timer "update_hess_fact" if !Cones.update_hess_fact(cone_k)
-                    return false
-                end
-            end
-            temp2_k = similar(temp_k) # TODO prealloc
-            if hasfield(typeof(cone_k), :hess_fact_cache) && cone_k.hess_fact_cache isa DenseSymCache{T}
-                Cones.inv_hess_prod!(temp2_k, temp_k, cone_k)
-                nbhd_k = dot(temp_k, temp2_k) / mu_temp
-                if nbhd_k <= -cbrt(eps(T))
-                    @warn("numerical failure: cone neighborhood is $nbhd_k")
-                    return false
-                end
-                nbhd_k = abs(nbhd_k)
-            else
-                Cones.inv_hess_sqrt_prod!(temp2_k, temp_k, cone_k)
-                nbhd_k = sum(abs2, temp2_k) / mu_temp
-            end
-            lhs_nbhd += nbhd_k
-        end
-
-        if lhs_nbhd > rhs_nbhd
+        if !Cones.in_neighborhood(cone_k, solver.dual_views[k], mu)
             return false
         end
+
+        # TODO delete unused nbhd_temp etc
+
+        # temp_k = solver.nbhd_temp[k]
+        # g_k = Cones.grad(cone_k)
+        # @. temp_k = solver.dual_views[k] + g_k * mu_temp
+        #
+        # # TODO optionally could use multiple nbhd checks (add separate bool options and separate max_nbhd value options), eg smaller hess nbhd for each cone and larger hess nbhd for sum of cone nbhds
+        # # TODO could use infinity nbhd (cheaper) for affine line search and hess nbhd for combined line search
+        # if solver.use_infty_nbhd
+        #     nbhd_k = abs2(norm(temp_k, Inf) / norm(g_k, Inf)) / mu_temp
+        #     # nbhd_k = abs2(maximum(abs(dj) / abs(gj) for (dj, gj) in zip(duals_k, g_k))) # TODO try this neighborhood
+        #     lhs_nbhd = max(lhs_nbhd, nbhd_k)
+        # else
+        #     # TODO use dispatch
+        #     if hasfield(typeof(cone_k), :hess_fact_cache)
+        #         @timeit solver.timer "update_hess_fact" if !Cones.update_hess_fact(cone_k)
+        #             return false
+        #         end
+        #     end
+        #     temp2_k = similar(temp_k) # TODO prealloc
+        #     if hasfield(typeof(cone_k), :hess_fact_cache) && cone_k.hess_fact_cache isa DenseSymCache{T}
+        #         Cones.inv_hess_prod!(temp2_k, temp_k, cone_k)
+        #         nbhd_k = dot(temp_k, temp2_k) / mu_temp
+        #         if nbhd_k <= -cbrt(eps(T))
+        #             @warn("numerical failure: cone neighborhood is $nbhd_k")
+        #             return false
+        #         end
+        #         nbhd_k = abs(nbhd_k)
+        #     else
+        #         Cones.inv_hess_sqrt_prod!(temp2_k, temp_k, cone_k)
+        #         nbhd_k = sum(abs2, temp2_k) / mu_temp
+        #     end
+        #     lhs_nbhd += nbhd_k
+        # end
+        #
+        # if lhs_nbhd > rhs_nbhd
+        #     return false
+        # end
     end
 
     return true
