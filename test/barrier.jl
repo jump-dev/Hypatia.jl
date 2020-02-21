@@ -51,16 +51,16 @@ function test_barrier_oracles(
     # test gradient and Hessian oracles
     test_grad_hess(cone, point, tol = tol)
 
-    # # check gradient and Hessian agree with ForwardDiff
-    # if dim < 10 # too slow if dimension is large
-    #     grad = CO.grad(cone)
-    #     fd_grad = ForwardDiff.gradient(barrier, point)
-    #     @test grad ≈ fd_grad atol=tol rtol=tol
-    #
-    #     hess = CO.hess(cone)
-    #     fd_hess = ForwardDiff.hessian(barrier, point)
-    #     @test hess ≈ fd_hess atol=tol rtol=tol
-    # end
+    # check gradient and Hessian agree with ForwardDiff
+    if dim < 10 # too slow if dimension is large
+        grad = CO.grad(cone)
+        fd_grad = ForwardDiff.gradient(barrier, point)
+        @test grad ≈ fd_grad atol=tol rtol=tol
+
+        hess = CO.hess(cone)
+        fd_hess = ForwardDiff.hessian(barrier, point)
+        @test hess ≈ fd_hess atol=tol rtol=tol
+    end
 
     # TODO decide whether to add
     # # check 3rd order corrector agrees with ForwardDiff
