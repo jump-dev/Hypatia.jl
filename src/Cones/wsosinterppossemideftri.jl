@@ -11,6 +11,7 @@ and "Semidefinite Characterization of Sum-of-Squares Cones in Algebras" by D. Pa
 mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
     use_dual::Bool
     max_neighborhood::T
+    use_heuristic_neighborhood::Bool
     dim::Int
     R::Int
     U::Int
@@ -53,6 +54,7 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
         cone = new{T}()
         cone.use_dual = !is_dual # using dual barrier
         cone.max_neighborhood = default_max_neighborhood()
+        cone.use_heuristic_neighborhood = default_use_heuristic_neighborhood()
         cone.dim = U * svec_length(R)
         cone.R = R
         cone.U = U

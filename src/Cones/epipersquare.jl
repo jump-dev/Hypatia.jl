@@ -50,6 +50,8 @@ end
 
 EpiPerSquare{T}(dim::Int) where {T <: Real} = EpiPerSquare{T}(dim, false)
 
+use_heuristic_neighborhood(cone::EpiPerSquare) = false
+
 reset_data(cone::EpiPerSquare) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_sqrt_prod_updated = cone.inv_hess_sqrt_prod_updated = false)
 
 function setup_data(cone::EpiPerSquare{T}) where {T <: Real}

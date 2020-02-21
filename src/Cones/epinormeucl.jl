@@ -43,6 +43,8 @@ end
 
 EpiNormEucl{T}(dim::Int) where {T <: Real} = EpiNormEucl{T}(dim, false)
 
+use_heuristic_neighborhood(cone::EpiNormEucl) = false
+
 reset_data(cone::EpiNormEucl) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
 
 # TODO only allocate the fields we use

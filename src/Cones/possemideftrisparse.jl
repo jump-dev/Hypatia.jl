@@ -26,6 +26,7 @@ TODO
 mutable struct PosSemidefTriSparse{T <: BlasReal, R <: RealOrComplex{T}} <: Cone{T}
     use_dual::Bool
     max_neighborhood::T
+    use_heuristic_neighborhood::Bool
     dim::Int
     side::Int
     row_idxs::Vector{Int}
@@ -96,6 +97,7 @@ mutable struct PosSemidefTriSparse{T <: BlasReal, R <: RealOrComplex{T}} <: Cone
         @assert cone.dim >= 1
         cone.use_dual = is_dual
         cone.max_neighborhood = default_max_neighborhood()
+        cone.use_heuristic_neighborhood = default_use_heuristic_neighborhood()
         cone.side = side # side dimension of sparse matrix
         cone.row_idxs = row_idxs
         cone.col_idxs = col_idxs

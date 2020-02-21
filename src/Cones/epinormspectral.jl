@@ -14,6 +14,7 @@ barrier from "Interior-Point Polynomial Algorithms in Convex Programming" by Nes
 mutable struct EpiNormSpectral{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     use_dual::Bool
     max_neighborhood::T
+    use_heuristic_neighborhood::Bool
     dim::Int
     n::Int
     m::Int
@@ -56,6 +57,7 @@ mutable struct EpiNormSpectral{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
         cone = new{T, R}()
         cone.use_dual = is_dual
         cone.max_neighborhood = default_max_neighborhood()
+        cone.use_heuristic_neighborhood = default_use_heuristic_neighborhood()
         cone.is_complex = (R <: Complex)
         cone.dim = (cone.is_complex ? 2 * n * m + 1 : n * m + 1)
         cone.n = n

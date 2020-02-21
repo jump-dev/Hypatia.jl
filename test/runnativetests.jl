@@ -18,7 +18,7 @@ blas_reals = [
     Float32,
     ]
 
-options = (verbose = false,)
+options = (verbose = true,)
 
 @info("starting native tests")
 @testset "native tests" begin
@@ -41,11 +41,6 @@ options = (verbose = false,)
     # end
     # @testset "reduction tests: $t, $T" for t in testfuns_reduce, T in generic_reals
     #     t(T, solver = SO.Solver{T}(preprocess = true, init_use_indirect = false, reduce = true, system_solver = SO.QRCholDenseSystemSolver{T}(); options...))
-    # end
-    #
-    # # test with different neighborhood functions
-    # @testset "neighborhood function tests: $t, $T, $n" for t in testfuns_many, T in generic_reals, n in [true, false]
-    #     t(T, solver = SO.Solver{T}(use_infty_nbhd = n; options...))
     # end
     #
     # # test each system solver
@@ -80,6 +75,7 @@ options = (verbose = false,)
         Hypatia.DensePosDefCache
         ]
     @testset "QRCholDense tests: $t, $T, $c" for t in testfuns_many, T in generic_reals, c in qrchol_cache
+        @show t
         t(T, solver = SO.Solver{T}(system_solver = SO.QRCholDenseSystemSolver{T}(fact_cache = c{T}()); options...))
     end
 end

@@ -40,6 +40,8 @@ end
 
 Nonnegative{T}(dim::Int) where {T <: Real} = Nonnegative{T}(dim, false)
 
+use_heuristic_neighborhood(cone::Nonnegative) = false
+
 use_3order_corr(cone::Nonnegative) = cone.use_3order_corr
 
 reset_data(cone::Nonnegative) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)

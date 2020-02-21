@@ -62,6 +62,8 @@ end
 
 EpiNormInf{T, R}(dim::Int) where {R <: RealOrComplex{T}} where {T <: Real} = EpiNormInf{T, R}(dim, false)
 
+use_heuristic_neighborhood(cone::EpiNormInf) = false
+
 reset_data(cone::EpiNormInf) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_inv_hess_updated = false)
 
 # TODO only allocate the fields we use

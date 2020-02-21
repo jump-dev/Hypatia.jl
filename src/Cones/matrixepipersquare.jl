@@ -9,6 +9,7 @@ matrix epigraph of matrix square
 mutable struct MatrixEpiPerSquare{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     use_dual::Bool
     max_neighborhood::T
+    use_heuristic_neighborhood::Bool
     dim::Int
     n::Int
     m::Int
@@ -52,6 +53,7 @@ mutable struct MatrixEpiPerSquare{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
         cone = new{T, R}()
         cone.use_dual = is_dual
         cone.max_neighborhood = default_max_neighborhood()
+        cone.use_heuristic_neighborhood = default_use_heuristic_neighborhood()
         cone.is_complex = (R <: Complex)
         cone.v_idx = (cone.is_complex ? n ^ 2 + 1 : svec_length(n) + 1)
         cone.dim = cone.v_idx + (cone.is_complex ? 2 : 1) * n * m
