@@ -102,7 +102,7 @@ function update_grad(cone::HypoPerLog)
     g[1] = inv(cone.vlwvu)
     cone.lvwnivlwvu = (d - cone.lwv) / cone.vlwvu
     g[2] = cone.lvwnivlwvu - d / v
-    gden = -1 - inv(cone.lwv - u / v)
+    gden = -1 - v / (cone.vlwvu)
     @. g[3:end] = gden / w
 
     cone.grad_updated = true
