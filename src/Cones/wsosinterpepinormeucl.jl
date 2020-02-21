@@ -54,8 +54,8 @@ mutable struct WSOSInterpEpiNormEucl{T <: Real} <: Cone{T}
     function WSOSInterpEpiNormEucl{T}(
         R::Int,
         U::Int,
-        Ps::Vector{Matrix{T}},
-        is_dual::Bool;
+        Ps::Vector{Matrix{T}};
+        use_dual::Bool = true, # using dual barrier
         max_neighborhood::Real = default_max_neighborhood(),
         use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
         hess_fact_cache = hessian_cache(T),
@@ -64,7 +64,7 @@ mutable struct WSOSInterpEpiNormEucl{T <: Real} <: Cone{T}
             @assert size(Pj, 1) == U
         end
         cone = new{T}()
-        cone.use_dual = !is_dual # using dual barrier
+        cone.use_dual = is_dual
         cone.max_neighborhood = max_neighborhood
         cone.use_heuristic_neighborhood = use_heuristic_neighborhood
         cone.dim = U * R
@@ -75,8 +75,6 @@ mutable struct WSOSInterpEpiNormEucl{T <: Real} <: Cone{T}
         return cone
     end
 end
-
-WSOSInterpEpiNormEucl{T}(R::Int, U::Int, Ps::Vector{Matrix{T}}) where {T <: Real} = WSOSInterpEpiNormEucl{T}(R, U, Ps, false)
 
 function setup_data(cone::WSOSInterpEpiNormEucl{T}) where {T <: Real}
     reset_data(cone)

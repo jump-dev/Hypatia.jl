@@ -49,8 +49,8 @@ mutable struct EpiNormSpectral{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
 
     function EpiNormSpectral{T, R}(
         n::Int,
-        m::Int,
-        is_dual::Bool;
+        m::Int;
+        use_dual::Bool = false,
         max_neighborhood::Real = default_max_neighborhood(),
         use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
         hess_fact_cache = hessian_cache(T),
@@ -68,8 +68,6 @@ mutable struct EpiNormSpectral{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
         return cone
     end
 end
-
-EpiNormSpectral{T, R}(n::Int, m::Int) where {R <: RealOrComplex{T}} where {T <: Real} = EpiNormSpectral{T, R}(n, m, false)
 
 reset_data(cone::EpiNormSpectral) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_prod_updated = cone.hess_fact_updated = false)
 
@@ -108,7 +106,7 @@ function update_feas(cone::EpiNormSpectral)
 
     if u > 0
         @views vec_copy_to!(cone.W, cone.point[2:end])
-        copyto!(cone.Z, abs2(u) * I) # TODO inefficient
+        copyto!(cone.Z, abs2(u) * I)
         mul!(cone.Z, cone.W, cone.W', -1, true)
         cone.fact_Z = cholesky!(Hermitian(cone.Z, :U), check = false)
         cone.is_feas = isposdef(cone.fact_Z)
@@ -163,8 +161,8 @@ function update_hess(cone::EpiNormSpectral)
     H = cone.hess.data
 
     # H_W_W part
-    mul!(tmpmm, W', ZiW)
-    tmpmm += I # TODO inefficient
+    copyto!(tmpmm, I)
+    mul!(tmpmm, W', ZiW, true, true)
 
     # TODO parallelize loops
     idx_incr = (cone.is_complex ? 2 : 1)

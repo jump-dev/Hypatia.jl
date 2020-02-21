@@ -40,8 +40,8 @@ mutable struct EpiSumPerEntropy{T <: Real} <: Cone{T}
     wvdiff::Vector{T}
 
     function EpiSumPerEntropy{T}(
-        dim::Int,
-        is_dual::Bool;
+        dim::Int;
+        use_dual::Bool = false,
         max_neighborhood::Real = default_max_neighborhood(),
         use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
         hess_fact_cache = hessian_cache(T),
@@ -59,8 +59,6 @@ mutable struct EpiSumPerEntropy{T <: Real} <: Cone{T}
         return cone
     end
 end
-
-EpiSumPerEntropy{T}(dim::Int) where {T <: Real} = EpiSumPerEntropy{T}(dim, false)
 
 # TODO only allocate the fields we use
 function setup_data(cone::EpiSumPerEntropy{T}) where {T <: Real}

@@ -381,13 +381,18 @@ end
 function test_hypoperlogdettri_barrier(T::Type{<:Real})
     for side in [1, 2, 3, 4, 5, 6, 12, 20]
         # real logdet barrier
+        dim = 2 + CO.svec_length(side)
+
+
+
+
+        # TODO remove sc_const = 1
+        cone = CO.HypoPerLogdetTri{T, T}(dim, sc_const = 1)
         function R_barrier(s)
             (u, v, W) = (s[1], s[2], zeros(eltype(s), side, side))
             CO.svec_to_smat!(W, s[3:end], sqrt(T(2)))
-            return T(256) * (-log(v * logdet(cholesky!(Symmetric(W / v, :U))) - u) - logdet(cholesky!(Symmetric(W, :U))) - (side + 1) * log(v))
+            return cone.sc_const * (-log(v * logdet(cholesky!(Symmetric(W / v, :U))) - u) - logdet(cholesky!(Symmetric(W, :U))) - (side + 1) * log(v))
         end
-        dim = 2 + CO.svec_length(side)
-        cone = CO.HypoPerLogdetTri{T, T}(dim)
         if side <= 5
             test_barrier_oracles(cone, R_barrier, init_tol = 1e-5)
         else
@@ -395,13 +400,13 @@ function test_hypoperlogdettri_barrier(T::Type{<:Real})
         end
 
         # complex logdet barrier
+        dim = 2 + side^2
+        cone = CO.HypoPerLogdetTri{T, Complex{T}}(dim)
         function C_barrier(s)
             (u, v, W) = (s[1], s[2], zeros(Complex{eltype(s)}, side, side))
             CO.svec_to_smat!(W, s[3:end], sqrt(T(2)))
-            return T(256) * (-log(v * logdet(cholesky!(Hermitian(W / v, :U))) - u) - logdet(cholesky!(Hermitian(W, :U))) - (side + 1) * log(v))
+            return cone.sc_const * (-log(v * logdet(cholesky!(Hermitian(W / v, :U))) - u) - logdet(cholesky!(Hermitian(W, :U))) - (side + 1) * log(v))
         end
-        dim = 2 + side^2
-        cone = CO.HypoPerLogdetTri{T, Complex{T}}(dim)
         if side <= 4
             test_barrier_oracles(cone, C_barrier, init_tol = 1e-5)
         else
@@ -414,25 +419,25 @@ end
 function test_hyporootdettri_barrier(T::Type{<:Real})
     for side in [1, 2, 3, 5]
         # real rootdet barrier
+        dim = 1 + CO.svec_length(side)
+        cone = CO.HypoRootdetTri{T, T}(dim, sc_const = 1)
         function R_barrier(s)
             (u, W) = (s[1], zeros(eltype(s), side, side))
             CO.svec_to_smat!(W, s[2:end], sqrt(T(2)))
             fact_W = cholesky!(Symmetric(W, :U))
-            return -T(25) / T(9) * (log(det(fact_W) ^ inv(T(side)) - u) + logdet(fact_W))
+            return cone.sc_const * (-log(det(fact_W) ^ inv(T(side)) - u) - logdet(fact_W))
         end
-        dim = 1 + CO.svec_length(side)
-        cone = CO.HypoRootdetTri{T, T}(dim)
         test_barrier_oracles(cone, R_barrier)
 
         # complex rootdet barrier
+        dim = 1 + side^2
+        cone = CO.HypoRootdetTri{T, Complex{T}}(dim)
         function C_barrier(s)
             (u, W) = (s[1], zeros(Complex{eltype(s)}, side, side))
             CO.svec_to_smat!(W, s[2:end], sqrt(T(2)))
             fact_W = cholesky!(Hermitian(W, :U))
-            return -T(25) / T(9) * (log(det(fact_W) ^ inv(T(side)) - u) + logdet(fact_W))
+            return cone.sc_const * (-log(det(fact_W) ^ inv(T(side)) - u) - logdet(fact_W))
         end
-        dim = 1 + side^2
-        cone = CO.HypoRootdetTri{T, Complex{T}}(dim)
         test_barrier_oracles(cone, C_barrier)
     end
     return

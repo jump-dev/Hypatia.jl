@@ -39,8 +39,8 @@ mutable struct EpiPerSquare{T <: Real} <: Cone{T}
     inv_hess_sqrt_vec::Vector{T}
 
     function EpiPerSquare{T}(
-        dim::Int,
-        is_dual::Bool;
+        dim::Int;
+        use_dual::Bool = false, # TODO self-dual so maybe remove this option/field?
         max_neighborhood::Real = default_max_neighborhood(),
         ) where {T <: Real}
         @assert dim >= 3
@@ -51,8 +51,6 @@ mutable struct EpiPerSquare{T <: Real} <: Cone{T}
         return cone
     end
 end
-
-EpiPerSquare{T}(dim::Int) where {T <: Real} = EpiPerSquare{T}(dim, false)
 
 use_heuristic_neighborhood(cone::EpiPerSquare) = false
 

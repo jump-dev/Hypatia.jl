@@ -40,8 +40,8 @@ mutable struct Power{T <: Real} <: Cone{T}
 
     function Power{T}(
         alpha::Vector{T},
-        n::Int,
-        is_dual::Bool;
+        n::Int;
+        use_dual::Bool = false,
         max_neighborhood::Real = default_max_neighborhood(),
         use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
         hess_fact_cache = hessian_cache(T),
@@ -62,8 +62,6 @@ mutable struct Power{T <: Real} <: Cone{T}
         return cone
     end
 end
-
-Power{T}(alpha::Vector{T}, n::Int) where {T <: Real} = Power{T}(alpha, n, false)
 
 dimension(cone::Power) = length(cone.alpha) + cone.n
 

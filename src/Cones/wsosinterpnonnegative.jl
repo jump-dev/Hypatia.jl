@@ -41,8 +41,8 @@ mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T
 
     function WSOSInterpNonnegative{T, R}(
         U::Int,
-        Ps::Vector{Matrix{R}},
-        is_dual::Bool;
+        Ps::Vector{Matrix{R}};
+        use_dual::Bool = true, # using dual barrier
         max_neighborhood::Real = default_max_neighborhood(),
         use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
         hess_fact_cache = hessian_cache(T),
@@ -51,7 +51,7 @@ mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T
             @assert size(Pk, 1) == U
         end
         cone = new{T, R}()
-        cone.use_dual = !is_dual # using dual barrier
+        cone.use_dual = is_dual
         cone.max_neighborhood = max_neighborhood
         cone.use_heuristic_neighborhood = use_heuristic_neighborhood
         cone.dim = U
@@ -60,8 +60,6 @@ mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T
         return cone
     end
 end
-
-WSOSInterpNonnegative{T, R}(dim::Int, Ps::Vector{Matrix{R}}) where {R <: RealOrComplex{T}} where {T <: Real} = WSOSInterpNonnegative{T, R}(dim, Ps, false)
 
 function setup_data(cone::WSOSInterpNonnegative{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     reset_data(cone)

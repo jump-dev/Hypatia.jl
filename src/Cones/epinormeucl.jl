@@ -32,8 +32,8 @@ mutable struct EpiNormEucl{T <: Real} <: Cone{T}
     dist::T
 
     function EpiNormEucl{T}(
-        dim::Int,
-        is_dual::Bool;
+        dim::Int;
+        use_dual::Bool = false, # TODO self-dual so maybe remove this option/field?
         max_neighborhood::Real = default_max_neighborhood(),
         ) where {T <: Real}
         @assert dim >= 2
@@ -44,8 +44,6 @@ mutable struct EpiNormEucl{T <: Real} <: Cone{T}
         return cone
     end
 end
-
-EpiNormEucl{T}(dim::Int) where {T <: Real} = EpiNormEucl{T}(dim, false)
 
 use_heuristic_neighborhood(cone::EpiNormEucl) = false
 
