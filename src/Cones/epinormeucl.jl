@@ -111,7 +111,7 @@ function update_inv_hess(cone::EpiNormEucl)
 
     mul!(cone.inv_hess.data, cone.point, cone.point')
     @inbounds for j in eachindex(cone.grad)
-        cone.hess[j, j] += cone.dist
+        cone.inv_hess[j, j] += cone.dist
     end
     cone.inv_hess[1, 1] -= cone.dist + cone.dist
 
