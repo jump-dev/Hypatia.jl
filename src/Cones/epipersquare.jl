@@ -7,6 +7,9 @@ note v*1/2*norm_2(w/v)^2 = 1/2*sum_i(w_i^2)/v
 
 barrier from "Self-Scaled Barriers and Interior-Point Methods for Convex Programming" by Nesterov & Todd
 -log(2*u*v - norm_2(w)^2)
+
+TODO
+- try to derive faster neighborhood calculations for this cone specifically
 =#
 
 mutable struct EpiPerSquare{T <: Real} <: Cone{T}

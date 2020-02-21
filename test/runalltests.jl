@@ -10,7 +10,7 @@ using Test
     # include(joinpath(@__DIR__, "runbarriertests.jl"))
     include(joinpath(@__DIR__, "runnativetests.jl"))
     include(joinpath(@__DIR__, "runnativeexamplestests.jl"))
-    # include(joinpath(@__DIR__, "runmoitests.jl"))
+    include(joinpath(@__DIR__, "runmoitests.jl"))
     include(joinpath(@__DIR__, "runjumpexamplestests.jl"))
     #
     # # require optional dependencies:
