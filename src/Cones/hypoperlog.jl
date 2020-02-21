@@ -41,7 +41,7 @@ mutable struct HypoPerLog{T <: Real} <: Cone{T}
         @assert dim >= 3
         cone = new{T}()
         cone.use_dual = is_dual
-        cone.max_neighborhood = 0.1
+        cone.max_neighborhood = default_max_neighborhood()
         cone.dim = dim
         cone.hess_fact_cache = hess_fact_cache
         return cone

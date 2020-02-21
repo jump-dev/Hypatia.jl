@@ -49,7 +49,7 @@ mutable struct PosSemidefTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
         @assert dim >= 1
         cone = new{T, R}()
         cone.use_dual = is_dual
-        cone.max_neighborhood = 0.1
+        cone.max_neighborhood = default_max_neighborhood()
         cone.dim = dim # real vector dimension
         cone.rt2 = sqrt(T(2))
         if R <: Complex

@@ -52,7 +52,7 @@ mutable struct EpiNormInf{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
         @assert dim >= 2
         cone = new{T, R}()
         cone.use_dual = is_dual
-        cone.max_neighborhood = 0.1
+        cone.max_neighborhood = default_max_neighborhood()
         cone.dim = dim # TODO
         cone.is_complex = (R <: Complex)
         cone.n = (cone.is_complex ? div(dim - 1, 2) : dim - 1)
