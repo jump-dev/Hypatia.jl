@@ -24,6 +24,7 @@ import Hypatia.inv_sqrt_prod
 import Hypatia.invert
 
 default_max_neighborhood() = 0.5
+default_use_heuristic_neighborhood() = true
 
 # hessian_cache(T::Type{<:BlasReal}) = DenseSymCache{T}() # use Bunch Kaufman for BlasReals from start
 hessian_cache(T::Type{<:Real}) = DensePosDefCache{T}()
@@ -153,27 +154,34 @@ hess_nz_idxs_col_tril(cone::Cone, j::Int) = j:dimension(cone)
 inv_hess_nz_idxs_col(cone::Cone, j::Int) = 1:dimension(cone)
 inv_hess_nz_idxs_col_tril(cone::Cone, j::Int) = j:dimension(cone)
 
+use_heuristic_neighborhood(cone::Cone) = cone.use_heuristic_neighborhood
+
 function in_neighborhood(cone::Cone{T}, dual_point::AbstractVector, mu::Real) where {T <: Real}
     # norm(H^(-1/2) * (z + mu * grad))
     nbhd_tmp = cone.nbhd_tmp
-    nbhd_tmp2 = cone.nbhd_tmp2
     g = grad(cone)
     @. nbhd_tmp = dual_point + mu * g
 
-    if hasfield(typeof(cone), :hess_fact_cache) && !update_hess_fact(cone)
-        return false
-    end
-    if hasfield(typeof(cone), :hess_fact_cache) && cone.hess_fact_cache isa DenseSymCache{T}
-        inv_hess_prod!(nbhd_tmp2, nbhd_tmp, cone)
-        nbhd_sqr = dot(nbhd_tmp2, nbhd_tmp)
-        if nbhd_sqr < -eps(T) # TODO possibly loosen
-            @warn("numerical failure: cone neighborhood is $nbhd_sqr")
+    if use_heuristic_neighborhood(cone)
+        nbhd = norm(nbhd_tmp, Inf) / norm(g, Inf)
+        # nbhd = maximum(abs(dj / gj) for (dj, gj) in zip(nbhd_tmp, g)) # TODO try this neighborhood
+    else
+        if hasfield(typeof(cone), :hess_fact_cache) && !update_hess_fact(cone)
             return false
         end
-        nbhd = sqrt(abs(nbhd_sqr))
-    else
-        inv_hess_sqrt_prod!(nbhd_tmp2, nbhd_tmp, cone)
-        nbhd = norm(nbhd_tmp2)
+        nbhd_tmp2 = cone.nbhd_tmp2
+        if hasfield(typeof(cone), :hess_fact_cache) && cone.hess_fact_cache isa DenseSymCache{T}
+            inv_hess_prod!(nbhd_tmp2, nbhd_tmp, cone)
+            nbhd_sqr = dot(nbhd_tmp2, nbhd_tmp)
+            if nbhd_sqr < -eps(T) # TODO possibly loosen
+                @warn("numerical failure: cone neighborhood is $nbhd_sqr")
+                return false
+            end
+            nbhd = sqrt(abs(nbhd_sqr))
+        else
+            inv_hess_sqrt_prod!(nbhd_tmp2, nbhd_tmp, cone)
+            nbhd = norm(nbhd_tmp2)
+        end
     end
 
     return (nbhd < mu * cone.max_neighborhood)

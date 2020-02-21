@@ -14,6 +14,7 @@ TODO
 mutable struct EpiSumPerEntropy{T <: Real} <: Cone{T}
     use_dual::Bool
     max_neighborhood::T
+    use_heuristic_neighborhood::Bool
     dim::Int
     w_dim::Int
     point::Vector{T}
@@ -47,6 +48,7 @@ mutable struct EpiSumPerEntropy{T <: Real} <: Cone{T}
         cone = new{T}()
         cone.use_dual = is_dual
         cone.max_neighborhood = default_max_neighborhood()
+        cone.use_heuristic_neighborhood = default_use_heuristic_neighborhood()
         cone.dim = dim
         cone.w_dim = div(dim - 1, 2)
         cone.v_idxs = 2:(cone.w_dim + 1)

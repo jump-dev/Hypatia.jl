@@ -15,6 +15,7 @@ TODO
 mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     use_dual::Bool
     max_neighborhood::T
+    use_heuristic_neighborhood::Bool
     dim::Int
     side::Int
     is_complex::Bool
@@ -57,6 +58,7 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
         cone = new{T, R}()
         cone.use_dual = is_dual
         cone.max_neighborhood = default_max_neighborhood()
+        cone.use_heuristic_neighborhood = default_use_heuristic_neighborhood()
         cone.dim = dim
         cone.rt2 = sqrt(T(2))
         if R <: Complex

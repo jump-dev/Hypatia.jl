@@ -275,45 +275,6 @@ function check_nbhd(
         if !Cones.in_neighborhood(cone_k, solver.dual_views[k], mu_temp)
             return false
         end
-
-        # TODO delete unused nbhd_temp etc
-
-        # temp_k = solver.nbhd_temp[k]
-        # g_k = Cones.grad(cone_k)
-        # @. temp_k = solver.dual_views[k] + g_k * mu_temp
-        #
-        # # TODO optionally could use multiple nbhd checks (add separate bool options and separate max_nbhd value options), eg smaller hess nbhd for each cone and larger hess nbhd for sum of cone nbhds
-        # # TODO could use infinity nbhd (cheaper) for affine line search and hess nbhd for combined line search
-        # if solver.use_infty_nbhd
-        #     nbhd_k = abs2(norm(temp_k, Inf) / norm(g_k, Inf)) / mu_temp
-        #     # nbhd_k = abs2(maximum(abs(dj) / abs(gj) for (dj, gj) in zip(duals_k, g_k))) # TODO try this neighborhood
-        #     lhs_nbhd = max(lhs_nbhd, nbhd_k)
-        # else
-        #     # TODO use dispatch
-        #     if hasfield(typeof(cone_k), :hess_fact_cache)
-        #         @timeit solver.timer "update_hess_fact" if !Cones.update_hess_fact(cone_k)
-        #             return false
-        #         end
-        #     end
-        #     temp2_k = similar(temp_k) # TODO prealloc
-        #     if hasfield(typeof(cone_k), :hess_fact_cache) && cone_k.hess_fact_cache isa DenseSymCache{T}
-        #         Cones.inv_hess_prod!(temp2_k, temp_k, cone_k)
-        #         nbhd_k = dot(temp_k, temp2_k) / mu_temp
-        #         if nbhd_k <= -cbrt(eps(T))
-        #             @warn("numerical failure: cone neighborhood is $nbhd_k")
-        #             return false
-        #         end
-        #         nbhd_k = abs(nbhd_k)
-        #     else
-        #         Cones.inv_hess_sqrt_prod!(temp2_k, temp_k, cone_k)
-        #         nbhd_k = sum(abs2, temp2_k) / mu_temp
-        #     end
-        #     lhs_nbhd += nbhd_k
-        # end
-        #
-        # if lhs_nbhd > rhs_nbhd
-        #     return false
-        # end
     end
 
     return true
