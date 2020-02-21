@@ -5,8 +5,7 @@ Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 (u in R, v in R_+, w in S_+) : u <= v*logdet(W/v)
 (see equivalent MathOptInterface LogDetConeConeTriangle definition)
 
-barrier (self-concordance follows from theorem 5.1.4, Interior-Point Polynomial Algorithms in Convex Programming
-by Y. Nesterov and A. Nemirovski)
+barrier (self-concordance follows from theorem 5.1.4, "Interior-Point Polynomial Algorithms in Convex Programming" by Y. Nesterov and A. Nemirovski):
 theta^2 * (-log(v*logdet(W/v) - u) - logdet(W) - (n + 1) log(v))
 we use theta = 16
 
@@ -23,6 +22,7 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     is_complex::Bool
     point::Vector{T}
     rt2::T
+    sc_const::T
     timer::TimerOutput
 
     feas_updated::Bool
@@ -49,7 +49,6 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     ldWvuv::T
     vzip1::T
     Wivzi::Matrix{R}
-    sc_const::T
 
     function HypoPerLogdetTri{T, R}(
         dim::Int,
@@ -59,7 +58,7 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
         @assert dim >= 3
         cone = new{T, R}()
         cone.use_dual = is_dual
-        cone.max_neighborhood = default_max_neighborhood()
+        cone.max_neighborhood = default_max_neighborhood() / 2 # TODO depends on selected sc_const
         cone.dim = dim
         cone.rt2 = sqrt(T(2))
         if R <: Complex
@@ -72,7 +71,7 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
             cone.is_complex = false
         end
         cone.side = side
-        cone.sc_const = T(256)
+        cone.sc_const = T(1) #T(256)
         cone.hess_fact_cache = hess_fact_cache
         return cone
     end
