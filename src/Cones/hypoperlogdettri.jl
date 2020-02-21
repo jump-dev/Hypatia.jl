@@ -136,7 +136,7 @@ function update_grad(cone::HypoPerLogdetTri)
     cone.Wi = inv(cone.fact_mat)
     cone.nLz = (cone.side - cone.ldWv) / cone.z
     cone.ldWvuv = cone.ldWv - u / v
-    cone.vzip1 = 1 + inv(cone.ldWvuv)
+    cone.vzip1 = 1 + v / (cone.z)
     cone.grad[1] = inv(cone.z)
     cone.grad[2] = cone.nLz - inv(v) * (cone.side + 1)
     gend = view(cone.grad, 3:cone.dim)
