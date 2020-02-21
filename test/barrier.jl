@@ -21,7 +21,7 @@ function test_barrier_oracles(
     barrier::Function;
     noise::T = T(0.1),
     scale::T = T(1e-2),
-    tol::Real = 100eps(T),
+    tol::Real = 1000eps(T),
     init_tol::Real = tol,
     init_only::Bool = false,
     ) where {T <: Real}
@@ -37,9 +37,10 @@ function test_barrier_oracles(
 
     if isfinite(init_tol)
         # tests for centrality of initial point
-        grad = CO.grad(cone)
-        @test dot(point, -grad) ≈ norm(point) * norm(grad) atol=init_tol rtol=init_tol
-        @test point ≈ -grad atol=init_tol rtol=init_tol
+        minus_grad = -CO.grad(cone)
+        @test dot(point, minus_grad) ≈ norm(point) * norm(minus_grad) atol=init_tol rtol=init_tol
+        @test point ≈ minus_grad atol=init_tol rtol=init_tol
+        @test CO.in_neighborhood(cone, minus_grad, one(T))
     end
     init_only && return
 
@@ -50,16 +51,16 @@ function test_barrier_oracles(
     # test gradient and Hessian oracles
     test_grad_hess(cone, point, tol = tol)
 
-    # check gradient and Hessian agree with ForwardDiff
-    if dim < 10 # too slow if dimension is large
-        grad = CO.grad(cone)
-        fd_grad = ForwardDiff.gradient(barrier, point)
-        @test grad ≈ fd_grad atol=tol rtol=tol
-
-        hess = CO.hess(cone)
-        fd_hess = ForwardDiff.hessian(barrier, point)
-        @test hess ≈ fd_hess atol=tol rtol=tol
-    end
+    # # check gradient and Hessian agree with ForwardDiff
+    # if dim < 10 # too slow if dimension is large
+    #     grad = CO.grad(cone)
+    #     fd_grad = ForwardDiff.gradient(barrier, point)
+    #     @test grad ≈ fd_grad atol=tol rtol=tol
+    #
+    #     hess = CO.hess(cone)
+    #     fd_hess = ForwardDiff.hessian(barrier, point)
+    #     @test hess ≈ fd_hess atol=tol rtol=tol
+    # end
 
     # TODO decide whether to add
     # # check 3rd order corrector agrees with ForwardDiff
@@ -79,7 +80,7 @@ function test_barrier_oracles(
     return
 end
 
-function test_grad_hess(cone::CO.Cone{T}, point::Vector{T}; tol::Real = 100eps(T)) where {T <: Real}
+function test_grad_hess(cone::CO.Cone{T}, point::Vector{T}; tol::Real = 1000eps(T)) where {T <: Real}
     nu = CO.get_nu(cone)
     dim = length(point)
     grad = CO.grad(cone)
@@ -102,6 +103,9 @@ function test_grad_hess(cone::CO.Cone{T}, point::Vector{T}; tol::Real = 100eps(T
     @test CO.hess_sqrt_prod!(prod_mat, prod_mat2, cone) ≈ I atol=tol rtol=tol
     CO.inv_hess_sqrt_prod!(prod_mat2, Matrix(one(T) * I, dim, dim), cone)
     @test prod_mat2' * prod_mat2 ≈ inv_hess atol=tol rtol=tol
+
+    dual_point = -grad + T(1e-3) * randn(length(grad))
+    @test CO.in_neighborhood(cone, dual_point, one(T))
 
     return
 end

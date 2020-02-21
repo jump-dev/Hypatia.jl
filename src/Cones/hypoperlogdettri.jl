@@ -12,7 +12,7 @@ we use theta = 16
 
 TODO
 - describe complex case
-- fix self-concordance and try to reduce theta parameter
+- try to reduce theta parameter but maintain self-concordance
 =#
 
 mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
