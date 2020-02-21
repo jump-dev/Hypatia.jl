@@ -49,7 +49,7 @@ mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T
         end
         cone = new{T, R}()
         cone.use_dual = !is_dual # using dual barrier
-        cone.max_neighborhood = 0.1
+        cone.max_neighborhood = default_max_neighborhood()
         cone.dim = U
         cone.Ps = Ps
         cone.hess_fact_cache = hess_fact_cache

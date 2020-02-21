@@ -32,7 +32,7 @@ mutable struct Nonnegative{T <: Real} <: Cone{T}
         cone = new{T}()
         cone.use_dual = is_dual
         cone.use_3order_corr = false # TODO maybe make it a function rather than a field
-        cone.max_neighborhood = 0.1
+        cone.max_neighborhood = default_max_neighborhood()
         cone.dim = dim
         return cone
     end

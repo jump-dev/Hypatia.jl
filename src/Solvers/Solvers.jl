@@ -140,7 +140,7 @@ mutable struct Solver{T <: Real}
         init_use_indirect::Bool = false,
         init_tol_qr::Real = 1000 * eps(T),
         init_use_fallback::Bool = true,
-        max_nbhd::Real = 0.1, # TODO cleanup - only for taukap
+        max_nbhd::Real = 0.2, # TODO cleanup - only for taukap
         use_infty_nbhd::Bool = false,
         stepper::Stepper{T} = CombinedStepper{T}(),
         system_solver::SystemSolver{T} = QRCholDenseSystemSolver{T}(),

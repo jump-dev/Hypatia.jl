@@ -52,7 +52,7 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
         end
         cone = new{T}()
         cone.use_dual = !is_dual # using dual barrier
-        cone.max_neighborhood = 0.1
+        cone.max_neighborhood = default_max_neighborhood()
         cone.dim = U * svec_length(R)
         cone.R = R
         cone.U = U

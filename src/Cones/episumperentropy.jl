@@ -46,7 +46,7 @@ mutable struct EpiSumPerEntropy{T <: Real} <: Cone{T}
         @assert dim >= 3
         cone = new{T}()
         cone.use_dual = is_dual
-        cone.max_neighborhood = 0.1
+        cone.max_neighborhood = default_max_neighborhood()
         cone.dim = dim
         cone.w_dim = div(dim - 1, 2)
         cone.v_idxs = 2:(cone.w_dim + 1)
@@ -132,14 +132,12 @@ function update_hess(cone::EpiSumPerEntropy)
     lwv1d = cone.lwv1d
     diff = cone.diff
     wvdiff = cone.wvdiff
-    g = cone.grad
-    g1 = g[1]
     H = cone.hess.data
 
     # H_u_u, H_u_v, H_u_w parts
-    H[1, 1] = abs2(g1)
+    H[1, 1] = abs2(cone.grad[1])
     @. wvdiff = w / v / diff
-    @. H[1, v_idxs] = cone.wvdiff / diff
+    @. H[1, v_idxs] = wvdiff / diff
     @. H[1, w_idxs] = lwv1d / diff
 
     # H_v_v, H_v_w, H_w_w parts
