@@ -37,6 +37,8 @@ mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
     function LinMatrixIneq{T}(
         As::Vector,
         is_dual::Bool;
+        max_neighborhood::Real = default_max_neighborhood(),
+        use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
         dim = length(As)
@@ -57,8 +59,8 @@ mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
         @assert side > 0
         cone = new{T}()
         cone.use_dual = is_dual
-        cone.max_neighborhood = default_max_neighborhood()
-        cone.use_heuristic_neighborhood = default_use_heuristic_neighborhood()
+        cone.max_neighborhood = max_neighborhood
+        cone.use_heuristic_neighborhood = use_heuristic_neighborhood
         cone.dim = dim
         cone.side = side
         cone.As = As

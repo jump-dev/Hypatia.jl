@@ -38,11 +38,15 @@ mutable struct EpiPerSquare{T <: Real} <: Cone{T}
     hess_sqrt_vec::Vector{T}
     inv_hess_sqrt_vec::Vector{T}
 
-    function EpiPerSquare{T}(dim::Int, is_dual::Bool) where {T <: Real}
+    function EpiPerSquare{T}(
+        dim::Int,
+        is_dual::Bool;
+        max_neighborhood::Real = default_max_neighborhood(),
+        ) where {T <: Real}
         @assert dim >= 3
         cone = new{T}()
         cone.use_dual = is_dual
-        cone.max_neighborhood = default_max_neighborhood()
+        cone.max_neighborhood = max_neighborhood
         cone.dim = dim
         return cone
     end

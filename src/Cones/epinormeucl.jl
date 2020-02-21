@@ -31,11 +31,15 @@ mutable struct EpiNormEucl{T <: Real} <: Cone{T}
 
     dist::T
 
-    function EpiNormEucl{T}(dim::Int, is_dual::Bool) where {T <: Real}
+    function EpiNormEucl{T}(
+        dim::Int,
+        is_dual::Bool;
+        max_neighborhood::Real = default_max_neighborhood(),
+        ) where {T <: Real}
         @assert dim >= 2
         cone = new{T}()
         cone.use_dual = is_dual
-        cone.max_neighborhood = default_max_neighborhood()
+        cone.max_neighborhood = max_neighborhood
         cone.dim = dim
         return cone
     end
