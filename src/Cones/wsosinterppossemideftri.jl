@@ -44,8 +44,8 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
     function WSOSInterpPosSemidefTri{T}(
         R::Int,
         U::Int,
-        Ps::Vector{Matrix{T}},
-        is_dual::Bool;
+        Ps::Vector{Matrix{T}};
+        use_dual::Bool = true, # using dual barrier
         max_neighborhood::Real = default_max_neighborhood(),
         use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
         hess_fact_cache = hessian_cache(T),
@@ -54,7 +54,7 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
             @assert size(Pk, 1) == U
         end
         cone = new{T}()
-        cone.use_dual = !is_dual # using dual barrier
+        cone.use_dual = is_dual
         cone.max_neighborhood = max_neighborhood
         cone.use_heuristic_neighborhood = use_heuristic_neighborhood
         cone.dim = U * svec_length(R)
@@ -65,8 +65,6 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
         return cone
     end
 end
-
-WSOSInterpPosSemidefTri{T}(R::Int, U::Int, Ps::Vector{Matrix{T}}) where {T <: Real} = WSOSInterpPosSemidefTri{T}(R, U, Ps, false)
 
 function setup_data(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     reset_data(cone)

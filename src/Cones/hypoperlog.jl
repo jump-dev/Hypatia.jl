@@ -35,8 +35,8 @@ mutable struct HypoPerLog{T <: Real} <: Cone{T}
     vwivlwvu::Vector{T}
 
     function HypoPerLog{T}(
-        dim::Int,
-        is_dual::Bool;
+        dim::Int;
+        use_dual::Bool = false,
         max_neighborhood::Real = default_max_neighborhood(),
         use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
         hess_fact_cache = hessian_cache(T),
@@ -51,8 +51,6 @@ mutable struct HypoPerLog{T <: Real} <: Cone{T}
         return cone
     end
 end
-
-HypoPerLog{T}(dim::Int) where {T <: Real} = HypoPerLog{T}(dim, false)
 
 # TODO only allocate the fields we use
 function setup_data(cone::HypoPerLog{T}) where {T <: Real}

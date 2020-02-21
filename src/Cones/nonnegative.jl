@@ -28,8 +28,8 @@ mutable struct Nonnegative{T <: Real} <: Cone{T}
     correction::Vector{T}
 
     function Nonnegative{T}(
-        dim::Int,
-        is_dual::Bool;
+        dim::Int;
+        use_dual::Bool = false, # TODO self-dual so maybe remove this option/field?
         max_neighborhood::Real = default_max_neighborhood(),
         ) where {T <: Real}
         @assert dim >= 1
@@ -41,8 +41,6 @@ mutable struct Nonnegative{T <: Real} <: Cone{T}
         return cone
     end
 end
-
-Nonnegative{T}(dim::Int) where {T <: Real} = Nonnegative{T}(dim, false)
 
 use_heuristic_neighborhood(cone::Nonnegative) = false
 

@@ -35,8 +35,8 @@ mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
     sumAinvAs::Vector
 
     function LinMatrixIneq{T}(
-        As::Vector,
-        is_dual::Bool;
+        As::Vector;
+        use_dual::Bool = false,
         max_neighborhood::Real = default_max_neighborhood(),
         use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
         hess_fact_cache = hessian_cache(T),
@@ -68,8 +68,6 @@ mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
         return cone
     end
 end
-
-LinMatrixIneq{T}(As::Vector) where {T <: Real} = LinMatrixIneq{T}(As, false)
 
 # TODO only allocate the fields we use
 function setup_data(cone::LinMatrixIneq{T}) where {T <: Real}

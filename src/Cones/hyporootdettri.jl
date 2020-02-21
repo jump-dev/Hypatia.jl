@@ -21,6 +21,7 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     is_complex::Bool
     point::Vector{T}
     rt2::T
+    sc_const::T
     timer::TimerOutput
 
     feas_updated::Bool
@@ -44,14 +45,13 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     rootdet::T
     rootdetu::T
     frac::T
-    # constants for Kronecker product and dot product components of the Hessian
     kron_const::T
     dot_const::T
-    sc_const::T
 
     function HypoRootdetTri{T, R}(
-        dim::Int,
-        is_dual::Bool;
+        dim::Int;
+        use_dual::Bool = false,
+        sc_const::Real = T(25) / T(9),
         max_neighborhood::Real = default_max_neighborhood(),
         use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
         hess_fact_cache = hessian_cache(T),
@@ -73,13 +73,11 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
             cone.is_complex = false
         end
         cone.side = side
-        cone.sc_const = T(25) / T(9)
+        cone.sc_const = sc_const
         cone.hess_fact_cache = hess_fact_cache
         return cone
     end
 end
-
-HypoRootdetTri{T, R}(dim::Int) where {R <: RealOrComplex{T}} where {T <: Real} = HypoRootdetTri{T, R}(dim, false)
 
 reset_data(cone::HypoRootdetTri) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_prod_updated = cone.hess_fact_updated = false)
 
@@ -104,8 +102,8 @@ function set_initial_point(arr::AbstractVector{T}, cone::HypoRootdetTri{T, R}) w
     arr .= 0
     side = cone.side
     const1 = sqrt(T(5side^2 + 2side + 1))
-    const2 = arr[1] = -5 * sqrt((3side + 1 - const1) / T(side + 1)) / (3 * sqrt(T(2)))
-    const3 = -const2 * (side + 1 + const1) / side / 2
+    const2 = arr[1] = -sqrt(cone.sc_const * (3side + 1 - const1) / T(2side + 2))
+    const3 = -const2 * (side + 1 + const1) / 2side
     incr = (cone.is_complex ? 2 : 1)
     k = 2
     @inbounds for i in 1:side

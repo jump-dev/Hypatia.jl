@@ -69,8 +69,8 @@ mutable struct PosSemidefTriSparse{T <: BlasReal, R <: RealOrComplex{T}} <: Cone
     function PosSemidefTriSparse{T, R}(
         side::Int,
         row_idxs::Vector{Int},
-        col_idxs::Vector{Int},
-        is_dual::Bool;
+        col_idxs::Vector{Int};
+        use_dual::Bool = false,
         max_neighborhood::Real = default_max_neighborhood(),
         use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
         hess_fact_cache = hessian_cache(T),
@@ -108,8 +108,6 @@ mutable struct PosSemidefTriSparse{T <: BlasReal, R <: RealOrComplex{T}} <: Cone
         return cone
     end
 end
-
-PosSemidefTriSparse{T, R}(side::Int, row_idxs::Vector{Int}, col_idxs::Vector{Int}) where {R <: RealOrComplex{T}} where {T <: BlasReal} = PosSemidefTriSparse{T, R}(side, row_idxs, col_idxs, false)
 
 function setup_data(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{T}} where {T <: BlasReal}
     reset_data(cone)

@@ -52,11 +52,12 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     Wivzi::Matrix{R}
 
     function HypoPerLogdetTri{T, R}(
-        dim::Int,
-        is_dual::Bool;
-        # sc_const::Real = 256, # TODO reduce this and use > 1
-        sc_const::Real = 1,
-        max_neighborhood::Real = default_max_neighborhood() / 2, # TODO divided by 2 because sc_const is currently 1
+        dim::Int;
+        use_dual::Bool = false,
+        # sc_const::Real = 256, # TODO reduce this
+        # max_neighborhood::Real = default_max_neighborhood()
+        sc_const::Real = 1, # TODO if use this, use smaller than default max nbhd
+        max_neighborhood::Real = default_max_neighborhood() / 3,
         use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {R <: RealOrComplex{T}} where {T <: Real}
@@ -83,8 +84,6 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     end
 end
 
-HypoPerLogdetTri{T, R}(dim::Int) where {R <: RealOrComplex{T}} where {T <: Real} = HypoPerLogdetTri{T, R}(dim, false)
-
 reset_data(cone::HypoPerLogdetTri) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_prod_updated = cone.hess_fact_updated = false)
 
 function setup_data(cone::HypoPerLogdetTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
@@ -107,7 +106,8 @@ get_nu(cone::HypoPerLogdetTri) = 2 * cone.sc_const * (cone.side + 1)
 
 function set_initial_point(arr::AbstractVector{T}, cone::HypoPerLogdetTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     arr .= 0
-    (arr[1], arr[2], w) = get_central_ray_hypoperlogdettri(cone.side)
+    # NOTE if not using theta = 16, rescaling the ray yields central ray
+    (arr[1], arr[2], w) = (cone.sc_const / 16) * get_central_ray_hypoperlogdettri(cone.side)
     incr = (cone.is_complex ? 2 : 1)
     k = 3
     @inbounds for i in 1:cone.side

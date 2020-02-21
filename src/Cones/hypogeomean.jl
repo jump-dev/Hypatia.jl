@@ -35,8 +35,8 @@ mutable struct HypoGeomean{T <: Real} <: Cone{T}
     wprodu::T
 
     function HypoGeomean{T}(
-        alpha::Vector{T},
-        is_dual::Bool;
+        alpha::Vector{T};
+        use_dual::Bool = false,
         max_neighborhood::Real = default_max_neighborhood(),
         use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
         hess_fact_cache = hessian_cache(T),
@@ -55,8 +55,6 @@ mutable struct HypoGeomean{T <: Real} <: Cone{T}
         return cone
     end
 end
-
-HypoGeomean{T}(alpha::Vector{T}) where {T <: Real} = HypoGeomean{T}(alpha, false)
 
 function setup_data(cone::HypoGeomean{T}) where {T <: Real}
     reset_data(cone)
@@ -82,7 +80,7 @@ function set_initial_point(arr::AbstractVector{T}, cone::HypoGeomean{T}) where {
         arr[2:end] .= (c - n + 1) / sqrt(T(n + 1) * (-2 * c + 6 * n + 2))
     else
         (arr[1], w) = get_central_ray_hypogeomean(cone.alpha)
-        arr[2:end] .= w
+        arr[2:end] = w
     end
     return arr
 end
