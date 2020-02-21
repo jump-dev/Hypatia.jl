@@ -53,7 +53,7 @@ mutable struct MatrixEpiPerSquare{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
         ) where {R <: RealOrComplex{T}} where {T <: Real}
         @assert 1 <= n <= m
         cone = new{T, R}()
-        cone.use_dual = is_dual
+        cone.use_dual = use_dual
         cone.max_neighborhood = max_neighborhood
         cone.use_heuristic_neighborhood = use_heuristic_neighborhood
         cone.is_complex = (R <: Complex)

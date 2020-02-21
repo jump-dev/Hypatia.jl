@@ -53,7 +53,7 @@ mutable struct Power{T <: Real} <: Cone{T}
         @assert sum(alpha) ≈ 1
         cone = new{T}()
         cone.n = n
-        cone.use_dual = is_dual
+        cone.use_dual = use_dual
         cone.max_neighborhood = max_neighborhood
         cone.use_heuristic_neighborhood = use_heuristic_neighborhood
         cone.dim = dim

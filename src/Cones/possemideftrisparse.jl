@@ -97,7 +97,7 @@ mutable struct PosSemidefTriSparse{T <: BlasReal, R <: RealOrComplex{T}} <: Cone
             cone.is_complex = true
         end
         @assert cone.dim >= 1
-        cone.use_dual = is_dual
+        cone.use_dual = use_dual
         cone.max_neighborhood = max_neighborhood
         cone.use_heuristic_neighborhood = use_heuristic_neighborhood
         cone.side = side # side dimension of sparse matrix

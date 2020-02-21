@@ -34,7 +34,7 @@ mutable struct Nonnegative{T <: Real} <: Cone{T}
         ) where {T <: Real}
         @assert dim >= 1
         cone = new{T}()
-        cone.use_dual = is_dual
+        cone.use_dual = use_dual
         cone.use_3order_corr = false # TODO maybe make it a function rather than a field
         cone.max_neighborhood = max_neighborhood
         cone.dim = dim
