@@ -51,7 +51,7 @@ mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T
             @assert size(Pk, 1) == U
         end
         cone = new{T, R}()
-        cone.use_dual = is_dual
+        cone.use_dual = use_dual
         cone.max_neighborhood = max_neighborhood
         cone.use_heuristic_neighborhood = use_heuristic_neighborhood
         cone.dim = U

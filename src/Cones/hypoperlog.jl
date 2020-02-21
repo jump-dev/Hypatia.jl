@@ -43,7 +43,7 @@ mutable struct HypoPerLog{T <: Real} <: Cone{T}
         ) where {T <: Real}
         @assert dim >= 3
         cone = new{T}()
-        cone.use_dual = is_dual
+        cone.use_dual = use_dual
         cone.max_neighborhood = max_neighborhood
         cone.use_heuristic_neighborhood = use_heuristic_neighborhood
         cone.dim = dim

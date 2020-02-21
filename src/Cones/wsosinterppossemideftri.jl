@@ -54,7 +54,7 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
             @assert size(Pk, 1) == U
         end
         cone = new{T}()
-        cone.use_dual = is_dual
+        cone.use_dual = use_dual
         cone.max_neighborhood = max_neighborhood
         cone.use_heuristic_neighborhood = use_heuristic_neighborhood
         cone.dim = U * svec_length(R)
