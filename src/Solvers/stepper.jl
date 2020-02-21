@@ -239,7 +239,7 @@ function check_nbhd(
     # TODO use a vector of bools for which cones are already in nbhd?
 
     # check neighborhood for tau and kappa
-    if taukap_temp - mu_temp >= nbhd
+    if abs(taukap_temp - mu_temp) >= mu_temp * nbhd
         return false
     end
 
