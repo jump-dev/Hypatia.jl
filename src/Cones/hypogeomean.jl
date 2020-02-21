@@ -85,7 +85,7 @@ function update_feas(cone::HypoGeomean)
     if all(>(zero(u)), w)
         cone.wprod = exp(sum(cone.alpha[i] * log(w[i]) for i in eachindex(cone.alpha)))
         cone.wprodu = cone.wprod - u
-        cone.is_feas = (u < 0) || (wprodu > 0)
+        cone.is_feas = (u < 0) || (cone.wprodu > 0)
     else
         cone.is_feas = false
     end
