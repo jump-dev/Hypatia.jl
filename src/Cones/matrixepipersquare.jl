@@ -47,13 +47,15 @@ mutable struct MatrixEpiPerSquare{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
         n::Int,
         m::Int,
         is_dual::Bool;
+        max_neighborhood::Real = default_max_neighborhood(),
+        use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {R <: RealOrComplex{T}} where {T <: Real}
         @assert 1 <= n <= m
         cone = new{T, R}()
         cone.use_dual = is_dual
-        cone.max_neighborhood = default_max_neighborhood()
-        cone.use_heuristic_neighborhood = default_use_heuristic_neighborhood()
+        cone.max_neighborhood = max_neighborhood
+        cone.use_heuristic_neighborhood = use_heuristic_neighborhood
         cone.is_complex = (R <: Complex)
         cone.v_idx = (cone.is_complex ? n ^ 2 + 1 : svec_length(n) + 1)
         cone.dim = cone.v_idx + (cone.is_complex ? 2 : 1) * n * m

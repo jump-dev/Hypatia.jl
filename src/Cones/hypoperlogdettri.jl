@@ -54,13 +54,17 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     function HypoPerLogdetTri{T, R}(
         dim::Int,
         is_dual::Bool;
+        # sc_const::Real = 256, # TODO reduce this and use > 1
+        sc_const::Real = 1,
+        max_neighborhood::Real = default_max_neighborhood() / 2, # TODO divided by 2 because sc_const is currently 1
+        use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {R <: RealOrComplex{T}} where {T <: Real}
         @assert dim >= 3
         cone = new{T, R}()
         cone.use_dual = is_dual
-        cone.max_neighborhood = default_max_neighborhood() / 2 # TODO depends on selected sc_const
-        cone.use_heuristic_neighborhood = default_use_heuristic_neighborhood()
+        cone.max_neighborhood = max_neighborhood
+        cone.use_heuristic_neighborhood = use_heuristic_neighborhood
         cone.dim = dim
         cone.rt2 = sqrt(T(2))
         if R <: Complex
@@ -73,7 +77,7 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
             cone.is_complex = false
         end
         cone.side = side
-        cone.sc_const = T(1) #T(256)
+        cone.sc_const = sc_const
         cone.hess_fact_cache = hess_fact_cache
         return cone
     end

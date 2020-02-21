@@ -46,14 +46,15 @@ mutable struct EpiNormInf{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     rtdiag::Vector{T}
 
     function EpiNormInf{T, R}(
-        dim::Int, # TODO maybe change to n (dim of the normed vector)
-        is_dual::Bool,
+        dim::Int,
+        is_dual::Bool;
+        max_neighborhood::Real = default_max_neighborhood(),
         ) where {R <: RealOrComplex{T}} where {T <: Real}
         @assert dim >= 2
         cone = new{T, R}()
         cone.use_dual = is_dual
-        cone.max_neighborhood = default_max_neighborhood()
-        cone.dim = dim # TODO
+        cone.max_neighborhood = max_neighborhood
+        cone.dim = dim
         cone.is_complex = (R <: Complex)
         cone.n = (cone.is_complex ? div(dim - 1, 2) : dim - 1)
         return cone

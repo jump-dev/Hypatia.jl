@@ -42,13 +42,15 @@ mutable struct EpiSumPerEntropy{T <: Real} <: Cone{T}
     function EpiSumPerEntropy{T}(
         dim::Int,
         is_dual::Bool;
+        max_neighborhood::Real = default_max_neighborhood(),
+        use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
         @assert dim >= 3
         cone = new{T}()
         cone.use_dual = is_dual
-        cone.max_neighborhood = default_max_neighborhood()
-        cone.use_heuristic_neighborhood = default_use_heuristic_neighborhood()
+        cone.max_neighborhood = max_neighborhood
+        cone.use_heuristic_neighborhood = use_heuristic_neighborhood
         cone.dim = dim
         cone.w_dim = div(dim - 1, 2)
         cone.v_idxs = 2:(cone.w_dim + 1)
