@@ -50,7 +50,7 @@ include("wsosinterpnonnegative.jl")
 include("wsosinterppossemideftri.jl")
 include("wsosinterpepinormeucl.jl")
 
-use_dual(cone::Cone) = cone.use_dual
+use_dual_barrier(cone::Cone) = cone.use_dual_barrier
 use_3order_corr(cone::Cone) = false
 load_point(cone::Cone, point::AbstractVector) = copyto!(cone.point, point)
 dimension(cone::Cone) = cone.dim

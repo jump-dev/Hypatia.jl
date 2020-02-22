@@ -12,7 +12,7 @@ TODO
 =#
 
 mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
-    use_dual::Bool
+    use_dual_barrier::Bool
     max_neighborhood::T
     use_heuristic_neighborhood::Bool
     dim::Int
@@ -51,7 +51,7 @@ mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T
             @assert size(Pk, 1) == U
         end
         cone = new{T, R}()
-        cone.use_dual = !use_dual # using dual barrier
+        cone.use_dual_barrier = !use_dual # using dual barrier
         cone.max_neighborhood = max_neighborhood
         cone.use_heuristic_neighborhood = use_heuristic_neighborhood
         cone.dim = U

@@ -78,7 +78,7 @@ function load(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     for (k, idxs_k) in enumerate(cone_idxs)
         s_k = view(dir, tau_row .+ idxs_k)
         z_k = view(dir, (n + p) .+ idxs_k)
-        (stepper.primal_dir_k[k], stepper.dual_dir_k[k]) = (Cones.use_dual(cones[k]) ? (z_k, s_k) : (s_k, z_k))
+        (stepper.primal_dir_k[k], stepper.dual_dir_k[k]) = (Cones.use_dual_barrier(cones[k]) ? (z_k, s_k) : (s_k, z_k))
     end
 
     stepper.kap_row = dim

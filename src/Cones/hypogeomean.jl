@@ -10,7 +10,7 @@ barrier from "Constructing self-concordant barriers for convex cones" by Yu. Nes
 =#
 
 mutable struct HypoGeomean{T <: Real} <: Cone{T}
-    use_dual::Bool
+    use_dual_barrier::Bool
     max_neighborhood::T
     use_heuristic_neighborhood::Bool
     dim::Int
@@ -46,7 +46,7 @@ mutable struct HypoGeomean{T <: Real} <: Cone{T}
         @assert all(ai > 0 for ai in alpha)
         @assert sum(alpha) ≈ 1
         cone = new{T}()
-        cone.use_dual = use_dual
+        cone.use_dual_barrier = use_dual
         cone.max_neighborhood = max_neighborhood
         cone.use_heuristic_neighborhood = use_heuristic_neighborhood
         cone.dim = dim
