@@ -79,7 +79,7 @@ function matrixcompletion(
         h_norm_x = vcat(zero(T), h_norm_x)
         h_norm = h_norm_x
 
-        cones = CO.Cone{T}[CO.EpiNormSpectral{T, T}(m, n, nuclearnorm_obj)]
+        cones = CO.Cone{T}[CO.EpiNormSpectral{T, T}(m, n, use_dual = nuclearnorm_obj)]
     else
         # build an extended formulation for the norm used in the objective
         if nuclearnorm_obj

@@ -57,7 +57,7 @@ TODO
 #         cone_rows[k1] = cone_rows[k2] = rows
 #         cone_cols[k1] = (n + p) .+ idxs_k
 #         cone_cols[k2] = rows
-#         if Cones.use_dual(cone_k)
+#         if Cones.use_dual_barrier(cone_k)
 #             cone_blocks[k1] = cone_k
 #             cone_blocks[k2] = I
 #         else
@@ -150,7 +150,7 @@ function load(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) wher
     for (cone_k, idxs_k) in zip(cones, cone_idxs)
         z_start_k = n + p + first(idxs_k) - 1
         s_start_k = tau_row + first(idxs_k) - 1
-        H_start_k = Cones.use_dual(cone_k) ? z_start_k : s_start_k
+        H_start_k = Cones.use_dual_barrier(cone_k) ? z_start_k : s_start_k
         for j in 1:Cones.dimension(cone_k)
             nz_rows_kj = s_start_k .+ Cones.hess_nz_idxs_col(cone_k, j)
             len_kj = length(nz_rows_kj)
@@ -179,7 +179,7 @@ function load(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) wher
         idxs_k = cone_idxs[k]
         z_start_k = n + p + first(idxs_k) - 1
         s_start_k = tau_row + first(idxs_k) - 1
-        H_start_k = Cones.use_dual(cone_k) ? z_start_k : s_start_k
+        H_start_k = Cones.use_dual_barrier(cone_k) ? z_start_k : s_start_k
         for j in 1:Cones.dimension(cone_k)
             col = H_start_k + j
             # get nonzero rows in the current column of the LHS
@@ -254,7 +254,7 @@ function load(system_solver::NaiveDenseSystemSolver{T}, solver::Solver{T}) where
 
     function view_H_k(cone_k, idxs_k)
         rows = system_solver.tau_row .+ idxs_k
-        cols = Cones.use_dual(cone_k) ? (n + p) .+ idxs_k : rows
+        cols = Cones.use_dual_barrier(cone_k) ? (n + p) .+ idxs_k : rows
         return view(system_solver.lhs6, rows, cols)
     end
     system_solver.lhs6_H_k = [view_H_k(cone_k, idxs_k) for (cone_k, idxs_k) in zip(cones, cone_idxs)]

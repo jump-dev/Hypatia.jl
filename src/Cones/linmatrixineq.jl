@@ -7,7 +7,7 @@ TODO
 =#
 
 mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
-    use_dual::Bool
+    use_dual_barrier::Bool
     max_neighborhood::T
     use_heuristic_neighborhood::Bool
     dim::Int
@@ -58,7 +58,7 @@ mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
         @assert isposdef(first(As))
         @assert side > 0
         cone = new{T}()
-        cone.use_dual = use_dual
+        cone.use_dual_barrier = use_dual
         cone.max_neighborhood = max_neighborhood
         cone.use_heuristic_neighborhood = use_heuristic_neighborhood
         cone.dim = dim

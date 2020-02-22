@@ -22,7 +22,7 @@ function test_moi_cones(T::Type{<:Real})
         hyp_cone = HYP.cone_from_moi(T, moi_cone)
         @test hyp_cone isa CO.EpiNormInf{T, T}
         @test MOI.dimension(moi_cone) == CO.dimension(hyp_cone) == 3
-        @test !CO.use_dual(hyp_cone)
+        @test !CO.use_dual_barrier(hyp_cone)
     end
 
     @testset "NormOneCone" begin
@@ -30,7 +30,7 @@ function test_moi_cones(T::Type{<:Real})
         hyp_cone = HYP.cone_from_moi(T, moi_cone)
         @test hyp_cone isa CO.EpiNormInf{T, T}
         @test MOI.dimension(moi_cone) == CO.dimension(hyp_cone) == 3
-        @test CO.use_dual(hyp_cone)
+        @test CO.use_dual_barrier(hyp_cone)
     end
 
     @testset "SecondOrderCone" begin
@@ -38,7 +38,7 @@ function test_moi_cones(T::Type{<:Real})
         hyp_cone = HYP.cone_from_moi(T, moi_cone)
         @test hyp_cone isa CO.EpiNormEucl{T}
         @test MOI.dimension(moi_cone) == CO.dimension(hyp_cone) == 3
-        @test !CO.use_dual(hyp_cone)
+        @test !CO.use_dual_barrier(hyp_cone)
     end
 
     @testset "RotatedSecondOrderCone" begin
@@ -46,7 +46,7 @@ function test_moi_cones(T::Type{<:Real})
         hyp_cone = HYP.cone_from_moi(T, moi_cone)
         @test hyp_cone isa CO.EpiPerSquare{T}
         @test MOI.dimension(moi_cone) == CO.dimension(hyp_cone) == 3
-        @test !CO.use_dual(hyp_cone)
+        @test !CO.use_dual_barrier(hyp_cone)
     end
 
     @testset "ExponentialCone" begin
@@ -54,7 +54,7 @@ function test_moi_cones(T::Type{<:Real})
         hyp_cone = HYP.cone_from_moi(T, moi_cone)
         @test hyp_cone isa CO.HypoPerLog{T}
         @test MOI.dimension(moi_cone) == CO.dimension(hyp_cone) == 3
-        @test !CO.use_dual(hyp_cone)
+        @test !CO.use_dual_barrier(hyp_cone)
     end
 
     @testset "DualExponentialCone" begin
@@ -62,7 +62,7 @@ function test_moi_cones(T::Type{<:Real})
         hyp_cone = HYP.cone_from_moi(T, moi_cone)
         @test hyp_cone isa CO.HypoPerLog{T}
         @test MOI.dimension(moi_cone) == CO.dimension(hyp_cone) == 3
-        @test CO.use_dual(hyp_cone)
+        @test CO.use_dual_barrier(hyp_cone)
     end
 
     @testset "PowerCone" begin
@@ -71,7 +71,7 @@ function test_moi_cones(T::Type{<:Real})
         hyp_cone = HYP.cone_from_moi(T, moi_cone)
         @test hyp_cone isa CO.Power{T}
         @test MOI.dimension(moi_cone) == CO.dimension(hyp_cone) == 3
-        @test !CO.use_dual(hyp_cone)
+        @test !CO.use_dual_barrier(hyp_cone)
         @test hyp_cone.alpha == T[iT5, 1 - iT5]
     end
 
@@ -81,7 +81,7 @@ function test_moi_cones(T::Type{<:Real})
         hyp_cone = HYP.cone_from_moi(T, moi_cone)
         @test hyp_cone isa CO.Power{T}
         @test MOI.dimension(moi_cone) == CO.dimension(hyp_cone) == 3
-        @test CO.use_dual(hyp_cone)
+        @test CO.use_dual_barrier(hyp_cone)
         @test hyp_cone.alpha == T[iT5, 1 - iT5]
     end
 
@@ -90,7 +90,7 @@ function test_moi_cones(T::Type{<:Real})
         hyp_cone = HYP.cone_from_moi(T, moi_cone)
         @test hyp_cone isa CO.HypoGeomean{T}
         @test MOI.dimension(moi_cone) == CO.dimension(hyp_cone) == 3
-        @test !CO.use_dual(hyp_cone)
+        @test !CO.use_dual_barrier(hyp_cone)
         iT2 = inv(T(2))
         @test hyp_cone.alpha == T[iT2, iT2]
     end
@@ -100,7 +100,7 @@ function test_moi_cones(T::Type{<:Real})
         hyp_cone = HYP.cone_from_moi(T, moi_cone)
         @test hyp_cone isa CO.EpiSumPerEntropy{T}
         @test MOI.dimension(moi_cone) == CO.dimension(hyp_cone) == 3
-        @test !CO.use_dual(hyp_cone)
+        @test !CO.use_dual_barrier(hyp_cone)
     end
 
     @testset "NormSpectralCone" begin
@@ -108,7 +108,7 @@ function test_moi_cones(T::Type{<:Real})
         hyp_cone = HYP.cone_from_moi(T, moi_cone)
         @test hyp_cone isa CO.EpiNormSpectral{T, T}
         @test MOI.dimension(moi_cone) == CO.dimension(hyp_cone) == 7
-        @test !CO.use_dual(hyp_cone)
+        @test !CO.use_dual_barrier(hyp_cone)
     end
 
     @testset "NormNuclearCone" begin
@@ -116,7 +116,7 @@ function test_moi_cones(T::Type{<:Real})
         hyp_cone = HYP.cone_from_moi(T, moi_cone)
         @test hyp_cone isa CO.EpiNormSpectral{T, T}
         @test MOI.dimension(moi_cone) == CO.dimension(hyp_cone) == 7
-        @test CO.use_dual(hyp_cone)
+        @test CO.use_dual_barrier(hyp_cone)
     end
 
     @testset "PositiveSemidefiniteConeTriangle" begin
@@ -124,7 +124,7 @@ function test_moi_cones(T::Type{<:Real})
         hyp_cone = HYP.cone_from_moi(T, moi_cone)
         @test hyp_cone isa CO.PosSemidefTri{T, T}
         @test MOI.dimension(moi_cone) == CO.dimension(hyp_cone) == 6
-        @test !CO.use_dual(hyp_cone)
+        @test !CO.use_dual_barrier(hyp_cone)
     end
 
     @testset "LogDetConeTriangle" begin
@@ -132,7 +132,7 @@ function test_moi_cones(T::Type{<:Real})
         hyp_cone = HYP.cone_from_moi(T, moi_cone)
         @test hyp_cone isa CO.HypoPerLogdetTri{T, T}
         @test MOI.dimension(moi_cone) == CO.dimension(hyp_cone) == 8
-        @test !CO.use_dual(hyp_cone)
+        @test !CO.use_dual_barrier(hyp_cone)
     end
 
     @testset "RootDetConeTriangle" begin
@@ -140,7 +140,7 @@ function test_moi_cones(T::Type{<:Real})
         hyp_cone = HYP.cone_from_moi(T, moi_cone)
         @test hyp_cone isa CO.HypoRootdetTri{T, T}
         @test MOI.dimension(moi_cone) == CO.dimension(hyp_cone) == 7
-        @test !CO.use_dual(hyp_cone)
+        @test !CO.use_dual_barrier(hyp_cone)
     end
 
     # Hypatia predefined cones

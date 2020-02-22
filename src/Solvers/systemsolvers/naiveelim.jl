@@ -46,7 +46,7 @@ function solve_system(system_solver::NaiveElimSystemSolver{T}, solver::Solver{T}
     for (cone_k, idxs_k) in zip(model.cones, model.cone_idxs)
         z_rows_k = (n + p) .+ idxs_k
         s_rows_k = (q + 1) .+ z_rows_k
-        if Cones.use_dual(cone_k)
+        if Cones.use_dual_barrier(cone_k)
             # -G_k*x + mu*H_k*z_k + h_k*tau = zrhs_k + srhs_k
             @. @views rhs4[z_rows_k] += rhs[s_rows_k]
         elseif system_solver.use_inv_hess
@@ -132,7 +132,7 @@ function load(system_solver::NaiveElimSparseSystemSolver{T}, solver::Solver{T}) 
     if isempty(cones)
         hess_nz_total = 0
     else
-        hess_nz_total = sum(Cones.use_dual(cone_k) ? Cones.hess_nz_count(cone_k) : Cones.inv_hess_nz_count(cone_k) for cone_k in cones)
+        hess_nz_total = sum(Cones.use_dual_barrier(cone_k) ? Cones.hess_nz_count(cone_k) : Cones.inv_hess_nz_count(cone_k) for cone_k in cones)
     end
     H_Is = Vector{Int}(undef, hess_nz_total)
     H_Js = Vector{Int}(undef, hess_nz_total)
@@ -140,7 +140,7 @@ function load(system_solver::NaiveElimSparseSystemSolver{T}, solver::Solver{T}) 
     for (cone_k, idxs_k) in zip(cones, cone_idxs)
         z_start_k = n + p + first(idxs_k) - 1
         for j in 1:Cones.dimension(cone_k)
-            nz_rows_kj = z_start_k .+ (Cones.use_dual(cone_k) ? Cones.hess_nz_idxs_col(cone_k, j) : Cones.inv_hess_nz_idxs_col(cone_k, j))
+            nz_rows_kj = z_start_k .+ (Cones.use_dual_barrier(cone_k) ? Cones.hess_nz_idxs_col(cone_k, j) : Cones.inv_hess_nz_idxs_col(cone_k, j))
             len_kj = length(nz_rows_kj)
             IJV_idxs = offset:(offset + len_kj - 1)
             offset += len_kj
@@ -171,7 +171,7 @@ function load(system_solver::NaiveElimSparseSystemSolver{T}, solver::Solver{T}) 
             col_idx_start = lhs4.colptr[col]
             nz_rows = lhs4.rowval[col_idx_start:(lhs4.colptr[col + 1] - 1)]
             # get nonzero rows in column j of the Hessian or inverse Hessian
-            nz_hess_indices = (Cones.use_dual(cone_k) ? Cones.hess_nz_idxs_col(cone_k, j) : Cones.inv_hess_nz_idxs_col(cone_k, j))
+            nz_hess_indices = (Cones.use_dual_barrier(cone_k) ? Cones.hess_nz_idxs_col(cone_k, j) : Cones.inv_hess_nz_idxs_col(cone_k, j))
             # get index corresponding to first nonzero Hessian element of the current column of the LHS
             first_H = findfirst(isequal(z_start_k + first(nz_hess_indices)), nz_rows)
             # indices of nonzero values for cone k column j
@@ -184,9 +184,9 @@ end
 
 function update_fact(system_solver::NaiveElimSparseSystemSolver, solver::Solver)
     for (k, cone_k) in enumerate(solver.model.cones)
-        H_k = (Cones.use_dual(cone_k) ? Cones.hess(cone_k) : Cones.inv_hess(cone_k))
+        H_k = (Cones.use_dual_barrier(cone_k) ? Cones.hess(cone_k) : Cones.inv_hess(cone_k))
         for j in 1:Cones.dimension(cone_k)
-            if Cones.use_dual(cone_k)
+            if Cones.use_dual_barrier(cone_k)
                 nz_rows = Cones.hess_nz_idxs_col(cone_k, j)
                 @. @views system_solver.lhs4.nzval[system_solver.hess_idxs[k][j]] = H_k[nz_rows, j] * solver.mu
             else
@@ -255,7 +255,7 @@ function update_fact(system_solver::NaiveElimDenseSystemSolver{T}, solver::Solve
 
     for (cone_k, idxs_k) in zip(model.cones, model.cone_idxs)
         z_rows_k = (n + p) .+ idxs_k
-        if Cones.use_dual(cone_k)
+        if Cones.use_dual_barrier(cone_k)
             # -G_k*x + mu*H_k*z_k + h_k*tau = zrhs_k + srhs_k
             H_k = Cones.hess(cone_k)
             @. lhs4[z_rows_k, z_rows_k] = solver.mu * H_k

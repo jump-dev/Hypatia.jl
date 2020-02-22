@@ -18,7 +18,7 @@ blas_reals = [
     Float32,
     ]
 
-options = (verbose = true,)
+options = (verbose = false,)
 
 @info("starting native tests")
 @testset "native tests" begin

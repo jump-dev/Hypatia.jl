@@ -13,7 +13,7 @@ TODO
 =#
 
 mutable struct EpiPerSquare{T <: Real} <: Cone{T}
-    use_dual::Bool
+    use_dual_barrier::Bool
     max_neighborhood::T
     dim::Int
     point::Vector{T}
@@ -45,7 +45,7 @@ mutable struct EpiPerSquare{T <: Real} <: Cone{T}
         ) where {T <: Real}
         @assert dim >= 3
         cone = new{T}()
-        cone.use_dual = use_dual
+        cone.use_dual_barrier = use_dual
         cone.max_neighborhood = max_neighborhood
         cone.dim = dim
         return cone

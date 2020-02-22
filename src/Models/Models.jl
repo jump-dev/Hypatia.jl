@@ -64,8 +64,8 @@ mutable struct Point{T <: Real}
 
         point.z_views = [view(point.z, idxs) for idxs in cone_idxs]
         point.s_views = [view(point.s, idxs) for idxs in cone_idxs]
-        point.dual_views = [Cones.use_dual(cones[k]) ? point.s_views[k] : point.z_views[k] for k in eachindex(cones)]
-        point.primal_views = [Cones.use_dual(cones[k]) ? point.z_views[k] : point.s_views[k] for k in eachindex(cones)]
+        point.dual_views = [Cones.use_dual_barrier(cones[k]) ? point.s_views[k] : point.z_views[k] for k in eachindex(cones)]
+        point.primal_views = [Cones.use_dual_barrier(cones[k]) ? point.z_views[k] : point.s_views[k] for k in eachindex(cones)]
 
         return point
     end

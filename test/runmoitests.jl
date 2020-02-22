@@ -4,20 +4,20 @@ Copyright 2019, Chris Coey and contributors
 
 # MOI wrapper Hypatia cone tests
 
-# include(joinpath(@__DIR__, "moicones.jl"))
-#
-# real_types = [
-#     Float64,
-#     Float32,
-#     BigFloat,
-#     ]
-#
-# @info("starting MOI wrapper Hypatia cone tests")
-# @testset "MOI wrapper Hypatia cone tests" begin
-#     @testset "MOI wrapper Hypatia cone tests: $T" for T in real_types
-#         test_moi_cones(T)
-#     end
-# end
+include(joinpath(@__DIR__, "moicones.jl"))
+
+real_types = [
+    Float64,
+    Float32,
+    BigFloat,
+    ]
+
+@info("starting MOI wrapper Hypatia cone tests")
+@testset "MOI wrapper Hypatia cone tests" begin
+    @testset "MOI wrapper Hypatia cone tests: $T" for T in real_types
+        test_moi_cones(T)
+    end
+end
 
 # MOI.Test linear and conic tests
 

@@ -9,7 +9,7 @@ barrier modified from "Primal-Dual Interior-Point Methods for Domain-Driven Form
 =#
 
 mutable struct HypoPerLog{T <: Real} <: Cone{T}
-    use_dual::Bool
+    use_dual_barrier::Bool
     max_neighborhood::T
     use_heuristic_neighborhood::Bool
     dim::Int
@@ -43,7 +43,7 @@ mutable struct HypoPerLog{T <: Real} <: Cone{T}
         ) where {T <: Real}
         @assert dim >= 3
         cone = new{T}()
-        cone.use_dual = use_dual
+        cone.use_dual_barrier = use_dual
         cone.max_neighborhood = max_neighborhood
         cone.use_heuristic_neighborhood = use_heuristic_neighborhood
         cone.dim = dim
