@@ -448,7 +448,7 @@ function test_wsosinterpnonnegative_barrier(T::Type{<:Real})
     for (n, halfdeg) in [(1, 1), (1, 2), (1, 3), (2, 1), (2, 2), (3, 1)]
         (U, _, Ps, _) = MU.interpolate(MU.Box{T}(-ones(T, n), ones(T, n)), halfdeg, sample = false) # use a unit box domain
         barrier(s) = -sum(logdet(cholesky!(Symmetric(P' * Diagonal(s) * P))) for P in Ps)
-        cone = CO.WSOSInterpNonnegative{T, T}(U, Ps, true)
+        cone = CO.WSOSInterpNonnegative{T, T}(U, Ps)
         test_barrier_oracles(cone, barrier, init_tol = Inf) # TODO center and test initial points
     end
     # TODO also test complex case CO.WSOSInterpNonnegative{T, Complex{T}} - need complex MU interp functions first
@@ -460,7 +460,7 @@ function test_wsosinterppossemideftri_barrier(T::Type{<:Real})
     rt2i = inv(sqrt(T(2)))
     for n in 1:3, halfdeg in 1:2, R in 1:3
         (U, _, Ps, _) = MU.interpolate(MU.Box{T}(-ones(T, n), ones(T, n)), halfdeg, sample = false)
-        cone = CO.WSOSInterpPosSemidefTri{T}(R, U, Ps, true)
+        cone = CO.WSOSInterpPosSemidefTri{T}(R, U, Ps)
         function barrier(s)
             bar = zero(eltype(s))
             for P in Ps
@@ -486,7 +486,7 @@ function test_wsosinterpepinormeucl_barrier(T::Type{<:Real})
     Random.seed!(1)
     for n in 1:3, halfdeg in 1:2, R in 2:3
         (U, _, Ps, _) = MU.interpolate(MU.Box{T}(-ones(T, n), ones(T, n)), halfdeg, sample = false)
-        cone = CO.WSOSInterpEpiNormEucl{T}(R, U, Ps, true)
+        cone = CO.WSOSInterpEpiNormEucl{T}(R, U, Ps)
         function barrier(s)
             bar = zero(eltype(s))
             for P in Ps
