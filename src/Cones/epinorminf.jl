@@ -10,7 +10,8 @@ barrier from "Barrier Functions in Interior Point Methods" by Osman Guler
 =#
 
 mutable struct EpiNormInf{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
-    use_dual::Bool
+    use_dual_barrier::Bool
+    max_neighborhood::T
     dim::Int
     n::Int
     is_complex::Bool
@@ -26,6 +27,8 @@ mutable struct EpiNormInf{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     grad::Vector{T}
     hess::Symmetric{T, SparseMatrixCSC{T, Int}}
     inv_hess::Symmetric{T, Matrix{T}}
+    nbhd_tmp::Vector{T}
+    nbhd_tmp2::Vector{T}
 
     w::AbstractVector{R}
     den::AbstractVector{T}
@@ -43,20 +46,22 @@ mutable struct EpiNormInf{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     rtdiag::Vector{T}
 
     function EpiNormInf{T, R}(
-        dim::Int, # TODO maybe change to n (dim of the normed vector)
-        is_dual::Bool,
+        dim::Int;
+        use_dual::Bool = false,
+        max_neighborhood::Real = default_max_neighborhood(),
         ) where {R <: RealOrComplex{T}} where {T <: Real}
         @assert dim >= 2
         cone = new{T, R}()
-        cone.use_dual = is_dual
-        cone.dim = dim # TODO
+        cone.use_dual_barrier = use_dual
+        cone.max_neighborhood = max_neighborhood
+        cone.dim = dim
         cone.is_complex = (R <: Complex)
         cone.n = (cone.is_complex ? div(dim - 1, 2) : dim - 1)
         return cone
     end
 end
 
-EpiNormInf{T, R}(dim::Int) where {R <: RealOrComplex{T}} where {T <: Real} = EpiNormInf{T, R}(dim, false)
+use_heuristic_neighborhood(cone::EpiNormInf) = false
 
 reset_data(cone::EpiNormInf) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_inv_hess_updated = false)
 
@@ -67,6 +72,8 @@ function setup_data(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where 
     cone.point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
+    cone.nbhd_tmp = zeros(T, dim)
+    cone.nbhd_tmp2 = zeros(T, dim)
     n = cone.n
     cone.w = zeros(R, n)
     cone.wden = zeros(R, n)

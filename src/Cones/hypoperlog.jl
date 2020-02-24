@@ -9,7 +9,9 @@ barrier modified from "Primal-Dual Interior-Point Methods for Domain-Driven Form
 =#
 
 mutable struct HypoPerLog{T <: Real} <: Cone{T}
-    use_dual::Bool
+    use_dual_barrier::Bool
+    use_heuristic_neighborhood::Bool
+    max_neighborhood::T
     dim::Int
     point::Vector{T}
     timer::TimerOutput
@@ -24,6 +26,8 @@ mutable struct HypoPerLog{T <: Real} <: Cone{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
+    nbhd_tmp::Vector{T}
+    nbhd_tmp2::Vector{T}
 
     lwv::T
     vlwvu::T
@@ -31,20 +35,22 @@ mutable struct HypoPerLog{T <: Real} <: Cone{T}
     vwivlwvu::Vector{T}
 
     function HypoPerLog{T}(
-        dim::Int,
-        is_dual::Bool;
+        dim::Int;
+        use_dual::Bool = false,
+        use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
+        max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
         @assert dim >= 3
         cone = new{T}()
-        cone.use_dual = is_dual
+        cone.use_dual_barrier = use_dual
+        cone.use_heuristic_neighborhood = use_heuristic_neighborhood
+        cone.max_neighborhood = max_neighborhood
         cone.dim = dim
         cone.hess_fact_cache = hess_fact_cache
         return cone
     end
 end
-
-HypoPerLog{T}(dim::Int) where {T <: Real} = HypoPerLog{T}(dim, false)
 
 # TODO only allocate the fields we use
 function setup_data(cone::HypoPerLog{T}) where {T <: Real}
@@ -55,6 +61,8 @@ function setup_data(cone::HypoPerLog{T}) where {T <: Real}
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
+    cone.nbhd_tmp = zeros(T, dim)
+    cone.nbhd_tmp2 = zeros(T, dim)
     cone.vwivlwvu = zeros(T, dim - 2)
     return
 end

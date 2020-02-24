@@ -47,7 +47,6 @@ mutable struct Solver{T <: Real}
     init_tol_qr::T
     init_use_fallback::Bool
     max_nbhd::T
-    use_infty_nbhd::Bool
     stepper::Stepper{T}
     system_solver::SystemSolver{T}
 
@@ -123,7 +122,6 @@ mutable struct Solver{T <: Real}
     s_temp::Vector{T}
     primal_views
     dual_views
-    nbhd_temp::Vector
     cones_infeas::Vector{Bool}
     cones_loaded::Vector{Bool}
 
@@ -140,8 +138,7 @@ mutable struct Solver{T <: Real}
         init_use_indirect::Bool = false,
         init_tol_qr::Real = 1000 * eps(T),
         init_use_fallback::Bool = true,
-        max_nbhd::Real = 0.7,
-        use_infty_nbhd::Bool = false,
+        max_nbhd::Real = Cones.default_max_neighborhood(), # TODO cleanup - only for taukap, maybe use full name
         stepper::Stepper{T} = CombinedStepper{T}(),
         system_solver::SystemSolver{T} = QRCholDenseSystemSolver{T}(),
         ) where {T <: Real}
@@ -168,7 +165,6 @@ mutable struct Solver{T <: Real}
         solver.init_tol_qr = init_tol_qr
         solver.init_use_fallback = init_use_fallback
         solver.max_nbhd = max_nbhd
-        solver.use_infty_nbhd = use_infty_nbhd
         solver.stepper = stepper
         solver.system_solver = system_solver
         solver.status = :NotLoaded
@@ -254,11 +250,8 @@ function solve(solver::Solver{T}) where {T <: Real}
     solver.prev_alpha = one(T)
     solver.z_temp = similar(model.h)
     solver.s_temp = similar(model.h)
-    solver.primal_views = [view(Cones.use_dual(model.cones[k]) ? solver.z_temp : solver.s_temp, model.cone_idxs[k]) for k in eachindex(model.cones)]
-    solver.dual_views = [view(Cones.use_dual(model.cones[k]) ? solver.s_temp : solver.z_temp, model.cone_idxs[k]) for k in eachindex(model.cones)]
-    # if !solver.use_infty_nbhd
-        solver.nbhd_temp = [Vector{T}(undef, length(model.cone_idxs[k])) for k in eachindex(model.cones)]
-    # end
+    solver.primal_views = [view(Cones.use_dual_barrier(model.cones[k]) ? solver.z_temp : solver.s_temp, model.cone_idxs[k]) for k in eachindex(model.cones)]
+    solver.dual_views = [view(Cones.use_dual_barrier(model.cones[k]) ? solver.s_temp : solver.z_temp, model.cone_idxs[k]) for k in eachindex(model.cones)]
     solver.cones_infeas = trues(length(model.cones))
     solver.cones_loaded = trues(length(model.cones))
 

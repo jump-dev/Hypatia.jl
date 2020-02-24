@@ -7,7 +7,9 @@ TODO
 =#
 
 mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
-    use_dual::Bool
+    use_dual_barrier::Bool
+    use_heuristic_neighborhood::Bool
+    max_neighborhood::T
     dim::Int
     side::Int
     As::Vector
@@ -25,14 +27,18 @@ mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
+    nbhd_tmp::Vector{T}
+    nbhd_tmp2::Vector{T}
 
     sumA
     fact
     sumAinvAs::Vector
 
     function LinMatrixIneq{T}(
-        As::Vector,
-        is_dual::Bool;
+        As::Vector;
+        use_dual::Bool = false,
+        use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
+        max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
         dim = length(As)
@@ -52,7 +58,9 @@ mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
         @assert isposdef(first(As))
         @assert side > 0
         cone = new{T}()
-        cone.use_dual = is_dual
+        cone.use_dual_barrier = use_dual
+        cone.use_heuristic_neighborhood = use_heuristic_neighborhood
+        cone.max_neighborhood = max_neighborhood
         cone.dim = dim
         cone.side = side
         cone.As = As
@@ -60,8 +68,6 @@ mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
         return cone
     end
 end
-
-LinMatrixIneq{T}(As::Vector) where {T <: Real} = LinMatrixIneq{T}(As, false)
 
 # TODO only allocate the fields we use
 function setup_data(cone::LinMatrixIneq{T}) where {T <: Real}
@@ -72,6 +78,8 @@ function setup_data(cone::LinMatrixIneq{T}) where {T <: Real}
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
+    cone.nbhd_tmp = zeros(T, dim)
+    cone.nbhd_tmp2 = zeros(T, dim)
     return
 end
 

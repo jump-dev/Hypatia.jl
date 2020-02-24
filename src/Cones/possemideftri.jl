@@ -11,10 +11,12 @@ barrier from "Self-Scaled Barriers and Interior-Point Methods for Convex Program
 TODO
 - describe svec scaling
 - describe hermitian complex PSD cone
+- try to derive faster neighborhood calculations for this cone specifically
 =#
 
 mutable struct PosSemidefTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
-    use_dual::Bool
+    use_dual_barrier::Bool
+    max_neighborhood::T
     dim::Int
     side::Int
     is_complex::Bool
@@ -30,6 +32,8 @@ mutable struct PosSemidefTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
+    nbhd_tmp::Vector{T}
+    nbhd_tmp2::Vector{T}
 
     mat::Matrix{R}
     mat2::Matrix{R}
@@ -39,12 +43,14 @@ mutable struct PosSemidefTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     fact_mat
 
     function PosSemidefTri{T, R}(
-        dim::Int,
-        is_dual::Bool,
+        dim::Int;
+        use_dual::Bool = false, # TODO self-dual so maybe remove this option/field?
+        max_neighborhood::Real = default_max_neighborhood(),
         ) where {R <: RealOrComplex{T}} where {T <: Real}
         @assert dim >= 1
         cone = new{T, R}()
-        cone.use_dual = is_dual
+        cone.use_dual_barrier = use_dual
+        cone.max_neighborhood = max_neighborhood
         cone.dim = dim # real vector dimension
         cone.rt2 = sqrt(T(2))
         if R <: Complex
@@ -61,7 +67,7 @@ mutable struct PosSemidefTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     end
 end
 
-PosSemidefTri{T, R}(dim::Int) where {R <: RealOrComplex{T}} where {T <: Real} = PosSemidefTri{T, R}(dim, false)
+use_heuristic_neighborhood(cone::PosSemidefTri) = false
 
 reset_data(cone::PosSemidefTri) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
 
@@ -72,6 +78,8 @@ function setup_data(cone::PosSemidefTri{T, R}) where {R <: RealOrComplex{T}} whe
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
+    cone.nbhd_tmp = zeros(T, dim)
+    cone.nbhd_tmp2 = zeros(T, dim)
     cone.mat = zeros(R, cone.side, cone.side)
     cone.mat2 = similar(cone.mat)
     cone.mat3 = similar(cone.mat)
@@ -129,9 +137,6 @@ function update_inv_hess(cone::PosSemidefTri)
     cone.inv_hess_updated = true
     return cone.inv_hess
 end
-
-# update_hess_prod(cone::PosSemidefTri) = nothing
-# update_inv_hess_prod(cone::PosSemidefTri) = nothing
 
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidefTri)
     @assert is_feas(cone)

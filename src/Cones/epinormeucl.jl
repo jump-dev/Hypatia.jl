@@ -6,10 +6,14 @@ epigraph of Euclidean (2-)norm (AKA second-order cone)
 
 barrier from "Self-Scaled Barriers and Interior-Point Methods for Convex Programming" by Nesterov & Todd
 -log(u^2 - norm_2(w)^2)
+
+TODO
+- try to derive faster neighborhood calculations for this cone specifically
 =#
 
 mutable struct EpiNormEucl{T <: Real} <: Cone{T}
-    use_dual::Bool
+    use_dual_barrier::Bool
+    max_neighborhood::T
     dim::Int
     point::Vector{T}
     timer::TimerOutput
@@ -22,19 +26,26 @@ mutable struct EpiNormEucl{T <: Real} <: Cone{T}
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
+    nbhd_tmp::Vector{T}
+    nbhd_tmp2::Vector{T}
 
     dist::T
 
-    function EpiNormEucl{T}(dim::Int, is_dual::Bool) where {T <: Real}
+    function EpiNormEucl{T}(
+        dim::Int;
+        use_dual::Bool = false, # TODO self-dual so maybe remove this option/field?
+        max_neighborhood::Real = default_max_neighborhood(),
+        ) where {T <: Real}
         @assert dim >= 2
         cone = new{T}()
-        cone.use_dual = is_dual
+        cone.use_dual_barrier = use_dual
+        cone.max_neighborhood = max_neighborhood
         cone.dim = dim
         return cone
     end
 end
 
-EpiNormEucl{T}(dim::Int) where {T <: Real} = EpiNormEucl{T}(dim, false)
+use_heuristic_neighborhood(cone::EpiNormEucl) = false
 
 reset_data(cone::EpiNormEucl) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
 
@@ -46,6 +57,8 @@ function setup_data(cone::EpiNormEucl{T}) where {T <: Real}
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
+    cone.nbhd_tmp = zeros(T, dim)
+    cone.nbhd_tmp2 = zeros(T, dim)
     return
 end
 
@@ -87,8 +100,11 @@ function update_hess(cone::EpiNormEucl)
     @assert cone.grad_updated
 
     mul!(cone.hess.data, cone.grad, cone.grad')
-    cone.hess += inv(cone.dist) * I # TODO inefficient?
-    cone.hess[1, 1] -= 2 / cone.dist
+    inv_dist = inv(cone.dist)
+    @inbounds for j in eachindex(cone.grad)
+        cone.hess[j, j] += inv_dist
+    end
+    cone.hess[1, 1] -= inv_dist + inv_dist
 
     cone.hess_updated = true
     return cone.hess
@@ -98,15 +114,14 @@ function update_inv_hess(cone::EpiNormEucl)
     @assert cone.is_feas
 
     mul!(cone.inv_hess.data, cone.point, cone.point')
-    cone.inv_hess += cone.dist * I # TODO inefficient?
-    cone.inv_hess[1, 1] -= 2 * cone.dist
+    @inbounds for j in eachindex(cone.grad)
+        cone.inv_hess[j, j] += cone.dist
+    end
+    cone.inv_hess[1, 1] -= cone.dist + cone.dist
 
     cone.inv_hess_updated = true
     return cone.inv_hess
 end
-
-# update_hess_prod(cone::EpiNormEucl) = nothing
-# update_inv_hess_prod(cone::EpiNormEucl) = nothing
 
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormEucl)
     @assert cone.is_feas

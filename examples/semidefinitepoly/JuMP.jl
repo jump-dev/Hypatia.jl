@@ -20,7 +20,12 @@ const MU = HYP.ModelUtilities
 
 const rt2 = sqrt(2)
 
-function semidefinitepolyJuMP(x::Vector{DP.PolyVar{true}}, H::Matrix; use_wsos::Bool = true, use_dual::Bool = false)
+function semidefinitepolyJuMP(
+    x::Vector{DP.PolyVar{true}},
+    H::Matrix;
+    use_wsos::Bool = true,
+    use_dual::Bool = false,
+    )
     model = JuMP.Model()
 
     if use_wsos

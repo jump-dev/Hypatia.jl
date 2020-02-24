@@ -9,8 +9,9 @@ barrier from "Self-Scaled Barriers and Interior-Point Methods for Convex Program
 =#
 
 mutable struct Nonnegative{T <: Real} <: Cone{T}
-    use_dual::Bool
+    use_dual_barrier::Bool
     use_3order_corr::Bool
+    max_neighborhood::T
     dim::Int
     point::Vector{T}
     timer::TimerOutput
@@ -26,17 +27,22 @@ mutable struct Nonnegative{T <: Real} <: Cone{T}
 
     correction::Vector{T}
 
-    function Nonnegative{T}(dim::Int, is_dual::Bool) where {T <: Real}
+    function Nonnegative{T}(
+        dim::Int;
+        use_dual::Bool = false, # TODO self-dual so maybe remove this option/field?
+        max_neighborhood::Real = default_max_neighborhood(),
+        ) where {T <: Real}
         @assert dim >= 1
         cone = new{T}()
-        cone.use_dual = is_dual
-        cone.use_3order_corr = false # TODO option
+        cone.use_dual_barrier = use_dual
+        cone.use_3order_corr = false # TODO maybe make it a function rather than a field
+        cone.max_neighborhood = max_neighborhood
         cone.dim = dim
         return cone
     end
 end
 
-Nonnegative{T}(dim::Int) where {T <: Real} = Nonnegative{T}(dim, false)
+use_heuristic_neighborhood(cone::Nonnegative) = false
 
 use_3order_corr(cone::Nonnegative) = cone.use_3order_corr
 
@@ -86,9 +92,6 @@ function update_inv_hess(cone::Nonnegative)
     return cone.inv_hess
 end
 
-# update_hess_prod(cone::Nonnegative) = nothing
-# update_inv_hess_prod(cone::Nonnegative) = nothing
-
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Nonnegative)
     @assert cone.is_feas
     @. prod = arr / cone.point / cone.point
@@ -121,6 +124,11 @@ hess_nz_idxs_col(cone::Nonnegative, j::Int) = [j]
 hess_nz_idxs_col_tril(cone::Nonnegative, j::Int) = [j]
 inv_hess_nz_idxs_col(cone::Nonnegative, j::Int) = [j]
 inv_hess_nz_idxs_col_tril(cone::Nonnegative, j::Int) = [j]
+
+function in_neighborhood(cone::Nonnegative, dual_point::AbstractVector, mu::Real)
+    mu_nbhd = mu * cone.max_neighborhood
+    return all(abs(si * zi - mu) < mu_nbhd for (si, zi) in zip(cone.point, dual_point))
+end
 
 function correction(cone::Nonnegative, primal_dir::AbstractVector, dual_dir::AbstractVector)
     @. cone.correction = primal_dir * dual_dir / cone.point

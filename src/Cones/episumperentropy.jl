@@ -12,7 +12,9 @@ TODO
 =#
 
 mutable struct EpiSumPerEntropy{T <: Real} <: Cone{T}
-    use_dual::Bool
+    use_dual_barrier::Bool
+    use_heuristic_neighborhood::Bool
+    max_neighborhood::T
     dim::Int
     w_dim::Int
     point::Vector{T}
@@ -28,6 +30,8 @@ mutable struct EpiSumPerEntropy{T <: Real} <: Cone{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
+    nbhd_tmp::Vector{T}
+    nbhd_tmp2::Vector{T}
 
     v_idxs::UnitRange{Int}
     w_idxs::UnitRange{Int}
@@ -36,13 +40,17 @@ mutable struct EpiSumPerEntropy{T <: Real} <: Cone{T}
     wvdiff::Vector{T}
 
     function EpiSumPerEntropy{T}(
-        dim::Int,
-        is_dual::Bool;
+        dim::Int;
+        use_dual::Bool = false,
+        use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
+        max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
         @assert dim >= 3
         cone = new{T}()
-        cone.use_dual = is_dual
+        cone.use_dual_barrier = use_dual
+        cone.use_heuristic_neighborhood = use_heuristic_neighborhood
+        cone.max_neighborhood = max_neighborhood
         cone.dim = dim
         cone.w_dim = div(dim - 1, 2)
         cone.v_idxs = 2:(cone.w_dim + 1)
@@ -51,8 +59,6 @@ mutable struct EpiSumPerEntropy{T <: Real} <: Cone{T}
         return cone
     end
 end
-
-EpiSumPerEntropy{T}(dim::Int) where {T <: Real} = EpiSumPerEntropy{T}(dim, false)
 
 # TODO only allocate the fields we use
 function setup_data(cone::EpiSumPerEntropy{T}) where {T <: Real}
@@ -63,6 +69,8 @@ function setup_data(cone::EpiSumPerEntropy{T}) where {T <: Real}
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
+    cone.nbhd_tmp = zeros(T, dim)
+    cone.nbhd_tmp2 = zeros(T, dim)
     cone.lwv1d = zeros(T, cone.w_dim)
     cone.wvdiff = zeros(T, cone.w_dim)
     return
@@ -126,14 +134,12 @@ function update_hess(cone::EpiSumPerEntropy)
     lwv1d = cone.lwv1d
     diff = cone.diff
     wvdiff = cone.wvdiff
-    g = cone.grad
-    g1 = g[1]
     H = cone.hess.data
 
     # H_u_u, H_u_v, H_u_w parts
-    H[1, 1] = abs2(g1)
+    H[1, 1] = abs2(cone.grad[1])
     @. wvdiff = w / v / diff
-    @. H[1, v_idxs] = cone.wvdiff / diff
+    @. H[1, v_idxs] = wvdiff / diff
     @. H[1, w_idxs] = lwv1d / diff
 
     # H_v_v, H_v_w, H_w_w parts

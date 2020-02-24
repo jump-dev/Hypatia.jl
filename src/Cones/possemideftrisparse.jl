@@ -24,7 +24,9 @@ TODO
 =#
 
 mutable struct PosSemidefTriSparse{T <: BlasReal, R <: RealOrComplex{T}} <: Cone{T}
-    use_dual::Bool
+    use_dual_barrier::Bool
+    use_heuristic_neighborhood::Bool
+    max_neighborhood::T
     dim::Int
     side::Int
     row_idxs::Vector{Int}
@@ -44,6 +46,8 @@ mutable struct PosSemidefTriSparse{T <: BlasReal, R <: RealOrComplex{T}} <: Cone
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
+    nbhd_tmp::Vector{T}
+    nbhd_tmp2::Vector{T}
 
     sparse_point
     sparse_point_map
@@ -65,8 +69,10 @@ mutable struct PosSemidefTriSparse{T <: BlasReal, R <: RealOrComplex{T}} <: Cone
     function PosSemidefTriSparse{T, R}(
         side::Int,
         row_idxs::Vector{Int},
-        col_idxs::Vector{Int},
-        is_dual::Bool;
+        col_idxs::Vector{Int};
+        use_dual::Bool = false,
+        use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
+        max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {R <: RealOrComplex{T}} where {T <: BlasReal}
         # check validity of inputs
@@ -91,7 +97,9 @@ mutable struct PosSemidefTriSparse{T <: BlasReal, R <: RealOrComplex{T}} <: Cone
             cone.is_complex = true
         end
         @assert cone.dim >= 1
-        cone.use_dual = is_dual
+        cone.use_dual_barrier = use_dual
+        cone.use_heuristic_neighborhood = use_heuristic_neighborhood
+        cone.max_neighborhood = max_neighborhood
         cone.side = side # side dimension of sparse matrix
         cone.row_idxs = row_idxs
         cone.col_idxs = col_idxs
@@ -101,8 +109,6 @@ mutable struct PosSemidefTriSparse{T <: BlasReal, R <: RealOrComplex{T}} <: Cone
     end
 end
 
-PosSemidefTriSparse{T, R}(side::Int, row_idxs::Vector{Int}, col_idxs::Vector{Int}) where {R <: RealOrComplex{T}} where {T <: BlasReal} = PosSemidefTriSparse{T, R}(side, row_idxs, col_idxs, false)
-
 function setup_data(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{T}} where {T <: BlasReal}
     reset_data(cone)
     dim = cone.dim
@@ -111,6 +117,8 @@ function setup_data(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{T
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
+    cone.nbhd_tmp = zeros(T, dim)
+    cone.nbhd_tmp2 = zeros(T, dim)
     setup_symbfact(cone)
     return
 end
