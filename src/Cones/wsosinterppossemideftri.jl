@@ -10,8 +10,8 @@ and "Semidefinite Characterization of Sum-of-Squares Cones in Algebras" by D. Pa
 
 mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
-    max_neighborhood::T
     use_heuristic_neighborhood::Bool
+    max_neighborhood::T
     dim::Int
     R::Int
     U::Int
@@ -46,8 +46,8 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
         U::Int,
         Ps::Vector{Matrix{T}};
         use_dual::Bool = false,
-        max_neighborhood::Real = default_max_neighborhood(),
         use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
+        max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
         for Pk in Ps
@@ -55,8 +55,8 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
         end
         cone = new{T}()
         cone.use_dual_barrier = !use_dual # using dual barrier
-        cone.max_neighborhood = max_neighborhood
         cone.use_heuristic_neighborhood = use_heuristic_neighborhood
+        cone.max_neighborhood = max_neighborhood
         cone.dim = U * svec_length(R)
         cone.R = R
         cone.U = U
