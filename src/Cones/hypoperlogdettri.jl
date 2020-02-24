@@ -16,8 +16,8 @@ TODO
 
 mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     use_dual_barrier::Bool
-    max_neighborhood::T
     use_heuristic_neighborhood::Bool
+    max_neighborhood::T
     dim::Int
     side::Int
     is_complex::Bool
@@ -54,18 +54,16 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     function HypoPerLogdetTri{T, R}(
         dim::Int;
         use_dual::Bool = false,
-        # sc_const::Real = 256, # TODO reduce this
-        # max_neighborhood::Real = default_max_neighborhood()
-        sc_const::Real = 1, # TODO if use this, use smaller than default max nbhd
-        max_neighborhood::Real = default_max_neighborhood() / 3,
+        sc_const::Real = 256, # TODO reduce this
         use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
+        max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {R <: RealOrComplex{T}} where {T <: Real}
         @assert dim >= 3
         cone = new{T, R}()
         cone.use_dual_barrier = use_dual
-        cone.max_neighborhood = max_neighborhood
         cone.use_heuristic_neighborhood = use_heuristic_neighborhood
+        cone.max_neighborhood = max_neighborhood
         cone.dim = dim
         cone.rt2 = sqrt(T(2))
         if R <: Complex
@@ -107,7 +105,7 @@ get_nu(cone::HypoPerLogdetTri) = 2 * cone.sc_const * (cone.side + 1)
 function set_initial_point(arr::AbstractVector{T}, cone::HypoPerLogdetTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     arr .= 0
     # NOTE if not using theta = 16, rescaling the ray yields central ray
-    (arr[1], arr[2], w) = (cone.sc_const / 16) * get_central_ray_hypoperlogdettri(cone.side)
+    (arr[1], arr[2], w) = (sqrt(cone.sc_const) / T(16)) * get_central_ray_hypoperlogdettri(cone.side)
     incr = (cone.is_complex ? 2 : 1)
     k = 3
     @inbounds for i in 1:cone.side

@@ -382,12 +382,7 @@ function test_hypoperlogdettri_barrier(T::Type{<:Real})
     for side in [1, 2, 3, 4, 5, 6, 12, 20]
         # real logdet barrier
         dim = 2 + CO.svec_length(side)
-
-
-
-
-        # TODO remove sc_const = 1
-        cone = CO.HypoPerLogdetTri{T, T}(dim, sc_const = 1)
+        cone = CO.HypoPerLogdetTri{T, T}(dim)
         function R_barrier(s)
             (u, v, W) = (s[1], s[2], zeros(eltype(s), side, side))
             CO.svec_to_smat!(W, s[3:end], sqrt(T(2)))
@@ -397,6 +392,19 @@ function test_hypoperlogdettri_barrier(T::Type{<:Real})
             test_barrier_oracles(cone, R_barrier, init_tol = 1e-5)
         else
             test_barrier_oracles(cone, R_barrier, init_tol = 1e-1, init_only = true)
+        end
+
+        # try sc_const = 1 (not self-concordant)
+        cone = CO.HypoPerLogdetTri{T, T}(dim, sc_const = 1)
+        function R_barrier_sc1(s)
+            (u, v, W) = (s[1], s[2], zeros(eltype(s), side, side))
+            CO.svec_to_smat!(W, s[3:end], sqrt(T(2)))
+            return -log(v * logdet(cholesky!(Symmetric(W / v, :U))) - u) - logdet(cholesky!(Symmetric(W, :U))) - (side + 1) * log(v)
+        end
+        if side <= 3
+            test_barrier_oracles(cone, R_barrier_sc1, init_tol = 1e-5)
+        else
+            test_barrier_oracles(cone, R_barrier_sc1, init_tol = 1e-1, init_only = true)
         end
 
         # complex logdet barrier
@@ -420,7 +428,7 @@ function test_hyporootdettri_barrier(T::Type{<:Real})
     for side in [1, 2, 3, 5]
         # real rootdet barrier
         dim = 1 + CO.svec_length(side)
-        cone = CO.HypoRootdetTri{T, T}(dim, sc_const = 1)
+        cone = CO.HypoRootdetTri{T, T}(dim)
         function R_barrier(s)
             (u, W) = (s[1], zeros(eltype(s), side, side))
             CO.svec_to_smat!(W, s[2:end], sqrt(T(2)))
@@ -428,6 +436,17 @@ function test_hyporootdettri_barrier(T::Type{<:Real})
             return cone.sc_const * (-log(det(fact_W) ^ inv(T(side)) - u) - logdet(fact_W))
         end
         test_barrier_oracles(cone, R_barrier)
+
+        # try sc_const = 1 (not self-concordant)
+        dim = 1 + CO.svec_length(side)
+        cone = CO.HypoRootdetTri{T, T}(dim, sc_const = 1)
+        function R_barrier_sc1(s)
+            (u, W) = (s[1], zeros(eltype(s), side, side))
+            CO.svec_to_smat!(W, s[2:end], sqrt(T(2)))
+            fact_W = cholesky!(Symmetric(W, :U))
+            return -log(det(fact_W) ^ inv(T(side)) - u) - logdet(fact_W)
+        end
+        test_barrier_oracles(cone, R_barrier_sc1)
 
         # complex rootdet barrier
         dim = 1 + side^2
