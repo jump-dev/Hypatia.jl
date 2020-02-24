@@ -24,13 +24,13 @@ end
 include(joinpath(@__DIR__, "moi.jl"))
 
 system_solvers = [
-    # SO.NaiveDenseSystemSolver,
-    # SO.NaiveSparseSystemSolver,
-    # # SO.NaiveIndirectSystemSolver,
-    # SO.NaiveElimDenseSystemSolver,
-    # SO.NaiveElimSparseSystemSolver,
-    # SO.SymIndefDenseSystemSolver,
-    # SO.SymIndefSparseSystemSolver,
+    SO.NaiveDenseSystemSolver,
+    SO.NaiveSparseSystemSolver,
+    # SO.NaiveIndirectSystemSolver,
+    SO.NaiveElimDenseSystemSolver,
+    SO.NaiveElimSparseSystemSolver,
+    SO.SymIndefDenseSystemSolver,
+    SO.SymIndefSparseSystemSolver,
     SO.QRCholDenseSystemSolver,
     ]
 
@@ -43,7 +43,7 @@ real_types = [
 
 @info("starting MOI.Test tests")
 @testset "MOI.Test tests" begin
-    @testset "MOI.Test tests: $s, $T" for s in system_solvers, T in real_types, use_dense_model in true#(false, true)
+    @testset "MOI.Test tests: $s, $T" for s in system_solvers, T in real_types, use_dense_model in (false, true)
         test_moi(T, use_dense_model, verbose = false, system_solver = s{T}())
     end
 end

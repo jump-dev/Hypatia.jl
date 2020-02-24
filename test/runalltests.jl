@@ -12,9 +12,9 @@ using Test
     include(joinpath(@__DIR__, "runnativeexamplestests.jl"))
     include(joinpath(@__DIR__, "runmoitests.jl"))
     include(joinpath(@__DIR__, "runjumpexamplestests.jl"))
-    #
-    # # require optional dependencies:
-    # # TODO maybe only run it if Pkg says the right dependency is installed
-    # include(joinpath(@__DIR__, "runpardisotests.jl"))
-    # include(joinpath(@__DIR__, "runhsltests.jl"))
+
+    # require optional dependencies:
+    # TODO maybe only run it if Pkg says the right dependency is installed
+    include(joinpath(@__DIR__, "runpardisotests.jl"))
+    include(joinpath(@__DIR__, "runhsltests.jl"))
 end
