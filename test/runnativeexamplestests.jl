@@ -21,8 +21,8 @@ include(joinpath(examples_dir, "sparsepca/native.jl"))
 
 T = Float64
 
-options = (atol = sqrt(sqrt(eps(T))), solver = SO.Solver{T}(
-    verbose = true, iter_limit = 250, time_limit = 12e2,
+options = (atol = 10eps(T)^0.25, solver = SO.Solver{T}(
+    verbose = false, iter_limit = 250, time_limit = 12e2,
     system_solver = SO.QRCholDenseSystemSolver{T}(),
     ))
 

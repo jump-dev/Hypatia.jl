@@ -7,7 +7,9 @@ matrix epigraph of matrix square
 =#
 
 mutable struct MatrixEpiPerSquare{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
-    use_dual::Bool
+    use_dual_barrier::Bool
+    use_heuristic_neighborhood::Bool
+    max_neighborhood::T
     dim::Int
     n::Int
     m::Int
@@ -26,6 +28,8 @@ mutable struct MatrixEpiPerSquare{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
+    nbhd_tmp::Vector{T}
+    nbhd_tmp2::Vector{T}
 
     U_idxs::UnitRange{Int}
     v_idx::Int
@@ -41,13 +45,17 @@ mutable struct MatrixEpiPerSquare{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
 
     function MatrixEpiPerSquare{T, R}(
         n::Int,
-        m::Int,
-        is_dual::Bool;
+        m::Int;
+        use_dual::Bool = false,
+        use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
+        max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {R <: RealOrComplex{T}} where {T <: Real}
         @assert 1 <= n <= m
         cone = new{T, R}()
-        cone.use_dual = is_dual
+        cone.use_dual_barrier = use_dual
+        cone.use_heuristic_neighborhood = use_heuristic_neighborhood
+        cone.max_neighborhood = max_neighborhood
         cone.is_complex = (R <: Complex)
         cone.v_idx = (cone.is_complex ? n ^ 2 + 1 : svec_length(n) + 1)
         cone.dim = cone.v_idx + (cone.is_complex ? 2 : 1) * n * m
@@ -61,8 +69,6 @@ mutable struct MatrixEpiPerSquare{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     end
 end
 
-MatrixEpiPerSquare{T, R}(n::Int, m::Int) where {R <: RealOrComplex{T}} where {T <: Real} = MatrixEpiPerSquare{T, R}(n, m, false)
-
 # TODO only allocate the fields we use
 function setup_data(cone::MatrixEpiPerSquare{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     reset_data(cone)
@@ -72,6 +78,8 @@ function setup_data(cone::MatrixEpiPerSquare{T, R}) where {R <: RealOrComplex{T}
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
+    cone.nbhd_tmp = zeros(T, dim)
+    cone.nbhd_tmp2 = zeros(T, dim)
     n = cone.n
     m = cone.m
     cone.U = Hermitian(zeros(R, n, n), :U)

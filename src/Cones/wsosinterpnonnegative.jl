@@ -12,7 +12,9 @@ TODO
 =#
 
 mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
-    use_dual::Bool
+    use_dual_barrier::Bool
+    use_heuristic_neighborhood::Bool
+    max_neighborhood::T
     dim::Int
     Ps::Vector{Matrix{R}}
     point::Vector{T}
@@ -28,6 +30,8 @@ mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
+    nbhd_tmp::Vector{T}
+    nbhd_tmp2::Vector{T}
 
     tmpLL::Vector{Matrix{R}}
     tmpUL::Vector{Matrix{R}}
@@ -37,23 +41,25 @@ mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T
 
     function WSOSInterpNonnegative{T, R}(
         U::Int,
-        Ps::Vector{Matrix{R}},
-        is_dual::Bool;
+        Ps::Vector{Matrix{R}};
+        use_dual::Bool = false,
+        use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
+        max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {R <: RealOrComplex{T}} where {T <: Real}
         for Pk in Ps
             @assert size(Pk, 1) == U
         end
         cone = new{T, R}()
-        cone.use_dual = !is_dual # using dual barrier
+        cone.use_dual_barrier = !use_dual # using dual barrier
+        cone.use_heuristic_neighborhood = use_heuristic_neighborhood
+        cone.max_neighborhood = max_neighborhood
         cone.dim = U
         cone.Ps = Ps
         cone.hess_fact_cache = hess_fact_cache
         return cone
     end
 end
-
-WSOSInterpNonnegative{T, R}(dim::Int, Ps::Vector{Matrix{R}}) where {R <: RealOrComplex{T}} where {T <: Real} = WSOSInterpNonnegative{T, R}(dim, Ps, false)
 
 function setup_data(cone::WSOSInterpNonnegative{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     reset_data(cone)
@@ -63,6 +69,8 @@ function setup_data(cone::WSOSInterpNonnegative{T, R}) where {R <: RealOrComplex
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
+    cone.nbhd_tmp = zeros(T, dim)
+    cone.nbhd_tmp2 = zeros(T, dim)
     Ps = cone.Ps
     cone.tmpLL = [Matrix{R}(undef, size(Pk, 2), size(Pk, 2)) for Pk in Ps]
     cone.tmpUL = [Matrix{R}(undef, dim, size(Pk, 2)) for Pk in Ps]

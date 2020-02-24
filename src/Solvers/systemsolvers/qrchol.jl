@@ -30,7 +30,7 @@ function solve_system(system_solver::QRCholSystemSolver{T}, solver::Solver{T}, s
         s_rows_k = (dim3 + 1) .+ idxs_k
         s_k = @view rhs[s_rows_k]
 
-        if Cones.use_dual(cone_k)
+        if Cones.use_dual_barrier(cone_k)
             z_temp_k = @view sol[z_rows_k]
             @. z_temp_k = -z_k - s_k
             Cones.inv_hess_prod!(z3_k, z_temp_k, cone_k)
@@ -116,7 +116,7 @@ function solve_3x3_subsystem(system_solver::QRCholSystemSolver{T}, solver::Solve
 end
 
 function block_hess_prod(cone_k::Cones.Cone{T}, prod_k::AbstractVecOrMat{T}, arr_k::AbstractVecOrMat{T}, mu::T) where {T <: Real}
-    if Cones.use_dual(cone_k)
+    if Cones.use_dual_barrier(cone_k)
         Cones.inv_hess_prod!(prod_k, arr_k, cone_k)
         @. prod_k /= mu
     else
@@ -223,7 +223,7 @@ function update_fact(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T
                     continue
                 end
             end
-            if Cones.use_dual(cone_k)
+            if Cones.use_dual_barrier(cone_k)
                 Cones.inv_hess_sqrt_prod!(prod_k, arr_k, cone_k)
                 prod_k ./= sqrtmu
             else

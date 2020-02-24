@@ -111,8 +111,8 @@ function matrixregression(
     reg_cone_dim = 1 + R_dim * data_pm
     lams = [
         (lam_fro, CO.EpiNormEucl{T}(reg_cone_dim)), # frobenius norm (vector L2 norm)
-        (lam_las, CO.EpiNormInf{T, R}(reg_cone_dim, true)), # vector lasso / L1 norm (dual to Linf norm)
-        (lam_nuc, CO.EpiNormSpectral{T, R}(data_m, data_p, true)), # nuclear norm (dual to spectral norm)
+        (lam_las, CO.EpiNormInf{T, R}(reg_cone_dim, use_dual = true)), # vector lasso / L1 norm (dual to Linf norm)
+        (lam_nuc, CO.EpiNormSpectral{T, R}(data_m, data_p, use_dual = true)), # nuclear norm (dual to spectral norm)
         ]
 
     for (lam, cone) in lams

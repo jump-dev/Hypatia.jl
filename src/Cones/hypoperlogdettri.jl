@@ -5,22 +5,25 @@ Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 (u in R, v in R_+, w in S_+) : u <= v*logdet(W/v)
 (see equivalent MathOptInterface LogDetConeConeTriangle definition)
 
-barrier (self-concordance follows from theorem 5.1.4, Interior-Point Polynomial Algorithms in Convex Programming
-by Y. Nesterov and A. Nemirovski)
+barrier (self-concordance follows from theorem 5.1.4, "Interior-Point Polynomial Algorithms in Convex Programming" by Y. Nesterov and A. Nemirovski):
 theta^2 * (-log(v*logdet(W/v) - u) - logdet(W) - (n + 1) log(v))
 we use theta = 16
 
 TODO
 - describe complex case
+- try to reduce theta parameter but maintain self-concordance
 =#
 
 mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
-    use_dual::Bool
+    use_dual_barrier::Bool
+    use_heuristic_neighborhood::Bool
+    max_neighborhood::T
     dim::Int
     side::Int
     is_complex::Bool
     point::Vector{T}
     rt2::T
+    sc_const::T
     timer::TimerOutput
 
     feas_updated::Bool
@@ -34,6 +37,8 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
+    nbhd_tmp::Vector{T}
+    nbhd_tmp2::Vector{T}
 
     mat::Matrix{R}
     mat2::Matrix{R}
@@ -45,16 +50,20 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     ldWvuv::T
     vzip1::T
     Wivzi::Matrix{R}
-    sc_const::T
 
     function HypoPerLogdetTri{T, R}(
-        dim::Int,
-        is_dual::Bool;
+        dim::Int;
+        use_dual::Bool = false,
+        sc_const::Real = 256, # TODO reduce this
+        use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
+        max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {R <: RealOrComplex{T}} where {T <: Real}
         @assert dim >= 3
         cone = new{T, R}()
-        cone.use_dual = is_dual
+        cone.use_dual_barrier = use_dual
+        cone.use_heuristic_neighborhood = use_heuristic_neighborhood
+        cone.max_neighborhood = max_neighborhood
         cone.dim = dim
         cone.rt2 = sqrt(T(2))
         if R <: Complex
@@ -67,13 +76,11 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
             cone.is_complex = false
         end
         cone.side = side
-        cone.sc_const = T(256)
+        cone.sc_const = sc_const
         cone.hess_fact_cache = hess_fact_cache
         return cone
     end
 end
-
-HypoPerLogdetTri{T, R}(dim::Int) where {R <: RealOrComplex{T}} where {T <: Real} = HypoPerLogdetTri{T, R}(dim, false)
 
 reset_data(cone::HypoPerLogdetTri) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_prod_updated = cone.hess_fact_updated = false)
 
@@ -85,6 +92,8 @@ function setup_data(cone::HypoPerLogdetTri{T, R}) where {R <: RealOrComplex{T}} 
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
+    cone.nbhd_tmp = zeros(T, dim)
+    cone.nbhd_tmp2 = zeros(T, dim)
     cone.mat = Matrix{R}(undef, cone.side, cone.side)
     cone.mat2 = similar(cone.mat)
     cone.Wivzi = similar(cone.mat)
@@ -95,7 +104,8 @@ get_nu(cone::HypoPerLogdetTri) = 2 * cone.sc_const * (cone.side + 1)
 
 function set_initial_point(arr::AbstractVector{T}, cone::HypoPerLogdetTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     arr .= 0
-    (arr[1], arr[2], w) = get_central_ray_hypoperlogdettri(cone.side)
+    # NOTE if not using theta = 16, rescaling the ray yields central ray
+    (arr[1], arr[2], w) = (sqrt(cone.sc_const) / T(16)) * get_central_ray_hypoperlogdettri(cone.side)
     incr = (cone.is_complex ? 2 : 1)
     k = 3
     @inbounds for i in 1:cone.side

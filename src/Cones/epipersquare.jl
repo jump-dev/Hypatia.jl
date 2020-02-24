@@ -7,10 +7,14 @@ note v*1/2*norm_2(w/v)^2 = 1/2*sum_i(w_i^2)/v
 
 barrier from "Self-Scaled Barriers and Interior-Point Methods for Convex Programming" by Nesterov & Todd
 -log(2*u*v - norm_2(w)^2)
+
+TODO
+- try to derive faster neighborhood calculations for this cone specifically
 =#
 
 mutable struct EpiPerSquare{T <: Real} <: Cone{T}
-    use_dual::Bool
+    use_dual_barrier::Bool
+    max_neighborhood::T
     dim::Int
     point::Vector{T}
     timer::TimerOutput
@@ -25,6 +29,8 @@ mutable struct EpiPerSquare{T <: Real} <: Cone{T}
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
+    nbhd_tmp::Vector{T}
+    nbhd_tmp2::Vector{T}
 
     dist::T
     rtdist::T
@@ -32,16 +38,21 @@ mutable struct EpiPerSquare{T <: Real} <: Cone{T}
     hess_sqrt_vec::Vector{T}
     inv_hess_sqrt_vec::Vector{T}
 
-    function EpiPerSquare{T}(dim::Int, is_dual::Bool) where {T <: Real}
+    function EpiPerSquare{T}(
+        dim::Int;
+        use_dual::Bool = false, # TODO self-dual so maybe remove this option/field?
+        max_neighborhood::Real = default_max_neighborhood(),
+        ) where {T <: Real}
         @assert dim >= 3
         cone = new{T}()
-        cone.use_dual = is_dual
+        cone.use_dual_barrier = use_dual
+        cone.max_neighborhood = max_neighborhood
         cone.dim = dim
         return cone
     end
 end
 
-EpiPerSquare{T}(dim::Int) where {T <: Real} = EpiPerSquare{T}(dim, false)
+use_heuristic_neighborhood(cone::EpiPerSquare) = false
 
 reset_data(cone::EpiPerSquare) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_sqrt_prod_updated = cone.inv_hess_sqrt_prod_updated = false)
 
@@ -54,6 +65,8 @@ function setup_data(cone::EpiPerSquare{T}) where {T <: Real}
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.hess_sqrt_vec = zeros(T, dim)
     cone.inv_hess_sqrt_vec = zeros(T, dim)
+    cone.nbhd_tmp = zeros(T, dim)
+    cone.nbhd_tmp2 = zeros(T, dim)
     return
 end
 
@@ -99,11 +112,11 @@ function update_hess(cone::EpiPerSquare)
     H = cone.hess.data
 
     mul!(H, cone.grad, cone.grad')
-    invdist = inv(cone.dist)
+    inv_dist = inv(cone.dist)
     @inbounds for j in 3:cone.dim
-        H[j, j] += invdist
+        H[j, j] += inv_dist
     end
-    H[1, 2] -= invdist
+    H[1, 2] -= inv_dist
 
     cone.hess_updated = true
     return cone.hess

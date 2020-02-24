@@ -49,7 +49,7 @@ function envelope(
         h = zeros(T, npoly * U)
     end
 
-    cones = CO.Cone{T}[CO.WSOSInterpNonnegative{T, T}(U, Ps, !primal_wsos) for k in 1:npoly]
+    cones = CO.Cone{T}[CO.WSOSInterpNonnegative{T, T}(U, Ps, use_dual = !primal_wsos) for k in 1:npoly]
 
     return (c = c, A = A, b = b, G = G, h = h, cones = cones)
 end

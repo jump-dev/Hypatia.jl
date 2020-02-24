@@ -10,7 +10,9 @@ barrier from "Constructing self-concordant barriers for convex cones" by Yu. Nes
 =#
 
 mutable struct HypoGeomean{T <: Real} <: Cone{T}
-    use_dual::Bool
+    use_dual_barrier::Bool
+    use_heuristic_neighborhood::Bool
+    max_neighborhood::T
     dim::Int
     alpha::Vector{T}
     point::Vector{T}
@@ -26,13 +28,17 @@ mutable struct HypoGeomean{T <: Real} <: Cone{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
+    nbhd_tmp::Vector{T}
+    nbhd_tmp2::Vector{T}
 
     wprod::T
     wprodu::T
 
     function HypoGeomean{T}(
-        alpha::Vector{T},
-        is_dual::Bool;
+        alpha::Vector{T};
+        use_dual::Bool = false,
+        use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
+        max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
         dim = length(alpha) + 1
@@ -40,15 +46,15 @@ mutable struct HypoGeomean{T <: Real} <: Cone{T}
         @assert all(ai > 0 for ai in alpha)
         @assert sum(alpha) ≈ 1
         cone = new{T}()
-        cone.use_dual = is_dual
+        cone.use_dual_barrier = use_dual
+        cone.use_heuristic_neighborhood = use_heuristic_neighborhood
+        cone.max_neighborhood = max_neighborhood
         cone.dim = dim
         cone.alpha = alpha
         cone.hess_fact_cache = hess_fact_cache
         return cone
     end
 end
-
-HypoGeomean{T}(alpha::Vector{T}) where {T <: Real} = HypoGeomean{T}(alpha, false)
 
 function setup_data(cone::HypoGeomean{T}) where {T <: Real}
     reset_data(cone)
@@ -58,6 +64,8 @@ function setup_data(cone::HypoGeomean{T}) where {T <: Real}
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
+    cone.nbhd_tmp = zeros(T, dim)
+    cone.nbhd_tmp2 = zeros(T, dim)
     return
 end
 
@@ -72,7 +80,7 @@ function set_initial_point(arr::AbstractVector{T}, cone::HypoGeomean{T}) where {
         arr[2:end] .= (c - n + 1) / sqrt(T(n + 1) * (-2 * c + 6 * n + 2))
     else
         (arr[1], w) = get_central_ray_hypogeomean(cone.alpha)
-        arr[2:end] .= w
+        arr[2:end] = w
     end
     return arr
 end

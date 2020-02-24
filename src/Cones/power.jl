@@ -10,7 +10,9 @@ barrier from "On self-concordant barriers for generalized power cones" by Roy & 
 =#
 
 mutable struct Power{T <: Real} <: Cone{T}
-    use_dual::Bool
+    use_dual_barrier::Bool
+    use_heuristic_neighborhood::Bool
+    max_neighborhood::T
     dim::Int
     alpha::Vector{T}
     n::Int
@@ -27,6 +29,8 @@ mutable struct Power{T <: Real} <: Cone{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
+    nbhd_tmp::Vector{T}
+    nbhd_tmp2::Vector{T}
 
     produ::T
     produw::T
@@ -36,8 +40,10 @@ mutable struct Power{T <: Real} <: Cone{T}
 
     function Power{T}(
         alpha::Vector{T},
-        n::Int,
-        is_dual::Bool;
+        n::Int;
+        use_dual::Bool = false,
+        use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
+        max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
         @assert n >= 1
@@ -47,15 +53,15 @@ mutable struct Power{T <: Real} <: Cone{T}
         @assert sum(alpha) ≈ 1
         cone = new{T}()
         cone.n = n
-        cone.use_dual = is_dual
+        cone.use_dual_barrier = use_dual
+        cone.use_heuristic_neighborhood = use_heuristic_neighborhood
+        cone.max_neighborhood = max_neighborhood
         cone.dim = dim
         cone.alpha = alpha
         cone.hess_fact_cache = hess_fact_cache
         return cone
     end
 end
-
-Power{T}(alpha::Vector{T}, n::Int) where {T <: Real} = Power{T}(alpha, n, false)
 
 dimension(cone::Power) = length(cone.alpha) + cone.n
 
@@ -67,6 +73,8 @@ function setup_data(cone::Power{T}) where {T <: Real}
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
+    cone.nbhd_tmp = zeros(T, dim)
+    cone.nbhd_tmp2 = zeros(T, dim)
     load_matrix(cone.hess_fact_cache, cone.hess)
     cone.aui = zeros(length(cone.alpha))
     cone.auiproduuw = zeros(length(cone.alpha))

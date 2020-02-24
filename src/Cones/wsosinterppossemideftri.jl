@@ -9,7 +9,9 @@ and "Semidefinite Characterization of Sum-of-Squares Cones in Algebras" by D. Pa
 =#
 
 mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
-    use_dual::Bool
+    use_dual_barrier::Bool
+    use_heuristic_neighborhood::Bool
+    max_neighborhood::T
     dim::Int
     R::Int
     U::Int
@@ -27,6 +29,8 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
+    nbhd_tmp::Vector{T}
+    nbhd_tmp2::Vector{T}
 
     rt2::T
     rt2i::T
@@ -40,15 +44,19 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
     function WSOSInterpPosSemidefTri{T}(
         R::Int,
         U::Int,
-        Ps::Vector{Matrix{T}},
-        is_dual::Bool;
+        Ps::Vector{Matrix{T}};
+        use_dual::Bool = false,
+        use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
+        max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
         for Pk in Ps
             @assert size(Pk, 1) == U
         end
         cone = new{T}()
-        cone.use_dual = !is_dual # using dual barrier
+        cone.use_dual_barrier = !use_dual # using dual barrier
+        cone.use_heuristic_neighborhood = use_heuristic_neighborhood
+        cone.max_neighborhood = max_neighborhood
         cone.dim = U * svec_length(R)
         cone.R = R
         cone.U = U
@@ -57,8 +65,6 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
         return cone
     end
 end
-
-WSOSInterpPosSemidefTri{T}(R::Int, U::Int, Ps::Vector{Matrix{T}}) where {T <: Real} = WSOSInterpPosSemidefTri{T}(R, U, Ps, false)
 
 function setup_data(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     reset_data(cone)
@@ -71,6 +77,8 @@ function setup_data(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
+    cone.nbhd_tmp = zeros(T, dim)
+    cone.nbhd_tmp2 = zeros(T, dim)
     cone.rt2 = sqrt(T(2))
     cone.rt2i = inv(cone.rt2)
     cone.tmpU = Vector{T}(undef, U)

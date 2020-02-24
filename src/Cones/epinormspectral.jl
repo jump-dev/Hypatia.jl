@@ -12,7 +12,9 @@ barrier from "Interior-Point Polynomial Algorithms in Convex Programming" by Nes
 =#
 
 mutable struct EpiNormSpectral{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
-    use_dual::Bool
+    use_dual_barrier::Bool
+    use_heuristic_neighborhood::Bool
+    max_neighborhood::T
     dim::Int
     n::Int
     m::Int
@@ -31,6 +33,8 @@ mutable struct EpiNormSpectral{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
+    nbhd_tmp::Vector{T}
+    nbhd_tmp2::Vector{T}
 
     W::Matrix{R}
     Z::Matrix{R}
@@ -45,13 +49,17 @@ mutable struct EpiNormSpectral{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
 
     function EpiNormSpectral{T, R}(
         n::Int,
-        m::Int,
-        is_dual::Bool;
+        m::Int;
+        use_dual::Bool = false,
+        use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
+        max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {R <: RealOrComplex{T}} where {T <: Real}
         @assert 1 <= n <= m
         cone = new{T, R}()
-        cone.use_dual = is_dual
+        cone.use_dual_barrier = use_dual
+        cone.use_heuristic_neighborhood = use_heuristic_neighborhood
+        cone.max_neighborhood = max_neighborhood
         cone.is_complex = (R <: Complex)
         cone.dim = (cone.is_complex ? 2 * n * m + 1 : n * m + 1)
         cone.n = n
@@ -60,8 +68,6 @@ mutable struct EpiNormSpectral{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
         return cone
     end
 end
-
-EpiNormSpectral{T, R}(n::Int, m::Int) where {R <: RealOrComplex{T}} where {T <: Real} = EpiNormSpectral{T, R}(n, m, false)
 
 reset_data(cone::EpiNormSpectral) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_prod_updated = cone.hess_fact_updated = false)
 
@@ -74,6 +80,8 @@ function setup_data(cone::EpiNormSpectral{T, R}) where {R <: RealOrComplex{T}} w
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
+    cone.nbhd_tmp = zeros(T, dim)
+    cone.nbhd_tmp2 = zeros(T, dim)
     cone.W = Matrix{R}(undef, cone.n, cone.m)
     cone.Z = Matrix{R}(undef, cone.n, cone.n)
     cone.ZiW = Matrix{R}(undef, cone.n, cone.m)
@@ -98,7 +106,7 @@ function update_feas(cone::EpiNormSpectral)
 
     if u > 0
         @views vec_copy_to!(cone.W, cone.point[2:end])
-        copyto!(cone.Z, abs2(u) * I) # TODO inefficient
+        copyto!(cone.Z, abs2(u) * I)
         mul!(cone.Z, cone.W, cone.W', -1, true)
         cone.fact_Z = cholesky!(Hermitian(cone.Z, :U), check = false)
         cone.is_feas = isposdef(cone.fact_Z)
@@ -153,8 +161,8 @@ function update_hess(cone::EpiNormSpectral)
     H = cone.hess.data
 
     # H_W_W part
-    mul!(tmpmm, W', ZiW)
-    tmpmm += I # TODO inefficient
+    copyto!(tmpmm, I)
+    mul!(tmpmm, W', ZiW, true, true)
 
     # TODO parallelize loops
     idx_incr = (cone.is_complex ? 2 : 1)

@@ -43,11 +43,6 @@ options = (verbose = false,)
         t(T, solver = SO.Solver{T}(preprocess = true, init_use_indirect = false, reduce = true, system_solver = SO.QRCholDenseSystemSolver{T}(); options...))
     end
 
-    # test with different neighborhood functions
-    @testset "neighborhood function tests: $t, $T, $n" for t in testfuns_many, T in generic_reals, n in [true, false]
-        t(T, solver = SO.Solver{T}(use_infty_nbhd = n; options...))
-    end
-
     # test each system solver
     @testset "NaiveDense tests: $t, $T" for t in testfuns_many, T in generic_reals
         t(T, solver = SO.Solver{T}(system_solver = SO.NaiveDenseSystemSolver{T}(); options...))
