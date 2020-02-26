@@ -35,7 +35,7 @@ include(joinpath(examples_dir, "signomialmin/JuMP.jl"))
 T = Float64
 options = (
     test_certificates = false,
-    verbose = true,
+    verbose = false,
     iter_limit = 250,
     time_limit = 6e2, # 1 minute
     system_solver = SO.QRCholDenseSystemSolver{T}(),
