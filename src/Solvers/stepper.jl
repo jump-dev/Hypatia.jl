@@ -105,14 +105,7 @@ end
 function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     point = solver.point
 
-    for (k, cone_k) in enumerate(solver.model.cones)
-        Cones.load_point(cone_k, solver.point.primal_views[k])
-        Cones.reset_data(cone_k)
-        @assert Cones.is_feas(cone_k)
-        grad = Cones.grad(cone_k)
-        hess = Cones.hess(cone_k)
-    end
-
+    # update linear system solver factorization and helpers
     @timeit solver.timer "update_fact" update_fact(solver.system_solver, solver)
 
     # calculate correction direction and keep in dir_corr
@@ -137,7 +130,7 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
         stepper, solver, prev_alpha = stepper.prev_alpha, min_alpha = T(1e-3))
 
     if iszero(alpha)
-        # could not step far in combined direction, so perform a pure correction step
+        # could not step far in combined direction, so attempt a pure correction step
         solver.verbose && println("performing correction step")
         copyto!(stepper.dir, stepper.dir_corr)
 
