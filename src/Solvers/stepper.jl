@@ -35,6 +35,9 @@ mutable struct CombinedStepper{T <: Real} <: Stepper{T}
     s_linesearch::Vector{T}
     primal_views_linesearch::Vector
     dual_views_linesearch::Vector
+    cone_times::Vector{Float64}
+    cone_order::Vector{Int}
+
     CombinedStepper{T}() where {T <: Real} = new{T}()
 end
 
@@ -98,6 +101,9 @@ function load(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     stepper.s_linesearch = zeros(T, q)
     stepper.primal_views_linesearch = [view(Cones.use_dual_barrier(model.cones[k]) ? stepper.z_linesearch : stepper.s_linesearch, model.cone_idxs[k]) for k in eachindex(model.cones)]
     stepper.dual_views_linesearch = [view(Cones.use_dual_barrier(model.cones[k]) ? stepper.s_linesearch : stepper.z_linesearch, model.cone_idxs[k]) for k in eachindex(model.cones)]
+
+    stepper.cone_times = zeros(Float64, length(solver.model.cones))
+    stepper.cone_order = collect(1:length(solver.model.cones))
 
     return stepper
 end
@@ -306,6 +312,9 @@ function find_max_alpha(
     prev_alpha::T,
     min_alpha::T,
     ) where {T <: Real}
+    cones = solver.model.cones
+    cone_times = stepper.cone_times
+    cone_order = stepper.cone_order
     z = solver.point.z
     s = solver.point.s
     tau = solver.tau
@@ -316,10 +325,6 @@ function find_max_alpha(
     kap_dir = stepper.dir[stepper.kap_row]
     z_linesearch = stepper.z_linesearch
     s_linesearch = stepper.s_linesearch
-
-# TODO prealloc
-    cone_times = zeros(length(solver.model.cones))
-    cone_order = collect(1:length(solver.model.cones))
 
     alpha = max(T(0.1), min(prev_alpha * T(1.4), one(T))) # TODO option for parameter
     if tau_dir < zero(T)
@@ -345,12 +350,12 @@ function find_max_alpha(
             sortperm!(cone_order, cone_times, initialized = true)
             in_nbhd = true
             for k in cone_order
-                cone_k = solver.model.cones[k]
-                cone_times[k] = @time begin
-                    Cones.load_point(cone_k, stepper.primal_views_linesearch[k])
-                    Cones.reset_data(cone_k)
-                    in_nbhd_k = Cones.is_feas(cone_k) && Cones.in_neighborhood(cone_k, stepper.dual_views_linesearch[k], mu_temp)
-                end
+                cone_k = cones[k]
+                time_k = time_ns()
+                Cones.load_point(cone_k, stepper.primal_views_linesearch[k])
+                Cones.reset_data(cone_k)
+                in_nbhd_k = Cones.is_feas(cone_k) && Cones.in_neighborhood(cone_k, stepper.dual_views_linesearch[k], mu_temp)
+                cone_times[k] = time_ns() - time_k
                 if !in_nbhd_k
                     in_nbhd = false
                     break

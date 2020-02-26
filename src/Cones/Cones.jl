@@ -84,7 +84,7 @@ function update_hess_fact(cone::Cone{T}) where {T <: Real}
     @timeit cone.timer "hess_fact" fact_success = update_fact(cone.hess_fact_cache, cone.hess)
     if !fact_success
         if T <: BlasReal && cone.hess_fact_cache isa DensePosDefCache{T}
-            @warn("Switching Hessian cache from Cholesky to Bunch Kaufman")
+            # @warn("switching Hessian cache from Cholesky to Bunch Kaufman")
             cone.hess_fact_cache = DenseSymCache{T}()
             load_matrix(cone.hess_fact_cache, cone.hess)
         else
