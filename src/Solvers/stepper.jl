@@ -103,7 +103,7 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     # calculate correction direction and keep in dir_corr
     @timeit solver.timer "rhs_corr" update_rhs_correction(stepper, solver)
     @timeit solver.timer "corr_dir" get_directions(stepper, solver, iter_ref_steps = 3)
-    copyto!(stepper.dir_corr, stepper.dir) # TODO can avoid copyto by making dir vector an arg?
+    copyto!(stepper.dir_corr, stepper.dir)
 
     # calculate affine/prediction direction and keep in dir
     @timeit solver.timer "rhs_aff" update_rhs_affine(stepper, solver)
@@ -111,8 +111,7 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
 
     # calculate correction factor gamma by finding distance aff_alpha for stepping in affine direction
     @timeit solver.timer "aff_alpha" solver.prev_aff_alpha = aff_alpha = find_max_alpha(
-        stepper, solver,
-        nbhd = one(T), prev_alpha = solver.prev_aff_alpha, min_alpha = T(2e-2))
+        stepper, solver, prev_alpha = solver.prev_aff_alpha, min_alpha = T(1e-2))
     solver.prev_gamma = gamma = abs2(one(T) - aff_alpha) # TODO allow different function (heuristic) as option?
 
     # calculate combined direction and keep in dir
@@ -120,18 +119,16 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
 
     # find distance alpha for stepping in combined direction
     @timeit solver.timer "comb_alpha" alpha = find_max_alpha(
-        stepper, solver,
-        nbhd = solver.max_nbhd, prev_alpha = solver.prev_alpha, min_alpha = T(1e-3))
+        stepper, solver, prev_alpha = solver.prev_alpha, min_alpha = T(1e-3))
 
     if iszero(alpha)
         # could not step far in combined direction, so perform a pure correction step
         solver.verbose && println("performing correction step")
-        copyto!(stepper.dir, stepper.dir_corr) # TODO can avoid copyto by making dir vector an arg?
+        copyto!(stepper.dir, stepper.dir_corr)
 
         # find distance alpha for stepping in correction direction
         @timeit solver.timer "corr_alpha" alpha = find_max_alpha(
-            stepper, solver,
-            nbhd = solver.max_nbhd, prev_alpha = one(T), min_alpha = T(1e-6))
+            stepper, solver, prev_alpha = one(T), min_alpha = T(1e-6))
 
         if iszero(alpha)
             @warn("numerical failure: could not step in correction direction; terminating")
@@ -299,7 +296,6 @@ end
 function find_max_alpha(
     stepper::CombinedStepper{T},
     solver::Solver{T};
-    nbhd::T,
     prev_alpha::T,
     min_alpha::T,
     ) where {T <: Real}
@@ -323,7 +319,7 @@ function find_max_alpha(
     end
     alpha *= T(0.9999)
 
-    solver.cones_infeas .= true
+    # solver.cones_infeas .= true # TODO move field to stepper?
     tau_temp = kap_temp = taukap_temp = mu_temp = zero(T)
     nup1 = solver.model.nu + 1
     while true
@@ -334,9 +330,24 @@ function find_max_alpha(
         taukap_temp = tau_temp * kap_temp
         mu_temp = (dot(s_temp, z_temp) + taukap_temp) / nup1
 
-        if check_neighborhood(mu_temp, taukap_temp, nbhd, solver)
-            # cone feasibility and neighborhood conditions are satisfied
-            break
+        if mu_temp > eps(T) && abs(taukap_temp - mu_temp) < mu_temp * solver.max_nbhd
+            # if check_neighborhood(solver, mu_temp)
+            #     # cone feasibility and neighborhood conditions are satisfied
+            #     break
+            # end
+
+            in_nbhd = true
+            for (k, cone_k) in enumerate(solver.model.cones)
+                Cones.load_point(cone_k, solver.primal_views[k])
+                Cones.reset_data(cone_k)
+                if !Cones.is_feas(cone_k) || !Cones.in_neighborhood(cone_k, solver.dual_views[k], mu_temp)
+                    in_nbhd = false
+                    break
+                end
+            end
+            if in_nbhd
+                break
+            end
         end
 
         if alpha < min_alpha
@@ -352,72 +363,8 @@ function find_max_alpha(
     return alpha
 end
 
-function check_neighborhood(
-    mu_temp::T,
-    taukap_temp::T,
-    nbhd::T,
-    solver::Solver{T},
-    ) where {T <: Real}
-    cones = solver.model.cones
-
-    if mu_temp <= eps(T)
-        return false
-    end
-
-    # check neighborhood for tau and kappa
-    if abs(taukap_temp - mu_temp) >= mu_temp * nbhd
-        return false
-    end
-
-
-    # TODO could collapse all below into the cone-wise in_nbhd function, and order cones according to speed and recent falses
-
-
-    # accept primal iterate if it is inside the cone and neighborhood
-    # first check inside cone for whichever cones were violated last line search iteration
-    Cones.load_point.(cones, solver.primal_views) # TODO only for cones that need to be checked?
-    for (k, cone_k) in enumerate(cones)
-        if solver.cones_infeas[k]
-            Cones.reset_data(cone_k)
-            if Cones.is_feas(cone_k)
-                solver.cones_infeas[k] = false
-                solver.cones_loaded[k] = true
-            else
-                return false
-            end
-        else
-            solver.cones_loaded[k] = false
-        end
-    end
-
-    @assert 0 < nbhd <= 1
-    # if !isfinite(nbhd)
-    #     return true
-    # end
-
-    for (k, cone_k) in enumerate(cones)
-        if !solver.cones_loaded[k]
-            Cones.reset_data(cone_k)
-            if !Cones.is_feas(cone_k)
-                return false
-            end
-        end
-
-
-
-
-        # TODO WRONG! this uses same cone nbhd for both affine and combined alphas. want to use 1
-
-        if !Cones.in_neighborhood(cone_k, solver.dual_views[k], mu_temp)
-            return false
-        end
-    end
-
-    return true
-end
-
-# # TODO experimental for BlockMatrix LHS: if block is a Cone then define mul as hessian product, if block is solver then define mul by mu/tau/tau
-# # TODO optimize... maybe need for each cone a 5-arg hess prod
+# TODO experimental for BlockMatrix LHS: if block is a Cone then define mul as hessian product, if block is solver then define mul by mu/tau/tau
+# TODO optimize... maybe need for each cone a 5-arg hess prod
 # import LinearAlgebra.mul!
 #
 # function mul!(y::AbstractVecOrMat{T}, A::Cones.Cone{T}, x::AbstractVecOrMat{T}, alpha::Number, beta::Number) where {T <: Real}
