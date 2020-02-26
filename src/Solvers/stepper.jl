@@ -317,6 +317,10 @@ function find_max_alpha(
     z_linesearch = stepper.z_linesearch
     s_linesearch = stepper.s_linesearch
 
+# TODO prealloc
+    cone_times = zeros(length(solver.model.cones))
+    cone_order = collect(1:length(solver.model.cones))
+
     alpha = max(T(0.1), min(prev_alpha * T(1.4), one(T))) # TODO option for parameter
     if tau_dir < zero(T)
         alpha = min(alpha, -tau / tau_dir)
@@ -337,12 +341,17 @@ function find_max_alpha(
         mu_temp = (dot(s_linesearch, z_linesearch) + taukap_temp) / nup1
 
         if mu_temp > eps(T) && abs(taukap_temp - mu_temp) < mu_temp * solver.max_nbhd
-            # TODO order the cones by how long it takes to check these conditions and iterate in that order, to improve efficiency
+            # order the cones by how long it takes to check neighborhood condition and iterate in that order, to improve efficiency
+            sortperm!(cone_order, cone_times, initialized = true)
             in_nbhd = true
-            for (k, cone_k) in enumerate(solver.model.cones)
-                Cones.load_point(cone_k, stepper.primal_views_linesearch[k])
-                Cones.reset_data(cone_k)
-                if !Cones.is_feas(cone_k) || !Cones.in_neighborhood(cone_k, stepper.dual_views_linesearch[k], mu_temp)
+            for k in cone_order
+                cone_k = solver.model.cones[k]
+                cone_times[k] = @time begin
+                    Cones.load_point(cone_k, stepper.primal_views_linesearch[k])
+                    Cones.reset_data(cone_k)
+                    in_nbhd_k = Cones.is_feas(cone_k) && Cones.in_neighborhood(cone_k, stepper.dual_views_linesearch[k], mu_temp)
+                end
+                if !in_nbhd_k
                     in_nbhd = false
                     break
                 end
