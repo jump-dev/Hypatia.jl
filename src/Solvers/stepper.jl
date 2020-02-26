@@ -5,20 +5,22 @@ interior point stepping routines for algorithms based on homogeneous self dual e
 =#
 
 mutable struct CombinedStepper{T <: Real} <: Stepper{T}
-    gamma::T
+    prev_aff_alpha::T
+    prev_alpha::T
+    prev_gamma::T
     rhs::Vector{T}
     x_rhs
     y_rhs
     z_rhs
     s_rhs
-    s_rhs_k
+    s_rhs_k::Vector
     dir::Vector{T}
     x_dir
     y_dir
     z_dir
-    dual_dir_k
+    dual_dir_k::Vector
     s_dir
-    primal_dir_k
+    primal_dir_k::Vector
     dir_temp::Vector{T}
     dir_corr::Vector{T}
     res::Vector{T}
@@ -26,14 +28,22 @@ mutable struct CombinedStepper{T <: Real} <: Stepper{T}
     y_res
     z_res
     s_res
-    s_res_k
+    s_res_k::Vector
     tau_row::Int
     kap_row::Int
+    z_linesearch::Vector{T}
+    s_linesearch::Vector{T}
+    primal_views_linesearch::Vector
+    dual_views_linesearch::Vector
     CombinedStepper{T}() where {T <: Real} = new{T}()
 end
 
 # create the stepper cache
 function load(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
+    stepper.prev_aff_alpha = one(T)
+    stepper.prev_gamma = one(T)
+    stepper.prev_alpha = one(T)
+
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
     cones = model.cones
@@ -84,6 +94,11 @@ function load(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
 
     stepper.kap_row = dim
 
+    stepper.z_linesearch = zeros(T, q)
+    stepper.s_linesearch = zeros(T, q)
+    stepper.primal_views_linesearch = [view(Cones.use_dual_barrier(model.cones[k]) ? stepper.z_linesearch : stepper.s_linesearch, model.cone_idxs[k]) for k in eachindex(model.cones)]
+    stepper.dual_views_linesearch = [view(Cones.use_dual_barrier(model.cones[k]) ? stepper.s_linesearch : stepper.z_linesearch, model.cone_idxs[k]) for k in eachindex(model.cones)]
+
     return stepper
 end
 
@@ -110,16 +125,16 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     @timeit solver.timer "aff_dir" get_directions(stepper, solver, iter_ref_steps = 3)
 
     # calculate correction factor gamma by finding distance aff_alpha for stepping in affine direction
-    @timeit solver.timer "aff_alpha" solver.prev_aff_alpha = aff_alpha = find_max_alpha(
-        stepper, solver, prev_alpha = solver.prev_aff_alpha, min_alpha = T(1e-2))
-    solver.prev_gamma = gamma = abs2(one(T) - aff_alpha) # TODO allow different function (heuristic) as option?
+    @timeit solver.timer "aff_alpha" stepper.prev_aff_alpha = aff_alpha = find_max_alpha(
+        stepper, solver, prev_alpha = stepper.prev_aff_alpha, min_alpha = T(1e-2))
+    stepper.prev_gamma = gamma = abs2(one(T) - aff_alpha) # TODO allow different function (heuristic) as option?
 
     # calculate combined direction and keep in dir
     axpby!(gamma, stepper.dir_corr, 1 - gamma, stepper.dir)
 
     # find distance alpha for stepping in combined direction
     @timeit solver.timer "comb_alpha" alpha = find_max_alpha(
-        stepper, solver, prev_alpha = solver.prev_alpha, min_alpha = T(1e-3))
+        stepper, solver, prev_alpha = stepper.prev_alpha, min_alpha = T(1e-3))
 
     if iszero(alpha)
         # could not step far in combined direction, so perform a pure correction step
@@ -133,11 +148,10 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
         if iszero(alpha)
             @warn("numerical failure: could not step in correction direction; terminating")
             solver.status = :NumericalFailure
-            solver.keep_iterating = false
-            return point
+            return false
         end
     end
-    solver.prev_alpha = alpha
+    stepper.prev_alpha = alpha
 
     # step distance alpha in combined direction
     @. point.x += alpha * stepper.x_dir
@@ -151,10 +165,10 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     if solver.tau <= zero(T) || solver.kap <= zero(T) || solver.mu <= zero(T)
         @warn("numerical failure: tau is $(solver.tau), kappa is $(solver.kap), mu is $(solver.mu); terminating")
         solver.status = :NumericalFailure
-        solver.keep_iterating = false
+        return false
     end
 
-    return point
+    return true # step succeeded
 end
 
 # update the RHS for affine direction
@@ -307,8 +321,8 @@ function find_max_alpha(
     s_dir = stepper.s_dir
     tau_dir = stepper.dir[stepper.tau_row]
     kap_dir = stepper.dir[stepper.kap_row]
-    z_temp = solver.z_temp
-    s_temp = solver.s_temp
+    z_linesearch = stepper.z_linesearch
+    s_linesearch = stepper.s_linesearch
 
     alpha = max(T(0.1), min(prev_alpha * T(1.4), one(T))) # TODO option for parameter
     if tau_dir < zero(T)
@@ -319,28 +333,23 @@ function find_max_alpha(
     end
     alpha *= T(0.9999)
 
-    # solver.cones_infeas .= true # TODO move field to stepper?
     tau_temp = kap_temp = taukap_temp = mu_temp = zero(T)
     nup1 = solver.model.nu + 1
     while true
-        @. z_temp = z + alpha * z_dir
-        @. s_temp = s + alpha * s_dir
+        @. z_linesearch = z + alpha * z_dir
+        @. s_linesearch = s + alpha * s_dir
         tau_temp = tau + alpha * tau_dir
         kap_temp = kap + alpha * kap_dir
         taukap_temp = tau_temp * kap_temp
-        mu_temp = (dot(s_temp, z_temp) + taukap_temp) / nup1
+        mu_temp = (dot(s_linesearch, z_linesearch) + taukap_temp) / nup1
 
         if mu_temp > eps(T) && abs(taukap_temp - mu_temp) < mu_temp * solver.max_nbhd
-            # if check_neighborhood(solver, mu_temp)
-            #     # cone feasibility and neighborhood conditions are satisfied
-            #     break
-            # end
-
+            # TODO order the cones by how long it takes to check these conditions and iterate in that order, to improve efficiency
             in_nbhd = true
             for (k, cone_k) in enumerate(solver.model.cones)
-                Cones.load_point(cone_k, solver.primal_views[k])
+                Cones.load_point(cone_k, stepper.primal_views_linesearch[k])
                 Cones.reset_data(cone_k)
-                if !Cones.is_feas(cone_k) || !Cones.in_neighborhood(cone_k, solver.dual_views[k], mu_temp)
+                if !Cones.is_feas(cone_k) || !Cones.in_neighborhood(cone_k, stepper.dual_views_linesearch[k], mu_temp)
                     in_nbhd = false
                     break
                 end
@@ -361,6 +370,29 @@ function find_max_alpha(
     end
 
     return alpha
+end
+
+# TODO if p = 0, don't print y_feas
+function print_iteration_stats(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
+    if iszero(solver.num_iters)
+        @printf("\n%5s %12s %12s %9s %9s %9s %9s %9s %9s %9s %9s %9s %9s\n",
+            "iter", "p_obj", "d_obj", "abs_gap", "rel_gap",
+            "x_feas", "y_feas", "z_feas", "tau", "kap", "mu",
+            "gamma", "alpha",
+            )
+        @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n",
+            solver.num_iters, solver.primal_obj, solver.dual_obj, solver.gap, solver.rel_gap,
+            solver.x_feas, solver.y_feas, solver.z_feas, solver.tau, solver.kap, solver.mu
+            )
+    else
+        @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n",
+            solver.num_iters, solver.primal_obj, solver.dual_obj, solver.gap, solver.rel_gap,
+            solver.x_feas, solver.y_feas, solver.z_feas, solver.tau, solver.kap, solver.mu,
+            stepper.prev_gamma, stepper.prev_alpha,
+            )
+    end
+    flush(stdout)
+    return
 end
 
 # TODO experimental for BlockMatrix LHS: if block is a Cone then define mul as hessian product, if block is solver then define mul by mu/tau/tau
