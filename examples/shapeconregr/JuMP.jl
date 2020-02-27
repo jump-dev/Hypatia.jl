@@ -52,13 +52,13 @@ function shapeconregrJuMP(
     @assert n == size(X, 2)
     num_points = size(X, 1)
 
+    (regressor_points, _) = MU.get_interp_pts(MU.FreeDomain{Float64}(n), deg, sample_factor = 50)
+    lagrange_polys = MU.recover_lagrange_polys(regressor_points, deg)
+    model = JuMP.Model()
+    JuMP.@variable(model, regressor, PJ.Poly(FixedPolynomialBasis(lagrange_polys)))
+    x = DP.variables(lagrange_polys)
+
     if use_wsos
-        (regressor_points, _) = MU.get_interp_pts(MU.FreeDomain{Float64}(n), deg, sample_factor = 50)
-        lagrange_polys = MU.recover_lagrange_polys(regressor_points, deg)
-
-        model = JuMP.Model()
-        JuMP.@variable(model, regressor, variable_type = PJ.Poly(FixedPolynomialBasis(lagrange_polys)))
-
         # monotonicity
         if !all(iszero, mono_profile)
             gradient_halfdeg = div(deg, 2)
@@ -66,7 +66,7 @@ function shapeconregrJuMP(
             mono_wsos_cone = Hypatia.WSOSInterpNonnegativeCone{Float64, Float64}(mono_U, mono_Ps)
             for j in 1:n
                 if !iszero(mono_profile[j])
-                    gradient = DP.differentiate(regressor, DP.variables(regressor)[j])
+                    gradient = DP.differentiate(regressor, x[j])
                     JuMP.@constraint(model, [mono_profile[j] * gradient(mono_points[u, :]) for u in 1:mono_U] in mono_wsos_cone)
                 end
             end
@@ -77,16 +77,13 @@ function shapeconregrJuMP(
             hessian_halfdeg = div(deg - 1, 2)
             (conv_U, conv_points, conv_Ps, _) = MU.interpolate(conv_dom, hessian_halfdeg, sample = sample, sample_factor = 50)
             conv_wsos_cone = Hypatia.WSOSInterpPosSemidefTriCone{Float64}(n, conv_U, conv_Ps)
-            hessian = DP.differentiate(regressor, DP.variables(regressor), 2)
+            hessian = DP.differentiate(regressor, x, 2)
             hessian_interp = [hessian[i, j](conv_points[u, :]) for i in 1:n for j in 1:i for u in 1:conv_U]
             MU.vec_to_svec!(hessian_interp, rt2 = sqrt(2), incr = conv_U)
             JuMP.@constraint(model, conv_profile * hessian_interp in conv_wsos_cone)
         end
     else
-        DP.@polyvar x[1:n]
-
-        model = SumOfSquares.SOSModel()
-        JuMP.@variable(model, regressor, PJ.Poly(DP.monomials(x, 0:deg)))
+        SumOfSquares.setpolymodule!(model, SumOfSquares)
 
         # monotonicity
         monotonic_set = MU.get_domain_inequalities(mono_dom, x)
@@ -101,7 +98,8 @@ function shapeconregrJuMP(
         if !iszero(conv_profile)
             convex_set = MU.get_domain_inequalities(conv_dom, x)
             hessian = DP.differentiate(regressor, x, 2)
-            JuMP.@constraint(model, conv_profile * hessian in JuMP.PSDCone(), domain = convex_set, maxdegree = 2 * div(deg - 1, 2))
+            # maxdegree of each element in the SOS-matrix is 2 * div(deg - 1, 2), but we add 2 to take auxiliary monomials into account from the SumOfSquares transformation
+            JuMP.@constraint(model, conv_profile * hessian in JuMP.PSDCone(), domain = convex_set, maxdegree = 2 * div(deg - 1, 2) + 2)
         end
     end
 
