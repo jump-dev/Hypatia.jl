@@ -99,7 +99,7 @@ function shapeconregrJuMP(
             convex_set = MU.get_domain_inequalities(conv_dom, x)
             hessian = DP.differentiate(regressor, x, 2)
             # maxdegree of each element in the SOS-matrix is 2 * div(deg - 1, 2), but we add 2 to take auxiliary monomials into account from the SumOfSquares transformation
-            JuMP.@constraint(model, conv_profile * hessian in JuMP.PSDCone(), domain = convex_set, maxdegree = 2 * div(deg - 1, 2) + 2)
+            JuMP.@constraint(model, Symmetric(conv_profile * hessian) in JuMP.PSDCone(), domain = convex_set, maxdegree = 2 * div(deg - 1, 2) + 2)
         end
     end
 
