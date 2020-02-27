@@ -14,14 +14,14 @@ instance_sets = [
 example_names = [
     "densityest",
     "envelope",
-    "expdesign",
+    # "expdesign",
     "linearopt",
-    "matrixcompletion",
-    "matrixregression",
-    "maxvolume",
-    "polymin",
-    "portfolio",
-    "sparsepca",
+    # "matrixcompletion",
+    # "matrixregression",
+    # "maxvolume",
+    # "polymin",
+    # "portfolio",
+    # "sparsepca",
     ]
 
 T = Float64
@@ -43,9 +43,9 @@ println("\nprinting: (test_time, solve_time, num_iters, status, primal_obj, dual
     @testset "$ex_name, $inst_set" for ex_name in example_names, inst_set in instance_sets
         instances = eval(Symbol("instances_", ex_name, "_", inst_set))
         test_function = eval(Symbol("test_", ex_name))
-        @testset "$inst" for inst in instances
-            println(inst, "...")
-            test_time = @elapsed r = test_function(inst, options = options)
+        @testset "$ex_name $i $inst" for (i, inst) in enumerate(instances)
+            println(ex_name, " ", i, ": ", inst, " ...")
+            test_time = @elapsed r = test_function(T, inst, options = options)
             perf[inst] = (test_time, r.solve_time, r.num_iters, r.status, r.primal_obj, r.dual_obj)
             print(perf[inst], "\n\n")
         end
