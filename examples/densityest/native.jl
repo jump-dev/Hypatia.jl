@@ -8,26 +8,29 @@ find a density function f maximizing the log likelihood of the observations
     ∫f = 1
     f ≥ 0
 
-TODO maximize geomean objective should be more efficient
+TODO
+- describe all options
 ==#
 
 using LinearAlgebra
 import Random
 using Test
+import DelimitedFiles
 import Hypatia
 import Hypatia.BlockMatrix
 const CO = Hypatia.Cones
 const MU = Hypatia.ModelUtilities
 
-include(joinpath(@__DIR__, "data.jl"))
+iris_data = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "iris.txt"))
+cancer_data = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "iris.txt"))
 
 function densityest(
     T::Type{<:Real},
     X::Matrix{<:Real},
-    deg::Int;
-    use_wsos::Bool = true,
-    hypogeomean_obj::Bool = true, # use root of likelihood, else log of likelihood
-    use_hypogeomean::Bool = true,
+    deg::Int,
+    use_wsos::Bool,
+    hypogeomean_obj::Bool, # use root of likelihood, else log of likelihood
+    use_hypogeomean::Bool;
     sample_factor::Int = 100,
     )
     (num_obs, dim) = size(X)
@@ -159,51 +162,36 @@ function densityest(
     return (c = c, A = A, b = b, G = G, h = h, cones = cones)
 end
 
-densityest(T::Type{<:Real}, num_obs::Int, n::Int, deg::Int; options...) = densityest(T, randn(T, num_obs, n), deg; options...)
+densityest(T::Type{<:Real}, data_name::Symbol, options...) = densityest(T, eval(data_name), options...)
 
-densityest1(T::Type{<:Real}) = densityest(T, iris_data(), 4)
-densityest2(T::Type{<:Real}) = densityest(T, iris_data(), 4, use_wsos = false)
-densityest3(T::Type{<:Real}) = densityest(T, cancer_data(), 4)
-densityest4(T::Type{<:Real}) = densityest(T, cancer_data(), 4, use_wsos = false)
-densityest5(T::Type{<:Real}) = densityest(T, 50, 1, 4)
-densityest6(T::Type{<:Real}) = densityest(T, 50, 1, 4, use_wsos = false)
-densityest7(T::Type{<:Real}) = densityest(T, 20, 2, 4)
-densityest8(T::Type{<:Real}) = densityest(T, 20, 2, 4, use_wsos = false)
-densityest9(T::Type{<:Real}) = densityest(T, 50, 1, 4, use_hypogeomean = false)
-densityest10(T::Type{<:Real}) = densityest(T, 50, 1, 4, use_wsos = false, use_hypogeomean = false)
-densityest11(T::Type{<:Real}) = densityest(T, 20, 2, 4, use_hypogeomean = false)
-densityest12(T::Type{<:Real}) = densityest(T, 20, 2, 4, use_wsos = false, use_hypogeomean = false)
-densityest13(T::Type{<:Real}) = densityest(T, 50, 1, 4, hypogeomean_obj = false)
-densityest14(T::Type{<:Real}) = densityest(T, 50, 1, 4, use_wsos = false, hypogeomean_obj = false)
-densityest15(T::Type{<:Real}) = densityest(T, 20, 2, 4, hypogeomean_obj = false)
-densityest16(T::Type{<:Real}) = densityest(T, 20, 2, 4, use_wsos = false, hypogeomean_obj = false)
+densityest(T::Type{<:Real}, num_obs::Int, n::Int, options...) = densityest(T, randn(T, num_obs, n), options...)
 
-instances_densityest_fast = [
-    densityest1,
-    densityest2,
-    densityest3,
-    densityest4,
-    densityest5,
-    densityest6,
-    densityest7,
-    densityest8,
-    densityest9,
-    densityest10,
-    densityest11,
-    densityest12,
-    densityest13,
-    densityest14,
-    densityest15,
-    densityest16,
-    ]
-instances_densityest_slow = [
-    # TODO
-    ]
-
-function test_densityest(instance::Function; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
+function test_densityest(T::Type{<:Real}, instance::Tuple; options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)
-    d = instance(T)
+    d = densityest(T, instance...)
     r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
     @test r.status == :Optimal
     return r
 end
+
+instances_densityest_fast = [
+    (:iris_data, 4, true, true, true),
+    (:iris_data, 4, false, true, true),
+    (:iris_data, 4, true, false, true),
+    (:iris_data, 4, true, true, false),
+    (:cancer_data, 4, true, true, true),
+    (:cancer_data, 4, false, true, true),
+    (:cancer_data, 4, true, false, true),
+    (:cancer_data, 4, true, true, false),
+    (50, 1, 4, true, true, true),
+    (50, 1, 4, false, true, true),
+    (50, 1, 4, true, false, true),
+    (50, 1, 4, true, true, false),
+    (20, 2, 4, true, true, true),
+    (20, 2, 4, false, true, true),
+    (20, 2, 4, true, false, true),
+    (20, 2, 4, true, true, false),
+    ]
+instances_densityest_slow = [
+    # TODO
+    ]
