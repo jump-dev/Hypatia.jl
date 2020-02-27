@@ -129,23 +129,20 @@ sparsepca6(T::Type{<:Real}) = sparsepca(T, 10, 3, noise_ratio = 10.0, use_linops
 sparsepca7(T::Type{<:Real}) = sparsepca(T, 10, 3, noise_ratio = 10.0, use_l1ball = false, use_linops = false)
 sparsepca8(T::Type{<:Real}) = sparsepca(T, 10, 3, noise_ratio = 10.0, use_l1ball = false, use_linops = true)
 
-instances_sparsepca_all = [
+instances_sparsepca_fast = [
     sparsepca1,
     sparsepca2,
     sparsepca3,
     sparsepca4,
-    sparsepca5,
-    sparsepca7,
+    ]
+instances_sparsepca_slow = [
+    # TODO
     ]
 instances_sparsepca_linops = [
     sparsepca5,
     sparsepca6,
     sparsepca7,
     sparsepca8,
-    ]
-instances_sparsepca_few = [
-    sparsepca1,
-    sparsepca2,
     ]
 
 function test_sparsepca(instance::Function; T::Type{<:Real} = Float64, options::NamedTuple = (atol = sqrt(sqrt(eps(T))),), rseed::Int = 1)
@@ -156,5 +153,5 @@ function test_sparsepca(instance::Function; T::Type{<:Real} = Float64, options::
     if !isnan(d.true_obj)
         @test r.primal_obj ≈ d.true_obj atol=options.atol rtol=options.atol
     end
-    return
+    return r
 end

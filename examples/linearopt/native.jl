@@ -41,19 +41,15 @@ linearopt4(T::Type{<:Real}) = linearopt(T, 500, 1000, nzfrac = 0.05)
 linearopt5(T::Type{<:Real}) = linearopt(T, 50, 100, nzfrac = 0.15)
 linearopt6(T::Type{<:Real}) = linearopt(T, 15, 20, nzfrac = 0.25)
 
-instances_linearopt_all = [
-    linearopt1,
+instances_linearopt_fast = [
     linearopt2,
     linearopt3,
-    linearopt4,
     linearopt5,
     linearopt6,
     ]
-instances_linearopt_few = [
-    linearopt2,
-    linearopt3,
-    linearopt5,
-    linearopt6,
+instances_linearopt_slow = [
+    linearopt1,
+    linearopt4,
     ]
 
 function test_linearopt(instance::Function; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
@@ -61,5 +57,5 @@ function test_linearopt(instance::Function; T::Type{<:Real} = Float64, options::
     d = instance(T)
     r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
     @test r.status == :Optimal
-    return
+    return r
 end

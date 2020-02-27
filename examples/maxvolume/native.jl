@@ -146,20 +146,19 @@ maxvolume7(T::Type{<:Real}) = maxvolume(T, 25, use_hypogeomean = true)
 maxvolume8(T::Type{<:Real}) = maxvolume(T, 25, use_power = true)
 maxvolume9(T::Type{<:Real}) = maxvolume(T, 25, use_epipersquare = true)
 
-instances_maxvolume_all = [
+instances_maxvolume_fast = [
     maxvolume1,
     maxvolume2,
     maxvolume3,
+    maxvolume4,
     maxvolume5,
     maxvolume6,
     maxvolume7,
     maxvolume8,
     maxvolume9,
     ]
-instances_maxvolume_few = [
-    maxvolume1,
-    maxvolume2,
-    maxvolume3,
+instances_maxvolume_slow = [
+    # TODO
     ]
 
 function test_maxvolume(instance::Function; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
@@ -167,5 +166,5 @@ function test_maxvolume(instance::Function; T::Type{<:Real} = Float64, options::
     d = instance(T)
     r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
     @test r.status == :Optimal
-    return
+    return r
 end

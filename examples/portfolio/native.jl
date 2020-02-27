@@ -204,7 +204,7 @@ portfolio12(T::Type{<:Real}) = portfolio(T, 4, hypoperlog_constr = true, use_epi
 portfolio13(T::Type{<:Real}) = portfolio(T, 20, epinorminf_constr = true, epinorminfdual_constr = true, use_epinorminf = false, use_epinorminfdual = false)
 portfolio14(T::Type{<:Real}) = portfolio(T, 30, epinorminf_constr = true, epinorminfdual_constr = true, use_epinorminfdual = true, use_linops = false)
 
-instances_portfolio_all = [
+instances_portfolio_fast = [
     portfolio1,
     portfolio2,
     portfolio3,
@@ -213,16 +213,11 @@ instances_portfolio_all = [
     portfolio6,
     portfolio7,
     portfolio9,
-    portfolio10,
     portfolio11,
-    portfolio12,
     portfolio13,
     ]
-instances_portfolio_few = [
-    portfolio1,
-    portfolio3,
-    portfolio5,
-    portfolio6,
+instances_portfolio_slow = [
+    # TODO
     ]
 instances_portfolio_linops = [
     portfolio8,
@@ -235,5 +230,5 @@ function test_portfolio(instance::Function; T::Type{<:Real} = Float64, options::
     d = instance(T)
     r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
     @test r.status == :Optimal
-    return
+    return r
 end

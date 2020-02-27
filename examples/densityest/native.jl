@@ -178,7 +178,7 @@ densityest14(T::Type{<:Real}) = densityest(T, 50, 1, 4, use_wsos = false, hypoge
 densityest15(T::Type{<:Real}) = densityest(T, 20, 2, 4, hypogeomean_obj = false)
 densityest16(T::Type{<:Real}) = densityest(T, 20, 2, 4, use_wsos = false, hypogeomean_obj = false)
 
-instances_densityest_all = [
+instances_densityest_fast = [
     densityest1,
     densityest2,
     densityest3,
@@ -196,11 +196,8 @@ instances_densityest_all = [
     densityest15,
     densityest16,
     ]
-instances_densityest_few = [
-    densityest1,
-    densityest3,
-    densityest5,
-    densityest6,
+instances_densityest_slow = [
+    # TODO
     ]
 
 function test_densityest(instance::Function; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
@@ -208,5 +205,5 @@ function test_densityest(instance::Function; T::Type{<:Real} = Float64, options:
     d = instance(T)
     r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
     @test r.status == :Optimal
-    return
+    return r
 end

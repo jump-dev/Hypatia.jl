@@ -61,7 +61,7 @@ envelope4(T::Type{<:Real}) = envelope(T, 2, 3, 2, 4, primal_wsos = false)
 envelope5(T::Type{<:Real}) = envelope(T, 3, 3, 3, 3, primal_wsos = false)
 envelope6(T::Type{<:Real}) = envelope(T, 2, 30, 1, 30, primal_wsos = false)
 
-instances_envelope_all = [
+instances_envelope_fast = [
     envelope1,
     envelope2,
     envelope3,
@@ -69,9 +69,8 @@ instances_envelope_all = [
     envelope5,
     envelope6,
     ]
-instances_envelope_few = [
-    envelope1,
-    envelope5,
+instances_envelope_slow = [
+    # TODO add
     ]
 
 function test_envelope(instance::Function; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
@@ -79,5 +78,5 @@ function test_envelope(instance::Function; T::Type{<:Real} = Float64, options::N
     d = instance(T)
     r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
     @test r.status == :Optimal
-    return
+    return r
 end

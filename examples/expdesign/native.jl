@@ -359,12 +359,12 @@ expdesign52(T::Type{<:Real}) = expdesign(T, 5, 15, 25, 5, geomean_obj = true, us
 expdesign53(T::Type{<:Real}) = expdesign(T, 4, 8, 12, 3, geomean_obj = true, use_epinorminf = false)
 expdesign54(T::Type{<:Real}) = expdesign(T, 3, 5, 7, 2, geomean_obj = true, use_epinorminf = false)
 
-instances_expdesign_all = [
-    expdesign1,
+instances_expdesign_fast = [
+    # expdesign1,
     expdesign2,
-    expdesign3,
-    expdesign4,
-    expdesign5,
+    # expdesign3,
+    # expdesign4,
+    # expdesign5,
     expdesign6,
     expdesign7,
     expdesign8,
@@ -386,11 +386,11 @@ instances_expdesign_all = [
     expdesign27,
     expdesign28,
     expdesign29,
-    expdesign30	,
+    # expdesign30,
     expdesign31,
     expdesign32,
     expdesign33,
-    expdesign34,
+    # expdesign34,
     expdesign35,
     expdesign36,
     expdesign37,
@@ -412,22 +412,13 @@ instances_expdesign_all = [
     expdesign53,
     expdesign54,
     ]
+instances_expdesign_slow = [
+    # TODO
+    ]
 instances_expdesign_linops = [
     expdesign11,
     expdesign12,
     expdesign14,
-    ]
-instances_expdesign_few = [
-    expdesign5,
-    expdesign10,
-    expdesign19,
-    expdesign24,
-    expdesign29,
-    expdesign34,
-    expdesign39,
-    expdesign44,
-    expdesign49,
-    expdesign54,
     ]
 
 function test_expdesign(instance::Function; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
@@ -435,5 +426,5 @@ function test_expdesign(instance::Function; T::Type{<:Real} = Float64, options::
     d = instance(T)
     r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
     @test r.status == :Optimal
-    return
+    return r
 end
