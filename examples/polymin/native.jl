@@ -236,7 +236,7 @@ polymincomplex12(T::Type{<:Real}) = polymincomplex(T, :absbox2d, 2, use_primal =
 polymincomplex13(T::Type{<:Real}) = polymincomplex(T, :negabsbox2d, 1, use_primal = false)
 polymincomplex14(T::Type{<:Real}) = polymincomplex(T, :denseunit1d, 2, use_primal = false)
 
-instances_polymin_all = [
+instances_polymin_fast = [
     polyminreal1,
     polyminreal2,
     polyminreal3,
@@ -246,16 +246,16 @@ instances_polymin_all = [
     polyminreal7,
     polyminreal8,
     polyminreal9,
-    polyminreal10,
+    # polyminreal10,
     polyminreal11,
     polyminreal12,
-    polyminreal13,
+    # polyminreal13,
     polyminreal14,
-    polyminreal15,
+    # polyminreal15,
     polyminreal16,
     polyminreal17,
     polyminreal18,
-    polyminreal19,
+    # polyminreal19,
     polyminreal20,
     polyminreal21,
     polyminreal23,
@@ -276,22 +276,13 @@ instances_polymin_all = [
     polymincomplex13,
     polymincomplex14,
     ]
+instances_polymin_slow = [
+    # TODO
+    ]
 instances_polymin_linops = [
     polyminreal22,
     polyminreal24,
     polyminreal26,
-    ]
-instances_polymin_few = [
-    polyminreal2,
-    polyminreal3,
-    polyminreal4,
-    polyminreal12,
-    polyminreal14,
-    polyminreal16,
-    polyminreal17,
-    polyminreal23,
-    polymincomplex7,
-    polymincomplex14,
     ]
 
 function test_polymin(instance::Function; T::Type{<:Real} = Float64, options::NamedTuple = (atol = sqrt(sqrt(eps(T))),), rseed::Int = 1)
@@ -302,5 +293,5 @@ function test_polymin(instance::Function; T::Type{<:Real} = Float64, options::Na
     if !isnan(d.true_obj)
         @test r.primal_obj ≈ d.true_obj atol=options.atol rtol=options.atol
     end
-    return
+    return r
 end

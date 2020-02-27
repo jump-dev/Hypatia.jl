@@ -274,7 +274,7 @@ matrixcompletion17(T::Type{<:Real}) = matrixcompletion(T, 12, 24, geomean_constr
 matrixcompletion18(T::Type{<:Real}) = matrixcompletion(T, 12, 24, geomean_constr = true, nuclearnorm_obj = true, use_epinormspectral = false, use_hypogeomean = false)
 matrixcompletion19(T::Type{<:Real}) = matrixcompletion(T, 12, 24, geomean_constr = true, nuclearnorm_obj = true, use_epinormspectral = true, use_hypogeomean = true)
 
-instances_matrixcompletion_all = [
+instances_matrixcompletion_fast = [
     matrixcompletion1,
     matrixcompletion2,
     matrixcompletion3,
@@ -295,18 +295,8 @@ instances_matrixcompletion_all = [
     matrixcompletion18,
     matrixcompletion19,
     ]
-instances_matrixcompletion_few = [
-    matrixcompletion1,
-    matrixcompletion2,
-    matrixcompletion3,
-    matrixcompletion4,
-    matrixcompletion5,
-    matrixcompletion6,
-    matrixcompletion7,
-    matrixcompletion8,
-    matrixcompletion9,
-    matrixcompletion10,
-    matrixcompletion11,
+instances_matrixcompletion_slow = [
+    # TODO
     ]
 
 function test_matrixcompletion(instance::Function; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
@@ -314,5 +304,5 @@ function test_matrixcompletion(instance::Function; T::Type{<:Real} = Float64, op
     d = instance(T)
     r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
     @test r.status == :Optimal
-    return
+    return r
 end

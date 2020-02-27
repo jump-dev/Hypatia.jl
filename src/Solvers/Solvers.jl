@@ -559,8 +559,9 @@ function solve_check(
     end
 
     solve_time = get_solve_time(solver)
+    num_iters = get_num_iters(solver)
 
-    return (solver = solver, model = model, solve_time = solve_time, primal_obj = primal_obj, dual_obj = dual_obj, status = status, x = x, y = y, s = s, z = z)
+    return (solver = solver, model = model, solve_time = solve_time, num_iters = num_iters, primal_obj = primal_obj, dual_obj = dual_obj, status = status, x = x, y = y, s = s, z = z)
 end
 
 # build model and call solve_check

@@ -230,8 +230,8 @@ function matrixregression(
 
     return (
         c = model_c, A = zeros(T, 0, model_n), b = zeros(T, 0), G = model_G, h = model_h, cones = cones,
-        n = data_n, m = data_m, p = data_p, Y = Y, X = X,
-        lam_fro = lam_fro, lam_nuc = lam_nuc, lam_las = lam_las, lam_glr = lam_glr, lam_glc = lam_glc
+        R = R, n = data_n, m = data_m, p = data_p, Y = Y, X = X,
+        lam_fro = lam_fro, lam_nuc = lam_nuc, lam_las = lam_las, lam_glr = lam_glr, lam_glc = lam_glc,
         )
 end
 
@@ -261,18 +261,28 @@ function matrixregression(
     return matrixregression(Y, X; model_kwargs...)
 end
 
-matrixregression1(R::Type{<:RealOrComplex}) = matrixregression(R, 5, 3, 4)
-matrixregression2(R::Type{<:RealOrComplex}) = matrixregression(R, 5, 3, 4, lam_fro = 0.1, lam_nuc = 0.1, lam_las = 0.1, lam_glc = 0.2, lam_glr = 0.2)
-matrixregression3(R::Type{<:RealOrComplex}) = matrixregression(R, 3, 4, 5)
-matrixregression4(R::Type{<:RealOrComplex}) = matrixregression(R, 3, 4, 5, lam_fro = 0.1, lam_nuc = 0.1, lam_las = 0.1, lam_glc = 0.2, lam_glr = 0.2)
-matrixregression5(R::Type{<:RealOrComplex}) = matrixregression(R, 100, 8, 12)
-matrixregression6(R::Type{<:RealOrComplex}) = matrixregression(R, 100, 8, 12, lam_fro = 0.0, lam_nuc = 0.4, lam_las = 1.0, lam_glc = 0.1, lam_glr = 2.0)
-matrixregression7(R::Type{<:RealOrComplex}) = matrixregression(R, 100, 8, 12, lam_fro = 0.0, lam_nuc = 0.0, lam_las = 0.0, lam_glc = 0.2, lam_glr = 1.5)
-matrixregression8(R::Type{<:RealOrComplex}) = matrixregression(R, 15, 10, 20)
-matrixregression9(R::Type{<:RealOrComplex}) = matrixregression(R, 15, 10, 20, lam_fro = 0.0, lam_nuc = 0.4, lam_las = 1.0, lam_glc = 0.1, lam_glr = 2.0)
-matrixregression10(R::Type{<:RealOrComplex}) = matrixregression(R, 15, 10, 20, lam_fro = 0.0, lam_nuc = 0.0, lam_las = 0.0, lam_glc = 0.2, lam_glr = 1.5)
+matrixregression1(T::Type{<:Real}) = matrixregression(T, 5, 3, 4)
+matrixregression2(T::Type{<:Real}) = matrixregression(T, 5, 3, 4, lam_fro = 0.1, lam_nuc = 0.1, lam_las = 0.1, lam_glc = 0.2, lam_glr = 0.2)
+matrixregression3(T::Type{<:Real}) = matrixregression(T, 3, 4, 5)
+matrixregression4(T::Type{<:Real}) = matrixregression(T, 3, 4, 5, lam_fro = 0.1, lam_nuc = 0.1, lam_las = 0.1, lam_glc = 0.2, lam_glr = 0.2)
+matrixregression5(T::Type{<:Real}) = matrixregression(T, 100, 8, 12)
+matrixregression6(T::Type{<:Real}) = matrixregression(T, 100, 8, 12, lam_fro = 0.0, lam_nuc = 0.4, lam_las = 1.0, lam_glc = 0.1, lam_glr = 2.0)
+matrixregression7(T::Type{<:Real}) = matrixregression(T, 100, 8, 12, lam_fro = 0.0, lam_nuc = 0.0, lam_las = 0.0, lam_glc = 0.2, lam_glr = 1.5)
+matrixregression8(T::Type{<:Real}) = matrixregression(T, 15, 10, 20)
+matrixregression9(T::Type{<:Real}) = matrixregression(T, 15, 10, 20, lam_fro = 0.0, lam_nuc = 0.4, lam_las = 1.0, lam_glc = 0.1, lam_glr = 2.0)
+matrixregression10(T::Type{<:Real}) = matrixregression(T, 15, 10, 20, lam_fro = 0.0, lam_nuc = 0.0, lam_las = 0.0, lam_glc = 0.2, lam_glr = 1.5)
+matrixregression11(T::Type{<:Real}) = matrixregression(Complex{T}, 5, 3, 4)
+matrixregression12(T::Type{<:Real}) = matrixregression(Complex{T}, 5, 3, 4, lam_fro = 0.1, lam_nuc = 0.1, lam_las = 0.1, lam_glc = 0.2, lam_glr = 0.2)
+matrixregression13(T::Type{<:Real}) = matrixregression(Complex{T}, 3, 4, 5)
+matrixregression14(T::Type{<:Real}) = matrixregression(Complex{T}, 3, 4, 5, lam_fro = 0.1, lam_nuc = 0.1, lam_las = 0.1, lam_glc = 0.2, lam_glr = 0.2)
+matrixregression15(T::Type{<:Real}) = matrixregression(Complex{T}, 100, 8, 12)
+matrixregression16(T::Type{<:Real}) = matrixregression(Complex{T}, 100, 8, 12, lam_fro = 0.0, lam_nuc = 0.4, lam_las = 1.0, lam_glc = 0.1, lam_glr = 2.0)
+matrixregression17(T::Type{<:Real}) = matrixregression(Complex{T}, 100, 8, 12, lam_fro = 0.0, lam_nuc = 0.0, lam_las = 0.0, lam_glc = 0.2, lam_glr = 1.5)
+matrixregression18(T::Type{<:Real}) = matrixregression(Complex{T}, 15, 10, 20)
+matrixregression19(T::Type{<:Real}) = matrixregression(Complex{T}, 15, 10, 20, lam_fro = 0.0, lam_nuc = 0.4, lam_las = 1.0, lam_glc = 0.1, lam_glr = 2.0)
+matrixregression20(T::Type{<:Real}) = matrixregression(Complex{T}, 15, 10, 20, lam_fro = 0.0, lam_nuc = 0.0, lam_las = 0.0, lam_glc = 0.2, lam_glr = 1.5)
 
-instances_matrixregression_all = [
+instances_matrixregression_fast = [
     matrixregression1,
     matrixregression2,
     matrixregression3,
@@ -283,24 +293,30 @@ instances_matrixregression_all = [
     matrixregression8,
     matrixregression9,
     matrixregression10,
+    matrixregression11,
+    matrixregression12,
+    matrixregression13,
+    matrixregression14,
+    matrixregression15,
+    matrixregression16,
+    matrixregression17,
+    matrixregression18,
+    matrixregression19,
+    matrixregression20,
     ]
-instances_matrixregression_few = [
-    matrixregression1,
-    matrixregression2,
-    matrixregression3,
-    matrixregression4,
+instances_matrixregression_slow = [
+    # TODO
     ]
 
-function test_matrixregression(instance::Function; R::Type{<:RealOrComplex{T}} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1) where {T <: Real}
+function test_matrixregression(instance::Function; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)
-    d = instance(R)
+    d = instance(T)
     r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
     @test r.status == :Optimal
-
     # check objective value is correct
-    if R <: Complex
+    if d.R <: Complex
         A_opt_real = reshape(r.x[2:(1 + 2 * d.p * d.m)], 2 * d.p, d.m)
-        A_opt = zeros(R, d.p, d.m)
+        A_opt = zeros(d.R, d.p, d.m)
         for k in 1:d.p
             @. @views A_opt[k, :] = A_opt_real[2k - 1, :] + A_opt_real[2k, :] * im
         end
@@ -312,5 +328,5 @@ function test_matrixregression(instance::Function; R::Type{<:RealOrComplex{T}} =
         d.lam_nuc * sum(svd(A_opt).S) + d.lam_las * norm(vec(A_opt), 1) +
         d.lam_glr * sum(norm, eachrow(A_opt)) + d.lam_glc * sum(norm, eachcol(A_opt))
     @test r.primal_obj ≈ obj_try atol = 1e-4 rtol = 1e-4
-    return
+    return r
 end

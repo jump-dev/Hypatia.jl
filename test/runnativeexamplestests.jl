@@ -6,42 +6,54 @@ using Test
 import Hypatia
 const SO = Hypatia.Solvers
 
-examples_dir = joinpath(@__DIR__, "../examples")
+instance_sets = [
+    "fast",
+    # "slow",
+    ]
 
-include(joinpath(examples_dir, "densityest/native.jl"))
-include(joinpath(examples_dir, "envelope/native.jl"))
-include(joinpath(examples_dir, "expdesign/native.jl"))
-include(joinpath(examples_dir, "linearopt/native.jl"))
-include(joinpath(examples_dir, "matrixcompletion/native.jl"))
-include(joinpath(examples_dir, "matrixregression/native.jl"))
-include(joinpath(examples_dir, "maxvolume/native.jl"))
-include(joinpath(examples_dir, "polymin/native.jl"))
-include(joinpath(examples_dir, "portfolio/native.jl"))
-include(joinpath(examples_dir, "sparsepca/native.jl"))
+example_names = [
+    "densityest",
+    "envelope",
+    "expdesign",
+    "linearopt",
+    "matrixcompletion",
+    "matrixregression",
+    "maxvolume",
+    "polymin",
+    "portfolio",
+    "sparsepca",
+    ]
 
 T = Float64
-
 options = (atol = 10eps(T)^0.25, solver = SO.Solver{T}(
     verbose = false, iter_limit = 250, time_limit = 12e2,
     system_solver = SO.QRCholDenseSystemSolver{T}(),
     ))
 
 @info("starting native examples tests")
-@testset "native examples tests" begin
-    @testset "densityest" begin test_densityest.(instances_densityest_few, T = T, options = options) end
-    @testset "envelope" begin test_envelope.(instances_envelope_few, T = T, options = options) end
-    @testset "expdesign" begin test_expdesign.(instances_expdesign_few, T = T, options = options) end
-    @testset "linearopt" begin test_linearopt.(instances_linearopt_few, T = T, options = options) end
-    @testset "matrixcompletion" begin test_matrixcompletion.(instances_matrixcompletion_few, T = T, options = options) end
-    @testset "matrixregression" begin test_matrixregression.(instances_matrixregression_few, R = T, options = options) end # real
-    @testset "matrixregression" begin test_matrixregression.(instances_matrixregression_few, R = Complex{T}, options = options) end # complex
-    @testset "maxvolume" begin test_maxvolume.(instances_maxvolume_few, T = T, options = options) end
-    if T == Float64 # some ModelUtilities functions only work with Float64
-        @testset "polymin" begin test_polymin.(instances_polymin_few, T = T, options = options) end
-    end
-    @testset "portfolio" begin test_portfolio.(instances_portfolio_few, T = T, options = options) end
-    @testset "sparsepca" begin test_sparsepca.(instances_sparsepca_few, T = T, options = options) end
+
+for ex_name in example_names
+    include(joinpath(@__DIR__, "../examples", ex_name, "native.jl"))
 end
+
+perf = Dict() # TODO maybe use a dataframe or table instead of dictionary
+
+println("\nprinting: (test_time, solve_time, num_iters, status, primal_obj, dual_obj)\n")
+@testset "native examples tests" begin
+    @testset "$ex_name, $inst_set" for ex_name in example_names, inst_set in instance_sets
+        instances = eval(Symbol("instances_", ex_name, "_", inst_set))
+        test_function = eval(Symbol("test_", ex_name))
+        @testset "$inst" for inst in instances
+            println(inst, "...")
+            test_time = @elapsed r = test_function(inst, options = options)
+            perf[inst] = (test_time, r.solve_time, r.num_iters, r.status, r.primal_obj, r.dual_obj)
+            print(perf[inst], "\n\n")
+        end
+    end
+end
+
+println()
+display(perf)
 
 # TODO currently broken
 # tol = sqrt(sqrt(eps(T)))
