@@ -14,14 +14,14 @@ instance_sets = [
 example_names = [
     "densityest",
     "envelope",
-    # "expdesign",
+    # # "expdesign",
     "linearopt",
-    # "matrixcompletion",
-    # "matrixregression",
-    # "maxvolume",
-    # "polymin",
-    # "portfolio",
-    # "sparsepca",
+    "matrixcompletion",
+    "matrixregression",
+    "maxvolume",
+    # # "polymin",
+    # # "portfolio",
+    "sparsepca",
     ]
 
 T = Float64
