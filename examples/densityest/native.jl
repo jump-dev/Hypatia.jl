@@ -140,20 +140,19 @@ function densityest(
     b = vcat(b_poly, one(T))
 
     if use_wsos
-        A = hcat(zeros(T, 1, num_hypo_vars), w', zeros(T, 1, num_ext_geom_vars))
-        G = [
-            zeros(T, U, num_hypo_vars)  Matrix{T}(-I, U, U)  zeros(T, U, num_ext_geom_vars);
-            G_likl;
-            ]
+        A = zeros(T, 1, num_hypo_vars + U + num_ext_geom_vars)
+        A[1, num_hypo_vars .+ (1:U)] = w
+        G = zeros(T, U + size(G_likl, 1), size(G_likl, 2))
+        G[1:U, num_hypo_vars .+ (1:U)] = Diagonal(-I, U)
+        G[(U + 1):end, :] = G_likl
     else
-        A = [
-            zeros(T, U, num_hypo_vars)    Matrix{T}(-I, U, U)    A_psd  zeros(T, U, num_ext_geom_vars);
-            zeros(T, 1, num_hypo_vars)    w'    zeros(T, 1, num_psd_vars)  zeros(T, 1, num_ext_geom_vars);
-            ]
-        G = [
-            zeros(T, num_psd_vars, num_hypo_vars + U)  -Matrix{T}(I, num_psd_vars, num_psd_vars)   zeros(T, num_psd_vars, num_ext_geom_vars);
-            G_likl;
-            ]
+        A = zeros(T, U + 1, num_hypo_vars + U + num_psd_vars + num_ext_geom_vars)
+        A[1:U, num_hypo_vars .+ (1:U)] = Diagonal(-I, U)
+        A[1:U, (num_hypo_vars + U) .+ (1:num_psd_vars)] = A_psd
+        A[U + 1, num_hypo_vars .+ (1:U)] = w
+        G = zeros(T, num_psd_vars + size(G_likl, 1), size(G_likl, 2))
+        G[1:num_psd_vars, (num_hypo_vars + U) .+ (1:num_psd_vars)] = Diagonal(-I, num_psd_vars)
+        G[(num_psd_vars + 1):end, :] = G_likl
     end
 
     return (c = c, A = A, b = b, G = G, h = h, cones = cones)
