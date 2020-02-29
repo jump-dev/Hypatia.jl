@@ -141,17 +141,17 @@ function densityest(
 
     if use_wsos
         A = zeros(T, 1, num_hypo_vars + U + num_ext_geom_vars)
-        A[1, (num_hypo_vars + 1):(num_hypo_vars + U)] = w
+        A[1, num_hypo_vars .+ (1:U)] = w
         G = zeros(T, U + size(G_likl, 1), size(G_likl, 2))
-        G[(1:U), (num_hypo_vars + 1):(num_hypo_vars + U)] = Diagonal(-I, U)
+        G[1:U, num_hypo_vars .+ (1:U)] = Diagonal(-I, U)
         G[(U + 1):end, :] = G_likl
     else
         A = zeros(T, U + 1, num_hypo_vars + U + num_psd_vars + num_ext_geom_vars)
-        A[1:U, (num_hypo_vars + 1):(num_hypo_vars + U)] = Diagonal(-I, U)
-        A[1:U, (num_hypo_vars + U + 1):(num_hypo_vars + U + num_psd_vars)] = A_psd
-        A[U + 1, (num_hypo_vars + 1):(num_hypo_vars + U)] = w
+        A[1:U, num_hypo_vars .+ (1:U)] = Diagonal(-I, U)
+        A[1:U, (num_hypo_vars + U) .+ (1:num_psd_vars)] = A_psd
+        A[U + 1, num_hypo_vars .+ (1:U)] = w
         G = zeros(T, num_psd_vars + size(G_likl, 1), size(G_likl, 2))
-        G[1:num_psd_vars, (num_hypo_vars + U + 1):(num_hypo_vars + U + num_psd_vars)] = Diagonal(-I, num_psd_vars)
+        G[1:num_psd_vars, (num_hypo_vars + U) .+ (1:num_psd_vars)] = Diagonal(-I, num_psd_vars)
         G[(num_psd_vars + 1):end, :] = G_likl
     end
 
@@ -178,22 +178,22 @@ densityest15(T::Type{<:Real}) = densityest(T, 20, 2, 4, hypogeomean_obj = false)
 densityest16(T::Type{<:Real}) = densityest(T, 20, 2, 4, use_wsos = false, hypogeomean_obj = false)
 
 instances_densityest_all = [
-    densityest1,
-    densityest2,
-    densityest3,
-    densityest4,
-    densityest5,
-    densityest6,
+    # densityest1,
+    # densityest2,
+    # densityest3,
+    # densityest4,
+    # densityest5,
+    # densityest6,
     densityest7,
     densityest8,
-    densityest9,
-    densityest10,
-    densityest11,
-    densityest12,
-    densityest13,
-    densityest14,
-    densityest15,
-    densityest16,
+    # densityest9,
+    # densityest10,
+    # densityest11,
+    # densityest12,
+    # densityest13,
+    # densityest14,
+    # densityest15,
+    # densityest16,
     ]
 instances_densityest_few = [
     densityest1,
