@@ -14,7 +14,7 @@ import Hypatia
 const MU = Hypatia.ModelUtilities
 
 # real polynomials
-function getpolydata(polyname::Symbol; T::DataType = Float64)
+function getpolydata(polyname::Symbol, T::DataType = Float64)
     if polyname == :butcher
         DP.@polyvar x[1:6]
         f = x[6]*x[2]^2+x[5]*x[3]^2-x[1]*x[4]^2+x[4]^3+x[4]^2-1/3*x[1]+4/3*x[4]

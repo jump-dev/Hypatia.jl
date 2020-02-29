@@ -29,7 +29,7 @@ function densityest(
     X::Matrix{<:Real},
     deg::Int,
     use_wsos::Bool,
-    hypogeomean_obj::Bool, # use root of likelihood, else log of likelihood
+    hypogeomean_obj::Bool, # use geomean objective, else sum of logs objective
     use_hypogeomean::Bool;
     sample_factor::Int = 100,
     )

@@ -266,23 +266,23 @@ function test_matrixregression(T::Type{<:Real}, instance::Tuple; options::NamedT
     d = matrixregression(R, instance[2:end]...)
     r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
     @test r.status == :Optimal
-
-    # check objective value is correct
-    if R <: Complex
-        A_opt_real = reshape(r.x[2:(1 + 2 * d.p * d.m)], 2 * d.p, d.m)
-        A_opt = zeros(R, d.p, d.m)
-        for k in 1:d.p
-            @. @views A_opt[k, :] = A_opt_real[2k - 1, :] + A_opt_real[2k, :] * im
+    if r.status == :Optimal
+        # check objective value is correct
+        if R <: Complex
+            A_opt_real = reshape(r.x[2:(1 + 2 * d.p * d.m)], 2 * d.p, d.m)
+            A_opt = zeros(R, d.p, d.m)
+            for k in 1:d.p
+                @. @views A_opt[k, :] = A_opt_real[2k - 1, :] + A_opt_real[2k, :] * im
+            end
+        else
+            A_opt = reshape(r.x[2:(1 + d.p * d.m)], d.p, d.m)
         end
-    else
-        A_opt = reshape(r.x[2:(1 + d.p * d.m)], d.p, d.m)
+        loss = (1/2 * sum(abs2, d.X * A_opt) - real(dot(d.X' * d.Y, A_opt))) / d.n
+        obj_try = loss + d.lam_fro * norm(vec(A_opt), 2) +
+            d.lam_nuc * sum(svd(A_opt).S) + d.lam_las * norm(vec(A_opt), 1) +
+            d.lam_glr * sum(norm, eachrow(A_opt)) + d.lam_glc * sum(norm, eachcol(A_opt))
+        @test r.primal_obj ≈ obj_try atol = 1e-4 rtol = 1e-4
     end
-    loss = (1/2 * sum(abs2, d.X * A_opt) - real(dot(d.X' * d.Y, A_opt))) / d.n
-    obj_try = loss + d.lam_fro * norm(vec(A_opt), 2) +
-        d.lam_nuc * sum(svd(A_opt).S) + d.lam_las * norm(vec(A_opt), 1) +
-        d.lam_glr * sum(norm, eachrow(A_opt)) + d.lam_glc * sum(norm, eachcol(A_opt))
-    @test r.primal_obj ≈ obj_try atol = 1e-4 rtol = 1e-4
-
     return r
 end
 

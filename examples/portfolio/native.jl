@@ -2,6 +2,10 @@
 Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
 maximize expected returns subject to risk constraints
+
+TODO
+- add entropic ball constraint using entropy cone (and optional extended formulation)
+- describe formulation and options
 =#
 
 using LinearAlgebra
@@ -12,22 +16,12 @@ const CO = Hypatia.Cones
 
 function portfolio(
     T::Type{<:Real},
-    num_stocks::Int;
-    use_linops::Bool = false,
-    epipernormeucl_constr::Bool = false,
-    epinorminf_constr::Bool = false,
-    epinorminfdual_constr::Bool = false,
-    hypoperlog_constr::Bool = false,
-    use_epinorminf::Bool = true,
-    use_epinorminfdual::Bool = true,
-    use_hypoperlog::Bool = true,
+    num_stocks::Int,
+    epinormeucl_constr::Bool,
+    epinorminf_constrs::Bool,
+    use_epinorminf::Bool,
+    use_linops::Bool,
     )
-    if hypoperlog_constr && (epipernormeucl_constr + epinorminf_constr + epinorminfdual_constr + hypoperlog_constr > 1)
-        error("if using entropic ball, cannot specify other risk measures")
-    end
-
-    last_idx(a::Vector{UnitRange{Int}}) = a[end][end]
-
     returns = rand(T, num_stocks)
     sigma_half = T.(randn(num_stocks, num_stocks))
     x = T.(randn(num_stocks))
@@ -52,7 +46,7 @@ function portfolio(
     cones = CO.Cone{T}[CO.Nonnegative{T}(num_stocks)]
     cone_offset = num_stocks
 
-    function add_single_ball(cone, gamma_new)
+    function add_ball_constr(cone, gamma_new)
         if use_linops
             push!(G_blocks, -sigma_half)
             push!(G_rows, (cone_offset + 2):(cone_offset + num_stocks + 1))
@@ -66,169 +60,116 @@ function portfolio(
         cone_offset += num_stocks + 1
     end
 
-    if epipernormeucl_constr
-        add_single_ball(CO.EpiNormEucl{T}(num_stocks + 1), gamma)
-    end
-    if epinorminfdual_constr && use_epinorminfdual
-        add_single_ball(CO.EpiNormInf{T, T}(num_stocks + 1, use_dual = true), gamma * sqrt(T(num_stocks)))
-    end
-    if epinorminf_constr && use_epinorminf
-        add_single_ball(CO.EpiNormInf{T, T}(num_stocks + 1), gamma)
+    last_idx(a::Vector{UnitRange{Int}}) = a[end][end]
+
+    if epinormeucl_constr
+        add_ball_constr(CO.EpiNormEucl{T}(num_stocks + 1), gamma)
     end
 
-    if epinorminfdual_constr && !use_epinorminfdual
-        c = vcat(c, zeros(T, 2 * num_stocks))
-        if use_linops
-            push!(A_blocks, sigma_half)
-            push!(A_blocks, -I)
-            push!(A_blocks, I)
-
-            A_offset = last_idx(A_rows)
-            append!(A_rows, fill((A_offset + 1):(A_offset + num_stocks), 3))
-
-            push!(A_cols, 1:num_stocks)
-            push!(A_cols, (num_stocks + 1):(2 * num_stocks))
-            push!(A_cols, (2 * num_stocks + 1):(3 * num_stocks))
-
-            push!(G_blocks, -I)
-            push!(G_blocks, ones(T, 1, 2 * num_stocks))
-            push!(G_rows, (last_idx(G_rows) + 1):(last_idx(G_rows) + 2 * num_stocks))
-            push!(G_rows, (last_idx(G_rows) + 1):(last_idx(G_rows) + 1))
-            # must have `num_stocks` primal variables, append columns
-            push!(G_cols, (num_stocks + 1):(3 * num_stocks))
-            push!(G_cols, (num_stocks + 1):(3 * num_stocks))
+    if epinorminf_constrs
+        if use_epinorminf
+            add_ball_constr(CO.EpiNormInf{T, T}(num_stocks + 1, use_dual = true), gamma * sqrt(T(num_stocks)))
+            add_ball_constr(CO.EpiNormInf{T, T}(num_stocks + 1), gamma)
         else
-            id = Matrix{T}(I, num_stocks, num_stocks)
-            id2 = Matrix{T}(I, 2 * num_stocks, 2 * num_stocks)
-            A = [
-                A    zeros(T, 1, 2 * num_stocks);
-                sigma_half    -id    id;
-                ]
-            G = [
-                G    zeros(T, size(G, 1), 2 * num_stocks);
-                zeros(T, 2 * num_stocks, num_stocks)    -id2;
-                zeros(T, 1, num_stocks)    ones(T, 1, 2 * num_stocks);
-                ]
-        end
-        b = vcat(b, zeros(T, num_stocks))
-        h = vcat(h, zeros(T, 2 * num_stocks), gamma * sqrt(T(num_stocks)))
-        push!(cones, CO.Nonnegative{T}(2 * num_stocks + 1))
-        cone_offset += 2 * num_stocks + 1
-    end
+            c = vcat(c, zeros(T, 2 * num_stocks))
+            if use_linops
+                push!(A_blocks, sigma_half)
+                push!(A_blocks, -I)
+                push!(A_blocks, I)
 
-    if epinorminf_constr && !use_epinorminf
-        if use_linops
-            push!(G_blocks, sigma_half)
-            push!(G_blocks, -sigma_half)
-            push!(G_rows, (cone_offset + 1):(cone_offset + num_stocks))
-            push!(G_rows, (cone_offset + num_stocks + 1):(cone_offset + 2 * num_stocks))
-            push!(G_cols, 1:num_stocks)
-            push!(G_cols, 1:num_stocks)
-        else
-            padding = zeros(T, num_stocks, size(G, 2) - num_stocks)
-            G = [
-                G;
-                sigma_half    padding;
-                -sigma_half    padding;
-                ]
-        end
-        h = vcat(h, gamma * ones(T, 2 * num_stocks))
-        push!(cones, CO.Nonnegative{T}(2 * num_stocks))
-        cone_offset += 2 * num_stocks
-    end
+                A_offset = last_idx(A_rows)
+                append!(A_rows, fill((A_offset + 1):(A_offset + num_stocks), 3))
 
-    if hypoperlog_constr
-        # sigma_half = abs.(sigma_half) TODO will this always be feasible?
-        c = vcat(c, zeros(T, 2 * num_stocks))
-        b = vcat(b, gamma^2)
-        col_offset = (use_linops ? last_idx(G_cols) : size(G, 2))
-        G2pos = zeros(T, 3 * num_stocks, 2 * num_stocks + col_offset)
-        G2neg = copy(G2pos)
-        h2 = zeros(T, 3 * num_stocks)
+                push!(A_cols, 1:num_stocks)
+                push!(A_cols, (num_stocks + 1):(2 * num_stocks))
+                push!(A_cols, (2 * num_stocks + 1):(3 * num_stocks))
 
-        row_offset = 1
-        for i in 1:num_stocks
-            G2pos[row_offset, num_stocks + i] = 1 # entropy
-            G2pos[row_offset + 1, 1:num_stocks] = -sigma_half[i, :]
-            h2[row_offset + 1] = 1
-            h2[row_offset + 2] = 1
-            G2neg[row_offset, 2 * num_stocks + i] = 1 # entropy
-            G2neg[row_offset + 1, 1:num_stocks] = sigma_half[i, :]
-            row_offset += 3
-        end
+                push!(G_blocks, -I)
+                push!(G_blocks, ones(T, 1, 2 * num_stocks))
+                push!(G_rows, (last_idx(G_rows) + 1):(last_idx(G_rows) + 2 * num_stocks))
+                push!(G_rows, (last_idx(G_rows) + 1):(last_idx(G_rows) + 1))
+                # must have `num_stocks` primal variables, append columns
+                push!(G_cols, (num_stocks + 1):(3 * num_stocks))
+                push!(G_cols, (num_stocks + 1):(3 * num_stocks))
+            else
+                id = Matrix{T}(I, num_stocks, num_stocks)
+                id2 = Matrix{T}(I, 2 * num_stocks, 2 * num_stocks)
+                A = [
+                    A    zeros(T, 1, 2 * num_stocks);
+                    sigma_half    -id    id;
+                    ]
+                G = [
+                    G    zeros(T, size(G, 1), 2 * num_stocks);
+                    zeros(T, 2 * num_stocks, num_stocks)    -id2;
+                    zeros(T, 1, num_stocks)    ones(T, 1, 2 * num_stocks);
+                    ]
+            end
+            b = vcat(b, zeros(T, num_stocks))
+            h = vcat(h, zeros(T, 2 * num_stocks), gamma * sqrt(T(num_stocks)))
+            push!(cones, CO.Nonnegative{T}(2 * num_stocks + 1))
+            cone_offset += 2 * num_stocks + 1
 
-        if use_linops
-            push!(A_blocks, ones(T, 1, 2 * num_stocks))
-            push!(A_rows, (last_idx(A_rows) + 1):(last_idx(A_rows) + 1))
-            push!(A_cols, (last_idx(A_cols) + 1):(last_idx(A_cols) + 2 * num_stocks))
-            push!(G_blocks, vcat(G2pos, G2neg))
-            push!(G_rows, (cone_offset + 1):(cone_offset + 6 * num_stocks))
-            push!(G_cols, 1:(2 * num_stocks + col_offset))
-        else
-            A = [
-                A    zeros(T, size(A, 1), 2 * num_stocks);
-                zeros(T, 1, num_stocks)    ones(T, 1, 2 * num_stocks);
-                ]
-            G = [
-                G    zeros(T, size(G, 1), 2 * num_stocks);
-                G2pos;
-                G2neg;
-                ]
+            if use_linops
+                push!(G_blocks, sigma_half)
+                push!(G_blocks, -sigma_half)
+                push!(G_rows, (cone_offset + 1):(cone_offset + num_stocks))
+                push!(G_rows, (cone_offset + num_stocks + 1):(cone_offset + 2 * num_stocks))
+                push!(G_cols, 1:num_stocks)
+                push!(G_cols, 1:num_stocks)
+            else
+                padding = zeros(T, num_stocks, size(G, 2) - num_stocks)
+                G = [
+                    G;
+                    sigma_half    padding;
+                    -sigma_half    padding;
+                    ]
+            end
+            h = vcat(h, gamma * ones(T, 2 * num_stocks))
+            push!(cones, CO.Nonnegative{T}(2 * num_stocks))
+            cone_offset += 2 * num_stocks
         end
-        h = vcat(h, h2, h2)
-        for i in 1:(2 * num_stocks)
-            push!(cones, CO.HypoPerLog{T}(3))
-        end
-        cone_offset += 6 * num_stocks
     end
 
     if use_linops
         A = Hypatia.BlockMatrix{T}(last_idx(A_rows), last_idx(A_cols), A_blocks, A_rows, A_cols)
         G = Hypatia.BlockMatrix{T}(last_idx(G_rows), last_idx(G_cols), G_blocks, G_rows, G_cols)
     end
+
     return (c = c, A = A, b = b, G = G, h = h, cones = cones)
 end
 
-portfolio1(T::Type{<:Real}) = portfolio(T, 4, epinorminfdual_constr = true, use_epinorminfdual = true)
-portfolio2(T::Type{<:Real}) = portfolio(T, 6, epinorminfdual_constr = true, use_epinorminfdual = false)
-portfolio3(T::Type{<:Real}) = portfolio(T, 4, epinorminf_constr = true, use_epinorminf = true)
-portfolio4(T::Type{<:Real}) = portfolio(T, 6, epinorminf_constr = true, use_epinorminf = false)
-portfolio5(T::Type{<:Real}) = portfolio(T, 4, epinorminf_constr = true, epinorminfdual_constr = true, use_epinorminf = true, use_epinorminfdual = true)
-portfolio6(T::Type{<:Real}) = portfolio(T, 6, epinorminf_constr = true, epinorminfdual_constr = true, use_epinorminf = false, use_epinorminfdual = false)
-portfolio7(T::Type{<:Real}) = portfolio(T, 4, epinorminf_constr = true, epinorminfdual_constr = true, use_epinorminfdual = true, use_linops = false)
-portfolio8(T::Type{<:Real}) = portfolio(T, 4, epinorminf_constr = true, epinorminfdual_constr = true, use_epinorminfdual = true, use_linops = true)
-portfolio9(T::Type{<:Real}) = portfolio(T, 3, epinorminf_constr = true, epinorminfdual_constr = true, use_epinorminfdual = false, use_linops = false)
-portfolio10(T::Type{<:Real}) = portfolio(T, 3, epinorminf_constr = true, epinorminfdual_constr = true, use_epinorminfdual = false, use_linops = true)
-portfolio11(T::Type{<:Real}) = portfolio(T, 4, hypoperlog_constr = true, use_epinorminfdual = false, use_linops = false)
-portfolio12(T::Type{<:Real}) = portfolio(T, 4, hypoperlog_constr = true, use_epinorminfdual = false, use_linops = true)
-portfolio13(T::Type{<:Real}) = portfolio(T, 20, epinorminf_constr = true, epinorminfdual_constr = true, use_epinorminf = false, use_epinorminfdual = false)
-portfolio14(T::Type{<:Real}) = portfolio(T, 30, epinorminf_constr = true, epinorminfdual_constr = true, use_epinorminfdual = true, use_linops = false)
+function test_portfolio(T::Type{<:Real}, instance::Tuple; options::NamedTuple = NamedTuple(), rseed::Int = 1)
+    Random.seed!(rseed)
+    d = portfolio(T, instance...)
+    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
+    @test r.status == :Optimal
+    return r
+end
 
 instances_portfolio_fast = [
-    portfolio1,
-    portfolio2,
-    portfolio3,
-    portfolio4,
-    portfolio5,
-    portfolio6,
-    portfolio7,
-    portfolio9,
-    portfolio11,
-    portfolio13,
+    (4, true, false, true, false),
+    (4, false, true, true, false),
+    (4, false, true, false, false),
+    (4, true, true, true, false),
+    (10, true, false, true, false),
+    (10, false, true, true, false),
+    (10, false, true, false, false),
+    (10, true, true, true, false),
+    (50, true, false, true, false),
+    (50, false, true, true, false),
+    (50, false, true, false, false),
+    (50, true, true, true, false),
+    (400, true, false, true, false),
+    (400, false, true, true, false),
+    (400, false, true, false, false),
+    (400, true, true, true, false),
     ]
 instances_portfolio_slow = [
     # TODO
     ]
 instances_portfolio_linops = [
-    portfolio8,
-    portfolio10,
-    portfolio12,
+    (20, true, false, true, true),
+    (20, false, true, true, true),
+    (20, false, true, false, true),
+    (20, true, true, true, true),
     ]
-
-function test_portfolio(instance::Function; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
-    Random.seed!(rseed)
-    d = instance(T)
-    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
-    @test r.status == :Optimal
-    return r
-end

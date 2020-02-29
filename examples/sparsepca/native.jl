@@ -125,7 +125,7 @@ function test_sparsepca(T::Type{<:Real}, instance::Tuple; options::NamedTuple = 
     d = sparsepca(T, instance...)
     r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
     @test r.status == :Optimal
-    if !isnan(d.true_obj)
+    if r.status == :Optimal && !isnan(d.true_obj)
         @test r.primal_obj ≈ d.true_obj atol = 1e-4 rtol = 1e-4
     end
     return r
