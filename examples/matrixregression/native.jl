@@ -18,12 +18,12 @@ const CO = Hypatia.Cones
 
 function matrixregression(
     Y::Matrix{R},
-    X::Matrix{R};
-    lam_fro::Real = zero(T),
-    lam_nuc::Real = zero(T),
-    lam_las::Real = zero(T),
-    lam_glr::Real = zero(T),
-    lam_glc::Real = zero(T),
+    X::Matrix{R},
+    lam_fro::Real,
+    lam_nuc::Real,
+    lam_las::Real,
+    lam_glr::Real,
+    lam_glc::Real,
     ) where {R <: RealOrComplex{T}} where {T <: Real}
     @assert lam_fro >= 0
     @assert lam_nuc >= 0
@@ -231,7 +231,7 @@ function matrixregression(
     return (
         c = model_c, A = zeros(T, 0, model_n), b = zeros(T, 0), G = model_G, h = model_h, cones = cones,
         n = data_n, m = data_m, p = data_p, Y = Y, X = X,
-        lam_fro = lam_fro, lam_nuc = lam_nuc, lam_las = lam_las, lam_glr = lam_glr, lam_glc = lam_glc
+        lam_fro = lam_fro, lam_nuc = lam_nuc, lam_las = lam_las, lam_glr = lam_glr, lam_glc = lam_glc,
         )
 end
 
@@ -239,11 +239,11 @@ function matrixregression(
     R::Type{<:RealOrComplex{T}},
     n::Int,
     m::Int,
-    p::Int;
+    p::Int,
+    args...;
     A_max_rank::Int = div(m, 2) + 1,
     A_sparsity::Real = max(0.2, inv(sqrt(m * p))),
     Y_noise::Real = 0.01,
-    model_kwargs...
     ) where {T <: Real}
     @assert p >= m
     @assert 1 <= A_max_rank <= m
@@ -254,63 +254,64 @@ function matrixregression(
     A = 10 * A_left * A_right
     X = randn(R, n, p)
     Y = X * A + Y_noise * randn(R, n, m)
-
     Y = Matrix{R}(Y)
     X = Matrix{R}(X)
 
-    return matrixregression(Y, X; model_kwargs...)
+    return matrixregression(Y, X, args...)
 end
 
-matrixregression1(R::Type{<:RealOrComplex}) = matrixregression(R, 5, 3, 4)
-matrixregression2(R::Type{<:RealOrComplex}) = matrixregression(R, 5, 3, 4, lam_fro = 0.1, lam_nuc = 0.1, lam_las = 0.1, lam_glc = 0.2, lam_glr = 0.2)
-matrixregression3(R::Type{<:RealOrComplex}) = matrixregression(R, 3, 4, 5)
-matrixregression4(R::Type{<:RealOrComplex}) = matrixregression(R, 3, 4, 5, lam_fro = 0.1, lam_nuc = 0.1, lam_las = 0.1, lam_glc = 0.2, lam_glr = 0.2)
-matrixregression5(R::Type{<:RealOrComplex}) = matrixregression(R, 100, 8, 12)
-matrixregression6(R::Type{<:RealOrComplex}) = matrixregression(R, 100, 8, 12, lam_fro = 0.0, lam_nuc = 0.4, lam_las = 1.0, lam_glc = 0.1, lam_glr = 2.0)
-matrixregression7(R::Type{<:RealOrComplex}) = matrixregression(R, 100, 8, 12, lam_fro = 0.0, lam_nuc = 0.0, lam_las = 0.0, lam_glc = 0.2, lam_glr = 1.5)
-matrixregression8(R::Type{<:RealOrComplex}) = matrixregression(R, 15, 10, 20)
-matrixregression9(R::Type{<:RealOrComplex}) = matrixregression(R, 15, 10, 20, lam_fro = 0.0, lam_nuc = 0.4, lam_las = 1.0, lam_glc = 0.1, lam_glr = 2.0)
-matrixregression10(R::Type{<:RealOrComplex}) = matrixregression(R, 15, 10, 20, lam_fro = 0.0, lam_nuc = 0.0, lam_las = 0.0, lam_glc = 0.2, lam_glr = 1.5)
-
-instances_matrixregression_all = [
-    matrixregression1,
-    matrixregression2,
-    matrixregression3,
-    matrixregression4,
-    matrixregression5,
-    matrixregression6,
-    matrixregression7,
-    matrixregression8,
-    matrixregression9,
-    matrixregression10,
-    ]
-instances_matrixregression_few = [
-    matrixregression1,
-    matrixregression2,
-    matrixregression3,
-    matrixregression4,
-    ]
-
-function test_matrixregression(instance::Function; R::Type{<:RealOrComplex{T}} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1) where {T <: Real}
+function test_matrixregression(T::Type{<:Real}, instance::Tuple; options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)
-    d = instance(R)
+    R = (instance[1] == Complex) ? Complex{T} : T
+    d = matrixregression(R, instance[2:end]...)
     r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
     @test r.status == :Optimal
-
-    # check objective value is correct
-    if R <: Complex
-        A_opt_real = reshape(r.x[2:(1 + 2 * d.p * d.m)], 2 * d.p, d.m)
-        A_opt = zeros(R, d.p, d.m)
-        for k in 1:d.p
-            @. @views A_opt[k, :] = A_opt_real[2k - 1, :] + A_opt_real[2k, :] * im
+    if r.status == :Optimal
+        # check objective value is correct
+        if R <: Complex
+            A_opt_real = reshape(r.x[2:(1 + 2 * d.p * d.m)], 2 * d.p, d.m)
+            A_opt = zeros(R, d.p, d.m)
+            for k in 1:d.p
+                @. @views A_opt[k, :] = A_opt_real[2k - 1, :] + A_opt_real[2k, :] * im
+            end
+        else
+            A_opt = reshape(r.x[2:(1 + d.p * d.m)], d.p, d.m)
         end
-    else
-        A_opt = reshape(r.x[2:(1 + d.p * d.m)], d.p, d.m)
+        loss = (1/2 * sum(abs2, d.X * A_opt) - real(dot(d.X' * d.Y, A_opt))) / d.n
+        obj_try = loss + d.lam_fro * norm(vec(A_opt), 2) +
+            d.lam_nuc * sum(svd(A_opt).S) + d.lam_las * norm(vec(A_opt), 1) +
+            d.lam_glr * sum(norm, eachrow(A_opt)) + d.lam_glc * sum(norm, eachcol(A_opt))
+        @test r.primal_obj ≈ obj_try atol = 1e-4 rtol = 1e-4
     end
-    loss = (1/2 * sum(abs2, d.X * A_opt) - real(dot(d.X' * d.Y, A_opt))) / d.n
-    obj_try = loss + d.lam_fro * norm(vec(A_opt), 2) +
-        d.lam_nuc * sum(svd(A_opt).S) + d.lam_las * norm(vec(A_opt), 1) +
-        d.lam_glr * sum(norm, eachrow(A_opt)) + d.lam_glc * sum(norm, eachcol(A_opt))
-    @test r.primal_obj ≈ obj_try atol = 1e-4 rtol = 1e-4
-    return
+    return r
 end
+
+instances_matrixregression_fast = [
+    (Real, 5, 3, 4, 0, 0, 0, 0, 0),
+    (Real, 5, 3, 4, 0.1, 0.1, 0.1, 0.2, 0.2),
+    (Real, 5, 3, 4, 0, 0.1, 0.1, 0, 0),
+    (Real, 3, 4, 5, 0, 0, 0, 0, 0),
+    (Real, 3, 4, 5, 0.1, 0.1, 0.1, 0.2, 0.2),
+    (Real, 3, 4, 5, 0, 0.1, 0.1, 0, 0),
+    (Complex, 5, 3, 4, 0, 0, 0, 0, 0),
+    (Complex, 5, 3, 4, 0.1, 0.1, 0.1, 0.2, 0.2),
+    (Complex, 5, 3, 4, 0, 0.1, 0.1, 0, 0),
+    (Complex, 3, 4, 5, 0, 0, 0, 0, 0),
+    (Complex, 3, 4, 5, 0.1, 0.1, 0.1, 0.2, 0.2),
+    (Complex, 3, 4, 5, 0, 0.1, 0.1, 0, 0),
+    (Real, 15, 10, 20, 0, 0, 0, 0, 0),
+    (Real, 15, 10, 20, 0.1, 0.1, 0.1, 0.2, 0.2),
+    (Real, 15, 10, 20, 0, 0.1, 0.1, 0, 0),
+    (Complex, 15, 10, 20, 0, 0, 0, 0, 0),
+    (Complex, 15, 10, 20, 0.1, 0.1, 0.1, 0.2, 0.2),
+    (Complex, 15, 10, 20, 0, 0.1, 0.1, 0, 0),
+    (Real, 100, 8, 12, 0, 0, 0, 0, 0),
+    (Real, 100, 8, 12, 0.1, 0.1, 0.1, 0.2, 0.2),
+    (Real, 100, 8, 12, 0, 0.1, 0.1, 0, 0),
+    (Complex, 100, 8, 12, 0, 0, 0, 0, 0),
+    (Complex, 100, 8, 12, 0.1, 0.1, 0.1, 0.2, 0.2),
+    (Complex, 100, 8, 12, 0, 0.1, 0.1, 0, 0),
+    ]
+instances_matrixregression_slow = [
+    # TODO
+    ]

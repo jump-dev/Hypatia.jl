@@ -49,13 +49,11 @@ mutable struct Solver{T <: Real}
     max_nbhd::T
     stepper::Stepper{T}
     system_solver::SystemSolver{T}
-
-    # current status of the solver object
-    status::Symbol
-
-    # solve info and timers
-    solve_time::Float64
     timer::TimerOutput
+
+    # current status of the solver object and info
+    status::Symbol
+    solve_time::Float64
     num_iters::Int
 
     # model and preprocessed model data
@@ -141,6 +139,7 @@ mutable struct Solver{T <: Real}
         max_nbhd::Real = Cones.default_max_neighborhood(), # TODO cleanup - only for taukap, maybe use full name
         stepper::Stepper{T} = CombinedStepper{T}(),
         system_solver::SystemSolver{T} = QRCholDenseSystemSolver{T}(),
+        timer::TimerOutput = TimerOutput(),
         ) where {T <: Real}
         if isa(system_solver, QRCholSystemSolver{T})
             @assert preprocess # require preprocessing for QRCholSystemSolver # TODO only need primal eq preprocessing or reduction
@@ -167,6 +166,7 @@ mutable struct Solver{T <: Real}
         solver.max_nbhd = max_nbhd
         solver.stepper = stepper
         solver.system_solver = system_solver
+        solver.timer = timer
         solver.status = :NotLoaded
 
         return solver
@@ -179,7 +179,6 @@ function solve(solver::Solver{T}) where {T <: Real}
     start_time = time()
     solver.num_iters = 0
     solver.solve_time = NaN
-    solver.timer = TimerOutput()
 
     solver.x_norm_res_t = NaN
     solver.y_norm_res_t = NaN
@@ -559,8 +558,9 @@ function solve_check(
     end
 
     solve_time = get_solve_time(solver)
+    num_iters = get_num_iters(solver)
 
-    return (solver = solver, model = model, solve_time = solve_time, primal_obj = primal_obj, dual_obj = dual_obj, status = status, x = x, y = y, s = s, z = z)
+    return (solver = solver, model = model, solve_time = solve_time, num_iters = num_iters, primal_obj = primal_obj, dual_obj = dual_obj, status = status, x = x, y = y, s = s, z = z)
 end
 
 # build model and call solve_check
