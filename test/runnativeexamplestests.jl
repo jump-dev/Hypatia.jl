@@ -5,6 +5,7 @@ Copyright 2019, Chris Coey and contributors
 using Test
 using DataFrames
 using Printf
+using TimerOutputs
 import Hypatia
 const SO = Hypatia.Solvers
 
@@ -15,24 +16,29 @@ instance_sets = [
 
 example_names = [
     "densityest",
-    "envelope",
-    "expdesign",
-    "linearopt",
-    "matrixcompletion",
-    "matrixregression",
-    "maxvolume",
-    "polymin",
-    "portfolio",
-    "sparsepca",
+    # "envelope",
+    # "expdesign",
+    # "linearopt",
+    # "matrixcompletion",
+    # "matrixregression",
+    # "maxvolume",
+    # "polymin",
+    # "portfolio",
+    # "sparsepca",
     ]
 
-# TODO could use a single TimerOutputs object for all tests and display that at end also
-
 T = Float64
-options = (atol = 10eps(T)^0.25, solver = SO.Solver{T}(
-    verbose = false, iter_limit = 250, time_limit = 12e2,
-    system_solver = SO.QRCholDenseSystemSolver{T}(),
-    ))
+timer = TimerOutput()
+options = (
+    atol = 10eps(T)^0.25,
+    solver = SO.Solver{T}(
+        verbose = false,
+        iter_limit = 250,
+        time_limit = 12e2,
+        system_solver = SO.QRCholDenseSystemSolver{T}(),
+        timer = timer,
+        ),
+    )
 
 @info("starting native examples tests")
 
@@ -66,10 +72,10 @@ all_tests_time = time()
             @printf("... %8.2e seconds\n", test_time)
         end
     end
-    println("")
-    @info("native examples tests time: $(time() - all_tests_time) seconds")
-    println("")
+    @printf("\nnative examples tests total time: %8.2e seconds\n\n", time() - all_tests_time)
     show(perf, allrows = true, allcols = true)
+    println("\n")
+    show(timer)
     println("\n")
 end
 
