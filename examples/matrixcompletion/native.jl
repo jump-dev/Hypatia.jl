@@ -3,7 +3,7 @@ Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
 references minimizing the nuclear norm:
 Minimization of a Particular Singular Value by Alborz Alavian and Michael Rotkowitz
-The Power of Convex Relaxation Emmanuel J. Cand�s and  Terence Tao
+The Power of Convex Relaxation Emmanuel J. Candes and  Terence Tao
 http://www.mit.edu/~parrilo/pubs/talkfiles/ISMP2009.pdf
 other:
 https://www.cvxpy.org/examples/dgp/pf_matrix_completion.html
@@ -11,7 +11,7 @@ https://www.cvxpy.org/examples/dgp/pf_matrix_completion.html
 hypogeomean constraint inspired by:
 https://www.cvxpy.org/examples/dgp/pf_matrix_completion.html
 
-extended formulations to (u, W) in EpiNormSpectral(true) uses:
+extended formulations to (u, W) in EpiNormSpectral(use_dual = true) uses:
 min 1/2(tr(W1) + tr(W2))
 [W1 X; X' W2] ⪰ 0
 from http://www.mit.edu/~parrilo/pubs/talkfiles/ISMP2009.pdf
@@ -27,11 +27,11 @@ const MU = Hypatia.ModelUtilities
 function matrixcompletion(
     T::Type{<:Real},
     m::Int,
-    n::Int;
+    n::Int,
     geomean_constr::Bool = true, # whether to add a constraint on the geomean of unknown values
     nuclearnorm_obj::Bool = true, # whether to use a nuclear norm as opposed to spectral norm in the objective
     use_hypogeomean::Bool = true, # natural/extended formulation for geomean constraint
-    use_epinormspectral::Bool = true,  # natural/extended formulation for the objective
+    use_epinormspectral::Bool = true, # natural/extended formulation for the objective
     )
     @assert m <= n
     mn = m * n
@@ -254,65 +254,32 @@ function matrixcompletion(
     return (c = c, A = A, b = b, G = G, h = h, cones = cones)
 end
 
-matrixcompletion1(T::Type{<:Real}) = matrixcompletion(T, 2, 3, geomean_constr = false)
-matrixcompletion2(T::Type{<:Real}) = matrixcompletion(T, 2, 3, geomean_constr = true)
-matrixcompletion3(T::Type{<:Real}) = matrixcompletion(T, 2, 3, geomean_constr = true, nuclearnorm_obj = false)
-matrixcompletion4(T::Type{<:Real}) = matrixcompletion(T, 2, 3, geomean_constr = true, nuclearnorm_obj = false, use_epinormspectral = false)
-matrixcompletion5(T::Type{<:Real}) = matrixcompletion(T, 2, 3, geomean_constr = true, nuclearnorm_obj = true)
-matrixcompletion6(T::Type{<:Real}) = matrixcompletion(T, 2, 3, geomean_constr = true, nuclearnorm_obj = true, use_epinormspectral = false)
-matrixcompletion7(T::Type{<:Real}) = matrixcompletion(T, 2, 3, geomean_constr = false, use_hypogeomean = false)
-matrixcompletion8(T::Type{<:Real}) = matrixcompletion(T, 2, 3, geomean_constr = true, nuclearnorm_obj = false, use_hypogeomean = false)
-matrixcompletion9(T::Type{<:Real}) = matrixcompletion(T, 2, 3, geomean_constr = true, nuclearnorm_obj = false, use_epinormspectral = false, use_hypogeomean = false)
-matrixcompletion10(T::Type{<:Real}) = matrixcompletion(T, 2, 3, geomean_constr = true, nuclearnorm_obj = true, use_hypogeomean = false)
-matrixcompletion11(T::Type{<:Real}) = matrixcompletion(T, 2, 3, geomean_constr = true, nuclearnorm_obj = true, use_epinormspectral = false, use_hypogeomean = false)
-matrixcompletion12(T::Type{<:Real}) = matrixcompletion(T, 6, 8, geomean_constr = true, nuclearnorm_obj = false, use_epinormspectral = false, use_hypogeomean = false)
-matrixcompletion13(T::Type{<:Real}) = matrixcompletion(T, 6, 8, geomean_constr = true, nuclearnorm_obj = false, use_epinormspectral = true, use_hypogeomean = true)
-matrixcompletion14(T::Type{<:Real}) = matrixcompletion(T, 6, 8, geomean_constr = true, nuclearnorm_obj = true, use_epinormspectral = false, use_hypogeomean = false)
-matrixcompletion15(T::Type{<:Real}) = matrixcompletion(T, 6, 8, geomean_constr = true, nuclearnorm_obj = true, use_epinormspectral = true, use_hypogeomean = true)
-matrixcompletion16(T::Type{<:Real}) = matrixcompletion(T, 12, 24, geomean_constr = true, nuclearnorm_obj = false, use_epinormspectral = false, use_hypogeomean = false)
-matrixcompletion17(T::Type{<:Real}) = matrixcompletion(T, 12, 24, geomean_constr = true, nuclearnorm_obj = false, use_epinormspectral = true, use_hypogeomean = true)
-matrixcompletion18(T::Type{<:Real}) = matrixcompletion(T, 12, 24, geomean_constr = true, nuclearnorm_obj = true, use_epinormspectral = false, use_hypogeomean = false)
-matrixcompletion19(T::Type{<:Real}) = matrixcompletion(T, 12, 24, geomean_constr = true, nuclearnorm_obj = true, use_epinormspectral = true, use_hypogeomean = true)
-
-instances_matrixcompletion_all = [
-    matrixcompletion1,
-    matrixcompletion2,
-    matrixcompletion3,
-    matrixcompletion4,
-    matrixcompletion5,
-    matrixcompletion6,
-    matrixcompletion7,
-    matrixcompletion8,
-    matrixcompletion9,
-    matrixcompletion10,
-    matrixcompletion11,
-    matrixcompletion12,
-    matrixcompletion13,
-    matrixcompletion14,
-    matrixcompletion15,
-    matrixcompletion16,
-    matrixcompletion17,
-    matrixcompletion18,
-    matrixcompletion19,
-    ]
-instances_matrixcompletion_few = [
-    matrixcompletion1,
-    matrixcompletion2,
-    matrixcompletion3,
-    matrixcompletion4,
-    matrixcompletion5,
-    matrixcompletion6,
-    matrixcompletion7,
-    matrixcompletion8,
-    matrixcompletion9,
-    matrixcompletion10,
-    matrixcompletion11,
-    ]
-
-function test_matrixcompletion(instance::Function; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
+function test_matrixcompletion(T::Type{<:Real}, instance::Tuple; options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)
-    d = instance(T)
+    d = matrixcompletion(T, instance...)
     r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
     @test r.status == :Optimal
-    return
+    return r
 end
+
+instances_matrixcompletion_fast = [
+    (2, 3, true, true, true, true),
+    (2, 3, false, true, true, true),
+    (2, 3, true, false, true, true),
+    (2, 3, false, false, true, true),
+    (2, 3, true, true, false, true),
+    (2, 3, false, false, false, true),
+    (2, 3, true, true, false, false),
+    (2, 3, false, false, false, false),
+    (6, 8, true, true, true, true),
+    (6, 8, true, true, false, true),
+    (6, 8, true, true, true, false),
+    (6, 8, true, true, false, false),
+    (12, 24, true, true, true, true),
+    (12, 24, true, true, false, true),
+    (12, 24, true, true, true, false),
+    (12, 24, true, true, false, false),
+    ]
+instances_matrixcompletion_slow = [
+    # TODO
+    ]

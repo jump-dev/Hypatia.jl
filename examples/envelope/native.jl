@@ -21,8 +21,8 @@ function envelope(
     npoly::Int,
     rand_halfdeg::Int,
     n::Int,
-    env_halfdeg::Int;
-    primal_wsos::Bool = true,
+    env_halfdeg::Int,
+    primal_wsos::Bool,
     )
     # generate interpolation
     @assert rand_halfdeg <= env_halfdeg
@@ -54,30 +54,22 @@ function envelope(
     return (c = c, A = A, b = b, G = G, h = h, cones = cones)
 end
 
-envelope1(T::Type{<:Real}) = envelope(T, 2, 3, 2, 4)
-envelope2(T::Type{<:Real}) = envelope(T, 3, 3, 3, 3)
-envelope3(T::Type{<:Real}) = envelope(T, 2, 30, 1, 30)
-envelope4(T::Type{<:Real}) = envelope(T, 2, 3, 2, 4, primal_wsos = false)
-envelope5(T::Type{<:Real}) = envelope(T, 3, 3, 3, 3, primal_wsos = false)
-envelope6(T::Type{<:Real}) = envelope(T, 2, 30, 1, 30, primal_wsos = false)
-
-instances_envelope_all = [
-    envelope1,
-    envelope2,
-    envelope3,
-    envelope4,
-    envelope5,
-    envelope6,
-    ]
-instances_envelope_few = [
-    envelope1,
-    envelope5,
-    ]
-
-function test_envelope(instance::Function; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
+function test_envelope(T::Type{<:Real}, instance::Tuple; options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)
-    d = instance(T)
+    d = envelope(T, instance...)
     r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
     @test r.status == :Optimal
-    return
+    return r
 end
+
+instances_envelope_fast = [
+    (2, 3, 2, 4, true),
+    (2, 3, 2, 4, false),
+    (3, 3, 3, 3, true),
+    (3, 3, 3, 3, false),
+    (2, 30, 1, 30, true),
+    (2, 30, 1, 30, false),
+    ]
+instances_envelope_slow = [
+    # TODO add
+    ]

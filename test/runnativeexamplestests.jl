@@ -3,47 +3,101 @@ Copyright 2019, Chris Coey and contributors
 =#
 
 using Test
+using DataFrames
+using Printf
+using TimerOutputs
 import Hypatia
 const SO = Hypatia.Solvers
 
-examples_dir = joinpath(@__DIR__, "../examples")
+instance_sets = [
+    "fast",
+    # "slow",
+    ]
 
-include(joinpath(examples_dir, "densityest/native.jl"))
-include(joinpath(examples_dir, "envelope/native.jl"))
-include(joinpath(examples_dir, "expdesign/native.jl"))
-include(joinpath(examples_dir, "linearopt/native.jl"))
-include(joinpath(examples_dir, "matrixcompletion/native.jl"))
-include(joinpath(examples_dir, "matrixregression/native.jl"))
-include(joinpath(examples_dir, "maxvolume/native.jl"))
-include(joinpath(examples_dir, "polymin/native.jl"))
-include(joinpath(examples_dir, "portfolio/native.jl"))
-include(joinpath(examples_dir, "sparsepca/native.jl"))
+example_names = [
+    "densityest",
+    "envelope",
+    "expdesign",
+    "linearopt",
+    "matrixcompletion",
+    "matrixregression",
+    "maxvolume",
+    "polymin",
+    "portfolio",
+    "sparsepca",
+    ]
 
 T = Float64
-
-options = (atol = 10eps(T)^0.25, solver = SO.Solver{T}(
-    verbose = false, iter_limit = 250, time_limit = 12e2,
-    system_solver = SO.QRCholDenseSystemSolver{T}(),
-    ))
+timer = TimerOutput()
+options = (
+    atol = 10eps(T)^0.25,
+    solver = SO.Solver{T}(
+        verbose = false,
+        iter_limit = 250,
+        time_limit = 12e2,
+        system_solver = SO.QRCholDenseSystemSolver{T}(),
+        timer = timer,
+        ),
+    )
 
 @info("starting native examples tests")
-@testset "native examples tests" begin
-    @testset "densityest" begin test_densityest.(instances_densityest_few, T = T, options = options) end
-    @testset "envelope" begin test_envelope.(instances_envelope_few, T = T, options = options) end
-    @testset "expdesign" begin test_expdesign.(instances_expdesign_few, T = T, options = options) end
-    @testset "linearopt" begin test_linearopt.(instances_linearopt_few, T = T, options = options) end
-    @testset "matrixcompletion" begin test_matrixcompletion.(instances_matrixcompletion_few, T = T, options = options) end
-    @testset "matrixregression" begin test_matrixregression.(instances_matrixregression_few, R = T, options = options) end # real
-    @testset "matrixregression" begin test_matrixregression.(instances_matrixregression_few, R = Complex{T}, options = options) end # complex
-    @testset "maxvolume" begin test_maxvolume.(instances_maxvolume_few, T = T, options = options) end
-    if T == Float64 # some ModelUtilities functions only work with Float64
-        @testset "polymin" begin test_polymin.(instances_polymin_few, T = T, options = options) end
-    end
-    @testset "portfolio" begin test_portfolio.(instances_portfolio_few, T = T, options = options) end
-    @testset "sparsepca" begin test_sparsepca.(instances_sparsepca_few, T = T, options = options) end
+
+for ex in example_names
+    include(joinpath(@__DIR__, "../examples", ex, "native.jl"))
 end
 
-# TODO currently broken
+perf = DataFrame(
+    example = String[],
+    inst = Int[],
+    inst_data = String[],
+    test_time = Float64[],
+    solve_time = Float64[],
+    iters = Int[],
+    status = Symbol[],
+    prim_obj = T[],
+    dual_obj = T[],
+    )
+
+all_tests_time = time()
+@testset "native examples tests" begin
+    @testset "$example, $inst_set" for example in example_names, inst_set in instance_sets
+        println()
+        test_function = eval(Symbol("test_", example))
+        instances = eval(Symbol("instances_", example, "_", inst_set))
+        @testset "$example $inst: $inst_data" for (inst, inst_data) in enumerate(instances)
+            inst_string = string(inst_data)
+            println(example, " ", inst, ": ", inst_data, " ...")
+            test_time = @elapsed r = test_function(T, inst_data, options = options)
+            push!(perf, (example, inst, inst_string, test_time, r.solve_time, r.num_iters, r.status, r.primal_obj, r.dual_obj))
+            @printf("... %8.2e seconds\n", test_time)
+        end
+    end
+    @printf("\nnative examples tests total time: %8.2e seconds\n\n", time() - all_tests_time)
+    show(perf, allrows = true, allcols = true)
+    println("\n")
+    show(timer)
+    println("\n")
+end
+
+# TODO update linear operators tests below when support linear operators again
+
+# instance_sets = [
+#     "linops",
+#     ]
+#
+# example_names = [
+#     "densityest",
+#     "envelope",
+#     "expdesign",
+#     "linearopt",
+#     "matrixcompletion",
+#     "matrixregression",
+#     "maxvolume",
+#     "polymin",
+#     "portfolio",
+#     "sparsepca",
+#     ]
+
 # tol = sqrt(sqrt(eps(T)))
 # options = (atol = 10 * tol, solver = SO.Solver{T}(
 #     verbose = true, init_use_indirect = true, reduce = false, preprocess = false, iter_limit = 250,

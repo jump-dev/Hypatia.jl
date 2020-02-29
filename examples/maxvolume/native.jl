@@ -26,10 +26,10 @@ end
 
 function maxvolume(
     T::Type{<:Real},
-    n::Int;
-    use_hypogeomean::Bool = false,
-    use_power::Bool = false,
-    use_epipersquare::Bool = false,
+    n::Int,
+    use_hypogeomean::Bool,
+    use_power::Bool,
+    use_epipersquare::Bool,
     )
     @assert use_hypogeomean + use_power + use_epipersquare == 1
     @assert n > 2
@@ -136,36 +136,25 @@ function maxvolume(
     return (c = c, A = A, b = b, G = G, h = h, cones = cones)
 end
 
-maxvolume1(T::Type{<:Real}) = maxvolume(T, 3, use_hypogeomean = true)
-maxvolume2(T::Type{<:Real}) = maxvolume(T, 3, use_power = true)
-maxvolume3(T::Type{<:Real}) = maxvolume(T, 3, use_epipersquare = true)
-maxvolume4(T::Type{<:Real}) = maxvolume(T, 10, use_hypogeomean = true)
-maxvolume5(T::Type{<:Real}) = maxvolume(T, 10, use_power = true)
-maxvolume6(T::Type{<:Real}) = maxvolume(T, 10, use_epipersquare = true)
-maxvolume7(T::Type{<:Real}) = maxvolume(T, 25, use_hypogeomean = true)
-maxvolume8(T::Type{<:Real}) = maxvolume(T, 25, use_power = true)
-maxvolume9(T::Type{<:Real}) = maxvolume(T, 25, use_epipersquare = true)
-
-instances_maxvolume_all = [
-    maxvolume1,
-    maxvolume2,
-    maxvolume3,
-    maxvolume5,
-    maxvolume6,
-    maxvolume7,
-    maxvolume8,
-    maxvolume9,
-    ]
-instances_maxvolume_few = [
-    maxvolume1,
-    maxvolume2,
-    maxvolume3,
-    ]
-
-function test_maxvolume(instance::Function; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
+function test_maxvolume(T::Type{<:Real}, instance::Tuple; options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)
-    d = instance(T)
+    d = maxvolume(T, instance...)
     r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
     @test r.status == :Optimal
-    return
+    return r
 end
+
+instances_maxvolume_fast = [
+    (3, true, false, false),
+    (3, false, true, false),
+    (3, false, false, true),
+    (10, true, false, false),
+    (10, false, true, false),
+    (10, false, false, true),
+    (25, true, false, false),
+    (25, false, true, false),
+    (25, false, false, true),
+    ]
+instances_maxvolume_slow = [
+    # TODO
+    ]

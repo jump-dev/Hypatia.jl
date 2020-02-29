@@ -16,14 +16,13 @@ const CO = Hypatia.Cones
 function linearopt(
     T::Type{<:Real},
     m::Int,
-    n::Int;
-    nzfrac::Float64 = 1.0,
+    n::Int,
+    nz_frac::Float64,
     )
     # generate random data
-    @assert 0 < nzfrac <= 1
+    @assert 0 < nz_frac <= 1
 
-    # A matrix is sparse iff nzfrac ∈ [0, 1)
-    A = (nzfrac >= 1.0) ? rand(T, m, n) : sprand(T, m, n, nzfrac)
+    A = (nz_frac >= 1.0) ? rand(T, m, n) : sprand(T, m, n, nz_frac)
     A .*= 10
     b = vec(sum(A, dims = 2))
     c = rand(T, n)
@@ -34,32 +33,21 @@ function linearopt(
     return (c = c, A = A, b = b, G = G, h = h, cones = cones)
 end
 
-linearopt1(T::Type{<:Real}) = linearopt(T, 500, 1000)
-linearopt2(T::Type{<:Real}) = linearopt(T, 50, 100)
-linearopt3(T::Type{<:Real}) = linearopt(T, 15, 20)
-linearopt4(T::Type{<:Real}) = linearopt(T, 500, 1000, nzfrac = 0.05)
-linearopt5(T::Type{<:Real}) = linearopt(T, 50, 100, nzfrac = 0.15)
-linearopt6(T::Type{<:Real}) = linearopt(T, 15, 20, nzfrac = 0.25)
-
-instances_linearopt_all = [
-    linearopt1,
-    linearopt2,
-    linearopt3,
-    linearopt4,
-    linearopt5,
-    linearopt6,
-    ]
-instances_linearopt_few = [
-    linearopt2,
-    linearopt3,
-    linearopt5,
-    linearopt6,
-    ]
-
-function test_linearopt(instance::Function; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
+function test_linearopt(T::Type{<:Real}, instance::Tuple; options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)
-    d = instance(T)
+    d = linearopt(T, instance...)
     r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
     @test r.status == :Optimal
-    return
+    return r
 end
+
+instances_linearopt_fast = [
+    (15, 20, 1.0),
+    (15, 20, 0.25),
+    (50, 100, 1.0),
+    (50, 100, 0.15),
+    ]
+instances_linearopt_slow = [
+    (500, 1000, 0.05),
+    (500, 1000, 1.0),
+    ]
