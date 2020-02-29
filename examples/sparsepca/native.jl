@@ -17,15 +17,15 @@ const MU = Hypatia.ModelUtilities
 function sparsepca(
     T::Type{<:Real},
     p::Int,
-    k::Int;
+    k::Int,
     use_l1ball::Bool = true,
-    noise_ratio::Float64 = 0.0,
+    noise_ratio::Real = 0.0,
     use_linops::Bool = false,
     )
     @assert 0 < k <= p
 
     signal_idxs = Distributions.sample(1:p, k, replace = false) # sample components that will carry the signal
-    if noise_ratio <= 0.0
+    if noise_ratio <= 0
         # noiseless model
         x = zeros(T, p)
         x[signal_idxs] = rand(T, k)
@@ -36,7 +36,7 @@ function sparsepca(
         # simulate some observations with noise
         x = randn(p, 100)
         sigma = x * x'
-        y = rand(Distributions.Normal(0, noise_ratio), k)
+        y = rand(Distributions.Normal(0, Float64(noise_ratio)), k)
         sigma[signal_idxs, signal_idxs] .+= y * y'
         sigma ./= 100
         sigma = T.(sigma)
@@ -120,41 +120,37 @@ function sparsepca(
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, true_obj = true_obj)
 end
 
-sparsepca1(T::Type{<:Real}) = sparsepca(T, 5, 3)
-sparsepca2(T::Type{<:Real}) = sparsepca(T, 5, 3, use_l1ball = false)
-sparsepca3(T::Type{<:Real}) = sparsepca(T, 10, 3)
-sparsepca4(T::Type{<:Real}) = sparsepca(T, 10, 3, use_l1ball = false)
-sparsepca5(T::Type{<:Real}) = sparsepca(T, 10, 3, noise_ratio = 10.0, use_linops = false)
-sparsepca6(T::Type{<:Real}) = sparsepca(T, 10, 3, noise_ratio = 10.0, use_linops = true)
-sparsepca7(T::Type{<:Real}) = sparsepca(T, 10, 3, noise_ratio = 10.0, use_l1ball = false, use_linops = false)
-sparsepca8(T::Type{<:Real}) = sparsepca(T, 10, 3, noise_ratio = 10.0, use_l1ball = false, use_linops = true)
-
-instances_sparsepca_all = [
-    sparsepca1,
-    sparsepca2,
-    sparsepca3,
-    sparsepca4,
-    sparsepca5,
-    sparsepca7,
-    ]
-instances_sparsepca_linops = [
-    sparsepca5,
-    sparsepca6,
-    sparsepca7,
-    sparsepca8,
-    ]
-instances_sparsepca_few = [
-    sparsepca1,
-    sparsepca2,
-    ]
-
-function test_sparsepca(instance::Function; T::Type{<:Real} = Float64, options::NamedTuple = (atol = sqrt(sqrt(eps(T))),), rseed::Int = 1)
+function test_sparsepca(T::Type{<:Real}, instance::Tuple; options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)
-    d = instance(T)
+    d = sparsepca(T, instance...)
     r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
     @test r.status == :Optimal
-    if !isnan(d.true_obj)
-        @test r.primal_obj ≈ d.true_obj atol=options.atol rtol=options.atol
+    if r.status == :Optimal && !isnan(d.true_obj)
+        @test r.primal_obj ≈ d.true_obj atol = 1e-4 rtol = 1e-4
     end
-    return
+    return r
 end
+
+instances_sparsepca_fast = [
+    (5, 3, true, 0, false),
+    (5, 3, false, 0, false),
+    (5, 3, true, 10, false),
+    (5, 3, false, 10, false),
+    (30, 10, true, 0, false),
+    (30, 10, false, 0, false),
+    (30, 10, true, 10, false),
+    (30, 10, false, 10, false),
+    ]
+instances_sparsepca_slow = [
+    # TODO
+    ]
+instances_sparsepca_linops = [
+    (5, 3, true, 0, true),
+    (5, 3, false, 0, true),
+    (5, 3, true, 10, true),
+    (5, 3, false, 10, true),
+    (30, 10, true, 0, true),
+    (30, 10, false, 0, true),
+    (30, 10, true, 10, true),
+    (30, 10, false, 10, true),
+    ]
