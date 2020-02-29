@@ -161,9 +161,9 @@ function densityest(
     return (c = c, A = A, b = b, G = G, h = h, cones = cones)
 end
 
-densityest(T::Type{<:Real}, data_name::Symbol, options...) = densityest(T, eval(data_name), options...)
+densityest(T::Type{<:Real}, data_name::Symbol, args...; kwargs...) = densityest(T, eval(data_name), args...; kwargs...)
 
-densityest(T::Type{<:Real}, num_obs::Int, n::Int, options...) = densityest(T, randn(T, num_obs, n), options...)
+densityest(T::Type{<:Real}, num_obs::Int, n::Int, args...; kwargs...) = densityest(T, randn(T, num_obs, n), args...; kwargs...)
 
 function test_densityest(T::Type{<:Real}, instance::Tuple; options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)
