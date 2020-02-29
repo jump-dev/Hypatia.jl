@@ -3,6 +3,8 @@ Copyright 2019, Chris Coey and contributors
 =#
 
 using Test
+using DataFrames
+using Printf
 import Hypatia
 const SO = Hypatia.Solvers
 
@@ -14,15 +16,17 @@ instance_sets = [
 example_names = [
     "densityest",
     "envelope",
-    # # "expdesign",
+    "expdesign",
     "linearopt",
     "matrixcompletion",
     "matrixregression",
     "maxvolume",
-    # # "polymin",
-    # # "portfolio",
+    "polymin",
+    "portfolio",
     "sparsepca",
     ]
+
+# TODO could use a single TimerOutputs object for all tests and display that at end also
 
 T = Float64
 options = (atol = 10eps(T)^0.25, solver = SO.Solver{T}(
@@ -32,30 +36,62 @@ options = (atol = 10eps(T)^0.25, solver = SO.Solver{T}(
 
 @info("starting native examples tests")
 
-for ex_name in example_names
-    include(joinpath(@__DIR__, "../examples", ex_name, "native.jl"))
+for ex in example_names
+    include(joinpath(@__DIR__, "../examples", ex, "native.jl"))
 end
 
-perf = Dict() # TODO maybe use a dataframe or table instead of dictionary
+perf = DataFrame(
+    example = String[],
+    inst = Int[],
+    inst_data = String[],
+    test_time = Float64[],
+    solve_time = Float64[],
+    iters = Int[],
+    status = Symbol[],
+    prim_obj = T[],
+    dual_obj = T[],
+    )
 
-println("\nprinting: (test_time, solve_time, num_iters, status, primal_obj, dual_obj)\n")
+all_tests_time = time()
 @testset "native examples tests" begin
-    @testset "$ex_name, $inst_set" for ex_name in example_names, inst_set in instance_sets
-        instances = eval(Symbol("instances_", ex_name, "_", inst_set))
-        test_function = eval(Symbol("test_", ex_name))
-        @testset "$ex_name $i $inst" for (i, inst) in enumerate(instances)
-            println(ex_name, " ", i, ": ", inst, " ...")
-            test_time = @elapsed r = test_function(T, inst, options = options)
-            perf[inst] = (test_time, r.solve_time, r.num_iters, r.status, r.primal_obj, r.dual_obj)
-            print(perf[inst], "\n\n")
+    @testset "$example, $inst_set" for example in example_names, inst_set in instance_sets
+        println()
+        test_function = eval(Symbol("test_", example))
+        instances = eval(Symbol("instances_", example, "_", inst_set))
+        @testset "$example $inst: $inst_data" for (inst, inst_data) in enumerate(instances)
+            inst_string = string(inst_data)
+            println(example, " ", inst, ": ", inst_data, " ...")
+            test_time = @elapsed r = test_function(T, inst_data, options = options)
+            push!(perf, (example, inst, inst_string, test_time, r.solve_time, r.num_iters, r.status, r.primal_obj, r.dual_obj))
+            @printf("... %8.2e seconds\n", test_time)
         end
     end
+    println("")
+    @info("native examples tests time: $(time() - all_tests_time) seconds")
+    println("")
+    show(perf, allrows = true, allcols = true)
+    println("\n")
 end
 
-println()
-display(perf)
+# TODO update linear operators tests below when support linear operators again
 
-# TODO currently broken
+# instance_sets = [
+#     "linops",
+#     ]
+#
+# example_names = [
+#     "densityest",
+#     "envelope",
+#     "expdesign",
+#     "linearopt",
+#     "matrixcompletion",
+#     "matrixregression",
+#     "maxvolume",
+#     "polymin",
+#     "portfolio",
+#     "sparsepca",
+#     ]
+
 # tol = sqrt(sqrt(eps(T)))
 # options = (atol = 10 * tol, solver = SO.Solver{T}(
 #     verbose = true, init_use_indirect = true, reduce = false, preprocess = false, iter_limit = 250,
