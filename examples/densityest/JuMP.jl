@@ -7,6 +7,7 @@ see description in native.jl
 using LinearAlgebra
 import Random
 using Test
+import DelimitedFiles
 import MathOptInterface
 const MOI = MathOptInterface
 import JuMP
@@ -15,7 +16,8 @@ import PolyJuMP
 import Hypatia
 const MU = Hypatia.ModelUtilities
 
-include(joinpath(@__DIR__, "data.jl"))
+iris_data = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "iris.txt"))
+cancer_data = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "iris.txt"))
 
 function densityestJuMP(
     X::Matrix{Float64},
@@ -86,10 +88,10 @@ end
 
 densityestJuMP(nobs::Int, n::Int, deg::Int; options...) = densityestJuMP(randn(nobs, n), deg; options...)
 
-densityestJuMP1() = densityestJuMP(iris_data(), 4)
-densityestJuMP2() = densityestJuMP(iris_data(), 6)
-densityestJuMP3() = densityestJuMP(cancer_data(), 4)
-densityestJuMP4() = densityestJuMP(cancer_data(), 6)
+densityestJuMP1() = densityestJuMP(iris_data, 4)
+densityestJuMP2() = densityestJuMP(iris_data, 6)
+densityestJuMP3() = densityestJuMP(cancer_data, 4)
+densityestJuMP4() = densityestJuMP(cancer_data, 6)
 densityestJuMP5() = densityestJuMP(200, 2, 3, use_monomials = false, use_wsos = true, geomean_obj = false)
 densityestJuMP6() = densityestJuMP(200, 2, 3, use_monomials = true, use_wsos = true, geomean_obj = false)
 densityestJuMP7() = densityestJuMP(200, 2, 3, use_monomials = false, use_wsos = false, geomean_obj = false)
