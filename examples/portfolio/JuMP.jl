@@ -14,9 +14,9 @@ const CO = Hypatia.Cones
 
 function portfolioJuMP(
     num_stocks::Int;
-    epipernormeucl_constr::Bool = false,
-    epinorminf_constr::Bool = false,
-    epinorminfdual_constr::Bool = false,
+    epipernormeucl_constr::Bool = false, # add L2 ball constraint, else don't add
+    epinorminf_constr::Bool = false, # add Linfty ball constraint, else don't add
+    epinorminfdual_constr::Bool = false, # add L1 ball constraint, else don't add
     )
     returns = rand(num_stocks)
     sigma_half = randn(num_stocks, num_stocks)

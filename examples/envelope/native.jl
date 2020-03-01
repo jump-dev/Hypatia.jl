@@ -22,7 +22,7 @@ function envelope(
     rand_halfdeg::Int,
     n::Int,
     env_halfdeg::Int,
-    primal_wsos::Bool,
+    primal_wsos::Bool, # use primal formulation, else use dual
     )
     # generate interpolation
     @assert rand_halfdeg <= env_halfdeg

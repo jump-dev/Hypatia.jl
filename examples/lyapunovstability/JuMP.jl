@@ -33,8 +33,8 @@ const CO = Hypatia.Cones
 function lyapunovstabilityJuMP(
     W_rows::Int,
     W_cols::Int = W_rows;
-    use_matrixepipersquare::Bool = true,
-    linear_dynamics::Bool = true,
+    use_matrixepipersquare::Bool = true, # use matrixepipersquare cone, else PSD formulation
+    linear_dynamics::Bool = true, # solve problem 1 in the description, else problem 2
     )
     model = JuMP.Model()
     JuMP.@variable(model, t)

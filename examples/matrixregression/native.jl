@@ -3,8 +3,14 @@ Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
 regularized matrix regression problems
 
+min 1/(2n) * ||Y - X * A||_fro^2 + lam_fro * ||A||_fro + lam_nuc * ||A||_nuc + lam_lass * ||A||_las + lam_glr * ||A||_glr + lamb_glc * ||A||_glc
+- ||.||_fro is the Frobenius norm
+- ||.||_nuc is the nuclear norm
+- ||.||_las is the L1 norm
+- ||.||_glr is the row group lasso penalty (L1 norm of row groups)
+- ||.||_glc  is the column group lasso penalty (L1 norm of column groups)
+
 TODO
-- describe, references
 - generalize for sparse Y,X but make sure qr factorization does not permute
 =#
 
@@ -19,11 +25,11 @@ const CO = Hypatia.Cones
 function matrixregression(
     Y::Matrix{R},
     X::Matrix{R},
-    lam_fro::Real,
-    lam_nuc::Real,
-    lam_las::Real,
-    lam_glr::Real,
-    lam_glc::Real,
+    lam_fro::Real, # penalty on Frobenius norm
+    lam_nuc::Real, # penalty on nuclearn norm
+    lam_las::Real, # penalty on L1 norm
+    lam_glr::Real, # penalty on penalty on row group l1 norm
+    lam_glc::Real, # penalty on penalty on column group l1 norm
     ) where {R <: RealOrComplex{T}} where {T <: Real}
     @assert lam_fro >= 0
     @assert lam_nuc >= 0

@@ -10,10 +10,6 @@ where
     - D is a domain such as a box or an ellipsoid,
     - ℓ is a convex loss function.
 see e.g. Chapter 8 of thesis by G. Hall (2018)
-
-TODO
-- reduce dimension in case of more observations by doing cholesky trick, as in matrixregression example
-- ? for odd degrees WSOS/PSD formulations don't match, modeling issue
 =#
 
 using LinearAlgebra
@@ -177,7 +173,7 @@ function production_data()
 end
 
 shapeconregrJuMP1() = shapeconregrJuMP(production_data()..., 4, mono_dom = MU.FreeDomain{Float64}(4), mono_profile = zeros(Int, 4))
-shapeconregrJuMP2() = shapeconregrJuMP(2, 3, 100, x -> sum(x .^ 3), use_L1_obj = true)
+shapeconregrJuMP2() = shapeconregrJuMP(2, 4, 100, x -> sum(x .^ 3), use_L1_obj = true)
 shapeconregrJuMP3() = shapeconregrJuMP(2, 3, 100, x -> sum(x .^ 4), use_L1_obj = true)
 shapeconregrJuMP4() = shapeconregrJuMP(2, 3, 100, x -> sum(x .^ 3), signal_ratio = 50.0, use_L1_obj = true)
 shapeconregrJuMP5() = shapeconregrJuMP(2, 3, 100, x -> sum(x .^ 4), signal_ratio = 50.0, use_L1_obj = true)
