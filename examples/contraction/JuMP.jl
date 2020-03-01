@@ -15,6 +15,7 @@ import JuMP
 import DynamicPolynomials
 const DP = DynamicPolynomials
 import PolyJuMP
+import MultivariateBases: FixedPolynomialBasis
 import SumOfSquares
 import Hypatia
 const HYP = Hypatia
@@ -26,7 +27,7 @@ function contractionJuMP(
     beta::Float64,
     M_deg::Int,
     delta::Float64;
-    use_wsos::Bool = true,
+    use_matrixwsos::Bool = true, # use wsos matrix cone, else PSD formulation
     )
     n = 2
     dom = MU.FreeDomain{Float64}(n)
@@ -34,9 +35,7 @@ function contractionJuMP(
     M_halfdeg = div(M_deg + 1, 2)
     (U_M, pts_M, Ps_M, _) = MU.interpolate(dom, M_halfdeg, sample = false)
     lagrange_polys = MU.recover_lagrange_polys(pts_M, 2 * M_halfdeg)
-
-    polyjump_basis = SumOfSquares.FixedPolynomialBasis(lagrange_polys)
-    x = DP.variables(lagrange_polys[1])
+    x = DP.variables(lagrange_polys)
 
     # dynamics according to the Moore-Greitzer model
     dx1dt = -x[2] - 1.5 * x[1]^2 - 0.5 * x[1]^3
@@ -44,7 +43,7 @@ function contractionJuMP(
     dynamics = [dx1dt; dx2dt]
 
     model = JuMP.Model()
-    JuMP.@variable(model, polys[1:3], PolyJuMP.Poly(polyjump_basis))
+    JuMP.@variable(model, polys[1:3], PolyJuMP.Poly(FixedPolynomialBasis(lagrange_polys)))
 
     M = [polys[1] polys[2]; polys[2] polys[3]]
     dMdt = [JuMP.dot(DP.differentiate(M[i, j], x), dynamics) for i in 1:n, j in 1:n]
@@ -52,7 +51,7 @@ function contractionJuMP(
     Mdfdx = [sum(M[i, k] * dfdx[k, j] for k in 1:n) for i in 1:n, j in 1:n]
     R = Mdfdx + Mdfdx' + dMdt + beta * M
 
-    if use_wsos
+    if use_matrixwsos
         deg_R = maximum(DP.maxdegree.(R))
         d_R = div(deg_R + 1, 2)
         (U_R, pts_R, Ps_R, _) = MU.interpolate(dom, d_R, sample = true)
@@ -69,10 +68,10 @@ function contractionJuMP(
     return (model = model,)
 end
 
-contractionJuMP1() = contractionJuMP(0.77, 4, 1e-3, use_wsos = true)
-contractionJuMP2() = contractionJuMP(0.77, 4, 1e-3, use_wsos = false)
-contractionJuMP3() = contractionJuMP(0.85, 4, 1e-3, use_wsos = true)
-contractionJuMP4() = contractionJuMP(0.85, 4, 1e-3, use_wsos = false)
+contractionJuMP1() = contractionJuMP(0.77, 4, 1e-3, use_matrixwsos = true)
+contractionJuMP2() = contractionJuMP(0.77, 4, 1e-3, use_matrixwsos = false)
+contractionJuMP3() = contractionJuMP(0.85, 4, 1e-3, use_matrixwsos = true)
+contractionJuMP4() = contractionJuMP(0.85, 4, 1e-3, use_matrixwsos = false)
 
 function test_contractionJuMP(instance::Tuple{Function, Bool}; options, rseed::Int = 1)
     Random.seed!(rseed)

@@ -26,7 +26,7 @@ using Test
 function matrixquadraticJuMP(
     W_rows::Int,
     W_cols::Int;
-    use_matrixepipersquare::Bool = true,
+    use_matrixepipersquare::Bool = true, # use matrixepipersquare cone, else PSD formulation
     )
     C = randn(W_cols, W_rows)
     P = randn(W_rows, W_rows)

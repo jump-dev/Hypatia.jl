@@ -7,9 +7,6 @@ find a density function f maximizing the log likelihood of the observations
     -zᵢ + log(f(Xᵢ)) ≥ 0 ∀ i = 1,...,n
     ∫f = 1
     f ≥ 0
-
-TODO
-- describe all options
 ==#
 
 using LinearAlgebra
@@ -30,7 +27,7 @@ function densityest(
     deg::Int,
     use_wsos::Bool,
     hypogeomean_obj::Bool, # use geomean objective, else sum of logs objective
-    use_hypogeomean::Bool;
+    use_hypogeomean::Bool; # use hypogeomean cone if applicable, else hypoperlog formulation
     sample_factor::Int = 100,
     )
     (num_obs, dim) = size(X)

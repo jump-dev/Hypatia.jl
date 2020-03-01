@@ -12,7 +12,6 @@ where
 see e.g. Chapter 8 of thesis by G. Hall (2018)
 
 TODO
-- reduce dimension in case of more observations by doing cholesky trick, as in matrixregression example
 - ? for odd degrees WSOS/PSD formulations don't match, modeling issue
 =#
 
@@ -211,26 +210,26 @@ function test_shapeconregrJuMP(instance::Tuple{Function, Number}; options, rseed
 end
 
 test_shapeconregrJuMP_all(; options...) = test_shapeconregrJuMP.([
-    (shapeconregrJuMP1, NaN),
+    # (shapeconregrJuMP1, NaN),
     (shapeconregrJuMP2, NaN),
-    (shapeconregrJuMP3, NaN),
-    (shapeconregrJuMP4, NaN),
-    (shapeconregrJuMP5, NaN),
-    (shapeconregrJuMP6, NaN),
-    (shapeconregrJuMP7, NaN),
-    (shapeconregrJuMP8, NaN),
-    (shapeconregrJuMP9, NaN),
-    (shapeconregrJuMP10, NaN),
-    (shapeconregrJuMP11, NaN),
-    (shapeconregrJuMP12, NaN),
-    (shapeconregrJuMP13, NaN),
-    (shapeconregrJuMP14, NaN),
-    (shapeconregrJuMP15, NaN),
-    (shapeconregrJuMP16, NaN),
-    (shapeconregrJuMP17, NaN),
-    (shapeconregrJuMP18, 0.0),
-    (shapeconregrJuMP19, 0.0),
-    (shapeconregrJuMP20, 0.0),
+    # (shapeconregrJuMP3, NaN),
+    # (shapeconregrJuMP4, NaN),
+    # (shapeconregrJuMP5, NaN),
+    # (shapeconregrJuMP6, NaN),
+    # (shapeconregrJuMP7, NaN),
+    # (shapeconregrJuMP8, NaN),
+    # (shapeconregrJuMP9, NaN),
+    # (shapeconregrJuMP10, NaN),
+    # (shapeconregrJuMP11, NaN),
+    # (shapeconregrJuMP12, NaN),
+    # (shapeconregrJuMP13, NaN),
+    # (shapeconregrJuMP14, NaN),
+    # (shapeconregrJuMP15, NaN),
+    # (shapeconregrJuMP16, NaN),
+    # (shapeconregrJuMP17, NaN),
+    # (shapeconregrJuMP18, 0.0),
+    # (shapeconregrJuMP19, 0.0),
+    # (shapeconregrJuMP20, 0.0),
     ], options = options)
 
 test_shapeconregrJuMP(; options...) = test_shapeconregrJuMP.([
