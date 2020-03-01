@@ -10,9 +10,6 @@ where
     - D is a domain such as a box or an ellipsoid,
     - ℓ is a convex loss function.
 see e.g. Chapter 8 of thesis by G. Hall (2018)
-
-TODO
-- ? for odd degrees WSOS/PSD formulations don't match, modeling issue
 =#
 
 using LinearAlgebra
@@ -176,7 +173,7 @@ function production_data()
 end
 
 shapeconregrJuMP1() = shapeconregrJuMP(production_data()..., 4, mono_dom = MU.FreeDomain{Float64}(4), mono_profile = zeros(Int, 4))
-shapeconregrJuMP2() = shapeconregrJuMP(2, 3, 100, x -> sum(x .^ 3), use_L1_obj = true)
+shapeconregrJuMP2() = shapeconregrJuMP(2, 4, 100, x -> sum(x .^ 3), use_L1_obj = true)
 shapeconregrJuMP3() = shapeconregrJuMP(2, 3, 100, x -> sum(x .^ 4), use_L1_obj = true)
 shapeconregrJuMP4() = shapeconregrJuMP(2, 3, 100, x -> sum(x .^ 3), signal_ratio = 50.0, use_L1_obj = true)
 shapeconregrJuMP5() = shapeconregrJuMP(2, 3, 100, x -> sum(x .^ 4), signal_ratio = 50.0, use_L1_obj = true)
@@ -210,26 +207,26 @@ function test_shapeconregrJuMP(instance::Tuple{Function, Number}; options, rseed
 end
 
 test_shapeconregrJuMP_all(; options...) = test_shapeconregrJuMP.([
-    # (shapeconregrJuMP1, NaN),
+    (shapeconregrJuMP1, NaN),
     (shapeconregrJuMP2, NaN),
-    # (shapeconregrJuMP3, NaN),
-    # (shapeconregrJuMP4, NaN),
-    # (shapeconregrJuMP5, NaN),
-    # (shapeconregrJuMP6, NaN),
-    # (shapeconregrJuMP7, NaN),
-    # (shapeconregrJuMP8, NaN),
-    # (shapeconregrJuMP9, NaN),
-    # (shapeconregrJuMP10, NaN),
-    # (shapeconregrJuMP11, NaN),
-    # (shapeconregrJuMP12, NaN),
-    # (shapeconregrJuMP13, NaN),
-    # (shapeconregrJuMP14, NaN),
-    # (shapeconregrJuMP15, NaN),
-    # (shapeconregrJuMP16, NaN),
-    # (shapeconregrJuMP17, NaN),
-    # (shapeconregrJuMP18, 0.0),
-    # (shapeconregrJuMP19, 0.0),
-    # (shapeconregrJuMP20, 0.0),
+    (shapeconregrJuMP3, NaN),
+    (shapeconregrJuMP4, NaN),
+    (shapeconregrJuMP5, NaN),
+    (shapeconregrJuMP6, NaN),
+    (shapeconregrJuMP7, NaN),
+    (shapeconregrJuMP8, NaN),
+    (shapeconregrJuMP9, NaN),
+    (shapeconregrJuMP10, NaN),
+    (shapeconregrJuMP11, NaN),
+    (shapeconregrJuMP12, NaN),
+    (shapeconregrJuMP13, NaN),
+    (shapeconregrJuMP14, NaN),
+    (shapeconregrJuMP15, NaN),
+    (shapeconregrJuMP16, NaN),
+    (shapeconregrJuMP17, NaN),
+    (shapeconregrJuMP18, 0.0),
+    (shapeconregrJuMP19, 0.0),
+    (shapeconregrJuMP20, 0.0),
     ], options = options)
 
 test_shapeconregrJuMP(; options...) = test_shapeconregrJuMP.([
