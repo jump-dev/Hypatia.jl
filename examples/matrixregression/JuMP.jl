@@ -16,11 +16,11 @@ import Hypatia
 function matrixregressionJuMP(
     Y::Matrix{Float64},
     X::Matrix{Float64};
-    lam_fro::Float64 = 0.0,
-    lam_nuc::Float64 = 0.0,
-    lam_las::Float64 = 0.0,
-    lam_glr::Float64 = 0.0,
-    lam_glc::Float64 = 0.0,
+    lam_fro::Float64 = 0.0, # penalty on Frobenius norm
+    lam_nuc::Float64 = 0.0, # penalty on nuclear norm
+    lam_las::Float64 = 0.0, # penalty on l1 norm
+    lam_glr::Float64 = 0.0, # penalty on penalty on row group l1 norm
+    lam_glc::Float64 = 0.0, # penalty on penalty on column group l1 norm
     )
     @assert lam_fro >= 0
     @assert lam_nuc >= 0

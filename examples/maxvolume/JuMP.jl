@@ -2,7 +2,7 @@
 Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
 find maximum volume hypercube with edges parallel to the axes inside a polyhedron
-defined with l_1, l_infty, or l_2 constraints (different to native.jl)
+defined with l_1, l_infty, or l_2 ball constraints (different to native.jl)
 =#
 
 using LinearAlgebra
@@ -14,9 +14,9 @@ using Test
 
 function maxvolumeJuMP(
     n::Int;
-    epipernormeucl_constr::Bool = false,
-    epinorminf_constr::Bool = false,
-    epinorminfdual_constr::Bool = false,
+    epipernormeucl_constr::Bool = false, # add an L2 ball constraint, else don't add
+    epinorminf_constr::Bool = false, # add an Linfty ball constraint, elsle don't add
+    epinorminfdual_constr::Bool = false, # add L1 ball constraint, else don't add
     )
     @assert n > 2
     A = randn(n, n)

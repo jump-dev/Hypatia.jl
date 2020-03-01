@@ -13,7 +13,11 @@ import Hypatia
 const CO = Hypatia.Cones
 using Test
 
-function matrixcompletionJuMP(num_rows::Int, num_cols::Int; nuclearnorm_obj::Bool = true)
+function matrixcompletionJuMP(
+    num_rows::Int,
+    num_cols::Int;
+    nuclearnorm_obj::Bool = true, # use nuclearnorm in the objective, else spectral norm
+    )
     @assert num_rows <= num_cols
     A = randn(num_rows, num_cols)
     (row_idxs, col_idxs, _) = findnz(sprand(Bool, num_rows, num_cols, 0.1))

@@ -2,7 +2,6 @@
 Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
 find maximum volume hypercube with edges parallel to the axes inside a polyhedron
-second-order cone (EpiNormEucl) extended formulation inspired by MOI bridge
 =#
 
 using LinearAlgebra
@@ -27,9 +26,9 @@ end
 function maxvolume(
     T::Type{<:Real},
     n::Int,
-    use_hypogeomean::Bool,
-    use_power::Bool,
-    use_epipersquare::Bool,
+    use_hypogeomean::Bool, # use hypogeomean cone for geomean objective
+    use_power::Bool, # use power cones for geomean objective
+    use_epipersquare::Bool, # use epipersquare cones for geomean objective
     )
     @assert use_hypogeomean + use_power + use_epipersquare == 1
     @assert n > 2

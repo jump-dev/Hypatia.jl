@@ -36,7 +36,7 @@ const MU = Hypatia.ModelUtilities
 function conditionnumJuMP(
     side::Int,
     len_y::Int;
-    use_linmatrixineq::Bool = true,
+    use_linmatrixineq::Bool = true, # use linmatrixineq cone, else PSD formulation
     )
     Mi = [zeros(side, side) for i in 1:len_y]
     for i in eachindex(Mi)

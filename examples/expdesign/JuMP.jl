@@ -26,12 +26,10 @@ function expdesignJuMP(
     p::Int,
     n::Int,
     nmax::Int;
-    logdet_obj::Bool = false,
-    rootdet_obj::Bool = false,
-    geomean_obj::Bool = false,
-    use_logdet::Bool = true,
-    use_rootdet::Bool = true,
-    use_epinorminf::Bool = true,
+    logdet_obj::Bool = false, # use formulation with logdet objective
+    rootdet_obj::Bool = false, # use formulation with rootdet objective
+    geomean_obj::Bool = false, # use formulation with geomean objective
+    use_nat::Bool = true, # use natural for all cones, else extended
     )
     @assert (p > q) && (n > q) && (nmax <= n)
     @assert logdet_obj + geomean_obj + rootdet_obj == 1
@@ -39,7 +37,7 @@ function expdesignJuMP(
 
     model = JuMP.Model()
     JuMP.@variable(model, np[1:p])
-    if use_epinorminf
+    if use_nat
         JuMP.@constraint(model, vcat(nmax / 2, np .- nmax / 2) in MOI.NormInfinityCone(p + 1))
     else
         JuMP.@constraint(model, 0 .<= np)
@@ -49,31 +47,31 @@ function expdesignJuMP(
     JuMP.@constraint(model, sum(np) == n)
     v1 = [Q[i, j] for i in 1:q for j in 1:i] # vectorized Q
 
-    if (logdet_obj && use_logdet) || rootdet_obj || geomean_obj
+    if (logdet_obj && use_nat) || rootdet_obj || geomean_obj
         # hypograph of logdet/rootdet/geomean
         JuMP.@variable(model, hypo)
         JuMP.@objective(model, Max, hypo)
     end
 
-    if (logdet_obj && !use_logdet) || (rootdet_obj && !use_rootdet) || geomean_obj
+    if geomean_obj || !use_nat
         JuMP.@variable(model, lowertri[i in 1:q, j in 1:i])
     end
 
-    if (logdet_obj && !use_logdet) || (rootdet_obj && !use_rootdet)
+    if !geomean_obj && !use_nat
         v2 = vcat([vcat(zeros(i - 1), [lowertri[j, i] for j in i:q], zeros(i - 1), lowertri[i, i]) for i in 1:q]...)
         JuMP.@constraint(model, vcat(v1, v2) in MOI.PositiveSemidefiniteConeTriangle(2q))
     end
 
     if logdet_obj
-        if use_logdet
+        if use_nat
             JuMP.@constraint(model, vcat(hypo, 1.0, v1) in MOI.LogDetConeTriangle(q)) # hypograph of logdet of information matrix
         else
             JuMP.@variable(model, hypo[1:q])
             JuMP.@constraint(model, [i in 1:q], [hypo[i], 1.0, lowertri[i, i]] in MOI.ExponentialCone())
             JuMP.@objective(model, Max, sum(hypo))
-        end # use_logdet
+        end
     elseif rootdet_obj
-        if use_rootdet
+        if use_nat
             JuMP.@constraint(model, vcat(hypo, v1) in MOI.RootDetConeTriangle(q))
         else
             JuMP.@constraint(model, vcat(hypo, [lowertri[i, i] for i in 1:q]) in MOI.GeometricMeanCone(q + 1))
@@ -105,26 +103,26 @@ expdesignJuMP2() = expdesignJuMP(10, 30, 50, 5, logdet_obj = true)
 expdesignJuMP3() = expdesignJuMP(5, 15, 25, 5, logdet_obj = true)
 expdesignJuMP4() = expdesignJuMP(4, 8, 12, 3, logdet_obj = true)
 expdesignJuMP5() = expdesignJuMP(3, 5, 7, 2, logdet_obj = true)
-expdesignJuMP6() = expdesignJuMP(25, 75, 125, 5, use_logdet = false, logdet_obj = true)
-expdesignJuMP7() = expdesignJuMP(10, 30, 50, 5, use_logdet = false, logdet_obj = true)
-expdesignJuMP8() = expdesignJuMP(5, 15, 25, 5, use_logdet = false, logdet_obj = true)
-expdesignJuMP9() = expdesignJuMP(4, 8, 12, 3, use_logdet = false, logdet_obj = true)
-expdesignJuMP10() = expdesignJuMP(3, 5, 7, 2, use_logdet = false, logdet_obj = true)
-expdesignJuMP11() = expdesignJuMP(25, 75, 125, 5, rootdet_obj = true, use_epinorminf = false)
-expdesignJuMP12() = expdesignJuMP(10, 30, 50, 5, rootdet_obj = true, use_epinorminf = false)
-expdesignJuMP13() = expdesignJuMP(5, 15, 25, 5, rootdet_obj = true, use_epinorminf = false)
-expdesignJuMP14() = expdesignJuMP(4, 8, 12, 3, rootdet_obj = true, use_epinorminf = false)
-expdesignJuMP15() = expdesignJuMP(3, 5, 7, 2, rootdet_obj = true, use_epinorminf = false)
+expdesignJuMP6() = expdesignJuMP(25, 75, 125, 5, use_nat = false, logdet_obj = true)
+expdesignJuMP7() = expdesignJuMP(10, 30, 50, 5, use_nat = false, logdet_obj = true)
+expdesignJuMP8() = expdesignJuMP(5, 15, 25, 5, use_nat = false, logdet_obj = true)
+expdesignJuMP9() = expdesignJuMP(4, 8, 12, 3, use_nat = false, logdet_obj = true)
+expdesignJuMP10() = expdesignJuMP(3, 5, 7, 2, use_nat = false, logdet_obj = true)
+expdesignJuMP11() = expdesignJuMP(25, 75, 125, 5, rootdet_obj = true)
+expdesignJuMP12() = expdesignJuMP(10, 30, 50, 5, rootdet_obj = true)
+expdesignJuMP13() = expdesignJuMP(5, 15, 25, 5, rootdet_obj = true)
+expdesignJuMP14() = expdesignJuMP(4, 8, 12, 3, rootdet_obj = true)
+expdesignJuMP15() = expdesignJuMP(3, 5, 7, 2, rootdet_obj = true)
 expdesignJuMP16() = expdesignJuMP(20, 40, 80, 5, geomean_obj = true) # other big size difficult for this formulation
 expdesignJuMP17() = expdesignJuMP(10, 30, 50, 5, geomean_obj = true)
 expdesignJuMP18() = expdesignJuMP(5, 15, 25, 5, geomean_obj = true)
 expdesignJuMP19() = expdesignJuMP(4, 8, 12, 3, geomean_obj = true)
 expdesignJuMP20() = expdesignJuMP(3, 5, 7, 2, geomean_obj = true)
-expdesignJuMP21() = expdesignJuMP(25, 75, 125, 5, rootdet_obj = true, use_rootdet = false)
-expdesignJuMP22() = expdesignJuMP(10, 30, 50, 5, rootdet_obj = true, use_rootdet = false)
-expdesignJuMP23() = expdesignJuMP(5, 15, 25, 5, rootdet_obj = true, use_rootdet = false)
-expdesignJuMP24() = expdesignJuMP(4, 8, 12, 3, rootdet_obj = true, use_rootdet = false)
-expdesignJuMP25() = expdesignJuMP(3, 5, 7, 2, rootdet_obj = true, use_rootdet = false)
+expdesignJuMP21() = expdesignJuMP(25, 75, 125, 5, rootdet_obj = true, use_nat = false)
+expdesignJuMP22() = expdesignJuMP(10, 30, 50, 5, rootdet_obj = true, use_nat = false)
+expdesignJuMP23() = expdesignJuMP(5, 15, 25, 5, rootdet_obj = true, use_nat = false)
+expdesignJuMP24() = expdesignJuMP(4, 8, 12, 3, rootdet_obj = true, use_nat = false)
+expdesignJuMP25() = expdesignJuMP(3, 5, 7, 2, rootdet_obj = true, use_nat = false)
 
 function test_expdesignJuMP(instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)
