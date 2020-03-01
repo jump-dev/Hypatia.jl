@@ -23,12 +23,12 @@ const rt2 = sqrt(2)
 function semidefinitepolyJuMP(
     x::Vector{DP.PolyVar{true}},
     H::Matrix;
-    use_wsos::Bool = true,
-    use_dual::Bool = false,
+    use_wsosmatrix::Bool = true, # use wsosinterppossemideftri cone, else PSD formulation
+    use_dual::Bool = false, # use dual formulation, else primal formulation
     )
     model = JuMP.Model()
 
-    if use_wsos
+    if use_wsosmatrix
         matdim = size(H, 1)
         halfdeg = div(maximum(DP.maxdegree.(H)) + 1, 2)
         n = DP.nvariables(x)
@@ -55,8 +55,8 @@ function semidefinitepolyJuMP(
     return (model = model,)
 end
 
-semidefinitepolyJuMP(x::Vector{DP.PolyVar{true}}, poly::DP.Polynomial; use_wsos::Bool = true, use_dual::Bool = false) =
-    semidefinitepolyJuMP(x, DP.differentiate(poly, x, 2), use_wsos = use_wsos, use_dual = use_dual)
+semidefinitepolyJuMP(x::Vector{DP.PolyVar{true}}, poly::DP.Polynomial; use_wsosmatrix::Bool = true, use_dual::Bool = false) =
+    semidefinitepolyJuMP(x, DP.differentiate(poly, x, 2), use_wsosmatrix = use_wsosmatrix, use_dual = use_dual)
 
 function semidefinitepolyJuMP1()
     DP.@polyvar x
@@ -65,19 +65,19 @@ function semidefinitepolyJuMP1()
         (-x^2 + 2)  (3x^2 - x + 1);
         ]
     MM = M' * M
-    return semidefinitepolyJuMP([x], MM, use_wsos = true)
+    return semidefinitepolyJuMP([x], MM, use_wsosmatrix = true)
 end
 
 function semidefinitepolyJuMP2()
     DP.@polyvar x
     poly = x^4 + 2x^2
-    return semidefinitepolyJuMP([x], poly, use_wsos = true)
+    return semidefinitepolyJuMP([x], poly, use_wsosmatrix = true)
 end
 
 function semidefinitepolyJuMP3()
     DP.@polyvar x y
     poly = (x + y)^4 + (x + y)^2
-    return semidefinitepolyJuMP([x, y], poly, use_wsos = true)
+    return semidefinitepolyJuMP([x, y], poly, use_wsosmatrix = true)
 end
 
 function semidefinitepolyJuMP4()
@@ -89,7 +89,7 @@ function semidefinitepolyJuMP4()
     M = [sum(rand() * Z[l] for l in 1:length(Z)) for i in 1:m, j in 1:m]
     MM = M' * M
     MM = 0.5 * (MM + MM')
-    return semidefinitepolyJuMP(x, MM, use_wsos = true)
+    return semidefinitepolyJuMP(x, MM, use_wsosmatrix = true)
 end
 
 # example modified from https://github.com/JuliaOpt/SumOfSquares.jl/blob/master/test/simplematrixsos.jl
@@ -101,7 +101,7 @@ function semidefinitepolyJuMP5()
         (x^2 - 2x + 2)  x;
         x               x^2;
         ]
-    return semidefinitepolyJuMP([x], P, use_wsos = true)
+    return semidefinitepolyJuMP([x], P, use_wsosmatrix = true)
 end
 
 # example modified from https://github.com/JuliaOpt/SumOfSquares.jl/blob/master/test/choi.jl
@@ -115,7 +115,7 @@ function semidefinitepolyJuMP6()
         (-x * y)        (y^2 + 2z^2)    (-y * z);
         (-x * z)        (-y * z)        (z^2 + 2x^2);
         ] .* (x * y * z)^0 # TODO the (x * y * z)^0 can be removed when https://github.com/JuliaOpt/SumOfSquares.jl/issues/106 is fixed
-    return semidefinitepolyJuMP([x, y, z], P, use_wsos = true)
+    return semidefinitepolyJuMP([x, y, z], P, use_wsosmatrix = true)
 end
 
 # example modified from https://github.com/JuliaOpt/SumOfSquares.jl/blob/master/test/sosdemo9.jl
@@ -126,7 +126,7 @@ function semidefinitepolyJuMP7()
         (x^4 + x^2 * y^2 + x^2 * z^2)                       (x * y * z^2 - x^3 * y - x * y * (y^2 + 2 * z^2));
         (x * y * z^2 - x^3 * y - x * y * (y^2 + 2 * z^2))   (x^2 * y^2 + y^2 * z^2 + (y^2 + 2 * z^2)^2);
         ]
-    return semidefinitepolyJuMP([x, y, z], P, use_wsos = true)
+    return semidefinitepolyJuMP([x, y, z], P, use_wsosmatrix = true)
 end
 
 function test_semidefinitepolyJuMP(instance::Tuple{Function,Bool}; options, rseed::Int = 1)

@@ -28,10 +28,10 @@ function matrixcompletion(
     T::Type{<:Real},
     m::Int,
     n::Int,
-    geomean_constr::Bool = true, # whether to add a constraint on the geomean of unknown values
-    nuclearnorm_obj::Bool = true, # whether to use a nuclear norm as opposed to spectral norm in the objective
-    use_hypogeomean::Bool = true, # natural/extended formulation for geomean constraint
-    use_epinormspectral::Bool = true, # natural/extended formulation for the objective
+    geomean_constr::Bool = true, # add a constraint on the geomean of unknown values, else don't add
+    nuclearnorm_obj::Bool = true, # use nuclear in the objective, else spectral norm
+    use_hypogeomean::Bool = true, # use hypogeomean cone, else power cone formulation
+    use_epinormspectral::Bool = true, # use epinormspectral cone (or its dual), else PSD formulation
     )
     @assert m <= n
     mn = m * n

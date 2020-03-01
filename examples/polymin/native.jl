@@ -28,8 +28,8 @@ function polymin(
     interp_vals::Vector{T},
     Ps::Vector{Matrix{T}},
     true_min::Real,
-    use_primal::Bool,
-    use_wsos::Bool,
+    use_primal::Bool, # solve primal, else solve dual
+    use_wsos::Bool, # use wsosinterpnonnegative cone, else PSD formulation
     use_linops::Bool,
     ) where {T <: Real}
     if use_primal && !use_wsos
