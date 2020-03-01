@@ -75,17 +75,14 @@ function polymin(
             G_full = zeros(T, 0, U)
             for Pk in Ps
                 Lk = size(Pk, 2)
-                @show Lk
                 dk = CO.svec_length(Lk)
                 push!(cones, CO.PosSemidefTri{T, T}(dk))
-                @show dk
                 Gk = Matrix{T}(undef, dk, U)
                 l = 1
                 for i in 1:Lk, j in 1:i
                     @. Gk[l, :] = -Pk[:, i] * Pk[:, j]
                     l += 1
                 end
-                @show Gk
                 MU.vec_to_svec!(Gk, rt2 = sqrt(T(2)))
                 G_full = vcat(G_full, Gk)
             end
@@ -258,7 +255,6 @@ instances_polymin_fast = [
     (Real, 5, 2, true, true, false),
     (Real, 3, 3, false, true, false),
     (Real, 3, 3, false, false, false),
-    (Real, 3, 1, false, false, false),
     (Complex, :abs1d, 1, true, true),
     (Complex, :abs1d, 3, true, true),
     (Complex, :absunit1d, 1, true, true),
@@ -273,11 +269,11 @@ instances_polymin_fast = [
     (Complex, :absball2d, 1, false, true),
     (Complex, :negabsbox2d, 1, false, true),
     (Complex, :denseunit1d, 2, false, true),
-    (Complex, :abs1d, 1, false, false),
-    (Complex, :negabsunit1d, 2, false, false),
-    (Complex, :absball2d, 1, false, false),
-    (Complex, :negabsbox2d, 1, false, false),
-    (Complex, :denseunit1d, 2, false, false),
+    # (Complex, :abs1d, 1, false, false),
+    # (Complex, :negabsunit1d, 2, false, false),
+    # (Complex, :absball2d, 1, false, false),
+    # (Complex, :negabsbox2d, 1, false, false),
+    # (Complex, :denseunit1d, 2, false, false),
     ]
 instances_polymin_slow = [
     # TODO
