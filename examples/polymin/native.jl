@@ -28,8 +28,8 @@ function polymin(
     interp_vals::Vector{T},
     Ps::Vector{Matrix{T}},
     true_min::Real,
-    use_primal::Bool,
-    use_wsos::Bool,
+    use_primal::Bool, # solve primal, else solve dual
+    use_wsos::Bool, # use wsosinterpnonnegative cone, else PSD formulation
     use_linops::Bool,
     ) where {T <: Real}
     if use_primal && !use_wsos
@@ -75,14 +75,17 @@ function polymin(
             G_full = zeros(T, 0, U)
             for Pk in Ps
                 Lk = size(Pk, 2)
+                @show Lk
                 dk = CO.svec_length(Lk)
                 push!(cones, CO.PosSemidefTri{T, T}(dk))
+                @show dk
                 Gk = Matrix{T}(undef, dk, U)
                 l = 1
                 for i in 1:Lk, j in 1:i
                     @. Gk[l, :] = -Pk[:, i] * Pk[:, j]
                     l += 1
                 end
+                @show Gk
                 MU.vec_to_svec!(Gk, rt2 = sqrt(T(2)))
                 G_full = vcat(G_full, Gk)
             end
@@ -222,53 +225,55 @@ function test_polymin(T::Type{<:Real}, instance::Tuple; options::NamedTuple = Na
 end
 
 instances_polymin_fast = [
-    (Real, :butcher, 2, true, true, false),
-    (Real, :caprasse, 4, true, true, false),
-    (Real, :goldsteinprice, 7, true, true, false),
-    (Real, :goldsteinprice_ball, 7, true, true, false),
-    (Real, :goldsteinprice_ellipsoid, 7, true, true, false),
-    (Real, :heart, 2, true, true, false),
-    (Real, :lotkavolterra, 3, true, true, false),
-    (Real, :magnetism7, 2, true, true, false),
-    (Real, :magnetism7_ball, 2, true, true, false),
-    (Real, :motzkin, 3, true, true, false),
-    (Real, :motzkin_ball, 3, true, true, false),
-    (Real, :motzkin_ellipsoid, 3, true, true, false),
-    (Real, :reactiondiffusion, 4, true, true, false),
-    (Real, :robinson, 8, true, true, false),
-    (Real, :robinson_ball, 8, true, true, false),
-    (Real, :rosenbrock, 5, true, true, false),
-    (Real, :rosenbrock_ball, 5, true, true, false),
-    (Real, :schwefel, 2, true, true, false),
-    (Real, :schwefel_ball, 2, true, true, false),
-    (Real, :lotkavolterra, 3, false, true, false),
-    (Real, :motzkin, 3, false, true, false),
-    (Real, :motzkin_ball, 3, false, true, false),
-    (Real, :schwefel, 2, false, true, false),
-    (Real, :lotkavolterra, 3, false, false, false),
-    (Real, :motzkin, 3, false, false, false),
-    (Real, :motzkin_ball, 3, false, false, false),
-    (Real, :schwefel, 2, false, false, false),
-    (Real, 1, 8, true, true, false),
-    (Real, 2, 5, true, true, false),
-    (Real, 3, 3, true, true, false),
-    (Real, 5, 2, true, true, false),
-    (Real, 3, 3, false, true, false),
-    (Real, 3, 3, false, false, false),
-    (Complex, :abs1d, 1, true, true),
-    (Complex, :abs1d, 3, true, true),
-    (Complex, :absunit1d, 1, true, true),
-    (Complex, :absunit1d, 3, true, true),
-    (Complex, :negabsunit1d, 2, true, true),
-    (Complex, :absball2d, 1, true, true),
-    (Complex, :absbox2d, 2, true, true),
-    (Complex, :negabsbox2d, 1, true, true),
-    (Complex, :denseunit1d, 2, true, true),
-    (Complex, :abs1d, 1, false, true),
-    (Complex, :negabsunit1d, 2, false, true),
-    (Complex, :absball2d, 1, false, true),
-    (Complex, :negabsbox2d, 1, false, true),
-    (Complex, :denseunit1d, 2, false, true),
+    # (Real, :butcher, 2, true, true, false),
+    # (Real, :caprasse, 4, true, true, false),
+    # (Real, :goldsteinprice, 7, true, true, false),
+    # (Real, :goldsteinprice_ball, 7, true, true, false),
+    # (Real, :goldsteinprice_ellipsoid, 7, true, true, false),
+    # (Real, :heart, 2, true, true, false),
+    # (Real, :lotkavolterra, 3, true, true, false),
+    # (Real, :magnetism7, 2, true, true, false),
+    # (Real, :magnetism7_ball, 2, true, true, false),
+    # (Real, :motzkin, 3, true, true, false),
+    # (Real, :motzkin_ball, 3, true, true, false),
+    # (Real, :motzkin_ellipsoid, 3, true, true, false),
+    # (Real, :reactiondiffusion, 4, true, true, false),
+    # (Real, :robinson, 8, true, true, false),
+    # (Real, :robinson_ball, 8, true, true, false),
+    # (Real, :rosenbrock, 5, true, true, false),
+    # (Real, :rosenbrock_ball, 5, true, true, false),
+    # (Real, :schwefel, 2, true, true, false),
+    # (Real, :schwefel_ball, 2, true, true, false),
+    # (Real, :lotkavolterra, 3, false, true, false),
+    # (Real, :motzkin, 3, false, true, false),
+    # (Real, :motzkin_ball, 3, false, true, false),
+    # (Real, :schwefel, 2, false, true, false),
+    # (Real, :lotkavolterra, 3, false, false, false),
+    # (Real, :motzkin, 3, false, false, false),
+    # (Real, :motzkin_ball, 3, false, false, false),
+    # (Real, :schwefel, 2, false, false, false),
+    # (Real, 1, 8, true, true, false),
+    # (Real, 2, 5, true, true, false),
+    # (Real, 3, 3, true, true, false),
+    # (Real, 5, 2, true, true, false),
+    # (Real, 3, 3, false, true, false),
+    # (Real, 3, 3, false, false, false),
+    (Real, 3, 1, false, false, false),
+    #
+    # (Complex, :abs1d, 1, true, true),
+    # (Complex, :abs1d, 3, true, true),
+    # (Complex, :absunit1d, 1, true, true),
+    # (Complex, :absunit1d, 3, true, true),
+    # (Complex, :negabsunit1d, 2, true, true),
+    # (Complex, :absball2d, 1, true, true),
+    # (Complex, :absbox2d, 2, true, true),
+    # (Complex, :negabsbox2d, 1, true, true),
+    # (Complex, :denseunit1d, 2, true, true),
+    # (Complex, :abs1d, 1, false, true),
+    # (Complex, :negabsunit1d, 2, false, true),
+    # (Complex, :absball2d, 1, false, true),
+    # (Complex, :negabsbox2d, 1, false, true),
+    # (Complex, :denseunit1d, 2, false, true),
     # (Complex, :abs1d, 1, false, false),
     # (Complex, :negabsunit1d, 2, false, false),
     # (Complex, :absball2d, 1, false, false),

@@ -17,9 +17,9 @@ const CO = Hypatia.Cones
 function portfolio(
     T::Type{<:Real},
     num_stocks::Int,
-    epinormeucl_constr::Bool,
-    epinorminf_constrs::Bool,
-    use_epinorminf::Bool,
+    epinormeucl_constr::Bool, # add L2 ball constraints, else don't add
+    epinorminf_constrs::Bool, # add Linfty ball constraints, else don't add
+    use_epinorminf::Bool, # use epinorminf cone, else nonnegative cones
     use_linops::Bool,
     )
     returns = rand(T, num_stocks)
