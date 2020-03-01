@@ -21,7 +21,10 @@ import Hypatia
 const HYP = Hypatia
 const MU = HYP.ModelUtilities
 
-function regionofattrJuMP(deg::Int; use_WSOS::Bool = true)
+function regionofattrJuMP(
+    deg::Int;
+    use_wsos::Bool = true, # use wsosinterpnonnegative cone, else PSD formulation
+    )
     T = 100.0
     DP.@polyvar x
     DP.@polyvar t
@@ -36,7 +39,7 @@ function regionofattrJuMP(deg::Int; use_WSOS::Bool = true)
     diffwv = w - DP.subs(v, t => 0.0) - 1.0
     vT = DP.subs(v, t => 1.0)
 
-    if use_WSOS
+    if use_wsos
         dom1 = MU.Box{Float64}([-1.0], [1.0]) # just state
         dom2 = MU.Box{Float64}([-1.0, 0.0], [1.0, 1.0]) # state and time
         dom3 = MU.Box{Float64}([-0.01], [0.01]) # state at the end
@@ -70,8 +73,8 @@ function regionofattrJuMP(deg::Int; use_WSOS::Bool = true)
     return (model = model,)
 end
 
-regionofattrJuMP1() = regionofattrJuMP(4, use_WSOS = true)
-regionofattrJuMP2() = regionofattrJuMP(4, use_WSOS = false)
+regionofattrJuMP1() = regionofattrJuMP(4, use_wsos = true)
+regionofattrJuMP2() = regionofattrJuMP(4, use_wsos = false)
 
 function test_regionofattrJuMP(instance::Function; options, rseed::Int = 1)
     Random.seed!(rseed)

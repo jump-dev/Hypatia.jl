@@ -18,8 +18,8 @@ include(joinpath(@__DIR__, "data.jl"))
 function polyminJuMP(
     polyname::Symbol,
     halfdeg::Int;
-    use_wsos::Bool = true,
-    use_primal::Bool = false,
+    use_wsos::Bool = true, # use wsosinterpnonnegative cone, else PSD formulation
+    use_primal::Bool = false, # solve primal, else solve dual
     sample::Bool = true,
     sample_factor::Int = 10,
     rseed::Int = 1,
