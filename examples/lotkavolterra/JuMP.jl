@@ -95,5 +95,5 @@ test_lotkavolterraJuMP_all(; options...) = test_lotkavolterraJuMP.([
     ], options = options)
 
 test_lotkavolterraJuMP(; options...) = test_lotkavolterraJuMP.([
-    # lotkavolterraJuMP1, # TODO fix slowness
+    lotkavolterraJuMP1, # TODO fix slowness
     ], options = options)
