@@ -19,40 +19,77 @@ cone_from_moi(::Type{T}, cone::MOI.PowerCone{T}) where {T <: Real} = Cones.Power
 cone_from_moi(::Type{T}, cone::MOI.DualPowerCone{T}) where {T <: Real} = Cones.Power{T}(T[cone.exponent, 1 - cone.exponent], 1, use_dual = true)
 cone_from_moi(::Type{T}, cone::MOI.GeometricMeanCone) where {T <: Real} = (l = MOI.dimension(cone) - 1; Cones.HypoGeomean{T}(fill(inv(T(l)), l)))
 cone_from_moi(::Type{T}, cone::MOI.RelativeEntropyCone) where {T <: Real} = Cones.EpiSumPerEntropy{T}(MOI.dimension(cone))
-cone_from_moi(::Type{T}, cone::MOI.NormSpectralCone) where {T <: Real} = Cones.EpiNormSpectral{T, T}(cone.row_dim, cone.column_dim)
-cone_from_moi(::Type{T}, cone::MOI.NormNuclearCone) where {T <: Real} = Cones.EpiNormSpectral{T, T}(cone.row_dim, cone.column_dim, use_dual = true)
+cone_from_moi(::Type{T}, cone::MOI.NormSpectralCone) where {T <: Real} = Cones.EpiNormSpectral{T, T}(extrema((cone.row_dim, cone.column_dim))...)
+cone_from_moi(::Type{T}, cone::MOI.NormNuclearCone) where {T <: Real} = Cones.EpiNormSpectral{T, T}(extrema((cone.row_dim, cone.column_dim))..., use_dual = true)
 cone_from_moi(::Type{T}, cone::MOI.PositiveSemidefiniteConeTriangle) where {T <: Real} = Cones.PosSemidefTri{T, T}(MOI.dimension(cone))
 cone_from_moi(::Type{T}, cone::MOI.LogDetConeTriangle) where {T <: Real} = Cones.HypoPerLogdetTri{T, T}(MOI.dimension(cone))
 cone_from_moi(::Type{T}, cone::MOI.RootDetConeTriangle) where {T <: Real} = Cones.HypoRootdetTri{T, T}(MOI.dimension(cone))
 
-# transformations for MOI cones not in svec (scaled lower triangle) form
+# transformations fallbacks
+needs_untransform(::MOI.AbstractVectorSet) = false
+untransform_affine(::MOI.AbstractVectorSet, vals::AbstractVector) = nothing
+permute_affine(::MOI.AbstractVectorSet, idxs::AbstractVector) = idxs
+rescale_affine(::MOI.AbstractVectorSet, vals::AbstractVector) = vals
+rescale_affine(::MOI.AbstractVectorSet, vals::AbstractVector, ::AbstractVector, ::Int) = vals
 
-SvecCone = Union{Cones.PosSemidefTri, Cones.HypoPerLogdetTri, Cones.HypoRootdetTri}
-svec_offset(cone::Cones.PosSemidefTri) = 0
-svec_offset(cone::Cones.HypoPerLogdetTri) = 2
-svec_offset(cone::Cones.HypoRootdetTri) = 1
+# transformations (transposition of matrix) for MOI rectangular matrix cones with matrix of more rows than columns
 
-untransform_cone_vec(cone::Cones.Cone, vec::AbstractVector) = nothing
-untransform_cone_vec(cone::SvecCone, vec::AbstractVector) = (@views ModelUtilities.svec_to_vec!(vec[(1 + svec_offset(cone)):end]))
+NonSquareMatrixCone = Union{MOI.NormSpectralCone, MOI.NormNuclearCone}
 
-const rt2 = sqrt(2)
-svec_scale(dim) = [(i == j ? 1.0 : rt2) for i in 1:round(Int, sqrt(0.25 + 2 * dim) - 0.5) for j in 1:i]
+needs_untransform(cone::NonSquareMatrixCone) = (cone.row_dim > cone.column_dim)
 
-get_affine_data_vov(cone::Cones.Cone, dim::Int) = fill(-1.0, dim)
-function get_affine_data_vov(cone::SvecCone, dim::Int)
-    offset = svec_offset(cone)
-    VGi = vcat(ones(offset), svec_scale(dim - offset))
-    VGi .*= -1
-    return VGi
+function untransform_affine(cone::NonSquareMatrixCone, vals::AbstractVector)
+    vals[2:end] = reshape(vals[2:end], cone.column_dim, cone.row_dim)'
+    # vals[2:end] = reshape(vals[2:end], cone.row_dim, cone.column_dim)'
+    return vals
 end
 
-get_affine_data_vaf(cone::Cones.Cone, fi::MOI.VectorAffineFunction{Float64}, dim::Int) = ([-vt.scalar_term.coefficient for vt in fi.terms], fi.constants)
-function get_affine_data_vaf(cone::SvecCone, fi::MOI.VectorAffineFunction{Float64}, dim::Int)
-    offset = svec_offset(cone)
-    scalevec = vcat(ones(offset), svec_scale(dim - offset))
-    VGi = [-vt.scalar_term.coefficient * scalevec[vt.output_index] for vt in fi.terms]
-    Vhi = scalevec .* fi.constants
-    return (VGi, Vhi)
+function permute_affine(cone::NonSquareMatrixCone, idxs::AbstractVector)
+    if cone.row_dim > cone.column_dim
+        idxs_new = collect(idxs)
+        # transpose the matrix part
+        for k in 2:length(idxs)
+            (col_old, row_old) = divrem(idxs[k] - 2, cone.row_dim)
+            # idxs_new[2 + row_old * cone.column_dim + col_old] = idxs[k]
+            idxs_new[k] = idxs[2 + row_old * cone.column_dim + col_old]
+        end
+        return idxs_new
+    end
+    return idxs
+end
+
+# transformations (svec rescaling) for MOI symmetric matrix cones not in svec (scaled lower triangle) form
+const rt2 = sqrt(2)
+SvecCone = Union{MOI.PositiveSemidefiniteConeTriangle, MOI.LogDetConeTriangle, MOI.RootDetConeTriangle}
+
+svec_offset(::MOI.PositiveSemidefiniteConeTriangle) = 1
+svec_offset(::MOI.RootDetConeTriangle) = 2
+svec_offset(::MOI.LogDetConeTriangle) = 3
+
+needs_untransform(::SvecCone) = true
+
+function untransform_affine(cone::SvecCone, vals::AbstractVector)
+    @views svec_vals = vals[svec_offset(cone):end]
+    ModelUtilities.svec_to_vec!(svec_vals, rt2 = rt2)
+    return vals
+end
+
+function rescale_affine(cone::SvecCone, vals::AbstractVector)
+    vals = collect(vals)
+    @views svec_vals = vals[svec_offset(cone):end]
+    ModelUtilities.vec_to_svec!(svec_vals, rt2 = rt2)
+    return vals
+end
+
+function rescale_affine(cone::SvecCone, vals::AbstractVector, idxs::AbstractVector, q::Int)
+    scal_start = q + svec_offset(cone) - 1
+    for i in eachindex(vals)
+        shifted_idx = idxs[i] - scal_start
+        if shifted_idx > 0 && !MOI.Utilities.is_diagonal_vectorized_index(shifted_idx)
+            vals[i] *= rt2
+        end
+    end
+    return vals
 end
 
 # Hypatia predefined cones

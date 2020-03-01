@@ -79,7 +79,9 @@ function update_grad(cone::Nonnegative)
 end
 
 function update_hess(cone::Nonnegative)
-    @assert cone.grad_updated
+    if !cone.grad_updated
+        update_grad(cone)
+    end
     @. cone.hess.diag = abs2(cone.grad)
     cone.hess_updated = true
     return cone.hess
