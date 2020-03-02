@@ -147,10 +147,10 @@ function test_portfolio_native(instance::Tuple; T::Type{<:Real} = Float64, optio
 end
 
 portfolio_native_fast = [
-    (4, true, false, true, false),
-    (4, false, true, true, false),
-    (4, false, true, false, false),
-    (4, true, true, true, false),
+    (3, true, false, true, false),
+    (3, false, true, true, false),
+    (3, false, true, false, false),
+    (3, true, true, true, false),
     (10, true, false, true, false),
     (10, false, true, true, false),
     (10, false, true, false, false),

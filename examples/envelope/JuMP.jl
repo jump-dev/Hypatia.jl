@@ -7,12 +7,10 @@ see description in examples/envelope/native.jl
 using LinearAlgebra
 import Random
 using Test
-import MathOptInterface
-const MOI = MathOptInterface
 import JuMP
+const MOI = JuMP.MOI
 import Hypatia
-const HYP = Hypatia
-const MU = HYP.ModelUtilities
+const MU = Hypatia.ModelUtilities
 
 function envelope_JuMP(
     T::Type{Float64}, # TODO support generic reals
@@ -37,7 +35,7 @@ function envelope_JuMP(
     model = JuMP.Model()
     JuMP.@variable(model, fpv[j in 1:U]) # values at Fekete points
     JuMP.@objective(model, Max, dot(fpv, w)) # integral over domain (via quadrature)
-    JuMP.@constraint(model, [i in 1:num_polys], polys[:, i] .- fpv in HYP.WSOSInterpNonnegativeCone{Float64, Float64}(U, Ps))
+    JuMP.@constraint(model, [i in 1:num_polys], polys[:, i] .- fpv in Hypatia.WSOSInterpNonnegativeCone{Float64, Float64}(U, Ps))
 
     return (model = model,)
 end

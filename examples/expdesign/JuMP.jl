@@ -16,9 +16,8 @@ if geomean_obj is true, we use a formulation from https://picos-api.gitlab.io/pi
 using LinearAlgebra
 import Random
 using Test
-import MathOptInterface
-const MOI = MathOptInterface
 import JuMP
+const MOI = JuMP.MOI
 import Hypatia
 
 function expdesign_JuMP(

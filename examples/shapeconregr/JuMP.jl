@@ -24,9 +24,8 @@ import SumOfSquares
 import PolyJuMP
 const PJ = PolyJuMP
 import MultivariateBases: FixedPolynomialBasis
-import MathOptInterface
-const MOI = MathOptInterface
 import JuMP
+const MOI = JuMP.MOI
 import Hypatia
 const MU = Hypatia.ModelUtilities
 

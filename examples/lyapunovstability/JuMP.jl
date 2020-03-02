@@ -24,9 +24,8 @@ for the system x_dot = A*x+g(x), norm(g(x)) <= gamma*norm(x)
 using LinearAlgebra
 import Random
 using Test
-import MathOptInterface
-const MOI = MathOptInterface
 import JuMP
+const MOI = JuMP.MOI
 import Hypatia
 const CO = Hypatia.Cones
 

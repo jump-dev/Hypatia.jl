@@ -7,60 +7,49 @@ check a sufficient condition for pointwise membership of vector valued polynomia
 import LinearAlgebra
 import Random
 using Test
-import MathOptInterface
-const MOI = MathOptInterface
 import JuMP
+const MOI = JuMP.MOI
 import Hypatia
-const HYP = Hypatia
-const MU = HYP.ModelUtilities
+const MU = Hypatia.ModelUtilities
 
-const rt2 = sqrt(2)
-
-function secondorderpolyJuMP(polyvec::Function, deg::Int)
+function secondorderpoly_JuMP(
+    T::Type{Float64}, # TODO support generic reals
+    polyvec::Function,
+    deg::Int,
+    is_feas::Bool, # whether model should be primal-dual feasible; only for testing
+    )
     halfdeg = div(deg + 1, 2)
     (U, pts, Ps, _) = MU.interpolate(MU.FreeDomain{Float64}(1), halfdeg, sample = false)
-
     vals = polyvec.(pts)
     l = length(vals[1])
-    cone = HYP.WSOSInterpEpiNormEuclCone{Float64}(l, U, Ps)
+    cone = Hypatia.WSOSInterpEpiNormEuclCone{Float64}(l, U, Ps)
 
     model = JuMP.Model()
     JuMP.@constraint(model, [v[i] for i in 1:l for v in vals] in cone)
 
-    return (model = model,)
+    return (model = model, is_feas = is_feas)
 end
 
-secondorderpolyJuMP1() = secondorderpolyJuMP(x -> [2x^2 + 2, x, x], 2)
-secondorderpolyJuMP2() = secondorderpolyJuMP(x -> [x^2 + 2, x], 2)
-secondorderpolyJuMP3() = secondorderpolyJuMP(x -> [x^2 + 2, x, x], 2)
-secondorderpolyJuMP4() = secondorderpolyJuMP(x -> [2 * x^4 + 8 * x^2 + 4, x + 2 + (x + 1)^2, x], 4)
-secondorderpolyJuMP5() = secondorderpolyJuMP(x -> [x, x^2 + x], 2)
-secondorderpolyJuMP6() = secondorderpolyJuMP(x -> [x, x + 1], 2)
-secondorderpolyJuMP7() = secondorderpolyJuMP(x -> [x^2, x], 2)
-secondorderpolyJuMP8() = secondorderpolyJuMP(x -> [x + 2, x], 2)
-secondorderpolyJuMP9() = secondorderpolyJuMP(x -> [x - 1, x, x], 2)
-
-function test_secondorderpolyJuMP(instance; options)
-    (instance, isfeas) = instance
-    d = instance()
-    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer(; options...))
+function test_secondorderpoly_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
+    Random.seed!(rseed)
+    d = secondorderpoly_JuMP(T, instance...)
+    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer{T}(; options...))
     JuMP.optimize!(d.model)
-    @test JuMP.termination_status(d.model) == (isfeas ? MOI.OPTIMAL : MOI.INFEASIBLE)
+    @test JuMP.termination_status(d.model) == (d.is_feas ? MOI.OPTIMAL : MOI.INFEASIBLE)
+    return d.model.moi_backend.optimizer.model.optimizer.result
 end
 
-test_secondorderpolyJuMP_all(; options...) = test_secondorderpolyJuMP.([
-    (secondorderpolyJuMP1, true),
-    (secondorderpolyJuMP2, true),
-    (secondorderpolyJuMP3, true),
-    (secondorderpolyJuMP4, true),
-    (secondorderpolyJuMP5, false),
-    (secondorderpolyJuMP6, false),
-    (secondorderpolyJuMP7, false),
-    (secondorderpolyJuMP8, false),
-    (secondorderpolyJuMP9, false),
-    ], options = options)
-
-test_secondorderpolyJuMP(; options...) = test_secondorderpolyJuMP.([
-    (secondorderpolyJuMP1, true),
-    (secondorderpolyJuMP6, false),
-    ], options = options)
+secondorderpoly_JuMP_fast = [
+    (x -> [2x^2 + 2, x, x], 2, true),
+    (x -> [x^2 + 2, x], 2, true),
+    (x -> [x^2 + 2, x, x], 2, true),
+    (x -> [2 * x^4 + 8 * x^2 + 4, x + 2 + (x + 1)^2, x], 4, true),
+    (x -> [x, x^2 + x], 2, false),
+    (x -> [x, x + 1], 2, false),
+    (x -> [x^2, x], 2, false),
+    (x -> [x + 2, x], 2, false),
+    (x -> [x - 1, x, x], 2, false),
+    ]
+secondorderpoly_JuMP_slow = [
+    # TODO
+    ]

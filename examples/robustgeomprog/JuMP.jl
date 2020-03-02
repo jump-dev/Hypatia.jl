@@ -14,27 +14,27 @@ where e = exp(1) and d(a, b) = sum_i a_i*log(a_i/b_i) is the relative entropy of
 
 using LinearAlgebra
 using Test
+import Random
 import JuMP
 const MOI = JuMP.MOI
 import Hypatia
-import Random
 
-function robustgeomprogJuMP(
+function robustgeomprog_JuMP(
+    T::Type{Float64}, # TODO support generic reals
     n::Int,
     k::Int;
     B::Matrix{Float64} = randn(k, n), # linear constraint matrix
     alphas::Vector{Float64} = rand(k) .+ 1, # for entropy constraint for set C
     )
     @assert n < k # want some degrees of freedom for v
+
     model = JuMP.Model()
     JuMP.@variable(model, t)
     JuMP.@objective(model, Min, t)
 
     JuMP.@variable(model, c[1:k])
     JuMP.@variable(model, v[1:k])
-
     JuMP.@constraint(model, vcat(t, ℯ * c, v) in MOI.RelativeEntropyCone(1 + 2k))
-
     JuMP.@constraint(model, B' * v .== 0)
 
     # use bounded convex set C of R_+^k excluding origin (note that the entropy constraint already forces c >= 0)
@@ -48,37 +48,24 @@ function robustgeomprogJuMP(
     return (model = model,)
 end
 
-robustgeomprogJuMP1() = robustgeomprogJuMP(3, 4)
-robustgeomprogJuMP2() = robustgeomprogJuMP(3, 10)
-robustgeomprogJuMP3() = robustgeomprogJuMP(6, 10)
-robustgeomprogJuMP4() = robustgeomprogJuMP(6, 20)
-robustgeomprogJuMP5() = robustgeomprogJuMP(15, 40)
-robustgeomprogJuMP6() = robustgeomprogJuMP(40, 60)
-robustgeomprogJuMP7() = robustgeomprogJuMP(50, 100)
-
-function test_robustgeomprogJuMP(instance::Function; options, rseed::Int = 1)
+function test_robustgeomprog_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)
-    d = instance()
-    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer(; options...))
+    d = robustgeomprog_JuMP(T, instance...)
+    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer{T}(; options...))
     JuMP.optimize!(d.model)
     @test JuMP.termination_status(d.model) == MOI.OPTIMAL
-    return
+    return d.model.moi_backend.optimizer.model.optimizer.result
 end
 
-test_robustgeomprogJuMP_all(; options...) = test_robustgeomprogJuMP.([
-    robustgeomprogJuMP1,
-    robustgeomprogJuMP2,
-    robustgeomprogJuMP3,
-    robustgeomprogJuMP4,
-    robustgeomprogJuMP5,
-    robustgeomprogJuMP6,
-    robustgeomprogJuMP7,
-    ], options = options)
-
-test_robustgeomprogJuMP(; options...) = test_robustgeomprogJuMP.([
-    robustgeomprogJuMP1,
-    robustgeomprogJuMP2,
-    robustgeomprogJuMP3,
-    robustgeomprogJuMP4,
-    robustgeomprogJuMP5,
-    ], options = options)
+robustgeomprog_JuMP_fast = [
+    (3, 4),
+    (3, 10),
+    (6, 10),
+    (6, 20),
+    (15, 40),
+    (40, 50),
+    (50, 70),
+    ]
+robustgeomprog_JuMP_slow = [
+    # TODO
+    ]

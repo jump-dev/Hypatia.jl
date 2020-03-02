@@ -9,17 +9,15 @@ Aylward, E.M., Parrilo, P.A. and Slotine, J.J.E
 using LinearAlgebra
 using Test
 import Random
-import MathOptInterface
-const MOI = MathOptInterface
 import JuMP
+const MOI = JuMP.MOI
 import DynamicPolynomials
 const DP = DynamicPolynomials
 import PolyJuMP
 import MultivariateBases: FixedPolynomialBasis
 import SumOfSquares
 import Hypatia
-const HYP = Hypatia
-const MU = HYP.ModelUtilities
+const MU = Hypatia.ModelUtilities
 
 function contraction_JuMP(
     T::Type{Float64}, # TODO support generic reals
@@ -57,8 +55,8 @@ function contraction_JuMP(
         M_gap = [M[i, j](pts_M[u, :]) - (i == j ? delta : 0.0) for i in 1:n for j in 1:i for u in 1:U_M]
         R_gap = [-R[i, j](pts_R[u, :]) - (i == j ? delta : 0.0) for i in 1:n for j in 1:i for u in 1:U_R]
         rt2 = sqrt(2)
-        JuMP.@constraint(model, MU.vec_to_svec!(M_gap, rt2 = rt2, incr = U_M) in HYP.WSOSInterpPosSemidefTriCone{Float64}(n, U_M, Ps_M))
-        JuMP.@constraint(model, MU.vec_to_svec!(R_gap, rt2 = rt2, incr = U_R) in HYP.WSOSInterpPosSemidefTriCone{Float64}(n, U_R, Ps_R))
+        JuMP.@constraint(model, MU.vec_to_svec!(M_gap, rt2 = rt2, incr = U_M) in Hypatia.WSOSInterpPosSemidefTriCone{Float64}(n, U_M, Ps_M))
+        JuMP.@constraint(model, MU.vec_to_svec!(R_gap, rt2 = rt2, incr = U_R) in Hypatia.WSOSInterpPosSemidefTriCone{Float64}(n, U_R, Ps_R))
     else
         PolyJuMP.setpolymodule!(model, SumOfSquares)
         JuMP.@constraint(model, M - Matrix(delta * I, n, n) in JuMP.PSDCone())

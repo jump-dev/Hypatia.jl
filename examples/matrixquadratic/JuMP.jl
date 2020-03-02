@@ -14,8 +14,7 @@ and also to the larger conic constraint [I X'; X Y] in S^{n + m}_+
 =#
 
 import JuMP
-import MathOptInterface
-const MOI = MathOptInterface
+const MOI = JuMP.MOI
 import Hypatia
 CO = Hypatia.Cones
 import Random
