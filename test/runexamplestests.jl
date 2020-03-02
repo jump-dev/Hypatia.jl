@@ -18,16 +18,29 @@ instance_sets = [
 
 model_types = [
     "native",
-    "JuMP",
+    # "JuMP",
+    ]
+
+native_example_names = [
+    "densityest",
+    "envelope",
+    "expdesign",
+    "linearopt",
+    "matrixcompletion",
+    "matrixregression",
+    "maxvolume",
+    "polymin",
+    "portfolio",
+    "sparsepca",
     ]
 
 JuMP_example_names = [
-    "centralpolymat",
+    # "centralpolymat",
     # "conditionnum",
     # "contraction",
     # "densityest",
     # "envelope",
-    # "expdesign",
+    "expdesign",
     # "lotkavolterra",
     # "lyapunovstability",
     # "matrixcompletion",
@@ -45,19 +58,6 @@ JuMP_example_names = [
     # "semidefinitepoly",
     # "shapeconregr",
     # "signomialmin",
-    ]
-
-native_example_names = [
-    "densityest",
-    # "envelope",
-    # "expdesign",
-    # "linearopt",
-    # "matrixcompletion",
-    # "matrixregression",
-    # "maxvolume",
-    # "polymin",
-    # "portfolio",
-    # "sparsepca",
     ]
 
 T = Float64
@@ -102,7 +102,7 @@ perf = DataFrame(
 all_tests_time = time()
 @testset "examples tests" begin
     for mod_type in model_types
-        println("\nstarting $mod_type examples\n")
+        println("\nstarting $mod_type examples")
         example_names = eval(Symbol(mod_type, "_example_names"))
         options = eval(Symbol(mod_type, "_options"))
         for ex_name in example_names, inst_set in instance_sets
@@ -131,7 +131,7 @@ end
 # TODO delete:
 # @testset "JuMP examples" begin
 #     @testset "centralpolymat" begin test_centralpolymatJuMP(; tol_rel_opt = 1e-6, tol_abs_opt = 1e-6, tol_feas = 1e-7, options...) end
-#     @testset "conditionnum" begin test_conditionnumJuMP(; tol_rel_opt = 1e-7, tol_abs_opt = 1e-7, tol_feas = 1e-7, options...) end
+#     @testset "conditionnum" begin test_conditionnum_JuMP(; tol_rel_opt = 1e-7, tol_abs_opt = 1e-7, tol_feas = 1e-7, options...) end
 #     @testset "contraction" begin test_contractionJuMP(; tol_rel_opt = 1e-4, tol_abs_opt = 1e-4, tol_feas = 1e-4, options...) end
 #     @testset "densityest" begin test_densityestJuMP(; tol_rel_opt = 1e-5, tol_abs_opt = 1e-5, tol_feas = 1e-6, options...) end
 #     @testset "envelope" begin test_envelopeJuMP(; tol_rel_opt = 1e-6, tol_abs_opt = 1e-7, tol_feas = 1e-7, options...) end

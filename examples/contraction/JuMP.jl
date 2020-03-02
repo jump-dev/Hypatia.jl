@@ -21,13 +21,12 @@ import Hypatia
 const HYP = Hypatia
 const MU = HYP.ModelUtilities
 
-const rt2 = sqrt(2)
-
-function contractionJuMP(
+function contraction_JuMP(
+    T::Type{Float64}, # TODO support generic reals
     beta::Float64,
     M_deg::Int,
-    delta::Float64;
-    use_matrixwsos::Bool = true, # use wsos matrix cone, else PSD formulation
+    delta::Float64,
+    use_matrixwsos::Bool, # use wsos matrix cone, else PSD formulation
     )
     n = 2
     dom = MU.FreeDomain{Float64}(n)
@@ -57,42 +56,33 @@ function contractionJuMP(
         (U_R, pts_R, Ps_R, _) = MU.interpolate(dom, d_R, sample = true)
         M_gap = [M[i, j](pts_M[u, :]) - (i == j ? delta : 0.0) for i in 1:n for j in 1:i for u in 1:U_M]
         R_gap = [-R[i, j](pts_R[u, :]) - (i == j ? delta : 0.0) for i in 1:n for j in 1:i for u in 1:U_R]
-        JuMP.@constraint(model, MU.vec_to_svec!(M_gap, rt2 = sqrt(2), incr = U_M) in HYP.WSOSInterpPosSemidefTriCone{Float64}(n, U_M, Ps_M))
-        JuMP.@constraint(model, MU.vec_to_svec!(R_gap, rt2 = sqrt(2), incr = U_R) in HYP.WSOSInterpPosSemidefTriCone{Float64}(n, U_R, Ps_R))
+        rt2 = sqrt(2)
+        JuMP.@constraint(model, MU.vec_to_svec!(M_gap, rt2 = rt2, incr = U_M) in HYP.WSOSInterpPosSemidefTriCone{Float64}(n, U_M, Ps_M))
+        JuMP.@constraint(model, MU.vec_to_svec!(R_gap, rt2 = rt2, incr = U_R) in HYP.WSOSInterpPosSemidefTriCone{Float64}(n, U_R, Ps_R))
     else
         PolyJuMP.setpolymodule!(model, SumOfSquares)
         JuMP.@constraint(model, M - Matrix(delta * I, n, n) in JuMP.PSDCone())
         JuMP.@constraint(model, -R - Matrix(delta * I, n, n) in JuMP.PSDCone())
     end
 
-    return (model = model,)
+    return (model = model, is_feas = (beta < 0.81))
 end
 
-contractionJuMP1() = contractionJuMP(0.77, 4, 1e-3, use_matrixwsos = true)
-contractionJuMP2() = contractionJuMP(0.77, 4, 1e-3, use_matrixwsos = false)
-contractionJuMP3() = contractionJuMP(0.85, 4, 1e-3, use_matrixwsos = true)
-contractionJuMP4() = contractionJuMP(0.85, 4, 1e-3, use_matrixwsos = false)
-
-function test_contractionJuMP(instance::Tuple{Function, Bool}; options, rseed::Int = 1)
+function test_contraction_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)
-    (instance, is_feas) = instance
-    d = instance()
-    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer(; options...))
+    d = contraction_JuMP(T, instance...)
+    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer{T}(; options...))
     JuMP.optimize!(d.model)
-    @test JuMP.termination_status(d.model) == (is_feas ? MOI.OPTIMAL : MOI.INFEASIBLE)
-    return
+    @test JuMP.termination_status(d.model) == (d.is_feas ? MOI.OPTIMAL : MOI.INFEASIBLE)
+    return d.model.moi_backend.optimizer.model.optimizer.result
 end
 
-test_contractionJuMP_all(; options...) = test_contractionJuMP.([
-    (contractionJuMP1, true),
-    (contractionJuMP2, true),
-    (contractionJuMP3, false),
-    (contractionJuMP4, false),
-    ], options = options)
-
-test_contractionJuMP(; options...) = test_contractionJuMP.([
-    (contractionJuMP1, true),
-    (contractionJuMP2, true),
-    (contractionJuMP3, false),
-    (contractionJuMP4, false),
-    ], options = options)
+contraction_JuMP_fast = [
+    (0.77, 4, 1e-3, true),
+    (0.77, 4, 1e-3, false),
+    (0.85, 4, 1e-3, true),
+    (0.85, 4, 1e-3, false),
+    ]
+contraction_JuMP_slow = [
+    # TODO
+    ]
