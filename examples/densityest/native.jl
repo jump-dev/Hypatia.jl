@@ -21,7 +21,7 @@ const MU = Hypatia.ModelUtilities
 iris_data = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "iris.txt"))
 cancer_data = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "iris.txt"))
 
-function densityest(
+function densityest_native(
     T::Type{<:Real},
     X::Matrix{<:Real},
     deg::Int,
@@ -158,19 +158,19 @@ function densityest(
     return (c = c, A = A, b = b, G = G, h = h, cones = cones)
 end
 
-densityest(T::Type{<:Real}, data_name::Symbol, args...; kwargs...) = densityest(T, eval(data_name), args...; kwargs...)
+densityest_native(T::Type{<:Real}, data_name::Symbol, args...; kwargs...) = densityest_native(T, eval(data_name), args...; kwargs...)
 
-densityest(T::Type{<:Real}, num_obs::Int, n::Int, args...; kwargs...) = densityest(T, randn(T, num_obs, n), args...; kwargs...)
+densityest_native(T::Type{<:Real}, num_obs::Int, n::Int, args...; kwargs...) = densityest_native(T, randn(T, num_obs, n), args...; kwargs...)
 
-function test_densityest(T::Type{<:Real}, instance::Tuple; options::NamedTuple = NamedTuple(), rseed::Int = 1)
+function test_densityest_native(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)
-    d = densityest(T, instance...)
+    d = densityest_native(T, instance...)
     r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
     @test r.status == :Optimal
     return r
 end
 
-instances_densityest_fast = [
+densityest_native_fast = [
     (:iris_data, 4, true, true, true),
     (:iris_data, 4, false, true, true),
     (:iris_data, 4, true, false, true),
@@ -188,6 +188,6 @@ instances_densityest_fast = [
     (20, 2, 4, true, false, true),
     (20, 2, 4, true, true, false),
     ]
-instances_densityest_slow = [
+densityest_native_slow = [
     # TODO
     ]

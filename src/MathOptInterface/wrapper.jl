@@ -41,7 +41,7 @@ mutable struct Optimizer{T <: Real} <: MOI.AbstractOptimizer
         opt = new{T}()
         opt.use_dense_model = use_dense_model
         opt.test_certificates = test_certificates
-        opt.solver = Solvers.Solver{T}(; solver_options...)
+        opt.solver = Solvers.Solver{T}(; solver_options...) # TODO allow passing in a solver?
         return opt
     end
 end
