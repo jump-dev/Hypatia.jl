@@ -39,6 +39,8 @@ function test_secondorderpoly_JuMP(instance::Tuple; T::Type{<:Real} = Float64, o
     return d.model.moi_backend.optimizer.model.optimizer.result
 end
 
+error("TODO need to put these polys in a dictionary and pass in a symbol to the instance tuples because can't print this data")
+
 secondorderpoly_JuMP_fast = [
     (x -> [2x^2 + 2, x, x], 2, true),
     (x -> [x^2 + 2, x], 2, true),

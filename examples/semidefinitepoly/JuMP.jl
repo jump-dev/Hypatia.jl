@@ -16,6 +16,8 @@ import PolyJuMP
 import Hypatia
 const MU = Hypatia.ModelUtilities
 
+error("TODO need to put these polys in dictionaries so as not to pollute namespace")
+
 const rt2 = sqrt(2)
 
 function semidefinitepolyJuMP(
@@ -33,6 +35,8 @@ function semidefinitepolyJuMP(
         dom = MU.FreeDomain{Float64}(n)
         (U, pts, Ps, _) = MU.interpolate(dom, halfdeg, sample_factor = 20, sample = true)
         mat_wsos_cone = Hypatia.WSOSInterpPosSemidefTriCone{Float64}(matdim, U, Ps, use_dual)
+
+        error("TODO can we use the svec rescale with offset function below. also use full z in obj so don't need the 2.0?")
 
         if use_dual
             JuMP.@variable(model, z[i in 1:n, 1:i, 1:U])
