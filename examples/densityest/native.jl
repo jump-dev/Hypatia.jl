@@ -23,7 +23,7 @@ cancer_data = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "iris.txt"))
 
 function densityest_native(
     T::Type{<:Real},
-    X::Matrix{<:Real},
+    X::Matrix{T},
     deg::Int,
     use_wsos::Bool,
     hypogeomean_obj::Bool, # use geomean objective, else sum of logs objective

@@ -13,7 +13,7 @@ using Test
 import Hypatia
 const CO = Hypatia.Cones
 
-function linearopt(
+function linearopt_native(
     T::Type{<:Real},
     m::Int,
     n::Int,
@@ -33,21 +33,21 @@ function linearopt(
     return (c = c, A = A, b = b, G = G, h = h, cones = cones)
 end
 
-function test_linearopt(T::Type{<:Real}, instance::Tuple; options::NamedTuple = NamedTuple(), rseed::Int = 1)
+function test_linearopt_native(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)
-    d = linearopt(T, instance...)
+    d = linearopt_native(T, instance...)
     r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
     @test r.status == :Optimal
     return r
 end
 
-instances_linearopt_fast = [
+linearopt_native_fast = [
     (15, 20, 1.0),
     (15, 20, 0.25),
     (50, 100, 1.0),
     (50, 100, 0.15),
     ]
-instances_linearopt_slow = [
+linearopt_native_slow = [
     (500, 1000, 0.05),
     (500, 1000, 1.0),
     ]

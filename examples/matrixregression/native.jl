@@ -22,7 +22,7 @@ import Hypatia
 import Hypatia.RealOrComplex
 const CO = Hypatia.Cones
 
-function matrixregression(
+function matrixregression_native(
     Y::Matrix{R},
     X::Matrix{R},
     lam_fro::Real, # penalty on Frobenius norm
@@ -241,7 +241,7 @@ function matrixregression(
         )
 end
 
-function matrixregression(
+function matrixregression_native(
     R::Type{<:RealOrComplex{T}},
     n::Int,
     m::Int,
@@ -263,13 +263,13 @@ function matrixregression(
     Y = Matrix{R}(Y)
     X = Matrix{R}(X)
 
-    return matrixregression(Y, X, args...)
+    return matrixregression_native(Y, X, args...)
 end
 
-function test_matrixregression(T::Type{<:Real}, instance::Tuple; options::NamedTuple = NamedTuple(), rseed::Int = 1)
+function test_matrixregression_native(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)
     R = (instance[1] == Complex) ? Complex{T} : T
-    d = matrixregression(R, instance[2:end]...)
+    d = matrixregression_native(R, instance[2:end]...)
     r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
     @test r.status == :Optimal
     if r.status == :Optimal
@@ -292,7 +292,7 @@ function test_matrixregression(T::Type{<:Real}, instance::Tuple; options::NamedT
     return r
 end
 
-instances_matrixregression_fast = [
+matrixregression_native_fast = [
     (Real, 5, 3, 4, 0, 0, 0, 0, 0),
     (Real, 5, 3, 4, 0.1, 0.1, 0.1, 0.2, 0.2),
     (Real, 5, 3, 4, 0, 0.1, 0.1, 0, 0),
@@ -318,6 +318,6 @@ instances_matrixregression_fast = [
     (Complex, 100, 8, 12, 0.1, 0.1, 0.1, 0.2, 0.2),
     (Complex, 100, 8, 12, 0, 0.1, 0.1, 0, 0),
     ]
-instances_matrixregression_slow = [
+matrixregression_native_slow = [
     # TODO
     ]

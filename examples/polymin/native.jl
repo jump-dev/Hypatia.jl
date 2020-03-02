@@ -1,10 +1,10 @@
 #=
 Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
-polyminreal: formulates and solves the real polynomial optimization problem for a given polynomial; see:
+polymin real: formulates and solves the real polynomial optimization problem for a given polynomial; see:
 D. Papp and S. Yildiz. Sum-of-squares optimization without semidefinite programming.
 
-polymincomplex: minimizes a real-valued complex polynomial over a domain defined by real-valued complex polynomials
+polymin complex: minimizes a real-valued complex polynomial over a domain defined by real-valued complex polynomials
 
 TODO
 - generalize ModelUtilities interpolation code for complex polynomials space
@@ -24,7 +24,7 @@ const MU = Hypatia.ModelUtilities
 include(joinpath(@__DIR__, "data.jl"))
 
 # real polynomials
-function polymin(
+function polymin_native(
     interp_vals::Vector{T},
     Ps::Vector{Matrix{T}},
     true_min::Real,
@@ -100,7 +100,7 @@ function polymin(
 end
 
 # use a predefined real poly from data.jl
-function polymin(
+function polymin_native(
     T::Type{<:Real},
     poly_name::Symbol,
     halfdeg::Int,
@@ -111,11 +111,11 @@ function polymin(
     sample = (length(x) >= 5) || !isa(dom, MU.Box)
     (U, pts, Ps, _) = MU.interpolate(dom, halfdeg, sample = sample, sample_factor = sample_factor)
     interp_vals = T[fn(pts[j, :]...) for j in 1:U]
-    return polymin(interp_vals, Ps, true_min, args...)
+    return polymin_native(interp_vals, Ps, true_min, args...)
 end
 
 # generate a random real poly in n variables of half degree halfdeg and use a box domain
-function polymin(
+function polymin_native(
     T::Type{<:Real},
     n::Int,
     halfdeg::Int,
@@ -126,11 +126,11 @@ function polymin(
     (U, pts, Ps, _) = MU.interpolate(dom, halfdeg, sample = (n >= 5), sample_factor = sample_factor)
     interp_vals = randn(T, U)
     true_min = T(NaN) # TODO could get an upper bound by evaluating at random points in domain
-    return polymin(interp_vals, Ps, true_min, args...)
+    return polymin_native(interp_vals, Ps, true_min, args...)
 end
 
 # real-valued complex polynomials
-function polymin(
+function polymin_native(
     R::Type{Complex{T}},
     poly_name::Symbol,
     halfdeg::Int,
@@ -209,10 +209,10 @@ function polymin(
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, true_min = true_min)
 end
 
-function test_polymin(T::Type{<:Real}, instance::Tuple; options::NamedTuple = NamedTuple(), rseed::Int = 1)
+function test_polymin_native(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)
     R = (instance[1] == Complex) ? Complex{T} : T
-    d = polymin(R, instance[2:end]...)
+    d = polymin_native(R, instance[2:end]...)
     r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
     @test r.status == :Optimal
     if r.status == :Optimal && !isnan(d.true_min)
@@ -221,7 +221,7 @@ function test_polymin(T::Type{<:Real}, instance::Tuple; options::NamedTuple = Na
     return r
 end
 
-instances_polymin_fast = [
+polymin_native_fast = [
     (Real, :butcher, 2, true, true, false),
     (Real, :caprasse, 4, true, true, false),
     (Real, :goldsteinprice, 7, true, true, false),
@@ -275,10 +275,10 @@ instances_polymin_fast = [
     # (Complex, :negabsbox2d, 1, false, false),
     # (Complex, :denseunit1d, 2, false, false),
     ]
-instances_polymin_slow = [
+polymin_native_slow = [
     # TODO
     ]
-instances_polymin_linops = [
+polymin_native_linops = [
     (Real, :butcher, 2, true, true, true),
     (Real, :caprasse, 4, true, true, true),
     (Real, :goldsteinprice, 7, true, true, true),

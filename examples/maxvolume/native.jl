@@ -23,7 +23,7 @@ function log_floor(n::Integer)
     log_floor(n, zero(n))
 end
 
-function maxvolume(
+function maxvolume_native(
     T::Type{<:Real},
     n::Int,
     use_hypogeomean::Bool, # use hypogeomean cone for geomean objective
@@ -135,15 +135,15 @@ function maxvolume(
     return (c = c, A = A, b = b, G = G, h = h, cones = cones)
 end
 
-function test_maxvolume(T::Type{<:Real}, instance::Tuple; options::NamedTuple = NamedTuple(), rseed::Int = 1)
+function test_maxvolume_native(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)
-    d = maxvolume(T, instance...)
+    d = maxvolume_native(T, instance...)
     r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
     @test r.status == :Optimal
     return r
 end
 
-instances_maxvolume_fast = [
+maxvolume_native_fast = [
     (3, true, false, false),
     (3, false, true, false),
     (3, false, false, true),
@@ -154,6 +154,6 @@ instances_maxvolume_fast = [
     (25, false, true, false),
     (25, false, false, true),
     ]
-instances_maxvolume_slow = [
+maxvolume_native_slow = [
     # TODO
     ]
