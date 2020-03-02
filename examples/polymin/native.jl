@@ -127,7 +127,7 @@ function polymin_native(
         error("PSD formulation is not implemented yet")
     end
 
-    (n, f, gs, g_halfdegs, true_min) = complex_polys[poly_name]
+    (n, f, gs, g_halfdegs, true_min) = complex_poly_data[poly_name]
 
     # generate interpolation
     # TODO use more numerically-stable basis for columns

@@ -14,7 +14,7 @@ import Hypatia
 const MU = Hypatia.ModelUtilities
 
 # real polynomials
-function real_polys(polyname::Symbol, T::DataType = Float64)
+function real_poly_data(polyname::Symbol, T::DataType = Float64)
     if polyname == :butcher
         DP.@polyvar x[1:6]
         f = x[6]*x[2]^2+x[5]*x[3]^2-x[1]*x[4]^2+x[4]^3+x[4]^2-1/3*x[1]+4/3*x[4]
@@ -130,7 +130,7 @@ function get_interp_data(
     halfdeg::Int;
     sample_factor::Int = 100,
     )
-    (x, fn, dom, true_min) = real_polys(poly_name, T)
+    (x, fn, dom, true_min) = real_poly_data(poly_name, T)
     sample = (length(x) >= 5) || !isa(dom, MU.Box)
     (U, pts, Ps, _) = MU.interpolate(dom, halfdeg, sample = sample, sample_factor = sample_factor)
     interp_vals = T[fn(pts[j, :]...) for j in 1:U]
@@ -153,7 +153,7 @@ end
 
 # merge with real polys dictionary when complex polyvars are allowed in DynamicPolynomials: https://github.com/JuliaAlgebra/MultivariatePolynomials.jl/issues/11
 # real-valued complex polynomials
-complex_polys = Dict{Symbol, NamedTuple}(
+complex_poly_data = Dict{Symbol, NamedTuple}(
     :abs1d => (n = 1,
         f = (z -> 1 + sum(abs2, z)),
         gs = [],

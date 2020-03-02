@@ -15,12 +15,9 @@ import PolyJuMP
 import Hypatia
 const MU = Hypatia.ModelUtilities
 
-iris_data = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "iris.txt"))
-cancer_data = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "iris.txt"))
-
 function densityest_JuMP(
     T::Type{Float64}, # TODO support generic reals
-    X::Matrix{T},
+    X::Matrix{Float64},
     deg::Int,
     use_monomial_space::Bool, # use variables in monomial space, else interpolation space
     use_wsos::Bool; # use WSOS cone formulation, else PSD formulation
@@ -93,16 +90,19 @@ function test_densityest_JuMP(instance::Tuple; T::Type{<:Real} = Float64, option
     return d.model.moi_backend.optimizer.model.optimizer.result
 end
 
+iris_data = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "iris.txt"))
+cancer_data = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "cancer.txt"))
+
 densityest_JuMP_fast = [
     (:iris_data, 4, true, true),
+    (:iris_data, 5, true, true),
+    (:iris_data, 6, true, true),
     (:iris_data, 4, true, false),
     (:iris_data, 4, false, true),
-    (:iris_data, 4, false, false),
-    (:iris_data, 6, true, true),
     (:iris_data, 6, false, true),
+    (:iris_data, 4, false, false),
     (:cancer_data, 4, true, true),
     (:cancer_data, 4, false, true),
-    (:cancer_data, 6, false, true),
     (200, 2, 2, true, true),
     (200, 2, 2, true, false),
     (200, 2, 2, false, true),

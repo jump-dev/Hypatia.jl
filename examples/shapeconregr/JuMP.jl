@@ -14,50 +14,46 @@ see e.g. Chapter 8 of thesis by G. Hall (2018)
 
 using LinearAlgebra
 import Random
-import Distributions
 using Test
-import DataFrames
-import CSV
-import DynamicPolynomials
-const DP = DynamicPolynomials
-import SumOfSquares
-import PolyJuMP
-const PJ = PolyJuMP
-import MultivariateBases: FixedPolynomialBasis
+import DelimitedFiles
+import Distributions
 import JuMP
 const MOI = JuMP.MOI
+import DynamicPolynomials
+const DP = DynamicPolynomials
+import PolyJuMP
+import SumOfSquares
+import MultivariateBases: FixedPolynomialBasis
 import Hypatia
 const MU = Hypatia.ModelUtilities
 
-const rt2 = sqrt(2)
-
-function shapeconregrJuMP(
+function shapeconregr_JuMP(
+    T::Type{Float64}, # TODO support generic reals
     X::Matrix{Float64},
     y::Vector{Float64},
-    deg::Int;
-    n::Int = size(X, 2),
-    use_wsos::Bool = true, # use WSOS cone formulation, else SDP formulation
-    use_L1_obj::Bool = false, # in objective function use L1 norm, else L2 norm
-    sample::Bool = true,
-    mono_dom::MU.Domain = MU.Box{Float64}(-ones(n), ones(n)),
+    deg::Int,
+    use_wsos::Bool, # use WSOS cone formulation, else SDP formulation
+    use_L1_obj::Bool, # in objective function use L1 norm, else L2 norm
+    is_fit_exact::Bool;
+    mono_dom::MU.Domain = MU.Box{Float64}(-ones(size(X, 2)), ones(size(X, 2))),
     conv_dom::MU.Domain = mono_dom,
-    mono_profile::Vector{Int} = ones(Int, n),
+    mono_profile::Vector{Int} = ones(Int, size(X, 2)),
     conv_profile::Int = 1,
     )
-    @assert n == size(X, 2)
+    n = size(X, 2)
     num_points = size(X, 1)
 
     (regressor_points, _) = MU.get_interp_pts(MU.FreeDomain{Float64}(n), deg, sample_factor = 50)
     lagrange_polys = MU.recover_lagrange_polys(regressor_points, deg)
     model = JuMP.Model()
-    JuMP.@variable(model, regressor, PJ.Poly(FixedPolynomialBasis(lagrange_polys)))
+    JuMP.@variable(model, regressor, PolyJuMP.Poly(FixedPolynomialBasis(lagrange_polys)))
     x = DP.variables(lagrange_polys)
 
     if use_wsos
         # monotonicity
         if !all(iszero, mono_profile)
             gradient_halfdeg = div(deg, 2)
-            (mono_U, mono_points, mono_Ps, _) = MU.interpolate(mono_dom, gradient_halfdeg, sample = sample, sample_factor = 50)
+            (mono_U, mono_points, mono_Ps, _) = MU.interpolate(mono_dom, gradient_halfdeg, sample = true, sample_factor = 50)
             mono_wsos_cone = Hypatia.WSOSInterpNonnegativeCone{Float64, Float64}(mono_U, mono_Ps)
             for j in 1:n
                 if !iszero(mono_profile[j])
@@ -70,7 +66,7 @@ function shapeconregrJuMP(
         # convexity
         if !iszero(conv_profile)
             hessian_halfdeg = div(deg - 1, 2)
-            (conv_U, conv_points, conv_Ps, _) = MU.interpolate(conv_dom, hessian_halfdeg, sample = sample, sample_factor = 50)
+            (conv_U, conv_points, conv_Ps, _) = MU.interpolate(conv_dom, hessian_halfdeg, sample = true, sample_factor = 50)
             conv_wsos_cone = Hypatia.WSOSInterpPosSemidefTriCone{Float64}(n, conv_U, conv_Ps)
             hessian = DP.differentiate(regressor, x, 2)
             hessian_interp = [hessian[i, j](conv_points[u, :]) for i in 1:n for j in 1:i for u in 1:conv_U]
@@ -105,6 +101,7 @@ function shapeconregrJuMP(
     JuMP.@variable(model, z)
     JuMP.@objective(model, Min, z)
     norm_vec = [y[i] - regressor(X[i, :]) for i in 1:num_points]
+
     if use_L1_obj || (num_points <= num_vars)
         obj_cone = (use_L1_obj ? MOI.NormOneCone(1 + num_points) : MOI.SecondOrderCone(1 + num_points))
         JuMP.@constraint(model, vcat(z, norm_vec) in obj_cone)
@@ -121,127 +118,83 @@ function shapeconregrJuMP(
         JuMP.@constraint(model, vcat(z, coef_R * vcat(variables, 1)) in MOI.SecondOrderCone(2 + num_vars))
     end
 
-    return (model = model,)
+    return (model = model, is_fit_exact = is_fit_exact)
 end
 
-function shapeconregrJuMP(
+shapeconregr_JuMP(T::Type{Float64}, data_name::Symbol, args...; kwargs...) = shapeconregr_JuMP(T, eval(data_name)..., args...; kwargs...)
+
+function shapeconregr_JuMP(
+    T::Type{Float64}, # TODO support generic reals
     n::Int,
-    deg::Int,
     num_points::Int,
-    f::Function;
-    signal_ratio::Float64 = 0.0,
-    xmin::Float64 = -1.0,
-    xmax::Float64 = 1.0,
-    model_kwargs...
+    func::Symbol,
+    signal_ratio::Real,
+    args...;
+    xmin::Real = -1,
+    xmax::Real = 1,
+    kwargs...
     )
     X = rand(Distributions.Uniform(xmin, xmax), num_points, n)
-    y = [f(X[p, :]) for p in 1:num_points]
-
+    f = shapeconregr_data[func]
+    y = T[f(X[p, :]) for p in 1:num_points]
     if !iszero(signal_ratio)
-        noise = randn(num_points)
+        noise = randn(T, num_points)
         noise .*= norm(y) / sqrt(signal_ratio) / norm(noise)
         y .+= noise
     end
-
-    return shapeconregrJuMP(X, y, deg; model_kwargs...)
+    return shapeconregr_JuMP(T, X, y, args...; kwargs...)
 end
 
-# see https://arxiv.org/pdf/1509.08165v1.pdf (example 3)
-# data obtained from http://www.nber.org/data/nbprod2005.html
-error("TODO slow, so save to a txt and use readdlm")
-
-function production_data()
-    df = CSV.read(joinpath(@__DIR__, "data", "naics5811.csv"), copycols = true)
-    DataFrames.deleterows!(df, 157) # outlier
-    # number of non production employees
-    df[!, :prode] .= df[!, :emp] - df[!, :prode]
-    # group by industry codes
-    df_aggr = DataFrames.aggregate(DataFrames.dropmissing(df), :naics, sum)
-
-    # four covariates: non production employees, production worker hours, production workers, total capital stock
-    # use the log transform of covariates
-    X = log.(convert(Matrix{Float64}, df_aggr[!, [:prode_sum, :prodh_sum, :prodw_sum, :cap_sum]])) # n = 4
-    # value of shipment
-    y = convert(Vector{Float64}, df_aggr[!, :vship_sum])
-    # mean center
-    X .-= sum(X, dims = 1) ./ size(X, 1)
-    y .-= sum(y) / length(y)
-    # normalize to unit norm
-    X ./= norm.(eachcol(X))'
-    y /= norm(y)
-
-    return (X, y)
-end
-
-error("TODO need to put these polys in dictionaries so as not to pollute namespace")
-
-shapeconregrJuMP1() = shapeconregrJuMP(production_data()..., 4, mono_dom = MU.FreeDomain{Float64}(4), mono_profile = zeros(Int, 4))
-shapeconregrJuMP2() = shapeconregrJuMP(2, 4, 100, x -> sum(x .^ 3), use_L1_obj = true)
-shapeconregrJuMP3() = shapeconregrJuMP(2, 3, 100, x -> sum(x .^ 4), use_L1_obj = true)
-shapeconregrJuMP4() = shapeconregrJuMP(2, 3, 100, x -> sum(x .^ 3), signal_ratio = 50.0, use_L1_obj = true)
-shapeconregrJuMP5() = shapeconregrJuMP(2, 3, 100, x -> sum(x .^ 4), signal_ratio = 50.0, use_L1_obj = true)
-shapeconregrJuMP6() = shapeconregrJuMP(2, 3, 100, x -> exp(norm(x)))
-shapeconregrJuMP7() = shapeconregrJuMP(2, 3, 100, x -> sum(x .^ 4), signal_ratio = 50.0)
-shapeconregrJuMP8() = shapeconregrJuMP(2, 4, 100, x -> -inv(1 + exp(-10.0 * norm(x))), mono_dom = MU.Box{Float64}(zeros(2), ones(2)))
-shapeconregrJuMP9() = shapeconregrJuMP(2, 4, 100, x -> -inv(1 + exp(-10.0 * norm(x))), signal_ratio = 10.0, mono_dom = MU.Box{Float64}(zeros(2), ones(2)))
-shapeconregrJuMP10() = shapeconregrJuMP(2, 4, 100, x -> exp(norm(x)))
-shapeconregrJuMP11() = shapeconregrJuMP(2, 5, 100, x -> exp(norm(x)), signal_ratio = 10.0, mono_dom = MU.Box{Float64}(0.5 * ones(2), 2 * ones(2)))
-shapeconregrJuMP12() = shapeconregrJuMP(2, 5, 100, x -> exp(norm(x)), signal_ratio = 1.0, mono_dom = MU.Box{Float64}(0.5 * ones(2), 2 * ones(2)), use_wsos = false)
-shapeconregrJuMP13() = shapeconregrJuMP(2, 6, 100, x -> exp(norm(x)), signal_ratio = 1.0, use_L1_obj = true)
-shapeconregrJuMP14() = shapeconregrJuMP(5, 2, 50, x -> exp(norm(x)), use_L1_obj = true, use_wsos = false)
-shapeconregrJuMP15() = shapeconregrJuMP(2, 3, 100, x -> exp(norm(x)), use_L1_obj = true, use_wsos = false)
-shapeconregrJuMP16() = shapeconregrJuMP(5, 3, 100, x -> sum(x .^ 2), signal_ratio = 9.0) # see https://arxiv.org/pdf/1509.08165v1.pdf (example 1)
-shapeconregrJuMP17() = shapeconregrJuMP(5, 4, 100, x -> (5x[1] + 0.5x[2] + x[3])^2 + sqrt(x[4]^2 + x[5]^2), signal_ratio = 9.0) # see https://arxiv.org/pdf/1509.08165v1.pdf (example 5)
-shapeconregrJuMP18() = shapeconregrJuMP(2, 4, 100, x -> sum((x .+ 1) .^ 4), signal_ratio = 0.0)
-shapeconregrJuMP19() = shapeconregrJuMP(3, 4, 100, x -> sum((0.5 * x .+ 1) .^ 3), signal_ratio = 0.0)
-shapeconregrJuMP20() = shapeconregrJuMP(3, 6, 100, x -> sum((x .+ 1) .^ 5 .- 2), signal_ratio = 0.0)
-
-function test_shapeconregrJuMP(instance::Tuple{Function, Number}; options, rseed::Int = 1)
+function test_shapeconregr_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)
-    (instance, true_obj) = instance
-    d = instance()
-    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer(; options...))
+    d = shapeconregr_JuMP(T, instance...)
+    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer{T}(; options...))
     JuMP.optimize!(d.model)
     @test JuMP.termination_status(d.model) == MOI.OPTIMAL
-    if !isnan(true_obj)
-        @test JuMP.objective_value(d.model) ≈ true_obj atol = 1e-4 rtol = 1e-4
+    r = d.model.moi_backend.optimizer.model.optimizer.result
+    if d.is_fit_exact
+        @test r.primal_obj ≈ 0 atol = 1e-4 rtol = 1e-4
     end
-    return
+    return r
 end
 
-test_shapeconregrJuMP_all(; options...) = test_shapeconregrJuMP.([
-    (shapeconregrJuMP1, NaN),
-    (shapeconregrJuMP2, NaN),
-    (shapeconregrJuMP3, NaN),
-    (shapeconregrJuMP4, NaN),
-    (shapeconregrJuMP5, NaN),
-    (shapeconregrJuMP6, NaN),
-    (shapeconregrJuMP7, NaN),
-    (shapeconregrJuMP8, NaN),
-    (shapeconregrJuMP9, NaN),
-    (shapeconregrJuMP10, NaN),
-    (shapeconregrJuMP11, NaN),
-    (shapeconregrJuMP12, NaN),
-    (shapeconregrJuMP13, NaN),
-    (shapeconregrJuMP14, NaN),
-    (shapeconregrJuMP15, NaN),
-    (shapeconregrJuMP16, NaN),
-    (shapeconregrJuMP17, NaN),
-    (shapeconregrJuMP18, 0.0),
-    (shapeconregrJuMP19, 0.0),
-    (shapeconregrJuMP20, 0.0),
-    ], options = options)
+naics5811_data = begin
+    Xy = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "naics5811.txt"))
+    (Xy[:, 1:(end - 1)], Xy[:, end])
+end
 
-test_shapeconregrJuMP(; options...) = test_shapeconregrJuMP.([
-    (shapeconregrJuMP1, NaN),
-    (shapeconregrJuMP2, NaN),
-    (shapeconregrJuMP4, NaN),
-    (shapeconregrJuMP6, NaN),
-    (shapeconregrJuMP12, NaN),
-    (shapeconregrJuMP15, NaN),
-    (shapeconregrJuMP16, NaN),
-    (shapeconregrJuMP17, NaN),
-    (shapeconregrJuMP18, 0.0),
-    (shapeconregrJuMP19, 0.0),
-    (shapeconregrJuMP20, 0.0),
-    ], options = options)
+shapeconregr_data = Dict(
+    :func1 => (x -> sum(x .^ 2)),
+    :func2 => (x -> sum(x .^ 3)),
+    :func3 => (x -> sum(x .^ 4)),
+    :func4 => (x -> exp(norm(x))),
+    :func5 => (x -> -inv(1 + exp(-10 * norm(x)))),
+    :func6 => (x -> sum((x .+ 1) .^ 4)),
+    :func7 => (x -> sum((x / 2 .+ 1) .^ 3)),
+    :func8 => (x -> sum((x .+ 1) .^ 5 .- 2)),
+    :func9 => (x -> (5x[1] + 0.5x[2] + x[3])^2 + sqrt(x[4]^2 + x[5]^2)),
+    )
+
+shapeconregr_JuMP_fast = [
+    (:naics5811_data, 4, true, false, false),
+    (2, 50, :func1, 5, 3, true, false, false),
+    (2, 50, :func2, 5, 3, true, true, false),
+    (2, 50, :func3, 5, 3, false, false, false),
+    (2, 50, :func4, 5, 3, false, true, false),
+    (2, 50, :func5, 5, 4, true, false, false),
+    (2, 50, :func6, 5, 4, true, true, false),
+    (2, 50, :func7, 5, 4, false, false, false),
+    (2, 50, :func8, 5, 4, false, true, false),
+    (4, 150, :func6, 0, 4, true, false, true),
+    (4, 150, :func6, 0, 4, true, true, true),
+    (4, 150, :func7, 0, 4, true, false, true),
+    (4, 150, :func7, 0, 4, true, true, true),
+    (4, 150, :func7, 0, 4, false, false, true),
+    (3, 150, :func8, 0, 6, true, false, true),
+    (3, 150, :func8, 0, 6, true, true, true),
+    (5, 100, :func9, 9, 4, true, false, false),
+    ]
+shapeconregr_JuMP_slow = [
+    (4, 150, :func6, 0, 4, false, false, true),
+    (3, 150, :func8, 0, 6, false, false, true),
+    ]
