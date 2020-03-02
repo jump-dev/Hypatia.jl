@@ -47,7 +47,7 @@ JuMP_example_names = [
     # "matrixquadratic",
     # "matrixregression",
     # "maxvolume",
-    "muconvexity",
+    # "muconvexity",
     # "nearestpsd",
     # "polymin",
     # "polynorm",
@@ -55,7 +55,7 @@ JuMP_example_names = [
     # "regionofattr",
     # "robustgeomprog",
     # "secondorderpoly",
-    # "semidefinitepoly",
+    "semidefinitepoly",
     # "shapeconregr",
     # "signomialmin",
     ]

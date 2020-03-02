@@ -8,9 +8,8 @@ using LinearAlgebra
 import Random
 using Test
 import DelimitedFiles
-import MathOptInterface
-const MOI = MathOptInterface
 import JuMP
+const MOI = JuMP.MOI
 import DynamicPolynomials
 import PolyJuMP
 import Hypatia

@@ -8,9 +8,8 @@ using LinearAlgebra
 using SparseArrays
 import Random
 using Test
-import MathOptInterface
-const MOI = MathOptInterface
 import JuMP
+const MOI = JuMP.MOI
 import Hypatia
 
 function matrixregression_JuMP(

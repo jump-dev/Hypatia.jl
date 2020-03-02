@@ -27,9 +27,8 @@ we make F_0 and M_0 positive definite to ensure existence of a feasible solution
 using LinearAlgebra
 import Random
 using Test
-import MathOptInterface
-const MOI = MathOptInterface
 import JuMP
+const MOI = JuMP.MOI
 import Hypatia
 
 function conditionnum_JuMP(

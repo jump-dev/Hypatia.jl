@@ -10,10 +10,8 @@ using LinearAlgebra
 import Random
 using Test
 import Hypatia
-import Hypatia.BlockMatrix
 const CO = Hypatia.Cones
 const MU = Hypatia.ModelUtilities
-const HYP = Hypatia
 
 function expdesign_native(
     T::Type{<:Real},

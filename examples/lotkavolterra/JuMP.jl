@@ -10,9 +10,8 @@ TODO
 using LinearAlgebra
 import GSL: sf_gamma
 using Test
-import MathOptInterface
-const MOI = MathOptInterface
 import JuMP
+const MOI = JuMP.MOI
 import DynamicPolynomials
 const DP = DynamicPolynomials
 import SemialgebraicSets

@@ -7,8 +7,7 @@ compute a gram matrix of a polynomial, minimizing its log-determinant or root-de
 import DynamicPolynomials
 const DP = DynamicPolynomials
 import JuMP
-import MathOptInterface
-const MOI = MathOptInterface
+const MOI = JuMP.MOI
 import Hypatia
 import Random
 using LinearAlgebra

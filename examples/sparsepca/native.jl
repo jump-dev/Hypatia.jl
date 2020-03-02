@@ -18,9 +18,9 @@ function sparsepca_native(
     T::Type{<:Real},
     p::Int,
     k::Int,
-    use_use_epinorminfdual::Bool = true, # use dual of epinorminf cone, else nonnegative cones
-    noise_ratio::Real = 0.0,
-    use_linops::Bool = false,
+    use_epinorminfdual::Bool, # use dual of epinorminf cone, else nonnegative cones
+    noise_ratio::Real,
+    use_linops::Bool,
     )
     @assert 0 < k <= p
 
@@ -55,7 +55,7 @@ function sparsepca_native(
     hpsd = zeros(T, dimx)
     cones = CO.Cone{T}[CO.PosSemidefTri{T, T}(dimx)]
 
-    if use_use_epinorminfdual
+    if use_epinorminfdual
         # l1 cone
         # double off-diagonals, which are already scaled by rt2
         if use_linops

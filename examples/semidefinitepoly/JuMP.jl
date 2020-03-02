@@ -7,16 +7,14 @@ and use this procedure to check whether a polynomial is globally convex
 
 using Test
 import Random
-import MathOptInterface
-const MOI = MathOptInterface
 import JuMP
+const MOI = JuMP.MOI
 import DynamicPolynomials
 const DP = DynamicPolynomials
 import SumOfSquares
 import PolyJuMP
 import Hypatia
-const HYP = Hypatia
-const MU = HYP.ModelUtilities
+const MU = Hypatia.ModelUtilities
 
 const rt2 = sqrt(2)
 
@@ -34,7 +32,7 @@ function semidefinitepolyJuMP(
         n = DP.nvariables(x)
         dom = MU.FreeDomain{Float64}(n)
         (U, pts, Ps, _) = MU.interpolate(dom, halfdeg, sample_factor = 20, sample = true)
-        mat_wsos_cone = HYP.WSOSInterpPosSemidefTriCone{Float64}(matdim, U, Ps, use_dual)
+        mat_wsos_cone = Hypatia.WSOSInterpPosSemidefTriCone{Float64}(matdim, U, Ps, use_dual)
 
         if use_dual
             JuMP.@variable(model, z[i in 1:n, 1:i, 1:U])
