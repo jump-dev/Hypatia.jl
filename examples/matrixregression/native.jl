@@ -23,6 +23,7 @@ import Hypatia.RealOrComplex
 const CO = Hypatia.Cones
 
 function matrixregression_native(
+    T::Type{<:Real},
     Y::Matrix{R},
     X::Matrix{R},
     lam_fro::Real, # penalty on Frobenius norm
@@ -30,7 +31,7 @@ function matrixregression_native(
     lam_las::Real, # penalty on L1 norm
     lam_glr::Real, # penalty on penalty on row group l1 norm
     lam_glc::Real, # penalty on penalty on column group l1 norm
-    ) where {R <: RealOrComplex{T}} where {T <: Real}
+    ) where {R <: RealOrComplex{T}}
     @assert lam_fro >= 0
     @assert lam_nuc >= 0
     @assert lam_las >= 0
@@ -242,7 +243,8 @@ function matrixregression_native(
 end
 
 function matrixregression_native(
-    R::Type{<:RealOrComplex{T}},
+    T::Type{<:Real},
+    R_type::Type{<:Union{Real, Complex}},
     n::Int,
     m::Int,
     p::Int,
@@ -250,10 +252,11 @@ function matrixregression_native(
     A_max_rank::Int = div(m, 2) + 1,
     A_sparsity::Real = max(0.2, inv(sqrt(m * p))),
     Y_noise::Real = 0.01,
-    ) where {T <: Real}
+    )
     @assert p >= m
     @assert 1 <= A_max_rank <= m
     @assert 0 < A_sparsity <= 1
+    R = (R_type == Complex ? Complex{T} : T)
 
     A_left = sprandn(R, p, A_max_rank, A_sparsity)
     A_right = sprandn(R, A_max_rank, m, A_sparsity)
@@ -263,17 +266,17 @@ function matrixregression_native(
     Y = Matrix{R}(Y)
     X = Matrix{R}(X)
 
-    return matrixregression_native(Y, X, args...)
+    return matrixregression_native(T, Y, X, args...)
 end
 
 function test_matrixregression_native(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)
-    R = (instance[1] == Complex) ? Complex{T} : T
-    d = matrixregression_native(R, instance[2:end]...)
+    d = matrixregression_native(T, instance...)
     r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
     @test r.status == :Optimal
     if r.status == :Optimal
         # check objective value is correct
+        R = eltype(d.Y)
         if R <: Complex
             A_opt_real = reshape(r.x[2:(1 + 2 * d.p * d.m)], 2 * d.p, d.m)
             A_opt = zeros(R, d.p, d.m)

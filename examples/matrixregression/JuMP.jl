@@ -13,14 +13,15 @@ const MOI = MathOptInterface
 import JuMP
 import Hypatia
 
-function matrixregressionJuMP(
-    Y::Matrix{Float64},
-    X::Matrix{Float64};
-    lam_fro::Float64 = 0.0, # penalty on Frobenius norm
-    lam_nuc::Float64 = 0.0, # penalty on nuclear norm
-    lam_las::Float64 = 0.0, # penalty on l1 norm
-    lam_glr::Float64 = 0.0, # penalty on penalty on row group l1 norm
-    lam_glc::Float64 = 0.0, # penalty on penalty on column group l1 norm
+function matrixregression_JuMP(
+    T::Type{Float64}, # TODO support generic reals
+    Y::Matrix{T},
+    X::Matrix{T},
+    lam_fro::Real, # penalty on Frobenius norm
+    lam_nuc::Real, # penalty on nuclear norm
+    lam_las::Real, # penalty on l1 norm
+    lam_glr::Real, # penalty on penalty on row group l1 norm
+    lam_glc::Real, # penalty on penalty on column group l1 norm
     )
     @assert lam_fro >= 0
     @assert lam_nuc >= 0
@@ -73,15 +74,16 @@ function matrixregressionJuMP(
     return (model = model,)
 end
 
-function matrixregressionJuMP(
+function matrixregression_JuMP(
+    T::Type{Float64}, # TODO support generic reals
     n::Int,
     m::Int,
-    p::Int;
+    p::Int,
+    args...;
     A_max_rank::Int = div(m, 2) + 1,
     A_sparsity::Real = max(0.2, inv(sqrt(m * p))),
     Y_noise::Real = 0.01,
-    model_kwargs...
-    ) where {T <: Real}
+    )
     @assert p >= m
     @assert 1 <= A_max_rank <= m
     @assert 0 < A_sparsity <= 1
@@ -95,45 +97,32 @@ function matrixregressionJuMP(
     Y = Matrix(Y)
     X = Matrix(X)
 
-    return matrixregressionJuMP(Y, X; model_kwargs...)
+    return matrixregression_JuMP(T, Y, X, args...)
 end
 
-matrixregressionJuMP1() = matrixregressionJuMP(5, 3, 4)
-matrixregressionJuMP2() = matrixregressionJuMP(5, 3, 4, lam_fro = 0.1, lam_nuc = 0.1, lam_las = 0.1, lam_glc = 0.2, lam_glr = 0.2)
-matrixregressionJuMP3() = matrixregressionJuMP(3, 4, 5)
-matrixregressionJuMP4() = matrixregressionJuMP(3, 4, 5, lam_fro = 0.1, lam_nuc = 0.1, lam_las = 0.1, lam_glc = 0.2, lam_glr = 0.2)
-matrixregressionJuMP5() = matrixregressionJuMP(100, 8, 12)
-matrixregressionJuMP6() = matrixregressionJuMP(100, 8, 12, lam_fro = 0.0, lam_nuc = 0.4, lam_las = 1.0, lam_glc = 0.1, lam_glr = 2.0)
-matrixregressionJuMP7() = matrixregressionJuMP(100, 8, 12, lam_fro = 0.0, lam_nuc = 0.0, lam_las = 0.0, lam_glc = 0.2, lam_glr = 1.5)
-matrixregressionJuMP8() = matrixregressionJuMP(15, 10, 20)
-matrixregressionJuMP9() = matrixregressionJuMP(15, 10, 20, lam_fro = 0.0, lam_nuc = 0.4, lam_las = 1.0, lam_glc = 0.1, lam_glr = 2.0)
-matrixregressionJuMP10() = matrixregressionJuMP(15, 10, 20, lam_fro = 0.0, lam_nuc = 0.0, lam_las = 0.0, lam_glc = 0.2, lam_glr = 1.5)
-
-function test_matrixregressionJuMP(instance::Function; options, rseed::Int = 1)
+function test_matrixregression_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)
-    d = instance()
-    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer(; options...))
+    d = matrixregression_JuMP(T, instance...)
+    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer{T}(; options...))
     JuMP.optimize!(d.model)
     @test JuMP.termination_status(d.model) == MOI.OPTIMAL
-    return
+    return d.model.moi_backend.optimizer.model.optimizer.result
 end
 
-test_matrixregressionJuMP_all(; options...) = test_matrixregressionJuMP.([
-    matrixregressionJuMP1,
-    matrixregressionJuMP2,
-    matrixregressionJuMP3,
-    matrixregressionJuMP4,
-    matrixregressionJuMP5,
-    matrixregressionJuMP6,
-    matrixregressionJuMP7,
-    matrixregressionJuMP8,
-    matrixregressionJuMP9,
-    matrixregressionJuMP10,
-    ], options = options)
-
-test_matrixregressionJuMP(; options...) = test_matrixregressionJuMP.([
-    matrixregressionJuMP1,
-    matrixregressionJuMP2,
-    matrixregressionJuMP3,
-    matrixregressionJuMP4,
-    ], options = options)
+matrixregression_JuMP_fast = [
+    (5, 3, 4, 0, 0, 0, 0, 0),
+    (5, 3, 4, 0.1, 0.1, 0.1, 0.2, 0.2),
+    (5, 3, 4, 0, 0.1, 0.1, 0, 0),
+    (3, 4, 5, 0, 0, 0, 0, 0),
+    (3, 4, 5, 0.1, 0.1, 0.1, 0.2, 0.2),
+    (3, 4, 5, 0, 0.1, 0.1, 0, 0),
+    (15, 10, 20, 0, 0, 0, 0, 0),
+    (15, 10, 20, 0.1, 0.1, 0.1, 0.2, 0.2),
+    (15, 10, 20, 0, 0.1, 0.1, 0, 0),
+    (100, 8, 12, 0, 0, 0, 0, 0),
+    (100, 8, 12, 0.1, 0.1, 0.1, 0.2, 0.2),
+    (100, 8, 12, 0, 0.1, 0.1, 0, 0),
+    ]
+matrixregression_JuMP_slow = [
+    # TODO
+    ]

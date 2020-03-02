@@ -17,8 +17,8 @@ instance_sets = [
     ]
 
 model_types = [
-    "native",
-    # "JuMP",
+    # "native",
+    "JuMP",
     ]
 
 native_example_names = [
@@ -40,14 +40,14 @@ JuMP_example_names = [
     # "contraction",
     # "densityest",
     # "envelope",
-    "expdesign",
+    # "expdesign",
     # "lotkavolterra",
     # "lyapunovstability",
     # "matrixcompletion",
     # "matrixquadratic",
     # "matrixregression",
     # "maxvolume",
-    # "muconvexity",
+    "muconvexity",
     # "nearestpsd",
     # "polymin",
     # "polynorm",
