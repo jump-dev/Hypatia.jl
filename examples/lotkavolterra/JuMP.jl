@@ -1,8 +1,10 @@
 #=
 Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
-TODO reference paper for model
-TODO options to use standard PSD cone formulation vs interpolation-based WSOS cone formulation
+TODO
+- reference paper for model
+- add options to use standard PSD cone formulation vs interpolation-based WSOS cone formulation
+- add random data generation
 =#
 
 using LinearAlgebra
@@ -18,9 +20,6 @@ const SAS = SemialgebraicSets
 import SumOfSquares
 import PolyJuMP
 import Hypatia
-const HYP = Hypatia
-const CO = HYP.Cones
-const MU = HYP.ModelUtilities
 
 function integrate_ball_monomial(mon, n)
     as = DP.exponents(mon)
@@ -35,7 +34,9 @@ end
 
 integrate_ball(p, n) = sum(DP.coefficient(t) * integrate_ball_monomial(t, n) for t in DP.terms(p))
 
-function lotkavolterraJuMP()
+function lotkavolterra_JuMP(
+    T::Type{Float64}, # TODO support generic reals
+    )
     # parameters
     deg = 4 # degree
     n = 4 # number of species
@@ -80,20 +81,17 @@ function lotkavolterraJuMP()
     return (model = model,)
 end
 
-lotkavolterraJuMP1() = lotkavolterraJuMP()
-
-function test_lotkavolterraJuMP(instance::Function; options)
-    d = instance()
-    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer(; options...))
+function test_lotkavolterra_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
+    Random.seed!(rseed)
+    d = lotkavolterra_JuMP(T, instance...)
+    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer{T}(; options...))
     JuMP.optimize!(d.model)
     @test JuMP.termination_status(d.model) == MOI.OPTIMAL
-    return
+    return d.model.moi_backend.optimizer.model.optimizer.result
 end
 
-test_lotkavolterraJuMP_all(; options...) = test_lotkavolterraJuMP.([
-    lotkavolterraJuMP1,
-    ], options = options)
-
-test_lotkavolterraJuMP(; options...) = test_lotkavolterraJuMP.([
-    lotkavolterraJuMP1, # TODO fix slowness
-    ], options = options)
+lotkavolterra_JuMP_fast = [
+    ]
+lotkavolterra_JuMP_slow = [
+    (),
+    ]

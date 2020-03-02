@@ -29,7 +29,7 @@ function matrixcompletion_native(
     m::Int,
     n::Int,
     geomean_constr::Bool = true, # add a constraint on the geomean of unknown values, else don't add
-    nuclearnorm_obj::Bool = true, # use nuclear in the objective, else spectral norm
+    nuclearnorm_obj::Bool = true, # use nuclear norm in the objective, else spectral norm
     use_hypogeomean::Bool = true, # use hypogeomean cone, else power cone formulation
     use_epinormspectral::Bool = true, # use epinormspectral cone (or its dual), else PSD formulation
     )
