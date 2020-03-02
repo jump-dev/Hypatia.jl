@@ -148,6 +148,8 @@ end
 
 # see https://arxiv.org/pdf/1509.08165v1.pdf (example 3)
 # data obtained from http://www.nber.org/data/nbprod2005.html
+error("TODO slow, so save to a txt and use readdlm")
+
 function production_data()
     df = CSV.read(joinpath(@__DIR__, "data", "naics5811.csv"), copycols = true)
     DataFrames.deleterows!(df, 157) # outlier
@@ -170,6 +172,8 @@ function production_data()
 
     return (X, y)
 end
+
+error("TODO need to put these polys in dictionaries so as not to pollute namespace")
 
 shapeconregrJuMP1() = shapeconregrJuMP(production_data()..., 4, mono_dom = MU.FreeDomain{Float64}(4), mono_profile = zeros(Int, 4))
 shapeconregrJuMP2() = shapeconregrJuMP(2, 4, 100, x -> sum(x .^ 3), use_L1_obj = true)

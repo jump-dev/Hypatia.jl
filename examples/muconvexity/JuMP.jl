@@ -17,6 +17,8 @@ import PolyJuMP
 import Hypatia
 const MU = Hypatia.ModelUtilities
 
+error("TODO need to put these polys and doms in dictionaries so as not to pollute namespace")
+
 poly1 = (x -> (x[1] + 1)^2 * (x[1] - 1)^2)
 poly2 = (x -> sum(x.^4) - sum(x.^2))
 dom1 = MU.FreeDomain{Float64}(1)
