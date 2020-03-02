@@ -38,7 +38,8 @@ import Random
 
 include(joinpath(@__DIR__, "data.jl"))
 
-function signomialminJuMP(
+function signomialmin_JuMP(
+    T::Type{Float64}, # TODO support generic reals
     fc::Vector,
     fA::AbstractMatrix,
     gc::Vector,
@@ -120,77 +121,49 @@ function signomialminJuMP(
     return (model = model, obj_ub = obj_ub)
 end
 
-function signomialminJuMP(signomial_name::Symbol)
-    (fc, fA, gc, gA, x, obj_ub) = signomials[signomial_name]
-    return signomialminJuMP(fc, fA, gc, gA; x = x, obj_ub = obj_ub)
+function signomialmin_JuMP(signomial_name::Symbol)
+    (fc, fA, gc, gA, x, obj_ub) = signomialmin_data[signomial_name]
+    return signomialmin_JuMP(fc, fA, gc, gA; x = x, obj_ub = obj_ub)
 end
 
-function signomialminJuMP(m::Int, n::Int)
+function signomialmin_JuMP(m::Int, n::Int)
     (fc, fA, gc, gA, obj_ub) = random_instance(m, n)
-    return signomialminJuMP(fc, fA, gc, gA; obj_ub = obj_ub)
+    return signomialmin_JuMP(fc, fA, gc, gA; obj_ub = obj_ub)
 end
 
-signomialminJuMP1() = signomialminJuMP(:motzkin2)
-signomialminJuMP2() = signomialminJuMP(:motzkin3)
-signomialminJuMP3() = signomialminJuMP(:CS16ex8_13)
-signomialminJuMP4() = signomialminJuMP(:CS16ex8_14)
-signomialminJuMP5() = signomialminJuMP(:CS16ex18)
-signomialminJuMP6() = signomialminJuMP(:CS16ex12)
-signomialminJuMP7() = signomialminJuMP(:CS16ex13)
-signomialminJuMP8() = signomialminJuMP(:MCW19ex1_mod)
-signomialminJuMP9() = signomialminJuMP(:MCW19ex8)
-signomialminJuMP10() = signomialminJuMP(3, 2)
-signomialminJuMP11() = signomialminJuMP(3, 3)
-signomialminJuMP12() = signomialminJuMP(4, 3)
-signomialminJuMP13() = signomialminJuMP(6, 2)
-signomialminJuMP14() = signomialminJuMP(6, 4)
-signomialminJuMP15() = signomialminJuMP(6, 6)
-signomialminJuMP16() = signomialminJuMP(8, 4)
-
-function test_signomialminJuMP(instance::Function; options, rseed::Int = 1)
+function test_signomialmin_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)
-    d = instance()
-    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer(; options...))
+    d = signomialmin_JuMP(T, instance...)
+    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer{T}(; options...))
     JuMP.optimize!(d.model)
     @test JuMP.termination_status(d.model) == MOI.OPTIMAL
-    @test JuMP.objective_value(d.model) <= d.obj_ub
-    return
+    if !isnan(d.obj_ub)
+        @test JuMP.objective_value(d.model) <= d.obj_ub
+    end
+    return d.model.moi_backend.optimizer.model.optimizer.result
 end
 
-test_signomialminJuMP_all(; options...) = test_signomialminJuMP.([
-    signomialminJuMP1,
-    signomialminJuMP2,
-    signomialminJuMP3,
-    signomialminJuMP4,
-    signomialminJuMP5,
-    signomialminJuMP6,
-    signomialminJuMP7,
-    signomialminJuMP8,
-    signomialminJuMP9,
-    signomialminJuMP10,
-    signomialminJuMP11,
-    signomialminJuMP12,
-    signomialminJuMP13,
-    signomialminJuMP14,
-    signomialminJuMP15,
-    signomialminJuMP16,
-    ], options = options)
-
-test_signomialminJuMP(; options...) = test_signomialminJuMP.([
-    signomialminJuMP1,
-    signomialminJuMP2,
-    signomialminJuMP3,
-    signomialminJuMP4,
-    signomialminJuMP5,
-    signomialminJuMP6,
-    signomialminJuMP7,
-    signomialminJuMP8,
-    signomialminJuMP9,
-    signomialminJuMP10,
-    signomialminJuMP11,
-    signomialminJuMP12,
-    signomialminJuMP13,
-    signomialminJuMP14,
-    signomialminJuMP15,
-    signomialminJuMP16,
-    ], options = options)
+signomialmin_JuMP_fast = [
+    (:motzkin2),
+    ]
+signomialmin_JuMP_slow = [
+    # TODO
+    ]
+# 
+#
+# signomialmin_JuMP1() = signomialmin_JuMP(:motzkin2)
+# signomialmin_JuMP2() = signomialmin_JuMP(:motzkin3)
+# signomialmin_JuMP3() = signomialmin_JuMP(:CS16ex8_13)
+# signomialmin_JuMP4() = signomialmin_JuMP(:CS16ex8_14)
+# signomialmin_JuMP5() = signomialmin_JuMP(:CS16ex18)
+# signomialmin_JuMP6() = signomialmin_JuMP(:CS16ex12)
+# signomialmin_JuMP7() = signomialmin_JuMP(:CS16ex13)
+# signomialmin_JuMP8() = signomialmin_JuMP(:MCW19ex1_mod)
+# signomialmin_JuMP9() = signomialmin_JuMP(:MCW19ex8)
+# signomialmin_JuMP10() = signomialmin_JuMP(3, 2)
+# signomialmin_JuMP11() = signomialmin_JuMP(3, 3)
+# signomialmin_JuMP12() = signomialmin_JuMP(4, 3)
+# signomialmin_JuMP13() = signomialmin_JuMP(6, 2)
+# signomialmin_JuMP14() = signomialmin_JuMP(6, 4)
+# signomialmin_JuMP15() = signomialmin_JuMP(6, 6)
+# signomialmin_JuMP16() = signomialmin_JuMP(8, 4)

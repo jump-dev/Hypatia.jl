@@ -22,35 +22,28 @@ function matrixregression_JuMP(
     lam_glr::Real, # penalty on penalty on row group l1 norm
     lam_glc::Real, # penalty on penalty on column group l1 norm
     )
-    @assert lam_fro >= 0
-    @assert lam_nuc >= 0
-    @assert lam_las >= 0
+    @assert min(lam_fro, lam_nuc, lam_las, lam_glr, lam_glc) >= 0
     (data_n, data_m) = size(Y)
     data_p = size(X, 2)
     @assert size(X, 1) == data_n
     @assert data_p >= data_m
 
-    if data_n > data_p
-        Xhalf = qr(X).R
-    else
-        Xhalf = X
-    end
+    Qhalf = (data_n > data_p) ? qr(X).R : X # dimension reduction via QR if helpful
 
     model = JuMP.Model()
     JuMP.@variable(model, A[1:data_p, 1:data_m])
     JuMP.@variable(model, u_fro)
-    JuMP.@constraint(model, vcat(u_fro, 0.5, vec(Xhalf * A)) in JuMP.RotatedSecondOrderCone())
+    JuMP.@constraint(model, vcat(u_fro, 0.5, vec(Qhalf * A)) in JuMP.RotatedSecondOrderCone())
     obj = (u_fro - 2 * dot(X' * Y, A)) / (2 * data_n)
 
     if !iszero(lam_fro)
         JuMP.@variable(model, t_fro)
-        # NOTE this penalty is usually squared
         JuMP.@constraint(model, vcat(t_fro, vec(A)) in JuMP.SecondOrderCone())
         obj += lam_fro * t_fro
     end
     if !iszero(lam_nuc)
         JuMP.@variable(model, t_nuc)
-        JuMP.@constraint(model, vcat(t_nuc, vec(A')) in MOI.NormNuclearCone(data_m, data_p))
+        JuMP.@constraint(model, vcat(t_nuc, vec(A)) in MOI.NormNuclearCone(data_p, data_m))
         obj += lam_nuc * t_nuc
     end
     if !iszero(lam_las)
@@ -68,9 +61,14 @@ function matrixregression_JuMP(
         JuMP.@constraint(model, [i = 1:data_m], vcat(t_glc[i], A[:, i]) in JuMP.SecondOrderCone())
         obj += lam_glc * sum(t_glc)
     end
+
     JuMP.@objective(model, Min, obj)
 
-    return (model = model,)
+    return (
+        model = model,
+        n = data_n, m = data_m, p = data_p, Y = Y, X = X,
+        lam_fro = lam_fro, lam_nuc = lam_nuc, lam_las = lam_las, lam_glr = lam_glr, lam_glc = lam_glc,
+        )
 end
 
 function matrixregression_JuMP(
@@ -93,10 +91,7 @@ function matrixregression_JuMP(
     X = randn(n, p)
     Y = X * A + Y_noise * randn(n, m)
 
-    Y = Matrix(Y)
-    X = Matrix(X)
-
-    return matrixregression_JuMP(T, Y, X, args...)
+    return matrixregression_JuMP(T, Matrix(Y), Matrix(X), args...)
 end
 
 function test_matrixregression_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
@@ -105,7 +100,26 @@ function test_matrixregression_JuMP(instance::Tuple; T::Type{<:Real} = Float64, 
     JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer{T}(; options...))
     JuMP.optimize!(d.model)
     @test JuMP.termination_status(d.model) == MOI.OPTIMAL
-    return d.model.moi_backend.optimizer.model.optimizer.result
+    r = d.model.moi_backend.optimizer.model.optimizer.result
+    if r.status == :Optimal
+        # check objective value is correct
+        R = eltype(d.Y)
+        if R <: Complex
+            A_opt_real = reshape(r.x[2:(1 + 2 * d.p * d.m)], 2 * d.p, d.m)
+            A_opt = zeros(R, d.p, d.m)
+            for k in 1:d.p
+                @. @views A_opt[k, :] = A_opt_real[2k - 1, :] + A_opt_real[2k, :] * im
+            end
+        else
+            A_opt = reshape(r.x[2:(1 + d.p * d.m)], d.p, d.m)
+        end
+        loss = (1/2 * sum(abs2, d.X * A_opt) - real(dot(d.X' * d.Y, A_opt))) / d.n
+        obj_try = loss + d.lam_fro * norm(vec(A_opt), 2) +
+            d.lam_nuc * sum(svd(A_opt).S) + d.lam_las * norm(vec(A_opt), 1) +
+            d.lam_glr * sum(norm, eachrow(A_opt)) + d.lam_glc * sum(norm, eachcol(A_opt))
+        @test r.primal_obj ≈ obj_try atol = 1e-4 rtol = 1e-4
+    end
+    return r
 end
 
 matrixregression_JuMP_fast = [

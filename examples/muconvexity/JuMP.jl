@@ -17,15 +17,6 @@ import PolyJuMP
 import Hypatia
 const MU = Hypatia.ModelUtilities
 
-error("TODO need to put these polys and doms in dictionaries so as not to pollute namespace")
-
-poly1 = (x -> (x[1] + 1)^2 * (x[1] - 1)^2)
-poly2 = (x -> sum(x.^4) - sum(x.^2))
-dom1 = MU.FreeDomain{Float64}(1)
-dom2 = MU.Box{Float64}([-1.0], [1.0])
-dom3 = MU.FreeDomain{Float64}(3)
-dom4 = MU.Ball{Float64}(ones(2), 5.0)
-
 function muconvexity_JuMP(
     T::Type{Float64}, # TODO support generic reals
     poly::Symbol,
@@ -33,10 +24,10 @@ function muconvexity_JuMP(
     use_matrixwsos::Bool, # use wsosinterpposeideftricone, else PSD formulation
     true_mu::Real = NaN, # optional true value of parameter for testing only
     )
-    dom = eval(dom)
+    dom = muconvexity_data[dom]
     n = MU.get_dimension(dom)
     DP.@polyvar x[1:n]
-    poly = eval(poly)(x)
+    poly = muconvexity_data[poly](x)
 
     model = JuMP.Model()
     JuMP.@variable(model, mu)
@@ -70,6 +61,15 @@ function test_muconvexity_JuMP(instance::Tuple; T::Type{<:Real} = Float64, optio
     end
     return d.model.moi_backend.optimizer.model.optimizer.result
 end
+
+muconvexity_data = Dict(
+    :poly1 => (x -> (x[1] + 1)^2 * (x[1] - 1)^2),
+    :poly2 => (x -> sum(x .^ 4) - sum(x .^ 2)),
+    :dom1 => MU.FreeDomain{Float64}(1),
+    :dom2 => MU.Box{Float64}([-1.0], [1.0]),
+    :dom3 => MU.FreeDomain{Float64}(3),
+    :dom4 => MU.Ball{Float64}(ones(2), 5.0),
+    )
 
 muconvexity_JuMP_fast = [
     (:poly1, :dom1, true, -4),

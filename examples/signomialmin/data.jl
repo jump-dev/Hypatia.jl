@@ -16,7 +16,7 @@ obj_ub is an objective upper bound (value at feasible point), if known
 using Distributions
 using SparseArrays
 
-signomials = Dict{Symbol, NamedTuple}(
+signomialmin_data = Dict{Symbol, NamedTuple}(
     :motzkin2 => (
         # f = 1 - 3*x1^2*x2^2 + x1^2*x2^4 + x1^4*x2^2
         fc = [1, -3, 1, 1],

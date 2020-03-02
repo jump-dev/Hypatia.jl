@@ -27,14 +27,12 @@ function matrixregression_native(
     Y::Matrix{R},
     X::Matrix{R},
     lam_fro::Real, # penalty on Frobenius norm
-    lam_nuc::Real, # penalty on nuclearn norm
+    lam_nuc::Real, # penalty on nuclear norm
     lam_las::Real, # penalty on L1 norm
     lam_glr::Real, # penalty on penalty on row group l1 norm
     lam_glc::Real, # penalty on penalty on column group l1 norm
     ) where {R <: RealOrComplex{T}}
-    @assert lam_fro >= 0
-    @assert lam_nuc >= 0
-    @assert lam_las >= 0
+    @assert min(lam_fro, lam_nuc, lam_las, lam_glr, lam_glc) >= 0
     (data_n, data_m) = size(Y)
     data_p = size(X, 2)
     @assert size(X, 1) == data_n

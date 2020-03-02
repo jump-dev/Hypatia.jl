@@ -45,19 +45,19 @@ JuMP_example_names = [
     # "lyapunovstability",
     # "matrixcompletion",
     # "matrixquadratic",
-    # "matrixregression",
+    "matrixregression", # TODO incorrect and moi issue
     # "maxvolume",
-    "muconvexity",
+    # "muconvexity",
     # "nearestpsd",
     # "polymin",
     # "polynorm",
     # "portfolio",
     # "regionofattr",
     # "robustgeomprog",
-    "secondorderpoly",
-    # "semidefinitepoly",
+    # "secondorderpoly",
+    # "semidefinitepoly", # TODO update
     # "shapeconregr",
-    # "signomialmin",
+    # "signomialmin", # TODO update
     ]
 
 T = Float64

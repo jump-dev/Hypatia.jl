@@ -18,9 +18,6 @@ import Hypatia.BlockMatrix
 const CO = Hypatia.Cones
 const MU = Hypatia.ModelUtilities
 
-iris_data = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "iris.txt"))
-cancer_data = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "iris.txt"))
-
 function densityest_native(
     T::Type{<:Real},
     X::Matrix{T},
@@ -170,8 +167,13 @@ function test_densityest_native(instance::Tuple; T::Type{<:Real} = Float64, opti
     return r
 end
 
+iris_data = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "iris.txt"))
+cancer_data = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "cancer.txt"))
+
 densityest_native_fast = [
     (:iris_data, 4, true, true, true),
+    (:iris_data, 5, true, true, true),
+    (:iris_data, 6, true, true, true),
     (:iris_data, 4, false, true, true),
     (:iris_data, 4, true, false, true),
     (:iris_data, 4, true, true, false),
