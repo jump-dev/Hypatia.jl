@@ -17,7 +17,7 @@ instance_sets = [
     ]
 
 model_types = [
-    # "native",
+    "native",
     "JuMP",
     ]
 
@@ -35,29 +35,29 @@ native_example_names = [
     ]
 
 JuMP_example_names = [
-    # "centralpolymat",
-    # "conditionnum",
-    # "contraction",
-    # "densityest",
-    # "envelope",
-    # "expdesign",
-    # "lotkavolterra",
-    # "lyapunovstability",
-    # "matrixcompletion",
-    # "matrixquadratic",
+    "centralpolymat",
+    "conditionnum",
+    "contraction",
+    "densityest",
+    "envelope",
+    "expdesign",
+    "lotkavolterra",
+    "lyapunovstability",
+    "matrixcompletion",
+    "matrixquadratic",
     "matrixregression",
-    # "maxvolume",
-    # "muconvexity",
-    # "nearestpsd",
-    # "polymin",
-    # "polynorm",
-    # "portfolio",
-    # "regionofattr",
-    # "robustgeomprog",
-    # "secondorderpoly",
-    # "semidefinitepoly",
-    # "shapeconregr",
-    # "signomialmin",
+    "maxvolume",
+    "muconvexity",
+    "nearestpsd",
+    "polymin",
+    "polynorm",
+    "portfolio",
+    "regionofattr",
+    "robustgeomprog",
+    "secondorderpoly",
+    "semidefinitepoly",
+    "shapeconregr",
+    "signomialmin",
     ]
 
 T = Float64
@@ -102,12 +102,12 @@ perf = DataFrame(
 all_tests_time = time()
 @testset "examples tests" begin
     for mod_type in model_types
-        println("\nstarting $mod_type examples")
         example_names = eval(Symbol(mod_type, "_example_names"))
+        println("\nstarting $(length(example_names)) examples for $mod_type")
         options = eval(Symbol(mod_type, "_options"))
         for ex_name in example_names, inst_set in instance_sets
-            println("\nstarting $mod_type $ex_name $inst_set examples\n")
             instances = enumerate(eval(Symbol(ex_name, "_", mod_type, "_", inst_set)))
+            println("\nstarting $(length(instances)) instances for $mod_type $ex_name $inst_set\n")
             test_function = eval(Symbol("test_", ex_name, "_", mod_type))
             for (inst_num, inst_data) in instances
                 test_info = "$mod_type $ex_name $inst_set $inst_num: $inst_data"
@@ -128,7 +128,7 @@ all_tests_time = time()
 end
 ;
 
-# TODO delete:
+# TODO use these options then delete:
 # @testset "JuMP examples" begin
 #     @testset "centralpolymat" begin test_centralpolymatJuMP(; tol_rel_opt = 1e-6, tol_abs_opt = 1e-6, tol_feas = 1e-7, options...) end
 #     @testset "conditionnum" begin test_conditionnum_JuMP(; tol_rel_opt = 1e-7, tol_abs_opt = 1e-7, tol_feas = 1e-7, options...) end
