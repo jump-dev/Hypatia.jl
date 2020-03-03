@@ -1,80 +1,149 @@
 #=
 Copyright 2019, Chris Coey and contributors
+
+run native instance tests from test/nativeinstances.jl and display basic benchmarks
 =#
+
+using Test
+using DataFrames
+using Printf
+using TimerOutputs
+import Hypatia
+import Hypatia.Solvers
 
 include(joinpath(@__DIR__, "nativeinstances.jl"))
 include(joinpath(@__DIR__, "nativesets.jl"))
 
-const SO = Hypatia.Solvers
-
-generic_reals = [
+all_reals = [
     Float64,
     Float32,
     BigFloat,
     ]
-
-blas_reals = [
+default_reals = [
     Float64,
-    Float32,
     ]
 
-options = (verbose = false,)
+# system solvers tests options
+system_solvers_instance_names = vcat(
+    inst_preproc,
+    inst_infeas,
+    # inst_cones_few, # NOTE subset of inst_cones_many
+    inst_cones_many,
+    )
+system_solvers = Dict(
+    # "NaiveDense" => all_reals,
+    # "NaiveSparse" => default_reals,
+    # # "NaiveIndirect" => all_reals, # TODO fix
+    # "NaiveElimDense" => all_reals,
+    # "NaiveElimSparse" => default_reals,
+    # "SymIndefDense" => all_reals,
+    # "SymIndefSparse" => default_reals,
+    "QRCholDense" => all_reals,
+    )
+
+# preprocessing test options
+preprocess_instance_names = vcat(
+    inst_preproc,
+    # inst_infeas,
+    # inst_cones_few, # NOTE subset of inst_cones_many
+    # inst_cones_many,
+    )
+preprocess_system_solver = "SymIndefDense"
+preprocess_reals = all_reals
+preprocess_options = (init_use_indirect = false, reduce = false)
+preprocess_flags = [
+    true,
+    false,
+    ]
+
+# indirect initialization test options
+init_use_indirect_instance_names = vcat(
+    # inst_preproc,
+    # inst_infeas,
+    inst_cones_few, # NOTE subset of inst_cones_many
+    # inst_cones_many,
+    )
+init_use_indirect_system_solver = "SymIndefDense"
+init_use_indirect_reals = all_reals
+init_use_indirect_options = (preprocess = false, reduce = false)
+init_use_indirect_flags = [
+    true,
+    false,
+    ]
+
+# reduce test options
+reduce_instance_names = vcat(
+    # inst_preproc,
+    # inst_infeas,
+    inst_cones_few, # NOTE subset of inst_cones_many
+    # inst_cones_many,
+    )
+reduce_system_solver = "QRCholDense"
+reduce_reals = all_reals
+reduce_options = (preprocess = true, init_use_indirect = false)
+reduce_flags = [
+    true,
+    false,
+    ]
+
+# other solver options
+timer = TimerOutput()
+other_options = (
+    # verbose = true,
+    verbose = false,
+    iter_limit = 250,
+    time_limit = 6e1,
+    timer = timer,
+    )
 
 @info("starting native tests")
-@testset "native tests" begin
-    # test with and without preprocessing
-    @testset "no preprocessing tests: $t, $T" for t in testfuns_few, T in generic_reals
-        t(T, solver = SO.Solver{T}(preprocess = false, init_use_indirect = false, reduce = false, system_solver = SO.SymIndefDenseSystemSolver{T}(); options...)) # TODO make default system solver depend on preprocess
-    end
-    @testset "preprocessing tests: $t, $T" for t in testfuns_preproc, T in generic_reals
-        t(T, solver = SO.Solver{T}(preprocess = true, init_use_indirect = false, reduce = false; options...))
-    end
 
-    # test indirect initial point method
-    @testset "indirect initialization tests: $t, $T" for t in testfuns_few, T in blas_reals
-        t(T, solver = SO.Solver{T}(preprocess = false, init_use_indirect = true, reduce = false, system_solver = SO.SymIndefDenseSystemSolver{T}(); options...))
-    end
+perf = DataFrame(
+    inst_name = String[],
+    sys_solver = String[],
+    real_T = String[],
+    preprocess = Bool[],
+    init_use_indirect = Bool[],
+    reduce = Bool[],
+    test_time = Float64[],
+    )
 
-    # test with reduction (removing all primal equalities)
-    @testset "no reduction tests: $t, $T" for t in testfuns_reduce, T in generic_reals
-        t(T, solver = SO.Solver{T}(preprocess = true, init_use_indirect = false, reduce = false, system_solver = SO.QRCholDenseSystemSolver{T}(); options...))
+function run_instance_options(T::Type{<:Real}, inst_name::String, sys_name::String, test_info::String; kwargs...)
+    @testset "$test_info" begin
+        println(test_info, "...")
+        inst_function = eval(Symbol(inst_name))
+        sys_solver = Solvers.eval(Symbol(sys_name, "SystemSolver"))
+        solver = Solvers.Solver{T}(; system_solver = sys_solver{T}(), kwargs..., other_options...)
+        test_time = @elapsed inst_function(T, solver = solver)
+        push!(perf, (inst_name, sys_name, string(T), solver.preprocess, solver.init_use_indirect, solver.reduce, test_time))
+        @printf("... %8.2e seconds\n", test_time)
     end
-    @testset "reduction tests: $t, $T" for t in testfuns_reduce, T in generic_reals
-        t(T, solver = SO.Solver{T}(preprocess = true, init_use_indirect = false, reduce = true, system_solver = SO.QRCholDenseSystemSolver{T}(); options...))
-    end
-
-    # test each system solver
-    @testset "NaiveDense tests: $t, $T" for t in testfuns_many, T in generic_reals
-        t(T, solver = SO.Solver{T}(system_solver = SO.NaiveDenseSystemSolver{T}(); options...))
-    end
-    @testset "NaiveSparse tests: $t" for t in testfuns_many
-        T = Float64
-        t(T, solver = SO.Solver{T}(system_solver = SO.NaiveSparseSystemSolver{T}(); options...))
-    end
-    # TODO currently broken
-    # @testset "NaiveIndirect tests: $t" for t in testfuns_many
-    #     T = Float64
-    #     t(T, solver = SO.Solver{T}(preprocess = false, init_use_indirect = true, reduce = false, system_solver = SO.NaiveIndirectSystemSolver{T}(); options...))
-    # end
-    @testset "NaiveElimDense tests: $t, $T, $h" for t in testfuns_many, T in generic_reals, h in [true, false]
-        t(T, solver = SO.Solver{T}(system_solver = SO.NaiveElimDenseSystemSolver{T}(use_inv_hess = h); options...))
-    end
-    @testset "NaiveElimSparse tests: $t" for t in testfuns_many
-        T = Float64
-        t(T, solver = SO.Solver{T}(system_solver = SO.NaiveElimSparseSystemSolver{T}(); options...))
-    end
-    @testset "SymIndefDense tests: $t, $T" for t in testfuns_many, T in generic_reals
-        t(T, solver = SO.Solver{T}(system_solver = SO.SymIndefDenseSystemSolver{T}(); options...))
-    end
-    @testset "SymIndefSparse tests: $t" for t in testfuns_many
-        T = Float64
-        t(T, solver = SO.Solver{T}(system_solver = SO.SymIndefSparseSystemSolver{T}(); options...))
-    end
-    qrchol_cache = [
-        # Hypatia.DenseSymCache,
-        Hypatia.DensePosDefCache
-        ]
-    @testset "QRCholDense tests: $t, $T, $c" for t in testfuns_many, T in generic_reals, c in qrchol_cache
-        t(T, solver = SO.Solver{T}(system_solver = SO.QRCholDenseSystemSolver{T}(fact_cache = c{T}()); options...))
-    end
+    return nothing
 end
+
+all_tests_time = time()
+
+@testset "native tests" begin
+    for inst_name in system_solvers_instance_names, (sys_name, real_types) in system_solvers, T in real_types
+        run_instance_options(T, inst_name, sys_name, "$inst_name system_solver = $sys_name $T")
+    end
+
+    for inst_name in preprocess_instance_names, preprocess in preprocess_flags, T in preprocess_reals
+        run_instance_options(T, inst_name, preprocess_system_solver, "$inst_name preprocess = $preprocess $T"; preprocess = preprocess, preprocess_options...)
+    end
+
+    for inst_name in init_use_indirect_instance_names, init_use_indirect in init_use_indirect_flags, T in init_use_indirect_reals
+        run_instance_options(T, inst_name, init_use_indirect_system_solver, "$inst_name init_use_indirect = $init_use_indirect $T"; init_use_indirect = init_use_indirect, init_use_indirect_options...)
+    end
+
+    for inst_name in reduce_instance_names, reduce in reduce_flags, T in reduce_reals
+        run_instance_options(T, inst_name, reduce_system_solver, "$inst_name reduce = $reduce $T"; reduce = reduce, reduce_options...)
+    end
+
+    @printf("\nnative tests total time: %8.2e seconds\n\n", time() - all_tests_time)
+    show(perf, allrows = true, allcols = true)
+    println("\n")
+    show(timer)
+    println("\n")
+end
+;
