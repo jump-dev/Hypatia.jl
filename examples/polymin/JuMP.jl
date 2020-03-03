@@ -8,19 +8,20 @@ import Random
 using LinearAlgebra
 using Test
 import JuMP
+const MOI = JuMP.MOI
 import Hypatia
 const MU = Hypatia.ModelUtilities
 
 include(joinpath(@__DIR__, "data.jl"))
 
 function polymin_JuMP(
-    T::Type{Float64}, # TODO support generic reals
+    ::Type{T},
     interp_vals::Vector{T},
     Ps::Vector{Matrix{T}},
     true_min::Real,
     use_primal::Bool, # solve primal, else solve dual
     use_wsos::Bool, # use wsosinterpnonnegative cone, else PSD formulation
-    )
+    ) where {T <: Float64} # TODO support generic reals
     U = length(interp_vals)
 
     model = JuMP.Model()
@@ -50,7 +51,7 @@ function polymin_JuMP(
         else
             for P in Ps
                 L = size(P, 2)
-                JuMP.@constraint(model, [sum(P[u, i] * P[u, j] * μ[u] for u in 1:U) for i in 1:L for j in 1:i] in JuMP.MOI.PositiveSemidefiniteConeTriangle(L))
+                JuMP.@constraint(model, [sum(P[u, i] * P[u, j] * μ[u] for u in 1:U) for i in 1:L for j in 1:i] in MOI.PositiveSemidefiniteConeTriangle(L))
             end
         end
     end
@@ -59,18 +60,20 @@ function polymin_JuMP(
 end
 
 polymin_JuMP(
-    T::Type{<:Real},
+    ::Type{T},
     poly_name::Symbol,
     halfdeg::Int,
-    args...
-    ) = polymin_JuMP(T, get_interp_data(T, poly_name, halfdeg)..., args...)
+    args...;
+    sample_factor::Int = 100,
+    ) where {T <: Float64} = polymin_JuMP(T, get_interp_data(T, poly_name, halfdeg, sample_factor)..., args...)
 
 polymin_JuMP(
-    T::Type{<:Real},
+    ::Type{T},
     n::Int,
     halfdeg::Int,
-    args...
-    ) = polymin_JuMP(T, random_interp_data(T, n, halfdeg)..., args...)
+    args...;
+    sample_factor::Int = 100,
+    ) where {T <: Float64} = polymin_JuMP(T, random_interp_data(T, n, halfdeg, sample_factor)..., args...)
 
 function test_polymin_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)

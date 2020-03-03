@@ -14,11 +14,11 @@ const CO = Hypatia.Cones
 using Test
 
 function matrixcompletion_JuMP(
-    T::Type{Float64}, # TODO support generic reals
+    ::Type{T},
     num_rows::Int,
     num_cols::Int,
     nuclearnorm_obj::Bool, # use nuclearnorm in the objective, else spectral norm
-    )
+    ) where {T <: Float64} # TODO support generic reals
     @assert num_rows <= num_cols
     A = randn(num_rows, num_cols)
     (row_idxs, col_idxs, _) = findnz(sprand(Bool, num_rows, num_cols, 0.1))

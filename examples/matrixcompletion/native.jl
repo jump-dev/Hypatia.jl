@@ -25,14 +25,14 @@ const CO = Hypatia.Cones
 const MU = Hypatia.ModelUtilities
 
 function matrixcompletion_native(
-    T::Type{<:Real},
+    ::Type{T},
     m::Int,
     n::Int,
     geomean_constr::Bool = true, # add a constraint on the geomean of unknown values, else don't add
     nuclearnorm_obj::Bool = true, # use nuclear norm in the objective, else spectral norm
     use_hypogeomean::Bool = true, # use hypogeomean cone, else power cone formulation
     use_epinormspectral::Bool = true, # use epinormspectral cone (or its dual), else PSD formulation
-    )
+    ) where {T <: Real}
     @assert m <= n
     mn = m * n
     rt2 = sqrt(T(2))

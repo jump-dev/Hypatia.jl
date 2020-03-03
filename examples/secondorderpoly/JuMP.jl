@@ -12,11 +12,11 @@ import Hypatia
 const MU = Hypatia.ModelUtilities
 
 function secondorderpoly_JuMP(
-    T::Type{Float64}, # TODO support generic reals
+    ::Type{T},
     poly_vec::Function,
     deg::Int,
     is_feas::Bool, # whether model should be primal-dual feasible; only for testing
-    )
+    ) where {T <: Float64} # TODO support generic reals
     halfdeg = div(deg + 1, 2)
     (U, pts, Ps, _) = MU.interpolate(MU.FreeDomain{Float64}(1), halfdeg, sample = false)
     vals = poly_vec.(pts)
@@ -29,7 +29,10 @@ function secondorderpoly_JuMP(
     return (model = model, is_feas = is_feas)
 end
 
-secondorderpoly_JuMP(T::Type{Float64}, polys_name::Symbol, args...) = secondorderpoly_JuMP(T, secondorderpoly_data[polys_name], args...)
+secondorderpoly_JuMP(
+    ::Type{T},
+    polys_name::Symbol, 
+    args...) where {T <: Float64} = secondorderpoly_JuMP(T, secondorderpoly_data[polys_name], args...)
 
 function test_secondorderpoly_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)

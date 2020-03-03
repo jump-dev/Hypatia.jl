@@ -21,7 +21,7 @@ const MOI = JuMP.MOI
 import Hypatia
 
 function expdesign_JuMP(
-    T::Type{Float64}, # TODO support generic reals
+    ::Type{T},
     q::Int,
     p::Int,
     n::Int,
@@ -29,7 +29,7 @@ function expdesign_JuMP(
     logdet_obj::Bool, # use formulation with logdet objective
     rootdet_obj::Bool, # use formulation with rootdet objective
     geomean_obj::Bool, # use formulation with geomean objective
-    )
+    ) where {T <: Float64} # TODO support generic reals
     @assert (p > q) && (n > q) && (n_max <= n)
     @assert logdet_obj + geomean_obj + rootdet_obj == 1
     V = randn(q, p)

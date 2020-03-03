@@ -15,11 +15,11 @@ import Hypatia
 const MU = Hypatia.ModelUtilities
 
 function polynorm_JuMP(
-    T::Type{Float64}, # TODO support generic reals
+    ::Type{T},
     n::Int,
     deg::Int,
     npolys::Int,
-    )
+    ) where {T <: Float64} # TODO support generic reals
     dom = MU.FreeDomain{Float64}(n)
     halfdeg = div(deg + 1, 2)
     (U, pts, Ps, w) = MU.interpolate(dom, halfdeg, sample = false, calc_w = true)

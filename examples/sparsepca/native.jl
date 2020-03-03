@@ -15,13 +15,13 @@ const CO = Hypatia.Cones
 const MU = Hypatia.ModelUtilities
 
 function sparsepca_native(
-    T::Type{<:Real},
+    ::Type{T},
     p::Int,
     k::Int,
     use_epinorminfdual::Bool, # use dual of epinorminf cone, else nonnegative cones
     noise_ratio::Real,
     use_linops::Bool,
-    )
+    ) where {T <: Real}
     @assert 0 < k <= p
 
     signal_idxs = Distributions.sample(1:p, k, replace = false) # sample components that will carry the signal
