@@ -418,17 +418,19 @@ function MOI.copy_to(
         dim = MOI.output_dimension(fi)
         if F == MOI.VectorOfVariables
             JGi = (idx_map[vj].value for vj in fi.variables)
-            IGi = permute_affine(si, (q + 1):(q + dim))
+            IGi = permute_affine(si, 1:dim)
             VGi = rescale_affine(si, fill(-1.0, dim))
         else
             JGi = (idx_map[vt.scalar_term.variable_index].value for vt in fi.terms)
-            IGi = permute_affine(si, [q + vt.output_index for vt in fi.terms])
-            VGi = rescale_affine(si, [-vt.scalar_term.coefficient for vt in fi.terms], IGi, q)
-            Ihi = permute_affine(si, (q + 1):(q + dim))
+            IGi = permute_affine(si, [vt.output_index for vt in fi.terms])
+            VGi = rescale_affine(si, [-vt.scalar_term.coefficient for vt in fi.terms], IGi)
+            Ihi = permute_affine(si, 1:dim)
             Vhi = rescale_affine(si, fi.constants)
+            Ihi = q .+ Ihi
             append!(Ih, Ihi)
             append!(Vh, Vhi)
         end
+        IGi = q .+ IGi
         append!(IG, IGi)
         append!(JG, JGi)
         append!(VG, VGi)
