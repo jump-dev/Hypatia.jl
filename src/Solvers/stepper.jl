@@ -5,35 +5,48 @@ interior point stepping routines for algorithms based on homogeneous self dual e
 =#
 
 mutable struct CombinedStepper{T <: Real} <: Stepper{T}
-    in_affine_phase::Bool
-    gamma::T
+    prev_aff_alpha::T
+    prev_alpha::T
+    prev_gamma::T
     rhs::Vector{T}
     x_rhs
     y_rhs
     z_rhs
     s_rhs
-    s_rhs_k
+    s_rhs_k::Vector
     dir::Vector{T}
     x_dir
     y_dir
     z_dir
-    dual_dir_k
+    dual_dir_k::Vector
     s_dir
-    primal_dir_k
+    primal_dir_k::Vector
     dir_temp::Vector{T}
+    dir_corr::Vector{T}
     res::Vector{T}
     x_res
     y_res
     z_res
     s_res
-    s_res_k
+    s_res_k::Vector
     tau_row::Int
     kap_row::Int
+    z_linesearch::Vector{T}
+    s_linesearch::Vector{T}
+    primal_views_linesearch::Vector
+    dual_views_linesearch::Vector
+    cone_times::Vector{Float64}
+    cone_order::Vector{Int}
+
     CombinedStepper{T}() where {T <: Real} = new{T}()
 end
 
 # create the stepper cache
 function load(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
+    stepper.prev_aff_alpha = one(T)
+    stepper.prev_gamma = one(T)
+    stepper.prev_alpha = one(T)
+
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
     cones = model.cones
@@ -46,6 +59,7 @@ function load(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     stepper.rhs = rhs
     stepper.dir = dir
     stepper.dir_temp = zeros(T, dim)
+    stepper.dir_corr = zeros(T, dim)
     stepper.res = res
 
     rows = 1:n
@@ -83,218 +97,137 @@ function load(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
 
     stepper.kap_row = dim
 
+    stepper.z_linesearch = zeros(T, q)
+    stepper.s_linesearch = zeros(T, q)
+    stepper.primal_views_linesearch = [view(Cones.use_dual_barrier(model.cones[k]) ? stepper.z_linesearch : stepper.s_linesearch, model.cone_idxs[k]) for k in eachindex(model.cones)]
+    stepper.dual_views_linesearch = [view(Cones.use_dual_barrier(model.cones[k]) ? stepper.s_linesearch : stepper.z_linesearch, model.cone_idxs[k]) for k in eachindex(model.cones)]
+
+    stepper.cone_times = zeros(Float64, length(solver.model.cones))
+    stepper.cone_order = collect(1:length(solver.model.cones))
+
     return stepper
 end
 
 function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     point = solver.point
 
+    # update linear system solver factorization and helpers
     @timeit solver.timer "update_fact" update_fact(solver.system_solver, solver)
 
-    # calculate affine/prediction and combined directions
-    # TODO cleanup booleans
-    stepper.in_affine_phase = true
-    @timeit solver.timer "aff_dir" get_directions(stepper, solver)
-    # TODO prealloc, cleanup
-    z_pred = copy(stepper.z_dir)
-    s_pred = copy(stepper.s_dir)
-    x_pred = copy(stepper.x_dir)
-    y_pred = copy(stepper.y_dir)
-    tau_pred = stepper.dir[stepper.tau_row]
-    kap_pred = stepper.dir[stepper.kap_row]
-    stepper.in_affine_phase = false
-    @timeit solver.timer "comb_dir" get_directions(stepper, solver)
-    stepper.in_affine_phase = true
+    # calculate correction direction and keep in dir_corr
+    @timeit solver.timer "rhs_corr" update_rhs_correction(stepper, solver)
+    @timeit solver.timer "corr_dir" get_directions(stepper, solver, iter_ref_steps = 3)
+    copyto!(stepper.dir_corr, stepper.dir)
+
+    # calculate affine/prediction direction and keep in dir
+    @timeit solver.timer "rhs_aff" update_rhs_affine(stepper, solver)
+    @timeit solver.timer "aff_dir" get_directions(stepper, solver, iter_ref_steps = 3)
 
     # calculate correction factor gamma by finding distance aff_alpha for stepping in affine direction
-    # TODO try setting nbhd to T(Inf) and avoiding the neighborhood checks - requires tuning
-    @timeit solver.timer "aff_alpha" aff_alpha = find_max_alpha(
-        z_pred, s_pred, tau_pred, kap_pred, solver,
-        # nbhd = T(Inf), prev_alpha = max(solver.prev_aff_alpha, T(2e-2)), min_alpha = T(2e-2)) # TODO
-        nbhd = one(T), prev_alpha = max(solver.prev_aff_alpha, T(2e-2)), min_alpha = T(2e-2))
-    solver.prev_aff_alpha = aff_alpha
-    # gamma = (1 - aff_alpha) * min(abs2(1 - aff_alpha), T(0.25))
-    gamma = abs2(one(T) - aff_alpha) # TODO allow different function (heuristic)
-    solver.prev_gamma = gamma
+    @timeit solver.timer "aff_alpha" stepper.prev_aff_alpha = aff_alpha = find_max_alpha(
+        stepper, solver, prev_alpha = stepper.prev_aff_alpha, min_alpha = T(1e-2))
+    stepper.prev_gamma = gamma = abs2(one(T) - aff_alpha) # TODO allow different function (heuristic) as option?
+
+    # calculate combined direction and keep in dir
+    axpby!(gamma, stepper.dir_corr, 1 - gamma, stepper.dir)
 
     # find distance alpha for stepping in combined direction
-    z_comb = z_pred
-    s_comb = s_pred
-    pred_factor = one(T) - gamma
-    @. z_comb = pred_factor * z_comb + gamma * stepper.z_dir
-    @. s_comb = pred_factor * s_comb + gamma * stepper.s_dir
-    tau_comb = pred_factor * tau_pred + gamma * stepper.dir[stepper.tau_row]
-    kap_comb = pred_factor * kap_pred + gamma * stepper.dir[stepper.kap_row]
     @timeit solver.timer "comb_alpha" alpha = find_max_alpha(
-        z_comb, s_comb, tau_comb, kap_comb, solver,
-        nbhd = solver.max_nbhd, prev_alpha = solver.prev_alpha, min_alpha = T(1e-2))
+        stepper, solver, prev_alpha = stepper.prev_alpha, min_alpha = T(1e-3))
 
     if iszero(alpha)
-        # could not step far in combined direction, so perform a pure correction step
+        # could not step far in combined direction, so attempt a pure correction step
         solver.verbose && println("performing correction step")
-        z_comb = stepper.z_dir
-        s_comb = stepper.s_dir
-        tau_comb = stepper.dir[stepper.tau_row]
-        kap_comb = stepper.dir[stepper.kap_row]
+        copyto!(stepper.dir, stepper.dir_corr)
+
+        # find distance alpha for stepping in correction direction
         @timeit solver.timer "corr_alpha" alpha = find_max_alpha(
-            z_comb, s_comb, tau_comb, kap_comb, solver,
-            nbhd = solver.max_nbhd, prev_alpha = one(T), min_alpha = T(1e-6))
+            stepper, solver, prev_alpha = one(T), min_alpha = T(1e-6))
 
         if iszero(alpha)
             @warn("numerical failure: could not step in correction direction; terminating")
             solver.status = :NumericalFailure
-            solver.keep_iterating = false
-            return point
+            return false
         end
-        @. point.x += alpha * stepper.x_dir
-        @. point.y += alpha * stepper.y_dir
-    else
-        @. point.x += alpha * (pred_factor * x_pred + gamma * stepper.x_dir)
-        @. point.y += alpha * (pred_factor * y_pred + gamma * stepper.y_dir)
     end
-    solver.prev_alpha = alpha
+    stepper.prev_alpha = alpha
 
     # step distance alpha in combined direction
-    @. point.z += alpha * z_comb
-    @. point.s += alpha * s_comb
-    solver.tau += alpha * tau_comb
-    solver.kap += alpha * kap_comb
+    @. point.x += alpha * stepper.x_dir
+    @. point.y += alpha * stepper.y_dir
+    @. point.z += alpha * stepper.z_dir
+    @. point.s += alpha * stepper.s_dir
+    solver.tau += alpha * stepper.dir[stepper.tau_row]
+    solver.kap += alpha * stepper.dir[stepper.kap_row]
     calc_mu(solver)
 
     if solver.tau <= zero(T) || solver.kap <= zero(T) || solver.mu <= zero(T)
         @warn("numerical failure: tau is $(solver.tau), kappa is $(solver.kap), mu is $(solver.mu); terminating")
         solver.status = :NumericalFailure
-        solver.keep_iterating = false
-    end
-
-    return point
-end
-
-# backtracking line search to find large distance to step in direction while remaining inside cones and inside a given neighborhood
-function find_max_alpha(
-    z_dir::AbstractVector{T},
-    s_dir::AbstractVector{T},
-    tau_dir::T,
-    kap_dir::T,
-    solver::Solver{T};
-    nbhd::T,
-    prev_alpha::T,
-    min_alpha::T,
-    ) where {T <: Real}
-    point = solver.point
-    model = solver.model
-    z_temp = solver.z_temp
-    s_temp = solver.s_temp
-
-    alpha = min(prev_alpha * T(1.4), one(T)) # TODO option for parameter
-    if kap_dir < zero(T)
-        alpha = min(alpha, -solver.kap / kap_dir)
-    end
-    if tau_dir < zero(T)
-        alpha = min(alpha, -solver.tau / tau_dir)
-    end
-    alpha *= T(0.9999)
-
-    solver.cones_infeas .= true
-    tau_temp = kap_temp = taukap_temp = mu_temp = zero(T)
-    while true
-        @timeit solver.timer "ls_update" begin
-        @. z_temp = point.z + alpha * z_dir
-        @. s_temp = point.s + alpha * s_dir
-        tau_temp = solver.tau + alpha * tau_dir
-        kap_temp = solver.kap + alpha * kap_dir
-        taukap_temp = tau_temp * kap_temp
-        mu_temp = (dot(s_temp, z_temp) + taukap_temp) / (one(T) + model.nu)
-        end
-
-        if mu_temp > zero(T)
-            @timeit solver.timer "nbhd_check" in_nbhd = check_nbhd(mu_temp, taukap_temp, nbhd, solver)
-            if in_nbhd
-                break
-            end
-        end
-
-        if alpha < min_alpha
-            # alpha is very small so finish
-            alpha = zero(T)
-            break
-        end
-
-        # iterate is outside the neighborhood: decrease alpha
-        alpha *= T(0.9) # TODO option for parameter
-    end
-
-    return alpha
-end
-
-# TODO maybe just combine with above function if can simplify
-function check_nbhd(
-    mu_temp::T,
-    taukap_temp::T,
-    nbhd::T,
-    solver::Solver{T},
-    ) where {T <: Real}
-    cones = solver.model.cones
-
-    # TODO use a vector of bools for which cones are already in nbhd?
-
-    # check neighborhood for tau and kappa
-    if abs(taukap_temp - mu_temp) >= mu_temp * nbhd
         return false
     end
 
-    # accept primal iterate if it is inside the cone and neighborhood
-    # first check inside cone for whichever cones were violated last line search iteration
-    Cones.load_point.(cones, solver.primal_views) # TODO only for cones that need to be checked?
-    for (k, cone_k) in enumerate(cones)
-        if solver.cones_infeas[k]
-            Cones.reset_data(cone_k)
-            if Cones.is_feas(cone_k)
-                solver.cones_infeas[k] = false
-                solver.cones_loaded[k] = true
-            else
-                return false
-            end
-        else
-            solver.cones_loaded[k] = false
-        end
-    end
-
-    if !isfinite(nbhd)
-        return true
-    end
-
-    for (k, cone_k) in enumerate(cones)
-        if !solver.cones_loaded[k]
-            Cones.reset_data(cone_k)
-            if !Cones.is_feas(cone_k)
-                return false
-            end
-        end
-
-        if !Cones.in_neighborhood(cone_k, solver.dual_views[k], mu_temp)
-            return false
-        end
-    end
-
-    return true
+    return true # step succeeded
 end
 
-# return affine or combined directions, depending on stepper.in_affine_phase
-# TODO try to refactor the iterative refinement
-function get_directions(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
+# update the RHS for affine direction
+function update_rhs_affine(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
+    rhs = stepper.rhs
+
+    # x, y, z, tau
+    stepper.x_rhs .= solver.x_residual
+    stepper.y_rhs .= solver.y_residual
+    stepper.z_rhs .= solver.z_residual
+    rhs[stepper.tau_row] = solver.kap + solver.primal_obj_t - solver.dual_obj_t
+
+    # s
+    for k in eachindex(solver.model.cones)
+        duals_k = solver.point.dual_views[k]
+        @. stepper.s_rhs_k[k] = -duals_k
+    end
+
+    # kap
+    rhs[end] = -solver.kap
+    # TODO NT: -solver.tau
+
+    return rhs
+end
+
+# update the RHS for correction direction
+function update_rhs_correction(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
+    rhs = stepper.rhs
+
+    # x, y, z, tau
+    stepper.rhs[1:stepper.tau_row] .= 0
+
+    # s
+    for (k, cone_k) in enumerate(solver.model.cones)
+        duals_k = solver.point.dual_views[k]
+        grad_k = Cones.grad(cone_k)
+        @. stepper.s_rhs_k[k] = -duals_k - solver.mu * grad_k
+        # if Cones.use_3order_corr(cone_k)
+        #     # TODO check math here for case of cone.use_dual true - should s and z be swapped then?
+        #     stepper.s_rhs_k[k] .-= Cones.correction(cone_k, stepper.primal_dir_k[k], stepper.dual_dir_k[k])
+        # end
+    end
+
+    # kap
+    rhs[end] = -solver.kap + solver.mu / solver.tau
+
+    return rhs
+end
+
+# calculate direction given rhs, and apply iterative refinement
+function get_directions(stepper::CombinedStepper{T}, solver::Solver{T}; iter_ref_steps::Int = 0) where {T <: Real}
     rhs = stepper.rhs
     dir = stepper.dir
     dir_temp = stepper.dir_temp
     res = stepper.res
     system_solver = solver.system_solver
 
-    @timeit solver.timer "update_rhs" update_rhs(stepper, solver) # different for affine vs combined phases
     @timeit solver.timer "solve_system" solve_system(system_solver, solver, dir, rhs)
 
-    # use iterative refinement - note apply_lhs is different for affine vs combined phases
-    iter_ref_steps = (stepper.in_affine_phase ? 1 : 4) # TODO handle, maybe change dynamically, try fewer for affine phase
-
+    # use iterative refinement
     copyto!(dir_temp, dir)
     res = apply_lhs(stepper, solver) # modifies res
     res .-= rhs
@@ -327,49 +260,6 @@ function get_directions(stepper::CombinedStepper{T}, solver::Solver{T}) where {T
     end
 
     return dir
-end
-
-# update the RHS
-function update_rhs(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
-    rhs = stepper.rhs
-
-    if stepper.in_affine_phase
-        # x, y, z, tau rhs
-        stepper.x_rhs .= solver.x_residual
-        stepper.y_rhs .= solver.y_residual
-        stepper.z_rhs .= solver.z_residual
-        rhs[stepper.tau_row] = solver.kap + solver.primal_obj_t - solver.dual_obj_t
-
-        # s rhs
-        for k in eachindex(solver.model.cones)
-            duals_k = solver.point.dual_views[k]
-            @. stepper.s_rhs_k[k] = -duals_k
-        end
-
-        # kap rhs
-        rhs[end] = -solver.kap
-        # TODO NT: -solver.tau
-    else
-        # x, y, z, tau rhs
-        stepper.rhs[1:stepper.tau_row] .= 0
-
-        # s rhs
-        for (k, cone_k) in enumerate(solver.model.cones)
-            grad_k = Cones.grad(cone_k)
-            @. stepper.s_rhs_k[k] -= solver.mu * grad_k
-            # TODO 3-order corrector?
-            # if Cones.use_3order_corr(cone_k)
-            #     # TODO check math here for case of cone.use_dual true - should s and z be swapped then?
-            #     stepper.s_rhs_k[k] .-= Cones.correction(cone_k, stepper.primal_dir_k[k], stepper.dual_dir_k[k])
-            # end
-        end
-
-        # kap rhs
-        rhs[end] += solver.mu / solver.tau
-        # TODO NT rhs[end] += (solver.mu - stepper.dir[stepper.tau_row] * stepper.dir[stepper.kap_row]) / solver.kap
-    end
-
-    return rhs
 end
 
 # calculate residual on 6x6 linear system
@@ -415,8 +305,105 @@ function apply_lhs(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: R
     return stepper.res
 end
 
-# # TODO experimental for BlockMatrix LHS: if block is a Cone then define mul as hessian product, if block is solver then define mul by mu/tau/tau
-# # TODO optimize... maybe need for each cone a 5-arg hess prod
+# backtracking line search to find large distance to step in direction while remaining inside cones and inside a given neighborhood
+function find_max_alpha(
+    stepper::CombinedStepper{T},
+    solver::Solver{T};
+    prev_alpha::T,
+    min_alpha::T,
+    ) where {T <: Real}
+    cones = solver.model.cones
+    cone_times = stepper.cone_times
+    cone_order = stepper.cone_order
+    z = solver.point.z
+    s = solver.point.s
+    tau = solver.tau
+    kap = solver.kap
+    z_dir = stepper.z_dir
+    s_dir = stepper.s_dir
+    tau_dir = stepper.dir[stepper.tau_row]
+    kap_dir = stepper.dir[stepper.kap_row]
+    z_linesearch = stepper.z_linesearch
+    s_linesearch = stepper.s_linesearch
+
+    alpha = max(T(0.1), min(prev_alpha * T(1.4), one(T))) # TODO option for parameter
+    if tau_dir < zero(T)
+        alpha = min(alpha, -tau / tau_dir)
+    end
+    if kap_dir < zero(T)
+        alpha = min(alpha, -kap / kap_dir)
+    end
+    alpha *= T(0.9999)
+
+    tau_temp = kap_temp = taukap_temp = mu_temp = zero(T)
+    nup1 = solver.model.nu + 1
+    while true
+        @. z_linesearch = z + alpha * z_dir
+        @. s_linesearch = s + alpha * s_dir
+        tau_temp = tau + alpha * tau_dir
+        kap_temp = kap + alpha * kap_dir
+        taukap_temp = tau_temp * kap_temp
+        mu_temp = (dot(s_linesearch, z_linesearch) + taukap_temp) / nup1
+
+        if mu_temp > eps(T) && abs(taukap_temp - mu_temp) < mu_temp * solver.max_nbhd
+            # order the cones by how long it takes to check neighborhood condition and iterate in that order, to improve efficiency
+            sortperm!(cone_order, cone_times, initialized = true)
+            in_nbhd = true
+            for k in cone_order
+                cone_k = cones[k]
+                time_k = time_ns()
+                Cones.load_point(cone_k, stepper.primal_views_linesearch[k])
+                Cones.reset_data(cone_k)
+                in_nbhd_k = Cones.is_feas(cone_k) && Cones.in_neighborhood(cone_k, stepper.dual_views_linesearch[k], mu_temp)
+                cone_times[k] = time_ns() - time_k
+                if !in_nbhd_k
+                    in_nbhd = false
+                    break
+                end
+            end
+            if in_nbhd
+                break
+            end
+        end
+
+        if alpha < min_alpha
+            # alpha is very small so finish
+            alpha = zero(T)
+            break
+        end
+
+        # iterate is outside the neighborhood: decrease alpha
+        alpha *= T(0.9) # TODO option for parameter
+    end
+
+    return alpha
+end
+
+# TODO if p = 0, don't print y_feas
+function print_iteration_stats(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
+    if iszero(solver.num_iters)
+        @printf("\n%5s %12s %12s %9s %9s %9s %9s %9s %9s %9s %9s %9s %9s\n",
+            "iter", "p_obj", "d_obj", "abs_gap", "rel_gap",
+            "x_feas", "y_feas", "z_feas", "tau", "kap", "mu",
+            "gamma", "alpha",
+            )
+        @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n",
+            solver.num_iters, solver.primal_obj, solver.dual_obj, solver.gap, solver.rel_gap,
+            solver.x_feas, solver.y_feas, solver.z_feas, solver.tau, solver.kap, solver.mu
+            )
+    else
+        @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n",
+            solver.num_iters, solver.primal_obj, solver.dual_obj, solver.gap, solver.rel_gap,
+            solver.x_feas, solver.y_feas, solver.z_feas, solver.tau, solver.kap, solver.mu,
+            stepper.prev_gamma, stepper.prev_alpha,
+            )
+    end
+    flush(stdout)
+    return
+end
+
+# TODO experimental for BlockMatrix LHS: if block is a Cone then define mul as hessian product, if block is solver then define mul by mu/tau/tau
+# TODO optimize... maybe need for each cone a 5-arg hess prod
 # import LinearAlgebra.mul!
 #
 # function mul!(y::AbstractVecOrMat{T}, A::Cones.Cone{T}, x::AbstractVecOrMat{T}, alpha::Number, beta::Number) where {T <: Real}

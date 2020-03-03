@@ -111,18 +111,6 @@ mutable struct Solver{T <: Real}
     prev_y_feas::T
     prev_z_feas::T
 
-    # step helpers
-    keep_iterating::Bool
-    prev_aff_alpha::T
-    prev_gamma::T
-    prev_alpha::T
-    z_temp::Vector{T}
-    s_temp::Vector{T}
-    primal_views
-    dual_views
-    cones_infeas::Vector{Bool}
-    cones_loaded::Vector{Bool}
-
     function Solver{T}(;
         verbose::Bool = true,
         iter_limit::Int = 1000,
@@ -244,27 +232,17 @@ function solve(solver::Solver{T}) where {T <: Real}
     solver.prev_y_feas = NaN
     solver.prev_z_feas = NaN
 
-    solver.prev_aff_alpha = one(T)
-    solver.prev_gamma = one(T)
-    solver.prev_alpha = one(T)
-    solver.z_temp = similar(model.h)
-    solver.s_temp = similar(model.h)
-    solver.primal_views = [view(Cones.use_dual_barrier(model.cones[k]) ? solver.z_temp : solver.s_temp, model.cone_idxs[k]) for k in eachindex(model.cones)]
-    solver.dual_views = [view(Cones.use_dual_barrier(model.cones[k]) ? solver.s_temp : solver.z_temp, model.cone_idxs[k]) for k in eachindex(model.cones)]
-    solver.cones_infeas = trues(length(model.cones))
-    solver.cones_loaded = trues(length(model.cones))
-
-    @timeit solver.timer "setup_stepper" load(solver.stepper, solver)
+    stepper = solver.stepper
+    @timeit solver.timer "setup_stepper" load(stepper, solver)
     @timeit solver.timer "setup_system" load(solver.system_solver, solver)
 
     # iterate from initial point
-    solver.keep_iterating = true
-    while solver.keep_iterating
+    while true
         @timeit solver.timer "calc_res" calc_residual(solver)
 
         @timeit solver.timer "calc_conv" calc_convergence_params(solver)
 
-        @timeit solver.timer "print_iter" solver.verbose && print_iteration_stats(solver)
+        @timeit solver.timer "print_iter" solver.verbose && print_iteration_stats(stepper, solver)
 
         @timeit solver.timer "check_conv" check_convergence(solver) && break
 
@@ -279,7 +257,7 @@ function solve(solver::Solver{T}) where {T <: Real}
             break
         end
 
-        @timeit solver.timer "step" step(solver.stepper, solver)
+        @timeit solver.timer "step" step(stepper, solver) || break
         solver.num_iters += 1
     end
 
@@ -364,28 +342,6 @@ function calc_convergence_params(solver::Solver{T}) where {T <: Real}
     solver.y_feas = solver.y_norm_res * solver.y_conv_tol
     solver.z_feas = solver.z_norm_res * solver.z_conv_tol
 
-    return
-end
-
-function print_iteration_stats(solver::Solver{T}) where {T <: Real}
-    if iszero(solver.num_iters)
-        @printf("\n%5s %12s %12s %9s %9s %9s %9s %9s %9s %9s %9s %9s %9s\n",
-            "iter", "p_obj", "d_obj", "abs_gap", "rel_gap",
-            "x_feas", "y_feas", "z_feas", "tau", "kap", "mu",
-            "gamma", "alpha",
-            )
-        @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n",
-            solver.num_iters, solver.primal_obj, solver.dual_obj, solver.gap, solver.rel_gap,
-            solver.x_feas, solver.y_feas, solver.z_feas, solver.tau, solver.kap, solver.mu
-            )
-    else
-        @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n",
-            solver.num_iters, solver.primal_obj, solver.dual_obj, solver.gap, solver.rel_gap,
-            solver.x_feas, solver.y_feas, solver.z_feas, solver.tau, solver.kap, solver.mu,
-            solver.prev_gamma, solver.prev_alpha,
-            )
-    end
-    flush(stdout)
     return
 end
 
