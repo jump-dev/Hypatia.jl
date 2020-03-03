@@ -102,15 +102,17 @@ polymin_native(
     T::Type{<:Real},
     poly_name::Symbol,
     halfdeg::Int,
-    args...
-    ) = polymin_native(T, get_interp_data(T, poly_name, halfdeg)..., args...)
+    args...;
+    sample_factor::Int = 100,
+    ) = polymin_native(T, get_interp_data(T, poly_name, halfdeg, sample_factor)..., args...)
 
 polymin_native(
     T::Type{<:Real},
     n::Int,
     halfdeg::Int,
-    args...
-    ) = polymin_native(T, random_interp_data(T, n, halfdeg)..., args...)
+    args...;
+    sample_factor::Int = 100,
+    ) = polymin_native(T, random_interp_data(T, n, halfdeg, sample_factor)..., args...)
 
 # real-valued complex polynomials
 function polymin_native(

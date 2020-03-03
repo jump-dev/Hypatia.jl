@@ -10,6 +10,7 @@ using Test
 import JuMP
 import Hypatia
 const MU = Hypatia.ModelUtilities
+const MOI = JuMP.MOI
 
 include(joinpath(@__DIR__, "data.jl"))
 
@@ -62,15 +63,17 @@ polymin_JuMP(
     T::Type{<:Real},
     poly_name::Symbol,
     halfdeg::Int,
-    args...
-    ) = polymin_JuMP(T, get_interp_data(T, poly_name, halfdeg)..., args...)
+    args...;
+    sample_factor::Int = 100,
+    ) = polymin_JuMP(T, get_interp_data(T, poly_name, halfdeg, sample_factor)..., args...)
 
 polymin_JuMP(
     T::Type{<:Real},
     n::Int,
     halfdeg::Int,
-    args...
-    ) = polymin_JuMP(T, random_interp_data(T, n, halfdeg)..., args...)
+    args...;
+    sample_factor::Int = 100,
+    ) = polymin_JuMP(T, random_interp_data(T, n, halfdeg, sample_factor)..., args...)
 
 function test_polymin_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)
