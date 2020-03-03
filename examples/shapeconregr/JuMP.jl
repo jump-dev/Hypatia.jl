@@ -74,7 +74,7 @@ function shapeconregr_JuMP(
             JuMP.@constraint(model, conv_profile * hessian_interp in conv_wsos_cone)
         end
     else
-        SumOfSquares.setpolymodule!(model, SumOfSquares)
+        PolyJuMP.setpolymodule!(model, SumOfSquares)
 
         # monotonicity
         monotonic_set = MU.get_domain_inequalities(mono_dom, x)

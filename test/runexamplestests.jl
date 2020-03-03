@@ -35,29 +35,29 @@ native_example_names = [
     ]
 
 JuMP_example_names = [
-    # "centralpolymat",
-    # "conditionnum",
-    # "contraction",
-    # "densityest",
-    # "envelope",
-    # "expdesign",
-    # "lotkavolterra",
-    # "lyapunovstability",
-    # "matrixcompletion",
-    # "matrixquadratic",
+    "centralpolymat",
+    "conditionnum",
+    "contraction",
+    "densityest",
+    "envelope",
+    "expdesign",
+    "lotkavolterra",
+    "lyapunovstability",
+    "matrixcompletion",
+    "matrixquadratic",
     "matrixregression", # TODO incorrect and moi issue
-    # "maxvolume",
-    # "muconvexity",
-    # "nearestpsd",
-    # "polymin",
-    # "polynorm",
-    # "portfolio",
-    # "regionofattr",
-    # "robustgeomprog",
-    # "secondorderpoly",
-    # "semidefinitepoly", # TODO update
-    # "shapeconregr",
-    # "signomialmin", # TODO update
+    "maxvolume",
+    "muconvexity",
+    "nearestpsd",
+    "polymin",
+    "polynorm",
+    "portfolio",
+    "regionofattr",
+    "robustgeomprog",
+    "secondorderpoly",
+    "semidefinitepoly",
+    "shapeconregr",
+    "signomialmin",
     ]
 
 T = Float64
