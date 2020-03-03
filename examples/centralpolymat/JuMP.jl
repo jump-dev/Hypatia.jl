@@ -14,11 +14,11 @@ using LinearAlgebra
 using Test
 
 function centralpolymat_JuMP(
-    T::Type{Float64}, # TODO support generic reals
+    ::Type{T},
     n::Int,
     halfdeg::Int,
     logdet_obj::Bool, # use logdet, else rootdet
-    )
+    ) where {T <: Float64} # TODO support generic reals
     DP.@polyvar x[1:n]
     monomials = DP.monomials(x, 0:halfdeg)
     L = binomial(n + halfdeg, n)

@@ -32,11 +32,11 @@ const MOI = JuMP.MOI
 import Hypatia
 
 function conditionnum_JuMP(
-    T::Type{Float64}, # TODO support generic reals
+    ::Type{T},
     side::Int,
     len_y::Int,
     use_linmatrixineq::Bool, # use linmatrixineq cone, else PSD formulation
-    )
+    ) where {T <: Float64} # TODO support generic reals
     Mi = [zeros(side, side) for i in 1:len_y]
     for i in eachindex(Mi)
         Mi_half = randn(side)

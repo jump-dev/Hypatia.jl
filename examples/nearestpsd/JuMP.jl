@@ -23,13 +23,13 @@ const MOI = JuMP.MOI
 import Hypatia
 
 function nearestpsd_JuMP(
-    T::Type{Float64}, # TODO support BLAS reals
+    ::Type{T},
     side::Int,
     use_completable::Bool, # solve problem (2) above, else solve problem (1)
     use_chordal_sparsity::Bool, # use a chordal sparsity pattern, else use a general sparsity pattern
     use_sparsepsd::Bool = true; # use sparse PSD cone formulation, else dense PSD formulation
     sparsity::Float64 = min(3 / side, 1.0), # sparsity factor (before computing optional chordal extension)
-    )
+    ) where {T <: Float64} # TODO support generic reals
     # generate random symmetric A (indefinite) with sparsity pattern E (nonchordal, with diagonal)
     A = tril!(sprandn(side, side, sparsity)) + Diagonal(randn(side))
     if use_chordal_sparsity

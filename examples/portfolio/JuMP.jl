@@ -13,11 +13,11 @@ import Hypatia
 const CO = Hypatia.Cones
 
 function portfolio_JuMP(
-    T::Type{Float64}, # TODO support generic reals
+    ::Type{T},
     num_stocks::Int,
     epipernormeucl_constr::Bool, # add an L2 ball constraint, else don't add
     epinorminf_constrs::Bool, # add L1 and Linfty ball constraints, elsle don't add
-    )
+    ) where {T <: Float64} # TODO support generic reals
     returns = rand(num_stocks)
     sigma_half = randn(num_stocks, num_stocks)
     x = randn(num_stocks)

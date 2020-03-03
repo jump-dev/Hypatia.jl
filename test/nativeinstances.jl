@@ -1,5 +1,6 @@
 #=
 Copyright 2018, Chris Coey, Lea Kapelevich and contributors
+
 native test instances
 
 TODO
@@ -1770,6 +1771,9 @@ function wsosinterppossemideftri2(T; options...)
 end
 
 function wsosinterppossemideftri3(T; options...)
+    if !(T <: LinearAlgebra.BlasReal)
+        return # too slow with BigFloat real types
+    end
     # convexity parameter for sum(x .^ 6) - sum(x .^ 2)
     tol = sqrt(sqrt(eps(T)))
     n = 3
@@ -1835,12 +1839,13 @@ function wsosinterpepinormeucl2(T; options...)
 end
 
 function wsosinterpepinormeucl3(T; options...)
+    if !(T <: LinearAlgebra.BlasReal)
+        return # calc_w only works with BlasReal
+    end
     # max: w'f: 25x^4 >= f(x)^4 + 9x^4 on [-1, 1], soln is +/- 4x^2
     tol = sqrt(sqrt(eps(T)))
     DynamicPolynomials.@polyvar x
-    # TODO when calc_w = true works with BigFloat, enable it
-    (U, pts, Ps, _) = MU.interpolate(MU.Box{T}([-one(T)], [one(T)]), 1, sample = false, calc_w = false)
-    w = fill(T(1 / 3), 3)
+    (U, pts, Ps, _) = MU.interpolate(MU.Box{T}([-one(T)], [one(T)]), 1, sample = false, calc_w = true)
     fn1 = 5x^2
     fn2 = 3x^2
 

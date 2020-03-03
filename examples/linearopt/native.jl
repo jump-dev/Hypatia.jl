@@ -14,11 +14,11 @@ import Hypatia
 const CO = Hypatia.Cones
 
 function linearopt_native(
-    T::Type{<:Real},
+    ::Type{T},
     m::Int,
     n::Int,
     nz_frac::Float64,
-    )
+    ) where {T <: Real}
     # generate random data
     @assert 0 < nz_frac <= 1
 

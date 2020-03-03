@@ -28,18 +28,18 @@ import Hypatia
 const MU = Hypatia.ModelUtilities
 
 function shapeconregr_JuMP(
-    T::Type{Float64}, # TODO support generic reals
-    X::Matrix{Float64},
-    y::Vector{Float64},
+    ::Type{T},
+    X::Matrix{T},
+    y::Vector{T},
     deg::Int,
     use_wsos::Bool, # use WSOS cone formulation, else SDP formulation
     use_L1_obj::Bool, # in objective function use L1 norm, else L2 norm
     is_fit_exact::Bool;
-    mono_dom::MU.Domain = MU.Box{Float64}(-ones(size(X, 2)), ones(size(X, 2))),
+    mono_dom::MU.Domain = MU.Box{T}(-ones(size(X, 2)), ones(size(X, 2))),
     conv_dom::MU.Domain = mono_dom,
     mono_profile::Vector{Int} = ones(Int, size(X, 2)),
     conv_profile::Int = 1,
-    )
+    ) where {T <: Float64} # TODO support generic reals
     n = size(X, 2)
     num_points = size(X, 1)
 
@@ -121,10 +121,14 @@ function shapeconregr_JuMP(
     return (model = model, is_fit_exact = is_fit_exact)
 end
 
-shapeconregr_JuMP(T::Type{Float64}, data_name::Symbol, args...; kwargs...) = shapeconregr_JuMP(T, eval(data_name)..., args...; kwargs...)
+shapeconregr_JuMP(
+    ::Type{T},
+    data_name::Symbol,
+    args...; kwargs...
+    ) where {T <: Float64} = shapeconregr_JuMP(T, eval(data_name)..., args...; kwargs...)
 
 function shapeconregr_JuMP(
-    T::Type{Float64}, # TODO support generic reals
+    ::Type{T},
     n::Int,
     num_points::Int,
     func::Symbol,
@@ -133,7 +137,7 @@ function shapeconregr_JuMP(
     xmin::Real = -1,
     xmax::Real = 1,
     kwargs...
-    )
+    ) where {T <: Float64}
     X = rand(Distributions.Uniform(xmin, xmax), num_points, n)
     f = shapeconregr_data[func]
     y = T[f(X[p, :]) for p in 1:num_points]
@@ -172,7 +176,7 @@ shapeconregr_data = Dict(
     :func6 => (x -> sum((x .+ 1) .^ 4)),
     :func7 => (x -> sum((x / 2 .+ 1) .^ 3)),
     :func8 => (x -> sum((x .+ 1) .^ 5 .- 2)),
-    :func9 => (x -> (5x[1] + 0.5x[2] + x[3])^2 + sqrt(x[4]^2 + x[5]^2)),
+    :func9 => (x -> (5x[1] + x[2] / 2 + x[3])^2 + sqrt(x[4]^2 + x[5]^2)),
     )
 
 shapeconregr_JuMP_fast = [
