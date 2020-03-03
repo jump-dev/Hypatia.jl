@@ -43,8 +43,7 @@ function matrixregression_JuMP(
     end
     if !iszero(lam_nuc)
         JuMP.@variable(model, t_nuc)
-        JuMP.@constraint(model, vcat(t_nuc, vec(A')) in MOI.NormNuclearCone(data_m, data_p))
-        # JuMP.@constraint(model, vcat(t_nuc, vec(A)) in MOI.NormNuclearCone(data_p, data_m))
+        JuMP.@constraint(model, vcat(t_nuc, vec(A)) in MOI.NormNuclearCone(data_p, data_m))
         obj += lam_nuc * t_nuc
     end
     if !iszero(lam_las)

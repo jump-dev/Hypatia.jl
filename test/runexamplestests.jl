@@ -45,7 +45,7 @@ JuMP_example_names = [
     # "lyapunovstability",
     # "matrixcompletion",
     # "matrixquadratic",
-    "matrixregression", # TODO incorrect and moi issue
+    "matrixregression",
     # "maxvolume",
     # "muconvexity",
     # "nearestpsd",
