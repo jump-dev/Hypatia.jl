@@ -18,12 +18,12 @@ import Hypatia
 const MU = Hypatia.ModelUtilities
 
 function muconvexity_JuMP(
-    T::Type{Float64}, # TODO support generic reals
+    ::Type{T},
     poly::Symbol,
     dom::Symbol,
     use_matrixwsos::Bool, # use wsosinterpposeideftricone, else PSD formulation
     true_mu::Real = NaN, # optional true value of parameter for testing only
-    )
+    ) where {T <: Float64} # TODO support generic reals
     dom = muconvexity_data[dom]
     n = MU.get_dimension(dom)
     DP.@polyvar x[1:n]

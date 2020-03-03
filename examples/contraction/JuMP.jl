@@ -20,12 +20,12 @@ import Hypatia
 const MU = Hypatia.ModelUtilities
 
 function contraction_JuMP(
-    T::Type{Float64}, # TODO support generic reals
+    ::Type{T},
     beta::Float64,
     M_deg::Int,
     delta::Float64,
     use_matrixwsos::Bool, # use wsos matrix cone, else PSD formulation
-    )
+    ) where {T <: Float64} # TODO support generic reals
     n = 2
     dom = MU.FreeDomain{Float64}(n)
 

@@ -25,14 +25,14 @@ include(joinpath(@__DIR__, "data.jl"))
 
 # real polynomials
 function polymin_native(
-    T::Type{<:Real},
+    ::Type{T},
     interp_vals::Vector{T},
     Ps::Vector{Matrix{T}},
     true_min::Real,
     use_primal::Bool, # solve primal, else solve dual
     use_wsos::Bool, # use wsosinterpnonnegative cone, else PSD formulation
     use_linops::Bool,
-    )
+    ) where {T <: Real}
     if use_primal && !use_wsos
         error("primal psd formulation is not implemented yet")
     end
@@ -99,22 +99,24 @@ function polymin_native(
 end
 
 polymin_native(
-    T::Type{<:Real},
+    ::Type{T},
     poly_name::Symbol,
     halfdeg::Int,
-    args...
-    ) = polymin_native(T, get_interp_data(T, poly_name, halfdeg)..., args...)
+    args...;
+    sample_factor::Int = 100,
+    ) where {T <: Real} = polymin_native(T, get_interp_data(T, poly_name, halfdeg, sample_factor)..., args...)
 
 polymin_native(
-    T::Type{<:Real},
+    ::Type{T},
     n::Int,
     halfdeg::Int,
-    args...
-    ) = polymin_native(T, random_interp_data(T, n, halfdeg)..., args...)
+    args...;
+    sample_factor::Int = 100,
+    ) where {T <: Real} = polymin_native(T, random_interp_data(T, n, halfdeg, sample_factor)..., args...)
 
 # real-valued complex polynomials
 function polymin_native(
-    T::Type{<:Real},
+    ::Type{T},
     ::Type{Complex},
     poly_name::Symbol,
     halfdeg::Int,
@@ -122,7 +124,7 @@ function polymin_native(
     use_wsos::Bool;
     sample_factor::Int = 100,
     use_QR::Bool = false,
-    )
+    ) where {T <: Real}
     if !use_wsos
         error("PSD formulation is not implemented yet")
     end
