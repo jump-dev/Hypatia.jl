@@ -16,14 +16,14 @@ import Hypatia
 const MU = Hypatia.ModelUtilities
 
 function densityest_JuMP(
-    T::Type{Float64}, # TODO support generic reals
-    X::Matrix{Float64},
+    ::Type{T},
+    X::Matrix{T},
     deg::Int,
     use_monomial_space::Bool, # use variables in monomial space, else interpolation space
     use_wsos::Bool; # use WSOS cone formulation, else PSD formulation
     sample::Bool = true,
     sample_factor::Int = 100,
-    )
+    ) where {T <: Float64} # TODO support generic reals
     (num_obs, dim) = size(X)
 
     domain = MU.Box{Float64}(-ones(dim), ones(dim))
@@ -77,9 +77,18 @@ function densityest_JuMP(
     return (model = model,)
 end
 
-densityest_JuMP(T::Type{Float64}, data_name::Symbol, args...; kwargs...) = densityest_JuMP(T, eval(data_name), args...; kwargs...)
+densityest_JuMP(
+    ::Type{T},
+    data_name::Symbol,
+    args...; kwargs...
+    ) where {T <: Float64} = densityest_JuMP(T, eval(data_name), args...; kwargs...)
 
-densityest_JuMP(T::Type{Float64}, num_obs::Int, n::Int, args...; kwargs...) = densityest_JuMP(T, randn(T, num_obs, n), args...; kwargs...)
+densityest_JuMP(
+    ::Type{T},
+    num_obs::Int,
+    n::Int,
+    args...; kwargs...
+    ) where {T <: Float64} = densityest_JuMP(T, randn(T, num_obs, n), args...; kwargs...)
 
 function test_densityest_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)

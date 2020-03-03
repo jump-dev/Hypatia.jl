@@ -13,7 +13,7 @@ const MOI = JuMP.MOI
 import Hypatia
 
 function matrixregression_JuMP(
-    T::Type{Float64}, # TODO support generic reals
+    ::Type{T},
     Y::Matrix{T},
     X::Matrix{T},
     lam_fro::Real, # penalty on Frobenius norm
@@ -21,7 +21,7 @@ function matrixregression_JuMP(
     lam_las::Real, # penalty on l1 norm
     lam_glr::Real, # penalty on penalty on row group l1 norm
     lam_glc::Real, # penalty on penalty on column group l1 norm
-    )
+    ) where {T <: Float64} # TODO support generic reals
     @assert min(lam_fro, lam_nuc, lam_las, lam_glr, lam_glc) >= 0
     (data_n, data_m) = size(Y)
     data_p = size(X, 2)
@@ -72,7 +72,7 @@ function matrixregression_JuMP(
 end
 
 function matrixregression_JuMP(
-    T::Type{Float64}, # TODO support generic reals
+    ::Type{T},
     n::Int,
     m::Int,
     p::Int,
@@ -80,7 +80,7 @@ function matrixregression_JuMP(
     A_max_rank::Int = div(m, 2) + 1,
     A_sparsity::Real = max(0.2, inv(sqrt(m * p))),
     Y_noise::Real = 0.01,
-    )
+    ) where {T <: Float64} # TODO support generic reals
     @assert p >= m
     @assert 1 <= A_max_rank <= m
     @assert 0 < A_sparsity <= 1

@@ -14,7 +14,7 @@ const CO = Hypatia.Cones
 const MU = Hypatia.ModelUtilities
 
 function expdesign_native(
-    T::Type{<:Real},
+    ::Type{T},
     q::Int,
     p::Int,
     n::Int,
@@ -25,7 +25,7 @@ function expdesign_native(
     use_logdet::Bool,
     use_rootdet::Bool,
     use_epinorminf::Bool,
-    )
+    ) where {T <: Real}
     @assert logdet_obj + geomean_obj + rootdet_obj == 1
     @assert (p > q) && (n > q) && (n_max <= n)
     V = T(4) * rand(T, q, p) .- T(2)

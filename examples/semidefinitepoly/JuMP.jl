@@ -20,13 +20,13 @@ const MU = Hypatia.ModelUtilities
 include(joinpath(@__DIR__, "data.jl"))
 
 function semidefinitepoly_JuMP(
-    T::Type{Float64}, # TODO support generic reals
+    ::Type{T},
     x::Vector{<:DP.PolyVar},
     H::Matrix{<:DP.Polynomial},
     is_feas::Bool, # whether model should be primal-dual feasible; only for testing
     use_wsosmatrix::Bool, # use wsosinterppossemideftri cone, else PSD formulation
     use_dual::Bool, # use dual formulation, else primal formulation
-    )
+    ) where {T <: Float64} # TODO support generic reals
     model = JuMP.Model()
 
     if use_wsosmatrix
@@ -62,17 +62,17 @@ function semidefinitepoly_JuMP(
 end
 
 semidefinitepoly_JuMP(
-    T::Type{Float64},
+    ::Type{T},
     x::Vector{DP.PolyVar{true}},
     poly::DP.Polynomial,
     args...
-    ) = semidefinitepoly_JuMP(T, x, DP.differentiate(poly, x, 2), args...)
+    ) where {T <: Float64} = semidefinitepoly_JuMP(T, x, DP.differentiate(poly, x, 2), args...)
 
 semidefinitepoly_JuMP(
-    T::Type{Float64},
+    ::Type{T},
     matpoly::Symbol,
     args...
-    ) = semidefinitepoly_JuMP(T, get_semidefinitepoly_data(matpoly)..., args...)
+    ) where {T <: Float64} = semidefinitepoly_JuMP(T, get_semidefinitepoly_data(matpoly)..., args...)
 
 function test_semidefinitepoly_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)

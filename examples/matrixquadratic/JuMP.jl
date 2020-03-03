@@ -23,11 +23,11 @@ using SparseArrays
 using Test
 
 function matrixquadratic_JuMP(
-    T::Type{Float64}, # TODO support generic reals
+    ::Type{T},
     W_rows::Int,
     W_cols::Int,
     use_matrixepipersquare::Bool, # use matrixepipersquare cone, else PSD formulation
-    )
+    ) where {T <: Float64} # TODO support generic reals
     C = randn(W_cols, W_rows)
     P = randn(W_rows, W_rows)
     P = Symmetric(P * P')

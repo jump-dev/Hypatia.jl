@@ -30,12 +30,12 @@ import Hypatia
 const CO = Hypatia.Cones
 
 function lyapunovstability_JuMP(
-    T::Type{Float64}, # TODO support generic reals
+    ::Type{T},
     W_rows::Int,
     W_cols::Int,
     linear_dynamics::Bool, # solve problem 1 in the description, else problem 2
     use_matrixepipersquare::Bool, # use matrixepipersquare cone, else PSD formulation
-    )
+    ) where {T <: Float64} # TODO support generic reals
     model = JuMP.Model()
     JuMP.@variable(model, t)
     JuMP.@objective(model, Min, t)
