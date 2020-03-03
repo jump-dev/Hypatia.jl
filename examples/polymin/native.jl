@@ -1,10 +1,10 @@
 #=
 Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
-polyminreal: formulates and solves the real polynomial optimization problem for a given polynomial; see:
+polymin real: formulates and solves the real polynomial optimization problem for a given polynomial; see:
 D. Papp and S. Yildiz. Sum-of-squares optimization without semidefinite programming.
 
-polymincomplex: minimizes a real-valued complex polynomial over a domain defined by real-valued complex polynomials
+polymin complex: minimizes a real-valued complex polynomial over a domain defined by real-valued complex polynomials
 
 TODO
 - generalize ModelUtilities interpolation code for complex polynomials space
@@ -24,24 +24,23 @@ const MU = Hypatia.ModelUtilities
 include(joinpath(@__DIR__, "data.jl"))
 
 # real polynomials
-function polymin(
+function polymin_native(
+    T::Type{<:Real},
     interp_vals::Vector{T},
     Ps::Vector{Matrix{T}},
     true_min::Real,
     use_primal::Bool, # solve primal, else solve dual
     use_wsos::Bool, # use wsosinterpnonnegative cone, else PSD formulation
     use_linops::Bool,
-    ) where {T <: Real}
+    )
     if use_primal && !use_wsos
         error("primal psd formulation is not implemented yet")
     end
     U = length(interp_vals)
 
+    cones = CO.Cone{T}[]
     if use_wsos
-        cones = CO.Cone{T}[CO.WSOSInterpNonnegative{T, T}(U, Ps, use_dual = !use_primal)]
-    else
-        # will be set up iteratively
-        cones = CO.Cone{T}[]
+        push!(cones, CO.WSOSInterpNonnegative{T, T}(U, Ps, use_dual = !use_primal))
     end
 
     if use_primal
@@ -99,51 +98,36 @@ function polymin(
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, true_min = true_min)
 end
 
-# use a predefined real poly from data.jl
-function polymin(
+polymin_native(
     T::Type{<:Real},
     poly_name::Symbol,
     halfdeg::Int,
-    args...;
-    sample_factor::Int = 10,
-    )
-    (x, fn, dom, true_min) = getpolydata(poly_name, T)
-    sample = (length(x) >= 5) || !isa(dom, MU.Box)
-    (U, pts, Ps, _) = MU.interpolate(dom, halfdeg, sample = sample, sample_factor = sample_factor)
-    interp_vals = T[fn(pts[j, :]...) for j in 1:U]
-    return polymin(interp_vals, Ps, true_min, args...)
-end
+    args...
+    ) = polymin_native(T, get_interp_data(T, poly_name, halfdeg)..., args...)
 
-# generate a random real poly in n variables of half degree halfdeg and use a box domain
-function polymin(
+polymin_native(
     T::Type{<:Real},
     n::Int,
     halfdeg::Int,
-    args...;
-    sample_factor::Int = 10,
-    )
-    dom = MU.Box{T}(-ones(T, n), ones(T, n))
-    (U, pts, Ps, _) = MU.interpolate(dom, halfdeg, sample = (n >= 5), sample_factor = sample_factor)
-    interp_vals = randn(T, U)
-    true_min = T(NaN) # TODO could get an upper bound by evaluating at random points in domain
-    return polymin(interp_vals, Ps, true_min, args...)
-end
+    args...
+    ) = polymin_native(T, random_interp_data(T, n, halfdeg)..., args...)
 
 # real-valued complex polynomials
-function polymin(
-    R::Type{Complex{T}},
+function polymin_native(
+    T::Type{<:Real},
+    ::Type{Complex},
     poly_name::Symbol,
     halfdeg::Int,
     use_primal::Bool,
     use_wsos::Bool;
     sample_factor::Int = 100,
     use_QR::Bool = false,
-    ) where {T <: Real}
+    )
     if !use_wsos
         error("PSD formulation is not implemented yet")
     end
 
-    (n, f, gs, g_halfdegs, true_min) = complexpolys[poly_name]
+    (n, f, gs, g_halfdegs, true_min) = complex_poly_data[poly_name]
 
     # generate interpolation
     # TODO use more numerically-stable basis for columns
@@ -209,10 +193,9 @@ function polymin(
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, true_min = true_min)
 end
 
-function test_polymin(T::Type{<:Real}, instance::Tuple; options::NamedTuple = NamedTuple(), rseed::Int = 1)
+function test_polymin_native(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)
-    R = (instance[1] == Complex) ? Complex{T} : T
-    d = polymin(R, instance[2:end]...)
+    d = polymin_native(T, instance...)
     r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
     @test r.status == :Optimal
     if r.status == :Optimal && !isnan(d.true_min)
@@ -221,40 +204,40 @@ function test_polymin(T::Type{<:Real}, instance::Tuple; options::NamedTuple = Na
     return r
 end
 
-instances_polymin_fast = [
-    (Real, :butcher, 2, true, true, false),
-    (Real, :caprasse, 4, true, true, false),
-    (Real, :goldsteinprice, 7, true, true, false),
-    (Real, :goldsteinprice_ball, 7, true, true, false),
-    (Real, :goldsteinprice_ellipsoid, 7, true, true, false),
-    (Real, :heart, 2, true, true, false),
-    (Real, :lotkavolterra, 3, true, true, false),
-    (Real, :magnetism7, 2, true, true, false),
-    (Real, :magnetism7_ball, 2, true, true, false),
-    (Real, :motzkin, 3, true, true, false),
-    (Real, :motzkin_ball, 3, true, true, false),
-    (Real, :motzkin_ellipsoid, 3, true, true, false),
-    (Real, :reactiondiffusion, 4, true, true, false),
-    (Real, :robinson, 8, true, true, false),
-    (Real, :robinson_ball, 8, true, true, false),
-    (Real, :rosenbrock, 5, true, true, false),
-    (Real, :rosenbrock_ball, 5, true, true, false),
-    (Real, :schwefel, 2, true, true, false),
-    (Real, :schwefel_ball, 2, true, true, false),
-    (Real, :lotkavolterra, 3, false, true, false),
-    (Real, :motzkin, 3, false, true, false),
-    (Real, :motzkin_ball, 3, false, true, false),
-    (Real, :schwefel, 2, false, true, false),
-    (Real, :lotkavolterra, 3, false, false, false),
-    (Real, :motzkin, 3, false, false, false),
-    (Real, :motzkin_ball, 3, false, false, false),
-    (Real, :schwefel, 2, false, false, false),
-    (Real, 1, 8, true, true, false),
-    (Real, 2, 5, true, true, false),
-    (Real, 3, 3, true, true, false),
-    (Real, 5, 2, true, true, false),
-    (Real, 3, 3, false, true, false),
-    (Real, 3, 3, false, false, false),
+polymin_native_fast = [
+    (:butcher, 2, true, true, false),
+    (:caprasse, 4, true, true, false),
+    (:goldsteinprice, 7, true, true, false),
+    (:goldsteinprice_ball, 7, true, true, false),
+    (:goldsteinprice_ellipsoid, 7, true, true, false),
+    (:heart, 2, true, true, false),
+    (:lotkavolterra, 3, true, true, false),
+    (:magnetism7, 2, true, true, false),
+    (:magnetism7_ball, 2, true, true, false),
+    (:motzkin, 3, true, true, false),
+    (:motzkin_ball, 3, true, true, false),
+    (:motzkin_ellipsoid, 3, true, true, false),
+    (:reactiondiffusion, 4, true, true, false),
+    (:robinson, 8, true, true, false),
+    (:robinson_ball, 8, true, true, false),
+    (:rosenbrock, 5, true, true, false),
+    (:rosenbrock_ball, 5, true, true, false),
+    (:schwefel, 2, true, true, false),
+    (:schwefel_ball, 2, true, true, false),
+    (:lotkavolterra, 3, false, true, false),
+    (:motzkin, 3, false, true, false),
+    (:motzkin_ball, 3, false, true, false),
+    (:schwefel, 2, false, true, false),
+    (:lotkavolterra, 3, false, false, false),
+    (:motzkin, 3, false, false, false),
+    (:motzkin_ball, 3, false, false, false),
+    (:schwefel, 2, false, false, false),
+    (1, 8, true, true, false),
+    (2, 5, true, true, false),
+    (3, 3, true, true, false),
+    (5, 2, true, true, false),
+    (3, 3, false, true, false),
+    (3, 3, false, false, false),
     (Complex, :abs1d, 1, true, true),
     (Complex, :abs1d, 3, true, true),
     (Complex, :absunit1d, 1, true, true),
@@ -275,17 +258,17 @@ instances_polymin_fast = [
     # (Complex, :negabsbox2d, 1, false, false),
     # (Complex, :denseunit1d, 2, false, false),
     ]
-instances_polymin_slow = [
+polymin_native_slow = [
     # TODO
     ]
-instances_polymin_linops = [
-    (Real, :butcher, 2, true, true, true),
-    (Real, :caprasse, 4, true, true, true),
-    (Real, :goldsteinprice, 7, true, true, true),
-    (Real, 1, 8, true, true, true),
-    (Real, 2, 5, true, true, true),
-    (Real, 3, 3, true, true, true),
-    (Real, 5, 2, true, true, true),
-    (Real, 3, 3, false, true, true),
-    (Real, 3, 3, false, false, true),
+polymin_native_linops = [
+    (:butcher, 2, true, true, true),
+    (:caprasse, 4, true, true, true),
+    (:goldsteinprice, 7, true, true, true),
+    (1, 8, true, true, true),
+    (2, 5, true, true, true),
+    (3, 3, true, true, true),
+    (5, 2, true, true, true),
+    (3, 3, false, true, true),
+    (3, 3, false, false, true),
     ]

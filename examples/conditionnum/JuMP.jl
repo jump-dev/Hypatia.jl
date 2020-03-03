@@ -27,16 +27,15 @@ we make F_0 and M_0 positive definite to ensure existence of a feasible solution
 using LinearAlgebra
 import Random
 using Test
-import MathOptInterface
-const MOI = MathOptInterface
 import JuMP
+const MOI = JuMP.MOI
 import Hypatia
-const MU = Hypatia.ModelUtilities
 
-function conditionnumJuMP(
+function conditionnum_JuMP(
+    T::Type{Float64}, # TODO support generic reals
     side::Int,
-    len_y::Int;
-    use_linmatrixineq::Bool = true, # use linmatrixineq cone, else PSD formulation
+    len_y::Int,
+    use_linmatrixineq::Bool, # use linmatrixineq cone, else PSD formulation
     )
     Mi = [zeros(side, side) for i in 1:len_y]
     for i in eachindex(Mi)
@@ -79,34 +78,27 @@ function conditionnumJuMP(
     return (model = model,)
 end
 
-conditionnumJuMP1() = conditionnumJuMP(5, 6, use_linmatrixineq = true)
-conditionnumJuMP2() = conditionnumJuMP(5, 6, use_linmatrixineq = false)
-conditionnumJuMP3() = conditionnumJuMP(10, 8, use_linmatrixineq = true)
-conditionnumJuMP4() = conditionnumJuMP(10, 8, use_linmatrixineq = false)
-conditionnumJuMP5() = conditionnumJuMP(50, 15, use_linmatrixineq = true)
-conditionnumJuMP6() = conditionnumJuMP(50, 15, use_linmatrixineq = false)
-
-function test_conditionnumJuMP(instance::Function; options, rseed::Int = 1)
+function test_conditionnum_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)
-    d = instance()
-    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer(; options...))
+    d = conditionnum_JuMP(T, instance...)
+    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer{T}(; options...))
     JuMP.optimize!(d.model)
     @test JuMP.termination_status(d.model) == MOI.OPTIMAL
-    return
+    return d.model.moi_backend.optimizer.model.optimizer.result
 end
 
-test_conditionnumJuMP_all(; options...) = test_conditionnumJuMP.([
-    conditionnumJuMP1,
-    conditionnumJuMP2,
-    conditionnumJuMP3,
-    conditionnumJuMP4,
-    conditionnumJuMP5,
-    conditionnumJuMP6,
-    ], options = options)
-
-test_conditionnumJuMP(; options...) = test_conditionnumJuMP.([
-    conditionnumJuMP1,
-    conditionnumJuMP2,
-    conditionnumJuMP3,
-    conditionnumJuMP4,
-    ], options = options)
+conditionnum_JuMP_fast = [
+    (2, 3, true),
+    (2, 3, false),
+    (3, 2, true),
+    (3, 2, false),
+    (10, 8, true),
+    (10, 8, false),
+    (50, 15, true),
+    (50, 15, false),
+    (100, 10, true),
+    (100, 10, false),
+    ]
+conditionnum_JuMP_slow = [
+    # TODO
+    ]

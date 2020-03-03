@@ -14,13 +14,13 @@ import Hypatia.BlockMatrix
 const CO = Hypatia.Cones
 const MU = Hypatia.ModelUtilities
 
-function sparsepca(
+function sparsepca_native(
     T::Type{<:Real},
     p::Int,
     k::Int,
-    use_use_epinorminfdual::Bool = true, # use dual of epinorminf cone, else nonnegative cones
-    noise_ratio::Real = 0.0,
-    use_linops::Bool = false,
+    use_epinorminfdual::Bool, # use dual of epinorminf cone, else nonnegative cones
+    noise_ratio::Real,
+    use_linops::Bool,
     )
     @assert 0 < k <= p
 
@@ -55,7 +55,7 @@ function sparsepca(
     hpsd = zeros(T, dimx)
     cones = CO.Cone{T}[CO.PosSemidefTri{T, T}(dimx)]
 
-    if use_use_epinorminfdual
+    if use_epinorminfdual
         # l1 cone
         # double off-diagonals, which are already scaled by rt2
         if use_linops
@@ -120,9 +120,9 @@ function sparsepca(
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, true_obj = true_obj)
 end
 
-function test_sparsepca(T::Type{<:Real}, instance::Tuple; options::NamedTuple = NamedTuple(), rseed::Int = 1)
+function test_sparsepca_native(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)
-    d = sparsepca(T, instance...)
+    d = sparsepca_native(T, instance...)
     r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
     @test r.status == :Optimal
     if r.status == :Optimal && !isnan(d.true_obj)
@@ -131,7 +131,7 @@ function test_sparsepca(T::Type{<:Real}, instance::Tuple; options::NamedTuple = 
     return r
 end
 
-instances_sparsepca_fast = [
+sparsepca_native_fast = [
     (5, 3, true, 0, false),
     (5, 3, false, 0, false),
     (5, 3, true, 10, false),
@@ -141,10 +141,10 @@ instances_sparsepca_fast = [
     (30, 10, true, 10, false),
     (30, 10, false, 10, false),
     ]
-instances_sparsepca_slow = [
+sparsepca_native_slow = [
     # TODO
     ]
-instances_sparsepca_linops = [
+sparsepca_native_linops = [
     (5, 3, true, 0, true),
     (5, 3, false, 0, true),
     (5, 3, true, 10, true),

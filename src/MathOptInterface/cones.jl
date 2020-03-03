@@ -30,7 +30,7 @@ needs_untransform(::MOI.AbstractVectorSet) = false
 untransform_affine(::MOI.AbstractVectorSet, vals::AbstractVector) = nothing
 permute_affine(::MOI.AbstractVectorSet, idxs::AbstractVector) = idxs
 rescale_affine(::MOI.AbstractVectorSet, vals::AbstractVector) = vals
-rescale_affine(::MOI.AbstractVectorSet, vals::AbstractVector, ::AbstractVector, ::Int) = vals
+rescale_affine(::MOI.AbstractVectorSet, vals::AbstractVector, ::AbstractVector) = vals
 
 # transformations (transposition of matrix) for MOI rectangular matrix cones with matrix of more rows than columns
 
@@ -40,7 +40,6 @@ needs_untransform(cone::NonSquareMatrixCone) = (cone.row_dim > cone.column_dim)
 
 function untransform_affine(cone::NonSquareMatrixCone, vals::AbstractVector)
     vals[2:end] = reshape(vals[2:end], cone.column_dim, cone.row_dim)'
-    # vals[2:end] = reshape(vals[2:end], cone.row_dim, cone.column_dim)'
     return vals
 end
 
@@ -50,7 +49,6 @@ function permute_affine(cone::NonSquareMatrixCone, idxs::AbstractVector)
         # transpose the matrix part
         for k in 2:length(idxs)
             (col_old, row_old) = divrem(idxs[k] - 2, cone.row_dim)
-            # idxs_new[2 + row_old * cone.column_dim + col_old] = idxs[k]
             idxs_new[k] = idxs[2 + row_old * cone.column_dim + col_old]
         end
         return idxs_new
@@ -81,8 +79,8 @@ function rescale_affine(cone::SvecCone, vals::AbstractVector)
     return vals
 end
 
-function rescale_affine(cone::SvecCone, vals::AbstractVector, idxs::AbstractVector, q::Int)
-    scal_start = q + svec_offset(cone) - 1
+function rescale_affine(cone::SvecCone, vals::AbstractVector, idxs::AbstractVector)
+    scal_start = svec_offset(cone) - 1
     for i in eachindex(vals)
         shifted_idx = idxs[i] - scal_start
         if shifted_idx > 0 && !MOI.Utilities.is_diagonal_vectorized_index(shifted_idx)

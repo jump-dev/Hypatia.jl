@@ -24,12 +24,12 @@ import Hypatia
 const CO = Hypatia.Cones
 const MU = Hypatia.ModelUtilities
 
-function matrixcompletion(
+function matrixcompletion_native(
     T::Type{<:Real},
     m::Int,
     n::Int,
     geomean_constr::Bool = true, # add a constraint on the geomean of unknown values, else don't add
-    nuclearnorm_obj::Bool = true, # use nuclear in the objective, else spectral norm
+    nuclearnorm_obj::Bool = true, # use nuclear norm in the objective, else spectral norm
     use_hypogeomean::Bool = true, # use hypogeomean cone, else power cone formulation
     use_epinormspectral::Bool = true, # use epinormspectral cone (or its dual), else PSD formulation
     )
@@ -254,15 +254,15 @@ function matrixcompletion(
     return (c = c, A = A, b = b, G = G, h = h, cones = cones)
 end
 
-function test_matrixcompletion(T::Type{<:Real}, instance::Tuple; options::NamedTuple = NamedTuple(), rseed::Int = 1)
+function test_matrixcompletion_native(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)
-    d = matrixcompletion(T, instance...)
+    d = matrixcompletion_native(T, instance...)
     r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
     @test r.status == :Optimal
     return r
 end
 
-instances_matrixcompletion_fast = [
+matrixcompletion_native_fast = [
     (2, 3, true, true, true, true),
     (2, 3, false, true, true, true),
     (2, 3, true, false, true, true),
@@ -280,6 +280,6 @@ instances_matrixcompletion_fast = [
     (12, 24, true, true, true, false),
     (12, 24, true, true, false, false),
     ]
-instances_matrixcompletion_slow = [
+matrixcompletion_native_slow = [
     # TODO
     ]
