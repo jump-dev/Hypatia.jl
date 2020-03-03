@@ -14,8 +14,7 @@ and also to the larger conic constraint [I X'; X Y] in S^{n + m}_+
 =#
 
 import JuMP
-import MathOptInterface
-const MOI = MathOptInterface
+const MOI = JuMP.MOI
 import Hypatia
 CO = Hypatia.Cones
 import Random
@@ -23,10 +22,11 @@ using LinearAlgebra
 using SparseArrays
 using Test
 
-function matrixquadraticJuMP(
+function matrixquadratic_JuMP(
+    T::Type{Float64}, # TODO support generic reals
     W_rows::Int,
-    W_cols::Int;
-    use_matrixepipersquare::Bool = true, # use matrixepipersquare cone, else PSD formulation
+    W_cols::Int,
+    use_matrixepipersquare::Bool, # use matrixepipersquare cone, else PSD formulation
     )
     C = randn(W_cols, W_rows)
     P = randn(W_rows, W_rows)
@@ -50,34 +50,23 @@ function matrixquadraticJuMP(
     return (model = model,)
 end
 
-matrixquadraticJuMP1() = matrixquadraticJuMP(5, 6, use_matrixepipersquare = true)
-matrixquadraticJuMP2() = matrixquadraticJuMP(5, 6, use_matrixepipersquare = false)
-matrixquadraticJuMP3() = matrixquadraticJuMP(10, 20, use_matrixepipersquare = true)
-matrixquadraticJuMP4() = matrixquadraticJuMP(10, 20, use_matrixepipersquare = false)
-matrixquadraticJuMP5() = matrixquadraticJuMP(25, 30, use_matrixepipersquare = true)
-matrixquadraticJuMP6() = matrixquadraticJuMP(25, 30, use_matrixepipersquare = false)
-
-function test_matrixquadraticJuMP(instance::Function; options, rseed::Int = 1)
+function test_matrixquadratic_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)
-    d = instance()
-    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer(; options...))
+    d = matrixquadratic_JuMP(T, instance...)
+    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer{T}(; options...))
     JuMP.optimize!(d.model)
     @test JuMP.termination_status(d.model) == MOI.OPTIMAL
-    return
+    return d.model.moi_backend.optimizer.model.optimizer.result
 end
 
-test_matrixquadraticJuMP_all(; options...) = test_matrixquadraticJuMP.([
-    matrixquadraticJuMP1,
-    matrixquadraticJuMP2,
-    matrixquadraticJuMP3,
-    matrixquadraticJuMP4,
-    matrixquadraticJuMP5,
-    matrixquadraticJuMP6,
-    ], options = options)
-
-test_matrixquadraticJuMP(; options...) = test_matrixquadraticJuMP.([
-    matrixquadraticJuMP1,
-    matrixquadraticJuMP2,
-    matrixquadraticJuMP3,
-    matrixquadraticJuMP4,
-    ], options = options)
+matrixquadratic_JuMP_fast = [
+    (5, 6, true),
+    (5, 6, false),
+    (10, 20, true),
+    (10, 20, false),
+    (25, 30, true),
+    (25, 30, false),
+    ]
+matrixquadratic_JuMP_slow = [
+    # TODO
+    ]
