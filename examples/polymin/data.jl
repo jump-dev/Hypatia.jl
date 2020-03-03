@@ -127,8 +127,8 @@ end
 function get_interp_data(
     T::Type{<:Real},
     poly_name::Symbol,
-    halfdeg::Int;
-    sample_factor::Int = 100,
+    halfdeg::Int,
+    sample_factor::Int,
     )
     (x, fn, dom, true_min) = real_poly_data(poly_name, T)
     sample = (length(x) >= 5) || !isa(dom, MU.Box)
@@ -143,7 +143,7 @@ function random_interp_data(
     n::Int,
     halfdeg::Int;
     dom = MU.Box{T}(-ones(T, n), ones(T, n)),
-    sample_factor::Int = 100,
+    sample_factor::Int,
     )
     (U, pts, Ps, _) = MU.interpolate(dom, halfdeg, sample = (n >= 5), sample_factor = sample_factor)
     interp_vals = randn(T, U)
