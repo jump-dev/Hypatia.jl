@@ -13,12 +13,13 @@ import Random
 using Test
 
 function maxvolume_JuMP(
-    T::Type{Float64}, # TODO support generic reals
+    ::Type{T},
     n::Int,
     epipernormeucl_constr::Bool, # add an L2 ball constraint, else don't add
     epinorminf_constrs::Bool, # add L1 and Linfty ball constraints, elsle don't add
-    )
+    ) where {T <: Float64} # TODO support generic reals
     @assert n > 2
+
     A = randn(n, n)
     # ensure there will be a feasible solution
     x = randn(n)

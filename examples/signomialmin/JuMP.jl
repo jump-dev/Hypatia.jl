@@ -39,13 +39,13 @@ import Hypatia
 include(joinpath(@__DIR__, "data.jl"))
 
 function signomialmin_JuMP(
-    T::Type{Float64}, # TODO support generic reals
+    ::Type{T},
     fc::Vector,
     fA::AbstractMatrix,
     gc::Vector,
     gA::Vector,
     obj_ub::Real,
-    )
+    ) where {T <: Float64} # TODO support generic reals
     (fm, n) = size(fA)
     @assert length(fc) == fm
     q = length(gc)
@@ -115,9 +115,16 @@ function signomialmin_JuMP(
     return (model = model, obj_ub = obj_ub)
 end
 
-signomialmin_JuMP(T::Type{Float64}, sig::Symbol) = signomialmin_JuMP(T, signomialmin_data[sig]...)
+signomialmin_JuMP(
+    ::Type{T},
+    sig::Symbol,
+    ) where {T <: Float64} = signomialmin_JuMP(T, signomialmin_data[sig]...)
 
-signomialmin_JuMP(T::Type{Float64}, m::Int, n::Int) = signomialmin_JuMP(T, signomialmin_random(m, n)...)
+signomialmin_JuMP(
+    ::Type{T},
+    m::Int,
+    n::Int,
+    ) where {T <: Float64} = signomialmin_JuMP(T, signomialmin_random(m, n)...)
 
 function test_signomialmin_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)

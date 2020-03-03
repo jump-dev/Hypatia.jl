@@ -13,7 +13,7 @@ import Hypatia
 const MU = Hypatia.ModelUtilities
 
 function envelope_JuMP(
-    T::Type{Float64}, # TODO support generic reals
+    ::Type{T},
     n::Int,
     rand_halfdeg::Int,
     num_polys::Int,
@@ -21,7 +21,7 @@ function envelope_JuMP(
     domain::MU.Domain = MU.Box{T}(-ones(T, n), ones(T, n)),
     sample::Bool = true,
     sample_factor::Int = 100,
-    )
+    ) where {T <: Float64} # TODO support generic reals
     @assert n == MU.get_dimension(domain)
     @assert rand_halfdeg <= env_halfdeg
 

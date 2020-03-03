@@ -17,7 +17,7 @@ const CO = Hypatia.Cones
 const MU = Hypatia.ModelUtilities
 
 function envelope_native(
-    T::Type{<:Real},
+    ::Type{T},
     n::Int,
     rand_halfdeg::Int,
     num_polys::Int,
@@ -26,7 +26,7 @@ function envelope_native(
     domain::MU.Domain = MU.Box{T}(-ones(T, n), ones(T, n)),
     sample::Bool = true,
     sample_factor::Int = 100,
-    )
+    ) where {T <: Real}
     @assert n == MU.get_dimension(domain)
     @assert rand_halfdeg <= env_halfdeg
 

@@ -24,12 +24,12 @@ function log_floor(n::Integer)
 end
 
 function maxvolume_native(
-    T::Type{<:Real},
+    ::Type{T},
     n::Int,
     use_hypogeomean::Bool, # use hypogeomean cone for geomean objective
     use_power::Bool, # use power cones for geomean objective
     use_epipersquare::Bool, # use epipersquare cones for geomean objective
-    )
+    ) where {T <: Real}
     @assert use_hypogeomean + use_power + use_epipersquare == 1
     @assert n > 2
     poly_hrep = Matrix{T}(I, n, n)
@@ -132,6 +132,7 @@ function maxvolume_native(
         push!(cones, CO.Nonnegative{T}(1))
         h = zeros(T, 3 * num_new_vars + 1)
     end
+    
     return (c = c, A = A, b = b, G = G, h = h, cones = cones)
 end
 

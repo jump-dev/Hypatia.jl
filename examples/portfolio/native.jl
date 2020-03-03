@@ -15,13 +15,13 @@ import Hypatia
 const CO = Hypatia.Cones
 
 function portfolio_native(
-    T::Type{<:Real},
+    ::Type{T},
     num_stocks::Int,
     epinormeucl_constr::Bool, # add L2 ball constraints, else don't add
     epinorminf_constrs::Bool, # add Linfty ball constraints, else don't add
     use_epinorminf::Bool, # use epinorminf cone, else nonnegative cones
     use_linops::Bool,
-    )
+    ) where {T <: Real}
     returns = rand(T, num_stocks)
     sigma_half = T.(randn(num_stocks, num_stocks))
     x = T.(randn(num_stocks))

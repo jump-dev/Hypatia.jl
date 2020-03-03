@@ -23,7 +23,7 @@ import Hypatia.RealOrComplex
 const CO = Hypatia.Cones
 
 function matrixregression_native(
-    T::Type{<:Real},
+    ::Type{T},
     Y::Matrix{R},
     X::Matrix{R},
     lam_fro::Real, # penalty on Frobenius norm
@@ -31,7 +31,7 @@ function matrixregression_native(
     lam_las::Real, # penalty on L1 norm
     lam_glr::Real, # penalty on penalty on row group l1 norm
     lam_glc::Real, # penalty on penalty on column group l1 norm
-    ) where {R <: RealOrComplex{T}}
+    ) where {R <: RealOrComplex{T}} where {T <: Real}
     @assert min(lam_fro, lam_nuc, lam_las, lam_glr, lam_glc) >= 0
     (data_n, data_m) = size(Y)
     data_p = size(X, 2)
@@ -241,7 +241,7 @@ function matrixregression_native(
 end
 
 function matrixregression_native(
-    T::Type{<:Real},
+    ::Type{T},
     R_type::Type{<:Union{Real, Complex}},
     n::Int,
     m::Int,
@@ -250,7 +250,7 @@ function matrixregression_native(
     A_max_rank::Int = div(m, 2) + 1,
     A_sparsity::Real = max(0.2, inv(sqrt(m * p))),
     Y_noise::Real = 0.01,
-    )
+    ) where {T <: Real}
     @assert p >= m
     @assert 1 <= A_max_rank <= m
     @assert 0 < A_sparsity <= 1
