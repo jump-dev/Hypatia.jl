@@ -129,7 +129,7 @@ function get_interp_data(
     poly_name::Symbol,
     halfdeg::Int,
     sample_factor::Int,
-    )
+    ) where {T <: Real}
     (x, fn, dom, true_min) = real_poly_data(poly_name, T)
     sample = (length(x) >= 5) || !isa(dom, MU.Box)
     (U, pts, Ps, _) = MU.interpolate(dom, halfdeg, sample = sample, sample_factor = sample_factor)
@@ -144,7 +144,7 @@ function random_interp_data(
     halfdeg::Int,
     sample_factor::Int;
     dom = MU.Box{T}(-ones(T, n), ones(T, n)),
-    )
+    ) where {T <: Real}
     (U, pts, Ps, _) = MU.interpolate(dom, halfdeg, sample = (n >= 5), sample_factor = sample_factor)
     interp_vals = randn(T, U)
     true_min = T(NaN) # TODO could get an upper bound by evaluating at random points in domain
