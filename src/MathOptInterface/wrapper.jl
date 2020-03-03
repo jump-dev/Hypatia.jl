@@ -30,6 +30,8 @@ mutable struct Optimizer{T <: Real} <: MOI.AbstractOptimizer
     nonpos_idxs::UnitRange{Int}
     interval_idxs::UnitRange{Int}
     interval_scales::Vector{T}
+    moi_other_cones_start::Int
+    moi_other_cones::Vector{MOI.AbstractVectorSet}
 
     function Optimizer{T}(;
         use_dense_model::Bool = true,
@@ -39,7 +41,7 @@ mutable struct Optimizer{T <: Real} <: MOI.AbstractOptimizer
         opt = new{T}()
         opt.use_dense_model = use_dense_model
         opt.test_certificates = test_certificates
-        opt.solver = Solvers.Solver{T}(; solver_options...)
+        opt.solver = Solvers.Solver{T}(; solver_options...) # TODO allow passing in a solver?
         return opt
     end
 end
@@ -404,33 +406,36 @@ function MOI.copy_to(
     end
 
     # non-LP conic constraints
-    for S in MOIOtherConesList(T), F in (MOI.VectorOfVariables, MOI.VectorAffineFunction{T})
-        for ci in get_src_cons(F, S)
-            i += 1
-            idx_map[ci] = MOI.ConstraintIndex{F, S}(i)
-            push!(constr_offset_cone, q)
-            fi = get_con_fun(ci)
-            si = get_con_set(ci)
-            dim = MOI.output_dimension(fi)
-            conei = cone_from_moi(T, si)
-            if F == MOI.VectorOfVariables
-                IGi = (q + 1):(q + dim)
-                JGi = (idx_map[vj].value for vj in fi.variables)
-                VGi = get_affine_data_vov(conei, dim)
-            else
-                IGi = [q + vt.output_index for vt in fi.terms]
-                JGi = (idx_map[vt.scalar_term.variable_index].value for vt in fi.terms)
-                Ihi = (q + 1):(q + dim)
-                (VGi, Vhi) = get_affine_data_vaf(conei, fi, dim)
-                append!(Ih, Ihi)
-                append!(Vh, Vhi)
-            end
-            append!(IG, IGi)
-            append!(JG, JGi)
-            append!(VG, VGi)
-            push!(cones, conei)
-            q += dim
+    moi_other_cones_start = i + 1
+    moi_other_cones = MOI.AbstractVectorSet[]
+    for S in MOIOtherConesList(T), F in (MOI.VectorOfVariables, MOI.VectorAffineFunction{T}), ci in get_src_cons(F, S)
+        i += 1
+        idx_map[ci] = MOI.ConstraintIndex{F, S}(i)
+        push!(constr_offset_cone, q)
+        fi = get_con_fun(ci)
+        si = get_con_set(ci)
+        push!(moi_other_cones, si)
+        dim = MOI.output_dimension(fi)
+        if F == MOI.VectorOfVariables
+            JGi = (idx_map[vj].value for vj in fi.variables)
+            IGi = permute_affine(si, 1:dim)
+            VGi = rescale_affine(si, fill(-1.0, dim))
+        else
+            JGi = (idx_map[vt.scalar_term.variable_index].value for vt in fi.terms)
+            IGi = permute_affine(si, [vt.output_index for vt in fi.terms])
+            VGi = rescale_affine(si, [-vt.scalar_term.coefficient for vt in fi.terms], IGi)
+            Ihi = permute_affine(si, 1:dim)
+            Vhi = rescale_affine(si, fi.constants)
+            Ihi = q .+ Ihi
+            append!(Ih, Ihi)
+            append!(Vh, Vhi)
         end
+        IGi = q .+ IGi
+        append!(IG, IGi)
+        append!(JG, JGi)
+        append!(VG, VGi)
+        push!(cones, cone_from_moi(T, si))
+        q += dim
     end
 
     push!(constr_offset_cone, q)
@@ -446,6 +451,8 @@ function MOI.copy_to(
 
     opt.constr_offset_cone = constr_offset_cone
     opt.constr_prim_cone = Vector(sparsevec(Icpc, Vcpc, q))
+    opt.moi_other_cones_start = moi_other_cones_start
+    opt.moi_other_cones = moi_other_cones
 
     return idx_map
 end
@@ -464,9 +471,15 @@ function MOI.optimize!(opt::Optimizer{T}) where {T <: Real}
     opt.s[opt.nonpos_idxs] .*= -1
     opt.z[opt.nonpos_idxs] .*= -1
     opt.s[opt.interval_idxs] ./= opt.interval_scales
-    for (cone, idxs) in zip(model.cones, Models.get_cone_idxs(r.model))
-        @views untransform_cone_vec(cone, opt.s[idxs])
-        @views untransform_cone_vec(cone, opt.z[idxs])
+    i = opt.moi_other_cones_start - opt.num_eq_constrs
+    for cone in opt.moi_other_cones
+        if needs_untransform(cone)
+            os = opt.constr_offset_cone
+            idxs = (os[i] + 1):os[i + 1]
+            @views untransform_affine(cone, opt.s[idxs])
+            @views untransform_affine(cone, opt.z[idxs])
+        end
+        i += 1
     end
     opt.constr_prim_cone .+= opt.s
     opt.z[opt.interval_idxs] .*= opt.interval_scales

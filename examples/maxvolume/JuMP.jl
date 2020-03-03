@@ -2,7 +2,7 @@
 Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
 find maximum volume hypercube with edges parallel to the axes inside a polyhedron
-defined with l_1, l_infty, or l_2 constraints (different to native.jl)
+defined with l_1, l_infty, or l_2 ball constraints (different to native.jl)
 =#
 
 using LinearAlgebra
@@ -12,11 +12,11 @@ import Hypatia
 import Random
 using Test
 
-function maxvolumeJuMP(
-    n::Int;
-    epipernormeucl_constr::Bool = false,
-    epinorminf_constr::Bool = false,
-    epinorminfdual_constr::Bool = false,
+function maxvolume_JuMP(
+    T::Type{Float64}, # TODO support generic reals
+    n::Int,
+    epipernormeucl_constr::Bool, # add an L2 ball constraint, else don't add
+    epinorminf_constrs::Bool, # add L1 and Linfty ball constraints, elsle don't add
     )
     @assert n > 2
     A = randn(n, n)
@@ -28,46 +28,42 @@ function maxvolumeJuMP(
     JuMP.@variable(model, t)
     JuMP.@variable(model, end_pts[1:n])
     JuMP.@objective(model, Max, t)
+    JuMP.@constraint(model, vcat(t, end_pts) in MOI.GeometricMeanCone(n + 1))
+
     if epipernormeucl_constr
         JuMP.@constraint(model, vcat(gamma, A * end_pts) in JuMP.SecondOrderCone())
     end
-    if epinorminf_constr
+    if epinorminf_constrs
         JuMP.@constraint(model, vcat(gamma, A * end_pts) in MOI.NormInfinityCone(n + 1))
-    end
-    if epinorminfdual_constr
         JuMP.@constraint(model, vcat(sqrt(n) * gamma, A * end_pts) in MOI.NormOneCone(n + 1))
     end
-    JuMP.@constraint(model, vcat(t, end_pts) in MOI.GeometricMeanCone(n + 1))
 
     return (model = model,)
 end
 
-maxvolumeJuMP1() = maxvolumeJuMP(3, epipernormeucl_constr = true)
-maxvolumeJuMP2() = maxvolumeJuMP(3, epipernormeucl_constr = true, epinorminf_constr = true, epinorminfdual_constr = true)
-maxvolumeJuMP3() = maxvolumeJuMP(6, epipernormeucl_constr = true)
-maxvolumeJuMP4() = maxvolumeJuMP(6, epipernormeucl_constr = true, epinorminf_constr = true, epinorminfdual_constr = true)
-maxvolumeJuMP5() = maxvolumeJuMP(25, epipernormeucl_constr = true)
-maxvolumeJuMP6() = maxvolumeJuMP(25, epipernormeucl_constr = true, epinorminf_constr = true, epinorminfdual_constr = true)
-
-function test_maxvolumeJuMP(instance::Function; options, rseed::Int = 1)
+function test_maxvolume_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)
-    d = instance()
-    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer(; options...))
+    d = maxvolume_JuMP(T, instance...)
+    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer{T}(; options...))
     JuMP.optimize!(d.model)
     @test JuMP.termination_status(d.model) == MOI.OPTIMAL
-    return
+    return d.model.moi_backend.optimizer.model.optimizer.result
 end
 
-test_maxvolumeJuMP_all(; options...) = test_maxvolumeJuMP.([
-    maxvolumeJuMP1,
-    maxvolumeJuMP2,
-    maxvolumeJuMP3,
-    maxvolumeJuMP4,
-    maxvolumeJuMP5,
-    maxvolumeJuMP6,
-    ], options = options)
-
-test_maxvolumeJuMP(; options...) = test_maxvolumeJuMP.([
-    maxvolumeJuMP1,
-    maxvolumeJuMP2,
-    ], options = options)
+maxvolume_JuMP_fast = [
+    (3, true, false),
+    (3, false, true),
+    (3, true, true),
+    (8, true, false),
+    (8, false, true),
+    (8, true, true),
+    (25, true, false),
+    (25, false, true),
+    (25, true, true),
+    (100, true, false),
+    (100, false, true),
+    (100, true, true),
+    ]
+maxvolume_JuMP_slow = [
+    # TODO
+    ]

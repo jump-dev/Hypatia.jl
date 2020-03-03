@@ -14,12 +14,12 @@ using Test
 import Hypatia
 const CO = Hypatia.Cones
 
-function portfolio(
+function portfolio_native(
     T::Type{<:Real},
     num_stocks::Int,
-    epinormeucl_constr::Bool,
-    epinorminf_constrs::Bool,
-    use_epinorminf::Bool,
+    epinormeucl_constr::Bool, # add L2 ball constraints, else don't add
+    epinorminf_constrs::Bool, # add Linfty ball constraints, else don't add
+    use_epinorminf::Bool, # use epinorminf cone, else nonnegative cones
     use_linops::Bool,
     )
     returns = rand(T, num_stocks)
@@ -138,19 +138,19 @@ function portfolio(
     return (c = c, A = A, b = b, G = G, h = h, cones = cones)
 end
 
-function test_portfolio(T::Type{<:Real}, instance::Tuple; options::NamedTuple = NamedTuple(), rseed::Int = 1)
+function test_portfolio_native(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)
-    d = portfolio(T, instance...)
+    d = portfolio_native(T, instance...)
     r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
     @test r.status == :Optimal
     return r
 end
 
-instances_portfolio_fast = [
-    (4, true, false, true, false),
-    (4, false, true, true, false),
-    (4, false, true, false, false),
-    (4, true, true, true, false),
+portfolio_native_fast = [
+    (3, true, false, true, false),
+    (3, false, true, true, false),
+    (3, false, true, false, false),
+    (3, true, true, true, false),
     (10, true, false, true, false),
     (10, false, true, true, false),
     (10, false, true, false, false),
@@ -164,10 +164,10 @@ instances_portfolio_fast = [
     (400, false, true, false, false),
     (400, true, true, true, false),
     ]
-instances_portfolio_slow = [
+portfolio_native_slow = [
     # TODO
     ]
-instances_portfolio_linops = [
+portfolio_native_linops = [
     (20, true, false, true, true),
     (20, false, true, true, true),
     (20, false, true, false, true),

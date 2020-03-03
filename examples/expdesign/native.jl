@@ -10,12 +10,10 @@ using LinearAlgebra
 import Random
 using Test
 import Hypatia
-import Hypatia.BlockMatrix
 const CO = Hypatia.Cones
 const MU = Hypatia.ModelUtilities
-const HYP = Hypatia
 
-function expdesign(
+function expdesign_native(
     T::Type{<:Real},
     q::Int,
     p::Int,
@@ -246,15 +244,15 @@ function expdesign(
     return (c = c, A = A, b = b, G = G, h = h, cones = cones)
 end
 
-function test_expdesign(T::Type{<:Real}, instance::Tuple; options::NamedTuple = NamedTuple(), rseed::Int = 1)
+function test_expdesign_native(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)
-    d = expdesign(T, instance...)
+    d = expdesign_native(T, instance...)
     r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
     @test r.status == :Optimal
     return r
 end
 
-instances_expdesign_fast = [
+expdesign_native_fast = [
     (3, 5, 7, 2, true, false, false, true, true, false),
     (3, 5, 7, 2, true, false, false, true, true, true),
     (3, 5, 7, 2, false, true, false, true, true, true),
@@ -274,6 +272,6 @@ instances_expdesign_fast = [
     (25, 75, 125, 5, true, false, false, false, false, true),
     (25, 75, 125, 5, false, true, false, false, false, true),
     ]
-instances_expdesign_slow = [
+expdesign_native_slow = [
     # TODO
     ]
