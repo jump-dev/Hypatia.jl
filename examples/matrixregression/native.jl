@@ -284,7 +284,7 @@ function test_matrixregression_native(instance::Tuple; T::Type{<:Real} = Float64
         else
             A_opt = reshape(r.x[2:(1 + d.p * d.m)], d.p, d.m)
         end
-        loss = (1/2 * sum(abs2, d.X * A_opt) - real(dot(d.X' * d.Y, A_opt))) / d.n
+        loss = (sum(abs2, d.X * A_opt) / 2 - real(dot(d.X' * d.Y, A_opt))) / d.n
         obj_try = loss + d.lam_fro * norm(vec(A_opt), 2) +
             d.lam_nuc * sum(svd(A_opt).S) + d.lam_las * norm(vec(A_opt), 1) +
             d.lam_glr * sum(norm, eachrow(A_opt)) + d.lam_glc * sum(norm, eachcol(A_opt))

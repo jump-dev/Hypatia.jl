@@ -32,9 +32,9 @@ function matrixregression_JuMP(
 
     model = JuMP.Model()
     JuMP.@variable(model, A[1:data_p, 1:data_m])
-    JuMP.@variable(model, u_fro)
-    JuMP.@constraint(model, vcat(u_fro, 0.5, vec(Qhalf * A)) in JuMP.RotatedSecondOrderCone())
-    obj = (u_fro - 2 * dot(X' * Y, A)) / (2 * data_n)
+    JuMP.@variable(model, loss)
+    JuMP.@constraint(model, vcat(loss, 0.5, vec(Qhalf * A)) in JuMP.RotatedSecondOrderCone())
+    obj = (loss / 2 - dot(X' * Y, A)) / data_n
 
     if !iszero(lam_fro)
         JuMP.@variable(model, t_fro)
@@ -43,7 +43,8 @@ function matrixregression_JuMP(
     end
     if !iszero(lam_nuc)
         JuMP.@variable(model, t_nuc)
-        JuMP.@constraint(model, vcat(t_nuc, vec(A)) in MOI.NormNuclearCone(data_p, data_m))
+        JuMP.@constraint(model, vcat(t_nuc, vec(A')) in MOI.NormNuclearCone(data_m, data_p))
+        # JuMP.@constraint(model, vcat(t_nuc, vec(A)) in MOI.NormNuclearCone(data_p, data_m))
         obj += lam_nuc * t_nuc
     end
     if !iszero(lam_las)
@@ -56,7 +57,7 @@ function matrixregression_JuMP(
         JuMP.@constraint(model, [i = 1:data_p], vcat(t_glr[i], A[i, :]) in JuMP.SecondOrderCone())
         obj += lam_glr * sum(t_glr)
     end
-    if !iszero(lam_glr)
+    if !iszero(lam_glc)
         JuMP.@variable(model, t_glc[1:data_m])
         JuMP.@constraint(model, [i = 1:data_m], vcat(t_glc[i], A[:, i]) in JuMP.SecondOrderCone())
         obj += lam_glc * sum(t_glc)
@@ -65,7 +66,7 @@ function matrixregression_JuMP(
     JuMP.@objective(model, Min, obj)
 
     return (
-        model = model,
+        model = model, A_var = A,
         n = data_n, m = data_m, p = data_p, Y = Y, X = X,
         lam_fro = lam_fro, lam_nuc = lam_nuc, lam_las = lam_las, lam_glr = lam_glr, lam_glc = lam_glc,
         )
@@ -100,26 +101,16 @@ function test_matrixregression_JuMP(instance::Tuple; T::Type{<:Real} = Float64, 
     JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer{T}(; options...))
     JuMP.optimize!(d.model)
     @test JuMP.termination_status(d.model) == MOI.OPTIMAL
-    r = d.model.moi_backend.optimizer.model.optimizer.result
-    if r.status == :Optimal
+    if JuMP.termination_status(d.model) == MOI.OPTIMAL
         # check objective value is correct
-        R = eltype(d.Y)
-        if R <: Complex
-            A_opt_real = reshape(r.x[2:(1 + 2 * d.p * d.m)], 2 * d.p, d.m)
-            A_opt = zeros(R, d.p, d.m)
-            for k in 1:d.p
-                @. @views A_opt[k, :] = A_opt_real[2k - 1, :] + A_opt_real[2k, :] * im
-            end
-        else
-            A_opt = reshape(r.x[2:(1 + d.p * d.m)], d.p, d.m)
-        end
-        loss = (1/2 * sum(abs2, d.X * A_opt) - real(dot(d.X' * d.Y, A_opt))) / d.n
+        A_opt = reshape(JuMP.value.(d.A_var), d.p, d.m)
+        loss = (sum(abs2, d.X * A_opt) / 2 - dot(d.X' * d.Y, A_opt)) / d.n
         obj_try = loss + d.lam_fro * norm(vec(A_opt), 2) +
             d.lam_nuc * sum(svd(A_opt).S) + d.lam_las * norm(vec(A_opt), 1) +
             d.lam_glr * sum(norm, eachrow(A_opt)) + d.lam_glc * sum(norm, eachcol(A_opt))
-        @test r.primal_obj ≈ obj_try atol = 1e-4 rtol = 1e-4
+        @test JuMP.objective_value(d.model) ≈ obj_try atol = 1e-4 rtol = 1e-4
     end
-    return r
+    return d.model.moi_backend.optimizer.model.optimizer.result
 end
 
 matrixregression_JuMP_fast = [
