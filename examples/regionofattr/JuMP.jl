@@ -20,10 +20,10 @@ import Hypatia
 const MU = Hypatia.ModelUtilities
 
 function regionofattr_JuMP(
-    T::Type{Float64}, # TODO support generic reals
+    ::Type{T},
     deg::Int,
     use_wsos::Bool, # use wsosinterpnonnegative cone, else PSD formulation
-    )
+    ) where {T <: Float64} # TODO support generic reals
     DP.@polyvar x
     DP.@polyvar t
     f = x * (x - 0.5) * (x + 0.5) * 100

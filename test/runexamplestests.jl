@@ -1,6 +1,8 @@
 #=
 Copyright 2019, Chris Coey and contributors
 
+run examples tests from the examples folder and display basic benchmarks
+
 TODO when linear operators are working, update linear operators tests in native tests add tests here
 =#
 
@@ -9,7 +11,7 @@ using DataFrames
 using Printf
 using TimerOutputs
 import Hypatia
-const SO = Hypatia.Solvers
+import Hypatia.Solvers
 
 instance_sets = [
     "fast",
@@ -66,12 +68,12 @@ solver_options = (
     verbose = false,
     iter_limit = 250,
     time_limit = 12e2,
-    system_solver = SO.QRCholDenseSystemSolver{T}(),
+    system_solver = Solvers.QRCholDenseSystemSolver{T}(),
     timer = timer,
     )
 native_options = (
     atol = 10eps(T)^0.25,
-    solver = SO.Solver{T}(; solver_options...),
+    solver = Solvers.Solver{T}(; solver_options...),
     )
 JuMP_options = (
     use_dense_model = true,
@@ -100,6 +102,7 @@ perf = DataFrame(
     )
 
 all_tests_time = time()
+
 @testset "examples tests" begin
     for mod_type in model_types
         example_names = eval(Symbol(mod_type, "_example_names"))
@@ -120,6 +123,7 @@ all_tests_time = time()
             end
         end
     end
+
     @printf("\nexamples tests total time: %8.2e seconds\n\n", time() - all_tests_time)
     show(perf, allrows = true, allcols = true)
     println("\n")

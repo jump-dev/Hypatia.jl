@@ -20,12 +20,12 @@ const MOI = JuMP.MOI
 import Hypatia
 
 function robustgeomprog_JuMP(
-    T::Type{Float64}, # TODO support generic reals
+    ::Type{T},
     n::Int,
     k::Int;
-    B::Matrix{Float64} = randn(k, n), # linear constraint matrix
-    alphas::Vector{Float64} = rand(k) .+ 1, # for entropy constraint for set C
-    )
+    B::Matrix{T} = randn(T, k, n), # linear constraint matrix
+    alphas::Vector{T} = rand(T, k) .+ 1, # for entropy constraint for set C
+    ) where {T <: Float64} # TODO support generic reals
     @assert n < k # want some degrees of freedom for v
 
     model = JuMP.Model()

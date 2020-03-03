@@ -19,16 +19,15 @@ const CO = Hypatia.Cones
 const MU = Hypatia.ModelUtilities
 
 function densityest_native(
-    T::Type{<:Real},
+    ::Type{T},
     X::Matrix{T},
     deg::Int,
     use_wsos::Bool,
     hypogeomean_obj::Bool, # use geomean objective, else sum of logs objective
     use_hypogeomean::Bool; # use hypogeomean cone if applicable, else hypoperlog formulation
     sample_factor::Int = 100,
-    )
+    ) where {T <: Real}
     (num_obs, dim) = size(X)
-    X = convert(Matrix{T}, X)
 
     domain = MU.Box{T}(-ones(T, dim), ones(T, dim))
     # rescale X to be in unit box
@@ -155,9 +154,18 @@ function densityest_native(
     return (c = c, A = A, b = b, G = G, h = h, cones = cones)
 end
 
-densityest_native(T::Type{<:Real}, data_name::Symbol, args...; kwargs...) = densityest_native(T, eval(data_name), args...; kwargs...)
+densityest_native(
+    ::Type{T},
+    data_name::Symbol,
+    args...; kwargs...
+    ) where {T <: Real} = densityest_native(T, convert(Matrix{T}, eval(data_name)), args...; kwargs...)
 
-densityest_native(T::Type{<:Real}, num_obs::Int, n::Int, args...; kwargs...) = densityest_native(T, randn(T, num_obs, n), args...; kwargs...)
+densityest_native(
+    ::Type{T},
+    num_obs::Int,
+    n::Int,
+    args...; kwargs...
+    ) where {T <: Real} = densityest_native(T, randn(T, num_obs, n), args...; kwargs...)
 
 function test_densityest_native(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)

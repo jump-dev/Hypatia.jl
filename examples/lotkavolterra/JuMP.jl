@@ -34,8 +34,8 @@ end
 integrate_ball(p, n) = sum(DP.coefficient(t) * integrate_ball_monomial(t, n) for t in DP.terms(p))
 
 function lotkavolterra_JuMP(
-    T::Type{Float64}, # TODO support generic reals
-    )
+    ::Type{T},
+    ) where {T <: Float64} # TODO support generic reals
     # parameters
     deg = 4 # degree
     n = 4 # number of species
