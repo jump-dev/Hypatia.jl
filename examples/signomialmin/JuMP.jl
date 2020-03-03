@@ -31,28 +31,23 @@ which is equivalent to the feasibility problem over C in R^{m, m} and V in R^{m,
 
 using Test
 using LinearAlgebra
+import Random
 import JuMP
 const MOI = JuMP.MOI
 import Hypatia
-import Random
 
 include(joinpath(@__DIR__, "data.jl"))
 
-function signomialminJuMP(
+function signomialmin_JuMP(
+    T::Type{Float64}, # TODO support generic reals
     fc::Vector,
     fA::AbstractMatrix,
     gc::Vector,
-    gA::Vector;
-    x::Vector = [],
-    obj_ub = NaN,
+    gA::Vector,
+    obj_ub::Real,
     )
     (fm, n) = size(fA)
     @assert length(fc) == fm
-    if isnan(obj_ub)
-        @assert !isempty(x)
-        @assert all(eval_signomial(gc_p, gA_p, x) >= 0 for (gc_p, gA_p) in zip(gc, gA))
-        obj_ub = eval_signomial(fc, fA, x)
-    end
     q = length(gc)
     @assert length(gA) == q
     @assert all(size(gA_p, 2) == n for gA_p in gA)
@@ -120,77 +115,40 @@ function signomialminJuMP(
     return (model = model, obj_ub = obj_ub)
 end
 
-function signomialminJuMP(signomial_name::Symbol)
-    (fc, fA, gc, gA, x, obj_ub) = signomials[signomial_name]
-    return signomialminJuMP(fc, fA, gc, gA; x = x, obj_ub = obj_ub)
-end
+signomialmin_JuMP(T::Type{Float64}, sig::Symbol) = signomialmin_JuMP(T, signomialmin_data[sig]...)
 
-function signomialminJuMP(m::Int, n::Int)
-    (fc, fA, gc, gA, obj_ub) = random_instance(m, n)
-    return signomialminJuMP(fc, fA, gc, gA; obj_ub = obj_ub)
-end
+signomialmin_JuMP(T::Type{Float64}, m::Int, n::Int) = signomialmin_JuMP(T, signomialmin_random(m, n)...)
 
-signomialminJuMP1() = signomialminJuMP(:motzkin2)
-signomialminJuMP2() = signomialminJuMP(:motzkin3)
-signomialminJuMP3() = signomialminJuMP(:CS16ex8_13)
-signomialminJuMP4() = signomialminJuMP(:CS16ex8_14)
-signomialminJuMP5() = signomialminJuMP(:CS16ex18)
-signomialminJuMP6() = signomialminJuMP(:CS16ex12)
-signomialminJuMP7() = signomialminJuMP(:CS16ex13)
-signomialminJuMP8() = signomialminJuMP(:MCW19ex1_mod)
-signomialminJuMP9() = signomialminJuMP(:MCW19ex8)
-signomialminJuMP10() = signomialminJuMP(3, 2)
-signomialminJuMP11() = signomialminJuMP(3, 3)
-signomialminJuMP12() = signomialminJuMP(4, 3)
-signomialminJuMP13() = signomialminJuMP(6, 2)
-signomialminJuMP14() = signomialminJuMP(6, 4)
-signomialminJuMP15() = signomialminJuMP(6, 6)
-signomialminJuMP16() = signomialminJuMP(8, 4)
-
-function test_signomialminJuMP(instance::Function; options, rseed::Int = 1)
+function test_signomialmin_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)
-    d = instance()
-    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer(; options...))
+    d = signomialmin_JuMP(T, instance...)
+    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer{T}(; options...))
     JuMP.optimize!(d.model)
     @test JuMP.termination_status(d.model) == MOI.OPTIMAL
-    @test JuMP.objective_value(d.model) <= d.obj_ub
-    return
+    if !isnan(d.obj_ub)
+        @test JuMP.objective_value(d.model) <= d.obj_ub + 1e-4
+    end
+    return d.model.moi_backend.optimizer.model.optimizer.result
 end
 
-test_signomialminJuMP_all(; options...) = test_signomialminJuMP.([
-    signomialminJuMP1,
-    signomialminJuMP2,
-    signomialminJuMP3,
-    signomialminJuMP4,
-    signomialminJuMP5,
-    signomialminJuMP6,
-    signomialminJuMP7,
-    signomialminJuMP8,
-    signomialminJuMP9,
-    signomialminJuMP10,
-    signomialminJuMP11,
-    signomialminJuMP12,
-    signomialminJuMP13,
-    signomialminJuMP14,
-    signomialminJuMP15,
-    signomialminJuMP16,
-    ], options = options)
-
-test_signomialminJuMP(; options...) = test_signomialminJuMP.([
-    signomialminJuMP1,
-    signomialminJuMP2,
-    signomialminJuMP3,
-    signomialminJuMP4,
-    signomialminJuMP5,
-    signomialminJuMP6,
-    signomialminJuMP7,
-    signomialminJuMP8,
-    signomialminJuMP9,
-    signomialminJuMP10,
-    signomialminJuMP11,
-    signomialminJuMP12,
-    signomialminJuMP13,
-    signomialminJuMP14,
-    signomialminJuMP15,
-    signomialminJuMP16,
-    ], options = options)
+signomialmin_JuMP_fast = [
+    (:motzkin2,),
+    (:motzkin3,),
+    (:CS16ex8_13,),
+    (:CS16ex8_14,),
+    (:CS16ex18,),
+    (:CS16ex12,),
+    (:CS16ex13,),
+    (:MCW19ex1_mod,),
+    (:MCW19ex8,),
+    (3, 2),
+    (3, 3),
+    (4, 3),
+    (6, 2),
+    (6, 4),
+    (6, 6),
+    (8, 4),
+    ]
+signomialmin_JuMP_slow = [
+    # TODO
+    ]

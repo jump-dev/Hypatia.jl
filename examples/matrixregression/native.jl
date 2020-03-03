@@ -3,8 +3,14 @@ Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
 regularized matrix regression problems
 
+min 1/(2n) * ||Y - X * A||_fro^2 + lam_fro * ||A||_fro + lam_nuc * ||A||_nuc + lam_lass * ||A||_las + lam_glr * ||A||_glr + lamb_glc * ||A||_glc
+- ||.||_fro is the Frobenius norm
+- ||.||_nuc is the nuclear norm
+- ||.||_las is the L1 norm
+- ||.||_glr is the row group lasso penalty (L1 norm of row groups)
+- ||.||_glc  is the column group lasso penalty (L1 norm of column groups)
+
 TODO
-- describe, references
 - generalize for sparse Y,X but make sure qr factorization does not permute
 =#
 
@@ -16,18 +22,17 @@ import Hypatia
 import Hypatia.RealOrComplex
 const CO = Hypatia.Cones
 
-function matrixregression(
+function matrixregression_native(
+    T::Type{<:Real},
     Y::Matrix{R},
     X::Matrix{R},
-    lam_fro::Real,
-    lam_nuc::Real,
-    lam_las::Real,
-    lam_glr::Real,
-    lam_glc::Real,
-    ) where {R <: RealOrComplex{T}} where {T <: Real}
-    @assert lam_fro >= 0
-    @assert lam_nuc >= 0
-    @assert lam_las >= 0
+    lam_fro::Real, # penalty on Frobenius norm
+    lam_nuc::Real, # penalty on nuclear norm
+    lam_las::Real, # penalty on L1 norm
+    lam_glr::Real, # penalty on penalty on row group l1 norm
+    lam_glc::Real, # penalty on penalty on column group l1 norm
+    ) where {R <: RealOrComplex{T}}
+    @assert min(lam_fro, lam_nuc, lam_las, lam_glr, lam_glc) >= 0
     (data_n, data_m) = size(Y)
     data_p = size(X, 2)
     @assert size(X, 1) == data_n
@@ -235,8 +240,9 @@ function matrixregression(
         )
 end
 
-function matrixregression(
-    R::Type{<:RealOrComplex{T}},
+function matrixregression_native(
+    T::Type{<:Real},
+    R_type::Type{<:Union{Real, Complex}},
     n::Int,
     m::Int,
     p::Int,
@@ -244,10 +250,11 @@ function matrixregression(
     A_max_rank::Int = div(m, 2) + 1,
     A_sparsity::Real = max(0.2, inv(sqrt(m * p))),
     Y_noise::Real = 0.01,
-    ) where {T <: Real}
+    )
     @assert p >= m
     @assert 1 <= A_max_rank <= m
     @assert 0 < A_sparsity <= 1
+    R = (R_type == Complex ? Complex{T} : T)
 
     A_left = sprandn(R, p, A_max_rank, A_sparsity)
     A_right = sprandn(R, A_max_rank, m, A_sparsity)
@@ -257,17 +264,17 @@ function matrixregression(
     Y = Matrix{R}(Y)
     X = Matrix{R}(X)
 
-    return matrixregression(Y, X, args...)
+    return matrixregression_native(T, Y, X, args...)
 end
 
-function test_matrixregression(T::Type{<:Real}, instance::Tuple; options::NamedTuple = NamedTuple(), rseed::Int = 1)
+function test_matrixregression_native(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)
-    R = (instance[1] == Complex) ? Complex{T} : T
-    d = matrixregression(R, instance[2:end]...)
+    d = matrixregression_native(T, instance...)
     r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
     @test r.status == :Optimal
     if r.status == :Optimal
         # check objective value is correct
+        R = eltype(d.Y)
         if R <: Complex
             A_opt_real = reshape(r.x[2:(1 + 2 * d.p * d.m)], 2 * d.p, d.m)
             A_opt = zeros(R, d.p, d.m)
@@ -277,7 +284,7 @@ function test_matrixregression(T::Type{<:Real}, instance::Tuple; options::NamedT
         else
             A_opt = reshape(r.x[2:(1 + d.p * d.m)], d.p, d.m)
         end
-        loss = (1/2 * sum(abs2, d.X * A_opt) - real(dot(d.X' * d.Y, A_opt))) / d.n
+        loss = (sum(abs2, d.X * A_opt) / 2 - real(dot(d.X' * d.Y, A_opt))) / d.n
         obj_try = loss + d.lam_fro * norm(vec(A_opt), 2) +
             d.lam_nuc * sum(svd(A_opt).S) + d.lam_las * norm(vec(A_opt), 1) +
             d.lam_glr * sum(norm, eachrow(A_opt)) + d.lam_glc * sum(norm, eachcol(A_opt))
@@ -286,7 +293,7 @@ function test_matrixregression(T::Type{<:Real}, instance::Tuple; options::NamedT
     return r
 end
 
-instances_matrixregression_fast = [
+matrixregression_native_fast = [
     (Real, 5, 3, 4, 0, 0, 0, 0, 0),
     (Real, 5, 3, 4, 0.1, 0.1, 0.1, 0.2, 0.2),
     (Real, 5, 3, 4, 0, 0.1, 0.1, 0, 0),
@@ -312,6 +319,6 @@ instances_matrixregression_fast = [
     (Complex, 100, 8, 12, 0.1, 0.1, 0.1, 0.2, 0.2),
     (Complex, 100, 8, 12, 0, 0.1, 0.1, 0, 0),
     ]
-instances_matrixregression_slow = [
+matrixregression_native_slow = [
     # TODO
     ]

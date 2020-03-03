@@ -2,7 +2,6 @@
 Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
 find maximum volume hypercube with edges parallel to the axes inside a polyhedron
-second-order cone (EpiNormEucl) extended formulation inspired by MOI bridge
 =#
 
 using LinearAlgebra
@@ -24,12 +23,12 @@ function log_floor(n::Integer)
     log_floor(n, zero(n))
 end
 
-function maxvolume(
+function maxvolume_native(
     T::Type{<:Real},
     n::Int,
-    use_hypogeomean::Bool,
-    use_power::Bool,
-    use_epipersquare::Bool,
+    use_hypogeomean::Bool, # use hypogeomean cone for geomean objective
+    use_power::Bool, # use power cones for geomean objective
+    use_epipersquare::Bool, # use epipersquare cones for geomean objective
     )
     @assert use_hypogeomean + use_power + use_epipersquare == 1
     @assert n > 2
@@ -136,15 +135,15 @@ function maxvolume(
     return (c = c, A = A, b = b, G = G, h = h, cones = cones)
 end
 
-function test_maxvolume(T::Type{<:Real}, instance::Tuple; options::NamedTuple = NamedTuple(), rseed::Int = 1)
+function test_maxvolume_native(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)
-    d = maxvolume(T, instance...)
+    d = maxvolume_native(T, instance...)
     r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
     @test r.status == :Optimal
     return r
 end
 
-instances_maxvolume_fast = [
+maxvolume_native_fast = [
     (3, true, false, false),
     (3, false, true, false),
     (3, false, false, true),
@@ -155,6 +154,6 @@ instances_maxvolume_fast = [
     (25, false, true, false),
     (25, false, false, true),
     ]
-instances_maxvolume_slow = [
+maxvolume_native_slow = [
     # TODO
     ]

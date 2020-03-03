@@ -9,14 +9,17 @@ TODO add scalar SOS formulation
 using LinearAlgebra
 import Random
 using Test
-import MathOptInterface
-const MOI = MathOptInterface
 import JuMP
+const MOI = JuMP.MOI
 import Hypatia
-const HYP = Hypatia
-const MU = HYP.ModelUtilities
+const MU = Hypatia.ModelUtilities
 
-function polynormJuMP(n::Int, deg::Int, npolys::Int)
+function polynorm_JuMP(
+    T::Type{Float64}, # TODO support generic reals
+    n::Int,
+    deg::Int,
+    npolys::Int,
+    )
     dom = MU.FreeDomain{Float64}(n)
     halfdeg = div(deg + 1, 2)
     (U, pts, Ps, w) = MU.interpolate(dom, halfdeg, sample = false, calc_w = true)
@@ -31,29 +34,25 @@ function polynormJuMP(n::Int, deg::Int, npolys::Int)
 
     fpoly = dot(f, lagrange_polys)
     rand_polys = [dot(polys[:, i], lagrange_polys) for i in 1:npolys]
-    cone = HYP.WSOSInterpEpiNormEuclCone{Float64}(npolys + 1, U, Ps)
+    cone = Hypatia.WSOSInterpEpiNormEuclCone{Float64}(npolys + 1, U, Ps)
     JuMP.@constraint(model, vcat(f, [polys[:, i] for i in 1:npolys]...) in cone)
 
     return (model = model,)
 end
 
-polynormJuMP1() = polynormJuMP(2, 2, 2)
-polynormJuMP2() = polynormJuMP(2, 1, 3)
-
-function test_polynormJuMP(instance::Function; options, rseed::Int = 1)
+function test_polynorm_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)
-    d = instance()
-    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer(; options...))
+    d = polynorm_JuMP(T, instance...)
+    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer{T}(; options...))
     JuMP.optimize!(d.model)
     @test JuMP.termination_status(d.model) == MOI.OPTIMAL
-    return
+    return d.model.moi_backend.optimizer.model.optimizer.result
 end
 
-test_polynormJuMP_all(; options...) = test_polynormJuMP.([
-    polynormJuMP1,
-    polynormJuMP2,
-    ], options = options)
-
-test_polynormJuMP(; options...) = test_polynormJuMP.([
-    polynormJuMP1,
-    ], options = options)
+polynorm_JuMP_fast = [
+    (2, 2, 2),
+    (2, 1, 3),
+    ]
+polynorm_JuMP_slow = [
+    # TODO
+    ]

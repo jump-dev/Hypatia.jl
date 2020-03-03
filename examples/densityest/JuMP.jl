@@ -7,25 +7,24 @@ see description in native.jl
 using LinearAlgebra
 import Random
 using Test
-import MathOptInterface
-const MOI = MathOptInterface
+import DelimitedFiles
 import JuMP
+const MOI = JuMP.MOI
 import DynamicPolynomials
 import PolyJuMP
 import Hypatia
 const MU = Hypatia.ModelUtilities
 
-include(joinpath(@__DIR__, "data.jl"))
-
-function densityestJuMP(
+function densityest_JuMP(
+    T::Type{Float64}, # TODO support generic reals
     X::Matrix{Float64},
-    deg::Int;
-    use_monomials::Bool = false, # use variables in monomial space, else interpolation space
-    use_wsos::Bool = true, # use WSOS cone formulation, else PSD formulation
-    geomean_obj::Bool = true, # use geomean formulation, else exponential cone sum-log formulation
+    deg::Int,
+    use_monomial_space::Bool, # use variables in monomial space, else interpolation space
+    use_wsos::Bool; # use WSOS cone formulation, else PSD formulation
+    sample::Bool = true,
     sample_factor::Int = 100,
     )
-    (nobs, dim) = size(X)
+    (num_obs, dim) = size(X)
 
     domain = MU.Box{Float64}(-ones(dim), ones(dim))
     # rescale X to be in unit box
@@ -35,11 +34,11 @@ function densityestJuMP(
     X ./= (maxX - minX) / 2
 
     halfdeg = div(deg + 1, 2)
-    (U, pts, Ps, w) = MU.interpolate(domain, halfdeg, sample = true, calc_w = true, sample_factor = sample_factor)
+    (U, pts, Ps, w) = MU.interpolate(domain, halfdeg, calc_w = true, sample = sample, sample_factor = sample_factor)
 
     model = JuMP.Model()
 
-    if use_monomials
+    if use_monomial_space
         DynamicPolynomials.@polyvar x[1:dim]
         PX = DynamicPolynomials.monomials(x, 0:(2 * halfdeg))
         JuMP.@variable(model, f, PolyJuMP.Poly(PX))
@@ -47,8 +46,8 @@ function densityestJuMP(
         f_X = [f(X_i) for X_i in eachrow(X)]
     else
         lagrange_polys = MU.recover_lagrange_polys(pts, 2 * halfdeg)
-        basis_evals = Matrix{Float64}(undef, nobs, U)
-        for i in 1:nobs, j in 1:U
+        basis_evals = Matrix{Float64}(undef, num_obs, U)
+        for i in 1:num_obs, j in 1:U
             basis_evals[i, j] = lagrange_polys[j](X[i, :])
         end
         JuMP.@variable(model, f_pts[1:U])
@@ -57,15 +56,9 @@ function densityestJuMP(
 
     JuMP.@constraint(model, dot(w, f_pts) == 1.0) # integrate to 1
 
-    if geomean_obj
-        JuMP.@variable(model, z)
-        JuMP.@objective(model, Max, z)
-        JuMP.@constraint(model, vcat(z, f_X) in MOI.GeometricMeanCone(1 + length(f_X)))
-    else
-        JuMP.@variable(model, z[1:nobs])
-        JuMP.@objective(model, Max, sum(z))
-        JuMP.@constraint(model, [i in 1:nobs], vcat(z[i], 1.0, f_X[i]) in MOI.ExponentialCone()) # hypograph of log
-    end
+    JuMP.@variable(model, z)
+    JuMP.@objective(model, Max, z)
+    JuMP.@constraint(model, vcat(z, f_X) in MOI.GeometricMeanCone(1 + length(f_X)))
 
     # density nonnegative
     if use_wsos
@@ -84,54 +77,45 @@ function densityestJuMP(
     return (model = model,)
 end
 
-densityestJuMP(nobs::Int, n::Int, deg::Int; options...) = densityestJuMP(randn(nobs, n), deg; options...)
+densityest_JuMP(T::Type{Float64}, data_name::Symbol, args...; kwargs...) = densityest_JuMP(T, eval(data_name), args...; kwargs...)
 
-densityestJuMP1() = densityestJuMP(iris_data(), 4)
-densityestJuMP2() = densityestJuMP(iris_data(), 6)
-densityestJuMP3() = densityestJuMP(cancer_data(), 4)
-densityestJuMP4() = densityestJuMP(cancer_data(), 6)
-densityestJuMP5() = densityestJuMP(200, 2, 3, use_monomials = false, use_wsos = true, geomean_obj = false)
-densityestJuMP6() = densityestJuMP(200, 2, 3, use_monomials = true, use_wsos = true, geomean_obj = false)
-densityestJuMP7() = densityestJuMP(200, 2, 3, use_monomials = false, use_wsos = false, geomean_obj = false)
-densityestJuMP8() = densityestJuMP(200, 2, 3, use_monomials = true, use_wsos = false, geomean_obj = false)
-densityestJuMP9() = densityestJuMP(200, 2, 3, use_monomials = false, use_wsos = true, geomean_obj = true)
-densityestJuMP10() = densityestJuMP(200, 2, 3, use_monomials = true, use_wsos = true, geomean_obj = true)
-densityestJuMP11() = densityestJuMP(200, 2, 3, use_monomials = false, use_wsos = false, geomean_obj = true)
-densityestJuMP12() = densityestJuMP(200, 2, 3, use_monomials = true, use_wsos = false, geomean_obj = true)
+densityest_JuMP(T::Type{Float64}, num_obs::Int, n::Int, args...; kwargs...) = densityest_JuMP(T, randn(T, num_obs, n), args...; kwargs...)
 
-function test_densityestJuMP(instance::Function; options, rseed::Int = 1)
+function test_densityest_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)
-    d = instance()
-    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer(; options...))
+    d = densityest_JuMP(T, instance...)
+    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer{T}(; options...))
     JuMP.optimize!(d.model)
     @test JuMP.termination_status(d.model) == MOI.OPTIMAL
-    return
+    return d.model.moi_backend.optimizer.model.optimizer.result
 end
 
-test_densityestJuMP_all(; options...) = test_densityestJuMP.([
-    densityestJuMP1,
-    densityestJuMP2,
-    densityestJuMP3,
-    densityestJuMP4,
-    densityestJuMP5,
-    densityestJuMP6,
-    densityestJuMP7,
-    densityestJuMP8,
-    densityestJuMP9,
-    densityestJuMP10,
-    densityestJuMP11,
-    densityestJuMP12,
-    ], options = options)
+iris_data = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "iris.txt"))
+cancer_data = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "cancer.txt"))
 
-test_densityestJuMP(; options...) = test_densityestJuMP.([
-    densityestJuMP1,
-    densityestJuMP3,
-    densityestJuMP5,
-    densityestJuMP6,
-    densityestJuMP7,
-    densityestJuMP8,
-    densityestJuMP9,
-    densityestJuMP10,
-    densityestJuMP11,
-    densityestJuMP12,
-    ], options = options)
+densityest_JuMP_fast = [
+    (:iris_data, 4, true, true),
+    (:iris_data, 5, true, true),
+    (:iris_data, 6, true, true),
+    (:iris_data, 4, true, false),
+    (:iris_data, 4, false, true),
+    (:iris_data, 6, false, true),
+    (:iris_data, 4, false, false),
+    (:cancer_data, 4, true, true),
+    (:cancer_data, 4, false, true),
+    (200, 2, 2, true, true),
+    (200, 2, 2, true, false),
+    (200, 2, 2, false, true),
+    (200, 2, 2, false, false),
+    (100, 8, 2, true, true),
+    (100, 8, 2, true, false),
+    (100, 8, 2, false, true),
+    (100, 8, 2, false, false),
+    (250, 4, 4, true, true),
+    (250, 4, 4, true, false),
+    (250, 4, 4, false, true),
+    (250, 4, 4, false, false),
+    ]
+densityest_JuMP_slow = [
+    # TODO
+    ]

@@ -7,9 +7,6 @@ find a density function f maximizing the log likelihood of the observations
     -zᵢ + log(f(Xᵢ)) ≥ 0 ∀ i = 1,...,n
     ∫f = 1
     f ≥ 0
-
-TODO
-- describe all options
 ==#
 
 using LinearAlgebra
@@ -21,16 +18,13 @@ import Hypatia.BlockMatrix
 const CO = Hypatia.Cones
 const MU = Hypatia.ModelUtilities
 
-iris_data = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "iris.txt"))
-cancer_data = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "iris.txt"))
-
-function densityest(
+function densityest_native(
     T::Type{<:Real},
-    X::Matrix{<:Real},
+    X::Matrix{T},
     deg::Int,
     use_wsos::Bool,
     hypogeomean_obj::Bool, # use geomean objective, else sum of logs objective
-    use_hypogeomean::Bool;
+    use_hypogeomean::Bool; # use hypogeomean cone if applicable, else hypoperlog formulation
     sample_factor::Int = 100,
     )
     (num_obs, dim) = size(X)
@@ -161,20 +155,25 @@ function densityest(
     return (c = c, A = A, b = b, G = G, h = h, cones = cones)
 end
 
-densityest(T::Type{<:Real}, data_name::Symbol, options...) = densityest(T, eval(data_name), options...)
+densityest_native(T::Type{<:Real}, data_name::Symbol, args...; kwargs...) = densityest_native(T, eval(data_name), args...; kwargs...)
 
-densityest(T::Type{<:Real}, num_obs::Int, n::Int, options...) = densityest(T, randn(T, num_obs, n), options...)
+densityest_native(T::Type{<:Real}, num_obs::Int, n::Int, args...; kwargs...) = densityest_native(T, randn(T, num_obs, n), args...; kwargs...)
 
-function test_densityest(T::Type{<:Real}, instance::Tuple; options::NamedTuple = NamedTuple(), rseed::Int = 1)
+function test_densityest_native(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)
-    d = densityest(T, instance...)
+    d = densityest_native(T, instance...)
     r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
     @test r.status == :Optimal
     return r
 end
 
-instances_densityest_fast = [
+iris_data = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "iris.txt"))
+cancer_data = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "cancer.txt"))
+
+densityest_native_fast = [
     (:iris_data, 4, true, true, true),
+    (:iris_data, 5, true, true, true),
+    (:iris_data, 6, true, true, true),
     (:iris_data, 4, false, true, true),
     (:iris_data, 4, true, false, true),
     (:iris_data, 4, true, true, false),
@@ -191,6 +190,6 @@ instances_densityest_fast = [
     (20, 2, 4, true, false, true),
     (20, 2, 4, true, true, false),
     ]
-instances_densityest_slow = [
+densityest_native_slow = [
     # TODO
     ]

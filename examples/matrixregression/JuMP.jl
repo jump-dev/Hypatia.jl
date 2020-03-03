@@ -8,49 +8,42 @@ using LinearAlgebra
 using SparseArrays
 import Random
 using Test
-import MathOptInterface
-const MOI = MathOptInterface
 import JuMP
+const MOI = JuMP.MOI
 import Hypatia
 
-function matrixregressionJuMP(
-    Y::Matrix{Float64},
-    X::Matrix{Float64};
-    lam_fro::Float64 = 0.0,
-    lam_nuc::Float64 = 0.0,
-    lam_las::Float64 = 0.0,
-    lam_glr::Float64 = 0.0,
-    lam_glc::Float64 = 0.0,
+function matrixregression_JuMP(
+    T::Type{Float64}, # TODO support generic reals
+    Y::Matrix{T},
+    X::Matrix{T},
+    lam_fro::Real, # penalty on Frobenius norm
+    lam_nuc::Real, # penalty on nuclear norm
+    lam_las::Real, # penalty on l1 norm
+    lam_glr::Real, # penalty on penalty on row group l1 norm
+    lam_glc::Real, # penalty on penalty on column group l1 norm
     )
-    @assert lam_fro >= 0
-    @assert lam_nuc >= 0
-    @assert lam_las >= 0
+    @assert min(lam_fro, lam_nuc, lam_las, lam_glr, lam_glc) >= 0
     (data_n, data_m) = size(Y)
     data_p = size(X, 2)
     @assert size(X, 1) == data_n
     @assert data_p >= data_m
 
-    if data_n > data_p
-        Xhalf = qr(X).R
-    else
-        Xhalf = X
-    end
+    Qhalf = (data_n > data_p) ? qr(X).R : X # dimension reduction via QR if helpful
 
     model = JuMP.Model()
     JuMP.@variable(model, A[1:data_p, 1:data_m])
-    JuMP.@variable(model, u_fro)
-    JuMP.@constraint(model, vcat(u_fro, 0.5, vec(Xhalf * A)) in JuMP.RotatedSecondOrderCone())
-    obj = (u_fro - 2 * dot(X' * Y, A)) / (2 * data_n)
+    JuMP.@variable(model, loss)
+    JuMP.@constraint(model, vcat(loss, 0.5, vec(Qhalf * A)) in JuMP.RotatedSecondOrderCone())
+    obj = (loss / 2 - dot(X' * Y, A)) / data_n
 
     if !iszero(lam_fro)
         JuMP.@variable(model, t_fro)
-        # NOTE this penalty is usually squared
         JuMP.@constraint(model, vcat(t_fro, vec(A)) in JuMP.SecondOrderCone())
         obj += lam_fro * t_fro
     end
     if !iszero(lam_nuc)
         JuMP.@variable(model, t_nuc)
-        JuMP.@constraint(model, vcat(t_nuc, vec(A')) in MOI.NormNuclearCone(data_m, data_p))
+        JuMP.@constraint(model, vcat(t_nuc, vec(A)) in MOI.NormNuclearCone(data_p, data_m))
         obj += lam_nuc * t_nuc
     end
     if !iszero(lam_las)
@@ -63,25 +56,31 @@ function matrixregressionJuMP(
         JuMP.@constraint(model, [i = 1:data_p], vcat(t_glr[i], A[i, :]) in JuMP.SecondOrderCone())
         obj += lam_glr * sum(t_glr)
     end
-    if !iszero(lam_glr)
+    if !iszero(lam_glc)
         JuMP.@variable(model, t_glc[1:data_m])
         JuMP.@constraint(model, [i = 1:data_m], vcat(t_glc[i], A[:, i]) in JuMP.SecondOrderCone())
         obj += lam_glc * sum(t_glc)
     end
+
     JuMP.@objective(model, Min, obj)
 
-    return (model = model,)
+    return (
+        model = model, A_var = A,
+        n = data_n, m = data_m, p = data_p, Y = Y, X = X,
+        lam_fro = lam_fro, lam_nuc = lam_nuc, lam_las = lam_las, lam_glr = lam_glr, lam_glc = lam_glc,
+        )
 end
 
-function matrixregressionJuMP(
+function matrixregression_JuMP(
+    T::Type{Float64}, # TODO support generic reals
     n::Int,
     m::Int,
-    p::Int;
+    p::Int,
+    args...;
     A_max_rank::Int = div(m, 2) + 1,
     A_sparsity::Real = max(0.2, inv(sqrt(m * p))),
     Y_noise::Real = 0.01,
-    model_kwargs...
-    ) where {T <: Real}
+    )
     @assert p >= m
     @assert 1 <= A_max_rank <= m
     @assert 0 < A_sparsity <= 1
@@ -92,48 +91,41 @@ function matrixregressionJuMP(
     X = randn(n, p)
     Y = X * A + Y_noise * randn(n, m)
 
-    Y = Matrix(Y)
-    X = Matrix(X)
-
-    return matrixregressionJuMP(Y, X; model_kwargs...)
+    return matrixregression_JuMP(T, Matrix(Y), Matrix(X), args...)
 end
 
-matrixregressionJuMP1() = matrixregressionJuMP(5, 3, 4)
-matrixregressionJuMP2() = matrixregressionJuMP(5, 3, 4, lam_fro = 0.1, lam_nuc = 0.1, lam_las = 0.1, lam_glc = 0.2, lam_glr = 0.2)
-matrixregressionJuMP3() = matrixregressionJuMP(3, 4, 5)
-matrixregressionJuMP4() = matrixregressionJuMP(3, 4, 5, lam_fro = 0.1, lam_nuc = 0.1, lam_las = 0.1, lam_glc = 0.2, lam_glr = 0.2)
-matrixregressionJuMP5() = matrixregressionJuMP(100, 8, 12)
-matrixregressionJuMP6() = matrixregressionJuMP(100, 8, 12, lam_fro = 0.0, lam_nuc = 0.4, lam_las = 1.0, lam_glc = 0.1, lam_glr = 2.0)
-matrixregressionJuMP7() = matrixregressionJuMP(100, 8, 12, lam_fro = 0.0, lam_nuc = 0.0, lam_las = 0.0, lam_glc = 0.2, lam_glr = 1.5)
-matrixregressionJuMP8() = matrixregressionJuMP(15, 10, 20)
-matrixregressionJuMP9() = matrixregressionJuMP(15, 10, 20, lam_fro = 0.0, lam_nuc = 0.4, lam_las = 1.0, lam_glc = 0.1, lam_glr = 2.0)
-matrixregressionJuMP10() = matrixregressionJuMP(15, 10, 20, lam_fro = 0.0, lam_nuc = 0.0, lam_las = 0.0, lam_glc = 0.2, lam_glr = 1.5)
-
-function test_matrixregressionJuMP(instance::Function; options, rseed::Int = 1)
+function test_matrixregression_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)
-    d = instance()
-    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer(; options...))
+    d = matrixregression_JuMP(T, instance...)
+    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer{T}(; options...))
     JuMP.optimize!(d.model)
     @test JuMP.termination_status(d.model) == MOI.OPTIMAL
-    return
+    if JuMP.termination_status(d.model) == MOI.OPTIMAL
+        # check objective value is correct
+        A_opt = reshape(JuMP.value.(d.A_var), d.p, d.m)
+        loss = (sum(abs2, d.X * A_opt) / 2 - dot(d.X' * d.Y, A_opt)) / d.n
+        obj_try = loss + d.lam_fro * norm(vec(A_opt), 2) +
+            d.lam_nuc * sum(svd(A_opt).S) + d.lam_las * norm(vec(A_opt), 1) +
+            d.lam_glr * sum(norm, eachrow(A_opt)) + d.lam_glc * sum(norm, eachcol(A_opt))
+        @test JuMP.objective_value(d.model) ≈ obj_try atol = 1e-4 rtol = 1e-4
+    end
+    return d.model.moi_backend.optimizer.model.optimizer.result
 end
 
-test_matrixregressionJuMP_all(; options...) = test_matrixregressionJuMP.([
-    matrixregressionJuMP1,
-    matrixregressionJuMP2,
-    matrixregressionJuMP3,
-    matrixregressionJuMP4,
-    matrixregressionJuMP5,
-    matrixregressionJuMP6,
-    matrixregressionJuMP7,
-    matrixregressionJuMP8,
-    matrixregressionJuMP9,
-    matrixregressionJuMP10,
-    ], options = options)
-
-test_matrixregressionJuMP(; options...) = test_matrixregressionJuMP.([
-    matrixregressionJuMP1,
-    matrixregressionJuMP2,
-    matrixregressionJuMP3,
-    matrixregressionJuMP4,
-    ], options = options)
+matrixregression_JuMP_fast = [
+    (5, 3, 4, 0, 0, 0, 0, 0),
+    (5, 3, 4, 0.1, 0.1, 0.1, 0.2, 0.2),
+    (5, 3, 4, 0, 0.1, 0.1, 0, 0),
+    (3, 4, 5, 0, 0, 0, 0, 0),
+    (3, 4, 5, 0.1, 0.1, 0.1, 0.2, 0.2),
+    (3, 4, 5, 0, 0.1, 0.1, 0, 0),
+    (15, 10, 20, 0, 0, 0, 0, 0),
+    (15, 10, 20, 0.1, 0.1, 0.1, 0.2, 0.2),
+    (15, 10, 20, 0, 0.1, 0.1, 0, 0),
+    (100, 8, 12, 0, 0, 0, 0, 0),
+    (100, 8, 12, 0.1, 0.1, 0.1, 0.2, 0.2),
+    (100, 8, 12, 0, 0.1, 0.1, 0, 0),
+    ]
+matrixregression_JuMP_slow = [
+    # TODO
+    ]
