@@ -65,9 +65,10 @@ function expdesign_JuMP(
     return (model = model,)
 end
 
-function test_expdesign_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
+function test_expdesign_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1, optimize_hook::Function)
     Random.seed!(rseed)
     d = expdesign_JuMP(T, instance...)
+    JuMP.set_optimize_hook(d.model, optimize_hook)
     JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer{T}(; options...))
     JuMP.optimize!(d.model)
     @test JuMP.termination_status(d.model) == MOI.OPTIMAL

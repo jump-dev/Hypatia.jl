@@ -17,47 +17,52 @@ instance_sets = [
     ]
 
 model_types = [
-    "native",
+    # "native",
     "JuMP",
     ]
 
 native_example_names = [
-    "densityest",
-    "envelope",
-    "expdesign",
-    "linearopt",
-    "matrixcompletion",
-    "matrixregression",
-    "maxvolume",
-    "polymin",
-    "portfolio",
-    "sparsepca",
+    # "densityest",
+    # "envelope",
+    # "expdesign",
+    # "linearopt",
+    # "matrixcompletion",
+    # "matrixregression",
+    # "maxvolume",
+    # "polymin",
+    # "portfolio",
+    # "sparsepca",
     ]
 
 JuMP_example_names = [
-    "centralpolymat",
-    "conditionnum",
-    "contraction",
-    "densityest",
-    "envelope",
+    # "centralpolymat",
+    # "conditionnum",
+    # "contraction",
+    # "densityest",
+    # "envelope",
     "expdesign",
-    "lotkavolterra",
-    "lyapunovstability",
-    "matrixcompletion",
-    "matrixquadratic",
-    "matrixregression",
-    "maxvolume",
-    "muconvexity",
-    "nearestpsd",
-    "polymin",
-    "polynorm",
-    "portfolio",
-    "regionofattr",
-    "robustgeomprog",
-    "secondorderpoly",
-    "semidefinitepoly",
-    "shapeconregr",
-    "signomialmin",
+    # "lotkavolterra",
+    # "lyapunovstability",
+    # "matrixcompletion",
+    # "matrixquadratic",
+    # "matrixregression",
+    # "maxvolume",
+    # "muconvexity",
+    # "nearestpsd",
+    # "polymin",
+    # "polynorm",
+    # "portfolio",
+    # "regionofattr",
+    # "robustgeomprog",
+    # "secondorderpoly",
+    # "semidefinitepoly",
+    # "shapeconregr",
+    # "signomialmin",
+    ]
+
+bridgeable_example_names = [
+    "densityest",
+    "expdesign",
     ]
 
 T = Float64
@@ -99,6 +104,29 @@ perf = DataFrame(
     dual_obj = T[],
     )
 
+MOIU.@model(ClassicConeOptimizer,
+   (),
+   (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan, MOI.Interval,),
+   (MOI.Reals, MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives, MOI.SecondOrderCone, MOI.RotatedSecondOrderCone, MOI.PositiveSemidefiniteConeTriangle, MOI.ExponentialCone, MOI.DualExponentialCone),
+   (MOI.PowerCone, MOI.DualPowerCone,),
+   (),
+   (MOI.ScalarAffineFunction,),
+   (MOI.VectorOfVariables,),
+   (MOI.VectorAffineFunction,),
+   true,
+  )
+# solver hook applicable to some JuMP examples
+# extend_formulation() = nothing
+function extend_formulation(model::Model; kwargs...)
+   JuMP.set_optimizer(model, ClassicConeOptimizer{Float64})
+   MOIU.attach_optimizer(backend(model))
+
+   hyp_opt = Hypatia.Optimizer(; solver_options...)
+   MOI.copy_to(hyp_opt, backend(model).optimizer.model)
+   JuMP.set_optimizer(model, () -> hyp_opt)
+   MOI.optimize!(hyp_opt)
+end
+
 all_tests_time = time()
 @testset "examples tests" begin
     for mod_type in model_types
@@ -113,7 +141,7 @@ all_tests_time = time()
                 test_info = "$mod_type $ex_name $inst_set $inst_num: $inst_data"
                 @testset "$test_info" begin
                     println(test_info, "...")
-                    test_time = @elapsed r = test_function(inst_data, T = T, options = options)
+                    test_time = @elapsed r = test_function(inst_data, T = T, options = options, optimize_hook = extend_formulation)
                     push!(perf, (mod_type, ex_name, inst_num, string(inst_data), test_time, r.solve_time, r.num_iters, r.status, r.primal_obj, r.dual_obj))
                     @printf("... %8.2e seconds\n", test_time)
                 end
