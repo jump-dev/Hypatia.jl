@@ -90,7 +90,7 @@ TODO
 #     return system_solver
 # end
 #
-# update_fact(system_solver::NaiveIndirectSystemSolver, solver::Solver) = system_solver
+# update_lhs(system_solver::NaiveIndirectSystemSolver, solver::Solver) = system_solver
 #
 # function solve_system(system_solver::NaiveIndirectSystemSolver, solver::Solver, sol6::Matrix, rhs6::Matrix)
 #     for j in 1:size(rhs6, 2)
@@ -200,7 +200,7 @@ function load(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) wher
     return system_solver
 end
 
-function update_fact(system_solver::NaiveSparseSystemSolver, solver::Solver)
+function update_lhs(system_solver::NaiveSparseSystemSolver, solver::Solver)
     for (k, cone_k) in enumerate(solver.model.cones)
         H_k = Cones.hess(cone_k)
         for j in 1:Cones.dimension(cone_k)
@@ -216,7 +216,7 @@ function update_fact(system_solver::NaiveSparseSystemSolver, solver::Solver)
 end
 
 function solve_system(system_solver::NaiveSparseSystemSolver, solver::Solver, sol6::Vector, rhs6::Vector)
-    @timeit solver.timer "solve_system" inv_prod(system_solver.fact_cache, sol6, system_solver.lhs6, rhs6)
+    inv_prod(system_solver.fact_cache, sol6, system_solver.lhs6, rhs6)
     return sol6
 end
 
@@ -264,14 +264,14 @@ function load(system_solver::NaiveDenseSystemSolver{T}, solver::Solver{T}) where
     return system_solver
 end
 
-function update_fact(system_solver::NaiveDenseSystemSolver, solver::Solver)
+function update_lhs(system_solver::NaiveDenseSystemSolver, solver::Solver)
     for (cone_k, lhs6_H_k) in zip(solver.model.cones, system_solver.lhs6_H_k)
         H_k = Cones.hess(cone_k)
         @. lhs6_H_k = solver.mu * H_k
     end
     system_solver.lhs6[end, system_solver.tau_row] = solver.mu / solver.tau / solver.tau
 
-    update_fact(system_solver.fact_cache, system_solver.lhs6)
+    @timeit solver.timer "update_fact" update_fact(system_solver.fact_cache, system_solver.lhs6)
 
     return system_solver
 end

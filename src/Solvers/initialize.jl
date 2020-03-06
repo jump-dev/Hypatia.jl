@@ -133,7 +133,7 @@ function find_initial_x(solver::Solver{T}) where {T <: Real}
 end
 
 # optionally preprocess primal equalities and solve for y as least squares solution to A'y = -c - G'z
-function find_initial_y(solver::Solver{T}, reducing::Bool) where {T <: Real}
+function find_initial_y(solver::Solver{T}, reduce::Bool) where {T <: Real}
     model = solver.model
     p = model.p
     if iszero(p) # y is empty (no primal variables)
@@ -147,7 +147,7 @@ function find_initial_y(solver::Solver{T}, reducing::Bool) where {T <: Real}
     A = model.A
     solver.y_keep_idxs = 1:p
 
-    if !reducing
+    if !reduce
         # rhs = -c - G' * point.z
         rhs = copy(model.c)
         mul!(rhs, model.G', solver.point.z, -1, -1)
@@ -177,7 +177,7 @@ function find_initial_y(solver::Solver{T}, reducing::Bool) where {T <: Real}
     end
     Ap_rank = get_rank_est(Ap_fact, solver.init_tol_qr)
 
-    if !reducing && !solver.preprocess
+    if !reduce && !solver.preprocess
         Ap_rank < p && @warn("some primal equalities appear to be dependent (possibly inconsistent); try using preprocess = true")
         @timeit solver.timer "qr_solve" init_y = Ap_fact \ rhs
         return init_y
@@ -213,58 +213,62 @@ function find_initial_y(solver::Solver{T}, reducing::Bool) where {T <: Real}
         solver.verbose && println("$(p - Ap_rank) out of $p primal equality constraints are dependent")
     end
 
-    if reducing
-        # remove all primal equalities by making A and b empty with n = n0 - p0 and p = 0
-        # TODO improve efficiency
-        # TODO avoid calculating GQ1 explicitly if possible
-        # recover original-space solution using:
-        # x0 = Q * [(R' \ b0), x]
-        # y0 = R \ (-cQ1' - GQ1' * z0)
-        if !(Ap_fact isa QRPivoted{T, Matrix{T}})
-            row_piv = Ap_fact.prow
-            model.c = model.c[row_piv]
-            model.G = model.G[:, row_piv]
-            solver.reduce_row_piv_inv = Ap_fact.rpivinv
-        else
-            solver.reduce_row_piv_inv = Int[]
+    if reduce
+        @timeit solver.timer "reduce" begin
+            # remove all primal equalities by making A and b empty with n = n0 - p0 and p = 0
+            # TODO improve efficiency
+            # TODO avoid calculating GQ1 explicitly if possible
+            # recover original-space solution using:
+            # x0 = Q * [(R' \ b0), x]
+            # y0 = R \ (-cQ1' - GQ1' * z0)
+            if !(Ap_fact isa QRPivoted{T, Matrix{T}})
+                row_piv = Ap_fact.prow
+                model.c = model.c[row_piv]
+                model.G = model.G[:, row_piv]
+                solver.reduce_row_piv_inv = Ap_fact.rpivinv
+            else
+                solver.reduce_row_piv_inv = Int[]
+            end
+
+            Q1_idxs = 1:Ap_rank
+            Q2_idxs = (Ap_rank + 1):n
+
+            # [cQ1 cQ2] = c0' * Q
+            cQ = model.c' * Ap_Q
+            cQ1 = solver.reduce_cQ1 = cQ[Q1_idxs]
+            cQ2 = cQ[Q2_idxs]
+            # c = cQ2
+            model.c = cQ2
+            model.n = length(model.c)
+            # offset = offset0 + cQ1 * (R' \ b0)
+            Rpib0 = solver.reduce_Rpib0 = ldiv!(Ap_R', b_sub)
+            # solver.Rpib0 = Rpib0 # TODO
+            model.obj_offset += dot(cQ1, Rpib0)
+
+            # [GQ1 GQ2] = G0 * Q
+            @timeit solver.timer "mul_G_Q" GQ = model.G * Ap_Q
+            @timeit solver.timer "split_GQ" begin
+                GQ1 = solver.reduce_GQ1 = GQ[:, Q1_idxs]
+                GQ2 = GQ[:, Q2_idxs]
+            end
+            # h = h0 - GQ1 * (R' \ b0)
+            model.h -= GQ1 * Rpib0 # TODO replace with below when working
+            # mul!(model.h, GQ1, Rpib0, -1, true)
+
+            # G = GQ2
+            model.G = GQ2
+
+            # A and b empty
+            model.p = 0
+            model.A = zeros(T, 0, model.n)
+            model.b = zeros(T, 0)
+            solver.reduce_Ap_R = Ap_R
+            solver.reduce_Ap_Q = Ap_Q
+
+            solver.reduce_y_keep_idxs = y_keep_idxs
+            solver.Ap_R = UpperTriangular(zeros(T, 0, 0))
+            solver.Ap_Q = I
         end
-
-        Q1_idxs = 1:Ap_rank
-        Q2_idxs = (Ap_rank + 1):n
-
-        # [cQ1 cQ2] = c0' * Q
-        cQ = model.c' * Ap_Q
-        cQ1 = solver.reduce_cQ1 = cQ[Q1_idxs]
-        cQ2 = cQ[Q2_idxs]
-        # c = cQ2
-        model.c = cQ2
-        model.n = length(model.c)
-        # offset = offset0 + cQ1 * (R' \ b0)
-        Rpib0 = solver.reduce_Rpib0 = ldiv!(Ap_R', b_sub)
-        # solver.Rpib0 = Rpib0 # TODO
-        model.obj_offset += dot(cQ1, Rpib0)
-
-        # [GQ1 GQ2] = G0 * Q
-        GQ = model.G * Ap_Q
-        GQ1 = solver.reduce_GQ1 = GQ[:, Q1_idxs]
-        GQ2 = GQ[:, Q2_idxs]
-        # h = h0 - GQ1 * (R' \ b0)
-        model.h -= GQ1 * Rpib0 # TODO replace with below when working
-        # mul!(model.h, GQ1, Rpib0, -1, true)
-
-        # G = GQ2
-        model.G = GQ2
-
-        # A and b empty
-        model.p = 0
-        model.A = zeros(T, 0, model.n)
-        model.b = zeros(T, 0)
-        solver.reduce_Ap_R = Ap_R
-        solver.reduce_Ap_Q = Ap_Q
-
-        solver.reduce_y_keep_idxs = y_keep_idxs
-        solver.Ap_R = UpperTriangular(zeros(T, 0, 0))
-        solver.Ap_Q = I
 
         return zeros(T, 0)
     end
