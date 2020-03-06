@@ -41,7 +41,7 @@ function solve_system(system_solver::QRCholSystemSolver{T}, solver::Solver{T}, s
         end
     end
 
-    sol3 = solve_3x3_subsystem(system_solver, solver, rhs3) # NOTE modifies and returns rhs3
+    @timeit solver.timer "solve_subsystem" sol3 = solve_subsystem(system_solver, solver, rhs3) # NOTE modifies and returns rhs3
 
     # TODO refactor all below
     # TODO maybe use higher precision here
@@ -74,7 +74,7 @@ function solve_system(system_solver::QRCholSystemSolver{T}, solver::Solver{T}, s
     return sol
 end
 
-function solve_3x3_subsystem(system_solver::QRCholSystemSolver{T}, solver::Solver{T}, rhs3::Vector{T}) where {T <: Real}
+function solve_subsystem(system_solver::QRCholSystemSolver{T}, solver::Solver{T}, rhs3::Vector{T}) where {T <: Real}
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
 
@@ -96,7 +96,8 @@ function solve_3x3_subsystem(system_solver::QRCholSystemSolver{T}, solver::Solve
         mul!(system_solver.GQ1x, system_solver.GQ1, y)
         block_hess_prod.(model.cones, system_solver.HGQ1x_k, system_solver.GQ1x_k, solver.mu)
         mul!(system_solver.Q2div, system_solver.GQ2', system_solver.HGQ1x, -1, true)
-        solve_subsystem(system_solver, x_sub2, system_solver.Q2div)
+        copyto!(x_sub2, system_solver.Q2div)
+        inv_prod(system_solver.fact_cache, x_sub2)
     end
 
     lmul!(solver.Ap_Q, x)
@@ -206,67 +207,67 @@ end
 outer_prod(UGQ2::AbstractMatrix{T}, lhs1::AbstractMatrix{T}) where {T <: LinearAlgebra.BlasReal} = BLAS.syrk!('U', 'T', true, UGQ2, true, lhs1)
 outer_prod(UGQ2::AbstractMatrix{T}, lhs1::AbstractMatrix{T}) where {T <: Real} = mul!(lhs1, UGQ2', UGQ2, true, true)
 
-function update_fact(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
+function update_lhs(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
     model = solver.model
+    timer = solver.timer
 
     if !isempty(system_solver.Q2div)
-        # TODO use dispatch
-        # TODO faster if only do one syrk from the first block of indices and one mul from the second block
-        system_solver.lhs1.data .= 0
-        sqrtmu = sqrt(solver.mu)
-        for (cone_k, prod_k, arr_k) in zip(model.cones, system_solver.HGQ2_k, system_solver.GQ2_k)
-            if hasfield(typeof(cone_k), :hess_fact_cache)
-                Cones.update_hess_fact(cone_k)
-                if cone_k.hess_fact_cache isa DenseSymCache{T}
-                    block_hess_prod(cone_k, prod_k, arr_k, solver.mu)
-                    mul!(system_solver.lhs1.data, arr_k', prod_k, true, true)
-                    continue
+        @timeit timer "update_inner_lhs" begin
+            # TODO use dispatch
+            # TODO faster if only do one syrk from the first block of indices and one mul from the second block
+            system_solver.lhs1.data .= 0
+            sqrtmu = sqrt(solver.mu)
+            for (cone_k, prod_k, arr_k) in zip(model.cones, system_solver.HGQ2_k, system_solver.GQ2_k)
+                if hasfield(typeof(cone_k), :hess_fact_cache)
+                    @timeit timer "update_hess_fact" Cones.update_hess_fact(cone_k)
+                    if cone_k.hess_fact_cache isa DenseSymCache{T}
+                        @timeit timer "block_hess_prod" block_hess_prod(cone_k, prod_k, arr_k, solver.mu)
+                        @timeit timer "mul" mul!(system_solver.lhs1.data, arr_k', prod_k, true, true)
+                        continue
+                    end
                 end
+                @timeit timer "use_hess_sqrt" begin
+                    if Cones.use_dual_barrier(cone_k)
+                        Cones.inv_hess_sqrt_prod!(prod_k, arr_k, cone_k)
+                        prod_k ./= sqrtmu
+                    else
+                        Cones.hess_sqrt_prod!(prod_k, arr_k, cone_k)
+                        prod_k .*= sqrtmu
+                    end
+                end
+                @timeit timer "outer_prod" outer_prod(prod_k, system_solver.lhs1.data) # TODO cheaper to do one outer_prod for cones using sqrt oracles, but complicated because potentially doing some full hess oracles; could split cones into those using one or the other
             end
-            if Cones.use_dual_barrier(cone_k)
-                Cones.inv_hess_sqrt_prod!(prod_k, arr_k, cone_k)
-                prod_k ./= sqrtmu
-            else
-                Cones.hess_sqrt_prod!(prod_k, arr_k, cone_k)
-                prod_k .*= sqrtmu
-            end
-            outer_prod(prod_k, system_solver.lhs1.data)
         end
 
-        if !update_fact(system_solver.fact_cache, system_solver.lhs1)
-            @warn("QRChol factorization failed")
-            if T <: LinearAlgebra.BlasReal && system_solver.fact_cache isa DensePosDefCache{T}
-                @warn("Switching QRChol solver from Cholesky to Bunch Kaufman")
-                system_solver.fact_cache = DenseSymCache{T}()
-                load_matrix(system_solver.fact_cache, system_solver.lhs1)
-            else
-                system_solver.lhs1 += sqrt(eps(T)) * I # attempt recovery # TODO make more efficient
-            end
-            if !update_fact(system_solver.fact_cache, system_solver.lhs1)
-                @warn("QRChol Bunch-Kaufman factorization failed after recovery")
-                system_solver.lhs1 += sqrt(eps(T)) * I # attempt recovery # TODO make more efficient
-                if !update_fact(system_solver.fact_cache, system_solver.lhs1)
-                    @warn("QRChol Bunch-Kaufman factorization failed twice after recovery")
+        # TODO refactor below
+        @timeit timer "update_fact" success = update_fact(system_solver.fact_cache, system_solver.lhs1)
+        if !success
+            @timeit timer "recover" begin
+                @warn("QRChol factorization failed")
+                if T <: LinearAlgebra.BlasReal && system_solver.fact_cache isa DensePosDefCache{T}
+                    @warn("switching QRChol solver from Cholesky to Bunch Kaufman")
+                    system_solver.fact_cache = DenseSymCache{T}()
+                    load_matrix(system_solver.fact_cache, system_solver.lhs1)
+                else
+                    system_solver.lhs1 += sqrt(eps(T)) * I # attempt recovery # TODO make more efficient
                 end
+                @timeit timer "update_fact" success = update_fact(system_solver.fact_cache, system_solver.lhs1)
+                success || @warn("QRChol Bunch-Kaufman factorization failed after recovery")
             end
         end
     end
 
     # update solution for fixed c,b,h part
-    (n, p) = (model.n, model.p)
-    const_sol = system_solver.const_sol
-    @views const_sol[1:n] = -model.c
-    @views const_sol[n .+ (1:p)] = model.b
-    for (cone_k, idxs_k) in zip(model.cones, model.cone_idxs)
-        @views block_hess_prod(cone_k, const_sol[(n + p) .+ idxs_k], model.h[idxs_k], solver.mu)
+    @timeit timer "update_fixed_rhs" begin
+        (n, p) = (model.n, model.p)
+        const_sol = system_solver.const_sol
+        @views const_sol[1:n] = -model.c
+        @views const_sol[n .+ (1:p)] = model.b
+        for (cone_k, idxs_k) in zip(model.cones, model.cone_idxs)
+            @views block_hess_prod(cone_k, const_sol[(n + p) .+ idxs_k], model.h[idxs_k], solver.mu)
+        end
     end
-    solve_3x3_subsystem(system_solver, solver, const_sol)
+    @timeit timer "solve_subsystem" solve_subsystem(system_solver, solver, const_sol)
 
     return system_solver
-end
-
-function solve_subsystem(system_solver::QRCholDenseSystemSolver, sol1::AbstractVector, rhs1::AbstractVector)
-    copyto!(sol1, rhs1)
-    inv_prod(system_solver.fact_cache, sol1)
-    return sol1
 end

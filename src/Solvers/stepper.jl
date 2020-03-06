@@ -110,21 +110,22 @@ end
 
 function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     point = solver.point
+    timer = solver.timer
 
     # update linear system solver factorization and helpers
-    @timeit solver.timer "update_fact" update_fact(solver.system_solver, solver)
+    @timeit timer "update_lhs" update_lhs(solver.system_solver, solver)
 
     # calculate correction direction and keep in dir_corr
-    @timeit solver.timer "rhs_corr" update_rhs_correction(stepper, solver)
-    @timeit solver.timer "corr_dir" get_directions(stepper, solver, iter_ref_steps = 3)
+    @timeit timer "rhs_corr" update_rhs_correction(stepper, solver)
+    @timeit timer "dir_corr" get_directions(stepper, solver, iter_ref_steps = 3)
     copyto!(stepper.dir_corr, stepper.dir)
 
     # calculate affine/prediction direction and keep in dir
-    @timeit solver.timer "rhs_aff" update_rhs_affine(stepper, solver)
-    @timeit solver.timer "aff_dir" get_directions(stepper, solver, iter_ref_steps = 3)
+    @timeit timer "rhs_aff" update_rhs_affine(stepper, solver)
+    @timeit timer "dir_aff" get_directions(stepper, solver, iter_ref_steps = 3)
 
     # calculate correction factor gamma by finding distance aff_alpha for stepping in affine direction
-    @timeit solver.timer "aff_alpha" stepper.prev_aff_alpha = aff_alpha = find_max_alpha(
+    @timeit timer "alpha_aff" stepper.prev_aff_alpha = aff_alpha = find_max_alpha(
         stepper, solver, prev_alpha = stepper.prev_aff_alpha, min_alpha = T(1e-2))
     stepper.prev_gamma = gamma = abs2(one(T) - aff_alpha) # TODO allow different function (heuristic) as option?
 
@@ -132,7 +133,7 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     axpby!(gamma, stepper.dir_corr, 1 - gamma, stepper.dir)
 
     # find distance alpha for stepping in combined direction
-    @timeit solver.timer "comb_alpha" alpha = find_max_alpha(
+    @timeit timer "alpha_comb" alpha = find_max_alpha(
         stepper, solver, prev_alpha = stepper.prev_alpha, min_alpha = T(1e-3))
 
     if iszero(alpha)
@@ -141,7 +142,7 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
         copyto!(stepper.dir, stepper.dir_corr)
 
         # find distance alpha for stepping in correction direction
-        @timeit solver.timer "corr_alpha" alpha = find_max_alpha(
+        @timeit timer "alpha_corr" alpha = find_max_alpha(
             stepper, solver, prev_alpha = one(T), min_alpha = T(1e-6))
 
         if iszero(alpha)
@@ -224,39 +225,42 @@ function get_directions(stepper::CombinedStepper{T}, solver::Solver{T}; iter_ref
     dir_temp = stepper.dir_temp
     res = stepper.res
     system_solver = solver.system_solver
+    timer = solver.timer
 
-    @timeit solver.timer "solve_system" solve_system(system_solver, solver, dir, rhs)
+    @timeit timer "solve_system" solve_system(system_solver, solver, dir, rhs)
 
     # use iterative refinement
-    copyto!(dir_temp, dir)
-    res = apply_lhs(stepper, solver) # modifies res
-    res .-= rhs
-    norm_inf = norm(res, Inf)
-    norm_2 = norm(res, 2)
-
-    for i in 1:iter_ref_steps
-        if norm_inf < 100 * eps(T) # TODO change tolerance dynamically
-            break
-        end
-        @timeit solver.timer "solve_system" solve_system(system_solver, solver, dir, res)
-        axpby!(true, dir_temp, -1, dir)
-        res = apply_lhs(stepper, solver) # modifies res
-        res .-= rhs
-
-        norm_inf_new = norm(res, Inf)
-        norm_2_new = norm(res, 2)
-        if norm_inf_new > norm_inf || norm_2_new > norm_2
-            # residual has not improved
-            copyto!(dir, dir_temp)
-            break
-        end
-
-        # residual has improved, so use the iterative refinement
-        # TODO only print if using debug mode
-        # solver.verbose && @printf("iter ref round %d norms: inf %9.2e to %9.2e, two %9.2e to %9.2e\n", i, norm_inf, norm_inf_new, norm_2, norm_2_new)
+    @timeit timer "iter_ref" begin
         copyto!(dir_temp, dir)
-        norm_inf = norm_inf_new
-        norm_2 = norm_2_new
+        @timeit timer "apply_lhs" res = apply_lhs(stepper, solver) # modifies res
+        res .-= rhs
+        norm_inf = norm(res, Inf)
+        norm_2 = norm(res, 2)
+
+        for i in 1:iter_ref_steps
+            if norm_inf < 100 * eps(T) # TODO change tolerance dynamically
+                break
+            end
+            @timeit timer "solve_system" solve_system(system_solver, solver, dir, res)
+            axpby!(true, dir_temp, -1, dir)
+            res = apply_lhs(stepper, solver) # modifies res
+            res .-= rhs
+
+            norm_inf_new = norm(res, Inf)
+            norm_2_new = norm(res, 2)
+            if norm_inf_new > norm_inf || norm_2_new > norm_2
+                # residual has not improved
+                copyto!(dir, dir_temp)
+                break
+            end
+
+            # residual has improved, so use the iterative refinement
+            # TODO only print if using debug mode
+            # solver.verbose && @printf("iter ref round %d norms: inf %9.2e to %9.2e, two %9.2e to %9.2e\n", i, norm_inf, norm_inf_new, norm_2, norm_2_new)
+            copyto!(dir_temp, dir)
+            norm_inf = norm_inf_new
+            norm_2 = norm_2_new
+        end
     end
 
     return dir
@@ -325,6 +329,7 @@ function find_max_alpha(
     kap_dir = stepper.dir[stepper.kap_row]
     z_linesearch = stepper.z_linesearch
     s_linesearch = stepper.s_linesearch
+    timer = solver.timer
 
     alpha = max(T(0.1), min(prev_alpha * T(1.4), one(T))) # TODO option for parameter
     if tau_dir < zero(T)
@@ -338,27 +343,37 @@ function find_max_alpha(
     tau_temp = kap_temp = taukap_temp = mu_temp = zero(T)
     nup1 = solver.model.nu + 1
     while true
-        @. z_linesearch = z + alpha * z_dir
-        @. s_linesearch = s + alpha * s_dir
-        tau_temp = tau + alpha * tau_dir
-        kap_temp = kap + alpha * kap_dir
-        taukap_temp = tau_temp * kap_temp
-        mu_temp = (dot(s_linesearch, z_linesearch) + taukap_temp) / nup1
+        @timeit timer "update_line" begin
+            @. z_linesearch = z + alpha * z_dir
+            @. s_linesearch = s + alpha * s_dir
+            tau_temp = tau + alpha * tau_dir
+            kap_temp = kap + alpha * kap_dir
+            taukap_temp = tau_temp * kap_temp
+            mu_temp = (dot(s_linesearch, z_linesearch) + taukap_temp) / nup1
+        end
 
         if mu_temp > eps(T) && abs(taukap_temp - mu_temp) < mu_temp * solver.max_nbhd
-            # order the cones by how long it takes to check neighborhood condition and iterate in that order, to improve efficiency
-            sortperm!(cone_order, cone_times, initialized = true)
             in_nbhd = true
-            for k in cone_order
-                cone_k = cones[k]
-                time_k = time_ns()
-                Cones.load_point(cone_k, stepper.primal_views_linesearch[k])
-                Cones.reset_data(cone_k)
-                in_nbhd_k = Cones.is_feas(cone_k) && Cones.in_neighborhood(cone_k, stepper.dual_views_linesearch[k], mu_temp)
-                cone_times[k] = time_ns() - time_k
-                if !in_nbhd_k
-                    in_nbhd = false
-                    break
+            @timeit timer "nbhd_checks" begin
+                # order the cones by how long it takes to check neighborhood condition and iterate in that order, to improve efficiency
+                sortperm!(cone_order, cone_times, initialized = true)
+                for k in cone_order
+                    cone_k = cones[k]
+                    time_k = time_ns()
+                    Cones.load_point(cone_k, stepper.primal_views_linesearch[k])
+                    Cones.reset_data(cone_k)
+                    @timeit timer "is_feas" is_feas_k = Cones.is_feas(cone_k)
+                    if is_feas_k
+                        @timeit timer "in_nbhd" in_nbhd_k = Cones.in_neighborhood(cone_k, stepper.dual_views_linesearch[k], mu_temp)
+                    else
+                        in_nbhd_k = false
+                    end
+                    # in_nbhd_k = Cones.is_feas(cone_k) && Cones.in_neighborhood(cone_k, stepper.dual_views_linesearch[k], mu_temp)
+                    cone_times[k] = time_ns() - time_k
+                    if !in_nbhd_k
+                        in_nbhd = false
+                        break
+                    end
                 end
             end
             if in_nbhd

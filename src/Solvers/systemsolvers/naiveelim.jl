@@ -64,7 +64,7 @@ function solve_system(system_solver::NaiveElimSystemSolver{T}, solver::Solver{T}
     # -c'x - b'y - h'z + mu/(taubar^2)*tau = taurhs + kaprhs
     rhs4[end] += rhs[end]
 
-    @timeit solver.timer "solve_system" solve_subsystem(system_solver, sol4, rhs4)
+    @timeit solver.timer "solve_subsystem" solve_subsystem(system_solver, sol4, rhs4)
     sol[1:dim4] .= sol4
 
     # lift to get s and kap
@@ -88,7 +88,7 @@ direct sparse
 
 mutable struct NaiveElimSparseSystemSolver{T <: Real} <: NaiveElimSystemSolver{T}
     use_inv_hess::Bool
-    lhs4::SparseMatrixCSC # TODO CSC type will depend on factor cache Int type
+    lhs4::SparseMatrixCSC # TODO type params will depend on factor cache Int type
     rhs4::Vector{T}
     sol4::Vector{T}
     hess_idxs::Vector
@@ -182,7 +182,7 @@ function load(system_solver::NaiveElimSparseSystemSolver{T}, solver::Solver{T}) 
     return system_solver
 end
 
-function update_fact(system_solver::NaiveElimSparseSystemSolver, solver::Solver)
+function update_lhs(system_solver::NaiveElimSparseSystemSolver, solver::Solver)
     for (k, cone_k) in enumerate(solver.model.cones)
         H_k = (Cones.use_dual_barrier(cone_k) ? Cones.hess(cone_k) : Cones.inv_hess(cone_k))
         for j in 1:Cones.dimension(cone_k)
@@ -199,7 +199,7 @@ function update_fact(system_solver::NaiveElimSparseSystemSolver, solver::Solver)
     # TODO NT:
     # system_solver.lhs4.nzval[end] = solver.kap / solver.tau
 
-    update_fact(system_solver.fact_cache, system_solver.lhs4)
+    @timeit solver.timer "update_fact" update_fact(system_solver.fact_cache, system_solver.lhs4)
 
     return system_solver
 end
@@ -248,7 +248,7 @@ function load(system_solver::NaiveElimDenseSystemSolver{T}, solver::Solver{T}) w
     return system_solver
 end
 
-function update_fact(system_solver::NaiveElimDenseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
+function update_lhs(system_solver::NaiveElimDenseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
     model = solver.model
     (n, p) = (model.n, model.p)
     lhs4 = system_solver.lhs4
@@ -274,7 +274,7 @@ function update_fact(system_solver::NaiveElimDenseSystemSolver{T}, solver::Solve
     end
     lhs4[end, end] = solver.mu / solver.tau / solver.tau
 
-    update_fact(system_solver.fact_cache, system_solver.lhs4)
+    @timeit solver.timer "update_fact" update_fact(system_solver.fact_cache, system_solver.lhs4)
 
     return system_solver
 end
