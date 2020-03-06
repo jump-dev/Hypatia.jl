@@ -59,7 +59,7 @@ function solve_system(system_solver::SymIndefSystemSolver{T}, solver::Solver{T},
         end
     end
 
-    @timeit solver.timer "solve_system" solve_subsystem(system_solver, sol3, rhs3)
+    @timeit solver.timer "solve_subsystem" solve_subsystem(system_solver, sol3, rhs3)
 
     # TODO refactor all below
     # TODO maybe use higher precision here
@@ -194,7 +194,7 @@ function load(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) w
     return system_solver
 end
 
-function update_fact(system_solver::SymIndefSparseSystemSolver, solver::Solver)
+function update_lhs(system_solver::SymIndefSparseSystemSolver, solver::Solver)
     for (k, cone_k) in enumerate(solver.model.cones)
         H_k = (Cones.use_dual_barrier(cone_k) ? Cones.hess(cone_k) : Cones.inv_hess(cone_k))
         for j in 1:Cones.dimension(cone_k)
@@ -209,7 +209,7 @@ function update_fact(system_solver::SymIndefSparseSystemSolver, solver::Solver)
     end
 
     @timeit solver.timer "update_fact" update_fact(system_solver.fact_cache, system_solver.lhs3)
-    solve_subsystem(system_solver, system_solver.const_sol, system_solver.const_rhs)
+    @timeit solver.timer "solve_subsystem" solve_subsystem(system_solver, system_solver.const_sol, system_solver.const_rhs)
 
     return system_solver
 end
@@ -261,7 +261,7 @@ function load(system_solver::SymIndefDenseSystemSolver{T}, solver::Solver{T}) wh
     return system_solver
 end
 
-function update_fact(system_solver::SymIndefDenseSystemSolver, solver::Solver)
+function update_lhs(system_solver::SymIndefDenseSystemSolver, solver::Solver)
     model = solver.model
     (n, p) = (model.n, model.p)
     lhs3 = system_solver.lhs3.data
@@ -279,8 +279,8 @@ function update_fact(system_solver::SymIndefDenseSystemSolver, solver::Solver)
         end
     end
 
-    update_fact(system_solver.fact_cache, system_solver.lhs3)
-    solve_subsystem(system_solver, system_solver.const_sol, system_solver.const_rhs)
+    @timeit solver.timer "update_fact" update_fact(system_solver.fact_cache, system_solver.lhs3)
+    @timeit solver.timer "solve_subsystem" solve_subsystem(system_solver, system_solver.const_sol, system_solver.const_rhs)
 
     return system_solver
 end
