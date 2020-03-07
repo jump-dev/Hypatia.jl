@@ -177,6 +177,7 @@ shapeconregr_data = Dict(
     :func7 => (x -> sum((x / 2 .+ 1) .^ 3)),
     :func8 => (x -> sum((x .+ 1) .^ 5 .- 2)),
     :func9 => (x -> (5x[1] + x[2] / 2 + x[3])^2 + sqrt(x[4]^2 + x[5]^2)),
+    :func10 => (x -> sum(exp.(x))),
     )
 
 shapeconregr_JuMP_fast = [
@@ -197,6 +198,7 @@ shapeconregr_JuMP_fast = [
     (3, 150, :func8, 0, 6, true, false, true),
     (3, 150, :func8, 0, 6, true, true, true),
     (5, 100, :func9, 9, 4, true, false, false),
+    (5, 100, :func10, 4, 4, true, false, false),
     ]
 shapeconregr_JuMP_slow = [
     (4, 150, :func6, 0, 4, false, false, true),
