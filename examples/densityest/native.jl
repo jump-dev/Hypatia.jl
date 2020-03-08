@@ -199,5 +199,8 @@ densityest_native_fast = [
     (20, 2, 4, true, true, false),
     ]
 densityest_native_slow = [
-    # TODO
+    (200, 4, 6, true, true, true),
+    (200, 4, 6, false, true, true),
+    (200, 4, 6, true, false, true),
+    (200, 4, 6, true, true, false),
     ]

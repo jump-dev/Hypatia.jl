@@ -48,10 +48,12 @@ matrixcompletion_JuMP_fast = [
     (5, 8, false),
     (15, 20, true),
     (15, 20, false),
-    (25, 40, true),
-    (25, 40, false),
+    (10, 100, true),
+    (10, 100, false),
     ]
 matrixcompletion_JuMP_slow = [
     (40, 70, true),
     (40, 70, false),
+    (18, 180, true),
+    (18, 180, false),
     ]

@@ -119,9 +119,12 @@ polymin_JuMP_fast = [
     (2, 5, true, true),
     (3, 3, true, true),
     (5, 2, true, true),
-    (3, 3, false, true),
-    (3, 3, false, false),
+    (4, 4, false, true),
+    (4, 4, false, false),
     ]
 polymin_JuMP_slow = [
-    # TODO
+    (4, 5, true, true),
+    (4, 5, true, true),
+    (2, 30, false, true),
+    (2, 30, false, false),
     ]

@@ -64,9 +64,10 @@ matrixquadratic_JuMP_fast = [
     (5, 6, false),
     (10, 20, true),
     (10, 20, false),
-    (25, 30, true),
-    (25, 30, false),
+    (20, 40, true),
+    (20, 40, false),
     ]
 matrixquadratic_JuMP_slow = [
-    # TODO
+    (60, 80, true),
+    (60, 80, false),
     ]

@@ -273,5 +273,10 @@ expdesign_native_fast = [
     (25, 75, 125, 5, false, true, false, false, false, true),
     ]
 expdesign_native_slow = [
-    # TODO
+    (100, 200, 200, 10, true, false, false, true, true, false),
+    (100, 200, 200, 10, true, false, false, true, true, true),
+    (100, 200, 200, 10, false, true, false, true, true, true),
+    (100, 200, 200, 10, false, false, true, true, true, true),
+    (100, 200, 200, 10, true, false, false, false, false, true),
+    (100, 200, 200, 10, false, true, false, false, false, true),
     ]

@@ -89,5 +89,7 @@ expdesign_JuMP_fast = [
     (25, 75, 125, 10, false, false, true),
     ]
 expdesign_JuMP_slow = [
-    # TODO
+    (100, 200, 200, 10, true, false, false),
+    (100, 200, 200, 10, false, true, false),
+    (100, 200, 200, 10, false, false, true),
     ]

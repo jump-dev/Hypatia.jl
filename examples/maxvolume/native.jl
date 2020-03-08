@@ -132,7 +132,7 @@ function maxvolume_native(
         push!(cones, CO.Nonnegative{T}(1))
         h = zeros(T, 3 * num_new_vars + 1)
     end
-    
+
     return (c = c, A = A, b = b, G = G, h = h, cones = cones)
 end
 
@@ -145,16 +145,18 @@ function test_maxvolume_native(instance::Tuple; T::Type{<:Real} = Float64, optio
 end
 
 maxvolume_native_fast = [
-    (3, true, false, false),
-    (3, false, true, false),
-    (3, false, false, true),
     (10, true, false, false),
     (10, false, true, false),
     (10, false, false, true),
     (25, true, false, false),
     (25, false, true, false),
     (25, false, false, true),
+    (500, true, false, false),
     ]
 maxvolume_native_slow = [
-    # TODO
+    (500, false, true, false),
+    (500, false, false, true),
+    (1000, true, false, false),
+    (1000, false, true, false),
+    (1000, false, false, true),
     ]
