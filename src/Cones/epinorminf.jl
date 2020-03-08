@@ -321,7 +321,8 @@ function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Ep
             @. @views prod[2j + 1, :] = side2j * arr[1, :] + rtdetd1j * arr[2j + 1, :]
         end
     else
-        @. @views prod[2:end, :] = cone.edge / cone.rtdiag * arr[1, :]' + cone.rtdiag * arr[2:end, :]
+        @. @views prod[2:end, :] = cone.edge / cone.rtdiag * arr[1, :]'
+        @. @views prod[2:end, :] += cone.rtdiag * arr[2:end, :]
     end
 
     return prod
