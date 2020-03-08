@@ -51,7 +51,8 @@ function polymin_JuMP(
         else
             for P in Ps
                 L = size(P, 2)
-                JuMP.@constraint(model, [sum(P[u, i] * P[u, j] * μ[u] for u in 1:U) for i in 1:L for j in 1:i] in MOI.PositiveSemidefiniteConeTriangle(L))
+                @timeit jump_to "psd_vec" psd_vec = JuMP.@expression(model, [i in 1:L, j in 1:i], sum(P[u, i] * P[u, j] * μ[u] for u in 1:U))
+                @timeit jump_to "constr" JuMP.@constraint(model, [psd_vec[i, j] for i in 1:L for j in 1:i] in MOI.PositiveSemidefiniteConeTriangle(L))
             end
         end
     end
@@ -67,13 +68,19 @@ polymin_JuMP(
     sample_factor::Int = 100,
     ) where {T <: Float64} = polymin_JuMP(T, get_interp_data(T, poly_name, halfdeg, sample_factor)..., args...)
 
-polymin_JuMP(
+function polymin_JuMP(
     ::Type{T},
     n::Int,
     halfdeg::Int,
     args...;
     sample_factor::Int = 100,
-    ) where {T <: Float64} = polymin_JuMP(T, random_interp_data(T, n, halfdeg, sample_factor)..., args...)
+    ) where {T <: Float64}
+
+    @timeit jump_to "everything" begin
+    @timeit jump_to "interp" d = random_interp_data(T, n, halfdeg, sample_factor)
+    polymin_JuMP(T, d..., args...)
+    end
+end
 
 function test_polymin_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)
