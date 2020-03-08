@@ -59,5 +59,6 @@ envelope_JuMP_fast = [
     (10, 1, 3, 1),
     ]
 envelope_JuMP_slow = [
-    # TODO
+    (4, 6, 4, 5),
+    (2, 30, 4, 30),
     ]

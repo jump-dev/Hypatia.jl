@@ -165,7 +165,10 @@ portfolio_native_fast = [
     (400, true, true, true, false),
     ]
 portfolio_native_slow = [
-    # TODO
+    (3000, true, false, true, false),
+    (3000, false, true, true, false),
+    (3000, false, true, false, false),
+    (3000, true, true, true, false),
     ]
 portfolio_native_linops = [
     (20, true, false, true, true),

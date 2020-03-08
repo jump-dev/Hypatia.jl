@@ -197,6 +197,10 @@ densityest_native_fast = [
     (20, 2, 4, false, true, true),
     (20, 2, 4, true, false, true),
     (20, 2, 4, true, true, false),
+    (20, 4, 4, true, true, true),
+    (20, 4, 4, false, true, true),
+    (20, 4, 4, true, false, true),
+    (20, 4, 4, true, true, false),
     ]
 densityest_native_slow = [
     (200, 4, 6, true, true, true),

@@ -154,12 +154,12 @@ maxvolume_native_fast = [
     (25, true, false, false),
     (25, false, true, false),
     (25, false, false, true),
-    (500, true, false, false),
+    (1000, true, false, false),
     ]
 maxvolume_native_slow = [
-    (500, false, true, false),
-    (500, false, false, true),
-    (1000, true, false, false),
     (1000, false, true, false),
     (1000, false, false, true),
+    (1500, true, false, false),
+    (1500, false, true, false),
+    (1500, false, false, true),
     ]
