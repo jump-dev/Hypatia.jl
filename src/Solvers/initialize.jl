@@ -7,7 +7,7 @@ preprocessing and initial point finding functions for interior point algorithms
 # TODO rewrite using a new function in Cones.jl - for most cones we want to just set the dual point same as primal point rather than taking gradient
 function initialize_cone_point(cones::Vector{Cones.Cone{T}}, cone_idxs::Vector{UnitRange{Int}}, timer::TimerOutput) where {T <: Real}
     q = isempty(cones) ? 0 : sum(Cones.dimension, cones)
-    point = Models.Point(T[], T[], Vector{T}(undef, q), Vector{T}(undef, q), cones, cone_idxs)
+    point = Models.Point(T[], T[], zeros(T, q), zeros(T, q), cones, cone_idxs)
 
     for (k, cone_k) in enumerate(cones)
         Cones.setup_data(cone_k)
@@ -246,11 +246,10 @@ function find_initial_y(solver::Solver{T}, reduce::Bool) where {T <: Real}
             model.obj_offset += dot(cQ1, Rpib0)
 
             # [GQ1 GQ2] = G0 * Q
+            # NOTE very inefficient method used for sparse G * QRSparseQ : see https://github.com/JuliaLang/julia/issues/31124#issuecomment-501540818
             @timeit solver.timer "mul_G_Q" GQ = model.G * Ap_Q
-            @timeit solver.timer "split_GQ" begin
-                GQ1 = solver.reduce_GQ1 = GQ[:, Q1_idxs]
-                GQ2 = GQ[:, Q2_idxs]
-            end
+            GQ1 = solver.reduce_GQ1 = GQ[:, Q1_idxs]
+            GQ2 = GQ[:, Q2_idxs]
             # h = h0 - GQ1 * (R' \ b0)
             model.h -= GQ1 * Rpib0 # TODO replace with below when working
             # mul!(model.h, GQ1, Rpib0, -1, true)
