@@ -66,5 +66,5 @@ maxvolume_JuMP_fast = [
     (100, true, true),
     ]
 maxvolume_JuMP_slow = [
-    # TODO
+    (1000, false, true),
     ]
