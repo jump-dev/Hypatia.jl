@@ -31,13 +31,13 @@ system_solvers_instance_names = vcat(
     inst_cones_many,
     )
 system_solvers = Dict(
-    "NaiveDense" => all_reals,
-    "NaiveSparse" => default_reals,
-    # "NaiveIndirect" => all_reals, # TODO fix
-    "NaiveElimDense" => all_reals,
-    "NaiveElimSparse" => default_reals,
-    "SymIndefDense" => all_reals,
-    "SymIndefSparse" => default_reals,
+    # "NaiveDense" => all_reals,
+    # "NaiveSparse" => default_reals,
+    # # "NaiveIndirect" => all_reals, # TODO fix
+    # "NaiveElimDense" => all_reals,
+    # "NaiveElimSparse" => default_reals,
+    # "SymIndefDense" => all_reals,
+    # "SymIndefSparse" => default_reals,
     "QRCholDense" => all_reals,
     )
 
@@ -52,8 +52,8 @@ preprocess_system_solver = "SymIndefDense"
 preprocess_reals = all_reals
 preprocess_options = (init_use_indirect = false, reduce = false)
 preprocess_flags = [
-    true,
-    false,
+    # true,
+    # false,
     ]
 
 # indirect initialization test options
@@ -67,8 +67,8 @@ init_use_indirect_system_solver = "SymIndefDense"
 init_use_indirect_reals = all_reals
 init_use_indirect_options = (preprocess = false, reduce = false)
 init_use_indirect_flags = [
-    true,
-    false,
+    # true,
+    # false,
     ]
 
 # reduce test options
@@ -82,8 +82,8 @@ reduce_system_solver = "QRCholDense"
 reduce_reals = all_reals
 reduce_options = (preprocess = true, init_use_indirect = false)
 reduce_flags = [
-    true,
-    false,
+    # true,
+    # false,
     ]
 
 # other solver options
