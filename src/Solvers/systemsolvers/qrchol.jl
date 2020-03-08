@@ -12,20 +12,19 @@ abstract type QRCholSystemSolver{T <: Real} <: SystemSolver{T} end
 
 function solve_system(system_solver::QRCholSystemSolver{T}, solver::Solver{T}, sol::Vector{T}, rhs::Vector{T}) where {T <: Real}
     model = solver.model
-    (n, p, q) = (model.n, model.p, model.q)
+    x_rows = system_solver.x_rows
+    y_rows = system_solver.y_rows
+    z_rows = system_solver.z_rows
 
     @timeit solver.timer "setup_rhs3" begin
         rhs3 = system_solver.rhs3
         dim3 = length(rhs3)
-        x_rows = 1:n
-        y_rows = n .+ (1:p)
-        z_rows = (n + p) .+ (1:q)
 
         @. @views rhs3[x_rows] = rhs[x_rows]
         @. @views rhs3[y_rows] = -rhs[y_rows]
 
         for (cone_k, idxs_k) in zip(model.cones, model.cone_idxs)
-            z_rows_k = (n + p) .+ idxs_k
+            z_rows_k = (model.n + model.p) .+ idxs_k
             z_k = @view rhs[z_rows_k]
             z3_k = @view rhs3[z_rows_k]
             s_k = @view rhs[(dim3 + 1) .+ idxs_k]
@@ -72,30 +71,31 @@ end
 
 function solve_subsystem(system_solver::QRCholSystemSolver{T}, solver::Solver{T}, rhs3::Vector{T}) where {T <: Real}
     model = solver.model
-    (n, p, q) = (model.n, model.p, model.q)
+    (n, p) = (model.n, model.p)
+    @views x = rhs3[system_solver.x_rows]
+    @views y = rhs3[system_solver.y_rows]
+    @views z = rhs3[system_solver.z_rows]
 
     @timeit solver.timer "setup_rhs_sub" begin
-        x = @view rhs3[1:n]
-        x_sub1 = @view rhs3[1:p]
-        x_sub2 = @view rhs3[(p + 1):n]
-        y = @view rhs3[n .+ (1:p)]
-        z = @view rhs3[(n + p) .+ (1:q)]
-
-        ldiv!(solver.Ap_R', y)
-
         copyto!(system_solver.QpbxGHbz, x) # TODO can be avoided
         mul!(system_solver.QpbxGHbz, model.G', z, true, true)
         lmul!(solver.Ap_Q', system_solver.QpbxGHbz)
 
-        copyto!(x_sub1, y)
+        if !iszero(p)
+            ldiv!(solver.Ap_R', y)
+            rhs3[1:p] = y
+
+            if !isempty(system_solver.Q2div)
+                mul!(system_solver.GQ1x, system_solver.GQ1, y)
+                block_hess_prod.(model.cones, system_solver.HGQ1x_k, system_solver.GQ1x_k, solver.mu)
+                mul!(system_solver.Q2div, system_solver.GQ2', system_solver.HGQ1x, -1, true)
+            end
+        end
     end
 
     if !isempty(system_solver.Q2div)
         @timeit solver.timer "solve_sub" begin
-            mul!(system_solver.GQ1x, system_solver.GQ1, y)
-            block_hess_prod.(model.cones, system_solver.HGQ1x_k, system_solver.GQ1x_k, solver.mu)
-            mul!(system_solver.Q2div, system_solver.GQ2', system_solver.HGQ1x, -1, true)
-            copyto!(x_sub2, system_solver.Q2div)
+            @views x_sub2 = copyto!(rhs3[(p + 1):n], system_solver.Q2div)
             inv_prod(system_solver.fact_cache, x_sub2)
         end
     end
@@ -108,7 +108,7 @@ function solve_subsystem(system_solver::QRCholSystemSolver{T}, solver::Solver{T}
 
         @. z = system_solver.HGx - z
 
-        if !isempty(y)
+        if !iszero(p)
             copyto!(y, system_solver.Q1pbxGHbz)
             mul!(y, system_solver.GQ1', system_solver.HGx, -1, true)
             ldiv!(solver.Ap_R, y)
@@ -134,9 +134,16 @@ direct dense
 =#
 
 mutable struct QRCholDenseSystemSolver{T <: Real} <: QRCholSystemSolver{T}
+    x_rows::UnitRange{Int}
+    y_rows::UnitRange{Int}
+    z_rows::UnitRange{Int}
     rhs3::Vector{T}
     const_sol::Vector{T}
     lhs1::Symmetric{T, Matrix{T}}
+    inv_hess_cones::Vector{Int}
+    inv_hess_sqrt_cones::Vector{Int}
+    hess_cones::Vector{Int}
+    hess_sqrt_cones::Vector{Int}
     GQ1
     GQ2
     QpbxGHbz
@@ -155,11 +162,10 @@ mutable struct QRCholDenseSystemSolver{T <: Real} <: QRCholSystemSolver{T}
     Gx_k
     fact_cache::Union{DensePosDefCache{T}, DenseSymCache{T}} # can use BunchKaufman or Cholesky
     function QRCholDenseSystemSolver{T}(;
-        fact_cache::Union{DensePosDefCache{T}, DenseSymCache{T}} = DensePosDefCache{T}(),
-        # fact_cache::Union{DensePosDefCache{T}, DenseSymCache{T}} = DenseSymCache{T}(),
+        fact_cache::Union{DensePosDefCache{T}, DenseSymCache{T}} = DensePosDefCache{T}(), # NOTE or DenseSymCache{T}()
         ) where {T <: Real}
         system_solver = new{T}()
-        system_solver.fact_cache = fact_cache # TODO start with cholesky and then switch to BK if numerical issues
+        system_solver.fact_cache = fact_cache
         return system_solver
     end
 end
@@ -167,36 +173,44 @@ end
 function load(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
+    nmp = n - p
     cone_idxs = model.cone_idxs
 
-    system_solver.rhs3 = zeros(T, n + p + q)
+    system_solver.x_rows = 1:n
+    system_solver.y_rows = n .+ (1:p)
+    system_solver.z_rows = (n + p) .+ (1:q)
 
-    # TODO optimize for case of empty A
-    # TODO very inefficient method used for sparse G * QRSparseQ : see https://github.com/JuliaLang/julia/issues/31124#issuecomment-501540818
-    if !isa(model.G, Matrix{T})
-        @warn("in QRChol, converting G to dense before multiplying by sparse Householder Q due to very inefficient dispatch")
-    end
-    G = Matrix(model.G)
-    GQ = rmul!(G, solver.Ap_Q)
-
-    system_solver.GQ1 = GQ[:, 1:p]
-    system_solver.GQ2 = GQ[:, (p + 1):end]
-    nmp = n - p
-    system_solver.HGQ2 = Matrix{T}(undef, q, nmp)
+    system_solver.rhs3 = Vector{T}(undef, n + p + q)
     system_solver.lhs1 = Symmetric(Matrix{T}(undef, nmp, nmp), :U)
+
+    num_cones = length(cone_idxs)
+    system_solver.inv_hess_cones = sizehint!(Int[], num_cones)
+    system_solver.inv_hess_sqrt_cones = sizehint!(Int[], num_cones)
+    system_solver.hess_cones = sizehint!(Int[], num_cones)
+    system_solver.hess_sqrt_cones = sizehint!(Int[], num_cones)
+
+    # NOTE very inefficient method used for sparse G * QRSparseQ : see https://github.com/JuliaLang/julia/issues/31124#issuecomment-501540818
+    @timeit solver.timer "mul_G_Q" GQ = model.G * solver.Ap_Q
+
+    system_solver.GQ2 = GQ[:, (p + 1):end]
+    system_solver.HGQ2 = zeros(T, q, nmp)
     system_solver.QpbxGHbz = Vector{T}(undef, n)
-    system_solver.Q1pbxGHbz = view(system_solver.QpbxGHbz, 1:p)
     system_solver.Q2div = view(system_solver.QpbxGHbz, (p + 1):n)
-    system_solver.GQ1x = Vector{T}(undef, q)
-    system_solver.HGQ1x = similar(system_solver.GQ1x)
-    system_solver.Gx = similar(system_solver.GQ1x)
+    system_solver.Gx = Vector{T}(undef, q)
     system_solver.HGx = similar(system_solver.Gx)
-    system_solver.HGQ1x_k = [view(system_solver.HGQ1x, idxs, :) for idxs in cone_idxs]
-    system_solver.GQ1x_k = [view(system_solver.GQ1x, idxs, :) for idxs in cone_idxs]
     system_solver.HGQ2_k = [view(system_solver.HGQ2, idxs, :) for idxs in cone_idxs]
     system_solver.GQ2_k = [view(system_solver.GQ2, idxs, :) for idxs in cone_idxs]
     system_solver.HGx_k = [view(system_solver.HGx, idxs, :) for idxs in cone_idxs]
     system_solver.Gx_k = [view(system_solver.Gx, idxs, :) for idxs in cone_idxs]
+
+    if !iszero(p)
+        system_solver.GQ1 = GQ[:, 1:p]
+        system_solver.Q1pbxGHbz = view(system_solver.QpbxGHbz, 1:p)
+        system_solver.GQ1x = Vector{T}(undef, q)
+        system_solver.HGQ1x = similar(system_solver.GQ1x)
+        system_solver.HGQ1x_k = [view(system_solver.HGQ1x, idxs, :) for idxs in cone_idxs]
+        system_solver.GQ1x_k = [view(system_solver.GQ1x, idxs, :) for idxs in cone_idxs]
+    end
 
     load_matrix(system_solver.fact_cache, system_solver.lhs1)
 
@@ -216,10 +230,10 @@ function update_lhs(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}
 
     if !isempty(system_solver.Q2div)
         @timeit timer "update_inner_lhs" begin
-            inv_hess_cones = Int[]
-            inv_hess_sqrt_cones = Int[]
-            hess_cones = Int[]
-            hess_sqrt_cones = Int[]
+            inv_hess_cones = empty!(system_solver.inv_hess_cones)
+            inv_hess_sqrt_cones = empty!(system_solver.inv_hess_sqrt_cones)
+            hess_cones = empty!(system_solver.hess_cones)
+            hess_sqrt_cones = empty!(system_solver.hess_sqrt_cones)
 
             # update hessian factorizations and partition of cones
             for (k, cone_k) in enumerate(model.cones)
@@ -305,12 +319,12 @@ function update_lhs(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}
 
     # update solution for fixed c,b,h part
     @timeit timer "update_fixed_rhs" begin
-        (n, p) = (model.n, model.p)
         const_sol = system_solver.const_sol
-        @views const_sol[1:n] = -model.c
-        @views const_sol[n .+ (1:p)] = model.b
+        @. const_sol[system_solver.x_rows] = -model.c
+        const_sol[system_solver.y_rows] = model.b
+        @views const_sol_z = const_sol[system_solver.z_rows]
         for (cone_k, idxs_k) in zip(model.cones, model.cone_idxs)
-            @views block_hess_prod(cone_k, const_sol[(n + p) .+ idxs_k], model.h[idxs_k], solver.mu)
+            @views block_hess_prod(cone_k, const_sol_z[idxs_k], model.h[idxs_k], solver.mu)
         end
     end
     @timeit timer "solve_subsystem" solve_subsystem(system_solver, solver, const_sol)
