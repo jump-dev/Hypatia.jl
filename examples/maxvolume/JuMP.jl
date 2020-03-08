@@ -52,19 +52,18 @@ function test_maxvolume_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options
 end
 
 maxvolume_JuMP_fast = [
-    (3, true, false),
-    (3, false, true),
-    (3, true, true),
     (8, true, false),
     (8, false, true),
     (8, true, true),
     (25, true, false),
     (25, false, true),
     (25, true, true),
-    (100, true, false),
-    (100, false, true),
-    (100, true, true),
+    (500, true, false),
+    (500, false, true),
+    (500, true, true),
     ]
 maxvolume_JuMP_slow = [
-    # TODO
+    (1500, true, false),
+    (1500, false, true),
+    (1500, true, true),
     ]

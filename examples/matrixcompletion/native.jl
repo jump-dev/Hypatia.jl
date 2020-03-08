@@ -281,5 +281,8 @@ matrixcompletion_native_fast = [
     (12, 24, true, true, false, false),
     ]
 matrixcompletion_native_slow = [
-    # TODO
+    (18, 180, true, true, true, true),
+    (18, 180, true, true, false, true),
+    (18, 180, true, true, true, false),
+    (18, 180, true, true, false, false),
     ]

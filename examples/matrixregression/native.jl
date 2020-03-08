@@ -320,5 +320,10 @@ matrixregression_native_fast = [
     (Complex, 100, 8, 12, 0, 0.1, 0.1, 0, 0),
     ]
 matrixregression_native_slow = [
-    # TODO
+    (Real, 15, 20, 50, 0, 0, 0, 0, 0),
+    (Real, 15, 20, 50, 0.1, 0.1, 0.1, 0.2, 0.2),
+    (Real, 15, 20, 50, 0, 0.1, 0.1, 0, 0),
+    (Complex, 15, 20, 50, 0, 0, 0, 0, 0),
+    (Complex, 15, 20, 50, 0.1, 0.1, 0.1, 0.2, 0.2),
+    (Complex, 15, 20, 50, 0, 0.1, 0.1, 0, 0),
     ]

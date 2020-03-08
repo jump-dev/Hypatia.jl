@@ -59,13 +59,9 @@ end
 
 robustgeomprog_JuMP_fast = [
     (3, 4),
-    (3, 10),
-    (6, 10),
-    (6, 20),
-    (15, 40),
-    (40, 50),
-    (50, 70),
+    (20, 40),
+    (50, 100),
     ]
 robustgeomprog_JuMP_slow = [
-    # TODO
+    (100, 200),
     ]

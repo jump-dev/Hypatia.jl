@@ -123,8 +123,9 @@ densityest_JuMP_fast = [
     (250, 4, 4, true, true),
     (250, 4, 4, true, false),
     (250, 4, 4, false, true),
-    (250, 4, 4, false, false),
     ]
 densityest_JuMP_slow = [
-    # TODO
+    (250, 4, 4, false, false),
+    (200, 4, 6, false, true),
+    (200, 4, 6, false, false),
     ]

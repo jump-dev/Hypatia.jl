@@ -238,8 +238,8 @@ polymin_native_fast = [
     (2, 5, true, true, false),
     (3, 3, true, true, false),
     (5, 2, true, true, false),
-    (3, 3, false, true, false),
-    (3, 3, false, false, false),
+    (4, 4, false, true, false),
+    (4, 4, false, false, false),
     (Complex, :abs1d, 1, true, true),
     (Complex, :abs1d, 3, true, true),
     (Complex, :absunit1d, 1, true, true),
@@ -261,7 +261,10 @@ polymin_native_fast = [
     # (Complex, :denseunit1d, 2, false, false),
     ]
 polymin_native_slow = [
-    # TODO
+    (4, 5, true, true, false),
+    (4, 5, true, true, false),
+    (2, 30, false, true, false),
+    (2, 30, false, false, false),
     ]
 polymin_native_linops = [
     (:butcher, 2, true, true, true),

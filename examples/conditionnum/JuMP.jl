@@ -98,7 +98,8 @@ conditionnum_JuMP_fast = [
     (50, 15, false),
     (100, 10, true),
     (100, 10, false),
+    (100, 40, false),
     ]
 conditionnum_JuMP_slow = [
-    # TODO
+    (100, 40, true),
     ]
