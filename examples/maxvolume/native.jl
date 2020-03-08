@@ -145,6 +145,9 @@ function test_maxvolume_native(instance::Tuple; T::Type{<:Real} = Float64, optio
 end
 
 maxvolume_native_fast = [
+    (3, true, false, false),
+    (3, false, true, false),
+    (3, false, false, true),
     (10, true, false, false),
     (10, false, true, false),
     (10, false, false, true),
