@@ -30,7 +30,7 @@ function test_JuMP_instance(
     )
     # setup model
     Random.seed!(rseed)
-    (model, test_helpers) = model_function(T, instance_info[1]...)
+    (model, test_helpers) = model_function(instance_info[1]...)
 
     # solve model
     JuMP.set_optimizer(model, () -> Hypatia.Optimizer(; default_solver_options..., instance_info[3]...))

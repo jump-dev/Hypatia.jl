@@ -43,7 +43,7 @@ function test_centralpolymat_JuMP(model, test_helpers, test_options)
 end
 
 centralpolymat_JuMP_fast = [
-    ((2, 3, true), (), ()),
+    ((Float64, 2, 3, true), (), ()),
     # (2, 3, false),
     # (3, 2, true),
     # (3, 2, false),

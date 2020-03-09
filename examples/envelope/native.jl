@@ -58,7 +58,7 @@ function test_envelope_native(result, test_helpers, test_options)
 end
 
 envelope_native_fast = [
-    ((2, 2, 3, 4, true), (), ()),
+    ((Float64, 2, 2, 3, 4, true), (), ()),
     # (2, 2, 3, 4, false),
     # (2, 3, 2, 4, true),
     # (2, 3, 2, 4, false),
