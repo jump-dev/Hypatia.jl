@@ -6,18 +6,13 @@ contraction analysis example adapted from
 Aylward, E.M., Parrilo, P.A. and Slotine, J.J.E
 =#
 
-using LinearAlgebra
-using Test
-import Random
-import JuMP
-const MOI = JuMP.MOI
+include(joinpath(@__DIR__, "../common_JuMP.jl"))
+
 import DynamicPolynomials
 const DP = DynamicPolynomials
 import PolyJuMP
 import MultivariateBases: FixedPolynomialBasis
 import SumOfSquares
-import Hypatia
-const MU = Hypatia.ModelUtilities
 
 function contraction_JuMP(
     ::Type{T},
@@ -63,24 +58,23 @@ function contraction_JuMP(
         JuMP.@constraint(model, -R - Matrix(delta * I, n, n) in JuMP.PSDCone())
     end
 
-    return (model = model, is_feas = (beta < 0.81))
+    return (model, ())
 end
 
-function test_contraction_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
-    Random.seed!(rseed)
-    d = contraction_JuMP(T, instance...)
-    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer{T}(; options...))
-    JuMP.optimize!(d.model)
-    @test JuMP.termination_status(d.model) == (d.is_feas ? MOI.OPTIMAL : MOI.INFEASIBLE)
-    return d.model.moi_backend.optimizer.model.optimizer.result
+function test_contraction_JuMP(model, test_helpers, test_options)
+    @test JuMP.termination_status(model) == (test_options[1] ? MOI.OPTIMAL : MOI.INFEASIBLE)
 end
 
+options = (tol_feas = 1e-5, tol_rel_opt = 1e-5, tol_abs_opt = 1e-5)
 contraction_JuMP_fast = [
-    (0.77, 4, 1e-3, true),
-    (0.77, 4, 1e-3, false),
-    (0.85, 4, 1e-3, true),
-    (0.85, 4, 1e-3, false),
+    ((0.77, 4, 1e-3, true), (true,), options),
+    # (0.77, 4, 1e-3, false),
+    ((0.85, 4, 1e-3, true), (false,), options),
+    # (0.85, 4, 1e-3, false),
     ]
 contraction_JuMP_slow = [
     # TODO
     ]
+
+test_JuMP_instance.(contraction_JuMP, test_contraction_JuMP, contraction_JuMP_fast)
+;

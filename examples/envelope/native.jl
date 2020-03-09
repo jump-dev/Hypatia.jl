@@ -8,13 +8,8 @@ D. Papp and S. Yildiz. Sum-of-squares optimization without semidefinite programm
 available at https://arxiv.org/abs/1712.01792
 =#
 
-using LinearAlgebra
 using SparseArrays
-import Random
-using Test
-import Hypatia
-const CO = Hypatia.Cones
-const MU = Hypatia.ModelUtilities
+include(joinpath(@__DIR__, "../common_native.jl"))
 
 function envelope_native(
     ::Type{T},
@@ -55,33 +50,32 @@ function envelope_native(
 
     cones = CO.Cone{T}[CO.WSOSInterpNonnegative{T, T}(U, Ps, use_dual = !primal_wsos) for k in 1:num_polys]
 
-    return (c = c, A = A, b = b, G = G, h = h, cones = cones)
+    return ((c, A, b, G, h, cones), ())
 end
 
-function test_envelope_native(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
-    Random.seed!(rseed)
-    d = envelope_native(T, instance...)
-    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
-    @test r.status == :Optimal
-    return r
+function test_envelope_native(result, test_helpers, test_options)
+    @test result.status == :Optimal
 end
 
 envelope_native_fast = [
-    (2, 2, 3, 4, true),
-    (2, 2, 3, 4, false),
-    (2, 3, 2, 4, true),
-    (2, 3, 2, 4, false),
-    (3, 3, 3, 3, true),
-    (3, 3, 3, 3, false),
-    (3, 3, 5, 4, true),
-    (5, 2, 5, 2, true),
-    (1, 30, 2, 30, true),
-    (1, 30, 2, 30, false),
-    (10, 1, 3, 1, true),
-    (10, 1, 3, 1, false),
+    ((2, 2, 3, 4, true), (), ()),
+    # (2, 2, 3, 4, false),
+    # (2, 3, 2, 4, true),
+    # (2, 3, 2, 4, false),
+    # (3, 3, 3, 3, true),
+    # (3, 3, 3, 3, false),
+    # (3, 3, 5, 4, true),
+    # (5, 2, 5, 2, true),
+    # (1, 30, 2, 30, true),
+    # (1, 30, 2, 30, false),
+    # (10, 1, 3, 1, true),
+    # (10, 1, 3, 1, false),
     ]
 envelope_native_slow = [
     # TODO below are too slow, need all boolean combinations
     # (3, 3, 5, 4, false),
     # (5, 2, 5, 2, false),
     ]
+
+test_native_instance.(envelope_native, test_envelope_native, envelope_native_fast)
+;

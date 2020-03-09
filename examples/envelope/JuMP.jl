@@ -4,13 +4,7 @@ Copyright 2018, Chris Coey and contributors
 see description in examples/envelope/native.jl
 =#
 
-using LinearAlgebra
-import Random
-using Test
-import JuMP
-const MOI = JuMP.MOI
-import Hypatia
-const MU = Hypatia.ModelUtilities
+include(joinpath(@__DIR__, "../common_JuMP.jl"))
 
 function envelope_JuMP(
     ::Type{T},
@@ -37,28 +31,26 @@ function envelope_JuMP(
     JuMP.@objective(model, Max, dot(fpv, w)) # integral over domain (via quadrature)
     JuMP.@constraint(model, [i in 1:num_polys], polys[:, i] .- fpv in Hypatia.WSOSInterpNonnegativeCone{Float64, Float64}(U, Ps))
 
-    return (model = model,)
+    return (model, ())
 end
 
-function test_envelope_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
-    Random.seed!(rseed)
-    d = envelope_JuMP(T, instance...)
-    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer{T}(; options...))
-    JuMP.optimize!(d.model)
-    @test JuMP.termination_status(d.model) == MOI.OPTIMAL
-    return d.model.moi_backend.optimizer.model.optimizer.result
+function test_envelope_JuMP(model, test_helpers, test_options)
+    @test JuMP.termination_status(model) == MOI.OPTIMAL
 end
 
 envelope_JuMP_fast = [
-    (2, 2, 3, 4),
-    (2, 3, 2, 4),
-    (3, 3, 3, 3),
-    (3, 3, 5, 4),
-    (5, 2, 5, 2),
-    (1, 30, 2, 30),
-    (10, 1, 3, 1),
+    ((2, 2, 3, 4), (), ()),
+    # (2, 3, 2, 4),
+    # (3, 3, 3, 3),
+    # (3, 3, 5, 4),
+    # (5, 2, 5, 2),
+    # (1, 30, 2, 30),
+    # (10, 1, 3, 1),
     ]
 envelope_JuMP_slow = [
-    (4, 6, 4, 5),
-    (2, 30, 4, 30),
+    # (4, 6, 4, 5),
+    # (2, 30, 4, 30),
     ]
+
+test_JuMP_instance.(envelope_JuMP, test_envelope_JuMP, envelope_JuMP_fast)
+;
