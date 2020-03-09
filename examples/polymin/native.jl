@@ -78,7 +78,7 @@ function polymin_native(
                 Lk = size(Pk, 2)
                 push!(cones, CO.PosSemidefTri{T, T}(dk))
                 l = 1
-                @timeit to "loop" for i in 1:Lk, j in 1:i
+                for i in 1:Lk, j in 1:i
                     @. @views G_full[offset + l, :] = -Pk[:, i] * Pk[:, j]
                     l += 1
                 end
@@ -98,32 +98,21 @@ function polymin_native(
     return (c = c, A = A, b = b, G = G, h = h, cones = cones, true_min = true_min)
 end
 
-function polymin_native(
+polymin_native(
     ::Type{T},
     poly_name::Symbol,
     halfdeg::Int,
     args...;
     sample_factor::Int = 100,
-    ) where {T <: Real}
+    ) where {T <: Real} = polymin_native(T, get_interp_data(T, poly_name, halfdeg, sample_factor)..., args...)
 
-    @timeit to "everything" begin
-    @timeit to "interp" d = get_interp_data(T, poly_name, halfdeg, sample_factor)
-    polymin_native(T, d..., args...)
-    end
-end
-
-function polymin_native(
+polymin_native(
     ::Type{T},
     n::Int,
     halfdeg::Int,
     args...;
     sample_factor::Int = 100,
-    ) where {T <: Real}
-    @timeit to "everything" begin
-        @timeit to "interp" d = random_interp_data(T, n, halfdeg, sample_factor)
-        polymin_native(T, d..., args...)
-    end
-end
+    ) where {T <: Real} = polymin_native(T, random_interp_data(T, n, halfdeg, sample_factor)..., args...)
 
 # real-valued complex polynomials
 function polymin_native(
