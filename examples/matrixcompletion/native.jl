@@ -271,15 +271,18 @@ matrixcompletion_native_fast = [
     (2, 3, false, false, false, true),
     (2, 3, true, true, false, false),
     (2, 3, false, false, false, false),
-    (6, 8, true, true, true, true),
-    (6, 8, true, true, false, true),
-    (6, 8, true, true, true, false),
-    (6, 8, true, true, false, false),
     (12, 24, true, true, true, true),
     (12, 24, true, true, false, true),
     (12, 24, true, true, true, false),
     (12, 24, true, true, false, false),
     ]
 matrixcompletion_native_slow = [
-    # TODO
+    (14, 140, true, true, true, true),
+    (14, 140, true, true, false, true),
+    (14, 140, true, true, true, false),
+    (14, 140, true, true, false, false),
+    (18, 180, true, true, true, true),
+    (18, 180, true, true, false, true),
+    (18, 180, true, true, true, false),
+    (18, 180, true, true, false, false),
     ]

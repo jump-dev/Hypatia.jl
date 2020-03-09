@@ -44,14 +44,18 @@ function test_matrixcompletion_JuMP(instance::Tuple; T::Type{<:Real} = Float64, 
 end
 
 matrixcompletion_JuMP_fast = [
+    (2, 3, true),
+    (2, 3, false),
     (5, 8, true),
     (5, 8, false),
-    (15, 20, true),
-    (15, 20, false),
-    (25, 40, true),
-    (25, 40, false),
+    (12, 24, true),
+    (12, 24, false),
+    (14, 140, false),
     ]
 matrixcompletion_JuMP_slow = [
+    (14, 140, true),
     (40, 70, true),
     (40, 70, false),
+    (18, 180, true),
+    (18, 180, false),
     ]

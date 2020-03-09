@@ -132,7 +132,7 @@ function maxvolume_native(
         push!(cones, CO.Nonnegative{T}(1))
         h = zeros(T, 3 * num_new_vars + 1)
     end
-    
+
     return (c = c, A = A, b = b, G = G, h = h, cones = cones)
 end
 
@@ -148,13 +148,18 @@ maxvolume_native_fast = [
     (3, true, false, false),
     (3, false, true, false),
     (3, false, false, true),
-    (10, true, false, false),
-    (10, false, true, false),
-    (10, false, false, true),
-    (25, true, false, false),
-    (25, false, true, false),
-    (25, false, false, true),
+    (12, true, false, false),
+    (12, false, true, false),
+    (12, false, false, true),
+    (100, true, false, false),
+    (100, false, true, false),
+    (100, false, false, true),
+    (1000, true, false, false),
     ]
 maxvolume_native_slow = [
-    # TODO
+    (1000, false, true, false),
+    (1000, false, false, true),
+    (1500, true, false, false),
+    (1500, false, true, false),
+    (1500, false, false, true),
     ]

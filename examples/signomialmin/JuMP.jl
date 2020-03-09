@@ -149,13 +149,11 @@ signomialmin_JuMP_fast = [
     (:MCW19ex1_mod,),
     (:MCW19ex8,),
     (3, 2),
-    (3, 3),
-    (4, 3),
-    (6, 2),
-    (6, 4),
     (6, 6),
-    (8, 4),
+    (20, 3),
     ]
 signomialmin_JuMP_slow = [
-    # TODO
+    (10, 10),
+    (20, 6),
+    (40, 3),
     ]

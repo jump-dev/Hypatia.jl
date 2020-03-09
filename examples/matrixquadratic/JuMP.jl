@@ -60,13 +60,16 @@ function test_matrixquadratic_JuMP(instance::Tuple; T::Type{<:Real} = Float64, o
 end
 
 matrixquadratic_JuMP_fast = [
+    (2, 3, true),
+    (2, 3, false),
     (5, 6, true),
     (5, 6, false),
     (10, 20, true),
     (10, 20, false),
-    (25, 30, true),
-    (25, 30, false),
+    (20, 40, true),
+    (20, 40, false),
     ]
 matrixquadratic_JuMP_slow = [
-    # TODO
+    (60, 80, true),
+    (60, 80, false),
     ]
