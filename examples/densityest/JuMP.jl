@@ -112,10 +112,10 @@ densityest_JuMP_fast = [
     (:iris_data, 4, false, false),
     (:cancer_data, 4, true, true),
     (:cancer_data, 4, false, true),
-    (200, 2, 2, true, true),
-    (200, 2, 2, true, false),
-    (200, 2, 2, false, true),
-    (200, 2, 2, false, false),
+    (50, 2, 2, true, true),
+    (50, 2, 2, true, false),
+    (50, 2, 2, false, true),
+    (50, 2, 2, false, false),
     (100, 8, 2, true, true),
     (100, 8, 2, true, false),
     (100, 8, 2, false, true),
@@ -125,7 +125,7 @@ densityest_JuMP_fast = [
     (250, 4, 4, false, true),
     ]
 densityest_JuMP_slow = [
-    (250, 4, 4, false, false),
+    (200, 4, 4, false, false),
     (200, 4, 6, false, true),
     (200, 4, 6, false, false),
     ]
