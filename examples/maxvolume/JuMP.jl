@@ -55,16 +55,18 @@ maxvolume_JuMP_fast = [
     (3, true, false),
     (3, false, true),
     (3, true, true),
-    (8, true, false),
-    (8, false, true),
-    (8, true, true),
-    (25, true, false),
-    (25, false, true),
-    (25, true, true),
+    (12, true, false),
+    (12, false, true),
+    (12, true, true),
     (100, true, false),
     (100, false, true),
     (100, true, true),
+    (1000, true, false),
+    (1000, true, true), # with bridges extended formulation will need to go into slow list
     ]
 maxvolume_JuMP_slow = [
     (1000, false, true),
+    (2000, true, false),
+    (2000, false, true),
+    (2000, true, true),
     ]
