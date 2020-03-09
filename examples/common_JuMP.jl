@@ -34,12 +34,12 @@ function test_JuMP_instance(
     (model, test_helpers) = model_function(instance_info[1]...)
 
     # solve model
-   hyp_opt = Hypatia.Optimizer(; default_solver_options..., instance_info[4]...)
+    hyp_opt = Hypatia.Optimizer(; default_solver_options..., instance_info[4]...)
     if instance_info[2]
         # use MOI automated extended formulation
-       JuMP.set_optimizer(model, ClassicConeOptimizer{Float64})
-       MOI.Utilities.attach_optimizer(JuMP.backend(model))
-       MOI.copy_to(hyp_opt, JuMP.backend(model).optimizer.model)
+        JuMP.set_optimizer(model, ClassicConeOptimizer{Float64})
+        MOI.Utilities.attach_optimizer(JuMP.backend(model))
+        MOI.copy_to(hyp_opt, JuMP.backend(model).optimizer.model)
     end
     JuMP.set_optimizer(model, () -> hyp_opt)
     JuMP.optimize!(model)
