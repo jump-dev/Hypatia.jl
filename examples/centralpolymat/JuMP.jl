@@ -6,12 +6,7 @@ compute a gram matrix of a polynomial, minimizing its log-determinant or root-de
 
 import DynamicPolynomials
 const DP = DynamicPolynomials
-import JuMP
-const MOI = JuMP.MOI
-import Hypatia
-import Random
-using LinearAlgebra
-using Test
+include(joinpath(@__DIR__, "../common_JuMP.jl"))
 
 function centralpolymat_JuMP(
     ::Type{T},
@@ -40,31 +35,29 @@ function centralpolymat_JuMP(
         JuMP.@constraint(model, vcat(hypo, v1) in MOI.RootDetConeTriangle(L))
     end
 
-    return (model = model,)
+    return (model, ())
 end
 
-function test_centralpolymat_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
-    Random.seed!(rseed)
-    d = centralpolymat_JuMP(T, instance...)
-    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer{T}(; options...))
-    JuMP.optimize!(d.model)
-    @test JuMP.termination_status(d.model) == MOI.OPTIMAL
-    return d.model.moi_backend.optimizer.model.optimizer.result
+function test_centralpolymat_JuMP(model, test_helpers, test_options)
+    @test JuMP.termination_status(model) == MOI.OPTIMAL
 end
 
 centralpolymat_JuMP_fast = [
-    (2, 3, true),
-    (2, 3, false),
-    (3, 2, true),
-    (3, 2, false),
-    (3, 4, true),
-    (3, 4, false),
-    (7, 2, true),
-    (7, 2, false),
+    ((2, 3, true), (), ()),
+    # (2, 3, false),
+    # (3, 2, true),
+    # (3, 2, false),
+    # (3, 4, true),
+    # (3, 4, false),
+    # (7, 2, true),
+    # (7, 2, false),
     ]
 centralpolymat_JuMP_slow = [
-    (3, 5, true),
-    (3, 5, false),
-    (6, 3, true),
-    (6, 3, false),
+    # (3, 5, true),
+    # (3, 5, false),
+    # (6, 3, true),
+    # (6, 3, false),
     ]
+
+test_JuMP_instance.(centralpolymat_JuMP, test_centralpolymat_JuMP, centralpolymat_JuMP_fast)
+;

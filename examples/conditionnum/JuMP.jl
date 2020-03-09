@@ -24,12 +24,7 @@ gamma*I - nu*M_0 - sum_i y_i*M_i in S_+
 we make F_0 and M_0 positive definite to ensure existence of a feasible solution
 =#
 
-using LinearAlgebra
-import Random
-using Test
-import JuMP
-const MOI = JuMP.MOI
-import Hypatia
+include(joinpath(@__DIR__, "../common_JuMP.jl"))
 
 function conditionnum_JuMP(
     ::Type{T},
@@ -75,29 +70,27 @@ function conditionnum_JuMP(
         end)
     end
 
-    return (model = model,)
+    return (model, ())
 end
 
-function test_conditionnum_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
-    Random.seed!(rseed)
-    d = conditionnum_JuMP(T, instance...)
-    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer{T}(; options...))
-    JuMP.optimize!(d.model)
-    @test JuMP.termination_status(d.model) == MOI.OPTIMAL
-    return d.model.moi_backend.optimizer.model.optimizer.result
+function test_conditionnum_JuMP(model, test_helpers, test_options)
+    @test JuMP.termination_status(model) == MOI.OPTIMAL
 end
 
 conditionnum_JuMP_fast = [
-    (2, 3, true),
-    (2, 3, false),
-    (3, 2, true),
-    (3, 2, false),
-    (50, 15, true),
-    (50, 15, false),
-    (100, 10, false),
-    (100, 40, false),
+    ((2, 3, true), (), ()),
+    # (2, 3, false),
+    # (3, 2, true),
+    # (3, 2, false),
+    # (50, 15, true),
+    # (50, 15, false),
+    # (100, 10, false),
+    # (100, 40, false),
     ]
 conditionnum_JuMP_slow = [
-    (100, 10, true),
-    (100, 40, true),
+    # (100, 10, true),
+    # (100, 40, true),
     ]
+
+test_JuMP_instance.(conditionnum_JuMP, test_conditionnum_JuMP, conditionnum_JuMP_fast)
+;
