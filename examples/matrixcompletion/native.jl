@@ -275,9 +275,9 @@ matrixcompletion_native_fast = [
     (12, 24, true, true, false, true),
     (12, 24, true, true, true, false),
     (12, 24, true, true, false, false),
-    (14, 140, true, true, true, true),
     ]
 matrixcompletion_native_slow = [
+    (14, 140, true, true, true, true),
     (14, 140, true, true, false, true),
     (14, 140, true, true, true, false),
     (14, 140, true, true, false, false),

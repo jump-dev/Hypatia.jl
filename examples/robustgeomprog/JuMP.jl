@@ -59,6 +59,7 @@ end
 
 robustgeomprog_JuMP_fast = [
     (3, 4),
+    (10, 20),
     (20, 40),
     (50, 100),
     ]

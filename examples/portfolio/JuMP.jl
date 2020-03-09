@@ -68,9 +68,9 @@ portfolio_JuMP_fast = [
     (400, true, true),
     ]
 portfolio_JuMP_slow = [
-    (3000, true, false),
-    (3000, false, true),
-    (3000, true, true),
+    (1000, true, false),
+    (1000, false, true),
+    (1000, true, true),
     (3000, true, false),
     (3000, false, true),
     (3000, true, true),
