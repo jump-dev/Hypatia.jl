@@ -51,7 +51,8 @@ function polymin_JuMP(
         else
             for P in Ps
                 L = size(P, 2)
-                JuMP.@constraint(model, [sum(P[u, i] * P[u, j] * μ[u] for u in 1:U) for i in 1:L for j in 1:i] in MOI.PositiveSemidefiniteConeTriangle(L))
+                psd_vec = [JuMP.@expression(model, sum(P[u, i] * P[u, j] * μ[u] for u in 1:U)) for i in 1:L for j in 1:i]
+                JuMP.@constraint(model, psd_vec in MOI.PositiveSemidefiniteConeTriangle(L))
             end
         end
     end
