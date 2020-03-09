@@ -1845,11 +1845,11 @@ function wsosinterpepinormeucl3(T; options...)
     # max: w'f: 25x^4 >= f(x)^4 + 9x^4 on [-1, 1], soln is +/- 4x^2
     tol = sqrt(sqrt(eps(T)))
     DynamicPolynomials.@polyvar x
-    (U, pts, Ps, _) = MU.interpolate(MU.Box{T}([-one(T)], [one(T)]), 1, sample = false, calc_w = true)
+    (U, pts, Ps, w) = MU.interpolate(MU.Box{T}([-one(T)], [one(T)]), 1, sample = false, calc_w = true)
     fn1 = 5x^2
     fn2 = 3x^2
 
-    c = -w
+    c = -T.(w)
     A = zeros(T, 0, U)
     b = T[]
     G = vcat(spzeros(T, U, U), Diagonal(-one(T) * I, U), spzeros(T, U, U))

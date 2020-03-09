@@ -71,19 +71,19 @@ function polymin_native(
             end
             h = zeros(T, U)
         else
-            G_full = zeros(T, 0, U)
-            for Pk in Ps
+            svec_lengths = [CO.svec_length(size(Pk, 2)) for Pk in Ps]
+            G_full = zeros(T, sum(svec_lengths), U)
+            offset = 0
+            for (Pk, dk) in zip(Ps, svec_lengths)
                 Lk = size(Pk, 2)
-                dk = CO.svec_length(Lk)
                 push!(cones, CO.PosSemidefTri{T, T}(dk))
-                Gk = Matrix{T}(undef, dk, U)
                 l = 1
                 for i in 1:Lk, j in 1:i
-                    @. Gk[l, :] = -Pk[:, i] * Pk[:, j]
+                    @. @views G_full[offset + l, :] = -Pk[:, i] * Pk[:, j]
                     l += 1
                 end
-                MU.vec_to_svec!(Gk, rt2 = sqrt(T(2)))
-                G_full = vcat(G_full, Gk)
+                @views MU.vec_to_svec!(G_full[(offset + 1):(offset + dk), :], rt2 = sqrt(T(2)))
+                offset += dk
             end
             if use_linops
                 (nrows, ncols) = size(G_full)
