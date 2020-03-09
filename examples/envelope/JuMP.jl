@@ -39,7 +39,7 @@ function test_envelope_JuMP(model, test_helpers, test_options)
 end
 
 envelope_JuMP_fast = [
-    ((2, 2, 3, 4), (), ()),
+    ((Float64, 2, 2, 3, 4), (), ()),
     # (2, 3, 2, 4),
     # (3, 3, 3, 3),
     # (3, 3, 5, 4),

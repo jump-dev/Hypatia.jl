@@ -67,9 +67,9 @@ end
 
 options = (tol_feas = 1e-5, tol_rel_opt = 1e-5, tol_abs_opt = 1e-5)
 contraction_JuMP_fast = [
-    ((0.77, 4, 1e-3, true), (true,), options),
+    ((Float64, 0.77, 4, 1e-3, true), (true,), options),
     # (0.77, 4, 1e-3, false),
-    ((0.85, 4, 1e-3, true), (false,), options),
+    ((Float64, 0.85, 4, 1e-3, true), (false,), options),
     # (0.85, 4, 1e-3, false),
     ]
 contraction_JuMP_slow = [

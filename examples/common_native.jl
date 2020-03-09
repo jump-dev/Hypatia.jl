@@ -28,7 +28,7 @@ function test_native_instance(
     )
     # setup model
     Random.seed!(rseed)
-    (model, test_helpers) = model_function(T, instance_info[1]...)
+    (model, test_helpers) = model_function(instance_info[1]...)
 
     # solve model
     result = Hypatia.Solvers.build_solve_check(model...; solver_options..., instance_info[2]...)
