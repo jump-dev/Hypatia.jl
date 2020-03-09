@@ -13,16 +13,32 @@ using TimerOutputs
 import Hypatia
 import Hypatia.Solvers
 
-instance_sets = [
-    "fast",
-    # "slow",
-    ]
+# options to solvers
+T = Float64
+timer = TimerOutput()
+partial_solver_options = (
+    verbose = false,
+    iter_limit = 250,
+    system_solver = Solvers.QRCholDenseSystemSolver{T}(),
+    timer = timer,
+    )
+native_options(; other_solver_options...) = (
+    atol = 10eps(T)^0.25,
+    solver = Solvers.Solver{T}(; partial_solver_options..., other_solver_options...),
+    )
+JuMP_options(; other_solver_options...) = (
+    use_dense_model = true,
+    test_certificates = false,
+    partial_solver_options..., other_solver_options...
+    )
 
-model_types = [
-    "native",
-    "JuMP",
-    ]
+# prefixes of instance sets to run and corresponding time limits (seconds)
+instance_sets = Dict(
+    "fast" => 15,
+    # "slow" => 120,
+    )
 
+# list of names of native examples to run
 native_example_names = [
     "densityest",
     "envelope",
@@ -36,6 +52,7 @@ native_example_names = [
     "sparsepca",
     ]
 
+# list of names of JuMP examples to run
 JuMP_example_names = [
     "centralpolymat",
     "conditionnum",
@@ -62,29 +79,20 @@ JuMP_example_names = [
     "signomialmin",
     ]
 
-T = Float64
-timer = TimerOutput()
-solver_options = (
-    verbose = false,
-    iter_limit = 250,
-    time_limit = 12e2,
-    system_solver = Solvers.QRCholDenseSystemSolver{T}(),
-    timer = timer,
-    )
-native_options = (
-    atol = 10eps(T)^0.25,
-    solver = Solvers.Solver{T}(; solver_options...),
-    )
-JuMP_options = (
-    use_dense_model = true,
-    test_certificates = false,
-    solver_options...
+# types of models to run and corresponding options and example names
+model_types = Dict(
+    "native" => (native_options, native_example_names),
+    "JuMP" => (JuMP_options, JuMP_example_names),
     )
 
+# start the tests
 @info("starting examples tests")
+for (key, val) in instance_sets
+    @info("each $key instance should take <$val seconds")
+end
 
 examples_dir = joinpath(@__DIR__, "../examples")
-for mod_type in model_types, ex in eval(Symbol(mod_type, "_example_names"))
+for mod_type in keys(model_types), ex in eval(Symbol(mod_type, "_example_names"))
     include(joinpath(examples_dir, ex, mod_type * ".jl"))
 end
 
@@ -104,15 +112,14 @@ perf = DataFrame(
 all_tests_time = time()
 
 @testset "examples tests" begin
-    for mod_type in model_types
-        example_names = eval(Symbol(mod_type, "_example_names"))
+    for (mod_type, (options_func, example_names)) in model_types
         println("\nstarting $(length(example_names)) examples for $mod_type")
-        options = eval(Symbol(mod_type, "_options"))
-        for ex_name in example_names, inst_set in instance_sets
-            instances = enumerate(eval(Symbol(ex_name, "_", mod_type, "_", inst_set)))
+        for ex_name in example_names, (inst_set, time_limit) in instance_sets
+            options = options_func(time_limit = time_limit)
+            instances = eval(Symbol(ex_name, "_", mod_type, "_", inst_set))
             println("\nstarting $(length(instances)) instances for $mod_type $ex_name $inst_set\n")
             test_function = eval(Symbol("test_", ex_name, "_", mod_type))
-            for (inst_num, inst_data) in instances
+            for (inst_num, inst_data) in enumerate(instances)
                 test_info = "$mod_type $ex_name $inst_set $inst_num: $inst_data"
                 @testset "$test_info" begin
                     println(test_info, "...")
