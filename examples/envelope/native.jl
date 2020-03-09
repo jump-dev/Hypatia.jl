@@ -81,6 +81,7 @@ envelope_native_fast = [
     (10, 1, 3, 1, false),
     ]
 envelope_native_slow = [
-    (3, 3, 5, 4, false),
-    (5, 2, 5, 2, false),
+    # TODO below are too slow, need all boolean combinations
+    # (3, 3, 5, 4, false),
+    # (5, 2, 5, 2, false),
     ]
