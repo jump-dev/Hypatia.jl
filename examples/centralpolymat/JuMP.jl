@@ -60,5 +60,5 @@ centralpolymat_JuMP_slow = [
     ((Float64, 6, 3, false), false, (), options),
     ]
 
-@testset begin test_JuMP_instance.(centralpolymat_JuMP, test_centralpolymat_JuMP, centralpolymat_JuMP_fast) end
+@testset begin "centralpolymat_JuMP" test_JuMP_instance.(centralpolymat_JuMP, test_centralpolymat_JuMP, centralpolymat_JuMP_fast) end
 ;

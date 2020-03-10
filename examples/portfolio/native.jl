@@ -171,5 +171,5 @@ portfolio_native_linops = [
     ((Float64, 20, true, true, true, true), (), options),
     ]
 
-# @testset begin test_native_instance.(portfolio_native, test_portfolio_native, portfolio_native_fast) end
+# @testset begin "portfolio_native" test_native_instance.(portfolio_native, test_portfolio_native, portfolio_native_fast) end
 ;
