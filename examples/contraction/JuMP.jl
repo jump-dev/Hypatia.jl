@@ -73,5 +73,5 @@ contraction_JuMP_fast = [
     ]
 contraction_JuMP_slow = []
 
-@testset begin test_JuMP_instance.(contraction_JuMP, test_contraction_JuMP, contraction_JuMP_fast) end
+@testset begin "contraction_JuMP" test_JuMP_instance.(contraction_JuMP, test_contraction_JuMP, contraction_JuMP_fast) end
 ;

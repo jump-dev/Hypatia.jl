@@ -280,5 +280,5 @@ matrixcompletion_native_slow = [
     ((Float64, 18, 180, true, true, false, false), (), options),
     ]
 
-# @testset begin test_native_instance.(matrixcompletion_native, test_matrixcompletion_native, matrixcompletion_native_fast) end
+# @testset begin "matrixcompletion_native" test_native_instance.(matrixcompletion_native, test_matrixcompletion_native, matrixcompletion_native_fast) end
 ;

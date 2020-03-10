@@ -64,35 +64,37 @@ JuMP_example_names = [
     "densityest",
     "envelope",
     "expdesign",
-    "lotkavolterra",
-    "lyapunovstability",
-    "matrixcompletion",
-    "matrixquadratic",
-    "matrixregression",
-    "maxvolume",
-    "muconvexity",
-    "nearestpsd",
-    "polymin",
-    "polynorm",
-    "portfolio",
-    "regionofattr",
-    "robustgeomprog",
-    "secondorderpoly",
-    "semidefinitepoly",
-    "shapeconregr",
-    "signomialmin",
+    # "lotkavolterra",
+    # "lyapunovstability",
+    # "matrixcompletion",
+    # "matrixquadratic",
+    # "matrixregression",
+    # "maxvolume",
+    # "muconvexity",
+    # "nearestpsd",
+    # "polymin",
+    # "polynorm",
+    # "portfolio",
+    # "regionofattr",
+    # "robustgeomprog",
+    # "secondorderpoly",
+    # "semidefinitepoly",
+    # "shapeconregr",
+    # "signomialmin",
     ]
 
 # types of models to run and corresponding options and example names
 model_types = Dict(
-    "native" => (native_options, native_example_names),
-    # "JuMP" => (JuMP_options, JuMP_example_names),
+    # "native" => (native_options, native_example_names),
+    "JuMP" => (JuMP_options, JuMP_example_names),
     )
 
+@testset begin # TODO delete
 # start the tests
 @info("starting examples tests")
 for (key, val) in instance_sets
     @info("each $key instance should take <$val seconds")
+end
 end
 
 examples_dir = joinpath(@__DIR__, "../examples")
@@ -127,6 +129,10 @@ end
 #                 test_info = "$mod_type $ex_name $inst_set $inst_num: $inst_data"
 #                 @testset "$test_info" begin
 #                     println(test_info, "...")
+#
+#
+#                     # TODO how to get result?
+#
 #                     test_time = @elapsed r = test_function(inst_data, T = T, options = options)
 #                     push!(perf, (mod_type, ex_name, inst_num, string(inst_data), test_time, r.solve_time, r.num_iters, r.status, r.primal_obj, r.dual_obj))
 #                     @printf("... %8.2e seconds\n", test_time)

@@ -120,5 +120,5 @@ densityest_JuMP_slow = [
     ((Float64, 200, 4, 6, false, false), false, (), options),
     ]
 
-@testset begin test_JuMP_instance.(densityest_JuMP, test_densityest_JuMP, densityest_JuMP_fast) end
+@testset begin "densityest_JuMP" test_JuMP_instance.(densityest_JuMP, test_densityest_JuMP, densityest_JuMP_fast) end
 ;

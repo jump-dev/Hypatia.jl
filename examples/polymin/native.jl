@@ -284,5 +284,5 @@ polymin_native_linops = [
     ((Float64, 3, 3, false, false, true), (), options),
     ]
 
-# @testset begin test_native_instance.(polymin_native, test_polymin_native, polymin_native_fast) end
+# @testset begin "polymin_native" test_native_instance.(polymin_native, test_polymin_native, polymin_native_fast) end
 ;

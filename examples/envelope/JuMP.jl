@@ -53,5 +53,5 @@ envelope_JuMP_slow = [
     ((Float64, 2, 30, 4, 30), false, (), options),
     ]
 
-@testset begin test_JuMP_instance.(envelope_JuMP, test_envelope_JuMP, envelope_JuMP_fast) end
+@testset begin "envelope_JuMP" test_JuMP_instance.(envelope_JuMP, test_envelope_JuMP, envelope_JuMP_fast) end
 ;

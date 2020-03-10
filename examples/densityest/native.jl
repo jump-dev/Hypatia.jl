@@ -205,5 +205,5 @@ densityest_native_slow = [
     ((Float64, 400, 5, 6, true, true, false), (), options),
     ]
 
-# @testset begin test_native_instance.(densityest_native, test_densityest_native, densityest_native_fast) end
+# @testset "densityest_native" begin test_native_instance.(densityest_native, test_densityest_native, densityest_native_fast) end
 ;
