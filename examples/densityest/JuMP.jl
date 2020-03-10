@@ -71,7 +71,8 @@ function densityest_JuMP(
             push!(psd_vars, psd_r)
             JuMP.@SDconstraint(model, psd_r >= 0)
         end
-        JuMP.@constraint(model, sum(diag(Pr * psd_r * Pr') for (Pr, psd_r) in zip(Ps, psd_vars)) .== f_pts)
+        coeffs_lhs = JuMP.@expression(model, [u in 1:U], sum(sum(Pr[u, k] * Pr[u, l] * psd_r[k, l] * (k == l ? 1 : 2) for k in 1:size(Pr, 2) for l in 1:k) for (Pr, psd_r) in zip(Ps, psd_vars)))
+        JuMP.@constraint(model, coeffs_lhs .== f_pts)
     end
 
     return (model = model,)
