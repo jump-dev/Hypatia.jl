@@ -47,7 +47,7 @@ function matrixquadratic_JuMP(
         JuMP.@constraint(model, Symmetric([Matrix(I, W_cols, W_cols) X'; X Y]) in JuMP.PSDCone())
     end
 
-    return (model = model,)
+    return (model, ())
 end
 
 function test_matrixquadratic_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)

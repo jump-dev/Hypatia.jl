@@ -68,7 +68,7 @@ function regionofattr_JuMP(
         JuMP.@constraint(model, w >= 0, domain = (SAS.@set -1 <= x && x <= 1))
     end
 
-    return (model = model,)
+    return (model, ())
 end
 
 function test_regionofattr_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)

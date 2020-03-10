@@ -31,7 +31,7 @@ function matrixcompletion_JuMP(
     JuMP.@constraint(model, vcat(t, vec(X)) in cone(num_rows, num_cols))
     JuMP.@constraint(model, [(row, col) in zip(row_idxs, col_idxs)], X[row, col] == A[row, col])
 
-    return (model = model,)
+    return (model, ())
 end
 
 function test_matrixcompletion_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)

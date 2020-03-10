@@ -13,12 +13,7 @@ if logdet_obj or rootdet_obj is true, F is the logdet or rootdet function
 if geomean_obj is true, we use a formulation from https://picos-api.gitlab.io/picos/optdes.html that finds an equivalent minimizer
 =#
 
-using LinearAlgebra
-import Random
-using Test
-import JuMP
-const MOI = JuMP.MOI
-import Hypatia
+include(joinpath(@__DIR__, "../common_JuMP.jl"))
 
 function expdesign_JuMP(
     ::Type{T},
@@ -62,34 +57,33 @@ function expdesign_JuMP(
         end)
     end
 
-    return (model = model,)
+    return (model, ())
 end
 
-function test_expdesign_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
-    Random.seed!(rseed)
-    d = expdesign_JuMP(T, instance...)
-    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer{T}(; options...))
-    JuMP.optimize!(d.model)
-    @test JuMP.termination_status(d.model) == MOI.OPTIMAL
-    return d.model.moi_backend.optimizer.model.optimizer.result
+function test_expdesign_JuMP(model, test_helpers, test_options)
+    @test JuMP.termination_status(model) == MOI.OPTIMAL
 end
 
+options = ()
 expdesign_JuMP_fast = [
-    (3, 5, 7, 2, true, false, false),
-    (3, 5, 7, 2, false, true, false),
-    (3, 5, 7, 2, false, false, true),
-    (5, 15, 25, 5, true, false, false),
-    (5, 15, 25, 5, false, true, false),
-    (5, 15, 25, 5, false, false, true),
-    (10, 30, 50, 5, true, false, false),
-    (10, 30, 50, 5, false, true, false),
-    (10, 30, 50, 5, false, false, true),
-    (25, 75, 125, 10, true, false, false),
-    (25, 75, 125, 10, false, true, false),
-    (25, 75, 125, 10, false, false, true),
+    ((Float64, 3, 5, 7, 2, true, false, false), false, (), options),
+    ((Float64, 3, 5, 7, 2, false, true, false), false, (), options),
+    ((Float64, 3, 5, 7, 2, false, false, true), false, (), options),
+    ((Float64, 5, 15, 25, 5, true, false, false), false, (), options),
+    ((Float64, 5, 15, 25, 5, false, true, false), false, (), options),
+    ((Float64, 5, 15, 25, 5, false, false, true), false, (), options),
+    ((Float64, 10, 30, 50, 5, true, false, false), false, (), options),
+    ((Float64, 10, 30, 50, 5, false, true, false), false, (), options),
+    ((Float64, 10, 30, 50, 5, false, false, true), false, (), options),
+    ((Float64, 25, 75, 125, 10, true, false, false), false, (), options),
+    ((Float64, 25, 75, 125, 10, false, true, false), false, (), options),
+    ((Float64, 25, 75, 125, 10, false, false, true), false, (), options),
     ]
 expdesign_JuMP_slow = [
-    (100, 200, 200, 10, true, false, false),
-    (100, 200, 200, 10, false, true, false),
-    (100, 200, 200, 10, false, false, true),
+    ((Float64, 100, 200, 200, 10, true, false, false), false, (), options),
+    ((Float64, 100, 200, 200, 10, false, true, false), false, (), options),
+    ((Float64, 100, 200, 200, 10, false, false, true), false, (), options),
     ]
+
+@testset begin test_JuMP_instance.(expdesign_JuMP, test_expdesign_JuMP, expdesign_JuMP_fast) end
+;

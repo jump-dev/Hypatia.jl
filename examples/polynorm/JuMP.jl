@@ -37,7 +37,7 @@ function polynorm_JuMP(
     cone = Hypatia.WSOSInterpEpiNormEuclCone{Float64}(npolys + 1, U, Ps)
     JuMP.@constraint(model, vcat(f, [polys[:, i] for i in 1:npolys]...) in cone)
 
-    return (model = model,)
+    return (model, ())
 end
 
 function test_polynorm_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)

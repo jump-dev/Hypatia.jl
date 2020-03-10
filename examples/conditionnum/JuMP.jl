@@ -77,20 +77,21 @@ function test_conditionnum_JuMP(model, test_helpers, test_options)
     @test JuMP.termination_status(model) == MOI.OPTIMAL
 end
 
+options = (tol_feas = 1e-5,)
 conditionnum_JuMP_fast = [
-    ((Float64, 2, 3, true), (), ()),
-    # (2, 3, false),
-    # (3, 2, true),
-    # (3, 2, false),
-    # (50, 15, true),
-    # (50, 15, false),
-    # (100, 10, false),
-    # (100, 40, false),
+    ((Float64, 2, 3, true), false, (), options),
+    ((Float64, 2, 3, false), false, (), options),
+    ((Float64, 3, 2, true), false, (), options),
+    ((Float64, 3, 2, false), false, (), options),
+    ((Float64, 50, 15, true), false, (), options),
+    ((Float64, 50, 15, false), false, (), options),
+    ((Float64, 100, 10, false), false, (), options),
+    ((Float64, 100, 40, false), false, (), options),
     ]
 conditionnum_JuMP_slow = [
-    # (100, 10, true),
-    # (100, 40, true),
+    ((Float64, 100, 10, true), false, (), options),
+    ((Float64, 100, 40, true), false, (), options),
     ]
 
-test_JuMP_instance.(conditionnum_JuMP, test_conditionnum_JuMP, conditionnum_JuMP_fast)
+@testset begin test_JuMP_instance.(conditionnum_JuMP, test_conditionnum_JuMP, conditionnum_JuMP_fast) end
 ;

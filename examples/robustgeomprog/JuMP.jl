@@ -45,7 +45,7 @@ function robustgeomprog_JuMP(
     alphas /= sum(alphas)
     JuMP.@constraint(model, vcat(-sum(log, alphas), alphas, c) in MOI.RelativeEntropyCone(1 + 2k))
 
-    return (model = model,)
+    return (model, ())
 end
 
 function test_robustgeomprog_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)

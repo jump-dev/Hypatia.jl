@@ -8,11 +8,7 @@ TODO
 - describe formulation and options
 =#
 
-using LinearAlgebra
-import Random
-using Test
-import Hypatia
-const CO = Hypatia.Cones
+include(joinpath(@__DIR__, "../common_JuMP.jl"))
 
 function portfolio_native(
     ::Type{T},
@@ -135,44 +131,45 @@ function portfolio_native(
         G = Hypatia.BlockMatrix{T}(last_idx(G_rows), last_idx(G_cols), G_blocks, G_rows, G_cols)
     end
 
-    return (c = c, A = A, b = b, G = G, h = h, cones = cones)
+    model = Models.Model{T}(c, A, b, G, h, cones)
+    return (model, ())
 end
 
-function test_portfolio_native(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
-    Random.seed!(rseed)
-    d = portfolio_native(T, instance...)
-    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
-    @test r.status == :Optimal
-    return r
+function test_portfolio_native(result, test_helpers, test_options)
+    @test result.status == :Optimal
 end
 
+options = ()
 portfolio_native_fast = [
-    (3, true, false, true, false),
-    (3, false, true, true, false),
-    (3, false, true, false, false),
-    (3, true, true, true, false),
-    (10, true, false, true, false),
-    (10, false, true, true, false),
-    (10, false, true, false, false),
-    (10, true, true, true, false),
-    (50, true, false, true, false),
-    (50, false, true, true, false),
-    (50, false, true, false, false),
-    (50, true, true, true, false),
-    (400, true, false, true, false),
-    (400, false, true, true, false),
-    (400, false, true, false, false),
-    (400, true, true, true, false),
+    ((Float64, 3, true, false, true, false), (), options),
+    ((Float64, 3, false, true, true, false), (), options),
+    ((Float64, 3, false, true, false, false), (), options),
+    ((Float64, 3, true, true, true, false), (), options),
+    ((Float64, 10, true, false, true, false), (), options),
+    ((Float64, 10, false, true, true, false), (), options),
+    ((Float64, 10, false, true, false, false), (), options),
+    ((Float64, 10, true, true, true, false), (), options),
+    ((Float64, 50, true, false, true, false), (), options),
+    ((Float64, 50, false, true, true, false), (), options),
+    ((Float64, 50, false, true, false, false), (), options),
+    ((Float64, 50, true, true, true, false), (), options),
+    ((Float64, 400, true, false, true, false), (), options),
+    ((Float64, 400, false, true, true, false), (), options),
+    ((Float64, 400, false, true, false, false), (), options),
+    ((Float64, 400, true, true, true, false), (), options),
     ]
 portfolio_native_slow = [
-    (3000, true, false, true, false),
-    (3000, false, true, true, false),
-    (3000, false, true, false, false),
-    (3000, true, true, true, false),
+    ((Float64, 3000, true, false, true, false), (), options),
+    ((Float64, 3000, false, true, true, false), (), options),
+    ((Float64, 3000, false, true, false, false), (), options),
+    ((Float64, 3000, true, true, true, false), (), options),
     ]
 portfolio_native_linops = [
-    (20, true, false, true, true),
-    (20, false, true, true, true),
-    (20, false, true, false, true),
-    (20, true, true, true, true),
+    ((Float64, 20, true, false, true, true), (), options),
+    ((Float64, 20, false, true, true, true), (), options),
+    ((Float64, 20, false, true, false, true), (), options),
+    ((Float64, 20, true, true, true, true), (), options),
     ]
+
+# @testset begin test_native_instance.(portfolio_native, test_portfolio_native, portfolio_native_fast) end
+;

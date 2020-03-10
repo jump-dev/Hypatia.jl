@@ -77,7 +77,7 @@ function lotkavolterra_JuMP(
     JuMP.@constraint(model, rho_T >= 0, domain = X)
     JuMP.@constraint(model, [i in 1:m], sigma[i] >= 0, domain = X)
 
-    return (model = model,)
+    return (model, ())
 end
 
 function test_lotkavolterra_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)

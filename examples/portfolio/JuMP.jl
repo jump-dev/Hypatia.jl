@@ -38,7 +38,7 @@ function portfolio_JuMP(
         JuMP.@constraint(model, vcat(gamma, aff_expr) in MOI.NormInfinityCone(num_stocks + 1))
     end
 
-    return (model = model,)
+    return (model, ())
 end
 
 function test_portfolio_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)

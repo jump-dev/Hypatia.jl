@@ -12,8 +12,6 @@ const MOI = JuMP.MOI
 import Hypatia
 const MU = Hypatia.ModelUtilities
 
-include(joinpath(@__DIR__, "data.jl"))
-
 function polymin_JuMP(
     ::Type{T},
     interp_vals::Vector{T},
@@ -87,6 +85,8 @@ function test_polymin_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::
     end
     return d.model.moi_backend.optimizer.model.optimizer.result
 end
+
+include(joinpath(@__DIR__, "data.jl"))
 
 polymin_JuMP_fast = [
     (:butcher, 2, true, true),

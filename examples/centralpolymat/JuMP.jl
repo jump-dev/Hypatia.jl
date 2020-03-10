@@ -4,9 +4,9 @@ Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 compute a gram matrix of a polynomial, minimizing its log-determinant or root-determinant (equivalent optimal solutions with different optimal objective values)
 =#
 
+include(joinpath(@__DIR__, "../common_JuMP.jl"))
 import DynamicPolynomials
 const DP = DynamicPolynomials
-include(joinpath(@__DIR__, "../common_JuMP.jl"))
 
 function centralpolymat_JuMP(
     ::Type{T},
@@ -42,22 +42,23 @@ function test_centralpolymat_JuMP(model, test_helpers, test_options)
     @test JuMP.termination_status(model) == MOI.OPTIMAL
 end
 
+options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
 centralpolymat_JuMP_fast = [
-    ((Float64, 2, 3, true), (), ()),
-    # (2, 3, false),
-    # (3, 2, true),
-    # (3, 2, false),
-    # (3, 4, true),
-    # (3, 4, false),
-    # (7, 2, true),
-    # (7, 2, false),
+    ((Float64, 2, 3, true), false, (), options),
+    ((Float64, 2, 3, false), false, (), options),
+    ((Float64, 3, 2, true), false, (), options),
+    ((Float64, 3, 2, false), false, (), options),
+    ((Float64, 3, 4, true), false, (), options),
+    ((Float64, 3, 4, false), false, (), options),
+    ((Float64, 7, 2, true), false, (), options),
+    ((Float64, 7, 2, false), false, (), options),
     ]
 centralpolymat_JuMP_slow = [
-    # (3, 5, true),
-    # (3, 5, false),
-    # (6, 3, true),
-    # (6, 3, false),
+    ((Float64, 3, 5, true), false, (), options),
+    ((Float64, 3, 5, false), false, (), options),
+    ((Float64, 6, 3, true), false, (), options),
+    ((Float64, 6, 3, false), false, (), options),
     ]
 
-test_JuMP_instance.(centralpolymat_JuMP, test_centralpolymat_JuMP, centralpolymat_JuMP_fast)
+@testset begin test_JuMP_instance.(centralpolymat_JuMP, test_centralpolymat_JuMP, centralpolymat_JuMP_fast) end
 ;
