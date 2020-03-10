@@ -17,12 +17,7 @@ min 1/2(tr(W1) + tr(W2))
 from http://www.mit.edu/~parrilo/pubs/talkfiles/ISMP2009.pdf
 =#
 
-using LinearAlgebra
-import Random
-using Test
-import Hypatia
-const CO = Hypatia.Cones
-const MU = Hypatia.ModelUtilities
+include(joinpath(@__DIR__, "../common_native.jl"))
 
 function matrixcompletion_native(
     ::Type{T},
@@ -251,38 +246,39 @@ function matrixcompletion_native(
     A = zeros(T, 0, size(G, 2))
     b = T[]
 
-    return (c = c, A = A, b = b, G = G, h = h, cones = cones)
+    model = Models.Model{T}(c, A, b, G, h, cones)
+    return (model, ())
 end
 
-function test_matrixcompletion_native(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
-    Random.seed!(rseed)
-    d = matrixcompletion_native(T, instance...)
-    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
-    @test r.status == :Optimal
-    return r
+function test_matrixcompletion_native(result, test_helpers, test_options)
+    @test result.status == :Optimal
 end
 
+options = ()
 matrixcompletion_native_fast = [
-    (2, 3, true, true, true, true),
-    (2, 3, false, true, true, true),
-    (2, 3, true, false, true, true),
-    (2, 3, false, false, true, true),
-    (2, 3, true, true, false, true),
-    (2, 3, false, false, false, true),
-    (2, 3, true, true, false, false),
-    (2, 3, false, false, false, false),
-    (12, 24, true, true, true, true),
-    (12, 24, true, true, false, true),
-    (12, 24, true, true, true, false),
-    (12, 24, true, true, false, false),
+    ((Float64, 2, 3, true, true, true, true), (), options),
+    ((Float64, 2, 3, false, true, true, true), (), options),
+    ((Float64, 2, 3, true, false, true, true), (), options),
+    ((Float64, 2, 3, false, false, true, true), (), options),
+    ((Float64, 2, 3, true, true, false, true), (), options),
+    ((Float64, 2, 3, false, false, false, true), (), options),
+    ((Float64, 2, 3, true, true, false, false), (), options),
+    ((Float64, 2, 3, false, false, false, false), (), options),
+    ((Float64, 12, 24, true, true, true, true), (), options),
+    ((Float64, 12, 24, true, true, false, true), (), options),
+    ((Float64, 12, 24, true, true, true, false), (), options),
+    ((Float64, 12, 24, true, true, false, false), (), options),
     ]
 matrixcompletion_native_slow = [
-    (14, 140, true, true, true, true),
-    (14, 140, true, true, false, true),
-    (14, 140, true, true, true, false),
-    (14, 140, true, true, false, false),
-    (18, 180, true, true, true, true),
-    (18, 180, true, true, false, true),
-    (18, 180, true, true, true, false),
-    (18, 180, true, true, false, false),
+    ((Float64, 14, 140, true, true, true, true), (), options),
+    ((Float64, 14, 140, true, true, false, true), (), options),
+    ((Float64, 14, 140, true, true, true, false), (), options),
+    ((Float64, 14, 140, true, true, false, false), (), options),
+    ((Float64, 18, 180, true, true, true, true), (), options),
+    ((Float64, 18, 180, true, true, false, true), (), options),
+    ((Float64, 18, 180, true, true, true, false), (), options),
+    ((Float64, 18, 180, true, true, false, false), (), options),
     ]
+
+# @testset begin test_native_instance.(matrixcompletion_native, test_matrixcompletion_native, matrixcompletion_native_fast) end
+;

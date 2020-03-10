@@ -12,16 +12,9 @@ TODO
 - implement PSD formulation for complex case
 =#
 
-import Random
-using LinearAlgebra
-import Combinatorics
-using Test
-import Hypatia
+include(joinpath(@__DIR__, "../common_native.jl"))
 import Hypatia.BlockMatrix
-const CO = Hypatia.Cones
-const MU = Hypatia.ModelUtilities
-
-include(joinpath(@__DIR__, "data.jl"))
+import Combinatorics
 
 # real polynomials
 function polymin_native(
@@ -95,7 +88,8 @@ function polymin_native(
         end
     end
 
-    return (c = c, A = A, b = b, G = G, h = h, cones = cones, true_min = true_min)
+    model = Models.Model{T}(c, A, b, G, h, cones)
+    return (model, (true_min = true_min,))
 end
 
 polymin_native(
@@ -192,97 +186,103 @@ function polymin_native(
     end
     cones = CO.Cone{T}[CO.WSOSInterpNonnegative{T, Complex{T}}(U, P_data, use_dual = !use_primal)]
 
-    return (c = c, A = A, b = b, G = G, h = h, cones = cones, true_min = true_min)
+    model = Models.Model{T}(c, A, b, G, h, cones)
+    return (model, (true_min = true_min,))
 end
 
-function test_polymin_native(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
-    Random.seed!(rseed)
-    d = polymin_native(T, instance...)
-    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
-    @test r.status == :Optimal
-    if r.status == :Optimal && !isnan(d.true_min)
-        @test r.primal_obj ≈ d.true_min atol = 1e-4 rtol = 1e-4
+function test_polymin_native(result, test_helpers, test_options)
+    @test result.status == :Optimal
+    if result.status == :Optimal && !isnan(test_helpers.true_min)
+        # check objective value is correct
+        tol = eps(eltype(result.x))^0.2
+        @test result.primal_obj ≈ test_helpers.true_min atol = tol rtol = tol
     end
-    return r
 end
 
+include(joinpath(@__DIR__, "data.jl"))
+
+options = ()
 polymin_native_fast = [
-    (:butcher, 2, true, true, false),
-    (:caprasse, 4, true, true, false),
-    (:goldsteinprice, 7, true, true, false),
-    (:goldsteinprice_ball, 7, true, true, false),
-    (:goldsteinprice_ellipsoid, 7, true, true, false),
-    (:heart, 2, true, true, false),
-    (:lotkavolterra, 3, true, true, false),
-    (:magnetism7, 2, true, true, false),
-    (:magnetism7_ball, 2, true, true, false),
-    (:motzkin, 3, true, true, false),
-    (:motzkin_ball, 3, true, true, false),
-    (:motzkin_ellipsoid, 3, true, true, false),
-    (:reactiondiffusion, 4, true, true, false),
-    (:robinson, 8, true, true, false),
-    (:robinson_ball, 8, true, true, false),
-    (:rosenbrock, 5, true, true, false),
-    (:rosenbrock_ball, 5, true, true, false),
-    (:schwefel, 2, true, true, false),
-    (:schwefel_ball, 2, true, true, false),
-    (:lotkavolterra, 3, false, true, false),
-    (:motzkin, 3, false, true, false),
-    (:motzkin_ball, 3, false, true, false),
-    (:schwefel, 2, false, true, false),
-    (:lotkavolterra, 3, false, false, false),
-    (:motzkin, 3, false, false, false),
-    (:motzkin_ball, 3, false, false, false),
-    (:schwefel, 2, false, false, false),
-    (1, 3, true, true, false),
-    (1, 30, true, true, false),
-    (1, 30, false, true, false),
-    (1, 30, false, false, false),
-    (2, 8, true, true, false),
-    (3, 6, true, true, false),
-    (5, 3, true, true, false),
-    (10, 1, true, true, false),
-    (10, 1, false, true, false),
-    (10, 1, false, false, false),
-    (4, 4, true, true, false),
-    (4, 4, false, true, false),
-    (4, 4, false, false, false),
-    (Complex, :abs1d, 1, true, true),
-    (Complex, :abs1d, 3, true, true),
-    (Complex, :absunit1d, 1, true, true),
-    (Complex, :absunit1d, 3, true, true),
-    (Complex, :negabsunit1d, 2, true, true),
-    (Complex, :absball2d, 1, true, true),
-    (Complex, :absbox2d, 2, true, true),
-    (Complex, :negabsbox2d, 1, true, true),
-    (Complex, :denseunit1d, 2, true, true),
-    (Complex, :abs1d, 1, false, true),
-    (Complex, :negabsunit1d, 2, false, true),
-    (Complex, :absball2d, 1, false, true),
-    (Complex, :negabsbox2d, 1, false, true),
-    (Complex, :denseunit1d, 2, false, true),
-    # (Complex, :abs1d, 1, false, false),
-    # (Complex, :negabsunit1d, 2, false, false),
-    # (Complex, :absball2d, 1, false, false),
-    # (Complex, :negabsbox2d, 1, false, false),
-    # (Complex, :denseunit1d, 2, false, false),
+    ((Float64, :butcher, 2, true, true, false), (), options),
+    ((Float64, :caprasse, 4, true, true, false), (), options),
+    ((Float64, :goldsteinprice, 7, true, true, false), (), options),
+    ((Float64, :goldsteinprice_ball, 6, true, true, false), (), options),
+    ((Float64, :goldsteinprice_ellipsoid, 7, true, true, false), (), options),
+    ((Float64, :heart, 2, true, true, false), (), options),
+    ((Float64, :lotkavolterra, 3, true, true, false), (), options),
+    ((Float64, :magnetism7, 2, true, true, false), (), options),
+    ((Float64, :magnetism7_ball, 2, true, true, false), (), options),
+    ((Float64, :motzkin, 3, true, true, false), (), options),
+    ((Float64, :motzkin_ball, 3, true, true, false), (), options),
+    ((Float64, :motzkin_ellipsoid, 3, true, true, false), (), options),
+    ((Float64, :reactiondiffusion, 4, true, true, false), (), options),
+    ((Float64, :robinson, 8, true, true, false), (), options),
+    ((Float64, :robinson_ball, 8, true, true, false), (), options),
+    ((Float64, :rosenbrock, 5, true, true, false), (), options),
+    ((Float64, :rosenbrock_ball, 5, true, true, false), (), options),
+    ((Float64, :schwefel, 2, true, true, false), (), options),
+    ((Float64, :schwefel_ball, 2, true, true, false), (), options),
+    ((Float64, :lotkavolterra, 3, false, true, false), (), options),
+    ((Float64, :motzkin, 3, false, true, false), (), options),
+    ((Float64, :motzkin_ball, 3, false, true, false), (), options),
+    ((Float64, :schwefel, 2, false, true, false), (), options),
+    ((Float64, :lotkavolterra, 3, false, false, false), (), options),
+    ((Float64, :motzkin, 3, false, false, false), (), options),
+    ((Float64, :motzkin_ball, 3, false, false, false), (), options),
+    ((Float64, :schwefel, 2, false, false, false), (), options),
+    ((Float64, 1, 3, true, true, false), (), options),
+    ((Float64, 1, 30, true, true, false), (), options),
+    ((Float64, 1, 30, false, true, false), (), options),
+    ((Float64, 1, 30, false, false, false), (), options),
+    ((Float64, 2, 8, true, true, false), (), options),
+    ((Float64, 3, 6, true, true, false), (), options),
+    ((Float64, 5, 3, true, true, false), (), options),
+    ((Float64, 10, 1, true, true, false), (), options),
+    ((Float64, 10, 1, false, true, false), (), options),
+    ((Float64, 10, 1, false, false, false), (), options),
+    ((Float64, 4, 4, true, true, false), (), options),
+    ((Float64, 4, 4, false, true, false), (), options),
+    ((Float64, 4, 4, false, false, false), (), options),
+    ((Float64, Complex, :abs1d, 1, true, true), (), options),
+    ((Float64, Complex, :abs1d, 3, true, true), (), options),
+    ((Float64, Complex, :absunit1d, 1, true, true), (), options),
+    ((Float64, Complex, :absunit1d, 3, true, true), (), options),
+    ((Float64, Complex, :negabsunit1d, 2, true, true), (), options),
+    ((Float64, Complex, :absball2d, 1, true, true), (), options),
+    ((Float64, Complex, :absbox2d, 2, true, true), (), options),
+    ((Float64, Complex, :negabsbox2d, 1, true, true), (), options),
+    ((Float64, Complex, :denseunit1d, 2, true, true), (), options),
+    ((Float64, Complex, :abs1d, 1, false, true), (), options),
+    ((Float64, Complex, :negabsunit1d, 2, false, true), (), options),
+    ((Float64, Complex, :absball2d, 1, false, true), (), options),
+    ((Float64, Complex, :negabsbox2d, 1, false, true), (), options),
+    ((Float64, Complex, :denseunit1d, 2, false, true), (), options),
+    # TODO implement PSD formulation for complex case
+    # ((Float64, Complex, :abs1d, 1, false, false), (), options),
+    # ((Float64, Complex, :negabsunit1d, 2, false, false), (), options),
+    # ((Float64, Complex, :absball2d, 1, false, false), (), options),
+    # ((Float64, Complex, :negabsbox2d, 1, false, false), (), options),
+    # ((Float64, Complex, :denseunit1d, 2, false, false), (), options),
     ]
 polymin_native_slow = [
-    (4, 5, true, true, false),
-    (4, 5, false, true, false),
-    (4, 5, false, false, false),
-    (2, 30, true, true, false),
-    (2, 30, false, true, false),
-    (2, 30, false, false, false),
+    ((Float64, 4, 5, true, true, false), (), options),
+    ((Float64, 4, 5, false, true, false), (), options),
+    ((Float64, 4, 5, false, false, false), (), options),
+    ((Float64, 2, 30, true, true, false), (), options),
+    ((Float64, 2, 30, false, true, false), (), options),
+    ((Float64, 2, 30, false, false, false), (), options),
     ]
 polymin_native_linops = [
-    (:butcher, 2, true, true, true),
-    (:caprasse, 4, true, true, true),
-    (:goldsteinprice, 7, true, true, true),
-    (1, 8, true, true, true),
-    (2, 5, true, true, true),
-    (3, 3, true, true, true),
-    (5, 2, true, true, true),
-    (3, 3, false, true, true),
-    (3, 3, false, false, true),
+    ((Float64, :butcher, 2, true, true, true), (), options),
+    ((Float64, :caprasse, 4, true, true, true), (), options),
+    ((Float64, :goldsteinprice, 7, true, true, true), (), options),
+    ((Float64, 1, 8, true, true, true), (), options),
+    ((Float64, 2, 5, true, true, true), (), options),
+    ((Float64, 3, 3, true, true, true), (), options),
+    ((Float64, 5, 2, true, true, true), (), options),
+    ((Float64, 3, 3, false, true, true), (), options),
+    ((Float64, 3, 3, false, false, true), (), options),
     ]
+
+# @testset begin test_native_instance.(polymin_native, test_polymin_native, polymin_native_fast) end
+;

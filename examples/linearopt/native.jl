@@ -6,12 +6,8 @@ modified from https://github.com/dpapp-github/alfonso/blob/master/random_lp.m
 solves a simple linear optimization problem (LP) min c'x s.t. Ax = b, x >= 0
 =#
 
+include(joinpath(@__DIR__, "../common_native.jl"))
 using SparseArrays
-using LinearAlgebra
-import Random
-using Test
-import Hypatia
-const CO = Hypatia.Cones
 
 function linearopt_native(
     ::Type{T},
@@ -30,24 +26,25 @@ function linearopt_native(
     h = zeros(T, n)
     cones = CO.Cone{T}[CO.Nonnegative{T}(n)]
 
-    return (c = c, A = A, b = b, G = G, h = h, cones = cones)
+    model = Models.Model{T}(c, A, b, G, h, cones)
+    return (model, ())
 end
 
-function test_linearopt_native(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
-    Random.seed!(rseed)
-    d = linearopt_native(T, instance...)
-    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
-    @test r.status == :Optimal
-    return r
+function test_linearopt_native(result, test_helpers, test_options)
+    @test result.status == :Optimal
 end
 
+options = ()
 linearopt_native_fast = [
-    (15, 20, 1.0),
-    (15, 20, 0.25),
-    (50, 100, 1.0),
-    (50, 100, 0.15),
+    ((Float64, 15, 20, 1.0), (), options),
+    ((Float64, 15, 20, 0.25), (), options),
+    ((Float64, 50, 100, 1.0), (), options),
+    ((Float64, 50, 100, 0.15), (), options),
     ]
 linearopt_native_slow = [
-    (500, 1000, 0.05),
-    (500, 1000, 1.0),
+    ((Float64, 500, 1000, 0.05), (), options),
+    ((Float64, 500, 1000, 1.0), (), options),
     ]
+
+# @testset begin test_native_instance.(linearopt_native, test_linearopt_native, linearopt_native_fast) end
+;

@@ -71,7 +71,7 @@ function nearestpsd_JuMP(
         JuMP.@constraint(model, tr(X) == 1) # tr(X) == 1
     end
 
-    return (model = model,)
+    return (model, ())
 end
 
 function test_nearestpsd_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)

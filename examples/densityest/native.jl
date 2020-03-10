@@ -9,14 +9,8 @@ find a density function f maximizing the log likelihood of the observations
     f ≥ 0
 ==#
 
-using LinearAlgebra
-import Random
-using Test
+include(joinpath(@__DIR__, "../common_native.jl"))
 import DelimitedFiles
-import Hypatia
-import Hypatia.BlockMatrix
-const CO = Hypatia.Cones
-const MU = Hypatia.ModelUtilities
 
 function densityest_native(
     ::Type{T},
@@ -151,7 +145,8 @@ function densityest_native(
         G[(num_psd_vars + 1):end, :] = G_likl
     end
 
-    return (c = c, A = A, b = b, G = G, h = h, cones = cones)
+    model = Models.Model{T}(c, A, b, G, h, cones)
+    return (model, ())
 end
 
 densityest_native(
@@ -167,48 +162,48 @@ densityest_native(
     args...; kwargs...
     ) where {T <: Real} = densityest_native(T, randn(T, num_obs, n), args...; kwargs...)
 
-function test_densityest_native(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
-    Random.seed!(rseed)
-    d = densityest_native(T, instance...)
-    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
-    @test r.status == :Optimal
-    return r
+function test_densityest_native(result, test_helpers, test_options)
+    @test result.status == :Optimal
 end
 
 iris_data = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "iris.txt"))
 cancer_data = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "cancer.txt"))
 
+options = ()
 densityest_native_fast = [
-    (:iris_data, 4, true, true, true),
-    (:iris_data, 5, true, true, true),
-    (:iris_data, 6, true, true, true),
-    (:iris_data, 4, false, true, true),
-    (:iris_data, 4, true, false, true),
-    (:iris_data, 4, true, true, false),
-    (:cancer_data, 4, true, true, true),
-    (:cancer_data, 4, false, true, true),
-    (:cancer_data, 4, true, false, true),
-    (:cancer_data, 4, true, true, false),
-    (50, 2, 2, true, true, true),
-    (50, 2, 2, false, true, true),
-    (50, 2, 2, true, false, true),
-    (50, 2, 2, true, true, false),
-    (100, 8, 2, true, true, true),
-    (100, 8, 2, false, true, true),
-    (100, 8, 2, true, false, true),
-    (100, 8, 2, true, true, false),
-    (250, 4, 6, true, true, true),
-    (250, 4, 6, false, true, true),
-    (250, 4, 6, true, false, true),
-    (250, 4, 6, true, true, false),
+    ((Float64, :iris_data, 4, true, true, true), (), options),
+    ((Float64, :iris_data, 5, true, true, true), (), options),
+    ((Float64, :iris_data, 6, true, true, true), (), options),
+    ((Float64, :iris_data, 4, false, true, true), (), options),
+    ((Float64, :iris_data, 4, true, false, true), (), options),
+    ((Float64, :iris_data, 4, true, true, false), (), options),
+    ((Float64, :cancer_data, 4, true, true, true), (), options),
+    ((Float64, :cancer_data, 4, false, true, true), (), options),
+    ((Float64, :cancer_data, 4, true, false, true), (), options),
+    ((Float64, :cancer_data, 4, true, true, false), (), options),
+    ((Float64, 50, 2, 2, true, true, true), (), options),
+    ((Float64, 50, 2, 2, false, true, true), (), options),
+    ((Float64, 50, 2, 2, true, false, true), (), options),
+    ((Float64, 50, 2, 2, true, true, false), (), options),
+    ((Float64, 100, 8, 2, true, true, true), (), options),
+    ((Float64, 100, 8, 2, false, true, true), (), options),
+    ((Float64, 100, 8, 2, true, false, true), (), options),
+    ((Float64, 100, 8, 2, true, true, false), (), options),
+    ((Float64, 250, 4, 6, true, true, true), (), options),
+    ((Float64, 250, 4, 6, false, true, true), (), options),
+    ((Float64, 250, 4, 6, true, false, true), (), options),
+    ((Float64, 250, 4, 6, true, true, false), (), options),
     ]
 densityest_native_slow = [
-    (:cancer_data, 6, true, true, true),
-    (:cancer_data, 6, false, true, true),
-    (:cancer_data, 6, true, false, true),
-    (:cancer_data, 6, true, true, false),
-    (400, 5, 6, true, true, true),
-    (400, 5, 6, false, true, true),
-    (400, 5, 6, true, false, true),
-    (400, 5, 6, true, true, false),
+    ((Float64, :cancer_data, 6, true, true, true), (), options),
+    ((Float64, :cancer_data, 6, false, true, true), (), options),
+    ((Float64, :cancer_data, 6, true, false, true), (), options),
+    ((Float64, :cancer_data, 6, true, true, false), (), options),
+    ((Float64, 400, 5, 6, true, true, true), (), options),
+    ((Float64, 400, 5, 6, false, true, true), (), options),
+    ((Float64, 400, 5, 6, true, false, true), (), options),
+    ((Float64, 400, 5, 6, true, true, false), (), options),
     ]
+
+# @testset begin test_native_instance.(densityest_native, test_densityest_native, densityest_native_fast) end
+;

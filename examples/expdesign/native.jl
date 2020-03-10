@@ -6,12 +6,7 @@ see description in examples/expdesign/JuMP.jl
 TODO describe options
 =#
 
-using LinearAlgebra
-import Random
-using Test
-import Hypatia
-const CO = Hypatia.Cones
-const MU = Hypatia.ModelUtilities
+include(joinpath(@__DIR__, "../common_native.jl"))
 
 function expdesign_native(
     ::Type{T},
@@ -241,43 +236,45 @@ function expdesign_native(
         h = vcat(h_norminf, h_psd, h_log)
     end
 
-    return (c = c, A = A, b = b, G = G, h = h, cones = cones)
+    model = Models.Model{T}(c, A, b, G, h, cones)
+    return (model, ())
 end
 
-function test_expdesign_native(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
-    Random.seed!(rseed)
-    d = expdesign_native(T, instance...)
-    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
-    @test r.status == :Optimal
-    return r
+function test_expdesign_native(result, test_helpers, test_options)
+    @test result.status == :Optimal
 end
 
+options = ()
+logdet_options = (tol_feas = 1e-6, tol_rel_opt = 1e-5, tol_abs_opt = 1e-5)
 expdesign_native_fast = [
-    (3, 5, 7, 2, true, false, false, true, true, false),
-    (3, 5, 7, 2, true, false, false, true, true, true),
-    (3, 5, 7, 2, false, true, false, true, true, true),
-    (3, 5, 7, 2, false, false, true, true, true, true),
-    (3, 5, 7, 2, true, false, false, false, false, true),
-    (3, 5, 7, 2, false, true, false, false, false, true),
-    (5, 15, 25, 5, true, false, false, true, true, false),
-    (5, 15, 25, 5, true, false, false, true, true, true),
-    (5, 15, 25, 5, false, true, false, true, true, true),
-    (5, 15, 25, 5, false, false, true, true, true, true),
-    (5, 15, 25, 5, true, false, false, false, false, true),
-    (5, 15, 25, 5, false, true, false, false, false, true),
-    (25, 75, 125, 5, true, false, false, true, true, false),
-    (25, 75, 125, 5, true, false, false, true, true, true),
-    (25, 75, 125, 5, false, true, false, true, true, true),
-    (25, 75, 125, 5, false, false, true, true, true, true),
-    (25, 75, 125, 5, true, false, false, false, false, true),
-    (25, 75, 125, 5, false, true, false, false, false, true),
+    ((Float64, 3, 5, 7, 2, true, false, false, true, true, false), (), logdet_options),
+    ((Float64, 3, 5, 7, 2, true, false, false, true, true, true), (), logdet_options),
+    ((Float64, 3, 5, 7, 2, false, true, false, true, true, true), (), options),
+    ((Float64, 3, 5, 7, 2, false, false, true, true, true, true), (), options),
+    ((Float64, 3, 5, 7, 2, true, false, false, false, false, true), (), logdet_options),
+    ((Float64, 3, 5, 7, 2, false, true, false, false, false, true), (), options),
+    ((Float64, 5, 15, 25, 5, true, false, false, true, true, false), (), logdet_options),
+    ((Float64, 5, 15, 25, 5, true, false, false, true, true, true), (), logdet_options),
+    ((Float64, 5, 15, 25, 5, false, true, false, true, true, true), (), options),
+    ((Float64, 5, 15, 25, 5, false, false, true, true, true, true), (), options),
+    ((Float64, 5, 15, 25, 5, true, false, false, false, false, true), (), logdet_options),
+    ((Float64, 5, 15, 25, 5, false, true, false, false, false, true), (), options),
+    ((Float64, 25, 75, 125, 5, true, false, false, true, true, false), (), logdet_options),
+    ((Float64, 25, 75, 125, 5, true, false, false, true, true, true), (), logdet_options),
+    ((Float64, 25, 75, 125, 5, false, true, false, true, true, true), (), options),
+    ((Float64, 25, 75, 125, 5, false, false, true, true, true, true), (), options),
+    ((Float64, 25, 75, 125, 5, true, false, false, false, false, true), (), logdet_options),
+    ((Float64, 25, 75, 125, 5, false, true, false, false, false, true), (), options),
     ]
 expdesign_native_slow = [
     # TODO commented too slow
-    # (100, 200, 200, 10, true, false, false, true, true, false),
-    (100, 200, 200, 10, true, false, false, true, true, true),
-    (100, 200, 200, 10, false, true, false, true, true, true),
-    (100, 200, 200, 10, false, false, true, true, true, true),
-    (100, 200, 200, 10, true, false, false, false, false, true),
-    (100, 200, 200, 10, false, true, false, false, false, true),
+    # ((Float64, 100, 200, 200, 10, true, false, false, true, true, false), (), options),
+    ((Float64, 100, 200, 200, 10, true, false, false, true, true, true), (), logdet_options),
+    ((Float64, 100, 200, 200, 10, false, true, false, true, true, true), (), options),
+    ((Float64, 100, 200, 200, 10, false, false, true, true, true, true), (), options),
+    ((Float64, 100, 200, 200, 10, true, false, false, false, false, true), (), logdet_options),
+    ((Float64, 100, 200, 200, 10, false, true, false, false, false, true), (), options),
     ]
+
+# @testset begin test_native_instance.(expdesign_native, test_expdesign_native, expdesign_native_fast) end
+;

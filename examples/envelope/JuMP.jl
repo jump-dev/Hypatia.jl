@@ -38,20 +38,20 @@ function test_envelope_JuMP(model, test_helpers, test_options)
     @test JuMP.termination_status(model) == MOI.OPTIMAL
 end
 
+options = ()
 envelope_JuMP_fast = [
-    ((Float64, 2, 2, 3, 4), false, (), ()),
-    ((Float64, 2, 2, 3, 4), true, (), ()),
-    # (2, 3, 2, 4),
-    # (3, 3, 3, 3),
-    # (3, 3, 5, 4),
-    # (5, 2, 5, 2),
-    # (1, 30, 2, 30),
-    # (10, 1, 3, 1),
+    ((Float64, 2, 2, 3, 4), false, (), options),
+    ((Float64, 2, 3, 2, 4), false, (), options),
+    ((Float64, 3, 3, 3, 3), false, (), options),
+    ((Float64, 3, 3, 5, 4), false, (), options),
+    ((Float64, 5, 2, 5, 2), false, (), options),
+    ((Float64, 1, 30, 2, 30), false, (), options),
+    ((Float64, 10, 1, 3, 1), false, (), options),
     ]
 envelope_JuMP_slow = [
-    # (4, 6, 4, 5),
-    # (2, 30, 4, 30),
+    ((Float64, 4, 6, 4, 5), false, (), options),
+    ((Float64, 2, 30, 4, 30), false, (), options),
     ]
 
-test_JuMP_instance.(envelope_JuMP, test_envelope_JuMP, envelope_JuMP_fast)
+@testset begin test_JuMP_instance.(envelope_JuMP, test_envelope_JuMP, envelope_JuMP_fast) end
 ;

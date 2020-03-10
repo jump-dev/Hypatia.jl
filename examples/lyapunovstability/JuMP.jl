@@ -68,7 +68,7 @@ function lyapunovstability_JuMP(
         JuMP.@constraint(model, Symmetric([t .* Matrix(I, W_cols, W_cols) W'; W U]) in JuMP.PSDCone())
     end
 
-    return (model = model,)
+    return (model, ())
 end
 
 function test_lyapunovstability_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)

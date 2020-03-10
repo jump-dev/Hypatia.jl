@@ -39,7 +39,7 @@ function maxvolume_JuMP(
         JuMP.@constraint(model, vcat(sqrt(n) * gamma, A * end_pts) in MOI.NormOneCone(n + 1))
     end
 
-    return (model = model,)
+    return (model, ())
 end
 
 function test_maxvolume_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)

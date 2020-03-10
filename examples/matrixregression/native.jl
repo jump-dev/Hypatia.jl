@@ -14,13 +14,8 @@ TODO
 - generalize for sparse Y,X but make sure qr factorization does not permute
 =#
 
-using LinearAlgebra
+include(joinpath(@__DIR__, "../common_native.jl"))
 using SparseArrays
-import Random
-using Test
-import Hypatia
-import Hypatia.RealOrComplex
-const CO = Hypatia.Cones
 
 function matrixregression_native(
     ::Type{T},
@@ -31,7 +26,7 @@ function matrixregression_native(
     lam_las::Real, # penalty on L1 norm
     lam_glr::Real, # penalty on penalty on row group l1 norm
     lam_glc::Real, # penalty on penalty on column group l1 norm
-    ) where {R <: RealOrComplex{T}} where {T <: Real}
+    ) where {R <: Hypatia.RealOrComplex{T}} where {T <: Real}
     @assert min(lam_fro, lam_nuc, lam_las, lam_glr, lam_glc) >= 0
     (data_n, data_m) = size(Y)
     data_p = size(X, 2)
@@ -233,11 +228,8 @@ function matrixregression_native(
         append!(cones, CO.Cone{T}[CO.EpiNormEucl{T}(1 + R_dim * data_p) for k in 1:data_m])
     end
 
-    return (
-        c = model_c, A = zeros(T, 0, model_n), b = zeros(T, 0), G = model_G, h = model_h, cones = cones,
-        n = data_n, m = data_m, p = data_p, Y = Y, X = X,
-        lam_fro = lam_fro, lam_nuc = lam_nuc, lam_las = lam_las, lam_glr = lam_glr, lam_glc = lam_glc,
-        )
+    model = Models.Model{T}(model_c, zeros(T, 0, model_n), zeros(T, 0), model_G, model_h, cones)
+    return (model, (Y = Y, X = X, lam_fro = lam_fro, lam_nuc = lam_nuc, lam_las = lam_las, lam_glr = lam_glr, lam_glc = lam_glc))
 end
 
 function matrixregression_native(
@@ -267,63 +259,63 @@ function matrixregression_native(
     return matrixregression_native(T, Y, X, args...)
 end
 
-function test_matrixregression_native(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
-    Random.seed!(rseed)
-    d = matrixregression_native(T, instance...)
-    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
-    @test r.status == :Optimal
-    if r.status == :Optimal
+function test_matrixregression_native(result, test_helpers, test_options)
+    @test result.status == :Optimal
+    if result.status == :Optimal
         # check objective value is correct
-        R = eltype(d.Y)
-        if R <: Complex
-            A_opt_real = reshape(r.x[2:(1 + 2 * d.p * d.m)], 2 * d.p, d.m)
-            A_opt = zeros(R, d.p, d.m)
-            for k in 1:d.p
-                @. @views A_opt[k, :] = A_opt_real[2k - 1, :] + A_opt_real[2k, :] * im
-            end
-        else
-            A_opt = reshape(r.x[2:(1 + d.p * d.m)], d.p, d.m)
-        end
-        loss = (sum(abs2, d.X * A_opt) / 2 - real(dot(d.X' * d.Y, A_opt))) / d.n
-        obj_try = loss + d.lam_fro * norm(vec(A_opt), 2) +
-            d.lam_nuc * sum(svd(A_opt).S) + d.lam_las * norm(vec(A_opt), 1) +
-            d.lam_glr * sum(norm, eachrow(A_opt)) + d.lam_glc * sum(norm, eachcol(A_opt))
-        @test r.primal_obj ≈ obj_try atol = 1e-4 rtol = 1e-4
+        X = test_helpers.X
+        Y = test_helpers.Y
+        R = eltype(Y)
+        A_opt = zeros(R, size(X, 2), size(Y, 2))
+        A_len = length(A_opt) * (R <: Complex ? 2 : 1)
+        @views CO.vec_copy_to!(A_opt, result.x[1 .+ (1:A_len)])
+        loss = (sum(abs2, X * A_opt) / 2 - real(dot(X' * Y, A_opt))) / size(Y, 1)
+        obj_result = loss +
+            test_helpers.lam_fro * norm(vec(A_opt), 2) +
+            test_helpers.lam_nuc * sum(svd(A_opt).S) +
+            test_helpers.lam_las * norm(vec(A_opt), 1) +
+            test_helpers.lam_glr * sum(norm, eachrow(A_opt)) +
+            test_helpers.lam_glc * sum(norm, eachcol(A_opt))
+        tol = eps(eltype(result.x))^0.25
+        @test result.primal_obj ≈ obj_result atol = tol rtol = tol
     end
-    return r
 end
 
+options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
 matrixregression_native_fast = [
-    (Real, 5, 3, 4, 0, 0, 0, 0, 0),
-    (Real, 5, 3, 4, 0.1, 0.1, 0.1, 0.2, 0.2),
-    (Real, 5, 3, 4, 0, 0.1, 0.1, 0, 0),
-    (Real, 3, 4, 5, 0, 0, 0, 0, 0),
-    (Real, 3, 4, 5, 0.1, 0.1, 0.1, 0.2, 0.2),
-    (Real, 3, 4, 5, 0, 0.1, 0.1, 0, 0),
-    (Complex, 5, 3, 4, 0, 0, 0, 0, 0),
-    (Complex, 5, 3, 4, 0.1, 0.1, 0.1, 0.2, 0.2),
-    (Complex, 5, 3, 4, 0, 0.1, 0.1, 0, 0),
-    (Complex, 3, 4, 5, 0, 0, 0, 0, 0),
-    (Complex, 3, 4, 5, 0.1, 0.1, 0.1, 0.2, 0.2),
-    (Complex, 3, 4, 5, 0, 0.1, 0.1, 0, 0),
-    (Real, 15, 10, 20, 0, 0, 0, 0, 0),
-    (Real, 15, 10, 20, 0.1, 0.1, 0.1, 0.2, 0.2),
-    (Real, 15, 10, 20, 0, 0.1, 0.1, 0, 0),
-    (Complex, 15, 10, 20, 0, 0, 0, 0, 0),
-    (Complex, 15, 10, 20, 0.1, 0.1, 0.1, 0.2, 0.2),
-    (Complex, 15, 10, 20, 0, 0.1, 0.1, 0, 0),
-    (Real, 100, 8, 12, 0, 0, 0, 0, 0),
-    (Real, 100, 8, 12, 0.1, 0.1, 0.1, 0.2, 0.2),
-    (Real, 100, 8, 12, 0, 0.1, 0.1, 0, 0),
-    (Complex, 100, 8, 12, 0, 0, 0, 0, 0),
-    (Complex, 100, 8, 12, 0.1, 0.1, 0.1, 0.2, 0.2),
-    (Complex, 100, 8, 12, 0, 0.1, 0.1, 0, 0),
+    ((Float64, Real, 5, 3, 4, 0, 0, 0, 0, 0), (), options),
+    ((Float64, Real, 5, 3, 4, 0.1, 0.1, 0.1, 0.2, 0.2), (), options),
+    ((Float64, Real, 5, 3, 4, 0, 0.1, 0.1, 0, 0), (), options),
+    ((Float64, Real, 3, 4, 5, 0, 0, 0, 0, 0), (), options),
+    ((Float64, Real, 3, 4, 5, 0.1, 0.1, 0.1, 0.2, 0.2), (), options),
+    ((Float64, Real, 3, 4, 5, 0, 0.1, 0.1, 0, 0), (), options),
+    ((Float64, Complex, 5, 3, 4, 0, 0, 0, 0, 0), (), options),
+    ((Float64, Complex, 5, 3, 4, 0.1, 0.1, 0.1, 0.2, 0.2), (), options),
+    ((Float64, Complex, 5, 3, 4, 0, 0.1, 0.1, 0, 0), (), options),
+    ((Float64, Complex, 3, 4, 5, 0, 0, 0, 0, 0), (), options),
+    ((Float64, Complex, 3, 4, 5, 0.1, 0.1, 0.1, 0.2, 0.2), (), options),
+    ((Float64, Complex, 3, 4, 5, 0, 0.1, 0.1, 0, 0), (), options),
+    ((Float64, Real, 15, 10, 20, 0, 0, 0, 0, 0), (), options),
+    ((Float64, Real, 15, 10, 20, 0.1, 0.1, 0.1, 0.2, 0.2), (), options),
+    ((Float64, Real, 15, 10, 20, 0, 0.1, 0.1, 0, 0), (), options),
+    ((Float64, Complex, 15, 10, 20, 0, 0, 0, 0, 0), (), options),
+    ((Float64, Complex, 15, 10, 20, 0.1, 0.1, 0.1, 0.2, 0.2), (), options),
+    ((Float64, Complex, 15, 10, 20, 0, 0.1, 0.1, 0, 0), (), options),
+    ((Float64, Real, 100, 8, 12, 0, 0, 0, 0, 0), (), options),
+    ((Float64, Real, 100, 8, 12, 0.1, 0.1, 0.1, 0.2, 0.2), (), options),
+    ((Float64, Real, 100, 8, 12, 0, 0.1, 0.1, 0, 0), (), options),
+    ((Float64, Complex, 100, 8, 12, 0, 0, 0, 0, 0), (), options),
+    ((Float64, Complex, 100, 8, 12, 0.1, 0.1, 0.1, 0.2, 0.2), (), options),
+    ((Float64, Complex, 100, 8, 12, 0, 0.1, 0.1, 0, 0), (), options),
     ]
 matrixregression_native_slow = [
-    (Real, 15, 20, 50, 0, 0, 0, 0, 0),
-    (Real, 15, 20, 50, 0.1, 0.1, 0.1, 0.2, 0.2),
-    (Real, 15, 20, 50, 0, 0.1, 0.1, 0, 0),
-    (Complex, 15, 20, 50, 0, 0, 0, 0, 0),
-    (Complex, 15, 20, 50, 0.1, 0.1, 0.1, 0.2, 0.2),
-    (Complex, 15, 20, 50, 0, 0.1, 0.1, 0, 0),
+    ((Float64, Real, 15, 20, 50, 0, 0, 0, 0, 0), (), options),
+    ((Float64, Real, 15, 20, 50, 0.1, 0.1, 0.1, 0.2, 0.2), (), options),
+    ((Float64, Real, 15, 20, 50, 0, 0.1, 0.1, 0, 0), (), options),
+    ((Float64, Complex, 15, 20, 50, 0, 0, 0, 0, 0), (), options),
+    ((Float64, Complex, 15, 20, 50, 0.1, 0.1, 0.1, 0.2, 0.2), (), options),
+    ((Float64, Complex, 15, 20, 50, 0, 0.1, 0.1, 0, 0), (), options),
     ]
+
+# @testset begin test_native_instance.(matrixregression_native, test_matrixregression_native, matrixregression_native_fast) end
+;

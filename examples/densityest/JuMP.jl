@@ -4,16 +4,10 @@ Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 see description in native.jl
 ==#
 
-using LinearAlgebra
-import Random
-using Test
+include(joinpath(@__DIR__, "../common_JuMP.jl"))
 import DelimitedFiles
-import JuMP
-const MOI = JuMP.MOI
 import DynamicPolynomials
 import PolyJuMP
-import Hypatia
-const MU = Hypatia.ModelUtilities
 
 function densityest_JuMP(
     ::Type{T},
@@ -74,7 +68,7 @@ function densityest_JuMP(
         JuMP.@constraint(model, sum(diag(Pr * psd_r * Pr') for (Pr, psd_r) in zip(Ps, psd_vars)) .== f_pts)
     end
 
-    return (model = model,)
+    return (model, ())
 end
 
 densityest_JuMP(
@@ -90,42 +84,41 @@ densityest_JuMP(
     args...; kwargs...
     ) where {T <: Float64} = densityest_JuMP(T, randn(T, num_obs, n), args...; kwargs...)
 
-function test_densityest_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
-    Random.seed!(rseed)
-    d = densityest_JuMP(T, instance...)
-    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer{T}(; options...))
-    JuMP.optimize!(d.model)
-    @test JuMP.termination_status(d.model) == MOI.OPTIMAL
-    return d.model.moi_backend.optimizer.model.optimizer.result
+function test_densityest_JuMP(model, test_helpers, test_options)
+    @test JuMP.termination_status(model) == MOI.OPTIMAL
 end
 
 iris_data = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "iris.txt"))
 cancer_data = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "cancer.txt"))
 
+options = ()
 densityest_JuMP_fast = [
-    (:iris_data, 4, true, true),
-    (:iris_data, 5, true, true),
-    (:iris_data, 6, true, true),
-    (:iris_data, 4, true, false),
-    (:iris_data, 4, false, true),
-    (:iris_data, 6, false, true),
-    (:iris_data, 4, false, false),
-    (:cancer_data, 4, true, true),
-    (:cancer_data, 4, false, true),
-    (50, 2, 2, true, true),
-    (50, 2, 2, true, false),
-    (50, 2, 2, false, true),
-    (50, 2, 2, false, false),
-    (100, 8, 2, true, true),
-    (100, 8, 2, true, false),
-    (100, 8, 2, false, true),
-    (100, 8, 2, false, false),
-    (250, 4, 4, true, true),
-    (250, 4, 4, true, false),
-    (250, 4, 4, false, true),
+    ((Float64, :iris_data, 4, true, true), false, (), options),
+    ((Float64, :iris_data, 5, true, true), false, (), options),
+    ((Float64, :iris_data, 6, true, true), false, (), options),
+    ((Float64, :iris_data, 4, true, false), false, (), options),
+    ((Float64, :iris_data, 4, false, true), false, (), options),
+    ((Float64, :iris_data, 6, false, true), false, (), options),
+    ((Float64, :iris_data, 4, false, false), false, (), options),
+    ((Float64, :cancer_data, 4, true, true), false, (), options),
+    ((Float64, :cancer_data, 4, false, true), false, (), options),
+    ((Float64, 50, 2, 2, true, true), false, (), options),
+    ((Float64, 50, 2, 2, true, false), false, (), options),
+    ((Float64, 50, 2, 2, false, true), false, (), options),
+    ((Float64, 50, 2, 2, false, false), false, (), options),
+    ((Float64, 100, 8, 2, true, true), false, (), options),
+    ((Float64, 100, 8, 2, true, false), false, (), options),
+    ((Float64, 100, 8, 2, false, true), false, (), options),
+    ((Float64, 100, 8, 2, false, false), false, (), options),
+    ((Float64, 250, 4, 4, true, true), false, (), options),
+    ((Float64, 250, 4, 4, true, false), false, (), options),
+    ((Float64, 250, 4, 4, false, true), false, (), options),
     ]
 densityest_JuMP_slow = [
-    (200, 4, 4, false, false),
-    (200, 4, 6, false, true),
-    (200, 4, 6, false, false),
+    ((Float64, 200, 4, 4, false, false), false, (), options),
+    ((Float64, 200, 4, 6, false, true), false, (), options),
+    ((Float64, 200, 4, 6, false, false), false, (), options),
     ]
+
+@testset begin test_JuMP_instance.(densityest_JuMP, test_densityest_JuMP, densityest_JuMP_fast) end
+;

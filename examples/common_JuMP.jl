@@ -24,8 +24,7 @@ const MOI = JuMP.MOI
 function test_JuMP_instance(
     model_function::Function,
     test_function::Function,
-    instance_info::Tuple;
-    T::Type{<:Real} = Float64,
+    instance_info::NTuple{4, Any};
     default_solver_options::NamedTuple = NamedTuple(),
     rseed::Int = 1,
     )
@@ -55,16 +54,7 @@ MOI.Utilities.@model(ClassicConeOptimizer,
     (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan, MOI.Interval,),
     (MOI.Reals, MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives,
     MOI.SecondOrderCone, MOI.RotatedSecondOrderCone, MOI.PositiveSemidefiniteConeTriangle, MOI.ExponentialCone, MOI.DualExponentialCone,),
-    (MOI.PowerCone, MOI.DualPowerCone,
-    Hypatia.HypoPerLogCone,
-    Hypatia.HypoGeomeanCone,
-    Hypatia.MatrixEpiPerSquareCone,
-    Hypatia.LinMatrixIneqCone,
-    Hypatia.PosSemidefTriSparseCone,
-    Hypatia.WSOSInterpNonnegativeCone,
-    Hypatia.WSOSInterpPosSemidefTriCone,
-    Hypatia.WSOSInterpEpiNormEuclCone,
-    ),
+    (MOI.PowerCone, MOI.DualPowerCone,),
     (),
     (MOI.ScalarAffineFunction,),
     (MOI.VectorOfVariables,),

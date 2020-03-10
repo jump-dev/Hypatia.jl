@@ -7,7 +7,6 @@ Aylward, E.M., Parrilo, P.A. and Slotine, J.J.E
 =#
 
 include(joinpath(@__DIR__, "../common_JuMP.jl"))
-
 import DynamicPolynomials
 const DP = DynamicPolynomials
 import PolyJuMP
@@ -67,14 +66,12 @@ end
 
 options = (tol_feas = 1e-5, tol_rel_opt = 1e-5, tol_abs_opt = 1e-5)
 contraction_JuMP_fast = [
-    ((Float64, 0.77, 4, 1e-3, true), (true,), options),
-    # (0.77, 4, 1e-3, false),
-    ((Float64, 0.85, 4, 1e-3, true), (false,), options),
-    # (0.85, 4, 1e-3, false),
+    ((Float64, 0.77, 4, 1e-3, true), false, (true,), options),
+    ((Float64, 0.77, 4, 1e-3, false), false, (true,), options),
+    ((Float64, 0.85, 4, 1e-3, true), false, (false,), options),
+    ((Float64, 0.85, 4, 1e-3, false), false, (false,), options),
     ]
-contraction_JuMP_slow = [
-    # TODO
-    ]
+contraction_JuMP_slow = []
 
-test_JuMP_instance.(contraction_JuMP, test_contraction_JuMP, contraction_JuMP_fast)
+@testset begin test_JuMP_instance.(contraction_JuMP, test_contraction_JuMP, contraction_JuMP_fast) end
 ;

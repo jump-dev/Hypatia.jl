@@ -5,14 +5,9 @@ see "A Direct Formulation for Sparse PCA Using Semidefinite Programming" by
 Alexandre d’Aspremont, Laurent El Ghaoui, Michael I. Jordan, Gert R. G. Lanckriet
 ==#
 
-using LinearAlgebra
-import Distributions
-import Random
-using Test
-import Hypatia
+include(joinpath(@__DIR__, "../common_native.jl"))
 import Hypatia.BlockMatrix
-const CO = Hypatia.Cones
-const MU = Hypatia.ModelUtilities
+import Distributions
 
 function sparsepca_native(
     ::Type{T},
@@ -117,40 +112,43 @@ function sparsepca_native(
         push!(cones, CO.Nonnegative{T}(2 * dimx + 1))
     end
 
-    return (c = c, A = A, b = b, G = G, h = h, cones = cones, true_obj = true_obj)
+    model = Models.Model{T}(c, A, b, G, h, cones)
+    return (model, (true_obj = true_obj,))
 end
 
-function test_sparsepca_native(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
-    Random.seed!(rseed)
-    d = sparsepca_native(T, instance...)
-    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
-    @test r.status == :Optimal
-    if r.status == :Optimal && !isnan(d.true_obj)
-        @test r.primal_obj ≈ d.true_obj atol = 1e-4 rtol = 1e-4
+function test_sparsepca_native(result, test_helpers, test_options)
+    @test result.status == :Optimal
+    if result.status == :Optimal && !isnan(test_helpers.true_obj)
+        # check objective value is correct
+        tol = eps(eltype(result.x))^0.2
+        @test result.primal_obj ≈ test_helpers.true_obj atol = tol rtol = tol
     end
-    return r
 end
 
+options = ()
 sparsepca_native_fast = [
-    (5, 3, true, 0, false),
-    (5, 3, false, 0, false),
-    (5, 3, true, 10, false),
-    (5, 3, false, 10, false),
-    (30, 10, true, 0, false),
-    (30, 10, false, 0, false),
-    (30, 10, true, 10, false),
-    (30, 10, false, 10, false),
+    ((Float64, 5, 3, true, 0, false), (), options),
+    ((Float64, 5, 3, false, 0, false), (), options),
+    ((Float64, 5, 3, true, 10, false), (), options),
+    ((Float64, 5, 3, false, 10, false), (), options),
+    ((Float64, 30, 10, true, 0, false), (), options),
+    ((Float64, 30, 10, false, 0, false), (), options),
+    ((Float64, 30, 10, true, 10, false), (), options),
+    ((Float64, 30, 10, false, 10, false), (), options),
     ]
 sparsepca_native_slow = [
     # TODO
     ]
 sparsepca_native_linops = [
-    (5, 3, true, 0, true),
-    (5, 3, false, 0, true),
-    (5, 3, true, 10, true),
-    (5, 3, false, 10, true),
-    (30, 10, true, 0, true),
-    (30, 10, false, 0, true),
-    (30, 10, true, 10, true),
-    (30, 10, false, 10, true),
+    ((Float64, 5, 3, true, 0, true), (), options),
+    ((Float64, 5, 3, false, 0, true), (), options),
+    ((Float64, 5, 3, true, 10, true), (), options),
+    ((Float64, 5, 3, false, 10, true), (), options),
+    ((Float64, 30, 10, true, 0, true), (), options),
+    ((Float64, 30, 10, false, 0, true), (), options),
+    ((Float64, 30, 10, true, 10, true), (), options),
+    ((Float64, 30, 10, false, 10, true), (), options),
     ]
+
+# @testset begin test_native_instance.(sparsepca_native, test_sparsepca_native, sparsepca_native_fast) end
+;

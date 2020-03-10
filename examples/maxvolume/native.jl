@@ -4,24 +4,7 @@ Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 find maximum volume hypercube with edges parallel to the axes inside a polyhedron
 =#
 
-using LinearAlgebra
-import Random
-using Test
-import Hypatia
-const CO = Hypatia.Cones
-
-# modified from https://github.com/JuliaOpt/MathOptInterface.jl/blob/master/src/Bridges/Constraint/geomean.jl
-function log_floor(n, i)
-    if n <= 2 ^ i
-        i
-    else
-        log_floor(n, i + 1)
-    end
-end
-function log_floor(n::Integer)
-    @assert n > zero(n)
-    log_floor(n, zero(n))
-end
+include(joinpath(@__DIR__, "../common_native.jl"))
 
 function maxvolume_native(
     ::Type{T},
@@ -37,6 +20,19 @@ function maxvolume_native(
     c = vcat(-1, zeros(T, n))
     A = hcat(zeros(T, n), poly_hrep)
     b = ones(T, n)
+
+    # modified from https://github.com/JuliaOpt/MathOptInterface.jl/blob/master/src/Bridges/Constraint/geomean.jl
+    function log_floor(n, i)
+        if n <= 2 ^ i
+            i
+        else
+            log_floor(n, i + 1)
+        end
+    end
+    function log_floor(n::Integer)
+        @assert n > zero(n)
+        log_floor(n, zero(n))
+    end
 
     if use_hypogeomean
         G = -Matrix{T}(I, n + 1, n + 1)
@@ -133,33 +129,34 @@ function maxvolume_native(
         h = zeros(T, 3 * num_new_vars + 1)
     end
 
-    return (c = c, A = A, b = b, G = G, h = h, cones = cones)
+    model = Models.Model{T}(c, A, b, G, h, cones)
+    return (model, ())
 end
 
-function test_maxvolume_native(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
-    Random.seed!(rseed)
-    d = maxvolume_native(T, instance...)
-    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
-    @test r.status == :Optimal
-    return r
+function test_maxvolume_native(result, test_helpers, test_options)
+    @test result.status == :Optimal
 end
 
+options = ()
 maxvolume_native_fast = [
-    (3, true, false, false),
-    (3, false, true, false),
-    (3, false, false, true),
-    (12, true, false, false),
-    (12, false, true, false),
-    (12, false, false, true),
-    (100, true, false, false),
-    (100, false, true, false),
-    (100, false, false, true),
-    (1000, true, false, false),
+    ((Float64, 3, true, false, false), (), options),
+    ((Float64, 3, false, true, false), (), options),
+    ((Float64, 3, false, false, true), (), options),
+    ((Float64, 12, true, false, false), (), options),
+    ((Float64, 12, false, true, false), (), options),
+    ((Float64, 12, false, false, true), (), options),
+    ((Float64, 100, true, false, false), (), options),
+    ((Float64, 100, false, true, false), (), options),
+    ((Float64, 100, false, false, true), (), options),
+    ((Float64, 1000, true, false, false), (), options),
     ]
 maxvolume_native_slow = [
-    (1000, false, true, false),
-    (1000, false, false, true),
-    (1500, true, false, false),
-    (1500, false, true, false),
-    (1500, false, false, true),
+    ((Float64, 1000, false, true, false), (), options),
+    ((Float64, 1000, false, false, true), (), options),
+    ((Float64, 1500, true, false, false), (), options),
+    ((Float64, 1500, false, true, false), (), options),
+    ((Float64, 1500, false, false, true), (), options),
     ]
+
+# @testset begin test_native_instance.(maxvolume_native, test_maxvolume_native, maxvolume_native_fast) end
+;
