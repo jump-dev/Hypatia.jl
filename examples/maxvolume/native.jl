@@ -158,5 +158,5 @@ maxvolume_native_slow = [
     ((Float64, 1500, false, false, true), (), options),
     ]
 
-# @testset begin "maxvolume_native" test_native_instance.(maxvolume_native, test_maxvolume_native, maxvolume_native_fast) end
+@testset "maxvolume_native" begin test_native_instance.(maxvolume_native, test_maxvolume_native, maxvolume_native_fast) end
 ;

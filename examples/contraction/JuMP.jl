@@ -24,7 +24,7 @@ function contraction_JuMP(
     dom = MU.FreeDomain{Float64}(n)
 
     M_halfdeg = div(M_deg + 1, 2)
-    (U_M, pts_M, Ps_M, _) = MU.interpolate(dom, M_halfdeg, sample = false)
+    (U_M, pts_M, Ps_M, _) = MU.interpolate(dom, M_halfdeg)
     lagrange_polys = MU.recover_lagrange_polys(pts_M, 2 * M_halfdeg)
     x = DP.variables(lagrange_polys)
 
@@ -45,7 +45,7 @@ function contraction_JuMP(
     if use_matrixwsos
         deg_R = maximum(DP.maxdegree.(R))
         d_R = div(deg_R + 1, 2)
-        (U_R, pts_R, Ps_R, _) = MU.interpolate(dom, d_R, sample = true)
+        (U_R, pts_R, Ps_R, _) = MU.interpolate(dom, d_R)
         M_gap = [M[i, j](pts_M[u, :]) - (i == j ? delta : 0.0) for i in 1:n for j in 1:i for u in 1:U_M]
         R_gap = [-R[i, j](pts_R[u, :]) - (i == j ? delta : 0.0) for i in 1:n for j in 1:i for u in 1:U_R]
         rt2 = sqrt(2)
@@ -73,5 +73,5 @@ contraction_JuMP_fast = [
     ]
 contraction_JuMP_slow = []
 
-@testset begin "contraction_JuMP" test_JuMP_instance.(contraction_JuMP, test_contraction_JuMP, contraction_JuMP_fast) end
+@testset "contraction_JuMP" begin test_JuMP_instance.(contraction_JuMP, test_contraction_JuMP, contraction_JuMP_fast) end
 ;

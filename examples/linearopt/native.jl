@@ -46,5 +46,5 @@ linearopt_native_slow = [
     ((Float64, 500, 1000, 1.0), (), options),
     ]
 
-# @testset begin "linearopt_native" test_native_instance.(linearopt_native, test_linearopt_native, linearopt_native_fast) end
+@testset "linearopt_native" begin test_native_instance.(linearopt_native, test_linearopt_native, linearopt_native_fast) end
 ;

@@ -18,7 +18,7 @@ function secondorderpoly_JuMP(
     is_feas::Bool, # whether model should be primal-dual feasible; only for testing
     ) where {T <: Float64} # TODO support generic reals
     halfdeg = div(deg + 1, 2)
-    (U, pts, Ps, _) = MU.interpolate(MU.FreeDomain{Float64}(1), halfdeg, sample = false)
+    (U, pts, Ps, _) = MU.interpolate(MU.FreeDomain{Float64}(1), halfdeg)
     vals = poly_vec.(pts)
     l = length(vals[1])
     cone = Hypatia.WSOSInterpEpiNormEuclCone{Float64}(l, U, Ps)
@@ -31,7 +31,7 @@ end
 
 secondorderpoly_JuMP(
     ::Type{T},
-    polys_name::Symbol, 
+    polys_name::Symbol,
     args...) where {T <: Float64} = secondorderpoly_JuMP(T, secondorderpoly_data[polys_name], args...)
 
 function test_secondorderpoly_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)

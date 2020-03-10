@@ -34,7 +34,7 @@ function semidefinitepoly_JuMP(
         halfdeg = div(maximum(DP.maxdegree.(H)) + 1, 2)
         n = DP.nvariables(x)
         dom = MU.FreeDomain{Float64}(n)
-        (U, pts, Ps, _) = MU.interpolate(dom, halfdeg, sample_factor = 20, sample = true)
+        (U, pts, Ps, _) = MU.interpolate(dom, halfdeg)
         mat_wsos_cone = Hypatia.WSOSInterpPosSemidefTriCone{Float64}(side, U, Ps, use_dual)
 
         rt2 = sqrt(2)

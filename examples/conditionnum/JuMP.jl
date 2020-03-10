@@ -93,5 +93,5 @@ conditionnum_JuMP_slow = [
     ((Float64, 100, 40, true), false, (), options),
     ]
 
-@testset begin "conditionnum_JuMP" test_JuMP_instance.(conditionnum_JuMP, test_conditionnum_JuMP, conditionnum_JuMP_fast) end
+@testset "conditionnum_JuMP" begin test_JuMP_instance.(conditionnum_JuMP, test_conditionnum_JuMP, conditionnum_JuMP_fast) end
 ;

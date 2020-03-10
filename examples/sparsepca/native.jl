@@ -150,5 +150,5 @@ sparsepca_native_linops = [
     ((Float64, 30, 10, false, 10, true), (), options),
     ]
 
-# @testset begin "sparsepca_native" test_native_instance.(sparsepca_native, test_sparsepca_native, sparsepca_native_fast) end
+@testset "sparsepca_native" begin test_native_instance.(sparsepca_native, test_sparsepca_native, sparsepca_native_fast) end
 ;

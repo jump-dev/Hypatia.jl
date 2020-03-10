@@ -18,8 +18,7 @@ function densityest_native(
     deg::Int,
     use_wsos::Bool,
     hypogeomean_obj::Bool, # use geomean objective, else sum of logs objective
-    use_hypogeomean::Bool; # use hypogeomean cone if applicable, else hypoperlog formulation
-    sample_factor::Int = 100,
+    use_hypogeomean::Bool, # use hypogeomean cone if applicable, else hypoperlog formulation
     ) where {T <: Real}
     (num_obs, dim) = size(X)
 
@@ -31,7 +30,7 @@ function densityest_native(
     X ./= (maxX - minX) / 2
 
     halfdeg = div(deg + 1, 2)
-    (U, pts, Ps, w) = MU.interpolate(domain, halfdeg, sample = true, calc_w = true, sample_factor = sample_factor)
+    (U, pts, Ps, w) = MU.interpolate(domain, halfdeg, calc_w = true)
     lagrange_polys = MU.recover_lagrange_polys(pts, 2 * halfdeg)
     basis_evals = Matrix{T}(undef, num_obs, U)
     for i in 1:num_obs, j in 1:U
@@ -205,5 +204,5 @@ densityest_native_slow = [
     ((Float64, 400, 5, 6, true, true, false), (), options),
     ]
 
-# @testset "densityest_native" begin test_native_instance.(densityest_native, test_densityest_native, densityest_native_fast) end
+@testset "densityest_native" begin test_native_instance.(densityest_native, test_densityest_native, densityest_native_fast) end
 ;

@@ -25,7 +25,7 @@ function test_JuMP_instance(
     model_function::Function,
     test_function::Function,
     instance_info::NTuple{4, Any};
-    default_solver_options::NamedTuple = NamedTuple(),
+    default_solver_options::NamedTuple = (verbose = false,),
     rseed::Int = 1,
     )
     # setup model

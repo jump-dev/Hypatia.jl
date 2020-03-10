@@ -14,9 +14,7 @@ function densityest_JuMP(
     X::Matrix{T},
     deg::Int,
     use_monomial_space::Bool, # use variables in monomial space, else interpolation space
-    use_wsos::Bool; # use WSOS cone formulation, else PSD formulation
-    sample::Bool = true,
-    sample_factor::Int = 100,
+    use_wsos::Bool, # use WSOS cone formulation, else PSD formulation
     ) where {T <: Float64} # TODO support generic reals
     (num_obs, dim) = size(X)
 
@@ -28,7 +26,7 @@ function densityest_JuMP(
     X ./= (maxX - minX) / 2
 
     halfdeg = div(deg + 1, 2)
-    (U, pts, Ps, w) = MU.interpolate(domain, halfdeg, calc_w = true, sample = sample, sample_factor = sample_factor)
+    (U, pts, Ps, w) = MU.interpolate(domain, halfdeg, calc_w = true)
 
     model = JuMP.Model()
 
@@ -120,5 +118,5 @@ densityest_JuMP_slow = [
     ((Float64, 200, 4, 6, false, false), false, (), options),
     ]
 
-@testset begin "densityest_JuMP" test_JuMP_instance.(densityest_JuMP, test_densityest_JuMP, densityest_JuMP_fast) end
+@testset "densityest_JuMP" begin test_JuMP_instance.(densityest_JuMP, test_densityest_JuMP, densityest_JuMP_fast) end
 ;

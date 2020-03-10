@@ -96,17 +96,15 @@ polymin_native(
     ::Type{T},
     poly_name::Symbol,
     halfdeg::Int,
-    args...;
-    sample_factor::Int = 100,
-    ) where {T <: Real} = polymin_native(T, get_interp_data(T, poly_name, halfdeg, sample_factor)..., args...)
+    args...
+    ) where {T <: Real} = polymin_native(T, get_interp_data(T, poly_name, halfdeg)..., args...)
 
 polymin_native(
     ::Type{T},
     n::Int,
     halfdeg::Int,
-    args...;
-    sample_factor::Int = 100,
-    ) where {T <: Real} = polymin_native(T, random_interp_data(T, n, halfdeg, sample_factor)..., args...)
+    args...
+    ) where {T <: Real} = polymin_native(T, random_interp_data(T, n, halfdeg)..., args...)
 
 # real-valued complex polynomials
 function polymin_native(
@@ -116,7 +114,7 @@ function polymin_native(
     halfdeg::Int,
     use_primal::Bool,
     use_wsos::Bool;
-    sample_factor::Int = 100,
+    sample_factor::Int = 10,
     use_QR::Bool = false,
     ) where {T <: Real}
     if !use_wsos
@@ -284,5 +282,5 @@ polymin_native_linops = [
     ((Float64, 3, 3, false, false, true), (), options),
     ]
 
-# @testset begin "polymin_native" test_native_instance.(polymin_native, test_polymin_native, polymin_native_fast) end
+@testset "polymin_native" begin test_native_instance.(polymin_native, test_polymin_native, polymin_native_fast) end
 ;

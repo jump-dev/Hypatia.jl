@@ -13,14 +13,12 @@ function envelope_JuMP(
     num_polys::Int,
     env_halfdeg::Int;
     domain::MU.Domain = MU.Box{T}(-ones(T, n), ones(T, n)),
-    sample::Bool = true,
-    sample_factor::Int = 100,
     ) where {T <: Float64} # TODO support generic reals
     @assert n == MU.get_dimension(domain)
     @assert rand_halfdeg <= env_halfdeg
 
     # generate interpolation
-    (U, pts, Ps, w) = MU.interpolate(domain, env_halfdeg, calc_w = true, sample = sample, sample_factor = sample_factor)
+    (U, pts, Ps, w) = MU.interpolate(domain, env_halfdeg, calc_w = true)
 
     # generate random polynomials
     L = binomial(n + rand_halfdeg, n)
@@ -53,5 +51,5 @@ envelope_JuMP_slow = [
     ((Float64, 2, 30, 4, 30), false, (), options),
     ]
 
-@testset begin "envelope_JuMP" test_JuMP_instance.(envelope_JuMP, test_envelope_JuMP, envelope_JuMP_fast) end
+@testset "envelope_JuMP" begin test_JuMP_instance.(envelope_JuMP, test_envelope_JuMP, envelope_JuMP_fast) end
 ;
