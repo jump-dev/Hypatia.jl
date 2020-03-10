@@ -62,17 +62,15 @@ polymin_JuMP(
     ::Type{T},
     poly_name::Symbol,
     halfdeg::Int,
-    args...;
-    sample_factor::Int = 100,
-    ) where {T <: Float64} = polymin_JuMP(T, get_interp_data(T, poly_name, halfdeg, sample_factor)..., args...)
+    args...
+    ) where {T <: Float64} = polymin_JuMP(T, get_interp_data(T, poly_name, halfdeg)..., args...)
 
 polymin_JuMP(
     ::Type{T},
     n::Int,
     halfdeg::Int,
-    args...;
-    sample_factor::Int = 100,
-    ) where {T <: Float64} = polymin_JuMP(T, random_interp_data(T, n, halfdeg, sample_factor)..., args...)
+    args...
+    ) where {T <: Float64} = polymin_JuMP(T, random_interp_data(T, n, halfdeg)..., args...)
 
 function test_polymin_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
     Random.seed!(rseed)

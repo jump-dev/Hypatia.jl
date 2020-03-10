@@ -14,7 +14,7 @@ import Hypatia
 const MU = Hypatia.ModelUtilities
 
 # real polynomials
-function real_poly_data(polyname::Symbol, T::DataType = Float64)
+function real_poly_data(polyname::Symbol, T::Type{<:Real} = Float64)
     if polyname == :butcher
         DP.@polyvar x[1:6]
         f = x[6]*x[2]^2+x[5]*x[3]^2-x[1]*x[4]^2+x[4]^3+x[4]^2-1/3*x[1]+4/3*x[4]
@@ -128,11 +128,9 @@ function get_interp_data(
     ::Type{T},
     poly_name::Symbol,
     halfdeg::Int,
-    sample_factor::Int,
     ) where {T <: Real}
     (x, fn, dom, true_min) = real_poly_data(poly_name, T)
-    sample = (length(x) >= 5) || !isa(dom, MU.Box)
-    (U, pts, Ps, _) = MU.interpolate(dom, halfdeg, sample = sample, sample_factor = sample_factor)
+    (U, pts, Ps, _) = MU.interpolate(dom, halfdeg)
     interp_vals = T[fn(pts[j, :]...) for j in 1:U]
     return (interp_vals, Ps, true_min)
 end
@@ -142,10 +140,9 @@ function random_interp_data(
     ::Type{T},
     n::Int,
     halfdeg::Int,
-    sample_factor::Int;
     dom = MU.Box{T}(-ones(T, n), ones(T, n)),
     ) where {T <: Real}
-    (U, pts, Ps, _) = MU.interpolate(dom, halfdeg, sample = (n >= 5), sample_factor = sample_factor)
+    (U, pts, Ps, _) = MU.interpolate(dom, halfdeg)
     interp_vals = randn(T, U)
     true_min = T(NaN) # TODO could get an upper bound by evaluating at random points in domain
     return (interp_vals, Ps, true_min)

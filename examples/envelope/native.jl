@@ -19,14 +19,12 @@ function envelope_native(
     env_halfdeg::Int,
     primal_wsos::Bool; # use primal formulation, else use dual
     domain::MU.Domain = MU.Box{T}(-ones(T, n), ones(T, n)),
-    sample::Bool = true,
-    sample_factor::Int = 100,
     ) where {T <: Real}
     @assert n == MU.get_dimension(domain)
     @assert rand_halfdeg <= env_halfdeg
 
     # generate interpolation
-    (U, pts, Ps, w) = MU.interpolate(domain, env_halfdeg, calc_w = true, sample = sample, sample_factor = sample_factor)
+    (U, pts, Ps, w) = MU.interpolate(domain, env_halfdeg, calc_w = true)
 
     # generate random data
     L = binomial(n + rand_halfdeg, n)
@@ -78,5 +76,5 @@ envelope_native_slow = [
     ((Float64, 5, 2, 5, 2, false, false), (), ()),
     ]
 
-# @testset begin "envelope_native" test_native_instance.(envelope_native, test_envelope_native, envelope_native_fast) end
+@testset "envelope_native" begin test_native_instance.(envelope_native, test_envelope_native, envelope_native_fast) end
 ;

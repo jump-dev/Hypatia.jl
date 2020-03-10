@@ -85,5 +85,5 @@ expdesign_JuMP_slow = [
     ((Float64, 100, 200, 200, 10, false, false, true), false, (), options),
     ]
 
-@testset begin "expdesign_JuMP" test_JuMP_instance.(expdesign_JuMP, test_expdesign_JuMP, expdesign_JuMP_fast) end
+@testset "expdesign_JuMP" begin test_JuMP_instance.(expdesign_JuMP, test_expdesign_JuMP, expdesign_JuMP_fast) end
 ;

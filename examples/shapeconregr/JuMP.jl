@@ -43,7 +43,7 @@ function shapeconregr_JuMP(
     n = size(X, 2)
     num_points = size(X, 1)
 
-    (regressor_points, _) = MU.get_interp_pts(MU.FreeDomain{Float64}(n), deg, sample_factor = 50)
+    (regressor_points, _) = MU.get_interp_pts(MU.FreeDomain{Float64}(n), deg)
     lagrange_polys = MU.recover_lagrange_polys(regressor_points, deg)
     model = JuMP.Model()
     JuMP.@variable(model, regressor, PolyJuMP.Poly(FixedPolynomialBasis(lagrange_polys)))
@@ -53,7 +53,7 @@ function shapeconregr_JuMP(
         # monotonicity
         if !all(iszero, mono_profile)
             gradient_halfdeg = div(deg, 2)
-            (mono_U, mono_points, mono_Ps, _) = MU.interpolate(mono_dom, gradient_halfdeg, sample = true, sample_factor = 50)
+            (mono_U, mono_points, mono_Ps, _) = MU.interpolate(mono_dom, gradient_halfdeg)
             mono_wsos_cone = Hypatia.WSOSInterpNonnegativeCone{Float64, Float64}(mono_U, mono_Ps)
             for j in 1:n
                 if !iszero(mono_profile[j])
@@ -66,7 +66,7 @@ function shapeconregr_JuMP(
         # convexity
         if !iszero(conv_profile)
             hessian_halfdeg = div(deg - 1, 2)
-            (conv_U, conv_points, conv_Ps, _) = MU.interpolate(conv_dom, hessian_halfdeg, sample = true, sample_factor = 50)
+            (conv_U, conv_points, conv_Ps, _) = MU.interpolate(conv_dom, hessian_halfdeg)
             conv_wsos_cone = Hypatia.WSOSInterpPosSemidefTriCone{Float64}(n, conv_U, conv_Ps)
             hessian = DP.differentiate(regressor, x, 2)
             hessian_interp = [hessian[i, j](conv_points[u, :]) for i in 1:n for j in 1:i for u in 1:conv_U]

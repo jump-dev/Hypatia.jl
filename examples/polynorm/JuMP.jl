@@ -22,7 +22,7 @@ function polynorm_JuMP(
     ) where {T <: Float64} # TODO support generic reals
     dom = MU.FreeDomain{Float64}(n)
     halfdeg = div(deg + 1, 2)
-    (U, pts, Ps, w) = MU.interpolate(dom, halfdeg, sample = false, calc_w = true)
+    (U, pts, Ps, w) = MU.interpolate(dom, halfdeg, calc_w = true)
     lagrange_polys = MU.recover_lagrange_polys(pts, 2 * halfdeg)
 
     model = JuMP.Model()

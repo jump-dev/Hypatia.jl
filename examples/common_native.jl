@@ -27,7 +27,7 @@ function test_native_instance(
     test_function::Function,
     instance_info::Tuple;
     rseed::Int = 1,
-    default_solver_options::NamedTuple = NamedTuple(),
+    default_solver_options::NamedTuple = (verbose = false,),
     test::Bool = false,
     checker_tols...
     )

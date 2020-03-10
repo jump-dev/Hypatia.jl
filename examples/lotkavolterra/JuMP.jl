@@ -7,31 +7,14 @@ TODO
 - add random data generation
 =#
 
-using LinearAlgebra
+include(joinpath(@__DIR__, "../common_JuMP.jl"))
 import GSL: sf_gamma
-using Test
-import JuMP
-const MOI = JuMP.MOI
 import DynamicPolynomials
 const DP = DynamicPolynomials
 import SemialgebraicSets
 const SAS = SemialgebraicSets
 import SumOfSquares
 import PolyJuMP
-import Hypatia
-
-function integrate_ball_monomial(mon, n)
-    as = DP.exponents(mon)
-    @assert length(as) == n
-    if any(isodd, as)
-        return 0.0
-    else
-        bs = (as .+ 1) ./ 2.0
-        return 2.0 * prod(sf_gamma.(bs)) / (sf_gamma(sum(bs)) * (sum(as) + n))
-    end
-end
-
-integrate_ball(p, n) = sum(DP.coefficient(t) * integrate_ball_monomial(t, n) for t in DP.terms(p))
 
 function lotkavolterra_JuMP(
     ::Type{T},
@@ -59,6 +42,19 @@ function lotkavolterra_JuMP(
     X = SAS.@set x_h' * x_h <= 1.0 # non-extinction domain
     delta_X = SAS.@set x_h' * x_h == 1.0
 
+    function integrate_ball_monomial(mon, n)
+        as = DP.exponents(mon)
+        @assert length(as) == n
+        if any(isodd, as)
+            return 0.0
+        else
+            bs = (as .+ 1) ./ 2.0
+            return 2.0 * prod(sf_gamma.(bs)) / (sf_gamma(sum(bs)) * (sum(as) + n))
+        end
+    end
+
+    integrate_ball(p, n) = sum(DP.coefficient(t) * integrate_ball_monomial(t, n) for t in DP.terms(p))
+
     model = SumOfSquares.SOSModel()
     JuMP.@variable(model, rho, PolyJuMP.Poly(x_mon))
     JuMP.@variable(model, rho_T, PolyJuMP.Poly(x_mon))
@@ -80,17 +76,17 @@ function lotkavolterra_JuMP(
     return (model, ())
 end
 
-function test_lotkavolterra_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
-    Random.seed!(rseed)
-    d = lotkavolterra_JuMP(T, instance...)
-    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer{T}(; options...))
-    JuMP.optimize!(d.model)
-    @test JuMP.termination_status(d.model) == MOI.OPTIMAL
-    return d.model.moi_backend.optimizer.model.optimizer.result
+function test_lotkavolterra_JuMP(model, test_helpers, test_options)
+    @test JuMP.termination_status(model) == MOI.OPTIMAL
 end
 
+options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
 lotkavolterra_JuMP_fast = [
+    ((Float64,), false, (), options),
     ]
 lotkavolterra_JuMP_slow = [
-    (),
+    # ((Float64,), false, (), options),
     ]
+
+@testset "lotkavolterra_JuMP" begin test_JuMP_instance.(lotkavolterra_JuMP, test_lotkavolterra_JuMP, lotkavolterra_JuMP_fast) end
+;

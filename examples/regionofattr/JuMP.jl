@@ -42,9 +42,9 @@ function regionofattr_JuMP(
         dom2 = MU.Box{Float64}([-1.0, 0.0], [1.0, 1.0]) # state and time
         dom3 = MU.Box{Float64}([-0.01], [0.01]) # state at the end
         halfdeg = div(deg + 1, 2)
-        (U1, pts1, Ps1, quad_weights) = MU.interpolate(dom1, halfdeg, sample = false, calc_w = true)
-        (U2, pts2, Ps2, _) = MU.interpolate(dom2, halfdeg, sample = false)
-        (U3, pts3, Ps3, _) = MU.interpolate(dom3, halfdeg - 1, sample = false)
+        (U1, pts1, Ps1, quad_weights) = MU.interpolate(dom1, halfdeg, calc_w = true)
+        (U2, pts2, Ps2, _) = MU.interpolate(dom2, halfdeg)
+        (U3, pts3, Ps3, _) = MU.interpolate(dom3, halfdeg - 1)
         wsos_cone1 = Hypatia.WSOSInterpNonnegativeCone{Float64, Float64}(U1, Ps1)
         wsos_cone2 = Hypatia.WSOSInterpNonnegativeCone{Float64, Float64}(U2, Ps2)
         wsos_cone3 = Hypatia.WSOSInterpNonnegativeCone{Float64, Float64}(U3, Ps3)
