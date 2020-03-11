@@ -47,7 +47,8 @@ function polymin_JuMP(
                 push!(psd_vars, psd_k)
                 JuMP.@SDconstraint(model, psd_k >= 0)
             end
-            JuMP.@constraint(model, sum(diag(P * psd_k * P') for (P, psd_k) in zip(Ps, psd_vars)) .== interp_vals .- a)
+            coeffs_lhs = JuMP.@expression(model, [u in 1:U], sum(sum(P[u, k] * P[u, l] * psd_k[k, l] * (k == l ? 1 : 2) for k in 1:size(Pr, 2) for l in 1:k) for (P, psd_k) in zip(Ps, psd_vars)))
+            JuMP.@constraint(model, coeffs_lhs .== interp_vals .- a)
         else
             for P in Ps
                 L = size(P, 2)
