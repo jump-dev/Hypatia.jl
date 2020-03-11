@@ -50,7 +50,7 @@ function build(inst::MatrixCompletionJuMP{T}) where {T <: Float64} # TODO generi
     return model
 end
 
-function test_extra(inst::MatrixCompletionJuMP, model, options)
+function test_extra(inst::MatrixCompletionJuMP, model)
     @test JuMP.termination_status(model) == MOI.OPTIMAL
 end
 

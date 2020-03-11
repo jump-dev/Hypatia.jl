@@ -88,7 +88,7 @@ function build(inst::LotkaVolterraJuMP{T}) where {T <: Float64} # TODO generic r
     return model
 end
 
-function test_extra(inst::LotkaVolterraJuMP, model, options)
+function test_extra(inst::LotkaVolterraJuMP, model)
     @test JuMP.termination_status(model) == MOI.OPTIMAL
 end
 

@@ -89,7 +89,7 @@ function build(inst::ExpDesignJuMP{T}) where {T <: Float64} # TODO generic reals
     return model
 end
 
-function test_extra(inst::ExpDesignJuMP, model, options)
+function test_extra(inst::ExpDesignJuMP, model)
     @test JuMP.termination_status(model) == MOI.OPTIMAL
 end
 

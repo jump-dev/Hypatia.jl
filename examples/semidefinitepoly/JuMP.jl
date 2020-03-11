@@ -96,7 +96,7 @@ function build(inst::SemidefinitePolyJuMP{T}) where {T <: Float64} # TODO generi
     return model
 end
 
-function test_extra(inst::SemidefinitePolyJuMP, model, options)
+function test_extra(inst::SemidefinitePolyJuMP, model)
     @test JuMP.termination_status(model) in (inst.is_feas ? (MOI.OPTIMAL,) : (MOI.INFEASIBLE, MOI.DUAL_INFEASIBLE))
 end
 

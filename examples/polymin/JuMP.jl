@@ -29,7 +29,7 @@ end
 
 options = ()
 example_tests(::Type{PolyMinJuMP{Float64}}, ::MinimalInstances) = [
-    ((:rosenbrock, 2, true, true), false, options),
+    ((:rosenbrock, 3, true, true), false, options),
     ((1, 2, true, true), false, options),
     ((1, 2, false, true), false, options),
     ((1, 2, false, false), false, options),
@@ -126,7 +126,7 @@ function build(inst::PolyMinJuMP{T}) where {T <: Float64} # TODO generic reals
     return model
 end
 
-function test_extra(inst::PolyMinJuMP{T}, model, options) where T
+function test_extra(inst::PolyMinJuMP{T}, model) where T
     @test JuMP.termination_status(model) == MOI.OPTIMAL
     if JuMP.termination_status(model) == MOI.OPTIMAL && !isnan(inst.true_min)
         # check objective value is correct

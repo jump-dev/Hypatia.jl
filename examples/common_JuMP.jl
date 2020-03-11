@@ -14,9 +14,8 @@ function test(
     E::Type{<:ExampleInstanceJuMP{Float64}}, # an instance of a JuMP example # TODO support generic reals
     inst_data::Tuple,
     extend::Bool = false, # whether to use MOI automatic bridging to a `classic' cone formulation
-    solver_options = nothing, # additional non-default solver options specific to the example
-    test_options = nothing; # options for the example test function
-    default_solver_options = (verbose = true,), # default solver options
+    solver_options = nothing; # additional non-default solver options specific to the example
+    default_solver_options = (verbose = false,), # default solver options
     rseed::Int = 1,
     )
     # setup instance and model
@@ -38,7 +37,7 @@ function test(
     JuMP.optimize!(model)
 
     # run tests for the example
-    test_extra(inst, model, test_options)
+    test_extra(inst, model)
 
     return model_backend.optimizer.model.optimizer.result
 end

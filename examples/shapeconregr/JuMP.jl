@@ -188,7 +188,7 @@ function build(inst::ShapeConRegrJuMP{T}) where {T <: Float64} # TODO generic re
     return model
 end
 
-function test_extra(inst::ShapeConRegrJuMP, model, options)
+function test_extra(inst::ShapeConRegrJuMP, model)
     @test JuMP.termination_status(model) == MOI.OPTIMAL
     if JuMP.termination_status(model) == MOI.OPTIMAL && inst.is_fit_exact
         # check objective value is correct

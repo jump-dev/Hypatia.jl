@@ -54,7 +54,7 @@ function build(inst::SecondOrderPolyJuMP{T}) where {T <: Float64} # TODO generic
     return model
 end
 
-function test_extra(inst::SecondOrderPolyJuMP, model, options)
+function test_extra(inst::SecondOrderPolyJuMP, model)
     @test JuMP.termination_status(model) == (inst.is_feas ? MOI.OPTIMAL : MOI.INFEASIBLE)
 end
 

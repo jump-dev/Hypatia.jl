@@ -96,7 +96,7 @@ function build(inst::ConditionNumJuMP{T}) where {T <: Float64} # TODO generic re
     return model
 end
 
-function test_extra(inst::ConditionNumJuMP, model, options)
+function test_extra(inst::ConditionNumJuMP, model)
     @test JuMP.termination_status(model) == MOI.OPTIMAL
 end
 
