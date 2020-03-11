@@ -109,7 +109,7 @@ function build(inst::MatrixRegressionJuMP{T}) where {T <: Float64} # TODO generi
     return model
 end
 
-function test_extra(inst::MatrixRegressionJuMP, model, options)
+function test_extra(inst::MatrixRegressionJuMP, model)
     @test JuMP.termination_status(model) == MOI.OPTIMAL
     if JuMP.termination_status(model) == MOI.OPTIMAL
         # check objective value is correct

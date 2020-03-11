@@ -18,18 +18,19 @@ struct ContractionJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     M_deg::Int
     delta::Float64
     use_matrixwsos::Bool # use wsos matrix cone, else PSD formulation
+    is_feas::Bool
 end
 
 options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
 example_tests(::Type{ContractionJuMP{Float64}}, ::MinimalInstances) = [
-    ((0.85, 2, 1e-3, true), false, options, (false,)),
-    ((0.85, 2, 1e-3, false), false, options, (false,)),
+    ((0.85, 2, 1e-3, true, false), false, options),
+    ((0.85, 2, 1e-3, false, false), false, options),
     ]
 example_tests(::Type{ContractionJuMP{Float64}}, ::FastInstances) = [
-    ((0.77, 4, 1e-3, true), false, options, (true,)),
-    ((0.77, 4, 1e-3, false), false, options, (true,)),
-    ((0.85, 4, 1e-3, true), false, options, (false,)),
-    ((0.85, 4, 1e-3, false), false, options, (false,)),
+    ((0.77, 4, 1e-3, true, true), false, options),
+    ((0.77, 4, 1e-3, false, true), false, options),
+    ((0.85, 4, 1e-3, true, false), false, options),
+    ((0.85, 4, 1e-3, false, false), false, options),
     ]
 example_tests(::Type{ContractionJuMP{Float64}}, ::SlowInstances) = [
     ]
@@ -76,8 +77,8 @@ function build(inst::ContractionJuMP{T}) where {T <: Float64} # TODO generic rea
     return model
 end
 
-function test_extra(inst::ContractionJuMP, model, options)
-    @test JuMP.termination_status(model) == (options[1] ? MOI.OPTIMAL : MOI.INFEASIBLE)
+function test_extra(inst::ContractionJuMP, model)
+    @test JuMP.termination_status(model) == (inst.is_feas ? MOI.OPTIMAL : MOI.INFEASIBLE)
 end
 
 # @testset "ContractionJuMP" for inst in example_tests(ContractionJuMP{Float64}, MinimalInstances()) test(inst...) end

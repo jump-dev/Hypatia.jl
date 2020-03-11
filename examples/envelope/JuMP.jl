@@ -51,7 +51,7 @@ function build(inst::EnvelopeJuMP{T}) where {T <: Float64} # TODO generic reals
     return model
 end
 
-function test_extra(inst::EnvelopeJuMP, model, options)
+function test_extra(inst::EnvelopeJuMP, model)
     @test JuMP.termination_status(model) == MOI.OPTIMAL
 end
 
