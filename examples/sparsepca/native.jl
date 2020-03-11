@@ -38,9 +38,9 @@ function sparsepca_native(
         true_obj = NaN
     end
 
-    dimx = CO.svec_length(p)
+    dimx = Cones.svec_length(p)
     # x will be the svec (lower triangle, row-wise) of the matrix solution we seek
-    c = CO.smat_to_svec!(zeros(T, dimx), -sigma, sqrt(T(2)))
+    c = Cones.smat_to_svec!(zeros(T, dimx), -sigma, sqrt(T(2)))
     b = T[1]
     A = zeros(T, 1, dimx)
     for i in 1:p
@@ -48,7 +48,7 @@ function sparsepca_native(
         A[s] = 1
     end
     hpsd = zeros(T, dimx)
-    cones = CO.Cone{T}[CO.PosSemidefTri{T, T}(dimx)]
+    cones = Cones.Cone{T}[Cones.PosSemidefTri{T, T}(dimx)]
 
     if use_epinorminfdual
         # l1 cone
@@ -58,7 +58,7 @@ function sparsepca_native(
         else
             Gl1 = -Matrix{T}(I, dimx, dimx)
         end
-        MU.vec_to_svec!(Gl1, rt2 = sqrt(T(2)))
+        ModelUtilities.vec_to_svec!(Gl1, rt2 = sqrt(T(2)))
         if use_linops
             G = BlockMatrix{T}(
                 2 * dimx + 1,
@@ -76,10 +76,10 @@ function sparsepca_native(
                 ]
         end
         h = vcat(hpsd, T(k), zeros(T, dimx))
-        push!(cones, CO.EpiNormInf{T, T}(1 + dimx, use_dual = true))
+        push!(cones, Cones.EpiNormInf{T, T}(1 + dimx, use_dual = true))
     else
         id = Matrix{T}(I, dimx, dimx)
-        l1 = MU.vec_to_svec!(ones(T, dimx), rt2 = sqrt(T(2)))
+        l1 = ModelUtilities.vec_to_svec!(ones(T, dimx), rt2 = sqrt(T(2)))
         if use_linops
             A = BlockMatrix{T}(
                 dimx + 1,
@@ -109,7 +109,7 @@ function sparsepca_native(
         c = vcat(c, zeros(T, 2 * dimx))
         b = vcat(b, zeros(T, dimx))
         h = vcat(hpsd, zeros(T, 2 * dimx), k)
-        push!(cones, CO.Nonnegative{T}(2 * dimx + 1))
+        push!(cones, Cones.Nonnegative{T}(2 * dimx + 1))
     end
 
     model = Models.Model{T}(c, A, b, G, h, cones)

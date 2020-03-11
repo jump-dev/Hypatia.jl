@@ -74,14 +74,14 @@ function matrixcompletion_native(
         h_norm_x = vcat(zero(T), h_norm_x)
         h_norm = h_norm_x
 
-        cones = CO.Cone{T}[CO.EpiNormSpectral{T, T}(m, n, use_dual = nuclearnorm_obj)]
+        cones = Cones.Cone{T}[Cones.EpiNormSpectral{T, T}(m, n, use_dual = nuclearnorm_obj)]
     else
         # build an extended formulation for the norm used in the objective
         if nuclearnorm_obj
             # extended formulation for nuclear norm
             # X, W_1, W_2
-            num_W1_vars = CO.svec_length(m)
-            num_W2_vars = CO.svec_length(n)
+            num_W1_vars = Cones.svec_length(m)
+            num_W2_vars = Cones.svec_length(n)
             num_vars = num_W1_vars + num_W2_vars + num_unknown
 
             A = zeros(T, 0, num_vars)
@@ -120,22 +120,22 @@ function matrixcompletion_native(
                     G_norm[offset + idx, num_unknown + num_W1_vars + W2_var_idx] = -1
                 end
             end
-            MU.vec_to_svec!(G_norm, rt2 = rt2)
-            MU.vec_to_svec!(h_norm, rt2 = rt2)
-            cones = CO.Cone{T}[CO.PosSemidefTri{T, T}(num_rows)]
-            c_W1 = CO.smat_to_svec!(zeros(T, num_W1_vars), Diagonal(one(T) * I, m), rt2)
-            c_W2 = CO.smat_to_svec!(zeros(T, num_W2_vars), Diagonal(one(T) * I, n), rt2)
+            ModelUtilities.vec_to_svec!(G_norm, rt2 = rt2)
+            ModelUtilities.vec_to_svec!(h_norm, rt2 = rt2)
+            cones = Cones.Cone{T}[Cones.PosSemidefTri{T, T}(num_rows)]
+            c_W1 = Cones.smat_to_svec!(zeros(T, num_W1_vars), Diagonal(one(T) * I, m), rt2)
+            c_W2 = Cones.smat_to_svec!(zeros(T, num_W2_vars), Diagonal(one(T) * I, n), rt2)
             c = vcat(zeros(T, num_unknown), c_W1, c_W2) / 2
         else
             # extended formulation for spectral norm
-            num_rows = CO.svec_length(m) + m * n + CO.svec_length(n)
+            num_rows = Cones.svec_length(m) + m * n + Cones.svec_length(n)
             G_norm = zeros(T, num_rows, num_unknown + 1)
             h_norm = zeros(T, num_rows)
             # first block epigraph variable * I
             for i in 1:m
                 G_norm[sum(1:i), 1] = -1
             end
-            offset = CO.svec_length(m)
+            offset = Cones.svec_length(m)
             # index to count rows in the bottom half of the large to-be-PSD matrix
             idx = 1
             # index only in X
@@ -160,9 +160,9 @@ function matrixcompletion_native(
                 idx += i
                 G_norm[offset + idx - 1, 1] = -1
             end
-            MU.vec_to_svec!(G_norm, rt2 = rt2)
-            MU.vec_to_svec!(h_norm, rt2 = rt2)
-            cones = CO.Cone{T}[CO.PosSemidefTri{T, T}(num_rows)]
+            ModelUtilities.vec_to_svec!(G_norm, rt2 = rt2)
+            ModelUtilities.vec_to_svec!(h_norm, rt2 = rt2)
+            cones = Cones.Cone{T}[Cones.PosSemidefTri{T, T}(num_rows)]
             c = vcat(one(T), zeros(T, num_unknown))
         end
     end # objective natural true/false
@@ -190,7 +190,7 @@ function matrixcompletion_native(
                 G_norm;
                 prepad  G_geo  postpad
                 ]
-            push!(cones, CO.HypoGeomean{T}(fill(inv(T(num_unknown)), num_unknown)))
+            push!(cones, Cones.HypoGeomean{T}(fill(inv(T(num_unknown)), num_unknown)))
         else
             # number of 3-dimensional power cones needed is num_unknown - 1, number of new variables is num_unknown - 2
             # first num_unknown columns overlap with G_norm, column for the epigraph variable of the spectral cone added later
@@ -201,21 +201,21 @@ function matrixcompletion_native(
             G_geo_unknown[1, 1] = -1
             G_geo_unknown[2, 2] = -1
             G_geo_newvars[3, 1] = -1
-            push!(cones, CO.Power{T}(fill(inv(T(2)), 2), 1))
+            push!(cones, Cones.Power{T}(fill(inv(T(2)), 2), 1))
             offset = 4
             # loop over new vars
             for i in 1:(num_unknown - 3)
                 G_geo_newvars[offset + 2, i + 1] = -1
                 G_geo_newvars[offset + 1, i] = -1
                 G_geo_unknown[offset, i + 2] = -1
-                push!(cones, CO.Power{T}([inv(T(i + 2)), T(i + 1) / T(i + 2)], 1))
+                push!(cones, Cones.Power{T}([inv(T(i + 2)), T(i + 1) / T(i + 2)], 1))
                 offset += 3
             end
 
             # last row also special because hypograph variable is fixed
             G_geo_unknown[offset, num_unknown] = -1
             G_geo_newvars[offset + 1, num_unknown - 2] = -1
-            push!(cones, CO.Power{T}([inv(T(num_unknown)), T(num_unknown - 1) / T(num_unknown)], 1))
+            push!(cones, Cones.Power{T}([inv(T(num_unknown)), T(num_unknown - 1) / T(num_unknown)], 1))
             h = vcat(h_norm, zeros(T, 3 * (num_unknown - 2)), T[0, 0, 1])
 
             # if using extended with spectral objective G_geo needs to be prepadded with an epigraph variable

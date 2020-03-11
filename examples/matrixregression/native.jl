@@ -93,14 +93,14 @@ function matrixregression_native(
         end
     end
 
-    cones = CO.Cone{T}[CO.EpiNormEucl{T}(model_q)]
+    cones = Cones.Cone{T}[Cones.EpiNormEucl{T}(model_q)]
 
     # put 1/(2n) * (epi(sum(abs2, X * A)) - 2 * dot(X' * Y, A)) in objective
     # ignore constant term 1/(2n) * sum(abs2, Y)
     model_c = zeros(T, model_n)
     mXpY = -X' * Y
     if is_complex
-        @views CO.cvec_to_rvec!(model_c[2:end], vec(mXpY))
+        @views Cones.cvec_to_rvec!(model_c[2:end], vec(mXpY))
     else
         model_c[2:end] .= vec(mXpY)
     end
@@ -110,9 +110,9 @@ function matrixregression_native(
     # list of optional regularizers (group lasso handled separately below)
     reg_cone_dim = 1 + R_dim * data_pm
     lams = [
-        (lam_fro, CO.EpiNormEucl{T}(reg_cone_dim)), # frobenius norm (vector L2 norm)
-        (lam_las, CO.EpiNormInf{T, R}(reg_cone_dim, use_dual = true)), # vector lasso / L1 norm (dual to Linf norm)
-        (lam_nuc, CO.EpiNormSpectral{T, R}(data_m, data_p, use_dual = true)), # nuclear norm (dual to spectral norm)
+        (lam_fro, Cones.EpiNormEucl{T}(reg_cone_dim)), # frobenius norm (vector L2 norm)
+        (lam_las, Cones.EpiNormInf{T, R}(reg_cone_dim, use_dual = true)), # vector lasso / L1 norm (dual to Linf norm)
+        (lam_nuc, Cones.EpiNormSpectral{T, R}(data_m, data_p, use_dual = true)), # nuclear norm (dual to spectral norm)
         ]
 
     for (lam, cone) in lams
@@ -123,7 +123,7 @@ function matrixregression_native(
         # constraint: (z, data_A) in cone
         push!(model_c, lam)
 
-        if cone isa CO.EpiNormSpectral{T, R}
+        if cone isa Cones.EpiNormSpectral{T, R}
             # permute identity because need transpose of data_A since data_p >= data_m
             iden_mat = zeros(T, R_dim * data_pm, R_dim * data_pm)
             for j in 1:data_m, k in 1:data_p
@@ -188,7 +188,7 @@ function matrixregression_native(
         model_n += data_p
         model_q += q_glr
 
-        append!(cones, CO.Cone{T}[CO.EpiNormEucl{T}(1 + R_dim * data_m) for k in 1:data_p])
+        append!(cones, Cones.Cone{T}[Cones.EpiNormEucl{T}(1 + R_dim * data_m) for k in 1:data_p])
     end
 
     # column group lasso regularizer (one lambda for all columns)
@@ -225,7 +225,7 @@ function matrixregression_native(
         model_n += data_m
         model_q += q_glc
 
-        append!(cones, CO.Cone{T}[CO.EpiNormEucl{T}(1 + R_dim * data_p) for k in 1:data_m])
+        append!(cones, Cones.Cone{T}[Cones.EpiNormEucl{T}(1 + R_dim * data_p) for k in 1:data_m])
     end
 
     model = Models.Model{T}(model_c, zeros(T, 0, model_n), zeros(T, 0), model_G, model_h, cones)
@@ -268,7 +268,7 @@ function test_matrixregression_native(result, test_helpers, test_options)
         R = eltype(Y)
         A_opt = zeros(R, size(X, 2), size(Y, 2))
         A_len = length(A_opt) * (R <: Complex ? 2 : 1)
-        @views CO.vec_copy_to!(A_opt, result.x[1 .+ (1:A_len)])
+        @views Cones.vec_copy_to!(A_opt, result.x[1 .+ (1:A_len)])
         loss = (sum(abs2, X * A_opt) / 2 - real(dot(X' * Y, A_opt))) / size(Y, 1)
         obj_result = loss +
             test_helpers.lam_fro * norm(vec(A_opt), 2) +

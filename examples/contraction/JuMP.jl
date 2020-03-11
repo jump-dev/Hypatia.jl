@@ -21,11 +21,11 @@ function contraction_JuMP(
     use_matrixwsos::Bool, # use wsos matrix cone, else PSD formulation
     ) where {T <: Float64} # TODO support generic reals
     n = 2
-    dom = MU.FreeDomain{Float64}(n)
+    dom = ModelUtilities.FreeDomain{Float64}(n)
 
     M_halfdeg = div(M_deg + 1, 2)
-    (U_M, pts_M, Ps_M, _) = MU.interpolate(dom, M_halfdeg)
-    lagrange_polys = MU.recover_lagrange_polys(pts_M, 2 * M_halfdeg)
+    (U_M, pts_M, Ps_M, _) = ModelUtilities.interpolate(dom, M_halfdeg)
+    lagrange_polys = ModelUtilities.recover_lagrange_polys(pts_M, 2 * M_halfdeg)
     x = DP.variables(lagrange_polys)
 
     # dynamics according to the Moore-Greitzer model
@@ -45,12 +45,12 @@ function contraction_JuMP(
     if use_matrixwsos
         deg_R = maximum(DP.maxdegree.(R))
         d_R = div(deg_R + 1, 2)
-        (U_R, pts_R, Ps_R, _) = MU.interpolate(dom, d_R)
+        (U_R, pts_R, Ps_R, _) = ModelUtilities.interpolate(dom, d_R)
         M_gap = [M[i, j](pts_M[u, :]) - (i == j ? delta : 0.0) for i in 1:n for j in 1:i for u in 1:U_M]
         R_gap = [-R[i, j](pts_R[u, :]) - (i == j ? delta : 0.0) for i in 1:n for j in 1:i for u in 1:U_R]
         rt2 = sqrt(2)
-        JuMP.@constraint(model, MU.vec_to_svec!(M_gap, rt2 = rt2, incr = U_M) in Hypatia.WSOSInterpPosSemidefTriCone{Float64}(n, U_M, Ps_M))
-        JuMP.@constraint(model, MU.vec_to_svec!(R_gap, rt2 = rt2, incr = U_R) in Hypatia.WSOSInterpPosSemidefTriCone{Float64}(n, U_R, Ps_R))
+        JuMP.@constraint(model, ModelUtilities.vec_to_svec!(M_gap, rt2 = rt2, incr = U_M) in Hypatia.WSOSInterpPosSemidefTriCone{Float64}(n, U_M, Ps_M))
+        JuMP.@constraint(model, ModelUtilities.vec_to_svec!(R_gap, rt2 = rt2, incr = U_R) in Hypatia.WSOSInterpPosSemidefTriCone{Float64}(n, U_R, Ps_R))
     else
         PolyJuMP.setpolymodule!(model, SumOfSquares)
         JuMP.@constraint(model, M - Matrix(delta * I, n, n) in JuMP.PSDCone())

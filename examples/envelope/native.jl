@@ -18,13 +18,13 @@ function envelope_native(
     num_polys::Int,
     env_halfdeg::Int,
     primal_wsos::Bool; # use primal formulation, else use dual
-    domain::MU.Domain = MU.Box{T}(-ones(T, n), ones(T, n)),
+    domain::ModelUtilities.Domain = ModelUtilities.Box{T}(-ones(T, n), ones(T, n)),
     ) where {T <: Real}
-    @assert n == MU.get_dimension(domain)
+    @assert n == ModelUtilities.get_dimension(domain)
     @assert rand_halfdeg <= env_halfdeg
 
     # generate interpolation
-    (U, pts, Ps, w) = MU.interpolate(domain, env_halfdeg, calc_w = true)
+    (U, pts, Ps, w) = ModelUtilities.interpolate(domain, env_halfdeg, calc_w = true)
 
     # generate random data
     L = binomial(n + rand_halfdeg, n)
@@ -46,7 +46,7 @@ function envelope_native(
         h = zeros(T, num_polys * U)
     end
 
-    cones = CO.Cone{T}[CO.WSOSInterpNonnegative{T, T}(U, Ps, use_dual = !primal_wsos) for k in 1:num_polys]
+    cones = Cones.Cone{T}[Cones.WSOSInterpNonnegative{T, T}(U, Ps, use_dual = !primal_wsos) for k in 1:num_polys]
 
     model = Models.Model{T}(c, A, b, G, h, cones)
     return (model, ())

@@ -37,9 +37,9 @@ function maxvolume_native(
     if use_hypogeomean
         G = -Matrix{T}(I, n + 1, n + 1)
         h = zeros(T, n + 1)
-        cones = CO.Cone{T}[CO.HypoGeomean{T}(fill(inv(T(n)), n))]
+        cones = Cones.Cone{T}[Cones.HypoGeomean{T}(fill(inv(T(n)), n))]
     elseif use_power
-        cones = CO.Cone{T}[]
+        cones = Cones.Cone{T}[]
         # number of 3-dimensional power cones needed is n - 1, number of new variables is n - 2
         len_power = 3 * (n - 1)
         G_geo_orig = zeros(T, len_power, n)
@@ -51,14 +51,14 @@ function maxvolume_native(
         G_geo_orig[1, 1] = -1
         G_geo_orig[2, 2] = -1
         G_geo_newvars[3, 1] = -1
-        push!(cones, CO.Power{T}(fill(inv(T(2)), 2), 1))
+        push!(cones, Cones.Power{T}(fill(inv(T(2)), 2), 1))
         offset = 4
         # loop over new vars
         for i in 1:(n - 3)
             G_geo_newvars[offset + 2, i + 1] = -1
             G_geo_newvars[offset + 1, i] = -1
             G_geo_orig[offset, i + 2] = -1
-            push!(cones, CO.Power{T}([inv(T(i + 2)), T(i + 1) / T(i + 2)], 1))
+            push!(cones, Cones.Power{T}([inv(T(i + 2)), T(i + 1) / T(i + 2)], 1))
             offset += 3
         end
         # last row also special becuase hypograph variable is involved
@@ -67,7 +67,7 @@ function maxvolume_native(
         G = [
             vcat(zeros(T, len_power - 1), -one(T))  G_geo_orig  G_geo_newvars
             ]
-        push!(cones, CO.Power{T}([inv(T(n)), T(n - 1) / T(n)], 1))
+        push!(cones, Cones.Power{T}([inv(T(n)), T(n - 1) / T(n)], 1))
         h = zeros(T, 3 * (n - 1))
     else
         @assert use_epipersquare == true
@@ -82,7 +82,7 @@ function maxvolume_native(
         rtfact = sqrt(T(2) ^ num_layers)
         # excludes original hypograph variable, padded later
         G_rsoc = zeros(T, 3 * num_new_vars, n + num_new_vars)
-        cones = CO.Cone{T}[]
+        cones = Cones.Cone{T}[]
 
         offset = offset_next = 0
         row = 1
@@ -95,7 +95,7 @@ function maxvolume_native(
                 G_rsoc[row, n + offset_next + 2j - 1] = -1
                 G_rsoc[row + 1, n + offset_next + 2j] = -1
                 G_rsoc[row + 2, n + offset + j] = -1
-                push!(cones, CO.EpiPerSquare{T}(3))
+                push!(cones, Cones.EpiPerSquare{T}(3))
                 row += 3
             end
             offset = offset_next
@@ -116,7 +116,7 @@ function maxvolume_native(
                 G_rsoc[row + 1, 2j] = -1
             end
             G_rsoc[row + 2, n + offset + j] = -1
-            push!(cones, CO.EpiPerSquare{T}(3))
+            push!(cones, Cones.EpiPerSquare{T}(3))
             row += 3
         end
 
@@ -125,7 +125,7 @@ function maxvolume_native(
             zeros(T, 3 * num_new_vars)  G_rsoc;
             one(T)  zeros(T, 1, n)  -inv(rtfact)  zeros(T, 1, num_new_vars - 1);
             ]
-        push!(cones, CO.Nonnegative{T}(1))
+        push!(cones, Cones.Nonnegative{T}(1))
         h = zeros(T, 3 * num_new_vars + 1)
     end
 

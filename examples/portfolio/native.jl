@@ -39,7 +39,7 @@ function portfolio_native(
     end
     b = T[1]
     h = zeros(T, num_stocks)
-    cones = CO.Cone{T}[CO.Nonnegative{T}(num_stocks)]
+    cones = Cones.Cone{T}[Cones.Nonnegative{T}(num_stocks)]
     cone_offset = num_stocks
 
     function add_ball_constr(cone, gamma_new)
@@ -59,13 +59,13 @@ function portfolio_native(
     last_idx(a::Vector{UnitRange{Int}}) = a[end][end]
 
     if epinormeucl_constr
-        add_ball_constr(CO.EpiNormEucl{T}(num_stocks + 1), gamma)
+        add_ball_constr(Cones.EpiNormEucl{T}(num_stocks + 1), gamma)
     end
 
     if epinorminf_constrs
         if use_epinorminf
-            add_ball_constr(CO.EpiNormInf{T, T}(num_stocks + 1, use_dual = true), gamma * sqrt(T(num_stocks)))
-            add_ball_constr(CO.EpiNormInf{T, T}(num_stocks + 1), gamma)
+            add_ball_constr(Cones.EpiNormInf{T, T}(num_stocks + 1, use_dual = true), gamma * sqrt(T(num_stocks)))
+            add_ball_constr(Cones.EpiNormInf{T, T}(num_stocks + 1), gamma)
         else
             c = vcat(c, zeros(T, 2 * num_stocks))
             if use_linops
@@ -102,7 +102,7 @@ function portfolio_native(
             end
             b = vcat(b, zeros(T, num_stocks))
             h = vcat(h, zeros(T, 2 * num_stocks), gamma * sqrt(T(num_stocks)))
-            push!(cones, CO.Nonnegative{T}(2 * num_stocks + 1))
+            push!(cones, Cones.Nonnegative{T}(2 * num_stocks + 1))
             cone_offset += 2 * num_stocks + 1
 
             if use_linops
@@ -121,7 +121,7 @@ function portfolio_native(
                     ]
             end
             h = vcat(h, gamma * ones(T, 2 * num_stocks))
-            push!(cones, CO.Nonnegative{T}(2 * num_stocks))
+            push!(cones, Cones.Nonnegative{T}(2 * num_stocks))
             cone_offset += 2 * num_stocks
         end
     end
