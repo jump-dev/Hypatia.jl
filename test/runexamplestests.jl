@@ -97,7 +97,6 @@ for mod_type in model_types, ex in eval(Symbol(mod_type, "_example_names"))
     example_types[ex] = include(joinpath(examples_dir, ex, mod_type * ".jl"))
 end
 end
-
 @show example_types
 
 perf = DataFrame(
@@ -107,11 +106,11 @@ perf = DataFrame(
     inst = Int[],
     inst_data = Tuple[],
     test_time = Float64[],
-    # solve_time = Float64[],
-    # iters = Int[],
-    # status = Symbol[],
-    # prim_obj = Float64[],
-    # dual_obj = Float64[],
+    solve_time = Float64[],
+    iters = Int[],
+    status = Symbol[],
+    prim_obj = Float64[],
+    dual_obj = Float64[],
     )
 
 all_tests_time = time()
@@ -130,7 +129,7 @@ all_tests_time = time()
                 @testset "$test_info" begin
                     println(test_info, "...")
                     test_time = @elapsed r = test(ex_type, inst..., default_solver_options = solver_options)
-                    push!(perf, (mod_type, ex_name, real_T, inst_num, inst[1], test_time)) #r.solve_time, r.num_iters, r.status, r.primal_obj, r.dual_obj))
+                    push!(perf, (mod_type, ex_name, real_T, inst_num, inst[1], test_time, r.solve_time, r.num_iters, r.status, r.primal_obj, r.dual_obj))
                     @printf("... %8.2e seconds\n", test_time)
                 end
             end
