@@ -16,11 +16,23 @@ const SAS = SemialgebraicSets
 import SumOfSquares
 import PolyJuMP
 
-function lotkavolterra_JuMP(
-    ::Type{T},
-    ) where {T <: Float64} # TODO support generic reals
+struct LotkaVolterraJuMP{T <: Real} <: ExampleInstanceJuMP{T}
+    deg::Int # polynomial degrees
+end
+
+options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
+example_tests(::Type{LotkaVolterraJuMP{Float64}}, ::MinimalInstances) = [
+    ((2,), false, options),
+    ]
+example_tests(::Type{LotkaVolterraJuMP{Float64}}, ::FastInstances) = [
+    ((4,), false, options),
+    ]
+example_tests(::Type{LotkaVolterraJuMP{Float64}}, ::SlowInstances) = [
+    ((6,), false, options),
+    ]
+
+function build(inst::LotkaVolterraJuMP{T}) where {T <: Float64} # TODO generic reals
     # parameters
-    deg = 4 # degree
     n = 4 # number of species
     m = 2 * n # number of control inputs (u)
     Q = 0.475
@@ -30,7 +42,7 @@ function lotkavolterra_JuMP(
     r = [1.0, 0.6, 0.4, 0.2] # growth rate of species
 
     DP.@polyvar x_h[1:n]
-    x_mon = DP.monomials(x_h, 0:deg)
+    x_mon = DP.monomials(x_h, 0:inst.deg)
     x_o = x_h * Q .+ q
     A = [1.0 0.3 0.4 0.2; -0.2 1.0 0.4 -0.1; -0.1 -0.2 1.0 0.3; -0.1 -0.2 -0.3 1.0]
     M = (sum(abs, l_u) + sum(l_u)) / 2.0 + l_x
@@ -73,20 +85,13 @@ function lotkavolterra_JuMP(
     JuMP.@constraint(model, rho_T >= 0, domain = X)
     JuMP.@constraint(model, [i in 1:m], sigma[i] >= 0, domain = X)
 
-    return (model, ())
+    return model
 end
 
-function test_lotkavolterra_JuMP(model, test_helpers, test_options)
+function test_extra(inst::LotkaVolterraJuMP, model, options)
     @test JuMP.termination_status(model) == MOI.OPTIMAL
 end
 
-options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
-lotkavolterra_JuMP_fast = [
-    ((Float64,), false, (), options),
-    ]
-lotkavolterra_JuMP_slow = [
-    # ((Float64,), false, (), options),
-    ]
+# @testset "LotkaVolterraJuMP" for inst in example_tests(LotkaVolterraJuMP{Float64}, MinimalInstances()) test(inst...) end
 
-@testset "lotkavolterra_JuMP" begin test_JuMP_instance.(lotkavolterra_JuMP, test_lotkavolterra_JuMP, lotkavolterra_JuMP_fast) end
-;
+return LotkaVolterraJuMP

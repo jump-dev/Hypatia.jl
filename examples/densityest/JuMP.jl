@@ -20,12 +20,21 @@ struct DensityEstJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     use_monomial_space::Bool # use variables in monomial space, else interpolation space
     use_wsos::Bool # use WSOS cone formulation, else PSD formulation
 end
-function DensityEstJuMP{Float64}(dataset_name::Symbol, deg::Int, use_monomial_space::Bool, use_wsos::Bool)
+function DensityEstJuMP{Float64}(
+    dataset_name::Symbol,
+    deg::Int,
+    use_monomial_space::Bool,
+    use_wsos::Bool)
     X = get_dataset(dataset_name)
     (num_obs, n) = size(X)
     return DensityEstJuMP{Float64}(dataset_name, num_obs, n, X, deg, use_monomial_space, use_wsos)
 end
-function DensityEstJuMP{Float64}(num_obs::Int, n::Int, deg::Int, use_monomial_space::Bool, use_wsos::Bool)
+function DensityEstJuMP{Float64}(
+    num_obs::Int,
+    n::Int,
+    deg::Int,
+    use_monomial_space::Bool,
+    use_wsos::Bool)
     X = randn(num_obs, n)
     return DensityEstJuMP{Float64}(:Random, num_obs, n, X, deg, use_monomial_space, use_wsos)
 end

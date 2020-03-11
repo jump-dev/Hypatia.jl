@@ -21,78 +21,81 @@ originally a feasibility problem, a feasible P and t prove the existence of a Ly
 for the system x_dot = A*x+g(x), norm(g(x)) <= gamma*norm(x)
 =#
 
-using LinearAlgebra
-import Random
-using Test
-import JuMP
-const MOI = JuMP.MOI
-import Hypatia
-const CO = Hypatia.Cones
+include(joinpath(@__DIR__, "../common_JuMP.jl"))
 
-function lyapunovstability_JuMP(
-    ::Type{T},
-    W_rows::Int,
-    W_cols::Int,
-    linear_dynamics::Bool, # solve problem 1 in the description, else problem 2
-    use_matrixepipersquare::Bool, # use matrixepipersquare cone, else PSD formulation
-    ) where {T <: Float64} # TODO support generic reals
+struct LyapunovStabilityJuMP{T <: Real} <: ExampleInstanceJuMP{T}
+    num_rows::Int
+    num_cols::Int
+    linear_dynamics::Bool # solve problem 1 in the description, else problem 2
+    use_matrixepipersquare::Bool # use matrixepipersquare cone, else PSD formulation
+end
+
+options = ()
+example_tests(::Type{LyapunovStabilityJuMP{Float64}}, ::MinimalInstances) = [
+    ((2, 3, true, true), false, options),
+    ((2, 3, true, false), false, options),
+    ((2, 2, false, true), false, options),
+    ((2, 2, false, false), false, options),
+    ]
+example_tests(::Type{LyapunovStabilityJuMP{Float64}}, ::FastInstances) = [
+    ((5, 6, true, true), false, options),
+    ((5, 6, true, false), false, options),
+    ((5, 5, false, true), false, options),
+    ((5, 5, false, false), false, options),
+    ((10, 20, true, true), false, options),
+    ((10, 20, true, false), false, options),
+    ((15, 15, false, true), false, options),
+    ((15, 15, false, false), false, options),
+    ((25, 30, true, false), false, options),
+    ((30, 30, false, false), false, options),
+    ]
+example_tests(::Type{LyapunovStabilityJuMP{Float64}}, ::SlowInstances) = [
+    ((25, 30, true, true), false, options),
+    ((30, 30, false, true), false, options),
+    ]
+
+function build(inst::LyapunovStabilityJuMP{T}) where {T <: Float64} # TODO generic reals
+    (num_rows, num_cols) = (inst.num_rows, inst.num_cols)
+
     model = JuMP.Model()
     JuMP.@variable(model, t)
     JuMP.@objective(model, Min, t)
 
-    if linear_dynamics
-        A = randn(W_rows, W_rows)
+    if inst.linear_dynamics
+        A = randn(num_rows, num_rows)
         A = -A * A'
-        B = randn(W_rows, W_cols)
-        C = randn(W_rows, W_rows)
-        JuMP.@variable(model, P[1:W_rows, 1:W_rows], PSD)
+        B = randn(num_rows, num_cols)
+        C = randn(num_rows, num_rows)
+        JuMP.@variable(model, P[1:num_rows, 1:num_rows], PSD)
         U = -A' * P - P * A - C' * C / 100
         W = P * B
     else
-        @assert W_rows == W_cols
+        @assert num_rows == num_cols
         # P = -A is a feasible solution, with alpha and gamma sufficiently small
-        A = randn(W_rows, W_rows)
+        A = randn(num_rows, num_rows)
         A = -A * A' - I
         alpha = 0.01
         gamma = 0.01
-        JuMP.@variable(model, P[1:W_rows, 1:W_rows], Symmetric)
+        JuMP.@variable(model, P[1:num_rows, 1:num_rows], Symmetric)
         JuMP.@constraint(model, Symmetric(P - I) in JuMP.PSDCone())
-        U = -A' * P - P * A - alpha * P - (t * gamma ^ 2) .* Matrix(I, W_rows, W_rows)
+        U = -A' * P - P * A - alpha * P - (t * gamma ^ 2) .* Matrix(I, num_rows, num_rows)
         W = -P
     end
 
-    if use_matrixepipersquare
-        U_svec = Cones.smat_to_svec!(zeros(eltype(U), Cones.svec_length(W_rows)), U, sqrt(2))
-        JuMP.@constraint(model, vcat(U_svec, t / 2, vec(W)) in Hypatia.MatrixEpiPerSquareCone{Float64, Float64}(W_rows, W_cols))
+    if inst.use_matrixepipersquare
+        U_svec = Cones.smat_to_svec!(zeros(eltype(U), Cones.svec_length(num_rows)), U, sqrt(2))
+        JuMP.@constraint(model, vcat(U_svec, t / 2, vec(W)) in Hypatia.MatrixEpiPerSquareCone{Float64, Float64}(num_rows, num_cols))
     else
-        JuMP.@constraint(model, Symmetric([t .* Matrix(I, W_cols, W_cols) W'; W U]) in JuMP.PSDCone())
+        JuMP.@constraint(model, Symmetric([t .* Matrix(I, num_cols, num_cols) W'; W U]) in JuMP.PSDCone())
     end
 
-    return (model, ())
+    return model
 end
 
-function test_lyapunovstability_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
-    Random.seed!(rseed)
-    d = lyapunovstability_JuMP(T, instance...)
-    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer{T}(; options...))
-    JuMP.optimize!(d.model)
-    @test JuMP.termination_status(d.model) == MOI.OPTIMAL
-    return d.model.moi_backend.optimizer.model.optimizer.result
+function test_extra(inst::LyapunovStabilityJuMP, model, options)
+    @test JuMP.termination_status(model) == MOI.OPTIMAL
 end
 
-lyapunovstability_JuMP_fast = [
-    (5, 6, true, true),
-    (5, 6, true, false),
-    (5, 5, false, true),
-    (5, 5, false, false),
-    (10, 20, true, true),
-    (10, 20, true, false),
-    (15, 15, false, true),
-    (15, 15, false, false),
-    (25, 30, true, false),
-    (30, 30, false, false),
-    ]
-lyapunovstability_JuMP_slow = [
-    (25, 30, true, true),
-    (30, 30, false, true),
-    ]
+# @testset "LyapunovStabilityJuMP" for inst in example_tests(LyapunovStabilityJuMP{Float64}, MinimalInstances()) test(inst...) end
+
+return LyapunovStabilityJuMP

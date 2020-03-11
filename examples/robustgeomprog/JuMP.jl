@@ -12,21 +12,32 @@ the authors show that:
 where e = exp(1) and d(a, b) = sum_i a_i*log(a_i/b_i) is the relative entropy of a and b
 =#
 
-using LinearAlgebra
-using Test
-import Random
-import JuMP
-const MOI = JuMP.MOI
-import Hypatia
+include(joinpath(@__DIR__, "../common_JuMP.jl"))
 
-function robustgeomprog_JuMP(
-    ::Type{T},
-    n::Int,
-    k::Int;
-    B::Matrix{T} = randn(T, k, n), # linear constraint matrix
-    alphas::Vector{T} = rand(T, k) .+ 1, # for entropy constraint for set C
-    ) where {T <: Float64} # TODO support generic reals
+struct RobustGeomProgJuMP{T <: Real} <: ExampleInstanceJuMP{T}
+    n::Int
+    k::Int
+end
+
+options = ()
+example_tests(::Type{RobustGeomProgJuMP{Float64}}, ::MinimalInstances) = [
+    ((2, 3), false, options),
+    ]
+example_tests(::Type{RobustGeomProgJuMP{Float64}}, ::FastInstances) = [
+    ((5, 10), false, options),
+    ((10, 20), false, options),
+    ((20, 40), false, options),
+    ((50, 100), false, options),
+    ]
+example_tests(::Type{RobustGeomProgJuMP{Float64}}, ::SlowInstances) = [
+    ((100, 200), false, options),
+    ]
+
+function build(inst::RobustGeomProgJuMP{T}) where {T <: Float64} # TODO generic reals
+    (n, k) = (inst.n, inst.k)
     @assert n < k # want some degrees of freedom for v
+    B = randn(T, k, n) # linear constraint matrix
+    alphas = rand(T, k) .+ 1 # for entropy constraint for set C
 
     model = JuMP.Model()
     JuMP.@variable(model, t)
@@ -45,24 +56,13 @@ function robustgeomprog_JuMP(
     alphas /= sum(alphas)
     JuMP.@constraint(model, vcat(-sum(log, alphas), alphas, c) in MOI.RelativeEntropyCone(1 + 2k))
 
-    return (model, ())
+    return model
 end
 
-function test_robustgeomprog_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
-    Random.seed!(rseed)
-    d = robustgeomprog_JuMP(T, instance...)
-    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer{T}(; options...))
-    JuMP.optimize!(d.model)
-    @test JuMP.termination_status(d.model) == MOI.OPTIMAL
-    return d.model.moi_backend.optimizer.model.optimizer.result
+function test_extra(inst::RobustGeomProgJuMP, model, options)
+    @test JuMP.termination_status(model) == MOI.OPTIMAL
 end
 
-robustgeomprog_JuMP_fast = [
-    (3, 4),
-    (10, 20),
-    (20, 40),
-    (50, 100),
-    ]
-robustgeomprog_JuMP_slow = [
-    (100, 200),
-    ]
+# @testset "RobustGeomProgJuMP" for inst in example_tests(RobustGeomProgJuMP{Float64}, MinimalInstances()) test(inst...) end
+
+return RobustGeomProgJuMP

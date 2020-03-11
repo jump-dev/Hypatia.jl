@@ -26,12 +26,35 @@ we make F_0 and M_0 positive definite to ensure existence of a feasible solution
 
 include(joinpath(@__DIR__, "../common_JuMP.jl"))
 
-function conditionnum_JuMP(
-    ::Type{T},
-    side::Int,
-    len_y::Int,
-    use_linmatrixineq::Bool, # use linmatrixineq cone, else PSD formulation
-    ) where {T <: Float64} # TODO support generic reals
+struct ConditionNumJuMP{T <: Real} <: ExampleInstanceJuMP{T}
+    side::Int
+    len_y::Int
+    use_linmatrixineq::Bool # use linmatrixineq cone, else PSD formulation
+end
+
+options = (tol_feas = 1e-5,)
+example_tests(::Type{ConditionNumJuMP{Float64}}, ::MinimalInstances) = [
+    ((2, 2, true), false, options),
+    ((2, 2, false), false, options),
+    ]
+example_tests(::Type{ConditionNumJuMP{Float64}}, ::FastInstances) = [
+    ((2, 3, true), false, options),
+    ((2, 3, false), false, options),
+    ((3, 2, true), false, options),
+    ((3, 2, false), false, options),
+    ((50, 15, true), false, options),
+    ((50, 15, false), false, options),
+    ((100, 10, false), false, options),
+    ((100, 40, false), false, options),
+    ]
+example_tests(::Type{ConditionNumJuMP{Float64}}, ::SlowInstances) = [
+    ((100, 10, true), false, options),
+    ((100, 40, true), false, options),
+    ]
+
+function build(inst::ConditionNumJuMP{T}) where {T <: Float64} # TODO generic reals
+    (side, len_y) = (inst.side, inst.len_y)
+
     Mi = [zeros(side, side) for i in 1:len_y]
     for i in eachindex(Mi)
         Mi_half = randn(side)
@@ -56,7 +79,7 @@ function conditionnum_JuMP(
     end)
     JuMP.@objective(model, Min, gamma)
 
-    if use_linmatrixineq
+    if inst.use_linmatrixineq
         JuMP.@constraints(model, begin
             vcat(nu, y) in Hypatia.LinMatrixIneqCone{Float64}([F0, Fi...])
             vcat(-1, nu, y) in Hypatia.LinMatrixIneqCone{Float64}([I, M0, Mi...])
@@ -70,28 +93,13 @@ function conditionnum_JuMP(
         end)
     end
 
-    return (model, ())
+    return model
 end
 
-function test_conditionnum_JuMP(model, test_helpers, test_options)
+function test_extra(inst::ConditionNumJuMP, model, options)
     @test JuMP.termination_status(model) == MOI.OPTIMAL
 end
 
-options = (tol_feas = 1e-5,)
-conditionnum_JuMP_fast = [
-    ((Float64, 2, 3, true), false, (), options),
-    ((Float64, 2, 3, false), false, (), options),
-    ((Float64, 3, 2, true), false, (), options),
-    ((Float64, 3, 2, false), false, (), options),
-    ((Float64, 50, 15, true), false, (), options),
-    ((Float64, 50, 15, false), false, (), options),
-    ((Float64, 100, 10, false), false, (), options),
-    ((Float64, 100, 40, false), false, (), options),
-    ]
-conditionnum_JuMP_slow = [
-    ((Float64, 100, 10, true), false, (), options),
-    ((Float64, 100, 40, true), false, (), options),
-    ]
+# @testset "ConditionNumJuMP" for inst in example_tests(ConditionNumJuMP{Float64}, MinimalInstances()) test(inst...) end
 
-@testset "conditionnum_JuMP" begin test_JuMP_instance.(conditionnum_JuMP, test_conditionnum_JuMP, conditionnum_JuMP_fast) end
-;
+return ConditionNumJuMP

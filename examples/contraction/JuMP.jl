@@ -13,17 +13,33 @@ import PolyJuMP
 import MultivariateBases: FixedPolynomialBasis
 import SumOfSquares
 
-function contraction_JuMP(
-    ::Type{T},
-    beta::Float64,
-    M_deg::Int,
-    delta::Float64,
-    use_matrixwsos::Bool, # use wsos matrix cone, else PSD formulation
-    ) where {T <: Float64} # TODO support generic reals
+struct ContractionJuMP{T <: Real} <: ExampleInstanceJuMP{T}
+    beta::Float64
+    M_deg::Int
+    delta::Float64
+    use_matrixwsos::Bool # use wsos matrix cone, else PSD formulation
+end
+
+options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
+example_tests(::Type{ContractionJuMP{Float64}}, ::MinimalInstances) = [
+    ((0.85, 2, 1e-3, true), false, options, (false,)),
+    ((0.85, 2, 1e-3, false), false, options, (false,)),
+    ]
+example_tests(::Type{ContractionJuMP{Float64}}, ::FastInstances) = [
+    ((0.77, 4, 1e-3, true), false, options, (true,)),
+    ((0.77, 4, 1e-3, false), false, options, (true,)),
+    ((0.85, 4, 1e-3, true), false, options, (false,)),
+    ((0.85, 4, 1e-3, false), false, options, (false,)),
+    ]
+example_tests(::Type{ContractionJuMP{Float64}}, ::SlowInstances) = [
+    ]
+
+function build(inst::ContractionJuMP{T}) where {T <: Float64} # TODO generic reals
+    delta = inst.delta
     n = 2
     dom = ModelUtilities.FreeDomain{Float64}(n)
 
-    M_halfdeg = div(M_deg + 1, 2)
+    M_halfdeg = div(inst.M_deg + 1, 2)
     (U_M, pts_M, Ps_M, _) = ModelUtilities.interpolate(dom, M_halfdeg)
     lagrange_polys = ModelUtilities.recover_lagrange_polys(pts_M, 2 * M_halfdeg)
     x = DP.variables(lagrange_polys)
@@ -40,9 +56,9 @@ function contraction_JuMP(
     dMdt = [JuMP.dot(DP.differentiate(M[i, j], x), dynamics) for i in 1:n, j in 1:n]
     dfdx = DP.differentiate(dynamics, x)'
     Mdfdx = [sum(M[i, k] * dfdx[k, j] for k in 1:n) for i in 1:n, j in 1:n]
-    R = Mdfdx + Mdfdx' + dMdt + beta * M
+    R = Mdfdx + Mdfdx' + dMdt + inst.beta * M
 
-    if use_matrixwsos
+    if inst.use_matrixwsos
         deg_R = maximum(DP.maxdegree.(R))
         d_R = div(deg_R + 1, 2)
         (U_R, pts_R, Ps_R, _) = ModelUtilities.interpolate(dom, d_R)
@@ -57,21 +73,13 @@ function contraction_JuMP(
         JuMP.@constraint(model, -R - Matrix(delta * I, n, n) in JuMP.PSDCone())
     end
 
-    return (model, ())
+    return model
 end
 
-function test_contraction_JuMP(model, test_helpers, test_options)
-    @test JuMP.termination_status(model) == (test_options[1] ? MOI.OPTIMAL : MOI.INFEASIBLE)
+function test_extra(inst::ContractionJuMP, model, options)
+    @test JuMP.termination_status(model) == (options[1] ? MOI.OPTIMAL : MOI.INFEASIBLE)
 end
 
-options = (tol_feas = 1e-5, tol_rel_opt = 1e-5, tol_abs_opt = 1e-5)
-contraction_JuMP_fast = [
-    ((Float64, 0.77, 4, 1e-3, true), false, (true,), options),
-    ((Float64, 0.77, 4, 1e-3, false), false, (true,), options),
-    ((Float64, 0.85, 4, 1e-3, true), false, (false,), options),
-    ((Float64, 0.85, 4, 1e-3, false), false, (false,), options),
-    ]
-contraction_JuMP_slow = []
+# @testset "ContractionJuMP" for inst in example_tests(ContractionJuMP{Float64}, MinimalInstances()) test(inst...) end
 
-@testset "contraction_JuMP" begin test_JuMP_instance.(contraction_JuMP, test_contraction_JuMP, contraction_JuMP_fast) end
-;
+return ContractionJuMP
