@@ -1,23 +1,48 @@
-400#=
+#=
 Copyright 2020, Chris Coey, Lea Kapelevich and contributors
 
 see description in native.jl
 =#
 
-using LinearAlgebra
-import JuMP
-const MOI = JuMP.MOI
-import Random
-using Test
-import Hypatia
-const CO = Hypatia.Cones
+include(joinpath(@__DIR__, "../common_JuMP.jl"))
 
-function portfolio_JuMP(
-    ::Type{T},
-    num_stocks::Int,
-    epipernormeucl_constr::Bool, # add an L2 ball constraint, else don't add
-    epinorminf_constrs::Bool, # add L1 and Linfty ball constraints, elsle don't add
-    ) where {T <: Float64} # TODO support generic reals
+struct PortfolioJuMP{T <: Real} <: ExampleInstanceJuMP{T}
+    num_stocks::Int
+    epipernormeucl_constr::Bool # add an L2 ball constraint, else don't add
+    epinorminf_constrs::Bool # add L1 and Linfty ball constraints, elsle don't add
+end
+
+options = ()
+example_tests(::Type{PortfolioJuMP{Float64}}, ::MinimalInstances) = [
+    ((3, true, false), false, options),
+    ((3, false, true), false, options),
+    ((3, true, true), false, options),
+    ]
+example_tests(::Type{PortfolioJuMP{Float64}}, ::FastInstances) = [
+    ((10, true, false), false, options),
+    ((10, false, true), false, options),
+    ((10, true, true), false, options),
+    ((50, true, false), false, options),
+    ((50, false, true), false, options),
+    ((50, true, true), false, options),
+    ((400, true, false), false, options),
+    ((400, false, true), false, options),
+    ((400, true, true), false, options),
+    ((400, true, false), false, options),
+    ((400, false, true), false, options),
+    ((400, true, true), false, options),
+    ]
+example_tests(::Type{PortfolioJuMP{Float64}}, ::SlowInstances) = [
+    ((1000, true, false), false, options),
+    ((1000, false, true), false, options),
+    ((1000, true, true), false, options),
+    ((3000, true, false), false, options),
+    ((3000, false, true), false, options),
+    ((3000, true, true), false, options),
+    ]
+
+function build(inst::PortfolioJuMP{T}) where {T <: Float64} # TODO generic reals
+    num_stocks = inst.num_stocks
     returns = rand(num_stocks)
     sigma_half = randn(num_stocks, num_stocks)
     x = randn(num_stocks)
@@ -30,48 +55,21 @@ function portfolio_JuMP(
     JuMP.@constraint(model, sum(invest) == 1)
 
     aff_expr = sigma_half * invest
-    if epipernormeucl_constr
+    if inst.epipernormeucl_constr
         JuMP.@constraint(model, vcat(gamma, aff_expr) in JuMP.SecondOrderCone())
     end
-    if epinorminf_constrs
+    if inst.epinorminf_constrs
         JuMP.@constraint(model, vcat(gamma * sqrt(num_stocks), aff_expr) in MOI.NormOneCone(num_stocks + 1))
         JuMP.@constraint(model, vcat(gamma, aff_expr) in MOI.NormInfinityCone(num_stocks + 1))
     end
 
-    return (model, ())
+    return model
 end
 
-function test_portfolio_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
-    Random.seed!(rseed)
-    d = portfolio_JuMP(T, instance...)
-    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer{T}(; options...))
-    JuMP.optimize!(d.model)
-    @test JuMP.termination_status(d.model) == MOI.OPTIMAL
-    return d.model.moi_backend.optimizer.model.optimizer.result
+function test_extra(inst::PortfolioJuMP, model, options)
+    @test JuMP.termination_status(model) == MOI.OPTIMAL
 end
 
-portfolio_JuMP_fast = [
-    (3, true, false),
-    (3, false, true),
-    (3, true, true),
-    (10, true, false),
-    (10, false, true),
-    (10, true, true),
-    (50, true, false),
-    (50, false, true),
-    (50, true, true),
-    (400, true, false),
-    (400, false, true),
-    (400, true, true),
-    (400, true, false),
-    (400, false, true),
-    (400, true, true),
-    ]
-portfolio_JuMP_slow = [
-    (1000, true, false),
-    (1000, false, true),
-    (1000, true, true),
-    (3000, true, false),
-    (3000, false, true),
-    (3000, true, true),
-    ]
+# @testset "PortfolioJuMP" for inst in example_tests(PortfolioJuMP{Float64}, MinimalInstances()) test(inst...) end
+
+return PortfolioJuMP

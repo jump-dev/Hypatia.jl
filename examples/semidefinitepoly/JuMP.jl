@@ -5,42 +5,77 @@ test whether a given matrix has a SOS decomposition,
 and use this procedure to check whether a polynomial is globally convex
 =#
 
-using LinearAlgebra
-using Test
-import Random
-import JuMP
-const MOI = JuMP.MOI
-import DynamicPolynomials
-const DP = DynamicPolynomials
+include(joinpath(@__DIR__, "../common_JuMP.jl"))
+include(joinpath(@__DIR__, "data.jl"))
 import SumOfSquares
 import PolyJuMP
-import Hypatia
-const MU = Hypatia.ModelUtilities
 
-include(joinpath(@__DIR__, "data.jl"))
+struct SemidefinitePolyJuMP{T <: Real} <: ExampleInstanceJuMP{T}
+    x::Vector{<:DP.PolyVar}
+    H::Matrix{<:DP.Polynomial}
+    is_feas::Bool # whether model should be primal-dual feasible; only for testing
+    use_wsosmatrix::Bool # use wsosinterppossemideftri cone, else PSD formulation
+    use_dual::Bool # use dual formulation, else primal formulation
+end
+function SemidefinitePolyJuMP{Float64}(
+    x::Vector{DP.PolyVar{true}},
+    poly::DP.Polynomial,
+    args...)
+    return SemidefinitePolyJuMP{Float64}(x, DP.differentiate(poly, x, 2), args...)
+end
+function SemidefinitePolyJuMP{Float64}(
+    matpoly::Symbol,
+    args...)
+    return SemidefinitePolyJuMP{Float64}(get_semidefinitepoly_data(matpoly)..., args...)
+end
 
-function semidefinitepoly_JuMP(
-    ::Type{T},
-    x::Vector{<:DP.PolyVar},
-    H::Matrix{<:DP.Polynomial},
-    is_feas::Bool, # whether model should be primal-dual feasible; only for testing
-    use_wsosmatrix::Bool, # use wsosinterppossemideftri cone, else PSD formulation
-    use_dual::Bool, # use dual formulation, else primal formulation
-    ) where {T <: Float64} # TODO support generic reals
+options = ()
+example_tests(::Type{SemidefinitePolyJuMP{Float64}}, ::MinimalInstances) = [
+    ((:matpoly2, true, true), false, options),
+    ((:matpoly5, true, true), false, options),
+    ((:matpoly5, true, false), false, options),
+    ((:matpoly5, false, false), false, options),
+    ]
+example_tests(::Type{SemidefinitePolyJuMP{Float64}}, ::FastInstances) = [
+    ((:matpoly1, true, true), false, options),
+    ((:matpoly1, true, false), false, options),
+    ((:matpoly1, false, false), false, options),
+    ((:matpoly2, true, true), false, options),
+    ((:matpoly2, true, false), false, options),
+    ((:matpoly2, false, false), false, options),
+    ((:matpoly3, true, true), false, options),
+    ((:matpoly3, true, false), false, options),
+    ((:matpoly3, false, false), false, options),
+    ((:matpoly4, true, true), false, options),
+    ((:matpoly4, true, false), false, options),
+    ((:matpoly4, false, false), false, options),
+    ((:matpoly6, true, true), false, options),
+    ((:matpoly6, true, false), false, options),
+    ((:matpoly6, false, false), false, options),
+    ((:matpoly7, true, true), false, options),
+    ((:matpoly7, true, false), false, options),
+    ((:matpoly7, false, false), false, options),
+    ]
+example_tests(::Type{SemidefinitePolyJuMP{Float64}}, ::SlowInstances) = [
+    ]
+
+function build(inst::SemidefinitePolyJuMP{T}) where {T <: Float64} # TODO generic reals
+    (x, H) = (inst.x, inst.H)
+
     model = JuMP.Model()
 
-    if use_wsosmatrix
+    if inst.use_wsosmatrix
         side = size(H, 1)
         halfdeg = div(maximum(DP.maxdegree.(H)) + 1, 2)
         n = DP.nvariables(x)
         dom = ModelUtilities.FreeDomain{Float64}(n)
         (U, pts, Ps, _) = ModelUtilities.interpolate(dom, halfdeg)
-        mat_wsos_cone = Hypatia.WSOSInterpPosSemidefTriCone{Float64}(side, U, Ps, use_dual)
+        mat_wsos_cone = Hypatia.WSOSInterpPosSemidefTriCone{Float64}(side, U, Ps, inst.use_dual)
 
         rt2 = sqrt(2)
         H_svec = [H[i, j](pts[u, :]) for i in 1:side for j in 1:i for u in 1:U]
         ModelUtilities.vec_to_svec!(H_svec, rt2 = rt2, incr = U)
-        if use_dual
+        if inst.use_dual
             JuMP.@variable(model, z[i in 1:side, 1:i, 1:U])
             z_svec = [1.0 * z[i, j, u] for i in 1:side for j in 1:i for u in 1:U]
             ModelUtilities.vec_to_svec!(z_svec, rt2 = rt2, incr = U)
@@ -50,7 +85,7 @@ function semidefinitepoly_JuMP(
             JuMP.@constraint(model, H_svec in mat_wsos_cone)
         end
     else
-        if use_dual
+        if inst.use_dual
             error("dual formulation not implemented for scalar SOS formulation")
         else
             PolyJuMP.setpolymodule!(model, SumOfSquares)
@@ -58,54 +93,13 @@ function semidefinitepoly_JuMP(
         end
     end
 
-    return (model = model, is_feas = is_feas)
+    return model
 end
 
-semidefinitepoly_JuMP(
-    ::Type{T},
-    x::Vector{DP.PolyVar{true}},
-    poly::DP.Polynomial,
-    args...
-    ) where {T <: Float64} = semidefinitepoly_JuMP(T, x, DP.differentiate(poly, x, 2), args...)
-
-semidefinitepoly_JuMP(
-    ::Type{T},
-    matpoly::Symbol,
-    args...
-    ) where {T <: Float64} = semidefinitepoly_JuMP(T, get_semidefinitepoly_data(matpoly)..., args...)
-
-function test_semidefinitepoly_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
-    Random.seed!(rseed)
-    d = semidefinitepoly_JuMP(T, instance...)
-    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer{T}(; options...))
-    JuMP.optimize!(d.model)
-    @test JuMP.termination_status(d.model) in (d.is_feas ? (MOI.OPTIMAL,) : (MOI.INFEASIBLE, MOI.DUAL_INFEASIBLE))
-    return d.model.moi_backend.optimizer.model.optimizer.result
+function test_extra(inst::SemidefinitePolyJuMP, model, options)
+    @test JuMP.termination_status(model) in (inst.is_feas ? (MOI.OPTIMAL,) : (MOI.INFEASIBLE, MOI.DUAL_INFEASIBLE))
 end
 
-semidefinitepoly_JuMP_fast = [
-    (:matpoly1, true, true),
-    (:matpoly1, true, false),
-    (:matpoly1, false, false),
-    (:matpoly2, true, true),
-    (:matpoly2, true, false),
-    (:matpoly2, false, false),
-    (:matpoly3, true, true),
-    (:matpoly3, true, false),
-    (:matpoly3, false, false),
-    (:matpoly4, true, true),
-    (:matpoly4, true, false),
-    (:matpoly4, false, false),
-    (:matpoly5, true, true),
-    (:matpoly5, true, false),
-    (:matpoly5, false, false),
-    (:matpoly6, true, true),
-    (:matpoly6, true, false),
-    (:matpoly6, false, false),
-    (:matpoly7, true, true),
-    (:matpoly7, true, false),
-    (:matpoly7, false, false),
-    ]
-semidefinitepoly_JuMP_slow = [
-    # TODO
-    ]
+# @testset "SemidefinitePolyJuMP" for inst in example_tests(SemidefinitePolyJuMP{Float64}, MinimalInstances()) test(inst...) end
+
+return SemidefinitePolyJuMP

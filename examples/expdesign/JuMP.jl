@@ -15,18 +15,47 @@ if geomean_obj is true, we use a formulation from https://picos-api.gitlab.io/pi
 
 include(joinpath(@__DIR__, "../common_JuMP.jl"))
 
-function expdesign_JuMP(
-    ::Type{T},
-    q::Int,
-    p::Int,
-    n::Int,
-    n_max::Int,
-    logdet_obj::Bool, # use formulation with logdet objective
-    rootdet_obj::Bool, # use formulation with rootdet objective
-    geomean_obj::Bool, # use formulation with geomean objective
-    ) where {T <: Float64} # TODO support generic reals
+struct ExpDesignJuMP{T <: Real} <: ExampleInstanceJuMP{T}
+    q::Int
+    p::Int
+    n::Int
+    n_max::Int
+    logdet_obj::Bool # use formulation with logdet objective
+    rootdet_obj::Bool # use formulation with rootdet objective
+    geomean_obj::Bool # use formulation with geomean objective
+end
+
+options = ()
+logdet_options = (tol_feas = 1e-6, tol_rel_opt = 1e-5, tol_abs_opt = 1e-5)
+example_tests(::Type{ExpDesignJuMP{Float64}}, ::MinimalInstances) = [
+    ((2, 3, 4, 2, true, false, false), false, logdet_options),
+    ((2, 3, 4, 2, false, true, false), false, options),
+    ((2, 3, 4, 2, false, false, true), false, options),
+    ]
+example_tests(::Type{ExpDesignJuMP{Float64}}, ::FastInstances) = [
+    ((3, 5, 7, 2, true, false, false), false, logdet_options),
+    ((3, 5, 7, 2, false, true, false), false, options),
+    ((3, 5, 7, 2, false, false, true), false, options),
+    ((5, 15, 25, 5, true, false, false), false, logdet_options),
+    ((5, 15, 25, 5, false, true, false), false, options),
+    ((5, 15, 25, 5, false, false, true), false, options),
+    ((10, 30, 50, 5, true, false, false), false, logdet_options),
+    ((10, 30, 50, 5, false, true, false), false, options),
+    ((10, 30, 50, 5, false, false, true), false, options),
+    ((25, 75, 125, 10, true, false, false), false, logdet_options),
+    ((25, 75, 125, 10, false, true, false), false, options),
+    ((25, 75, 125, 10, false, false, true), false, options),
+    ]
+example_tests(::Type{ExpDesignJuMP{Float64}}, ::SlowInstances) = [
+    ((100, 200, 200, 10, true, false, false), false, logdet_options),
+    ((100, 200, 200, 10, false, true, false), false, options),
+    ((100, 200, 200, 10, false, false, true), false, options),
+    ]
+
+function build(inst::ExpDesignJuMP{T}) where {T <: Float64} # TODO generic reals
+    (q, p, n, n_max) = (inst.q, inst.p, inst.n, inst.n_max)
     @assert (p > q) && (n > q) && (n_max <= n)
-    @assert logdet_obj + geomean_obj + rootdet_obj == 1
+    @assert inst.logdet_obj + inst.geomean_obj + inst.rootdet_obj == 1
     V = randn(q, p)
 
     model = JuMP.Model()
@@ -40,9 +69,9 @@ function expdesign_JuMP(
     JuMP.@variable(model, hypo)
     JuMP.@objective(model, Max, hypo)
 
-    if logdet_obj
+    if inst.logdet_obj
         JuMP.@constraint(model, vcat(hypo, 1.0, v1) in MOI.LogDetConeTriangle(q))
-    elseif rootdet_obj
+    elseif inst.rootdet_obj
         JuMP.@constraint(model, vcat(hypo, v1) in MOI.RootDetConeTriangle(q))
     else
         # hypogeomean + epinormeucl formulation
@@ -57,33 +86,13 @@ function expdesign_JuMP(
         end)
     end
 
-    return (model, ())
+    return model
 end
 
-function test_expdesign_JuMP(model, test_helpers, test_options)
+function test_extra(inst::ExpDesignJuMP, model, options)
     @test JuMP.termination_status(model) == MOI.OPTIMAL
 end
 
-options = ()
-expdesign_JuMP_fast = [
-    ((Float64, 3, 5, 7, 2, true, false, false), false, (), options),
-    ((Float64, 3, 5, 7, 2, false, true, false), false, (), options),
-    ((Float64, 3, 5, 7, 2, false, false, true), false, (), options),
-    ((Float64, 5, 15, 25, 5, true, false, false), false, (), options),
-    ((Float64, 5, 15, 25, 5, false, true, false), false, (), options),
-    ((Float64, 5, 15, 25, 5, false, false, true), false, (), options),
-    ((Float64, 10, 30, 50, 5, true, false, false), false, (), options),
-    ((Float64, 10, 30, 50, 5, false, true, false), false, (), options),
-    ((Float64, 10, 30, 50, 5, false, false, true), false, (), options),
-    ((Float64, 25, 75, 125, 10, true, false, false), false, (), options),
-    ((Float64, 25, 75, 125, 10, false, true, false), false, (), options),
-    ((Float64, 25, 75, 125, 10, false, false, true), false, (), options),
-    ]
-expdesign_JuMP_slow = [
-    ((Float64, 100, 200, 200, 10, true, false, false), false, (), options),
-    ((Float64, 100, 200, 200, 10, false, true, false), false, (), options),
-    ((Float64, 100, 200, 200, 10, false, false, true), false, (), options),
-    ]
+# @testset "ExpDesignJuMP" for inst in example_tests(ExpDesignJuMP{Float64}, MinimalInstances()) test(inst...) end
 
-@testset "expdesign_JuMP" begin test_JuMP_instance.(expdesign_JuMP, test_expdesign_JuMP, expdesign_JuMP_fast) end
-;
+return ExpDesignJuMP

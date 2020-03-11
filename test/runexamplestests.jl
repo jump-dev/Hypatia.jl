@@ -6,15 +6,11 @@ run examples tests from the examples folder and display basic benchmarks
 TODO when linear operators are working, update linear operators tests in native tests add tests here
 =#
 
-using Test
+examples_dir = joinpath(@__DIR__, "../examples")
+include(joinpath(examples_dir, "common.jl"))
 using DataFrames
 using Printf
 using TimerOutputs
-import Hypatia
-import Hypatia.Solvers
-
-examples_dir = joinpath(@__DIR__, "../examples")
-include(joinpath(examples_dir, "common.jl"))
 
 # options to solvers
 timer = TimerOutput()
@@ -26,7 +22,7 @@ default_solver_options = (
 
 # instance sets to run and corresponding time limits (seconds)
 instance_sets = [
-    (MinimalInstances, 5),
+    (MinimalInstances, 15),
     # (FastInstances, 15),
     # (SlowInstances, 120),
     ]
@@ -55,28 +51,28 @@ native_example_names = [
 # list of names of JuMP examples to run
 JuMP_example_names = [
     "centralpolymat",
-    # "conditionnum",
-    # "contraction",
+    "conditionnum",
+    "contraction",
     "densityest",
-    # "envelope",
-    # "expdesign",
-    # "lotkavolterra",
-    # "lyapunovstability",
-    # "matrixcompletion",
-    # "matrixquadratic",
-    # "matrixregression",
-    # "maxvolume",
-    # "muconvexity",
-    # "nearestpsd",
-    # "polymin",
-    # "polynorm",
-    # "portfolio",
-    # "regionofattr",
-    # "robustgeomprog",
-    # "secondorderpoly",
-    # "semidefinitepoly",
-    # "shapeconregr",
-    # "signomialmin",
+    "envelope",
+    "expdesign",
+    "lotkavolterra",
+    "lyapunovstability",
+    "matrixcompletion",
+    "matrixquadratic",
+    "matrixregression",
+    "maxvolume",
+    "muconvexity",
+    "nearestpsd",
+    "polymin",
+    "polynorm",
+    "portfolio",
+    "regionofattr",
+    "robustgeomprog",
+    "secondorderpoly",
+    "semidefinitepoly",
+    "shapeconregr",
+    "signomialmin",
     ]
 
 # types of models to run and corresponding options and example names
@@ -92,12 +88,9 @@ for (inst_set, lim) in instance_sets
 end
 
 example_types = Dict{String, Type{<:ExampleInstance}}()
-@testset begin # TODO delete
 for mod_type in model_types, ex in eval(Symbol(mod_type, "_example_names"))
     example_types[ex] = include(joinpath(examples_dir, ex, mod_type * ".jl"))
 end
-end
-@show example_types
 
 perf = DataFrame(
     model = String[],

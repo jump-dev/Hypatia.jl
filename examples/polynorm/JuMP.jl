@@ -6,22 +6,30 @@ find a polynomial f such that f² >= Σᵢ gᵢ² where gᵢ are arbitrary polyn
 TODO add scalar SOS formulation
 =#
 
-using LinearAlgebra
-import Random
-using Test
-import JuMP
-const MOI = JuMP.MOI
-import Hypatia
-const MU = Hypatia.ModelUtilities
+include(joinpath(@__DIR__, "../common_JuMP.jl"))
 
-function polynorm_JuMP(
-    ::Type{T},
-    n::Int,
-    deg::Int,
-    npolys::Int,
-    ) where {T <: Float64} # TODO support generic reals
+struct PolyNormJuMP{T <: Real} <: ExampleInstanceJuMP{T}
+    n::Int
+    deg::Int
+    num_polys::Int
+end
+
+options = ()
+example_tests(::Type{PolyNormJuMP{Float64}}, ::MinimalInstances) = [
+    ((1, 2, 2), false, options),
+    ]
+example_tests(::Type{PolyNormJuMP{Float64}}, ::FastInstances) = [
+    ((2, 2, 2), false, options),
+    ((2, 1, 3), false, options),
+    ]
+example_tests(::Type{PolyNormJuMP{Float64}}, ::SlowInstances) = [
+    ]
+
+function build(inst::PolyNormJuMP{T}) where {T <: Float64} # TODO generic reals
+    (n, num_polys) = (inst.n, inst.num_polys)
+
     dom = ModelUtilities.FreeDomain{Float64}(n)
-    halfdeg = div(deg + 1, 2)
+    halfdeg = div(inst.deg + 1, 2)
     (U, pts, Ps, w) = ModelUtilities.interpolate(dom, halfdeg, calc_w = true)
     lagrange_polys = ModelUtilities.recover_lagrange_polys(pts, 2 * halfdeg)
 
@@ -30,29 +38,20 @@ function polynorm_JuMP(
     JuMP.@objective(model, Min, dot(w, f))
 
     L = size(Ps[1], 2)
-    polys = Ps[1] * rand(-9:9, L, npolys)
+    polys = Ps[1] * rand(-9:9, L, num_polys)
 
     fpoly = dot(f, lagrange_polys)
-    rand_polys = [dot(polys[:, i], lagrange_polys) for i in 1:npolys]
-    cone = Hypatia.WSOSInterpEpiNormEuclCone{Float64}(npolys + 1, U, Ps)
-    JuMP.@constraint(model, vcat(f, [polys[:, i] for i in 1:npolys]...) in cone)
+    rand_polys = [dot(polys[:, i], lagrange_polys) for i in 1:num_polys]
+    cone = Hypatia.WSOSInterpEpiNormEuclCone{Float64}(num_polys + 1, U, Ps)
+    JuMP.@constraint(model, vcat(f, [polys[:, i] for i in 1:num_polys]...) in cone)
 
-    return (model, ())
+    return model
 end
 
-function test_polynorm_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
-    Random.seed!(rseed)
-    d = polynorm_JuMP(T, instance...)
-    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer{T}(; options...))
-    JuMP.optimize!(d.model)
-    @test JuMP.termination_status(d.model) == MOI.OPTIMAL
-    return d.model.moi_backend.optimizer.model.optimizer.result
+function test_extra(inst::PolyNormJuMP, model, options)
+    @test JuMP.termination_status(model) == MOI.OPTIMAL
 end
 
-polynorm_JuMP_fast = [
-    (2, 2, 2),
-    (2, 1, 3),
-    ]
-polynorm_JuMP_slow = [
-    # TODO
-    ]
+# @testset "PolyNormJuMP" for inst in example_tests(PolyNormJuMP{Float64}, MinimalInstances()) test(inst...) end
+
+return PolyNormJuMP
