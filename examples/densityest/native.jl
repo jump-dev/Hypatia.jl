@@ -124,7 +124,8 @@ function densityest_native(
         G_likl = hcat(G_likl, zeros(T, size(G_likl, 1), num_psd_vars))
         num_ext_geom_vars = 0
     end
-    c = vcat(-ones(T, num_hypo_vars), zeros(T, U + num_psd_vars + num_ext_geom_vars))
+    c = zeros(T, num_hypo_vars + U + num_psd_vars + num_ext_geom_vars)
+    @views c[1:num_hypo_vars] .= -1
     h = vcat(h_poly, h_likl)
     b = vcat(b_poly, one(T))
 
