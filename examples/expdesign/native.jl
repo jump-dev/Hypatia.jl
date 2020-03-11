@@ -29,11 +29,11 @@ function expdesign_native(
     if use_epinorminf
         h_norminf = vcat(T(n_max) / 2, fill(-T(n_max) / 2, p))
         G_norminf = vcat(zeros(T, 1, p), -Matrix{T}(I, p, p))
-        cones = CO.Cone{T}[CO.EpiNormInf{T, T}(p + 1)]
+        cones = Cones.Cone{T}[Cones.EpiNormInf{T, T}(p + 1)]
     else
         h_norminf = vcat(zeros(T, p), fill(T(n_max), p))
         G_norminf = vcat(Matrix{T}(-I, p, p), Matrix{T}(I, p, p))
-        cones = CO.Cone{T}[CO.Nonnegative{T}(p), CO.Nonnegative{T}(p)]
+        cones = Cones.Cone{T}[Cones.Nonnegative{T}(p), Cones.Nonnegative{T}(p)]
     end
 
     # constraint on total number of trials
@@ -49,7 +49,7 @@ function expdesign_native(
         G_norminf = hcat(zeros(T, size(G_norminf, 1)), G_norminf)
 
         # dimension of vectorized matrix V*diag(np)*V'
-        dimvec = CO.svec_length(q)
+        dimvec = Cones.svec_length(q)
         G_detcone = zeros(T, dimvec, p)
         l = 1
         for i in 1:q, j in 1:i
@@ -58,11 +58,11 @@ function expdesign_native(
             end
             l += 1
         end
-        MU.vec_to_svec!(G_detcone, rt2 = sqrt(T(2)))
+        ModelUtilities.vec_to_svec!(G_detcone, rt2 = sqrt(T(2)))
         @assert l - 1 == dimvec
 
         if logdet_obj
-            push!(cones, CO.HypoPerLogdetTri{T, T}(dimvec + 2))
+            push!(cones, Cones.HypoPerLogdetTri{T, T}(dimvec + 2))
             # pad with hypograph variable and perspective variable
             h_detcone = vcat(zero(T), one(T), zeros(T, dimvec))
             # include perspective variable
@@ -72,7 +72,7 @@ function expdesign_native(
                 zeros(T, dimvec)    G_detcone;
                 ]
         else
-            push!(cones, CO.HypoRootdetTri{T, T}(dimvec + 1))
+            push!(cones, Cones.HypoRootdetTri{T, T}(dimvec + 1))
             # pad with hypograph variable
             h_detcone = zeros(T, dimvec + 1)
             # include perspective variable
@@ -91,7 +91,7 @@ function expdesign_native(
         # auxiliary matrix variable has pq elements stored row-major, auxiliary lower triangular variable has svec_length(q) elements, also stored row-major
         pq = p * q
         qq = q ^ 2
-        num_trivars = CO.svec_length(q)
+        num_trivars = Cones.svec_length(q)
         c = vcat(-one(T), zeros(T, p + pq + num_trivars))
 
         A_VW = zeros(T, qq, pq)
@@ -120,13 +120,13 @@ function expdesign_native(
         for i in 1:q
             G_geo[i, sum(1:i)] = -1
         end
-        push!(cones, CO.HypoGeomean{T}(fill(inv(T(q)), q)))
+        push!(cones, Cones.HypoGeomean{T}(fill(inv(T(q)), q)))
         G_soc_epi = zeros(T, pq + p, p)
         G_soc = zeros(T, pq + p, pq)
         epi_idx = 1
         col_idx = 1
         for i in 1:p
-            push!(cones, CO.EpiNormEucl{T}(q + 1))
+            push!(cones, Cones.EpiNormEucl{T}(q + 1))
             G_soc_epi[epi_idx, i] = -sqrt(T(q))
             G_soc[(epi_idx + 1):(epi_idx + q), col_idx:(col_idx + q - 1)] = Matrix{T}(-I, q, q)
             epi_idx += q + 1
@@ -144,7 +144,7 @@ function expdesign_native(
     if (rootdet_obj && !use_rootdet) || (logdet_obj && !use_logdet)
         # extended formulations require an upper triangular matrix of additional variables
         # we will store this matrix row-major
-        num_trivars = CO.svec_length(q)
+        num_trivars = Cones.svec_length(q)
         # vectorized dimension of extended psd matrix
         dimvec = q * (2 * q + 1)
         G_psd = zeros(T, dimvec, p + num_trivars)
@@ -177,10 +177,10 @@ function expdesign_native(
             G_psd[l, p + diag_idx(i)] = -1
             l += 1
         end
-        MU.vec_to_svec!(G_psd, rt2 = sqrt(T(2)))
+        ModelUtilities.vec_to_svec!(G_psd, rt2 = sqrt(T(2)))
 
         h_psd = zeros(T, dimvec)
-        push!(cones, CO.PosSemidefTri{T, T}(dimvec))
+        push!(cones, Cones.PosSemidefTri{T, T}(dimvec))
     end
 
     if rootdet_obj && !use_rootdet
@@ -191,7 +191,7 @@ function expdesign_native(
         for i in 1:q
             G_geo[i, diag_idx(i)] = -1
         end
-        push!(cones, CO.HypoGeomean{T}(fill(inv(T(q)), q)))
+        push!(cones, Cones.HypoGeomean{T}(fill(inv(T(q)), q)))
         # all conic constraints
         G = [
             G_norminf   zeros(T, size(G_norminf, 1), num_trivars + 1);
@@ -221,7 +221,7 @@ function expdesign_native(
             h_log[offset + 1] = 1
             # diagonal element in the triangular matrix
             G_log[offset + 2, p + diag_idx(i)] = -1
-            push!(cones, CO.HypoPerLog{T}(3))
+            push!(cones, Cones.HypoPerLog{T}(3))
             offset += 3
         end
 

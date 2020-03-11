@@ -20,10 +20,10 @@ function polynorm_JuMP(
     deg::Int,
     npolys::Int,
     ) where {T <: Float64} # TODO support generic reals
-    dom = MU.FreeDomain{Float64}(n)
+    dom = ModelUtilities.FreeDomain{Float64}(n)
     halfdeg = div(deg + 1, 2)
-    (U, pts, Ps, w) = MU.interpolate(dom, halfdeg, calc_w = true)
-    lagrange_polys = MU.recover_lagrange_polys(pts, 2 * halfdeg)
+    (U, pts, Ps, w) = ModelUtilities.interpolate(dom, halfdeg, calc_w = true)
+    lagrange_polys = ModelUtilities.recover_lagrange_polys(pts, 2 * halfdeg)
 
     model = JuMP.Model()
     JuMP.@variable(model, f[1:U])

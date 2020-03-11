@@ -12,13 +12,13 @@ function envelope_JuMP(
     rand_halfdeg::Int,
     num_polys::Int,
     env_halfdeg::Int;
-    domain::MU.Domain = MU.Box{T}(-ones(T, n), ones(T, n)),
+    domain::ModelUtilities.Domain = ModelUtilities.Box{T}(-ones(T, n), ones(T, n)),
     ) where {T <: Float64} # TODO support generic reals
-    @assert n == MU.get_dimension(domain)
+    @assert n == ModelUtilities.get_dimension(domain)
     @assert rand_halfdeg <= env_halfdeg
 
     # generate interpolation
-    (U, pts, Ps, w) = MU.interpolate(domain, env_halfdeg, calc_w = true)
+    (U, pts, Ps, w) = ModelUtilities.interpolate(domain, env_halfdeg, calc_w = true)
 
     # generate random polynomials
     L = binomial(n + rand_halfdeg, n)

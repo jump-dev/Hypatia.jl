@@ -8,12 +8,39 @@ include(joinpath(@__DIR__, "../common_JuMP.jl"))
 import DynamicPolynomials
 const DP = DynamicPolynomials
 
-function centralpolymat_JuMP(
-    ::Type{T},
-    n::Int,
-    halfdeg::Int,
-    logdet_obj::Bool, # use logdet, else rootdet
-    ) where {T <: Float64} # TODO support generic reals
+struct CentralPolyMatJuMP{T <: Real} <: ExampleInstanceJuMP{T}
+    n::Int # number of polyvars
+    halfdeg::Int # half degree of random polynomials
+    logdet_obj::Bool # use logdet, else rootdet
+end
+
+options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
+example_tests(::Type{CentralPolyMatJuMP{Float64}}, ::MinimalInstances) = [
+    ((2, 2, true), false, options),
+    ((2, 2, false), false, options),
+    # ((2, 2, true), true, options),
+    # ((2, 2, false), true, options),
+    ]
+example_tests(::Type{CentralPolyMatJuMP{Float64}}, ::FastInstances) = [
+    ((2, 3, true), false, options),
+    ((2, 3, false), false, options),
+    ((3, 2, true), false, options),
+    ((3, 2, false), false, options),
+    ((3, 4, true), false, options),
+    ((3, 4, false), false, options),
+    ((7, 2, true), false, options),
+    ((7, 2, false), false, options),
+    ]
+example_tests(::Type{CentralPolyMatJuMP{Float64}}, ::SlowInstances) = [
+    ((3, 5, true), false, options),
+    ((3, 5, false), false, options),
+    ((6, 3, true), false, options),
+    ((6, 3, false), false, options),
+    ]
+
+function build(inst::CentralPolyMatJuMP{T}) where {T <: Float64} # TODO generic reals
+    (n, halfdeg) = (inst.n, inst.halfdeg)
+
     DP.@polyvar x[1:n]
     monomials = DP.monomials(x, 0:halfdeg)
     L = binomial(n + halfdeg, n)
@@ -29,36 +56,19 @@ function centralpolymat_JuMP(
 
     JuMP.@variable(model, hypo)
     JuMP.@objective(model, Max, hypo)
-    if logdet_obj
+    if inst.logdet_obj
         JuMP.@constraint(model, vcat(hypo, 1.0, v1) in MOI.LogDetConeTriangle(L))
     else
         JuMP.@constraint(model, vcat(hypo, v1) in MOI.RootDetConeTriangle(L))
     end
 
-    return (model, ())
+    return model
 end
 
-function test_centralpolymat_JuMP(model, test_helpers, test_options)
+function test_extra(inst::CentralPolyMatJuMP, model, options)
     @test JuMP.termination_status(model) == MOI.OPTIMAL
 end
 
-options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
-centralpolymat_JuMP_fast = [
-    ((Float64, 2, 3, true), false, (), options),
-    ((Float64, 2, 3, false), false, (), options),
-    ((Float64, 3, 2, true), false, (), options),
-    ((Float64, 3, 2, false), false, (), options),
-    ((Float64, 3, 4, true), false, (), options),
-    ((Float64, 3, 4, false), false, (), options),
-    ((Float64, 7, 2, true), false, (), options),
-    ((Float64, 7, 2, false), false, (), options),
-    ]
-centralpolymat_JuMP_slow = [
-    ((Float64, 3, 5, true), false, (), options),
-    ((Float64, 3, 5, false), false, (), options),
-    ((Float64, 6, 3, true), false, (), options),
-    ((Float64, 6, 3, false), false, (), options),
-    ]
+# @testset "CentralPolyMatJuMP" for inst in example_tests(CentralPolyMatJuMP{Float64}, MinimalInstances()) test(inst...) end
 
-@testset "centralpolymat_JuMP" begin test_JuMP_instance.(centralpolymat_JuMP, test_centralpolymat_JuMP, centralpolymat_JuMP_fast) end
-;
+return CentralPolyMatJuMP

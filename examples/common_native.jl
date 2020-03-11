@@ -11,6 +11,9 @@ an instance consists of a tuple of:
 (3) solver options
 =#
 
+abstract type HypatiaExample end
+abstract type NativeExample <: HypatiaExample end
+
 using Test
 import Random
 using LinearAlgebra

@@ -31,9 +31,9 @@ function polymin_native(
     end
     U = length(interp_vals)
 
-    cones = CO.Cone{T}[]
+    cones = Cones.Cone{T}[]
     if use_wsos
-        push!(cones, CO.WSOSInterpNonnegative{T, T}(U, Ps, use_dual = !use_primal))
+        push!(cones, Cones.WSOSInterpNonnegative{T, T}(U, Ps, use_dual = !use_primal))
     end
 
     if use_primal
@@ -64,18 +64,18 @@ function polymin_native(
             end
             h = zeros(T, U)
         else
-            svec_lengths = [CO.svec_length(size(Pk, 2)) for Pk in Ps]
+            svec_lengths = [Cones.svec_length(size(Pk, 2)) for Pk in Ps]
             G_full = zeros(T, sum(svec_lengths), U)
             offset = 0
             for (Pk, dk) in zip(Ps, svec_lengths)
                 Lk = size(Pk, 2)
-                push!(cones, CO.PosSemidefTri{T, T}(dk))
+                push!(cones, Cones.PosSemidefTri{T, T}(dk))
                 l = 1
                 for i in 1:Lk, j in 1:i
                     @. @views G_full[offset + l, :] = -Pk[:, i] * Pk[:, j]
                     l += 1
                 end
-                @views MU.vec_to_svec!(G_full[(offset + 1):(offset + dk), :], rt2 = sqrt(T(2)))
+                @views ModelUtilities.vec_to_svec!(G_full[(offset + 1):(offset + dk), :], rt2 = sqrt(T(2)))
                 offset += dk
             end
             if use_linops
@@ -182,7 +182,7 @@ function polymin_native(
         G = Diagonal(-one(T) * I, U)
         h = zeros(T, U)
     end
-    cones = CO.Cone{T}[CO.WSOSInterpNonnegative{T, Complex{T}}(U, P_data, use_dual = !use_primal)]
+    cones = Cones.Cone{T}[Cones.WSOSInterpNonnegative{T, Complex{T}}(U, P_data, use_dual = !use_primal)]
 
     model = Models.Model{T}(c, A, b, G, h, cones)
     return (model, (true_min = true_min,))

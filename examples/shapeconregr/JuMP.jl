@@ -35,16 +35,16 @@ function shapeconregr_JuMP(
     use_wsos::Bool, # use WSOS cone formulation, else SDP formulation
     use_L1_obj::Bool, # in objective function use L1 norm, else L2 norm
     is_fit_exact::Bool;
-    mono_dom::MU.Domain = MU.Box{T}(-ones(size(X, 2)), ones(size(X, 2))),
-    conv_dom::MU.Domain = mono_dom,
+    mono_dom::ModelUtilities.Domain = ModelUtilities.Box{T}(-ones(size(X, 2)), ones(size(X, 2))),
+    conv_dom::ModelUtilities.Domain = mono_dom,
     mono_profile::Vector{Int} = ones(Int, size(X, 2)),
     conv_profile::Int = 1,
     ) where {T <: Float64} # TODO support generic reals
     n = size(X, 2)
     num_points = size(X, 1)
 
-    (regressor_points, _) = MU.get_interp_pts(MU.FreeDomain{Float64}(n), deg)
-    lagrange_polys = MU.recover_lagrange_polys(regressor_points, deg)
+    (regressor_points, _) = ModelUtilities.get_interp_pts(ModelUtilities.FreeDomain{Float64}(n), deg)
+    lagrange_polys = ModelUtilities.recover_lagrange_polys(regressor_points, deg)
     model = JuMP.Model()
     JuMP.@variable(model, regressor, PolyJuMP.Poly(FixedPolynomialBasis(lagrange_polys)))
     x = DP.variables(lagrange_polys)
@@ -53,7 +53,7 @@ function shapeconregr_JuMP(
         # monotonicity
         if !all(iszero, mono_profile)
             gradient_halfdeg = div(deg, 2)
-            (mono_U, mono_points, mono_Ps, _) = MU.interpolate(mono_dom, gradient_halfdeg)
+            (mono_U, mono_points, mono_Ps, _) = ModelUtilities.interpolate(mono_dom, gradient_halfdeg)
             mono_wsos_cone = Hypatia.WSOSInterpNonnegativeCone{Float64, Float64}(mono_U, mono_Ps)
             for j in 1:n
                 if !iszero(mono_profile[j])
@@ -66,18 +66,18 @@ function shapeconregr_JuMP(
         # convexity
         if !iszero(conv_profile)
             hessian_halfdeg = div(deg - 1, 2)
-            (conv_U, conv_points, conv_Ps, _) = MU.interpolate(conv_dom, hessian_halfdeg)
+            (conv_U, conv_points, conv_Ps, _) = ModelUtilities.interpolate(conv_dom, hessian_halfdeg)
             conv_wsos_cone = Hypatia.WSOSInterpPosSemidefTriCone{Float64}(n, conv_U, conv_Ps)
             hessian = DP.differentiate(regressor, x, 2)
             hessian_interp = [hessian[i, j](conv_points[u, :]) for i in 1:n for j in 1:i for u in 1:conv_U]
-            MU.vec_to_svec!(hessian_interp, rt2 = sqrt(2), incr = conv_U)
+            ModelUtilities.vec_to_svec!(hessian_interp, rt2 = sqrt(2), incr = conv_U)
             JuMP.@constraint(model, conv_profile * hessian_interp in conv_wsos_cone)
         end
     else
         PolyJuMP.setpolymodule!(model, SumOfSquares)
 
         # monotonicity
-        monotonic_set = MU.get_domain_inequalities(mono_dom, x)
+        monotonic_set = ModelUtilities.get_domain_inequalities(mono_dom, x)
         for j in 1:n
             if !iszero(mono_profile[j])
                 gradient = DP.differentiate(regressor, x[j])
@@ -87,7 +87,7 @@ function shapeconregr_JuMP(
 
         # convexity
         if !iszero(conv_profile)
-            convex_set = MU.get_domain_inequalities(conv_dom, x)
+            convex_set = ModelUtilities.get_domain_inequalities(conv_dom, x)
             hessian = DP.differentiate(regressor, x, 2)
             # maxdegree of each element in the SOS-matrix is 2 * div(deg - 1, 2), but we add 2 to take auxiliary monomials into account from the SumOfSquares transformation
             JuMP.@constraint(model, Symmetric(conv_profile * hessian) in JuMP.PSDCone(), domain = convex_set, maxdegree = 2 * div(deg - 1, 2) + 2)

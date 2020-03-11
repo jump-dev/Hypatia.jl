@@ -4,49 +4,45 @@ Copyright 2020, Chris Coey, Lea Kapelevich and contributors
 common code for JuMP examples
 
 a model function returns a tuple of (JuMP model, test helpers)
-
-an instance consists of a tuple of:
-(1) tuple of args to the example model function
-(2) boolean for whether to use MOI automatic extend formulation to a `classic' cone formulation (see ClassicConeOptimizer below)
-(3) tuple of options for the example test function
-(4) tuple of solver options
 =#
 
-using Test
-import Random
-using LinearAlgebra
-import Hypatia
-const CO = Hypatia.Cones
-const MU = Hypatia.ModelUtilities
+include(joinpath(@__DIR__, "common.jl"))
 import JuMP
 const MOI = JuMP.MOI
 
-function test_JuMP_instance(
-    model_function::Function,
-    test_function::Function,
-    instance_info::NTuple{4, Any};
-    default_solver_options::NamedTuple = (verbose = false,),
+abstract type ExampleInstanceJuMP{T <: Real} <: ExampleInstance{T} end
+
+function test(
+    E::Type{<:ExampleInstanceJuMP{T}}, # an instance of a JuMP example
+    inst_data::Tuple,
+    extend::Bool = false, # whether to use MOI automatic bridging to a `classic' cone formulation
+    solver_options = nothing, # additional non-default solver options specific to the example
+    test_options = nothing; # options for the example test function
+    default_solver_options = (verbose = true,), # default solver options
     rseed::Int = 1,
-    )
-    # setup model
+    ) where {T <: Real}
+    # setup instance and model
     Random.seed!(rseed)
-    (model, test_helpers) = model_function(instance_info[1]...)
+    inst = E(inst_data...)
+    model = build(inst)
 
     # solve model
-    hyp_opt = Hypatia.Optimizer(; default_solver_options..., instance_info[4]...)
-    if instance_info[2]
+    hyp_opt = Hypatia.Optimizer(; default_solver_options..., solver_options...)
+    if extend
+        error("doesn't seem to use EF - fix")
         # use MOI automated extended formulation
         JuMP.set_optimizer(model, ClassicConeOptimizer{Float64})
-        MOI.Utilities.attach_optimizer(JuMP.backend(model))
-        MOI.copy_to(hyp_opt, JuMP.backend(model).optimizer.model)
+        model_backend = JuMP.backend(model)
+        MOI.Utilities.attach_optimizer(model_backend)
+        MOI.copy_to(hyp_opt, model_backend.optimizer.model)
     end
     JuMP.set_optimizer(model, () -> hyp_opt)
     JuMP.optimize!(model)
 
     # run tests for the example
-    test_function(model, test_helpers, instance_info[3])
+    test_extra(inst, model, test_options)
 
-    return model
+    return nothing
 end
 
 MOI.Utilities.@model(ClassicConeOptimizer,

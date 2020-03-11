@@ -62,7 +62,7 @@ function lyapunovstability_JuMP(
     end
 
     if use_matrixepipersquare
-        U_svec = CO.smat_to_svec!(zeros(eltype(U), CO.svec_length(W_rows)), U, sqrt(2))
+        U_svec = Cones.smat_to_svec!(zeros(eltype(U), Cones.svec_length(W_rows)), U, sqrt(2))
         JuMP.@constraint(model, vcat(U_svec, t / 2, vec(W)) in Hypatia.MatrixEpiPerSquareCone{Float64, Float64}(W_rows, W_cols))
     else
         JuMP.@constraint(model, Symmetric([t .* Matrix(I, W_cols, W_cols) W'; W U]) in JuMP.PSDCone())

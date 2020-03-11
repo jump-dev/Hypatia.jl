@@ -40,8 +40,8 @@ function matrixquadratic_JuMP(
     JuMP.@constraint(model, [(row, col) in zip(row_idxs, col_idxs)], Y[row, col] == P[row, col])
 
     if use_matrixepipersquare
-        U_svec = zeros(JuMP.GenericAffExpr{Float64, JuMP.VariableRef}, CO.svec_length(W_rows))
-        U_svec = CO.smat_to_svec!(U_svec, 1.0 * Y, sqrt(2))
+        U_svec = zeros(JuMP.GenericAffExpr{Float64, JuMP.VariableRef}, Cones.svec_length(W_rows))
+        U_svec = Cones.smat_to_svec!(U_svec, 1.0 * Y, sqrt(2))
         JuMP.@constraint(model, vcat(U_svec, 0.5, vec(X)) in Hypatia.MatrixEpiPerSquareCone{Float64, Float64}(W_rows, W_cols))
     else
         JuMP.@constraint(model, Symmetric([Matrix(I, W_cols, W_cols) X'; X Y]) in JuMP.PSDCone())

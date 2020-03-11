@@ -33,17 +33,17 @@ function semidefinitepoly_JuMP(
         side = size(H, 1)
         halfdeg = div(maximum(DP.maxdegree.(H)) + 1, 2)
         n = DP.nvariables(x)
-        dom = MU.FreeDomain{Float64}(n)
-        (U, pts, Ps, _) = MU.interpolate(dom, halfdeg)
+        dom = ModelUtilities.FreeDomain{Float64}(n)
+        (U, pts, Ps, _) = ModelUtilities.interpolate(dom, halfdeg)
         mat_wsos_cone = Hypatia.WSOSInterpPosSemidefTriCone{Float64}(side, U, Ps, use_dual)
 
         rt2 = sqrt(2)
         H_svec = [H[i, j](pts[u, :]) for i in 1:side for j in 1:i for u in 1:U]
-        MU.vec_to_svec!(H_svec, rt2 = rt2, incr = U)
+        ModelUtilities.vec_to_svec!(H_svec, rt2 = rt2, incr = U)
         if use_dual
             JuMP.@variable(model, z[i in 1:side, 1:i, 1:U])
             z_svec = [1.0 * z[i, j, u] for i in 1:side for j in 1:i for u in 1:U]
-            MU.vec_to_svec!(z_svec, rt2 = rt2, incr = U)
+            ModelUtilities.vec_to_svec!(z_svec, rt2 = rt2, incr = U)
             JuMP.@constraint(model, z_svec in mat_wsos_cone)
             JuMP.@objective(model, Min, dot(z_svec, H_svec))
         else

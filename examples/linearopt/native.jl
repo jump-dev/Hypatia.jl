@@ -24,7 +24,7 @@ function linearopt_native(
     c = rand(T, n)
     G = Diagonal(-one(T) * I, n) # TODO uniformscaling
     h = zeros(T, n)
-    cones = CO.Cone{T}[CO.Nonnegative{T}(n)]
+    cones = Cones.Cone{T}[Cones.Nonnegative{T}(n)]
 
     model = Models.Model{T}(c, A, b, G, h, cones)
     return (model, ())
