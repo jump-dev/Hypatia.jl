@@ -57,7 +57,7 @@ JuMP_example_names = [
     "centralpolymat",
     # "conditionnum",
     # "contraction",
-    # ("densityest", DensityEstJuMP)
+    "densityest",
     # "envelope",
     # "expdesign",
     # "lotkavolterra",

@@ -11,7 +11,7 @@ import PolyJuMP
 
 get_dataset(name::Symbol) = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "$name.txt"))
 
-struct DensityEstJuMP{T <: Real} <: ExampleInstanceJuMP
+struct DensityEstJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     dataset_name::Symbol
     num_obs::Int
     n::Int
@@ -30,39 +30,39 @@ function DensityEstJuMP{Float64}(num_obs::Int, n::Int, deg::Int, use_monomial_sp
     return DensityEstJuMP{Float64}(:Random, num_obs, n, X, deg, use_monomial_space, use_wsos)
 end
 
-options = ()
-example_tests(E::Type{DensityEstJuMP{Float64}}, ::MinimalInstances) = [
-    (E(5, 1, 2, true, true), false, options),
-    (E(:iris, 2, true, true), false, options),
-    # (E(5, 1, 2, true, true), true, options),
-    # (E(:iris, 2, true, true), true, options),
+options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
+example_tests(::Type{DensityEstJuMP{Float64}}, ::MinimalInstances) = [
+    ((5, 1, 2, true, true), false, options),
+    ((:iris, 2, true, true), false, options),
+    # ((5, 1, 2, true, true), true, options),
+    # ((:iris, 2, true, true), true, options),
     ]
-example_tests(E::Type{DensityEstJuMP{Float64}}, ::FastInstances) = [
-    (E(50, 2, 2, true, true), false, options),
-    (E(50, 2, 2, true, false), false, options),
-    (E(50, 2, 2, false, true), false, options),
-    (E(50, 2, 2, false, false), false, options),
-    (E(100, 8, 2, true, true), false, options),
-    (E(100, 8, 2, true, false), false, options),
-    (E(100, 8, 2, false, true), false, options),
-    (E(100, 8, 2, false, false), false, options),
-    (E(250, 4, 4, true, true), false, options),
-    (E(250, 4, 4, true, false), false, options),
-    (E(250, 4, 4, false, true), false, options),
-    (E(:iris, 4, true, true), false, options),
-    (E(:iris, 5, true, true), false, options),
-    (E(:iris, 6, true, true), false, options),
-    (E(:iris, 4, true, false), false, options),
-    (E(:iris, 4, false, true), false, options),
-    (E(:iris, 6, false, true), false, options),
-    (E(:iris, 4, false, false), false, options),
-    (E(:cancer, 4, true, true), false, options),
-    (E(:cancer, 4, false, true), false, options),
+example_tests(::Type{DensityEstJuMP{Float64}}, ::FastInstances) = [
+    ((50, 2, 2, true, true), false, options),
+    ((50, 2, 2, true, false), false, options),
+    ((50, 2, 2, false, true), false, options),
+    ((50, 2, 2, false, false), false, options),
+    ((100, 8, 2, true, true), false, options),
+    ((100, 8, 2, true, false), false, options),
+    ((100, 8, 2, false, true), false, options),
+    ((100, 8, 2, false, false), false, options),
+    ((250, 4, 4, true, true), false, options),
+    ((250, 4, 4, true, false), false, options),
+    ((250, 4, 4, false, true), false, options),
+    ((:iris, 4, true, true), false, options),
+    ((:iris, 5, true, true), false, options),
+    ((:iris, 6, true, true), false, options),
+    ((:iris, 4, true, false), false, options),
+    ((:iris, 4, false, true), false, options),
+    ((:iris, 6, false, true), false, options),
+    ((:iris, 4, false, false), false, options),
+    ((:cancer, 4, true, true), false, options),
+    ((:cancer, 4, false, true), false, options),
     ]
-example_tests(E::Type{DensityEstJuMP{Float64}}, ::SlowInstances) = [
-    (E(200, 4, 4, false, false), false, options),
-    (E(200, 4, 6, false, true), false, options),
-    (E(200, 4, 6, false, false), false, options),
+example_tests(::Type{DensityEstJuMP{Float64}}, ::SlowInstances) = [
+    ((200, 4, 4, false, false), false, options),
+    ((200, 4, 6, false, true), false, options),
+    ((200, 4, 6, false, false), false, options),
     ]
 
 function build(inst::DensityEstJuMP{T}) where {T <: Float64} # TODO generic reals
@@ -126,4 +126,4 @@ end
 
 # @testset "DensityEstJuMP" for inst in example_tests(DensityEstJuMP{Float64}, MinimalInstances()) test(inst...) end
 
-;
+return DensityEstJuMP
