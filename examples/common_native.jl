@@ -2,13 +2,6 @@
 Copyright 2020, Chris Coey, Lea Kapelevich and contributors
 
 common code for native examples
-
-a model function returns a tuple of ((c, A, b, G, h, cones, ...), test helpers)
-
-an instance consists of a tuple of:
-(1) args to the example model function
-(2) options for the example test function
-(3) solver options
 =#
 
 abstract type HypatiaExample end

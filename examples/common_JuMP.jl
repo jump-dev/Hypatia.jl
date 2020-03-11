@@ -2,8 +2,6 @@
 Copyright 2020, Chris Coey, Lea Kapelevich and contributors
 
 common code for JuMP examples
-
-a model function returns a tuple of (JuMP model, test helpers)
 =#
 
 include(joinpath(@__DIR__, "common.jl"))
@@ -13,14 +11,14 @@ const MOI = JuMP.MOI
 abstract type ExampleInstanceJuMP{T <: Real} <: ExampleInstance{T} end
 
 function test(
-    E::Type{<:ExampleInstanceJuMP{T}}, # an instance of a JuMP example
+    E::Type{<:ExampleInstanceJuMP{Float64}}, # an instance of a JuMP example # TODO support generic reals
     inst_data::Tuple,
     extend::Bool = false, # whether to use MOI automatic bridging to a `classic' cone formulation
     solver_options = nothing, # additional non-default solver options specific to the example
     test_options = nothing; # options for the example test function
     default_solver_options = (verbose = true,), # default solver options
     rseed::Int = 1,
-    ) where {T <: Real}
+    )
     # setup instance and model
     Random.seed!(rseed)
     inst = E(inst_data...)
