@@ -4,39 +4,29 @@ Copyright 2020, Chris Coey, Lea Kapelevich and contributors
 common code for native examples
 =#
 
-abstract type HypatiaExample end
-abstract type NativeExample <: HypatiaExample end
+include(joinpath(@__DIR__, "common.jl"))
 
-using Test
-import Random
-using LinearAlgebra
-import Hypatia
-import Hypatia.Models
-import Hypatia.Solvers
-const CO = Hypatia.Cones
-const MU = Hypatia.ModelUtilities
+abstract type ExampleInstanceNative{T <: Real} <: ExampleInstance{T} end
 
-solver_for_model(::Models.Model{T}) where {T <: Real} = Solvers.Solver{T}
-
-function test_native_instance(
-    model_function::Function,
-    test_function::Function,
-    instance_info::Tuple;
+function test(
+    E::Type{<:ExampleInstanceNative{T}}, # an instance of a native example # TODO support generic reals
+    inst_data::Tuple,
+    solver_options = nothing; # additional non-default solver options specific to the example
+    default_solver_options = (verbose = false,), # default solver options
     rseed::Int = 1,
-    default_solver_options::NamedTuple = (verbose = false,),
-    test::Bool = false,
-    checker_tols...
-    )
-    # setup model
+    checker_options...
+    ) where {T <: Real}
+    # setup instance and model
     Random.seed!(rseed)
-    (model, test_helpers) = model_function(instance_info[1]...)
+    inst = E(inst_data...)
+    model = build(inst)
 
     # solve model
-    solver = solver_for_model(model)(; default_solver_options..., instance_info[3]...)
-    result = Solvers.solve_check(model; solver = solver, test = test, checker_tols...)
+    solver = Solvers.Solver{T}(; default_solver_options..., solver_options...)
+    result = Solvers.solve_check(model; solver = solver, checker_options...)
 
     # run tests for the example
-    test_function(result, test_helpers, instance_info[2])
+    test_extra(inst, result)
 
     return result
 end

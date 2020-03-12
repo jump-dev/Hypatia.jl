@@ -5,6 +5,7 @@ common code for JuMP examples
 =#
 
 include(joinpath(@__DIR__, "common.jl"))
+
 import JuMP
 const MOI = JuMP.MOI
 
