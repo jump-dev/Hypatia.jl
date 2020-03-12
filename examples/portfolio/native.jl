@@ -132,7 +132,7 @@ function portfolio_native(
     end
 
     model = Models.Model{T}(c, A, b, G, h, cones)
-    return (model, ())
+    return model
 end
 
 function test_portfolio_native(result, test_helpers, test_options)

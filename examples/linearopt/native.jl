@@ -9,16 +9,34 @@ solves a simple linear optimization problem (LP) min c'x s.t. Ax = b, x >= 0
 include(joinpath(@__DIR__, "../common_native.jl"))
 using SparseArrays
 
-function linearopt_native(
-    ::Type{T},
-    m::Int,
-    n::Int,
-    nz_frac::Float64,
-    ) where {T <: Real}
-    # generate random data
+struct LinearOptNative{T <: Real} <: ExampleInstanceNative{T}
+    m::Int
+    n::Int
+    nz_frac::Float64
+end
+
+options = ()
+example_tests(::Type{LinearOptNative{Float64}}, ::MinimalInstances) = [
+    ((2, 4, 1.0), options),
+    ((2, 4, 0.5), options),
+    ]
+example_tests(::Type{LinearOptNative{Float64}}, ::FastInstances) = [
+    ((15, 20, 1.0), options),
+    ((15, 20, 0.25), options),
+    ((50, 100, 1.0), options),
+    ((50, 100, 0.15), options),
+    ]
+example_tests(::Type{LinearOptNative{Float64}}, ::SlowInstances) = [
+    ((500, 1000, 0.05), options),
+    ((500, 1000, 1.0), options),
+    ]
+
+function build(inst::LinearOptNative{T}) where {T <: Float64} # TODO generic reals
+    (m, n, nz_frac) = (inst.m, inst.n, inst.nz_frac)
     @assert 0 < nz_frac <= 1
 
-    A = (nz_frac >= 1.0) ? rand(T, m, n) : sprand(T, m, n, nz_frac)
+    # generate random data
+    A = (nz_frac >= 1) ? rand(T, m, n) : sprand(T, m, n, nz_frac)
     A .*= 10
     b = vec(sum(A, dims = 2))
     c = rand(T, n)
@@ -27,24 +45,13 @@ function linearopt_native(
     cones = Cones.Cone{T}[Cones.Nonnegative{T}(n)]
 
     model = Models.Model{T}(c, A, b, G, h, cones)
-    return (model, ())
+    return model
 end
 
-function test_linearopt_native(result, test_helpers, test_options)
+function test_extra(inst::LinearOptNative, result)
     @test result.status == :Optimal
 end
 
-options = ()
-linearopt_native_fast = [
-    ((Float64, 15, 20, 1.0), (), options),
-    ((Float64, 15, 20, 0.25), (), options),
-    ((Float64, 50, 100, 1.0), (), options),
-    ((Float64, 50, 100, 0.15), (), options),
-    ]
-linearopt_native_slow = [
-    ((Float64, 500, 1000, 0.05), (), options),
-    ((Float64, 500, 1000, 1.0), (), options),
-    ]
+# @testset "LinearOptNative" for inst in example_tests(LinearOptNative{Float64}, MinimalInstances()) test(inst...) end
 
-@testset "linearopt_native" begin test_native_instance.(linearopt_native, test_linearopt_native, linearopt_native_fast) end
-;
+return LinearOptNative

@@ -247,7 +247,7 @@ function matrixcompletion_native(
     b = T[]
 
     model = Models.Model{T}(c, A, b, G, h, cones)
-    return (model, ())
+    return model
 end
 
 function test_matrixcompletion_native(result, test_helpers, test_options)

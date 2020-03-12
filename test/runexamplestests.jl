@@ -38,7 +38,7 @@ real_types = [
 native_example_names = [
     # "densityest",
     # "envelope",
-    # "expdesign",
+    "expdesign",
     # "linearopt",
     # "matrixcompletion",
     # "matrixregression",
@@ -77,8 +77,8 @@ JuMP_example_names = [
 
 # types of models to run and corresponding options and example names
 model_types = [
-    # "native",
-    "JuMP",
+    "native",
+    # "JuMP",
     ]
 
 # start the tests

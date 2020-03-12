@@ -7,29 +7,93 @@ find a density function f maximizing the log likelihood of the observations
     -zᵢ + log(f(Xᵢ)) ≥ 0 ∀ i = 1,...,n
     ∫f = 1
     f ≥ 0
-==#
+=#
 
 include(joinpath(@__DIR__, "../common_native.jl"))
 import DelimitedFiles
 
-function densityest_native(
-    ::Type{T},
-    X::Matrix{T},
+struct DensityEstNative{T <: Real} <: ExampleInstanceNative{T}
+    dataset_name::Symbol
+    num_obs::Int
+    n::Int
+    X::Matrix{T}
+    deg::Int
+    use_wsos::Bool # use WSOS cone formulation, else PSD formulation
+    hypogeomean_obj::Bool # use geomean objective, else sum of logs objective
+    use_hypogeomean::Bool # use hypogeomean cone if applicable, else hypoperlog formulation
+end
+function DensityEstNative{Float64}(
+    dataset_name::Symbol,
     deg::Int,
     use_wsos::Bool,
-    hypogeomean_obj::Bool, # use geomean objective, else sum of logs objective
-    use_hypogeomean::Bool, # use hypogeomean cone if applicable, else hypoperlog formulation
-    ) where {T <: Real}
-    (num_obs, dim) = size(X)
+    hypogeomean_obj::Bool,
+    use_hypogeomean::Bool)
+    X = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "$dataset_name.txt"))
+    (num_obs, n) = size(X)
+    return DensityEstNative{Float64}(dataset_name, num_obs, n, X, deg, use_wsos, hypogeomean_obj, use_hypogeomean)
+end
+function DensityEstNative{Float64}(
+    num_obs::Int,
+    n::Int,
+    args...)
+    X = randn(num_obs, n)
+    return DensityEstNative{Float64}(:Random, num_obs, n, X, args...)
+end
 
-    domain = ModelUtilities.Box{T}(-ones(T, dim), ones(T, dim))
+options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
+example_tests(::Type{DensityEstNative{Float64}}, ::MinimalInstances) = [
+    ((5, 1, 2, true, true, true), options),
+    ((5, 1, 2, false, true, true), options),
+    ((5, 1, 2, true, false, true), options),
+    ((5, 1, 2, true, true, false), options),
+    ((:iris, 2, true, true, true), options),
+    ]
+example_tests(::Type{DensityEstNative{Float64}}, ::FastInstances) = [
+    ((50, 2, 2, true, true, true), options),
+    ((50, 2, 2, false, true, true), options),
+    ((50, 2, 2, true, false, true), options),
+    ((50, 2, 2, true, true, false), options),
+    ((100, 8, 2, true, true, true), options),
+    ((100, 8, 2, false, true, true), options),
+    ((100, 8, 2, true, false, true), options),
+    ((100, 8, 2, true, true, false), options),
+    ((250, 4, 6, true, true, true), options),
+    ((250, 4, 6, false, true, true), options),
+    ((250, 4, 6, true, false, true), options),
+    ((250, 4, 6, true, true, false), options),
+    ((:iris_data, 4, true, true, true), options),
+    ((:iris_data, 5, true, true, true), options),
+    ((:iris_data, 6, true, true, true), options),
+    ((:iris_data, 4, false, true, true), options),
+    ((:iris_data, 4, true, false, true), options),
+    ((:iris_data, 4, true, true, false), options),
+    ((:cancer_data, 4, true, true, true), options),
+    ((:cancer_data, 4, false, true, true), options),
+    ((:cancer_data, 4, true, false, true), options),
+    ((:cancer_data, 4, true, true, false), options),
+    ]
+example_tests(::Type{DensityEstNative{Float64}}, ::SlowInstances) = [
+    ((:cancer_data, 6, true, true, true), options),
+    ((:cancer_data, 6, false, true, true), options),
+    ((:cancer_data, 6, true, false, true), options),
+    ((:cancer_data, 6, true, true, false), options),
+    ((400, 5, 6, true, true, true), options),
+    ((400, 5, 6, false, true, true), options),
+    ((400, 5, 6, true, false, true), options),
+    ((400, 5, 6, true, true, false), options),
+    ]
+
+function build(inst::DensityEstNative{T}) where {T <: Float64} # TODO generic reals
+    (X, num_obs) = (inst.X, inst.num_obs)
+
+    domain = ModelUtilities.Box{Float64}(-ones(inst.n), ones(inst.n))
     # rescale X to be in unit box
     minX = minimum(X, dims = 1)
     maxX = maximum(X, dims = 1)
     X .-= (minX + maxX) / 2
     X ./= (maxX - minX) / 2
 
-    halfdeg = div(deg + 1, 2)
+    halfdeg = div(inst.deg + 1, 2)
     (U, pts, Ps, w) = ModelUtilities.interpolate(domain, halfdeg, calc_w = true)
     lagrange_polys = ModelUtilities.recover_lagrange_polys(pts, 2 * halfdeg)
     basis_evals = Matrix{T}(undef, num_obs, U)
@@ -40,7 +104,7 @@ function densityest_native(
     cones = Cones.Cone{T}[]
 
     num_psd_vars = 0
-    if use_wsos
+    if inst.use_wsos
         # U variables
         h_poly = zeros(T, U)
         b_poly = T[]
@@ -72,9 +136,9 @@ function densityest_native(
         h_poly = zeros(T, num_psd_vars)
     end
 
-    if hypogeomean_obj
+    if inst.hypogeomean_obj
         num_hypo_vars = 1
-        if use_hypogeomean
+        if inst.use_hypogeomean
             G_likl = [
                 -one(T) zeros(T, 1, U)
                 zeros(T, num_obs) -basis_evals
@@ -120,7 +184,7 @@ function densityest_native(
     end
 
     # extended formulation variables for hypogeomean cone are added after psd ones, so psd vars were already accounted for in hypogeomean_obj && !use_hypogeomean path
-    if !hypogeomean_obj || use_hypogeomean
+    if !inst.hypogeomean_obj || inst.use_hypogeomean
         G_likl = hcat(G_likl, zeros(T, size(G_likl, 1), num_psd_vars))
         num_ext_geom_vars = 0
     end
@@ -129,7 +193,7 @@ function densityest_native(
     h = vcat(h_poly, h_likl)
     b = vcat(b_poly, one(T))
 
-    if use_wsos
+    if inst.use_wsos
         A = zeros(T, 1, num_hypo_vars + U + num_ext_geom_vars)
         A[1, num_hypo_vars .+ (1:U)] = w
         G = zeros(T, U + size(G_likl, 1), size(G_likl, 2))
@@ -146,64 +210,13 @@ function densityest_native(
     end
 
     model = Models.Model{T}(c, A, b, G, h, cones)
-    return (model, ())
+    return model
 end
 
-densityest_native(
-    ::Type{T},
-    data_name::Symbol,
-    args...; kwargs...
-    ) where {T <: Real} = densityest_native(T, convert(Matrix{T}, eval(data_name)), args...; kwargs...)
-
-densityest_native(
-    ::Type{T},
-    num_obs::Int,
-    n::Int,
-    args...; kwargs...
-    ) where {T <: Real} = densityest_native(T, randn(T, num_obs, n), args...; kwargs...)
-
-function test_densityest_native(result, test_helpers, test_options)
+function test_extra(inst::DensityEstNative, result)
     @test result.status == :Optimal
 end
 
-iris_data = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "iris.txt"))
-cancer_data = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "cancer.txt"))
+# @testset "DensityEstNative" for inst in example_tests(DensityEstNative{Float64}, MinimalInstances()) test(inst...) end
 
-options = ()
-densityest_native_fast = [
-    ((Float64, :iris_data, 4, true, true, true), (), options),
-    ((Float64, :iris_data, 5, true, true, true), (), options),
-    ((Float64, :iris_data, 6, true, true, true), (), options),
-    ((Float64, :iris_data, 4, false, true, true), (), options),
-    ((Float64, :iris_data, 4, true, false, true), (), options),
-    ((Float64, :iris_data, 4, true, true, false), (), options),
-    ((Float64, :cancer_data, 4, true, true, true), (), options),
-    ((Float64, :cancer_data, 4, false, true, true), (), options),
-    ((Float64, :cancer_data, 4, true, false, true), (), options),
-    ((Float64, :cancer_data, 4, true, true, false), (), options),
-    ((Float64, 50, 2, 2, true, true, true), (), options),
-    ((Float64, 50, 2, 2, false, true, true), (), options),
-    ((Float64, 50, 2, 2, true, false, true), (), options),
-    ((Float64, 50, 2, 2, true, true, false), (), options),
-    ((Float64, 100, 8, 2, true, true, true), (), options),
-    ((Float64, 100, 8, 2, false, true, true), (), options),
-    ((Float64, 100, 8, 2, true, false, true), (), options),
-    ((Float64, 100, 8, 2, true, true, false), (), options),
-    ((Float64, 250, 4, 6, true, true, true), (), options),
-    ((Float64, 250, 4, 6, false, true, true), (), options),
-    ((Float64, 250, 4, 6, true, false, true), (), options),
-    ((Float64, 250, 4, 6, true, true, false), (), options),
-    ]
-densityest_native_slow = [
-    ((Float64, :cancer_data, 6, true, true, true), (), options),
-    ((Float64, :cancer_data, 6, false, true, true), (), options),
-    ((Float64, :cancer_data, 6, true, false, true), (), options),
-    ((Float64, :cancer_data, 6, true, true, false), (), options),
-    ((Float64, 400, 5, 6, true, true, true), (), options),
-    ((Float64, 400, 5, 6, false, true, true), (), options),
-    ((Float64, 400, 5, 6, true, false, true), (), options),
-    ((Float64, 400, 5, 6, true, true, false), (), options),
-    ]
-
-@testset "densityest_native" begin test_native_instance.(densityest_native, test_densityest_native, densityest_native_fast) end
-;
+return DensityEstNative

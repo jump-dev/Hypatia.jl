@@ -2,14 +2,12 @@
 Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 
 see description in native.jl
-==#
+=#
 
 include(joinpath(@__DIR__, "../common_JuMP.jl"))
 import DelimitedFiles
 import DynamicPolynomials
 import PolyJuMP
-
-get_dataset(name::Symbol) = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "$name.txt"))
 
 struct DensityEstJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     dataset_name::Symbol
@@ -25,18 +23,16 @@ function DensityEstJuMP{Float64}(
     deg::Int,
     use_monomial_space::Bool,
     use_wsos::Bool)
-    X = get_dataset(dataset_name)
+    X = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "$dataset_name.txt"))
     (num_obs, n) = size(X)
     return DensityEstJuMP{Float64}(dataset_name, num_obs, n, X, deg, use_monomial_space, use_wsos)
 end
 function DensityEstJuMP{Float64}(
     num_obs::Int,
     n::Int,
-    deg::Int,
-    use_monomial_space::Bool,
-    use_wsos::Bool)
+    args...)
     X = randn(num_obs, n)
-    return DensityEstJuMP{Float64}(:Random, num_obs, n, X, deg, use_monomial_space, use_wsos)
+    return DensityEstJuMP{Float64}(:Random, num_obs, n, X, args...)
 end
 
 options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
