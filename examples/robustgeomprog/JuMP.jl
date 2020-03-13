@@ -58,10 +58,4 @@ function build(inst::RobustGeomProgJuMP{T}) where {T <: Float64} # TODO generic 
     return model
 end
 
-function test_extra(inst::RobustGeomProgJuMP, model)
-    @test JuMP.termination_status(model) == MOI.OPTIMAL
-end
-
-# @testset "RobustGeomProgJuMP" for inst in example_tests(RobustGeomProgJuMP{Float64}, MinimalInstances()) test(inst...) end
-
 return RobustGeomProgJuMP

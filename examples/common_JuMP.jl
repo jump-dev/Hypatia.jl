@@ -9,6 +9,19 @@ include(joinpath(@__DIR__, "common.jl"))
 import JuMP
 const MOI = JuMP.MOI
 
+MOI.Utilities.@model(ClassicConeOptimizer,
+    (),
+    (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan, MOI.Interval,),
+    (MOI.Reals, MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives,
+    MOI.SecondOrderCone, MOI.RotatedSecondOrderCone, MOI.PositiveSemidefiniteConeTriangle, MOI.ExponentialCone, MOI.DualExponentialCone,),
+    (MOI.PowerCone, MOI.DualPowerCone,),
+    (),
+    (MOI.ScalarAffineFunction,),
+    (MOI.VectorOfVariables,),
+    (MOI.VectorAffineFunction,),
+    true,
+    )
+
 abstract type ExampleInstanceJuMP{T <: Real} <: ExampleInstance{T} end
 
 function test(
@@ -43,15 +56,7 @@ function test(
     return model_backend.optimizer.model.optimizer.result
 end
 
-MOI.Utilities.@model(ClassicConeOptimizer,
-    (),
-    (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan, MOI.Interval,),
-    (MOI.Reals, MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives,
-    MOI.SecondOrderCone, MOI.RotatedSecondOrderCone, MOI.PositiveSemidefiniteConeTriangle, MOI.ExponentialCone, MOI.DualExponentialCone,),
-    (MOI.PowerCone, MOI.DualPowerCone,),
-    (),
-    (MOI.ScalarAffineFunction,),
-    (MOI.VectorOfVariables,),
-    (MOI.VectorAffineFunction,),
-    true,
-    )
+# fallback: just check optimal status
+function test_extra(inst::ExampleInstanceJuMP{T}, model::JuMP.Model) where T
+    @test JuMP.termination_status(model) == MOI.OPTIMAL
+end

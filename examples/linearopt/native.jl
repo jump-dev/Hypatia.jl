@@ -47,10 +47,4 @@ function build(inst::LinearOptNative{T}) where {T <: Real}
     return model
 end
 
-function test_extra(inst::LinearOptNative, result)
-    @test result.status == :Optimal
-end
-
-# @testset "LinearOptNative" for inst in example_tests(LinearOptNative{Float64}, MinimalInstances()) test(inst...) end
-
 return LinearOptNative

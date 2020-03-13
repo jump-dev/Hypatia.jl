@@ -145,7 +145,7 @@ function build(inst::SignomialMinJuMP{T}) where {T <: Float64} # TODO generic re
     return model
 end
 
-function test_extra(inst::SignomialMinJuMP{T}, model) where T
+function test_extra(inst::SignomialMinJuMP{T}, model::JuMP.Model) where T
     @test JuMP.termination_status(model) == MOI.OPTIMAL
     if JuMP.termination_status(model) == MOI.OPTIMAL && !isnan(inst.obj_ub)
         # check objective value is correct
@@ -153,7 +153,5 @@ function test_extra(inst::SignomialMinJuMP{T}, model) where T
         @test JuMP.objective_value(model) <= inst.obj_ub + tol
     end
 end
-
-# @testset "SignomialMinJuMP" for inst in example_tests(SignomialMinJuMP{Float64}, MinimalInstances()) test(inst...) end
 
 return SignomialMinJuMP

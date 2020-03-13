@@ -59,10 +59,4 @@ function build(inst::MaxVolumeJuMP{T}) where {T <: Float64} # TODO generic reals
     return model
 end
 
-function test_extra(inst::MaxVolumeJuMP, model)
-    @test JuMP.termination_status(model) == MOI.OPTIMAL
-end
-
-# @testset "MaxVolumeJuMP" for inst in example_tests(MaxVolumeJuMP{Float64}, MinimalInstances()) test(inst...) end
-
 return MaxVolumeJuMP

@@ -70,7 +70,7 @@ function build(inst::MuConvexityJuMP{T}) where {T <: Float64} # TODO generic rea
     return model
 end
 
-function test_extra(inst::MuConvexityJuMP{T}, model) where T
+function test_extra(inst::MuConvexityJuMP{T}, model::JuMP.Model) where T
     @test JuMP.termination_status(model) == MOI.OPTIMAL
     if JuMP.termination_status(model) == MOI.OPTIMAL && !isnan(inst.true_mu)
         # check objective value is correct
@@ -78,7 +78,5 @@ function test_extra(inst::MuConvexityJuMP{T}, model) where T
         @test JuMP.objective_value(model) ≈ inst.true_mu atol = tol rtol = tol
     end
 end
-
-# @testset "MuConvexityJuMP" for inst in example_tests(MuConvexityJuMP{Float64}, MinimalInstances()) test(inst...) end
 
 return MuConvexityJuMP

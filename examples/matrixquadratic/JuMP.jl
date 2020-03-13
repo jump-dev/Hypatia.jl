@@ -65,10 +65,4 @@ function build(inst::MatrixQuadraticJuMP{T}) where {T <: Float64} # TODO generic
     return model
 end
 
-function test_extra(inst::MatrixQuadraticJuMP, model)
-    @test JuMP.termination_status(model) == MOI.OPTIMAL
-end
-
-# @testset "MatrixQuadraticJuMP" for inst in example_tests(MatrixQuadraticJuMP{Float64}, MinimalInstances()) test(inst...) end
-
 return MatrixQuadraticJuMP

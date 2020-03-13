@@ -219,10 +219,4 @@ function build(inst::DensityEstNative{T}) where {T <: Real}
     return model
 end
 
-function test_extra(inst::DensityEstNative, result)
-    @test result.status == :Optimal
-end
-
-# @testset "DensityEstNative" for inst in example_tests(DensityEstNative{Float64}, MinimalInstances()) test(inst...) end
-
 return DensityEstNative

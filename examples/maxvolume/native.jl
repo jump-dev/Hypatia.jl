@@ -157,10 +157,4 @@ function build(inst::MaxVolumeNative{T}) where {T <: Real}
     return model
 end
 
-function test_extra(inst::MaxVolumeNative, result)
-    @test result.status == :Optimal
-end
-
-# @testset "MaxVolumeNative" for inst in example_tests(MaxVolumeNative{Float64}, MinimalInstances()) test(inst...) end
-
 return MaxVolumeNative

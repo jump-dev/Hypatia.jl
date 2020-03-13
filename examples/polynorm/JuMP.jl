@@ -47,10 +47,4 @@ function build(inst::PolyNormJuMP{T}) where {T <: Float64} # TODO generic reals
     return model
 end
 
-function test_extra(inst::PolyNormJuMP, model)
-    @test JuMP.termination_status(model) == MOI.OPTIMAL
-end
-
-# @testset "PolyNormJuMP" for inst in example_tests(PolyNormJuMP{Float64}, MinimalInstances()) test(inst...) end
-
 return PolyNormJuMP

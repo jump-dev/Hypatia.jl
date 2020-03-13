@@ -29,6 +29,12 @@ instance_sets = [
     # (SlowInstances, Float64, 120),
     ]
 
+# types of models to run and corresponding options and example names
+model_types = [
+    "native",
+    "JuMP",
+    ]
+
 # list of names of native examples to run
 native_example_names = [
     "densityest",
@@ -70,12 +76,6 @@ JuMP_example_names = [
     "signomialmin",
     ]
 
-# types of models to run and corresponding options and example names
-model_types = [
-    "native",
-    "JuMP",
-    ]
-
 # start the tests
 @info("starting examples tests")
 for (inst_set, real_T, time_limit) in instance_sets
@@ -105,10 +105,11 @@ all_tests_time = time()
 
 @testset "examples tests" begin
     for (ex_name, ex_type) in example_types, (inst_set, real_T, time_limit) in instance_sets
-        solver_options = (default_solver_options..., time_limit = time_limit)
         ex_type_T = ex_type{real_T}
         instances = example_tests(ex_type_T, inst_set())
+        isempty(instances) && continue
         println("\nstarting $(length(instances)) instances for $ex_type_T $inst_set\n")
+        solver_options = (default_solver_options..., time_limit = time_limit)
         for (inst_num, inst) in enumerate(instances)
             test_info = "$ex_type_T $inst_set $inst_num: $(inst[1])"
             @testset "$test_info" begin
@@ -125,8 +126,8 @@ all_tests_time = time()
     @printf("\nexamples tests total time: %8.2e seconds\n\n", time() - all_tests_time)
     show(perf, allrows = true, allcols = true)
     println("\n")
-    # show(timer)
-    # println("\n")
+    show(timer)
+    println("\n")
 end
 
 ;

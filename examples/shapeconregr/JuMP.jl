@@ -198,7 +198,7 @@ function build(inst::ShapeConRegrJuMP{T}) where {T <: Float64} # TODO generic re
     return model
 end
 
-function test_extra(inst::ShapeConRegrJuMP{T}, model) where T
+function test_extra(inst::ShapeConRegrJuMP{T}, model::JuMP.Model) where T
     @test JuMP.termination_status(model) == MOI.OPTIMAL
     if JuMP.termination_status(model) == MOI.OPTIMAL && inst.is_fit_exact
         # check objective value is correct
@@ -206,7 +206,5 @@ function test_extra(inst::ShapeConRegrJuMP{T}, model) where T
         @test JuMP.objective_value(model) ≈ 0 atol = tol rtol = tol
     end
 end
-
-# @testset "ShapeConRegrJuMP" for inst in example_tests(ShapeConRegrJuMP{Float64}, MinimalInstances()) test(inst...) end
 
 return ShapeConRegrJuMP

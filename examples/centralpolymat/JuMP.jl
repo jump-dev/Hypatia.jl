@@ -73,10 +73,4 @@ function build(inst::CentralPolyMatJuMP{T}) where {T <: Float64} # TODO generic 
     return model
 end
 
-function test_extra(inst::CentralPolyMatJuMP, model)
-    @test JuMP.termination_status(model) == MOI.OPTIMAL
-end
-
-# @testset "CentralPolyMatJuMP" for inst in example_tests(CentralPolyMatJuMP{Float64}, MinimalInstances()) test(inst...) end
-
 return CentralPolyMatJuMP
