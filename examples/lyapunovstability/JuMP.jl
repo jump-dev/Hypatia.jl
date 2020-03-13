@@ -98,10 +98,4 @@ function build(inst::LyapunovStabilityJuMP{T}) where {T <: Float64} # TODO gener
     return model
 end
 
-function test_extra(inst::LyapunovStabilityJuMP, model)
-    @test JuMP.termination_status(model) == MOI.OPTIMAL
-end
-
-# @testset "LyapunovStabilityJuMP" for inst in example_tests(LyapunovStabilityJuMP{Float64}, MinimalInstances()) test(inst...) end
-
 return LyapunovStabilityJuMP

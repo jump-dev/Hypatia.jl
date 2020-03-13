@@ -80,10 +80,8 @@ function build(inst::ContractionJuMP{T}) where {T <: Float64} # TODO generic rea
     return model
 end
 
-function test_extra(inst::ContractionJuMP, model)
+function test_extra(inst::ContractionJuMP{T}, model::JuMP.Model) where T
     @test JuMP.termination_status(model) == (inst.is_feas ? MOI.OPTIMAL : MOI.INFEASIBLE)
 end
-
-# @testset "ContractionJuMP" for inst in example_tests(ContractionJuMP{Float64}, MinimalInstances()) test(inst...) end
 
 return ContractionJuMP

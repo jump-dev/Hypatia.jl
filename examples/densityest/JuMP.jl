@@ -130,10 +130,4 @@ function build(inst::DensityEstJuMP{T}) where {T <: Float64} # TODO generic real
     return model
 end
 
-function test_extra(inst::DensityEstJuMP, model)
-    @test JuMP.termination_status(model) == MOI.OPTIMAL
-end
-
-# @testset "DensityEstJuMP" for inst in example_tests(DensityEstJuMP{Float64}, MinimalInstances()) test(inst...) end
-
 return DensityEstJuMP

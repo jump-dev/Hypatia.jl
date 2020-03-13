@@ -85,10 +85,4 @@ function build(inst::RegionOfAttrJuMP{T}) where {T <: Float64} # TODO generic re
     return model
 end
 
-function test_extra(inst::RegionOfAttrJuMP, model)
-    @test JuMP.termination_status(model) == MOI.OPTIMAL
-end
-
-# @testset "RegionOfAttrJuMP" for inst in example_tests(RegionOfAttrJuMP{Float64}, MinimalInstances()) test(inst...) end
-
 return RegionOfAttrJuMP

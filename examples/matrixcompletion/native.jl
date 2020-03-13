@@ -284,10 +284,4 @@ function build(inst::MatrixCompletionNative{T}) where {T <: Real}
     return model
 end
 
-function test_extra(inst::MatrixCompletionNative, result)
-    @test result.status == :Optimal
-end
-
-# @testset "MatrixCompletionNative" for inst in example_tests(MatrixCompletionNative{Float64}, MinimalInstances()) test(inst...) end
-
 return MatrixCompletionNative

@@ -30,3 +30,8 @@ function test(
 
     return result
 end
+
+# fallback: just check optimal status
+function test_extra(inst::ExampleInstanceNative, result::NamedTuple)
+    @test result.status == :Optimal
+end

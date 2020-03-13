@@ -79,10 +79,4 @@ function build(inst::EnvelopeNative{T}) where {T <: Real}
     return model
 end
 
-function test_extra(inst::EnvelopeNative, result)
-    @test result.status == :Optimal
-end
-
-# @testset "EnvelopeNative" for inst in example_tests(EnvelopeNative{Float64}, MinimalInstances()) test(inst...) end
-
 return EnvelopeNative

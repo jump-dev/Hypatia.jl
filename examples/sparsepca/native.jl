@@ -146,7 +146,7 @@ function build(inst::SparsePCANative{T}) where {T <: Real}
     return model
 end
 
-function test_extra(inst::SparsePCANative, result)
+function test_extra(inst::SparsePCANative, result::NamedTuple)
     @test result.status == :Optimal
     if result.status == :Optimal && iszero(inst.noise_ratio)
         # check objective value is correct
@@ -154,7 +154,5 @@ function test_extra(inst::SparsePCANative, result)
         @test result.primal_obj ≈ -1 atol = tol rtol = tol
     end
 end
-
-# @testset "SparsePCANative" for inst in example_tests(SparsePCANative{Float64}, MinimalInstances()) test(inst...) end
 
 return SparsePCANative

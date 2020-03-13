@@ -102,10 +102,4 @@ function build(inst::ConditionNumJuMP{T}) where {T <: Float64} # TODO generic re
     return model
 end
 
-function test_extra(inst::ConditionNumJuMP, model)
-    @test JuMP.termination_status(model) == MOI.OPTIMAL
-end
-
-# @testset "ConditionNumJuMP" for inst in example_tests(ConditionNumJuMP{Float64}, MinimalInstances()) test(inst...) end
-
 return ConditionNumJuMP

@@ -170,10 +170,4 @@ function build(inst::PortfolioNative{T}) where {T <: Real}
     return model
 end
 
-function test_extra(inst::PortfolioNative, result)
-    @test result.status == :Optimal
-end
-
-# @testset "PortfolioNative" for inst in example_tests(PortfolioNative{Float64}, MinimalInstances()) test(inst...) end
-
 return PortfolioNative

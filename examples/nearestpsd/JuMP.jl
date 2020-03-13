@@ -111,10 +111,4 @@ function build(inst::NearestPSDJuMP{T}) where {T <: Float64} # TODO generic real
     return model
 end
 
-function test_extra(inst::NearestPSDJuMP, model)
-    @test JuMP.termination_status(model) == MOI.OPTIMAL
-end
-
-# @testset "NearestPSDJuMP" for inst in example_tests(NearestPSDJuMP{Float64}, MinimalInstances()) test(inst...) end
-
 return NearestPSDJuMP

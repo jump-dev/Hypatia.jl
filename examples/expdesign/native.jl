@@ -22,7 +22,7 @@ struct ExpDesignNative{T <: Real} <: ExampleInstanceNative{T}
 end
 
 example_tests(::Type{ExpDesignNative{Float64}}, ::MinimalInstances) = begin
-    options = (tol_feas = 1e-6, tol_rel_opt = 1e-5, tol_abs_opt = 1e-5)
+    options = (tol_feas = 1e-5, tol_rel_opt = 1e-5, tol_abs_opt = 1e-5)
     return [
     ((2, 3, 4, 2, true, false, false, true, true, false), options),
     ((2, 3, 4, 2, true, false, false, true, true, true), options),
@@ -37,7 +37,7 @@ example_tests(::Type{<:ExpDesignNative{<:Real}}, ::MinimalInstances) = [
     ((2, 3, 4, 2, false, false, true, true, true, true),),
     ]
 example_tests(::Type{ExpDesignNative{Float64}}, ::FastInstances) = begin
-    options = (tol_feas = 1e-6, tol_rel_opt = 1e-5, tol_abs_opt = 1e-5)
+    options = (tol_feas = 1e-5, tol_rel_opt = 1e-5, tol_abs_opt = 1e-5)
     return [
     ((3, 5, 7, 2, true, false, false, true, true, false), options),
     ((3, 5, 7, 2, true, false, false, true, true, true), options),
@@ -60,7 +60,7 @@ example_tests(::Type{ExpDesignNative{Float64}}, ::FastInstances) = begin
     ]
 end
 example_tests(::Type{ExpDesignNative{Float64}}, ::SlowInstances) = begin
-    options = (tol_feas = 1e-6, tol_rel_opt = 1e-5, tol_abs_opt = 1e-5)
+    options = (tol_feas = 1e-5, tol_rel_opt = 1e-5, tol_abs_opt = 1e-5)
     return [
     # TODO commented too slow
     # ((100, 200, 200, 10, true, false, false, true, true, false),),
@@ -289,15 +289,8 @@ function build(inst::ExpDesignNative{T}) where {T <: Real}
         h = vcat(h_norminf, h_psd, h_log)
     end
 
-    @show T, typeof(A), typeof(h)
     model = Models.Model{T}(c, A, b, G, h, cones)
     return model
 end
-
-function test_extra(inst::ExpDesignNative, result)
-    @test result.status == :Optimal
-end
-
-# @testset "ExpDesignNative" for inst in example_tests(ExpDesignNative{Float64}, MinimalInstances()) test(inst...) end
 
 return ExpDesignNative

@@ -297,7 +297,7 @@ function build(inst::MatrixRegressionNative{T}) where {T <: Real}
     return model
 end
 
-function test_extra(inst::MatrixRegressionNative{T}, result) where T
+function test_extra(inst::MatrixRegressionNative{T}, result::NamedTuple) where T
     @test result.status == :Optimal
     if result.status == :Optimal
         # check objective value is correct
@@ -316,7 +316,5 @@ function test_extra(inst::MatrixRegressionNative{T}, result) where T
         @test result.primal_obj ≈ obj_result atol = tol rtol = tol
     end
 end
-
-# @testset "MatrixRegressionNative" for inst in example_tests(MatrixRegressionNative{T}, MinimalInstances()) test(inst...) end
 
 return MatrixRegressionNative

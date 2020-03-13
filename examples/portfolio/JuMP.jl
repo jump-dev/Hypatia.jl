@@ -65,10 +65,4 @@ function build(inst::PortfolioJuMP{T}) where {T <: Float64} # TODO generic reals
     return model
 end
 
-function test_extra(inst::PortfolioJuMP, model)
-    @test JuMP.termination_status(model) == MOI.OPTIMAL
-end
-
-# @testset "PortfolioJuMP" for inst in example_tests(PortfolioJuMP{Float64}, MinimalInstances()) test(inst...) end
-
 return PortfolioJuMP

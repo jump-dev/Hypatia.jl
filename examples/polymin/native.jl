@@ -225,7 +225,7 @@ function build_complex(inst::PolyMinNative{T}) where {T <: Real}
     return model
 end
 
-function test_extra(inst::PolyMinNative{T}, result) where T
+function test_extra(inst::PolyMinNative{T}, result::NamedTuple) where T
     @test result.status == :Optimal
     if result.status == :Optimal && !isnan(inst.true_min)
         # check objective value is correct
@@ -234,7 +234,5 @@ function test_extra(inst::PolyMinNative{T}, result) where T
         @test result.primal_obj ≈ true_min atol = tol rtol = tol
     end
 end
-
-# @testset "PolyMinNative" for inst in example_tests(PolyMinNative{T}, MinimalInstances()) test(inst...) end
 
 return PolyMinNative

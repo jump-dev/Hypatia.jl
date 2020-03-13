@@ -109,7 +109,7 @@ function build(inst::MatrixRegressionJuMP{T}) where {T <: Float64} # TODO generi
     return model
 end
 
-function test_extra(inst::MatrixRegressionJuMP{T}, model) where T
+function test_extra(inst::MatrixRegressionJuMP{T}, model::JuMP.Model) where T
     @test JuMP.termination_status(model) == MOI.OPTIMAL
     if JuMP.termination_status(model) == MOI.OPTIMAL
         # check objective value is correct
@@ -126,7 +126,5 @@ function test_extra(inst::MatrixRegressionJuMP{T}, model) where T
         @test JuMP.objective_value(model) ≈ obj_result atol = tol rtol = tol
     end
 end
-
-# @testset "MatrixRegressionJuMP" for inst in example_tests(MatrixRegressionJuMP{Float64}, MinimalInstances()) test(inst...) end
 
 return MatrixRegressionJuMP
