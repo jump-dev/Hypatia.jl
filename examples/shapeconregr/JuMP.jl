@@ -68,16 +68,17 @@ shapeconregr_data = Dict(
     :func10 => (x -> sum(exp.(x))),
     )
 
-options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
-relaxed_options = (tol_feas = 1e-5, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4)
 example_tests(::Type{ShapeConRegrJuMP{Float64}}, ::MinimalInstances) = [
-    ((:naics5811, 3, true, false, false), false, options),
-    ((1, 5, :func1, 2, 4, true, false, false), false, options),
-    ((1, 5, :func1, 2, 4, true, true, false), false, options),
-    ((1, 5, :func1, 2, 4, false, false, false), false, options),
-    ((1, 5, :func1, 2, 4, false, true, false), false, options),
+    ((:naics5811, 3, true, false, false), false),
+    ((1, 5, :func1, 2, 4, true, false, false), false),
+    ((1, 5, :func1, 2, 4, true, true, false), false),
+    ((1, 5, :func1, 2, 4, false, false, false), false),
+    ((1, 5, :func1, 2, 4, false, true, false), false),
     ]
-example_tests(::Type{ShapeConRegrJuMP{Float64}}, ::FastInstances) = [
+example_tests(::Type{ShapeConRegrJuMP{Float64}}, ::FastInstances) = begin
+    options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
+    relaxed_options = (tol_feas = 1e-5, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4)
+    return [
     ((:naics5811, 4, true, false, false), false, options),
     ((:naics5811, 4, true, true, false), false, relaxed_options),
     ((:naics5811, 3, false, false, false), false, options),
@@ -98,11 +99,15 @@ example_tests(::Type{ShapeConRegrJuMP{Float64}}, ::FastInstances) = [
     ((5, 100, :func9, 9, 4, true, false, false), false, options),
     ((5, 100, :func10, 4, 4, true, false, false), false, options),
     ]
-example_tests(::Type{ShapeConRegrJuMP{Float64}}, ::SlowInstances) = [
+end
+example_tests(::Type{ShapeConRegrJuMP{Float64}}, ::SlowInstances) = begin
+    options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
+    return [
     ((:naics5811, 7, true, false, false), false, options),
     ((4, 150, :func6, 0, 4, false, false, true), false, options),
     ((3, 150, :func8, 0, 6, false, false, true), false, options),
     ]
+end
 
 function build(inst::ShapeConRegrJuMP{T}) where {T <: Float64} # TODO generic reals
     (X, y, deg) = (inst.X, inst.y, inst.deg)

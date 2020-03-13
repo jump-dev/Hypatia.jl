@@ -20,14 +20,14 @@ struct LotkaVolterraJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     deg::Int # polynomial degrees
 end
 
-options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
 example_tests(::Type{LotkaVolterraJuMP{Float64}}, ::MinimalInstances) = [
-    ((2,), false, options),
+    ((2,), false),
     ]
 example_tests(::Type{LotkaVolterraJuMP{Float64}}, ::FastInstances) = [
+    ((4,), false),
     ]
 example_tests(::Type{LotkaVolterraJuMP{Float64}}, ::SlowInstances) = [
-    ((6,), false, options),
+    ((6,), false),
     ]
 
 function build(inst::LotkaVolterraJuMP{T}) where {T <: Float64} # TODO generic reals

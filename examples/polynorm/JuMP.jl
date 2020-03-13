@@ -14,13 +14,12 @@ struct PolyNormJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     num_polys::Int
 end
 
-options = ()
 example_tests(::Type{PolyNormJuMP{Float64}}, ::MinimalInstances) = [
-    ((1, 2, 2), false, options),
+    ((1, 2, 2), false),
     ]
 example_tests(::Type{PolyNormJuMP{Float64}}, ::FastInstances) = [
-    ((2, 2, 2), false, options),
-    ((2, 1, 3), false, options),
+    ((2, 2, 2), false),
+    ((2, 1, 3), false),
     ]
 example_tests(::Type{PolyNormJuMP{Float64}}, ::SlowInstances) = [
     ]

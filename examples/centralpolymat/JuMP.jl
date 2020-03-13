@@ -14,14 +14,18 @@ struct CentralPolyMatJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     logdet_obj::Bool # use logdet, else rootdet
 end
 
-options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
-example_tests(::Type{CentralPolyMatJuMP{Float64}}, ::MinimalInstances) = [
+example_tests(::Type{CentralPolyMatJuMP{Float64}}, ::MinimalInstances) = begin
+    options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
+    return [
     ((2, 2, true), false, options),
     ((2, 2, false), false, options),
     # ((2, 2, true), true, options),
     # ((2, 2, false), true, options),
     ]
-example_tests(::Type{CentralPolyMatJuMP{Float64}}, ::FastInstances) = [
+end
+example_tests(::Type{CentralPolyMatJuMP{Float64}}, ::FastInstances) = begin
+    options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
+    return [
     ((2, 3, true), false, options),
     ((2, 3, false), false, options),
     ((3, 2, true), false, options),
@@ -31,12 +35,16 @@ example_tests(::Type{CentralPolyMatJuMP{Float64}}, ::FastInstances) = [
     ((7, 2, true), false, options),
     ((7, 2, false), false, options),
     ]
-example_tests(::Type{CentralPolyMatJuMP{Float64}}, ::SlowInstances) = [
+end
+example_tests(::Type{CentralPolyMatJuMP{Float64}}, ::SlowInstances) = begin
+    options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
+    return [
     ((3, 5, true), false, options),
     ((3, 5, false), false, options),
     ((6, 3, true), false, options),
     ((6, 3, false), false, options),
     ]
+end
 
 function build(inst::CentralPolyMatJuMP{T}) where {T <: Float64} # TODO generic reals
     (n, halfdeg) = (inst.n, inst.halfdeg)

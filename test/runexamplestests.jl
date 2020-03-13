@@ -20,18 +20,13 @@ default_solver_options = (
     timer = timer,
     )
 
-# instance sets to run and corresponding time limits (seconds)
+# instance sets and real types to run and corresponding time limits (seconds)
 instance_sets = [
-    # (MinimalInstances, 15),
-    (FastInstances, 15),
-    # (SlowInstances, 120),
-    ]
-
-# TODO
-real_types = [
-    Float64,
-    # Float32,
-    # BigFloat,
+    (MinimalInstances, Float64, 15),
+    (MinimalInstances, Float32, 15),
+    (MinimalInstances, BigFloat, 60),
+    # (FastInstances, Float64, 15),
+    # (SlowInstances, Float64, 120),
     ]
 
 # list of names of native examples to run
@@ -83,8 +78,8 @@ model_types = [
 
 # start the tests
 @info("starting examples tests")
-for (inst_set, lim) in instance_sets
-    @info("each $inst_set instance should take <$lim seconds")
+for (inst_set, real_T, time_limit) in instance_sets
+    @info("each $inst_set $real_T instance should take <$time_limit seconds")
 end
 
 example_types = Tuple{String, Type{<:ExampleInstance}}[]
@@ -109,7 +104,7 @@ perf = DataFrame(
 all_tests_time = time()
 
 @testset "examples tests" begin
-    for (ex_name, ex_type) in example_types, (inst_set, time_limit) in instance_sets, real_T in real_types
+    for (ex_name, ex_type) in example_types, (inst_set, real_T, time_limit) in instance_sets
         solver_options = (default_solver_options..., time_limit = time_limit)
         ex_type_T = ex_type{real_T}
         instances = example_tests(ex_type_T, inst_set())
@@ -130,8 +125,8 @@ all_tests_time = time()
     @printf("\nexamples tests total time: %8.2e seconds\n\n", time() - all_tests_time)
     show(perf, allrows = true, allcols = true)
     println("\n")
-    show(timer)
-    println("\n")
+    # show(timer)
+    # println("\n")
 end
 
 ;

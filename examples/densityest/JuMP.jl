@@ -35,14 +35,15 @@ function DensityEstJuMP{Float64}(
     return DensityEstJuMP{Float64}(:Random, num_obs, n, X, args...)
 end
 
-options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
 example_tests(::Type{DensityEstJuMP{Float64}}, ::MinimalInstances) = [
-    ((5, 1, 2, true, true), false, options),
-    ((:iris, 2, true, true), false, options),
-    # ((5, 1, 2, true, true), true, options),
-    # ((:iris, 2, true, true), true, options),
+    ((5, 1, 2, true, true), false),
+    ((:iris, 2, true, true), false),
+    # ((5, 1, 2, true, true), true),
+    # ((:iris, 2, true, true), true),
     ]
-example_tests(::Type{DensityEstJuMP{Float64}}, ::FastInstances) = [
+example_tests(::Type{DensityEstJuMP{Float64}}, ::FastInstances) = begin
+    options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
+    return [
     ((50, 2, 2, true, true), false, options),
     ((50, 2, 2, true, false), false, options),
     ((50, 2, 2, false, true), false, options),
@@ -64,11 +65,15 @@ example_tests(::Type{DensityEstJuMP{Float64}}, ::FastInstances) = [
     ((:cancer, 4, true, true), false, options),
     ((:cancer, 4, false, true), false, options),
     ]
-example_tests(::Type{DensityEstJuMP{Float64}}, ::SlowInstances) = [
+end
+example_tests(::Type{DensityEstJuMP{Float64}}, ::SlowInstances) = begin
+    options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
+    return [
     ((200, 4, 4, false, false), false, options),
     ((200, 4, 6, false, true), false, options),
     ((200, 4, 6, false, false), false, options),
     ]
+end
 
 function build(inst::DensityEstJuMP{T}) where {T <: Float64} # TODO generic reals
     (n, X) = (inst.n, inst.X)
