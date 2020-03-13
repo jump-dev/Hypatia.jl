@@ -3,15 +3,105 @@ Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
 list of predefined polynomials and domains from various applications
 see https://people.sc.fsu.edu/~jburkardt/py_src/polynomials/polynomials.html
-
-TODO
-- remove dependency on DynamicPolynomials?
 =#
 
 import DynamicPolynomials
 const DP = DynamicPolynomials
 import Hypatia
-const MU = Hypatia.ModelUtilities
+
+# get complex interpolation
+function interpolate(
+    R::Type{Complex{T}},
+    halfdeg::Int,
+    n::Int,
+    gs::Vector,
+    g_halfdegs::Vector{Int};
+    sample_factor::Int = 10,
+    use_QR::Bool = false,
+    ) where {T <: Real}
+    # generate interpolation
+    # TODO use more numerically-stable basis for columns
+    L = binomial(n + halfdeg, n)
+    U = L^2
+    L_basis = [a for t in 0:halfdeg for a in Combinatorics.multiexponents(n, t)]
+    mon_pow(z, ex) = prod(z[i]^ex[i] for i in eachindex(ex))
+    V_basis = [z -> mon_pow(z, L_basis[k]) * mon_pow(conj(z), L_basis[l]) for l in eachindex(L_basis) for k in eachindex(L_basis)]
+    @assert length(V_basis) == U
+
+    # sample from domain (inefficient for general domains, only samples from unit box and checks feasibility)
+    num_samples = sample_factor * U
+    samples = Vector{Vector{Complex{T}}}(undef, num_samples)
+    k = 0
+    randbox() = 2 * rand(T) - 1
+    while k < num_samples
+        z = [Complex(randbox(), randbox()) for i in 1:n]
+        if all(g -> g(z) > zero(T), gs)
+            k += 1
+            samples[k] = z
+        end
+    end
+
+    # select subset of points to maximize |det(V)| in heuristic QR-based procedure (analogous to real case)
+    V = [b(z) for z in samples, b in V_basis]
+    VF = qr(Matrix(transpose(V)), Val(true))
+    keep = VF.p[1:U]
+    points = samples[keep]
+    V = V[keep, :]
+
+    # setup P matrices
+    P0 = V[:, 1:L]
+    if use_QR
+        P0 = Matrix(qr(P0).Q)
+    end
+    Ps = [P0]
+    for i in eachindex(gs)
+        gi = gs[i].(points)
+        Pi = Diagonal(sqrt.(gi)) * P0[:, 1:binomial(n + halfdeg - g_halfdegs[i], n)]
+        if use_QR
+            Pi = Matrix(qr(Pi).Q)
+        end
+        push!(Ps, Pi)
+    end
+
+    return (points, Ps)
+end
+
+# get interpolation for a predefined real poly
+function get_interp_data(
+    ::Type{T},
+    poly_name::Symbol,
+    halfdeg::Int,
+    ) where {T <: Real}
+    (x, fn, dom, true_min) = real_poly_data(poly_name, T)
+    (U, pts, Ps, _) = ModelUtilities.interpolate(dom, halfdeg)
+    interp_vals = T[fn(pts[j, :]...) for j in 1:U]
+    return (interp_vals, Ps, true_min)
+end
+
+# get interpolation for a predefined complex poly
+function get_interp_data(
+    R::Type{Complex{T}},
+    poly_name::Symbol,
+    halfdeg::Int,
+    ) where {T <: Real}
+    (n, f, gs, g_halfdegs, true_min) = complex_poly_data[poly_name]
+    (points, Ps) = interpolate(R, halfdeg, n, gs, g_halfdegs)
+    interp_vals = f.(points)
+    return (interp_vals, Ps, true_min)
+end
+
+# get interpolation for a random real poly in n variables of half degree halfdeg and use a box domain
+function random_interp_data(
+    ::Type{T},
+    n::Int,
+    halfdeg::Int,
+    dom = ModelUtilities.Box{T}(-ones(T, n), ones(T, n)),
+    ) where {T <: Real}
+    (U, pts, Ps, _) = ModelUtilities.interpolate(dom, halfdeg)
+    interp_vals = randn(T, U)
+    true_min = T(NaN) # TODO could get an upper bound by evaluating at random points in domain
+    return (interp_vals, Ps, true_min)
+end
 
 # real polynomials
 function real_poly_data(polyname::Symbol, T::Type{<:Real} = Float64)
@@ -123,74 +213,49 @@ function real_poly_data(polyname::Symbol, T::Type{<:Real} = Float64)
     return (x, f, dom, true_obj)
 end
 
-# get interpolation for a predefined real poly
-function get_interp_data(
-    ::Type{T},
-    poly_name::Symbol,
-    halfdeg::Int,
-    ) where {T <: Real}
-    (x, fn, dom, true_min) = real_poly_data(poly_name, T)
-    (U, pts, Ps, _) = ModelUtilities.interpolate(dom, halfdeg)
-    interp_vals = T[fn(pts[j, :]...) for j in 1:U]
-    return (interp_vals, Ps, true_min)
-end
-
-# get interpolation for a random real poly in n variables of half degree halfdeg and use a box domain
-function random_interp_data(
-    ::Type{T},
-    n::Int,
-    halfdeg::Int,
-    dom = ModelUtilities.Box{T}(-ones(T, n), ones(T, n)),
-    ) where {T <: Real}
-    (U, pts, Ps, _) = ModelUtilities.interpolate(dom, halfdeg)
-    interp_vals = randn(T, U)
-    true_min = T(NaN) # TODO could get an upper bound by evaluating at random points in domain
-    return (interp_vals, Ps, true_min)
-end
-
-# merge with real polys dictionary when complex polyvars are allowed in DynamicPolynomials: https://github.com/JuliaAlgebra/MultivariatePolynomials.jl/issues/11
+# merge with real polys when complex polyvars are allowed in DynamicPolynomials: https://github.com/JuliaAlgebra/MultivariatePolynomials.jl/issues/11
 # real-valued complex polynomials
 complex_poly_data = Dict{Symbol, NamedTuple}(
     :abs1d => (n = 1,
         f = (z -> 1 + sum(abs2, z)),
-        gs = [],
-        g_halfdegs = [],
-        truemin = 1,
+        gs = Function[],
+        g_halfdegs = Int[],
+        true_min = 1,
         ),
     :absunit1d => (n = 1,
         f = (z -> 1 + sum(abs2, z)),
         gs = [z -> 1 - sum(abs2, z)],
         g_halfdegs = [1],
-        truemin = 1,
+        true_min = 1,
         ),
     :negabsunit1d => (n = 1,
         f = (z -> -sum(abs2, z)),
         gs = [z -> 1 - sum(abs2, z)],
         g_halfdegs = [1],
-        truemin = -1,
+        true_min = -1,
         ),
     :absball2d => (n = 2,
         f = (z -> 1 + sum(abs2, z)),
         gs = [z -> 1 - sum(abs2, z)],
         g_halfdegs = [1],
-        truemin = 1,
+        true_min = 1,
         ),
     :absbox2d => (n = 2,
         f = (z -> 1 + sum(abs2, z)),
         gs = [z -> 1 - abs2(z[1]), z -> 1 - abs2(z[2])],
         g_halfdegs = [1, 1],
-        truemin = 1,
+        true_min = 1,
         ),
     :negabsbox2d => (n = 2,
         f = (z -> -sum(abs2, z)),
         gs = [z -> 1 - abs2(z[1]), z -> 1 - abs2(z[2])],
         g_halfdegs = [1, 1],
-        truemin = -2,
+        true_min = -2,
         ),
     :denseunit1d => (n = 1,
         f = (z -> 1 + 2real(z[1]) + abs(z[1])^2 + 2real(z[1]^2) + 2real(z[1]^2 * conj(z[1])) + abs(z[1])^4),
         gs = [z -> 1 - abs2(z[1])],
         g_halfdegs = [1],
-        truemin = 0,
+        true_min = 0,
         ),
     )

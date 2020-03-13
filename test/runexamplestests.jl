@@ -22,8 +22,8 @@ default_solver_options = (
 
 # instance sets to run and corresponding time limits (seconds)
 instance_sets = [
-    (MinimalInstances, 15),
-    # (FastInstances, 15),
+    # (MinimalInstances, 15),
+    (FastInstances, 15),
     # (SlowInstances, 120),
     ]
 
@@ -36,16 +36,16 @@ real_types = [
 
 # list of names of native examples to run
 native_example_names = [
-    # "densityest",
-    # "envelope",
+    "densityest",
+    "envelope",
     "expdesign",
-    # "linearopt",
-    # "matrixcompletion",
-    # "matrixregression",
-    # "maxvolume",
-    # "polymin",
-    # "portfolio",
-    # "sparsepca",
+    "linearopt",
+    "matrixcompletion",
+    "matrixregression",
+    "maxvolume",
+    "polymin",
+    "portfolio",
+    "sparsepca",
     ]
 
 # list of names of JuMP examples to run
@@ -78,7 +78,7 @@ JuMP_example_names = [
 # types of models to run and corresponding options and example names
 model_types = [
     "native",
-    # "JuMP",
+    "JuMP",
     ]
 
 # start the tests
@@ -87,15 +87,15 @@ for (inst_set, lim) in instance_sets
     @info("each $inst_set instance should take <$lim seconds")
 end
 
-example_types = Dict{String, Type{<:ExampleInstance}}()
+example_types = Tuple{String, Type{<:ExampleInstance}}[]
 for mod_type in model_types, ex in eval(Symbol(mod_type, "_example_names"))
-    example_types[ex] = include(joinpath(examples_dir, ex, mod_type * ".jl"))
+    ex_type = include(joinpath(examples_dir, ex, mod_type * ".jl"))
+    push!(example_types, (ex, ex_type))
 end
 
 perf = DataFrame(
-    model = String[],
     example = String[],
-    real_T = Type{<:Real}[],
+    real_T = String[],
     inst = Int[],
     inst_data = Tuple[],
     test_time = Float64[],
@@ -109,22 +109,20 @@ perf = DataFrame(
 all_tests_time = time()
 
 @testset "examples tests" begin
-    for mod_type in model_types
-        example_names = eval(Symbol(mod_type, "_example_names"))
-        println("\nstarting $(length(example_names)) examples for $mod_type")
-        for (ex_name, ex_type) in example_types, (inst_set, time_limit) in instance_sets, real_T in real_types
-            solver_options = (default_solver_options..., time_limit = time_limit)
-            ex_type = ex_type{real_T}
-            instances = example_tests(ex_type, inst_set())
-            println("\nstarting $(length(instances)) instances for $ex_type $inst_set\n")
-            for (inst_num, inst) in enumerate(instances)
-                test_info = "$ex_type $inst_set $inst_num: $(inst[1])"
-                @testset "$test_info" begin
-                    println(test_info, "...")
-                    test_time = @elapsed r = test(ex_type, inst..., default_solver_options = solver_options)
-                    push!(perf, (mod_type, ex_name, real_T, inst_num, inst[1], test_time, r.solve_time, r.num_iters, r.status, r.primal_obj, r.dual_obj))
-                    @printf("... %8.2e seconds\n", test_time)
-                end
+    for (ex_name, ex_type) in example_types, (inst_set, time_limit) in instance_sets, real_T in real_types
+        solver_options = (default_solver_options..., time_limit = time_limit)
+        ex_type_T = ex_type{real_T}
+        instances = example_tests(ex_type_T, inst_set())
+        println("\nstarting $(length(instances)) instances for $ex_type_T $inst_set\n")
+        for (inst_num, inst) in enumerate(instances)
+            test_info = "$ex_type_T $inst_set $inst_num: $(inst[1])"
+            @testset "$test_info" begin
+                println(test_info, "...")
+                test_time = @elapsed r = test(ex_type_T, inst..., default_solver_options = solver_options)
+                push!(perf, (
+                    string(ex_type), string(real_T), inst_num, inst[1], test_time,
+                    r.solve_time, r.num_iters, r.status, r.primal_obj, r.dual_obj))
+                @printf("... %8.2e seconds\n", test_time)
             end
         end
     end

@@ -9,12 +9,12 @@ include(joinpath(@__DIR__, "common.jl"))
 abstract type ExampleInstanceNative{T <: Real} <: ExampleInstance{T} end
 
 function test(
-    E::Type{<:ExampleInstanceNative{T}}, # an instance of a native example # TODO support generic reals
+    E::Type{<:ExampleInstanceNative{T}}, # an instance of a native example
     inst_data::Tuple,
     solver_options = nothing; # additional non-default solver options specific to the example
     default_solver_options = (verbose = false,), # default solver options
     rseed::Int = 1,
-    checker_options...
+    checker_options = (test = false,)
     ) where {T <: Real}
     # setup instance and model
     Random.seed!(rseed)

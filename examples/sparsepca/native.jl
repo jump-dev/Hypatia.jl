@@ -9,14 +9,47 @@ include(joinpath(@__DIR__, "../common_native.jl"))
 import Hypatia.BlockMatrix
 import Distributions
 
-function sparsepca_native(
-    ::Type{T},
-    p::Int,
-    k::Int,
-    use_epinorminfdual::Bool, # use dual of epinorminf cone, else nonnegative cones
-    noise_ratio::Real,
-    use_linops::Bool,
-    ) where {T <: Real}
+struct SparsePCANative{T <: Real} <: ExampleInstanceNative{T}
+    p::Int
+    k::Int
+    use_epinorminfdual::Bool # use dual of epinorminf cone, else nonnegative cones
+    noise_ratio::Real
+    use_linops::Bool
+end
+
+options = ()
+example_tests(::Type{SparsePCANative{Float64}}, ::MinimalInstances) = [
+    ((3, 2, true, 0, false), options),
+    ((3, 2, false, 0, false), options),
+    ((3, 2, true, 10, false), options),
+    ((3, 2, false, 10, false), options),
+    ]
+example_tests(::Type{SparsePCANative{Float64}}, ::FastInstances) = [
+    ((5, 3, true, 0, false), options),
+    ((5, 3, false, 0, false), options),
+    ((5, 3, true, 10, false), options),
+    ((5, 3, false, 10, false), options),
+    ((30, 10, true, 0, false), options),
+    ((30, 10, false, 0, false), options),
+    ((30, 10, true, 10, false), options),
+    ((30, 10, false, 10, false), options),
+    ]
+example_tests(::Type{SparsePCANative{Float64}}, ::SlowInstances) = [
+    # TODO
+    ]
+example_tests(::Type{SparsePCANative{Float64}}, ::LinearOperatorsInstances) = [
+    ((5, 3, true, 0, true), options),
+    ((5, 3, false, 0, true), options),
+    ((5, 3, true, 10, true), options),
+    ((5, 3, false, 10, true), options),
+    ((30, 10, true, 0, true), options),
+    ((30, 10, false, 0, true), options),
+    ((30, 10, true, 10, true), options),
+    ((30, 10, false, 10, true), options),
+    ]
+
+function build(inst::SparsePCANative{T}) where {T <: Real}
+    (p, k, noise_ratio) = (inst.p, inst.k, inst.noise_ratio)
     @assert 0 < k <= p
 
     signal_idxs = Distributions.sample(1:p, k, replace = false) # sample components that will carry the signal
@@ -26,7 +59,6 @@ function sparsepca_native(
         x[signal_idxs] = rand(T, k)
         sigma = x * x'
         sigma ./= tr(sigma)
-        true_obj = -1
     else
         # simulate some observations with noise
         x = randn(p, 100)
@@ -35,7 +67,6 @@ function sparsepca_native(
         sigma[signal_idxs, signal_idxs] .+= y * y'
         sigma ./= 100
         sigma = T.(sigma)
-        true_obj = NaN
     end
 
     dimx = Cones.svec_length(p)
@@ -50,16 +81,16 @@ function sparsepca_native(
     hpsd = zeros(T, dimx)
     cones = Cones.Cone{T}[Cones.PosSemidefTri{T, T}(dimx)]
 
-    if use_epinorminfdual
+    if inst.use_epinorminfdual
         # l1 cone
         # double off-diagonals, which are already scaled by rt2
-        if use_linops
+        if inst.use_linops
             Gl1 = Diagonal(-one(T) * I, dimx)
         else
             Gl1 = -Matrix{T}(I, dimx, dimx)
         end
         ModelUtilities.vec_to_svec!(Gl1, rt2 = sqrt(T(2)))
-        if use_linops
+        if inst.use_linops
             G = BlockMatrix{T}(
                 2 * dimx + 1,
                 dimx,
@@ -80,7 +111,7 @@ function sparsepca_native(
     else
         id = Matrix{T}(I, dimx, dimx)
         l1 = ModelUtilities.vec_to_svec!(ones(T, dimx), rt2 = sqrt(T(2)))
-        if use_linops
+        if inst.use_linops
             A = BlockMatrix{T}(
                 dimx + 1,
                 3 * dimx,
@@ -113,42 +144,18 @@ function sparsepca_native(
     end
 
     model = Models.Model{T}(c, A, b, G, h, cones)
-    return (model, (true_obj = true_obj,))
+    return model
 end
 
-function test_sparsepca_native(result, test_helpers, test_options)
+function test_extra(inst::SparsePCANative, result)
     @test result.status == :Optimal
-    if result.status == :Optimal && !isnan(test_helpers.true_obj)
+    if result.status == :Optimal && iszero(inst.noise_ratio)
         # check objective value is correct
-        tol = eps(eltype(result.x))^0.2
-        @test result.primal_obj ≈ test_helpers.true_obj atol = tol rtol = tol
+        tol = eps(eltype(result.x))^0.25
+        @test result.primal_obj ≈ -1 atol = tol rtol = tol
     end
 end
 
-options = ()
-sparsepca_native_fast = [
-    ((Float64, 5, 3, true, 0, false), (), options),
-    ((Float64, 5, 3, false, 0, false), (), options),
-    ((Float64, 5, 3, true, 10, false), (), options),
-    ((Float64, 5, 3, false, 10, false), (), options),
-    ((Float64, 30, 10, true, 0, false), (), options),
-    ((Float64, 30, 10, false, 0, false), (), options),
-    ((Float64, 30, 10, true, 10, false), (), options),
-    ((Float64, 30, 10, false, 10, false), (), options),
-    ]
-sparsepca_native_slow = [
-    # TODO
-    ]
-sparsepca_native_linops = [
-    ((Float64, 5, 3, true, 0, true), (), options),
-    ((Float64, 5, 3, false, 0, true), (), options),
-    ((Float64, 5, 3, true, 10, true), (), options),
-    ((Float64, 5, 3, false, 10, true), (), options),
-    ((Float64, 30, 10, true, 0, true), (), options),
-    ((Float64, 30, 10, false, 0, true), (), options),
-    ((Float64, 30, 10, true, 10, true), (), options),
-    ((Float64, 30, 10, false, 10, true), (), options),
-    ]
+# @testset "SparsePCANative" for inst in example_tests(SparsePCANative{Float64}, MinimalInstances()) test(inst...) end
 
-@testset "sparsepca_native" begin test_native_instance.(sparsepca_native, test_sparsepca_native, sparsepca_native_fast) end
-;
+return SparsePCANative

@@ -27,27 +27,25 @@ example_tests(::Type{EnvelopeNative{Float64}}, ::MinimalInstances) = [
 example_tests(::Type{EnvelopeNative{Float64}}, ::FastInstances) = [
     ((2, 2, 3, 2, true), options),
     ((2, 2, 3, 2, false), options),
-    ((2, 3, 2, 2, true), options),
-    ((2, 3, 2, 2, false), options),
     ((3, 3, 3, 3, true), options),
     ((3, 3, 3, 3, false), options),
     ((3, 3, 5, 4, true), options),
-    ((3, 3, 5, 4, false), options),
-    ((5, 2, 5, 2, true), options),
-    ((5, 2, 5, 2, false), options),
+    ((5, 2, 5, 3, true), options),
     ((1, 30, 2, 30, true), options),
     ((1, 30, 2, 30, false), options),
     ((10, 1, 3, 1, true), options),
     ((10, 1, 3, 1, false), options),
     ]
 example_tests(::Type{EnvelopeNative{Float64}}, ::SlowInstances) = [
+    ((3, 3, 5, 4, false), options),
+    ((5, 2, 5, 3, false), options),
     ((4, 6, 4, 5, true), options),
     ((4, 6, 4, 5, false), options),
     ((2, 30, 4, 30, true), options),
     ((2, 30, 4, 30, false), options),
     ]
 
-function build(inst::EnvelopeNative{T}) where {T <: Float64} # TODO generic reals
+function build(inst::EnvelopeNative{T}) where {T <: Real}
     (n, num_polys) = (inst.n, inst.num_polys)
     @assert inst.rand_halfdeg <= inst.env_halfdeg
     # TODO allow option

@@ -6,15 +6,39 @@ find maximum volume hypercube with edges parallel to the axes inside a polyhedro
 
 include(joinpath(@__DIR__, "../common_native.jl"))
 
-function maxvolume_native(
-    ::Type{T},
-    n::Int,
-    use_hypogeomean::Bool, # use hypogeomean cone for geomean objective
-    use_power::Bool, # use power cones for geomean objective
-    use_epipersquare::Bool, # use epipersquare cones for geomean objective
-    ) where {T <: Real}
-    @assert use_hypogeomean + use_power + use_epipersquare == 1
-    @assert n > 2
+struct MaxVolumeNative{T <: Real} <: ExampleInstanceNative{T}
+    n::Int
+    use_hypogeomean::Bool # use hypogeomean cone for geomean objective
+    use_power::Bool # use power cones for geomean objective
+    use_epipersquare::Bool # use epipersquare cones for geomean objective
+end
+
+options = ()
+example_tests(::Type{MaxVolumeNative{Float64}}, ::MinimalInstances) = [
+    ((2, true, false, false), options),
+    ((3, false, true, false), options),
+    ((2, false, false, true), options),
+    ]
+example_tests(::Type{MaxVolumeNative{Float64}}, ::FastInstances) = [
+    ((10, true, false, false), options),
+    ((10, false, true, false), options),
+    ((10, false, false, true), options),
+    ((100, true, false, false), options),
+    ((100, false, true, false), options),
+    ((100, false, false, true), options),
+    ((1000, true, false, false), options),
+    ]
+example_tests(::Type{MaxVolumeNative{Float64}}, ::SlowInstances) = [
+    ((1000, false, true, false), options),
+    ((1000, false, false, true), options),
+    ((1500, true, false, false), options),
+    ((1500, false, true, false), options),
+    ((1500, false, false, true), options),
+    ]
+
+function build(inst::MaxVolumeNative{T}) where {T <: Real}
+    @assert inst.use_hypogeomean + inst.use_power + inst.use_epipersquare == 1
+    n = inst.n
     poly_hrep = Matrix{T}(I, n, n)
     poly_hrep .+= T.(randn(n, n)) / n
     c = vcat(-1, zeros(T, n))
@@ -34,11 +58,12 @@ function maxvolume_native(
         log_floor(n, zero(n))
     end
 
-    if use_hypogeomean
+    if inst.use_hypogeomean
         G = -Matrix{T}(I, n + 1, n + 1)
         h = zeros(T, n + 1)
         cones = Cones.Cone{T}[Cones.HypoGeomean{T}(fill(inv(T(n)), n))]
-    elseif use_power
+    elseif inst.use_power
+        @assert n > 2
         cones = Cones.Cone{T}[]
         # number of 3-dimensional power cones needed is n - 1, number of new variables is n - 2
         len_power = 3 * (n - 1)
@@ -70,7 +95,7 @@ function maxvolume_native(
         push!(cones, Cones.Power{T}([inv(T(n)), T(n - 1) / T(n)], 1))
         h = zeros(T, 3 * (n - 1))
     else
-        @assert use_epipersquare == true
+        @assert inst.use_epipersquare == true
         # number of variables inside geometric mean is n
         # number of layers of variables
         num_layers = log_floor(n)
@@ -133,30 +158,10 @@ function maxvolume_native(
     return model
 end
 
-function test_maxvolume_native(result, test_helpers, test_options)
+function test_extra(inst::MaxVolumeNative, result)
     @test result.status == :Optimal
 end
 
-options = ()
-maxvolume_native_fast = [
-    ((Float64, 3, true, false, false), (), options),
-    ((Float64, 3, false, true, false), (), options),
-    ((Float64, 3, false, false, true), (), options),
-    ((Float64, 12, true, false, false), (), options),
-    ((Float64, 12, false, true, false), (), options),
-    ((Float64, 12, false, false, true), (), options),
-    ((Float64, 100, true, false, false), (), options),
-    ((Float64, 100, false, true, false), (), options),
-    ((Float64, 100, false, false, true), (), options),
-    ((Float64, 1000, true, false, false), (), options),
-    ]
-maxvolume_native_slow = [
-    ((Float64, 1000, false, true, false), (), options),
-    ((Float64, 1000, false, false, true), (), options),
-    ((Float64, 1500, true, false, false), (), options),
-    ((Float64, 1500, false, true, false), (), options),
-    ((Float64, 1500, false, false, true), (), options),
-    ]
+# @testset "MaxVolumeNative" for inst in example_tests(MaxVolumeNative{Float64}, MinimalInstances()) test(inst...) end
 
-@testset "maxvolume_native" begin test_native_instance.(maxvolume_native, test_maxvolume_native, maxvolume_native_fast) end
-;
+return MaxVolumeNative

@@ -18,5 +18,6 @@ abstract type InstanceSet end
 struct MinimalInstances <: InstanceSet end
 struct FastInstances <: InstanceSet end
 struct SlowInstances <: InstanceSet end
+struct LinearOperatorsInstances <: InstanceSet end
 
 abstract type ExampleInstance{T <: Real} end

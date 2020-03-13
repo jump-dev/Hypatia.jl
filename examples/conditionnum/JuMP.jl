@@ -33,6 +33,7 @@ struct ConditionNumJuMP{T <: Real} <: ExampleInstanceJuMP{T}
 end
 
 options = (tol_feas = 1e-5,)
+relaxed_options = (tol_feas = 1e-4, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
 example_tests(::Type{ConditionNumJuMP{Float64}}, ::MinimalInstances) = [
     ((2, 2, true), false, options),
     ((2, 2, false), false, options),
@@ -44,8 +45,8 @@ example_tests(::Type{ConditionNumJuMP{Float64}}, ::FastInstances) = [
     ((3, 2, false), false, options),
     ((50, 15, true), false, options),
     ((50, 15, false), false, options),
-    ((100, 10, false), false, options),
-    ((100, 40, false), false, options),
+    ((100, 10, false), false, relaxed_options),
+    ((100, 40, false), false, relaxed_options),
     ]
 example_tests(::Type{ConditionNumJuMP{Float64}}, ::SlowInstances) = [
     ((100, 10, true), false, options),
