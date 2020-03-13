@@ -27,7 +27,7 @@ example_tests(::Type{RobustGeomProgJuMP{Float64}}, ::FastInstances) = [
     ((5, 10), false, options),
     ((10, 20), false, options),
     ((20, 40), false, options),
-    ((50, 100), false, options),
+    ((40, 80), false, options),
     ]
 example_tests(::Type{RobustGeomProgJuMP{Float64}}, ::SlowInstances) = [
     ((100, 200), false, options),

@@ -25,7 +25,6 @@ example_tests(::Type{LotkaVolterraJuMP{Float64}}, ::MinimalInstances) = [
     ((2,), false, options),
     ]
 example_tests(::Type{LotkaVolterraJuMP{Float64}}, ::FastInstances) = [
-    ((4,), false, options),
     ]
 example_tests(::Type{LotkaVolterraJuMP{Float64}}, ::SlowInstances) = [
     ((6,), false, options),

@@ -31,7 +31,7 @@ example_tests(::Type{LinearOptNative{Float64}}, ::SlowInstances) = [
     ((500, 1000, 1.0), options),
     ]
 
-function build(inst::LinearOptNative{T}) where {T <: Float64} # TODO generic reals
+function build(inst::LinearOptNative{T}) where {T <: Real}
     (m, n, nz_frac) = (inst.m, inst.n, inst.nz_frac)
     @assert 0 < nz_frac <= 1
 

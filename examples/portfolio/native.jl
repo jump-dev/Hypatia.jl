@@ -8,16 +8,52 @@ TODO
 - describe formulation and options
 =#
 
-include(joinpath(@__DIR__, "../common_JuMP.jl"))
+include(joinpath(@__DIR__, "../common_native.jl"))
 
-function portfolio_native(
-    ::Type{T},
-    num_stocks::Int,
-    epinormeucl_constr::Bool, # add L2 ball constraints, else don't add
-    epinorminf_constrs::Bool, # add Linfty ball constraints, else don't add
-    use_epinorminf::Bool, # use epinorminf cone, else nonnegative cones
-    use_linops::Bool,
-    ) where {T <: Real}
+struct PortfolioNative{T <: Real} <: ExampleInstanceNative{T}
+    num_stocks::Int
+    epinormeucl_constr::Bool # add L2 ball constraints, else don't add
+    epinorminf_constrs::Bool # add Linfty ball constraints, else don't add
+    use_epinorminf::Bool # use epinorminf cone, else nonnegative cones
+    use_linops::Bool
+end
+
+options = ()
+example_tests(::Type{PortfolioNative{Float64}}, ::MinimalInstances) = [
+    ((3, true, false, true, false), options),
+    ((3, false, true, true, false), options),
+    ((3, false, true, false, false), options),
+    ((3, true, true, true, false), options),
+    ]
+example_tests(::Type{PortfolioNative{Float64}}, ::FastInstances) = [
+    ((10, true, false, true, false), options),
+    ((10, false, true, true, false), options),
+    ((10, false, true, false, false), options),
+    ((10, true, true, true, false), options),
+    ((50, true, false, true, false), options),
+    ((50, false, true, true, false), options),
+    ((50, false, true, false, false), options),
+    ((50, true, true, true, false), options),
+    ((400, true, false, true, false), options),
+    ((400, false, true, true, false), options),
+    ((400, false, true, false, false), options),
+    ((400, true, true, true, false), options),
+    ]
+example_tests(::Type{PortfolioNative{Float64}}, ::SlowInstances) = [
+    ((3000, true, false, true, false), options),
+    ((3000, false, true, true, false), options),
+    ((3000, false, true, false, false), options),
+    ((3000, true, true, true, false), options),
+    ]
+example_tests(::Type{PortfolioNative{Float64}}, ::LinearOperatorsInstances) = [
+    ((20, true, false, true, true), options),
+    ((20, false, true, true, true), options),
+    ((20, false, true, false, true), options),
+    ((20, true, true, true, true), options),
+    ]
+
+function build(inst::PortfolioNative{T}) where {T <: Real}
+    num_stocks = inst.num_stocks
     returns = rand(T, num_stocks)
     sigma_half = T.(randn(num_stocks, num_stocks))
     x = T.(randn(num_stocks))
@@ -26,7 +62,7 @@ function portfolio_native(
 
     c = -returns
     # investments add to one, nonnegativity
-    if use_linops
+    if inst.use_linops
         A_blocks = Any[ones(T, 1, num_stocks)]
         A_rows = [1:1]
         A_cols = [1:num_stocks]
@@ -43,7 +79,7 @@ function portfolio_native(
     cone_offset = num_stocks
 
     function add_ball_constr(cone, gamma_new)
-        if use_linops
+        if inst.use_linops
             push!(G_blocks, -sigma_half)
             push!(G_rows, (cone_offset + 2):(cone_offset + num_stocks + 1))
             push!(G_cols, 1:num_stocks)
@@ -58,17 +94,17 @@ function portfolio_native(
 
     last_idx(a::Vector{UnitRange{Int}}) = a[end][end]
 
-    if epinormeucl_constr
+    if inst.epinormeucl_constr
         add_ball_constr(Cones.EpiNormEucl{T}(num_stocks + 1), gamma)
     end
 
-    if epinorminf_constrs
-        if use_epinorminf
+    if inst.epinorminf_constrs
+        if inst.use_epinorminf
             add_ball_constr(Cones.EpiNormInf{T, T}(num_stocks + 1, use_dual = true), gamma * sqrt(T(num_stocks)))
             add_ball_constr(Cones.EpiNormInf{T, T}(num_stocks + 1), gamma)
         else
             c = vcat(c, zeros(T, 2 * num_stocks))
-            if use_linops
+            if inst.use_linops
                 push!(A_blocks, sigma_half)
                 push!(A_blocks, -I)
                 push!(A_blocks, I)
@@ -105,7 +141,7 @@ function portfolio_native(
             push!(cones, Cones.Nonnegative{T}(2 * num_stocks + 1))
             cone_offset += 2 * num_stocks + 1
 
-            if use_linops
+            if inst.use_linops
                 push!(G_blocks, sigma_half)
                 push!(G_blocks, -sigma_half)
                 push!(G_rows, (cone_offset + 1):(cone_offset + num_stocks))
@@ -126,7 +162,7 @@ function portfolio_native(
         end
     end
 
-    if use_linops
+    if inst.use_linops
         A = Hypatia.BlockMatrix{T}(last_idx(A_rows), last_idx(A_cols), A_blocks, A_rows, A_cols)
         G = Hypatia.BlockMatrix{T}(last_idx(G_rows), last_idx(G_cols), G_blocks, G_rows, G_cols)
     end
@@ -135,41 +171,10 @@ function portfolio_native(
     return model
 end
 
-function test_portfolio_native(result, test_helpers, test_options)
+function test_extra(inst::PortfolioNative, result)
     @test result.status == :Optimal
 end
 
-options = ()
-portfolio_native_fast = [
-    ((Float64, 3, true, false, true, false), (), options),
-    ((Float64, 3, false, true, true, false), (), options),
-    ((Float64, 3, false, true, false, false), (), options),
-    ((Float64, 3, true, true, true, false), (), options),
-    ((Float64, 10, true, false, true, false), (), options),
-    ((Float64, 10, false, true, true, false), (), options),
-    ((Float64, 10, false, true, false, false), (), options),
-    ((Float64, 10, true, true, true, false), (), options),
-    ((Float64, 50, true, false, true, false), (), options),
-    ((Float64, 50, false, true, true, false), (), options),
-    ((Float64, 50, false, true, false, false), (), options),
-    ((Float64, 50, true, true, true, false), (), options),
-    ((Float64, 400, true, false, true, false), (), options),
-    ((Float64, 400, false, true, true, false), (), options),
-    ((Float64, 400, false, true, false, false), (), options),
-    ((Float64, 400, true, true, true, false), (), options),
-    ]
-portfolio_native_slow = [
-    ((Float64, 3000, true, false, true, false), (), options),
-    ((Float64, 3000, false, true, true, false), (), options),
-    ((Float64, 3000, false, true, false, false), (), options),
-    ((Float64, 3000, true, true, true, false), (), options),
-    ]
-portfolio_native_linops = [
-    ((Float64, 20, true, false, true, true), (), options),
-    ((Float64, 20, false, true, true, true), (), options),
-    ((Float64, 20, false, true, false, true), (), options),
-    ((Float64, 20, true, true, true, true), (), options),
-    ]
+# @testset "PortfolioNative" for inst in example_tests(PortfolioNative{Float64}, MinimalInstances()) test(inst...) end
 
-@testset "portfolio_native" begin test_native_instance.(portfolio_native, test_portfolio_native, portfolio_native_fast) end
-;
+return PortfolioNative

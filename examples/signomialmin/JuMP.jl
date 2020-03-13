@@ -43,6 +43,7 @@ SignomialMinJuMP{Float64}(sig_name::Symbol) = SignomialMinJuMP{Float64}(signomia
 SignomialMinJuMP{Float64}(m::Int, n::Int) = SignomialMinJuMP{Float64}(signomialmin_random(m, n)...)
 
 options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
+relaxed_options = (tol_feas = 1e-5, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4)
 example_tests(::Type{SignomialMinJuMP{Float64}}, ::MinimalInstances) = [
     ((:motzkin2,), false, options),
     ((2, 2), false, options),
@@ -56,7 +57,7 @@ example_tests(::Type{SignomialMinJuMP{Float64}}, ::FastInstances) = [
     ((:CS16ex12,), false, options),
     ((:CS16ex13,), false, options),
     ((:MCW19ex1_mod,), false, options),
-    ((:MCW19ex8,), false, options),
+    ((:MCW19ex8,), false, relaxed_options),
     ((3, 2), false, options),
     ((6, 6), false, options),
     ((20, 3), false, options),

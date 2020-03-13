@@ -3,7 +3,7 @@ Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
 references minimizing the nuclear norm:
 Minimization of a Particular Singular Value by Alborz Alavian and Michael Rotkowitz
-The Power of Convex Relaxation Emmanuel J. Candes and  Terence Tao
+The Power of Convex Relaxation Emmanuel J. Candes and Terence Tao
 http://www.mit.edu/~parrilo/pubs/talkfiles/ISMP2009.pdf
 other:
 https://www.cvxpy.org/examples/dgp/pf_matrix_completion.html
@@ -19,15 +19,50 @@ from http://www.mit.edu/~parrilo/pubs/talkfiles/ISMP2009.pdf
 
 include(joinpath(@__DIR__, "../common_native.jl"))
 
-function matrixcompletion_native(
-    ::Type{T},
-    m::Int,
-    n::Int,
-    geomean_constr::Bool = true, # add a constraint on the geomean of unknown values, else don't add
-    nuclearnorm_obj::Bool = true, # use nuclear norm in the objective, else spectral norm
-    use_hypogeomean::Bool = true, # use hypogeomean cone, else power cone formulation
-    use_epinormspectral::Bool = true, # use epinormspectral cone (or its dual), else PSD formulation
-    ) where {T <: Real}
+struct MatrixCompletionNative{T <: Real} <: ExampleInstanceNative{T}
+    m::Int
+    n::Int
+    geomean_constr::Bool # add a constraint on the geomean of unknown values, else don't add
+    nuclearnorm_obj::Bool # use nuclear norm in the objective, else spectral norm
+    use_hypogeomean::Bool # use hypogeomean cone, else power cone formulation
+    use_epinormspectral::Bool # use epinormspectral cone (or its dual), else PSD formulation
+end
+
+options = ()
+example_tests(::Type{MatrixCompletionNative{Float64}}, ::MinimalInstances) = [
+    ((2, 3, true, true, true, true), options),
+    ((2, 3, false, true, true, true), options),
+    ((2, 3, true, false, true, true), options),
+    ((2, 3, false, false, true, true), options),
+    ((2, 3, true, true, false, true), options),
+    ((2, 3, false, false, false, true), options),
+    ((2, 3, true, true, false, false), options),
+    ((2, 3, false, false, false, false), options),
+    ]
+example_tests(::Type{MatrixCompletionNative{Float64}}, ::FastInstances) = [
+    ((12, 24, true, true, true, true), options),
+    ((12, 24, false, true, true, true), options),
+    ((12, 24, true, false, true, true), options),
+    ((12, 24, false, false, true, true), options),
+    ((12, 24, true, true, false, true), options),
+    ((12, 24, false, false, false, true), options),
+    ((12, 24, true, true, false, false), options),
+    ((12, 24, false, false, false, false), options),
+    ]
+example_tests(::Type{MatrixCompletionNative{Float64}}, ::SlowInstances) = [
+    # TODO add missing boolean combinations
+    ((14, 140, true, true, true, true), options),
+    ((14, 140, true, true, false, true), options),
+    ((14, 140, true, true, true, false), options),
+    ((14, 140, true, true, false, false), options),
+    ((18, 180, true, true, true, true), options),
+    ((18, 180, true, true, false, true), options),
+    ((18, 180, true, true, true, false), options),
+    ((18, 180, true, true, false, false), options),
+    ]
+
+function build(inst::MatrixCompletionNative{T}) where {T <: Real}
+    (m, n) = (inst.m, inst.n)
     @assert m <= n
     mn = m * n
     rt2 = sqrt(T(2))
@@ -53,7 +88,7 @@ function matrixcompletion_native(
     num_unknown = m * n - num_known
 
     # epinormspectral cone or its dual- get vec(X) in G and h
-    if use_epinormspectral
+    if inst.use_epinormspectral
         c = vcat(one(T), zeros(T, num_unknown))
         G_norm = zeros(T, mn, num_unknown)
         total_idx = 1
@@ -74,10 +109,10 @@ function matrixcompletion_native(
         h_norm_x = vcat(zero(T), h_norm_x)
         h_norm = h_norm_x
 
-        cones = Cones.Cone{T}[Cones.EpiNormSpectral{T, T}(m, n, use_dual = nuclearnorm_obj)]
+        cones = Cones.Cone{T}[Cones.EpiNormSpectral{T, T}(m, n, use_dual = inst.nuclearnorm_obj)]
     else
         # build an extended formulation for the norm used in the objective
-        if nuclearnorm_obj
+        if inst.nuclearnorm_obj
             # extended formulation for nuclear norm
             # X, W_1, W_2
             num_W1_vars = Cones.svec_length(m)
@@ -167,15 +202,15 @@ function matrixcompletion_native(
         end
     end # objective natural true/false
 
-    if geomean_constr
-        if use_hypogeomean
+    if inst.geomean_constr
+        if inst.use_hypogeomean
             # hypogeomean for values to be filled
             G_geo = vcat(zeros(T, 1, num_unknown), Matrix{T}(-I, num_unknown, num_unknown))
             h = vcat(h_norm, one(T), zeros(T, num_unknown))
 
             # if using extended with spectral objective G_geo needs to be prepadded with an epigraph variable
-            if nuclearnorm_obj
-                if use_epinormspectral
+            if inst.nuclearnorm_obj
+                if inst.use_epinormspectral
                     prepad = zeros(T, num_unknown + 1, 1)
                     postpad = zeros(T, num_unknown + 1, 0)
                 else
@@ -219,8 +254,8 @@ function matrixcompletion_native(
             h = vcat(h_norm, zeros(T, 3 * (num_unknown - 2)), T[0, 0, 1])
 
             # if using extended with spectral objective G_geo needs to be prepadded with an epigraph variable
-            if nuclearnorm_obj
-                if use_epinormspectral
+            if inst.nuclearnorm_obj
+                if inst.use_epinormspectral
                     prepad = zeros(T, len_power, 1)
                     postpad = zeros(T, len_power, 0)
                 else
@@ -250,35 +285,10 @@ function matrixcompletion_native(
     return model
 end
 
-function test_matrixcompletion_native(result, test_helpers, test_options)
+function test_extra(inst::MatrixCompletionNative, result)
     @test result.status == :Optimal
 end
 
-options = ()
-matrixcompletion_native_fast = [
-    ((Float64, 2, 3, true, true, true, true), (), options),
-    ((Float64, 2, 3, false, true, true, true), (), options),
-    ((Float64, 2, 3, true, false, true, true), (), options),
-    ((Float64, 2, 3, false, false, true, true), (), options),
-    ((Float64, 2, 3, true, true, false, true), (), options),
-    ((Float64, 2, 3, false, false, false, true), (), options),
-    ((Float64, 2, 3, true, true, false, false), (), options),
-    ((Float64, 2, 3, false, false, false, false), (), options),
-    ((Float64, 12, 24, true, true, true, true), (), options),
-    ((Float64, 12, 24, true, true, false, true), (), options),
-    ((Float64, 12, 24, true, true, true, false), (), options),
-    ((Float64, 12, 24, true, true, false, false), (), options),
-    ]
-matrixcompletion_native_slow = [
-    ((Float64, 14, 140, true, true, true, true), (), options),
-    ((Float64, 14, 140, true, true, false, true), (), options),
-    ((Float64, 14, 140, true, true, true, false), (), options),
-    ((Float64, 14, 140, true, true, false, false), (), options),
-    ((Float64, 18, 180, true, true, true, true), (), options),
-    ((Float64, 18, 180, true, true, false, true), (), options),
-    ((Float64, 18, 180, true, true, true, false), (), options),
-    ((Float64, 18, 180, true, true, false, false), (), options),
-    ]
+# @testset "MatrixCompletionNative" for inst in example_tests(MatrixCompletionNative{Float64}, MinimalInstances()) test(inst...) end
 
-@testset "matrixcompletion_native" begin test_native_instance.(matrixcompletion_native, test_matrixcompletion_native, matrixcompletion_native_fast) end
-;
+return MatrixCompletionNative

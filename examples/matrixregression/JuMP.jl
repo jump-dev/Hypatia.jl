@@ -5,6 +5,7 @@ see description in native.jl
 =#
 
 include(joinpath(@__DIR__, "../common_JuMP.jl"))
+using SparseArrays
 
 struct MatrixRegressionJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     Y::Matrix{T}
@@ -109,21 +110,21 @@ function build(inst::MatrixRegressionJuMP{T}) where {T <: Float64} # TODO generi
     return model
 end
 
-function test_extra(inst::MatrixRegressionJuMP, model)
+function test_extra(inst::MatrixRegressionJuMP{T}, model) where T
     @test JuMP.termination_status(model) == MOI.OPTIMAL
     if JuMP.termination_status(model) == MOI.OPTIMAL
         # check objective value is correct
         (Y, X) = (inst.Y, inst.X)
         A_opt = JuMP.value.(model.ext[:A_var])
         loss = (sum(abs2, X * A_opt) / 2 - dot(X' * Y, A_opt)) / size(Y, 1)
-        obj_try = loss +
+        obj_result = loss +
             inst.lam_fro * norm(vec(A_opt), 2) +
             inst.lam_nuc * sum(svd(A_opt).S) +
             inst.lam_las * norm(vec(A_opt), 1) +
             inst.lam_glr * sum(norm, eachrow(A_opt)) +
             inst.lam_glc * sum(norm, eachcol(A_opt))
-        tol = eps(eltype(X))^0.25
-        @test JuMP.objective_value(model) ≈ obj_try atol = tol rtol = tol
+        tol = eps(T)^0.25
+        @test JuMP.objective_value(model) ≈ obj_result atol = tol rtol = tol
     end
 end
 

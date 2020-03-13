@@ -8,25 +8,67 @@ TODO describe options
 
 include(joinpath(@__DIR__, "../common_native.jl"))
 
-function expdesign_native(
-    ::Type{T},
-    q::Int,
-    p::Int,
-    n::Int,
-    n_max::Int,
-    logdet_obj::Bool,
-    rootdet_obj::Bool,
-    geomean_obj::Bool,
-    use_logdet::Bool,
-    use_rootdet::Bool,
-    use_epinorminf::Bool,
-    ) where {T <: Real}
-    @assert logdet_obj + geomean_obj + rootdet_obj == 1
+struct ExpDesignNative{T <: Real} <: ExampleInstanceNative{T}
+    q::Int
+    p::Int
+    n::Int
+    n_max::Int
+    logdet_obj::Bool
+    rootdet_obj::Bool
+    geomean_obj::Bool
+    use_logdet::Bool
+    use_rootdet::Bool
+    use_epinorminf::Bool
+end
+
+options = ()
+logdet_options = (tol_feas = 1e-6, tol_rel_opt = 1e-5, tol_abs_opt = 1e-5)
+example_tests(::Type{ExpDesignNative{Float64}}, ::MinimalInstances) = [
+    ((2, 3, 4, 2, true, false, false, true, true, false), logdet_options),
+    ((2, 3, 4, 2, true, false, false, true, true, true), logdet_options),
+    ((2, 3, 4, 2, false, true, false, true, true, true), options),
+    ((2, 3, 4, 2, false, false, true, true, true, true), options),
+    ((2, 3, 4, 2, true, false, false, false, false, true), logdet_options),
+    ((2, 3, 4, 2, false, true, false, false, false, true), options),
+    ]
+example_tests(::Type{ExpDesignNative{Float64}}, ::FastInstances) = [
+    ((3, 5, 7, 2, true, false, false, true, true, false), logdet_options),
+    ((3, 5, 7, 2, true, false, false, true, true, true), logdet_options),
+    ((3, 5, 7, 2, false, true, false, true, true, true), options),
+    ((3, 5, 7, 2, false, false, true, true, true, true), options),
+    ((3, 5, 7, 2, true, false, false, false, false, true), logdet_options),
+    ((3, 5, 7, 2, false, true, false, false, false, true), options),
+    ((5, 15, 25, 5, true, false, false, true, true, false), logdet_options),
+    ((5, 15, 25, 5, true, false, false, true, true, true), logdet_options),
+    ((5, 15, 25, 5, false, true, false, true, true, true), options),
+    ((5, 15, 25, 5, false, false, true, true, true, true), options),
+    ((5, 15, 25, 5, true, false, false, false, false, true), logdet_options),
+    ((5, 15, 25, 5, false, true, false, false, false, true), options),
+    ((25, 75, 125, 5, true, false, false, true, true, false), logdet_options),
+    ((25, 75, 125, 5, true, false, false, true, true, true), logdet_options),
+    ((25, 75, 125, 5, false, true, false, true, true, true), options),
+    ((25, 75, 125, 5, false, false, true, true, true, true), options),
+    ((25, 75, 125, 5, true, false, false, false, false, true), logdet_options),
+    ((25, 75, 125, 5, false, true, false, false, false, true), options),
+    ]
+example_tests(::Type{ExpDesignNative{Float64}}, ::SlowInstances) = [
+    # TODO commented too slow
+    # ((100, 200, 200, 10, true, false, false, true, true, false), options),
+    ((100, 200, 200, 10, true, false, false, true, true, true), logdet_options),
+    ((100, 200, 200, 10, false, true, false, true, true, true), options),
+    ((100, 200, 200, 10, false, false, true, true, true, true), options),
+    ((100, 200, 200, 10, true, false, false, false, false, true), logdet_options),
+    ((100, 200, 200, 10, false, true, false, false, false, true), options),
+    ]
+
+function build(inst::ExpDesignNative{T}) where {T <: Real}
+    (q, p, n, n_max) = (inst.q, inst.p, inst.n, inst.n_max)
     @assert (p > q) && (n > q) && (n_max <= n)
-    V = T(4) * rand(T, q, p) .- T(2)
+    @assert inst.logdet_obj + inst.geomean_obj + inst.rootdet_obj == 1
+    V = randn(T, q, p)
 
     # constraints on upper bound of number of trials and nonnegativity of numbers of trials
-    if use_epinorminf
+    if inst.use_epinorminf
         h_norminf = vcat(T(n_max) / 2, fill(-T(n_max) / 2, p))
         G_norminf = vcat(zeros(T, 1, p), -Matrix{T}(I, p, p))
         cones = Cones.Cone{T}[Cones.EpiNormInf{T, T}(p + 1)]
@@ -40,7 +82,7 @@ function expdesign_native(
     A = ones(T, 1, p)
     b = T[n]
 
-    if (logdet_obj && use_logdet) || (rootdet_obj && use_rootdet)
+    if (inst.logdet_obj && inst.use_logdet) || (inst.rootdet_obj && inst.use_rootdet)
         # maximize the hypograph variable of the cone
         c = vcat(-one(T), zeros(T, p))
 
@@ -61,7 +103,7 @@ function expdesign_native(
         ModelUtilities.vec_to_svec!(G_detcone, rt2 = sqrt(T(2)))
         @assert l - 1 == dimvec
 
-        if logdet_obj
+        if inst.logdet_obj
             push!(cones, Cones.HypoPerLogdetTri{T, T}(dimvec + 2))
             # pad with hypograph variable and perspective variable
             h_detcone = vcat(zero(T), one(T), zeros(T, dimvec))
@@ -87,7 +129,7 @@ function expdesign_native(
         h = vcat(h_norminf, h_detcone)
     end
 
-    if geomean_obj
+    if inst.geomean_obj
         # auxiliary matrix variable has pq elements stored row-major, auxiliary lower triangular variable has svec_length(q) elements, also stored row-major
         pq = p * q
         qq = q ^ 2
@@ -141,7 +183,7 @@ function expdesign_native(
         h = vcat(h_norminf, zeros(p + 1 + q + pq))
     end
 
-    if (rootdet_obj && !use_rootdet) || (logdet_obj && !use_logdet)
+    if (inst.rootdet_obj && !inst.use_rootdet) || (inst.logdet_obj && !inst.use_logdet)
         # extended formulations require an upper triangular matrix of additional variables
         # we will store this matrix row-major
         num_trivars = Cones.svec_length(q)
@@ -183,7 +225,7 @@ function expdesign_native(
         push!(cones, Cones.PosSemidefTri{T, T}(dimvec))
     end
 
-    if rootdet_obj && !use_rootdet
+    if inst.rootdet_obj && !inst.use_rootdet
         c = vcat(zeros(T, p + num_trivars), -one(T))
         A = hcat(A, zeros(T, 1, num_trivars + 1))
         h_geo = zeros(T, q + 1)
@@ -202,7 +244,7 @@ function expdesign_native(
         h = vcat(h_norminf, h_psd, h_geo)
     end
 
-    if logdet_obj && !use_logdet
+    if inst.logdet_obj && !inst.use_logdet
         # extended formulation for logdet
         # number of experiments, upper triangular matrix, hypograph variables
         dimx = p + num_trivars + q
@@ -240,41 +282,10 @@ function expdesign_native(
     return model
 end
 
-function test_expdesign_native(result, test_helpers, test_options)
+function test_extra(inst::ExpDesignNative, result)
     @test result.status == :Optimal
 end
 
-options = ()
-logdet_options = (tol_feas = 1e-6, tol_rel_opt = 1e-5, tol_abs_opt = 1e-5)
-expdesign_native_fast = [
-    ((Float64, 3, 5, 7, 2, true, false, false, true, true, false), (), logdet_options),
-    ((Float64, 3, 5, 7, 2, true, false, false, true, true, true), (), logdet_options),
-    ((Float64, 3, 5, 7, 2, false, true, false, true, true, true), (), options),
-    ((Float64, 3, 5, 7, 2, false, false, true, true, true, true), (), options),
-    ((Float64, 3, 5, 7, 2, true, false, false, false, false, true), (), logdet_options),
-    ((Float64, 3, 5, 7, 2, false, true, false, false, false, true), (), options),
-    ((Float64, 5, 15, 25, 5, true, false, false, true, true, false), (), logdet_options),
-    ((Float64, 5, 15, 25, 5, true, false, false, true, true, true), (), logdet_options),
-    ((Float64, 5, 15, 25, 5, false, true, false, true, true, true), (), options),
-    ((Float64, 5, 15, 25, 5, false, false, true, true, true, true), (), options),
-    ((Float64, 5, 15, 25, 5, true, false, false, false, false, true), (), logdet_options),
-    ((Float64, 5, 15, 25, 5, false, true, false, false, false, true), (), options),
-    ((Float64, 25, 75, 125, 5, true, false, false, true, true, false), (), logdet_options),
-    ((Float64, 25, 75, 125, 5, true, false, false, true, true, true), (), logdet_options),
-    ((Float64, 25, 75, 125, 5, false, true, false, true, true, true), (), options),
-    ((Float64, 25, 75, 125, 5, false, false, true, true, true, true), (), options),
-    ((Float64, 25, 75, 125, 5, true, false, false, false, false, true), (), logdet_options),
-    ((Float64, 25, 75, 125, 5, false, true, false, false, false, true), (), options),
-    ]
-expdesign_native_slow = [
-    # TODO commented too slow
-    # ((Float64, 100, 200, 200, 10, true, false, false, true, true, false), (), options),
-    ((Float64, 100, 200, 200, 10, true, false, false, true, true, true), (), logdet_options),
-    ((Float64, 100, 200, 200, 10, false, true, false, true, true, true), (), options),
-    ((Float64, 100, 200, 200, 10, false, false, true, true, true, true), (), options),
-    ((Float64, 100, 200, 200, 10, true, false, false, false, false, true), (), logdet_options),
-    ((Float64, 100, 200, 200, 10, false, true, false, false, false, true), (), options),
-    ]
+# @testset "ExpDesignNative" for inst in example_tests(ExpDesignNative{Float64}, MinimalInstances()) test(inst...) end
 
-@testset "expdesign_native" begin test_native_instance.(expdesign_native, test_expdesign_native, expdesign_native_fast) end
-;
+return ExpDesignNative

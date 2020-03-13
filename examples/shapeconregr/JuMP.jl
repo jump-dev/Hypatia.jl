@@ -69,12 +69,19 @@ shapeconregr_data = Dict(
     )
 
 options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
+relaxed_options = (tol_feas = 1e-5, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4)
 example_tests(::Type{ShapeConRegrJuMP{Float64}}, ::MinimalInstances) = [
-    ((:naics5811, 4, true, false, false), false, options),
+    ((:naics5811, 3, true, false, false), false, options),
     ((1, 5, :func1, 2, 4, true, false, false), false, options),
+    ((1, 5, :func1, 2, 4, true, true, false), false, options),
+    ((1, 5, :func1, 2, 4, false, false, false), false, options),
+    ((1, 5, :func1, 2, 4, false, true, false), false, options),
     ]
 example_tests(::Type{ShapeConRegrJuMP{Float64}}, ::FastInstances) = [
-    ((:naics5811, 6, true, false, false), false, options),
+    ((:naics5811, 4, true, false, false), false, options),
+    ((:naics5811, 4, true, true, false), false, relaxed_options),
+    ((:naics5811, 3, false, false, false), false, options),
+    ((:naics5811, 3, false, true, false), false, options),
     ((2, 50, :func1, 5, 3, true, false, false), false, options),
     ((2, 50, :func2, 5, 3, true, true, false), false, options),
     ((2, 50, :func3, 5, 3, false, false, false), false, options),
@@ -83,18 +90,16 @@ example_tests(::Type{ShapeConRegrJuMP{Float64}}, ::FastInstances) = [
     ((2, 50, :func6, 5, 4, true, true, false), false, options),
     ((2, 50, :func7, 5, 4, false, false, false), false, options),
     ((2, 50, :func8, 5, 4, false, true, false), false, options),
-    ((4, 150, :func6, 0, 4, true, false, true), false, options),
-    ((4, 150, :func6, 0, 4, true, true, true), false, options),
+    ((4, 150, :func6, 0, 4, true, false, true), false, relaxed_options),
     ((4, 150, :func7, 0, 4, true, false, true), false, options),
     ((4, 150, :func7, 0, 4, true, true, true), false, options),
     ((4, 150, :func7, 0, 4, false, false, true), false, options),
     ((3, 150, :func8, 0, 6, true, false, true), false, options),
-    ((3, 150, :func8, 0, 6, true, true, true), false, options),
     ((5, 100, :func9, 9, 4, true, false, false), false, options),
     ((5, 100, :func10, 4, 4, true, false, false), false, options),
     ]
 example_tests(::Type{ShapeConRegrJuMP{Float64}}, ::SlowInstances) = [
-    ((:naics5811, 8, true, false, false), false, options),
+    ((:naics5811, 7, true, false, false), false, options),
     ((4, 150, :func6, 0, 4, false, false, true), false, options),
     ((3, 150, :func8, 0, 6, false, false, true), false, options),
     ]
@@ -188,7 +193,7 @@ function build(inst::ShapeConRegrJuMP{T}) where {T <: Float64} # TODO generic re
     return model
 end
 
-function test_extra(inst::ShapeConRegrJuMP, model)
+function test_extra(inst::ShapeConRegrJuMP{T}, model) where T
     @test JuMP.termination_status(model) == MOI.OPTIMAL
     if JuMP.termination_status(model) == MOI.OPTIMAL && inst.is_fit_exact
         # check objective value is correct

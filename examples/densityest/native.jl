@@ -61,29 +61,29 @@ example_tests(::Type{DensityEstNative{Float64}}, ::FastInstances) = [
     ((250, 4, 6, false, true, true), options),
     ((250, 4, 6, true, false, true), options),
     ((250, 4, 6, true, true, false), options),
-    ((:iris_data, 4, true, true, true), options),
-    ((:iris_data, 5, true, true, true), options),
-    ((:iris_data, 6, true, true, true), options),
-    ((:iris_data, 4, false, true, true), options),
-    ((:iris_data, 4, true, false, true), options),
-    ((:iris_data, 4, true, true, false), options),
-    ((:cancer_data, 4, true, true, true), options),
-    ((:cancer_data, 4, false, true, true), options),
-    ((:cancer_data, 4, true, false, true), options),
-    ((:cancer_data, 4, true, true, false), options),
+    ((:iris, 4, true, true, true), options),
+    ((:iris, 5, true, true, true), options),
+    ((:iris, 6, true, true, true), options),
+    ((:iris, 4, false, true, true), options),
+    ((:iris, 4, true, false, true), options),
+    ((:iris, 4, true, true, false), options),
+    ((:cancer, 4, true, true, true), options),
+    ((:cancer, 4, false, true, true), options),
+    ((:cancer, 4, true, false, true), options),
+    ((:cancer, 4, true, true, false), options),
     ]
 example_tests(::Type{DensityEstNative{Float64}}, ::SlowInstances) = [
-    ((:cancer_data, 6, true, true, true), options),
-    ((:cancer_data, 6, false, true, true), options),
-    ((:cancer_data, 6, true, false, true), options),
-    ((:cancer_data, 6, true, true, false), options),
+    ((:cancer, 6, true, true, true), options),
+    ((:cancer, 6, false, true, true), options),
+    ((:cancer, 6, true, false, true), options),
+    ((:cancer, 6, true, true, false), options),
     ((400, 5, 6, true, true, true), options),
     ((400, 5, 6, false, true, true), options),
     ((400, 5, 6, true, false, true), options),
     ((400, 5, 6, true, true, false), options),
     ]
 
-function build(inst::DensityEstNative{T}) where {T <: Float64} # TODO generic reals
+function build(inst::DensityEstNative{T}) where {T <: Real}
     (X, num_obs) = (inst.X, inst.num_obs)
 
     domain = ModelUtilities.Box{Float64}(-ones(inst.n), ones(inst.n))
