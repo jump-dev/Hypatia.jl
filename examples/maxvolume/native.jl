@@ -4,46 +4,66 @@ Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 find maximum volume hypercube with edges parallel to the axes inside a polyhedron
 =#
 
-using LinearAlgebra
-import Random
-using Test
-import Hypatia
-const CO = Hypatia.Cones
+include(joinpath(@__DIR__, "../common_native.jl"))
 
-# modified from https://github.com/JuliaOpt/MathOptInterface.jl/blob/master/src/Bridges/Constraint/geomean.jl
-function log_floor(n, i)
-    if n <= 2 ^ i
-        i
-    else
-        log_floor(n, i + 1)
-    end
-end
-function log_floor(n::Integer)
-    @assert n > zero(n)
-    log_floor(n, zero(n))
+struct MaxVolumeNative{T <: Real} <: ExampleInstanceNative{T}
+    n::Int
+    use_hypogeomean::Bool # use hypogeomean cone for geomean objective
+    use_power::Bool # use power cones for geomean objective
+    use_epipersquare::Bool # use epipersquare cones for geomean objective
 end
 
-function maxvolume_native(
-    ::Type{T},
-    n::Int,
-    use_hypogeomean::Bool, # use hypogeomean cone for geomean objective
-    use_power::Bool, # use power cones for geomean objective
-    use_epipersquare::Bool, # use epipersquare cones for geomean objective
-    ) where {T <: Real}
-    @assert use_hypogeomean + use_power + use_epipersquare == 1
-    @assert n > 2
+example_tests(::Type{<:MaxVolumeNative{<:Real}}, ::MinimalInstances) = [
+    ((2, true, false, false),),
+    ((3, false, true, false),),
+    ((2, false, false, true),),
+    ]
+example_tests(::Type{MaxVolumeNative{Float64}}, ::FastInstances) = [
+    ((10, true, false, false),),
+    ((10, false, true, false),),
+    ((10, false, false, true),),
+    ((100, true, false, false),),
+    ((100, false, true, false),),
+    ((100, false, false, true),),
+    ((1000, true, false, false),),
+    ]
+example_tests(::Type{MaxVolumeNative{Float64}}, ::SlowInstances) = [
+    ((1000, false, true, false),),
+    ((1000, false, false, true),),
+    ((1500, true, false, false),),
+    ((1500, false, true, false),),
+    ((1500, false, false, true),),
+    ]
+
+function build(inst::MaxVolumeNative{T}) where {T <: Real}
+    @assert inst.use_hypogeomean + inst.use_power + inst.use_epipersquare == 1
+    n = inst.n
     poly_hrep = Matrix{T}(I, n, n)
     poly_hrep .+= T.(randn(n, n)) / n
     c = vcat(-1, zeros(T, n))
     A = hcat(zeros(T, n), poly_hrep)
     b = ones(T, n)
 
-    if use_hypogeomean
+    # modified from https://github.com/JuliaOpt/MathOptInterface.jl/blob/master/src/Bridges/Constraint/geomean.jl
+    function log_floor(n, i)
+        if n <= 2 ^ i
+            i
+        else
+            log_floor(n, i + 1)
+        end
+    end
+    function log_floor(n::Integer)
+        @assert n > zero(n)
+        log_floor(n, zero(n))
+    end
+
+    if inst.use_hypogeomean
         G = -Matrix{T}(I, n + 1, n + 1)
         h = zeros(T, n + 1)
-        cones = CO.Cone{T}[CO.HypoGeomean{T}(fill(inv(T(n)), n))]
-    elseif use_power
-        cones = CO.Cone{T}[]
+        cones = Cones.Cone{T}[Cones.HypoGeomean{T}(fill(inv(T(n)), n))]
+    elseif inst.use_power
+        @assert n > 2
+        cones = Cones.Cone{T}[]
         # number of 3-dimensional power cones needed is n - 1, number of new variables is n - 2
         len_power = 3 * (n - 1)
         G_geo_orig = zeros(T, len_power, n)
@@ -55,14 +75,14 @@ function maxvolume_native(
         G_geo_orig[1, 1] = -1
         G_geo_orig[2, 2] = -1
         G_geo_newvars[3, 1] = -1
-        push!(cones, CO.Power{T}(fill(inv(T(2)), 2), 1))
+        push!(cones, Cones.Power{T}(fill(inv(T(2)), 2), 1))
         offset = 4
         # loop over new vars
         for i in 1:(n - 3)
             G_geo_newvars[offset + 2, i + 1] = -1
             G_geo_newvars[offset + 1, i] = -1
             G_geo_orig[offset, i + 2] = -1
-            push!(cones, CO.Power{T}([inv(T(i + 2)), T(i + 1) / T(i + 2)], 1))
+            push!(cones, Cones.Power{T}([inv(T(i + 2)), T(i + 1) / T(i + 2)], 1))
             offset += 3
         end
         # last row also special becuase hypograph variable is involved
@@ -71,10 +91,10 @@ function maxvolume_native(
         G = [
             vcat(zeros(T, len_power - 1), -one(T))  G_geo_orig  G_geo_newvars
             ]
-        push!(cones, CO.Power{T}([inv(T(n)), T(n - 1) / T(n)], 1))
+        push!(cones, Cones.Power{T}([inv(T(n)), T(n - 1) / T(n)], 1))
         h = zeros(T, 3 * (n - 1))
     else
-        @assert use_epipersquare == true
+        @assert inst.use_epipersquare == true
         # number of variables inside geometric mean is n
         # number of layers of variables
         num_layers = log_floor(n)
@@ -86,7 +106,7 @@ function maxvolume_native(
         rtfact = sqrt(T(2) ^ num_layers)
         # excludes original hypograph variable, padded later
         G_rsoc = zeros(T, 3 * num_new_vars, n + num_new_vars)
-        cones = CO.Cone{T}[]
+        cones = Cones.Cone{T}[]
 
         offset = offset_next = 0
         row = 1
@@ -99,7 +119,7 @@ function maxvolume_native(
                 G_rsoc[row, n + offset_next + 2j - 1] = -1
                 G_rsoc[row + 1, n + offset_next + 2j] = -1
                 G_rsoc[row + 2, n + offset + j] = -1
-                push!(cones, CO.EpiPerSquare{T}(3))
+                push!(cones, Cones.EpiPerSquare{T}(3))
                 row += 3
             end
             offset = offset_next
@@ -120,7 +140,7 @@ function maxvolume_native(
                 G_rsoc[row + 1, 2j] = -1
             end
             G_rsoc[row + 2, n + offset + j] = -1
-            push!(cones, CO.EpiPerSquare{T}(3))
+            push!(cones, Cones.EpiPerSquare{T}(3))
             row += 3
         end
 
@@ -129,37 +149,12 @@ function maxvolume_native(
             zeros(T, 3 * num_new_vars)  G_rsoc;
             one(T)  zeros(T, 1, n)  -inv(rtfact)  zeros(T, 1, num_new_vars - 1);
             ]
-        push!(cones, CO.Nonnegative{T}(1))
+        push!(cones, Cones.Nonnegative{T}(1))
         h = zeros(T, 3 * num_new_vars + 1)
     end
 
-    return (c = c, A = A, b = b, G = G, h = h, cones = cones)
+    model = Models.Model{T}(c, A, b, G, h, cones)
+    return model
 end
 
-function test_maxvolume_native(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
-    Random.seed!(rseed)
-    d = maxvolume_native(T, instance...)
-    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
-    @test r.status == :Optimal
-    return r
-end
-
-maxvolume_native_fast = [
-    (3, true, false, false),
-    (3, false, true, false),
-    (3, false, false, true),
-    (12, true, false, false),
-    (12, false, true, false),
-    (12, false, false, true),
-    (100, true, false, false),
-    (100, false, true, false),
-    (100, false, false, true),
-    (1000, true, false, false),
-    ]
-maxvolume_native_slow = [
-    (1000, false, true, false),
-    (1000, false, false, true),
-    (1500, true, false, false),
-    (1500, false, true, false),
-    (1500, false, false, true),
-    ]
+return MaxVolumeNative

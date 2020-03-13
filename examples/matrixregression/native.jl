@@ -14,31 +14,91 @@ TODO
 - generalize for sparse Y,X but make sure qr factorization does not permute
 =#
 
-using LinearAlgebra
+include(joinpath(@__DIR__, "../common_native.jl"))
 using SparseArrays
-import Random
-using Test
-import Hypatia
-import Hypatia.RealOrComplex
-const CO = Hypatia.Cones
 
-function matrixregression_native(
-    ::Type{T},
-    Y::Matrix{R},
-    X::Matrix{R},
-    lam_fro::Real, # penalty on Frobenius norm
-    lam_nuc::Real, # penalty on nuclear norm
-    lam_las::Real, # penalty on L1 norm
-    lam_glr::Real, # penalty on penalty on row group l1 norm
-    lam_glc::Real, # penalty on penalty on column group l1 norm
-    ) where {R <: RealOrComplex{T}} where {T <: Real}
-    @assert min(lam_fro, lam_nuc, lam_las, lam_glr, lam_glc) >= 0
+struct MatrixRegressionNative{T <: Real} <: ExampleInstanceNative{T}
+    is_complex::Bool
+    Y::Matrix
+    X::Matrix
+    lam_fro::Real # penalty on Frobenius norm
+    lam_nuc::Real # penalty on nuclear norm
+    lam_las::Real # penalty on l1 norm
+    lam_glr::Real # penalty on penalty on row group l1 norm
+    lam_glc::Real # penalty on penalty on column group l1 norm
+end
+function MatrixRegressionNative{T}(
+    is_complex::Bool,
+    n::Int,
+    m::Int,
+    p::Int,
+    args...;
+    A_max_rank::Int = div(m, 2) + 1,
+    A_sparsity::Real = max(0.2, inv(sqrt(m * p))),
+    Y_noise::Real = 0.01,
+    ) where {T <: Real}
+    @assert p >= m
+    @assert 1 <= A_max_rank <= m
+    @assert 0 < A_sparsity <= 1
+    R = (is_complex ? Complex{T} : T)
+    A_left = sprandn(R, p, A_max_rank, A_sparsity)
+    A_right = sprandn(R, A_max_rank, m, A_sparsity)
+    A = 10 * A_left * A_right
+    X = randn(R, n, p)
+    Y = Matrix{R}(X * A + Y_noise * randn(R, n, m))
+    return MatrixRegressionNative{T}(is_complex, Y, X, args...)
+end
+
+example_tests(::Type{<:MatrixRegressionNative{<:BlasReal}}, ::MinimalInstances) = [
+    ((false, 2, 3, 4, 0, 0, 0, 0, 0),),
+    ((false, 2, 3, 4, 0.1, 0.1, 0.1, 0.2, 0.2),),
+    ((true, 2, 3, 4, 0, 0, 0, 0, 0),),
+    ((true, 2, 3, 4, 0.1, 0.1, 0.1, 0.2, 0.2),),
+    ]
+example_tests(::Type{MatrixRegressionNative{Float64}}, ::FastInstances) = [
+    ((false, 5, 3, 4, 0, 0, 0, 0, 0),),
+    ((false, 5, 3, 4, 0.1, 0.1, 0.1, 0.2, 0.2),),
+    ((false, 5, 3, 4, 0, 0.1, 0.1, 0, 0),),
+    ((false, 3, 4, 5, 0, 0, 0, 0, 0),),
+    ((false, 3, 4, 5, 0.1, 0.1, 0.1, 0.2, 0.2),),
+    ((false, 3, 4, 5, 0, 0.1, 0.1, 0, 0),),
+    ((true, 5, 3, 4, 0, 0, 0, 0, 0),),
+    ((true, 5, 3, 4, 0.1, 0.1, 0.1, 0.2, 0.2),),
+    ((true, 5, 3, 4, 0, 0.1, 0.1, 0, 0),),
+    ((true, 3, 4, 5, 0, 0, 0, 0, 0),),
+    ((true, 3, 4, 5, 0.1, 0.1, 0.1, 0.2, 0.2),),
+    ((true, 3, 4, 5, 0, 0.1, 0.1, 0, 0),),
+    ((false, 15, 10, 20, 0, 0, 0, 0, 0),),
+    ((false, 15, 10, 20, 0.1, 0.1, 0.1, 0.2, 0.2),),
+    ((false, 15, 10, 20, 0, 0.1, 0.1, 0, 0),),
+    ((true, 15, 10, 20, 0, 0, 0, 0, 0),),
+    ((true, 15, 10, 20, 0.1, 0.1, 0.1, 0.2, 0.2),),
+    ((true, 15, 10, 20, 0, 0.1, 0.1, 0, 0),),
+    ((false, 100, 8, 12, 0, 0, 0, 0, 0),),
+    ((false, 100, 8, 12, 0.1, 0.1, 0.1, 0.2, 0.2),),
+    ((false, 100, 8, 12, 0, 0.1, 0.1, 0, 0),),
+    ((true, 100, 8, 12, 0.1, 0.1, 0.1, 0.2, 0.2),),
+    ((true, 100, 8, 12, 0, 0.1, 0.1, 0, 0),),
+    ]
+example_tests(::Type{MatrixRegressionNative{Float64}}, ::SlowInstances) = [
+    ((false, 15, 20, 50, 0, 0, 0, 0, 0),),
+    ((false, 15, 20, 50, 0.1, 0.1, 0.1, 0.2, 0.2),),
+    ((false, 15, 20, 50, 0, 0.1, 0.1, 0, 0),),
+    ((true, 15, 20, 50, 0, 0, 0, 0, 0),),
+    ((true, 15, 20, 50, 0.1, 0.1, 0.1, 0.2, 0.2),),
+    ((true, 15, 20, 50, 0, 0.1, 0.1, 0, 0),),
+    ]
+
+function build(inst::MatrixRegressionNative{T}) where {T <: Real}
+    (Y, X) = (inst.Y, inst.X)
+    is_complex = inst.is_complex
+    R = eltype(Y)
+    @assert min(inst.lam_fro, inst.lam_nuc, inst.lam_las, inst.lam_glr, inst.lam_glc) >= 0
     (data_n, data_m) = size(Y)
     data_p = size(X, 2)
     @assert size(X, 1) == data_n
     @assert data_p >= data_m
 
-    is_complex = (R <: Complex{T})
     R_dim = (is_complex ? 2 : 1)
     data_pm = data_p * data_m
     data_nm = data_n * data_m
@@ -98,14 +158,14 @@ function matrixregression_native(
         end
     end
 
-    cones = CO.Cone{T}[CO.EpiNormEucl{T}(model_q)]
+    cones = Cones.Cone{T}[Cones.EpiNormEucl{T}(model_q)]
 
     # put 1/(2n) * (epi(sum(abs2, X * A)) - 2 * dot(X' * Y, A)) in objective
     # ignore constant term 1/(2n) * sum(abs2, Y)
     model_c = zeros(T, model_n)
     mXpY = -X' * Y
     if is_complex
-        @views CO.cvec_to_rvec!(model_c[2:end], vec(mXpY))
+        @views Cones.cvec_to_rvec!(model_c[2:end], vec(mXpY))
     else
         model_c[2:end] .= vec(mXpY)
     end
@@ -115,9 +175,9 @@ function matrixregression_native(
     # list of optional regularizers (group lasso handled separately below)
     reg_cone_dim = 1 + R_dim * data_pm
     lams = [
-        (lam_fro, CO.EpiNormEucl{T}(reg_cone_dim)), # frobenius norm (vector L2 norm)
-        (lam_las, CO.EpiNormInf{T, R}(reg_cone_dim, use_dual = true)), # vector lasso / L1 norm (dual to Linf norm)
-        (lam_nuc, CO.EpiNormSpectral{T, R}(data_m, data_p, use_dual = true)), # nuclear norm (dual to spectral norm)
+        (inst.lam_fro, Cones.EpiNormEucl{T}(reg_cone_dim)), # frobenius norm (vector L2 norm)
+        (inst.lam_las, Cones.EpiNormInf{T, R}(reg_cone_dim, use_dual = true)), # vector lasso / L1 norm (dual to Linf norm)
+        (inst.lam_nuc, Cones.EpiNormSpectral{T, R}(data_m, data_p, use_dual = true)), # nuclear norm (dual to spectral norm)
         ]
 
     for (lam, cone) in lams
@@ -128,7 +188,7 @@ function matrixregression_native(
         # constraint: (z, data_A) in cone
         push!(model_c, lam)
 
-        if cone isa CO.EpiNormSpectral{T, R}
+        if cone isa Cones.EpiNormSpectral{T, R}
             # permute identity because need transpose of data_A since data_p >= data_m
             iden_mat = zeros(T, R_dim * data_pm, R_dim * data_pm)
             for j in 1:data_m, k in 1:data_p
@@ -160,8 +220,8 @@ function matrixregression_native(
     end
 
     # row group lasso regularizer (one lambda for all rows)
-    if !iszero(lam_glr)
-        append!(model_c, fill(lam_glr, data_p))
+    if !iszero(inst.lam_glr)
+        append!(model_c, fill(inst.lam_glr, data_p))
 
         q_glr = data_p * (1 + R_dim * data_m)
         G_glr = zeros(T, q_glr, model_n + data_p)
@@ -193,12 +253,12 @@ function matrixregression_native(
         model_n += data_p
         model_q += q_glr
 
-        append!(cones, CO.Cone{T}[CO.EpiNormEucl{T}(1 + R_dim * data_m) for k in 1:data_p])
+        append!(cones, Cones.Cone{T}[Cones.EpiNormEucl{T}(1 + R_dim * data_m) for k in 1:data_p])
     end
 
     # column group lasso regularizer (one lambda for all columns)
-    if !iszero(lam_glc)
-        append!(model_c, fill(lam_glc, data_m))
+    if !iszero(inst.lam_glc)
+        append!(model_c, fill(inst.lam_glc, data_m))
 
         q_glc = data_m * (1 + R_dim * data_p)
         G_glc = zeros(T, q_glc, model_n + data_m)
@@ -230,100 +290,31 @@ function matrixregression_native(
         model_n += data_m
         model_q += q_glc
 
-        append!(cones, CO.Cone{T}[CO.EpiNormEucl{T}(1 + R_dim * data_p) for k in 1:data_m])
+        append!(cones, Cones.Cone{T}[Cones.EpiNormEucl{T}(1 + R_dim * data_p) for k in 1:data_m])
     end
 
-    return (
-        c = model_c, A = zeros(T, 0, model_n), b = zeros(T, 0), G = model_G, h = model_h, cones = cones,
-        n = data_n, m = data_m, p = data_p, Y = Y, X = X,
-        lam_fro = lam_fro, lam_nuc = lam_nuc, lam_las = lam_las, lam_glr = lam_glr, lam_glc = lam_glc,
-        )
+    model = Models.Model{T}(model_c, zeros(T, 0, model_n), zeros(T, 0), model_G, model_h, cones)
+    return model
 end
 
-function matrixregression_native(
-    ::Type{T},
-    R_type::Type{<:Union{Real, Complex}},
-    n::Int,
-    m::Int,
-    p::Int,
-    args...;
-    A_max_rank::Int = div(m, 2) + 1,
-    A_sparsity::Real = max(0.2, inv(sqrt(m * p))),
-    Y_noise::Real = 0.01,
-    ) where {T <: Real}
-    @assert p >= m
-    @assert 1 <= A_max_rank <= m
-    @assert 0 < A_sparsity <= 1
-    R = (R_type == Complex ? Complex{T} : T)
-
-    A_left = sprandn(R, p, A_max_rank, A_sparsity)
-    A_right = sprandn(R, A_max_rank, m, A_sparsity)
-    A = 10 * A_left * A_right
-    X = randn(R, n, p)
-    Y = X * A + Y_noise * randn(R, n, m)
-    Y = Matrix{R}(Y)
-    X = Matrix{R}(X)
-
-    return matrixregression_native(T, Y, X, args...)
-end
-
-function test_matrixregression_native(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
-    Random.seed!(rseed)
-    d = matrixregression_native(T, instance...)
-    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
-    @test r.status == :Optimal
-    if r.status == :Optimal
+function test_extra(inst::MatrixRegressionNative{T}, result::NamedTuple) where T
+    @test result.status == :Optimal
+    if result.status == :Optimal
         # check objective value is correct
-        R = eltype(d.Y)
-        if R <: Complex
-            A_opt_real = reshape(r.x[2:(1 + 2 * d.p * d.m)], 2 * d.p, d.m)
-            A_opt = zeros(R, d.p, d.m)
-            for k in 1:d.p
-                @. @views A_opt[k, :] = A_opt_real[2k - 1, :] + A_opt_real[2k, :] * im
-            end
-        else
-            A_opt = reshape(r.x[2:(1 + d.p * d.m)], d.p, d.m)
-        end
-        loss = (sum(abs2, d.X * A_opt) / 2 - real(dot(d.X' * d.Y, A_opt))) / d.n
-        obj_try = loss + d.lam_fro * norm(vec(A_opt), 2) +
-            d.lam_nuc * sum(svd(A_opt).S) + d.lam_las * norm(vec(A_opt), 1) +
-            d.lam_glr * sum(norm, eachrow(A_opt)) + d.lam_glc * sum(norm, eachcol(A_opt))
-        @test r.primal_obj ≈ obj_try atol = 1e-4 rtol = 1e-4
+        (Y, X) = (inst.Y, inst.X)
+        A_opt = similar(Y, size(X, 2), size(Y, 2))
+        A_len = length(A_opt) * (inst.is_complex ? 2 : 1)
+        @views Cones.vec_copy_to!(A_opt, result.x[1 .+ (1:A_len)])
+        loss = (sum(abs2, X * A_opt) / 2 - real(dot(X' * Y, A_opt))) / size(Y, 1)
+        obj_result = loss +
+            inst.lam_fro * norm(vec(A_opt), 2) +
+            inst.lam_nuc * sum(svd(A_opt).S) +
+            inst.lam_las * norm(vec(A_opt), 1) +
+            inst.lam_glr * sum(norm, eachrow(A_opt)) +
+            inst.lam_glc * sum(norm, eachcol(A_opt))
+        tol = eps(T)^0.25
+        @test result.primal_obj ≈ obj_result atol = tol rtol = tol
     end
-    return r
 end
 
-matrixregression_native_fast = [
-    (Real, 5, 3, 4, 0, 0, 0, 0, 0),
-    (Real, 5, 3, 4, 0.1, 0.1, 0.1, 0.2, 0.2),
-    (Real, 5, 3, 4, 0, 0.1, 0.1, 0, 0),
-    (Real, 3, 4, 5, 0, 0, 0, 0, 0),
-    (Real, 3, 4, 5, 0.1, 0.1, 0.1, 0.2, 0.2),
-    (Real, 3, 4, 5, 0, 0.1, 0.1, 0, 0),
-    (Complex, 5, 3, 4, 0, 0, 0, 0, 0),
-    (Complex, 5, 3, 4, 0.1, 0.1, 0.1, 0.2, 0.2),
-    (Complex, 5, 3, 4, 0, 0.1, 0.1, 0, 0),
-    (Complex, 3, 4, 5, 0, 0, 0, 0, 0),
-    (Complex, 3, 4, 5, 0.1, 0.1, 0.1, 0.2, 0.2),
-    (Complex, 3, 4, 5, 0, 0.1, 0.1, 0, 0),
-    (Real, 15, 10, 20, 0, 0, 0, 0, 0),
-    (Real, 15, 10, 20, 0.1, 0.1, 0.1, 0.2, 0.2),
-    (Real, 15, 10, 20, 0, 0.1, 0.1, 0, 0),
-    (Complex, 15, 10, 20, 0, 0, 0, 0, 0),
-    (Complex, 15, 10, 20, 0.1, 0.1, 0.1, 0.2, 0.2),
-    (Complex, 15, 10, 20, 0, 0.1, 0.1, 0, 0),
-    (Real, 100, 8, 12, 0, 0, 0, 0, 0),
-    (Real, 100, 8, 12, 0.1, 0.1, 0.1, 0.2, 0.2),
-    (Real, 100, 8, 12, 0, 0.1, 0.1, 0, 0),
-    (Complex, 100, 8, 12, 0, 0, 0, 0, 0),
-    (Complex, 100, 8, 12, 0.1, 0.1, 0.1, 0.2, 0.2),
-    (Complex, 100, 8, 12, 0, 0.1, 0.1, 0, 0),
-    ]
-matrixregression_native_slow = [
-    (Real, 15, 20, 50, 0, 0, 0, 0, 0),
-    (Real, 15, 20, 50, 0.1, 0.1, 0.1, 0.2, 0.2),
-    (Real, 15, 20, 50, 0, 0.1, 0.1, 0, 0),
-    (Complex, 15, 20, 50, 0, 0, 0, 0, 0),
-    (Complex, 15, 20, 50, 0.1, 0.1, 0.1, 0.2, 0.2),
-    (Complex, 15, 20, 50, 0, 0.1, 0.1, 0, 0),
-    ]
+return MatrixRegressionNative

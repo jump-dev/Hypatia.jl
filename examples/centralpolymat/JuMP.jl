@@ -4,21 +4,51 @@ Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 compute a gram matrix of a polynomial, minimizing its log-determinant or root-determinant (equivalent optimal solutions with different optimal objective values)
 =#
 
+include(joinpath(@__DIR__, "../common_JuMP.jl"))
 import DynamicPolynomials
 const DP = DynamicPolynomials
-import JuMP
-const MOI = JuMP.MOI
-import Hypatia
-import Random
-using LinearAlgebra
-using Test
 
-function centralpolymat_JuMP(
-    ::Type{T},
-    n::Int,
-    halfdeg::Int,
-    logdet_obj::Bool, # use logdet, else rootdet
-    ) where {T <: Float64} # TODO support generic reals
+struct CentralPolyMatJuMP{T <: Real} <: ExampleInstanceJuMP{T}
+    n::Int # number of polyvars
+    halfdeg::Int # half degree of random polynomials
+    logdet_obj::Bool # use logdet, else rootdet
+end
+
+example_tests(::Type{CentralPolyMatJuMP{Float64}}, ::MinimalInstances) = begin
+    options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
+    return [
+    ((2, 2, true), false, options),
+    ((2, 2, false), false, options),
+    # ((2, 2, true), true, options),
+    # ((2, 2, false), true, options),
+    ]
+end
+example_tests(::Type{CentralPolyMatJuMP{Float64}}, ::FastInstances) = begin
+    options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
+    return [
+    ((2, 3, true), false, options),
+    ((2, 3, false), false, options),
+    ((3, 2, true), false, options),
+    ((3, 2, false), false, options),
+    ((3, 4, true), false, options),
+    ((3, 4, false), false, options),
+    ((7, 2, true), false, options),
+    ((7, 2, false), false, options),
+    ]
+end
+example_tests(::Type{CentralPolyMatJuMP{Float64}}, ::SlowInstances) = begin
+    options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
+    return [
+    ((3, 5, true), false, options),
+    ((3, 5, false), false, options),
+    ((6, 3, true), false, options),
+    ((6, 3, false), false, options),
+    ]
+end
+
+function build(inst::CentralPolyMatJuMP{T}) where {T <: Float64} # TODO generic reals
+    (n, halfdeg) = (inst.n, inst.halfdeg)
+
     DP.@polyvar x[1:n]
     monomials = DP.monomials(x, 0:halfdeg)
     L = binomial(n + halfdeg, n)
@@ -34,37 +64,13 @@ function centralpolymat_JuMP(
 
     JuMP.@variable(model, hypo)
     JuMP.@objective(model, Max, hypo)
-    if logdet_obj
+    if inst.logdet_obj
         JuMP.@constraint(model, vcat(hypo, 1.0, v1) in MOI.LogDetConeTriangle(L))
     else
         JuMP.@constraint(model, vcat(hypo, v1) in MOI.RootDetConeTriangle(L))
     end
 
-    return (model = model,)
+    return model
 end
 
-function test_centralpolymat_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
-    Random.seed!(rseed)
-    d = centralpolymat_JuMP(T, instance...)
-    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer{T}(; options...))
-    JuMP.optimize!(d.model)
-    @test JuMP.termination_status(d.model) == MOI.OPTIMAL
-    return d.model.moi_backend.optimizer.model.optimizer.result
-end
-
-centralpolymat_JuMP_fast = [
-    (2, 3, true),
-    (2, 3, false),
-    (3, 2, true),
-    (3, 2, false),
-    (3, 4, true),
-    (3, 4, false),
-    (7, 2, true),
-    (7, 2, false),
-    ]
-centralpolymat_JuMP_slow = [
-    (3, 5, true),
-    (3, 5, false),
-    (6, 3, true),
-    (6, 3, false),
-    ]
+return CentralPolyMatJuMP

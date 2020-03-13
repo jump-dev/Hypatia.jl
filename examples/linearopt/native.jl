@@ -6,48 +6,45 @@ modified from https://github.com/dpapp-github/alfonso/blob/master/random_lp.m
 solves a simple linear optimization problem (LP) min c'x s.t. Ax = b, x >= 0
 =#
 
+include(joinpath(@__DIR__, "../common_native.jl"))
 using SparseArrays
-using LinearAlgebra
-import Random
-using Test
-import Hypatia
-const CO = Hypatia.Cones
 
-function linearopt_native(
-    ::Type{T},
-    m::Int,
-    n::Int,
-    nz_frac::Float64,
-    ) where {T <: Real}
-    # generate random data
+struct LinearOptNative{T <: Real} <: ExampleInstanceNative{T}
+    m::Int
+    n::Int
+    nz_frac::Float64
+end
+
+example_tests(::Type{<:LinearOptNative{<:Real}}, ::MinimalInstances) = [
+    ((2, 4, 1.0),),
+    ((2, 4, 0.5),),
+    ]
+example_tests(::Type{LinearOptNative{Float64}}, ::FastInstances) = [
+    ((15, 20, 1.0),),
+    ((15, 20, 0.25),),
+    ((50, 100, 1.0),),
+    ((50, 100, 0.15),),
+    ]
+example_tests(::Type{LinearOptNative{Float64}}, ::SlowInstances) = [
+    ((500, 1000, 0.05),),
+    ((500, 1000, 1.0),),
+    ]
+
+function build(inst::LinearOptNative{T}) where {T <: Real}
+    (m, n, nz_frac) = (inst.m, inst.n, inst.nz_frac)
     @assert 0 < nz_frac <= 1
 
-    A = (nz_frac >= 1.0) ? rand(T, m, n) : sprand(T, m, n, nz_frac)
+    # generate random data
+    A = (nz_frac >= 1) ? rand(T, m, n) : sprand(T, m, n, nz_frac)
     A .*= 10
     b = vec(sum(A, dims = 2))
     c = rand(T, n)
     G = Diagonal(-one(T) * I, n) # TODO uniformscaling
     h = zeros(T, n)
-    cones = CO.Cone{T}[CO.Nonnegative{T}(n)]
+    cones = Cones.Cone{T}[Cones.Nonnegative{T}(n)]
 
-    return (c = c, A = A, b = b, G = G, h = h, cones = cones)
+    model = Models.Model{T}(c, A, b, G, h, cones)
+    return model
 end
 
-function test_linearopt_native(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
-    Random.seed!(rseed)
-    d = linearopt_native(T, instance...)
-    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
-    @test r.status == :Optimal
-    return r
-end
-
-linearopt_native_fast = [
-    (15, 20, 1.0),
-    (15, 20, 0.25),
-    (50, 100, 1.0),
-    (50, 100, 0.15),
-    ]
-linearopt_native_slow = [
-    (500, 1000, 0.05),
-    (500, 1000, 1.0),
-    ]
+return LinearOptNative

@@ -13,25 +13,56 @@ if logdet_obj or rootdet_obj is true, F is the logdet or rootdet function
 if geomean_obj is true, we use a formulation from https://picos-api.gitlab.io/picos/optdes.html that finds an equivalent minimizer
 =#
 
-using LinearAlgebra
-import Random
-using Test
-import JuMP
-const MOI = JuMP.MOI
-import Hypatia
+include(joinpath(@__DIR__, "../common_JuMP.jl"))
 
-function expdesign_JuMP(
-    ::Type{T},
-    q::Int,
-    p::Int,
-    n::Int,
-    n_max::Int,
-    logdet_obj::Bool, # use formulation with logdet objective
-    rootdet_obj::Bool, # use formulation with rootdet objective
-    geomean_obj::Bool, # use formulation with geomean objective
-    ) where {T <: Float64} # TODO support generic reals
+struct ExpDesignJuMP{T <: Real} <: ExampleInstanceJuMP{T}
+    q::Int
+    p::Int
+    n::Int
+    n_max::Int
+    logdet_obj::Bool # use formulation with logdet objective
+    rootdet_obj::Bool # use formulation with rootdet objective
+    geomean_obj::Bool # use formulation with geomean objective
+end
+
+example_tests(::Type{ExpDesignJuMP{Float64}}, ::MinimalInstances) = begin
+    options = (tol_feas = 1e-5, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4)
+    return [
+    ((2, 3, 4, 2, true, false, false), false, options),
+    ((2, 3, 4, 2, false, true, false), false),
+    ((2, 3, 4, 2, false, false, true), false),
+    ]
+end
+example_tests(::Type{ExpDesignJuMP{Float64}}, ::FastInstances) = begin
+    options = (tol_feas = 1e-5, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4)
+    return [
+    ((3, 5, 7, 2, true, false, false), false, options),
+    ((3, 5, 7, 2, false, true, false), false),
+    ((3, 5, 7, 2, false, false, true), false),
+    ((5, 15, 25, 5, true, false, false), false, options),
+    ((5, 15, 25, 5, false, true, false), false),
+    ((5, 15, 25, 5, false, false, true), false),
+    ((10, 30, 50, 5, true, false, false), false, options),
+    ((10, 30, 50, 5, false, true, false), false),
+    ((10, 30, 50, 5, false, false, true), false),
+    ((25, 75, 125, 10, true, false, false), false, options),
+    ((25, 75, 125, 10, false, true, false), false),
+    ((25, 75, 125, 10, false, false, true), false),
+    ]
+end
+example_tests(::Type{ExpDesignJuMP{Float64}}, ::SlowInstances) = begin
+    options = (tol_feas = 1e-5, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4)
+    return [
+    ((100, 200, 200, 10, true, false, false), false, options),
+    ((100, 200, 200, 10, false, true, false), false),
+    ((100, 200, 200, 10, false, false, true), false),
+    ]
+end
+
+function build(inst::ExpDesignJuMP{T}) where {T <: Float64} # TODO generic reals
+    (q, p, n, n_max) = (inst.q, inst.p, inst.n, inst.n_max)
     @assert (p > q) && (n > q) && (n_max <= n)
-    @assert logdet_obj + geomean_obj + rootdet_obj == 1
+    @assert inst.logdet_obj + inst.geomean_obj + inst.rootdet_obj == 1
     V = randn(q, p)
 
     model = JuMP.Model()
@@ -45,9 +76,9 @@ function expdesign_JuMP(
     JuMP.@variable(model, hypo)
     JuMP.@objective(model, Max, hypo)
 
-    if logdet_obj
+    if inst.logdet_obj
         JuMP.@constraint(model, vcat(hypo, 1.0, v1) in MOI.LogDetConeTriangle(q))
-    elseif rootdet_obj
+    elseif inst.rootdet_obj
         JuMP.@constraint(model, vcat(hypo, v1) in MOI.RootDetConeTriangle(q))
     else
         # hypogeomean + epinormeucl formulation
@@ -62,34 +93,7 @@ function expdesign_JuMP(
         end)
     end
 
-    return (model = model,)
+    return model
 end
 
-function test_expdesign_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
-    Random.seed!(rseed)
-    d = expdesign_JuMP(T, instance...)
-    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer{T}(; options...))
-    JuMP.optimize!(d.model)
-    @test JuMP.termination_status(d.model) == MOI.OPTIMAL
-    return d.model.moi_backend.optimizer.model.optimizer.result
-end
-
-expdesign_JuMP_fast = [
-    (3, 5, 7, 2, true, false, false),
-    (3, 5, 7, 2, false, true, false),
-    (3, 5, 7, 2, false, false, true),
-    (5, 15, 25, 5, true, false, false),
-    (5, 15, 25, 5, false, true, false),
-    (5, 15, 25, 5, false, false, true),
-    (10, 30, 50, 5, true, false, false),
-    (10, 30, 50, 5, false, true, false),
-    (10, 30, 50, 5, false, false, true),
-    (25, 75, 125, 10, true, false, false),
-    (25, 75, 125, 10, false, true, false),
-    (25, 75, 125, 10, false, false, true),
-    ]
-expdesign_JuMP_slow = [
-    (100, 200, 200, 10, true, false, false),
-    (100, 200, 200, 10, false, true, false),
-    (100, 200, 200, 10, false, false, true),
-    ]
+return ExpDesignJuMP

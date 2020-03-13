@@ -34,15 +34,13 @@ function get_weights(dom::Box{T}, pts::AbstractMatrix{T}) where {T <: Real}
 end
 
 
-interp_sample(dom::Ball{T}, npts::Int) where {T <: Real} = error("cannot handle ball domains with number type $T")
-
-function interp_sample(dom::Ball{Float64}, npts::Int)
+function interp_sample(dom::Ball{T}, npts::Int) where {T <: Real}
     dim = get_dimension(dom)
-    pts = randn(npts, dim)
+    pts = randn(T, npts, dim)
     norms = sum(abs2, pts, dims = 2)
     pts .*= dom.r ./ sqrt.(norms) # scale
-    norms .*= 0.5
-    pts .*= sf_gamma_inc_Q.(norms, dim * 0.5) .^ inv(dim) # sf_gamma_inc_Q is the normalized incomplete gamma function
+    norms ./= 2
+    pts .*= sf_gamma_inc_Q.(norms, dim / 2) .^ inv(dim) # sf_gamma_inc_Q is the normalized incomplete gamma function
     for i in 1:dim
         pts[:, i] .+= dom.c[i] # shift
     end
@@ -55,26 +53,25 @@ function get_weights(dom::Ball{T}, pts::AbstractMatrix{T}) where {T <: Real}
     return [g]
 end
 
-interp_sample(dom::Ellipsoid{T}, npts::Int) where {T <: Real} = error("cannot handle ellipsoid domains with number type $T")
 
-function interp_sample(dom::Ellipsoid{Float64}, npts::Int)
+function interp_sample(dom::Ellipsoid{T}, npts::Int) where {T <: Real}
     dim = get_dimension(dom)
-    pts = randn(npts, dim)
+    pts = randn(T, npts, dim)
     norms = sum(abs2, pts, dims = 2)
     for i in 1:npts
         pts[i, :] ./= sqrt(norms[i]) # scale
     end
-    norms .*= 0.5
-    pts .*= sf_gamma_inc_Q.(norms, dim * 0.5) .^ inv(dim) # sf_gamma_inc_Q is the normalized incomplete gamma function
+    norms ./= 2
+    pts .*= sf_gamma_inc_Q.(norms, dim / 2) .^ inv(dim) # sf_gamma_inc_Q is the normalized incomplete gamma function
 
     F_rotate_scale = cholesky(dom.Q).U
     for i in 1:npts
         pts[i, :] = F_rotate_scale \ pts[i, :] # rotate/scale
     end
-
     for i in 1:dim
         pts[:, i] .+= dom.c[i] # shift
     end
+
     return pts
 end
 
@@ -87,7 +84,7 @@ end
 interp_sample(dom::SemiFreeDomain, npts::Int) =
     hcat(interp_sample(dom.restricted_halfregion, npts), interp_sample(dom.restricted_halfregion, npts))
 
-get_weights(dom::SemiFreeDomain, pts::Matrix{Float64}) =
+get_weights(dom::SemiFreeDomain, pts::Matrix{<:Real}) =
     get_weights(dom.restricted_halfregion, view(pts, :, 1:div(size(pts, 2), 2)))
 
 
@@ -101,8 +98,8 @@ get_L_U(n::Int, d::Int) = (binomial(n + d, n), binomial(n + 2d, n))
 function interpolate(
     dom::Domain{T},
     d::Int; # TODO make this 2d
-    sample::Bool = false,
     calc_w::Bool = false,
+    sample::Bool = (get_dimension(dom) >= 5) || !isa(dom, Box), # sample if n >= 5 or if domain is not Box
     sample_factor::Int = 10,
     ) where {T <: Real}
     if sample
@@ -113,10 +110,15 @@ function interpolate(
 end
 
 # slow but high-quality hyperrectangle/box point selections
-wsos_box_params(dom::Domain, n::Int, d::Int; calc_w::Bool) = error("accurate methods for interpolation points are only available for box domains, use sampling instead")
+wsos_box_params(dom::Domain, n::Int, d::Int; calc_w::Bool) = error("non-sampling based interpolation methods are only available for box domains")
 
 # difference with sampling functions is that P0 is always formed using points in [-1, 1]
-function wsos_box_params(dom::Box{T}, n::Int, d::Int; calc_w::Bool = false) where {T <: Real}
+function wsos_box_params(
+    dom::Box{T},
+    n::Int,
+    d::Int;
+    calc_w::Bool = false,
+    ) where {T <: Real}
     # n could be larger than the dimension of dom if the original domain was a SemiFreeDomain
     (U, pts, P0, P0sub, w) = wsos_box_params(T, n, d, calc_w)
 
@@ -131,13 +133,18 @@ function wsos_box_params(dom::Box{T}, n::Int, d::Int; calc_w::Bool = false) wher
     return (U = U, pts = trpts, Ps = [P0, PWts...], w = w)
 end
 
-function wsos_box_params(dom::FreeDomain{T}, n::Int, d::Int; calc_w::Bool = false) where {T <: Real}
+function wsos_box_params(
+    dom::FreeDomain{T},
+    n::Int,
+    d::Int;
+    calc_w::Bool = false,
+    ) where {T <: Real}
     # n could be larger than the dimension of dom if the original domain was a SemiFreeDomain
     (U, pts, P0, P0sub, w) = wsos_box_params(T, n, d, calc_w)
     return (U = U, pts = pts, Ps = [P0], w = w)
 end
 
-function wsos_box_params(T::DataType, n::Int, d::Int, calc_w::Bool)
+function wsos_box_params(T::Type{<:Real}, n::Int, d::Int, calc_w::Bool)
     if n == 1
         return cheb2_data(T, d, calc_w)
     elseif n == 2
@@ -148,7 +155,7 @@ function wsos_box_params(T::DataType, n::Int, d::Int, calc_w::Bool)
 end
 
 # return k Chebyshev points of the second kind
-cheb2_pts(T::DataType, k::Int) = [-cospi(T(j) / T(k - 1)) for j in 0:(k - 1)]
+cheb2_pts(T::Type{<:Real}, k::Int) = [-cospi(T(j) / T(k - 1)) for j in 0:(k - 1)]
 
 function calc_u(n::Int, d::Int, pts::Matrix{T}) where {T <: Real}
     @assert d > 0
@@ -164,7 +171,7 @@ function calc_u(n::Int, d::Int, pts::Matrix{T}) where {T <: Real}
     return u
 end
 
-function cheb2_data(T::DataType, d::Int, calc_w::Bool)
+function cheb2_data(T::Type{<:Real}, d::Int, calc_w::Bool)
     @assert d > 0
     U = 2d + 1
 
@@ -177,23 +184,19 @@ function cheb2_data(T::DataType, d::Int, calc_w::Bool)
 
     # weights for Clenshaw-Curtis quadrature at pts
     if calc_w
-        if T == BigFloat
-            # TODO we can probably avoid FFTW.ifft
-            error("cannot compute quadrature weights using BigFloat without sampling")
-        end
-        wa = [2.0 / (1 - j^2) for j in 0:2:(U - 1)]
+        wa = T[2 / T(1 - j^2) for j in 0:2:(U - 1)]
         append!(wa, wa[div(U, 2):-1:2])
         w = real.(FFTW.ifft(wa))
-        w[1] *= 0.5
+        w[1] /= 2
         push!(w, w[1])
     else
-        w = Float64[]
+        w = T[]
     end
 
     return (U, pts, P0, P0sub, w)
 end
 
-function padua_data(T::DataType, d::Int, calc_w::Bool)
+function padua_data(T::Type{<:Real}, d::Int, calc_w::Bool)
     @assert d > 0
     (L, U) = get_L_U(2, d)
 
@@ -244,23 +247,23 @@ function padua_data(T::DataType, d::Int, calc_w::Bool)
         for j in 1:(d + 1), i in 1:(d + 2 - j)
             Mmom[i, j] = mom[i] * mom[j] * f
         end
-        Mmom[1, d + 1] /= T(2)
+        Mmom[1, d + 1] /= 2
         # cubature weights as matrices on the subgrids
         W = Matrix{T}(undef, d + 1, 2d + 1)
         W[:, 1:2:(2d + 1)] .= to2' * Mmom * te1
         W[:, 2:2:(2d + 1)] .= te2' * Mmom * to1
-        W[:, [1, (2d + 1)]] ./= T(2)
-        W[1, 2:2:(2d + 1)] ./= T(2)
-        W[d + 1, 1:2:(2d + 1)] ./= T(2)
+        W[:, [1, (2d + 1)]] ./= 2
+        W[1, 2:2:(2d + 1)] ./= 2
+        W[d + 1, 1:2:(2d + 1)] ./= 2
         w = vec(W)
     else
-        w = Float64[]
+        w = T[]
     end
 
     return (U, pts, P0, P0sub, w)
 end
 
-function approxfekete_data(T::DataType, n::Int, d::Int, calc_w::Bool)
+function approxfekete_data(T::Type{<:Real}, n::Int, d::Int, calc_w::Bool)
     @assert d > 0
     @assert n > 1
     (L, U) = get_L_U(n, d)
@@ -287,6 +290,7 @@ function approxfekete_data(T::DataType, n::Int, d::Int, calc_w::Bool)
     end
     dom = Box{T}(-ones(T, n), ones(T, n))
     (pts, P0, P0sub, w) = make_wsos_arrays(dom, candidate_pts, 2d, U, L, calc_w = calc_w)
+
     return (U, pts, P0, P0sub, w)
 end
 
@@ -298,7 +302,6 @@ function choose_interp_pts!(
     U::Int,
     calc_w::Bool,
     ) where {T <: Real}
-
     n = size(candidate_pts, 2)
     u = calc_u(n, deg, candidate_pts)
     m = Vector{T}(undef, U)
@@ -325,8 +328,9 @@ function choose_interp_pts!(
         Qtm = F.Q' * m
         w = UpperTriangular(F.R[:, 1:U]) \ Qtm
     else
-        w = Float64[]
+        w = T[]
     end
+
     return (F.p[1:U], w)
 end
 
@@ -338,7 +342,6 @@ function make_wsos_arrays(
     L::Int;
     calc_w::Bool = false,
     ) where {T <: Real}
-
     (npts, n) = size(candidate_pts)
     M = Matrix{T}(undef, npts, U)
     (keep_pts, w) = choose_interp_pts!(M, candidate_pts, deg, U, calc_w)
@@ -346,7 +349,6 @@ function make_wsos_arrays(
     P0 = M[keep_pts, 1:L] # subset of polynomial evaluations up to total degree d
     subd = div(deg - get_degree(dom), 2)
     P0sub = view(P0, :, 1:binomial(n + subd, n))
-
     return (pts, P0, P0sub, w)
 end
 
@@ -367,7 +369,12 @@ function wsos_sample_params(
 end
 
 # TODO should work without sampling too
-function get_interp_pts(dom::Domain{T}, deg::Int; sample_factor::Int = 10, calc_w::Bool = false) where {T <: Real}
+function get_interp_pts(
+    dom::Domain{T},
+    deg::Int;
+    calc_w::Bool = false,
+    sample_factor::Int = 10,
+    ) where {T <: Real}
     n = get_dimension(dom)
     U = binomial(n + deg, n)
     candidate_pts = interp_sample(dom, U * sample_factor)

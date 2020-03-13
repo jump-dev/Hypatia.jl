@@ -3,7 +3,7 @@ Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
 references minimizing the nuclear norm:
 Minimization of a Particular Singular Value by Alborz Alavian and Michael Rotkowitz
-The Power of Convex Relaxation Emmanuel J. Candes and  Terence Tao
+The Power of Convex Relaxation Emmanuel J. Candes and Terence Tao
 http://www.mit.edu/~parrilo/pubs/talkfiles/ISMP2009.pdf
 other:
 https://www.cvxpy.org/examples/dgp/pf_matrix_completion.html
@@ -17,22 +17,51 @@ min 1/2(tr(W1) + tr(W2))
 from http://www.mit.edu/~parrilo/pubs/talkfiles/ISMP2009.pdf
 =#
 
-using LinearAlgebra
-import Random
-using Test
-import Hypatia
-const CO = Hypatia.Cones
-const MU = Hypatia.ModelUtilities
+include(joinpath(@__DIR__, "../common_native.jl"))
 
-function matrixcompletion_native(
-    ::Type{T},
-    m::Int,
-    n::Int,
-    geomean_constr::Bool = true, # add a constraint on the geomean of unknown values, else don't add
-    nuclearnorm_obj::Bool = true, # use nuclear norm in the objective, else spectral norm
-    use_hypogeomean::Bool = true, # use hypogeomean cone, else power cone formulation
-    use_epinormspectral::Bool = true, # use epinormspectral cone (or its dual), else PSD formulation
-    ) where {T <: Real}
+struct MatrixCompletionNative{T <: Real} <: ExampleInstanceNative{T}
+    m::Int
+    n::Int
+    geomean_constr::Bool # add a constraint on the geomean of unknown values, else don't add
+    nuclearnorm_obj::Bool # use nuclear norm in the objective, else spectral norm
+    use_hypogeomean::Bool # use hypogeomean cone, else power cone formulation
+    use_epinormspectral::Bool # use epinormspectral cone (or its dual), else PSD formulation
+end
+
+example_tests(::Type{<:MatrixCompletionNative{<:Real}}, ::MinimalInstances) = [
+    ((2, 3, true, true, true, true),),
+    ((2, 3, false, true, true, true),),
+    ((2, 3, true, false, true, true),),
+    ((2, 3, false, false, true, true),),
+    ((2, 3, true, true, false, true),),
+    ((2, 3, false, false, false, true),),
+    ((2, 3, true, true, false, false),),
+    ((2, 3, false, false, false, false),),
+    ]
+example_tests(::Type{MatrixCompletionNative{Float64}}, ::FastInstances) = [
+    ((12, 24, true, true, true, true),),
+    ((12, 24, false, true, true, true),),
+    ((12, 24, true, false, true, true),),
+    ((12, 24, false, false, true, true),),
+    ((12, 24, true, true, false, true),),
+    ((12, 24, false, false, false, true),),
+    ((12, 24, true, true, false, false),),
+    ((12, 24, false, false, false, false),),
+    ]
+example_tests(::Type{MatrixCompletionNative{Float64}}, ::SlowInstances) = [
+    # TODO add missing boolean combinations
+    ((14, 140, true, true, true, true),),
+    ((14, 140, true, true, false, true),),
+    ((14, 140, true, true, true, false),),
+    ((14, 140, true, true, false, false),),
+    ((18, 180, true, true, true, true),),
+    ((18, 180, true, true, false, true),),
+    ((18, 180, true, true, true, false),),
+    ((18, 180, true, true, false, false),),
+    ]
+
+function build(inst::MatrixCompletionNative{T}) where {T <: Real}
+    (m, n) = (inst.m, inst.n)
     @assert m <= n
     mn = m * n
     rt2 = sqrt(T(2))
@@ -58,7 +87,7 @@ function matrixcompletion_native(
     num_unknown = m * n - num_known
 
     # epinormspectral cone or its dual- get vec(X) in G and h
-    if use_epinormspectral
+    if inst.use_epinormspectral
         c = vcat(one(T), zeros(T, num_unknown))
         G_norm = zeros(T, mn, num_unknown)
         total_idx = 1
@@ -79,14 +108,14 @@ function matrixcompletion_native(
         h_norm_x = vcat(zero(T), h_norm_x)
         h_norm = h_norm_x
 
-        cones = CO.Cone{T}[CO.EpiNormSpectral{T, T}(m, n, use_dual = nuclearnorm_obj)]
+        cones = Cones.Cone{T}[Cones.EpiNormSpectral{T, T}(m, n, use_dual = inst.nuclearnorm_obj)]
     else
         # build an extended formulation for the norm used in the objective
-        if nuclearnorm_obj
+        if inst.nuclearnorm_obj
             # extended formulation for nuclear norm
             # X, W_1, W_2
-            num_W1_vars = CO.svec_length(m)
-            num_W2_vars = CO.svec_length(n)
+            num_W1_vars = Cones.svec_length(m)
+            num_W2_vars = Cones.svec_length(n)
             num_vars = num_W1_vars + num_W2_vars + num_unknown
 
             A = zeros(T, 0, num_vars)
@@ -125,22 +154,22 @@ function matrixcompletion_native(
                     G_norm[offset + idx, num_unknown + num_W1_vars + W2_var_idx] = -1
                 end
             end
-            MU.vec_to_svec!(G_norm, rt2 = rt2)
-            MU.vec_to_svec!(h_norm, rt2 = rt2)
-            cones = CO.Cone{T}[CO.PosSemidefTri{T, T}(num_rows)]
-            c_W1 = CO.smat_to_svec!(zeros(T, num_W1_vars), Diagonal(one(T) * I, m), rt2)
-            c_W2 = CO.smat_to_svec!(zeros(T, num_W2_vars), Diagonal(one(T) * I, n), rt2)
+            ModelUtilities.vec_to_svec!(G_norm, rt2 = rt2)
+            ModelUtilities.vec_to_svec!(h_norm, rt2 = rt2)
+            cones = Cones.Cone{T}[Cones.PosSemidefTri{T, T}(num_rows)]
+            c_W1 = Cones.smat_to_svec!(zeros(T, num_W1_vars), Diagonal(one(T) * I, m), rt2)
+            c_W2 = Cones.smat_to_svec!(zeros(T, num_W2_vars), Diagonal(one(T) * I, n), rt2)
             c = vcat(zeros(T, num_unknown), c_W1, c_W2) / 2
         else
             # extended formulation for spectral norm
-            num_rows = CO.svec_length(m) + m * n + CO.svec_length(n)
+            num_rows = Cones.svec_length(m) + m * n + Cones.svec_length(n)
             G_norm = zeros(T, num_rows, num_unknown + 1)
             h_norm = zeros(T, num_rows)
             # first block epigraph variable * I
             for i in 1:m
                 G_norm[sum(1:i), 1] = -1
             end
-            offset = CO.svec_length(m)
+            offset = Cones.svec_length(m)
             # index to count rows in the bottom half of the large to-be-PSD matrix
             idx = 1
             # index only in X
@@ -165,22 +194,22 @@ function matrixcompletion_native(
                 idx += i
                 G_norm[offset + idx - 1, 1] = -1
             end
-            MU.vec_to_svec!(G_norm, rt2 = rt2)
-            MU.vec_to_svec!(h_norm, rt2 = rt2)
-            cones = CO.Cone{T}[CO.PosSemidefTri{T, T}(num_rows)]
+            ModelUtilities.vec_to_svec!(G_norm, rt2 = rt2)
+            ModelUtilities.vec_to_svec!(h_norm, rt2 = rt2)
+            cones = Cones.Cone{T}[Cones.PosSemidefTri{T, T}(num_rows)]
             c = vcat(one(T), zeros(T, num_unknown))
         end
     end # objective natural true/false
 
-    if geomean_constr
-        if use_hypogeomean
+    if inst.geomean_constr
+        if inst.use_hypogeomean
             # hypogeomean for values to be filled
             G_geo = vcat(zeros(T, 1, num_unknown), Matrix{T}(-I, num_unknown, num_unknown))
             h = vcat(h_norm, one(T), zeros(T, num_unknown))
 
             # if using extended with spectral objective G_geo needs to be prepadded with an epigraph variable
-            if nuclearnorm_obj
-                if use_epinormspectral
+            if inst.nuclearnorm_obj
+                if inst.use_epinormspectral
                     prepad = zeros(T, num_unknown + 1, 1)
                     postpad = zeros(T, num_unknown + 1, 0)
                 else
@@ -195,7 +224,7 @@ function matrixcompletion_native(
                 G_norm;
                 prepad  G_geo  postpad
                 ]
-            push!(cones, CO.HypoGeomean{T}(fill(inv(T(num_unknown)), num_unknown)))
+            push!(cones, Cones.HypoGeomean{T}(fill(inv(T(num_unknown)), num_unknown)))
         else
             # number of 3-dimensional power cones needed is num_unknown - 1, number of new variables is num_unknown - 2
             # first num_unknown columns overlap with G_norm, column for the epigraph variable of the spectral cone added later
@@ -206,26 +235,26 @@ function matrixcompletion_native(
             G_geo_unknown[1, 1] = -1
             G_geo_unknown[2, 2] = -1
             G_geo_newvars[3, 1] = -1
-            push!(cones, CO.Power{T}(fill(inv(T(2)), 2), 1))
+            push!(cones, Cones.Power{T}(fill(inv(T(2)), 2), 1))
             offset = 4
             # loop over new vars
             for i in 1:(num_unknown - 3)
                 G_geo_newvars[offset + 2, i + 1] = -1
                 G_geo_newvars[offset + 1, i] = -1
                 G_geo_unknown[offset, i + 2] = -1
-                push!(cones, CO.Power{T}([inv(T(i + 2)), T(i + 1) / T(i + 2)], 1))
+                push!(cones, Cones.Power{T}([inv(T(i + 2)), T(i + 1) / T(i + 2)], 1))
                 offset += 3
             end
 
             # last row also special because hypograph variable is fixed
             G_geo_unknown[offset, num_unknown] = -1
             G_geo_newvars[offset + 1, num_unknown - 2] = -1
-            push!(cones, CO.Power{T}([inv(T(num_unknown)), T(num_unknown - 1) / T(num_unknown)], 1))
+            push!(cones, Cones.Power{T}([inv(T(num_unknown)), T(num_unknown - 1) / T(num_unknown)], 1))
             h = vcat(h_norm, zeros(T, 3 * (num_unknown - 2)), T[0, 0, 1])
 
             # if using extended with spectral objective G_geo needs to be prepadded with an epigraph variable
-            if nuclearnorm_obj
-                if use_epinormspectral
+            if inst.nuclearnorm_obj
+                if inst.use_epinormspectral
                     prepad = zeros(T, len_power, 1)
                     postpad = zeros(T, len_power, 0)
                 else
@@ -251,38 +280,8 @@ function matrixcompletion_native(
     A = zeros(T, 0, size(G, 2))
     b = T[]
 
-    return (c = c, A = A, b = b, G = G, h = h, cones = cones)
+    model = Models.Model{T}(c, A, b, G, h, cones)
+    return model
 end
 
-function test_matrixcompletion_native(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
-    Random.seed!(rseed)
-    d = matrixcompletion_native(T, instance...)
-    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
-    @test r.status == :Optimal
-    return r
-end
-
-matrixcompletion_native_fast = [
-    (2, 3, true, true, true, true),
-    (2, 3, false, true, true, true),
-    (2, 3, true, false, true, true),
-    (2, 3, false, false, true, true),
-    (2, 3, true, true, false, true),
-    (2, 3, false, false, false, true),
-    (2, 3, true, true, false, false),
-    (2, 3, false, false, false, false),
-    (12, 24, true, true, true, true),
-    (12, 24, true, true, false, true),
-    (12, 24, true, true, true, false),
-    (12, 24, true, true, false, false),
-    ]
-matrixcompletion_native_slow = [
-    (14, 140, true, true, true, true),
-    (14, 140, true, true, false, true),
-    (14, 140, true, true, true, false),
-    (14, 140, true, true, false, false),
-    (18, 180, true, true, true, true),
-    (18, 180, true, true, false, true),
-    (18, 180, true, true, true, false),
-    (18, 180, true, true, false, false),
-    ]
+return MatrixCompletionNative

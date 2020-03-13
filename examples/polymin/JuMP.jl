@@ -4,24 +4,87 @@ Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 see description in examples/polymin/native.jl
 =#
 
-import Random
-using LinearAlgebra
-using Test
-import JuMP
-const MOI = JuMP.MOI
-import Hypatia
-const MU = Hypatia.ModelUtilities
-
+include(joinpath(@__DIR__, "../common_JuMP.jl"))
 include(joinpath(@__DIR__, "data.jl"))
 
-function polymin_JuMP(
-    ::Type{T},
-    interp_vals::Vector{T},
-    Ps::Vector{Matrix{T}},
-    true_min::Real,
-    use_primal::Bool, # solve primal, else solve dual
-    use_wsos::Bool, # use wsosinterpnonnegative cone, else PSD formulation
-    ) where {T <: Float64} # TODO support generic reals
+struct PolyMinJuMP{T <: Real} <: ExampleInstanceJuMP{T}
+    interp_vals::Vector{T}
+    Ps::Vector{Matrix{T}}
+    true_min::Real
+    use_primal::Bool # solve primal, else solve dual
+    use_wsos::Bool # use wsosinterpnonnegative cone, else PSD formulation
+end
+function PolyMinJuMP{Float64}(
+    poly_name::Symbol,
+    halfdeg::Int,
+    args...)
+    return PolyMinJuMP{Float64}(get_interp_data(Float64, poly_name, halfdeg)..., args...)
+end
+function PolyMinJuMP{Float64}(
+    n::Int,
+    halfdeg::Int,
+    args...)
+    return PolyMinJuMP{Float64}(random_interp_data(Float64, n, halfdeg)..., args...)
+end
+
+example_tests(::Type{PolyMinJuMP{Float64}}, ::MinimalInstances) = [
+    ((1, 2, true, true), false),
+    ((1, 2, false, true), false),
+    ((1, 2, false, false), false),
+    ((:motzkin, 3, true, true), false),
+    ]
+example_tests(::Type{PolyMinJuMP{Float64}}, ::FastInstances) = [
+    ((1, 3, true, true), false),
+    ((1, 30, true, true), false),
+    ((1, 30, false, true), false),
+    ((1, 30, false, false), false),
+    ((2, 8, true, true), false),
+    ((3, 6, true, true), false),
+    ((5, 3, true, true), false),
+    ((10, 1, true, true), false),
+    ((10, 1, false, true), false),
+    ((10, 1, false, false), false),
+    ((4, 4, true, true), false),
+    ((4, 4, false, true), false),
+    ((4, 4, false, false), false),
+    ((:butcher, 2, true, true), false),
+    ((:caprasse, 4, true, true), false),
+    ((:goldsteinprice, 7, true, true), false),
+    ((:goldsteinprice_ball, 6, true, true), false),
+    ((:goldsteinprice_ellipsoid, 7, true, true), false),
+    ((:heart, 2, true, true), false),
+    ((:lotkavolterra, 3, true, true), false),
+    ((:magnetism7, 2, true, true), false),
+    ((:magnetism7_ball, 2, true, true), false),
+    ((:motzkin, 3, true, true), false),
+    ((:motzkin_ball, 3, true, true), false),
+    ((:motzkin_ellipsoid, 3, true, true), false),
+    ((:reactiondiffusion, 4, true, true), false),
+    ((:robinson, 8, true, true), false),
+    ((:robinson_ball, 8, true, true), false),
+    ((:rosenbrock, 5, true, true), false),
+    ((:rosenbrock_ball, 5, true, true), false),
+    ((:schwefel, 2, true, true), false),
+    ((:schwefel_ball, 2, true, true), false),
+    ((:lotkavolterra, 3, false, true), false),
+    ((:motzkin, 3, false, true), false),
+    ((:motzkin_ball, 3, false, true), false),
+    ((:schwefel, 2, false, true), false),
+    ((:lotkavolterra, 3, false, false), false),
+    ((:motzkin, 3, false, false), false),
+    ((:motzkin_ball, 3, false, false), false),
+    ]
+example_tests(::Type{PolyMinJuMP{Float64}}, ::SlowInstances) = [
+    ((4, 5, true, true), false),
+    ((4, 5, false, true), false),
+    ((4, 5, false, false), false),
+    ((2, 30, true, true), false),
+    ((2, 30, false, true), false),
+    ((2, 30, false, false), false),
+    ]
+
+function build(inst::PolyMinJuMP{T}) where {T <: Float64} # TODO generic reals
+    (interp_vals, Ps, use_primal) = (inst.interp_vals, inst.Ps, inst.use_primal)
     U = length(interp_vals)
 
     model = JuMP.Model()
@@ -34,7 +97,7 @@ function polymin_JuMP(
         JuMP.@constraint(model, sum(μ) == 1.0) # TODO can remove this constraint and a variable
     end
 
-    if use_wsos
+    if inst.use_wsos
         cone = Hypatia.WSOSInterpNonnegativeCone{Float64, Float64}(U, Ps, !use_primal)
         aff_expr = (use_primal ? interp_vals .- a : μ)
         JuMP.@constraint(model, aff_expr in cone)
@@ -58,84 +121,16 @@ function polymin_JuMP(
         end
     end
 
-    return (model = model, true_min = true_min)
+    return model
 end
 
-polymin_JuMP(
-    ::Type{T},
-    poly_name::Symbol,
-    halfdeg::Int,
-    args...;
-    sample_factor::Int = 100,
-    ) where {T <: Float64} = polymin_JuMP(T, get_interp_data(T, poly_name, halfdeg, sample_factor)..., args...)
-
-polymin_JuMP(
-    ::Type{T},
-    n::Int,
-    halfdeg::Int,
-    args...;
-    sample_factor::Int = 100,
-    ) where {T <: Float64} = polymin_JuMP(T, random_interp_data(T, n, halfdeg, sample_factor)..., args...)
-
-function test_polymin_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
-    Random.seed!(rseed)
-    d = polymin_JuMP(T, instance...)
-    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer{T}(; options...))
-    JuMP.optimize!(d.model)
-    @test JuMP.termination_status(d.model) == MOI.OPTIMAL
-    if !isnan(d.true_min)
-        @test JuMP.objective_value(d.model) ≈ d.true_min atol = 1e-4 rtol = 1e-4
+function test_extra(inst::PolyMinJuMP{T}, model::JuMP.Model) where T
+    @test JuMP.termination_status(model) == MOI.OPTIMAL
+    if JuMP.termination_status(model) == MOI.OPTIMAL && !isnan(inst.true_min)
+        # check objective value is correct
+        tol = eps(T)^0.2
+        @test JuMP.objective_value(model) ≈ inst.true_min atol = tol rtol = tol
     end
-    return d.model.moi_backend.optimizer.model.optimizer.result
 end
 
-polymin_JuMP_fast = [
-    (:butcher, 2, true, true),
-    (:caprasse, 4, true, true),
-    (:goldsteinprice, 7, true, true),
-    (:goldsteinprice_ball, 7, true, true),
-    (:goldsteinprice_ellipsoid, 7, true, true),
-    (:heart, 2, true, true),
-    (:lotkavolterra, 3, true, true),
-    (:magnetism7, 2, true, true),
-    (:magnetism7_ball, 2, true, true),
-    (:motzkin, 3, true, true),
-    (:motzkin_ball, 3, true, true),
-    (:motzkin_ellipsoid, 3, true, true),
-    (:reactiondiffusion, 4, true, true),
-    (:robinson, 8, true, true),
-    (:robinson_ball, 8, true, true),
-    (:rosenbrock, 5, true, true),
-    (:rosenbrock_ball, 5, true, true),
-    (:schwefel, 2, true, true),
-    (:schwefel_ball, 2, true, true),
-    (:lotkavolterra, 3, false, true),
-    (:motzkin, 3, false, true),
-    (:motzkin_ball, 3, false, true),
-    (:schwefel, 2, false, true),
-    (:lotkavolterra, 3, false, false),
-    (:motzkin, 3, false, false),
-    (:motzkin_ball, 3, false, false),
-    (:schwefel, 2, false, false),
-    (1, 3, true, true),
-    (1, 30, true, true),
-    (1, 30, false, true),
-    (1, 30, false, false),
-    (2, 8, true, true),
-    (3, 6, true, true),
-    (5, 3, true, true),
-    (10, 1, true, true),
-    (10, 1, false, true),
-    (10, 1, false, false),
-    (4, 4, true, true),
-    (4, 4, false, true),
-    (4, 4, false, false),
-    ]
-polymin_JuMP_slow = [
-    (4, 5, true, true),
-    (4, 5, false, true),
-    (4, 5, false, false),
-    (2, 30, true, true),
-    (2, 30, false, true),
-    (2, 30, false, false),
-    ]
+return PolyMinJuMP

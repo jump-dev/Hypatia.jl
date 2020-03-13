@@ -2,52 +2,104 @@
 Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 
 see description in native.jl
-==#
+=#
 
-using LinearAlgebra
-import Random
-using Test
+include(joinpath(@__DIR__, "../common_JuMP.jl"))
 import DelimitedFiles
-import JuMP
-const MOI = JuMP.MOI
 import DynamicPolynomials
 import PolyJuMP
-import Hypatia
-const MU = Hypatia.ModelUtilities
 
-function densityest_JuMP(
-    ::Type{T},
-    X::Matrix{T},
+struct DensityEstJuMP{T <: Real} <: ExampleInstanceJuMP{T}
+    dataset_name::Symbol
+    num_obs::Int
+    n::Int
+    X::Matrix{T}
+    deg::Int
+    use_monomial_space::Bool # use variables in monomial space, else interpolation space
+    use_wsos::Bool # use WSOS cone formulation, else PSD formulation
+end
+function DensityEstJuMP{Float64}(
+    dataset_name::Symbol,
     deg::Int,
-    use_monomial_space::Bool, # use variables in monomial space, else interpolation space
-    use_wsos::Bool; # use WSOS cone formulation, else PSD formulation
-    sample::Bool = true,
-    sample_factor::Int = 100,
-    ) where {T <: Float64} # TODO support generic reals
-    (num_obs, dim) = size(X)
+    use_monomial_space::Bool,
+    use_wsos::Bool)
+    X = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "$dataset_name.txt"))
+    (num_obs, n) = size(X)
+    return DensityEstJuMP{Float64}(dataset_name, num_obs, n, X, deg, use_monomial_space, use_wsos)
+end
+function DensityEstJuMP{Float64}(
+    num_obs::Int,
+    n::Int,
+    args...)
+    X = randn(num_obs, n)
+    return DensityEstJuMP{Float64}(:Random, num_obs, n, X, args...)
+end
 
-    domain = MU.Box{Float64}(-ones(dim), ones(dim))
+example_tests(::Type{DensityEstJuMP{Float64}}, ::MinimalInstances) = [
+    ((5, 1, 2, true, true), false),
+    ((:iris, 2, true, true), false),
+    # ((5, 1, 2, true, true), true),
+    # ((:iris, 2, true, true), true),
+    ]
+example_tests(::Type{DensityEstJuMP{Float64}}, ::FastInstances) = begin
+    options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
+    return [
+    ((50, 2, 2, true, true), false, options),
+    ((50, 2, 2, true, false), false, options),
+    ((50, 2, 2, false, true), false, options),
+    ((50, 2, 2, false, false), false, options),
+    ((100, 8, 2, true, true), false, options),
+    ((100, 8, 2, true, false), false, options),
+    ((100, 8, 2, false, true), false, options),
+    ((100, 8, 2, false, false), false, options),
+    ((250, 4, 4, true, true), false, options),
+    ((250, 4, 4, true, false), false, options),
+    ((250, 4, 4, false, true), false, options),
+    ((:iris, 4, true, true), false, options),
+    ((:iris, 5, true, true), false, options),
+    ((:iris, 6, true, true), false, options),
+    ((:iris, 4, true, false), false, options),
+    ((:iris, 4, false, true), false, options),
+    ((:iris, 6, false, true), false, options),
+    ((:iris, 4, false, false), false, options),
+    ((:cancer, 4, true, true), false, options),
+    ((:cancer, 4, false, true), false, options),
+    ]
+end
+example_tests(::Type{DensityEstJuMP{Float64}}, ::SlowInstances) = begin
+    options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
+    return [
+    ((200, 4, 4, false, false), false, options),
+    ((200, 4, 6, false, true), false, options),
+    ((200, 4, 6, false, false), false, options),
+    ]
+end
+
+function build(inst::DensityEstJuMP{T}) where {T <: Float64} # TODO generic reals
+    (n, X) = (inst.n, inst.X)
+
+    domain = ModelUtilities.Box{Float64}(-ones(n), ones(n))
     # rescale X to be in unit box
     minX = minimum(X, dims = 1)
     maxX = maximum(X, dims = 1)
     X .-= (minX + maxX) / 2
     X ./= (maxX - minX) / 2
 
-    halfdeg = div(deg + 1, 2)
-    (U, pts, Ps, w) = MU.interpolate(domain, halfdeg, calc_w = true, sample = sample, sample_factor = sample_factor)
+    halfdeg = div(inst.deg + 1, 2)
+    (U, pts, Ps, w) = ModelUtilities.interpolate(domain, halfdeg, calc_w = true)
 
     model = JuMP.Model()
 
-    if use_monomial_space
-        DynamicPolynomials.@polyvar x[1:dim]
+    if inst.use_monomial_space
+        DynamicPolynomials.@polyvar x[1:n]
         PX = DynamicPolynomials.monomials(x, 0:(2 * halfdeg))
         JuMP.@variable(model, f, PolyJuMP.Poly(PX))
         f_pts = [f(pts_i) for pts_i in eachrow(pts)]
         f_X = [f(X_i) for X_i in eachrow(X)]
     else
-        lagrange_polys = MU.recover_lagrange_polys(pts, 2 * halfdeg)
-        basis_evals = Matrix{Float64}(undef, num_obs, U)
-        for i in 1:num_obs, j in 1:U
+        lagrange_polys = ModelUtilities.recover_lagrange_polys(pts, 2 * halfdeg)
+        basis_evals = Matrix{Float64}(undef, inst.num_obs, U)
+        for i in 1:inst.num_obs, j in 1:U
             basis_evals[i, j] = lagrange_polys[j](X[i, :])
         end
         JuMP.@variable(model, f_pts[1:U])
@@ -61,7 +113,7 @@ function densityest_JuMP(
     JuMP.@constraint(model, vcat(z, f_X) in MOI.GeometricMeanCone(1 + length(f_X)))
 
     # density nonnegative
-    if use_wsos
+    if inst.use_wsos
         JuMP.@constraint(model, f_pts in Hypatia.WSOSInterpNonnegativeCone{Float64, Float64}(U, Ps))
     else
         psd_vars = []
@@ -75,58 +127,7 @@ function densityest_JuMP(
         JuMP.@constraint(model, coeffs_lhs .== f_pts)
     end
 
-    return (model = model,)
+    return model
 end
 
-densityest_JuMP(
-    ::Type{T},
-    data_name::Symbol,
-    args...; kwargs...
-    ) where {T <: Float64} = densityest_JuMP(T, eval(data_name), args...; kwargs...)
-
-densityest_JuMP(
-    ::Type{T},
-    num_obs::Int,
-    n::Int,
-    args...; kwargs...
-    ) where {T <: Float64} = densityest_JuMP(T, randn(T, num_obs, n), args...; kwargs...)
-
-function test_densityest_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
-    Random.seed!(rseed)
-    d = densityest_JuMP(T, instance...)
-    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer{T}(; options...))
-    JuMP.optimize!(d.model)
-    @test JuMP.termination_status(d.model) == MOI.OPTIMAL
-    return d.model.moi_backend.optimizer.model.optimizer.result
-end
-
-iris_data = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "iris.txt"))
-cancer_data = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "cancer.txt"))
-
-densityest_JuMP_fast = [
-    (:iris_data, 4, true, true),
-    (:iris_data, 5, true, true),
-    (:iris_data, 6, true, true),
-    (:iris_data, 4, true, false),
-    (:iris_data, 4, false, true),
-    (:iris_data, 6, false, true),
-    (:iris_data, 4, false, false),
-    (:cancer_data, 4, true, true),
-    (:cancer_data, 4, false, true),
-    (50, 2, 2, true, true),
-    (50, 2, 2, true, false),
-    (50, 2, 2, false, true),
-    (50, 2, 2, false, false),
-    (100, 8, 2, true, true),
-    (100, 8, 2, true, false),
-    (100, 8, 2, false, true),
-    (100, 8, 2, false, false),
-    (250, 4, 4, true, true),
-    (250, 4, 4, true, false),
-    (250, 4, 4, false, true),
-    ]
-densityest_JuMP_slow = [
-    (200, 4, 4, false, false),
-    (200, 4, 6, false, true),
-    (200, 4, 6, false, false),
-    ]
+return DensityEstJuMP

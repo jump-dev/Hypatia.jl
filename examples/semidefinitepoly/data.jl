@@ -1,8 +1,10 @@
 #=
 Copyright 2020, Chris Coey, Lea Kapelevich and contributors
-
 list of predefined matrix polynomials
 =#
+
+import DynamicPolynomials
+const DP = DynamicPolynomials
 
 function get_semidefinitepoly_data(matpoly::Symbol)
     if matpoly == :matpoly1
