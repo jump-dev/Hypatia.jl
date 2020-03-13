@@ -7,37 +7,31 @@ TODO
 - add random data generation
 =#
 
-using LinearAlgebra
+include(joinpath(@__DIR__, "../common_JuMP.jl"))
 import GSL: sf_gamma
-using Test
-import JuMP
-const MOI = JuMP.MOI
 import DynamicPolynomials
 const DP = DynamicPolynomials
 import SemialgebraicSets
 const SAS = SemialgebraicSets
 import SumOfSquares
 import PolyJuMP
-import Hypatia
 
-function integrate_ball_monomial(mon, n)
-    as = DP.exponents(mon)
-    @assert length(as) == n
-    if any(isodd, as)
-        return 0.0
-    else
-        bs = (as .+ 1) ./ 2.0
-        return 2.0 * prod(sf_gamma.(bs)) / (sf_gamma(sum(bs)) * (sum(as) + n))
-    end
+struct LotkaVolterraJuMP{T <: Real} <: ExampleInstanceJuMP{T}
+    deg::Int # polynomial degrees
 end
 
-integrate_ball(p, n) = sum(DP.coefficient(t) * integrate_ball_monomial(t, n) for t in DP.terms(p))
+example_tests(::Type{LotkaVolterraJuMP{Float64}}, ::MinimalInstances) = [
+    ((2,), false),
+    ]
+example_tests(::Type{LotkaVolterraJuMP{Float64}}, ::FastInstances) = [
+    ((4,), false),
+    ]
+example_tests(::Type{LotkaVolterraJuMP{Float64}}, ::SlowInstances) = [
+    ((6,), false),
+    ]
 
-function lotkavolterra_JuMP(
-    ::Type{T},
-    ) where {T <: Float64} # TODO support generic reals
+function build(inst::LotkaVolterraJuMP{T}) where {T <: Float64} # TODO generic reals
     # parameters
-    deg = 4 # degree
     n = 4 # number of species
     m = 2 * n # number of control inputs (u)
     Q = 0.475
@@ -47,7 +41,7 @@ function lotkavolterra_JuMP(
     r = [1.0, 0.6, 0.4, 0.2] # growth rate of species
 
     DP.@polyvar x_h[1:n]
-    x_mon = DP.monomials(x_h, 0:deg)
+    x_mon = DP.monomials(x_h, 0:inst.deg)
     x_o = x_h * Q .+ q
     A = [1.0 0.3 0.4 0.2; -0.2 1.0 0.4 -0.1; -0.1 -0.2 1.0 0.3; -0.1 -0.2 -0.3 1.0]
     M = (sum(abs, l_u) + sum(l_u)) / 2.0 + l_x
@@ -58,6 +52,19 @@ function lotkavolterra_JuMP(
     u_bar = 1.0 # upper bound on u
     X = SAS.@set x_h' * x_h <= 1.0 # non-extinction domain
     delta_X = SAS.@set x_h' * x_h == 1.0
+
+    function integrate_ball_monomial(mon, n)
+        as = DP.exponents(mon)
+        @assert length(as) == n
+        if any(isodd, as)
+            return 0.0
+        else
+            bs = (as .+ 1) ./ 2.0
+            return 2.0 * prod(sf_gamma.(bs)) / (sf_gamma(sum(bs)) * (sum(as) + n))
+        end
+    end
+
+    integrate_ball(p, n) = sum(DP.coefficient(t) * integrate_ball_monomial(t, n) for t in DP.terms(p))
 
     model = SumOfSquares.SOSModel()
     JuMP.@variable(model, rho, PolyJuMP.Poly(x_mon))
@@ -77,20 +84,7 @@ function lotkavolterra_JuMP(
     JuMP.@constraint(model, rho_T >= 0, domain = X)
     JuMP.@constraint(model, [i in 1:m], sigma[i] >= 0, domain = X)
 
-    return (model = model,)
+    return model
 end
 
-function test_lotkavolterra_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
-    Random.seed!(rseed)
-    d = lotkavolterra_JuMP(T, instance...)
-    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer{T}(; options...))
-    JuMP.optimize!(d.model)
-    @test JuMP.termination_status(d.model) == MOI.OPTIMAL
-    return d.model.moi_backend.optimizer.model.optimizer.result
-end
-
-lotkavolterra_JuMP_fast = [
-    ]
-lotkavolterra_JuMP_slow = [
-    (),
-    ]
+return LotkaVolterraJuMP

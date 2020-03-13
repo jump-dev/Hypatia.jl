@@ -5,46 +5,60 @@ univariate cubic dynamical system
 example taken from "Convex computation of the region of attraction of polynomial control systems" by D. Henrion and M. Korda
 =#
 
-using LinearAlgebra
-using Test
-import Random
-import JuMP
-const MOI = JuMP.MOI
+include(joinpath(@__DIR__, "../common_JuMP.jl"))
 import DynamicPolynomials
 const DP = DynamicPolynomials
 import SemialgebraicSets
 const SAS = SemialgebraicSets
 import SumOfSquares
 import PolyJuMP
-import Hypatia
-const MU = Hypatia.ModelUtilities
 
-function regionofattr_JuMP(
-    ::Type{T},
-    deg::Int,
-    use_wsos::Bool, # use wsosinterpnonnegative cone, else PSD formulation
-    ) where {T <: Float64} # TODO support generic reals
+struct RegionOfAttrJuMP{T <: Real} <: ExampleInstanceJuMP{T}
+    deg::Int
+    use_wsos::Bool # use wsosinterpnonnegative cone, else PSD formulation
+end
+
+example_tests(::Type{RegionOfAttrJuMP{Float64}}, ::MinimalInstances) = [
+    ((4, true), false),
+    ((4, false), false),
+    ]
+example_tests(::Type{RegionOfAttrJuMP{Float64}}, ::FastInstances) = begin
+    options = (tol_feas = 1e-5,)
+    return [
+    ((6, true), false, options),
+    ((6, false), false, options),
+    ((8, true), false, options),
+    ]
+end
+example_tests(::Type{RegionOfAttrJuMP{Float64}}, ::SlowInstances) = begin
+    options = (tol_feas = 1e-5,)
+    return [
+    ((8, false), false, options),
+    ]
+end
+
+function build(inst::RegionOfAttrJuMP{T}) where {T <: Float64} # TODO generic reals
     DP.@polyvar x
     DP.@polyvar t
     f = x * (x - 0.5) * (x + 0.5) * 100
 
     model = JuMP.Model()
     JuMP.@variables(model, begin
-        v, PolyJuMP.Poly(DP.monomials([x; t], 0:deg))
-        w, PolyJuMP.Poly(DP.monomials(x, 0:deg))
+        v, PolyJuMP.Poly(DP.monomials([x; t], 0:inst.deg))
+        w, PolyJuMP.Poly(DP.monomials(x, 0:inst.deg))
     end)
     dvdt = DP.differentiate(v, t) + DP.differentiate(v, x) * f
     diffwv = w - DP.subs(v, t => 0.0) - 1.0
     vT = DP.subs(v, t => 1.0)
 
-    if use_wsos
-        dom1 = MU.Box{Float64}([-1.0], [1.0]) # just state
-        dom2 = MU.Box{Float64}([-1.0, 0.0], [1.0, 1.0]) # state and time
-        dom3 = MU.Box{Float64}([-0.01], [0.01]) # state at the end
-        halfdeg = div(deg + 1, 2)
-        (U1, pts1, Ps1, quad_weights) = MU.interpolate(dom1, halfdeg, sample = false, calc_w = true)
-        (U2, pts2, Ps2, _) = MU.interpolate(dom2, halfdeg, sample = false)
-        (U3, pts3, Ps3, _) = MU.interpolate(dom3, halfdeg - 1, sample = false)
+    if inst.use_wsos
+        dom1 = ModelUtilities.Box{Float64}([-1.0], [1.0]) # just state
+        dom2 = ModelUtilities.Box{Float64}([-1.0, 0.0], [1.0, 1.0]) # state and time
+        dom3 = ModelUtilities.Box{Float64}([-0.01], [0.01]) # state at the end
+        halfdeg = div(inst.deg + 1, 2)
+        (U1, pts1, Ps1, quad_weights) = ModelUtilities.interpolate(dom1, halfdeg, calc_w = true)
+        (U2, pts2, Ps2, _) = ModelUtilities.interpolate(dom2, halfdeg)
+        (U3, pts3, Ps3, _) = ModelUtilities.interpolate(dom3, halfdeg - 1)
         wsos_cone1 = Hypatia.WSOSInterpNonnegativeCone{Float64, Float64}(U1, Ps1)
         wsos_cone2 = Hypatia.WSOSInterpNonnegativeCone{Float64, Float64}(U2, Ps2)
         wsos_cone3 = Hypatia.WSOSInterpNonnegativeCone{Float64, Float64}(U3, Ps3)
@@ -68,25 +82,7 @@ function regionofattr_JuMP(
         JuMP.@constraint(model, w >= 0, domain = (SAS.@set -1 <= x && x <= 1))
     end
 
-    return (model = model,)
+    return model
 end
 
-function test_regionofattr_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
-    Random.seed!(rseed)
-    d = regionofattr_JuMP(T, instance...)
-    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer{T}(; options...))
-    JuMP.optimize!(d.model)
-    @test JuMP.termination_status(d.model) == MOI.OPTIMAL
-    return d.model.moi_backend.optimizer.model.optimizer.result
-end
-
-regionofattr_JuMP_fast = [
-    (4, true),
-    (4, false),
-    (6, true),
-    (6, false),
-    (8, true),
-    ]
-regionofattr_JuMP_slow = [
-    (8, false),
-    ]
+return RegionOfAttrJuMP

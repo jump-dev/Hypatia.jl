@@ -3,25 +3,52 @@ Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
 see "A Direct Formulation for Sparse PCA Using Semidefinite Programming" by
 Alexandre d’Aspremont, Laurent El Ghaoui, Michael I. Jordan, Gert R. G. Lanckriet
-==#
+=#
 
-using LinearAlgebra
-import Distributions
-import Random
-using Test
-import Hypatia
+include(joinpath(@__DIR__, "../common_native.jl"))
 import Hypatia.BlockMatrix
-const CO = Hypatia.Cones
-const MU = Hypatia.ModelUtilities
+import Distributions
 
-function sparsepca_native(
-    ::Type{T},
-    p::Int,
-    k::Int,
-    use_epinorminfdual::Bool, # use dual of epinorminf cone, else nonnegative cones
-    noise_ratio::Real,
-    use_linops::Bool,
-    ) where {T <: Real}
+struct SparsePCANative{T <: Real} <: ExampleInstanceNative{T}
+    p::Int
+    k::Int
+    use_epinorminfdual::Bool # use dual of epinorminf cone, else nonnegative cones
+    noise_ratio::Real
+    use_linops::Bool
+end
+
+example_tests(::Type{<:SparsePCANative{<:Real}}, ::MinimalInstances) = [
+    ((3, 2, true, 0, false),),
+    ((3, 2, false, 0, false),),
+    ((3, 2, true, 10, false),),
+    ((3, 2, false, 10, false),),
+    ]
+example_tests(::Type{SparsePCANative{Float64}}, ::FastInstances) = [
+    ((5, 3, true, 0, false),),
+    ((5, 3, false, 0, false),),
+    ((5, 3, true, 10, false),),
+    ((5, 3, false, 10, false),),
+    ((30, 10, true, 0, false),),
+    ((30, 10, false, 0, false),),
+    ((30, 10, true, 10, false),),
+    ((30, 10, false, 10, false),),
+    ]
+example_tests(::Type{SparsePCANative{Float64}}, ::SlowInstances) = [
+    # TODO
+    ]
+example_tests(::Type{SparsePCANative{Float64}}, ::LinearOperatorsInstances) = [
+    ((5, 3, true, 0, true),),
+    ((5, 3, false, 0, true),),
+    ((5, 3, true, 10, true),),
+    ((5, 3, false, 10, true),),
+    ((30, 10, true, 0, true),),
+    ((30, 10, false, 0, true),),
+    ((30, 10, true, 10, true),),
+    ((30, 10, false, 10, true),),
+    ]
+
+function build(inst::SparsePCANative{T}) where {T <: Real}
+    (p, k, noise_ratio) = (inst.p, inst.k, inst.noise_ratio)
     @assert 0 < k <= p
 
     signal_idxs = Distributions.sample(1:p, k, replace = false) # sample components that will carry the signal
@@ -31,7 +58,6 @@ function sparsepca_native(
         x[signal_idxs] = rand(T, k)
         sigma = x * x'
         sigma ./= tr(sigma)
-        true_obj = -1
     else
         # simulate some observations with noise
         x = randn(p, 100)
@@ -40,12 +66,11 @@ function sparsepca_native(
         sigma[signal_idxs, signal_idxs] .+= y * y'
         sigma ./= 100
         sigma = T.(sigma)
-        true_obj = NaN
     end
 
-    dimx = CO.svec_length(p)
+    dimx = Cones.svec_length(p)
     # x will be the svec (lower triangle, row-wise) of the matrix solution we seek
-    c = CO.smat_to_svec!(zeros(T, dimx), -sigma, sqrt(T(2)))
+    c = Cones.smat_to_svec!(zeros(T, dimx), -sigma, sqrt(T(2)))
     b = T[1]
     A = zeros(T, 1, dimx)
     for i in 1:p
@@ -53,18 +78,18 @@ function sparsepca_native(
         A[s] = 1
     end
     hpsd = zeros(T, dimx)
-    cones = CO.Cone{T}[CO.PosSemidefTri{T, T}(dimx)]
+    cones = Cones.Cone{T}[Cones.PosSemidefTri{T, T}(dimx)]
 
-    if use_epinorminfdual
+    if inst.use_epinorminfdual
         # l1 cone
         # double off-diagonals, which are already scaled by rt2
-        if use_linops
+        if inst.use_linops
             Gl1 = Diagonal(-one(T) * I, dimx)
         else
             Gl1 = -Matrix{T}(I, dimx, dimx)
         end
-        MU.vec_to_svec!(Gl1, rt2 = sqrt(T(2)))
-        if use_linops
+        ModelUtilities.vec_to_svec!(Gl1, rt2 = sqrt(T(2)))
+        if inst.use_linops
             G = BlockMatrix{T}(
                 2 * dimx + 1,
                 dimx,
@@ -81,11 +106,11 @@ function sparsepca_native(
                 ]
         end
         h = vcat(hpsd, T(k), zeros(T, dimx))
-        push!(cones, CO.EpiNormInf{T, T}(1 + dimx, use_dual = true))
+        push!(cones, Cones.EpiNormInf{T, T}(1 + dimx, use_dual = true))
     else
         id = Matrix{T}(I, dimx, dimx)
-        l1 = MU.vec_to_svec!(ones(T, dimx), rt2 = sqrt(T(2)))
-        if use_linops
+        l1 = ModelUtilities.vec_to_svec!(ones(T, dimx), rt2 = sqrt(T(2)))
+        if inst.use_linops
             A = BlockMatrix{T}(
                 dimx + 1,
                 3 * dimx,
@@ -114,43 +139,20 @@ function sparsepca_native(
         c = vcat(c, zeros(T, 2 * dimx))
         b = vcat(b, zeros(T, dimx))
         h = vcat(hpsd, zeros(T, 2 * dimx), k)
-        push!(cones, CO.Nonnegative{T}(2 * dimx + 1))
+        push!(cones, Cones.Nonnegative{T}(2 * dimx + 1))
     end
 
-    return (c = c, A = A, b = b, G = G, h = h, cones = cones, true_obj = true_obj)
+    model = Models.Model{T}(c, A, b, G, h, cones)
+    return model
 end
 
-function test_sparsepca_native(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
-    Random.seed!(rseed)
-    d = sparsepca_native(T, instance...)
-    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
-    @test r.status == :Optimal
-    if r.status == :Optimal && !isnan(d.true_obj)
-        @test r.primal_obj ≈ d.true_obj atol = 1e-4 rtol = 1e-4
+function test_extra(inst::SparsePCANative, result::NamedTuple)
+    @test result.status == :Optimal
+    if result.status == :Optimal && iszero(inst.noise_ratio)
+        # check objective value is correct
+        tol = eps(eltype(result.x))^0.25
+        @test result.primal_obj ≈ -1 atol = tol rtol = tol
     end
-    return r
 end
 
-sparsepca_native_fast = [
-    (5, 3, true, 0, false),
-    (5, 3, false, 0, false),
-    (5, 3, true, 10, false),
-    (5, 3, false, 10, false),
-    (30, 10, true, 0, false),
-    (30, 10, false, 0, false),
-    (30, 10, true, 10, false),
-    (30, 10, false, 10, false),
-    ]
-sparsepca_native_slow = [
-    # TODO
-    ]
-sparsepca_native_linops = [
-    (5, 3, true, 0, true),
-    (5, 3, false, 0, true),
-    (5, 3, true, 10, true),
-    (5, 3, false, 10, true),
-    (30, 10, true, 0, true),
-    (30, 10, false, 0, true),
-    (30, 10, true, 10, true),
-    (30, 10, false, 10, true),
-    ]
+return SparsePCANative

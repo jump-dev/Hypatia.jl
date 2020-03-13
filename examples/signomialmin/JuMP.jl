@@ -29,23 +29,53 @@ which is equivalent to the feasibility problem over C in R^{m, m} and V in R^{m,
         [C_{k, k} + sum(V_{k, :}), C_{k, \k}, V_{k, :}] in RelEntr(1 + 2(m - 1))
 =#
 
-using Test
-using LinearAlgebra
-import Random
-import JuMP
-const MOI = JuMP.MOI
-import Hypatia
-
+include(joinpath(@__DIR__, "../common_JuMP.jl"))
 include(joinpath(@__DIR__, "data.jl"))
 
-function signomialmin_JuMP(
-    ::Type{T},
-    fc::Vector,
-    fA::AbstractMatrix,
-    gc::Vector,
-    gA::Vector,
-    obj_ub::Real,
-    ) where {T <: Float64} # TODO support generic reals
+struct SignomialMinJuMP{T <: Real} <: ExampleInstanceJuMP{T}
+    fc::Vector
+    fA::AbstractMatrix
+    gc::Vector
+    gA::Vector
+    obj_ub::Real
+end
+SignomialMinJuMP{Float64}(sig_name::Symbol) = SignomialMinJuMP{Float64}(signomialmin_data[sig_name]...)
+SignomialMinJuMP{Float64}(m::Int, n::Int) = SignomialMinJuMP{Float64}(signomialmin_random(m, n)...)
+
+example_tests(::Type{SignomialMinJuMP{Float64}}, ::MinimalInstances) = [
+    ((:CS16ex12,), false),
+    ((2, 2), false),
+    ]
+example_tests(::Type{SignomialMinJuMP{Float64}}, ::FastInstances) = begin
+    options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
+    relaxed_options = (tol_feas = 1e-5, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4)
+    return [
+    ((:motzkin2,), false, options),
+    ((:motzkin3,), false, options),
+    ((:CS16ex8_13,), false, options),
+    ((:CS16ex8_14,), false, options),
+    ((:CS16ex18,), false, options),
+    ((:CS16ex12,), false, options),
+    ((:CS16ex13,), false, options),
+    ((:MCW19ex1_mod,), false, options),
+    ((:MCW19ex8,), false, relaxed_options),
+    ((3, 2), false, options),
+    ((6, 6), false, options),
+    ((20, 3), false, options),
+    ]
+end
+example_tests(::Type{SignomialMinJuMP{Float64}}, ::SlowInstances) = begin
+    options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
+    relaxed_options = (tol_feas = 1e-5, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4)
+    return [
+    ((10, 10), false, options),
+    ((20, 6), false, options),
+    ((40, 3), false, options),
+    ]
+end
+
+function build(inst::SignomialMinJuMP{T}) where {T <: Float64} # TODO generic reals
+    (fc, fA, gc, gA) = (inst.fc, inst.fA, inst.gc, inst.gA)
     (fm, n) = size(fA)
     @assert length(fc) == fm
     q = length(gc)
@@ -112,48 +142,16 @@ function signomialmin_JuMP(
     JuMP.@constraint(model, [k in 1:m, i in 1:n], dot(A[notk[k], i] .- A[k, i], V[k, :]) == 0)
     JuMP.@constraint(model, [k in 1:m], vcat(C[k, k] + sum(V[k, :]), C[k, notk[k]], V[k, :]) in MOI.RelativeEntropyCone(2m - 1))
 
-    return (model = model, obj_ub = obj_ub)
+    return model
 end
 
-signomialmin_JuMP(
-    ::Type{T},
-    sig::Symbol,
-    ) where {T <: Float64} = signomialmin_JuMP(T, signomialmin_data[sig]...)
-
-signomialmin_JuMP(
-    ::Type{T},
-    m::Int,
-    n::Int,
-    ) where {T <: Float64} = signomialmin_JuMP(T, signomialmin_random(m, n)...)
-
-function test_signomialmin_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
-    Random.seed!(rseed)
-    d = signomialmin_JuMP(T, instance...)
-    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer{T}(; options...))
-    JuMP.optimize!(d.model)
-    @test JuMP.termination_status(d.model) == MOI.OPTIMAL
-    if !isnan(d.obj_ub)
-        @test JuMP.objective_value(d.model) <= d.obj_ub + 1e-4
+function test_extra(inst::SignomialMinJuMP{T}, model::JuMP.Model) where T
+    @test JuMP.termination_status(model) == MOI.OPTIMAL
+    if JuMP.termination_status(model) == MOI.OPTIMAL && !isnan(inst.obj_ub)
+        # check objective value is correct
+        tol = eps(T)^0.2
+        @test JuMP.objective_value(model) <= inst.obj_ub + tol
     end
-    return d.model.moi_backend.optimizer.model.optimizer.result
 end
 
-signomialmin_JuMP_fast = [
-    (:motzkin2,),
-    (:motzkin3,),
-    (:CS16ex8_13,),
-    (:CS16ex8_14,),
-    (:CS16ex18,),
-    (:CS16ex12,),
-    (:CS16ex13,),
-    (:MCW19ex1_mod,),
-    (:MCW19ex8,),
-    (3, 2),
-    (6, 6),
-    (20, 3),
-    ]
-signomialmin_JuMP_slow = [
-    (10, 10),
-    (20, 6),
-    (40, 3),
-    ]
+return SignomialMinJuMP

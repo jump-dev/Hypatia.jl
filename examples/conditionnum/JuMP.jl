@@ -24,19 +24,43 @@ gamma*I - nu*M_0 - sum_i y_i*M_i in S_+
 we make F_0 and M_0 positive definite to ensure existence of a feasible solution
 =#
 
-using LinearAlgebra
-import Random
-using Test
-import JuMP
-const MOI = JuMP.MOI
-import Hypatia
+include(joinpath(@__DIR__, "../common_JuMP.jl"))
 
-function conditionnum_JuMP(
-    ::Type{T},
-    side::Int,
-    len_y::Int,
-    use_linmatrixineq::Bool, # use linmatrixineq cone, else PSD formulation
-    ) where {T <: Float64} # TODO support generic reals
+struct ConditionNumJuMP{T <: Real} <: ExampleInstanceJuMP{T}
+    side::Int
+    len_y::Int
+    use_linmatrixineq::Bool # use linmatrixineq cone, else PSD formulation
+end
+
+example_tests(::Type{ConditionNumJuMP{Float64}}, ::MinimalInstances) = [
+    ((2, 2, true), false),
+    ((2, 2, false), false),
+    ]
+example_tests(::Type{ConditionNumJuMP{Float64}}, ::FastInstances) = begin
+    options = (tol_feas = 1e-5,)
+    relaxed_options = (tol_feas = 1e-4, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
+    return [
+    ((2, 3, true), false, options),
+    ((2, 3, false), false, options),
+    ((3, 2, true), false, options),
+    ((3, 2, false), false, options),
+    ((50, 15, true), false, options),
+    ((50, 15, false), false, options),
+    ((100, 10, false), false, relaxed_options),
+    ((100, 40, false), false, relaxed_options),
+    ]
+end
+example_tests(::Type{ConditionNumJuMP{Float64}}, ::SlowInstances) = begin
+    options = (tol_feas = 1e-5,)
+    return [
+    ((100, 10, true), false, options),
+    ((100, 40, true), false, options),
+    ]
+end
+
+function build(inst::ConditionNumJuMP{T}) where {T <: Float64} # TODO generic reals
+    (side, len_y) = (inst.side, inst.len_y)
+
     Mi = [zeros(side, side) for i in 1:len_y]
     for i in eachindex(Mi)
         Mi_half = randn(side)
@@ -61,7 +85,7 @@ function conditionnum_JuMP(
     end)
     JuMP.@objective(model, Min, gamma)
 
-    if use_linmatrixineq
+    if inst.use_linmatrixineq
         JuMP.@constraints(model, begin
             vcat(nu, y) in Hypatia.LinMatrixIneqCone{Float64}([F0, Fi...])
             vcat(-1, nu, y) in Hypatia.LinMatrixIneqCone{Float64}([I, M0, Mi...])
@@ -75,29 +99,7 @@ function conditionnum_JuMP(
         end)
     end
 
-    return (model = model,)
+    return model
 end
 
-function test_conditionnum_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
-    Random.seed!(rseed)
-    d = conditionnum_JuMP(T, instance...)
-    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer{T}(; options...))
-    JuMP.optimize!(d.model)
-    @test JuMP.termination_status(d.model) == MOI.OPTIMAL
-    return d.model.moi_backend.optimizer.model.optimizer.result
-end
-
-conditionnum_JuMP_fast = [
-    (2, 3, true),
-    (2, 3, false),
-    (3, 2, true),
-    (3, 2, false),
-    (50, 15, true),
-    (50, 15, false),
-    (100, 10, false),
-    (100, 40, false),
-    ]
-conditionnum_JuMP_slow = [
-    (100, 10, true),
-    (100, 40, true),
-    ]
+return ConditionNumJuMP

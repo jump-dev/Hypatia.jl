@@ -6,46 +6,94 @@ see description in examples/expdesign/JuMP.jl
 TODO describe options
 =#
 
-using LinearAlgebra
-import Random
-using Test
-import Hypatia
-const CO = Hypatia.Cones
-const MU = Hypatia.ModelUtilities
+include(joinpath(@__DIR__, "../common_native.jl"))
 
-function expdesign_native(
-    ::Type{T},
-    q::Int,
-    p::Int,
-    n::Int,
-    n_max::Int,
-    logdet_obj::Bool,
-    rootdet_obj::Bool,
-    geomean_obj::Bool,
-    use_logdet::Bool,
-    use_rootdet::Bool,
-    use_epinorminf::Bool,
-    ) where {T <: Real}
-    @assert logdet_obj + geomean_obj + rootdet_obj == 1
+struct ExpDesignNative{T <: Real} <: ExampleInstanceNative{T}
+    q::Int
+    p::Int
+    n::Int
+    n_max::Int
+    logdet_obj::Bool
+    rootdet_obj::Bool
+    geomean_obj::Bool
+    use_logdet::Bool
+    use_rootdet::Bool
+    use_epinorminf::Bool
+end
+
+example_tests(::Type{ExpDesignNative{Float64}}, ::MinimalInstances) = begin
+    options = (tol_feas = 1e-5, tol_rel_opt = 1e-5, tol_abs_opt = 1e-5)
+    return [
+    ((2, 3, 4, 2, true, false, false, true, true, false), options),
+    ((2, 3, 4, 2, true, false, false, true, true, true), options),
+    ((2, 3, 4, 2, false, true, false, true, true, true),),
+    ((2, 3, 4, 2, false, false, true, true, true, true),),
+    ((2, 3, 4, 2, true, false, false, false, false, true), options),
+    ((2, 3, 4, 2, false, true, false, false, false, true),),
+    ]
+end
+example_tests(::Type{<:ExpDesignNative{<:Real}}, ::MinimalInstances) = [
+    ((2, 3, 4, 2, false, true, false, true, true, true),),
+    ((2, 3, 4, 2, false, false, true, true, true, true),),
+    ]
+example_tests(::Type{ExpDesignNative{Float64}}, ::FastInstances) = begin
+    options = (tol_feas = 1e-5, tol_rel_opt = 1e-5, tol_abs_opt = 1e-5)
+    return [
+    ((3, 5, 7, 2, true, false, false, true, true, false), options),
+    ((3, 5, 7, 2, true, false, false, true, true, true), options),
+    ((3, 5, 7, 2, false, true, false, true, true, true),),
+    ((3, 5, 7, 2, false, false, true, true, true, true),),
+    ((3, 5, 7, 2, true, false, false, false, false, true), options),
+    ((3, 5, 7, 2, false, true, false, false, false, true),),
+    ((5, 15, 25, 5, true, false, false, true, true, false), options),
+    ((5, 15, 25, 5, true, false, false, true, true, true), options),
+    ((5, 15, 25, 5, false, true, false, true, true, true),),
+    ((5, 15, 25, 5, false, false, true, true, true, true),),
+    ((5, 15, 25, 5, true, false, false, false, false, true), options),
+    ((5, 15, 25, 5, false, true, false, false, false, true),),
+    ((25, 75, 125, 5, true, false, false, true, true, false), options),
+    ((25, 75, 125, 5, true, false, false, true, true, true), options),
+    ((25, 75, 125, 5, false, true, false, true, true, true),),
+    ((25, 75, 125, 5, false, false, true, true, true, true),),
+    ((25, 75, 125, 5, true, false, false, false, false, true), options),
+    ((25, 75, 125, 5, false, true, false, false, false, true),),
+    ]
+end
+example_tests(::Type{ExpDesignNative{Float64}}, ::SlowInstances) = begin
+    options = (tol_feas = 1e-5, tol_rel_opt = 1e-5, tol_abs_opt = 1e-5)
+    return [
+    # TODO commented too slow
+    # ((100, 200, 200, 10, true, false, false, true, true, false),),
+    ((100, 200, 200, 10, true, false, false, true, true, true), options),
+    ((100, 200, 200, 10, false, true, false, true, true, true),),
+    ((100, 200, 200, 10, false, false, true, true, true, true),),
+    ((100, 200, 200, 10, true, false, false, false, false, true), options),
+    ((100, 200, 200, 10, false, true, false, false, false, true),),
+    ]
+end
+
+function build(inst::ExpDesignNative{T}) where {T <: Real}
+    (q, p, n, n_max) = (inst.q, inst.p, inst.n, inst.n_max)
     @assert (p > q) && (n > q) && (n_max <= n)
-    V = T(4) * rand(T, q, p) .- T(2)
+    @assert inst.logdet_obj + inst.geomean_obj + inst.rootdet_obj == 1
+    V = randn(T, q, p)
 
     # constraints on upper bound of number of trials and nonnegativity of numbers of trials
-    if use_epinorminf
+    if inst.use_epinorminf
         h_norminf = vcat(T(n_max) / 2, fill(-T(n_max) / 2, p))
         G_norminf = vcat(zeros(T, 1, p), -Matrix{T}(I, p, p))
-        cones = CO.Cone{T}[CO.EpiNormInf{T, T}(p + 1)]
+        cones = Cones.Cone{T}[Cones.EpiNormInf{T, T}(p + 1)]
     else
         h_norminf = vcat(zeros(T, p), fill(T(n_max), p))
         G_norminf = vcat(Matrix{T}(-I, p, p), Matrix{T}(I, p, p))
-        cones = CO.Cone{T}[CO.Nonnegative{T}(p), CO.Nonnegative{T}(p)]
+        cones = Cones.Cone{T}[Cones.Nonnegative{T}(p), Cones.Nonnegative{T}(p)]
     end
 
     # constraint on total number of trials
     A = ones(T, 1, p)
     b = T[n]
 
-    if (logdet_obj && use_logdet) || (rootdet_obj && use_rootdet)
+    if (inst.logdet_obj && inst.use_logdet) || (inst.rootdet_obj && inst.use_rootdet)
         # maximize the hypograph variable of the cone
         c = vcat(-one(T), zeros(T, p))
 
@@ -54,7 +102,7 @@ function expdesign_native(
         G_norminf = hcat(zeros(T, size(G_norminf, 1)), G_norminf)
 
         # dimension of vectorized matrix V*diag(np)*V'
-        dimvec = CO.svec_length(q)
+        dimvec = Cones.svec_length(q)
         G_detcone = zeros(T, dimvec, p)
         l = 1
         for i in 1:q, j in 1:i
@@ -63,11 +111,11 @@ function expdesign_native(
             end
             l += 1
         end
-        MU.vec_to_svec!(G_detcone, rt2 = sqrt(T(2)))
+        ModelUtilities.vec_to_svec!(G_detcone, rt2 = sqrt(T(2)))
         @assert l - 1 == dimvec
 
-        if logdet_obj
-            push!(cones, CO.HypoPerLogdetTri{T, T}(dimvec + 2))
+        if inst.logdet_obj
+            push!(cones, Cones.HypoPerLogdetTri{T, T}(dimvec + 2))
             # pad with hypograph variable and perspective variable
             h_detcone = vcat(zero(T), one(T), zeros(T, dimvec))
             # include perspective variable
@@ -77,7 +125,7 @@ function expdesign_native(
                 zeros(T, dimvec)    G_detcone;
                 ]
         else
-            push!(cones, CO.HypoRootdetTri{T, T}(dimvec + 1))
+            push!(cones, Cones.HypoRootdetTri{T, T}(dimvec + 1))
             # pad with hypograph variable
             h_detcone = zeros(T, dimvec + 1)
             # include perspective variable
@@ -92,11 +140,11 @@ function expdesign_native(
         h = vcat(h_norminf, h_detcone)
     end
 
-    if geomean_obj
+    if inst.geomean_obj
         # auxiliary matrix variable has pq elements stored row-major, auxiliary lower triangular variable has svec_length(q) elements, also stored row-major
         pq = p * q
         qq = q ^ 2
-        num_trivars = CO.svec_length(q)
+        num_trivars = Cones.svec_length(q)
         c = vcat(-one(T), zeros(T, p + pq + num_trivars))
 
         A_VW = zeros(T, qq, pq)
@@ -116,7 +164,7 @@ function expdesign_native(
             end
         end
         A = [
-            zero(T)    A    zeros(1, pq + num_trivars);
+            zero(T)    A    zeros(T, 1, pq + num_trivars);
             zeros(T, qq, 1 + p)    A_VW    A_lowertri;
             ]
         b = vcat(b, zeros(T, qq))
@@ -125,13 +173,13 @@ function expdesign_native(
         for i in 1:q
             G_geo[i, sum(1:i)] = -1
         end
-        push!(cones, CO.HypoGeomean{T}(fill(inv(T(q)), q)))
+        push!(cones, Cones.HypoGeomean{T}(fill(inv(T(q)), q)))
         G_soc_epi = zeros(T, pq + p, p)
         G_soc = zeros(T, pq + p, pq)
         epi_idx = 1
         col_idx = 1
         for i in 1:p
-            push!(cones, CO.EpiNormEucl{T}(q + 1))
+            push!(cones, Cones.EpiNormEucl{T}(q + 1))
             G_soc_epi[epi_idx, i] = -sqrt(T(q))
             G_soc[(epi_idx + 1):(epi_idx + q), col_idx:(col_idx + q - 1)] = Matrix{T}(-I, q, q)
             epi_idx += q + 1
@@ -143,13 +191,13 @@ function expdesign_native(
             zeros(T, q, 1 + p + pq)    G_geo; # geomean
             zeros(T, pq + p)    G_soc_epi    G_soc    zeros(T, pq + p, num_trivars); # epinormeucl
             ]
-        h = vcat(h_norminf, zeros(p + 1 + q + pq))
+        h = vcat(h_norminf, zeros(T, p + 1 + q + pq))
     end
 
-    if (rootdet_obj && !use_rootdet) || (logdet_obj && !use_logdet)
+    if (inst.rootdet_obj && !inst.use_rootdet) || (inst.logdet_obj && !inst.use_logdet)
         # extended formulations require an upper triangular matrix of additional variables
         # we will store this matrix row-major
-        num_trivars = CO.svec_length(q)
+        num_trivars = Cones.svec_length(q)
         # vectorized dimension of extended psd matrix
         dimvec = q * (2 * q + 1)
         G_psd = zeros(T, dimvec, p + num_trivars)
@@ -182,13 +230,13 @@ function expdesign_native(
             G_psd[l, p + diag_idx(i)] = -1
             l += 1
         end
-        MU.vec_to_svec!(G_psd, rt2 = sqrt(T(2)))
+        ModelUtilities.vec_to_svec!(G_psd, rt2 = sqrt(T(2)))
 
         h_psd = zeros(T, dimvec)
-        push!(cones, CO.PosSemidefTri{T, T}(dimvec))
+        push!(cones, Cones.PosSemidefTri{T, T}(dimvec))
     end
 
-    if rootdet_obj && !use_rootdet
+    if inst.rootdet_obj && !inst.use_rootdet
         c = vcat(zeros(T, p + num_trivars), -one(T))
         A = hcat(A, zeros(T, 1, num_trivars + 1))
         h_geo = zeros(T, q + 1)
@@ -196,7 +244,7 @@ function expdesign_native(
         for i in 1:q
             G_geo[i, diag_idx(i)] = -1
         end
-        push!(cones, CO.HypoGeomean{T}(fill(inv(T(q)), q)))
+        push!(cones, Cones.HypoGeomean{T}(fill(inv(T(q)), q)))
         # all conic constraints
         G = [
             G_norminf   zeros(T, size(G_norminf, 1), num_trivars + 1);
@@ -207,7 +255,7 @@ function expdesign_native(
         h = vcat(h_norminf, h_psd, h_geo)
     end
 
-    if logdet_obj && !use_logdet
+    if inst.logdet_obj && !inst.use_logdet
         # extended formulation for logdet
         # number of experiments, upper triangular matrix, hypograph variables
         dimx = p + num_trivars + q
@@ -226,7 +274,7 @@ function expdesign_native(
             h_log[offset + 1] = 1
             # diagonal element in the triangular matrix
             G_log[offset + 2, p + diag_idx(i)] = -1
-            push!(cones, CO.HypoPerLog{T}(3))
+            push!(cones, Cones.HypoPerLog{T}(3))
             offset += 3
         end
 
@@ -241,43 +289,8 @@ function expdesign_native(
         h = vcat(h_norminf, h_psd, h_log)
     end
 
-    return (c = c, A = A, b = b, G = G, h = h, cones = cones)
+    model = Models.Model{T}(c, A, b, G, h, cones)
+    return model
 end
 
-function test_expdesign_native(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
-    Random.seed!(rseed)
-    d = expdesign_native(T, instance...)
-    r = Hypatia.Solvers.build_solve_check(d.c, d.A, d.b, d.G, d.h, d.cones; options...)
-    @test r.status == :Optimal
-    return r
-end
-
-expdesign_native_fast = [
-    (3, 5, 7, 2, true, false, false, true, true, false),
-    (3, 5, 7, 2, true, false, false, true, true, true),
-    (3, 5, 7, 2, false, true, false, true, true, true),
-    (3, 5, 7, 2, false, false, true, true, true, true),
-    (3, 5, 7, 2, true, false, false, false, false, true),
-    (3, 5, 7, 2, false, true, false, false, false, true),
-    (5, 15, 25, 5, true, false, false, true, true, false),
-    (5, 15, 25, 5, true, false, false, true, true, true),
-    (5, 15, 25, 5, false, true, false, true, true, true),
-    (5, 15, 25, 5, false, false, true, true, true, true),
-    (5, 15, 25, 5, true, false, false, false, false, true),
-    (5, 15, 25, 5, false, true, false, false, false, true),
-    (25, 75, 125, 5, true, false, false, true, true, false),
-    (25, 75, 125, 5, true, false, false, true, true, true),
-    (25, 75, 125, 5, false, true, false, true, true, true),
-    (25, 75, 125, 5, false, false, true, true, true, true),
-    (25, 75, 125, 5, true, false, false, false, false, true),
-    (25, 75, 125, 5, false, true, false, false, false, true),
-    ]
-expdesign_native_slow = [
-    # TODO commented too slow
-    # (100, 200, 200, 10, true, false, false, true, true, false),
-    (100, 200, 200, 10, true, false, false, true, true, true),
-    (100, 200, 200, 10, false, true, false, true, true, true),
-    (100, 200, 200, 10, false, false, true, true, true, true),
-    (100, 200, 200, 10, true, false, false, false, false, true),
-    (100, 200, 200, 10, false, true, false, false, false, true),
-    ]
+return ExpDesignNative

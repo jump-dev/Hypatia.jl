@@ -4,61 +4,49 @@ Copyright 2018, Chris Coey and contributors
 see description in examples/envelope/native.jl
 =#
 
-using LinearAlgebra
-import Random
-using Test
-import JuMP
-const MOI = JuMP.MOI
-import Hypatia
-const MU = Hypatia.ModelUtilities
+include(joinpath(@__DIR__, "../common_JuMP.jl"))
 
-function envelope_JuMP(
-    ::Type{T},
-    n::Int,
-    rand_halfdeg::Int,
-    num_polys::Int,
-    env_halfdeg::Int;
-    domain::MU.Domain = MU.Box{T}(-ones(T, n), ones(T, n)),
-    sample::Bool = true,
-    sample_factor::Int = 100,
-    ) where {T <: Float64} # TODO support generic reals
-    @assert n == MU.get_dimension(domain)
-    @assert rand_halfdeg <= env_halfdeg
+struct EnvelopeJuMP{T <: Real} <: ExampleInstanceJuMP{T}
+    n::Int
+    rand_halfdeg::Int
+    num_polys::Int
+    env_halfdeg::Int
+end
+
+example_tests(::Type{EnvelopeJuMP{Float64}}, ::MinimalInstances) = [
+    ((1, 2, 2, 2), false),
+    ]
+example_tests(::Type{EnvelopeJuMP{Float64}}, ::FastInstances) = [
+    ((2, 2, 3, 2), false),
+    ((3, 3, 3, 3), false),
+    ((3, 3, 5, 4), false),
+    ((5, 2, 5, 3), false),
+    ((1, 30, 2, 30), false),
+    ((10, 1, 3, 1), false),
+    ]
+example_tests(::Type{EnvelopeJuMP{Float64}}, ::SlowInstances) = [
+    ((4, 6, 4, 5), false),
+    ((2, 30, 4, 30), false),
+    ]
+
+function build(inst::EnvelopeJuMP{T}) where {T <: Float64} # TODO generic reals
+    n = inst.n
+    @assert inst.rand_halfdeg <= inst.env_halfdeg
+    domain = ModelUtilities.Box{T}(-ones(T, n), ones(T, n))
 
     # generate interpolation
-    (U, pts, Ps, w) = MU.interpolate(domain, env_halfdeg, calc_w = true, sample = sample, sample_factor = sample_factor)
+    (U, pts, Ps, w) = ModelUtilities.interpolate(domain, inst.env_halfdeg, calc_w = true)
 
     # generate random polynomials
-    L = binomial(n + rand_halfdeg, n)
-    polys = Ps[1][:, 1:L] * rand(-9:9, L, num_polys)
+    L = binomial(n + inst.rand_halfdeg, n)
+    polys = Ps[1][:, 1:L] * rand(-9:9, L, inst.num_polys)
 
     model = JuMP.Model()
     JuMP.@variable(model, fpv[j in 1:U]) # values at Fekete points
     JuMP.@objective(model, Max, dot(fpv, w)) # integral over domain (via quadrature)
-    JuMP.@constraint(model, [i in 1:num_polys], polys[:, i] .- fpv in Hypatia.WSOSInterpNonnegativeCone{Float64, Float64}(U, Ps))
+    JuMP.@constraint(model, [i in 1:inst.num_polys], polys[:, i] .- fpv in Hypatia.WSOSInterpNonnegativeCone{Float64, Float64}(U, Ps))
 
-    return (model = model,)
+    return model
 end
 
-function test_envelope_JuMP(instance::Tuple; T::Type{<:Real} = Float64, options::NamedTuple = NamedTuple(), rseed::Int = 1)
-    Random.seed!(rseed)
-    d = envelope_JuMP(T, instance...)
-    JuMP.set_optimizer(d.model, () -> Hypatia.Optimizer{T}(; options...))
-    JuMP.optimize!(d.model)
-    @test JuMP.termination_status(d.model) == MOI.OPTIMAL
-    return d.model.moi_backend.optimizer.model.optimizer.result
-end
-
-envelope_JuMP_fast = [
-    (2, 2, 3, 4),
-    (2, 3, 2, 4),
-    (3, 3, 3, 3),
-    (3, 3, 5, 4),
-    (5, 2, 5, 2),
-    (1, 30, 2, 30),
-    (10, 1, 3, 1),
-    ]
-envelope_JuMP_slow = [
-    (4, 6, 4, 5),
-    (2, 30, 4, 30),
-    ]
+return EnvelopeJuMP

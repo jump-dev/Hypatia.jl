@@ -9,7 +9,7 @@ import DynamicPolynomials
 import Hypatia
 const MU = Hypatia.ModelUtilities
 
-function fekete_sample(T::DataType)
+function fekete_sample(T::Type{<:Real})
     Random.seed!(1)
     n = 3
     halfdeg = 2
@@ -27,7 +27,7 @@ function fekete_sample(T::DataType)
     end
 end
 
-function test_recover_lagrange_polys(T::DataType)
+function test_recover_lagrange_polys(T::Type{<:Real})
     tol = sqrt(eps(T))
     Random.seed!(1)
     n = 1
@@ -74,7 +74,7 @@ function test_recover_lagrange_polys(T::DataType)
     end
 end
 
-function test_recover_cheb_polys(T::DataType)
+function test_recover_cheb_polys(T::Type{<:Real})
     DynamicPolynomials.@polyvar x[1:2]
     halfdeg = 2
     monos = DynamicPolynomials.monomials(x, 0:halfdeg)
@@ -82,7 +82,7 @@ function test_recover_cheb_polys(T::DataType)
     @test cheb_polys == [1, x[1], x[2], 2x[1]^2 - 1, x[1] * x[2], 2x[2]^2 - 1]
 end
 
-function test_svec_conversion(T::DataType)
+function test_svec_conversion(T::Type{<:Real})
     tol = 10eps(T)
     rt2 = sqrt(T(2))
     vec = rand(T, 6)
