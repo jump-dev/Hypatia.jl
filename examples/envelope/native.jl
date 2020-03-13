@@ -19,30 +19,29 @@ struct EnvelopeNative{T <: Real} <: ExampleInstanceNative{T}
     primal_wsos::Bool # use primal formulation, else use dual
 end
 
-options = ()
-example_tests(::Type{EnvelopeNative{Float64}}, ::MinimalInstances) = [
-    ((1, 2, 2, 2, true), options),
-    ((1, 2, 2, 2, false), options),
+example_tests(::Type{<:EnvelopeNative{<:BlasReal}}, ::MinimalInstances) = [
+    ((1, 2, 2, 2, true),),
+    ((1, 2, 2, 2, false),),
     ]
 example_tests(::Type{EnvelopeNative{Float64}}, ::FastInstances) = [
-    ((2, 2, 3, 2, true), options),
-    ((2, 2, 3, 2, false), options),
-    ((3, 3, 3, 3, true), options),
-    ((3, 3, 3, 3, false), options),
-    ((3, 3, 5, 4, true), options),
-    ((5, 2, 5, 3, true), options),
-    ((1, 30, 2, 30, true), options),
-    ((1, 30, 2, 30, false), options),
-    ((10, 1, 3, 1, true), options),
-    ((10, 1, 3, 1, false), options),
+    ((2, 2, 3, 2, true),),
+    ((2, 2, 3, 2, false),),
+    ((3, 3, 3, 3, true),),
+    ((3, 3, 3, 3, false),),
+    ((3, 3, 5, 4, true),),
+    ((5, 2, 5, 3, true),),
+    ((1, 30, 2, 30, true),),
+    ((1, 30, 2, 30, false),),
+    ((10, 1, 3, 1, true),),
+    ((10, 1, 3, 1, false),),
     ]
 example_tests(::Type{EnvelopeNative{Float64}}, ::SlowInstances) = [
-    ((3, 3, 5, 4, false), options),
-    ((5, 2, 5, 3, false), options),
-    ((4, 6, 4, 5, true), options),
-    ((4, 6, 4, 5, false), options),
-    ((2, 30, 4, 30, true), options),
-    ((2, 30, 4, 30, false), options),
+    ((3, 3, 5, 4, false),),
+    ((5, 2, 5, 3, false),),
+    ((4, 6, 4, 5, true),),
+    ((4, 6, 4, 5, false),),
+    ((2, 30, 4, 30, true),),
+    ((2, 30, 4, 30, false),),
     ]
 
 function build(inst::EnvelopeNative{T}) where {T <: Real}

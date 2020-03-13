@@ -13,27 +13,26 @@ struct MaxVolumeJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     epinorminf_constrs::Bool # add L1 and Linfty ball constraints, elsle don't add
 end
 
-options = ()
 example_tests(::Type{MaxVolumeJuMP{Float64}}, ::MinimalInstances) = [
-    ((2, true, false), false, options),
-    ((2, false, true), false, options),
-    ((2, true, true), false, options),
+    ((2, true, false), false),
+    ((2, false, true), false),
+    ((2, true, true), false),
     ]
 example_tests(::Type{MaxVolumeJuMP{Float64}}, ::FastInstances) = [
-    ((10, true, false), false, options),
-    ((10, false, true), false, options),
-    ((10, true, true), false, options),
-    ((100, true, false), false, options),
-    ((100, false, true), false, options),
-    ((100, true, true), false, options),
-    ((1000, true, false), false, options),
-    ((1000, true, true), false, options), # with bridges extended formulation will need to go into slow list
+    ((10, true, false), false),
+    ((10, false, true), false),
+    ((10, true, true), false),
+    ((100, true, false), false),
+    ((100, false, true), false),
+    ((100, true, true), false),
+    ((1000, true, false), false),
+    ((1000, true, true), false), # with bridges extended formulation will need to go into slow list
     ]
 example_tests(::Type{MaxVolumeJuMP{Float64}}, ::SlowInstances) = [
-    ((1000, false, true), false, options),
-    ((2000, true, false), false, options),
-    ((2000, false, true), false, options),
-    ((2000, true, true), false, options),
+    ((1000, false, true), false),
+    ((2000, true, false), false),
+    ((2000, false, true), false),
+    ((2000, true, true), false),
     ]
 
 function build(inst::MaxVolumeJuMP{T}) where {T <: Float64} # TODO generic reals

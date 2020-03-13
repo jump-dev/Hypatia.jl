@@ -15,20 +15,19 @@ struct LinearOptNative{T <: Real} <: ExampleInstanceNative{T}
     nz_frac::Float64
 end
 
-options = ()
-example_tests(::Type{LinearOptNative{Float64}}, ::MinimalInstances) = [
-    ((2, 4, 1.0), options),
-    ((2, 4, 0.5), options),
+example_tests(::Type{<:LinearOptNative{<:Real}}, ::MinimalInstances) = [
+    ((2, 4, 1.0),),
+    ((2, 4, 0.5),),
     ]
 example_tests(::Type{LinearOptNative{Float64}}, ::FastInstances) = [
-    ((15, 20, 1.0), options),
-    ((15, 20, 0.25), options),
-    ((50, 100, 1.0), options),
-    ((50, 100, 0.15), options),
+    ((15, 20, 1.0),),
+    ((15, 20, 0.25),),
+    ((50, 100, 1.0),),
+    ((50, 100, 0.15),),
     ]
 example_tests(::Type{LinearOptNative{Float64}}, ::SlowInstances) = [
-    ((500, 1000, 0.05), options),
-    ((500, 1000, 1.0), options),
+    ((500, 1000, 0.05),),
+    ((500, 1000, 1.0),),
     ]
 
 function build(inst::LinearOptNative{T}) where {T <: Real}

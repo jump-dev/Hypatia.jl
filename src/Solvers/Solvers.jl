@@ -28,6 +28,9 @@ import Hypatia.DensePosDefCache
 import Hypatia.load_matrix
 import Hypatia.invert
 
+default_tol(::Type{T}) where {T <: Real} = sqrt(eps(T))
+default_tol(::Type{BigFloat}) = eps(BigFloat) ^ 0.4
+
 abstract type Stepper{T <: Real} end
 
 abstract type SystemSolver{T <: Real} end
@@ -115,9 +118,9 @@ mutable struct Solver{T <: Real}
         verbose::Bool = true,
         iter_limit::Int = 1000,
         time_limit::Real = Inf,
-        tol_rel_opt::Real = sqrt(eps(T)),
-        tol_abs_opt::Real = sqrt(eps(T)),
-        tol_feas::Real = sqrt(eps(T)),
+        tol_rel_opt::Real = default_tol(T),
+        tol_abs_opt::Real = default_tol(T),
+        tol_feas::Real = default_tol(T),
         tol_slow::Real = 1e-3,
         preprocess::Bool = true,
         reduce::Bool = true,

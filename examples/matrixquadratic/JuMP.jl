@@ -22,24 +22,23 @@ struct MatrixQuadraticJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     use_matrixepipersquare::Bool # use matrixepipersquare cone, else PSD formulation
 end
 
-options = ()
 example_tests(::Type{MatrixQuadraticJuMP{Float64}}, ::MinimalInstances) = [
-    ((2, 2, true), false, options),
-    ((2, 2, false), false, options),
+    ((2, 2, true), false),
+    ((2, 2, false), false),
     ]
 example_tests(::Type{MatrixQuadraticJuMP{Float64}}, ::FastInstances) = [
-    ((2, 3, true), false, options),
-    ((2, 3, false), false, options),
-    ((5, 6, true), false, options),
-    ((5, 6, false), false, options),
-    ((10, 20, true), false, options),
-    ((10, 20, false), false, options),
-    ((20, 40, true), false, options),
-    ((20, 40, false), false, options),
+    ((2, 3, true), false),
+    ((2, 3, false), false),
+    ((5, 6, true), false),
+    ((5, 6, false), false),
+    ((10, 20, true), false),
+    ((10, 20, false), false),
+    ((20, 40, true), false),
+    ((20, 40, false), false),
     ]
 example_tests(::Type{MatrixQuadraticJuMP{Float64}}, ::SlowInstances) = [
-    ((60, 80, true), false, options),
-    ((60, 80, false), false, options),
+    ((60, 80, true), false),
+    ((60, 80, false), false),
     ]
 
 function build(inst::MatrixQuadraticJuMP{T}) where {T <: Float64} # TODO generic reals

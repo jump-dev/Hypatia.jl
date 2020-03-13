@@ -36,29 +36,28 @@ function MatrixRegressionJuMP{Float64}(
     return MatrixRegressionJuMP{Float64}(Y, X, args...)
 end
 
-options = ()
 example_tests(::Type{MatrixRegressionJuMP{Float64}}, ::MinimalInstances) = [
-    ((2, 3, 4, 0, 0, 0, 0, 0), false, options),
-    ((2, 3, 4, 0.1, 0.1, 0.1, 0.2, 0.2), false, options),
+    ((2, 3, 4, 0, 0, 0, 0, 0), false),
+    ((2, 3, 4, 0.1, 0.1, 0.1, 0.2, 0.2), false),
     ]
 example_tests(::Type{MatrixRegressionJuMP{Float64}}, ::FastInstances) = [
-    ((5, 3, 4, 0, 0, 0, 0, 0), false, options),
-    ((5, 3, 4, 0.1, 0.1, 0.1, 0.2, 0.2), false, options),
-    ((5, 3, 4, 0, 0.1, 0.1, 0, 0), false, options),
-    ((3, 4, 5, 0, 0, 0, 0, 0), false, options),
-    ((3, 4, 5, 0.1, 0.1, 0.1, 0.2, 0.2), false, options),
-    ((3, 4, 5, 0, 0.1, 0.1, 0, 0), false, options),
-    ((10, 20, 20, 0, 0, 0, 0, 0), false, options),
-    ((10, 20, 20, 0.1, 0.1, 0.1, 0.2, 0.2), false, options),
-    ((10, 20, 20, 0, 0.1, 0.1, 0, 0), false, options),
-    ((100, 8, 12, 0, 0, 0, 0, 0), false, options),
-    ((100, 8, 12, 0.1, 0.1, 0.1, 0.2, 0.2), false, options),
-    ((100, 8, 12, 0, 0.1, 0.1, 0, 0), false, options),
+    ((5, 3, 4, 0, 0, 0, 0, 0), false),
+    ((5, 3, 4, 0.1, 0.1, 0.1, 0.2, 0.2), false),
+    ((5, 3, 4, 0, 0.1, 0.1, 0, 0), false),
+    ((3, 4, 5, 0, 0, 0, 0, 0), false),
+    ((3, 4, 5, 0.1, 0.1, 0.1, 0.2, 0.2), false),
+    ((3, 4, 5, 0, 0.1, 0.1, 0, 0), false),
+    ((10, 20, 20, 0, 0, 0, 0, 0), false),
+    ((10, 20, 20, 0.1, 0.1, 0.1, 0.2, 0.2), false),
+    ((10, 20, 20, 0, 0.1, 0.1, 0, 0), false),
+    ((100, 8, 12, 0, 0, 0, 0, 0), false),
+    ((100, 8, 12, 0.1, 0.1, 0.1, 0.2, 0.2), false),
+    ((100, 8, 12, 0, 0.1, 0.1, 0, 0), false),
     ]
 example_tests(::Type{MatrixRegressionJuMP{Float64}}, ::SlowInstances) = [
-    ((15, 20, 50, 0, 0, 0, 0, 0), false, options),
-    ((15, 20, 50, 0.1, 0.1, 0.1, 0.2, 0.2), false, options),
-    ((15, 20, 50, 0, 0.1, 0.1, 0, 0), false, options),
+    ((15, 20, 50, 0, 0, 0, 0, 0), false),
+    ((15, 20, 50, 0.1, 0.1, 0.1, 0.2, 0.2), false),
+    ((15, 20, 50, 0, 0.1, 0.1, 0, 0), false),
     ]
 
 function build(inst::MatrixRegressionJuMP{T}) where {T <: Float64} # TODO generic reals

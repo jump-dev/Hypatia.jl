@@ -29,32 +29,31 @@ function SemidefinitePolyJuMP{Float64}(
     return SemidefinitePolyJuMP{Float64}(get_semidefinitepoly_data(matpoly)..., args...)
 end
 
-options = ()
 example_tests(::Type{SemidefinitePolyJuMP{Float64}}, ::MinimalInstances) = [
-    ((:matpoly2, true, true), false, options),
-    ((:matpoly5, true, true), false, options),
-    ((:matpoly5, true, false), false, options),
-    ((:matpoly5, false, false), false, options),
+    ((:matpoly2, true, true), false),
+    ((:matpoly5, true, true), false),
+    ((:matpoly5, true, false), false),
+    ((:matpoly5, false, false), false),
     ]
 example_tests(::Type{SemidefinitePolyJuMP{Float64}}, ::FastInstances) = [
-    ((:matpoly1, true, true), false, options),
-    ((:matpoly1, true, false), false, options),
-    ((:matpoly1, false, false), false, options),
-    ((:matpoly2, true, true), false, options),
-    ((:matpoly2, true, false), false, options),
-    ((:matpoly2, false, false), false, options),
-    ((:matpoly3, true, true), false, options),
-    ((:matpoly3, true, false), false, options),
-    ((:matpoly3, false, false), false, options),
-    ((:matpoly4, true, true), false, options),
-    ((:matpoly4, true, false), false, options),
-    ((:matpoly4, false, false), false, options),
-    ((:matpoly6, true, true), false, options),
-    ((:matpoly6, true, false), false, options),
-    ((:matpoly6, false, false), false, options),
-    ((:matpoly7, true, true), false, options),
-    ((:matpoly7, true, false), false, options),
-    ((:matpoly7, false, false), false, options),
+    ((:matpoly1, true, true), false),
+    ((:matpoly1, true, false), false),
+    ((:matpoly1, false, false), false),
+    ((:matpoly2, true, true), false),
+    ((:matpoly2, true, false), false),
+    ((:matpoly2, false, false), false),
+    ((:matpoly3, true, true), false),
+    ((:matpoly3, true, false), false),
+    ((:matpoly3, false, false), false),
+    ((:matpoly4, true, true), false),
+    ((:matpoly4, true, false), false),
+    ((:matpoly4, false, false), false),
+    ((:matpoly6, true, true), false),
+    ((:matpoly6, true, false), false),
+    ((:matpoly6, false, false), false),
+    ((:matpoly7, true, true), false),
+    ((:matpoly7, true, false), false),
+    ((:matpoly7, false, false), false),
     ]
 example_tests(::Type{SemidefinitePolyJuMP{Float64}}, ::SlowInstances) = [
     ]

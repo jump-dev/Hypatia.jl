@@ -30,16 +30,16 @@ struct LyapunovStabilityJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     use_matrixepipersquare::Bool # use matrixepipersquare cone, else PSD formulation
 end
 
-options = ()
 example_tests(::Type{LyapunovStabilityJuMP{Float64}}, ::MinimalInstances) = [
-    ((2, 3, true, true), false, options),
-    ((2, 3, true, false), false, options),
-    ((2, 2, false, true), false, options),
-    ((2, 2, false, false), false, options),
+    ((2, 3, true, true), false),
+    ((2, 3, true, false), false),
+    ((2, 2, false, true), false),
+    ((2, 2, false, false), false),
     ]
-options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
-relaxed_options = (tol_feas = 1e-3, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4)
-example_tests(::Type{LyapunovStabilityJuMP{Float64}}, ::FastInstances) = [
+example_tests(::Type{LyapunovStabilityJuMP{Float64}}, ::FastInstances) = begin
+    options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
+    relaxed_options = (tol_feas = 1e-3, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4)
+    return [
     ((5, 6, true, true), false, relaxed_options),
     ((5, 6, true, false), false, options),
     ((5, 5, false, true), false, options),
@@ -51,10 +51,14 @@ example_tests(::Type{LyapunovStabilityJuMP{Float64}}, ::FastInstances) = [
     ((25, 30, true, false), false, options),
     ((30, 30, false, false), false, options),
     ]
-example_tests(::Type{LyapunovStabilityJuMP{Float64}}, ::SlowInstances) = [
+end
+example_tests(::Type{LyapunovStabilityJuMP{Float64}}, ::SlowInstances) = begin
+    options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
+    return [
     ((25, 30, true, true), false, options),
     ((30, 30, false, true), false, options),
     ]
+end
 
 function build(inst::LyapunovStabilityJuMP{T}) where {T <: Float64} # TODO generic reals
     (num_rows, num_cols) = (inst.num_rows, inst.num_cols)

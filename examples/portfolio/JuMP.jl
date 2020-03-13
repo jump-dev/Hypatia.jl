@@ -12,33 +12,32 @@ struct PortfolioJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     epinorminf_constrs::Bool # add L1 and Linfty ball constraints, elsle don't add
 end
 
-options = ()
 example_tests(::Type{PortfolioJuMP{Float64}}, ::MinimalInstances) = [
-    ((3, true, false), false, options),
-    ((3, false, true), false, options),
-    ((3, true, true), false, options),
+    ((3, true, false), false),
+    ((3, false, true), false),
+    ((3, true, true), false),
     ]
 example_tests(::Type{PortfolioJuMP{Float64}}, ::FastInstances) = [
-    ((10, true, false), false, options),
-    ((10, false, true), false, options),
-    ((10, true, true), false, options),
-    ((50, true, false), false, options),
-    ((50, false, true), false, options),
-    ((50, true, true), false, options),
-    ((400, true, false), false, options),
-    ((400, false, true), false, options),
-    ((400, true, true), false, options),
-    ((400, true, false), false, options),
-    ((400, false, true), false, options),
-    ((400, true, true), false, options),
+    ((10, true, false), false),
+    ((10, false, true), false),
+    ((10, true, true), false),
+    ((50, true, false), false),
+    ((50, false, true), false),
+    ((50, true, true), false),
+    ((400, true, false), false),
+    ((400, false, true), false),
+    ((400, true, true), false),
+    ((400, true, false), false),
+    ((400, false, true), false),
+    ((400, true, true), false),
     ]
 example_tests(::Type{PortfolioJuMP{Float64}}, ::SlowInstances) = [
-    ((1000, true, false), false, options),
-    ((1000, false, true), false, options),
-    ((1000, true, true), false, options),
-    ((3000, true, false), false, options),
-    ((3000, false, true), false, options),
-    ((3000, true, true), false, options),
+    ((1000, true, false), false),
+    ((1000, false, true), false),
+    ((1000, true, true), false),
+    ((3000, true, false), false),
+    ((3000, false, true), false),
+    ((3000, true, true), false),
     ]
 
 function build(inst::PortfolioJuMP{T}) where {T <: Float64} # TODO generic reals

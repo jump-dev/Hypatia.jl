@@ -7,6 +7,7 @@ common code for examples
 using Test
 import Random
 using LinearAlgebra
+import LinearAlgebra.BlasReal
 
 import Hypatia
 import Hypatia.ModelUtilities
@@ -21,3 +22,9 @@ struct SlowInstances <: InstanceSet end
 struct LinearOperatorsInstances <: InstanceSet end
 
 abstract type ExampleInstance{T <: Real} end
+
+example_tests(::Type{<:ExampleInstance}, ::InstanceSet) = Tuple[]
+
+# NOTE this is a workaround for randn's lack of support for BigFloat
+Random.randn(R::Type{BigFloat}, dims::Vararg{Int, N} where N) = R.(randn(dims...))
+Random.randn(R::Type{Complex{BigFloat}}, dims::Vararg{Int, N} where N) = R.(randn(ComplexF64, dims...))

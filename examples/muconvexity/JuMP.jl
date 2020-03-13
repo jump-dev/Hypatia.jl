@@ -28,18 +28,17 @@ muconvexity_data = Dict(
     :dom4 => ModelUtilities.Ball{Float64}(ones(2), 5.0),
     )
 
-options = ()
 example_tests(::Type{MuConvexityJuMP{Float64}}, ::MinimalInstances) = [
-    ((:poly1, :dom1, true, -4), false, options),
+    ((:poly1, :dom1, true, -4), false),
     ]
 example_tests(::Type{MuConvexityJuMP{Float64}}, ::FastInstances) = [
-    ((:poly1, :dom2, true, -4), false, options),
-    ((:poly1, :dom1, false, -4), false, options),
-    ((:poly1, :dom2, false, -4), false, options),
-    ((:poly2, :dom3, true, -2), false, options),
-    ((:poly2, :dom4, true, -2), false, options),
-    ((:poly2, :dom3, false, -2), false, options),
-    ((:poly2, :dom4, false, -2), false, options),
+    ((:poly1, :dom2, true, -4), false),
+    ((:poly1, :dom1, false, -4), false),
+    ((:poly1, :dom2, false, -4), false),
+    ((:poly2, :dom3, true, -2), false),
+    ((:poly2, :dom4, true, -2), false),
+    ((:poly2, :dom3, false, -2), false),
+    ((:poly2, :dom4, false, -2), false),
     ]
 example_tests(::Type{MuConvexityJuMP{Float64}}, ::SlowInstances) = [
     ]

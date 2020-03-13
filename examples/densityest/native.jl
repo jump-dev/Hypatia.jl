@@ -22,33 +22,35 @@ struct DensityEstNative{T <: Real} <: ExampleInstanceNative{T}
     hypogeomean_obj::Bool # use geomean objective, else sum of logs objective
     use_hypogeomean::Bool # use hypogeomean cone if applicable, else hypoperlog formulation
 end
-function DensityEstNative{Float64}(
+function DensityEstNative{T}(
     dataset_name::Symbol,
     deg::Int,
     use_wsos::Bool,
     hypogeomean_obj::Bool,
-    use_hypogeomean::Bool)
+    use_hypogeomean::Bool) where {T <: Real}
     X = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "$dataset_name.txt"))
+    X = convert(Matrix{T}, X)
     (num_obs, n) = size(X)
-    return DensityEstNative{Float64}(dataset_name, num_obs, n, X, deg, use_wsos, hypogeomean_obj, use_hypogeomean)
+    return DensityEstNative{T}(dataset_name, num_obs, n, X, deg, use_wsos, hypogeomean_obj, use_hypogeomean)
 end
-function DensityEstNative{Float64}(
+function DensityEstNative{T}(
     num_obs::Int,
     n::Int,
-    args...)
-    X = randn(num_obs, n)
-    return DensityEstNative{Float64}(:Random, num_obs, n, X, args...)
+    args...) where {T <: Real}
+    X = randn(T, num_obs, n)
+    return DensityEstNative{T}(:Random, num_obs, n, X, args...)
 end
 
-options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
-example_tests(::Type{DensityEstNative{Float64}}, ::MinimalInstances) = [
-    ((5, 1, 2, true, true, true), options),
-    ((5, 1, 2, false, true, true), options),
-    ((5, 1, 2, true, false, true), options),
-    ((5, 1, 2, true, true, false), options),
-    ((:iris, 2, true, true, true), options),
+example_tests(::Type{<:DensityEstNative{<:BlasReal}}, ::MinimalInstances) = [
+    ((5, 1, 2, true, true, true),),
+    ((5, 1, 2, false, true, true),),
+    ((5, 1, 2, true, false, true),),
+    ((5, 1, 2, true, true, false),),
+    ((:iris, 2, true, true, true),),
     ]
-example_tests(::Type{DensityEstNative{Float64}}, ::FastInstances) = [
+example_tests(::Type{DensityEstNative{Float64}}, ::FastInstances) = begin
+    options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
+    return [
     ((50, 2, 2, true, true, true), options),
     ((50, 2, 2, false, true, true), options),
     ((50, 2, 2, true, false, true), options),
@@ -72,7 +74,10 @@ example_tests(::Type{DensityEstNative{Float64}}, ::FastInstances) = [
     ((:cancer, 4, true, false, true), options),
     ((:cancer, 4, true, true, false), options),
     ]
-example_tests(::Type{DensityEstNative{Float64}}, ::SlowInstances) = [
+end
+example_tests(::Type{DensityEstNative{Float64}}, ::SlowInstances) = begin
+    options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
+    return [
     ((:cancer, 6, true, true, true), options),
     ((:cancer, 6, false, true, true), options),
     ((:cancer, 6, true, false, true), options),
@@ -82,11 +87,12 @@ example_tests(::Type{DensityEstNative{Float64}}, ::SlowInstances) = [
     ((400, 5, 6, true, false, true), options),
     ((400, 5, 6, true, true, false), options),
     ]
+end
 
 function build(inst::DensityEstNative{T}) where {T <: Real}
     (X, num_obs) = (inst.X, inst.num_obs)
 
-    domain = ModelUtilities.Box{Float64}(-ones(inst.n), ones(inst.n))
+    domain = ModelUtilities.Box{T}(-ones(T, inst.n), ones(T, inst.n))
     # rescale X to be in unit box
     minX = minimum(X, dims = 1)
     maxX = maximum(X, dims = 1)

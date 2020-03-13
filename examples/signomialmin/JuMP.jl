@@ -42,13 +42,14 @@ end
 SignomialMinJuMP{Float64}(sig_name::Symbol) = SignomialMinJuMP{Float64}(signomialmin_data[sig_name]...)
 SignomialMinJuMP{Float64}(m::Int, n::Int) = SignomialMinJuMP{Float64}(signomialmin_random(m, n)...)
 
-options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
-relaxed_options = (tol_feas = 1e-5, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4)
 example_tests(::Type{SignomialMinJuMP{Float64}}, ::MinimalInstances) = [
-    ((:motzkin2,), false, options),
-    ((2, 2), false, options),
+    ((:CS16ex12,), false),
+    ((2, 2), false),
     ]
-example_tests(::Type{SignomialMinJuMP{Float64}}, ::FastInstances) = [
+example_tests(::Type{SignomialMinJuMP{Float64}}, ::FastInstances) = begin
+    options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
+    relaxed_options = (tol_feas = 1e-5, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4)
+    return [
     ((:motzkin2,), false, options),
     ((:motzkin3,), false, options),
     ((:CS16ex8_13,), false, options),
@@ -62,11 +63,16 @@ example_tests(::Type{SignomialMinJuMP{Float64}}, ::FastInstances) = [
     ((6, 6), false, options),
     ((20, 3), false, options),
     ]
-example_tests(::Type{SignomialMinJuMP{Float64}}, ::SlowInstances) = [
+end
+example_tests(::Type{SignomialMinJuMP{Float64}}, ::SlowInstances) = begin
+    options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
+    relaxed_options = (tol_feas = 1e-5, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4)
+    return [
     ((10, 10), false, options),
     ((20, 6), false, options),
     ((40, 3), false, options),
     ]
+end
 
 function build(inst::SignomialMinJuMP{T}) where {T <: Float64} # TODO generic reals
     (fc, fA, gc, gA) = (inst.fc, inst.fA, inst.gc, inst.gA)

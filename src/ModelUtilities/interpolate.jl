@@ -34,15 +34,13 @@ function get_weights(dom::Box{T}, pts::AbstractMatrix{T}) where {T <: Real}
 end
 
 
-interp_sample(dom::Ball{T}, npts::Int) where {T <: Real} = error("cannot handle ball domains with number type $T")
-
-function interp_sample(dom::Ball{Float64}, npts::Int)
+function interp_sample(dom::Ball{T}, npts::Int) where {T <: Real}
     dim = get_dimension(dom)
-    pts = randn(npts, dim)
+    pts = randn(T, npts, dim)
     norms = sum(abs2, pts, dims = 2)
     pts .*= dom.r ./ sqrt.(norms) # scale
-    norms .*= 0.5
-    pts .*= sf_gamma_inc_Q.(norms, dim * 0.5) .^ inv(dim) # sf_gamma_inc_Q is the normalized incomplete gamma function
+    norms ./= 2
+    pts .*= sf_gamma_inc_Q.(norms, dim / 2) .^ inv(dim) # sf_gamma_inc_Q is the normalized incomplete gamma function
     for i in 1:dim
         pts[:, i] .+= dom.c[i] # shift
     end
@@ -56,26 +54,24 @@ function get_weights(dom::Ball{T}, pts::AbstractMatrix{T}) where {T <: Real}
 end
 
 
-interp_sample(dom::Ellipsoid{T}, npts::Int) where {T <: Real} = error("cannot handle ellipsoid domains with number type $T")
-
-function interp_sample(dom::Ellipsoid{Float64}, npts::Int)
+function interp_sample(dom::Ellipsoid{T}, npts::Int) where {T <: Real}
     dim = get_dimension(dom)
-    pts = randn(npts, dim)
+    pts = randn(T, npts, dim)
     norms = sum(abs2, pts, dims = 2)
     for i in 1:npts
         pts[i, :] ./= sqrt(norms[i]) # scale
     end
-    norms .*= 0.5
-    pts .*= sf_gamma_inc_Q.(norms, dim * 0.5) .^ inv(dim) # sf_gamma_inc_Q is the normalized incomplete gamma function
+    norms ./= 2
+    pts .*= sf_gamma_inc_Q.(norms, dim / 2) .^ inv(dim) # sf_gamma_inc_Q is the normalized incomplete gamma function
 
     F_rotate_scale = cholesky(dom.Q).U
     for i in 1:npts
         pts[i, :] = F_rotate_scale \ pts[i, :] # rotate/scale
     end
-
     for i in 1:dim
         pts[:, i] .+= dom.c[i] # shift
     end
+
     return pts
 end
 
@@ -88,7 +84,7 @@ end
 interp_sample(dom::SemiFreeDomain, npts::Int) =
     hcat(interp_sample(dom.restricted_halfregion, npts), interp_sample(dom.restricted_halfregion, npts))
 
-get_weights(dom::SemiFreeDomain, pts::Matrix{Float64}) =
+get_weights(dom::SemiFreeDomain, pts::Matrix{<:Real}) =
     get_weights(dom.restricted_halfregion, view(pts, :, 1:div(size(pts, 2), 2)))
 
 
@@ -114,7 +110,7 @@ function interpolate(
 end
 
 # slow but high-quality hyperrectangle/box point selections
-wsos_box_params(dom::Domain, n::Int, d::Int; calc_w::Bool) = error("accurate methods for interpolation points are only available for box domains, use sampling instead")
+wsos_box_params(dom::Domain, n::Int, d::Int; calc_w::Bool) = error("non-sampling based interpolation methods are only available for box domains")
 
 # difference with sampling functions is that P0 is always formed using points in [-1, 1]
 function wsos_box_params(
@@ -188,17 +184,13 @@ function cheb2_data(T::Type{<:Real}, d::Int, calc_w::Bool)
 
     # weights for Clenshaw-Curtis quadrature at pts
     if calc_w
-        if T == BigFloat
-            # TODO we can probably avoid FFTW.ifft
-            error("cannot compute quadrature weights using BigFloat without sampling")
-        end
-        wa = [2.0 / (1 - j^2) for j in 0:2:(U - 1)]
+        wa = T[2 / T(1 - j^2) for j in 0:2:(U - 1)]
         append!(wa, wa[div(U, 2):-1:2])
         w = real.(FFTW.ifft(wa))
-        w[1] *= 0.5
+        w[1] /= 2
         push!(w, w[1])
     else
-        w = Float64[]
+        w = T[]
     end
 
     return (U, pts, P0, P0sub, w)
@@ -255,17 +247,17 @@ function padua_data(T::Type{<:Real}, d::Int, calc_w::Bool)
         for j in 1:(d + 1), i in 1:(d + 2 - j)
             Mmom[i, j] = mom[i] * mom[j] * f
         end
-        Mmom[1, d + 1] /= T(2)
+        Mmom[1, d + 1] /= 2
         # cubature weights as matrices on the subgrids
         W = Matrix{T}(undef, d + 1, 2d + 1)
         W[:, 1:2:(2d + 1)] .= to2' * Mmom * te1
         W[:, 2:2:(2d + 1)] .= te2' * Mmom * to1
-        W[:, [1, (2d + 1)]] ./= T(2)
-        W[1, 2:2:(2d + 1)] ./= T(2)
-        W[d + 1, 1:2:(2d + 1)] ./= T(2)
+        W[:, [1, (2d + 1)]] ./= 2
+        W[1, 2:2:(2d + 1)] ./= 2
+        W[d + 1, 1:2:(2d + 1)] ./= 2
         w = vec(W)
     else
-        w = Float64[]
+        w = T[]
     end
 
     return (U, pts, P0, P0sub, w)
@@ -336,7 +328,7 @@ function choose_interp_pts!(
         Qtm = F.Q' * m
         w = UpperTriangular(F.R[:, 1:U]) \ Qtm
     else
-        w = Float64[]
+        w = T[]
     end
 
     return (F.p[1:U], w)

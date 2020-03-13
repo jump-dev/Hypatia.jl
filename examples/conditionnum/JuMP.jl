@@ -32,13 +32,14 @@ struct ConditionNumJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     use_linmatrixineq::Bool # use linmatrixineq cone, else PSD formulation
 end
 
-options = (tol_feas = 1e-5,)
-relaxed_options = (tol_feas = 1e-4, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
 example_tests(::Type{ConditionNumJuMP{Float64}}, ::MinimalInstances) = [
-    ((2, 2, true), false, options),
-    ((2, 2, false), false, options),
+    ((2, 2, true), false),
+    ((2, 2, false), false),
     ]
-example_tests(::Type{ConditionNumJuMP{Float64}}, ::FastInstances) = [
+example_tests(::Type{ConditionNumJuMP{Float64}}, ::FastInstances) = begin
+    options = (tol_feas = 1e-5,)
+    relaxed_options = (tol_feas = 1e-4, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
+    return [
     ((2, 3, true), false, options),
     ((2, 3, false), false, options),
     ((3, 2, true), false, options),
@@ -48,10 +49,14 @@ example_tests(::Type{ConditionNumJuMP{Float64}}, ::FastInstances) = [
     ((100, 10, false), false, relaxed_options),
     ((100, 40, false), false, relaxed_options),
     ]
-example_tests(::Type{ConditionNumJuMP{Float64}}, ::SlowInstances) = [
+end
+example_tests(::Type{ConditionNumJuMP{Float64}}, ::SlowInstances) = begin
+    options = (tol_feas = 1e-5,)
+    return [
     ((100, 10, true), false, options),
     ((100, 40, true), false, options),
     ]
+end
 
 function build(inst::ConditionNumJuMP{T}) where {T <: Float64} # TODO generic reals
     (side, len_y) = (inst.side, inst.len_y)

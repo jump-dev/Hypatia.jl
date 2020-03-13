@@ -13,27 +13,26 @@ struct MaxVolumeNative{T <: Real} <: ExampleInstanceNative{T}
     use_epipersquare::Bool # use epipersquare cones for geomean objective
 end
 
-options = ()
-example_tests(::Type{MaxVolumeNative{Float64}}, ::MinimalInstances) = [
-    ((2, true, false, false), options),
-    ((3, false, true, false), options),
-    ((2, false, false, true), options),
+example_tests(::Type{<:MaxVolumeNative{<:Real}}, ::MinimalInstances) = [
+    ((2, true, false, false),),
+    ((3, false, true, false),),
+    ((2, false, false, true),),
     ]
 example_tests(::Type{MaxVolumeNative{Float64}}, ::FastInstances) = [
-    ((10, true, false, false), options),
-    ((10, false, true, false), options),
-    ((10, false, false, true), options),
-    ((100, true, false, false), options),
-    ((100, false, true, false), options),
-    ((100, false, false, true), options),
-    ((1000, true, false, false), options),
+    ((10, true, false, false),),
+    ((10, false, true, false),),
+    ((10, false, false, true),),
+    ((100, true, false, false),),
+    ((100, false, true, false),),
+    ((100, false, false, true),),
+    ((1000, true, false, false),),
     ]
 example_tests(::Type{MaxVolumeNative{Float64}}, ::SlowInstances) = [
-    ((1000, false, true, false), options),
-    ((1000, false, false, true), options),
-    ((1500, true, false, false), options),
-    ((1500, false, true, false), options),
-    ((1500, false, false, true), options),
+    ((1000, false, true, false),),
+    ((1000, false, false, true),),
+    ((1500, true, false, false),),
+    ((1500, false, true, false),),
+    ((1500, false, false, true),),
     ]
 
 function build(inst::MaxVolumeNative{T}) where {T <: Real}

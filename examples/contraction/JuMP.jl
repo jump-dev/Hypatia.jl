@@ -21,18 +21,20 @@ struct ContractionJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     is_feas::Bool
 end
 
-options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
-relaxed_options = (tol_feas = 1e-6, tol_rel_opt = 1e-5, tol_abs_opt = 1e-5)
 example_tests(::Type{ContractionJuMP{Float64}}, ::MinimalInstances) = [
-    ((0.85, 2, 1e-3, true, false), false, options),
-    ((0.85, 2, 1e-3, false, false), false, options),
+    ((0.85, 2, 1e-3, true, false), false),
+    ((0.85, 2, 1e-3, false, false), false),
     ]
-example_tests(::Type{ContractionJuMP{Float64}}, ::FastInstances) = [
+example_tests(::Type{ContractionJuMP{Float64}}, ::FastInstances) = begin
+    options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
+    relaxed_options = (tol_feas = 1e-6, tol_rel_opt = 1e-5, tol_abs_opt = 1e-5)
+    return [
     ((0.77, 4, 1e-3, true, true), false, options),
     ((0.77, 4, 1e-3, false, true), false, options),
     ((0.85, 4, 1e-3, true, false), false, relaxed_options),
     ((0.85, 4, 1e-3, false, false), false, options),
     ]
+end
 example_tests(::Type{ContractionJuMP{Float64}}, ::SlowInstances) = [
     ]
 

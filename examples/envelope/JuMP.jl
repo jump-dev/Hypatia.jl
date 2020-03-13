@@ -13,21 +13,20 @@ struct EnvelopeJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     env_halfdeg::Int
 end
 
-options = ()
 example_tests(::Type{EnvelopeJuMP{Float64}}, ::MinimalInstances) = [
-    ((1, 2, 2, 2), false, options),
+    ((1, 2, 2, 2), false),
     ]
 example_tests(::Type{EnvelopeJuMP{Float64}}, ::FastInstances) = [
-    ((2, 2, 3, 2), false, options),
-    ((3, 3, 3, 3), false, options),
-    ((3, 3, 5, 4), false, options),
-    ((5, 2, 5, 3), false, options),
-    ((1, 30, 2, 30), false, options),
-    ((10, 1, 3, 1), false, options),
+    ((2, 2, 3, 2), false),
+    ((3, 3, 3, 3), false),
+    ((3, 3, 5, 4), false),
+    ((5, 2, 5, 3), false),
+    ((1, 30, 2, 30), false),
+    ((10, 1, 3, 1), false),
     ]
 example_tests(::Type{EnvelopeJuMP{Float64}}, ::SlowInstances) = [
-    ((4, 6, 4, 5), false, options),
-    ((2, 30, 4, 30), false, options),
+    ((4, 6, 4, 5), false),
+    ((2, 30, 4, 30), false),
     ]
 
 function build(inst::EnvelopeJuMP{T}) where {T <: Float64} # TODO generic reals

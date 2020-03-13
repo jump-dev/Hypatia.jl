@@ -13,24 +13,23 @@ struct MatrixCompletionJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     nuclearnorm_obj::Bool # use nuclearnorm in the objective, else spectral norm
 end
 
-options = ()
 example_tests(::Type{MatrixCompletionJuMP{Float64}}, ::MinimalInstances) = [
-    ((2, 3, true), false, options),
-    ((2, 3, false), false, options),
+    ((2, 3, true), false),
+    ((2, 3, false), false),
     ]
 example_tests(::Type{MatrixCompletionJuMP{Float64}}, ::FastInstances) = [
-    ((5, 8, true), false, options),
-    ((5, 8, false), false, options),
-    ((12, 24, true), false, options),
-    ((12, 24, false), false, options),
-    ((14, 140, false), false, options),
+    ((5, 8, true), false),
+    ((5, 8, false), false),
+    ((12, 24, true), false),
+    ((12, 24, false), false),
+    ((14, 140, false), false),
     ]
 example_tests(::Type{MatrixCompletionJuMP{Float64}}, ::SlowInstances) = [
-    ((14, 140, true), false, options),
-    ((40, 70, true), false, options),
-    ((40, 70, false), false, options),
-    ((18, 180, true), false, options),
-    ((18, 180, false), false, options),
+    ((14, 140, true), false),
+    ((40, 70, true), false),
+    ((40, 70, false), false),
+    ((18, 180, true), false),
+    ((18, 180, false), false),
     ]
 
 function build(inst::MatrixCompletionJuMP{T}) where {T <: Float64} # TODO generic reals
