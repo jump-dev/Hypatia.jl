@@ -36,19 +36,21 @@ function test(
     Random.seed!(rseed)
     inst = E(inst_data...)
     build_time = @elapsed model = build(inst)
+    model_backend = JuMP.backend(model)
 
     # solve model
     hyp_opt = Hypatia.Optimizer(; default_solver_options..., solver_options...)
-    model_backend = JuMP.backend(model)
     if extend
-        error("doesn't seem to use EF - fix")
         # use MOI automated extended formulation
         JuMP.set_optimizer(model, ClassicConeOptimizer{Float64})
         MOI.Utilities.attach_optimizer(model_backend)
         MOI.copy_to(hyp_opt, model_backend.optimizer.model)
+        JuMP.set_optimizer(model, () -> hyp_opt)
+        MOI.optimize!(hyp_opt)
+    else
+        JuMP.set_optimizer(model, () -> hyp_opt)
+        JuMP.optimize!(model)
     end
-    JuMP.set_optimizer(model, () -> hyp_opt)
-    JuMP.optimize!(model)
 
     # run tests for the example
     test_extra(inst, model)

@@ -19,8 +19,8 @@ example_tests(::Type{CentralPolyMatJuMP{Float64}}, ::MinimalInstances) = begin
     return [
     ((2, 2, true), false, options),
     ((2, 2, false), false, options),
-    # ((2, 2, true), true, options),
-    # ((2, 2, false), true, options),
+    ((2, 2, true), true, options),
+    ((2, 2, false), true, options),
     ]
 end
 example_tests(::Type{CentralPolyMatJuMP{Float64}}, ::FastInstances) = begin
