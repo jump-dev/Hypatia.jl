@@ -10,13 +10,16 @@ include(joinpath(@__DIR__, "../common_JuMP.jl"))
 struct MaxVolumeJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     n::Int
     epipernormeucl_constr::Bool # add an L2 ball constraint, else don't add
-    epinorminf_constrs::Bool # add L1 and Linfty ball constraints, elsle don't add
+    epinorminf_constrs::Bool # add L1 and Linfty ball constraints, else don't add
 end
 
 example_tests(::Type{MaxVolumeJuMP{Float64}}, ::MinimalInstances) = [
-    ((2, true, false), false),
-    ((2, false, true), false),
-    ((2, true, true), false),
+    # ((2, true, false),),
+    # ((2, true, true),),
+    ((2, false, true),),
+    ((2, false, true), ClassicConeOptimizer),
+    ((2, false, true), ExpConeOptimizer),
+    ((2, false, true), SOConeOptimizer),
     ]
 example_tests(::Type{MaxVolumeJuMP{Float64}}, ::FastInstances) = [
     ((10, true, false), false),
