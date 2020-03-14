@@ -51,7 +51,7 @@ native_example_names = [
 
 # list of names of JuMP examples to run
 JuMP_example_names = [
-    "centralpolymat",
+    # "centralpolymat",
     # "conditionnum",
     # "contraction",
     # "densityest",
@@ -62,7 +62,7 @@ JuMP_example_names = [
     # "matrixcompletion",
     # "matrixquadratic",
     # "matrixregression",
-    # "maxvolume",
+    "maxvolume",
     # "muconvexity",
     # "nearestpsd",
     # "polymin",
@@ -94,6 +94,7 @@ perf = DataFrame(
     real_T = Type{<:Real}[],
     count = Int[],
     inst_data = Tuple[],
+    extender = Any[],
     test_time = Float64[],
     build_time = Float64[],
     solve_time = Float64[],
@@ -116,13 +117,12 @@ all_tests_time = time()
         println("\nstarting $(length(instances)) instances for $ex_type_T $inst_set\n")
         solver_options = (default_solver_options..., time_limit = time_limit)
         for (inst_num, inst) in enumerate(instances)
-            inst_data = inst[1]
-            test_info = "$ex_type_T $inst_set $inst_num: $inst_data"
+            test_info = "$ex_type_T $inst_set $inst_num: $inst"
             @testset "$test_info" begin
                 println(test_info, "...")
-                test_time = @elapsed (build_time, r) = test(ex_type_T, inst..., default_solver_options = solver_options)
+                test_time = @elapsed (extender, build_time, r) = test(ex_type_T, inst..., default_solver_options = solver_options)
                 push!(perf, (
-                    ex_type, inst_set, real_T, inst_num, inst_data, test_time, build_time,
+                    ex_type, inst_set, real_T, inst_num, inst[1], extender, test_time, build_time,
                     r.solve_time, r.num_iters, r.status, r.primal_obj, r.dual_obj,
                     length(r.x), length(r.y), length(r.s),
                     ))

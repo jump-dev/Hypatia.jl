@@ -22,12 +22,38 @@ MOI.Utilities.@model(ClassicConeOptimizer,
     true,
     )
 
+MOI.Utilities.@model(ExpConeOptimizer,
+    (),
+    (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan, MOI.Interval,),
+    (MOI.Reals, MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives,
+    MOI.ExponentialCone,),
+    (),
+    (),
+    (MOI.ScalarAffineFunction,),
+    (MOI.VectorOfVariables,),
+    (MOI.VectorAffineFunction,),
+    true,
+    )
+
+MOI.Utilities.@model(SOConeOptimizer,
+    (),
+    (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan, MOI.Interval,),
+    (MOI.Reals, MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives,
+    MOI.SecondOrderCone, MOI.RotatedSecondOrderCone,),
+    (),
+    (),
+    (MOI.ScalarAffineFunction,),
+    (MOI.VectorOfVariables,),
+    (MOI.VectorAffineFunction,),
+    true,
+    )
+
 abstract type ExampleInstanceJuMP{T <: Real} <: ExampleInstance{T} end
 
 function test(
     E::Type{<:ExampleInstanceJuMP{Float64}}, # an instance of a JuMP example # TODO support generic reals
     inst_data::Tuple,
-    extend::Bool = false, # whether to use MOI automatic bridging to a `classic' cone formulation
+    extender = nothing, # MOI.Utilities-defined optimizer with subset of cones if using extended formulation
     solver_options = (); # additional non-default solver options specific to the example
     default_solver_options = (verbose = false,), # default solver options
     rseed::Int = 1,
@@ -40,23 +66,24 @@ function test(
 
     # solve model
     hyp_opt = Hypatia.Optimizer(; default_solver_options..., solver_options...)
-    if extend
+    if isnothing(extender)
+        # not using MOI extended formulation
+        JuMP.set_optimizer(model, () -> hyp_opt)
+        JuMP.optimize!(model)
+    else
         # use MOI automated extended formulation
-        JuMP.set_optimizer(model, ClassicConeOptimizer{Float64})
+        JuMP.set_optimizer(model, extender{Float64})
         MOI.Utilities.attach_optimizer(model_backend)
         MOI.copy_to(hyp_opt, model_backend.optimizer.model)
         JuMP.set_optimizer(model, () -> hyp_opt)
         MOI.optimize!(hyp_opt)
-    else
-        JuMP.set_optimizer(model, () -> hyp_opt)
-        JuMP.optimize!(model)
     end
 
     # run tests for the example
     test_extra(inst, model)
 
     result = model_backend.optimizer.model.optimizer.result
-    return (build_time, result)
+    return (extender, build_time, result)
 end
 
 # fallback: just check optimal status

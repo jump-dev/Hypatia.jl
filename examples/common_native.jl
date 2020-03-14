@@ -28,7 +28,7 @@ function test(
     # run tests for the example
     test_extra(inst, result)
 
-    return (build_time, result)
+    return (nothing, build_time, result)
 end
 
 # fallback: just check optimal status
