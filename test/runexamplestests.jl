@@ -31,7 +31,7 @@ instance_sets = [
 
 # types of models to run and corresponding options and example names
 model_types = [
-    "native",
+    # "native",
     "JuMP",
     ]
 
@@ -39,20 +39,20 @@ model_types = [
 native_example_names = [
     "densityest",
     "envelope",
-    # "expdesign",
-    # "linearopt",
-    # "matrixcompletion",
-    # "matrixregression",
-    # "maxvolume",
-    # "polymin",
-    # "portfolio",
-    # "sparsepca",
+    "expdesign",
+    "linearopt",
+    "matrixcompletion",
+    "matrixregression",
+    "maxvolume",
+    "polymin",
+    "portfolio",
+    "sparsepca",
     ]
 
 # list of names of JuMP examples to run
 JuMP_example_names = [
     "centralpolymat",
-    "conditionnum",
+    # "conditionnum",
     # "contraction",
     # "densityest",
     # "envelope",
