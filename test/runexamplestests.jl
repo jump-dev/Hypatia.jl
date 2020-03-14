@@ -23,8 +23,8 @@ default_solver_options = (
 # instance sets and real types to run and corresponding time limits (seconds)
 instance_sets = [
     (MinimalInstances, Float64, 15),
-    (MinimalInstances, Float32, 15),
-    (MinimalInstances, BigFloat, 60),
+    # (MinimalInstances, Float32, 15),
+    # (MinimalInstances, BigFloat, 60),
     # (FastInstances, Float64, 15),
     # (SlowInstances, Float64, 120),
     ]
@@ -39,41 +39,41 @@ model_types = [
 native_example_names = [
     "densityest",
     "envelope",
-    "expdesign",
-    "linearopt",
-    "matrixcompletion",
-    "matrixregression",
-    "maxvolume",
-    "polymin",
-    "portfolio",
-    "sparsepca",
+    # "expdesign",
+    # "linearopt",
+    # "matrixcompletion",
+    # "matrixregression",
+    # "maxvolume",
+    # "polymin",
+    # "portfolio",
+    # "sparsepca",
     ]
 
 # list of names of JuMP examples to run
 JuMP_example_names = [
     "centralpolymat",
     "conditionnum",
-    "contraction",
-    "densityest",
-    "envelope",
-    "expdesign",
-    "lotkavolterra",
-    "lyapunovstability",
-    "matrixcompletion",
-    "matrixquadratic",
-    "matrixregression",
-    "maxvolume",
-    "muconvexity",
-    "nearestpsd",
-    "polymin",
-    "polynorm",
-    "portfolio",
-    "regionofattr",
-    "robustgeomprog",
-    "secondorderpoly",
-    "semidefinitepoly",
-    "shapeconregr",
-    "signomialmin",
+    # "contraction",
+    # "densityest",
+    # "envelope",
+    # "expdesign",
+    # "lotkavolterra",
+    # "lyapunovstability",
+    # "matrixcompletion",
+    # "matrixquadratic",
+    # "matrixregression",
+    # "maxvolume",
+    # "muconvexity",
+    # "nearestpsd",
+    # "polymin",
+    # "polynorm",
+    # "portfolio",
+    # "regionofattr",
+    # "robustgeomprog",
+    # "secondorderpoly",
+    # "semidefinitepoly",
+    # "shapeconregr",
+    # "signomialmin",
     ]
 
 # start the tests
@@ -94,11 +94,15 @@ perf = DataFrame(
     inst = Int[],
     inst_data = Tuple[],
     test_time = Float64[],
+    build_time = Float64[],
     solve_time = Float64[],
     iters = Int[],
     status = Symbol[],
     prim_obj = Float64[],
     dual_obj = Float64[],
+    n = Int[],
+    p = Int[],
+    q = Int[],
     )
 
 all_tests_time = time()
@@ -114,10 +118,12 @@ all_tests_time = time()
             test_info = "$ex_type_T $inst_set $inst_num: $(inst[1])"
             @testset "$test_info" begin
                 println(test_info, "...")
-                test_time = @elapsed r = test(ex_type_T, inst..., default_solver_options = solver_options)
+                test_time = @elapsed (build_time, r) = test(ex_type_T, inst..., default_solver_options = solver_options)
                 push!(perf, (
-                    string(ex_type), string(real_T), inst_num, inst[1], test_time,
-                    r.solve_time, r.num_iters, r.status, r.primal_obj, r.dual_obj))
+                    string(ex_type), string(real_T), inst_num, inst[1], test_time, build_time,
+                    r.solve_time, r.num_iters, r.status, r.primal_obj, r.dual_obj,
+                    length(r.x), length(r.y), length(r.s),
+                    ))
                 @printf("... %8.2e seconds\n", test_time)
             end
         end

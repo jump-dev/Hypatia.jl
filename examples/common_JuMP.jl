@@ -35,7 +35,7 @@ function test(
     # setup instance and model
     Random.seed!(rseed)
     inst = E(inst_data...)
-    model = build(inst)
+    build_time = @elapsed model = build(inst)
 
     # solve model
     hyp_opt = Hypatia.Optimizer(; default_solver_options..., solver_options...)
@@ -53,7 +53,8 @@ function test(
     # run tests for the example
     test_extra(inst, model)
 
-    return model_backend.optimizer.model.optimizer.result
+    result = model_backend.optimizer.model.optimizer.result
+    return (build_time, result)
 end
 
 # fallback: just check optimal status
