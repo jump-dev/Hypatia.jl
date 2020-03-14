@@ -19,7 +19,7 @@ function test(
     # setup instance and model
     Random.seed!(rseed)
     inst = E(inst_data...)
-    model = build(inst)
+    build_time = @elapsed model = build(inst)
 
     # solve model
     solver = Solvers.Solver{T}(; default_solver_options..., solver_options...)
@@ -28,7 +28,7 @@ function test(
     # run tests for the example
     test_extra(inst, result)
 
-    return result
+    return (build_time, result)
 end
 
 # fallback: just check optimal status
