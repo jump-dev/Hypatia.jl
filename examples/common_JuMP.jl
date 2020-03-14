@@ -41,7 +41,7 @@ function test(
     hyp_opt = Hypatia.Optimizer(; default_solver_options..., solver_options...)
     model_backend = JuMP.backend(model)
     if extend
-        error("doesn't seem to use EF - fix")
+        @warn("trying to use EF - fix")
         # use MOI automated extended formulation
         JuMP.set_optimizer(model, ClassicConeOptimizer{Float64})
         MOI.Utilities.attach_optimizer(model_backend)
