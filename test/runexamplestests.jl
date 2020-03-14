@@ -89,9 +89,10 @@ for mod_type in model_types, ex in eval(Symbol(mod_type, "_example_names"))
 end
 
 perf = DataFrame(
-    example = String[],
-    real_T = String[],
-    inst = Int[],
+    example = Type{<:ExampleInstance}[],
+    inst_set = Type{<:InstanceSet}[],
+    real_T = Type{<:Real}[],
+    count = Int[],
     inst_data = Tuple[],
     test_time = Float64[],
     build_time = Float64[],
@@ -115,12 +116,13 @@ all_tests_time = time()
         println("\nstarting $(length(instances)) instances for $ex_type_T $inst_set\n")
         solver_options = (default_solver_options..., time_limit = time_limit)
         for (inst_num, inst) in enumerate(instances)
-            test_info = "$ex_type_T $inst_set $inst_num: $(inst[1])"
+            inst_data = inst[1]
+            test_info = "$ex_type_T $inst_set $inst_num: $inst_data"
             @testset "$test_info" begin
                 println(test_info, "...")
                 test_time = @elapsed (build_time, r) = test(ex_type_T, inst..., default_solver_options = solver_options)
                 push!(perf, (
-                    string(ex_type), string(real_T), inst_num, inst[1], test_time, build_time,
+                    ex_type, inst_set, real_T, inst_num, inst_data, test_time, build_time,
                     r.solve_time, r.num_iters, r.status, r.primal_obj, r.dual_obj,
                     length(r.x), length(r.y), length(r.s),
                     ))
