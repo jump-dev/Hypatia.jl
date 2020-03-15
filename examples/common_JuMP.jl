@@ -9,6 +9,7 @@ include(joinpath(@__DIR__, "common.jl"))
 import JuMP
 const MOI = JuMP.MOI
 
+# SOCone, PSDCone, ExpCone, PowerCone only
 MOI.Utilities.@model(ClassicConeOptimizer,
     (),
     (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan,),
@@ -22,6 +23,7 @@ MOI.Utilities.@model(ClassicConeOptimizer,
     true,
     )
 
+# ExpCone only
 MOI.Utilities.@model(ExpConeOptimizer,
     (),
     (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan,),
@@ -35,6 +37,7 @@ MOI.Utilities.@model(ExpConeOptimizer,
     true,
     )
 
+# SOCone only
 MOI.Utilities.@model(SOConeOptimizer,
     (),
     (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan,),
