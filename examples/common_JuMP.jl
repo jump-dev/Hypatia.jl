@@ -16,7 +16,7 @@ MOI.Utilities.@model(ClassicConeOptimizer,
     (MOI.Reals, MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives,
     MOI.SecondOrderCone, MOI.RotatedSecondOrderCone, MOI.PositiveSemidefiniteConeTriangle, MOI.ExponentialCone, MOI.DualExponentialCone,),
     (MOI.PowerCone, MOI.DualPowerCone,),
-    (MOI.SingleVariable,),
+    (),
     (MOI.ScalarAffineFunction,),
     (MOI.VectorOfVariables,),
     (MOI.VectorAffineFunction,),
@@ -30,7 +30,7 @@ MOI.Utilities.@model(ExpConeOptimizer,
     (MOI.Reals, MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives,
     MOI.ExponentialCone,),
     (),
-    (MOI.SingleVariable,),
+    (),
     (MOI.ScalarAffineFunction,),
     (MOI.VectorOfVariables,),
     (MOI.VectorAffineFunction,),
@@ -44,7 +44,7 @@ MOI.Utilities.@model(SOConeOptimizer,
     (MOI.Reals, MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives,
     MOI.SecondOrderCone, MOI.RotatedSecondOrderCone,),
     (),
-    (MOI.SingleVariable,),
+    (),
     (MOI.ScalarAffineFunction,),
     (MOI.VectorOfVariables,),
     (MOI.VectorAffineFunction,),
@@ -72,69 +72,108 @@ function test(
     # setup instance and model
     Random.seed!(rseed)
     inst = E(inst_data...)
-    build_time = @elapsed model = build(inst)
-    model_backend = JuMP.backend(model)
+    build_time = @elapsed nat_model = build(inst)
 
     # solve
     opt = solver{Float64}(; default_solver_options..., solver_options...)
-    if isnothing(extender)
-        # solve without MOI extended formulation
-        JuMP.set_optimizer(model, () -> opt)
-        JuMP.optimize!(model)
-    else
+    if !isnothing(extender)
         # solve with MOI automated extended formulation
-        JuMP.set_optimizer(model, extender{Float64})
+        model_backend = JuMP.backend(nat_model)
+        JuMP.set_optimizer(nat_model, extender{Float64})
         MOI.Utilities.attach_optimizer(model_backend)
-        MOI.copy_to(opt, model_backend.optimizer.model)
-        JuMP.set_optimizer(model, () -> opt)
-        MOI.optimize!(opt)
+        model = JuMP.Model()
+        MOI.copy_to(model, model_backend.optimizer.model)
     end
+    JuMP.set_optimizer(model, () -> opt)
+    JuMP.optimize!(model)
 
     # run tests for the example
     test_extra(inst, model)
 
     # process the solve info and solution
     # TODO any problem with using the isnothing(extender) in the if statement?
-    hypatia_opt = model_backend.optimizer.model.optimizer
-    if isnothing(extender) || (process_extended_certificates && solver <: Hypatia.Optimizer)
+    if process_extended_certificates && solver <: Hypatia.Optimizer
         # use native process result function to calculate residuals on extended certificates stored inside the Hypatia optimizer struct
-        result = process_result(hypatia_opt.model, hypatia_opt.solver)
+        result = process_result(opt.model, opt.solver)
     else
-        result = process_result_JuMP(model, hypatia_opt)
+        result = process_result_JuMP(model, nat_model)
     end
 
     return (extender, build_time, result)
 end
 
 # return solve information and certificate violations
-function process_result_JuMP(model::JuMP.Model, hypatia_opt::Hypatia.Optimizer{T}) where {T <: Real}
-    status = JuMP.termination_status(model)
+function process_result_JuMP(model::JuMP.Model, nat_model::JuMP.Model)
+    # status = JuMP.termination_status(model)
     solve_time = JuMP.solve_time(model)
     num_iters = MOI.get(model, MOI.BarrierIterations())
     primal_obj = JuMP.objective_value(model)
     dual_obj = JuMP.dual_objective_value(model)
 
-    # get native data in natural space from MOI.copy_to without extension
-    # TODO
+    # get data from extended Hypatia model
+    model_backend = JuMP.backend(model)
+    hypatia_opt = model_backend.optimizer.model.optimizer
+    hypatia_model = hypatia_opt.model
+    (ext_n, ext_p, ext_q) = (hypatia_model.n, hypatia_model.p, hypatia_model.q)
+    hypatia_status = Solvers.get_status(hypatia_opt.solver)
+
+    # get Hypatia native model in natural space from MOI.copy_to without extension
+    nat_hypatia_opt = Hypatia.Optimizer{Float64}()
+    idx_map = MOI.copy_to(nat_hypatia_opt, JuMP.backend(nat_model))
+    nat_hypatia_model = nat_hypatia_opt.model
+
+    println()
+    @show model_backend
+    println()
+    @show nat_hypatia_model
+    println()
+    @show idx_map
+    println()
 
     # get native certificates in natural space
-    # TODO fix old code
-    # x = JuMP.value.(x)
-    # y = (isempty(A) ? Float64[] : -JuMP.dual.(lin_ref))
-    # z = vcat([JuMP.dual.(c) for c in conic_refs]...)
-    # s = vcat([JuMP.value.(c) for c in conic_refs]...)
-    # transform_moi_convention(G, h, s, z, cones, cone_idxs, opt)
-    # kkt_data = get_kkt(x, s, y, z, A, b, c, G, h, flip_sense, tol)
+    (n, p, q) = (nat_hypatia_model.n, nat_hypatia_model.p, nat_hypatia_model.q)
+    x = Vector{Float64}(undef, n)
+    y = Vector{Float64}(undef, p)
+    z = Vector{Float64}(undef, q)
+    s = similar(z)
+    for (moi_idx, hyp_idx) in idx_map
+        if moi_idx isa MOI.VariableIndex
+            x[hyp_idx.value] = MOI.get(model_backend, MOI.VariablePrimal(), moi_idx)
+        else # moi_idx isa MOI.ConstraintIndex
+            # TODO linear or conic constraint? get from
+            i = hyp_idx.value
+            if i <= nat_hypatia_opt.num_eq_constrs
+                # constraint is an equality
+                os = nat_hypatia_opt.constr_offset_eq
+                y[(os[i] + 1):os[i + 1]] = MOI.get(model_backend, MOI.ConstraintDual(), moi_idx)
+            else
+                # constraint is conic - get primal and dual
+                os = nat_hypatia_opt.constr_offset_cone
+                cone_idxs_i = [(os[i] + 1):os[i + 1]]
+                s[cone_idxs_i] = MOI.get(model_backend, MOI.ConstraintPrimal(), moi_idx)
+                z[cone_idxs_i] = MOI.get(model_backend, MOI.ConstraintDual(), moi_idx)
+            end
+        end
+    end
+
+    @show x
+    @show y
+    @show z
+    @show s
+    println()
+
+    # TODO transform z and s if necessary, or tell hypatia copy_to not to transform before
+
 
     # process certificates
     obj_diff = primal_obj - dual_obj
     compl = dot(s, z)
-    (x_viol, y_viol, z_viol) = certificate_violations(status, hypatia_model, x, y, z, s)
+    (x_viol, y_viol, z_viol) = certificate_violations(hypatia_status, nat_hypatia_model, x, y, z, s)
 
-    return (status = status,
+    return (status = hypatia_status,
         solve_time = solve_time, num_iters = num_iters,
         primal_obj = primal_obj, dual_obj = dual_obj,
-        x = x, y = y, s = s, z = z,
+        n = ext_n, p = ext_p, q = ext_q,
         obj_diff = obj_diff, compl = compl,
         x_viol = x_viol, y_viol = y_viol, z_viol = z_viol)
 end

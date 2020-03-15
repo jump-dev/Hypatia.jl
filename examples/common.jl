@@ -112,7 +112,7 @@ function process_result(
     return (status = status,
         solve_time = solve_time, num_iters = num_iters,
         primal_obj = primal_obj, dual_obj = dual_obj,
-        x = x, y = y, s = s, z = z,
+        n = model.n, p = model.p, q = model.q,
         obj_diff = obj_diff, compl = compl,
         x_viol = x_viol, y_viol = y_viol, z_viol = z_viol)
 end
