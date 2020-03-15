@@ -44,8 +44,8 @@ function build_solve_check(
     dual_obj = Solvers.get_dual_obj(solver)
     x = Solvers.get_x(solver)
     y = Solvers.get_y(solver)
-    s = Solvers.get_s(solver)
     z = Solvers.get_z(solver)
+    s = Solvers.get_s(solver)
 
     tol_sq = abs2(tol)
     tol_rt = sqrt(tol)
