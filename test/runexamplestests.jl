@@ -31,7 +31,7 @@ instance_sets = [
 
 # types of models to run and corresponding options and example names
 model_types = [
-    "native",
+    # "native",
     "JuMP",
     ]
 
@@ -107,9 +107,9 @@ perf = DataFrame(
     x_viol = Float64[],
     y_viol = Float64[],
     z_viol = Float64[],
-    n = Int[],
-    p = Int[],
-    q = Int[],
+    ext_n = Int[],
+    ext_p = Int[],
+    ext_q = Int[],
     )
 
 all_tests_time = time()
@@ -130,7 +130,7 @@ all_tests_time = time()
                     ex_type, inst_set, real_T, inst_num, inst[1], extender, test_time, build_time,
                     r.status, r.solve_time, r.num_iters, r.primal_obj, r.dual_obj,
                     r.obj_diff, r.compl, r.x_viol, r.y_viol, r.z_viol,
-                    length(r.x), length(r.y), length(r.s),
+                    r.n, r.p, r.q,
                     ))
                 @printf("... %8.2e seconds\n", test_time)
             end
@@ -139,9 +139,9 @@ all_tests_time = time()
 
     @printf("\nexamples tests total time: %8.2e seconds\n\n", time() - all_tests_time)
     show(perf, allrows = true, allcols = true)
-    println("\n")
-    show(timer)
-    println("\n")
+    # println("\n")
+    # show(timer)
+    # println("\n")
 end
 
 ;
