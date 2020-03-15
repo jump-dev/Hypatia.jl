@@ -15,7 +15,7 @@ MOI.Utilities.@model(ClassicConeOptimizer,
     (MOI.Reals, MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives,
     MOI.SecondOrderCone, MOI.RotatedSecondOrderCone, MOI.PositiveSemidefiniteConeTriangle, MOI.ExponentialCone, MOI.DualExponentialCone,),
     (MOI.PowerCone, MOI.DualPowerCone,),
-    (),
+    (MOI.SingleVariable,),
     (MOI.ScalarAffineFunction,),
     (MOI.VectorOfVariables,),
     (MOI.VectorAffineFunction,),
@@ -28,7 +28,7 @@ MOI.Utilities.@model(ExpConeOptimizer,
     (MOI.Reals, MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives,
     MOI.ExponentialCone,),
     (),
-    (),
+    (MOI.SingleVariable,),
     (MOI.ScalarAffineFunction,),
     (MOI.VectorOfVariables,),
     (MOI.VectorAffineFunction,),
@@ -41,7 +41,7 @@ MOI.Utilities.@model(SOConeOptimizer,
     (MOI.Reals, MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives,
     MOI.SecondOrderCone, MOI.RotatedSecondOrderCone,),
     (),
-    (),
+    (MOI.SingleVariable,),
     (MOI.ScalarAffineFunction,),
     (MOI.VectorOfVariables,),
     (MOI.VectorAffineFunction,),
@@ -54,8 +54,9 @@ function test(
     E::Type{<:ExampleInstanceJuMP{Float64}}, # an instance of a JuMP example # TODO support generic reals
     inst_data::Tuple,
     extender = nothing, # MOI.Utilities-defined optimizer with subset of cones if using extended formulation
-    solver_options = (); # additional non-default solver options specific to the example
-    default_solver_options = (verbose = false,), # default solver options
+    solver_options = (),
+    solver::Type{<:MOI.AbstractOptimizer} = Hypatia.Optimizer; # additional non-default solver options specific to the example
+    default_solver_options = (), # default solver options
     rseed::Int = 1,
     )
     # setup instance and model
@@ -65,18 +66,18 @@ function test(
     model_backend = JuMP.backend(model)
 
     # solve model
-    hyp_opt = Hypatia.Optimizer(; default_solver_options..., solver_options...)
+    opt = solver{Float64}(; default_solver_options..., solver_options...)
     if isnothing(extender)
         # not using MOI extended formulation
-        JuMP.set_optimizer(model, () -> hyp_opt)
+        JuMP.set_optimizer(model, () -> opt)
         JuMP.optimize!(model)
     else
         # use MOI automated extended formulation
         JuMP.set_optimizer(model, extender{Float64})
         MOI.Utilities.attach_optimizer(model_backend)
-        MOI.copy_to(hyp_opt, model_backend.optimizer.model)
-        JuMP.set_optimizer(model, () -> hyp_opt)
-        MOI.optimize!(hyp_opt)
+        MOI.copy_to(opt, model_backend.optimizer.model)
+        JuMP.set_optimizer(model, () -> opt)
+        MOI.optimize!(opt)
     end
 
     # run tests for the example
