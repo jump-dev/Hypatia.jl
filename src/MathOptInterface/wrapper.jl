@@ -333,8 +333,9 @@ function MOI.copy_to(
 
     # build up one L_infinity norm cone from two-sided interval constraints
     interval_start = q
-    num_intervals = MOI.get(src, MOI.NumberOfConstraints{MOI.SingleVariable, MOI.Interval{T}}()) +
-        MOI.get(src, MOI.NumberOfConstraints{MOI.ScalarAffineFunction{T}, MOI.Interval{T}}())
+    SV_interval_cons = get_src_cons(MOI.SingleVariable, MOI.Interval{T})
+    SAF_interval_cons = get_src_cons(MOI.ScalarAffineFunction{T}, MOI.Interval{T})
+    num_intervals = length(SV_interval_cons) + length(SAF_interval_cons)
     interval_scales = Vector{T}(undef, num_intervals)
 
     if num_intervals > 0
@@ -347,7 +348,7 @@ function MOI.copy_to(
 
     interval_count = 0
 
-    for ci in get_src_cons(MOI.SingleVariable, MOI.Interval{T})
+    for ci in SV_interval_cons
         i += 1
         idx_map[ci] = MOI.ConstraintIndex{MOI.SingleVariable, MOI.Interval{T}}(i)
         push!(constr_offset_cone, q)
@@ -371,7 +372,7 @@ function MOI.copy_to(
         interval_scales[interval_count] = scal
     end
 
-    for ci in get_src_cons(MOI.ScalarAffineFunction{T}, MOI.Interval{T})
+    for ci in SAF_interval_cons
         i += 1
         idx_map[ci] = MOI.ConstraintIndex{MOI.ScalarAffineFunction{T}, MOI.Interval{T}}(i)
         push!(constr_offset_cone, q)
