@@ -31,8 +31,8 @@ instance_sets = [
 
 # types of models to run and corresponding options and example names
 model_types = [
-    # "native",
-    "JuMP",
+    "native",
+    # "JuMP",
     ]
 
 # list of names of native examples to run
@@ -51,29 +51,29 @@ native_example_names = [
 
 # list of names of JuMP examples to run
 JuMP_example_names = [
-    # "centralpolymat",
-    # "conditionnum",
-    # "contraction",
-    # "densityest",
-    # "envelope",
-    # "expdesign",
-    # "lotkavolterra",
-    # "lyapunovstability",
-    # "matrixcompletion",
-    # "matrixquadratic",
-    # "matrixregression",
+    "centralpolymat",
+    "conditionnum",
+    "contraction",
+    "densityest",
+    "envelope",
+    "expdesign",
+    "lotkavolterra",
+    "lyapunovstability",
+    "matrixcompletion",
+    "matrixquadratic",
+    "matrixregression",
     "maxvolume",
-    # "muconvexity",
-    # "nearestpsd",
-    # "polymin",
-    # "polynorm",
-    # "portfolio",
-    # "regionofattr",
-    # "robustgeomprog",
-    # "secondorderpoly",
-    # "semidefinitepoly",
-    # "shapeconregr",
-    # "signomialmin",
+    "muconvexity",
+    "nearestpsd",
+    "polymin",
+    "polynorm",
+    "portfolio",
+    "regionofattr",
+    "robustgeomprog",
+    "secondorderpoly",
+    "semidefinitepoly",
+    "shapeconregr",
+    "signomialmin",
     ]
 
 # start the tests
@@ -97,11 +97,16 @@ perf = DataFrame(
     extender = Any[],
     test_time = Float64[],
     build_time = Float64[],
+    status = Symbol[],
     solve_time = Float64[],
     iters = Int[],
-    status = Symbol[],
     prim_obj = Float64[],
     dual_obj = Float64[],
+    obj_diff = Float64[],
+    compl = Float64[],
+    x_viol = Float64[],
+    y_viol = Float64[],
+    z_viol = Float64[],
     n = Int[],
     p = Int[],
     q = Int[],
@@ -123,7 +128,8 @@ all_tests_time = time()
                 test_time = @elapsed (extender, build_time, r) = test(ex_type_T, inst..., default_solver_options = solver_options)
                 push!(perf, (
                     ex_type, inst_set, real_T, inst_num, inst[1], extender, test_time, build_time,
-                    r.solve_time, r.num_iters, r.status, r.primal_obj, r.dual_obj,
+                    r.status, r.solve_time, r.num_iters, r.primal_obj, r.dual_obj,
+                    r.obj_diff, r.compl, r.x_viol, r.y_viol, r.z_viol,
                     length(r.x), length(r.y), length(r.s),
                     ))
                 @printf("... %8.2e seconds\n", test_time)

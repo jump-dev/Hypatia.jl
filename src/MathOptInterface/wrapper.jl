@@ -8,13 +8,11 @@ TODO generalize all code for T <: Real
 
 mutable struct Optimizer{T <: Real} <: MOI.AbstractOptimizer
     use_dense_model::Bool # make the model use dense A and G data instead of sparse
-    test_certificates::Bool # test that conic certificates satisfy certain tolerances
 
     solver::Solvers.Solver{T} # Hypatia solver object
     model::Models.Model{T} # Hypatia model object
 
     # result data
-    result::NamedTuple
     x::Vector{T}
     s::Vector{T}
     y::Vector{T}
@@ -35,12 +33,10 @@ mutable struct Optimizer{T <: Real} <: MOI.AbstractOptimizer
 
     function Optimizer{T}(;
         use_dense_model::Bool = true,
-        test_certificates::Bool = false,
         solver_options...
         ) where {T <: Real}
         opt = new{T}()
         opt.use_dense_model = use_dense_model
-        opt.test_certificates = test_certificates
         opt.solver = Solvers.Solver{T}(; solver_options...) # TODO allow passing in a solver?
         return opt
     end
@@ -55,7 +51,6 @@ MOI.is_empty(opt::Optimizer) = (opt.solver.status == :NotLoaded)
 
 function MOI.empty!(opt::Optimizer)
     opt.solver.status = :NotLoaded
-    opt.result = NamedTuple()
     return
 end
 
@@ -461,14 +456,21 @@ end
 function MOI.optimize!(opt::Optimizer{T}) where {T <: Real}
     # build and solve the model
     model = opt.model
-    opt.result = r = Solvers.solve_check(model, solver = opt.solver, test = opt.test_certificates)
+    solver = opt.solver
+
+    Solvers.load(solver, model)
+    Solvers.solve(solver)
+
+    status = Solvers.get_status(solver)
+    primal_obj = Solvers.get_primal_obj(solver)
+    dual_obj = Solvers.get_dual_obj(solver)
+    opt.x = Solvers.get_x(solver)
+    opt.y = Solvers.get_y(solver)
+    opt.s = Solvers.get_s(solver)
+    opt.z = Solvers.get_z(solver)
 
     # transform solution for MOI conventions
-    opt.x = r.x
     opt.constr_prim_eq += model.b - model.A * opt.x
-    opt.y = r.y
-    opt.s = r.s
-    opt.z = r.z
     opt.s[opt.nonpos_idxs] .*= -1
     opt.z[opt.nonpos_idxs] .*= -1
     opt.s[opt.interval_idxs] ./= opt.interval_scales
@@ -501,7 +503,7 @@ function MOI.get(opt::Optimizer, ::MOI.SolveTime)
     if opt.solver.status in (:NotLoaded, :Loaded)
         error("solve has not been called")
     end
-    return opt.result.solve_time
+    return Solvers.get_solve_time(opt.solver)
 end
 
 MOI.get(opt::Optimizer, ::MOI.RawStatusString) = string(opt.solver.status)
@@ -561,20 +563,22 @@ function MOI.get(opt::Optimizer, ::MOI.DualStatus)
 end
 
 function MOI.get(opt::Optimizer, ::MOI.ObjectiveValue)
+    raw_obj_val = Solvers.get_primal_obj(opt.solver)
     if opt.obj_sense == MOI.MIN_SENSE
-        return opt.result.primal_obj
+        return raw_obj_val
     elseif opt.obj_sense == MOI.MAX_SENSE
-        return -opt.result.primal_obj
+        return -raw_obj_val
     else
         error("no objective sense is set")
     end
 end
 
 function MOI.get(opt::Optimizer, ::Union{MOI.DualObjectiveValue, MOI.ObjectiveBound})
+    raw_dual_obj_val = Solvers.get_dual_obj(opt.solver)
     if opt.obj_sense == MOI.MIN_SENSE
-        return opt.result.dual_obj
+        return raw_dual_obj_val
     elseif opt.obj_sense == MOI.MAX_SENSE
-        return -opt.result.dual_obj
+        return -raw_dual_obj_val
     else
         error("no objective sense is set")
     end

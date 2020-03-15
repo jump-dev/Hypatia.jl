@@ -23,7 +23,11 @@ function test(
 
     # solve model
     solver = Solvers.Solver{T}(; default_solver_options..., solver_options...)
-    result = Solvers.solve_check(model; solver = solver, checker_options...)
+    Solvers.load(solver, model)
+    Solvers.solve(solver)
+
+    # process the solve info and solution
+    result = process_result(model, solver)
 
     # run tests for the example
     test_extra(inst, result)
