@@ -16,10 +16,10 @@ end
 example_tests(::Type{MaxVolumeJuMP{Float64}}, ::MinimalInstances) = [
     # ((2, true, false),),
     # ((2, true, true),),
-    # ((2, false, true),),
-    ((2, false, true), ClassicConeOptimizer),
+    ((2, false, true),),
+    # ((2, false, true), ClassicConeOptimizer),
+    ((2, false, true), SOConeOptimizer),
     # ((2, false, true), ExpConeOptimizer), # TODO waiting for MOI bridges geomean to exp
-    # ((2, false, true), SOConeOptimizer),
     ]
 example_tests(::Type{MaxVolumeJuMP{Float64}}, ::FastInstances) = [
     ((10, true, false), false),
