@@ -112,6 +112,7 @@ function process_result_JuMP(model::JuMP.Model)
     (ext_n, ext_p, ext_q) = (hypatia_model.n, hypatia_model.p, hypatia_model.q)
     hypatia_status = Solvers.get_status(hypatia_opt.solver)
     @show (ext_n, ext_p, ext_q)
+    @show typeof.(hypatia_model.cones)
 
     # get Hypatia native model in natural space from MOI.copy_to without extension
     nat_hypatia_opt = Hypatia.Optimizer{Float64}()
@@ -121,6 +122,7 @@ function process_result_JuMP(model::JuMP.Model)
     # get native certificates in natural space
     (nat_n, nat_p, nat_q) = (nat_hypatia_model.n, nat_hypatia_model.p, nat_hypatia_model.q)
     @show (nat_n, nat_p, nat_q)
+    @show typeof.(nat_hypatia_model.cones)
     x = Vector{Float64}(undef, nat_n)
     y = Vector{Float64}(undef, nat_p)
     z = Vector{Float64}(undef, nat_q)
