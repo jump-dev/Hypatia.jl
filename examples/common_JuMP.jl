@@ -23,12 +23,12 @@ MOI.Utilities.@model(ClassicConeOptimizer,
     true,
     )
 
-# ExpCone only
-MOI.Utilities.@model(ExpConeOptimizer,
+# SOCone only
+MOI.Utilities.@model(SOConeOptimizer,
     (),
     (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan,),
     (MOI.Reals, MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives,
-    MOI.ExponentialCone,),
+    MOI.SecondOrderCone, MOI.RotatedSecondOrderCone,),
     (),
     (),
     (MOI.ScalarAffineFunction,),
@@ -37,12 +37,12 @@ MOI.Utilities.@model(ExpConeOptimizer,
     true,
     )
 
-# SOCone only
-MOI.Utilities.@model(SOConeOptimizer,
+# ExpCone only
+MOI.Utilities.@model(ExpConeOptimizer,
     (),
     (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan,),
     (MOI.Reals, MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives,
-    MOI.SecondOrderCone, MOI.RotatedSecondOrderCone,),
+    MOI.ExponentialCone,),
     (),
     (),
     (MOI.ScalarAffineFunction,),
@@ -72,17 +72,13 @@ function test(
     # setup instance and model
     Random.seed!(rseed)
     inst = E(inst_data...)
-    build_time = @elapsed nat_model = build(inst)
+    build_time = @elapsed model = build(inst)
 
     # solve
     opt = solver{Float64}(; default_solver_options..., solver_options...)
     if !isnothing(extender)
-        # solve with MOI automated extended formulation
-        model_backend = JuMP.backend(nat_model)
-        JuMP.set_optimizer(nat_model, extender{Float64})
-        MOI.Utilities.attach_optimizer(model_backend)
-        model = JuMP.Model()
-        MOI.copy_to(model, model_backend.optimizer.model)
+        # use MOI automated extended formulation
+        opt = MOI.Bridges.full_bridge_optimizer(MOI.Utilities.CachingOptimizer(ClassicConeOptimizer{Float64}(), opt), Float64)
     end
     JuMP.set_optimizer(model, () -> opt)
     JuMP.optimize!(model)
@@ -91,20 +87,18 @@ function test(
     test_extra(inst, model)
 
     # process the solve info and solution
-    # TODO any problem with using the isnothing(extender) in the if statement?
     if process_extended_certificates && solver <: Hypatia.Optimizer
         # use native process result function to calculate residuals on extended certificates stored inside the Hypatia optimizer struct
         result = process_result(opt.model, opt.solver)
     else
-        result = process_result_JuMP(model, nat_model)
+        result = process_result_JuMP(model)
     end
 
     return (extender, build_time, result)
 end
 
 # return solve information and certificate violations
-function process_result_JuMP(model::JuMP.Model, nat_model::JuMP.Model)
-    # status = JuMP.termination_status(model)
+function process_result_JuMP(model::JuMP.Model)
     solve_time = JuMP.solve_time(model)
     num_iters = MOI.get(model, MOI.BarrierIterations())
     primal_obj = JuMP.objective_value(model)
@@ -112,35 +106,30 @@ function process_result_JuMP(model::JuMP.Model, nat_model::JuMP.Model)
 
     # get data from extended Hypatia model
     model_backend = JuMP.backend(model)
-    hypatia_opt = model_backend.optimizer.model.optimizer
+    inner_model = model_backend.optimizer.model
+    hypatia_opt = (inner_model isa MOI.Bridges.LazyBridgeOptimizer ? inner_model.model : inner_model).optimizer
     hypatia_model = hypatia_opt.model
     (ext_n, ext_p, ext_q) = (hypatia_model.n, hypatia_model.p, hypatia_model.q)
     hypatia_status = Solvers.get_status(hypatia_opt.solver)
+    @show (ext_n, ext_p, ext_q)
 
     # get Hypatia native model in natural space from MOI.copy_to without extension
     nat_hypatia_opt = Hypatia.Optimizer{Float64}()
-    idx_map = MOI.copy_to(nat_hypatia_opt, JuMP.backend(nat_model))
+    idx_map = MOI.copy_to(nat_hypatia_opt, model_backend)
     nat_hypatia_model = nat_hypatia_opt.model
 
-    println()
-    @show model_backend
-    println()
-    @show nat_hypatia_model
-    println()
-    @show idx_map
-    println()
-
     # get native certificates in natural space
-    (n, p, q) = (nat_hypatia_model.n, nat_hypatia_model.p, nat_hypatia_model.q)
-    x = Vector{Float64}(undef, n)
-    y = Vector{Float64}(undef, p)
-    z = Vector{Float64}(undef, q)
+    (nat_n, nat_p, nat_q) = (nat_hypatia_model.n, nat_hypatia_model.p, nat_hypatia_model.q)
+    @show (nat_n, nat_p, nat_q)
+    x = Vector{Float64}(undef, nat_n)
+    y = Vector{Float64}(undef, nat_p)
+    z = Vector{Float64}(undef, nat_q)
     s = similar(z)
     for (moi_idx, hyp_idx) in idx_map
         if moi_idx isa MOI.VariableIndex
             x[hyp_idx.value] = MOI.get(model_backend, MOI.VariablePrimal(), moi_idx)
-        else # moi_idx isa MOI.ConstraintIndex
-            # TODO linear or conic constraint? get from
+        else
+            # moi_idx isa MOI.ConstraintIndex
             i = hyp_idx.value
             if i <= nat_hypatia_opt.num_eq_constrs
                 # constraint is an equality
@@ -149,21 +138,20 @@ function process_result_JuMP(model::JuMP.Model, nat_model::JuMP.Model)
             else
                 # constraint is conic - get primal and dual
                 os = nat_hypatia_opt.constr_offset_cone
-                cone_idxs_i = [(os[i] + 1):os[i + 1]]
+                cone_idxs_i = (os[i] + 1):os[i + 1]
                 s[cone_idxs_i] = MOI.get(model_backend, MOI.ConstraintPrimal(), moi_idx)
                 z[cone_idxs_i] = MOI.get(model_backend, MOI.ConstraintDual(), moi_idx)
             end
         end
     end
 
+    # TODO transform z and s if necessary, or tell hypatia copy_to not to transform before
+    println()
     @show x
     @show y
     @show z
     @show s
     println()
-
-    # TODO transform z and s if necessary, or tell hypatia copy_to not to transform before
-
 
     # process certificates
     obj_diff = primal_obj - dual_obj
