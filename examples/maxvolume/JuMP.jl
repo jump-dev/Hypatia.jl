@@ -14,28 +14,30 @@ struct MaxVolumeJuMP{T <: Real} <: ExampleInstanceJuMP{T}
 end
 
 example_tests(::Type{MaxVolumeJuMP{Float64}}, ::MinimalInstances) = [
-    # ((2, true, false),),
-    # ((2, true, true),),
+    ((2, true, false),),
+    ((2, true, true),),
     ((2, false, true),),
-    # ((2, false, true), ClassicConeOptimizer),
+    ((2, false, true), ClassicConeOptimizer),
     ((2, false, true), SOConeOptimizer),
     # ((2, false, true), ExpConeOptimizer), # TODO waiting for MOI bridges geomean to exp
     ]
 example_tests(::Type{MaxVolumeJuMP{Float64}}, ::FastInstances) = [
-    ((10, true, false), false),
-    ((10, false, true), false),
-    ((10, true, true), false),
-    ((100, true, false), false),
-    ((100, false, true), false),
-    ((100, true, true), false),
-    ((1000, true, false), false),
-    ((1000, true, true), false), # with bridges extended formulation will need to go into slow list
+    ((10, true, false),),
+    ((10, false, true),),
+    ((10, false, true), ClassicConeOptimizer),
+    ((10, true, true),),
+    ((100, true, false),),
+    ((100, false, true),),
+    ((100, false, true), ClassicConeOptimizer),
+    ((100, true, true),),
+    ((1000, true, false),),
+    ((1000, true, true),), # with bridges extended formulation will need to go into slow list
     ]
 example_tests(::Type{MaxVolumeJuMP{Float64}}, ::SlowInstances) = [
-    ((1000, false, true), false),
-    ((2000, true, false), false),
-    ((2000, false, true), false),
-    ((2000, true, true), false),
+    ((1000, false, true), ClassicConeOptimizer),
+    ((2000, true, false),),
+    ((2000, false, true),),
+    ((2000, true, true),),
     ]
 
 function build(inst::MaxVolumeJuMP{T}) where {T <: Float64} # TODO generic reals

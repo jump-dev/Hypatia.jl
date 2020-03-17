@@ -28,34 +28,43 @@ end
 example_tests(::Type{ExpDesignJuMP{Float64}}, ::MinimalInstances) = begin
     options = (tol_feas = 1e-5, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4)
     return [
-    ((2, 3, 4, 2, true, false, false), false, options),
-    ((2, 3, 4, 2, false, true, false), false),
-    ((2, 3, 4, 2, false, false, true), false),
+    ((2, 3, 4, 2, true, false, false), nothing, options),
+    ((2, 3, 4, 2, true, false, false), ClassicConeOptimizer),
+    ((2, 3, 4, 2, false, true, false),),
+    ((2, 3, 4, 2, false, true, false), ClassicConeOptimizer),
+    ((2, 3, 4, 2, false, false, true),),
+    ((2, 3, 4, 2, false, false, true), ClassicConeOptimizer),
     ]
 end
 example_tests(::Type{ExpDesignJuMP{Float64}}, ::FastInstances) = begin
     options = (tol_feas = 1e-5, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4)
     return [
-    ((3, 5, 7, 2, true, false, false), false, options),
-    ((3, 5, 7, 2, false, true, false), false),
-    ((3, 5, 7, 2, false, false, true), false),
-    ((5, 15, 25, 5, true, false, false), false, options),
-    ((5, 15, 25, 5, false, true, false), false),
-    ((5, 15, 25, 5, false, false, true), false),
-    ((10, 30, 50, 5, true, false, false), false, options),
-    ((10, 30, 50, 5, false, true, false), false),
-    ((10, 30, 50, 5, false, false, true), false),
-    ((25, 75, 125, 10, true, false, false), false, options),
-    ((25, 75, 125, 10, false, true, false), false),
-    ((25, 75, 125, 10, false, false, true), false),
+    ((3, 5, 7, 2, true, false, false), nothing, options),
+    ((3, 5, 7, 2, true, false, false), ClassicConeOptimizer),
+    ((3, 5, 7, 2, false, true, false),),
+    ((3, 5, 7, 2, false, true, false), ClassicConeOptimizer),
+    ((3, 5, 7, 2, false, false, true),),
+    ((3, 5, 7, 2, false, false, true), ClassicConeOptimizer),
+    ((5, 15, 25, 5, true, false, false), nothing, options),
+    ((5, 15, 25, 5, false, true, false),),
+    ((5, 15, 25, 5, false, false, true),),
+    ((10, 30, 50, 5, true, false, false), nothing, options),
+    ((10, 30, 50, 5, false, true, false),),
+    ((10, 30, 50, 5, false, false, true),),
+    ((25, 75, 125, 10, true, false, false), nothing, options),
+    ((25, 75, 125, 10, false, true, false),),
+    ((25, 75, 125, 10, false, false, true),),
     ]
 end
 example_tests(::Type{ExpDesignJuMP{Float64}}, ::SlowInstances) = begin
     options = (tol_feas = 1e-5, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4)
     return [
-    ((100, 200, 200, 10, true, false, false), false, options),
-    ((100, 200, 200, 10, false, true, false), false),
-    ((100, 200, 200, 10, false, false, true), false),
+    ((25, 75, 125, 10, true, false, false), ClassicConeOptimizer),
+    ((25, 75, 125, 10, false, true, false), ClassicConeOptimizer),
+    ((25, 75, 125, 10, false, false, true), ClassicConeOptimizer),
+    ((100, 200, 200, 10, true, false, false), nothing, options),
+    ((100, 200, 200, 10, false, true, false),),
+    ((100, 200, 200, 10, false, false, true),),
     ]
 end
 

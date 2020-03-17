@@ -564,24 +564,12 @@ end
 
 function MOI.get(opt::Optimizer, ::MOI.ObjectiveValue)
     raw_obj_val = Solvers.get_primal_obj(opt.solver)
-    if opt.obj_sense == MOI.MIN_SENSE
-        return raw_obj_val
-    elseif opt.obj_sense == MOI.MAX_SENSE
-        return -raw_obj_val
-    else
-        error("no objective sense is set")
-    end
+    return (opt.obj_sense == MOI.MAX_SENSE) ? -raw_obj_val : raw_obj_val
 end
 
 function MOI.get(opt::Optimizer, ::Union{MOI.DualObjectiveValue, MOI.ObjectiveBound})
     raw_dual_obj_val = Solvers.get_dual_obj(opt.solver)
-    if opt.obj_sense == MOI.MIN_SENSE
-        return raw_dual_obj_val
-    elseif opt.obj_sense == MOI.MAX_SENSE
-        return -raw_dual_obj_val
-    else
-        error("no objective sense is set")
-    end
+    return (opt.obj_sense == MOI.MAX_SENSE) ? -raw_dual_obj_val : raw_dual_obj_val
 end
 
 MOI.get(opt::Optimizer, ::MOI.ResultCount) = 1

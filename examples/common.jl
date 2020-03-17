@@ -32,7 +32,7 @@ Random.randn(R::Type{Complex{BigFloat}}, dims::Vararg{Int, N} where N) = R.(rand
 # helper for calculating solution violations
 function relative_residual(residual::Vector{T}, constant::Vector{T}) where {T <: Real}
     @assert length(residual) == length(constant)
-    return T[residual[i] / max(one(T), constant[i]) for i in eachindex(constant)]
+    return T[residual[i] / max(one(T), abs(constant[i])) for i in eachindex(constant)]
 end
 
 # calculate violations for Hypatia certificate equalities
@@ -57,9 +57,6 @@ function certificate_violations(
         y_viol = norm(y_res_rel, Inf)
         z_viol = norm(z_res_rel, Inf)
     elseif status == :PrimalInfeasible
-        if dual_obj < obj_offset
-            @warn("dual_obj < obj_offset for primal infeasible case")
-        end
         # TODO conv check causes us to stop before this is satisfied to sufficient tolerance - maybe add option to keep going
         x_res = G' * z + A' * y
         x_res_rel = relative_residual(x_res, c)
@@ -67,9 +64,6 @@ function certificate_violations(
         y_viol = NaN
         z_viol = NaN
     elseif status == :DualInfeasible
-        if primal_obj > obj_offset
-            @warn("primal_obj > obj_offset for primal infeasible case")
-        end
         # TODO conv check causes us to stop before this is satisfied to sufficient tolerance - maybe add option to keep going
         y_res = A * x
         z_res = G * x + s
@@ -113,6 +107,7 @@ function process_result(
         solve_time = solve_time, num_iters = num_iters,
         primal_obj = primal_obj, dual_obj = dual_obj,
         n = model.n, p = model.p, q = model.q,
+        x = x, y = y, z = z, s = s,
         obj_diff = obj_diff, compl = compl,
         x_viol = x_viol, y_viol = y_viol, z_viol = z_viol)
 end

@@ -23,22 +23,22 @@ struct MatrixQuadraticJuMP{T <: Real} <: ExampleInstanceJuMP{T}
 end
 
 example_tests(::Type{MatrixQuadraticJuMP{Float64}}, ::MinimalInstances) = [
-    ((2, 2, true), false),
-    ((2, 2, false), false),
+    ((2, 2, true),),
+    ((2, 2, false),),
     ]
 example_tests(::Type{MatrixQuadraticJuMP{Float64}}, ::FastInstances) = [
-    ((2, 3, true), false),
-    ((2, 3, false), false),
-    ((5, 6, true), false),
-    ((5, 6, false), false),
-    ((10, 20, true), false),
-    ((10, 20, false), false),
-    ((20, 40, true), false),
-    ((20, 40, false), false),
+    ((2, 3, true),),
+    ((2, 3, false),),
+    ((5, 6, true),),
+    ((5, 6, false),),
+    ((10, 20, true),),
+    ((10, 20, false),),
+    ((20, 40, true),),
+    ((20, 40, false),),
     ]
 example_tests(::Type{MatrixQuadraticJuMP{Float64}}, ::SlowInstances) = [
-    ((60, 80, true), false),
-    ((60, 80, false), false),
+    ((60, 80, true),),
+    ((60, 80, false),),
     ]
 
 function build(inst::MatrixQuadraticJuMP{T}) where {T <: Float64} # TODO generic reals
