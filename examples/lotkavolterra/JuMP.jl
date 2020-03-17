@@ -21,13 +21,13 @@ struct LotkaVolterraJuMP{T <: Real} <: ExampleInstanceJuMP{T}
 end
 
 example_tests(::Type{LotkaVolterraJuMP{Float64}}, ::MinimalInstances) = [
-    ((2,), false),
+    ((2,),),
     ]
 example_tests(::Type{LotkaVolterraJuMP{Float64}}, ::FastInstances) = [
-    ((4,), false),
+    ((4,),),
     ]
 example_tests(::Type{LotkaVolterraJuMP{Float64}}, ::SlowInstances) = [
-    ((6,), false),
+    ((6,),),
     ]
 
 function build(inst::LotkaVolterraJuMP{T}) where {T <: Float64} # TODO generic reals

@@ -447,9 +447,10 @@ function get_y(solver::Solver{T}) where {T <: Real}
         if solver.reduce
             # unreduce solver's solution
             # y0 = R \ (-cQ1' - GQ1' * z0)
-            y0 = solver.reduce_cQ1
-            mul!(y0, solver.reduce_GQ1', solver.point.z, -1, -1)
-            y[solver.reduce_y_keep_idxs] = ldiv!(solver.reduce_Ap_R, y0[1:length(solver.reduce_y_keep_idxs)])
+            y0 = solver.reduce_GQ1' * solver.point.z
+            y0 .+= solver.reduce_cQ1
+            @views ldiv!(solver.reduce_Ap_R, y0[1:length(solver.reduce_y_keep_idxs)])
+            @. y[solver.reduce_y_keep_idxs] = -y0
         else
             y[solver.y_keep_idxs] = solver.point.y
         end

@@ -31,32 +31,32 @@ struct LyapunovStabilityJuMP{T <: Real} <: ExampleInstanceJuMP{T}
 end
 
 example_tests(::Type{LyapunovStabilityJuMP{Float64}}, ::MinimalInstances) = [
-    ((2, 3, true, true), false),
-    ((2, 3, true, false), false),
-    ((2, 2, false, true), false),
-    ((2, 2, false, false), false),
+    ((2, 3, true, true),),
+    ((2, 3, true, false),),
+    ((2, 2, false, true),),
+    ((2, 2, false, false),),
     ]
 example_tests(::Type{LyapunovStabilityJuMP{Float64}}, ::FastInstances) = begin
     options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
     relaxed_options = (tol_feas = 1e-3, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4)
     return [
-    ((5, 6, true, true), false, relaxed_options),
-    ((5, 6, true, false), false, options),
-    ((5, 5, false, true), false, options),
-    ((5, 5, false, false), false, options),
-    # ((10, 20, true, true), false, relaxed_options),
-    ((10, 20, true, false), false, options),
-    ((15, 15, false, true), false, options),
-    ((15, 15, false, false), false, options),
-    ((25, 30, true, false), false, options),
-    ((30, 30, false, false), false, options),
+    ((5, 6, true, true), nothing, relaxed_options),
+    ((5, 6, true, false), nothing, options),
+    ((5, 5, false, true), nothing, options),
+    ((5, 5, false, false), nothing, options),
+    # ((10, 20, true, true), nothing, relaxed_options),
+    ((10, 20, true, false), nothing, options),
+    ((15, 15, false, true), nothing, options),
+    ((15, 15, false, false), nothing, options),
+    ((25, 30, true, false), nothing, options),
+    ((30, 30, false, false), nothing, options),
     ]
 end
 example_tests(::Type{LyapunovStabilityJuMP{Float64}}, ::SlowInstances) = begin
     options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
     return [
-    ((25, 30, true, true), false, options),
-    ((30, 30, false, true), false, options),
+    ((25, 30, true, true), nothing, options),
+    ((30, 30, false, true), nothing, options),
     ]
 end
 
