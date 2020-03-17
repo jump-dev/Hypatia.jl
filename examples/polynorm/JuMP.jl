@@ -15,11 +15,11 @@ struct PolyNormJuMP{T <: Real} <: ExampleInstanceJuMP{T}
 end
 
 example_tests(::Type{PolyNormJuMP{Float64}}, ::MinimalInstances) = [
-    ((1, 2, 2), false),
+    ((1, 2, 2),),
     ]
 example_tests(::Type{PolyNormJuMP{Float64}}, ::FastInstances) = [
-    ((2, 2, 2), false),
-    ((2, 1, 3), false),
+    ((2, 2, 2),),
+    ((2, 1, 3),),
     ]
 example_tests(::Type{PolyNormJuMP{Float64}}, ::SlowInstances) = [
     ]

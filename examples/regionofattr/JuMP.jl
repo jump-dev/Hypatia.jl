@@ -19,21 +19,21 @@ struct RegionOfAttrJuMP{T <: Real} <: ExampleInstanceJuMP{T}
 end
 
 example_tests(::Type{RegionOfAttrJuMP{Float64}}, ::MinimalInstances) = [
-    ((4, true), false),
-    ((4, false), false),
+    ((4, true),),
+    ((4, false),),
     ]
 example_tests(::Type{RegionOfAttrJuMP{Float64}}, ::FastInstances) = begin
     options = (tol_feas = 1e-5,)
     return [
-    ((6, true), false, options),
-    ((6, false), false, options),
-    ((8, true), false, options),
+    ((6, true), nothing, options),
+    ((6, false), nothing, options),
+    ((8, true), nothing, options),
     ]
 end
 example_tests(::Type{RegionOfAttrJuMP{Float64}}, ::SlowInstances) = begin
     options = (tol_feas = 1e-5,)
     return [
-    ((8, false), false, options),
+    ((8, false), nothing, options),
     ]
 end
 

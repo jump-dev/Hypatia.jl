@@ -25,17 +25,17 @@ secondorderpoly_data = Dict(
     )
 
 example_tests(::Type{SecondOrderPolyJuMP{Float64}}, ::MinimalInstances) = [
-    ((:polys1, 2, true), false),
+    ((:polys1, 2, true),),
     ]
 example_tests(::Type{SecondOrderPolyJuMP{Float64}}, ::FastInstances) = [
-    ((:polys2, 2, true), false),
-    ((:polys3, 2, true), false),
-    ((:polys4, 4, true), false),
-    ((:polys5, 2, false), false),
-    ((:polys6, 2, false), false),
-    ((:polys7, 2, false), false),
-    ((:polys8, 2, false), false),
-    ((:polys9, 2, false), false),
+    ((:polys2, 2, true),),
+    ((:polys3, 2, true),),
+    ((:polys4, 4, true),),
+    ((:polys5, 2, false),),
+    ((:polys6, 2, false),),
+    ((:polys7, 2, false),),
+    ((:polys8, 2, false),),
+    ((:polys9, 2, false),),
     ]
 example_tests(::Type{SecondOrderPolyJuMP{Float64}}, ::SlowInstances) = [
     ]

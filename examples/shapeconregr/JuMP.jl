@@ -69,43 +69,54 @@ shapeconregr_data = Dict(
     )
 
 example_tests(::Type{ShapeConRegrJuMP{Float64}}, ::MinimalInstances) = [
-    ((:naics5811, 3, true, false, false), false),
-    ((1, 5, :func1, 2, 4, true, false, false), false),
-    ((1, 5, :func1, 2, 4, true, true, false), false),
-    ((1, 5, :func1, 2, 4, false, false, false), false),
-    ((1, 5, :func1, 2, 4, false, true, false), false),
+    ((:naics5811, 3, true, false, false),),
+    ((1, 5, :func1, 2, 4, true, false, false),),
+    ((1, 5, :func1, 2, 4, true, true, false),),
+    ((1, 5, :func1, 2, 4, false, false, false),),
+    ((1, 5, :func1, 2, 4, false, false, false), ClassicConeOptimizer),
+    ((1, 5, :func1, 2, 4, false, true, false),),
+    ((1, 5, :func1, 2, 4, false, true, false), ClassicConeOptimizer),
     ]
 example_tests(::Type{ShapeConRegrJuMP{Float64}}, ::FastInstances) = begin
     options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
     relaxed_options = (tol_feas = 1e-5, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4)
     return [
-    ((:naics5811, 4, true, false, false), false, options),
-    ((:naics5811, 4, true, true, false), false, relaxed_options),
-    ((:naics5811, 3, false, false, false), false, options),
-    ((:naics5811, 3, false, true, false), false, options),
-    ((2, 50, :func1, 5, 3, true, false, false), false, options),
-    ((2, 50, :func2, 5, 3, true, true, false), false, options),
-    ((2, 50, :func3, 5, 3, false, false, false), false, options),
-    ((2, 50, :func4, 5, 3, false, true, false), false, options),
-    ((2, 50, :func5, 5, 4, true, false, false), false, options),
-    ((2, 50, :func6, 5, 4, true, true, false), false, options),
-    ((2, 50, :func7, 5, 4, false, false, false), false, options),
-    ((2, 50, :func8, 5, 4, false, true, false), false, options),
-    ((4, 150, :func6, 0, 4, true, false, true), false, relaxed_options),
-    ((4, 150, :func7, 0, 4, true, false, true), false, options),
-    ((4, 150, :func7, 0, 4, true, true, true), false, options),
-    ((4, 150, :func7, 0, 4, false, false, true), false, options),
-    ((3, 150, :func8, 0, 6, true, false, true), false, options),
-    ((5, 100, :func9, 9, 4, true, false, false), false, options),
-    ((5, 100, :func10, 4, 4, true, false, false), false, options),
+    ((:naics5811, 4, true, false, false), nothing, options),
+    ((:naics5811, 4, true, true, false), nothing, relaxed_options),
+    ((:naics5811, 3, false, false, false), nothing, options),
+    ((:naics5811, 3, false, false, false), ClassicConeOptimizer, options),
+    ((:naics5811, 3, false, true, false), nothing, options),
+    ((:naics5811, 3, false, true, false), ClassicConeOptimizer, options),
+    ((2, 50, :func1, 5, 3, true, false, false), nothing, options),
+    ((2, 50, :func2, 5, 3, true, true, false), nothing, options),
+    ((2, 50, :func3, 5, 3, false, false, false), nothing, options),
+    ((2, 50, :func3, 5, 3, false, false, false), ClassicConeOptimizer, options),
+    ((2, 50, :func4, 5, 3, false, true, false), nothing, options),
+    ((2, 50, :func4, 5, 3, false, true, false), ClassicConeOptimizer, options),
+    ((2, 50, :func5, 5, 4, true, false, false), nothing, options),
+    ((2, 50, :func6, 5, 4, true, true, false), nothing, options),
+    ((2, 50, :func7, 5, 4, false, false, false), nothing, options),
+    ((2, 50, :func8, 5, 4, false, true, false), nothing, options),
+    ((4, 150, :func6, 0, 4, true, false, true), nothing, relaxed_options),
+    ((4, 150, :func7, 0, 4, true, false, true), nothing, options),
+    ((4, 150, :func7, 0, 4, true, true, true), nothing, options),
+    ((4, 150, :func7, 0, 4, false, false, true), nothing, options),
+    ((3, 150, :func8, 0, 6, true, false, true), nothing, options),
+    ((5, 100, :func9, 9, 4, true, false, false), nothing, options),
+    ((5, 100, :func9, 9, 4, true, false, false), ClassicConeOptimizer, options),
+    ((5, 100, :func10, 4, 4, true, false, false), nothing, options),
+    ((5, 100, :func10, 4, 4, true, false, false), ClassicConeOptimizer, options),
     ]
 end
 example_tests(::Type{ShapeConRegrJuMP{Float64}}, ::SlowInstances) = begin
     options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
     return [
-    ((:naics5811, 7, true, false, false), false, options),
-    ((4, 150, :func6, 0, 4, false, false, true), false, options),
-    ((3, 150, :func8, 0, 6, false, false, true), false, options),
+    ((:naics5811, 7, true, false, false), nothing, options),
+    ((:naics5811, 5, false, false, false), ClassicConeOptimizer, options),
+    ((4, 150, :func6, 0, 4, false, false, true), nothing, options),
+    ((4, 150, :func6, 0, 4, false, false, true), ClassicConeOptimizer, options),
+    ((3, 150, :func8, 0, 6, false, false, true), nothing, options),
+    ((3, 150, :func8, 0, 6, false, false, true), ClassicConeOptimizer, options),
     ]
 end
 

@@ -13,31 +13,36 @@ struct PortfolioJuMP{T <: Real} <: ExampleInstanceJuMP{T}
 end
 
 example_tests(::Type{PortfolioJuMP{Float64}}, ::MinimalInstances) = [
-    ((3, true, false), false),
-    ((3, false, true), false),
-    ((3, true, true), false),
+    ((3, true, false),),
+    ((3, false, true),),
+    ((3, false, true), ClassicConeOptimizer),
+    ((3, true, true),),
     ]
 example_tests(::Type{PortfolioJuMP{Float64}}, ::FastInstances) = [
-    ((10, true, false), false),
-    ((10, false, true), false),
-    ((10, true, true), false),
-    ((50, true, false), false),
-    ((50, false, true), false),
-    ((50, true, true), false),
-    ((400, true, false), false),
-    ((400, false, true), false),
-    ((400, true, true), false),
-    ((400, true, false), false),
-    ((400, false, true), false),
-    ((400, true, true), false),
+    ((10, true, false),),
+    ((10, false, true),),
+    ((10, false, true), ClassicConeOptimizer),
+    ((10, true, true),),
+    ((50, true, false),),
+    ((50, false, true),),
+    ((50, true, true),),
+    ((400, true, false),),
+    ((400, false, true),),
+    ((400, true, true),),
+    ((400, true, false),),
+    ((400, false, true),),
+    ((400, false, true), ClassicConeOptimizer),
+    ((400, true, true),),
     ]
 example_tests(::Type{PortfolioJuMP{Float64}}, ::SlowInstances) = [
-    ((1000, true, false), false),
-    ((1000, false, true), false),
-    ((1000, true, true), false),
-    ((3000, true, false), false),
-    ((3000, false, true), false),
-    ((3000, true, true), false),
+    ((1000, true, false),),
+    ((1000, false, true),),
+    ((1000, false, true), ClassicConeOptimizer),
+    ((1000, true, true),),
+    ((3000, true, false),),
+    ((3000, false, true),),
+    ((3000, false, true), ClassicConeOptimizer),
+    ((3000, true, true),),
     ]
 
 function build(inst::PortfolioJuMP{T}) where {T <: Float64} # TODO generic reals
