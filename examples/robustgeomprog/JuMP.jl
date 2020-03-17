@@ -20,16 +20,19 @@ struct RobustGeomProgJuMP{T <: Real} <: ExampleInstanceJuMP{T}
 end
 
 example_tests(::Type{RobustGeomProgJuMP{Float64}}, ::MinimalInstances) = [
-    ((2, 3), false),
+    ((2, 3),),
+    ((2, 3), ClassicConeOptimizer),
     ]
 example_tests(::Type{RobustGeomProgJuMP{Float64}}, ::FastInstances) = [
-    ((5, 10), false),
-    ((10, 20), false),
-    ((20, 40), false),
-    ((40, 80), false),
+    ((5, 10),),
+    ((5, 10), ClassicConeOptimizer),
+    ((10, 20),),
+    ((20, 40),),
+    ((40, 80),),
     ]
 example_tests(::Type{RobustGeomProgJuMP{Float64}}, ::SlowInstances) = [
-    ((100, 200), false),
+    ((40, 80), ClassicConeOptimizer),
+    ((100, 200),),
     ]
 
 function build(inst::RobustGeomProgJuMP{T}) where {T <: Float64} # TODO generic reals

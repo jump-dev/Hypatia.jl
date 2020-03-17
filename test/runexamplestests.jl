@@ -89,16 +89,27 @@ for mod_type in model_types, ex in eval(Symbol(mod_type, "_example_names"))
 end
 
 perf = DataFrame(
-    example = String[],
-    real_T = String[],
-    inst = Int[],
+    example = Type{<:ExampleInstance}[],
+    inst_set = Type{<:InstanceSet}[],
+    real_T = Type{<:Real}[],
+    count = Int[],
     inst_data = Tuple[],
+    extender = Any[],
     test_time = Float64[],
+    build_time = Float64[],
+    status = Symbol[],
     solve_time = Float64[],
     iters = Int[],
-    status = Symbol[],
     prim_obj = Float64[],
     dual_obj = Float64[],
+    obj_diff = Float64[],
+    compl = Float64[],
+    x_viol = Float64[],
+    y_viol = Float64[],
+    z_viol = Float64[],
+    ext_n = Int[],
+    ext_p = Int[],
+    ext_q = Int[],
     )
 
 all_tests_time = time()
@@ -111,13 +122,16 @@ all_tests_time = time()
         println("\nstarting $(length(instances)) instances for $ex_type_T $inst_set\n")
         solver_options = (default_solver_options..., time_limit = time_limit)
         for (inst_num, inst) in enumerate(instances)
-            test_info = "$ex_type_T $inst_set $inst_num: $(inst[1])"
+            test_info = "$ex_type_T $inst_set $inst_num: $inst"
             @testset "$test_info" begin
                 println(test_info, "...")
-                test_time = @elapsed r = test(ex_type_T, inst..., default_solver_options = solver_options)
+                test_time = @elapsed (extender, build_time, r) = test(ex_type_T, inst..., default_solver_options = solver_options)
                 push!(perf, (
-                    string(ex_type), string(real_T), inst_num, inst[1], test_time,
-                    r.solve_time, r.num_iters, r.status, r.primal_obj, r.dual_obj))
+                    ex_type, inst_set, real_T, inst_num, inst[1], extender, test_time, build_time,
+                    r.status, r.solve_time, r.num_iters, r.primal_obj, r.dual_obj,
+                    r.obj_diff, r.compl, r.x_viol, r.y_viol, r.z_viol,
+                    r.n, r.p, r.q,
+                    ))
                 @printf("... %8.2e seconds\n", test_time)
             end
         end

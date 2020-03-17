@@ -17,32 +17,38 @@ end
 example_tests(::Type{CentralPolyMatJuMP{Float64}}, ::MinimalInstances) = begin
     options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
     return [
-    ((2, 2, true), false, options),
-    ((2, 2, false), false, options),
-    # ((2, 2, true), true, options),
-    # ((2, 2, false), true, options),
+    ((2, 2, true), nothing, options),
+    ((2, 2, true), ClassicConeOptimizer, options),
+    ((2, 2, false), nothing, options),
+    ((2, 2, false), ClassicConeOptimizer, options),
     ]
 end
 example_tests(::Type{CentralPolyMatJuMP{Float64}}, ::FastInstances) = begin
     options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
     return [
-    ((2, 3, true), false, options),
-    ((2, 3, false), false, options),
-    ((3, 2, true), false, options),
-    ((3, 2, false), false, options),
-    ((3, 4, true), false, options),
-    ((3, 4, false), false, options),
-    ((7, 2, true), false, options),
-    ((7, 2, false), false, options),
+    ((2, 3, true), nothing, options),
+    ((2, 3, true), ClassicConeOptimizer, options),
+    ((2, 3, false), nothing, options),
+    ((2, 3, false), ClassicConeOptimizer, options),
+    ((3, 2, true), nothing, options),
+    ((3, 2, false), nothing, options),
+    ((3, 4, true), nothing, options),
+    ((3, 4, false), nothing, options),
+    ((7, 2, true), nothing, options),
+    ((7, 2, true), ClassicConeOptimizer, options),
+    ((7, 2, false), nothing, options),
+    ((7, 2, false), ClassicConeOptimizer, options),
     ]
 end
 example_tests(::Type{CentralPolyMatJuMP{Float64}}, ::SlowInstances) = begin
     options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
     return [
-    ((3, 5, true), false, options),
-    ((3, 5, false), false, options),
-    ((6, 3, true), false, options),
-    ((6, 3, false), false, options),
+    ((3, 4, true), ClassicConeOptimizer, options),
+    ((3, 4, false), ClassicConeOptimizer, options),
+    ((3, 5, true), nothing, options),
+    ((3, 5, false), nothing, options),
+    ((6, 3, true), nothing, options),
+    ((6, 3, false), nothing, options),
     ]
 end
 
