@@ -473,7 +473,8 @@ function load(solver::Solver{T}, model::Models.Model{T}) where {T <: Real}
 end
 
 include("initialize.jl")
-include("stepper.jl")
+include("steppers/combined.jl")
+include("steppers/scaling.jl")
 include("systemsolvers/naive.jl")
 include("systemsolvers/naiveelim.jl")
 include("systemsolvers/symindef.jl")

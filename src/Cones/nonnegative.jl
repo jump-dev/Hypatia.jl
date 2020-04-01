@@ -11,9 +11,11 @@ barrier from "Self-Scaled Barriers and Interior-Point Methods for Convex Program
 mutable struct Nonnegative{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
     use_3order_corr::Bool
+    use_scaling::Bool
     max_neighborhood::T
     dim::Int
     point::Vector{T}
+    dual_point::Vector{T}
     timer::TimerOutput
 
     feas_updated::Bool
@@ -29,6 +31,7 @@ mutable struct Nonnegative{T <: Real} <: Cone{T}
 
     function Nonnegative{T}(
         dim::Int;
+        use_scaling::Bool = true,
         use_dual::Bool = false, # TODO self-dual so maybe remove this option/field?
         max_neighborhood::Real = default_max_neighborhood(),
         ) where {T <: Real}
@@ -37,6 +40,7 @@ mutable struct Nonnegative{T <: Real} <: Cone{T}
         cone.use_dual_barrier = use_dual
         cone.use_3order_corr = false # TODO maybe make it a function rather than a field
         cone.max_neighborhood = max_neighborhood
+        cone.use_scaling = use_scaling
         cone.dim = dim
         return cone
     end
@@ -44,7 +48,11 @@ end
 
 use_heuristic_neighborhood(cone::Nonnegative) = false
 
+use_scaling(cone::Nonnegative) = cone.use_scaling # TODO remove from here and just use one in Cones.jl when all cones allow scaling
+
 use_3order_corr(cone::Nonnegative) = cone.use_3order_corr
+
+load_dual_point(cone::Nonnegative, dual_point::AbstractVector) = copyto!(cone.dual_point, dual_point)
 
 reset_data(cone::Nonnegative) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
 
@@ -53,6 +61,7 @@ function setup_data(cone::Nonnegative{T}) where {T <: Real}
     reset_data(cone)
     dim = cone.dim
     cone.point = zeros(T, dim)
+    cone.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Diagonal(zeros(T, dim))
     cone.inv_hess = Diagonal(zeros(T, dim))
@@ -135,4 +144,20 @@ end
 function correction(cone::Nonnegative, primal_dir::AbstractVector, dual_dir::AbstractVector)
     @. cone.correction = primal_dir * dual_dir / cone.point
     return cone.correction
+end
+
+function step_max_dist(cone::Nonnegative{T}, primal_dir::AbstractVector{T}, dual_dir::AbstractVector{T}) where {T <: Real}
+    @assert cone.is_feas
+    point = cone.point
+    dual_point = cone.dual_point
+    dist = T(Inf)
+    @inbounds for i in eachindex(point)
+        if primal_dir[i] < 0
+            dist = min(dist, -point[i] / primal_dir[i])
+        end
+        if dual_dir[i] < 0
+            dist = min(dist, -dual_point[i] / dual_dir[i])
+        end
+    end
+    return dist
 end

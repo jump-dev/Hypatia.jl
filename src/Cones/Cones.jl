@@ -50,9 +50,11 @@ include("wsosinterpnonnegative.jl")
 include("wsosinterppossemideftri.jl")
 include("wsosinterpepinormeucl.jl")
 
+use_scaling(cone::Cone) = false
 use_dual_barrier(cone::Cone) = cone.use_dual_barrier
 use_3order_corr(cone::Cone) = false
 load_point(cone::Cone, point::AbstractVector) = copyto!(cone.point, point)
+load_dual_point(cone::Cone, ::AbstractVector) = nothing
 dimension(cone::Cone) = cone.dim
 set_timer(cone::Cone, timer::TimerOutput) = (cone.timer = timer)
 
@@ -62,6 +64,8 @@ hess(cone::Cone) = (cone.hess_updated ? cone.hess : update_hess(cone))
 inv_hess(cone::Cone) = (cone.inv_hess_updated ? cone.inv_hess : update_inv_hess(cone))
 
 # fallbacks
+
+step_and_update_scaling(::Cone{T}, ::AbstractVector{T}, ::AbstractVector{T}, ::T) where {T} = nothing
 
 reset_data(cone::Cone) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = false)
 
