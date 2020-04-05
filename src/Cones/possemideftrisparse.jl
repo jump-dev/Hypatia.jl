@@ -1,17 +1,17 @@
 #=
 Copyright 2020, Chris Coey, Lea Kapelevich and contributors
 
-sparse lower triangle of positive semidefinite matrix cone (unscaled "smat" form)
-dense(W) \in S^n : 0 >= eigmin(W)
+svec-scaled sparse positive semidefinite matrix cone
+mat(w) PSD
 
 specified with ordered lists of row and column indices for elements in lower triangle
-dual cone is cone of PSD-completable matrices given the same sparsity pattern
+must include all diagonal elements
+dual cone is cone of PSD-completable matrices with the given sparsity pattern
 real symmetric or complex Hermitian cases
-
 NOTE in complex Hermitian case, on-diagonal (real) elements have one slot in the vector and below diagonal (complex) elements have two consecutive slots in the vector, but row and column indices are not repeated
 
 see "Logarithmic barriers for sparse matrix cones" by Andersen, Dahl, Vandenberghe (2012)
-but note that we do not restrict the sparsity pattern to be chordal here (at the cost of not being able to obtain "closed form" hess sqrt and inv hess oracles)
+NOTE we do not restrict the sparsity pattern to be chordal here (at the cost of not being able to obtain "closed form" hess sqrt and inv hess oracles)
 barrier is -logdet(dense(W))
 
 NOTE only implemented for BLAS real types (Float32 and Float64) because implementation calls SuiteSparse.CHOLMOD
