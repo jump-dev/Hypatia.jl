@@ -79,20 +79,15 @@ function build(inst::NearestPSDJuMP{T}) where {T <: Float64} # TODO generic real
     else
         (row_idxs, col_idxs, A_vals) = findnz(A)
     end
-    num_nz = length(row_idxs)
-    diag_idxs = Int[]
-    for k in 1:num_nz
-        if row_idxs[k] == col_idxs[k]
-            push!(diag_idxs, k)
-        end
-    end
+    diag_idxs = findall(row_idxs .== col_idxs)
 
     model = JuMP.Model()
 
     if inst.use_sparsepsd || !inst.use_completable
-        JuMP.@variable(model, X[1:num_nz])
+        JuMP.@variable(model, X[1:length(row_idxs)])
         JuMP.@objective(model, Max, 2 * dot(A_vals, X) - sum(A_vals[k] * X[k] for k in diag_idxs)) # tr(A, X)
         JuMP.@constraint(model, sum(X[diag_idxs]) == 1) # tr(X) == 1
+        
         if inst.use_sparsepsd
             rt2 = sqrt(2)
             X_scal = [X[k] * (row_idxs[k] == col_idxs[k] ? 1.0 : rt2) for k in eachindex(X)]
