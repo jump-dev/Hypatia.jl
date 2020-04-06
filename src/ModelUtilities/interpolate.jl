@@ -387,11 +387,8 @@ function recover_lagrange_polys(pts::Matrix{T}, deg::Int) where {T <: Real}
     (U, n) = size(pts)
     DP.@polyvar x[1:n]
     monos = DP.monomials(x, 0:deg)
-    vandermonde_inv = inv([monos[j](pts[i, :]) for i in 1:U, j in 1:U])
-    lagrange_polys = Vector{DP.Polynomial{true, Float64}}(undef, U)
-    for i in 1:U
-        lagrange_polys[i] = DP.Polynomial(vandermonde_inv[:, i], monos)
-    end
+    vandermonde_inv = inv([monos[j](view(pts, i, :)) for i in 1:U, j in 1:U])
+    lagrange_polys = [DP.Polynomial(view(vandermonde_inv, :, i), monos) for i in 1:U]
     return lagrange_polys
 end
 
