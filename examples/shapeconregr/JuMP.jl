@@ -27,6 +27,8 @@ struct ShapeConRegrJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     deg::Int
     use_wsos::Bool # use WSOS cone formulation, else SDP formulation
     use_L1_obj::Bool # in objective function use L1 norm, else L2 norm
+    use_monotonicity::Bool # if true add monotonicity constraints, else don't
+    use_convexity::Bool # if true add convexity constraints, else don't
     is_fit_exact::Bool
 end
 function ShapeConRegrJuMP{Float64}(
@@ -69,54 +71,74 @@ shapeconregr_data = Dict(
     )
 
 example_tests(::Type{ShapeConRegrJuMP{Float64}}, ::MinimalInstances) = [
-    ((:naics5811, 3, true, false, false),),
-    ((1, 5, :func1, 2, 4, true, false, false),),
-    ((1, 5, :func1, 2, 4, true, true, false),),
-    ((1, 5, :func1, 2, 4, false, false, false),),
-    ((1, 5, :func1, 2, 4, false, false, false), ClassicConeOptimizer),
-    ((1, 5, :func1, 2, 4, false, true, false),),
-    ((1, 5, :func1, 2, 4, false, true, false), ClassicConeOptimizer),
+    ((:naics5811, 3, true, false, true, true, false),),
+    ((:naics5811, 3, true, false, true, false, false),),
+    ((:naics5811, 3, true, false, false, true, false),),
+    ((1, 5, :func1, 2, 4, true, false, true, true, false),),
+    ((1, 5, :func1, 2, 4, true, false, true, false, false),),
+    ((1, 5, :func1, 2, 4, true, false, false, true, false),),
+    ((1, 5, :func1, 2, 4, true, false, false, false, true),),
+    ((1, 5, :func1, 2, 4, true, true, true, true, false),),
+    ((1, 5, :func1, 2, 4, false, false, true, true, false),),
+    ((1, 5, :func1, 2, 4, false, false, true, true, false), ClassicConeOptimizer),
+    ((1, 5, :func1, 2, 4, false, true, true, true, false),),
+    ((1, 5, :func1, 2, 4, false, true, true, true, false), ClassicConeOptimizer),
+    ((1, 5, :func1, 2, 4, false, true, true, false, false), ClassicConeOptimizer),
+    ((1, 5, :func1, 2, 4, false, true, false, true, false), ClassicConeOptimizer),
+    ((1, 5, :func1, 2, 4, false, true, false, false, true), ClassicConeOptimizer),
     ]
 example_tests(::Type{ShapeConRegrJuMP{Float64}}, ::FastInstances) = begin
     options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
     relaxed_options = (tol_feas = 1e-5, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4)
     return [
-    ((:naics5811, 4, true, false, false), nothing, options),
-    ((:naics5811, 4, true, true, false), nothing, relaxed_options),
-    ((:naics5811, 3, false, false, false), nothing, options),
-    ((:naics5811, 3, false, false, false), ClassicConeOptimizer, options),
-    ((:naics5811, 3, false, true, false), nothing, options),
-    ((:naics5811, 3, false, true, false), ClassicConeOptimizer, options),
-    ((2, 50, :func1, 5, 3, true, false, false), nothing, options),
-    ((2, 50, :func2, 5, 3, true, true, false), nothing, options),
-    ((2, 50, :func3, 5, 3, false, false, false), nothing, options),
-    ((2, 50, :func3, 5, 3, false, false, false), ClassicConeOptimizer, options),
-    ((2, 50, :func4, 5, 3, false, true, false), nothing, options),
-    ((2, 50, :func4, 5, 3, false, true, false), ClassicConeOptimizer, options),
-    ((2, 50, :func5, 5, 4, true, false, false), nothing, options),
-    ((2, 50, :func6, 5, 4, true, true, false), nothing, options),
-    ((2, 50, :func7, 5, 4, false, false, false), nothing, options),
-    ((2, 50, :func8, 5, 4, false, true, false), nothing, options),
-    ((4, 150, :func6, 0, 4, true, false, true), nothing, relaxed_options),
-    ((4, 150, :func7, 0, 4, true, false, true), nothing, options),
-    ((4, 150, :func7, 0, 4, true, true, true), nothing, options),
-    ((4, 150, :func7, 0, 4, false, false, true), nothing, options),
-    ((3, 150, :func8, 0, 6, true, false, true), nothing, options),
-    ((5, 100, :func9, 9, 4, true, false, false), nothing, options),
-    ((5, 100, :func9, 9, 4, true, false, false), ClassicConeOptimizer, options),
-    ((5, 100, :func10, 4, 4, true, false, false), nothing, options),
-    ((5, 100, :func10, 4, 4, true, false, false), ClassicConeOptimizer, options),
+    ((:naics5811, 4, true, false, true, true, false), nothing, options),
+    ((:naics5811, 4, true, true, true, true, false), nothing, relaxed_options),
+    ((:naics5811, 3, false, false, true, true, false), nothing, options),
+    ((:naics5811, 3, false, false, true, true, false), ClassicConeOptimizer, options),
+    ((:naics5811, 3, false, true, true, true, false), nothing, options),
+    ((:naics5811, 3, false, true, true, true, false), ClassicConeOptimizer, options),
+    ((:naics5811, 3, false, true, true, false, false), ClassicConeOptimizer, options),
+    ((:naics5811, 3, false, true, false, true, false), ClassicConeOptimizer, options),
+    ((2, 50, :func1, 5, 3, true, false, true, true, false), nothing, options),
+    ((2, 50, :func1, 5, 3, true, false, true, false, false), nothing, options),
+    ((2, 50, :func1, 5, 3, true, false, false, true, false), nothing, options),
+    ((2, 50, :func1, 5, 3, true, false, false, false, true), nothing, options),
+    ((2, 50, :func2, 5, 3, true, true, true, true, false), nothing, options),
+    ((2, 50, :func3, 5, 3, false, false, true, true, false), nothing, options),
+    ((2, 50, :func3, 5, 3, false, false, true, true, false), ClassicConeOptimizer, options),
+    ((2, 50, :func4, 5, 3, false, true, true, true, false), nothing, options),
+    ((2, 50, :func4, 5, 3, false, true, true, true, false), ClassicConeOptimizer, options),
+    ((2, 50, :func5, 5, 4, true, false, true, true, false), nothing, options),
+    ((2, 50, :func6, 5, 4, true, true, true, true, false), nothing, options),
+    ((2, 50, :func7, 5, 4, false, false, true, true, false), nothing, options),
+    ((2, 50, :func8, 5, 4, false, true, true, true, false), nothing, options),
+    ((4, 150, :func6, 0, 4, true, false, true, true, true), nothing, relaxed_options),
+    ((4, 150, :func7, 0, 4, true, false, true, true, true), nothing, options),
+    ((4, 150, :func7, 0, 4, true, true, true, true, true), nothing, options),
+    ((4, 150, :func7, 0, 4, false, false, true, true, true), nothing, options),
+    ((3, 150, :func8, 0, 6, true, false, true, true, true), nothing, options),
+    ((5, 100, :func9, 9, 4, true, false, true, true, false), nothing, options),
+    ((5, 100, :func9, 9, 4, true, false, true, true, false), ClassicConeOptimizer, options),
+    ((5, 100, :func10, 4, 4, true, false, true, true, false), nothing, options),
+    ((5, 100, :func10, 4, 4, true, false, true, true, false), ClassicConeOptimizer, options),
+    ((5, 100, :func10, 4, 4, true, false, true, false, false), ClassicConeOptimizer, options),
+    ((5, 100, :func10, 4, 4, true, false, false, true, false), ClassicConeOptimizer, options),
+    ((5, 100, :func10, 4, 4, true, false, false, false, true), ClassicConeOptimizer, options),
     ]
 end
 example_tests(::Type{ShapeConRegrJuMP{Float64}}, ::SlowInstances) = begin
     options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
     return [
-    ((:naics5811, 7, true, false, false), nothing, options),
-    ((:naics5811, 5, false, false, false), ClassicConeOptimizer, options),
-    ((4, 150, :func6, 0, 4, false, false, true), nothing, options),
-    ((4, 150, :func6, 0, 4, false, false, true), ClassicConeOptimizer, options),
-    ((3, 150, :func8, 0, 6, false, false, true), nothing, options),
-    ((3, 150, :func8, 0, 6, false, false, true), ClassicConeOptimizer, options),
+    ((:naics5811, 7, true, false, true, true, false), nothing, options),
+    ((:naics5811, 5, false, false, true, true, false), ClassicConeOptimizer, options),
+    ((4, 150, :func6, 0, 4, false, false, true, true, true), nothing, options),
+    ((4, 150, :func6, 0, 4, false, false, true, true, true), ClassicConeOptimizer, options),
+    ((3, 150, :func8, 0, 6, false, false, true, true, true), nothing, options),
+    ((3, 150, :func8, 0, 6, false, false, true, false, true), nothing, options),
+    ((3, 150, :func8, 0, 6, false, false, false, true, true), nothing, options),
+    ((3, 150, :func8, 0, 6, false, false, true, true, true), ClassicConeOptimizer, options),
+    ((3, 150, :func8, 0, 6, false, false, true, false, true), ClassicConeOptimizer, options),
+    ((3, 150, :func8, 0, 6, false, false, false, true, true), ClassicConeOptimizer, options),
     ]
 end
 
@@ -124,7 +146,6 @@ function build(inst::ShapeConRegrJuMP{T}) where {T <: Float64} # TODO generic re
     (X, y, deg) = (inst.X, inst.y, inst.deg)
     n = size(X, 2)
     num_points = size(X, 1)
-    # TODO allow options for below
     mono_dom = ModelUtilities.Box{T}(-ones(size(X, 2)), ones(size(X, 2)))
     conv_dom = mono_dom
     mono_profile = ones(Int, size(X, 2))
@@ -139,7 +160,7 @@ function build(inst::ShapeConRegrJuMP{T}) where {T <: Float64} # TODO generic re
 
     if inst.use_wsos
         # monotonicity
-        if !all(iszero, mono_profile)
+        if inst.use_monotonicity
             gradient_halfdeg = div(deg, 2)
             (mono_U, mono_points, mono_Ps, _) = ModelUtilities.interpolate(mono_dom, gradient_halfdeg)
             mono_wsos_cone = Hypatia.WSOSInterpNonnegativeCone{Float64, Float64}(mono_U, mono_Ps)
@@ -152,7 +173,7 @@ function build(inst::ShapeConRegrJuMP{T}) where {T <: Float64} # TODO generic re
         end
 
         # convexity
-        if !iszero(conv_profile)
+        if inst.use_convexity
             hessian_halfdeg = div(deg - 1, 2)
             (conv_U, conv_points, conv_Ps, _) = ModelUtilities.interpolate(conv_dom, hessian_halfdeg)
             conv_wsos_cone = Hypatia.WSOSInterpPosSemidefTriCone{Float64}(n, conv_U, conv_Ps)
@@ -165,16 +186,18 @@ function build(inst::ShapeConRegrJuMP{T}) where {T <: Float64} # TODO generic re
         PolyJuMP.setpolymodule!(model, SumOfSquares)
 
         # monotonicity
-        monotonic_set = ModelUtilities.get_domain_inequalities(mono_dom, x)
-        for j in 1:n
-            if !iszero(mono_profile[j])
-                gradient = DP.differentiate(regressor, x[j])
-                JuMP.@constraint(model, mono_profile[j] * gradient >= 0, domain = monotonic_set, maxdegree = 2 * div(deg, 2))
+        if inst.use_monotonicity
+            monotonic_set = ModelUtilities.get_domain_inequalities(mono_dom, x)
+            for j in 1:n
+                if !iszero(mono_profile[j])
+                    gradient = DP.differentiate(regressor, x[j])
+                    JuMP.@constraint(model, mono_profile[j] * gradient >= 0, domain = monotonic_set, maxdegree = 2 * div(deg, 2))
+                end
             end
         end
 
         # convexity
-        if !iszero(conv_profile)
+        if inst.use_convexity
             convex_set = ModelUtilities.get_domain_inequalities(conv_dom, x)
             hessian = DP.differentiate(regressor, x, 2)
             # maxdegree of each element in the SOS-matrix is 2 * div(deg - 1, 2), but we add 2 to take auxiliary monomials into account from the SumOfSquares transformation
