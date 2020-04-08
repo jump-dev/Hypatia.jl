@@ -391,16 +391,10 @@ function get_interp_pts(
     calc_w::Bool = false,
     sample_factor::Int = 10,
     ) where {T <: Real}
-    @show "here"
-    flush(stdout)
     n = get_dimension(dom)
     U = binomial(n + deg, n)
     candidate_pts = interp_sample(dom, U * sample_factor)
-    @show "a"
-    flush(stdout)
     M = Matrix{T}(undef, size(candidate_pts, 1), U)
-    @show "b"
-    flush(stdout)
     (keep_pts, w) = choose_interp_pts!(M, candidate_pts, deg, U, calc_w)
     return (candidate_pts[keep_pts, :], w)
 end
@@ -409,8 +403,8 @@ function recover_lagrange_polys(pts::Matrix{T}, deg::Int) where {T <: Real}
     (U, n) = size(pts)
     DP.@polyvar x[1:n]
     monos = DP.monomials(x, 0:deg)
-    @time vandermonde_inv = inv([monos[j](view(pts, i, :)) for i in 1:U, j in 1:U])
-    @time lagrange_polys = [DP.polynomial(view(vandermonde_inv, :, i), monos) for i in 1:U]
+    vandermonde_inv = inv([monos[j](view(pts, i, :)) for i in 1:U, j in 1:U])
+    lagrange_polys = [DP.polynomial(view(vandermonde_inv, :, i), monos) for i in 1:U]
     return lagrange_polys
 end
 
