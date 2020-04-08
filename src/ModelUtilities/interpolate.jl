@@ -100,24 +100,40 @@ function interpolate(
     d::Int; # TODO make this 2d
     calc_w::Bool = false,
     sample::Bool = (get_dimension(dom) >= 5) || !isa(dom, Box), # sample if n >= 5 or if domain is not Box
-    sample_factor::Int = 10,
+    sample_factor::Int = 0,
     ) where {T <: Real}
+    n = get_dimension(dom)
     if sample
-        return wsos_sample_params(dom, d, calc_w = calc_w, sample_factor = sample_factor)
+        if iszero(sample_factor)
+            U = binomial(n + 2d, n)
+            if U <= 12_000
+                sample_factor = 10
+            elseif U <= 15_000
+                sample_factor = 5
+            elseif U <= 35_000
+                sample_factor = 1
+            else
+                if calc_w
+                    error("dimensions are too large to compute quadrature weights")
+                end
+                # no qr
+            end
+        end
+        return wsos_sample_params(dom, d, calc_w, sample_factor)
     else
-        return wsos_box_params(sampling_region(dom), get_dimension(dom), d, calc_w = calc_w)
+        return wsos_box_params(sampling_region(dom), n, d, calc_w)
     end
 end
 
 # slow but high-quality hyperrectangle/box point selections
-wsos_box_params(dom::Domain, n::Int, d::Int; calc_w::Bool) = error("non-sampling based interpolation methods are only available for box domains")
+wsos_box_params(dom::Domain, n::Int, d::Int, calc_w::Bool) = error("non-sampling based interpolation methods are only available for box domains")
 
 # difference with sampling functions is that P0 is always formed using points in [-1, 1]
 function wsos_box_params(
     dom::Box{T},
     n::Int,
-    d::Int;
-    calc_w::Bool = false,
+    d::Int,
+    calc_w::Bool,
     ) where {T <: Real}
     # n could be larger than the dimension of dom if the original domain was a SemiFreeDomain
     (U, pts, P0, P0sub, w) = wsos_box_params(T, n, d, calc_w)
@@ -136,8 +152,8 @@ end
 function wsos_box_params(
     dom::FreeDomain{T},
     n::Int,
-    d::Int;
-    calc_w::Bool = false,
+    d::Int,
+    calc_w::Bool,
     ) where {T <: Real}
     # n could be larger than the dimension of dom if the original domain was a SemiFreeDomain
     (U, pts, P0, P0sub, w) = wsos_box_params(T, n, d, calc_w)
@@ -289,7 +305,7 @@ function approxfekete_data(T::Type{<:Real}, n::Int, d::Int, calc_w::Bool)
         end
     end
     dom = Box{T}(-ones(T, n), ones(T, n))
-    (pts, P0, P0sub, w) = make_wsos_arrays(dom, candidate_pts, 2d, U, L, calc_w = calc_w)
+    (pts, P0, P0sub, w) = make_wsos_arrays(dom, candidate_pts, 2d, U, L, calc_w)
 
     return (U, pts, P0, P0sub, w)
 end
@@ -339,8 +355,8 @@ function make_wsos_arrays(
     candidate_pts::Matrix{T},
     deg::Int,
     U::Int,
-    L::Int;
-    calc_w::Bool = false,
+    L::Int,
+    calc_w::Bool,
     ) where {T <: Real}
     (npts, n) = size(candidate_pts)
     M = Matrix{T}(undef, npts, U)
@@ -355,14 +371,14 @@ end
 # fast, sampling-based point selection for general domains
 function wsos_sample_params(
     dom::Domain,
-    d::Int;
-    calc_w::Bool = false,
-    sample_factor::Int = 10,
+    d::Int,
+    calc_w,
+    sample_factor,
     )
     n = get_dimension(dom)
     (L, U) = get_L_U(n, d)
     candidate_pts = interp_sample(dom, U * sample_factor)
-    (pts, P0, P0sub, w) = make_wsos_arrays(dom, candidate_pts, 2d, U, L, calc_w = calc_w)
+    (pts, P0, P0sub, w) = make_wsos_arrays(dom, candidate_pts, 2d, U, L, calc_w)
     g = get_weights(dom, pts)
     PWts = [sqrt.(gi) .* P0sub for gi in g]
     return (U = U, pts = pts, Ps = [P0, PWts...], w = w)
@@ -375,10 +391,16 @@ function get_interp_pts(
     calc_w::Bool = false,
     sample_factor::Int = 10,
     ) where {T <: Real}
+    @show "here"
+    flush(stdout)
     n = get_dimension(dom)
     U = binomial(n + deg, n)
     candidate_pts = interp_sample(dom, U * sample_factor)
+    @show "a"
+    flush(stdout)
     M = Matrix{T}(undef, size(candidate_pts, 1), U)
+    @show "b"
+    flush(stdout)
     (keep_pts, w) = choose_interp_pts!(M, candidate_pts, deg, U, calc_w)
     return (candidate_pts[keep_pts, :], w)
 end
@@ -387,8 +409,8 @@ function recover_lagrange_polys(pts::Matrix{T}, deg::Int) where {T <: Real}
     (U, n) = size(pts)
     DP.@polyvar x[1:n]
     monos = DP.monomials(x, 0:deg)
-    vandermonde_inv = inv([monos[j](view(pts, i, :)) for i in 1:U, j in 1:U])
-    lagrange_polys = [DP.polynomial(view(vandermonde_inv, :, i), monos) for i in 1:U]
+    @time vandermonde_inv = inv([monos[j](view(pts, i, :)) for i in 1:U, j in 1:U])
+    @time lagrange_polys = [DP.polynomial(view(vandermonde_inv, :, i), monos) for i in 1:U]
     return lagrange_polys
 end
 
