@@ -22,9 +22,9 @@ default_solver_options = (
 
 # instance sets and real types to run and corresponding time limits (seconds)
 instance_sets = [
-    (MinimalInstances, Float64, 15),
-    (MinimalInstances, Float32, 15),
-    (MinimalInstances, BigFloat, 60),
+    # (MinimalInstances, Float64, 15),
+    # (MinimalInstances, Float32, 15),
+    # (MinimalInstances, BigFloat, 60),
     # (FastInstances, Float64, 15),
     # (SlowInstances, Float64, 120),
     ]
@@ -37,43 +37,43 @@ model_types = [
 
 # list of names of native examples to run
 native_example_names = [
-    "densityest",
-    "envelope",
-    "expdesign",
-    "linearopt",
-    "matrixcompletion",
-    "matrixregression",
-    "maxvolume",
+    # "densityest",
+    # "envelope",
+    # "expdesign",
+    # "linearopt",
+    # "matrixcompletion",
+    # "matrixregression",
+    # "maxvolume",
     "polymin",
-    "portfolio",
-    "sparsepca",
+    # "portfolio",
+    # "sparsepca",
     ]
 
 # list of names of JuMP examples to run
 JuMP_example_names = [
-    "centralpolymat",
-    "conditionnum",
-    "contraction",
-    "densityest",
-    "envelope",
-    "expdesign",
-    "lotkavolterra",
-    "lyapunovstability",
-    "matrixcompletion",
-    "matrixquadratic",
-    "matrixregression",
-    "maxvolume",
-    "muconvexity",
-    "nearestpsd",
+    # "centralpolymat",
+    # "conditionnum",
+    # "contraction",
+    # "densityest",
+    # "envelope",
+    # "expdesign",
+    # "lotkavolterra",
+    # "lyapunovstability",
+    # "matrixcompletion",
+    # "matrixquadratic",
+    # "matrixregression",
+    # "maxvolume",
+    # "muconvexity",
+    # "nearestpsd",
     "polymin",
-    "polynorm",
-    "portfolio",
-    "regionofattr",
-    "robustgeomprog",
-    "secondorderpoly",
-    "semidefinitepoly",
-    "shapeconregr",
-    "signomialmin",
+    # "polynorm",
+    # "portfolio",
+    # "regionofattr",
+    # "robustgeomprog",
+    # "secondorderpoly",
+    # "semidefinitepoly",
+    # "shapeconregr",
+    # "signomialmin",
     ]
 
 # start the tests
@@ -87,6 +87,67 @@ for mod_type in model_types, ex in eval(Symbol(mod_type, "_example_names"))
     ex_type = include(joinpath(examples_dir, ex, mod_type * ".jl"))
     push!(example_types, (ex, ex_type))
 end
+
+
+
+include_file = joinpath(@__DIR__, "..", "..", "Supplements", "instances.jl")
+include(include_file)
+
+solvers = [Hypatia.Optimizer]
+
+# make_instances(CentralPolyMatJuMP, solvers)
+# make_instances(ConditionNumJuMP, solvers)
+# make_instances(DensityEstJuMP, solvers)
+# make_instances(DensityEstNative, solvers)
+# make_instances(ExpDesignJuMP, solvers)
+# make_instances(MatrixCompletionJuMP, solvers)
+# make_instances(MatrixRegressionJuMP, solvers)
+# make_instances(MaxVolumeJuMP, solvers)
+# make_instances(NearestPSDJuMP, solvers)
+make_instances(PolyMinJuMP, solvers)
+make_instances(PolyMinNative, solvers)
+
+instance_sets = [
+    # CentralPolyMatJuMP_LogDet_Nat,
+    # CentralPolyMatJuMP_RootDet_Nat,
+    # CentralPolyMatJuMP_LogDet_Ext,
+    # CentralPolyMatJuMP_RootDet_Ext,
+    # ConditionNumJuMP_Nat,
+    # ConditionNumJuMP_Ext,
+    # DensityEstJuMP_Random_Nat,
+    # DensityEstJuMP_Random_Ext,
+    # DensityEstJuMP_Applied_Nat,
+    # DensityEstJuMP_Applied_Ext,
+    # DensityEstNative_Random_Nat,
+    # DensityEstNative_Random_Ext,
+    # DensityEstNative_Applied_Nat,
+    # DensityEstNative_Applied_Ext,
+    # ExpDesignJuMP_LogDet_Nat,
+    # ExpDesignJuMP_RootDet_Nat,
+    # ExpDesignJuMP_LogDet_Ext,
+    # ExpDesignJuMP_RootDet_Ext,
+    # MatrixCompletionJuMP_Nat,
+    # MatrixCompletionJuMP_Ext,
+    # MatrixRegressionJuMP_Nat,
+    # MatrixRegressionJuMP_Ext,
+    # MaxVolumeJuMP_Nat,
+    # MaxVolumeJuMP_ExtSO,
+    # MaxVolumeJuMP_ExtExp, # TODO waiting for PR
+    # NearestPSDJuMP_Sparse_Nat,
+    # NearestPSDJuMP_Sparse_Ext,
+    # NearestPSDJuMP_Compl_Nat,
+    # NearestPSDJuMP_Compl_Ext,
+    # PolyMinJuMP_Random_Nat,
+    # PolyMinJuMP_Random_Ext,
+    # PolyMinJuMP_Applied_Nat,
+    # PolyMinJuMP_Applied_Ext,
+    PolyMinNative_Random_Nat,
+    PolyMinNative_Random_Ext,
+    PolyMinNative_Applied_Nat,
+    PolyMinNative_Applied_Ext,
+    ]
+instance_sets = [(inst_set, Float64, 120) for inst_set in instance_sets]
+
 
 perf = DataFrame(
     example = Type{<:ExampleInstance}[],

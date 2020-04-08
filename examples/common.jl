@@ -16,6 +16,7 @@ import Hypatia.Models
 import Hypatia.Solvers
 
 abstract type InstanceSet end
+# TODO instead of structs, these can be abstract types
 struct MinimalInstances <: InstanceSet end
 struct FastInstances <: InstanceSet end
 struct SlowInstances <: InstanceSet end
@@ -72,7 +73,7 @@ function certificate_violations(
         x_viol = NaN
         y_viol = norm(y_res_rel, Inf)
         z_viol = norm(z_res_rel, Inf)
-    elseif status == :IllPosed
+    else#if status == :IllPosed
         # TODO primal vs dual ill-posed statuses and conditions
         x_viol = NaN
         y_viol = NaN
