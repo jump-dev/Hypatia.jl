@@ -341,7 +341,7 @@ function choose_interp_pts(
         end
     end
 
-    if !calc_w && n == U && U > 35_000
+    if !calc_w && size(candidate_pts, 1) == U && U > 35_000
         # large matrix and don't need to perform QR procedure, so don't
         # TODO this is hacky; later the interpolate function and functions it calls should take options (and have better defaults) for whether to perform the QR or not
         return (1:U, T[])
