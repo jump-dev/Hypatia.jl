@@ -110,13 +110,13 @@ function interpolate(
                 sample_factor = 10
             elseif U <= 15_000
                 sample_factor = 5
-            elseif U <= 35_000
-                sample_factor = 1
+            elseif U <= 22_000
+                sample_factor = 2
             else
-                if calc_w
+                sample_factor = 1
+                if U > 35_000 && calc_w
                     error("dimensions are too large to compute quadrature weights")
                 end
-                # no qr
             end
         end
         return wsos_sample_params(dom, d, calc_w, sample_factor)
@@ -311,7 +311,7 @@ function approxfekete_data(T::Type{<:Real}, n::Int, d::Int, calc_w::Bool)
 end
 
 # indices of points to keep and quadrature weights at those points
-function choose_interp_pts!(
+function choose_interp_pts(
     M::Matrix{T},
     candidate_pts::Matrix{T},
     deg::Int,
@@ -320,6 +320,7 @@ function choose_interp_pts!(
     ) where {T <: Real}
     n = size(candidate_pts, 2)
     u = calc_u(n, deg, candidate_pts)
+    # TODO don't need m if calc_w = false
     m = Vector{T}(undef, U)
     m[1] = 2^n
     M[:, 1] .= 1
@@ -339,15 +340,23 @@ function choose_interp_pts!(
             end
         end
     end
+
+    if !calc_w && n == U && U > 35_000
+        # large matrix and don't need to perform QR procedure, so don't
+        # TODO this is hacky; later the interpolate function and functions it calls should take options (and have better defaults) for whether to perform the QR or not
+        return (1:U, T[])
+    end
+
     F = qr!(Array(M'), Val(true))
+    keep_pts = F.p[1:U]
+
     if calc_w
         Qtm = F.Q' * m
         w = UpperTriangular(F.R[:, 1:U]) \ Qtm
-    else
-        w = T[]
+        return (keep_pts, w)
     end
 
-    return (F.p[1:U], w)
+    return (keep_pts, T[])
 end
 
 function make_wsos_arrays(
@@ -360,7 +369,7 @@ function make_wsos_arrays(
     ) where {T <: Real}
     (npts, n) = size(candidate_pts)
     M = Matrix{T}(undef, npts, U)
-    (keep_pts, w) = choose_interp_pts!(M, candidate_pts, deg, U, calc_w)
+    (keep_pts, w) = choose_interp_pts(M, candidate_pts, deg, U, calc_w)
     pts = candidate_pts[keep_pts, :]
     P0 = M[keep_pts, 1:L] # subset of polynomial evaluations up to total degree d
     subd = div(deg - get_degree(dom), 2)
@@ -368,12 +377,12 @@ function make_wsos_arrays(
     return (pts, P0, P0sub, w)
 end
 
-# fast, sampling-based point selection for general domains
+# sampling-based point selection for general domains
 function wsos_sample_params(
     dom::Domain,
     d::Int,
-    calc_w,
-    sample_factor,
+    calc_w::Bool,
+    sample_factor::Int,
     )
     n = get_dimension(dom)
     (L, U) = get_L_U(n, d)
@@ -395,9 +404,10 @@ function get_interp_pts(
     U = binomial(n + deg, n)
     candidate_pts = interp_sample(dom, U * sample_factor)
     M = Matrix{T}(undef, size(candidate_pts, 1), U)
-    (keep_pts, w) = choose_interp_pts!(M, candidate_pts, deg, U, calc_w)
+    (keep_pts, w) = choose_interp_pts(M, candidate_pts, deg, U, calc_w)
     return (candidate_pts[keep_pts, :], w)
 end
+
 
 function recover_lagrange_polys(pts::Matrix{T}, deg::Int) where {T <: Real}
     (U, n) = size(pts)
