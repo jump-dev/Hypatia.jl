@@ -97,15 +97,20 @@ get_L_U(n::Int, d::Int) = (binomial(n + d, n), binomial(n + 2d, n))
 
 function interpolate(
     dom::Domain{T},
-    d::Int; # TODO make this 2d
+    d::Int;
     calc_w::Bool = false,
-    sample::Bool = (get_dimension(dom) >= 5) || !isa(dom, Box), # sample if n >= 5 or if domain is not Box
+    sample = nothing,
     sample_factor::Int = 0,
     ) where {T <: Real}
     n = get_dimension(dom)
+    U = binomial(n + 2d, n)
+
+    if isnothing(sample)
+        sample = (!isa(dom, Box) || num_approxfekete_candidate_pts(n, d) > 35_000)
+    end
+
     if sample
-        if iszero(sample_factor)
-            U = binomial(n + 2d, n)
+        if sample_factor <= 0
             if U <= 12_000
                 sample_factor = 10
             elseif U <= 15_000
@@ -279,14 +284,17 @@ function padua_data(T::Type{<:Real}, d::Int, calc_w::Bool)
     return (U, pts, P0, P0sub, w)
 end
 
+num_approxfekete_candidate_pts(n::Int, d::Int) = prod((2d + 1):(2d + n))
+
 function approxfekete_data(T::Type{<:Real}, n::Int, d::Int, calc_w::Bool)
     @assert d > 0
     @assert n > 1
     (L, U) = get_L_U(n, d)
 
     # points in the initial interpolation grid
-    npts = prod((2d + 1):(2d + n))
+    npts = num_approxfekete_candidate_pts(n, d)
     candidate_pts = Matrix{T}(undef, npts, n)
+
     for j in 1:n
         ig = prod((2d + 1 + j):(2d + n))
         cs = cheb2_pts(T, 2d + j)
