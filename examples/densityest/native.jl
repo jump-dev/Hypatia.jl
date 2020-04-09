@@ -27,7 +27,8 @@ function DensityEstNative{T}(
     deg::Int,
     use_wsos::Bool,
     hypogeomean_obj::Bool,
-    use_hypogeomean::Bool) where {T <: Real}
+    use_hypogeomean::Bool,
+    ) where {T <: Real}
     X = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "$dataset_name.txt"))
     X = convert(Matrix{T}, X)
     (num_obs, n) = size(X)

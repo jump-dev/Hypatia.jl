@@ -63,8 +63,8 @@ function test(
     E::Type{<:ExampleInstanceJuMP{Float64}}, # an instance of a JuMP example # TODO support generic reals
     inst_data::Tuple,
     extender = nothing, # MOI.Utilities.@model-defined optimizer with subset of cones if using extended formulation
-    solver_options = (),
-    solver::Type{<:MOI.AbstractOptimizer} = Hypatia.Optimizer; # additional non-default solver options specific to the example
+    solver_options = (), # additional non-default solver options specific to the example
+    solver::Type{<:MOI.AbstractOptimizer} = Hypatia.Optimizer;
     default_solver_options = (), # default solver options
     process_extended_certificates::Bool = true, # whether to process the certificates for the extended space model (for Hypatia only) or the natural space model
     rseed::Int = 1,
@@ -78,7 +78,7 @@ function test(
     opt = solver{Float64}(; default_solver_options..., solver_options...)
     if !isnothing(extender)
         # use MOI automated extended formulation
-        opt = MOI.Bridges.full_bridge_optimizer(MOI.Utilities.CachingOptimizer(ClassicConeOptimizer{Float64}(), opt), Float64)
+        opt = MOI.Bridges.full_bridge_optimizer(MOI.Utilities.CachingOptimizer(extender{Float64}(), opt), Float64)
     end
     JuMP.set_optimizer(model, () -> opt)
     JuMP.optimize!(model)
@@ -99,6 +99,7 @@ function test(
 end
 
 # return solve information and certificate violations
+# TODO finish natural space certificate checks and delete unused code
 function process_result_JuMP(model::JuMP.Model)
     solve_time = JuMP.solve_time(model)
     num_iters = MOI.get(model, MOI.BarrierIterations())
