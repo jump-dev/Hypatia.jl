@@ -99,6 +99,7 @@ function test(
 end
 
 # return solve information and certificate violations
+# TODO finish natural space certificate checks and delete unused code
 function process_result_JuMP(model::JuMP.Model)
     solve_time = JuMP.solve_time(model)
     num_iters = MOI.get(model, MOI.BarrierIterations())

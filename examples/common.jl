@@ -73,8 +73,8 @@ function certificate_violations(
         x_viol = NaN
         y_viol = norm(y_res_rel, Inf)
         z_viol = norm(z_res_rel, Inf)
-    else#if status == :IllPosed
-        # TODO primal vs dual ill-posed statuses and conditions
+    # TODO elseif status == :IllPosed # primal vs dual ill-posed statuses and conditions
+    else # failure
         x_viol = NaN
         y_viol = NaN
         z_viol = NaN
