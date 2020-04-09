@@ -45,11 +45,11 @@ function PolyMinNative{T}(
 end
 
 example_tests(::Type{<:PolyMinNative{<:Real}}, ::MinimalInstances) = [
-    # ((false, 1, 2, true, true, false),),
-    # ((false, 1, 2, false, true, false),),
-    # ((false, 1, 2, false, false, false),),
-    # ((true, :abs1d, 1, true, true, false),),
-    # ((true, :abs1d, 1, false, true, false),),
+    ((false, 1, 2, true, true, false),),
+    ((false, 1, 2, false, true, false),),
+    ((false, 1, 2, false, false, false),),
+    ((true, :abs1d, 1, true, true, false),),
+    ((true, :abs1d, 1, false, true, false),),
     ((false, :motzkin, 3, false, true, false),),
     ]
 example_tests(::Type{PolyMinNative{Float64}}, ::FastInstances) = [
