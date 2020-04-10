@@ -45,6 +45,7 @@ function ShapeConRegrJuMP{Float64}(
     args...;
     xmin::Real = -1,
     xmax::Real = 1)
+    Random.seed!(1) # TODO remove
     X = rand(Distributions.Uniform(xmin, xmax), num_points, n)
     f = shapeconregr_data[func]
     y = Float64[f(X[p, :]) for p in 1:num_points]
@@ -102,7 +103,9 @@ example_tests(::Type{ShapeConRegrJuMP{Float64}}, ::FastInstances) = begin
     # ((2, 50, :func1, 5, 3, true, false, false, true, false), nothing, options),
     # ((2, 200, :func1, 0, 3, true, false, false, false, true), nothing, options),
     # ((2, 50, :func2, 5, 3, true, true, true, true, false), nothing, options),
-    ((2, 50, :func3, 5, 3, false, true, true, true, false), nothing, options),
+    ((2, 50, :func3, 10, 4, false, true, false, true, false), nothing, options),
+    ((2, 50, :func3, 10, 4, true, true, false, true, false), nothing, options),
+    #
     # ((2, 50, :func3, 5, 3, false, true, true, true, false), ClassicConeOptimizer, options),
     # ((2, 50, :func4, 5, 3, false, true, true, true, false), nothing, options),
     # ((2, 50, :func4, 5, 3, false, true, true, true, false), ClassicConeOptimizer, options),
@@ -115,7 +118,7 @@ example_tests(::Type{ShapeConRegrJuMP{Float64}}, ::FastInstances) = begin
     # ((4, 150, :func7, 0, 4, true, true, true, true, true), nothing, options),
     # ((4, 150, :func7, 0, 4, false, false, true, true, true), nothing, options),
     # ((3, 150, :func8, 0, 6, true, false, true, true, true), nothing, relaxed_options),
-    # ((1, 200, :func10, 100.0, 200, true, false, false, true, false), options),
+    # ((1, 200, :func10, 100.0, 200, true, false, false, true, false), nothing, options),
     ]
 end
 example_tests(::Type{ShapeConRegrJuMP{Float64}}, ::SlowInstances) = begin
@@ -154,14 +157,28 @@ function build(inst::ShapeConRegrJuMP{T}) where {T <: Float64} # TODO generic re
     mono_profile = ones(Int, size(X, 2))
     conv_profile = 1
 
-    (regressor_points, _) = ModelUtilities.get_interp_pts(ModelUtilities.FreeDomain{Float64}(n), deg)
-    lagrange_polys = ModelUtilities.recover_lagrange_polys(regressor_points, deg)
-    x = DP.variables(lagrange_polys)
+    use_mono = false
 
     U = binomial(n + deg, n)
     model = JuMP.Model()
     JuMP.@variable(model, regressor[1:U])
-    regressor_fun = DP.polynomial(regressor, lagrange_polys)
+    if use_mono
+        DP.@polyvar x[1:n]
+        monos = DP.monomials(x, 0:deg)
+        regressor_fun = DP.polynomial(regressor, monos)
+    else
+        (regressor_points, _) = ModelUtilities.get_interp_pts(ModelUtilities.FreeDomain{Float64}(n), deg)
+        #
+        # lagrange_polys = ModelUtilities.recover_lagrange_polys(regressor_points, deg)
+        # regressor_fun = DP.polynomial(regressor, lagrange_polys)
+        # x = DP.variables(lagrange_polys)
+        #
+        DP.@polyvar x[1:n]
+        monos = DP.monomials(x, 0:deg)
+        vandermonde = [monos[j](view(regressor_points, i, :)) for i in 1:U, j in 1:U]
+        regressor_mono = inv(vandermonde) * regressor
+        regressor_fun = DP.polynomial(regressor_mono, monos)
+    end
 
     # monotonicity
     if inst.use_monotonicity
@@ -192,15 +209,13 @@ function build(inst::ShapeConRegrJuMP{T}) where {T <: Float64} # TODO generic re
     if inst.use_convexity
         hessian_halfdeg = div(deg - 1, 2)
         (conv_U, conv_points, conv_Ps, _) = ModelUtilities.interpolate(conv_dom, hessian_halfdeg)
-        conv_wsos_cone = Hypatia.WSOSInterpPosSemidefTriCone{Float64}(n, conv_U, conv_Ps)
         hessian_fun = DP.differentiate(regressor_fun, x, 2)
         hessian_interp = [hessian_fun[i, j](conv_points[u, :]) for i in 1:n for j in 1:i for u in 1:conv_U]
         if inst.use_wsos
             ModelUtilities.vec_to_svec!(hessian_interp, rt2 = sqrt(2), incr = conv_U)
-            JuMP.@constraint(model, conv_profile * hessian_interp in conv_wsos_cone)
+            JuMP.@constraint(model, conv_profile * hessian_interp in Hypatia.WSOSInterpPosSemidefTriCone{Float64}(n, conv_U, conv_Ps))
         else
             psd_vars = []
-            sdim_m = CO.svec_length(n)
             for (r, Pr) in enumerate(conv_Ps)
                 Lr = size(Pr, 2)
                 psd_r = JuMP.@variable(model, [1:(Lr * n), 1:(Lr * n)], Symmetric)
@@ -212,10 +227,8 @@ function build(inst::ShapeConRegrJuMP{T}) where {T <: Float64} # TODO generic re
             offset = 0
             for x1 in 1:n, x2 in 1:x1
                 offset += 1
-                row_start = (x1 - 1) * conv_U
-                col_start = (x2 - 1) * conv_U
                 coeffs_lhs = JuMP.@expression(model, [u in 1:conv_U], sum(sum(conv_Ps[r][u, k] * conv_Ps[r][u, l] * psd_vars[r][(x1 - 1) * Ls[r] + k, (x2 - 1) * Ls[r] + l] * (k == l ? 1 : 2) for k in 1:Ls[r] for l in 1:k) for r in eachindex(Ls)))
-                JuMP.@constraint(model, coeffs_lhs .== hessian_interp[((offset - 1) * conv_U + 1):(offset * conv_U)])
+                JuMP.@constraint(model, coeffs_lhs .== hessian_interp[conv_U .* (offset - 1) .+ (1:conv_U)])
             end # x1, x2
         end # use_wsos
     end # use_convexity
