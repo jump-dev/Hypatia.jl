@@ -103,8 +103,8 @@ example_tests(::Type{ShapeConRegrJuMP{Float64}}, ::FastInstances) = begin
     # ((2, 50, :func1, 5, 3, true, false, false, true, false), nothing, options),
     # ((2, 200, :func1, 0, 3, true, false, false, false, true), nothing, options),
     # ((2, 50, :func2, 5, 3, true, true, true, true, false), nothing, options),
-    ((2, 50, :func3, 10, 4, false, true, false, true, false), nothing, options),
-    ((2, 50, :func3, 10, 4, true, true, false, true, false), nothing, options),
+    ((2, 50, :func3, 10, 3, false, true, false, true, false), nothing, options),
+    ((2, 50, :func3, 10, 3, true, true, false, true, false), nothing, options),
     #
     # ((2, 50, :func3, 5, 3, false, true, true, true, false), ClassicConeOptimizer, options),
     # ((2, 50, :func4, 5, 3, false, true, true, true, false), nothing, options),
@@ -227,7 +227,18 @@ function build(inst::ShapeConRegrJuMP{T}) where {T <: Float64} # TODO generic re
             offset = 0
             for x1 in 1:n, x2 in 1:x1
                 offset += 1
-                coeffs_lhs = JuMP.@expression(model, [u in 1:conv_U], sum(sum(conv_Ps[r][u, k] * conv_Ps[r][u, l] * psd_vars[r][(x1 - 1) * Ls[r] + k, (x2 - 1) * Ls[r] + l] * (k == l ? 1 : 2) for k in 1:Ls[r] for l in 1:k) for r in eachindex(Ls)))
+                # coeffs_lhs = Vector{JuMP.GenericAffExpr}(undef, conv_U)
+                # for u in 1:conv_U
+                #     coeffs_lhs[u] = 0.0 * psd_vars[1][1, 1]
+                #     for (Pr, psd_r) in zip(conv_Ps, psd_vars)
+                #         Lr = size(Pr, 2)
+                #         for k in 1:Lr, l in 1:Lr
+                #             coeffs_lhs[u] += Pr[u, k] * Pr[u, l] * psd_r[(x1 - 1) * Lr + k, (x2 - 1) * Lr + l]
+                #         end
+                #     end
+                # end
+                # note that psd_vars[r][(x1 - 1) * Ls[r] + k, (x2 - 1) * Ls[r] + l] is not necessarily symmetric
+                coeffs_lhs = JuMP.@expression(model, [u in 1:conv_U], sum(sum(conv_Ps[r][u, k] * conv_Ps[r][u, l] * psd_vars[r][(x1 - 1) * Ls[r] + k, (x2 - 1) * Ls[r] + l] for k in 1:Ls[r] for l in 1:Ls[r]) for r in eachindex(Ls)))
                 JuMP.@constraint(model, coeffs_lhs .== hessian_interp[conv_U .* (offset - 1) .+ (1:conv_U)])
             end # x1, x2
         end # use_wsos
