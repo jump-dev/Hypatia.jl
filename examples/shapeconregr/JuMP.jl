@@ -103,8 +103,8 @@ example_tests(::Type{ShapeConRegrJuMP{Float64}}, ::FastInstances) = begin
     # ((2, 50, :func1, 5, 3, true, false, false, true, false), nothing, options),
     # ((2, 200, :func1, 0, 3, true, false, false, false, true), nothing, options),
     # ((2, 50, :func2, 5, 3, true, true, true, true, false), nothing, options),
-    ((2, 50, :func3, 10, 3, false, true, false, true, false), nothing, options),
-    ((2, 50, :func3, 10, 3, true, true, false, true, false), nothing, options),
+    # ((2, 50, :func3, 10, 3, false, true, false, true, false), nothing, options),
+    # ((2, 50, :func3, 10, 3, true, true, false, true, false), nothing, options),
     #
     # ((2, 50, :func3, 5, 3, false, true, true, true, false), ClassicConeOptimizer, options),
     # ((2, 50, :func4, 5, 3, false, true, true, true, false), nothing, options),
@@ -118,7 +118,7 @@ example_tests(::Type{ShapeConRegrJuMP{Float64}}, ::FastInstances) = begin
     # ((4, 150, :func7, 0, 4, true, true, true, true, true), nothing, options),
     # ((4, 150, :func7, 0, 4, false, false, true, true, true), nothing, options),
     # ((3, 150, :func8, 0, 6, true, false, true, true, true), nothing, relaxed_options),
-    # ((1, 200, :func10, 100.0, 200, true, false, false, true, false), nothing, options),
+    ((1, 100, :func10, 50.0, 100, true, false, false, true, false), nothing, options),
     ]
 end
 example_tests(::Type{ShapeConRegrJuMP{Float64}}, ::SlowInstances) = begin
@@ -175,9 +175,13 @@ function build(inst::ShapeConRegrJuMP{T}) where {T <: Float64} # TODO generic re
         #
         DP.@polyvar x[1:n]
         monos = DP.monomials(x, 0:deg)
+        cheby_monos = basis_covering_monomials(ChebyshevBasisSecondKind, [monos...]).polynomials # yuck typing
+        # vandermonde = [cheby_monos[j](view(regressor_points, i, :)) for i in 1:U, j in 1:U]
         vandermonde = [monos[j](view(regressor_points, i, :)) for i in 1:U, j in 1:U]
+        @show cond(vandermonde)
         regressor_mono = inv(vandermonde) * regressor
         regressor_fun = DP.polynomial(regressor_mono, monos)
+        # regressor_fun = DP.polynomial(regressor_mono, cheby_monos)
     end
 
     # monotonicity
@@ -227,16 +231,6 @@ function build(inst::ShapeConRegrJuMP{T}) where {T <: Float64} # TODO generic re
             offset = 0
             for x1 in 1:n, x2 in 1:x1
                 offset += 1
-                # coeffs_lhs = Vector{JuMP.GenericAffExpr}(undef, conv_U)
-                # for u in 1:conv_U
-                #     coeffs_lhs[u] = 0.0 * psd_vars[1][1, 1]
-                #     for (Pr, psd_r) in zip(conv_Ps, psd_vars)
-                #         Lr = size(Pr, 2)
-                #         for k in 1:Lr, l in 1:Lr
-                #             coeffs_lhs[u] += Pr[u, k] * Pr[u, l] * psd_r[(x1 - 1) * Lr + k, (x2 - 1) * Lr + l]
-                #         end
-                #     end
-                # end
                 # note that psd_vars[r][(x1 - 1) * Ls[r] + k, (x2 - 1) * Ls[r] + l] is not necessarily symmetric
                 coeffs_lhs = JuMP.@expression(model, [u in 1:conv_U], sum(sum(conv_Ps[r][u, k] * conv_Ps[r][u, l] * psd_vars[r][(x1 - 1) * Ls[r] + k, (x2 - 1) * Ls[r] + l] for k in 1:Ls[r] for l in 1:Ls[r]) for r in eachindex(Ls)))
                 JuMP.@constraint(model, coeffs_lhs .== hessian_interp[conv_U .* (offset - 1) .+ (1:conv_U)])
