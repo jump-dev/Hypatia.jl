@@ -104,10 +104,7 @@ function build(inst::DensityEstNative{T}) where {T <: Real}
     halfdeg = div(inst.deg + 1, 2)
     (U, pts, Ps, w) = ModelUtilities.interpolate(domain, halfdeg, calc_w = true)
     lagrange_polys = ModelUtilities.recover_lagrange_polys(pts, 2 * halfdeg)
-    basis_evals = Matrix{T}(undef, num_obs, U)
-    for i in 1:num_obs, j in 1:U
-        basis_evals[i, j] = lagrange_polys[j](X[i, :])
-    end
+    basis_evals = [lagrange_polys[j](X[i, :]) for i in 1:inst.num_obs, j in 1:U]
 
     cones = Cones.Cone{T}[]
 
