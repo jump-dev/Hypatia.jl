@@ -1,10 +1,9 @@
 #=
 Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
-given a sequence of observations X_1,...,X_n with each Xᵢ in Rᵈ,
+given a sequence of observations X_1,...,X_n with each X_i in Rᵈ,
 find a density function f maximizing the log likelihood of the observations
-    min -∑ᵢ zᵢ
-    -zᵢ + log(f(Xᵢ)) ≥ 0 ∀ i = 1,...,n
+    max prod_i f(X_i)
     ∫f = 1
     f ≥ 0
 =#
