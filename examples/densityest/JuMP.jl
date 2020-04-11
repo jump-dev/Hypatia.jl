@@ -19,7 +19,11 @@ function DensityEstJuMP{Float64}(
     dataset_name::Symbol,
     deg::Int,
     use_wsos::Bool)
-    X = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "$dataset_name.txt"))
+    if dataset_name == :Uniform
+        X = (rand(num_obs, n) .- 0.5) .* 2
+    else
+        X = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "$dataset_name.txt"))
+    end
     return DensityEstJuMP{Float64}(dataset_name, X, deg, use_wsos)
 end
 function DensityEstJuMP{Float64}(
@@ -33,6 +37,8 @@ end
 example_tests(::Type{DensityEstJuMP{Float64}}, ::MinimalInstances) = [
     ((5, 1, 2, true),),
     ((:iris, 2, true),),
+    ((:Uniform, 2, true), nothing, options),
+    ((:Uniform, 2, false), nothing, options),
     ]
 example_tests(::Type{DensityEstJuMP{Float64}}, ::FastInstances) = begin
     options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
@@ -115,5 +121,15 @@ function build(inst::DensityEstJuMP{T}) where {T <: Float64} # TODO generic real
 
     return model
 end
+
+function test_extra(inst::DensityEstJuMP{T}, model::JuMP.Model) where T
+    @test JuMP.termination_status(model) == MOI.OPTIMAL
+    if JuMP.termination_status(model) == MOI.OPTIMAL && inst.dataset_name == :Uniform
+        # check objective value is correct
+        tol = eps(T)^0.25
+        @test JuMP.objective_value(model) ≈ 1 atol = tol rtol = tol
+    end
+end
+
 
 return DensityEstJuMP
