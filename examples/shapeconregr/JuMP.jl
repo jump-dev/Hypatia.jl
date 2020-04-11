@@ -87,7 +87,7 @@ example_tests(::Type{ShapeConRegrJuMP{Float64}}, ::MinimalInstances) = [
     ((1, 5, :func1, 2, 4, false, true, false, false, true), ClassicConeOptimizer),
     ]
 example_tests(::Type{ShapeConRegrJuMP{Float64}}, ::FastInstances) = begin
-    options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6, verbose = true)
+    options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
     relaxed_options = (tol_feas = 1e-4, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4)
     return [
     # ((:naics5811, 4, true, false, true, true, false), nothing, options),
@@ -97,8 +97,8 @@ example_tests(::Type{ShapeConRegrJuMP{Float64}}, ::FastInstances) = begin
     # ((:naics5811, 3, false, true, true, true, false), nothing, options),
     # ((:naics5811, 3, false, false, true, true, false), nothing, options),
     # ((:naics5811, 3, false, true, true, false, false), ClassicConeOptimizer, options),
+    ((1, 100, :func1, 5, 20, true, false, false, true, false), nothing, options),
     ((1, 100, :func1, 5, 25, true, false, false, true, false), nothing, options),
-    ((1, 100, :func10, 5, 100, true, false, false, true, false), nothing, options),
     ((2, 100, :func1, 5, 10, true, false, false, true, false), nothing, options),
     # ((2, 50, :func1, 5, 3, true, false, true, true, false), nothing, options),
     # ((2, 50, :func1, 5, 3, true, false, true, false, false), nothing, options),
@@ -148,7 +148,6 @@ example_tests(::Type{ShapeConRegrJuMP{Float64}}, ::SlowInstances) = begin
     ]
 end
 
-
 function build(inst::ShapeConRegrJuMP{T}) where {T <: Float64} # TODO generic reals
     (X, y, deg) = (inst.X, inst.y, inst.deg)
     n = size(X, 2)
@@ -157,26 +156,45 @@ function build(inst::ShapeConRegrJuMP{T}) where {T <: Float64} # TODO generic re
     conv_dom = mono_dom
     mono_profile = ones(Int, size(X, 2))
     conv_profile = 1
-    U = binomial(n + deg, n)
+
+    # setup interpolation (not actually using FreeDomain, just need points here)
+    halfdeg = div(deg + 1, 2)
+    free_dom = ModelUtilities.FreeDomain{Float64}(n)
+    (U, pts, _) = ModelUtilities.interpolate(free_dom, halfdeg)
+
+    DynamicPolynomials.@polyvar x[1:n]
+    basis = ModelUtilities.get_chebyshev_polys(x, 2 * halfdeg)
+    # TODO try to get the V U*U sub-QR out from interpolate instead
+    V = [bj(x => pts_u) for pts_u in eachrow(pts), bj in basis]
+    F = qr!(V, Val(true))
+    V_X = [bj(x => X_i) for X_i in eachrow(X), bj in basis]
+    X_pts_polys = (V_X[:, F.p] / F.R) * F.Q'
+    lagrange_polys = inv(F) * basis # TODO this can be avoided by being smart about interp and differentiation in monotonic/convex constraint setup
 
     model = JuMP.Model()
     JuMP.@variable(model, regressor[1:U])
+    JuMP.@variable(model, z)
+    JuMP.@objective(model, Min, z)
 
-    (regressor_points, _) = ModelUtilities.get_interp_pts(ModelUtilities.FreeDomain{Float64}(n), deg)
-    #
-    # lagrange_polys = ModelUtilities.recover_lagrange_polys(regressor_points, deg)
-    # regressor_fun = DP.polynomial(regressor, lagrange_polys)
-    # x = DP.variables(lagrange_polys)
-    #
-    DP.@polyvar x[1:n]
-    monos = DP.monomials(x, 0:deg)
-    cheby_monos = basis_covering_monomials(ChebyshevBasisSecondKind, [monos...]).polynomials # yuck typing
-    # vandermonde = [cheby_monos[j](view(regressor_points, i, :)) for i in 1:U, j in 1:U]
-    vandermonde = [monos[j](view(regressor_points, i, :)) for i in 1:U, j in 1:U]
-    @show cond(vandermonde)
-    regressor_mono = inv(vandermonde) * regressor
-    regressor_fun = DP.polynomial(regressor_mono, monos)
-    # regressor_fun = DP.polynomial(regressor_mono, cheby_monos)
+    # objective epigraph
+    norm_vec = y - X_pts_polys * regressor
+    if inst.use_L1_obj || (num_points <= U)
+        obj_cone = (inst.use_L1_obj ? MOI.NormOneCone : MOI.SecondOrderCone)(1 + num_points)
+        JuMP.@constraint(model, vcat(z, norm_vec) in obj_cone)
+    else
+        # using L2 norm objective and number of samples exceeds variables, so use qr trick to reduce dimension
+        coef_mat = zeros(num_points, U + 1)
+        for (i, expr_i) in enumerate(norm_vec)
+            for (c, v) in JuMP.linear_terms(expr_i)
+                coef_mat[i, JuMP.index(v).value] = c
+            end
+            coef_mat[i, end] = JuMP.constant(expr_i)
+        end
+        coef_R = qr(coef_mat).R
+        JuMP.@constraint(model, vcat(z, coef_R * vcat(regressor, 1)) in MOI.SecondOrderCone(2 + U))
+    end
+
+    regressor_fun = DP.polynomial(regressor, lagrange_polys) # TODO this can be avoided ... see above comment
 
     # monotonicity
     if inst.use_monotonicity
@@ -231,27 +249,6 @@ function build(inst::ShapeConRegrJuMP{T}) where {T <: Float64} # TODO generic re
             end # x1, x2
         end # use_wsos
     end # use_convexity
-
-    # objective function
-    JuMP.@variable(model, z)
-    JuMP.@objective(model, Min, z)
-    norm_vec = [y[i] - regressor_fun(X[i, :]) for i in 1:num_points]
-
-    if inst.use_L1_obj || (num_points <= U)
-        obj_cone = (inst.use_L1_obj ? MOI.NormOneCone(1 + num_points) : MOI.SecondOrderCone(1 + num_points))
-        JuMP.@constraint(model, vcat(z, norm_vec) in obj_cone)
-    else
-        # using L2 norm objective and number of samples exceeds variables, so use qr trick to reduce dimension
-        coef_mat = zeros(num_points, U + 1)
-        for (i, expr_i) in enumerate(norm_vec)
-            for (c, v) in JuMP.linear_terms(expr_i)
-                coef_mat[i, JuMP.index(v).value] = c
-            end
-            coef_mat[i, end] = JuMP.constant(expr_i)
-        end
-        coef_R = qr(coef_mat).R
-        JuMP.@constraint(model, vcat(z, coef_R * vcat(regressor, 1)) in MOI.SecondOrderCone(2 + U))
-    end
 
     return model
 end
