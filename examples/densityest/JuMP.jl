@@ -45,23 +45,14 @@ example_tests(::Type{DensityEstJuMP{Float64}}, ::FastInstances) = begin
     return [
     ((50, 2, 2, true), nothing, options),
     ((50, 2, 2, false), nothing, options),
-    ((50, 2, 2, true), nothing, options),
-    ((50, 2, 2, false), nothing, options),
-    ((100, 8, 2, true), nothing, options),
-    ((100, 8, 2, false), nothing, options),
     ((100, 8, 2, true), nothing, options),
     ((100, 8, 2, false), nothing, options),
     ((250, 4, 4, true), nothing, options),
     ((250, 4, 4, false), nothing, options),
-    ((250, 4, 4, true), nothing, options),
     ((:iris, 4, true), nothing, options),
     ((:iris, 5, true), nothing, options),
     ((:iris, 6, true), nothing, options),
     ((:iris, 4, false), nothing, options),
-    ((:iris, 4, true), nothing, options),
-    ((:iris, 6, true), nothing, options),
-    ((:iris, 4, false), nothing, options),
-    ((:cancer, 4, true), nothing, options),
     ((:cancer, 4, true), nothing, options),
     ]
 end
