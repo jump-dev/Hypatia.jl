@@ -85,7 +85,7 @@ function build(inst::DensityEstJuMP{T}) where {T <: Float64} # TODO generic real
     halfdeg = div(inst.deg + 1, 2)
     (U, pts, Ps, w) = ModelUtilities.interpolate(domain, halfdeg, calc_w = true)
 
-    DP.@polyvar x[1:n]
+    DynamicPolynomials.@polyvar x[1:n]
     basis = ModelUtilities.get_chebyshev_polys(x, 2 * halfdeg)
     # TODO try to get the V U*U sub-QR out from interpolate instead
     V = [bj(x => pts_u) for pts_u in eachrow(pts), bj in basis]
