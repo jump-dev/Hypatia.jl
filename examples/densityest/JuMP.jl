@@ -11,8 +11,6 @@ import PolyJuMP
 
 struct DensityEstJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     dataset_name::Symbol
-    num_obs::Int
-    n::Int
     X::Matrix{T}
     deg::Int
     use_wsos::Bool # use WSOS cone formulation, else PSD formulation
@@ -22,15 +20,14 @@ function DensityEstJuMP{Float64}(
     deg::Int,
     use_wsos::Bool)
     X = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "$dataset_name.txt"))
-    (num_obs, n) = size(X)
-    return DensityEstJuMP{Float64}(dataset_name, num_obs, n, X, deg, use_wsos)
+    return DensityEstJuMP{Float64}(dataset_name, X, deg, use_wsos)
 end
 function DensityEstJuMP{Float64}(
     num_obs::Int,
     n::Int,
     args...)
     X = randn(num_obs, n)
-    return DensityEstJuMP{Float64}(:Random, num_obs, n, X, args...)
+    return DensityEstJuMP{Float64}(:Random, X, args...)
 end
 
 example_tests(::Type{DensityEstJuMP{Float64}}, ::MinimalInstances) = [
@@ -72,7 +69,8 @@ example_tests(::Type{DensityEstJuMP{Float64}}, ::SlowInstances) = begin
 end
 
 function build(inst::DensityEstJuMP{T}) where {T <: Float64} # TODO generic reals
-    (n, X) = (inst.n, inst.X)
+    X = inst.X
+    (num_obs, n) = size(X)
     domain = ModelUtilities.Box{Float64}(-ones(n), ones(n)) # domain is unit box [-1,1]^n
 
     # rescale X to be in unit box
@@ -85,20 +83,18 @@ function build(inst::DensityEstJuMP{T}) where {T <: Float64} # TODO generic real
     halfdeg = div(inst.deg + 1, 2)
     (U, pts, Ps, w) = ModelUtilities.interpolate(domain, halfdeg, calc_w = true)
     lagrange_polys = ModelUtilities.recover_lagrange_polys(pts, 2 * halfdeg)
-    basis_evals = Matrix{Float64}(undef, inst.num_obs, U)
-    for i in 1:inst.num_obs, j in 1:U
-        basis_evals[i, j] = lagrange_polys[j](X[i, :])
-    end
+    basis_evals = [l_j(X_i) for X_i in eachrow(X), l_j in lagrange_polys]
 
     model = JuMP.Model()
-    JuMP.@variable(model, f_pts[1:U])
-
     JuMP.@variable(model, z)
     JuMP.@objective(model, Max, z)
-    f_X = [dot(f_pts, b_i) for b_i in eachrow(basis_evals)]
-    JuMP.@constraint(model, vcat(z, f_X) in MOI.GeometricMeanCone(1 + length(f_X)))
+    JuMP.@variable(model, f_pts[1:U])
 
-    JuMP.@constraint(model, dot(w, f_pts) == 1.0) # density integrates to 1
+    # objective epigraph
+    JuMP.@constraint(model, vcat(z, basis_evals * f_pts) in MOI.GeometricMeanCone(1 + num_obs))
+
+    # density integrates to 1
+    JuMP.@constraint(model, dot(w, f_pts) == 1)
 
     # density nonnegative
     if inst.use_wsos
