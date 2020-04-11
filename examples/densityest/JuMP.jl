@@ -127,6 +127,7 @@ end
 function test_extra(inst::DensityEstJuMP{T}, model::JuMP.Model) where T
     @test JuMP.termination_status(model) == MOI.OPTIMAL
     if JuMP.termination_status(model) == MOI.OPTIMAL && inst.dataset_name == :Uniform
+        error("TODO: finish this and add instances")
         # check objective value is correct
         tol = eps(T)^0.25
         @test JuMP.objective_value(model) ≈ 1 atol = tol rtol = tol
