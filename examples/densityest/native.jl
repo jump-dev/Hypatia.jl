@@ -1,10 +1,10 @@
 #=
 Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
-given a sequence of observations X_1,...,X_n with each Xᵢ in Rᵈ,
+given a sequence of observations X₁,...,Xᵢ with each Xᵢ in Rᵈ,
 find a density function f maximizing the log likelihood of the observations
-    min -∑ᵢ zᵢ
-    -zᵢ + log(f(Xᵢ)) ≥ 0 ∀ i = 1,...,n
+(equivalent to maximizing geomean of f.(X))
+    max (prod_i f(Xᵢ))^(1/n)
     ∫f = 1
     f ≥ 0
 =#
@@ -92,21 +92,19 @@ end
 
 function build(inst::DensityEstNative{T}) where {T <: Real}
     (X, num_obs) = (inst.X, inst.num_obs)
+    domain = ModelUtilities.Box{T}(-ones(T, inst.n), ones(T, inst.n)) # domain is unit box [-1,1]^n
 
-    domain = ModelUtilities.Box{T}(-ones(T, inst.n), ones(T, inst.n))
     # rescale X to be in unit box
     minX = minimum(X, dims = 1)
     maxX = maximum(X, dims = 1)
     X .-= (minX + maxX) / 2
     X ./= (maxX - minX) / 2
 
+    # setup interpolation
     halfdeg = div(inst.deg + 1, 2)
     (U, pts, Ps, w) = ModelUtilities.interpolate(domain, halfdeg, calc_w = true)
     lagrange_polys = ModelUtilities.recover_lagrange_polys(pts, 2 * halfdeg)
-    basis_evals = Matrix{T}(undef, num_obs, U)
-    for i in 1:num_obs, j in 1:U
-        basis_evals[i, j] = lagrange_polys[j](X[i, :])
-    end
+    basis_evals = [lagrange_polys[j](X[i, :]) for i in 1:inst.num_obs, j in 1:U]
 
     cones = Cones.Cone{T}[]
 
