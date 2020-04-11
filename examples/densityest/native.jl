@@ -91,14 +91,15 @@ end
 
 function build(inst::DensityEstNative{T}) where {T <: Real}
     (X, num_obs) = (inst.X, inst.num_obs)
-
     domain = ModelUtilities.Box{T}(-ones(T, inst.n), ones(T, inst.n))
+
     # rescale X to be in unit box
     minX = minimum(X, dims = 1)
     maxX = maximum(X, dims = 1)
     X .-= (minX + maxX) / 2
     X ./= (maxX - minX) / 2
 
+    # setup interpolation
     halfdeg = div(inst.deg + 1, 2)
     (U, pts, Ps, w) = ModelUtilities.interpolate(domain, halfdeg, calc_w = true)
     lagrange_polys = ModelUtilities.recover_lagrange_polys(pts, 2 * halfdeg)
