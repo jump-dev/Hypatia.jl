@@ -26,11 +26,11 @@ end
 function DensityEstJuMP{Float64}(
     density_name::Symbol,
     use_wsos::Bool)
-    (density, cummulative_inv, num_obs, n, deg) = densityest_data(density_name)
+    (density, cumulative_inv, num_obs, n, deg) = densityest_data(density_name)
     X = rand(num_obs, n)
     # assume independence between dimensions
     @views for i in 1:num_obs
-        X[i, :] .= map(cummulative_inv, X[i, :])
+        X[i, :] .= map(cumulative_inv, X[i, :])
     end
     true_obj = exp(sum(log(density(X[i, :]...)) / num_obs for i in 1:num_obs))
     return DensityEstJuMP{Float64}(density_name, X, true_obj, deg, use_wsos)
@@ -44,30 +44,30 @@ function DensityEstJuMP{Float64}(
 end
 
 # support on [-1, 1]^n, so won't get rescaled in build
-# assume independence between dimensions, cummulative_inv always univariate
+# assume independence between dimensions, cumulative_inv always univariate
 function densityest_data(density_name::Symbol)
     if density_name == :density1
         density = (x -> 0.5)
-        cummulative_inv = (x -> (x - 0.5) * 2)
+        cumulative_inv = (x -> (x - 0.5) * 2)
         num_obs = 400
         n = 1
         deg = 2
     elseif density_name == :density2
         density = ((x, y) -> 0.25)
-        cummulative_inv = (x -> (x - 0.5) * 2)
+        cumulative_inv = (x -> (x - 0.5) * 2)
         num_obs = 400
         n = 2
         deg = 2
     elseif density_name == :density3
         density = (x -> 0.5 - 0.5 * x)
-        cummulative_inv = (x -> 1 - sqrt(-4 * (x - 1)))
+        cumulative_inv = (x -> 1 - sqrt(-4 * (x - 1)))
         num_obs = 400
         n = 1
         deg = 2
     else
         error("unknown name $(density_name)")
     end
-    return (density, cummulative_inv, num_obs, n, deg)
+    return (density, cumulative_inv, num_obs, n, deg)
 end
 
 example_tests(::Type{DensityEstJuMP{Float64}}, ::MinimalInstances) = [
