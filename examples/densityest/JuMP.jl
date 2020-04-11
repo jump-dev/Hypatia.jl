@@ -43,17 +43,21 @@ example_tests(::Type{DensityEstJuMP{Float64}}, ::MinimalInstances) = [
 example_tests(::Type{DensityEstJuMP{Float64}}, ::FastInstances) = begin
     options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
     return [
-    ((50, 2, 2, true), nothing, options),
-    ((50, 2, 2, false), nothing, options),
-    ((100, 8, 2, true), nothing, options),
-    ((100, 8, 2, false), nothing, options),
-    ((250, 4, 4, true), nothing, options),
-    ((250, 4, 4, false), nothing, options),
-    ((:iris, 4, true), nothing, options),
-    ((:iris, 5, true), nothing, options),
-    ((:iris, 6, true), nothing, options),
-    ((:iris, 4, false), nothing, options),
-    ((:cancer, 4, true), nothing, options),
+    ((100, 1, 60, true), nothing, options),
+    # ((100, 1, 60, false), nothing, options),
+    # ((50, 2, 2, true), nothing, options),
+    # ((50, 2, 2, false), nothing, options),
+    ((200, 2, 30, true), nothing, options),
+    # ((200, 2, 30, false), nothing, options),
+    # ((100, 8, 2, true), nothing, options),
+    # ((100, 8, 2, false), nothing, options),
+    # ((250, 4, 4, true), nothing, options),
+    # ((250, 4, 4, false), nothing, options),
+    # ((:iris, 4, true), nothing, options),
+    # ((:iris, 5, true), nothing, options),
+    # ((:iris, 6, true), nothing, options),
+    # ((:iris, 4, false), nothing, options),
+    # ((:cancer, 4, true), nothing, options),
     ]
 end
 example_tests(::Type{DensityEstJuMP{Float64}}, ::SlowInstances) = begin
@@ -79,8 +83,11 @@ function build(inst::DensityEstJuMP{T}) where {T <: Float64} # TODO generic real
     # setup interpolation
     halfdeg = div(inst.deg + 1, 2)
     (U, pts, Ps, w) = ModelUtilities.interpolate(domain, halfdeg, calc_w = true)
+    # TODO get the V U*U sub-QR out from here
+
+    # TODO get rid of lagrange_polys and basis_evals. evaluate the cheby basis at X points, then ldiv with the QR to get f_X. 
     lagrange_polys = ModelUtilities.recover_lagrange_polys(pts, 2 * halfdeg)
-    basis_evals = [l_j(X_i) for X_i in eachrow(X), l_j in lagrange_polys]
+    basis_evals = [l_j(X_i) for X_i in eachrow(X), l_j in lagrange_polys] # TODO try to get rid of this by evaling the cheby polys at the X points and doing linear algebra
 
     model = JuMP.Model()
     JuMP.@variable(model, z)
@@ -88,7 +95,8 @@ function build(inst::DensityEstJuMP{T}) where {T <: Float64} # TODO generic real
     JuMP.@variable(model, f_pts[1:U])
 
     # objective epigraph
-    JuMP.@constraint(model, vcat(z, basis_evals * f_pts) in MOI.GeometricMeanCone(1 + num_obs))
+    f_X = basis_evals * f_pts
+    JuMP.@constraint(model, vcat(z, f_X) in MOI.GeometricMeanCone(1 + num_obs))
 
     # density integrates to 1
     JuMP.@constraint(model, dot(w, f_pts) == 1)
