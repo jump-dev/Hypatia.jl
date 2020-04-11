@@ -323,26 +323,20 @@ function choose_interp_pts(
     M::Matrix{T},
     candidate_pts::Matrix{T},
     deg::Int,
-    U::Int,
     calc_w::Bool,
     ) where {T <: Real}
     n = size(candidate_pts, 2)
+    U = size(M, 2)
     u = calc_u(n, deg, candidate_pts)
-    # TODO don't need m if calc_w = false
-    m = Vector{T}(undef, U)
-    m[1] = 2^n
-    M[:, 1] .= 1
 
-    col = 1
-    for t in 1:deg, xp in Combinatorics.multiexponents(n, t)
+    expos = [xp for t in 1:deg for xp in Combinatorics.multiexponents(n, t)]
+    @assert length(expos) == U - 1
+
+    M[:, 1] .= 1
+    for (col, xp) in enumerate(expos)
         col += 1
-        if any(isodd, xp)
-            m[col] = 0
-        else
-            m[col] = m[1] / prod(1 - abs2(xp[j]) for j in 1:n)
-        end
-        @. @views M[:, col] = u[1][:, xp[1] + 1]
-        for j in 2:n
+        @inbounds @. @views M[:, col] = u[1][:, xp[1] + 1]
+        @inbounds for j in 2:n
             @. @views M[:, col] *= u[j][:, xp[j] + 1]
         end
     end
@@ -357,6 +351,13 @@ function choose_interp_pts(
     keep_pts = F.p[1:U]
 
     if calc_w
+        m = zeros(T, U)
+        m1 = m[1] = 2^n
+        for (col, xp) in enumerate(expos)
+            if all(iseven, xp)
+                @inbounds m[col + 1] = m1 / prod(1 - abs2(xp[j]) for j in 1:n)
+            end
+        end
         Qtm = F.Q' * m
         w = UpperTriangular(F.R[:, 1:U]) \ Qtm
         return (keep_pts, w)
@@ -375,7 +376,7 @@ function make_wsos_arrays(
     ) where {T <: Real}
     (npts, n) = size(candidate_pts)
     M = Matrix{T}(undef, npts, U)
-    (keep_pts, w) = choose_interp_pts(M, candidate_pts, deg, U, calc_w)
+    (keep_pts, w) = choose_interp_pts(M, candidate_pts, deg, calc_w)
     pts = candidate_pts[keep_pts, :]
     P0 = M[keep_pts, 1:L] # subset of polynomial evaluations up to total degree d
     subd = div(deg - get_degree(dom), 2)
@@ -410,7 +411,7 @@ function get_interp_pts(
     U = binomial(n + deg, n)
     candidate_pts = interp_sample(dom, U * sample_factor)
     M = Matrix{T}(undef, size(candidate_pts, 1), U)
-    (keep_pts, w) = choose_interp_pts(M, candidate_pts, deg, U, calc_w)
+    (keep_pts, w) = choose_interp_pts(M, candidate_pts, deg, calc_w)
     return (candidate_pts[keep_pts, :], w)
 end
 
