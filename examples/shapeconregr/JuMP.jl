@@ -99,6 +99,8 @@ example_tests(::Type{ShapeConRegrJuMP{Float64}}, ::FastInstances) = begin
     ((:naics5811, 3, false, false, true, true, false), nothing, options),
     ((:naics5811, 3, false, true, true, false, false), ClassicConeOptimizer, options),
     ((:naics5811, 3, false, true, false, true, false), ClassicConeOptimizer, options),
+    ((1, 100, :func1, 5, 25, true, false, true, true, false),),
+    ((2, 100, :func1, 5, 10, true, false, true, true, false),),
     ((2, 50, :func1, 5, 3, true, false, true, true, false), nothing, options),
     ((2, 50, :func1, 5, 3, true, false, true, false, false), nothing, options),
     ((2, 50, :func1, 5, 3, true, false, false, true, false), nothing, options),
