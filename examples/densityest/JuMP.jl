@@ -8,6 +8,7 @@ include(joinpath(@__DIR__, "../common_JuMP.jl"))
 import DelimitedFiles
 import DynamicPolynomials
 import PolyJuMP
+include(joinpath(@__DIR__, "data.jl"))
 
 struct DensityEstJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     dataset_name::Symbol
@@ -41,33 +42,6 @@ function DensityEstJuMP{Float64}(
     args...)
     X = randn(num_obs, n)
     return DensityEstJuMP{Float64}(:random, X, NaN, args...)
-end
-
-# support on [-1, 1]^n, so won't get rescaled in build
-# assume independence between dimensions, cumulative_inv always univariate
-function densityest_data(density_name::Symbol)
-    if density_name == :density1
-        density = (x -> 0.5)
-        cumulative_inv = (x -> (x - 0.5) * 2)
-        num_obs = 400
-        n = 1
-        deg = 2
-    elseif density_name == :density2
-        density = ((x, y) -> 0.25)
-        cumulative_inv = (x -> (x - 0.5) * 2)
-        num_obs = 400
-        n = 2
-        deg = 2
-    elseif density_name == :density3
-        density = (x -> 0.5 - 0.5 * x)
-        cumulative_inv = (x -> 1 - sqrt(-4 * (x - 1)))
-        num_obs = 400
-        n = 1
-        deg = 2
-    else
-        error("unknown name $(density_name)")
-    end
-    return (density, cumulative_inv, num_obs, n, deg)
 end
 
 example_tests(::Type{DensityEstJuMP{Float64}}, ::MinimalInstances) = [
@@ -180,7 +154,7 @@ function test_extra(inst::DensityEstJuMP{T}, model::JuMP.Model) where T
     @test JuMP.termination_status(model) == MOI.OPTIMAL
     if JuMP.termination_status(model) == MOI.OPTIMAL && !isnan(inst.true_obj)
         # check objective value is correct
-        tol = 0.1
+        tol = 0.1 # TODO
         @test JuMP.objective_value(model) ≈ inst.true_obj atol = tol rtol = tol
     end
 end

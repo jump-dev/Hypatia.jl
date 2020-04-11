@@ -11,12 +11,14 @@ find a density function f maximizing the log likelihood of the observations
 
 include(joinpath(@__DIR__, "../common_native.jl"))
 import DelimitedFiles
+include(joinpath(@__DIR__, "data.jl"))
 
 struct DensityEstNative{T <: Real} <: ExampleInstanceNative{T}
     dataset_name::Symbol
     num_obs::Int
     n::Int
     X::Matrix{T}
+    true_obj::Real
     deg::Int
     use_wsos::Bool # use WSOS cone formulation, else PSD formulation
     hypogeomean_obj::Bool # use geomean objective, else sum of logs objective
@@ -32,14 +34,30 @@ function DensityEstNative{T}(
     X = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "$dataset_name.txt"))
     X = convert(Matrix{T}, X)
     (num_obs, n) = size(X)
-    return DensityEstNative{T}(dataset_name, num_obs, n, X, deg, use_wsos, hypogeomean_obj, use_hypogeomean)
+    return DensityEstNative{T}(dataset_name, num_obs, n, X, NaN, deg, use_wsos, hypogeomean_obj, use_hypogeomean)
+end
+function DensityEstNative{T}(
+    density_name::Symbol,
+    use_wsos::Bool,
+    hypogeomean_obj::Bool,
+    use_hypogeomean::Bool,
+    ) where {T <: Real}
+    (density, cumulative_inv, num_obs, n, deg) = densityest_data(density_name, T)
+    X = rand(T, num_obs, n)
+    # assume independence between dimensions
+    @views for i in 1:num_obs
+        X[i, :] .= map(cumulative_inv, X[i, :])
+    end
+    log_likl = sum(log(density(X[i, :]...)) for i in 1:num_obs)
+    true_obj = (hypogeomean_obj ? exp(log_likl / num_obs) : log_likl)
+    return DensityEstNative{T}(density_name, num_obs, n, X, true_obj, deg, use_wsos, hypogeomean_obj, use_hypogeomean)
 end
 function DensityEstNative{T}(
     num_obs::Int,
     n::Int,
     args...) where {T <: Real}
     X = randn(T, num_obs, n)
-    return DensityEstNative{T}(:Random, num_obs, n, X, args...)
+    return DensityEstNative{T}(:Random, num_obs, n, X, NaN, args...)
 end
 
 example_tests(::Type{<:DensityEstNative{<:BlasReal}}, ::MinimalInstances) = [
@@ -48,32 +66,41 @@ example_tests(::Type{<:DensityEstNative{<:BlasReal}}, ::MinimalInstances) = [
     ((5, 1, 2, true, false, true),),
     ((5, 1, 2, true, true, false),),
     ((:iris, 2, true, true, true),),
+    ((:density1, true, true, true),),
     ]
 example_tests(::Type{DensityEstNative{Float64}}, ::FastInstances) = begin
     options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
     return [
-    ((50, 2, 2, true, true, true), options),
-    ((50, 2, 2, false, true, true), options),
-    ((50, 2, 2, true, false, true), options),
-    ((50, 2, 2, true, true, false), options),
-    ((100, 8, 2, true, true, true), options),
-    ((100, 8, 2, false, true, true), options),
-    ((100, 8, 2, true, false, true), options),
-    ((100, 8, 2, true, true, false), options),
-    ((250, 4, 6, true, true, true), options),
-    ((250, 4, 6, false, true, true), options),
-    ((250, 4, 6, true, false, true), options),
-    ((250, 4, 6, true, true, false), options),
-    ((:iris, 4, true, true, true), options),
-    ((:iris, 5, true, true, true), options),
-    ((:iris, 6, true, true, true), options),
-    ((:iris, 4, false, true, true), options),
-    ((:iris, 4, true, false, true), options),
-    ((:iris, 4, true, true, false), options),
-    ((:cancer, 4, true, true, true), options),
-    ((:cancer, 4, false, true, true), options),
-    ((:cancer, 4, true, false, true), options),
-    ((:cancer, 4, true, true, false), options),
+    # ((50, 2, 2, true, true, true), options),
+    # ((50, 2, 2, false, true, true), options),
+    # ((50, 2, 2, true, false, true), options),
+    # ((50, 2, 2, true, true, false), options),
+    # ((100, 8, 2, true, true, true), options),
+    # ((100, 8, 2, false, true, true), options),
+    # ((100, 8, 2, true, false, true), options),
+    # ((100, 8, 2, true, true, false), options),
+    # ((250, 4, 6, true, true, true), options),
+    # ((250, 4, 6, false, true, true), options),
+    # ((250, 4, 6, true, false, true), options),
+    # ((250, 4, 6, true, true, false), options),
+    # ((:iris, 4, true, true, true), options),
+    # ((:iris, 5, true, true, true), options),
+    # ((:iris, 6, true, true, true), options),
+    # ((:iris, 4, false, true, true), options),
+    # ((:iris, 4, true, false, true), options),
+    # ((:iris, 4, true, true, false), options),
+    # ((:cancer, 4, true, true, true), options),
+    # ((:cancer, 4, false, true, true), options),
+    # ((:cancer, 4, true, false, true), options),
+    # ((:cancer, 4, true, true, false), options),
+    ((:density2, true, true, true), options),
+    ((:density2, false, true, true), options),
+    ((:density2, true, false, true), options),
+    ((:density2, true, true, false), options),
+    ((:density3, true, true, true), options),
+    ((:density3, false, true, true), options),
+    ((:density3, true, false, true), options),
+    ((:density3, true, true, false), options),
     ]
 end
 example_tests(::Type{DensityEstNative{Float64}}, ::SlowInstances) = begin
@@ -216,6 +243,15 @@ function build(inst::DensityEstNative{T}) where {T <: Real}
 
     model = Models.Model{T}(c, A, b, G, h, cones)
     return model
+end
+
+function test_extra(inst::DensityEstNative{T}, result::NamedTuple) where T
+    @test result.status == :Optimal
+    if result.status == :Optimal && !isnan(inst.true_obj)
+        # check objective value is correct
+        tol = 0.1 # TODO
+        @test -result.primal_obj ≈ inst.true_obj atol = tol rtol = tol
+    end
 end
 
 return DensityEstNative
