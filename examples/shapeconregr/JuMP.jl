@@ -97,6 +97,9 @@ example_tests(::Type{ShapeConRegrJuMP{Float64}}, ::FastInstances) = begin
     # ((:naics5811, 3, false, true, true, true, false), nothing, options),
     # ((:naics5811, 3, false, false, true, true, false), nothing, options),
     # ((:naics5811, 3, false, true, true, false, false), ClassicConeOptimizer, options),
+    ((1, 100, :func1, 5, 25, true, false, false, true, false), nothing, options),
+    ((1, 100, :func10, 5, 100, true, false, false, true, false), nothing, options),
+    ((2, 100, :func1, 5, 10, true, false, false, true, false), nothing, options),
     # ((2, 50, :func1, 5, 3, true, false, true, true, false), nothing, options),
     # ((2, 50, :func1, 5, 3, true, false, true, false, false), nothing, options),
     # ((2, 50, :func1, 5, 3, true, false, false, true, false), nothing, options),
@@ -117,7 +120,6 @@ example_tests(::Type{ShapeConRegrJuMP{Float64}}, ::FastInstances) = begin
     # ((4, 150, :func7, 0, 4, true, true, true, true, true), nothing, options),
     # ((4, 150, :func7, 0, 4, false, false, true, true, true), nothing, options),
     # ((3, 150, :func8, 0, 6, true, false, true, true, true), nothing, relaxed_options),
-    ((1, 100, :func10, 50, 100, true, false, false, true, false), nothing, options),
     ]
 end
 example_tests(::Type{ShapeConRegrJuMP{Float64}}, ::SlowInstances) = begin
@@ -155,33 +157,26 @@ function build(inst::ShapeConRegrJuMP{T}) where {T <: Float64} # TODO generic re
     conv_dom = mono_dom
     mono_profile = ones(Int, size(X, 2))
     conv_profile = 1
-
-    use_mono = false
-
     U = binomial(n + deg, n)
+
     model = JuMP.Model()
     JuMP.@variable(model, regressor[1:U])
-    if use_mono
-        DP.@polyvar x[1:n]
-        monos = DP.monomials(x, 0:deg)
-        regressor_fun = DP.polynomial(regressor, monos)
-    else
-        (regressor_points, _) = ModelUtilities.get_interp_pts(ModelUtilities.FreeDomain{Float64}(n), deg)
-        #
-        # lagrange_polys = ModelUtilities.recover_lagrange_polys(regressor_points, deg)
-        # regressor_fun = DP.polynomial(regressor, lagrange_polys)
-        # x = DP.variables(lagrange_polys)
-        #
-        DP.@polyvar x[1:n]
-        monos = DP.monomials(x, 0:deg)
-        cheby_monos = basis_covering_monomials(ChebyshevBasisSecondKind, [monos...]).polynomials # yuck typing
-        # vandermonde = [cheby_monos[j](view(regressor_points, i, :)) for i in 1:U, j in 1:U]
-        vandermonde = [monos[j](view(regressor_points, i, :)) for i in 1:U, j in 1:U]
-        @show cond(vandermonde)
-        regressor_mono = inv(vandermonde) * regressor
-        regressor_fun = DP.polynomial(regressor_mono, monos)
-        # regressor_fun = DP.polynomial(regressor_mono, cheby_monos)
-    end
+
+    (regressor_points, _) = ModelUtilities.get_interp_pts(ModelUtilities.FreeDomain{Float64}(n), deg)
+    #
+    # lagrange_polys = ModelUtilities.recover_lagrange_polys(regressor_points, deg)
+    # regressor_fun = DP.polynomial(regressor, lagrange_polys)
+    # x = DP.variables(lagrange_polys)
+    #
+    DP.@polyvar x[1:n]
+    monos = DP.monomials(x, 0:deg)
+    cheby_monos = basis_covering_monomials(ChebyshevBasisSecondKind, [monos...]).polynomials # yuck typing
+    # vandermonde = [cheby_monos[j](view(regressor_points, i, :)) for i in 1:U, j in 1:U]
+    vandermonde = [monos[j](view(regressor_points, i, :)) for i in 1:U, j in 1:U]
+    @show cond(vandermonde)
+    regressor_mono = inv(vandermonde) * regressor
+    regressor_fun = DP.polynomial(regressor_mono, monos)
+    # regressor_fun = DP.polynomial(regressor_mono, cheby_monos)
 
     # monotonicity
     if inst.use_monotonicity
