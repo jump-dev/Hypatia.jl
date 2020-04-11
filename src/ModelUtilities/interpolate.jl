@@ -334,18 +334,16 @@ function choose_interp_pts(
     M[:, 1] .= 1
 
     col = 1
-    for t in 1:deg
-        for xp in Combinatorics.multiexponents(n, t)
-            col += 1
-            if any(isodd, xp)
-                m[col] = 0
-            else
-                m[col] = m[1] / prod(1 - abs2(xp[j]) for j in 1:n)
-            end
-            @. @views M[:, col] = u[1][:, xp[1] + 1]
-            for j in 2:n
-                @. @views M[:, col] *= u[j][:, xp[j] + 1]
-            end
+    for t in 1:deg, xp in Combinatorics.multiexponents(n, t)
+        col += 1
+        if any(isodd, xp)
+            m[col] = 0
+        else
+            m[col] = m[1] / prod(1 - abs2(xp[j]) for j in 1:n)
+        end
+        @. @views M[:, col] = u[1][:, xp[1] + 1]
+        for j in 2:n
+            @. @views M[:, col] *= u[j][:, xp[j] + 1]
         end
     end
 
@@ -417,12 +415,15 @@ function get_interp_pts(
 end
 
 
+# TODO this is redundant if already do a QR of the U*U Vandermonde - just use that QR
 function recover_lagrange_polys(pts::Matrix{T}, deg::Int) where {T <: Real}
     (U, n) = size(pts)
     DP.@polyvar x[1:n]
-    monos = DP.monomials(x, 0:deg)
-    vandermonde_inv = inv([monos[j](view(pts, i, :)) for i in 1:U, j in 1:U])
-    lagrange_polys = [DP.polynomial(view(vandermonde_inv, :, i), monos) for i in 1:U]
+    # basis = DP.monomials(x, 0:deg) # bad numerically
+    basis = get_chebyshev_polys(x, deg)
+    @assert length(basis) == U
+    vandermonde_inv = inv([basis[j](x => view(pts, i, :)) for i in 1:U, j in 1:U])
+    lagrange_polys = [DP.polynomial(view(vandermonde_inv, :, i), basis) for i in 1:U]
     return lagrange_polys
 end
 
@@ -430,11 +431,11 @@ function calc_u(monovec::Vector{DynamicPolynomials.PolyVar{true}}, d::Int)
     n = length(monovec)
     u = Vector{Vector}(undef, n)
     for j in 1:n
-        uj = u[j] = Vector{DP.Polynomial{true, Int64}}(undef, d + 1)
+        uj = u[j] = Vector{DP.Polynomial{true, Int}}(undef, d + 1)
         uj[1] = DP.Monomial(1)
         uj[2] = monovec[j]
         for t in 3:(d + 1)
-            uj[t] = 2.0 * uj[2] * uj[t - 1] - uj[t - 2]
+            uj[t] = 2 * uj[2] * uj[t - 1] - uj[t - 2]
         end
     end
     return u
@@ -445,7 +446,7 @@ function get_chebyshev_polys(x::Vector{DynamicPolynomials.PolyVar{true}}, d::Int
     n = length(x)
     u = calc_u(x, d)
     L = binomial(n + d, n)
-    M = Vector{DP.Polynomial{true, Int64}}(undef, L)
+    M = Vector{DP.Polynomial{true, Int}}(undef, L)
     M[1] = DP.Monomial(1)
     col = 1
     for t in 1:d, xp in Combinatorics.multiexponents(n, t)
