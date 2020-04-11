@@ -73,7 +73,7 @@ end
 
 function build(inst::DensityEstJuMP{T}) where {T <: Float64} # TODO generic reals
     (n, X) = (inst.n, inst.X)
-    domain = ModelUtilities.Box{Float64}(-ones(n), ones(n))
+    domain = ModelUtilities.Box{Float64}(-ones(n), ones(n)) # domain is unit box [-1,1]^n
 
     # rescale X to be in unit box
     minX = minimum(X, dims = 1)
@@ -93,17 +93,19 @@ function build(inst::DensityEstJuMP{T}) where {T <: Float64} # TODO generic real
     model = JuMP.Model()
     JuMP.@variable(model, f_pts[1:U])
 
-    JuMP.@constraint(model, dot(w, f_pts) == 1.0) # integrate to 1
-
     JuMP.@variable(model, z)
     JuMP.@objective(model, Max, z)
     f_X = [dot(f_pts, b_i) for b_i in eachrow(basis_evals)]
     JuMP.@constraint(model, vcat(z, f_X) in MOI.GeometricMeanCone(1 + length(f_X)))
 
+    JuMP.@constraint(model, dot(w, f_pts) == 1.0) # density integrates to 1
+
     # density nonnegative
     if inst.use_wsos
+        # WSOS formulation
         JuMP.@constraint(model, f_pts in Hypatia.WSOSInterpNonnegativeCone{Float64, Float64}(U, Ps))
     else
+        # PSD formulation
         psd_vars = []
         for (r, Pr) in enumerate(Ps)
             Lr = size(Pr, 2)

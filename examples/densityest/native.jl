@@ -3,7 +3,8 @@ Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
 given a sequence of observations X₁,...,Xᵢ with each Xᵢ in Rᵈ,
 find a density function f maximizing the log likelihood of the observations
-    max prod_i f(Xᵢ)
+(equivalent to maximizing geomean of f.(X))
+    max (prod_i f(Xᵢ))^(1/n)
     ∫f = 1
     f ≥ 0
 =#
@@ -91,7 +92,7 @@ end
 
 function build(inst::DensityEstNative{T}) where {T <: Real}
     (X, num_obs) = (inst.X, inst.num_obs)
-    domain = ModelUtilities.Box{T}(-ones(T, inst.n), ones(T, inst.n))
+    domain = ModelUtilities.Box{T}(-ones(T, inst.n), ones(T, inst.n)) # domain is unit box [-1,1]^n
 
     # rescale X to be in unit box
     minX = minimum(X, dims = 1)
