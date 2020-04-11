@@ -18,7 +18,6 @@ import Distributions
 import DynamicPolynomials
 const DP = DynamicPolynomials
 import MultivariateBases: FixedPolynomialBasis
-CO = Hypatia.Cones
 
 struct ShapeConRegrJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     X::Matrix{T}
@@ -118,7 +117,7 @@ example_tests(::Type{ShapeConRegrJuMP{Float64}}, ::FastInstances) = begin
     # ((4, 150, :func7, 0, 4, true, true, true, true, true), nothing, options),
     # ((4, 150, :func7, 0, 4, false, false, true, true, true), nothing, options),
     # ((3, 150, :func8, 0, 6, true, false, true, true, true), nothing, relaxed_options),
-    ((1, 100, :func10, 50.0, 100, true, false, false, true, false), nothing, options),
+    ((1, 100, :func10, 50, 100, true, false, false, true, false), nothing, options),
     ]
 end
 example_tests(::Type{ShapeConRegrJuMP{Float64}}, ::SlowInstances) = begin
