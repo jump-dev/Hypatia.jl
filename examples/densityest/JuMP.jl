@@ -34,6 +34,7 @@ function DensityEstJuMP{Float64}(
         X[i, :] .= map(cumulative_inv, X[i, :])
     end
     true_obj = exp(sum(log(density(X[i, :]...)) / num_obs for i in 1:num_obs))
+
     return DensityEstJuMP{Float64}(density_name, X, true_obj, deg, use_wsos)
 end
 function DensityEstJuMP{Float64}(
@@ -114,7 +115,7 @@ function build(inst::DensityEstJuMP{T}) where {T <: Float64} # TODO generic real
     JuMP.@objective(model, Max, z)
     JuMP.@variable(model, f_pts[1:U])
 
-    # objective epigraph
+    # objective hypograph
     JuMP.@constraint(model, vcat(z, X_pts_polys * f_pts) in MOI.GeometricMeanCone(1 + num_obs))
 
     # density integrates to 1
