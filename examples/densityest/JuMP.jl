@@ -19,11 +19,24 @@ function DensityEstJuMP{Float64}(
     dataset_name::Symbol,
     deg::Int,
     use_wsos::Bool)
-    if dataset_name == :Uniform
-        X = (rand(num_obs, n) .- 0.5) .* 2
-    else
-        X = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "$dataset_name.txt"))
-    end
+    # if dataset_name == :Uniform
+    #     X = (rand(num_obs, n) .- 0.5) .* 2
+    # else
+    #     X = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "$dataset_name.txt"))
+    # end
+    halfdeg = 2
+    domain = ModelUtilities.Box{Float64}(-ones(1), ones(1))
+    (U, pts, Ps, w) = ModelUtilities.interpolate(domain, halfdeg, calc_w = true)
+    X = pts
+    # X = [
+    # 1 0.5
+    # 1 -1
+    # 0 1
+    # 0 -0.5
+    # -1 0.5
+    # -1 -1
+    # ]
+    deg = 2 * halfdeg
     return DensityEstJuMP{Float64}(dataset_name, X, deg, use_wsos)
 end
 function DensityEstJuMP{Float64}(
@@ -36,28 +49,28 @@ end
 
 example_tests(::Type{DensityEstJuMP{Float64}}, ::MinimalInstances) = [
     ((5, 1, 2, true),),
-    ((:iris, 2, true),),
-    ((:Uniform, 2, true), nothing, options),
-    ((:Uniform, 2, false), nothing, options),
+    # ((:iris, 2, true),),
+    # ((:Uniform, 2, true), nothing, options),
+    # ((:Uniform, 2, false), nothing, options),
     ]
 example_tests(::Type{DensityEstJuMP{Float64}}, ::FastInstances) = begin
     options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
     return [
-    ((100, 1, 10, true), nothing, options),
-    ((100, 1, 85, true), nothing, options),
-    ((100, 1, 60, false), nothing, options),
-    ((10, 2, 2, true), nothing, options),
-    ((50, 2, 2, false), nothing, options),
-    ((200, 2, 40, true), nothing, options),
-    ((100, 8, 2, true), nothing, options),
-    ((100, 8, 2, false), nothing, options),
-    ((250, 4, 4, true), nothing, options),
-    ((250, 4, 4, false), nothing, options),
-    ((:iris, 4, true), nothing, options),
-    ((:iris, 5, true), nothing, options),
-    ((:iris, 6, true), nothing, options),
-    ((:iris, 4, false), nothing, options),
-    ((:cancer, 4, true), nothing, options),
+    # ((100, 1, 10, true), nothing, options),
+    # ((100, 1, 85, true), nothing, options),
+    # ((100, 1, 60, false), nothing, options),
+    # ((10, 2, 2, true), nothing, options),
+    # ((50, 2, 2, false), nothing, options),
+    # ((200, 2, 40, true), nothing, options),
+    # ((100, 8, 2, true), nothing, options),
+    # ((100, 8, 2, false), nothing, options),
+    # ((250, 4, 4, true), nothing, options),
+    # ((250, 4, 4, false), nothing, options),
+    # ((:iris, 4, true), nothing, options),
+    # ((:iris, 5, true), nothing, options),
+    # ((:iris, 6, true), nothing, options),
+    # ((:iris, 4, false), nothing, options),
+    # ((:cancer, 4, true), nothing, options),
     ]
 end
 example_tests(::Type{DensityEstJuMP{Float64}}, ::SlowInstances) = begin
@@ -84,6 +97,7 @@ function build(inst::DensityEstJuMP{T}) where {T <: Float64} # TODO generic real
     # setup interpolation
     halfdeg = div(inst.deg + 1, 2)
     (U, pts, Ps, w) = ModelUtilities.interpolate(domain, halfdeg, calc_w = true)
+    lagrange_polys = ModelUtilities.recover_lagrange_polys(pts, 2 * halfdeg)
 
     DynamicPolynomials.@polyvar x[1:n]
     basis = ModelUtilities.get_chebyshev_polys(x, 2 * halfdeg)
@@ -121,6 +135,13 @@ function build(inst::DensityEstJuMP{T}) where {T <: Float64} # TODO generic real
         JuMP.@constraint(model, coeffs_lhs .== f_pts)
     end
 
+    set_optimizer(model, Hypatia.Optimizer)
+    optimize!(model)
+    @show objective_value(model)
+    @show value.(f_pts)
+    println(dot(value.(f_pts), lagrange_polys))
+    error()
+
     return model
 end
 
@@ -134,4 +155,7 @@ function test_extra(inst::DensityEstJuMP{T}, model::JuMP.Model) where T
     end
 end
 
-return DensityEstJuMP
+inst = DensityEstJuMP{Float64}(:l, 2, true)
+model = build(inst)
+
+# return DensityEstJuMP
