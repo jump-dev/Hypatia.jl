@@ -74,7 +74,7 @@ function get_interp_data(
     halfdeg::Int,
     ) where {T <: Real}
     (x, fn, dom, true_min) = real_poly_data(poly_name, T)
-    (U, pts, Ps, _) = ModelUtilities.interpolate(dom, halfdeg)
+    (U, pts, Ps) = ModelUtilities.interpolate(dom, halfdeg)
     interp_vals = T[fn(pts[j, :]...) for j in 1:U]
     return (interp_vals, Ps, true_min)
 end
@@ -98,7 +98,7 @@ function random_interp_data(
     halfdeg::Int,
     dom = ModelUtilities.Box{T}(-ones(T, n), ones(T, n)),
     ) where {T <: Real}
-    (U, pts, Ps, _) = ModelUtilities.interpolate(dom, halfdeg)
+    (U, pts, Ps) = ModelUtilities.interpolate(dom, halfdeg)
     interp_vals = randn(T, U)
     true_min = T(NaN) # TODO could get an upper bound by evaluating at random points in domain
     return (interp_vals, Ps, true_min)

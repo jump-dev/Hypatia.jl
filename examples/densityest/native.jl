@@ -81,7 +81,7 @@ example_tests(::Type{DensityEstNative{Float64}}, ::SlowInstances) = begin
     options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
     return [
     ((:cancer, 6, true, true, true), options),
-    ((:cancer, 6, false, true, true), options),
+    # ((:cancer, 6, false, true, true), options),
     ((:cancer, 6, true, false, true), options),
     ((:cancer, 6, true, true, false), options),
     ((500, 2, 60, true, true, true), options),

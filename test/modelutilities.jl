@@ -17,8 +17,8 @@ function fekete_sample(T::Type{<:Real})
     free = MU.FreeDomain{T}(n)
 
     for sample in (true, false)
-        (box_U, box_pts, box_Ps, _) = MU.interpolate(box, halfdeg, sample = sample, sample_factor = 20)
-        (free_U, free_pts, free_Ps, _) = MU.interpolate(free, halfdeg, sample = sample, sample_factor = 20)
+        (box_U, box_pts, box_Ps) = MU.interpolate(box, halfdeg, sample = sample, sample_factor = 20)
+        (free_U, free_pts, free_Ps) = MU.interpolate(free, halfdeg, sample = sample, sample_factor = 20)
         @test length(free_Ps) == 1
         @test box_U == free_U
         @test size(box_pts) == size(free_pts)
@@ -64,11 +64,12 @@ function test_recover_lagrange_polys(T::Type{<:Real})
             continue
         end
 
-        (U, pts, Ps, V, w) = MU.interpolate(MU.FreeDomain{T}(n), halfdeg, sample = sample, calc_w = true)
+        (U, pts, Ps, V, w) = MU.interpolate(MU.FreeDomain{T}(n), halfdeg, sample = sample, calc_V = true, calc_w = true)
         DynamicPolynomials.@polyvar x[1:n]
         monos = DynamicPolynomials.monomials(x, 0:(2 * halfdeg))
         lagrange_polys = MU.recover_lagrange_polys(pts, 2 * halfdeg)
 
+        @test size(V) == (size(pts, 1), U)
         @test sum(lagrange_polys) ≈ 1
         @test sum(w[i] * lagrange_polys[j](pts[i, :]) for j in 1:U, i in 1:U) ≈ sum(w) atol=tol rtol=tol
         @test sum(w) ≈ 2^n
