@@ -94,7 +94,7 @@ function build(inst::PolyMinJuMP{T}) where {T <: Float64} # TODO generic reals
     else
         JuMP.@variable(model, μ[1:U])
         JuMP.@objective(model, Min, dot(μ, interp_vals))
-        JuMP.@constraint(model, sum(μ) == 1.0) # TODO can remove this constraint and a variable
+        JuMP.@constraint(model, sum(μ) == 1)
     end
 
     if inst.use_wsos

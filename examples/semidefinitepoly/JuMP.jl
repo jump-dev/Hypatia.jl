@@ -68,7 +68,7 @@ function build(inst::SemidefinitePolyJuMP{T}) where {T <: Float64} # TODO generi
         halfdeg = div(maximum(DP.maxdegree.(H)) + 1, 2)
         n = DP.nvariables(x)
         dom = ModelUtilities.FreeDomain{Float64}(n)
-        (U, pts, Ps, _) = ModelUtilities.interpolate(dom, halfdeg)
+        (U, pts, Ps) = ModelUtilities.interpolate(dom, halfdeg)
         mat_wsos_cone = Hypatia.WSOSInterpPosSemidefTriCone{Float64}(side, U, Ps, inst.use_dual)
 
         rt2 = sqrt(2)
