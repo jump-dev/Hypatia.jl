@@ -54,6 +54,10 @@ function find_initial_x(solver::Solver{T}) where {T <: Real}
         return init_x
     end
 
+    @show maximum(abs, G, dims = 2)
+    @show sum(abs, G, dims = 2)
+    @show cond(G)
+
     # direct method
     if iszero(p)
         # A is empty

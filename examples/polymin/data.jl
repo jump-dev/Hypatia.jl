@@ -21,7 +21,7 @@ function interpolate(
     use_QR::Bool = false,
     ) where {T <: Real}
     # generate interpolation
-    # TODO use more numerically-stable basis for columns
+    # TODO use more numerically-stable basis for columns, and evaluate in a more numerically stable way by multiplying the columns
     L = binomial(n + halfdeg, n)
     U = L^2
     L_basis = [a for t in 0:halfdeg for a in Combinatorics.multiexponents(n, t)]

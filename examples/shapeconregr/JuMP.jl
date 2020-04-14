@@ -44,7 +44,6 @@ function ShapeConRegrJuMP{Float64}(
     args...;
     xmin::Real = -1,
     xmax::Real = 1)
-    Random.seed!(1) # TODO remove
     X = rand(Distributions.Uniform(xmin, xmax), num_points, n)
     f = shapeconregr_data[func]
     y = Float64[f(X[p, :]) for p in 1:num_points]
@@ -70,21 +69,21 @@ shapeconregr_data = Dict(
     )
 
 example_tests(::Type{ShapeConRegrJuMP{Float64}}, ::MinimalInstances) = [
-    ((:naics5811, 3, true, false, true, true, false),),
-    ((:naics5811, 3, true, false, true, false, false),),
+    # ((:naics5811, 3, true, false, true, true, false),),
+    # ((:naics5811, 3, true, false, true, false, false),),
     ((:naics5811, 3, true, false, false, true, false),),
-    ((1, 5, :func1, 2, 4, true, false, true, true, false),),
-    ((1, 5, :func1, 2, 4, true, false, true, false, false),),
+    # ((1, 5, :func1, 2, 4, true, false, true, true, false),),
+    # ((1, 5, :func1, 2, 4, true, false, true, false, false),),
     ((1, 5, :func1, 2, 4, true, false, false, true, false),),
-    ((1, 5, :func1, 2, 4, true, false, false, false, true),),
-    ((1, 5, :func1, 2, 4, true, true, true, true, false),),
-    ((1, 5, :func1, 2, 4, false, false, true, true, false),),
-    ((1, 5, :func1, 2, 4, false, true, true, true, false), ClassicConeOptimizer),
-    ((1, 5, :func1, 2, 4, false, true, true, true, false),),
-    ((1, 5, :func1, 2, 4, false, true, true, true, false), ClassicConeOptimizer),
-    ((1, 5, :func1, 2, 4, false, true, true, false, false), ClassicConeOptimizer),
+    # ((1, 5, :func1, 2, 4, true, false, false, false, true),),
+    # ((1, 5, :func1, 2, 4, true, true, true, true, false),),
+    # ((1, 5, :func1, 2, 4, false, false, true, true, false),),
+    # ((1, 5, :func1, 2, 4, false, true, true, true, false), ClassicConeOptimizer),
+    # ((1, 5, :func1, 2, 4, false, true, true, true, false),),
+    # ((1, 5, :func1, 2, 4, false, true, true, true, false), ClassicConeOptimizer),
+    # ((1, 5, :func1, 2, 4, false, true, true, false, false), ClassicConeOptimizer),
     ((1, 5, :func1, 2, 4, false, true, false, true, false), ClassicConeOptimizer),
-    ((1, 5, :func1, 2, 4, false, true, false, false, true), ClassicConeOptimizer),
+    # ((1, 5, :func1, 2, 4, false, true, false, false, true), ClassicConeOptimizer),
     ]
 example_tests(::Type{ShapeConRegrJuMP{Float64}}, ::FastInstances) = begin
     options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
@@ -97,9 +96,19 @@ example_tests(::Type{ShapeConRegrJuMP{Float64}}, ::FastInstances) = begin
     # ((:naics5811, 3, false, true, true, true, false), nothing, options),
     # ((:naics5811, 3, false, false, true, true, false), nothing, options),
     # ((:naics5811, 3, false, true, true, false, false), ClassicConeOptimizer, options),
-    ((1, 100, :func1, 5, 20, true, false, false, true, false), nothing, options),
-    ((1, 100, :func1, 5, 25, true, false, false, true, false), nothing, options),
-    ((2, 100, :func1, 5, 10, true, false, false, true, false), nothing, options),
+    # ((5, 10, :func1, 5, 3, true, false, true, true, false), nothing, options),
+    ((2, 10, :func1, 5, 5, true, false, false, true, false), nothing, options),
+    ((2, 10, :func1, 5, 10, true, false, false, true, false), nothing, options),
+    # ((1, 100, :func1, 5, 10, true, false, true, true, false), nothing, options),
+    # ((1, 100, :func1, 5, 20, true, false, true, true, false), nothing, options),
+    # ((1, 100, :func1, 5, 100, true, false, false, true, false), nothing, options),
+    # ((1, 100, :func1, 5, 20, false, false, false, true, false), nothing, options),
+    # ((1, 100, :func1, 5, 60, true, false, true, true, false), nothing, options),
+    # ((1, 100, :func1, 5, 80, true, false, true, true, false), nothing, options),
+    # ((1, 100, :func1, 5, 25, true, false, false, true, false), nothing, options),
+    # ((1, 10, :func1, 5, 5, true, false, false, true, false),), # tight tols
+    # ((2, 100, :func1, 5, 20, true, false, false, true, false), nothing, options),
+
     # ((2, 50, :func1, 5, 3, true, false, true, true, false), nothing, options),
     # ((2, 50, :func1, 5, 3, true, false, true, false, false), nothing, options),
     # ((2, 50, :func1, 5, 3, true, false, false, true, false), nothing, options),
@@ -128,6 +137,8 @@ example_tests(::Type{ShapeConRegrJuMP{Float64}}, ::SlowInstances) = begin
     # ((:naics5811, 3, false, true, false, true, false), ClassicConeOptimizer, options),
     # ((:naics5811, 7, true, false, true, true, false), nothing, options),
     # ((:naics5811, 5, false, true, true, true, false), ClassicConeOptimizer, options),
+    ((2, 5000, :func1, 5, 40, true, false, false, true, false), nothing, options),
+    # ((2, 10, :func1, 5, 40, true, false, false, true, false), nothing, options),
     # ((4, 150, :func6, 0, 4, false, false, true, true, true), nothing, options),
     # ((4, 150, :func6, 0, 4, false, true, true, true, true), ClassicConeOptimizer, options),
     # ((3, 150, :func8, 0, 6, false, false, true, true, true), nothing, options),
@@ -160,16 +171,11 @@ function build(inst::ShapeConRegrJuMP{T}) where {T <: Float64} # TODO generic re
     # setup interpolation (not actually using FreeDomain, just need points here)
     halfdeg = div(deg + 1, 2)
     free_dom = ModelUtilities.FreeDomain{Float64}(n)
-    (U, pts, _) = ModelUtilities.interpolate(free_dom, halfdeg)
-
-    DynamicPolynomials.@polyvar x[1:n]
-    basis = ModelUtilities.get_chebyshev_polys(x, 2 * halfdeg)
-    # TODO try to get the V U*U sub-QR out from interpolate instead
-    V = [bj(x => pts_u) for pts_u in eachrow(pts), bj in basis]
-    F = qr!(V, Val(true))
-    V_X = [bj(x => X_i) for X_i in eachrow(X), bj in basis]
-    X_pts_polys = (V_X[:, F.p] / F.R) * F.Q'
-    lagrange_polys = inv(F) * basis # TODO this can be avoided by being smart about interp and differentiation in monotonic/convex constraint setup
+    (U, points, Ps, V) = ModelUtilities.interpolate(free_dom, halfdeg, calc_V = true) # return F parts for qr(V') instead?? # TODO don't need points
+    # TODO maybe incorporate this interp-basis transform into MU, and do something smarter for uni/bi-variate
+    F = qr!(Array(V'), Val(true)) # TODO reuse QR parts
+    V_X = ModelUtilities.make_chebyshev_vandermonde(X, 2halfdeg)
+    X_points_polys = F \ V_X'
 
     model = JuMP.Model()
     JuMP.@variable(model, regressor[1:U])
@@ -177,7 +183,7 @@ function build(inst::ShapeConRegrJuMP{T}) where {T <: Float64} # TODO generic re
     JuMP.@objective(model, Min, z)
 
     # objective epigraph
-    norm_vec = y - X_pts_polys * regressor
+    norm_vec = y - X_points_polys' * regressor
     if inst.use_L1_obj || (num_points <= U)
         obj_cone = (inst.use_L1_obj ? MOI.NormOneCone : MOI.SecondOrderCone)(1 + num_points)
         JuMP.@constraint(model, vcat(z, norm_vec) in obj_cone)
@@ -194,49 +200,75 @@ function build(inst::ShapeConRegrJuMP{T}) where {T <: Float64} # TODO generic re
         JuMP.@constraint(model, vcat(z, coef_R * vcat(regressor, 1)) in MOI.SecondOrderCone(2 + U))
     end
 
-    regressor_fun = DP.polynomial(regressor, lagrange_polys) # TODO this can be avoided ... see above comment
-
     # monotonicity
     if inst.use_monotonicity
         gradient_halfdeg = div(deg, 2)
-        (mono_U, mono_points, mono_Ps, _) = ModelUtilities.interpolate(mono_dom, gradient_halfdeg)
+        (mono_U, mono_points, mono_Ps) = ModelUtilities.interpolate(mono_dom, gradient_halfdeg) # return F parts for qr(V') instead??
+        univ_chebs_derivs = [ModelUtilities.calc_univariate_chebyshev(mono_points[:, i], 2halfdeg, calc_gradient = true) for i in 1:n]
+
         for j in 1:n
-            if !iszero(mono_profile[j])
-                gradient_fun = DP.differentiate(regressor_fun, x[j])
-                gradient_interp = [gradient_fun(mono_points[u, :]) for u in 1:mono_U]
-                if inst.use_wsos
-                    JuMP.@constraint(model, mono_profile[j] .* gradient_interp in Hypatia.WSOSInterpNonnegativeCone{Float64, Float64}(mono_U, mono_Ps))
-                else
-                    psd_vars = []
-                    for (r, Pr) in enumerate(mono_Ps)
-                        Lr = size(Pr, 2)
-                        psd_r = JuMP.@variable(model, [1:Lr, 1:Lr], Symmetric)
-                        push!(psd_vars, psd_r)
-                        JuMP.@SDconstraint(model, mono_profile[j] .* psd_r >= 0)
-                    end
-                    coeffs_lhs = JuMP.@expression(model, [u in 1:mono_U], sum(sum(Pr[u, k] * Pr[u, l] * psd_r[k, l] * (k == l ? 1 : 2) for k in 1:size(Pr, 2) for l in 1:k) for (Pr, psd_r) in zip(mono_Ps, psd_vars)))
-                    JuMP.@constraint(model, coeffs_lhs .== gradient_interp)
-                end # use_wsos
-            end # mono_profile
-        end # j
-    end # use_monotonicity
+            iszero(mono_profile[j]) && continue
+
+            univ_chebs_g = [univ_chebs_derivs[i][(i == j) ? 2 : 1] for i in 1:n]
+            V_g = ModelUtilities.make_product_vandermonde(univ_chebs_g, ModelUtilities.n_deg_exponents(n, 2halfdeg))
+            scal = inv(maximum(abs, V_g) / 10)
+            scal < 1e-7 && @warn("model is numerically challenging to set up", maxlog = 1)
+            lmul!(scal, V_g)
+            g_points_polys = F \ V_g'
+
+            gradient_interp = mono_profile[j] * g_points_polys' * regressor
+
+            if inst.use_wsos
+                JuMP.@constraint(model, gradient_interp in Hypatia.WSOSInterpNonnegativeCone{Float64, Float64}(mono_U, mono_Ps))
+            else
+                psd_vars = []
+                for (r, Pr) in enumerate(mono_Ps)
+                    Lr = size(Pr, 2)
+                    psd_r = JuMP.@variable(model, [1:Lr, 1:Lr], Symmetric)
+                    push!(psd_vars, psd_r)
+                    JuMP.@SDconstraint(model, psd_r >= 0)
+                end
+                coeffs_lhs = JuMP.@expression(model, [u in 1:mono_U], sum(sum(Pr[u, k] * Pr[u, l] * psd_r[k, l] * (k == l ? 1 : 2) for k in 1:size(Pr, 2) for l in 1:k) for (Pr, psd_r) in zip(mono_Ps, psd_vars)))
+                JuMP.@constraint(model, coeffs_lhs .== gradient_interp)
+            end
+        end
+    end
 
     # convexity
-    if inst.use_convexity
+    if inst.use_convexity && !iszero(conv_profile)
         hessian_halfdeg = div(deg - 1, 2)
-        (conv_U, conv_points, conv_Ps, _) = ModelUtilities.interpolate(conv_dom, hessian_halfdeg)
-        hessian_fun = DP.differentiate(regressor_fun, x, 2)
-        hessian_interp = [hessian_fun[i, j](conv_points[u, :]) for i in 1:n for j in 1:i for u in 1:conv_U]
+        (conv_U, conv_points, conv_Ps) = ModelUtilities.interpolate(conv_dom, hessian_halfdeg) # return F parts for qr(V') instead??
+        univ_chebs_derivs = [ModelUtilities.calc_univariate_chebyshev(conv_points[:, i], 2halfdeg, calc_gradient = true, calc_hessian = true) for i in 1:n]
+
+        deriv_num(i, j, k) = (k != i && k != j && return 1; k == i && k == j && return 3; return 2)
+
+        V_Hs = Matrix{Float64}[]
+        for i in 1:n, j in 1:i
+            univ_chebs_H = [univ_chebs_derivs[k][deriv_num(i, j, k)] for k in 1:n]
+            V_H = ModelUtilities.make_product_vandermonde(univ_chebs_H, ModelUtilities.n_deg_exponents(n, 2halfdeg))
+            push!(V_Hs, V_H)
+        end
+        scal = inv(maximum(maximum(abs, V_H) for V_H in V_Hs))
+        scal < 1e-7 && @warn("model is numerically challenging to set up", maxlog = 1)
+        lmul!.(scal, V_Hs)
+
+        hessian_interp = conv_profile * vcat([(F \ V_H')' * regressor for V_H in V_Hs]...)
+
         if inst.use_wsos
-            ModelUtilities.vec_to_svec!(hessian_interp, rt2 = sqrt(2), incr = conv_U)
-            JuMP.@constraint(model, conv_profile * hessian_interp in Hypatia.WSOSInterpPosSemidefTriCone{Float64}(n, conv_U, conv_Ps))
+            if n == 1
+                conv_cone = Hypatia.WSOSInterpNonnegativeCone{Float64, Float64}(conv_U, conv_Ps)
+            else
+                ModelUtilities.vec_to_svec!(hessian_interp, rt2 = sqrt(2), incr = conv_U)
+                conv_cone = Hypatia.WSOSInterpPosSemidefTriCone{Float64}(n, conv_U, conv_Ps)
+            end
+            JuMP.@constraint(model, hessian_interp in conv_cone)
         else
             psd_vars = []
             for (r, Pr) in enumerate(conv_Ps)
                 Lr = size(Pr, 2)
                 psd_r = JuMP.@variable(model, [1:(Lr * n), 1:(Lr * n)], Symmetric)
                 push!(psd_vars, psd_r)
-                JuMP.@SDconstraint(model, conv_profile .* psd_r >= 0)
+                JuMP.@SDconstraint(model, psd_r >= 0)
             end
             # for readability
             Ls = [size(Pr, 2) for Pr in conv_Ps]
@@ -246,9 +278,9 @@ function build(inst::ShapeConRegrJuMP{T}) where {T <: Float64} # TODO generic re
                 # note that psd_vars[r][(x1 - 1) * Ls[r] + k, (x2 - 1) * Ls[r] + l] is not necessarily symmetric
                 coeffs_lhs = JuMP.@expression(model, [u in 1:conv_U], sum(sum(conv_Ps[r][u, k] * conv_Ps[r][u, l] * psd_vars[r][(x1 - 1) * Ls[r] + k, (x2 - 1) * Ls[r] + l] for k in 1:Ls[r] for l in 1:Ls[r]) for r in eachindex(Ls)))
                 JuMP.@constraint(model, coeffs_lhs .== hessian_interp[conv_U .* (offset - 1) .+ (1:conv_U)])
-            end # x1, x2
-        end # use_wsos
-    end # use_convexity
+            end
+        end
+    end
 
     return model
 end

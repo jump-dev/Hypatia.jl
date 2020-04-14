@@ -93,11 +93,13 @@ interp_sample(dom::FreeDomain{T}, npts::Int) where {T <: Real} = interp_sample(B
 get_weights(::FreeDomain{T}, ::AbstractMatrix{T}) where {T <: Real} = T[]
 
 
-get_L_U(n::Int, d::Int) = (binomial(n + d, n), binomial(n + 2d, n))
+get_L(n::Int, d::Int) = binomial(n + d, n)
+get_U(n::Int, d::Int) = binomial(n + 2d, n)
 
 function interpolate(
     dom::Domain{T},
     d::Int;
+    calc_V::Bool = false,
     calc_w::Bool = false,
     sample = nothing,
     sample_factor::Int = 0,
@@ -124,24 +126,25 @@ function interpolate(
                 end
             end
         end
-        return wsos_sample_params(dom, d, calc_w, sample_factor)
+        return wsos_sample_params(dom, d, calc_V, calc_w, sample_factor)
     else
-        return wsos_box_params(sampling_region(dom), n, d, calc_w)
+        return wsos_box_params(sampling_region(dom), n, d, calc_V, calc_w)
     end
 end
 
 # slow but high-quality hyperrectangle/box point selections
-wsos_box_params(dom::Domain, n::Int, d::Int, calc_w::Bool) = error("non-sampling based interpolation methods are only available for box domains")
+wsos_box_params(dom::Domain, n::Int, d::Int, calc_V::Bool, calc_w::Bool) = error("non-sampling based interpolation methods are only available for box domains")
 
 # difference with sampling functions is that P0 is always formed using points in [-1, 1]
 function wsos_box_params(
     dom::Box{T},
     n::Int,
     d::Int,
+    calc_V::Bool,
     calc_w::Bool,
     ) where {T <: Real}
     # n could be larger than the dimension of dom if the original domain was a SemiFreeDomain
-    (U, pts, P0, P0sub, w) = wsos_box_params(T, n, d, calc_w)
+    (U, pts, P0, P0sub, V, w) = wsos_box_params(T, n, d, calc_V, calc_w)
 
     # TODO refactor/cleanup below
     # scale and shift points, get WSOS matrices
@@ -151,57 +154,99 @@ function wsos_box_params(
     PWts = [Wtsfun(j) .* P0sub for j in 1:get_dimension(dom)]
     trpts = pts .* pscale' .+ pshift'
 
-    return (U = U, pts = trpts, Ps = [P0, PWts...], w = w)
+    return (U = U, pts = trpts, Ps = [P0, PWts...], V = V, w = w)
 end
 
 function wsos_box_params(
     dom::FreeDomain{T},
     n::Int,
     d::Int,
+    calc_V::Bool,
     calc_w::Bool,
     ) where {T <: Real}
     # n could be larger than the dimension of dom if the original domain was a SemiFreeDomain
-    (U, pts, P0, P0sub, w) = wsos_box_params(T, n, d, calc_w)
-    return (U = U, pts = pts, Ps = [P0], w = w)
+    (U, pts, P0, P0sub, V, w) = wsos_box_params(T, n, d, calc_V, calc_w)
+    return (U = U, pts = pts, Ps = [P0], V = V, w = w)
 end
 
-function wsos_box_params(T::Type{<:Real}, n::Int, d::Int, calc_w::Bool)
+function wsos_box_params(T::Type{<:Real}, n::Int, d::Int, calc_V::Bool, calc_w::Bool)
     if n == 1
-        return cheb2_data(T, d, calc_w)
+        return cheb2_data(T, d, calc_V, calc_w)
     elseif n == 2
-        return padua_data(T, d, calc_w) # or approxfekete_data(n, d)
+        return padua_data(T, d, calc_V, calc_w) # or approxfekete_data(n, d)
     elseif n > 2
-        return approxfekete_data(T, n, d, calc_w)
+        return approxfekete_data(T, n, d, calc_V, calc_w)
     end
 end
 
 # return k Chebyshev points of the second kind
 cheb2_pts(T::Type{<:Real}, k::Int) = [-cospi(T(j) / T(k - 1)) for j in 0:(k - 1)]
 
-function calc_u(n::Int, d::Int, pts::Matrix{T}) where {T <: Real}
+function calc_univariate_chebyshev(
+    pts_i::AbstractVector{T},
+    d::Int;
+    calc_gradient::Bool = false,
+    calc_hessian::Bool = false,
+    ) where {T <: Real}
     @assert d > 0
-    u = Vector{Matrix{T}}(undef, n)
-    for j in 1:n
-        uj = u[j] = Matrix{T}(undef, size(pts, 1), d + 1)
-        uj[:, 1] .= 1
-        @. @views uj[:, 2] = pts[:, j]
-        for t in 3:(d + 1)
-            @. @views uj[:, t] = 2 * uj[:, 2] * uj[:, t - 1] - uj[:, t - 2]
-        end
+    u = Matrix{T}(undef, length(pts_i), d + 1)
+    @. u[:, 1] = 1
+    @. u[:, 2] = pts_i
+    for t in 3:(d + 1)
+        @. @views u[:, t] = 2 * pts_i * u[:, t - 1] - u[:, t - 2]
     end
-    return u
+
+    if !calc_gradient && !calc_hessian
+        return u
+    end
+    @assert calc_gradient
+
+    # calculate gradient
+    ug = similar(u)
+    @. ug[:, 1] = 0
+    @. ug[:, 2] = 1
+    for t in 3:(d + 1)
+        @. @views ug[:, t] = 2 * (u[:, t - 1] + pts_i * ug[:, t - 1]) - ug[:, t - 2]
+    end
+
+    if !calc_hessian
+        return (u, ug)
+    end
+    @assert d > 1
+
+    # calculate hessian
+    uh = similar(u)
+    @. uh[:, 1:2] = 0
+    for t in 3:(d + 1)
+        @. @views uh[:, t] = 2 * (2 * ug[:, t - 1] + pts_i * uh[:, t - 1]) - uh[:, t - 2]
+    end
+
+    return (u, ug, uh)
 end
 
-function cheb2_data(T::Type{<:Real}, d::Int, calc_w::Bool)
+function cheb2_data(
+    T::Type{<:Real},
+    d::Int,
+    calc_V::Bool,
+    calc_w::Bool,
+    )
     @assert d > 0
-    U = 2d + 1
+    U = get_U(1, d)
+    L = get_L(1, d)
 
     # Chebyshev points for degree 2d
     pts = reshape(cheb2_pts(T, U), :, 1)
 
     # evaluations
-    P0 = calc_u(1, d, pts)[1]
-    P0sub = view(P0, :, 1:d)
+    L =
+    if calc_V
+        V = make_chebyshev_vandermonde(pts, 2d)
+        P0 = V[:, 1:L]
+    else
+        V = zeros(T, 0, 0)
+        P0 = make_chebyshev_vandermonde(pts, d)
+    end
+    P0sub = view(P0, :, 1:get_L(1, d - 1))
 
     # weights for Clenshaw-Curtis quadrature at pts
     if calc_w
@@ -214,12 +259,24 @@ function cheb2_data(T::Type{<:Real}, d::Int, calc_w::Bool)
         w = T[]
     end
 
-    return (U, pts, P0, P0sub, w)
+    if calc_V
+        V = make_chebyshev_vandermonde(pts, 2d)
+    else
+        V = zeros(T, 0, 0)
+    end
+
+    return (U, pts, P0, P0sub, V, w)
 end
 
-function padua_data(T::Type{<:Real}, d::Int, calc_w::Bool)
+function padua_data(
+    T::Type{<:Real},
+    d::Int,
+    calc_V::Bool,
+    calc_w::Bool,
+    )
     @assert d > 0
-    (L, U) = get_L_U(2, d)
+    U = get_U(2, d)
+    L = get_L(2, d)
 
     # Padua points for degree 2d
     cheba = cheb2_pts(T, 2d + 1)
@@ -237,17 +294,24 @@ function padua_data(T::Type{<:Real}, d::Int, calc_w::Bool)
     end
 
     # evaluations
-    u = calc_u(2, d, pts)
-    P0 = Matrix{T}(undef, U, L)
-    P0[:, 1] .= 1
-    col = 1
-    for t in 1:d
-        for xp in Combinatorics.multiexponents(2, t)
-            col += 1
-            P0[:, col] .= u[1][:, xp[1] + 1] .* u[2][:, xp[2] + 1]
-        end
+    if calc_V
+        V = make_chebyshev_vandermonde(pts, 2d)
+        P0 = V[:, 1:L]
+    else
+        V = zeros(T, 0, 0)
+        P0 = make_chebyshev_vandermonde(pts, d)
     end
-    P0sub = view(P0, :, 1:binomial(1 + d, 2))
+    P0sub = view(P0, :, 1:get_L(2, d - 1))
+
+    # u = [calc_univariate_chebyshev(view(pts, :, i), d) for i in 1:2]
+    # P0 = Matrix{T}(undef, U, get_L(2, d))
+    # P0[:, 1] .= 1
+    # col = 1
+    # for t in 1:d, xp in Combinatorics.multiexponents(2, t)
+    #     col += 1
+    #     P0[:, col] .= u[1][:, xp[1] + 1] .* u[2][:, xp[2] + 1]
+    # end
+    # P0sub = view(P0, :, 1:binomial(1 + d, 2))
 
     # cubature weights at Padua points
     # even-degree Chebyshev polynomials on the subgrids
@@ -281,15 +345,20 @@ function padua_data(T::Type{<:Real}, d::Int, calc_w::Bool)
         w = T[]
     end
 
-    return (U, pts, P0, P0sub, w)
+    return (U, pts, P0, P0sub, V, w)
 end
 
 num_approxfekete_candidate_pts(n::Int, d::Int) = prod((2d + 1):(2d + n))
 
-function approxfekete_data(T::Type{<:Real}, n::Int, d::Int, calc_w::Bool)
+function approxfekete_data(
+    T::Type{<:Real},
+    n::Int,
+    d::Int,
+    calc_V::Bool,
+    calc_w::Bool,
+    )
     @assert d > 0
     @assert n > 1
-    (L, U) = get_L_U(n, d)
 
     # points in the initial interpolation grid
     npts = num_approxfekete_candidate_pts(n, d)
@@ -312,112 +381,120 @@ function approxfekete_data(T::Type{<:Real}, n::Int, d::Int, calc_w::Bool)
             end
         end
     end
+
     dom = Box{T}(-ones(T, n), ones(T, n))
-    (pts, P0, P0sub, w) = make_wsos_arrays(dom, candidate_pts, 2d, U, L, calc_w)
+    (pts, P0, P0sub, V, w) = make_wsos_arrays(dom, candidate_pts, d, calc_V, calc_w)
 
-    return (U, pts, P0, P0sub, w)
-end
-
-# indices of points to keep and quadrature weights at those points
-function choose_interp_pts(
-    M::Matrix{T},
-    candidate_pts::Matrix{T},
-    deg::Int,
-    calc_w::Bool,
-    ) where {T <: Real}
-    n = size(candidate_pts, 2)
-    U = size(M, 2)
-    u = calc_u(n, deg, candidate_pts)
-
-    expos = [xp for t in 1:deg for xp in Combinatorics.multiexponents(n, t)]
-    @assert length(expos) == U - 1
-
-    M[:, 1] .= 1
-    for (col, xp) in enumerate(expos)
-        col += 1
-        @inbounds @. @views M[:, col] = u[1][:, xp[1] + 1]
-        @inbounds for j in 2:n
-            @. @views M[:, col] *= u[j][:, xp[j] + 1]
-        end
-    end
-
-    if !calc_w && size(candidate_pts, 1) == U && U > 35_000
-        # large matrix and don't need to perform QR procedure, so don't
-        # TODO this is hacky; later the interpolate function and functions it calls should take options (and have better defaults) for whether to perform the QR or not
-        return (1:U, T[])
-    end
-
-    F = qr!(Array(M'), Val(true))
-    keep_pts = F.p[1:U]
-
-    if calc_w
-        m = zeros(T, U)
-        m1 = m[1] = 2^n
-        for (col, xp) in enumerate(expos)
-            if all(iseven, xp)
-                @inbounds m[col + 1] = m1 / prod(1 - abs2(xp[j]) for j in 1:n)
-            end
-        end
-        Qtm = F.Q' * m
-        w = UpperTriangular(F.R[:, 1:U]) \ Qtm
-        return (keep_pts, w)
-    end
-
-    return (keep_pts, T[])
+    return (size(pts, 1), pts, P0, P0sub, V, w)
 end
 
 function make_wsos_arrays(
     dom::Domain{T},
     candidate_pts::Matrix{T},
-    deg::Int,
-    U::Int,
-    L::Int,
+    d::Int,
+    calc_V::Bool,
     calc_w::Bool,
     ) where {T <: Real}
-    (npts, n) = size(candidate_pts)
-    M = Matrix{T}(undef, npts, U)
-    (keep_pts, w) = choose_interp_pts(M, candidate_pts, deg, calc_w)
+    n = size(candidate_pts, 2)
+
+
+
+
+
+    (V, keep_pts, w) = choose_interp_pts(candidate_pts, d, calc_V, calc_w)
     pts = candidate_pts[keep_pts, :]
-    P0 = M[keep_pts, 1:L] # subset of polynomial evaluations up to total degree d
-    subd = div(deg - get_degree(dom), 2)
-    P0sub = view(P0, :, 1:binomial(n + subd, n))
-    return (pts, P0, P0sub, w)
+    P0 = V[:, 1:get_L(n, d)] # subset of polynomial evaluations up to total degree d
+    Lsub = get_L(n, div(2d - get_degree(dom), 2))
+    P0sub = view(P0, :, 1:Lsub)
+    return (pts, P0, P0sub, V, w)
 end
 
 # sampling-based point selection for general domains
 function wsos_sample_params(
     dom::Domain,
     d::Int,
+    calc_V::Bool,
     calc_w::Bool,
     sample_factor::Int,
     )
-    n = get_dimension(dom)
-    (L, U) = get_L_U(n, d)
+    U = get_U(get_dimension(dom), d)
     candidate_pts = interp_sample(dom, U * sample_factor)
-    (pts, P0, P0sub, w) = make_wsos_arrays(dom, candidate_pts, 2d, U, L, calc_w)
+    (pts, P0, P0sub, V, w) = make_wsos_arrays(dom, candidate_pts, d, calc_V, calc_w)
     g = get_weights(dom, pts)
     PWts = [sqrt.(gi) .* P0sub for gi in g]
-    return (U = U, pts = pts, Ps = [P0, PWts...], w = w)
+    return (U = U, pts = pts, Ps = [P0, PWts...], V = V, w = w)
 end
 
-# TODO should work without sampling too
-function get_interp_pts(
-    dom::Domain{T},
-    deg::Int;
-    calc_w::Bool = false,
-    sample_factor::Int = 10,
+n_deg_exponents(n::Int, deg::Int) = [xp for t in 0:deg for xp in Combinatorics.multiexponents(n, t)]
+
+# indices of points to keep and quadrature weights at those points
+function choose_interp_pts(
+    candidate_pts::Matrix{T},
+    d::Int,
+    calc_V::Bool,
+    calc_w::Bool,
     ) where {T <: Real}
-    n = get_dimension(dom)
-    U = binomial(n + deg, n)
-    candidate_pts = interp_sample(dom, U * sample_factor)
-    M = Matrix{T}(undef, size(candidate_pts, 1), U)
-    (keep_pts, w) = choose_interp_pts(M, candidate_pts, deg, calc_w)
-    return (candidate_pts[keep_pts, :], w)
+    n = size(candidate_pts, 2)
+    U = get_U(n, d)
+
+    V = make_chebyshev_vandermonde(candidate_pts, 2d)
+
+    if !calc_w && size(candidate_pts, 1) == U && U > 35_000
+        # large matrix and don't need to perform QR procedure, so don't
+        # TODO this is hacky; later the interpolate function and functions it calls should take options (and have better defaults) for whether to perform the QR or not
+        return (V, 1:U, T[])
+    end
+
+    F = qr!(Array(V'), Val(true))
+    keep_pts = F.p[1:U]
+    V = V[keep_pts, :]
+
+    if calc_w
+        m = zeros(T, U)
+        m1 = m[1] = 2^n
+        for (col, xp) in enumerate(n_deg_exponents(n, 2d))
+            if col > 1 && all(iseven, xp)
+                @inbounds m[col] = m1 / prod(1 - abs2(xp[j]) for j in 1:n)
+            end
+        end
+        Qtm = F.Q' * m
+        w = UpperTriangular(F.R[:, 1:U]) \ Qtm
+        return (V, keep_pts, w)
+    end
+
+    return (V, keep_pts, T[])
 end
+
+# construct vandermonde with rows corresponding to points and columns to Chebyshev polys
+function make_chebyshev_vandermonde(pts::Matrix{T}, deg::Int) where {T <: Real}
+    n = size(pts, 2)
+    expos = n_deg_exponents(n, deg)
+    univ_chebs = [calc_univariate_chebyshev(view(pts, :, i), deg) for i in 1:n]
+    return make_product_vandermonde(univ_chebs, expos)
+end
+
+function make_product_vandermonde(u::Vector{Matrix{T}}, expos::Vector) where {T <: Real}
+    npts = size(u[1], 1)
+    n = length(u)
+    V = Matrix{T}(undef, npts, length(expos))
+
+    # V[:, 1] .= 1
+    for (col, xp) in enumerate(expos)
+        # col += 1
+        @inbounds @. @views V[:, col] = u[1][:, xp[1] + 1]
+        @inbounds for j in 2:n
+            @. @views V[:, col] *= u[j][:, xp[j] + 1]
+        end
+    end
+
+    return V
+end
+
 
 
 # TODO this is redundant if already do a QR of the U*U Vandermonde - just use that QR
 function recover_lagrange_polys(pts::Matrix{T}, deg::Int) where {T <: Real}
+    @warn("recover_lagrange_polys is not numerically stable for large degree")
     (U, n) = size(pts)
     DP.@polyvar x[1:n]
     # basis = DP.monomials(x, 0:deg) # bad numerically
@@ -428,34 +505,35 @@ function recover_lagrange_polys(pts::Matrix{T}, deg::Int) where {T <: Real}
     return lagrange_polys
 end
 
-function calc_u(monovec::Vector{DynamicPolynomials.PolyVar{true}}, d::Int)
+function calc_chebyshev_univariate(monovec::Vector{DynamicPolynomials.PolyVar{true}}, deg::Int)
+    @warn("calc_u for polyvar input is not numerically stable for large degree")
     n = length(monovec)
     u = Vector{Vector}(undef, n)
     for j in 1:n
-        uj = u[j] = Vector{DP.Polynomial{true, Int}}(undef, d + 1)
+        uj = u[j] = Vector{DP.Polynomial{true, Int}}(undef, deg + 1)
         uj[1] = DP.Monomial(1)
         uj[2] = monovec[j]
-        for t in 3:(d + 1)
+        for t in 3:(deg + 1)
             uj[t] = 2 * uj[2] * uj[t - 1] - uj[t - 2]
         end
     end
     return u
 end
 
-# returns the multivariate Chebyshev polynomials in x up to degree d
-function get_chebyshev_polys(x::Vector{DynamicPolynomials.PolyVar{true}}, d::Int)
+# returns the multivariate Chebyshev polynomials in x up to degree deg
+function get_chebyshev_polys(x::Vector{DynamicPolynomials.PolyVar{true}}, deg::Int)
+    @warn("get_chebyshev_polys for polyvar input is not numerically stable for large degree")
     n = length(x)
-    u = calc_u(x, d)
-    L = binomial(n + d, n)
-    M = Vector{DP.Polynomial{true, Int}}(undef, L)
-    M[1] = DP.Monomial(1)
+    u = calc_chebyshev_univariate(x, deg)
+    V = Vector{DP.Polynomial{true, Int}}(undef, get_L(n, deg))
+    V[1] = DP.Monomial(1)
     col = 1
-    for t in 1:d, xp in Combinatorics.multiexponents(n, t)
+    for t in 1:deg, xp in Combinatorics.multiexponents(n, t)
         col += 1
-        M[col] = u[1][xp[1] + 1]
+        V[col] = u[1][xp[1] + 1]
         for j in 2:n
-            M[col] *= u[j][xp[j] + 1]
+            V[col] *= u[j][xp[j] + 1]
         end
     end
-    return M
+    return V
 end
