@@ -47,11 +47,10 @@ example_tests(::Type{EnvelopeNative{Float64}}, ::SlowInstances) = [
 function build(inst::EnvelopeNative{T}) where {T <: Real}
     (n, num_polys) = (inst.n, inst.num_polys)
     @assert inst.rand_halfdeg <= inst.env_halfdeg
-    # TODO allow option
     domain = ModelUtilities.Box{T}(-ones(T, n), ones(T, n))
 
     # generate interpolation
-    (U, pts, Ps, w) = ModelUtilities.interpolate(domain, inst.env_halfdeg, calc_w = true)
+    (U, pts, Ps, _, w) = ModelUtilities.interpolate(domain, inst.env_halfdeg, calc_w = true)
 
     # generate random data
     L = binomial(n + inst.rand_halfdeg, n)

@@ -38,14 +38,15 @@ example_tests(::Type{RegionOfAttrJuMP{Float64}}, ::SlowInstances) = begin
 end
 
 function build(inst::RegionOfAttrJuMP{T}) where {T <: Float64} # TODO generic reals
+    deg = inst.deg
     DP.@polyvar x
     DP.@polyvar t
     f = x * (x - 0.5) * (x + 0.5) * 100
 
     model = JuMP.Model()
     JuMP.@variables(model, begin
-        v, PolyJuMP.Poly(DP.monomials([x; t], 0:inst.deg))
-        w, PolyJuMP.Poly(DP.monomials(x, 0:inst.deg))
+        v, PolyJuMP.Poly(DP.monomials(vcat(x, t), 0:deg))
+        w, PolyJuMP.Poly(DP.monomials(x, 0:deg))
     end)
     dvdt = DP.differentiate(v, t) + DP.differentiate(v, x) * f
     diffwv = w - DP.subs(v, t => 0.0) - 1.0
@@ -55,10 +56,10 @@ function build(inst::RegionOfAttrJuMP{T}) where {T <: Float64} # TODO generic re
         dom1 = ModelUtilities.Box{Float64}([-1.0], [1.0]) # just state
         dom2 = ModelUtilities.Box{Float64}([-1.0, 0.0], [1.0, 1.0]) # state and time
         dom3 = ModelUtilities.Box{Float64}([-0.01], [0.01]) # state at the end
-        halfdeg = div(inst.deg + 1, 2)
-        (U1, pts1, Ps1, quad_weights) = ModelUtilities.interpolate(dom1, halfdeg, calc_w = true)
-        (U2, pts2, Ps2, _) = ModelUtilities.interpolate(dom2, halfdeg)
-        (U3, pts3, Ps3, _) = ModelUtilities.interpolate(dom3, halfdeg - 1)
+        halfdeg = div(deg + 1, 2)
+        (U1, pts1, Ps1, _, quad_weights) = ModelUtilities.interpolate(dom1, halfdeg, calc_w = true)
+        (U2, pts2, Ps2) = ModelUtilities.interpolate(dom2, halfdeg)
+        (U3, pts3, Ps3) = ModelUtilities.interpolate(dom3, halfdeg - 1)
         wsos_cone1 = Hypatia.WSOSInterpNonnegativeCone{Float64, Float64}(U1, Ps1)
         wsos_cone2 = Hypatia.WSOSInterpNonnegativeCone{Float64, Float64}(U2, Ps2)
         wsos_cone3 = Hypatia.WSOSInterpNonnegativeCone{Float64, Float64}(U3, Ps3)

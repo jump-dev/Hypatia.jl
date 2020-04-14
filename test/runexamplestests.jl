@@ -2,8 +2,6 @@
 Copyright 2019, Chris Coey and contributors
 
 run examples tests from the examples folder and display basic benchmarks
-
-TODO when linear operators are working, update linear operators tests in native tests add tests here
 =#
 
 examples_dir = joinpath(@__DIR__, "../examples")
@@ -22,58 +20,58 @@ default_solver_options = (
 
 # instance sets and real types to run and corresponding time limits (seconds)
 instance_sets = [
-    # (MinimalInstances, Float64, 15),
+    (MinimalInstances, Float64, 15),
     # (MinimalInstances, Float32, 15),
     # (MinimalInstances, BigFloat, 60),
     # (FastInstances, Float64, 15),
-    (SlowInstances, Float64, 120),
+    # (SlowInstances, Float64, 120),
     ]
 
 # types of models to run and corresponding options and example names
 model_types = [
     "native",
-    # "JuMP",
+    "JuMP",
     ]
 
 # list of names of native examples to run
 native_example_names = [
     "densityest",
-    # "envelope",
-    # "expdesign",
-    # "linearopt",
-    # "matrixcompletion",
-    # "matrixregression",
-    # "maxvolume",
-    # "polymin",
-    # "portfolio",
-    # "sparsepca",
+    "envelope",
+    "expdesign",
+    "linearopt",
+    "matrixcompletion",
+    "matrixregression",
+    "maxvolume",
+    "polymin",
+    "portfolio",
+    "sparsepca",
     ]
 
 # list of names of JuMP examples to run
 JuMP_example_names = [
-    # "centralpolymat",
-    # "conditionnum",
-    # "contraction",
+    "centralpolymat",
+    "conditionnum",
+    "contraction",
     "densityest",
-    # "envelope",
-    # "expdesign",
-    # "lotkavolterra",
-    # "lyapunovstability",
-    # "matrixcompletion",
-    # "matrixquadratic",
-    # "matrixregression",
-    # "maxvolume",
-    # "muconvexity",
-    # "nearestpsd",
-    # "polymin",
-    # "polynorm",
-    # "portfolio",
-    # "regionofattr",
-    # "robustgeomprog",
-    # "secondorderpoly",
-    # "semidefinitepoly",
-    # "shapeconregr",
-    # "signomialmin",
+    "envelope",
+    "expdesign",
+    "lotkavolterra",
+    "lyapunovstability",
+    "matrixcompletion",
+    "matrixquadratic",
+    "matrixregression",
+    "maxvolume",
+    "muconvexity",
+    "nearestpsd",
+    "polymin",
+    "polynorm",
+    "portfolio",
+    "regionofattr",
+    "robustgeomprog",
+    "secondorderpoly",
+    "semidefinitepoly",
+    "shapeconregr",
+    "signomialmin",
     ]
 
 # start the tests
@@ -140,8 +138,8 @@ all_tests_time = time()
     @printf("\nexamples tests total time: %8.2e seconds\n\n", time() - all_tests_time)
     show(perf, allrows = true, allcols = true)
     println("\n")
-    # show(timer)
-    # println("\n")
+    show(timer)
+    println("\n")
 end
 
 ;

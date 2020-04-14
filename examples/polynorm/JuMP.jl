@@ -29,7 +29,7 @@ function build(inst::PolyNormJuMP{T}) where {T <: Float64} # TODO generic reals
 
     dom = ModelUtilities.FreeDomain{Float64}(n)
     halfdeg = div(inst.deg + 1, 2)
-    (U, pts, Ps, w) = ModelUtilities.interpolate(dom, halfdeg, calc_w = true)
+    (U, pts, Ps, _, w) = ModelUtilities.interpolate(dom, halfdeg, calc_w = true)
     lagrange_polys = ModelUtilities.recover_lagrange_polys(pts, 2 * halfdeg)
 
     model = JuMP.Model()

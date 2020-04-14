@@ -42,7 +42,7 @@ example_tests(::Type{SecondOrderPolyJuMP{Float64}}, ::SlowInstances) = [
 
 function build(inst::SecondOrderPolyJuMP{T}) where {T <: Float64} # TODO generic reals
     halfdeg = div(inst.deg + 1, 2)
-    (U, pts, Ps, _) = ModelUtilities.interpolate(ModelUtilities.FreeDomain{Float64}(1), halfdeg)
+    (U, pts, Ps) = ModelUtilities.interpolate(ModelUtilities.FreeDomain{Float64}(1), halfdeg)
     vals = secondorderpoly_data[inst.polys_name].(pts)
     l = length(vals[1])
     cone = Hypatia.WSOSInterpEpiNormEuclCone{Float64}(l, U, Ps)

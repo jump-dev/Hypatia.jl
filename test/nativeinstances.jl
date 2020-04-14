@@ -1733,7 +1733,7 @@ end
 
 function wsosinterpnonnegative1(T; options...)
     tol = sqrt(sqrt(eps(T)))
-    (U, pts, Ps, _) = ModelUtilities.interpolate(ModelUtilities.Box{T}(-ones(T, 2), ones(T, 2)), 2, sample = false)
+    (U, pts, Ps) = ModelUtilities.interpolate(ModelUtilities.Box{T}(-ones(T, 2), ones(T, 2)), 2)
     DynamicPolynomials.@polyvar x y
     fn = x ^ 4 + x ^ 2 * y ^ 2 + 4 * y ^ 2 + 4
 
@@ -1752,7 +1752,7 @@ end
 
 function wsosinterpnonnegative2(T; options...)
     tol = sqrt(sqrt(eps(T)))
-    (U, pts, Ps, _) = ModelUtilities.interpolate(ModelUtilities.Box{T}(zeros(T, 2), fill(T(3), 2)), 2, sample = false)
+    (U, pts, Ps) = ModelUtilities.interpolate(ModelUtilities.Box{T}(zeros(T, 2), fill(T(3), 2)), 2)
     DynamicPolynomials.@polyvar x y
     fn = (x - 2) ^ 2 + (x * y - 3) ^ 2
 
@@ -1771,7 +1771,7 @@ end
 
 function wsosinterpnonnegative3(T; options...)
     tol = sqrt(sqrt(eps(T)))
-    (U, pts, Ps, _) = ModelUtilities.interpolate(ModelUtilities.Box{T}(zeros(T, 2), fill(T(3), 2)), 2, sample = false)
+    (U, pts, Ps) = ModelUtilities.interpolate(ModelUtilities.Box{T}(zeros(T, 2), fill(T(3), 2)), 2)
     DynamicPolynomials.@polyvar x y
     fn = (x - 2) ^ 2 + (x * y - 3) ^ 2
 
@@ -1790,9 +1790,9 @@ end
 function wsosinterppossemideftri1(T; options...)
     # convexity parameter for (x + 1) ^ 2 * (x - 1) ^ 2
     tol = sqrt(sqrt(eps(T)))
+    (U, pts, Ps) = ModelUtilities.interpolate(ModelUtilities.Box{T}([-one(T)], [one(T)]), 1)
     DynamicPolynomials.@polyvar x
     fn = (x + 1) ^ 2 * (x - 1) ^ 2
-    (U, pts, Ps, _) = ModelUtilities.interpolate(ModelUtilities.Box{T}([-one(T)], [one(T)]), 1, sample = false)
     H = DynamicPolynomials.differentiate(fn, x, 2)
 
     c = T[-1]
@@ -1811,19 +1811,18 @@ end
 function wsosinterppossemideftri2(T; options...)
     # convexity parameter for x[1] ^ 4 - 3 * x[2] ^ 2
     tol = sqrt(sqrt(eps(T)))
-    n = 2
-    DynamicPolynomials.@polyvar x[1:n]
+    (U, pts, Ps) = ModelUtilities.interpolate(ModelUtilities.FreeDomain{T}(2), 1)
+    DynamicPolynomials.@polyvar x[1:2]
     fn = x[1] ^ 4 - 3 * x[2] ^ 2
-    (U, pts, Ps, _) = ModelUtilities.interpolate(ModelUtilities.FreeDomain{T}(n), 1, sample = false)
     H = DynamicPolynomials.differentiate(fn, x, 2)
 
     c = T[-1]
     A = zeros(T, 0, 1)
     b = T[]
     G = vcat(ones(T, U, 1), zeros(T, U, 1), ones(T, U, 1))
-    h = T[H[i, j](pts[u, :]...) for i in 1:n for j in 1:i for u in 1:U]
+    h = T[H[i, j](pts[u, :]...) for i in 1:2 for j in 1:i for u in 1:U]
     ModelUtilities.vec_to_svec!(h, incr = U)
-    cones = Cone{T}[Cones.WSOSInterpPosSemidefTri{T}(n, U, Ps)]
+    cones = Cone{T}[Cones.WSOSInterpPosSemidefTri{T}(2, U, Ps)]
 
     r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
     @test r.status == :Optimal
@@ -1837,19 +1836,18 @@ function wsosinterppossemideftri3(T; options...)
     end
     # convexity parameter for sum(x .^ 6) - sum(x .^ 2)
     tol = sqrt(sqrt(eps(T)))
-    n = 3
-    DynamicPolynomials.@polyvar x[1:n]
+    (U, pts, Ps) = ModelUtilities.interpolate(ModelUtilities.FreeDomain{T}(3), 2)
+    DynamicPolynomials.@polyvar x[1:3]
     fn = sum(x .^ 4) - sum(x .^ 2)
-    (U, pts, Ps, _) = ModelUtilities.interpolate(ModelUtilities.FreeDomain{T}(n), 2, sample = false)
     H = DynamicPolynomials.differentiate(fn, x, 2)
 
     c = T[-1]
     A = zeros(T, 0, 1)
     b = T[]
     G = vcat(ones(T, U, 1), zeros(T, U, 1), ones(T, U, 1), zeros(T, U, 1), zeros(T, U, 1), ones(T, U, 1))
-    h = T[H[i, j](pts[u, :]...) for i in 1:n for j in 1:i for u in 1:U]
+    h = T[H[i, j](pts[u, :]...) for i in 1:3 for j in 1:i for u in 1:U]
     ModelUtilities.vec_to_svec!(h, incr = U)
-    cones = Cone{T}[Cones.WSOSInterpPosSemidefTri{T}(n, U, Ps)]
+    cones = Cone{T}[Cones.WSOSInterpPosSemidefTri{T}(3, U, Ps)]
 
     r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
     @test r.status == :Optimal
@@ -1860,10 +1858,10 @@ end
 function wsosinterpepinormeucl1(T; options...)
     # min t(x) : t(x) ^ 2 >= x ^ 4 on [-1, 1] where t(x) a constant
     tol = sqrt(sqrt(eps(T)))
+    (U, pts, Ps) = ModelUtilities.interpolate(ModelUtilities.Box{T}([-one(T)], [one(T)]), 1)
+    @assert U == 3
     DynamicPolynomials.@polyvar x
     fn = x ^ 2
-    (U, pts, Ps, _) = ModelUtilities.interpolate(ModelUtilities.Box{T}([-one(T)], [one(T)]), 1, sample = false)
-    @assert U == 3
 
     c = ones(T, U)
     A = T[1 -1 0; 1 0 -1]
@@ -1881,10 +1879,10 @@ end
 function wsosinterpepinormeucl2(T; options...)
     # min t(x) : t(x) ^ 2 >= x ^ 4 + (x - 1) ^ 2 on [-1, 1]^2 where t(x) a constant
     tol = sqrt(sqrt(eps(T)))
+    (U, pts, Ps) = ModelUtilities.interpolate(ModelUtilities.Box{T}([-one(T)], [one(T)]), 1)
     DynamicPolynomials.@polyvar x
     fn1 = x ^ 2
     fn2 = (x - 1)
-    (U, pts, Ps, _) = ModelUtilities.interpolate(ModelUtilities.Box{T}([-one(T)], [one(T)]), 1, sample = false)
 
     c = ones(T, U)
     A = T[1 -1 0; 1 0 -1]
@@ -1905,8 +1903,8 @@ function wsosinterpepinormeucl3(T; options...)
     end
     # max: w'f: 25x^4 >= f(x)^4 + 9x^4 on [-1, 1], soln is +/- 4x^2
     tol = sqrt(sqrt(eps(T)))
+    (U, pts, Ps, _, w) = ModelUtilities.interpolate(ModelUtilities.Box{T}([-one(T)], [one(T)]), 1, calc_w = true)
     DynamicPolynomials.@polyvar x
-    (U, pts, Ps, w) = ModelUtilities.interpolate(ModelUtilities.Box{T}([-one(T)], [one(T)]), 1, sample = false, calc_w = true)
     fn1 = 5x^2
     fn2 = 3x^2
 

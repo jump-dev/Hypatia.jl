@@ -276,13 +276,11 @@ function padua_data(
     chebb = cheb2_pts(T, 2d + 2)
     pts = Matrix{T}(undef, U, 2)
     j = 1
-    for a in 0:2d
-        for b in 0:(2d + 1)
-            if iseven(a + b)
-                pts[j, 1] = -cheba[a + 1]
-                pts[(U + 1 - j), 2] = -chebb[2d + 2 - b]
-                j += 1
-            end
+    for a in 0:2d, b in 0:(2d + 1)
+        if iseven(a + b)
+            pts[j, 1] = -cheba[a + 1]
+            pts[(U + 1 - j), 2] = -chebb[2d + 2 - b]
+            j += 1
         end
     end
 
@@ -381,6 +379,7 @@ function approxfekete_data(
     return (size(pts, 1), pts, P0, P0sub, V, w)
 end
 
+# TODO could merge this function and choose_interp_pts
 function make_wsos_arrays(
     dom::Domain{T},
     candidate_pts::Matrix{T},
@@ -389,11 +388,6 @@ function make_wsos_arrays(
     calc_w::Bool,
     ) where {T <: Real}
     n = size(candidate_pts, 2)
-
-
-
-
-
     (V, keep_pts, w) = choose_interp_pts(candidate_pts, d, calc_V, calc_w)
     pts = candidate_pts[keep_pts, :]
     P0 = V[:, 1:get_L(n, d)] # subset of polynomial evaluations up to total degree d
@@ -484,7 +478,7 @@ function make_product_vandermonde(u::Vector{Matrix{T}}, expos::Vector) where {T 
 end
 
 
-
+# these functions are not numerically stable for high degree (since they essentially calculate 2^degree); consider removing entirely
 # TODO this is redundant if already do a QR of the U*U Vandermonde - just use that QR
 function recover_lagrange_polys(pts::Matrix{T}, deg::Int) where {T <: Real}
     @warn("recover_lagrange_polys is not numerically stable for large degree")
