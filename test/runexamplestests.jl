@@ -15,7 +15,7 @@ using TimerOutputs
 # options to solvers
 timer = TimerOutput()
 default_solver_options = (
-    verbose = true,
+    verbose = false,
     iter_limit = 250,
     timer = timer,
     )
@@ -31,22 +31,22 @@ instance_sets = [
 
 # types of models to run and corresponding options and example names
 model_types = [
-    # "native",
-    "JuMP",
+    "native",
+    # "JuMP",
     ]
 
 # list of names of native examples to run
 native_example_names = [
     "densityest",
-    "envelope",
-    "expdesign",
-    "linearopt",
-    "matrixcompletion",
-    "matrixregression",
-    "maxvolume",
-    "polymin",
-    "portfolio",
-    "sparsepca",
+    # "envelope",
+    # "expdesign",
+    # "linearopt",
+    # "matrixcompletion",
+    # "matrixregression",
+    # "maxvolume",
+    # "polymin",
+    # "portfolio",
+    # "sparsepca",
     ]
 
 # list of names of JuMP examples to run
@@ -54,7 +54,7 @@ JuMP_example_names = [
     # "centralpolymat",
     # "conditionnum",
     # "contraction",
-    # "densityest",
+    "densityest",
     # "envelope",
     # "expdesign",
     # "lotkavolterra",
@@ -72,7 +72,7 @@ JuMP_example_names = [
     # "robustgeomprog",
     # "secondorderpoly",
     # "semidefinitepoly",
-    "shapeconregr",
+    # "shapeconregr",
     # "signomialmin",
     ]
 
