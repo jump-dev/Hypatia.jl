@@ -63,7 +63,8 @@ function test_recover_lagrange_polys(T::Type{<:Real})
             @test_broken MU.interpolate(MU.FreeDomain{T}(n), halfdeg, sample = sample, calc_w = true)
             continue
         end
-        (U, pts, Ps, w) = MU.interpolate(MU.FreeDomain{T}(n), halfdeg, sample = sample, calc_w = true)
+
+        (U, pts, Ps, V, w) = MU.interpolate(MU.FreeDomain{T}(n), halfdeg, sample = sample, calc_w = true)
         DynamicPolynomials.@polyvar x[1:n]
         monos = DynamicPolynomials.monomials(x, 0:(2 * halfdeg))
         lagrange_polys = MU.recover_lagrange_polys(pts, 2 * halfdeg)

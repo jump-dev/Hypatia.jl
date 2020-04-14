@@ -25,8 +25,8 @@ instance_sets = [
     # (MinimalInstances, Float64, 15),
     # (MinimalInstances, Float32, 15),
     # (MinimalInstances, BigFloat, 60),
-    (FastInstances, Float64, 15),
-    # (SlowInstances, Float64, 120),
+    # (FastInstances, Float64, 15),
+    (SlowInstances, Float64, 120),
     ]
 
 # types of models to run and corresponding options and example names
@@ -140,8 +140,8 @@ all_tests_time = time()
     @printf("\nexamples tests total time: %8.2e seconds\n\n", time() - all_tests_time)
     show(perf, allrows = true, allcols = true)
     println("\n")
-    show(timer)
-    println("\n")
+    # show(timer)
+    # println("\n")
 end
 
 ;

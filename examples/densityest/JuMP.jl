@@ -43,30 +43,38 @@ example_tests(::Type{DensityEstJuMP{Float64}}, ::MinimalInstances) = [
 example_tests(::Type{DensityEstJuMP{Float64}}, ::FastInstances) = begin
     options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
     return [
-    ((100, 1, 10, true), nothing, options),
-    ((100, 1, 85, true), nothing, options),
-    ((100, 1, 60, false), nothing, options),
-    ((10, 2, 2, true), nothing, options),
-    ((50, 2, 2, false), nothing, options),
-    ((200, 2, 40, true), nothing, options),
-    ((100, 8, 2, true), nothing, options),
-    ((100, 8, 2, false), nothing, options),
-    ((250, 4, 4, true), nothing, options),
-    ((250, 4, 4, false), nothing, options),
-    ((:iris, 4, true), nothing, options),
-    ((:iris, 5, true), nothing, options),
-    ((:iris, 6, true), nothing, options),
-    ((:iris, 4, false), nothing, options),
-    ((:cancer, 4, true), nothing, options),
+    # ((100, 1, 5, true), nothing, options),
+    # ((100, 1, 10, true), nothing, options),
+    # ((100, 1, 20, true), nothing, options),
+    # ((100, 1, 50, true), nothing, options),
+    # ((100, 1, 100, true), nothing, options),
+    # ((100, 1, 200, true), nothing, options),
+    # ((100, 1, 500, true), nothing, options),
+    ((100, 2, 5, true), nothing, options),
+    ((100, 2, 10, true), nothing, options),
+    ((100, 2, 20, true), nothing, options),
+    # ((50, 3, 2, true), nothing, options),
+    # ((50, 3, 4, true), nothing, options),
+    # ((50, 4, 2, true), nothing, options),
+    # ((100, 8, 2, true), nothing, options),
+    # ((100, 8, 2, false), nothing, options),
+    # ((250, 4, 4, true), nothing, options),
+    # ((250, 4, 4, false), nothing, options),
+    # ((:iris, 4, true), nothing, options),
+    # ((:iris, 5, true), nothing, options),
+    # ((:iris, 6, true), nothing, options),
+    # ((:iris, 4, false), nothing, options),
+    # ((:cancer, 4, true), nothing, options),
     ]
 end
 example_tests(::Type{DensityEstJuMP{Float64}}, ::SlowInstances) = begin
     options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
     return [
-    ((200, 2, 50, true), nothing, options),
-    ((200, 4, 4, false), nothing, options),
-    ((200, 4, 6, true), nothing, options),
-    ((200, 4, 6, false), nothing, options),
+    ((100, 2, 50, true), nothing, options),
+    ((100, 2, 70, true), nothing, options),
+    # ((200, 4, 4, false), nothing, options),
+    # ((200, 4, 6, true), nothing, options),
+    # ((200, 4, 6, false), nothing, options),
     ]
 end
 
@@ -83,15 +91,11 @@ function build(inst::DensityEstJuMP{T}) where {T <: Float64} # TODO generic real
 
     # setup interpolation
     halfdeg = div(inst.deg + 1, 2)
-    (U, pts, Ps, w) = ModelUtilities.interpolate(domain, halfdeg, calc_w = true)
-
-    DynamicPolynomials.@polyvar x[1:n]
-    basis = ModelUtilities.get_chebyshev_polys(x, 2 * halfdeg)
-    # TODO try to get the V U*U sub-QR out from interpolate instead
-    V = [bj(x => pts_u) for pts_u in eachrow(pts), bj in basis]
-    F = qr!(V, Val(true))
-    V_X = [bj(x => X_i) for X_i in eachrow(X), bj in basis]
-    X_pts_polys = (V_X[:, F.p] / F.R) * F.Q'
+    (U, _, Ps, V, w) = ModelUtilities.interpolate(domain, halfdeg, calc_V = true, calc_w = true) # return F parts for qr(V') instead??
+    # TODO maybe incorporate this interp-basis transform into MU, and do something smarter for uni/bi-variate
+    F = qr!(Array(V'), Val(true)) # TODO reuse QR parts
+    V_X = ModelUtilities.make_chebyshev_vandermonde(X, halfdeg)
+    X_pts_polys = F \ V_X'
 
     model = JuMP.Model()
     JuMP.@variable(model, z)
@@ -99,7 +103,7 @@ function build(inst::DensityEstJuMP{T}) where {T <: Float64} # TODO generic real
     JuMP.@variable(model, f_pts[1:U])
 
     # objective epigraph
-    JuMP.@constraint(model, vcat(z, X_pts_polys * f_pts) in MOI.GeometricMeanCone(1 + num_obs))
+    JuMP.@constraint(model, vcat(z, X_pts_polys' * f_pts) in MOI.GeometricMeanCone(1 + num_obs))
 
     # density integrates to 1
     JuMP.@constraint(model, dot(w, f_pts) == 1)
