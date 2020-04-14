@@ -238,7 +238,6 @@ function cheb2_data(
     pts = reshape(cheb2_pts(T, U), :, 1)
 
     # evaluations
-    L =
     if calc_V
         V = make_chebyshev_vandermonde(pts, 2d)
         P0 = V[:, 1:L]
@@ -257,12 +256,6 @@ function cheb2_data(
         push!(w, w[1])
     else
         w = T[]
-    end
-
-    if calc_V
-        V = make_chebyshev_vandermonde(pts, 2d)
-    else
-        V = zeros(T, 0, 0)
     end
 
     return (U, pts, P0, P0sub, V, w)
