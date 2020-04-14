@@ -44,7 +44,7 @@ function build(inst::ContractionJuMP{T}) where {T <: Float64} # TODO generic rea
     dom = ModelUtilities.FreeDomain{Float64}(n)
 
     M_halfdeg = div(inst.M_deg + 1, 2)
-    (U_M, pts_M, Ps_M, _) = ModelUtilities.interpolate(dom, M_halfdeg)
+    (U_M, pts_M, Ps_M) = ModelUtilities.interpolate(dom, M_halfdeg)
     lagrange_polys = ModelUtilities.recover_lagrange_polys(pts_M, 2 * M_halfdeg)
     x = DP.variables(lagrange_polys)
 
@@ -65,7 +65,7 @@ function build(inst::ContractionJuMP{T}) where {T <: Float64} # TODO generic rea
     if inst.use_matrixwsos
         deg_R = maximum(DP.maxdegree.(R))
         d_R = div(deg_R + 1, 2)
-        (U_R, pts_R, Ps_R, _) = ModelUtilities.interpolate(dom, d_R)
+        (U_R, pts_R, Ps_R) = ModelUtilities.interpolate(dom, d_R)
         M_gap = [M[i, j](pts_M[u, :]) - (i == j ? delta : 0.0) for i in 1:n for j in 1:i for u in 1:U_M]
         R_gap = [-R[i, j](pts_R[u, :]) - (i == j ? delta : 0.0) for i in 1:n for j in 1:i for u in 1:U_R]
         rt2 = sqrt(2)

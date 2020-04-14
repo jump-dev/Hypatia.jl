@@ -14,8 +14,6 @@ import DelimitedFiles
 
 struct DensityEstNative{T <: Real} <: ExampleInstanceNative{T}
     dataset_name::Symbol
-    num_obs::Int
-    n::Int
     X::Matrix{T}
     deg::Int
     use_wsos::Bool # use WSOS cone formulation, else PSD formulation
@@ -31,15 +29,11 @@ function DensityEstNative{T}(
     ) where {T <: Real}
     X = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "$dataset_name.txt"))
     X = convert(Matrix{T}, X)
-    (num_obs, n) = size(X)
-    return DensityEstNative{T}(dataset_name, num_obs, n, X, deg, use_wsos, hypogeomean_obj, use_hypogeomean)
+    return DensityEstNative{T}(dataset_name, X, deg, use_wsos, hypogeomean_obj, use_hypogeomean)
 end
-function DensityEstNative{T}(
-    num_obs::Int,
-    n::Int,
-    args...) where {T <: Real}
+function DensityEstNative{T}(num_obs::Int, n::Int, args...) where {T <: Real}
     X = randn(T, num_obs, n)
-    return DensityEstNative{T}(:Random, num_obs, n, X, args...)
+    return DensityEstNative{T}(:Random, X, args...)
 end
 
 example_tests(::Type{<:DensityEstNative{<:BlasReal}}, ::MinimalInstances) = [
@@ -52,10 +46,17 @@ example_tests(::Type{<:DensityEstNative{<:BlasReal}}, ::MinimalInstances) = [
 example_tests(::Type{DensityEstNative{Float64}}, ::FastInstances) = begin
     options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
     return [
+    ((50, 1, 4, true, true, true), options),
+    ((50, 1, 10, true, true, true), options),
+    ((50, 1, 50, true, true, true), options),
+    ((100, 1, 100, true, true, true), options),
+    ((500, 1, 500, true, true, true), options),
     ((50, 2, 2, true, true, true), options),
+    ((200, 2, 20, true, true, true), options),
     ((50, 2, 2, false, true, true), options),
     ((50, 2, 2, true, false, true), options),
     ((50, 2, 2, true, true, false), options),
+    ((500, 3, 14, true, true, true), options),
     ((100, 8, 2, true, true, true), options),
     ((100, 8, 2, false, true, true), options),
     ((100, 8, 2, true, false, true), options),
@@ -80,9 +81,11 @@ example_tests(::Type{DensityEstNative{Float64}}, ::SlowInstances) = begin
     options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
     return [
     ((:cancer, 6, true, true, true), options),
-    ((:cancer, 6, false, true, true), options),
+    # ((:cancer, 6, false, true, true), options),
     ((:cancer, 6, true, false, true), options),
     ((:cancer, 6, true, true, false), options),
+    ((500, 2, 60, true, true, true), options),
+    ((1000, 3, 20, true, true, true), options),
     ((400, 5, 6, true, true, true), options),
     ((400, 5, 6, false, true, true), options),
     ((400, 5, 6, true, false, true), options),
@@ -91,8 +94,9 @@ example_tests(::Type{DensityEstNative{Float64}}, ::SlowInstances) = begin
 end
 
 function build(inst::DensityEstNative{T}) where {T <: Real}
-    (X, num_obs) = (inst.X, inst.num_obs)
-    domain = ModelUtilities.Box{T}(-ones(T, inst.n), ones(T, inst.n)) # domain is unit box [-1,1]^n
+    X = inst.X
+    (num_obs, n) = size(X)
+    domain = ModelUtilities.Box{T}(-ones(T, n), ones(T, n)) # domain is unit box [-1,1]^n
 
     # rescale X to be in unit box
     minX = minimum(X, dims = 1)
@@ -102,9 +106,11 @@ function build(inst::DensityEstNative{T}) where {T <: Real}
 
     # setup interpolation
     halfdeg = div(inst.deg + 1, 2)
-    (U, pts, Ps, w) = ModelUtilities.interpolate(domain, halfdeg, calc_w = true)
-    lagrange_polys = ModelUtilities.recover_lagrange_polys(pts, 2 * halfdeg)
-    basis_evals = [lagrange_polys[j](X[i, :]) for i in 1:inst.num_obs, j in 1:U]
+    (U, _, Ps, V, w) = ModelUtilities.interpolate(domain, halfdeg, calc_V = true, calc_w = true)
+    # TODO maybe incorporate this interp-basis transform into MU, and do something smarter for uni/bi-variate
+    F = qr!(Array(V'), Val(true))
+    V_X = ModelUtilities.make_chebyshev_vandermonde(X, 2halfdeg)
+    X_pts_polys = (F \ V_X')'
 
     cones = Cones.Cone{T}[]
 
@@ -146,7 +152,7 @@ function build(inst::DensityEstNative{T}) where {T <: Real}
         if inst.use_hypogeomean
             G_likl = [
                 -one(T) zeros(T, 1, U)
-                zeros(T, num_obs) -basis_evals
+                zeros(T, num_obs) -X_pts_polys
                 ]
             h_likl = zeros(T, 1 + num_obs)
             push!(cones, Cones.HypoGeomean{T}(fill(inv(T(num_obs)), num_obs)))
@@ -169,7 +175,7 @@ function build(inst::DensityEstNative{T}) where {T <: Real}
             for i in 1:num_obs
                 G_likl[row_offset, ext_offset + i] = -1
                 G_likl[row_offset + 1, ext_offset] = -1
-                G_likl[row_offset + 2, 2:(1 + U)] = -basis_evals[i, :]
+                G_likl[row_offset + 2, 2:(1 + U)] = -X_pts_polys[i, :]
                 row_offset += 3
                 push!(cones, Cones.HypoPerLog{T}(3))
             end
@@ -180,7 +186,7 @@ function build(inst::DensityEstNative{T}) where {T <: Real}
         G_likl = zeros(T, 3 * num_obs, num_obs + U)
         offset = 1
         for i in 1:num_obs
-            G_likl[offset + 2, (num_obs + 1):(num_obs + U)] = -basis_evals[i, :]
+            G_likl[offset + 2, (num_obs + 1):(num_obs + U)] = -X_pts_polys[i, :]
             h_likl[offset + 1] = 1
             G_likl[offset, i] = -1
             offset += 3

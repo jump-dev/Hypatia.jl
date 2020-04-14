@@ -2,8 +2,6 @@
 Copyright 2019, Chris Coey and contributors
 
 run examples tests from the examples folder and display basic benchmarks
-
-TODO when linear operators are working, update linear operators tests in native tests add tests here
 =#
 
 examples_dir = joinpath(@__DIR__, "../examples")
@@ -23,8 +21,8 @@ default_solver_options = (
 # instance sets and real types to run and corresponding time limits (seconds)
 instance_sets = [
     (MinimalInstances, Float64, 15),
-    (MinimalInstances, Float32, 15),
-    (MinimalInstances, BigFloat, 60),
+    # (MinimalInstances, Float32, 15),
+    # (MinimalInstances, BigFloat, 60),
     # (FastInstances, Float64, 15),
     # (SlowInstances, Float64, 120),
     ]
