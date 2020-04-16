@@ -9,7 +9,6 @@ SC barrier from correspondence with A. Nemirovski
 
 TODO
 - describe complex case
-- initial point
 =#
 
 mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
@@ -120,7 +119,8 @@ function update_feas(cone::HypoRootdetTri{T, R}) where {R <: RealOrComplex{T}} w
     @views svec_to_smat!(cone.W, cone.point[2:end], cone.rt2)
     cone.fact_W = cholesky!(Hermitian(cone.W, :U), check = false) # mutates W, which isn't used anywhere else
     if isposdef(cone.fact_W)
-        cone.rootdet = det(cone.fact_W) ^ inv(T(cone.side))
+        # cone.rootdet = det(cone.fact_W) ^ inv(T(cone.side))
+        cone.rootdet = exp(logdet(cone.fact_W) / cone.side)
         cone.rootdetu = cone.rootdet - u
         cone.is_feas = (cone.rootdetu > 0)
     else

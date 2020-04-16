@@ -433,7 +433,7 @@ function test_hyporootdettri_barrier(T::Type{<:Real})
             (u, W) = (s[1], zeros(eltype(s), side, side))
             CO.svec_to_smat!(W, s[2:end], sqrt(T(2)))
             fact_W = cholesky!(Symmetric(W, :U))
-            return cone.sc_const * (-log(det(fact_W) ^ inv(T(side)) - u) - logdet(fact_W))
+            return cone.sc_const * (-log(exp(logdet(fact_W) / side) - u) - logdet(fact_W))
         end
         test_barrier_oracles(cone, R_barrier)
 
@@ -444,7 +444,7 @@ function test_hyporootdettri_barrier(T::Type{<:Real})
             (u, W) = (s[1], zeros(eltype(s), side, side))
             CO.svec_to_smat!(W, s[2:end], sqrt(T(2)))
             fact_W = cholesky!(Symmetric(W, :U))
-            return -log(det(fact_W) ^ inv(T(side)) - u) - logdet(fact_W)
+            return -log(exp(logdet(fact_W) / side) - u) - logdet(fact_W)
         end
         test_barrier_oracles(cone, R_barrier_sc1)
 
@@ -455,7 +455,7 @@ function test_hyporootdettri_barrier(T::Type{<:Real})
             (u, W) = (s[1], zeros(Complex{eltype(s)}, side, side))
             CO.svec_to_smat!(W, s[2:end], sqrt(T(2)))
             fact_W = cholesky!(Hermitian(W, :U))
-            return cone.sc_const * (-log(det(fact_W) ^ inv(T(side)) - u) - logdet(fact_W))
+            return cone.sc_const * (-log(exp(logdet(fact_W) / side) - u) - logdet(fact_W))
         end
         test_barrier_oracles(cone, C_barrier)
     end
