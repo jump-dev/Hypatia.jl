@@ -15,9 +15,6 @@ see e.g. Chapter 8 of thesis by G. Hall (2018)
 include(joinpath(@__DIR__, "../common_JuMP.jl"))
 import DelimitedFiles
 import Distributions
-import DynamicPolynomials
-const DP = DynamicPolynomials
-import MultivariateBases: FixedPolynomialBasis
 
 struct ShapeConRegrJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     X::Matrix{T}
