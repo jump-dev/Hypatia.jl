@@ -69,7 +69,7 @@ function build(inst::CentralPolyMatJuMP{T}) where {T <: Float64} # TODO generic 
     DynamicPolynomials.@polyvar x[1:n]
     basis = DynamicPolynomials.monomials(x, 0:halfdeg)
     L = length(basis)
-    poly_half = randn(L, L) * basis
+    poly_half = randn(L, L) / L * basis
     poly_rand = poly_half' * poly_half
 
     model = JuMP.Model()
