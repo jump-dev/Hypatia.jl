@@ -17,7 +17,6 @@ import DelimitedFiles
 import Distributions
 import DynamicPolynomials
 const DP = DynamicPolynomials
-import MultivariateBases: FixedPolynomialBasis
 
 struct ShapeConRegrJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     X::Matrix{T}
