@@ -425,7 +425,7 @@ function test_hypoperlogdettri_barrier(T::Type{<:Real})
 end
 
 function test_hyporootdettri_barrier(T::Type{<:Real})
-    for side in [1, 2, 3, 5]
+    for side in [1, 2, 3, 5, 8]
         # real rootdet barrier
         dim = 1 + CO.svec_length(side)
         cone = CO.HypoRootdetTri{T, T}(dim)
