@@ -9,7 +9,6 @@ SC barrier from correspondence with A. Nemirovski
 
 TODO
 - describe complex case
-- initial point
 =#
 
 mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
@@ -92,6 +91,7 @@ function setup_data(cone::HypoRootdetTri{T, R}) where {R <: RealOrComplex{T}} wh
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
     cone.W = zeros(R, cone.side, cone.side)
+    cone.Wi = zeros(R, cone.side, cone.side)
     cone.work_mat = zeros(R, cone.side, cone.side)
     return
 end
@@ -120,7 +120,7 @@ function update_feas(cone::HypoRootdetTri{T, R}) where {R <: RealOrComplex{T}} w
     @views svec_to_smat!(cone.W, cone.point[2:end], cone.rt2)
     cone.fact_W = cholesky!(Hermitian(cone.W, :U), check = false) # mutates W, which isn't used anywhere else
     if isposdef(cone.fact_W)
-        cone.rootdet = det(cone.fact_W) ^ inv(T(cone.side))
+        cone.rootdet = exp(logdet(cone.fact_W) / cone.side)
         cone.rootdetu = cone.rootdet - u
         cone.is_feas = (cone.rootdetu > 0)
     else
@@ -135,11 +135,11 @@ function update_grad(cone::HypoRootdetTri)
     @assert cone.is_feas
     u = cone.point[1]
 
-    cone.grad[1] = inv(cone.rootdetu)
-    cone.Wi = inv(cone.fact_W) # TODO in-place
+    cone.grad[1] = cone.sc_const / cone.rootdetu
+    copyto!(cone.Wi, cone.fact_W.factors)
+    LinearAlgebra.inv!(Cholesky(cone.Wi, 'U', 0))
     @views smat_to_svec!(cone.grad[2:cone.dim], cone.Wi, cone.rt2)
-    cone.frac = cone.rootdet / cone.side / cone.rootdetu
-    cone.grad[1] *= cone.sc_const
+    cone.frac = cone.rootdet / cone.rootdetu / cone.side
     @. cone.grad[2:end] *= -cone.sc_const * (cone.frac + 1)
 
     cone.grad_updated = true
@@ -211,20 +211,17 @@ function update_hess(cone::HypoRootdetTri)
 end
 
 # update first row of the Hessian
-function update_hess_prod(cone::HypoRootdetTri)
+function update_hess_prod(cone::HypoRootdetTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     @assert cone.grad_updated
 
     frac = cone.frac # rootdet / rootdetu / side
     # update constants used in the Hessian
     cone.kron_const = frac + 1
-    cone.dot_const = abs2(frac) - frac / cone.side
+    cone.dot_const = frac * (frac - inv(T(cone.side)))
     # update first row in the Hessian
-    rootdetu = cone.rootdetu
-    Wi = cone.Wi
     hess = cone.hess.data
-    hess[1, 1] = cone.grad[1] / rootdetu
-    @views smat_to_svec!(hess[1, 2:cone.dim], Wi, cone.rt2)
-    @. hess[1, 2:end] *= -frac / rootdetu * cone.sc_const
+    @. hess[1, :] = cone.grad / cone.rootdetu
+    @. hess[1, 2:end] *= frac / cone.kron_const
 
     cone.hess_prod_updated = true
     return
@@ -235,18 +232,20 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoRoo
         update_hess_prod(cone)
     end
 
+    const_diag = cone.dot_const / cone.kron_const
     @views mul!(prod[1, :]', cone.hess[1, :]', arr)
     @inbounds for i in 1:size(arr, 2)
         svec_to_smat!(cone.work_mat, view(arr, 2:cone.dim, i), cone.rt2)
-        dot_prod = dot(Hermitian(cone.work_mat, :U), Hermitian(cone.Wi, :U))
         copytri!(cone.work_mat, 'U', cone.is_complex)
         rdiv!(cone.work_mat, cone.fact_W)
+        const_i = tr(cone.work_mat) * const_diag
+        for j in 1:cone.side
+            @inbounds cone.work_mat[j, j] += const_i
+        end
         ldiv!(cone.fact_W, cone.work_mat)
-        axpby!(dot_prod * cone.dot_const, cone.Wi, cone.kron_const, cone.work_mat)
         smat_to_svec!(view(prod, 2:cone.dim, i), cone.work_mat, cone.rt2)
     end
-    @. @views prod[2:cone.dim, :] *= cone.sc_const
-    @views mul!(prod[2:cone.dim, :], cone.hess[2:cone.dim, 1], arr[1, :]', true, true)
+    @views mul!(prod[2:cone.dim, :], cone.hess[2:end, 1], arr[1, :]', true, cone.sc_const * cone.kron_const)
 
     return prod
 end

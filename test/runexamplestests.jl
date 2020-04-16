@@ -23,7 +23,7 @@ instance_sets = [
     (MinimalInstances, Float64, 15),
     # (MinimalInstances, Float32, 15),
     # (MinimalInstances, BigFloat, 60),
-    # (FastInstances, Float64, 15),
+    (FastInstances, Float64, 15),
     # (SlowInstances, Float64, 120),
     ]
 

@@ -143,7 +143,7 @@ function update_grad(cone::HypoPerLogdetTri)
     u = cone.point[1]
     v = cone.point[2]
 
-    cone.Wi = inv(cone.fact_mat)
+    cone.Wi = inv(cone.fact_mat) # TODO in-place
     cone.nLz = (cone.side - cone.ldWv) / cone.z
     cone.ldWvuv = cone.ldWv - u / v
     cone.vzip1 = 1 + v / (cone.z)
