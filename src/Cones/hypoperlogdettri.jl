@@ -96,6 +96,7 @@ function setup_data(cone::HypoPerLogdetTri{T, R}) where {R <: RealOrComplex{T}} 
     cone.nbhd_tmp2 = zeros(T, dim)
     cone.mat = Matrix{R}(undef, cone.side, cone.side)
     cone.mat2 = similar(cone.mat)
+    cone.Wi = similar(cone.mat)
     cone.Wivzi = similar(cone.mat)
     return
 end
@@ -140,19 +141,20 @@ end
 
 function update_grad(cone::HypoPerLogdetTri)
     @assert cone.is_feas
+    z = cone.z
     u = cone.point[1]
     v = cone.point[2]
 
-    cone.Wi = inv(cone.fact_mat) # TODO in-place
-    cone.nLz = (cone.side - cone.ldWv) / cone.z
+    copyto!(cone.Wi, cone.fact_mat.factors)
+    LinearAlgebra.inv!(Cholesky(cone.Wi, 'U', 0))
+    cone.nLz = (cone.side - cone.ldWv) / z
     cone.ldWvuv = cone.ldWv - u / v
-    cone.vzip1 = 1 + v / (cone.z)
-    cone.grad[1] = inv(cone.z)
-    cone.grad[2] = cone.nLz - inv(v) * (cone.side + 1)
+    cone.vzip1 = 1 + v / z
+    cone.grad[1] = cone.sc_const / z
+    cone.grad[2] = cone.sc_const * (cone.nLz - (cone.side + 1) / v)
     gend = view(cone.grad, 3:cone.dim)
     smat_to_svec!(gend, cone.Wi, cone.rt2)
-    gend .*= -cone.vzip1
-    @. cone.grad *= cone.sc_const
+    gend .*= -cone.vzip1 * cone.sc_const
 
     cone.grad_updated = true
     return cone.grad
@@ -254,18 +256,20 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPer
         update_hess_prod(cone)
     end
 
+    const_diag = cone.ldWvuv * cone.vzip1 * cone.ldWvuv
     @views mul!(prod[1:2, :], cone.hess[1:2, :], arr)
     @inbounds for i in 1:size(arr, 2)
         svec_to_smat!(cone.mat2, view(arr, 3:cone.dim, i), cone.rt2)
-        dot_prod = dot(Hermitian(cone.mat2, :U), Hermitian(cone.Wivzi, :U))
         copytri!(cone.mat2, 'U', cone.is_complex)
         rdiv!(cone.mat2, cone.fact_mat)
+        const_i = tr(cone.mat2) / const_diag
+        for j in 1:cone.side
+            @inbounds cone.mat2[j, j] += const_i
+        end
         ldiv!(cone.fact_mat, cone.mat2)
-        axpby!(dot_prod, cone.Wivzi, cone.vzip1, cone.mat2)
         smat_to_svec!(view(prod, 3:cone.dim, i), cone.mat2, cone.rt2)
     end
-    @. @views prod[3:cone.dim, :] *= cone.sc_const
-    @views mul!(prod[3:cone.dim, :], cone.hess[3:cone.dim, 1:2], arr[1:2, :], true, true)
+    @views mul!(prod[3:cone.dim, :], cone.hess[3:cone.dim, 1:2], arr[1:2, :], true, cone.vzip1 * cone.sc_const)
 
     return prod
 end
