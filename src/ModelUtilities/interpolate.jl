@@ -104,11 +104,12 @@ function interpolate(
     sample = nothing,
     sample_factor::Int = 0,
     ) where {T <: Real}
+    @assert d >= 1
     n = get_dimension(dom)
     U = binomial(n + 2d, n)
 
     if isnothing(sample)
-        sample = (!isa(dom, Box) || num_approxfekete_candidate_pts(n, d) > 35_000)
+        sample = (!isa(dom, Box) || n >= 7 || prod_consec(n, d) > 35_000)
     end
 
     if sample
@@ -294,16 +295,6 @@ function padua_data(
     end
     P0sub = view(P0, :, 1:get_L(2, d - 1))
 
-    # u = [calc_univariate_chebyshev(view(pts, :, i), d) for i in 1:2]
-    # P0 = Matrix{T}(undef, U, get_L(2, d))
-    # P0[:, 1] .= 1
-    # col = 1
-    # for t in 1:d, xp in Combinatorics.multiexponents(2, t)
-    #     col += 1
-    #     P0[:, col] .= u[1][:, xp[1] + 1] .* u[2][:, xp[2] + 1]
-    # end
-    # P0sub = view(P0, :, 1:binomial(1 + d, 2))
-
     # cubature weights at Padua points
     # even-degree Chebyshev polynomials on the subgrids
     if calc_w
@@ -339,7 +330,7 @@ function padua_data(
     return (U, pts, P0, P0sub, V, w)
 end
 
-num_approxfekete_candidate_pts(n::Int, d::Int) = prod((2d + 1):(2d + n))
+prod_consec(n::Int, d::Int, j::Int = 0) = prod(big(2d + 1 + j):big(2d + n))
 
 function approxfekete_data(
     T::Type{<:Real},
@@ -352,11 +343,11 @@ function approxfekete_data(
     @assert n > 1
 
     # points in the initial interpolation grid
-    npts = num_approxfekete_candidate_pts(n, d)
+    npts = prod_consec(n, d)
     candidate_pts = Matrix{T}(undef, npts, n)
 
     for j in 1:n
-        ig = prod((2d + 1 + j):(2d + n))
+        ig = prod_consec(n, d, j)
         cs = cheb2_pts(T, 2d + j)
         i = 1
         l = 1
@@ -437,11 +428,11 @@ function choose_interp_pts(
     V = V[keep_pts, :]
 
     if calc_w
+        n > 32 && @warn("quadrature weights not numerically stable for large n")
         m = zeros(T, U)
-        m1 = m[1] = 2^n
         for (col, xp) in enumerate(n_deg_exponents(n, 2d))
-            if col > 1 && all(iseven, xp)
-                @inbounds m[col] = m1 / prod(1 - abs2(xp[j]) for j in 1:n)
+            if all(iseven, xp)
+                @inbounds m[col] = prod(2 / (1 - xp[j]^2) for j in 1:n)
             end
         end
         Qtm = F.Q' * m
@@ -465,9 +456,7 @@ function make_product_vandermonde(u::Vector{Matrix{T}}, expos::Vector) where {T 
     n = length(u)
     V = Matrix{T}(undef, npts, length(expos))
 
-    # V[:, 1] .= 1
     for (col, xp) in enumerate(expos)
-        # col += 1
         @inbounds @. @views V[:, col] = u[1][:, xp[1] + 1]
         @inbounds for j in 2:n
             @. @views V[:, col] *= u[j][:, xp[j] + 1]
@@ -484,7 +473,6 @@ function recover_lagrange_polys(pts::Matrix{T}, deg::Int) where {T <: Real}
     @warn("recover_lagrange_polys is not numerically stable for large degree")
     (U, n) = size(pts)
     DP.@polyvar x[1:n]
-    # basis = DP.monomials(x, 0:deg) # bad numerically
     basis = get_chebyshev_polys(x, deg)
     @assert length(basis) == U
     vandermonde_inv = inv([basis[j](x => view(pts, i, :)) for i in 1:U, j in 1:U])
