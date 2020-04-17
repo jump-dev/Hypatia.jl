@@ -65,6 +65,7 @@ example_tests(::Type{DensityEstNative{Float64}}, ::FastInstances) = begin
     ((250, 4, 6, false, true, true), options),
     ((250, 4, 6, true, false, true), options),
     ((250, 4, 6, true, true, false), options),
+    ((200, 32, 2, true, true, true), options),
     ((:iris, 4, true, true, true), options),
     ((:iris, 5, true, true, true), options),
     ((:iris, 6, true, true, true), options),
