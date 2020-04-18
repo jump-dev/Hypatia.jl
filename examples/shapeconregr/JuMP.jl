@@ -31,6 +31,7 @@ function ShapeConRegrJuMP{Float64}(
     args...)
     Xy = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "$data_name.txt"))
     (X, y) = (Xy[:, 1:(end - 1)], Xy[:, end])
+    # TODO assert X data is on the domain [-1, 1]^n
     return ShapeConRegrJuMP{Float64}(X, y, args...)
 end
 function ShapeConRegrJuMP{Float64}(
@@ -38,10 +39,8 @@ function ShapeConRegrJuMP{Float64}(
     num_points::Int,
     func::Symbol,
     signal_ratio::Real,
-    args...;
-    xmin::Real = -1,
-    xmax::Real = 1)
-    X = rand(Distributions.Uniform(xmin, xmax), num_points, n)
+    args...)
+    X = rand(Distributions.Uniform(-1, 1), num_points, n)
     f = shapeconregr_data[func]
     y = Float64[f(X[p, :]) for p in 1:num_points]
     if !iszero(signal_ratio)
@@ -80,41 +79,42 @@ example_tests(::Type{ShapeConRegrJuMP{Float64}}, ::MinimalInstances) = [
     ((1, 5, :func1, 2, 4, false, true, false, false, true), ClassicConeOptimizer),
     ]
 example_tests(::Type{ShapeConRegrJuMP{Float64}}, ::FastInstances) = begin
-    options = ()#(tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
+    options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
     relaxed_options = (tol_feas = 1e-4, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4)
     return [
-    # ((:naics5811, 4, true, false, true, true, false), nothing, options),
-    # ((:naics5811, 4, true, true, true, true, false), nothing, relaxed_options),
-    # ((:naics5811, 3, false, false, true, true, false), nothing, options),
-    # ((:naics5811, 3, false, true, true, true, false), ClassicConeOptimizer, options),
-    # ((:naics5811, 3, false, true, true, true, false), nothing, options),
-    # ((:naics5811, 3, false, false, true, true, false), nothing, options),
-    # ((:naics5811, 3, false, true, true, false, false), ClassicConeOptimizer, options),
-    # ((1, 100, :func1, 5, 10, true, false, true, true, false), nothing, options),
-    # ((1, 100, :func1, 5, 20, false, false, false, true, false), nothing, options),
-    # ((1, 100, :func1, 5, 50, true, false, false, true, false), nothing, options),
-    # ((1, 100, :func1, 5, 80, true, false, false, true, false), nothing, options),
-    ((1, 200, :func4, 5, 90, true, false, false, true, false), nothing, options),
-    # ((2, 50, :func1, 5, 3, true, false, true, true, false), nothing, options),
-    # ((2, 50, :func1, 5, 10, true, false, true, true, false), nothing, options),
-    # ((2, 50, :func1, 5, 3, true, false, true, false, false), nothing, options),
-    # ((2, 50, :func1, 5, 3, true, false, false, true, false), nothing, options),
-    # ((2, 200, :func1, 0, 3, true, false, false, false, true), nothing, options),
-    # ((2, 50, :func2, 5, 3, true, true, true, true, false), nothing, options),
-    # ((2, 50, :func3, 10, 3, false, true, false, true, false), nothing, options),
-    # ((2, 50, :func3, 10, 3, true, true, false, true, false), nothing, options),
-    # ((2, 50, :func3, 5, 3, false, true, true, true, false), ClassicConeOptimizer, options),
-    # ((2, 50, :func4, 5, 3, false, true, true, true, false), nothing, options),
-    # ((2, 50, :func4, 5, 3, false, true, true, true, false), ClassicConeOptimizer, options),
-    # ((2, 50, :func5, 5, 4, true, false, true, true, false), nothing, options),
-    # ((2, 50, :func6, 5, 4, true, true, true, true, false), nothing, options),
-    # ((2, 50, :func7, 5, 4, false, false, true, true, false), nothing, options),
-    # ((2, 50, :func8, 5, 4, false, true, true, true, false), nothing, options),
-    # ((4, 150, :func6, 0, 4, true, false, true, true, true), nothing, relaxed_options), # objective not tight enough
-    # ((4, 150, :func7, 0, 4, true, false, true, true, true), nothing, options),
-    # ((4, 150, :func7, 0, 4, true, true, true, true, true), nothing, options),
-    # ((4, 150, :func7, 0, 4, false, false, true, true, true), nothing, options),
-    # ((3, 150, :func8, 0, 6, true, false, true, true, true), nothing, relaxed_options),
+    ((:naics5811, 4, true, false, true, true, false), nothing, options),
+    ((:naics5811, 4, true, true, true, true, false), nothing, relaxed_options),
+    ((:naics5811, 3, false, false, true, true, false), nothing, options),
+    ((:naics5811, 3, false, true, true, true, false), ClassicConeOptimizer, options),
+    ((:naics5811, 3, false, true, true, true, false), nothing, options),
+    ((:naics5811, 3, false, false, true, true, false), nothing, options),
+    ((:naics5811, 3, false, true, true, false, false), ClassicConeOptimizer, options),
+    ((1, 100, :func1, 5, 10, true, false, true, true, false), nothing, options),
+    ((1, 100, :func1, 5, 20, false, false, false, true, false), nothing, options),
+    ((1, 100, :func1, 5, 50, true, false, false, true, false), nothing, options),
+    ((1, 100, :func1, 5, 80, true, false, false, true, false), nothing, options),
+    ((1, 100, :func1, 5, 100, true, false, false, true, false), nothing, options),
+    ((1, 200, :func4, 5, 100, true, false, false, true, false), nothing, options),
+    ((2, 50, :func1, 5, 3, true, false, true, true, false), nothing, options),
+    ((2, 50, :func1, 5, 10, true, false, true, true, false), nothing, options),
+    ((2, 50, :func1, 5, 3, true, false, true, false, false), nothing, options),
+    ((2, 50, :func1, 5, 3, true, false, false, true, false), nothing, options),
+    ((2, 200, :func1, 0, 3, true, false, false, false, true), nothing, options),
+    ((2, 50, :func2, 5, 3, true, true, true, true, false), nothing, options),
+    ((2, 50, :func3, 10, 3, false, true, false, true, false), nothing, options),
+    ((2, 50, :func3, 10, 3, true, true, false, true, false), nothing, options),
+    ((2, 50, :func3, 5, 3, false, true, true, true, false), ClassicConeOptimizer, options),
+    ((2, 50, :func4, 5, 3, false, true, true, true, false), nothing, options),
+    ((2, 50, :func4, 5, 3, false, true, true, true, false), ClassicConeOptimizer, options),
+    ((2, 50, :func5, 5, 4, true, false, true, true, false), nothing, options),
+    ((2, 50, :func6, 5, 4, true, true, true, true, false), nothing, options),
+    ((2, 50, :func7, 5, 4, false, false, true, true, false), nothing, options),
+    ((2, 50, :func8, 5, 4, false, true, true, true, false), nothing, options),
+    ((4, 150, :func6, 0, 4, true, false, true, true, true), nothing, relaxed_options), # objective not tight enough
+    ((4, 150, :func7, 0, 4, true, false, true, true, true), nothing, options),
+    ((4, 150, :func7, 0, 4, true, true, true, true, true), nothing, options),
+    ((4, 150, :func7, 0, 4, false, false, true, true, true), nothing, options),
+    ((3, 150, :func8, 0, 6, true, false, true, true, true), nothing, relaxed_options),
     ]
 end
 example_tests(::Type{ShapeConRegrJuMP{Float64}}, ::SlowInstances) = begin
