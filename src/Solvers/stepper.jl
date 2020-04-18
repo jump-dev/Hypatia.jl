@@ -376,7 +376,7 @@ function find_max_alpha(
                     end
                 end
             end
-            if in_nbhd
+            if in_nbhd && all(Cones.in_neighborhood(cones[k], stepper.dual_views_linesearch[k], mu_temp, true) for k in cone_order)
                 break
             end
         end
