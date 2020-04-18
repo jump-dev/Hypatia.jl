@@ -31,6 +31,7 @@ function ShapeConRegrJuMP{Float64}(
     args...)
     Xy = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "$data_name.txt"))
     (X, y) = (Xy[:, 1:(end - 1)], Xy[:, end])
+    # TODO assert X data is on the domain [-1, 1]^n
     return ShapeConRegrJuMP{Float64}(X, y, args...)
 end
 function ShapeConRegrJuMP{Float64}(
@@ -38,10 +39,8 @@ function ShapeConRegrJuMP{Float64}(
     num_points::Int,
     func::Symbol,
     signal_ratio::Real,
-    args...;
-    xmin::Real = -1,
-    xmax::Real = 1)
-    X = rand(Distributions.Uniform(xmin, xmax), num_points, n)
+    args...)
+    X = rand(Distributions.Uniform(-1, 1), num_points, n)
     f = shapeconregr_data[func]
     y = Float64[f(X[p, :]) for p in 1:num_points]
     if !iszero(signal_ratio)
@@ -56,7 +55,7 @@ shapeconregr_data = Dict(
     :func1 => (x -> sum(x .^ 2)),
     :func2 => (x -> sum(x .^ 3)),
     :func3 => (x -> sum(x .^ 4)),
-    :func4 => (x -> exp(norm(x))),
+    :func4 => (x -> exp(norm(x)^2 / length(x)) - 1),
     :func5 => (x -> -inv(1 + exp(-10 * norm(x)))),
     :func6 => (x -> sum((x .+ 1) .^ 4)),
     :func7 => (x -> sum((x / 2 .+ 1) .^ 3)),
@@ -95,6 +94,7 @@ example_tests(::Type{ShapeConRegrJuMP{Float64}}, ::FastInstances) = begin
     ((1, 100, :func1, 5, 50, true, false, false, true, false), nothing, options),
     ((1, 100, :func1, 5, 80, true, false, false, true, false), nothing, options),
     ((1, 100, :func1, 5, 100, true, false, false, true, false), nothing, options),
+    ((1, 200, :func4, 5, 100, true, false, false, true, false), nothing, options),
     ((2, 50, :func1, 5, 3, true, false, true, true, false), nothing, options),
     ((2, 50, :func1, 5, 10, true, false, true, true, false), nothing, options),
     ((2, 50, :func1, 5, 3, true, false, true, false, false), nothing, options),
