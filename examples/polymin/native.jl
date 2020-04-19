@@ -170,7 +170,7 @@ function build_real(inst::PolyMinNative{T}) where {T <: Real}
             if inst.use_linops
                 G = BlockMatrix{T}(U, U, [-I], [1:U], [1:U])
             else
-                G = Diagonal(-one(T) * I, U)
+                G = -one(T) * I
             end
             h = zeros(T, U)
         else
@@ -215,7 +215,7 @@ function build_complex(inst::PolyMinNative{T}) where {T <: Real}
         c = inst.interp_vals
         A = ones(T, 1, U)
         b = T[1]
-        G = Diagonal(-one(T) * I, U)
+        G = -one(T) * I
         h = zeros(T, U)
     end
 
