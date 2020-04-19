@@ -247,7 +247,12 @@ function find_initial_y(solver::Solver{T}, reduce::Bool) where {T <: Real}
 
             # [GQ1 GQ2] = G0 * Q
             # NOTE very inefficient method used for sparse G * QRSparseQ : see https://github.com/JuliaLang/julia/issues/31124#issuecomment-501540818
-            @timeit solver.timer "mul_G_Q" GQ = model.G * Ap_Q
+            @timeit solver.timer "mul_G_Q" if model.G isa UniformScaling
+                side = size(Ap_Q, 1)
+                GQ = Matrix{T}(model.G, side, side) * Ap_Q
+            else
+                GQ = model.G * Ap_Q
+            end
             GQ1 = solver.reduce_GQ1 = GQ[:, Q1_idxs]
             GQ2 = GQ[:, Q2_idxs]
             # h = h0 - GQ1 * (R' \ b0)
