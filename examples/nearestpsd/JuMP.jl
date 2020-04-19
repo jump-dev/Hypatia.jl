@@ -65,7 +65,7 @@ example_tests(::Type{NearestPSDJuMP{Float64}}, ::SlowInstances) = [
 
 function build(inst::NearestPSDJuMP{T}) where {T <: Float64} # TODO generic reals
     side = inst.side
-    sparsity = min(3 / side, 1.0) # sparsity factor (before computing optional chordal extension) TODO make option
+    sparsity = min(5 / side, 1.0) # sparsity factor (before computing optional chordal extension) TODO make option
 
     # generate random symmetric A (indefinite) with sparsity pattern E (nonchordal, with diagonal)
     A = tril!(sprandn(side, side, sparsity)) + Diagonal(randn(side))
@@ -87,7 +87,7 @@ function build(inst::NearestPSDJuMP{T}) where {T <: Float64} # TODO generic real
         JuMP.@variable(model, X[1:length(row_idxs)])
         JuMP.@objective(model, Max, 2 * dot(A_vals, X) - sum(A_vals[k] * X[k] for k in diag_idxs)) # tr(A, X)
         JuMP.@constraint(model, sum(X[diag_idxs]) == 1) # tr(X) == 1
-        
+
         if inst.use_sparsepsd
             rt2 = sqrt(2)
             X_scal = [X[k] * (row_idxs[k] == col_idxs[k] ? 1.0 : rt2) for k in eachindex(X)]
