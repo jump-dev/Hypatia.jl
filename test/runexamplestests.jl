@@ -14,7 +14,7 @@ using TimerOutputs
 timer = TimerOutput()
 default_solver_options = (
     verbose = true,
-    iter_limit = 250,
+    iter_limit = 500,
     timer = timer,
     )
 
@@ -23,7 +23,7 @@ instance_sets = [
     # (MinimalInstances, Float64, 15),
     # (MinimalInstances, Float32, 15),
     # (MinimalInstances, BigFloat, 60),
-    (FastInstances, Float64, 15),
+    (FastInstances, Float64, 600),
     # (SlowInstances, Float64, 120),
     ]
 
@@ -62,7 +62,7 @@ JuMP_example_names = [
     # "matrixregression",
     # "maxvolume",
     # "muconvexity",
-    # "nearestpsd",
+    "nearestpsd",
     # "polymin",
     # "polynorm",
     # "portfolio",
@@ -70,7 +70,7 @@ JuMP_example_names = [
     # "robustgeomprog",
     # "secondorderpoly",
     # "semidefinitepoly",
-    "shapeconregr",
+    # "shapeconregr",
     # "signomialmin",
     ]
 
