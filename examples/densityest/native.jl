@@ -47,41 +47,38 @@ example_tests(::Type{<:DensityEstNative{<:BlasReal}}, ::MinimalInstances) = [
 example_tests(::Type{DensityEstNative{Float64}}, ::FastInstances) = begin
     options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
     return [
-    ((5, 4, 1, false, true, false),),
-    ((5, 4, 1, true, true, true),),
-    #
-    #
-    #
-    # ((50, 1, 4, true, true, true), options),
-    # ((50, 1, 10, true, true, true), options),
-    # ((50, 1, 50, true, true, true), options),
-    # ((100, 1, 100, true, true, true), options),
-    # ((500, 1, 500, true, true, true), options),
-    # ((50, 2, 2, true, true, true), options),
-    # ((200, 2, 20, true, true, true), options),
-    # ((50, 2, 2, false, true, true), options),
-    # ((50, 2, 2, true, false, true), options),
-    # ((50, 2, 2, true, true, false), options),
-    # ((500, 3, 14, true, true, true), options),
-    # ((100, 8, 2, true, true, true), options),
-    # ((100, 8, 2, false, true, true), options),
-    # ((100, 8, 2, true, false, true), options),
-    # ((100, 8, 2, true, true, false), options),
-    # ((250, 4, 6, true, true, true), options),
-    # ((250, 4, 6, false, true, true), options),
-    # ((250, 4, 6, true, false, true), options),
-    # ((250, 4, 6, true, true, false), options),
-    # ((200, 32, 2, true, true, true), options),
-    # ((:iris, 4, true, true, true), options),
-    # ((:iris, 5, true, true, true), options),
-    # ((:iris, 6, true, true, true), options),
-    # ((:iris, 4, false, true, true), options),
-    # ((:iris, 4, true, false, true), options),
-    # ((:iris, 4, true, true, false), options),
-    # ((:cancer, 4, true, true, true), options),
-    # ((:cancer, 4, false, true, true), options),
-    # ((:cancer, 4, true, false, true), options),
-    # ((:cancer, 4, true, true, false), options),
+    ((50, 1, 4, true, true, true), options),
+    ((50, 1, 10, true, true, true), options),
+    ((50, 1, 50, true, true, true), options),
+    ((100, 1, 100, true, true, true), options),
+    ((500, 1, 500, true, true, true), options),
+    ((50, 2, 2, true, true, true), options),
+    ((200, 2, 20, true, true, true), options),
+    ((50, 2, 2, false, true, true), options),
+    ((50, 2, 2, true, false, true), options),
+    ((50, 2, 2, true, true, false), options),
+    ((500, 3, 14, true, true, true), options),
+    ((20, 4, 3, false, true, false),),
+    ((20, 4, 3, true, true, true),),
+    ((100, 8, 2, true, true, true), options),
+    ((100, 8, 2, false, true, true), options),
+    ((100, 8, 2, true, false, true), options),
+    ((100, 8, 2, true, true, false), options),
+    ((250, 4, 6, true, true, true), options),
+    ((250, 4, 6, false, true, true), options),
+    ((250, 4, 6, true, false, true), options),
+    ((250, 4, 6, true, true, false), options),
+    ((200, 32, 2, true, true, true), options),
+    ((:iris, 4, true, true, true), options),
+    ((:iris, 5, true, true, true), options),
+    ((:iris, 6, true, true, true), options),
+    ((:iris, 4, false, true, true), options),
+    ((:iris, 4, true, false, true), options),
+    ((:iris, 4, true, true, false), options),
+    ((:cancer, 4, true, true, true), options),
+    ((:cancer, 4, false, true, true), options),
+    ((:cancer, 4, true, false, true), options),
+    ((:cancer, 4, true, true, false), options),
     ]
 end
 example_tests(::Type{DensityEstNative{Float64}}, ::SlowInstances) = begin
@@ -180,11 +177,10 @@ function build(inst::DensityEstNative{T}) where {T <: Real}
             h_likl = zeros(T,  3 * num_obs + 2)
             # order of variables is: hypograph vars, f(obs), psd_vars, geomean ext vars (y, z)
             G_likl = zeros(T, 3 * num_obs + 2, 2 + U + num_psd_vars + num_obs)
-            # TODO next few lines are inefficient: only set the nonzero elements
-            # TODO is u - y constraint needed? can we just remove u variable?
-            # u - y <= 0, e'z >= 0
-            G_likl[1, :] = vcat(one(T), zeros(T, U + num_psd_vars), -one(T), zeros(T, num_obs))
-            G_likl[2, :] = vcat(zeros(T, 2 + U + num_psd_vars), -ones(T, num_obs))
+            # u is hypograph of geomean: add u - y <= 0, e'z >= 0
+            G_likl[1, 1] = 1
+            G_likl[1, 2 + U + num_psd_vars] = -1
+            G_likl[2, (end - num_obs + 1):end] .= -1
             push!(cones, Cones.Nonnegative{T}(2))
             # f(x) <= y * log(z / y)
             row_offset = 3
@@ -237,8 +233,6 @@ function build(inst::DensityEstNative{T}) where {T <: Real}
         G[1:num_psd_vars, (num_hypo_vars + U) .+ (1:num_psd_vars)] = Diagonal(-I, num_psd_vars)
         G[(num_psd_vars + 1):end, :] = G_likl
     end
-
-    @show cones
 
     model = Models.Model{T}(c, A, b, G, h, cones)
     return model
