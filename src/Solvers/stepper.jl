@@ -126,7 +126,7 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
 
     # calculate correction factor gamma by finding distance aff_alpha for stepping in affine direction
     @timeit timer "alpha_aff" stepper.prev_aff_alpha = aff_alpha = find_max_alpha(
-        stepper, solver, prev_alpha = stepper.prev_aff_alpha, min_alpha = T(1e-2))
+        stepper, solver, prev_alpha = stepper.prev_aff_alpha, min_alpha = T(1e-2), check_hess_nbhd = false)
     stepper.prev_gamma = gamma = abs2(one(T) - aff_alpha) # TODO allow different function (heuristic) as option?
 
     # calculate combined direction and keep in dir
@@ -134,7 +134,7 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
 
     # find distance alpha for stepping in combined direction
     @timeit timer "alpha_comb" alpha = find_max_alpha(
-        stepper, solver, prev_alpha = stepper.prev_alpha, min_alpha = T(1e-3))
+        stepper, solver, prev_alpha = stepper.prev_alpha, min_alpha = T(1e-3), check_hess_nbhd = true)
 
     if iszero(alpha)
         # could not step far in combined direction, so attempt a pure correction step
@@ -143,7 +143,7 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
 
         # find distance alpha for stepping in correction direction
         @timeit timer "alpha_corr" alpha = find_max_alpha(
-            stepper, solver, prev_alpha = one(T), min_alpha = T(1e-6))
+            stepper, solver, prev_alpha = one(T), min_alpha = T(1e-6), check_hess_nbhd = true)
 
         if iszero(alpha)
             @warn("numerical failure: could not step in correction direction; terminating")
@@ -315,6 +315,7 @@ function find_max_alpha(
     solver::Solver{T};
     prev_alpha::T,
     min_alpha::T,
+    check_hess_nbhd::Bool,
     ) where {T <: Real}
     cones = solver.model.cones
     cone_times = stepper.cone_times
@@ -376,8 +377,11 @@ function find_max_alpha(
                     end
                 end
             end
-            if in_nbhd && all(Cones.in_neighborhood(cones[k], stepper.dual_views_linesearch[k], mu_temp, true) for k in cone_order)
-                break
+            if in_nbhd
+                # if !check_hess_nbhd || all(Cones.in_neighborhood(cones[k], stepper.dual_views_linesearch[k], mu_temp, true) for k in cone_order)
+                if all(Cones.in_neighborhood(cones[k], stepper.dual_views_linesearch[k], mu_temp, true) for k in cone_order)
+                    break
+                end
             end
         end
 
