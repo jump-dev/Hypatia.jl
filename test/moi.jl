@@ -51,7 +51,7 @@ conic_exclude = String[
     # "normspec",
     # "normnuc",
     # "sdp",
-    # "logdet",
+    "logdet", # TODO currently failing due to bad barrier
     # "rootdet",
     # square logdet and rootdet cones not handled
     "logdets",
