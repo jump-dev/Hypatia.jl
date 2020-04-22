@@ -69,20 +69,19 @@ update_hess_prod(cone::Cone) = nothing
 
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
     if !cone.hess_updated
-        @timeit cone.timer "update_hess" update_hess(cone)
+        update_hess(cone)
     end
-    @timeit cone.timer "hess_prod" mul!(prod, cone.hess, arr)
+    mul!(prod, cone.hess, arr)
     return prod
 end
 
 function update_hess_fact(cone::Cone{T}) where {T <: Real}
     cone.hess_fact_updated && return true
     if !cone.hess_updated
-        @timeit cone.timer "update_hess" update_hess(cone)
+        update_hess(cone)
     end
 
-    @timeit cone.timer "hess_fact" fact_success = update_fact(cone.hess_fact_cache, cone.hess)
-    if !fact_success
+    if !update_fact(cone.hess_fact_cache, cone.hess)
         if T <: BlasReal && cone.hess_fact_cache isa DensePosDefCache{T}
             # @warn("switching Hessian cache from Cholesky to Bunch Kaufman")
             cone.hess_fact_cache = DenseSymCache{T}()
@@ -95,9 +94,8 @@ function update_hess_fact(cone::Cone{T}) where {T <: Real}
                 cone.hess[i, i] += rteps
             end
         end
-        @timeit cone.timer "hess_fact2" fact2_success = update_fact(cone.hess_fact_cache, cone.hess)
-        if !fact2_success
-            @warn("Hessian Bunch-Kaufman factorization failed after recovery")
+        if !update_fact(cone.hess_fact_cache, cone.hess)
+            # @warn("Hessian Bunch-Kaufman factorization failed after recovery")
             return false
         end
     end
@@ -109,37 +107,37 @@ end
 function update_inv_hess(cone::Cone)
     @assert !cone.inv_hess_updated
     if !cone.hess_fact_updated
-        @timeit cone.timer "update_hess_fact" update_hess_fact(cone)
+        update_hess_fact(cone)
     end
-    @timeit cone.timer "invert_hess" invert(cone.hess_fact_cache, cone.inv_hess)
+    invert(cone.hess_fact_cache, cone.inv_hess)
     cone.inv_hess_updated = true
     return cone.inv_hess
 end
 
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
     if !cone.hess_fact_updated
-        @timeit cone.timer "update_hess_fact" update_hess_fact(cone)
+        update_hess_fact(cone)
     end
     copyto!(prod, arr)
-    @timeit cone.timer "inv_hess_prod" inv_prod(cone.hess_fact_cache, prod)
+    inv_prod(cone.hess_fact_cache, prod)
     return prod
 end
 
 function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
     if !cone.hess_fact_updated
-        @timeit cone.timer "update_hess_fact" update_hess_fact(cone)
+        update_hess_fact(cone)
     end
     copyto!(prod, arr)
-    @timeit cone.timer "hess_sqrt_prod" sqrt_prod(cone.hess_fact_cache, prod)
+    sqrt_prod(cone.hess_fact_cache, prod)
     return prod
 end
 
 function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
     if !cone.hess_fact_updated
-        @timeit cone.timer "update_hess_fact" update_hess_fact(cone)
+        update_hess_fact(cone)
     end
     copyto!(prod, arr)
-    @timeit cone.timer "inv_hess_sqrt_prod" inv_sqrt_prod(cone.hess_fact_cache, prod)
+    inv_sqrt_prod(cone.hess_fact_cache, prod)
     return prod
 end
 
@@ -166,15 +164,16 @@ function in_neighborhood(cone::Cone{T}, dual_point::AbstractVector, mu::Real) wh
         nbhd = norm(nbhd_tmp, Inf) / norm(g, Inf)
         # nbhd = maximum(abs(dj / gj) for (dj, gj) in zip(nbhd_tmp, g)) # TODO try this neighborhood
     else
-        if hasfield(typeof(cone), :hess_fact_cache) && !update_hess_fact(cone)
+        has_hess_fact_cache = hasfield(typeof(cone), :hess_fact_cache)
+        if has_hess_fact_cache && !update_hess_fact(cone)
             return false
         end
         nbhd_tmp2 = cone.nbhd_tmp2
-        if hasfield(typeof(cone), :hess_fact_cache) && cone.hess_fact_cache isa DenseSymCache{T}
+        if has_hess_fact_cache && cone.hess_fact_cache isa DenseSymCache{T}
             inv_hess_prod!(nbhd_tmp2, nbhd_tmp, cone)
             nbhd_sqr = dot(nbhd_tmp2, nbhd_tmp)
             if nbhd_sqr < -eps(T) # TODO possibly loosen
-                @warn("numerical failure: cone neighborhood is $nbhd_sqr")
+                # @warn("numerical failure: cone neighborhood is $nbhd_sqr")
                 return false
             end
             nbhd = sqrt(abs(nbhd_sqr))
