@@ -18,7 +18,7 @@ struct DensityEstNative{T <: Real} <: ExampleInstanceNative{T}
     deg::Int
     use_wsos::Bool # use WSOS cone formulation, else PSD formulation
     hypogeomean_obj::Bool # use geomean objective, else sum of logs objective
-    use_hypogeomean::Bool # use hypogeomean cone if applicable, else hypoperlog formulation
+    use_hypogeomean::Bool # use hypogeomean cone if applicable, else 3-dim entropy formulation
 end
 function DensityEstNative{T}(
     dataset_name::Symbol,
@@ -174,24 +174,23 @@ function build(inst::DensityEstNative{T}) where {T <: Real}
             A_ext = zeros(T, 0, num_obs)
         else
             num_ext_geom_vars = 1 + num_obs
-            h_likl = zeros(T,  3 * num_obs + 2)
-            # order of variables is: hypograph vars, f(obs), psd_vars, geomean ext vars (y, z)
-            G_likl = zeros(T, 3 * num_obs + 2, 2 + U + num_psd_vars + num_obs)
-            # u is hypograph of geomean: add u - y <= 0, e'z >= 0
+            ext_offset = 2 + U + num_psd_vars
+            h_likl = zeros(T, 3 * num_obs + 2)
+            # order of variables: hypograph u, U f(obs) vars, psd vars, geomean ext vars (y, z)
+            G_likl = zeros(T, 3 * num_obs + 2, ext_offset + num_obs)
+            # y >= u, e'z >= 0
             G_likl[1, 1] = 1
-            G_likl[1, 2 + U + num_psd_vars] = -1
+            G_likl[1, ext_offset] = -1
             G_likl[2, (end - num_obs + 1):end] .= -1
             push!(cones, Cones.Nonnegative{T}(2))
             # f(x) <= y * log(z / y)
             row_offset = 3
-            # number of columns before extended variables start
-            ext_offset = 2 + U + num_psd_vars
             for i in 1:num_obs
-                G_likl[row_offset, ext_offset + i] = -1
-                G_likl[row_offset + 1, ext_offset] = -1
-                G_likl[row_offset + 2, 2:(1 + U)] = -X_pts_polys[i, :]
+                G_likl[row_offset, ext_offset + i] = 1
+                G_likl[row_offset + 1, 2:(1 + U)] = -X_pts_polys[i, :]
+                G_likl[row_offset + 2, ext_offset] = -1
                 row_offset += 3
-                push!(cones, Cones.HypoPerLog{T}(3))
+                push!(cones, Cones.EpiSumPerEntropy{T}(3))
             end
         end
     else
