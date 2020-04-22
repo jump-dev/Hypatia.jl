@@ -350,26 +350,35 @@ function find_max_alpha(
             tau_temp = tau + alpha * tau_dir
             kap_temp = kap + alpha * kap_dir
             taukap_temp = tau_temp * kap_temp
-            mu_temp = (dot(s_linesearch, z_linesearch) + taukap_temp) / nup1
+            dot_s_z = dot(s_linesearch, z_linesearch)
+            mu_temp = (dot_s_z + taukap_temp) / nup1
         end
 
-        if mu_temp > eps(T) && abs(taukap_temp - mu_temp) < mu_temp * solver.max_nbhd
+        if dot_s_z > eps(T) && mu_temp > eps(T) && abs(taukap_temp - mu_temp) < mu_temp * solver.max_nbhd
             in_nbhd = true
             @timeit timer "nbhd_checks" begin
                 # order the cones by how long it takes to check neighborhood condition and iterate in that order, to improve efficiency
                 sortperm!(cone_order, cone_times, initialized = true)
                 for k in cone_order
                     cone_k = cones[k]
+                    primal_k = stepper.primal_views_linesearch[k]
+                    dual_k = stepper.dual_views_linesearch[k]
+                    if dot(primal_k, dual_k) < eps(T)
+                        @warn("dot k not pos")
+                        @show dot(primal_k, dual_k)
+                        in_nbhd = false
+                        break
+                    end
                     time_k = time_ns()
-                    Cones.load_point(cone_k, stepper.primal_views_linesearch[k])
+                    Cones.load_point(cone_k, primal_k)
                     Cones.reset_data(cone_k)
                     @timeit timer "is_feas" is_feas_k = Cones.is_feas(cone_k)
                     if is_feas_k
-                        @timeit timer "in_nbhd" in_nbhd_k = Cones.in_neighborhood(cone_k, stepper.dual_views_linesearch[k], mu_temp)
+                        @timeit timer "in_nbhd" in_nbhd_k = Cones.in_neighborhood(cone_k, dual_k, mu_temp)
                     else
                         in_nbhd_k = false
                     end
-                    # in_nbhd_k = Cones.is_feas(cone_k) && Cones.in_neighborhood(cone_k, stepper.dual_views_linesearch[k], mu_temp)
+                    # in_nbhd_k = Cones.is_feas(cone_k) && Cones.in_neighborhood(cone_k, dual_k, mu_temp)
                     cone_times[k] = time_ns() - time_k
                     if !in_nbhd_k
                         in_nbhd = false
