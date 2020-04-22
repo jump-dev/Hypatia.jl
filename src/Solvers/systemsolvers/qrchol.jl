@@ -215,7 +215,6 @@ outer_prod(A::AbstractMatrix{T}, B::AbstractMatrix{T}, alpha::Real, beta::Real) 
 
 function update_lhs(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
     model = solver.model
-    timer = solver.timer
     lhs = system_solver.lhs1.data
 
     if !isempty(system_solver.Q2div)
@@ -289,7 +288,7 @@ function update_lhs(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}
     end
 
     # TODO refactor below
-    if !update_fact(system_solver.fact_cache, system_solver.lhs1)
+    if !isempty(system_solver.lhs1) && !update_fact(system_solver.fact_cache, system_solver.lhs1)
         # @warn("QRChol factorization failed")
         if T <: LinearAlgebra.BlasReal && system_solver.fact_cache isa DensePosDefCache{T}
             # @warn("switching QRChol solver from Cholesky to Bunch Kaufman")
