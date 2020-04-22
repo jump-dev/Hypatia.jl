@@ -65,7 +65,7 @@ example_tests(::Type{NearestPSDJuMP{Float64}}, ::SlowInstances) = [
 
 function build(inst::NearestPSDJuMP{T}) where {T <: Float64} # TODO generic reals
     side = inst.side
-    sparsity = min(5 / side, 1.0) # sparsity factor (before computing optional chordal extension) TODO make option
+    sparsity = min(3.0 / side, 1.0) # sparsity factor (before computing optional chordal extension) TODO make option
 
     # generate random symmetric A (indefinite) with sparsity pattern E (nonchordal, with diagonal)
     A = tril!(sprandn(side, side, sparsity)) + Diagonal(randn(side))
