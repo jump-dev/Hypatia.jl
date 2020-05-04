@@ -36,26 +36,24 @@ example_tests(::Type{NearestPSDJuMP{Float64}}, ::MinimalInstances) = [
     ]
 example_tests(::Type{NearestPSDJuMP{Float64}}, ::FastInstances) = [
     ((100, true, false, true),),
-
-
-    # ((5, false, true, true),),
-    # ((5, false, false, true),),
-    # ((5, true, true, true),),
-    # ((5, true, false, true),),
-    # ((5, false, true, false),),
-    # ((5, false, false, false),),
-    # ((5, true, true, false),),
-    # ((5, true, false, false),),
-    # ((20, false, true, true),),
-    # ((20, false, false, true),),
-    # ((20, true, true, true),),
-    # ((20, true, false, true),),
-    # ((20, false, true, false),),
-    # ((20, false, false, false),),
-    # ((20, true, true, false),),
-    # ((20, true, false, false),),
-    # ((100, false, true, false),),
-    # ((100, false, false, false),),
+    ((5, false, true, true),),
+    ((5, false, false, true),),
+    ((5, true, true, true),),
+    ((5, true, false, true),),
+    ((5, false, true, false),),
+    ((5, false, false, false),),
+    ((5, true, true, false),),
+    ((5, true, false, false),),
+    ((20, false, true, true),),
+    ((20, false, false, true),),
+    ((20, true, true, true),),
+    ((20, true, false, true),),
+    ((20, false, true, false),),
+    ((20, false, false, false),),
+    ((20, true, true, false),),
+    ((20, true, false, false),),
+    ((100, false, true, false),),
+    ((100, false, false, false),),
     ]
 example_tests(::Type{NearestPSDJuMP{Float64}}, ::SlowInstances) = [
     ((100, false, true, true),),
@@ -68,7 +66,7 @@ example_tests(::Type{NearestPSDJuMP{Float64}}, ::SlowInstances) = [
 
 function build(inst::NearestPSDJuMP{T}) where {T <: Float64} # TODO generic reals
     side = inst.side
-    sparsity = min(3 / side, 1.0) # sparsity factor (before computing optional chordal extension) TODO make option
+    sparsity = min(3.0 / side, 1.0) # sparsity factor (before computing optional chordal extension) TODO make option
 
     # generate random symmetric A (indefinite) with sparsity pattern E (nonchordal, with diagonal)
     A = tril!(sprandn(side, side, sparsity)) + Diagonal(randn(side))

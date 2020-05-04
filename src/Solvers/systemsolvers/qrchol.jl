@@ -16,55 +16,51 @@ function solve_system(system_solver::QRCholSystemSolver{T}, solver::Solver{T}, s
     y_rows = system_solver.y_rows
     z_rows = system_solver.z_rows
 
-    @timeit solver.timer "setup_rhs3" begin
-        rhs3 = system_solver.rhs3
-        dim3 = length(rhs3)
+    rhs3 = system_solver.rhs3
+    dim3 = length(rhs3)
 
-        @. @views rhs3[x_rows] = rhs[x_rows]
-        @. @views rhs3[y_rows] = -rhs[y_rows]
+    @. @views rhs3[x_rows] = rhs[x_rows]
+    @. @views rhs3[y_rows] = -rhs[y_rows]
 
-        for (cone_k, idxs_k) in zip(model.cones, model.cone_idxs)
-            z_rows_k = (model.n + model.p) .+ idxs_k
-            z_k = @view rhs[z_rows_k]
-            z3_k = @view rhs3[z_rows_k]
-            s_k = @view rhs[(dim3 + 1) .+ idxs_k]
+    for (cone_k, idxs_k) in zip(model.cones, model.cone_idxs)
+        z_rows_k = (model.n + model.p) .+ idxs_k
+        z_k = @view rhs[z_rows_k]
+        z3_k = @view rhs3[z_rows_k]
+        s_k = @view rhs[(dim3 + 1) .+ idxs_k]
 
-            if Cones.use_dual_barrier(cone_k)
-                z_temp_k = @view sol[z_rows_k]
-                @. z_temp_k = -z_k - s_k
-                Cones.inv_hess_prod!(z3_k, z_temp_k, cone_k)
-                z3_k ./= solver.mu
-            else
-                Cones.hess_prod!(z3_k, z_k, cone_k)
-                axpby!(-1, s_k, -solver.mu, z3_k)
-            end
+        if Cones.use_dual_barrier(cone_k)
+            z_temp_k = @view sol[z_rows_k]
+            @. z_temp_k = -z_k - s_k
+            Cones.inv_hess_prod!(z3_k, z_temp_k, cone_k)
+            z3_k ./= solver.mu
+        else
+            Cones.hess_prod!(z3_k, z_k, cone_k)
+            axpby!(-1, s_k, -solver.mu, z3_k)
         end
     end
 
-    @timeit solver.timer "solve_subsystem" sol3 = solve_subsystem(system_solver, solver, rhs3) # NOTE modifies and returns rhs3
+    sol3 = solve_subsystem(system_solver, solver, rhs3) # NOTE modifies and returns rhs3
 
-    @timeit solver.timer "lift_sol3" begin
-        # TODO refactor all below
-        # TODO maybe use higher precision here
-        const_sol = system_solver.const_sol
+    # TODO refactor all below
+    # TODO maybe use higher precision here
+    const_sol = system_solver.const_sol
 
-        # lift to get tau
-        @views tau_num = rhs[dim3 + 1] + rhs[end] + dot(model.c, sol3[x_rows]) + dot(model.b, sol3[y_rows]) + dot(model.h, sol3[z_rows])
-        @views tau_denom = solver.mu / solver.tau / solver.tau - dot(model.c, const_sol[x_rows]) - dot(model.b, const_sol[y_rows]) - dot(model.h, const_sol[z_rows])
+    # lift to get tau
+    @views tau_num = rhs[dim3 + 1] + rhs[end] + dot(model.c, sol3[x_rows]) + dot(model.b, sol3[y_rows]) + dot(model.h, sol3[z_rows])
+    @views tau_denom = solver.mu / solver.tau / solver.tau - dot(model.c, const_sol[x_rows]) - dot(model.b, const_sol[y_rows]) - dot(model.h, const_sol[z_rows])
 
-        sol_tau = tau_num / tau_denom
-        @. sol[1:dim3] = sol3 + sol_tau * const_sol
-        sol[dim3 + 1] = sol_tau
+    sol_tau = tau_num / tau_denom
+    @. sol[1:dim3] = sol3 + sol_tau * const_sol
+    sol[dim3 + 1] = sol_tau
 
-        # lift to get s and kap
-        # TODO refactor below for use with symindef and qrchol methods
-        s = @view sol[(dim3 + 2):(end - 1)]
-        @. @views s = model.h * sol_tau - rhs[z_rows]
-        @views mul!(s, model.G, sol[x_rows], -1, true)
+    # lift to get s and kap
+    # TODO refactor below for use with symindef and qrchol methods
+    s = @view sol[(dim3 + 2):(end - 1)]
+    @. @views s = model.h * sol_tau - rhs[z_rows]
+    @views mul!(s, model.G, sol[x_rows], -1, true)
 
-        # kap = -mu/(taubar^2)*tau + kaprhs
-        sol[end] = -solver.mu / solver.tau * sol_tau / solver.tau + rhs[end]
-    end
+    # kap = -mu/(taubar^2)*tau + kaprhs
+    sol[end] = -solver.mu / solver.tau * sol_tau / solver.tau + rhs[end]
 
     return sol
 end
@@ -76,43 +72,37 @@ function solve_subsystem(system_solver::QRCholSystemSolver{T}, solver::Solver{T}
     @views y = rhs3[system_solver.y_rows]
     @views z = rhs3[system_solver.z_rows]
 
-    @timeit solver.timer "setup_rhs_sub" begin
-        copyto!(system_solver.QpbxGHbz, x) # TODO can be avoided
-        mul!(system_solver.QpbxGHbz, model.G', z, true, true)
-        lmul!(solver.Ap_Q', system_solver.QpbxGHbz)
+    copyto!(system_solver.QpbxGHbz, x) # TODO can be avoided
+    mul!(system_solver.QpbxGHbz, model.G', z, true, true)
+    lmul!(solver.Ap_Q', system_solver.QpbxGHbz)
 
-        if !iszero(p)
-            ldiv!(solver.Ap_R', y)
-            rhs3[1:p] = y
+    if !iszero(p)
+        ldiv!(solver.Ap_R', y)
+        rhs3[1:p] = y
 
-            if !isempty(system_solver.Q2div)
-                mul!(system_solver.GQ1x, system_solver.GQ1, y)
-                block_hess_prod.(model.cones, system_solver.HGQ1x_k, system_solver.GQ1x_k, solver.mu)
-                mul!(system_solver.Q2div, system_solver.GQ2', system_solver.HGQ1x, -1, true)
-            end
+        if !isempty(system_solver.Q2div)
+            mul!(system_solver.GQ1x, system_solver.GQ1, y)
+            block_hess_prod.(model.cones, system_solver.HGQ1x_k, system_solver.GQ1x_k, solver.mu)
+            mul!(system_solver.Q2div, system_solver.GQ2', system_solver.HGQ1x, -1, true)
         end
     end
 
     if !isempty(system_solver.Q2div)
-        @timeit solver.timer "solve_sub" begin
-            @views x_sub2 = copyto!(rhs3[(p + 1):n], system_solver.Q2div)
-            inv_prod(system_solver.fact_cache, x_sub2)
-        end
+        @views x_sub2 = copyto!(rhs3[(p + 1):n], system_solver.Q2div)
+        inv_prod(system_solver.fact_cache, x_sub2)
     end
 
-    @timeit solver.timer "lift_sol_sub" begin
-        lmul!(solver.Ap_Q, x)
+    lmul!(solver.Ap_Q, x)
 
-        mul!(system_solver.Gx, model.G, x)
-        block_hess_prod.(model.cones, system_solver.HGx_k, system_solver.Gx_k, solver.mu)
+    mul!(system_solver.Gx, model.G, x)
+    block_hess_prod.(model.cones, system_solver.HGx_k, system_solver.Gx_k, solver.mu)
 
-        @. z = system_solver.HGx - z
+    @. z = system_solver.HGx - z
 
-        if !iszero(p)
-            copyto!(y, system_solver.Q1pbxGHbz)
-            mul!(y, system_solver.GQ1', system_solver.HGx, -1, true)
-            ldiv!(solver.Ap_R, y)
-        end
+    if !iszero(p)
+        copyto!(y, system_solver.Q1pbxGHbz)
+        mul!(y, system_solver.GQ1', system_solver.HGx, -1, true)
+        ldiv!(solver.Ap_R, y)
     end
 
     return rhs3
@@ -225,109 +215,100 @@ outer_prod(A::AbstractMatrix{T}, B::AbstractMatrix{T}, alpha::Real, beta::Real) 
 
 function update_lhs(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
     model = solver.model
-    timer = solver.timer
     lhs = system_solver.lhs1.data
 
     if !isempty(system_solver.Q2div)
-        @timeit timer "update_inner_lhs" begin
-            inv_hess_cones = empty!(system_solver.inv_hess_cones)
-            inv_hess_sqrt_cones = empty!(system_solver.inv_hess_sqrt_cones)
-            hess_cones = empty!(system_solver.hess_cones)
-            hess_sqrt_cones = empty!(system_solver.hess_sqrt_cones)
+        inv_hess_cones = empty!(system_solver.inv_hess_cones)
+        inv_hess_sqrt_cones = empty!(system_solver.inv_hess_sqrt_cones)
+        hess_cones = empty!(system_solver.hess_cones)
+        hess_sqrt_cones = empty!(system_solver.hess_sqrt_cones)
 
-            # update hessian factorizations and partition of cones
-            for (k, cone_k) in enumerate(model.cones)
-                if hasfield(typeof(cone_k), :hess_fact_cache) # TODO use dispatch or a function
-                    @timeit timer "update_hess_fact" Cones.update_hess_fact(cone_k)
-                    if cone_k.hess_fact_cache isa DenseSymCache{T}
-                        cones_list = Cones.use_dual_barrier(cone_k) ? inv_hess_cones : hess_cones
-                        push!(cones_list, k)
-                        continue
-                    end
+        # update hessian factorizations and partition of cones
+        for (k, cone_k) in enumerate(model.cones)
+            if hasfield(typeof(cone_k), :hess_fact_cache) # TODO use dispatch or a function
+                Cones.update_hess_fact(cone_k)
+                if cone_k.hess_fact_cache isa DenseSymCache{T}
+                    cones_list = Cones.use_dual_barrier(cone_k) ? inv_hess_cones : hess_cones
+                    push!(cones_list, k)
+                    continue
                 end
-                cones_list = Cones.use_dual_barrier(cone_k) ? inv_hess_sqrt_cones : hess_sqrt_cones
-                push!(cones_list, k)
             end
-
-            # do inv_hess and inv_hess_sqrt cones
-            if isempty(inv_hess_sqrt_cones)
-                lhs .= 0
-            else
-                idx = 1
-                for k in inv_hess_sqrt_cones
-                    arr_k = system_solver.GQ2_k[k]
-                    q_k = size(arr_k, 1)
-                    @views prod_k = system_solver.HGQ2[idx:(idx + q_k - 1), :]
-                    @timeit timer "inv_hess_sqrt" Cones.inv_hess_sqrt_prod!(prod_k, arr_k, model.cones[k])
-                    idx += q_k
-                end
-                @views HGQ2_sub = system_solver.HGQ2[1:(idx - 1), :]
-                @timeit timer "syrk_inv_hess_sqrt" outer_prod(HGQ2_sub, lhs, true, false)
-            end
-
-            for k in inv_hess_cones
-                arr_k = system_solver.GQ2_k[k]
-                prod_k = system_solver.HGQ2_k[k]
-                @timeit timer "inv_hess" Cones.inv_hess_prod!(prod_k, arr_k, model.cones[k])
-                @timeit timer "mul" mul!(lhs, arr_k', prod_k, true, true)
-            end
-
-            if !(isempty(inv_hess_cones) && isempty(inv_hess_sqrt_cones))
-                # divide by mu for inv_hess and inv_hess_sqrt cones
-                lhs ./= solver.mu
-            end
-
-            # do hess and hess_sqrt cones
-            if !isempty(hess_sqrt_cones)
-                idx = 1
-                for k in hess_sqrt_cones
-                    arr_k = system_solver.GQ2_k[k]
-                    q_k = size(arr_k, 1)
-                    @views prod_k = system_solver.HGQ2[idx:(idx + q_k - 1), :]
-                    @timeit timer "hess_sqrt" Cones.hess_sqrt_prod!(prod_k, arr_k, model.cones[k])
-                    idx += q_k
-                end
-                @views HGQ2_sub = system_solver.HGQ2[1:(idx - 1), :]
-                @timeit timer "syrk_hess_sqrt" outer_prod(HGQ2_sub, lhs, solver.mu, true)
-            end
-
-            for k in hess_cones
-                arr_k = system_solver.GQ2_k[k]
-                prod_k = system_solver.HGQ2_k[k]
-                @timeit timer "hess" Cones.hess_prod!(prod_k, arr_k, model.cones[k])
-                @timeit timer "mul" mul!(lhs, arr_k', prod_k, solver.mu, true)
-            end
+            cones_list = Cones.use_dual_barrier(cone_k) ? inv_hess_sqrt_cones : hess_sqrt_cones
+            push!(cones_list, k)
         end
 
-        # TODO refactor below
-        @timeit timer "update_fact" success = update_fact(system_solver.fact_cache, system_solver.lhs1)
-        if !success
-            @timeit timer "recover" begin
-                @warn("QRChol factorization failed")
-                if T <: LinearAlgebra.BlasReal && system_solver.fact_cache isa DensePosDefCache{T}
-                    @warn("switching QRChol solver from Cholesky to Bunch Kaufman")
-                    system_solver.fact_cache = DenseSymCache{T}()
-                    load_matrix(system_solver.fact_cache, system_solver.lhs1)
-                else
-                    system_solver.lhs1 += sqrt(eps(T)) * I # attempt recovery # TODO make more efficient
-                end
-                @timeit timer "update_fact" success = update_fact(system_solver.fact_cache, system_solver.lhs1)
-                success || @warn("QRChol Bunch-Kaufman factorization failed after recovery")
+        # do inv_hess and inv_hess_sqrt cones
+        if isempty(inv_hess_sqrt_cones)
+            lhs .= 0
+        else
+            idx = 1
+            for k in inv_hess_sqrt_cones
+                arr_k = system_solver.GQ2_k[k]
+                q_k = size(arr_k, 1)
+                @views prod_k = system_solver.HGQ2[idx:(idx + q_k - 1), :]
+                Cones.inv_hess_sqrt_prod!(prod_k, arr_k, model.cones[k])
+                idx += q_k
             end
+            @views HGQ2_sub = system_solver.HGQ2[1:(idx - 1), :]
+            outer_prod(HGQ2_sub, lhs, true, false)
         end
+
+        for k in inv_hess_cones
+            arr_k = system_solver.GQ2_k[k]
+            prod_k = system_solver.HGQ2_k[k]
+            Cones.inv_hess_prod!(prod_k, arr_k, model.cones[k])
+            mul!(lhs, arr_k', prod_k, true, true)
+        end
+
+        if !(isempty(inv_hess_cones) && isempty(inv_hess_sqrt_cones))
+            # divide by mu for inv_hess and inv_hess_sqrt cones
+            lhs ./= solver.mu
+        end
+
+        # do hess and hess_sqrt cones
+        if !isempty(hess_sqrt_cones)
+            idx = 1
+            for k in hess_sqrt_cones
+                arr_k = system_solver.GQ2_k[k]
+                q_k = size(arr_k, 1)
+                @views prod_k = system_solver.HGQ2[idx:(idx + q_k - 1), :]
+                Cones.hess_sqrt_prod!(prod_k, arr_k, model.cones[k])
+                idx += q_k
+            end
+            @views HGQ2_sub = system_solver.HGQ2[1:(idx - 1), :]
+            outer_prod(HGQ2_sub, lhs, solver.mu, true)
+        end
+
+        for k in hess_cones
+            arr_k = system_solver.GQ2_k[k]
+            prod_k = system_solver.HGQ2_k[k]
+            Cones.hess_prod!(prod_k, arr_k, model.cones[k])
+            mul!(lhs, arr_k', prod_k, solver.mu, true)
+        end
+    end
+
+    # TODO refactor below
+    if !isempty(system_solver.lhs1) && !update_fact(system_solver.fact_cache, system_solver.lhs1)
+        # @warn("QRChol factorization failed")
+        if T <: LinearAlgebra.BlasReal && system_solver.fact_cache isa DensePosDefCache{T}
+            # @warn("switching QRChol solver from Cholesky to Bunch Kaufman")
+            system_solver.fact_cache = DenseSymCache{T}()
+            load_matrix(system_solver.fact_cache, system_solver.lhs1)
+        else
+            system_solver.lhs1 += sqrt(eps(T)) * I # attempt recovery # TODO make more efficient
+        end
+        update_fact(system_solver.fact_cache, system_solver.lhs1) # || @warn("QRChol Bunch-Kaufman factorization failed after recovery")
     end
 
     # update solution for fixed c,b,h part
-    @timeit timer "update_fixed_rhs" begin
-        const_sol = system_solver.const_sol
-        @. const_sol[system_solver.x_rows] = -model.c
-        const_sol[system_solver.y_rows] = model.b
-        @views const_sol_z = const_sol[system_solver.z_rows]
-        for (cone_k, idxs_k) in zip(model.cones, model.cone_idxs)
-            @views block_hess_prod(cone_k, const_sol_z[idxs_k], model.h[idxs_k], solver.mu)
-        end
+    const_sol = system_solver.const_sol
+    @. const_sol[system_solver.x_rows] = -model.c
+    const_sol[system_solver.y_rows] = model.b
+    @views const_sol_z = const_sol[system_solver.z_rows]
+    for (cone_k, idxs_k) in zip(model.cones, model.cone_idxs)
+        @views block_hess_prod(cone_k, const_sol_z[idxs_k], model.h[idxs_k], solver.mu)
     end
-    @timeit timer "solve_subsystem" solve_subsystem(system_solver, solver, const_sol)
+    solve_subsystem(system_solver, solver, const_sol)
 
     return system_solver
 end

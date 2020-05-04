@@ -48,12 +48,12 @@ example_tests(::Type{<:PolyMinNative{<:Real}}, ::MinimalInstances) = [
     ((false, 1, 2, true, true, false),),
     ((false, 1, 2, false, true, false),),
     ((false, 1, 2, false, false, false),),
+    ((false, 3, 1, false, false, false),),
     ((true, :abs1d, 1, true, true, false),),
     ((true, :abs1d, 1, false, true, false),),
     ((false, :motzkin, 3, false, true, false),),
     ]
 example_tests(::Type{PolyMinNative{Float64}}, ::FastInstances) = [
-    ((false, 1, 3, true, true, false),),
     ((false, 1, 30, true, true, false),),
     ((false, 1, 30, false, true, false),),
     ((false, 1, 30, false, false, false),),
@@ -177,9 +177,17 @@ function build_real(inst::PolyMinNative{T}) where {T <: Real}
             svec_lengths = [Cones.svec_length(size(Pk, 2)) for Pk in inst.Ps]
             G_full = zeros(T, sum(svec_lengths), U)
             offset = 0
+            nonneg_cone_size = 0
             for (Pk, dk) in zip(inst.Ps, svec_lengths)
                 Lk = size(Pk, 2)
-                push!(cones, Cones.PosSemidefTri{T, T}(dk))
+                if dk == 1
+                    nonneg_cone_size += 1
+                else
+                    if nonneg_cone_size > 0
+                        push!(cones, Cones.Nonnegative{T}(nonneg_cone_size))
+                    end
+                    push!(cones, Cones.PosSemidefTri{T, T}(dk))
+                end
                 l = 1
                 for i in 1:Lk, j in 1:i
                     @. @views G_full[offset + l, :] = -Pk[:, i] * Pk[:, j]
@@ -187,6 +195,9 @@ function build_real(inst::PolyMinNative{T}) where {T <: Real}
                 end
                 @views ModelUtilities.vec_to_svec!(G_full[(offset + 1):(offset + dk), :], rt2 = sqrt(T(2)))
                 offset += dk
+            end
+            if nonneg_cone_size > 0
+                push!(cones, Cones.Nonnegative{T}(nonneg_cone_size))
             end
             if inst.use_linops
                 (nrows, ncols) = size(G_full)

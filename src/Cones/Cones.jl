@@ -24,7 +24,7 @@ import Hypatia.inv_sqrt_prod
 import Hypatia.invert
 
 default_max_neighborhood() = 0.5
-default_use_heuristic_neighborhood() = false
+default_use_heuristic_neighborhood() = true
 
 # hessian_cache(T::Type{<:BlasReal}) = DenseSymCache{T}() # use Bunch Kaufman for BlasReals from start
 hessian_cache(T::Type{<:Real}) = DensePosDefCache{T}()
@@ -69,20 +69,19 @@ update_hess_prod(cone::Cone) = nothing
 
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
     if !cone.hess_updated
-        @timeit cone.timer "update_hess" update_hess(cone)
+        update_hess(cone)
     end
-    @timeit cone.timer "hess_prod" mul!(prod, cone.hess, arr)
+    mul!(prod, cone.hess, arr)
     return prod
 end
 
 function update_hess_fact(cone::Cone{T}) where {T <: Real}
     cone.hess_fact_updated && return true
     if !cone.hess_updated
-        @timeit cone.timer "update_hess" update_hess(cone)
+        update_hess(cone)
     end
 
-    @timeit cone.timer "hess_fact" fact_success = update_fact(cone.hess_fact_cache, cone.hess)
-    if !fact_success
+    if !update_fact(cone.hess_fact_cache, cone.hess)
         if T <: BlasReal && cone.hess_fact_cache isa DensePosDefCache{T}
             # @warn("switching Hessian cache from Cholesky to Bunch Kaufman")
             cone.hess_fact_cache = DenseSymCache{T}()
@@ -95,9 +94,8 @@ function update_hess_fact(cone::Cone{T}) where {T <: Real}
                 cone.hess[i, i] += rteps
             end
         end
-        @timeit cone.timer "hess_fact2" fact2_success = update_fact(cone.hess_fact_cache, cone.hess)
-        if !fact2_success
-            @warn("Hessian Bunch-Kaufman factorization failed after recovery")
+        if !update_fact(cone.hess_fact_cache, cone.hess)
+            # @warn("Hessian Bunch-Kaufman factorization failed after recovery")
             return false
         end
     end
@@ -109,37 +107,37 @@ end
 function update_inv_hess(cone::Cone)
     @assert !cone.inv_hess_updated
     if !cone.hess_fact_updated
-        @timeit cone.timer "update_hess_fact" update_hess_fact(cone)
+        update_hess_fact(cone)
     end
-    @timeit cone.timer "invert_hess" invert(cone.hess_fact_cache, cone.inv_hess)
+    invert(cone.hess_fact_cache, cone.inv_hess)
     cone.inv_hess_updated = true
     return cone.inv_hess
 end
 
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
     if !cone.hess_fact_updated
-        @timeit cone.timer "update_hess_fact" update_hess_fact(cone)
+        update_hess_fact(cone)
     end
     copyto!(prod, arr)
-    @timeit cone.timer "inv_hess_prod" inv_prod(cone.hess_fact_cache, prod)
+    inv_prod(cone.hess_fact_cache, prod)
     return prod
 end
 
 function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
     if !cone.hess_fact_updated
-        @timeit cone.timer "update_hess_fact" update_hess_fact(cone)
+        update_hess_fact(cone)
     end
     copyto!(prod, arr)
-    @timeit cone.timer "hess_sqrt_prod" sqrt_prod(cone.hess_fact_cache, prod)
+    sqrt_prod(cone.hess_fact_cache, prod)
     return prod
 end
 
 function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
     if !cone.hess_fact_updated
-        @timeit cone.timer "update_hess_fact" update_hess_fact(cone)
+        update_hess_fact(cone)
     end
     copyto!(prod, arr)
-    @timeit cone.timer "inv_hess_sqrt_prod" inv_sqrt_prod(cone.hess_fact_cache, prod)
+    inv_sqrt_prod(cone.hess_fact_cache, prod)
     return prod
 end
 
