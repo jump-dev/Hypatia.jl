@@ -138,7 +138,7 @@ function update_feas(cone::HypoPerLog{T}) where {T}
     #     cone.is_feas = false
     # end
 
-    if v <= eps(T) || any(<=(eps(T)), w)
+    if v <= 0 || any(<=(0), w)
         cone.is_feas = false
     else
         cone.lwv = sum(log(wi / v) for wi in w)
@@ -146,7 +146,7 @@ function update_feas(cone::HypoPerLog{T}) where {T}
         # cone.scal = cone.vlwvu
         # cone.scal = 1
         # cone.point = point / cone.scal
-        cone.is_feas = (cone.vlwvu > eps(T))
+        cone.is_feas = (cone.vlwvu > 0)
     end
 
 
@@ -160,7 +160,7 @@ function update_dual_feas(cone::HypoPerLog{T}) where {T}
     u = cone.dual_point[1]
     v = cone.dual_point[2]
     w = cone.dual_point[3]
-    return u < -eps(T) && w > eps(T) && v - u - u * log(-w / u) > eps(T)
+    return u < 0 && w > 0 && v - u - u * log(-w / u) > 0
 end
 
 function update_grad(cone::HypoPerLog)
