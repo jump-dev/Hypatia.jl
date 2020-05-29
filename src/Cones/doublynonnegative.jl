@@ -3,7 +3,7 @@ Copyright 2020, Chris Coey, Lea Kapelevich and contributors
 
 smat(w) in S_+^d intersected with w in R_+^(sdim(d))
 
-barrier -logdet(smat(w)) - sum.(log(w))
+barrier -logdet(smat(w)) - sum(log.(w))
 
 TODO
 initial point
@@ -98,10 +98,14 @@ end
 function update_feas(cone::DoublyNonnegative)
     @assert !cone.feas_updated
 
-    svec_to_smat!(cone.mat, cone.point, cone.rt2)
-    copyto!(cone.mat2, cone.mat)
-    cone.fact_mat = cholesky!(Symmetric(cone.mat2, :U), check = false)
-    cone.is_feas = isposdef(cone.fact_mat)
+    if all(u -> (u > 0), cone.point)
+        svec_to_smat!(cone.mat, cone.point, cone.rt2)
+        copyto!(cone.mat2, cone.mat)
+        cone.fact_mat = cholesky!(Symmetric(cone.mat2, :U), check = false)
+        cone.is_feas = isposdef(cone.fact_mat)
+    else
+        cone.is_feas = false
+    end
 
     cone.feas_updated = true
     return cone.is_feas
