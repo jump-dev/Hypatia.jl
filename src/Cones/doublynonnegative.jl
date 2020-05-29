@@ -127,7 +127,7 @@ function update_grad(cone::DoublyNonnegative)
     cone.grad .*= -1
     copytri!(cone.mat, 'U')
     @. @views cone.inv_vec[cone.offdiag_idxs] = inv(cone.point[cone.offdiag_idxs])
-    @. @views cone.grad -= cone.inv_vec
+    @. cone.grad -= cone.inv_vec
 
     cone.grad_updated = true
     return cone.grad
