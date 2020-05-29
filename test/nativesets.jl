@@ -21,6 +21,7 @@ inst_infeas = [
     ]
 
 inst_cones_few = [
+    "doublynonnegative1",
     "nonnegative1",
     "epinorminf1",
     "epinorminf6",
@@ -45,6 +46,8 @@ inst_cones_few = [
     ]
 
 inst_cones_many = [
+    "doublynonnegative1",
+    "doublynonnegative2",
     "nonnegative1",
     "nonnegative2",
     "nonnegative3",
