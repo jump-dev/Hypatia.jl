@@ -135,7 +135,7 @@ function test_doublynonnegative_barrier(T::Type{<:Real})
             return -logdet(cholesky!(Symmetric(S, :U))) - sum(log.(s))
         end
         dim = CO.svec_length(side)
-        test_barrier_oracles(CO.DoublyNonnegative{T}(dim), barrier, init_tol = 0.1)
+        test_barrier_oracles(CO.DoublyNonnegative{T}(dim), barrier, init_tol = Inf)
     end
     return
 end
