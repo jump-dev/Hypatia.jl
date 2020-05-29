@@ -48,6 +48,7 @@ inst_cones_few = [
 inst_cones_many = [
     "doublynonnegative1",
     "doublynonnegative2",
+    "doublynonnegative3",
     "nonnegative1",
     "nonnegative2",
     "nonnegative3",
