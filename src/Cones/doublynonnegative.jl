@@ -53,9 +53,9 @@ mutable struct DoublyNonnegative{T <: Real} <: Cone{T}
         cone.use_dual_barrier = use_dual
         cone.use_heuristic_neighborhood = use_heuristic_neighborhood
         cone.max_neighborhood = max_neighborhood
-        cone.dim = dim # real vector dimension
+        cone.dim = dim
         cone.rt2 = sqrt(T(2))
-        side = round(Int, sqrt(0.25 + 2 * dim) - 0.5) # real lower triangle
+        side = round(Int, sqrt(0.25 + 2 * dim) - 0.5)
         @assert side * (side + 1) == 2 * dim
         cone.side = side
         cone.hess_fact_cache = hess_fact_cache
