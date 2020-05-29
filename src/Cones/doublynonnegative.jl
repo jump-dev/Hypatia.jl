@@ -3,7 +3,8 @@ Copyright 2020, Chris Coey, Lea Kapelevich and contributors
 
 smat(w) in S_+^d intersected with w in R_+^(sdim(d))
 
-barrier -logdet(smat(w)) - sum(log.(w))
+barrier -logdet(W) - sum(log(W_ij) for i in 1:n, j in 1:(i-1))
+where W = smat(w)
 
 TODO
 initial point
@@ -37,6 +38,7 @@ mutable struct DoublyNonnegative{T <: Real} <: Cone{T}
     mat::Matrix{T}
     mat2::Matrix{T}
     mat3::Matrix{T}
+    offdiag_idxs
     inv_mat::Matrix{T}
     inv_vec::Vector{T}
     fact_mat
@@ -58,6 +60,7 @@ mutable struct DoublyNonnegative{T <: Real} <: Cone{T}
         side = round(Int, sqrt(0.25 + 2 * dim) - 0.5)
         @assert side * (side + 1) == 2 * dim
         cone.side = side
+        cone.offdiag_idxs = vcat([(sum(1:(i - 1)) + 1):(sum(1:i) - 1) for i in 2:side]...) # TODO better way without splatting?
         cone.hess_fact_cache = hess_fact_cache
         return cone
     end
@@ -80,18 +83,23 @@ function setup_data(cone::DoublyNonnegative{T}) where {T <: Real}
     cone.mat = zeros(T, cone.side, cone.side)
     cone.mat2 = similar(cone.mat)
     cone.mat3 = similar(cone.mat)
+    cone.inv_vec = zeros(T, svec_length(cone.side))
     return
 end
 
-get_nu(cone::DoublyNonnegative) = cone.side + cone.dim
+get_nu(cone::DoublyNonnegative) = cone.side + svec_length(cone.side - 1)
 
 function set_initial_point(arr::AbstractVector, cone::DoublyNonnegative)
-    arr .= 1
-    k = 1
-    @inbounds for i in 1:cone.side
-        arr[k] = cone.side
-        k += i + 1
-    end
+    # if cone.dim == 3
+    #     arr .= [1.474920536130485, 0.5697451059901455 * sqrt(2), 1.474920536130485]
+    # else
+        arr .= 1
+        k = 1
+        @inbounds for i in 1:cone.side
+            arr[k] = cone.side
+            k += i + 1
+        end
+    # end
     return arr
 end
 
@@ -118,8 +126,8 @@ function update_grad(cone::DoublyNonnegative)
     smat_to_svec!(cone.grad, cone.inv_mat, cone.rt2)
     cone.grad .*= -1
     copytri!(cone.mat, 'U')
-    cone.inv_vec = inv.(cone.point)
-    cone.grad .-= cone.inv_vec
+    @. @views cone.inv_vec[cone.offdiag_idxs] = inv(cone.point[cone.offdiag_idxs])
+    @. @views cone.grad -= cone.inv_vec
 
     cone.grad_updated = true
     return cone.grad
@@ -142,6 +150,6 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::DoublyN
         ldiv!(cone.fact_mat, cone.mat3)
         smat_to_svec!(view(prod, :, i), cone.mat3, cone.rt2)
     end
-    @. prod += arr / cone.point / cone.point
+    @. @views prod[cone.offdiag_idxs, :] += arr[cone.offdiag_idxs, :] / cone.point[cone.offdiag_idxs, :] / cone.point[cone.offdiag_idxs, :]
     return prod
 end

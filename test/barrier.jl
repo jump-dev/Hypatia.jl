@@ -129,10 +129,12 @@ end
 # primitive cone barrier tests
 function test_doublynonnegative_barrier(T::Type{<:Real})
     for side in [1, 2, 3, 6]
+    # for side in [2]
         function barrier(s)
             S = similar(s, side, side)
             CO.svec_to_smat!(S, s, sqrt(T(2)))
-            return -logdet(cholesky!(Symmetric(S, :U))) - sum(log.(s))
+            offdiag_idxs = vcat([(sum(1:(i - 1)) + 1):(sum(1:i) - 1) for i in 2:side]...)
+            return -logdet(cholesky!(Symmetric(S, :U))) - sum(log.(s[offdiag_idxs]))
         end
         dim = CO.svec_length(side)
         test_barrier_oracles(CO.DoublyNonnegative{T}(dim), barrier, init_tol = Inf)
