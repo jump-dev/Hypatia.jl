@@ -31,6 +31,7 @@ hessian_cache(T::Type{<:Real}) = DensePosDefCache{T}()
 
 abstract type Cone{T <: Real} end
 
+include("doublynonnegative.jl")
 include("nonnegative.jl")
 include("epinorminf.jl")
 include("epinormeucl.jl")
