@@ -93,11 +93,11 @@ function set_initial_point(arr::AbstractVector{T}, cone::DoublyNonnegative{T}) w
     n = T(cone.side)
     d = T(cone.dim)
     p1 = [
-        -n-1,
+        -n - 1,
         0,
-        n^2+n+7,
+        n ^ 2 + n + 7,
         0,
-        -2*n^2-8,
+        -2 * n ^ 2 - 8,
         0,
         n ^ 2,
         ]
@@ -116,7 +116,7 @@ function set_initial_point(arr::AbstractVector{T}, cone::DoublyNonnegative{T}) w
                 ond_try = sqrt(tmp / n)
                 denom = ond_try ^ 2 + (n - 2) / cone.rt2 * ond_try * offd_real - (n - 1) * offd_real ^ 2 / 2
                 # @show ond_try + (n - 2) * offd_real / cone.rt2, ond_try * denom, -offd_real ^ 2 + denom, offd_real ^ 2 * denom
-                if ond_try + (n - 2) * offd_real / cone.rt2 ≈ ond_try * denom && -offd_real ^ 2 + denom ≈ offd_real ^ 2 * denom
+                if (ond_try * cone.rt2 + (n - 2) * offd_real ≈ ond_try * denom * cone.rt2) && (denom ≈ offd_real ^ 2 * (denom + 1)) # TODO could we drop one of these?
                     (on_diag, off_diag) = (ond_try, offd_real)
                     found_soln = true
                 end
