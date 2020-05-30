@@ -87,19 +87,19 @@ function setup_data(cone::DoublyNonnegative{T}) where {T <: Real}
     return
 end
 
-get_nu(cone::DoublyNonnegative) = cone.side + svec_length(cone.side - 1)
+get_nu(cone::DoublyNonnegative) = cone.dim
 
 function set_initial_point(arr::AbstractVector, cone::DoublyNonnegative)
-    # if cone.dim == 3
-    #     arr .= [1.474920536130485, 0.5697451059901455 * sqrt(2), 1.474920536130485]
-    # else
+    if cone.dim == 3
+        arr .= [1.1180340045943178, 0.5000000098333939 * sqrt(2), 1.1180340045943178]
+    else
         arr .= 1
         k = 1
         @inbounds for i in 1:cone.side
             arr[k] = cone.side
             k += i + 1
         end
-    # end
+    end
     return arr
 end
 
