@@ -89,16 +89,49 @@ end
 
 get_nu(cone::DoublyNonnegative) = cone.dim
 
-function set_initial_point(arr::AbstractVector, cone::DoublyNonnegative)
-    if cone.dim == 3
-        arr .= [1.1180340045943178, 0.5000000098333939 * sqrt(2), 1.1180340045943178]
-    else
-        arr .= 1
-        k = 1
-        @inbounds for i in 1:cone.side
-            arr[k] = cone.side
-            k += i + 1
+function set_initial_point(arr::AbstractVector{T}, cone::DoublyNonnegative{T}) where {T}
+    n = T(cone.side)
+    d = T(cone.dim)
+    p1 = [
+        -n-1,
+        0,
+        n^2+n+7,
+        0,
+        -2*n^2-8,
+        0,
+        n ^ 2,
+        ]
+
+    found_soln = false
+    # fallback values
+    (on_diag, off_diag) = (n + 1, one(T))
+    for offd_try in PolynomialRoots.roots(p1)
+        # trial point on the diagonal
+        offd_real = real(offd_try)
+        # TODO better check?
+        if (offd_try ≈ offd_real) && (offd_real > 0)
+            # trial point on the diagonal
+            tmp = d - (d - n) * abs2(offd_real)
+            if tmp > 0
+                ond_try = sqrt(tmp / n)
+                denom = ond_try ^ 2 + (n - 2) / cone.rt2 * ond_try * offd_real - (n - 1) * offd_real ^ 2 / 2
+                # @show ond_try + (n - 2) * offd_real / cone.rt2, ond_try * denom, -offd_real ^ 2 + denom, offd_real ^ 2 * denom
+                if ond_try + (n - 2) * offd_real / cone.rt2 ≈ ond_try * denom && -offd_real ^ 2 + denom ≈ offd_real ^ 2 * denom
+                    (on_diag, off_diag) = (ond_try, offd_real)
+                    found_soln = true
+                end
+            end
         end
+    end
+    if !found_soln
+        @warn("initial point inaccurate for DoublyNonnegative cone dimension $(cone.dim)")
+    end
+
+    arr .= off_diag
+    k = 1
+    @inbounds for i in 1:cone.side
+        arr[k] = on_diag
+        k += i + 1
     end
     return arr
 end

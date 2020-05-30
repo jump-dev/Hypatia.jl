@@ -11,6 +11,7 @@ using LinearAlgebra
 import LinearAlgebra.copytri!
 import LinearAlgebra.HermOrSym
 import LinearAlgebra.BlasReal
+import PolynomialRoots
 using SparseArrays
 import SuiteSparse.CHOLMOD
 import Hypatia.RealOrComplex
