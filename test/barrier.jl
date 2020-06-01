@@ -249,7 +249,7 @@ function test_hypogeomean_barrier(T::Type{<:Real})
             return -log(prod(w[j] ^ alpha[j] for j in eachindex(w)) - u) - sum(log(wi) for wi in w)
         end
         cone = CO.HypoGeomean{T}(alpha)
-        test_barrier_oracles(cone, barrier, init_tol = 1e-2, init_only = (dim > 3))
+        test_barrier_oracles(cone, barrier, init_tol = 1e-2, init_only = (dim > 5))
         # test initial point when all alphas are the same
         cone = CO.HypoGeomean{T}(fill(inv(T(dim - 1)), dim - 1))
         test_barrier_oracles(cone, barrier, init_tol = sqrt(eps(T)), init_only = true)
