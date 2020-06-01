@@ -11,6 +11,7 @@ using LinearAlgebra
 import LinearAlgebra.copytri!
 import LinearAlgebra.HermOrSym
 import LinearAlgebra.BlasReal
+import PolynomialRoots
 using SparseArrays
 import SuiteSparse.CHOLMOD
 import Hypatia.RealOrComplex
@@ -31,6 +32,7 @@ hessian_cache(T::Type{<:Real}) = DensePosDefCache{T}()
 
 abstract type Cone{T <: Real} end
 
+include("doublynonnegative.jl")
 include("nonnegative.jl")
 include("epinorminf.jl")
 include("epinormeucl.jl")

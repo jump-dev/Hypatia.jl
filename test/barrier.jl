@@ -127,6 +127,19 @@ function perturb_scale(point::Vector{T}, noise::T, scale::T) where {T <: Real}
 end
 
 # primitive cone barrier tests
+function test_doublynonnegative_barrier(T::Type{<:Real})
+    for side in [1, 2, 3, 6, 20, 50, 100, 200]
+        function barrier(s)
+            S = similar(s, side, side)
+            CO.svec_to_smat!(S, s, sqrt(T(2)))
+            offdiag_idxs = vcat([(sum(1:(i - 1)) + 1):(sum(1:i) - 1) for i in 2:side]...)
+            return -logdet(cholesky!(Symmetric(S, :U))) - sum(log.(s[offdiag_idxs]))
+        end
+        dim = CO.svec_length(side)
+        test_barrier_oracles(CO.DoublyNonnegative{T}(dim), barrier, init_tol = sqrt(eps(T)), init_only = (side > 6))
+    end
+    return
+end
 
 function test_nonnegative_barrier(T::Type{<:Real})
     barrier = (s -> -sum(log, s))
