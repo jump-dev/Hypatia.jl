@@ -90,41 +90,40 @@ end
 get_nu(cone::DoublyNonnegative) = cone.dim
 
 function set_initial_point(arr::AbstractVector{T}, cone::DoublyNonnegative{T}) where {T}
-    n = T(cone.side)
-    d = T(cone.dim)
-    p1 = [
-        -n - 1,
-        0,
-        n ^ 2 + n + 7,
-        0,
-        -2 * n ^ 2 - 8,
-        0,
-        n ^ 2,
-        ]
-
-    found_soln = false
-    # fallback values
-    (on_diag, off_diag) = (n + 1, one(T))
-    for offd_try in PolynomialRoots.roots(p1)
-        # trial point on the diagonal
-        offd_real = real(offd_try)
-        # TODO better check?
-        if (offd_try ≈ offd_real) && (offd_real > 0)
-            # trial point on the diagonal
-            tmp = d - (d - n) * abs2(offd_real)
-            if tmp > 0
-                ond_try = sqrt(tmp / n)
-                denom = ond_try ^ 2 + (n - 2) / cone.rt2 * ond_try * offd_real - (n - 1) * offd_real ^ 2 / 2
-                # @show ond_try + (n - 2) * offd_real / cone.rt2, ond_try * denom, -offd_real ^ 2 + denom, offd_real ^ 2 * denom
-                if (ond_try * cone.rt2 + (n - 2) * offd_real ≈ ond_try * denom * cone.rt2) && (denom ≈ offd_real ^ 2 * (denom + 1)) # TODO could we drop one of these?
-                    (on_diag, off_diag) = (ond_try, offd_real)
-                    found_soln = true
+    side = cone.side
+    # for small side dimension, use closed-form solutions
+    if side == 1
+        on_diag = off_diag = one(T)
+    elseif side == 2
+        (on_diag, off_diag) = (sqrt(T(5)) / 2, inv(cone.rt2))
+    else
+        n = T(side)
+        d = T(cone.dim)
+        # root of this polynomial gives off-diagonal
+        p1 = [-n - 1, 0, n ^ 2 + n + 7, 0, -2 * n ^ 2 - 8, 0, n ^ 2]
+        # fallback values
+        (on_diag, off_diag) = (n + 1, one(T))
+        found_soln = false
+        for offd_try in PolynomialRoots.roots(p1)
+            offd_real = real(offd_try)
+            # TODO this poly seems to always have real roots, prove
+            if offd_real > 0
+                # get trial point on the diagonal
+                tmp = d - (d - n) * abs2(offd_real)
+                if tmp > sqrt(eps(T))
+                    ond_try = sqrt(tmp / n)
+                    denom = abs2(ond_try) + (n - 2) / cone.rt2 * ond_try * offd_real - (n - 1) * abs2(offd_real) / 2
+                    if ond_try * cone.rt2 + (n - 2) * offd_real ≈ ond_try * denom * cone.rt2 && denom ≈ abs2(offd_real) * (denom + 1)
+                        (on_diag, off_diag) = (ond_try, offd_real)
+                        found_soln = true
+                        break
+                    end
                 end
             end
         end
-    end
-    if !found_soln
-        @warn("initial point inaccurate for DoublyNonnegative cone dimension $(cone.dim)")
+        if !found_soln
+            @warn("initial point inaccurate for DoublyNonnegative cone dimension $(cone.dim)")
+        end
     end
 
     arr .= off_diag
