@@ -136,11 +136,7 @@ function test_doublynonnegative_barrier(T::Type{<:Real})
             return -logdet(cholesky!(Symmetric(S, :U))) - sum(log.(s[offdiag_idxs]))
         end
         dim = CO.svec_length(side)
-        if side <= 6
-            test_barrier_oracles(CO.DoublyNonnegative{T}(dim), barrier, init_tol = sqrt(eps(T)))
-        else
-            test_barrier_oracles(CO.DoublyNonnegative{T}(dim), barrier, init_tol = sqrt(eps(T)), init_only = true)
-        end
+        test_barrier_oracles(CO.DoublyNonnegative{T}(dim), barrier, init_tol = sqrt(eps(T)), init_only = (side > 6))
     end
     return
 end
