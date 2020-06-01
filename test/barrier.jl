@@ -410,7 +410,7 @@ function test_hypoperlogdettri_barrier(T::Type{<:Real})
             CO.svec_to_smat!(W, s[3:end], sqrt(T(2)))
             return -log(v * logdet(cholesky!(Symmetric(W / v, :U))) - u) - logdet(cholesky!(Symmetric(W, :U))) - (side + 1) * log(v)
         end
-        if side <= 3
+        if side <= 5
             test_barrier_oracles(cone, R_barrier_sc1, init_tol = 1e-5)
         else
             test_barrier_oracles(cone, R_barrier_sc1, init_tol = 1e-1, init_only = true)
@@ -424,7 +424,7 @@ function test_hypoperlogdettri_barrier(T::Type{<:Real})
             CO.svec_to_smat!(W, s[3:end], sqrt(T(2)))
             return cone.sc_const * (-log(v * logdet(cholesky!(Hermitian(W / v, :U))) - u) - logdet(cholesky!(Hermitian(W, :U))) - (side + 1) * log(v))
         end
-        if side <= 4
+        if side <= 5
             test_barrier_oracles(cone, C_barrier, init_tol = 1e-5)
         else
             test_barrier_oracles(cone, C_barrier, init_tol = 1e-1, init_only = true)
