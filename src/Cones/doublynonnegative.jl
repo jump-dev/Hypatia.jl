@@ -7,7 +7,6 @@ barrier -logdet(W) - sum(log(W_ij) for i in 1:n, j in 1:(i-1))
 where W = smat(w)
 
 TODO
-initial point
 better description
 
 =#
@@ -113,6 +112,7 @@ function set_initial_point(arr::AbstractVector{T}, cone::DoublyNonnegative{T}) w
                 if tmp > sqrt(eps(T))
                     ond_try = sqrt(tmp / n)
                     denom = abs2(ond_try) + (n - 2) / cone.rt2 * ond_try * offd_real - (n - 1) * abs2(offd_real) / 2
+                    # check s = -g(s) conditions
                     if ond_try * cone.rt2 + (n - 2) * offd_real ≈ ond_try * denom * cone.rt2 && denom ≈ abs2(offd_real) * (denom + 1)
                         (on_diag, off_diag) = (ond_try, offd_real)
                         found_soln = true
