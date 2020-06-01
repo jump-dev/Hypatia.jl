@@ -160,6 +160,56 @@ function inconsistent2(T; options...)
     @test_throws ErrorException options.linear_model{T}(c, A, b, G, h, Cone{T}[Cones.Nonnegative{T}(q)])
 end
 
+function doublynonnegative1(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    n = q = 3
+    c = T[0, 1, 0]
+    A = T[1 0 0; 0 0 1]
+    b = ones(T, 2)
+    G = SparseMatrixCSC(-one(T) * I, q, n)
+    for use_dual in [true, false]
+        use_dual = false
+        h = (use_dual ? T[1, 0, 1] : zeros(T, q))
+        cones = Cone{T}[Cones.DoublyNonnegative{T}(q, use_dual = use_dual)]
+
+        r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
+        @test r.status == :Optimal
+        @test r.primal_obj ≈ 0 atol=tol rtol=tol
+        @test r.x ≈ T[1, 0, 1] atol=tol rtol=tol
+        @test r.s ≈ T[1, 0, 1] atol=tol rtol=tol
+    end
+end
+
+function doublynonnegative2(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    c = T[0, -1, 0]
+    A = T[1 0 0; 0 0 1]
+    b = T[1.0, 1.5]
+    G = Matrix{T}(-I, 3, 3)
+    h = [-inv(T(2)), zero(T), -inv(T(2))]
+    cones = Cone{T}[Cones.DoublyNonnegative{T}(3)]
+
+    r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
+    @test r.status == :Optimal
+    @test r.primal_obj ≈ -one(T) atol=tol rtol=tol
+    @test r.x[2] ≈ one(T) atol=tol rtol=tol
+end
+
+function doublynonnegative3(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    c = ones(T, 3)
+    A = T[1 0 1]
+    b = T[0]
+    G = Diagonal(-one(T) * I, 3)
+    h = zeros(T, 3)
+    cones = Cone{T}[Cones.PosSemidefTri{T, T}(3)]
+
+    r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
+    @test r.status == :Optimal
+    @test r.primal_obj ≈ 0 atol=tol rtol=tol
+    @test norm(r.x) ≈ 0 atol=tol rtol=tol
+end
+
 function nonnegative1(T; options...)
     tol = sqrt(sqrt(eps(T)))
     Random.seed!(1)
