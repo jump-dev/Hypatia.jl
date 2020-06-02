@@ -143,7 +143,7 @@ function update_hess(cone::HypoGeomean)
     return cone.hess
 end
 
-# see analysis in https://github.com/lkapelevich/HypatiaBenchmarks.jl/tree/master/centralpoints
+# see analysis in https://github.com/lkapelevich/HypatiaSupplements.jl/tree/master/centralpoints
 function get_central_ray_hypogeomean(alpha::Vector{<:Real})
     wdim = length(alpha)
     # predict each w_i given alpha_i and n
@@ -151,15 +151,15 @@ function get_central_ray_hypogeomean(alpha::Vector{<:Real})
     if wdim == 1
         w .= 1.306563
     elseif wdim == 2
-        @. w = 1.005320 + 0.298108 * alpha
+        @. w = 1.0049885 + 0.2986276 * alpha
     elseif wdim <= 5
-        @. w = 1.0049327 - 0.0006020 * wdim + 0.2998672 * alpha
+        @. w = 1.0040142949 - 0.0004885108 * wdim + 0.3016645951 * alpha
     elseif wdim <= 20
-        @. w = 1.001146 - 4.463046e-05 * wdim + 3.034014e-01 * alpha
+        @. w = 1.001168 - 4.547017e-05 * wdim + 3.032880e-01 * alpha
     elseif wdim <= 100
-        @. w = 1.000066 - 5.202270e-07 * wdim + 3.074873e-01 * alpha
+        @. w = 1.000069 - 5.469926e-07 * wdim + 3.074084e-01 * alpha
     else
-        @. w = 1 + 3.086695e-01 * alpha
+        @. w = 1 + 3.086535e-01 * alpha
     end
     # get u in closed form from w
     p = exp(sum(alpha[i] * log(w[i]) for i in eachindex(alpha)))

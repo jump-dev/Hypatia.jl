@@ -166,7 +166,7 @@ function update_hess(cone::EpiSumPerEntropy)
     return cone.hess
 end
 
-# see analysis in https://github.com/lkapelevich/HypatiaBenchmarks.jl/tree/master/centralpoints
+# see analysis in https://github.com/lkapelevich/HypatiaSupplements.jl/tree/master/centralpoints
 function get_central_ray_episumperentropy(w_dim::Int)
     if w_dim <= 10
         # lookup points where x = f'(x)

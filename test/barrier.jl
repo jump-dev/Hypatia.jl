@@ -206,21 +206,17 @@ function test_hypoperlog_barrier(T::Type{<:Real})
 end
 
 function test_episumperentropy_barrier(T::Type{<:Real})
-    for w_dim in [3, 4, 6]
+    for w_dim in [3, 4, 6, 15, 65, 75, 100, 500]
         function barrier(s)
             (u, v, w) = (s[1], s[2:(w_dim + 1)], s[(w_dim + 2):dim])
             return -log(u - sum(wi * log(wi / vi) for (vi, wi) in zip(v, w))) - sum(log(vi) + log(wi) for (vi, wi) in zip(v, w))
         end
         dim = 1 + 2 * w_dim
-        test_barrier_oracles(CO.EpiSumPerEntropy{T}(dim), barrier, init_tol = 1e-5)
-    end
-    for w_dim in [15, 65, 75, 100, 500]
-        function barrier(s)
-            (u, v, w) = (s[1], s[2:(w_dim + 1)], s[(w_dim + 2):dim])
-            return -log(u - sum(wi * log(wi / vi) for (vi, wi) in zip(v, w))) - sum(log(vi) + log(wi) for (vi, wi) in zip(v, w))
+        if dim <= 6
+            test_barrier_oracles(CO.EpiSumPerEntropy{T}(dim), barrier, init_tol = 1e-5)
+        else
+            test_barrier_oracles(CO.EpiSumPerEntropy{T}(dim), barrier, init_tol = 1e-1, init_only = true)
         end
-        dim = 1 + 2 * w_dim
-        test_barrier_oracles(CO.EpiSumPerEntropy{T}(dim), barrier, init_tol = 1e-1, init_only = true)
     end
     return
 end
@@ -249,11 +245,7 @@ function test_hypogeomean_barrier(T::Type{<:Real})
             return -log(prod(w[j] ^ alpha[j] for j in eachindex(w)) - u) - sum(log(wi) for wi in w)
         end
         cone = CO.HypoGeomean{T}(alpha)
-        if dim <= 3
-            test_barrier_oracles(cone, barrier, init_tol = 1e-2)
-        else
-            test_barrier_oracles(cone, barrier, init_tol = 1e-2, init_only = true)
-        end
+        test_barrier_oracles(cone, barrier, init_tol = 1e-2, init_only = (dim > 5))
         # test initial point when all alphas are the same
         cone = CO.HypoGeomean{T}(fill(inv(T(dim - 1)), dim - 1))
         test_barrier_oracles(cone, barrier, init_tol = sqrt(eps(T)), init_only = true)
@@ -414,7 +406,7 @@ function test_hypoperlogdettri_barrier(T::Type{<:Real})
             CO.svec_to_smat!(W, s[3:end], sqrt(T(2)))
             return -log(v * logdet(cholesky!(Symmetric(W / v, :U))) - u) - logdet(cholesky!(Symmetric(W, :U))) - (side + 1) * log(v)
         end
-        if side <= 3
+        if side <= 5
             test_barrier_oracles(cone, R_barrier_sc1, init_tol = 1e-5)
         else
             test_barrier_oracles(cone, R_barrier_sc1, init_tol = 1e-1, init_only = true)
@@ -428,7 +420,7 @@ function test_hypoperlogdettri_barrier(T::Type{<:Real})
             CO.svec_to_smat!(W, s[3:end], sqrt(T(2)))
             return cone.sc_const * (-log(v * logdet(cholesky!(Hermitian(W / v, :U))) - u) - logdet(cholesky!(Hermitian(W, :U))) - (side + 1) * log(v))
         end
-        if side <= 4
+        if side <= 5
             test_barrier_oracles(cone, C_barrier, init_tol = 1e-5)
         else
             test_barrier_oracles(cone, C_barrier, init_tol = 1e-1, init_only = true)
