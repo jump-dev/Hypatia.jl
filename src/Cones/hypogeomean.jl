@@ -162,33 +162,27 @@ function update_hess(cone::HypoGeomean)
     return cone.hess
 end
 
-function update_inv_hess(cone::HypoGeomean)
-    @assert !cone.inv_hess_updated
-    u = cone.point[1]
-    w = view(cone.point, 2:cone.dim)
-    n = cone.dim - 1
-    alpha = cone.alpha
-    wprod = cone.wprod
-    H = cone.inv_hess.data
-    denom = n * (n + 1) * wprod - abs2(n) * u
-    H[1, 2:end] = wprod .* w / n
-    for j in eachindex(w), i in eachindex(w)
-        j1 = j + 1
-        i1 = i + 1
-        if i == j
-            H[i1, j1] = ((abs2(n) + 1) * wprod - abs2(n) * u) * abs2(w[i]) / denom
-            # abs2(n) * wprodu + wprod
-        else
-            H[i1, j1] = wprod * w[i] * w[j] / denom
-        end
-    end
-    H[1, 1] = (n + 1) * abs2(wprod) / n + abs2(u) - 2 * wprod * u
-    @show inv(cone.old_hess) ./ cone.inv_hess
-
-    cone.inv_hess = inv(cone.old_hess)
-    cone.inv_hess_updated = true
-    return cone.inv_hess
-end
+# TODO move into new cone with equal alphas
+# function update_inv_hess(cone::HypoGeomean)
+#     @assert !cone.inv_hess_updated
+#     u = cone.point[1]
+#     w = view(cone.point, 2:cone.dim)
+#     n = cone.dim - 1
+#     alpha = cone.alpha
+#     wprod = cone.wprod
+#     H = cone.inv_hess.data
+#     denom = n * (n + 1) * wprod - abs2(n) * u
+#     H[1, 1] = (n + 1) * abs2(wprod) / n + abs2(u) - 2 * wprod * u
+#     H[1, 2:end] = wprod .* w / n
+#     H[2:end, 2:end] = wprod * w * w'
+#     H[2:end, 2:end] .+= Diagonal(abs2.(w) .* cone.wprodu .* abs2(n))
+#     H[2:end, 2:end] /= denom
+#     @show inv(cone.old_hess) ./ cone.inv_hess
+#
+#     cone.inv_hess = inv(cone.old_hess)
+#     cone.inv_hess_updated = true
+#     return cone.inv_hess
+# end
 
 # see analysis in https://github.com/lkapelevich/HypatiaBenchmarks.jl/tree/master/centralpoints
 function get_central_ray_hypogeomean(alpha::Vector{<:Real})
