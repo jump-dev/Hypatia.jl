@@ -16,6 +16,7 @@ mutable struct HypoGeomean{T <: Real} <: Cone{T}
     dim::Int
     alpha::Vector{T}
     point::Vector{T}
+    dual_point::Vector{T}
     timer::TimerOutput
 
     feas_updated::Bool
@@ -26,6 +27,7 @@ mutable struct HypoGeomean{T <: Real} <: Cone{T}
     is_feas::Bool
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
+    old_hess
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
     nbhd_tmp::Vector{T}
@@ -60,8 +62,10 @@ function setup_data(cone::HypoGeomean{T}) where {T <: Real}
     reset_data(cone)
     dim = cone.dim
     cone.point = zeros(T, dim)
+    cone.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
+    cone.old_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
     cone.nbhd_tmp = zeros(T, dim)
@@ -70,6 +74,12 @@ function setup_data(cone::HypoGeomean{T}) where {T <: Real}
 end
 
 get_nu(cone::HypoGeomean) = cone.dim
+
+use_correction(cone::HypoGeomean) = false
+
+use_scaling(cone::HypoGeomean) = false
+
+rescale_point(cone::HypoGeomean{T}, s::T) where {T} = (cone.point .*= s)
 
 function set_initial_point(arr::AbstractVector{T}, cone::HypoGeomean{T}) where {T}
     # get closed form central ray if all powers are equal, else use fitting
@@ -100,6 +110,13 @@ function update_feas(cone::HypoGeomean)
 
     cone.feas_updated = true
     return cone.is_feas
+end
+
+function update_dual_feas(cone::HypoGeomean{T}) where {T <: Real}
+    u = cone.point[1]
+    w = view(cone.point, 2:cone.dim)
+    # TODO
+    return true
 end
 
 function update_grad(cone::HypoGeomean)
@@ -139,8 +156,38 @@ function update_hess(cone::HypoGeomean)
         H[j1, j1] = (awwwprodu * (1 + aj * wwprodum1) + inv(wj)) / wj
     end
 
+    copyto!(cone.old_hess.data, H)
+
     cone.hess_updated = true
     return cone.hess
+end
+
+function update_inv_hess(cone::HypoGeomean)
+    @assert !cone.inv_hess_updated
+    u = cone.point[1]
+    w = view(cone.point, 2:cone.dim)
+    n = cone.dim - 1
+    alpha = cone.alpha
+    wprod = cone.wprod
+    H = cone.inv_hess.data
+    denom = n * (n + 1) * wprod - abs2(n) * u
+    H[1, 2:end] = wprod .* w / n
+    for j in eachindex(w), i in eachindex(w)
+        j1 = j + 1
+        i1 = i + 1
+        if i == j
+            H[i1, j1] = ((abs2(n) + 1) * wprod - abs2(n) * u) * abs2(w[i]) / denom
+            # abs2(n) * wprodu + wprod
+        else
+            H[i1, j1] = wprod * w[i] * w[j] / denom
+        end
+    end
+    H[1, 1] = (n + 1) * abs2(wprod) / n + abs2(u) - 2 * wprod * u
+    @show inv(cone.old_hess) ./ cone.inv_hess
+
+    cone.inv_hess = inv(cone.old_hess)
+    cone.inv_hess_updated = true
+    return cone.inv_hess
 end
 
 # see analysis in https://github.com/lkapelevich/HypatiaBenchmarks.jl/tree/master/centralpoints
