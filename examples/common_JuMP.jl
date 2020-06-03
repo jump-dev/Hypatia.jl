@@ -52,6 +52,20 @@ MOI.Utilities.@model(ExpConeOptimizer,
     true,
     )
 
+# Geomean only
+MOI.Utilities.@model(GeomeanConeOptimizer,
+    (),
+    (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan,),
+    (MOI.Reals, MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives,
+    MOI.GeometricMeanCone,),
+    (),
+    (),
+    (MOI.ScalarAffineFunction,),
+    (MOI.VectorOfVariables,),
+    (MOI.VectorAffineFunction,),
+    true,
+        )
+
 abstract type ExampleInstanceJuMP{T <: Real} <: ExampleInstance{T} end
 
 function write_and_run(

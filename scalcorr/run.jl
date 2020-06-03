@@ -11,6 +11,7 @@ using Printf
 using TimerOutputs
 
 struct ExpInstances <: InstanceSet end
+struct GeomeanInstances <: InstanceSet end
 struct PolyhedralInstances <: InstanceSet end
 
 run_in_bf = false
@@ -33,7 +34,8 @@ default_solver_options = (
 # instance sets and real types to run and corresponding time limits (seconds)
 instance_sets = [
     # (FastInstances, Float64, 60),
-    (ExpInstances, Float64, 60),
+    # (ExpInstances, Float64, 60),
+    (GeomeanInstances, Float64, 60),
     # (PolyhedralInstances, Float64, 60),
     ]
 
@@ -53,10 +55,10 @@ native_example_names = [
 JuMP_example_names = [
     # "centralpolymat",
     # "expdesign",
-    # # "maxvolume", # TODO uncomment when geomean -> exp bridge is in
+    "maxvolume", # TODO uncomment when geomean -> exp bridge is in
     # "portfolio",
     # "robustgeomprog",
-    "signomialmin",
+    # "signomialmin",
     ]
 
 # start the tests

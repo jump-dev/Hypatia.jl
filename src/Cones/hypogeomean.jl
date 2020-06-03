@@ -22,6 +22,7 @@ mutable struct HypoGeomean{T <: Real} <: Cone{T}
     feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
+    scal_hess_updated::Bool
     inv_hess_updated::Bool
     hess_fact_updated::Bool
     is_feas::Bool
@@ -60,6 +61,8 @@ mutable struct HypoGeomean{T <: Real} <: Cone{T}
     end
 end
 
+reset_data(cone::HypoGeomean) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = cone.scal_hess_updated = false)
+
 function setup_data(cone::HypoGeomean{T}) where {T <: Real}
     reset_data(cone)
     dim = cone.dim
@@ -80,7 +83,7 @@ get_nu(cone::HypoGeomean) = cone.dim
 
 use_correction(cone::HypoGeomean) = true
 
-use_scaling(cone::HypoGeomean) = false
+use_scaling(cone::HypoGeomean) = true
 
 rescale_point(cone::HypoGeomean{T}, s::T) where {T} = (cone.point .*= s)
 
@@ -208,8 +211,6 @@ function inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, con
     @views mul!(prod[2:dim, :], w, arr[1, :]', wprod / n, true)
     return prod
 end
-
-using ForwardDiff
 
 function correction(
     cone::HypoGeomean{T},

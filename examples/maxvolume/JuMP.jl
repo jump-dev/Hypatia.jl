@@ -13,6 +13,8 @@ struct MaxVolumeJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     epinorminf_constrs::Bool # add L1 and Linfty ball constraints, else don't add
 end
 
+# handles geomean but not epinorminf
+
 example_tests(::Type{MaxVolumeJuMP{Float64}}, ::MinimalInstances) = [
     ((2, true, false),),
     ((2, true, true),),
@@ -42,7 +44,12 @@ example_tests(::Type{MaxVolumeJuMP{Float64}}, ::SlowInstances) = [
 example_tests(::Type{MaxVolumeJuMP{Float64}}, ::ExpInstances) = [
     ((10, false, true), ClassicConeOptimizer),
     ((100, false, true), ClassicConeOptimizer),
-    ((1000, true, true), ClassicConeOptimizer),
+    ((1000, false, true), ClassicConeOptimizer),
+    ]
+example_tests(::Type{MaxVolumeJuMP{Float64}}, ::GeomeanInstances) = [
+    ((10, false, true), GeomeanConeOptimizer),
+    ((100, false, true), GeomeanConeOptimizer),
+    ((1000, false, true), GeomeanConeOptimizer),
     ]
 
 function build(inst::MaxVolumeJuMP{T}) where {T <: Float64} # TODO generic reals
