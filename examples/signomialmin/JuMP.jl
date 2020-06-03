@@ -91,6 +91,18 @@ example_tests(::Type{SignomialMinJuMP{Float64}}, ::ExpInstances) = begin
     ]
 end
 
+example_tests(::Type{SignomialMinJuMP{Float64}}, ::EntropyInstances) = begin
+    options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
+    relaxed_options = (tol_feas = 1e-5, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4)
+    return [
+    ((:motzkin2,), nothing, options),
+    ((:MCW19ex8,), nothing, relaxed_options),
+    ((3, 2), nothing, options),
+    ((20, 3), nothing, options),
+    ((10, 10), nothing, options),
+    ]
+end
+
 function build(inst::SignomialMinJuMP{T}) where {T <: Float64} # TODO generic reals
     (fc, fA, gc, gA) = (inst.fc, inst.fA, inst.gc, inst.gA)
     (fm, n) = size(fA)

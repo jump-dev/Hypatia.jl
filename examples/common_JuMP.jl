@@ -64,7 +64,21 @@ MOI.Utilities.@model(GeomeanConeOptimizer,
     (MOI.VectorOfVariables,),
     (MOI.VectorAffineFunction,),
     true,
-        )
+    )
+
+# Entropy only
+MOI.Utilities.@model(EntropyConeOptimizer,
+    (),
+    (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan,),
+    (MOI.Reals, MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives,
+    MOI.RelativeEntropyCone,),
+    (),
+    (),
+    (MOI.ScalarAffineFunction,),
+    (MOI.VectorOfVariables,),
+    (MOI.VectorAffineFunction,),
+    true,
+    )
 
 abstract type ExampleInstanceJuMP{T <: Real} <: ExampleInstance{T} end
 

@@ -146,7 +146,7 @@ function update_dual_feas(cone::EpiSumPerEntropy{T}) where {T <: Real}
 
     if all(vi -> vi > 0, v) && u > 0
         # TODO allocates
-        return all(u + u * log.(v ./ u) + w > 0)
+        return all(u .+ u * log.(v ./ u) .+ w .> 0)
     else
         cone.is_feas = false
     end

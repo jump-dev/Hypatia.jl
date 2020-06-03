@@ -83,7 +83,7 @@ get_nu(cone::HypoGeomean) = cone.dim
 
 use_correction(cone::HypoGeomean) = true
 
-use_scaling(cone::HypoGeomean) = true
+use_scaling(cone::HypoGeomean) = false
 
 rescale_point(cone::HypoGeomean{T}, s::T) where {T} = (cone.point .*= s)
 
