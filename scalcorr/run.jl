@@ -15,7 +15,7 @@ struct GeomeanInstances <: InstanceSet end
 struct EntropyInstances <: InstanceSet end
 struct PolyhedralInstances <: InstanceSet end
 
-run_in_bf = false
+run_in_bf = true
 
 # options to solvers
 timer = TimerOutput()

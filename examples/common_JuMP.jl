@@ -82,6 +82,13 @@ MOI.Utilities.@model(EntropyConeOptimizer,
 
 abstract type ExampleInstanceJuMP{T <: Real} <: ExampleInstance{T} end
 
+convert_cone(cone::Hypatia.Cones.Nonnegative, out_type::Type) = Hypatia.Cones.Nonnegative{out_type}(cone.dim)
+convert_cone(cone::Hypatia.Cones.HypoPerLog, out_type::Type) = Hypatia.Cones.HypoPerLog{out_type}(cone.dim)
+convert_cone(cone::Hypatia.Cones.Power, out_type::Type) = Hypatia.Cones.Power{out_type}(out_type.(cone.alpha), cone.n)
+convert_cone(cone::Hypatia.Cones.HypoGeomean, out_type::Type) = Hypatia.Cones.HypoGeomean{out_type}(out_type.(cone.alpha), cone.n)
+convert_cone(cone::Hypatia.Cones.EpiNormInf, out_type::Type) = Hypatia.Cones.EpiNormInf{out_type}(cone.dim)
+convert_cone(cone::Hypatia.Cones.EpiSumPerEntropy, out_type::Type) = Hypatia.Cones.EpiSumPerEntropy{out_type}(cone.dim)
+
 function write_and_run(
     E::Type{<:ExampleInstanceJuMP{Float64}},
     inst_data::Tuple,
@@ -97,26 +104,22 @@ function write_and_run(
     if !isnothing(extender)
         # use MOI automated extended formulation
         opt = MOI.Bridges.full_bridge_optimizer(MOI.Utilities.CachingOptimizer(extender{Float64}(), Hypatia.Optimizer()), Float64)
+        JuMP.set_optimizer(model, () -> opt)
+        MOI.Utilities.attach_optimizer(JuMP.backend(model))
+        caching_opt = JuMP.backend(model).optimizer.model
+        hyp_opt = Hypatia.Optimizer(; solver_options...)
+        MOI.copy_to(hyp_opt, caching_opt.model)
+    else
+        hyp_opt = Hypatia.Optimizer()
+        MOI.copy_to(hyp_opt, JuMP.backend(model))
     end
-    JuMP.set_optimizer(model, () -> opt)
-
-    MOI.Utilities.attach_optimizer(JuMP.backend(model))
-    caching_opt = JuMP.backend(model).optimizer.model
-    hyp_opt = Hypatia.Optimizer(; solver_options...)
-    MOI.copy_to(hyp_opt, caching_opt.model)
 
     # open("try_$(out_type).jl", "w") do io
         model = hyp_opt.model
         # hack just for signomial example
         new_cones = Hypatia.Cones.Cone{out_type}[]
         for c in model.cones
-            if c isa Hypatia.Cones.Nonnegative
-                push!(new_cones, Hypatia.Cones.Nonnegative{out_type}(c.dim))
-            elseif c isa Hypatia.Cones.HypoPerLog
-                push!(new_cones, Hypatia.Cones.HypoPerLog{out_type}(c.dim))
-            else
-                error()
-            end
+            push!(new_cones, convert_cone(c, out_type))
         end
         new_model = Hypatia.Models.Model{out_type}(
             out_type.(model.c),

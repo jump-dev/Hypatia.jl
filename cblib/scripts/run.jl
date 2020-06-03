@@ -45,6 +45,9 @@ options = (
 convert_cone(cone::Hypatia.Cones.Nonnegative, out_type::Type) = Hypatia.Cones.Nonnegative{out_type}(cone.dim)
 convert_cone(cone::Hypatia.Cones.HypoPerLog, out_type::Type) = Hypatia.Cones.HypoPerLog{out_type}(cone.dim)
 convert_cone(cone::Hypatia.Cones.Power, out_type::Type) = Hypatia.Cones.Power{out_type}(out_type.(cone.alpha), cone.n)
+convert_cone(cone::Hypatia.Cones.HypoGeomean, out_type::Type) = Hypatia.Cones.HypoGeomean{out_type}(out_type.(cone.alpha), cone.n)
+convert_cone(cone::Hypatia.Cones.EpiNormInf, out_type::Type) = Hypatia.Cones.EpiNormInf{out_type}(cone.dim)
+convert_cone(cone::Hypatia.Cones.EpiSumPerEntropy, out_type::Type) = Hypatia.Cones.EpiSumPerEntropy{out_type}(cone.dim)
 
 setfile = joinpath(@__DIR__, "../sets", set * ".txt")
 if !isfile(setfile)
