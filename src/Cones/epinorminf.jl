@@ -24,13 +24,17 @@ mutable struct EpiNormInf{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     dual_grad_updated::Bool
     hess_updated::Bool
     inv_hess_updated::Bool
+    hess_fact_updated::Bool
     hess_inv_hess_updated::Bool
     scal_hess_updated::Bool
     is_feas::Bool
     grad::Vector{T}
     dual_grad::Vector{T}
-    hess::Symmetric{T, SparseMatrixCSC{T, Int}}
+    sparse_hess::Symmetric{T, SparseMatrixCSC{T, Int}} # TODO decide what to do with this
+    hess::Symmetric{T, Matrix{T}}
+    old_hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
+    hess_fact_cache
     scal_hess::Symmetric{T, Matrix{T}}
     nbhd_tmp::Vector{T}
     nbhd_tmp2::Vector{T}
@@ -58,10 +62,13 @@ mutable struct EpiNormInf{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     newton_hess::Matrix{T}
     newton_norm::T
 
+    correction::Vector{T}
+
     function EpiNormInf{T, R}(
         dim::Int;
         use_dual::Bool = false,
         max_neighborhood::Real = default_max_neighborhood(),
+        hess_fact_cache = hessian_cache(T),
         ) where {R <: RealOrComplex{T}} where {T <: Real}
         @assert dim >= 2
         cone = new{T, R}()
@@ -70,6 +77,7 @@ mutable struct EpiNormInf{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
         cone.dim = dim
         cone.is_complex = (R <: Complex)
         cone.n = (cone.is_complex ? div(dim - 1, 2) : dim - 1)
+        cone.hess_fact_cache = hess_fact_cache
 
         cone.barrier = (x -> -sum(log(abs2(x[1]) - abs2(wi)) for wi in x[2:end]) + (cone.n - 1) * log(x[1]))
         return cone
@@ -107,12 +115,17 @@ function setup_data(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where 
         cone.edgeR = zeros(R, n)
         cone.invedgeR = zeros(R, n)
     end
+    cone.hess = Symmetric(zeros(T, dim, dim), :U)
+    cone.old_hess = Symmetric(zeros(T, dim, dim), :U)
+    load_matrix(cone.hess_fact_cache, cone.hess)
+    cone.correction = zeros(T, dim)
 
     cone.newton_cone = deepcopy(cone)
     cone.newton_point = zeros(T, dim)
     cone.newton_grad = zeros(T, dim)
     cone.newton_stepdir = zeros(T, dim)
     cone.newton_hess = zeros(T, dim, dim)
+
     return
 end
 
@@ -212,7 +225,7 @@ function update_hess(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where
     end
     n = cone.n
 
-    if !isdefined(cone, :hess)
+    if !isdefined(cone, :sparse_hess)
         # initialize sparse idxs for upper triangle of Hessian
         dim = cone.dim
         H_nnz_tri = 2 * dim - 1 + (cone.is_complex ? n : 0)
@@ -230,11 +243,11 @@ function update_hess(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where
             J[idxs3] .= 3:2:dim
         end
         V = ones(T, H_nnz_tri)
-        cone.hess = Symmetric(sparse(I, J, V, dim, dim), :U)
+        cone.sparse_hess = Symmetric(sparse(I, J, V, dim, dim), :U)
     end
 
     # modify nonzeros of sparse data structure of upper triangle of Hessian
-    H_nzval = cone.hess.data.nzval
+    H_nzval = cone.sparse_hess.data.nzval
     H_nzval[1] = cone.diag11
     nz_idx = 2
     diag_idx = 1
@@ -251,6 +264,8 @@ function update_hess(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where
             diag_idx += 1
         end
     end
+    cone.hess = Symmetric(Matrix(cone.sparse_hess))
+    copyto!(cone.old_hess.data, cone.hess.data)
 
     cone.hess_updated = true
     return cone.hess
@@ -418,7 +433,7 @@ function correction(cone::EpiNormInf{T}, primal_dir::AbstractVector{T}, dual_dir
     # third order derivative multiplied by s
     u_dir = primal_dir[1]
     Hiz1 = Hinv_z[1]
-    corr = zeros(T, dim)
+    corr = cone.correction
     @views corr1 = (uuu * u_dir + dot(uuw, primal_dir[2:end])) * Hiz1
     for i in 1:cone.n
         j = i + 1
