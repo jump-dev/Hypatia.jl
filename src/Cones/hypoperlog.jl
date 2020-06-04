@@ -104,6 +104,8 @@ reset_data(cone::HypoPerLog) = (cone.feas_updated = cone.grad_updated = cone.dua
 
 rescale_point(cone::HypoPerLog{T}, s::T) where {T} = (cone.point .*= s)
 
+use_nt(::HypoPerLog) = false
+
 function set_initial_point(arr::AbstractVector, cone::HypoPerLog)
     (arr[1], arr[2], w) = get_central_ray_hypoperlog(cone.dim - 2)
     arr[3:end] .= w

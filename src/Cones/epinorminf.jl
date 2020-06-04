@@ -86,7 +86,8 @@ end
 
 use_heuristic_neighborhood(cone::EpiNormInf) = false
 
-reset_data(cone::EpiNormInf) = (cone.feas_updated = cone.grad_updated = cone.dual_grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_inv_hess_updated = cone.scal_hess_updated = false)
+reset_data(cone::EpiNormInf) = (cone.feas_updated = cone.grad_updated = cone.dual_grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated =
+    cone.hess_inv_hess_updated = cone.scal_hess_updated = false)
 
 # TODO only allocate the fields we use
 function setup_data(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
@@ -134,6 +135,10 @@ use_scaling(cone::EpiNormInf) = true
 use_correction(cone::EpiNormInf) = true
 
 get_nu(cone::EpiNormInf) = cone.n + 1
+
+rescale_point(cone::EpiNormInf{T, R}, s::T) where {R <: RealOrComplex{T}} where {T <: Real} = (cone.point .*= s)
+
+use_nt(::EpiNormInf) = false
 
 function set_initial_point(arr::AbstractVector{T}, cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     arr .= 0
@@ -302,24 +307,24 @@ function update_inv_hess(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} w
 end
 
 # uses edge, diag11, diag, offdiag
-function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
-    if !cone.hess_inv_hess_updated
-        update_hess_inv_hess(cone)
-    end
-
-    @views copyto!(prod[1, :], arr[1, :])
-    @views mul!(prod[1, :], arr[2:end, :]', cone.edge, true, cone.diag11)
-    @views mul!(prod[2:end, :], cone.edge, arr[1, :]')
-    @. @views prod[2:end, :] += cone.diag * arr[2:end, :]
-    if cone.is_complex
-        @inbounds for (j, oj) in enumerate(cone.offdiag)
-            @. @views prod[2j, :] += oj * arr[2j + 1, :]
-            @. @views prod[2j + 1, :] += oj * arr[2j, :]
-        end
-    end
-
-    return prod
-end
+# function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
+#     if !cone.hess_inv_hess_updated
+#         update_hess_inv_hess(cone)
+#     end
+#
+#     @views copyto!(prod[1, :], arr[1, :])
+#     @views mul!(prod[1, :], arr[2:end, :]', cone.edge, true, cone.diag11)
+#     @views mul!(prod[2:end, :], cone.edge, arr[1, :]')
+#     @. @views prod[2:end, :] += cone.diag * arr[2:end, :]
+#     if cone.is_complex
+#         @inbounds for (j, oj) in enumerate(cone.offdiag)
+#             @. @views prod[2j, :] += oj * arr[2j + 1, :]
+#             @. @views prod[2j + 1, :] += oj * arr[2j, :]
+#         end
+#     end
+#
+#     return prod
+# end
 
 # uses invedge, schur, diag, offdiag, det
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
@@ -347,61 +352,61 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Epi
 end
 
 # multiply by a sparse sqrt of hessian
-function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
-    if !cone.hess_inv_hess_updated
-        update_hess_inv_hess(cone) # TODO needed?
-    end
-    @. cone.rtdiag = sqrt(cone.diag) # TODO update
-
-    @. @views prod[1, :] = sqrt(cone.schur) * arr[1, :]
-    if cone.is_complex
-        for (j, oj) in enumerate(cone.offdiag)
-            # TODO cache these fields?
-            erj = cone.edge[2j - 1]
-            eij = cone.edge[2j]
-            rtd1j = sqrt(cone.diag[2j - 1])
-            rtdetj = sqrt(cone.detdiag[j])
-            ortd1j = oj / rtd1j
-            side1j = erj / rtd1j
-            side2j = (eij * rtd1j - erj * ortd1j) / rtdetj
-            rtdetd1j = rtdetj / rtd1j
-            @. @views prod[2j, :] = side1j * arr[1, :] + rtd1j * arr[2j, :] + ortd1j * arr[2j + 1, :]
-            @. @views prod[2j + 1, :] = side2j * arr[1, :] + rtdetd1j * arr[2j + 1, :]
-        end
-    else
-        @. @views prod[2:end, :] = cone.edge / cone.rtdiag * arr[1, :]'
-        @. @views prod[2:end, :] += cone.rtdiag * arr[2:end, :]
-    end
-
-    return prod
-end
-
-# multiply by sparse U factor of inverse hessian
-function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
-    if !cone.hess_inv_hess_updated
-        update_hess_inv_hess(cone) # TODO needed?
-    end
-    @. cone.rtdiag = sqrt(cone.diag) # TODO update
-
-    @. @views prod[1, :] = arr[1, :]
-    @views mul!(prod[1, :], arr[2:end, :]', cone.invedge, true, true)
-    prod[1, :] ./= sqrt(cone.schur)
-    if cone.is_complex
-        for (j, oj) in enumerate(cone.offdiag)
-            # TODO cache these fields?
-            rtd2j = sqrt(cone.diag[2j])
-            rtdetj = sqrt(cone.detdiag[j])
-            rtd2detj = rtd2j / rtdetj
-            ortd2detj = oj / rtd2j / rtdetj
-            @. @views prod[2j, :] = rtd2detj * arr[2j, :] - ortd2detj * arr[2j + 1, :]
-            @. @views prod[2j + 1, :] = arr[2j + 1, :] / rtd2j
-        end
-    else
-        @. @views prod[2:end, :] = arr[2:end, :] / cone.rtdiag
-    end
-
-    return prod
-end
+# function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
+#     if !cone.hess_inv_hess_updated
+#         update_hess_inv_hess(cone) # TODO needed?
+#     end
+#     @. cone.rtdiag = sqrt(cone.diag) # TODO update
+#
+#     @. @views prod[1, :] = sqrt(cone.schur) * arr[1, :]
+#     if cone.is_complex
+#         for (j, oj) in enumerate(cone.offdiag)
+#             # TODO cache these fields?
+#             erj = cone.edge[2j - 1]
+#             eij = cone.edge[2j]
+#             rtd1j = sqrt(cone.diag[2j - 1])
+#             rtdetj = sqrt(cone.detdiag[j])
+#             ortd1j = oj / rtd1j
+#             side1j = erj / rtd1j
+#             side2j = (eij * rtd1j - erj * ortd1j) / rtdetj
+#             rtdetd1j = rtdetj / rtd1j
+#             @. @views prod[2j, :] = side1j * arr[1, :] + rtd1j * arr[2j, :] + ortd1j * arr[2j + 1, :]
+#             @. @views prod[2j + 1, :] = side2j * arr[1, :] + rtdetd1j * arr[2j + 1, :]
+#         end
+#     else
+#         @. @views prod[2:end, :] = cone.edge / cone.rtdiag * arr[1, :]'
+#         @. @views prod[2:end, :] += cone.rtdiag * arr[2:end, :]
+#     end
+#
+#     return prod
+# end
+#
+# # multiply by sparse U factor of inverse hessian
+# function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
+#     if !cone.hess_inv_hess_updated
+#         update_hess_inv_hess(cone) # TODO needed?
+#     end
+#     @. cone.rtdiag = sqrt(cone.diag) # TODO update
+#
+#     @. @views prod[1, :] = arr[1, :]
+#     @views mul!(prod[1, :], arr[2:end, :]', cone.invedge, true, true)
+#     prod[1, :] ./= sqrt(cone.schur)
+#     if cone.is_complex
+#         for (j, oj) in enumerate(cone.offdiag)
+#             # TODO cache these fields?
+#             rtd2j = sqrt(cone.diag[2j])
+#             rtdetj = sqrt(cone.detdiag[j])
+#             rtd2detj = rtd2j / rtdetj
+#             ortd2detj = oj / rtd2j / rtdetj
+#             @. @views prod[2j, :] = rtd2detj * arr[2j, :] - ortd2detj * arr[2j + 1, :]
+#             @. @views prod[2j + 1, :] = arr[2j + 1, :] / rtd2j
+#         end
+#     else
+#         @. @views prod[2:end, :] = arr[2:end, :] / cone.rtdiag
+#     end
+#
+#     return prod
+# end
 
 # TODO complex
 # TODO in-place, inbounds

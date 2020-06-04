@@ -49,7 +49,7 @@ example_tests(::Type{MaxVolumeJuMP{Float64}}, ::ExpInstances) = [
 example_tests(::Type{MaxVolumeJuMP{Float64}}, ::GeomeanInstances) = [
     ((10, false, true), GeomeanConeOptimizer),
     ((100, false, true), GeomeanConeOptimizer),
-    ((1000, false, true), GeomeanConeOptimizer),
+    ((200, false, true), GeomeanConeOptimizer),
     ]
 
 function build(inst::MaxVolumeJuMP{T}) where {T <: Float64} # TODO generic reals

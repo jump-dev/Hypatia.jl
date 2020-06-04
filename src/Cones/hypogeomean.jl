@@ -87,6 +87,8 @@ use_scaling(cone::HypoGeomean) = false
 
 rescale_point(cone::HypoGeomean{T}, s::T) where {T} = (cone.point .*= s)
 
+use_nt(::HypoGeomean) = false
+
 function set_initial_point(arr::AbstractVector{T}, cone::HypoGeomean{T}) where {T}
     # get closed form central ray if all powers are equal, else use fitting
     if all(isequal(inv(T(cone.dim - 1))), cone.alpha)
@@ -122,7 +124,7 @@ function update_dual_feas(cone::HypoGeomean{T}) where {T <: Real}
     u = cone.dual_point[1]
     w = view(cone.dual_point, 2:cone.dim)
     alpha = cone.alpha
-    if u < 0
+    if u < 0 && all(>(zero(u)), w)
         return u < exp(sum(alpha[i] * log(w[i] / alpha[i]) for i in eachindex(alpha)))
     else
         return false
@@ -136,7 +138,12 @@ function update_grad(cone::HypoGeomean)
 
     cone.grad[1] = inv(cone.z)
     wwprodu = -cone.wprod / cone.z
+    # for j in 1:(cone.dim - 1)
+    #     cone.grad[j + 1] = exp(sum(cone.alpha[i] * log(w[i]) for i in eachindex(cone.alpha) if i != j)) / (-cone.z) - inv(w[j])
+    # end
     @. cone.grad[2:end] = (wwprodu * cone.alpha - 1) / w
+
+    # @show dot(cone.grad, cone.point) + cone.dim
 
     cone.grad_updated = true
     return cone.grad

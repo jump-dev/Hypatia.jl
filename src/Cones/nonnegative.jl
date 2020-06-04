@@ -53,6 +53,8 @@ use_scaling(cone::Nonnegative) = true
 
 reset_data(cone::Nonnegative) = (cone.feas_updated = cone.grad_updated = cone.dual_grad_updated = cone.hess_updated = cone.scal_hess_updated = cone.inv_hess_updated = false)
 
+use_nt(::Nonnegative) = true
+
 # TODO only allocate the fields we use
 function setup_data(cone::Nonnegative{T}) where {T <: Real}
     reset_data(cone)

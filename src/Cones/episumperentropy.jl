@@ -80,7 +80,8 @@ mutable struct EpiSumPerEntropy{T <: Real} <: Cone{T}
     end
 end
 
-reset_data(cone::EpiSumPerEntropy) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = cone.scal_hess_updated = cone.hess_inv_hess_updated = false)
+reset_data(cone::EpiSumPerEntropy) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated =
+    cone.hess_fact_updated = cone.scal_hess_updated = cone.hess_inv_hess_updated = false)
 
 # TODO only allocate the fields we use
 function setup_data(cone::EpiSumPerEntropy{T}) where {T <: Real}
@@ -113,6 +114,8 @@ use_scaling(cone::EpiSumPerEntropy) = false
 get_nu(cone::EpiSumPerEntropy) = cone.dim
 
 rescale_point(cone::EpiSumPerEntropy{T}, s::T) where {T} = (cone.point .*= s)
+
+use_nt(::EpiSumPerEntropy) = false
 
 function set_initial_point(arr::AbstractVector, cone::EpiSumPerEntropy)
     (arr[1], v, w) = get_central_ray_episumperentropy(div(cone.dim - 1, 2))

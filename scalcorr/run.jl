@@ -37,8 +37,8 @@ instance_sets = [
     # (FastInstances, Float64, 60),
     # (ExpInstances, Float64, 60),
     # (GeomeanInstances, Float64, 60),
-    # (EntropyInstances, Float64, 60),
-    (PolyhedralInstances, Float64, 60),
+    (EntropyInstances, Float64, 60),
+    # (PolyhedralInstances, Float64, 60),
     ]
 
 # types of models to run and corresponding options and example names
@@ -55,11 +55,11 @@ native_example_names = [
 
 # list of names of JuMP examples to run
 JuMP_example_names = [
-    "centralpolymat",
-    "expdesign",
-    "maxvolume", # TODO uncomment when geomean -> exp bridge is in
-    "portfolio",
-    "robustgeomprog",
+    # "centralpolymat",
+    # "expdesign",
+    # "maxvolume", # TODO uncomment when geomean -> exp bridge is in
+    # "portfolio",
+    # "robustgeomprog",
     "signomialmin",
     ]
 
