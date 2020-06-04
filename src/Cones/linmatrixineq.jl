@@ -27,6 +27,7 @@ mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
     hess_fact_updated::Bool
     is_feas::Bool
     grad::Vector{T}
+    dual_grad
     hess::Symmetric{T, Matrix{T}}
     old_hess
     inv_hess::Symmetric{T, Matrix{T}}
@@ -82,7 +83,7 @@ function setup_data(cone::LinMatrixIneq{T}) where {T <: Real}
     reset_data(cone)
     dim = cone.dim
     cone.point = zeros(T, dim)
-    cond.dual_point = zeros(T, dim)
+    cone.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.dual_grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
@@ -101,8 +102,6 @@ use_correction(cone::LinMatrixIneq) = true
 use_scaling(cone::LinMatrixIneq) = false
 
 rescale_point(cone::LinMatrixIneq{T}, s::T) where {T} = (cone.point .*= s)
-
-use_nt(::LinMatrixIneq) = false
 
 function set_initial_point(arr::AbstractVector, cone::LinMatrixIneq{T}) where {T <: Real}
     arr .= 0

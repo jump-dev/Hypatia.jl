@@ -115,8 +115,6 @@ get_nu(cone::EpiSumPerEntropy) = cone.dim
 
 rescale_point(cone::EpiSumPerEntropy{T}, s::T) where {T} = (cone.point .*= s)
 
-use_nt(::EpiSumPerEntropy) = false
-
 function set_initial_point(arr::AbstractVector, cone::EpiSumPerEntropy)
     (arr[1], v, w) = get_central_ray_episumperentropy(div(cone.dim - 1, 2))
     arr[cone.v_idxs] .= v

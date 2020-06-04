@@ -138,8 +138,6 @@ get_nu(cone::EpiNormInf) = cone.n + 1
 
 rescale_point(cone::EpiNormInf{T, R}, s::T) where {R <: RealOrComplex{T}} where {T <: Real} = (cone.point .*= s)
 
-use_nt(::EpiNormInf) = false
-
 function set_initial_point(arr::AbstractVector{T}, cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     arr .= 0
     arr[1] = sqrt(T(get_nu(cone)))

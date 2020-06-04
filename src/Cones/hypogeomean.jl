@@ -90,8 +90,6 @@ use_scaling(cone::HypoGeomean) = false
 
 rescale_point(cone::HypoGeomean{T}, s::T) where {T} = (cone.point .*= s)
 
-use_nt(::HypoGeomean) = false
-
 function set_initial_point(arr::AbstractVector{T}, cone::HypoGeomean{T}) where {T}
     # get closed form central ray if all powers are equal, else use fitting
     if all(isequal(inv(T(cone.dim - 1))), cone.alpha)

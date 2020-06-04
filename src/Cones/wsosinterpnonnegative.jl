@@ -101,8 +101,6 @@ use_scaling(cone::WSOSInterpNonnegative) = false
 
 rescale_point(cone::WSOSInterpNonnegative{T}, s::T) where {T} = (cone.point .*= s)
 
-use_nt(::WSOSInterpNonnegative) = false
-
 # TODO find "central" initial point, like for other cones
 set_initial_point(arr::AbstractVector, cone::WSOSInterpNonnegative) = (arr .= 1)
 
