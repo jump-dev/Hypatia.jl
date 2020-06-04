@@ -15,16 +15,20 @@ mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
     As::Vector
     is_complex::Bool
     point::Vector{T}
+    dual_point::Vector{T}
     timer::TimerOutput
 
     feas_updated::Bool
     grad_updated::Bool
+    dual_grad_updated::Bool
     hess_updated::Bool
+    scal_hess_updated::Bool
     inv_hess_updated::Bool
     hess_fact_updated::Bool
     is_feas::Bool
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
+    old_hess
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
     nbhd_tmp::Vector{T}
@@ -33,6 +37,8 @@ mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
     sumA
     fact
     sumAinvAs::Vector
+
+    correction
 
     function LinMatrixIneq{T}(
         As::Vector;
@@ -69,21 +75,34 @@ mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
     end
 end
 
+reset_data(cone::LinMatrixIneq) = (cone.feas_updated = cone.grad_updated = cone.dual_grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = cone.scal_hess_updated = false)
+
 # TODO only allocate the fields we use
 function setup_data(cone::LinMatrixIneq{T}) where {T <: Real}
     reset_data(cone)
     dim = cone.dim
     cone.point = zeros(T, dim)
+    cond.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
+    cone.dual_grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
+    cone.correction = zeros(T, dim)
     return
 end
 
 get_nu(cone::LinMatrixIneq) = cone.side
+
+use_correction(cone::LinMatrixIneq) = true
+
+use_scaling(cone::LinMatrixIneq) = false
+
+rescale_point(cone::LinMatrixIneq{T}, s::T) where {T} = (cone.point .*= s)
+
+use_nt(::LinMatrixIneq) = false
 
 function set_initial_point(arr::AbstractVector, cone::LinMatrixIneq{T}) where {T <: Real}
     arr .= 0
@@ -110,6 +129,10 @@ function update_feas(cone::LinMatrixIneq{T}) where {T <: Real}
     return cone.is_feas
 end
 
+function update_dual_feas(cone::LinMatrixIneq{T}) where {T <: Real}
+    return all(isposdef(cholesky(cone.As[i]) * cone.dual_point[i]) for i in eachindex(cone.dual_point))
+end
+
 function update_grad(cone::LinMatrixIneq{T}) where {T <: Real}
     @assert cone.is_feas
 
@@ -132,7 +155,21 @@ function update_hess(cone::LinMatrixIneq)
     @inbounds for i in 1:cone.dim, j in i:cone.dim
         H[i, j] = real(dot(sumAinvAs[i], sumAinvAs[j]'))
     end
+    copyto!(cone.old_hess.data, H)
 
     cone.hess_updated = true
     return cone.hess
+end
+
+function correction(
+    cone::LinMatrixIneq{T},
+    primal_dir::AbstractVector{T},
+    dual_dir::AbstractVector{T},
+    ) where {T <: Real}
+    corr = cone.correction
+    Hi_z = cone.inv_hess \ dual_dir
+    for i in eachindex(corr)
+        corr[i] = sum(tr(sumAinvAs[i] * sumAinvAs[j] * sumAinvAs[k]) * primal_dir[j] * Hi_z[k] for i in 1:cone.dim, j in 1:cone.dim)
+    end
+    return corr
 end
