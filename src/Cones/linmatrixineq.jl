@@ -29,7 +29,7 @@ mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
     grad::Vector{T}
     dual_grad
     hess::Symmetric{T, Matrix{T}}
-    old_hess
+    old_hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
     nbhd_tmp::Vector{T}
@@ -87,6 +87,7 @@ function setup_data(cone::LinMatrixIneq{T}) where {T <: Real}
     cone.grad = zeros(T, dim)
     cone.dual_grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
+    cone.old_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
     cone.nbhd_tmp = zeros(T, dim)
@@ -165,10 +166,11 @@ function correction(
     primal_dir::AbstractVector{T},
     dual_dir::AbstractVector{T},
     ) where {T <: Real}
+    sumAinvAs = cone.sumAinvAs
     corr = cone.correction
-    Hi_z = cone.inv_hess \ dual_dir
+    Hi_z = cone.old_hess \ dual_dir
     for i in eachindex(corr)
-        corr[i] = sum(tr(sumAinvAs[i] * sumAinvAs[j] * sumAinvAs[k]) * primal_dir[j] * Hi_z[k] for i in 1:cone.dim, j in 1:cone.dim)
+        corr[i] = sum(tr(sumAinvAs[i] * sumAinvAs[j] * sumAinvAs[k]) * primal_dir[j] * Hi_z[k] for j in 1:cone.dim, k in 1:cone.dim)
     end
     return corr
 end

@@ -23,6 +23,7 @@ mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T
 
     feas_updated::Bool
     grad_updated::Bool
+    dual_grad_updated::Bool
     hess_updated::Bool
     scal_hess_updated::Bool
     inv_hess_updated::Bool
@@ -31,7 +32,7 @@ mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T
     grad::Vector{T}
     dual_grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
-    old_hess
+    old_hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
     nbhd_tmp::Vector{T}
@@ -40,7 +41,7 @@ mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T
     tmpLL::Vector{Matrix{R}}
     tmpUL::Vector{Matrix{R}}
     tmpLU::Vector{Matrix{R}}
-    tmpUU::Matrix{R}
+    tmpUU::Vector{Matrix{R}}
     ΛF::Vector
 
     correction
@@ -86,7 +87,7 @@ function setup_data(cone::WSOSInterpNonnegative{T, R}) where {R <: RealOrComplex
     cone.tmpLL = [Matrix{R}(undef, size(Pk, 2), size(Pk, 2)) for Pk in Ps]
     cone.tmpUL = [Matrix{R}(undef, dim, size(Pk, 2)) for Pk in Ps]
     cone.tmpLU = [Matrix{R}(undef, size(Pk, 2), dim) for Pk in Ps]
-    cone.tmpUU = Matrix{R}(undef, dim, dim)
+    cone.tmpUU = [Matrix{R}(undef, dim, dim) for Pk in Ps]
     cone.ΛF = Vector{Any}(undef, length(Ps))
 
     cone.correction = zeros(T, dim)
@@ -162,13 +163,14 @@ function update_hess(cone::WSOSInterpNonnegative)
     cone.hess .= 0
     @inbounds for k in eachindex(cone.Ps)
         LUk = cone.tmpLU[k]
-        UUk = mul!(cone.tmpUU, LUk', LUk)
+        UUk = mul!(cone.tmpUU[k], LUk', LUk)
         @inbounds for j in 1:cone.dim, i in 1:j
             cone.hess.data[i, j] += abs2(UUk[i, j])
         end
     end
 
     cone.hess_updated = true
+    copyto!(cone.old_hess.data, cone.hess.data)
     return cone.hess
 end
 
@@ -176,7 +178,7 @@ function correction(cone::WSOSInterpNonnegative, primal_dir::AbstractVector, dua
     Hinv_z = cone.old_hess \ dual_dir
     corr = cone.correction
     @inbounds for k in eachindex(corr)
-        corr[k] = sum(sum(PΛiP[i, j] * PΛiP[i, k] * PΛiP[j, k] for PΛiP in cone.PΛiPs) * primal_dir[i] * Hinv_z[j] for i in eachindex(corr), j in eachindex(corr))
+        corr[k] = sum(sum(UUk[i, j] * UUk[i, k] * UUk[j, k] for UUk in cone.tmpUU) * primal_dir[i] * Hinv_z[j] for i in eachindex(corr), j in eachindex(corr))
     end
     return corr
 end
