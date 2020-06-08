@@ -85,7 +85,7 @@ abstract type ExampleInstanceJuMP{T <: Real} <: ExampleInstance{T} end
 convert_cone(cone::Hypatia.Cones.Nonnegative, out_type::Type) = Hypatia.Cones.Nonnegative{out_type}(cone.dim)
 convert_cone(cone::Hypatia.Cones.HypoPerLog, out_type::Type) = Hypatia.Cones.HypoPerLog{out_type}(cone.dim)
 convert_cone(cone::Hypatia.Cones.Power, out_type::Type) = Hypatia.Cones.Power{out_type}(out_type.(cone.alpha), cone.n)
-convert_cone(cone::Hypatia.Cones.HypoGeomean, out_type::Type) = Hypatia.Cones.HypoGeomean{out_type}(out_type.(cone.alpha), cone.n)
+convert_cone(cone::Hypatia.Cones.HypoGeomean, out_type::Type) = Hypatia.Cones.HypoGeomean{out_type}(fill(inv(out_type(length(cone.alpha))), length(cone.alpha))) # NOTE hardcoded equal powers
 convert_cone(cone::Hypatia.Cones.EpiNormInf, out_type::Type) = Hypatia.Cones.EpiNormInf{out_type}(cone.dim)
 convert_cone(cone::Hypatia.Cones.EpiSumPerEntropy, out_type::Type) = Hypatia.Cones.EpiSumPerEntropy{out_type}(cone.dim)
 
@@ -129,6 +129,7 @@ function write_and_run(
             out_type.(model.h),
             new_cones,
             )
+        @show typeof.(new_cones)
         # println(io, "return ", new_model)
     # end
 

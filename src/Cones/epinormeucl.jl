@@ -16,46 +16,59 @@ mutable struct EpiNormEucl{T <: Real} <: Cone{T}
     max_neighborhood::T
     dim::Int
     point::Vector{T}
+    dual_point::Vector{T}
     timer::TimerOutput
 
     feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
+    scal_hess_updated::Bool
     inv_hess_updated::Bool
     is_feas::Bool
     grad::Vector{T}
+    correction::Vector{T}
     hess::Symmetric{T, Matrix{T}}
+    old_hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     nbhd_tmp::Vector{T}
     nbhd_tmp2::Vector{T}
 
     dist::T
 
+    hess_fact_cache
+
+    # TODO remove fact_cache when NT in
     function EpiNormEucl{T}(
         dim::Int;
         use_dual::Bool = false, # TODO self-dual so maybe remove this option/field?
         max_neighborhood::Real = default_max_neighborhood(),
+        hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
         @assert dim >= 2
         cone = new{T}()
         cone.use_dual_barrier = use_dual
         cone.max_neighborhood = max_neighborhood
         cone.dim = dim
+        cone.hess_fact_cache = hess_fact_cache
         return cone
     end
 end
 
 use_heuristic_neighborhood(cone::EpiNormEucl) = false
 
-reset_data(cone::EpiNormEucl) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
+reset_data(cone::EpiNormEucl) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = cone.scal_hess_updated = false)
 
 # TODO only allocate the fields we use
 function setup_data(cone::EpiNormEucl{T}) where {T <: Real}
     reset_data(cone)
     dim = cone.dim
     cone.point = zeros(T, dim)
+    cone.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
+    cone.correction = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
+    cone.old_hess = Symmetric(zeros(T, dim, dim), :U)
+    load_matrix(cone.hess_fact_cache, cone.hess)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
@@ -153,43 +166,61 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Epi
     return prod
 end
 
-function hess_sqrt_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiNormEucl{T}) where {T <: Real}
-    @assert cone.is_feas
-    u = cone.point[1]
-    w = @view cone.point[2:end]
+# function hess_sqrt_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiNormEucl{T}) where {T <: Real}
+#     @assert cone.is_feas
+#     u = cone.point[1]
+#     w = @view cone.point[2:end]
+#
+#     rt2 = sqrt(T(2))
+#     distrt2 = cone.dist * rt2
+#     rtdist = sqrt(cone.dist)
+#     urtdist = u + rtdist * rt2
+#     @inbounds for j in 1:size(arr, 2)
+#         uj = arr[1, j]
+#         @views wj = arr[2:end, j]
+#         dotwwj = dot(w, wj)
+#         prod[1, j] = (u * uj - dotwwj) / distrt2
+#         wmulj = (dotwwj / urtdist - uj) / distrt2
+#         @. prod[2:end, j] = w * wmulj + wj / rtdist
+#     end
+#
+#     return prod
+# end
+#
+# function inv_hess_sqrt_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiNormEucl{T}) where {T <: Real}
+#     @assert cone.is_feas
+#     u = cone.point[1]
+#     w = @view cone.point[2:end]
+#
+#     rt2 = sqrt(T(2))
+#     rtdist = sqrt(cone.dist)
+#     urtdist = u + rtdist * rt2
+#     @inbounds for j in 1:size(arr, 2)
+#         uj = arr[1, j]
+#         @views wj = arr[2:end, j]
+#         dotwwj = dot(w, wj)
+#         prod[1, j] = (u * uj + dotwwj) / rt2
+#         wmulj = (dotwwj / urtdist + uj) / rt2
+#         @. prod[2:end, j] = w * wmulj + wj * rtdist
+#     end
+#
+#     return prod
+# end
 
-    rt2 = sqrt(T(2))
-    distrt2 = cone.dist * rt2
-    rtdist = sqrt(cone.dist)
-    urtdist = u + rtdist * rt2
-    @inbounds for j in 1:size(arr, 2)
-        uj = arr[1, j]
-        @views wj = arr[2:end, j]
-        dotwwj = dot(w, wj)
-        prod[1, j] = (u * uj - dotwwj) / distrt2
-        wmulj = (dotwwj / urtdist - uj) / distrt2
-        @. prod[2:end, j] = w * wmulj + wj / rtdist
-    end
+jdot(x::AbstractVector, y::AbstractVector) = @views x[1] * y[1] - dot(x[2:end], y[2:end])
 
-    return prod
-end
+function correction(cone::EpiNormEucl, primal_dir::AbstractVector, dual_dir::AbstractVector)
+    @assert cone.grad_updated
+    corr = cone.correction
+    point = cone.point
 
-function inv_hess_sqrt_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiNormEucl{T}) where {T <: Real}
-    @assert cone.is_feas
-    u = cone.point[1]
-    w = @view cone.point[2:end]
+    jdot_p_s = jdot(point, primal_dir)
+    @. corr = jdot_p_s * dual_dir
+    dot_s_z = dot(primal_dir, dual_dir)
+    dot_p_z = dot(point, dual_dir)
+    corr[1] += dot_s_z * point[1] - dot_p_z * primal_dir[1]
+    @. @views corr[2:end] += -dot_s_z * point[2:end] + dot_p_z * primal_dir[2:end]
+    corr ./= cone.dist
 
-    rt2 = sqrt(T(2))
-    rtdist = sqrt(cone.dist)
-    urtdist = u + rtdist * rt2
-    @inbounds for j in 1:size(arr, 2)
-        uj = arr[1, j]
-        @views wj = arr[2:end, j]
-        dotwwj = dot(w, wj)
-        prod[1, j] = (u * uj + dotwwj) / rt2
-        wmulj = (dotwwj / urtdist + uj) / rt2
-        @. prod[2:end, j] = w * wmulj + wj * rtdist
-    end
-
-    return prod
+    return corr
 end

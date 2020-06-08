@@ -109,7 +109,7 @@ end
 
 use_correction(cone::EpiSumPerEntropy) = true
 
-use_scaling(cone::EpiSumPerEntropy) = false
+use_scaling(cone::EpiSumPerEntropy) = true
 
 get_nu(cone::EpiSumPerEntropy) = cone.dim
 

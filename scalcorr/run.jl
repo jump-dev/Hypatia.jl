@@ -15,7 +15,7 @@ struct GeomeanInstances <: InstanceSet end
 struct EntropyInstances <: InstanceSet end
 struct PolyhedralInstances <: InstanceSet end
 
-run_in_bf = false
+run_in_bf = true
 
 # options to solvers
 timer = TimerOutput()
@@ -24,8 +24,8 @@ default_solver_options = (
     verbose = true,
     iter_limit = 100,
     timer = timer,
-    # system_solver = Solvers.NaiveDenseSystemSolver{Float64}(),
-    system_solver = Solvers.QRCholDenseSystemSolver{Float64}(),
+    system_solver = Solvers.NaiveDenseSystemSolver{Float64}(),
+    # system_solver = Solvers.QRCholDenseSystemSolver{Float64}(),
     # max_nbhd = 0.02,
     tol_rel_opt = tol,
     tol_abs_opt = tol,
@@ -57,7 +57,7 @@ native_example_names = [
 JuMP_example_names = [
     # "centralpolymat",
     # "expdesign",
-    "maxvolume", # TODO uncomment when geomean -> exp bridge is in
+    "maxvolume", # TODO only useful for exp instances when geomean -> exp bridge is in
     # "portfolio",
     # "robustgeomprog",
     # "signomialmin",
