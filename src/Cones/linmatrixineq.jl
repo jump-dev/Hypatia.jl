@@ -48,6 +48,7 @@ mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
         max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
+        @assert !use_dual # TODO delete later
         dim = length(As)
         @assert dim > 1
         side = 0

@@ -117,7 +117,8 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
 
     rtmu = sqrt(solver.mu)
     irtmu = inv(rtmu)
-    @assert irtmu >= one(T)
+    # @show irtmu
+    # @assert irtmu >= one(T)
     Cones.load_point.(cones, point.primal_views)
     Cones.rescale_point.(cones, irtmu)
     Cones.load_dual_point.(cones, point.dual_views)

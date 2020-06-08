@@ -54,6 +54,7 @@ mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T
         max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {R <: RealOrComplex{T}} where {T <: Real}
+        @assert !use_dual # TODO delete later
         for Pk in Ps
             @assert size(Pk, 1) == U
         end

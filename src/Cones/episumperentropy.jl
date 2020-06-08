@@ -61,6 +61,7 @@ mutable struct EpiSumPerEntropy{T <: Real} <: Cone{T}
         max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
+        @assert !use_dual # TODO delete later
         @assert dim >= 3
         cone = new{T}()
         cone.use_dual_barrier = use_dual
@@ -147,7 +148,9 @@ function update_dual_feas(cone::EpiSumPerEntropy{T}) where {T <: Real}
 
     if all(vi -> vi > 0, v) && u > 0
         # TODO allocates
-        return all(u .+ u * log.(v ./ u) .+ w .> 0)
+        # 𝑤𝑖≤𝑢(log(𝑣𝑖/−𝑢)+1)
+        # return all(u * (one(T) .+ log.(v / u)) + w .> 0)
+        return all(-w .< u * (1 .+ log.(v / u)))
     else
         cone.is_feas = false
     end

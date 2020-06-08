@@ -15,7 +15,8 @@ struct GeomeanInstances <: InstanceSet end
 struct EntropyInstances <: InstanceSet end
 struct PolyhedralInstances <: InstanceSet end
 
-run_in_bf = true
+# run_in_bf = true
+run_in_bf = false
 
 # options to solvers
 timer = TimerOutput()
@@ -35,8 +36,8 @@ default_solver_options = (
 # instance sets and real types to run and corresponding time limits (seconds)
 instance_sets = [
     # (FastInstances, Float64, 60),
-    # (ExpInstances, Float64, 60),
-    (GeomeanInstances, Float64, 60),
+    (ExpInstances, Float64, 60),
+    # (GeomeanInstances, Float64, 60),
     # (EntropyInstances, Float64, 60),
     # (PolyhedralInstances, Float64, 60),
     ]
@@ -57,10 +58,10 @@ native_example_names = [
 JuMP_example_names = [
     # "centralpolymat",
     # "expdesign",
-    "maxvolume", # TODO only useful for exp instances when geomean -> exp bridge is in
+    # "maxvolume", # TODO only useful for exp instances when geomean -> exp bridge is in
     # "portfolio",
-    # "robustgeomprog",
-    # "signomialmin",
+    "robustgeomprog",
+    "signomialmin",
     ]
 
 # start the tests

@@ -60,6 +60,7 @@ mutable struct WSOSInterpEpiNormEucl{T <: Real} <: Cone{T}
         max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
+        @assert !use_dual # TODO delete later
         for Pj in Ps
             @assert size(Pj, 1) == U
         end

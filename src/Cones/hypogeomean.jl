@@ -48,6 +48,7 @@ mutable struct HypoGeomean{T <: Real} <: Cone{T}
         max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
+        @assert !use_dual # TODO delete later
         dim = length(alpha) + 1
         @assert dim >= 2
         @assert all(ai > 0 for ai in alpha)

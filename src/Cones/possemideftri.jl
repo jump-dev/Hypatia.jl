@@ -47,6 +47,7 @@ mutable struct PosSemidefTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
         use_dual::Bool = false, # TODO self-dual so maybe remove this option/field?
         max_neighborhood::Real = default_max_neighborhood(),
         ) where {R <: RealOrComplex{T}} where {T <: Real}
+        @assert !use_dual # TODO delete later
         @assert dim >= 1
         cone = new{T, R}()
         cone.use_dual_barrier = use_dual
