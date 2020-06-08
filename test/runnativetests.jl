@@ -94,6 +94,10 @@ other_options = (
     iter_limit = 250,
     time_limit = 6e1,
     timer = timer,
+    # TODO this is tighter than default
+    tol_feas = 1e-12,
+    tol_rel_opt = 1e-12,
+    tol_abs_opt = 1e-12,
     )
 
 @info("starting native tests")
