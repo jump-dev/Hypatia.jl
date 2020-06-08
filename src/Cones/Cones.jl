@@ -71,6 +71,8 @@ barrier(cone::Cone) = cone.barrier
 
 # fallbacks
 
+use_nt(::Cone) = false
+
 reset_data(cone::Cone) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = false)
 
 update_hess_prod(cone::Cone) = nothing

@@ -18,16 +18,21 @@ mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T
     dim::Int
     Ps::Vector{Matrix{R}}
     point::Vector{T}
+    dual_point::Vector{T}
     timer::TimerOutput
 
     feas_updated::Bool
     grad_updated::Bool
+    dual_grad_updated::Bool
     hess_updated::Bool
+    scal_hess_updated::Bool
     inv_hess_updated::Bool
     hess_fact_updated::Bool
     is_feas::Bool
     grad::Vector{T}
+    dual_grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
+    old_hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
     nbhd_tmp::Vector{T}
@@ -36,8 +41,10 @@ mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T
     tmpLL::Vector{Matrix{R}}
     tmpUL::Vector{Matrix{R}}
     tmpLU::Vector{Matrix{R}}
-    tmpUU::Matrix{R}
+    tmpUU::Vector{Matrix{R}}
     ΛF::Vector
+
+    correction
 
     function WSOSInterpNonnegative{T, R}(
         U::Int,
@@ -61,12 +68,17 @@ mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T
     end
 end
 
+reset_data(cone::WSOSInterpNonnegative) = (cone.feas_updated = cone.grad_updated = cone.dual_grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = cone.scal_hess_updated = false)
+
 function setup_data(cone::WSOSInterpNonnegative{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     reset_data(cone)
     dim = cone.dim
     cone.point = zeros(T, dim)
+    cone.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
+    cone.dual_grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
+    cone.old_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
     cone.nbhd_tmp = zeros(T, dim)
@@ -75,12 +87,20 @@ function setup_data(cone::WSOSInterpNonnegative{T, R}) where {R <: RealOrComplex
     cone.tmpLL = [Matrix{R}(undef, size(Pk, 2), size(Pk, 2)) for Pk in Ps]
     cone.tmpUL = [Matrix{R}(undef, dim, size(Pk, 2)) for Pk in Ps]
     cone.tmpLU = [Matrix{R}(undef, size(Pk, 2), dim) for Pk in Ps]
-    cone.tmpUU = Matrix{R}(undef, dim, dim)
+    cone.tmpUU = [Matrix{R}(undef, dim, dim) for Pk in Ps]
     cone.ΛF = Vector{Any}(undef, length(Ps))
+
+    cone.correction = zeros(T, dim)
     return
 end
 
 get_nu(cone::WSOSInterpNonnegative) = sum(size(Pk, 2) for Pk in cone.Ps)
+
+use_correction(cone::WSOSInterpNonnegative) = true
+
+use_scaling(cone::WSOSInterpNonnegative) = false
+
+rescale_point(cone::WSOSInterpNonnegative{T}, s::T) where {T} = (cone.point .*= s)
 
 # TODO find "central" initial point, like for other cones
 set_initial_point(arr::AbstractVector, cone::WSOSInterpNonnegative) = (arr .= 1)
@@ -113,6 +133,11 @@ function update_feas(cone::WSOSInterpNonnegative)
     return cone.is_feas
 end
 
+function update_dual_feas(cone::WSOSInterpNonnegative, mu)
+    gap = cone.dual_point + mu * cone.grad
+    return dot(gap, cone.old_hess \ gap)
+end
+
 # TODO decide whether to compute the LUk' * LUk in grad or in hess (only diag needed for grad)
 # TODO can be done in parallel
 # TODO may be faster (but less numerically stable) with explicit inverse here
@@ -138,12 +163,22 @@ function update_hess(cone::WSOSInterpNonnegative)
     cone.hess .= 0
     @inbounds for k in eachindex(cone.Ps)
         LUk = cone.tmpLU[k]
-        UUk = mul!(cone.tmpUU, LUk', LUk)
+        UUk = mul!(cone.tmpUU[k], LUk', LUk)
         @inbounds for j in 1:cone.dim, i in 1:j
             cone.hess.data[i, j] += abs2(UUk[i, j])
         end
     end
 
     cone.hess_updated = true
+    copyto!(cone.old_hess.data, cone.hess.data)
     return cone.hess
+end
+
+function correction(cone::WSOSInterpNonnegative, primal_dir::AbstractVector, dual_dir::AbstractVector)
+    Hinv_z = cone.old_hess \ dual_dir
+    corr = cone.correction
+    @inbounds for k in eachindex(corr)
+        corr[k] = sum(sum(UUk[i, j] * UUk[i, k] * UUk[j, k] for UUk in cone.tmpUU) * primal_dir[i] * Hinv_z[j] for i in eachindex(corr), j in eachindex(corr))
+    end
+    return corr
 end

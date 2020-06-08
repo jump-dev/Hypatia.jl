@@ -77,6 +77,15 @@ example_tests(::Type{ExpDesignJuMP{Float64}}, ::ExpInstances) = begin
     # ((25, 75, 125, 10, false, true, false), ClassicConeOptimizer),
     ]
 end
+# NOTE add when psd usable
+# example_tests(::Type{ExpDesignJuMP{Float64}}, ::GeomeanInstances) = begin
+#     options = (tol_feas = 1e-5, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4)
+#     return [
+#     # rootdet in objective
+#     ((3, 5, 7, 2, false, true, false), GeomeanConeOptimizer),
+#     ((25, 75, 125, 10, false, true, false), GeomeanConeOptimizer),
+#     ]
+# end
 
 function build(inst::ExpDesignJuMP{T}) where {T <: Float64} # TODO generic reals
     (q, p, n, n_max) = (inst.q, inst.p, inst.n, inst.n_max)

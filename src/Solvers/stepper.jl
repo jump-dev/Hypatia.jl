@@ -138,6 +138,11 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
 
     # stepper.prev_gamma = gamma = (one(T) - aff_alpha) * min(abs2(one(T) - aff_alpha), T(0.25))
     stepper.prev_gamma = gamma = (one(T) - aff_alpha)^2
+    # if aff_alpha < 0.1
+    #     stepper.prev_gamma = gamma = solver.mu / 3
+    # else
+    #     stepper.prev_gamma = gamma = (one(T) - aff_alpha)^2
+    # end
 
     # TODO have to reload point after affine alpha line search
     Cones.load_point.(cones, point.primal_views)
@@ -216,7 +221,7 @@ function update_rhs_predcorr(stepper::CombinedStepper{T}, solver::Solver{T}, pre
         if Cones.use_correction(cone_k)
             # (reuses affine direction)
             # TODO check math here for case of cone.use_dual true - should s and z be swapped then?
-            scal = (cone_k isa Cones.HypoPerLog || cone_k isa Cones.Power ? irtmu : one(T))
+            scal = (Cones.use_nt(cone_k) ? one(T) : irtmu)
             stepper.s_rhs_k[k] .-= scal * Cones.correction(cone_k, stepper.primal_dir_k[k], stepper.dual_dir_k[k]) * prev_aff_alpha^2
         end
     end
@@ -244,13 +249,13 @@ function update_rhs_comb(stepper::CombinedStepper{T}, solver::Solver{T}, aff_alp
     for (k, cone_k) in enumerate(solver.model.cones)
         duals_k = solver.point.dual_views[k]
         grad_k = Cones.grad(cone_k)
-        scal = (cone_k isa Cones.HypoPerLog || cone_k isa Cones.Power ? rtmu : solver.mu)
+        scal = (Cones.use_nt(cone_k) ? solver.mu : rtmu)
         @. stepper.s_rhs_k[k] = -duals_k - (scal * grad_k) * gamma
         if Cones.use_correction(cone_k)
             # (reuses affine direction)
             # TODO check math here for case of cone.use_dual true - should s and z be swapped then?
             # stepper.s_rhs_k[k] .-= cone_k.correction
-            scal = (cone_k isa Cones.HypoPerLog || cone_k isa Cones.Power ? irtmu : one(T))
+            scal = (Cones.use_nt(cone_k) ? one(T) : irtmu)
             stepper.s_rhs_k[k] .-= scal * cone_k.correction * aff_alpha^2 # TODO this is heuristicy currently and just tries to reduce the amount of correction depending on how far we actually can step. redo in math, use linearity of the third-order corrector in s_dir and z_dir
         end
     end
