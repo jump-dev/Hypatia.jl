@@ -129,11 +129,10 @@ function write_and_run(
             out_type.(model.h),
             new_cones,
             )
-        @show typeof.(new_cones)
         # println(io, "return ", new_model)
     # end
 
-    solver = Solvers.Solver{out_type}()
+    solver = Solvers.Solver{out_type}(; solver_options...)
     Solvers.load(solver, new_model)
     Solvers.solve(solver)
     return

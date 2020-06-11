@@ -22,6 +22,7 @@ mutable struct EpiNormEucl{T <: Real} <: Cone{T}
     feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
+    hess_fact_updated::Bool
     scal_hess_updated::Bool
     inv_hess_updated::Bool
     is_feas::Bool
@@ -120,6 +121,7 @@ function update_hess(cone::EpiNormEucl)
     cone.hess[1, 1] -= inv_dist + inv_dist
 
     cone.hess_updated = true
+    copyto!(cone.old_hess.data, cone.hess.data)
     return cone.hess
 end
 

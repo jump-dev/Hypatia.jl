@@ -16,10 +16,11 @@ mutable struct EpiNormSpectral{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     use_heuristic_neighborhood::Bool
     max_neighborhood::T
     dim::Int
-    n::Int
-    m::Int
+    d1::Int
+    d2::Int
     is_complex::Bool
     point::Vector{T}
+    dual_point::Vector{T}
     timer::TimerOutput
 
     feas_updated::Bool
@@ -28,9 +29,11 @@ mutable struct EpiNormSpectral{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     inv_hess_updated::Bool
     hess_prod_updated::Bool
     hess_fact_updated::Bool
+    scal_hess_updated::Bool
     is_feas::Bool
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
+    old_hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
     nbhd_tmp::Vector{T}
@@ -40,59 +43,70 @@ mutable struct EpiNormSpectral{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     Z::Matrix{R}
     fact_Z
     Zi::Hermitian{R, Matrix{R}}
-    ZiW::Matrix{R}
+    tau::Matrix{R}
     HuW::Matrix{R}
     Huu::T
-    tmpmm::Matrix{R}
-    tmpnm::Matrix{R}
-    tmpnn::Matrix{R}
+    Wtau::Matrix{R}
+    tmpd1d2::Matrix{R}
+    tmpd1d1::Matrix{R}
+
+    correction::Vector{T}
 
     function EpiNormSpectral{T, R}(
-        n::Int,
-        m::Int;
+        d1::Int,
+        d2::Int;
         use_dual::Bool = false,
         use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
         max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {R <: RealOrComplex{T}} where {T <: Real}
-        @assert 1 <= n <= m
+        @assert 1 <= d1 <= d2
         cone = new{T, R}()
         cone.use_dual_barrier = use_dual
         cone.use_heuristic_neighborhood = use_heuristic_neighborhood
         cone.max_neighborhood = max_neighborhood
         cone.is_complex = (R <: Complex)
-        cone.dim = (cone.is_complex ? 2 * n * m + 1 : n * m + 1)
-        cone.n = n
-        cone.m = m
+        cone.dim = (cone.is_complex ? 2 * d1 * d2 + 1 : d1 * d2 + 1)
+        cone.d1 = d1
+        cone.d2 = d2
         cone.hess_fact_cache = hess_fact_cache
         return cone
     end
 end
 
-reset_data(cone::EpiNormSpectral) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_prod_updated = cone.hess_fact_updated = false)
+reset_data(cone::EpiNormSpectral) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.scal_hess_updated = cone.inv_hess_updated = cone.hess_prod_updated = cone.hess_fact_updated = false)
 
 # TODO only allocate the fields we use
 function setup_data(cone::EpiNormSpectral{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     reset_data(cone)
     dim = cone.dim
     cone.point = zeros(T, dim)
+    cone.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
+    cone.old_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
-    cone.W = Matrix{R}(undef, cone.n, cone.m)
-    cone.Z = Matrix{R}(undef, cone.n, cone.n)
-    cone.ZiW = Matrix{R}(undef, cone.n, cone.m)
-    cone.HuW = Matrix{R}(undef, cone.n, cone.m)
-    cone.tmpmm = Matrix{R}(undef, cone.m, cone.m)
-    cone.tmpnm = Matrix{R}(undef, cone.n, cone.m)
-    cone.tmpnn = Matrix{R}(undef, cone.n, cone.n)
+    cone.W = Matrix{R}(undef, cone.d1, cone.d2)
+    cone.Z = Matrix{R}(undef, cone.d1, cone.d1)
+    cone.tau = Matrix{R}(undef, cone.d1, cone.d2)
+    cone.HuW = Matrix{R}(undef, cone.d1, cone.d2)
+    cone.Wtau = Matrix{R}(undef, cone.d2, cone.d2)
+    cone.tmpd1d2 = Matrix{R}(undef, cone.d1, cone.d2)
+    cone.tmpd1d1 = Matrix{R}(undef, cone.d1, cone.d1)
+    cone.correction = zeros(T, dim)
     return
 end
 
 get_nu(cone::EpiNormSpectral) = cone.n + 1
+
+use_correction(cone::EpiNormSpectral) = true
+
+use_scaling(cone::EpiNormSpectral) = true
+
+rescale_point(cone::EpiNormSpectral{T}, s::T) where {T} = (cone.point .*= s)
 
 function set_initial_point(arr::AbstractVector, cone::EpiNormSpectral{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     arr .= 0
@@ -122,12 +136,12 @@ function update_grad(cone::EpiNormSpectral)
     @assert cone.is_feas
     u = cone.point[1]
 
-    ldiv!(cone.ZiW, cone.fact_Z, cone.W)
+    ldiv!(cone.tau, cone.fact_Z, cone.W)
     cone.Zi = Hermitian(inv(cone.fact_Z), :U) # TODO only need trace of inverse here, which we can get from the cholesky factor - if cheap, don't do the inverse until needed in the hessian
     cone.grad[1] = -u * tr(cone.Zi)
-    @views vec_copy_to!(cone.grad[2:end], cone.ZiW)
+    @views vec_copy_to!(cone.grad[2:end], cone.tau)
     cone.grad .*= 2
-    cone.grad[1] += (cone.n - 1) / u
+    cone.grad[1] += (cone.d1 - 1) / u
 
     cone.grad_updated = true
     return cone.grad
@@ -138,10 +152,10 @@ function update_hess_prod(cone::EpiNormSpectral)
     u = cone.point[1]
     HuW = cone.HuW
 
-    copyto!(HuW, cone.ZiW)
+    copyto!(HuW, cone.tau)
     HuW .*= -4 * u
     ldiv!(cone.fact_Z, HuW)
-    cone.Huu = 4 * abs2(u) * sum(abs2, cone.Zi) + (cone.grad[1] - 2 * (cone.n - 1) / u) / u
+    cone.Huu = 4 * abs2(u) * sum(abs2, cone.Zi) + (cone.grad[1] - 2 * (cone.d1 - 1) / u) / u
 
     cone.hess_prod_updated = true
     return
@@ -156,13 +170,13 @@ function update_hess(cone::EpiNormSpectral)
     u = cone.point[1]
     W = cone.W
     Zi = cone.Zi
-    ZiW = cone.ZiW
-    tmpmm = cone.tmpmm
+    tau = cone.tau
+    Wtau = cone.Wtau
     H = cone.hess.data
 
     # H_W_W part
-    copyto!(tmpmm, I)
-    mul!(tmpmm, W', ZiW, true, true)
+    copyto!(Wtau, I)
+    mul!(Wtau, W', tau, true, true)
 
     # TODO parallelize loops
     idx_incr = (cone.is_complex ? 2 : 1)
@@ -170,12 +184,12 @@ function update_hess(cone::EpiNormSpectral)
     for i in 1:m, j in 1:n
         c_idx = r_idx
         @inbounds for k in i:m
-            ZiWjk = ZiW[j, k]
-            tmpmmik = tmpmm[i, k]
+            taujk = tau[j, k]
+            Wtauik = Wtau[i, k]
             lstart = (i == k ? j : 1)
             @inbounds for l in lstart:n
-                term1 = Zi[l, j] * tmpmmik
-                term2 = ZiW[l, i] * ZiWjk
+                term1 = Zi[l, j] * Wtauik
+                term2 = tau[l, i] * taujk
                 hess_element(H, r_idx, c_idx, term1, term2)
                 c_idx += idx_incr
             end
@@ -188,6 +202,8 @@ function update_hess(cone::EpiNormSpectral)
     @views vec_copy_to!(H[1, 2:end], cone.HuW)
     H[1, 1] = cone.Huu
 
+    copyto!(cone.old_hess.data, H)
+
     cone.hess_updated = true
     return cone.hess
 end
@@ -198,26 +214,26 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNorm
     end
     u = cone.point[1]
     W = cone.W
-    tmpnm = cone.tmpnm
-    tmpnn = cone.tmpnn
+    tmpd1d2 = cone.tmpd1d2
+    tmpd1d1 = cone.tmpd1d1
 
     @inbounds for j in 1:size(prod, 2)
         arr_1j = arr[1, j]
-        @views vec_copy_to!(tmpnm, arr[2:end, j])
+        @views vec_copy_to!(tmpd1d2, arr[2:end, j])
 
-        prod[1, j] = cone.Huu * arr_1j + real(dot(cone.HuW, tmpnm))
+        prod[1, j] = cone.Huu * arr_1j + real(dot(cone.HuW, tmpd1d2))
 
-        # prod_2j = 2 * cone.fact_Z \ (((tmpnm * W' + W * tmpnm' - (2 * u * arr_1j) * I) / cone.fact_Z) * W + tmpnm)
-        mul!(tmpnn, tmpnm, W')
+        # prod_2j = 2 * cone.fact_Z \ (((tmpd1d2 * W' + W * tmpd1d2' - (2 * u * arr_1j) * I) / cone.fact_Z) * W + tmpd1d2)
+        mul!(tmpd1d1, tmpd1d2, W')
         @inbounds for j in 1:cone.n
             @inbounds for i in 1:j
-                tmpnn[i, j] += tmpnn[j, i]'
+                tmpd1d1[i, j] += tmpd1d1[j, i]'
             end
-            tmpnn[j, j] -= 2 * u * arr_1j
+            tmpd1d1[j, j] -= 2 * u * arr_1j
         end
-        mul!(tmpnm, Hermitian(tmpnn, :U), cone.ZiW, 2, 2)
-        ldiv!(cone.fact_Z, tmpnm)
-        @views vec_copy_to!(prod[2:end, j], tmpnm)
+        mul!(tmpd1d2, Hermitian(tmpd1d1, :U), cone.tau, 2, 2)
+        ldiv!(cone.fact_Z, tmpd1d2)
+        @views vec_copy_to!(prod[2:end, j], tmpd1d2)
     end
 
     return prod
