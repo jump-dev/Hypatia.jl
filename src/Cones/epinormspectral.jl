@@ -101,7 +101,7 @@ function setup_data(cone::EpiNormSpectral{T, R}) where {R <: RealOrComplex{T}} w
     return
 end
 
-get_nu(cone::EpiNormSpectral) = cone.n + 1
+get_nu(cone::EpiNormSpectral) = cone.d1 + 1
 
 use_correction(cone::EpiNormSpectral) = true
 
@@ -166,8 +166,8 @@ function update_hess(cone::EpiNormSpectral)
     if !cone.hess_prod_updated
         update_hess_prod(cone)
     end
-    n = cone.n
-    m = cone.m
+    d1 = cone.d1
+    d2 = cone.d2
     u = cone.point[1]
     W = cone.W
     Zi = cone.Zi
@@ -182,13 +182,13 @@ function update_hess(cone::EpiNormSpectral)
     # TODO parallelize loops
     idx_incr = (cone.is_complex ? 2 : 1)
     r_idx = 2
-    for i in 1:m, j in 1:n
+    for i in 1:d2, j in 1:d1
         c_idx = r_idx
-        @inbounds for k in i:m
+        @inbounds for k in i:d2
             taujk = tau[j, k]
             Wtauik = Wtau[i, k]
             lstart = (i == k ? j : 1)
-            @inbounds for l in lstart:n
+            @inbounds for l in lstart:d1
                 term1 = Zi[l, j] * Wtauik
                 term2 = tau[l, i] * taujk
                 hess_element(H, r_idx, c_idx, term1, term2)
@@ -226,7 +226,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNorm
 
         # prod_2j = 2 * cone.fact_Z \ (((tmpd1d2 * W' + W * tmpd1d2' - (2 * u * arr_1j) * I) / cone.fact_Z) * W + tmpd1d2)
         mul!(tmpd1d1, tmpd1d2, W')
-        @inbounds for j in 1:cone.n
+        @inbounds for j in 1:cone.d1
             @inbounds for i in 1:j
                 tmpd1d1[i, j] += tmpd1d1[j, i]'
             end
@@ -238,4 +238,83 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNorm
     end
 
     return prod
+end
+
+using ForwardDiff
+
+function correction(
+    cone::EpiNormSpectral{T},
+    primal_dir::AbstractVector{T},
+    dual_dir::AbstractVector{T},
+    ) where {T <: Real}
+
+    dim = cone.dim
+    d1 = cone.d1
+    d2 = cone.d2
+    u = cone.point[1]
+    W = cone.W
+    third = zeros(T, cone.dim, cone.dim, cone.dim)
+
+    # TODO use stored fields
+    Z = abs2(u) * I - W * W'
+    Zi = inv(Z)
+    tau = Z \ W
+    Wtau = W' * tau
+    Zi2 = Zi ^ 2
+    Zi2W = (Z ^ 2) \ W
+    Zi3W = (Z ^ 3) \ W
+    WZi2W = W' * Zi ^ 2 * W
+
+    # Tuuu
+    third[1, 1, 1] = 6 * u * tr(Zi ^ 2) - 8 * u ^ 3 * tr(Zi ^ 3) + (d1 - 1) / u ^ 3
+
+    idx1 = 1
+    for j in 1:d2, i in 1:d1
+        idx1 += 1
+        # Tuuw
+        third[1, 1, idx1] = third[1, idx1, 1] = third[idx1, 1, 1] = 8 * abs2(u) * Zi3W[i, j] - 2 * Zi2W[i, j]
+        idx2 = 1
+        for l in 1:d2, k in 1:d1
+            idx2 += 1
+            idx2 >= idx1 || continue
+            # Tuww
+            t1 = -2 * u * Zi2[k, i] * Wtau[j, l] + Zi[k, i] * WZi2W[j, l] * (-2 * u) +
+                -2 * u * (tau[k, j] * Zi2W[i, l] + Zi2W[k, j] * tau[i, l])
+            if j == l
+                t1 -= 2 * u * Zi2[i, k]
+            end
+            third[1, idx1, idx2] = third[1, idx2, idx1] = third[idx1, 1, idx2] =
+                third[idx2, 1, idx1] = third[idx1, idx2, 1] = third[idx2, idx1, 1] = t1
+            idx3 = 1
+            # Twww
+            for n in 1:d2, m in 1:d1
+                idx3 += 1
+                idx3 >= idx2 || continue
+                dZki_dwmn = tau[k, n] * Zi[m, i] + tau[i, n] * Zi[m, k]
+                dwtaujl_dwmn = tau[m, j] * Wtau[l, n] + tau[m, l] * Wtau[j, n]
+                dZik_dmn = 2 * tau[i, n] * Zi[m, k]
+                dtauil_dwmn = Zi[m, i] * Wtau[l, n] + tau[m, l] * tau[i, n]
+                dtaukj_dwmn = Zi[m, k] * Wtau[j, n] + tau[m, j] * tau[k, n]
+                t1 = dZki_dwmn * Wtau[j, l] + Zi[k, i] * dwtaujl_dwmn + tau[k, j] * dtauil_dwmn + dtaukj_dwmn * tau[i, l]
+                if j == l
+                    t1 += Zi[m, k] * tau[i, n] + Zi[m, i] * tau[k, n]
+                end
+                if l == n
+                    t1 += Zi[k, i] * tau[m, j] + Zi[i, m] * tau[k, j]
+                end
+                if j == n
+                    t1 += Zi[k, i] * tau[m, l] + Zi[k, m] * tau[i, l]
+                end
+                third[idx1, idx2, idx3] = third[idx1, idx3, idx2] = third[idx2, idx1, idx3] =
+                    third[idx2, idx3, idx1] = third[idx3, idx1, idx2] = third[idx3, idx2, idx1] = t1
+            end
+        end
+    end
+    third *= -1
+
+    third_order = reshape(third, cone.dim^2, cone.dim)
+    Hi_z = Symmetric(cone.old_hess) \ dual_dir
+    cone.correction .= reshape(third_order * primal_dir, cone.dim, cone.dim) * Hi_z
+
+    return cone.correction
 end
