@@ -278,13 +278,12 @@ function correction(
             idx2 += 1
             idx2 >= idx1 || continue
             # Tuww
-            t1 = -2 * u * Zi2[k, i] * Wtau[j, l] + Zi[k, i] * WZi2W[j, l] * (-2 * u) +
-                -2 * u * (tau[k, j] * Zi2W[i, l] + Zi2W[k, j] * tau[i, l])
+            Tuww = -2 * u * (Zi2[k, i] * Wtau[j, l] + Zi[k, i] * WZi2W[j, l] + tau[k, j] * Zi2W[i, l] + Zi2W[k, j] * tau[i, l])
             if j == l
-                t1 -= 2 * u * Zi2[i, k]
+                Tuww -= 2 * u * Zi2[i, k]
             end
             third[1, idx1, idx2] = third[1, idx2, idx1] = third[idx1, 1, idx2] =
-                third[idx2, 1, idx1] = third[idx1, idx2, 1] = third[idx2, idx1, 1] = t1
+                third[idx2, 1, idx1] = third[idx1, idx2, 1] = third[idx2, idx1, 1] = Tuww
             idx3 = 1
             # Twww
             for n in 1:d2, m in 1:d1
@@ -295,18 +294,18 @@ function correction(
                 dZik_dmn = 2 * tau[i, n] * Zi[m, k]
                 dtauil_dwmn = Zi[m, i] * Wtau[l, n] + tau[m, l] * tau[i, n]
                 dtaukj_dwmn = Zi[m, k] * Wtau[j, n] + tau[m, j] * tau[k, n]
-                t1 = dZki_dwmn * Wtau[j, l] + Zi[k, i] * dwtaujl_dwmn + tau[k, j] * dtauil_dwmn + dtaukj_dwmn * tau[i, l]
+                Twww = dZki_dwmn * Wtau[j, l] + Zi[k, i] * dwtaujl_dwmn + tau[k, j] * dtauil_dwmn + dtaukj_dwmn * tau[i, l]
                 if j == l
-                    t1 += Zi[m, k] * tau[i, n] + Zi[m, i] * tau[k, n]
+                    Twww += Zi[m, k] * tau[i, n] + Zi[m, i] * tau[k, n]
                 end
                 if l == n
-                    t1 += Zi[k, i] * tau[m, j] + Zi[i, m] * tau[k, j]
+                    Twww += Zi[k, i] * tau[m, j] + Zi[i, m] * tau[k, j]
                 end
                 if j == n
-                    t1 += Zi[k, i] * tau[m, l] + Zi[k, m] * tau[i, l]
+                    Twww += Zi[k, i] * tau[m, l] + Zi[k, m] * tau[i, l]
                 end
                 third[idx1, idx2, idx3] = third[idx1, idx3, idx2] = third[idx2, idx1, idx3] =
-                    third[idx2, idx3, idx1] = third[idx3, idx1, idx2] = third[idx3, idx2, idx1] = t1
+                    third[idx2, idx3, idx1] = third[idx3, idx1, idx2] = third[idx3, idx2, idx1] = Twww
             end
         end
     end
