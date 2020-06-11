@@ -46,9 +46,12 @@ mutable struct EpiNormSpectral{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     tau::Matrix{R}
     HuW::Matrix{R}
     Huu::T
+    trZi2::T
     Wtau::Matrix{R}
+    Zitau::Matrix{R}
     tmpd1d2::Matrix{R}
     tmpd1d1::Matrix{R}
+    tmpd2d2::Matrix{R}
 
     correction::Vector{T}
 
@@ -95,8 +98,10 @@ function setup_data(cone::EpiNormSpectral{T, R}) where {R <: RealOrComplex{T}} w
     cone.tau = Matrix{R}(undef, cone.d1, cone.d2)
     cone.HuW = Matrix{R}(undef, cone.d1, cone.d2)
     cone.Wtau = Matrix{R}(undef, cone.d2, cone.d2)
+    cone.Zitau = Matrix{R}(undef, cone.d1, cone.d2)
     cone.tmpd1d2 = Matrix{R}(undef, cone.d1, cone.d2)
     cone.tmpd1d1 = Matrix{R}(undef, cone.d1, cone.d1)
+    cone.tmpd2d2 = Matrix{R}(undef, cone.d2, cone.d2)
     cone.correction = zeros(T, dim)
     return
 end
@@ -151,12 +156,13 @@ end
 function update_hess_prod(cone::EpiNormSpectral)
     @assert cone.grad_updated
     u = cone.point[1]
-    HuW = cone.HuW
+    Zitau = cone.Zitau
 
-    copyto!(HuW, cone.tau)
-    HuW .*= -4 * u
-    ldiv!(cone.fact_Z, HuW)
-    cone.Huu = 4 * abs2(u) * sum(abs2, cone.Zi) + (cone.grad[1] - 2 * (cone.d1 - 1) / u) / u
+    copyto!(Zitau, cone.tau)
+    ldiv!(cone.fact_Z, Zitau)
+    @. cone.HuW = -4 * u * Zitau
+    cone.trZi2 = sum(abs2, cone.Zi)
+    cone.Huu = 4 * abs2(u) * cone.trZi2 + (cone.grad[1] - 2 * (cone.d1 - 1) / u) / u
 
     cone.hess_prod_updated = true
     return
@@ -255,30 +261,33 @@ function correction(
     W = cone.W
     third = zeros(T, cone.dim, cone.dim, cone.dim)
 
+    Zi = cone.Zi
+    tau = cone.tau
     # TODO use stored fields
-    Z = abs2(u) * I - W * W'
-    Zi = inv(Z)
-    tau = Z \ W
-    Wtau = W' * tau
     Zi2 = Zi ^ 2
-    Zi2W = (Z ^ 2) \ W
-    Zi3W = (Z ^ 3) \ W
-    WZi2W = W' * Zi ^ 2 * W
+    Wtau = W' * tau
+
+    Zitau = cone.Zitau
+    Zi2tau = cone.tmpd1d2
+    copyto!(Zi2tau, Zitau)
+    ldiv!(cone.fact_Z, Zi2tau)
+    WZi2W = cone.tmpd2d2
+    mul!(WZi2W, W', Zitau)
 
     # Tuuu
-    third[1, 1, 1] = 6 * u * tr(Zi ^ 2) - 8 * u ^ 3 * tr(Zi ^ 3) + (d1 - 1) / u ^ 3
+    third[1, 1, 1] = 6 * u * cone.trZi2 - 8 * u ^ 3 * sum(x -> x ^ 3, cone.Zi) + (d1 - 1) / u ^ 3
 
     idx1 = 1
     for j in 1:d2, i in 1:d1
         idx1 += 1
         # Tuuw
-        third[1, 1, idx1] = third[1, idx1, 1] = third[idx1, 1, 1] = 8 * abs2(u) * Zi3W[i, j] - 2 * Zi2W[i, j]
+        third[1, 1, idx1] = third[1, idx1, 1] = third[idx1, 1, 1] = 8 * abs2(u) * Zi2tau[i, j] - 2 * Zitau[i, j]
         idx2 = 1
         for l in 1:d2, k in 1:d1
             idx2 += 1
             idx2 >= idx1 || continue
             # Tuww
-            Tuww = -2 * u * (Zi2[k, i] * Wtau[j, l] + Zi[k, i] * WZi2W[j, l] + tau[k, j] * Zi2W[i, l] + Zi2W[k, j] * tau[i, l])
+            Tuww = -2 * u * (Zi2[k, i] * Wtau[j, l] + Zi[k, i] * WZi2W[j, l] + tau[k, j] * Zitau[i, l] + Zitau[k, j] * tau[i, l])
             if j == l
                 Tuww -= 2 * u * Zi2[i, k]
             end
@@ -309,11 +318,11 @@ function correction(
             end
         end
     end
-    third *= -1
 
     third_order = reshape(third, cone.dim^2, cone.dim)
     Hi_z = Symmetric(cone.old_hess) \ dual_dir
     cone.correction .= reshape(third_order * primal_dir, cone.dim, cone.dim) * Hi_z
+    cone.correction *= -1
 
     return cone.correction
 end
