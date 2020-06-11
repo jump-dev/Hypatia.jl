@@ -48,6 +48,7 @@ mutable struct HypoGeomean{T <: Real} <: Cone{T}
         max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
+        @assert !use_dual # TODO delete later
         dim = length(alpha) + 1
         @assert dim >= 2
         @assert all(ai > 0 for ai in alpha)
@@ -86,7 +87,7 @@ get_nu(cone::HypoGeomean) = cone.dim
 
 use_correction(cone::HypoGeomean) = true
 
-use_scaling(cone::HypoGeomean) = false
+use_scaling(cone::HypoGeomean) = true
 
 rescale_point(cone::HypoGeomean{T}, s::T) where {T} = (cone.point .*= s)
 
@@ -121,7 +122,7 @@ function update_feas(cone::HypoGeomean)
     return cone.is_feas
 end
 
-function update_dual_feas(cone::HypoGeomean{T}) where {T <: Real}
+function update_dual_feas(cone::HypoGeomean)
     u = cone.dual_point[1]
     w = view(cone.dual_point, 2:cone.dim)
     alpha = cone.alpha

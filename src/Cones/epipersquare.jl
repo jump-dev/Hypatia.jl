@@ -43,6 +43,7 @@ mutable struct EpiPerSquare{T <: Real} <: Cone{T}
         use_dual::Bool = false, # TODO self-dual so maybe remove this option/field?
         max_neighborhood::Real = default_max_neighborhood(),
         ) where {T <: Real}
+        @assert !use_dual # TODO delete later
         @assert dim >= 3
         cone = new{T}()
         cone.use_dual_barrier = use_dual

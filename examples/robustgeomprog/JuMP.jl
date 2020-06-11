@@ -25,7 +25,7 @@ example_tests(::Type{RobustGeomProgJuMP{Float64}}, ::MinimalInstances) = [
     ]
 example_tests(::Type{RobustGeomProgJuMP{Float64}}, ::FastInstances) = [
     ((5, 10),),
-    ((5, 10), ClassicConeOptimizer),
+    # ((5, 10), ClassicConeOptimizer),
     ((10, 20),),
     ((20, 40),),
     ((40, 80),),

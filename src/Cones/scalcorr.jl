@@ -57,7 +57,7 @@ function update_scal_hess(
             # scal_hess += Symmetric(za * za')
             # gb = inv(sqrt(nu)) * g
             # BLAS.syr!('U', -inv(nu), g, scal_hess.data)
-            outer_prod1(g, scal_hess.data, -inv(nu))
+            outer_prod1(g, scal_hess.data, -inv(T(nu)))
             # scal_hess -= Symmetric(gb * gb')
             # if norm(scal_hess * rtmu * s - z) > 1e-4
             #     println("large residual after 1st update on norm(scal_hess * s - z): $(norm(scal_hess * s - z))")

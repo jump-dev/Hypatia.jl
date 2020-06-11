@@ -117,7 +117,8 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
 
     rtmu = sqrt(solver.mu)
     irtmu = inv(rtmu)
-    @assert irtmu >= one(T)
+    # @show irtmu
+    # @assert irtmu >= one(T)
     Cones.load_point.(cones, point.primal_views)
     Cones.rescale_point.(cones, irtmu)
     Cones.load_dual_point.(cones, point.dual_views)
@@ -126,23 +127,16 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     Cones.grad.(cones)
     Cones.hess.(cones)
 
-    # update linear system solver factorization and helpers
-    @timeit timer "update_lhs" update_lhs(solver.system_solver, solver)
+    update_lhs(solver.system_solver, solver)
 
-    # calculate affine/prediction direction and keep in dir
-    @timeit timer "rhs_aff" update_rhs_affine(stepper, solver)
-    @timeit timer "dir_aff" get_directions(stepper, solver, iter_ref_steps = 3)
-    # @show stepper.dir
+    update_rhs_pred(stepper, solver)
+    get_directions(stepper, solver, iter_ref_steps = 3)
 
-    @timeit timer "rhs_corr" update_rhs_corr(stepper, solver, stepper.prev_aff_alpha)
-    @timeit timer "dir_corr" get_directions(stepper, solver, iter_ref_steps = 3)
-    # @show stepper.dir
+    update_rhs_predcorr(stepper, solver, stepper.prev_aff_alpha)
+    get_directions(stepper, solver, iter_ref_steps = 3)
 
-    # get alpha for affine direction
-    @timeit timer "alpha_aff" stepper.prev_aff_alpha = aff_alpha = find_max_alpha(
-        stepper, solver, true, prev_alpha = stepper.prev_aff_alpha, min_alpha = T(1e-2))
-    # @show aff_alpha
-    # calculate correction factor gamma
+    stepper.prev_aff_alpha = aff_alpha = find_max_alpha(stepper, solver, true, prev_alpha = stepper.prev_aff_alpha, min_alpha = T(1e-2))
+
     # stepper.prev_gamma = gamma = (one(T) - aff_alpha) * min(abs2(one(T) - aff_alpha), T(0.25))
     stepper.prev_gamma = gamma = (one(T) - aff_alpha)^2
     # if aff_alpha < 0.1
@@ -160,23 +154,17 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     Cones.grad.(cones)
     Cones.hess.(cones)
 
-    # calculate final direction and keep in dir
-    @timeit timer "rhs_final" update_rhs_final(stepper, solver, aff_alpha, gamma)
-    @timeit timer "dir_final" get_directions(stepper, solver, iter_ref_steps = 5)
-    # @show stepper.dir
+    update_rhs_comb(stepper, solver, aff_alpha, gamma)
+    get_directions(stepper, solver, iter_ref_steps = 5)
 
-    # find distance alpha for stepping in combined direction
-    @timeit timer "alpha_comb" alpha = find_max_alpha(
-        stepper, solver, false, prev_alpha = stepper.prev_alpha, min_alpha = T(1e-3))
+    alpha = find_max_alpha(stepper, solver, false, prev_alpha = stepper.prev_alpha, min_alpha = T(1e-3))
     if iszero(alpha)
         @warn("very small alpha")
         solver.status = :NumericalFailure
         return false
     end
     stepper.prev_alpha = alpha
-    # @show alpha
 
-    # step distance alpha in combined direction
     @. point.x += alpha * stepper.x_dir
     @. point.y += alpha * stepper.y_dir
     @. point.z += alpha * stepper.z_dir
@@ -191,11 +179,11 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
         return false
     end
 
-    return true # step succeeded
+    return true
 end
 
 # update the RHS for affine direction
-function update_rhs_affine(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
+function update_rhs_pred(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     rhs = stepper.rhs
 
     # x, y, z, tau
@@ -217,7 +205,7 @@ function update_rhs_affine(stepper::CombinedStepper{T}, solver::Solver{T}) where
 end
 
 # update the RHS for affine-corr direction
-function update_rhs_corr(stepper::CombinedStepper{T}, solver::Solver{T}, prev_aff_alpha::T) where {T <: Real}
+function update_rhs_predcorr(stepper::CombinedStepper{T}, solver::Solver{T}, prev_aff_alpha::T) where {T <: Real}
     rhs = stepper.rhs
 
     # x, y, z, tau
@@ -247,7 +235,7 @@ function update_rhs_corr(stepper::CombinedStepper{T}, solver::Solver{T}, prev_af
 end
 
 # update the RHS for combined direction
-function update_rhs_final(stepper::CombinedStepper{T}, solver::Solver{T}, aff_alpha::T, gamma::T) where {T <: Real}
+function update_rhs_comb(stepper::CombinedStepper{T}, solver::Solver{T}, aff_alpha::T, gamma::T) where {T <: Real}
     rhs = stepper.rhs
 
     # x, y, z, tau
@@ -289,46 +277,44 @@ function get_directions(stepper::CombinedStepper{T}, solver::Solver{T}; iter_ref
     system_solver = solver.system_solver
     timer = solver.timer
 
-    @timeit timer "solve_system" solve_system(system_solver, solver, dir, rhs)
+    solve_system(system_solver, solver, dir, rhs)
 
     # use iterative refinement
-    @timeit timer "iter_ref" begin
-        copyto!(dir_temp, dir)
-        @timeit timer "apply_lhs" res = apply_lhs(stepper, solver) # modifies res
+    copyto!(dir_temp, dir)
+    res = apply_lhs(stepper, solver) # modifies res
+    res .-= rhs
+    norm_inf = norm(res, Inf)
+    norm_2 = norm(res, 2)
+
+    for i in 1:iter_ref_steps
+        # @show norm_inf
+        if norm_inf < 100 * eps(T) # TODO change tolerance dynamically
+            break
+        end
+        solve_system(system_solver, solver, dir, res)
+        axpby!(true, dir_temp, -1, dir)
+        res = apply_lhs(stepper, solver) # modifies res
         res .-= rhs
-        norm_inf = norm(res, Inf)
-        norm_2 = norm(res, 2)
 
-        for i in 1:iter_ref_steps
-            # @show norm_inf
-            if norm_inf < 100 * eps(T) # TODO change tolerance dynamically
-                break
-            end
-            @timeit timer "solve_system" solve_system(system_solver, solver, dir, res)
-            axpby!(true, dir_temp, -1, dir)
-            res = apply_lhs(stepper, solver) # modifies res
-            res .-= rhs
-
-            norm_inf_new = norm(res, Inf)
-            norm_2_new = norm(res, 2)
-            if norm_inf_new > norm_inf || norm_2_new > norm_2
-                # residual has not improved
-                copyto!(dir, dir_temp)
-                break
-            end
-
-            # residual has improved, so use the iterative refinement
-            # TODO only print if using debug mode
-            # solver.verbose && @printf("iter ref round %d norms: inf %9.2e to %9.2e, two %9.2e to %9.2e\n", i, norm_inf, norm_inf_new, norm_2, norm_2_new)
-            copyto!(dir_temp, dir)
-            norm_inf = norm_inf_new
-            norm_2 = norm_2_new
+        norm_inf_new = norm(res, Inf)
+        norm_2_new = norm(res, 2)
+        if norm_inf_new > norm_inf || norm_2_new > norm_2
+            # residual has not improved
+            copyto!(dir, dir_temp)
+            break
         end
 
-        @assert !isnan(norm_inf)
-        if norm_inf > 1e-5
-            println("residual on direction too large: $norm_inf")
-        end
+        # residual has improved, so use the iterative refinement
+        # TODO only print if using debug mode
+        # solver.verbose && @printf("iter ref round %d norms: inf %9.2e to %9.2e, two %9.2e to %9.2e\n", i, norm_inf, norm_inf_new, norm_2, norm_2_new)
+        copyto!(dir_temp, dir)
+        norm_inf = norm_inf_new
+        norm_2 = norm_2_new
+    end
+
+    @assert !isnan(norm_inf)
+    if norm_inf > 1e-5
+        println("residual on direction too large: $norm_inf")
     end
 
     return dir

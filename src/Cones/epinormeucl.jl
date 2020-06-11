@@ -45,6 +45,7 @@ mutable struct EpiNormEucl{T <: Real} <: Cone{T}
         max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
+        @assert !use_dual # TODO delete later
         @assert dim >= 2
         cone = new{T}()
         cone.use_dual_barrier = use_dual

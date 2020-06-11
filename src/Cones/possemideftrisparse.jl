@@ -75,6 +75,7 @@ mutable struct PosSemidefTriSparse{T <: BlasReal, R <: RealOrComplex{T}} <: Cone
         max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {R <: RealOrComplex{T}} where {T <: BlasReal}
+        @assert !use_dual # TODO delete later
         # check validity of inputs
         num_nz = length(row_idxs)
         @assert length(col_idxs) == num_nz
