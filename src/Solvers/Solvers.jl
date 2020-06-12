@@ -372,20 +372,20 @@ function check_convergence(solver::Solver{T}) where {T <: Real}
         return true
     end
 
-    # prev_worst_res = solver.prev_worst_res
-    # worst_res = solver.prev_worst_res = max(solver.gap, solver.x_feas, solver.y_feas, solver.z_feas)
-    # if (prev_worst_res - worst_res) / prev_worst_res < solver.tol_slow
-    #     if solver.prev_is_slow
-    #         solver.verbose && println("slow progress in consecutive iterations; terminating")
-    #         solver.status = :SlowProgress
-    #         return true
-    #     else
-    #         solver.prev_is_slow = true
-    #         solver.verbose && println("worst residual did not improve significantly")
-    #     end
-    # else
-    #     solver.prev_is_slow = false
-    # end
+    prev_worst_res = solver.prev_worst_res
+    worst_res = solver.prev_worst_res = max(solver.gap, solver.x_feas, solver.y_feas, solver.z_feas)
+    if (prev_worst_res - worst_res) / prev_worst_res < solver.tol_slow
+        if solver.prev_is_slow
+            solver.verbose && println("slow progress in consecutive iterations; terminating")
+            solver.status = :SlowProgress
+            return true
+        else
+            solver.prev_is_slow = true
+            solver.verbose && println("worst residual did not improve significantly")
+        end
+    else
+        solver.prev_is_slow = false
+    end
 
     return false
 end

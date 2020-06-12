@@ -121,7 +121,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
     return prod
 end
 
-function update_hess_fact(cone::Cone{T}; recover::Bool = true) where {T <: Real}
+function update_hess_fact(cone::Cone{T}; recover::Bool = false) where {T <: Real}
     cone.hess_fact_updated && return true
     if !cone.hess_updated
         update_hess(cone)
@@ -217,7 +217,8 @@ function in_neighborhood_sy(cone::Cone{T}, mu::Real) where {T <: Real}
     irtmu = inv(sqrt(mu))
     g = grad(cone)
     dp = copy(cone.dual_point)
-    dp *= irtmu
+    # dp *= irtmu
+    # dp *= inv(mu)
 
     # TODO trying to see if ray intersects dikin ellipsoid
     # TODO find point on ray closest to g in the hessian norm
@@ -227,7 +228,11 @@ function in_neighborhood_sy(cone::Cone{T}, mu::Real) where {T <: Real}
     if gdp > 0
         return false
     end
-    dp .*= -gdp / sum(abs2, dp)
+
+    # scal = -gdp / sum(abs2, dp)
+    # dp .*= scal
+    # @show scal
+
     @. nbhd_tmp = dp + g
 
     # if use_heuristic_neighborhood(cone)
@@ -257,8 +262,8 @@ function in_neighborhood_sy(cone::Cone{T}, mu::Real) where {T <: Real}
     # return (nbhd < mu * cone.max_neighborhood)
     # return (nbhd < 0.5 * mu)
     # @show nbhd
-    # return (nbhd < T(0.7))
-    return (nbhd < T(1))
+    return (nbhd < T(0.7))
+    # return (nbhd < T(1))
 end
 
 # in_neighborhood_sy(cone::Cone, mu::Real) = true

@@ -284,7 +284,6 @@ function update_lhs(system_solver::NaiveDenseSystemSolver, solver::Solver)
         # end
     end
     system_solver.lhs6[end, system_solver.tau_row] = solver.kap / solver.tau
-
     @timeit solver.timer "update_fact" update_fact(system_solver.fact_cache, system_solver.lhs6)
 
     return system_solver

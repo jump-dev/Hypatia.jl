@@ -63,7 +63,7 @@ mutable struct EpiNormSpectral{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
         max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {R <: RealOrComplex{T}} where {T <: Real}
-        @assert !use_dual # TODO delete later
+        # @assert !use_dual # TODO delete later
         @assert 1 <= d1 <= d2
         cone = new{T, R}()
         cone.use_dual_barrier = use_dual
@@ -137,6 +137,8 @@ function update_feas(cone::EpiNormSpectral)
     cone.feas_updated = true
     return cone.is_feas
 end
+
+update_dual_feas(cone::EpiNormSpectral) = true
 
 # function update_dual_feas(cone::EpiNormSpectral)
 #     u = cone.dual_point[1]

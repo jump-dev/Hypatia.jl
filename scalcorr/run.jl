@@ -12,8 +12,10 @@ using TimerOutputs
 
 struct ExpInstances <: InstanceSet end
 struct GeomeanInstances <: InstanceSet end
+struct GeomeanInfInstances <: InstanceSet end
 struct EntropyInstances <: InstanceSet end
 struct PolyhedralInstances <: InstanceSet end
+struct WSOSGeomeanInstances <: InstanceSet end
 
 # run_in_bf = true
 run_in_bf = false
@@ -25,8 +27,8 @@ default_solver_options = (
     verbose = true,
     iter_limit = 100,
     timer = timer,
-    # system_solver = Solvers.NaiveDenseSystemSolver{Float64}(),
-    system_solver = Solvers.QRCholDenseSystemSolver{Float64}(),
+    system_solver = Solvers.NaiveDenseSystemSolver{Float64}(),
+    # system_solver = Solvers.QRCholDenseSystemSolver{Float64}(),
     # max_nbhd = 0.02,
     tol_rel_opt = tol,
     tol_abs_opt = tol,
@@ -37,21 +39,23 @@ default_solver_options = (
 instance_sets = [
     # (FastInstances, Float64, 60),
     # (ExpInstances, Float64, 60),
-    (GeomeanInstances, Float64, 60),
+    # (GeomeanInstances, Float64, 60),
+    # (GeomeanInfInstances, Float64, 60),
+    # (WSOSGeomeanInstances, Float64, 60),
     (EntropyInstances, Float64, 60),
-    (PolyhedralInstances, Float64, 60),
+    # (PolyhedralInstances, Float64, 60),
     ]
 
 # types of models to run and corresponding options and example names
 model_types = [
-    # "native",
+    "native",
     "JuMP",
     ]
 
 # list of names of native examples to run
 native_example_names = [
     # "densityest",
-    "linearopt",
+    # "linearopt",
     ]
 
 # list of names of JuMP examples to run

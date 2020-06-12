@@ -241,7 +241,8 @@ function epinorminf1(T; options...)
 end
 
 function epinorminf2(T; options...)
-    tol = 10 * sqrt(sqrt(eps(T)))
+    # tol = 10 * sqrt(sqrt(eps(T)))
+    tol = 1e-4
     l = 3
     L = 2l + 1
     c = collect(T, -l:l)
@@ -269,7 +270,7 @@ function epinorminf3(T; options...)
     G = Diagonal(-one(T) * I, 6)
     h = zeros(T, 6)
 
-    for use_dual in (false,) # TODO (true, false)
+    for use_dual in (true, false)
         cones = Cone{T}[Cones.EpiNormInf{T, T}(6, use_dual = use_dual)]
 
         r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
@@ -280,7 +281,8 @@ function epinorminf3(T; options...)
 end
 
 function epinorminf4(T; options...)
-    tol = sqrt(sqrt(eps(T)))
+    # tol = sqrt(sqrt(eps(T)))
+    tol = 1e-4
     c = T[0, 1, -1]
     A = T[1 0 0; 0 1 0]
     b = T[1, -0.4]
@@ -296,7 +298,8 @@ function epinorminf4(T; options...)
 end
 
 function epinorminf5(T; options...)
-    tol = sqrt(sqrt(eps(T)))
+    # tol = sqrt(sqrt(eps(T)))
+    tol = 1e-4
     Random.seed!(1)
     c = T[1, 0, 0, 0, 0, 0]
     A = rand(T(-9):T(9), 3, 6)
@@ -333,7 +336,7 @@ function epinorminf7(T; options...)
     G = Diagonal(-one(T) * I, 7)
     h = zeros(T, 7)
 
-    for use_dual in (false,) # TODO (true, false)
+    for use_dual in (true, false)
         cones = Cone{T}[Cones.EpiNormInf{T, Complex{T}}(7, use_dual = use_dual)]
 
         r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
@@ -721,7 +724,7 @@ function hypogeomean1(T; options...)
     G = Matrix{T}(-I, 3, 3)
     h = zeros(T, 3)
 
-    for use_dual in (false,) # TODO (true, false)
+    for use_dual in (true, false)
         cones = Cone{T}[Cones.HypoGeomean{T}(ones(T, 2) / 2, use_dual = use_dual)]
 
         r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
@@ -740,7 +743,7 @@ function hypogeomean2(T; options...)
     G = SparseMatrixCSC(-one(T) * I, l + 1, l + 1)
     h = zeros(T, l + 1)
 
-    for use_dual in (false,) # TODO (true, false)
+    for use_dual in (true, false)
         b = use_dual ? [-one(T)] : [one(T)]
         cones = Cone{T}[Cones.HypoGeomean{T}(fill(inv(T(l)), l), use_dual = use_dual)]
 
@@ -761,7 +764,7 @@ function hypogeomean3(T; options...)
     G = [zeros(T, 1, l); Matrix{T}(-I, l, l)]
     h = zeros(T, l + 1)
 
-    for use_dual in (false,) # TODO (true, false)
+    for use_dual in (true, false)
         cones = Cone{T}[Cones.HypoGeomean{T}(fill(inv(T(l)), l), use_dual = use_dual)]
 
         r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
@@ -835,7 +838,7 @@ function power1(T; options...)
     G = Matrix{T}(-I, 3, 3)
     h = zeros(T, 3)
 
-    for use_dual in (false,)# true)
+    for use_dual in (false, true)
         cones = Cone{T}[Cones.Power{T}(ones(T, 2) / 2, 1, use_dual = use_dual)]
 
         r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
@@ -855,7 +858,7 @@ function power2(T; options...)
     G = Matrix{T}(-I, 4, 4)
     h = zeros(T, 4)
 
-    for use_dual in (false,)# true)
+    for use_dual in (false, true)
         cones = Cone{T}[Cones.Power{T}(ones(T, 2) / 2, 2, use_dual = use_dual)]
 
         r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
@@ -876,7 +879,7 @@ function power3(T; options...)
     G = SparseMatrixCSC(-T(10) * I, l + 2, l + 2)
     h = zeros(T, l + 2)
 
-    for use_dual in (false,)# true)
+    for use_dual in (false, true)
         b = [one(T), zero(T)]
         cones = Cone{T}[Cones.Power{T}(fill(inv(T(l)), l), 2, use_dual = use_dual)]
 
@@ -897,7 +900,7 @@ function power4(T; options...)
     G = [zeros(T, 3, l); Matrix{T}(-I, l, l)]
     h = zeros(T, l + 3)
 
-    for use_dual in (false,)# true)
+    for use_dual in (false, true)
         cones = Cone{T}[Cones.Power{T}(fill(inv(T(l)), l), 3, use_dual = use_dual)]
 
         r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
@@ -912,7 +915,7 @@ function epinormspectral1(T; options...)
     tol = 1e-4
     Random.seed!(1)
     (Xn, Xm) = (3, 4)
-    for is_complex in (false,)# true)
+    for is_complex in (false, true)
         dim = Xn * Xm
         if is_complex
             dim *= 2
@@ -923,7 +926,7 @@ function epinormspectral1(T; options...)
         G = Matrix{T}(-I, dim + 1, dim + 1)
         h = vcat(zero(T), rand(T, dim))
 
-        for use_dual in (false,)# true)
+        for use_dual in (false, true)
             R = (is_complex ? Complex{T} : T)
             cones = Cone{T}[Cones.EpiNormSpectral{T, R}(Xn, Xm, use_dual = use_dual)]
 
@@ -952,7 +955,7 @@ function epinormspectral2(T; options...)
     tol = 1e-4
     Random.seed!(1)
     (Xn, Xm) = (3, 4)
-    for is_complex in (false,)# true)
+    for is_complex in (false, true)
         R = (is_complex ? Complex{T} : T)
         dim = Xn * Xm
         if is_complex
@@ -967,7 +970,7 @@ function epinormspectral2(T; options...)
         G = vcat(zeros(T, 1, dim), Matrix{T}(-I, dim, dim))
         h = vcat(one(T), zeros(T, dim))
 
-        for use_dual in (false,)# true)
+        for use_dual in (false, true)
             cones = Cone{T}[Cones.EpiNormSpectral{T, R}(Xn, Xm, use_dual = use_dual)]
             r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
             @test r.status == :Optimal
@@ -995,7 +998,7 @@ function epinormspectral3(T; options...)
         G = vcat(zeros(T, 1, dim), Matrix{T}(-I, dim, dim))
         h = zeros(T, dim + 1)
 
-        for use_dual in (false,)# true)
+        for use_dual in (false, true)
             R = (is_complex ? Complex{T} : T)
             cones = Cone{T}[Cones.EpiNormSpectral{T, R}(Xn, Xm, use_dual = use_dual)]
             r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
@@ -1020,7 +1023,7 @@ function epinormspectral4(T; options...)
     rt3 = sqrt(T(3))
     invrt2 = inv(rt2)
     invrt3 = inv(rt3)
-    for use_dual in (false,)# true)
+    for use_dual in (false, true)
         cones = Cone{T}[Cones.EpiNormSpectral{T, T}(2, 3, use_dual = use_dual)]
         r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
         @test r.status == :Optimal
@@ -1127,7 +1130,7 @@ function matrixepipersquare3(T; options...)
         U = Hermitian(U_half * U_half')
         @views Cones.smat_to_svec!(h[1:(per_idx - 1)], U.data, sqrt(T(2)))
 
-        for use_dual in (false,)# true)
+        for use_dual in (false, true)
             cones = Cone{T}[Cones.MatrixEpiPerSquare{T, R}(Xn, Xm, use_dual = use_dual)]
             r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
             @test r.status == :Optimal
@@ -1752,7 +1755,8 @@ function hyporootdettri4(T; options...)
 end
 
 function wsosinterpnonnegative1(T; options...)
-    tol = sqrt(sqrt(eps(T)))
+    # tol = sqrt(sqrt(eps(T)))
+    tol = 1e-4
     (U, pts, Ps) = ModelUtilities.interpolate(ModelUtilities.Box{T}(-ones(T, 2), ones(T, 2)), 2)
     DynamicPolynomials.@polyvar x y
     fn = x ^ 4 + x ^ 2 * y ^ 2 + 4 * y ^ 2 + 4
@@ -1771,7 +1775,8 @@ function wsosinterpnonnegative1(T; options...)
 end
 
 function wsosinterpnonnegative2(T; options...)
-    tol = sqrt(sqrt(eps(T)))
+    # tol = sqrt(sqrt(eps(T)))
+    tol = 1e-4
     (U, pts, Ps) = ModelUtilities.interpolate(ModelUtilities.Box{T}(zeros(T, 2), fill(T(3), 2)), 2)
     DynamicPolynomials.@polyvar x y
     fn = (x - 2) ^ 2 + (x * y - 3) ^ 2

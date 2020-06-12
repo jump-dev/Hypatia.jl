@@ -106,6 +106,16 @@ example_tests(::Type{DensityEstNative{Float64}}, ::ExpInstances) = begin
     ((400, 5, 6, true, true, false), options),
     ]
 end
+example_tests(::Type{DensityEstNative{Float64}}, ::WSOSGeomeanInstances) = begin
+    options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
+    return [
+    ((50, 2, 2, true, true, true), options),
+    ((20, 4, 3, true, true, true), options),
+    ((100, 8, 2, true, true, true), options),
+    # ((250, 4, 6, true, true, true), options),
+    # ((400, 5, 6, true, true, true), options),
+    ]
+end
 
 function build(inst::DensityEstNative{T}) where {T <: Real}
     X = inst.X

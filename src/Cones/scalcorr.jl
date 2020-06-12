@@ -6,12 +6,34 @@ use_scaling(cone::Cone) = false
 use_correction(cone::Cone) = false
 
 # scal_hess(cone::Cone{T}, mu::T) where {T} = (cone.scal_hess_updated ? cone.scal_hess : update_scal_hess(cone, mu))
-scal_hess(cone::Cone{T}, mu::T) where {T} = (cone.scal_hess_updated ? cone.hess : update_scal_hess(cone, mu))
+scal_hess(cone::Cone{T}, mu::T) where {T <: Real} = (cone.scal_hess_updated ? cone.hess : update_scal_hess(cone, mu))
 
-# use_update_1_default() = true
-use_update_1_default() = false
+use_update_1_default() = true
+# use_update_1_default() = false
 
 use_update_2_default() = false
+
+
+
+function inv_scal_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone, mu::Real)
+    @assert cone.scal_hess_updated
+    if !cone.hess_fact_updated
+        update_hess_fact(cone)
+    end
+    copyto!(prod, arr)
+    inv_prod(cone.hess_fact_cache, prod)
+    return prod
+end
+
+function inv_scal_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone, mu::Real)
+    @assert cone.scal_hess_updated
+    if !cone.hess_fact_updated
+        update_hess_fact(cone)
+    end
+    copyto!(prod, arr)
+    inv_sqrt_prod(cone.hess_fact_cache, prod)
+    return prod
+end
 
 
 

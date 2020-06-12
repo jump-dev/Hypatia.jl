@@ -48,7 +48,7 @@ mutable struct HypoGeomean{T <: Real} <: Cone{T}
         max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
-        @assert !use_dual # TODO delete later
+        # @assert !use_dual # TODO delete later
         dim = length(alpha) + 1
         @assert dim >= 2
         @assert all(ai > 0 for ai in alpha)
@@ -64,7 +64,7 @@ mutable struct HypoGeomean{T <: Real} <: Cone{T}
     end
 end
 
-reset_data(cone::HypoGeomean) = (cone.feas_updated = cone.grad_updated = cone.dual_grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = cone.scal_hess_updated = false)
+reset_data(cone::HypoGeomean) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = cone.scal_hess_updated = false)
 
 function setup_data(cone::HypoGeomean{T}) where {T <: Real}
     reset_data(cone)
@@ -292,7 +292,6 @@ function correction(
 
     return cone.correction
 end
-
 
 # see analysis in https://github.com/lkapelevich/HypatiaBenchmarks.jl/tree/master/centralpoints
 function get_central_ray_hypogeomean(alpha::Vector{<:Real})
