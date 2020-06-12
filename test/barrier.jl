@@ -56,21 +56,25 @@ function test_barrier_oracles(
     test_grad_hess(cone, point, dual_point, tol = tol)
 
     # check gradient and Hessian agree with ForwardDiff
-    if dim < 10 # too slow if dimension is large
+    if dim < 15 # too slow if dimension is large
+        println("starting ForwardDiff tests: $dim")
         CO.reset_data(cone)
         @test CO.is_feas(cone)
         grad = CO.grad(cone)
+        println("start grad")
         fd_grad = ForwardDiff.gradient(barrier, point)
         @test grad ≈ fd_grad atol=tol rtol=tol
-
+        println("done grad")
         hess = CO.hess(cone)
         fd_hess = ForwardDiff.hessian(barrier, point)
         @test hess ≈ fd_hess atol=tol rtol=tol
+        println("done hess")
     end
 
     # check 3rd order corrector agrees with ForwardDiff
     # too slow if cone is too large or not using BlasReals
     if CO.use_correction(cone)
+        println("starting correction tests: $dim")
         if cone isa CO.HypoPerLog{T} && dim > 3
             return # TODO fix corrector for larger dim
         end
@@ -78,9 +82,12 @@ function test_barrier_oracles(
         (primal_dir, dual_dir) = perturb_scale(zeros(T, dim), zeros(T, dim), noise, one(T))
         Hinv_z = CO.inv_hess_prod!(similar(dual_dir), dual_dir, cone)
         corr = CO.correction(cone, primal_dir, dual_dir)
+        @show corr
         # TODO increase dim limit, not sure why so slow
-        if dim < 5 && T in (Float32, Float64)
+        if dim < 6 && T in (Float32, Float64)
+            println("starting fd 3o")
             FD_3deriv = ForwardDiff.jacobian(x -> ForwardDiff.hessian(barrier, x), point)
+            println("done fd 3o")
             # check log-homog property that F'''(point)[point] = -2F''(point)
             @test reshape(FD_3deriv * point, dim, dim) ≈ -2 * fd_hess
             FD_corr = reshape(FD_3deriv * primal_dir, dim, dim) * Hinv_z / -2
@@ -224,7 +231,7 @@ function test_hypoperlog_barrier(T::Type{<:Real})
 end
 
 function test_episumperentropy_barrier(T::Type{<:Real})
-    for w_dim in [3, 4, 6]
+    for w_dim in [1, 2, 3, 6]
         dim = 1 + 2 * w_dim
         function barrier(s)
             (u, v, w) = (s[1], s[2:2:(dim - 1)], s[3:2:dim])
@@ -282,7 +289,7 @@ function test_hypogeomean_barrier(T::Type{<:Real})
 end
 
 function test_epinormspectral_barrier(T::Type{<:Real})
-    for (n, m) in [(1, 1), (1, 2), (2, 2), (2, 4), (3, 4)]
+    for (n, m) in [(1, 1), (1, 2), (1, 3), (2, 2), (2, 4), (3, 4)]
         # real epinormspectral barrier
         function R_barrier(s)
             (u, W) = (s[1], reshape(s[2:end], n, m))
@@ -330,7 +337,7 @@ end
 function test_linmatrixineq_barrier(T::Type{<:Real})
     Random.seed!(1)
     # Rs_list = [[T, T], [Complex{T}, Complex{T}], [T, Complex{T}, T], [Complex{T}, T, T]]
-    Rs_list = [[T, T]]
+    Rs_list = [[T, T], [T, T, T]]
     for side in [2, 3, 5], Rs in Rs_list
         As = Vector{LinearAlgebra.HermOrSym{R, Matrix{R}} where {R <: Hypatia.RealOrComplex{T}}}(undef, length(Rs))
         A_1_half = rand(Rs[1], side, side)

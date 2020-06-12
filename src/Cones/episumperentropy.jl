@@ -34,7 +34,7 @@ mutable struct EpiSumPerEntropy{T <: Real} <: Cone{T}
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     old_hess
-    inv_hess::Symmetric{T, SparseMatrixCSC{T, Int}}
+    inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
     nbhd_tmp::Vector{T}
     nbhd_tmp2::Vector{T}
@@ -52,7 +52,6 @@ mutable struct EpiSumPerEntropy{T <: Real} <: Cone{T}
     denom::Vector{T} # denominator for all parts but the first of the inverse Hessian
 
     correction::Vector{T}
-    barrier::Function
 
     function EpiSumPerEntropy{T}(
         dim::Int;
@@ -72,17 +71,13 @@ mutable struct EpiSumPerEntropy{T <: Real} <: Cone{T}
         cone.v_idxs = 2:2:(dim - 1)
         cone.w_idxs = 3:2:dim
         cone.hess_fact_cache = hess_fact_cache
-        function barrier(s)
-            (u, v, w) = (s[1], cone.v_idxs, cone.w_idxs)
-            return -log(u - sum(wi * log(wi / vi) for (vi, wi) in zip(v, w))) - sum(log(vi) + log(wi) for (vi, wi) in zip(v, w))
-        end
-        cone.barrier = barrier
         return cone
     end
 end
 
-reset_data(cone::EpiSumPerEntropy) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated =
-    cone.hess_fact_updated = cone.scal_hess_updated = cone.hess_inv_hess_updated = false)
+reset_data(cone::EpiSumPerEntropy) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = cone.scal_hess_updated = cone.hess_inv_hess_updated = false)
+
+# reset_data(cone::EpiSumPerEntropy) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = cone.scal_hess_updated = false)
 
 # TODO only allocate the fields we use
 function setup_data(cone::EpiSumPerEntropy{T}) where {T <: Real}
@@ -93,6 +88,7 @@ function setup_data(cone::EpiSumPerEntropy{T}) where {T <: Real}
     cone.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
+    cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.old_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
     cone.nbhd_tmp = zeros(T, dim)
@@ -243,35 +239,35 @@ function update_hess(cone::EpiSumPerEntropy)
     return cone.hess
 end
 
-# auxiliary calculations for inverse Hessian and inverse Hessian prod
-function inv_hess_vals(cone)
-    cone.hess_inv_hess_updated || update_hess_inv_hess(cone)
-    u = cone.point[1]
-    v_idxs = cone.v_idxs
-    w_idxs = cone.w_idxs
-    point = cone.point
-    @views v = point[v_idxs]
-    @views w = point[w_idxs]
-    z = cone.z
-    Hu = cone.Hu
-    logprod = u - z # TODO cache in feas check?
-    @. cone.denom = z + 2 * w
-
-    for (i, v_idx, w_idx) in zip(1:cone.w_dim, v_idxs, w_idxs)
-        temp1 = logprod - w[i] * log(w[i] / v[i]) # TODO cache in feas check?
-        temp2 = log(w[i] / v[i])# TODO cache in feas check?
-        Hu[v_idx - 1] = -(u - temp1 - 2 * w[i] * temp2) * w[i] * v[i] / cone.denom[i]
-        Hu[w_idx - 1] = abs2(w[i]) * (temp2 * z + u - temp1) / cone.denom[i]
-    end
-    @views cone.Huu = abs2(z) * (1 - dot(Hu, cone.old_hess[1, 2:cone.dim]))
-    @. cone.Hvw = v * abs2(w)
-    @. cone.Hvv = z + w
-    @. cone.Hww = cone.Hvv * abs2(w)
-    @. cone.Hvv *= abs2(v)
-
-    return
-end
-
+# # auxiliary calculations for inverse Hessian and inverse Hessian prod
+# function inv_hess_vals(cone)
+#     cone.hess_inv_hess_updated || update_hess_inv_hess(cone)
+#     u = cone.point[1]
+#     v_idxs = cone.v_idxs
+#     w_idxs = cone.w_idxs
+#     point = cone.point
+#     @views v = point[v_idxs]
+#     @views w = point[w_idxs]
+#     z = cone.z
+#     Hu = cone.Hu
+#     logprod = u - z # TODO cache in feas check?
+#     @. cone.denom = z + 2 * w
+#
+#     for (i, v_idx, w_idx) in zip(1:cone.w_dim, v_idxs, w_idxs)
+#         temp1 = logprod - w[i] * log(w[i] / v[i]) # TODO cache in feas check?
+#         temp2 = log(w[i] / v[i])# TODO cache in feas check?
+#         Hu[v_idx - 1] = -(u - temp1 - 2 * w[i] * temp2) * w[i] * v[i] / cone.denom[i]
+#         Hu[w_idx - 1] = abs2(w[i]) * (temp2 * z + u - temp1) / cone.denom[i]
+#     end
+#     @views cone.Huu = abs2(z) * (1 - dot(Hu, cone.old_hess[1, 2:cone.dim]))
+#     @. cone.Hvw = v * abs2(w)
+#     @. cone.Hvv = z + w
+#     @. cone.Hww = cone.Hvv * abs2(w)
+#     @. cone.Hvv *= abs2(v)
+#
+#     return
+# end
+#
 # function update_inv_hess(cone::EpiSumPerEntropy{T}) where {T}
 #     inv_hess_vals(cone)
 #     dim = cone.dim
@@ -461,7 +457,10 @@ function correction(
     # FD_3deriv = ForwardDiff.jacobian(x -> ForwardDiff.hessian(barrier, x), cone.point)
     # @show norm(third_order - FD_3deriv)
     Hi_z = cone.old_hess \ dual_dir
-    Hi_z .*= -0.5
+    # Hi_z = similar(dual_dir)
+    # inv_hess_prod!(Hi_z, dual_dir, cone)
+
+    Hi_z .*= -T(0.5)
     cone.correction .= reshape(third_order * primal_dir, cone.dim, cone.dim) * Hi_z
 
     return cone.correction

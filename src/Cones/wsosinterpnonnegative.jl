@@ -54,7 +54,7 @@ mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T
         max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {R <: RealOrComplex{T}} where {T <: Real}
-        @assert !use_dual # TODO delete later
+        # @assert use_dual # TODO delete later
         for Pk in Ps
             @assert size(Pk, 1) == U
         end
@@ -99,7 +99,7 @@ get_nu(cone::WSOSInterpNonnegative) = sum(size(Pk, 2) for Pk in cone.Ps)
 
 use_correction(cone::WSOSInterpNonnegative) = true
 
-use_scaling(cone::WSOSInterpNonnegative) = false
+use_scaling(cone::WSOSInterpNonnegative) = true
 
 rescale_point(cone::WSOSInterpNonnegative{T}, s::T) where {T} = (cone.point .*= s)
 
@@ -134,10 +134,11 @@ function update_feas(cone::WSOSInterpNonnegative)
     return cone.is_feas
 end
 
-function update_dual_feas(cone::WSOSInterpNonnegative, mu)
-    gap = cone.dual_point + mu * cone.grad
-    return dot(gap, cone.old_hess \ gap)
-end
+update_dual_feas(cone::WSOSInterpNonnegative) = true # TODO use a dikin ellipsoid condition?
+# function update_dual_feas(cone::WSOSInterpNonnegative, mu)
+#     gap = cone.dual_point + mu * cone.grad
+#     return dot(gap, cone.old_hess \ gap)
+# end
 
 # TODO decide whether to compute the LUk' * LUk in grad or in hess (only diag needed for grad)
 # TODO can be done in parallel
@@ -176,10 +177,11 @@ function update_hess(cone::WSOSInterpNonnegative)
 end
 
 function correction(cone::WSOSInterpNonnegative, primal_dir::AbstractVector, dual_dir::AbstractVector)
-    Hinv_z = cone.old_hess \ dual_dir
+    Hi_z = similar(dual_dir)
+    inv_hess_prod!(Hi_z, dual_dir, cone)
     corr = cone.correction
     @inbounds for k in eachindex(corr)
-        corr[k] = sum(sum(UUk[i, j] * UUk[i, k] * UUk[j, k] for UUk in cone.tmpUU) * primal_dir[i] * Hinv_z[j] for i in eachindex(corr), j in eachindex(corr))
+        corr[k] = sum(sum(UUk[i, j] * UUk[i, k] * UUk[j, k] for UUk in cone.tmpUU) * primal_dir[i] * Hi_z[j] for i in eachindex(corr), j in eachindex(corr))
     end
     return corr
 end

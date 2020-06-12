@@ -260,6 +260,8 @@ function solve(solver::Solver{T}) where {T <: Real}
         # end
     end
 
+    @show solver.num_iters
+
     # calculate result and iteration statistics and finish
     point.x ./= solver.tau
     point.y ./= solver.tau
@@ -379,7 +381,7 @@ function check_convergence(solver::Solver{T}) where {T <: Real}
             return true
         else
             solver.prev_is_slow = true
-            solver.verbose && println("worst residual did not improve significantly")
+            # solver.verbose && println("worst residual did not improve significantly")
         end
     else
         solver.prev_is_slow = false
